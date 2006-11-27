@@ -1,6 +1,6 @@
 # Should work for both GNU make and BSD mke
 
-VERSION = 3.0.0_alpha3
+VERSION = 3.0.0
 
 CFLAGS ?= -Wall -O2 -pedantic -std=gnu99
 
@@ -40,6 +40,6 @@ dist:
 	$(INSTALL) -m 0755 -d /tmp/dhcpcd-$(VERSION)
 	cp -RPp . /tmp/dhcpcd-$(VERSION)
 	$(MAKE) -C /tmp/dhcpcd-$(VERSION) clean
-	rm -f /tmp/dhcpcd-$(VERSION)/*.bz2
+	rm -rf /tmp/dhcpcd-$(VERSION)/*.bz2 /tmp/dhcpcd-$(VERSION)/.svn
 	tar cvjpf dhcpcd-$(VERSION).tar.bz2 -C /tmp dhcpcd-$(VERSION)
 	rm -rf /tmp/dhcpcd-$(VERSION)
