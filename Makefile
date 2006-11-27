@@ -2,7 +2,6 @@
 
 VERSION = 3.0.0
 
-CC ?= gcc
 INSTALL ?= install
 CFLAGS ?= -Wall -O2 -pedantic -std=gnu99
 
