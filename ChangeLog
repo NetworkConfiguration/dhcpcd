@@ -1,0 +1,21 @@
+dhcpcd-3.0.0
+A complete rewrite by Roy Marples <uberlord@gentoo.org>
+
+Functional changes since version 2:
+We now support FreeBSD as well as Linux.
+RFC 3004 User Class support has been added.
+RFC 3442 Classless Static Routes support has been added
+(thanks to apexman for helping).
+Options -r, -e, -v, -w, -B, -C, -D, -L, -S have been dropped.
+-a now means "do arp" instead of "don't arp".
+-o has been dropped, but we never bring down the interface anymore.
+IP address is now required for the -s option.
+-G no longer takes an IP address as an replacement gateway.
+The .cache file is no longer created or used.
+Default script is now /etc/dhcpcd.sh instead of /etc/dhcpc/dhcpcd.exe.
+The .info file has changed slightly to better support mulitple entries with
+more than one entity, such as route now having network,genmask and gateway.
+We no longer create and restore .sv files as it's up to the interface
+manager to restore them correctly as >1 dhcp client may be running.
+
+For ChangeLog for prior versions can be found in their tarballs.
