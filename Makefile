@@ -2,11 +2,13 @@
 
 VERSION = 3.0.0
 
+CC ?= gcc
+INSTALL ?= install
 CFLAGS ?= -Wall -O2 -pedantic -std=gnu99
 
 DESTDIR =
 SBINDIR = $(DESTDIR)/sbin
-MANDIR = $(DESDIR)/usr/share/man
+MANDIR = $(DESTDIR)/usr/share/man
 
 SBIN_TARGETS = dhcpcd
 MAN8_TARGETS = dhcpcd.8
