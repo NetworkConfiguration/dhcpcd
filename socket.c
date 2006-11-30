@@ -94,11 +94,11 @@ void make_dhcp_packet(struct udp_dhcp_packet *packet,
   memcpy (&packet->dhcp, data, sizeof (dhcpmessage_t));
 
   ip->ip_p = IPPROTO_UDP;
-  ip->ip_src.s_addr = htonl (source.s_addr);
+  ip->ip_src.s_addr = source.s_addr;
   if (dest.s_addr == 0)
-    ip->ip_dst.s_addr = htonl (INADDR_BROADCAST);
+    ip->ip_dst.s_addr = INADDR_BROADCAST;
   else
-    ip->ip_dst.s_addr = htonl (dest.s_addr);
+    ip->ip_dst.s_addr = dest.s_addr;
 
   udp->uh_sport = htons (DHCP_CLIENT_PORT);
   udp->uh_dport = htons (DHCP_SERVER_PORT);

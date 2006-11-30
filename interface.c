@@ -51,10 +51,6 @@
 #include "logger.h"
 #include "pathnames.h"
 
-#ifndef IFF_NOTRAILERS
-#define	IFF_NOTRAILERS 0
-#endif
-
 void free_address (address_t *addresses)
 {
   if (!addresses)
@@ -99,7 +95,6 @@ interface_t *read_interface (const char *ifname, int metric)
 
   struct ifaddrs *ifap;
   struct ifaddrs *p;
-  unsigned int flags;
 
   if (getifaddrs (&ifap) != 0)
     return NULL;
@@ -122,7 +117,6 @@ interface_t *read_interface (const char *ifname, int metric)
 	  return NULL;
 	}
 
-      flags = p->ifa_flags;
 #ifdef __linux__
       memcpy (hwaddr, sll->sll_addr, ETHER_ADDR_LEN);
 #else
@@ -146,21 +140,6 @@ interface_t *read_interface (const char *ifname, int metric)
       return NULL;
     }
 
-  if (ioctl(s, SIOCGIFFLAGS, &ifr) < 0)
-    {
-      logger (LOG_ERR, "ioctl SIOCGIFFLAGS: %s", strerror (errno));
-      close (s);
-      return NULL;
-    }
-
-  ifr.ifr_flags |= IFF_UP | IFF_BROADCAST | IFF_NOTRAILERS | IFF_RUNNING;
-  if (ioctl(s, SIOCSIFFLAGS, &ifr) < 0)
-    {
-      logger (LOG_ERR, "ioctl SIOCSIFFLAGS: %s", strerror (errno));
-      close (s);
-      return NULL;
-    }
-
 #ifndef __linux__
   ifr.ifr_metric = metric;
   if (ioctl(s, SIOCSIFMETRIC, &ifr) < 0)
@@ -170,6 +149,25 @@ interface_t *read_interface (const char *ifname, int metric)
       return NULL;
     }
 #endif
+
+  if (ioctl(s, SIOCGIFFLAGS, &ifr) < 0)
+    {
+      logger (LOG_ERR, "ioctl SIOCGIFFLAGS: %s", strerror (errno));
+      close (s);
+      return NULL;
+    }
+
+  /* Bring the interface up if we need to */
+  if (! (ifr.ifr_flags & IFF_UP))
+    {
+      ifr.ifr_flags |= IFF_UP | IFF_RUNNING;
+      if (ioctl(s, SIOCSIFFLAGS, &ifr) < 0)
+	{
+	  logger (LOG_ERR, "ioctl SIOCSIFFLAGS: %s", strerror (errno));
+	  close (s);
+	  return NULL;
+	}
+    }
 
   close (s);
 

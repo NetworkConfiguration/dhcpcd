@@ -128,9 +128,9 @@ typedef struct dhcp_t
   struct in_addr broadcast;
   unsigned short mtu;
 
-  unsigned leasetime;
-  unsigned renewaltime;
-  unsigned rebindtime;
+  unsigned int leasetime;
+  unsigned int renewaltime;
+  unsigned int rebindtime;
   
   route_t *routes;
 

@@ -56,7 +56,7 @@
   _int = (int) _number; \
 }
 
-static pid_t readpid(char *pidfile)
+static pid_t read_pid(const char *pidfile)
 {
   FILE *fp;
   pid_t pid;
@@ -73,18 +73,18 @@ static pid_t readpid(char *pidfile)
   return pid;
 }
 
-static int kill_pid (char *pidfile, int sig)
+void make_pid (const char *pidfile)
 {
-  pid_t pid = readpid (pidfile);
-  int r = 0;
+  FILE *fp;
 
-  if (!pid || (r = kill (pid, sig)))
+  if ((fp = fopen (pidfile, "w")) == NULL)
     {
-      logger (LOG_ERR, ""PACKAGE" not running");
-      unlink (pidfile);
+      logger (LOG_ERR, "fopen `%s': %s", pidfile, strerror (errno));
+      return;
     }
 
-  return r;
+  fprintf (fp, "%u\n", getpid ());
+  fclose (fp);
 }
 
 static void usage ()
@@ -330,20 +330,31 @@ int main(int argc, char **argv)
 	    options.interface);
 
   if (options.signal != 0)
-    exit (kill_pid (options.pidfile, options.signal));
+    {
+      pid_t pid = read_pid (options.pidfile);
+      if (pid != 0)
+        logger (LOG_INFO, "sending signal %d to pid %d", options.signal, pid);
+     
+      int killed = -1;
+      if (! pid || (killed = kill (pid, options.signal)))
+	logger (options.signal == SIGALRM ? LOG_INFO : LOG_ERR, ""PACKAGE" not running");
+
+      if (pid != 0 && (options.signal != SIGALRM || killed != 0))
+	unlink (options.pidfile);
+
+      if (killed == 0)
+	exit (EXIT_SUCCESS);
+
+      if (options.signal != SIGALRM)
+	exit (EXIT_FAILURE);
+    }
 
   umask (022);
-
-  if (readpid (options.pidfile))
-    {
-      logger (LOG_ERR, ""PACKAGE" already running (%s)", options.pidfile);
-      exit (EXIT_FAILURE);
-    }
 
   if (mkdir (CONFIGDIR, S_IRUSR |S_IWUSR |S_IXUSR | S_IRGRP | S_IXGRP
 	     | S_IROTH | S_IXOTH) && errno != EEXIST )
     {
-      logger( LOG_ERR, "mkdir(\"%s\",0): %m\n", CONFIGDIR);
+      logger (LOG_ERR, "mkdir(\"%s\",0): %m\n", CONFIGDIR);
       exit (EXIT_FAILURE);
     }
 
@@ -353,6 +364,14 @@ int main(int argc, char **argv)
       logger (LOG_ERR, "mkdir(\"%s\",0): %m\n", ETCDIR);
       exit (EXIT_FAILURE);
     }
+
+  if (read_pid (options.pidfile))
+    {
+      logger (LOG_ERR, ""PACKAGE" already running (%s)", options.pidfile);
+      exit (EXIT_FAILURE);
+    }
+
+  make_pid (options.pidfile);
 
   logger (LOG_INFO, PACKAGE " " VERSION " starting");
   if (dhcp_run (&options))

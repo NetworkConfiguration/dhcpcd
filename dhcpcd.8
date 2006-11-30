@@ -1,6 +1,6 @@
 .\" $Id$
 .\"
-.TH dhcpcd 8 "15 August 2006" "dhcpcd 3.0"
+.TH dhcpcd 8 "30 November 2006" "dhcpcd 3.0"
 
 .SH NAME
 dhcpcd \- DHCP client daemon
@@ -144,9 +144,11 @@ is stopped it can no longer down an interface at the end of its
 lease period when the lease is not renewed.
 .TP
 .BI \-s \ ipaddr
-Sends DHCP_DISCOVER message to DHCP server requesting to lease ip address
-ipaddr.
+Sends DHCP_REQUEST message requesting to lease IP address ipaddr.
 The ipaddr parameter must be in the form xxx.xxx.xxx.xxx.
+This effectively doubles the timeout period, as if we fail to get
+this IP address then we enter the INIT state and try to get any
+IP address.
 .TP
 .BI \-t \ timeout
 Specifies (in seconds ) for how long

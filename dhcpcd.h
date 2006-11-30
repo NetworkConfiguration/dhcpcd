@@ -64,4 +64,6 @@ typedef struct options_t {
   char pidfile[PATH_MAX];
 } options_t;
 
+void make_pid (const char *pidfile);
+
 #endif

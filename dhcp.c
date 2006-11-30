@@ -36,6 +36,8 @@
 #include "logger.h"
 #include "socket.h"
 
+#define BROADCAST_FLAG 0x8000
+
 static char *dhcp_message[] = {
   [DHCP_DISCOVER] 	= "DHCP_DISCOVER",
   [DHCP_OFFER]		= "DHCP_OFFER",
@@ -55,9 +57,23 @@ size_t send_message (interface_t *iface, dhcp_t *dhcp,
   unsigned char *p = (unsigned char *) &message.options;
   unsigned char *n_params = NULL;
   unsigned long l;
+  struct in_addr from;
+  struct in_addr to;
 
   if (!iface || !options || !dhcp)
     return -1;
+
+  if (type == DHCP_RELEASE || type == DHCP_INFORM ||
+      (type == DHCP_REQUEST &&
+       iface->previous_address.s_addr == dhcp->address.s_addr))
+    from.s_addr = dhcp->address.s_addr;
+  else
+    from.s_addr = 0;
+
+  if (type == DHCP_RELEASE)
+    to.s_addr = dhcp->serveraddress.s_addr;
+  else
+    to.s_addr = 0;
 
   memset (&message, 0, sizeof (dhcpmessage_t));
 
@@ -67,11 +83,22 @@ size_t send_message (interface_t *iface, dhcp_t *dhcp,
   message.secs = htons (10);
   message.xid = xid;
   memcpy (&message.hwaddr, &iface->ethernet_address, ETHER_ADDR_LEN);
-  message.cookie = htonl(MAGIC_COOKIE);
+  message.cookie = htonl (MAGIC_COOKIE);
 
-  if (iface->previous_address.s_addr != 0 &&
-      iface->previous_address.s_addr == dhcp->address.s_addr)
-    message.ciaddr = iface->previous_address.s_addr; 
+  /* This logic should be improved so that we don't need to set the 0
+     flag as it's done in the above memset statement */
+  if (type == DHCP_REQUEST
+      && dhcp->address.s_addr == iface->previous_address.s_addr
+      && iface->previous_address.s_addr != 0)
+    message.flags = 0;
+  else
+    message.flags = htons (BROADCAST_FLAG);
+
+  if (iface->previous_address.s_addr != 0
+      && (type == DHCP_INFORM || type == DHCP_RELEASE
+	  || (type == DHCP_REQUEST
+	      && iface->previous_address.s_addr == dhcp->address.s_addr)))
+    message.ciaddr = iface->previous_address.s_addr;
 
   *p++ = DHCP_MESSAGETYPE; 
   *p++ = 1;
@@ -86,72 +113,73 @@ size_t send_message (interface_t *iface, dhcp_t *dhcp,
       p += 2;
     }
 
-  if (dhcp->address.s_addr != 0 && iface->previous_address.s_addr == 0)
-    {
-      *p++ = DHCP_ADDRESS;
-      *p++ = 4;
-      memcpy (p, &dhcp->address.s_addr, 4);
-      p += 4;
+#define PUTADDR(_type, _val) \
+    { \
+      *p++ = _type; \
+      *p++ = 4; \
+      memcpy (p, &_val.s_addr, 4); \
+      p += 4; \
     }
+  if (dhcp->address.s_addr != 0 && iface->previous_address.s_addr == 0
+      && type != DHCP_RELEASE)
+    PUTADDR (DHCP_ADDRESS, dhcp->address);
 
   if (dhcp->serveraddress.s_addr != 0 && dhcp->address.s_addr !=0 &&
-      iface->previous_address.s_addr == 0)
-    {
-      *p++ = DHCP_SERVERIDENTIFIER;
-      *p++ = 4;
-      memcpy (p, &dhcp->serveraddress.s_addr, 4);
-      p += 4;
-
-      /* Blank out the server address so we broadcast */
-      if (type == DHCP_REQUEST) dhcp->serveraddress.s_addr = 0;
-    }
+      (iface->previous_address.s_addr == 0 || type == DHCP_RELEASE))
+    PUTADDR (DHCP_SERVERIDENTIFIER, dhcp->serveraddress);
+#undef PUTADDR
 
   if (type == DHCP_REQUEST || type == DHCP_DISCOVER)
     {
-      if (dhcp->leasetime > 0)
+      if (options->leasetime != 0)
 	{
 	  *p++ = DHCP_LEASETIME;
 	  *p++ = 4;
-	  uint32_t ul = htonl (dhcp->leasetime);
+	  uint32_t ul = htonl (options->leasetime);
 	  memcpy (p, &ul, 4);
 	  p += 4;
 	}
     }
 
-  *p++ = DHCP_PARAMETERREQUESTLIST;
-  n_params = p;
-  *p++ = 0;
-
-  if (type == DHCP_REQUEST)
+  if (type == DHCP_DISCOVER || type == DHCP_INFORM || type == DHCP_REQUEST)
     {
-      *p++ = DHCP_RENEWALTIME;
-      *p++ = DHCP_REBINDTIME;
-      *p++ = DHCP_NETMASK;
-      *p++ = DHCP_BROADCAST;
-      *p++ = DHCP_CSR;
-      /* RFC 3442 states classless static routes should be before routers
-       * and static routes as classless static routes override them both */
-      *p++ = DHCP_ROUTERS;
-      *p++ = DHCP_STATICROUTE;
-      *p++ = DHCP_HOSTNAME;
-      *p++ = DHCP_DNSSEARCH;
-      *p++ = DHCP_DNSDOMAIN;
-      *p++ = DHCP_DNSSERVER;
-      *p++ = DHCP_NISDOMAIN;
-      *p++ = DHCP_NISSERVER;
-      *p++ = DHCP_NTPSERVER;
-      /* These parameters were requested by dhcpcd-2.0 and earlier
-	 but we never did anything with them */
-      /*    *p++ = DHCP_DEFAULTIPTTL;
-       *p++ = DHCP_MASKDISCOVERY;
-       *p++ = DHCP_ROUTERDISCOVERY; */
-    }
-  else
-    /* Always request one parameter so we don't get the server default
-       when we don't actally need any at this time */
-    *p++ = DHCP_DNSSERVER;
+      *p++ = DHCP_PARAMETERREQUESTLIST;
+      n_params = p;
+      *p++ = 0;
 
-  *n_params = p - n_params - 1;
+      /* If we don't request one item, then we get defaults back which
+	 we don't want */
+      if (type == DHCP_DISCOVER)
+	{
+	  *p++ = DHCP_DNSSERVER;
+	}
+      else
+	{
+	  *p++ = DHCP_RENEWALTIME;
+	  *p++ = DHCP_REBINDTIME;
+	  *p++ = DHCP_NETMASK;
+	  *p++ = DHCP_BROADCAST;
+	  *p++ = DHCP_CSR;
+	  /* RFC 3442 states classless static routes should be before routers
+	   * and static routes as classless static routes override them both */
+	  *p++ = DHCP_ROUTERS;
+	  *p++ = DHCP_STATICROUTE;
+	  *p++ = DHCP_HOSTNAME;
+	  *p++ = DHCP_DNSSEARCH;
+	  *p++ = DHCP_DNSDOMAIN;
+	  *p++ = DHCP_DNSSERVER;
+	  *p++ = DHCP_NISDOMAIN;
+	  *p++ = DHCP_NISSERVER;
+	  *p++ = DHCP_NTPSERVER;
+	  /* These parameters were requested by dhcpcd-2.0 and earlier
+	     but we never did anything with them */
+	  /*    *p++ = DHCP_DEFAULTIPTTL;
+	   *p++ = DHCP_MASKDISCOVERY;
+	   *p++ = DHCP_ROUTERDISCOVERY; */
+	}
+
+      *n_params = p - n_params - 1;
+    }
 
   if (type == DHCP_REQUEST)
     {
@@ -184,18 +212,21 @@ size_t send_message (interface_t *iface, dhcp_t *dhcp,
 	}
     }
 
-  if (options->userclass)
+  if (type != DHCP_DECLINE && type != DHCP_RELEASE)
     {
-      *p++ = DHCP_USERCLASS;
-      *p++ = l = strlen (options->userclass);
-      memcpy (p, options->userclass, l);
+      if (options->userclass)
+	{
+	  *p++ = DHCP_USERCLASS;
+	  *p++ = l = strlen (options->userclass);
+	  memcpy (p, options->userclass, l);
+	  p += l;
+	}
+      
+      *p++ = DHCP_CLASSID;
+      *p++ = l = strlen (options->classid);
+      memcpy (p, options->classid, l);
       p += l;
     }
-
-  *p++ = DHCP_CLASSID;
-  *p++ = l = strlen (options->classid);
-  memcpy (p, options->classid, l);
-  p += l;
 
   *p++ = DHCP_CLIENTID;
   if (options->clientid[0])
@@ -218,8 +249,7 @@ size_t send_message (interface_t *iface, dhcp_t *dhcp,
 
   struct udp_dhcp_packet packet;
   memset (&packet, 0, sizeof (struct udp_dhcp_packet));
-  make_dhcp_packet (&packet, (unsigned char *) &message,
-		    dhcp->address, dhcp->serveraddress);
+  make_dhcp_packet (&packet, (unsigned char *) &message, from, to);
 
   logger (LOG_DEBUG, "Sending %s with xid %d", dhcp_message[(int) type], xid);
   return send_packet (iface, ETHERTYPE_IP, (unsigned char *) &packet,
@@ -330,7 +360,7 @@ static route_t *decodeCSR(unsigned char *p, int len)
     {
       memset (route, 0, sizeof (route_t));
 
-      cidr = (int) *q++;
+      cidr = *q++;
       if (cidr == 0)
 	ocets = 0;
       else if (cidr < 9)
@@ -475,94 +505,77 @@ int parse_dhcpmessage (dhcp_t *dhcp, dhcpmessage_t *message)
 	case DHCP_MESSAGETYPE:
 	  retval = (int) *p;
 	  break;
-
+#define GET_UINT32(_val) \
+	  memcpy (&_val, p, sizeof (uint32_t));
+#define GET_UINT32_H(_val) \
+	  GET_UINT32 (_val); \
+	  _val = ntohl (_val);
 	case DHCP_ADDRESS:
-	  memcpy (&dhcp->address.s_addr, p, 4);
+	  GET_UINT32 (dhcp->address.s_addr);
 	  break;
 	case DHCP_NETMASK:
-	  memcpy (&dhcp->netmask.s_addr, p, 4);
+	  GET_UINT32 (dhcp->netmask.s_addr);
 	  break;
 	case DHCP_BROADCAST:
-	  memcpy (&dhcp->broadcast.s_addr, p, 4);
+	  GET_UINT32 (dhcp->broadcast.s_addr);
 	  break;
 	case DHCP_SERVERIDENTIFIER:
-	  memcpy (&dhcp->serveraddress.s_addr, p, 4);
+	  GET_UINT32 (dhcp->serveraddress.s_addr);
 	  break;
-
 	case DHCP_LEASETIME:
-	  dhcp->leasetime = ntohl (* (uint32_t *) p);
+	  GET_UINT32_H (dhcp->leasetime);
 	  break;
 	case DHCP_RENEWALTIME:
-	  dhcp->renewaltime = ntohl (* (uint32_t *) p);
+	  GET_UINT32_H (dhcp->renewaltime);
 	  break;
 	case DHCP_REBINDTIME:
-	  dhcp->rebindtime = ntohl (* (uint32_t *) p);
+	  GET_UINT32_H (dhcp->rebindtime);
 	  break;
 	case DHCP_MTU:
-	  dhcp->mtu = ntohs (* (uint16_t *) p);
+	  GET_UINT32_H (dhcp->mtu);
 	  /* Minimum legal mtu is 68 */
 	  if (dhcp->mtu > 0 && dhcp->mtu < 68)
 	    dhcp->mtu = 68;
 	  break;
+#undef GET_UINT32_H
+#undef GET_UINT32
 
+#define GETSTR(_var) \
+	  if (_var) free (_var); \
+	  _var = xmalloc (length + 1); \
+	  memcpy (_var, p, length); \
+	  memset (_var + length, 0, 1);
 	case DHCP_HOSTNAME:
-	  if (dhcp->hostname)
-	    free (dhcp->hostname);
-	  dhcp->hostname = xmalloc (length + 1);
-	  memcpy (dhcp->hostname, p, length);
-	  dhcp->hostname[length] = '\0';
+	  GETSTR (dhcp->hostname);
 	  break;
-
 	case DHCP_DNSDOMAIN:
-	  if (dhcp->dnsdomain)
-	    free (dhcp->dnsdomain);
-	  dhcp->dnsdomain = xmalloc (length + 1);
-	  memcpy (dhcp->dnsdomain, p, length);
-	  dhcp->dnsdomain[length] = '\0';
+	  GETSTR (dhcp->dnsdomain);
 	  break;
-
 	case DHCP_MESSAGE:
-	  if (dhcp->message)
-	    free (dhcp->message);
-	  dhcp->message = xmalloc (length + 1);
-	  memcpy (dhcp->message, p, length);
-	  dhcp->message[length] = '\0';
+	  GETSTR (dhcp->message);
 	  break;
-
 	case DHCP_ROOTPATH:
-	  if (dhcp->rootpath)
-	    free (dhcp->rootpath);
-	  dhcp->rootpath = xmalloc (length + 1);
-	  memcpy (dhcp->rootpath, p, length);
-	  dhcp->rootpath[length] = '\0';
+	  GETSTR (dhcp->rootpath);
 	  break;
-
 	case DHCP_NISDOMAIN:
-	  if (dhcp->nisdomain)
-	    free (dhcp->nisdomain);
-	  dhcp->nisdomain = xmalloc (length + 1);
-	  memcpy (dhcp->nisdomain, p, length);
-	  dhcp->nisdomain[length] = '\0';
+	  GETSTR (dhcp->nisdomain);
 	  break;
+#undef GETSTR
 
+#define GETADDR(_var) \
+	  if (_var) free (_var); \
+	  _var = xmalloc (sizeof (address_t)); \
+	  dhcp_add_address (_var, p, length);
 	case DHCP_DNSSERVER:
-	  if (dhcp->dnsservers)
-	    free_address (dhcp->dnsservers);
-	  dhcp->dnsservers = xmalloc (sizeof (address_t));
-	  dhcp_add_address (dhcp->dnsservers, p, length);
+	  GETADDR (dhcp->dnsservers);
 	  break;
 	case DHCP_NTPSERVER:
-	  if (dhcp->ntpservers)
-	    free_address (dhcp->ntpservers);
-	  dhcp->ntpservers = xmalloc (sizeof (address_t));
-	  dhcp_add_address (dhcp->ntpservers, p, length);
+	  GETADDR (dhcp->ntpservers);
 	  break;
 	case DHCP_NISSERVER:
-	  if (dhcp->nisservers)
-	    free_address (dhcp->nisservers);
-	  dhcp->nisservers = xmalloc (sizeof (address_t));
-	  dhcp_add_address (dhcp->nisservers, p, length);
+	  GETADDR (dhcp->nisservers);
 	  break;
+#undef GETADDR
 
 	case DHCP_DNSSEARCH:
 	  if (dhcp->dnssearch)
@@ -612,9 +625,9 @@ int parse_dhcpmessage (dhcp_t *dhcp, dhcpmessage_t *message)
 
 eexit:
   /* Fill in any missing fields */
-  if (!dhcp->netmask.s_addr)
+  if (! dhcp->netmask.s_addr)
     dhcp->netmask.s_addr = getnetmask (dhcp->address.s_addr);
-  if (!dhcp->broadcast.s_addr)
+  if (! dhcp->broadcast.s_addr)
     dhcp->broadcast.s_addr = dhcp->address.s_addr | ~dhcp->netmask.s_addr;
 
   /* If we have classess static routes then we discard

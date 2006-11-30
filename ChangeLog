@@ -1,3 +1,12 @@
+dhcpcd-3.0.1
+Quote all vars in the info file.
+-n and -G options now work as stated in the man page.
+Handle select loops with large timeouts and infinite lease times.
+Correctly set the broadcast flag.
+make_dhcp_packet already has byte ordered addresses, thanks to TGL
+for the fix.
+If we get a NAK then always re-enter the INIT state.
+
 dhcpcd-3.0.0
 A complete rewrite by Roy Marples <uberlord@gentoo.org>
 

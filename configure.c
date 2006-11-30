@@ -252,11 +252,11 @@ static int write_info(interface_t *iface, dhcp_t *dhcp)
       return -1;
     }
 
-  fprintf (f, "IPADDR=%s\n", inet_ntoa (dhcp->address));
-  fprintf (f, "NETMASK=%s\n", inet_ntoa (dhcp->netmask));
-  fprintf (f, "BROADCAST=%s\n", inet_ntoa (dhcp->broadcast));
+  fprintf (f, "IPADDR='%s'\n", inet_ntoa (dhcp->address));
+  fprintf (f, "NETMASK='%s'\n", inet_ntoa (dhcp->netmask));
+  fprintf (f, "BROADCAST='%s'\n", inet_ntoa (dhcp->broadcast));
   if (dhcp->mtu > 0)
-    fprintf (f, "MTU=%d\n", dhcp->mtu);
+    fprintf (f, "MTU='%d'\n", dhcp->mtu);
   
   if (dhcp->routes)
     {
@@ -295,9 +295,9 @@ static int write_info(interface_t *iface, dhcp_t *dhcp)
 
   if (dhcp->fqdn)
     {
-      fprintf (f, "FQDNFLAGS=%u\n", dhcp->fqdn->flags);
-      fprintf (f, "FQDNRCODE1=%u\n", dhcp->fqdn->r1);
-      fprintf (f, "FQDNRCODE2=%u\n", dhcp->fqdn->r2);
+      fprintf (f, "FQDNFLAGS='%u'\n", dhcp->fqdn->flags);
+      fprintf (f, "FQDNRCODE1='%u'\n", dhcp->fqdn->r1);
+      fprintf (f, "FQDNRCODE2='%u'\n", dhcp->fqdn->r2);
       fprintf (f, "FQDNHOSTNAME='%s'\n", dhcp->fqdn->name);
     }
 
@@ -331,12 +331,12 @@ static int write_info(interface_t *iface, dhcp_t *dhcp)
   if (dhcp->rootpath)
     fprintf (f, "ROOTPATH='%s'\n", cleanmetas (dhcp->rootpath));
 
-  fprintf (f, "DHCPSID=%s\n", inet_ntoa (dhcp->serveraddress));
-  fprintf (f, "DHCPCHADDR=%s\n", ether_ntoa (&iface->ethernet_address));
+  fprintf (f, "DHCPSID='%s'\n", inet_ntoa (dhcp->serveraddress));
+  fprintf (f, "DHCPCHADDR='%s'\n", ether_ntoa (&iface->ethernet_address));
   fprintf (f, "DHCPSNAME='%s'\n", cleanmetas (dhcp->servername));
-  fprintf (f, "LEASETIME=%u\n", dhcp->leasetime);
-  fprintf (f, "RENEWALTIME=%u\n", dhcp->renewaltime);
-  fprintf (f, "REBINDTIME=%u\n", dhcp->rebindtime);
+  fprintf (f, "LEASETIME='%u'\n", dhcp->leasetime);
+  fprintf (f, "RENEWALTIME='%u'\n", dhcp->renewaltime);
+  fprintf (f, "REBINDTIME='%u'\n", dhcp->rebindtime);
   fprintf (f, "INTERFACE='%s'\n", iface->name);
   fprintf (f, "CLASSID='%s'\n", cleanmetas (dhcp->classid));
   fprintf (f, "CLIENTID='%s'\n", cleanmetas (dhcp->clientid));
@@ -392,14 +392,17 @@ int configure (options_t *options, interface_t *iface, dhcp_t *dhcp)
 	  iface->previous_routes = NULL;
 	}
 
+      /* Only reset things if we had set them before */
       if (iface->previous_address.s_addr != 0)
-	del_address (iface->name, iface->previous_address);
-      memset (&iface->previous_address, 0, sizeof (struct in_addr));
+	{
+	  del_address (iface->name, iface->previous_address);
+	  memset (&iface->previous_address, 0, sizeof (struct in_addr));
 
-      restore_resolv (iface->name);
-      
-      /* We currently don't have a resolvconf style programs for ntp/nis */
-      exec_script (options->script, iface->infofile, "down");
+	  restore_resolv (iface->name);
+
+	  /* we currently don't have a resolvconf style programs for ntp/nis */
+	  exec_script (options->script, iface->infofile, "down");
+	}
       return 0;
     }
 
@@ -434,6 +437,11 @@ int configure (options_t *options, interface_t *iface, dhcp_t *dhcp)
       
       for (route = dhcp->routes; route; route = route->next)
 	{
+	  /* Don't set default routes if not asked to */
+	  if (route->destination.s_addr == 0 && route->netmask.s_addr == 0
+	      && ! options->dogateway)
+	    continue;
+
 	  int remember = add_route (iface->name, route->destination,
 				    route->netmask,  route->gateway,
 				    options->metric);
