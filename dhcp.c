@@ -477,9 +477,6 @@ int parse_dhcpmessage (dhcp_t *dhcp, dhcpmessage_t *message)
   strcpy (classid, dhcp->classid);
   strcpy (clientid, dhcp->clientid);
 
-  free_dhcp (dhcp);
-  memset (dhcp, 0, sizeof (dhcp_t));
-
   dhcp->address.s_addr = message->yiaddr;
   strcpy (dhcp->servername, message->servername);
 

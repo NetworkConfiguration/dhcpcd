@@ -1,3 +1,5 @@
+xmalloc dhcp objects so we can swap pointer around easily.
+
 dhcpcd-3.0.1
 Quote all vars in the info file.
 -n and -G options now work as stated in the man page.

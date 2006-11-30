@@ -593,11 +593,11 @@ static int do_route (const char *ifname,
     }
 
   /* Store the netmask in the prefix */
-  uint32_t mask = htonl (netmask.s_addr);
+  uint32_t mask = netmask.s_addr;
   while (mask)
     {
       nlm.rt.rtm_dst_len++;
-      mask <<= 1;
+      mask >>= 1;
     }
 
   add_attr_l (&nlm.hdr, sizeof (nlm), RTA_DST, &destination.s_addr,

@@ -71,9 +71,8 @@ if (open_socket (iface, false) < 0) { retval = -1; goto eexit; } \
 mode = _mode;
 
 #define SEND_MESSAGE(_type) \
- memcpy (&last_dhcp, &dhcp, sizeof (struct dhcp_t)); \
 last_type = _type; \
-send_message (iface, &dhcp, xid, _type, options);
+send_message (iface, dhcp, xid, _type, options);
 
 static int daemonise (char *pidfile)
 {
@@ -127,8 +126,7 @@ int dhcp_run (options_t *options)
   int maxfd;
   int retval;
   dhcpmessage_t message;
-  dhcp_t dhcp;
-  dhcp_t last_dhcp;
+  dhcp_t *dhcp;
   int type;
   int last_type = DHCP_REQUEST;
   bool daemonised = false;
@@ -148,17 +146,17 @@ int dhcp_run (options_t *options)
      afterwards by the user if needed. */
   flush_addresses (iface->name);
 
-  memset (&dhcp, 0, sizeof (dhcp_t));
-  memset (&last_dhcp, 0, sizeof (dhcp_t));
+  dhcp = xmalloc (sizeof (dhcp_t));
+  memset (dhcp, 0, sizeof (dhcp_t));
 
-  strcpy (dhcp.classid, options->classid);
+  strcpy (dhcp->classid, options->classid);
   if (options->clientid[0])
-    strcpy (dhcp.clientid, options->clientid);
+    strcpy (dhcp->clientid, options->clientid);
   else
-    sprintf (dhcp.clientid, "%s", ether_ntoa (&iface->ethernet_address));
+    sprintf (dhcp->clientid, "%s", ether_ntoa (&iface->ethernet_address));
 
   if (options->requestaddress.s_addr != 0)
-    dhcp.address.s_addr = options->requestaddress.s_addr;
+    dhcp->address.s_addr = options->requestaddress.s_addr;
 
   signal_setup ();
 
@@ -169,7 +167,7 @@ int dhcp_run (options_t *options)
       if (timeout > 0 || (options->timeout == 0 &&
 			  (state != STATE_INIT || xid)))
 	{
-	  if (options->timeout == 0 || dhcp.leasetime == -1)
+	  if (options->timeout == 0 || dhcp->leasetime == -1)
 	    {
 	      logger (LOG_DEBUG, "waiting on select for infinity");
 	      retval = select (maxfd + 1, &rset, NULL, NULL, NULL);
@@ -193,7 +191,7 @@ int dhcp_run (options_t *options)
 		  start = uptime ();
 		  retval = select (maxfd + 1, &rset, NULL, NULL, &tv);
 		  if (retval == 0 && iface->fd != -1)
-		    send_message (iface, &last_dhcp, xid, last_type, options);
+		    send_message (iface, dhcp, xid, last_type, options);
 		  timeout -= uptime () - start;
 		}
 	    }
@@ -273,10 +271,9 @@ int dhcp_run (options_t *options)
 		  SOCKET_MODE (SOCKET_CLOSED);
 		  if (! options->persistent)
 		    {
-		      dhcp.address.s_addr = 0;
-		      dhcp.netmask.s_addr = 0;
-		      dhcp.broadcast.s_addr = 0;
-		      configure (options, iface, &dhcp);
+		      free_dhcp (dhcp);
+		      memset (dhcp, 0, sizeof (dhcp_t));
+		      configure (options, iface, dhcp);
 		    }
 		  if (! daemonised)
 		    {
@@ -300,7 +297,7 @@ int dhcp_run (options_t *options)
 
 	      SOCKET_MODE (SOCKET_OPEN);
 	      timeout = options->timeout;
-	      if (dhcp.address.s_addr == 0)
+	      if (dhcp->address.s_addr == 0)
 		{
 		  logger (LOG_INFO, "broadcasting for a lease");
 		  SEND_MESSAGE (DHCP_DISCOVER);
@@ -308,7 +305,7 @@ int dhcp_run (options_t *options)
 	      else
 		{
 		  logger (LOG_INFO, "broadcasting for a lease of %s",
-			  inet_ntoa (dhcp.address));
+			  inet_ntoa (dhcp->address));
 		  SEND_MESSAGE (DHCP_REQUEST);
 		  state = STATE_REQUESTING;
 		}
@@ -320,17 +317,17 @@ int dhcp_run (options_t *options)
 	      xid = random_xid ();
 	    case STATE_RENEWING:
 	      logger (LOG_INFO, "renewing lease of %s", inet_ntoa
-		      (dhcp.address));
+		      (dhcp->address));
 	      SOCKET_MODE (SOCKET_OPEN);
 	      SEND_MESSAGE (DHCP_REQUEST);
-	      timeout = dhcp.rebindtime - dhcp.renewaltime;
+	      timeout = dhcp->rebindtime - dhcp->renewaltime;
 	      state = STATE_REBINDING;
 	      break;
 	    case STATE_REBINDING:
 	      logger (LOG_ERR, "lost lease, attemping to rebind");
 	      SOCKET_MODE (SOCKET_OPEN);
 	      SEND_MESSAGE (DHCP_DISCOVER);
-	      timeout = dhcp.leasetime - dhcp.rebindtime;
+	      timeout = dhcp->leasetime - dhcp->rebindtime;
 	      state = STATE_INIT;
 	      break;
 	    case STATE_REQUESTING:
@@ -339,13 +336,12 @@ int dhcp_run (options_t *options)
 	      SOCKET_MODE (SOCKET_CLOSED);
 	      timeout = 0;
 	      xid = 0;
-	      free_dhcp (&dhcp);
-	      memset (&dhcp, 0, sizeof (dhcp_t));
-	      memset (&last_dhcp, 0, sizeof (dhcp_t));
+	      free_dhcp (dhcp);
+	      memset (dhcp, 0, sizeof (dhcp_t));
 	      break;
 
 	    case STATE_RELEASED:
-	      dhcp.leasetime = -1;
+	      dhcp->leasetime = -1;
 	      break;
 	    }
 	}
@@ -366,6 +362,9 @@ int dhcp_run (options_t *options)
 
 	  memset (&message, 0, sizeof (struct dhcpmessage_t));
 	  int valid = 0;
+	  struct dhcp_t *new_dhcp;
+	  new_dhcp = xmalloc (sizeof (dhcp_t));
+
 	  while (buffer_pos != 0)
 	    {
 	      if (get_packet (iface, (unsigned char *) &message, buffer,
@@ -381,7 +380,8 @@ int dhcp_run (options_t *options)
 		}
 
 	      logger (LOG_DEBUG, "got a packet with xid %d", message.xid);
-	      if ((type = parse_dhcpmessage (&dhcp, &message)) < 0)
+	      memset (new_dhcp, 0, sizeof (dhcp_t));
+	      if ((type = parse_dhcpmessage (new_dhcp, &message)) < 0)
 		{
 		  logger (LOG_ERR, "failed to parse packet");
 		  continue;
@@ -396,19 +396,28 @@ int dhcp_run (options_t *options)
 
 	  /* No packets for us, so wait until we get one */
 	  if (! valid)
-	    continue;
+	    {
+	      free_dhcp (new_dhcp);
+	      free (new_dhcp);
+	      continue;
+	    }
+
+	  /* new_dhcp is now our master DHCP message */
+	  free_dhcp (dhcp);
+	  free (dhcp);
+	  dhcp = new_dhcp;
+	  new_dhcp = NULL;
 
 	  /* We should restart on a NAK */
 	  if (type == DHCP_NAK)
 	    {
-	      logger (LOG_INFO, "received NAK: %s", dhcp.message);
+	      logger (LOG_INFO, "received NAK: %s", dhcp->message);
 	      state = STATE_INIT;
 	      timeout = 0;
 	      xid = 0;
-	      free_dhcp (&dhcp);
-	      memset (&dhcp, 0, sizeof (dhcp_t));
-	      memset (&last_dhcp, 0, sizeof (dhcp_t));
-	      configure (options, iface, &dhcp);
+	      free_dhcp (dhcp);
+	      memset (dhcp, 0, sizeof (dhcp_t));
+	      configure (options, iface, dhcp);
 	      continue;
 	    }
 
@@ -418,7 +427,7 @@ int dhcp_run (options_t *options)
 	      if (type == DHCP_OFFER)
 		{
 		  logger (LOG_INFO, "offered lease of %s",
-			  inet_ntoa (dhcp.address));
+			  inet_ntoa (dhcp->address));
 
 		  SEND_MESSAGE (DHCP_REQUEST);
 		  state = STATE_REQUESTING;
@@ -433,16 +442,17 @@ int dhcp_run (options_t *options)
 		{
 		  SOCKET_MODE (SOCKET_CLOSED);
 		  if (options->doarp && iface->previous_address.s_addr !=
-		      dhcp.address.s_addr)
+		      dhcp->address.s_addr)
 		    {
-		      if (arp_check (iface, dhcp.address))
+		      if (arp_check (iface, dhcp->address))
 			{
 			  SOCKET_MODE (SOCKET_OPEN);
 			  SEND_MESSAGE (DHCP_DECLINE);
 			  SOCKET_MODE (SOCKET_CLOSED);
-			  dhcp.address.s_addr = 0;
+			  free_dhcp (dhcp);
+			  memset (dhcp, 0, sizeof (dhcp));
 			  if (daemonised)
-			    configure (options, iface, &dhcp);
+			    configure (options, iface, dhcp);
 
 			  xid = 0;
 			  state = STATE_INIT;
@@ -453,43 +463,43 @@ int dhcp_run (options_t *options)
 			}
 		    }
 
-		  if (! dhcp.leasetime)
+		  if (! dhcp->leasetime)
 		    {
-		      dhcp.leasetime = DEFAULT_TIMEOUT;
+		      dhcp->leasetime = DEFAULT_TIMEOUT;
 		      logger(LOG_INFO,
 			     "no lease time supplied, assuming %d seconds",
-			     dhcp.leasetime);
+			     dhcp->leasetime);
 		    }
 
-		  if (! dhcp.renewaltime) 
+		  if (! dhcp->renewaltime) 
 		    {
-		      dhcp.renewaltime = dhcp.leasetime / 2;
+		      dhcp->renewaltime = dhcp->leasetime / 2;
 		      logger (LOG_INFO,
 			      "no renewal time supplied, assuming %d seconds",
-			      dhcp.renewaltime);
+			      dhcp->renewaltime);
 		    }
 
-		  if (! dhcp.rebindtime)
+		  if (! dhcp->rebindtime)
 		    {
-		      dhcp.rebindtime = (dhcp.leasetime * 0x7) >> 3;
+		      dhcp->rebindtime = (dhcp->leasetime * 0x7) >> 3;
 		      logger (LOG_INFO,
 			      "no rebind time supplied, assuming %d seconds",
-			      dhcp.rebindtime);
+			      dhcp->rebindtime);
 		    }
 
-		  if (dhcp.leasetime == -1)
+		  if (dhcp->leasetime == -1)
 		    logger (LOG_INFO, "leased %s for infinity",
-			    inet_ntoa (dhcp.address));
+			    inet_ntoa (dhcp->address));
 		  else
 		    logger (LOG_INFO, "leased %s for %u seconds",
-			    inet_ntoa (dhcp.address),
-			    dhcp.leasetime, dhcp.renewaltime);
+			    inet_ntoa (dhcp->address),
+			    dhcp->leasetime, dhcp->renewaltime);
 
 		  state = STATE_BOUND;
-		  timeout = dhcp.renewaltime;
+		  timeout = dhcp->renewaltime;
 		  xid = 0;
 
-		  if (configure (options, iface, &dhcp) < 0 && ! daemonised)
+		  if (configure (options, iface, dhcp) < 0 && ! daemonised)
 		    {
 		      retval = -1;
 		      goto eexit;
@@ -507,7 +517,7 @@ int dhcp_run (options_t *options)
 		}
 	      else if (type == DHCP_OFFER)
 		logger (LOG_INFO, "got subsequent offer of %s, ignoring ",
-			inet_ntoa (dhcp.address));
+			inet_ntoa (dhcp->address));
 	      else
 		logger (LOG_ERR,
 			"no idea what to do with DHCP type %d at this point",
@@ -532,10 +542,11 @@ eexit:
   SOCKET_MODE (SOCKET_CLOSED);
 
   /* Remove our config if we need to */
-  free_dhcp (&dhcp);
-  memset (&dhcp, 0, sizeof (dhcp_t));
+  free_dhcp (dhcp);
+  memset (dhcp, 0, sizeof (dhcp_t));
   if (iface->previous_address.s_addr != 0 && ! options->persistent && daemonised)
-      configure (options, iface, &dhcp);
+    configure (options, iface, dhcp);
+  free (dhcp);
 
   if (iface)
     {
