@@ -243,6 +243,7 @@ int main(int argc, char **argv)
 	    userclasses++;
 	    memcpy (options.userclass + offset + 1 , optarg, strlen (optarg));
 	    options.userclass[offset] = strlen (optarg);
+	    options.userclass_len += (strlen (optarg)) + 1;
 	  }
 	break;
       case 'F':

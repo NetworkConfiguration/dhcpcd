@@ -45,6 +45,7 @@ typedef struct options_t {
   char classid[CLASS_ID_MAX_LEN];
   char clientid[CLIENT_ID_MAX_LEN];
   char userclass[USERCLASS_MAX_LEN];
+  int userclass_len;
   unsigned leasetime;
   time_t timeout;
   int metric;
