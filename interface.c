@@ -28,6 +28,7 @@
 
 /* Netlink suff */
 #ifdef __linux__ 
+#include <asm/types.h> /* Needed for 2.4 kernels */
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <netinet/ether.h>
@@ -157,16 +158,12 @@ interface_t *read_interface (const char *ifname, int metric)
       return NULL;
     }
 
-  /* Bring the interface up if we need to */
-  if (! (ifr.ifr_flags & IFF_UP))
+  ifr.ifr_flags |= IFF_UP | IFF_RUNNING;
+  if (ioctl(s, SIOCSIFFLAGS, &ifr) < 0)
     {
-      ifr.ifr_flags |= IFF_UP | IFF_RUNNING;
-      if (ioctl(s, SIOCSIFFLAGS, &ifr) < 0)
-	{
-	  logger (LOG_ERR, "ioctl SIOCSIFFLAGS: %s", strerror (errno));
-	  close (s);
-	  return NULL;
-	}
+      logger (LOG_ERR, "ioctl SIOCSIFFLAGS: %s", strerror (errno));
+      close (s);
+      return NULL;
     }
 
   close (s);

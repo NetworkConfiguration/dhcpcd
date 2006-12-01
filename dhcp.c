@@ -27,6 +27,7 @@
 
 #include <limits.h>
 #include <math.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -54,6 +55,7 @@ size_t send_message (interface_t *iface, dhcp_t *dhcp,
 		     unsigned long xid, char type, options_t *options)
 {
   dhcpmessage_t message;
+  unsigned char *m = (unsigned char *) &message;
   unsigned char *p = (unsigned char *) &message.options;
   unsigned char *n_params = NULL;
   unsigned long l;
@@ -80,7 +82,11 @@ size_t send_message (interface_t *iface, dhcp_t *dhcp,
   message.op = DHCP_BOOTREQUEST;
   message.hwtype = ARPHRD_ETHER;
   message.hwlen = ETHER_ADDR_LEN;
-  message.secs = htons (10);
+  long up = uptime() - iface->start_uptime;
+  if (up < 0 || up > UINT16_MAX)
+    message.secs = htons (UINT16_MAX);
+  else
+    message.secs = htons (up);
   message.xid = xid;
   memcpy (&message.hwaddr, &iface->ethernet_address, ETHER_ADDR_LEN);
   message.cookie = htonl (MAGIC_COOKIE);
@@ -108,7 +114,7 @@ size_t send_message (interface_t *iface, dhcp_t *dhcp,
     {
       *p++ = DHCP_MAXMESSAGESIZE;
       *p++ = 2;
-      uint16_t sz = htons (sizeof (struct udp_dhcp_packet));
+      uint16_t sz = htons (sizeof (dhcpmessage_t));
       memcpy (p, &sz, 2);
       p += 2;
     }
@@ -217,9 +223,9 @@ size_t send_message (interface_t *iface, dhcp_t *dhcp,
       if (options->userclass)
 	{
 	  *p++ = DHCP_USERCLASS;
-	  *p++ = l = strlen (options->userclass);
-	  memcpy (p, options->userclass, l);
-	  p += l;
+	  *p++ = options->userclass_len;
+	  memcpy (p, &options->userclass, options->userclass_len);
+	  p += options->userclass_len;
 	}
       
       *p++ = DHCP_CLASSID;
@@ -245,15 +251,19 @@ size_t send_message (interface_t *iface, dhcp_t *dhcp,
       p += ETHER_ADDR_LEN;
     }
 
-  *p = DHCP_END;
+  *p++ = DHCP_END;
+
+  unsigned int message_length = p - m;
 
   struct udp_dhcp_packet packet;
   memset (&packet, 0, sizeof (struct udp_dhcp_packet));
-  make_dhcp_packet (&packet, (unsigned char *) &message, from, to);
+  make_dhcp_packet (&packet, (unsigned char *) &message, message_length,
+		    from, to);
 
   logger (LOG_DEBUG, "Sending %s with xid %d", dhcp_message[(int) type], xid);
   return send_packet (iface, ETHERTYPE_IP, (unsigned char *) &packet,
-		      sizeof (struct udp_dhcp_packet));
+		      message_length + sizeof (struct ip) +
+		      sizeof (struct udphdr));
 }
 
 static unsigned long getnetmask (unsigned long ip_in)

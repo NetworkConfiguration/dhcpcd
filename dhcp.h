@@ -31,6 +31,9 @@
 #include "dhcpcd.h"
 #include "interface.h"
 
+/* Max MTU - defines dhcp option length */
+#define MTU_MAX			1500
+
 /* UDP port numbers for DHCP */
 #define DHCP_SERVER_PORT 67
 #define DHCP_CLIENT_PORT 68
@@ -50,6 +53,7 @@
 #define DHCP_NAK		6
 #define	DHCP_RELEASE		7
 #define DHCP_INFORM		8
+
 
 /* DHCP options */
 enum DHCP_OPTIONS
@@ -150,24 +154,37 @@ typedef struct dhcp_t
   char *rootpath;
 } dhcp_t;
 
+/* Sizes for DHCP options */
+#define HWADDR_LEN		16
+#define SERVERNAME_LEN		64
+#define BOOTFILE_LEN		128
+#define DHCP_UDP_LEN		(20 + 8)
+#define DHCP_BASE_LEN		(4 + 4 + 2 + 2 + 4 + 4 + 4 + 4 + 4)
+#define DHCP_RESERVE_LEN	(4 + 4 + 4 + 4 + 2)
+#define DHCP_FIXED_LEN		(DHCP_BASE_LEN + HWADDR_LEN + \
+				+ SERVERNAME_LEN + BOOTFILE_LEN)
+#define DHCP_OPTION_LEN		(MTU_MAX - DHCP_FIXED_LEN - DHCP_UDP_LEN \
+				 - DHCP_RESERVE_LEN)
+
+
 typedef struct dhcpmessage_t
 {
-  char op;		/* message type */
-  char hwtype;		/* hardware address type */
-  char hwlen;		/* hardware address length */
-  char hwopcount;	/* should be zero in client's message */
-  int32_t xid;		/* transaction id */
-  int16_t secs;		/* elapsed time in sec. from trying to boot */
+  unsigned char op;				/* message type */
+  unsigned char hwtype;				/* hardware address type */
+  unsigned char hwlen;				/* hardware address length */
+  unsigned char hwopcount;			/* should be zero in client's message */
+  int32_t xid;				/* transaction id */
+  int16_t secs;				/* elapsed time in sec. from trying to boot */
   int16_t flags;
-  int32_t ciaddr;		/* (previously allocated) client IP address */
-  int32_t yiaddr;		/* 'your' client IP address */
-  int32_t siaddr;		/* should be zero in client's messages */
-  int32_t giaddr;		/* should be zero in client's messages */
-  unsigned char hwaddr[16];	/* client's hardware address */
-  char servername[64];	/* server host name, null terminated string */
-  char bootfile[128];	/* boot file name, null terminated string */
+  int32_t ciaddr;			/* (previously allocated) client IP address */
+  int32_t yiaddr;			/* 'your' client IP address */
+  int32_t siaddr;			/* should be zero in client's messages */
+  int32_t giaddr;			/* should be zero in client's messages */
+  unsigned char hwaddr[HWADDR_LEN];	/* client's hardware address */
+  char servername[SERVERNAME_LEN];	/* server host name, null terminated string */
+  char bootfile[BOOTFILE_LEN];		/* boot file name, null terminated string */
   uint32_t cookie;
-  unsigned char options[308];	/* message options - cookie */
+  unsigned char options[DHCP_OPTION_LEN];	/* message options - cookie */
 } dhcpmessage_t;
 
 struct udp_dhcp_packet

@@ -31,6 +31,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "arp.h"
@@ -64,15 +65,20 @@
 #define SOCKET_OPEN		1
 
 #define SOCKET_MODE(_mode) \
- if (iface->fd >= 0) close (iface->fd); \
-iface->fd = -1; \
-if (_mode == SOCKET_OPEN) \
-if (open_socket (iface, false) < 0) { retval = -1; goto eexit; } \
-mode = _mode;
+{ \
+  if (iface->fd >= 0) close (iface->fd); \
+  iface->fd = -1; \
+  if (_mode == SOCKET_OPEN) \
+  if (open_socket (iface, false) < 0) { retval = -1; goto eexit; } \
+  mode = _mode; \
+}
 
 #define SEND_MESSAGE(_type) \
-last_type = _type; \
-send_message (iface, dhcp, xid, _type, options);
+{ \
+  last_type = _type; \
+  last_send = uptime (); \
+  send_message (iface, dhcp, xid, _type, options); \
+}
 
 static int daemonise (char *pidfile)
 {
@@ -127,10 +133,11 @@ int dhcp_run (options_t *options)
   int retval;
   dhcpmessage_t message;
   dhcp_t *dhcp;
-  int type;
-  int last_type = DHCP_REQUEST;
+  int type = DHCP_DISCOVER;
+  int last_type = DHCP_DISCOVER;
   bool daemonised = false;
   unsigned long start = 0;
+  unsigned long last_send = 0;
   int sig;
   unsigned char *buffer = NULL;
   int buffer_len = 0;
@@ -162,18 +169,23 @@ int dhcp_run (options_t *options)
 
   while (1)
     {
-      maxfd = signal_fd_set (&rset, iface->fd);
-
       if (timeout > 0 || (options->timeout == 0 &&
 			  (state != STATE_INIT || xid)))
 	{
 	  if (options->timeout == 0 || dhcp->leasetime == -1)
 	    {
 	      logger (LOG_DEBUG, "waiting on select for infinity");
+	      maxfd = signal_fd_set (&rset, iface->fd);
 	      retval = select (maxfd + 1, &rset, NULL, NULL, NULL);
 	    }
 	  else
 	    {
+	      /* Resend our message if we're getting loads of packets
+		 that aren't for us. This mainly happens on Linux as it
+		 doesn't have a nice BPF filter. */
+	      if (iface->fd > -1 && uptime () - last_send >= TIMEOUT_MINI)
+		SEND_MESSAGE (last_type);
+
 	      logger (LOG_DEBUG, "waiting on select for %d seconds",
 		      timeout);
 	      /* If we're waiting for a reply, then we re-send the last
@@ -189,10 +201,11 @@ int dhcp_run (options_t *options)
 		    tv.tv_sec = timeout;
 		  tv.tv_usec = 0;
 		  start = uptime ();
+		  maxfd = signal_fd_set (&rset, iface->fd);
 		  retval = select (maxfd + 1, &rset, NULL, NULL, &tv);
-		  if (retval == 0 && iface->fd != -1)
-		    send_message (iface, dhcp, xid, last_type, options);
 		  timeout -= uptime () - start;
+		  if (retval == 0 && iface->fd != -1 && timeout > 0)
+		    SEND_MESSAGE (last_type);
 		}
 	    }
 	}
@@ -297,6 +310,7 @@ int dhcp_run (options_t *options)
 
 	      SOCKET_MODE (SOCKET_OPEN);
 	      timeout = options->timeout;
+	      iface->start_uptime = uptime ();
 	      if (dhcp->address.s_addr == 0)
 		{
 		  logger (LOG_INFO, "broadcasting for a lease");
@@ -316,6 +330,7 @@ int dhcp_run (options_t *options)
 	      state = STATE_RENEWING;
 	      xid = random_xid ();
 	    case STATE_RENEWING:
+	      iface->start_uptime = uptime ();
 	      logger (LOG_INFO, "renewing lease of %s", inet_ntoa
 		      (dhcp->address));
 	      SOCKET_MODE (SOCKET_OPEN);
@@ -332,6 +347,9 @@ int dhcp_run (options_t *options)
 	      break;
 	    case STATE_REQUESTING:
 	      logger (LOG_ERR, "timed out");
+	      if (! daemonised)
+		goto eexit;
+
 	      state = STATE_INIT;
 	      SOCKET_MODE (SOCKET_CLOSED);
 	      timeout = 0;
@@ -384,6 +402,7 @@ int dhcp_run (options_t *options)
 	      if ((type = parse_dhcpmessage (new_dhcp, &message)) < 0)
 		{
 		  logger (LOG_ERR, "failed to parse packet");
+		  free_dhcp (new_dhcp);
 		  continue;
 		}
 
@@ -397,7 +416,6 @@ int dhcp_run (options_t *options)
 	  /* No packets for us, so wait until we get one */
 	  if (! valid)
 	    {
-	      free_dhcp (new_dhcp);
 	      free (new_dhcp);
 	      continue;
 	    }

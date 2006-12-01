@@ -37,6 +37,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "dhcp.h"
@@ -66,7 +67,6 @@ static uint16_t checksum (unsigned char *addr, uint16_t len)
       uint8_t a = 0;
       memcpy (&a, w, 1);
       sum += ntohs (a) << 8;
-      // sum += a;
     }
 
   sum = (sum >> 16) + (sum & 0xffff);
@@ -76,7 +76,7 @@ static uint16_t checksum (unsigned char *addr, uint16_t len)
 }
 
 void make_dhcp_packet(struct udp_dhcp_packet *packet,
-		      unsigned char *data,
+		      unsigned char *data, unsigned int length,
 		      struct in_addr source, struct in_addr dest)
 {
   struct ip *ip = &packet->ip;
@@ -91,7 +91,7 @@ void make_dhcp_packet(struct udp_dhcp_packet *packet,
      If we don't do the ordering like so then the udp checksum will be
      broken, so find another way of doing it! */
 
-  memcpy (&packet->dhcp, data, sizeof (dhcpmessage_t));
+  memcpy (&packet->dhcp, data, length);
 
   ip->ip_p = IPPROTO_UDP;
   ip->ip_src.s_addr = source.s_addr;
@@ -102,7 +102,7 @@ void make_dhcp_packet(struct udp_dhcp_packet *packet,
 
   udp->uh_sport = htons (DHCP_CLIENT_PORT);
   udp->uh_dport = htons (DHCP_SERVER_PORT);
-  udp->uh_ulen = htons (sizeof (struct udphdr) + sizeof (struct dhcpmessage_t));
+  udp->uh_ulen = htons (sizeof (struct udphdr) + length);
   ip->ip_len = udp->uh_ulen;
   udp->uh_sum = checksum ((unsigned char *) packet,
 			  sizeof (struct udp_dhcp_packet));
@@ -112,7 +112,7 @@ void make_dhcp_packet(struct udp_dhcp_packet *packet,
   ip->ip_id = 0;
   ip->ip_tos = IPTOS_LOWDELAY;
   ip->ip_len = htons (sizeof (struct ip) + sizeof (struct udphdr) +
-		      sizeof (struct dhcpmessage_t));
+		      length);
   ip->ip_id = 0;
   ip->ip_off = 0;
   ip->ip_ttl = IPDEFTTL;
@@ -334,6 +334,10 @@ int get_packet (interface_t *iface, unsigned char *data,
       if (*buffer_len < 1)
 	{
 	  logger (LOG_ERR, "read: %s", strerror (errno));
+	  struct timespec tv;
+	  tv.tv_sec = 5;
+	  tv.tv_nsec = 0;
+	  nanosleep (&tv, NULL);
 	  return -1;
 	}
     }
@@ -397,7 +401,7 @@ int open_socket (interface_t *iface, bool arp)
   int flags;
   struct sockaddr_ll sll;
 
-  if ((fd = socket (PF_PACKET, SOCK_DGRAM, htons (ETH_P_IP))) == -1)
+  if ((fd = socket (PF_PACKET, SOCK_DGRAM, htons (ETH_P_IP))) < 0)
     {
       logger (LOG_ERR, "socket: %s", strerror (errno));
       return -1;
@@ -418,8 +422,6 @@ int open_socket (interface_t *iface, bool arp)
   else
     sll.sll_protocol = htons (ETH_P_IP);
   sll.sll_ifindex = if_nametoindex (iface->name);
-  sll.sll_halen = ETHER_ADDR_LEN;
-  memset(sll.sll_addr, 0xff, sizeof (sll.sll_addr));
 
   if (bind(fd, (struct sockaddr *) &sll, sizeof (struct sockaddr_ll)) == -1)
     {
@@ -427,7 +429,7 @@ int open_socket (interface_t *iface, bool arp)
       close (fd);
       return -1;
     }
-
+  
   if (iface->fd > -1)
     close (iface->fd);
   iface->fd = fd;
@@ -475,6 +477,10 @@ size_t get_packet (interface_t *iface, unsigned char *data,
   if (bytes < 0)
     {
       logger (LOG_ERR, "read: %s", strerror (errno));
+      struct timespec tv;
+      tv.tv_sec = 5;
+      tv.tv_nsec = 0;
+      nanosleep (&tv, NULL);
       return -1;
     }
 

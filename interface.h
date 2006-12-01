@@ -61,6 +61,8 @@ typedef struct interface_t
 
   struct in_addr previous_address;
   route_t *previous_routes;
+
+  long start_uptime;
 } interface_t;
 
 void free_address (address_t *addresses);
