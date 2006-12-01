@@ -1,3 +1,4 @@
+Changed the default timeout to 20 seconds, allowing hme Sparc drivers to work.
 Set the rfds correctly so we can get a reply after re-sending a request.
 Set the seconds elasped and maximum message size correctly in DHCP messages.
 Now compiles on Linux 2.4 kernels. 

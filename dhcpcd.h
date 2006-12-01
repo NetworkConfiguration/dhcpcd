@@ -29,7 +29,7 @@
 
 #include "common.h"
 
-#define DEFAULT_TIMEOUT		10
+#define DEFAULT_TIMEOUT		20
 // #define DEFAULT_LEASETIME	0xffffffff      /* infinite lease time */
 #define DEFAULT_LEASETIME	3600 		/* 1 hour */
 
