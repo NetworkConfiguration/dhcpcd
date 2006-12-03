@@ -29,19 +29,26 @@
 /* Netlink suff */
 #ifdef __linux__ 
 #include <asm/types.h> /* Needed for 2.4 kernels */
+#include <features.h>
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <netinet/ether.h>
 #include <netpacket/packet.h>
+/* Only glibc-2.3 ships with ifaddrs.h */
+#if defined (__GLIBC__) && defined (__GLIBC_PREREQ) && __GLIBC_PREREQ (2,3)
+#define HAVE_IFADDRS_H
+#include <ifaddrs.h>
+#endif
 #else
 #include <net/if_dl.h>
 #include <net/if_types.h>
 #include <net/route.h>
 #include <netinet/in.h>
-#endif /* __linux__ */
+#define HAVE_IFADDRS_H
+#include <ifaddrs.h>
+#endif
 
 #include <errno.h>
-#include <ifaddrs.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -84,6 +91,8 @@ void free_route (route_t *routes)
     }
 }
 
+
+
 interface_t *read_interface (const char *ifname, int metric)
 {
   if (! ifname)
@@ -94,6 +103,7 @@ interface_t *read_interface (const char *ifname, int metric)
   interface_t *iface;
   unsigned char hwaddr[ETHER_ADDR_LEN];
 
+#ifndef __linux__
   struct ifaddrs *ifap;
   struct ifaddrs *p;
 
@@ -104,25 +114,16 @@ interface_t *read_interface (const char *ifname, int metric)
     {
       if (strcmp (p->ifa_name, ifname) != 0)
 	continue;
-#ifdef __linux__
-      struct sockaddr_ll *sll = (struct sockaddr_ll*) p->ifa_addr;
-      if (p->ifa_addr->sa_family != AF_PACKET
-	  || sll->sll_hatype != ARPHRD_ETHER)
-#else
-	struct sockaddr_dl *sdl = (struct sockaddr_dl *) p->ifa_addr;
+	
+      struct sockaddr_dl *sdl = (struct sockaddr_dl *) p->ifa_addr;
       if (p->ifa_addr->sa_family != AF_LINK || sdl->sdl_type != IFT_ETHER)
-#endif
 	{
 	  logger (LOG_ERR, "not Ethernet");
 	  freeifaddrs (ifap);
 	  return NULL;
 	}
 
-#ifdef __linux__
-      memcpy (hwaddr, sll->sll_addr, ETHER_ADDR_LEN);
-#else
       memcpy (hwaddr, sdl->sdl_data + sdl->sdl_nlen, ETHER_ADDR_LEN);
-#endif
       break;
     }
   freeifaddrs (ifap);
@@ -132,18 +133,33 @@ interface_t *read_interface (const char *ifname, int metric)
       logger (LOG_ERR, "could not find interface %s", ifname);
       return NULL;
     }
+#endif
 
   memset (&ifr, 0, sizeof (struct ifreq));
   strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
-  if ((s = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
+  if ((s = socket (AF_INET, SOCK_DGRAM, 0)) < 0)
     {
       logger (LOG_ERR, "socket: %s", strerror (errno));
       return NULL;
     }
 
-#ifndef __linux__
+#ifdef __linux__
+  if (ioctl (s, SIOCGIFHWADDR, &ifr) <0)
+    {
+      logger (LOG_ERR, "ioctl SIOCGIFHWADDR: %s", strerror(errno));
+      close (s);
+      return NULL;
+    }
+  if (ifr.ifr_hwaddr.sa_family != ARPHRD_ETHER)
+    {
+      logger (LOG_ERR, "interface is not Ethernet");
+      close (s);
+      return NULL;
+    }
+  memcpy (&hwaddr, &ifr.ifr_hwaddr.sa_data, ETHER_ADDR_LEN);
+#else
   ifr.ifr_metric = metric;
-  if (ioctl(s, SIOCSIFMETRIC, &ifr) < 0)
+  if (ioctl (s, SIOCSIFMETRIC, &ifr) < 0)
     {
       logger (LOG_ERR, "ioctl SIOCSIFMETRIC: %s", strerror (errno));
       close (s);
@@ -637,32 +653,6 @@ int del_address (const char *ifname, struct in_addr address)
   return (do_address (ifname, address, t, t, 1));
 }
 
-/* This should work on all platforms */
-int flush_addresses (const char *ifname)
-{
-  if (! ifname)
-    return -1;
-
-  struct ifaddrs *ifap;
-  struct ifaddrs *p;
-
-  if (getifaddrs (&ifap) != 0)
-    return -1;
-
-  for (p = ifap; p; p = p->ifa_next)
-    {
-      if (strcmp (p->ifa_name, ifname) != 0)
-	continue;
-
-      struct sockaddr_in *sin = (struct sockaddr_in*) p->ifa_addr;
-      if (sin->sin_family == AF_INET)
-	del_address (ifname, sin->sin_addr);
-    }
-  freeifaddrs (ifap);
-
-  return 0;
-}
-
 int add_route (const char *ifname, struct in_addr destination,
 	       struct in_addr netmask, struct in_addr gateway, int metric)
 {
@@ -681,3 +671,81 @@ int del_route (const char *ifname, struct in_addr destination,
   return (do_route (ifname, destination, netmask, gateway, metric, 0, 1));
 }
 
+#ifdef HAVE_IFADDRS_H
+int flush_addresses (const char *ifname)
+{
+  if (! ifname)
+    return -1;
+
+  struct ifaddrs *ifap;
+  struct ifaddrs *p;
+
+  if (getifaddrs (&ifap) != 0)
+    return -1;
+
+  int retval = 0;
+  for (p = ifap; p; p = p->ifa_next)
+    {
+      if (strcmp (p->ifa_name, ifname) != 0)
+	continue;
+
+      struct sockaddr_in *sin = (struct sockaddr_in*) p->ifa_addr;
+      if (sin->sin_family == AF_INET)
+	if (del_address (ifname, sin->sin_addr) < 0)
+	  retval = -1;
+    }
+  freeifaddrs (ifap);
+
+  return retval;
+}
+#else
+int flush_addresses (const char *ifname)
+{
+  int s;
+  if ((s = socket (AF_INET, SOCK_DGRAM, 0)) < 0)
+    {
+      logger (LOG_ERR, "socket: %s", strerror (errno));
+      return -1;
+    }
+
+  struct ifconf ifc;
+  memset (&ifc, 0, sizeof (struct ifconf));
+  ifc.ifc_buf = NULL;
+  if (ioctl (s, SIOCGIFCONF, &ifc) < 0)
+    {
+      logger (LOG_ERR, "ioctl SIOCGIFCONF: %s", strerror (errno));
+      close (s);
+    }
+
+  void *ifrs = xmalloc (ifc.ifc_len);
+  ifc.ifc_buf = ifrs;
+  if (ioctl (s, SIOCGIFCONF, &ifc) < 0)
+    {
+      logger (LOG_ERR, "ioctl SIOCGIFCONF: %s", strerror (errno));
+      close (s);
+      free (ifrs);
+      return -1;
+    }
+
+  close (s);
+
+  int nifs = ifc.ifc_len / sizeof (struct ifreq);
+  struct ifreq *ifr = ifrs;
+  int retval = 0;
+  int i;
+  for (i = 0; i < nifs; i++)
+    {
+      if (ifr->ifr_addr.sa_family != AF_INET
+	  || strcmp (ifname, ifr->ifr_name) != 0)
+	continue;
+
+      struct sockaddr_in *in = (struct sockaddr_in *) &ifr->ifr_addr;
+      if (del_address (ifname, in->sin_addr) < 0)
+	retval = -1;
+      ifr++;
+    }
+
+  free (ifrs);
+  return retval;
+}
+#endif
