@@ -1,3 +1,5 @@
+Include linux/if_addr.h so we compile on 2.6.19 kernels, thanks to AlexExtreme.
+
 dhcpcd-3.0.2
 Linux systems without glibc-2.3 don't have getifaddrs, so we define our own.
 Changed the default timeout to 20 seconds, allowing hme Sparc drivers to work.

@@ -30,6 +30,7 @@
 #ifdef __linux__ 
 #include <asm/types.h> /* Needed for 2.4 kernels */
 #include <features.h>
+#include <linux/if_addr.h>
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <netinet/ether.h>
