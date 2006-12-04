@@ -127,7 +127,7 @@ interface_t *read_interface (const char *ifname, int metric)
 	  return NULL;
 	}
 
-      memcpy (hwaddr, sdl->sdl_data + sdl->sdl_nlen, ETHER_ADDR_LEN);
+      memcpy (&hwaddr, sdl->sdl_data + sdl->sdl_nlen, ETHER_ADDR_LEN);
       break;
     }
   freeifaddrs (ifap);

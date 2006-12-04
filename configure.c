@@ -103,7 +103,7 @@ static int make_resolv (char *ifname, dhcp_t *dhcp)
   char resolvconf[PATH_MAX];
   address_t *address;
 
-  memset (&resolvconf, 0, sizeof (resolvconf));
+  memset (&buf, 0, sizeof (struct stat));
   if (stat ("/sbin/resolvconf", &buf) == 0)
     {
       logger (LOG_DEBUG, "sending DNS information to resolvconf");
@@ -132,7 +132,7 @@ static int make_resolv (char *ifname, dhcp_t *dhcp)
       for (address = dhcp->dnsservers; address; address = address->next)
 	fprintf (f, "nameserver %s\n", inet_ntoa (address->address));
 
-      if (resolvconf)
+      if (buf.st_ino)
 	{
 	  pclose (f);
 	  logger (LOG_DEBUG, "resolvconf completed");
