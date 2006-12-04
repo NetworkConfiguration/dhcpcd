@@ -185,10 +185,7 @@ size_t send_message (interface_t *iface, dhcp_t *dhcp,
 	}
 
       *n_params = p - n_params - 1;
-    }
 
-  if (type == DHCP_REQUEST)
-    {
       if (options->hostname) 
 	{
 	  if (options->fqdn == FQDN_DISABLE)
@@ -220,7 +217,7 @@ size_t send_message (interface_t *iface, dhcp_t *dhcp,
 
   if (type != DHCP_DECLINE && type != DHCP_RELEASE)
     {
-      if (options->userclass)
+      if (options->userclass_len > 0)
 	{
 	  *p++ = DHCP_USERCLASS;
 	  *p++ = options->userclass_len;

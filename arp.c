@@ -70,7 +70,7 @@ int arp_check (interface_t *iface, struct in_addr address)
   unsigned char buf[256];
   struct arphdr *ah = (struct arphdr *) buf;
 
-  memset (&buf, 0, sizeof (buf));
+  memset (buf, 0, sizeof (buf));
 
   ah->ar_hrd = htons (ARPHRD_ETHER);
   ah->ar_pro = htons (ETHERTYPE_IP);
@@ -118,7 +118,7 @@ int arp_check (interface_t *iface, struct in_addr address)
 
       while (bufpos != 0)
 	{
-	  memset (&reply, 0, sizeof (reply));
+	  memset (reply, 0, sizeof (reply));
 	  if ((bytes = get_packet (iface, (unsigned char *) &reply, buffer,
 				   &buflen, &bufpos)) < 0)
 	    break;

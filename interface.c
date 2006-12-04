@@ -127,7 +127,7 @@ interface_t *read_interface (const char *ifname, int metric)
 	  return NULL;
 	}
 
-      memcpy (&hwaddr, sdl->sdl_data + sdl->sdl_nlen, ETHER_ADDR_LEN);
+      memcpy (hwaddr, sdl->sdl_data + sdl->sdl_nlen, ETHER_ADDR_LEN);
       break;
     }
   freeifaddrs (ifap);
@@ -160,7 +160,7 @@ interface_t *read_interface (const char *ifname, int metric)
       close (s);
       return NULL;
     }
-  memcpy (&hwaddr, &ifr.ifr_hwaddr.sa_data, ETHER_ADDR_LEN);
+  memcpy (hwaddr, ifr.ifr_hwaddr.sa_data, ETHER_ADDR_LEN);
 #else
   ifr.ifr_metric = metric;
   if (ioctl (s, SIOCSIFMETRIC, &ifr) < 0)
@@ -192,7 +192,7 @@ interface_t *read_interface (const char *ifname, int metric)
   memset (iface, 0, sizeof (interface_t));
   strncpy (iface->name, ifname, IF_NAMESIZE);
   snprintf (iface->infofile, PATH_MAX, INFOFILE, ifname);
-  memcpy (&iface->ethernet_address, &hwaddr, ETHER_ADDR_LEN);
+  memcpy (&iface->ethernet_address, hwaddr, ETHER_ADDR_LEN);
 
   iface->arpable = ! (ifr.ifr_flags & (IFF_NOARP | IFF_LOOPBACK));
 
@@ -380,7 +380,7 @@ static int send_netlink(struct nlmsghdr *hdr)
     }
 
   char buffer[16384];
-  memset (&buffer, 0, sizeof (buffer));
+  memset (buffer, 0, sizeof (buffer));
   iov.iov_base = buffer;
 
   struct nlmsghdr *h;
@@ -542,11 +542,11 @@ static int do_address(const char *ifname,
   nlm.ifa.ifa_family = AF_INET;
 
   /* Store the netmask in the prefix */
-  uint32_t mask = htonl (netmask.s_addr);
+  uint32_t mask = netmask.s_addr;
   while (mask)
     {
       nlm.ifa.ifa_prefixlen++;
-      mask <<= 1;
+      mask >>= 1;
     }
 
   add_attr_l (&nlm.hdr, sizeof (nlm), IFA_LOCAL, &address.s_addr,

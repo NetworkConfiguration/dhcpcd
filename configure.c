@@ -356,7 +356,7 @@ int configure (options_t *options, interface_t *iface, dhcp_t *dhcp)
   route_t *new_route = NULL;
   route_t *old_route = NULL;
   struct hostent *he = NULL;
-  char *newhostname[HOSTNAME_MAX_LEN] = {0};
+  char newhostname[HOSTNAME_MAX_LEN] = {0};
   char curhostname[HOSTNAME_MAX_LEN] = {0};
   char *dname = NULL;
   int dnamel = 0;
@@ -522,9 +522,9 @@ int configure (options_t *options, interface_t *iface, dhcp_t *dhcp)
       || strcmp (curhostname, "localhost") == 0)
     {
       if (dhcp->hostname)
-	strcpy ((char *) newhostname, dhcp->hostname); 
+	strcpy (newhostname, dhcp->hostname); 
 
-      sethostname ((char *) newhostname, strlen ((char *) newhostname));
+      sethostname (newhostname, strlen (newhostname));
       logger (LOG_INFO, "setting hostname to `%s'", newhostname);
     }
 

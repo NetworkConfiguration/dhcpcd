@@ -100,7 +100,7 @@ void logger(int level, const char *fmt, ...)
       int len = strlen (logprefix);
       char *fmt2 = xmalloc (strlen (fmt) + len + 1);
       char *p = fmt2;
-      memcpy (p, &logprefix, len);
+      memcpy (p, logprefix, len);
       p += len;
       strcpy (p, fmt);
       vsyslog (level, fmt2, p2);
