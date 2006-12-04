@@ -1,3 +1,5 @@
+Add more debug messages.
+Fix writing to resolv.conf when resolvconf not present.
 Include linux/if_addr.h for 2.6.19+ kernels, thanks to AlexExtreme.
 
 dhcpcd-3.0.2

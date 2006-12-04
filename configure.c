@@ -96,13 +96,14 @@ void exec_script (char *script, char *infofile, char *arg)
     logger (LOG_ERR, "fork: %s", strerror (errno));
 }
 
-static int make_resolv (char *ifname, dhcp_t *dhcp, int wait)
+static int make_resolv (char *ifname, dhcp_t *dhcp)
 {
   FILE *f;
   struct stat buf;
   char resolvconf[PATH_MAX];
   address_t *address;
 
+  memset (&resolvconf, 0, sizeof (resolvconf));
   if (stat ("/sbin/resolvconf", &buf) == 0)
     {
       logger (LOG_DEBUG, "sending DNS information to resolvconf");
@@ -114,6 +115,7 @@ static int make_resolv (char *ifname, dhcp_t *dhcp, int wait)
     }
   else
     {
+      logger (LOG_DEBUG, "writing "RESOLVFILE);
       if (! (f = fopen(RESOLVFILE, "w")))
 	logger (LOG_ERR, "fopen `%s': %s", RESOLVFILE, strerror (errno));
     }
@@ -185,6 +187,7 @@ static int make_ntp (char *ifname, dhcp_t *dhcp)
   address_t *address;
   char *a;
 
+  logger (LOG_DEBUG, "writing "NTPFILE);
   if (! (f = fopen(NTPFILE, "w")))
     {
       logger (LOG_ERR, "fopen `%s': %s", NTPFILE, strerror (errno));
@@ -213,6 +216,7 @@ static int make_nis (char *ifname, dhcp_t *dhcp)
   address_t *address;
   char prefix[256] = {0};
 
+  logger (LOG_DEBUG, "writing "NISFILE);
   if (! (f = fopen(NISFILE, "w")))
     {
       logger (LOG_ERR, "fopen `%s': %s", NISFILE, strerror (errno));
@@ -246,6 +250,7 @@ static int write_info(interface_t *iface, dhcp_t *dhcp)
   route_t *route;
   address_t *address;
 
+  logger (LOG_DEBUG, "writing %s", iface->infofile);
   if ((f = fopen (iface->infofile, "w")) == NULL)
     {
       logger (LOG_ERR, "fopen `%s': %s", iface->infofile, strerror (errno));
@@ -483,7 +488,9 @@ int configure (options_t *options, interface_t *iface, dhcp_t *dhcp)
     }
 
   if (options->dodns && dhcp->dnsservers)
-    make_resolv(iface->name, dhcp, (options->dohostname && !dhcp->hostname));
+    make_resolv(iface->name, dhcp);
+  else
+    logger (LOG_DEBUG, "no dns information to write");
 
   if (options->dontp && dhcp->ntpservers)
     make_ntp(iface->name, dhcp);
@@ -492,7 +499,7 @@ int configure (options_t *options, interface_t *iface, dhcp_t *dhcp)
     make_nis(iface->name, dhcp);
 
   /* Now we have made a resolv.conf we can obtain a hostname if we need one */
-  if (options->dohostname && !dhcp->hostname)
+  if (options->dohostname && ! dhcp->hostname)
     {
       he = gethostbyaddr (inet_ntoa (dhcp->address),
 			  sizeof (struct in_addr), AF_INET);
@@ -509,14 +516,16 @@ int configure (options_t *options, interface_t *iface, dhcp_t *dhcp)
 
   gethostname (curhostname, sizeof (curhostname));
   
-  if (options->dohostname || !strlen (curhostname) 
-      || !strcmp (curhostname, "(none)") || !strcmp (curhostname, "localhost"))
+  if (options->dohostname
+      || strlen (curhostname) == 0
+      || strcmp (curhostname, "(none)") == 0
+      || strcmp (curhostname, "localhost") == 0)
     {
       if (dhcp->hostname)
 	strcpy ((char *) newhostname, dhcp->hostname); 
 
       sethostname ((char *) newhostname, strlen ((char *) newhostname));
-      logger (LOG_INFO, "setting hostname to %s", newhostname);
+      logger (LOG_INFO, "setting hostname to `%s'", newhostname);
     }
 
   write_info (iface, dhcp);
