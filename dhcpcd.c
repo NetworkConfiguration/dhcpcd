@@ -355,14 +355,14 @@ int main(int argc, char **argv)
   if (mkdir (CONFIGDIR, S_IRUSR |S_IWUSR |S_IXUSR | S_IRGRP | S_IXGRP
 	     | S_IROTH | S_IXOTH) && errno != EEXIST )
     {
-      logger (LOG_ERR, "mkdir(\"%s\",0): %m\n", CONFIGDIR);
+      logger (LOG_ERR, "mkdir(\"%s\",0): %s\n", CONFIGDIR, strerror (errno));
       exit (EXIT_FAILURE);
     }
 
   if (mkdir (ETCDIR, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP
 	     | S_IROTH | S_IXOTH) && errno != EEXIST )
     {
-      logger (LOG_ERR, "mkdir(\"%s\",0): %m\n", ETCDIR);
+      logger (LOG_ERR, "mkdir(\"%s\",0): %s\n", ETCDIR, strerror (errno));
       exit (EXIT_FAILURE);
     }
 

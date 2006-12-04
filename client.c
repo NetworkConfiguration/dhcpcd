@@ -105,7 +105,8 @@ unsigned long random_xid (void)
       fd = open ("/dev/urandom", 0);
       if (fd < 0 || read (fd,  &seed, sizeof(seed)) < 0)
 	{
-	  logger (LOG_WARNING, "Could not load seed from /dev/urandom: %m");
+	  logger (LOG_WARNING, "Could not load seed from /dev/urandom: %s",
+		  strerror (errno));
 	  seed = time (0);
 	}
       if (fd >= 0)

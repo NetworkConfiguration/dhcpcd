@@ -47,7 +47,7 @@
 
 static char *cleanmetas (char *cstr)
 {
-  if (!cstr)
+  if (! cstr)
     return "";
   
   register char *c = cstr;
@@ -62,13 +62,13 @@ static char *cleanmetas (char *cstr)
 
 void exec_script (char *script, char *infofile, char *arg)
 {
-  if (!script || !infofile || !arg)
+  if (! script || ! infofile || ! arg)
     return;
 
   struct stat buf;
-  if (stat (script, &buf))
+  if (stat (script, &buf) < 0)
     {
-      if (strcmp (script, DEFAULT_SCRIPT))
+      if (strcmp (script, DEFAULT_SCRIPT) != 0)
 	logger (LOG_ERR, "`%s': %s", script, strerror (ENOENT));
       return;
     }
@@ -88,8 +88,8 @@ void exec_script (char *script, char *infofile, char *arg)
   if ((pid = fork ()) == 0)
     {
       if (execv (script, argc))
-	logger (LOG_ERR, "error executing \"%s %s %s\": %m",
-		argc[0], argc[1], argc[2]);
+	logger (LOG_ERR, "error executing \"%s %s %s\": %s",
+		argc[0], argc[1], argc[2], strerror (errno));
       exit (0);
     }
   else if (pid == -1)
@@ -103,19 +103,19 @@ static int make_resolv (char *ifname, dhcp_t *dhcp, int wait)
   char resolvconf[PATH_MAX];
   address_t *address;
 
-  if (!stat ("/sbin/resolvconf", &buf))
+  if (stat ("/sbin/resolvconf", &buf) == 0)
     {
       logger (LOG_DEBUG, "sending DNS information to resolvconf");
       snprintf (resolvconf, PATH_MAX, "/sbin/resolvconf -a %s", ifname);
       f = popen (resolvconf, "w");
 
-      if (!f)
-	logger (LOG_ERR, "popen: %m");
+      if (! f)
+	logger (LOG_ERR, "popen: %s", strerror (errno));
     }
   else
     {
       if (! (f = fopen(RESOLVFILE, "w")))
-	logger (LOG_ERR, "fopen `%s': %m", RESOLVFILE);
+	logger (LOG_ERR, "fopen `%s': %s", RESOLVFILE, strerror (errno));
     }
 
   if (f) 
@@ -150,7 +150,7 @@ static void restore_resolv(char *ifname)
 {
   struct stat buf;
 
-  if (stat ("/sbin/resolvconf", &buf))
+  if (stat ("/sbin/resolvconf", &buf) < 0)
     return;
 
   logger (LOG_DEBUG, "removing information from resolvconf");
@@ -171,8 +171,8 @@ static void restore_resolv(char *ifname)
   if ((pid = fork ()) == 0)
     {
       if (execve (argc[0], argc, NULL))
-	logger (LOG_ERR, "error executing \"%s %s %s\": %m",
-		argc[0], argc[1], argc[2]);
+	logger (LOG_ERR, "error executing \"%s %s %s\": %s",
+		argc[0], argc[1], argc[2], strerror (errno));
       exit (0);
     }
   else if (pid == -1)
@@ -187,7 +187,7 @@ static int make_ntp (char *ifname, dhcp_t *dhcp)
 
   if (! (f = fopen(NTPFILE, "w")))
     {
-      logger (LOG_ERR, "fopen `%s': %m", NTPFILE);
+      logger (LOG_ERR, "fopen `%s': %s", NTPFILE, strerror (errno));
       return -1;
     }
 	  
@@ -215,7 +215,7 @@ static int make_nis (char *ifname, dhcp_t *dhcp)
 
   if (! (f = fopen(NISFILE, "w")))
     {
-      logger (LOG_ERR, "fopen `%s': %m", NISFILE);
+      logger (LOG_ERR, "fopen `%s': %s", NISFILE, strerror (errno));
       return -1;
     }
 
@@ -248,7 +248,7 @@ static int write_info(interface_t *iface, dhcp_t *dhcp)
 
   if ((f = fopen (iface->infofile, "w")) == NULL)
     {
-      logger (LOG_ERR, "fopen `%s': %m", iface->infofile);
+      logger (LOG_ERR, "fopen `%s': %s", iface->infofile, strerror (errno));
       return -1;
     }
 
@@ -356,7 +356,7 @@ int configure (options_t *options, interface_t *iface, dhcp_t *dhcp)
   char *dname = NULL;
   int dnamel = 0;
  
-  if (!options || !iface || !dhcp)
+  if (! options || ! iface || ! dhcp)
     return -1;
 
   /* Remove old routes

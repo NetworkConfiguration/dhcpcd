@@ -20,6 +20,7 @@
  */
 
 #include <sys/time.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -43,7 +44,7 @@ long uptime (void)
 
   if (clock_gettime(CLOCK_MONOTONIC, &tp) == -1)
     {
-      logger (LOG_ERR, "Unable to get uptime: %m");
+      logger (LOG_ERR, "Unable to get uptime: %s", strerror (errno));
       return -1;
     }
 
