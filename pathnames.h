@@ -24,6 +24,8 @@
 
 #define PACKAGE			"dhcpcd"
 
+#define RESOLVCONF		"/sbin/resolvconf"
+
 #define ETCDIR			"/etc"
 #define RESOLVFILE		ETCDIR "/resolv.conf"
 #define NISFILE			ETCDIR "/yp.conf"

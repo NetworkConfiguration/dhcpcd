@@ -115,6 +115,7 @@ int main(int argc, char **argv)
 
   options.doarp = false;
   options.dodns = true;
+  options.donis = true;
   options.dontp = true;
   options.dogateway = true;
   options.timeout = DEFAULT_TIMEOUT;

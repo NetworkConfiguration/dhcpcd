@@ -100,14 +100,13 @@ static int make_resolv (char *ifname, dhcp_t *dhcp)
 {
   FILE *f;
   struct stat buf;
-  char resolvconf[PATH_MAX];
+  char resolvconf[PATH_MAX] = {0};
   address_t *address;
 
-  memset (&buf, 0, sizeof (struct stat));
-  if (stat ("/sbin/resolvconf", &buf) == 0)
+  if (stat (RESOLVCONF, &buf) == 0)
     {
       logger (LOG_DEBUG, "sending DNS information to resolvconf");
-      snprintf (resolvconf, PATH_MAX, "/sbin/resolvconf -a %s", ifname);
+      snprintf (resolvconf, PATH_MAX, RESOLVCONF" -a %s", ifname);
       f = popen (resolvconf, "w");
 
       if (! f)
@@ -132,11 +131,8 @@ static int make_resolv (char *ifname, dhcp_t *dhcp)
       for (address = dhcp->dnsservers; address; address = address->next)
 	fprintf (f, "nameserver %s\n", inet_ntoa (address->address));
 
-      if (buf.st_ino)
-	{
-	  pclose (f);
-	  logger (LOG_DEBUG, "resolvconf completed");
-	}
+      if (*resolvconf)
+	pclose (f);
       else
 	fclose (f);
     }
@@ -152,14 +148,14 @@ static void restore_resolv(char *ifname)
 {
   struct stat buf;
 
-  if (stat ("/sbin/resolvconf", &buf) < 0)
+  if (stat (RESOLVCONF, &buf) < 0)
     return;
 
   logger (LOG_DEBUG, "removing information from resolvconf");
 
   char *argc[4];
 
-  argc[0] = "/sbin/resolvconf";
+  argc[0] = RESOLVCONF;
   argc[1] = "-d";
   argc[2] = ifname;
   argc[3] = NULL;

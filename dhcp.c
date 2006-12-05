@@ -153,36 +153,27 @@ size_t send_message (interface_t *iface, dhcp_t *dhcp,
       n_params = p;
       *p++ = 0;
 
-      /* If we don't request one item, then we get defaults back which
-	 we don't want */
-      if (type == DHCP_DISCOVER)
-	{
-	  *p++ = DHCP_DNSSERVER;
-	}
-      else
-	{
-	  *p++ = DHCP_RENEWALTIME;
-	  *p++ = DHCP_REBINDTIME;
-	  *p++ = DHCP_NETMASK;
-	  *p++ = DHCP_BROADCAST;
-	  *p++ = DHCP_CSR;
-	  /* RFC 3442 states classless static routes should be before routers
-	   * and static routes as classless static routes override them both */
-	  *p++ = DHCP_ROUTERS;
-	  *p++ = DHCP_STATICROUTE;
-	  *p++ = DHCP_HOSTNAME;
-	  *p++ = DHCP_DNSSEARCH;
-	  *p++ = DHCP_DNSDOMAIN;
-	  *p++ = DHCP_DNSSERVER;
-	  *p++ = DHCP_NISDOMAIN;
-	  *p++ = DHCP_NISSERVER;
-	  *p++ = DHCP_NTPSERVER;
-	  /* These parameters were requested by dhcpcd-2.0 and earlier
-	     but we never did anything with them */
-	  /*    *p++ = DHCP_DEFAULTIPTTL;
-	   *p++ = DHCP_MASKDISCOVERY;
-	   *p++ = DHCP_ROUTERDISCOVERY; */
-	}
+      *p++ = DHCP_RENEWALTIME;
+      *p++ = DHCP_REBINDTIME;
+      *p++ = DHCP_NETMASK;
+      *p++ = DHCP_BROADCAST;
+      *p++ = DHCP_CSR;
+      /* RFC 3442 states classless static routes should be before routers
+       * and static routes as classless static routes override them both */
+      *p++ = DHCP_ROUTERS;
+      *p++ = DHCP_STATICROUTE;
+      *p++ = DHCP_HOSTNAME;
+      *p++ = DHCP_DNSSEARCH;
+      *p++ = DHCP_DNSDOMAIN;
+      *p++ = DHCP_DNSSERVER;
+      *p++ = DHCP_NISDOMAIN;
+      *p++ = DHCP_NISSERVER;
+      *p++ = DHCP_NTPSERVER;
+      /* These parameters were requested by dhcpcd-2.0 and earlier
+	 but we never did anything with them */
+      /*    *p++ = DHCP_DEFAULTIPTTL;
+       *p++ = DHCP_MASKDISCOVERY;
+       *p++ = DHCP_ROUTERDISCOVERY; */
 
       *n_params = p - n_params - 1;
 
