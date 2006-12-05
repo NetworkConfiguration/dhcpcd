@@ -1,6 +1,6 @@
 dhcpcd-3.0.3
 NIS setup (yp.conf / domainname) works again.
-Send hostname/fqdn and our parameter list in DISCOVER and INFORM messages too.
+Send hostname/fqdn in DISCOVER and INFORM messages too.
 Add more debug messages.
 Fix writing to resolv.conf when resolvconf not present.
 Include linux/if_addr.h for 2.6.19+ kernels, thanks to AlexExtreme.
