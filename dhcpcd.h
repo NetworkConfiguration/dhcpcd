@@ -20,6 +20,7 @@
 #ifndef DHCPCD_H
 #define DHCPCD_H
 
+#include <sys/socket.h>
 #ifdef __linux__
 #include <linux/limits.h>
 #endif
