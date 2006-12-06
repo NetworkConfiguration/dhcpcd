@@ -186,7 +186,7 @@ size_t send_message (interface_t *iface, dhcp_t *dhcp,
 
       *n_params = p - n_params - 1;
 
-      if (options->hostname) 
+      if (*options->hostname) 
 	{
 	  if (options->fqdn == FQDN_DISABLE)
 	    {

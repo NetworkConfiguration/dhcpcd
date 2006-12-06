@@ -23,6 +23,7 @@
 #ifdef __linux__
 #include <linux/limits.h>
 #endif
+#include <net/if.h>
 #include <netinet/in.h>
 #include <limits.h>
 #include <stdbool.h>
@@ -35,12 +36,12 @@
 
 #define CLASS_ID_MAX_LEN	48
 #define CLIENT_ID_MAX_LEN	48
-#define HOSTNAME_MAX_LEN	64
+#define HOSTNAME_MAX_LEN	255	
 #define USERCLASS_MAX_LEN	255	
 
 typedef struct options_t {
-  char *interface;
-  char *hostname;
+  char interface[IF_NAMESIZE];
+  char hostname[HOSTNAME_MAX_LEN];
   int fqdn;
   char classid[CLASS_ID_MAX_LEN];
   char clientid[CLIENT_ID_MAX_LEN];

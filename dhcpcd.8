@@ -1,6 +1,6 @@
 .\" $Id$
 .\"
-.TH dhcpcd 8 "30 November 2006" "dhcpcd 3.0"
+.TH dhcpcd 8 "06 December 2006" "dhcpcd 3.0"
 
 .SH NAME
 dhcpcd \- DHCP client daemon
@@ -70,6 +70,7 @@ sends DHCP messages. Some DHCP servers, notably those used by
 field containing a specific string in the DHCP messages from clients.
 When combined with the -F switch, specifies the string used for the
 FQDN option field instead of the hostname option field.
+We send the current hostname by default. To send no hostname, use -h ''.
 .TP
 .BI \-i \ vendorClassID
 Specifies the vendor class identifier string.

@@ -520,8 +520,11 @@ int configure (options_t *options, interface_t *iface, dhcp_t *dhcp)
       if (dhcp->hostname)
 	strcpy (newhostname, dhcp->hostname); 
 
-      sethostname (newhostname, strlen (newhostname));
-      logger (LOG_INFO, "setting hostname to `%s'", newhostname);
+      if (*newhostname)
+	{
+	  logger (LOG_INFO, "setting hostname to `%s'", newhostname);
+	  sethostname (newhostname, strlen (newhostname));
+	}
     }
 
   write_info (iface, dhcp);

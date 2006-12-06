@@ -118,6 +118,10 @@ int main(int argc, char **argv)
   options.donis = true;
   options.dontp = true;
   options.dogateway = true;
+  gethostname (options.hostname, sizeof (options.hostname));
+  if (strcmp (options.hostname, "(none)") == 0 ||
+      strcmp (options.hostname, "localhost") == 0)
+    memset (options.hostname, 0, sizeof (options.hostname));
   options.timeout = DEFAULT_TIMEOUT;
 
   int doversion = 0;
@@ -182,7 +186,7 @@ int main(int argc, char **argv)
 	    exit (EXIT_FAILURE);
 	  }
 	else
-	  options.hostname = optarg;
+	  strcpy (options.hostname, optarg);
 	break;
       case 'i':
 	if (strlen(optarg) > CLASS_ID_MAX_LEN)
@@ -307,7 +311,7 @@ int main(int argc, char **argv)
 		  argv[optind], IF_NAMESIZE);
 	  exit (EXIT_FAILURE);
 	}
-      options.interface = argv[optind];
+      strcpy (options.interface, argv[optind]);
     }
   else
     {
