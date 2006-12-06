@@ -230,10 +230,10 @@ static int make_nis (char *ifname, dhcp_t *dhcp)
 	fprintf (f, "domain %s broadcast\n", dhcp->nisdomain);
     }
   else
-    sprintf(prefix, "ypserver %c", '\0');
+    snprintf (prefix, sizeof (prefix), "%s", "ypserver");
 
   for (address = dhcp->nisservers; address; address = address->next)
-    fprintf (f, "%s%s\n", prefix, inet_ntoa (address->address));
+    fprintf (f, "%s %s\n", prefix, inet_ntoa (address->address));
 
   fclose (f);
   

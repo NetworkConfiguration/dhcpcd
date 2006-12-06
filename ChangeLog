@@ -1,3 +1,6 @@
+dhcpcd-3.0.5
+Fix yp.conf creation.
+
 dhcpcd-3.0.4
 Fix netmask thanks to Marc Duponcheel.
 Send the hostname by default unless null, (none) or localhost.
