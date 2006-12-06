@@ -1,3 +1,4 @@
+dhcpcd-3.0.4
 Fix netmask thanks to Marc Duponcheel.
 Send the hostname by default unless null, (none) or localhost.
 This can be overridden by using a an empty option for -h (-h '').
