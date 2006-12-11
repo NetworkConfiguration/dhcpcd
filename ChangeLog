@@ -1,3 +1,7 @@
+dhcpcd-3.0.6
+Don't set the broadcast flag anymore as all BPF and Linux sockets should be
+able to unicast correctly.
+
 dhcpcd-3.0.5
 Fix yp.conf creation.
 

@@ -1,6 +1,6 @@
-# Should work for both GNU make and BSD mke
+# Should work for both GNU make and BSD make
 
-VERSION = 3.0.5
+VERSION = 3.0.6
 
 INSTALL ?= install
 CFLAGS ?= -Wall -O2 -pedantic -std=gnu99

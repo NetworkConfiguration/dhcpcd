@@ -91,15 +91,6 @@ size_t send_message (interface_t *iface, dhcp_t *dhcp,
   memcpy (&message.hwaddr, &iface->ethernet_address, ETHER_ADDR_LEN);
   message.cookie = htonl (MAGIC_COOKIE);
 
-  /* This logic should be improved so that we don't need to set the 0
-     flag as it's done in the above memset statement */
-  if (type == DHCP_REQUEST
-      && dhcp->address.s_addr == iface->previous_address.s_addr
-      && iface->previous_address.s_addr != 0)
-    message.flags = 0;
-  else
-    message.flags = htons (BROADCAST_FLAG);
-
   if (iface->previous_address.s_addr != 0
       && (type == DHCP_INFORM || type == DHCP_RELEASE
 	  || (type == DHCP_REQUEST
