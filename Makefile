@@ -1,9 +1,15 @@
 # Should work for both GNU make and BSD make
 
-VERSION = 3.0.6
+VERSION = 3.0.7_pre1
 
 INSTALL ?= install
-CFLAGS ?= -Wall -O2 -pedantic -std=gnu99
+CFLAGS = -O2 -pedantic -std=gnu99 \
+    -Wall -Wunused -Wimplicit -Wshadow -Wformat=2 \
+    -Wmissing-declarations -Wno-missing-prototypes -Wwrite-strings \
+    -Wbad-function-cast -Wnested-externs -Wcomment -Winline \
+    -Wchar-subscripts -Wcast-align -Wno-format-nonliteral  \
+    -Wsequence-point -Wextra
+# -Wdeclaration-after-statement 
 
 DESTDIR =
 SBINDIR = $(DESTDIR)/sbin

@@ -34,8 +34,9 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "arp.h"
 #include "common.h"
+#include "arp.h"
+#include "client.h"
 #include "configure.h"
 #include "dhcp.h"
 #include "dhcpcd.h"
@@ -94,7 +95,7 @@ static int daemonise (char *pidfile)
   return 0;
 }
 
-unsigned long random_xid (void)
+static unsigned long random_xid (void)
 {
   static int initialized;
 
@@ -174,7 +175,7 @@ int dhcp_run (options_t *options)
       if (timeout > 0 || (options->timeout == 0 &&
 			  (state != STATE_INIT || xid)))
 	{
-	  if (options->timeout == 0 || dhcp->leasetime == -1)
+	  if (options->timeout == 0 || dhcp->leasetime == (unsigned) -1)
 	    {
 	      logger (LOG_DEBUG, "waiting on select for infinity");
 	      maxfd = signal_fd_set (&rset, iface->fd);
@@ -507,7 +508,7 @@ int dhcp_run (options_t *options)
 			      dhcp->rebindtime);
 		    }
 
-		  if (dhcp->leasetime == -1)
+		  if (dhcp->leasetime == (unsigned) -1)
 		    logger (LOG_INFO, "leased %s for infinity",
 			    inet_ntoa (dhcp->address));
 		  else

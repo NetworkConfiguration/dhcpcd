@@ -148,9 +148,11 @@ interface_t *read_interface (const char *ifname, int metric)
     }
 
 #ifdef __linux__
+  /* Do something with the metric parameter to satisfy the compiler warning */
+  metric = 0;
   if (ioctl (s, SIOCGIFHWADDR, &ifr) <0)
     {
-      logger (LOG_ERR, "ioctl SIOCGIFHWADDR: %s", strerror(errno));
+      logger (LOG_ERR, "ioctl SIOCGIFHWADDR: %s", strerror (errno));
       close (s);
       return NULL;
     }
@@ -262,6 +264,9 @@ static int do_route (const char *ifname,
   if (! ifname)
     return -1;
 
+  /* Do something with metric to satisfy compiler warnings */
+  metric = 0;
+
   char *destd = strdup (inet_ntoa (destination));
   char *gend = strdup (inet_ntoa (netmask));
   logger (LOG_INFO, "%s route to %s (%s) via %s",
@@ -344,7 +349,7 @@ static int send_netlink(struct nlmsghdr *hdr)
       return -1;
     }
 
-  int mypid = getpid ();
+  pid_t mypid = getpid ();
   struct sockaddr_nl nl;
   memset (&nl, 0, sizeof (struct sockaddr_nl));
   nl.nl_family = AF_NETLINK;
@@ -369,7 +374,7 @@ static int send_netlink(struct nlmsghdr *hdr)
 
   /* Request a reply */
   hdr->nlmsg_flags |= NLM_F_ACK;
-  static int seq;
+  static unsigned int seq;
   hdr->nlmsg_seq = ++seq;
 
   if (sendmsg (s, &msg, 0) < 0)
@@ -408,7 +413,7 @@ static int send_netlink(struct nlmsghdr *hdr)
 	  goto eexit;
 	}
 
-      for (h = (struct nlmsghdr *) buffer; bytes >= sizeof (*h); )
+      for (h = (struct nlmsghdr *) buffer; bytes >= (signed) sizeof (*h); )
 	{
 	  int len = h->nlmsg_len;
 	  int l = len - sizeof (*h);
@@ -423,7 +428,7 @@ static int send_netlink(struct nlmsghdr *hdr)
 	    }
 
 	  if (nl.nl_pid != 0 ||
-	      h->nlmsg_pid != mypid ||
+	      (pid_t) h->nlmsg_pid != mypid ||
 	      h->nlmsg_seq != seq)
 	    /* Message isn't for us, so skip it */
 	    goto next;
@@ -432,7 +437,7 @@ static int send_netlink(struct nlmsghdr *hdr)
 	  if (h->nlmsg_type == NLMSG_ERROR)
 	    {
 	      struct nlmsgerr *err = (struct nlmsgerr *) NLMSG_DATA (h);
-	      if (l < sizeof (struct nlmsgerr))
+	      if ((unsigned) l < sizeof (struct nlmsgerr))
 		logger (LOG_ERR, "truncated error message");
 	      else
 		{
@@ -477,7 +482,7 @@ eexit:
 #define NLMSG_TAIL(nmsg) \
  ((struct rtattr *) (((unsigned char *) (nmsg)) \
 		     + NLMSG_ALIGN((nmsg)->nlmsg_len)))
-static int add_attr_l(struct nlmsghdr *n, int maxlen, int type, const void *data,
+static int add_attr_l(struct nlmsghdr *n, unsigned int maxlen, int type, const void *data,
 		      int alen)
 {
   int len = RTA_LENGTH(alen);
@@ -498,7 +503,7 @@ static int add_attr_l(struct nlmsghdr *n, int maxlen, int type, const void *data
   return 0;
 }
 
-static int add_attr_32(struct nlmsghdr *n, int maxlen, int type, uint32_t data)
+static int add_attr_32(struct nlmsghdr *n, unsigned int maxlen, int type, uint32_t data)
 {
   int len = RTA_LENGTH (sizeof (uint32_t));
   struct rtattr *rta;

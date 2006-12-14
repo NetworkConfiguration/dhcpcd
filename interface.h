@@ -23,10 +23,11 @@
 #define INTERFACE_H
 
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/socket.h>
 #include <net/if.h>
-#include <netinet/if_ether.h>
 #include <netinet/in.h>
+#include <netinet/if_ether.h>
 #include <limits.h>
 #include <stdbool.h>
 

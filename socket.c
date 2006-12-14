@@ -22,9 +22,9 @@
 /* We use BSD structure so our code is more portable */
 #define _BSD_SOURCE
 
+#include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
-#include <sys/types.h>
 #include <sys/uio.h>
 #include <arpa/inet.h>
 #include <netinet/in_systm.h>
@@ -43,6 +43,7 @@
 #include "dhcp.h"
 #include "interface.h"
 #include "logger.h"
+#include "socket.h"
 
 /* A suitably large buffer for all transactions.
    BPF buffer size is set by the kernel, so no define. */
@@ -76,7 +77,7 @@ static uint16_t checksum (unsigned char *addr, uint16_t len)
 }
 
 void make_dhcp_packet(struct udp_dhcp_packet *packet,
-		      unsigned char *data, unsigned int length,
+		      unsigned char *data, int length,
 		      struct in_addr source, struct in_addr dest)
 {
   struct ip *ip = &packet->ip;
@@ -293,8 +294,7 @@ int open_socket (interface_t *iface, bool arp)
   return fd;
 }
 
-int send_packet (interface_t *iface, int type, unsigned char *data,
-		 unsigned int len)
+int send_packet (interface_t *iface, int type, unsigned char *data, int len)
 {
   /* We only support ethernet atm */
   struct ether_header hw;
@@ -348,7 +348,8 @@ int get_packet (interface_t *iface, unsigned char *data,
   while (packet)
     {
       /* Ensure that the entire packet is in our buffer */
-      if (*buffer_pos + packet->bh_hdrlen + packet->bh_caplen > *buffer_len)
+      if (*buffer_pos + packet->bh_hdrlen + packet->bh_caplen
+          > (unsigned) *buffer_len)
         break;
 
       hw = (struct ether_header *) ((char *) packet + packet->bh_hdrlen);
@@ -464,7 +465,7 @@ int send_packet (interface_t *iface, int type, unsigned char *data, int len)
 
 /* Linux has no need for the buffer as we can read as much as we want.
    We only have the buffer listed to keep the same API. */
-size_t get_packet (interface_t *iface, unsigned char *data,
+int get_packet (interface_t *iface, unsigned char *data,
 		   unsigned char *buffer, int *buffer_len, int *buffer_pos)
 {
   long bytes;
@@ -492,7 +493,7 @@ size_t get_packet (interface_t *iface, unsigned char *data,
       return bytes;
     }
 
-  if (bytes < (sizeof (struct ip) + sizeof (struct udphdr)))
+  if ((unsigned) bytes < (sizeof (struct ip) + sizeof (struct udphdr)))
     {
       logger (LOG_DEBUG, "message too short, ignoring");
       return -1;

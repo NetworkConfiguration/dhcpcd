@@ -26,6 +26,7 @@
 #include "interface.h"
 #include "dhcp.h"
 
-int configure (options_t *options, interface_t *iface, dhcp_t *dhcp);
+int configure (const options_t *options, interface_t *iface,
+	       const dhcp_t *dhcp);
 
 #endif

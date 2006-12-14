@@ -31,7 +31,7 @@
 static int loglevel = LOG_WARNING;
 static char logprefix[12] = {0};
 
-static char *syslog_level_msg[] = {
+static const char *syslog_level_msg[] = {
   [LOG_EMERG]   	= "EMERGENCY!",
   [LOG_ALERT]   	= "ALERT!",
   [LOG_CRIT]    	= "Critical!",
@@ -42,7 +42,7 @@ static char *syslog_level_msg[] = {
   [LOG_DEBUG + 1]	= NULL
 };
 
-static char *syslog_level[] = {
+static const char *syslog_level[] = {
   [LOG_EMERG]   	= "LOG_EMERG",
   [LOG_ALERT]   	= "LOG_ALERT",
   [LOG_CRIT]    	= "LOG_CRIT",
@@ -99,10 +99,10 @@ void logger(int level, const char *fmt, ...)
     {
       int len = strlen (logprefix);
       char *fmt2 = xmalloc (strlen (fmt) + len + 1);
-      char *p = fmt2;
-      memcpy (p, logprefix, len);
-      p += len;
-      strcpy (p, fmt);
+      char *pf = fmt2;
+      memcpy (pf, logprefix, len);
+      pf += len;
+      strcpy (pf, fmt);
       vsyslog (level, fmt2, p2);
       free (fmt2);
     }

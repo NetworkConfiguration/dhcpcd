@@ -24,10 +24,10 @@
 
 #define _BSD_SOURCE
 
+#include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
 #include <sys/socket.h>
-#include <sys/types.h>
 #include <netinet/in_systm.h>
 #ifdef __linux
 #include <netinet/ether.h>
@@ -40,6 +40,7 @@
 #include <unistd.h>
 
 #include "common.h"
+#include "arp.h"
 #include "interface.h"
 #include "logger.h"
 #include "socket.h"
@@ -58,7 +59,7 @@
 #define arphdr_len(ap) (arphdr_len2 ((ap)->ar_hln, (ap)->ar_pln))
 #endif
 
-int arp_check (interface_t *iface, struct in_addr address)
+int arp_check (interface_t *iface, const struct in_addr address)
 {
   if (! iface->arpable)
     {
@@ -138,7 +139,7 @@ int arp_check (interface_t *iface, struct in_addr address)
 
 	  if (ah->ar_hln != ETHER_ADDR_LEN)
 	    continue;
-	  if (bytes < sizeof (*ah) + 2 * (4 + ah->ar_hln))
+	  if ((unsigned) bytes < sizeof (*ah) + 2 * (4 + ah->ar_hln))
 	    continue;
 
 	  logger (LOG_ERR, "ARPOP_REPLY received from %s (%s)",

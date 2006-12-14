@@ -20,10 +20,8 @@
 #ifndef DHCPCD_H
 #define DHCPCD_H
 
+#include <sys/param.h>
 #include <sys/socket.h>
-#ifdef __linux__
-#include <linux/limits.h>
-#endif
 #include <net/if.h>
 #include <netinet/in.h>
 #include <limits.h>

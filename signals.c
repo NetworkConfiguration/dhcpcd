@@ -28,6 +28,7 @@
 #include <unistd.h>
 
 #include "logger.h"
+#include "signals.h"
 
 static int signal_pipe[2];
 

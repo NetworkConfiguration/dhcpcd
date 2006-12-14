@@ -26,10 +26,10 @@
 
 #include <arpa/inet.h>
 
+#include <netinet/in.h>
 #ifdef __linux__
 #include <netinet/ether.h>
 #endif
-#include <netinet/in.h>
 #include <string.h>
 #include <errno.h>
 #include <netdb.h>
@@ -38,6 +38,7 @@
 #include <unistd.h>
 
 #include "common.h"
+#include "configure.h"
 #include "dhcp.h"
 #include "interface.h"
 #include "dhcpcd.h"
@@ -48,7 +49,7 @@
 static char *cleanmetas (char *cstr)
 {
   if (! cstr)
-    return "";
+    return NULL;
   
   register char *c = cstr;
 
@@ -60,7 +61,8 @@ static char *cleanmetas (char *cstr)
   return cstr;
 }
 
-void exec_script (char *script, char *infofile, char *arg)
+static void exec_script (const char *script, const char *infofile,
+			 const char *arg)
 {
   if (! script || ! infofile || ! arg)
     return;
@@ -73,12 +75,8 @@ void exec_script (char *script, char *infofile, char *arg)
       return;
     }
   
-  char *argc[4];
-
-  argc[0] = script;
-  argc[1] = infofile;
-  argc[2] = arg;
-  argc[3] = NULL;
+  char *const argc[4] =
+    { (char *) script, (char *) infofile, (char *) arg, NULL };
   logger (LOG_DEBUG, "exec \"%s %s %s\"", script, infofile, arg);
   
   /* We don't wait for the user script to finish - do we trust it? */
@@ -96,7 +94,7 @@ void exec_script (char *script, char *infofile, char *arg)
     logger (LOG_ERR, "fork: %s", strerror (errno));
 }
 
-static int make_resolv (char *ifname, dhcp_t *dhcp)
+static int make_resolv (const char *ifname, const dhcp_t *dhcp)
 {
   FILE *f;
   struct stat buf;
@@ -144,7 +142,7 @@ static int make_resolv (char *ifname, dhcp_t *dhcp)
   return 0;
 }
 
-static void restore_resolv(char *ifname)
+static void restore_resolv(const char *ifname)
 {
   struct stat buf;
 
@@ -153,12 +151,7 @@ static void restore_resolv(char *ifname)
 
   logger (LOG_DEBUG, "removing information from resolvconf");
 
-  char *argc[4];
-
-  argc[0] = RESOLVCONF;
-  argc[1] = "-d";
-  argc[2] = ifname;
-  argc[3] = NULL;
+  char *const argc[4] = { (char *) RESOLVCONF, (char *) "-d", (char *) ifname, NULL };
 
   /* Don't wait around here as we should only be called when
      dhcpcd is closing down and something may do a kill -9
@@ -177,7 +170,7 @@ static void restore_resolv(char *ifname)
     logger (LOG_ERR, "fork: %s", strerror (errno));
 }
 
-static int make_ntp (char *ifname, dhcp_t *dhcp)
+static int make_ntp (const char *ifname, const dhcp_t *dhcp)
 {
   FILE *f;
   address_t *address;
@@ -206,7 +199,7 @@ static int make_ntp (char *ifname, dhcp_t *dhcp)
   return 0;
 }
 
-static int make_nis (char *ifname, dhcp_t *dhcp)
+static int make_nis (const char *ifname, const dhcp_t *dhcp)
 {
   FILE *f;
   address_t *address;
@@ -240,7 +233,7 @@ static int make_nis (char *ifname, dhcp_t *dhcp)
   return 0;
 }
 
-static int write_info(interface_t *iface, dhcp_t *dhcp)
+static int write_info(const interface_t *iface, const dhcp_t *dhcp)
 {
   FILE *f;
   route_t *route;
@@ -346,7 +339,8 @@ static int write_info(interface_t *iface, dhcp_t *dhcp)
   return 0;
 }
 
-int configure (options_t *options, interface_t *iface, dhcp_t *dhcp)
+int configure (const options_t *options, interface_t *iface,
+	       const dhcp_t *dhcp)
 {
   route_t *route = NULL;
   route_t *new_route = NULL;

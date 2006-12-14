@@ -19,8 +19,8 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/socket.h>
 
 #include <netinet/in.h>
 #include <net/if_arp.h>
@@ -32,6 +32,7 @@
 #include <string.h>
 
 #include "common.h"
+#include "dhcpcd.h"
 #include "dhcp.h"
 #include "interface.h"
 #include "logger.h"
@@ -39,7 +40,7 @@
 
 #define BROADCAST_FLAG 0x8000
 
-static char *dhcp_message[] = {
+static const char *dhcp_message[] = {
   [DHCP_DISCOVER] 	= "DHCP_DISCOVER",
   [DHCP_OFFER]		= "DHCP_OFFER",
   [DHCP_REQUEST]	= "DHCP_REQUEST",

@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "common.h"
 #include "logger.h"
 
 /* This requires us to link to rt on glibc, so we use sysinfo instead */

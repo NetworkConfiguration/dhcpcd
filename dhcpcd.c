@@ -110,7 +110,7 @@ int main(int argc, char **argv)
   openlog (PACKAGE, LOG_PID, LOG_LOCAL0);
 
   memset (&options, 0, sizeof (options_t));
-  options.script = DEFAULT_SCRIPT;
+  options.script = (char *) DEFAULT_SCRIPT;
   snprintf (options.classid, CLASS_ID_MAX_LEN, "%s %s", PACKAGE, VERSION); 
 
   options.doarp = false;
