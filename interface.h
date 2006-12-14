@@ -76,9 +76,9 @@ int del_address (const char *ifname, struct in_addr address);
 int flush_addresses (const char *ifname);
 
 int add_route (const char *ifname, struct in_addr destination,
-	      struct in_addr netmask, struct in_addr gateway, int metric);
+	       struct in_addr netmask, struct in_addr gateway, int metric);
 int change_route (const char *ifname, struct in_addr destination,
 		  struct in_addr netmask, struct in_addr gateway, int metric);
 int del_route (const char *ifname, struct in_addr destination,
-	      struct in_addr netmask, struct in_addr gateway, int metric);
+	       struct in_addr netmask, struct in_addr gateway, int metric);
 #endif

@@ -123,7 +123,7 @@ static unsigned long random_xid (void)
 
 /* This state machine is based on the one from udhcpc
    written by Russ Dill */
-int dhcp_run (options_t *options)
+int dhcp_run (const options_t *options)
 {
   interface_t *iface;
   int mode = SOCKET_CLOSED;

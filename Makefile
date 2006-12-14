@@ -8,8 +8,7 @@ CFLAGS = -O2 -pedantic -std=gnu99 \
     -Wmissing-declarations -Wno-missing-prototypes -Wwrite-strings \
     -Wbad-function-cast -Wnested-externs -Wcomment -Winline \
     -Wchar-subscripts -Wcast-align -Wno-format-nonliteral  \
-    -Wsequence-point -Wextra
-# -Wdeclaration-after-statement 
+    -Wsequence-point -Wextra -Werror
 
 DESTDIR =
 SBINDIR = $(DESTDIR)/sbin

@@ -52,8 +52,9 @@ static const char *dhcp_message[] = {
   [DHCP_INFORM + 1]	= NULL
 };
 
-size_t send_message (interface_t *iface, dhcp_t *dhcp,
-		     unsigned long xid, char type, options_t *options)
+size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
+		     unsigned long xid, char type,
+		     const options_t *options)
 {
   dhcpmessage_t message;
   unsigned char *m = (unsigned char *) &message;
@@ -454,7 +455,7 @@ static void dhcp_add_address(address_t *address, unsigned char *data, int length
     }
 }
 
-int parse_dhcpmessage (dhcp_t *dhcp, dhcpmessage_t *message)
+int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 {
   unsigned char *p = message->options;
   unsigned char option;

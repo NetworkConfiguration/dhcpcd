@@ -24,6 +24,6 @@
 
 #include "dhcpcd.h"
 
-int dhcp_run (options_t *options);
+int dhcp_run (const options_t *options);
 
 #endif

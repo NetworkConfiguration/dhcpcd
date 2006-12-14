@@ -194,9 +194,10 @@ struct udp_dhcp_packet
   dhcpmessage_t dhcp;
 };
 
-size_t send_message (interface_t *iface, dhcp_t *dhcp,
-		     unsigned long xid, char type, options_t *options);
+size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
+		     unsigned long xid, char type,
+		     const options_t *options);
 void free_dhcp (dhcp_t *dhcp);
-int parse_dhcpmessage (dhcp_t *dhcp, dhcpmessage_t *message);
+int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message);
 
 #endif

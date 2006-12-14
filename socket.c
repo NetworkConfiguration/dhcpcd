@@ -77,7 +77,7 @@ static uint16_t checksum (unsigned char *addr, uint16_t len)
 }
 
 void make_dhcp_packet(struct udp_dhcp_packet *packet,
-		      unsigned char *data, int length,
+		      const unsigned char *data, int length,
 		      struct in_addr source, struct in_addr dest)
 {
   struct ip *ip = &packet->ip;
@@ -441,7 +441,8 @@ int open_socket (interface_t *iface, bool arp)
   return fd;
 }
 
-int send_packet (interface_t *iface, int type, unsigned char *data, int len)
+int send_packet (const interface_t *iface, const int type,
+		 const unsigned char *data, const int len)
 {
   struct sockaddr_ll sll;
   int retval;
@@ -465,7 +466,7 @@ int send_packet (interface_t *iface, int type, unsigned char *data, int len)
 
 /* Linux has no need for the buffer as we can read as much as we want.
    We only have the buffer listed to keep the same API. */
-int get_packet (interface_t *iface, unsigned char *data,
+int get_packet (const interface_t *iface, unsigned char *data,
 		   unsigned char *buffer, int *buffer_len, int *buffer_pos)
 {
   long bytes;

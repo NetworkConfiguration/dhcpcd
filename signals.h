@@ -22,6 +22,6 @@
 
 void signal_setup (void);
 int signal_fd_set (fd_set *rfds, int extra_fd);
-int signal_read (fd_set *rfds);
+int signal_read (const fd_set *rfds);
 
 #endif

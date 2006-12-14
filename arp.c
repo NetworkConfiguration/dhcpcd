@@ -59,7 +59,7 @@
 #define arphdr_len(ap) (arphdr_len2 ((ap)->ar_hln, (ap)->ar_pln))
 #endif
 
-int arp_check (interface_t *iface, const struct in_addr address)
+int arp_check (interface_t *iface, struct in_addr address)
 {
   if (! iface->arpable)
     {
