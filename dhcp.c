@@ -464,9 +464,9 @@ static void dhcp_add_address(address_t *address, unsigned char *data, int length
 int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 {
   unsigned char *p = message->options;
+  unsigned char *end = message->options; /* Add size later for gcc-3 issue */
   unsigned char option;
   unsigned char length;
-  unsigned char *end = message->options + sizeof (message->options);
   unsigned int len = 0;
   int i;
   int retval = -1;
@@ -474,14 +474,10 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
   route_t *route = first_route;
   route_t *last_route = NULL;
   route_t *csr = NULL;
-  char classid[CLASS_ID_MAX_LEN];
-  char clientid[CLIENT_ID_MAX_LEN];
+
+  end += sizeof (message->options);
 
   memset (first_route, 0, sizeof (route_t));
-
-  /* The message back never has the class or client id's so we save them */
-  strcpy (classid, dhcp->classid);
-  strcpy (clientid, dhcp->clientid);
 
   dhcp->address.s_addr = message->yiaddr;
   strcpy (dhcp->servername, message->servername);
@@ -654,10 +650,6 @@ eexit:
 	  dhcp->routes = NULL;
 	}
     }
-
-  /* The message back never has the class or client id's so we restore them */
-  strcpy (dhcp->classid, classid);
-  strcpy (dhcp->clientid, clientid);
 
   return retval;
 }

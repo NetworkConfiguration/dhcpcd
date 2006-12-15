@@ -38,7 +38,6 @@ static void signal_handler (int sig)
     logger (LOG_ERR, "Could not send signal: %s", strerror (errno));
 }
 
-
 /* Call this before doing anything else. Sets up the socket pair
  * and installs the signal handler */
 void signal_setup(void)
@@ -60,7 +59,6 @@ void signal_setup(void)
   signal (SIGINT, signal_handler);
 }
 
-
 /* Quick little function to setup the rfds. Will return the
  * max_fd for use with select. Limited in that you can only pass
  * one extra fd */
@@ -73,7 +71,6 @@ int signal_fd_set (fd_set *rfds, int extra_fd)
   return signal_pipe[0] > extra_fd ? signal_pipe[0] : extra_fd;
 }
 
-
 /* Read a signal from the signal pipe. Returns 0 if there is
  * no signal, -1 on error (and sets errno appropriately), and
  * your signal on success */
@@ -81,7 +78,7 @@ int signal_read (const fd_set *rfds)
 {
   int sig;
 
-  if (!FD_ISSET (signal_pipe[0], rfds))
+  if (! FD_ISSET (signal_pipe[0], rfds))
     return 0;
 
   if (read (signal_pipe[0], &sig, sizeof (sig)) < 0)

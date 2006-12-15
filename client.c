@@ -81,7 +81,7 @@
   send_message (iface, dhcp, xid, _type, options); \
 }
 
-static int daemonise (char *pidfile)
+static int daemonise (const char *pidfile)
 {
   logger (LOG_DEBUG, "forking to background");
   if (daemon (0, 0) < 0)
@@ -158,12 +158,6 @@ int dhcp_run (const options_t *options)
 
   dhcp = xmalloc (sizeof (dhcp_t));
   memset (dhcp, 0, sizeof (dhcp_t));
-
-  strcpy (dhcp->classid, options->classid);
-  if (options->clientid[0])
-    strcpy (dhcp->clientid, options->clientid);
-  else
-    sprintf (dhcp->clientid, "%s", ether_ntoa (&iface->ethernet_address));
 
   if (options->requestaddress.s_addr != 0)
     dhcp->address.s_addr = options->requestaddress.s_addr;

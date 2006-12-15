@@ -123,9 +123,6 @@ typedef struct dhcp_t
   struct in_addr serveraddress;
   char serverhw[IF_NAMESIZE];
   char servername[64];
-
-  char classid[CLASS_ID_MAX_LEN];
-  char clientid[CLIENT_ID_MAX_LEN];
   
   struct in_addr address;
   struct in_addr netmask;

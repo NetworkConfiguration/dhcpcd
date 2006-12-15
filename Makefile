@@ -1,6 +1,6 @@
 # Should work for both GNU make and BSD make
 
-VERSION = 3.0.7_pre2
+VERSION = 3.0.7_pre3
 
 INSTALL ?= install
 
@@ -9,7 +9,7 @@ CFLAGS ?= -O2 -pipe
 # Loads of nice flags to ensure our code is good
 # We define _BSD_SOURCE for maximum portability
 CFLAGS += -D_BSD_SOURCE -pedantic -std=c99 \
-    -Wall -Werror -Wunused -Wimplicit -Wshadow -Wformat=2 \
+    -Wall -Wunused -Wimplicit -Wshadow -Wformat=2 \
     -Wmissing-declarations -Wno-missing-prototypes -Wwrite-strings \
     -Wbad-function-cast -Wnested-externs -Wcomment -Winline \
     -Wchar-subscripts -Wcast-align -Wno-format-nonliteral
@@ -17,6 +17,10 @@ CFLAGS += -D_BSD_SOURCE -pedantic -std=c99 \
 # Early GCC versions don't support these flags, so you may need to comment
 # this line out
 CFLAGS += -Wsequence-point -Wextra -Wdeclaration-after-statement
+
+# -Werrror is a good flag to use for development, but some platforms may
+#  have buggy headers from time to time, so you may need to comment this out
+#CFLAGS += -Werror
 
 DESTDIR =
 SBINDIR = $(DESTDIR)/sbin

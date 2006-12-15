@@ -117,7 +117,7 @@ void make_dhcp_packet(struct udp_dhcp_packet *packet,
   ip->ip_sum = checksum ((unsigned char *) ip, sizeof (struct ip));
 }
 
-static int valid_dhcp_packet (unsigned char * data)
+static int valid_dhcp_packet (unsigned char *data)
 {
   struct udp_dhcp_packet *packet = (struct udp_dhcp_packet *) data;
   uint16_t bytes = ntohs (packet->ip.ip_len);
@@ -212,7 +212,7 @@ static struct bpf_insn arp_bpf_filter [] = {
 int open_socket (interface_t *iface, bool arp)
 {
   int n = 0;
-  int fd = 0;
+  int fd = -1;
   char device[PATH_MAX];
   int flags;
   struct ifreq ifr;
@@ -239,6 +239,7 @@ int open_socket (interface_t *iface, bool arp)
       return -1;
     }
 
+  memset (&ifr, 0, sizeof (struct ifreq));
   strncpy (ifr.ifr_name, iface->name, sizeof (ifr.ifr_name));
   if (ioctl (fd, BIOCSETIF, &ifr) < 0)
     {
@@ -257,6 +258,7 @@ int open_socket (interface_t *iface, bool arp)
     }
   iface->buffer_length = buf;
 
+  flags = 1;
   if (ioctl (fd, BIOCIMMEDIATE, &flags) < 0)
     {
       logger (LOG_ERR, "ioctl BIOCIMMEDIATE: %s", strerror (errno));
@@ -267,6 +269,7 @@ int open_socket (interface_t *iface, bool arp)
   /* Install the DHCP filter */
   if (arp)
     {
+      printf ("arp!");
       p.bf_insns = arp_bpf_filter;
       p.bf_len = sizeof (arp_bpf_filter) / sizeof (struct bpf_insn);
     }
@@ -466,7 +469,7 @@ int get_packet (const interface_t *iface, unsigned char *data,
   long bytes;
   struct udp_dhcp_packet *dhcp;
 
- /* We don't use the given buffer, but we need to rewind the position */
+  /* We don't use the given buffer, but we need to rewind the position */
   *buffer_pos = 0;
 
   memset (buffer, 0, iface->buffer_length);
