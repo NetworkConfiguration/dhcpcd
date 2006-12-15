@@ -294,7 +294,8 @@ int open_socket (interface_t *iface, bool arp)
   return fd;
 }
 
-int send_packet (interface_t *iface, int type, unsigned char *data, int len)
+int send_packet (const interface_t *iface, int type,
+		 const unsigned char *data, int len)
 {
   /* We only support ethernet atm */
   struct ether_header hw;
@@ -307,7 +308,7 @@ int send_packet (interface_t *iface, int type, unsigned char *data, int len)
 
   iov[0].iov_base = &hw;
   iov[0].iov_len = sizeof (struct ether_header);
-  iov[1].iov_base = data;
+  iov[1].iov_base = (unsigned char *) data;
   iov[1].iov_len = len;
 
   if ((retval = writev(iface->fd, iov, 2)) == -1)
@@ -318,7 +319,7 @@ int send_packet (interface_t *iface, int type, unsigned char *data, int len)
 
 /* BPF requires that we read the entire buffer.
    So we pass the buffer in the API so we can loop on >1 dhcp packet. */
-int get_packet (interface_t *iface, unsigned char *data,
+int get_packet (const interface_t *iface, unsigned char *data,
 		unsigned char *buffer, int *buffer_len, int *buffer_pos)
 {
   unsigned char *buf = buffer;
@@ -349,8 +350,8 @@ int get_packet (interface_t *iface, unsigned char *data,
     {
       /* Ensure that the entire packet is in our buffer */
       if (*buffer_pos + packet->bh_hdrlen + packet->bh_caplen
-          > (unsigned) *buffer_len)
-        break;
+	  > (unsigned) *buffer_len)
+	break;
 
       hw = (struct ether_header *) ((char *) packet + packet->bh_hdrlen);
       hdr = (unsigned char *) ((char *) hw + sizeof (struct ether_header));
@@ -430,7 +431,7 @@ int open_socket (interface_t *iface, bool arp)
       close (fd);
       return -1;
     }
-  
+
   if (iface->fd > -1)
     close (iface->fd);
   iface->fd = fd;
@@ -467,7 +468,7 @@ int send_packet (const interface_t *iface, const int type,
 /* Linux has no need for the buffer as we can read as much as we want.
    We only have the buffer listed to keep the same API. */
 int get_packet (const interface_t *iface, unsigned char *data,
-		   unsigned char *buffer, int *buffer_len, int *buffer_pos)
+		unsigned char *buffer, int *buffer_len, int *buffer_pos)
 {
   long bytes;
 

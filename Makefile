@@ -3,6 +3,9 @@
 VERSION = 3.0.7_pre1
 
 INSTALL ?= install
+
+# Loads of nice flags to ensure our code is good
+# And yes, we require C99 style code which means gcc-3 as a minimum
 CFLAGS = -O2 -pedantic -std=gnu99 \
     -Wall -Wunused -Wimplicit -Wshadow -Wformat=2 \
     -Wmissing-declarations -Wno-missing-prototypes -Wwrite-strings \

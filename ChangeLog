@@ -1,3 +1,6 @@
+Add new CFLAGS to ensure that the code quality is good.
+Use const more in public functions.
+
 dhcpcd-3.0.6
 Don't set the broadcast flag anymore as all BPF and Linux sockets should be
 able to unicast correctly.
