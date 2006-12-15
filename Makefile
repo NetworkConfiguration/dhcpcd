@@ -20,7 +20,7 @@ CFLAGS += -Wsequence-point -Wextra -Wdeclaration-after-statement
 
 # -Werrror is a good flag to use for development, but some platforms may
 #  have buggy headers from time to time, so you may need to comment this out
-#CFLAGS += -Werror
+CFLAGS += -Werror
 
 DESTDIR =
 SBINDIR = $(DESTDIR)/sbin
