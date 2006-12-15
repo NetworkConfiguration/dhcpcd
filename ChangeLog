@@ -1,3 +1,4 @@
+Dawin is now reported to work.
 cleanmetas now inserts a \ when it finds a ' so we get the proper
 values in our .info files when read by a shell.
 Add new CFLAGS to ensure that the code quality is good.

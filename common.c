@@ -37,6 +37,25 @@ long uptime (void)
   sysinfo (&info);
   return info.uptime;
 }
+#elif __APPLE__
+/* Darwin doesn't appear to have an uptime, so try and make one ourselves */
+#include <sys/time.h>
+long uptime (void)
+{
+  struct timeval tv;
+  static long start = 0;
+
+  if (gettimeofday (&tv, NULL) == -1)
+    {
+      logger (LOG_ERR, "gettimeofday: %s", strerror (errno));
+      return -1;
+    }
+
+  if (start == 0)
+    start = tv.tv_sec;
+
+  return tv.tv_sec - start;
+}
 #else
 #include <time.h>
 long uptime (void)
@@ -45,17 +64,17 @@ long uptime (void)
 
   if (clock_gettime(CLOCK_MONOTONIC, &tp) == -1)
     {
-      logger (LOG_ERR, "Unable to get uptime: %s", strerror (errno));
+      logger (LOG_ERR, "clock_gettime: %s", strerror (errno));
       return -1;
     }
 
   return tp.tv_sec;
 }
-#endif /* __linux__ */
+#endif
 
 void *xmalloc (size_t size)
 {
-  register void *value = malloc (size);
+  void *value = malloc (size);
 
   if (value)
     return value;

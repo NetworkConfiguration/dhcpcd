@@ -34,8 +34,12 @@ dhcpcd_H = version.h
 dhcpcd_OBJS = arp.o client.o common.o configure.o dhcp.o dhcpcd.o \
 		interface.o logger.o signals.o socket.o
 
+# By default we don't need to link to anything
+# Except on Darwin where we need -lresolv, so they need to uncomment this
+#dhcpcd_LIBS = -lresolv
+
 dhcpcd: $(dhcpcd_H) $(dhcpcd_OBJS)
-	$(CC) $(LDFLAGS) $(dhcpcd_OBJS) -o dhcpcd
+	$(CC) $(LDFLAGS) $(dhcpcd_OBJS) $(dhcpcd_LIBS) -o dhcpcd
 
 version.h:
 	echo '#define VERSION "$(VERSION)"' > version.h

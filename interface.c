@@ -211,7 +211,7 @@ interface_t *read_interface (const char *ifname, int metric)
   return iface;
 }
 
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__APPLE__)
 static int do_address (const char *ifname, struct in_addr address,
 		       struct in_addr netmask, struct in_addr broadcast, int del)
 {

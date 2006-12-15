@@ -51,14 +51,13 @@ static char *cleanmetas (const char *cstr)
   /* The largest single element we can have is 256 bytes according to the RFC,
      so this buffer size should be safe even if it's all ' */
   char buffer[1024] = {0};
-  register char *c = (char *) cstr;
-  register char *b = buffer;
+  char *b = buffer;
 
   if (! cstr || strlen (cstr) == 0)
       return b;
 
   do
-    if (*c == 39)
+    if (*cstr == 39)
       {
 	*b++ = '\'';
 	*b++ = '\\';
@@ -66,8 +65,8 @@ static char *cleanmetas (const char *cstr)
 	*b++ = '\'';
       }
     else
-      *b++ = *c;
-  while (*c++);
+      *b++ = *cstr;
+  while (*cstr++);
 
   *b++ = 0;
   b = buffer;
@@ -80,8 +79,6 @@ static void exec_script (const char *script, const char *infofile,
 {
   struct stat buf;
   pid_t pid;
-  char *const argc[4] =
-    { (char *) script, (char *) infofile, (char *) arg, NULL };
 
   if (! script || ! infofile || ! arg)
     return;
@@ -100,9 +97,9 @@ static void exec_script (const char *script, const char *infofile,
      causing the script to fail */
   if ((pid = fork ()) == 0)
     {
-      if (execv (script, argc))
+      if (execle (script, script, infofile, arg, NULL, NULL))
 	logger (LOG_ERR, "error executing \"%s %s %s\": %s",
-		argc[0], argc[1], argc[2], strerror (errno));
+		script, infofile, arg, strerror (errno));
       exit (0);
     }
   else if (pid == -1)
@@ -161,8 +158,6 @@ static void restore_resolv(const char *ifname)
 {
   struct stat buf;
   pid_t pid;
-  char *const argc[4] =
-    { (char *) RESOLVCONF, (char *) "-d", (char *) ifname, NULL };
 
   if (stat (RESOLVCONF, &buf) < 0)
     return;
@@ -176,9 +171,9 @@ static void restore_resolv(const char *ifname)
      causing the script to fail */
   if ((pid = fork ()) == 0)
     {
-      if (execve (argc[0], argc, NULL))
-	logger (LOG_ERR, "error executing \"%s %s %s\": %s",
-		argc[0], argc[1], argc[2], strerror (errno));
+      if (execle (RESOLVCONF, RESOLVCONF, "-d", ifname, NULL, NULL))
+	logger (LOG_ERR, "error executing \"%s -d %s\": %s",
+		RESOLVCONF, ifname, strerror (errno));
       exit (0);
     }
   else if (pid == -1)

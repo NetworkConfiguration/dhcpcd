@@ -49,9 +49,9 @@
 
 static uint16_t checksum (unsigned char *addr, uint16_t len)
 {
-  register uint32_t sum = 0;
-  register uint16_t *w = (uint16_t *) addr;
-  register uint16_t nleft = len;
+  uint32_t sum = 0;
+  uint16_t *w = (uint16_t *) addr;
+  uint16_t nleft = len;
 
   while (nleft > 1)
     {
@@ -159,7 +159,7 @@ eexit:
   return retval;
 }
 
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__APPLE__)
 
 /* Credit where credit is due :)
    The below BPF filter is taken from ISC DHCP */
