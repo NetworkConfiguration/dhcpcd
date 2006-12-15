@@ -48,11 +48,11 @@
 
 static char *cleanmetas (char *cstr)
 {
+  register char *c = cstr;
+  
   if (! cstr)
     return NULL;
   
-  register char *c = cstr;
-
   do
     if (*c == 39)
       *c = ' ';
@@ -64,10 +64,14 @@ static char *cleanmetas (char *cstr)
 static void exec_script (const char *script, const char *infofile,
 			 const char *arg)
 {
+  struct stat buf;
+  pid_t pid;
+  char *const argc[4] =
+    { (char *) script, (char *) infofile, (char *) arg, NULL };
+ 
   if (! script || ! infofile || ! arg)
     return;
 
-  struct stat buf;
   if (stat (script, &buf) < 0)
     {
       if (strcmp (script, DEFAULT_SCRIPT) != 0)
@@ -75,14 +79,11 @@ static void exec_script (const char *script, const char *infofile,
       return;
     }
   
-  char *const argc[4] =
-    { (char *) script, (char *) infofile, (char *) arg, NULL };
   logger (LOG_DEBUG, "exec \"%s %s %s\"", script, infofile, arg);
-  
+ 
   /* We don't wait for the user script to finish - do we trust it? */
   /* Don't use vfork as we lose our memory when dhcpcd exits
      causing the script to fail */
-  pid_t pid;
   if ((pid = fork ()) == 0)
     {
       if (execv (script, argc))
@@ -145,20 +146,20 @@ static int make_resolv (const char *ifname, const dhcp_t *dhcp)
 static void restore_resolv(const char *ifname)
 {
   struct stat buf;
+  pid_t pid;
+  char *const argc[4] =
+    { (char *) RESOLVCONF, (char *) "-d", (char *) ifname, NULL };
 
   if (stat (RESOLVCONF, &buf) < 0)
     return;
 
   logger (LOG_DEBUG, "removing information from resolvconf");
 
-  char *const argc[4] = { (char *) RESOLVCONF, (char *) "-d", (char *) ifname, NULL };
-
   /* Don't wait around here as we should only be called when
      dhcpcd is closing down and something may do a kill -9
      if we take too long */
   /* Don't use vfork as we lose our memory when dhcpcd exits
      causing the script to fail */
-  pid_t pid;
   if ((pid = fork ()) == 0)
     {
       if (execve (argc[0], argc, NULL))
@@ -429,6 +430,7 @@ int configure (const options_t *options, interface_t *iface,
   if (dhcp->routes)
     {
       route_t *new_routes = NULL;
+      int remember;
       
       for (route = dhcp->routes; route; route = route->next)
 	{
@@ -437,7 +439,7 @@ int configure (const options_t *options, interface_t *iface,
 	      && ! options->dogateway)
 	    continue;
 
-	  int remember = add_route (iface->name, route->destination,
+	  remember = add_route (iface->name, route->destination,
 				    route->netmask,  route->gateway,
 				    options->metric);
 	  /* If we failed to add the route, we may have already added it

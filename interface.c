@@ -65,11 +65,11 @@
 
 void free_address (address_t *addresses)
 {
-  if (!addresses)
-    return;
-
   address_t *p = addresses;
   address_t *n = NULL;
+
+  if (! addresses)
+    return;
 
   while (p)
     {
@@ -81,11 +81,11 @@ void free_address (address_t *addresses)
 
 void free_route (route_t *routes)
 {
-  if (!routes)
-    return;
-
   route_t *p = routes;
   route_t *n = NULL;
+
+  if (!routes)
+    return;
 
   while (p)
     {
@@ -99,8 +99,6 @@ void free_route (route_t *routes)
 
 interface_t *read_interface (const char *ifname, int metric)
 {
-  if (! ifname)
-    return NULL;
 
   int s;
   struct ifreq ifr;
@@ -110,16 +108,22 @@ interface_t *read_interface (const char *ifname, int metric)
 #ifndef __linux__
   struct ifaddrs *ifap;
   struct ifaddrs *p;
+#endif
 
+  if (! ifname)
+    return NULL;
+
+#ifndef __linux__
   if (getifaddrs (&ifap) != 0)
     return NULL;
 
   for (p = ifap; p; p = p->ifa_next)
     {
+      struct sockaddr_dl *sdl = (struct sockaddr_dl *) p->ifa_addr;
+
       if (strcmp (p->ifa_name, ifname) != 0)
 	continue;
 	
-      struct sockaddr_dl *sdl = (struct sockaddr_dl *) p->ifa_addr;
       if (p->ifa_addr->sa_family != AF_LINK || sdl->sdl_type != IFT_ETHER)
 	{
 	  logger (LOG_ERR, "not Ethernet");
@@ -211,17 +215,18 @@ interface_t *read_interface (const char *ifname, int metric)
 static int do_address (const char *ifname, struct in_addr address,
 		       struct in_addr netmask, struct in_addr broadcast, int del)
 {
+  int s;
+  struct ifaliasreq ifa;
+
   if (! ifname)
     return -1;
 
-  int s;
   if ((s = socket(AF_INET, SOCK_DGRAM, 0)) < 0) 
     {
       logger (LOG_ERR, "socket: %s", strerror (errno));
       return -1;
     }
 
-  struct ifaliasreq ifa;
   memset (&ifa, 0, sizeof (ifa));
   strcpy (ifa.ifra_name, ifname);
 
@@ -261,14 +266,26 @@ static int do_route (const char *ifname,
 		     int metric,
 		     int change, int del)
 {
+  int s;
+  char *destd;
+  char *gend;
+  struct rtm
+    {
+      struct rt_msghdr hdr;
+      struct sockaddr_in destination;
+      struct sockaddr_in gateway;
+      struct sockaddr_in netmask;
+    } rtm;
+  static int seq;
+
   if (! ifname)
     return -1;
 
   /* Do something with metric to satisfy compiler warnings */
   metric = 0;
 
-  char *destd = strdup (inet_ntoa (destination));
-  char *gend = strdup (inet_ntoa (netmask));
+  destd = strdup (inet_ntoa (destination));
+  gend = strdup (inet_ntoa (netmask));
   logger (LOG_INFO, "%s route to %s (%s) via %s",
 	  change ? "changing" : del ? "removing" : "adding",
 	  destd, gend, inet_ntoa(gateway));
@@ -277,24 +294,15 @@ static int do_route (const char *ifname,
   if (gend)
     free (gend);
 
-  int s;
   if ((s = socket(PF_ROUTE, SOCK_RAW, 0)) < 0) 
     {
       logger (LOG_ERR, "socket: %s", strerror (errno));
       return -1;
     }
 
-  struct rtm
-    {
-      struct rt_msghdr hdr;
-      struct sockaddr_in destination;
-      struct sockaddr_in gateway;
-      struct sockaddr_in netmask;
-    } rtm;
   memset (&rtm, 0, sizeof (struct rtm));
 
   rtm.hdr.rtm_version = RTM_VERSION;
-  static int seq;
   rtm.hdr.rtm_seq = ++seq;
   rtm.hdr.rtm_type = change ? RTM_CHANGE : del ? RTM_DELETE : RTM_ADD;
 
@@ -343,14 +351,20 @@ static int do_route (const char *ifname,
 static int send_netlink(struct nlmsghdr *hdr)
 {
   int s;
+  pid_t mypid = getpid ();
+  struct sockaddr_nl nl;
+  struct iovec iov;
+  struct msghdr msg;
+  static unsigned int seq;
+  char buffer[16384];
+  struct nlmsghdr *h;
+
   if ((s = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE)) < 0) 
     {
       logger (LOG_ERR, "socket: %s", strerror (errno));
       return -1;
     }
 
-  pid_t mypid = getpid ();
-  struct sockaddr_nl nl;
   memset (&nl, 0, sizeof (struct sockaddr_nl));
   nl.nl_family = AF_NETLINK;
   if (bind (s, (struct sockaddr *) &nl, sizeof (nl)) < 0)
@@ -360,12 +374,10 @@ static int send_netlink(struct nlmsghdr *hdr)
       return -1;
     }
 
-  struct iovec iov;
   memset (&iov, 0, sizeof (struct iovec));
   iov.iov_base = hdr;
   iov.iov_len = hdr->nlmsg_len;
 
-  struct msghdr msg;
   memset (&msg, 0, sizeof (struct msghdr));
   msg.msg_name = &nl;
   msg.msg_namelen = sizeof (nl);
@@ -374,7 +386,6 @@ static int send_netlink(struct nlmsghdr *hdr)
 
   /* Request a reply */
   hdr->nlmsg_flags |= NLM_F_ACK;
-  static unsigned int seq;
   hdr->nlmsg_seq = ++seq;
 
   if (sendmsg (s, &msg, 0) < 0)
@@ -384,15 +395,13 @@ static int send_netlink(struct nlmsghdr *hdr)
       return -1;
     }
 
-  char buffer[16384];
   memset (buffer, 0, sizeof (buffer));
   iov.iov_base = buffer;
 
-  struct nlmsghdr *h;
   while (1) 
     {
-      iov.iov_len = sizeof (buffer);
       int bytes = recvmsg(s, &msg, 0);
+      iov.iov_len = sizeof (buffer);
 
       if (bytes < 0)
 	{
@@ -522,14 +531,10 @@ static int add_attr_32(struct nlmsghdr *n, unsigned int maxlen, int type, uint32
   return 0;
 }
 
-
 static int do_address(const char *ifname,
 		      struct in_addr address, struct in_addr netmask,
 		      struct in_addr broadcast, int del)
 {
-  if (!ifname)
-    return -1;
-
   struct
     {
       struct nlmsghdr hdr;
@@ -537,6 +542,10 @@ static int do_address(const char *ifname,
       char buffer[256];
     }
   nlm;
+  uint32_t mask = htonl (netmask.s_addr);
+
+  if (!ifname)
+    return -1;
 
   memset (&nlm, 0, sizeof (nlm));
 
@@ -547,7 +556,6 @@ static int do_address(const char *ifname,
   nlm.ifa.ifa_family = AF_INET;
 
   /* Store the netmask in the prefix */
-  uint32_t mask = htonl (netmask.s_addr);
   while (mask)
     {
       nlm.ifa.ifa_prefixlen++;
@@ -569,11 +577,22 @@ static int do_route (const char *ifname,
 		     struct in_addr gateway,
 		     int metric, int change, int del)
 {
+  char *dstd;
+  char *gend;
+  struct
+    {
+      struct nlmsghdr hdr;
+      struct rtmsg rt;
+      char buffer[256];
+    }
+  nlm;
+  uint32_t mask = htonl (netmask.s_addr);
+
   if (! ifname)
     return -1;
 
-  char *dstd = strdup (inet_ntoa (destination));
-  char *gend = strdup (inet_ntoa (netmask));
+  dstd = strdup (inet_ntoa (destination));
+  gend = strdup (inet_ntoa (netmask));
   logger (LOG_INFO, "%s route to %s (%s) via %s, metric %d",
 	  change ? "changing" : del ? "removing" : "adding",
 	  dstd, gend, inet_ntoa (gateway), metric);
@@ -582,13 +601,6 @@ static int do_route (const char *ifname,
   if (gend)
     free (gend);
 
-  struct
-    {
-      struct nlmsghdr hdr;
-      struct rtmsg rt;
-      char buffer[256];
-    }
-  nlm;
   memset (&nlm, 0, sizeof (nlm));
 
   nlm.hdr.nlmsg_len = NLMSG_LENGTH (sizeof (struct rtmsg));
@@ -615,7 +627,6 @@ static int do_route (const char *ifname,
     }
 
   /* Store the netmask in the prefix */
-  uint32_t mask = htonl (netmask.s_addr);
   while (mask)
     {
       nlm.rt.rtm_dst_len++;
@@ -655,9 +666,10 @@ int add_address (const char *ifname, struct in_addr address,
 
 int del_address (const char *ifname, struct in_addr address)
 {
+  struct in_addr t;
+  
   logger (LOG_INFO, "deleting IP address %s", inet_ntoa (address));
 
-  struct in_addr t;
   memset (&t, 0, sizeof (t));
   return (do_address (ifname, address, t, t, 1));
 }
@@ -683,22 +695,21 @@ int del_route (const char *ifname, struct in_addr destination,
 #ifdef HAVE_IFADDRS_H
 int flush_addresses (const char *ifname)
 {
-  if (! ifname)
-    return -1;
-
   struct ifaddrs *ifap;
   struct ifaddrs *p;
+  int retval = 0;
 
+  if (! ifname)
+    return -1;
   if (getifaddrs (&ifap) != 0)
     return -1;
 
-  int retval = 0;
   for (p = ifap; p; p = p->ifa_next)
     {
+      struct sockaddr_in *sin = (struct sockaddr_in*) p->ifa_addr;
       if (strcmp (p->ifa_name, ifname) != 0)
 	continue;
 
-      struct sockaddr_in *sin = (struct sockaddr_in*) p->ifa_addr;
       if (sin->sin_family == AF_INET)
 	if (del_address (ifname, sin->sin_addr) < 0)
 	  retval = -1;
@@ -711,13 +722,19 @@ int flush_addresses (const char *ifname)
 int flush_addresses (const char *ifname)
 {
   int s;
+  struct ifconf ifc;
+  int retval = 0;
+  int i;
+  void *ifrs;
+  int nifs;
+  struct ifreq *ifr;
+
   if ((s = socket (AF_INET, SOCK_DGRAM, 0)) < 0)
     {
       logger (LOG_ERR, "socket: %s", strerror (errno));
       return -1;
     }
 
-  struct ifconf ifc;
   memset (&ifc, 0, sizeof (struct ifconf));
   ifc.ifc_buf = NULL;
   if (ioctl (s, SIOCGIFCONF, &ifc) < 0)
@@ -726,7 +743,7 @@ int flush_addresses (const char *ifname)
       close (s);
     }
 
-  void *ifrs = xmalloc (ifc.ifc_len);
+  ifrs = xmalloc (ifc.ifc_len);
   ifc.ifc_buf = ifrs;
   if (ioctl (s, SIOCGIFCONF, &ifc) < 0)
     {
@@ -738,17 +755,16 @@ int flush_addresses (const char *ifname)
 
   close (s);
 
-  int nifs = ifc.ifc_len / sizeof (struct ifreq);
-  struct ifreq *ifr = ifrs;
-  int retval = 0;
-  int i;
+  nifs = ifc.ifc_len / sizeof (struct ifreq);
+  ifr = ifrs;
   for (i = 0; i < nifs; i++)
     {
+      struct sockaddr_in *in = (struct sockaddr_in *) &ifr->ifr_addr;
+
       if (ifr->ifr_addr.sa_family != AF_INET
 	  || strcmp (ifname, ifr->ifr_name) != 0)
 	continue;
 
-      struct sockaddr_in *in = (struct sockaddr_in *) &ifr->ifr_addr;
       if (del_address (ifname, in->sin_addr) < 0)
 	retval = -1;
       ifr++;

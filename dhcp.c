@@ -57,12 +57,17 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 		     const options_t *options)
 {
   dhcpmessage_t message;
+  struct udp_dhcp_packet packet;
   unsigned char *m = (unsigned char *) &message;
   unsigned char *p = (unsigned char *) &message.options;
   unsigned char *n_params = NULL;
   unsigned long l;
   struct in_addr from;
   struct in_addr to;
+  long up = uptime() - iface->start_uptime;
+  uint32_t ul;
+  uint16_t sz;
+  unsigned int message_length;
 
   if (!iface || !options || !dhcp)
     return -1;
@@ -84,7 +89,6 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
   message.op = DHCP_BOOTREQUEST;
   message.hwtype = ARPHRD_ETHER;
   message.hwlen = ETHER_ADDR_LEN;
-  long up = uptime() - iface->start_uptime;
   if (up < 0 || up > UINT16_MAX)
     message.secs = htons (UINT16_MAX);
   else
@@ -107,7 +111,7 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
     {
       *p++ = DHCP_MAXMESSAGESIZE;
       *p++ = 2;
-      uint16_t sz = htons (sizeof (dhcpmessage_t));
+      sz = htons (sizeof (dhcpmessage_t));
       memcpy (p, &sz, 2);
       p += 2;
     }
@@ -134,7 +138,7 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 	{
 	  *p++ = DHCP_LEASETIME;
 	  *p++ = 4;
-	  uint32_t ul = htonl (options->leasetime);
+	  ul = htonl (options->leasetime);
 	  memcpy (p, &ul, 4);
 	  p += 4;
 	}
@@ -243,9 +247,8 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 
   *p++ = DHCP_END;
 
-  unsigned int message_length = p - m;
+  message_length = p - m;
 
-  struct udp_dhcp_packet packet;
   memset (&packet, 0, sizeof (struct udp_dhcp_packet));
   make_dhcp_packet (&packet, (unsigned char *) &message, message_length,
 		    from, to);
@@ -346,15 +349,18 @@ static unsigned int decode_search (u_char *p, int len, char *out)
  * and return the last route set */
 static route_t *decodeCSR(unsigned char *p, int len)
 {
+  unsigned char *q = p;
+  int cidr;
+  int ocets;
+  route_t *first;
+  route_t *route;
+
   /* Minimum is 5 -first is CIDR and a router length of 4 */
   if (len < 5)
     return NULL;
 
-  unsigned char *q = p;
-  int cidr;
-  int ocets;
-  route_t *first = xmalloc (sizeof (route_t));
-  route_t *route = first;
+  first = xmalloc (sizeof (route_t));
+  route = first;
 
   while (q - p < len)
     {

@@ -19,6 +19,12 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+/* We need to define this to get kill on GNU systems */
+#ifdef __linux__
+#define _POSIX_SOURCE
+#endif
+
+#include <sys/types.h>
 #include <sys/stat.h>
 #include <arpa/inet.h>
 #include <errno.h>
@@ -44,8 +50,8 @@
 
 #define STRINGINT(_string, _int) { \
   char *_tmp; \
-  errno = 0; \
   long _number = strtol (_string, &_tmp, 0); \
+  errno = 0; \
   if ((errno != 0 && _number == 0) || _string == _tmp || \
       (errno == ERANGE && (_number == LONG_MAX || _number == LONG_MIN))) \
     { \
@@ -94,39 +100,16 @@ static void usage ()
 	  "              [-u userclass] [-F [none | ptr | both]] [-I clientID]\n");
 }
 
+
 int main(int argc, char **argv)
 {
   options_t options;
-
-  /* Sanitize our fd's */
-  int zero;
-  if ((zero = open (_PATH_DEVNULL, O_RDWR, 0)) >= 0)
-    {
-      while (zero < 3)
-	zero = dup (zero);
-      close(zero);
-    }
-
-  openlog (PACKAGE, LOG_PID, LOG_LOCAL0);
-
-  memset (&options, 0, sizeof (options_t));
-  options.script = (char *) DEFAULT_SCRIPT;
-  snprintf (options.classid, CLASS_ID_MAX_LEN, "%s %s", PACKAGE, VERSION); 
-
-  options.doarp = false;
-  options.dodns = true;
-  options.donis = true;
-  options.dontp = true;
-  options.dogateway = true;
-  gethostname (options.hostname, sizeof (options.hostname));
-  if (strcmp (options.hostname, "(none)") == 0 ||
-      strcmp (options.hostname, "localhost") == 0)
-    memset (options.hostname, 0, sizeof (options.hostname));
-  options.timeout = DEFAULT_TIMEOUT;
-
   int doversion = 0;
   int dohelp = 0;
   int userclasses = 0;
+  int ch;
+  int option_index = 0;
+  char prefix[IF_NAMESIZE + 3];
 
   const struct option longopts[] =
     {
@@ -155,8 +138,32 @@ int main(int argc, char **argv)
 	{NULL, 0, NULL, 0}
     };
 
-  int ch;
-  int option_index = 0;
+  /* Sanitize our fd's */
+  int zero;
+  if ((zero = open (_PATH_DEVNULL, O_RDWR, 0)) >= 0)
+    {
+      while (zero < 3)
+	zero = dup (zero);
+      close(zero);
+    }
+
+  openlog (PACKAGE, LOG_PID, LOG_LOCAL0);
+
+  memset (&options, 0, sizeof (options_t));
+  options.script = (char *) DEFAULT_SCRIPT;
+  snprintf (options.classid, CLASS_ID_MAX_LEN, "%s %s", PACKAGE, VERSION); 
+
+  options.doarp = false;
+  options.dodns = true;
+  options.donis = true;
+  options.dontp = true;
+  options.dogateway = true;
+  gethostname (options.hostname, sizeof (options.hostname));
+  if (strcmp (options.hostname, "(none)") == 0 ||
+      strcmp (options.hostname, "localhost") == 0)
+    memset (options.hostname, 0, sizeof (options.hostname));
+  options.timeout = DEFAULT_TIMEOUT;
+
   while ((ch = getopt_long(argc, argv, "ac:dh:i:kl:m:nps:t:u:F:GHI:NRY", longopts,
 			   &option_index)) != -1)
     switch (ch)
@@ -329,7 +336,6 @@ int main(int argc, char **argv)
       exit (EXIT_FAILURE);
     }
 
-  char prefix[IF_NAMESIZE + 3];
   snprintf (prefix, IF_NAMESIZE, "%s: ", options.interface);
   setlogprefix (prefix);
   snprintf (options.pidfile, sizeof (options.pidfile), PIDFILE,
@@ -337,11 +343,11 @@ int main(int argc, char **argv)
 
   if (options.signal != 0)
     {
+      int killed = -1;
       pid_t pid = read_pid (options.pidfile);
       if (pid != 0)
         logger (LOG_INFO, "sending signal %d to pid %d", options.signal, pid);
-     
-      int killed = -1;
+
       if (! pid || (killed = kill (pid, options.signal)))
 	logger (options.signal == SIGALRM ? LOG_INFO : LOG_ERR, ""PACKAGE" not running");
 

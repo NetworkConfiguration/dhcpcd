@@ -22,8 +22,6 @@
 /* OK, a lot of this was lifting from iputils as the existing code
    for dhcpcd was kinda klunky and had some issues */
 
-#define _BSD_SOURCE
-
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
@@ -61,15 +59,21 @@
 
 int arp_check (interface_t *iface, struct in_addr address)
 {
+  unsigned char buf[256];
+  struct arphdr *ah = (struct arphdr *) buf;
+  unsigned char reply[4096];
+  int bytes;
+  unsigned char buffer[iface->buffer_length];
+  struct timeval tv;
+  long timeout = 0;
+  fd_set rset;
+
   if (! iface->arpable)
     {
       logger (LOG_DEBUG, "arp_check: interface `%s' is not ARPable",
 	      iface->name);
       return 0;
     }
-
-  unsigned char buf[256];
-  struct arphdr *ah = (struct arphdr *) buf;
 
   memset (buf, 0, sizeof (buf));
 
@@ -87,17 +91,12 @@ int arp_check (interface_t *iface, struct in_addr address)
   open_socket (iface, true);
   send_packet (iface, ETHERTYPE_ARP, (unsigned char *) &buf, arphdr_len(ah));
 
-  unsigned char reply[4096];
-  int bytes;
-  unsigned char buffer[iface->buffer_length];
-
-  struct timeval tv;
-  long timeout = 0;
-  fd_set rset;
-
   timeout = uptime() + TIMEOUT;
   while (1)
     {
+      int buflen = sizeof (buffer);
+      int bufpos = -1;
+
       tv.tv_sec = timeout - uptime ();
       tv.tv_usec = 0;
 
@@ -114,8 +113,6 @@ int arp_check (interface_t *iface, struct in_addr address)
 	continue;
 
       memset (buffer, 0, sizeof (buffer));
-      int buflen = sizeof (buffer);
-      int bufpos = -1;
 
       while (bufpos != 0)
 	{

@@ -368,6 +368,8 @@ int dhcp_run (const options_t *options)
 	}
       else if (retval > 0 && mode != SOCKET_CLOSED && FD_ISSET(iface->fd, &rset))
 	{
+	  int valid = 0;
+	  struct dhcp_t *new_dhcp;
 
 	  /* Allocate our buffer space for BPF.
 	     We cannot do this until we have opened our socket as we don't
@@ -382,8 +384,6 @@ int dhcp_run (const options_t *options)
 	     the first one fails for any reason, we can use the next. */
 
 	  memset (&message, 0, sizeof (struct dhcpmessage_t));
-	  int valid = 0;
-	  struct dhcp_t *new_dhcp;
 	  new_dhcp = xmalloc (sizeof (dhcp_t));
 
 	  while (buffer_pos != 0)

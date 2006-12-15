@@ -19,9 +19,6 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-/* We use BSD structure so our code is more portable */
-#define _BSD_SOURCE
-
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
@@ -37,7 +34,6 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
-#include <time.h>
 #include <unistd.h>
 
 #include "dhcp.h"
@@ -218,6 +214,10 @@ int open_socket (interface_t *iface, bool arp)
   int n = 0;
   int fd = 0;
   char device[PATH_MAX];
+  int flags;
+  struct ifreq ifr;
+  int buf = 0;
+  struct bpf_program p;
 
   do
     {
@@ -231,7 +231,6 @@ int open_socket (interface_t *iface, bool arp)
       return -1;
     }
 
-  int flags;
   if ((flags = fcntl (fd, F_GETFD, 0)) < 0
       || fcntl (fd, F_SETFD, flags | FD_CLOEXEC) < 0)
     {
@@ -240,7 +239,6 @@ int open_socket (interface_t *iface, bool arp)
       return -1;
     }
 
-  struct ifreq ifr;
   strncpy (ifr.ifr_name, iface->name, sizeof (ifr.ifr_name));
   if (ioctl (fd, BIOCSETIF, &ifr) < 0)
     {
@@ -251,7 +249,6 @@ int open_socket (interface_t *iface, bool arp)
     }
 
   /* Get the required BPF buffer length from the kernel. */
-  int buf = 0;
   if (ioctl (fd, BIOCGBLEN, &buf) < 0)
     {
       logger (LOG_ERR, "ioctl BIOCGBLEN: %s", strerror (errno));
@@ -260,8 +257,7 @@ int open_socket (interface_t *iface, bool arp)
     }
   iface->buffer_length = buf;
 
-  int flag = 1;
-  if (ioctl (fd, BIOCIMMEDIATE, &flag) < 0)
+  if (ioctl (fd, BIOCIMMEDIATE, &flags) < 0)
     {
       logger (LOG_ERR, "ioctl BIOCIMMEDIATE: %s", strerror (errno));
       close (fd);
@@ -269,7 +265,6 @@ int open_socket (interface_t *iface, bool arp)
     }
 
   /* Install the DHCP filter */
-  struct bpf_program p;
   if (arp)
     {
       p.bf_insns = arp_bpf_filter;
@@ -297,14 +292,14 @@ int open_socket (interface_t *iface, bool arp)
 int send_packet (const interface_t *iface, int type,
 		 const unsigned char *data, int len)
 {
+  int retval = -1;
+  struct iovec iov[2];
+
   /* We only support ethernet atm */
   struct ether_header hw;
   memset (&hw, 0, sizeof (struct ether_header));
   memset (&hw.ether_dhost, 0xff, ETHER_ADDR_LEN);
   hw.ether_type = htons (type);
-
-  int retval = -1;
-  struct iovec iov[2];
 
   iov[0].iov_base = &hw;
   iov[0].iov_len = sizeof (struct ether_header);
@@ -335,10 +330,7 @@ int get_packet (const interface_t *iface, unsigned char *data,
       if (*buffer_len < 1)
 	{
 	  logger (LOG_ERR, "read: %s", strerror (errno));
-	  struct timespec tv;
-	  tv.tv_sec = 5;
-	  tv.tv_nsec = 0;
-	  nanosleep (&tv, NULL);
+	  sleep (3);
 	  return -1;
 	}
     }
@@ -348,6 +340,8 @@ int get_packet (const interface_t *iface, unsigned char *data,
   packet = (struct bpf_hdr *) buf;
   while (packet)
     {
+      int len = -1;
+
       /* Ensure that the entire packet is in our buffer */
       if (*buffer_pos + packet->bh_hdrlen + packet->bh_caplen
 	  > (unsigned) *buffer_len)
@@ -357,7 +351,6 @@ int get_packet (const interface_t *iface, unsigned char *data,
       hdr = (unsigned char *) ((char *) hw + sizeof (struct ether_header));
 
       /* If it's an ARP reply, then just send it back */
-      int len = -1;
       if (hw->ether_type == htons (ETHERTYPE_ARP))
 	{
 	  len = packet->bh_caplen - sizeof (struct ether_header);
@@ -471,8 +464,9 @@ int get_packet (const interface_t *iface, unsigned char *data,
 		unsigned char *buffer, int *buffer_len, int *buffer_pos)
 {
   long bytes;
+  struct udp_dhcp_packet *dhcp;
 
-  /* We don't use the given buffer, but we need to rewind the position */
+ /* We don't use the given buffer, but we need to rewind the position */
   *buffer_pos = 0;
 
   memset (buffer, 0, iface->buffer_length);
@@ -480,10 +474,7 @@ int get_packet (const interface_t *iface, unsigned char *data,
   if (bytes < 0)
     {
       logger (LOG_ERR, "read: %s", strerror (errno));
-      struct timespec tv;
-      tv.tv_sec = 5;
-      tv.tv_nsec = 0;
-      nanosleep (&tv, NULL);
+      sleep (3);
       return -1;
     }
 
@@ -501,7 +492,7 @@ int get_packet (const interface_t *iface, unsigned char *data,
       return -1;
     }
 
-  struct udp_dhcp_packet *dhcp = (struct udp_dhcp_packet *) buffer;
+  dhcp = (struct udp_dhcp_packet *) buffer;
   if (bytes < ntohs (dhcp->ip.ip_len))
     {
       logger (LOG_DEBUG, "truncated packet, ignoring");
