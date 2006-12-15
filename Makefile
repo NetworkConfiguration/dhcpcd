@@ -4,7 +4,7 @@ VERSION = 3.0.7_pre2
 
 INSTALL ?= install
 
-CFLAGS ?= -O2
+CFLAGS ?= -O2 -pipe
 
 # Loads of nice flags to ensure our code is good
 # We define _BSD_SOURCE for maximum portability
