@@ -90,7 +90,7 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
   message.hwtype = ARPHRD_ETHER;
   message.hwlen = ETHER_ADDR_LEN;
   if (up < 0 || up > UINT16_MAX)
-    message.secs = htons (UINT16_MAX);
+    message.secs = htons ((short) UINT16_MAX);
   else
     message.secs = htons (up);
   message.xid = xid;
