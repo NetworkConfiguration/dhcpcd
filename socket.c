@@ -29,6 +29,9 @@
 #include <netinet/udp.h>
 #include <netinet/if_ether.h>
 #include <net/ethernet.h>
+#ifndef __linux__
+#include <net/if_types.h>
+#endif
 #include <net/if.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -314,14 +317,21 @@ int send_packet (const interface_t *iface, int type,
   int retval = -1;
   struct iovec iov[2];
 
-  /* We only support ethernet atm */
-  struct ether_header hw;
-  memset (&hw, 0, sizeof (struct ether_header));
-  memset (&hw.ether_dhost, 0xff, ETHER_ADDR_LEN);
-  hw.ether_type = htons (type);
+  if (iface->family == IFT_ETHER)
+    {
+      struct ether_header hw;
+      memset (&hw, 0, sizeof (struct ether_header));
+      memset (&hw.ether_dhost, 0xff, ETHER_ADDR_LEN);
+      hw.ether_type = htons (type);
 
-  iov[0].iov_base = &hw;
-  iov[0].iov_len = sizeof (struct ether_header);
+      iov[0].iov_base = &hw;
+      iov[0].iov_len = sizeof (struct ether_header);
+    }
+  else
+    {
+      logger (LOG_ERR, "unsupported interace type %d", iface->family);
+      return -1;
+    }
   iov[1].iov_base = (unsigned char *) data;
   iov[1].iov_len = len;
 

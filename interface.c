@@ -104,6 +104,7 @@ interface_t *read_interface (const char *ifname, int metric)
   struct ifreq ifr;
   interface_t *iface;
   unsigned char hwaddr[ETHER_ADDR_LEN];
+  sa_family_t family;
 
 #ifndef __linux__
   struct ifaddrs *ifap;
@@ -130,14 +131,19 @@ interface_t *read_interface (const char *ifname, int metric)
 
       us.sa = p->ifa_addr;
 
-      if (p->ifa_addr->sa_family != AF_LINK || us.sdl->sdl_type != IFT_ETHER)
-	{
-	  logger (LOG_ERR, "not Ethernet");
-	  freeifaddrs (ifap);
-	  return NULL;
-	}
+      if (p->ifa_addr->sa_family != AF_LINK
+	  || (us.sdl->sdl_type != IFT_ETHER))
+	/*
+	   && us.sdl->sdl_type != IFT_ISO88025))
+	   */
+	  {
+	    logger (LOG_ERR, "interface is not Ethernet");
+	    freeifaddrs (ifap);
+	    return NULL;
+	  }
 
       memcpy (hwaddr, us.sdl->sdl_data + us.sdl->sdl_nlen, ETHER_ADDR_LEN);
+      family = us.sdl->sdl_type;
       break;
     }
   freeifaddrs (ifap);
@@ -166,13 +172,15 @@ interface_t *read_interface (const char *ifname, int metric)
       close (s);
       return NULL;
     }
-  if (ifr.ifr_hwaddr.sa_family != ARPHRD_ETHER)
+  if (ifr.ifr_hwaddr.sa_family != ARPHRD_ETHER &&
+      ifr.ifr_hwaddr.sa_family != ARPHRD_IEEE802_TR)
     {
-      logger (LOG_ERR, "interface is not Ethernet");
+      logger (LOG_ERR, "interface is not Ethernet or Token Ring");
       close (s);
       return NULL;
     }
   memcpy (hwaddr, ifr.ifr_hwaddr.sa_data, ETHER_ADDR_LEN);
+  family = ifr.ifr_hwaddr.sa_family;
 #else
   ifr.ifr_metric = metric;
   if (ioctl (s, SIOCSIFMETRIC, &ifr) < 0)
@@ -206,6 +214,7 @@ interface_t *read_interface (const char *ifname, int metric)
   snprintf (iface->infofile, PATH_MAX, INFOFILE, ifname);
   memcpy (&iface->ethernet_address, hwaddr, ETHER_ADDR_LEN);
 
+  iface->family = family;
   iface->arpable = ! (ifr.ifr_flags & (IFF_NOARP | IFF_LOOPBACK));
 
   logger (LOG_INFO, "ethernet address = %s",

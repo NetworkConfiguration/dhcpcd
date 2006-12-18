@@ -151,7 +151,7 @@ int arp_check (interface_t *iface, struct in_addr address)
 	  if ((unsigned) bytes < sizeof (reply.hdr) + 2 * (4 + reply.hdr.ar_hln))
 	    continue;
 
-	  ra.c = ar_spa (&reply.hdr);
+	  ra.c = (unsigned char *) ar_spa (&reply.hdr);
 	  logger (LOG_ERR, "ARPOP_REPLY received from %s (%s)",
 		  inet_ntoa (ra.a),
 		  ether_ntoa ((struct ether_addr *) ar_sha (&reply.hdr)));

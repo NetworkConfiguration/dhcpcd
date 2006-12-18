@@ -7,8 +7,7 @@ INSTALL ?= install
 CFLAGS ?= -O2 -pipe
 
 # Loads of nice flags to ensure our code is good
-# We define _BSD_SOURCE for maximum portability
-CFLAGS += -D_BSD_SOURCE -pedantic -std=c99 \
+CFLAGS += -pedantic -std=c99 \
     -Wall -Wunused -Wimplicit -Wshadow -Wformat=2 \
     -Wmissing-declarations -Wno-missing-prototypes -Wwrite-strings \
     -Wbad-function-cast -Wnested-externs -Wcomment -Winline \
@@ -45,7 +44,7 @@ version.h:
 	echo '#define VERSION "$(VERSION)"' > version.h
 
 $(dhcpcd_OBJS): 
-	$(CC) $(CFLAGS) -c $*.c
+	$(CC) -D_BSD_SOURCE $(CFLAGS) -c $*.c
 
 all: $(TARGET)
 

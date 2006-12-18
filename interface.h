@@ -49,6 +49,7 @@ typedef struct interface_t
 {
   char name[IF_NAMESIZE];
   struct ether_addr ethernet_address;
+  sa_family_t family;
   bool arpable;
 
   int fd;
