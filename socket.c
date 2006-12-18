@@ -507,7 +507,11 @@ int get_packet (const interface_t *iface, unsigned char *data,
 		unsigned char *buffer, int *buffer_len, int *buffer_pos)
 {
   long bytes;
-  struct udp_dhcp_packet *dhcp;
+  union
+  {
+      unsigned char *buffer;
+      struct udp_dhcp_packet *packet;
+  } pay;
 
   /* We don't use the given buffer, but we need to rewind the position */
   *buffer_pos = 0;
@@ -535,21 +539,22 @@ int get_packet (const interface_t *iface, unsigned char *data,
       return -1;
     }
 
-  dhcp = (struct udp_dhcp_packet *) buffer;
-  if (bytes < ntohs (dhcp->ip.ip_len))
+  pay.buffer = buffer;
+  if (bytes < ntohs (pay.packet->ip.ip_len))
     {
       logger (LOG_DEBUG, "truncated packet, ignoring");
       return -1;
     }
 
-  bytes = ntohs (dhcp->ip.ip_len);
+  bytes = ntohs (pay.packet->ip.ip_len);
 
   /* This is like our BPF filter above */
-  if (dhcp->ip.ip_p != IPPROTO_UDP || dhcp->ip.ip_v != IPVERSION ||
-      dhcp->ip.ip_hl != sizeof (dhcp->ip) >> 2 ||
-      dhcp->udp.uh_dport != htons (DHCP_CLIENT_PORT) ||
+  if (pay.packet->ip.ip_p != IPPROTO_UDP || pay.packet->ip.ip_v != IPVERSION ||
+      pay.packet->ip.ip_hl != sizeof (pay.packet->ip) >> 2 ||
+      pay.packet->udp.uh_dport != htons (DHCP_CLIENT_PORT) ||
       bytes > (int) sizeof (struct udp_dhcp_packet) ||
-      ntohs (dhcp->udp.uh_ulen) != (uint16_t) (bytes - sizeof (dhcp->ip)))
+      ntohs (pay.packet->udp.uh_ulen)
+      != (uint16_t) (bytes - sizeof (pay.packet->ip)))
     {
       return -1;
     }
@@ -557,10 +562,10 @@ int get_packet (const interface_t *iface, unsigned char *data,
   if (valid_dhcp_packet (buffer) < 0)
     return -1;
 
-  memcpy(data, &dhcp->dhcp, bytes - (sizeof (dhcp->ip) +
-				     sizeof (dhcp->udp)));
+  memcpy(data, &pay.packet->dhcp,
+  bytes - (sizeof (pay.packet->ip) + sizeof (pay.packet->udp)));
 
-  return bytes - (sizeof (dhcp->ip) + sizeof (dhcp->udp));
+  return bytes - (sizeof (pay.packet->ip) + sizeof (pay.packet->udp));
 }
 
 #else

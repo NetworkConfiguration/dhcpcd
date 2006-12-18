@@ -53,6 +53,7 @@
 #endif
 
 #include <errno.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -373,7 +374,11 @@ static int send_netlink(struct nlmsghdr *hdr)
   struct msghdr msg;
   static unsigned int seq;
   char buffer[16384];
-  struct nlmsghdr *h;
+  union
+  {
+    char *buffer;
+    struct nlmsghdr *nlm;
+  } h;
 
   if ((s = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE)) < 0) 
     {
@@ -438,10 +443,10 @@ static int send_netlink(struct nlmsghdr *hdr)
 	  goto eexit;
 	}
 
-      for (h = (struct nlmsghdr *) buffer; bytes >= (signed) sizeof (*h); )
+      for (h.buffer = buffer; bytes >= (signed) sizeof (*h.nlm); )
 	{
-	  int len = h->nlmsg_len;
-	  int l = len - sizeof (*h);
+	  int len = h.nlm->nlmsg_len;
+	  int l = len - sizeof (*h.nlm);
 
 	  if (l < 0 || len > bytes)
 	    {
@@ -453,15 +458,15 @@ static int send_netlink(struct nlmsghdr *hdr)
 	    }
 
 	  if (nl.nl_pid != 0 ||
-	      (pid_t) h->nlmsg_pid != mypid ||
-	      h->nlmsg_seq != seq)
+	      (pid_t) h.nlm->nlmsg_pid != mypid ||
+	      h.nlm->nlmsg_seq != seq)
 	    /* Message isn't for us, so skip it */
 	    goto next;
 
 	  /* We get an NLMSG_ERROR back with a code of zero for success */
-	  if (h->nlmsg_type == NLMSG_ERROR)
+	  if (h.nlm->nlmsg_type == NLMSG_ERROR)
 	    {
-	      struct nlmsgerr *err = (struct nlmsgerr *) NLMSG_DATA (h);
+	      struct nlmsgerr *err = (struct nlmsgerr *) NLMSG_DATA (h.nlm);
 	      if ((unsigned) l < sizeof (struct nlmsgerr))
 		logger (LOG_ERR, "truncated error message");
 	      else
@@ -483,7 +488,7 @@ static int send_netlink(struct nlmsghdr *hdr)
 	  logger (LOG_ERR, "unexpected reply");
 next:
 	  bytes -= NLMSG_ALIGN (len);
-	  h = (struct nlmsghdr *) ((char *) h + NLMSG_ALIGN (len));
+	  h.buffer += NLMSG_ALIGN (len);
 	}
 
       if (msg.msg_flags & MSG_TRUNC)
@@ -505,10 +510,10 @@ eexit:
 }
 
 #define NLMSG_TAIL(nmsg) \
- ((struct rtattr *) (((unsigned char *) (nmsg)) \
-		     + NLMSG_ALIGN((nmsg)->nlmsg_len)))
-static int add_attr_l(struct nlmsghdr *n, unsigned int maxlen, int type, const void *data,
-		      int alen)
+  ((struct rtattr *) (((ptrdiff_t) (nmsg)) + NLMSG_ALIGN ((nmsg)->nlmsg_len)))
+
+static int add_attr_l(struct nlmsghdr *n, unsigned int maxlen, int type,
+		      const void *data, int alen)
 {
   int len = RTA_LENGTH(alen);
   struct rtattr *rta;
@@ -528,10 +533,12 @@ static int add_attr_l(struct nlmsghdr *n, unsigned int maxlen, int type, const v
   return 0;
 }
 
-static int add_attr_32(struct nlmsghdr *n, unsigned int maxlen, int type, uint32_t data)
+static int add_attr_32(struct nlmsghdr *n, unsigned int maxlen, int type,
+		       uint32_t data)
 {
   int len = RTA_LENGTH (sizeof (uint32_t));
   struct rtattr *rta;
+  
   if (NLMSG_ALIGN (n->nlmsg_len) + len > maxlen)
     {
       logger (LOG_ERR, "add_attr32: message exceeded bound of %d\n", maxlen);
