@@ -50,19 +50,25 @@
 static uint16_t checksum (unsigned char *addr, uint16_t len)
 {
   uint32_t sum = 0;
-  uint16_t *w = (uint16_t *) addr;
+  union
+    {
+      unsigned char *addr;
+      uint16_t *i;
+    } p;
   uint16_t nleft = len;
 
+  p.addr = addr;
   while (nleft > 1)
     {
-      sum += *w++;
+      sum += *p.i++;
       nleft -= 2;
     }
+
 
   if (nleft == 1)
     {
       uint8_t a = 0;
-      memcpy (&a, w, 1);
+      memcpy (&a, p.i, 1);
       sum += ntohs (a) << 8;
     }
 
@@ -103,7 +109,7 @@ void make_dhcp_packet(struct udp_dhcp_packet *packet,
   ip->ip_len = udp->uh_ulen;
   udp->uh_sum = checksum ((unsigned char *) packet,
 			  sizeof (struct udp_dhcp_packet));
-
+  
   ip->ip_v = IPVERSION;
   ip->ip_hl = 5;
   ip->ip_id = 0;
@@ -119,42 +125,53 @@ void make_dhcp_packet(struct udp_dhcp_packet *packet,
 
 static int valid_dhcp_packet (unsigned char *data)
 {
-  struct udp_dhcp_packet *packet = (struct udp_dhcp_packet *) data;
-  uint16_t bytes = ntohs (packet->ip.ip_len);
-  uint16_t ipsum = packet->ip.ip_sum;
-  uint16_t iplen = packet->ip.ip_len;
-  uint16_t udpsum = packet->udp.uh_sum;
+  union
+    {
+      unsigned char *data;
+      struct udp_dhcp_packet *packet;
+    } d;
+  uint16_t bytes;
+  uint16_t ipsum;
+  uint16_t iplen;
+  uint16_t udpsum;
   struct in_addr source;
   struct in_addr dest;
   int retval = 0;
 
-  packet->ip.ip_sum = 0;
-  if (ipsum != checksum ((unsigned char *) &packet->ip, sizeof (struct ip)))
+  d.data = data;
+  bytes = ntohs (d.packet->ip.ip_len);
+  ipsum = d.packet->ip.ip_sum;
+  iplen = d.packet->ip.ip_len;
+  udpsum = d.packet->udp.uh_sum;
+
+  d.data = data;
+  d.packet->ip.ip_sum = 0;
+  if (ipsum != checksum ((unsigned char *) &d.packet->ip, sizeof (struct ip)))
     {
       logger (LOG_DEBUG, "bad IP header checksum, ignoring");
       retval = -1;
       goto eexit;
     }
 
-  memcpy (&source, &packet->ip.ip_src, sizeof (struct in_addr));
-  memcpy (&dest, &packet->ip.ip_dst, sizeof (struct in_addr));
-  memset (&packet->ip, 0, sizeof (struct ip));
-  packet->udp.uh_sum = 0;
+  memcpy (&source, &d.packet->ip.ip_src, sizeof (struct in_addr));
+  memcpy (&dest, &d.packet->ip.ip_dst, sizeof (struct in_addr));
+  memset (&d.packet->ip, 0, sizeof (struct ip));
+  d.packet->udp.uh_sum = 0;
 
-  packet->ip.ip_p = IPPROTO_UDP;
-  memcpy (&packet->ip.ip_src, &source, sizeof (struct in_addr));
-  memcpy (&packet->ip.ip_dst, &dest, sizeof (struct in_addr));
-  packet->ip.ip_len = packet->udp.uh_ulen;
-  if (udpsum && udpsum != checksum ((unsigned char *) packet, bytes))
+  d.packet->ip.ip_p = IPPROTO_UDP;
+  memcpy (&d.packet->ip.ip_src, &source, sizeof (struct in_addr));
+  memcpy (&d.packet->ip.ip_dst, &dest, sizeof (struct in_addr));
+  d.packet->ip.ip_len = d.packet->udp.uh_ulen;
+  if (udpsum && udpsum != checksum (d.data, bytes))
     {
       logger (LOG_ERR, "bad UDP checksum, ignoring");
       retval = -1;
     }
 
 eexit:
-  packet->ip.ip_sum = ipsum;
-  packet->ip.ip_len = iplen;
-  packet->udp.uh_sum = udpsum;
+  d.packet->ip.ip_sum = ipsum;
+  d.packet->ip.ip_len = iplen;
+  d.packet->udp.uh_sum = udpsum;
 
   return retval;
 }
@@ -269,7 +286,6 @@ int open_socket (interface_t *iface, bool arp)
   /* Install the DHCP filter */
   if (arp)
     {
-      printf ("arp!");
       p.bf_insns = arp_bpf_filter;
       p.bf_len = sizeof (arp_bpf_filter) / sizeof (struct bpf_insn);
     }
@@ -320,15 +336,18 @@ int send_packet (const interface_t *iface, int type,
 int get_packet (const interface_t *iface, unsigned char *data,
 		unsigned char *buffer, int *buffer_len, int *buffer_pos)
 {
-  unsigned char *buf = buffer;
-  struct bpf_hdr *packet;
-  struct ether_header *hw;
-  unsigned char *hdr;
+  union
+    {
+      unsigned char *buffer;
+      struct bpf_hdr *packet;
+    } bpf;
+
+  bpf.buffer = buffer;
 
   if (*buffer_pos < 1)
     {
-      memset (buf, 0, iface->buffer_length);
-      *buffer_len = read (iface->fd, buf, iface->buffer_length);
+      memset (bpf.buffer, 0, iface->buffer_length);
+      *buffer_len = read (iface->fd, bpf.buffer, iface->buffer_length);
       *buffer_pos = 0;
       if (*buffer_len < 1)
 	{
@@ -338,42 +357,53 @@ int get_packet (const interface_t *iface, unsigned char *data,
 	}
     }
   else
-    buf += *buffer_pos;
+    bpf.buffer += *buffer_pos;
 
-  packet = (struct bpf_hdr *) buf;
-  while (packet)
+  while (bpf.packet)
     {
       int len = -1;
+      union
+        {
+	  unsigned char *buffer;
+	  struct ether_header *hw;
+	} hdr;
+      unsigned char *payload;
 
       /* Ensure that the entire packet is in our buffer */
-      if (*buffer_pos + packet->bh_hdrlen + packet->bh_caplen
+      if (*buffer_pos + bpf.packet->bh_hdrlen + bpf.packet->bh_caplen
 	  > (unsigned) *buffer_len)
 	break;
 
-      hw = (struct ether_header *) ((char *) packet + packet->bh_hdrlen);
-      hdr = (unsigned char *) ((char *) hw + sizeof (struct ether_header));
+      hdr.buffer = bpf.buffer + bpf.packet->bh_hdrlen;
+      payload = hdr.buffer + sizeof (struct ether_header);
 
       /* If it's an ARP reply, then just send it back */
-      if (hw->ether_type == htons (ETHERTYPE_ARP))
+      if (hdr.hw->ether_type == htons (ETHERTYPE_ARP))
 	{
-	  len = packet->bh_caplen - sizeof (struct ether_header);
-	  memcpy (data, hdr, len);
+	  len = bpf.packet->bh_caplen - sizeof (struct ether_header);
+	  memcpy (data, payload, len);
 	}
       else
 	{
-	  if (valid_dhcp_packet (hdr) >= 0)
+	  if (valid_dhcp_packet (payload) >= 0)
 	    {
-	      struct udp_dhcp_packet *dhcp = (struct udp_dhcp_packet *) hdr;
-	      len = ntohs (dhcp->ip.ip_len) - sizeof (struct ip) -
+	      union
+	        {
+		  unsigned char *buffer;
+		  struct udp_dhcp_packet *packet;
+		} pay;
+	      pay.buffer = payload;
+	      len = ntohs (pay.packet->ip.ip_len) - sizeof (struct ip) -
 	       sizeof (struct udphdr);
-	      memcpy (data, &dhcp->dhcp, len);
+	      memcpy (data, &pay.packet->dhcp, len);
 	    }
 	}
 
       /* Update the buffer_pos pointer */
-      packet += BPF_WORDALIGN (packet->bh_hdrlen + packet->bh_caplen);
-      if (packet - (struct bpf_hdr *) buffer <  *buffer_len)
-	*buffer_pos = (packet - (struct bpf_hdr *) buffer);
+      bpf.buffer +=
+      BPF_WORDALIGN (bpf.packet->bh_hdrlen + bpf.packet->bh_caplen);
+      if (bpf.buffer - buffer <  *buffer_len)
+	*buffer_pos = bpf.buffer - buffer;
       else
 	*buffer_pos = 0;
 

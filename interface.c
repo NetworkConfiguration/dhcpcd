@@ -119,19 +119,25 @@ interface_t *read_interface (const char *ifname, int metric)
 
   for (p = ifap; p; p = p->ifa_next)
     {
-      struct sockaddr_dl *sdl = (struct sockaddr_dl *) p->ifa_addr;
+      union
+        {
+	  struct sockaddr *sa;
+	  struct sockaddr_dl *sdl;
+	} us;
 
       if (strcmp (p->ifa_name, ifname) != 0)
 	continue;
-	
-      if (p->ifa_addr->sa_family != AF_LINK || sdl->sdl_type != IFT_ETHER)
+
+      us.sa = p->ifa_addr;
+
+      if (p->ifa_addr->sa_family != AF_LINK || us.sdl->sdl_type != IFT_ETHER)
 	{
 	  logger (LOG_ERR, "not Ethernet");
 	  freeifaddrs (ifap);
 	  return NULL;
 	}
 
-      memcpy (hwaddr, sdl->sdl_data + sdl->sdl_nlen, ETHER_ADDR_LEN);
+      memcpy (hwaddr, us.sdl->sdl_data + us.sdl->sdl_nlen, ETHER_ADDR_LEN);
       break;
     }
   freeifaddrs (ifap);
@@ -232,10 +238,11 @@ static int do_address (const char *ifname, struct in_addr address,
 
 #define ADDADDR(_var, _addr) \
     { \
-      struct sockaddr_in *_sin = (struct sockaddr_in *) &_var; \
-      _sin->sin_family = AF_INET; \
-      _sin->sin_len = sizeof (struct sockaddr_in); \
-      memcpy (&_sin->sin_addr, &_addr, sizeof (struct in_addr)); \
+      union { struct sockaddr *sa; struct sockaddr_in *sin; } _s; \
+      _s.sa = &_var; \
+      _s.sin->sin_family = AF_INET; \
+      _s.sin->sin_len = sizeof (struct sockaddr_in); \
+      memcpy (&_s.sin->sin_addr, &_addr, sizeof (struct in_addr)); \
     }
 
   ADDADDR (ifa.ifra_addr, address);
@@ -706,12 +713,19 @@ int flush_addresses (const char *ifname)
 
   for (p = ifap; p; p = p->ifa_next)
     {
-      struct sockaddr_in *sin = (struct sockaddr_in*) p->ifa_addr;
+      union
+        {
+	  struct sockaddr *sa;
+	  struct sockaddr_in *sin;
+	} us;
+
       if (strcmp (p->ifa_name, ifname) != 0)
 	continue;
 
-      if (sin->sin_family == AF_INET)
-	if (del_address (ifname, sin->sin_addr) < 0)
+      us.sa = p->ifa_addr;
+
+      if (us.sin->sin_family == AF_INET)
+	if (del_address (ifname, us.sin->sin_addr) < 0)
 	  retval = -1;
     }
   freeifaddrs (ifap);
