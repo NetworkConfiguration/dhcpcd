@@ -43,6 +43,7 @@ dhcpcd: $(dhcpcd_H) $(dhcpcd_OBJS)
 version.h:
 	echo '#define VERSION "$(VERSION)"' > version.h
 
+# We define _BSD_SOURCE as GNU supports BSD too - which is nice :)
 $(dhcpcd_OBJS): 
 	$(CC) -D_BSD_SOURCE $(CFLAGS) -c $*.c
 

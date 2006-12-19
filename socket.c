@@ -179,8 +179,8 @@ eexit:
   return retval;
 }
 
-#if defined(__FreeBSD__) || defined(__APPLE__)
-
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined (__OpenBSD__) \
+|| defined(__APPLE__)
 /* Credit where credit is due :)
    The below BPF filter is taken from ISC DHCP */
 

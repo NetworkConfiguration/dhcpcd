@@ -96,8 +96,6 @@ void free_route (route_t *routes)
     }
 }
 
-
-
 interface_t *read_interface (const char *ifname, int metric)
 {
 
@@ -227,7 +225,8 @@ interface_t *read_interface (const char *ifname, int metric)
   return iface;
 }
 
-#if defined(__FreeBSD__) || defined(__APPLE__)
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined (__OpenBSD__) \
+|| defined(__APPLE__)
 static int do_address (const char *ifname, struct in_addr address,
 		       struct in_addr netmask, struct in_addr broadcast, int del)
 {
