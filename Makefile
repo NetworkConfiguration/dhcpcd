@@ -2,12 +2,15 @@
 
 VERSION = 3.0.8_pre1
 
-INSTALL ?= install
+# We define _BSD_SOURCE as GNU supports BSD too - which is nice :)
+CDEFS = -D_BSD_SOURCE
 
 CFLAGS ?= -O2 -pipe
 
 # Loads of nice flags to ensure our code is good
-CFLAGS += -pedantic -std=c99 \
+# IMPORTANT: We should be using c99 instead of gnu99 but for some reason
+# generic linux headers as of 2.6.19 don't allow this in asm/types.h
+CFLAGS += -pedantic -std=gnu99 \
     -Wall -Wunused -Wimplicit -Wshadow -Wformat=2 \
     -Wmissing-declarations -Wno-missing-prototypes -Wwrite-strings \
     -Wbad-function-cast -Wnested-externs -Wcomment -Winline \
@@ -21,6 +24,7 @@ CFLAGS += -Wsequence-point -Wextra -Wdeclaration-after-statement
 #  have buggy headers from time to time, so you may need to comment this out
 #CFLAGS += -Werror
 
+INSTALL ?= install
 DESTDIR =
 SBINDIR = $(DESTDIR)/sbin
 MANDIR = $(DESTDIR)/usr/share/man
@@ -43,7 +47,6 @@ dhcpcd: $(dhcpcd_H) $(dhcpcd_OBJS)
 version.h:
 	echo '#define VERSION "$(VERSION)"' > version.h
 
-# We define _BSD_SOURCE as GNU supports BSD too - which is nice :)
 $(dhcpcd_OBJS): 
 	$(CC) -D_BSD_SOURCE $(CFLAGS) -c $*.c
 

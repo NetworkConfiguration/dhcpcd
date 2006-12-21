@@ -26,15 +26,6 @@
 
 #include <arpa/inet.h>
 
-/* Check linux version before including headers which break us */
-#ifdef __linux__ 
-#include <features.h>
-#include <linux/version.h>
-#if LINUX_VERSION_CODE == KERNEL_VERSION (2,6,19)
-#error "linux 2.6.19 headers are so badly broken, use something else"
-#endif
-#endif
-
 /* Netlink suff */
 #ifdef __linux__
 #include <asm/types.h> /* Needed for 2.4 kernels */

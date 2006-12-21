@@ -1,7 +1,6 @@
-Fix arp checking
-linux-2.6.19 headers NOW don't work with c99 which is just wrong, so
-dhcpcd no longer builds against these kernel headers. You get a nice
-error though :)
+Fix arp checking.
+linux header asm/types.h doesn't work with c99 which is just wrong,
+so it's back to gnu99 until a working linux version is released.
 
 dhcpcd-3.0.7
 Allow Linux to use Token Ring again as Linux does not have any more hardware
