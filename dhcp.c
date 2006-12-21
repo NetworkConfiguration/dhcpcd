@@ -253,7 +253,7 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
   make_dhcp_packet (&packet, (unsigned char *) &message, message_length,
 		    from, to);
 
-  logger (LOG_DEBUG, "Sending %s with xid %d", dhcp_message[(int) type], xid);
+  logger (LOG_DEBUG, "sending %s with xid %d", dhcp_message[(int) type], xid);
   return send_packet (iface, ETHERTYPE_IP, (unsigned char *) &packet,
 		      message_length + sizeof (struct ip) +
 		      sizeof (struct udphdr));
@@ -409,7 +409,7 @@ static route_t *decodeCSR(unsigned char *p, int len)
 
 void free_dhcp (dhcp_t *dhcp)
 {
-  if (!dhcp)
+  if (! dhcp)
     return;
 
   if (dhcp->routes)

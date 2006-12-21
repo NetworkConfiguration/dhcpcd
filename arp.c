@@ -121,16 +121,20 @@ int arp_check (interface_t *iface, struct in_addr address)
 	{
 	  union
 	  {
-	    unsigned char buffer[sizeof (struct arphdr)];
+	    unsigned char buffer[buflen];
 	    struct arphdr hdr;
 	  } reply;
 	  union
 	  {
 	    unsigned char *c;
-	    struct in_addr a;
-	  } ra;
-
-	  memset (reply.buffer, 0, sizeof (struct arphdr));
+	    struct in_addr *a;
+	  } rp;
+	  union
+	  {
+	    unsigned char *c;
+	    struct ether_addr *a;
+	  } rh;
+	  memset (reply.buffer, 0, sizeof (reply.buffer));
 	  if ((bytes = get_packet (iface, reply.buffer, arp.buffer,
 				   &buflen, &bufpos)) < 0)
 	    break;
@@ -151,10 +155,10 @@ int arp_check (interface_t *iface, struct in_addr address)
 	  if ((unsigned) bytes < sizeof (reply.hdr) + 2 * (4 + reply.hdr.ar_hln))
 	    continue;
 
-	  ra.c = (unsigned char *) ar_spa (&reply.hdr);
+	  rp.c = (unsigned char *) ar_spa (&reply.hdr);
+	  rh.c = (unsigned char *) ar_sha (&reply.hdr);
 	  logger (LOG_ERR, "ARPOP_REPLY received from %s (%s)",
-		  inet_ntoa (ra.a),
-		  ether_ntoa ((struct ether_addr *) ar_sha (&reply.hdr)));
+		  inet_ntoa (*rp.a), ether_ntoa (rh.a));
 	  close (iface->fd);
 	  iface->fd = -1;
 	  return 1;

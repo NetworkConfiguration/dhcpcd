@@ -464,15 +464,19 @@ int dhcp_run (const options_t *options)
 			  SOCKET_MODE (SOCKET_OPEN);
 			  SEND_MESSAGE (DHCP_DECLINE);
 			  SOCKET_MODE (SOCKET_CLOSED);
+
 			  free_dhcp (dhcp);
-			  memset (dhcp, 0, sizeof (dhcp));
+			  memset (dhcp, 0, sizeof (dhcp_t));
+ 
 			  if (daemonised)
 			    configure (options, iface, dhcp);
 
 			  xid = 0;
+			  timeout = 0;
 			  state = STATE_INIT;
 			  /* RFC 2131 says that we should wait for 10 seconds
 			     before doing anything else */
+			  logger (LOG_INFO, "sleeping for 10 seconds");
 			  sleep (10);
 			  continue;
 			}

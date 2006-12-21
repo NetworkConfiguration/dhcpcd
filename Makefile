@@ -1,6 +1,6 @@
 # Should work for both GNU make and BSD make
 
-VERSION = 3.0.7
+VERSION = 3.0.8_pre1
 
 INSTALL ?= install
 
