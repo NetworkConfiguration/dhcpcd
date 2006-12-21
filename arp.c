@@ -19,9 +19,6 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-/* OK, a lot of this was lifting from iputils as the existing code
-   for dhcpcd was kinda klunky and had some issues */
-
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
@@ -50,10 +47,12 @@
 #ifndef ar_sha
 #define ar_sha(ap) (((unsigned char *) ((ap) + 1)) + 0)
 #define ar_spa(ap) (((unsigned char *) ((ap) + 1)) + (ap)->ar_hln)
-#define ar_tha(ap) (((unsigned char *) ((ap) + 1)) + (ap)->ar_hln + (ap)->ar_pln)
-#define ar_tpa(ap) (((unsigned char *) ((ap) + 1)) + 2 * (ap)->ar_hln + (ap)->ar_pln)
-
-#define arphdr_len2(ar_hln, ar_pln) (sizeof (struct arphdr) + 2 * (ar_hln) + 2 * (ar_pln))
+#define ar_tha(ap) (((unsigned char *) ((ap) + 1)) + \
+		    (ap)->ar_hln + (ap)->ar_pln)
+#define ar_tpa(ap) (((unsigned char *) ((ap) + 1)) + \
+		    2 * (ap)->ar_hln + (ap)->ar_pln)
+#define arphdr_len2(ar_hln, ar_pln) (sizeof (struct arphdr) + \
+				     2 * (ar_hln) + 2 * (ar_pln))
 #define arphdr_len(ap) (arphdr_len2 ((ap)->ar_hln, (ap)->ar_pln))
 #endif
 
@@ -152,7 +151,8 @@ int arp_check (interface_t *iface, struct in_addr address)
 
 	  if (reply.hdr.ar_hln != ETHER_ADDR_LEN)
 	    continue;
-	  if ((unsigned) bytes < sizeof (reply.hdr) + 2 * (4 + reply.hdr.ar_hln))
+	  if ((unsigned) bytes < sizeof (reply.hdr) + 
+	      2 * (4 + reply.hdr.ar_hln))
 	    continue;
 
 	  rp.c = (unsigned char *) ar_spa (&reply.hdr);
