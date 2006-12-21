@@ -2,9 +2,6 @@
 
 VERSION = 3.0.8_pre1
 
-# We define _BSD_SOURCE as GNU supports BSD too - which is nice :)
-CDEFS = -D_BSD_SOURCE
-
 CFLAGS ?= -O2 -pipe
 
 # Loads of nice flags to ensure our code is good
@@ -23,6 +20,9 @@ CFLAGS += -Wsequence-point -Wextra -Wdeclaration-after-statement
 # -Werrror is a good flag to use for development, but some platforms may
 #  have buggy headers from time to time, so you may need to comment this out
 #CFLAGS += -Werror
+
+# We define _BSD_SOURCE as GNU supports BSD too - which is nice :)
+CDEFS = -D_BSD_SOURCE
 
 INSTALL ?= install
 DESTDIR =
@@ -48,7 +48,7 @@ version.h:
 	echo '#define VERSION "$(VERSION)"' > version.h
 
 $(dhcpcd_OBJS): 
-	$(CC) -D_BSD_SOURCE $(CFLAGS) -c $*.c
+	$(CC) $(CDEFS) $(CFLAGS) -c $*.c
 
 all: $(TARGET)
 
