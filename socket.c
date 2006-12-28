@@ -112,7 +112,7 @@ void make_dhcp_packet(struct udp_dhcp_packet *packet,
   ip->ip_len = udp->uh_ulen;
   udp->uh_sum = checksum ((unsigned char *) packet,
 			  sizeof (struct udp_dhcp_packet));
-  
+
   ip->ip_v = IPVERSION;
   ip->ip_hl = 5;
   ip->ip_id = 0;
@@ -180,7 +180,7 @@ eexit:
 }
 
 #if defined(__FreeBSD__) || defined(__NetBSD__) || defined (__OpenBSD__) \
-|| defined(__APPLE__)
+ || defined(__APPLE__)
 /* Credit where credit is due :)
    The below BPF filter is taken from ISC DHCP */
 
@@ -373,7 +373,7 @@ int get_packet (const interface_t *iface, unsigned char *data,
     {
       int len = -1;
       union
-        {
+	{
 	  unsigned char *buffer;
 	  struct ether_header *hw;
 	} hdr;
@@ -398,7 +398,7 @@ int get_packet (const interface_t *iface, unsigned char *data,
 	  if (valid_dhcp_packet (payload) >= 0)
 	    {
 	      union
-	        {
+		{
 		  unsigned char *buffer;
 		  struct udp_dhcp_packet *packet;
 		} pay;
@@ -411,7 +411,7 @@ int get_packet (const interface_t *iface, unsigned char *data,
 
       /* Update the buffer_pos pointer */
       bpf.buffer +=
-      BPF_WORDALIGN (bpf.packet->bh_hdrlen + bpf.packet->bh_caplen);
+       BPF_WORDALIGN (bpf.packet->bh_hdrlen + bpf.packet->bh_caplen);
       if (bpf.buffer - buffer <  *buffer_len)
 	*buffer_pos = bpf.buffer - buffer;
       else
@@ -508,10 +508,10 @@ int get_packet (const interface_t *iface, unsigned char *data,
 {
   long bytes;
   union
-  {
+    {
       unsigned char *buffer;
       struct udp_dhcp_packet *packet;
-  } pay;
+    } pay;
 
   /* We don't use the given buffer, but we need to rewind the position */
   *buffer_pos = 0;
@@ -563,7 +563,7 @@ int get_packet (const interface_t *iface, unsigned char *data,
     return -1;
 
   memcpy(data, &pay.packet->dhcp,
-  bytes - (sizeof (pay.packet->ip) + sizeof (pay.packet->udp)));
+	 bytes - (sizeof (pay.packet->ip) + sizeof (pay.packet->udp)));
 
   return bytes - (sizeof (pay.packet->ip) + sizeof (pay.packet->udp));
 }

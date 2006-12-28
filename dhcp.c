@@ -165,8 +165,8 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 	  *p++ = DHCP_CSR;
 	  /* RFC 3442 states classless static routes should be before routers
 	   * and static routes as classless static routes override them both */
-	  *p++ = DHCP_ROUTERS;
 	  *p++ = DHCP_STATICROUTE;
+	  *p++ = DHCP_ROUTERS;
 	  *p++ = DHCP_HOSTNAME;
 	  *p++ = DHCP_DNSSEARCH;
 	  *p++ = DHCP_DNSDOMAIN;

@@ -1,3 +1,6 @@
+Add static routes before any default routes as a router may require a host
+route in the static routes.
+
 dhcpcd-3.0.8
 Fix arp checking.
 linux header asm/types.h doesn't work with c99 which is just wrong,

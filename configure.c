@@ -426,7 +426,7 @@ int configure (const options_t *options, interface_t *iface,
 #ifdef __linux__
   /* On linux, we need to change the subnet route to have our metric. */
   if (iface->previous_address.s_addr != dhcp->address.s_addr
-      && options->metric > 0)
+      && options->metric > 0 && dhcp->netmask.s_addr != INADDR_BROADCAST)
     {
       struct in_addr td;
       struct in_addr tg;
