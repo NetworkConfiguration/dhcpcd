@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon -
- * Copyright (C) 2005 - 2006 Roy Marples <uberlord@gentoo.org>
+ * Copyright 2006-2007 Roy Marples <uberlord@gentoo.org>
  *
  * dhcpcd is an RFC2131 compliant DHCP client daemon.
  *
@@ -34,6 +34,7 @@
 #include <errno.h>
 #include <netdb.h>
 #include <resolv.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -74,11 +75,50 @@ static char *cleanmetas (const char *cstr)
   return b;
 }
 
+/* IMPORTANT: Ensure that the last parameter is NULL when calling */
+static int exec_cmd (const char *cmd, const char *args, ...)
+{
+  va_list va;
+  pid_t pid;
+  char **argv;
+  int n = 1;
+
+  va_start (va, args);
+  while (va_arg (va, char *) != NULL)
+    n++;
+  va_end (va);
+  argv = alloca ((n + 1) * sizeof (*argv));
+  if (argv == NULL)
+    {
+      errno = ENOMEM;
+      return -1;
+    }
+
+  va_start (va, args);
+  n = 2;
+  argv[0] = (char *) cmd;
+  argv[1] = (char *) args;
+  while ((argv[n] = va_arg (va, char *)) != NULL)
+    n++;
+  va_end (va);
+
+  if ((pid = fork ()) == 0)
+    {
+      if (execve (cmd, argv, NULL) && errno != ENOENT)
+	logger (LOG_ERR, "error executing \"%s\": %s",
+		cmd, strerror (errno));
+      exit (0);
+    }
+  else if (pid == -1)
+    logger (LOG_ERR, "fork: %s", strerror (errno));
+
+  return 0;
+}
+
 static void exec_script (const char *script, const char *infofile,
 			 const char *arg)
 {
   struct stat buf;
-  pid_t pid;
 
   if (! script || ! infofile || ! arg)
     return;
@@ -91,19 +131,7 @@ static void exec_script (const char *script, const char *infofile,
     }
 
   logger (LOG_DEBUG, "exec \"%s %s %s\"", script, infofile, arg);
-
-  /* We don't wait for the user script to finish - do we trust it? */
-  /* Don't use vfork as we lose our memory when dhcpcd exits
-     causing the script to fail */
-  if ((pid = fork ()) == 0)
-    {
-      if (execle (script, script, infofile, arg, NULL, NULL))
-	logger (LOG_ERR, "error executing \"%s %s %s\": %s",
-		script, infofile, arg, strerror (errno));
-      exit (0);
-    }
-  else if (pid == -1)
-    logger (LOG_ERR, "fork: %s", strerror (errno));
+  exec_cmd (script, infofile, arg, NULL);
 }
 
 static int make_resolv (const char *ifname, const dhcp_t *dhcp)
@@ -157,27 +185,12 @@ static int make_resolv (const char *ifname, const dhcp_t *dhcp)
 static void restore_resolv(const char *ifname)
 {
   struct stat buf;
-  pid_t pid;
 
   if (stat (RESOLVCONF, &buf) < 0)
     return;
 
   logger (LOG_DEBUG, "removing information from resolvconf");
-
-  /* Don't wait around here as we should only be called when
-     dhcpcd is closing down and something may do a kill -9
-     if we take too long */
-  /* Don't use vfork as we lose our memory when dhcpcd exits
-     causing the script to fail */
-  if ((pid = fork ()) == 0)
-    {
-      if (execle (RESOLVCONF, RESOLVCONF, "-d", ifname, NULL, NULL))
-	logger (LOG_ERR, "error executing \"%s -d %s\": %s",
-		RESOLVCONF, ifname, strerror (errno));
-      exit (0);
-    }
-  else if (pid == -1)
-    logger (LOG_ERR, "fork: %s", strerror (errno));
+  exec_cmd (RESOLVCONF, "-d", ifname, NULL);
 }
 
 static int make_ntp (const char *ifname, const dhcp_t *dhcp)
@@ -206,6 +219,8 @@ static int make_ntp (const char *ifname, const dhcp_t *dhcp)
   fprintf (f, "driftfile " NTPDRIFTFILE "\n");
   fprintf (f, "logfile " NTPLOGFILE "\n");
   fclose (f);
+
+  exec_cmd (NTPSERVICE, NTPRESTARTARGS, NULL);
   return 0;
 }
 
@@ -240,6 +255,7 @@ static int make_nis (const char *ifname, const dhcp_t *dhcp)
 
   fclose (f);
 
+  exec_cmd (NISSERVICE, NISRESTARTARGS, NULL);
   return 0;
 }
 

@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon -
- * Copyright (C) 2006 Roy Marples <uberlord@gentoo.org>
+ * Copyright 2007 Roy Marples <uberlord@gentoo.org>
  * 
  * dhcpcd is an RFC2131 compliant DHCP client daemon.
  *

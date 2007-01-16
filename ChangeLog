@@ -1,3 +1,10 @@
+For infinite timeout, we now resent the last request at TIMEOUT_MINI
+intervals like we do otherwise.
+We now return a non zero exit code on SIGTERM and SIGINT if we have not
+forked into the background.
+When NIS and/or NTP servers are updated, we restart the service for them
+if we can.
+
 dhcpcd-3.0.9
 Add static routes before any default routes as a router may require a host
 route in the static routes.

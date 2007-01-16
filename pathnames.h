@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon -
- * Copyright (C) 2005 - 2006 Roy Marples <uberlord@gentoo.org>
+ * Copyright 2005 - 2007 Roy Marples <uberlord@gentoo.org>
  *
  * dhcpcd is an RFC2131 compliant DHCP client daemon.
  *
@@ -28,9 +28,17 @@
 
 #define ETCDIR			"/etc"
 #define RESOLVFILE		ETCDIR "/resolv.conf"
+
 #define NISFILE			ETCDIR "/yp.conf"
+#define NISSERVICE		ETCDIR "/init.d/ypbind"
+#define NISRESTARTARGS		"--quiet", "conditionalrestart"
+
 #define NTPFILE			ETCDIR "/ntp.conf"
 #define NTPDRIFTFILE		ETCDIR "/ntp.drift"
+#define NTPLOGFILE		"/var/log/ntp.log"
+#define NTPSERVICE		ETCDIR "/init.d/ntpd"
+#define NTPRESTARTARGS		"--quiet", "conditionalrestart"
+
 #define DEFAULT_SCRIPT		ETCDIR "/" PACKAGE ".sh"
 
 #define STATEDIR		"/var"
@@ -38,7 +46,5 @@
 
 #define CONFIGDIR		STATEDIR "/lib/" PACKAGE
 #define INFOFILE		CONFIGDIR "/" PACKAGE "-%s.info"
-
-#define NTPLOGFILE		"/var/log/ntp.log"
 
 #endif

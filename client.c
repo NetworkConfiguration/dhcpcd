@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon -
- * Copyright (C) 2006 Roy Marples <uberlord@gentoo.org>
+ * Copyright 2006-2007 Roy Marples <uberlord@gentoo.org>
  * 
  * dhcpcd is an RFC2131 compliant DHCP client daemon.
  *
@@ -172,8 +172,16 @@ int dhcp_run (const options_t *options)
 	  if (options->timeout == 0 || dhcp->leasetime == (unsigned) -1)
 	    {
 	      logger (LOG_DEBUG, "waiting on select for infinity");
-	      maxfd = signal_fd_set (&rset, iface->fd);
-	      retval = select (maxfd + 1, &rset, NULL, NULL, NULL);
+	      retval = 0;
+	      while (retval == 0)
+		{
+		  tv.tv_sec = TIMEOUT_MINI;
+		  tv.tv_usec = 0;
+		  maxfd = signal_fd_set (&rset, iface->fd);
+		  retval = select (maxfd + 1, &rset, NULL, NULL, &tv);
+		  if (retval == 0)
+		    SEND_MESSAGE (last_type);
+		}
 	    }
 	  else
 	    {
@@ -216,12 +224,12 @@ int dhcp_run (const options_t *options)
 	    {
 	    case SIGINT:
 	      logger (LOG_INFO, "receieved SIGINT, stopping");
-	      retval = 0;
+	      retval = (! daemonised);
 	      goto eexit;
 
 	    case SIGTERM:
 	      logger (LOG_INFO, "receieved SIGTERM, stopping");
-	      retval = 0;
+	      retval = (! daemonised);
 	      goto eexit;
 
 	    case SIGALRM:
