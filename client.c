@@ -267,7 +267,7 @@ int dhcp_run (const options_t *options)
 		}
 	      else
 		logger (LOG_ERR,
-			"receieved SIGUP, but no we have lease to release");
+			"receieved SIGHUP, but no we have lease to release");
 	      retval = 0;
 	      goto eexit;
 
