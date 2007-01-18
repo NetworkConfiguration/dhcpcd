@@ -52,6 +52,9 @@
 /* This is out mini timeout.
    Basically we resend the last request every TIMEOUT_MINI seconds. */
 #define TIMEOUT_MINI 		3
+/* Except for an infinite timeout. We keep adding TIMEOUT_MINI to
+   ourself until TIMEOUT_MINI_INF is reached. */
+#define TIMEOUT_MINI_INF	60
 
 #define STATE_INIT		0
 #define STATE_REQUESTING	1
@@ -171,11 +174,18 @@ int dhcp_run (const options_t *options)
 	{
 	  if (options->timeout == 0 || dhcp->leasetime == (unsigned) -1)
 	    {
+	      int retry = 0;
 	      logger (LOG_DEBUG, "waiting on select for infinity");
 	      retval = 0;
 	      while (retval == 0)
 		{
-		  tv.tv_sec = TIMEOUT_MINI;
+		  /* Slow down our requests */
+		  if (retry < TIMEOUT_MINI_INF)
+		    retry += TIMEOUT_MINI;
+		  else if (retry > TIMEOUT_MINI_INF)
+		    retry = TIMEOUT_MINI_INF;
+
+		  tv.tv_sec = retry;
 		  tv.tv_usec = 0;
 		  maxfd = signal_fd_set (&rset, iface->fd);
 		  retval = select (maxfd + 1, &rset, NULL, NULL, &tv);
