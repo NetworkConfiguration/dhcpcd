@@ -198,6 +198,52 @@ static int make_ntp (const char *ifname, const dhcp_t *dhcp)
   FILE *f;
   address_t *address;
   char *a;
+  char buffer[1024];
+  int tomatch = 0;
+  char *token;
+
+  for (address = dhcp->ntpservers; address; address = address->next)
+    tomatch++;
+
+  /* Check that we really need to update the servers
+     We do this because ntp has to be restarted to work with a changed config */
+  if (! (f = fopen(NTPFILE, "r")))
+    {
+      if (errno != ENOENT)
+	{
+	  logger (LOG_ERR, "fopen `%s': %s", NTPFILE, strerror (errno));
+	  return -1;
+	}
+    }
+  else
+    {
+      memset (buffer, 0, sizeof (buffer));
+      while (fgets (buffer, sizeof (buffer), f))
+	{
+	  a = buffer;
+	  token = strsep (&a, " ");
+	  if (! token || strcmp (token, "server") != 0)
+	    continue;
+
+	  if ((token = strsep (&a, " \n")) == NULL)
+	    continue;
+
+	  for (address = dhcp->ntpservers; address; address = address->next)
+	    if (strcmp (token, inet_ntoa (address->address)) == 0)
+	      {
+		tomatch--;
+		break;
+	      }
+	}
+      fclose (f);
+
+      /* File has the same name servers that we do, so no need to restart ntp */
+      if (tomatch == 0)
+	{
+	  logger (LOG_DEBUG, "ntp already configured, skipping");
+	  return 0;
+	}
+    }
 
   logger (LOG_DEBUG, "writing "NTPFILE);
   if (! (f = fopen(NTPFILE, "w")))
