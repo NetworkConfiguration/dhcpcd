@@ -1,3 +1,4 @@
+dhcpcd-3.0.10
 Only write a new ntp.conf if any of our servers are not present in it.
 We now work with SIGCHLD and call wait so that we don't leave any
 zombies lying around.
