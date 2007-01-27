@@ -57,6 +57,7 @@ void signal_setup(void)
   signal (SIGALRM, signal_handler);
   signal (SIGTERM, signal_handler);
   signal (SIGINT, signal_handler);
+  signal (SIGCHLD, signal_handler);
 }
 
 /* Quick little function to setup the rfds. Will return the

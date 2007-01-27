@@ -1,3 +1,5 @@
+We now work with SIGCHLD and call wait so that we don't leave any
+zombies lying around.
 For infinite timeout, we now resent the last request at +TIMEOUT_MINI
 intervals until TIMEOUT_MINI_INF is reached, thanks to siadak.
 We now return a non zero exit code on SIGTERM and SIGINT if we have not

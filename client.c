@@ -19,7 +19,9 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <sys/types.h>
 #include <sys/select.h>
+#include <sys/wait.h>
 #include <arpa/inet.h>
 #ifdef __linux__
 #include <netinet/ether.h>
@@ -232,19 +234,24 @@ int dhcp_run (const options_t *options)
 	{
 	  switch (sig)
 	    {
+	    case SIGCHLD:
+	      /* Silently ignore this signal and wait for it
+		 This stops zombies */
+	      wait (0);
+	      break;
 	    case SIGINT:
-	      logger (LOG_INFO, "receieved SIGINT, stopping");
+	      logger (LOG_INFO, "received SIGINT, stopping");
 	      retval = (! daemonised);
 	      goto eexit;
 
 	    case SIGTERM:
-	      logger (LOG_INFO, "receieved SIGTERM, stopping");
+	      logger (LOG_INFO, "received SIGTERM, stopping");
 	      retval = (! daemonised);
 	      goto eexit;
 
 	    case SIGALRM:
 
-	      logger (LOG_INFO, "receieved SIGALRM, renewing lease");
+	      logger (LOG_INFO, "received SIGALRM, renewing lease");
 	      switch (state)
 		{
 		case STATE_BOUND:
@@ -277,7 +284,7 @@ int dhcp_run (const options_t *options)
 		}
 	      else
 		logger (LOG_ERR,
-			"receieved SIGHUP, but no we have lease to release");
+			"received SIGHUP, but no we have lease to release");
 	      retval = 0;
 	      goto eexit;
 
