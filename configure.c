@@ -234,6 +234,9 @@ static int make_ntp (const char *ifname, const dhcp_t *dhcp)
 		tomatch--;
 		break;
 	      }
+
+	  if (tomatch == 0)
+	    break;
 	}
       fclose (f);
 
