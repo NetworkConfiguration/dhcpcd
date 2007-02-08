@@ -181,18 +181,23 @@ int dhcp_run (const options_t *options)
 	      retval = 0;
 	      while (retval == 0)
 		{
-		  /* Slow down our requests */
-		  if (retry < TIMEOUT_MINI_INF)
-		    retry += TIMEOUT_MINI;
-		  else if (retry > TIMEOUT_MINI_INF)
-		    retry = TIMEOUT_MINI_INF;
-
-		  tv.tv_sec = retry;
-		  tv.tv_usec = 0;
 		  maxfd = signal_fd_set (&rset, iface->fd);
-		  retval = select (maxfd + 1, &rset, NULL, NULL, &tv);
-		  if (retval == 0)
-		    SEND_MESSAGE (last_type);
+		  if (iface->fd == -1)
+		    retval = select (maxfd + 1, &rset, NULL, NULL, NULL);
+		  else
+		    {
+		      /* Slow down our requests */
+		      if (retry < TIMEOUT_MINI_INF)
+			retry += TIMEOUT_MINI;
+		      else if (retry > TIMEOUT_MINI_INF)
+			retry = TIMEOUT_MINI_INF;
+
+		      tv.tv_sec = retry;
+		      tv.tv_usec = 0;
+		      retval = select (maxfd + 1, &rset, NULL, NULL, &tv);
+		      if (retval == 0)
+			SEND_MESSAGE (last_type);
+		    }
 		}
 	    }
 	  else
