@@ -1,6 +1,6 @@
 # Should work for both GNU make and BSD make
 
-VERSION = 3.0.11
+VERSION = 3.0.12_pre1
 
 CFLAGS ?= -O2 -pipe
 
@@ -59,7 +59,7 @@ install: $(TARGET)
 	$(INSTALL) -m 0755 $(MAN8_TARGETS) $(MANDIR)/man8
 
 clean:
-	rm -f $(TARGET) $(dhcpcd_H) *.o *~ *.core
+	rm -f $(TARGET) $(dhcpcd_H) *.o *~ *.core *.bz2
 
 dist:
 	$(INSTALL) -m 0755 -d /tmp/dhcpcd-$(VERSION)

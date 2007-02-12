@@ -411,8 +411,8 @@ static int write_info(const interface_t *iface, const dhcp_t *dhcp,
   if (options->clientid[0])
     fprintf (f, "CLIENTID='%s'\n", cleanmetas (options->clientid));
   else
-    fprintf (f, "CLIENTID='%s'\n", ether_ntoa (&iface->ethernet_address));
-  fprintf (f, "DHCPCHADDR='%s'\n", ether_ntoa (&iface->ethernet_address));
+    fprintf (f, "CLIENTID='%s'\n", hwaddr_ntoa (iface->hwaddr, iface->hwlen));
+  fprintf (f, "DHCPCHADDR='%s'\n", hwaddr_ntoa (iface->hwaddr, iface->hwlen));
   fclose (f);
   return 0;
 }

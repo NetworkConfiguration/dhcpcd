@@ -72,13 +72,6 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
   if (!iface || !options || !dhcp)
     return -1;
 
-  if (type == DHCP_RELEASE || type == DHCP_INFORM ||
-      (type == DHCP_REQUEST &&
-       iface->previous_address.s_addr == dhcp->address.s_addr))
-    from.s_addr = dhcp->address.s_addr;
-  else
-    from.s_addr = 0;
-
   if (type == DHCP_RELEASE)
     to.s_addr = dhcp->serveraddress.s_addr;
   else
@@ -86,22 +79,40 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 
   memset (&message, 0, sizeof (dhcpmessage_t));
 
+  if (iface->previous_address.s_addr != 0
+      && (type == DHCP_INFORM || type == DHCP_RELEASE
+	  || (type == DHCP_REQUEST
+	      && iface->previous_address.s_addr == dhcp->address.s_addr)))
+    {
+      message.ciaddr = iface->previous_address.s_addr;
+      from.s_addr = iface->previous_address.s_addr;
+    }
+
   message.op = DHCP_BOOTREQUEST;
-  message.hwtype = ARPHRD_ETHER;
-  message.hwlen = ETHER_ADDR_LEN;
+  message.hwtype = iface->family;
+  switch (iface->family)
+    {
+    case ARPHRD_ETHER:
+    case ARPHRD_IEEE802:
+      message.hwlen = ETHER_ADDR_LEN;
+      memcpy (&message.chaddr, &iface->hwaddr, ETHER_ADDR_LEN);
+      break;
+    case ARPHRD_IEEE1394:
+    case ARPHRD_INFINIBAND:
+      if (message.ciaddr == 0)
+	message.flags = htons (BROADCAST_FLAG);
+      message.hwlen = 0;
+      break;
+    default:
+      logger (LOG_ERR, "dhcp: unknown hardware type %d", iface->family);
+    }
+
   if (up < 0 || up > UINT16_MAX)
     message.secs = htons ((short) UINT16_MAX);
   else
     message.secs = htons (up);
   message.xid = xid;
-  memcpy (&message.hwaddr, &iface->ethernet_address, ETHER_ADDR_LEN);
   message.cookie = htonl (MAGIC_COOKIE);
-
-  if (iface->previous_address.s_addr != 0
-      && (type == DHCP_INFORM || type == DHCP_RELEASE
-	  || (type == DHCP_REQUEST
-	      && iface->previous_address.s_addr == dhcp->address.s_addr)))
-    message.ciaddr = iface->previous_address.s_addr;
 
   *p++ = DHCP_MESSAGETYPE; 
   *p++ = 1;
@@ -239,10 +250,10 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
     }
   else
     {
-      *p++ = ETHER_ADDR_LEN + 1;
-      *p++ = ARPHRD_ETHER;
-      memcpy (p, &iface->ethernet_address, ETHER_ADDR_LEN);
-      p += ETHER_ADDR_LEN;
+      *p++ = iface->hwlen + 1;
+      *p++ = iface->family;
+      memcpy (p, &iface->hwaddr, iface->hwlen);
+      p += iface->hwlen;
     }
 
   *p++ = DHCP_END;

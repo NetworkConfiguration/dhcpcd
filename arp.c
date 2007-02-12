@@ -78,12 +78,12 @@ int arp_check (interface_t *iface, struct in_addr address)
 
   memset (arp.buffer, 0, sizeof (arp.buffer));
 
-  arp.ah.ar_hrd = htons (ARPHRD_ETHER);
+  arp.ah.ar_hrd = htons (iface->family);
   arp.ah.ar_pro = htons (ETHERTYPE_IP);
-  arp.ah.ar_hln = ETHER_ADDR_LEN;
+  arp.ah.ar_hln = iface->hwlen;
   arp.ah.ar_pln = sizeof (struct in_addr);
   arp.ah.ar_op = htons (ARPOP_REQUEST);
-  memcpy (ar_sha (&arp.ah), &iface->ethernet_address, arp.ah.ar_hln);
+  memcpy (ar_sha (&arp.ah), &iface->hwaddr, arp.ah.ar_hln);
   memcpy (ar_tpa (&arp.ah), &address, arp.ah.ar_pln);
 
   logger (LOG_INFO, "checking %s is available on attached networks", inet_ntoa
@@ -139,8 +139,7 @@ int arp_check (interface_t *iface, struct in_addr address)
 	    break;
 
 	  /* Only these types are recognised */
-	  if (reply.hdr.ar_op != htons(ARPOP_REPLY)
-	      || reply.hdr.ar_hrd != htons (ARPHRD_ETHER))
+	  if (reply.hdr.ar_op != htons(ARPOP_REPLY))
 	    continue;
 
 	  /* Protocol must be IP. */

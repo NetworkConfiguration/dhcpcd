@@ -1,3 +1,6 @@
+Add DHCP over FireWire 1394 (RFC 2855) and InfiniBand (RFC 4390) support.
+We should add support for DUIDs (RFC4361) as well.
+
 dhcpcd-3.0.11
 Don't try to send messages when we infinite leasetime and the interface
 fd is closed.

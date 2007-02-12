@@ -152,13 +152,13 @@ typedef struct dhcp_t
 } dhcp_t;
 
 /* Sizes for DHCP options */
-#define HWADDR_LEN		16
+#define DHCP_CHADDR_LEN		16
 #define SERVERNAME_LEN		64
 #define BOOTFILE_LEN		128
 #define DHCP_UDP_LEN		(20 + 8)
 #define DHCP_BASE_LEN		(4 + 4 + 2 + 2 + 4 + 4 + 4 + 4 + 4)
 #define DHCP_RESERVE_LEN	(4 + 4 + 4 + 4 + 2)
-#define DHCP_FIXED_LEN		(DHCP_BASE_LEN + HWADDR_LEN + \
+#define DHCP_FIXED_LEN		(DHCP_BASE_LEN + DHCP_CHADDR_LEN + \
 				+ SERVERNAME_LEN + BOOTFILE_LEN)
 #define DHCP_OPTION_LEN		(MTU_MAX - DHCP_FIXED_LEN - DHCP_UDP_LEN \
 				 - DHCP_RESERVE_LEN)
@@ -177,7 +177,7 @@ typedef struct dhcpmessage_t
   int32_t yiaddr;			/* 'your' client IP address */
   int32_t siaddr;			/* should be zero in client's messages */
   int32_t giaddr;			/* should be zero in client's messages */
-  unsigned char hwaddr[HWADDR_LEN];	/* client's hardware address */
+  unsigned char chaddr[DHCP_CHADDR_LEN];	/* client's hardware address */
   char servername[SERVERNAME_LEN];	/* server host name, null terminated string */
   char bootfile[BOOTFILE_LEN];		/* boot file name, null terminated string */
   uint32_t cookie;

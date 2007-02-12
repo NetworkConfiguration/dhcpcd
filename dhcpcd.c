@@ -387,7 +387,10 @@ int main(int argc, char **argv)
 
   logger (LOG_INFO, PACKAGE " " VERSION " starting");
   if (dhcp_run (&options))
-    exit (EXIT_FAILURE);
+    {
+      unlink (options.pidfile);
+      exit (EXIT_FAILURE);
+    }
 
   exit (EXIT_SUCCESS);
 }

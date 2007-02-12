@@ -91,13 +91,31 @@ void free_route (route_t *routes)
     }
 }
 
+
+char *hwaddr_ntoa (const unsigned char *hwaddr, int hwlen)
+{
+  static char buffer[128];
+  char *p = buffer;
+  int i;
+
+  for (i = 0; i < hwlen && i < 125; i++)
+    {
+      if (i > 0)
+	p += sprintf (p, ":");
+      p += sprintf (p, "%.2x", hwaddr[i]);
+    }
+
+  return (buffer);
+}
+
 interface_t *read_interface (const char *ifname, int metric)
 {
 
   int s;
   struct ifreq ifr;
   interface_t *iface;
-  unsigned char hwaddr[ETHER_ADDR_LEN];
+  unsigned char hwaddr[16];
+  int hwlen = 0;
   sa_family_t family;
 
 #ifndef __linux__
@@ -107,6 +125,8 @@ interface_t *read_interface (const char *ifname, int metric)
 
   if (! ifname)
     return NULL;
+
+  memset (hwaddr, sizeof (hwaddr), 0);
 
 #ifndef __linux__
   if (getifaddrs (&ifap) != 0)
@@ -137,7 +157,8 @@ interface_t *read_interface (const char *ifname, int metric)
 	}
 
       memcpy (hwaddr, us.sdl->sdl_data + us.sdl->sdl_nlen, ETHER_ADDR_LEN);
-      family = us.sdl->sdl_type;
+      family = ARPHRD_ETHER;
+      hwlen = ETHER_ADDR_LEN;
       break;
     }
   freeifaddrs (ifap);
@@ -166,14 +187,23 @@ interface_t *read_interface (const char *ifname, int metric)
       close (s);
       return NULL;
     }
-  if (ifr.ifr_hwaddr.sa_family != ARPHRD_ETHER &&
-      ifr.ifr_hwaddr.sa_family != ARPHRD_IEEE802_TR)
+  switch (ifr.ifr_hwaddr.sa_family)
     {
-      logger (LOG_ERR, "interface is not Ethernet or Token Ring");
+    case ARPHRD_ETHER:
+    case ARPHRD_IEEE802:
+      hwlen = ETHER_ADDR_LEN;
+      break;
+    case ARPHRD_IEEE1394:
+      hwlen = EUI64_ADDR_LEN;
+    case ARPHRD_INFINIBAND:
+      hwlen = INFINIBAND_ADDR_LEN;
+      break;
+    default:
+      logger (LOG_ERR, "interface is not Ethernet, FireWire, InfiniBand or Token Ring");
       close (s);
       return NULL;
     }
-  memcpy (hwaddr, ifr.ifr_hwaddr.sa_data, ETHER_ADDR_LEN);
+  memcpy (hwaddr, ifr.ifr_hwaddr.sa_data, hwlen);
   family = ifr.ifr_hwaddr.sa_family;
 #else
   ifr.ifr_metric = metric;
@@ -206,13 +236,14 @@ interface_t *read_interface (const char *ifname, int metric)
   memset (iface, 0, sizeof (interface_t));
   strncpy (iface->name, ifname, IF_NAMESIZE);
   snprintf (iface->infofile, PATH_MAX, INFOFILE, ifname);
-  memcpy (&iface->ethernet_address, hwaddr, ETHER_ADDR_LEN);
+  memcpy (&iface->hwaddr, hwaddr, hwlen);
+  iface->hwlen = hwlen;
 
   iface->family = family;
   iface->arpable = ! (ifr.ifr_flags & (IFF_NOARP | IFF_LOOPBACK));
 
-  logger (LOG_INFO, "ethernet address = %s",
-	  ether_ntoa (&iface->ethernet_address));
+  logger (LOG_INFO, "hardware address = %s",
+	  hwaddr_ntoa (iface->hwaddr, iface->hwlen));
 
   /* 0 is a valid fd, so init to -1 */
   iface->fd = -1;

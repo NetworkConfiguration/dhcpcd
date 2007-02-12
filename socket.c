@@ -317,7 +317,7 @@ int send_packet (const interface_t *iface, int type,
   int retval = -1;
   struct iovec iov[2];
 
-  if (iface->family == IFT_ETHER)
+  if (iface->family == ARPHRD_ETHER)
     {
       struct ether_header hw;
       memset (&hw, 0, sizeof (struct ether_header));

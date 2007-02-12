@@ -31,6 +31,14 @@
 #include <limits.h>
 #include <stdbool.h>
 
+#define EUI64_ADDR_LEN			8
+#define INFINIBAND_ADDR_LEN		20
+
+/* The BSD's don't define this yet */
+#ifndef ARPHRD_INFINIBAND
+#  define ARPHRD_INFINIBAND		27
+#endif
+
 typedef struct route_t
 {
   struct in_addr destination; 
@@ -48,8 +56,9 @@ typedef struct address_t
 typedef struct interface_t
 {
   char name[IF_NAMESIZE];
-  struct ether_addr ethernet_address;
   sa_family_t family;
+  unsigned char hwaddr[20];
+  int hwlen;
   bool arpable;
 
   int fd;
@@ -82,4 +91,7 @@ int change_route (const char *ifname, struct in_addr destination,
 		  struct in_addr netmask, struct in_addr gateway, int metric);
 int del_route (const char *ifname, struct in_addr destination,
 	       struct in_addr netmask, struct in_addr gateway, int metric);
+
+char *hwaddr_ntoa (const unsigned char *hwaddr, int hwlen);
+
 #endif
