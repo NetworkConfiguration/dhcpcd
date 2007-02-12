@@ -1,6 +1,6 @@
 .\" $Id$
 .\"
-.TH DHCPCD 8 "06 December 2006" "dhcpcd 3.0"
+.TH DHCPCD 8 "12 February 2007" "dhcpcd 3.0"
 
 .SH NAME
 dhcpcd \- DHCP client daemon
@@ -73,10 +73,7 @@ FQDN option field instead of the hostname option field.
 We send the current hostname by default. To send no hostname, use -h ''.
 .TP
 .BI \-i \ vendorClassID
-Specifies the vendor class identifier string.
-.B dhcpcd
-uses the default vendor class identifier string (system name, system release,
-and machine type) if it is not specified.
+Specifies the vendor class identifier string. The default is dhcpcd-<version>.
 .TP
 .BI \-k
 Sends
@@ -217,23 +214,21 @@ interface) if it is not specified.
 .BI \-N
 Prevents
 .B dhcpcd
-from replacing existing
+from replacing
 .I /etc/ntp.conf
-file.
 .TP
 .BI \-R
 Prevents
 .B dhcpcd
-from replacing existing using resolvconf or replacing
+from replacing
 .I /etc/resolv.conf
-file.
+or using resolvconf.
 .TP
 .BI \-Y
 Prevents
 .B dhcpcd
-from replacing existing
+from replacing
 .I /etc/yp.conf
-file.
 .TP
 .BI \-G
 Prevents
