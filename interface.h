@@ -71,6 +71,7 @@ typedef struct interface_t
   char infofile[PATH_MAX];
 
   struct in_addr previous_address;
+  struct in_addr previous_netmask;
   route_t *previous_routes;
 
   long start_uptime;
@@ -82,7 +83,8 @@ interface_t *read_interface (const char *ifname, int metric);
 
 int add_address (const char *ifname, struct in_addr address,
 		 struct in_addr netmask, struct in_addr broadcast);
-int del_address (const char *ifname, struct in_addr address);
+int del_address (const char *ifname, struct in_addr address,
+		 struct in_addr netmask);
 int flush_addresses (const char *ifname);
 
 int add_route (const char *ifname, struct in_addr destination,

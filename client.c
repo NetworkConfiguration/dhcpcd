@@ -174,7 +174,8 @@ int dhcp_run (const options_t *options)
       if (timeout > 0 || (options->timeout == 0 &&
 			  (state != STATE_INIT || xid)))
 	{
-	  if (options->timeout == 0 || dhcp->leasetime == (unsigned) -1)
+	  if (options->timeout == 0 ||
+	      (dhcp->leasetime == (unsigned) -1 && state == STATE_BOUND))
 	    {
 	      int retry = 0;
 	      logger (LOG_DEBUG, "waiting on select for infinity");
@@ -471,8 +472,15 @@ int dhcp_run (const options_t *options)
 	    case STATE_INIT:
 	      if (type == DHCP_OFFER)
 		{
-		  logger (LOG_INFO, "offered lease of %s",
-			  inet_ntoa (dhcp->address));
+		  char *addr = strdup (inet_ntoa (dhcp->address));
+		  if (dhcp->servername)
+		    logger (LOG_INFO, "offered %s from %s `%s'",
+			    addr, inet_ntoa (dhcp->serveraddress),
+			    dhcp->servername);
+		  else
+		    logger (LOG_INFO, "offered %s from %s",
+			    addr, inet_ntoa (dhcp->serveraddress));
+		  free (addr);
 
 		  SEND_MESSAGE (DHCP_REQUEST);
 		  state = STATE_REQUESTING;
@@ -512,40 +520,69 @@ int dhcp_run (const options_t *options)
 			}
 		    }
 
-		  if (! dhcp->leasetime)
-		    {
-		      dhcp->leasetime = DEFAULT_TIMEOUT;
-		      logger(LOG_INFO,
-			     "no lease time supplied, assuming %d seconds",
-			     dhcp->leasetime);
-		    }
-
-		  if (! dhcp->renewaltime) 
-		    {
-		      dhcp->renewaltime = dhcp->leasetime / 2;
-		      logger (LOG_INFO,
-			      "no renewal time supplied, assuming %d seconds",
-			      dhcp->renewaltime);
-		    }
-
-		  if (! dhcp->rebindtime)
-		    {
-		      dhcp->rebindtime = (dhcp->leasetime * 0x7) >> 3;
-		      logger (LOG_INFO,
-			      "no rebind time supplied, assuming %d seconds",
-			      dhcp->rebindtime);
-		    }
-
 		  if (dhcp->leasetime == (unsigned) -1)
-		    logger (LOG_INFO, "leased %s for infinity",
-			    inet_ntoa (dhcp->address));
+		    {
+		      dhcp->renewaltime = dhcp->rebindtime = dhcp->leasetime;
+		      timeout = 1; /* So we select on infinity */
+		      logger (LOG_INFO, "leased %s for infinity",
+			      inet_ntoa (dhcp->address));
+		    }
 		  else
-		    logger (LOG_INFO, "leased %s for %u seconds",
-			    inet_ntoa (dhcp->address),
-			    dhcp->leasetime, dhcp->renewaltime);
+		    {
+		      if (! dhcp->leasetime)
+			{
+			  dhcp->leasetime = DEFAULT_TIMEOUT;
+			  logger(LOG_INFO,
+				 "no lease time supplied, assuming %d seconds",
+				 dhcp->leasetime);
+			}
+		      else
+			logger (LOG_INFO, "leased %s for %u seconds",
+				inet_ntoa (dhcp->address), dhcp->leasetime);
+
+		      if (dhcp->rebindtime >= dhcp->leasetime)
+			{
+			  dhcp->rebindtime = (dhcp->leasetime * 0.875);
+			  logger (LOG_ERR, "rebind time greater than lease "
+				  "time, forcing to %u seconds",
+				  dhcp->rebindtime);
+			}
+
+		      if (dhcp->renewaltime > dhcp->rebindtime)
+			{
+			
+			  dhcp->renewaltime = (dhcp->leasetime * 0.5);
+			  logger (LOG_ERR, "renewal time greater than rebind time, "
+				  "forcing to %u seconds",
+				  dhcp->renewaltime);
+			}
+
+		      if (! dhcp->renewaltime) 
+			{
+			  dhcp->renewaltime = (dhcp->leasetime * 0.5);
+			  logger (LOG_INFO,
+				  "no renewal time supplied, assuming %d seconds",
+				  dhcp->renewaltime);
+			}
+		      else
+			logger (LOG_DEBUG, "renew in %u seconds",
+				dhcp->renewaltime);
+
+		      if (! dhcp->rebindtime)
+			{
+			  dhcp->rebindtime = (dhcp->leasetime * 0.875);
+			  logger (LOG_INFO,
+				  "no rebind time supplied, assuming %d seconds",
+				  dhcp->rebindtime);
+			}
+		      else
+			logger (LOG_DEBUG, "rebind in %u seconds",
+				dhcp->rebindtime);
+
+		      timeout = dhcp->renewaltime;
+		    }
 
 		  state = STATE_BOUND;
-		  timeout = dhcp->renewaltime;
 		  xid = 0;
 
 		  if (configure (options, iface, dhcp) < 0 && ! daemonised)

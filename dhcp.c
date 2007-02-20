@@ -296,9 +296,9 @@ static unsigned long getnetmask (unsigned long ip_in)
    seperated string. Returns length of string (including 
    terminating zero) or zero on error. out may be NULL
    to just determine output length. */
-static unsigned int decode_search (u_char *p, int len, char *out)
+static unsigned int decode_search (const unsigned char *p, int len, char *out)
 {
-  u_char *r, *q = p;
+  const unsigned char *r, *q = p;
   unsigned int count = 0, l, hops;
 
   while (q - p < len)
@@ -358,9 +358,9 @@ static unsigned int decode_search (u_char *p, int len, char *out)
 
 /* Add our classless static routes to the routes variable
  * and return the last route set */
-static route_t *decodeCSR(unsigned char *p, int len)
+static route_t *decodeCSR(const unsigned char *p, int len)
 {
-  unsigned char *q = p;
+  const unsigned char *q = p;
   int cidr;
   int ocets;
   route_t *first;
@@ -455,7 +455,7 @@ void free_dhcp (dhcp_t *dhcp)
     }
 }
 
-static void dhcp_add_address(address_t *address, unsigned char *data, int length)
+static void dhcp_add_address(address_t *address, const unsigned char *data, int length)
 {
   int i;
   address_t *p = address;
@@ -474,8 +474,8 @@ static void dhcp_add_address(address_t *address, unsigned char *data, int length
 
 int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 {
-  unsigned char *p = message->options;
-  unsigned char *end = message->options; /* Add size later for gcc-3 issue */
+  const unsigned char *p = message->options;
+  const unsigned char *end = p; /* Add size later for gcc-3 issue */
   unsigned char option;
   unsigned char length;
   unsigned int len = 0;

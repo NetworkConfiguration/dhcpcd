@@ -100,7 +100,6 @@ static void usage ()
 	  "              [-u userclass] [-F [none | ptr | both]] [-I clientID]\n");
 }
 
-
 int main(int argc, char **argv)
 {
   options_t options;
@@ -110,6 +109,7 @@ int main(int argc, char **argv)
   int ch;
   int option_index = 0;
   char prefix[IF_NAMESIZE + 3];
+  pid_t pid;
 
   const struct option longopts[] =
     {
@@ -344,7 +344,7 @@ int main(int argc, char **argv)
   if (options.signal != 0)
     {
       int killed = -1;
-      pid_t pid = read_pid (options.pidfile);
+      pid = read_pid (options.pidfile);
       if (pid != 0)
         logger (LOG_INFO, "sending signal %d to pid %d", options.signal, pid);
 
@@ -377,7 +377,7 @@ int main(int argc, char **argv)
       exit (EXIT_FAILURE);
     }
 
-  if (read_pid (options.pidfile))
+  if ((pid = read_pid (options.pidfile)) > 0 && kill (pid, 0) == 0)
     {
       logger (LOG_ERR, ""PACKAGE" already running (%s)", options.pidfile);
       exit (EXIT_FAILURE);

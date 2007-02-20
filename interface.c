@@ -181,6 +181,7 @@ interface_t *read_interface (const char *ifname, int metric)
 #ifdef __linux__
   /* Do something with the metric parameter to satisfy the compiler warning */
   metric = 0;
+  strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
   if (ioctl (s, SIOCGIFHWADDR, &ifr) <0)
     {
       logger (LOG_ERR, "ioctl SIOCGIFHWADDR: %s", strerror (errno));
@@ -207,6 +208,7 @@ interface_t *read_interface (const char *ifname, int metric)
   family = ifr.ifr_hwaddr.sa_family;
 #else
   ifr.ifr_metric = metric;
+  strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
   if (ioctl (s, SIOCSIFMETRIC, &ifr) < 0)
     {
       logger (LOG_ERR, "ioctl SIOCSIFMETRIC: %s", strerror (errno));
@@ -215,6 +217,7 @@ interface_t *read_interface (const char *ifname, int metric)
     }
 #endif
 
+  strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
   if (ioctl(s, SIOCGIFFLAGS, &ifr) < 0)
     {
       logger (LOG_ERR, "ioctl SIOCGIFFLAGS: %s", strerror (errno));
@@ -223,6 +226,7 @@ interface_t *read_interface (const char *ifname, int metric)
     }
 
   ifr.ifr_flags |= IFF_UP | IFF_RUNNING;
+  strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
   if (ioctl(s, SIOCSIFFLAGS, &ifr) < 0)
     {
       logger (LOG_ERR, "ioctl SIOCSIFFLAGS: %s", strerror (errno));
@@ -281,9 +285,9 @@ static int do_address (const char *ifname, struct in_addr address,
     }
 
   ADDADDR (ifa.ifra_addr, address);
+  ADDADDR (ifa.ifra_mask, netmask);
   if (! del)
     {
-      ADDADDR (ifa.ifra_mask, netmask);
       ADDADDR (ifa.ifra_broadaddr, broadcast);
     }
 
@@ -448,7 +452,8 @@ static int send_netlink(struct nlmsghdr *hdr)
   struct iovec iov;
   struct msghdr msg;
   static unsigned int seq;
-  char buffer[16384];
+  char buffer[256];
+  int bytes;
   union
     {
       char *buffer;
@@ -496,25 +501,25 @@ static int send_netlink(struct nlmsghdr *hdr)
 
   while (1) 
     {
-      int bytes = recvmsg(s, &msg, 0);
       iov.iov_len = sizeof (buffer);
+      bytes = recvmsg(s, &msg, 0);
 
       if (bytes < 0)
 	{
 	  if (errno != EINTR)
-	    logger (LOG_ERR, "overrun");
+	    logger (LOG_ERR, "netlink: overrun");
 	  continue;
 	}
 
       if (bytes == 0)
 	{
-	  logger (LOG_ERR, "EOF on netlink");
+	  logger (LOG_ERR, "netlink: EOF");
 	  goto eexit;
 	}
 
       if (msg.msg_namelen != sizeof (nl))
 	{
-	  logger (LOG_ERR, "sender address length == %d", msg.msg_namelen);
+	  logger (LOG_ERR, "netlink: sender address length mismatch");
 	  goto eexit;
 	}
 
@@ -526,9 +531,9 @@ static int send_netlink(struct nlmsghdr *hdr)
 	  if (l < 0 || len > bytes)
 	    {
 	      if (msg.msg_flags & MSG_TRUNC)
-		logger (LOG_ERR, "truncated message");
+		logger (LOG_ERR, "netlink: truncated message");
 	      else
-		logger (LOG_ERR, "malformed message");
+		logger (LOG_ERR, "netlink: malformed message");
 	      goto eexit;
 	    }
 
@@ -543,7 +548,7 @@ static int send_netlink(struct nlmsghdr *hdr)
 	    {
 	      struct nlmsgerr *err = (struct nlmsgerr *) NLMSG_DATA (h.nlm);
 	      if ((unsigned) l < sizeof (struct nlmsgerr))
-		logger (LOG_ERR, "truncated error message");
+		logger (LOG_ERR, "netlink: truncated error message");
 	      else
 		{
 		  errno = -err->error;
@@ -555,12 +560,12 @@ static int send_netlink(struct nlmsghdr *hdr)
 
 		  /* Don't report on something already existing */
 		  if (errno != EEXIST)
-		    logger (LOG_ERR, "RTNETLINK answers: %s", strerror (errno));
+		    logger (LOG_ERR, "netlink: %s", strerror (errno));
 		}
 	      goto eexit;
 	    }
 
-	  logger (LOG_ERR, "unexpected reply");
+	  logger (LOG_ERR, "netlink: unexpected reply");
 next:
 	  bytes -= NLMSG_ALIGN (len);
 	  h.buffer += NLMSG_ALIGN (len);
@@ -568,13 +573,13 @@ next:
 
       if (msg.msg_flags & MSG_TRUNC)
 	{
-	  logger (LOG_ERR, "message truncated");
+	  logger (LOG_ERR, "netlink: truncated message");
 	  continue;
 	}
 
       if (bytes)
 	{
-	  logger (LOG_ERR, "remnant of size %d", bytes);
+	  logger (LOG_ERR, "netlink: remnant of size %d", bytes);
 	  goto eexit;
 	}
     }
@@ -637,7 +642,7 @@ static int do_address(const char *ifname,
     {
       struct nlmsghdr hdr;
       struct ifaddrmsg ifa;
-      char buffer[256];
+      char buffer[64];
     }
   nlm;
   uint32_t mask = htonl (netmask.s_addr);
@@ -649,6 +654,8 @@ static int do_address(const char *ifname,
 
   nlm.hdr.nlmsg_len = NLMSG_LENGTH (sizeof (struct ifaddrmsg));
   nlm.hdr.nlmsg_flags = NLM_F_REQUEST;
+  if (! del)
+    nlm.hdr.nlmsg_flags |= NLM_F_CREATE | NLM_F_REPLACE;
   nlm.hdr.nlmsg_type = del ? RTM_DELADDR : RTM_NEWADDR;
   nlm.ifa.ifa_index = if_nametoindex (ifname);
   nlm.ifa.ifa_family = AF_INET;
@@ -772,14 +779,18 @@ int add_address (const char *ifname, struct in_addr address,
   return (do_address (ifname, address, netmask, broadcast, 0));
 }
 
-int del_address (const char *ifname, struct in_addr address)
+int del_address (const char *ifname,
+		 struct in_addr address, struct in_addr netmask)
 {
   struct in_addr t;
+  char *addr = strdup (inet_ntoa (address));
 
-  logger (LOG_INFO, "deleting IP address %s", inet_ntoa (address));
+  logger (LOG_INFO, "deleting IP address %s netmask %s", addr,
+	  inet_ntoa (netmask));
+  free (addr);
 
   memset (&t, 0, sizeof (t));
-  return (do_address (ifname, address, t, t, 1));
+  return (do_address (ifname, address, netmask, t, 1));
 }
 
 int add_route (const char *ifname, struct in_addr destination,
@@ -818,15 +829,16 @@ int flush_addresses (const char *ifname)
 	{
 	  struct sockaddr *sa;
 	  struct sockaddr_in *sin;
-	} us;
+	} us_a, us_m;
 
       if (strcmp (p->ifa_name, ifname) != 0)
 	continue;
 
-      us.sa = p->ifa_addr;
+      us_a.sa = p->ifa_addr;
+      us_m.sa = p->ifa_netmask;
 
-      if (us.sin->sin_family == AF_INET)
-	if (del_address (ifname, us.sin->sin_addr) < 0)
+      if (us_a.sin->sin_family == AF_INET)
+	if (del_address (ifname, us_a.sin->sin_addr, us_m.sin->sin_addr) < 0)
 	  retval = -1;
     }
   freeifaddrs (ifap);
@@ -874,14 +886,13 @@ int flush_addresses (const char *ifname)
   ifr = ifrs;
   for (i = 0; i < nifs; i++)
     {
-      struct sockaddr_in *in = (struct sockaddr_in *) &ifr->ifr_addr;
+      struct sockaddr_in *addr = (struct sockaddr_in *) &ifr->ifr_addr;
+      struct sockaddr_in *netm = (struct sockaddr_in *) &ifr->ifr_netmask;
 
-      if (ifr->ifr_addr.sa_family != AF_INET
-	  || strcmp (ifname, ifr->ifr_name) != 0)
-	continue;
-
-      if (del_address (ifname, in->sin_addr) < 0)
-	retval = -1;
+      if (ifr->ifr_addr.sa_family == AF_INET
+	  && strcmp (ifname, ifr->ifr_name) == 0)
+	if (del_address (ifname, addr->sin_addr, netm->sin_addr) < 0)
+	  retval = -1;
       ifr++;
     }
 

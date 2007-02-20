@@ -1,3 +1,9 @@
+Test to see if the pid in the pidfile is actually running before claiming
+that we are.
+Fix the `netlink message truncated` error since 3.0.6.
+We now ensure that our renewal and rebind times are sane.
+Fix flushing interfaces for systems without getifaddrs and >1 interface.
+All netlink error messages are now prefixed with netlink.
 Add DHCP over FireWire 1394 (RFC 2855) and InfiniBand (RFC 4390) support.
 We should add support for DUIDs (RFC4361) as well.
 

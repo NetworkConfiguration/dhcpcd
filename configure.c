@@ -468,8 +468,10 @@ int configure (const options_t *options, interface_t *iface,
       /* Only reset things if we had set them before */
       if (iface->previous_address.s_addr != 0)
 	{
-	  del_address (iface->name, iface->previous_address);
+	  del_address (iface->name, iface->previous_address,
+		       iface->previous_netmask);
 	  memset (&iface->previous_address, 0, sizeof (struct in_addr));
+	  memset (&iface->previous_netmask, 0, sizeof (struct in_addr));
 
 	  restore_resolv (iface->name);
 
@@ -486,7 +488,7 @@ int configure (const options_t *options, interface_t *iface,
   /* Now delete the old address if different */
   if (iface->previous_address.s_addr != dhcp->address.s_addr
       && iface->previous_address.s_addr != 0)
-    del_address (iface->name, iface->previous_address);
+    del_address (iface->name, iface->previous_address, iface->previous_netmask);
 
 #ifdef __linux__
   /* On linux, we need to change the subnet route to have our metric. */
@@ -602,10 +604,13 @@ int configure (const options_t *options, interface_t *iface,
 
   write_info (iface, dhcp, options);
 
-  if (iface->previous_address.s_addr != dhcp->address.s_addr)
+  if (iface->previous_address.s_addr != dhcp->address.s_addr ||
+      iface->previous_netmask.s_addr != dhcp->netmask.s_addr)
     {
       memcpy (&iface->previous_address,
 	      &dhcp->address, sizeof (struct in_addr));
+      memcpy (&iface->previous_netmask,
+	      &dhcp->netmask, sizeof (struct in_addr));
       exec_script (options->script, iface->infofile, "new");
     }
   else
