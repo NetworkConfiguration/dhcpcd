@@ -34,6 +34,11 @@
 #define EUI64_ADDR_LEN			8
 #define INFINIBAND_ADDR_LEN		20
 
+/* Linux 2.4 doesn't define this */
+#ifndef ARPHRD_IEEE1394
+#  define ARPHRD_IEEE1394		24
+#endif
+
 /* The BSD's don't define this yet */
 #ifndef ARPHRD_INFINIBAND
 #  define ARPHRD_INFINIBAND		27

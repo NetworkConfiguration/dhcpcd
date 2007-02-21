@@ -1,3 +1,5 @@
+define ARPHRD_IEEE1394 if it doesn not exist, like for Linux-2.4 kernels.
+
 dhcpcd-3.0.12
 Test to see if the pid in the pidfile is actually running before claiming
 that we are.
