@@ -51,10 +51,11 @@ static char *cleanmetas (const char *cstr)
 {
   /* The largest single element we can have is 256 bytes according to the RFC,
      so this buffer size should be safe even if it's all ' */
-  char buffer[1024] = {0};
+  static char buffer[1024]; 
   char *b = buffer;
 
-  if (! cstr || strlen (cstr) == 0)
+  memset (buffer, 0, sizeof (buffer));
+  if (cstr == NULL || strlen (cstr) == 0)
       return b;
 
   do
@@ -343,7 +344,7 @@ static int write_info(const interface_t *iface, const dhcp_t *dhcp,
     }
 
   if (dhcp->hostname)
-    fprintf (f, "HOSTNAME='%s'\n",cleanmetas (dhcp->hostname));
+    fprintf (f, "HOSTNAME='%s'\n", cleanmetas (dhcp->hostname));
 
   if (dhcp->dnsdomain)
     fprintf (f, "DNSDOMAIN='%s'\n", cleanmetas (dhcp->dnsdomain));
