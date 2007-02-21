@@ -72,10 +72,11 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
   if (!iface || !options || !dhcp)
     return -1;
 
+  memset (&from, 0, sizeof (from));
+  memset (&to, 0, sizeof (to));
+
   if (type == DHCP_RELEASE)
     to.s_addr = dhcp->serveraddress.s_addr;
-  else
-    to.s_addr = 0;
 
   memset (&message, 0, sizeof (dhcpmessage_t));
 

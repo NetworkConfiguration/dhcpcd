@@ -495,7 +495,7 @@ int send_packet (const interface_t *iface, const int type,
   sll.sll_family = AF_PACKET;
   sll.sll_protocol = htons (type);
   sll.sll_ifindex = if_nametoindex (iface->name);
-  sll.sll_halen = ETHER_ADDR_LEN;
+  sll.sll_halen = iface->hwlen;
   memset(sll.sll_addr, 0xff, sizeof (sll.sll_addr));
 
   if ((retval = sendto (iface->fd, data, len, 0, (struct sockaddr *) &sll,
