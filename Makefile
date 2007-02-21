@@ -1,6 +1,6 @@
 # Should work for both GNU make and BSD make
 
-VERSION = 3.0.12_pre2
+VERSION = 3.0.12
 
 CFLAGS ?= -O2 -pipe
 
