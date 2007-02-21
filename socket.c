@@ -21,6 +21,7 @@
 
 #include <sys/types.h>
 #include <sys/ioctl.h>
+#include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
 #include <arpa/inet.h>
@@ -361,8 +362,11 @@ int get_packet (const interface_t *iface, unsigned char *data,
       *buffer_pos = 0;
       if (*buffer_len < 1)
 	{
+	  struct timeval tv;
 	  logger (LOG_ERR, "read: %s", strerror (errno));
-	  sleep (3);
+	  tv.tv_sec = 3;
+	  tv.tv_usec = 0;
+	  select (0, NULL, NULL, NULL, &tv);
 	  return -1;
 	}
     }
@@ -520,8 +524,11 @@ int get_packet (const interface_t *iface, unsigned char *data,
   bytes = read (iface->fd, buffer, iface->buffer_length);
   if (bytes < 0)
     {
+      struct timeval tv;
       logger (LOG_ERR, "read: %s", strerror (errno));
-      sleep (3);
+      tv.tv_sec = 3;
+      tv.tv_usec = 0;
+      select (0, NULL, NULL, NULL, &tv);
       return -1;
     }
 

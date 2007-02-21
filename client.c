@@ -515,7 +515,9 @@ int dhcp_run (const options_t *options)
 			  /* RFC 2131 says that we should wait for 10 seconds
 			     before doing anything else */
 			  logger (LOG_INFO, "sleeping for 10 seconds");
-			  sleep (10);
+			  tv.tv_sec = 10;
+			  tv.tv_usec = 0;
+			  select (0, NULL, NULL, NULL, &tv);
 			  continue;
 			}
 		    }
@@ -536,9 +538,8 @@ int dhcp_run (const options_t *options)
 				 "no lease time supplied, assuming %d seconds",
 				 dhcp->leasetime);
 			}
-		      else
-			logger (LOG_INFO, "leased %s for %u seconds",
-				inet_ntoa (dhcp->address), dhcp->leasetime);
+		      logger (LOG_INFO, "leased %s for %u seconds",
+			      inet_ntoa (dhcp->address), dhcp->leasetime);
 
 		      if (dhcp->rebindtime >= dhcp->leasetime)
 			{

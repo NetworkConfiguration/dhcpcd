@@ -91,6 +91,19 @@ void free_route (route_t *routes)
     }
 }
 
+int inet_ntocidr (struct in_addr address)
+{
+  int cidr = 0;
+  uint32_t mask = htonl (address.s_addr);
+  
+  while (mask)
+    {
+      cidr++;
+      mask <<= 1;
+    }
+
+  return (cidr);
+}
 
 char *hwaddr_ntoa (const unsigned char *hwaddr, int hwlen)
 {
@@ -337,23 +350,20 @@ static int do_route (const char *ifname,
   metric = 0;
 
   dstd = strdup (inet_ntoa (destination));
-  gend = strdup (inet_ntoa (netmask));
   if (gateway.s_addr == destination.s_addr)
-    logger (LOG_INFO, "%s route to %s (%s)",
+    logger (LOG_INFO, "%s route to %s/%d",
 	    change ? "changing" : del ? "removing" : "adding",
-	    dstd, gend);
+	    dstd, gend, inet_ntocidr (netmask));
   else if (destination.s_addr == INADDR_ANY && netmask.s_addr == INADDR_ANY)
     logger (LOG_INFO, "%s default route via %s",
 	    change ? "changing" : del ? "removing" : "adding",
 	    inet_ntoa (gateway));
   else
-    logger (LOG_INFO, "%s route to %s (%s) via %s",
+    logger (LOG_INFO, "%s route to %s/%d via %s",
 	    change ? "changing" : del ? "removing" : "adding",
-	    dstd, gend, inet_ntoa (gateway));
+	    dstd, inet_ntocidr (netmask), inet_ntoa (gateway));
   if (dstd)
     free (dstd);
-  if (gend)
-    free (gend);
 
   if ((s = socket(PF_ROUTE, SOCK_RAW, 0)) < 0) 
     {
@@ -645,7 +655,6 @@ static int do_address(const char *ifname,
       char buffer[64];
     }
   nlm;
-  uint32_t mask = htonl (netmask.s_addr);
 
   if (!ifname)
     return -1;
@@ -660,13 +669,7 @@ static int do_address(const char *ifname,
   nlm.ifa.ifa_index = if_nametoindex (ifname);
   nlm.ifa.ifa_family = AF_INET;
 
-  /* Store the netmask in the prefix */
-  while (mask)
-    {
-      nlm.ifa.ifa_prefixlen++;
-      mask <<= 1;
-    }
-
+  nlm.ifa.ifa_prefixlen = inet_ntocidr (netmask);
   add_attr_l (&nlm.hdr, sizeof (nlm), IFA_LOCAL, &address.s_addr,
 	      sizeof (address.s_addr));
   if (! del)
@@ -691,7 +694,6 @@ static int do_route (const char *ifname,
       char buffer[256];
     }
   nlm;
-  uint32_t mask = htonl (netmask.s_addr);
 
   if (! ifname)
     return -1;
@@ -741,13 +743,7 @@ static int do_route (const char *ifname,
       nlm.rt.rtm_type = RTN_UNICAST;
     }
 
-  /* Store the netmask in the prefix */
-  while (mask)
-    {
-      nlm.rt.rtm_dst_len++;
-      mask <<= 1;
-    }
-
+  nlm.rt.rtm_dst_len = inet_ntocidr (netmask);
   add_attr_l (&nlm.hdr, sizeof (nlm), RTA_DST, &destination.s_addr,
 	      sizeof (destination.s_addr));
   if (gateway.s_addr != INADDR_ANY && gateway.s_addr != destination.s_addr)
@@ -771,10 +767,8 @@ static int do_route (const char *ifname,
 int add_address (const char *ifname, struct in_addr address,
 		 struct in_addr netmask, struct in_addr broadcast)
 {
-  char *daddress = strdup (inet_ntoa (address));
-  logger (LOG_INFO, "adding IP address %s netmask %s",
-	  daddress, inet_ntoa (netmask));
-  free (daddress);
+  logger (LOG_INFO, "adding IP address %s/%d",
+	  inet_ntoa (address), inet_ntocidr (netmask));
 
   return (do_address (ifname, address, netmask, broadcast, 0));
 }
@@ -783,11 +777,9 @@ int del_address (const char *ifname,
 		 struct in_addr address, struct in_addr netmask)
 {
   struct in_addr t;
-  char *addr = strdup (inet_ntoa (address));
 
-  logger (LOG_INFO, "deleting IP address %s netmask %s", addr,
-	  inet_ntoa (netmask));
-  free (addr);
+  logger (LOG_INFO, "deleting IP address %s/%d",
+	  inet_ntoa (address), inet_ntocidr (netmask));
 
   memset (&t, 0, sizeof (t));
   return (do_address (ifname, address, netmask, t, 1));

@@ -94,6 +94,7 @@ int change_route (const char *ifname, struct in_addr destination,
 int del_route (const char *ifname, struct in_addr destination,
 	       struct in_addr netmask, struct in_addr gateway, int metric);
 
+int inet_ntocidr (struct in_addr address);
 char *hwaddr_ntoa (const unsigned char *hwaddr, int hwlen);
 
 #endif
