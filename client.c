@@ -533,7 +533,7 @@ int dhcp_run (const options_t *options)
 		    {
 		      if (! dhcp->leasetime)
 			{
-			  dhcp->leasetime = DEFAULT_TIMEOUT;
+			  dhcp->leasetime = DEFAULT_LEASETIME;
 			  logger(LOG_INFO,
 				 "no lease time supplied, assuming %d seconds",
 				 dhcp->leasetime);

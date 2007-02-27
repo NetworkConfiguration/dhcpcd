@@ -456,21 +456,36 @@ void free_dhcp (dhcp_t *dhcp)
     }
 }
 
-static void dhcp_add_address(address_t *address, const unsigned char *data, int length)
+static bool dhcp_add_address(address_t **address, const unsigned char *data, int length)
 {
   int i;
-  address_t *p = address;
+  address_t *p = *address;
 
   for (i = 0; i < length; i += 4)
     {
-      memset (p, 0, sizeof (address_t));
-      memcpy (&p->address.s_addr, data + i, 4);
-      if (length - i > 4)
+      if (*address == NULL)
+	{
+	  *address = xmalloc (sizeof (address_t));
+	  p = *address;
+	}
+      else
 	{
 	  p->next = xmalloc (sizeof (address_t));
 	  p = p->next;
 	}
+      memset (p, 0, sizeof (address_t));
+ 
+      /* Sanity check */
+      if (i + 4 > length)
+	{
+	  logger (LOG_ERR, "invalid address length");
+	  return (false);
+	}
+
+      memcpy (&p->address.s_addr, data + i, 4);
     }
+
+  return (true);
 }
 
 int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
@@ -494,6 +509,13 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
   dhcp->address.s_addr = message->yiaddr;
   strcpy (dhcp->servername, message->servername);
 
+#define LEN_ERR \
+    { \
+      logger (LOG_ERR, "invalid length %d for option %d", length, option); \
+      retval = -1; \
+      goto eexit; \
+    }
+
   while (p < end)
     {
       option = *p++;
@@ -504,6 +526,7 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 
       if (p + length >= end)
 	{
+	  logger (LOG_ERR, "dhcp option exceeds message length");
 	  retval = -1;
 	  goto eexit;
 	}
@@ -515,12 +538,33 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 
 	case DHCP_MESSAGETYPE:
 	  retval = (int) *p;
-	  break;
+	  p += length;
+	  continue;
+
+	default:
+	  if (length == 0)
+	    {
+	      logger (LOG_DEBUG, "option %d has zero length, skipping",
+		      option);
+	      continue;
+	    }
+	}
+
+#define MIN_LENGTH(_length) \
+      if (length < _length) \
+      LEN_ERR;
+#define MULT_LENGTH(_mult) \
+      if (length % _mult != 0) \
+      LEN_ERR;
 #define GET_UINT32(_val) \
-	  memcpy (&_val, p, sizeof (uint32_t));
+      MIN_LENGTH (sizeof (uint32_t)); \
+      memcpy (&_val, p, sizeof (uint32_t));
 #define GET_UINT32_H(_val) \
-	  GET_UINT32 (_val); \
-	  _val = ntohl (_val);
+      GET_UINT32 (_val); \
+      _val = ntohl (_val);
+
+      switch (option)
+	{
 	case DHCP_ADDRESS:
 	  GET_UINT32 (dhcp->address.s_addr);
 	  break;
@@ -552,6 +596,7 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 #undef GET_UINT32
 
 #define GETSTR(_var) \
+	  MIN_LENGTH (sizeof (char)); \
 	  if (_var) free (_var); \
 	  _var = xmalloc (length + 1); \
 	  memcpy (_var, p, length); \
@@ -574,9 +619,12 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 #undef GETSTR
 
 #define GETADDR(_var) \
-	  if (_var) free (_var); \
-	  _var = xmalloc (sizeof (address_t)); \
-	  dhcp_add_address (_var, p, length);
+	  MULT_LENGTH (4); \
+	  if (! dhcp_add_address (&_var, p, length)) \
+	    { \
+	      retval = -1; \
+	      goto eexit; \
+	    }
 	case DHCP_DNSSERVER:
 	  GETADDR (dhcp->dnsservers);
 	  break;
@@ -589,9 +637,10 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 #undef GETADDR
 
 	case DHCP_DNSSEARCH:
+	  MIN_LENGTH (1);
 	  if (dhcp->dnssearch)
 	    free (dhcp->dnssearch);
-	  if ((len = decode_search (p, length, NULL)))
+	  if ((len = decode_search (p, length, NULL)) > 0)
 	    {
 	      dhcp->dnssearch = xmalloc (len);
 	      decode_search (p, length, dhcp->dnssearch);
@@ -599,10 +648,14 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 	  break;
 
 	case DHCP_CSR:
+	  MIN_LENGTH (5);
+	  if (csr)
+	    free_route (csr);
 	  csr = decodeCSR (p, length);
 	  break;
 
 	case DHCP_STATICROUTE:
+	  MULT_LENGTH (8);
 	  for (i = 0; i < length; i += 8)
 	    {
 	      memcpy (&route->destination.s_addr, p + i, 4);
@@ -616,6 +669,7 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 	  break;
 
 	case DHCP_ROUTERS:
+	  MULT_LENGTH (4); 
 	  for (i = 0; i < length; i += 4)
 	    {
 	      memcpy (&route->gateway.s_addr, p + i, 4);
@@ -625,6 +679,9 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 	      memset (route, 0, sizeof (route_t));
 	    }
 	  break;
+
+#undef MIN_LENGTH
+#undef MULT_LENGTH
 
 	default:
 	  logger (LOG_DEBUG, "no facility to parse DHCP code %u", option);

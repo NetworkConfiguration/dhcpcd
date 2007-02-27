@@ -522,6 +522,7 @@ int get_packet (const interface_t *iface, unsigned char *data,
 
   memset (buffer, 0, iface->buffer_length);
   bytes = read (iface->fd, buffer, iface->buffer_length);
+
   if (bytes < 0)
     {
       struct timeval tv;

@@ -1,3 +1,6 @@
+Don't crash with 0 or invalid length DHCP options, reported by
+Stefan de Konink.
+
 dhcpcd-3.0.13
 Fix regression on Linux for sending packets over non Ethernet devices.
 define ARPHRD_IEEE1394 if it doesn not exist, like for Linux-2.4 kernels.
