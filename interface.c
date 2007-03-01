@@ -268,6 +268,31 @@ interface_t *read_interface (const char *ifname, int metric)
   return iface;
 }
 
+int set_mtu (const char *ifname, short int mtu)
+{
+  struct ifreq ifr;
+  int r;
+  int s;
+
+  if ((s = socket(AF_INET, SOCK_DGRAM, 0)) < 0) 
+    {
+      logger (LOG_ERR, "socket: %s", strerror (errno));
+      return (-1);
+    }
+
+  memset (&ifr, 0, sizeof (struct ifreq));
+  logger (LOG_DEBUG, "setting MTU to %d", mtu);
+  strcpy (ifr.ifr_name, ifname);
+  ifr.ifr_mtu = mtu;
+  r = ioctl (s, SIOCSIFMTU, &ifr);
+  close (s);
+
+  if (r < 0)
+    logger (LOG_ERR, "ioctl SIOCSIFMTU: %s", strerror (errno));
+
+  return (r == 0 ? 0 : -1);
+}
+
 #if defined(__FreeBSD__) || defined(__NetBSD__) || defined (__OpenBSD__) \
 || defined(__APPLE__)
 static int do_address (const char *ifname, struct in_addr address,

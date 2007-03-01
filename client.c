@@ -473,7 +473,7 @@ int dhcp_run (const options_t *options)
 	      if (type == DHCP_OFFER)
 		{
 		  char *addr = strdup (inet_ntoa (dhcp->address));
-		  if (dhcp->servername)
+		  if (dhcp->servername[0])
 		    logger (LOG_INFO, "offered %s from %s `%s'",
 			    addr, inet_ntoa (dhcp->serveraddress),
 			    dhcp->servername);

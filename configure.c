@@ -482,6 +482,9 @@ int configure (const options_t *options, interface_t *iface,
       return 0;
     }
 
+  if (dhcp->mtu)
+    set_mtu (iface->name, dhcp->mtu);
+
   if (add_address (iface->name, dhcp->address, dhcp->netmask,
 		   dhcp->broadcast) < 0 && errno != EEXIST)
     return -1;

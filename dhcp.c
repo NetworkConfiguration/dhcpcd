@@ -186,6 +186,7 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 	  *p++ = DHCP_NISDOMAIN;
 	  *p++ = DHCP_NISSERVER;
 	  *p++ = DHCP_NTPSERVER;
+	  *p++ = DHCP_MTU;
 	  /* These parameters were requested by dhcpcd-2.0 and earlier
 	     but we never did anything with them */
 	  /*    *p++ = DHCP_DEFAULTIPTTL;
@@ -550,15 +551,27 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 	    }
 	}
 
+#define LENGTH(_length) \
+      if (length != _length) \
+      LEN_ERR;
 #define MIN_LENGTH(_length) \
       if (length < _length) \
       LEN_ERR;
 #define MULT_LENGTH(_mult) \
       if (length % _mult != 0) \
       LEN_ERR;
+#define GET_UINT8(_val) \
+      LENGTH (sizeof (uint8_t)); \
+      memcpy (&_val, p, sizeof (uint8_t));
+#define GET_UINT16(_val) \
+      LENGTH (sizeof (uint16_t)); \
+      memcpy (&_val, p, sizeof (uint16_t));
 #define GET_UINT32(_val) \
-      MIN_LENGTH (sizeof (uint32_t)); \
+      LENGTH (sizeof (uint32_t)); \
       memcpy (&_val, p, sizeof (uint32_t));
+#define GET_UINT16_H(_val) \
+      GET_UINT16 (_val); \
+      _val = ntohs (_val);
 #define GET_UINT32_H(_val) \
       GET_UINT32 (_val); \
       _val = ntohl (_val);
@@ -587,13 +600,20 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 	  GET_UINT32_H (dhcp->rebindtime);
 	  break;
 	case DHCP_MTU:
-	  GET_UINT32_H (dhcp->mtu);
+	  GET_UINT16_H (dhcp->mtu);
 	  /* Minimum legal mtu is 68 */
-	  if (dhcp->mtu > 0 && dhcp->mtu < 68)
-	    dhcp->mtu = 68;
+	  if (dhcp->mtu < 68)
+	    {
+	      logger (LOG_ERR, "minimum legal MTU is 68");
+	      dhcp->mtu = 68;
+	    }
 	  break;
+
 #undef GET_UINT32_H
 #undef GET_UINT32
+#undef GET_UINT16_H
+#undef GET_UINT16
+#undef GET_UINT8
 
 #define GETSTR(_var) \
 	  MIN_LENGTH (sizeof (char)); \
@@ -680,6 +700,7 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 	    }
 	  break;
 
+#undef LENGTH
 #undef MIN_LENGTH
 #undef MULT_LENGTH
 

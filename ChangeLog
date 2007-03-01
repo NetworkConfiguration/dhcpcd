@@ -1,3 +1,7 @@
+dhcpcd-3.0.15
+Fix MTU length checking.
+We now request MTU from the DHCP server, and if given we set it.
+
 dhcpcd-3.0.14
 Don't crash with 0 or invalid length DHCP options, reported by
 Stefan de Konink.
