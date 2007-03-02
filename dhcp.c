@@ -123,7 +123,13 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
     {
       *p++ = DHCP_MAXMESSAGESIZE;
       *p++ = 2;
-      sz = htons (sizeof (dhcpmessage_t));
+      sz = get_mtu (iface->name);
+      if (sz < MTU_MIN)
+	{
+	  if (set_mtu (iface->name, MTU_MIN) == 0)
+	    sz = MTU_MIN;
+	}
+      sz = htons (sz);
       memcpy (p, &sz, 2);
       p += 2;
     }
@@ -601,11 +607,12 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 	  break;
 	case DHCP_MTU:
 	  GET_UINT16_H (dhcp->mtu);
-	  /* Minimum legal mtu is 68 */
-	  if (dhcp->mtu < 68)
+	  /* Minimum legal mtu is 68 accoridng to RFC 2132.
+	     In practise it's 576 (minimum maximum message size) */
+	  if (dhcp->mtu < MTU_MIN)
 	    {
-	      logger (LOG_ERR, "minimum legal MTU is 68");
-	      dhcp->mtu = 68;
+	      logger (LOG_ERR, "given MTU %d is too low, minium is %d", dhcp->mtu, MTU_MIN);
+	      dhcp->mtu = MTU_MIN;
 	    }
 	  break;
 

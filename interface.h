@@ -85,6 +85,7 @@ typedef struct interface_t
 void free_address (address_t *addresses);
 void free_route (route_t *routes);
 interface_t *read_interface (const char *ifname, int metric);
+int get_mtu (const char *ifname);
 int set_mtu (const char *ifname, short int mtu);
 
 int add_address (const char *ifname, struct in_addr address,

@@ -1,3 +1,7 @@
+dhcpcd-3.0.16
+RFC 2131 is full of confusion regarding MTU it seems as the effective minimum
+MTU is really 576 or DHCP requests stop working.
+
 dhcpcd-3.0.15
 Fix MTU length checking.
 We now request MTU from the DHCP server, and if given we set it.

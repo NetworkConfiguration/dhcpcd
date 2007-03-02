@@ -33,6 +33,7 @@
 
 /* Max MTU - defines dhcp option length */
 #define MTU_MAX			1500
+#define MTU_MIN			576
 
 /* UDP port numbers for DHCP */
 #define DHCP_SERVER_PORT 67
@@ -162,7 +163,6 @@ typedef struct dhcp_t
 				+ SERVERNAME_LEN + BOOTFILE_LEN)
 #define DHCP_OPTION_LEN		(MTU_MAX - DHCP_FIXED_LEN - DHCP_UDP_LEN \
 				 - DHCP_RESERVE_LEN)
-
 
 typedef struct dhcpmessage_t
 {

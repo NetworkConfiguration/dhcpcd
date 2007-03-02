@@ -55,6 +55,7 @@
 #include <unistd.h>
 
 #include "common.h"
+#include "dhcp.h"
 #include "interface.h"
 #include "logger.h"
 #include "pathnames.h"
@@ -231,6 +232,26 @@ interface_t *read_interface (const char *ifname, int metric)
 #endif
 
   strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
+  if (ioctl(s, SIOCGIFMTU, &ifr) < 0)
+    {
+      logger (LOG_ERR, "ioctl SIOCGIFMTU: %s", strerror (errno));
+      close (s);
+      return NULL;
+    }
+  if (ifr.ifr_mtu < MTU_MIN)
+    {
+      logger (LOG_DEBUG, "MTU of %d is too low, setting to %d", ifr.ifr_mtu, MTU_MIN);
+      ifr.ifr_mtu = MTU_MIN;
+      strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
+      if (ioctl(s, SIOCSIFMTU, &ifr) < 0)
+	{
+	  logger (LOG_ERR, "ioctl SIOCSIFMTU,: %s", strerror (errno));
+	  close (s);
+	  return NULL;
+	}
+    }
+
+  strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
   if (ioctl(s, SIOCGIFFLAGS, &ifr) < 0)
     {
       logger (LOG_ERR, "ioctl SIOCGIFFLAGS: %s", strerror (errno));
@@ -266,6 +287,32 @@ interface_t *read_interface (const char *ifname, int metric)
   iface->fd = -1;
 
   return iface;
+}
+
+int get_mtu (const char *ifname)
+{
+  struct ifreq ifr;
+  int r;
+  int s;
+
+  if ((s = socket(AF_INET, SOCK_DGRAM, 0)) < 0) 
+    {
+      logger (LOG_ERR, "socket: %s", strerror (errno));
+      return (-1);
+    }
+
+  memset (&ifr, 0, sizeof (struct ifreq));
+  strcpy (ifr.ifr_name, ifname);
+  r = ioctl (s, SIOCGIFMTU, &ifr);
+  close (s);
+
+  if (r < 0)
+    {
+      logger (LOG_ERR, "ioctl SIOCGIFMTU: %s", strerror (errno));
+      return (-1);
+    }
+
+  return (ifr.ifr_mtu);
 }
 
 int set_mtu (const char *ifname, short int mtu)
