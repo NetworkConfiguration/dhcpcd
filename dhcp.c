@@ -519,8 +519,8 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 #define LEN_ERR \
     { \
       logger (LOG_ERR, "invalid length %d for option %d", length, option); \
-      retval = -1; \
-      goto eexit; \
+      p += length; \
+      continue; \
     }
 
   while (p < end)

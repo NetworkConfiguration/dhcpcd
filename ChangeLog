@@ -1,3 +1,5 @@
+When we get an invalid length for a DHCP option, try and continue anyway.
+
 dhcpcd-3.0.16
 RFC 2131 is full of confusion regarding MTU it seems as the effective minimum
 MTU is really 576 or DHCP requests stop working.
