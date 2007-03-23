@@ -34,17 +34,21 @@
 #include <netinet/ether.h>
 #include <netpacket/packet.h>
 /* Only glibc-2.3 ships with ifaddrs.h */
-#if defined (__GLIBC__) && defined (__GLIBC_PREREQ) && __GLIBC_PREREQ (2,3)
-#define HAVE_IFADDRS_H
-#include <ifaddrs.h>
+#if defined (__GLIBC__) && defined (__GLIBC_PREREQ)
+#  if  __GLIBC_PREREQ (2,3)
+#    define HAVE_IFADDRS_H
+#    include <ifaddrs.h>
+#  endif
 #endif
 #else
+#include <net/if_arp.h> /*dietlibc requires this - normally from
+			  netinet/ether.h */
 #include <net/if_dl.h>
 #include <net/if_types.h>
 #include <net/route.h>
 #include <netinet/in.h>
 #define HAVE_IFADDRS_H
-#include <ifaddrs.h>
+#  include <ifaddrs.h>
 #endif
 
 #include <errno.h>
