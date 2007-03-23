@@ -742,7 +742,12 @@ static int do_address(const char *ifname,
   if (! del)
     nlm.hdr.nlmsg_flags |= NLM_F_CREATE | NLM_F_REPLACE;
   nlm.hdr.nlmsg_type = del ? RTM_DELADDR : RTM_NEWADDR;
-  nlm.ifa.ifa_index = if_nametoindex (ifname);
+  if (! (nlm.ifa.ifa_index = if_nametoindex (ifname)))
+    {
+      logger (LOG_ERR, "if_nametoindex: Couldn't find index for interface `%s'",
+	      ifname);
+      return -1;
+    }
   nlm.ifa.ifa_family = AF_INET;
 
   nlm.ifa.ifa_prefixlen = inet_ntocidr (netmask);
@@ -763,6 +768,7 @@ static int do_route (const char *ifname,
 {
   char *dstd;
   char *gend;
+  unsigned int ifindex;
   struct
     {
       struct nlmsghdr hdr;
@@ -826,7 +832,15 @@ static int do_route (const char *ifname,
     add_attr_l (&nlm.hdr, sizeof (nlm), RTA_GATEWAY, &gateway.s_addr,
 		sizeof (gateway.s_addr));
 
-  add_attr_32 (&nlm.hdr, sizeof (nlm), RTA_OIF, if_nametoindex (ifname));
+
+  if (! (ifindex = if_nametoindex (ifname)))
+    {
+      logger (LOG_ERR, "if_nametoindex: Couldn't find index for interface `%s'",
+	      ifname);
+      return -1;
+    }
+
+  add_attr_32 (&nlm.hdr, sizeof (nlm), RTA_OIF, ifindex);
   add_attr_32 (&nlm.hdr, sizeof (nlm), RTA_PRIORITY, metric);
 
   return send_netlink (&nlm.hdr);

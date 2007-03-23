@@ -1,6 +1,7 @@
 When we get an invalid length for a DHCP option, try and continue anyway.
 When MTU is less than 576 we now ignore it instead of setting the MTU to 576.
 Build correctly on dietlibc, thanks to d00mer.
+Check that if_nametoindex returns a valid index, thanks to d00mer.
 
 dhcpcd-3.0.16
 RFC 2131 is full of confusion regarding MTU it seems as the effective minimum

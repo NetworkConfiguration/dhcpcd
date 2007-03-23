@@ -463,7 +463,13 @@ int open_socket (interface_t *iface, bool arp)
     sll.sll_protocol = htons (ETH_P_ARP);
   else
     sll.sll_protocol = htons (ETH_P_IP);
-  sll.sll_ifindex = if_nametoindex (iface->name);
+  if (! (sll.sll_ifindex = if_nametoindex (iface->name)))
+    {
+      logger (LOG_ERR, "if_nametoindex: Couldn't find index for interface `%s'",
+	      iface->name);
+      close (fd);
+      return -1;
+    }
 
   if (bind(fd, (struct sockaddr *) &sll, sizeof (struct sockaddr_ll)) == -1)
     {
@@ -494,7 +500,12 @@ int send_packet (const interface_t *iface, const int type,
   memset (&sll, 0, sizeof (struct sockaddr_ll));
   sll.sll_family = AF_PACKET;
   sll.sll_protocol = htons (type);
-  sll.sll_ifindex = if_nametoindex (iface->name);
+  if (! (sll.sll_ifindex = if_nametoindex (iface->name)))
+    {
+      logger (LOG_ERR, "if_nametoindex: Couldn't find index for interface `%s'",
+	      iface->name);
+      return -1;
+    }
   sll.sll_halen = ETHER_ADDR_LEN;
   memset(sll.sll_addr, 0xff, sizeof (sll.sll_addr));
 
