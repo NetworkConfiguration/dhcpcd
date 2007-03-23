@@ -611,8 +611,8 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 	     In practise it's 576 (minimum maximum message size) */
 	  if (dhcp->mtu < MTU_MIN)
 	    {
-	      logger (LOG_ERR, "given MTU %d is too low, minium is %d", dhcp->mtu, MTU_MIN);
-	      dhcp->mtu = MTU_MIN;
+	      logger (LOG_DEBUG, "MTU %d is too low, minium is %d; ignoring", dhcp->mtu, MTU_MIN);
+	      dhcp->mtu = 0;
 	    }
 	  break;
 
