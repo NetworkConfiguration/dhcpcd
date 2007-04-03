@@ -110,6 +110,7 @@ int main(int argc, char **argv)
   int option_index = 0;
   char prefix[IF_NAMESIZE + 3];
   pid_t pid;
+  int debug = 0;
 
   const struct option longopts[] =
     {
@@ -158,6 +159,7 @@ int main(int argc, char **argv)
   options.donis = true;
   options.dontp = true;
   options.dogateway = true;
+  options.daemonise = true;
   gethostname (options.hostname, sizeof (options.hostname));
   if (strcmp (options.hostname, "(none)") == 0 ||
       strcmp (options.hostname, "localhost") == 0)
@@ -183,12 +185,21 @@ int main(int argc, char **argv)
 	options.script = optarg;
 	break;
       case 'd':
-	setloglevel(LOG_DEBUG);
+	debug++;
+	switch (debug)
+	  {
+	    case 1:
+		setloglevel(LOG_DEBUG);
+		break;
+	    case 2:
+		options.daemonise = false;
+		break;
+	  }
 	break;
       case 'h':
 	if (strlen (optarg) > HOSTNAME_MAX_LEN)
 	  {
-	    logger(LOG_ERR, "`%s' too long for HostName string, max is %d",
+	    logger (LOG_ERR, "`%s' too long for HostName string, max is %d",
 		   optarg, HOSTNAME_MAX_LEN);
 	    exit (EXIT_FAILURE);
 	  }
@@ -196,14 +207,14 @@ int main(int argc, char **argv)
 	  strcpy (options.hostname, optarg);
 	break;
       case 'i':
-	if (strlen(optarg) > CLASS_ID_MAX_LEN)
+	if (strlen (optarg) > CLASS_ID_MAX_LEN)
 	  {
 	    logger (LOG_ERR, "`%s' too long for ClassID string, max is %d",
 		    optarg, CLASS_ID_MAX_LEN);
 	    exit (EXIT_FAILURE);
 	  }
 	else
-	  sprintf(options.classid, "%s", optarg);
+	  sprintf (options.classid, "%s", optarg);
 	break;
       case 'k':
 	options.signal = SIGHUP;
@@ -217,7 +228,7 @@ int main(int argc, char **argv)
 	  }
 	break;
       case 'm':
-	STRINGINT(optarg, options.metric);
+	STRINGINT (optarg, options.metric);
 	break;
       case 'n':
 	options.signal = SIGALRM;

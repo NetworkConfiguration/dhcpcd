@@ -39,6 +39,10 @@
 #define NTPSERVICE		ETCDIR "/init.d/ntpd"
 #define NTPRESTARTARGS		"--quiet", "conditionalrestart"
 
+#define OPENNTPFILE		ETCDIR "/ntpd.conf"
+#define OPENNTPSERVICE		ETCDIR "/init.d/ntpd"
+#define OPENNTPRESTARTARGS	"--quiet", "conditionalrestart"
+
 #define DEFAULT_SCRIPT		ETCDIR "/" PACKAGE ".sh"
 
 #define STATEDIR		"/var"

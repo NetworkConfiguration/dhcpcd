@@ -1,6 +1,6 @@
 # Should work for both GNU make and BSD make
 
-VERSION = 3.0.16
+VERSION = 3.0.17_pre2
 
 CFLAGS ?= -O2 -pipe
 
@@ -8,7 +8,7 @@ CFLAGS ?= -O2 -pipe
 # IMPORTANT: We should be using c99 instead of gnu99 but for some reason
 # generic linux headers as of 2.6.19 don't allow this in asm/types.h
 CFLAGS += -pedantic -std=gnu99 \
-    -Wall -Wunused -Wimplicit -Wshadow -Wformat=2 \
+    -Wall -Wextra -Wunused -Wimplicit -Wshadow -Wformat=2 \
     -Wmissing-declarations -Wno-missing-prototypes -Wwrite-strings \
     -Wbad-function-cast -Wnested-externs -Wcomment -Winline \
     -Wchar-subscripts -Wcast-align -Wno-format-nonliteral

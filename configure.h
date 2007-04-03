@@ -22,6 +22,13 @@
 #ifndef DHCPCONFIG_H
 #define DHCPCONFIG_H
 
+/* If you disable all 3 options you can shrink the binary by around 5-10k
+   unstripped depending on platform and CFLAGS
+*/
+#define ENABLE_NTP
+#define ENABLE_NIS
+#define ENABLE_INFO
+
 #include "dhcpcd.h"
 #include "interface.h"
 #include "dhcp.h"

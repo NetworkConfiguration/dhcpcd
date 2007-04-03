@@ -80,10 +80,9 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 
   memset (&message, 0, sizeof (dhcpmessage_t));
 
-  if (iface->previous_address.s_addr != 0
-      && (type == DHCP_INFORM || type == DHCP_RELEASE
-	  || (type == DHCP_REQUEST
-	      && iface->previous_address.s_addr == dhcp->address.s_addr)))
+  if (type == DHCP_INFORM ||
+      type == DHCP_RELEASE ||
+      type == DHCP_REQUEST)
     {
       message.ciaddr = iface->previous_address.s_addr;
       from.s_addr = iface->previous_address.s_addr;
@@ -272,7 +271,7 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
   make_dhcp_packet (&packet, (unsigned char *) &message, message_length,
 		    from, to);
 
-  logger (LOG_DEBUG, "sending %s with xid %d", dhcp_message[(int) type], xid);
+  logger (LOG_DEBUG, "sending %s with xid 0x%x", dhcp_message[(int) type], xid);
   return send_packet (iface, ETHERTYPE_IP, (unsigned char *) &packet,
 		      message_length + sizeof (struct ip) +
 		      sizeof (struct udphdr));

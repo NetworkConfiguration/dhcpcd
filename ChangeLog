@@ -1,3 +1,8 @@
+You can now build dhcpcd without support for writing ntp, nis and info files
+which makes the binary a few k smaller.
+Support OpenNTP as well as NTP.
+Re-work the state engine a little, so we renew and rebind correctly.
+Subsequent debug options stop dhcpcd from daemonising.
 When we get an invalid length for a DHCP option, try and continue anyway.
 When MTU is less than 576 we now ignore it instead of setting the MTU to 576.
 Build correctly on dietlibc, thanks to d00mer.

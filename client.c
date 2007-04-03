@@ -21,7 +21,6 @@
 
 #include <sys/types.h>
 #include <sys/select.h>
-#include <sys/wait.h>
 #include <arpa/inet.h>
 #ifdef __linux__
 #include <netinet/ether.h>
@@ -84,6 +83,15 @@
   last_type = _type; \
   last_send = uptime (); \
   send_message (iface, dhcp, xid, _type, options); \
+}
+
+#define DROP_CONFIG \
+{ \
+  memset (&dhcp->address, 0, sizeof (struct in_addr)); \
+  if (iface->previous_address.s_addr != 0 && ! options->persistent) \
+    configure (options, iface, dhcp); \
+  free_dhcp (dhcp); \
+  memset (dhcp, 0, sizeof (dhcp_t)); \
 }
 
 static int daemonise (const char *pidfile)
@@ -240,10 +248,6 @@ int dhcp_run (const options_t *options)
 	{
 	  switch (sig)
 	    {
-	    case SIGCHLD:
-	      /* Silently ignore this signal and wait for it
-		 This stops zombies */
-	      wait (0);
 	      break;
 	    case SIGINT:
 	      logger (LOG_INFO, "received SIGINT, stopping");
@@ -311,17 +315,7 @@ int dhcp_run (const options_t *options)
 		  xid = 0;
 		  SOCKET_MODE (SOCKET_CLOSED);
 		  if (! options->persistent)
-		    {
-		      free_dhcp (dhcp);
-		      memset (dhcp, 0, sizeof (dhcp_t));
-		      configure (options, iface, dhcp);
-		    }
-		  if (! daemonised)
-		    {
-		      retval = -1;
-		      goto eexit;
-		    }
-		  break;
+		    DROP_CONFIG;
 		}
 
 	      if (xid == 0)
@@ -368,22 +362,25 @@ int dhcp_run (const options_t *options)
 	      break;
 	    case STATE_REBINDING:
 	      logger (LOG_ERR, "lost lease, attemping to rebind");
+	      memset (&dhcp->address, 0, sizeof (struct in_addr));
 	      SOCKET_MODE (SOCKET_OPEN);
-	      SEND_MESSAGE (DHCP_DISCOVER);
+	      SEND_MESSAGE (DHCP_REQUEST);
 	      timeout = dhcp->leasetime - dhcp->rebindtime;
-	      state = STATE_INIT;
+	      state = STATE_REQUESTING;
 	      break;
 	    case STATE_REQUESTING:
-	      logger (LOG_ERR, "timed out");
-	      if (! daemonised)
+	      if (iface->previous_address.s_addr != 0)
+		logger (LOG_ERR, "lost lease");
+	      else
+		logger (LOG_ERR, "timed out");
+	      if (! daemonised && options->daemonise)
 		goto eexit;
 
 	      state = STATE_INIT;
 	      SOCKET_MODE (SOCKET_CLOSED);
 	      timeout = 0;
 	      xid = 0;
-	      free_dhcp (dhcp);
-	      memset (dhcp, 0, sizeof (dhcp_t));
+	      DROP_CONFIG;
 	      break;
 
 	    case STATE_RELEASED:
@@ -420,12 +417,12 @@ int dhcp_run (const options_t *options)
 	      if (xid != message.xid)
 		{
 		  logger (LOG_ERR,
-			  "ignoring packet with xid %d as it's not ours (%d)",
+			  "ignoring packet with xid 0x%x as it's not ours (0x%x)",
 			  message.xid, xid);
 		  continue;
 		}
 
-	      logger (LOG_DEBUG, "got a packet with xid %d", message.xid);
+	      logger (LOG_DEBUG, "got a packet with xid 0x%x", message.xid);
 	      memset (new_dhcp, 0, sizeof (dhcp_t));
 	      if ((type = parse_dhcpmessage (new_dhcp, &message)) < 0)
 		{
@@ -461,9 +458,7 @@ int dhcp_run (const options_t *options)
 	      state = STATE_INIT;
 	      timeout = 0;
 	      xid = 0;
-	      free_dhcp (dhcp);
-	      memset (dhcp, 0, sizeof (dhcp_t));
-	      configure (options, iface, dhcp);
+	      DROP_CONFIG;
 	      continue;
 	    }
 
@@ -502,12 +497,7 @@ int dhcp_run (const options_t *options)
 			  SOCKET_MODE (SOCKET_OPEN);
 			  SEND_MESSAGE (DHCP_DECLINE);
 			  SOCKET_MODE (SOCKET_CLOSED);
-
-			  free_dhcp (dhcp);
-			  memset (dhcp, 0, sizeof (dhcp_t));
- 
-			  if (daemonised)
-			    configure (options, iface, dhcp);
+			  DROP_CONFIG;
 
 			  xid = 0;
 			  timeout = 0;
@@ -592,7 +582,7 @@ int dhcp_run (const options_t *options)
 		      goto eexit;
 		    }
 
-		  if (! daemonised)
+		  if (! daemonised && options->daemonise)
 		    {
 		      if ((daemonise (options->pidfile)) < 0 )
 			{
@@ -627,12 +617,7 @@ int dhcp_run (const options_t *options)
 
 eexit:
   SOCKET_MODE (SOCKET_CLOSED);
-
-  /* Remove our config if we need to */
-  free_dhcp (dhcp);
-  memset (dhcp, 0, sizeof (dhcp_t));
-  if (iface->previous_address.s_addr != 0 && ! options->persistent && daemonised)
-    configure (options, iface, dhcp);
+  DROP_CONFIG;
   free (dhcp);
 
   if (iface)

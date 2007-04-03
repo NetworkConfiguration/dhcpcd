@@ -21,6 +21,7 @@
 
 #include <sys/socket.h>
 #include <sys/select.h>
+#include <sys/wait.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -34,6 +35,15 @@ static int signal_pipe[2];
 
 static void signal_handler (int sig)
 {
+  /* Silently ignore this signal and wait for it. This stops zombies.
+     We do this here instead of client.c so that we don't spam the log file
+     with "waiting on select messages" */
+  if (sig == SIGCHLD)
+    {
+      wait (0);
+      return;
+    }
+  
   if (send (signal_pipe[1], &sig, sizeof (sig), MSG_DONTWAIT) < 0)
     logger (LOG_ERR, "Could not send signal: %s", strerror (errno));
 }

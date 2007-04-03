@@ -59,6 +59,7 @@ typedef struct options_t {
   bool dodomainname;
   int signal;
   bool persistent;
+  bool daemonise;
 
   char *script;
   char pidfile[PATH_MAX];
