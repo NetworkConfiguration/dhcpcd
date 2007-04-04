@@ -52,11 +52,13 @@ typedef struct options_t {
 
   bool doarp;
   bool dodns;
-  bool dontp;
-  bool donis;
+  bool dodomainname;
   bool dogateway;
   bool dohostname;
-  bool dodomainname;
+  bool domtu;
+  bool donis;
+  bool dontp;
+  
   int signal;
   bool persistent;
   bool daemonise;

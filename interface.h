@@ -65,6 +65,7 @@ typedef struct interface_t
   unsigned char hwaddr[20];
   int hwlen;
   bool arpable;
+  unsigned short mtu;
 
   int fd;
   int buffer_length;
@@ -75,10 +76,11 @@ typedef struct interface_t
 
   char infofile[PATH_MAX];
 
+  unsigned short previous_mtu;
   struct in_addr previous_address;
   struct in_addr previous_netmask;
   route_t *previous_routes;
-
+  
   long start_uptime;
 } interface_t;
 

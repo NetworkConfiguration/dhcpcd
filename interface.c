@@ -135,6 +135,7 @@ interface_t *read_interface (const char *ifname, int metric)
   unsigned char hwaddr[16];
   int hwlen = 0;
   sa_family_t family;
+  unsigned short mtu;
 
 #ifndef __linux__
   struct ifaddrs *ifap;
@@ -254,6 +255,7 @@ interface_t *read_interface (const char *ifname, int metric)
 	  return NULL;
 	}
     }
+  mtu = ifr.ifr_mtu;
 
   strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
   if (ioctl(s, SIOCGIFFLAGS, &ifr) < 0)
@@ -283,6 +285,7 @@ interface_t *read_interface (const char *ifname, int metric)
 
   iface->family = family;
   iface->arpable = ! (ifr.ifr_flags & (IFF_NOARP | IFF_LOOPBACK));
+  iface->mtu = iface->previous_mtu = mtu;
 
   logger (LOG_INFO, "hardware address = %s",
 	  hwaddr_ntoa (iface->hwaddr, iface->hwlen));

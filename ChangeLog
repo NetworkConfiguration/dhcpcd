@@ -1,3 +1,6 @@
+We now restore the starting MTU value when we exit OR we don't receive a
+a valid MTU value from the dhcp server.
+--nomtu / -M now stops the MTU from being used.
 You can now build dhcpcd without support for writing ntp, nis and info files
 which makes the binary a few k smaller.
 Support OpenNTP as well as NTP.

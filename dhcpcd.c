@@ -95,7 +95,7 @@ void make_pid (const char *pidfile)
 
 static void usage ()
 {
-  printf ("usage: "PACKAGE" [-adknpGHNRY] [-c script] [-h hostame] [-i classID]\n"
+  printf ("usage: "PACKAGE" [-adknpGHMNRY] [-c script] [-h hostame] [-i classID]\n"
 	  "              [-l leasetime] [-m metric] [-s ipaddress] [-t timeout]\n"
 	  "              [-u userclass] [-F [none | ptr | both]] [-I clientID]\n");
 }
@@ -131,6 +131,7 @@ int main(int argc, char **argv)
 	{"nogateway", no_argument, NULL, 'G'},
 	{"sethostname", no_argument, NULL, 'H'},
 	{"clientid", required_argument, NULL, 'I'},
+	{"nomtu", no_argument, NULL, 'M'},
 	{"nontp", no_argument, NULL, 'N'},
 	{"nodns", no_argument, NULL, 'R'},
 	{"nonis", no_argument, NULL, 'Y'},
@@ -156,6 +157,7 @@ int main(int argc, char **argv)
 
   options.doarp = false;
   options.dodns = true;
+  options.domtu = true;
   options.donis = true;
   options.dontp = true;
   options.dogateway = true;
@@ -166,7 +168,7 @@ int main(int argc, char **argv)
     memset (options.hostname, 0, sizeof (options.hostname));
   options.timeout = DEFAULT_TIMEOUT;
 
-  while ((ch = getopt_long(argc, argv, "ac:dh:i:kl:m:nps:t:u:F:GHI:NRY", longopts,
+  while ((ch = getopt_long(argc, argv, "ac:dh:i:kl:m:nps:t:u:F:GHI:MNRY", longopts,
 			   &option_index)) != -1)
     switch (ch)
       {
@@ -297,6 +299,9 @@ int main(int argc, char **argv)
 	  }
 	else
 	  sprintf(options.clientid, "%s", optarg);
+	break;
+      case 'M':
+	options.domtu = false;
 	break;
       case 'N':
 	options.dontp = false;

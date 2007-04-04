@@ -535,6 +535,13 @@ int configure (const options_t *options, interface_t *iface,
 	  iface->previous_routes = NULL;
 	}
 
+      /* Restore the original MTU value */
+      if (iface->mtu && iface->previous_mtu != iface->mtu)
+	{
+	  set_mtu (iface->name, iface->mtu);
+	  iface->previous_mtu = iface->mtu;
+	}
+
       /* Only reset things if we had set them before */
       if (iface->previous_address.s_addr != 0)
 	{
@@ -551,8 +558,21 @@ int configure (const options_t *options, interface_t *iface,
       return 0;
     }
 
-  if (dhcp->mtu)
-    set_mtu (iface->name, dhcp->mtu);
+  /* Set the MTU requested.
+     If the DHCP server no longer sends one OR it's invalid then we restore
+     the original MTU */
+  if (options->domtu)
+    {
+      unsigned short mtu = iface->mtu;
+      if (dhcp->mtu)
+	mtu = dhcp->mtu;
+
+      if (mtu != iface->previous_mtu)
+	{
+	  if (set_mtu (iface->name, mtu) == 0)
+	    iface->previous_mtu = mtu;
+	}
+    }
 
   if (add_address (iface->name, dhcp->address, dhcp->netmask,
 		   dhcp->broadcast) < 0 && errno != EEXIST)
