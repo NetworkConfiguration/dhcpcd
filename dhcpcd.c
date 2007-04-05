@@ -342,7 +342,7 @@ int main(int argc, char **argv)
       if (doversion || dohelp)
 	exit (EXIT_SUCCESS);
 
-      logger (LOG_ERR, "no interface specified", options.interface);
+      logger (LOG_ERR, "no interface specified");
       exit (EXIT_FAILURE);
     }
 

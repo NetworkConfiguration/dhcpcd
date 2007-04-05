@@ -217,7 +217,7 @@ int dhcp_run (const options_t *options)
 	      if (iface->fd > -1 && uptime () - last_send >= TIMEOUT_MINI)
 		SEND_MESSAGE (last_type);
 
-	      logger (LOG_DEBUG, "waiting on select for %d seconds",
+	      logger (LOG_DEBUG, "waiting on select for %ld seconds",
 		      timeout);
 	      /* If we're waiting for a reply, then we re-send the last
 		 DHCP request periodically in-case of a bad line */

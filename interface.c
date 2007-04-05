@@ -406,7 +406,6 @@ static int do_route (const char *ifname,
 {
   int s;
   char *dstd;
-  char *gend;
   struct rtm
     {
       struct rt_msghdr hdr;
@@ -432,7 +431,7 @@ static int do_route (const char *ifname,
   if (gateway.s_addr == destination.s_addr)
     logger (LOG_INFO, "%s route to %s/%d",
 	    change ? "changing" : del ? "removing" : "adding",
-	    dstd, gend, inet_ntocidr (netmask));
+	    dstd, inet_ntocidr (netmask));
   else if (destination.s_addr == INADDR_ANY && netmask.s_addr == INADDR_ANY)
     logger (LOG_INFO, "%s default route via %s",
 	    change ? "changing" : del ? "removing" : "adding",

@@ -265,7 +265,7 @@ int open_socket (interface_t *iface, bool arp)
   if (ioctl (fd, BIOCSETIF, &ifr) < 0)
     {
       logger (LOG_ERR, "cannot attach interface `%s' to bpf device `%s': %s",
-	      iface->name, strerror (errno));
+	      iface->name, device, strerror (errno));
       close (fd);
       return -1;
     }

@@ -271,7 +271,7 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
   make_dhcp_packet (&packet, (unsigned char *) &message, message_length,
 		    from, to);
 
-  logger (LOG_DEBUG, "sending %s with xid 0x%x", dhcp_message[(int) type], xid);
+  logger (LOG_DEBUG, "sending %s with xid 0x%lx", dhcp_message[(int) type], xid);
   return send_packet (iface, ETHERTYPE_IP, (unsigned char *) &packet,
 		      message_length + sizeof (struct ip) +
 		      sizeof (struct udphdr));

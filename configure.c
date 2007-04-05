@@ -47,7 +47,6 @@
 #include "logger.h"
 #include "socket.h"
 
-
 /* IMPORTANT: Ensure that the last parameter is NULL when calling */
 static int exec_cmd (const char *cmd, const char *args, ...)
 {
@@ -110,10 +109,10 @@ static void exec_script (const char *script, const char *infofile,
 
 #ifdef ENABLE_INFO
   logger (LOG_DEBUG, "exec \"%s %s %s\"", script, infofile, arg);
-  exec_cmd (script, infofile, arg, NULL);
+  exec_cmd (script, infofile, arg, (char *) NULL);
 #else
   logger (LOG_DEBUG, "exec \"%s \"\" %s\"", script, infofile, arg);
-  exec_cmd (script, infofile, "", arg, NULL);
+  exec_cmd (script, infofile, "", arg, (char *) NULL);
 #endif
 }
 
@@ -176,7 +175,7 @@ static void restore_resolv(const char *ifname)
     return;
 
   logger (LOG_DEBUG, "removing information from resolvconf");
-  exec_cmd (RESOLVCONF, "-d", ifname, NULL);
+  exec_cmd (RESOLVCONF, "-d", ifname, (char *) NULL);
 #endif
 }
 
@@ -294,16 +293,16 @@ static int make_ntp (const char *ifname, const dhcp_t *dhcp)
 
 #ifdef NTPSERVICE
   if (restart_ntp)
-    retval += exec_cmd (NTPSERVICE, NTPRESTARTARGS, NULL);
+    retval += exec_cmd (NTPSERVICE, NTPRESTARTARGS, (char *) NULL);
 #endif
 
 #if defined (NTPSERVICE) && defined (OPENNTPSERVICE)
   if (restart_openntp &&
       (strcmp (NTPSERVICE, OPENNTPSERVICE) != 0 || ! restart_ntp))
-    retval += exec_cmd (OPENNTPSERVICE, OPENNTPRESTARTARGS, NULL);
+    retval += exec_cmd (OPENNTPSERVICE, OPENNTPRESTARTARGS, (char *) NULL);
 #elif defined (OPENNTPSERVICE) && ! defined (NTPSERVICE)
   if (restart_openntp) 
-    retval += exec_cmd (OPENNTPSERVICE, OPENNTPRESTARTARGS, NULL);
+    retval += exec_cmd (OPENNTPSERVICE, OPENNTPRESTARTARGS, (char *) NULL);
 #endif
 
   return retval;
@@ -342,7 +341,7 @@ static int make_nis (const char *ifname, const dhcp_t *dhcp)
 
   fclose (f);
 
-  exec_cmd (NISSERVICE, NISRESTARTARGS, NULL);
+  exec_cmd (NISSERVICE, NISRESTARTARGS, (char *) NULL);
   return 0;
 }
 #endif
