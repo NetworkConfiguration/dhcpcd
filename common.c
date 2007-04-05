@@ -27,6 +27,16 @@
 #include "common.h"
 #include "logger.h"
 
+/* A way of safely handling strncpy */
+char *safe_strncpy (char *dst, const char *src, size_t size)
+{
+  if (! size)
+    return dst;
+
+  dst[--size] = '\0';
+  return strncpy (dst, src, size);
+}
+
 /* This requires us to link to rt on glibc, so we use sysinfo instead */
 #ifdef __linux__
 #include <sys/sysinfo.h>

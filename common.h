@@ -22,7 +22,9 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+char *safe_strncpy (char *dst, const char *src, size_t size);
 long uptime (void);
 void *xmalloc (size_t size);
+
 
 #endif

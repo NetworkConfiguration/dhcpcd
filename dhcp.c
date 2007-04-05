@@ -513,7 +513,8 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
   memset (first_route, 0, sizeof (route_t));
 
   dhcp->address.s_addr = message->yiaddr;
-  strcpy (dhcp->servername, message->servername);
+  safe_strncpy (dhcp->servername, message->servername,
+		sizeof (dhcp->servername));
 
 #define LEN_ERR \
     { \

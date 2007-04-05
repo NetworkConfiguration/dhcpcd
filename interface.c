@@ -190,7 +190,7 @@ interface_t *read_interface (const char *ifname, int metric)
 #endif
 
   memset (&ifr, 0, sizeof (struct ifreq));
-  strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
+  safe_strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
   if ((s = socket (AF_INET, SOCK_DGRAM, 0)) < 0)
     {
       logger (LOG_ERR, "socket: %s", strerror (errno));
@@ -200,7 +200,7 @@ interface_t *read_interface (const char *ifname, int metric)
 #ifdef __linux__
   /* Do something with the metric parameter to satisfy the compiler warning */
   metric = 0;
-  strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
+  safe_strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
   if (ioctl (s, SIOCGIFHWADDR, &ifr) <0)
     {
       logger (LOG_ERR, "ioctl SIOCGIFHWADDR: %s", strerror (errno));
@@ -227,7 +227,7 @@ interface_t *read_interface (const char *ifname, int metric)
   family = ifr.ifr_hwaddr.sa_family;
 #else
   ifr.ifr_metric = metric;
-  strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
+  safe_strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
   if (ioctl (s, SIOCSIFMETRIC, &ifr) < 0)
     {
       logger (LOG_ERR, "ioctl SIOCSIFMETRIC: %s", strerror (errno));
@@ -236,7 +236,7 @@ interface_t *read_interface (const char *ifname, int metric)
     }
 #endif
 
-  strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
+  safe_strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
   if (ioctl(s, SIOCGIFMTU, &ifr) < 0)
     {
       logger (LOG_ERR, "ioctl SIOCGIFMTU: %s", strerror (errno));
@@ -247,7 +247,7 @@ interface_t *read_interface (const char *ifname, int metric)
     {
       logger (LOG_DEBUG, "MTU of %d is too low, setting to %d", ifr.ifr_mtu, MTU_MIN);
       ifr.ifr_mtu = MTU_MIN;
-      strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
+      safe_strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
       if (ioctl(s, SIOCSIFMTU, &ifr) < 0)
 	{
 	  logger (LOG_ERR, "ioctl SIOCSIFMTU,: %s", strerror (errno));
@@ -257,7 +257,7 @@ interface_t *read_interface (const char *ifname, int metric)
     }
   mtu = ifr.ifr_mtu;
 
-  strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
+  safe_strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
   if (ioctl(s, SIOCGIFFLAGS, &ifr) < 0)
     {
       logger (LOG_ERR, "ioctl SIOCGIFFLAGS: %s", strerror (errno));
@@ -266,7 +266,7 @@ interface_t *read_interface (const char *ifname, int metric)
     }
 
   ifr.ifr_flags |= IFF_UP | IFF_RUNNING;
-  strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
+  safe_strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
   if (ioctl(s, SIOCSIFFLAGS, &ifr) < 0)
     {
       logger (LOG_ERR, "ioctl SIOCSIFFLAGS: %s", strerror (errno));
@@ -278,7 +278,7 @@ interface_t *read_interface (const char *ifname, int metric)
 
   iface = xmalloc (sizeof (interface_t));
   memset (iface, 0, sizeof (interface_t));
-  strncpy (iface->name, ifname, IF_NAMESIZE);
+  safe_strncpy (iface->name, ifname, IF_NAMESIZE);
   snprintf (iface->infofile, PATH_MAX, INFOFILE, ifname);
   memcpy (&iface->hwaddr, hwaddr, hwlen);
   iface->hwlen = hwlen;
@@ -309,7 +309,7 @@ int get_mtu (const char *ifname)
     }
 
   memset (&ifr, 0, sizeof (struct ifreq));
-  strcpy (ifr.ifr_name, ifname);
+  safe_strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
   r = ioctl (s, SIOCGIFMTU, &ifr);
   close (s);
 
@@ -336,7 +336,7 @@ int set_mtu (const char *ifname, short int mtu)
 
   memset (&ifr, 0, sizeof (struct ifreq));
   logger (LOG_DEBUG, "setting MTU to %d", mtu);
-  strcpy (ifr.ifr_name, ifname);
+  safe_strncpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
   ifr.ifr_mtu = mtu;
   r = ioctl (s, SIOCSIFMTU, &ifr);
   close (s);
@@ -365,7 +365,7 @@ static int do_address (const char *ifname, struct in_addr address,
     }
 
   memset (&ifa, 0, sizeof (ifa));
-  strcpy (ifa.ifra_name, ifname);
+  safe_strncpy (ifa.ifra_name, ifname, sizeof (ifa.ifra_name));
 
 #define ADDADDR(_var, _addr) \
     { \

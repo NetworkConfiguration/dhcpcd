@@ -206,7 +206,7 @@ int main(int argc, char **argv)
 	    exit (EXIT_FAILURE);
 	  }
 	else
-	  strcpy (options.hostname, optarg);
+	  safe_strncpy (options.hostname, optarg, sizeof (options.hostname));
 	break;
       case 'i':
 	if (strlen (optarg) > CLASS_ID_MAX_LEN)
@@ -334,7 +334,8 @@ int main(int argc, char **argv)
 		  argv[optind], IF_NAMESIZE);
 	  exit (EXIT_FAILURE);
 	}
-      strcpy (options.interface, argv[optind]);
+      safe_strncpy (options.interface, argv[optind],
+		    sizeof (options.interface));
     }
   else
     {

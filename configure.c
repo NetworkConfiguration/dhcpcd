@@ -689,7 +689,7 @@ int configure (const options_t *options, interface_t *iface,
       || strcmp (curhostname, "localhost") == 0)
     {
       if (dhcp->hostname)
-	strcpy (newhostname, dhcp->hostname); 
+	safe_strncpy (newhostname, dhcp->hostname, sizeof (newhostname)); 
 
       if (*newhostname)
 	{

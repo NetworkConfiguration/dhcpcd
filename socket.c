@@ -262,7 +262,7 @@ int open_socket (interface_t *iface, bool arp)
     }
 
   memset (&ifr, 0, sizeof (struct ifreq));
-  strncpy (ifr.ifr_name, iface->name, sizeof (ifr.ifr_name));
+  safe_strncpy (ifr.ifr_name, iface->name, sizeof (ifr.ifr_name));
   if (ioctl (fd, BIOCSETIF, &ifr) < 0)
     {
       logger (LOG_ERR, "cannot attach interface `%s' to bpf device `%s': %s",
