@@ -119,9 +119,10 @@ char *hwaddr_ntoa (const unsigned char *hwaddr, int hwlen)
   for (i = 0; i < hwlen && i < 125; i++)
     {
       if (i > 0)
-	p += sprintf (p, ":");
-      p += sprintf (p, "%.2x", hwaddr[i]);
+	*p ++= ':';
+      p += snprintf (p, 3, "%.2x", hwaddr[i]);
     }
+  *p ++= '\0';
 
   return (buffer);
 }
