@@ -206,7 +206,7 @@ int main(int argc, char **argv)
 	    exit (EXIT_FAILURE);
 	  }
 	else
-	  safe_strncpy (options.hostname, optarg, sizeof (options.hostname));
+	  strlcpy (options.hostname, optarg, sizeof (options.hostname));
 	break;
       case 'i':
 	if (strlen (optarg) > CLASS_ID_MAX_LEN)
@@ -216,7 +216,7 @@ int main(int argc, char **argv)
 	    exit (EXIT_FAILURE);
 	  }
 	else
-	  sprintf (options.classid, "%s", optarg);
+	  strlcpy (options.classid, optarg, sizeof (options.classid));
 	break;
       case 'k':
 	options.signal = SIGHUP;
@@ -298,7 +298,7 @@ int main(int argc, char **argv)
 	    exit (EXIT_FAILURE);
 	  }
 	else
-	  sprintf(options.clientid, "%s", optarg);
+	  strlcpy (options.clientid, optarg, sizeof (options.clientid));
 	break;
       case 'M':
 	options.domtu = false;
@@ -334,7 +334,7 @@ int main(int argc, char **argv)
 		  argv[optind], IF_NAMESIZE);
 	  exit (EXIT_FAILURE);
 	}
-      safe_strncpy (options.interface, argv[optind],
+      strlcpy (options.interface, argv[optind],
 		    sizeof (options.interface));
     }
   else

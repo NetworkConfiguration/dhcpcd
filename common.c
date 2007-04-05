@@ -27,15 +27,32 @@
 #include "common.h"
 #include "logger.h"
 
-/* A way of safely handling strncpy */
-char *safe_strncpy (char *dst, const char *src, size_t size)
+/* strlcpy is nice, shame glibc does not define it */
+#ifdef __GLIBC__
+size_t strlcpy (char *dst, const char *src, size_t size)
 {
-  if (! size)
-    return dst;
+  const char *s = src;
+  size_t n = size;
 
-  dst[--size] = '\0';
-  return strncpy (dst, src, size);
+  if (n && --n)
+    do
+      {
+	if (! (*dst++ = *src++))
+	  break;
+      }
+    while (--n);
+
+  if (! n)
+    {
+      if (size)
+	*dst = '\0';
+      while (*src++)
+	;
+    }
+
+  return (src - s - 1);
 }
+#endif
 
 /* This requires us to link to rt on glibc, so we use sysinfo instead */
 #ifdef __linux__
