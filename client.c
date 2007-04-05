@@ -248,7 +248,6 @@ int dhcp_run (const options_t *options)
 	{
 	  switch (sig)
 	    {
-	      break;
 	    case SIGINT:
 	      logger (LOG_INFO, "received SIGINT, stopping");
 	      retval = (! daemonised);

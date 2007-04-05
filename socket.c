@@ -24,8 +24,8 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
-#include <arpa/inet.h>
 #include <netinet/in_systm.h>
+#include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/udp.h>
 #include <netinet/if_ether.h>
@@ -34,6 +34,7 @@
 #include <net/if_types.h>
 #endif
 #include <net/if.h>
+#include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>

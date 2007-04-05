@@ -134,7 +134,7 @@ interface_t *read_interface (const char *ifname, int metric)
   interface_t *iface;
   unsigned char hwaddr[16];
   int hwlen = 0;
-  sa_family_t family;
+  sa_family_t family = 0;
   unsigned short mtu;
 
 #ifndef __linux__
