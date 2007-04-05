@@ -22,6 +22,9 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+/* string.h pulls in features.h so the below define checks work */
+#include <string.h>
+
 /* Only GLIBC doesn't support strlcpy */
 #ifdef __GLIBC__
 #  if ! defined(__UCLIBC__) && ! defined (__dietlibc__)
