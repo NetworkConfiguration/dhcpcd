@@ -22,8 +22,11 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+/* Only GLIBC doesn't support strlcpy */
 #ifdef __GLIBC__
+#  if ! defined(__UCLIBC__) && ! defined (__dietlibc__)
 size_t strlcpy (char *dst, const char *src, size_t size);
+#  endif
 #endif
 
 long uptime (void);
