@@ -98,15 +98,17 @@ void logger(int level, const char *fmt, ...)
   if (level < LOG_DEBUG || level <= loglevel)
     {
       int len = strlen (logprefix);
-      char *fmt2 = xmalloc (strlen (fmt) + len + 1);
+      int fmt2len = strlen (fmt) + len + 1;
+      char *fmt2 = xmalloc (sizeof (char *) * fmt2len);
       char *pf = fmt2;
       memcpy (pf, logprefix, len);
       pf += len;
-      strcpy (pf, fmt);
+      strlcpy (pf, fmt, fmt2len - len);
       vsyslog (level, fmt2, p2);
       free (fmt2);
     }
 
+  va_end (p2);
   va_end (p);
 }
 
