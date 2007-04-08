@@ -1,3 +1,5 @@
+Compile ok on OpenBSD (thanks to icezimm and reb in #gentoo-bsd for testing)
+We check gcc supports -Wextra and friends before using them.
 We now restore the starting MTU value when we exit OR we don't receive a
 a valid MTU value from the dhcp server.
 --nomtu / -M now stops the MTU from being used.

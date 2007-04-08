@@ -26,10 +26,12 @@
 #include <sys/uio.h>
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
+#ifndef __OpenBSD__
 #include <netinet/ip.h>
-#include <netinet/udp.h>
 #include <netinet/if_ether.h>
 #include <net/ethernet.h>
+#endif
+#include <netinet/udp.h>
 #ifndef __linux__
 #include <net/if_types.h>
 #endif

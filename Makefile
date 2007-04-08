@@ -1,8 +1,20 @@
+VERSION = 3.0.17_pre2
+CFLAGS ?= -O2 -pipe
+
 # Should work for both GNU make and BSD make
 
-VERSION = 3.0.17_pre2
+# Saying that, this function only works with GNU Make :/
+check_gcc=$(shell if $(CC) $(1) -S -o /dev/null -xc /dev/null >/dev/null 2>&1; \
+	  then echo "$(1)"; else echo "$(2)"; fi)
 
-CFLAGS ?= -O2 -pipe
+# Luckily we can do this more long winded thing with pmake used by the BSDs
+# FIXME: Look into making this into a loop
+WAFTST != if $(CC) -Wextra -S -o /dev/null -xc /dev/null >/dev/null 2>&1; \
+	  then echo "-Wdeclaration-after-statement"; fi
+WSEQ   != if $(CC) -Wextra -S -o /dev/null -xc /dev/null >/dev/null 2>&1; \
+	  then echo "-Wsequence-point"; fi
+WEXTRA != if $(CC) -Wextra -S -o /dev/null -xc /dev/null >/dev/null 2>&1; \
+	  then echo "-Wextra"; fi
 
 # Loads of nice flags to ensure our code is good
 # IMPORTANT: We should be using c99 instead of gnu99 but for some reason
@@ -11,11 +23,10 @@ CFLAGS += -pedantic -std=gnu99 \
     -Wall -Wunused -Wimplicit -Wshadow -Wformat=2 \
     -Wmissing-declarations -Wno-missing-prototypes -Wwrite-strings \
     -Wbad-function-cast -Wnested-externs -Wcomment -Winline \
-    -Wchar-subscripts -Wcast-align -Wno-format-nonliteral
-
-# Early GCC versions don't support these flags, so you may need to comment
-# this line out
-CFLAGS += -Wsequence-point -Wextra -Wdeclaration-after-statement
+    -Wchar-subscripts -Wcast-align -Wno-format-nonliteral \
+    $(call check_gcc, -Wdeclaration-after-statement) \
+    $(call check_gcc, -Wsequence-point) \
+    $(call check_gcc, -Wextra) $(WAFTST) $(WSEQ) $(WEXTRA)
 
 # -Werrror is a good flag to use for development, but some platforms may
 #  have buggy headers from time to time, so you may need to comment this out
