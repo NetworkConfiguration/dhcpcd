@@ -44,7 +44,7 @@ static void signal_handler (int sig)
       wait (0);
       return;
     }
-  
+
   if (send (signal_pipe[1], &sig, sizeof (sig), MSG_DONTWAIT) < 0)
     logger (LOG_ERR, "Could not send signal: %s", strerror (errno));
 }
@@ -61,9 +61,9 @@ void signal_setup(void)
   /* Stop any scripts from inheriting us */
   for (i = 0; i < 2; i++)
     if ((flags = fcntl (signal_pipe[i], F_GETFD, 0)) < 0 ||
-	fcntl (signal_pipe[i], F_SETFD, flags | FD_CLOEXEC) < 0)
+        fcntl (signal_pipe[i], F_SETFD, flags | FD_CLOEXEC) < 0)
       logger (LOG_ERR ,"fcntl: %s", strerror (errno));
-  
+
   signal (SIGHUP, signal_handler);
   signal (SIGALRM, signal_handler);
   signal (SIGTERM, signal_handler);

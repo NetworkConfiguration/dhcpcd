@@ -61,7 +61,7 @@ int logtolevel (const char *priority)
   while (syslog_level[i])
     {
       if (!strcmp (priority, syslog_level[i]))
-	return i;
+        return i;
       i++;
     }
   return -1;
@@ -89,7 +89,7 @@ void logger(int level, const char *fmt, ...)
   if (level <= LOG_ERR || level <= loglevel)
     {
       if (level == LOG_DEBUG || level == LOG_INFO)
-	f = stdout;
+        f = stdout;
       fprintf (f, "%s, %s", syslog_level_msg[level], logprefix);
       vfprintf (f, fmt, p);
       fputc ('\n', f);

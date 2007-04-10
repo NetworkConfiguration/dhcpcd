@@ -53,8 +53,8 @@ static const char *dhcp_message[] = {
 };
 
 size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
-		     unsigned long xid, char type,
-		     const options_t *options)
+                     unsigned long xid, char type,
+                     const options_t *options)
 {
   dhcpmessage_t message;
   struct udp_dhcp_packet packet;
@@ -100,7 +100,7 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
     case ARPHRD_IEEE1394:
     case ARPHRD_INFINIBAND:
       if (message.ciaddr == 0)
-	message.flags = htons (BROADCAST_FLAG);
+        message.flags = htons (BROADCAST_FLAG);
       message.hwlen = 0;
       break;
     default:
@@ -124,10 +124,10 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
       *p++ = 2;
       sz = get_mtu (iface->name);
       if (sz < MTU_MIN)
-	{
-	  if (set_mtu (iface->name, MTU_MIN) == 0)
-	    sz = MTU_MIN;
-	}
+        {
+          if (set_mtu (iface->name, MTU_MIN) == 0)
+            sz = MTU_MIN;
+        }
       sz = htons (sz);
       memcpy (p, &sz, 2);
       p += 2;
@@ -152,13 +152,13 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
   if (type == DHCP_REQUEST || type == DHCP_DISCOVER)
     {
       if (options->leasetime != 0)
-	{
-	  *p++ = DHCP_LEASETIME;
-	  *p++ = 4;
-	  ul = htonl (options->leasetime);
-	  memcpy (p, &ul, 4);
-	  p += 4;
-	}
+        {
+          *p++ = DHCP_LEASETIME;
+          *p++ = 4;
+          ul = htonl (options->leasetime);
+          memcpy (p, &ul, 4);
+          p += 4;
+        }
     }
 
   if (type == DHCP_DISCOVER || type == DHCP_INFORM || type == DHCP_REQUEST)
@@ -168,78 +168,78 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
       *p++ = 0;
 
       /* Only request DNSSERVER in discover to keep the packets small.
-	 RFC2131 Section 3.5 states that the REQUEST must include the list
-	 from the DISCOVER message, so I think we can safely do this. */
+         RFC2131 Section 3.5 states that the REQUEST must include the list
+         from the DISCOVER message, so I think we can safely do this. */
 
       if (type == DHCP_DISCOVER)
-	*p++ = DHCP_DNSSERVER;
+        *p++ = DHCP_DNSSERVER;
       else
-	{
-	  *p++ = DHCP_RENEWALTIME;
-	  *p++ = DHCP_REBINDTIME;
-	  *p++ = DHCP_NETMASK;
-	  *p++ = DHCP_BROADCAST;
-	  *p++ = DHCP_CSR;
-	  /* RFC 3442 states classless static routes should be before routers
-	   * and static routes as classless static routes override them both */
-	  *p++ = DHCP_STATICROUTE;
-	  *p++ = DHCP_ROUTERS;
-	  *p++ = DHCP_HOSTNAME;
-	  *p++ = DHCP_DNSSEARCH;
-	  *p++ = DHCP_DNSDOMAIN;
-	  *p++ = DHCP_DNSSERVER;
-	  *p++ = DHCP_NISDOMAIN;
-	  *p++ = DHCP_NISSERVER;
-	  *p++ = DHCP_NTPSERVER;
-	  *p++ = DHCP_MTU;
-	  /* These parameters were requested by dhcpcd-2.0 and earlier
-	     but we never did anything with them */
-	  /*    *p++ = DHCP_DEFAULTIPTTL;
-	   *p++ = DHCP_MASKDISCOVERY;
-	   *p++ = DHCP_ROUTERDISCOVERY; */
-	}
+        {
+          *p++ = DHCP_RENEWALTIME;
+          *p++ = DHCP_REBINDTIME;
+          *p++ = DHCP_NETMASK;
+          *p++ = DHCP_BROADCAST;
+          *p++ = DHCP_CSR;
+          /* RFC 3442 states classless static routes should be before routers
+           * and static routes as classless static routes override them both */
+          *p++ = DHCP_STATICROUTE;
+          *p++ = DHCP_ROUTERS;
+          *p++ = DHCP_HOSTNAME;
+          *p++ = DHCP_DNSSEARCH;
+          *p++ = DHCP_DNSDOMAIN;
+          *p++ = DHCP_DNSSERVER;
+          *p++ = DHCP_NISDOMAIN;
+          *p++ = DHCP_NISSERVER;
+          *p++ = DHCP_NTPSERVER;
+          *p++ = DHCP_MTU;
+          /* These parameters were requested by dhcpcd-2.0 and earlier
+             but we never did anything with them */
+          /*    *p++ = DHCP_DEFAULTIPTTL;
+           *p++ = DHCP_MASKDISCOVERY;
+           *p++ = DHCP_ROUTERDISCOVERY; */
+        }
 
       *n_params = p - n_params - 1;
 
       if (*options->hostname) 
-	{
-	  if (options->fqdn == FQDN_DISABLE)
-	    {
-	      *p++ = DHCP_HOSTNAME;
-	      *p++ = l = strlen (options->hostname);
-	      memcpy (p, options->hostname, l);
-	      p += l;
-	    }
-	  else
-	    {
-	      /* Draft IETF DHC-FQDN option (81) */
-	      *p++ = DHCP_FQDN;
-	      *p++ = (l = strlen (options->hostname)) + 3;
-	      /* Flags: 0000NEOS
-	       * S: 1 => Client requests Server to update A RR in DNS as well as PTR
-	       * O: 1 => Server indicates to client that DNS has been updated
-	       * E: 1 => Name data is DNS format
-	       * N: 1 => Client requests Server to not update DNS
-	       */
-	      *p++ = options->fqdn & 0x9;
-	      *p++ = 0; /* rcode1, response from DNS server for PTR RR */
-	      *p++ = 0; /* rcode2, response from DNS server for A RR if S=1 */
-	      memcpy (p, options->hostname, l);
-	      p += l;
-	    }
-	}
+        {
+          if (options->fqdn == FQDN_DISABLE)
+            {
+              *p++ = DHCP_HOSTNAME;
+              *p++ = l = strlen (options->hostname);
+              memcpy (p, options->hostname, l);
+              p += l;
+            }
+          else
+            {
+              /* Draft IETF DHC-FQDN option (81) */
+              *p++ = DHCP_FQDN;
+              *p++ = (l = strlen (options->hostname)) + 3;
+              /* Flags: 0000NEOS
+               * S: 1 => Client requests Server to update A RR in DNS as well as PTR
+               * O: 1 => Server indicates to client that DNS has been updated
+               * E: 1 => Name data is DNS format
+               * N: 1 => Client requests Server to not update DNS
+               */
+              *p++ = options->fqdn & 0x9;
+              *p++ = 0; /* rcode1, response from DNS server for PTR RR */
+              *p++ = 0; /* rcode2, response from DNS server for A RR if S=1 */
+              memcpy (p, options->hostname, l);
+              p += l;
+            }
+        }
     }
 
   if (type != DHCP_DECLINE && type != DHCP_RELEASE)
     {
       if (options->userclass_len > 0)
-	{
-	  *p++ = DHCP_USERCLASS;
-	  *p++ = options->userclass_len;
-	  memcpy (p, &options->userclass, options->userclass_len);
-	  p += options->userclass_len;
-	}
-      
+        {
+          *p++ = DHCP_USERCLASS;
+          *p++ = options->userclass_len;
+          memcpy (p, &options->userclass, options->userclass_len);
+          p += options->userclass_len;
+        }
+
       *p++ = DHCP_CLASSID;
       *p++ = l = strlen (options->classid);
       memcpy (p, options->classid, l);
@@ -269,12 +269,12 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 
   memset (&packet, 0, sizeof (struct udp_dhcp_packet));
   make_dhcp_packet (&packet, (unsigned char *) &message, message_length,
-		    from, to);
+                    from, to);
 
   logger (LOG_DEBUG, "sending %s with xid 0x%lx", dhcp_message[(int) type], xid);
   return send_packet (iface, ETHERTYPE_IP, (unsigned char *) &packet,
-		      message_length + sizeof (struct ip) +
-		      sizeof (struct udphdr));
+                      message_length + sizeof (struct ip) +
+                      sizeof (struct udphdr));
 }
 
 static unsigned long getnetmask (unsigned long ip_in)
@@ -286,14 +286,14 @@ static unsigned long getnetmask (unsigned long ip_in)
   else
     {
       if (IN_CLASSB (p))
-	t = ~IN_CLASSB_NET;
+        t = ~IN_CLASSB_NET;
       else
-	{
-	  if (IN_CLASSC (p))
-	    t = ~IN_CLASSC_NET;
-	  else
-	    t = 0;
-	}
+        {
+          if (IN_CLASSC (p))
+            t = ~IN_CLASSC_NET;
+          else
+            t = 0;
+        }
     }
   while (t & p) t >>= 1;
   return htonl (~t);
@@ -313,47 +313,47 @@ static unsigned int decode_search (const unsigned char *p, int len, char *out)
       r = NULL;
       hops = 0;
       while ((l = *q++))
-	{
-	  unsigned int label_type = l & 0xc0;
-	  if (label_type == 0x80 || label_type == 0x40)
-	    return 0;
-	  else if (label_type == 0xc0) /* pointer */
-	    { 
-	      l = (l & 0x3f) << 8;
-	      l |= *q++;
+        {
+          unsigned int label_type = l & 0xc0;
+          if (label_type == 0x80 || label_type == 0x40)
+            return 0;
+          else if (label_type == 0xc0) /* pointer */
+            { 
+              l = (l & 0x3f) << 8;
+              l |= *q++;
 
-	      /* save source of first jump. */
-	      if (!r)
-		r = q;
+              /* save source of first jump. */
+              if (!r)
+                r = q;
 
-	      hops++;
-	      if (hops > 255)
-		return 0;
+              hops++;
+              if (hops > 255)
+                return 0;
 
-	      q = p + l;
-	      if (q - p >= len)
-		return 0;
-	    }
-	  else 
-	    {
-	      /* straightforward name segment, add with '.' */
-	      count += l + 1;
-	      if (out)
-		{
-		  memcpy (out, q, l);
-		  out += l;
-		  *out++ = '.';
-		}
-	      q += l;
-	    }
-	}
+              q = p + l;
+              if (q - p >= len)
+                return 0;
+            }
+          else 
+            {
+              /* straightforward name segment, add with '.' */
+              count += l + 1;
+              if (out)
+                {
+                  memcpy (out, q, l);
+                  out += l;
+                  *out++ = '.';
+                }
+              q += l;
+            }
+        }
 
       /* change last dot to space */
       if (out)
-	*(out - 1) = ' ';
+        *(out - 1) = ' ';
 
       if (r)
-	q = r;
+        q = r;
     }
 
   /* change last space to zero terminator */
@@ -386,29 +386,29 @@ static route_t *decodeCSR(const unsigned char *p, int len)
 
       cidr = *q++;
       if (cidr == 0)
-	ocets = 0;
+        ocets = 0;
       else if (cidr < 9)
-	ocets = 1;
+        ocets = 1;
       else if (cidr < 17)
-	ocets = 2;
+        ocets = 2;
       else if (cidr < 25)
-	ocets = 3;
+        ocets = 3;
       else
-	ocets = 4;
+        ocets = 4;
 
       if (ocets > 0)
-	{
-	  memcpy (&route->destination.s_addr, q, ocets);
-	  q += ocets;
-	}
+        {
+          memcpy (&route->destination.s_addr, q, ocets);
+          q += ocets;
+        }
 
       /* Now enter the netmask */
       if (ocets > 0)
-	{
-	  memset (&route->netmask.s_addr, 255, ocets - 1);
-	  memset ((unsigned char *) &route->netmask.s_addr + (ocets - 1),
-		  (256 - (1 << (32 - cidr) % 8)), 1);
-	}
+        {
+          memset (&route->netmask.s_addr, 255, ocets - 1);
+          memset ((unsigned char *) &route->netmask.s_addr + (ocets - 1),
+                  (256 - (1 << (32 - cidr) % 8)), 1);
+        }
 
       /* Finally, snag the router */
       memcpy (&route->gateway.s_addr, q, 4);
@@ -416,10 +416,10 @@ static route_t *decodeCSR(const unsigned char *p, int len)
 
       /* We have another route */
       if (q - p < len)
-	{
-	  route->next = xmalloc (sizeof (route_t));
-	  route = route->next;
-	}
+        {
+          route->next = xmalloc (sizeof (route_t));
+          route = route->next;
+        }
     }
 
   return first;
@@ -457,7 +457,7 @@ void free_dhcp (dhcp_t *dhcp)
   if (dhcp->fqdn)
     {
       if (dhcp->fqdn->name)
-	free (dhcp->fqdn->name);
+        free (dhcp->fqdn->name);
       free (dhcp->fqdn);
     }
 }
@@ -470,23 +470,23 @@ static bool dhcp_add_address(address_t **address, const unsigned char *data, int
   for (i = 0; i < length; i += 4)
     {
       if (*address == NULL)
-	{
-	  *address = xmalloc (sizeof (address_t));
-	  p = *address;
-	}
+        {
+          *address = xmalloc (sizeof (address_t));
+          p = *address;
+        }
       else
-	{
-	  p->next = xmalloc (sizeof (address_t));
-	  p = p->next;
-	}
+        {
+          p->next = xmalloc (sizeof (address_t));
+          p = p->next;
+        }
       memset (p, 0, sizeof (address_t));
- 
+
       /* Sanity check */
       if (i + 4 > length)
-	{
-	  logger (LOG_ERR, "invalid address length");
-	  return (false);
-	}
+        {
+          logger (LOG_ERR, "invalid address length");
+          return (false);
+        }
 
       memcpy (&p->address.s_addr, data + i, 4);
     }
@@ -514,7 +514,7 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 
   dhcp->address.s_addr = message->yiaddr;
   strlcpy (dhcp->servername, message->servername,
-		sizeof (dhcp->servername));
+           sizeof (dhcp->servername));
 
 #define LEN_ERR \
     { \
@@ -527,35 +527,35 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
     {
       option = *p++;
       if (!option)
-	continue;
+        continue;
 
       length = *p++;
 
       if (p + length >= end)
-	{
-	  logger (LOG_ERR, "dhcp option exceeds message length");
-	  retval = -1;
-	  goto eexit;
-	}
+        {
+          logger (LOG_ERR, "dhcp option exceeds message length");
+          retval = -1;
+          goto eexit;
+        }
 
       switch (option)
-	{
-	case DHCP_END:
-	  goto eexit;
+        {
+        case DHCP_END:
+          goto eexit;
 
-	case DHCP_MESSAGETYPE:
-	  retval = (int) *p;
-	  p += length;
-	  continue;
+        case DHCP_MESSAGETYPE:
+          retval = (int) *p;
+          p += length;
+          continue;
 
-	default:
-	  if (length == 0)
-	    {
-	      logger (LOG_DEBUG, "option %d has zero length, skipping",
-		      option);
-	      continue;
-	    }
-	}
+        default:
+          if (length == 0)
+            {
+              logger (LOG_DEBUG, "option %d has zero length, skipping",
+                      option);
+              continue;
+            }
+        }
 
 #define LENGTH(_length) \
       if (length != _length) \
@@ -583,38 +583,38 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
       _val = ntohl (_val);
 
       switch (option)
-	{
-	case DHCP_ADDRESS:
-	  GET_UINT32 (dhcp->address.s_addr);
-	  break;
-	case DHCP_NETMASK:
-	  GET_UINT32 (dhcp->netmask.s_addr);
-	  break;
-	case DHCP_BROADCAST:
-	  GET_UINT32 (dhcp->broadcast.s_addr);
-	  break;
-	case DHCP_SERVERIDENTIFIER:
-	  GET_UINT32 (dhcp->serveraddress.s_addr);
-	  break;
-	case DHCP_LEASETIME:
-	  GET_UINT32_H (dhcp->leasetime);
-	  break;
-	case DHCP_RENEWALTIME:
-	  GET_UINT32_H (dhcp->renewaltime);
-	  break;
-	case DHCP_REBINDTIME:
-	  GET_UINT32_H (dhcp->rebindtime);
-	  break;
-	case DHCP_MTU:
-	  GET_UINT16_H (dhcp->mtu);
-	  /* Minimum legal mtu is 68 accoridng to RFC 2132.
-	     In practise it's 576 (minimum maximum message size) */
-	  if (dhcp->mtu < MTU_MIN)
-	    {
-	      logger (LOG_DEBUG, "MTU %d is too low, minium is %d; ignoring", dhcp->mtu, MTU_MIN);
-	      dhcp->mtu = 0;
-	    }
-	  break;
+        {
+        case DHCP_ADDRESS:
+          GET_UINT32 (dhcp->address.s_addr);
+          break;
+        case DHCP_NETMASK:
+          GET_UINT32 (dhcp->netmask.s_addr);
+          break;
+        case DHCP_BROADCAST:
+          GET_UINT32 (dhcp->broadcast.s_addr);
+          break;
+        case DHCP_SERVERIDENTIFIER:
+          GET_UINT32 (dhcp->serveraddress.s_addr);
+          break;
+        case DHCP_LEASETIME:
+          GET_UINT32_H (dhcp->leasetime);
+          break;
+        case DHCP_RENEWALTIME:
+          GET_UINT32_H (dhcp->renewaltime);
+          break;
+        case DHCP_REBINDTIME:
+          GET_UINT32_H (dhcp->rebindtime);
+          break;
+        case DHCP_MTU:
+          GET_UINT16_H (dhcp->mtu);
+          /* Minimum legal mtu is 68 accoridng to RFC 2132.
+             In practise it's 576 (minimum maximum message size) */
+          if (dhcp->mtu < MTU_MIN)
+            {
+              logger (LOG_DEBUG, "MTU %d is too low, minium is %d; ignoring", dhcp->mtu, MTU_MIN);
+              dhcp->mtu = 0;
+            }
+          break;
 
 #undef GET_UINT32_H
 #undef GET_UINT32
@@ -623,98 +623,98 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 #undef GET_UINT8
 
 #define GETSTR(_var) \
-	  MIN_LENGTH (sizeof (char)); \
-	  if (_var) free (_var); \
-	  _var = xmalloc (length + 1); \
-	  memcpy (_var, p, length); \
-	  memset (_var + length, 0, 1);
-	case DHCP_HOSTNAME:
-	  GETSTR (dhcp->hostname);
-	  break;
-	case DHCP_DNSDOMAIN:
-	  GETSTR (dhcp->dnsdomain);
-	  break;
-	case DHCP_MESSAGE:
-	  GETSTR (dhcp->message);
-	  break;
-	case DHCP_ROOTPATH:
-	  GETSTR (dhcp->rootpath);
-	  break;
-	case DHCP_NISDOMAIN:
-	  GETSTR (dhcp->nisdomain);
-	  break;
+          MIN_LENGTH (sizeof (char)); \
+          if (_var) free (_var); \
+          _var = xmalloc (length + 1); \
+          memcpy (_var, p, length); \
+          memset (_var + length, 0, 1);
+        case DHCP_HOSTNAME:
+          GETSTR (dhcp->hostname);
+          break;
+        case DHCP_DNSDOMAIN:
+          GETSTR (dhcp->dnsdomain);
+          break;
+        case DHCP_MESSAGE:
+          GETSTR (dhcp->message);
+          break;
+        case DHCP_ROOTPATH:
+          GETSTR (dhcp->rootpath);
+          break;
+        case DHCP_NISDOMAIN:
+          GETSTR (dhcp->nisdomain);
+          break;
 #undef GETSTR
 
 #define GETADDR(_var) \
-	  MULT_LENGTH (4); \
-	  if (! dhcp_add_address (&_var, p, length)) \
-	    { \
-	      retval = -1; \
-	      goto eexit; \
-	    }
-	case DHCP_DNSSERVER:
-	  GETADDR (dhcp->dnsservers);
-	  break;
-	case DHCP_NTPSERVER:
-	  GETADDR (dhcp->ntpservers);
-	  break;
-	case DHCP_NISSERVER:
-	  GETADDR (dhcp->nisservers);
-	  break;
+          MULT_LENGTH (4); \
+          if (! dhcp_add_address (&_var, p, length)) \
+            { \
+              retval = -1; \
+              goto eexit; \
+            }
+        case DHCP_DNSSERVER:
+          GETADDR (dhcp->dnsservers);
+          break;
+        case DHCP_NTPSERVER:
+          GETADDR (dhcp->ntpservers);
+          break;
+        case DHCP_NISSERVER:
+          GETADDR (dhcp->nisservers);
+          break;
 #undef GETADDR
 
-	case DHCP_DNSSEARCH:
-	  MIN_LENGTH (1);
-	  if (dhcp->dnssearch)
-	    free (dhcp->dnssearch);
-	  if ((len = decode_search (p, length, NULL)) > 0)
-	    {
-	      dhcp->dnssearch = xmalloc (len);
-	      decode_search (p, length, dhcp->dnssearch);
-	    }
-	  break;
+        case DHCP_DNSSEARCH:
+          MIN_LENGTH (1);
+          if (dhcp->dnssearch)
+            free (dhcp->dnssearch);
+          if ((len = decode_search (p, length, NULL)) > 0)
+            {
+              dhcp->dnssearch = xmalloc (len);
+              decode_search (p, length, dhcp->dnssearch);
+            }
+          break;
 
-	case DHCP_CSR:
-	  MIN_LENGTH (5);
-	  if (csr)
-	    free_route (csr);
-	  csr = decodeCSR (p, length);
-	  break;
+        case DHCP_CSR:
+          MIN_LENGTH (5);
+          if (csr)
+            free_route (csr);
+          csr = decodeCSR (p, length);
+          break;
 
-	case DHCP_STATICROUTE:
-	  MULT_LENGTH (8);
-	  for (i = 0; i < length; i += 8)
-	    {
-	      memcpy (&route->destination.s_addr, p + i, 4);
-	      memcpy (&route->gateway.s_addr, p + i + 4, 4);
-	      route->netmask.s_addr = getnetmask (route->destination.s_addr); 
-	      last_route = route;
-	      route->next = xmalloc (sizeof (route_t));
-	      route = route->next;
-	      memset (route, 0, sizeof (route_t));
-	    }
-	  break;
+        case DHCP_STATICROUTE:
+          MULT_LENGTH (8);
+          for (i = 0; i < length; i += 8)
+            {
+              memcpy (&route->destination.s_addr, p + i, 4);
+              memcpy (&route->gateway.s_addr, p + i + 4, 4);
+              route->netmask.s_addr = getnetmask (route->destination.s_addr); 
+              last_route = route;
+              route->next = xmalloc (sizeof (route_t));
+              route = route->next;
+              memset (route, 0, sizeof (route_t));
+            }
+          break;
 
-	case DHCP_ROUTERS:
-	  MULT_LENGTH (4); 
-	  for (i = 0; i < length; i += 4)
-	    {
-	      memcpy (&route->gateway.s_addr, p + i, 4);
-	      last_route = route;
-	      route->next = xmalloc (sizeof (route_t));
-	      route = route->next;
-	      memset (route, 0, sizeof (route_t));
-	    }
-	  break;
+        case DHCP_ROUTERS:
+          MULT_LENGTH (4); 
+          for (i = 0; i < length; i += 4)
+            {
+              memcpy (&route->gateway.s_addr, p + i, 4);
+              last_route = route;
+              route->next = xmalloc (sizeof (route_t));
+              route = route->next;
+              memset (route, 0, sizeof (route_t));
+            }
+          break;
 
 #undef LENGTH
 #undef MIN_LENGTH
 #undef MULT_LENGTH
 
-	default:
-	  logger (LOG_DEBUG, "no facility to parse DHCP code %u", option);
-	  break;
-	}
+        default:
+          logger (LOG_DEBUG, "no facility to parse DHCP code %u", option);
+          break;
+        }
 
       p += length;
     }
@@ -737,15 +737,15 @@ eexit:
     {
       dhcp->routes = first_route;
       if (last_route)
-	{
-	  free (last_route->next);
-	  last_route->next = NULL;
-	}
+        {
+          free (last_route->next);
+          last_route->next = NULL;
+        }
       else
-	{
-	  free_route (dhcp->routes);
-	  dhcp->routes = NULL;
-	}
+        {
+          free_route (dhcp->routes);
+          dhcp->routes = NULL;
+        }
     }
 
   return retval;

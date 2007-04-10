@@ -38,22 +38,22 @@ size_t strlcpy (char *dst, const char *src, size_t size)
   if (n && --n)
     do
       {
-	if (! (*dst++ = *src++))
-	  break;
+        if (! (*dst++ = *src++))
+          break;
       }
     while (--n);
 
   if (! n)
     {
       if (size)
-	*dst = '\0';
+        *dst = '\0';
       while (*src++)
-	;
+        ;
     }
 
   return (src - s - 1);
 }
-  #endif
+#endif
 #endif
 
 /* This requires us to link to rt on glibc, so we use sysinfo instead */

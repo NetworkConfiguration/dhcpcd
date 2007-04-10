@@ -86,8 +86,8 @@ static uint16_t checksum (unsigned char *addr, uint16_t len)
 }
 
 void make_dhcp_packet(struct udp_dhcp_packet *packet,
-		      const unsigned char *data, int length,
-		      struct in_addr source, struct in_addr dest)
+                      const unsigned char *data, int length,
+                      struct in_addr source, struct in_addr dest)
 {
   struct ip *ip = &packet->ip;
   struct udphdr *udp = &packet->udp;
@@ -115,14 +115,14 @@ void make_dhcp_packet(struct udp_dhcp_packet *packet,
   udp->uh_ulen = htons (sizeof (struct udphdr) + length);
   ip->ip_len = udp->uh_ulen;
   udp->uh_sum = checksum ((unsigned char *) packet,
-			  sizeof (struct udp_dhcp_packet));
+                          sizeof (struct udp_dhcp_packet));
 
   ip->ip_v = IPVERSION;
   ip->ip_hl = 5;
   ip->ip_id = 0;
   ip->ip_tos = IPTOS_LOWDELAY;
   ip->ip_len = htons (sizeof (struct ip) + sizeof (struct udphdr) +
-		      length);
+                      length);
   ip->ip_id = 0;
   ip->ip_off = 0;
   ip->ip_ttl = IPDEFTTL;
@@ -268,7 +268,7 @@ int open_socket (interface_t *iface, bool arp)
   if (ioctl (fd, BIOCSETIF, &ifr) < 0)
     {
       logger (LOG_ERR, "cannot attach interface `%s' to bpf device `%s': %s",
-	      iface->name, device, strerror (errno));
+              iface->name, device, strerror (errno));
       close (fd);
       return -1;
     }
@@ -316,7 +316,7 @@ int open_socket (interface_t *iface, bool arp)
 }
 
 int send_packet (const interface_t *iface, int type,
-		 const unsigned char *data, int len)
+                 const unsigned char *data, int len)
 {
   int retval = -1;
   struct iovec iov[2];
@@ -348,7 +348,7 @@ int send_packet (const interface_t *iface, int type,
 /* BPF requires that we read the entire buffer.
    So we pass the buffer in the API so we can loop on >1 dhcp packet. */
 int get_packet (const interface_t *iface, unsigned char *data,
-		unsigned char *buffer, int *buffer_len, int *buffer_pos)
+                unsigned char *buffer, int *buffer_len, int *buffer_pos)
 {
   union
     {
@@ -364,14 +364,14 @@ int get_packet (const interface_t *iface, unsigned char *data,
       *buffer_len = read (iface->fd, bpf.buffer, iface->buffer_length);
       *buffer_pos = 0;
       if (*buffer_len < 1)
-	{
-	  struct timeval tv;
-	  logger (LOG_ERR, "read: %s", strerror (errno));
-	  tv.tv_sec = 3;
-	  tv.tv_usec = 0;
-	  select (0, NULL, NULL, NULL, &tv);
-	  return -1;
-	}
+        {
+          struct timeval tv;
+          logger (LOG_ERR, "read: %s", strerror (errno));
+          tv.tv_sec = 3;
+          tv.tv_usec = 0;
+          select (0, NULL, NULL, NULL, &tv);
+          return -1;
+        }
     }
   else
     bpf.buffer += *buffer_pos;
@@ -380,55 +380,55 @@ int get_packet (const interface_t *iface, unsigned char *data,
     {
       int len = -1;
       union
-	{
-	  unsigned char *buffer;
-	  struct ether_header *hw;
-	} hdr;
+        {
+          unsigned char *buffer;
+          struct ether_header *hw;
+        } hdr;
       unsigned char *payload;
 
       /* Ensure that the entire packet is in our buffer */
       if (*buffer_pos + bpf.packet->bh_hdrlen + bpf.packet->bh_caplen
-	  > (unsigned) *buffer_len)
-	break;
+          > (unsigned) *buffer_len)
+        break;
 
       hdr.buffer = bpf.buffer + bpf.packet->bh_hdrlen;
       payload = hdr.buffer + sizeof (struct ether_header);
 
       /* If it's an ARP reply, then just send it back */
       if (hdr.hw->ether_type == htons (ETHERTYPE_ARP))
-	{
-	  len = bpf.packet->bh_caplen - sizeof (struct ether_header);
-	  memcpy (data, payload, len);
-	}
+        {
+          len = bpf.packet->bh_caplen - sizeof (struct ether_header);
+          memcpy (data, payload, len);
+        }
       else
-	{
-	  if (valid_dhcp_packet (payload) >= 0)
-	    {
-	      union
-		{
-		  unsigned char *buffer;
-		  struct udp_dhcp_packet *packet;
-		} pay;
-	      pay.buffer = payload;
-	      len = ntohs (pay.packet->ip.ip_len) - sizeof (struct ip) -
-	       sizeof (struct udphdr);
-	      memcpy (data, &pay.packet->dhcp, len);
-	    }
-	}
+        {
+          if (valid_dhcp_packet (payload) >= 0)
+            {
+              union
+                {
+                  unsigned char *buffer;
+                  struct udp_dhcp_packet *packet;
+                } pay;
+              pay.buffer = payload;
+              len = ntohs (pay.packet->ip.ip_len) - sizeof (struct ip) -
+               sizeof (struct udphdr);
+              memcpy (data, &pay.packet->dhcp, len);
+            }
+        }
 
       /* Update the buffer_pos pointer */
       bpf.buffer +=
        BPF_WORDALIGN (bpf.packet->bh_hdrlen + bpf.packet->bh_caplen);
       if (bpf.buffer - buffer <  *buffer_len)
-	*buffer_pos = bpf.buffer - buffer;
+        *buffer_pos = bpf.buffer - buffer;
       else
-	*buffer_pos = 0;
+        *buffer_pos = 0;
 
       if (len != -1)
-	return len;
+        return len;
 
       if (*buffer_pos == 0)
-	break;
+        break;
     }
 
   /* No valid packets left, so return */
@@ -469,7 +469,7 @@ int open_socket (interface_t *iface, bool arp)
   if (! (sll.sll_ifindex = if_nametoindex (iface->name)))
     {
       logger (LOG_ERR, "if_nametoindex: Couldn't find index for interface `%s'",
-	      iface->name);
+              iface->name);
       close (fd);
       return -1;
     }
@@ -492,7 +492,7 @@ int open_socket (interface_t *iface, bool arp)
 }
 
 int send_packet (const interface_t *iface, const int type,
-		 const unsigned char *data, const int len)
+                 const unsigned char *data, const int len)
 {
   struct sockaddr_ll sll;
   int retval;
@@ -506,14 +506,14 @@ int send_packet (const interface_t *iface, const int type,
   if (! (sll.sll_ifindex = if_nametoindex (iface->name)))
     {
       logger (LOG_ERR, "if_nametoindex: Couldn't find index for interface `%s'",
-	      iface->name);
+              iface->name);
       return -1;
     }
   sll.sll_halen = ETHER_ADDR_LEN;
   memset(sll.sll_addr, 0xff, sizeof (sll.sll_addr));
 
   if ((retval = sendto (iface->fd, data, len, 0, (struct sockaddr *) &sll,
-			sizeof (struct sockaddr_ll))) < 0)
+                        sizeof (struct sockaddr_ll))) < 0)
 
     logger (LOG_ERR, "sendto: %s", strerror (errno));
   return retval;
@@ -522,7 +522,7 @@ int send_packet (const interface_t *iface, const int type,
 /* Linux has no need for the buffer as we can read as much as we want.
    We only have the buffer listed to keep the same API. */
 int get_packet (const interface_t *iface, unsigned char *data,
-		unsigned char *buffer, int *buffer_len, int *buffer_pos)
+                unsigned char *buffer, int *buffer_len, int *buffer_pos)
 {
   long bytes;
   union
@@ -585,7 +585,7 @@ int get_packet (const interface_t *iface, unsigned char *data,
     return -1;
 
   memcpy(data, &pay.packet->dhcp,
-	 bytes - (sizeof (pay.packet->ip) + sizeof (pay.packet->udp)));
+         bytes - (sizeof (pay.packet->ip) + sizeof (pay.packet->udp)));
 
   return bytes - (sizeof (pay.packet->ip) + sizeof (pay.packet->udp));
 }
