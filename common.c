@@ -32,26 +32,23 @@
 #  if ! defined(__UCLIBC__) && ! defined (__dietlibc__)
 size_t strlcpy (char *dst, const char *src, size_t size)
 {
-  const char *s = src;
-  size_t n = size;
+	const char *s = src;
+	size_t n = size;
 
-  if (n && --n)
-    do
-      {
-        if (! (*dst++ = *src++))
-          break;
-      }
-    while (--n);
+	if (n && --n)
+		do {
+			if (! (*dst++ = *src++))
+				break;
+		} while (--n);
 
-  if (! n)
-    {
-      if (size)
-        *dst = '\0';
-      while (*src++)
-        ;
-    }
+	if (! n) {
+		if (size)
+			*dst = '\0';
+		while (*src++)
+			;
+	}
 
-  return (src - s - 1);
+	return (src - s - 1);
 }
 #endif
 #endif
@@ -61,54 +58,52 @@ size_t strlcpy (char *dst, const char *src, size_t size)
 #include <sys/sysinfo.h>
 long uptime (void)
 {
-  struct sysinfo info;
+	struct sysinfo info;
 
-  sysinfo (&info);
-  return info.uptime;
+	sysinfo (&info);
+	return info.uptime;
 }
 #elif __APPLE__
 /* Darwin doesn't appear to have an uptime, so try and make one ourselves */
 #include <sys/time.h>
 long uptime (void)
 {
-  struct timeval tv;
-  static long start = 0;
+	struct timeval tv;
+	static long start = 0;
 
-  if (gettimeofday (&tv, NULL) == -1)
-    {
-      logger (LOG_ERR, "gettimeofday: %s", strerror (errno));
-      return -1;
-    }
+	if (gettimeofday (&tv, NULL) == -1) {
+		logger (LOG_ERR, "gettimeofday: %s", strerror (errno));
+		return -1;
+	}
 
-  if (start == 0)
-    start = tv.tv_sec;
+	if (start == 0)
+		start = tv.tv_sec;
 
-  return tv.tv_sec - start;
+	return tv.tv_sec - start;
 }
 #else
 #include <time.h>
 long uptime (void)
 {
-  struct timespec tp;
+	struct timespec tp;
 
-  if (clock_gettime(CLOCK_MONOTONIC, &tp) == -1)
-    {
-      logger (LOG_ERR, "clock_gettime: %s", strerror (errno));
-      return -1;
-    }
+	if (clock_gettime(CLOCK_MONOTONIC, &tp) == -1) {
+		logger (LOG_ERR, "clock_gettime: %s", strerror (errno));
+		return -1;
+	}
 
-  return tp.tv_sec;
+	return tp.tv_sec;
 }
 #endif
 
 void *xmalloc (size_t size)
 {
-  void *value = malloc (size);
+	void *value = malloc (size);
 
-  if (value)
-    return value;
+	if (value)
+		return value;
 
-  logger (LOG_ERR, "memory exhausted");
-  exit (1);
+	logger (LOG_ERR, "memory exhausted");
+	exit (1);
 }
 

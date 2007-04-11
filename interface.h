@@ -46,42 +46,42 @@
 
 typedef struct route_t
 {
-  struct in_addr destination; 
-  struct in_addr netmask;
-  struct in_addr gateway;
-  struct route_t *next;
+	struct in_addr destination; 
+	struct in_addr netmask;
+	struct in_addr gateway;
+	struct route_t *next;
 } route_t;
 
 typedef struct address_t
 {
-  struct in_addr address;
-  struct address_t *next;
+	struct in_addr address;
+	struct address_t *next;
 } address_t;
 
 typedef struct interface_t
 {
-  char name[IF_NAMESIZE];
-  sa_family_t family;
-  unsigned char hwaddr[20];
-  int hwlen;
-  bool arpable;
-  unsigned short mtu;
+	char name[IF_NAMESIZE];
+	sa_family_t family;
+	unsigned char hwaddr[20];
+	int hwlen;
+	bool arpable;
+	unsigned short mtu;
 
-  int fd;
-  int buffer_length;
+	int fd;
+	int buffer_length;
 
 #ifdef __linux__
-  int socket_protocol;
+	int socket_protocol;
 #endif
 
-  char infofile[PATH_MAX];
+	char infofile[PATH_MAX];
 
-  unsigned short previous_mtu;
-  struct in_addr previous_address;
-  struct in_addr previous_netmask;
-  route_t *previous_routes;
-  
-  long start_uptime;
+	unsigned short previous_mtu;
+	struct in_addr previous_address;
+	struct in_addr previous_netmask;
+	route_t *previous_routes;
+
+	long start_uptime;
 } interface_t;
 
 void free_address (address_t *addresses);
@@ -91,17 +91,17 @@ int get_mtu (const char *ifname);
 int set_mtu (const char *ifname, short int mtu);
 
 int add_address (const char *ifname, struct in_addr address,
-		 struct in_addr netmask, struct in_addr broadcast);
+				 struct in_addr netmask, struct in_addr broadcast);
 int del_address (const char *ifname, struct in_addr address,
-		 struct in_addr netmask);
+				 struct in_addr netmask);
 int flush_addresses (const char *ifname);
 
 int add_route (const char *ifname, struct in_addr destination,
-	       struct in_addr netmask, struct in_addr gateway, int metric);
+			   struct in_addr netmask, struct in_addr gateway, int metric);
 int change_route (const char *ifname, struct in_addr destination,
-		  struct in_addr netmask, struct in_addr gateway, int metric);
+				  struct in_addr netmask, struct in_addr gateway, int metric);
 int del_route (const char *ifname, struct in_addr destination,
-	       struct in_addr netmask, struct in_addr gateway, int metric);
+			   struct in_addr netmask, struct in_addr gateway, int metric);
 
 int inet_ntocidr (struct in_addr address);
 char *hwaddr_ntoa (const unsigned char *hwaddr, int hwlen);

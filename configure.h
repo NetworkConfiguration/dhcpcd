@@ -24,7 +24,7 @@
 
 /* If you disable all 3 options you can shrink the binary by around 5-10k
    unstripped depending on platform and CFLAGS
-*/
+   */
 #define ENABLE_NTP
 #define ENABLE_NIS
 #define ENABLE_INFO
@@ -34,6 +34,6 @@
 #include "dhcp.h"
 
 int configure (const options_t *options, interface_t *iface,
-	       const dhcp_t *dhcp);
+			   const dhcp_t *dhcp);
 
 #endif

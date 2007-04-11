@@ -59,43 +59,43 @@
 /* DHCP options */
 enum DHCP_OPTIONS
 {
-  DHCP_PAD				=	0,
-  DHCP_NETMASK				=	1,
-  DHCP_TIMEROFFSET			=	2,
-  DHCP_ROUTERS				=	3,
-  DHCP_TIMESERVER			=	4,
-  DHCP_NAMESERVER			=	5,
-  DHCP_DNSSERVER			=	6,
-  DHCP_LOGSERVER			=	7,
-  DHCP_COOKIESERVER			=	8,
-  DHCP_HOSTNAME				=	12,
-  DHCP_DNSDOMAIN			=	15,
-  DHCP_ROOTPATH				=	17,
-  DHCP_DEFAULTIPTTL			=	23,
-  DHCP_MTU				=	26,
-  DHCP_BROADCAST			=	28,
-  DHCP_MASKDISCOVERY			=	29,
-  DHCP_ROUTERDISCOVERY			=	31,
-  DHCP_STATICROUTE			=	33,
-  DHCP_NISDOMAIN			=	40,
-  DHCP_NISSERVER			=	41,
-  DHCP_NTPSERVER			=	42,
-  DHCP_ADDRESS				=	50,
-  DHCP_LEASETIME			=	51,
-  DHCP_MESSAGETYPE			=	53,
-  DHCP_SERVERIDENTIFIER			=	54,
-  DHCP_PARAMETERREQUESTLIST		=	55,
-  DHCP_MESSAGE				=	56,
-  DHCP_MAXMESSAGESIZE			=	57,
-  DHCP_RENEWALTIME			=	58,
-  DHCP_REBINDTIME			=	59,
-  DHCP_CLASSID				=	60,
-  DHCP_CLIENTID				=	61,
-  DHCP_USERCLASS			=	77,  /* RFC 3004 */
-  DHCP_FQDN				=	81,
-  DHCP_DNSSEARCH			=       119, /* RFC 3397 */
-  DHCP_CSR				=	121, /* RFC 3442 */
-  DHCP_END				=	255
+	DHCP_PAD				=	0,
+	DHCP_NETMASK				=	1,
+	DHCP_TIMEROFFSET			=	2,
+	DHCP_ROUTERS				=	3,
+	DHCP_TIMESERVER			=	4,
+	DHCP_NAMESERVER			=	5,
+	DHCP_DNSSERVER			=	6,
+	DHCP_LOGSERVER			=	7,
+	DHCP_COOKIESERVER			=	8,
+	DHCP_HOSTNAME				=	12,
+	DHCP_DNSDOMAIN			=	15,
+	DHCP_ROOTPATH				=	17,
+	DHCP_DEFAULTIPTTL			=	23,
+	DHCP_MTU				=	26,
+	DHCP_BROADCAST			=	28,
+	DHCP_MASKDISCOVERY			=	29,
+	DHCP_ROUTERDISCOVERY			=	31,
+	DHCP_STATICROUTE			=	33,
+	DHCP_NISDOMAIN			=	40,
+	DHCP_NISSERVER			=	41,
+	DHCP_NTPSERVER			=	42,
+	DHCP_ADDRESS				=	50,
+	DHCP_LEASETIME			=	51,
+	DHCP_MESSAGETYPE			=	53,
+	DHCP_SERVERIDENTIFIER			=	54,
+	DHCP_PARAMETERREQUESTLIST		=	55,
+	DHCP_MESSAGE				=	56,
+	DHCP_MAXMESSAGESIZE			=	57,
+	DHCP_RENEWALTIME			=	58,
+	DHCP_REBINDTIME			=	59,
+	DHCP_CLASSID				=	60,
+	DHCP_CLIENTID				=	61,
+	DHCP_USERCLASS			=	77,  /* RFC 3004 */
+	DHCP_FQDN				=	81,
+	DHCP_DNSSEARCH			=       119, /* RFC 3397 */
+	DHCP_CSR				=	121, /* RFC 3442 */
+	DHCP_END				=	255
 };
 
 /* SetFQDNHostName values - lsnybble used in flags
@@ -103,53 +103,53 @@ enum DHCP_OPTIONS
  * and to allow 0x00 to mean disable
  */
 enum FQQN {
-  FQDN_DISABLE				=	0x00,
-  FQDN_NONE				=	0x18,
-  FQDN_PTR				=	0x20,
-  FQDN_BOTH				=	0x31
+	FQDN_DISABLE				=	0x00,
+	FQDN_NONE				=	0x18,
+	FQDN_PTR				=	0x20,
+	FQDN_BOTH				=	0x31
 };
 
 typedef struct fqdn_t
 {
-  uint8_t flags;
-  uint8_t r1;
-  uint8_t r2;
-  char *name;
+	uint8_t flags;
+	uint8_t r1;
+	uint8_t r2;
+	char *name;
 } fqdn_t;
 
 typedef struct dhcp_t
 {
-  char version[11];
+	char version[11];
 
-  struct in_addr serveraddress;
-  char serverhw[IF_NAMESIZE];
-  char servername[64];
-  
-  struct in_addr address;
-  struct in_addr netmask;
-  struct in_addr broadcast;
-  unsigned short mtu;
+	struct in_addr serveraddress;
+	char serverhw[IF_NAMESIZE];
+	char servername[64];
 
-  unsigned int leasetime;
-  unsigned int renewaltime;
-  unsigned int rebindtime;
-  
-  route_t *routes;
+	struct in_addr address;
+	struct in_addr netmask;
+	struct in_addr broadcast;
+	unsigned short mtu;
 
-  char *hostname;
-  fqdn_t *fqdn;
- 
-  address_t *dnsservers;
-  char *dnsdomain;
-  char *dnssearch;
-  
-  address_t *ntpservers;
+	unsigned int leasetime;
+	unsigned int renewaltime;
+	unsigned int rebindtime;
 
-  address_t *nisservers;
-  char *nisdomain;
+	route_t *routes;
 
-  char *message;
-  char *rootpath;
+	char *hostname;
+	fqdn_t *fqdn;
+
+	address_t *dnsservers;
+	char *dnsdomain;
+	char *dnssearch;
+
+	address_t *ntpservers;
+
+	address_t *nisservers;
+	char *nisdomain;
+
+	char *message;
+	char *rootpath;
 } dhcp_t;
 
 /* Sizes for DHCP options */
@@ -160,40 +160,40 @@ typedef struct dhcp_t
 #define DHCP_BASE_LEN		(4 + 4 + 2 + 2 + 4 + 4 + 4 + 4 + 4)
 #define DHCP_RESERVE_LEN	(4 + 4 + 4 + 4 + 2)
 #define DHCP_FIXED_LEN		(DHCP_BASE_LEN + DHCP_CHADDR_LEN + \
-				+ SERVERNAME_LEN + BOOTFILE_LEN)
+							 + SERVERNAME_LEN + BOOTFILE_LEN)
 #define DHCP_OPTION_LEN		(MTU_MAX - DHCP_FIXED_LEN - DHCP_UDP_LEN \
-				 - DHCP_RESERVE_LEN)
+							 - DHCP_RESERVE_LEN)
 
 typedef struct dhcpmessage_t
 {
-  unsigned char op;				/* message type */
-  unsigned char hwtype;				/* hardware address type */
-  unsigned char hwlen;				/* hardware address length */
-  unsigned char hwopcount;			/* should be zero in client's message */
-  int32_t xid;				/* transaction id */
-  int16_t secs;				/* elapsed time in sec. from trying to boot */
-  int16_t flags;
-  int32_t ciaddr;			/* (previously allocated) client IP address */
-  int32_t yiaddr;			/* 'your' client IP address */
-  int32_t siaddr;			/* should be zero in client's messages */
-  int32_t giaddr;			/* should be zero in client's messages */
-  unsigned char chaddr[DHCP_CHADDR_LEN];	/* client's hardware address */
-  char servername[SERVERNAME_LEN];	/* server host name, null terminated string */
-  char bootfile[BOOTFILE_LEN];		/* boot file name, null terminated string */
-  uint32_t cookie;
-  unsigned char options[DHCP_OPTION_LEN];	/* message options - cookie */
+	unsigned char op;				/* message type */
+	unsigned char hwtype;				/* hardware address type */
+	unsigned char hwlen;				/* hardware address length */
+	unsigned char hwopcount;			/* should be zero in client's message */
+	int32_t xid;				/* transaction id */
+	int16_t secs;				/* elapsed time in sec. from trying to boot */
+	int16_t flags;
+	int32_t ciaddr;			/* (previously allocated) client IP address */
+	int32_t yiaddr;			/* 'your' client IP address */
+	int32_t siaddr;			/* should be zero in client's messages */
+	int32_t giaddr;			/* should be zero in client's messages */
+	unsigned char chaddr[DHCP_CHADDR_LEN];	/* client's hardware address */
+	char servername[SERVERNAME_LEN];	/* server host name, null terminated string */
+	char bootfile[BOOTFILE_LEN];		/* boot file name, null terminated string */
+	uint32_t cookie;
+	unsigned char options[DHCP_OPTION_LEN];	/* message options - cookie */
 } dhcpmessage_t;
 
 struct udp_dhcp_packet
 {
-  struct ip ip;
-  struct udphdr udp;
-  dhcpmessage_t dhcp;
+	struct ip ip;
+	struct udphdr udp;
+	dhcpmessage_t dhcp;
 };
 
 size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
-		     unsigned long xid, char type,
-		     const options_t *options);
+					 unsigned long xid, char type,
+					 const options_t *options);
 void free_dhcp (dhcp_t *dhcp);
 int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message);
 

@@ -36,39 +36,38 @@ static int signal_pipe[2];
 
 static void signal_handler (int sig)
 {
-  /* Silently ignore this signal and wait for it. This stops zombies.
-     We do this here instead of client.c so that we don't spam the log file
-     with "waiting on select messages" */
-  if (sig == SIGCHLD)
-    {
-      wait (0);
-      return;
-    }
+	/* Silently ignore this signal and wait for it. This stops zombies.
+	   We do this here instead of client.c so that we don't spam the log file
+	   with "waiting on select messages" */
+	if (sig == SIGCHLD) {
+		wait (0);
+		return;
+	}
 
-  if (send (signal_pipe[1], &sig, sizeof (sig), MSG_DONTWAIT) < 0)
-    logger (LOG_ERR, "Could not send signal: %s", strerror (errno));
+	if (send (signal_pipe[1], &sig, sizeof (sig), MSG_DONTWAIT) < 0)
+		logger (LOG_ERR, "Could not send signal: %s", strerror (errno));
 }
 
 /* Call this before doing anything else. Sets up the socket pair
  * and installs the signal handler */
 void signal_setup(void)
 {
-  int i;
-  int flags;
+	int i;
+	int flags;
 
-  socketpair (AF_UNIX, SOCK_STREAM, 0, signal_pipe);
+	socketpair (AF_UNIX, SOCK_STREAM, 0, signal_pipe);
 
-  /* Stop any scripts from inheriting us */
-  for (i = 0; i < 2; i++)
-    if ((flags = fcntl (signal_pipe[i], F_GETFD, 0)) < 0 ||
-        fcntl (signal_pipe[i], F_SETFD, flags | FD_CLOEXEC) < 0)
-      logger (LOG_ERR ,"fcntl: %s", strerror (errno));
+	/* Stop any scripts from inheriting us */
+	for (i = 0; i < 2; i++)
+		if ((flags = fcntl (signal_pipe[i], F_GETFD, 0)) < 0 ||
+			fcntl (signal_pipe[i], F_SETFD, flags | FD_CLOEXEC) < 0)
+			logger (LOG_ERR ,"fcntl: %s", strerror (errno));
 
-  signal (SIGHUP, signal_handler);
-  signal (SIGALRM, signal_handler);
-  signal (SIGTERM, signal_handler);
-  signal (SIGINT, signal_handler);
-  signal (SIGCHLD, signal_handler);
+	signal (SIGHUP, signal_handler);
+	signal (SIGALRM, signal_handler);
+	signal (SIGTERM, signal_handler);
+	signal (SIGINT, signal_handler);
+	signal (SIGCHLD, signal_handler);
 }
 
 /* Quick little function to setup the rfds. Will return the
@@ -76,11 +75,11 @@ void signal_setup(void)
  * one extra fd */
 int signal_fd_set (fd_set *rfds, int extra_fd)
 {
-  FD_ZERO (rfds);
-  FD_SET (signal_pipe[0], rfds);
-  if (extra_fd >= 0)
-    FD_SET (extra_fd, rfds);
-  return signal_pipe[0] > extra_fd ? signal_pipe[0] : extra_fd;
+	FD_ZERO (rfds);
+	FD_SET (signal_pipe[0], rfds);
+	if (extra_fd >= 0)
+		FD_SET (extra_fd, rfds);
+	return signal_pipe[0] > extra_fd ? signal_pipe[0] : extra_fd;
 }
 
 /* Read a signal from the signal pipe. Returns 0 if there is
@@ -88,14 +87,14 @@ int signal_fd_set (fd_set *rfds, int extra_fd)
  * your signal on success */
 int signal_read (const fd_set *rfds)
 {
-  int sig;
+	int sig;
 
-  if (! FD_ISSET (signal_pipe[0], rfds))
-    return 0;
+	if (! FD_ISSET (signal_pipe[0], rfds))
+		return 0;
 
-  if (read (signal_pipe[0], &sig, sizeof (sig)) < 0)
-    return -1;
+	if (read (signal_pipe[0], &sig, sizeof (sig)) < 0)
+		return -1;
 
-  return sig;
+	return sig;
 }
 

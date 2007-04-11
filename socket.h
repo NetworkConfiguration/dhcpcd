@@ -29,12 +29,12 @@
 #include "interface.h"
 
 void make_dhcp_packet(struct udp_dhcp_packet *packet,
-		      const unsigned char *data, int length,
-		      struct in_addr source, struct in_addr dest);
+					  const unsigned char *data, int length,
+					  struct in_addr source, struct in_addr dest);
 
 int open_socket (interface_t *iface, bool arp);
 int send_packet (const interface_t *iface, int type,
-		 const unsigned char *data, int len);
+				 const unsigned char *data, int len);
 int get_packet (const interface_t *iface, unsigned char *data,
-		unsigned char *buffer, int *buffer_len, int *buffer_pos);
+				unsigned char *buffer, int *buffer_len, int *buffer_pos);
 #endif

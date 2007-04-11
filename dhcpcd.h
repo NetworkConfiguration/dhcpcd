@@ -38,33 +38,33 @@
 #define USERCLASS_MAX_LEN	255	
 
 typedef struct options_t {
-  char interface[IF_NAMESIZE];
-  char hostname[HOSTNAME_MAX_LEN];
-  int fqdn;
-  char classid[CLASS_ID_MAX_LEN];
-  char clientid[CLIENT_ID_MAX_LEN];
-  char userclass[USERCLASS_MAX_LEN];
-  int userclass_len;
-  unsigned leasetime;
-  time_t timeout;
-  int metric;
-  struct in_addr requestaddress;
+	char interface[IF_NAMESIZE];
+	char hostname[HOSTNAME_MAX_LEN];
+	int fqdn;
+	char classid[CLASS_ID_MAX_LEN];
+	char clientid[CLIENT_ID_MAX_LEN];
+	char userclass[USERCLASS_MAX_LEN];
+	int userclass_len;
+	unsigned leasetime;
+	time_t timeout;
+	int metric;
+	struct in_addr requestaddress;
 
-  bool doarp;
-  bool dodns;
-  bool dodomainname;
-  bool dogateway;
-  bool dohostname;
-  bool domtu;
-  bool donis;
-  bool dontp;
-  
-  int signal;
-  bool persistent;
-  bool daemonise;
+	bool doarp;
+	bool dodns;
+	bool dodomainname;
+	bool dogateway;
+	bool dohostname;
+	bool domtu;
+	bool donis;
+	bool dontp;
 
-  char *script;
-  char pidfile[PATH_MAX];
+	int signal;
+	bool persistent;
+	bool daemonise;
+
+	char *script;
+	char pidfile[PATH_MAX];
 } options_t;
 
 void make_pid (const char *pidfile);
