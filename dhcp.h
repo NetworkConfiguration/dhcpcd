@@ -33,70 +33,70 @@
 
 
 /* Max MTU - defines dhcp option length */
-#define MTU_MAX				1500
-#define MTU_MIN				576
+#define MTU_MAX             1500
+#define MTU_MIN             576
 
 /* UDP port numbers for DHCP */
-#define DHCP_SERVER_PORT 	67
-#define DHCP_CLIENT_PORT 	68
+#define DHCP_SERVER_PORT    67
+#define DHCP_CLIENT_PORT    68
 
-#define MAGIC_COOKIE		0x63825363
-#define BROADCAST_FLAG 		0x8000
+#define MAGIC_COOKIE        0x63825363
+#define BROADCAST_FLAG      0x8000
 
 /* DHCP message OP code */
-#define DHCP_BOOTREQUEST	1
-#define DHCP_BOOTREPLY		2
+#define DHCP_BOOTREQUEST    1
+#define DHCP_BOOTREPLY      2
 
 /* DHCP message type */
-#define	DHCP_DISCOVER		1
-#define DHCP_OFFER			2
-#define	DHCP_REQUEST		3
-#define	DHCP_DECLINE		4
-#define	DHCP_ACK			5
-#define DHCP_NAK			6
-#define	DHCP_RELEASE		7
-#define DHCP_INFORM			8
+#define DHCP_DISCOVER       1
+#define DHCP_OFFER          2
+#define DHCP_REQUEST        3
+#define DHCP_DECLINE        4
+#define DHCP_ACK            5
+#define DHCP_NAK            6
+#define DHCP_RELEASE        7
+#define DHCP_INFORM         8
 
 /* DHCP options */
 enum DHCP_OPTIONS
 {
-	DHCP_PAD					=	0,
-	DHCP_NETMASK				=	1,
-	DHCP_TIMEROFFSET			=	2,
-	DHCP_ROUTERS				=	3,
-	DHCP_TIMESERVER				=	4,
-	DHCP_NAMESERVER				=	5,
-	DHCP_DNSSERVER				=	6,
-	DHCP_LOGSERVER				=	7,
-	DHCP_COOKIESERVER			=	8,
-	DHCP_HOSTNAME				=	12,
-	DHCP_DNSDOMAIN				=	15,
-	DHCP_ROOTPATH				=	17,
-	DHCP_DEFAULTIPTTL			=	23,
-	DHCP_MTU					=	26,
-	DHCP_BROADCAST				=	28,
-	DHCP_MASKDISCOVERY			=	29,
-	DHCP_ROUTERDISCOVERY		=	31,
-	DHCP_STATICROUTE			=	33,
-	DHCP_NISDOMAIN				=	40,
-	DHCP_NISSERVER				=	41,
-	DHCP_NTPSERVER				=	42,
-	DHCP_ADDRESS				=	50,
-	DHCP_LEASETIME				=	51,
-	DHCP_MESSAGETYPE			=	53,
-	DHCP_SERVERIDENTIFIER		=	54,
-	DHCP_PARAMETERREQUESTLIST	=	55,
-	DHCP_MESSAGE				=	56,
-	DHCP_MAXMESSAGESIZE			=	57,
-	DHCP_RENEWALTIME			=	58,
-	DHCP_REBINDTIME				=	59,
-	DHCP_CLASSID				=	60,
-	DHCP_CLIENTID				=	61,
-	DHCP_USERCLASS				=	77,  /* RFC 3004 */
-	DHCP_FQDN					=	81,
-	DHCP_DNSSEARCH				=	119, /* RFC 3397 */
-	DHCP_CSR					=	121, /* RFC 3442 */
-	DHCP_END					=	255
+	DHCP_PAD                    = 0,
+	DHCP_NETMASK                = 1,
+	DHCP_TIMEROFFSET            = 2,
+	DHCP_ROUTERS                = 3,
+	DHCP_TIMESERVER             = 4,
+	DHCP_NAMESERVER             = 5,
+	DHCP_DNSSERVER              = 6,
+	DHCP_LOGSERVER              = 7,
+	DHCP_COOKIESERVER           = 8,
+	DHCP_HOSTNAME               = 12,
+	DHCP_DNSDOMAIN              = 15,
+	DHCP_ROOTPATH               = 17,
+	DHCP_DEFAULTIPTTL           = 23,
+	DHCP_MTU                    = 26,
+	DHCP_BROADCAST              = 28,
+	DHCP_MASKDISCOVERY          = 29,
+	DHCP_ROUTERDISCOVERY        = 31,
+	DHCP_STATICROUTE            = 33,
+	DHCP_NISDOMAIN              = 40,
+	DHCP_NISSERVER              = 41,
+	DHCP_NTPSERVER              = 42,
+	DHCP_ADDRESS                = 50,
+	DHCP_LEASETIME              = 51,
+	DHCP_MESSAGETYPE            = 53,
+	DHCP_SERVERIDENTIFIER       = 54,
+	DHCP_PARAMETERREQUESTLIST   = 55,
+	DHCP_MESSAGE                = 56,
+	DHCP_MAXMESSAGESIZE         = 57,
+	DHCP_RENEWALTIME            = 58,
+	DHCP_REBINDTIME             = 59,
+	DHCP_CLASSID                = 60,
+	DHCP_CLIENTID               = 61,
+	DHCP_USERCLASS              = 77,  /* RFC 3004 */
+	DHCP_FQDN                   = 81,
+	DHCP_DNSSEARCH              = 119, /* RFC 3397 */
+	DHCP_CSR                    = 121, /* RFC 3442 */
+	DHCP_END                    = 255
 };
 
 /* SetFQDNHostName values - lsnybble used in flags
@@ -104,10 +104,10 @@ enum DHCP_OPTIONS
  * and to allow 0x00 to mean disable
  */
 enum FQQN {
-	FQDN_DISABLE			=	0x00,
-	FQDN_NONE				=	0x18,
-	FQDN_PTR				=	0x20,
-	FQDN_BOTH				=	0x31
+	FQDN_DISABLE    = 0x00,
+	FQDN_NONE       = 0x18,
+	FQDN_PTR        = 0x20,
+	FQDN_BOTH       = 0x31
 };
 
 typedef struct fqdn_t
@@ -156,38 +156,38 @@ typedef struct dhcp_t
 
 
 /* Sizes for DHCP options */
-#define DHCP_CHADDR_LEN			16
-#define SERVERNAME_LEN			64
-#define BOOTFILE_LEN			128
-#define DHCP_UDP_LEN			(20 + 8)
-#define DHCP_BASE_LEN			(4 + 4 + 2 + 2 + 4 + 4 + 4 + 4 + 4)
-#define DHCP_RESERVE_LEN		(4 + 4 + 4 + 4 + 2)
-#define DHCP_FIXED_LEN			(DHCP_BASE_LEN + DHCP_CHADDR_LEN + \
-							 	+ SERVERNAME_LEN + BOOTFILE_LEN)
-#define DHCP_OPTION_LEN			(MTU_MAX - DHCP_FIXED_LEN - DHCP_UDP_LEN \
-							 	- DHCP_RESERVE_LEN)
+#define DHCP_CHADDR_LEN         16
+#define SERVERNAME_LEN          64
+#define BOOTFILE_LEN            128
+#define DHCP_UDP_LEN            (20 + 8)
+#define DHCP_BASE_LEN           (4 + 4 + 2 + 2 + 4 + 4 + 4 + 4 + 4)
+#define DHCP_RESERVE_LEN        (4 + 4 + 4 + 4 + 2)
+#define DHCP_FIXED_LEN          (DHCP_BASE_LEN + DHCP_CHADDR_LEN + \
+                                 + SERVERNAME_LEN + BOOTFILE_LEN)
+#define DHCP_OPTION_LEN         (MTU_MAX - DHCP_FIXED_LEN - DHCP_UDP_LEN \
+                                 - DHCP_RESERVE_LEN)
 
 /* Some crappy DHCP servers require the BOOTP minimum length */
-#define BOOTP_MESSAGE_LENTH_MIN	300
+#define BOOTP_MESSAGE_LENTH_MIN 300
 
 typedef struct dhcpmessage_t
 {
-	unsigned char op;				/* message type */
-	unsigned char hwtype;				/* hardware address type */
-	unsigned char hwlen;				/* hardware address length */
-	unsigned char hwopcount;			/* should be zero in client's message */
-	int32_t xid;				/* transaction id */
-	int16_t secs;				/* elapsed time in sec. from trying to boot */
+	unsigned char op;           /* message type */
+	unsigned char hwtype;       /* hardware address type */
+	unsigned char hwlen;        /* hardware address length */
+	unsigned char hwopcount;        /* should be zero in client message */
+	int32_t xid;            /* transaction id */
+	int16_t secs;           /* elapsed time in sec. from boot */
 	int16_t flags;
-	int32_t ciaddr;			/* (previously allocated) client IP address */
-	int32_t yiaddr;			/* 'your' client IP address */
-	int32_t siaddr;			/* should be zero in client's messages */
-	int32_t giaddr;			/* should be zero in client's messages */
-	unsigned char chaddr[DHCP_CHADDR_LEN];	/* client's hardware address */
-	char servername[SERVERNAME_LEN];	/* server host name, null terminated string */
-	char bootfile[BOOTFILE_LEN];		/* boot file name, null terminated string */
+	int32_t ciaddr;         /* (previously allocated) client IP */
+	int32_t yiaddr;         /* 'your' client IP address */
+	int32_t siaddr;         /* should be zero in client's messages */
+	int32_t giaddr;         /* should be zero in client's messages */
+	unsigned char chaddr[DHCP_CHADDR_LEN];  /* client's hardware address */
+	char servername[SERVERNAME_LEN];    /* server host name */
+	char bootfile[BOOTFILE_LEN];    /* boot file name */
 	uint32_t cookie;
-	unsigned char options[DHCP_OPTION_LEN];	/* message options - cookie */
+	unsigned char options[DHCP_OPTION_LEN]; /* message options - cookie */
 } dhcpmessage_t;
 
 struct udp_dhcp_packet

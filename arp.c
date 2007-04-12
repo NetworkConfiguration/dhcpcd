@@ -84,8 +84,8 @@ int arp_check (interface_t *iface, struct in_addr address)
 	memcpy (ar_sha (&arp.ah), &iface->hwaddr, arp.ah.ar_hln);
 	memcpy (ar_tpa (&arp.ah), &address, arp.ah.ar_pln);
 
-	logger (LOG_INFO, "checking %s is available on attached networks", inet_ntoa
-			(address));
+	logger (LOG_INFO, "checking %s is available on attached networks",
+			inet_ntoa (address));
 
 	open_socket (iface, true);
 	send_packet (iface, ETHERTYPE_ARP, (unsigned char *) &arp.buffer,

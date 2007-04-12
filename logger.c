@@ -32,34 +32,33 @@ static int loglevel = LOG_WARNING;
 static char logprefix[12] = {0};
 
 static const char *syslog_level_msg[] = {
-	[LOG_EMERG]   	= "EMERGENCY!",
-	[LOG_ALERT]   	= "ALERT!",
-	[LOG_CRIT]    	= "Critical!",
-	[LOG_WARNING] 	= "Warning",
-	[LOG_ERR]     	= "Error",
-	[LOG_INFO]    	= "Info",
-	[LOG_DEBUG]   	= "Debug",
-	[LOG_DEBUG + 1]	= NULL
+	[LOG_EMERG]     = "EMERGENCY!",
+	[LOG_ALERT]     = "ALERT!",
+	[LOG_CRIT]      = "Critical!",
+	[LOG_WARNING]   = "Warning",
+	[LOG_ERR]       = "Error",
+	[LOG_INFO]      = "Info",
+	[LOG_DEBUG]     = "Debug",
+	[LOG_DEBUG + 1] = NULL
 };
 
 static const char *syslog_level[] = {
-	[LOG_EMERG]   	= "LOG_EMERG",
-	[LOG_ALERT]   	= "LOG_ALERT",
-	[LOG_CRIT]    	= "LOG_CRIT",
-	[LOG_ERR]     	= "LOG_ERR",
-	[LOG_WARNING] 	= "LOG_WARNING",
-	[LOG_NOTICE]  	= "LOG_NOTICE",
-	[LOG_INFO]    	= "LOG_INFO",
-	[LOG_DEBUG]   	= "LOG_DEBUG",
-	[LOG_DEBUG + 1]		= NULL
+	[LOG_EMERG]     = "LOG_EMERG",
+	[LOG_ALERT]     = "LOG_ALERT",
+	[LOG_CRIT]      = "LOG_CRIT",
+	[LOG_ERR]       = "LOG_ERR",
+	[LOG_WARNING]   = "LOG_WARNING",
+	[LOG_NOTICE]    = "LOG_NOTICE",
+	[LOG_INFO]      = "LOG_INFO",
+	[LOG_DEBUG]     = "LOG_DEBUG",
+	[LOG_DEBUG + 1]     = NULL
 };
 
 int logtolevel (const char *priority)
 {
 	int i = 0;
 
-	while (syslog_level[i])
-	{
+	while (syslog_level[i]) {
 		if (!strcmp (priority, syslog_level[i]))
 			return i;
 		i++;

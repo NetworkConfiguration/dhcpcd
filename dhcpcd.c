@@ -94,8 +94,8 @@ void make_pid (const char *pidfile)
 static void usage ()
 {
 	printf ("usage: "PACKAGE" [-adknpGHMNRY] [-c script] [-h hostame] [-i classID]\n"
-			"              [-l leasetime] [-m metric] [-s ipaddress] [-t timeout]\n"
-			"              [-u userclass] [-F [none | ptr | both]] [-I clientID]\n");
+	        "              [-l leasetime] [-m metric] [-s ipaddress] [-t timeout]\n"
+	        "              [-u userclass] [-F [none | ptr | both]] [-I clientID]\n");
 }
 
 int main(int argc, char **argv)
@@ -111,30 +111,30 @@ int main(int argc, char **argv)
 	int debug = 0;
 
 	const struct option longopts[] = {
-		{"arp", no_argument, NULL, 'a'},
-		{"script",required_argument, NULL, 'c'},
-		{"debug", no_argument, NULL, 'd'},
-		{"hostname", required_argument, NULL, 'h'},
-		{"classid", required_argument, NULL, 'i'},
-		{"release", no_argument, NULL, 'k'},
-		{"leasetime", required_argument, NULL, 'l'},
-		{"metric", required_argument, NULL, 'm'},
-		{"renew", no_argument, NULL, 'n'},
-		{"persistent", no_argument, NULL, 'p'},
-		{"request", required_argument, NULL, 's'},
-		{"timeout", required_argument, NULL, 't'},
-		{"userclass", required_argument, NULL, 'u'},
-		{"fqdn", optional_argument, NULL, 'F'},
-		{"nogateway", no_argument, NULL, 'G'},
-		{"sethostname", no_argument, NULL, 'H'},
-		{"clientid", required_argument, NULL, 'I'},
-		{"nomtu", no_argument, NULL, 'M'},
-		{"nontp", no_argument, NULL, 'N'},
-		{"nodns", no_argument, NULL, 'R'},
-		{"nonis", no_argument, NULL, 'Y'},
-		{"help", no_argument, &dohelp, 1},
-		{"version", no_argument, &doversion, 1},
-		{NULL, 0, NULL, 0}
+        {"arp",         no_argument,        NULL, 'a'},
+        {"script",      required_argument,  NULL, 'c'},
+        {"debug",       no_argument,        NULL, 'd'},
+        {"hostname",    required_argument,  NULL, 'h'},
+        {"classid",     required_argument,  NULL, 'i'},
+        {"release",     no_argument,        NULL, 'k'},
+        {"leasetime",   required_argument,  NULL, 'l'},
+        {"metric",      required_argument,  NULL, 'm'},
+        {"renew",       no_argument,        NULL, 'n'},
+        {"persistent",  no_argument,        NULL, 'p'},
+        {"request",     required_argument,  NULL, 's'},
+        {"timeout",     required_argument,  NULL, 't'},
+        {"userclass",   required_argument,  NULL, 'u'},
+        {"fqdn",        optional_argument,  NULL, 'F'},
+        {"nogateway",   no_argument,        NULL, 'G'},
+        {"sethostname", no_argument,        NULL, 'H'},
+        {"clientid",    required_argument,  NULL, 'I'},
+        {"nomtu",       no_argument,        NULL, 'M'},
+        {"nontp",       no_argument,        NULL, 'N'},
+        {"nodns",       no_argument,        NULL, 'R'},
+        {"nonis",       no_argument,        NULL, 'Y'},
+        {"help",        no_argument,        &dohelp, 1},
+        {"version",     no_argument,        &doversion, 1},
+        {NULL,          0,                  NULL, 0}
 	};
 
 	/* Sanitize our fd's */

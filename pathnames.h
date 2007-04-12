@@ -22,33 +22,33 @@
 #ifndef PATHNAMES_H
 #define PATHNAMES_H
 
-#define PACKAGE			"dhcpcd"
+#define PACKAGE             "dhcpcd"
 
-#define RESOLVCONF		"/sbin/resolvconf"
+#define RESOLVCONF          "/sbin/resolvconf"
 
-#define ETCDIR			"/etc"
-#define RESOLVFILE		ETCDIR "/resolv.conf"
+#define ETCDIR              "/etc"
+#define RESOLVFILE          ETCDIR "/resolv.conf"
 
-#define NISFILE			ETCDIR "/yp.conf"
-#define NISSERVICE		ETCDIR "/init.d/ypbind"
-#define NISRESTARTARGS		"--quiet", "conditionalrestart"
+#define NISFILE             ETCDIR "/yp.conf"
+#define NISSERVICE          ETCDIR "/init.d/ypbind"
+#define NISRESTARTARGS      "--quiet", "conditionalrestart"
 
-#define NTPFILE			ETCDIR "/ntp.conf"
-#define NTPDRIFTFILE		ETCDIR "/ntp.drift"
-#define NTPLOGFILE		"/var/log/ntp.log"
-#define NTPSERVICE		ETCDIR "/init.d/ntpd"
-#define NTPRESTARTARGS		"--quiet", "conditionalrestart"
+#define NTPFILE             ETCDIR "/ntp.conf"
+#define NTPDRIFTFILE        ETCDIR "/ntp.drift"
+#define NTPLOGFILE          "/var/log/ntp.log"
+#define NTPSERVICE          ETCDIR "/init.d/ntpd"
+#define NTPRESTARTARGS      "--quiet", "conditionalrestart"
 
-#define OPENNTPFILE		ETCDIR "/ntpd.conf"
-#define OPENNTPSERVICE		ETCDIR "/init.d/ntpd"
-#define OPENNTPRESTARTARGS	"--quiet", "conditionalrestart"
+#define OPENNTPFILE         ETCDIR "/ntpd.conf"
+#define OPENNTPSERVICE      ETCDIR "/init.d/ntpd"
+#define OPENNTPRESTARTARGS  "--quiet", "conditionalrestart"
 
-#define DEFAULT_SCRIPT		ETCDIR "/" PACKAGE ".sh"
+#define DEFAULT_SCRIPT      ETCDIR "/" PACKAGE ".sh"
 
-#define STATEDIR		"/var"
-#define PIDFILE			STATEDIR "/run/" PACKAGE "-%s.pid"
+#define STATEDIR            "/var"
+#define PIDFILE             STATEDIR "/run/" PACKAGE "-%s.pid"
 
-#define CONFIGDIR		STATEDIR "/lib/" PACKAGE
-#define INFOFILE		CONFIGDIR "/" PACKAGE "-%s.info"
+#define CONFIGDIR           STATEDIR "/lib/" PACKAGE
+#define INFOFILE            CONFIGDIR "/" PACKAGE "-%s.info"
 
 #endif

@@ -29,13 +29,13 @@
 
 #include "common.h"
 
-#define DEFAULT_TIMEOUT		20
-#define DEFAULT_LEASETIME	3600 		/* 1 hour */
+#define DEFAULT_TIMEOUT     20
+#define DEFAULT_LEASETIME   3600        /* 1 hour */
 
-#define CLASS_ID_MAX_LEN	48
-#define CLIENT_ID_MAX_LEN	48
-#define HOSTNAME_MAX_LEN	255	
-#define USERCLASS_MAX_LEN	255	
+#define CLASS_ID_MAX_LEN    48
+#define CLIENT_ID_MAX_LEN   48
+#define HOSTNAME_MAX_LEN    255 
+#define USERCLASS_MAX_LEN   255 
 
 typedef struct options_t {
 	char interface[IF_NAMESIZE];

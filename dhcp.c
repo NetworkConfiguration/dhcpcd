@@ -39,15 +39,15 @@
 #include "socket.h"
 
 static const char *dhcp_message[] = {
-	[DHCP_DISCOVER] 	= "DHCP_DISCOVER",
-	[DHCP_OFFER]		= "DHCP_OFFER",
-	[DHCP_REQUEST]	= "DHCP_REQUEST",
-	[DHCP_DECLINE]	= "DHCP_DECLINE",
-	[DHCP_ACK]		= "DHCP_ACK",
-	[DHCP_NAK]		= "DHCP_NAK",
-	[DHCP_RELEASE]	= "DHCP_RELEASE",
-	[DHCP_INFORM]		= "DHCP_INFORM",
-	[DHCP_INFORM + 1]	= NULL
+	[DHCP_DISCOVER]     = "DHCP_DISCOVER",
+	[DHCP_OFFER]        = "DHCP_OFFER",
+	[DHCP_REQUEST]      = "DHCP_REQUEST",
+	[DHCP_DECLINE]      = "DHCP_DECLINE",
+	[DHCP_ACK]          = "DHCP_ACK",
+	[DHCP_NAK]          = "DHCP_NAK",
+	[DHCP_RELEASE]      = "DHCP_RELEASE",
+	[DHCP_INFORM]       = "DHCP_INFORM",
+	[DHCP_INFORM + 1]   = NULL
 };
 
 size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
@@ -128,7 +128,8 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 		p += 2;
 	}
 
-#define PUTADDR(_type, _val) { \
+#define PUTADDR(_type, _val) \
+	{ \
 		*p++ = _type; \
 		*p++ = 4; \
 		memcpy (p, &_val.s_addr, 4); \
@@ -487,7 +488,8 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 	strlcpy (dhcp->servername, message->servername,
 			 sizeof (dhcp->servername));
 
-#define LEN_ERR { \
+#define LEN_ERR \
+	{ \
 		logger (LOG_ERR, "invalid length %d for option %d", length, option); \
 		p += length; \
 		continue; \
