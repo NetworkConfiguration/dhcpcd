@@ -246,8 +246,10 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 
 	*p++ = DHCP_END;
 
-#ifdef DHCP_MESSAGE_LENTH_MIN
-	while (p - m < DHCP_MESSAGE_LENTH_MIN)
+#ifdef BOOTP_MESSAGE_LENTH_MIN
+	/* Some crappy DHCP servers think they have to obey the BOOTP minimum
+	 * messag length. They are wrong, but we should still cater for them */
+	while (p - m < BOOTP_MESSAGE_LENTH_MIN)
 		*p++ = DHCP_PAD;
 #endif
 

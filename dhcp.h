@@ -168,7 +168,7 @@ typedef struct dhcp_t
 							 	- DHCP_RESERVE_LEN)
 
 /* Some crappy DHCP servers require the BOOTP minimum length */
-#define DHCP_MESSAGE_LENTH_MIN	300
+#define BOOTP_MESSAGE_LENTH_MIN	300
 
 typedef struct dhcpmessage_t
 {
