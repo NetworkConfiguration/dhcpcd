@@ -1,4 +1,5 @@
-Minimum message size is now 300 bytes for crappy DHCP servers :/
+Minimum message size is now 300 bytes for crappy DHCP servers who think
+they have to obey the BOOTP minimum message size :/
 Compile ok on OpenBSD (thanks to icezimm and reb in #gentoo-bsd for testing)
 We check gcc supports -Wextra and friends before using them.
 We now restore the starting MTU value when we exit OR we don't receive a
