@@ -390,7 +390,7 @@ int dhcp_run (const options_t *options)
 					break;
 
 				if (xid != message.xid) {
-					logger (LOG_ERR,
+					logger (LOG_DEBUG,
 							"ignoring packet with xid 0x%x as it's not ours (0x%x)",
 							message.xid, xid);
 					continue;
