@@ -577,7 +577,7 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 				/* Minimum legal mtu is 68 accoridng to RFC 2132.
 				   In practise it's 576 (minimum maximum message size) */
 				if (dhcp->mtu < MTU_MIN) {
-					logger (LOG_DEBUG, "MTU %d is too low, minium is %d; ignoring", dhcp->mtu, MTU_MIN);
+					logger (LOG_DEBUG, "MTU %d is too low, minimum is %d; ignoring", dhcp->mtu, MTU_MIN);
 					dhcp->mtu = 0;
 				}
 				break;
