@@ -255,7 +255,6 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 #endif
 
 	message_length = p - m;
-	logger (LOG_DEBUG, "xx %d\n", message_length);
 
 	memset (&packet, 0, sizeof (struct udp_dhcp_packet));
 	make_dhcp_packet (&packet, (unsigned char *) &message, message_length,
