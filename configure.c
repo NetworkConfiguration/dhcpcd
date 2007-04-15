@@ -373,13 +373,29 @@ static int write_info(const interface_t *iface, const dhcp_t *dhcp,
 		fprintf (f, "MTU='%d'\n", dhcp->mtu);
 
 	if (dhcp->routes) {
+		bool doneone = false;
 		fprintf (f, "ROUTES='");
 		for (route = dhcp->routes; route; route = route->next) {
-			fprintf (f, "%s", inet_ntoa (route->destination));
-			fprintf (f, ",%s", inet_ntoa (route->netmask));
-			fprintf (f, ",%s", inet_ntoa (route->gateway));
-			if (route->next)
-				fprintf (f, " ");
+			if (route->destination.s_addr != 0) {
+				if (doneone)
+					fprintf (f, " ");
+				fprintf (f, "%s", inet_ntoa (route->destination));
+				fprintf (f, ",%s", inet_ntoa (route->netmask));
+				fprintf (f, ",%s", inet_ntoa (route->gateway));
+				doneone = true;
+			}
+		}
+		fprintf (f, "'\n");
+
+		doneone = false;
+		fprintf (f, "GATEWAYS='");
+		for (route = dhcp->routes; route; route = route->next) {
+			if (route->destination.s_addr == 0) {
+				if (doneone)
+					fprintf (f, " ");
+				fprintf (f, "%s", inet_ntoa (route->gateway));
+				doneone = true;
+			}
 		}
 		fprintf (f, "'\n");
 	}
@@ -448,6 +464,34 @@ static int write_info(const interface_t *iface, const dhcp_t *dhcp,
 	else
 		fprintf (f, "CLIENTID='%s'\n", hwaddr_ntoa (iface->hwaddr, iface->hwlen));
 	fprintf (f, "DHCPCHADDR='%s'\n", hwaddr_ntoa (iface->hwaddr, iface->hwlen));
+
+#ifdef INFO_COMPAT
+	/* Support the old .info settings if we need to */
+	if (dhcp->dnsservers) {
+		fprintf (f, "DNS='");
+		for (address = dhcp->dnsservers; address; address = address->next) {
+			fprintf (f, "%s", inet_ntoa (address->address));
+			if (address->next)
+				fprintf (f, ",");
+		}
+		fprintf (f, "'\n");
+	}
+
+	if (dhcp->routes) {
+		bool doneone = false;
+		fprintf (f, "GATEWAY='");
+		for (route = dhcp->routes; route; route = route->next) {
+			if (route->destination.s_addr == 0) {
+				if (doneone)
+					fprintf (f, ",");
+				fprintf (f, "%s", inet_ntoa (route->gateway));
+				doneone = true;
+			}
+		}
+		fprintf (f, "'\n");
+	}
+#endif
+	
 	fclose (f);
 	return 0;
 }

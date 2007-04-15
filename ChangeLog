@@ -1,3 +1,7 @@
+Remove gateways from the ROUTES and add to GATEWAYS
+define #INFO_COMPAT if you wish your .info file to add support for some
+old 1.x and 2.x structure.
+
 dhcpcd-3.0.17
 Minimum message size is now 300 bytes for crappy DHCP servers who think
 they have to obey the BOOTP minimum message size :/
