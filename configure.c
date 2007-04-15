@@ -73,13 +73,13 @@ static int exec_cmd (const char *cmd, const char *args, ...)
 		n++;
 	va_end (va);
 
-	if ((pid = fork ()) == 0) {
+	if ((pid = vfork ()) == 0) {
 		if (execv (cmd, argv) && errno != ENOENT)
 			logger (LOG_ERR, "error executing \"%s\": %s",
 					cmd, strerror (errno));
-		exit (0);
+		_exit (0);
 	} else if (pid == -1)
-		logger (LOG_ERR, "fork: %s", strerror (errno));
+		logger (LOG_ERR, "vfork: %s", strerror (errno));
 
 	return 0;
 }
