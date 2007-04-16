@@ -465,8 +465,9 @@ static int write_info(const interface_t *iface, const dhcp_t *dhcp,
 		fprintf (f, "CLIENTID='%s'\n", hwaddr_ntoa (iface->hwaddr, iface->hwlen));
 	fprintf (f, "DHCPCHADDR='%s'\n", hwaddr_ntoa (iface->hwaddr, iface->hwlen));
 
-#ifdef INFO_COMPAT
+#ifdef ENABLE_INFO_COMPAT
 	/* Support the old .info settings if we need to */
+	fprintf (f, "\n# dhcpcd-1.x and 2.x compatible variables\n");
 	if (dhcp->dnsservers) {
 		fprintf (f, "DNS='");
 		for (address = dhcp->dnsservers; address; address = address->next) {
@@ -491,7 +492,8 @@ static int write_info(const interface_t *iface, const dhcp_t *dhcp,
 		fprintf (f, "'\n");
 	}
 #endif
-	
+
+	fprintf (f, "\n");	
 	fclose (f);
 	return 0;
 }

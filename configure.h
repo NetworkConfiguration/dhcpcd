@@ -30,7 +30,7 @@
 #define ENABLE_INFO
 
 /* Define this to enable some compatability with 1.x and 2.x info files */
-// #define INFO_COMPAT
+// #define ENABLE_INFO_COMPAT
 
 #include "dhcpcd.h"
 #include "interface.h"
