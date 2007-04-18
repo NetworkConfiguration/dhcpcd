@@ -84,7 +84,7 @@ void free_route (route_t *routes)
 	route_t *p = routes;
 	route_t *n = NULL;
 
-	if (!routes)
+	if (! routes)
 		return;
 
 	while (p) {

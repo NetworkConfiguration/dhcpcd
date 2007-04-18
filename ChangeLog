@@ -1,3 +1,4 @@
+Ensure that static routes are always added before routers.
 Use getnameinfo instead of gethostbyaddr.
 Remove gateways from the ROUTES and add to GATEWAYS
 define #INFO_COMPAT if you wish your .info file to add support for some

@@ -674,7 +674,6 @@ int configure (const options_t *options, interface_t *iface,
 		salen = sizeof (struct sockaddr);
 		memset (&su.sa, 0, salen);
 		su.sin.sin_family = AF_INET;
-		su.sin.sin_len = sizeof (struct sockaddr_in);
 		memcpy (&su.sin.sin_addr, &dhcp->address, sizeof (struct in_addr));
 
 		if (getnameinfo (&su.sa, salen, addr, sizeof (addr),
@@ -686,7 +685,7 @@ int configure (const options_t *options, interface_t *iface,
 			if (getaddrinfo (addr, "0", &hints, &res) == 0) {
 				freeaddrinfo (res);
 				addr[0] = '\0';
-				logger (LOG_DEBUG, "malicious PTR record detected");
+				logger (LOG_ERR, "malicious PTR record detected");
 			}
 		}
 		

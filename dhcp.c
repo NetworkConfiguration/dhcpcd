@@ -407,33 +407,17 @@ void free_dhcp (dhcp_t *dhcp)
 	if (! dhcp)
 		return;
 
-	if (dhcp->routes)
-		free_route (dhcp->routes);
-
-	if (dhcp->hostname)
-		free (dhcp->hostname);
-
-	if (dhcp->dnsservers)
-		free_address (dhcp->dnsservers);
-	if (dhcp->dnsdomain)
-		free (dhcp->dnsdomain);
-	if (dhcp->dnssearch)
-		free (dhcp->dnssearch);
-
-	if (dhcp->ntpservers)
-		free_address (dhcp->ntpservers);
-
-	if (dhcp->nisdomain)
-		free (dhcp->nisdomain);
-	if (dhcp->nisservers)
-		free_address (dhcp->nisservers);
-
-	if (dhcp->rootpath)
-		free (dhcp->rootpath);
-
+	free_route (dhcp->routes);
+	free (dhcp->hostname);
+	free_address (dhcp->dnsservers);
+	free (dhcp->dnsdomain);
+	free (dhcp->dnssearch);
+	free_address (dhcp->ntpservers);
+	free (dhcp->nisdomain);
+	free_address (dhcp->nisservers);
+	free (dhcp->rootpath);
 	if (dhcp->fqdn) {
-		if (dhcp->fqdn->name)
-			free (dhcp->fqdn->name);
+		free (dhcp->fqdn->name);
 		free (dhcp->fqdn);
 	}
 }
@@ -474,14 +458,13 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 	unsigned int len = 0;
 	int i;
 	int retval = -1;
-	route_t *first_route = xmalloc (sizeof (route_t));
-	route_t *route = first_route;
-	route_t *last_route = NULL;
+	route_t *routers = NULL;
+	route_t *routersp = NULL;
+	route_t *static_routes = NULL;
+	route_t *static_routesp = NULL;
 	route_t *csr = NULL;
 
 	end += sizeof (message->options);
-
-	memset (first_route, 0, sizeof (route_t));
 
 	dhcp->address.s_addr = message->yiaddr;
 	strlcpy (dhcp->servername, message->servername,
@@ -496,7 +479,7 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 
 	while (p < end) {
 		option = *p++;
-		if (!option)
+		if (! option)
 			continue;
 
 		length = *p++;
@@ -630,8 +613,7 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 
 			case DHCP_DNSSEARCH:
 				MIN_LENGTH (1);
-				if (dhcp->dnssearch)
-					free (dhcp->dnssearch);
+				free (dhcp->dnssearch);
 				if ((len = decode_search (p, length, NULL)) > 0) {
 					dhcp->dnssearch = xmalloc (len);
 					decode_search (p, length, dhcp->dnssearch);
@@ -640,21 +622,23 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 
 			case DHCP_CSR:
 				MIN_LENGTH (5);
-				if (csr)
-					free_route (csr);
+				free_route (csr);
 				csr = decodeCSR (p, length);
 				break;
 
 			case DHCP_STATICROUTE:
 				MULT_LENGTH (8);
 				for (i = 0; i < length; i += 8) {
-					memcpy (&route->destination.s_addr, p + i, 4);
-					memcpy (&route->gateway.s_addr, p + i + 4, 4);
-					route->netmask.s_addr = getnetmask (route->destination.s_addr); 
-					last_route = route;
-					route->next = xmalloc (sizeof (route_t));
-					route = route->next;
-					memset (route, 0, sizeof (route_t));
+					if (static_routesp) {
+						static_routesp->next = xmalloc (sizeof (route_t));
+						static_routesp = static_routesp->next;
+					} else
+						static_routesp = static_routes = xmalloc (sizeof (route_t));
+					memset (static_routesp, 0, sizeof (route_t));
+					memcpy (&static_routesp->destination.s_addr, p + i, 4);
+					memcpy (&static_routesp->gateway.s_addr, p + i + 4, 4);
+					static_routesp->netmask.s_addr =
+						getnetmask (static_routesp->destination.s_addr); 
 				}
 				break;
 
@@ -662,11 +646,13 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 				MULT_LENGTH (4); 
 				for (i = 0; i < length; i += 4)
 				{
-					memcpy (&route->gateway.s_addr, p + i, 4);
-					last_route = route;
-					route->next = xmalloc (sizeof (route_t));
-					route = route->next;
-					memset (route, 0, sizeof (route_t));
+					if (routersp) {
+						routersp->next = xmalloc (sizeof (route_t));
+						routersp = routersp->next;
+					} else
+						routersp = routers = xmalloc (sizeof (route_t));
+					memset (routersp, 0, sizeof (route_t));
+					memcpy (&routersp->gateway.s_addr, p + i, 4);
 				}
 				break;
 
@@ -693,16 +679,16 @@ eexit:
 	   static routes and routers according to RFC 3442 */
 	if (csr) {
 		dhcp->routes = csr;
-		free_route (first_route); 
+		free_route (routers);
+		free_route (static_routes);
 	} else {
-		dhcp->routes = first_route;
-		if (last_route)	{
-			free (last_route->next);
-			last_route->next = NULL;
-		} else {
-			free_route (dhcp->routes);
-			dhcp->routes = NULL;
-		}
+		/* Ensure that we apply static routes before routers */
+		if (static_routes)
+		{
+			dhcp->routes = static_routes;
+			static_routesp->next = routers;
+		} else
+			dhcp->routes = routers;
 	}
 
 	return retval;
