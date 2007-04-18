@@ -505,8 +505,8 @@ int configure (const options_t *options, interface_t *iface,
 	route_t *route = NULL;
 	route_t *new_route = NULL;
 	route_t *old_route = NULL;
-	char newhostname[HOSTNAME_MAX_LEN] = {0};
-	char curhostname[HOSTNAME_MAX_LEN] = {0};
+	char newhostname[MAXHOSTNAMELEN] = {0};
+	char curhostname[MAXHOSTNAMELEN] = {0};
 
 	if (! options || ! iface || ! dhcp)
 		return -1;
