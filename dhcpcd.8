@@ -1,6 +1,6 @@
 .\" $Id$
 .\"
-.TH DHCPCD 8 "27 February 2007" "dhcpcd 3.0"
+.TH DHCPCD 8 "18 April 2007" "dhcpcd 3.0"
 
 .SH NAME
 dhcpcd \- DHCP client daemon
@@ -183,7 +183,8 @@ By default
 .B dhcpcd
 will NOT set hostname of the host to the hostname option
 received from DHCP server unless the current hostname is blank, (none) or
-localhost.
+localhost. If no hostname is returned by the DHCP server then we attempt
+to lookup the hostname via DNS.
 .TP
 .BI \-F \ none | ptr | both
 Forces

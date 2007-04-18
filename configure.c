@@ -505,11 +505,8 @@ int configure (const options_t *options, interface_t *iface,
 	route_t *route = NULL;
 	route_t *new_route = NULL;
 	route_t *old_route = NULL;
-	struct hostent *he = NULL;
 	char newhostname[HOSTNAME_MAX_LEN] = {0};
 	char curhostname[HOSTNAME_MAX_LEN] = {0};
-	char *dname = NULL;
-	int dnamel = 0;
 
 	if (! options || ! iface || ! dhcp)
 		return -1;
@@ -666,16 +663,41 @@ int configure (const options_t *options, interface_t *iface,
 
 	/* Now we have made a resolv.conf we can obtain a hostname if we need one */
 	if (options->dohostname && ! dhcp->hostname) {
-		he = gethostbyaddr (inet_ntoa (dhcp->address),
-							sizeof (struct in_addr), AF_INET);
-		if (he) {
-			dname = he->h_name;
-			while (*dname > 32)
-				dname++;
-			dnamel = dname - he->h_name;
-			memcpy (newhostname, he->h_name, dnamel);
-			newhostname[dnamel] = 0;
+		union {
+			struct sockaddr sa;
+			struct sockaddr_in sin;
+		} su;
+		socklen_t salen;
+		char addr[NI_MAXHOST];
+		struct addrinfo hints, *res;
+
+		salen = sizeof (struct sockaddr);
+		memset (&su.sa, 0, salen);
+		su.sin.sin_family = AF_INET;
+		su.sin.sin_len = sizeof (struct sockaddr_in);
+		memcpy (&su.sin.sin_addr, &dhcp->address, sizeof (struct in_addr));
+
+		if (getnameinfo (&su.sa, salen, addr, sizeof (addr),
+						 NULL, 0, NI_NAMEREQD) == 0) {
+			memset (&hints, 0, sizeof (hints));
+			hints.ai_socktype = SOCK_DGRAM;
+			hints.ai_flags = AI_NUMERICHOST;
+			/* Check for a malicious PTR record */
+			if (getaddrinfo (addr, "0", &hints, &res) == 0) {
+				freeaddrinfo (res);
+				addr[0] = '\0';
+				logger (LOG_DEBUG, "malicious PTR record detected");
+			}
 		}
+		
+		/* Split the hostname from the domain */
+		if (addr[0]) {
+			char *p = addr;
+			char *token = strsep (&p, ".");
+			if (token)
+				strlcpy (newhostname, token, sizeof (newhostname));
+		} else
+			logger (LOG_ERR, "failed to lookup the hostname");
 	}
 
 	gethostname (curhostname, sizeof (curhostname));
