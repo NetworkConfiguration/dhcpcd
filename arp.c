@@ -51,6 +51,9 @@
 					(ap)->ar_hln + (ap)->ar_pln)
 #define ar_tpa(ap) (((unsigned char *) ((ap) + 1)) + \
 					2 * (ap)->ar_hln + (ap)->ar_pln)
+#endif
+
+#ifndef arphdr_len
 #define arphdr_len2(ar_hln, ar_pln) (sizeof (struct arphdr) + \
 									 2 * (ar_hln) + 2 * (ar_pln))
 #define arphdr_len(ap) (arphdr_len2 ((ap)->ar_hln, (ap)->ar_pln))

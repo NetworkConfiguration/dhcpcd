@@ -94,6 +94,7 @@
 static int daemonise (const char *pidfile)
 {
 	logger (LOG_DEBUG, "forking to background");
+
 	if (daemon (0, 0) < 0) {
 		logger (LOG_ERR, "daemon: %s", strerror (errno));
 		return -1;

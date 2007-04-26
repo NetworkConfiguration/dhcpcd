@@ -407,7 +407,7 @@ static int do_route (const char *ifname,
 	/* Do something with metric to satisfy compiler warnings */
 	metric = 0;
 
-	dstd = strdup (inet_ntoa (destination));
+	dstd = xstrdup (inet_ntoa (destination));
 	if (gateway.s_addr == destination.s_addr)
 		logger (LOG_INFO, "%s route to %s/%d",
 				change ? "changing" : del ? "removing" : "adding",
@@ -738,8 +738,8 @@ static int do_route (const char *ifname,
 	if (! ifname)
 		return -1;
 
-	dstd = strdup (inet_ntoa (destination));
-	gend = strdup (inet_ntoa (netmask));
+	dstd = xstrdup (inet_ntoa (destination));
+	gend = xstrdup (inet_ntoa (netmask));
 	if (gateway.s_addr == destination.s_addr)
 		logger (LOG_INFO, "%s route to %s (%s) metric %d",
 				change ? "changing" : del ? "removing" : "adding",

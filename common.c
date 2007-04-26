@@ -104,6 +104,20 @@ void *xmalloc (size_t size)
 		return value;
 
 	logger (LOG_ERR, "memory exhausted");
-	exit (1);
+	exit (EXIT_FAILURE);
+}
+
+char *xstrdup (const char *str)
+{
+	char *value;
+
+	if (! str)
+		return (NULL);
+
+	if ((value = strdup (str)))
+		return (value);
+
+	logger (LOG_ERR, "memory exhausted");
+	exit (EXIT_FAILURE);
 }
 

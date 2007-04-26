@@ -24,6 +24,7 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
+#include <net/if.h>
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
 #ifndef __OpenBSD__
@@ -32,10 +33,6 @@
 #include <net/ethernet.h>
 #endif
 #include <netinet/udp.h>
-#ifndef __linux__
-#include <net/if_types.h>
-#endif
-#include <net/if.h>
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>

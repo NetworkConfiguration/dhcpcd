@@ -661,8 +661,8 @@ int configure (const options_t *options, interface_t *iface,
 		make_nis(iface->name, dhcp);
 #endif
 
-	/* Now we have made a resolv.conf we can obtain a hostname if we need one */
-	if (options->dohostname && ! dhcp->hostname) {
+	/* Now we have made a resolv.conf we can obtain a hostname if we need it */
+	if (options->dohostname && ! dhcp->hostname) { 
 		union {
 			struct sockaddr sa;
 			struct sockaddr_in sin;
@@ -670,33 +670,55 @@ int configure (const options_t *options, interface_t *iface,
 		socklen_t salen;
 		char addr[NI_MAXHOST];
 		struct addrinfo hints, *res;
+		int result;
 
 		salen = sizeof (struct sockaddr);
 		memset (&su.sa, 0, salen);
 		su.sin.sin_family = AF_INET;
 		memcpy (&su.sin.sin_addr, &dhcp->address, sizeof (struct in_addr));
 
-		if (getnameinfo (&su.sa, salen, addr, sizeof (addr),
-						 NULL, 0, NI_NAMEREQD) == 0) {
+		logger (LOG_DEBUG, "Looking up hostname via DNS");
+		if ((result = getnameinfo (&su.sa, salen, addr, sizeof (addr),
+						 NULL, 0, NI_NAMEREQD)) != 0)
+			logger (LOG_ERR, "Failed to lookup hostname via DNS: %s", gai_strerror (result));
+		else {
+			/* Check for a malicious PTR record */
 			memset (&hints, 0, sizeof (hints));
 			hints.ai_socktype = SOCK_DGRAM;
 			hints.ai_flags = AI_NUMERICHOST;
-			/* Check for a malicious PTR record */
 			if (getaddrinfo (addr, "0", &hints, &res) == 0) {
 				freeaddrinfo (res);
 				addr[0] = '\0';
 				logger (LOG_ERR, "malicious PTR record detected");
+			} else if (*addr) {
+				/* Strip out the domain if it matches */
+				char *p = addr;
+				char *token = strsep (&p, ".");
+				bool match_domain = false;
+
+				if (p && *p) {
+					if (dhcp->dnssearch) {
+						char *s = xstrdup (dhcp->dnssearch);
+						char *sp = s;
+						char *t;
+
+						while ((t = strsep (&sp, " ")))
+							if (strcmp (t, p) == 0) {
+								match_domain = true;
+								break;
+							}
+						free (s);
+					} else if (dhcp->dnsdomain) {
+						if (strcmp (dhcp->dnsdomain, p) == 0)
+							match_domain = true;
+					}
+				}
+				if (match_domain)
+					strlcpy (newhostname, token, sizeof (newhostname));
+				else
+					snprintf (newhostname, sizeof (newhostname), "%s.%s", token, p);
 			}
 		}
-		
-		/* Split the hostname from the domain */
-		if (addr[0]) {
-			char *p = addr;
-			char *token = strsep (&p, ".");
-			if (token)
-				strlcpy (newhostname, token, sizeof (newhostname));
-		} else
-			logger (LOG_ERR, "failed to lookup the hostname");
 	}
 
 	gethostname (curhostname, sizeof (curhostname));

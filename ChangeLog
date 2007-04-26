@@ -1,3 +1,4 @@
+If the current hostname contains dots then send it as a FQDN.
 Ensure that static routes are always added before routers.
 Use getnameinfo instead of gethostbyaddr.
 Remove gateways from the ROUTES and add to GATEWAYS

@@ -109,6 +109,7 @@ int main(int argc, char **argv)
 	char prefix[IF_NAMESIZE + 3];
 	pid_t pid;
 	int debug = 0;
+	int i;
 
 	const struct option longopts[] = {
         {"arp",         no_argument,        NULL, 'a'},
@@ -137,13 +138,9 @@ int main(int argc, char **argv)
         {NULL,          0,                  NULL, 0}
 	};
 
-	/* Sanitize our fd's */
-	int zero;
-	if ((zero = open (_PATH_DEVNULL, O_RDWR, 0)) >= 0) {
-		while (zero < 3)
-			zero = dup (zero);
-		close(zero);
-	}
+	/* Close any un-needed fd's */
+	for (i = getdtablesize() - 1; i >= 3; --i)
+		close (i);
 
 	openlog (PACKAGE, LOG_PID, LOG_LOCAL0);
 
@@ -158,10 +155,6 @@ int main(int argc, char **argv)
 	options.dontp = true;
 	options.dogateway = true;
 	options.daemonise = true;
-	gethostname (options.hostname, sizeof (options.hostname));
-	if (strcmp (options.hostname, "(none)") == 0 ||
-		strcmp (options.hostname, "localhost") == 0)
-		memset (options.hostname, 0, sizeof (options.hostname));
 	options.timeout = DEFAULT_TIMEOUT;
 
 	while ((ch = getopt_long(argc, argv, "ac:dh:i:kl:m:nps:t:u:F:GHI:MNRY", longopts,
@@ -242,7 +235,6 @@ int main(int argc, char **argv)
 				break;
 			case 'u':
 				{
-					int i;
 					int offset = 0;
 					for (i = 0; i < userclasses; i++)
 						offset += (int) options.userclass[offset] + 1;
@@ -258,11 +250,11 @@ int main(int argc, char **argv)
 				}
 				break;
 			case 'F':
-				if (strcmp (optarg, "none") == 0)
+				if (strncmp (optarg, "none", strlen (optarg)) == 0)
 					options.fqdn = FQDN_NONE;
-				else if (strcmp (optarg, "ptr") == 0)
+				else if (strncmp (optarg, "ptr", strlen (optarg)) == 0)
 					options.fqdn = FQDN_PTR;
-				else if (strcmp (optarg, "both") == 0)
+				else if (strncmp (optarg, "both", strlen (optarg)) == 0)
 					options.fqdn = FQDN_BOTH;
 				else {
 					logger (LOG_ERR, "invalid value `%s' for FQDN", optarg);
@@ -326,6 +318,19 @@ int main(int argc, char **argv)
 		exit (EXIT_FAILURE);
 	}
 
+	/* If we are given a hostname use it and set FQDN if it contains a . */
+	if (! options.hostname[0]) {
+		gethostname (options.hostname, sizeof (options.hostname));
+		if (strcmp (options.hostname, "(none)") == 0 ||
+			strcmp (options.hostname, "localhost") == 0)
+			memset (options.hostname, 0, sizeof (options.hostname));
+	}
+	if (strchr (options.hostname, '.')) {
+		if (options.fqdn == FQDN_DISABLE)
+			options.fqdn = FQDN_BOTH;
+	} else
+		options.fqdn = FQDN_DISABLE;
+	
 	if (geteuid ()) {
 		logger (LOG_ERR, "you need to be root to run "PACKAGE);
 		exit (EXIT_FAILURE);

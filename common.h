@@ -34,6 +34,6 @@ size_t strlcpy (char *dst, const char *src, size_t size);
 
 long uptime (void);
 void *xmalloc (size_t size);
-
+char *xstrdup (const char *str);
 
 #endif

@@ -91,6 +91,10 @@ void logger(int level, const char *fmt, ...)
 		fprintf (f, "%s, %s", syslog_level_msg[level], logprefix);
 		vfprintf (f, fmt, p);
 		fputc ('\n', f);
+
+		/* stdout, stderr may be re-directed to some kind of buffer.
+		 * So we always flush to ensure it's written. */
+		fflush (f);
 	}
 
 	if (level < LOG_DEBUG || level <= loglevel) {
