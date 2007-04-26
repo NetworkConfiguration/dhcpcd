@@ -1,4 +1,4 @@
-VERSION = 3.0.18_pre2
+VERSION = 3.0.18_pre3
 CFLAGS ?= -O2 -pipe
 
 # Should work for both GNU make and BSD make
@@ -75,7 +75,8 @@ clean:
 dist:
 	$(INSTALL) -m 0755 -d /tmp/dhcpcd-$(VERSION)
 	cp -RPp . /tmp/dhcpcd-$(VERSION)
-	$(MAKE) -C /tmp/dhcpcd-$(VERSION) clean
+	(cd /tmp/dhcpcd-$(VERSION); $(MAKE) clean)
 	rm -rf /tmp/dhcpcd-$(VERSION)/*.bz2 /tmp/dhcpcd-$(VERSION)/.svn
 	tar cvjpf dhcpcd-$(VERSION).tar.bz2 -C /tmp dhcpcd-$(VERSION)
 	rm -rf /tmp/dhcpcd-$(VERSION)
+	ls -l dhcpcd-$(VERSION).tar.bz2
