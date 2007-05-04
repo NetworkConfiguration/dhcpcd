@@ -73,7 +73,7 @@
 	if (iface->fd >= 0) close (iface->fd); \
 	iface->fd = -1; \
 	if (_mode == SOCKET_OPEN) \
-	if (open_socket (iface, false) < 0) { retval = -1; goto eexit; } \
+	if (open_socket (iface, false) < 0) { retval = EXIT_FAILURE; goto eexit; } \
 	mode = _mode; \
 }
 
@@ -304,7 +304,7 @@ int dhcp_run (const options_t *options)
 					else {
 						logger (LOG_ERR, "timed out");
 						if (! daemonised) {
-							retval = -1;
+							retval = EXIT_FAILURE;
 							goto eexit;
 						}
 					}
@@ -534,13 +534,13 @@ int dhcp_run (const options_t *options)
 						xid = 0;
 
 						if (configure (options, iface, dhcp) < 0 && ! daemonised) {
-							retval = -1;
+							retval = EXIT_FAILURE;
 							goto eexit;
 						}
 
 						if (! daemonised && options->daemonise) {
 							if ((daemonise (options->pidfile)) < 0 ) {
-								retval = -1;
+								retval = EXIT_FAILURE;
 								goto eexit;
 							}
 							daemonised = true;
@@ -559,7 +559,7 @@ int dhcp_run (const options_t *options)
 		} else {
 			/* An error occured. As we heavily depend on select, we abort. */
 			logger (LOG_ERR, "error on select: %s", strerror (errno));
-			retval = -1;
+			retval = EXIT_FAILURE;
 			goto eexit;
 		}
 	}

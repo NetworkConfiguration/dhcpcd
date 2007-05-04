@@ -423,7 +423,7 @@ static int do_route (const char *ifname,
 	if (dstd)
 		free (dstd);
 
-	if ((s = socket(PF_ROUTE, SOCK_RAW, 0)) < 0) {
+	if ((s = socket (PF_ROUTE, SOCK_RAW, 0)) < 0) {
 		logger (LOG_ERR, "socket: %s", strerror (errno));
 		return -1;
 	}
@@ -458,6 +458,7 @@ static int do_route (const char *ifname,
 
 		if (getifaddrs (&ifap)) {
 			logger (LOG_ERR, "getifaddrs: %s", strerror (errno));
+			close (s);
 			return -1;
 		}
 
