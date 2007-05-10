@@ -21,10 +21,12 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 
 #include <netinet/in.h>
 #include <net/if_arp.h>
 
+#include <errno.h>
 #include <limits.h>
 #include <math.h>
 #include <stdint.h>
@@ -457,6 +459,7 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 	unsigned int len = 0;
 	int i;
 	int retval = -1;
+	struct timeval tv;
 	route_t *routers = NULL;
 	route_t *routersp = NULL;
 	route_t *static_routes = NULL;
@@ -464,6 +467,13 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 	route_t *csr = NULL;
 
 	end += sizeof (message->options);
+
+	if (gettimeofday (&tv, NULL) == -1) {
+		logger (LOG_ERR, "gettimeofday: %s", strerror (errno));
+		return (-1);
+	}
+	dhcp->leasedfrom = tv.tv_sec;
+	dhcp->frominfo = false;
 
 	dhcp->address.s_addr = message->yiaddr;
 	strlcpy (dhcp->servername, message->servername,

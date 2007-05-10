@@ -38,9 +38,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "config.h"
 #include "common.h"
 #include "configure.h"
 #include "dhcp.h"
+#ifdef ENABLE_INFO
+#include "info.h"
+#endif
 #include "interface.h"
 #include "dhcpcd.h"
 #include "pathnames.h"
@@ -107,8 +111,9 @@ static void exec_script (const char *script, const char *infofile,
 	logger (LOG_DEBUG, "exec \"%s %s %s\"", script, infofile, arg);
 	exec_cmd (script, infofile, arg, (char *) NULL);
 #else
-	logger (LOG_DEBUG, "exec \"%s \"\" %s\"", script, infofile, arg);
-	exec_cmd (script, infofile, "", arg, (char *) NULL);
+	infofile = NULL; /* appease gcc */
+	logger (LOG_DEBUG, "exec \"%s \"\" %s\"", script, arg);
+	exec_cmd (script, "", arg, (char *) NULL);
 #endif
 }
 
@@ -321,180 +326,6 @@ static int make_nis (const char *ifname, const dhcp_t *dhcp)
 	fclose (f);
 
 	exec_cmd (NISSERVICE, NISRESTARTARGS, (char *) NULL);
-	return 0;
-}
-#endif
-
-#ifdef ENABLE_INFO
-static char *cleanmetas (const char *cstr)
-{
-	/* The largest single element we can have is 256 bytes according to the RFC,
-	   so this buffer size should be safe even if it's all ' */
-	static char buffer[1024]; 
-	char *b = buffer;
-
-	memset (buffer, 0, sizeof (buffer));
-	if (cstr == NULL || strlen (cstr) == 0)
-		return b;
-
-	do
-		if (*cstr == 39) {
-			*b++ = '\'';
-			*b++ = '\\';
-			*b++ = '\'';
-			*b++ = '\'';
-		} else
-			*b++ = *cstr;
-	while (*cstr++);
-
-	*b++ = 0;
-	b = buffer;
-
-	return b;
-}
-
-static int write_info(const interface_t *iface, const dhcp_t *dhcp,
-					  const options_t *options)
-{
-	FILE *f;
-	route_t *route;
-	address_t *address;
-
-	logger (LOG_DEBUG, "writing %s", iface->infofile);
-	if ((f = fopen (iface->infofile, "w")) == NULL) {
-		logger (LOG_ERR, "fopen `%s': %s", iface->infofile, strerror (errno));
-		return -1;
-	}
-
-	fprintf (f, "IPADDR='%s'\n", inet_ntoa (dhcp->address));
-	fprintf (f, "NETMASK='%s'\n", inet_ntoa (dhcp->netmask));
-	fprintf (f, "BROADCAST='%s'\n", inet_ntoa (dhcp->broadcast));
-	if (dhcp->mtu > 0)
-		fprintf (f, "MTU='%d'\n", dhcp->mtu);
-
-	if (dhcp->routes) {
-		bool doneone = false;
-		fprintf (f, "ROUTES='");
-		for (route = dhcp->routes; route; route = route->next) {
-			if (route->destination.s_addr != 0) {
-				if (doneone)
-					fprintf (f, " ");
-				fprintf (f, "%s", inet_ntoa (route->destination));
-				fprintf (f, ",%s", inet_ntoa (route->netmask));
-				fprintf (f, ",%s", inet_ntoa (route->gateway));
-				doneone = true;
-			}
-		}
-		fprintf (f, "'\n");
-
-		doneone = false;
-		fprintf (f, "GATEWAYS='");
-		for (route = dhcp->routes; route; route = route->next) {
-			if (route->destination.s_addr == 0) {
-				if (doneone)
-					fprintf (f, " ");
-				fprintf (f, "%s", inet_ntoa (route->gateway));
-				doneone = true;
-			}
-		}
-		fprintf (f, "'\n");
-	}
-
-	if (dhcp->hostname)
-		fprintf (f, "HOSTNAME='%s'\n", cleanmetas (dhcp->hostname));
-
-	if (dhcp->dnsdomain)
-		fprintf (f, "DNSDOMAIN='%s'\n", cleanmetas (dhcp->dnsdomain));
-
-	if (dhcp->dnssearch)
-		fprintf (f, "DNSSEARCH='%s'\n", cleanmetas (dhcp->dnssearch));
-
-	if (dhcp->dnsservers) {
-		fprintf (f, "DNSSERVERS='");
-		for (address = dhcp->dnsservers; address; address = address->next) {
-			fprintf (f, "%s", inet_ntoa (address->address));
-			if (address->next)
-				fprintf (f, " ");
-		}
-		fprintf (f, "'\n");
-	}
-
-	if (dhcp->fqdn) {
-		fprintf (f, "FQDNFLAGS='%u'\n", dhcp->fqdn->flags);
-		fprintf (f, "FQDNRCODE1='%u'\n", dhcp->fqdn->r1);
-		fprintf (f, "FQDNRCODE2='%u'\n", dhcp->fqdn->r2);
-		fprintf (f, "FQDNHOSTNAME='%s'\n", dhcp->fqdn->name);
-	}
-
-	if (dhcp->ntpservers) {
-		fprintf (f, "NTPSERVERS='");
-		for (address = dhcp->ntpservers; address; address = address->next) {
-			fprintf (f, "%s", inet_ntoa (address->address));
-			if (address->next)
-				fprintf (f, " ");
-		}
-		fprintf (f, "'\n");
-	}
-
-	if (dhcp->nisdomain)
-		fprintf (f, "NISDOMAIN='%s'\n", cleanmetas (dhcp->nisdomain));
-
-	if (dhcp->nisservers) {
-		fprintf (f, "NISSERVERS='");
-		for (address = dhcp->nisservers; address; address = address->next) {
-			fprintf (f, "%s", inet_ntoa (address->address));
-			if (address->next)
-				fprintf (f, " ");
-		}
-		fprintf (f, "'\n");
-	}
-
-	if (dhcp->rootpath)
-		fprintf (f, "ROOTPATH='%s'\n", cleanmetas (dhcp->rootpath));
-
-	fprintf (f, "DHCPSID='%s'\n", inet_ntoa (dhcp->serveraddress));
-	fprintf (f, "DHCPSNAME='%s'\n", cleanmetas (dhcp->servername));
-	fprintf (f, "LEASETIME='%u'\n", dhcp->leasetime);
-	fprintf (f, "RENEWALTIME='%u'\n", dhcp->renewaltime);
-	fprintf (f, "REBINDTIME='%u'\n", dhcp->rebindtime);
-	fprintf (f, "INTERFACE='%s'\n", iface->name);
-	fprintf (f, "CLASSID='%s'\n", cleanmetas (options->classid));
-	if (options->clientid[0])
-		fprintf (f, "CLIENTID='%s'\n", cleanmetas (options->clientid));
-	else
-		fprintf (f, "CLIENTID='%s'\n", hwaddr_ntoa (iface->hwaddr, iface->hwlen));
-	fprintf (f, "DHCPCHADDR='%s'\n", hwaddr_ntoa (iface->hwaddr, iface->hwlen));
-
-#ifdef ENABLE_INFO_COMPAT
-	/* Support the old .info settings if we need to */
-	fprintf (f, "\n# dhcpcd-1.x and 2.x compatible variables\n");
-	if (dhcp->dnsservers) {
-		fprintf (f, "DNS='");
-		for (address = dhcp->dnsservers; address; address = address->next) {
-			fprintf (f, "%s", inet_ntoa (address->address));
-			if (address->next)
-				fprintf (f, ",");
-		}
-		fprintf (f, "'\n");
-	}
-
-	if (dhcp->routes) {
-		bool doneone = false;
-		fprintf (f, "GATEWAY='");
-		for (route = dhcp->routes; route; route = route->next) {
-			if (route->destination.s_addr == 0) {
-				if (doneone)
-					fprintf (f, ",");
-				fprintf (f, "%s", inet_ntoa (route->gateway));
-				doneone = true;
-			}
-		}
-		fprintf (f, "'\n");
-	}
-#endif
-
-	fprintf (f, "\n");	
-	fclose (f);
 	return 0;
 }
 #endif
@@ -738,7 +569,8 @@ int configure (const options_t *options, interface_t *iface,
 	}
 
 #ifdef ENABLE_INFO
-	write_info (iface, dhcp, options);
+	if (! dhcp->frominfo)
+		write_info (iface, dhcp, options);
 #endif
 
 	if (iface->previous_address.s_addr != dhcp->address.s_addr ||

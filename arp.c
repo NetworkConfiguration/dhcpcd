@@ -34,6 +34,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "config.h"
 #include "common.h"
 #include "arp.h"
 #include "interface.h"
@@ -59,6 +60,7 @@
 #define arphdr_len(ap) (arphdr_len2 ((ap)->ar_hln, (ap)->ar_pln))
 #endif
 
+#ifdef ENABLE_ARP
 int arp_check (interface_t *iface, struct in_addr address)
 {
 	union {
@@ -165,4 +167,4 @@ int arp_check (interface_t *iface, struct in_addr address)
 	iface->fd = -1;
 	return 0;
 }
-
+#endif

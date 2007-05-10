@@ -21,6 +21,7 @@
 
 #include <sys/types.h>
 #include <sys/select.h>
+#include <sys/time.h>
 #include <arpa/inet.h>
 #ifdef __linux__
 #include <netinet/ether.h>
@@ -35,12 +36,18 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "config.h"
 #include "common.h"
+#ifdef ENABLE_ARP
 #include "arp.h"
+#endif
 #include "client.h"
 #include "configure.h"
 #include "dhcp.h"
 #include "dhcpcd.h"
+#ifdef ENABLE_INFO
+#include "info.h"
+#endif
 #include "interface.h"
 #include "logger.h"
 #include "signals.h"
@@ -176,7 +183,7 @@ int dhcp_run (const options_t *options)
 		if (timeout > 0 || (options->timeout == 0 &&
 							(state != STATE_INIT || xid)))
 		{
-			if (options->timeout == 0 ||
+			if ((options->timeout == 0 && xid) ||
 				(dhcp->leasetime == (unsigned) -1 && state == STATE_BOUND))
 			{
 				int retry = 0;
@@ -302,7 +309,65 @@ int dhcp_run (const options_t *options)
 					if (xid == 0)
 						xid = random_xid ();
 					else {
+						SOCKET_MODE (SOCKET_CLOSED);
 						logger (LOG_ERR, "timed out");
+#ifdef ENABLE_INFO
+						if (options->dolastlease) {
+							unsigned int offset = 0;
+
+							logger (LOG_INFO, "trying to use old lease in `%s'",
+									iface->infofile);
+							if (! read_info (iface, dhcp)) {
+								if (! daemonised) {
+									retval = EXIT_FAILURE;
+									goto eexit;
+								}
+							}
+
+							/* Ensure that we can still use the lease */
+							if (gettimeofday (&tv, NULL) == -1) {
+								logger (LOG_ERR, "gettimeofday: %s", strerror (errno));
+								retval = EXIT_FAILURE;
+								goto eexit;
+							}
+
+							offset = tv.tv_sec - dhcp->leasedfrom;
+							if (dhcp->leasedfrom &&
+								tv.tv_sec - dhcp->leasedfrom > dhcp->leasetime)
+							{
+								logger (LOG_ERR, "lease expired %u seconds ago",
+										offset + dhcp->leasetime);
+								if (! daemonised) {
+									retval = EXIT_FAILURE;
+									goto eexit;
+								}
+							} else {
+								logger (LOG_INFO, "using last known IP address %s",
+										inet_ntoa (dhcp->address));
+								if (configure (options, iface, dhcp)) {
+									retval = EXIT_FAILURE;
+									goto eexit;
+								}
+
+								state = STATE_BOUND;
+								/* We'll timeout above if timeout is negative,
+								 * so no need for special handling */
+								if (dhcp->leasedfrom == 0)
+									offset = 0;
+								timeout = dhcp->renewaltime - offset;
+								iface->start_uptime = uptime ();
+
+								if (! daemonised && options->daemonise) {
+									if ((daemonise (options->pidfile)) < 0) {
+										retval = -1;
+										goto eexit;
+									}
+									daemonised = true;
+								}		    
+								continue;
+							}
+						}
+#endif
 						if (! daemonised) {
 							retval = EXIT_FAILURE;
 							goto eexit;
@@ -340,6 +405,8 @@ int dhcp_run (const options_t *options)
 					logger (LOG_ERR, "lost lease, attemping to rebind");
 					memset (&dhcp->address, 0, sizeof (struct in_addr));
 					SOCKET_MODE (SOCKET_OPEN);
+					if (xid == 0)
+						xid = random_xid ();
 					SEND_MESSAGE (DHCP_REQUEST);
 					timeout = dhcp->leasetime - dhcp->rebindtime;
 					state = STATE_REQUESTING;
@@ -458,6 +525,7 @@ int dhcp_run (const options_t *options)
 				case STATE_REBINDING:
 					if (type == DHCP_ACK) {
 						SOCKET_MODE (SOCKET_CLOSED);
+#ifdef ENABLE_ARP
 						if (options->doarp && iface->previous_address.s_addr !=
 							dhcp->address.s_addr)
 						{
@@ -479,6 +547,7 @@ int dhcp_run (const options_t *options)
 								continue;
 							}
 						}
+#endif
 
 						if (dhcp->leasetime == (unsigned) -1) {
 							dhcp->renewaltime = dhcp->rebindtime = dhcp->leasetime;

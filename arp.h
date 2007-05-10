@@ -20,10 +20,12 @@
 #ifndef ARP_H
 #define ARP_H
 
+#ifdef ENABLE_ARP
 #include <netinet/in.h>
 
 #include "interface.h"
 
 int arp_check (interface_t *iface, struct in_addr address);
+#endif
 
 #endif

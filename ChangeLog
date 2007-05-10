@@ -1,3 +1,6 @@
+config.h now has the compile time options, instead of being dotted around.
+Added -E option, which reads the last info file and uses the information there
+if we timeout and the lease is still valid, thanks to Roberto Angelino.
 Compiles ok on NetBSD, but doesn't add routes yet - thanks to Gabor Z. Papp.
 If the current hostname contains dots then send it as a FQDN.
 Ensure that static routes are always added before routers.

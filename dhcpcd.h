@@ -57,6 +57,7 @@ typedef struct options_t {
 	bool domtu;
 	bool donis;
 	bool dontp;
+	bool dolastlease;
 
 	int signal;
 	bool persistent;

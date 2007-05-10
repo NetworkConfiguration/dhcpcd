@@ -87,7 +87,7 @@ long uptime (void)
 {
 	struct timespec tp;
 
-	if (clock_gettime(CLOCK_MONOTONIC, &tp) == -1) {
+	if (clock_gettime (CLOCK_MONOTONIC, &tp) == -1) {
 		logger (LOG_ERR, "clock_gettime: %s", strerror (errno));
 		return -1;
 	}

@@ -131,6 +131,7 @@ typedef struct dhcp_t
 	struct in_addr broadcast;
 	unsigned short mtu;
 
+	unsigned int leasedfrom;
 	unsigned int leasetime;
 	unsigned int renewaltime;
 	unsigned int rebindtime;
@@ -151,6 +152,8 @@ typedef struct dhcp_t
 
 	char *message;
 	char *rootpath;
+
+	bool frominfo;
 } dhcp_t;
 
 

@@ -93,7 +93,7 @@ void make_pid (const char *pidfile)
 
 static void usage ()
 {
-	printf ("usage: "PACKAGE" [-adknpGHMNRY] [-c script] [-h hostame] [-i classID]\n"
+	printf ("usage: "PACKAGE" [-adknpGHLMNRY] [-c script] [-h hostame] [-i classID]\n"
 	        "              [-l leasetime] [-m metric] [-s ipaddress] [-t timeout]\n"
 	        "              [-u userclass] [-F [none | ptr | both]] [-I clientID]\n");
 }
@@ -125,14 +125,15 @@ int main(int argc, char **argv)
         {"request",     required_argument,  NULL, 's'},
         {"timeout",     required_argument,  NULL, 't'},
         {"userclass",   required_argument,  NULL, 'u'},
-        {"fqdn",        optional_argument,  NULL, 'F'},
+        {"lastlease",   no_argument,        NULL, 'E'},
+		{"fqdn",        optional_argument,  NULL, 'F'},
         {"nogateway",   no_argument,        NULL, 'G'},
         {"sethostname", no_argument,        NULL, 'H'},
         {"clientid",    required_argument,  NULL, 'I'},
         {"nomtu",       no_argument,        NULL, 'M'},
         {"nontp",       no_argument,        NULL, 'N'},
         {"nodns",       no_argument,        NULL, 'R'},
-        {"nonis",       no_argument,        NULL, 'Y'},
+		{"nonis",       no_argument,        NULL, 'Y'},
         {"help",        no_argument,        &dohelp, 1},
         {"version",     no_argument,        &doversion, 1},
         {NULL,          0,                  NULL, 0}
@@ -157,7 +158,7 @@ int main(int argc, char **argv)
 	options.daemonise = true;
 	options.timeout = DEFAULT_TIMEOUT;
 
-	while ((ch = getopt_long(argc, argv, "ac:dh:i:kl:m:nps:t:u:F:GHI:MNRY", longopts,
+	while ((ch = getopt_long(argc, argv, "ac:dh:i:kl:m:nps:t:u:EF:GHI:MNRY", longopts,
 							 &option_index)) != -1)
 		switch (ch) {
 			case 0:
@@ -248,6 +249,9 @@ int main(int argc, char **argv)
 					options.userclass[offset] = strlen (optarg);
 					options.userclass_len += (strlen (optarg)) + 1;
 				}
+				break;
+			case 'E':
+				options.dolastlease = true;
 				break;
 			case 'F':
 				if (strncmp (optarg, "none", strlen (optarg)) == 0)

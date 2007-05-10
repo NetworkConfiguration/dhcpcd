@@ -9,7 +9,7 @@ dhcpcd \- DHCP client daemon
 .in +.5i
 .ti -.5i
 dhcpcd
-\%[\-adknpGHNRY]
+\%[\-adknpGHMNRTY]
 \%[\-c\ script]
 \%[\-h\ hostname]
 \%[\-i\ vendorClassID]
@@ -234,6 +234,15 @@ Prevents
 from replacing
 .I /etc/resolv.conf
 or using resolvconf.
+.TP
+.BI \-T
+Will read 
+.I /var/lib/dhcpcd/dhcpcd-<interface>.info
+file and use last known good lease if
+.B dhcpcd
+is unable to reach the DHCP server and the lease has not expired.
+This puts \fBdhcpcd\fR into the BOUND or REBINDING state depending on
+how long the lease has until expiry.
 .TP
 .BI \-Y
 Prevents
