@@ -1,7 +1,7 @@
 /*
  * dhcpcd - DHCP client daemon -
- * Copyright 2005 - 2007 Roy Marples <uberlord@gentoo.org>
- *
+ * Copyright 2006-2007 Roy Marples <uberlord@gentoo.org>
+ * 
  * dhcpcd is an RFC2131 compliant DHCP client daemon.
  *
  * This is free software; you can redistribute it and/or modify it
@@ -19,8 +19,27 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#ifndef PATHNAMES_H
-#define PATHNAMES_H
+#ifndef CONFIG_H
+#define CONFIG_H
+
+/* You can enable/disable various chunks of optional code here.
+ * You would only do this to try and shrink the end binary if dhcpcd
+ * was running on a low memory device */
+
+#define ENABLE_ARP
+#define ENABLE_NTP
+#define ENABLE_NIS
+#define ENABLE_INFO
+/* Define this to enable some compatability with 1.x and 2.x info files */
+// #define ENABLE_INFO_COMPAT
+
+/* We will auto create a DUID_LLT file if it doesn't exist.
+ * You can always create your own DUID file that just contains the
+ * hex string that represents the DUID.
+ * See RFC 3315 for details on this. */
+#define ENABLE_DUID
+
+/* Packname name and pathname definitions */
 
 #define PACKAGE             "dhcpcd"
 
@@ -50,5 +69,7 @@
 
 #define CONFIGDIR           STATEDIR "/lib/" PACKAGE
 #define INFOFILE            CONFIGDIR "/" PACKAGE "-%s.info"
+
+#define DUIDFILE            CONFIGDIR "/" PACKAGE ".duid"
 
 #endif

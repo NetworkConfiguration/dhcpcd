@@ -31,6 +31,13 @@
 #include <limits.h>
 #include <stdbool.h>
 
+#include "config.h"
+#ifdef ENABLE_DUID
+#ifndef DUID_LENGTH_MAX
+#define DUID_LENGTH_MAX 128 + 2
+#endif
+#endif
+
 #define EUI64_ADDR_LEN			8
 #define INFINIBAND_ADDR_LEN		20
 
@@ -82,6 +89,11 @@ typedef struct interface_t
 	route_t *previous_routes;
 
 	long start_uptime;
+
+#ifdef ENABLE_DUID
+	unsigned char duid[DUID_LENGTH_MAX];
+	int duid_length;
+#endif
 } interface_t;
 
 void free_address (address_t *addresses);

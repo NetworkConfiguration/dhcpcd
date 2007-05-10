@@ -58,11 +58,15 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "config.h"
 #include "common.h"
 #include "dhcp.h"
 #include "interface.h"
 #include "logger.h"
-#include "pathnames.h"
+
+#ifdef ENABLE_DUID
+#include "duid.h"
+#endif
 
 void free_address (address_t *addresses)
 {
@@ -277,6 +281,13 @@ interface_t *read_interface (const char *ifname, int metric)
 
 	logger (LOG_INFO, "hardware address = %s",
 			hwaddr_ntoa (iface->hwaddr, iface->hwlen));
+
+#ifdef ENABLE_DUID
+	get_duid (iface);
+	if (iface->duid_length > 0)
+		logger (LOG_INFO, "DUID = %s",
+				hwaddr_ntoa (iface->duid, iface->duid_length));
+#endif
 
 	/* 0 is a valid fd, so init to -1 */
 	iface->fd = -1;

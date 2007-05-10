@@ -240,6 +240,24 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 		*p++ = 0; /* string */
 		memcpy (p, options, l);
 		p += l;
+#ifdef ENABLE_DUID
+	} else if (iface->duid) {
+		*p++ = iface->duid_length + 5;
+		*p++ = 255; /* RFC 4361 */
+
+		/* IAID is 4 bytes, so if the interface name is 4 bytes then use it */
+		if (strlen (iface->name) == 4) {
+			memcpy (p, iface->name, 4);
+		} else {
+			/* Name isn't 4 bytes, so use the index */
+			ul = htonl (if_nametoindex (iface->name));
+			memcpy (p, &ul, 4);
+		}
+		p += 4;
+
+		memcpy (p, iface->duid, iface->duid_length);
+		p += iface->duid_length;
+#endif
 	} else {
 		*p++ = iface->hwlen + 1;
 		*p++ = iface->family;

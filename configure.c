@@ -47,7 +47,6 @@
 #endif
 #include "interface.h"
 #include "dhcpcd.h"
-#include "pathnames.h"
 #include "logger.h"
 #include "socket.h"
 

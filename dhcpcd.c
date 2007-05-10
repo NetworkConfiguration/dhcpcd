@@ -38,15 +38,13 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "config.h"
 #include "client.h"
 #include "dhcpcd.h"
 #include "dhcp.h"
 #include "interface.h"
 #include "logger.h"
-#include "pathnames.h"
 #include "version.h"
-
-#define PACKAGE "dhcpcd"
 
 #define STRINGINT(_string, _int) { \
 	char *_tmp; \

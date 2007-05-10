@@ -212,10 +212,12 @@ information is recorded in the
 file.
 .TP
 .BI \-I \ clientID
-Specifies the client identifier string.
+Specifies the client identifier string. If not specified then
 .B dhcpcd
-uses the default client identifier (MAC address of the network
-interface) if it is not specified.
+will attempt to create a client identifier according to \fBRFC 4361\fR
+and store the DUID part in /var/lib/dhcpcd/dhcpcd.duid, otherwise
+.B dhcpcd
+uses the MAC address of the network interface.
 .TP
 .BI \-M
 Prevents

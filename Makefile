@@ -45,7 +45,7 @@ MAN8_TARGETS = dhcpcd.8
 TARGET = $(SBIN_TARGETS)
 
 dhcpcd_H = version.h
-dhcpcd_OBJS = arp.o client.o common.o configure.o dhcp.o dhcpcd.o \
+dhcpcd_OBJS = arp.o client.o common.o configure.o dhcp.o dhcpcd.o duid.o \
 		info.o interface.o logger.o signals.o socket.o
 
 # By default we don't need to link to anything

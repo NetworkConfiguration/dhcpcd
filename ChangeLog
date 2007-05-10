@@ -1,3 +1,6 @@
+Use the DUID stored to create an RFC 4361 conformant client identifier
+if none is specified instead of just using the MAC address.
+Create a DUID-LLT according to RFC 3315 and store it in peristent file.
 config.h now has the compile time options, instead of being dotted around.
 Added -E option, which reads the last info file and uses the information there
 if we timeout and the lease is still valid, thanks to Roberto Angelino.
