@@ -127,7 +127,7 @@ int main(int argc, char **argv)
 		{"fqdn",        optional_argument,  NULL, 'F'},
         {"nogateway",   no_argument,        NULL, 'G'},
         {"sethostname", no_argument,        NULL, 'H'},
-        {"clientid",    required_argument,  NULL, 'I'},
+        {"clientid",    optional_argument,  NULL, 'I'},
         {"nomtu",       no_argument,        NULL, 'M'},
         {"nontp",       no_argument,        NULL, 'N'},
         {"nodns",       no_argument,        NULL, 'R'},
@@ -156,8 +156,9 @@ int main(int argc, char **argv)
 	options.daemonise = true;
 	options.timeout = DEFAULT_TIMEOUT;
 
-	while ((ch = getopt_long(argc, argv, "ac:dh:i:kl:m:nps:t:u:EF:GHI:MNRY", longopts,
+	while ((ch = getopt_long(argc, argv, "ac:dh:i:kl:m:nps:t:u:EF::GHI::MNRY", longopts,
 							 &option_index)) != -1)
+	{
 		switch (ch) {
 			case 0:
 				if (longopts[option_index].flag)
@@ -252,16 +253,19 @@ int main(int argc, char **argv)
 				options.dolastlease = true;
 				break;
 			case 'F':
-				if (strncmp (optarg, "none", strlen (optarg)) == 0)
-					options.fqdn = FQDN_NONE;
-				else if (strncmp (optarg, "ptr", strlen (optarg)) == 0)
-					options.fqdn = FQDN_PTR;
-				else if (strncmp (optarg, "both", strlen (optarg)) == 0)
+				if (optarg) {
+					if (strncmp (optarg, "none", strlen (optarg)) == 0)
+						options.fqdn = FQDN_NONE;
+					else if (strncmp (optarg, "ptr", strlen (optarg)) == 0)
+						options.fqdn = FQDN_PTR;
+					else if (strncmp (optarg, "both", strlen (optarg)) == 0)
+						options.fqdn = FQDN_BOTH;
+					else {
+						logger (LOG_ERR, "invalid value `%s' for FQDN", optarg);
+						exit (EXIT_FAILURE);
+					}
+				} else
 					options.fqdn = FQDN_BOTH;
-				else {
-					logger (LOG_ERR, "invalid value `%s' for FQDN", optarg);
-					exit (EXIT_FAILURE);
-				}
 				break;
 			case 'G':
 				options.dogateway = false;
@@ -270,12 +274,16 @@ int main(int argc, char **argv)
 				options.dohostname = true;
 				break;
 			case 'I':
-				if (strlen (optarg) > CLIENT_ID_MAX_LEN) {
-					logger (LOG_ERR, "`%s' is too long for ClientID, max is %d",
-							optarg, CLIENT_ID_MAX_LEN);
-					exit (EXIT_FAILURE);
+				if (optarg && strlen(optarg) > 0) {
+					if (strlen (optarg) > CLIENT_ID_MAX_LEN) {
+						logger (LOG_ERR, "`%s' is too long for ClientID, max is %d",
+								optarg, CLIENT_ID_MAX_LEN);
+						exit (EXIT_FAILURE);
+					} else
+						strlcpy (options.clientid, optarg, sizeof (options.clientid));
+					options.clientid_len = strlen (options.clientid);
 				} else
-					strlcpy (options.clientid, optarg, sizeof (options.clientid));
+					options.clientid_len = -1;
 				break;
 			case 'M':
 				options.domtu = false;
@@ -296,7 +304,7 @@ int main(int argc, char **argv)
 				usage ();
 				exit (EXIT_FAILURE);
 		}
-
+	}
 	if (doversion)
 		printf (""PACKAGE" "VERSION"\n");
 

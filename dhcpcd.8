@@ -18,8 +18,8 @@ dhcpcd
 \%[\-s\ ipaddr]
 \%[\-t\ timeout]
 \%[\-u\ userClass]
-\%[\-F\ none | ptr | both]
-\%[\-I\ clientID]
+\%[\-F\ [ none | ptr | both ] ]
+\%[\-I\ [ clientID ] ]
 \%[interface]
 .in -.5i
 .SH DESCRIPTION
@@ -217,7 +217,8 @@ Specifies the client identifier string. If not specified then
 will attempt to create a client identifier according to \fBRFC 4361\fR
 and store the DUID part in /var/lib/dhcpcd/dhcpcd.duid, otherwise
 .B dhcpcd
-uses the MAC address of the network interface.
+uses the MAC address of the network interface. If \fB-I\fR is not given
+an option then we use the MAC address of the network interface.
 .TP
 .BI \-M
 Prevents

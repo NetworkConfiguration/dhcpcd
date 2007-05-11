@@ -234,12 +234,11 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 	}
 
 	*p++ = DHCP_CLIENTID;
-	if (options->clientid[0]) {
-		l = strlen (options->clientid);
-		*p++ = l + 1;
+	if (options->clientid_len > 0) {
+		*p++ = options->clientid_len + 1;
 		*p++ = 0; /* string */
-		memcpy (p, options, l);
-		p += l;
+		memcpy (p, options, options->clientid_len);
+		p += options->clientid_len;
 #ifdef ENABLE_DUID
 	} else if (iface->duid) {
 		*p++ = iface->duid_length + 5;

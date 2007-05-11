@@ -171,13 +171,15 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 	fprintf (f, "REBINDTIME='%u'\n", dhcp->rebindtime);
 	fprintf (f, "INTERFACE='%s'\n", iface->name);
 	fprintf (f, "CLASSID='%s'\n", cleanmetas (options->classid));
-	if (options->clientid[0])
-		fprintf (f, "CLIENTID='%s'\n", cleanmetas (options->clientid));
+	if (options->clientid_len > 0)
+		fprintf (f, "CLIENTID='00:%s'\n", cleanmetas (options->clientid));
 #ifdef ENABLE_DUID
-	else if (iface->duid_length > 0) {
+	else if (iface->duid_length > 0 && options->clientid_len != -1) {
 		unsigned char duid[256];
 		unsigned char *p = duid;
 		uint32_t ul;
+
+		*p++ = 255;
 
 		/* IAID is 4 bytes, so if the interface name is 4 bytes then use it */
 		if (strlen (iface->name) == 4) {
@@ -196,7 +198,8 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 	}
 #endif
 	else
-		fprintf (f, "CLIENTID='%s'\n", hwaddr_ntoa (iface->hwaddr, iface->hwlen));
+		fprintf (f, "CLIENTID='%.2X:%s'\n", iface->family,
+				 hwaddr_ntoa (iface->hwaddr, iface->hwlen));
 	fprintf (f, "DHCPCHADDR='%s'\n", hwaddr_ntoa (iface->hwaddr, iface->hwlen));
 
 #ifdef ENABLE_INFO_COMPAT
