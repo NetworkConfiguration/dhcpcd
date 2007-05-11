@@ -55,26 +55,26 @@
 
 /* We need this for our maximum timeout as FreeBSD's select cannot handle
    any higher than this. Is there a better way of working this out? */
-#define SELECT_MAX 100000000 
+#define SELECT_MAX              100000000
 
 /* This is out mini timeout.
    Basically we resend the last request every TIMEOUT_MINI seconds. */
-#define TIMEOUT_MINI 		3
+#define TIMEOUT_MINI            3
 /* Except for an infinite timeout. We keep adding TIMEOUT_MINI to
    ourself until TIMEOUT_MINI_INF is reached. */
-#define TIMEOUT_MINI_INF	60
+#define TIMEOUT_MINI_INF        60
 
-#define STATE_INIT		0
-#define STATE_REQUESTING	1
-#define STATE_BOUND		2
-#define STATE_RENEWING	        3
-#define STATE_REBINDING		4
-#define STATE_REBOOT		5
-#define STATE_RENEW_REQUESTED	6
-#define STATE_RELEASED		7
+#define STATE_INIT              0
+#define STATE_REQUESTING        1
+#define STATE_BOUND             2
+#define STATE_RENEWING          3
+#define STATE_REBINDING         4
+#define STATE_REBOOT            5
+#define STATE_RENEW_REQUESTED   6
+#define STATE_RELEASED          7
 
-#define SOCKET_CLOSED		0
-#define SOCKET_OPEN		1
+#define SOCKET_CLOSED           0
+#define SOCKET_OPEN             1
 
 #define SOCKET_MODE(_mode) { \
 	if (iface->fd >= 0) close (iface->fd); \
@@ -160,22 +160,38 @@ int dhcp_run (const options_t *options)
 	unsigned char *buffer = NULL;
 	int buffer_len = 0;
 	int buffer_pos = 0;
+	struct in_addr netmask;
+	struct in_addr broadcast;
 
 	if (! options || (iface = (read_interface (options->interface,
 											   options->metric))) == NULL)
 		return -1;
 
+	dhcp = xmalloc (sizeof (dhcp_t));
+	memset (dhcp, 0, sizeof (dhcp_t));
+
+	memset (&netmask, 0, sizeof (struct in_addr));
+	memset (&broadcast, 0, sizeof (struct in_addr));
+	
 	/* Remove all existing addresses.
 	   After all, we ARE a DHCP client whose job it is to configure the
 	   interface. We only do this on start, so persistent addresses can be added
 	   afterwards by the user if needed. */
-	flush_addresses (iface->name);
-
-	dhcp = xmalloc (sizeof (dhcp_t));
-	memset (dhcp, 0, sizeof (dhcp_t));
-
-	if (options->requestaddress.s_addr != 0)
+	if (! options->doinform)
+		flush_addresses (iface->name);
+	else {
 		dhcp->address.s_addr = options->requestaddress.s_addr;
+
+		/* The inform address HAS to be configured for it to work with most
+		 * DHCP servers */
+		if (options->doinform && has_address (iface->name, dhcp->address) < 1) {
+			netmask.s_addr = get_netmask (dhcp->address.s_addr);
+			broadcast.s_addr = dhcp->address.s_addr | ~netmask.s_addr;
+			add_address (iface->name, dhcp->address, netmask, broadcast);
+			iface->previous_address = dhcp->address;
+			iface->previous_netmask = netmask;
+		}
+	}
 
 	signal_setup ();
 
@@ -298,7 +314,7 @@ int dhcp_run (const options_t *options)
 			/* timed out */
 			switch (state) {
 				case STATE_INIT:
-					if (iface->previous_address.s_addr != 0) {
+					if (iface->previous_address.s_addr != 0 && ! options->doinform) {
 						logger (LOG_ERR, "lost lease");
 						xid = 0;
 						SOCKET_MODE (SOCKET_CLOSED);
@@ -380,6 +396,11 @@ int dhcp_run (const options_t *options)
 					if (dhcp->address.s_addr == 0) {
 						logger (LOG_INFO, "broadcasting for a lease");
 						SEND_MESSAGE (DHCP_DISCOVER);
+					} else if (options->doinform) {
+						logger (LOG_INFO, "broadcasting inform for %s",
+								inet_ntoa (dhcp->address));
+						SEND_MESSAGE (DHCP_INFORM);
+						state = STATE_REQUESTING;
 					} else {
 						logger (LOG_INFO, "broadcasting for a lease of %s",
 								inet_ntoa (dhcp->address));
@@ -412,7 +433,7 @@ int dhcp_run (const options_t *options)
 					state = STATE_REQUESTING;
 					break;
 				case STATE_REQUESTING:
-					if (iface->previous_address.s_addr != 0)
+					if (iface->previous_address.s_addr != 0 && ! options->doinform)
 						logger (LOG_ERR, "lost lease");
 					else
 						logger (LOG_ERR, "timed out");
@@ -423,7 +444,8 @@ int dhcp_run (const options_t *options)
 					SOCKET_MODE (SOCKET_CLOSED);
 					timeout = 0;
 					xid = 0;
-					DROP_CONFIG;
+					if (! options->doinform)
+						DROP_CONFIG;
 					break;
 
 				case STATE_RELEASED:
@@ -549,11 +571,20 @@ int dhcp_run (const options_t *options)
 						}
 #endif
 
-						if (dhcp->leasetime == (unsigned) -1) {
+						if (options->doinform) {
+							dhcp->address = options->requestaddress;
+							logger (LOG_INFO, "received approval for %s",
+									inet_ntoa (dhcp->address));
+							timeout = options->leasetime;
+							if (timeout == 0)
+								timeout = DEFAULT_LEASETIME;
+							state = STATE_INIT;
+						} else if (dhcp->leasetime == (unsigned) -1) {
 							dhcp->renewaltime = dhcp->rebindtime = dhcp->leasetime;
 							timeout = 1; /* So we select on infinity */
 							logger (LOG_INFO, "leased %s for infinity",
 									inet_ntoa (dhcp->address));
+							state = STATE_BOUND;
 						} else {
 							if (! dhcp->leasetime) {
 								dhcp->leasetime = DEFAULT_LEASETIME;
@@ -597,9 +628,9 @@ int dhcp_run (const options_t *options)
 										dhcp->rebindtime);
 
 							timeout = dhcp->renewaltime;
+							state = STATE_BOUND;
 						}
 
-						state = STATE_BOUND;
 						xid = 0;
 
 						if (configure (options, iface, dhcp) < 0 && ! daemonised) {

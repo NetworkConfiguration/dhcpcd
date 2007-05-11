@@ -60,9 +60,11 @@ typedef struct options_t {
 	bool donis;
 	bool dontp;
 	bool dolastlease;
+	bool doinform;
 
 	int signal;
 	bool persistent;
+	bool keep_address;
 	bool daemonise;
 
 	char *script;

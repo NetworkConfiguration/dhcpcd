@@ -111,6 +111,24 @@ int inet_ntocidr (struct in_addr address)
 	return (cidr);
 }
 
+unsigned long get_netmask (unsigned long addr)
+{
+	unsigned long dst;
+
+	if (addr == 0)
+		return (0);
+
+	dst = htonl (addr);
+	if (IN_CLASSA (dst))
+		return (ntohl (IN_CLASSA_NET));
+	if (IN_CLASSB (dst))
+		return (ntohl (IN_CLASSB_NET));
+	if (IN_CLASSC (dst))
+		return (ntohl (IN_CLASSC_NET));
+
+	return (0);
+}
+
 char *hwaddr_ntoa (const unsigned char *hwaddr, int hwlen)
 {
 	static char buffer[128];
@@ -862,7 +880,7 @@ int del_route (const char *ifname, struct in_addr destination,
 }
 
 #ifdef HAVE_IFADDRS_H
-int flush_addresses (const char *ifname)
+static int _do_addresses (const char *ifname, struct in_addr *addr, bool flush, bool get)
 {
 	struct ifaddrs *ifap;
 	struct ifaddrs *p;
@@ -886,16 +904,30 @@ int flush_addresses (const char *ifname)
 		us_a.sa = p->ifa_addr;
 		us_m.sa = p->ifa_netmask;
 
-		if (us_a.sin->sin_family == AF_INET)
-			if (del_address (ifname, us_a.sin->sin_addr, us_m.sin->sin_addr) < 0)
-				retval = -1;
+		if (us_a.sin->sin_family == AF_INET) {
+			if (flush) {
+				if (del_address (ifname, us_a.sin->sin_addr, us_m.sin->sin_addr)
+					< 0)
+					retval = -1;
+			} else if (get) {
+				addr->s_addr = us_a.sin->sin_addr.s_addr;
+				retval = 1;
+				break;
+			} else {
+				if (us_a.sin->sin_addr.s_addr == addr->s_addr) {
+					retval = 1;
+					break;
+				}
+			}
+		}
 	}
 	freeifaddrs (ifap);
 
 	return retval;
 }
+
 #else
-int flush_addresses (const char *ifname)
+static int _do_addresses (const char *ifname, struct in_addr address, bool flush)
 {
 	int s;
 	struct ifconf ifc;
@@ -936,8 +968,15 @@ int flush_addresses (const char *ifname)
 
 		if (ifr->ifr_addr.sa_family == AF_INET
 			&& strcmp (ifname, ifr->ifr_name) == 0)
-			if (del_address (ifname, addr->sin_addr, netm->sin_addr) < 0)
-				retval = -1;
+		{
+			if (flush) {
+				if (del_address (ifname, addr->sin_addr, netm->sin_addr) < 0)
+					retval = -1;
+			} else if (addr->sin_addr.s_addr == address.s_addr) {
+				retval = 1;
+				break;
+			}
+		}
 		ifr++;
 	}
 
@@ -945,3 +984,23 @@ int flush_addresses (const char *ifname)
 	return retval;
 }
 #endif
+
+int flush_addresses (const char *ifname)
+{
+	struct in_addr address;
+	return (_do_addresses (ifname, &address, true, false));
+}
+
+unsigned long get_address (const char *ifname)
+{
+	struct in_addr address;
+	if (_do_addresses (ifname, &address, false, true) > 0)
+		return (address.s_addr);
+	return (0);
+}
+
+int has_address (const char *ifname, struct in_addr address)
+{
+	return (_do_addresses (ifname, &address, false, false));
+}
+

@@ -91,9 +91,9 @@ void make_pid (const char *pidfile)
 
 static void usage ()
 {
-	printf ("usage: "PACKAGE" [-adknpGHLMNRY] [-c script] [-h hostame] [-i classID]\n"
+	printf ("usage: "PACKAGE" [-adknpEGHMNRSY] [-c script] [-h hostame] [-i classID]\n"
 	        "              [-l leasetime] [-m metric] [-s ipaddress] [-t timeout]\n"
-	        "              [-u userclass] [-F [none | ptr | both]] [-I clientID]\n");
+	        "              [-u userclass] [-F [none | ptr | both]] [-I [clientID]]\n");
 }
 
 int main(int argc, char **argv)
@@ -110,31 +110,32 @@ int main(int argc, char **argv)
 	int i;
 
 	const struct option longopts[] = {
-        {"arp",         no_argument,        NULL, 'a'},
-        {"script",      required_argument,  NULL, 'c'},
-        {"debug",       no_argument,        NULL, 'd'},
-        {"hostname",    required_argument,  NULL, 'h'},
-        {"classid",     required_argument,  NULL, 'i'},
-        {"release",     no_argument,        NULL, 'k'},
-        {"leasetime",   required_argument,  NULL, 'l'},
-        {"metric",      required_argument,  NULL, 'm'},
-        {"renew",       no_argument,        NULL, 'n'},
-        {"persistent",  no_argument,        NULL, 'p'},
-        {"request",     required_argument,  NULL, 's'},
-        {"timeout",     required_argument,  NULL, 't'},
-        {"userclass",   required_argument,  NULL, 'u'},
-        {"lastlease",   no_argument,        NULL, 'E'},
+		{"arp",         no_argument,        NULL, 'a'},
+		{"script",      required_argument,  NULL, 'c'},
+		{"debug",       no_argument,        NULL, 'd'},
+		{"hostname",    required_argument,  NULL, 'h'},
+		{"classid",     required_argument,  NULL, 'i'},
+		{"release",     no_argument,        NULL, 'k'},
+		{"leasetime",   required_argument,  NULL, 'l'},
+		{"metric",      required_argument,  NULL, 'm'},
+		{"renew",       no_argument,        NULL, 'n'},
+		{"persistent",  no_argument,        NULL, 'p'},
+		{"request",     required_argument,  NULL, 's'},
+		{"timeout",     required_argument,  NULL, 't'},
+		{"userclass",   required_argument,  NULL, 'u'},
+		{"lastlease",   no_argument,        NULL, 'E'},
 		{"fqdn",        optional_argument,  NULL, 'F'},
-        {"nogateway",   no_argument,        NULL, 'G'},
-        {"sethostname", no_argument,        NULL, 'H'},
-        {"clientid",    optional_argument,  NULL, 'I'},
-        {"nomtu",       no_argument,        NULL, 'M'},
-        {"nontp",       no_argument,        NULL, 'N'},
-        {"nodns",       no_argument,        NULL, 'R'},
+		{"nogateway",   no_argument,        NULL, 'G'},
+		{"sethostname", no_argument,        NULL, 'H'},
+		{"clientid",    optional_argument,  NULL, 'I'},
+		{"nomtu",       no_argument,        NULL, 'M'},
+		{"nontp",       no_argument,        NULL, 'N'},
+		{"nodns",       no_argument,        NULL, 'R'},
+		{"inform",      no_argument,        NULL, 'S'},
 		{"nonis",       no_argument,        NULL, 'Y'},
-        {"help",        no_argument,        &dohelp, 1},
-        {"version",     no_argument,        &doversion, 1},
-        {NULL,          0,                  NULL, 0}
+		{"help",        no_argument,        &dohelp, 1},
+		{"version",     no_argument,        &doversion, 1},
+		{NULL,          0,                  NULL, 0}
 	};
 
 	/* Close any un-needed fd's */
@@ -154,9 +155,10 @@ int main(int argc, char **argv)
 	options.dontp = true;
 	options.dogateway = true;
 	options.daemonise = true;
+	options.doinform = false;
 	options.timeout = DEFAULT_TIMEOUT;
 
-	while ((ch = getopt_long(argc, argv, "ac:dh:i:kl:m:nps:t:u:EF::GHI::MNRY", longopts,
+	while ((ch = getopt_long(argc, argv, "ac:dh:i:kl:m:nps::t:u:EF::GHI::MNRSY", longopts,
 							 &option_index)) != -1)
 	{
 		switch (ch) {
@@ -187,7 +189,7 @@ int main(int argc, char **argv)
 				break;
 			case 'h':
 				if (strlen (optarg) > sizeof (options.hostname)) {
-					logger (LOG_ERR, "`%s' too long for HostName string, max is %d",
+					logger (LOG_ERR, "`%s' too long for HostName string, max is %lu",
 							optarg, sizeof (options.hostname));
 					exit (EXIT_FAILURE);
 				} else
@@ -221,7 +223,7 @@ int main(int argc, char **argv)
 				options.persistent = true;
 				break;
 			case 's':
-				if (! inet_aton (optarg, &options.requestaddress)) {
+				if (! inet_aton (optarg, &options.requestaddress)) { 
 					logger (LOG_ERR, "`%s' is not a valid IP address", optarg);
 					exit (EXIT_FAILURE);
 				}
@@ -294,6 +296,9 @@ int main(int argc, char **argv)
 			case 'R':
 				options.dodns = false;
 				break;
+			case 'S':
+				options.doinform = true;
+				break;
 			case 'Y':
 				options.donis = false;
 				break;
@@ -340,7 +345,15 @@ int main(int argc, char **argv)
 			options.fqdn = FQDN_BOTH;
 	} else
 		options.fqdn = FQDN_DISABLE;
-	
+
+	if (options.doinform && options.requestaddress.s_addr == 0) {
+		if ((options.requestaddress.s_addr = get_address (options.interface)) == 0) {
+			logger (LOG_ERR, "no existing address to inform");
+			exit (EXIT_FAILURE);
+		}
+		options.keep_address = true;
+	}
+
 	if (geteuid ()) {
 		logger (LOG_ERR, "you need to be root to run "PACKAGE);
 		exit (EXIT_FAILURE);

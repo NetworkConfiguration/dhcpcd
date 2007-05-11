@@ -86,6 +86,10 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 	{
 		message.ciaddr = iface->previous_address.s_addr;
 		from.s_addr = iface->previous_address.s_addr;
+
+		/* Just incase we haven't actually configured the address yet */
+		if (type == DHCP_INFORM && iface->previous_address.s_addr == 0)
+			message.ciaddr = dhcp->address.s_addr;
 	}
 
 	message.op = DHCP_BOOTREQUEST;
@@ -130,6 +134,7 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 		p += 2;
 	}
 
+	if (type != DHCP_INFORM) {
 #define PUTADDR(_type, _val) \
 	{ \
 		*p++ = _type; \
@@ -145,6 +150,7 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 		(iface->previous_address.s_addr == 0 || type == DHCP_RELEASE))
 		PUTADDR (DHCP_SERVERIDENTIFIER, dhcp->serveraddress);
 #undef PUTADDR
+	}
 
 	if (type == DHCP_REQUEST || type == DHCP_DISCOVER) {
 		if (options->leasetime != 0) {
@@ -168,8 +174,10 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 		if (type == DHCP_DISCOVER)
 			*p++ = DHCP_DNSSERVER;
 		else {
-			*p++ = DHCP_RENEWALTIME;
-			*p++ = DHCP_REBINDTIME;
+			if (type != DHCP_INFORM) {
+				*p++ = DHCP_RENEWALTIME;
+				*p++ = DHCP_REBINDTIME;
+			}
 			*p++ = DHCP_NETMASK;
 			*p++ = DHCP_BROADCAST;
 			*p++ = DHCP_CSR;
@@ -282,26 +290,6 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 	return send_packet (iface, ETHERTYPE_IP, (unsigned char *) &packet,
 						message_length + sizeof (struct ip) +
 						sizeof (struct udphdr));
-}
-
-static unsigned long getnetmask (unsigned long ip_in)
-{
-	unsigned long t, p = ntohl (ip_in);
-
-	if (IN_CLASSA (p))
-		t = ~IN_CLASSA_NET;
-	else {
-		if (IN_CLASSB (p))
-			t = ~IN_CLASSB_NET;
-		else {
-			if (IN_CLASSC (p))
-				t = ~IN_CLASSC_NET;
-			else
-				t = 0;
-		}
-	}
-	while (t & p) t >>= 1;
-	return htonl (~t);
 }
 
 /* Decode an RFC3397 DNS search order option into a space
@@ -664,7 +652,7 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 					memcpy (&static_routesp->destination.s_addr, p + i, 4);
 					memcpy (&static_routesp->gateway.s_addr, p + i + 4, 4);
 					static_routesp->netmask.s_addr =
-						getnetmask (static_routesp->destination.s_addr); 
+						get_netmask (static_routesp->destination.s_addr); 
 				}
 				break;
 
@@ -697,7 +685,7 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 eexit:
 	/* Fill in any missing fields */
 	if (! dhcp->netmask.s_addr)
-		dhcp->netmask.s_addr = getnetmask (dhcp->address.s_addr);
+		dhcp->netmask.s_addr = get_netmask (dhcp->address.s_addr);
 	if (! dhcp->broadcast.s_addr)
 		dhcp->broadcast.s_addr = dhcp->address.s_addr | ~dhcp->netmask.s_addr;
 

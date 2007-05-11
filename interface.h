@@ -98,6 +98,9 @@ typedef struct interface_t
 
 void free_address (address_t *addresses);
 void free_route (route_t *routes);
+unsigned long get_netmask (unsigned long addr);
+char *hwaddr_ntoa (const unsigned char *hwaddr, int hwlen);
+
 interface_t *read_interface (const char *ifname, int metric);
 int get_mtu (const char *ifname);
 int set_mtu (const char *ifname, short int mtu);
@@ -106,7 +109,10 @@ int add_address (const char *ifname, struct in_addr address,
 				 struct in_addr netmask, struct in_addr broadcast);
 int del_address (const char *ifname, struct in_addr address,
 				 struct in_addr netmask);
+
 int flush_addresses (const char *ifname);
+unsigned long get_address (const char *ifname);
+int has_address (const char *ifname, struct in_addr address);
 
 int add_route (const char *ifname, struct in_addr destination,
 			   struct in_addr netmask, struct in_addr gateway, int metric);
@@ -116,6 +122,5 @@ int del_route (const char *ifname, struct in_addr destination,
 			   struct in_addr netmask, struct in_addr gateway, int metric);
 
 int inet_ntocidr (struct in_addr address);
-char *hwaddr_ntoa (const unsigned char *hwaddr, int hwlen);
 
 #endif

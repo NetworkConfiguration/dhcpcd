@@ -1,6 +1,6 @@
 .\" $Id$
 .\"
-.TH DHCPCD 8 "18 April 2007" "dhcpcd 3.0"
+.TH DHCPCD 8 "11 May 2007" "dhcpcd 3.1"
 
 .SH NAME
 dhcpcd \- DHCP client daemon
@@ -9,7 +9,7 @@ dhcpcd \- DHCP client daemon
 .in +.5i
 .ti -.5i
 dhcpcd
-\%[\-adknpGHMNRTY]
+\%[\-adknpGHMNRSTY]
 \%[\-c\ script]
 \%[\-h\ hostname]
 \%[\-i\ vendorClassID]
@@ -151,7 +151,7 @@ message requesting to lease IP address ipaddr.
 The ipaddr parameter must be in the form xxx.xxx.xxx.xxx.
 This effectively doubles the timeout period, as if we fail to get
 this IP address then we enter the INIT state and try to get any
-IP address.
+IP address. To send a DHCP_INFORM message use the -S option.
 .TP
 .BI \-t \ timeout
 Specifies (in seconds ) for how long
@@ -215,7 +215,8 @@ file.
 Specifies the client identifier string. If not specified then
 .B dhcpcd
 will attempt to create a client identifier according to \fBRFC 4361\fR
-and store the DUID part in /var/lib/dhcpcd/dhcpcd.duid, otherwise
+and store the DUID part in
+.I /var/lib/dhcpcd/dhcpcd.duid\fR, otherwise
 .B dhcpcd
 uses the MAC address of the network interface. If \fB-I\fR is not given
 an option then we use the MAC address of the network interface.
@@ -237,6 +238,14 @@ Prevents
 from replacing
 .I /etc/resolv.conf
 or using resolvconf.
+.TP
+.BI \-S
+Sends a DHCP_INFORM message instead of a DHCP_REQUEST message when using the
+.BI \-s
+option. When we DHCP_INFORM, we don't request or respect any lease times.
+However, we do re-inform by the lease time specified by
+.BI \-l
+if given.
 .TP
 .BI \-T
 Will read 

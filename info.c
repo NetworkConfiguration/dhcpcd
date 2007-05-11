@@ -165,10 +165,12 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 
 	fprintf (f, "DHCPSID='%s'\n", inet_ntoa (dhcp->serveraddress));
 	fprintf (f, "DHCPSNAME='%s'\n", cleanmetas (dhcp->servername));
-	fprintf (f, "LEASEDFROM='%u'\n", dhcp->leasedfrom);
-	fprintf (f, "LEASETIME='%u'\n", dhcp->leasetime);
-	fprintf (f, "RENEWALTIME='%u'\n", dhcp->renewaltime);
-	fprintf (f, "REBINDTIME='%u'\n", dhcp->rebindtime);
+	if (! options->doinform) {
+		fprintf (f, "LEASEDFROM='%u'\n", dhcp->leasedfrom);
+		fprintf (f, "LEASETIME='%u'\n", dhcp->leasetime);
+		fprintf (f, "RENEWALTIME='%u'\n", dhcp->renewaltime);
+		fprintf (f, "REBINDTIME='%u'\n", dhcp->rebindtime);
+	}
 	fprintf (f, "INTERFACE='%s'\n", iface->name);
 	fprintf (f, "CLASSID='%s'\n", cleanmetas (options->classid));
 	if (options->clientid_len > 0)
