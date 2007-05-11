@@ -9,9 +9,9 @@ check_gcc=$(shell if $(CC) $(1) -S -o /dev/null -xc /dev/null >/dev/null 2>&1; \
 
 # Luckily we can do this more long winded thing with pmake used by the BSDs
 # FIXME: Look into making this into a loop
-WAFTST != if $(CC) -Wextra -S -o /dev/null -xc /dev/null >/dev/null 2>&1; \
+WAFTST != if $(CC) -Wdeclaration-after-statement -S -o /dev/null -xc /dev/null >/dev/null 2>&1; \
 	  then echo "-Wdeclaration-after-statement"; fi
-WSEQ   != if $(CC) -Wextra -S -o /dev/null -xc /dev/null >/dev/null 2>&1; \
+WSEQ   != if $(CC) -Wsequence-point -S -o /dev/null -xc /dev/null >/dev/null 2>&1; \
 	  then echo "-Wsequence-point"; fi
 WEXTRA != if $(CC) -Wextra -S -o /dev/null -xc /dev/null >/dev/null 2>&1; \
 	  then echo "-Wextra"; fi
