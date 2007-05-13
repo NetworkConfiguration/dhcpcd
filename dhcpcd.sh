@@ -21,7 +21,7 @@ hostinfo="$1"
 state="$2"
 
 # Reading HostInfo file for configuration parameters
-. "${hostinfo}"
+[ -e "${hostinfo}" ] && . "${hostinfo}"
 
 case "${state}" in
     up)

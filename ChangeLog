@@ -1,3 +1,4 @@
+Ensure that dhcpcd.sh is always called.
 flock the pidfile and stop writing the parent pid to it so we're more robst.
 Enable DHCP_INFORM support via the -S option (requires -s ipaddr too)
 Use the DUID stored to create an RFC 4361 conformant client identifier

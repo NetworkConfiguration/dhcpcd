@@ -289,7 +289,9 @@ interface_t *read_interface (const char *ifname, int metric)
 	iface = xmalloc (sizeof (interface_t));
 	memset (iface, 0, sizeof (interface_t));
 	strlcpy (iface->name, ifname, IF_NAMESIZE);
+#ifdef ENABLE_INFO
 	snprintf (iface->infofile, PATH_MAX, INFOFILE, ifname);
+#endif
 	memcpy (&iface->hwaddr, hwaddr, hwlen);
 	iface->hwlen = hwlen;
 

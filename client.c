@@ -96,7 +96,7 @@
 
 #define DROP_CONFIG { \
 	memset (&dhcp->address, 0, sizeof (struct in_addr)); \
-	if (iface->previous_address.s_addr != 0 && ! options->persistent) \
+	if (! options->persistent) \
 	configure (options, iface, dhcp); \
 	free_dhcp (dhcp); \
 	memset (dhcp, 0, sizeof (dhcp_t)); \
@@ -534,7 +534,8 @@ int dhcp_run (const options_t *options, int *pidfd)
 				state = STATE_INIT;
 				timeout = 0;
 				xid = 0;
-				DROP_CONFIG;
+				free_dhcp (dhcp);
+				memset (dhcp, 0, sizeof (dhcp_t));
 				continue;
 			}
 
@@ -570,11 +571,13 @@ int dhcp_run (const options_t *options, int *pidfd)
 								SOCKET_MODE (SOCKET_OPEN);
 								SEND_MESSAGE (DHCP_DECLINE);
 								SOCKET_MODE (SOCKET_CLOSED);
-								DROP_CONFIG;
 
+								free_dhcp (dhcp);
+								memset (dhcp, 0, sizeof (dhcp_t));
 								xid = 0;
 								timeout = 0;
 								state = STATE_INIT;
+
 								/* RFC 2131 says that we should wait for 10 seconds
 								   before doing anything else */
 								logger (LOG_INFO, "sleeping for 10 seconds");

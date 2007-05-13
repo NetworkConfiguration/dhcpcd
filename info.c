@@ -77,9 +77,11 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 		return (false);
 	}
 
-	fprintf (f, "IPADDR='%s'\n", inet_ntoa (dhcp->address));
-	fprintf (f, "NETMASK='%s'\n", inet_ntoa (dhcp->netmask));
-	fprintf (f, "BROADCAST='%s'\n", inet_ntoa (dhcp->broadcast));
+	if (dhcp->address.s_addr) {
+		fprintf (f, "IPADDR='%s'\n", inet_ntoa (dhcp->address));
+		fprintf (f, "NETMASK='%s'\n", inet_ntoa (dhcp->netmask));
+		fprintf (f, "BROADCAST='%s'\n", inet_ntoa (dhcp->broadcast));
+	}
 	if (dhcp->mtu > 0)
 		fprintf (f, "MTU='%d'\n", dhcp->mtu);
 
@@ -163,9 +165,11 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 	if (dhcp->rootpath)
 		fprintf (f, "ROOTPATH='%s'\n", cleanmetas (dhcp->rootpath));
 
-	fprintf (f, "DHCPSID='%s'\n", inet_ntoa (dhcp->serveraddress));
-	fprintf (f, "DHCPSNAME='%s'\n", cleanmetas (dhcp->servername));
-	if (! options->doinform) {
+	if (dhcp->serveraddress.s_addr)
+		fprintf (f, "DHCPSID='%s'\n", inet_ntoa (dhcp->serveraddress));
+	if (dhcp->servername[0])
+		fprintf (f, "DHCPSNAME='%s'\n", cleanmetas (dhcp->servername));
+	if (! options->doinform && dhcp->address.s_addr) {
 		fprintf (f, "LEASEDFROM='%u'\n", dhcp->leasedfrom);
 		fprintf (f, "LEASETIME='%u'\n", dhcp->leasetime);
 		fprintf (f, "RENEWALTIME='%u'\n", dhcp->renewaltime);
@@ -232,7 +236,6 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 	}
 #endif
 
-	fprintf (f, "\n");	
 	fclose (f);
 	return (true);
 }

@@ -92,13 +92,8 @@ static void exec_script (const char *script, const char *infofile,
 {
 	struct stat buf;
 
-#ifdef ENABLE_INFO
 	if (! script || ! infofile || ! arg)
 		return;
-#else
-	if (! script || ! arg)
-		return ;
-#endif
 
 	if (stat (script, &buf) < 0) {
 		if (strcmp (script, DEFAULT_SCRIPT) != 0)
@@ -106,14 +101,8 @@ static void exec_script (const char *script, const char *infofile,
 		return;
 	}
 
-#ifdef ENABLE_INFO
-	logger (LOG_DEBUG, "exec \"%s %s %s\"", script, infofile, arg);
+	logger (LOG_DEBUG, "exec \"%s\" \"%s\" \"%s\"", script, infofile, arg);
 	exec_cmd (script, infofile, arg, (char *) NULL);
-#else
-	infofile = NULL; /* appease gcc */
-	logger (LOG_DEBUG, "exec \"%s \"\" %s\"", script, arg);
-	exec_cmd (script, "", arg, (char *) NULL);
-#endif
 }
 
 static int make_resolv (const char *ifname, const dhcp_t *dhcp)
@@ -376,6 +365,12 @@ int configure (const options_t *options, interface_t *iface,
 			iface->previous_mtu = iface->mtu;
 		}
 
+#ifdef ENABLE_INFO
+		/* If we haven't created an info file, do so now */
+		if (! dhcp->frominfo && iface->previous_address.s_addr == 0)
+			write_info (iface, dhcp, options);
+#endif
+
 		/* Only reset things if we had set them before */
 		if (iface->previous_address.s_addr != 0) {
 			if (! options->keep_address) {
@@ -384,12 +379,13 @@ int configure (const options_t *options, interface_t *iface,
 				memset (&iface->previous_address, 0, sizeof (struct in_addr));
 				memset (&iface->previous_netmask, 0, sizeof (struct in_addr));
 			}
-
-			restore_resolv (iface->name);
-
-			/* we currently don't have a resolvconf style programs for ntp/nis */
-			exec_script (options->script, iface->infofile, "down");
 		}
+
+		restore_resolv (iface->name);
+		/* we currently don't have a resolvconf style programs for ntp/nis */
+
+		exec_script (options->script, iface->infofile, "down");
+
 		return 0;
 	}
 
