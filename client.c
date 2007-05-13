@@ -19,12 +19,16 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#ifdef __linux__
+# define _XOPEN_SOURCE 500 /* needed for pwrite */
+#endif
+
 #include <sys/types.h>
 #include <sys/select.h>
 #include <sys/time.h>
 #include <arpa/inet.h>
 #ifdef __linux__
-#include <netinet/ether.h>
+# include <netinet/ether.h>
 #endif
 #include <errno.h>
 #include <fcntl.h>
@@ -39,14 +43,14 @@
 #include "config.h"
 #include "common.h"
 #ifdef ENABLE_ARP
-#include "arp.h"
+# include "arp.h"
 #endif
 #include "client.h"
 #include "configure.h"
 #include "dhcp.h"
 #include "dhcpcd.h"
 #ifdef ENABLE_INFO
-#include "info.h"
+# include "info.h"
 #endif
 #include "interface.h"
 #include "logger.h"
@@ -98,18 +102,32 @@
 	memset (dhcp, 0, sizeof (dhcp_t)); \
 }
 
-static int daemonise (const char *pidfile)
+static bool daemonise (int *pidfd)
 {
+	char pid[16];
+
 	logger (LOG_DEBUG, "forking to background");
 
 	if (daemon (0, 0) < 0) {
 		logger (LOG_ERR, "daemon: %s", strerror (errno));
-		return -1;
+		return (false);
 	}
 
-	make_pid (pidfile);
+	if (ftruncate (*pidfd, 0) == -1) {
+		logger (LOG_ERR, "ftruncate: %s", strerror (errno));
+		return (false);
+	}
 
-	return 0;
+	snprintf (pid, sizeof (pid), "%u", getpid());
+	if (pwrite (*pidfd, pid, strlen(pid), 0) != (ssize_t) strlen (pid)) {
+		logger (LOG_ERR, "pwrite: %s", strerror (errno));
+		return (false);
+	}
+	
+	close (*pidfd);
+	*pidfd = -1;
+
+	return (true);
 }
 
 static unsigned long random_xid (void)
@@ -138,7 +156,7 @@ static unsigned long random_xid (void)
 
 /* This state machine is based on the one from udhcpc
    written by Russ Dill */
-int dhcp_run (const options_t *options)
+int dhcp_run (const options_t *options, int *pidfd)
 {
 	interface_t *iface;
 	int mode = SOCKET_CLOSED;
@@ -374,7 +392,7 @@ int dhcp_run (const options_t *options)
 								iface->start_uptime = uptime ();
 
 								if (! daemonised && options->daemonise) {
-									if ((daemonise (options->pidfile)) < 0) {
+									if ((daemonise (pidfd)) < 0) {
 										retval = -1;
 										goto eexit;
 									}
@@ -639,7 +657,7 @@ int dhcp_run (const options_t *options)
 						}
 
 						if (! daemonised && options->daemonise) {
-							if ((daemonise (options->pidfile)) < 0 ) {
+							if ((daemonise (pidfd)) < 0 ) {
 								retval = EXIT_FAILURE;
 								goto eexit;
 							}

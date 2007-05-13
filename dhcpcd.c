@@ -24,6 +24,7 @@
 #define _POSIX_SOURCE
 #endif
 
+#include <sys/file.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <arpa/inet.h>
@@ -76,19 +77,6 @@ static pid_t read_pid(const char *pidfile)
 	return pid;
 }
 
-void make_pid (const char *pidfile)
-{
-	FILE *fp;
-
-	if ((fp = fopen (pidfile, "w")) == NULL) {
-		logger (LOG_ERR, "fopen `%s': %s", pidfile, strerror (errno));
-		return;
-	}
-
-	fprintf (fp, "%u\n", getpid ());
-	fclose (fp);
-}
-
 static void usage ()
 {
 	printf ("usage: "PACKAGE" [-adknpEGHMNRSY] [-c script] [-h hostame] [-i classID]\n"
@@ -108,6 +96,7 @@ int main(int argc, char **argv)
 	pid_t pid;
 	int debug = 0;
 	int i;
+	int pidfd;
 
 	const struct option longopts[] = {
 		{"arp",         no_argument,        NULL, 'a'},
@@ -404,10 +393,23 @@ int main(int argc, char **argv)
 		exit (EXIT_FAILURE);
 	}
 
-	make_pid (options.pidfile);
+	pidfd = open (options.pidfile,
+				  O_WRONLY | O_CREAT | O_TRUNC | O_NONBLOCK, 0660);
+	if (pidfd == -1) {
+		logger (LOG_ERR, "open `%s': %s", options.pidfile, strerror (errno));
+		exit (EXIT_FAILURE);
+	}
+
+	/* Lock the file so that only one instance of dhcpcd runs on an interface */
+	if (flock (pidfd, LOCK_EX | LOCK_NB) == -1) {
+		logger (LOG_ERR, "flock `%s': %s", options.pidfile, strerror (errno));
+		exit (EXIT_FAILURE);
+	}
 
 	logger (LOG_INFO, PACKAGE " " VERSION " starting");
-	if (dhcp_run (&options)) {
+	if (dhcp_run (&options, &pidfd)) {
+		if (pidfd > -1)
+			close (pidfd);
 		unlink (options.pidfile);
 		exit (EXIT_FAILURE);
 	}
