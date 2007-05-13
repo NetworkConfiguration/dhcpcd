@@ -389,12 +389,12 @@ int main(int argc, char **argv)
 	}
 
 	if ((pid = read_pid (options.pidfile)) > 0 && kill (pid, 0) == 0) {
-		logger (LOG_ERR, ""PACKAGE" already running (%s)", options.pidfile);
+		logger (LOG_ERR, ""PACKAGE" already running on pid %d (%s)",
+				pid, options.pidfile);
 		exit (EXIT_FAILURE);
 	}
 
-	pidfd = open (options.pidfile,
-				  O_WRONLY | O_CREAT | O_TRUNC | O_NONBLOCK, 0660);
+	pidfd = open (options.pidfile, O_WRONLY | O_CREAT | O_NONBLOCK, 0660);
 	if (pidfd == -1) {
 		logger (LOG_ERR, "open `%s': %s", options.pidfile, strerror (errno));
 		exit (EXIT_FAILURE);
@@ -405,6 +405,11 @@ int main(int argc, char **argv)
 		logger (LOG_ERR, "flock `%s': %s", options.pidfile, strerror (errno));
 		exit (EXIT_FAILURE);
 	}
+
+	/* dhcpcd.sh should not interhit this fd */
+	if ((i = fcntl (pidfd, F_GETFD, 0)) < 0 ||
+		fcntl (pidfd, F_SETFD, i | FD_CLOEXEC) < 0)
+			logger (LOG_ERR, "fcntl: %s", strerror (errno));
 
 	logger (LOG_INFO, PACKAGE " " VERSION " starting");
 	if (dhcp_run (&options, &pidfd)) {

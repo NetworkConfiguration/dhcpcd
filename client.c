@@ -124,9 +124,6 @@ static bool daemonise (int *pidfd)
 		return (false);
 	}
 	
-	close (*pidfd);
-	*pidfd = -1;
-
 	return (true);
 }
 
@@ -695,6 +692,11 @@ eexit:
 
 	if (buffer)
 		free (buffer);
+
+	if (*pidfd != -1) {
+		close (*pidfd);
+		*pidfd = -1;
+	}
 
 	logger (LOG_INFO, "exiting");
 
