@@ -39,6 +39,7 @@ INSTALL ?= install
 DESTDIR =
 SBINDIR = $(DESTDIR)/sbin
 MANDIR = $(DESTDIR)/usr/share/man
+LIBDIR = $(DESTDIR)/var/lib
 
 SBIN_TARGETS = dhcpcd
 MAN8_TARGETS = dhcpcd.8
@@ -67,7 +68,8 @@ install: $(TARGET)
 	$(INSTALL) -m 0755 -d $(SBINDIR)
 	$(INSTALL) -m 0755 $(SBIN_TARGETS) $(SBINDIR)
 	$(INSTALL) -m 0755 -d $(MANDIR)/man8
-	$(INSTALL) -m 0755 $(MAN8_TARGETS) $(MANDIR)/man8
+	$(INSTALL) -m 0644 $(MAN8_TARGETS) $(MANDIR)/man8
+	$(INSTALL) -m 0755 -d $(LIBDIR)
 
 clean:
 	rm -f $(TARGET) $(dhcpcd_H) *.o *~ *.core *.bz2

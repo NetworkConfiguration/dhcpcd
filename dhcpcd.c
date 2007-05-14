@@ -81,7 +81,7 @@ static void usage ()
 {
 	printf ("usage: "PACKAGE" [-adknpEGHMNRSY] [-c script] [-h hostame] [-i classID]\n"
 	        "              [-l leasetime] [-m metric] [-s ipaddress] [-t timeout]\n"
-	        "              [-u userclass] [-F [none | ptr | both]] [-I [clientID]]\n");
+	        "              [-u userclass] [-F none | ptr | both] [-I clientID]\n");
 }
 
 int main(int argc, char **argv)
@@ -113,10 +113,10 @@ int main(int argc, char **argv)
 		{"timeout",     required_argument,  NULL, 't'},
 		{"userclass",   required_argument,  NULL, 'u'},
 		{"lastlease",   no_argument,        NULL, 'E'},
-		{"fqdn",        optional_argument,  NULL, 'F'},
+		{"fqdn",        required_argument,  NULL, 'F'},
 		{"nogateway",   no_argument,        NULL, 'G'},
 		{"sethostname", no_argument,        NULL, 'H'},
-		{"clientid",    optional_argument,  NULL, 'I'},
+		{"clientid",    required_argument,  NULL, 'I'},
 		{"nomtu",       no_argument,        NULL, 'M'},
 		{"nontp",       no_argument,        NULL, 'N'},
 		{"nodns",       no_argument,        NULL, 'R'},
@@ -147,7 +147,7 @@ int main(int argc, char **argv)
 	options.doinform = false;
 	options.timeout = DEFAULT_TIMEOUT;
 
-	while ((opt = getopt_long(argc, argv, "ac:dh:i:kl:m:nps::t:u:EF::GHI::MNRSY",
+	while ((opt = getopt_long(argc, argv, "ac:dh:i:kl:m:nps:t:u:EF:GHI:MNRSY",
 							  longopts, &option_index)) != -1)
 	{
 		switch (opt) {
@@ -212,7 +212,9 @@ int main(int argc, char **argv)
 				options.persistent = true;
 				break;
 			case 's':
-				if (! inet_aton (optarg, &options.requestaddress)) { 
+				if (strlen (optarg) == 0)
+					options.requestaddress.s_addr = 0;
+				else if (! inet_aton (optarg, &options.requestaddress)) { 
 					logger (LOG_ERR, "`%s' is not a valid IP address", optarg);
 					exit (EXIT_FAILURE);
 				}
@@ -244,19 +246,16 @@ int main(int argc, char **argv)
 				options.dolastlease = true;
 				break;
 			case 'F':
-				if (optarg) {
-					if (strncmp (optarg, "none", strlen (optarg)) == 0)
-						options.fqdn = FQDN_NONE;
-					else if (strncmp (optarg, "ptr", strlen (optarg)) == 0)
-						options.fqdn = FQDN_PTR;
-					else if (strncmp (optarg, "both", strlen (optarg)) == 0)
-						options.fqdn = FQDN_BOTH;
-					else {
-						logger (LOG_ERR, "invalid value `%s' for FQDN", optarg);
-						exit (EXIT_FAILURE);
-					}
-				} else
+				if (strncmp (optarg, "none", strlen (optarg)) == 0)
+					options.fqdn = FQDN_NONE;
+				else if (strncmp (optarg, "ptr", strlen (optarg)) == 0)
+					options.fqdn = FQDN_PTR;
+				else if (strncmp (optarg, "both", strlen (optarg)) == 0)
 					options.fqdn = FQDN_BOTH;
+				else {
+					logger (LOG_ERR, "invalid value `%s' for FQDN", optarg);
+					exit (EXIT_FAILURE);
+				}
 				break;
 			case 'G':
 				options.dogateway = false;
@@ -265,15 +264,15 @@ int main(int argc, char **argv)
 				options.dohostname = true;
 				break;
 			case 'I':
-				if (optarg && strlen(optarg) > 0) {
-					if (strlen (optarg) > CLIENT_ID_MAX_LEN) {
-						logger (LOG_ERR, "`%s' is too long for ClientID, max is %d",
-								optarg, CLIENT_ID_MAX_LEN);
-						exit (EXIT_FAILURE);
-					} else
-						strlcpy (options.clientid, optarg, sizeof (options.clientid));
-					options.clientid_len = strlen (options.clientid);
-				} else
+				if (strlen (optarg) > CLIENT_ID_MAX_LEN) {
+					logger (LOG_ERR, "`%s' is too long for ClientID, max is %d",
+							optarg, CLIENT_ID_MAX_LEN);
+					exit (EXIT_FAILURE);
+				}
+				strlcpy (options.clientid, optarg, sizeof (options.clientid));
+				options.clientid_len = strlen (options.clientid);
+				/* empty string disabled duid */
+				if (options.clientid_len == 0)
 					options.clientid_len = -1;
 				break;
 			case 'M':
