@@ -65,11 +65,15 @@ static char *cleanmetas (const char *cstr)
 }
 
 bool write_info(const interface_t *iface, const dhcp_t *dhcp,
-				const options_t *options)
+				const options_t *options, bool overwrite)
 {
 	FILE *f;
 	route_t *route;
 	address_t *address;
+	struct stat sb;
+
+	if (! overwrite && stat (iface->infofile, &sb) == 0)
+		return (true);
 
 	logger (LOG_DEBUG, "writing %s", iface->infofile);
 	if ((f = fopen (iface->infofile, "w")) == NULL) {

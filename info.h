@@ -28,7 +28,7 @@
 
 #ifdef ENABLE_INFO
 bool write_info (const interface_t *iface, const dhcp_t *dhcp,
-				 const options_t *options);
+				 const options_t *options, bool overwrite);
 
 bool read_info (const interface_t *iface, dhcp_t *dhcp);
 #endif

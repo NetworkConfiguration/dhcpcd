@@ -27,6 +27,6 @@
 #include "dhcp.h"
 
 int configure (const options_t *options, interface_t *iface,
-			   const dhcp_t *dhcp);
+			   const dhcp_t *dhcp, bool up);
 
 #endif

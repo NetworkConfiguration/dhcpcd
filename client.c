@@ -95,9 +95,8 @@
 }
 
 #define DROP_CONFIG { \
-	memset (&dhcp->address, 0, sizeof (struct in_addr)); \
 	if (! options->persistent) \
-	configure (options, iface, dhcp); \
+	configure (options, iface, dhcp, false); \
 	free_dhcp (dhcp); \
 	memset (dhcp, 0, sizeof (dhcp_t)); \
 }
@@ -375,7 +374,7 @@ int dhcp_run (const options_t *options, int *pidfd)
 							} else {
 								logger (LOG_INFO, "using last known IP address %s",
 										inet_ntoa (dhcp->address));
-								if (configure (options, iface, dhcp)) {
+								if (configure (options, iface, dhcp, true)) {
 									retval = EXIT_FAILURE;
 									goto eexit;
 								}
@@ -651,7 +650,7 @@ int dhcp_run (const options_t *options, int *pidfd)
 
 						xid = 0;
 
-						if (configure (options, iface, dhcp) < 0 && ! daemonised) {
+						if (configure (options, iface, dhcp, true) < 0 && ! daemonised) {
 							retval = EXIT_FAILURE;
 							goto eexit;
 						}
