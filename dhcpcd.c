@@ -90,7 +90,7 @@ int main(int argc, char **argv)
 	int doversion = 0;
 	int dohelp = 0;
 	int userclasses = 0;
-	int ch;
+	int opt;
 	int option_index = 0;
 	char prefix[IF_NAMESIZE + 3];
 	pid_t pid;
@@ -147,10 +147,10 @@ int main(int argc, char **argv)
 	options.doinform = false;
 	options.timeout = DEFAULT_TIMEOUT;
 
-	while ((ch = getopt_long(argc, argv, "ac:dh:i:kl:m:nps::t:u:EF::GHI::MNRSY", longopts,
-							 &option_index)) != -1)
+	while ((opt = getopt_long(argc, argv, "ac:dh:i:kl:m:nps::t:u:EF::GHI::MNRSY",
+							  longopts, &option_index)) != -1)
 	{
-		switch (ch) {
+		switch (opt) {
 			case 0:
 				if (longopts[option_index].flag)
 					break;
