@@ -150,6 +150,46 @@ static unsigned long random_xid (void)
 	return rand();
 }
 
+#ifdef ENABLE_INFO
+static bool get_old_lease (interface_t *iface, dhcp_t *dhcp, long *timeout)
+{
+	struct timeval tv;
+	unsigned int offset = 0;
+
+	logger (LOG_INFO, "trying to use old lease in `%s'", iface->infofile);
+	if (! read_info (iface, dhcp))
+		return (false);
+
+	/* Vitaly important we remove the server information here */
+	memset (&dhcp->serveraddress, 0, sizeof (struct in_addr));
+	memset (dhcp->servername, 0, sizeof (dhcp->servername));
+
+
+	/* Ensure that we can still use the lease */
+	if (gettimeofday (&tv, NULL) == -1) {
+		logger (LOG_ERR, "gettimeofday: %s", strerror (errno));
+		return (false);
+	}
+
+	offset = tv.tv_sec - dhcp->leasedfrom;
+	if (dhcp->leasedfrom &&
+		tv.tv_sec - dhcp->leasedfrom > dhcp->leasetime)
+	{
+		logger (LOG_ERR, "lease expired %u seconds ago",
+				offset + dhcp->leasetime);
+		return (false);
+	}
+
+	if (dhcp->leasedfrom == 0)
+		offset = 0;
+	if (timeout)
+		*timeout = dhcp->renewaltime - offset;
+	iface->start_uptime = uptime ();
+	logger (LOG_INFO, "using last known IP address %s", inet_ntoa (dhcp->address));
+	return (true);
+}
+#endif
+
 /* This state machine is based on the one from udhcpc
    written by Russ Dill */
 int dhcp_run (const options_t *options, int *pidfd)
@@ -174,19 +214,32 @@ int dhcp_run (const options_t *options, int *pidfd)
 	unsigned char *buffer = NULL;
 	int buffer_len = 0;
 	int buffer_pos = 0;
-	struct in_addr netmask;
-	struct in_addr broadcast;
 
 	if (! options || (iface = (read_interface (options->interface,
 											   options->metric))) == NULL)
-		return -1;
+		return (-1);
 
 	dhcp = xmalloc (sizeof (dhcp_t));
 	memset (dhcp, 0, sizeof (dhcp_t));
 
-	memset (&netmask, 0, sizeof (struct in_addr));
-	memset (&broadcast, 0, sizeof (struct in_addr));
-	
+	if (options->request_address.s_addr == 0 &&
+		(options->doinform || options->dorequest))
+	{
+#ifdef ENABLE_INFO
+		if (! get_old_lease (iface, dhcp, NULL))
+#endif
+		{
+			free (dhcp);
+			return (-1);
+		}
+	} else {
+		dhcp->address = options->request_address;
+		dhcp->netmask = options->request_netmask;
+		if (dhcp->netmask.s_addr == 0)
+			dhcp->netmask.s_addr = get_netmask (dhcp->address.s_addr);
+		dhcp->broadcast.s_addr = dhcp->address.s_addr | ~dhcp->netmask.s_addr;
+	}
+
 	/* Remove all existing addresses.
 	   After all, we ARE a DHCP client whose job it is to configure the
 	   interface. We only do this on start, so persistent addresses can be added
@@ -194,16 +247,13 @@ int dhcp_run (const options_t *options, int *pidfd)
 	if (! options->doinform)
 		flush_addresses (iface->name);
 	else {
-		dhcp->address.s_addr = options->requestaddress.s_addr;
-
 		/* The inform address HAS to be configured for it to work with most
 		 * DHCP servers */
 		if (options->doinform && has_address (iface->name, dhcp->address) < 1) {
-			netmask.s_addr = get_netmask (dhcp->address.s_addr);
-			broadcast.s_addr = dhcp->address.s_addr | ~netmask.s_addr;
-			add_address (iface->name, dhcp->address, netmask, broadcast);
+			add_address (iface->name, dhcp->address, dhcp->netmask,
+						 dhcp->broadcast);
 			iface->previous_address = dhcp->address;
-			iface->previous_netmask = netmask;
+			iface->previous_netmask = dhcp->netmask;
 		}
 	}
 
@@ -343,59 +393,23 @@ int dhcp_run (const options_t *options, int *pidfd)
 						logger (LOG_ERR, "timed out");
 #ifdef ENABLE_INFO
 						if (options->dolastlease) {
-							unsigned int offset = 0;
-
-							logger (LOG_INFO, "trying to use old lease in `%s'",
-									iface->infofile);
-							if (! read_info (iface, dhcp)) {
-								if (! daemonised) {
-									retval = EXIT_FAILURE;
-									goto eexit;
-								}
-							}
-
-							/* Ensure that we can still use the lease */
-							if (gettimeofday (&tv, NULL) == -1) {
-								logger (LOG_ERR, "gettimeofday: %s", strerror (errno));
-								retval = EXIT_FAILURE;
-								goto eexit;
-							}
-
-							offset = tv.tv_sec - dhcp->leasedfrom;
-							if (dhcp->leasedfrom &&
-								tv.tv_sec - dhcp->leasedfrom > dhcp->leasetime)
-							{
-								logger (LOG_ERR, "lease expired %u seconds ago",
-										offset + dhcp->leasetime);
-								if (! daemonised) {
-									retval = EXIT_FAILURE;
-									goto eexit;
-								}
-							} else {
-								logger (LOG_INFO, "using last known IP address %s",
-										inet_ntoa (dhcp->address));
-								if (configure (options, iface, dhcp, true)) {
+							if (! get_old_lease (iface, dhcp, &timeout))
+								if (! daemonised ||
+									configure (options, iface, dhcp, true))
+								{
 									retval = EXIT_FAILURE;
 									goto eexit;
 								}
 
-								state = STATE_BOUND;
-								/* We'll timeout above if timeout is negative,
-								 * so no need for special handling */
-								if (dhcp->leasedfrom == 0)
-									offset = 0;
-								timeout = dhcp->renewaltime - offset;
-								iface->start_uptime = uptime ();
-
-								if (! daemonised && options->daemonise) {
-									if ((daemonise (pidfd)) < 0) {
-										retval = -1;
-										goto eexit;
-									}
-									daemonised = true;
-								}		    
-								continue;
-							}
+							state = STATE_BOUND;
+							if (! daemonised && options->daemonise) {
+								if ((daemonise (pidfd)) < 0) {
+									retval = -1;
+									goto eexit;
+								}
+								daemonised = true;
+							}		    
+							continue;
 						}
 #endif
 						if (! daemonised) {
@@ -589,9 +603,18 @@ int dhcp_run (const options_t *options, int *pidfd)
 #endif
 
 						if (options->doinform) {
-							dhcp->address = options->requestaddress;
+							if (options->request_address.s_addr != 0)
+								dhcp->address = options->request_address;
+							else
+								dhcp->address = iface->previous_address;
+
 							logger (LOG_INFO, "received approval for %s",
 									inet_ntoa (dhcp->address));
+							if (iface->previous_netmask.s_addr != dhcp->netmask.s_addr) {
+								add_address (iface->name, dhcp->address,
+											 dhcp->netmask, dhcp->broadcast);
+								iface->previous_netmask.s_addr = dhcp->netmask.s_addr;
+							}
 							timeout = options->leasetime;
 							if (timeout == 0)
 								timeout = DEFAULT_LEASETIME;

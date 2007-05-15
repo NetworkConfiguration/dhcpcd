@@ -102,25 +102,25 @@ int main(int argc, char **argv)
 		{"arp",         no_argument,        NULL, 'a'},
 		{"script",      required_argument,  NULL, 'c'},
 		{"debug",       no_argument,        NULL, 'd'},
-		{"hostname",    required_argument,  NULL, 'h'},
-		{"classid",     required_argument,  NULL, 'i'},
+		{"hostname",    optional_argument,  NULL, 'h'},
+		{"classid",     optional_argument,  NULL, 'i'},
 		{"release",     no_argument,        NULL, 'k'},
 		{"leasetime",   required_argument,  NULL, 'l'},
 		{"metric",      required_argument,  NULL, 'm'},
 		{"renew",       no_argument,        NULL, 'n'},
 		{"persistent",  no_argument,        NULL, 'p'},
-		{"request",     required_argument,  NULL, 's'},
+		{"inform",      optional_argument,  NULL, 's'},
+		{"request",     optional_argument,  NULL, 'r'},
 		{"timeout",     required_argument,  NULL, 't'},
 		{"userclass",   required_argument,  NULL, 'u'},
 		{"lastlease",   no_argument,        NULL, 'E'},
 		{"fqdn",        required_argument,  NULL, 'F'},
 		{"nogateway",   no_argument,        NULL, 'G'},
 		{"sethostname", no_argument,        NULL, 'H'},
-		{"clientid",    required_argument,  NULL, 'I'},
+		{"clientid",    optional_argument,  NULL, 'I'},
 		{"nomtu",       no_argument,        NULL, 'M'},
 		{"nontp",       no_argument,        NULL, 'N'},
 		{"nodns",       no_argument,        NULL, 'R'},
-		{"inform",      no_argument,        NULL, 'S'},
 		{"nonis",       no_argument,        NULL, 'Y'},
 		{"help",        no_argument,        &dohelp, 1},
 		{"version",     no_argument,        &doversion, 1},
@@ -135,7 +135,8 @@ int main(int argc, char **argv)
 
 	memset (&options, 0, sizeof (options_t));
 	options.script = (char *) DEFAULT_SCRIPT;
-	snprintf (options.classid, CLASS_ID_MAX_LEN, "%s %s", PACKAGE, VERSION); 
+	snprintf (options.classid, CLASS_ID_MAX_LEN, "%s %s", PACKAGE, VERSION);
+	options.classid_len = strlen (options.classid);
 
 	options.doarp = false;
 	options.dodns = true;
@@ -147,7 +148,14 @@ int main(int argc, char **argv)
 	options.doinform = false;
 	options.timeout = DEFAULT_TIMEOUT;
 
-	while ((opt = getopt_long(argc, argv, "ac:dh:i:kl:m:nps:t:u:EF:GHI:MNRSY",
+	gethostname (options.hostname, sizeof (options.hostname));
+	if (strcmp (options.hostname, "(none)") == 0 ||
+		strcmp (options.hostname, "localhost") == 0)
+		memset (options.hostname, 0, sizeof (options.hostname));
+
+	/* Don't set any optional arguments here so we retain POSIX
+	 * compatibility with getopt */
+	while ((opt = getopt_long(argc, argv, "ac:dh:i:kl:m:npr:s:t:u:EF:GHI:MNRY",
 							  longopts, &option_index)) != -1)
 	{
 		switch (opt) {
@@ -177,7 +185,9 @@ int main(int argc, char **argv)
 				}
 				break;
 			case 'h':
-				if (strlen (optarg) > MAXHOSTNAMELEN) {
+				if (! optarg)
+					memset (options.hostname, 0, sizeof (options.hostname));
+				else if (strlen (optarg) > MAXHOSTNAMELEN) {
 					logger (LOG_ERR, "`%s' too long for HostName string, max is %d",
 							optarg, MAXHOSTNAMELEN);
 					exit (EXIT_FAILURE);
@@ -185,12 +195,16 @@ int main(int argc, char **argv)
 					strlcpy (options.hostname, optarg, sizeof (options.hostname));
 				break;
 			case 'i':
-				if (strlen (optarg) > CLASS_ID_MAX_LEN) {
+				if (! optarg) {
+					memset (options.classid, 0, sizeof (options.classid));
+					options.classid_len = 0;
+				} else if (strlen (optarg) > CLASS_ID_MAX_LEN) {
 					logger (LOG_ERR, "`%s' too long for ClassID string, max is %d",
 							optarg, CLASS_ID_MAX_LEN);
 					exit (EXIT_FAILURE);
 				} else
-					strlcpy (options.classid, optarg, sizeof (options.classid));
+					options.classid_len = strlcpy (options.classid, optarg,
+												   sizeof (options.classid));
 				break;
 			case 'k':
 				options.signal = SIGHUP;
@@ -212,9 +226,31 @@ int main(int argc, char **argv)
 				options.persistent = true;
 				break;
 			case 's':
-				if (strlen (optarg) == 0)
-					options.requestaddress.s_addr = 0;
-				else if (! inet_aton (optarg, &options.requestaddress)) { 
+				options.doinform = true;
+				if (! optarg || strlen (optarg) == 0) {
+					options.request_address.s_addr = 0;
+					break;
+				} else {
+					char *slash = strchr (optarg, '/');
+					if (slash) {
+						int cidr;
+						/* nullify the slash, so the -r option can read the
+						 * address */
+						*slash++ = '\0';
+						if (sscanf (slash, "%d", &cidr) != 1) {
+							logger (LOG_ERR, "`%s' is not a valid CIDR", slash);
+							exit (EXIT_FAILURE);
+						}
+						options.request_netmask = inet_cidrtoaddr (cidr);
+					}
+					/* fall through */
+				}
+			case 'r':
+				if (! options.doinform)
+					options.dorequest = true;
+				if (strlen (optarg) > 0 &&
+					! inet_aton (optarg, &options.request_address))
+				{ 
 					logger (LOG_ERR, "`%s' is not a valid IP address", optarg);
 					exit (EXIT_FAILURE);
 				}
@@ -264,16 +300,21 @@ int main(int argc, char **argv)
 				options.dohostname = true;
 				break;
 			case 'I':
-				if (strlen (optarg) > CLIENT_ID_MAX_LEN) {
-					logger (LOG_ERR, "`%s' is too long for ClientID, max is %d",
-							optarg, CLIENT_ID_MAX_LEN);
-					exit (EXIT_FAILURE);
-				}
-				strlcpy (options.clientid, optarg, sizeof (options.clientid));
-				options.clientid_len = strlen (options.clientid);
-				/* empty string disabled duid */
-				if (options.clientid_len == 0)
+				if (optarg) {
+					if (strlen (optarg) > CLIENT_ID_MAX_LEN) {
+						logger (LOG_ERR, "`%s' is too long for ClientID, max is %d",
+								optarg, CLIENT_ID_MAX_LEN);
+						exit (EXIT_FAILURE);
+					}
+					options.clientid_len = strlcpy (options.clientid, optarg,
+													sizeof (options.clientid));
+					/* empty string disabled duid */
+					if (options.clientid_len == 0)
+						options.clientid_len = -1;
+				} else {
+					memset (options.clientid, 0, sizeof (options.clientid));
 					options.clientid_len = -1;
+				}
 				break;
 			case 'M':
 				options.domtu = false;
@@ -283,9 +324,6 @@ int main(int argc, char **argv)
 				break;
 			case 'R':
 				options.dodns = false;
-				break;
-			case 'S':
-				options.doinform = true;
 				break;
 			case 'Y':
 				options.donis = false;
@@ -321,25 +359,15 @@ int main(int argc, char **argv)
 		exit (EXIT_FAILURE);
 	}
 
-	/* If we are given a hostname use it and set FQDN if it contains a . */
-	if (! options.hostname[0]) {
-		gethostname (options.hostname, sizeof (options.hostname));
-		if (strcmp (options.hostname, "(none)") == 0 ||
-			strcmp (options.hostname, "localhost") == 0)
-			memset (options.hostname, 0, sizeof (options.hostname));
-	}
 	if (strchr (options.hostname, '.')) {
 		if (options.fqdn == FQDN_DISABLE)
 			options.fqdn = FQDN_BOTH;
 	} else
 		options.fqdn = FQDN_DISABLE;
 
-	if (options.doinform && options.requestaddress.s_addr == 0) {
-		if ((options.requestaddress.s_addr = get_address (options.interface)) == 0) {
-			logger (LOG_ERR, "no existing address to inform");
-			exit (EXIT_FAILURE);
-		}
-		options.keep_address = true;
+	if (options.request_address.s_addr == 0 && options.doinform) {
+		if ((options.request_address.s_addr = get_address (options.interface)) != 0)
+			options.keep_address = true;
 	}
 
 	if (geteuid ()) {

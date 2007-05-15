@@ -406,16 +406,17 @@ int configure (const options_t *options, interface_t *iface,
 		}
 	}
 
+	/* This also changes netmask */
 	if (! options->doinform || ! has_address (iface->name, dhcp->address))
 		if (add_address (iface->name, dhcp->address, dhcp->netmask,
 						 dhcp->broadcast) < 0 && errno != EEXIST)
 			return (false);
-
+	
 	/* Now delete the old address if different */
-	if (iface->previous_address.s_addr != dhcp->address.s_addr &&
-		iface->previous_address.s_addr != 0 &&
-		! options->keep_address)
-		del_address (iface->name, iface->previous_address, iface->previous_netmask);
+	if (iface->previous_address.s_addr != dhcp->address.s_addr) {
+		if (iface->previous_address.s_addr != 0 && ! options->keep_address)
+			del_address (iface->name, iface->previous_address, iface->previous_netmask);
+	}
 
 #ifdef __linux__
 	/* On linux, we need to change the subnet route to have our metric. */

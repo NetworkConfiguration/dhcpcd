@@ -315,13 +315,13 @@ bool read_info (const interface_t *iface, dhcp_t *dhcp)
 	struct stat sb;
 
 	if (stat (iface->infofile, &sb) != 0) {
-		syslog (LOG_ERR, "lease information file `%s' does not exist",
+		logger (LOG_ERR, "lease information file `%s' does not exist",
 				iface->infofile);
 		return (false);
 	}
 
 	if (! (fp = fopen (iface->infofile, "r"))) {
-		syslog (LOG_ERR, "fopen `%s': %s", iface->infofile, strerror (errno));
+		logger (LOG_ERR, "fopen `%s': %s", iface->infofile, strerror (errno));
 		return (false);
 	}
 

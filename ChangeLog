@@ -1,6 +1,7 @@
+Enable DHCP_INFORM support via the -s option again, moving DHCP_REQUEST
+to the -r option. This makes us more compatible with dhcpcd-1.x and 2.x.
 Ensure that dhcpcd.sh is always called.
 flock the pidfile and stop writing the parent pid to it so we're more robst.
-Enable DHCP_INFORM support via the -S option (requires -s ipaddr too)
 Use the DUID stored to create an RFC 4361 conformant client identifier
 if none is specified instead of just using the MAC address.
 Create a DUID-LLT according to RFC 3315 and store it in peristent file.

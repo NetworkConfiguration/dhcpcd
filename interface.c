@@ -111,6 +111,31 @@ int inet_ntocidr (struct in_addr address)
 	return (cidr);
 }
 
+struct in_addr inet_cidrtoaddr (int cidr) {
+	struct in_addr addr;
+	int ocets;
+
+	if (cidr == 0)
+		ocets = 0;
+	else if (cidr < 9)
+		ocets = 1;
+	else if (cidr < 17)
+		ocets = 2;
+	else if (cidr < 25)
+		ocets = 3;
+	else
+		ocets = 4;
+
+	memset (&addr, 0, sizeof (struct in_addr));
+	if (ocets > 0) {
+		memset (&addr.s_addr, 255, ocets - 1);
+		memset ((unsigned char *) &addr.s_addr + (ocets - 1),
+				(256 - (1 << (32 - cidr) % 8)), 1);
+	}
+
+	return (addr);
+}
+
 unsigned long get_netmask (unsigned long addr)
 {
 	unsigned long dst;

@@ -49,7 +49,6 @@ typedef struct options_t {
 	unsigned leasetime;
 	time_t timeout;
 	int metric;
-	struct in_addr requestaddress;
 
 	bool doarp;
 	bool dodns;
@@ -61,6 +60,10 @@ typedef struct options_t {
 	bool dontp;
 	bool dolastlease;
 	bool doinform;
+	bool dorequest;
+
+	struct in_addr request_address;
+	struct in_addr request_netmask;
 
 	int signal;
 	bool persistent;

@@ -202,7 +202,7 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 
 		*n_params = p - n_params - 1;
 
-		if (*options->hostname) {
+		if (options->hostname[0]) {
 			if (options->fqdn == FQDN_DISABLE) {
 				*p++ = DHCP_HOSTNAME;
 				*p++ = l = strlen (options->hostname);
@@ -235,10 +235,12 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 			p += options->userclass_len;
 		}
 
-		*p++ = DHCP_CLASSID;
-		*p++ = l = strlen (options->classid);
-		memcpy (p, options->classid, l);
-		p += l;
+		if (options->classid_len > 0) {
+			*p++ = DHCP_CLASSID;
+			*p++ = options->classid_len;
+			memcpy (p, options->classid, options->classid_len);
+			p += options->classid_len;
+		}
 	}
 
 	*p++ = DHCP_CLIENTID;
@@ -248,7 +250,7 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 		memcpy (p, options, options->clientid_len);
 		p += options->clientid_len;
 #ifdef ENABLE_DUID
-	} else if (iface->duid) {
+	} else if (iface->duid && options->clientid_len != -1) {
 		*p++ = iface->duid_length + 5;
 		*p++ = 255; /* RFC 4361 */
 

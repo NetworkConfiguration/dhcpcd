@@ -1,6 +1,6 @@
 .\" $Id$
 .\"
-.TH DHCPCD 8 "11 May 2007" "dhcpcd 3.1"
+.TH DHCPCD 8 "15 May 2007" "dhcpcd 3.1"
 
 .SH NAME
 dhcpcd \- DHCP client daemon
@@ -9,17 +9,18 @@ dhcpcd \- DHCP client daemon
 .in +.5i
 .ti -.5i
 dhcpcd
-\%[\-adknpGHMNRSTY]
+\%[\-adknpGHMNRTY]
 \%[\-c\ script]
 \%[\-h\ hostname]
 \%[\-i\ vendorClassID]
 \%[\-l\ leasetime]
 \%[\-m\ metric]
-\%[\-s\ ipaddr]
+\%[\-r\ ipaddr]
+\%[\-s\ ipaddr[/cidr]]
 \%[\-t\ timeout]
 \%[\-u\ userClass]
-\%[\-F\ [ none | ptr | both ] ]
-\%[\-I\ [ clientID ] ]
+\%[\-F\ none | ptr | both ]
+\%[\-I\ clientID ]
 \%[interface]
 .in -.5i
 .SH DESCRIPTION
@@ -144,14 +145,25 @@ except in those circumstances, since if
 is stopped it can no longer down an interface at the end of its
 lease period when the lease is not renewed.
 .TP
-.BI \-s \ ipaddr
+.BI \-r \ ipaddr
 Sends
 .B DHCP_REQUEST
 message requesting to lease IP address ipaddr.
 The ipaddr parameter must be in the form xxx.xxx.xxx.xxx.
+If we are not given an ipaddr then we try use one assigned the the
+interface if present, otherwise the last address we leased for the
+interface, otherwise we error.
 This effectively doubles the timeout period, as if we fail to get
 this IP address then we enter the INIT state and try to get any
-IP address. To send a DHCP_INFORM message use the -S option.
+IP address.
+.TP
+.BI \-s \ ipaddr[/cidr]
+Exactly like \fB-r\fR, but sends DHCP_INFORM instead. This requires the
+interface to be configured with the ipaddr/cidr first.
+When we DHCP_INFORM, we don't request or respect any lease times.
+However, we do re-inform by the lease time specified by
+.BI \-l
+if given.
 .TP
 .BI \-t \ timeout
 Specifies (in seconds ) for how long
@@ -238,14 +250,6 @@ Prevents
 from replacing
 .I /etc/resolv.conf
 or using resolvconf.
-.TP
-.BI \-S
-Sends a DHCP_INFORM message instead of a DHCP_REQUEST message when using the
-.BI \-s
-option. When we DHCP_INFORM, we don't request or respect any lease times.
-However, we do re-inform by the lease time specified by
-.BI \-l
-if given.
 .TP
 .BI \-T
 Will read 
