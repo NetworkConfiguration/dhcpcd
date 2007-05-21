@@ -31,6 +31,7 @@
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <arpa/inet.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -63,45 +64,50 @@
 #ifdef ENABLE_ARP
 int arp_check (interface_t *iface, struct in_addr address)
 {
-	union {
-		unsigned char buffer[iface->buffer_length];
-		struct arphdr ah;
-	} arp;
-
-	int bytes;
-	struct timeval tv;
+	struct arphdr *arp;
+	struct arphdr *reply = NULL;
 	long timeout = 0;
-	fd_set rset;
+	unsigned char *buffer;
+	int arpsize = arphdr_len2 (iface->hwlen, sizeof (struct in_addr));
+	int retval = 0;
 
 	if (! iface->arpable) {
 		logger (LOG_DEBUG, "arp_check: interface `%s' is not ARPable",
 				iface->name);
-		return 0;
+		return (0);
 	}
 
-	memset (arp.buffer, 0, sizeof (arp.buffer));
+	arp = xmalloc (arpsize);
+	memset (arp, 0, arpsize);
 
-	arp.ah.ar_hrd = htons (iface->family);
-	arp.ah.ar_pro = htons (ETHERTYPE_IP);
-	arp.ah.ar_hln = iface->hwlen;
-	arp.ah.ar_pln = sizeof (struct in_addr);
-	arp.ah.ar_op = htons (ARPOP_REQUEST);
-	memcpy (ar_sha (&arp.ah), &iface->hwaddr, arp.ah.ar_hln);
-	memcpy (ar_tpa (&arp.ah), &address, arp.ah.ar_pln);
+	arp->ar_hrd = htons (iface->family);
+	arp->ar_pro = htons (ETHERTYPE_IP);
+	arp->ar_hln = iface->hwlen;
+	arp->ar_pln = sizeof (struct in_addr);
+	arp->ar_op = htons (ARPOP_REQUEST);
+	memcpy (ar_sha (arp), &iface->hwaddr, arp->ar_hln);
+	memcpy (ar_tpa (arp), &address, arp->ar_pln);
 
 	logger (LOG_INFO, "checking %s is available on attached networks",
 			inet_ntoa (address));
 
 	open_socket (iface, true);
-	send_packet (iface, ETHERTYPE_ARP, (unsigned char *) &arp.buffer,
-				 arphdr_len (&arp.ah));
+	send_packet (iface, ETHERTYPE_ARP, (unsigned char *) arp,
+				 arphdr_len (arp));
 
 	timeout = uptime() + TIMEOUT;
-	while (1) {
-		int buflen = sizeof (arp.buffer);
-		int bufpos = -1;
 
-		tv.tv_sec = timeout - uptime ();
+	buffer = xmalloc (sizeof (char *) * iface->buffer_length);
+	reply = xmalloc (arpsize * 2);
+
+	while (1) {
+		struct timeval tv;
+		int bufpos = -1;
+		int buflen = sizeof (char *) * iface->buffer_length;
+		fd_set rset;
+		int bytes;
+
+		tv.tv_sec = timeout - uptime();
 		tv.tv_usec = 0;
 
 		if (tv.tv_sec < 1)
@@ -109,20 +115,14 @@ int arp_check (interface_t *iface, struct in_addr address)
 
 		FD_ZERO (&rset);
 		FD_SET (iface->fd, &rset);
-
-		if (select (iface->fd + 1, &rset, NULL, NULL, &tv) == 0)
+		if (select (FD_SETSIZE, &rset, NULL, NULL, &tv) == 0)
 			break;
 
 		if (! FD_ISSET (iface->fd, &rset))
 			continue;
-
-		memset (arp.buffer, 0, sizeof (arp.buffer));
-
+		
+		memset (buffer, 0, buflen);
 		while (bufpos != 0)	{
-			union {
-				unsigned char buffer[buflen];
-				struct arphdr hdr;
-			} reply;
 			union {
 				unsigned char *c;
 				struct in_addr *a;
@@ -132,39 +132,43 @@ int arp_check (interface_t *iface, struct in_addr address)
 				struct ether_addr *a;
 			} rh;
 
-			memset (reply.buffer, 0, sizeof (reply.buffer));
-			if ((bytes = get_packet (iface, reply.buffer, arp.buffer,
+			memset (reply, 0, arpsize * 2);
+			if ((bytes = get_packet (iface, (unsigned char *) reply,
+									 buffer,
 									 &buflen, &bufpos)) < 0)
 				break;
 
 			/* Only these types are recognised */
-			if (reply.hdr.ar_op != htons(ARPOP_REPLY))
+			if (reply->ar_op != htons (ARPOP_REPLY))
 				continue;
 
 			/* Protocol must be IP. */
-			if (reply.hdr.ar_pro != htons (ETHERTYPE_IP))
+			if (reply->ar_pro != htons (ETHERTYPE_IP))
 				continue;
-			if (reply.hdr.ar_pln != sizeof (struct in_addr))
-				continue;
-
-			if (reply.hdr.ar_hln != ETHER_ADDR_LEN)
-				continue;
-			if ((unsigned) bytes < sizeof (reply.hdr) + 
-				2 * (4 + reply.hdr.ar_hln))
+			if (reply->ar_pln != sizeof (struct in_addr))
 				continue;
 
-			rp.c = (unsigned char *) ar_spa (&reply.hdr);
-			rh.c = (unsigned char *) ar_sha (&reply.hdr);
+			if (reply->ar_hln != ETHER_ADDR_LEN)
+				continue;
+			if ((unsigned) bytes < sizeof (reply) + 
+				2 * (4 + reply->ar_hln))
+				continue;
+
+			rp.c = (unsigned char *) ar_spa (reply);
+			rh.c = (unsigned char *) ar_sha (reply);
 			logger (LOG_ERR, "ARPOP_REPLY received from %s (%s)",
 					inet_ntoa (*rp.a), ether_ntoa (rh.a));
-			close (iface->fd);
-			iface->fd = -1;
-			return 1;
+			retval = -1;
+			goto eexit;
 		}
 	}
 
+eexit:
 	close (iface->fd);
 	iface->fd = -1;
-	return 0;
+	free (arp);
+	free (buffer);
+	free (reply);
+	return (retval);
 }
 #endif
