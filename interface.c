@@ -181,7 +181,9 @@ interface_t *read_interface (const char *ifname, int metric)
 	sa_family_t family = 0;
 	unsigned short mtu;
 
-#ifndef __linux__
+#ifdef __linux__
+	char *p;
+#else
 	struct ifaddrs *ifap;
 	struct ifaddrs *p;
 #endif
@@ -295,18 +297,24 @@ interface_t *read_interface (const char *ifname, int metric)
 	mtu = ifr.ifr_mtu;
 
 	strlcpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
+#ifdef __linux__
+	/* We can only bring the real interface up */
+	if ((p = strchr (ifr.ifr_name, ':')))
+		*p = '\0';
+#endif
 	if (ioctl(s, SIOCGIFFLAGS, &ifr) < 0) {
 		logger (LOG_ERR, "ioctl SIOCGIFFLAGS: %s", strerror (errno));
 		close (s);
 		return NULL;
 	}
 
-	ifr.ifr_flags |= IFF_UP | IFF_RUNNING;
-	strlcpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
-	if (ioctl(s, SIOCSIFFLAGS, &ifr) < 0) {
-		logger (LOG_ERR, "ioctl SIOCSIFFLAGS: %s", strerror (errno));
-		close (s);
-		return NULL;
+	if (! (ifr.ifr_flags & IFF_UP) || ! (ifr.ifr_flags & IFF_RUNNING)) {
+		ifr.ifr_flags |= IFF_UP | IFF_RUNNING;
+		if (ioctl(s, SIOCSIFFLAGS, &ifr) < 0) {
+			logger (LOG_ERR, "ioctl SIOCSIFFLAGS: %s", strerror (errno));
+			close (s);
+			return NULL;
+		}
 	}
 
 	close (s);
@@ -766,6 +774,10 @@ static int do_address(const char *ifname,
 	nlm.ifa.ifa_family = AF_INET;
 
 	nlm.ifa.ifa_prefixlen = inet_ntocidr (netmask);
+
+	/* This creates the aliased interface */
+	add_attr_l (&nlm.hdr, sizeof (nlm), IFA_LABEL, ifname, strlen (ifname) + 1);
+
 	add_attr_l (&nlm.hdr, sizeof (nlm), IFA_LOCAL, &address.s_addr,
 				sizeof (address.s_addr));
 	if (! del)
