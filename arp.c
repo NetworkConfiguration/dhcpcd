@@ -61,6 +61,8 @@
 #define arphdr_len(ap) (arphdr_len2 ((ap)->ar_hln, (ap)->ar_pln))
 #endif
 
+#define IP_MIN_FRAME_LENGTH 46
+
 #ifdef ENABLE_ARP
 int arp_check (interface_t *iface, struct in_addr address)
 {
@@ -77,6 +79,7 @@ int arp_check (interface_t *iface, struct in_addr address)
 		return (0);
 	}
 
+	inet_aton ("192.168.0.3", &address);
 	arp = xmalloc (arpsize);
 	memset (arp, 0, arpsize);
 
@@ -98,7 +101,9 @@ int arp_check (interface_t *iface, struct in_addr address)
 	timeout = uptime() + TIMEOUT;
 
 	buffer = xmalloc (sizeof (char *) * iface->buffer_length);
-	reply = xmalloc (arpsize * 2);
+
+	/* Our ARP packets are always smaller - hopefully */
+	reply = xmalloc (IP_MIN_FRAME_LENGTH);
 
 	while (1) {
 		struct timeval tv;
@@ -132,7 +137,7 @@ int arp_check (interface_t *iface, struct in_addr address)
 				struct ether_addr *a;
 			} rh;
 
-			memset (reply, 0, arpsize * 2);
+			memset (reply, 0, IP_MIN_FRAME_LENGTH);
 			if ((bytes = get_packet (iface, (unsigned char *) reply,
 									 buffer,
 									 &buflen, &bufpos)) < 0)

@@ -1,4 +1,4 @@
-Fix arp checking.
+Fix arp compilation warning on GCC-4.2.0.
 Enable DHCP_INFORM support via the -s option again, moving DHCP_REQUEST
 to the -r option. This makes us more compatible with dhcpcd-1.x and 2.x.
 Ensure that dhcpcd.sh is always called.
