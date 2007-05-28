@@ -297,7 +297,7 @@ int main(int argc, char **argv)
 				options.dogateway = false;
 				break;
 			case 'H':
-				options.dohostname = true;
+				options.dohostname++;
 				break;
 			case 'I':
 				if (optarg) {

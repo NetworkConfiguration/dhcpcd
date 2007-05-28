@@ -496,7 +496,7 @@ int configure (const options_t *options, interface_t *iface,
 #endif
 
 	/* Now we have made a resolv.conf we can obtain a hostname if we need it */
-	if (options->dohostname  && ! dhcp->hostname) { 
+	if (options->dohostname && ! dhcp->hostname) { 
 		union {
 			struct sockaddr sa;
 			struct sockaddr_in sin;
@@ -524,8 +524,31 @@ int configure (const options_t *options, interface_t *iface,
 				freeaddrinfo (res);
 				addr[0] = '\0';
 				logger (LOG_ERR, "malicious PTR record detected");
-			} else if (*addr)
+			} else if (*addr) {
+				if (options->dohostname == 1) {
+					/* Strip out the domain if it matches */
+					char *p = strchr (addr, '.');
+					if (p) {
+						p++;
+						if (*p && dhcp->dnssearch) {
+							char *s = xstrdup (dhcp->dnssearch);
+							char *sp = s;
+							char *t;
+
+							while ((t = strsep (&sp, " ")))
+								if (strcmp (t, p) == 0) {
+									*--p = '\0';
+									break;
+								}
+							free (s);
+						} else if (dhcp->dnsdomain) {
+							if (strcmp (dhcp->dnsdomain, p) == 0)
+								*--p = '\0';
+						}
+					}
+				}
 				strlcpy (newhostname, addr, sizeof (newhostname));
+			}
 		}
 	}
 

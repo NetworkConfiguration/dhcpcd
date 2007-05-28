@@ -196,7 +196,9 @@ By default
 will NOT set hostname of the host to the hostname option
 received from DHCP server unless the current hostname is blank, (none) or
 localhost. If no hostname is returned by the DHCP server then we attempt
-to lookup the hostname via DNS.
+to lookup the hostname via DNS. If we are given a DNS domain in the DHCP
+message then we strip the matching part from the looked up hostname unless
+told to by -HH.
 .TP
 .BI \-F \ none | ptr | both
 Forces
