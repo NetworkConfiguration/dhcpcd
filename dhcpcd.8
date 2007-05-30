@@ -196,9 +196,26 @@ By default
 will NOT set hostname of the host to the hostname option
 received from DHCP server unless the current hostname is blank, (none) or
 localhost. If no hostname is returned by the DHCP server then we attempt
-to lookup the hostname via DNS. If we are given a DNS domain in the DHCP
-message then we strip the matching part from the looked up hostname unless
-told to by -HH.
+to lookup the hostname via DNS.
+More -H's control what we do with the FQDN returned by DNS.
+.IP
+.BI \-H
+set hostname to the full FQDN
+.br
+.BI \-HH
+strip the domain if it matches a given domain in our DHCP message
+.br
+.BI \-HHH
+strip the domain regardless
+.br
+.BI \-HHHH
+force hostname lookup even if given a hostname in our DHCP message
+.br
+.BI \-HHHHH
+same as above, but strip the domain if it matches
+.br
+.BI \-HHHHHH
+same as above, but strip the domain regardless
 .TP
 .BI \-F \ none | ptr | both
 Forces
