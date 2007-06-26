@@ -399,6 +399,7 @@ int main(int argc, char **argv)
 			exit (EXIT_FAILURE);
 	}
 
+	chdir ("/");
 	umask (022);
 
 	if (mkdir (CONFIGDIR, S_IRUSR |S_IWUSR |S_IXUSR | S_IRGRP | S_IXGRP
