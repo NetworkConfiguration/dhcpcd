@@ -193,6 +193,7 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 			*p++ = DHCP_NISSERVER;
 			*p++ = DHCP_NTPSERVER;
 			*p++ = DHCP_MTU;
+			*p++ = DHCP_ROOTPATH;
 			/* These parameters were requested by dhcpcd-2.0 and earlier
 			   but we never did anything with them */
 			/*    *p++ = DHCP_DEFAULTIPTTL;

@@ -1,3 +1,4 @@
+ROOTPATH should work correctly again, thanks to danhien.
 We now have 6 hostname options, which should satisfy everyone.
 Fix arp compilation warning on GCC-4.2.0.
 Enable DHCP_INFORM support via the -s option again, moving DHCP_REQUEST
