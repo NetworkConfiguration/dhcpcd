@@ -453,17 +453,21 @@ static int do_route (const char *ifname,
 	struct rtm 
 	{
 		struct rt_msghdr hdr;
-		struct sockaddr_in destination;
-		union
-		{
-			struct sockaddr sa;
-			struct sockaddr_in sin;
-			struct sockaddr_dl sdl;
-			struct sockaddr_storage sss; /* added to avoid memory overrun */
-		} gateway;
-		struct sockaddr_in netmask;
+		char buffer[sizeof (struct sockaddr_storage) * 3];
 	} rtm;
+	char *bp = rtm.buffer;
 	static int seq;
+	union sockunion {
+		struct sockaddr sa;
+		struct sockaddr_in sin;
+#ifdef INET6
+		struct sockaddr_in6 sin6;
+#endif
+		struct sockaddr_dl sdl;
+		struct sockaddr_storage ss;
+	} su;
+	
+	int l;
 
 	if (! ifname)
 		return -1;
@@ -476,7 +480,7 @@ static int do_route (const char *ifname,
 		logger (LOG_INFO, "%s route to %s/%d",
 				change ? "changing" : del ? "removing" : "adding",
 				dstd, inet_ntocidr (netmask));
-	else if (destination.s_addr == INADDR_ANY && netmask.s_addr == INADDR_ANY)
+	else if (destination.s_addr == INADDR_ANY)
 		logger (LOG_INFO, "%s default route via %s",
 				change ? "changing" : del ? "removing" : "adding",
 				inet_ntoa (gateway));
@@ -499,26 +503,27 @@ static int do_route (const char *ifname,
 	rtm.hdr.rtm_type = change ? RTM_CHANGE : del ? RTM_DELETE : RTM_ADD;
 
 	rtm.hdr.rtm_flags = RTF_UP | RTF_STATIC;
-	if (netmask.s_addr == INADDR_BROADCAST) 
+	if (netmask.s_addr == INADDR_BROADCAST)
 		rtm.hdr.rtm_flags |= RTF_HOST;
 	else
 		rtm.hdr.rtm_flags |= RTF_GATEWAY;
 
+	/* This order is important */
 	rtm.hdr.rtm_addrs = RTA_DST | RTA_GATEWAY | RTA_NETMASK;
 
-#define ADDADDR(_var, _addr) \
-	_var.sin_family = AF_INET; \
-	_var.sin_len = sizeof (struct sockaddr_in); \
-	memcpy (&_var.sin_addr, &_addr, sizeof (struct in_addr));
+#define ADDADDR(_addr) \
+	memset (&su, 0, sizeof (struct sockaddr_storage)); \
+	su.sin.sin_family = AF_INET; \
+	su.sin.sin_len = sizeof (struct sockaddr_in); \
+	memcpy (&su.sin.sin_addr, &_addr, sizeof (struct in_addr)); \
+	l = SA_SIZE (&(su.sa)); \
+	memcpy (bp, &(su), l); \
+	bp += l;
 
-	ADDADDR (rtm.destination, destination);
+	ADDADDR (destination);
+
 	if (netmask.s_addr == INADDR_BROADCAST) {
 		struct ifaddrs *ifap, *ifa;
-		union
-		{
-			struct sockaddr *sa;
-			struct sockaddr_dl *sdl;
-		} us;
 
 		if (getifaddrs (&ifap)) {
 			logger (LOG_ERR, "getifaddrs: %s", strerror (errno));
@@ -533,21 +538,20 @@ static int do_route (const char *ifname,
 			if (strcmp (ifname, ifa->ifa_name))
 				continue;
 
-			us.sa = ifa->ifa_addr;
-			memcpy (&rtm.gateway.sdl, us.sdl, us.sdl->sdl_len);
+			l = SA_SIZE (ifa->ifa_addr);
+			memcpy (bp, ifa->ifa_addr, l);
+			bp += l;
 			break;
 		}
 		freeifaddrs (ifap);
 	} else {
-		ADDADDR (rtm.gateway.sin, gateway);
+		ADDADDR (gateway);
 	}
 
-	ADDADDR (rtm.netmask, netmask);
-
+	ADDADDR (netmask);
 #undef ADDADDR
 
 	rtm.hdr.rtm_msglen = sizeof (rtm);
-
 	if (write(s, &rtm, sizeof (rtm)) < 0) {
 		/* Don't report error about routes already existing */
 		if (errno != EEXIST)

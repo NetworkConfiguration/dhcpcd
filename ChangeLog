@@ -1,3 +1,4 @@
+Fix adding of routes on the BSDs.
 ROOTPATH should work correctly again, thanks to danhien.
 We now have 6 hostname options, which should satisfy everyone.
 Fix arp compilation warning on GCC-4.2.0.
@@ -11,7 +12,7 @@ Create a DUID-LLT according to RFC 3315 and store it in peristent file.
 config.h now has the compile time options, instead of being dotted around.
 Added -E option, which reads the last info file and uses the information there
 if we timeout and the lease is still valid, thanks to Roberto Angelino.
-Compiles ok on NetBSD, but doesn't add routes yet - thanks to Gabor Z. Papp.
+Compiles ok on NetBSD thanks to Gabor Z. Papp.
 If the current hostname contains dots then send it as a FQDN.
 Ensure that static routes are always added before routers.
 Use getnameinfo instead of gethostbyaddr.
