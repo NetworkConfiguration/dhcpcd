@@ -49,13 +49,18 @@
 #include "configure.h"
 #include "dhcp.h"
 #include "dhcpcd.h"
-#ifdef ENABLE_INFO
-# include "info.h"
-#endif
 #include "interface.h"
 #include "logger.h"
 #include "signals.h"
 #include "socket.h"
+
+#ifdef ENABLE_DUID
+# include "duid.h"
+#endif
+
+#ifdef ENABLE_INFO
+# include "info.h"
+#endif
 
 /* We need this for our maximum timeout as FreeBSD's select cannot handle
    any higher than this. Is there a better way of working this out? */
@@ -218,6 +223,15 @@ int dhcp_run (const options_t *options, int *pidfd)
 	if (! options || (iface = (read_interface (options->interface,
 											   options->metric))) == NULL)
 		return (-1);
+
+#ifdef ENABLE_DUID
+	if (options->clientid_len == 0) {
+		get_duid (iface);
+		if (iface->duid_length > 0)
+			logger (LOG_INFO, "DUID = %s",
+					hwaddr_ntoa (iface->duid, iface->duid_length));
+	}
+#endif
 
 	dhcp = xmalloc (sizeof (dhcp_t));
 	memset (dhcp, 0, sizeof (dhcp_t));
