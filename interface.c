@@ -836,8 +836,7 @@ static int do_route (const char *ifname,
 	else {
 		nlm.hdr.nlmsg_flags |= NLM_F_CREATE | NLM_F_EXCL;
 		nlm.rt.rtm_protocol = RTPROT_BOOT;
-		if (gateway.s_addr == INADDR_ANY ||
-			netmask.s_addr == INADDR_BROADCAST)
+		if (gateway.s_addr == INADDR_ANY)
 			nlm.rt.rtm_scope = RT_SCOPE_LINK;
 		else
 			nlm.rt.rtm_scope = RT_SCOPE_UNIVERSE;
