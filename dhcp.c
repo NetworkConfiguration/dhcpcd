@@ -275,14 +275,15 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 		p += iface->hwlen;
 	}
 
+	*p++ = DHCP_END;
+
 #ifdef BOOTP_MESSAGE_LENTH_MIN
 	/* Some crappy DHCP servers think they have to obey the BOOTP minimum
 	 * messag length. They are wrong, but we should still cater for them */
-	while (p - m < BOOTP_MESSAGE_LENTH_MIN - 1)
+	while (p - m < BOOTP_MESSAGE_LENTH_MIN)
 		*p++ = DHCP_PAD;
 #endif
 
-	*p++ = DHCP_END;
 	message_length = p - m;
 
 	memset (&packet, 0, sizeof (struct udp_dhcp_packet));
