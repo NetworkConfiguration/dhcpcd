@@ -69,6 +69,7 @@ typedef struct options_t {
 	bool persistent;
 	bool keep_address;
 	bool daemonise;
+	bool test;
 
 	char *script;
 	char pidfile[PATH_MAX];

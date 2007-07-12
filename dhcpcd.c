@@ -79,7 +79,7 @@ static pid_t read_pid(const char *pidfile)
 
 static void usage ()
 {
-	printf ("usage: "PACKAGE" [-adknpEGHMNRSY] [-c script] [-h hostame] [-i classID]\n"
+	printf ("usage: "PACKAGE" [-adknpEGHMNRTY] [-c script] [-h hostame] [-i classID]\n"
 	        "              [-l leasetime] [-m metric] [-s ipaddress] [-t timeout]\n"
 	        "              [-u userclass] [-F none | ptr | both] [-I clientID]\n");
 }
@@ -96,7 +96,7 @@ int main(int argc, char **argv)
 	pid_t pid;
 	int debug = 0;
 	int i;
-	int pidfd;
+	int pidfd = -1;
 
 	const struct option longopts[] = {
 		{"arp",         no_argument,        NULL, 'a'},
@@ -121,6 +121,7 @@ int main(int argc, char **argv)
 		{"nomtu",       no_argument,        NULL, 'M'},
 		{"nontp",       no_argument,        NULL, 'N'},
 		{"nodns",       no_argument,        NULL, 'R'},
+		{"test",        no_argument,        NULL, 'T'},
 		{"nonis",       no_argument,        NULL, 'Y'},
 		{"help",        no_argument,        &dohelp, 1},
 		{"version",     no_argument,        &doversion, 1},
@@ -155,7 +156,7 @@ int main(int argc, char **argv)
 
 	/* Don't set any optional arguments here so we retain POSIX
 	 * compatibility with getopt */
-	while ((opt = getopt_long(argc, argv, "ac:dh:i:kl:m:npr:s:t:u:EF:GHI:MNRY",
+	while ((opt = getopt_long(argc, argv, "ac:dh:i:kl:m:npr:s:t:u:EF:GHI:MNRTY",
 							  longopts, &option_index)) != -1)
 	{
 		switch (opt) {
@@ -168,6 +169,10 @@ int main(int argc, char **argv)
 				break;
 
 			case 'a':
+#ifndef ENABLE_ARP
+				logger (LOG_ERR, "arp support not compiled into dhcpcd");
+				exit (EXIT_FAILURE);
+#endif
 				options.doarp = true;
 				break;
 			case 'c':
@@ -279,6 +284,10 @@ int main(int argc, char **argv)
 				}
 				break;
 			case 'E':
+#ifndef ENABLE_INFO
+				logger (LOG_ERR, "info support not compiled into dhcpcd");
+				exit (EXIT_FAILURE);
+#endif
 				options.dolastlease = true;
 				break;
 			case 'F':
@@ -324,6 +333,14 @@ int main(int argc, char **argv)
 				break;
 			case 'R':
 				options.dodns = false;
+				break;
+			case 'T':
+#ifndef ENABLE_INFO
+				logger (LOG_ERR, "info support not compiled into dhcpcd");
+				exit (EXIT_FAILURE);
+#endif
+				options.test = true;
+				options.persistent = true;
 				break;
 			case 'Y':
 				options.donis = false;
@@ -380,7 +397,41 @@ int main(int argc, char **argv)
 	snprintf (options.pidfile, sizeof (options.pidfile), PIDFILE,
 			  options.interface);
 
-	if (options.signal != 0) {
+	chdir ("/");
+	umask (022);
+
+	if (mkdir (CONFIGDIR, S_IRUSR |S_IWUSR |S_IXUSR | S_IRGRP | S_IXGRP
+			   | S_IROTH | S_IXOTH) && errno != EEXIST )
+	{
+		logger (LOG_ERR, "mkdir(\"%s\",0): %s\n", CONFIGDIR, strerror (errno));
+		exit (EXIT_FAILURE);
+	}
+
+	if (mkdir (ETCDIR, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP
+			   | S_IROTH | S_IXOTH) && errno != EEXIST )
+	{
+		logger (LOG_ERR, "mkdir(\"%s\",0): %s\n", ETCDIR, strerror (errno));
+		exit (EXIT_FAILURE);
+	}
+
+	if (options.test) {
+		if (options.dorequest || options.doinform) {
+			logger (LOG_ERR, "cannot test with --inform or --request");
+			exit (EXIT_FAILURE);
+		}
+
+		if (options.dolastlease) {
+			logger (LOG_ERR, "cannot test with --lastlease");
+			exit (EXIT_FAILURE);
+		}
+
+		if (options.signal != 0) {
+			logger (LOG_ERR, "cannot test with --release or --renew");
+			exit (EXIT_FAILURE);
+		}
+	}
+
+	if (options.signal != 0 ) {
 		int killed = -1;
 		pid = read_pid (options.pidfile);
 		if (pid != 0)
@@ -399,47 +450,33 @@ int main(int argc, char **argv)
 			exit (EXIT_FAILURE);
 	}
 
-	chdir ("/");
-	umask (022);
+	if (! options.test) {
+		if ((pid = read_pid (options.pidfile)) > 0 && kill (pid, 0) == 0) {
+			logger (LOG_ERR, ""PACKAGE" already running on pid %d (%s)",
+					pid, options.pidfile);
+			exit (EXIT_FAILURE);
+		}
 
-	if (mkdir (CONFIGDIR, S_IRUSR |S_IWUSR |S_IXUSR | S_IRGRP | S_IXGRP
-			   | S_IROTH | S_IXOTH) && errno != EEXIST )
-	{
-		logger (LOG_ERR, "mkdir(\"%s\",0): %s\n", CONFIGDIR, strerror (errno));
-		exit (EXIT_FAILURE);
-	}
+		pidfd = open (options.pidfile, O_WRONLY | O_CREAT | O_NONBLOCK, 0660);
+		if (pidfd == -1) {
+			logger (LOG_ERR, "open `%s': %s", options.pidfile, strerror (errno));
+			exit (EXIT_FAILURE);
+		}
 
-	if (mkdir (ETCDIR, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP
-			   | S_IROTH | S_IXOTH) && errno != EEXIST )
-	{
-		logger (LOG_ERR, "mkdir(\"%s\",0): %s\n", ETCDIR, strerror (errno));
-		exit (EXIT_FAILURE);
-	}
+		/* Lock the file so that only one instance of dhcpcd runs on an interface */
+		if (flock (pidfd, LOCK_EX | LOCK_NB) == -1) {
+			logger (LOG_ERR, "flock `%s': %s", options.pidfile, strerror (errno));
+			exit (EXIT_FAILURE);
+		}
 
-	if ((pid = read_pid (options.pidfile)) > 0 && kill (pid, 0) == 0) {
-		logger (LOG_ERR, ""PACKAGE" already running on pid %d (%s)",
-				pid, options.pidfile);
-		exit (EXIT_FAILURE);
-	}
-
-	pidfd = open (options.pidfile, O_WRONLY | O_CREAT | O_NONBLOCK, 0660);
-	if (pidfd == -1) {
-		logger (LOG_ERR, "open `%s': %s", options.pidfile, strerror (errno));
-		exit (EXIT_FAILURE);
-	}
-
-	/* Lock the file so that only one instance of dhcpcd runs on an interface */
-	if (flock (pidfd, LOCK_EX | LOCK_NB) == -1) {
-		logger (LOG_ERR, "flock `%s': %s", options.pidfile, strerror (errno));
-		exit (EXIT_FAILURE);
-	}
-
-	/* dhcpcd.sh should not interhit this fd */
-	if ((i = fcntl (pidfd, F_GETFD, 0)) < 0 ||
-		fcntl (pidfd, F_SETFD, i | FD_CLOEXEC) < 0)
+		/* dhcpcd.sh should not interhit this fd */
+		if ((i = fcntl (pidfd, F_GETFD, 0)) < 0 ||
+			fcntl (pidfd, F_SETFD, i | FD_CLOEXEC) < 0)
 			logger (LOG_ERR, "fcntl: %s", strerror (errno));
 
-	logger (LOG_INFO, PACKAGE " " VERSION " starting");
+		logger (LOG_INFO, PACKAGE " " VERSION " starting");
+	}
+
 	if (dhcp_run (&options, &pidfd)) {
 		if (pidfd > -1)
 			close (pidfd);

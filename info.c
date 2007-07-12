@@ -72,13 +72,17 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 	address_t *address;
 	struct stat sb;
 
-	if (! overwrite && stat (iface->infofile, &sb) == 0)
-		return (true);
+	if (options->test)
+		f = stdout;
+	else {
+		if (! overwrite && stat (iface->infofile, &sb) == 0)
+			return (true);
 
-	logger (LOG_DEBUG, "writing %s", iface->infofile);
-	if ((f = fopen (iface->infofile, "w")) == NULL) {
-		logger (LOG_ERR, "fopen `%s': %s", iface->infofile, strerror (errno));
-		return (false);
+		logger (LOG_DEBUG, "writing %s", iface->infofile);
+		if ((f = fopen (iface->infofile, "w")) == NULL) {
+			logger (LOG_ERR, "fopen `%s': %s", iface->infofile, strerror (errno));
+			return (false);
+		}
 	}
 
 	if (dhcp->address.s_addr) {
@@ -174,7 +178,8 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 	if (dhcp->servername[0])
 		fprintf (f, "DHCPSNAME='%s'\n", cleanmetas (dhcp->servername));
 	if (! options->doinform && dhcp->address.s_addr) {
-		fprintf (f, "LEASEDFROM='%u'\n", dhcp->leasedfrom);
+		if (! options->test)
+			fprintf (f, "LEASEDFROM='%u'\n", dhcp->leasedfrom);
 		fprintf (f, "LEASETIME='%u'\n", dhcp->leasetime);
 		fprintf (f, "RENEWALTIME='%u'\n", dhcp->renewaltime);
 		fprintf (f, "REBINDTIME='%u'\n", dhcp->rebindtime);
@@ -240,7 +245,8 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 	}
 #endif
 
-	fclose (f);
+	if (! options->test)
+		fclose (f);
 	return (true);
 }
 

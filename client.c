@@ -49,6 +49,7 @@
 #include "configure.h"
 #include "dhcp.h"
 #include "dhcpcd.h"
+#include "info.h"
 #include "interface.h"
 #include "logger.h"
 #include "signals.h"
@@ -258,16 +259,18 @@ int dhcp_run (const options_t *options, int *pidfd)
 	   After all, we ARE a DHCP client whose job it is to configure the
 	   interface. We only do this on start, so persistent addresses can be added
 	   afterwards by the user if needed. */
-	if (! options->doinform)
-		flush_addresses (iface->name);
-	else {
-		/* The inform address HAS to be configured for it to work with most
-		 * DHCP servers */
-		if (options->doinform && has_address (iface->name, dhcp->address) < 1) {
-			add_address (iface->name, dhcp->address, dhcp->netmask,
-						 dhcp->broadcast);
-			iface->previous_address = dhcp->address;
-			iface->previous_netmask = dhcp->netmask;
+	if (! options->test) {
+		if (! options->doinform)
+			flush_addresses (iface->name);
+		else {
+			/* The inform address HAS to be configured for it to work with most
+			 * DHCP servers */
+			if (options->doinform && has_address (iface->name, dhcp->address) < 1) {
+				add_address (iface->name, dhcp->address, dhcp->netmask,
+							 dhcp->broadcast);
+				iface->previous_address = dhcp->address;
+				iface->previous_netmask = dhcp->netmask;
+			}
 		}
 	}
 
@@ -579,6 +582,13 @@ int dhcp_run (const options_t *options, int *pidfd)
 									addr, inet_ntoa (dhcp->serveraddress));
 						free (addr);
 
+#ifdef ENABLE_INFO
+						if (options->test) {
+							write_info (iface, dhcp, options, false);
+							goto eexit;
+						}
+#endif
+						
 						SEND_MESSAGE (DHCP_REQUEST);
 						state = STATE_REQUESTING;
 					}

@@ -1,3 +1,6 @@
+Added -T test option. This just sends a DHCP_DISCOVER message and then
+prints the configuration data to stdout - we don't request a lease,
+configure the interface or write the info file.
 Fix adding of routes on the BSDs.
 ROOTPATH should work correctly again, thanks to danhien.
 We now have 6 hostname options, which should satisfy everyone.

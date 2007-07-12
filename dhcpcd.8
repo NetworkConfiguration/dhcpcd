@@ -1,6 +1,6 @@
 .\" $Id$
 .\"
-.TH DHCPCD 8 "15 May 2007" "dhcpcd 3.1"
+.TH DHCPCD 8 "12 Jul 2007" "dhcpcd 3.1"
 
 .SH NAME
 dhcpcd \- DHCP client daemon
@@ -9,7 +9,7 @@ dhcpcd \- DHCP client daemon
 .in +.5i
 .ti -.5i
 dhcpcd
-\%[\-adknpGHMNRTY]
+\%[\-adknpEGHMNRTY]
 \%[\-c\ script]
 \%[\-h\ hostname]
 \%[\-i\ vendorClassID]
@@ -87,7 +87,7 @@ process associated with the specified interface if one is currently running. If
 receives
 .B SIGHUP
 it will send
-.B DCHP_RELEASE
+.B DHCP_RELEASE
 message to the server and destroy dhcpcd cache. In a case
 .B dhcpcd
 receives
@@ -187,6 +187,45 @@ fixed hardware addresses. You can specify more than one user class, but the
 total length must be less than 255 characters, -1 character for each user
 class.
 .TP
+.BI \-E
+Will read 
+.I /var/lib/dhcpcd/dhcpcd-<interface>.info
+file and use last known good lease if
+.B dhcpcd
+is unable to reach the DHCP server and the lease has not expired.
+This puts \fBdhcpcd\fR into the BOUND or REBINDING state depending on
+how long the lease has until expiry.
+.TP
+.BI \-F \ none | ptr | both
+Forces
+.B dhcpcd
+to request the DHCP server update the DNS using the FQDN option
+instead of the Hostname option. The name used by this option
+is specified with the \fB-h\fP switch, which must be present. If
+the \fB-h\fP switch is not present, the FQDN option is ignored.
+The name should be fully qualified, although servers usually
+accept a simple name.
+.I both
+requests that the DHCP server update both the A and PTR
+records in the DNS.
+.I ptr
+requests that the DHCP server updates only the PTR record in
+the DNS.
+.I none
+requests that the DHCP server perform no updates.
+.B dhcpcd
+does not perform any DNS update, even when the server is
+requested to perform no updates.  This can be easily
+implemented outside the client; all the necessary
+information is recorded in the
+.I /var/lib/dhcpcd/dhcpcd-<interface>.info
+file.
+.TP
+.BI \-G
+Prevents
+.B dhcpcd
+from installing default routes provided by DHCP server.
+.TP
 .BI \-H
 Forces
 .B dhcpcd
@@ -217,31 +256,6 @@ same as above, but strip the domain if it matches
 .BI \-HHHHHH
 same as above, but strip the domain regardless
 .TP
-.BI \-F \ none | ptr | both
-Forces
-.B dhcpcd
-to request the DHCP server update the DNS using the FQDN option
-instead of the Hostname option. The name used by this option
-is specified with the \fB-h\fP switch, which must be present. If
-the \fB-h\fP switch is not present, the FQDN option is ignored.
-The name should be fully qualified, although servers usually
-accept a simple name.
-.I both
-requests that the DHCP server update both the A and PTR
-records in the DNS.
-.I ptr
-requests that the DHCP server updates only the PTR record in
-the DNS.
-.I none
-requests that the DHCP server perform no updates.
-.B dhcpcd
-does not perform any DNS update, even when the server is
-requested to perform no updates.  This can be easily
-implemented outside the client; all the necessary
-information is recorded in the
-.I /var/lib/dhcpcd/dhcpcd-<interface>.info
-file.
-.TP
 .BI \-I \ clientID
 Specifies the client identifier string. If not specified then
 .B dhcpcd
@@ -271,40 +285,14 @@ from replacing
 or using resolvconf.
 .TP
 .BI \-T
-Will read 
-.I /var/lib/dhcpcd/dhcpcd-<interface>.info
-file and use last known good lease if
-.B dhcpcd
-is unable to reach the DHCP server and the lease has not expired.
-This puts \fBdhcpcd\fR into the BOUND or REBINDING state depending on
-how long the lease has until expiry.
+dhcpcd sends out a DHCP_DISCOVER message and then prints the values returned to
+stdout. It does not configure the interface or touch the .info files.
 .TP
 .BI \-Y
 Prevents
 .B dhcpcd
 from replacing
 .I /etc/yp.conf
-.TP
-.BI \-G
-Prevents
-.B dhcpcd
-from installing default routes provided by DHCP server.
-.SH NOTES
-.TP
-.B dhcpcd
-uses
-.I LOCAL0
-syslog facility for all logging. To catch
-.B dhcpcd
-debugging output add the following line to
-.I /etc/syslog.conf
-file:
-
-local0.*     /var/log/dhcpcd.log
-
-and then refresh syslogd daemon:
-
-kill -1 `cat /var/run/syslogd.pid`
 
 .SH FILES
 .PD 0
@@ -363,9 +351,6 @@ to which
 is attached.
 
 .SH SEE ALSO
-.BR dig (1),
-.BR nslookup (8),
-.BR nsupdate (8)
 .LP
 .I Dynamic Host Configuration Protocol,
 RFC2132
@@ -373,11 +358,11 @@ RFC2132
 .I DHCP Options and BOOTP Vendor Extensions,
 RFC2132
 .LP
-.I Draft DHC FQDN Option specification,
-draft-ietf-dhc-fqdn-option
+.I DHCP FQDN Option specification,
+RFC4702
 
 .SH BUGS
-Please report them to http://bugs.gentoo.org.
+Please report them to http://dhcpcd.berlios.de or http://bugs.gentoo.org.
 .PD 0
 
 .SH AUTHORS
