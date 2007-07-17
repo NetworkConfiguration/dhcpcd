@@ -83,6 +83,7 @@ enum DHCP_OPTIONS
 	DHCP_NTPSERVER              = 42,
 	DHCP_ADDRESS                = 50,
 	DHCP_LEASETIME              = 51,
+	DHCP_OPTIONSOVERLOADED      = 52,
 	DHCP_MESSAGETYPE            = 53,
 	DHCP_SERVERIDENTIFIER       = 54,
 	DHCP_PARAMETERREQUESTLIST   = 55,
@@ -187,8 +188,8 @@ typedef struct dhcpmessage_t
 	int32_t siaddr;         /* should be zero in client's messages */
 	int32_t giaddr;         /* should be zero in client's messages */
 	unsigned char chaddr[DHCP_CHADDR_LEN];  /* client's hardware address */
-	char servername[SERVERNAME_LEN];    /* server host name */
-	char bootfile[BOOTFILE_LEN];    /* boot file name */
+	unsigned char servername[SERVERNAME_LEN];    /* server host name */
+	unsigned char bootfile[BOOTFILE_LEN];    /* boot file name */
 	uint32_t cookie;
 	unsigned char options[DHCP_OPTION_LEN]; /* message options - cookie */
 } dhcpmessage_t;

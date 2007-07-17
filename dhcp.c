@@ -474,18 +474,22 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 	route_t *static_routes = NULL;
 	route_t *static_routesp = NULL;
 	route_t *csr = NULL;
-
-	end += sizeof (message->options);
+	bool in_overload = false;
+	bool parse_sname = false;
+	bool parse_file = false;
+ 
+ 	end += sizeof (message->options);
 
 	if (gettimeofday (&tv, NULL) == -1) {
 		logger (LOG_ERR, "gettimeofday: %s", strerror (errno));
 		return (-1);
 	}
+
+ 	dhcp->address.s_addr = message->yiaddr;
 	dhcp->leasedfrom = tv.tv_sec;
 	dhcp->frominfo = false;
-
 	dhcp->address.s_addr = message->yiaddr;
-	strlcpy (dhcp->servername, message->servername,
+	strlcpy (dhcp->servername, (char *) message->servername,
 			 sizeof (dhcp->servername));
 
 #define LEN_ERR \
@@ -495,10 +499,14 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 		continue; \
 	}
 
+parse_start:
 	while (p < end) {
 		option = *p++;
 		if (! option)
 			continue;
+
+		if (option == DHCP_END)
+			goto eexit;
 
 		length = *p++;
 
@@ -509,9 +517,6 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 		}
 
 		switch (option) {
-			case DHCP_END:
-				goto eexit;
-
 			case DHCP_MESSAGETYPE:
 				retval = (int) *p;
 				p += length;
@@ -674,6 +679,18 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 				}
 				break;
 
+			case DHCP_OPTIONSOVERLOADED:
+				LENGTH (1);
+				/* The overloaded option in an overloaded option
+				 * should be ignored, overwise we may get an infinite loop */
+				if (! in_overload) {
+					if (*p & 1)
+						parse_file = true;
+					if (*p & 2)
+						parse_sname = true;
+				}
+				break;
+
 #undef LENGTH
 #undef MIN_LENGTH
 #undef MULT_LENGTH
@@ -687,6 +704,22 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 	}
 
 eexit:
+	/* We may have options overloaded, so go back and grab them */
+	if (parse_file) {
+		parse_file = false;
+		p = message->bootfile;
+		end = p + sizeof (message->bootfile);
+		in_overload = true;
+		goto parse_start;
+	} else if (parse_sname) {
+		parse_sname = false;
+		p = message->servername;
+		end = p + sizeof (message->servername);
+		memset (dhcp->servername, 0, sizeof (dhcp->servername));
+		in_overload = true;
+		goto parse_start;
+	}
+
 	/* Fill in any missing fields */
 	if (! dhcp->netmask.s_addr)
 		dhcp->netmask.s_addr = get_netmask (dhcp->address.s_addr);
