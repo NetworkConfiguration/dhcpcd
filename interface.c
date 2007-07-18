@@ -239,7 +239,7 @@ interface_t *read_interface (const char *ifname, int metric)
 	/* Do something with the metric parameter to satisfy the compiler warning */
 	metric = 0;
 	strlcpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
-	if (ioctl (s, SIOCGIFHWADDR, &ifr) <0) {
+	if (ioctl (s, SIOCGIFHWADDR, &ifr) == -1) {
 		logger (LOG_ERR, "ioctl SIOCGIFHWADDR: %s", strerror (errno));
 		close (s);
 		return NULL;
