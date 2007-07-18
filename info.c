@@ -173,6 +173,9 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 	if (dhcp->rootpath)
 		fprintf (f, "ROOTPATH='%s'\n", cleanmetas (dhcp->rootpath));
 
+	if (dhcp->sipservers)
+		fprintf (f, "SIPSERVERS='%s'\n", cleanmetas (dhcp->sipservers));
+
 	if (dhcp->serveraddress.s_addr)
 		fprintf (f, "DHCPSID='%s'\n", inet_ntoa (dhcp->serveraddress));
 	if (dhcp->servername[0])

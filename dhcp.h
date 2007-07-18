@@ -96,6 +96,7 @@ enum DHCP_OPTIONS
 	DHCP_USERCLASS              = 77,  /* RFC 3004 */
 	DHCP_FQDN                   = 81,
 	DHCP_DNSSEARCH              = 119, /* RFC 3397 */
+	DHCP_SIPSERVER              = 120, /* RFC 3361 */
 	DHCP_CSR                    = 121, /* RFC 3442 */
 	DHCP_END                    = 255
 };
@@ -150,6 +151,8 @@ typedef struct dhcp_t
 
 	address_t *nisservers;
 	char *nisdomain;
+
+	char *sipservers;
 
 	char *message;
 	char *rootpath;

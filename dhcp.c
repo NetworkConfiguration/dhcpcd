@@ -26,9 +26,12 @@
 #include <netinet/in.h>
 #include <net/if_arp.h>
 
+#include <arpa/inet.h>
+
 #include <errno.h>
 #include <limits.h>
 #include <math.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -171,7 +174,7 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 		   RFC2131 Section 3.5 states that the REQUEST must include the list
 		   from the DISCOVER message, so I think we can safely do this. */
 
-		if (type == DHCP_DISCOVER)
+		if (type == DHCP_DISCOVER && ! options->test)
 			*p++ = DHCP_DNSSERVER;
 		else {
 			if (type != DHCP_INFORM) {
@@ -194,11 +197,7 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 			*p++ = DHCP_NTPSERVER;
 			*p++ = DHCP_MTU;
 			*p++ = DHCP_ROOTPATH;
-			/* These parameters were requested by dhcpcd-2.0 and earlier
-			   but we never did anything with them */
-			/*    *p++ = DHCP_DEFAULTIPTTL;
-			 *p++ = DHCP_MASKDISCOVERY;
-			 *p++ = DHCP_ROUTERDISCOVERY; */
+			*p++ = DHCP_SIPSERVER;
 		}
 
 		*n_params = p - n_params - 1;
@@ -356,7 +355,7 @@ static unsigned int decode_search (const unsigned char *p, int len, char *out)
 
 /* Add our classless static routes to the routes variable
  * and return the last route set */
-static route_t *decodeCSR(const unsigned char *p, int len)
+static route_t *decode_CSR(const unsigned char *p, int len)
 {
 	const unsigned char *q = p;
 	int cidr;
@@ -459,6 +458,48 @@ static bool dhcp_add_address(address_t **address, const unsigned char *data, int
 	return (true);
 }
 
+static char *decode_sipservers (const unsigned char *data, int length)
+{
+	char *sip = NULL;
+	char *p;
+	const char encoding = *data++;
+	struct in_addr addr;
+	int len;
+
+	length--;
+
+	switch (encoding) {
+		case 0:
+			if ((len = decode_search (data, length, NULL)) > 0) {
+				sip = xmalloc (len);
+				decode_search (data, length, sip);
+			}
+			break;
+
+		case 1:
+			if (length % 4 != 0) {
+				logger (LOG_ERR, "invalid length %d for option 120", length + 1);
+				break;
+			}
+			len = ((length / 4) * (4 * 4)) + 1;
+			sip = p = xmalloc (len);
+			while (length != 0) {
+				memcpy (&addr.s_addr, data, 4);
+				data += 4;
+				p += snprintf (p, len - (p - sip), "%s ", inet_ntoa (addr));
+				length -= 4;
+			}
+			*--p = '\0';
+			break;
+
+		default:
+			logger (LOG_ERR, "unknown sip encoding %d", *data);
+			break;
+	}
+
+	return (sip);
+}
+
 int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 {
 	const unsigned char *p = message->options;
@@ -509,6 +550,12 @@ parse_start:
 			goto eexit;
 
 		length = *p++;
+
+		if (option != DHCP_PAD && length == 0) {
+			logger (LOG_ERR, "option %d has zero length", option);
+			retval = -1;
+			goto eexit;
+		}
 
 		if (p + length >= end) {
 			logger (LOG_ERR, "dhcp option exceeds message length");
@@ -646,7 +693,12 @@ parse_start:
 			case DHCP_CSR:
 				MIN_LENGTH (5);
 				free_route (csr);
-				csr = decodeCSR (p, length);
+				csr = decode_CSR (p, length);
+				break;
+
+			case DHCP_SIPSERVER:
+				free (dhcp->sipservers);
+				dhcp->sipservers = decode_sipservers (p, length);
 				break;
 
 			case DHCP_STATICROUTE:

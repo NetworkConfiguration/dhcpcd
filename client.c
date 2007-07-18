@@ -410,7 +410,9 @@ int dhcp_run (const options_t *options, int *pidfd)
 						free_dhcp (dhcp);
 						memset (dhcp, 0, sizeof (dhcp_t));
 #ifdef ENABLE_INFO
-						if (! get_old_lease (options, iface, dhcp, &timeout)) {
+						if (! options->test && 
+							! get_old_lease (options, iface, dhcp, &timeout))
+						{
 							if (options->dolastlease) {
 								retval = EXIT_FAILURE;
 								goto eexit;
@@ -422,9 +424,10 @@ int dhcp_run (const options_t *options, int *pidfd)
 #endif
 
 #ifdef ENABLE_IPV4LL
-						if (! dhcp->address.s_addr ||
-							(! IN_LINKLOCAL (dhcp->address.s_addr) &&
-							 ! options->dolastlease))
+						if (! options->test &&
+							(! dhcp->address.s_addr ||
+							 (! IN_LINKLOCAL (dhcp->address.s_addr) &&
+							  ! options->dolastlease)))
 						{
 							logger (LOG_INFO, "probing for an IPV4LL address");
 							free_dhcp (dhcp);
