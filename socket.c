@@ -241,15 +241,15 @@ int open_socket (interface_t *iface, bool arp)
 	do {
 		snprintf (device, PATH_MAX, "/dev/bpf%d",  n++);
 		fd = open (device, O_RDWR);
-	} while (fd < 0 && errno == EBUSY);
+	} while (fd == -1 && errno == EBUSY);
 
-	if (fd < 0) {
+	if (fd == -1) {
 		logger (LOG_ERR, "unable to open a BPF device");
 		return -1;
 	}
 
-	if ((flags = fcntl (fd, F_GETFD, 0)) < 0
-		|| fcntl (fd, F_SETFD, flags | FD_CLOEXEC) < 0)
+	if ((flags = fcntl (fd, F_GETFD, 0)) == -1
+		|| fcntl (fd, F_SETFD, flags | FD_CLOEXEC) == -1)
 	{
 		logger (LOG_ERR, "fcntl: %s", strerror (errno));
 		close (fd);
@@ -258,7 +258,7 @@ int open_socket (interface_t *iface, bool arp)
 
 	memset (&ifr, 0, sizeof (struct ifreq));
 	strlcpy (ifr.ifr_name, iface->name, sizeof (ifr.ifr_name));
-	if (ioctl (fd, BIOCSETIF, &ifr) < 0) {
+	if (ioctl (fd, BIOCSETIF, &ifr) == -1) {
 		logger (LOG_ERR, "cannot attach interface `%s' to bpf device `%s': %s",
 				iface->name, device, strerror (errno));
 		close (fd);
@@ -266,7 +266,7 @@ int open_socket (interface_t *iface, bool arp)
 	}
 
 	/* Get the required BPF buffer length from the kernel. */
-	if (ioctl (fd, BIOCGBLEN, &buf) < 0) {
+	if (ioctl (fd, BIOCGBLEN, &buf) == -1) {
 		logger (LOG_ERR, "ioctl BIOCGBLEN: %s", strerror (errno));
 		close (fd);
 		return -1;
@@ -274,7 +274,7 @@ int open_socket (interface_t *iface, bool arp)
 	iface->buffer_length = buf;
 
 	flags = 1;
-	if (ioctl (fd, BIOCIMMEDIATE, &flags) < 0) {
+	if (ioctl (fd, BIOCIMMEDIATE, &flags) == -1) {
 		logger (LOG_ERR, "ioctl BIOCIMMEDIATE: %s", strerror (errno));
 		close (fd);
 		return -1;
@@ -288,7 +288,7 @@ int open_socket (interface_t *iface, bool arp)
 		p.bf_insns = dhcp_bpf_filter;
 		p.bf_len = sizeof (dhcp_bpf_filter) / sizeof (struct bpf_insn);
 	}
-	if (ioctl (fd, BIOCSETF, &p) < 0) {
+	if (ioctl (fd, BIOCSETF, &p) == -1) {
 		logger (LOG_ERR, "ioctl BIOCSETF: %s", strerror (errno));
 		close (fd);
 		return -1;
@@ -421,13 +421,13 @@ int open_socket (interface_t *iface, bool arp)
 	int flags;
 	struct sockaddr_ll sll;
 
-	if ((fd = socket (PF_PACKET, SOCK_DGRAM, htons (ETH_P_IP))) < 0) {
+	if ((fd = socket (PF_PACKET, SOCK_DGRAM, htons (ETH_P_IP))) == -1) {
 		logger (LOG_ERR, "socket: %s", strerror (errno));
 		return -1;
 	}
 
-	if ((flags = fcntl (fd, F_GETFD, 0)) < 0
-		|| fcntl (fd, F_SETFD, flags | FD_CLOEXEC) < 0)
+	if ((flags = fcntl (fd, F_GETFD, 0)) == -1
+		|| fcntl (fd, F_SETFD, flags | FD_CLOEXEC) == -1)
 	{
 		logger (LOG_ERR, "fcntl: %s", strerror (errno));
 		close (fd);
@@ -486,7 +486,7 @@ int send_packet (const interface_t *iface, const int type,
 	memset(sll.sll_addr, 0xff, sizeof (sll.sll_addr));
 
 	if ((retval = sendto (iface->fd, data, len, 0, (struct sockaddr *) &sll,
-						  sizeof (struct sockaddr_ll))) < 0)
+						  sizeof (struct sockaddr_ll))) == -1) 
 
 		logger (LOG_ERR, "sendto: %s", strerror (errno));
 	return retval;
@@ -510,7 +510,7 @@ int get_packet (const interface_t *iface, unsigned char *data,
 	memset (buffer, 0, iface->buffer_length);
 	bytes = read (iface->fd, buffer, iface->buffer_length);
 
-	if (bytes < 0) {
+	if (bytes == -1) {
 		struct timeval tv;
 		logger (LOG_ERR, "read: %s", strerror (errno));
 		tv.tv_sec = 3;
@@ -550,7 +550,7 @@ int get_packet (const interface_t *iface, unsigned char *data,
 		return -1;
 	}
 
-	if (valid_dhcp_packet (buffer) < 0)
+	if (valid_dhcp_packet (buffer) == -1)
 		return -1;
 
 	memcpy(data, &pay.packet->dhcp,

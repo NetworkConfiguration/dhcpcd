@@ -474,8 +474,8 @@ int main(int argc, char **argv)
 		}
 
 		/* dhcpcd.sh should not interhit this fd */
-		if ((i = fcntl (pidfd, F_GETFD, 0)) < 0 ||
-			fcntl (pidfd, F_SETFD, i | FD_CLOEXEC) < 0)
+		if ((i = fcntl (pidfd, F_GETFD, 0)) == -1 ||
+			fcntl (pidfd, F_SETFD, i | FD_CLOEXEC) == -1)
 			logger (LOG_ERR, "fcntl: %s", strerror (errno));
 
 		logger (LOG_INFO, PACKAGE " " VERSION " starting");

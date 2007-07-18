@@ -95,7 +95,7 @@ static void exec_script (const char *script, const char *infofile,
 	if (! script || ! infofile || ! arg)
 		return;
 
-	if (stat (script, &buf) < 0) {
+	if (stat (script, &buf) == -1) {
 		if (strcmp (script, DEFAULT_SCRIPT) != 0)
 			logger (LOG_ERR, "`%s': %s", script, strerror (ENOENT));
 		return;
@@ -156,7 +156,7 @@ static void restore_resolv(const char *ifname)
 #ifdef RESOLVCONF
 	struct stat buf;
 
-	if (stat (RESOLVCONF, &buf) < 0)
+	if (stat (RESOLVCONF, &buf) == -1)
 		return;
 
 	logger (LOG_DEBUG, "removing information from resolvconf");
@@ -409,7 +409,7 @@ int configure (const options_t *options, interface_t *iface,
 	/* This also changes netmask */
 	if (! options->doinform || ! has_address (iface->name, dhcp->address))
 		if (add_address (iface->name, dhcp->address, dhcp->netmask,
-						 dhcp->broadcast) < 0 && errno != EEXIST)
+						 dhcp->broadcast) == -1 && errno != EEXIST)
 			return (false);
 	
 	/* Now delete the old address if different */

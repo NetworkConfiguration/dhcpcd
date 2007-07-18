@@ -93,7 +93,7 @@
 	if (iface->fd >= 0) close (iface->fd); \
 	iface->fd = -1; \
 	if (_mode == SOCKET_OPEN) \
-	if (open_socket (iface, false) < 0) { retval = EXIT_FAILURE; goto eexit; } \
+	if (open_socket (iface, false) == -1) { retval = EXIT_FAILURE; goto eexit; } \
 	mode = _mode; \
 }
 
@@ -116,7 +116,7 @@ static bool daemonise (int *pidfd)
 
 	logger (LOG_DEBUG, "forking to background");
 
-	if (daemon (0, 0) < 0) {
+	if (daemon (0, 0) == -1) {
 		logger (LOG_ERR, "daemon: %s", strerror (errno));
 		return (false);
 	}
@@ -438,7 +438,7 @@ int dhcp_run (const options_t *options, int *pidfd)
 #if defined (ENABLE_INFO) || defined (ENABLE_IPV4LL)
 						if (dhcp->address.s_addr)
 						{
-							if (configure (options, iface, dhcp, true) < 0 &&
+							if (configure (options, iface, dhcp, true) == -1 &&
 								! daemonised)
 							{
 								retval = EXIT_FAILURE;
@@ -447,7 +447,7 @@ int dhcp_run (const options_t *options, int *pidfd)
 
 							state = STATE_BOUND;
 							if (! daemonised && options->daemonise) {
-								if ((daemonise (pidfd)) < 0) {
+								if ((daemonise (pidfd)) == -1) {
 									retval = EXIT_FAILURE;
 									goto eexit;
 								}
@@ -561,7 +561,7 @@ int dhcp_run (const options_t *options, int *pidfd)
 
 			while (buffer_pos != 0) {
 				if (get_packet (iface, (unsigned char *) &message, buffer,
-								&buffer_len, &buffer_pos) < 0)
+								&buffer_len, &buffer_pos) == -1)
 					break;
 
 				if (xid != message.xid) {
@@ -573,7 +573,7 @@ int dhcp_run (const options_t *options, int *pidfd)
 
 				logger (LOG_DEBUG, "got a packet with xid 0x%x", message.xid);
 				memset (new_dhcp, 0, sizeof (dhcp_t));
-				if ((type = parse_dhcpmessage (new_dhcp, &message)) < 0) {
+				if ((type = parse_dhcpmessage (new_dhcp, &message)) == -1) {
 					logger (LOG_ERR, "failed to parse packet");
 					free_dhcp (new_dhcp);
 					continue;
@@ -737,13 +737,13 @@ int dhcp_run (const options_t *options, int *pidfd)
 
 						xid = 0;
 
-						if (configure (options, iface, dhcp, true) < 0 && ! daemonised) {
+						if (configure (options, iface, dhcp, true) == -1 && ! daemonised) {
 							retval = EXIT_FAILURE;
 							goto eexit;
 						}
 
 						if (! daemonised && options->daemonise) {
-							if ((daemonise (pidfd)) < 0 ) {
+							if ((daemonise (pidfd)) == -1 ) {
 								retval = EXIT_FAILURE;
 								goto eexit;
 							}

@@ -230,7 +230,7 @@ interface_t *read_interface (const char *ifname, int metric)
 
 	memset (&ifr, 0, sizeof (struct ifreq));
 	strlcpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
-	if ((s = socket (AF_INET, SOCK_DGRAM, 0)) < 0) {
+	if ((s = socket (AF_INET, SOCK_DGRAM, 0)) == -1) {
 		logger (LOG_ERR, "socket: %s", strerror (errno));
 		return NULL;
 	}
@@ -266,7 +266,7 @@ interface_t *read_interface (const char *ifname, int metric)
 #else
 	ifr.ifr_metric = metric;
 	strlcpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
-	if (ioctl (s, SIOCSIFMETRIC, &ifr) < 0) {
+	if (ioctl (s, SIOCSIFMETRIC, &ifr) == -1) {
 		logger (LOG_ERR, "ioctl SIOCSIFMETRIC: %s", strerror (errno));
 		close (s);
 		return NULL;
@@ -274,7 +274,7 @@ interface_t *read_interface (const char *ifname, int metric)
 #endif
 
 	strlcpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
-	if (ioctl(s, SIOCGIFMTU, &ifr) < 0) {
+	if (ioctl (s, SIOCGIFMTU, &ifr) == -1) {
 		logger (LOG_ERR, "ioctl SIOCGIFMTU: %s", strerror (errno));
 		close (s);
 		return NULL;
@@ -284,7 +284,7 @@ interface_t *read_interface (const char *ifname, int metric)
 		logger (LOG_DEBUG, "MTU of %d is too low, setting to %d", ifr.ifr_mtu, MTU_MIN);
 		ifr.ifr_mtu = MTU_MIN;
 		strlcpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
-		if (ioctl(s, SIOCSIFMTU, &ifr) < 0) {
+		if (ioctl (s, SIOCSIFMTU, &ifr) == -1) {
 			logger (LOG_ERR, "ioctl SIOCSIFMTU,: %s", strerror (errno));
 			close (s);
 			return NULL;
@@ -298,7 +298,7 @@ interface_t *read_interface (const char *ifname, int metric)
 	if ((p = strchr (ifr.ifr_name, ':')))
 		*p = '\0';
 #endif
-	if (ioctl(s, SIOCGIFFLAGS, &ifr) < 0) {
+	if (ioctl (s, SIOCGIFFLAGS, &ifr) == -1) {
 		logger (LOG_ERR, "ioctl SIOCGIFFLAGS: %s", strerror (errno));
 		close (s);
 		return NULL;
@@ -306,7 +306,7 @@ interface_t *read_interface (const char *ifname, int metric)
 
 	if (! (ifr.ifr_flags & IFF_UP) || ! (ifr.ifr_flags & IFF_RUNNING)) {
 		ifr.ifr_flags |= IFF_UP | IFF_RUNNING;
-		if (ioctl(s, SIOCSIFFLAGS, &ifr) < 0) {
+		if (ioctl (s, SIOCSIFFLAGS, &ifr) == -1) {
 			logger (LOG_ERR, "ioctl SIOCSIFFLAGS: %s", strerror (errno));
 			close (s);
 			return NULL;
@@ -343,7 +343,7 @@ int get_mtu (const char *ifname)
 	int r;
 	int s;
 
-	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
 		logger (LOG_ERR, "socket: %s", strerror (errno));
 		return (-1);
 	}
@@ -353,7 +353,7 @@ int get_mtu (const char *ifname)
 	r = ioctl (s, SIOCGIFMTU, &ifr);
 	close (s);
 
-	if (r < 0) {
+	if (r == -1) {
 		logger (LOG_ERR, "ioctl SIOCGIFMTU: %s", strerror (errno));
 		return (-1);
 	}
@@ -367,7 +367,7 @@ int set_mtu (const char *ifname, short int mtu)
 	int r;
 	int s;
 
-	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
 		logger (LOG_ERR, "socket: %s", strerror (errno));
 		return (-1);
 	}
@@ -379,7 +379,7 @@ int set_mtu (const char *ifname, short int mtu)
 	r = ioctl (s, SIOCSIFMTU, &ifr);
 	close (s);
 
-	if (r < 0)
+	if (r == -1)
 		logger (LOG_ERR, "ioctl SIOCSIFMTU: %s", strerror (errno));
 
 	return (r == 0 ? 0 : -1);
@@ -396,7 +396,7 @@ static int do_address (const char *ifname, struct in_addr address,
 	if (! ifname)
 		return -1;
 
-	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
 		logger (LOG_ERR, "socket: %s", strerror (errno));
 		return -1;
 	}
@@ -480,7 +480,7 @@ static int do_route (const char *ifname,
 	if (dstd)
 		free (dstd);
 
-	if ((s = socket (PF_ROUTE, SOCK_RAW, 0)) < 0) {
+	if ((s = socket (PF_ROUTE, SOCK_RAW, 0)) == -1) {
 		logger (LOG_ERR, "socket: %s", strerror (errno));
 		return -1;
 	}
@@ -541,7 +541,7 @@ static int do_route (const char *ifname,
 #undef ADDADDR
 
 	rtm.hdr.rtm_msglen = sizeof (rtm);
-	if (write(s, &rtm, sizeof (rtm)) < 0) {
+	if (write (s, &rtm, sizeof (rtm)) == -1) {
 		/* Don't report error about routes already existing */
 		if (errno != EEXIST)
 			logger (LOG_ERR, "write: %s", strerror (errno));
@@ -579,14 +579,14 @@ static int send_netlink(struct nlmsghdr *hdr)
 		struct nlmsghdr *nlm;
 	} h;
 
-	if ((s = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE)) < 0) {
+	if ((s = socket (AF_NETLINK, SOCK_RAW, NETLINK_ROUTE)) == -1) {
 		logger (LOG_ERR, "socket: %s", strerror (errno));
 		return -1;
 	}
 
 	memset (&nl, 0, sizeof (struct sockaddr_nl));
 	nl.nl_family = AF_NETLINK;
-	if (bind (s, (struct sockaddr *) &nl, sizeof (nl)) < 0) {
+	if (bind (s, (struct sockaddr *) &nl, sizeof (nl)) == -1) {
 		logger (LOG_ERR, "bind: %s", strerror (errno));
 		close (s);
 		return -1;
@@ -606,7 +606,7 @@ static int send_netlink(struct nlmsghdr *hdr)
 	hdr->nlmsg_flags |= NLM_F_ACK;
 	hdr->nlmsg_seq = ++seq;
 
-	if (sendmsg (s, &msg, 0) < 0) {
+	if (sendmsg (s, &msg, 0) == -1) {
 		logger (LOG_ERR, "write: %s", strerror (errno));
 		close (s);
 		return -1;
@@ -617,9 +617,9 @@ static int send_netlink(struct nlmsghdr *hdr)
 
 	while (1) {
 		iov.iov_len = sizeof (buffer);
-		bytes = recvmsg(s, &msg, 0);
+		bytes = recvmsg (s, &msg, 0);
 
-		if (bytes < 0) {
+		if (bytes == -1) {
 			if (errno != EINTR)
 				logger (LOG_ERR, "netlink: overrun");
 			continue;
@@ -938,7 +938,7 @@ static int _do_addresses (const char *ifname, struct in_addr *addr, bool flush, 
 		if (us_a.sin->sin_family == AF_INET) {
 			if (flush) {
 				if (del_address (ifname, us_a.sin->sin_addr, us_m.sin->sin_addr)
-					< 0)
+					== -1)
 					retval = -1;
 			} else if (get) {
 				addr->s_addr = us_a.sin->sin_addr.s_addr;
@@ -968,21 +968,21 @@ static int _do_addresses (const char *ifname, struct in_addr address, bool flush
 	int nifs;
 	struct ifreq *ifr;
 
-	if ((s = socket (AF_INET, SOCK_DGRAM, 0)) < 0) {
+	if ((s = socket (AF_INET, SOCK_DGRAM, 0)) == -1) {
 		logger (LOG_ERR, "socket: %s", strerror (errno));
 		return -1;
 	}
 
 	memset (&ifc, 0, sizeof (struct ifconf));
 	ifc.ifc_buf = NULL;
-	if (ioctl (s, SIOCGIFCONF, &ifc) < 0) {
+	if (ioctl (s, SIOCGIFCONF, &ifc) == -1) {
 		logger (LOG_ERR, "ioctl SIOCGIFCONF: %s", strerror (errno));
 		close (s);
 	}
 
 	ifrs = xmalloc (ifc.ifc_len);
 	ifc.ifc_buf = ifrs;
-	if (ioctl (s, SIOCGIFCONF, &ifc) < 0) {
+	if (ioctl (s, SIOCGIFCONF, &ifc) == -1) {
 		logger (LOG_ERR, "ioctl SIOCGIFCONF: %s", strerror (errno));
 		close (s);
 		free (ifrs);
@@ -1001,7 +1001,7 @@ static int _do_addresses (const char *ifname, struct in_addr address, bool flush
 			&& strcmp (ifname, ifr->ifr_name) == 0)
 		{
 			if (flush) {
-				if (del_address (ifname, addr->sin_addr, netm->sin_addr) < 0)
+				if (del_address (ifname, addr->sin_addr, netm->sin_addr) == -1)
 					retval = -1;
 			} else if (addr->sin_addr.s_addr == address.s_addr) {
 				retval = 1;
