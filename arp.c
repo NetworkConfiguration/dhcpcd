@@ -31,6 +31,7 @@
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <arpa/inet.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -42,8 +43,11 @@
 #include "logger.h"
 #include "socket.h"
 
-/* Longer is safer and slower - 2 seconds seems a happy medium */
-#define TIMEOUT 2 
+/* These are really for IPV4LL */
+#define NPROBES                 3
+#define PROBE_INTERVAL          200000
+#define NCLAIMS                 2
+#define CLAIM_INTERVAL          200000
 
 /* Linux does not seem to define these handy macros */
 #ifndef ar_sha
@@ -64,22 +68,14 @@
 #define IP_MIN_FRAME_LENGTH 46
 
 #ifdef ENABLE_ARP
-int arp_check (interface_t *iface, struct in_addr address)
+
+static int send_arp (interface_t *iface, int op, struct in_addr sip,
+					 unsigned char *taddr, struct in_addr tip)
 {
 	struct arphdr *arp;
-	struct arphdr *reply = NULL;
-	long timeout = 0;
-	unsigned char *buffer;
 	int arpsize = arphdr_len2 (iface->hwlen, sizeof (struct in_addr));
-	int retval = 0;
+	int retval;
 
-	if (! iface->arpable) {
-		logger (LOG_DEBUG, "arp_check: interface `%s' is not ARPable",
-				iface->name);
-		return (0);
-	}
-
-	inet_aton ("192.168.0.3", &address);
 	arp = xmalloc (arpsize);
 	memset (arp, 0, arpsize);
 
@@ -87,18 +83,41 @@ int arp_check (interface_t *iface, struct in_addr address)
 	arp->ar_pro = htons (ETHERTYPE_IP);
 	arp->ar_hln = iface->hwlen;
 	arp->ar_pln = sizeof (struct in_addr);
-	arp->ar_op = htons (ARPOP_REQUEST);
+	arp->ar_op = htons (op);
 	memcpy (ar_sha (arp), &iface->hwaddr, arp->ar_hln);
-	memcpy (ar_tpa (arp), &address, arp->ar_pln);
+	memcpy (ar_spa (arp), &sip, arp->ar_pln);
+	if (taddr)
+		memcpy (ar_tha (arp), taddr, arp->ar_hln); 
+	memcpy (ar_tpa (arp), &tip, arp->ar_pln);
+
+	retval = send_packet (iface, ETHERTYPE_ARP,
+						  (unsigned char *) arp, arphdr_len (arp));
+	free (arp);
+	return (retval);
+}
+
+int arp_claim (interface_t *iface, struct in_addr address)
+{
+	struct arphdr *reply = NULL;
+	long timeout = 0;
+	unsigned char *buffer;
+	int retval = -1;
+	int nprobes = 0;
+	int nclaims = 0;
+	struct in_addr null_address;
+
+	if (! iface->arpable) {
+		logger (LOG_DEBUG, "interface `%s' is not ARPable", iface->name);
+		return (0);
+	}
 
 	logger (LOG_INFO, "checking %s is available on attached networks",
 			inet_ntoa (address));
 
-	open_socket (iface, true);
-	send_packet (iface, ETHERTYPE_ARP, (unsigned char *) arp,
-				 arphdr_len (arp));
+	if (! open_socket (iface, true))
+		return (0);
 
-	timeout = uptime() + TIMEOUT;
+	memset (&null_address, 0, sizeof (null_address));
 
 	buffer = xmalloc (sizeof (char *) * iface->buffer_length);
 
@@ -111,21 +130,40 @@ int arp_check (interface_t *iface, struct in_addr address)
 		int buflen = sizeof (char *) * iface->buffer_length;
 		fd_set rset;
 		int bytes;
+		int s;
 
-		tv.tv_sec = timeout - uptime();
-		tv.tv_usec = 0;
-
-		if (tv.tv_sec < 1)
-			break; /* Time out */
+		tv.tv_sec = 0; 
+		tv.tv_usec = timeout;
 
 		FD_ZERO (&rset);
 		FD_SET (iface->fd, &rset);
-		if (select (FD_SETSIZE, &rset, NULL, NULL, &tv) == 0)
+		errno = 0;
+		if ((s = select (FD_SETSIZE, &rset, NULL, NULL, &tv)) == -1) {
+			if (errno != EINTR)
+				logger (LOG_ERR, "select: `%s'", strerror (errno));
 			break;
-
+		} else if (s == 0) {
+			/* Timed out */
+			if (nprobes < NPROBES) {
+				nprobes ++;
+				timeout = PROBE_INTERVAL;
+				logger (LOG_DEBUG, "sending ARP probe #%d", nprobes);
+				send_arp (iface, ARPOP_REQUEST, null_address, NULL, address);
+			} else if (nclaims < NCLAIMS) {
+				nclaims ++;
+				timeout = CLAIM_INTERVAL;
+				logger (LOG_DEBUG, "sending ARP claim #%d", nclaims);
+				send_arp (iface, ARPOP_REQUEST, address, iface->hwaddr, address);
+			} else {
+				/* No replies, so done */
+				retval = 0;
+				break;
+			}
+		}
+		
 		if (! FD_ISSET (iface->fd, &rset))
 			continue;
-		
+
 		memset (buffer, 0, buflen);
 		while (bufpos != 0)	{
 			union {
@@ -171,7 +209,6 @@ int arp_check (interface_t *iface, struct in_addr address)
 eexit:
 	close (iface->fd);
 	iface->fd = -1;
-	free (arp);
 	free (buffer);
 	free (reply);
 	return (retval);

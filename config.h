@@ -33,6 +33,10 @@
 /* Define this to enable some compatability with 1.x and 2.x info files */
 // #define ENABLE_INFO_COMPAT
 
+/* IPV4LL, aka ZeroConf, aka APIPA, aka RFC 3927.
+ * Needs ARP. */
+#define ENABLE_IPV4LL
+
 /* We will auto create a DUID_LLT file if it doesn't exist.
  * You can always create your own DUID file that just contains the
  * hex string that represents the DUID.

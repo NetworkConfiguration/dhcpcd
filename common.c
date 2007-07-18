@@ -23,9 +23,32 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "common.h"
 #include "logger.h"
+
+/* OK, this should be in dhcpcd.c
+ * It's here to make dhcpcd more readable */
+#ifdef __linux__
+#include <fcntl.h>
+#include <unistd.h>
+void srandomdev (void) {
+	int fd;
+	unsigned long seed;
+
+	fd = open ("/dev/urandom", 0);
+	if (fd == -1 || read (fd,  &seed, sizeof(seed)) == -1) {
+		logger (LOG_WARNING, "Could not load seed from /dev/urandom: %s",
+				strerror (errno));
+		seed = time (0);
+	}
+	if (fd >= 0)
+		close(fd);
+
+	srandom (seed);
+}
+#endif
 
 /* strlcpy is nice, shame glibc does not define it */
 #ifdef __GLIBC__
@@ -65,7 +88,6 @@ long uptime (void)
 }
 #elif __APPLE__
 /* Darwin doesn't appear to have an uptime, so try and make one ourselves */
-#include <sys/time.h>
 long uptime (void)
 {
 	struct timeval tv;
@@ -82,7 +104,6 @@ long uptime (void)
 	return tv.tv_sec - start;
 }
 #else
-#include <time.h>
 long uptime (void)
 {
 	struct timespec tp;

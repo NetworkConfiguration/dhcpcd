@@ -1,6 +1,6 @@
 .\" $Id$
 .\"
-.TH DHCPCD 8 "12 Jul 2007" "dhcpcd 3.1"
+.TH DHCPCD 8 "18 Jul 2007" "dhcpcd 3.1"
 
 .SH NAME
 dhcpcd \- DHCP client daemon
@@ -9,7 +9,7 @@ dhcpcd \- DHCP client daemon
 .in +.5i
 .ti -.5i
 dhcpcd
-\%[\-adknpEGHMNRTY]
+\%[\-dknpAEGHMLNRTY]
 \%[\-c\ script]
 \%[\-h\ hostname]
 \%[\-i\ vendorClassID]
@@ -26,26 +26,25 @@ dhcpcd
 .SH DESCRIPTION
 .B dhcpcd
 is an implementation of the DHCP client specified in
-.B RFC2131.
+.B RFC 2131.
 
 It gets the host information (IP address, netmask, broadcast address,
 etc.) from a DHCP server and configures the network interface of the
 machine on which it is running. It also tries to renew the lease time
 according to
-.B RFC2131.
+.B RFC 2131.
+
+If
+.B dhcpcd
+fails to get a lease then we attempt Dynamic Configuration of IPv4
+Link-Local Addresses unless the
+.B \-L
+option is given.
 
 .SH OPTIONS
 .TP
 .BI interface
 Specifies the network interface name (eth0, eth1, etc.).
-.TP
-.BI \-a
-Do an
-.B ARP
-check on the IP address give to us by the DHCP server. We may need to do this
-if a client on the same network segment has the same IP address, however we do
-not do this by default as most DHCP servers test the IP briefly with an ICMP
-Echo request before assigning the IP address.
 .TP
 .BI \-c \ script
 .B dhcpcd
@@ -187,6 +186,11 @@ fixed hardware addresses. You can specify more than one user class, but the
 total length must be less than 255 characters, -1 character for each user
 class.
 .TP
+.BI \-A
+Don't do an
+.B ARP
+check on the IP address. 
+.TP
 .BI \-E
 Will read 
 .I /var/lib/dhcpcd/dhcpcd-<interface>.info
@@ -265,6 +269,10 @@ and store the DUID part in
 .B dhcpcd
 uses the MAC address of the network interface. If \fB-I\fR is not given
 an option then we use the MAC address of the network interface.
+.TP
+.BI \-L
+Prevents dhcpcd from probing for IPV4LL addresses. IPV4LL is otherwise
+known as ZeroConf or APIPA and is \fBRFC 3927\fR.
 .TP
 .BI \-M
 Prevents
@@ -353,13 +361,16 @@ is attached.
 .SH SEE ALSO
 .LP
 .I Dynamic Host Configuration Protocol,
-RFC2132
+RFC 2131
 .LP
 .I DHCP Options and BOOTP Vendor Extensions,
-RFC2132
+RFC 2132
+.LP
+.I Dynamic Configuration of IPv4 Link-Local Addresses, 
+RFC 3927
 .LP
 .I DHCP FQDN Option specification,
-RFC4702
+RFC 4702
 
 .SH BUGS
 Please report them to http://dhcpcd.berlios.de or http://bugs.gentoo.org.

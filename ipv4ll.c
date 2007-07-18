@@ -1,7 +1,7 @@
 /*
  * dhcpcd - DHCP client daemon -
  * Copyright 2006-2007 Roy Marples <uberlord@gentoo.org>
- * 
+ *
  * dhcpcd is an RFC2131 compliant DHCP client daemon.
  *
  * This is free software; you can redistribute it and/or modify it
@@ -19,25 +19,45 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#ifndef COMMON_H
-#define COMMON_H
+#include <errno.h>
+#include <stdlib.h>
 
-/* string.h pulls in features.h so the below define checks work */
-#include <string.h>
+#include "config.h"
+#include "arp.h"
+#include "ipv4ll.h"
 
-/* Only GLIBC doesn't support strlcpy */
-#ifdef __GLIBC__
-#  if ! defined(__UCLIBC__) && ! defined (__dietlibc__)
-size_t strlcpy (char *dst, const char *src, size_t size);
-#  endif
+#ifdef ENABLE_IPV4LL
+
+#ifndef ENABLE_ARP
+#error IPV4LL requires ARP
 #endif
 
-#ifdef __linux__
-void srandomdev (void);
-#endif
+#define IPV4LL_LEASETIME 10 
 
-long uptime (void);
-void *xmalloc (size_t size);
-char *xstrdup (const char *str);
+int ipv4ll_get_address (interface_t *iface, dhcp_t *dhcp) {
+	struct in_addr addr;
+
+	while (1) {
+		addr.s_addr = htonl (LINKLOCAL_ADDR |
+							 ((abs (random ()) % 0xFD00) + 0x0100));
+		errno = 0;
+		if (! arp_claim (iface, addr))
+			break;
+		/* Our ARP may have been interrupted */
+		if (errno == EINTR)
+			return (-1);
+	}
+
+	dhcp->address.s_addr = addr.s_addr;
+	dhcp->netmask.s_addr = htonl (LINKLOCAL_MASK);
+	dhcp->broadcast.s_addr = htonl (LINKLOCAL_BRDC);
+
+	/* Finally configure some DHCP like lease times */
+	dhcp->leasetime = IPV4LL_LEASETIME;
+	dhcp->renewaltime = (dhcp->leasetime * 0.5);
+	dhcp->rebindtime = (dhcp->leasetime * 0.875);
+
+	return (0);
+}
 
 #endif

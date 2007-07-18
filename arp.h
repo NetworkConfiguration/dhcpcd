@@ -25,7 +25,7 @@
 
 #include "interface.h"
 
-int arp_check (interface_t *iface, struct in_addr address);
+int arp_claim (interface_t *iface, struct in_addr address);
 #endif
 
 #endif

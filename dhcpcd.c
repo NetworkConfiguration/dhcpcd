@@ -118,6 +118,7 @@ int main(int argc, char **argv)
 		{"nogateway",   no_argument,        NULL, 'G'},
 		{"sethostname", no_argument,        NULL, 'H'},
 		{"clientid",    optional_argument,  NULL, 'I'},
+		{"noipv4ll",	no_argument,		NULL, 'L'},
 		{"nomtu",       no_argument,        NULL, 'M'},
 		{"nontp",       no_argument,        NULL, 'N'},
 		{"nodns",       no_argument,        NULL, 'R'},
@@ -139,7 +140,7 @@ int main(int argc, char **argv)
 	snprintf (options.classid, CLASS_ID_MAX_LEN, "%s %s", PACKAGE, VERSION);
 	options.classid_len = strlen (options.classid);
 
-	options.doarp = false;
+	options.doarp = true;
 	options.dodns = true;
 	options.domtu = true;
 	options.donis = true;
@@ -147,6 +148,7 @@ int main(int argc, char **argv)
 	options.dogateway = true;
 	options.daemonise = true;
 	options.doinform = false;
+	options.doipv4ll = true;
 	options.timeout = DEFAULT_TIMEOUT;
 
 	gethostname (options.hostname, sizeof (options.hostname));
@@ -156,7 +158,7 @@ int main(int argc, char **argv)
 
 	/* Don't set any optional arguments here so we retain POSIX
 	 * compatibility with getopt */
-	while ((opt = getopt_long(argc, argv, "ac:dh:i:kl:m:npr:s:t:u:EF:GHI:MNRTY",
+	while ((opt = getopt_long(argc, argv, "c:dh:i:kl:m:npr:s:t:u:AEF:GHI:LMNRTY",
 							  longopts, &option_index)) != -1)
 	{
 		switch (opt) {
@@ -166,14 +168,6 @@ int main(int argc, char **argv)
 				logger (LOG_ERR, "option `%s' should set a flag",
 						longopts[option_index].name);
 				exit (EXIT_FAILURE);
-				break;
-
-			case 'a':
-#ifndef ENABLE_ARP
-				logger (LOG_ERR, "arp support not compiled into dhcpcd");
-				exit (EXIT_FAILURE);
-#endif
-				options.doarp = true;
 				break;
 			case 'c':
 				options.script = optarg;
@@ -283,6 +277,13 @@ int main(int argc, char **argv)
 					options.userclass_len += (strlen (optarg)) + 1;
 				}
 				break;
+			case 'A':
+#ifndef ENABLE_ARP
+				logger (LOG_ERR, "arp support not compiled into dhcpcd");
+				exit (EXIT_FAILURE);
+#endif
+				options.doarp = false;
+				break;
 			case 'E':
 #ifndef ENABLE_INFO
 				logger (LOG_ERR, "info support not compiled into dhcpcd");
@@ -324,6 +325,9 @@ int main(int argc, char **argv)
 					memset (options.clientid, 0, sizeof (options.clientid));
 					options.clientid_len = -1;
 				}
+				break;
+			case 'L':
+				options.doipv4ll = false;
 				break;
 			case 'M':
 				options.domtu = false;
@@ -476,6 +480,9 @@ int main(int argc, char **argv)
 
 		logger (LOG_INFO, PACKAGE " " VERSION " starting");
 	}
+
+	/* Seed random */
+	srandomdev ();
 
 	if (dhcp_run (&options, &pidfd)) {
 		if (pidfd > -1)

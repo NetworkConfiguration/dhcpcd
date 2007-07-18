@@ -1,4 +1,4 @@
-VERSION = 3.1.0_pre4
+VERSION = 3.1.0_pre5
 CFLAGS ?= -O2 -pipe
 
 # Should work for both GNU make and BSD make
@@ -47,7 +47,7 @@ TARGET = $(SBIN_TARGETS)
 
 dhcpcd_H = version.h
 dhcpcd_OBJS = arp.o client.o common.o configure.o dhcp.o dhcpcd.o duid.o \
-		info.o interface.o logger.o signals.o socket.o
+		info.o interface.o ipv4ll.o logger.o signals.o socket.o
 
 # By default we don't need to link to anything
 # Except on Darwin where we need -lresolv, so they need to uncomment this

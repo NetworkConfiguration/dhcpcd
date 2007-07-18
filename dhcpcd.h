@@ -61,6 +61,7 @@ typedef struct options_t {
 	bool dolastlease;
 	bool doinform;
 	bool dorequest;
+	bool doipv4ll;
 
 	struct in_addr request_address;
 	struct in_addr request_netmask;

@@ -1,3 +1,5 @@
+We now do ARP checking by default as recommended by RFC 2131.
+Add RFC 3927 (aka IPV4LL aka APIPA) support by default.
 Suport DHCP option (52) overload.
 Added -T test option. This just sends a DHCP_DISCOVER message and then
 prints the configuration data to stdout - we don't request a lease,

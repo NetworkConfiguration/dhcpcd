@@ -51,6 +51,9 @@
 #include "dhcpcd.h"
 #include "info.h"
 #include "interface.h"
+#ifdef ENABLE_IPV4LL
+# include "ipv4ll.h"
+#endif
 #include "logger.h"
 #include "signals.h"
 #include "socket.h"
@@ -132,32 +135,9 @@ static bool daemonise (int *pidfd)
 	return (true);
 }
 
-static unsigned long random_xid (void)
-{
-	static int initialized;
-
-	if (! initialized) {
-		int fd;
-		unsigned long seed;
-
-		fd = open ("/dev/urandom", 0);
-		if (fd < 0 || read (fd,  &seed, sizeof(seed)) < 0) {
-			logger (LOG_WARNING, "Could not load seed from /dev/urandom: %s",
-					strerror (errno));
-			seed = time (0);
-		}
-		if (fd >= 0)
-			close(fd);
-
-		srand(seed);
-		initialized++;
-	}
-
-	return rand();
-}
-
 #ifdef ENABLE_INFO
-static bool get_old_lease (interface_t *iface, dhcp_t *dhcp, long *timeout)
+static bool get_old_lease (const options_t *options, interface_t *iface,
+						   dhcp_t *dhcp, long *timeout)
 {
 	struct timeval tv;
 	unsigned int offset = 0;
@@ -170,6 +150,21 @@ static bool get_old_lease (interface_t *iface, dhcp_t *dhcp, long *timeout)
 	memset (&dhcp->serveraddress, 0, sizeof (struct in_addr));
 	memset (dhcp->servername, 0, sizeof (dhcp->servername));
 
+#ifdef ENABLE_ARP
+	/* Check that no-one is using the address */
+	if ((options->dolastlease ||
+		 IN_LINKLOCAL (dhcp->address.s_addr)) &&
+		arp_claim (iface, dhcp->address)) {
+		memset (&dhcp->address, 0, sizeof (struct in_addr));
+		memset (&dhcp->netmask, 0, sizeof (struct in_addr));
+		memset (&dhcp->broadcast, 0, sizeof (struct in_addr));
+		return (false);
+	}
+
+	/* Ok, lets use this */
+	if (IN_LINKLOCAL (dhcp->address.s_addr))
+		return (true);
+#endif
 
 	/* Ensure that we can still use the lease */
 	if (gettimeofday (&tv, NULL) == -1) {
@@ -191,7 +186,6 @@ static bool get_old_lease (interface_t *iface, dhcp_t *dhcp, long *timeout)
 	if (timeout)
 		*timeout = dhcp->renewaltime - offset;
 	iface->start_uptime = uptime ();
-	logger (LOG_INFO, "using last known IP address %s", inet_ntoa (dhcp->address));
 	return (true);
 }
 #endif
@@ -241,7 +235,7 @@ int dhcp_run (const options_t *options, int *pidfd)
 		(options->doinform || options->dorequest))
 	{
 #ifdef ENABLE_INFO
-		if (! get_old_lease (iface, dhcp, NULL))
+		if (! get_old_lease (options, iface, dhcp, NULL))
 #endif
 		{
 			free (dhcp);
@@ -374,7 +368,7 @@ int dhcp_run (const options_t *options, int *pidfd)
 					{
 						logger (LOG_INFO, "received SIGHUP, releasing lease");
 						SOCKET_MODE (SOCKET_OPEN);
-						xid = random_xid ();
+						xid = random ();
 						if ((open_socket (iface, false)) >= 0)
 							SEND_MESSAGE (DHCP_RELEASE);
 						SOCKET_MODE (SOCKET_CLOSED);
@@ -395,7 +389,11 @@ int dhcp_run (const options_t *options, int *pidfd)
 			/* timed out */
 			switch (state) {
 				case STATE_INIT:
-					if (iface->previous_address.s_addr != 0 && ! options->doinform) {
+					if (iface->previous_address.s_addr != 0 &&
+#ifdef ENABLE_IPV4LL
+						! IN_LINKLOCAL (iface->previous_address.s_addr) &&
+#endif
+						! options->doinform) {
 						logger (LOG_ERR, "lost lease");
 						xid = 0;
 						SOCKET_MODE (SOCKET_CLOSED);
@@ -404,31 +402,64 @@ int dhcp_run (const options_t *options, int *pidfd)
 					}
 
 					if (xid == 0)
-						xid = random_xid ();
+						xid = random ();
 					else {
 						SOCKET_MODE (SOCKET_CLOSED);
 						logger (LOG_ERR, "timed out");
+
+						free_dhcp (dhcp);
+						memset (dhcp, 0, sizeof (dhcp_t));
 #ifdef ENABLE_INFO
-						if (options->dolastlease) {
-							if (! get_old_lease (iface, dhcp, &timeout))
-								if (! daemonised ||
-									configure (options, iface, dhcp, true))
-								{
-									retval = EXIT_FAILURE;
-									goto eexit;
-								}
+						if (! get_old_lease (options, iface, dhcp, &timeout)) {
+							if (options->dolastlease) {
+								retval = EXIT_FAILURE;
+								goto eexit;
+							}
+
+							free_dhcp (dhcp);
+							memset (dhcp, 0, sizeof (dhcp_t));
+						}
+#endif
+
+#ifdef ENABLE_IPV4LL
+						if (! dhcp->address.s_addr ||
+							(! IN_LINKLOCAL (dhcp->address.s_addr) &&
+							 ! options->dolastlease))
+						{
+							logger (LOG_INFO, "probing for an IPV4LL address");
+							free_dhcp (dhcp);
+							memset (dhcp, 0, sizeof (dhcp_t));
+							if (ipv4ll_get_address (iface, dhcp) == -1)
+								break;
+							timeout = dhcp->renewaltime;
+						}
+#endif
+
+#if defined (ENABLE_INFO) || defined (ENABLE_IPV4LL)
+						if (dhcp->address.s_addr)
+						{
+							if (configure (options, iface, dhcp, true) < 0 &&
+								! daemonised)
+							{
+								retval = EXIT_FAILURE;
+								goto eexit;
+							}
 
 							state = STATE_BOUND;
 							if (! daemonised && options->daemonise) {
 								if ((daemonise (pidfd)) < 0) {
-									retval = -1;
+									retval = EXIT_FAILURE;
 									goto eexit;
 								}
 								daemonised = true;
-							}		    
-							continue;
+							}
+
+							timeout = dhcp->renewaltime;
+							xid = 0;
+							break;
 						}
 #endif
+
 						if (! daemonised) {
 							retval = EXIT_FAILURE;
 							goto eexit;
@@ -456,10 +487,19 @@ int dhcp_run (const options_t *options, int *pidfd)
 					break;
 				case STATE_BOUND:
 				case STATE_RENEW_REQUESTED:
+#ifdef ENABLE_IPV4LL
+					if (IN_LINKLOCAL (dhcp->address.s_addr)) {
+						memset (&dhcp->address, 0, sizeof (struct in_addr));
+						state = STATE_INIT;
+						xid = 0;
+						break;
+					}
+#endif
 					state = STATE_RENEWING;
-					xid = random_xid ();
+					xid = random ();
 				case STATE_RENEWING:
 					iface->start_uptime = uptime ();
+					free_dhcp (dhcp);
 					logger (LOG_INFO, "renewing lease of %s", inet_ntoa
 							(dhcp->address));
 					SOCKET_MODE (SOCKET_OPEN);
@@ -472,7 +512,7 @@ int dhcp_run (const options_t *options, int *pidfd)
 					memset (&dhcp->address, 0, sizeof (struct in_addr));
 					SOCKET_MODE (SOCKET_OPEN);
 					if (xid == 0)
-						xid = random_xid ();
+						xid = random ();
 					SEND_MESSAGE (DHCP_REQUEST);
 					timeout = dhcp->leasetime - dhcp->rebindtime;
 					state = STATE_REQUESTING;
@@ -604,7 +644,7 @@ int dhcp_run (const options_t *options, int *pidfd)
 						if (options->doarp && iface->previous_address.s_addr !=
 							dhcp->address.s_addr)
 						{
-							if (arp_check (iface, dhcp->address)) {
+							if (arp_claim (iface, dhcp->address)) {
 								SOCKET_MODE (SOCKET_OPEN);
 								SEND_MESSAGE (DHCP_DECLINE);
 								SOCKET_MODE (SOCKET_CLOSED);
