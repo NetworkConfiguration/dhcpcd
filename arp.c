@@ -178,7 +178,7 @@ int arp_claim (interface_t *iface, struct in_addr address)
 			memset (reply, 0, IP_MIN_FRAME_LENGTH);
 			if ((bytes = get_packet (iface, (unsigned char *) reply,
 									 buffer,
-									 &buflen, &bufpos)) < 0)
+									 &buflen, &bufpos)) == -1)
 				break;
 
 			/* Only these types are recognised */
