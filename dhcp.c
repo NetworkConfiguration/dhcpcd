@@ -425,6 +425,7 @@ void free_dhcp (dhcp_t *dhcp)
 	free (dhcp->nisdomain);
 	free_address (dhcp->nisservers);
 	free (dhcp->rootpath);
+	free (dhcp->sipservers);
 	if (dhcp->fqdn) {
 		free (dhcp->fqdn->name);
 		free (dhcp->fqdn);
@@ -493,7 +494,7 @@ static char *decode_sipservers (const unsigned char *data, int length)
 			break;
 
 		default:
-			logger (LOG_ERR, "unknown sip encoding %d", *data);
+			logger (LOG_ERR, "unknown sip encoding %d", encoding);
 			break;
 	}
 
