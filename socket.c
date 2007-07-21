@@ -419,7 +419,11 @@ int open_socket (interface_t *iface, bool arp)
 {
 	int fd;
 	int flags;
-	struct sockaddr_ll sll;
+	union sockunion {
+		struct sockaddr sa;
+		struct sockaddr_ll sll;
+		struct sockaddr_storage ss;
+	} su;
 
 	if ((fd = socket (PF_PACKET, SOCK_DGRAM, htons (ETH_P_IP))) == -1) {
 		logger (LOG_ERR, "socket: %s", strerror (errno));
@@ -434,21 +438,20 @@ int open_socket (interface_t *iface, bool arp)
 		return -1;
 	}
 
-	memset (&sll, 0, sizeof (struct sockaddr_ll));
-	sll.sll_family = AF_PACKET;
+	memset (&su, 0, sizeof (struct sockaddr_storage));
+	su.sll.sll_family = AF_PACKET;
 	if (arp)
-		sll.sll_protocol = htons (ETH_P_ARP);
+		su.sll.sll_protocol = htons (ETH_P_ARP);
 	else
-		sll.sll_protocol = htons (ETH_P_IP);
-	if (! (sll.sll_ifindex = if_nametoindex (iface->name))) {
+		su.sll.sll_protocol = htons (ETH_P_IP);
+	if (! (su.sll.sll_ifindex = if_nametoindex (iface->name))) {
 		logger (LOG_ERR, "if_nametoindex: Couldn't find index for interface `%s'",
 				iface->name);
 		close (fd);
 		return -1;
 	}
 
-	if (bind (fd, (struct sockaddr *) &sll,
-			  sizeof (struct sockaddr_ll)) == -1)
+	if (bind (fd, &su.sa, sizeof (struct sockaddr_storage)) == -1)
 	{
 		logger (LOG_ERR, "bind: %s", strerror (errno));
 		close (fd);
@@ -458,7 +461,7 @@ int open_socket (interface_t *iface, bool arp)
 	if (iface->fd > -1)
 		close (iface->fd);
 	iface->fd = fd;
-	iface->socket_protocol = ntohs (sll.sll_protocol);
+	iface->socket_protocol = ntohs (su.sll.sll_protocol);
 
 	iface->buffer_length = BUFFER_LENGTH;
 
@@ -468,25 +471,29 @@ int open_socket (interface_t *iface, bool arp)
 int send_packet (const interface_t *iface, const int type,
 				 const unsigned char *data, const int len)
 {
-	struct sockaddr_ll sll;
+	union sockunion {
+		struct sockaddr sa;
+		struct sockaddr_ll sll;
+		struct sockaddr_storage ss;
+	} su;
 	int retval;
 
 	if (! iface)
 		return -1;
 
-	memset (&sll, 0, sizeof (struct sockaddr_ll));
-	sll.sll_family = AF_PACKET;
-	sll.sll_protocol = htons (type);
-	if (! (sll.sll_ifindex = if_nametoindex (iface->name))) {
+	memset (&su, 0, sizeof (struct sockaddr_storage));
+	su.sll.sll_family = AF_PACKET;
+	su.sll.sll_protocol = htons (type);
+	if (! (su.sll.sll_ifindex = if_nametoindex (iface->name))) {
 		logger (LOG_ERR, "if_nametoindex: Couldn't find index for interface `%s'",
 				iface->name);
 		return -1;
 	}
-	sll.sll_halen = ETHER_ADDR_LEN;
-	memset(sll.sll_addr, 0xff, sizeof (sll.sll_addr));
+	su.sll.sll_halen = iface->hwlen;
+	memset(&su.sll.sll_addr, 0xff, iface->hwlen);
 
-	if ((retval = sendto (iface->fd, data, len, 0, (struct sockaddr *) &sll,
-						  sizeof (struct sockaddr_ll))) == -1) 
+	if ((retval = sendto (iface->fd, data, len, 0, &su.sa,
+						  sizeof (struct sockaddr_storage))) == -1)
 
 		logger (LOG_ERR, "sendto: %s", strerror (errno));
 	return retval;
