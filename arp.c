@@ -190,9 +190,6 @@ int arp_claim (interface_t *iface, struct in_addr address)
 				continue;
 			if (reply->ar_pln != sizeof (struct in_addr))
 				continue;
-
-			if (reply->ar_hln != ETHER_ADDR_LEN)
-				continue;
 			if ((unsigned) bytes < sizeof (reply) + 
 				2 * (4 + reply->ar_hln))
 				continue;
@@ -200,7 +197,8 @@ int arp_claim (interface_t *iface, struct in_addr address)
 			rp.c = (unsigned char *) ar_spa (reply);
 			rh.c = (unsigned char *) ar_sha (reply);
 			logger (LOG_ERR, "ARPOP_REPLY received from %s (%s)",
-					inet_ntoa (*rp.a), ether_ntoa (rh.a));
+					inet_ntoa (*rp.a),
+					hwaddr_ntoa (rh.a, reply->ar_hln));
 			retval = -1;
 			goto eexit;
 		}

@@ -33,7 +33,6 @@
 #include "logger.h"
 
 #ifdef ENABLE_DUID
-#define DUID_LEN                   130
 
 #define THIRTY_YEARS_IN_SECONDS    946707779
 

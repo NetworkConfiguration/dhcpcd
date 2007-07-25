@@ -33,8 +33,8 @@
 
 #include "config.h"
 #ifdef ENABLE_DUID
-#ifndef DUID_LENGTH_MAX
-#define DUID_LENGTH_MAX 128 + 2
+#ifndef DUID_LEN
+#  define DUID_LEN				128 + 2
 #endif
 #endif
 
@@ -50,6 +50,8 @@
 #ifndef ARPHRD_INFINIBAND
 #  define ARPHRD_INFINIBAND		27
 #endif
+
+#define HWADDR_LEN				20	
 
 typedef struct route_t
 {
@@ -69,7 +71,7 @@ typedef struct interface_t
 {
 	char name[IF_NAMESIZE];
 	sa_family_t family;
-	unsigned char hwaddr[20];
+	unsigned char hwaddr[HWADDR_LEN];
 	int hwlen;
 	bool arpable;
 	unsigned short mtu;
@@ -91,7 +93,7 @@ typedef struct interface_t
 	long start_uptime;
 
 #ifdef ENABLE_DUID
-	unsigned char duid[DUID_LENGTH_MAX];
+	unsigned char duid[DUID_LEN];
 	int duid_length;
 #endif
 } interface_t;

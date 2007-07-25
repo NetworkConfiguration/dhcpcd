@@ -52,7 +52,7 @@ void srandomdev (void) {
 
 /* strlcpy is nice, shame glibc does not define it */
 #ifdef __GLIBC__
-#  if ! defined(__UCLIBC__) && ! defined (__dietlibc__)
+#  if ! defined (__UCLIBC__) && ! defined (__dietlibc__)
 size_t strlcpy (char *dst, const char *src, size_t size)
 {
 	const char *s = src;
@@ -73,7 +73,7 @@ size_t strlcpy (char *dst, const char *src, size_t size)
 
 	return (src - s - 1);
 }
-#endif
+#  endif
 #endif
 
 /* This requires us to link to rt on glibc, so we use sysinfo instead */

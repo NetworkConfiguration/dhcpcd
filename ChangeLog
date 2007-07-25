@@ -1,3 +1,5 @@
+Remove getifaddrs code and instead just use ioctls.
+
 dhcpcd-3.1.0
 Add new socket code to try and support InfiniBand better.
 Support RFC 3361 SIP Servers.

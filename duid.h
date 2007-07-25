@@ -25,8 +25,8 @@
 #include "config.h"
 
 #ifdef ENABLE_DUID
-#ifndef DUID_LENGTH_MAX
-#define DUID_LENGTH_MAX 128 + 2
+#ifndef DUID_LEN
+#  define DUID_LEN 128 + 2
 #endif
 
 #include "interface.h"
