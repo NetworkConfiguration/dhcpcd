@@ -1,4 +1,7 @@
-Remove getifaddrs code and instead just use ioctls.
+dhcpcd-3.1.1
+Fix segfault in arp code that some users had.
+Remove getifaddrs code and instead just use ioctls so we don't break
+platforms without getifaddrs as often.
 
 dhcpcd-3.1.0
 Add new socket code to try and support InfiniBand better.

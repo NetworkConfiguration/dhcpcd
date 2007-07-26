@@ -196,9 +196,19 @@ int arp_claim (interface_t *iface, struct in_addr address)
 
 			rp.c = (unsigned char *) ar_spa (reply);
 			rh.c = (unsigned char *) ar_sha (reply);
+			
+			/* Ensure the ARP reply is for the address we asked for */
+			if (rp.a->s_addr != address.s_addr)
+				continue;
+
+			/* Some systems send a reply back from our hwaddress - weird */
+			if (reply->ar_hln == iface->hwlen &&
+				memcmp (rh.c, iface->hwaddr, iface->hwlen) == 0)
+				continue;
+
 			logger (LOG_ERR, "ARPOP_REPLY received from %s (%s)",
 					inet_ntoa (*rp.a),
-					hwaddr_ntoa (rh.a, reply->ar_hln));
+					hwaddr_ntoa (rh.c, reply->ar_hln));
 			retval = -1;
 			goto eexit;
 		}
