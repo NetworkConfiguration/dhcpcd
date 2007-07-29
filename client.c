@@ -502,7 +502,6 @@ int dhcp_run (const options_t *options, int *pidfd)
 					xid = random ();
 				case STATE_RENEWING:
 					iface->start_uptime = uptime ();
-					free_dhcp (dhcp);
 					logger (LOG_INFO, "renewing lease of %s", inet_ntoa
 							(dhcp->address));
 					SOCKET_MODE (SOCKET_OPEN);

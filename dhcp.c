@@ -374,16 +374,7 @@ static route_t *decode_CSR(const unsigned char *p, int len)
 		memset (route, 0, sizeof (route_t));
 
 		cidr = *q++;
-		if (cidr == 0)
-			ocets = 0;
-		else if (cidr < 9)
-			ocets = 1;
-		else if (cidr < 17)
-			ocets = 2;
-		else if (cidr < 25)
-			ocets = 3;
-		else
-			ocets = 4;
+		ocets = (cidr + 7) / 8;
 
 		if (ocets > 0) {
 			memcpy (&route->destination.s_addr, q, ocets);

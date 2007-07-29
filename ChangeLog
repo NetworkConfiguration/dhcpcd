@@ -1,3 +1,5 @@
+Don't free the dhcp object on RENEW (fixes a segfault)
+
 dhcpcd-3.1.1
 Fix segfault in arp code that some users had.
 Remove getifaddrs code and instead just use ioctls so we don't break
