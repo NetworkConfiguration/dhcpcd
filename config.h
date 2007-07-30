@@ -43,7 +43,9 @@
  * See RFC 3315 for details on this. */
 #define ENABLE_DUID
 
-/* Packname name and pathname definitions */
+/* Packname name and pathname definitions.
+ * NOTE: The service restart commands are Gentoo specific and will
+ * probably need to be adapted for your OS. */
 
 #define PACKAGE             "dhcpcd"
 
@@ -54,17 +56,17 @@
 
 #define NISFILE             ETCDIR "/yp.conf"
 #define NISSERVICE          ETCDIR "/init.d/ypbind"
-#define NISRESTARTARGS      "--quiet", "conditionalrestart"
+#define NISRESTARTARGS      "--nodeps", "--quiet", "conditionalrestart"
 
 #define NTPFILE             ETCDIR "/ntp.conf"
 #define NTPDRIFTFILE        ETCDIR "/ntp.drift"
 #define NTPLOGFILE          "/var/log/ntp.log"
 #define NTPSERVICE          ETCDIR "/init.d/ntpd"
-#define NTPRESTARTARGS      "--quiet", "conditionalrestart"
+#define NTPRESTARTARGS      "--nodeps", "--quiet", "conditionalrestart"
 
 #define OPENNTPFILE         ETCDIR "/ntpd.conf"
 #define OPENNTPSERVICE      ETCDIR "/init.d/ntpd"
-#define OPENNTPRESTARTARGS  "--quiet", "conditionalrestart"
+#define OPENNTPRESTARTARGS  "--nodeps", "--quiet", "conditionalrestart"
 
 #define DEFAULT_SCRIPT      ETCDIR "/" PACKAGE ".sh"
 

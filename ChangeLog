@@ -1,3 +1,4 @@
+Use --nodeps when restarting services.
 Simply CIDR calculation, thanks to Francois-Xavier Le Bail.
 Don't free the dhcp object on RENEW (fixes a segfault).
 
