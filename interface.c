@@ -839,7 +839,6 @@ static int do_route (const char *ifname,
 					 int metric, int change, int del)
 {
 	char *dstd;
-	char *gend;
 	unsigned int ifindex;
 	struct
 	{
@@ -848,28 +847,26 @@ static int do_route (const char *ifname,
 		char buffer[256];
 	}
 	nlm;
+	int cidr = inet_ntocidr (netmask);
 
 	if (! ifname)
 		return -1;
 
 	dstd = xstrdup (inet_ntoa (destination));
-	gend = xstrdup (inet_ntoa (netmask));
 	if (gateway.s_addr == destination.s_addr)
-		logger (LOG_INFO, "%s route to %s (%s) metric %d",
+		logger (LOG_INFO, "%s route to %s/%d metric %d",
 				change ? "changing" : del ? "removing" : "adding",
-				dstd, gend, metric);
+				dstd, cidr, metric);
 	else if (destination.s_addr == INADDR_ANY && netmask.s_addr == INADDR_ANY)
 		logger (LOG_INFO, "%s default route via %s metric %d",
 				change ? "changing" : del ? "removing" : "adding",
 				inet_ntoa (gateway), metric);
 	else
-		logger (LOG_INFO, "%s route to %s (%s) via %s metric %d",
+		logger (LOG_INFO, "%s route to %s/%d via %s metric %d",
 				change ? "changing" : del ? "removing" : "adding",
-				dstd, gend, inet_ntoa (gateway), metric);
+				dstd, cidr, inet_ntoa (gateway), metric);
 	if (dstd)
 		free (dstd);
-	if (gend)
-		free (gend);
 
 	memset (&nlm, 0, sizeof (nlm));
 
@@ -901,7 +898,6 @@ static int do_route (const char *ifname,
 	if (gateway.s_addr != INADDR_ANY && gateway.s_addr != destination.s_addr)
 		add_attr_l (&nlm.hdr, sizeof (nlm), RTA_GATEWAY, &gateway.s_addr,
 					sizeof (gateway.s_addr));
-
 
 	if (! (ifindex = if_nametoindex (ifname))) {
 		logger (LOG_ERR, "if_nametoindex: Couldn't find index for interface `%s'",
