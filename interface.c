@@ -441,6 +441,52 @@ int set_mtu (const char *ifname, short int mtu)
 	return (r == 0 ? 0 : -1);
 }
 
+static void log_route( 
+					  struct in_addr destination,
+					  struct in_addr netmask,
+					  struct in_addr gateway,
+					  int metric,
+					  int change, int del)
+{
+	char *dstd = xstrdup (inet_ntoa (destination));
+
+#ifdef __linux__
+#define METRIC " metric %d"
+#else
+#define METRIC ""
+	metric = 0;
+#endif
+
+	if (gateway.s_addr == destination.s_addr ||
+		gateway.s_addr == INADDR_ANY)
+		logger (LOG_INFO, "%s route to %s/%d" METRIC,
+				change ? "changing" : del ? "removing" : "adding",
+				dstd, inet_ntocidr (netmask)
+#ifdef __linux__
+				, metric
+#endif
+			   );
+	else if (destination.s_addr == INADDR_ANY)
+		logger (LOG_INFO, "%s default route via %s" METRIC,
+				change ? "changing" : del ? "removing" : "adding",
+				inet_ntoa (gateway)
+
+#ifdef __linux__
+				, metric
+#endif
+			   );
+	else
+		logger (LOG_INFO, "%s route to %s/%d via %s" METRIC,
+				change ? "changing" : del ? "removing" : "adding",
+				dstd, inet_ntocidr (netmask), inet_ntoa (gateway)
+#ifdef __linux__
+				, metric
+#endif
+			   );
+
+	free (dstd);
+}
+
 #if defined(__FreeBSD__) || defined(__NetBSD__) || defined (__OpenBSD__) \
 || defined(__APPLE__)
 static int do_address (const char *ifname, struct in_addr address,
@@ -494,7 +540,6 @@ static int do_route (const char *ifname,
 					 int change, int del)
 {
 	int s;
-	char *dstd;
 	struct rtm 
 	{
 		struct rt_msghdr hdr;
@@ -517,24 +562,7 @@ static int do_route (const char *ifname,
 	if (! ifname)
 		return -1;
 
-	/* Do something with metric to satisfy compiler warnings */
-	metric = 0;
-
-	dstd = xstrdup (inet_ntoa (destination));
-	if (gateway.s_addr == destination.s_addr)
-		logger (LOG_INFO, "%s route to %s/%d",
-				change ? "changing" : del ? "removing" : "adding",
-				dstd, inet_ntocidr (netmask));
-	else if (destination.s_addr == INADDR_ANY)
-		logger (LOG_INFO, "%s default route via %s",
-				change ? "changing" : del ? "removing" : "adding",
-				inet_ntoa (gateway));
-	else
-		logger (LOG_INFO, "%s route to %s/%d via %s",
-				change ? "changing" : del ? "removing" : "adding",
-				dstd, inet_ntocidr (netmask), inet_ntoa (gateway));
-	if (dstd)
-		free (dstd);
+	log_route (destination, netmask, gateway, metric, change, del);
 
 	if ((s = socket (PF_ROUTE, SOCK_RAW, 0)) == -1) {
 		logger (LOG_ERR, "socket: %s", strerror (errno));
@@ -546,12 +574,7 @@ static int do_route (const char *ifname,
 	rtm.hdr.rtm_version = RTM_VERSION;
 	rtm.hdr.rtm_seq = ++seq;
 	rtm.hdr.rtm_type = change ? RTM_CHANGE : del ? RTM_DELETE : RTM_ADD;
-
 	rtm.hdr.rtm_flags = RTF_UP | RTF_STATIC;
-	if (netmask.s_addr == INADDR_BROADCAST)
-		rtm.hdr.rtm_flags |= RTF_HOST;
-	else
-		rtm.hdr.rtm_flags |= RTF_GATEWAY;
 
 	/* This order is important */
 	rtm.hdr.rtm_addrs = RTA_DST | RTA_GATEWAY | RTA_NETMASK;
@@ -567,10 +590,15 @@ static int do_route (const char *ifname,
 
 	ADDADDR (destination);
 
-	if (netmask.s_addr == INADDR_BROADCAST) {
+	if (netmask.s_addr == INADDR_BROADCAST ||
+		gateway.s_addr == INADDR_ANY)
+	{
 		/* Make us a link layer socket */
 		unsigned char hwaddr[HWADDR_LEN];
 		int hwlen = 0;
+
+		if (netmask.s_addr == INADDR_BROADCAST) 
+			rtm.hdr.rtm_flags |= RTF_HOST;
 
 		_do_interface (ifname, hwaddr, &hwlen, NULL, false, false);
 		memset (&su, 0, sizeof (struct sockaddr_storage));
@@ -586,6 +614,7 @@ static int do_route (const char *ifname,
 		memcpy (bp, &su, l);
 		bp += l;
 	} else {
+		rtm.hdr.rtm_flags |= RTF_GATEWAY;
 		ADDADDR (gateway);
 	}
 
@@ -838,7 +867,6 @@ static int do_route (const char *ifname,
 					 struct in_addr gateway,
 					 int metric, int change, int del)
 {
-	char *dstd;
 	unsigned int ifindex;
 	struct
 	{
@@ -847,26 +875,11 @@ static int do_route (const char *ifname,
 		char buffer[256];
 	}
 	nlm;
-	int cidr = inet_ntocidr (netmask);
 
 	if (! ifname)
 		return -1;
 
-	dstd = xstrdup (inet_ntoa (destination));
-	if (gateway.s_addr == destination.s_addr)
-		logger (LOG_INFO, "%s route to %s/%d metric %d",
-				change ? "changing" : del ? "removing" : "adding",
-				dstd, cidr, metric);
-	else if (destination.s_addr == INADDR_ANY && netmask.s_addr == INADDR_ANY)
-		logger (LOG_INFO, "%s default route via %s metric %d",
-				change ? "changing" : del ? "removing" : "adding",
-				inet_ntoa (gateway), metric);
-	else
-		logger (LOG_INFO, "%s route to %s/%d via %s metric %d",
-				change ? "changing" : del ? "removing" : "adding",
-				dstd, cidr, inet_ntoa (gateway), metric);
-	if (dstd)
-		free (dstd);
+	log_route (destination, netmask, gateway, metric, change, del);
 
 	memset (&nlm, 0, sizeof (nlm));
 
@@ -885,7 +898,7 @@ static int do_route (const char *ifname,
 	else {
 		nlm.hdr.nlmsg_flags |= NLM_F_CREATE | NLM_F_EXCL;
 		nlm.rt.rtm_protocol = RTPROT_BOOT;
-		if (gateway.s_addr == INADDR_ANY)
+		if (netmask.s_addr == INADDR_BROADCAST)
 			nlm.rt.rtm_scope = RT_SCOPE_LINK;
 		else
 			nlm.rt.rtm_scope = RT_SCOPE_UNIVERSE;
@@ -895,7 +908,8 @@ static int do_route (const char *ifname,
 	nlm.rt.rtm_dst_len = inet_ntocidr (netmask);
 	add_attr_l (&nlm.hdr, sizeof (nlm), RTA_DST, &destination.s_addr,
 				sizeof (destination.s_addr));
-	if (gateway.s_addr != INADDR_ANY && gateway.s_addr != destination.s_addr)
+	if (netmask.s_addr != INADDR_BROADCAST &&
+		destination.s_addr != gateway.s_addr)
 		add_attr_l (&nlm.hdr, sizeof (nlm), RTA_GATEWAY, &gateway.s_addr,
 					sizeof (gateway.s_addr));
 

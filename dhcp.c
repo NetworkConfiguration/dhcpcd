@@ -492,6 +492,33 @@ static char *decode_sipservers (const unsigned char *data, int length)
 	return (sip);
 }
 
+/* This calculates the netmask that we should use for static routes.
+ * This IS different from the calculation used to calculate the netmask
+ * for an interface address. */
+static unsigned long route_netmask (unsigned long ip_in)
+{
+	unsigned long p = ntohl (ip_in);
+	unsigned long t;
+
+	if (IN_CLASSA (p))
+		t = ~IN_CLASSA_NET;
+	else {
+		if (IN_CLASSB (p))
+			t = ~IN_CLASSB_NET;
+		else {
+			if (IN_CLASSC (p))
+				t = ~IN_CLASSC_NET;
+			else
+				t = 0;
+		}
+	}
+
+	while (t & p)
+		t >>= 1;
+
+	return (htonl (~t));
+}
+
 int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 {
 	const unsigned char *p = message->options;
@@ -705,7 +732,7 @@ parse_start:
 					memcpy (&static_routesp->destination.s_addr, p + i, 4);
 					memcpy (&static_routesp->gateway.s_addr, p + i + 4, 4);
 					static_routesp->netmask.s_addr =
-						get_netmask (static_routesp->destination.s_addr); 
+						route_netmask (static_routesp->destination.s_addr); 
 				}
 				break;
 
