@@ -1,3 +1,4 @@
+dhcpcd-3.1.2
 Use a generic route logger.
 Fix static route netmask calculation and applicaton.
 Use --nodeps when restarting services.
