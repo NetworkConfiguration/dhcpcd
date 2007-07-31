@@ -1,3 +1,6 @@
+dhcpcd-3.1.3
+Fix link routes which broke in 3.1.2.
+
 dhcpcd-3.1.2
 Use a generic route logger.
 Fix static route netmask calculation and applicaton.
