@@ -66,7 +66,6 @@ typedef struct options_t {
 	struct in_addr request_address;
 	struct in_addr request_netmask;
 
-	int signal;
 	bool persistent;
 	bool keep_address;
 	bool daemonise;

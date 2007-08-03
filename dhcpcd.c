@@ -97,6 +97,7 @@ int main(int argc, char **argv)
 	int debug = 0;
 	int i;
 	int pidfd = -1;
+	int sig = 0;
 
 	const struct option longopts[] = {
 		{"arp",         no_argument,        NULL, 'a'},
@@ -207,7 +208,7 @@ int main(int argc, char **argv)
 												   sizeof (options.classid));
 				break;
 			case 'k':
-				options.signal = SIGHUP;
+				sig = SIGHUP;
 				break;
 			case 'l':
 				STRINGINT (optarg, options.leasetime);
@@ -220,7 +221,7 @@ int main(int argc, char **argv)
 				STRINGINT (optarg, options.metric);
 				break;
 			case 'n':
-				options.signal = SIGALRM;
+				sig = SIGALRM;
 				break;
 			case 'p':
 				options.persistent = true;
@@ -279,7 +280,7 @@ int main(int argc, char **argv)
 				}
 				break;
 			case 'x':
-				options.signal = SIGTERM;
+				sig = SIGTERM;
 				break;
 			case 'A':
 #ifndef ENABLE_ARP
@@ -433,28 +434,28 @@ int main(int argc, char **argv)
 			exit (EXIT_FAILURE);
 		}
 
-		if (options.signal != 0) {
+		if (sig != 0) {
 			logger (LOG_ERR, "cannot test with --release or --renew");
 			exit (EXIT_FAILURE);
 		}
 	}
 
-	if (options.signal != 0 ) {
+	if (sig != 0 ) {
 		int killed = -1;
 		pid = read_pid (options.pidfile);
 		if (pid != 0)
-			logger (LOG_INFO, "sending signal %d to pid %d", options.signal, pid);
+			logger (LOG_INFO, "sending signal %d to pid %d", sig, pid);
 
-		if (! pid || (killed = kill (pid, options.signal)))
-			logger (options.signal == SIGALRM ? LOG_INFO : LOG_ERR, ""PACKAGE" not running");
+		if (! pid || (killed = kill (pid, sig)))
+			logger (sig == SIGALRM ? LOG_INFO : LOG_ERR, ""PACKAGE" not running");
 
-		if (pid != 0 && (options.signal != SIGALRM || killed != 0))
+		if (pid != 0 && (sig != SIGALRM || killed != 0))
 			unlink (options.pidfile);
 
 		if (killed == 0)
 			exit (EXIT_SUCCESS);
 
-		if (options.signal != SIGALRM)
+		if (sig != SIGALRM)
 			exit (EXIT_FAILURE);
 	}
 
