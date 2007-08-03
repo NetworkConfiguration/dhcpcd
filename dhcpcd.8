@@ -186,6 +186,22 @@ fixed hardware addresses. You can specify more than one user class, but the
 total length must be less than 255 characters, -1 character for each user
 class.
 .TP
+.BI \-x
+Sends
+.B SIGTERM
+signal to the
+.B dhcpcd
+process associated with the specified interface if one is currently running. If
+.B dhcpcd
+receives
+.B SIGTERM
+it will stop running, de-configure the interface and exit.
+(see also
+.B -k
+and
+.B -p
+)
+.TP
 .BI \-A
 Don't do an
 .B ARP

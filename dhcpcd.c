@@ -113,6 +113,7 @@ int main(int argc, char **argv)
 		{"request",     optional_argument,  NULL, 'r'},
 		{"timeout",     required_argument,  NULL, 't'},
 		{"userclass",   required_argument,  NULL, 'u'},
+		{"exit",        no_argument,        NULL, 'x'},
 		{"lastlease",   no_argument,        NULL, 'E'},
 		{"fqdn",        required_argument,  NULL, 'F'},
 		{"nogateway",   no_argument,        NULL, 'G'},
@@ -158,7 +159,7 @@ int main(int argc, char **argv)
 
 	/* Don't set any optional arguments here so we retain POSIX
 	 * compatibility with getopt */
-	while ((opt = getopt_long(argc, argv, "c:dh:i:kl:m:npr:s:t:u:AEF:GHI:LMNRTY",
+	while ((opt = getopt_long(argc, argv, "c:dh:i:kl:m:npr:s:t:u:xAEF:GHI:LMNRTY",
 							  longopts, &option_index)) != -1)
 	{
 		switch (opt) {
@@ -276,6 +277,9 @@ int main(int argc, char **argv)
 					options.userclass[offset] = strlen (optarg);
 					options.userclass_len += (strlen (optarg)) + 1;
 				}
+				break;
+			case 'x':
+				options.signal = SIGTERM;
 				break;
 			case 'A':
 #ifndef ENABLE_ARP

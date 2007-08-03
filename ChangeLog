@@ -1,3 +1,5 @@
+Add -x option to quit without releasing the lease.
+
 dhcpcd-3.1.3
 Fix link routes which broke in 3.1.2.
 
