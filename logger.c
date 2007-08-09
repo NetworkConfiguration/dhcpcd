@@ -25,7 +25,6 @@
 #include <string.h>
 #include <syslog.h>
 
-#include "common.h"
 #include "logger.h"
 
 static int loglevel = LOG_WARNING;
@@ -100,13 +99,19 @@ void logger(int level, const char *fmt, ...)
 	if (level < LOG_DEBUG || level <= loglevel) {
 		int len = strlen (logprefix);
 		int fmt2len = strlen (fmt) + len + 1;
-		char *fmt2 = xmalloc (sizeof (char *) * fmt2len);
+		char *fmt2 = malloc (sizeof (char *) * fmt2len);
 		char *pf = fmt2;
-		memcpy (pf, logprefix, len);
-		pf += len;
-		strlcpy (pf, fmt, fmt2len - len);
-		vsyslog (level, fmt2, p2);
-		free (fmt2);
+		if (fmt2) {
+			memcpy (pf, logprefix, len);
+			pf += len;
+			strlcpy (pf, fmt, fmt2len - len);
+			vsyslog (level, fmt2, p2);
+			free (fmt2);
+		} else {
+			vsyslog (level, fmt, p2);
+			syslog (LOG_ERR, "logger: memory exhausted");
+			exit (EXIT_FAILURE);
+		}
 	}
 
 	va_end (p2);
