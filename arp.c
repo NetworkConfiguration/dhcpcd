@@ -24,7 +24,7 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <netinet/in_systm.h>
-#ifdef __linux
+#ifdef __linux__
 #include <netinet/ether.h>
 #include <netpacket/packet.h>
 #endif
@@ -65,12 +65,10 @@
 #define arphdr_len(ap) (arphdr_len2 ((ap)->ar_hln, (ap)->ar_pln))
 #endif
 
-#define IP_MIN_FRAME_LENGTH 46
-
 #ifdef ENABLE_ARP
 
-static int send_arp (interface_t *iface, int op, struct in_addr sip,
-					 unsigned char *taddr, struct in_addr tip)
+static int send_arp (const interface_t *iface, int op, struct in_addr sip,
+					 const unsigned char *taddr, struct in_addr tip)
 {
 	struct arphdr *arp;
 	int arpsize = arphdr_len2 (iface->hwlen, sizeof (struct in_addr));
@@ -84,7 +82,7 @@ static int send_arp (interface_t *iface, int op, struct in_addr sip,
 	arp->ar_hln = iface->hwlen;
 	arp->ar_pln = sizeof (struct in_addr);
 	arp->ar_op = htons (op);
-	memcpy (ar_sha (arp), &iface->hwaddr, arp->ar_hln);
+	memcpy (ar_sha (arp), iface->hwaddr, arp->ar_hln);
 	memcpy (ar_spa (arp), &sip, arp->ar_pln);
 	if (taddr)
 		memcpy (ar_tha (arp), taddr, arp->ar_hln); 
@@ -105,6 +103,11 @@ int arp_claim (interface_t *iface, struct in_addr address)
 	int nprobes = 0;
 	int nclaims = 0;
 	struct in_addr null_address;
+	struct timeval stopat;
+	struct timeval now;
+
+	if (! iface)
+		return (-1);
 
 	if (! iface->arpable) {
 		logger (LOG_DEBUG, "interface `%s' is not ARPable", iface->name);
@@ -115,35 +118,39 @@ int arp_claim (interface_t *iface, struct in_addr address)
 			inet_ntoa (address));
 
 	if (! open_socket (iface, true))
-		return (0);
+		return (-1);
 
-	memset (&null_address, 0, sizeof (null_address));
+	memset (&null_address, 0, sizeof (struct in_addr));
 
-	buffer = xmalloc (sizeof (char *) * iface->buffer_length);
-
-	/* Our ARP packets are always smaller - hopefully */
-	reply = xmalloc (IP_MIN_FRAME_LENGTH);
+	buffer = xmalloc (iface->buffer_length);
+	reply = xmalloc (iface->buffer_length);
 
 	while (1) {
 		struct timeval tv;
 		int bufpos = -1;
-		int buflen = sizeof (char *) * iface->buffer_length;
+		int buflen = iface->buffer_length;
 		fd_set rset;
 		int bytes;
-		int s;
+		int s = 0;
 
-		tv.tv_sec = 0; 
-		tv.tv_usec = timeout;
+		/* Only select if we have a timeout */
+		if (timeout > 0) {
+			tv.tv_sec = 0; 
+			tv.tv_usec = timeout;
 
-		FD_ZERO (&rset);
-		FD_SET (iface->fd, &rset);
-		errno = 0;
-		if ((s = select (FD_SETSIZE, &rset, NULL, NULL, &tv)) == -1) {
-			if (errno != EINTR)
-				logger (LOG_ERR, "select: `%s'", strerror (errno));
-			break;
-		} else if (s == 0) {
-			/* Timed out */
+			FD_ZERO (&rset);
+			FD_SET (iface->fd, &rset);
+
+			errno = 0;
+			if ((s = select (FD_SETSIZE, &rset, NULL, NULL, &tv)) == -1) {
+				if (errno != EINTR)
+					logger (LOG_ERR, "select: `%s'", strerror (errno));
+				break;
+			}
+		}
+
+		/* Timed out */
+		if (s == 0) {
 			if (nprobes < NPROBES) {
 				nprobes ++;
 				timeout = PROBE_INTERVAL;
@@ -159,8 +166,23 @@ int arp_claim (interface_t *iface, struct in_addr address)
 				retval = 0;
 				break;
 			}
+
+			/* Setup our stop time */
+			if (get_time (&stopat) != 0)
+				break;
+			stopat.tv_usec += timeout;
+
+			continue;
 		}
-		
+
+		/* We maybe ARP flooded, so check our time */
+		if (get_time (&now) != 0)
+			break;
+		if (timercmp (&now, &stopat, >)) {
+			timeout = 0;
+			continue;
+		}
+
 		if (! FD_ISSET (iface->fd, &rset))
 			continue;
 
@@ -175,7 +197,7 @@ int arp_claim (interface_t *iface, struct in_addr address)
 				struct ether_addr *a;
 			} rh;
 
-			memset (reply, 0, IP_MIN_FRAME_LENGTH);
+			memset (reply, 0, iface->buffer_length);
 			if ((bytes = get_packet (iface, (unsigned char *) reply,
 									 buffer,
 									 &buflen, &bufpos)) == -1)
@@ -196,7 +218,7 @@ int arp_claim (interface_t *iface, struct in_addr address)
 
 			rp.c = (unsigned char *) ar_spa (reply);
 			rh.c = (unsigned char *) ar_sha (reply);
-			
+
 			/* Ensure the ARP reply is for the address we asked for */
 			if (rp.a->s_addr != address.s_addr)
 				continue;

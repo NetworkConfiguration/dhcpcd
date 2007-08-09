@@ -1,4 +1,4 @@
-VERSION = 3.1.3
+VERSION = 3.1.4_pre3
 CFLAGS ?= -O2 -pipe
 
 # Should work for both GNU make and BSD make
@@ -49,12 +49,16 @@ dhcpcd_H = version.h
 dhcpcd_OBJS = arp.o client.o common.o configure.o dhcp.o dhcpcd.o duid.o \
 		info.o interface.o ipv4ll.o logger.o signals.o socket.o
 
-# By default we don't need to link to anything
-# Except on Darwin where we need -lresolv, so they need to uncomment this
-#dhcpcd_LIBS = -lresolv
+# These are nasty hacks to work out what libs we need to link to
+# We require librt for glibc bases systems
+LIBRT != ldd /bin/date 2>/dev/null | grep -q /librt.so && echo "-lrt" || exit 0
+LIBRT ?= $(shell ldd /bin/date 2>/dev/null | grep -q /librt.so && echo "-lrt")
+
+# Darwin needs this, but we have no way of detecting this atm
+#LIBRESOLV = -lresolv
 
 dhcpcd: $(dhcpcd_H) $(dhcpcd_OBJS)
-	$(CC) $(LDFLAGS) $(dhcpcd_OBJS) $(dhcpcd_LIBS) -o dhcpcd
+	$(CC) $(LDFLAGS) $(dhcpcd_OBJS) $(LIBRT) $(LIBRESOLV) -o dhcpcd
 
 version.h:
 	echo '#define VERSION "$(VERSION)"' > version.h

@@ -76,18 +76,47 @@ size_t strlcpy (char *dst, const char *src, size_t size)
 #  endif
 #endif
 
-/* This requires us to link to rt on glibc, so we use sysinfo instead */
-#ifdef __linux__
-#include <sys/sysinfo.h>
+/* Handy function to get the time.
+ * We only care about time advancements, not the actual time itself
+ * Which is why we use CLOCK_MONOTONIC, but it is not available on all
+ * platforms
+ */
+#ifdef CLOCK_MONOTONIC
+int get_time (struct timeval *tp)
+{
+	struct timespec ts;
+
+	if (clock_gettime (CLOCK_MONOTONIC, &ts) == -1) {
+		logger (LOG_ERR, "clock_gettime: %s", strerror (errno));
+		return (-1);
+	}
+
+	tp->tv_sec = ts.tv_sec;
+	tp->tv_usec = ts.tv_nsec / 1000;
+	return (0);
+}
+
 long uptime (void)
 {
-	struct sysinfo info;
+	struct timespec tp;
 
-	sysinfo (&info);
-	return info.uptime;
+	if (clock_gettime (CLOCK_MONOTONIC, &tp) == -1) {
+		logger (LOG_ERR, "clock_gettime: %s", strerror (errno));
+		return (-1);
+	}
+
+	return (tp.tv_sec);
 }
-#elif __APPLE__
-/* Darwin doesn't appear to have an uptime, so try and make one ourselves */
+#else
+int get_time (struct timeval *tp)
+{
+	if (gettimeofday (&tp, NULL) == -1) {
+		logger (LOG_ERR, "gettimeofday: %s", strerror (errno));
+		return (-1);
+	}
+	return (0);
+}
+
 long uptime (void)
 {
 	struct timeval tv;
@@ -95,34 +124,22 @@ long uptime (void)
 
 	if (gettimeofday (&tv, NULL) == -1) {
 		logger (LOG_ERR, "gettimeofday: %s", strerror (errno));
-		return -1;
+		return (-1);
 	}
 
 	if (start == 0)
 		start = tv.tv_sec;
 
-	return tv.tv_sec - start;
-}
-#else
-long uptime (void)
-{
-	struct timespec tp;
-
-	if (clock_gettime (CLOCK_MONOTONIC, &tp) == -1) {
-		logger (LOG_ERR, "clock_gettime: %s", strerror (errno));
-		return -1;
-	}
-
-	return tp.tv_sec;
+	return (tv.tv_sec - start);
 }
 #endif
 
-void *xmalloc (size_t size)
+void *xmalloc (size_t s)
 {
-	void *value = malloc (size);
+	void *value = malloc (s);
 
 	if (value)
-		return value;
+		return (value);
 
 	logger (LOG_ERR, "memory exhausted");
 	exit (EXIT_FAILURE);

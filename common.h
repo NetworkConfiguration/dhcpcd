@@ -23,6 +23,7 @@
 #define COMMON_H
 
 /* string.h pulls in features.h so the below define checks work */
+#include <sys/time.h>
 #include <string.h>
 
 /* Only GLIBC doesn't support strlcpy */
@@ -36,6 +37,7 @@ size_t strlcpy (char *dst, const char *src, size_t size);
 void srandomdev (void);
 #endif
 
+int get_time (struct timeval *tp);
 long uptime (void);
 void *xmalloc (size_t size);
 char *xstrdup (const char *str);

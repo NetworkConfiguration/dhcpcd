@@ -61,10 +61,10 @@
 	_int = (int) _number; \
 }
 
-static pid_t read_pid(const char *pidfile)
+static pid_t read_pid (const char *pidfile)
 {
 	FILE *fp;
-	pid_t pid;
+	pid_t pid = 0;
 
 	if ((fp = fopen (pidfile, "r")) == NULL) {
 		errno = ENOENT;
