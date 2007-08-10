@@ -25,6 +25,7 @@
 #include <string.h>
 #include <syslog.h>
 
+#include "common.h"
 #include "logger.h"
 
 static int loglevel = LOG_WARNING;
