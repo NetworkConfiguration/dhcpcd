@@ -152,9 +152,11 @@ static bool get_old_lease (const options_t *options, interface_t *iface,
 
 #ifdef ENABLE_ARP
 	/* Check that no-one is using the address */
-	if ((options->dolastlease ||
-		 IN_LINKLOCAL (dhcp->address.s_addr)) &&
-		arp_claim (iface, dhcp->address)) {
+	if ((options->dolastlease || 
+		 (IN_LINKLOCAL (dhcp->address.s_addr) &&
+		  (! options->doipv4ll ||
+		   arp_claim (iface, dhcp->address)))))
+	{
 		memset (&dhcp->address, 0, sizeof (struct in_addr));
 		memset (&dhcp->netmask, 0, sizeof (struct in_addr));
 		memset (&dhcp->broadcast, 0, sizeof (struct in_addr));
@@ -424,7 +426,7 @@ int dhcp_run (const options_t *options, int *pidfd)
 #endif
 
 #ifdef ENABLE_IPV4LL
-						if (! options->test &&
+						if (! options->test && options->doipv4ll &&
 							(! dhcp->address.s_addr ||
 							 (! IN_LINKLOCAL (dhcp->address.s_addr) &&
 							  ! options->dolastlease)))
