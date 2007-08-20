@@ -1,5 +1,7 @@
-Fix a potential heap overflow in decode_CSR when CIDR > 32.
-Fix a potential heap overflow in decode_sipservers when length is 1.
+Thanks to regenrecht for reporting the below three overflows:-
+ Fix a potential buffer overflow in hwaddr_ntoa if length > 42.
+ Fix a potential heap overflow in decode_CSR when CIDR > 32.
+ Fix a potential heap overflow in decode_sipservers when length is 1.
 -L actually doesn't do IPv4LL as advertised.
 
 dhcpcd-3.1.4

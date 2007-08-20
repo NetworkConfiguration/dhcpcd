@@ -141,15 +141,16 @@ unsigned long get_netmask (unsigned long addr)
 
 char *hwaddr_ntoa (const unsigned char *hwaddr, int hwlen)
 {
-	static char buffer[128];
+	static char buffer[(HWADDR_LEN * 3) + 1];
 	char *p = buffer;
 	int i;
 
-	for (i = 0; i < hwlen && i < 125; i++) {
+	for (i = 0; i < hwlen && i < HWADDR_LEN; i++) {
 		if (i > 0)
 			*p ++= ':';
 		p += snprintf (p, 3, "%.2x", hwaddr[i]);
 	}
+		
 	*p ++= '\0';
 
 	return (buffer);
