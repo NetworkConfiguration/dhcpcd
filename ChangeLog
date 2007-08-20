@@ -1,3 +1,4 @@
+Fix a potential heap overflow in decode_sipservers when length is 1.
 -L actually doesn't do IPv4LL as advertised.
 
 dhcpcd-3.1.4

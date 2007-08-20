@@ -469,7 +469,7 @@ static char *decode_sipservers (const unsigned char *data, int length)
 			break;
 
 		case 1:
-			if (length % 4 != 0) {
+			if (length == 0 || length % 4 != 0) {
 				logger (LOG_ERR, "invalid length %d for option 120", length + 1);
 				break;
 			}
