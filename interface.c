@@ -198,8 +198,16 @@ static int _do_interface (const char *ifname,
 	}
 
 	for (p = ifc.ifc_buf; p < ifc.ifc_buf + ifc.ifc_len;) {
-		struct ifreq *ifr = (struct ifreq *) p;
+		union {
+			char *buffer;
+			struct ifreq *ifr;
+		} ifreqs;
 		struct sockaddr_in address;
+		struct ifreq *ifr;
+
+		/* Cast the ifc buffer to an ifreq cleanly */
+		ifreqs.buffer = p;
+		ifr = ifreqs.ifr;
 
 #ifdef __linux__
 		p += sizeof (struct ifreq);
@@ -977,12 +985,7 @@ int del_route (const char *ifname, struct in_addr destination,
 
 int flush_addresses (const char *ifname)
 {
-	struct in_addr address;
-	unsigned char buf[1024];
-	int len = 0;
-
-	memset (buf, 0, 1023);
-	return (_do_interface (ifname, buf, &len, &address, true, false));
+	return (_do_interface (ifname, NULL, NULL, NULL, true, false));
 }
 
 unsigned long get_address (const char *ifname)
