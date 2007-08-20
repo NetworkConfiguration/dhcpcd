@@ -49,16 +49,11 @@ dhcpcd_H = version.h
 dhcpcd_OBJS = arp.o client.o common.o configure.o dhcp.o dhcpcd.o duid.o \
 		info.o interface.o ipv4ll.o logger.o signals.o socket.o
 
-# These are nasty hacks to work out what libs we need to link to
-# We require librt for glibc bases systems
-LIBRT != ldd /bin/date 2>/dev/null | grep -q /librt.so && echo "-lrt" || exit 0
-LIBRT ?= $(shell ldd /bin/date 2>/dev/null | grep -q /librt.so && echo "-lrt")
-
 # Darwin needs this, but we have no way of detecting this atm
 #LIBRESOLV = -lresolv
 
 dhcpcd: $(dhcpcd_H) $(dhcpcd_OBJS)
-	$(CC) $(LDFLAGS) $(dhcpcd_OBJS) $(LIBRT) $(LIBRESOLV) -o dhcpcd
+	$(CC) $(LDFLAGS) $(dhcpcd_OBJS) $(LIBRESOLV) -o dhcpcd
 
 version.h:
 	echo '#define VERSION "$(VERSION)"' > version.h

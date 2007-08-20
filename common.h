@@ -35,9 +35,11 @@ size_t strlcpy (char *dst, const char *src, size_t size);
 
 #ifdef __linux__
 void srandomdev (void);
+#else
+#define HAVE_GET_TIME
+int get_time (struct timeval *tp);
 #endif
 
-int get_time (struct timeval *tp);
 long uptime (void);
 void *xmalloc (size_t size);
 char *xstrdup (const char *str);

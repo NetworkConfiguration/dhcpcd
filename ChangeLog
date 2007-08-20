@@ -1,3 +1,5 @@
+dhcpcd-3.1.5
+Rework the arp code again so that we don't link to librt on Linux.
 Thanks to regenrecht for reporting the below three overflows:-
  Fix a potential buffer overflow in hwaddr_ntoa if length > 42.
  Fix a potential heap overflow in decode_CSR when CIDR > 32.
