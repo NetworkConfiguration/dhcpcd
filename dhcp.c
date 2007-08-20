@@ -374,6 +374,12 @@ static route_t *decode_CSR(const unsigned char *p, int len)
 		memset (route, 0, sizeof (route_t));
 
 		cidr = *q++;
+		if (cidr > 32) {
+			logger (LOG_ERR, "invalid CIDR of %d in classless static route",
+					cidr);
+			free_route (first);
+			return (NULL);
+		}
 		ocets = (cidr + 7) / 8;
 
 		if (ocets > 0) {
