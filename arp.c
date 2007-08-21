@@ -104,11 +104,6 @@ int arp_claim (interface_t *iface, struct in_addr address)
 	int nclaims = 0;
 	struct in_addr null_address;
 
-#ifdef HAVE_GET_TIME
-	struct timeval stopat;
-	struct timeval now;
-#endif
-
 	if (! iface)
 		return (-1);
 
@@ -135,6 +130,8 @@ int arp_claim (interface_t *iface, struct in_addr address)
 		fd_set rset;
 		int bytes;
 		int s = 0;
+		struct timeval stopat;
+		struct timeval now;
 
 		/* Only select if we have a timeout */
 		if (timeout > 0) {
@@ -170,32 +167,21 @@ int arp_claim (interface_t *iface, struct in_addr address)
 				break;
 			}
 
-
-#ifdef HAVE_GET_TIME
 			/* Setup our stop time */
 			if (get_time (&stopat) != 0)
 				break;
 			stopat.tv_usec += timeout;
-#endif
 
 			continue;
 		}
 
-		/* Check for ARP floods */
-#ifdef __linux__
-		/* Linux does modify the tv struct, otherwise we would have to link
-		 * into librt to use get get_time function */
-		timeout = tv.tv_usec;
-		if (timeout <= 0)
-			continue;
-#else
+		/* We maybe ARP flooded, so check our time */
 		if (get_time (&now) != 0)
 			break;
 		if (timercmp (&now, &stopat, >)) {
 			timeout = 0;
 			continue;
 		}
-#endif
 
 		if (! FD_ISSET (iface->fd, &rset))
 			continue;
