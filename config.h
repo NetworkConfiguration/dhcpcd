@@ -43,6 +43,11 @@
  * See RFC 3315 for details on this. */
 #define ENABLE_DUID
 
+/* Some systems do not have a working fork.
+ * The Makefile will attempt to work it out, but if it fails to feel free to
+ * define it here. */
+// #define THERE_IS_NO_FORK
+
 /* Packname name and pathname definitions.
  * NOTE: The service restart commands are Gentoo specific and will
  * probably need to be adapted for your OS. */

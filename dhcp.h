@@ -22,11 +22,11 @@
 #ifndef DHCP_H
 #define DHCP_H
 
-#include <sys/types.h>
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/udp.h>
+#include <stdint.h>
 
 #include "dhcpcd.h"
 #include "interface.h"

@@ -58,9 +58,6 @@ void free_address (address_t *addresses)
 	address_t *p = addresses;
 	address_t *n = NULL;
 
-	if (! addresses)
-		return;
-
 	while (p) {
 		n = p->next;
 		free (p);
@@ -72,9 +69,6 @@ void free_route (route_t *routes)
 {
 	route_t *p = routes;
 	route_t *n = NULL;
-
-	if (! routes)
-		return;
 
 	while (p) {
 		n = p->next;
@@ -96,29 +90,23 @@ int inet_ntocidr (struct in_addr address)
 	return (cidr);
 }
 
-struct in_addr inet_cidrtoaddr (int cidr) {
-	struct in_addr addr;
+int inet_cidrtoaddr (int cidr, struct in_addr *addr) {
 	int ocets;
 
-	if (cidr == 0)
-		ocets = 0;
-	else if (cidr < 9)
-		ocets = 1;
-	else if (cidr < 17)
-		ocets = 2;
-	else if (cidr < 25)
-		ocets = 3;
-	else
-		ocets = 4;
+	if (cidr < 0 || cidr > 32) {
+		errno = EINVAL;
+		return (-1);
+	}
+	ocets = (cidr + 7) / 8;
 
-	memset (&addr, 0, sizeof (struct in_addr));
+	memset (addr, 0, sizeof (struct in_addr));
 	if (ocets > 0) {
-		memset (&addr.s_addr, 255, ocets - 1);
-		memset ((unsigned char *) &addr.s_addr + (ocets - 1),
+		memset (&addr->s_addr, 255, ocets - 1);
+		memset ((unsigned char *) &addr->s_addr + (ocets - 1),
 				(256 - (1 << (32 - cidr) % 8)), 1);
 	}
 
-	return (addr);
+	return (0);
 }
 
 unsigned long get_netmask (unsigned long addr)
@@ -498,6 +486,15 @@ static void log_route(
 
 #if defined(__FreeBSD__) || defined(__NetBSD__) || defined (__OpenBSD__) \
 || defined(__APPLE__)
+
+/* Darwin doesn't define this for some very odd reason */
+#ifndef SA_SIZE
+# define SA_SIZE(sa)						\
+    (  (!(sa) || ((struct sockaddr *)(sa))->sa_len == 0) ?	\
+	sizeof(long)		:				\
+	1 + ( (((struct sockaddr *)(sa))->sa_len - 1) | (sizeof(long) - 1) ) )
+#endif
+
 static int do_address (const char *ifname, struct in_addr address,
 					   struct in_addr netmask, struct in_addr broadcast, int del)
 {

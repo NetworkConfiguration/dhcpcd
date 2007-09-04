@@ -19,6 +19,8 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#define _BSD_SOURCE
+
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>

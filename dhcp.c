@@ -67,7 +67,7 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 	unsigned long l;
 	struct in_addr from;
 	struct in_addr to;
-	long up = uptime() - iface->start_uptime;
+	time_t up = uptime() - iface->start_uptime;
 	uint32_t ul;
 	uint16_t sz;
 	unsigned int message_length;
@@ -106,7 +106,7 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 		case ARPHRD_IEEE1394:
 		case ARPHRD_INFINIBAND:
 			if (message.ciaddr == 0)
-				message.flags = htons (BROADCAST_FLAG);
+				message.flags = (int16_t) htons (BROADCAST_FLAG);
 			message.hwlen = 0;
 			break;
 		default:

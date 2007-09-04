@@ -36,6 +36,12 @@
 #define CLIENT_ID_MAX_LEN   48
 #define USERCLASS_MAX_LEN   255
 
+#ifndef HAVE_FORK
+extern char dhcpcd[PATH_MAX];
+extern char **dhcpcd_argv;
+extern int dhcpcd_argc;
+#endif
+
 typedef struct options_t {
 	char interface[IF_NAMESIZE];
 	char hostname[MAXHOSTNAMELEN];
@@ -69,6 +75,7 @@ typedef struct options_t {
 	bool persistent;
 	bool keep_address;
 	bool daemonise;
+	bool daemonised;
 	bool test;
 
 	char *script;

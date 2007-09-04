@@ -90,7 +90,7 @@ typedef struct interface_t
 	struct in_addr previous_netmask;
 	route_t *previous_routes;
 
-	long start_uptime;
+	time_t start_uptime;
 
 #ifdef ENABLE_DUID
 	unsigned char duid[DUID_LEN];
@@ -124,6 +124,6 @@ int del_route (const char *ifname, struct in_addr destination,
 			   struct in_addr netmask, struct in_addr gateway, int metric);
 
 int inet_ntocidr (struct in_addr address);
-struct in_addr inet_cidrtoaddr (int cidr);
+int inet_cidrtoaddr (int cidr, struct in_addr *addr);
 
 #endif

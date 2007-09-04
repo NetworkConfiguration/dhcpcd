@@ -3,8 +3,6 @@ Edit config.h to match your building requirements.
 Take special note of ENABLE_DUID and unset it if the target media is 
 volatile, like say a LiveCD.
 
-Darwin users should edit the Makefile and enable dhcpcd_LIBS = -lresolv
-
 Then just make; make install
 
 man dhcpcd for command line options

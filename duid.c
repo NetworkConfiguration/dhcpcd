@@ -19,6 +19,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <arpa/inet.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdlib.h>

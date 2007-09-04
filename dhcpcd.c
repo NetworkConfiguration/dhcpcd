@@ -21,6 +21,7 @@
 
 /* We need to define this to get kill on GNU systems */
 #ifdef __linux__
+#define _BSD_SOURCE
 #define _POSIX_SOURCE
 #endif
 
@@ -60,6 +61,12 @@
 	else \
 	_int = (int) _number; \
 }
+
+#ifdef THERE_IS_NO_FORK
+char dhcpcd[PATH_MAX];
+char **dhcpcd_argv = NULL;
+int dhcpcd_argc = 0;
+#endif
 
 static pid_t read_pid (const char *pidfile)
 {
@@ -128,6 +135,9 @@ int main(int argc, char **argv)
 		{"nonis",       no_argument,        NULL, 'Y'},
 		{"help",        no_argument,        &dohelp, 1},
 		{"version",     no_argument,        &doversion, 1},
+#ifdef THERE_IS_NO_FORK
+		{"daemonised",	no_argument,		NULL, 'f'},
+#endif
 		{NULL,          0,                  NULL, 0}
 	};
 
@@ -185,6 +195,12 @@ int main(int argc, char **argv)
 						break;
 				}
 				break;
+#ifdef THERE_IS_NO_FORK
+			case 'f':
+				options.daemonised = true;
+				close_fds ();
+				break;
+#endif
 			case 'h':
 				if (! optarg)
 					memset (options.hostname, 0, sizeof (options.hostname));
@@ -228,6 +244,7 @@ int main(int argc, char **argv)
 				break;
 			case 's':
 				options.doinform = true;
+				options.doarp = false;
 				if (! optarg || strlen (optarg) == 0) {
 					options.request_address.s_addr = 0;
 					break;
@@ -238,11 +255,11 @@ int main(int argc, char **argv)
 						/* nullify the slash, so the -r option can read the
 						 * address */
 						*slash++ = '\0';
-						if (sscanf (slash, "%d", &cidr) != 1) {
+						if (sscanf (slash, "%d", &cidr) != 1 ||
+							inet_cidrtoaddr (cidr, &options.request_netmask) != 0) {
 							logger (LOG_ERR, "`%s' is not a valid CIDR", slash);
 							exit (EXIT_FAILURE);
 						}
-						options.request_netmask = inet_cidrtoaddr (cidr);
 					}
 					/* fall through */
 				}
@@ -368,6 +385,24 @@ int main(int argc, char **argv)
 	if (dohelp)
 		usage ();
 
+#ifdef THERE_IS_NO_FORK
+	dhcpcd_argv = argv;
+	dhcpcd_argc = argc;
+
+	/* We need the full path to the dhcpcd */
+	if (*argv[0] == '/')
+		strlcpy (dhcpcd, argv[0], sizeof (dhcpcd));
+	else {
+		char pwd[PATH_MAX];
+		if (! getcwd (pwd, PATH_MAX)) {
+			logger (LOG_ERR, "getcwd: %s", strerror (errno));
+			exit (EXIT_FAILURE);
+		}
+		snprintf (dhcpcd, sizeof (dhcpcd), "%s/%s", pwd, argv[0]);
+	}
+
+#endif
+
 	if (optind < argc) {
 		if (strlen (argv[optind]) > IF_NAMESIZE) {
 			logger (LOG_ERR, "`%s' is too long for an interface name (max=%d)",
@@ -408,7 +443,7 @@ int main(int argc, char **argv)
 
 	chdir ("/");
 	umask (022);
-
+	
 	if (mkdir (CONFIGDIR, S_IRUSR |S_IWUSR |S_IXUSR | S_IRGRP | S_IXGRP
 			   | S_IROTH | S_IXOTH) && errno != EEXIST )
 	{
@@ -440,7 +475,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (sig != 0 ) {
+	if (sig != 0) {
 		int killed = -1;
 		pid = read_pid (options.pidfile);
 		if (pid != 0)
@@ -459,7 +494,7 @@ int main(int argc, char **argv)
 			exit (EXIT_FAILURE);
 	}
 
-	if (! options.test) {
+	if (! options.test && ! options.daemonised) {
 		if ((pid = read_pid (options.pidfile)) > 0 && kill (pid, 0) == 0) {
 			logger (LOG_ERR, ""PACKAGE" already running on pid %d (%s)",
 					pid, options.pidfile);
@@ -489,12 +524,14 @@ int main(int argc, char **argv)
 	/* Seed random */
 	srandomdev ();
 
-	if (dhcp_run (&options, &pidfd)) {
-		if (pidfd > -1)
-			close (pidfd);
-		unlink (options.pidfile);
-		exit (EXIT_FAILURE);
-	}
+	i = EXIT_FAILURE;
+	if (dhcp_run (&options, &pidfd) == 0)
+		i = EXIT_SUCCESS;
 
-	exit (EXIT_SUCCESS);
+	logger (LOG_INFO, "exiting");
+	
+	if (pidfd > -1)
+		close (pidfd);
+
+	exit (i);
 }

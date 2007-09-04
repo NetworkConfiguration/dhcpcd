@@ -1,3 +1,10 @@
+Many thanks to Michael Durrant for testing the below changes.
+Compile and work on OSX/Darwin.
+If we have no fork then we re-exec ourselves with --daemonised.
+Improved the build system so we automatically detect if we need
+librt or libresolv and if fork() works or not.
+Move back to using librt for clock_gettime on Linux systems.
+
 dhcpcd-3.1.5
 Fix the flushing of addresses on BSD systems.
 Rework get_time so that we don't link to librt on Linux.

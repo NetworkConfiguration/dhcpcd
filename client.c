@@ -19,7 +19,9 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+
 #ifdef __linux__
+# define _BSD_SOURCE
 # define _XOPEN_SOURCE 500 /* needed for pwrite */
 #endif
 
@@ -66,6 +68,12 @@
 # include "info.h"
 #endif
 
+#ifdef THERE_IS_NO_FORK
+# ifndef ENABLE_INFO
+#  error "Non MMU requires ENABLE_INFO to work"
+# endif
+#endif
+
 /* We need this for our maximum timeout as FreeBSD's select cannot handle
    any higher than this. Is there a better way of working this out? */
 #define SELECT_MAX              100000000
@@ -104,40 +112,68 @@
 }
 
 #define DROP_CONFIG { \
-	if (! options->persistent) \
+	if (! persistent) \
 	configure (options, iface, dhcp, false); \
 	free_dhcp (dhcp); \
 	memset (dhcp, 0, sizeof (dhcp_t)); \
 }
 
-static bool daemonise (int *pidfd)
+static pid_t daemonise (int *pidfd)
 {
-	char pid[16];
+	pid_t pid;
+	char spid[16];
 
+#ifndef THERE_IS_NO_FORK
 	logger (LOG_DEBUG, "forking to background");
-
-	if (daemon (0, 0) == -1) {
-		logger (LOG_ERR, "daemon: %s", strerror (errno));
-		return (false);
+	if ((pid = fork()) == -1) {
+		logger (LOG_ERR, "fork: %s", strerror (errno));
+		exit (EXIT_FAILURE);
 	}
 
-	if (ftruncate (*pidfd, 0) == -1) {
-		logger (LOG_ERR, "ftruncate: %s", strerror (errno));
-		return (false);
+	setsid ();
+	close_fds ();
+#else
+	char **argv;
+	int i;
+
+	logger (LOG_INFO, "forking to background");
+
+	/* We need to add --daemonise to our options */
+	argv = xmalloc (sizeof (char *) * (dhcpcd_argc + 2));
+	for (i = 0; i < dhcpcd_argc; i++)
+		argv[i] = dhcpcd_argv[i];
+	argv[i] = (char *) "--daemonised";
+	argv[i + 1] = NULL;
+
+	switch (pid = vfork ()) {
+		case -1:
+			logger (LOG_ERR, "vfork: %s", strerror (errno));
+			_exit (EXIT_FAILURE);
+		case 0:
+			execvp (dhcpcd, argv);
+			logger (LOG_ERR, "execl `%s': %s", dhcpcd, strerror (errno));
+			_exit (EXIT_FAILURE);
 	}
 
-	snprintf (pid, sizeof (pid), "%u", getpid());
-	if (pwrite (*pidfd, pid, strlen(pid), 0) != (ssize_t) strlen (pid)) {
-		logger (LOG_ERR, "pwrite: %s", strerror (errno));
-		return (false);
+	free (argv);
+#endif
+
+	if (pid != 0) {
+		if (ftruncate (*pidfd, 0) == -1) {
+			logger (LOG_ERR, "ftruncate: %s", strerror (errno));
+		} else {
+			snprintf (spid, sizeof (spid), "%u", pid);
+			if (pwrite (*pidfd, spid, strlen (spid), 0) != (ssize_t) strlen (spid))
+				logger (LOG_ERR, "pwrite: %s", strerror (errno));
+		}
 	}
-	
-	return (true);
+
+	return (pid);
 }
 
 #ifdef ENABLE_INFO
 static bool get_old_lease (const options_t *options, interface_t *iface,
-						   dhcp_t *dhcp, long *timeout)
+						   dhcp_t *dhcp, time_t *timeout)
 {
 	struct timeval tv;
 	unsigned int offset = 0;
@@ -201,7 +237,7 @@ int dhcp_run (const options_t *options, int *pidfd)
 	int state = STATE_INIT;
 	struct timeval tv;
 	int xid = 0;
-	long timeout = 0;
+	time_t timeout = 0;
 	fd_set rset;
 	int maxfd;
 	int retval;
@@ -209,9 +245,10 @@ int dhcp_run (const options_t *options, int *pidfd)
 	dhcp_t *dhcp;
 	int type = DHCP_DISCOVER;
 	int last_type = DHCP_DISCOVER;
-	bool daemonised = false;
-	unsigned long start = 0;
-	unsigned long last_send = 0;
+	bool daemonised = options->daemonised;
+	bool persistent = options->persistent;
+	time_t start = 0;
+	time_t last_send = 0;
 	int sig;
 	unsigned char *buffer = NULL;
 	int buffer_len = 0;
@@ -234,7 +271,7 @@ int dhcp_run (const options_t *options, int *pidfd)
 	memset (dhcp, 0, sizeof (dhcp_t));
 
 	if (options->request_address.s_addr == 0 &&
-		(options->doinform || options->dorequest))
+		(options->doinform || options->dorequest || options->daemonised))
 	{
 #ifdef ENABLE_INFO
 		if (! get_old_lease (options, iface, dhcp, NULL))
@@ -243,6 +280,35 @@ int dhcp_run (const options_t *options, int *pidfd)
 			free (dhcp);
 			return (-1);
 		}
+
+#ifdef THERE_IS_NO_FORK
+		if (options->daemonised) {
+			state = STATE_BOUND;
+			timeout = dhcp->renewaltime;
+			iface->previous_address = dhcp->address;
+			iface->previous_netmask = dhcp->netmask;
+
+			/* FIXME: Some routes may not be added for whatever reason.
+			 * This is especially true on BSD platforms where we can only
+			 * have one default route. */
+			if (dhcp->routes) {
+				route_t *droute;
+				route_t *iroute;
+				
+				free_route (iface->previous_routes);
+
+				iroute = iface->previous_routes = xmalloc (sizeof (route_t));
+				for (droute = dhcp->routes; droute; droute = droute->next) {
+					memcpy (iroute, droute, sizeof (route_t));
+					if (droute->next) {
+						iroute->next = xmalloc (sizeof (route_t));
+						iroute = iroute->next;
+					}
+				}
+			}
+		}
+#endif
+
 	} else {
 		dhcp->address = options->request_address;
 		dhcp->netmask = options->request_netmask;
@@ -255,7 +321,7 @@ int dhcp_run (const options_t *options, int *pidfd)
 	   After all, we ARE a DHCP client whose job it is to configure the
 	   interface. We only do this on start, so persistent addresses can be added
 	   afterwards by the user if needed. */
-	if (! options->test) {
+	if (! options->test && ! options->daemonised) {
 		if (! options->doinform)
 			flush_addresses (iface->name);
 		else {
@@ -308,7 +374,7 @@ int dhcp_run (const options_t *options, int *pidfd)
 					SEND_MESSAGE (last_type);
 
 				logger (LOG_DEBUG, "waiting on select for %ld seconds",
-						timeout);
+						(unsigned long) timeout);
 				/* If we're waiting for a reply, then we re-send the last
 				   DHCP request periodically in-case of a bad line */
 				retval = 0;
@@ -452,11 +518,18 @@ int dhcp_run (const options_t *options, int *pidfd)
 
 							state = STATE_BOUND;
 							if (! daemonised && options->daemonise) {
-								if ((daemonise (pidfd)) == -1) {
-									retval = EXIT_FAILURE;
-									goto eexit;
+								switch (daemonise (pidfd)) {
+									case -1:
+										retval = EXIT_FAILURE;
+										goto eexit;
+									case 0:
+										daemonised = true;
+										break;
+									default:
+										persistent = true;
+										retval = EXIT_SUCCESS;
+										goto eexit;
 								}
-								daemonised = true;
 							}
 
 							timeout = dhcp->renewaltime;
@@ -741,17 +814,26 @@ int dhcp_run (const options_t *options, int *pidfd)
 
 						xid = 0;
 
-						if (configure (options, iface, dhcp, true) == -1 && ! daemonised) {
+						if (configure (options, iface, dhcp, true) == -1 &&
+							! daemonised)
+						{
 							retval = EXIT_FAILURE;
 							goto eexit;
 						}
 
 						if (! daemonised && options->daemonise) {
-							if ((daemonise (pidfd)) == -1 ) {
-								retval = EXIT_FAILURE;
-								goto eexit;
+							switch (daemonise (pidfd)) {
+								case -1:
+									retval = EXIT_FAILURE;
+									goto eexit;
+								case 0:
+									daemonised = true;
+									break;
+								default:
+									persistent = true;
+									retval = EXIT_SUCCESS;
+									goto eexit;
 							}
-							daemonised = true;
 						}
 					} else if (type == DHCP_OFFER)
 						logger (LOG_INFO, "got subsequent offer of %s, ignoring ",
@@ -778,8 +860,7 @@ eexit:
 	free (dhcp);
 
 	if (iface) {
-		if (iface->previous_routes)
-			free_route (iface->previous_routes);
+		free_route (iface->previous_routes);
 		free (iface);
 	}
 
@@ -791,10 +872,8 @@ eexit:
 		*pidfd = -1;
 	}
 
-	logger (LOG_INFO, "exiting");
-
-	/* Unlink our pidfile */
-	unlink (options->pidfile);
+	if (daemonised)
+		unlink (options->pidfile);
 
 	return retval;
 }

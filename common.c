@@ -21,9 +21,12 @@
 
 #include <sys/time.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "common.h"
 #include "logger.h"
@@ -31,14 +34,13 @@
 /* OK, this should be in dhcpcd.c
  * It's here to make dhcpcd more readable */
 #ifdef __linux__
-#include <fcntl.h>
-#include <unistd.h>
-void srandomdev (void) {
+void srandomdev (void)
+{
 	int fd;
 	unsigned long seed;
 
 	fd = open ("/dev/urandom", 0);
-	if (fd == -1 || read (fd,  &seed, sizeof(seed)) == -1) {
+	if (fd == -1 || read (fd,  &seed, sizeof (seed)) == -1) {
 		logger (LOG_WARNING, "Could not load seed from /dev/urandom: %s",
 				strerror (errno));
 		seed = time (0);
@@ -67,8 +69,7 @@ size_t strlcpy (char *dst, const char *src, size_t size)
 	if (! n) {
 		if (size)
 			*dst = '\0';
-		while (*src++)
-			;
+		while (*src++);
 	}
 
 	return (src - s - 1);
@@ -76,57 +77,31 @@ size_t strlcpy (char *dst, const char *src, size_t size)
 #  endif
 #endif
 
-/* This requires us to link to rt on glibc, so we use sysinfo instead */
-#ifdef __linux__
-#include <sys/sysinfo.h>
-/* Avoid clock_gettime as it requires librt on Linux */
-#undef CLOCK_MONOTONIC
-long uptime (void)
+/* Close our fd's */
+void close_fds (void)
 {
-	struct sysinfo info;
+	int fd;
 
-	sysinfo (&info);
-	return info.uptime;
-}
-#elif CLOCK_MONOTONIC
-long uptime (void)
-{
-	struct timespec tp;
-
-	if (clock_gettime (CLOCK_MONOTONIC, &tp) == -1) {
-		logger (LOG_ERR, "clock_gettime: %s", strerror (errno));
-		return -1;
+	if ((fd = open ("/dev/null", O_RDWR)) == -1) {
+		logger (LOG_ERR, "open `/dev/null': %s", strerror (errno));
+		return;
 	}
 
-	return tp.tv_sec;
+	dup2 (fd, fileno (stdin));
+	dup2 (fd, fileno (stdout));
+	dup2 (fd, fileno (stderr));
+	if (fd > 2)
+		close (fd);
 }
-#else
-/* Darwin doesn't appear to have an uptime, so try and make one ourselves */
-long uptime (void)
-{
-	struct timeval tv;
-	static long start = 0;
-
-	if (gettimeofday (&tv, NULL) == -1) {
-		logger (LOG_ERR, "gettimeofday: %s", strerror (errno));
-		return -1;
-	}
-
-	if (start == 0)
-		start = tv.tv_sec;
-
-	return tv.tv_sec - start;
-}
-#endif
 
 /* Handy function to get the time.
  * We only care about time advancements, not the actual time itself
  * Which is why we use CLOCK_MONOTONIC, but it is not available on all
  * platforms.
  */
-#ifdef CLOCK_MONOTONIC 
 int get_time (struct timeval *tp)
 {
+#ifdef CLOCK_MONOTONIC
 	struct timespec ts;
 
 	if (clock_gettime (CLOCK_MONOTONIC, &ts) == -1) {
@@ -137,17 +112,24 @@ int get_time (struct timeval *tp)
 	tp->tv_sec = ts.tv_sec;
 	tp->tv_usec = ts.tv_nsec / 1000;
 	return (0);
-}
 #else
-int get_time (struct timeval *tp)
-{
 	if (gettimeofday (tp, NULL) == -1) {
 		logger (LOG_ERR, "gettimeofday: %s", strerror (errno));
 		return (-1);
 	}
 	return (0);
-}
 #endif
+}
+
+time_t uptime (void)
+{
+	struct timeval tp;
+
+	if (get_time (&tp) == -1)
+		return (-1);
+
+	return (tp.tv_sec);
+}
 
 void *xmalloc (size_t s)
 {

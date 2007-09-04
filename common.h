@@ -37,8 +37,9 @@ size_t strlcpy (char *dst, const char *src, size_t size);
 void srandomdev (void);
 #endif
 
+void close_fds (void);
 int get_time (struct timeval *tp);
-long uptime (void);
+time_t uptime (void);
 void *xmalloc (size_t size);
 char *xstrdup (const char *str);
 

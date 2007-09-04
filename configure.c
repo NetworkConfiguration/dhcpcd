@@ -28,7 +28,7 @@
 
 #include <netinet/in.h>
 #ifdef __linux__
-#include <netinet/ether.h>
+# include <netinet/ether.h>
 #endif
 #include <string.h>
 #include <errno.h>
@@ -43,7 +43,7 @@
 #include "configure.h"
 #include "dhcp.h"
 #ifdef ENABLE_INFO
-#include "info.h"
+# include "info.h"
 #endif
 #include "interface.h"
 #include "dhcpcd.h"
@@ -62,11 +62,7 @@ static int exec_cmd (const char *cmd, const char *args, ...)
 	while (va_arg (va, char *) != NULL)
 		n++;
 	va_end (va);
-	argv = alloca ((n + 1) * sizeof (*argv));
-	if (argv == NULL) {
-		errno = ENOMEM;
-		return (-1);
-	}
+	argv = xmalloc (sizeof (char *) * (n + 2));
 
 	va_start (va, args);
 	n = 2;
@@ -81,9 +77,13 @@ static int exec_cmd (const char *cmd, const char *args, ...)
 			logger (LOG_ERR, "error executing \"%s\": %s",
 					cmd, strerror (errno));
 		_exit (0);
-	} else if (pid == -1)
+	} else if (pid == -1) {
 		logger (LOG_ERR, "vfork: %s", strerror (errno));
+		free (argv);
+		return (-1);
+	}
 
+	free (argv);
 	return (0);
 }
 
