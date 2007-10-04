@@ -66,6 +66,7 @@
 char dhcpcd[PATH_MAX];
 char **dhcpcd_argv = NULL;
 int dhcpcd_argc = 0;
+char *dhcpcd_skiproutes = NULL;
 #endif
 
 static pid_t read_pid (const char *pidfile)
@@ -137,6 +138,7 @@ int main(int argc, char **argv)
 		{"version",     no_argument,        &doversion, 1},
 #ifdef THERE_IS_NO_FORK
 		{"daemonised",	no_argument,		NULL, 'f'},
+		{"skiproutes",  required_argument,	NULL, 'g'},
 #endif
 		{NULL,          0,                  NULL, 0}
 	};
@@ -199,6 +201,9 @@ int main(int argc, char **argv)
 			case 'f':
 				options.daemonised = true;
 				close_fds ();
+				break;
+			case 'g':
+				dhcpcd_skiproutes = xstrdup (optarg);
 				break;
 #endif
 			case 'h':
@@ -527,6 +532,12 @@ int main(int argc, char **argv)
 	i = EXIT_FAILURE;
 	if (dhcp_run (&options, &pidfd) == 0)
 		i = EXIT_SUCCESS;
+
+#ifdef THERE_IS_NO_FORK
+	/* There may have been an error before the dhcp_run function
+	 * clears this, so just do it here to be safe */
+	free (dhcpcd_skiproutes);
+#endif
 
 	logger (LOG_INFO, "exiting");
 	

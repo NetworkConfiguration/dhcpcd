@@ -19,6 +19,10 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#ifdef __linux__
+# define _GNU_SOURCE /* for asprinf */
+#endif
+
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
@@ -433,10 +437,18 @@ int configure (const options_t *options, interface_t *iface,
 	}
 #endif
 
+#ifdef THERE_IS_NO_FORK
+	free (dhcpcd_skiproutes);
+	dhcpcd_skiproutes = NULL;
+#endif
+
 	/* Remember added routes */
 	if (dhcp->routes) {
 		route_t *new_routes = NULL;
 		int remember;
+#ifdef THERE_IS_NO_FORK
+		int skip = 0;
+#endif
 
 		for (route = dhcp->routes; route; route = route->next) {
 			/* Don't set default routes if not asked to */
@@ -472,6 +484,21 @@ int configure (const options_t *options, interface_t *iface,
 				memcpy (new_route, route, sizeof (route_t));
 				new_route -> next = NULL;
 			}
+#ifdef THERE_IS_NO_FORK
+			/* If we have daemonised yet we need to record which routes
+			 * we failed to add so we can skip them */
+			else if (! options->daemonised) {
+				if (dhcpcd_skiproutes) {
+					char *p = NULL;
+					asprintf (&p, "%s,%d", dhcpcd_skiproutes, skip);
+					free (dhcpcd_skiproutes);
+					dhcpcd_skiproutes = p;
+				} else {
+					asprintf (&dhcpcd_skiproutes, "%d", skip);
+				}
+			}
+			skip++;
+#endif
 		}
 
 		if (iface->previous_routes)

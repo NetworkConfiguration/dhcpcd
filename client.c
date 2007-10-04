@@ -32,6 +32,7 @@
 #ifdef __linux__
 # include <netinet/ether.h>
 #endif
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -139,10 +140,14 @@ static pid_t daemonise (int *pidfd)
 	logger (LOG_INFO, "forking to background");
 
 	/* We need to add --daemonise to our options */
-	argv = xmalloc (sizeof (char *) * (dhcpcd_argc + 2));
+	argv = xmalloc (sizeof (char *) * (dhcpcd_argc + 4));
 	for (i = 0; i < dhcpcd_argc; i++)
 		argv[i] = dhcpcd_argv[i];
 	argv[i] = (char *) "--daemonised";
+	if (dhcpcd_skiproutes) {
+		argv[++i] = (char *) "--skiproutes";
+		argv[++i] = dhcpcd_skiproutes;
+	}
 	argv[i + 1] = NULL;
 
 	switch (pid = vfork ()) {
@@ -292,19 +297,45 @@ int dhcp_run (const options_t *options, int *pidfd)
 			 * This is especially true on BSD platforms where we can only
 			 * have one default route. */
 			if (dhcp->routes) {
+				int i = -1;
 				route_t *droute;
-				route_t *iroute;
+				route_t *iroute = NULL;
 				
 				free_route (iface->previous_routes);
 
-				iroute = iface->previous_routes = xmalloc (sizeof (route_t));
 				for (droute = dhcp->routes; droute; droute = droute->next) {
+					i++;
+					
+					/* Check that we did add this route or not */
+					if (dhcpcd_skiproutes) {
+						char *sk = xstrdup (dhcpcd_skiproutes);
+						char *skp = sk;
+						char *token;
+						bool found = false;
+
+						while ((token = strsep (&skp, ","))) {
+							if (isdigit (*token) && atoi (token) == i) {
+								found = true;
+								break;
+							}
+						}
+						free (sk);
+						if (found)
+							continue;
+					}
+
+					if (! iroute)
+						iroute = iface->previous_routes = xmalloc (sizeof (route_t));
 					memcpy (iroute, droute, sizeof (route_t));
 					if (droute->next) {
 						iroute->next = xmalloc (sizeof (route_t));
 						iroute = iroute->next;
 					}
 				}
+
+				/* We no longer need this argument */
+				free (dhcpcd_skiproutes);
+				dhcpcd_skiproutes = NULL;
 			}
 		}
 #endif
@@ -478,16 +509,18 @@ int dhcp_run (const options_t *options, int *pidfd)
 						free_dhcp (dhcp);
 						memset (dhcp, 0, sizeof (dhcp_t));
 #ifdef ENABLE_INFO
-						if (! options->test && 
-							! get_old_lease (options, iface, dhcp, &timeout))
+						if (! options->test &&
+							(options->doipv4ll || options->dolastlease))
 						{
-							if (options->dolastlease) {
-								retval = EXIT_FAILURE;
-								goto eexit;
+							if (! get_old_lease (options, iface, dhcp, &timeout))
+							{
+								if (options->dolastlease) {
+									retval = EXIT_FAILURE;
+									goto eexit;
+								}
+								free_dhcp (dhcp);
+								memset (dhcp, 0, sizeof (dhcp_t));
 							}
-
-							free_dhcp (dhcp);
-							memset (dhcp, 0, sizeof (dhcp_t));
 						}
 #endif
 

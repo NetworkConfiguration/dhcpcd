@@ -36,10 +36,11 @@
 #define CLIENT_ID_MAX_LEN   48
 #define USERCLASS_MAX_LEN   255
 
-#ifndef HAVE_FORK
+#ifdef THERE_IS_NO_FORK 
 extern char dhcpcd[PATH_MAX];
 extern char **dhcpcd_argv;
 extern int dhcpcd_argc;
+extern char *dhcpcd_skiproutes;
 #endif
 
 typedef struct options_t {
