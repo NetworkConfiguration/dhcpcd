@@ -3,7 +3,7 @@
 # such as the need to link to libresolv and/or librt so please forgive the
 # embedded code :)
 
-VERSION = 3.1.6_pre8
+VERSION = 3.1.6
 CFLAGS += -O2 -pipe
 
 INSTALL ?= install
