@@ -149,9 +149,9 @@ Sends
 .B DHCP_REQUEST
 message requesting to lease IP address ipaddr.
 The ipaddr parameter must be in the form xxx.xxx.xxx.xxx.
-If we are not given an ipaddr then we try use one assigned the the
-interface if present, otherwise the last address we leased for the
-interface, otherwise we error.
+If we are not given an ipaddr then we try to use the first one assigned
+to the interface if present, otherwise the last address we leased for the
+interface, otherwise we return an error.
 This effectively doubles the timeout period, as if we fail to get
 this IP address then we enter the INIT state and try to get any
 IP address.
