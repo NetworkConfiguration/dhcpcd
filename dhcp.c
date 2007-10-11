@@ -59,10 +59,10 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 					 unsigned long xid, char type,
 					 const options_t *options)
 {
-	dhcpmessage_t message;
-	struct udp_dhcp_packet packet;
-	unsigned char *m = (unsigned char *) &message;
-	unsigned char *p = (unsigned char *) &message.options;
+	struct udp_dhcp_packet *packet;
+	dhcpmessage_t *message;
+	unsigned char *m;
+	unsigned char *p;
 	unsigned char *n_params = NULL;
 	unsigned long l;
 	struct in_addr from;
@@ -71,6 +71,7 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 	uint32_t ul;
 	uint16_t sz;
 	unsigned int message_length;
+	size_t retval;
 
 	if (!iface || !options || !dhcp)
 		return -1;
@@ -81,49 +82,52 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 	if (type == DHCP_RELEASE)
 		to.s_addr = dhcp->serveraddress.s_addr;
 
-	memset (&message, 0, sizeof (dhcpmessage_t));
+	message = xmalloc (sizeof (dhcpmessage_t));
+	memset (message, 0, sizeof (dhcpmessage_t));
+	m = (unsigned char *) message;
+	p = (unsigned char *) &message->options;
 
 	if (type == DHCP_INFORM ||
 		type == DHCP_RELEASE ||
 		type == DHCP_REQUEST)
 	{
-		message.ciaddr = iface->previous_address.s_addr;
+		message->ciaddr = iface->previous_address.s_addr;
 		from.s_addr = iface->previous_address.s_addr;
 
 		/* Just incase we haven't actually configured the address yet */
 		if (type == DHCP_INFORM && iface->previous_address.s_addr == 0)
-			message.ciaddr = dhcp->address.s_addr;
-
+			message->ciaddr = dhcp->address.s_addr;
+		
 		/* Zero the address if we're currently on a different subnet */
 		if (type == DHCP_REQUEST &&
 			iface->previous_netmask.s_addr != dhcp->netmask.s_addr)
 			message->ciaddr = from.s_addr = 0;
 	}
 
-	message.op = DHCP_BOOTREQUEST;
-	message.hwtype = iface->family;
+	message->op = DHCP_BOOTREQUEST;
+	message->hwtype = iface->family;
 	switch (iface->family) {
 		case ARPHRD_ETHER:
 		case ARPHRD_IEEE802:
-			message.hwlen = ETHER_ADDR_LEN;
-			memcpy (&message.chaddr, &iface->hwaddr, ETHER_ADDR_LEN);
+			message->hwlen = ETHER_ADDR_LEN;
+			memcpy (&message->chaddr, &iface->hwaddr, ETHER_ADDR_LEN);
 			break;
 		case ARPHRD_IEEE1394:
 		case ARPHRD_INFINIBAND:
-			if (message.ciaddr == 0)
-				message.flags = (int16_t) htons (BROADCAST_FLAG);
-			message.hwlen = 0;
+			if (message->ciaddr == 0)
+				message->flags = (int16_t) htons (BROADCAST_FLAG);
+			message->hwlen = 0;
 			break;
 		default:
 			logger (LOG_ERR, "dhcp: unknown hardware type %d", iface->family);
 	}
 
 	if (up < 0 || up > UINT16_MAX)
-		message.secs = htons ((short) UINT16_MAX);
+		message->secs = htons ((short) UINT16_MAX);
 	else
-		message.secs = htons (up);
-	message.xid = xid;
-	message.cookie = htonl (MAGIC_COOKIE);
+		message->secs = htons (up);
+	message->xid = xid;
+	message->cookie = htonl (MAGIC_COOKIE);
 
 	*p++ = DHCP_MESSAGETYPE; 
 	*p++ = 1;
@@ -144,19 +148,19 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 
 	if (type != DHCP_INFORM) {
 #define PUTADDR(_type, _val) \
-	{ \
-		*p++ = _type; \
-		*p++ = 4; \
-		memcpy (p, &_val.s_addr, 4); \
-		p += 4; \
-	}
-	if (dhcp->address.s_addr != 0 && iface->previous_address.s_addr == 0
-		&& type != DHCP_RELEASE)
-		PUTADDR (DHCP_ADDRESS, dhcp->address);
+		{ \
+			*p++ = _type; \
+			*p++ = 4; \
+			memcpy (p, &_val.s_addr, 4); \
+			p += 4; \
+		}
+		if (dhcp->address.s_addr != iface->previous_address.s_addr &&
+			type != DHCP_RELEASE)
+			PUTADDR (DHCP_ADDRESS, dhcp->address);
 
-	if (dhcp->serveraddress.s_addr != 0 && dhcp->address.s_addr !=0 &&
-		(iface->previous_address.s_addr == 0 || type == DHCP_RELEASE))
-		PUTADDR (DHCP_SERVERIDENTIFIER, dhcp->serveraddress);
+		if (dhcp->serveraddress.s_addr != 0 && dhcp->address.s_addr !=0 &&
+			(iface->previous_address.s_addr == 0 || type == DHCP_RELEASE))
+			PUTADDR (DHCP_SERVERIDENTIFIER, dhcp->serveraddress);
 #undef PUTADDR
 	}
 
@@ -290,14 +294,19 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 
 	message_length = p - m;
 
-	memset (&packet, 0, sizeof (struct udp_dhcp_packet));
-	make_dhcp_packet (&packet, (unsigned char *) &message, message_length,
+	packet = xmalloc (sizeof (struct udp_dhcp_packet));
+	memset (packet, 0, sizeof (struct udp_dhcp_packet));
+	make_dhcp_packet (packet, (unsigned char *) message, message_length,
 					  from, to);
+	free (message);
 
-	logger (LOG_DEBUG, "sending %s with xid 0x%lx", dhcp_message[(int) type], xid);
-	return send_packet (iface, ETHERTYPE_IP, (unsigned char *) &packet,
-						message_length + sizeof (struct ip) +
-						sizeof (struct udphdr));
+	logger (LOG_DEBUG, "sending %s with xid 0x%lx",
+			dhcp_message[(int) type], xid);
+	retval = send_packet (iface, ETHERTYPE_IP, (unsigned char *) packet,
+						  message_length + sizeof (struct ip) +
+						  sizeof (struct udphdr));
+	free (packet);
+	return (retval);
 }
 
 /* Decode an RFC3397 DNS search order option into a space

@@ -39,6 +39,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -68,7 +69,6 @@ static uint16_t checksum (unsigned char *addr, uint16_t len)
 		sum += *p.i++;
 		nleft -= 2;
 	}
-
 
 	if (nleft == 1) {
 		uint8_t a = 0;
@@ -234,16 +234,18 @@ int open_socket (interface_t *iface, bool arp)
 {
 	int n = 0;
 	int fd = -1;
-	char device[PATH_MAX];
+	char *device;
 	int flags;
 	struct ifreq ifr;
 	int buf = 0;
 	struct bpf_program p;
 
+	device = xmalloc (sizeof (char *) * PATH_MAX);
 	do {
 		snprintf (device, PATH_MAX, "/dev/bpf%d",  n++);
 		fd = open (device, O_RDWR);
 	} while (fd == -1 && errno == EBUSY);
+	free (device);
 
 	if (fd == -1) {
 		logger (LOG_ERR, "unable to open a BPF device");

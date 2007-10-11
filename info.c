@@ -37,11 +37,13 @@
 #include "info.h"
 
 #ifdef ENABLE_INFO
+#define BUFFERSIZE 1024
+
 static char *cleanmetas (const char *cstr)
 {
 	/* The largest single element we can have is 256 bytes according to the RFC,
 	   so this buffer size should be safe even if it's all ' */
-	static char buffer[1024]; 
+	static char buffer[BUFFERSIZE]; 
 	char *b = buffer;
 
 	memset (buffer, 0, sizeof (buffer));
@@ -193,10 +195,11 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 		fprintf (f, "CLIENTID='00:%s'\n", cleanmetas (options->clientid));
 #ifdef ENABLE_DUID
 	else if (iface->duid_length > 0 && options->clientid_len != -1) {
-		unsigned char duid[256];
-		unsigned char *p = duid;
+		unsigned char *duid;
+		unsigned char *p;
 		uint32_t ul;
 
+		p = duid = xmalloc (iface->duid_length + 6);
 		*p++ = 255;
 
 		/* IAID is 4 bytes, so if the interface name is 4 bytes then use it */
@@ -213,6 +216,7 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 		p += iface->duid_length;
 
 		fprintf (f, "CLIENTID='%s'\n", hwaddr_ntoa (duid, p - duid));
+		free (duid);
 	}
 #endif
 	else
@@ -317,7 +321,7 @@ static bool parse_addresses (address_t **address, char *value, const char *var)
 bool read_info (const interface_t *iface, dhcp_t *dhcp)
 {
 	FILE *fp;
-	char buffer[1024];
+	char *buffer;
 	char *var;
 	char *value;
 	char *p;
@@ -336,8 +340,9 @@ bool read_info (const interface_t *iface, dhcp_t *dhcp)
 
 	dhcp->frominfo = true;
 
-	memset (buffer, 0, sizeof (buffer));
-	while ((fgets (buffer, sizeof (buffer), fp))) {
+	buffer = xmalloc (sizeof (char *) * BUFFERSIZE);
+	memset (buffer, 0, BUFFERSIZE);
+	while ((fgets (buffer, BUFFERSIZE, fp))) {
 		var = buffer;
 
 		/* Strip leading spaces/tabs */
@@ -474,6 +479,7 @@ bool read_info (const interface_t *iface, dhcp_t *dhcp)
 	}
 
 	fclose (fp);
+	free (buffer);
 	return (true);
 }
 
