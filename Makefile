@@ -3,7 +3,7 @@
 # such as the need to link to libresolv and/or librt so please forgive the
 # embedded code :)
 
-VERSION = 3.1.6
+VERSION = 3.1.7_pre1
 CFLAGS += -O2 -pipe
 
 INSTALL ?= install
@@ -24,6 +24,7 @@ _LIBRESOLV_SH = printf '\#include <netinet/in.h>\n\#include <resolv.h>\nint main
 		echo "-lresolv"; \
 	else \
 		echo "Cannot work out how to get res_init to link" >&2; \
+		rm -f .res_init.c .res_init; \
 		exit 1; \
 	fi; \
 	rm -f .res_init.c .res_init
@@ -38,6 +39,7 @@ _LIBRT_SH = printf '\#include <time.h>\nint main (void) { struct timespec ts; re
 		echo "-lrt"; \
 	else \
 		echo "Cannot work out how to get clock_gettime to link" >&2; \
+		rm -f .clock_gettime.c .clock_gettime; \
 		exit 1; \
 	fi; \
 	rm -f .clock_gettime.c .clock_gettime
