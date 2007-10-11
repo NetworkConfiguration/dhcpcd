@@ -41,6 +41,7 @@
 #include "arp.h"
 #include "interface.h"
 #include "logger.h"
+#include "signals.h"
 #include "socket.h"
 
 /* These are really for IPV4LL */
@@ -130,6 +131,7 @@ int arp_claim (interface_t *iface, struct in_addr address)
 		fd_set rset;
 		int bytes;
 		int s = 0;
+		int maxfd;
 		struct timeval stopat;
 		struct timeval now;
 
@@ -138,20 +140,15 @@ int arp_claim (interface_t *iface, struct in_addr address)
 			tv.tv_sec = 0; 
 			tv.tv_usec = timeout;
 
-			FD_ZERO (&rset);
-			FD_SET (iface->fd, &rset);
-
-			if ((s = select (iface->fd + 1, &rset, NULL, NULL, &tv)) == -1) {
-				/* If anyone can explain why we get an EINTR when probing
-				 * for an ip address we don't have assigned, I'd like to here
-				 * from you - hopefully with a patch or info on how to fix.
-				 * Note, no signal is really received, so it's probably a
-				 * bogus error as we've done something wrong somewhere.
-				 * Until then, we ignore it and continue. Or timeout an flood
-				 * protection should be robust enough to cater for this.
-				 * This happens on both Linux and FreeBSD. */
-				if (errno == EINTR)
-					continue;
+			maxfd = signal_fd_set (&rset, iface->fd);
+			if ((s = select (maxfd + 1, &rset, NULL, NULL, &tv)) == -1) {
+				if (errno == EINTR) {
+					if (signal_read (NULL) == -1) {
+						errno = 0;
+						continue;
+					} else
+						break;
+				}
 				
 				logger (LOG_ERR, "select: `%s'", strerror (errno));
 				break;
@@ -164,12 +161,16 @@ int arp_claim (interface_t *iface, struct in_addr address)
 				nprobes ++;
 				timeout = PROBE_INTERVAL;
 				logger (LOG_DEBUG, "sending ARP probe #%d", nprobes);
-				send_arp (iface, ARPOP_REQUEST, null_address, NULL, address);
+				if (send_arp (iface, ARPOP_REQUEST,
+							  null_address, NULL, address) == -1)
+					break;
 			} else if (nclaims < NCLAIMS) {
 				nclaims ++;
 				timeout = CLAIM_INTERVAL;
 				logger (LOG_DEBUG, "sending ARP claim #%d", nclaims);
-				send_arp (iface, ARPOP_REQUEST, address, iface->hwaddr, address);
+				if (send_arp (iface, ARPOP_REQUEST,
+							  address, iface->hwaddr, address) == -1)
+					break;
 			} else {
 				/* No replies, so done */
 				retval = 0;
