@@ -93,6 +93,11 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 		/* Just incase we haven't actually configured the address yet */
 		if (type == DHCP_INFORM && iface->previous_address.s_addr == 0)
 			message.ciaddr = dhcp->address.s_addr;
+
+		/* Zero the address if we're currently on a different subnet */
+		if (type == DHCP_REQUEST &&
+			iface->previous_netmask.s_addr != dhcp->netmask.s_addr)
+			message->ciaddr = from.s_addr = 0;
 	}
 
 	message.op = DHCP_BOOTREQUEST;
