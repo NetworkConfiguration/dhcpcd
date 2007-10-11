@@ -141,10 +141,19 @@ int arp_claim (interface_t *iface, struct in_addr address)
 			FD_ZERO (&rset);
 			FD_SET (iface->fd, &rset);
 
-			errno = 0;
-			if ((s = select (FD_SETSIZE, &rset, NULL, NULL, &tv)) == -1) {
-				if (errno != EINTR)
-					logger (LOG_ERR, "select: `%s'", strerror (errno));
+			if ((s = select (iface->fd + 1, &rset, NULL, NULL, &tv)) == -1) {
+				/* If anyone can explain why we get an EINTR when probing
+				 * for an ip address we don't have assigned, I'd like to here
+				 * from you - hopefully with a patch or info on how to fix.
+				 * Note, no signal is really received, so it's probably a
+				 * bogus error as we've done something wrong somewhere.
+				 * Until then, we ignore it and continue. Or timeout an flood
+				 * protection should be robust enough to cater for this.
+				 * This happens on both Linux and FreeBSD. */
+				if (errno == EINTR)
+					continue;
+				
+				logger (LOG_ERR, "select: `%s'", strerror (errno));
 				break;
 			}
 		}

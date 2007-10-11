@@ -1,3 +1,7 @@
+Skip over bogus EINTR error on select when arp checking for a
+different address from what we already have. This should not
+happen, so a better fix is probably needed.
+
 dhcpcd-3.1.6
 --skiproutes has been added for no fork users so that we know if we
 can delete the route at a later date.
