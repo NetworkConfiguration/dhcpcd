@@ -33,6 +33,7 @@
 #include "signals.h"
 
 static int signal_pipe[2];
+static int signal_signal = 0;
 
 static void signal_handler (int sig)
 {
@@ -44,6 +45,7 @@ static void signal_handler (int sig)
 		return;
 	}
 
+	signal_signal = sig;
 	if (send (signal_pipe[1], &sig, sizeof (sig), MSG_DONTWAIT) == -1)
 		logger (LOG_ERR, "Could not send signal: %s", strerror (errno));
 }
@@ -89,9 +91,12 @@ int signal_read (const fd_set *rfds)
 {
 	int sig;
 
-	if (! FD_ISSET (signal_pipe[0], rfds))
-		return 0;
+	if (signal_signal)
+		return signal_signal;
 
+	if (! rfds || ! FD_ISSET (signal_pipe[0], rfds))
+		return -1;
+	
 	if (read (signal_pipe[0], &sig, sizeof (sig)) == -1)
 		return -1;
 
