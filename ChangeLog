@@ -2,8 +2,7 @@ Reduce stack usage by using malloc more.
 If we're on a different subnet from the one we get DHCP for, don't
 use our current address in messages. Thanks to Wilson Callan.
 Skip over bogus EINTR error on select when arp checking for a
-different address from what we already have. This should not
-happen, so a better fix is probably needed.
+different address from what we already have.
 
 dhcpcd-3.1.6
 --skiproutes has been added for no fork users so that we know if we
