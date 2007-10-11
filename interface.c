@@ -271,7 +271,6 @@ interface_t *read_interface (const char *ifname, int metric)
 	if (! ifname)
 		return NULL;
 
-	memset (hwaddr, sizeof (hwaddr), 0);
 	memset (&ifr, 0, sizeof (struct ifreq));
 	strlcpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
 
@@ -304,7 +303,7 @@ interface_t *read_interface (const char *ifname, int metric)
 			goto exit;
 	}
 
-	hwaddr = xmalloc (sizeof (unsigned char *) * HWADDR_LEN);
+	hwaddr = xmalloc (sizeof (unsigned char) * HWADDR_LEN);
 	memcpy (hwaddr, ifr.ifr_hwaddr.sa_data, hwlen);
 	family = ifr.ifr_hwaddr.sa_family;
 #else
@@ -315,7 +314,7 @@ interface_t *read_interface (const char *ifname, int metric)
 		goto exit;
 	}
 
-	hwaddr = xmalloc (sizeof (unsigned char *) * HWADDR_LEN);
+	hwaddr = xmalloc (sizeof (unsigned char) * HWADDR_LEN);
 	if (_do_interface (ifname, hwaddr, &hwlen, NULL, false, false) != 1) {
 		logger (LOG_ERR, "could not find interface %s", ifname);
 		goto exit;
@@ -601,7 +600,7 @@ static int do_route (const char *ifname,
 		if (netmask.s_addr == INADDR_BROADCAST) 
 			rtm.hdr.rtm_flags |= RTF_HOST;
 
-		hwaddr = xmalloc (sizeof (unsigned char *) * HWADDR_LEN);
+		hwaddr = xmalloc (sizeof (unsigned char) * HWADDR_LEN);
 		_do_interface (ifname, hwaddr, &hwlen, NULL, false, false);
 		memset (&su, 0, sizeof (struct sockaddr_storage));
 		su.sdl.sdl_len = sizeof (struct sockaddr_dl);
@@ -697,7 +696,7 @@ static int send_netlink(struct nlmsghdr *hdr)
 		return -1;
 	}
 
-	buffer = xmalloc (sizeof (char *) * BUFFERLEN);
+	buffer = xmalloc (sizeof (char) * BUFFERLEN);
 	memset (buffer, 0, BUFFERLEN);
 	iov.iov_base = buffer;
 

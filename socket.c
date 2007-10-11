@@ -240,7 +240,7 @@ int open_socket (interface_t *iface, bool arp)
 	int buf = 0;
 	struct bpf_program p;
 
-	device = xmalloc (sizeof (char *) * PATH_MAX);
+	device = xmalloc (sizeof (char) * PATH_MAX);
 	do {
 		snprintf (device, PATH_MAX, "/dev/bpf%d",  n++);
 		fd = open (device, O_RDWR);

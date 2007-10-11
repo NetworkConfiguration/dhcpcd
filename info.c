@@ -340,7 +340,7 @@ bool read_info (const interface_t *iface, dhcp_t *dhcp)
 
 	dhcp->frominfo = true;
 
-	buffer = xmalloc (sizeof (char *) * BUFFERSIZE);
+	buffer = xmalloc (sizeof (char) * BUFFERSIZE);
 	memset (buffer, 0, BUFFERSIZE);
 	while ((fgets (buffer, BUFFERSIZE, fp))) {
 		var = buffer;

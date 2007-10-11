@@ -59,7 +59,7 @@ void get_duid (interface_t *iface)
 	if ((fp = fopen (DUIDFILE, "r"))) {
 		char *fduid;
 		char *fdp;
-		fduid = fdp = xmalloc ((sizeof (char *) * DUID_LEN * 2) + 1);
+		fduid = fdp = xmalloc ((sizeof (char) * DUID_LEN * 2) + 1);
 		if (fscanf (fp, "%260s", fduid) == 1) {
 			char c[3];
 			c[2] = '\0';

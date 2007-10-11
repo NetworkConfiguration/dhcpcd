@@ -447,7 +447,7 @@ int main(int argc, char **argv)
 		exit (EXIT_FAILURE);
 	}
 
-	prefix = xmalloc (sizeof (char *) * IF_NAMESIZE + 3);
+	prefix = xmalloc (sizeof (char) * (IF_NAMESIZE + 3));
 	snprintf (prefix, IF_NAMESIZE, "%s: ", options->interface);
 	setlogprefix (prefix);
 	snprintf (options->pidfile, sizeof (options->pidfile), PIDFILE,
