@@ -44,7 +44,7 @@ int ipv4ll_get_address (interface_t *iface, dhcp_t *dhcp) {
 		if (! arp_claim (iface, addr))
 			break;
 		/* Our ARP may have been interrupted */
-		if (errno == EINTR)
+		if (errno)
 			return (-1);
 	}
 
