@@ -896,8 +896,7 @@ eexit:
 		free (iface);
 	}
 
-	if (buffer)
-		free (buffer);
+	free (buffer);
 
 	if (*pidfd != -1) {
 		close (*pidfd);
