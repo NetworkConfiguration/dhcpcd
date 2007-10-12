@@ -966,7 +966,7 @@ int del_address (const char *ifname,
 {
 	struct in_addr t;
 
-	logger (LOG_INFO, "deleting IP address %s/%d",
+	logger (LOG_INFO, "removing IP address %s/%d",
 			inet_ntoa (address), inet_ntocidr (netmask));
 
 	memset (&t, 0, sizeof (t));
