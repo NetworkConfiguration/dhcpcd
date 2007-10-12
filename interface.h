@@ -51,7 +51,18 @@
 #  define ARPHRD_INFINIBAND		27
 #endif
 
-#define HWADDR_LEN				20	
+#define HWADDR_LEN				20
+
+/* Work out if we have a private address or not
+ * 10/8
+ * 172.16/12
+ * 192.168/16
+ */
+#ifndef IN_PRIVATE
+# define IN_PRIVATE(addr) (((ntohl (addr) & IN_CLASSA_NET) == 0x0a000000) || \
+						   ((ntohl (addr) & 0xfff00000)    == 0xac100000) || \
+						   ((ntohl (addr) & IN_CLASSB_NET) == 0xc0a80000))
+#endif
 
 typedef struct route_t
 {

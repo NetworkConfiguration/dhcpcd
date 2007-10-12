@@ -1,3 +1,5 @@
+Always add a link-local route unless we're given a non-private
+address by the DHCP server.
 Reduce stack usage by using malloc more.
 If we're on a different subnet from the one we get DHCP for, don't
 use our current address in messages. Thanks to Wilson Callan.

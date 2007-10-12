@@ -49,6 +49,9 @@
 #ifdef ENABLE_INFO
 # include "info.h"
 #endif
+#ifdef ENABLE_IPV4LL
+# include "ipv4ll.h"
+#endif
 #include "interface.h"
 #include "dhcpcd.h"
 #include "logger.h"
@@ -335,10 +338,15 @@ int configure (const options_t *options, interface_t *iface,
 			   const dhcp_t *dhcp, bool up)
 {
 	route_t *route = NULL;
+	route_t *new_routes = NULL;
 	route_t *new_route = NULL;
 	route_t *old_route = NULL;
 	char *newhostname = NULL;
 	char *curhostname = NULL;
+	int remember;
+#ifdef ENABLE_IPV4LL
+	bool haslinklocal = false;
+#endif
 
 	if (! options || ! iface || ! dhcp)
 		return (-1);
@@ -453,13 +461,18 @@ int configure (const options_t *options, interface_t *iface,
 
 	/* Remember added routes */
 	if (dhcp->routes) {
-		route_t *new_routes = NULL;
-		int remember;
 #ifdef THERE_IS_NO_FORK
 		int skip = 0;
 #endif
 
 		for (route = dhcp->routes; route; route = route->next) {
+#ifdef ENABLE_IPV4LL
+			/* Check if we have already got a link locale route dished
+			 * out by the DHCP server */
+			if (route->destination.s_addr == htonl (LINKLOCAL_ADDR) &&
+				route->netmask.s_addr == htonl (LINKLOCAL_MASK))
+				haslinklocal = true;
+#endif
 			/* Don't set default routes if not asked to */
 			if (route->destination.s_addr == 0 && route->netmask.s_addr == 0
 				&& ! options->dogateway)
@@ -510,11 +523,45 @@ int configure (const options_t *options, interface_t *iface,
 #endif
 		}
 
-		if (iface->previous_routes)
-			free_route (iface->previous_routes);
-
-		iface->previous_routes = new_routes;
 	}
+
+#ifdef ENABLE_IPV4LL
+	/* Ensure we always add the link local route if we got a private
+	 * address and isn't link local itself */
+	if (options-> doipv4ll &&
+		! haslinklocal &&
+		IN_PRIVATE (dhcp->address.s_addr))
+	{
+		struct in_addr dest;
+		struct in_addr mask;
+		struct in_addr gate;
+
+		dest.s_addr = htonl (LINKLOCAL_ADDR);
+		mask.s_addr = htonl (LINKLOCAL_MASK);
+		gate.s_addr = 0;
+		remember = add_route (iface->name, dest, mask, gate,
+							  options->metric);
+
+		if (remember >= 0) {
+			if (! new_routes) {
+				new_routes = xmalloc (sizeof (route_t));
+				memset (new_routes, 0, sizeof (route_t));
+				new_route = new_routes;
+			} else {
+				new_route->next = xmalloc (sizeof (route_t));
+				new_route = new_route->next;
+				new_route->next = NULL;
+			}
+			new_route->destination.s_addr = dest.s_addr;
+			new_route->netmask.s_addr = mask.s_addr;
+			new_route->gateway.s_addr = gate.s_addr;
+		}
+	}
+#endif
+
+	if (iface->previous_routes)
+		free_route (iface->previous_routes);
+	iface->previous_routes = new_routes;
 
 	if (options->dodns && dhcp->dnsservers)
 		make_resolv(iface->name, dhcp);
