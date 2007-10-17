@@ -64,6 +64,15 @@
 						   ((ntohl (addr) & IN_CLASSB_NET) == 0xc0a80000))
 #endif
 
+#define LINKLOCAL_ADDR       0xa9fe0000
+#define LINKLOCAL_MASK       0xffff0000
+#define LINKLOCAL_BRDC		 0xa9feffff
+
+#ifndef IN_LINKLOCAL
+# define IN_LINKLOCAL(addr) ((ntohl (addr) & IN_CLASSB_NET) == LINKLOCAL_ADDR)
+#endif
+
+
 typedef struct route_t
 {
 	struct in_addr destination; 

@@ -494,9 +494,7 @@ int dhcp_run (const options_t *options, int *pidfd)
 				case STATE_INIT:
 					if (xid != 0) {
 						if (iface->previous_address.s_addr != 0 &&
-#ifdef ENABLE_IPV4LL
 							! IN_LINKLOCAL (iface->previous_address.s_addr) &&
-#endif
 							! options->doinform)
 						{
 							logger (LOG_ERR, "lost lease");
@@ -605,14 +603,12 @@ int dhcp_run (const options_t *options, int *pidfd)
 					break;
 				case STATE_BOUND:
 				case STATE_RENEW_REQUESTED:
-#ifdef ENABLE_IPV4LL
 					if (IN_LINKLOCAL (dhcp->address.s_addr)) {
 						memset (&dhcp->address, 0, sizeof (struct in_addr));
 						state = STATE_INIT;
 						xid = 0;
 						break;
 					}
-#endif
 					state = STATE_RENEWING;
 					xid = random ();
 				case STATE_RENEWING:
