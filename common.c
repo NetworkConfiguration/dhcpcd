@@ -19,6 +19,10 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#ifdef __linux__
+# define _XOPEN_SOURCE 500 /* needed for pwrite */
+#endif
+
 #include <sys/time.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -129,6 +133,18 @@ time_t uptime (void)
 		return (-1);
 
 	return (tp.tv_sec);
+}
+
+void writepid (int fd, pid_t pid)
+{
+	char spid[16];
+	if (ftruncate (fd, 0) == -1) {
+		logger (LOG_ERR, "ftruncate: %s", strerror (errno));
+	} else {
+		snprintf (spid, sizeof (spid), "%u", pid);
+		if (pwrite (fd, spid, strlen (spid), 0) != (ssize_t) strlen (spid))
+			logger (LOG_ERR, "pwrite: %s", strerror (errno));
+	}
 }
 
 void *xmalloc (size_t s)

@@ -72,7 +72,6 @@
 # define IN_LINKLOCAL(addr) ((ntohl (addr) & IN_CLASSB_NET) == LINKLOCAL_ADDR)
 #endif
 
-
 typedef struct route_t
 {
 	struct in_addr destination; 

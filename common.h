@@ -40,6 +40,7 @@ void srandomdev (void);
 void close_fds (void);
 int get_time (struct timeval *tp);
 time_t uptime (void);
+void writepid (int fd, pid_t pid);
 void *xmalloc (size_t size);
 char *xstrdup (const char *str);
 

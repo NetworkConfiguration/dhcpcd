@@ -22,7 +22,6 @@
 
 #ifdef __linux__
 # define _BSD_SOURCE
-# define _XOPEN_SOURCE 500 /* needed for pwrite */
 #endif
 
 #include <sys/types.h>
@@ -125,7 +124,6 @@
 static pid_t daemonise (int *pidfd)
 {
 	pid_t pid;
-	char spid[16];
 
 #ifndef THERE_IS_NO_FORK
 	logger (LOG_DEBUG, "forking to background");
@@ -166,14 +164,11 @@ static pid_t daemonise (int *pidfd)
 	free (argv);
 #endif
 
+	/* Done with the fd now */
 	if (pid != 0) {
-		if (ftruncate (*pidfd, 0) == -1) {
-			logger (LOG_ERR, "ftruncate: %s", strerror (errno));
-		} else {
-			snprintf (spid, sizeof (spid), "%u", pid);
-			if (pwrite (*pidfd, spid, strlen (spid), 0) != (ssize_t) strlen (spid))
-				logger (LOG_ERR, "pwrite: %s", strerror (errno));
-		}
+		writepid (*pidfd, pid);
+		close (*pidfd);
+		*pidfd = -1;
 	}
 
 	return (pid);
@@ -437,12 +432,12 @@ int dhcp_run (const options_t *options, int *pidfd)
 			switch (sig) {
 				case SIGINT:
 					logger (LOG_INFO, "received SIGINT, stopping");
-					retval = (! daemonised);
+					retval = daemonised ? EXIT_SUCCESS : EXIT_FAILURE;
 					goto eexit;
 
 				case SIGTERM:
 					logger (LOG_INFO, "received SIGTERM, stopping");
-					retval = (! daemonised);
+					retval = daemonised ? EXIT_SUCCESS : EXIT_FAILURE;
 					goto eexit;
 
 				case SIGALRM:
@@ -480,7 +475,7 @@ int dhcp_run (const options_t *options, int *pidfd)
 					else
 						logger (LOG_ERR,
 								"received SIGHUP, but we no have lease to release");
-					retval = 0;
+					retval = daemonised ? EXIT_SUCCESS : EXIT_FAILURE;
 					goto eexit;
 
 				default:
@@ -891,13 +886,7 @@ eexit:
 		free_route (iface->previous_routes);
 		free (iface);
 	}
-
 	free (buffer);
-
-	if (*pidfd != -1) {
-		close (*pidfd);
-		*pidfd = -1;
-	}
 
 	if (daemonised)
 		unlink (options->pidfile);

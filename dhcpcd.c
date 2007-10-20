@@ -531,6 +531,7 @@ int main(int argc, char **argv)
 			fcntl (pidfd, F_SETFD, i | FD_CLOEXEC) == -1)
 			logger (LOG_ERR, "fcntl: %s", strerror (errno));
 
+		writepid (pidfd, getpid ());
 		logger (LOG_INFO, PACKAGE " " VERSION " starting");
 	}
 
@@ -540,6 +541,12 @@ int main(int argc, char **argv)
 	i = EXIT_FAILURE;
 	if (dhcp_run (options, &pidfd) == 0)
 		i = EXIT_SUCCESS;
+
+	/* If we didn't daemonise then we need to punt the pidfile now */
+	if (pidfd > -1) {
+		close (pidfd);
+		unlink (options->pidfile);
+	}
 
 	free (options);
 
@@ -551,8 +558,5 @@ int main(int argc, char **argv)
 
 	logger (LOG_INFO, "exiting");
 	
-	if (pidfd > -1)
-		close (pidfd);
-
 	exit (i);
 }
