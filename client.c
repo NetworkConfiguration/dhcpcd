@@ -284,6 +284,11 @@ int dhcp_run (const options_t *options, int *pidfd)
 			return (-1);
 		}
 
+		if (! options->daemonised && IN_LINKLOCAL (dhcp->address.s_addr)) {
+			logger (LOG_ERR, "cannot request a link local address");
+			return (-1);
+		}
+
 #ifdef THERE_IS_NO_FORK
 		if (options->daemonised) {
 			state = STATE_BOUND;

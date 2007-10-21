@@ -87,9 +87,10 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 	m = (unsigned char *) message;
 	p = (unsigned char *) &message->options;
 
-	if (type == DHCP_INFORM ||
+	if ((type == DHCP_INFORM ||
 		type == DHCP_RELEASE ||
-		type == DHCP_REQUEST)
+		type == DHCP_REQUEST) &&
+		! IN_LINKLOCAL (iface->previous_address.s_addr))
 	{
 		message->ciaddr = iface->previous_address.s_addr;
 		from.s_addr = iface->previous_address.s_addr;
@@ -154,13 +155,17 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 			memcpy (p, &_val.s_addr, 4); \
 			p += 4; \
 		}
-		if (dhcp->address.s_addr != iface->previous_address.s_addr &&
-			type != DHCP_RELEASE)
-			PUTADDR (DHCP_ADDRESS, dhcp->address);
+		if (IN_LINKLOCAL (dhcp->address.s_addr))
+			logger (LOG_ERR, "cannot request a link local address");
+		else {
+			if (dhcp->address.s_addr != iface->previous_address.s_addr &&
+				type != DHCP_RELEASE)
+				PUTADDR (DHCP_ADDRESS, dhcp->address);
 
-		if (dhcp->serveraddress.s_addr != 0 && dhcp->address.s_addr !=0 &&
-			(iface->previous_address.s_addr == 0 || type == DHCP_RELEASE))
-			PUTADDR (DHCP_SERVERIDENTIFIER, dhcp->serveraddress);
+			if (dhcp->serveraddress.s_addr != 0 && dhcp->address.s_addr !=0 &&
+				(iface->previous_address.s_addr == 0 || type == DHCP_RELEASE))
+				PUTADDR (DHCP_SERVERIDENTIFIER, dhcp->serveraddress);
+		}
 #undef PUTADDR
 	}
 

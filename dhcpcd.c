@@ -130,8 +130,9 @@ static pid_t read_pid (const char *pidfile)
 static void usage ()
 {
 	printf ("usage: "PACKAGE" [-adknpEGHMNRTY] [-c script] [-h hostame] [-i classID]\n"
-	        "              [-l leasetime] [-m metric] [-s ipaddress] [-t timeout]\n"
-	        "              [-u userclass] [-F none | ptr | both] [-I clientID]\n");
+	        "              [-l leasetime] [-m metric] [-r ipaddress] [-s ipaddress]\n"
+			"              [-t timeout] [-u userclass] [-F none | ptr | both]\n"
+			"              [-I clientID] <interface>\n");
 }
 
 int main(int argc, char **argv)
@@ -440,6 +441,11 @@ int main(int argc, char **argv)
 	if (options->request_address.s_addr == 0 && options->doinform) {
 		if ((options->request_address.s_addr = get_address (options->interface)) != 0)
 			options->keep_address = true;
+	}
+
+	if (IN_LINKLOCAL (options->request_address.s_addr)) {
+		logger (LOG_ERR, "you are not allowed to request a link local address");
+		exit (EXIT_FAILURE);
 	}
 
 	if (geteuid ()) {
