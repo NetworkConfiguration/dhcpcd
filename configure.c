@@ -49,9 +49,6 @@
 #ifdef ENABLE_INFO
 # include "info.h"
 #endif
-#ifdef ENABLE_IPV4LL
-# include "ipv4ll.h"
-#endif
 #include "interface.h"
 #include "dhcpcd.h"
 #include "logger.h"
