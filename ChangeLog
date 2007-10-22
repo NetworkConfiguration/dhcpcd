@@ -1,3 +1,4 @@
+Use sysconf to detect if we have a working monotonic clock.
 Only request NTP, NIS, etc if we have compiled that feature in.
 dhcpcd --version now shows what compile time options were used.
 

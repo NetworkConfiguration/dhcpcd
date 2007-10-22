@@ -3,7 +3,7 @@
 # such as the need to link to libresolv and/or librt so please forgive the
 # embedded code :)
 
-VERSION = 3.1.7
+VERSION = 3.1.8_pre1
 CFLAGS += -O2 -pipe
 
 INSTALL ?= install
@@ -32,15 +32,13 @@ _LIBRESOLV != $(_LIBRESOLV_SH)
 LIBRESOLV = $(_LIBRESOLV)$(shell $(_LIBRESOLV_SH))
 
 # Work out if we need -lrt or not
-_LIBRT_SH = printf '\#include <time.h>\nint main (void) { struct timespec ts; return (clock_gettime (CLOCK_MONOTONIC, &ts)); }\n' > .clock_gettime.c; \
+_LIBRT_SH = printf '\#include <time.h>\n\#include <unistd.h>\n\nint main (void) { struct timespec ts;\n\#if defined(_POSIX_MONOTONIC_CLOCK) && defined(CLOCK_MONOTONIC)\nreturn (clock_gettime (CLOCK_MONOTONIC, &ts));\n\#else\nreturn -1;\n\#endif\n}\n' > .clock_gettime.c; \
 	if $(CC) .clock_gettime.c -o .clock_gettime >/dev/null 2>&1; then \
 		echo ""; \
 	elif $(CC) .clock_gettime.c -lrt -o .clock_gettime >/dev/null 2>&1 ; then \
 		echo "-lrt"; \
 	else \
-		echo "Cannot work out how to get clock_gettime to link" >&2; \
-		rm -f .clock_gettime.c .clock_gettime; \
-		exit 1; \
+		echo ""; \
 	fi; \
 	rm -f .clock_gettime.c .clock_gettime
 _LIBRT != $(_LIBRT_SH)

@@ -105,10 +105,20 @@ void close_fds (void)
  */
 int get_time (struct timeval *tp)
 {
-#ifdef CLOCK_MONOTONIC
+#if defined(_POSIX_MONOTONIC_CLOCK) && defined(CLOCK_MONOTONIC)
 	struct timespec ts;
+	static clockid_t posix_clock;
+	static int posix_clock_set = 0;
 
-	if (clock_gettime (CLOCK_MONOTONIC, &ts) == -1) {
+	if (! posix_clock_set) {
+		if (sysconf (_SC_MONOTONIC_CLOCK) >= 0)
+			posix_clock = CLOCK_MONOTONIC;
+		else
+			posix_clock = CLOCK_REALTIME;
+		posix_clock_set = 1;
+	}
+
+	if (clock_gettime (posix_clock, &ts) == -1) {
 		logger (LOG_ERR, "clock_gettime: %s", strerror (errno));
 		return (-1);
 	}
