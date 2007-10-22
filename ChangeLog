@@ -1,3 +1,4 @@
+Only request NTP, NIS, etc if we have compiled that feature in.
 dhcpcd --version now shows what compile time options were used.
 
 dhcpcd-3.1.7

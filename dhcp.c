@@ -36,6 +36,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "config.h"
+
 #include "common.h"
 #include "dhcpcd.h"
 #include "dhcp.h"
@@ -206,12 +208,18 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 			*p++ = DHCP_DNSSEARCH;
 			*p++ = DHCP_DNSDOMAIN;
 			*p++ = DHCP_DNSSERVER;
+#ifdef ENABLE_NIS
 			*p++ = DHCP_NISDOMAIN;
 			*p++ = DHCP_NISSERVER;
+#endif
+#ifdef ENABLE_NTP
 			*p++ = DHCP_NTPSERVER;
+#endif
 			*p++ = DHCP_MTU;
+#ifdef ENABLE_INFO
 			*p++ = DHCP_ROOTPATH;
 			*p++ = DHCP_SIPSERVER;
+#endif
 		}
 
 		*n_params = p - n_params - 1;
@@ -475,6 +483,7 @@ static bool dhcp_add_address(address_t **address, const unsigned char *data, int
 	return (true);
 }
 
+#ifdef ENABLE_INFO
 static char *decode_sipservers (const unsigned char *data, int length)
 {
 	char *sip = NULL;
@@ -516,6 +525,7 @@ static char *decode_sipservers (const unsigned char *data, int length)
 
 	return (sip);
 }
+#endif
 
 /* This calculates the netmask that we should use for static routes.
  * This IS different from the calculation used to calculate the netmask
@@ -699,12 +709,16 @@ parse_start:
 			case DHCP_MESSAGE:
 				GETSTR (dhcp->message);
 				break;
+#ifdef ENABLE_INFO
 			case DHCP_ROOTPATH:
 				GETSTR (dhcp->rootpath);
 				break;
+#endif
+#ifdef ENABLE_NIS
 			case DHCP_NISDOMAIN:
 				GETSTR (dhcp->nisdomain);
 				break;
+#endif
 #undef GETSTR
 
 #define GETADDR(_var) \
@@ -717,12 +731,16 @@ parse_start:
 			case DHCP_DNSSERVER:
 				GETADDR (dhcp->dnsservers);
 				break;
+#ifdef ENABLE_NTP
 			case DHCP_NTPSERVER:
 				GETADDR (dhcp->ntpservers);
 				break;
+#endif
+#ifdef ENABLE_NIS
 			case DHCP_NISSERVER:
 				GETADDR (dhcp->nisservers);
 				break;
+#endif
 #undef GETADDR
 
 			case DHCP_DNSSEARCH:
@@ -740,10 +758,12 @@ parse_start:
 				csr = decode_CSR (p, length);
 				break;
 
+#ifdef ENABLE_INFO
 			case DHCP_SIPSERVER:
 				free (dhcp->sipservers);
 				dhcp->sipservers = decode_sipservers (p, length);
 				break;
+#endif
 
 			case DHCP_STATICROUTE:
 				MULT_LENGTH (8);
