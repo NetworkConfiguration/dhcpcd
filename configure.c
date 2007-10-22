@@ -105,8 +105,13 @@ static void exec_script (const char *script, const char *infofile,
 		return;
 	}
 
+#ifdef ENABLE_INFO
 	logger (LOG_DEBUG, "exec \"%s\" \"%s\" \"%s\"", script, infofile, arg);
 	exec_cmd (script, infofile, arg, (char *) NULL);
+#else
+	logger (LOG_DEBUG, "exec \"%s\" \"\" \"%s\"", script, arg);
+	exec_cmd (script, "", arg, (char *) NULL);
+#endif
 }
 
 static int make_resolv (const char *ifname, const dhcp_t *dhcp)
