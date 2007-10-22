@@ -391,8 +391,35 @@ int main(int argc, char **argv)
 				exit (EXIT_FAILURE);
 		}
 	}
-	if (doversion)
+	if (doversion) {
 		printf (""PACKAGE" "VERSION"\n");
+		printf ("Compile time options:"
+#ifdef ENABLE_ARP
+				" ARP"
+#endif
+#ifdef ENABLE_DUID
+				" DUID"
+#endif
+#ifdef ENABLE_INFO
+				" INFO"
+#endif
+#ifdef ENABLE_INFO_COMPAT
+				" INFO_COMPAT"
+#endif
+#ifdef ENABLE_IPV4LL
+				" IPV4LL"
+#endif
+#ifdef ENABLE_NIS
+				" NIS"
+#endif
+#ifdef ENABLE_NTP
+				" NTP"
+#endif
+#ifdef THERE_IS_NO_FORK
+				" THERE_IS_NO_FORK"
+#endif
+				"\n");
+	}
 
 	if (dohelp)
 		usage ();

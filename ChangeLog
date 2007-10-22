@@ -1,3 +1,5 @@
+dhcpcd --version now shows what compile time options were used.
+
 dhcpcd-3.1.7
 Add warnings about requesting a link local address.
 Always add a link local route unless we're given a non-private
