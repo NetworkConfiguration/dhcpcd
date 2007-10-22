@@ -470,11 +470,13 @@ int dhcp_run (const options_t *options, int *pidfd)
 						|| state == STATE_REBINDING)
 					{
 						logger (LOG_INFO, "received SIGHUP, releasing lease");
-						SOCKET_MODE (SOCKET_OPEN);
-						xid = random ();
-						if ((open_socket (iface, false)) >= 0)
-							SEND_MESSAGE (DHCP_RELEASE);
-						SOCKET_MODE (SOCKET_CLOSED);
+						if (! IN_LINKLOCAL (dhcp->address.s_addr)) {
+							SOCKET_MODE (SOCKET_OPEN);
+							xid = random ();
+							if ((open_socket (iface, false)) >= 0)
+								SEND_MESSAGE (DHCP_RELEASE);
+							SOCKET_MODE (SOCKET_CLOSED);
+						}
 						unlink (iface->infofile);
 					}
 					else
