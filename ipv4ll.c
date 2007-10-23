@@ -32,7 +32,7 @@
 #error IPV4LL requires ARP
 #endif
 
-#define IPV4LL_LEASETIME 10 
+#define IPV4LL_LEASETIME 20 
 
 int ipv4ll_get_address (interface_t *iface, dhcp_t *dhcp) {
 	struct in_addr addr;
