@@ -117,7 +117,7 @@ dist:
 	$(INSTALL) -m 0755 -d /tmp/dhcpcd-$(VERSION)
 	cp -RPp . /tmp/dhcpcd-$(VERSION)
 	(cd /tmp/dhcpcd-$(VERSION); $(MAKE) clean)
-	rm -rf /tmp/dhcpcd-$(VERSION)/*.bz2 /tmp/dhcpcd-$(VERSION)/.svn
+	rm -rf /tmp/dhcpcd-$(VERSION)/*.bz2 /tmp/dhcpcd-$(VERSION)/.git
 	tar cvjpf dhcpcd-$(VERSION).tar.bz2 -C /tmp dhcpcd-$(VERSION)
 	rm -rf /tmp/dhcpcd-$(VERSION)
 	ls -l dhcpcd-$(VERSION).tar.bz2
