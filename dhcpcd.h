@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon -
- * Copyright 2006-2007 Roy Marples <uberlord@gentoo.org>
+ * Copyright 2006-2007 Roy Marples <roy@marples.name>
  *
  * This is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
