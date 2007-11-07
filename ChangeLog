@@ -1,3 +1,5 @@
+Clear the signal_pipe fd from the fdset when all signals have
+been read.
 Don't release a link local address.
 Use sysconf to detect if we have a working monotonic clock.
 Only request NTP, NIS, etc if we have compiled that feature in.

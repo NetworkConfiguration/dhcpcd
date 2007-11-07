@@ -84,22 +84,39 @@ int signal_fd_set (fd_set *rfds, int extra_fd)
 	return signal_pipe[0] > extra_fd ? signal_pipe[0] : extra_fd;
 }
 
+/* Check if we have a signal or not */
+int signal_exists (const fd_set *rfds)
+{
+	if (signal_signal || (rfds && FD_ISSET (signal_pipe[0], rfds)))
+		return 0;
+	return -1;
+}
+
 /* Read a signal from the signal pipe. Returns 0 if there is
  * no signal, -1 on error (and sets errno appropriately), and
  * your signal on success */
-int signal_read (const fd_set *rfds)
+int signal_read (fd_set *rfds)
 {
-	int sig;
+	int sig = -1;
 
-	if (signal_signal)
-		return signal_signal;
+	if (signal_signal) {
+		sig = signal_signal;
+		signal_signal = 0;
+	}
 
-	if (! rfds || ! FD_ISSET (signal_pipe[0], rfds))
-		return -1;
-	
-	if (read (signal_pipe[0], &sig, sizeof (sig)) == -1)
-		return -1;
+	if (rfds && FD_ISSET (signal_pipe[0], rfds)) {
+		int buflen = sizeof (sig) * 2;
+		char buf[buflen];
+		size_t bytes;
+
+		memset (buf, 0, buflen);
+		bytes = read (signal_pipe[0], buf, buflen);
+
+		/* We need to clear us from rfds if nothing left in the buffer
+		 * in case we are called many times */
+		if (bytes == sizeof (sig))
+			FD_CLR (signal_pipe[0], rfds);
+	}
 
 	return sig;
 }
-

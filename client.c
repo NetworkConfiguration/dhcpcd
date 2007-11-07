@@ -432,7 +432,7 @@ int dhcp_run (const options_t *options, int *pidfd)
 			retval = 0;
 
 		/* We should always handle our signals first */
-		if ((sig = (signal_read (NULL))) != -1)
+		if ((sig = (signal_read (&rset))) != -1)
 		{
 			switch (sig) {
 				case SIGINT:
@@ -446,7 +446,6 @@ int dhcp_run (const options_t *options, int *pidfd)
 					goto eexit;
 
 				case SIGALRM:
-
 					logger (LOG_INFO, "received SIGALRM, renewing lease");
 					switch (state) {
 						case STATE_BOUND:

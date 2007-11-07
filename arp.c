@@ -143,7 +143,7 @@ int arp_claim (interface_t *iface, struct in_addr address)
 			maxfd = signal_fd_set (&rset, iface->fd);
 			if ((s = select (maxfd + 1, &rset, NULL, NULL, &tv)) == -1) {
 				if (errno == EINTR) {
-					if (signal_read (NULL) == -1) {
+					if (signal_exists (NULL) == -1) {
 						errno = 0;
 						continue;
 					} else
