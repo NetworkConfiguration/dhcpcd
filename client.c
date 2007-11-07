@@ -94,6 +94,9 @@
 #define STATE_RENEW_REQUESTED   6
 #define STATE_RELEASED          7
 
+/* We should define a maximum for the NAK exponential backoff */ 
+#define NAKOFF_MAX              60
+
 #define SOCKET_CLOSED           0
 #define SOCKET_OPEN             1
 
@@ -256,6 +259,7 @@ int dhcp_run (const options_t *options, int *pidfd)
 	unsigned char *buffer = NULL;
 	int buffer_len = 0;
 	int buffer_pos = 0;
+	time_t nakoff = 1;
 
 	if (! options || (iface = (read_interface (options->interface,
 											   options->metric))) == NULL)
@@ -373,6 +377,9 @@ int dhcp_run (const options_t *options, int *pidfd)
 	signal_setup ();
 
 	while (1) {
+		/* Ensure our fd set is clear */
+		FD_ZERO (&rset);
+
 		if (timeout > 0 || (options->timeout == 0 &&
 							(state != STATE_INIT || xid)))
 		{
@@ -710,8 +717,23 @@ int dhcp_run (const options_t *options, int *pidfd)
 				xid = 0;
 				free_dhcp (dhcp);
 				memset (dhcp, 0, sizeof (dhcp_t));
+				
+				/* If we constantly get NAKS then we should slowly back off */
+				if (nakoff > 0) {
+					logger (LOG_DEBUG, "sleeping for %d seconds", nakoff);
+					tv.tv_sec = nakoff;
+					tv.tv_usec = 0;
+					nakoff *= 2;
+					if (nakoff > NAKOFF_MAX)
+						nakoff = NAKOFF_MAX;
+					select (0, NULL, NULL, NULL, &tv);
+				}
+	
 				continue;
 			}
+
+			/* No NAK, so reset the backoff */
+			nakoff = 1;
 
 			switch (state) {
 				case STATE_INIT:
