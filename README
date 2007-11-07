@@ -18,3 +18,9 @@ volatile, like say a LiveCD.
 Then just make; make install
 
 man dhcpcd for command line options
+
+
+Notes
+-----
+If you're cross compiling you may need to send HAVE_FORK=yes or HAVE_FORK=no
+to the make command to avoid to automatic test.

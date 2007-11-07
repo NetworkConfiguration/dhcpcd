@@ -45,16 +45,22 @@ _LIBRT != $(_LIBRT_SH)
 LIBRT = $(_LIBRT)$(shell $(_LIBRT_SH))
 
 # Work out if our fork() works or not
-_HAVE_FORK_SH = printf '\#include <stdlib.h>\n\#include <unistd.h>\nint main (void) { pid_t pid = fork(); if (pid == -1) exit (-1); exit (0); }\n' > .fork.c; \
-	$(CC) .fork.c -o .fork >/dev/null 2>&1; \
-	if ./.fork; then \
+_HAVE_FORK_SH = if [ "$(HAVE_FORK)" = "yes" ]; then \
 		echo ""; \
-	else \
+	elif [ -n "$(HAVE_FORK)" ]; then \
 		echo "-DTHERE_IS_NO_FORK"; \
-	fi; \
-	rm -f .fork.c .fork
+	else \
+		printf '\#include <stdlib.h>\n\#include <unistd.h>\nint main (void) { pid_t pid = fork(); if (pid == -1) exit (-1); exit (0); }\n' > .fork.c; \
+		$(CC) .fork.c -o .fork >/dev/null 2>&1; \
+		if ./.fork; then \
+			echo ""; \
+		else \
+			echo "-DTHERE_IS_NO_FORK"; \
+		fi; \
+		rm -f .fork.c .fork; \
+	fi;
 _HAVE_FORK != $(_HAVE_FORK_SH)
-HAVE_FORK = $(_HAVE_FORK)$(shell $(_HAVE_FORK_SH))
+FORK = $(_HAVE_FORK)$(shell $(_HAVE_FORK_SH))
 
 # pmake check for extra cflags 
 WEXTRA != for x in -Wdeclaration-after-statement -Wsequence-point -Wextra; do \
@@ -89,7 +95,7 @@ dhcpcd_OBJS = arp.o client.o common.o configure.o dhcp.o dhcpcd.o duid.o \
 			  info.o interface.o ipv4ll.o logger.o signals.o socket.o
 
 $(dhcpcd_OBJS): 
-	$(CC) $(HAVE_FORK) $(CFLAGS) -c $*.c
+	$(CC) $(FORK) $(CFLAGS) -c $*.c
 
 dhcpcd: $(dhcpcd_H) .depend $(dhcpcd_OBJS)
 	$(CC) $(LDFLAGS) $(dhcpcd_OBJS) $(LIBRESOLV) $(LIBRT) -o dhcpcd
