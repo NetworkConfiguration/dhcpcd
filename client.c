@@ -498,6 +498,10 @@ int dhcp_run (const options_t *options, int *pidfd)
 			}
 		} else if (retval == 0) {
 			/* timed out */
+
+			/* No NAK, so reset the backoff */
+			nakoff = 1;
+
 			switch (state) {
 				case STATE_INIT:
 					if (xid != 0) {
