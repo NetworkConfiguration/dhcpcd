@@ -234,8 +234,6 @@ static bool get_old_lease (const options_t *options, interface_t *iface,
 }
 #endif
 
-/* This state machine is based on the one from udhcpc
-   written by Russ Dill */
 int dhcp_run (const options_t *options, int *pidfd)
 {
 	interface_t *iface;
