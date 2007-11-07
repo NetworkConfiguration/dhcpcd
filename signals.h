@@ -1,6 +1,8 @@
-/* 
- * Shameless taken from udhcp as I think it's a good idea.
- * Russ Dill <Russ.Dill@asu.edu> December 2003
+/*
+ * dhcpcd - DHCP client daemon -
+ * Copyright 2006-2007 Roy Marples <roy@marples.name>
+ * 
+ * dhcpcd is an RFC2131 compliant DHCP client daemon.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,8 +23,8 @@
 #define SIGNALS_H
 
 void signal_setup (void);
-int signal_fd_set (fd_set *rfds, int extra_fd);
-int signal_exists (const fd_set *rfds);
-int signal_read (fd_set *rfds);
+int signal_fd_set (fd_set *rset, int fd);
+int signal_exists (const fd_set *rset);
+int signal_read (fd_set *rset);
 
 #endif

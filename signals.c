@@ -1,8 +1,8 @@
-/* 
- * Shameless taken from udhcp as I think it's a good idea.
- * Signal pipe infrastructure. A reliable way of delivering signals.
- *
- * Russ Dill <Russ.Dill@asu.edu> December 2003
+/*
+ * dhcpcd - DHCP client daemon -
+ * Copyright 2006-2007 Roy Marples <roy@marples.name>
+ * 
+ * dhcpcd is an RFC2131 compliant DHCP client daemon.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -52,7 +52,7 @@ static void signal_handler (int sig)
 
 /* Call this before doing anything else. Sets up the socket pair
  * and installs the signal handler */
-void signal_setup(void)
+void signal_setup (void)
 {
 	int i;
 	int flags;
@@ -72,22 +72,20 @@ void signal_setup(void)
 	signal (SIGCHLD, signal_handler);
 }
 
-/* Quick little function to setup the rfds. Will return the
- * max_fd for use with select. Limited in that you can only pass
- * one extra fd */
-int signal_fd_set (fd_set *rfds, int extra_fd)
+/* Add the signal pipe to an fd set */
+int signal_fd_set (fd_set *rset, int fd)
 {
-	FD_ZERO (rfds);
-	FD_SET (signal_pipe[0], rfds);
-	if (extra_fd >= 0)
-		FD_SET (extra_fd, rfds);
-	return signal_pipe[0] > extra_fd ? signal_pipe[0] : extra_fd;
+	FD_ZERO (rset);
+	FD_SET (signal_pipe[0], rset);
+	if (fd >= 0)
+		FD_SET (fd, rset);
+	return signal_pipe[0] > fd ? signal_pipe[0] : fd;
 }
 
 /* Check if we have a signal or not */
-int signal_exists (const fd_set *rfds)
+int signal_exists (const fd_set *rset)
 {
-	if (signal_signal || (rfds && FD_ISSET (signal_pipe[0], rfds)))
+	if (signal_signal || (rset && FD_ISSET (signal_pipe[0], rset)))
 		return 0;
 	return -1;
 }
@@ -95,7 +93,7 @@ int signal_exists (const fd_set *rfds)
 /* Read a signal from the signal pipe. Returns 0 if there is
  * no signal, -1 on error (and sets errno appropriately), and
  * your signal on success */
-int signal_read (fd_set *rfds)
+int signal_read (fd_set *rset)
 {
 	int sig = -1;
 
@@ -104,7 +102,7 @@ int signal_read (fd_set *rfds)
 		signal_signal = 0;
 	}
 
-	if (rfds && FD_ISSET (signal_pipe[0], rfds)) {
+	if (rset && FD_ISSET (signal_pipe[0], rset)) {
 		int buflen = sizeof (sig) * 2;
 		char buf[buflen];
 		size_t bytes;
@@ -115,10 +113,10 @@ int signal_read (fd_set *rfds)
 		if (bytes >= sizeof (sig))
 			memcpy (&sig, buf, sizeof (sig));
 
-		/* We need to clear us from rfds if nothing left in the buffer
+		/* We need to clear us from rset if nothing left in the buffer
 		 * in case we are called many times */
 		if (bytes == sizeof (sig))
-			FD_CLR (signal_pipe[0], rfds);
+			FD_CLR (signal_pipe[0], rset);
 	}
 
 	return sig;
