@@ -9,9 +9,9 @@
 # define _BSD_SOURCE
 #endif
 
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/select.h>
-#include <sys/time.h>
 #include <arpa/inet.h>
 #ifdef __linux__
 # include <netinet/ether.h>
@@ -164,7 +164,7 @@ static pid_t daemonise (int *pidfd)
 
 #ifdef ENABLE_INFO
 static bool get_old_lease (const options_t *options, interface_t *iface,
-						   dhcp_t *dhcp, time_t *timeout)
+						   dhcp_t *dhcp, long *timeout)
 {
 	struct timeval tv;
 	unsigned int offset = 0;
@@ -226,7 +226,7 @@ int dhcp_run (const options_t *options, int *pidfd)
 	int state = STATE_INIT;
 	struct timeval tv;
 	int xid = 0;
-	time_t timeout = 0;
+	long timeout = 0;
 	fd_set rset;
 	int maxfd;
 	int retval;
@@ -236,13 +236,13 @@ int dhcp_run (const options_t *options, int *pidfd)
 	int last_type = DHCP_DISCOVER;
 	bool daemonised = options->daemonised;
 	bool persistent = options->persistent;
-	time_t start = 0;
-	time_t last_send = 0;
+	long start = 0;
+	long last_send = 0;
 	int sig;
 	unsigned char *buffer = NULL;
 	int buffer_len = 0;
 	int buffer_pos = 0;
-	time_t nakoff = 1;
+	long nakoff = 1;
 
 	if (! options || (iface = (read_interface (options->interface,
 											   options->metric))) == NULL)
@@ -707,7 +707,7 @@ int dhcp_run (const options_t *options, int *pidfd)
 				
 				/* If we constantly get NAKS then we should slowly back off */
 				if (nakoff > 0) {
-					logger (LOG_DEBUG, "sleeping for %d seconds", nakoff);
+					logger (LOG_DEBUG, "sleeping for %ld seconds", nakoff);
 					tv.tv_sec = nakoff;
 					tv.tv_usec = 0;
 					nakoff *= 2;

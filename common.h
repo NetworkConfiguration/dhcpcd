@@ -9,7 +9,6 @@
 #define COMMON_H
 
 /* string.h pulls in features.h so the below define checks work */
-#include <sys/time.h>
 #include <string.h>
 
 /* Only GLIBC doesn't support strlcpy */
@@ -25,7 +24,7 @@ void srandomdev (void);
 
 void close_fds (void);
 int get_time (struct timeval *tp);
-time_t uptime (void);
+long uptime (void);
 void writepid (int fd, pid_t pid);
 void *xmalloc (size_t size);
 char *xstrdup (const char *str);

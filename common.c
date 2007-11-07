@@ -121,7 +121,7 @@ int get_time (struct timeval *tp)
 #endif
 }
 
-time_t uptime (void)
+long uptime (void)
 {
 	struct timeval tp;
 
