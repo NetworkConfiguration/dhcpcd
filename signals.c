@@ -112,6 +112,9 @@ int signal_read (fd_set *rfds)
 		memset (buf, 0, buflen);
 		bytes = read (signal_pipe[0], buf, buflen);
 
+		if (bytes >= sizeof (sig))
+			memcpy (&sig, buf, sizeof (sig));
+
 		/* We need to clear us from rfds if nothing left in the buffer
 		 * in case we are called many times */
 		if (bytes == sizeof (sig))
