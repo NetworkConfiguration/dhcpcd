@@ -1,0 +1,20 @@
+dhcpcd-3 - DHCP client daemon
+Copyright 2006-2007 Roy Marples <roy@marples.name>
+
+
+License
+-------
+This program is licensed under both the GPL version 2, the text of which
+can be found in the LICENSE file.
+
+
+Installation
+------------
+Edit config.h to match your building requirements.
+
+Take special note of ENABLE_DUID and unset it if the target media is 
+volatile, like say a LiveCD.
+
+Then just make; make install
+
+man dhcpcd for command line options

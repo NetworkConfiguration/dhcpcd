@@ -1,8 +1,0 @@
-Edit config.h to match your building requirements.
-
-Take special note of ENABLE_DUID and unset it if the target media is 
-volatile, like say a LiveCD.
-
-Then just make; make install
-
-man dhcpcd for command line options
