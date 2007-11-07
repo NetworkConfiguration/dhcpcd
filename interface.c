@@ -641,10 +641,6 @@ static int do_route (const char *ifname,
    The BSD implementation is much cleaner and a lot less code.
    send_netlink handles the actual transmission so we can work out
    if there was an error or not.
-
-   As always throughout this code, credit is due :)
-   This blatently taken from libnetlink.c from the iproute2 package
-   which is the only good source of netlink code.
    */
 #define BUFFERLEN 256
 static int send_netlink(struct nlmsghdr *hdr)
@@ -706,7 +702,7 @@ static int send_netlink(struct nlmsghdr *hdr)
 
 		if (bytes == -1) {
 			if (errno != EINTR)
-				logger (LOG_ERR, "netlink: overrun");
+				logger (LOG_ERR, "recvmsg: %s", strerror (errno));
 			continue;
 		}
 
