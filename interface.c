@@ -705,6 +705,7 @@ static int send_netlink(struct nlmsghdr *hdr)
 		for (h.buffer = buffer; bytes >= (signed) sizeof (*h.nlm); ) {
 			int len = h.nlm->nlmsg_len;
 			int l = len - sizeof (*h.nlm);
+			struct nlmsgerr *err = (struct nlmsgerr *) NLMSG_DATA (h.nlm);
 
 			if (l < 0 || len > bytes) {
 				if (msg.msg_flags & MSG_TRUNC)
@@ -714,45 +715,38 @@ static int send_netlink(struct nlmsghdr *hdr)
 				goto eexit;
 			}
 
+			/* Ensure it's our message */
 			if (nl.nl_pid != 0 ||
 				(pid_t) h.nlm->nlmsg_pid != mypid ||
 				h.nlm->nlmsg_seq != seq)
-				/* Message isn't for us, so skip it */
-				goto next;
-
+			{
+				/* Next Message */
+				bytes -= NLMSG_ALIGN (len);
+				h.buffer += NLMSG_ALIGN (len);
+				continue;
+			}
+			
 			/* We get an NLMSG_ERROR back with a code of zero for success */
-			if (h.nlm->nlmsg_type == NLMSG_ERROR) {
-				struct nlmsgerr *err = (struct nlmsgerr *) NLMSG_DATA (h.nlm);
-				if ((unsigned) l < sizeof (struct nlmsgerr))
-					logger (LOG_ERR, "netlink: truncated error message");
-				else {
-					errno = -err->error;
-					if (errno == 0) {
-						close (s);
-						free (buffer);
-						return 0;
-					}
-
-					/* Don't report on something already existing */
-					if (errno != EEXIST)
-						logger (LOG_ERR, "netlink: %s", strerror (errno));
-				}
+			if (h.nlm->nlmsg_type != NLMSG_ERROR) {
+				logger (LOG_ERR, "netlink: unexpected reply %d", h.nlm->nlmsg_type);
 				goto eexit;
 			}
 
-			logger (LOG_ERR, "netlink: unexpected reply");
-next:
-			bytes -= NLMSG_ALIGN (len);
-			h.buffer += NLMSG_ALIGN (len);
-		}
+			if ((unsigned) l < sizeof (struct nlmsgerr)) {
+				logger (LOG_ERR, "netlink: error truncated");
+				goto eexit;
+			}
 
-		if (msg.msg_flags & MSG_TRUNC) {
-			logger (LOG_ERR, "netlink: truncated message");
-			continue;
-		}
+			if (err->error == 0) {
+				close (s);
+				free (buffer);
+				return 0;
+			}
 
-		if (bytes) {
-			logger (LOG_ERR, "netlink: remnant of size %d", bytes);
+			errno = -err->error;
+			/* Don't report on something already existing */
+			if (errno != EEXIST)
+				logger (LOG_ERR, "netlink: %s", strerror (errno));
 			goto eexit;
 		}
 	}
