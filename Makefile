@@ -97,7 +97,7 @@ all: $(TARGET)
 
 dhcpcd_H = version.h
 dhcpcd_OBJS = arp.o client.o common.o configure.o dhcp.o dhcpcd.o duid.o \
-			  info.o interface.o ipv4ll.o logger.o signals.o socket.o
+			  info.o interface.o ipv4ll.o logger.o signal.o socket.o
 
 $(dhcpcd_OBJS): 
 	$(CC) $(FORK) $(RC) $(CFLAGS) -c $*.c

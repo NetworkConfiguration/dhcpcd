@@ -16,7 +16,7 @@
 #include <unistd.h>
 
 #include "logger.h"
-#include "signals.h"
+#include "signal.h"
 
 static int signal_pipe[2];
 static int signal_signal = 0;

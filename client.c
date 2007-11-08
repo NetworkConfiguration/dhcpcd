@@ -42,7 +42,7 @@
 # include "ipv4ll.h"
 #endif
 #include "logger.h"
-#include "signals.h"
+#include "signal.h"
 #include "socket.h"
 
 #ifdef ENABLE_DUID

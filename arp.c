@@ -28,7 +28,7 @@
 #include "arp.h"
 #include "interface.h"
 #include "logger.h"
-#include "signals.h"
+#include "signal.h"
 #include "socket.h"
 
 /* These are really for IPV4LL */
