@@ -423,19 +423,11 @@ int main(int argc, char **argv)
 #ifdef THERE_IS_NO_FORK
 	dhcpcd_argv = argv;
 	dhcpcd_argc = argc;
-
-	/* We need the full path to the dhcpcd */
-	if (*argv[0] == '/')
-		strlcpy (dhcpcd, argv[0], sizeof (dhcpcd));
-	else {
-		char pwd[PATH_MAX];
-		if (! getcwd (pwd, PATH_MAX)) {
-			logger (LOG_ERR, "getcwd: %s", strerror (errno));
-			exit (EXIT_FAILURE);
-		}
-		snprintf (dhcpcd, sizeof (dhcpcd), "%s/%s", pwd, argv[0]);
+	if (! realpath (argv[0], dhcpcd)) {
+		logger (LOG_ERR, "unable to resolve the path `%s' (%s): %s",
+				argv[0], dhcpcd, strerror (errno));
+		exit (EXIT_FAILURE);
 	}
-
 #endif
 
 	if (optind < argc) {
