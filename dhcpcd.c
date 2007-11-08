@@ -5,8 +5,6 @@
  * Distributed under the terms of the GNU General Public License v2
  */
 
-const char copyright[] = "Copyright (c) 2006-2007 Roy Marples";
-
 /* We need to define this to get kill on GNU systems */
 #ifdef __linux__
 #define _BSD_SOURCE
@@ -402,6 +400,14 @@ int main(int argc, char **argv)
 #endif
 #ifdef ENABLE_NTP
 				" NTP"
+#endif
+#ifdef ENABLE_ORC
+				" ORC"
+#elif ENABLE_RC
+				" RC"
+#endif
+#ifdef ENABLE_RESOLVCONF
+				" RESOLVCONF"
 #endif
 #ifdef THERE_IS_NO_FORK
 				" THERE_IS_NO_FORK"

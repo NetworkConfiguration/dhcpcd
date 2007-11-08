@@ -1,3 +1,4 @@
+Work with the BSD RC system too.
 Find resolvconf in path instead of /sbin.
 make HAVE_FORK=yes|no should be used if cross compiling.
 Implement an exponential NAK backoff.

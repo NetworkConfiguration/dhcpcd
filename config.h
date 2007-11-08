@@ -29,35 +29,28 @@
  * See RFC 3315 for details on this. */
 #define ENABLE_DUID
 
+/* resolvconf is framework for multiple interfaces to manage resolv.conf */
+#define ENABLE_RESOLVCONF
+
 /* Some systems do not have a working fork.
  * The Makefile will attempt to work it out, but if it fails to feel free to
  * define it here. */
 // #define THERE_IS_NO_FORK
 
-/* Packname name and pathname definitions.
- * NOTE: The service restart commands are Gentoo specific and will
- * probably need to be adapted for your OS. */
+/* Packname name and pathname definitions. */
 
 #define PACKAGE             "dhcpcd"
-
-#define RESOLVCONF          "/sbin/resolvconf"
 
 #define ETCDIR              "/etc"
 #define RESOLVFILE          ETCDIR "/resolv.conf"
 
 #define NISFILE             ETCDIR "/yp.conf"
-#define NISSERVICE          ETCDIR "/init.d/ypbind"
-#define NISRESTARTARGS      "--nodeps", "--quiet", "conditionalrestart"
 
 #define NTPFILE             ETCDIR "/ntp.conf"
 #define NTPDRIFTFILE        ETCDIR "/ntp.drift"
 #define NTPLOGFILE          "/var/log/ntp.log"
-#define NTPSERVICE          ETCDIR "/init.d/ntpd"
-#define NTPRESTARTARGS      "--nodeps", "--quiet", "conditionalrestart"
 
 #define OPENNTPFILE         ETCDIR "/ntpd.conf"
-#define OPENNTPSERVICE      ETCDIR "/init.d/ntpd"
-#define OPENNTPRESTARTARGS  "--nodeps", "--quiet", "conditionalrestart"
 
 #define DEFAULT_SCRIPT      ETCDIR "/" PACKAGE ".sh"
 
@@ -68,5 +61,26 @@
 #define INFOFILE            CONFIGDIR "/" PACKAGE "-%s.info"
 
 #define DUIDFILE            CONFIGDIR "/" PACKAGE ".duid"
+
+/* ORC is the Open Run Control, forked from Gentoo's baselayout package
+ * RC is a BSD style Run Control system */
+#ifdef ENABLE_ORC
+#define NISSERVICE          ETCDIR "/init.d/ypbind"
+#define NISRESTARTARGS      "--nodeps", "--quiet", "conditionalrestart"
+#define NTPSERVICE          ETCDIR "/init.d/ntpd"
+#define NTPRESTARTARGS      "--nodeps", "--quiet", "conditionalrestart"
+#define OPENNTPSERVICE      ETCDIR "/init.d/ntpd"
+#define OPENNTPRESTARTARGS  "--nodeps", "--quiet", "conditionalrestart"
+#elif ENABLE_RC
+#define NISSERVICE          ETCDIR "/rc.d/ypbind"
+#define NISRESTARTARGS      "restart"
+#define NTPSERVICE          ETCDIR "/rc.d/ntpd"
+#define NTPRESTARTARGS      "restart"
+#define OPENNTPSERVICE      ETCDIR "/rc.d/ntpd"
+#define OPENNTPRESTARTARGS  "restart"
+#else
+#undef ENABLE_NIS
+#undef ENABLE_NTP
+#endif
 
 #endif

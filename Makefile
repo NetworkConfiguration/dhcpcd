@@ -62,6 +62,11 @@ _HAVE_FORK_SH = if [ "$(HAVE_FORK)" = "yes" ]; then \
 _HAVE_FORK != $(_HAVE_FORK_SH)
 FORK = $(_HAVE_FORK)$(shell $(_HAVE_FORK_SH))
 
+# Work out if we use ORC or RC
+_RC_SH = if [ -d /etc/init.d ]; then echo "-DENABLE_ORC"; elif [ -d /etc/rc.d ]; then echo "-DENABLE_RC"; fi
+_RC != $(_RC_SH)
+RC = $(_RC)$(shell $(_RC_SH))
+
 # pmake check for extra cflags 
 WEXTRA != for x in -Wdeclaration-after-statement -Wsequence-point -Wextra; do \
 	if $(CC) -Wdeclaration-after-statement -S -o /dev/null -xc /dev/null >/dev/null 2>&1; \
@@ -95,7 +100,7 @@ dhcpcd_OBJS = arp.o client.o common.o configure.o dhcp.o dhcpcd.o duid.o \
 			  info.o interface.o ipv4ll.o logger.o signals.o socket.o
 
 $(dhcpcd_OBJS): 
-	$(CC) $(FORK) $(CFLAGS) -c $*.c
+	$(CC) $(FORK) $(RC) $(CFLAGS) -c $*.c
 
 dhcpcd: $(dhcpcd_H) .depend $(dhcpcd_OBJS)
 	$(CC) $(LDFLAGS) $(dhcpcd_OBJS) $(LIBRESOLV) $(LIBRT) -o dhcpcd
