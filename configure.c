@@ -40,6 +40,33 @@
 #include "logger.h"
 #include "socket.h"
 
+static int file_in_path (const char *file)
+{
+	char *p = getenv ("PATH");
+	char *path;
+	char *token;
+	struct stat s;
+	char mypath[PATH_MAX];
+	int retval = -1;
+
+	if (! p) {
+		errno = ENOENT;
+		return -1;
+	}
+
+	path = strdup (p);
+	p = path;
+	while ((token = strsep (&p, ":"))) {
+		snprintf (mypath, PATH_MAX, "%s/%s", token, file);
+		if (stat (mypath, &s)) {
+			retval = 0;
+			break;
+		}
+	}
+	free (path);
+	return retval;
+}
+
 /* IMPORTANT: Ensure that the last parameter is NULL when calling */
 static int exec_cmd (const char *cmd, const char *args, ...)
 {
@@ -63,7 +90,7 @@ static int exec_cmd (const char *cmd, const char *args, ...)
 	va_end (va);
 
 	if ((pid = vfork ()) == 0) {
-		if (execv (cmd, argv) && errno != ENOENT)
+		if (execvp (cmd, argv) && errno != ENOENT)
 			logger (LOG_ERR, "error executing \"%s\": %s",
 					cmd, strerror (errno));
 		_exit (0);
@@ -102,23 +129,25 @@ static void exec_script (const char *script, const char *infofile,
 
 static int make_resolv (const char *ifname, const dhcp_t *dhcp)
 {
-	FILE *f;
-	struct stat buf;
-	char *resolvconf = NULL;
+	FILE *f = NULL;
 	address_t *address;
 
-#ifdef RESOLVCONF
-	if (stat (RESOLVCONF, &buf) == 0) {
-		logger (LOG_DEBUG, "sending DNS information to resolvconf");
-		asprintf (&resolvconf, RESOLVCONF" -a %s", ifname);
-		f = popen (resolvconf, "w");
-		free (resolvconf);
+#ifdef ENABLE_RESOLVCONF
+	char *resolvconf = NULL;
 
-		if (! f)
+	if (file_in_path ("resolvconf") == 0) {	
+		asprintf (&resolvconf, "resolvconf -a %s", ifname);
+		if ((f = popen (resolvconf , "w")))
+			logger (LOG_DEBUG, "sending DNS information to resolvconf");
+		else if (errno == EEXIST)
 			logger (LOG_ERR, "popen: %s", strerror (errno));
-	} else
+
+		if (ferror (f))
+			logger (LOG_ERR, "ferror");
+		free (resolvconf);
+	}
 #endif
-	{
+	if (! f) {
 		logger (LOG_DEBUG, "writing "RESOLVFILE);
 		if (! (f = fopen(RESOLVFILE, "w")))
 			logger (LOG_ERR, "fopen `%s': %s", RESOLVFILE, strerror (errno));
@@ -137,9 +166,11 @@ static int make_resolv (const char *ifname, const dhcp_t *dhcp)
 	for (address = dhcp->dnsservers; address; address = address->next)
 		fprintf (f, "nameserver %s\n", inet_ntoa (address->address));
 
+#ifdef ENABLE_RESOLVCONF
 	if (resolvconf)
 		pclose (f);
 	else
+#endif
 		fclose (f);
 
 	/* Refresh the local resolver */
@@ -149,14 +180,11 @@ static int make_resolv (const char *ifname, const dhcp_t *dhcp)
 
 static void restore_resolv (const char *ifname)
 {
-#ifdef RESOLVCONF
-	struct stat buf;
-
-	if (stat (RESOLVCONF, &buf) == -1)
-		return;
-
-	logger (LOG_DEBUG, "removing information from resolvconf");
-	exec_cmd (RESOLVCONF, "-d", ifname, (char *) NULL);
+#ifdef ENABLE_RESOLVCONF
+	if (file_in_path ("resolvconf") == 0) {
+		logger (LOG_DEBUG, "removing information from resolvconf");
+		exec_cmd("resolvconf", "-d", ifname, (char *) NULL);
+	}
 #endif
 }
 
