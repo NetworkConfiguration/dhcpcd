@@ -424,8 +424,8 @@ int main(int argc, char **argv)
 	dhcpcd_argv = argv;
 	dhcpcd_argc = argc;
 	if (! realpath (argv[0], dhcpcd)) {
-		logger (LOG_ERR, "unable to resolve the path `%s' (%s): %s",
-				argv[0], dhcpcd, strerror (errno));
+		logger (LOG_ERR, "unable to resolve the path `%s': %s",
+				argv[0], strerror (errno));
 		exit (EXIT_FAILURE);
 	}
 #endif
