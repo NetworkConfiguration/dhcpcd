@@ -9,6 +9,7 @@
 #define COMMON_H
 
 /* string.h pulls in features.h so the below define checks work */
+#include <sys/time.h>
 #include <string.h>
 
 /* Only GLIBC doesn't support strlcpy */
