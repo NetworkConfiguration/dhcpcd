@@ -62,25 +62,44 @@
 
 #define DUIDFILE            CONFIGDIR "/" PACKAGE ".duid"
 
-/* ORC is the Open Run Control, forked from Gentoo's baselayout package
- * RC is a BSD style Run Control system */
+/* ORC is Open Run Control, forked from Gentoo's baselayout package
+ * BRC is BSD style Run Control
+ * SRC is Slackware Run Control
+ * SERVICE is RedHat
+ * SYSV should cover everthing else */
 #ifdef ENABLE_ORC
-#define NISSERVICE          ETCDIR "/init.d/ypbind"
-#define NISRESTARTARGS      "--nodeps", "--quiet", "conditionalrestart"
-#define NTPSERVICE          ETCDIR "/init.d/ntpd"
-#define NTPRESTARTARGS      "--nodeps", "--quiet", "conditionalrestart"
-#define OPENNTPSERVICE      ETCDIR "/init.d/ntpd"
-#define OPENNTPRESTARTARGS  "--nodeps", "--quiet", "conditionalrestart"
+# define SERVICE             "ORC"
+# define NISSERVICE          ETCDIR "/init.d/ypbind"
+# define NISRESTARTARGS      "--nodeps", "--quiet", "conditionalrestart"
+# define NTPSERVICE          ETCDIR "/init.d/ntpd"
+# define NTPRESTARTARGS      "--nodeps", "--quiet", "conditionalrestart"
 #elif ENABLE_BRC
-#define NISSERVICE          ETCDIR "/rc.d/ypbind"
-#define NISRESTARTARGS      "restart"
-#define NTPSERVICE          ETCDIR "/rc.d/ntpd"
-#define NTPRESTARTARGS      "restart"
-#define OPENNTPSERVICE      ETCDIR "/rc.d/ntpd"
-#define OPENNTPRESTARTARGS  "restart"
+# define SERVICE             "BRC"
+# define NISSERVICE          ETCDIR "/rc.d/ypbind"
+# define NISRESTARTARGS      "restart"
+# define NTPSERVICE          ETCDIR "/rc.d/ntpd"
+# define NTPRESTARTARGS      "restart"
+#elif ENABLE_SRC
+# define SERVICE             "SRC"
+# define NISSERVICE          ETCDIR "/rc.d/rc.ypbind"
+# define NISRESTARTARGS      "restart"
+# define NTPSERVICE          ETCDIR "/rc.d/rc.ntpd"
+# define NTPRESTARTARGS      "restart"
+#elif ENABLE_SERVICE
+# define SERVICE             "SERVICE"
+# define NISSERVICE          "service"
+# define NISRESTARTARGS      "ypbind", "restart"
+# define NTPSERVICE          "service"
+# define NTPRESTARTARGS      "ntpd", "restart"
+#elif ENABLE_SYSV
+# define SERVICE             "SYSV"
+# define NISSERVICE          ETCDIR "/init.d/ypbind"
+# define NISRESTARTARGS      "restart"
+# define NTPSERVICE          ETCDIR "/init.d/ntpd"
+# define NTPRESTARTARGS      "restart"
 #else
-#undef ENABLE_NIS
-#undef ENABLE_NTP
+# undef ENABLE_NIS
+# undef ENABLE_NTP
 #endif
 
 #endif

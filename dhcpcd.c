@@ -403,10 +403,8 @@ int main(int argc, char **argv)
 #ifdef ENABLE_NTP
 				" NTP"
 #endif
-#ifdef ENABLE_ORC
-				" ORC"
-#elif ENABLE_BRC
-				" BRC"
+#ifdef SERVICE
+				" " SERVICE
 #endif
 #ifdef ENABLE_RESOLVCONF
 				" RESOLVCONF"

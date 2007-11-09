@@ -62,8 +62,14 @@ _HAVE_FORK_SH = if [ "$(HAVE_FORK)" = "yes" ]; then \
 _HAVE_FORK != $(_HAVE_FORK_SH)
 FORK = $(_HAVE_FORK)$(shell $(_HAVE_FORK_SH))
 
-# Work out if we use Open RC or BSD RC
-_RC_SH = if [ -d /etc/init.d ]; then echo "-DENABLE_ORC"; elif [ -d /etc/rc.d ]; then echo "-DENABLE_BRC"; fi
+# Work out how to restart services 
+_RC_SH = if [ -n "$(HAVE_INIT)" ]; then \
+		 [ "$(HAVE_INIT)" = "no" ] || echo "-DENABLE_$(HAVE_INIT)"; \
+		 elif [ -x /sbin/runscript ]; then echo "-DENABLE_ORC"; \
+		 elif [ -x /sbin/service ]; then echo "-DENABLE_SERVICE"; \
+		 elif [ -d /etc/rc.d ]; then echo "-DENABLE_BRC"; \
+		 elif [ -d /etc/init.d ]; then echo "-DENABLE_SYSV"; \
+		 fi
 _RC != $(_RC_SH)
 RC = $(_RC)$(shell $(_RC_SH))
 

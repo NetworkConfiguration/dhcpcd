@@ -293,17 +293,29 @@ static int make_ntp (const char *ifname, const dhcp_t *dhcp)
 #endif
 
 #ifdef NTPSERVICE
-	if (restart_ntp)
-		retval += exec_cmd (NTPSERVICE, NTPRESTARTARGS, (char *) NULL);
+	if (restart_ntp) {
+#ifdef NTPCHECK
+		if (system (NTPCHECK) == 0)
+#endif
+			retval += exec_cmd (NTPSERVICE, NTPRESTARTARGS, (char *) NULL);
+	}
 #endif
 
 #if defined (NTPSERVICE) && defined (OPENNTPSERVICE)
 	if (restart_openntp &&
 		(strcmp (NTPSERVICE, OPENNTPSERVICE) != 0 || ! restart_ntp))
-		retval += exec_cmd (OPENNTPSERVICE, OPENNTPRESTARTARGS, (char *) NULL);
+	{
+#ifdef OPENNTPCHECK
+		if (system (OPENNTPCHECK) == 0)
+#endif
+			retval += exec_cmd (OPENNTPSERVICE, OPENNTPRESTARTARGS, (char *) NULL);
+	}
 #elif defined (OPENNTPSERVICE) && ! defined (NTPSERVICE)
-	if (restart_openntp) 
-		retval += exec_cmd (OPENNTPSERVICE, OPENNTPRESTARTARGS, (char *) NULL);
+	if (restart_openntp) {
+#ifdef OPENNTPCHECK
+		if (system (OPENNTPCHECK) == 0)
+#endif
+			retval += exec_cmd (OPENNTPSERVICE, OPENNTPRESTARTARGS, (char *) NULL);
 #endif
 
 	return retval;
@@ -345,7 +357,10 @@ static int make_nis (const char *ifname, const dhcp_t *dhcp)
 	free (prefix);
 	fclose (f);
 
-	exec_cmd (NISSERVICE, NISRESTARTARGS, (char *) NULL);
+#ifdef NISCHECK
+	if (system (NISCHECK) == 0)
+#endif
+		exec_cmd (NISSERVICE, NISRESTARTARGS, (char *) NULL);
 	return 0;
 }
 #endif

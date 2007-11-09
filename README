@@ -24,3 +24,10 @@ Notes
 -----
 If you're cross compiling you may need to send HAVE_FORK=yes or HAVE_FORK=no
 to the make command to avoid to automatic test.
+
+We try and detect how to restart ntp and ypbind, you can override this with
+HAVE_INIT=no or force one of these values
+ORC      (OpenRC as used by Gentoo (forked from baselayout))
+BRC      (BSD RC system - /etc/rc.d/ntpd restart )
+SERVICE  (RedHat service command - service ntpd restart)
+SYSV     (SYSV style - /etc/init.d/ntpd restart)
