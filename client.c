@@ -180,7 +180,7 @@ static bool get_old_lease (const options_t *options, interface_t *iface,
 #ifdef ENABLE_ARP
 	/* Check that no-one is using the address */
 	if ((options->dolastlease || 
-		 (IN_LINKLOCAL (dhcp->address.s_addr) &&
+		 (IN_LINKLOCAL (ntohl (dhcp->address.s_addr)) &&
 		  (! options->doipv4ll ||
 		   arp_claim (iface, dhcp->address)))))
 	{
@@ -271,7 +271,9 @@ int dhcp_run (const options_t *options, int *pidfd)
 			return (-1);
 		}
 
-		if (! options->daemonised && IN_LINKLOCAL (dhcp->address.s_addr)) {
+		if (! options->daemonised &&
+			IN_LINKLOCAL (ntohl (dhcp->address.s_addr)))
+		{
 			logger (LOG_ERR, "cannot request a link local address");
 			return (-1);
 		}
@@ -459,7 +461,7 @@ int dhcp_run (const options_t *options, int *pidfd)
 						|| state == STATE_REBINDING)
 					{
 						logger (LOG_INFO, "received SIGHUP, releasing lease");
-						if (! IN_LINKLOCAL (dhcp->address.s_addr)) {
+						if (! IN_LINKLOCAL (ntohl (dhcp->address.s_addr))) {
 							SOCKET_MODE (SOCKET_OPEN);
 							xid = random ();
 							if ((open_socket (iface, false)) >= 0)
@@ -489,13 +491,13 @@ int dhcp_run (const options_t *options, int *pidfd)
 				case STATE_INIT:
 					if (xid != 0) {
 						if (iface->previous_address.s_addr != 0 &&
-							! IN_LINKLOCAL (iface->previous_address.s_addr) &&
+							! IN_LINKLOCAL (ntohl (iface->previous_address.s_addr)) &&
 							! options->doinform)
 						{
 							logger (LOG_ERR, "lost lease");
 							if (! options->persistent)
 								DROP_CONFIG;
-						} else
+						} else if (! IN_LINKLOCAL (ntohl (iface->previous_address.s_addr)))
 							logger (LOG_ERR, "timed out");
 						
 						SOCKET_MODE (SOCKET_CLOSED);
@@ -525,7 +527,7 @@ int dhcp_run (const options_t *options, int *pidfd)
 #ifdef ENABLE_IPV4LL
 						if (! options->test && options->doipv4ll &&
 							(! dhcp->address.s_addr ||
-							 (! IN_LINKLOCAL (dhcp->address.s_addr) &&
+							 (! IN_LINKLOCAL (ntohl (dhcp->address.s_addr)) &&
 							  ! options->dolastlease)))
 						{
 							logger (LOG_INFO, "probing for an IPV4LL address");
@@ -534,9 +536,6 @@ int dhcp_run (const options_t *options, int *pidfd)
 							if (ipv4ll_get_address (iface, dhcp) == -1) {
 								break;
 							}
-							if (! daemonised)
-								logger (LOG_WARNING, "using IPV4LL address %s",
-										inet_ntoa (dhcp->address));
 							timeout = dhcp->renewaltime;
 						}
 #endif
@@ -544,6 +543,10 @@ int dhcp_run (const options_t *options, int *pidfd)
 #if defined (ENABLE_INFO) || defined (ENABLE_IPV4LL)
 						if (dhcp->address.s_addr)
 						{
+							if (! daemonised &&
+								IN_LINKLOCAL (ntohl (dhcp->address.s_addr)))
+								logger (LOG_WARNING, "using IPV4LL address %s",
+										inet_ntoa (dhcp->address));
 							if (configure (options, iface, dhcp, true) == -1 &&
 								! daemonised)
 							{
@@ -601,7 +604,7 @@ int dhcp_run (const options_t *options, int *pidfd)
 					break;
 				case STATE_BOUND:
 				case STATE_RENEW_REQUESTED:
-					if (IN_LINKLOCAL (dhcp->address.s_addr)) {
+					if (IN_LINKLOCAL (ntohl (dhcp->address.s_addr))) {
 						memset (&dhcp->address, 0, sizeof (struct in_addr));
 						state = STATE_INIT;
 						xid = 0;

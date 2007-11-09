@@ -546,7 +546,7 @@ int configure (const options_t *options, interface_t *iface,
 	 * address and isn't link local itself */
 	if (options-> doipv4ll &&
 		! haslinklocal &&
-		IN_PRIVATE (dhcp->address.s_addr))
+		IN_PRIVATE (ntohl (dhcp->address.s_addr)))
 	{
 		struct in_addr dest;
 		struct in_addr mask;

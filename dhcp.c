@@ -78,7 +78,7 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 	if ((type == DHCP_INFORM ||
 		type == DHCP_RELEASE ||
 		type == DHCP_REQUEST) &&
-		! IN_LINKLOCAL (iface->previous_address.s_addr))
+		! IN_LINKLOCAL (ntohl (iface->previous_address.s_addr)))
 	{
 		message->ciaddr = iface->previous_address.s_addr;
 		from.s_addr = iface->previous_address.s_addr;
@@ -143,7 +143,7 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 			memcpy (p, &_val.s_addr, 4); \
 			p += 4; \
 		}
-		if (IN_LINKLOCAL (dhcp->address.s_addr))
+		if (IN_LINKLOCAL (ntohl (dhcp->address.s_addr)))
 			logger (LOG_ERR, "cannot request a link local address");
 		else {
 			if (dhcp->address.s_addr != iface->previous_address.s_addr &&

@@ -458,7 +458,7 @@ int main(int argc, char **argv)
 			options->keep_address = true;
 	}
 
-	if (IN_LINKLOCAL (options->request_address.s_addr)) {
+	if (IN_LINKLOCAL (ntohl (options->request_address.s_addr))) {
 		logger (LOG_ERR, "you are not allowed to request a link local address");
 		exit (EXIT_FAILURE);
 	}

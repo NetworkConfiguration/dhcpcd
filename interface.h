@@ -45,9 +45,9 @@
  * 192.168/16
  */
 #ifndef IN_PRIVATE
-# define IN_PRIVATE(addr) (((ntohl (addr) & IN_CLASSA_NET) == 0x0a000000) || \
-						   ((ntohl (addr) & 0xfff00000)    == 0xac100000) || \
-						   ((ntohl (addr) & IN_CLASSB_NET) == 0xc0a80000))
+# define IN_PRIVATE(addr) (((addr & IN_CLASSA_NET) == 0x0a000000) || \
+						   ((addr & 0xfff00000)    == 0xac100000) || \
+						   ((addr & IN_CLASSB_NET) == 0xc0a80000))
 #endif
 
 #define LINKLOCAL_ADDR       0xa9fe0000
@@ -55,7 +55,7 @@
 #define LINKLOCAL_BRDC		 0xa9feffff
 
 #ifndef IN_LINKLOCAL
-# define IN_LINKLOCAL(addr) ((ntohl (addr) & IN_CLASSB_NET) == LINKLOCAL_ADDR)
+# define IN_LINKLOCAL(addr) ((addr & IN_CLASSB_NET) == LINKLOCAL_ADDR)
 #endif
 
 typedef struct route_t
