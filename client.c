@@ -534,6 +534,9 @@ int dhcp_run (const options_t *options, int *pidfd)
 							if (ipv4ll_get_address (iface, dhcp) == -1) {
 								break;
 							}
+							if (! daemonised)
+								logger (LOG_WARNING, "using IPV4LL address %s",
+										inet_ntoa (dhcp->address));
 							timeout = dhcp->renewaltime;
 						}
 #endif
