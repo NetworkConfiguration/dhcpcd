@@ -5,7 +5,9 @@
  * Distributed under the terms of the GNU General Public License v2
  */
 
+#ifdef __linux__
 #define _BSD_SOURCE
+#endif
 
 #include <sys/types.h>
 #include <sys/ioctl.h>
