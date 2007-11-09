@@ -169,7 +169,8 @@ static bool get_old_lease (const options_t *options, interface_t *iface,
 	struct timeval tv;
 	unsigned int offset = 0;
 
-	logger (LOG_INFO, "trying to use old lease in `%s'", iface->infofile);
+	if (! IN_LINKLOCAL (ntohl (iface->previous_address.s_addr)))
+		logger (LOG_INFO, "trying to use old lease in `%s'", iface->infofile);
 	if (! read_info (iface, dhcp))
 		return (false);
 
@@ -587,7 +588,8 @@ int dhcp_run (const options_t *options, int *pidfd)
 					timeout = options->timeout;
 					iface->start_uptime = uptime ();
 					if (dhcp->address.s_addr == 0) {
-						logger (LOG_INFO, "broadcasting for a lease");
+						if (! IN_LINKLOCAL (ntohl (iface->previous_address.s_addr)))
+							logger (LOG_INFO, "broadcasting for a lease");
 						SEND_MESSAGE (DHCP_DISCOVER);
 					} else if (options->doinform) {
 						logger (LOG_INFO, "broadcasting inform for %s",

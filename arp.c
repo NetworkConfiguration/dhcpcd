@@ -100,8 +100,10 @@ int arp_claim (interface_t *iface, struct in_addr address)
 		return (0);
 	}
 
-	logger (LOG_INFO, "checking %s is available on attached networks",
-			inet_ntoa (address));
+	if (! IN_LINKLOCAL (ntohl (iface->previous_address.s_addr)) &&
+		! IN_LINKLOCAL (ntohl (address.s_addr)))
+		logger (LOG_INFO, "checking %s is available on attached networks",
+				inet_ntoa (address));
 
 	if (! open_socket (iface, true))
 		return (-1);
