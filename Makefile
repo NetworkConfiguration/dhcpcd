@@ -62,8 +62,8 @@ _HAVE_FORK_SH = if [ "$(HAVE_FORK)" = "yes" ]; then \
 _HAVE_FORK != $(_HAVE_FORK_SH)
 FORK = $(_HAVE_FORK)$(shell $(_HAVE_FORK_SH))
 
-# Work out if we use ORC or RC
-_RC_SH = if [ -d /etc/init.d ]; then echo "-DENABLE_ORC"; elif [ -d /etc/rc.d ]; then echo "-DENABLE_RC"; fi
+# Work out if we use Open RC or BSD RC
+_RC_SH = if [ -d /etc/init.d ]; then echo "-DENABLE_ORC"; elif [ -d /etc/rc.d ]; then echo "-DENABLE_BRC"; fi
 _RC != $(_RC_SH)
 RC = $(_RC)$(shell $(_RC_SH))
 

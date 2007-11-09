@@ -71,7 +71,7 @@
 #define NTPRESTARTARGS      "--nodeps", "--quiet", "conditionalrestart"
 #define OPENNTPSERVICE      ETCDIR "/init.d/ntpd"
 #define OPENNTPRESTARTARGS  "--nodeps", "--quiet", "conditionalrestart"
-#elif ENABLE_RC
+#elif ENABLE_BRC
 #define NISSERVICE          ETCDIR "/rc.d/ypbind"
 #define NISRESTARTARGS      "restart"
 #define NTPSERVICE          ETCDIR "/rc.d/ntpd"

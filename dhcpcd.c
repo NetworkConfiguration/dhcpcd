@@ -405,8 +405,8 @@ int main(int argc, char **argv)
 #endif
 #ifdef ENABLE_ORC
 				" ORC"
-#elif ENABLE_RC
-				" RC"
+#elif ENABLE_BRC
+				" BRC"
 #endif
 #ifdef ENABLE_RESOLVCONF
 				" RESOLVCONF"
