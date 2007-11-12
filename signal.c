@@ -19,10 +19,12 @@
 #include "signal.h"
 
 static int signal_pipe[2];
-static int signal_signal = 0;
+static int signals[5];
 
 static void signal_handler (int sig)
 {
+	unsigned int i = 0;
+
 	/* Silently ignore this signal and wait for it. This stops zombies.
 	   We do this here instead of client.c so that we don't spam the log file
 	   with "waiting on select messages" */
@@ -31,31 +33,16 @@ static void signal_handler (int sig)
 		return;
 	}
 
-	signal_signal = sig;
+	/* Add a signal to our stack */
+	while (signals[i])
+		i++;
+	if (i > sizeof (signals) / sizeof (signals[0]))
+		logger (LOG_ERR, "signal buffer overrun");
+	else
+		signals[i] = sig;
+
 	if (send (signal_pipe[1], &sig, sizeof (sig), MSG_DONTWAIT) == -1)
 		logger (LOG_ERR, "Could not send signal: %s", strerror (errno));
-}
-
-/* Call this before doing anything else. Sets up the socket pair
- * and installs the signal handler */
-void signal_setup (void)
-{
-	int i;
-	int flags;
-
-	socketpair (AF_UNIX, SOCK_STREAM, 0, signal_pipe);
-
-	/* Stop any scripts from inheriting us */
-	for (i = 0; i < 2; i++)
-		if ((flags = fcntl (signal_pipe[i], F_GETFD, 0)) == -1 ||
-			fcntl (signal_pipe[i], F_SETFD, flags | FD_CLOEXEC) == -1)
-			logger (LOG_ERR ,"fcntl: %s", strerror (errno));
-
-	signal (SIGHUP, signal_handler);
-	signal (SIGALRM, signal_handler);
-	signal (SIGTERM, signal_handler);
-	signal (SIGINT, signal_handler);
-	signal (SIGCHLD, signal_handler);
 }
 
 /* Add the signal pipe to an fd set */
@@ -71,7 +58,7 @@ int signal_fd_set (fd_set *rset, int fd)
 /* Check if we have a signal or not */
 int signal_exists (const fd_set *rset)
 {
-	if (signal_signal || (rset && FD_ISSET (signal_pipe[0], rset)))
+	if (signals[0] || (rset && FD_ISSET (signal_pipe[0], rset)))
 		return 0;
 	return -1;
 }
@@ -83,9 +70,16 @@ int signal_read (fd_set *rset)
 {
 	int sig = -1;
 
-	if (signal_signal) {
-		sig = signal_signal;
-		signal_signal = 0;
+	/* Pop a signal off the our stack */
+
+	if (signals[0]) {
+		unsigned int i = 0;
+		sig = signals[0];
+		while (i < (sizeof (signals) / sizeof (signals[0])) - 1) {
+			signals[i] = signals[i + 1];
+			if (! signals[++i])
+				break;
+		}
 	}
 
 	if (rset && FD_ISSET (signal_pipe[0], rset)) {
@@ -106,4 +100,28 @@ int signal_read (fd_set *rset)
 	}
 
 	return sig;
+}
+
+/* Call this before doing anything else. Sets up the socket pair
+ * and installs the signal handler */
+void signal_setup (void)
+{
+	unsigned int i;
+	int flags;
+
+	socketpair (AF_UNIX, SOCK_STREAM, 0, signal_pipe);
+
+	/* Stop any scripts from inheriting us */
+	for (i = 0; i < 2; i++)
+		if ((flags = fcntl (signal_pipe[i], F_GETFD, 0)) == -1 ||
+			fcntl (signal_pipe[i], F_SETFD, flags | FD_CLOEXEC) == -1)
+			logger (LOG_ERR ,"fcntl: %s", strerror (errno));
+
+	signal (SIGHUP, signal_handler);
+	signal (SIGALRM, signal_handler);
+	signal (SIGTERM, signal_handler);
+	signal (SIGINT, signal_handler);
+	signal (SIGCHLD, signal_handler);
+
+	memset (signals, 0, sizeof (signals));
 }
