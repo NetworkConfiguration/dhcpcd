@@ -535,6 +535,13 @@ int dhcp_run (const options_t *options, int *pidfd)
 							free_dhcp (dhcp);
 							memset (dhcp, 0, sizeof (dhcp_t));
 							if (ipv4ll_get_address (iface, dhcp) == -1) {
+								if (! daemonised) {
+									retval = EXIT_FAILURE;
+									goto eexit;
+								}
+
+								/* start over */
+								xid = 0;
 								break;
 							}
 							timeout = dhcp->renewaltime;
