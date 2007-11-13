@@ -559,7 +559,7 @@ int configure (const options_t *options, interface_t *iface,
 #ifdef ENABLE_IPV4LL
 	/* Ensure we always add the link local route if we got a private
 	 * address and isn't link local itself */
-	if (options-> doipv4ll &&
+	if (options->doipv4ll &&
 		! haslinklocal &&
 		IN_PRIVATE (ntohl (dhcp->address.s_addr)))
 	{
