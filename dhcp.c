@@ -793,6 +793,10 @@ parse_start:
 				}
 				break;
 
+			case DHCP_FQDN:
+				/* We ignore replies about FQDN */
+				break;
+
 #undef LENGTH
 #undef MIN_LENGTH
 #undef MULT_LENGTH
