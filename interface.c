@@ -560,10 +560,7 @@ static int do_route (const char *ifname,
 	rtm.hdr.rtm_version = RTM_VERSION;
 	rtm.hdr.rtm_seq = ++seq;
 	rtm.hdr.rtm_type = change ? RTM_CHANGE : del ? RTM_DELETE : RTM_ADD;
-	rtm.hdr.rtm_flags = RTF_UP;
-	if (ntohl (destination.s_addr) != LINKLOCAL_ADDR &&
-		ntohl (netmask.s_addr) != LINKLOCAL_MASK)
-		rtm.hdr.rtm_flags |= RTF_STATIC;
+	rtm.hdr.rtm_flags = RTF_UP | RTF_STATIC;
 
 	/* This order is important */
 	rtm.hdr.rtm_addrs = RTA_DST | RTA_GATEWAY | RTA_NETMASK;
