@@ -117,7 +117,7 @@ static pid_t read_pid (const char *pidfile)
 
 static void usage ()
 {
-	printf ("usage: "PACKAGE" [-adknpEGHMNRTY] [-c script] [-h hostame] [-i classID]\n"
+	printf ("usage: "PACKAGE" [-adknpEGHMNRTY] [-c script] [-h hostname] [-i classID]\n"
 	        "              [-l leasetime] [-m metric] [-r ipaddress] [-s ipaddress]\n"
 			"              [-t timeout] [-u userclass] [-F none | ptr | both]\n"
 			"              [-I clientID] <interface>\n");
@@ -476,15 +476,15 @@ int main(int argc, char **argv)
 	chdir ("/");
 	umask (022);
 	
-	if (mkdir (CONFIGDIR, S_IRUSR |S_IWUSR |S_IXUSR | S_IRGRP | S_IXGRP
-			   | S_IROTH | S_IXOTH) && errno != EEXIST )
+	if (mkdir (INFODIR, S_IRUSR | S_IWUSR |S_IXUSR | S_IRGRP | S_IXGRP
+			   | S_IROTH | S_IXOTH) && errno != EEXIST)
 	{
-		logger (LOG_ERR, "mkdir(\"%s\",0): %s\n", CONFIGDIR, strerror (errno));
+		logger (LOG_ERR, "mkdir(\"%s\",0): %s\n", INFODIR, strerror (errno));
 		exit (EXIT_FAILURE);
 	}
 
 	if (mkdir (ETCDIR, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP
-			   | S_IROTH | S_IXOTH) && errno != EEXIST )
+			   | S_IROTH | S_IXOTH) && errno != EEXIST)
 	{
 		logger (LOG_ERR, "mkdir(\"%s\",0): %s\n", ETCDIR, strerror (errno));
 		exit (EXIT_FAILURE);

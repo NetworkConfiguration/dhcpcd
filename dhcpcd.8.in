@@ -1,13 +1,7 @@
-.\" $Id$
-.\"
 .TH DHCPCD 8 "18 Jul 2007" "dhcpcd 3.1"
-
 .SH NAME
 dhcpcd \- DHCP client daemon
-
 .SH SYNOPSIS
-.in +.5i
-.ti -.5i
 dhcpcd
 \%[\-dknpAEGHMLNRTY]
 \%[\-c\ script]
@@ -22,7 +16,6 @@ dhcpcd
 \%[\-F\ none | ptr | both ]
 \%[\-I\ clientID ]
 \%[interface]
-.in -.5i
 .SH DESCRIPTION
 .B dhcpcd
 is an implementation of the DHCP client specified in
@@ -319,13 +312,6 @@ from replacing
 .I /etc/yp.conf
 
 .SH FILES
-.PD 0
-.TP
-.BI /var/lib/dhcpcd
-Directory used for storing files information files created by
-.B dhcpcd
-that can be used by shell scripts.
-.PD 1
 .TP
 .BI /etc/dhcpcd.sh
 script file, which
@@ -373,7 +359,13 @@ is actually replaced with the network interface name like
 to which
 .B dhcpcd
 is attached.
-
+.TP
+.BI /var/lib/dhcpcd/dhcpcd.duid
+file containing the generated DUID for dhcpcd to use.
+.TP
+.BI /var/lib/dhcpcd/dhcpcd-<interface>.info
+file containing information provided by the DHCP server than can be used in
+shell scripts.
 .SH SEE ALSO
 .LP
 .I Dynamic Host Configuration Protocol,
@@ -389,7 +381,7 @@ RFC 3927
 RFC 4702
 
 .SH BUGS
-Please report them to http://dhcpcd.berlios.de or http://bugs.gentoo.org.
+Please report them to http://dhcpcd.berlios.de
 .PD 0
 
 .SH AUTHORS

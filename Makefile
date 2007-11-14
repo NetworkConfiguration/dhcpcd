@@ -3,18 +3,19 @@
 # such as the need to link to libresolv and/or librt so please forgive the
 # embedded code :)
 
-VERSION = 3.1.8_pre1
+VERSION = 3.1.8pre1
 CFLAGS += -O2 -pipe
 
 INSTALL ?= install
 DESTDIR =
-SBINDIR = $(DESTDIR)/sbin
-MANDIR = $(DESTDIR)/usr/share/man
-LIBDIR = $(DESTDIR)/var/lib
+MANPREFIX ?= /usr/share
+SBINDIR = $(DESTDIR)$(PREFIX)/sbin
+MANDIR = $(DESTDIR)$(MANPREFIX)/man
+INFODIR = /var/lib/dhcpcd
 
 SBIN_TARGETS = dhcpcd
-MAN8_TARGETS = dhcpcd.8
-TARGET = $(SBIN_TARGETS)
+MAN_TARGETS = dhcpcd.8
+TARGET = $(SBIN_TARGETS) $(MAN_TARGETS)
 
 # Work out if we need -lresolv or not
 _LIBRESOLV_SH = printf '\#include <netinet/in.h>\n\#include <resolv.h>\nint main (void) { return (res_init ()); }\n' > .res_init.c; \
@@ -106,13 +107,18 @@ dhcpcd_OBJS = arp.o client.o common.o configure.o dhcp.o dhcpcd.o duid.o \
 			  info.o interface.o ipv4ll.o logger.o signal.o socket.o
 
 $(dhcpcd_OBJS): 
-	$(CC) $(FORK) $(RC) $(CFLAGS) -c $*.c
+	$(CC) $(FORK) $(RC) -DINFODIR=\"$(INFODIR)\" $(CFLAGS) -c $*.c
 
 dhcpcd: $(dhcpcd_H) .depend $(dhcpcd_OBJS)
 	$(CC) $(LDFLAGS) $(dhcpcd_OBJS) $(LIBRESOLV) $(LIBRT) -o dhcpcd
 
 version.h:
 	echo '#define VERSION "$(VERSION)"' > version.h
+
+dhcpcd.8:
+	sed 's:/var/lib/dhcpcd:$(INFODIR):g' dhcpcd.8.in > dhcpcd.8
+
+man: $(MAN_TARGETS) 
 
 .PHONY: clean install dist
 
@@ -127,8 +133,7 @@ install: $(TARGET)
 	$(INSTALL) -m 0755 -d $(SBINDIR)
 	$(INSTALL) -m 0755 $(SBIN_TARGETS) $(SBINDIR)
 	$(INSTALL) -m 0755 -d $(MANDIR)/man8
-	$(INSTALL) -m 0644 $(MAN8_TARGETS) $(MANDIR)/man8
-	$(INSTALL) -m 0755 -d $(LIBDIR)
+	$(INSTALL) -m 0644 $(MAN_TARGETS) $(MANDIR)/man8
 
 dist:
 	$(INSTALL) -m 0755 -d /tmp/dhcpcd-$(VERSION)

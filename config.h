@@ -57,10 +57,11 @@
 #define STATEDIR            "/var"
 #define PIDFILE             STATEDIR "/run/" PACKAGE "-%s.pid"
 
-#define CONFIGDIR           STATEDIR "/lib/" PACKAGE
-#define INFOFILE            CONFIGDIR "/" PACKAGE "-%s.info"
-
-#define DUIDFILE            CONFIGDIR "/" PACKAGE ".duid"
+#ifndef INFODIR
+# define INFODIR            "/var/lib/dhcpcd"
+#endif
+#define INFOFILE            INFODIR "/" PACKAGE "-%s.info"
+#define DUIDFILE            INFODIR "/" PACKAGE ".duid"
 
 /* ORC is Open Run Control, forked from Gentoo's baselayout package
  * BRC is BSD style Run Control
