@@ -95,21 +95,6 @@ static const struct option longopts[] = {
 	{NULL,          0,                  NULL, 0}
 };
 
-
-#define STRINGINT(_string, _int) { \
-	char *_tmp; \
-	long _number = strtol (_string, &_tmp, 0); \
-	errno = 0; \
-	if ((errno != 0 && _number == 0) || _string == _tmp || \
-		(errno == ERANGE && (_number == LONG_MAX || _number == LONG_MIN))) \
-	{ \
-		logger (LOG_ERR, "`%s' out of range", _string);; \
-		exit (EXIT_FAILURE); \
-	} \
-	else \
-	_int = (int) _number; \
-}
-
 #ifdef THERE_IS_NO_FORK
 char dhcpcd[PATH_MAX];
 char **dhcpcd_argv = NULL;
@@ -118,6 +103,22 @@ char *dhcpcd_skiproutes = NULL;
 #undef EXTRA_OPTS
 #define EXTRA_OPTS "fg:"
 #endif
+
+static int atoint (const char *s)
+{
+	char *t;
+	long n = strtol (s, &t, 0);
+	
+	errno = 0;
+	if ((errno != 0 && n == 0) || s == t ||
+		(errno == ERANGE && (n == LONG_MAX || n == LONG_MIN)))
+	{
+		logger (LOG_ERR, "`%s' out of range", s);
+		exit (EXIT_FAILURE);
+	}
+
+	return n;
+}
 
 static pid_t read_pid (const char *pidfile)
 {
@@ -247,14 +248,14 @@ int main(int argc, char **argv)
 				sig = SIGHUP;
 				break;
 			case 'l':
-				STRINGINT (optarg, options->leasetime);
+				options->leasetime = atoint (optarg);
 				if (options->leasetime <= 0) {
 					logger (LOG_ERR, "leasetime must be a positive value");
 					exit (EXIT_FAILURE);
 				}
 				break;
 			case 'm':
-				STRINGINT (optarg, options->metric);
+				options->metric = atoint (optarg);
 				break;
 			case 'n':
 				sig = SIGALRM;
@@ -294,7 +295,7 @@ int main(int argc, char **argv)
 				}
 				break;
 			case 't':
-				STRINGINT (optarg, options->timeout);
+				options->timeout = atoint (optarg);
 				if (options->timeout < 0) {
 					logger (LOG_ERR, "timeout must be a positive value");
 					exit (EXIT_FAILURE);
