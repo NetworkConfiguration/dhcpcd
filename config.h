@@ -63,25 +63,25 @@
 #define INFOFILE            INFODIR "/" PACKAGE "-%s.info"
 #define DUIDFILE            INFODIR "/" PACKAGE ".duid"
 
-/* ORC is Open Run Control, forked from Gentoo's baselayout package
- * BRC is BSD style Run Control
- * SRC is Slackware Run Control
- * SERVICE is RedHat
+/* OPENRC is Open Run Control, forked from Gentoo's baselayout package
+ * BSDRC is BSD style Run Control
+ * SLACKRC is Slackware Run Control
+ * SERVICE is RedHat service command
  * SYSV should cover everthing else */
-#ifdef ENABLE_ORC
-# define SERVICE             "ORC"
+#ifdef ENABLE_OPENRC
+# define SERVICE             "OPENRC"
 # define NISSERVICE          ETCDIR "/init.d/ypbind"
 # define NISRESTARTARGS      "--nodeps", "--quiet", "conditionalrestart"
 # define NTPSERVICE          ETCDIR "/init.d/ntpd"
 # define NTPRESTARTARGS      "--nodeps", "--quiet", "conditionalrestart"
-#elif ENABLE_BRC
-# define SERVICE             "BRC"
+#elif ENABLE_BSDRC
+# define SERVICE             "BSDRC"
 # define NISSERVICE          ETCDIR "/rc.d/ypbind"
 # define NISRESTARTARGS      "restart"
 # define NTPSERVICE          ETCDIR "/rc.d/ntpd"
 # define NTPRESTARTARGS      "restart"
-#elif ENABLE_SRC
-# define SERVICE             "SRC"
+#elif ENABLE_SLACKRC
+# define SERVICE             "SLACKRC"
 # define NISSERVICE          ETCDIR "/rc.d/rc.ypbind"
 # define NISRESTARTARGS      "restart"
 # define NTPSERVICE          ETCDIR "/rc.d/rc.ntpd"

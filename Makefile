@@ -66,9 +66,10 @@ FORK = $(_HAVE_FORK)$(shell $(_HAVE_FORK_SH))
 # Work out how to restart services 
 _RC_SH = if [ -n "$(HAVE_INIT)" ]; then \
 		 [ "$(HAVE_INIT)" = "no" ] || echo "-DENABLE_$(HAVE_INIT)"; \
-		 elif [ -x /sbin/runscript ]; then echo "-DENABLE_ORC"; \
+		 elif [ -x /sbin/runscript ]; then echo "-DENABLE_OPENRC"; \
 		 elif [ -x /sbin/service ]; then echo "-DENABLE_SERVICE"; \
-		 elif [ -d /etc/rc.d ]; then echo "-DENABLE_BRC"; \
+		 elif [ -x /etc/rc.d/rc.S -a -x /etc/rc.d/rc.M ]; then echo "-DENABLE_SLACKRC"; \
+		 elif [ -d /etc/rc.d ]; then echo "-DENABLE_BSDRC"; \
 		 elif [ -d /etc/init.d ]; then echo "-DENABLE_SYSV"; \
 		 fi
 _RC != $(_RC_SH)
