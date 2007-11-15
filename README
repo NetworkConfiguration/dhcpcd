@@ -2,12 +2,6 @@ dhcpcd-3 - DHCP client daemon
 Copyright 2006-2007 Roy Marples <roy@marples.name>
 
 
-License
--------
-This program is licensed under both the GPL version 2, the text of which
-can be found in the LICENSE file.
-
-
 Installation
 ------------
 Edit config.h to match your building requirements.
