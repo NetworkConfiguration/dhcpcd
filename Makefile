@@ -115,8 +115,8 @@ dhcpcd: $(dhcpcd_H) .depend $(dhcpcd_OBJS)
 version.h:
 	echo '#define VERSION "$(VERSION)"' > version.h
 
-dhcpcd.8:
-	sed 's:/var/lib/dhcpcd:$(INFODIR):g' dhcpcd.8.in > dhcpcd.8
+dhcpcd.8: dhcpcd.8.in
+	sed 's:%%INFODIR%%:$(INFODIR):g' dhcpcd.8.in > dhcpcd.8
 
 man: $(MAN_TARGETS) 
 

@@ -202,7 +202,7 @@ check on the IP address.
 .TP
 .BI \-E
 Will read 
-.I /var/lib/dhcpcd/dhcpcd-<interface>.info
+.I %%INFODIR%%/dhcpcd-<interface>.info
 file and use last known good lease if
 .B dhcpcd
 is unable to reach the DHCP server and the lease has not expired.
@@ -231,7 +231,7 @@ does not perform any DNS update, even when the server is
 requested to perform no updates.  This can be easily
 implemented outside the client; all the necessary
 information is recorded in the
-.I /var/lib/dhcpcd/dhcpcd-<interface>.info
+.I %%INFODIR%%/dhcpcd-<interface>.info
 file.
 .TP
 .BI \-G
@@ -274,7 +274,7 @@ Specifies the client identifier string. If not specified then
 .B dhcpcd
 will attempt to create a client identifier according to \fBRFC 4361\fR
 and store the DUID part in
-.I /var/lib/dhcpcd/dhcpcd.duid\fR, otherwise
+.I %%INFODIR%%/dhcpcd.duid\fR, otherwise
 .B dhcpcd
 uses the MAC address of the network interface. If \fB-I\fR is not given
 an option then we use the MAC address of the network interface.
@@ -360,10 +360,10 @@ to which
 .B dhcpcd
 is attached.
 .TP
-.BI /var/lib/dhcpcd/dhcpcd.duid
+.BI %%INFODIR%%/dhcpcd.duid
 file containing the generated DUID for dhcpcd to use.
 .TP
-.BI /var/lib/dhcpcd/dhcpcd-<interface>.info
+.BI %%INFODIR%%/dhcpcd-<interface>.info
 file containing information provided by the DHCP server than can be used in
 shell scripts.
 .SH SEE ALSO
