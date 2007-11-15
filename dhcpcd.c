@@ -107,9 +107,10 @@ char *dhcpcd_skiproutes = NULL;
 static int atoint (const char *s)
 {
 	char *t;
-	long n = strtol (s, &t, 0);
-	
+	long n;
+
 	errno = 0;
+	n = strtol (s, &t, 0);
 	if ((errno != 0 && n == 0) || s == t ||
 		(errno == ERANGE && (n == LONG_MAX || n == LONG_MIN)))
 	{
