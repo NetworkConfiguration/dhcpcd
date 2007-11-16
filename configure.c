@@ -78,7 +78,7 @@ static int file_in_path (const char *file)
 	p = path;
 	while ((token = strsep (&p, ":"))) {
 		snprintf (mypath, PATH_MAX, "%s/%s", token, file);
-		if (stat (mypath, &s)) {
+		if (stat (mypath, &s) == 0) {
 			retval = 0;
 			break;
 		}
