@@ -3,7 +3,7 @@
 # such as the need to link to libresolv and/or librt so please forgive the
 # embedded code :)
 
-NAME = dhcpcd 
+NAME = dhcpcd
 VERSION = 3.1.8pre1
 PKG = $(NAME)-$(VERSION)
 
