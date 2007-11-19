@@ -3,7 +3,10 @@
 # such as the need to link to libresolv and/or librt so please forgive the
 # embedded code :)
 
+NAME = dhcpcd 
 VERSION = 3.1.8pre1
+PKG = $(NAME)-$(VERSION)
+
 CFLAGS += -O2 -pipe
 
 INSTALL ?= install
@@ -137,13 +140,13 @@ install: $(TARGET)
 	$(INSTALL) -m 0644 $(MAN_TARGETS) $(MANDIR)/man8
 
 dist:
-	$(INSTALL) -m 0755 -d /tmp/dhcpcd-$(VERSION)
-	cp -RPp . /tmp/dhcpcd-$(VERSION)
-	(cd /tmp/dhcpcd-$(VERSION); $(MAKE) clean)
-	rm -rf /tmp/dhcpcd-$(VERSION)/*.bz2 /tmp/dhcpcd-$(VERSION)/.git
-	tar cvjpf dhcpcd-$(VERSION).tar.bz2 -C /tmp dhcpcd-$(VERSION)
-	rm -rf /tmp/dhcpcd-$(VERSION)
-	ls -l dhcpcd-$(VERSION).tar.bz2
+	$(INSTALL) -d /tmp/$(PKG)
+	cp -RPp . /tmp/$(PKG)
+	(cd /tmp/$(PKG); $(MAKE) clean)
+	rm -rf /tmp/$(PKG)/*.bz2 /tmp/$(PKG)/.git /tmp/$(PKG)/test
+	tar cvjpf $(PKG).tar.bz2 -C /tmp $(PKG) 
+	rm -rf /tmp/$(PKG) 
+	ls -l $(PKG).tar.bz2
 
 # Sucky, but I cannot find a way of optional including the .depend file
 # that works for all make implementations :/
