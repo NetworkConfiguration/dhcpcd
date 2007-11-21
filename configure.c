@@ -282,11 +282,6 @@ static int _make_ntp (const char *file, const char *ifname, const dhcp_t *dhcp)
 			fprintf (f, "restrict %s nomodify notrap noquery\n", a);
 		fprintf (f, "server %s\n", a);
 	}
-
-	if (ntp) {
-		fprintf (f, "driftfile " NTPDRIFTFILE "\n");
-		fprintf (f, "logfile " NTPLOGFILE "\n");
-	}
 	fclose (f);
 
 	return 1;
