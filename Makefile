@@ -4,7 +4,7 @@
 # embedded code :)
 
 NAME = dhcpcd
-VERSION = 3.1.8pre1
+VERSION = 3.1.8
 PKG = $(NAME)-$(VERSION)
 
 CFLAGS ?= -O2 -pipe
