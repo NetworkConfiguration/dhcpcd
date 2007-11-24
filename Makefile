@@ -7,7 +7,7 @@ NAME = dhcpcd
 VERSION = 3.1.8pre1
 PKG = $(NAME)-$(VERSION)
 
-CFLAGS += -O2 -pipe
+CFLAGS ?= -O2 -pipe
 
 INSTALL ?= install
 DESTDIR =
