@@ -11,6 +11,7 @@
 
 #include <sys/types.h>
 #include <sys/ioctl.h>
+#include <sys/param.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
@@ -168,8 +169,7 @@ eexit:
 	return retval;
 }
 
-#if defined(__FreeBSD__) || defined(__NetBSD__) || defined (__OpenBSD__) \
-	|| defined(__APPLE__)
+#ifdef BSD
 /* Credit where credit is due :)
    The below BPF filter is taken from ISC DHCP */
 

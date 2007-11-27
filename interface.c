@@ -29,6 +29,7 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
+#include <sys/param.h>
 
 #include <arpa/inet.h>
 
@@ -484,8 +485,7 @@ static void log_route(
 	free (dstd);
 }
 
-#if defined(__FreeBSD__) || defined(__NetBSD__) || defined (__OpenBSD__) \
-|| defined(__APPLE__)
+#ifdef BSD
 
 /* Darwin doesn't define this for some very odd reason */
 #ifndef SA_SIZE
