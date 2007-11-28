@@ -13,8 +13,8 @@
 #  Sanity checks
 
 if [ $# -lt 2 ]; then
-  logger -s -p local0.err -t dhcpcd.sh "wrong usage"
-  exit 1
+	logger -s -p local0.err -t dhcpcd.sh "wrong usage"
+	exit 1
 fi
 
 hostinfo="$1"
@@ -24,23 +24,23 @@ state="$2"
 [ -e "${hostinfo}" ] && . "${hostinfo}"
 
 case "${state}" in
-    up)
-    logger -s -p local0.info -t dhcpcd.sh \
-    "interface ${INTERFACE} has been configured with old IP=${IPADDR}"
-    # Put your code here for when the interface has been brought up with an
-    # old IP address here
-    ;;
+	up)
+	logger -s -p local0.info -t dhcpcd.sh \
+	"interface ${INTERFACE} has been configured with old IP=${IPADDR}"
+	# Put your code here for when the interface has been brought up with an
+	# old IP address here
+	;;
 
-    new)
-    logger -s -p local0.info -t dhcpcd.sh \
-    "interface ${INTERFACE} has been configured with new IP=${IPADDR}"
-    # Put your code here for when the interface has been brought up with a
-    # new IP address
-    ;;
+	new)
+	logger -s -p local0.info -t dhcpcd.sh \
+	"interface ${INTERFACE} has been configured with new IP=${IPADDR}"
+	# Put your code here for when the interface has been brought up with a
+	# new IP address
+	;;
 
-    down) logger -s -p local0.info -t dhcpcd.sh \
-    "interface ${INTERFACE} has been brought down"
-    # Put your code here for the when the interface has been shut down
-    ;;
+	down) logger -s -p local0.info -t dhcpcd.sh \
+	"interface ${INTERFACE} has been brought down"
+	# Put your code here for the when the interface has been shut down
+	;;
 esac
 exit 0

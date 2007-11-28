@@ -22,9 +22,9 @@ TARGET = $(SBIN_TARGETS) $(MAN_TARGETS)
 
 # Work out if we need -lresolv or not
 _LIBRESOLV_SH = printf '\#include <netinet/in.h>\n\#include <resolv.h>\nint main (void) { return (res_init ()); }\n' > .res_init.c; \
-	if $(CC) .res_init.c -o .res_init >/dev/null 2>&1 ; then \
+	if $(CC) .res_init.c -o .res_init >/dev/null 2>&1; then \
 		echo ""; \
-	elif $(CC) .res_init.c -lresolv -o .res_init >/dev/null 2>&1 ; then \
+	elif $(CC) .res_init.c -lresolv -o .res_init >/dev/null 2>&1; then \
 		echo "-lresolv"; \
 	else \
 		echo "Cannot work out how to get res_init to link" >&2; \
@@ -39,7 +39,7 @@ LIBRESOLV = $(_LIBRESOLV)$(shell $(_LIBRESOLV_SH))
 _LIBRT_SH = printf '\#include <time.h>\n\#include <unistd.h>\n\nint main (void) { struct timespec ts;\n\#if defined(_POSIX_MONOTONIC_CLOCK) && defined(CLOCK_MONOTONIC)\nreturn (clock_gettime (CLOCK_MONOTONIC, &ts));\n\#else\nreturn -1;\n\#endif\n}\n' > .clock_gettime.c; \
 	if $(CC) .clock_gettime.c -o .clock_gettime >/dev/null 2>&1; then \
 		echo ""; \
-	elif $(CC) .clock_gettime.c -lrt -o .clock_gettime >/dev/null 2>&1 ; then \
+	elif $(CC) .clock_gettime.c -lrt -o .clock_gettime >/dev/null 2>&1; then \
 		echo "-lrt"; \
 	else \
 		echo ""; \
