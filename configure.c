@@ -25,10 +25,6 @@
  * SUCH DAMAGE.
  */
 
-#ifdef __linux__
-# define _GNU_SOURCE /* for asprinf */
-#endif
-
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
@@ -155,8 +151,10 @@ static int make_resolv (const char *ifname, const dhcp_t *dhcp)
 #ifdef ENABLE_RESOLVCONF
 	char *resolvconf = NULL;
 
-	if (file_in_path ("resolvconf") == 0) {	
-		asprintf (&resolvconf, "resolvconf -a %s", ifname);
+	if (file_in_path ("resolvconf") == 0) {
+		size_t len = strlen ("resolvconf -a ") + strlen (ifname) + 1;
+		resolvconf = xmalloc (sizeof (char) * len);
+		snprintf (resolvconf, len, "resolvconf -a %s", ifname);
 		if ((f = popen (resolvconf , "w")))
 			logger (LOG_DEBUG, "sending DNS information to resolvconf");
 		else if (errno == EEXIST)
@@ -395,6 +393,10 @@ int configure (const options_t *options, interface_t *iface,
 #ifdef ENABLE_IPV4LL
 	bool haslinklocal = false;
 #endif
+#ifdef THERE_IS_NO_FORK
+	size_t skiplen;
+	char *skipp;
+#endif
 
 	if (! options || ! iface || ! dhcp)
 		return (-1);
@@ -504,7 +506,11 @@ int configure (const options_t *options, interface_t *iface,
 
 #ifdef THERE_IS_NO_FORK
 	free (dhcpcd_skiproutes);
-	dhcpcd_skiproutes = NULL;
+	/* We can never have more than 255 routes. So we need space
+	 * for 255 3 digit numbers and commas */
+	skiplen = 255 * 4 + 1;
+	skipp = dhcpcd_skiproutes = xmalloc (sizeof (char) * skiplen);
+	*skipp = '\0';
 #endif
 
 	/* Remember added routes */
@@ -558,20 +564,26 @@ int configure (const options_t *options, interface_t *iface,
 			/* If we have daemonised yet we need to record which routes
 			 * we failed to add so we can skip them */
 			else if (! options->daemonised) {
-				if (dhcpcd_skiproutes) {
-					char *p = NULL;
-					asprintf (&p, "%s,%d", dhcpcd_skiproutes, skip);
-					free (dhcpcd_skiproutes);
-					dhcpcd_skiproutes = p;
-				} else {
-					asprintf (&dhcpcd_skiproutes, "%d", skip);
-				}
+				/* We can never have more than 255 / 4 routes, so 3 chars is
+				 * plently */
+				if (*skipp)
+					*skipp++ = ',';
+				skipp += snprintf (skipp, dhcpcd_skiproutes + skiplen - skipp,
+								   "%d", skip);
 			}
 			skip++;
 #endif
 		}
-
 	}
+
+#ifdef THERE_IS_NO_FORK
+	if (*dhcpcd_skiproutes)
+		*skipp = '\0';
+	else {
+		free (dhcpcd_skiproutes);
+		dhcpcd_skiproutes = NULL;
+	}
+#endif
 
 #ifdef ENABLE_IPV4LL
 	/* Ensure we always add the link local route if we got a private
