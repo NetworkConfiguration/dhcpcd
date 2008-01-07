@@ -209,13 +209,12 @@ static void restore_resolv (const char *ifname)
 }
 
 #ifdef ENABLE_NTP
-#define BUFFERSIZE 1024
 static int _make_ntp (const char *file, const char *ifname, const dhcp_t *dhcp)
 {
 	FILE *f;
 	address_t *address;
 	char *a;
-	char *buffer;
+	char *line;
 	int tomatch = 0;
 	char *token;
 	bool ntp = false;
@@ -231,16 +230,18 @@ static int _make_ntp (const char *file, const char *ifname, const dhcp_t *dhcp)
 			return -1;
 		}
 	} else {
-		buffer = xmalloc (sizeof (char) * BUFFERSIZE);
-		memset (buffer, 0, BUFFERSIZE);
-		while (fgets (buffer, BUFFERSIZE, f)) {
-			a = buffer;
+		while ((line = getline (f))) {
+			a = line;
 			token = strsep (&a, " ");
-			if (! token || strcmp (token, "server") != 0)
+			if (! token || strcmp (token, "server") != 0) {
+				free (line);
 				continue;
+			}
 
-			if ((token = strsep (&a, " \n")) == NULL)
+			if ((token = strsep (&a, " \n")) == NULL) {
+				free (line);
 				continue;
+			}
 
 			for (address = dhcp->ntpservers; address; address = address->next)
 				if (strcmp (token, inet_ntoa (address->address)) == 0) {
@@ -248,10 +249,11 @@ static int _make_ntp (const char *file, const char *ifname, const dhcp_t *dhcp)
 					break;
 				}
 
-			if (tomatch == 0)
+			if (tomatch == 0) {
+				free (line);
 				break;
+			}
 		}
-		free (buffer);
 		fclose (f);
 
 		/* File has the same name servers that we do, so no need to restart ntp */

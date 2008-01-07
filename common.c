@@ -41,6 +41,33 @@
 #include "common.h"
 #include "logger.h"
 
+/* Handy routine to read very long lines in text files.
+ * This means we read the whole line and avoid any nasty buffer overflows. */
+char *getline (FILE *fp)
+{
+	char *line = NULL;
+	char *p;
+	size_t len = 0;
+	size_t last = 0;
+
+	if (feof (fp))
+		return (NULL);
+
+	do {
+		len += BUFSIZ;
+		line = xrealloc (line, sizeof (char) * len);
+		p = line + last;
+		fgets (p, BUFSIZ, fp);
+		last += strlen (p);
+	} while (! feof (fp) && line[last - 1] != '\n');
+
+	/* Trim the trailing newline */
+	if (line[--last] == '\n')
+		line[last] = '\0';
+
+	return (line);
+}
+
 /* OK, this should be in dhcpcd.c
  * It's here to make dhcpcd more readable */
 #ifdef __linux__
@@ -166,6 +193,17 @@ void writepid (int fd, pid_t pid)
 void *xmalloc (size_t s)
 {
 	void *value = malloc (s);
+
+	if (value)
+		return (value);
+
+	logger (LOG_ERR, "memory exhausted");
+	exit (EXIT_FAILURE);
+}
+
+void *xrealloc (void *ptr, size_t s)
+{
+	void *value = realloc (ptr, s);
 
 	if (value)
 		return (value);

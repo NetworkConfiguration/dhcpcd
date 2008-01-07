@@ -43,33 +43,49 @@
 #include "info.h"
 
 #ifdef ENABLE_INFO
-#define BUFFERSIZE 1024
 
+/* Create a malloced string of cstr, changing ' to '\''
+ * so the contents work in a shell */
 static char *cleanmetas (const char *cstr)
 {
-	/* The largest single element we can have is 256 bytes according to the RFC,
-	   so this buffer size should be safe even if it's all ' */
-	static char buffer[BUFFERSIZE]; 
-	char *b = buffer;
+	const char *p = cstr;
+	char *new;
+	char *n;
+	size_t len;
 
-	memset (buffer, 0, sizeof (buffer));
-	if (cstr == NULL || strlen (cstr) == 0)
-		return b;
+	if (cstr == NULL || (len = strlen (cstr)) == 0)
+		return (xstrdup (""));
 
+	n = new = xmalloc (sizeof (char) * len + 1);
 	do
-		if (*cstr == 39) {
-			*b++ = '\'';
-			*b++ = '\\';
-			*b++ = '\'';
-			*b++ = '\'';
+		if (*p == '\'') {
+			size_t pos = n - new;
+			len += 3;
+			new = xrealloc (new, sizeof (char) * len + 1);
+			n = new + pos;
+			*n++ = '\'';
+			*n++ = '\\';
+			*n++ = '\'';
+			*n++ = '\'';
 		} else
-			*b++ = *cstr;
-	while (*cstr++);
+			*n++ = *p;
+	while (*p++);
 
-	*b++ = 0;
-	b = buffer;
+	/* Terminate the sucker */
+	*n++ = '\0';
 
-	return b;
+	return (new);
+}
+
+static void print_clean (FILE *f, const char *name, const char *value) {
+	char *clean;
+
+	if (! value)
+		return;
+
+	clean = cleanmetas (value);
+	fprintf (f, "%s='%s'\n", name, clean);
+	free (clean);
 }
 
 bool write_info(const interface_t *iface, const dhcp_t *dhcp,
@@ -129,14 +145,9 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 		fprintf (f, "'\n");
 	}
 
-	if (dhcp->hostname)
-		fprintf (f, "HOSTNAME='%s'\n", cleanmetas (dhcp->hostname));
-
-	if (dhcp->dnsdomain)
-		fprintf (f, "DNSDOMAIN='%s'\n", cleanmetas (dhcp->dnsdomain));
-
-	if (dhcp->dnssearch)
-		fprintf (f, "DNSSEARCH='%s'\n", cleanmetas (dhcp->dnssearch));
+	print_clean (f, "HOSTNAME", dhcp->hostname);
+	print_clean (f, "DNSDOMAIN", dhcp->dnsdomain);
+	print_clean (f, "DNSSEARCH", dhcp->dnssearch);
 
 	if (dhcp->dnsservers) {
 		fprintf (f, "DNSSERVERS='");
@@ -152,7 +163,7 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 		fprintf (f, "FQDNFLAGS='%u'\n", dhcp->fqdn->flags);
 		fprintf (f, "FQDNRCODE1='%u'\n", dhcp->fqdn->r1);
 		fprintf (f, "FQDNRCODE2='%u'\n", dhcp->fqdn->r2);
-		fprintf (f, "FQDNHOSTNAME='%s'\n", dhcp->fqdn->name);
+		print_clean (f, "FQDNHOSTNAME", dhcp->fqdn->name);
 	}
 
 	if (dhcp->ntpservers) {
@@ -165,9 +176,7 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 		fprintf (f, "'\n");
 	}
 
-	if (dhcp->nisdomain)
-		fprintf (f, "NISDOMAIN='%s'\n", cleanmetas (dhcp->nisdomain));
-
+	print_clean (f, "NISDOMAIN", dhcp->nisdomain);
 	if (dhcp->nisservers) {
 		fprintf (f, "NISSERVERS='");
 		for (address = dhcp->nisservers; address; address = address->next) {
@@ -178,16 +187,14 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 		fprintf (f, "'\n");
 	}
 
-	if (dhcp->rootpath)
-		fprintf (f, "ROOTPATH='%s'\n", cleanmetas (dhcp->rootpath));
-
-	if (dhcp->sipservers)
-		fprintf (f, "SIPSERVERS='%s'\n", cleanmetas (dhcp->sipservers));
+	print_clean (f, "ROOTPATH", dhcp->rootpath);
+	print_clean (f, "SIPSERVERS", dhcp->sipservers);
 
 	if (dhcp->serveraddress.s_addr)
 		fprintf (f, "DHCPSID='%s'\n", inet_ntoa (dhcp->serveraddress));
 	if (dhcp->servername[0])
-		fprintf (f, "DHCPSNAME='%s'\n", cleanmetas (dhcp->servername));
+		print_clean (f, "DHCPSNAME", dhcp->servername);
+
 	if (! options->doinform && dhcp->address.s_addr) {
 		if (! options->test)
 			fprintf (f, "LEASEDFROM='%u'\n", dhcp->leasedfrom);
@@ -195,10 +202,13 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 		fprintf (f, "RENEWALTIME='%u'\n", dhcp->renewaltime);
 		fprintf (f, "REBINDTIME='%u'\n", dhcp->rebindtime);
 	}
-	fprintf (f, "INTERFACE='%s'\n", iface->name);
-	fprintf (f, "CLASSID='%s'\n", cleanmetas (options->classid));
-	if (options->clientid_len > 0)
-		fprintf (f, "CLIENTID='00:%s'\n", cleanmetas (options->clientid));
+	print_clean (f, "INTERFACE", iface->name);
+	print_clean (f, "CLASSID", options->classid);
+	if (options->clientid_len > 0) {
+		char *clean = cleanmetas (options->clientid);
+		fprintf (f, "CLIENTID='00:%s'\n", clean);
+		free (clean);
+	}
 #ifdef ENABLE_DUID
 	else if (iface->duid_length > 0 && options->clientid_len != -1) {
 		unsigned char *duid;
@@ -327,7 +337,7 @@ static bool parse_addresses (address_t **address, char *value, const char *var)
 bool read_info (const interface_t *iface, dhcp_t *dhcp)
 {
 	FILE *fp;
-	char *buffer;
+	char *line;
 	char *var;
 	char *value;
 	char *p;
@@ -346,10 +356,8 @@ bool read_info (const interface_t *iface, dhcp_t *dhcp)
 
 	dhcp->frominfo = true;
 
-	buffer = xmalloc (sizeof (char) * BUFFERSIZE);
-	memset (buffer, 0, BUFFERSIZE);
-	while ((fgets (buffer, BUFFERSIZE, fp))) {
-		var = buffer;
+	while ((line = getline (fp))) {
+		var = line;
 
 		/* Strip leading spaces/tabs */
 		while ((*var == ' ') || (*var == '\t'))
@@ -360,14 +368,13 @@ bool read_info (const interface_t *iface, dhcp_t *dhcp)
 		if (*p == '\n')
 			*p = 0;
 
-
 		/* Skip comments */
 		if (*var == '#')
-			continue;
+			goto next;
 		
 		/* If we don't have an equals sign then skip it */
 		if (! (p = strchr (var, '=')))
-			continue;
+			goto next;	
 
 		/* Terminate the = so we have two strings */
 		*p = 0;
@@ -382,7 +389,7 @@ bool read_info (const interface_t *iface, dhcp_t *dhcp)
 
 		/* Don't process null vars or values */
 		if (! *var || ! *value)
-			continue;
+			goto next;
 
 		if (strcmp (var, "IPADDR") == 0)
 			parse_address (&dhcp->address, value, "IPADDR");
@@ -404,7 +411,7 @@ bool read_info (const interface_t *iface, dhcp_t *dhcp)
 				if (! dest || ! net || ! gate) {
 					logger (LOG_ERR, "read_info ROUTES `%s,%s,%s': invalid route",
 							dest, net, gate);
-					continue;
+					goto next;
 				}
 
 				/* See if we can create a route */
@@ -414,19 +421,19 @@ bool read_info (const interface_t *iface, dhcp_t *dhcp)
 					logger (LOG_ERR, "read_info ROUTES `%s': not a valid destination address",
 							dest);
 					free (route);
-					continue;
+					goto next;
 				}
 				if (inet_aton (dest, &route->netmask) == 0) {
 					logger (LOG_ERR, "read_info ROUTES `%s': not a valid netmask address",
 							net);
 					free (route);
-					continue;
+					goto next;
 				}
 				if (inet_aton (dest, &route->gateway) == 0) {
 					logger (LOG_ERR, "read_info ROUTES `%s': not a valid gateway address",
 							gate);
 					free (route);
-					continue;
+					goto next;
 				}
 
 				/* OK, now add our route */
@@ -482,10 +489,12 @@ bool read_info (const interface_t *iface, dhcp_t *dhcp)
 			parse_uint (&dhcp->renewaltime, value, "RENEWALTIME");
 		else if (strcmp (var, "REBINDTIME") == 0)
 			parse_uint (&dhcp->rebindtime, value, "REBINDTIME");
+
+next:
+		free (line);
 	}
 
 	fclose (fp);
-	free (buffer);
 	return (true);
 }
 

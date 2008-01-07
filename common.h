@@ -30,6 +30,7 @@
 
 /* string.h pulls in features.h so the below define checks work */
 #include <sys/time.h>
+#include <stdio.h>
 #include <string.h>
 
 /* Only GLIBC doesn't support strlcpy */
@@ -44,9 +45,11 @@ void srandomdev (void);
 #endif
 
 void close_fds (void);
+char *getline (FILE *fp);
 int get_time (struct timeval *tp);
 long uptime (void);
 void writepid (int fd, pid_t pid);
+void *xrealloc (void *ptr, size_t size);
 void *xmalloc (size_t size);
 char *xstrdup (const char *str);
 
