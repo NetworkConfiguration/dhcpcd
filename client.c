@@ -150,7 +150,8 @@ static pid_t daemonise (int *pidfd)
 
 	/* We need to add --daemonise to our options */
 	argv = xmalloc (sizeof (char *) * (dhcpcd_argc + 4));
-	for (i = 0; i < dhcpcd_argc; i++)
+	argv[0] = dhcpcd;
+	for (i = 1; i < dhcpcd_argc; i++)
 		argv[i] = dhcpcd_argv[i];
 	argv[i] = (char *) "--daemonised";
 	if (dhcpcd_skiproutes) {
