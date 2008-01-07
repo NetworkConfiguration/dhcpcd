@@ -137,7 +137,7 @@ static pid_t read_pid (const char *pidfile)
 	return pid;
 }
 
-static void usage ()
+static void usage (void)
 {
 	printf ("usage: "PACKAGE" [-adknpEGHMNRTY] [-c script] [-h hostname] [-i classID]\n"
 	        "              [-l leasetime] [-m metric] [-r ipaddress] [-s ipaddress]\n"
@@ -157,6 +157,7 @@ int main(int argc, char **argv)
 	int i;
 	int pidfd = -1;
 	int sig = 0;
+	int retval = EXIT_FAILURE;
 
 	/* Close any un-needed fd's */
 	for (i = getdtablesize() - 1; i >= 3; --i)
@@ -446,7 +447,7 @@ int main(int argc, char **argv)
 	if (! realpath (argv[0], dhcpcd)) {
 		logger (LOG_ERR, "unable to resolve the path `%s': %s",
 				argv[0], strerror (errno));
-		exit (EXIT_FAILURE);
+		goto abort;
 	}
 #endif
 
@@ -454,17 +455,19 @@ int main(int argc, char **argv)
 		if (strlen (argv[optind]) > IF_NAMESIZE) {
 			logger (LOG_ERR, "`%s' is too long for an interface name (max=%d)",
 					argv[optind], IF_NAMESIZE);
-			exit (EXIT_FAILURE);
+			goto abort;
 		}
 		strlcpy (options->interface, argv[optind],
 				 sizeof (options->interface));
 	} else {
 		/* If only version was requested then exit now */
-		if (doversion || dohelp)
-			exit (EXIT_SUCCESS);
+		if (doversion || dohelp) {
+			retval = 0;
+			goto abort;
+		}
 
 		logger (LOG_ERR, "no interface specified");
-		exit (EXIT_FAILURE);
+		goto abort;
 	}
 
 	if (strchr (options->hostname, '.')) {
@@ -480,12 +483,12 @@ int main(int argc, char **argv)
 
 	if (IN_LINKLOCAL (ntohl (options->request_address.s_addr))) {
 		logger (LOG_ERR, "you are not allowed to request a link local address");
-		exit (EXIT_FAILURE);
+		goto abort;
 	}
 
 	if (geteuid ()) {
 		logger (LOG_ERR, "you need to be root to run "PACKAGE);
-		exit (EXIT_FAILURE);
+		goto abort;
 	}
 
 	prefix = xmalloc (sizeof (char) * (IF_NAMESIZE + 3));
@@ -502,30 +505,30 @@ int main(int argc, char **argv)
 			   | S_IROTH | S_IXOTH) && errno != EEXIST)
 	{
 		logger (LOG_ERR, "mkdir(\"%s\",0): %s\n", INFODIR, strerror (errno));
-		exit (EXIT_FAILURE);
+		goto abort;
 	}
 
 	if (mkdir (ETCDIR, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP
 			   | S_IROTH | S_IXOTH) && errno != EEXIST)
 	{
 		logger (LOG_ERR, "mkdir(\"%s\",0): %s\n", ETCDIR, strerror (errno));
-		exit (EXIT_FAILURE);
+		goto abort;
 	}
 
 	if (options->test) {
 		if (options->dorequest || options->doinform) {
 			logger (LOG_ERR, "cannot test with --inform or --request");
-			exit (EXIT_FAILURE);
+			goto abort;
 		}
 
 		if (options->dolastlease) {
 			logger (LOG_ERR, "cannot test with --lastlease");
-			exit (EXIT_FAILURE);
+			goto abort;
 		}
 
 		if (sig != 0) {
 			logger (LOG_ERR, "cannot test with --release or --renew");
-			exit (EXIT_FAILURE);
+			goto abort;
 		}
 	}
 
@@ -541,30 +544,32 @@ int main(int argc, char **argv)
 		if (pid != 0 && (sig != SIGALRM || killed != 0))
 			unlink (options->pidfile);
 
-		if (killed == 0)
-			exit (EXIT_SUCCESS);
+		if (killed == 0) {
+			retval = EXIT_SUCCESS;
+			goto abort;
+		}
 
 		if (sig != SIGALRM)
-			exit (EXIT_FAILURE);
+			goto abort;	
 	}
 
 	if (! options->test && ! options->daemonised) {
 		if ((pid = read_pid (options->pidfile)) > 0 && kill (pid, 0) == 0) {
 			logger (LOG_ERR, ""PACKAGE" already running on pid %d (%s)",
 					pid, options->pidfile);
-			exit (EXIT_FAILURE);
+			goto abort;
 		}
 
 		pidfd = open (options->pidfile, O_WRONLY | O_CREAT | O_NONBLOCK, 0660);
 		if (pidfd == -1) {
 			logger (LOG_ERR, "open `%s': %s", options->pidfile, strerror (errno));
-			exit (EXIT_FAILURE);
+			goto abort;
 		}
 
 		/* Lock the file so that only one instance of dhcpcd runs on an interface */
 		if (flock (pidfd, LOCK_EX | LOCK_NB) == -1) {
 			logger (LOG_ERR, "flock `%s': %s", options->pidfile, strerror (errno));
-			exit (EXIT_FAILURE);
+			goto abort;
 		}
 
 		/* dhcpcd.sh should not interhit this fd */
@@ -579,10 +584,10 @@ int main(int argc, char **argv)
 	/* Seed random */
 	srandomdev ();
 
-	i = EXIT_FAILURE;
 	if (dhcp_run (options, &pidfd) == 0)
-		i = EXIT_SUCCESS;
+		retval = EXIT_SUCCESS;
 
+abort:
 	/* If we didn't daemonise then we need to punt the pidfile now */
 	if (pidfd > -1) {
 		close (pidfd);
@@ -599,5 +604,5 @@ int main(int argc, char **argv)
 
 	logger (LOG_INFO, "exiting");
 	
-	exit (i);
+	exit (retval);
 }
