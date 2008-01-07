@@ -56,11 +56,11 @@ static char *cleanmetas (const char *cstr)
 	if (cstr == NULL || (len = strlen (cstr)) == 0)
 		return (xstrdup (""));
 
-	n = new = xmalloc (sizeof (char) * len + 1);
+	n = new = xmalloc (sizeof (char) * len + 2);
 	do
 		if (*p == '\'') {
 			size_t pos = n - new;
-			len += 3;
+			len += 4;
 			new = xrealloc (new, sizeof (char) * len + 1);
 			n = new + pos;
 			*n++ = '\'';
@@ -72,7 +72,7 @@ static char *cleanmetas (const char *cstr)
 	while (*p++);
 
 	/* Terminate the sucker */
-	*n++ = '\0';
+	*n = '\0';
 
 	return (new);
 }
