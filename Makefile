@@ -129,9 +129,7 @@ man: $(MAN_TARGETS)
 # We always need to have a .depend file as not all make implentations can work
 # with each others way of optionally including a file
 clean:
-	echo > .depend
-	touch -r Makefile .depend
-	rm -f $(TARGET) $(dhcpcd_H) *.o *~ *.core *.bz2
+	rm -f $(TARGET) $(dhcpcd_H) *.o *~ *.core *.bz2 .depend
 
 install: $(TARGET)
 	$(INSTALL) -m 0755 -d $(SBINDIR)
@@ -150,7 +148,6 @@ dist:
 
 # Sucky, but I cannot find a way of optional including the .depend file
 # that works for all make implementations :/
-include .depend
 _DEPS != ls *.c *.h
 .depend: $(dhcpcd_H) $(_DEPS)$(wildcard *.c *.h)
 	$(CC) $(CPPFLAGS) -MM *.c > .depend
