@@ -29,3 +29,10 @@ SYSV     (SYSV style - /etc/init.d/ntpd restart)
 
 You can change the default dir where dhcpcd stores it's .info files with
 INFODIR=/var/db
+
+
+ChangeLog
+---------
+We no longer supply a ChangeLog.
+However, you're more than welcome to read the git commit comments at
+http://git.marples.name/?p=dhcpcd/.git;a=summary

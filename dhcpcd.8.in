@@ -381,7 +381,7 @@ RFC 3927
 RFC 4702
 
 .SH BUGS
-Please report them to http://dhcpcd.berlios.de
+Please report them to http://bugs.marples.name 
 .PD 0
 
 .SH AUTHORS
