@@ -1,5 +1,5 @@
 # Setup OS specific variables
-# Copyright 2008 Roy Marples
+# Copyright 2008 Roy Marples <roy@marples.name>
 
 # Work out if we need -lresolv or not
 _LIBRESOLV_SH= printf '\#include <netinet/in.h>\n\#include <resolv.h>\nint main (void) { return (res_init ()); }\n' > .res_init.c; \

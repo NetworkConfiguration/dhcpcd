@@ -1,4 +1,4 @@
-# Copyright 2008 Roy Marples
+# Copyright 2008 Roy Marples <roy@marples.name>
 
 # Setup some good default CFLAGS
 

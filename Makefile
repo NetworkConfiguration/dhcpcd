@@ -1,6 +1,6 @@
 # Makefile based on BSD's pmake.
 # Our mk stubs also work with GNU make.
-# Copyright 2008 Roy Marples
+# Copyright 2008 Roy Marples <roy@marples.name>
 
 PROG=		dhcpcd
 SRCS=		arp.c client.c common.c configure.c dhcp.c dhcpcd.c duid.c \

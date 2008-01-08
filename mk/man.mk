@@ -1,5 +1,5 @@
 # rules to install manpages
-# Copyright 2008 Roy Marples
+# Copyright 2008 Roy Marples <roy@marples.name>
 
 MANPREFIX?=	/usr/share
 MANMODE?=	0444

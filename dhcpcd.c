@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright 2006-2007 Roy Marples
+ * Copyright 2006-2008 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * SUCH DAMAGE.
  */
 
-const char copyright[] = "Copyright (c) 2006-2007 Roy Marples";
+const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 
 /* We need to define this to get kill on GNU systems */
 #ifdef __linux__

@@ -1,7 +1,7 @@
 # rules to build a program 
 # based on FreeBSD's bsd.prog.mk
 
-# Copyright 2008 Roy Marples
+# Copyright 2008 Roy Marples <roy@marples.name>
 
 BINDIR?=	/sbin
 OBJS+=		${SRCS:.c=.o}
@@ -11,7 +11,7 @@ INSTALL?=	install
 all: ${PROG} ${MAN}
 
 ${PROG}: ${SCRIPTS} ${OBJS}
-	${CC} ${CFLAGS} ${LDFLAGS} ${PROGLDFLAGS} -o $@ ${OBJS} ${LDADD}
+	${CC} ${CFLAGS} ${LDFLAGS} -o $@ ${OBJS} ${LDADD}
 
 _proginstall: ${PROG}
 	${INSTALL} -d ${DESTDIR}${BINDIR}
