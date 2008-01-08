@@ -7,4 +7,4 @@ DISTFILE?=	${PROG}-${VERSION}.tar.bz2
 CLEANFILES+=	${DISTFILE}
 
 dist:
-	git archive ${GITREF} | bzip2 >${DISTFILE}
+	git archive ${GITREF} | bzip2 > ${DISTFILE}
