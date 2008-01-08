@@ -2,3 +2,4 @@
 version.h
 dhcpcd
 dhcpcd.8
+*.bz2
