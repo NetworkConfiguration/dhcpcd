@@ -17,12 +17,11 @@ _proginstall: ${PROG}
 	${INSTALL} -d ${DESTDIR}${BINDIR}
 	${INSTALL} ${PROG} ${DESTDIR}${BINDIR}
 
-_progclean:
-	rm -f ${OBJS} ${PROG} ${CLEANFILES}
-
 include ${MK}/depend.mk
 include ${MK}/man.mk
+include ${MK}/dist.mk
 
 install: _proginstall maninstall
 
-clean: _progclean _dependclean
+clean:
+	rm -f ${OBJS} ${PROG} ${CLEANFILES}

@@ -3,10 +3,9 @@
 
 # Copyright 2008 Roy Marples
 
+CLEANFILES+=	.depend
+
 .depend: ${SCRIPTS} ${SRCS}
-	$(CC) $(CFLAGS) -MM ${SRCS} > .depend
+	${CC} ${CFLAGS} -MM ${SRCS} > .depend
 
 depend: .depend
-
-_dependclean:
-	rm -f .depend
