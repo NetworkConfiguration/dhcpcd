@@ -10,7 +10,7 @@ MAN=		dhcpcd.8
 VERSION=	3.1.8
 CLEANFILES=	version.h dhcpcd.8
 
-BINDIR=		/sbin
+BINDIR=		${PREFIX}/sbin
 
 # Needed for crappy Linux headers :/
 CSTD=		gnu99

@@ -3,7 +3,7 @@
 
 # Copyright 2008 Roy Marples <roy@marples.name>
 
-BINDIR?=	/sbin
+BINDIR?=	${PREFIX}/usr/bin
 OBJS+=		${SRCS:.c=.o}
 
 INSTALL?=	install

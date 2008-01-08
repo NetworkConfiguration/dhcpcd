@@ -1,8 +1,8 @@
 # rules to install manpages
 # Copyright 2008 Roy Marples <roy@marples.name>
 
-SHAREDIR?=	/usr/share
-MANDIR?=	${SHAREDIR}/man/man
+MANPREFIX?=	/usr/share
+MANDIR?=	${MANPREFIX}/man/man
 MANMODE?=	0444
 MINSTALL?=	${INSTALL} -m ${MANMODE}
 

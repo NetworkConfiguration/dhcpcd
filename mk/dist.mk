@@ -2,9 +2,10 @@
 # Copyright 2008 Roy Marples <roy@marples.name>
 
 GITREF?=	HEAD
-DISTFILE?=	${PROG}-${VERSION}.tar.bz2
+DISTPREFIX?=	${PROG}-${VERSION}
+DISTFILE?=	${DISTPREFIX}.tar.bz2
 
 CLEANFILES+=	${DISTFILE}
 
 dist:
-	git archive ${GITREF} | bzip2 > ${DISTFILE}
+	git archive --prefix=${DISTPREFIX}/ ${GITREF} | bzip2 > ${DISTFILE}
