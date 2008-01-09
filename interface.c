@@ -629,8 +629,8 @@ static int do_route (const char *ifname,
 	ADDADDR (netmask);
 #undef ADDADDR
 
-	rtm.hdr.rtm_msglen = sizeof (rtm);
-	if (write (s, &rtm, sizeof (rtm)) == -1) {
+	rtm.hdr.rtm_msglen = l = bp - (char *)&rtm;
+	if (write (s, &rtm, l) == -1) {
 		/* Don't report error about routes already existing */
 		if (errno != EEXIST)
 			logger (LOG_ERR, "write: %s", strerror (errno));
