@@ -6,7 +6,7 @@
  */
 
 #ifdef __linux__
-#define _BSD_SOURCE
+# define _BSD_SOURCE
 #endif
 
 #include <sys/types.h>
@@ -18,11 +18,6 @@
 #include <net/if.h>
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
-#ifndef __OpenBSD__
-#include <netinet/ip.h>
-#include <netinet/if_ether.h>
-#include <net/ethernet.h>
-#endif
 #include <netinet/udp.h>
 #include <arpa/inet.h>
 #include <errno.h>
@@ -40,7 +35,7 @@
 /* A suitably large buffer for all transactions.
    BPF buffer size is set by the kernel, so no define. */
 #ifdef __linux__
-#define BUFFER_LENGTH 4096
+# define BUFFER_LENGTH 4096
 #endif
 
 static uint16_t checksum (unsigned char *addr, uint16_t len)
@@ -559,8 +554,8 @@ int get_packet (const interface_t *iface, unsigned char *data,
 }
 
 #else
-#error "Platform not supported!"
-#error "We currently support BPF and Linux sockets."
-#error "Other platforms may work using BPF. If yours does, please let me know"
-#error "so I can add it to our list."
+# error "Platform not supported!"
+# error "We currently support BPF and Linux sockets."
+# error "Other platforms may work using BPF. If yours does, please let me know"
+# error "so I can add it to our list."
 #endif
