@@ -247,7 +247,7 @@ int dhcp_run (const options_t *options, int *pidfd)
 	int mode = SOCKET_CLOSED;
 	int state = STATE_INIT;
 	struct timeval tv;
-	int xid = 0;
+	uint32_t xid = 0;
 	long timeout = 0;
 	fd_set rset;
 	int maxfd;

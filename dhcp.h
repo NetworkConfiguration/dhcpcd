@@ -189,13 +189,13 @@ typedef struct dhcpmessage_t
 	unsigned char hwtype;       /* hardware address type */
 	unsigned char hwlen;        /* hardware address length */
 	unsigned char hwopcount;        /* should be zero in client message */
-	int32_t xid;            /* transaction id */
-	int16_t secs;           /* elapsed time in sec. from boot */
-	int16_t flags;
-	int32_t ciaddr;         /* (previously allocated) client IP */
-	int32_t yiaddr;         /* 'your' client IP address */
-	int32_t siaddr;         /* should be zero in client's messages */
-	int32_t giaddr;         /* should be zero in client's messages */
+	uint32_t xid;            /* transaction id */
+	uint16_t secs;           /* elapsed time in sec. from boot */
+	uint16_t flags;
+	uint32_t ciaddr;         /* (previously allocated) client IP */
+	uint32_t yiaddr;         /* 'your' client IP address */
+	uint32_t siaddr;         /* should be zero in client's messages */
+	uint32_t giaddr;         /* should be zero in client's messages */
 	unsigned char chaddr[DHCP_CHADDR_LEN];  /* client's hardware address */
 	unsigned char servername[SERVERNAME_LEN];    /* server host name */
 	unsigned char bootfile[BOOTFILE_LEN];    /* boot file name */
