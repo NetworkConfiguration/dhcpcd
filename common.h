@@ -33,14 +33,18 @@
 #include <stdio.h>
 #include <string.h>
 
+#define HAVE_STRLCPY
 /* Only GLIBC doesn't support strlcpy */
 #ifdef __GLIBC__
 #  if ! defined(__UCLIBC__) && ! defined (__dietlibc__)
+#    undef HAVE_STRLCPY
 size_t strlcpy (char *dst, const char *src, size_t size);
 #  endif
 #endif
 
-#ifdef __linux__
+#define HAVE_SRANDOMDEV
+#if defined(__linux__) || defined(__NetBSD__)
+#  undef HAVE_SRANDOMDEV
 void srandomdev (void);
 #endif
 

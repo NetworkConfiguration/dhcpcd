@@ -71,7 +71,7 @@ char *getline (FILE *fp)
 
 /* OK, this should be in dhcpcd.c
  * It's here to make dhcpcd more readable */
-#ifdef __linux__
+#ifndef HAVE_SRANDOMDEV
 void srandomdev (void)
 {
 	int fd;
@@ -91,8 +91,7 @@ void srandomdev (void)
 #endif
 
 /* strlcpy is nice, shame glibc does not define it */
-#ifdef __GLIBC__
-#  if ! defined (__UCLIBC__) && ! defined (__dietlibc__)
+#ifndef HAVE_STRLCPY
 size_t strlcpy (char *dst, const char *src, size_t size)
 {
 	const char *s = src;
@@ -112,7 +111,6 @@ size_t strlcpy (char *dst, const char *src, size_t size)
 
 	return (src - s - 1);
 }
-#  endif
 #endif
 
 /* Close our fd's */
