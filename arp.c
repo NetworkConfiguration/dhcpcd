@@ -80,6 +80,7 @@ static int send_arp (const interface_t *iface, int op, struct in_addr sip,
 {
 	struct arphdr *arp;
 	int arpsize = arphdr_len2 (iface->hwlen, sizeof (struct in_addr));
+	char *tha;
 	int retval;
 
 	arp = xmalloc (arpsize);
@@ -92,8 +93,16 @@ static int send_arp (const interface_t *iface, int op, struct in_addr sip,
 	arp->ar_op = htons (op);
 	memcpy (ar_sha (arp), iface->hwaddr, arp->ar_hln);
 	memcpy (ar_spa (arp), &sip, arp->ar_pln);
-	if (taddr)
-		memcpy (ar_tha (arp), taddr, arp->ar_hln); 
+	if (taddr) {
+		/* NetBSD can return NULL from ar_tha, which is probably wrong
+		 * but we still need to deal with it */
+		if (! (tha = ar_tha (arp))) {
+			free (arp);
+			errno = EINVAL;
+			return (-1);
+		}
+		memcpy (tha, taddr, arp->ar_hln);
+	}
 	memcpy (ar_tpa (arp), &tip, arp->ar_pln);
 
 	retval = send_packet (iface, ETHERTYPE_ARP,
@@ -173,6 +182,12 @@ int arp_claim (interface_t *iface, struct in_addr address)
 				if (send_arp (iface, ARPOP_REQUEST,
 							  null_address, NULL, address) == -1)
 					break;
+
+				/* IEEE1394 cannot set ARP target address
+				 * according to RFC2734 */
+				if (nprobes >= NPROBES &&
+				    iface->family == ARPHRD_IEEE1394)
+					nclaims = NCLAIMS;
 			} else if (nclaims < NCLAIMS) {
 				nclaims ++;
 				timeout = CLAIM_INTERVAL;
