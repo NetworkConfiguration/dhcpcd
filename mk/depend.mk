@@ -5,7 +5,7 @@
 
 CLEANFILES+=	.depend
 
-.depend: ${SCRIPTS} ${SRCS}
+.depend: ${SRCS}
 	${CC} ${CFLAGS} -MM ${SRCS} > .depend
 
 depend: .depend
