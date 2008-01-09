@@ -131,8 +131,8 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 			logger (LOG_ERR, "dhcp: unknown hardware type %d", iface->family);
 	}
 
-	if (up < 0 || up > UINT16_MAX)
-		message->secs = htons ((short) UINT16_MAX);
+	if (up < 0 || up > (time_t) UINT16_MAX)
+		message->secs = htons ((uint16_t) UINT16_MAX);
 	else
 		message->secs = htons (up);
 	message->xid = xid;
