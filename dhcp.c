@@ -205,9 +205,17 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 			}
 			*p++ = DHCP_NETMASK;
 			*p++ = DHCP_BROADCAST;
-			*p++ = DHCP_CSR;
-			/* RFC 3442 states classless static routes should be before routers
-			 * and static routes as classless static routes override them both */
+
+			/* -S means request CSR and MSCSR
+			 * -SS means only request MSCSR incase DHCP message
+			 *  is too big */
+			if (options->domscsr < 2)
+				*p++ = DHCP_CSR;
+			if (options->domscsr > 0)
+				*p++ = DHCP_MSCSR;
+			/* RFC 3442 states classless static routes should be
+			 * before routers and static routes as classless static
+			 * routes override them both */
 			*p++ = DHCP_STATICROUTE;
 			*p++ = DHCP_ROUTERS;
 			*p++ = DHCP_HOSTNAME;
@@ -575,6 +583,7 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 	route_t *static_routes = NULL;
 	route_t *static_routesp = NULL;
 	route_t *csr = NULL;
+	route_t *mscsr = NULL;
 	bool in_overload = false;
 	bool parse_sname = false;
 	bool parse_file = false;
@@ -764,6 +773,12 @@ parse_start:
 				csr = decode_CSR (p, length);
 				break;
 
+			case DHCP_MSCSR:
+				MIN_LENGTH (5);
+				free_route (mscsr);
+				mscsr = decode_CSR (p, length);
+				break;
+
 #ifdef ENABLE_INFO
 			case DHCP_SIPSERVER:
 				free (dhcp->sipservers);
@@ -856,6 +871,11 @@ eexit:
 	   static routes and routers according to RFC 3442 */
 	if (csr) {
 		dhcp->routes = csr;
+		free_route (mscsr);
+		free_route (routers);
+		free_route (static_routes);
+	} else if (mscsr) {
+		dhcp->routes = mscsr;
 		free_route (routers);
 		free_route (static_routes);
 	} else {

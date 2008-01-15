@@ -3,7 +3,7 @@
 dhcpcd \- DHCP client daemon
 .SH SYNOPSIS
 dhcpcd
-\%[\-dknpAEGHMLNRTY]
+\%[\-dknpAEGHMLNRSTY]
 \%[\-c\ script]
 \%[\-h\ hostname]
 \%[\-i\ vendorClassID]
@@ -300,6 +300,17 @@ Prevents
 from replacing
 .I /etc/resolv.conf
 or using resolvconf.
+.TP
+.BI \-S
+Makes
+.B dhcpcd
+request Microsoft CSR option 249 as well as the normal CSR option 121.
+Subsquent
+.BI \-S
+options disable the requesting of the normal CSR if the dhcp message returned
+is too big.
+Ideally, DHCP servers should start responding to option 121 so
+that users don't have to deal with this mess.
 .TP
 .BI \-T
 dhcpcd sends out a DHCP_DISCOVER message and then prints the values returned to

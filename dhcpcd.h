@@ -77,6 +77,7 @@ typedef struct options_t {
 	bool doinform;
 	bool dorequest;
 	bool doipv4ll;
+	int domscsr;
 
 	struct in_addr request_address;
 	struct in_addr request_netmask;

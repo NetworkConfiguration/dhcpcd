@@ -80,17 +80,18 @@ static const struct option longopts[] = {
 	{"nogateway",   no_argument,        NULL, 'G'},
 	{"sethostname", no_argument,        NULL, 'H'},
 	{"clientid",    optional_argument,  NULL, 'I'},
-	{"noipv4ll",	no_argument,		NULL, 'L'},
+	{"noipv4ll",    no_argument,        NULL, 'L'},
 	{"nomtu",       no_argument,        NULL, 'M'},
 	{"nontp",       no_argument,        NULL, 'N'},
 	{"nodns",       no_argument,        NULL, 'R'},
+	{"msscr",       no_argument,        NULL, 'S'},
 	{"test",        no_argument,        NULL, 'T'},
 	{"nonis",       no_argument,        NULL, 'Y'},
 	{"help",        no_argument,        &dohelp, 1},
 	{"version",     no_argument,        &doversion, 1},
 #ifdef THERE_IS_NO_FORK
-	{"daemonised",	no_argument,		NULL, 'f'},
-	{"skiproutes",  required_argument,	NULL, 'g'},
+	{"daemonised",	no_argument,        NULL, 'f'},
+	{"skiproutes",  required_argument,  NULL, 'g'},
 #endif
 	{NULL,          0,                  NULL, 0}
 };
@@ -139,7 +140,7 @@ static pid_t read_pid (const char *pidfile)
 
 static void usage (void)
 {
-	printf ("usage: "PACKAGE" [-adknpEGHMNRTY] [-c script] [-h hostname] [-i classID]\n"
+	printf ("usage: "PACKAGE" [-adknpEGHMNRSTY] [-c script] [-h hostname] [-i classID]\n"
 	        "              [-l leasetime] [-m metric] [-r ipaddress] [-s ipaddress]\n"
 			"              [-t timeout] [-u userclass] [-F none | ptr | both]\n"
 			"              [-I clientID] <interface>\n");
@@ -382,6 +383,9 @@ int main(int argc, char **argv)
 				break;
 			case 'R':
 				options->dodns = false;
+				break;
+			case 'S':
+				options->domscsr++;
 				break;
 			case 'T':
 #ifndef ENABLE_INFO

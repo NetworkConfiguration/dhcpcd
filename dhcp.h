@@ -104,6 +104,7 @@ enum DHCP_OPTIONS
 	DHCP_DNSSEARCH              = 119, /* RFC 3397 */
 	DHCP_SIPSERVER              = 120, /* RFC 3361 */
 	DHCP_CSR                    = 121, /* RFC 3442 */
+	DHCP_MSCSR                  = 249, /* MS code for RFC 3442 */
 	DHCP_END                    = 255
 };
 
