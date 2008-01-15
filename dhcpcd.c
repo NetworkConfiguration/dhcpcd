@@ -191,7 +191,7 @@ int main(int argc, char **argv)
 	/* Don't set any optional arguments here so we retain POSIX
 	 * compatibility with getopt */
 	while ((opt = getopt_long(argc, argv, EXTRA_OPTS
-							  "c:dh:i:kl:m:npr:s:t:u:xAEF:GHI:LMNRTY",
+							  "c:dh:i:kl:m:npr:s:t:u:xAEF:GHI:LMNRSTY",
 							  longopts, &option_index)) != -1)
 	{
 		switch (opt) {
