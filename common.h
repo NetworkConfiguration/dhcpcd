@@ -51,7 +51,7 @@ void srandomdev (void);
 void close_fds (void);
 char *getline (FILE *fp);
 int get_time (struct timeval *tp);
-long uptime (void);
+time_t uptime (void);
 void writepid (int fd, pid_t pid);
 void *xrealloc (void *ptr, size_t size);
 void *xmalloc (size_t size);

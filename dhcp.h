@@ -167,8 +167,6 @@ typedef struct dhcp_t
 	bool frominfo;
 } dhcp_t;
 
-
-
 /* Sizes for DHCP options */
 #define DHCP_CHADDR_LEN         16
 #define SERVERNAME_LEN          64
