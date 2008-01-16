@@ -103,12 +103,11 @@ int signal_read (fd_set *rset)
 	}
 
 	if (rset && FD_ISSET (signal_pipe[0], rset)) {
-		int buflen = sizeof (sig) * 2;
-		char buf[buflen];
+		char buf[16];
 		size_t bytes;
 
-		memset (buf, 0, buflen);
-		bytes = read (signal_pipe[0], buf, buflen);
+		memset (buf, 0, sizeof (buf));
+		bytes = read (signal_pipe[0], buf, sizeof (buf));
 
 		if (bytes >= sizeof (sig))
 			memcpy (&sig, buf, sizeof (sig));

@@ -51,17 +51,32 @@
 #include "logger.h"
 #include "socket.h"
 
-static const char *dhcp_message[] = {
-	[DHCP_DISCOVER]     = "DHCP_DISCOVER",
-	[DHCP_OFFER]        = "DHCP_OFFER",
-	[DHCP_REQUEST]      = "DHCP_REQUEST",
-	[DHCP_DECLINE]      = "DHCP_DECLINE",
-	[DHCP_ACK]          = "DHCP_ACK",
-	[DHCP_NAK]          = "DHCP_NAK",
-	[DHCP_RELEASE]      = "DHCP_RELEASE",
-	[DHCP_INFORM]       = "DHCP_INFORM",
-	[DHCP_INFORM + 1]   = NULL
+typedef struct message {
+	int value;
+	const char *name;
+} dhcp_message_t;
+
+static dhcp_message_t dhcp_messages[] = {
+	{ DHCP_DISCOVER, "DHCP_DISCOVER" },
+	{ DHCP_OFFER,    "DHCP_OFFER" },
+	{ DHCP_REQUEST,  "DHCP_REQUEST" },
+	{ DHCP_DECLINE,  "DHCP_DECLINE" },
+	{ DHCP_ACK,      "DHCP_ACK" },
+	{ DHCP_NAK,      "DHCP_NAK" },
+	{ DHCP_RELEASE,  "DHCP_RELEASE" },
+	{ DHCP_INFORM,   "DHCP_INFORM" },
+	{ -1, NULL }
 };
+
+static const char *dhcp_message (int type)
+{
+	dhcp_message_t *d;
+	for (d = dhcp_messages; d->name; d++)
+		if (d->value == type)
+			return (d->name);
+
+	return (NULL);
+}
 
 size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 					 unsigned long xid, char type,
@@ -328,7 +343,7 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 	free (message);
 
 	logger (LOG_DEBUG, "sending %s with xid 0x%lx",
-			dhcp_message[(int) type], xid);
+		dhcp_message (type), xid);
 	retval = send_packet (iface, ETHERTYPE_IP, (unsigned char *) packet,
 						  message_length + sizeof (struct ip) +
 						  sizeof (struct udphdr));

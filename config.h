@@ -17,7 +17,7 @@
 #define ENABLE_NIS
 #define ENABLE_INFO
 /* Define this to enable some compatability with 1.x and 2.x info files */
-// #define ENABLE_INFO_COMPAT
+/* #define ENABLE_INFO_COMPAT */
 
 /* IPV4LL, aka ZeroConf, aka APIPA, aka RFC 3927.
  * Needs ARP. */
@@ -35,7 +35,7 @@
 /* Some systems do not have a working fork.
  * The Makefile will attempt to work it out, but if it fails to feel free to
  * define it here. */
-// #define THERE_IS_NO_FORK
+/* #define THERE_IS_NO_FORK */
 
 /* Packname name and pathname definitions. */
 

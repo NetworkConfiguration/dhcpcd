@@ -25,6 +25,9 @@
  * SUCH DAMAGE.
  */
 
+#define SYSLOG_NAMES
+
+#include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,39 +40,28 @@
 static int loglevel = LOG_WARNING;
 static char logprefix[12] = {0};
 
-static const char *syslog_level_msg[] = {
-	[LOG_EMERG]     = "EMERGENCY!",
-	[LOG_ALERT]     = "ALERT!",
-	[LOG_CRIT]      = "Critical!",
-	[LOG_WARNING]   = "Warning",
-	[LOG_ERR]       = "Error",
-	[LOG_INFO]      = "Info",
-	[LOG_DEBUG]     = "Debug",
-	[LOG_DEBUG + 1] = NULL
-};
-
-static const char *syslog_level[] = {
-	[LOG_EMERG]     = "LOG_EMERG",
-	[LOG_ALERT]     = "LOG_ALERT",
-	[LOG_CRIT]      = "LOG_CRIT",
-	[LOG_ERR]       = "LOG_ERR",
-	[LOG_WARNING]   = "LOG_WARNING",
-	[LOG_NOTICE]    = "LOG_NOTICE",
-	[LOG_INFO]      = "LOG_INFO",
-	[LOG_DEBUG]     = "LOG_DEBUG",
-	[LOG_DEBUG + 1]     = NULL
-};
-
 int logtolevel (const char *priority)
 {
-	int i = 0;
+	CODE *c;
 
-	while (syslog_level[i]) {
-		if (!strcmp (priority, syslog_level[i]))
-			return i;
-		i++;
-	}
-	return -1;
+	if (isdigit ((int) *priority))
+		return (atoi (priority));
+
+	for (c = prioritynames; c->c_name; c++)
+		if (! strcasecmp (priority, c->c_name))
+			return (c->c_val);
+
+	return (-1);
+}
+
+static const char *leveltolog (int level) {
+	CODE *c;
+
+	for (c = prioritynames; c->c_name; c++)
+		if (c->c_val == level)
+			return (c->c_name);
+
+	return (NULL);
 }
 
 void setloglevel (int level)
@@ -82,7 +74,7 @@ void setlogprefix (const char *prefix)
 	snprintf (logprefix, sizeof (logprefix), "%s", prefix);
 }
 
-void logger(int level, const char *fmt, ...)
+void logger (int level, const char *fmt, ...)
 {
 	va_list p;
 	va_list p2;
@@ -94,7 +86,7 @@ void logger(int level, const char *fmt, ...)
 	if (level <= LOG_ERR || level <= loglevel) {
 		if (level == LOG_DEBUG || level == LOG_INFO)
 			f = stdout;
-		fprintf (f, "%s, %s", syslog_level_msg[level], logprefix);
+		fprintf (f, "%s, %s", leveltolog (level), logprefix);
 		vfprintf (f, fmt, p);
 		fputc ('\n', f);
 
