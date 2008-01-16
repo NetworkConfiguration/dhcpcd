@@ -116,10 +116,10 @@ static int atoint (const char *s)
 	    (errno == ERANGE && (n == LONG_MAX || n == LONG_MIN)))
 	{
 		logger (LOG_ERR, "`%s' out of range", s);
-		exit (EXIT_FAILURE);
+		return (-1);	
 	}
 
-	return n;
+	return (n);
 }
 
 static pid_t read_pid (const char *pidfile)
@@ -135,7 +135,7 @@ static pid_t read_pid (const char *pidfile)
 	fscanf (fp, "%d", &pid);
 	fclose (fp);
 
-	return pid;
+	return (pid);
 }
 
 static void usage (void)
@@ -202,7 +202,7 @@ int main(int argc, char **argv)
 				logger (LOG_ERR,
 					"option `%s' should set a flag",
 					longopts[option_index].name);
-				exit (EXIT_FAILURE);
+				goto abort;
 				break;
 			case 'c':
 				options->script = optarg;
@@ -235,7 +235,7 @@ int main(int argc, char **argv)
 					logger (LOG_ERR,
 						"`%s' too long for HostName string, max is %d",
 						optarg, MAXHOSTNAMELEN);
-					exit (EXIT_FAILURE);
+					goto abort;
 				} else
 					strlcpy (options->hostname, optarg,
 						 sizeof (options->hostname));
@@ -249,7 +249,7 @@ int main(int argc, char **argv)
 					logger (LOG_ERR,
 						"`%s' too long for ClassID string, max is %d",
 						optarg, CLASS_ID_MAX_LEN);
-					exit (EXIT_FAILURE);
+					goto abort;
 				} else
 					options->classid_len = strlcpy (options->classid, optarg,
 									sizeof (options->classid));
@@ -262,11 +262,16 @@ int main(int argc, char **argv)
 				if (options->leasetime <= 0) {
 					logger (LOG_ERR,
 						"leasetime must be a positive value");
-					exit (EXIT_FAILURE);
+					goto abort;
 				}
 				break;
 			case 'm':
 				options->metric = atoint (optarg);
+				if (options->metric < 0) {
+					logger (LOG_ERR,
+						"metric must be a positive value");
+					goto abort;
+				}
 				break;
 			case 'n':
 				sig = SIGALRM;
@@ -290,7 +295,7 @@ int main(int argc, char **argv)
 						if (sscanf (slash, "%d", &cidr) != 1 ||
 						    inet_cidrtoaddr (cidr, &options->request_netmask) != 0) {
 							logger (LOG_ERR, "`%s' is not a valid CIDR", slash);
-							exit (EXIT_FAILURE);
+							goto abort;
 						}
 					}
 					/* fall through */
@@ -302,14 +307,14 @@ int main(int argc, char **argv)
 				    ! inet_aton (optarg, &options->request_address))
 				{ 
 					logger (LOG_ERR, "`%s' is not a valid IP address", optarg);
-					exit (EXIT_FAILURE);
+					goto abort;
 				}
 				break;
 			case 't':
 				options->timeout = atoint (optarg);
 				if (options->timeout < 0) {
 					logger (LOG_ERR, "timeout must be a positive value");
-					exit (EXIT_FAILURE);
+					goto abort;
 				}
 				break;
 			case 'u':
@@ -320,7 +325,7 @@ int main(int argc, char **argv)
 					if (offset + 1 + strlen (optarg) > USERCLASS_MAX_LEN) {
 						logger (LOG_ERR, "userclass overrun, max is %d",
 							USERCLASS_MAX_LEN);
-						exit (EXIT_FAILURE);
+						goto abort;
 					}
 					userclasses++;
 					memcpy (options->userclass + offset + 1 , optarg, strlen (optarg));
@@ -335,7 +340,7 @@ int main(int argc, char **argv)
 #ifndef ENABLE_ARP
 				logger (LOG_ERR,
 					"arp not compiled into dhcpcd");
-				exit (EXIT_FAILURE);
+				goto abort;
 #endif
 				options->doarp = false;
 				break;
@@ -343,7 +348,7 @@ int main(int argc, char **argv)
 #ifndef ENABLE_INFO
 				logger (LOG_ERR,
 					"info not compiled into dhcpcd");
-				exit (EXIT_FAILURE);
+				goto abort;
 #endif
 				options->dolastlease = true;
 				break;
@@ -356,7 +361,7 @@ int main(int argc, char **argv)
 					options->fqdn = FQDN_BOTH;
 				else {
 					logger (LOG_ERR, "invalid value `%s' for FQDN", optarg);
-					exit (EXIT_FAILURE);
+					goto abort;
 				}
 				break;
 			case 'G':
@@ -370,7 +375,7 @@ int main(int argc, char **argv)
 					if (strlen (optarg) > CLIENT_ID_MAX_LEN) {
 						logger (LOG_ERR, "`%s' is too long for ClientID, max is %d",
 							optarg, CLIENT_ID_MAX_LEN);
-						exit (EXIT_FAILURE);
+						goto abort;
 					}
 					options->clientid_len = strlcpy (options->clientid, optarg,
 									 sizeof (options->clientid));
@@ -400,7 +405,7 @@ int main(int argc, char **argv)
 			case 'T':
 #ifndef ENABLE_INFO
 				logger (LOG_ERR, "info support not compiled into dhcpcd");
-				exit (EXIT_FAILURE);
+				goto abort;
 #endif
 				options->test = true;
 				options->persistent = true;
@@ -410,10 +415,10 @@ int main(int argc, char **argv)
 				break;
 			case '?':
 				usage ();
-				exit (EXIT_FAILURE);
+				goto abort;
 			default:
 				usage ();
-				exit (EXIT_FAILURE);
+				goto abort;
 		}
 	}
 	if (doversion) {
