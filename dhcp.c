@@ -79,8 +79,8 @@ static const char *dhcp_message (int type)
 }
 
 size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
-					 unsigned long xid, char type,
-					 const options_t *options)
+		     unsigned long xid, char type,
+		     const options_t *options)
 {
 	struct udp_dhcp_packet *packet;
 	dhcpmessage_t *message;
@@ -111,9 +111,9 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 	p = (unsigned char *) &message->options;
 
 	if ((type == DHCP_INFORM ||
-		type == DHCP_RELEASE ||
-		type == DHCP_REQUEST) &&
-		! IN_LINKLOCAL (ntohl (iface->previous_address.s_addr)))
+	     type == DHCP_RELEASE ||
+	     type == DHCP_REQUEST) &&
+	    ! IN_LINKLOCAL (ntohl (iface->previous_address.s_addr)))
 	{
 		message->ciaddr = iface->previous_address.s_addr;
 		from.s_addr = iface->previous_address.s_addr;
@@ -121,10 +121,10 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 		/* Just incase we haven't actually configured the address yet */
 		if (type == DHCP_INFORM && iface->previous_address.s_addr == 0)
 			message->ciaddr = dhcp->address.s_addr;
-		
+
 		/* Zero the address if we're currently on a different subnet */
 		if (type == DHCP_REQUEST &&
-			iface->previous_netmask.s_addr != dhcp->netmask.s_addr)
+		    iface->previous_netmask.s_addr != dhcp->netmask.s_addr)
 			message->ciaddr = from.s_addr = 0;
 	}
 
@@ -134,7 +134,8 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 		case ARPHRD_ETHER:
 		case ARPHRD_IEEE802:
 			message->hwlen = ETHER_ADDR_LEN;
-			memcpy (&message->chaddr, &iface->hwaddr, ETHER_ADDR_LEN);
+			memcpy (&message->chaddr, &iface->hwaddr,
+				ETHER_ADDR_LEN);
 			break;
 		case ARPHRD_IEEE1394:
 		case ARPHRD_INFINIBAND:
@@ -143,7 +144,8 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 			message->hwlen = 0;
 			break;
 		default:
-			logger (LOG_ERR, "dhcp: unknown hardware type %d", iface->family);
+			logger (LOG_ERR, "dhcp: unknown hardware type %d",
+				iface->family);
 	}
 
 	if (up < 0 || up > (time_t) UINT16_MAX)
@@ -171,23 +173,24 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 	}
 
 	if (type != DHCP_INFORM) {
-#define PUTADDR(_type, _val) \
-		{ \
-			*p++ = _type; \
-			*p++ = 4; \
-			memcpy (p, &_val.s_addr, 4); \
-			p += 4; \
-		}
+#define PUTADDR(_type, _val) { \
+	*p++ = _type; \
+	*p++ = 4; \
+	memcpy (p, &_val.s_addr, 4); \
+	p += 4; \
+}
 		if (IN_LINKLOCAL (ntohl (dhcp->address.s_addr)))
-			logger (LOG_ERR, "cannot request a link local address");
+			logger (LOG_ERR,
+				"cannot request a link local address");
 		else {
 			if (dhcp->address.s_addr != iface->previous_address.s_addr &&
-				type != DHCP_RELEASE)
+			    type != DHCP_RELEASE)
 				PUTADDR (DHCP_ADDRESS, dhcp->address);
 
 			if (dhcp->serveraddress.s_addr != 0 && dhcp->address.s_addr !=0 &&
-				(iface->previous_address.s_addr == 0 || type == DHCP_RELEASE))
-				PUTADDR (DHCP_SERVERIDENTIFIER, dhcp->serveraddress);
+			    (iface->previous_address.s_addr == 0 || type == DHCP_RELEASE))
+				PUTADDR (DHCP_SERVERIDENTIFIER,
+					 dhcp->serveraddress);
 		}
 #undef PUTADDR
 	}
@@ -202,14 +205,17 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 		}
 	}
 
-	if (type == DHCP_DISCOVER || type == DHCP_INFORM || type == DHCP_REQUEST) {
+	if (type == DHCP_DISCOVER ||
+	    type == DHCP_INFORM ||
+	    type == DHCP_REQUEST)
+	{
 		*p++ = DHCP_PARAMETERREQUESTLIST;
 		n_params = p;
 		*p++ = 0;
 
 		/* Only request DNSSERVER in discover to keep the packets small.
-		   RFC2131 Section 3.5 states that the REQUEST must include the list
-		   from the DISCOVER message, so I think we can safely do this. */
+		   RFC2131 Section 3.5 states that the REQUEST must include the
+		   list from the DISCOVER message, so I think this is ok. */
 
 		if (type == DHCP_DISCOVER && ! options->test)
 			*p++ = DHCP_DNSSERVER;
@@ -264,14 +270,17 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 				*p++ = DHCP_FQDN;
 				*p++ = (l = strlen (options->hostname)) + 3;
 				/* Flags: 0000NEOS
-				 * S: 1 => Client requests Server to update A RR in DNS as well as PTR
-				 * O: 1 => Server indicates to client that DNS has been updated
+				 * S: 1 => Client requests Server to update
+				 *         a RR in DNS as well as PTR
+				 * O: 1 => Server indicates to client that
+				 *         DNS has been updated
 				 * E: 1 => Name data is DNS format
-				 * N: 1 => Client requests Server to not update DNS
+				 * N: 1 => Client requests Server to not
+				 *         update DNS
 				 */
 				*p++ = options->fqdn & 0x9;
-				*p++ = 0; /* rcode1, response from DNS server for PTR RR */
-				*p++ = 0; /* rcode2, response from DNS server for A RR if S=1 */
+				*p++ = 0; /* from server for PTR RR */
+				*p++ = 0; /* from server for A RR if S=1 */
 				memcpy (p, options->hostname, l);
 				p += l;
 			}
@@ -305,7 +314,7 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 		*p++ = iface->duid_length + 5;
 		*p++ = 255; /* RFC 4361 */
 
-		/* IAID is 4 bytes, so if the interface name is 4 bytes then use it */
+		/* IAID is 4 bytes, so if the iface name is 4 bytes use it */
 		if (strlen (iface->name) == 4) {
 			memcpy (p, iface->name, 4);
 		} else {
@@ -339,14 +348,14 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 	packet = xmalloc (sizeof (struct udp_dhcp_packet));
 	memset (packet, 0, sizeof (struct udp_dhcp_packet));
 	make_dhcp_packet (packet, (unsigned char *) message, message_length,
-					  from, to);
+			  from, to);
 	free (message);
 
 	logger (LOG_DEBUG, "sending %s with xid 0x%lx",
 		dhcp_message (type), xid);
 	retval = send_packet (iface, ETHERTYPE_IP, (unsigned char *) packet,
-						  message_length + sizeof (struct ip) +
-						  sizeof (struct udphdr));
+			      message_length + sizeof (struct ip) +
+			      sizeof (struct udphdr));
 	free (packet);
 	return (retval);
 }
@@ -431,8 +440,9 @@ static route_t *decode_CSR(const unsigned char *p, int len)
 
 		cidr = *q++;
 		if (cidr > 32) {
-			logger (LOG_ERR, "invalid CIDR of %d in classless static route",
-					cidr);
+			logger (LOG_ERR,
+				"invalid CIDR of %d in classless static route",
+				cidr);
 			free_route (first);
 			return (NULL);
 		}
@@ -446,8 +456,9 @@ static route_t *decode_CSR(const unsigned char *p, int len)
 		/* Now enter the netmask */
 		if (ocets > 0) {
 			memset (&route->netmask.s_addr, 255, ocets - 1);
-			memset ((unsigned char *) &route->netmask.s_addr + (ocets - 1),
-					(256 - (1 << (32 - cidr) % 8)), 1);
+			memset ((unsigned char *) &route->netmask.s_addr +
+				(ocets - 1),
+				(256 - (1 << (32 - cidr) % 8)), 1);
 		}
 
 		/* Finally, snag the router */
@@ -485,7 +496,8 @@ void free_dhcp (dhcp_t *dhcp)
 	}
 }
 
-static bool dhcp_add_address(address_t **address, const unsigned char *data, int length)
+static bool dhcp_add_address (address_t **address,
+			      const unsigned char *data, int length)
 {
 	int i;
 	address_t *p = *address;
@@ -533,7 +545,9 @@ static char *decode_sipservers (const unsigned char *data, int length)
 
 		case 1:
 			if (length == 0 || length % 4 != 0) {
-				logger (LOG_ERR, "invalid length %d for option 120", length + 1);
+				logger (LOG_ERR,
+					"invalid length %d for option 120",
+					length + 1);
 				break;
 			}
 			len = ((length / 4) * (4 * 4)) + 1;
@@ -541,7 +555,8 @@ static char *decode_sipservers (const unsigned char *data, int length)
 			while (length != 0) {
 				memcpy (&addr.s_addr, data, 4);
 				data += 4;
-				p += snprintf (p, len - (p - sip), "%s ", inet_ntoa (addr));
+				p += snprintf (p, len - (p - sip),
+					       "%s ", inet_ntoa (addr));
 				length -= 4;
 			}
 			*--p = '\0';
@@ -583,6 +598,46 @@ static unsigned long route_netmask (unsigned long ip_in)
 	return (htonl (~t));
 }
 
+static route_t *decode_routes (const unsigned char *data, int length)
+{
+	int i;
+	route_t *head = NULL;
+	route_t *routes = NULL;
+	
+	for (i = 0; i < length; i += 8) {
+		if (routes) {
+			routes->next = xmalloc (sizeof (route_t));
+			routes = routes->next;
+		} else
+			head = routes = xmalloc (sizeof (route_t));
+		memset (routes, 0, sizeof (route_t));
+		memcpy (&routes->destination.s_addr, data + i, 4);
+		memcpy (&routes->gateway.s_addr, data + i + 4, 4);
+		routes->netmask.s_addr =
+			route_netmask (routes->destination.s_addr); 
+	}
+
+	return (head);
+}
+
+static route_t *decode_routers (const unsigned char *data, int length)
+{
+	int i;
+	route_t *head = NULL;
+	route_t *routes = NULL;
+
+	for (i = 0; i < length; i += 4) {
+		if (routes) {
+			routes->next = xmalloc (sizeof (route_t));
+			routes = routes->next;
+		} else
+			head = routes = xmalloc (sizeof (route_t));
+		memset (routes, 0, sizeof (route_t));
+		memcpy (&routes->gateway.s_addr, data + i, 4);
+	}
+
+	return (head);
+}
 int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 {
 	const unsigned char *p = message->options;
@@ -590,36 +645,34 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 	unsigned char option;
 	unsigned char length;
 	unsigned int len = 0;
-	int i;
 	int retval = -1;
 	struct timeval tv;
 	route_t *routers = NULL;
-	route_t *routersp = NULL;
-	route_t *static_routes = NULL;
-	route_t *static_routesp = NULL;
+	route_t *routes = NULL;
 	route_t *csr = NULL;
 	route_t *mscsr = NULL;
 	bool in_overload = false;
 	bool parse_sname = false;
 	bool parse_file = false;
- 
- 	end += sizeof (message->options);
+
+	end += sizeof (message->options);
 
 	if (gettimeofday (&tv, NULL) == -1) {
 		logger (LOG_ERR, "gettimeofday: %s", strerror (errno));
 		return (-1);
 	}
 
- 	dhcp->address.s_addr = message->yiaddr;
+	dhcp->address.s_addr = message->yiaddr;
 	dhcp->leasedfrom = tv.tv_sec;
 	dhcp->frominfo = false;
 	dhcp->address.s_addr = message->yiaddr;
 	strlcpy (dhcp->servername, (char *) message->servername,
-			 sizeof (dhcp->servername));
+		 sizeof (dhcp->servername));
 
 #define LEN_ERR \
 	{ \
-		logger (LOG_ERR, "invalid length %d for option %d", length, option); \
+		logger (LOG_ERR, "invalid length %d for option %d", \
+			length, option); \
 		p += length; \
 		continue; \
 	}
@@ -655,8 +708,9 @@ parse_start:
 
 			default:
 				if (length == 0) {
-					logger (LOG_DEBUG, "option %d has zero length, skipping",
-							option);
+					logger (LOG_DEBUG,
+						"option %d has zero length, skipping",
+						option);
 					continue;
 				}
 		}
@@ -710,10 +764,13 @@ parse_start:
 				break;
 			case DHCP_MTU:
 				GET_UINT16_H (dhcp->mtu);
-				/* Minimum legal mtu is 68 accoridng to RFC 2132.
-				   In practise it's 576 (minimum maximum message size) */
+				/* Minimum legal mtu is 68 accoridng to
+				 * RFC 2132. In practise it's 576 which is the
+				 * minimum maximum message size. */
 				if (dhcp->mtu < MTU_MIN) {
-					logger (LOG_DEBUG, "MTU %d is too low, minimum is %d; ignoring", dhcp->mtu, MTU_MIN);
+					logger (LOG_DEBUG,
+						"MTU %d is too low, minimum is %d; ignoring",
+						dhcp->mtu, MTU_MIN);
 					dhcp->mtu = 0;
 				}
 				break;
@@ -724,12 +781,13 @@ parse_start:
 #undef GET_UINT16
 #undef GET_UINT8
 
-#define GETSTR(_var) \
-				MIN_LENGTH (sizeof (char)); \
-				if (_var) free (_var); \
-				_var = xmalloc (length + 1); \
-				memcpy (_var, p, length); \
-				memset (_var + length, 0, 1);
+#define GETSTR(_var) { \
+	MIN_LENGTH (sizeof (char)); \
+	if (_var) free (_var); \
+	_var = xmalloc (length + 1); \
+	memcpy (_var, p, length); \
+	memset (_var + length, 0, 1); \
+}
 			case DHCP_HOSTNAME:
 				GETSTR (dhcp->hostname);
 				break;
@@ -776,9 +834,11 @@ parse_start:
 			case DHCP_DNSSEARCH:
 				MIN_LENGTH (1);
 				free (dhcp->dnssearch);
-				if ((len = decode_search (p, length, NULL)) > 0) {
+				len = decode_search (p, length, NULL);
+				if (len > 0) {
 					dhcp->dnssearch = xmalloc (len);
-					decode_search (p, length, dhcp->dnssearch);
+					decode_search (p, length,
+						       dhcp->dnssearch);
 				}
 				break;
 
@@ -797,44 +857,27 @@ parse_start:
 #ifdef ENABLE_INFO
 			case DHCP_SIPSERVER:
 				free (dhcp->sipservers);
-				dhcp->sipservers = decode_sipservers (p, length);
+				dhcp->sipservers = decode_sipservers (p,length);
 				break;
 #endif
 
 			case DHCP_STATICROUTE:
 				MULT_LENGTH (8);
-				for (i = 0; i < length; i += 8) {
-					if (static_routesp) {
-						static_routesp->next = xmalloc (sizeof (route_t));
-						static_routesp = static_routesp->next;
-					} else
-						static_routesp = static_routes = xmalloc (sizeof (route_t));
-					memset (static_routesp, 0, sizeof (route_t));
-					memcpy (&static_routesp->destination.s_addr, p + i, 4);
-					memcpy (&static_routesp->gateway.s_addr, p + i + 4, 4);
-					static_routesp->netmask.s_addr =
-						route_netmask (static_routesp->destination.s_addr); 
-				}
+				free_route (routes);
+				routes = decode_routes (p, length);
 				break;
 
 			case DHCP_ROUTERS:
-				MULT_LENGTH (4); 
-				for (i = 0; i < length; i += 4)
-				{
-					if (routersp) {
-						routersp->next = xmalloc (sizeof (route_t));
-						routersp = routersp->next;
-					} else
-						routersp = routers = xmalloc (sizeof (route_t));
-					memset (routersp, 0, sizeof (route_t));
-					memcpy (&routersp->gateway.s_addr, p + i, 4);
-				}
+				MULT_LENGTH (4);
+				free_route (routers);
+				routers = decode_routers (p, length);
 				break;
 
 			case DHCP_OPTIONSOVERLOADED:
 				LENGTH (1);
 				/* The overloaded option in an overloaded option
-				 * should be ignored, overwise we may get an infinite loop */
+				 * should be ignored, overwise we may get an
+				 * infinite loop */
 				if (! in_overload) {
 					if (*p & 1)
 						parse_file = true;
@@ -852,7 +895,9 @@ parse_start:
 #undef MULT_LENGTH
 
 			default:
-				logger (LOG_DEBUG, "no facility to parse DHCP code %u", option);
+				logger (LOG_DEBUG,
+				       	"no facility to parse DHCP code %u",
+					option);
 				break;
 		}
 
@@ -880,7 +925,8 @@ eexit:
 	if (! dhcp->netmask.s_addr)
 		dhcp->netmask.s_addr = get_netmask (dhcp->address.s_addr);
 	if (! dhcp->broadcast.s_addr)
-		dhcp->broadcast.s_addr = dhcp->address.s_addr | ~dhcp->netmask.s_addr;
+		dhcp->broadcast.s_addr = dhcp->address.s_addr |
+			~dhcp->netmask.s_addr;
 
 	/* If we have classess static routes then we discard
 	   static routes and routers according to RFC 3442 */
@@ -888,21 +934,22 @@ eexit:
 		dhcp->routes = csr;
 		free_route (mscsr);
 		free_route (routers);
-		free_route (static_routes);
+		free_route (routes);
 	} else if (mscsr) {
 		dhcp->routes = mscsr;
 		free_route (routers);
-		free_route (static_routes);
+		free_route (routes);
 	} else {
 		/* Ensure that we apply static routes before routers */
-		if (static_routes)
+		if (routes)
 		{
-			dhcp->routes = static_routes;
-			static_routesp->next = routers;
+			dhcp->routes = routes;
+			while (routes->next)
+				routes = routes->next;
+			routes->next = routers;
 		} else
 			dhcp->routes = routers;
 	}
 
-	return retval;
+	return (retval);
 }
-

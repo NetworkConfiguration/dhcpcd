@@ -37,7 +37,6 @@
 #include "dhcpcd.h"
 #include "interface.h"
 
-
 /* Max MTU - defines dhcp option length */
 #define MTU_MAX             1500
 #define MTU_MIN             576
@@ -175,9 +174,9 @@ typedef struct dhcp_t
 #define DHCP_BASE_LEN           (4 + 4 + 2 + 2 + 4 + 4 + 4 + 4 + 4)
 #define DHCP_RESERVE_LEN        (4 + 4 + 4 + 4 + 2)
 #define DHCP_FIXED_LEN          (DHCP_BASE_LEN + DHCP_CHADDR_LEN + \
-                                 + SERVERNAME_LEN + BOOTFILE_LEN)
+				 + SERVERNAME_LEN + BOOTFILE_LEN)
 #define DHCP_OPTION_LEN         (MTU_MAX - DHCP_FIXED_LEN - DHCP_UDP_LEN \
-                                 - DHCP_RESERVE_LEN)
+				 - DHCP_RESERVE_LEN)
 
 /* Some crappy DHCP servers require the BOOTP minimum length */
 #define BOOTP_MESSAGE_LENTH_MIN 300
@@ -210,8 +209,8 @@ struct udp_dhcp_packet
 };
 
 size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
-					 unsigned long xid, char type,
-					 const options_t *options);
+		     unsigned long xid, char type,
+		     const options_t *options);
 void free_dhcp (dhcp_t *dhcp);
 int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message);
 
