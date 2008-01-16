@@ -258,8 +258,8 @@ int dhcp_run (const options_t *options, int *pidfd)
 	int last_type = DHCP_DISCOVER;
 	bool daemonised = options->daemonised;
 	bool persistent = options->persistent;
-	long start = 0;
-	long last_send = 0;
+	time_t start = 0;
+	time_t last_send = 0;
 	int sig;
 	unsigned char *buffer = NULL;
 	int buffer_len = 0;
