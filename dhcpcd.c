@@ -113,7 +113,7 @@ static int atoint (const char *s)
 	errno = 0;
 	n = strtol (s, &t, 0);
 	if ((errno != 0 && n == 0) || s == t ||
-		(errno == ERANGE && (n == LONG_MAX || n == LONG_MIN)))
+	    (errno == ERANGE && (n == LONG_MAX || n == LONG_MIN)))
 	{
 		logger (LOG_ERR, "`%s' out of range", s);
 		exit (EXIT_FAILURE);
@@ -141,9 +141,9 @@ static pid_t read_pid (const char *pidfile)
 static void usage (void)
 {
 	printf ("usage: "PACKAGE" [-adknpEGHMNRSTY] [-c script] [-h hostname] [-i classID]\n"
-	        "              [-l leasetime] [-m metric] [-r ipaddress] [-s ipaddress]\n"
-			"              [-t timeout] [-u userclass] [-F none | ptr | both]\n"
-			"              [-I clientID] <interface>\n");
+		"              [-l leasetime] [-m metric] [-r ipaddress] [-s ipaddress]\n"
+		"              [-t timeout] [-u userclass] [-F none | ptr | both]\n"
+		"              [-I clientID] <interface>\n");
 }
 
 int main(int argc, char **argv)
@@ -169,7 +169,8 @@ int main(int argc, char **argv)
 	options = xmalloc (sizeof (options_t));
 	memset (options, 0, sizeof (options_t));
 	options->script = (char *) DEFAULT_SCRIPT;
-	snprintf (options->classid, CLASS_ID_MAX_LEN, "%s %s", PACKAGE, VERSION);
+	snprintf (options->classid, CLASS_ID_MAX_LEN, "%s %s",
+		  PACKAGE, VERSION);
 	options->classid_len = strlen (options->classid);
 
 	options->doarp = true;
@@ -185,21 +186,22 @@ int main(int argc, char **argv)
 
 	gethostname (options->hostname, sizeof (options->hostname));
 	if (strcmp (options->hostname, "(none)") == 0 ||
-		strcmp (options->hostname, "localhost") == 0)
+	    strcmp (options->hostname, "localhost") == 0)
 		memset (options->hostname, 0, sizeof (options->hostname));
 
 	/* Don't set any optional arguments here so we retain POSIX
 	 * compatibility with getopt */
 	while ((opt = getopt_long(argc, argv, EXTRA_OPTS
-							  "c:dh:i:kl:m:npr:s:t:u:xAEF:GHI:LMNRSTY",
-							  longopts, &option_index)) != -1)
+				  "c:dh:i:kl:m:npr:s:t:u:xAEF:GHI:LMNRSTY",
+				  longopts, &option_index)) != -1)
 	{
 		switch (opt) {
 			case 0:
 				if (longopts[option_index].flag)
 					break;
-				logger (LOG_ERR, "option `%s' should set a flag",
-						longopts[option_index].name);
+				logger (LOG_ERR,
+					"option `%s' should set a flag",
+					longopts[option_index].name);
 				exit (EXIT_FAILURE);
 				break;
 			case 'c':
@@ -227,25 +229,30 @@ int main(int argc, char **argv)
 #endif
 			case 'h':
 				if (! optarg)
-					memset (options->hostname, 0, sizeof (options->hostname));
+					memset (options->hostname, 0,
+						sizeof (options->hostname));
 				else if (strlen (optarg) > MAXHOSTNAMELEN) {
-					logger (LOG_ERR, "`%s' too long for HostName string, max is %d",
-							optarg, MAXHOSTNAMELEN);
+					logger (LOG_ERR,
+						"`%s' too long for HostName string, max is %d",
+						optarg, MAXHOSTNAMELEN);
 					exit (EXIT_FAILURE);
 				} else
-					strlcpy (options->hostname, optarg, sizeof (options->hostname));
+					strlcpy (options->hostname, optarg,
+						 sizeof (options->hostname));
 				break;
 			case 'i':
 				if (! optarg) {
-					memset (options->classid, 0, sizeof (options->classid));
+					memset (options->classid, 0,
+						sizeof (options->classid));
 					options->classid_len = 0;
 				} else if (strlen (optarg) > CLASS_ID_MAX_LEN) {
-					logger (LOG_ERR, "`%s' too long for ClassID string, max is %d",
-							optarg, CLASS_ID_MAX_LEN);
+					logger (LOG_ERR,
+						"`%s' too long for ClassID string, max is %d",
+						optarg, CLASS_ID_MAX_LEN);
 					exit (EXIT_FAILURE);
 				} else
 					options->classid_len = strlcpy (options->classid, optarg,
-												   sizeof (options->classid));
+									sizeof (options->classid));
 				break;
 			case 'k':
 				sig = SIGHUP;
@@ -253,7 +260,8 @@ int main(int argc, char **argv)
 			case 'l':
 				options->leasetime = atoint (optarg);
 				if (options->leasetime <= 0) {
-					logger (LOG_ERR, "leasetime must be a positive value");
+					logger (LOG_ERR,
+						"leasetime must be a positive value");
 					exit (EXIT_FAILURE);
 				}
 				break;
@@ -280,7 +288,7 @@ int main(int argc, char **argv)
 						 * address */
 						*slash++ = '\0';
 						if (sscanf (slash, "%d", &cidr) != 1 ||
-							inet_cidrtoaddr (cidr, &options->request_netmask) != 0) {
+						    inet_cidrtoaddr (cidr, &options->request_netmask) != 0) {
 							logger (LOG_ERR, "`%s' is not a valid CIDR", slash);
 							exit (EXIT_FAILURE);
 						}
@@ -291,7 +299,7 @@ int main(int argc, char **argv)
 				if (! options->doinform)
 					options->dorequest = true;
 				if (strlen (optarg) > 0 &&
-					! inet_aton (optarg, &options->request_address))
+				    ! inet_aton (optarg, &options->request_address))
 				{ 
 					logger (LOG_ERR, "`%s' is not a valid IP address", optarg);
 					exit (EXIT_FAILURE);
@@ -311,7 +319,7 @@ int main(int argc, char **argv)
 						offset += (int) options->userclass[offset] + 1;
 					if (offset + 1 + strlen (optarg) > USERCLASS_MAX_LEN) {
 						logger (LOG_ERR, "userclass overrun, max is %d",
-								USERCLASS_MAX_LEN);
+							USERCLASS_MAX_LEN);
 						exit (EXIT_FAILURE);
 					}
 					userclasses++;
@@ -325,14 +333,16 @@ int main(int argc, char **argv)
 				break;
 			case 'A':
 #ifndef ENABLE_ARP
-				logger (LOG_ERR, "arp support not compiled into dhcpcd");
+				logger (LOG_ERR,
+					"arp not compiled into dhcpcd");
 				exit (EXIT_FAILURE);
 #endif
 				options->doarp = false;
 				break;
 			case 'E':
 #ifndef ENABLE_INFO
-				logger (LOG_ERR, "info support not compiled into dhcpcd");
+				logger (LOG_ERR,
+					"info not compiled into dhcpcd");
 				exit (EXIT_FAILURE);
 #endif
 				options->dolastlease = true;
@@ -359,11 +369,11 @@ int main(int argc, char **argv)
 				if (optarg) {
 					if (strlen (optarg) > CLIENT_ID_MAX_LEN) {
 						logger (LOG_ERR, "`%s' is too long for ClientID, max is %d",
-								optarg, CLIENT_ID_MAX_LEN);
+							optarg, CLIENT_ID_MAX_LEN);
 						exit (EXIT_FAILURE);
 					}
 					options->clientid_len = strlcpy (options->clientid, optarg,
-													sizeof (options->clientid));
+									 sizeof (options->clientid));
 					/* empty string disabled duid */
 					if (options->clientid_len == 0)
 						options->clientid_len = -1;
@@ -410,36 +420,36 @@ int main(int argc, char **argv)
 		printf (""PACKAGE" "VERSION"\n");
 		printf ("Compile time options:"
 #ifdef ENABLE_ARP
-				" ARP"
+			" ARP"
 #endif
 #ifdef ENABLE_DUID
-				" DUID"
+			" DUID"
 #endif
 #ifdef ENABLE_INFO
-				" INFO"
+			" INFO"
 #endif
 #ifdef ENABLE_INFO_COMPAT
-				" INFO_COMPAT"
+			" INFO_COMPAT"
 #endif
 #ifdef ENABLE_IPV4LL
-				" IPV4LL"
+			" IPV4LL"
 #endif
 #ifdef ENABLE_NIS
-				" NIS"
+			" NIS"
 #endif
 #ifdef ENABLE_NTP
-				" NTP"
+			" NTP"
 #endif
 #ifdef SERVICE
-				" " SERVICE
+			" " SERVICE
 #endif
 #ifdef ENABLE_RESOLVCONF
-				" RESOLVCONF"
+			" RESOLVCONF"
 #endif
 #ifdef THERE_IS_NO_FORK
-				" THERE_IS_NO_FORK"
+			" THERE_IS_NO_FORK"
 #endif
-				"\n");
+			"\n");
 	}
 
 	if (dohelp)
@@ -450,19 +460,20 @@ int main(int argc, char **argv)
 	dhcpcd_argc = argc;
 	if (! realpath (argv[0], dhcpcd)) {
 		logger (LOG_ERR, "unable to resolve the path `%s': %s",
-				argv[0], strerror (errno));
+			argv[0], strerror (errno));
 		goto abort;
 	}
 #endif
 
 	if (optind < argc) {
 		if (strlen (argv[optind]) > IF_NAMESIZE) {
-			logger (LOG_ERR, "`%s' is too long for an interface name (max=%d)",
-					argv[optind], IF_NAMESIZE);
+			logger (LOG_ERR,
+				"`%s' too long for an interface name (max=%d)",
+				argv[optind], IF_NAMESIZE);
 			goto abort;
 		}
 		strlcpy (options->interface, argv[optind],
-				 sizeof (options->interface));
+			 sizeof (options->interface));
 	} else {
 		/* If only version was requested then exit now */
 		if (doversion || dohelp) {
@@ -481,17 +492,19 @@ int main(int argc, char **argv)
 		options->fqdn = FQDN_DISABLE;
 
 	if (options->request_address.s_addr == 0 && options->doinform) {
-		if ((options->request_address.s_addr = get_address (options->interface)) != 0)
+		if ((options->request_address.s_addr =
+		     get_address (options->interface)) != 0)
 			options->keep_address = true;
 	}
 
 	if (IN_LINKLOCAL (ntohl (options->request_address.s_addr))) {
-		logger (LOG_ERR, "you are not allowed to request a link local address");
+		logger (LOG_ERR,
+			"you are not allowed to request a link local address");
 		goto abort;
 	}
 
 	if (geteuid ()) {
-		logger (LOG_ERR, "you need to be root to run "PACKAGE);
+		logger (LOG_ERR, "you need to be root to run " PACKAGE);
 		goto abort;
 	}
 
@@ -499,29 +512,32 @@ int main(int argc, char **argv)
 	snprintf (prefix, IF_NAMESIZE, "%s: ", options->interface);
 	setlogprefix (prefix);
 	snprintf (options->pidfile, sizeof (options->pidfile), PIDFILE,
-			  options->interface);
+		  options->interface);
 	free (prefix);
 
 	chdir ("/");
 	umask (022);
-	
+
 	if (mkdir (INFODIR, S_IRUSR | S_IWUSR |S_IXUSR | S_IRGRP | S_IXGRP
-			   | S_IROTH | S_IXOTH) && errno != EEXIST)
+		   | S_IROTH | S_IXOTH) && errno != EEXIST)
 	{
-		logger (LOG_ERR, "mkdir(\"%s\",0): %s\n", INFODIR, strerror (errno));
+		logger (LOG_ERR,
+			"mkdir(\"%s\",0): %s\n", INFODIR, strerror (errno));
 		goto abort;
 	}
 
 	if (mkdir (ETCDIR, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP
-			   | S_IROTH | S_IXOTH) && errno != EEXIST)
+		   | S_IROTH | S_IXOTH) && errno != EEXIST)
 	{
-		logger (LOG_ERR, "mkdir(\"%s\",0): %s\n", ETCDIR, strerror (errno));
+		logger (LOG_ERR,
+			"mkdir(\"%s\",0): %s\n", ETCDIR, strerror (errno));
 		goto abort;
 	}
 
 	if (options->test) {
 		if (options->dorequest || options->doinform) {
-			logger (LOG_ERR, "cannot test with --inform or --request");
+			logger (LOG_ERR,
+				"cannot test with --inform or --request");
 			goto abort;
 		}
 
@@ -531,7 +547,8 @@ int main(int argc, char **argv)
 		}
 
 		if (sig != 0) {
-			logger (LOG_ERR, "cannot test with --release or --renew");
+			logger (LOG_ERR,
+				"cannot test with --release or --renew");
 			goto abort;
 		}
 	}
@@ -540,10 +557,12 @@ int main(int argc, char **argv)
 		int killed = -1;
 		pid = read_pid (options->pidfile);
 		if (pid != 0)
-			logger (LOG_INFO, "sending signal %d to pid %d", sig, pid);
+			logger (LOG_INFO, "sending signal %d to pid %d",
+				sig, pid);
 
 		if (! pid || (killed = kill (pid, sig)))
-			logger (sig == SIGALRM ? LOG_INFO : LOG_ERR, ""PACKAGE" not running");
+			logger (sig == SIGALRM ? LOG_INFO : LOG_ERR,
+				""PACKAGE" not running");
 
 		if (pid != 0 && (sig != SIGALRM || killed != 0))
 			unlink (options->pidfile);
@@ -558,27 +577,34 @@ int main(int argc, char **argv)
 	}
 
 	if (! options->test && ! options->daemonised) {
-		if ((pid = read_pid (options->pidfile)) > 0 && kill (pid, 0) == 0) {
-			logger (LOG_ERR, ""PACKAGE" already running on pid %d (%s)",
-					pid, options->pidfile);
+		if ((pid = read_pid (options->pidfile)) > 0 &&
+		    kill (pid, 0) == 0)
+		{
+			logger (LOG_ERR, ""PACKAGE
+				" already running on pid %d (%s)",
+				pid, options->pidfile);
 			goto abort;
 		}
 
-		pidfd = open (options->pidfile, O_WRONLY | O_CREAT | O_NONBLOCK, 0660);
+		pidfd = open (options->pidfile,
+			      O_WRONLY | O_CREAT | O_NONBLOCK, 0660);
 		if (pidfd == -1) {
-			logger (LOG_ERR, "open `%s': %s", options->pidfile, strerror (errno));
+			logger (LOG_ERR, "open `%s': %s",
+				options->pidfile, strerror (errno));
 			goto abort;
 		}
 
-		/* Lock the file so that only one instance of dhcpcd runs on an interface */
+		/* Lock the file so that only one instance of dhcpcd runs
+		 * on an interface */
 		if (flock (pidfd, LOCK_EX | LOCK_NB) == -1) {
-			logger (LOG_ERR, "flock `%s': %s", options->pidfile, strerror (errno));
+			logger (LOG_ERR, "flock `%s': %s",
+				options->pidfile, strerror (errno));
 			goto abort;
 		}
 
 		/* dhcpcd.sh should not interhit this fd */
 		if ((i = fcntl (pidfd, F_GETFD, 0)) == -1 ||
-			fcntl (pidfd, F_SETFD, i | FD_CLOEXEC) == -1)
+		    fcntl (pidfd, F_SETFD, i | FD_CLOEXEC) == -1)
 			logger (LOG_ERR, "fcntl: %s", strerror (errno));
 
 		writepid (pidfd, getpid ());
@@ -607,6 +633,6 @@ abort:
 #endif
 
 	logger (LOG_INFO, "exiting");
-	
+
 	exit (retval);
 }

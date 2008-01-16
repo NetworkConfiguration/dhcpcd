@@ -79,8 +79,8 @@ void srandomdev (void)
 
 	fd = open ("/dev/urandom", 0);
 	if (fd == -1 || read (fd,  &seed, sizeof (seed)) == -1) {
-		logger (LOG_WARNING, "Could not load seed from /dev/urandom: %s",
-				strerror (errno));
+		logger (LOG_WARNING, "Could not read from /dev/urandom: %s",
+			strerror (errno));
 		seed = time (0);
 	}
 	if (fd >= 0)
@@ -183,8 +183,10 @@ void writepid (int fd, pid_t pid)
 	if (ftruncate (fd, 0) == -1) {
 		logger (LOG_ERR, "ftruncate: %s", strerror (errno));
 	} else {
+		ssize_t len;
 		snprintf (spid, sizeof (spid), "%u", pid);
-		if (pwrite (fd, spid, strlen (spid), 0) != (ssize_t) strlen (spid))
+		len = pwrite (fd, spid, strlen (spid), 0);
+		if (len != (ssize_t) strlen (spid))
 			logger (LOG_ERR, "pwrite: %s", strerror (errno));
 	}
 }

@@ -45,7 +45,7 @@ int ipv4ll_get_address (interface_t *iface, dhcp_t *dhcp) {
 
 	while (1) {
 		addr.s_addr = htonl (LINKLOCAL_ADDR |
-							 ((abs (random ()) % 0xFD00) + 0x0100));
+				     ((abs (random ()) % 0xFD00) + 0x0100));
 		errno = 0;
 		if (! arp_claim (iface, addr))
 			break;

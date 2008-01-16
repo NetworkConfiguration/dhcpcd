@@ -110,7 +110,7 @@ int inet_cidrtoaddr (int cidr, struct in_addr *addr) {
 	if (ocets > 0) {
 		memset (&addr->s_addr, 255, ocets - 1);
 		memset ((unsigned char *) &addr->s_addr + (ocets - 1),
-				(256 - (1 << (32 - cidr) % 8)), 1);
+			(256 - (1 << (32 - cidr) % 8)), 1);
 	}
 
 	return (0);
@@ -145,16 +145,16 @@ char *hwaddr_ntoa (const unsigned char *hwaddr, int hwlen)
 			*p ++= ':';
 		p += snprintf (p, 3, "%.2x", hwaddr[i]);
 	}
-		
+
 	*p ++= '\0';
 
 	return (buffer);
 }
 
 static int _do_interface (const char *ifname,
-						  unsigned char *hwaddr, int *hwlen,
-						  struct in_addr *addr,
-						  bool flush, bool get)
+			  unsigned char *hwaddr, int *hwlen,
+			  struct in_addr *addr,
+			  bool flush, bool get)
 {
 	int s;
 	struct ifconf ifc;
@@ -176,7 +176,8 @@ static int _do_interface (const char *ifname,
 		ifc.ifc_buf = xmalloc (len);
 		if (ioctl (s, SIOCGIFCONF, &ifc) == -1) {
 			if (errno != EINVAL || lastlen != 0) {
-				logger (LOG_ERR, "ioctl SIOCGIFCONF: %s", strerror (errno));
+				logger (LOG_ERR, "ioctl SIOCGIFCONF: %s",
+					strerror (errno));
 				close (s);
 				free (ifc.ifc_buf);	
 				return -1;
@@ -222,28 +223,34 @@ static int _do_interface (const char *ifname,
 		if (hwaddr && hwlen && ifr->ifr_addr.sa_family == AF_LINK) {
 			struct sockaddr_dl sdl;
 
-			memcpy (&sdl, &ifr->ifr_addr, sizeof (struct sockaddr_dl));
+			memcpy (&sdl, &ifr->ifr_addr,
+				sizeof (struct sockaddr_dl));
 			*hwlen = sdl.sdl_alen;
-			memcpy (hwaddr, sdl.sdl_data + sdl.sdl_nlen, sdl.sdl_alen);
+			memcpy (hwaddr, sdl.sdl_data + sdl.sdl_nlen,
+				sdl.sdl_alen);
 			retval = 1;
 			break;
 		}
 #endif
 
 		if (ifr->ifr_addr.sa_family == AF_INET)	{
-			memcpy (&address, &ifr->ifr_addr, sizeof (struct sockaddr_in));
+			memcpy (&address, &ifr->ifr_addr,
+				sizeof (struct sockaddr_in));
 			if (flush) {
 				struct sockaddr_in netmask;
 
 				if (ioctl (s, SIOCGIFNETMASK, ifr) == -1) {
-					logger (LOG_ERR, "ioctl SIOCGIFNETMASK: %s",
-							strerror (errno));
+					logger (LOG_ERR,
+						"ioctl SIOCGIFNETMASK: %s",
+						strerror (errno));
 					continue;
 				}
-				memcpy (&netmask, &ifr->ifr_addr, sizeof (struct sockaddr_in));
+				memcpy (&netmask, &ifr->ifr_addr,
+					sizeof (struct sockaddr_in));
 
 				if (del_address (ifname,
-								 address.sin_addr, netmask.sin_addr) == -1)
+						 address.sin_addr,
+						 netmask.sin_addr) == -1)
 					retval = -1;
 			} else if (get) {
 				addr->s_addr = address.sin_addr.s_addr;
@@ -306,7 +313,9 @@ interface_t *read_interface (const char *ifname, int metric)
 			hwlen = INFINIBAND_ADDR_LEN;
 			break;
 		default:
-			logger (LOG_ERR, "interface is not Ethernet, FireWire, InfiniBand or Token Ring");
+			logger (LOG_ERR,
+				"interface is not Ethernet, FireWire, " \
+				"InfiniBand or Token Ring");
 			goto exit;
 	}
 
@@ -337,11 +346,13 @@ interface_t *read_interface (const char *ifname, int metric)
 	}
 
 	if (ifr.ifr_mtu < MTU_MIN) {
-		logger (LOG_DEBUG, "MTU of %d is too low, setting to %d", ifr.ifr_mtu, MTU_MIN);
+		logger (LOG_DEBUG, "MTU of %d is too low, setting to %d",
+			ifr.ifr_mtu, MTU_MIN);
 		ifr.ifr_mtu = MTU_MIN;
 		strlcpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
 		if (ioctl (s, SIOCSIFMTU, &ifr) == -1) {
-			logger (LOG_ERR, "ioctl SIOCSIFMTU,: %s", strerror (errno));
+			logger (LOG_ERR, "ioctl SIOCSIFMTU,: %s",
+				strerror (errno));
 			goto exit;
 		}
 	}
@@ -361,7 +372,8 @@ interface_t *read_interface (const char *ifname, int metric)
 	if (! (ifr.ifr_flags & IFF_UP) || ! (ifr.ifr_flags & IFF_RUNNING)) {
 		ifr.ifr_flags |= IFF_UP | IFF_RUNNING;
 		if (ioctl (s, SIOCSIFFLAGS, &ifr) == -1) {
-			logger (LOG_ERR, "ioctl SIOCSIFFLAGS: %s", strerror (errno));
+			logger (LOG_ERR, "ioctl SIOCSIFFLAGS: %s",
+				strerror (errno));
 			goto exit;
 		}
 	}
@@ -380,7 +392,7 @@ interface_t *read_interface (const char *ifname, int metric)
 	iface->mtu = iface->previous_mtu = mtu;
 
 	logger (LOG_INFO, "hardware address = %s",
-			hwaddr_ntoa (iface->hwaddr, iface->hwlen));
+		hwaddr_ntoa (iface->hwaddr, iface->hwlen));
 
 	/* 0 is a valid fd, so init to -1 */
 	iface->fd = -1;
@@ -439,12 +451,11 @@ int set_mtu (const char *ifname, short int mtu)
 	return (r == 0 ? 0 : -1);
 }
 
-static void log_route( 
-					  struct in_addr destination,
-					  struct in_addr netmask,
-					  struct in_addr gateway,
-					  int metric,
-					  int change, int del)
+static void log_route (struct in_addr destination,
+		       struct in_addr netmask,
+		       struct in_addr gateway,
+		       int metric,
+		       int change, int del)
 {
 	char *dstd = xstrdup (inet_ntoa (destination));
 
@@ -456,31 +467,31 @@ static void log_route(
 #endif
 
 	if (gateway.s_addr == destination.s_addr ||
-		gateway.s_addr == INADDR_ANY)
+	    gateway.s_addr == INADDR_ANY)
 		logger (LOG_INFO, "%s route to %s/%d" METRIC,
-				change ? "changing" : del ? "removing" : "adding",
-				dstd, inet_ntocidr (netmask)
+			change ? "changing" : del ? "removing" : "adding",
+			dstd, inet_ntocidr (netmask)
 #ifdef __linux__
-				, metric
+			, metric
 #endif
-			   );
+		       );
 	else if (destination.s_addr == INADDR_ANY)
 		logger (LOG_INFO, "%s default route via %s" METRIC,
-				change ? "changing" : del ? "removing" : "adding",
-				inet_ntoa (gateway)
+			change ? "changing" : del ? "removing" : "adding",
+			inet_ntoa (gateway)
 
 #ifdef __linux__
-				, metric
+			, metric
 #endif
-			   );
+		       );
 	else
 		logger (LOG_INFO, "%s route to %s/%d via %s" METRIC,
-				change ? "changing" : del ? "removing" : "adding",
-				dstd, inet_ntocidr (netmask), inet_ntoa (gateway)
+			change ? "changing" : del ? "removing" : "adding",
+			dstd, inet_ntocidr (netmask), inet_ntoa (gateway)
 #ifdef __linux__
-				, metric
+			, metric
 #endif
-			   );
+		       );
 
 	free (dstd);
 }
@@ -490,13 +501,14 @@ static void log_route(
 /* Darwin doesn't define this for some very odd reason */
 #ifndef SA_SIZE
 # define SA_SIZE(sa)						\
-    (  (!(sa) || ((struct sockaddr *)(sa))->sa_len == 0) ?	\
-	sizeof(long)		:				\
-	1 + ( (((struct sockaddr *)(sa))->sa_len - 1) | (sizeof(long) - 1) ) )
+	(  (!(sa) || ((struct sockaddr *)(sa))->sa_len == 0) ?	\
+	   sizeof(long)		:				\
+	   1 + ( (((struct sockaddr *)(sa))->sa_len - 1) | (sizeof(long) - 1) ) )
 #endif
 
 static int do_address (const char *ifname, struct in_addr address,
-					   struct in_addr netmask, struct in_addr broadcast, int del)
+		       struct in_addr netmask, struct in_addr broadcast,
+		       int del)
 {
 	int s;
 	struct ifaliasreq ifa;
@@ -513,37 +525,38 @@ static int do_address (const char *ifname, struct in_addr address,
 	strlcpy (ifa.ifra_name, ifname, sizeof (ifa.ifra_name));
 
 #define ADDADDR(_var, _addr) { \
-		union { struct sockaddr *sa; struct sockaddr_in *sin; } _s; \
-		_s.sa = &_var; \
-		_s.sin->sin_family = AF_INET; \
-		_s.sin->sin_len = sizeof (struct sockaddr_in); \
-		memcpy (&_s.sin->sin_addr, &_addr, sizeof (struct in_addr)); \
-	}
+	union { struct sockaddr *sa; struct sockaddr_in *sin; } _s; \
+	_s.sa = &_var; \
+	_s.sin->sin_family = AF_INET; \
+	_s.sin->sin_len = sizeof (struct sockaddr_in); \
+	memcpy (&_s.sin->sin_addr, &_addr, sizeof (struct in_addr)); \
+}
 
 	ADDADDR (ifa.ifra_addr, address);
 	ADDADDR (ifa.ifra_mask, netmask);
-	if (! del)
-		ADDADDR (ifa.ifra_broadaddr, broadcast);
+if (! del)
+	ADDADDR (ifa.ifra_broadaddr, broadcast);
 
 #undef ADDADDR
 
 	if (ioctl (s, del ? SIOCDIFADDR : SIOCAIFADDR, &ifa) == -1) {
-		logger (LOG_ERR, "ioctl %s: %s", del ? "SIOCDIFADDR" : "SIOCAIFADDR",
-				strerror (errno));
+		logger (LOG_ERR, "ioctl %s: %s",
+			del ? "SIOCDIFADDR" : "SIOCAIFADDR",
+			strerror (errno));
 		close (s);
 		return -1;
 	}
 
-	close (s);
-	return 0;
+close (s);
+return 0;
 }
 
 static int do_route (const char *ifname,
-					 struct in_addr destination,
-					 struct in_addr netmask,
-					 struct in_addr gateway,
-					 int metric,
-					 int change, int del)
+		     struct in_addr destination,
+		     struct in_addr netmask,
+		     struct in_addr gateway,
+		     int metric,
+		     int change, int del)
 {
 	int s;
 	struct rtm 
@@ -562,7 +575,7 @@ static int do_route (const char *ifname,
 		struct sockaddr_dl sdl;
 		struct sockaddr_storage ss;
 	} su;
-	
+
 	int l;
 
 	if (! ifname)
@@ -597,7 +610,7 @@ static int do_route (const char *ifname,
 	ADDADDR (destination);
 
 	if (netmask.s_addr == INADDR_BROADCAST ||
-		gateway.s_addr == INADDR_ANY)
+	    gateway.s_addr == INADDR_ANY)
 	{
 		/* Make us a link layer socket */
 		unsigned char *hwaddr;
@@ -615,7 +628,7 @@ static int do_route (const char *ifname,
 		memcpy (&su.sdl.sdl_data, ifname, su.sdl.sdl_nlen);
 		su.sdl.sdl_alen = hwlen;
 		memcpy (((unsigned char *) &su.sdl.sdl_data) + su.sdl.sdl_nlen,
-				hwaddr, su.sdl.sdl_alen);
+			hwaddr, su.sdl.sdl_alen);
 
 		l = SA_SIZE (&(su.sa));
 		memcpy (bp, &su, l);
@@ -708,7 +721,8 @@ static int send_netlink(struct nlmsghdr *hdr)
 
 		if (bytes == -1) {
 			if (errno != EINTR)
-				logger (LOG_ERR, "recvmsg: %s", strerror (errno));
+				logger (LOG_ERR, "recvmsg: %s",
+					strerror (errno));
 			continue;
 		}
 
@@ -718,7 +732,8 @@ static int send_netlink(struct nlmsghdr *hdr)
 		}
 
 		if (msg.msg_namelen != sizeof (nl)) {
-			logger (LOG_ERR, "netlink: sender address length mismatch");
+			logger (LOG_ERR,
+				"netlink: sender address length mismatch");
 			goto eexit;
 		}
 
@@ -737,18 +752,19 @@ static int send_netlink(struct nlmsghdr *hdr)
 
 			/* Ensure it's our message */
 			if (nl.nl_pid != 0 ||
-				(pid_t) h.nlm->nlmsg_pid != mypid ||
-				h.nlm->nlmsg_seq != seq)
+			    (pid_t) h.nlm->nlmsg_pid != mypid ||
+			    h.nlm->nlmsg_seq != seq)
 			{
 				/* Next Message */
 				bytes -= NLMSG_ALIGN (len);
 				h.buffer += NLMSG_ALIGN (len);
 				continue;
 			}
-			
+
 			/* We get an NLMSG_ERROR back with a code of zero for success */
 			if (h.nlm->nlmsg_type != NLMSG_ERROR) {
-				logger (LOG_ERR, "netlink: unexpected reply %d", h.nlm->nlmsg_type);
+				logger (LOG_ERR, "netlink: unexpected reply %d",
+				       	h.nlm->nlmsg_type);
 				goto eexit;
 			}
 
@@ -766,7 +782,8 @@ static int send_netlink(struct nlmsghdr *hdr)
 			errno = -err->error;
 			/* Don't report on something already existing */
 			if (errno != EEXIST)
-				logger (LOG_ERR, "netlink: %s", strerror (errno));
+				logger (LOG_ERR, "netlink: %s",
+					strerror (errno));
 			goto eexit;
 		}
 	}
@@ -781,13 +798,14 @@ eexit:
 	((struct rtattr *) (((ptrdiff_t) (nmsg)) + NLMSG_ALIGN ((nmsg)->nlmsg_len)))
 
 static int add_attr_l(struct nlmsghdr *n, unsigned int maxlen, int type,
-					  const void *data, int alen)
+		      const void *data, int alen)
 {
 	int len = RTA_LENGTH(alen);
 	struct rtattr *rta;
 
 	if (NLMSG_ALIGN (n->nlmsg_len) + RTA_ALIGN (len) > maxlen) {
-		logger (LOG_ERR, "add_attr_l: message exceeded bound of %d\n", maxlen);
+		logger (LOG_ERR, "add_attr_l: message exceeded bound of %d\n",
+			maxlen);
 		return -1;
 	}
 
@@ -801,13 +819,14 @@ static int add_attr_l(struct nlmsghdr *n, unsigned int maxlen, int type,
 }
 
 static int add_attr_32(struct nlmsghdr *n, unsigned int maxlen, int type,
-					   uint32_t data)
+		       uint32_t data)
 {
 	int len = RTA_LENGTH (sizeof (uint32_t));
 	struct rtattr *rta;
 
 	if (NLMSG_ALIGN (n->nlmsg_len) + len > maxlen) {
-		logger (LOG_ERR, "add_attr32: message exceeded bound of %d\n", maxlen);
+		logger (LOG_ERR, "add_attr32: message exceeded bound of %d\n",
+			maxlen);
 		return -1;
 	}
 
@@ -835,8 +854,8 @@ struct nlmr
 };
 
 static int do_address(const char *ifname,
-					  struct in_addr address, struct in_addr netmask,
-					  struct in_addr broadcast, int del)
+		      struct in_addr address, struct in_addr netmask,
+		      struct in_addr broadcast, int del)
 {
 	struct nlma *nlm;
 	int retval;
@@ -853,8 +872,8 @@ static int do_address(const char *ifname,
 		nlm->hdr.nlmsg_flags |= NLM_F_CREATE | NLM_F_REPLACE;
 	nlm->hdr.nlmsg_type = del ? RTM_DELADDR : RTM_NEWADDR;
 	if (! (nlm->ifa.ifa_index = if_nametoindex (ifname))) {
-		logger (LOG_ERR, "if_nametoindex: Couldn't find index for interface `%s'",
-				ifname);
+		logger (LOG_ERR, "if_nametoindex: no index for interface `%s'",
+			ifname);
 		free (nlm);
 		return -1;
 	}
@@ -864,13 +883,13 @@ static int do_address(const char *ifname,
 
 	/* This creates the aliased interface */
 	add_attr_l (&nlm->hdr, sizeof (struct nlma), IFA_LABEL,
-				ifname, strlen (ifname) + 1);
+		    ifname, strlen (ifname) + 1);
 
 	add_attr_l (&nlm->hdr, sizeof (struct nlma), IFA_LOCAL,
-				&address.s_addr, sizeof (address.s_addr));
+		    &address.s_addr, sizeof (address.s_addr));
 	if (! del)
 		add_attr_l (&nlm->hdr, sizeof (struct nlma), IFA_BROADCAST,
-					&broadcast.s_addr, sizeof (broadcast.s_addr));
+			    &broadcast.s_addr, sizeof (broadcast.s_addr));
 
 	retval = send_netlink (&nlm->hdr);
 	free (nlm);
@@ -878,10 +897,10 @@ static int do_address(const char *ifname,
 }
 
 static int do_route (const char *ifname,
-					 struct in_addr destination,
-					 struct in_addr netmask,
-					 struct in_addr gateway,
-					 int metric, int change, int del)
+		     struct in_addr destination,
+		     struct in_addr netmask,
+		     struct in_addr gateway,
+		     int metric, int change, int del)
 {
 	struct nlmr *nlm;
 	unsigned int ifindex;
@@ -893,8 +912,8 @@ static int do_route (const char *ifname,
 	log_route (destination, netmask, gateway, metric, change, del);
 
 	if (! (ifindex = if_nametoindex (ifname))) {
-		logger (LOG_ERR, "if_nametoindex: Couldn't find index for interface `%s'",
-				ifname);
+		logger (LOG_ERR, "if_nametoindex: no index for interface `%s'",
+			ifname);
 		return -1;
 	}
 
@@ -917,7 +936,7 @@ static int do_route (const char *ifname,
 		nlm->hdr.nlmsg_flags |= NLM_F_CREATE | NLM_F_EXCL;
 		nlm->rt.rtm_protocol = RTPROT_BOOT;
 		if (netmask.s_addr == INADDR_BROADCAST ||
-			gateway.s_addr == INADDR_ANY)
+		    gateway.s_addr == INADDR_ANY)
 			nlm->rt.rtm_scope = RT_SCOPE_LINK;
 		else
 			nlm->rt.rtm_scope = RT_SCOPE_UNIVERSE;
@@ -926,11 +945,11 @@ static int do_route (const char *ifname,
 
 	nlm->rt.rtm_dst_len = inet_ntocidr (netmask);
 	add_attr_l (&nlm->hdr, sizeof (struct nlmr), RTA_DST,
-				&destination.s_addr, sizeof (destination.s_addr));
+		    &destination.s_addr, sizeof (destination.s_addr));
 	if (netmask.s_addr != INADDR_BROADCAST &&
-		destination.s_addr != gateway.s_addr)
+	    destination.s_addr != gateway.s_addr)
 		add_attr_l (&nlm->hdr, sizeof (struct nlmr), RTA_GATEWAY,
-					&gateway.s_addr, sizeof (gateway.s_addr));
+			    &gateway.s_addr, sizeof (gateway.s_addr));
 
 	add_attr_32 (&nlm->hdr, sizeof (struct nlmr), RTA_OIF, ifindex);
 	add_attr_32 (&nlm->hdr, sizeof (struct nlmr), RTA_PRIORITY, metric);
@@ -941,48 +960,47 @@ static int do_route (const char *ifname,
 }
 
 #else
-#error "Platform not supported!"
-#error "We currently support BPF and Linux sockets."
-#error "Other platforms may work using BPF. If yours does, please let me know"
-#error "so I can add it to our list."
+# error "Platform not supported!"
+# error "We currently support BPF and Linux sockets."
+# error "Other platforms may work using BPF. If yours does, please let me know"
+# error "so I can add it to our list."
 #endif
 
-
 int add_address (const char *ifname, struct in_addr address,
-				 struct in_addr netmask, struct in_addr broadcast)
+		 struct in_addr netmask, struct in_addr broadcast)
 {
 	logger (LOG_INFO, "adding IP address %s/%d",
-			inet_ntoa (address), inet_ntocidr (netmask));
+		inet_ntoa (address), inet_ntocidr (netmask));
 
 	return (do_address (ifname, address, netmask, broadcast, 0));
 }
 
 int del_address (const char *ifname,
-				 struct in_addr address, struct in_addr netmask)
+		 struct in_addr address, struct in_addr netmask)
 {
 	struct in_addr t;
 
 	logger (LOG_INFO, "removing IP address %s/%d",
-			inet_ntoa (address), inet_ntocidr (netmask));
+		inet_ntoa (address), inet_ntocidr (netmask));
 
 	memset (&t, 0, sizeof (t));
 	return (do_address (ifname, address, netmask, t, 1));
 }
 
 int add_route (const char *ifname, struct in_addr destination,
-			   struct in_addr netmask, struct in_addr gateway, int metric)
+	       struct in_addr netmask, struct in_addr gateway, int metric)
 {
 	return (do_route (ifname, destination, netmask, gateway, metric, 0, 0));
 }
 
 int change_route (const char *ifname, struct in_addr destination,
-				  struct in_addr netmask, struct in_addr gateway, int metric)
+		  struct in_addr netmask, struct in_addr gateway, int metric)
 {
 	return (do_route (ifname, destination, netmask, gateway, metric, 1, 0));
 }
 
 int del_route (const char *ifname, struct in_addr destination,
-			   struct in_addr netmask, struct in_addr gateway, int metric)
+	       struct in_addr netmask, struct in_addr gateway, int metric)
 {
 	return (do_route (ifname, destination, netmask, gateway, metric, 0, 1));
 }

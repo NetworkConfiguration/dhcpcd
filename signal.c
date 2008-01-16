@@ -46,8 +46,8 @@ static void signal_handler (int sig)
 	unsigned int i = 0;
 
 	/* Silently ignore this signal and wait for it. This stops zombies.
-	   We do this here instead of client.c so that we don't spam the log file
-	   with "waiting on select messages" */
+	   We do this here instead of client.c so that we don't spam the log
+	   file with "waiting on select messages" */
 	if (sig == SIGCHLD) {
 		wait (0);
 		return;
@@ -72,15 +72,15 @@ int signal_fd_set (fd_set *rset, int fd)
 	FD_SET (signal_pipe[0], rset);
 	if (fd >= 0)
 		FD_SET (fd, rset);
-	return signal_pipe[0] > fd ? signal_pipe[0] : fd;
+	return (signal_pipe[0] > fd ? signal_pipe[0] : fd);
 }
 
 /* Check if we have a signal or not */
 int signal_exists (const fd_set *rset)
 {
 	if (signals[0] || (rset && FD_ISSET (signal_pipe[0], rset)))
-		return 0;
-	return -1;
+		return (0);
+	return (-1);
 }
 
 /* Read a signal from the signal pipe. Returns 0 if there is
@@ -118,7 +118,7 @@ int signal_read (fd_set *rset)
 			FD_CLR (signal_pipe[0], rset);
 	}
 
-	return sig;
+	return (sig);
 }
 
 /* Call this before doing anything else. Sets up the socket pair
@@ -133,7 +133,7 @@ void signal_setup (void)
 	/* Stop any scripts from inheriting us */
 	for (i = 0; i < 2; i++)
 		if ((flags = fcntl (signal_pipe[i], F_GETFD, 0)) == -1 ||
-			fcntl (signal_pipe[i], F_SETFD, flags | FD_CLOEXEC) == -1)
+		    fcntl (signal_pipe[i], F_SETFD, flags | FD_CLOEXEC) == -1)
 			logger (LOG_ERR ,"fcntl: %s", strerror (errno));
 
 	signal (SIGHUP, signal_handler);

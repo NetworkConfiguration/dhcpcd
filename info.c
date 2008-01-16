@@ -77,7 +77,20 @@ static char *cleanmetas (const char *cstr)
 	return (new);
 }
 
-static void print_clean (FILE *f, const char *name, const char *value) {
+
+static void print_addresses (FILE *f, const address_t *addresses)
+{
+	const address_t *addr;
+
+	for (addr = addresses; addr; addr = addr->next) {
+		fprintf (f, "%s", inet_ntoa (addr->address));
+		if (addr->next)
+			fprintf (f, " ");
+	}
+}
+
+static void print_clean (FILE *f, const char *name, const char *value)
+{
 	char *clean;
 
 	if (! value)
@@ -89,11 +102,10 @@ static void print_clean (FILE *f, const char *name, const char *value) {
 }
 
 bool write_info(const interface_t *iface, const dhcp_t *dhcp,
-				const options_t *options, bool overwrite)
+		const options_t *options, bool overwrite)
 {
 	FILE *f;
 	route_t *route;
-	address_t *address;
 	struct stat sb;
 
 	if (options->test)
@@ -104,7 +116,8 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 
 		logger (LOG_DEBUG, "writing %s", iface->infofile);
 		if ((f = fopen (iface->infofile, "w")) == NULL) {
-			logger (LOG_ERR, "fopen `%s': %s", iface->infofile, strerror (errno));
+			logger (LOG_ERR, "fopen `%s': %s",
+				iface->infofile, strerror (errno));
 			return (false);
 		}
 	}
@@ -151,11 +164,7 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 
 	if (dhcp->dnsservers) {
 		fprintf (f, "DNSSERVERS='");
-		for (address = dhcp->dnsservers; address; address = address->next) {
-			fprintf (f, "%s", inet_ntoa (address->address));
-			if (address->next)
-				fprintf (f, " ");
-		}
+		print_addresses (f, dhcp->dnsservers);
 		fprintf (f, "'\n");
 	}
 
@@ -168,22 +177,14 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 
 	if (dhcp->ntpservers) {
 		fprintf (f, "NTPSERVERS='");
-		for (address = dhcp->ntpservers; address; address = address->next) {
-			fprintf (f, "%s", inet_ntoa (address->address));
-			if (address->next)
-				fprintf (f, " ");
-		}
+		print_addresses (f, dhcp->ntpservers);
 		fprintf (f, "'\n");
 	}
 
 	print_clean (f, "NISDOMAIN", dhcp->nisdomain);
 	if (dhcp->nisservers) {
 		fprintf (f, "NISSERVERS='");
-		for (address = dhcp->nisservers; address; address = address->next) {
-			fprintf (f, "%s", inet_ntoa (address->address));
-			if (address->next)
-				fprintf (f, " ");
-		}
+		print_addresses (f, dhcp->nisservers);
 		fprintf (f, "'\n");
 	}
 
@@ -218,7 +219,8 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 		p = duid = xmalloc (iface->duid_length + 6);
 		*p++ = 255;
 
-		/* IAID is 4 bytes, so if the interface name is 4 bytes then use it */
+		/* IAID is 4 bytes, so if the interface name is 4 bytes
+		 * then use it */
 		if (strlen (iface->name) == 4) {
 			memcpy (p, iface->name, 4);
 		} else {
@@ -237,17 +239,20 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 #endif
 	else
 		fprintf (f, "CLIENTID='%.2X:%s'\n", iface->family,
-				 hwaddr_ntoa (iface->hwaddr, iface->hwlen));
-	fprintf (f, "DHCPCHADDR='%s'\n", hwaddr_ntoa (iface->hwaddr, iface->hwlen));
+			 hwaddr_ntoa (iface->hwaddr, iface->hwlen));
+	fprintf (f, "DHCPCHADDR='%s'\n", hwaddr_ntoa (iface->hwaddr,
+						      iface->hwlen));
 
 #ifdef ENABLE_INFO_COMPAT
 	/* Support the old .info settings if we need to */
 	fprintf (f, "\n# dhcpcd-1.x and 2.x compatible variables\n");
 	if (dhcp->dnsservers) {
+		address_t *addr;
+
 		fprintf (f, "DNS='");
-		for (address = dhcp->dnsservers; address; address = address->next) {
-			fprintf (f, "%s", inet_ntoa (address->address));
-			if (address->next)
+		for (addr = dhcp->dnsservers; addr; addr = addr->next) {
+			fprintf (f, "%s", inet_ntoa (addr->address));
+			if (addr->next)
 				fprintf (f, ",");
 		}
 		fprintf (f, "'\n");
@@ -274,33 +279,33 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 }
 
 static bool parse_address (struct in_addr *addr,
-						   const char *value, const char *var)
+			   const char *value, const char *var)
 {
 	if (inet_aton (value, addr) == 0) {
 		logger (LOG_ERR, "%s `%s': %s", var, value,
-				strerror (errno));
+			strerror (errno));
 		return (false);
 	}
 	return (true);
 }
 
 static bool parse_uint (unsigned int *i,
-						const char *value, const char *var)
+			const char *value, const char *var)
 {
 	if (sscanf (value, "%u", i) != 1) {
 		logger (LOG_ERR, "%s `%s': not a valid number",
-				var, value);
+			var, value);
 		return (false);
 	}
 	return (true);
 }
 
 static bool parse_ushort (unsigned short *s,
-						  const char *value, const char *var)
+			  const char *value, const char *var)
 {
 	if (sscanf (value, "%hu", s) != 1) {
 		logger (LOG_ERR, "%s `%s': not a valid number",
-				var, value);
+			var, value);
 		return (false);
 	}
 	return (true);
@@ -345,12 +350,13 @@ bool read_info (const interface_t *iface, dhcp_t *dhcp)
 
 	if (stat (iface->infofile, &sb) != 0) {
 		logger (LOG_ERR, "lease information file `%s' does not exist",
-				iface->infofile);
+			iface->infofile);
 		return (false);
 	}
 
 	if (! (fp = fopen (iface->infofile, "r"))) {
-		logger (LOG_ERR, "fopen `%s': %s", iface->infofile, strerror (errno));
+		logger (LOG_ERR, "fopen `%s': %s",
+			iface->infofile, strerror (errno));
 		return (false);
 	}
 
@@ -371,7 +377,7 @@ bool read_info (const interface_t *iface, dhcp_t *dhcp)
 		/* Skip comments */
 		if (*var == '#')
 			goto next;
-		
+
 		/* If we don't have an equals sign then skip it */
 		if (! (p = strchr (var, '=')))
 			goto next;	
@@ -410,7 +416,7 @@ bool read_info (const interface_t *iface, dhcp_t *dhcp)
 
 				if (! dest || ! net || ! gate) {
 					logger (LOG_ERR, "read_info ROUTES `%s,%s,%s': invalid route",
-							dest, net, gate);
+						dest, net, gate);
 					goto next;
 				}
 
@@ -419,19 +425,19 @@ bool read_info (const interface_t *iface, dhcp_t *dhcp)
 				memset (route, 0, sizeof (route_t));
 				if (inet_aton (dest, &route->destination) == 0) {
 					logger (LOG_ERR, "read_info ROUTES `%s': not a valid destination address",
-							dest);
+						dest);
 					free (route);
 					goto next;
 				}
 				if (inet_aton (dest, &route->netmask) == 0) {
 					logger (LOG_ERR, "read_info ROUTES `%s': not a valid netmask address",
-							net);
+						net);
 					free (route);
 					goto next;
 				}
 				if (inet_aton (dest, &route->gateway) == 0) {
 					logger (LOG_ERR, "read_info ROUTES `%s': not a valid gateway address",
-							gate);
+						gate);
 					free (route);
 					goto next;
 				}

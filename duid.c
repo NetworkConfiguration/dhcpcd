@@ -105,7 +105,7 @@ void get_duid (interface_t *iface)
 	/* Finally, add the MAC address of the interface */
 	memcpy (p, iface->hwaddr, iface->hwlen);
 	p += iface->hwlen;
-	
+
 	iface->duid_length = p - iface->duid;
 
 	if (! (fp = fopen (DUIDFILE, "w")))

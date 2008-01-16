@@ -62,21 +62,21 @@
 #define ar_sha(ap) (((unsigned char *) ((ap) + 1)) + 0)
 #define ar_spa(ap) (((unsigned char *) ((ap) + 1)) + (ap)->ar_hln)
 #define ar_tha(ap) (((unsigned char *) ((ap) + 1)) + \
-					(ap)->ar_hln + (ap)->ar_pln)
+		    (ap)->ar_hln + (ap)->ar_pln)
 #define ar_tpa(ap) (((unsigned char *) ((ap) + 1)) + \
-					2 * (ap)->ar_hln + (ap)->ar_pln)
+		    2 * (ap)->ar_hln + (ap)->ar_pln)
 #endif
 
 #ifndef arphdr_len
 #define arphdr_len2(ar_hln, ar_pln) (sizeof (struct arphdr) + \
-									 2 * (ar_hln) + 2 * (ar_pln))
+				     2 * (ar_hln) + 2 * (ar_pln))
 #define arphdr_len(ap) (arphdr_len2 ((ap)->ar_hln, (ap)->ar_pln))
 #endif
 
 #ifdef ENABLE_ARP
 
 static int send_arp (const interface_t *iface, int op, struct in_addr sip,
-					 const unsigned char *taddr, struct in_addr tip)
+		     const unsigned char *taddr, struct in_addr tip)
 {
 	struct arphdr *arp;
 	int arpsize = arphdr_len2 (iface->hwlen, sizeof (struct in_addr));
@@ -106,7 +106,7 @@ static int send_arp (const interface_t *iface, int op, struct in_addr sip,
 	memcpy (ar_tpa (arp), &tip, arp->ar_pln);
 
 	retval = send_packet (iface, ETHERTYPE_ARP,
-						  (unsigned char *) arp, arphdr_len (arp));
+			      (unsigned char *) arp, arphdr_len (arp));
 	free (arp);
 	return (retval);
 }
@@ -130,9 +130,10 @@ int arp_claim (interface_t *iface, struct in_addr address)
 	}
 
 	if (! IN_LINKLOCAL (ntohl (iface->previous_address.s_addr)) &&
-		! IN_LINKLOCAL (ntohl (address.s_addr)))
-		logger (LOG_INFO, "checking %s is available on attached networks",
-				inet_ntoa (address));
+	    ! IN_LINKLOCAL (ntohl (address.s_addr)))
+		logger (LOG_INFO,
+			"checking %s is available on attached networks",
+			inet_ntoa (address));
 
 	if (! open_socket (iface, true))
 		return (-1);
@@ -159,7 +160,8 @@ int arp_claim (interface_t *iface, struct in_addr address)
 			tv.tv_usec = timeout;
 
 			maxfd = signal_fd_set (&rset, iface->fd);
-			if ((s = select (maxfd + 1, &rset, NULL, NULL, &tv)) == -1) {
+			s = select (maxfd + 1, &rset, NULL, NULL, &tv);
+			if (s == -1) {
 				if (errno == EINTR) {
 					if (signal_exists (NULL) == -1) {
 						errno = 0;
@@ -167,8 +169,9 @@ int arp_claim (interface_t *iface, struct in_addr address)
 					} else
 						break;
 				}
-				
-				logger (LOG_ERR, "select: `%s'", strerror (errno));
+
+				logger (LOG_ERR, "select: `%s'",
+					strerror (errno));
 				break;
 			}
 		}
@@ -178,9 +181,11 @@ int arp_claim (interface_t *iface, struct in_addr address)
 			if (nprobes < NPROBES) {
 				nprobes ++;
 				timeout = PROBE_INTERVAL;
-				logger (LOG_DEBUG, "sending ARP probe #%d", nprobes);
+				logger (LOG_DEBUG, "sending ARP probe #%d",
+					nprobes);
 				if (send_arp (iface, ARPOP_REQUEST,
-							  null_address, NULL, address) == -1)
+					      null_address, NULL,
+					      address) == -1)
 					break;
 
 				/* IEEE1394 cannot set ARP target address
@@ -191,9 +196,11 @@ int arp_claim (interface_t *iface, struct in_addr address)
 			} else if (nclaims < NCLAIMS) {
 				nclaims ++;
 				timeout = CLAIM_INTERVAL;
-				logger (LOG_DEBUG, "sending ARP claim #%d", nclaims);
+				logger (LOG_DEBUG, "sending ARP claim #%d",
+					nclaims);
 				if (send_arp (iface, ARPOP_REQUEST,
-							  address, iface->hwaddr, address) == -1)
+					      address, iface->hwaddr,
+					      address) == -1)
 					break;
 			} else {
 				/* No replies, so done */
@@ -233,8 +240,8 @@ int arp_claim (interface_t *iface, struct in_addr address)
 
 			memset (reply, 0, iface->buffer_length);
 			if ((bytes = get_packet (iface, (unsigned char *) reply,
-									 buffer,
-									 &buflen, &bufpos)) == -1)
+						 buffer,
+						 &buflen, &bufpos)) == -1)
 				break;
 
 			/* Only these types are recognised */
@@ -247,24 +254,25 @@ int arp_claim (interface_t *iface, struct in_addr address)
 			if (reply->ar_pln != sizeof (struct in_addr))
 				continue;
 			if ((unsigned) bytes < sizeof (reply) + 
-				2 * (4 + reply->ar_hln))
+			    2 * (4 + reply->ar_hln))
 				continue;
 
 			rp.c = (unsigned char *) ar_spa (reply);
 			rh.c = (unsigned char *) ar_sha (reply);
 
-			/* Ensure the ARP reply is for the address we asked for */
+			/* Ensure the ARP reply is for the our address */
 			if (rp.a->s_addr != address.s_addr)
 				continue;
 
-			/* Some systems send a reply back from our hwaddress - weird */
+			/* Some systems send a reply back from our hwaddress,
+			 * which is weird */
 			if (reply->ar_hln == iface->hwlen &&
-				memcmp (rh.c, iface->hwaddr, iface->hwlen) == 0)
+			    memcmp (rh.c, iface->hwaddr, iface->hwlen) == 0)
 				continue;
 
 			logger (LOG_ERR, "ARPOP_REPLY received from %s (%s)",
-					inet_ntoa (*rp.a),
-					hwaddr_ntoa (rh.c, reply->ar_hln));
+				inet_ntoa (*rp.a),
+				hwaddr_ntoa (rh.c, reply->ar_hln));
 			retval = -1;
 			goto eexit;
 		}
