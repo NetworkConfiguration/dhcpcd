@@ -183,12 +183,15 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 			logger (LOG_ERR,
 				"cannot request a link local address");
 		else {
-			if (dhcp->address.s_addr != iface->previous_address.s_addr &&
+			if (dhcp->address.s_addr &&
+			    dhcp->address.s_addr !=
+			    iface->previous_address.s_addr &&
 			    type != DHCP_RELEASE)
 				PUTADDR (DHCP_ADDRESS, dhcp->address);
 
-			if (dhcp->serveraddress.s_addr != 0 && dhcp->address.s_addr !=0 &&
-			    (iface->previous_address.s_addr == 0 || type == DHCP_RELEASE))
+			if (dhcp->serveraddress.s_addr &&
+			    dhcp->address.s_addr &&
+			    (type == DHCP_REQUEST || type == DHCP_RELEASE))
 				PUTADDR (DHCP_SERVERIDENTIFIER,
 					 dhcp->serveraddress);
 		}
