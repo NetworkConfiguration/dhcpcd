@@ -12,6 +12,8 @@ CLEANFILES=	version.h dhcpcd.8
 
 BINDIR=		${PREFIX}/sbin
 
+.SUFFIXES:	.in
+
 MK=		mk
 include ${MK}/os.mk
 include ${MK}/cc.mk
@@ -28,5 +30,5 @@ ${SRCS}:	version.h
 version.h:
 	echo "#define VERSION \"${VERSION}\""> version.h
 
-dhcpcd.8: dhcpcd.8.in
+.in:
 	sed 's:@PREFIX@:${PREFIX}:g; s:@INFODIR@:${INFOD}:g' $< > $@
