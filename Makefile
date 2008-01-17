@@ -12,9 +12,6 @@ CLEANFILES=	version.h dhcpcd.8
 
 BINDIR=		${PREFIX}/sbin
 
-# Needed for crappy Linux headers :/
-CSTD=		gnu99
-
 MK=		mk
 include ${MK}/os.mk
 include ${MK}/cc.mk
@@ -32,4 +29,4 @@ version.h:
 	echo "#define VERSION \"${VERSION}\""> version.h
 
 dhcpcd.8: dhcpcd.8.in
-	sed 's:%%INFODIR%%:${INFOD}:g' dhcpcd.8.in > dhcpcd.8
+	sed 's:@PREFIX@:${PREFIX}:g; s:@INFODIR@:${INFOD}:g' $< > $@
