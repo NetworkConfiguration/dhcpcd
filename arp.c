@@ -59,11 +59,11 @@
 
 /* Linux does not seem to define these handy macros */
 #ifndef ar_sha
-#define ar_sha(ap) (((unsigned char *) ((ap) + 1)) + 0)
-#define ar_spa(ap) (((unsigned char *) ((ap) + 1)) + (ap)->ar_hln)
-#define ar_tha(ap) (((unsigned char *) ((ap) + 1)) + \
+#define ar_sha(ap) (((caddr_t) ((ap) + 1)) + 0)
+#define ar_spa(ap) (((caddr_t) ((ap) + 1)) + (ap)->ar_hln)
+#define ar_tha(ap) (((caddr_t) ((ap) + 1)) + \
 		    (ap)->ar_hln + (ap)->ar_pln)
-#define ar_tpa(ap) (((unsigned char *) ((ap) + 1)) + \
+#define ar_tpa(ap) (((caddr_t) ((ap) + 1)) + \
 		    2 * (ap)->ar_hln + (ap)->ar_pln)
 #endif
 
@@ -80,7 +80,7 @@ static int send_arp (const interface_t *iface, int op, struct in_addr sip,
 {
 	struct arphdr *arp;
 	int arpsize = arphdr_len2 (iface->hwlen, sizeof (struct in_addr));
-	char *tha;
+	caddr_t tha;
 	int retval;
 
 	arp = xmalloc (arpsize);
