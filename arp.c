@@ -61,10 +61,8 @@
 #ifndef ar_sha
 #define ar_sha(ap) (((caddr_t) ((ap) + 1)) + 0)
 #define ar_spa(ap) (((caddr_t) ((ap) + 1)) + (ap)->ar_hln)
-#define ar_tha(ap) (((caddr_t) ((ap) + 1)) + \
-		    (ap)->ar_hln + (ap)->ar_pln)
-#define ar_tpa(ap) (((caddr_t) ((ap) + 1)) + \
-		    2 * (ap)->ar_hln + (ap)->ar_pln)
+#define ar_tha(ap) (((caddr_t) ((ap) + 1)) + (ap)->ar_hln + (ap)->ar_pln)
+#define ar_tpa(ap) (((caddr_t) ((ap) + 1)) + 2 * (ap)->ar_hln + (ap)->ar_pln)
 #endif
 
 #ifndef arphdr_len
