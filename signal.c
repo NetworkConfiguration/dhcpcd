@@ -28,7 +28,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/select.h>
-#include <sys/wait.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -44,14 +43,6 @@ static int signals[5];
 static void signal_handler (int sig)
 {
 	unsigned int i = 0;
-
-	/* Silently ignore this signal and wait for it. This stops zombies.
-	   We do this here instead of client.c so that we don't spam the log
-	   file with "waiting on select messages" */
-	if (sig == SIGCHLD) {
-		wait (0);
-		return;
-	}
 
 	/* Add a signal to our stack */
 	while (signals[i])
@@ -140,7 +131,9 @@ void signal_setup (void)
 	signal (SIGALRM, signal_handler);
 	signal (SIGTERM, signal_handler);
 	signal (SIGINT, signal_handler);
-	signal (SIGCHLD, signal_handler);
+
+	/* We don't care about our childs exit codes right now */
+	signal (SIGCHLD, SIG_IGN);
 
 	memset (signals, 0, sizeof (signals));
 }
