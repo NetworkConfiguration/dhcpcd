@@ -256,7 +256,7 @@ static int _make_ntp (const char *file, const char *ifname, const dhcp_t *dhcp)
 	} else {
 		while (tomatch != 0 && (line = getline (f))) {
 			struct in_addr addr;
-			
+
 			a = line;
 			token = strsep (&a, " ");
 			if (! token || strcmp (token, "server") != 0)
@@ -265,7 +265,7 @@ static int _make_ntp (const char *file, const char *ifname, const dhcp_t *dhcp)
 			if ((token = strsep (&a, " \n")) == NULL)
 				goto next;
 
-			if (inet_aton (token, &addr) == 0 &&
+			if (inet_aton (token, &addr) == 1 &&
 			    in_addresses (dhcp->ntpservers, addr))
 				tomatch--;
 
