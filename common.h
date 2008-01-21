@@ -33,6 +33,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#if __GNUC__ > 2 || defined(__INTEL_COMPILER)
+# define _unused __attribute__((__unused__))
+#endif
+
 #define HAVE_STRLCPY
 /* Only GLIBC doesn't support strlcpy */
 #ifdef __GLIBC__

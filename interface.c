@@ -454,7 +454,7 @@ int set_mtu (const char *ifname, short int mtu)
 static void log_route (struct in_addr destination,
 		       struct in_addr netmask,
 		       struct in_addr gateway,
-		       __unused int metric,
+		       _unused int metric,
 		       int change, int del)
 {
 	char *dstd = xstrdup (inet_ntoa (destination));
