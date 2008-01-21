@@ -308,10 +308,10 @@ int open_socket (interface_t *iface, bool arp)
 	return fd;
 }
 
-int send_packet (const interface_t *iface, int type,
-		 const unsigned char *data, int len)
+ssize_t send_packet (const interface_t *iface, int type,
+		     const unsigned char *data, int len)
 {
-	int retval = -1;
+	ssize_t retval = -1;
 	struct iovec iov[2];
 
 	if (iface->family == ARPHRD_ETHER) {
@@ -337,8 +337,8 @@ int send_packet (const interface_t *iface, int type,
 
 /* BPF requires that we read the entire buffer.
    So we pass the buffer in the API so we can loop on >1 dhcp packet. */
-int get_packet (const interface_t *iface, unsigned char *data,
-		unsigned char *buffer, int *buffer_len, int *buffer_pos)
+ssize_t get_packet (const interface_t *iface, unsigned char *data,
+		    unsigned char *buffer, int *buffer_len, int *buffer_pos)
 {
 	union
 	{
@@ -364,7 +364,7 @@ int get_packet (const interface_t *iface, unsigned char *data,
 		bpf.buffer += *buffer_pos;
 
 	while (bpf.packet) {
-		int len = -1;
+		ssize_t len = -1;
 		union
 		{
 			unsigned char *buffer;
@@ -478,15 +478,15 @@ int open_socket (interface_t *iface, bool arp)
 	return fd;
 }
 
-int send_packet (const interface_t *iface, const int type,
-		 const unsigned char *data, const int len)
+ssize_t send_packet (const interface_t *iface, const int type,
+		     const unsigned char *data, const int len)
 {
 	union sockunion {
 		struct sockaddr sa;
 		struct sockaddr_ll sll;
 		struct sockaddr_storage ss;
 	} su;
-	int retval;
+	ssize_t retval;
 
 	if (! iface)
 		return -1;
@@ -511,10 +511,10 @@ int send_packet (const interface_t *iface, const int type,
 
 /* Linux has no need for the buffer as we can read as much as we want.
    We only have the buffer listed to keep the same API. */
-int get_packet (const interface_t *iface, unsigned char *data,
-		unsigned char *buffer, int *buffer_len, int *buffer_pos)
+ssize_t get_packet (const interface_t *iface, unsigned char *data,
+		    unsigned char *buffer, int *buffer_len, int *buffer_pos)
 {
-	long bytes;
+	ssize_t bytes;
 	union
 	{
 		unsigned char *buffer;

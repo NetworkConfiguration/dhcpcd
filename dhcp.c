@@ -78,9 +78,9 @@ static const char *dhcp_message (int type)
 	return (NULL);
 }
 
-size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
-		     unsigned long xid, char type,
-		     const options_t *options)
+ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
+		      unsigned long xid, char type,
+		      const options_t *options)
 {
 	struct udp_dhcp_packet *packet;
 	dhcpmessage_t *message;
@@ -94,7 +94,7 @@ size_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 	uint32_t ul;
 	uint16_t sz;
 	unsigned int message_length;
-	size_t retval;
+	ssize_t retval;
 
 	if (!iface || !options || !dhcp)
 		return -1;
@@ -641,6 +641,7 @@ static route_t *decode_routers (const unsigned char *data, int length)
 
 	return (head);
 }
+
 int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 {
 	const unsigned char *p = message->options;

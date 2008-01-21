@@ -671,7 +671,7 @@ static int send_netlink(struct nlmsghdr *hdr)
 	struct msghdr msg;
 	static unsigned int seq;
 	char *buffer;
-	int bytes;
+	ssize_t bytes;
 	union
 	{
 		char *buffer;
