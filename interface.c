@@ -171,7 +171,7 @@ static int _do_interface (const char *ifname,
 	/* Not all implementations return the needed buffer size for
 	 * SIOGIFCONF so we loop like so for all until it works */
 	memset (&ifc, 0, sizeof (struct ifconf));
-	while (1) {
+	for (;;) {
 		ifc.ifc_len = len;
 		ifc.ifc_buf = xmalloc (len);
 		if (ioctl (s, SIOCGIFCONF, &ifc) == -1) {
@@ -715,7 +715,7 @@ static int send_netlink(struct nlmsghdr *hdr)
 	memset (buffer, 0, BUFFERLEN);
 	iov.iov_base = buffer;
 
-	while (1) {
+	for (;;) {
 		iov.iov_len = BUFFERLEN;
 		bytes = recvmsg (s, &msg, 0);
 

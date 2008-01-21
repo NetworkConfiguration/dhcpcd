@@ -999,7 +999,7 @@ int dhcp_run (const options_t *options, int *pidfd)
 
 	signal_setup ();
 
-	while (1) {
+	for (;;) {
 		retval = wait_for_packet (&rset, state, options);
 
 		/* We should always handle our signals first */

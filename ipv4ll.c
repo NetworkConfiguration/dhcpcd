@@ -43,7 +43,7 @@
 int ipv4ll_get_address (interface_t *iface, dhcp_t *dhcp) {
 	struct in_addr addr;
 
-	while (1) {
+	for (;;) {
 		addr.s_addr = htonl (LINKLOCAL_ADDR |
 				     ((abs (random ()) % 0xFD00) + 0x0100));
 		errno = 0;

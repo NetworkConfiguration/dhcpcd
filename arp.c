@@ -141,7 +141,7 @@ int arp_claim (interface_t *iface, struct in_addr address)
 	buffer = xmalloc (iface->buffer_length);
 	reply = xmalloc (iface->buffer_length);
 
-	while (1) {
+	for (;;) {
 		struct timeval tv;
 		int bufpos = -1;
 		int buflen = iface->buffer_length;
