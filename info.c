@@ -211,7 +211,7 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 		free (clean);
 	}
 #ifdef ENABLE_DUID
-	else if (iface->duid_length > 0 && options->clientid_len != -1) {
+	else if (iface->duid_length > 0 && options->doduid) {
 		unsigned char *duid;
 		unsigned char *p;
 		uint32_t ul;
@@ -233,7 +233,8 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 		memcpy (p, iface->duid, iface->duid_length);
 		p += iface->duid_length;
 
-		fprintf (f, "CLIENTID='%s'\n", hwaddr_ntoa (duid, p - duid));
+		fprintf (f, "CLIENTID='%s'\n", hwaddr_ntoa (duid,
+							    (size_t) (p - duid)));
 		free (duid);
 	}
 #endif

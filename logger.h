@@ -30,6 +30,8 @@
 
 #ifdef __GNUC__
 #  define _PRINTF_LIKE(_one, _two)  __attribute__ ((__format__ (__printf__, _one, _two)))
+#else
+#  define _PRINTF_LIKE(_one, _two)
 #endif
 
 #include <syslog.h>

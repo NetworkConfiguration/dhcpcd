@@ -35,7 +35,7 @@
 #ifdef ENABLE_IPV4LL
 
 #ifndef ENABLE_ARP
-#error IPV4LL requires ARP
+ # error IPV4LL requires ARP
 #endif
 
 #define IPV4LL_LEASETIME 20 
@@ -45,7 +45,8 @@ int ipv4ll_get_address (interface_t *iface, dhcp_t *dhcp) {
 
 	for (;;) {
 		addr.s_addr = htonl (LINKLOCAL_ADDR |
-				     ((abs (random ()) % 0xFD00) + 0x0100));
+				     (((uint32_t) abs ((int) random ())
+				       % 0xFD00) + 0x0100));
 		errno = 0;
 		if (! arp_claim (iface, addr))
 			break;

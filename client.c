@@ -75,7 +75,7 @@
 
 #ifdef THERE_IS_NO_FORK
 # ifndef ENABLE_INFO
-#  error "Non MMU requires ENABLE_INFO to work"
+ #  error "Non MMU requires ENABLE_INFO to work"
 # endif
 #endif
 
@@ -117,12 +117,12 @@ typedef struct _state {
 	time_t last_sent;
 	time_t last_type;
 	long timeout;
-	long nakoff;
+	time_t nakoff;
 	bool daemonised;
 	bool persistent;
 	unsigned char *buffer;
-	ssize_t buffer_len;
-	ssize_t buffer_pos;
+	size_t buffer_len;
+	size_t buffer_pos;
 } state_t;
 
 static pid_t daemonise (int *pidfd)
@@ -462,7 +462,7 @@ static int wait_for_packet (fd_set *rset, state_t *state,
 		else
 			tv.tv_sec = TIMEOUT_MINI;
 		if (state->timeout < tv.tv_sec)
-			tv.tv_sec = state->timeout;
+			tv.tv_sec = (time_t) state->timeout;
 		tv.tv_usec = 0;
 		state->start = uptime ();
 		maxfd = signal_fd_set (rset, iface->fd);
@@ -516,7 +516,7 @@ static bool handle_signal (int sig, state_t *state,  const options_t *options)
 			logger (LOG_INFO, "received SIGHUP, releasing lease");
 			if (! IN_LINKLOCAL (ntohl (state->dhcp->address.s_addr))) {
 				do_socket (state, SOCKET_OPEN);
-				state->xid = random ();
+				state->xid = (uint32_t) random ();
 				if ((open_socket (state->interface, false)) >= 0)
 					_send_message (state, DHCP_RELEASE, options);
 				do_socket (state, SOCKET_CLOSED);
@@ -632,7 +632,7 @@ static int handle_timeout (state_t *state, const options_t *options)
 
 	switch (state->state) {
 		case STATE_INIT:
-			state->xid = random ();
+			state->xid = (uint32_t) random ();
 			do_socket (state, SOCKET_OPEN);
 			state->timeout = options->timeout;
 			iface->start_uptime = uptime ();
@@ -662,7 +662,8 @@ static int handle_timeout (state_t *state, const options_t *options)
 				break;
 			}
 			state->state = STATE_RENEWING;
-			state->xid = random ();
+			state->xid = (uint32_t) random ();
+			/* FALLTHROUGH */
 		case STATE_RENEWING:
 			iface->start_uptime = uptime ();
 			logger (LOG_INFO, "renewing lease of %s", inet_ntoa
@@ -677,7 +678,7 @@ static int handle_timeout (state_t *state, const options_t *options)
 			memset (&dhcp->address, 0, sizeof (struct in_addr));
 			do_socket (state, SOCKET_OPEN);
 			if (state->xid == 0)
-				state->xid = random ();
+				state->xid = (uint32_t) random ();
 			_send_message (state, DHCP_REQUEST, options);
 			state->timeout = dhcp->leasetime - dhcp->rebindtime;
 			state->state = STATE_REQUESTING;
@@ -689,7 +690,7 @@ static int handle_timeout (state_t *state, const options_t *options)
 			break;
 
 		case STATE_RELEASED:
-			dhcp->leasetime = -1;
+			dhcp->leasetime = 0;
 			break;
 	}
 
@@ -715,7 +716,7 @@ static int handle_dhcp (state_t *state, int type, const options_t *options)
 		/* If we constantly get NAKS then we should slowly back off */
 		if (state->nakoff > 0) {
 			logger (LOG_DEBUG, "sleeping for %ld seconds",
-				state->nakoff);
+				(long) state->nakoff);
 			tv.tv_sec = state->nakoff;
 			tv.tv_usec = 0;
 			state->nakoff *= 2;
@@ -915,7 +916,7 @@ static int handle_packet (state_t *state, const options_t *options)
 	if (! state->buffer)
 		state->buffer = xmalloc (iface->buffer_length);
 	state->buffer_len = iface->buffer_length;
-	state->buffer_pos = -1;
+	state->buffer_pos = 0;
 
 	/* We loop through until our buffer is empty.
 	   The benefit is that if we get >1 DHCP packet in our buffer and
@@ -924,7 +925,7 @@ static int handle_packet (state_t *state, const options_t *options)
 	memset (&message, 0, sizeof (struct dhcpmessage_t));
 	new_dhcp = xmalloc (sizeof (dhcp_t));
 
-	while (state->buffer_pos != 0) {
+	do {
 		if (get_packet (iface, (unsigned char *) &message,
 				state->buffer,
 				&state->buffer_len, &state->buffer_pos) == -1)
@@ -952,7 +953,7 @@ static int handle_packet (state_t *state, const options_t *options)
 		   any more DHCP packets at this point. */
 		valid = true;
 		break;
-	}
+	} while (state->buffer_pos != 0);
 
 	/* No packets for us, so wait until we get one */
 	if (! valid) {

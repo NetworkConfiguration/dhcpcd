@@ -139,10 +139,10 @@ typedef struct dhcp_t
 	struct in_addr broadcast;
 	unsigned short mtu;
 
-	unsigned int leasedfrom;
-	unsigned int leasetime;
-	unsigned int renewaltime;
-	unsigned int rebindtime;
+	uint32_t leasedfrom;
+	uint32_t leasetime;
+	uint32_t renewaltime;
+	uint32_t rebindtime;
 
 	route_t *routes;
 
@@ -209,7 +209,7 @@ struct udp_dhcp_packet
 };
 
 ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
-		      unsigned long xid, char type,
+		      uint32_t xid, char type,
 		      const options_t *options);
 void free_dhcp (dhcp_t *dhcp);
 int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message);

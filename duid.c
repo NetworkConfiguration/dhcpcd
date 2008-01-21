@@ -111,7 +111,7 @@ void get_duid (interface_t *iface)
 	if (! (fp = fopen (DUIDFILE, "w")))
 		logger (LOG_ERR, "fopen `%s': %s", DUIDFILE, strerror (errno));
 	else {
-		int i;
+		size_t i;
 		for (i = 0; i < iface->duid_length; i++)
 			x += fprintf (fp, "%.2X", iface->duid[i]);
 		fprintf (fp, "\n");

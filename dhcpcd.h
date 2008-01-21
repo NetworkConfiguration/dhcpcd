@@ -56,12 +56,12 @@ typedef struct options_t {
 	char hostname[MAXHOSTNAMELEN];
 	int fqdn;
 	char classid[CLASS_ID_MAX_LEN];
-	int classid_len;
+	size_t classid_len;
 	char clientid[CLIENT_ID_MAX_LEN];
-	int clientid_len;
+	size_t clientid_len;
 	char userclass[USERCLASS_MAX_LEN];
-	int userclass_len;
-	unsigned leasetime;
+	size_t userclass_len;
+	uint32_t leasetime;
 	time_t timeout;
 	int metric;
 
@@ -77,6 +77,7 @@ typedef struct options_t {
 	bool doinform;
 	bool dorequest;
 	bool doipv4ll;
+	bool doduid;
 	int domscsr;
 
 	struct in_addr request_address;

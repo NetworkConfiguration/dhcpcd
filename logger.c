@@ -96,8 +96,8 @@ void logger (int level, const char *fmt, ...)
 	}
 
 	if (level < LOG_DEBUG || level <= loglevel) {
-		int len = strlen (logprefix);
-		int fmt2len = strlen (fmt) + len + 1;
+		size_t len = strlen (logprefix);
+		size_t fmt2len = strlen (fmt) + len + 1;
 		char *fmt2 = malloc (sizeof (char) * fmt2len);
 		char *pf = fmt2;
 		if (fmt2) {

@@ -77,7 +77,7 @@ static int send_arp (const interface_t *iface, int op, struct in_addr sip,
 		     const unsigned char *taddr, struct in_addr tip)
 {
 	struct arphdr *arp;
-	int arpsize = arphdr_len2 (iface->hwlen, sizeof (struct in_addr));
+	size_t arpsize = arphdr_len2 (iface->hwlen, sizeof (struct in_addr));
 	caddr_t tha;
 	int retval;
 
@@ -89,8 +89,8 @@ static int send_arp (const interface_t *iface, int op, struct in_addr sip,
 	arp->ar_hln = iface->hwlen;
 	arp->ar_pln = sizeof (struct in_addr);
 	arp->ar_op = htons (op);
-	memcpy (ar_sha (arp), iface->hwaddr, arp->ar_hln);
-	memcpy (ar_spa (arp), &sip, arp->ar_pln);
+	memcpy (ar_sha (arp), iface->hwaddr, (size_t) arp->ar_hln);
+	memcpy (ar_spa (arp), &sip, (size_t) arp->ar_pln);
 	if (taddr) {
 		/* NetBSD can return NULL from ar_tha, which is probably wrong
 		 * but we still need to deal with it */
@@ -99,9 +99,9 @@ static int send_arp (const interface_t *iface, int op, struct in_addr sip,
 			errno = EINVAL;
 			return (-1);
 		}
-		memcpy (tha, taddr, arp->ar_hln);
+		memcpy (tha, taddr, (size_t) arp->ar_hln);
 	}
-	memcpy (ar_tpa (arp), &tip, arp->ar_pln);
+	memcpy (ar_tpa (arp), &tip, (size_t) arp->ar_pln);
 
 	retval = send_packet (iface, ETHERTYPE_ARP,
 			      (unsigned char *) arp, arphdr_len (arp));
@@ -143,8 +143,8 @@ int arp_claim (interface_t *iface, struct in_addr address)
 
 	for (;;) {
 		struct timeval tv;
-		int bufpos = -1;
-		int buflen = iface->buffer_length;
+		size_t bufpos = 0;
+		size_t buflen = iface->buffer_length;
 		fd_set rset;
 		int bytes;
 		int s = 0;
@@ -226,7 +226,7 @@ int arp_claim (interface_t *iface, struct in_addr address)
 			continue;
 
 		memset (buffer, 0, buflen);
-		while (bufpos != 0)	{
+		do {
 			union {
 				unsigned char *c;
 				struct in_addr *a;
@@ -270,10 +270,10 @@ int arp_claim (interface_t *iface, struct in_addr address)
 
 			logger (LOG_ERR, "ARPOP_REPLY received from %s (%s)",
 				inet_ntoa (*rp.a),
-				hwaddr_ntoa (rh.c, reply->ar_hln));
+				hwaddr_ntoa (rh.c, (size_t) reply->ar_hln));
 			retval = -1;
 			goto eexit;
-		}
+		} while (bufpos != 0);
 	}
 
 eexit:

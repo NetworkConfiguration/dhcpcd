@@ -86,7 +86,7 @@ static uint16_t checksum (unsigned char *addr, uint16_t len)
 }
 
 void make_dhcp_packet(struct udp_dhcp_packet *packet,
-		      const unsigned char *data, int length,
+		      const unsigned char *data, size_t length,
 		      struct in_addr source, struct in_addr dest)
 {
 	struct ip *ip = &packet->ip;
@@ -309,7 +309,7 @@ int open_socket (interface_t *iface, bool arp)
 }
 
 ssize_t send_packet (const interface_t *iface, int type,
-		     const unsigned char *data, int len)
+		     const unsigned char *data, size_t len)
 {
 	ssize_t retval = -1;
 	struct iovec iov[2];
@@ -338,7 +338,8 @@ ssize_t send_packet (const interface_t *iface, int type,
 /* BPF requires that we read the entire buffer.
    So we pass the buffer in the API so we can loop on >1 dhcp packet. */
 ssize_t get_packet (const interface_t *iface, unsigned char *data,
-		    unsigned char *buffer, int *buffer_len, int *buffer_pos)
+		    unsigned char *buffer,
+		    size_t *buffer_len, size_t *buffer_pos)
 {
 	union
 	{
@@ -364,13 +365,14 @@ ssize_t get_packet (const interface_t *iface, unsigned char *data,
 		bpf.buffer += *buffer_pos;
 
 	while (bpf.packet) {
-		ssize_t len = -1;
+		size_t len = 0;
 		union
 		{
 			unsigned char *buffer;
 			struct ether_header *hw;
 		} hdr;
 		unsigned char *payload;
+		bool have_data = false;
 
 		/* Ensure that the entire packet is in our buffer */
 		if (*buffer_pos + bpf.packet->bh_hdrlen + bpf.packet->bh_caplen
@@ -385,6 +387,7 @@ ssize_t get_packet (const interface_t *iface, unsigned char *data,
 			len = bpf.packet->bh_caplen - 
 				sizeof (struct ether_header);
 			memcpy (data, payload, len);
+			have_data = true;
 		} else {
 			if (valid_dhcp_packet (payload) >= 0) {
 				union
@@ -397,18 +400,19 @@ ssize_t get_packet (const interface_t *iface, unsigned char *data,
 					sizeof (struct ip) -
 					sizeof (struct udphdr);
 				memcpy (data, &pay.packet->dhcp, len);
+				have_data = true;
 			}
 		}
 
 		/* Update the buffer_pos pointer */
 		bpf.buffer += BPF_WORDALIGN (bpf.packet->bh_hdrlen +
 					     bpf.packet->bh_caplen);
-		if (bpf.buffer - buffer <  *buffer_len)
+		if ((unsigned) (bpf.buffer - buffer) < *buffer_len)
 			*buffer_pos = bpf.buffer - buffer;
 		else
 			*buffer_pos = 0;
 
-		if (len != -1)
+		if (have_data)
 			return len;
 
 		if (*buffer_pos == 0)
@@ -478,8 +482,8 @@ int open_socket (interface_t *iface, bool arp)
 	return fd;
 }
 
-ssize_t send_packet (const interface_t *iface, const int type,
-		     const unsigned char *data, const int len)
+ssize_t send_packet (const interface_t *iface, int type,
+		     const unsigned char *data, size_t len)
 {
 	union sockunion {
 		struct sockaddr sa;
@@ -512,7 +516,8 @@ ssize_t send_packet (const interface_t *iface, const int type,
 /* Linux has no need for the buffer as we can read as much as we want.
    We only have the buffer listed to keep the same API. */
 ssize_t get_packet (const interface_t *iface, unsigned char *data,
-		    unsigned char *buffer, int *buffer_len, int *buffer_pos)
+		    unsigned char *buffer,
+		    size_t *buffer_len, size_t *buffer_pos)
 {
 	ssize_t bytes;
 	union
@@ -578,8 +583,8 @@ ssize_t get_packet (const interface_t *iface, unsigned char *data,
 }
 
 #else
-# error "Platform not supported!"
-# error "We currently support BPF and Linux sockets."
-# error "Other platforms may work using BPF. If yours does, please let me know"
-# error "so I can add it to our list."
+ #error "Platform not supported!"
+ #error "We currently support BPF and Linux sockets."
+ #error "Other platforms may work using BPF. If yours does, please let me know"
+ #error "so I can add it to our list."
 #endif

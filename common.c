@@ -180,12 +180,12 @@ time_t uptime (void)
 void writepid (int fd, pid_t pid)
 {
 	char spid[16];
-	if (ftruncate (fd, 0) == -1) {
+	if (ftruncate (fd, (off_t) 0) == -1) {
 		logger (LOG_ERR, "ftruncate: %s", strerror (errno));
 	} else {
 		ssize_t len;
 		snprintf (spid, sizeof (spid), "%u", pid);
-		len = pwrite (fd, spid, strlen (spid), 0);
+		len = pwrite (fd, spid, strlen (spid), (off_t) 0);
 		if (len != (ssize_t) strlen (spid))
 			logger (LOG_ERR, "pwrite: %s", strerror (errno));
 	}
@@ -199,7 +199,9 @@ void *xmalloc (size_t s)
 		return (value);
 
 	logger (LOG_ERR, "memory exhausted");
+
 	exit (EXIT_FAILURE);
+	/* NOTREACHED */
 }
 
 void *xrealloc (void *ptr, size_t s)
@@ -211,6 +213,7 @@ void *xrealloc (void *ptr, size_t s)
 
 	logger (LOG_ERR, "memory exhausted");
 	exit (EXIT_FAILURE);
+	/* NOTREACHED */
 }
 
 char *xstrdup (const char *str)
@@ -225,5 +228,5 @@ char *xstrdup (const char *str)
 
 	logger (LOG_ERR, "memory exhausted");
 	exit (EXIT_FAILURE);
+	/* NOTREACHED */
 }
-

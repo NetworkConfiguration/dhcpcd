@@ -79,7 +79,7 @@ static const char *dhcp_message (int type)
 }
 
 ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
-		      unsigned long xid, char type,
+		      uint32_t xid, char type,
 		      const options_t *options)
 {
 	struct udp_dhcp_packet *packet;
@@ -87,13 +87,13 @@ ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 	unsigned char *m;
 	unsigned char *p;
 	unsigned char *n_params = NULL;
-	unsigned long l;
+	size_t l;
 	struct in_addr from;
 	struct in_addr to;
 	time_t up = uptime() - iface->start_uptime;
 	uint32_t ul;
 	uint16_t sz;
-	unsigned int message_length;
+	size_t message_length;
 	ssize_t retval;
 
 	if (!iface || !options || !dhcp)
@@ -313,7 +313,7 @@ ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 		memcpy (p, options->clientid, options->clientid_len);
 		p += options->clientid_len;
 #ifdef ENABLE_DUID
-	} else if (iface->duid && options->clientid_len != -1) {
+	} else if (iface->duid && options->doduid) {
 		*p++ = iface->duid_length + 5;
 		*p++ = 255; /* RFC 4361 */
 
@@ -354,7 +354,7 @@ ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 			  from, to);
 	free (message);
 
-	logger (LOG_DEBUG, "sending %s with xid 0x%lx",
+	logger (LOG_DEBUG, "sending %s with xid 0x%x",
 		dhcp_message (type), xid);
 	retval = send_packet (iface, ETHERTYPE_IP, (unsigned char *) packet,
 			      message_length + sizeof (struct ip) +
@@ -452,13 +452,13 @@ static route_t *decode_CSR(const unsigned char *p, int len)
 		ocets = (cidr + 7) / 8;
 
 		if (ocets > 0) {
-			memcpy (&route->destination.s_addr, q, ocets);
+			memcpy (&route->destination.s_addr, q, (size_t) ocets);
 			q += ocets;
 		}
 
 		/* Now enter the netmask */
 		if (ocets > 0) {
-			memset (&route->netmask.s_addr, 255, ocets - 1);
+			memset (&route->netmask.s_addr, 255, (size_t) ocets - 1);
 			memset ((unsigned char *) &route->netmask.s_addr +
 				(ocets - 1),
 				(256 - (1 << (32 - cidr) % 8)), 1);
@@ -534,7 +534,7 @@ static char *decode_sipservers (const unsigned char *data, int length)
 	char *p;
 	const char encoding = *data++;
 	struct in_addr addr;
-	int len;
+	size_t len;
 
 	length--;
 
@@ -577,10 +577,11 @@ static char *decode_sipservers (const unsigned char *data, int length)
 /* This calculates the netmask that we should use for static routes.
  * This IS different from the calculation used to calculate the netmask
  * for an interface address. */
-static unsigned long route_netmask (unsigned long ip_in)
+static uint32_t route_netmask (uint32_t ip_in)
 {
-	unsigned long p = ntohl (ip_in);
-	unsigned long t;
+	/* used to be unsigned long - check if error */
+	uint32_t p = ntohl (ip_in);
+	uint32_t t;
 
 	if (IN_CLASSA (p))
 		t = ~IN_CLASSA_NET;
@@ -788,8 +789,8 @@ parse_start:
 #define GETSTR(_var) { \
 	MIN_LENGTH (sizeof (char)); \
 	if (_var) free (_var); \
-	_var = xmalloc (length + 1); \
-	memcpy (_var, p, length); \
+	_var = xmalloc ((size_t) length + 1); \
+	memcpy (_var, p, (size_t) length); \
 	memset (_var + length, 0, 1); \
 }
 			case DHCP_HOSTNAME:

@@ -93,32 +93,40 @@
 # define NISRESTARTARGS      "--nodeps", "--quiet", "conditionalrestart"
 # define NTPSERVICE          ETCDIR "/init.d/ntpd"
 # define NTPRESTARTARGS      "--nodeps", "--quiet", "conditionalrestart"
-#elif ENABLE_BSDRC
+#endif
+#if ENABLE_BSDRC
 # define SERVICE             "BSDRC"
 # define NISSERVICE          ETCDIR "/rc.d/ypbind"
 # define NISRESTARTARGS      "restart"
 # define NTPSERVICE          ETCDIR "/rc.d/ntpd"
 # define NTPRESTARTARGS      "restart"
-#elif ENABLE_SLACKRC
+#endif
+#if ENABLE_SLACKRC
 # define SERVICE             "SLACKRC"
 # define NISSERVICE          ETCDIR "/rc.d/rc.ypbind"
 # define NISRESTARTARGS      "restart"
 # define NTPSERVICE          ETCDIR "/rc.d/rc.ntpd"
 # define NTPRESTARTARGS      "restart"
-#elif ENABLE_SERVICE
+#endif
+#if ENABLE_SERVICE
 # define SERVICE             "SERVICE"
 # define NISSERVICE          "service"
 # define NISRESTARTARGS      "ypbind", "restart"
 # define NTPSERVICE          "service"
 # define NTPRESTARTARGS      "ntpd", "restart"
-#elif ENABLE_SYSV
+#endif
+#if ENABLE_SYSV
 # define SERVICE             "SYSV"
 # define NISSERVICE          ETCDIR "/init.d/ypbind"
 # define NISRESTARTARGS      "restart"
 # define NTPSERVICE          ETCDIR "/init.d/ntpd"
 # define NTPRESTARTARGS      "restart"
-#else
+#endif
+
+#ifndef NISSERVICE
 # undef ENABLE_NIS
+#endif
+#ifndef NTPSERVICE
 # undef ENABLE_NTP
 #endif
 

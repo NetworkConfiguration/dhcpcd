@@ -25,3 +25,9 @@ install: _proginstall maninstall
 
 clean:
 	rm -f ${OBJS} ${PROG} ${CLEANFILES}
+
+LINTFLAGS?=	-hx
+LINTFLAGS+=	-X 159,247,352
+
+lint: ${SRCS:.c=.c}
+	${LINT} ${LINTFLAGS} ${CFLAGS:M-[DIU]*} $^ ${.ALLSRC}

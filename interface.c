@@ -108,7 +108,7 @@ int inet_cidrtoaddr (int cidr, struct in_addr *addr) {
 
 	memset (addr, 0, sizeof (struct in_addr));
 	if (ocets > 0) {
-		memset (&addr->s_addr, 255, ocets - 1);
+		memset (&addr->s_addr, 255, (size_t) ocets - 1);
 		memset ((unsigned char *) &addr->s_addr + (ocets - 1),
 			(256 - (1 << (32 - cidr) % 8)), 1);
 	}
@@ -116,9 +116,9 @@ int inet_cidrtoaddr (int cidr, struct in_addr *addr) {
 	return (0);
 }
 
-unsigned long get_netmask (unsigned long addr)
+uint32_t get_netmask (uint32_t addr)
 {
-	unsigned long dst;
+	uint32_t dst;
 
 	if (addr == 0)
 		return (0);
@@ -134,11 +134,11 @@ unsigned long get_netmask (unsigned long addr)
 	return (0);
 }
 
-char *hwaddr_ntoa (const unsigned char *hwaddr, int hwlen)
+char *hwaddr_ntoa (const unsigned char *hwaddr, size_t hwlen)
 {
 	static char buffer[(HWADDR_LEN * 3) + 1];
 	char *p = buffer;
-	int i;
+	size_t i;
 
 	for (i = 0; i < hwlen && i < HWADDR_LEN; i++) {
 		if (i > 0)
@@ -152,7 +152,7 @@ char *hwaddr_ntoa (const unsigned char *hwaddr, int hwlen)
 }
 
 static int _do_interface (const char *ifname,
-			  unsigned char *hwaddr, int *hwlen,
+			  unsigned char *hwaddr, size_t *hwlen,
 			  struct in_addr *addr,
 			  bool flush, bool get)
 {
@@ -173,7 +173,7 @@ static int _do_interface (const char *ifname,
 	memset (&ifc, 0, sizeof (struct ifconf));
 	for (;;) {
 		ifc.ifc_len = len;
-		ifc.ifc_buf = xmalloc (len);
+		ifc.ifc_buf = xmalloc ((size_t) len);
 		if (ioctl (s, SIOCGIFCONF, &ifc) == -1) {
 			if (errno != EINVAL || lastlen != 0) {
 				logger (LOG_ERR, "ioctl SIOCGIFCONF: %s",
@@ -227,7 +227,7 @@ static int _do_interface (const char *ifname,
 				sizeof (struct sockaddr_dl));
 			*hwlen = sdl.sdl_alen;
 			memcpy (hwaddr, sdl.sdl_data + sdl.sdl_nlen,
-				sdl.sdl_alen);
+				(size_t) sdl.sdl_alen);
 			retval = 1;
 			break;
 		}
@@ -275,7 +275,7 @@ interface_t *read_interface (const char *ifname, int metric)
 	struct ifreq ifr;
 	interface_t *iface = NULL;
 	unsigned char *hwaddr = NULL;
-	int hwlen = 0;
+	size_t hwlen = 0;
 	sa_family_t family = 0;
 	unsigned short mtu;
 #ifdef __linux__
@@ -454,7 +454,7 @@ int set_mtu (const char *ifname, short int mtu)
 static void log_route (struct in_addr destination,
 		       struct in_addr netmask,
 		       struct in_addr gateway,
-		       int metric,
+		       __unused int metric,
 		       int change, int del)
 {
 	char *dstd = xstrdup (inet_ntoa (destination));
@@ -463,7 +463,6 @@ static void log_route (struct in_addr destination,
 #define METRIC " metric %d"
 #else
 #define METRIC ""
-	metric = 0;
 #endif
 
 	if (gateway.s_addr == destination.s_addr ||
@@ -576,7 +575,7 @@ static int do_route (const char *ifname,
 		struct sockaddr_storage ss;
 	} su;
 
-	int l;
+	size_t l;
 
 	if (! ifname)
 		return -1;
@@ -614,7 +613,7 @@ static int do_route (const char *ifname,
 	{
 		/* Make us a link layer socket */
 		unsigned char *hwaddr;
-		int hwlen = 0;
+		size_t hwlen = 0;
 
 		if (netmask.s_addr == INADDR_BROADCAST) 
 			rtm.hdr.rtm_flags |= RTF_HOST;
@@ -625,10 +624,10 @@ static int do_route (const char *ifname,
 		su.sdl.sdl_len = sizeof (struct sockaddr_dl);
 		su.sdl.sdl_family = AF_LINK;
 		su.sdl.sdl_nlen = strlen (ifname);
-		memcpy (&su.sdl.sdl_data, ifname, su.sdl.sdl_nlen);
+		memcpy (&su.sdl.sdl_data, ifname, (size_t) su.sdl.sdl_nlen);
 		su.sdl.sdl_alen = hwlen;
 		memcpy (((unsigned char *) &su.sdl.sdl_data) + su.sdl.sdl_nlen,
-			hwaddr, su.sdl.sdl_alen);
+			hwaddr, (size_t) su.sdl.sdl_alen);
 
 		l = SA_SIZE (&(su.sa));
 		memcpy (bp, &su, l);
@@ -960,10 +959,10 @@ static int do_route (const char *ifname,
 }
 
 #else
-# error "Platform not supported!"
-# error "We currently support BPF and Linux sockets."
-# error "Other platforms may work using BPF. If yours does, please let me know"
-# error "so I can add it to our list."
+ #error "Platform not supported!"
+ #error "We currently support BPF and Linux sockets."
+ #error "Other platforms may work using BPF. If yours does, please let me know"
+ #error "so I can add it to our list."
 #endif
 
 int add_address (const char *ifname, struct in_addr address,
@@ -1011,7 +1010,7 @@ int flush_addresses (const char *ifname)
 	return (_do_interface (ifname, NULL, NULL, NULL, true, false));
 }
 
-unsigned long get_address (const char *ifname)
+in_addr_t get_address (const char *ifname)
 {
 	struct in_addr address;
 	if (_do_interface (ifname, NULL, NULL, &address, false, true) > 0)

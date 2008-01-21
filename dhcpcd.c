@@ -119,7 +119,7 @@ static int atoint (const char *s)
 		return (-1);	
 	}
 
-	return (n);
+	return ((int) n);
 }
 
 static pid_t read_pid (const char *pidfile)
@@ -182,6 +182,7 @@ int main(int argc, char **argv)
 	options->daemonise = true;
 	options->doinform = false;
 	options->doipv4ll = true;
+	options->doduid = true;
 	options->timeout = DEFAULT_TIMEOUT;
 
 	gethostname (options->hostname, sizeof (options->hostname));
@@ -203,7 +204,6 @@ int main(int argc, char **argv)
 					"option `%s' should set a flag",
 					longopts[option_index].name);
 				goto abort;
-				break;
 			case 'c':
 				options->script = optarg;
 				break;
@@ -258,10 +258,15 @@ int main(int argc, char **argv)
 				sig = SIGHUP;
 				break;
 			case 'l':
-				options->leasetime = atoint (optarg);
-				if (options->leasetime <= 0) {
+				if (*optarg == '-') {
 					logger (LOG_ERR,
 						"leasetime must be a positive value");
+					goto abort;
+				}
+				errno = 0;
+				options->leasetime = (uint32_t) strtol (optarg, NULL, 0);
+				if (errno == EINVAL || errno == ERANGE) {
+					logger (LOG_ERR, "`%s' out of range", optarg);
 					goto abort;
 				}
 				break;
@@ -298,8 +303,8 @@ int main(int argc, char **argv)
 							goto abort;
 						}
 					}
-					/* fall through */
 				}
+				/* FALLTHROUGH */
 			case 'r':
 				if (! options->doinform)
 					options->dorequest = true;
@@ -381,10 +386,11 @@ int main(int argc, char **argv)
 									 sizeof (options->clientid));
 					/* empty string disabled duid */
 					if (options->clientid_len == 0)
-						options->clientid_len = -1;
+						options->doduid = false;
+
 				} else {
 					memset (options->clientid, 0, sizeof (options->clientid));
-					options->clientid_len = -1;
+					options->doduid = false;
 				}
 				break;
 			case 'L':
@@ -640,4 +646,5 @@ abort:
 	logger (LOG_INFO, "exiting");
 
 	exit (retval);
+	/* NOTREACHED */
 }

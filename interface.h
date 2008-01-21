@@ -97,12 +97,12 @@ typedef struct interface_t
 	char name[IF_NAMESIZE];
 	sa_family_t family;
 	unsigned char hwaddr[HWADDR_LEN];
-	int hwlen;
+	size_t hwlen;
 	bool arpable;
 	unsigned short mtu;
 
 	int fd;
-	int buffer_length;
+	size_t buffer_length;
 
 #ifdef __linux__
 	int socket_protocol;
@@ -119,26 +119,26 @@ typedef struct interface_t
 
 #ifdef ENABLE_DUID
 	unsigned char duid[DUID_LEN];
-	int duid_length;
+	size_t duid_length;
 #endif
 } interface_t;
 
 void free_address (address_t *addresses);
 void free_route (route_t *routes);
-unsigned long get_netmask (unsigned long addr);
-char *hwaddr_ntoa (const unsigned char *hwaddr, int hwlen);
+uint32_t get_netmask (uint32_t addr);
+char *hwaddr_ntoa (const unsigned char *hwaddr, size_t hwlen);
 
 interface_t *read_interface (const char *ifname, int metric);
 int get_mtu (const char *ifname);
 int set_mtu (const char *ifname, short int mtu);
 
 int add_address (const char *ifname, struct in_addr address,
-				 struct in_addr netmask, struct in_addr broadcast);
+		 struct in_addr netmask, struct in_addr broadcast);
 int del_address (const char *ifname, struct in_addr address,
 				 struct in_addr netmask);
 
 int flush_addresses (const char *ifname);
-unsigned long get_address (const char *ifname);
+in_addr_t get_address (const char *ifname);
 int has_address (const char *ifname, struct in_addr address);
 
 int add_route (const char *ifname, struct in_addr destination,
