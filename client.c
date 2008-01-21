@@ -411,8 +411,12 @@ static int wait_for_packet (fd_set *rset, state_t *state,
 
 	if (! (state->timeout > 0 ||
 	       (options->timeout == 0 &&
-		(state->state != STATE_INIT || state->xid))))
+		(state->state != STATE_INIT || state->xid)))) {
+		/* We need to zero our rset, otherwise we will block trying
+		 * to read a signal. */
+		FD_ZERO (rset);
 		return (0);
+	}
 
 	if ((options->timeout == 0 && state->xid) ||
 	    (dhcp->leasetime == (unsigned) -1 &&
