@@ -1009,7 +1009,9 @@ int dhcp_run (const options_t *options, int *pidfd)
 
 		/* We should always handle our signals first */
 		if ((sig = (signal_read (&rset))) != -1) {
-			if (! handle_signal (sig, state, options))
+			if (handle_signal (sig, state, options))
+				retval = 0;
+			else
 				retval = -1;
 		} else if (retval == 0)
 			retval = handle_timeout (state, options);
