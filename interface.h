@@ -54,10 +54,10 @@
 
 /* The BSD's don't define this yet */
 #ifndef ARPHRD_INFINIBAND
-#  define ARPHRD_INFINIBAND		27
+#  define ARPHRD_INFINIBAND		32
 #endif
 
-#define HWADDR_LEN				20
+#define HWADDR_LEN			20
 
 /* Work out if we have a private address or not
  * 10/8
@@ -66,13 +66,13 @@
  */
 #ifndef IN_PRIVATE
 # define IN_PRIVATE(addr) (((addr & IN_CLASSA_NET) == 0x0a000000) || \
-						   ((addr & 0xfff00000)    == 0xac100000) || \
-						   ((addr & IN_CLASSB_NET) == 0xc0a80000))
+			   ((addr & 0xfff00000)    == 0xac100000) || \
+			   ((addr & IN_CLASSB_NET) == 0xc0a80000))
 #endif
 
-#define LINKLOCAL_ADDR       0xa9fe0000
-#define LINKLOCAL_MASK       0xffff0000
-#define LINKLOCAL_BRDC		 0xa9feffff
+#define LINKLOCAL_ADDR	0xa9fe0000
+#define LINKLOCAL_MASK	0xffff0000
+#define LINKLOCAL_BRDC	0xa9feffff
 
 #ifndef IN_LINKLOCAL
 # define IN_LINKLOCAL(addr) ((addr & IN_CLASSB_NET) == LINKLOCAL_ADDR)
@@ -135,18 +135,18 @@ int set_mtu (const char *ifname, short int mtu);
 int add_address (const char *ifname, struct in_addr address,
 		 struct in_addr netmask, struct in_addr broadcast);
 int del_address (const char *ifname, struct in_addr address,
-				 struct in_addr netmask);
+		 struct in_addr netmask);
 
 int flush_addresses (const char *ifname);
 in_addr_t get_address (const char *ifname);
 int has_address (const char *ifname, struct in_addr address);
 
 int add_route (const char *ifname, struct in_addr destination,
-			   struct in_addr netmask, struct in_addr gateway, int metric);
+	       struct in_addr netmask, struct in_addr gateway, int metric);
 int change_route (const char *ifname, struct in_addr destination,
-				  struct in_addr netmask, struct in_addr gateway, int metric);
+		  struct in_addr netmask, struct in_addr gateway, int metric);
 int del_route (const char *ifname, struct in_addr destination,
-			   struct in_addr netmask, struct in_addr gateway, int metric);
+	       struct in_addr netmask, struct in_addr gateway, int metric);
 
 int inet_ntocidr (struct in_addr address);
 int inet_cidrtoaddr (int cidr, struct in_addr *addr);
