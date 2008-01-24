@@ -57,6 +57,13 @@
 # define BUFFER_LENGTH 4096
 #endif
 
+/* Broadcast address for IPoIB */
+static const uint8_t const ipv4_bcast_addr[] = {
+	0x00, 0xff, 0xff, 0xff,
+	0xff, 0x12, 0x40, 0x1b, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff
+};
+
 static uint16_t checksum (unsigned char *addr, uint16_t len)
 {
 	uint32_t sum = 0;
@@ -124,7 +131,7 @@ void make_dhcp_packet(struct udp_dhcp_packet *packet,
 	ip->ip_len = htons (sizeof (struct ip) + sizeof (struct udphdr) +
 			    length);
 	ip->ip_id = 0;
-	ip->ip_off = 0;
+	ip->ip_off = htons (IP_DF); /* Don't fragment */
 	ip->ip_ttl = IPDEFTTL;
 
 	ip->ip_sum = checksum ((unsigned char *) ip, sizeof (struct ip));
@@ -453,6 +460,7 @@ int open_socket (interface_t *iface, bool arp)
 
 	memset (&su, 0, sizeof (struct sockaddr_storage));
 	su.sll.sll_family = AF_PACKET;
+	su.sll.sll_hatype = htons (iface->family);
 	if (arp)
 		su.sll.sll_protocol = htons (ETH_P_ARP);
 	else
@@ -498,13 +506,20 @@ ssize_t send_packet (const interface_t *iface, int type,
 	memset (&su, 0, sizeof (struct sockaddr_storage));
 	su.sll.sll_family = AF_PACKET;
 	su.sll.sll_protocol = htons (type);
+
 	if (! (su.sll.sll_ifindex = if_nametoindex (iface->name))) {
 		logger (LOG_ERR, "if_nametoindex: no index for interface `%s'",
 			iface->name);
 		return -1;
 	}
+
+	su.sll.sll_hatype = htons (iface->family);
 	su.sll.sll_halen = iface->hwlen;
-	memset(&su.sll.sll_addr, 0xff, iface->hwlen);
+	if (iface->family == ARPHRD_INFINIBAND)
+		memcpy (&su.sll.sll_addr,
+			&ipv4_bcast_addr, sizeof (ipv4_bcast_addr));
+	else
+		memset (&su.sll.sll_addr, 0xff, iface->hwlen);
 
 	if ((retval = sendto (iface->fd, data, len, 0, &su.sa,
 			      sizeof (struct sockaddr_storage))) == -1)
