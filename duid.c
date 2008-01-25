@@ -45,7 +45,7 @@
 
 void get_duid (interface_t *iface)
 {
-	FILE *fp;
+	FILE *f;
 	uint16_t type = 0;
 	uint16_t hw = 0;
 	uint32_t ul;
@@ -62,28 +62,24 @@ void get_duid (interface_t *iface)
 
 	/* If we already have a DUID then use it as it's never supposed
 	 * to change once we have one even if the interfaces do */
-	if ((fp = fopen (DUIDFILE, "r"))) {
-		char *fduid;
-		char *fdp;
-		fduid = fdp = xmalloc ((sizeof (char) * DUID_LEN * 2) + 1);
-		if (fscanf (fp, "%260s", fduid) == 1) {
-			char c[3];
-			c[2] = '\0';
-			while (*fdp) {
-				c[0] = *fdp++;
-				c[1] = *fdp++;
-				*p++ = (char) strtol (c, NULL, 16);
-			}
+	if ((f = fopen (DUIDFILE, "r"))) {
+		char *duid = getline (f);
+		if (duid) {
+			iface->duid_length = hwaddr_aton (NULL, duid);
+			if (iface->duid_length &&
+			    iface->duid_length <= DUID_LEN)
+				hwaddr_aton (iface->duid, duid);
+			free (duid);
 		}
-		free (fduid);
-		iface->duid_length = p - iface->duid;
-		fclose (fp);
-		return;
-	}
-
-	if (errno != ENOENT) {
-		logger (LOG_ERR, "fopen `%s': %s", DUIDFILE, strerror (errno));
-		return;
+		fclose (f);
+		if (iface->duid_length)
+			return;
+	} else {
+		if (errno != ENOENT) {
+			logger (LOG_ERR, "fopen `%s': %s",
+				DUIDFILE, strerror (errno));
+			return;
+		}
 	}
 
 	/* No file? OK, lets make one based on our interface */
@@ -108,20 +104,19 @@ void get_duid (interface_t *iface)
 
 	iface->duid_length = p - iface->duid;
 
-	if (! (fp = fopen (DUIDFILE, "w")))
+	if (! (f = fopen (DUIDFILE, "w")))
 		logger (LOG_ERR, "fopen `%s': %s", DUIDFILE, strerror (errno));
 	else {
-		size_t i;
-		for (i = 0; i < iface->duid_length; i++)
-			x += fprintf (fp, "%.2X", iface->duid[i]);
-		fprintf (fp, "\n");
-		fclose (fp);
+		x = fprintf (f, "%s\n",
+			     hwaddr_ntoa (iface->duid, iface->duid_length));
+		fclose (f);
 	}
 
 	/* Failed to write the duid? scrub it, we cannot use it */
 	if (x < 1) {
 		memset (iface->duid, 0, sizeof (iface->duid));
 		iface->duid_length = 0;
+		unlink (DUIDFILE);
 	}
 }
 #endif

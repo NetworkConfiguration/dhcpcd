@@ -180,8 +180,6 @@ size_t hwaddr_aton (unsigned char *buffer, const char *addr)
 			len++;
 	}
 
-	printf ("vaid\n");
-
 	if (bp)
 		return (bp - buffer);
 	return (len);
