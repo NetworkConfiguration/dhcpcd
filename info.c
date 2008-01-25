@@ -123,8 +123,11 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 	}
 
 	if (dhcp->address.s_addr) {
+		struct in_addr n;
+		n.s_addr = dhcp->address.s_addr & dhcp->netmask.s_addr;
 		fprintf (f, "IPADDR='%s'\n", inet_ntoa (dhcp->address));
 		fprintf (f, "NETMASK='%s'\n", inet_ntoa (dhcp->netmask));
+		fprintf (f, "NETWORK='%s'\n", inet_ntoa (n));
 		fprintf (f, "BROADCAST='%s'\n", inet_ntoa (dhcp->broadcast));
 	}
 	if (dhcp->mtu > 0)
