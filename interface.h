@@ -127,6 +127,7 @@ void free_address (address_t *addresses);
 void free_route (route_t *routes);
 uint32_t get_netmask (uint32_t addr);
 char *hwaddr_ntoa (const unsigned char *hwaddr, size_t hwlen);
+size_t hwaddr_aton (unsigned char *hwaddr, const char *addr);
 
 interface_t *read_interface (const char *ifname, int metric);
 int get_mtu (const char *ifname);

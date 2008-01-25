@@ -47,6 +47,7 @@
 #include <netinet/in.h>
 #endif
 
+#include <ctype.h>
 #include <errno.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -149,6 +150,41 @@ char *hwaddr_ntoa (const unsigned char *hwaddr, size_t hwlen)
 	*p ++= '\0';
 
 	return (buffer);
+}
+
+size_t hwaddr_aton (unsigned char *buffer, const char *addr)
+{
+	char c[3];
+	const char *p = addr;
+	unsigned char *bp = buffer;
+	size_t len = 0;
+
+	c[2] = '\0';
+	while (*p) {
+		c[0] = *p++;
+		c[1] = *p++;
+		/* Ensure that next data is EOL or a seperator with data */
+		if (! (*p == '\0' || (*p == ':' && *(p + 1) != '\0'))) {
+			errno = EINVAL;
+			return (0);
+		}
+		/* Ensure that digits are hex */
+		if (isxdigit (c[0]) == 0 || isxdigit (c[1]) == 0) {
+			errno = EINVAL;
+			return (0);
+		}
+		p++;
+		if (bp)
+			*bp++ = (unsigned char) strtol (c, NULL, 16);
+		else
+			len++;
+	}
+
+	printf ("vaid\n");
+
+	if (bp)
+		return (bp - buffer);
+	return (len);
 }
 
 static int _do_interface (const char *ifname,

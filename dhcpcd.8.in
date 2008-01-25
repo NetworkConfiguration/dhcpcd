@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd Jan 17, 2008
+.Dd Jan 25, 2008
 .Dt DHCPCD 8 SMM
 .Sh NAME
 .Nm dhcpcd
@@ -252,9 +252,12 @@ same as above, but strip the domain if it matches the dns domain.
 same as above, but strip the domain regardless.
 .El
 .It Fl I , -clientid Ar clientid
-Send a
+Send
 .Ar clientid
-as a client identifier string.
+as a client identifier string. If
+.Ar clientid
+matches a hardware address format, such as 00:01:02:03:04:05 then we encode
+it as that, otherwise as a string.
 .It Fl S, -mscsr
 Microsoft have their own code for Classless Static Routes
 .Po

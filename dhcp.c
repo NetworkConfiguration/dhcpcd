@@ -308,10 +308,40 @@ ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 
 	*p++ = DHCP_CLIENTID;
 	if (options->clientid_len > 0) {
-		*p++ = options->clientid_len + 1;
-		*p++ = 0; /* string */
-		memcpy (p, options->clientid, options->clientid_len);
-		p += options->clientid_len;
+		/* Attempt to see if the ClientID is a hardware address */
+		size_t hwlen = hwaddr_aton (NULL, options->clientid);
+		sa_family_t family = 0;
+
+		if (hwlen) {
+			/* We need to at least try and guess the family */
+			switch (hwlen) {
+				case ETHER_ADDR_LEN:
+					family = ARPHRD_ETHER;
+					break;
+				case EUI64_ADDR_LEN:
+					family = ARPHRD_IEEE1394;
+					break;
+				case INFINIBAND_ADDR_LEN:
+					family = ARPHRD_INFINIBAND;
+					break;
+			}
+		}
+
+		/* It looks and smells like one, so make it one */
+		if (hwlen && family) {
+			unsigned char *hwaddr = xmalloc (hwlen);
+			hwaddr_aton (hwaddr, options->clientid);
+			*p++ = hwlen + 1;
+			*p++ = family;
+			memcpy (p, hwaddr, hwlen);
+			free (hwaddr);
+			p += hwlen;
+		} else {
+			*p++ = options->clientid_len + 1;
+			*p++ = 0;
+			memcpy (p, options->clientid, options->clientid_len);
+			p += options->clientid_len;
+		}
 #ifdef ENABLE_DUID
 	} else if (iface->duid && options->doduid) {
 		*p++ = iface->duid_length + 5;
