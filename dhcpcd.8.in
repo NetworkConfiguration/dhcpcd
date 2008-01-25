@@ -287,7 +287,7 @@ Don't set the MTU of the
 .Ar interface .
 .It Fl N , -nontp
 Don't touch
-.Pa /etc/ntp.d.conf
+.Pa /etc/ntpd.conf
 or restart the ntp service.
 .It Fl R , -nodns
 Don't send DNS information to resolvconf or touch
