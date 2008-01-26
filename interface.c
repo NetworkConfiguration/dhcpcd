@@ -169,7 +169,7 @@ size_t hwaddr_aton (unsigned char *buffer, const char *addr)
 			return (0);
 		}
 		/* Ensure that digits are hex */
-		if (isxdigit (c[0]) == 0 || isxdigit (c[1]) == 0) {
+		if (isxdigit ((int) c[0]) == 0 || isxdigit ((int) c[1]) == 0) {
 			errno = EINVAL;
 			return (0);
 		}
