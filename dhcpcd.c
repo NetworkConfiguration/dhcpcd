@@ -54,6 +54,7 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 #include "dhcp.h"
 #include "interface.h"
 #include "logger.h"
+#include "socket.h"
 #include "version.h"
 
 static int doversion = 0;
@@ -624,6 +625,9 @@ int main(int argc, char **argv)
 
 	/* Seed random */
 	srandomdev ();
+
+	/* Massage our filters per platform */
+	setup_packet_filters ();
 
 	if (dhcp_run (options, &pidfd) == 0)
 		retval = EXIT_SUCCESS;

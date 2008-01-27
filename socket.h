@@ -33,11 +33,12 @@
 #include "dhcp.h"
 #include "interface.h"
 
+void setup_packet_filters (void);
 void make_dhcp_packet(struct udp_dhcp_packet *packet,
 		      const unsigned char *data, size_t length,
 		      struct in_addr source, struct in_addr dest);
 
-int open_socket (interface_t *iface, bool arp);
+int open_socket (interface_t *iface, int protocol);
 ssize_t send_packet (const interface_t *iface, int type,
 		     const unsigned char *data, size_t len);
 ssize_t get_packet (const interface_t *iface, unsigned char *data,

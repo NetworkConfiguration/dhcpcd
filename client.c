@@ -374,7 +374,7 @@ static bool do_socket (state_t *state, int mode)
 
 	state->interface->fd = -1; 
 	if (mode == SOCKET_OPEN) 
-		if (open_socket (state->interface, false) == -1)
+		if (open_socket (state->interface, ETHERTYPE_IP) == -1)
 			return (false);
 	state->socket = mode;
 	return (true);
@@ -988,7 +988,6 @@ int dhcp_run (const options_t *options, int *pidfd)
 	iface = read_interface (options->interface, options->metric);
 	if (! iface)
 		goto eexit;
-
 
 	state = xmalloc (sizeof (state_t));
 	memset (state, 0, sizeof (state_t));

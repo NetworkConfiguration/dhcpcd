@@ -186,7 +186,7 @@ size_t hwaddr_aton (unsigned char *buffer, const char *addr)
 }
 
 static int _do_interface (const char *ifname,
-			  unsigned char *hwaddr, size_t *hwlen,
+			  _unused unsigned char *hwaddr, _unused size_t *hwlen,
 			  struct in_addr *addr,
 			  bool flush, bool get)
 {
@@ -249,11 +249,7 @@ static int _do_interface (const char *ifname,
 		if (strcmp (ifname, ifr->ifr_name) != 0)
 			continue;
 
-#ifdef __linux__
-		/* Do something with the values at least */
-		if (hwaddr && hwlen)
-			*hwlen = 0;
-#else
+#ifdef AF_LINK
 		if (hwaddr && hwlen && ifr->ifr_addr.sa_family == AF_LINK) {
 			struct sockaddr_dl sdl;
 
@@ -303,7 +299,7 @@ static int _do_interface (const char *ifname,
 	return retval;
 }
 
-interface_t *read_interface (const char *ifname, int metric)
+interface_t *read_interface (const char *ifname, _unused int metric)
 {
 	int s;
 	struct ifreq ifr;
@@ -328,8 +324,6 @@ interface_t *read_interface (const char *ifname, int metric)
 	}
 
 #ifdef __linux__
-	/* Do something with the metric parameter to satisfy the compiler warning */
-	metric = 0;
 	strlcpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
 	if (ioctl (s, SIOCGIFHWADDR, &ifr) == -1) {
 		logger (LOG_ERR, "ioctl SIOCGIFHWADDR: %s", strerror (errno));

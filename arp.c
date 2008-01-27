@@ -133,7 +133,7 @@ int arp_claim (interface_t *iface, struct in_addr address)
 			"checking %s is available on attached networks",
 			inet_ntoa (address));
 
-	if (! open_socket (iface, true))
+	if (! open_socket (iface, ETHERTYPE_ARP))
 		return (-1);
 
 	memset (&null_address, 0, sizeof (struct in_addr));

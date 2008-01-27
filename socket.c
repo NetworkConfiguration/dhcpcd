@@ -46,6 +46,15 @@
 #include <string.h>
 #include <unistd.h>
 
+#ifdef BSD
+# include <net/bpf.h>
+#elif __linux__
+# include <linux/filter.h>
+# include <netpacket/packet.h>
+# define bpf_insn sock_filter
+#endif
+
+#include "config.h"
 #include "dhcp.h"
 #include "interface.h"
 #include "logger.h"
@@ -63,6 +72,66 @@ static const uint8_t ipv4_bcast_addr[] = {
 	0xff, 0x12, 0x40, 0x1b, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff
 };
+
+/* Credit where credit is due :)
+   The below BPF filter is taken from ISC DHCP */
+static struct bpf_insn dhcp_bpf_filter [] = {
+	/* Make sure this is an IP packet... */
+	BPF_STMT (BPF_LD | BPF_H | BPF_ABS, 12),
+	BPF_JUMP (BPF_JMP | BPF_JEQ | BPF_K, ETHERTYPE_IP, 0, 8),
+
+	/* Make sure it's a UDP packet... */
+	BPF_STMT (BPF_LD | BPF_B | BPF_ABS, 23),
+	BPF_JUMP (BPF_JMP | BPF_JEQ | BPF_K, IPPROTO_UDP, 0, 6),
+
+	/* Make sure this isn't a fragment... */
+	BPF_STMT (BPF_LD | BPF_H | BPF_ABS, 20),
+	BPF_JUMP (BPF_JMP | BPF_JSET | BPF_K, 0x1fff, 4, 0),
+
+	/* Get the IP header length... */
+	BPF_STMT (BPF_LDX | BPF_B | BPF_MSH, 14),
+
+	/* Make sure it's to the right port... */
+	BPF_STMT (BPF_LD | BPF_H | BPF_IND, 16),
+	BPF_JUMP (BPF_JMP | BPF_JEQ | BPF_K, DHCP_CLIENT_PORT, 0, 1),
+
+	/* If we passed all the tests, ask for the whole packet. */
+	BPF_STMT (BPF_RET | BPF_K, ~0U),
+
+	/* Otherwise, drop it. */
+	BPF_STMT (BPF_RET | BPF_K, 0),
+};
+
+static struct bpf_insn arp_bpf_filter [] = {
+	/* Make sure this is an ARP packet... */
+	BPF_STMT (BPF_LD | BPF_H | BPF_ABS, 12),
+	BPF_JUMP (BPF_JMP | BPF_JEQ | BPF_K, ETHERTYPE_ARP, 0, 3),
+
+	/* Make sure this is an ARP REPLY... */
+	BPF_STMT (BPF_LD | BPF_H | BPF_ABS, 20),
+	BPF_JUMP (BPF_JMP | BPF_JEQ | BPF_K, ARPOP_REPLY, 0, 1),
+
+	/* If we passed all the tests, ask for the whole packet. */
+	BPF_STMT (BPF_RET | BPF_K, ~0U),
+
+	/* Otherwise, drop it. */
+	BPF_STMT (BPF_RET | BPF_K, 0),
+};
+
+void setup_packet_filters (void)
+{
+#ifdef __linux__
+	/* We need to massage the filters for Linux cooked packets */
+	dhcp_bpf_filter[1].jf = 0; /* skip the IP packet type check */
+	dhcp_bpf_filter[2].k -= ETH_HLEN;
+	dhcp_bpf_filter[4].k -= ETH_HLEN;
+	dhcp_bpf_filter[6].k -= ETH_HLEN;
+	dhcp_bpf_filter[7].k -= ETH_HLEN;
+
+	arp_bpf_filter[1].jf = 0; /* skip the IP packet type check */
+	arp_bpf_filter[2].k -= ETH_HLEN;
+#endif
+}
 
 static uint16_t checksum (unsigned char *addr, uint16_t len)
 {
@@ -191,55 +260,7 @@ eexit:
 }
 
 #ifdef BSD
-/* Credit where credit is due :)
-   The below BPF filter is taken from ISC DHCP */
-
-# include <net/bpf.h>
-
-static struct bpf_insn dhcp_bpf_filter [] = {
-	/* Make sure this is an IP packet... */
-	BPF_STMT (BPF_LD + BPF_H + BPF_ABS, 12),
-	BPF_JUMP (BPF_JMP + BPF_JEQ + BPF_K, ETHERTYPE_IP, 0, 8),
-
-	/* Make sure it's a UDP packet... */
-	BPF_STMT (BPF_LD + BPF_B + BPF_ABS, 23),
-	BPF_JUMP (BPF_JMP + BPF_JEQ + BPF_K, IPPROTO_UDP, 0, 6),
-
-	/* Make sure this isn't a fragment... */
-	BPF_STMT (BPF_LD + BPF_H + BPF_ABS, 20),
-	BPF_JUMP (BPF_JMP + BPF_JSET + BPF_K, 0x1fff, 4, 0),
-
-	/* Get the IP header length... */
-	BPF_STMT (BPF_LDX + BPF_B + BPF_MSH, 14),
-
-	/* Make sure it's to the right port... */
-	BPF_STMT (BPF_LD + BPF_H + BPF_IND, 16),
-	BPF_JUMP (BPF_JMP + BPF_JEQ + BPF_K, DHCP_CLIENT_PORT, 0, 1),
-
-	/* If we passed all the tests, ask for the whole packet. */
-	BPF_STMT (BPF_RET+BPF_K, (u_int) - 1),
-
-	/* Otherwise, drop it. */
-	BPF_STMT (BPF_RET+BPF_K, 0),
-};
-
-static struct bpf_insn arp_bpf_filter [] = {
-	/* Make sure this is an ARP packet... */
-	BPF_STMT (BPF_LD + BPF_H + BPF_ABS, 12),
-	BPF_JUMP (BPF_JMP + BPF_JEQ + BPF_K, ETHERTYPE_ARP, 0, 3),
-
-	/* Make sure this is an ARP REPLY... */
-	BPF_STMT (BPF_LD + BPF_H + BPF_ABS, 20),
-	BPF_JUMP (BPF_JMP + BPF_JEQ + BPF_K, ARPOP_REPLY, 0, 1),
-
-	/* If we passed all the tests, ask for the whole packet. */
-	BPF_STMT (BPF_RET+BPF_K, (u_int) - 1),
-
-	/* Otherwise, drop it. */
-	BPF_STMT (BPF_RET+BPF_K, 0),
-};
-
-int open_socket (interface_t *iface, bool arp)
+int open_socket (interface_t *iface, int protocol)
 {
 	int n = 0;
 	int fd = -1;
@@ -247,7 +268,7 @@ int open_socket (interface_t *iface, bool arp)
 	int flags;
 	struct ifreq ifr;
 	int buf = 0;
-	struct bpf_program p;
+	struct bpf_program pf;
 
 	device = xmalloc (sizeof (char) * PATH_MAX);
 	do {
@@ -295,14 +316,16 @@ int open_socket (interface_t *iface, bool arp)
 	}
 
 	/* Install the DHCP filter */
-	if (arp) {
-		p.bf_insns = arp_bpf_filter;
-		p.bf_len = sizeof (arp_bpf_filter) / sizeof (struct bpf_insn);
+	if (protocol == ETHERTYPE_ARP) {
+		pf.bf_insns = arp_bpf_filter;
+		pf.bf_len = sizeof (arp_bpf_filter)
+			/ sizeof (arp_bpf_insn[0]);
 	} else {
-		p.bf_insns = dhcp_bpf_filter;
-		p.bf_len = sizeof (dhcp_bpf_filter) / sizeof (struct bpf_insn);
+		pf.bf_insns = dhcp_bpf_filter;
+		pf.bf_len = sizeof (dhcp_bpf_filter) 
+			/ sizeof (dhcp_bpf_insn[0]);
 	}
-	if (ioctl (fd, BIOCSETF, &p) == -1) {
+	if (ioctl (fd, BIOCSETF, &pf) == -1) {
 		logger (LOG_ERR, "ioctl BIOCSETF: %s", strerror (errno));
 		close (fd);
 		return -1;
@@ -433,9 +456,7 @@ ssize_t get_packet (const interface_t *iface, unsigned char *data,
 
 #elif __linux__
 
-#include <netpacket/packet.h>
-
-int open_socket (interface_t *iface, bool arp)
+int open_socket (interface_t *iface, int protocol)
 {
 	int fd;
 	int flags;
@@ -444,10 +465,11 @@ int open_socket (interface_t *iface, bool arp)
 		struct sockaddr_ll sll;
 		struct sockaddr_storage ss;
 	} su;
+	struct sock_fprog pf;
 
-	if ((fd = socket (PF_PACKET, SOCK_DGRAM, htons (ETH_P_IP))) == -1) {
+	if ((fd = socket (PF_PACKET, SOCK_DGRAM, htons (protocol))) == -1) {
 		logger (LOG_ERR, "socket: %s", strerror (errno));
-		return -1;
+		return (-1);
 	}
 
 	if ((flags = fcntl (fd, F_GETFD, 0)) == -1
@@ -455,39 +477,50 @@ int open_socket (interface_t *iface, bool arp)
 	{
 		logger (LOG_ERR, "fcntl: %s", strerror (errno));
 		close (fd);
-		return -1;
+		return (-1);
 	}
 
 	memset (&su, 0, sizeof (struct sockaddr_storage));
-	su.sll.sll_family = AF_PACKET;
-	su.sll.sll_hatype = htons (iface->family);
-	if (arp)
-		su.sll.sll_protocol = htons (ETH_P_ARP);
-	else
-		su.sll.sll_protocol = htons (ETH_P_IP);
+	su.sll.sll_family = PF_PACKET;
+	su.sll.sll_protocol = htons (protocol);
 	if (! (su.sll.sll_ifindex = if_nametoindex (iface->name))) {
 		logger (LOG_ERR,
 			"if_nametoindex: no index for interface `%s'",
 			iface->name);
 		close (fd);
-		return -1;
+		return (-1);
+	}
+
+	/* Install the DHCP filter */
+	if (protocol == ETHERTYPE_ARP) {
+		pf.filter = arp_bpf_filter;
+		pf.len = sizeof (arp_bpf_filter) / sizeof (arp_bpf_filter[0]);
+	} else {
+		pf.filter = dhcp_bpf_filter;
+		pf.len = sizeof (dhcp_bpf_filter) / sizeof (dhcp_bpf_filter[0]);
+	}
+	if (setsockopt (fd, SOL_SOCKET, SO_ATTACH_FILTER,
+			&pf, sizeof (struct sock_fprog)) != 0)
+	{
+		logger (LOG_ERR, "SO_ATTACH_FILTER: %s", strerror (errno));
+		close (fd);
+		return (-1);
 	}
 
 	if (bind (fd, &su.sa, sizeof (struct sockaddr_storage)) == -1)
 	{
 		logger (LOG_ERR, "bind: %s", strerror (errno));
 		close (fd);
-		return -1;
+		return (-1);
 	}
 
 	if (iface->fd > -1)
 		close (iface->fd);
 	iface->fd = fd;
-	iface->socket_protocol = ntohs (su.sll.sll_protocol);
-
+	iface->socket_protocol = protocol;
 	iface->buffer_length = BUFFER_LENGTH;
 
-	return fd;
+	return (fd);
 }
 
 ssize_t send_packet (const interface_t *iface, int type,
@@ -501,7 +534,7 @@ ssize_t send_packet (const interface_t *iface, int type,
 	ssize_t retval;
 
 	if (! iface)
-		return -1;
+		return (-1);
 
 	memset (&su, 0, sizeof (struct sockaddr_storage));
 	su.sll.sll_family = AF_PACKET;
@@ -510,7 +543,7 @@ ssize_t send_packet (const interface_t *iface, int type,
 	if (! (su.sll.sll_ifindex = if_nametoindex (iface->name))) {
 		logger (LOG_ERR, "if_nametoindex: no index for interface `%s'",
 			iface->name);
-		return -1;
+		return (-1);
 	}
 
 	su.sll.sll_hatype = htons (iface->family);
@@ -525,7 +558,7 @@ ssize_t send_packet (const interface_t *iface, int type,
 			      sizeof (struct sockaddr_storage))) == -1)
 
 		logger (LOG_ERR, "sendto: %s", strerror (errno));
-	return retval;
+	return (retval);
 }
 
 /* Linux has no need for the buffer as we can read as much as we want.
@@ -553,48 +586,34 @@ ssize_t get_packet (const interface_t *iface, unsigned char *data,
 		tv.tv_sec = 3;
 		tv.tv_usec = 0;
 		select (0, NULL, NULL, NULL, &tv);
-		return -1;
+		return (-1);
 	}
 
 	*buffer_len = bytes;
 	/* If it's an ARP reply, then just send it back */
-	if (iface->socket_protocol == ETH_P_ARP) {
+	if (iface->socket_protocol == ETHERTYPE_ARP) {
 		memcpy (data, buffer, bytes);
-		return bytes;
+		return (bytes);
 	}
 
 	if ((unsigned) bytes < (sizeof (struct ip) + sizeof (struct udphdr))) {
 		logger (LOG_DEBUG, "message too short, ignoring");
-		return -1;
+		return (-1);
 	}
 
 	pay.buffer = buffer;
 	if (bytes < ntohs (pay.packet->ip.ip_len)) {
 		logger (LOG_DEBUG, "truncated packet, ignoring");
-		return -1;
-	}
-
-	bytes = ntohs (pay.packet->ip.ip_len);
-
-	/* This is like our BPF filter above */
-	if (pay.packet->ip.ip_p != IPPROTO_UDP ||
-	    pay.packet->ip.ip_v != IPVERSION ||
-	    pay.packet->ip.ip_hl != sizeof (pay.packet->ip) >> 2 ||
-	    pay.packet->udp.uh_dport != htons (DHCP_CLIENT_PORT) ||
-	    bytes > (int) sizeof (struct udp_dhcp_packet) ||
-	    ntohs (pay.packet->udp.uh_ulen)
-	    != (uint16_t) (bytes - sizeof (pay.packet->ip)))
-	{
-		return -1;
+		return (-1);
 	}
 
 	if (valid_dhcp_packet (buffer) == -1)
-		return -1;
+		return (-1);
 
-	memcpy(data, &pay.packet->dhcp,
-	       bytes - (sizeof (pay.packet->ip) + sizeof (pay.packet->udp)));
-
-	return bytes - (sizeof (pay.packet->ip) + sizeof (pay.packet->udp));
+	bytes = ntohs (pay.packet->ip.ip_len) -
+		(sizeof (pay.packet->ip) + sizeof (pay.packet->udp));
+	memcpy (data, &pay.packet->dhcp, bytes);
+	return (bytes);
 }
 
 #else
