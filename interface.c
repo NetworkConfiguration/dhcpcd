@@ -399,7 +399,7 @@ interface_t *read_interface (const char *ifname, _unused int metric)
 
 	if (! (ifr.ifr_flags & IFF_UP) || ! (ifr.ifr_flags & IFF_RUNNING)) {
 		ifr.ifr_flags |= IFF_UP | IFF_RUNNING;
-		if (ioctl (s, SIOCSIFFLAGS, &ifr) == -1) {
+		if (ioctl (s, SIOCSIFFLAGS, &ifr) != 0) {
 			logger (LOG_ERR, "ioctl SIOCSIFFLAGS: %s",
 				strerror (errno));
 			goto exit;

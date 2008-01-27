@@ -40,9 +40,17 @@
 static int signal_pipe[2];
 static int signals[5];
 
+static const int handle_sigs[] = {
+	SIGHUP,
+	SIGALRM,
+	SIGTERM,
+	SIGINT
+};
+
 static void signal_handler (int sig)
 {
 	unsigned int i = 0;
+	int serrno = errno;
 
 	/* Add a signal to our stack */
 	while (signals[i])
@@ -52,8 +60,11 @@ static void signal_handler (int sig)
 	else
 		signals[i] = sig;
 
-	if (send (signal_pipe[1], &sig, sizeof (sig), MSG_DONTWAIT) == -1)
+	if (write (signal_pipe[1], &sig, sizeof (sig)) == -1)
 		logger (LOG_ERR, "Could not send signal: %s", strerror (errno));
+
+	/* Restore errno */
+	errno = serrno;
 }
 
 /* Add the signal pipe to an fd set */
@@ -114,12 +125,16 @@ int signal_read (fd_set *rset)
 
 /* Call this before doing anything else. Sets up the socket pair
  * and installs the signal handler */
-void signal_setup (void)
+int signal_setup (void)
 {
 	unsigned int i;
 	int flags;
+	struct sigaction sa;
 
-	socketpair (AF_UNIX, SOCK_STREAM, 0, signal_pipe);
+	if (pipe (signal_pipe) == -1) {
+		logger (LOG_ERR, "pipe: %s", strerror (errno));
+		return (-1);
+	}
 
 	/* Stop any scripts from inheriting us */
 	for (i = 0; i < 2; i++)
@@ -127,13 +142,23 @@ void signal_setup (void)
 		    fcntl (signal_pipe[i], F_SETFD, flags | FD_CLOEXEC) == -1)
 			logger (LOG_ERR ,"fcntl: %s", strerror (errno));
 
-	signal (SIGHUP, signal_handler);
-	signal (SIGALRM, signal_handler);
-	signal (SIGTERM, signal_handler);
-	signal (SIGINT, signal_handler);
+	sa.sa_handler = signal_handler;
+	sigemptyset (&sa.sa_mask);
+	for (i = 0; i < sizeof (handle_sigs) / sizeof (handle_sigs[0]); i++)
+		if (sigaction (handle_sigs[i], &sa, NULL) == -1) {
+			logger (LOG_ERR, "sigaction: %s", strerror (errno));
+			return (-1);
+		}
 
-	/* We don't care about our childs exit codes right now */
-	signal (SIGCHLD, SIG_IGN);
+	/* Ignore child signals and don't make zombies */
+	sa.sa_handler = SIG_DFL;
+	sa.sa_flags = SA_NOCLDSTOP | SA_NOCLDWAIT;
+	if (sigaction (SIGCHLD, &sa, NULL) == -1) {
+		logger (LOG_ERR, "sigaction: %s", strerror (errno));
+		return (-1);
+	}
 
 	memset (signals, 0, sizeof (signals));
+
+	return (0);
 }

@@ -1001,7 +1001,8 @@ int dhcp_run (const options_t *options, int *pidfd)
 	if (! client_setup (state, options))
 		goto eexit;
 
-	signal_setup ();
+	if (signal_setup () == -1)
+		goto eexit;
 
 	for (;;) {
 		retval = wait_for_packet (&rset, state, options);
@@ -1032,24 +1033,25 @@ int dhcp_run (const options_t *options, int *pidfd)
 	}
 
 eexit:
-	do_socket (state, SOCKET_CLOSED);
-	drop_config (state, options);
-
 	if (iface) {
+		do_socket (state, SOCKET_CLOSED);
+		drop_config (state, options);
 		free_route (iface->previous_routes);
 		free (iface);
 	}
 
-	if (state->forked)
-		retval = 0;
+	if (state) {
+		if (state->forked)
+			retval = 0;
 
-	if (state->daemonised)
-		unlink (options->pidfile);
+		if (state->daemonised)
+			unlink (options->pidfile);
 
-	free_dhcp (state->dhcp);
-	free (state->dhcp);
-	free (state->buffer);
-	free (state);
+		free_dhcp (state->dhcp);
+		free (state->dhcp);
+		free (state->buffer);
+		free (state);
+	}
 
 	return (retval);
 }

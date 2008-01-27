@@ -28,7 +28,7 @@
 #ifndef SIGNAL_H
 #define SIGNAL_H
 
-void signal_setup (void);
+int signal_setup (void);
 int signal_fd_set (fd_set *rset, int fd);
 int signal_exists (const fd_set *rset);
 int signal_read (fd_set *rset);
