@@ -319,11 +319,11 @@ int open_socket (interface_t *iface, int protocol)
 	if (protocol == ETHERTYPE_ARP) {
 		pf.bf_insns = arp_bpf_filter;
 		pf.bf_len = sizeof (arp_bpf_filter)
-			/ sizeof (arp_bpf_insn[0]);
+			/ sizeof (arp_bpf_filter[0]);
 	} else {
 		pf.bf_insns = dhcp_bpf_filter;
 		pf.bf_len = sizeof (dhcp_bpf_filter) 
-			/ sizeof (dhcp_bpf_insn[0]);
+			/ sizeof (dhcp_bpf_filter[0]);
 	}
 	if (ioctl (fd, BIOCSETF, &pf) == -1) {
 		logger (LOG_ERR, "ioctl BIOCSETF: %s", strerror (errno));
