@@ -142,6 +142,7 @@ int signal_setup (void)
 		    fcntl (signal_pipe[i], F_SETFD, flags | FD_CLOEXEC) == -1)
 			logger (LOG_ERR ,"fcntl: %s", strerror (errno));
 
+	memset (&sa, 0, sizeof (struct sigaction));
 	sa.sa_handler = signal_handler;
 	sigemptyset (&sa.sa_mask);
 	for (i = 0; i < sizeof (handle_sigs) / sizeof (handle_sigs[0]); i++)
