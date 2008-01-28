@@ -188,22 +188,20 @@ void make_dhcp_packet(struct udp_dhcp_packet *packet,
 
 	udp->uh_sport = htons (DHCP_CLIENT_PORT);
 	udp->uh_dport = htons (DHCP_SERVER_PORT);
-	udp->uh_ulen = htons (sizeof (struct udphdr) + length);
+	udp->uh_ulen = htons (sizeof (*udp) + length);
 	ip->ip_len = udp->uh_ulen;
-	udp->uh_sum = checksum ((unsigned char *) packet,
-				sizeof (struct udp_dhcp_packet));
+	udp->uh_sum = checksum ((unsigned char *) packet, sizeof (*packet));
 
 	ip->ip_v = IPVERSION;
 	ip->ip_hl = 5;
 	ip->ip_id = 0;
 	ip->ip_tos = IPTOS_LOWDELAY;
-	ip->ip_len = htons (sizeof (struct ip) + sizeof (struct udphdr) +
-			    length);
+	ip->ip_len = htons (sizeof (*ip) + sizeof (*udp) + length);
 	ip->ip_id = 0;
 	ip->ip_off = htons (IP_DF); /* Don't fragment */
 	ip->ip_ttl = IPDEFTTL;
 
-	ip->ip_sum = checksum ((unsigned char *) ip, sizeof (struct ip));
+	ip->ip_sum = checksum ((unsigned char *) ip, sizeof (*ip));
 }
 
 static int valid_dhcp_packet (unsigned char *data)
@@ -230,21 +228,21 @@ static int valid_dhcp_packet (unsigned char *data)
 	d.data = data;
 	d.packet->ip.ip_sum = 0;
 	if (ipsum != checksum ((unsigned char *) &d.packet->ip,
-			       sizeof (struct ip)))
+			       sizeof (d.packet->ip)))
 	{
 		logger (LOG_DEBUG, "bad IP header checksum, ignoring");
 		retval = -1;
 		goto eexit;
 	}
 
-	memcpy (&source, &d.packet->ip.ip_src, sizeof (struct in_addr));
-	memcpy (&dest, &d.packet->ip.ip_dst, sizeof (struct in_addr));
-	memset (&d.packet->ip, 0, sizeof (struct ip));
+	memcpy (&source, &d.packet->ip.ip_src, sizeof (source));
+	memcpy (&dest, &d.packet->ip.ip_dst, sizeof (dest));
+	memset (&d.packet->ip, 0, sizeof (d.packet->ip));
 	d.packet->udp.uh_sum = 0;
 
 	d.packet->ip.ip_p = IPPROTO_UDP;
-	memcpy (&d.packet->ip.ip_src, &source, sizeof (struct in_addr));
-	memcpy (&d.packet->ip.ip_dst, &dest, sizeof (struct in_addr));
+	memcpy (&d.packet->ip.ip_src, &source, sizeof (source));
+	memcpy (&d.packet->ip.ip_dst, &dest, sizeof (dest));
 	d.packet->ip.ip_len = d.packet->udp.uh_ulen;
 	if (udpsum && udpsum != checksum (d.data, bytes)) {
 		logger (LOG_ERR, "bad UDP checksum, ignoring");
@@ -290,7 +288,7 @@ int open_socket (interface_t *iface, int protocol)
 		return -1;
 	}
 
-	memset (&ifr, 0, sizeof (struct ifreq));
+	memset (&ifr, 0, sizeof (ifr));
 	strlcpy (ifr.ifr_name, iface->name, sizeof (ifr.ifr_name));
 	if (ioctl (fd, BIOCSETIF, &ifr) == -1) {
 		logger (LOG_ERR,
@@ -346,12 +344,12 @@ ssize_t send_packet (const interface_t *iface, int type,
 
 	if (iface->family == ARPHRD_ETHER) {
 		struct ether_header hw;
-		memset (&hw, 0, sizeof (struct ether_header));
+		memset (&hw, 0, sizeof (hw));
 		memset (&hw.ether_dhost, 0xff, ETHER_ADDR_LEN);
 		hw.ether_type = htons (type);
 
 		iov[0].iov_base = &hw;
-		iov[0].iov_len = sizeof (struct ether_header);
+		iov[0].iov_len = sizeof (hw);
 	} else {
 		logger (LOG_ERR, "unsupported interace type %d", iface->family);
 		return -1;
@@ -410,12 +408,12 @@ ssize_t get_packet (const interface_t *iface, unsigned char *data,
 			break;
 
 		hdr.buffer = bpf.buffer + bpf.packet->bh_hdrlen;
-		payload = hdr.buffer + sizeof (struct ether_header);
+		payload = hdr.buffer + sizeof (*hdr.hw);
 
 		/* If it's an ARP reply, then just send it back */
 		if (hdr.hw->ether_type == htons (ETHERTYPE_ARP)) {
 			len = bpf.packet->bh_caplen - 
-				sizeof (struct ether_header);
+				sizeof (*hdr.hw);
 			memcpy (data, payload, len);
 			have_data = true;
 		} else {
@@ -480,7 +478,7 @@ int open_socket (interface_t *iface, int protocol)
 		return (-1);
 	}
 
-	memset (&su, 0, sizeof (struct sockaddr_storage));
+	memset (&su, 0, sizeof (su));
 	su.sll.sll_family = PF_PACKET;
 	su.sll.sll_protocol = htons (protocol);
 	if (! (su.sll.sll_ifindex = if_nametoindex (iface->name))) {
@@ -492,6 +490,7 @@ int open_socket (interface_t *iface, int protocol)
 	}
 
 	/* Install the DHCP filter */
+	memset (&pf, 0, sizeof (pf));
 	if (protocol == ETHERTYPE_ARP) {
 		pf.filter = arp_bpf_filter;
 		pf.len = sizeof (arp_bpf_filter) / sizeof (arp_bpf_filter[0]);
@@ -500,14 +499,14 @@ int open_socket (interface_t *iface, int protocol)
 		pf.len = sizeof (dhcp_bpf_filter) / sizeof (dhcp_bpf_filter[0]);
 	}
 	if (setsockopt (fd, SOL_SOCKET, SO_ATTACH_FILTER,
-			&pf, sizeof (struct sock_fprog)) != 0)
+			&pf, sizeof (pf)) != 0)
 	{
 		logger (LOG_ERR, "SO_ATTACH_FILTER: %s", strerror (errno));
 		close (fd);
 		return (-1);
 	}
 
-	if (bind (fd, &su.sa, sizeof (struct sockaddr_storage)) == -1)
+	if (bind (fd, &su.sa, sizeof (su)) == -1)
 	{
 		logger (LOG_ERR, "bind: %s", strerror (errno));
 		close (fd);
@@ -536,7 +535,7 @@ ssize_t send_packet (const interface_t *iface, int type,
 	if (! iface)
 		return (-1);
 
-	memset (&su, 0, sizeof (struct sockaddr_storage));
+	memset (&su, 0, sizeof (su));
 	su.sll.sll_family = AF_PACKET;
 	su.sll.sll_protocol = htons (type);
 
@@ -555,7 +554,7 @@ ssize_t send_packet (const interface_t *iface, int type,
 		memset (&su.sll.sll_addr, 0xff, iface->hwlen);
 
 	if ((retval = sendto (iface->fd, data, len, 0, &su.sa,
-			      sizeof (struct sockaddr_storage))) == -1)
+			      sizeof (su))) == -1)
 
 		logger (LOG_ERR, "sendto: %s", strerror (errno));
 	return (retval);

@@ -424,7 +424,7 @@ bool read_info (const interface_t *iface, dhcp_t *dhcp)
 				}
 
 				/* See if we can create a route */
-				route = xzalloc (sizeof (route_t));
+				route = xzalloc (sizeof (*route));
 				if (inet_aton (dest, &route->destination) == 0) {
 					logger (LOG_ERR, "read_info ROUTES `%s': not a valid destination address",
 						dest);
@@ -456,7 +456,7 @@ bool read_info (const interface_t *iface, dhcp_t *dhcp)
 		} else if (strcmp (var, "GATEWAYS") == 0) {
 			p = value;
 			while ((value = strsep (&p, " "))) {
-				route_t *route = xzalloc (sizeof (route_t));
+				route_t *route = xzalloc (sizeof (*route));
 				if (parse_address (&route->gateway, value, "GATEWAYS")) {
 					if (dhcp->routes) {
 						route_t *r = dhcp->routes;

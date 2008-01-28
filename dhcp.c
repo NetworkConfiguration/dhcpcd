@@ -105,7 +105,7 @@ ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 	if (type == DHCP_RELEASE)
 		to.s_addr = dhcp->serveraddress.s_addr;
 
-	message = xzalloc (sizeof (dhcpmessage_t));
+	message = xzalloc (sizeof (*message));
 	m = (unsigned char *) message;
 	p = (unsigned char *) &message->options;
 
@@ -377,7 +377,7 @@ ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 
 	message_length = p - m;
 
-	packet = xzalloc (sizeof (struct udp_dhcp_packet));
+	packet = xzalloc (sizeof (*packet));
 	make_dhcp_packet (packet, (unsigned char *) message, message_length,
 			  from, to);
 	free (message);
@@ -463,11 +463,11 @@ static route_t *decode_CSR(const unsigned char *p, int len)
 	if (len < 5)
 		return NULL;
 
-	first = xzalloc (sizeof (route_t));
+	first = xzalloc (sizeof (*first));
 	route = first;
 
 	while (q - p < len) {
-		memset (route, 0, sizeof (route_t));
+		memset (route, 0, sizeof (*route));
 
 		cidr = *q++;
 		if (cidr > 32) {
@@ -498,7 +498,7 @@ static route_t *decode_CSR(const unsigned char *p, int len)
 
 		/* We have another route */
 		if (q - p < len) {
-			route->next = xzalloc (sizeof (route_t));
+			route->next = xzalloc (sizeof (*route));
 			route = route->next;
 		}
 	}
@@ -637,10 +637,10 @@ static route_t *decode_routes (const unsigned char *data, int length)
 	
 	for (i = 0; i < length; i += 8) {
 		if (routes) {
-			routes->next = xzalloc (sizeof (route_t));
+			routes->next = xzalloc (sizeof (*routes));
 			routes = routes->next;
 		} else
-			head = routes = xzalloc (sizeof (route_t));
+			head = routes = xzalloc (sizeof (*head));
 		memcpy (&routes->destination.s_addr, data + i, 4);
 		memcpy (&routes->gateway.s_addr, data + i + 4, 4);
 		routes->netmask.s_addr =
@@ -658,10 +658,10 @@ static route_t *decode_routers (const unsigned char *data, int length)
 
 	for (i = 0; i < length; i += 4) {
 		if (routes) {
-			routes->next = xzalloc (sizeof (route_t));
+			routes->next = xzalloc (sizeof (*routes));
 			routes = routes->next;
 		} else
-			head = routes = xzalloc (sizeof (route_t));
+			head = routes = xzalloc (sizeof (*head));
 		memcpy (&routes->gateway.s_addr, data + i, 4);
 	}
 

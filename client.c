@@ -195,7 +195,7 @@ static bool get_old_lease (state_t *state, const options_t *options)
 		return (false);
 
 	/* Vitaly important we remove the server information here */
-	memset (&dhcp->serveraddress, 0, sizeof (struct in_addr));
+	memset (&dhcp->serveraddress, 0, sizeof (dhcp->serveraddress));
 	memset (dhcp->servername, 0, sizeof (dhcp->servername));
 
 #ifdef ENABLE_ARP
@@ -205,9 +205,9 @@ static bool get_old_lease (state_t *state, const options_t *options)
 	      (! options->doipv4ll ||
 	       arp_claim (iface, dhcp->address)))))
 	{
-		memset (&dhcp->address, 0, sizeof (struct in_addr));
-		memset (&dhcp->netmask, 0, sizeof (struct in_addr));
-		memset (&dhcp->broadcast, 0, sizeof (struct in_addr));
+		memset (&dhcp->address, 0, sizeof (dhcp->address));
+		memset (&dhcp->netmask, 0, sizeof (dhcp->netmask));
+		memset (&dhcp->broadcast, 0, sizeof (dhcp->broadcast));
 		return (false);
 	}
 
@@ -271,11 +271,11 @@ static void remove_skiproutes (dhcp_t *dhcp, interface_t *iface)
 
 		if (! iroute)
 			iroute = iface->previous_routes =
-				xmalloc (sizeof (route_t));
+				xmalloc (sizeof (*iroute));
 
-		memcpy (iroute, route, sizeof (route_t));
+		memcpy (iroute, route, sizeof (*iroute));
 		if (route->next) {
-			iroute->next = xmalloc (sizeof (route_t));
+			iroute->next = xmalloc (sizeof (*iroute));
 			iroute = iroute->next;
 		}
 	}
@@ -397,7 +397,7 @@ static void drop_config (state_t *state, const options_t *options)
 		configure (options, state->interface, state->dhcp, false);
 
 	free_dhcp (state->dhcp);
-	memset (state->dhcp, 0, sizeof (dhcp_t));
+	memset (state->dhcp, 0, sizeof (*state->dhcp));
 }
 
 static int wait_for_packet (fd_set *rset, state_t *state,
@@ -553,7 +553,7 @@ static int handle_timeout (state_t *state, const options_t *options)
 
 		do_socket (state, SOCKET_CLOSED);
 		free_dhcp (dhcp);
-		memset (dhcp, 0, sizeof (dhcp_t));
+		memset (dhcp, 0, sizeof (*dhcp));
 
 #ifdef ENABLE_INFO
 		if (! options->test &&
@@ -567,7 +567,7 @@ static int handle_timeout (state_t *state, const options_t *options)
 				if (options->dolastlease)
 					return (-1);
 				free_dhcp (dhcp);
-				memset (dhcp, 0, sizeof (dhcp_t));
+				memset (dhcp, 0, sizeof (*dhcp));
 			} else if (errno == EINTR)
 				return (0);
 		}
@@ -581,7 +581,7 @@ static int handle_timeout (state_t *state, const options_t *options)
 		{
 			logger (LOG_INFO, "probing for an IPV4LL address");
 			free_dhcp (dhcp);
-			memset (dhcp, 0, sizeof (dhcp_t));
+			memset (dhcp, 0, sizeof (*dhcp));
 			if (ipv4ll_get_address (iface, dhcp) == -1) {
 				if (! state->daemonised)
 					return (-1);
@@ -655,7 +655,7 @@ static int handle_timeout (state_t *state, const options_t *options)
 		case STATE_BOUND:
 		case STATE_RENEW_REQUESTED:
 			if (IN_LINKLOCAL (ntohl (dhcp->address.s_addr))) {
-				memset (&dhcp->address, 0, sizeof (struct in_addr));
+				memset (&dhcp->address, 0, sizeof (dhcp->address));
 				state->state = STATE_INIT;
 				state->xid = 0;
 				break;
@@ -674,7 +674,7 @@ static int handle_timeout (state_t *state, const options_t *options)
 			break;
 		case STATE_REBINDING:
 			logger (LOG_ERR, "lost lease, attemping to rebind");
-			memset (&dhcp->address, 0, sizeof (struct in_addr));
+			memset (&dhcp->address, 0, sizeof (dhcp->address));
 			do_socket (state, SOCKET_OPEN);
 			if (state->xid == 0)
 				state->xid = (uint32_t) random ();
@@ -710,7 +710,7 @@ static int handle_dhcp (state_t *state, int type, const options_t *options)
 		state->timeout = 0;
 		state->xid = 0;
 		free_dhcp (dhcp);
-		memset (dhcp, 0, sizeof (dhcp_t));
+		memset (dhcp, 0, sizeof (*dhcp));
 
 		/* If we constantly get NAKS then we should slowly back off */
 		if (state->nakoff > 0) {
@@ -790,7 +790,7 @@ static int handle_dhcp (state_t *state, int type, const options_t *options)
 			do_socket (state, SOCKET_CLOSED);
 
 			free_dhcp (dhcp);
-			memset (dhcp, 0, sizeof (dhcp_t));
+			memset (dhcp, 0, sizeof (*dhcp));
 			state->xid = 0;
 			state->timeout = 0;
 			state->state = STATE_INIT;
@@ -922,7 +922,7 @@ static int handle_packet (state_t *state, const options_t *options)
 	   the first one fails for any reason, we can use the next. */
 
 	memset (&message, 0, sizeof (struct dhcpmessage_t));
-	new_dhcp = xmalloc (sizeof (dhcp_t));
+	new_dhcp = xmalloc (sizeof (*new_dhcp));
 
 	do {
 		if (get_packet (iface, (unsigned char *) &message,
@@ -938,7 +938,7 @@ static int handle_packet (state_t *state, const options_t *options)
 		}
 
 		logger (LOG_DEBUG, "got a packet with xid 0x%x", message.xid);
-		memset (new_dhcp, 0, sizeof (dhcp_t));
+		memset (new_dhcp, 0, sizeof (*new_dhcp));
 		type = parse_dhcpmessage (new_dhcp, &message);
 		if (type == -1) {
 			logger (LOG_ERR, "failed to parse packet");
@@ -984,8 +984,8 @@ int dhcp_run (const options_t *options, int *pidfd)
 	if (! iface)
 		goto eexit;
 
-	state = xzalloc (sizeof (state_t));
-	state->dhcp = xzalloc (sizeof (dhcp_t));
+	state = xzalloc (sizeof (*state));
+	state->dhcp = xzalloc (sizeof (*state->dhcp));
 	state->pidfd = pidfd;
 	state->interface = iface;
 

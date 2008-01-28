@@ -107,7 +107,7 @@ int inet_cidrtoaddr (int cidr, struct in_addr *addr) {
 	}
 	ocets = (cidr + 7) / 8;
 
-	memset (addr, 0, sizeof (struct in_addr));
+	memset (addr, 0, sizeof (*addr));
 	if (ocets > 0) {
 		memset (&addr->s_addr, 255, (size_t) ocets - 1);
 		memset ((unsigned char *) &addr->s_addr + (ocets - 1),
@@ -204,7 +204,7 @@ static int _do_interface (const char *ifname,
 
 	/* Not all implementations return the needed buffer size for
 	 * SIOGIFCONF so we loop like so for all until it works */
-	memset (&ifc, 0, sizeof (struct ifconf));
+	memset (&ifc, 0, sizeof (ifc));
 	for (;;) {
 		ifc.ifc_len = len;
 		ifc.ifc_buf = xmalloc ((size_t) len);
@@ -253,8 +253,7 @@ static int _do_interface (const char *ifname,
 		if (hwaddr && hwlen && ifr->ifr_addr.sa_family == AF_LINK) {
 			struct sockaddr_dl sdl;
 
-			memcpy (&sdl, &ifr->ifr_addr,
-				sizeof (struct sockaddr_dl));
+			memcpy (&sdl, &ifr->ifr_addr, sizeof (sdl));
 			*hwlen = sdl.sdl_alen;
 			memcpy (hwaddr, sdl.sdl_data + sdl.sdl_nlen,
 				(size_t) sdl.sdl_alen);
@@ -264,8 +263,7 @@ static int _do_interface (const char *ifname,
 #endif
 
 		if (ifr->ifr_addr.sa_family == AF_INET)	{
-			memcpy (&address, &ifr->ifr_addr,
-				sizeof (struct sockaddr_in));
+			memcpy (&address, &ifr->ifr_addr, sizeof (address));
 			if (flush) {
 				struct sockaddr_in netmask;
 
@@ -276,7 +274,7 @@ static int _do_interface (const char *ifname,
 					continue;
 				}
 				memcpy (&netmask, &ifr->ifr_addr,
-					sizeof (struct sockaddr_in));
+					sizeof (netmask));
 
 				if (del_address (ifname,
 						 address.sin_addr,
@@ -315,7 +313,7 @@ interface_t *read_interface (const char *ifname, _unused int metric)
 	if (! ifname)
 		return NULL;
 
-	memset (&ifr, 0, sizeof (struct ifreq));
+	memset (&ifr, 0, sizeof (ifr));
 	strlcpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
 
 	if ((s = socket (AF_INET, SOCK_DGRAM, 0)) == -1) {
@@ -406,7 +404,7 @@ interface_t *read_interface (const char *ifname, _unused int metric)
 		}
 	}
 
-	iface = xzalloc (sizeof (interface_t));
+	iface = xzalloc (sizeof (*iface));
 	strlcpy (iface->name, ifname, IF_NAMESIZE);
 #ifdef ENABLE_INFO
 	snprintf (iface->infofile, PATH_MAX, INFOFILE, ifname);
@@ -441,7 +439,7 @@ int get_mtu (const char *ifname)
 		return (-1);
 	}
 
-	memset (&ifr, 0, sizeof (struct ifreq));
+	memset (&ifr, 0, sizeof (ifr));
 	strlcpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
 	r = ioctl (s, SIOCGIFMTU, &ifr);
 	close (s);
@@ -465,7 +463,7 @@ int set_mtu (const char *ifname, short int mtu)
 		return (-1);
 	}
 
-	memset (&ifr, 0, sizeof (struct ifreq));
+	memset (&ifr, 0, sizeof (ifr));
 	logger (LOG_DEBUG, "setting MTU to %d", mtu);
 	strlcpy (ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
 	ifr.ifr_mtu = mtu;
@@ -554,8 +552,8 @@ static int do_address (const char *ifname, struct in_addr address,
 	union { struct sockaddr *sa; struct sockaddr_in *sin; } _s; \
 	_s.sa = &_var; \
 	_s.sin->sin_family = AF_INET; \
-	_s.sin->sin_len = sizeof (struct sockaddr_in); \
-	memcpy (&_s.sin->sin_addr, &_addr, sizeof (struct in_addr)); \
+	_s.sin->sin_len = sizeof (*_s.sin); \
+	memcpy (&_s.sin->sin_addr, &_addr, sizeof (_s.sin->sin_addr)); \
 }
 
 	ADDADDR (ifa.ifra_addr, address);
@@ -614,7 +612,7 @@ static int do_route (const char *ifname,
 		return -1;
 	}
 
-	memset (&rtm, 0, sizeof (struct rtm));
+	memset (&rtm, 0, sizeof (rtm));
 
 	rtm.hdr.rtm_version = RTM_VERSION;
 	rtm.hdr.rtm_seq = ++seq;
@@ -709,7 +707,7 @@ static int send_netlink(struct nlmsghdr *hdr)
 		return -1;
 	}
 
-	memset (&nl, 0, sizeof (struct sockaddr_nl));
+	memset (&nl, 0, sizeof (nl));
 	nl.nl_family = AF_NETLINK;
 	if (bind (s, (struct sockaddr *) &nl, sizeof (nl)) == -1) {
 		logger (LOG_ERR, "bind: %s", strerror (errno));
@@ -717,11 +715,11 @@ static int send_netlink(struct nlmsghdr *hdr)
 		return -1;
 	}
 
-	memset (&iov, 0, sizeof (struct iovec));
+	memset (&iov, 0, sizeof (iov));
 	iov.iov_base = hdr;
 	iov.iov_len = hdr->nlmsg_len;
 
-	memset (&msg, 0, sizeof (struct msghdr));
+	memset (&msg, 0, sizeof (msg));
 	msg.msg_name = &nl;
 	msg.msg_namelen = sizeof (nl);
 	msg.msg_iov = &iov;
@@ -846,7 +844,7 @@ static int add_attr_l(struct nlmsghdr *n, unsigned int maxlen, int type,
 static int add_attr_32(struct nlmsghdr *n, unsigned int maxlen, int type,
 		       uint32_t data)
 {
-	int len = RTA_LENGTH (sizeof (uint32_t));
+	int len = RTA_LENGTH (sizeof (data));
 	struct rtattr *rta;
 
 	if (NLMSG_ALIGN (n->nlmsg_len) + len > maxlen) {
@@ -858,7 +856,7 @@ static int add_attr_32(struct nlmsghdr *n, unsigned int maxlen, int type,
 	rta = NLMSG_TAIL (n);
 	rta->rta_type = type;
 	rta->rta_len = len;
-	memcpy (RTA_DATA (rta), &data, sizeof (uint32_t));
+	memcpy (RTA_DATA (rta), &data, sizeof (data));
 	n->nlmsg_len = NLMSG_ALIGN (n->nlmsg_len) + len;
 
 	return 0;
@@ -888,7 +886,7 @@ static int do_address(const char *ifname,
 	if (!ifname)
 		return -1;
 
-	nlm = xzalloc (sizeof (struct nlma));
+	nlm = xzalloc (sizeof (*nlm));
 	nlm->hdr.nlmsg_len = NLMSG_LENGTH (sizeof (struct ifaddrmsg));
 	nlm->hdr.nlmsg_flags = NLM_F_REQUEST;
 	if (! del)
@@ -905,13 +903,13 @@ static int do_address(const char *ifname,
 	nlm->ifa.ifa_prefixlen = inet_ntocidr (netmask);
 
 	/* This creates the aliased interface */
-	add_attr_l (&nlm->hdr, sizeof (struct nlma), IFA_LABEL,
+	add_attr_l (&nlm->hdr, sizeof (*nlm), IFA_LABEL,
 		    ifname, strlen (ifname) + 1);
 
-	add_attr_l (&nlm->hdr, sizeof (struct nlma), IFA_LOCAL,
+	add_attr_l (&nlm->hdr, sizeof (*nlm), IFA_LOCAL,
 		    &address.s_addr, sizeof (address.s_addr));
 	if (! del)
-		add_attr_l (&nlm->hdr, sizeof (struct nlma), IFA_BROADCAST,
+		add_attr_l (&nlm->hdr, sizeof (*nlm), IFA_BROADCAST,
 			    &broadcast.s_addr, sizeof (broadcast.s_addr));
 
 	retval = send_netlink (&nlm->hdr);
@@ -940,7 +938,7 @@ static int do_route (const char *ifname,
 		return -1;
 	}
 
-	nlm = xzalloc (sizeof (struct nlmr));
+	nlm = xzalloc (sizeof (*nlm));
 	nlm->hdr.nlmsg_len = NLMSG_LENGTH (sizeof (struct rtmsg));
 	if (change)
 		nlm->hdr.nlmsg_flags = NLM_F_REPLACE;
@@ -965,15 +963,15 @@ static int do_route (const char *ifname,
 	}
 
 	nlm->rt.rtm_dst_len = inet_ntocidr (netmask);
-	add_attr_l (&nlm->hdr, sizeof (struct nlmr), RTA_DST,
+	add_attr_l (&nlm->hdr, sizeof (*nlm), RTA_DST,
 		    &destination.s_addr, sizeof (destination.s_addr));
 	if (netmask.s_addr != INADDR_BROADCAST &&
 	    destination.s_addr != gateway.s_addr)
-		add_attr_l (&nlm->hdr, sizeof (struct nlmr), RTA_GATEWAY,
+		add_attr_l (&nlm->hdr, sizeof (*nlm), RTA_GATEWAY,
 			    &gateway.s_addr, sizeof (gateway.s_addr));
 
-	add_attr_32 (&nlm->hdr, sizeof (struct nlmr), RTA_OIF, ifindex);
-	add_attr_32 (&nlm->hdr, sizeof (struct nlmr), RTA_PRIORITY, metric);
+	add_attr_32 (&nlm->hdr, sizeof (*nlm), RTA_OIF, ifindex);
+	add_attr_32 (&nlm->hdr, sizeof (*nlm), RTA_PRIORITY, metric);
 
 	retval = send_netlink (&nlm->hdr);
 	free (nlm);

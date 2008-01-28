@@ -167,8 +167,7 @@ int main(int argc, char **argv)
 
 	openlog (PACKAGE, LOG_PID, LOG_LOCAL0);
 
-	options = xmalloc (sizeof (options_t));
-	memset (options, 0, sizeof (options_t));
+	options = xzalloc (sizeof (*options));
 	options->script = (char *) DEFAULT_SCRIPT;
 	snprintf (options->classid, CLASS_ID_MAX_LEN, "%s %s",
 		  PACKAGE, VERSION);

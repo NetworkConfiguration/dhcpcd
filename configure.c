@@ -426,7 +426,7 @@ static char *lookuphostname (char *hostname, const dhcp_t *dhcp,
 	salen = sizeof (struct sockaddr);
 	memset (&su.sa, 0, salen);
 	su.sin.sin_family = AF_INET;
-	memcpy (&su.sin.sin_addr, &dhcp->address, sizeof (struct in_addr));
+	memcpy (&su.sin.sin_addr, &dhcp->address, sizeof (su.sin.sin_addr));
 
 	if ((result = getnameinfo (&su.sa, salen, addr, NI_MAXHOST,
 				   NULL, 0, NI_NAMEREQD)) != 0) {
@@ -551,9 +551,9 @@ int configure (const options_t *options, interface_t *iface,
 					     iface->previous_address,
 					     iface->previous_netmask);
 				memset (&iface->previous_address,
-					0, sizeof (struct in_addr));
+					0, sizeof (iface->previous_address));
 				memset (&iface->previous_netmask,
-					0, sizeof (struct in_addr));
+					0, sizeof (iface->previous_netmask));
 			}
 		}
 
@@ -640,13 +640,13 @@ int configure (const options_t *options, interface_t *iface,
 
 		if (remember >= 0) {
 			if (! new_routes) {
-				new_routes = xmalloc (sizeof (route_t));
+				new_routes = xmalloc (sizeof (*new_routes));
 				new_route = new_routes;
 			} else {
-				new_route->next = xmalloc (sizeof (route_t));
+				new_route->next = xmalloc (sizeof (*new_route));
 				new_route = new_route->next;
 			}
-			memcpy (new_route, route, sizeof (route_t));
+			memcpy (new_route, route, sizeof (*new_route));
 			new_route -> next = NULL;
 		}
 #ifdef THERE_IS_NO_FORK
@@ -693,10 +693,10 @@ int configure (const options_t *options, interface_t *iface,
 
 		if (remember >= 0) {
 			if (! new_routes) {
-				new_routes = xmalloc (sizeof (route_t));
+				new_routes = xmalloc (sizeof (*new_routes));
 				new_route = new_routes;
 			} else {
-				new_route->next = xmalloc (sizeof (route_t));
+				new_route->next = xmalloc (sizeof (*new_route));
 				new_route = new_route->next;
 			}
 			new_route->destination.s_addr = dest.s_addr;
@@ -767,9 +767,9 @@ int configure (const options_t *options, interface_t *iface,
 	    iface->previous_netmask.s_addr != dhcp->netmask.s_addr)
 	{
 		memcpy (&iface->previous_address,
-			&dhcp->address, sizeof (struct in_addr));
+			&dhcp->address, sizeof (iface->previous_address));
 		memcpy (&iface->previous_netmask,
-			&dhcp->netmask, sizeof (struct in_addr));
+			&dhcp->netmask, sizeof (iface->previous_netmask));
 		exec_script (options->script, iface->infofile, "new");
 	} else
 		exec_script (options->script, iface->infofile, "up");
