@@ -139,9 +139,9 @@ ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 			break;
 		case ARPHRD_IEEE1394:
 		case ARPHRD_INFINIBAND:
+			message->hwlen = 0;
 			if (message->ciaddr == 0)
 				message->flags = htons (BROADCAST_FLAG);
-			message->hwlen = 0;
 			break;
 		default:
 			logger (LOG_ERR, "dhcp: unknown hardware type %d",
