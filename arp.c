@@ -77,7 +77,7 @@ static int send_arp (const interface_t *iface, int op, struct in_addr sip,
 		     const unsigned char *taddr, struct in_addr tip)
 {
 	struct arphdr *arp;
-	size_t arpsize = arphdr_len2 (iface->hwlen, sizeof (struct in_addr));
+	size_t arpsize = arphdr_len2 (iface->hwlen, sizeof (sip));
 	caddr_t tha;
 	int retval;
 
@@ -85,7 +85,7 @@ static int send_arp (const interface_t *iface, int op, struct in_addr sip,
 	arp->ar_hrd = htons (iface->family);
 	arp->ar_pro = htons (ETHERTYPE_IP);
 	arp->ar_hln = iface->hwlen;
-	arp->ar_pln = sizeof (struct in_addr);
+	arp->ar_pln = sizeof (sip);
 	arp->ar_op = htons (op);
 	memcpy (ar_sha (arp), iface->hwaddr, (size_t) arp->ar_hln);
 	memcpy (ar_spa (arp), &sip, (size_t) arp->ar_pln);
@@ -134,7 +134,7 @@ int arp_claim (interface_t *iface, struct in_addr address)
 	if (! open_socket (iface, ETHERTYPE_ARP))
 		return (-1);
 
-	memset (&null_address, 0, sizeof (struct in_addr));
+	memset (&null_address, 0, sizeof (null_address));
 
 	buffer = xmalloc (iface->buffer_length);
 	reply = xmalloc (iface->buffer_length);
@@ -247,7 +247,7 @@ int arp_claim (interface_t *iface, struct in_addr address)
 			/* Protocol must be IP. */
 			if (reply->ar_pro != htons (ETHERTYPE_IP))
 				continue;
-			if (reply->ar_pln != sizeof (struct in_addr))
+			if (reply->ar_pln != sizeof (address))
 				continue;
 			if ((unsigned) bytes < sizeof (reply) + 
 			    2 * (4 + reply->ar_hln))

@@ -240,7 +240,7 @@ static int _do_interface (const char *ifname,
 		ifr = ifreqs.ifr;
 
 #ifdef __linux__
-		p += sizeof (struct ifreq);
+		p += sizeof (*ifr);
 #else
 		p += sizeof (ifr->ifr_name) +
 			MAX (ifr->ifr_addr.sa_len, sizeof (struct sockaddr));
@@ -583,12 +583,6 @@ static int do_route (const char *ifname,
 		     int change, int del)
 {
 	int s;
-	struct rtm 
-	{
-		struct rt_msghdr hdr;
-		char buffer[sizeof (struct sockaddr_storage) * 3];
-	} rtm;
-	char *bp = rtm.buffer;
 	static int seq;
 	union sockunion {
 		struct sockaddr sa;
@@ -599,7 +593,12 @@ static int do_route (const char *ifname,
 		struct sockaddr_dl sdl;
 		struct sockaddr_storage ss;
 	} su;
-
+	struct rtm 
+	{
+		struct rt_msghdr hdr;
+		char buffer[sizeof (su) * 3];
+	} rtm;
+	char *bp = rtm.buffer;
 	size_t l;
 
 	if (! ifname)
@@ -623,10 +622,10 @@ static int do_route (const char *ifname,
 	rtm.hdr.rtm_addrs = RTA_DST | RTA_GATEWAY | RTA_NETMASK;
 
 #define ADDADDR(_addr) \
-	memset (&su, 0, sizeof (struct sockaddr_storage)); \
+	memset (&su, 0, sizeof (su)); \
 	su.sin.sin_family = AF_INET; \
-	su.sin.sin_len = sizeof (struct sockaddr_in); \
-	memcpy (&su.sin.sin_addr, &_addr, sizeof (struct in_addr)); \
+	su.sin.sin_len = sizeof (su.sin.sin_addr); \
+	memcpy (&su.sin.sin_addr, &_addr, sizeof (su.sin.sin_addr)); \
 	l = SA_SIZE (&(su.sa)); \
 	memcpy (bp, &(su), l); \
 	bp += l;
@@ -645,8 +644,8 @@ static int do_route (const char *ifname,
 
 		hwaddr = xmalloc (sizeof (unsigned char) * HWADDR_LEN);
 		_do_interface (ifname, hwaddr, &hwlen, NULL, false, false);
-		memset (&su, 0, sizeof (struct sockaddr_storage));
-		su.sdl.sdl_len = sizeof (struct sockaddr_dl);
+		memset (&su, 0, sizeof (su));
+		su.sdl.sdl_len = sizeof (su.sdl);
 		su.sdl.sdl_family = AF_LINK;
 		su.sdl.sdl_nlen = strlen (ifname);
 		memcpy (&su.sdl.sdl_data, ifname, (size_t) su.sdl.sdl_nlen);
@@ -791,7 +790,7 @@ static int send_netlink(struct nlmsghdr *hdr)
 				goto eexit;
 			}
 
-			if ((unsigned) l < sizeof (struct nlmsgerr)) {
+			if ((unsigned) l < sizeof (*err)) {
 				logger (LOG_ERR, "netlink: error truncated");
 				goto eexit;
 			}

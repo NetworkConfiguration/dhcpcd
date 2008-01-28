@@ -385,8 +385,8 @@ ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 	logger (LOG_DEBUG, "sending %s with xid 0x%x",
 		dhcp_message (type), xid);
 	retval = send_packet (iface, ETHERTYPE_IP, (unsigned char *) packet,
-			      message_length + sizeof (struct ip) +
-			      sizeof (struct udphdr));
+			      message_length +
+			      sizeof (packet->ip) + sizeof (packet->udp));
 	free (packet);
 	return (retval);
 }
@@ -535,10 +535,9 @@ static bool dhcp_add_address (address_t **address,
 
 	for (i = 0; i < length; i += 4) {
 		if (*address == NULL) {
-			*address = xzalloc (sizeof (address_t));
-			p = *address;
+			p = *address = xzalloc (sizeof (*p));
 		} else {
-			p->next = xzalloc (sizeof (address_t));
+			p->next = xzalloc (sizeof (*p));
 			p = p->next;
 		}
 

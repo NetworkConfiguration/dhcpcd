@@ -423,7 +423,7 @@ static char *lookuphostname (char *hostname, const dhcp_t *dhcp,
 
 	logger (LOG_DEBUG, "Looking up hostname via DNS");
 	addr = xmalloc (sizeof (char) * NI_MAXHOST);
-	salen = sizeof (struct sockaddr);
+	salen = sizeof (su.sa);
 	memset (&su.sa, 0, salen);
 	su.sin.sin_family = AF_INET;
 	memcpy (&su.sin.sin_addr, &dhcp->address, sizeof (su.sin.sin_addr));

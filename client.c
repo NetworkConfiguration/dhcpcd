@@ -921,7 +921,7 @@ static int handle_packet (state_t *state, const options_t *options)
 	   The benefit is that if we get >1 DHCP packet in our buffer and
 	   the first one fails for any reason, we can use the next. */
 
-	memset (&message, 0, sizeof (struct dhcpmessage_t));
+	memset (&message, 0, sizeof (message));
 	new_dhcp = xmalloc (sizeof (*new_dhcp));
 
 	do {

@@ -425,8 +425,8 @@ ssize_t get_packet (const interface_t *iface, unsigned char *data,
 				} pay;
 				pay.buffer = payload;
 				len = ntohs (pay.packet->ip.ip_len) -
-					sizeof (struct ip) -
-					sizeof (struct udphdr);
+					sizeof (pay.packet->ip) -
+					sizeof (pay.packet->udp);
 				memcpy (data, &pay.packet->dhcp, len);
 				have_data = true;
 			}
@@ -595,7 +595,9 @@ ssize_t get_packet (const interface_t *iface, unsigned char *data,
 		return (bytes);
 	}
 
-	if ((unsigned) bytes < (sizeof (struct ip) + sizeof (struct udphdr))) {
+	if ((unsigned) bytes < (sizeof (pay.packet->ip) +
+				sizeof (pay.packet->udp)))
+	{
 		logger (LOG_DEBUG, "message too short, ignoring");
 		return (-1);
 	}

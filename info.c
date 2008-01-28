@@ -322,7 +322,7 @@ static bool parse_addresses (address_t **address, char *value, const char *var)
 	bool retval = true;
 
 	while ((token = strsep (&p, " "))) {
-		address_t *a = xzalloc (sizeof (address_t));
+		address_t *a = xzalloc (sizeof (*a));
 
 		if (inet_aton (token, &a->address) == 0) {
 			logger (LOG_ERR, "%s: invalid address `%s'", var, token);
