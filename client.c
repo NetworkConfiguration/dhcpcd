@@ -984,12 +984,8 @@ int dhcp_run (const options_t *options, int *pidfd)
 	if (! iface)
 		goto eexit;
 
-	state = xmalloc (sizeof (state_t));
-	memset (state, 0, sizeof (state_t));
-	
-	state->dhcp = xmalloc (sizeof (dhcp_t));
-	memset (state->dhcp, 0, sizeof (dhcp_t));
-
+	state = xzalloc (sizeof (state_t));
+	state->dhcp = xzalloc (sizeof (dhcp_t));
 	state->pidfd = pidfd;
 	state->interface = iface;
 

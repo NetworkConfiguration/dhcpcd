@@ -204,6 +204,13 @@ void *xmalloc (size_t s)
 	/* NOTREACHED */
 }
 
+void *xzalloc (size_t s)
+{
+	void *value = xmalloc (s);
+	memset (value, 0, s);
+	return (value);
+}
+
 void *xrealloc (void *ptr, size_t s)
 {
 	void *value = realloc (ptr, s);

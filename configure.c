@@ -641,7 +641,6 @@ int configure (const options_t *options, interface_t *iface,
 		if (remember >= 0) {
 			if (! new_routes) {
 				new_routes = xmalloc (sizeof (route_t));
-				memset (new_routes, 0, sizeof (route_t));
 				new_route = new_routes;
 			} else {
 				new_route->next = xmalloc (sizeof (route_t));
@@ -695,16 +694,15 @@ int configure (const options_t *options, interface_t *iface,
 		if (remember >= 0) {
 			if (! new_routes) {
 				new_routes = xmalloc (sizeof (route_t));
-				memset (new_routes, 0, sizeof (route_t));
 				new_route = new_routes;
 			} else {
 				new_route->next = xmalloc (sizeof (route_t));
 				new_route = new_route->next;
-				new_route->next = NULL;
 			}
 			new_route->destination.s_addr = dest.s_addr;
 			new_route->netmask.s_addr = mask.s_addr;
 			new_route->gateway.s_addr = gate.s_addr;
+			new_route->next = NULL;
 		}
 	}
 #endif

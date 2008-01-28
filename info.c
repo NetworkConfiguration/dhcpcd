@@ -322,8 +322,7 @@ static bool parse_addresses (address_t **address, char *value, const char *var)
 	bool retval = true;
 
 	while ((token = strsep (&p, " "))) {
-		address_t *a = xmalloc (sizeof (address_t));
-		memset (a, 0, sizeof (address_t));
+		address_t *a = xzalloc (sizeof (address_t));
 
 		if (inet_aton (token, &a->address) == 0) {
 			logger (LOG_ERR, "%s: invalid address `%s'", var, token);
@@ -425,8 +424,7 @@ bool read_info (const interface_t *iface, dhcp_t *dhcp)
 				}
 
 				/* See if we can create a route */
-				route = xmalloc (sizeof (route_t));
-				memset (route, 0, sizeof (route_t));
+				route = xzalloc (sizeof (route_t));
 				if (inet_aton (dest, &route->destination) == 0) {
 					logger (LOG_ERR, "read_info ROUTES `%s': not a valid destination address",
 						dest);
@@ -458,8 +456,7 @@ bool read_info (const interface_t *iface, dhcp_t *dhcp)
 		} else if (strcmp (var, "GATEWAYS") == 0) {
 			p = value;
 			while ((value = strsep (&p, " "))) {
-				route_t *route = xmalloc (sizeof (route_t));
-				memset (route, 0, sizeof (route_t));
+				route_t *route = xzalloc (sizeof (route_t));
 				if (parse_address (&route->gateway, value, "GATEWAYS")) {
 					if (dhcp->routes) {
 						route_t *r = dhcp->routes;

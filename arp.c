@@ -81,9 +81,7 @@ static int send_arp (const interface_t *iface, int op, struct in_addr sip,
 	caddr_t tha;
 	int retval;
 
-	arp = xmalloc (arpsize);
-	memset (arp, 0, arpsize);
-
+	arp = xzalloc (arpsize);
 	arp->ar_hrd = htons (iface->family);
 	arp->ar_pro = htons (ETHERTYPE_IP);
 	arp->ar_hln = iface->hwlen;

@@ -406,8 +406,7 @@ interface_t *read_interface (const char *ifname, _unused int metric)
 		}
 	}
 
-	iface = xmalloc (sizeof (interface_t));
-	memset (iface, 0, sizeof (interface_t));
+	iface = xzalloc (sizeof (interface_t));
 	strlcpy (iface->name, ifname, IF_NAMESIZE);
 #ifdef ENABLE_INFO
 	snprintf (iface->infofile, PATH_MAX, INFOFILE, ifname);
@@ -738,8 +737,7 @@ static int send_netlink(struct nlmsghdr *hdr)
 		return -1;
 	}
 
-	buffer = xmalloc (sizeof (char) * BUFFERLEN);
-	memset (buffer, 0, BUFFERLEN);
+	buffer = xzalloc (sizeof (char) * BUFFERLEN);
 	iov.iov_base = buffer;
 
 	for (;;) {
@@ -890,9 +888,7 @@ static int do_address(const char *ifname,
 	if (!ifname)
 		return -1;
 
-	nlm = xmalloc (sizeof (struct nlma));
-	memset (nlm, 0, sizeof (struct nlma));
-
+	nlm = xzalloc (sizeof (struct nlma));
 	nlm->hdr.nlmsg_len = NLMSG_LENGTH (sizeof (struct ifaddrmsg));
 	nlm->hdr.nlmsg_flags = NLM_F_REQUEST;
 	if (! del)
@@ -944,9 +940,7 @@ static int do_route (const char *ifname,
 		return -1;
 	}
 
-	nlm = xmalloc (sizeof (struct nlmr));
-	memset (nlm, 0, sizeof (struct nlmr));
-
+	nlm = xzalloc (sizeof (struct nlmr));
 	nlm->hdr.nlmsg_len = NLMSG_LENGTH (sizeof (struct rtmsg));
 	if (change)
 		nlm->hdr.nlmsg_flags = NLM_F_REPLACE;

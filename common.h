@@ -59,6 +59,7 @@ time_t uptime (void);
 void writepid (int fd, pid_t pid);
 void *xrealloc (void *ptr, size_t size);
 void *xmalloc (size_t size);
+void *xzalloc (size_t size);
 char *xstrdup (const char *str);
 
 #endif

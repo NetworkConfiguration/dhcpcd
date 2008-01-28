@@ -105,8 +105,7 @@ ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 	if (type == DHCP_RELEASE)
 		to.s_addr = dhcp->serveraddress.s_addr;
 
-	message = xmalloc (sizeof (dhcpmessage_t));
-	memset (message, 0, sizeof (dhcpmessage_t));
+	message = xzalloc (sizeof (dhcpmessage_t));
 	m = (unsigned char *) message;
 	p = (unsigned char *) &message->options;
 
@@ -378,8 +377,7 @@ ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 
 	message_length = p - m;
 
-	packet = xmalloc (sizeof (struct udp_dhcp_packet));
-	memset (packet, 0, sizeof (struct udp_dhcp_packet));
+	packet = xzalloc (sizeof (struct udp_dhcp_packet));
 	make_dhcp_packet (packet, (unsigned char *) message, message_length,
 			  from, to);
 	free (message);
@@ -465,7 +463,7 @@ static route_t *decode_CSR(const unsigned char *p, int len)
 	if (len < 5)
 		return NULL;
 
-	first = xmalloc (sizeof (route_t));
+	first = xzalloc (sizeof (route_t));
 	route = first;
 
 	while (q - p < len) {
@@ -500,7 +498,7 @@ static route_t *decode_CSR(const unsigned char *p, int len)
 
 		/* We have another route */
 		if (q - p < len) {
-			route->next = xmalloc (sizeof (route_t));
+			route->next = xzalloc (sizeof (route_t));
 			route = route->next;
 		}
 	}
@@ -537,13 +535,12 @@ static bool dhcp_add_address (address_t **address,
 
 	for (i = 0; i < length; i += 4) {
 		if (*address == NULL) {
-			*address = xmalloc (sizeof (address_t));
+			*address = xzalloc (sizeof (address_t));
 			p = *address;
 		} else {
-			p->next = xmalloc (sizeof (address_t));
+			p->next = xzalloc (sizeof (address_t));
 			p = p->next;
 		}
-		memset (p, 0, sizeof (address_t));
 
 		/* Sanity check */
 		if (i + 4 > length) {
@@ -640,11 +637,10 @@ static route_t *decode_routes (const unsigned char *data, int length)
 	
 	for (i = 0; i < length; i += 8) {
 		if (routes) {
-			routes->next = xmalloc (sizeof (route_t));
+			routes->next = xzalloc (sizeof (route_t));
 			routes = routes->next;
 		} else
-			head = routes = xmalloc (sizeof (route_t));
-		memset (routes, 0, sizeof (route_t));
+			head = routes = xzalloc (sizeof (route_t));
 		memcpy (&routes->destination.s_addr, data + i, 4);
 		memcpy (&routes->gateway.s_addr, data + i + 4, 4);
 		routes->netmask.s_addr =
@@ -662,11 +658,10 @@ static route_t *decode_routers (const unsigned char *data, int length)
 
 	for (i = 0; i < length; i += 4) {
 		if (routes) {
-			routes->next = xmalloc (sizeof (route_t));
+			routes->next = xzalloc (sizeof (route_t));
 			routes = routes->next;
 		} else
-			head = routes = xmalloc (sizeof (route_t));
-		memset (routes, 0, sizeof (route_t));
+			head = routes = xzalloc (sizeof (route_t));
 		memcpy (&routes->gateway.s_addr, data + i, 4);
 	}
 
