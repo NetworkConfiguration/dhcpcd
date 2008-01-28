@@ -442,18 +442,13 @@ static int wait_for_packet (fd_set *rset, state_t *state,
 				retval = select (maxfd + 1, rset,
 						 NULL, NULL, &tv);
 				if (retval == 0)
-					_send_message (state, state->last_type, options);
+					_send_message (state, state->last_type,
+						       options);
 			}
 		}
 
 		return (retval);
 	}
-
-	/* Resend our message if we're getting loads of packets
-	   that aren't for us. This mainly happens on Linux as it
-	   doesn't have a nice BPF filter. */
-	if (iface->fd > -1 && uptime () - state->last_sent >= TIMEOUT_MINI)
-		_send_message (state, state->last_type, options);
 
 	logger (LOG_DEBUG, "waiting on select for %ld seconds",
 		(unsigned long) state->timeout);
