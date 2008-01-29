@@ -80,14 +80,14 @@
 #endif
 
 /* We need this for our maximum timeout as FreeBSD's select cannot handle
-   any higher than this. Is there a better way of working this out? */
+ * any higher than this. Is there a better way of working this out? */
 #define SELECT_MAX              100000000
 
 /* This is out mini timeout.
-   Basically we resend the last request every TIMEOUT_MINI seconds. */
+ * Basically we resend the last request every TIMEOUT_MINI seconds. */
 #define TIMEOUT_MINI            3
 /* Except for an infinite timeout. We keep adding TIMEOUT_MINI to
-   ourself until TIMEOUT_MINI_INF is reached. */
+ * ourself until TIMEOUT_MINI_INF is reached. */
 #define TIMEOUT_MINI_INF        60
 
 #define STATE_INIT              0
@@ -802,7 +802,7 @@ static int handle_dhcp (state_t *state, int type, const options_t *options)
 			state->state = STATE_INIT;
 
 			/* RFC 2131 says that we should wait for 10 seconds
-			   before doing anything else */
+			 * before doing anything else */
 			logger (LOG_INFO, "sleeping for 10 seconds");
 			tv.tv_sec = 10;
 			tv.tv_usec = 0;
@@ -916,16 +916,16 @@ static int handle_packet (state_t *state, const options_t *options)
 	dhcpmessage_t message;
 
 	/* Allocate our buffer space for BPF.
-	   We cannot do this until we have opened our socket as we don't
-	   know how much of a buffer we need until then. */
+	 * We cannot do this until we have opened our socket as we don't
+	 * know how much of a buffer we need until then. */
 	if (! state->buffer)
 		state->buffer = xmalloc (iface->buffer_length);
 	state->buffer_len = iface->buffer_length;
 	state->buffer_pos = 0;
 
 	/* We loop through until our buffer is empty.
-	   The benefit is that if we get >1 DHCP packet in our buffer and
-	   the first one fails for any reason, we can use the next. */
+	 * The benefit is that if we get >1 DHCP packet in our buffer and
+	 * the first one fails for any reason, we can use the next. */
 
 	memset (&message, 0, sizeof (message));
 	new_dhcp = xmalloc (sizeof (*new_dhcp));
@@ -954,8 +954,8 @@ static int handle_packet (state_t *state, const options_t *options)
 		}
 
 		/* If we got here then the DHCP packet is valid and appears to
-		   be for us, so let's clear the buffer as we don't care about
-		   any more DHCP packets at this point. */
+		 * be for us, so let's clear the buffer as we don't care about
+		 * any more DHCP packets at this point. */
 		valid = true;
 		break;
 	} while (state->buffer_pos != 0);

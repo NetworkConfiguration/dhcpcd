@@ -245,8 +245,9 @@ static int _make_ntp (const char *file, const char *ifname, const dhcp_t *dhcp)
 	for (address = dhcp->ntpservers; address; address = address->next)
 		tomatch++;
 
-	/* Check that we really need to update the servers
-	   We do this because ntp has to be restarted to work with a changed config */
+	/* Check that we really need to update the servers.
+	 * We do this because ntp has to be restarted to
+	 * work with a changed config. */
 	if (! (f = fopen (file, "r"))) {
 		if (errno != ENOENT) {
 			logger (LOG_ERR, "fopen `%s': %s",
@@ -311,9 +312,9 @@ next:
 
 static int make_ntp (const char *ifname, const dhcp_t *dhcp)
 {
-	/* On some systems we have only have one ntp service, but we don't know
-	   which configuration file we're using. So we need to write to both and
-	   restart accordingly. */
+	/* On some systems we have only have one ntp service, but we don't
+	 * know which configuration file we're using. So we need to write
+	 * to both and restart accordingly. */
 
 	bool restart_ntp = false;
 	bool restart_openntp = false;
@@ -515,9 +516,9 @@ int configure (const options_t *options, interface_t *iface,
 	if (dhcp->address.s_addr == 0)
 		up = 0;
 
-	/* Remove old routes
-	   Always do this as the interface may have >1 address not added by us
-	   so the routes we added may still exist */
+	/* Remove old routes.
+	 * Always do this as the interface may have >1 address not added by us
+	 * so the routes we added may still exist. */
 	for (route = iface->previous_routes; route; route = route->next)
 		if ((route->destination.s_addr || options->dogateway) &&
 		    (! up || ! in_routes (dhcp->routes, route)))
@@ -564,8 +565,8 @@ int configure (const options_t *options, interface_t *iface,
 	}
 
 	/* Set the MTU requested.
-	   If the DHCP server no longer sends one OR it's invalid then
-	   we restore the original MTU */
+	 * If the DHCP server no longer sends one OR it's invalid then
+	 * we restore the original MTU */
 	if (options->domtu) {
 		unsigned short mtu = iface->mtu;
 		if (dhcp->mtu)
@@ -776,4 +777,3 @@ int configure (const options_t *options, interface_t *iface,
 
 	return (0);
 }
-

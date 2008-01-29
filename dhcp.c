@@ -216,8 +216,8 @@ ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 		*p++ = 0;
 
 		/* Only request DNSSERVER in discover to keep the packets small.
-		   RFC2131 Section 3.5 states that the REQUEST must include the
-		   list from the DISCOVER message, so I think this is ok. */
+		 * RFC2131 Section 3.5 states that the REQUEST must include the
+		 * list from the DISCOVER message, so I think this is ok. */
 
 		if (type == DHCP_DISCOVER && ! options->test)
 			*p++ = DHCP_DNSSERVER;
@@ -370,7 +370,8 @@ ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 
 #ifdef BOOTP_MESSAGE_LENTH_MIN
 	/* Some crappy DHCP servers think they have to obey the BOOTP minimum
-	 * messag length. They are wrong, but we should still cater for them */
+	 * message length.
+	 * They are wrong, but we should still cater for them. */
 	while (p - m < BOOTP_MESSAGE_LENTH_MIN)
 		*p++ = DHCP_PAD;
 #endif
@@ -392,9 +393,9 @@ ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 }
 
 /* Decode an RFC3397 DNS search order option into a space
-   seperated string. Returns length of string (including 
-   terminating zero) or zero on error. out may be NULL
-   to just determine output length. */
+ * seperated string. Returns length of string (including 
+ * terminating zero) or zero on error. out may be NULL
+ * to just determine output length. */
 static unsigned int decode_search (const unsigned char *p, int len, char *out)
 {
 	const unsigned char *r, *q = p;
@@ -958,7 +959,7 @@ eexit:
 			~dhcp->netmask.s_addr;
 
 	/* If we have classess static routes then we discard
-	   static routes and routers according to RFC 3442 */
+	 * static routes and routers according to RFC 3442 */
 	if (csr) {
 		dhcp->routes = csr;
 		free_route (mscsr);

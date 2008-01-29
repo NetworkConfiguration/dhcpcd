@@ -680,10 +680,9 @@ static int do_route (const char *ifname,
 
 #elif __linux__
 /* This netlink stuff is overly compex IMO.
-   The BSD implementation is much cleaner and a lot less code.
-   send_netlink handles the actual transmission so we can work out
-   if there was an error or not.
-   */
+ * The BSD implementation is much cleaner and a lot less code.
+ * send_netlink handles the actual transmission so we can work out
+ * if there was an error or not. */
 #define BUFFERLEN 256
 static int send_netlink(struct nlmsghdr *hdr)
 {

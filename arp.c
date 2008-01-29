@@ -261,7 +261,7 @@ int arp_claim (interface_t *iface, struct in_addr address)
 				continue;
 
 			/* Some systems send a reply back from our hwaddress,
-			 * which is weird */
+			 * which is wierd */
 			if (reply->ar_hln == iface->hwlen &&
 			    memcmp (rh.c, iface->hwaddr, iface->hwlen) == 0)
 				continue;

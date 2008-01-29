@@ -61,7 +61,7 @@
 #include "socket.h"
 
 /* A suitably large buffer for all transactions.
-   BPF buffer size is set by the kernel, so no define. */
+ * BPF buffer size is set by the kernel, so no define. */
 #ifdef __linux__
 # define BUFFER_LENGTH 4096
 #endif
@@ -74,7 +74,7 @@ static const uint8_t ipv4_bcast_addr[] = {
 };
 
 /* Credit where credit is due :)
-   The below BPF filter is taken from ISC DHCP */
+ * The below BPF filter is taken from ISC DHCP */
 static struct bpf_insn dhcp_bpf_filter [] = {
 	/* Make sure this is an IP packet... */
 	BPF_STMT (BPF_LD | BPF_H | BPF_ABS, 12),
@@ -169,13 +169,13 @@ void make_dhcp_packet(struct udp_dhcp_packet *packet,
 	struct udphdr *udp = &packet->udp;
 
 	/* OK, this is important :)
-	   We copy the data to our packet and then create a small part of the
-	   ip structure and an invalid ip_len (basically udp length).
-	   We then fill the udp structure and put the checksum
-	   of the whole packet into the udp checksum.
-	   Finally we complete the ip structure and ip checksum.
-	   If we don't do the ordering like so then the udp checksum will be
-	   broken, so find another way of doing it! */
+	 * We copy the data to our packet and then create a small part of the
+	 * ip structure and an invalid ip_len (basically udp length).
+	 * We then fill the udp structure and put the checksum
+	 * of the whole packet into the udp checksum.
+	 * Finally we complete the ip structure and ip checksum.
+	 * If we don't do the ordering like so then the udp checksum will be
+	 * broken, so find another way of doing it! */
 
 	memcpy (&packet->dhcp, data, length);
 
@@ -364,7 +364,7 @@ ssize_t send_packet (const interface_t *iface, int type,
 }
 
 /* BPF requires that we read the entire buffer.
-   So we pass the buffer in the API so we can loop on >1 dhcp packet. */
+ * So we pass the buffer in the API so we can loop on >1 dhcp packet. */
 ssize_t get_packet (const interface_t *iface, unsigned char *data,
 		    unsigned char *buffer,
 		    size_t *buffer_len, size_t *buffer_pos)
@@ -561,7 +561,7 @@ ssize_t send_packet (const interface_t *iface, int type,
 }
 
 /* Linux has no need for the buffer as we can read as much as we want.
-   We only have the buffer listed to keep the same API. */
+ * We only have the buffer listed to keep the same API. */
 ssize_t get_packet (const interface_t *iface, unsigned char *data,
 		    unsigned char *buffer,
 		    size_t *buffer_len, size_t *buffer_pos)
