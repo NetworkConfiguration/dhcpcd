@@ -450,10 +450,16 @@ static int wait_for_packet (fd_set *rset, state_t *state,
 		return (retval);
 	}
 
+       /* Resend our message if we're getting loads of packets.
+	* As we use BPF or LPF, we shouldn't hit this as much, but it's
+	* still nice to have. */
+	if (iface->fd > -1 && uptime () - state->last_sent >= TIMEOUT_MINI)
+		_send_message (state, state->last_type, options);
+
 	logger (LOG_DEBUG, "waiting on select for %ld seconds",
 		(unsigned long) state->timeout);
 	/* If we're waiting for a reply, then we re-send the last
-	   DHCP request periodically in-case of a bad line */
+	 * DHCP request periodically in-case of a bad line */
 	retval = 0;
 	while (state->timeout > 0 && retval == 0) {
 		if (iface->fd == -1)
