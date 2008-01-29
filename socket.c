@@ -235,14 +235,14 @@ static int valid_dhcp_packet (unsigned char *data)
 		goto eexit;
 	}
 
-	memcpy (&source, &d.packet->ip.ip_src, sizeof (source));
-	memcpy (&dest, &d.packet->ip.ip_dst, sizeof (dest));
+	memcpy (&source, &d.packet->ip.ip_src, sizeof (d.packet->ip.ip_src));
+	memcpy (&dest, &d.packet->ip.ip_dst, sizeof (d.packet->ip.ip_dst));
 	memset (&d.packet->ip, 0, sizeof (d.packet->ip));
 	d.packet->udp.uh_sum = 0;
 
 	d.packet->ip.ip_p = IPPROTO_UDP;
-	memcpy (&d.packet->ip.ip_src, &source, sizeof (source));
-	memcpy (&d.packet->ip.ip_dst, &dest, sizeof (dest));
+	memcpy (&d.packet->ip.ip_src, &source, sizeof (d.packet->ip.ip_src));
+	memcpy (&d.packet->ip.ip_dst, &dest, sizeof (d.packet->ip.ip_dst));
 	d.packet->ip.ip_len = d.packet->udp.uh_ulen;
 	if (udpsum && udpsum != checksum (d.data, bytes)) {
 		logger (LOG_ERR, "bad UDP checksum, ignoring");
