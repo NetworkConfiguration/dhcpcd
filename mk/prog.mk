@@ -4,6 +4,7 @@
 # Copyright 2008 Roy Marples <roy@marples.name>
 
 BINDIR?=	${PREFIX}/usr/bin
+BINMODE?=	0755
 OBJS+=		${SRCS:.c=.o}
 
 INSTALL?=	install
@@ -15,7 +16,7 @@ ${PROG}: ${SCRIPTS} ${OBJS}
 
 _proginstall: ${PROG}
 	${INSTALL} -d ${DESTDIR}${BINDIR}
-	${INSTALL} ${PROG} ${DESTDIR}${BINDIR}
+	${INSTALL} -m ${BINMODE} ${PROG} ${DESTDIR}${BINDIR}
 
 include ${MK}/depend.mk
 include ${MK}/man.mk
