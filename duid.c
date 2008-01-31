@@ -43,42 +43,38 @@
 
 #define THIRTY_YEARS_IN_SECONDS    946707779
 
-void get_duid (interface_t *iface)
+size_t get_duid (unsigned char *duid, const interface_t *iface)
 {
 	FILE *f;
 	uint16_t type = 0;
 	uint16_t hw = 0;
 	uint32_t ul;
 	time_t t;
-	unsigned char *p = iface->duid;
 	int x = 0;
-
+	unsigned char *p = duid;
+	size_t len = 0;
+	
 	if (! iface)
-		return;
-
-	/* Remove any existing */
-	iface->duid[0] = '\0';
-	iface->duid_length = 0;
+		return (0);
 
 	/* If we already have a DUID then use it as it's never supposed
 	 * to change once we have one even if the interfaces do */
 	if ((f = fopen (DUIDFILE, "r"))) {
-		char *duid = getline (f);
-		if (duid) {
-			iface->duid_length = hwaddr_aton (NULL, duid);
-			if (iface->duid_length &&
-			    iface->duid_length <= DUID_LEN)
-				hwaddr_aton (iface->duid, duid);
-			free (duid);
+		char *line = getline (f);
+		if (line) {
+			len = hwaddr_aton (NULL, line);
+			if (len && len <= DUID_LEN)
+				hwaddr_aton (duid, line);
+			free (line);
 		}
 		fclose (f);
-		if (iface->duid_length)
-			return;
+		if (len)
+			return (len);
 	} else {
 		if (errno != ENOENT) {
 			logger (LOG_ERR, "fopen `%s': %s",
 				DUIDFILE, strerror (errno));
-			return;
+			return (0);
 		}
 	}
 
@@ -102,21 +98,21 @@ void get_duid (interface_t *iface)
 	memcpy (p, iface->hwaddr, iface->hwlen);
 	p += iface->hwlen;
 
-	iface->duid_length = p - iface->duid;
+	len = p - duid;
 
 	if (! (f = fopen (DUIDFILE, "w")))
 		logger (LOG_ERR, "fopen `%s': %s", DUIDFILE, strerror (errno));
 	else {
-		x = fprintf (f, "%s\n",
-			     hwaddr_ntoa (iface->duid, iface->duid_length));
+		x = fprintf (f, "%s\n", hwaddr_ntoa (duid, len));
 		fclose (f);
 	}
 
 	/* Failed to write the duid? scrub it, we cannot use it */
 	if (x < 1) {
-		memset (iface->duid, 0, sizeof (iface->duid));
-		iface->duid_length = 0;
+		len = 0;
 		unlink (DUIDFILE);
 	}
+
+	return (len);
 }
 #endif

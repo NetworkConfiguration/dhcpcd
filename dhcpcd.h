@@ -56,9 +56,7 @@ typedef struct options_t {
 	char hostname[MAXHOSTNAMELEN];
 	int fqdn;
 	char classid[CLASS_ID_MAX_LEN];
-	size_t classid_len;
 	char clientid[CLIENT_ID_MAX_LEN];
-	size_t clientid_len;
 	char userclass[USERCLASS_MAX_LEN];
 	size_t userclass_len;
 	uint32_t leasetime;

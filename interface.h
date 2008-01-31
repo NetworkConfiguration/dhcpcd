@@ -117,10 +117,8 @@ typedef struct interface_t
 
 	time_t start_uptime;
 
-#ifdef ENABLE_DUID
-	unsigned char duid[DUID_LEN];
-	size_t duid_length;
-#endif
+	unsigned char *clientid;
+	size_t clientid_len;
 } interface_t;
 
 void free_address (address_t *addresses);

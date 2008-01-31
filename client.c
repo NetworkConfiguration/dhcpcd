@@ -297,15 +297,6 @@ static bool client_setup (state_t *state, const options_t *options)
 	state->daemonised = options->daemonised;
 	state->persistent = options->persistent;
 
-#ifdef ENABLE_DUID
-	if (options->clientid_len == 0) {
-		get_duid (iface);
-		if (iface->duid_length > 0)
-			logger (LOG_INFO, "DUID = %s",
-				hwaddr_ntoa (iface->duid, iface->duid_length));
-	}
-#endif
-
 	if (options->request_address.s_addr == 0 &&
 	    (options->doinform || options->dorequest || options->daemonised))
 	{
@@ -361,6 +352,76 @@ static bool client_setup (state_t *state, const options_t *options)
 				iface->previous_address = dhcp->address;
 				iface->previous_netmask = dhcp->netmask;
 			}
+		}
+	}
+
+	if (*options->clientid) {
+		uint8_t family = 0;
+		/* Attempt to see if the ClientID is a hardware address */
+		iface->clientid_len = hwaddr_aton (NULL, options->clientid);
+
+		/* We need to at least try and guess the family */
+		switch (iface->clientid_len) {
+			case ETHER_ADDR_LEN:
+				family = ARPHRD_ETHER;
+				break;
+			case EUI64_ADDR_LEN:
+				family = ARPHRD_IEEE1394;
+				break;
+			case INFINIBAND_ADDR_LEN:
+				family = ARPHRD_INFINIBAND;
+				break;
+		}
+
+		/* It looks and smells like one, so make it one */
+		if (family) {
+			iface->clientid_len += 1;
+			iface->clientid = xmalloc (iface->clientid_len);
+			*iface->clientid =  family;
+			hwaddr_aton (iface->clientid + 1, options->clientid);
+		} else {
+			iface->clientid_len = strlen (options->clientid) + 1;
+			iface->clientid = xmalloc (iface->clientid_len);
+			*iface->clientid = '\0';
+			memcpy (iface->clientid + 1,
+				options->clientid, iface->clientid_len - 1);
+		}
+	} else {
+#ifdef ENABLE_DUID
+		unsigned char *duid = NULL;
+		size_t duid_len = 0;
+
+		if (options->doduid) {
+			duid = xmalloc (DUID_LEN);
+			duid_len = get_duid (duid, iface);
+		}
+
+		if (duid_len > 0) {
+			logger (LOG_INFO, "DUID = %s", hwaddr_ntoa (duid, duid_len));
+		
+			iface->clientid_len = duid_len + 5;
+			iface->clientid = xmalloc (iface->clientid_len);
+			*iface->clientid = 255; /* RFC 4361 */
+
+			/* IAID is 4 bytes, so if the iface name is 4 bytes use it */
+			if (strlen (iface->name) == 4) {
+				memcpy (iface->clientid + 1, iface->name, 4);
+			} else {
+				/* Name isn't 4 bytes, so use the index */
+				uint32_t ul = htonl (if_nametoindex (iface->name));
+				memcpy (iface->clientid + 1, &ul, 4);
+			}
+
+			memcpy (iface->clientid + 5, duid, duid_len);
+			free (duid);
+		} else {
+#else
+		{
+#endif
+			iface->clientid_len = iface->hwlen + 1;
+			iface->clientid = xmalloc (iface->clientid_len);
+			*iface->clientid = iface->family;
+			memcpy (iface->clientid + 1, iface->hwaddr, iface->hwlen);
 		}
 	}
 
@@ -1034,6 +1095,7 @@ eexit:
 		do_socket (state, SOCKET_CLOSED);
 		drop_config (state, options);
 		free_route (iface->previous_routes);
+		free (iface->clientid);
 		free (iface);
 	}
 

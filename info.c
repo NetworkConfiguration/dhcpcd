@@ -208,42 +208,10 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 	}
 	print_clean (f, "INTERFACE", iface->name);
 	print_clean (f, "CLASSID", options->classid);
-	if (options->clientid_len > 0) {
-		char *clean = cleanmetas (options->clientid);
-		fprintf (f, "CLIENTID='00:%s'\n", clean);
-		free (clean);
+	if (iface->clientid_len > 0) {
+		fprintf (f, "CLIENTID='%s'\n",
+			 hwaddr_ntoa (iface->clientid, iface->clientid_len));
 	}
-#ifdef ENABLE_DUID
-	else if (iface->duid_length > 0 && options->doduid) {
-		unsigned char *duid;
-		unsigned char *p;
-		uint32_t ul;
-
-		p = duid = xmalloc (iface->duid_length + 6);
-		*p++ = 255;
-
-		/* IAID is 4 bytes, so if the interface name is 4 bytes
-		 * then use it */
-		if (strlen (iface->name) == 4) {
-			memcpy (p, iface->name, 4);
-		} else {
-			/* Name isn't 4 bytes, so use the index */
-			ul = htonl (if_nametoindex (iface->name));
-			memcpy (p, &ul, 4);
-		}
-		p += 4;
-
-		memcpy (p, iface->duid, iface->duid_length);
-		p += iface->duid_length;
-
-		fprintf (f, "CLIENTID='%s'\n", hwaddr_ntoa (duid,
-							    (size_t) (p - duid)));
-		free (duid);
-	}
-#endif
-	else
-		fprintf (f, "CLIENTID='%.2X:%s'\n", iface->family,
-			 hwaddr_ntoa (iface->hwaddr, iface->hwlen));
 	fprintf (f, "DHCPCHADDR='%s'\n", hwaddr_ntoa (iface->hwaddr,
 						      iface->hwlen));
 

@@ -37,6 +37,6 @@
 
 #include "interface.h"
 
-void get_duid (interface_t *iface);
+size_t get_duid (unsigned char *duid, const interface_t *iface);
 #endif
 #endif

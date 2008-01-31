@@ -171,7 +171,6 @@ int main(int argc, char **argv)
 	options->script = (char *) DEFAULT_SCRIPT;
 	snprintf (options->classid, CLASS_ID_MAX_LEN, "%s %s",
 		  PACKAGE, VERSION);
-	options->classid_len = strlen (options->classid);
 
 	options->doarp = true;
 	options->dodns = true;
@@ -229,8 +228,7 @@ int main(int argc, char **argv)
 #endif
 			case 'h':
 				if (! optarg)
-					memset (options->hostname, 0,
-						sizeof (options->hostname));
+					*options->hostname = '\0';
 				else if (strlen (optarg) > MAXHOSTNAMELEN) {
 					logger (LOG_ERR,
 						"`%s' too long for HostName string, max is %d",
@@ -242,17 +240,15 @@ int main(int argc, char **argv)
 				break;
 			case 'i':
 				if (! optarg) {
-					memset (options->classid, 0,
-						sizeof (options->classid));
-					options->classid_len = 0;
+					*options->classid = '\0';
 				} else if (strlen (optarg) > CLASS_ID_MAX_LEN) {
 					logger (LOG_ERR,
 						"`%s' too long for ClassID string, max is %d",
 						optarg, CLASS_ID_MAX_LEN);
 					goto abort;
 				} else
-					options->classid_len = strlcpy (options->classid, optarg,
-									sizeof (options->classid));
+					strlcpy (options->classid, optarg,
+						 sizeof (options->classid));
 				break;
 			case 'k':
 				sig = SIGHUP;
@@ -382,10 +378,9 @@ int main(int argc, char **argv)
 							optarg, CLIENT_ID_MAX_LEN);
 						goto abort;
 					}
-					options->clientid_len = strlcpy (options->clientid, optarg,
-									 sizeof (options->clientid));
-					/* empty string disabled duid */
-					if (options->clientid_len == 0)
+					if (strlcpy (options->clientid, optarg,
+						     sizeof (options->clientid)) == 0)
+						/* empty string disabled duid */
 						options->doduid = false;
 
 				} else {

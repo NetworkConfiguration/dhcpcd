@@ -79,8 +79,7 @@ static const char *dhcp_message (int type)
 }
 
 ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
-		      uint32_t xid, char type,
-		      const options_t *options)
+		      uint32_t xid, char type, const options_t *options)
 {
 	struct udp_dhcp_packet *packet;
 	dhcpmessage_t *message;
@@ -297,74 +296,18 @@ ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 			p += options->userclass_len;
 		}
 
-		if (options->classid_len > 0) {
+		if (*options->classid > 0) {
 			*p++ = DHCP_CLASSID;
-			*p++ = options->classid_len;
-			memcpy (p, options->classid, options->classid_len);
-			p += options->classid_len;
+			*p++ = l = strlen (options->classid);
+			memcpy (p, options->classid, l);
+			p += l;
 		}
 	}
 
 	*p++ = DHCP_CLIENTID;
-	if (options->clientid_len > 0) {
-		/* Attempt to see if the ClientID is a hardware address */
-		size_t hwlen = hwaddr_aton (NULL, options->clientid);
-		sa_family_t family = 0;
-
-		if (hwlen) {
-			/* We need to at least try and guess the family */
-			switch (hwlen) {
-				case ETHER_ADDR_LEN:
-					family = ARPHRD_ETHER;
-					break;
-				case EUI64_ADDR_LEN:
-					family = ARPHRD_IEEE1394;
-					break;
-				case INFINIBAND_ADDR_LEN:
-					family = ARPHRD_INFINIBAND;
-					break;
-			}
-		}
-
-		/* It looks and smells like one, so make it one */
-		if (hwlen && family) {
-			unsigned char *hwaddr = xmalloc (hwlen);
-			hwaddr_aton (hwaddr, options->clientid);
-			*p++ = hwlen + 1;
-			*p++ = family;
-			memcpy (p, hwaddr, hwlen);
-			free (hwaddr);
-			p += hwlen;
-		} else {
-			*p++ = options->clientid_len + 1;
-			*p++ = 0;
-			memcpy (p, options->clientid, options->clientid_len);
-			p += options->clientid_len;
-		}
-#ifdef ENABLE_DUID
-	} else if (iface->duid && options->doduid) {
-		*p++ = iface->duid_length + 5;
-		*p++ = 255; /* RFC 4361 */
-
-		/* IAID is 4 bytes, so if the iface name is 4 bytes use it */
-		if (strlen (iface->name) == 4) {
-			memcpy (p, iface->name, 4);
-		} else {
-			/* Name isn't 4 bytes, so use the index */
-			ul = htonl (if_nametoindex (iface->name));
-			memcpy (p, &ul, 4);
-		}
-		p += 4;
-
-		memcpy (p, iface->duid, iface->duid_length);
-		p += iface->duid_length;
-#endif
-	} else {
-		*p++ = iface->hwlen + 1;
-		*p++ = iface->family;
-		memcpy (p, iface->hwaddr, iface->hwlen);
-		p += iface->hwlen;
-	}
+	*p++ = iface->clientid_len;
+	memcpy (p, iface->clientid, iface->clientid_len);
+	p+= iface->clientid_len;
 
 	*p++ = DHCP_END;
 
