@@ -624,7 +624,7 @@ static int do_route (const char *ifname,
 #define ADDADDR(_addr) \
 	memset (&su, 0, sizeof (su)); \
 	su.sin.sin_family = AF_INET; \
-	su.sin.sin_len = sizeof (su.sin.sin_addr); \
+	su.sin.sin_len = sizeof (su.sin); \
 	memcpy (&su.sin.sin_addr, &_addr, sizeof (su.sin.sin_addr)); \
 	l = SA_SIZE (&(su.sa)); \
 	memcpy (bp, &(su), l); \
