@@ -27,6 +27,7 @@
 
 #include <sys/types.h>
 #include <sys/ioctl.h>
+#include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 
@@ -40,10 +41,17 @@
 #include <errno.h>
 #include <netdb.h>
 #include <resolv.h>
-#include <spawn.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <unistd.h>
+
+#ifndef BSD
+#define HAVE_POSIX_SPAWN
+#endif
+
+#ifdef HAVE_POSIX_SPAWN
+#include <spawn.h>
+#endif
 
 #include "config.h"
 #include "common.h"
@@ -93,6 +101,9 @@ static int exec_cmd (const char *cmd, const char *args, ...)
 	char **argv;
 	int n = 1;
 	int ret;
+#ifndef HAVE_POSIX_SPAWN
+	pid_t pid;
+#endif
 
 	va_start (va, args);
 	while (va_arg (va, char *) != NULL)
@@ -108,11 +119,26 @@ static int exec_cmd (const char *cmd, const char *args, ...)
 		n++;
 	va_end (va);
 
+#ifdef HAVE_POSIX_SPAWN
 	errno = 0;
 	ret = posix_spawnp (NULL, argv[0], NULL, NULL, argv, environ);
-	if (ret != 0 || errno != 0)
+	if (ret != 0 || errno != 0) {
 		logger (LOG_ERR, "error executing \"%s\": %s",
 			cmd, strerror (errno));
+		ret = -1;
+	}
+#else
+	if ((pid = vfork ()) == 0) {
+		if (execvp (cmd, argv) && errno != ENOENT)
+			logger (LOG_ERR, "error executing \"%s\": %s",
+				cmd, strerror (errno));
+		_exit (0);
+	} else if (pid == -1) {
+		logger (LOG_ERR, "vfork: %s", strerror (errno));
+		ret = -1;
+	}
+#endif
+
 	free (argv);
 	return (ret);
 }
