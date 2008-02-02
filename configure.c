@@ -40,6 +40,7 @@
 #include <errno.h>
 #include <netdb.h>
 #include <resolv.h>
+#include <spawn.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -55,6 +56,8 @@
 #include "dhcpcd.h"
 #include "logger.h"
 #include "socket.h"
+
+extern char **environ;
 
 static int file_in_path (const char *file)
 {
@@ -87,9 +90,9 @@ static int file_in_path (const char *file)
 static int exec_cmd (const char *cmd, const char *args, ...)
 {
 	va_list va;
-	pid_t pid;
 	char **argv;
 	int n = 1;
+	int ret;
 
 	va_start (va, args);
 	while (va_arg (va, char *) != NULL)
@@ -105,19 +108,13 @@ static int exec_cmd (const char *cmd, const char *args, ...)
 		n++;
 	va_end (va);
 
-	if ((pid = vfork ()) == 0) {
-		if (execvp (cmd, argv) && errno != ENOENT)
-			logger (LOG_ERR, "error executing \"%s\": %s",
-				cmd, strerror (errno));
-		_exit (0);
-	} else if (pid == -1) {
-		logger (LOG_ERR, "vfork: %s", strerror (errno));
-		free (argv);
-		return (-1);
-	}
-
+	errno = 0;
+	ret = posix_spawnp (NULL, argv[0], NULL, NULL, argv, environ);
+	if (ret != 0 || errno != 0)
+		logger (LOG_ERR, "error executing \"%s\": %s",
+			cmd, strerror (errno));
 	free (argv);
-	return (0);
+	return (ret);
 }
 
 static void exec_script (const char *script, const char *infofile,
