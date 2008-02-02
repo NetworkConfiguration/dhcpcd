@@ -41,20 +41,10 @@
 #include <errno.h>
 #include <netdb.h>
 #include <resolv.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <unistd.h>
-
-#ifndef BSD
-# define HAVE_POSIX_SPAWN
-#endif
-
-#ifdef HAVE_POSIX_SPAWN
-# include <spawn.h>
-extern char **environ;
-#else
-# include <signal.h>
-#endif
 
 #include "config.h"
 #include "common.h"
@@ -66,11 +56,8 @@ extern char **environ;
 #include "interface.h"
 #include "dhcpcd.h"
 #include "logger.h"
-#include "socket.h"
-
-#ifndef HAVE_POSIX_SPAWN
 #include "signal.h"
-#endif
+#include "socket.h"
 
 static int file_in_path (const char *file)
 {
@@ -106,11 +93,9 @@ static int exec_cmd (const char *cmd, const char *args, ...)
 	char **argv;
 	int n = 1;
 	int ret;
-#ifndef HAVE_POSIX_SPAWN
 	pid_t pid;
 	sigset_t full;
 	sigset_t old;
-#endif
 
 	va_start (va, args);
 	while (va_arg (va, char *) != NULL)
@@ -126,38 +111,40 @@ static int exec_cmd (const char *cmd, const char *args, ...)
 		n++;
 	va_end (va);
 
-#ifdef HAVE_POSIX_SPAWN
-	errno = 0;
-	ret = posix_spawnp (NULL, argv[0], NULL, NULL, argv, environ);
-	if (ret != 0 || errno != 0) {
-		logger (LOG_ERR, "error executing \"%s\": %s",
-			cmd, strerror (errno));
-		ret = -1;
-	}
-#else
 	/* OK, we need to block signals */
 	sigfillset (&full);
 	sigprocmask (SIG_SETMASK, &full, &old);
 
-	switch (pid = fork()) {
+#ifdef THERE_IS_NO_FORK
+	signal_reset ();
+	pid = vfork ();
+#else
+	pid = fork();
+#endif
+
+	switch (pid) {
 		case -1:
 			logger (LOG_ERR, "vfork: %s", strerror (errno));
 			ret = -1;
 			break;
 		case 0:
-			/* Reset signals and clear block */
+#ifndef THERE_IS_NO_FORK
 			signal_reset ();
+#endif
 			sigprocmask (SIG_SETMASK, &old, NULL);
 			if (execvp (cmd, argv) && errno != ENOENT)
 				logger (LOG_ERR, "error executing \"%s\": %s",
 					cmd, strerror (errno));
-			_exit (0);
+			_exit (111);
 			/* NOTREACHED */
 	}
 
+#ifdef THERE_IS_NO_FORK
+	signal_setup ();
+#endif
+
 	/* Restore our signals */
 	sigprocmask (SIG_SETMASK, &old, NULL);
-#endif
 
 	free (argv);
 	return (ret);

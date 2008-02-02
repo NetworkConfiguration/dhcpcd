@@ -125,7 +125,7 @@ int signal_read (fd_set *rset)
 
 /* Call this before doing anything else. Sets up the socket pair
  * and installs the signal handler */
-int signal_setup (void)
+int signal_init (void)
 {
 	unsigned int i;
 	int flags;
@@ -142,16 +142,8 @@ int signal_setup (void)
 		    fcntl (signal_pipe[i], F_SETFD, flags | FD_CLOEXEC) == -1)
 			logger (LOG_ERR ,"fcntl: %s", strerror (errno));
 
-	memset (&sa, 0, sizeof (sa));
-	sa.sa_handler = signal_handler;
-	sigemptyset (&sa.sa_mask);
-	for (i = 0; i < sizeof (handle_sigs) / sizeof (handle_sigs[0]); i++)
-		if (sigaction (handle_sigs[i], &sa, NULL) == -1) {
-			logger (LOG_ERR, "sigaction: %s", strerror (errno));
-			return (-1);
-		}
-
-	/* Ignore child signals and don't make zombies */
+	/* Ignore child signals and don't make zombies.
+	 * Because we do this, we don't need to be in signal_setup */
 	sa.sa_handler = SIG_DFL;
 	sa.sa_flags = SA_NOCLDSTOP | SA_NOCLDWAIT;
 	if (sigaction (SIGCHLD, &sa, NULL) == -1) {
@@ -160,7 +152,24 @@ int signal_setup (void)
 	}
 
 	memset (signals, 0, sizeof (signals));
+	return (0);
+}
 
+int signal_setup (void)
+{
+	unsigned int i;
+	struct sigaction sa;
+
+	memset (&sa, 0, sizeof (sa));
+	sa.sa_handler = signal_handler;
+	sigemptyset (&sa.sa_mask);
+
+	for (i = 0; i < sizeof (handle_sigs) / sizeof (handle_sigs[0]); i++)
+		if (sigaction (handle_sigs[i], &sa, NULL) == -1) {
+			logger (LOG_ERR, "sigaction: %s", strerror (errno));
+			return (-1);
+		}
+	
 	return (0);
 }
 

@@ -1059,6 +1059,8 @@ int dhcp_run (const options_t *options, int *pidfd)
 	if (! client_setup (state, options))
 		goto eexit;
 
+	if (signal_init () == -1)
+		goto eexit;
 	if (signal_setup () == -1)
 		goto eexit;
 

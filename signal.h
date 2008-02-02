@@ -28,6 +28,7 @@
 #ifndef SIGNAL_H
 #define SIGNAL_H
 
+int signal_init (void);
 int signal_setup (void);
 int signal_reset (void);
 int signal_fd_set (fd_set *rset, int fd);
