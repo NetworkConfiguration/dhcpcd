@@ -163,3 +163,21 @@ int signal_setup (void)
 
 	return (0);
 }
+
+int signal_reset (void)
+{
+	struct sigaction sa;
+	unsigned int i;
+
+	memset (&sa, 0, sizeof (sa));
+	sa.sa_handler = SIG_DFL;
+	sigemptyset (&sa.sa_mask);
+
+	for (i = 0; i < sizeof (handle_sigs) / sizeof (handle_sigs[0]); i++)
+		if (sigaction (handle_sigs[i], &sa, NULL) == -1) {
+			logger (LOG_ERR, "sigaction: %s", strerror (errno));
+			return (-1);
+		}
+
+	return (0);
+}

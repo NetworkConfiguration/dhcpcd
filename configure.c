@@ -46,11 +46,14 @@
 #include <unistd.h>
 
 #ifndef BSD
-#define HAVE_POSIX_SPAWN
+# define HAVE_POSIX_SPAWN
 #endif
 
 #ifdef HAVE_POSIX_SPAWN
-#include <spawn.h>
+# include <spawn.h>
+extern char **environ;
+#else
+# include <signal.h>
 #endif
 
 #include "config.h"
@@ -65,7 +68,9 @@
 #include "logger.h"
 #include "socket.h"
 
-extern char **environ;
+#ifndef HAVE_POSIX_SPAWN
+#include "signal.h"
+#endif
 
 static int file_in_path (const char *file)
 {
@@ -103,6 +108,8 @@ static int exec_cmd (const char *cmd, const char *args, ...)
 	int ret;
 #ifndef HAVE_POSIX_SPAWN
 	pid_t pid;
+	sigset_t full;
+	sigset_t old;
 #endif
 
 	va_start (va, args);
@@ -128,15 +135,28 @@ static int exec_cmd (const char *cmd, const char *args, ...)
 		ret = -1;
 	}
 #else
-	if ((pid = vfork ()) == 0) {
-		if (execvp (cmd, argv) && errno != ENOENT)
-			logger (LOG_ERR, "error executing \"%s\": %s",
-				cmd, strerror (errno));
-		_exit (0);
-	} else if (pid == -1) {
-		logger (LOG_ERR, "vfork: %s", strerror (errno));
-		ret = -1;
+	/* OK, we need to block signals */
+	sigfillset (&full);
+	sigprocmask (SIG_SETMASK, &full, &old);
+
+	switch (pid = fork()) {
+		case -1:
+			logger (LOG_ERR, "vfork: %s", strerror (errno));
+			ret = -1;
+			break;
+		case 0:
+			/* Reset signals and clear block */
+			signal_reset ();
+			sigprocmask (SIG_SETMASK, &old, NULL);
+			if (execvp (cmd, argv) && errno != ENOENT)
+				logger (LOG_ERR, "error executing \"%s\": %s",
+					cmd, strerror (errno));
+			_exit (0);
+			/* NOTREACHED */
 	}
+
+	/* Restore our signals */
+	sigprocmask (SIG_SETMASK, &old, NULL);
 #endif
 
 	free (argv);
