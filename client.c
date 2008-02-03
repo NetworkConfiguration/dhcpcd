@@ -128,20 +128,33 @@ typedef struct _state {
 static pid_t daemonise (int *pidfd)
 {
 	pid_t pid;
+	sigset_t full;
+	sigset_t old;
+#ifdef THERE_IS_NO_FORK
+	char **argv;
+	int i;
+#endif
+
+	sigfillset (&full);
+	sigprocmask (SIG_SETMASK, &full, &old);
 
 #ifndef THERE_IS_NO_FORK
 	logger (LOG_DEBUG, "forking to background");
-	if ((pid = fork()) == -1) {
-		logger (LOG_ERR, "fork: %s", strerror (errno));
-		exit (EXIT_FAILURE);
+	switch (pid = fork()) {
+		case -1:
+			logger (LOG_ERR, "fork: %s", strerror (errno));
+			exit (EXIT_FAILURE);
+			/* NOT REACHED */
+		case 0:
+			setsid ();
+			close_fds ();
+			break;
+		default:
+			/* Reset our signals as we're the parent about to exit. */
+			signal_reset ();
+			break;
 	}
-
-	setsid ();
-	close_fds ();
 #else
-	char **argv;
-	int i;
-
 	logger (LOG_INFO, "forking to background");
 
 	/* We need to add --daemonise to our options */
@@ -161,6 +174,8 @@ static pid_t daemonise (int *pidfd)
 			logger (LOG_ERR, "vfork: %s", strerror (errno));
 			_exit (EXIT_FAILURE);
 		case 0:
+			signal_reset ();
+			sigprocmask (SIG_SETMASK, &old, NULL);
 			execvp (dhcpcd, argv);
 			logger (LOG_ERR, "execl `%s': %s", dhcpcd,
 				strerror (errno));
@@ -175,8 +190,10 @@ static pid_t daemonise (int *pidfd)
 		writepid (*pidfd, pid);
 		close (*pidfd);
 		*pidfd = -1;
+
 	}
 
+	sigprocmask (SIG_SETMASK, &old, NULL);
 	return (pid);
 }
 
