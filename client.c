@@ -373,30 +373,13 @@ static bool client_setup (state_t *state, const options_t *options)
 	}
 
 	if (*options->clientid) {
-		uint8_t family = 0;
 		/* Attempt to see if the ClientID is a hardware address */
 		iface->clientid_len = hwaddr_aton (NULL, options->clientid);
-
-		/* We need to at least try and guess the family */
-		switch (iface->clientid_len) {
-			case ETHER_ADDR_LEN:
-				family = ARPHRD_ETHER;
-				break;
-			case EUI64_ADDR_LEN:
-				family = ARPHRD_IEEE1394;
-				break;
-			case INFINIBAND_ADDR_LEN:
-				family = ARPHRD_INFINIBAND;
-				break;
-		}
-
-		/* It looks and smells like one, so make it one */
-		if (family) {
-			iface->clientid_len += 1;
+		if (iface->clientid_len) {
 			iface->clientid = xmalloc (iface->clientid_len);
-			*iface->clientid =  family;
-			hwaddr_aton (iface->clientid + 1, options->clientid);
+			hwaddr_aton (iface->clientid, options->clientid);
 		} else {
+			/* Nope, so mark it as-is */
 			iface->clientid_len = strlen (options->clientid) + 1;
 			iface->clientid = xmalloc (iface->clientid_len);
 			*iface->clientid = '\0';

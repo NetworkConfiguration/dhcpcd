@@ -256,8 +256,14 @@ Send
 .Ar clientid
 as a client identifier string. If
 .Ar clientid
-matches a hardware address format, such as 00:01:02:03:04:05 then we encode
-it as that, otherwise as a string.
+matches a hardware address format, such as 01:00:01:02:03:04:05 then we encode
+it as that, otherwise as a string. You need to specify the hardware type in
+the first byte. Ethernet is 01, and the hardware address in the example is
+00:01:02:03:04:05. If the
+.Ar clientid
+is a blank string, then we disable DUID support and use a
+.Ar clientid
+as shown above.
 .It Fl S, -mscsr
 Microsoft have their own code for Classless Static Routes
 .Po
