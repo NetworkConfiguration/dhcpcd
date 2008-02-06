@@ -285,7 +285,7 @@ static int _make_ntp (const char *file, const char *ifname, const dhcp_t *dhcp)
 			return (-1);
 		}
 	} else {
-		while (tomatch != 0 && (line = getline (f))) {
+		while (tomatch != 0 && (line = get_line (f))) {
 			struct in_addr addr;
 
 			a = line;

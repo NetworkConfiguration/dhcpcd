@@ -53,7 +53,7 @@ void srandomdev (void);
 #endif
 
 void close_fds (void);
-char *getline (FILE *fp);
+char *get_line (FILE *fp);
 int get_time (struct timeval *tp);
 time_t uptime (void);
 void writepid (int fd, pid_t pid);

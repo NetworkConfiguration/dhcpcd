@@ -60,7 +60,7 @@ size_t get_duid (unsigned char *duid, const interface_t *iface)
 	/* If we already have a DUID then use it as it's never supposed
 	 * to change once we have one even if the interfaces do */
 	if ((f = fopen (DUIDFILE, "r"))) {
-		char *line = getline (f);
+		char *line = get_line (f);
 		if (line) {
 			len = hwaddr_aton (NULL, line);
 			if (len && len <= DUID_LEN)

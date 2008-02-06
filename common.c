@@ -43,7 +43,7 @@
 
 /* Handy routine to read very long lines in text files.
  * This means we read the whole line and avoid any nasty buffer overflows. */
-char *getline (FILE *fp)
+char *get_line (FILE *fp)
 {
 	char *line = NULL;
 	char *p;

@@ -333,7 +333,7 @@ bool read_info (const interface_t *iface, dhcp_t *dhcp)
 
 	dhcp->frominfo = true;
 
-	while ((line = getline (fp))) {
+	while ((line = get_line (fp))) {
 		var = line;
 
 		/* Strip leading spaces/tabs */
