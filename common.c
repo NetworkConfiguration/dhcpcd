@@ -114,13 +114,13 @@ size_t strlcpy (char *dst, const char *src, size_t size)
 #endif
 
 /* Close our fd's */
-void close_fds (void)
+int close_fds (void)
 {
 	int fd;
 
 	if ((fd = open ("/dev/null", O_RDWR)) == -1) {
 		logger (LOG_ERR, "open `/dev/null': %s", strerror (errno));
-		return;
+		return (-1);
 	}
 
 	dup2 (fd, fileno (stdin));
@@ -128,6 +128,20 @@ void close_fds (void)
 	dup2 (fd, fileno (stderr));
 	if (fd > 2)
 		close (fd);
+	return (0);
+}
+
+int close_on_exec (int fd)
+{
+	int flags;
+
+	if ((flags = fcntl (fd, F_GETFD, 0)) == -1
+	    || fcntl (fd, F_SETFD, flags | FD_CLOEXEC) == -1)
+	{
+		logger (LOG_ERR, "fcntl: %s", strerror (errno));
+		return (-1);
+	}
+	return (0);
 }
 
 /* Handy function to get the time.

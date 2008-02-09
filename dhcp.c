@@ -398,8 +398,8 @@ static unsigned int decode_search (const unsigned char *p, int len, char *out)
 static route_t *decode_CSR(const unsigned char *p, int len)
 {
 	const unsigned char *q = p;
-	int cidr;
-	int ocets;
+	unsigned int cidr;
+	unsigned int ocets;
 	route_t *first;
 	route_t *route;
 

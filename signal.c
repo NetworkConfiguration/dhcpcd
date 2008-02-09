@@ -29,11 +29,11 @@
 #include <sys/socket.h>
 #include <sys/select.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <signal.h>
 #include <string.h>
 #include <unistd.h>
 
+#include "common.h"
 #include "logger.h"
 #include "signal.h"
 
@@ -127,8 +127,6 @@ int signal_read (fd_set *rset)
  * and installs the signal handler */
 int signal_init (void)
 {
-	unsigned int i;
-	int flags;
 	struct sigaction sa;
 
 	if (pipe (signal_pipe) == -1) {
@@ -137,10 +135,8 @@ int signal_init (void)
 	}
 
 	/* Stop any scripts from inheriting us */
-	for (i = 0; i < 2; i++)
-		if ((flags = fcntl (signal_pipe[i], F_GETFD, 0)) == -1 ||
-		    fcntl (signal_pipe[i], F_SETFD, flags | FD_CLOEXEC) == -1)
-			logger (LOG_ERR ,"fcntl: %s", strerror (errno));
+	close_on_exec (signal_pipe[0]);
+	close_on_exec (signal_pipe[1]);
 
 	/* Ignore child signals and don't make zombies.
 	 * Because we do this, we don't need to be in signal_setup */

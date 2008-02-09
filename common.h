@@ -52,7 +52,8 @@ size_t strlcpy (char *dst, const char *src, size_t size);
 void srandomdev (void);
 #endif
 
-void close_fds (void);
+int close_fds (void);
+int close_on_exec (int fd);
 char *get_line (FILE *fp);
 int get_time (struct timeval *tp);
 time_t uptime (void);

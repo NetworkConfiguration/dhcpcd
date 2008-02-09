@@ -40,7 +40,6 @@
 #include <netinet/udp.h>
 #include <arpa/inet.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -280,13 +279,7 @@ int open_socket (interface_t *iface, int protocol)
 		return -1;
 	}
 
-	if ((flags = fcntl (fd, F_GETFD, 0)) == -1
-	    || fcntl (fd, F_SETFD, flags | FD_CLOEXEC) == -1)
-	{
-		logger (LOG_ERR, "fcntl: %s", strerror (errno));
-		close (fd);
-		return -1;
-	}
+	close_on_exec (fd);
 
 	memset (&ifr, 0, sizeof (ifr));
 	strlcpy (ifr.ifr_name, iface->name, sizeof (ifr.ifr_name));
@@ -457,7 +450,6 @@ ssize_t get_packet (const interface_t *iface, unsigned char *data,
 int open_socket (interface_t *iface, int protocol)
 {
 	int fd;
-	int flags;
 	union sockunion {
 		struct sockaddr sa;
 		struct sockaddr_ll sll;
@@ -470,13 +462,7 @@ int open_socket (interface_t *iface, int protocol)
 		return (-1);
 	}
 
-	if ((flags = fcntl (fd, F_GETFD, 0)) == -1
-	    || fcntl (fd, F_SETFD, flags | FD_CLOEXEC) == -1)
-	{
-		logger (LOG_ERR, "fcntl: %s", strerror (errno));
-		close (fd);
-		return (-1);
-	}
+	close_on_exec (fd);
 
 	memset (&su, 0, sizeof (su));
 	su.sll.sll_family = PF_PACKET;
