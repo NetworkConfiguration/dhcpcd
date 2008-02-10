@@ -27,8 +27,8 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <sys/select.h>
 #include <errno.h>
+#include <poll.h>
 #include <signal.h>
 #include <string.h>
 #include <unistd.h>
@@ -67,20 +67,15 @@ static void signal_handler (int sig)
 	errno = serrno;
 }
 
-/* Add the signal pipe to an fd set */
-int signal_fd_set (fd_set *rset, int fd)
+int signal_fd (void)
 {
-	FD_ZERO (rset);
-	FD_SET (signal_pipe[0], rset);
-	if (fd >= 0)
-		FD_SET (fd, rset);
-	return (signal_pipe[0] > fd ? signal_pipe[0] : fd);
+	return (signal_pipe[0]);
 }
 
 /* Check if we have a signal or not */
-int signal_exists (const fd_set *rset)
+int signal_exists (const struct pollfd *fd)
 {
-	if (signals[0] || (rset && FD_ISSET (signal_pipe[0], rset)))
+	if (signals[0] || (fd && fd->revents & POLLIN))
 		return (0);
 	return (-1);
 }
@@ -88,7 +83,7 @@ int signal_exists (const fd_set *rset)
 /* Read a signal from the signal pipe. Returns 0 if there is
  * no signal, -1 on error (and sets errno appropriately), and
  * your signal on success */
-int signal_read (fd_set *rset)
+int signal_read (struct pollfd *fd)
 {
 	int sig = -1;
 
@@ -104,7 +99,7 @@ int signal_read (fd_set *rset)
 		}
 	}
 
-	if (rset && FD_ISSET (signal_pipe[0], rset)) {
+	if (fd && fd->revents & POLLIN) {
 		char buf[16];
 		size_t bytes;
 
@@ -117,7 +112,7 @@ int signal_read (fd_set *rset)
 		/* We need to clear us from rset if nothing left in the buffer
 		 * in case we are called many times */
 		if (bytes == sizeof (sig))
-			FD_CLR (signal_pipe[0], rset);
+			fd->revents = 0;
 	}
 
 	return (sig);

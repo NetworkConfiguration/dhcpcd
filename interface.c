@@ -684,7 +684,7 @@ static int do_route (const char *ifname,
  * send_netlink handles the actual transmission so we can work out
  * if there was an error or not. */
 #define BUFFERLEN 256
-static int send_netlink(struct nlmsghdr *hdr)
+int send_netlink (struct nlmsghdr *hdr, netlink_callback callback, void *arg)
 {
 	int s;
 	pid_t mypid = getpid ();
@@ -795,9 +795,15 @@ static int send_netlink(struct nlmsghdr *hdr)
 			}
 
 			if (err->error == 0) {
+				int retval = 0;
+
 				close (s);
+				if (callback) {
+					if ((retval = callback (hdr, arg)) == -1)
+						logger (LOG_ERR, "netlink: callback failed");
+				}
 				free (buffer);
-				return 0;
+				return (retval);
 			}
 
 			errno = -err->error;
@@ -910,7 +916,7 @@ static int do_address(const char *ifname,
 		add_attr_l (&nlm->hdr, sizeof (*nlm), IFA_BROADCAST,
 			    &broadcast.s_addr, sizeof (broadcast.s_addr));
 
-	retval = send_netlink (&nlm->hdr);
+	retval = send_netlink (&nlm->hdr, NULL, NULL);
 	free (nlm);
 	return retval;
 }
@@ -971,7 +977,7 @@ static int do_route (const char *ifname,
 	add_attr_32 (&nlm->hdr, sizeof (*nlm), RTA_OIF, ifindex);
 	add_attr_32 (&nlm->hdr, sizeof (*nlm), RTA_PRIORITY, metric);
 
-	retval = send_netlink (&nlm->hdr);
+	retval = send_netlink (&nlm->hdr, NULL, NULL);
 	free (nlm);
 	return retval;
 }

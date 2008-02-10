@@ -31,13 +31,13 @@
 
 #include <sys/time.h>
 #include <sys/types.h>
-#include <sys/select.h>
 #include <arpa/inet.h>
 #ifdef __linux__
 # include <netinet/ether.h>
 #endif
 #include <ctype.h>
 #include <errno.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -78,9 +78,10 @@
 # endif
 #endif
 
-/* We need this for our maximum timeout as FreeBSD's select cannot handle
- * any higher than this. Is there a better way of working this out? */
-#define SELECT_MAX              100000000
+/* Some platforms don't define INFTIM */
+#ifndef INFTIM
+# define INFTIM                 -1
+#endif
 
 /* This is out mini timeout.
  * Basically we resend the last request every TIMEOUT_MINI seconds. */
@@ -103,6 +104,10 @@
 
 #define SOCKET_CLOSED           0
 #define SOCKET_OPEN             1
+
+/* Indexes for pollfds */
+#define POLLFD_SIGNAL           0
+#define POLLFD_IFACE            1 
 
 typedef struct _state {
 	int *pidfd;
@@ -460,47 +465,41 @@ static void drop_config (state_t *state, const options_t *options)
 	memset (state->dhcp, 0, sizeof (*state->dhcp));
 }
 
-static int wait_for_packet (fd_set *rset, state_t *state,
+static int wait_for_packet (struct pollfd *fds, state_t *state,
 			    const options_t *options)
 {
 	dhcp_t *dhcp = state->dhcp;
 	interface_t *iface = state->interface;
+	int timeout = 0;
 	int retval = 0;
-	struct timeval tv;
-	int maxfd;
 
 	if (! (state->timeout > 0 ||
 	       (options->timeout == 0 &&
 		(state->state != STATE_INIT || state->xid)))) {
-		/* We need to zero our rset, otherwise we will block trying
-		 * to read a signal. */
-		FD_ZERO (rset);
+		/* We need to zero our signal fd, otherwise we will block
+		 * trying to read a signal. */
+		fds[POLLFD_SIGNAL].revents = 0;
 		return (0);
 	}
+
+	fds[POLLFD_IFACE].fd = iface->fd;
 
 	if ((options->timeout == 0 && state->xid) ||
 	    (dhcp->leasetime == (unsigned) -1 &&
 	     state->state == STATE_BOUND))
 	{
-		int retry = 0;
-
-		logger (LOG_DEBUG, "waiting on select for infinity");
+		logger (LOG_DEBUG, "waiting for infinity");
 		while (retval == 0)	{
-			maxfd = signal_fd_set (rset, iface->fd);
 			if (iface->fd == -1)
-				retval = select (maxfd + 1, rset,
-						 NULL, NULL, NULL);
+				retval = poll (fds, 1, INFTIM);
 			else {
 				/* Slow down our requests */
-				if (retry < TIMEOUT_MINI_INF)
-					retry += TIMEOUT_MINI;
-				else if (retry > TIMEOUT_MINI_INF)
-					retry = TIMEOUT_MINI_INF;
+				if (timeout < TIMEOUT_MINI_INF)
+					timeout += TIMEOUT_MINI;
+				else if (timeout > TIMEOUT_MINI_INF)
+					timeout = TIMEOUT_MINI_INF;
 
-				tv.tv_sec = retry;
-				tv.tv_usec = 0;
-				retval = select (maxfd + 1, rset,
-						 NULL, NULL, &tv);
+				retval = poll (fds, 2, timeout * 1000);
 				if (retval == 0)
 					_send_message (state, state->last_type,
 						       options);
@@ -516,22 +515,20 @@ static int wait_for_packet (fd_set *rset, state_t *state,
 	if (iface->fd > -1 && uptime () - state->last_sent >= TIMEOUT_MINI)
 		_send_message (state, state->last_type, options);
 
-	logger (LOG_DEBUG, "waiting on select for %ld seconds",
+	logger (LOG_DEBUG, "waiting for %ld seconds",
 		(unsigned long) state->timeout);
 	/* If we're waiting for a reply, then we re-send the last
 	 * DHCP request periodically in-case of a bad line */
 	retval = 0;
 	while (state->timeout > 0 && retval == 0) {
 		if (iface->fd == -1)
-			tv.tv_sec = SELECT_MAX;
+			timeout = INFTIM;
 		else
-			tv.tv_sec = TIMEOUT_MINI;
-		if (state->timeout < tv.tv_sec)
-			tv.tv_sec = (time_t) state->timeout;
-		tv.tv_usec = 0;
+			timeout = TIMEOUT_MINI;
+		if (state->timeout < timeout)
+			timeout = (int) state->timeout;
 		state->start = uptime ();
-		maxfd = signal_fd_set (rset, iface->fd);
-		retval = select (maxfd + 1, rset, NULL, NULL, &tv);
+		retval = poll (fds, iface->fd == -1 ? 1 : 2, timeout * 1000);
 		state->timeout -= uptime () - state->start;
 		if (retval == 0 && iface->fd != -1 && state->timeout > 0)
 			_send_message (state, state->last_type, options);
@@ -765,7 +762,7 @@ static int handle_timeout (state_t *state, const options_t *options)
 
 static int handle_dhcp (state_t *state, int type, const options_t *options)
 {
-	struct timeval tv;
+	struct timespec ts;
 	interface_t *iface = state->interface;
 	dhcp_t *dhcp = state->dhcp;
 
@@ -782,12 +779,12 @@ static int handle_dhcp (state_t *state, int type, const options_t *options)
 		if (state->nakoff > 0) {
 			logger (LOG_DEBUG, "sleeping for %ld seconds",
 				(long) state->nakoff);
-			tv.tv_sec = state->nakoff;
-			tv.tv_usec = 0;
+			ts.tv_sec = state->nakoff;
+			ts.tv_nsec = 0;
 			state->nakoff *= 2;
 			if (state->nakoff > NAKOFF_MAX)
 				state->nakoff = NAKOFF_MAX;
-			select (0, NULL, NULL, NULL, &tv);
+			nanosleep (&ts, NULL);
 		}
 
 		return (0);
@@ -864,9 +861,9 @@ static int handle_dhcp (state_t *state, int type, const options_t *options)
 			/* RFC 2131 says that we should wait for 10 seconds
 			 * before doing anything else */
 			logger (LOG_INFO, "sleeping for 10 seconds");
-			tv.tv_sec = 10;
-			tv.tv_usec = 0;
-			select (0, NULL, NULL, NULL, &tv);
+			ts.tv_sec = 10;
+			ts.tv_nsec = 0;
+			nanosleep (&ts, NULL);
 			return (0);
 		} else if (errno == EINTR)
 			return (0);	
@@ -892,7 +889,7 @@ static int handle_dhcp (state_t *state, int type, const options_t *options)
 		state->state = STATE_INIT;
 	} else if (dhcp->leasetime == (unsigned) -1) {
 		dhcp->renewaltime = dhcp->rebindtime = dhcp->leasetime;
-		state->timeout = 1; /* So we select on infinity */
+		state->timeout = 1; /* So we wait for infinity */
 		logger (LOG_INFO, "leased %s for infinity",
 			inet_ntoa (dhcp->address));
 		state->state = STATE_BOUND;
@@ -1039,7 +1036,10 @@ int dhcp_run (const options_t *options, int *pidfd)
 {
 	interface_t *iface;
 	state_t *state = NULL;
-	fd_set rset;
+	struct pollfd fds[] = {
+		{ -1, POLLIN, 0 },
+		{ -1, POLLIN, 0 }
+	};
 	int retval = -1;
 	int sig;
 
@@ -1063,11 +1063,13 @@ int dhcp_run (const options_t *options, int *pidfd)
 	if (signal_setup () == -1)
 		goto eexit;
 
+	fds[POLLFD_SIGNAL].fd = signal_fd ();
+
 	for (;;) {
-		retval = wait_for_packet (&rset, state, options);
+		retval = wait_for_packet (fds, state, options);
 
 		/* We should always handle our signals first */
-		if ((sig = (signal_read (&rset))) != -1) {
+		if ((sig = (signal_read (&fds[POLLFD_SIGNAL]))) != -1) {
 			if (handle_signal (sig, state, options))
 				retval = 0;
 			else
@@ -1076,14 +1078,13 @@ int dhcp_run (const options_t *options, int *pidfd)
 			retval = handle_timeout (state, options);
 		else if (retval > 0 &&
 			 state->socket != SOCKET_CLOSED &&
-			 FD_ISSET (iface->fd, &rset))
+			 fds[POLLFD_IFACE].revents & POLLIN)
 			retval = handle_packet (state, options);
 		else if (retval == -1 && errno == EINTR) {
 			/* The interupt will be handled above */
 			retval = 0;
 		} else {
-			logger (LOG_ERR, "error on select: %s",
-				strerror (errno));
+			logger (LOG_ERR, "poll: %s", strerror (errno));
 			retval = -1;
 		}
 

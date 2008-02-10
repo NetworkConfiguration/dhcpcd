@@ -150,4 +150,8 @@ int del_route (const char *ifname, struct in_addr destination,
 int inet_ntocidr (struct in_addr address);
 int inet_cidrtoaddr (int cidr, struct in_addr *addr);
 
+#ifdef __linux__
+typedef int (*netlink_callback) (struct nlmsghdr *hdr, void *arg);
+int send_netlink (struct nlmsghdr *hdr, netlink_callback callback, void *arg);
+#endif
 #endif

@@ -28,7 +28,6 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
-#include <sys/select.h>
 #include <sys/socket.h>
 #include <netinet/in_systm.h>
 #ifdef __linux__
@@ -39,6 +38,7 @@
 #include <net/if_arp.h>
 #include <arpa/inet.h>
 #include <errno.h>
+#include <poll.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -53,9 +53,9 @@
 
 /* These are really for IPV4LL */
 #define NPROBES                 3
-#define PROBE_INTERVAL          200000
+#define PROBE_INTERVAL          200
 #define NCLAIMS                 2
-#define CLAIM_INTERVAL          200000
+#define CLAIM_INTERVAL          200
 
 /* Linux does not seem to define these handy macros */
 #ifndef ar_sha
@@ -116,6 +116,10 @@ int arp_claim (interface_t *iface, struct in_addr address)
 	int nprobes = 0;
 	int nclaims = 0;
 	struct in_addr null_address;
+	struct pollfd fds[] = {
+		{ -1, POLLIN, 0 },
+		{ -1, POLLIN, 0 }
+	};
 
 	if (! iface)
 		return (-1);
@@ -134,29 +138,25 @@ int arp_claim (interface_t *iface, struct in_addr address)
 	if (! open_socket (iface, ETHERTYPE_ARP))
 		return (-1);
 
+	fds[0].fd = signal_fd ();
+	fds[1].fd = iface->fd;
+
 	memset (&null_address, 0, sizeof (null_address));
 
 	buffer = xmalloc (iface->buffer_length);
 	reply = xmalloc (iface->buffer_length);
 
 	for (;;) {
-		struct timeval tv;
 		size_t bufpos = 0;
 		size_t buflen = iface->buffer_length;
-		fd_set rset;
 		int bytes;
 		int s = 0;
-		int maxfd;
 		struct timeval stopat;
 		struct timeval now;
 
-		/* Only select if we have a timeout */
+		/* Only poll if we have a timeout */
 		if (timeout > 0) {
-			tv.tv_sec = 0; 
-			tv.tv_usec = timeout;
-
-			maxfd = signal_fd_set (&rset, iface->fd);
-			s = select (maxfd + 1, &rset, NULL, NULL, &tv);
+			s = poll (fds, 2, timeout);
 			if (s == -1) {
 				if (errno == EINTR) {
 					if (signal_exists (NULL) == -1) {
@@ -166,7 +166,7 @@ int arp_claim (interface_t *iface, struct in_addr address)
 						break;
 				}
 
-				logger (LOG_ERR, "select: `%s'",
+				logger (LOG_ERR, "poll: `%s'",
 					strerror (errno));
 				break;
 			}
@@ -220,7 +220,7 @@ int arp_claim (interface_t *iface, struct in_addr address)
 			continue;
 		}
 
-		if (! FD_ISSET (iface->fd, &rset))
+		if (! fds[1].revents & POLLIN)
 			continue;
 
 		memset (buffer, 0, buflen);

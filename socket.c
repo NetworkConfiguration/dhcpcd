@@ -31,7 +31,6 @@
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/param.h>
-#include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
 #include <net/if.h>
@@ -43,6 +42,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #ifdef BSD
@@ -375,12 +375,12 @@ ssize_t get_packet (const interface_t *iface, unsigned char *data,
 		*buffer_len = read (iface->fd, bpf.buffer, iface->buffer_length);
 		*buffer_pos = 0;
 		if (*buffer_len < 1) {
-			struct timeval tv;
+			struct timespec tv;
 			logger (LOG_ERR, "read: %s", strerror (errno));
-			tv.tv_sec = 3;
-			tv.tv_usec = 0;
-			select (0, NULL, NULL, NULL, &tv);
-			return -1;
+			ts.tv_sec = 3;
+			ts.tv_nsec = 0;
+			nanosleep (&ts, NULL);
+			return (-1);
 		}
 	} else
 		bpf.buffer += *buffer_pos;
@@ -566,11 +566,11 @@ ssize_t get_packet (const interface_t *iface, unsigned char *data,
 	bytes = read (iface->fd, buffer, iface->buffer_length);
 
 	if (bytes == -1) {
-		struct timeval tv;
+		struct timespec ts;
 		logger (LOG_ERR, "read: %s", strerror (errno));
-		tv.tv_sec = 3;
-		tv.tv_usec = 0;
-		select (0, NULL, NULL, NULL, &tv);
+		ts.tv_sec = 3;
+		ts.tv_nsec = 0;
+		nanosleep (&ts, NULL);
 		return (-1);
 	}
 

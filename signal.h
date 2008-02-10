@@ -28,11 +28,13 @@
 #ifndef SIGNAL_H
 #define SIGNAL_H
 
+#include <poll.h>
+
 int signal_init (void);
 int signal_setup (void);
 int signal_reset (void);
-int signal_fd_set (fd_set *rset, int fd);
-int signal_exists (const fd_set *rset);
-int signal_read (fd_set *rset);
+int signal_fd (void);
+int signal_exists (const struct pollfd *fd);
+int signal_read (struct pollfd *fd);
 
 #endif
