@@ -509,10 +509,9 @@ int main(int argc, char **argv)
 		goto abort;
 	}
 
-	if (geteuid ()) {
-		logger (LOG_ERR, "you need to be root to run " PACKAGE);
-		goto abort;
-	}
+	if (geteuid ())
+		logger (LOG_WARNING, PACKAGE " will not work correctly unless"
+			" run as root");
 
 	prefix = xmalloc (sizeof (char) * (IF_NAMESIZE + 3));
 	snprintf (prefix, IF_NAMESIZE, "%s: ", options->interface);
