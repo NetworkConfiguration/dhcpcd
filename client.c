@@ -522,13 +522,13 @@ static int wait_for_packet (struct pollfd *fds, state_t *state,
 	retval = 0;
 	while (state->timeout > 0 && retval == 0) {
 		if (iface->fd == -1)
-			timeout = INFTIM;
+			timeout = (int) state->timeout;
 		else {
 			timeout = TIMEOUT_MINI;
 			if (state->timeout < timeout)
 				timeout = (int) state->timeout;
-			timeout *= 1000;
 		}
+		timeout *= 1000;
 		state->start = uptime ();
 		retval = poll (fds, iface->fd == -1 ? 1 : 2, timeout);
 		state->timeout -= uptime () - state->start;
