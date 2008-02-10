@@ -39,6 +39,7 @@
 #include <netinet/udp.h>
 #include <arpa/inet.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -375,7 +376,7 @@ ssize_t get_packet (const interface_t *iface, unsigned char *data,
 		*buffer_len = read (iface->fd, bpf.buffer, iface->buffer_length);
 		*buffer_pos = 0;
 		if (*buffer_len < 1) {
-			struct timespec tv;
+			struct timespec ts;
 			logger (LOG_ERR, "read: %s", strerror (errno));
 			ts.tv_sec = 3;
 			ts.tv_nsec = 0;
