@@ -88,7 +88,6 @@ int signal_read (struct pollfd *fd)
 	int sig = -1;
 
 	/* Pop a signal off the our stack */
-
 	if (signals[0]) {
 		unsigned int i = 0;
 		sig = signals[0];

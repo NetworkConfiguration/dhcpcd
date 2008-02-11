@@ -500,6 +500,10 @@ static int wait_for_packet (struct pollfd *fds, state_t *state,
 					timeout = TIMEOUT_MINI_INF;
 
 				retval = poll (fds, 2, timeout * 1000);
+				if (retval == -1 && errno == EINTR) {
+					retval = 0;
+					continue;
+				}
 				if (retval == 0)
 					_send_message (state, state->last_type,
 						       options);
@@ -530,8 +534,12 @@ static int wait_for_packet (struct pollfd *fds, state_t *state,
 		}
 		timeout *= 1000;
 		state->start = uptime ();
-		retval = poll (fds, iface->fd == -1 ? 1 : 2, timeout);
+		retval = poll (fds, 2, timeout);
 		state->timeout -= uptime () - state->start;
+		if (retval == -1 && errno == EINTR) {
+			retval = 0;
+			continue;
+		}
 		if (retval == 0 && iface->fd != -1 && state->timeout > 0)
 			_send_message (state, state->last_type, options);
 	}
@@ -1039,7 +1047,7 @@ int dhcp_run (const options_t *options, int *pidfd)
 	interface_t *iface;
 	state_t *state = NULL;
 	struct pollfd fds[] = {
-		{ -1, POLLIN, 0 },
+		{ -1, POLLIN | POLLERR | POLLPRI | POLLOUT | POLLERR | POLLHUP | POLLNVAL, 0 },
 		{ -1, POLLIN, 0 }
 	};
 	int retval = -1;
