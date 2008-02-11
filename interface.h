@@ -38,6 +38,11 @@
 #include <stdbool.h>
 
 #include "config.h"
+
+#ifdef __linux__
+#  include <linux/netlink.h>
+#endif
+
 #ifdef ENABLE_DUID
 #ifndef DUID_LEN
 #  define DUID_LEN				128 + 2
