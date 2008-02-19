@@ -32,9 +32,9 @@
 #include <net/if.h>
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
-#define __FAVOUR_BSD /* Nasty hack so we can use BSD semantics for UDP */
+#define __FAVOR_BSD /* Nasty hack so we can use BSD semantics for UDP */
 #include <netinet/udp.h>
-#undef __FAVOUR_BSD
+#undef __FAVOR_BSD
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
