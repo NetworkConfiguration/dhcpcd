@@ -92,7 +92,7 @@ static int exec_cmd (const char *cmd, const char *args, ...)
 	va_list va;
 	char **argv;
 	int n = 1;
-	int ret;
+	int ret = 0;
 	pid_t pid;
 	sigset_t full;
 	sigset_t old;
