@@ -25,10 +25,6 @@
  * SUCH DAMAGE.
  */
 
-#ifdef __linux__
-# define _BSD_SOURCE
-#endif
-
 #include <sys/time.h>
 #include <sys/types.h>
 #include <arpa/inet.h>

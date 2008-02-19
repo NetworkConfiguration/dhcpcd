@@ -70,3 +70,8 @@ _RC_SH= if test -n "${HAVE_INIT}"; then \
 		 fi
 _RC!= ${_RC_SH}
 RC= ${_RC}$(shell ${_RC_SH})
+
+# glibc requires _BSD_SOURCE and _XOPEN_SOURCE
+_DEF_SH=	case `uname -s` in Linux) echo "-D_BSD_SOURCE -D_XOPEN_SOURCE=600";; *) echo;; esac
+_DEF!=		${_DEF_SH}
+CFLAGS+=	${_DEF}$(shell ${_DEF_SH})

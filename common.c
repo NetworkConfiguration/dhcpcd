@@ -25,10 +25,6 @@
  * SUCH DAMAGE.
  */
 
-#ifdef __linux__
-# define _XOPEN_SOURCE 500 /* needed for pwrite */
-#endif
-
 #include <sys/time.h>
 #include <errno.h>
 #include <fcntl.h>

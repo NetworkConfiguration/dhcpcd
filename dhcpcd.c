@@ -27,12 +27,6 @@
 
 const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 
-/* We need to define this to get kill on GNU systems */
-#ifdef __linux__
-#define _BSD_SOURCE
-#define _POSIX_SOURCE
-#endif
-
 #include <sys/file.h>
 #include <sys/types.h>
 #include <sys/stat.h>
