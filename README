@@ -30,6 +30,13 @@ SYSV     (SYSV style - /etc/init.d/ntpd restart)
 You can change the default dir where dhcpcd stores it's .info files with
 INFODIR=/var/db
 
+We now default to using -std=c99. For 64-bit linux, this always works, but
+for 32-bit linux it requires either gnu99 or a patch to asm/types.h.
+Most distros patch linux headers so this should work fine.
+linux-2.6.24 finally ships with a working 32-bit header.
+If your linux headers are older, or your distro hasn't patched them you can
+set CSTD=gnu99 to work around this.
+
 
 ChangeLog
 ---------
