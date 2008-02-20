@@ -84,6 +84,10 @@
 # define IN_LINKLOCAL(addr) ((addr & IN_CLASSB_NET) == LINKLOCAL_ADDR)
 #endif
 
+#ifndef STAILQ_ENTRY
+# error "your sys/queue.h is too old and lacks STAILQ"
+#endif
+
 #define NSTAILQ_FOREACH(var, head, field) \
 		if (head) STAILQ_FOREACH (var, head, field)
 
