@@ -30,6 +30,7 @@
 
 #include <sys/types.h>
 #include <sys/param.h>
+#include <sys/queue.h>
 #include <sys/socket.h>
 #include <net/if.h>
 #include <netinet/in.h>
@@ -83,19 +84,24 @@
 # define IN_LINKLOCAL(addr) ((addr & IN_CLASSB_NET) == LINKLOCAL_ADDR)
 #endif
 
+#define NSTAILQ_FOREACH(var, head, field) \
+		if (head) STAILQ_FOREACH (var, head, field)
+
 typedef struct route_t
 {
 	struct in_addr destination; 
 	struct in_addr netmask;
 	struct in_addr gateway;
-	struct route_t *next;
+	STAILQ_ENTRY (route_t) entries;
 } route_t;
+STAILQ_HEAD (route_head, route_t);
 
 typedef struct address_t
 {
 	struct in_addr address;
-	struct address_t *next;
+	STAILQ_ENTRY (address_t) entries;
 } address_t;
+STAILQ_HEAD (address_head, address_t);
 
 typedef struct interface_t
 {
@@ -118,7 +124,7 @@ typedef struct interface_t
 	unsigned short previous_mtu;
 	struct in_addr previous_address;
 	struct in_addr previous_netmask;
-	route_t *previous_routes;
+	struct route_head *previous_routes;
 
 	time_t start_uptime;
 
@@ -126,8 +132,8 @@ typedef struct interface_t
 	size_t clientid_len;
 } interface_t;
 
-void free_address (address_t *addresses);
-void free_route (route_t *routes);
+void free_address (struct address_head *addresses);
+void free_route (struct route_head *routes);
 uint32_t get_netmask (uint32_t addr);
 char *hwaddr_ntoa (const unsigned char *hwaddr, size_t hwlen);
 size_t hwaddr_aton (unsigned char *hwaddr, const char *addr);

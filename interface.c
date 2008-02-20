@@ -61,25 +61,33 @@
 #include "interface.h"
 #include "logger.h"
 
-void free_address (address_t *addresses)
+void free_address (struct address_head *addresses)
 {
-	address_t *p = addresses;
-	address_t *n = NULL;
+	address_t *p;
+	address_t *n;
 
+	if (! addresses)
+		return;
+
+	p = STAILQ_FIRST (addresses);
 	while (p) {
-		n = p->next;
+		n = STAILQ_NEXT (p, entries); 
 		free (p);
 		p = n;
 	}
 }
 
-void free_route (route_t *routes)
+void free_route (struct route_head *routes)
 {
-	route_t *p = routes;
-	route_t *n = NULL;
+	route_t *p;
+	route_t *n;
 
+	if (! routes)
+		return;
+
+	p = STAILQ_FIRST (routes);
 	while (p) {
-		n = p->next;
+		n = STAILQ_NEXT (p, entries);
 		free (p);
 		p = n;
 	}

@@ -78,13 +78,13 @@ static char *cleanmetas (const char *cstr)
 }
 
 
-static void print_addresses (FILE *f, const address_t *addresses)
+static void print_addresses (FILE *f, const struct address_head *addresses)
 {
 	const address_t *addr;
 
-	for (addr = addresses; addr; addr = addr->next) {
+	STAILQ_FOREACH (addr, addresses, entries) {
 		fprintf (f, "%s", inet_ntoa (addr->address));
-		if (addr->next)
+		if (STAILQ_NEXT (addr, entries))
 			fprintf (f, " ");
 	}
 }
@@ -136,7 +136,7 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 	if (dhcp->routes) {
 		bool doneone = false;
 		fprintf (f, "ROUTES='");
-		for (route = dhcp->routes; route; route = route->next) {
+		STAILQ_FOREACH (route, dhcp->routes, entries) {
 			if (route->destination.s_addr != 0) {
 				if (doneone)
 					fprintf (f, " ");
@@ -150,7 +150,7 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 
 		doneone = false;
 		fprintf (f, "GATEWAYS='");
-		for (route = dhcp->routes; route; route = route->next) {
+		STAILQ_FOREACH (route, dhcp->routes, entries) {
 			if (route->destination.s_addr == 0) {
 				if (doneone)
 					fprintf (f, " ");
@@ -222,9 +222,9 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 		address_t *addr;
 
 		fprintf (f, "DNS='");
-		for (addr = dhcp->dnsservers; addr; addr = addr->next) {
+		STAILQ_FOREACH (addr, dhcp->dnsservers, entries) {
 			fprintf (f, "%s", inet_ntoa (addr->address));
-			if (addr->next)
+			if (STAILQ_NEXT (addr, entries))
 				fprintf (f, ",");
 		}
 		fprintf (f, "'\n");
@@ -233,7 +233,7 @@ bool write_info(const interface_t *iface, const dhcp_t *dhcp,
 	if (dhcp->routes) {
 		bool doneone = false;
 		fprintf (f, "GATEWAY='");
-		for (route = dhcp->routes; route; route = route->next) {
+		STAILQ_FOREACH (route, dhcp->routes, entries) {
 			if (route->destination.s_addr == 0) {
 				if (doneone)
 					fprintf (f, ",");
@@ -283,31 +283,30 @@ static bool parse_ushort (unsigned short *s,
 	return (true);
 }
 
-static bool parse_addresses (address_t **address, char *value, const char *var)
+static struct address_head *parse_addresses (char *value, const char *var)
 {
 	char *token;
 	char *p = value;
-	bool retval = true;
+	struct address_head *head = NULL;
 
 	while ((token = strsep (&p, " "))) {
 		address_t *a = xzalloc (sizeof (*a));
 
 		if (inet_aton (token, &a->address) == 0) {
 			logger (LOG_ERR, "%s: invalid address `%s'", var, token);
+			free_address (head);
 			free (a);
-			retval = false;
-		} else {
-			if (*address) {
-				address_t *aa = *address;
-				while (aa->next)
-					aa = aa->next;
-				aa->next = a;
-			} else
-				*address = a;
+			return (NULL);
 		}
+
+		if (! head) {
+			head = xmalloc (sizeof (*head));
+			STAILQ_INIT (head);
+		}
+		STAILQ_INSERT_TAIL (head, a, entries);
 	}
 
-	return (retval);
+	return (head);
 }
 
 bool read_info (const interface_t *iface, dhcp_t *dhcp)
@@ -413,26 +412,22 @@ bool read_info (const interface_t *iface, dhcp_t *dhcp)
 				}
 
 				/* OK, now add our route */
-				if (dhcp->routes) {
-					route_t *r = dhcp->routes;
-					while (r->next)
-						r = r->next;
-					r->next = route;
-				} else
-					dhcp->routes = route;
+				if (! dhcp->routes) {
+					dhcp->routes = xmalloc (sizeof (*dhcp->routes));
+					STAILQ_INIT (dhcp->routes);
+				}
+				STAILQ_INSERT_TAIL (dhcp->routes, route, entries);
 			}
 		} else if (strcmp (var, "GATEWAYS") == 0) {
 			p = value;
 			while ((value = strsep (&p, " "))) {
 				route_t *route = xzalloc (sizeof (*route));
 				if (parse_address (&route->gateway, value, "GATEWAYS")) {
-					if (dhcp->routes) {
-						route_t *r = dhcp->routes;
-						while (r->next)
-							r = r->next;
-						r->next = route;
-					} else
-						dhcp->routes = route;
+					if (! dhcp->routes) {
+						dhcp->routes = xmalloc (sizeof (*dhcp->routes));
+						STAILQ_INIT (dhcp->routes);
+					}
+					STAILQ_INSERT_TAIL (dhcp->routes, route, entries);
 				} else
 					free (route);
 			}
@@ -443,13 +438,13 @@ bool read_info (const interface_t *iface, dhcp_t *dhcp)
 		else if (strcmp (var, "DNSSEARCH") == 0)
 			dhcp->dnssearch = xstrdup (value);
 		else if (strcmp (var, "DNSSERVERS") == 0)
-			parse_addresses (&dhcp->dnsservers, value, "DNSSERVERS");
+			dhcp->dnsservers = parse_addresses (value, "DNSSERVERS");
 		else if (strcmp (var, "NTPSERVERS") == 0)
-			parse_addresses (&dhcp->ntpservers, value, "NTPSERVERS");
+			dhcp->ntpservers = parse_addresses (value, "NTPSERVERS");
 		else if (strcmp (var, "NISDOMAIN") == 0)
 			dhcp->nisdomain = xstrdup (value);
 		else if (strcmp (var, "NISSERVERS") == 0)
-			parse_addresses (&dhcp->nisservers, value, "NISSERVERS");
+			dhcp->nisservers = parse_addresses (value, "NISSERVERS");
 		else if (strcmp (var, "ROOTPATH") == 0)
 			dhcp->rootpath = xstrdup (value);
 		else if (strcmp (var, "DHCPSID") == 0)

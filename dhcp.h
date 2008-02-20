@@ -144,18 +144,18 @@ typedef struct dhcp_t
 	uint32_t renewaltime;
 	uint32_t rebindtime;
 
-	route_t *routes;
+	struct route_head *routes;
 
 	char *hostname;
 	fqdn_t *fqdn;
 
-	address_t *dnsservers;
+	struct address_head *dnsservers;
 	char *dnsdomain;
 	char *dnssearch;
 
-	address_t *ntpservers;
+	struct address_head *ntpservers;
 
-	address_t *nisservers;
+	struct address_head *nisservers;
 	char *nisdomain;
 
 	char *sipservers;

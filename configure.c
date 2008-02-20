@@ -212,7 +212,7 @@ static int make_resolv (const char *ifname, const dhcp_t *dhcp)
 		fprintf (f, "search %s\n", dhcp->dnsdomain);
 	}
 
-	for (address = dhcp->dnsservers; address; address = address->next)
+	STAILQ_FOREACH (address, dhcp->dnsservers, entries)
 		fprintf (f, "nameserver %s\n", inet_ntoa (address->address));
 
 #ifdef ENABLE_RESOLVCONF
@@ -237,22 +237,26 @@ static void restore_resolv (const char *ifname)
 #endif
 }
 
-static bool in_addresses (const address_t *addresses, struct in_addr addr)
+static bool in_addresses (const struct address_head *addresses,
+			  struct in_addr address)
 {
-	const address_t *address;
+	const address_t *addr;
 
-	for (address = addresses; address; address = address->next)
-		if (address->address.s_addr == addr.s_addr)
+	STAILQ_FOREACH (addr, addresses, entries)
+		if (addr->address.s_addr == address.s_addr)
 			return (true);
 
 	return (false);
 }
 
-static bool in_routes (const route_t *routes, route_t *route)
+static bool in_routes (const struct route_head *routes, route_t *route)
 {
 	const route_t *r;
+
+	if (! routes)
+		return (false);
 	
-	for (r = routes; r; r=r->next)
+	STAILQ_FOREACH (r, routes, entries)
 		if (r->destination.s_addr == route->destination.s_addr &&
 		    r->netmask.s_addr == route->netmask.s_addr &&
 		    r->gateway.s_addr == route->gateway.s_addr)
@@ -272,7 +276,7 @@ static int _make_ntp (const char *file, const char *ifname, const dhcp_t *dhcp)
 	char *token;
 	bool ntp = false;
 
-	for (address = dhcp->ntpservers; address; address = address->next)
+	STAILQ_FOREACH (address, dhcp->ntpservers, entries)
 		tomatch++;
 
 	/* Check that we really need to update the servers.
@@ -329,7 +333,7 @@ next:
 	}
 #endif
 
-	for (address = dhcp->ntpservers; address; address = address->next) {
+	STAILQ_FOREACH (address, dhcp->ntpservers, entries) {
 		a = inet_ntoa (address->address);
 		if (ntp)
 			fprintf (f, "restrict %s nomodify notrap noquery\n", a);
@@ -424,7 +428,7 @@ static int make_nis (const char *ifname, const dhcp_t *dhcp)
 	else
 		snprintf (prefix, PREFIXSIZE, "%s", "ypserver");
 
-	for (address = dhcp->nisservers; address; address = address->next)
+	STAILQ_FOREACH (address, dhcp->nisservers, entries)
 		fprintf (f, "%s %s\n", prefix, inet_ntoa (address->address));
 
 	free (prefix);
@@ -526,7 +530,7 @@ int configure (const options_t *options, interface_t *iface,
 	       const dhcp_t *dhcp, bool up)
 {
 	route_t *route = NULL;
-	route_t *new_routes = NULL;
+	struct route_head *new_routes = NULL;
 	route_t *new_route = NULL;
 	char *newhostname = NULL;
 	char *curhostname = NULL;
@@ -549,13 +553,12 @@ int configure (const options_t *options, interface_t *iface,
 	/* Remove old routes.
 	 * Always do this as the interface may have >1 address not added by us
 	 * so the routes we added may still exist. */
-	for (route = iface->previous_routes; route; route = route->next)
+	NSTAILQ_FOREACH (route, iface->previous_routes, entries)
 		if ((route->destination.s_addr || options->dogateway) &&
 		    (! up || ! in_routes (dhcp->routes, route)))
 			del_route (iface->name, route->destination,
 				   route->netmask, route->gateway,
 				   options->metric);
-
 	/* If we aren't up, then reset the interface as much as we can */
 	if (! up) {
 		if (iface->previous_routes) {
@@ -647,7 +650,7 @@ int configure (const options_t *options, interface_t *iface,
 #endif
 
 	/* Remember added routes */
-	for (route = dhcp->routes; route; route = route->next) {
+	NSTAILQ_FOREACH (route, dhcp->routes, entries) {
 #ifdef ENABLE_IPV4LL
 		/* Check if we have already got a link locale route dished
 		 * out by the DHCP server */
@@ -672,13 +675,11 @@ int configure (const options_t *options, interface_t *iface,
 		if (remember >= 0) {
 			if (! new_routes) {
 				new_routes = xmalloc (sizeof (*new_routes));
-				new_route = new_routes;
-			} else {
-				new_route->next = xmalloc (sizeof (*new_route));
-				new_route = new_route->next;
+				STAILQ_INIT (new_routes);
 			}
+			new_route = xmalloc (sizeof (route_t));
 			memcpy (new_route, route, sizeof (*new_route));
-			new_route -> next = NULL;
+			STAILQ_INSERT_TAIL (new_routes, new_route, entries);
 		}
 #ifdef THERE_IS_NO_FORK
 		/* If we have daemonised yet we need to record which routes
@@ -725,15 +726,13 @@ int configure (const options_t *options, interface_t *iface,
 		if (remember >= 0) {
 			if (! new_routes) {
 				new_routes = xmalloc (sizeof (*new_routes));
-				new_route = new_routes;
-			} else {
-				new_route->next = xmalloc (sizeof (*new_route));
-				new_route = new_route->next;
+				STAILQ_INIT (new_routes);
 			}
+			new_route = xmalloc (sizeof (*new_route));
 			new_route->destination.s_addr = dest.s_addr;
 			new_route->netmask.s_addr = mask.s_addr;
 			new_route->gateway.s_addr = gate.s_addr;
-			new_route->next = NULL;
+			STAILQ_INSERT_TAIL (new_routes, new_route, entries);
 		}
 	}
 #endif

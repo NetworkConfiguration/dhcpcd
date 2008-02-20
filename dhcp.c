@@ -51,6 +51,16 @@
 #include "logger.h"
 #include "socket.h"
 
+#ifndef STAILQ_CONCAT
+#define	STAILQ_CONCAT(head1, head2) do {				\
+	if (!STAILQ_EMPTY((head2))) {					\
+		*(head1)->stqh_last = (head2)->stqh_first;		\
+		(head1)->stqh_last = (head2)->stqh_last;		\
+		STAILQ_INIT((head2));					\
+	}								\
+} while (0)
+#endif
+
 typedef struct message {
 	int value;
 	const char *name;
@@ -395,30 +405,32 @@ static unsigned int decode_search (const unsigned char *p, int len, char *out)
 
 /* Add our classless static routes to the routes variable
  * and return the last route set */
-static route_t *decode_CSR(const unsigned char *p, int len)
+static struct route_head *decode_CSR (const unsigned char *p, int len)
 {
 	const unsigned char *q = p;
 	unsigned int cidr;
 	unsigned int ocets;
-	route_t *first;
+	struct route_head *routes = NULL;
 	route_t *route;
 
 	/* Minimum is 5 -first is CIDR and a router length of 4 */
 	if (len < 5)
 		return NULL;
 
-	first = xzalloc (sizeof (*first));
-	route = first;
-
 	while (q - p < len) {
-		memset (route, 0, sizeof (*route));
+		if (! routes) {
+			routes = xmalloc (sizeof (*routes));
+			STAILQ_INIT (routes);
+		}
+
+		route = xzalloc (sizeof (*route));
 
 		cidr = *q++;
 		if (cidr > 32) {
 			logger (LOG_ERR,
 				"invalid CIDR of %d in classless static route",
 				cidr);
-			free_route (first);
+			free_route (routes);
 			return (NULL);
 		}
 		ocets = (cidr + 7) / 8;
@@ -440,14 +452,10 @@ static route_t *decode_CSR(const unsigned char *p, int len)
 		memcpy (&route->gateway.s_addr, q, 4);
 		q += 4;
 
-		/* We have another route */
-		if (q - p < len) {
-			route->next = xzalloc (sizeof (*route));
-			route = route->next;
-		}
+		STAILQ_INSERT_TAIL (routes, route, entries);
 	}
 
-	return first;
+	return (routes);
 }
 
 void free_dhcp (dhcp_t *dhcp)
@@ -471,27 +479,27 @@ void free_dhcp (dhcp_t *dhcp)
 	}
 }
 
-static bool dhcp_add_address (address_t **address,
-			      const unsigned char *data, int length)
+static bool dhcp_add_address (struct address_head **addresses,
+			      const unsigned char *data,
+			      int length)
 {
 	int i;
-	address_t *p = *address;
+	address_t *address;
 
 	for (i = 0; i < length; i += 4) {
-		if (*address == NULL) {
-			p = *address = xzalloc (sizeof (*p));
-		} else {
-			p->next = xzalloc (sizeof (*p));
-			p = p->next;
-		}
-
 		/* Sanity check */
 		if (i + 4 > length) {
 			logger (LOG_ERR, "invalid address length");
 			return (false);
 		}
 
-		memcpy (&p->address.s_addr, data + i, 4);
+		if (*addresses == NULL) {
+			*addresses = xmalloc (sizeof (**addresses));
+			STAILQ_INIT (*addresses);
+		}
+		address = xzalloc (sizeof (*address));
+		memcpy (&address->address.s_addr, data + i, 4);
+		STAILQ_INSERT_TAIL (*addresses, address, entries);
 	}
 
 	return (true);
@@ -572,40 +580,42 @@ static uint32_t route_netmask (uint32_t ip_in)
 	return (htonl (~t));
 }
 
-static route_t *decode_routes (const unsigned char *data, int length)
+static struct route_head *decode_routes (const unsigned char *data, int length)
 {
 	int i;
-	route_t *head = NULL;
-	route_t *routes = NULL;
+	struct route_head *head = NULL;
+	route_t *route;
 	
 	for (i = 0; i < length; i += 8) {
-		if (routes) {
-			routes->next = xzalloc (sizeof (*routes));
-			routes = routes->next;
-		} else
-			head = routes = xzalloc (sizeof (*head));
-		memcpy (&routes->destination.s_addr, data + i, 4);
-		memcpy (&routes->gateway.s_addr, data + i + 4, 4);
-		routes->netmask.s_addr =
-			route_netmask (routes->destination.s_addr); 
+		if (! head) {
+			head = xmalloc (sizeof (*head));
+			STAILQ_INIT (head);
+		}
+		route = xzalloc (sizeof (*route));
+		memcpy (&route->destination.s_addr, data + i, 4);
+		memcpy (&route->gateway.s_addr, data + i + 4, 4);
+		route->netmask.s_addr =
+			route_netmask (route->destination.s_addr);
+		STAILQ_INSERT_TAIL (head, route, entries);
 	}
 
 	return (head);
 }
 
-static route_t *decode_routers (const unsigned char *data, int length)
+static struct route_head *decode_routers (const unsigned char *data, int length)
 {
 	int i;
-	route_t *head = NULL;
-	route_t *routes = NULL;
+	struct route_head *head = NULL;
+	route_t *route = NULL;
 
 	for (i = 0; i < length; i += 4) {
-		if (routes) {
-			routes->next = xzalloc (sizeof (*routes));
-			routes = routes->next;
-		} else
-			head = routes = xzalloc (sizeof (*head));
-		memcpy (&routes->gateway.s_addr, data + i, 4);
+		if (! head) {
+			head = xmalloc (sizeof (*head));
+			STAILQ_INIT (head);
+		}
+		route = xzalloc (sizeof (*route));
+		memcpy (&route->gateway.s_addr, data + i, 4);
+		STAILQ_INSERT_TAIL (head, route, entries);
 	}
 
 	return (head);
@@ -620,10 +630,10 @@ int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message)
 	unsigned int len = 0;
 	int retval = -1;
 	struct timeval tv;
-	route_t *routers = NULL;
-	route_t *routes = NULL;
-	route_t *csr = NULL;
-	route_t *mscsr = NULL;
+	struct route_head *routers = NULL;
+	struct route_head *routes = NULL;
+	struct route_head *csr = NULL;
+	struct route_head *mscsr = NULL;
 	bool in_overload = false;
 	bool parse_sname = false;
 	bool parse_file = false;
@@ -914,14 +924,11 @@ eexit:
 		free_route (routes);
 	} else {
 		/* Ensure that we apply static routes before routers */
-		if (routes)
-		{
-			dhcp->routes = routes;
-			while (routes->next)
-				routes = routes->next;
-			routes->next = routers;
-		} else
-			dhcp->routes = routers;
+		if (! routes)
+			routes = routers;
+		else if (routers)
+			STAILQ_CONCAT (routes, routers);
+		dhcp->routes = routes;
 	}
 
 	return (retval);
