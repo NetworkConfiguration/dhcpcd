@@ -12,7 +12,7 @@ INSTALL?=	install
 all: ${PROG} ${MAN}
 
 ${PROG}: ${SCRIPTS} ${OBJS}
-	${CC} ${CFLAGS} ${LDFLAGS} -o $@ ${OBJS} ${LDADD}
+	${CC} ${LDFLAGS} -o $@ ${OBJS} ${LDADD}
 
 _proginstall: ${PROG}
 	${INSTALL} -d ${DESTDIR}${BINDIR}
