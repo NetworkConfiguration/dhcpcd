@@ -10,7 +10,7 @@ _CSTD!=		${_CSTD_SH}
 CFLAGS+=	${_CSTD}$(shell ${_CSTD_SH})
 
 # Try and use some good cc flags
-_CC_FLAGS=	-pedantic -pipe -Wall -Wunused -Wimplicit -Wshadow -Wformat=2 \
+_CC_FLAGS=	-pedantic -Wall -Wunused -Wimplicit -Wshadow -Wformat=2 \
 		-Wmissing-declarations -Wno-missing-prototypes -Wwrite-strings \
 		-Wbad-function-cast -Wnested-externs -Wcomment -Winline \
 		-Wchar-subscripts -Wcast-align -Wno-format-nonliteral \
