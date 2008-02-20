@@ -7,7 +7,7 @@ SRCS=		arp.c client.c common.c configure.c dhcp.c dhcpcd.c duid.c \
 		info.c interface.c ipv4ll.c logger.c signal.c socket.c
 MAN=		dhcpcd.8
 
-VERSION=	3.2.1
+VERSION=	3.2.2
 CLEANFILES=	version.h dhcpcd.8
 
 BINDIR=		${PREFIX}/sbin
