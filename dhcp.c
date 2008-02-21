@@ -134,6 +134,9 @@ ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 		if (type == DHCP_REQUEST &&
 		    iface->previous_netmask.s_addr != dhcp->netmask.s_addr)
 			message->ciaddr = from.s_addr = 0;
+
+		if (from.s_addr != 0)
+			to.s_addr = dhcp->serveraddress.s_addr;
 	}
 
 	message->op = DHCP_BOOTREQUEST;
@@ -166,6 +169,27 @@ ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 	*p++ = DHCP_MESSAGETYPE; 
 	*p++ = 1;
 	*p++ = type;
+
+	*p++ = DHCP_CLIENTID;
+	*p++ = iface->clientid_len;
+	memcpy (p, iface->clientid, iface->clientid_len);
+	p+= iface->clientid_len;
+
+	if (type != DHCP_DECLINE && type != DHCP_RELEASE) {
+		if (options->userclass_len > 0) {
+			*p++ = DHCP_USERCLASS;
+			*p++ = options->userclass_len;
+			memcpy (p, &options->userclass, options->userclass_len);
+			p += options->userclass_len;
+		}
+
+		if (*options->classid > 0) {
+			*p++ = DHCP_CLASSID;
+			*p++ = l = strlen (options->classid);
+			memcpy (p, options->classid, l);
+			p += l;
+		}
+	}
 
 	if (type == DHCP_REQUEST) {
 		*p++ = DHCP_MAXMESSAGESIZE;
@@ -220,10 +244,36 @@ ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 	    type == DHCP_INFORM ||
 	    type == DHCP_REQUEST)
 	{
+		if (options->hostname[0]) {
+			if (options->fqdn == FQDN_DISABLE) {
+				*p++ = DHCP_HOSTNAME;
+				*p++ = l = strlen (options->hostname);
+				memcpy (p, options->hostname, l);
+				p += l;
+			} else {
+				/* Draft IETF DHC-FQDN option (81) */
+				*p++ = DHCP_FQDN;
+				*p++ = (l = strlen (options->hostname)) + 3;
+				/* Flags: 0000NEOS
+				 * S: 1 => Client requests Server to update
+				 *         a RR in DNS as well as PTR
+				 * O: 1 => Server indicates to client that
+				 *         DNS has been updated
+				 * E: 1 => Name data is DNS format
+				 * N: 1 => Client requests Server to not
+				 *         update DNS
+				 */
+				*p++ = options->fqdn & 0x9;
+				*p++ = 0; /* from server for PTR RR */
+				*p++ = 0; /* from server for A RR if S=1 */
+				memcpy (p, options->hostname, l);
+				p += l;
+			}
+		}
+
 		*p++ = DHCP_PARAMETERREQUESTLIST;
 		n_params = p;
 		*p++ = 0;
-
 		/* Only request DNSSERVER in discover to keep the packets small.
 		 * RFC2131 Section 3.5 states that the REQUEST must include the
 		 * list from the DISCOVER message, so I think this is ok. */
@@ -269,56 +319,7 @@ ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 		}
 
 		*n_params = p - n_params - 1;
-
-		if (options->hostname[0]) {
-			if (options->fqdn == FQDN_DISABLE) {
-				*p++ = DHCP_HOSTNAME;
-				*p++ = l = strlen (options->hostname);
-				memcpy (p, options->hostname, l);
-				p += l;
-			} else {
-				/* Draft IETF DHC-FQDN option (81) */
-				*p++ = DHCP_FQDN;
-				*p++ = (l = strlen (options->hostname)) + 3;
-				/* Flags: 0000NEOS
-				 * S: 1 => Client requests Server to update
-				 *         a RR in DNS as well as PTR
-				 * O: 1 => Server indicates to client that
-				 *         DNS has been updated
-				 * E: 1 => Name data is DNS format
-				 * N: 1 => Client requests Server to not
-				 *         update DNS
-				 */
-				*p++ = options->fqdn & 0x9;
-				*p++ = 0; /* from server for PTR RR */
-				*p++ = 0; /* from server for A RR if S=1 */
-				memcpy (p, options->hostname, l);
-				p += l;
-			}
-		}
 	}
-
-	if (type != DHCP_DECLINE && type != DHCP_RELEASE) {
-		if (options->userclass_len > 0) {
-			*p++ = DHCP_USERCLASS;
-			*p++ = options->userclass_len;
-			memcpy (p, &options->userclass, options->userclass_len);
-			p += options->userclass_len;
-		}
-
-		if (*options->classid > 0) {
-			*p++ = DHCP_CLASSID;
-			*p++ = l = strlen (options->classid);
-			memcpy (p, options->classid, l);
-			p += l;
-		}
-	}
-
-	*p++ = DHCP_CLIENTID;
-	*p++ = iface->clientid_len;
-	memcpy (p, iface->clientid, iface->clientid_len);
-	p+= iface->clientid_len;
-
 	*p++ = DHCP_END;
 
 #ifdef BOOTP_MESSAGE_LENTH_MIN
