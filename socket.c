@@ -451,10 +451,43 @@ int open_socket (interface_t *iface, int protocol)
 	int fd;
 	union sockunion {
 		struct sockaddr sa;
+		struct sockaddr_in sin;
 		struct sockaddr_ll sll;
 		struct sockaddr_storage ss;
 	} su;
 	struct sock_fprog pf;
+	struct ifreq ifr;
+	int n = 1;
+
+	/* We need to bind to a port, otherwise Linux generate ICMP messages
+	 * that cannot contect the port when we have an address.
+	 * We don't actually use this fd at all, instead using our packet
+	 * filter socket. */
+	if (iface->listen_fd == -1 &&
+	    iface->previous_address.s_addr &&
+	    ! IN_LINKLOCAL (iface->previous_address.s_addr))
+	{
+		if ((fd = socket (PF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
+			logger (LOG_ERR, "socket: %s", strerror (errno));
+		} else {
+			memset (&su, 0, sizeof (su));
+			su.sin.sin_family = AF_INET;
+			su.sin.sin_port = htons (DHCP_CLIENT_PORT);
+			su.sin.sin_addr = iface->previous_address;
+			if (setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, &n, sizeof (n)) == -1)
+				logger (LOG_ERR, "SO_REUSEADDR: %s", strerror (errno));
+			strncpy (ifr.ifr_name, iface->name, sizeof (ifr.ifr_name));
+			if (setsockopt (fd, SOL_SOCKET, SO_BINDTODEVICE, &ifr, sizeof (ifr)) == -1)
+				logger (LOG_ERR, "SO_SOBINDTODEVICE: %s", strerror (errno));
+			if (bind (fd, &su.sa, sizeof (su)) == -1) {
+				logger (LOG_ERR, "bind: %s", strerror (errno));
+				close (fd);
+			} else {
+				iface->listen_fd = fd;
+				close_on_exec (fd);
+			}
+		}
+	}
 
 	if ((fd = socket (PF_PACKET, SOCK_DGRAM, htons (protocol))) == -1) {
 		logger (LOG_ERR, "socket: %s", strerror (errno));
@@ -491,8 +524,7 @@ int open_socket (interface_t *iface, int protocol)
 		return (-1);
 	}
 
-	if (bind (fd, &su.sa, sizeof (su)) == -1)
-	{
+	if (bind (fd, &su.sa, sizeof (su)) == -1) {
 		logger (LOG_ERR, "bind: %s", strerror (errno));
 		close (fd);
 		return (-1);

@@ -429,6 +429,9 @@ interface_t *read_interface (const char *ifname, _unused int metric)
 
 	/* 0 is a valid fd, so init to -1 */
 	iface->fd = -1;
+#ifdef __linux__
+	iface->listen_fd = -1;
+#endif
 
 exit:
 	close (s);

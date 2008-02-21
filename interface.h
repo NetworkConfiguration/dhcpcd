@@ -120,6 +120,7 @@ typedef struct interface_t
 	size_t buffer_length;
 
 #ifdef __linux__
+	int listen_fd;
 	int socket_protocol;
 #endif
 

@@ -432,6 +432,12 @@ static bool do_socket (state_t *state, int mode)
 {
 	if (state->interface->fd >= 0)
 		close (state->interface->fd);
+#ifdef __linux
+	if (mode == SOCKET_CLOSED && state->interface->listen_fd >= 0) {
+		close (state->interface->listen_fd);
+		state->interface->listen_fd = -1;
+	}
+#endif
 
 	state->interface->fd = -1; 
 	if (mode == SOCKET_OPEN) 
