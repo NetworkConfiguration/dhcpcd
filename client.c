@@ -758,6 +758,7 @@ static int handle_timeout (state_t *state, const options_t *options)
 			do_socket (state, SOCKET_OPEN);
 			if (state->xid == 0)
 				state->xid = (uint32_t) random ();
+			dhcp->serveraddress.s_addr = 0;
 			_send_message (state, DHCP_REQUEST, options);
 			state->timeout = dhcp->leasetime - dhcp->rebindtime;
 			state->state = STATE_REQUESTING;

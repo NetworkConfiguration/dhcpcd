@@ -220,8 +220,9 @@ ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 			    iface->previous_address.s_addr)
 			{
 				PUTADDR (DHCP_ADDRESS, dhcp->address);
-				PUTADDR (DHCP_SERVERIDENTIFIER,
-					 dhcp->serveraddress);
+				if (dhcp->serveraddress.s_addr)
+					PUTADDR (DHCP_SERVERIDENTIFIER,
+							dhcp->serveraddress);
 			}
 		}
 #undef PUTADDR
