@@ -261,11 +261,12 @@ static void remove_skiproutes (dhcp_t *dhcp, interface_t *iface)
 {
 	int i = -1;
 	route_t *route;
-	route_t *iroute = NULL;
+	route_t *newroute;
 
 	free_route (iface->previous_routes);
+	iface->previous_routes = NULL;
 
-	for (route = dhcp->routes; route; route = route->next) {
+	NSTAILQ_FOREACH (route, dhcp->routes, entries) {
 		i++;
 
 		/* Check that we did add this route or not */
@@ -286,15 +287,14 @@ static void remove_skiproutes (dhcp_t *dhcp, interface_t *iface)
 				continue;
 		}
 
-		if (! iroute)
-			iroute = iface->previous_routes =
-				xmalloc (sizeof (*iroute));
-
-		memcpy (iroute, route, sizeof (*iroute));
-		if (route->next) {
-			iroute->next = xmalloc (sizeof (*iroute));
-			iroute = iroute->next;
+		if (! iface->previous_routes) {
+			iface->previous_routes = xmalloc (sizeof (*iface->previous_routes));
+			STAILQ_INIT (iface->previous_routes);
 		}
+
+		newroute = xmalloc (sizeof (*newroute));
+		memcpy (newroute, route, sizeof (*newroute));
+		STAILQ_INSERT_TAIL (iface->previous_routes, newroute, entries);
 	}
 
 	/* We no longer need this argument */
