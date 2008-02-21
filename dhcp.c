@@ -170,6 +170,19 @@ ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 	*p++ = 1;
 	*p++ = type;
 
+	if (type == DHCP_REQUEST) {
+		*p++ = DHCP_MAXMESSAGESIZE;
+		*p++ = 2;
+		sz = get_mtu (iface->name);
+		if (sz < MTU_MIN) {
+			if (set_mtu (iface->name, MTU_MIN) == 0)
+				sz = MTU_MIN;
+		}
+		sz = htons (sz);
+		memcpy (p, &sz, 2);
+		p += 2;
+	}
+
 	*p++ = DHCP_CLIENTID;
 	*p++ = iface->clientid_len;
 	memcpy (p, iface->clientid, iface->clientid_len);
@@ -191,20 +204,7 @@ ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 		}
 	}
 
-	if (type == DHCP_REQUEST) {
-		*p++ = DHCP_MAXMESSAGESIZE;
-		*p++ = 2;
-		sz = get_mtu (iface->name);
-		if (sz < MTU_MIN) {
-			if (set_mtu (iface->name, MTU_MIN) == 0)
-				sz = MTU_MIN;
-		}
-		sz = htons (sz);
-		memcpy (p, &sz, 2);
-		p += 2;
-	}
-
-	if (type != DHCP_INFORM) {
+	if (type == DHCP_DISCOVER || type == DHCP_REQUEST) {
 #define PUTADDR(_type, _val) { \
 	*p++ = _type; \
 	*p++ = 4; \
@@ -217,20 +217,15 @@ ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 		else {
 			if (dhcp->address.s_addr &&
 			    dhcp->address.s_addr !=
-			    iface->previous_address.s_addr &&
-			    type != DHCP_RELEASE)
+			    iface->previous_address.s_addr)
+			{
 				PUTADDR (DHCP_ADDRESS, dhcp->address);
-
-			if (dhcp->serveraddress.s_addr &&
-			    dhcp->address.s_addr &&
-			    (type == DHCP_REQUEST || type == DHCP_RELEASE))
 				PUTADDR (DHCP_SERVERIDENTIFIER,
 					 dhcp->serveraddress);
+			}
 		}
 #undef PUTADDR
-	}
 
-	if (type == DHCP_REQUEST || type == DHCP_DISCOVER) {
 		if (options->leasetime != 0) {
 			*p++ = DHCP_LEASETIME;
 			*p++ = 4;
