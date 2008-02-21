@@ -222,7 +222,7 @@ ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
 				PUTADDR (DHCP_ADDRESS, dhcp->address);
 				if (dhcp->serveraddress.s_addr)
 					PUTADDR (DHCP_SERVERIDENTIFIER,
-							dhcp->serveraddress);
+						 dhcp->serveraddress);
 			}
 		}
 #undef PUTADDR
