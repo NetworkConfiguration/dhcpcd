@@ -586,7 +586,7 @@ int main(int argc, char **argv)
 		}
 
 		pidfd = open (options->pidfile,
-			      O_WRONLY | O_CREAT | O_NONBLOCK, 0660);
+			      O_WRONLY | O_CREAT | O_NONBLOCK, 0664);
 		if (pidfd == -1) {
 			logger (LOG_ERR, "open `%s': %s",
 				options->pidfile, strerror (errno));
