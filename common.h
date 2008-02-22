@@ -49,7 +49,7 @@ size_t strlcpy (char *dst, const char *src, size_t size);
 #endif
 
 #define HAVE_SRANDOMDEV
-#if defined(__linux__) || defined(__NetBSD__)
+#if defined(__GLIBC__) || defined(__NetBSD__)
 #  undef HAVE_SRANDOMDEV
 void srandomdev (void);
 #endif

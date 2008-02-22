@@ -44,7 +44,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#ifdef BSD
+#if defined(BSD) || defined(__FreeBSD_kernel__)
 # include <net/bpf.h>
 #elif __linux__
 # include <linux/filter.h>
@@ -255,7 +255,7 @@ eexit:
 	return retval;
 }
 
-#ifdef BSD
+#if defined(BSD) || defined(__FreeBSD_kernel__)
 int open_socket (interface_t *iface, int protocol)
 {
 	int n = 0;

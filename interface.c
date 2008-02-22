@@ -530,7 +530,7 @@ static void log_route (struct in_addr destination,
 	free (dstd);
 }
 
-#ifdef BSD
+#if defined(BSD) || defined(__FreeBSD_kernel__)
 
 /* Darwin doesn't define this for some very odd reason */
 #ifndef SA_SIZE
