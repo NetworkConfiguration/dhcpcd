@@ -250,8 +250,7 @@ static int _do_interface (const char *ifname,
 #ifdef __linux__
 		p += sizeof (*ifr);
 #else
-		p += sizeof (ifr->ifr_name) +
-			MAX (ifr->ifr_addr.sa_len, sizeof (struct sockaddr));
+		p += offsetof (struct ifreq, ifr_ifru) + ifr->ifr_addr.sa_len;
 #endif
 
 		if (strcmp (ifname, ifr->ifr_name) != 0)
