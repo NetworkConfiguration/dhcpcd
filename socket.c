@@ -474,6 +474,10 @@ int open_socket (interface_t *iface, int protocol)
 					&n, sizeof (n)) == -1)
 				logger (LOG_ERR, "SO_REUSEADDR: %s",
 					strerror (errno));
+			if (setsockopt (fd, SOL_SOCKET, SO_RCVBUF,
+					&n, sizeof (n)) == -1)
+				logger (LOG_ERR, "SO_RCVBUF: %s",
+					strerror (errno));
 			strncpy (ifr.ifr_name, iface->name,
 				 sizeof (ifr.ifr_name));
 			if (setsockopt (fd, SOL_SOCKET, SO_BINDTODEVICE,
