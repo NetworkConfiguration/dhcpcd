@@ -28,7 +28,7 @@
 #ifndef LOGGER_H
 #define LOGGER_H
 
-#if defined(__GNUC__) || defined(__PCC__)
+#if defined(__GNUC__)
 #  define _PRINTF_LIKE(_one, _two)  __attribute__ ((__format__ (__printf__, _one, _two)))
 #else
 #  define _PRINTF_LIKE(_one, _two)

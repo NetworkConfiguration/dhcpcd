@@ -33,8 +33,10 @@
 #include <stdio.h>
 #include <string.h>
 
-#if __GNUC__ > 2 || defined(__INTEL_COMPILER) || defined(__PCC__)
+#if __GNUC__ > 2 || defined(__INTEL_COMPILER)
 # define _unused __attribute__((__unused__))
+#else
+# define _unused
 #endif
 
 #define HAVE_STRLCPY
