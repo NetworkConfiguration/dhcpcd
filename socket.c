@@ -463,22 +463,23 @@ int open_socket (interface_t *iface, int protocol)
 	 * that cannot contect the port when we have an address.
 	 * We don't actually use this fd at all, instead using our packet
 	 * filter socket. */
-	if (iface->listen_fd == -1 &&
-	    iface->previous_address.s_addr &&
-	    ! IN_LINKLOCAL (iface->previous_address.s_addr))
-	{
+	if (iface->listen_fd == -1 && protocol == ETHERTYPE_IP) {
 		if ((fd = socket (PF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
 			logger (LOG_ERR, "socket: %s", strerror (errno));
 		} else {
 			memset (&su, 0, sizeof (su));
 			su.sin.sin_family = AF_INET;
 			su.sin.sin_port = htons (DHCP_CLIENT_PORT);
-			su.sin.sin_addr = iface->previous_address;
-			if (setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, &n, sizeof (n)) == -1)
-				logger (LOG_ERR, "SO_REUSEADDR: %s", strerror (errno));
-			strncpy (ifr.ifr_name, iface->name, sizeof (ifr.ifr_name));
-			if (setsockopt (fd, SOL_SOCKET, SO_BINDTODEVICE, &ifr, sizeof (ifr)) == -1)
-				logger (LOG_ERR, "SO_SOBINDTODEVICE: %s", strerror (errno));
+			if (setsockopt (fd, SOL_SOCKET, SO_REUSEADDR,
+					&n, sizeof (n)) == -1)
+				logger (LOG_ERR, "SO_REUSEADDR: %s",
+					strerror (errno));
+			strncpy (ifr.ifr_name, iface->name,
+				 sizeof (ifr.ifr_name));
+			if (setsockopt (fd, SOL_SOCKET, SO_BINDTODEVICE,
+					&ifr, sizeof (ifr)) == -1)
+				logger (LOG_ERR, "SO_SOBINDTODEVICE: %s",
+					strerror (errno));
 			if (bind (fd, &su.sa, sizeof (su)) == -1) {
 				logger (LOG_ERR, "bind: %s", strerror (errno));
 				close (fd);
@@ -493,7 +494,6 @@ int open_socket (interface_t *iface, int protocol)
 		logger (LOG_ERR, "socket: %s", strerror (errno));
 		return (-1);
 	}
-
 	close_on_exec (fd);
 
 	memset (&su, 0, sizeof (su));
