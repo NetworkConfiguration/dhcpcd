@@ -75,6 +75,7 @@ void free_address (struct address_head *addresses)
 		free (p);
 		p = n;
 	}
+	free (addresses);
 }
 
 void free_route (struct route_head *routes)
@@ -91,6 +92,7 @@ void free_route (struct route_head *routes)
 		free (p);
 		p = n;
 	}
+	free (routes);
 }
 
 int inet_ntocidr (struct in_addr address)

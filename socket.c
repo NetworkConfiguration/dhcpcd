@@ -478,6 +478,7 @@ int open_socket (interface_t *iface, int protocol)
 					&n, sizeof (n)) == -1)
 				logger (LOG_ERR, "SO_RCVBUF: %s",
 					strerror (errno));
+			memset (&ifr, 0, sizeof (ifr));
 			strncpy (ifr.ifr_name, iface->name,
 				 sizeof (ifr.ifr_name));
 			if (setsockopt (fd, SOL_SOCKET, SO_BINDTODEVICE,
