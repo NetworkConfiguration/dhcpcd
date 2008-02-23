@@ -452,7 +452,7 @@ static char *lookuphostname (char *hostname, const dhcp_t *dhcp,
 	socklen_t salen;
 	char *addr;
 	struct addrinfo hints;
-	struct addrinfo *res;
+	struct addrinfo *res = NULL;
 	int result;
 	char *p;
 
@@ -477,7 +477,8 @@ static char *lookuphostname (char *hostname, const dhcp_t *dhcp,
 	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_flags = AI_NUMERICHOST;
 	result = getaddrinfo (addr, "0", &hints, &res);
-	freeaddrinfo (res);
+	if (res)
+		freeaddrinfo (res);
 	if (result == 0)
 		logger (LOG_ERR, "malicious PTR record detected");
 	if (result == 0 || ! *addr) {
@@ -774,7 +775,7 @@ int configure (const options_t *options, interface_t *iface,
 
 		/* Now we have made a resolv.conf we can obtain a hostname
 		 * if we need it */
-		if (! *newhostname && options->dohostname > 3)
+		if (! *newhostname || options->dohostname > 3)
 			lookuphostname (newhostname, dhcp, options);
 
 		if (*newhostname) {
