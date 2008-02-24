@@ -428,7 +428,7 @@ static int make_nis (const char *ifname, const dhcp_t *dhcp)
 	else
 		snprintf (prefix, PREFIXSIZE, "%s", "ypserver");
 
-	STAILQ_FOREACH (address, dhcp->nisservers, entries)
+	NSTAILQ_FOREACH (address, dhcp->nisservers, entries)
 		fprintf (f, "%s %s\n", prefix, inet_ntoa (address->address));
 
 	free (prefix);
