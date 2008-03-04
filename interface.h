@@ -30,7 +30,6 @@
 
 #include <sys/types.h>
 #include <sys/param.h>
-#include <sys/queue.h>
 #include <sys/socket.h>
 #include <net/if.h>
 #include <netinet/in.h>
@@ -39,6 +38,7 @@
 #include <stdbool.h>
 
 #include "config.h"
+#include "queue.h"
 
 #ifdef __linux__
 #  include <asm/types.h> /* needed for 2.4 kernels for the below header */
@@ -83,10 +83,6 @@
 
 #ifndef IN_LINKLOCAL
 # define IN_LINKLOCAL(addr) ((addr & IN_CLASSB_NET) == LINKLOCAL_ADDR)
-#endif
-
-#ifndef STAILQ_ENTRY
-# error "your sys/queue.h is too old and lacks STAILQ"
 #endif
 
 #define NSTAILQ_FOREACH(var, head, field) \
