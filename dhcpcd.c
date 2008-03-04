@@ -71,7 +71,7 @@ static const struct option longopts[] = {
 	{"userclass",   required_argument,  NULL, 'u'},
 	{"exit",        no_argument,        NULL, 'x'},
 	{"lastlease",   no_argument,        NULL, 'E'},
-	{"fqdn",        required_argument,  NULL, 'F'},
+	{"fqdn",        optional_argument,  NULL, 'F'},
 	{"nogateway",   no_argument,        NULL, 'G'},
 	{"sethostname", no_argument,        NULL, 'H'},
 	{"clientid",    optional_argument,  NULL, 'I'},
@@ -348,6 +348,10 @@ int main(int argc, char **argv)
 				options->dolastlease = true;
 				break;
 			case 'F':
+				if (! optarg) {
+					options->fqdn = FQDN_BOTH;
+					break;
+				}
 				if (strncmp (optarg, "none", strlen (optarg)) == 0)
 					options->fqdn = FQDN_NONE;
 				else if (strncmp (optarg, "ptr", strlen (optarg)) == 0)
