@@ -47,6 +47,7 @@
 #if defined(BSD) || defined(__FreeBSD_kernel__)
 # include <net/bpf.h>
 #elif __linux__
+# include <asm/types.h> /* needed for 2.4 kernels for the below header */
 # include <linux/filter.h>
 # include <netpacket/packet.h>
 # define bpf_insn sock_filter

@@ -41,6 +41,7 @@
 #include "config.h"
 
 #ifdef __linux__
+#  include <asm/types.h> /* needed for 2.4 kernels for the below header */
 #  include <linux/netlink.h>
 #endif
 
