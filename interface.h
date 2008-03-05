@@ -38,11 +38,13 @@
 #include <stdbool.h>
 
 #include "config.h"
-#include "queue.h"
 
 #ifdef __linux__
 #  include <asm/types.h> /* needed for 2.4 kernels for the below header */
 #  include <linux/netlink.h>
+#  include "queue.h" /* not all libc's support queue.h, so include our own */ 
+#else
+#  include <sys/queue.h>
 #endif
 
 #ifdef ENABLE_DUID
