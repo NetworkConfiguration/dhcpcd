@@ -669,30 +669,15 @@ parse_start:
 		length = *p++;
 
 		if (option != DHCP_PAD && length == 0) {
-			logger (LOG_ERR, "option %d has zero length", option);
-			retval = -1;
-			goto eexit;
+			logger (LOG_ERR, "option %d has zero length, skipping",
+				option);
+			continue;
 		}
 
 		if (p + length >= end) {
 			logger (LOG_ERR, "dhcp option exceeds message length");
 			retval = -1;
 			goto eexit;
-		}
-
-		switch (option) {
-			case DHCP_MESSAGETYPE:
-				retval = (int) *p;
-				p += length;
-				continue;
-
-			default:
-				if (length == 0) {
-					logger (LOG_DEBUG,
-						"option %d has zero length, skipping",
-						option);
-					continue;
-				}
 		}
 
 #define LENGTH(_length) \
@@ -721,6 +706,9 @@ parse_start:
 		_val = ntohl (_val);
 
 		switch (option) {
+			case DHCP_MESSAGETYPE:
+				retval = (int) *p;
+				break;
 			case DHCP_ADDRESS:
 				GET_UINT32 (dhcp->address.s_addr);
 				break;
