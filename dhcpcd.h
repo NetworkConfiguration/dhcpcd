@@ -30,8 +30,10 @@
 
 #include <sys/param.h>
 #include <sys/socket.h>
+
 #include <net/if.h>
 #include <netinet/in.h>
+
 #include <limits.h>
 #include <stdbool.h>
 
@@ -51,7 +53,7 @@ extern int dhcpcd_argc;
 extern char *dhcpcd_skiproutes;
 #endif
 
-typedef struct options_t {
+struct options {
 	char interface[IF_NAMESIZE];
 	char hostname[MAXHOSTNAMELEN];
 	int fqdn;
@@ -89,6 +91,6 @@ typedef struct options_t {
 
 	char *script;
 	char pidfile[PATH_MAX];
-} options_t;
+};
 
 #endif

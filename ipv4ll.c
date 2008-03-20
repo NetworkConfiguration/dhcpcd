@@ -40,31 +40,32 @@
 
 #define IPV4LL_LEASETIME 20 
 
-int ipv4ll_get_address (interface_t *iface, dhcp_t *dhcp) {
+int
+ipv4ll_get_address(struct interface *iface, struct dhcp *dhcp) {
 	struct in_addr addr;
 
 	for (;;) {
-		addr.s_addr = htonl (LINKLOCAL_ADDR |
-				     (((uint32_t) abs ((int) random ())
-				       % 0xFD00) + 0x0100));
+		addr.s_addr = htonl(LINKLOCAL_ADDR |
+				    (((uint32_t)abs((int)random())
+				      % 0xFD00) + 0x0100));
 		errno = 0;
-		if (! arp_claim (iface, addr))
+		if (!arp_claim(iface, addr))
 			break;
 		/* Our ARP may have been interrupted */
 		if (errno)
-			return (-1);
+			return -1;
 	}
 
 	dhcp->address.s_addr = addr.s_addr;
-	dhcp->netmask.s_addr = htonl (LINKLOCAL_MASK);
-	dhcp->broadcast.s_addr = htonl (LINKLOCAL_BRDC);
+	dhcp->netmask.s_addr = htonl(LINKLOCAL_MASK);
+	dhcp->broadcast.s_addr = htonl(LINKLOCAL_BRDC);
 
 	/* Finally configure some DHCP like lease times */
 	dhcp->leasetime = IPV4LL_LEASETIME;
-	dhcp->renewaltime = (dhcp->leasetime * 0.5);
-	dhcp->rebindtime = (dhcp->leasetime * 0.875);
+	dhcp->renewaltime = dhcp->leasetime * 0.5;
+	dhcp->rebindtime = dhcp->leasetime * 0.875;
 
-	return (0);
+	return 0;
 }
 
 #endif

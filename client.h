@@ -30,6 +30,6 @@
 
 #include "dhcpcd.h"
 
-int dhcp_run (const options_t *options, int *pidfd);
+int dhcp_run(const struct options *, int *);
 
 #endif

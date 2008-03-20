@@ -118,15 +118,15 @@ enum FQQN {
 	FQDN_BOTH       = 0x31
 };
 
-typedef struct fqdn_t
+struct fqdn
 {
 	uint8_t flags;
 	uint8_t r1;
 	uint8_t r2;
 	char *name;
-} fqdn_t;
+};
 
-typedef struct dhcp_t
+struct dhcp
 {
 	char version[11];
 
@@ -147,7 +147,7 @@ typedef struct dhcp_t
 	struct route_head *routes;
 
 	char *hostname;
-	fqdn_t *fqdn;
+	struct fqdn *fqdn;
 
 	struct address_head *dnsservers;
 	char *dnsdomain;
@@ -164,7 +164,7 @@ typedef struct dhcp_t
 	char *rootpath;
 
 	bool frominfo;
-} dhcp_t;
+};
 
 /* Sizes for DHCP options */
 #define DHCP_CHADDR_LEN         16
@@ -181,7 +181,7 @@ typedef struct dhcp_t
 /* Some crappy DHCP servers require the BOOTP minimum length */
 #define BOOTP_MESSAGE_LENTH_MIN 300
 
-typedef struct dhcpmessage_t
+struct dhcp_message
 {
 	unsigned char op;           /* message type */
 	unsigned char hwtype;       /* hardware address type */
@@ -199,18 +199,18 @@ typedef struct dhcpmessage_t
 	unsigned char bootfile[BOOTFILE_LEN];    /* boot file name */
 	uint32_t cookie;
 	unsigned char options[DHCP_OPTION_LEN]; /* message options - cookie */
-} dhcpmessage_t;
+};
 
 struct udp_dhcp_packet
 {
 	struct ip ip;
 	struct udphdr udp;
-	dhcpmessage_t dhcp;
+	struct dhcp_message dhcp;
 };
 
-ssize_t send_message (const interface_t *iface, const dhcp_t *dhcp,
-		      uint32_t xid, char type, const options_t *options);
-void free_dhcp (dhcp_t *dhcp);
-int parse_dhcpmessage (dhcp_t *dhcp, const dhcpmessage_t *message);
+ssize_t send_message(const struct interface *, const struct dhcp *,
+		     uint32_t, char, const struct options *);
+void free_dhcp(struct dhcp *);
+int parse_dhcpmessage (struct dhcp *, const struct dhcp_message *);
 
 #endif

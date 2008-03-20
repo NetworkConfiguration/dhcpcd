@@ -46,22 +46,24 @@
 
 /* Create a malloced string of cstr, changing ' to '\''
  * so the contents work in a shell */
-static char *cleanmetas (const char *cstr)
+static char *
+cleanmetas(const char *cstr)
 {
 	const char *p = cstr;
 	char *new;
 	char *n;
 	size_t len;
+	size_t pos;
 
-	if (cstr == NULL || (len = strlen (cstr)) == 0)
-		return (xstrdup (""));
+	if (cstr == NULL || (len = strlen(cstr)) == 0)
+		return (xstrdup(""));
 
-	n = new = xmalloc (sizeof (char) * len + 2);
+	n = new = xmalloc(sizeof(char) * len + 2);
 	do
 		if (*p == '\'') {
-			size_t pos = n - new;
+			pos = n - new;
 			len += 4;
-			new = xrealloc (new, sizeof (char) * len + 1);
+			new = xrealloc(new, sizeof(char) * len + 1);
 			n = new + pos;
 			*n++ = '\'';
 			*n++ = '\\';
@@ -74,265 +76,271 @@ static char *cleanmetas (const char *cstr)
 	/* Terminate the sucker */
 	*n = '\0';
 
-	return (new);
+	return new;
 }
 
 
-static void print_addresses (FILE *f, const struct address_head *addresses)
+static void
+print_addresses(FILE *f, const struct address_head *addresses)
 {
-	const address_t *addr;
+	const struct address *addr;
 
-	STAILQ_FOREACH (addr, addresses, entries) {
-		fprintf (f, "%s", inet_ntoa (addr->address));
-		if (STAILQ_NEXT (addr, entries))
-			fprintf (f, " ");
+	STAILQ_FOREACH(addr, addresses, entries) {
+		fprintf(f, "%s", inet_ntoa(addr->address));
+		if (STAILQ_NEXT(addr, entries))
+			fprintf(f, " ");
 	}
 }
 
-static void print_clean (FILE *f, const char *name, const char *value)
+static void
+print_clean(FILE *f, const char *name, const char *value)
 {
 	char *clean;
 
 	if (! value)
 		return;
 
-	clean = cleanmetas (value);
-	fprintf (f, "%s='%s'\n", name, clean);
-	free (clean);
+	clean = cleanmetas(value);
+	fprintf(f, "%s='%s'\n", name, clean);
+	free(clean);
 }
 
-bool write_info(const interface_t *iface, const dhcp_t *dhcp,
-		const options_t *options, bool overwrite)
+bool
+write_info(const struct interface *iface, const struct dhcp *dhcp,
+	   const struct options *options, bool overwrite)
 {
 	FILE *f;
-	route_t *route;
+	struct route *route;
 	struct stat sb;
+	struct in_addr addr;
+	bool doneone;
 
 	if (options->test)
 		f = stdout;
 	else {
-		if (! overwrite && stat (iface->infofile, &sb) == 0)
-			return (true);
+		if (!overwrite && stat(iface->infofile, &sb) == 0)
+			return true;
 
-		logger (LOG_DEBUG, "writing %s", iface->infofile);
-		if ((f = fopen (iface->infofile, "w")) == NULL) {
-			logger (LOG_ERR, "fopen `%s': %s",
-				iface->infofile, strerror (errno));
-			return (false);
+		logger(LOG_DEBUG, "writing %s", iface->infofile);
+		if ((f = fopen(iface->infofile, "w")) == NULL) {
+			logger(LOG_ERR, "fopen `%s': %s",
+			       iface->infofile, strerror(errno));
+			return false;
 		}
 	}
 
 	if (dhcp->address.s_addr) {
-		struct in_addr n;
-		n.s_addr = dhcp->address.s_addr & dhcp->netmask.s_addr;
-		fprintf (f, "IPADDR='%s'\n", inet_ntoa (dhcp->address));
-		fprintf (f, "NETMASK='%s'\n", inet_ntoa (dhcp->netmask));
-		fprintf (f, "NETWORK='%s'\n", inet_ntoa (n));
-		fprintf (f, "BROADCAST='%s'\n", inet_ntoa (dhcp->broadcast));
+		addr.s_addr = dhcp->address.s_addr & dhcp->netmask.s_addr;
+		fprintf(f, "IPADDR='%s'\n", inet_ntoa(dhcp->address));
+		fprintf(f, "NETMASK='%s'\n", inet_ntoa(dhcp->netmask));
+		fprintf(f, "NETWORK='%s'\n", inet_ntoa(addr));
+		fprintf(f, "BROADCAST='%s'\n", inet_ntoa(dhcp->broadcast));
 	}
 	if (dhcp->mtu > 0)
-		fprintf (f, "MTU='%d'\n", dhcp->mtu);
+		fprintf(f, "MTU='%d'\n", dhcp->mtu);
 
 	if (dhcp->routes) {
-		bool doneone = false;
-		fprintf (f, "ROUTES='");
-		STAILQ_FOREACH (route, dhcp->routes, entries) {
+		doneone = false;
+		fprintf(f, "ROUTES='");
+		STAILQ_FOREACH(route, dhcp->routes, entries) {
 			if (route->destination.s_addr != 0) {
 				if (doneone)
-					fprintf (f, " ");
-				fprintf (f, "%s", inet_ntoa (route->destination));
-				fprintf (f, ",%s", inet_ntoa (route->netmask));
-				fprintf (f, ",%s", inet_ntoa (route->gateway));
+					fprintf(f, " ");
+				fprintf(f, "%s", inet_ntoa(route->destination));
+				fprintf(f, ",%s", inet_ntoa(route->netmask));
+				fprintf(f, ",%s", inet_ntoa(route->gateway));
 				doneone = true;
 			}
 		}
-		fprintf (f, "'\n");
+		fprintf(f, "'\n");
 
 		doneone = false;
-		fprintf (f, "GATEWAYS='");
-		STAILQ_FOREACH (route, dhcp->routes, entries) {
+		fprintf(f, "GATEWAYS='");
+		STAILQ_FOREACH(route, dhcp->routes, entries) {
 			if (route->destination.s_addr == 0) {
 				if (doneone)
-					fprintf (f, " ");
-				fprintf (f, "%s", inet_ntoa (route->gateway));
+					fprintf(f, " ");
+				fprintf(f, "%s", inet_ntoa(route->gateway));
 				doneone = true;
 			}
 		}
-		fprintf (f, "'\n");
+		fprintf(f, "'\n");
 	}
 
-	print_clean (f, "HOSTNAME", dhcp->hostname);
-	print_clean (f, "DNSDOMAIN", dhcp->dnsdomain);
-	print_clean (f, "DNSSEARCH", dhcp->dnssearch);
+	print_clean(f, "HOSTNAME", dhcp->hostname);
+	print_clean(f, "DNSDOMAIN", dhcp->dnsdomain);
+	print_clean(f, "DNSSEARCH", dhcp->dnssearch);
 
 	if (dhcp->dnsservers) {
-		fprintf (f, "DNSSERVERS='");
-		print_addresses (f, dhcp->dnsservers);
-		fprintf (f, "'\n");
+		fprintf(f, "DNSSERVERS='");
+		print_addresses(f, dhcp->dnsservers);
+		fprintf(f, "'\n");
 	}
 
 	if (dhcp->fqdn) {
-		fprintf (f, "FQDNFLAGS='%u'\n", dhcp->fqdn->flags);
-		fprintf (f, "FQDNRCODE1='%u'\n", dhcp->fqdn->r1);
-		fprintf (f, "FQDNRCODE2='%u'\n", dhcp->fqdn->r2);
-		print_clean (f, "FQDNHOSTNAME", dhcp->fqdn->name);
+		fprintf(f, "FQDNFLAGS='%u'\n", dhcp->fqdn->flags);
+		fprintf(f, "FQDNRCODE1='%u'\n", dhcp->fqdn->r1);
+		fprintf(f, "FQDNRCODE2='%u'\n", dhcp->fqdn->r2);
+		print_clean(f, "FQDNHOSTNAME", dhcp->fqdn->name);
 	}
 
 	if (dhcp->ntpservers) {
-		fprintf (f, "NTPSERVERS='");
-		print_addresses (f, dhcp->ntpservers);
-		fprintf (f, "'\n");
+		fprintf(f, "NTPSERVERS='");
+		print_addresses(f, dhcp->ntpservers);
+		fprintf(f, "'\n");
 	}
 
-	print_clean (f, "NISDOMAIN", dhcp->nisdomain);
+	print_clean(f, "NISDOMAIN", dhcp->nisdomain);
 	if (dhcp->nisservers) {
-		fprintf (f, "NISSERVERS='");
-		print_addresses (f, dhcp->nisservers);
-		fprintf (f, "'\n");
+		fprintf(f, "NISSERVERS='");
+		print_addresses(f, dhcp->nisservers);
+		fprintf(f, "'\n");
 	}
 
-	print_clean (f, "ROOTPATH", dhcp->rootpath);
-	print_clean (f, "SIPSERVERS", dhcp->sipservers);
+	print_clean(f, "ROOTPATH", dhcp->rootpath);
+	print_clean(f, "SIPSERVERS", dhcp->sipservers);
 
 	if (dhcp->serveraddress.s_addr)
-		fprintf (f, "DHCPSID='%s'\n", inet_ntoa (dhcp->serveraddress));
+		fprintf(f, "DHCPSID='%s'\n", inet_ntoa(dhcp->serveraddress));
 	if (dhcp->servername[0])
-		print_clean (f, "DHCPSNAME", dhcp->servername);
+		print_clean(f, "DHCPSNAME", dhcp->servername);
 
-	if (! options->doinform && dhcp->address.s_addr) {
-		if (! options->test)
-			fprintf (f, "LEASEDFROM='%u'\n", dhcp->leasedfrom);
-		fprintf (f, "LEASETIME='%u'\n", dhcp->leasetime);
-		fprintf (f, "RENEWALTIME='%u'\n", dhcp->renewaltime);
-		fprintf (f, "REBINDTIME='%u'\n", dhcp->rebindtime);
+	if (!options->doinform && dhcp->address.s_addr) {
+		if (!options->test)
+			fprintf(f, "LEASEDFROM='%u'\n", dhcp->leasedfrom);
+		fprintf(f, "LEASETIME='%u'\n", dhcp->leasetime);
+		fprintf(f, "RENEWALTIME='%u'\n", dhcp->renewaltime);
+		fprintf(f, "REBINDTIME='%u'\n", dhcp->rebindtime);
 	}
-	print_clean (f, "INTERFACE", iface->name);
-	print_clean (f, "CLASSID", options->classid);
+	print_clean(f, "INTERFACE", iface->name);
+	print_clean(f, "CLASSID", options->classid);
 	if (iface->clientid_len > 0) {
-		fprintf (f, "CLIENTID='%s'\n",
-			 hwaddr_ntoa (iface->clientid, iface->clientid_len));
+		fprintf(f, "CLIENTID='%s'\n",
+			hwaddr_ntoa(iface->clientid, iface->clientid_len));
 	}
-	fprintf (f, "DHCPCHADDR='%s'\n", hwaddr_ntoa (iface->hwaddr,
-						      iface->hwlen));
+	fprintf(f, "DHCPCHADDR='%s'\n",
+		hwaddr_ntoa(iface->hwaddr, iface->hwlen));
 
 #ifdef ENABLE_INFO_COMPAT
 	/* Support the old .info settings if we need to */
-	fprintf (f, "\n# dhcpcd-1.x and 2.x compatible variables\n");
+	fprintf(f, "\n# dhcpcd-1.x and 2.x compatible variables\n");
 	if (dhcp->dnsservers) {
-		address_t *addr;
+		struct address *a;
 
-		fprintf (f, "DNS='");
-		STAILQ_FOREACH (addr, dhcp->dnsservers, entries) {
-			fprintf (f, "%s", inet_ntoa (addr->address));
-			if (STAILQ_NEXT (addr, entries))
-				fprintf (f, ",");
+		fprintf(f, "DNS='");
+		STAILQ_FOREACH(a, dhcp->dnsservers, entries) {
+			fprintf(f, "%s", inet_ntoa(a->address));
+			if (STAILQ_NEXT(a, entries))
+				fprintf(f, ",");
 		}
-		fprintf (f, "'\n");
+		fprintf(f, "'\n");
 	}
 
 	if (dhcp->routes) {
-		bool doneone = false;
-		fprintf (f, "GATEWAY='");
-		STAILQ_FOREACH (route, dhcp->routes, entries) {
+		doneone = false;
+		fprintf(f, "GATEWAY='");
+		STAILQ_FOREACH(route, dhcp->routes, entries) {
 			if (route->destination.s_addr == 0) {
 				if (doneone)
-					fprintf (f, ",");
-				fprintf (f, "%s", inet_ntoa (route->gateway));
+					fprintf(f, ",");
+				fprintf(f, "%s", inet_ntoa(route->gateway));
 				doneone = true;
 			}
 		}
-		fprintf (f, "'\n");
+		fprintf(f, "'\n");
 	}
 #endif
 
-	if (! options->test)
-		fclose (f);
-	return (true);
+	if (!options->test)
+		fclose(f);
+	return true;
 }
 
-static bool parse_address (struct in_addr *addr,
-			   const char *value, const char *var)
+static bool
+parse_address(struct in_addr *addr, const char *value, const char *var)
 {
-	if (inet_aton (value, addr) == 0) {
-		logger (LOG_ERR, "%s `%s': %s", var, value,
-			strerror (errno));
-		return (false);
+	if (inet_aton(value, addr) == 0) {
+		logger(LOG_ERR, "%s `%s': %s", var, value, strerror(errno));
+		return false;
 	}
-	return (true);
+	return true;
 }
 
-static bool parse_uint (unsigned int *i,
-			const char *value, const char *var)
+static bool
+parse_uint(unsigned int *i, const char *value, const char *var)
 {
-	if (sscanf (value, "%u", i) != 1) {
-		logger (LOG_ERR, "%s `%s': not a valid number",
-			var, value);
-		return (false);
+	if (sscanf(value, "%u", i) != 1) {
+		logger(LOG_ERR, "%s `%s': not a valid number", var, value);
+		return false;
 	}
-	return (true);
+	return true;
 }
 
-static bool parse_ushort (unsigned short *s,
-			  const char *value, const char *var)
+static bool
+parse_ushort(unsigned short *s, const char *value, const char *var)
 {
-	if (sscanf (value, "%hu", s) != 1) {
-		logger (LOG_ERR, "%s `%s': not a valid number",
-			var, value);
-		return (false);
+	if (sscanf(value, "%hu", s) != 1) {
+		logger(LOG_ERR, "%s `%s': not a valid number", var, value);
+		return false;
 	}
-	return (true);
+	return true;
 }
 
-static struct address_head *parse_addresses (char *value, const char *var)
+static struct address_head *
+parse_addresses(char *value, const char *var)
 {
 	char *token;
 	char *p = value;
 	struct address_head *head = NULL;
+	struct address *a;
 
 	while ((token = strsep (&p, " "))) {
-		address_t *a = xzalloc (sizeof (*a));
-
-		if (inet_aton (token, &a->address) == 0) {
-			logger (LOG_ERR, "%s: invalid address `%s'", var, token);
-			free_address (head);
-			free (a);
-			return (NULL);
+		a = xzalloc (sizeof(*a));
+		if (inet_aton(token, &a->address) == 0) {
+			logger(LOG_ERR, "%s: invalid address `%s'", var, token);
+			free_address(head);
+			free(a);
+			return NULL;
 		}
 
-		if (! head) {
-			head = xmalloc (sizeof (*head));
-			STAILQ_INIT (head);
+		if (!head) {
+			head = xmalloc(sizeof(*head));
+			STAILQ_INIT(head);
 		}
-		STAILQ_INSERT_TAIL (head, a, entries);
+		STAILQ_INSERT_TAIL(head, a, entries);
 	}
 
-	return (head);
+	return head;
 }
 
-bool read_info (const interface_t *iface, dhcp_t *dhcp)
+bool
+read_info(const struct interface *iface, struct dhcp *dhcp)
 {
 	FILE *fp;
-	char *line;
+	char *line = NULL;
+	size_t len = 0;
 	char *var;
 	char *value;
 	char *p;
 	struct stat sb;
+	char *pp, *dest, *net, *gate;
+	struct route *route;
 
-	if (stat (iface->infofile, &sb) != 0) {
-		logger (LOG_ERR, "lease information file `%s' does not exist",
-			iface->infofile);
-		return (false);
+	if (stat(iface->infofile, &sb) != 0) {
+		logger(LOG_ERR, "lease information file `%s' does not exist",
+		       iface->infofile);
+		return false;
 	}
 
-	if (! (fp = fopen (iface->infofile, "r"))) {
-		logger (LOG_ERR, "fopen `%s': %s",
-			iface->infofile, strerror (errno));
-		return (false);
+	if (!(fp = fopen(iface->infofile, "r"))) {
+		logger(LOG_ERR, "fopen `%s': %s",
+		       iface->infofile, strerror(errno));
+		return false;
 	}
 
 	dhcp->frominfo = true;
 
-	while ((line = get_line (fp))) {
+	while ((get_line(&line, &len, fp))) {
 		var = line;
 
 		/* Strip leading spaces/tabs */
@@ -340,17 +348,17 @@ bool read_info (const interface_t *iface, dhcp_t *dhcp)
 			var++;
 
 		/* Trim trailing \n */
-		p = var + strlen (var) - 1;
+		p = var + strlen(var) - 1;
 		if (*p == '\n')
 			*p = 0;
 
 		/* Skip comments */
 		if (*var == '#')
-			goto next;
+			continue;
 
 		/* If we don't have an equals sign then skip it */
-		if (! (p = strchr (var, '=')))
-			goto next;	
+		if (!(p = strchr(var, '=')))
+			continue;	
 
 		/* Terminate the = so we have two strings */
 		*p = 0;
@@ -359,113 +367,121 @@ bool read_info (const interface_t *iface, dhcp_t *dhcp)
 		/* Strip leading and trailing quotes if present */
 		if (*value == '\'' || *value == '"')
 			value++;
-		p = value + strlen (value) - 1;
+		p = value + strlen(value) - 1;
 		if (*p == '\'' || *p == '"')
 			*p = 0;
 
 		/* Don't process null vars or values */
-		if (! *var || ! *value)
-			goto next;
+		if (!*var || !*value)
+			continue;
 
-		if (strcmp (var, "IPADDR") == 0)
-			parse_address (&dhcp->address, value, "IPADDR");
-		else if (strcmp (var, "NETMASK") == 0)
+		if (strcmp(var, "IPADDR") == 0)
+			parse_address(&dhcp->address, value, "IPADDR");
+		else if (strcmp(var, "NETMASK") == 0)
 			parse_address (&dhcp->netmask, value, "NETMASK");
-		else if (strcmp (var, "BROADCAST") == 0)
+		else if (strcmp(var, "BROADCAST") == 0)
 			parse_address (&dhcp->broadcast, value, "BROADCAST");
-		else if (strcmp (var, "MTU") == 0)
+		else if (strcmp(var, "MTU") == 0)
 			parse_ushort (&dhcp->mtu, value, "MTU");
-		else if (strcmp (var, "ROUTES") == 0) {
+		else if (strcmp(var, "ROUTES") == 0) {
 			p = value;
 			while ((value = strsep (&p, " "))) {
-				char *pp = value;
-				char *dest = strsep (&pp, ",");
-				char *net = strsep (&pp, ",");
-				char *gate = strsep (&pp, ",");
-				route_t *route;
+				pp = value;
+				dest = strsep (&pp, ",");
+				net = strsep (&pp, ",");
+				gate = strsep (&pp, ",");
 
-				if (! dest || ! net || ! gate) {
-					logger (LOG_ERR, "read_info ROUTES `%s,%s,%s': invalid route",
+				if (!dest || !net || !gate) {
+					logger(LOG_ERR,
+					       "read_info ROUTES `%s,%s,%s': "
+					       "invalid route",
 						dest, net, gate);
-					goto next;
+					continue;
 				}
 
 				/* See if we can create a route */
-				route = xzalloc (sizeof (*route));
-				if (inet_aton (dest, &route->destination) == 0) {
-					logger (LOG_ERR, "read_info ROUTES `%s': not a valid destination address",
-						dest);
-					free (route);
-					goto next;
+				route = xzalloc(sizeof(*route));
+				if (inet_aton(dest, &route->destination) == 0) {
+					logger(LOG_ERR,
+					       "read_info ROUTES `%s': "
+					       "not a valid destination address",
+					       dest);
+					free(route);
+					continue;
 				}
-				if (inet_aton (dest, &route->netmask) == 0) {
-					logger (LOG_ERR, "read_info ROUTES `%s': not a valid netmask address",
-						net);
-					free (route);
-					goto next;
+				if (inet_aton(dest, &route->netmask) == 0) {
+					logger(LOG_ERR,
+					       "read_info ROUTES `%s': "
+					       "not a valid netmask address",
+					       net);
+					free(route);
+					continue;
 				}
-				if (inet_aton (dest, &route->gateway) == 0) {
-					logger (LOG_ERR, "read_info ROUTES `%s': not a valid gateway address",
-						gate);
-					free (route);
-					goto next;
+				if (inet_aton(dest, &route->gateway) == 0) {
+					logger(LOG_ERR,
+					       "read_info ROUTES `%s': "
+					       "not a valid gateway address",
+					       gate);
+					free(route);
+					continue;
 				}
 
 				/* OK, now add our route */
-				if (! dhcp->routes) {
-					dhcp->routes = xmalloc (sizeof (*dhcp->routes));
-					STAILQ_INIT (dhcp->routes);
+				if (!dhcp->routes) {
+					dhcp->routes = xmalloc(sizeof(*dhcp->routes));
+					STAILQ_INIT(dhcp->routes);
 				}
-				STAILQ_INSERT_TAIL (dhcp->routes, route, entries);
+				STAILQ_INSERT_TAIL(dhcp->routes, route, entries);
 			}
-		} else if (strcmp (var, "GATEWAYS") == 0) {
+		} else if (strcmp(var, "GATEWAYS") == 0) {
 			p = value;
 			while ((value = strsep (&p, " "))) {
-				route_t *route = xzalloc (sizeof (*route));
-				if (parse_address (&route->gateway, value, "GATEWAYS")) {
-					if (! dhcp->routes) {
-						dhcp->routes = xmalloc (sizeof (*dhcp->routes));
-						STAILQ_INIT (dhcp->routes);
+				route = xzalloc(sizeof(*route));
+				if (parse_address(&route->gateway, value,
+						  "GATEWAYS"))
+				{
+					if (!dhcp->routes) {
+						dhcp->routes = xmalloc(sizeof(*dhcp->routes));
+						STAILQ_INIT(dhcp->routes);
 					}
-					STAILQ_INSERT_TAIL (dhcp->routes, route, entries);
+					STAILQ_INSERT_TAIL(dhcp->routes, route, entries);
 				} else
-					free (route);
+					free(route);
 			}
-		} else if (strcmp (var, "HOSTNAME") == 0)
-			dhcp->hostname = xstrdup (value);
+		} else if (strcmp(var, "HOSTNAME") == 0)
+			dhcp->hostname = xstrdup(value);
 		else if (strcmp (var, "DNSDOMAIN") == 0)
-			dhcp->dnsdomain = xstrdup (value);
-		else if (strcmp (var, "DNSSEARCH") == 0)
-			dhcp->dnssearch = xstrdup (value);
-		else if (strcmp (var, "DNSSERVERS") == 0)
-			dhcp->dnsservers = parse_addresses (value, "DNSSERVERS");
-		else if (strcmp (var, "NTPSERVERS") == 0)
-			dhcp->ntpservers = parse_addresses (value, "NTPSERVERS");
-		else if (strcmp (var, "NISDOMAIN") == 0)
+			dhcp->dnsdomain = xstrdup(value);
+		else if (strcmp(var, "DNSSEARCH") == 0)
+			dhcp->dnssearch = xstrdup(value);
+		else if (strcmp(var, "DNSSERVERS") == 0)
+			dhcp->dnsservers = parse_addresses(value, "DNSSERVERS");
+		else if (strcmp(var, "NTPSERVERS") == 0)
+			dhcp->ntpservers = parse_addresses(value, "NTPSERVERS");
+		else if (strcmp(var, "NISDOMAIN") == 0)
 			dhcp->nisdomain = xstrdup (value);
-		else if (strcmp (var, "NISSERVERS") == 0)
-			dhcp->nisservers = parse_addresses (value, "NISSERVERS");
-		else if (strcmp (var, "ROOTPATH") == 0)
-			dhcp->rootpath = xstrdup (value);
-		else if (strcmp (var, "DHCPSID") == 0)
-			parse_address (&dhcp->serveraddress, value, "DHCPSID");
-		else if (strcmp (var, "DHCPSNAME") == 0)
-			strlcpy (dhcp->servername, value, sizeof (dhcp->servername));
-		else if (strcmp (var, "LEASEDFROM") == 0)
-			parse_uint (&dhcp->leasedfrom, value, "LEASEDFROM");
-		else if (strcmp (var, "LEASETIME") == 0)
-			parse_uint (&dhcp->leasetime, value, "LEASETIME");
-		else if (strcmp (var, "RENEWALTIME") == 0)
-			parse_uint (&dhcp->renewaltime, value, "RENEWALTIME");
-		else if (strcmp (var, "REBINDTIME") == 0)
-			parse_uint (&dhcp->rebindtime, value, "REBINDTIME");
-
-next:
-		free (line);
+		else if (strcmp(var, "NISSERVERS") == 0)
+			dhcp->nisservers = parse_addresses(value, "NISSERVERS");
+		else if (strcmp(var, "ROOTPATH") == 0)
+			dhcp->rootpath = xstrdup(value);
+		else if (strcmp(var, "DHCPSID") == 0)
+			parse_address(&dhcp->serveraddress, value, "DHCPSID");
+		else if (strcmp(var, "DHCPSNAME") == 0)
+			strlcpy(dhcp->servername, value,
+				sizeof(dhcp->servername));
+		else if (strcmp(var, "LEASEDFROM") == 0)
+			parse_uint(&dhcp->leasedfrom, value, "LEASEDFROM");
+		else if (strcmp(var, "LEASETIME") == 0)
+			parse_uint(&dhcp->leasetime, value, "LEASETIME");
+		else if (strcmp(var, "RENEWALTIME") == 0)
+			parse_uint(&dhcp->renewaltime, value, "RENEWALTIME");
+		else if (strcmp(var, "REBINDTIME") == 0)
+			parse_uint(&dhcp->rebindtime, value, "REBINDTIME");
 	}
 
 	fclose (fp);
-	return (true);
+	free(line);
+	return true;
 }
 
 #endif

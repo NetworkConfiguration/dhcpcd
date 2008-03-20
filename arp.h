@@ -33,7 +33,7 @@
 
 #include "interface.h"
 
-int arp_claim (interface_t *iface, struct in_addr address);
+int arp_claim(struct interface *, struct in_addr);
 #endif
 
 #endif

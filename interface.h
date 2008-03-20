@@ -31,9 +31,11 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/socket.h>
+
 #include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/if_ether.h>
+
 #include <limits.h>
 #include <stdbool.h>
 
@@ -90,23 +92,23 @@
 #define NSTAILQ_FOREACH(var, head, field) \
 		if (head) STAILQ_FOREACH (var, head, field)
 
-typedef struct route_t
+struct route
 {
 	struct in_addr destination; 
 	struct in_addr netmask;
 	struct in_addr gateway;
-	STAILQ_ENTRY (route_t) entries;
-} route_t;
-STAILQ_HEAD (route_head, route_t);
+	STAILQ_ENTRY (route) entries;
+};
+STAILQ_HEAD (route_head, route);
 
-typedef struct address_t
+struct address
 {
 	struct in_addr address;
-	STAILQ_ENTRY (address_t) entries;
-} address_t;
-STAILQ_HEAD (address_head, address_t);
+	STAILQ_ENTRY (address) entries;
+};
+STAILQ_HEAD (address_head, address);
 
-typedef struct interface_t
+struct interface
 {
 	char name[IF_NAMESIZE];
 	sa_family_t family;
@@ -134,39 +136,33 @@ typedef struct interface_t
 
 	unsigned char *clientid;
 	size_t clientid_len;
-} interface_t;
+};
 
-void free_address (struct address_head *addresses);
-void free_route (struct route_head *routes);
-uint32_t get_netmask (uint32_t addr);
-char *hwaddr_ntoa (const unsigned char *hwaddr, size_t hwlen);
-size_t hwaddr_aton (unsigned char *hwaddr, const char *addr);
+void free_address(struct address_head *);
+void free_route(struct route_head *);
+uint32_t get_netmask(uint32_t);
+char *hwaddr_ntoa(const unsigned char *, size_t);
+size_t hwaddr_aton(unsigned char *, const char *);
 
-interface_t *read_interface (const char *ifname, int metric);
-int get_mtu (const char *ifname);
-int set_mtu (const char *ifname, short int mtu);
+struct interface *read_interface(const char *, int);
+int get_mtu(const char *);
+int set_mtu(const char *, short int);
 
-int add_address (const char *ifname, struct in_addr address,
-		 struct in_addr netmask, struct in_addr broadcast);
-int del_address (const char *ifname, struct in_addr address,
-		 struct in_addr netmask);
+int add_address(const char *, struct in_addr, struct in_addr, struct in_addr);
+int del_address(const char *, struct in_addr, struct in_addr);
+int flush_addresses(const char *);
+in_addr_t get_address(const char *);
+int has_address(const char *, struct in_addr);
 
-int flush_addresses (const char *ifname);
-in_addr_t get_address (const char *ifname);
-int has_address (const char *ifname, struct in_addr address);
+int add_route(const char *, struct in_addr, struct in_addr, struct in_addr, int);
+int change_route(const char *, struct in_addr, struct in_addr, struct in_addr, int);
+int del_route(const char *, struct in_addr, struct in_addr, struct in_addr, int);
 
-int add_route (const char *ifname, struct in_addr destination,
-	       struct in_addr netmask, struct in_addr gateway, int metric);
-int change_route (const char *ifname, struct in_addr destination,
-		  struct in_addr netmask, struct in_addr gateway, int metric);
-int del_route (const char *ifname, struct in_addr destination,
-	       struct in_addr netmask, struct in_addr gateway, int metric);
-
-int inet_ntocidr (struct in_addr address);
-int inet_cidrtoaddr (int cidr, struct in_addr *addr);
+int inet_ntocidr(struct in_addr);
+int inet_cidrtoaddr(int, struct in_addr *);
 
 #ifdef __linux__
-typedef int (*netlink_callback) (struct nlmsghdr *hdr, void *arg);
-int send_netlink (struct nlmsghdr *hdr, netlink_callback callback, void *arg);
+typedef int (*netlink_callback)(struct nlmsghdr *, void *);
+int send_netlink(struct nlmsghdr *, netlink_callback, void *);
 #endif
 #endif

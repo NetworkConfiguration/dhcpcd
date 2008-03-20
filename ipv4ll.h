@@ -33,7 +33,7 @@
 #include "dhcp.h"
 #include "interface.h"
 
-int ipv4ll_get_address (interface_t *iface, dhcp_t *dhcp);
+int ipv4ll_get_address(struct interface *, struct dhcp *);
 
 #endif
 #endif

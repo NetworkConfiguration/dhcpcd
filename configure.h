@@ -32,7 +32,7 @@
 #include "interface.h"
 #include "dhcp.h"
 
-int configure (const options_t *options, interface_t *iface,
-			   const dhcp_t *dhcp, bool up);
+int configure(const struct options *, struct interface *,
+	      const struct dhcp *, bool up);
 
 #endif

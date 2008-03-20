@@ -44,25 +44,25 @@
 #ifdef __GLIBC__
 #  if ! defined(__UCLIBC__) && ! defined (__dietlibc__)
 #    undef HAVE_STRLCPY
-size_t strlcpy (char *dst, const char *src, size_t size);
+size_t strlcpy(char *, const char *, size_t);
 #  endif
 #endif
 
 #define HAVE_SRANDOMDEV
 #if defined(__GLIBC__) || defined(__NetBSD__)
 #  undef HAVE_SRANDOMDEV
-void srandomdev (void);
+void srandomdev(void);
 #endif
 
-int close_fds (void);
-int close_on_exec (int fd);
-char *get_line (FILE *fp);
-int get_time (struct timeval *tp);
-time_t uptime (void);
-void writepid (int fd, pid_t pid);
-void *xrealloc (void *ptr, size_t size);
-void *xmalloc (size_t size);
-void *xzalloc (size_t size);
-char *xstrdup (const char *str);
+int close_fds(void);
+int close_on_exec(int);
+ssize_t get_line(char **, size_t *, FILE *);
+int get_time(struct timeval *);
+time_t uptime(void);
+void writepid(int, pid_t);
+void *xrealloc(void *, size_t);
+void *xmalloc(size_t);
+void *xzalloc(size_t);
+char *xstrdup(const char *);
 
 #endif

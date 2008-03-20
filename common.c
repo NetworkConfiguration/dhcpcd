@@ -26,6 +26,7 @@
  */
 
 #include <sys/time.h>
+
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -39,105 +40,109 @@
 
 /* Handy routine to read very long lines in text files.
  * This means we read the whole line and avoid any nasty buffer overflows. */
-char *get_line (FILE *fp)
+ssize_t
+get_line(char **line, size_t *len, FILE *fp)
 {
-	char *line = NULL;
 	char *p;
-	size_t len = 0;
 	size_t last = 0;
 
-	if (feof (fp))
-		return (NULL);
+	if (feof(fp))
+		return 0;
 
 	do {
-		len += BUFSIZ;
-		line = xrealloc (line, sizeof (char) * len);
-		p = line + last;
-		memset (p, 0, BUFSIZ);
-		fgets (p, BUFSIZ, fp);
-		last += strlen (p);
-	} while (! feof (fp) && line[last - 1] != '\n');
+		if (*line == NULL || last != 0) {
+			*len += BUFSIZ;
+			*line = xrealloc(*line, *len);
+		}
+		p = *line + last;
+		memset(p, 0, BUFSIZ);
+		fgets(p, BUFSIZ, fp);
+		last += strlen(p);
+	} while (! feof(fp) && (*line)[last - 1] != '\n');
 
 	/* Trim the trailing newline */
-	if (*line && line[--last] == '\n')
-		line[last] = '\0';
+	if (**line && (*line)[last - 1] == '\n')
+		(*line)[last - 1] = '\0';
 
-	return (line);
+	return last;
 }
 
 /* OK, this should be in dhcpcd.c
  * It's here to make dhcpcd more readable */
 #ifndef HAVE_SRANDOMDEV
-void srandomdev (void)
+void srandomdev(void)
 {
 	int fd;
 	unsigned long seed;
 
-	fd = open ("/dev/urandom", 0);
-	if (fd == -1 || read (fd,  &seed, sizeof (seed)) == -1) {
-		logger (LOG_WARNING, "Could not read from /dev/urandom: %s",
-			strerror (errno));
-		seed = time (0);
+	fd = open("/dev/urandom", 0);
+	if (fd == -1 || read(fd,  &seed, sizeof(seed)) == -1) {
+		logger(LOG_WARNING, "Could not read from /dev/urandom: %s",
+		       strerror(errno));
+		seed = time(0);
 	}
 	if (fd >= 0)
 		close(fd);
 
-	srandom (seed);
+	srandom(seed);
 }
 #endif
 
 /* strlcpy is nice, shame glibc does not define it */
 #ifndef HAVE_STRLCPY
-size_t strlcpy (char *dst, const char *src, size_t size)
+size_t
+strlcpy(char *dst, const char *src, size_t size)
 {
 	const char *s = src;
 	size_t n = size;
 
 	if (n && --n)
 		do {
-			if (! (*dst++ = *src++))
+			if (!(*dst++ = *src++))
 				break;
 		} while (--n);
 
-	if (! n) {
+	if (!n) {
 		if (size)
 			*dst = '\0';
 		while (*src++);
 	}
 
-	return (src - s - 1);
+	return src - s - 1;
 }
 #endif
 
 /* Close our fd's */
-int close_fds (void)
+int
+close_fds(void)
 {
 	int fd;
 
-	if ((fd = open ("/dev/null", O_RDWR)) == -1) {
-		logger (LOG_ERR, "open `/dev/null': %s", strerror (errno));
-		return (-1);
+	if ((fd = open("/dev/null", O_RDWR)) == -1) {
+		logger(LOG_ERR, "open `/dev/null': %s", strerror(errno));
+		return -1;
 	}
 
-	dup2 (fd, fileno (stdin));
-	dup2 (fd, fileno (stdout));
-	dup2 (fd, fileno (stderr));
+	dup2(fd, fileno(stdin));
+	dup2(fd, fileno(stdout));
+	dup2(fd, fileno(stderr));
 	if (fd > 2)
-		close (fd);
-	return (0);
+		close(fd);
+	return 0;
 }
 
-int close_on_exec (int fd)
+int
+close_on_exec(int fd)
 {
 	int flags;
 
-	if ((flags = fcntl (fd, F_GETFD, 0)) == -1
-	    || fcntl (fd, F_SETFD, flags | FD_CLOEXEC) == -1)
+	if ((flags = fcntl(fd, F_GETFD, 0)) == -1
+	    || fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == -1)
 	{
-		logger (LOG_ERR, "fcntl: %s", strerror (errno));
-		return (-1);
+		logger(LOG_ERR, "fcntl: %s", strerror(errno));
+		return -1;
 	}
-	return (0);
+	return 0;
 }
 
 /* Handy function to get the time.
@@ -145,105 +150,111 @@ int close_on_exec (int fd)
  * Which is why we use CLOCK_MONOTONIC, but it is not available on all
  * platforms.
  */
-int get_time (struct timeval *tp)
+int
+get_time(struct timeval *tp)
 {
 #if defined(_POSIX_MONOTONIC_CLOCK) && defined(CLOCK_MONOTONIC)
 	struct timespec ts;
 	static clockid_t posix_clock;
 	static int posix_clock_set = 0;
 
-	if (! posix_clock_set) {
-		if (sysconf (_SC_MONOTONIC_CLOCK) >= 0)
+	if (!posix_clock_set) {
+		if (sysconf(_SC_MONOTONIC_CLOCK) >= 0)
 			posix_clock = CLOCK_MONOTONIC;
 		else
 			posix_clock = CLOCK_REALTIME;
 		posix_clock_set = 1;
 	}
 
-	if (clock_gettime (posix_clock, &ts) == -1) {
-		logger (LOG_ERR, "clock_gettime: %s", strerror (errno));
-		return (-1);
+	if (clock_gettime(posix_clock, &ts) == -1) {
+		logger(LOG_ERR, "clock_gettime: %s", strerror(errno));
+		return -1;
 	}
 
 	tp->tv_sec = ts.tv_sec;
 	tp->tv_usec = ts.tv_nsec / 1000;
-	return (0);
+	return 0;
 #else
-	if (gettimeofday (tp, NULL) == -1) {
-		logger (LOG_ERR, "gettimeofday: %s", strerror (errno));
-		return (-1);
+	if (gettimeofday(tp, NULL) == -1) {
+		logger(LOG_ERR, "gettimeofday: %s", strerror(errno));
+		return -1;
 	}
-	return (0);
+	return 0;
 #endif
 }
 
-time_t uptime (void)
+time_t
+uptime(void)
 {
 	struct timeval tp;
 
-	if (get_time (&tp) == -1)
-		return (-1);
+	if (get_time(&tp) == -1)
+		return -1;
 
-	return (tp.tv_sec);
+	return tp.tv_sec;
 }
 
-void writepid (int fd, pid_t pid)
+void
+writepid(int fd, pid_t pid)
 {
 	char spid[16];
-	if (ftruncate (fd, (off_t) 0) == -1) {
-		logger (LOG_ERR, "ftruncate: %s", strerror (errno));
+	ssize_t len;
+
+	if (ftruncate(fd, (off_t)0) == -1) {
+		logger(LOG_ERR, "ftruncate: %s", strerror(errno));
 	} else {
-		ssize_t len;
-		snprintf (spid, sizeof (spid), "%u", pid);
-		len = pwrite (fd, spid, strlen (spid), (off_t) 0);
-		if (len != (ssize_t) strlen (spid))
-			logger (LOG_ERR, "pwrite: %s", strerror (errno));
+		snprintf(spid, sizeof(spid), "%u", pid);
+		len = pwrite(fd, spid, strlen(spid), (off_t)0);
+		if (len != (ssize_t)strlen(spid))
+			logger(LOG_ERR, "pwrite: %s", strerror(errno));
 	}
 }
 
-void *xmalloc (size_t s)
+void *
+xmalloc(size_t s)
 {
-	void *value = malloc (s);
+	void *value = malloc(s);
 
 	if (value)
-		return (value);
-
-	logger (LOG_ERR, "memory exhausted");
-
-	exit (EXIT_FAILURE);
-	/* NOTREACHED */
-}
-
-void *xzalloc (size_t s)
-{
-	void *value = xmalloc (s);
-	memset (value, 0, s);
-	return (value);
-}
-
-void *xrealloc (void *ptr, size_t s)
-{
-	void *value = realloc (ptr, s);
-
-	if (value)
-		return (value);
-
+		return value;
 	logger (LOG_ERR, "memory exhausted");
 	exit (EXIT_FAILURE);
 	/* NOTREACHED */
 }
 
-char *xstrdup (const char *str)
+void *
+xzalloc(size_t s)
+{
+	void *value = xmalloc(s);
+
+	memset(value, 0, s);
+	return value;
+}
+
+void *
+xrealloc(void *ptr, size_t s)
+{
+	void *value = realloc(ptr, s);
+
+	if (value)
+		return (value);
+	logger(LOG_ERR, "memory exhausted");
+	exit(EXIT_FAILURE);
+	/* NOTREACHED */
+}
+
+char *
+xstrdup(const char *str)
 {
 	char *value;
 
 	if (! str)
-		return (NULL);
+		return NULL;
 
-	if ((value = strdup (str)))
-		return (value);
+	if ((value = strdup(str)))
+		return value;
 
-	logger (LOG_ERR, "memory exhausted");
-	exit (EXIT_FAILURE);
+	logger(LOG_ERR, "memory exhausted");
+	exit(EXIT_FAILURE);
 	/* NOTREACHED */
 }

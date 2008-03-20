@@ -33,10 +33,10 @@
 #include "dhcp.h"
 
 #ifdef ENABLE_INFO
-bool write_info (const interface_t *iface, const dhcp_t *dhcp,
-				 const options_t *options, bool overwrite);
+bool write_info(const struct interface *, const struct dhcp *,
+		const struct options *, bool);
 
-bool read_info (const interface_t *iface, dhcp_t *dhcp);
+bool read_info(const struct interface *, struct dhcp *);
 #endif
 
 #endif

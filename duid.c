@@ -26,6 +26,7 @@
  */
 
 #include <arpa/inet.h>
+
 #include <errno.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -43,7 +44,8 @@
 
 #define THIRTY_YEARS_IN_SECONDS    946707779
 
-size_t get_duid (unsigned char *duid, const interface_t *iface)
+size_t
+get_duid(unsigned char *duid, const struct interface *iface)
 {
 	FILE *f;
 	uint16_t type = 0;
@@ -53,66 +55,65 @@ size_t get_duid (unsigned char *duid, const interface_t *iface)
 	int x = 0;
 	unsigned char *p = duid;
 	size_t len = 0;
+	char *line = NULL;
 	
-	if (! iface)
-		return (0);
-
 	/* If we already have a DUID then use it as it's never supposed
 	 * to change once we have one even if the interfaces do */
-	if ((f = fopen (DUIDFILE, "r"))) {
-		char *line = get_line (f);
+	if ((f = fopen(DUIDFILE, "r"))) {
+		get_line(&line, &len, f);
 		if (line) {
-			len = hwaddr_aton (NULL, line);
+			len = hwaddr_aton(NULL, line);
 			if (len && len <= DUID_LEN)
-				hwaddr_aton (duid, line);
-			free (line);
-		}
-		fclose (f);
+				hwaddr_aton(duid, line);
+			free(line);
+		} else
+			len = 0;
+		fclose(f);
 		if (len)
-			return (len);
+			return len;
 	} else {
 		if (errno != ENOENT) {
-			logger (LOG_ERR, "fopen `%s': %s",
-				DUIDFILE, strerror (errno));
-			return (0);
+			logger(LOG_ERR, "fopen `%s': %s",
+			       DUIDFILE, strerror(errno));
+			return 0;
 		}
 	}
 
 	/* No file? OK, lets make one based on our interface */
-	type = htons (1); /* DUI-D-LLT */
-	memcpy (p, &type, 2);
+	type = htons(1); /* DUI-D-LLT */
+	memcpy(p, &type, 2);
 	p += 2;
 
-	hw = htons (iface->family);
-	memcpy (p, &hw, 2);
+	hw = htons(iface->family);
+	memcpy(p, &hw, 2);
 	p += 2;
 
 	/* time returns seconds from jan 1 1970, but DUID-LLT is
 	 * seconds from jan 1 2000 modulo 2^32 */
-	t = time (NULL) - THIRTY_YEARS_IN_SECONDS;
-	ul = htonl (t & 0xffffffff);
-	memcpy (p, &ul, 4);
+	t = time(NULL) - THIRTY_YEARS_IN_SECONDS;
+	ul = htonl(t & 0xffffffff);
+	memcpy(p, &ul, 4);
 	p += 4;
 
 	/* Finally, add the MAC address of the interface */
-	memcpy (p, iface->hwaddr, iface->hwlen);
+	memcpy(p, iface->hwaddr, iface->hwlen);
 	p += iface->hwlen;
 
 	len = p - duid;
 
-	if (! (f = fopen (DUIDFILE, "w")))
-		logger (LOG_ERR, "fopen `%s': %s", DUIDFILE, strerror (errno));
+	if (!(f = fopen(DUIDFILE, "w")))
+		logger(LOG_ERR, "fopen `%s': %s", DUIDFILE, strerror(errno));
 	else {
-		x = fprintf (f, "%s\n", hwaddr_ntoa (duid, len));
-		fclose (f);
+		x = fprintf(f, "%s\n", hwaddr_ntoa(duid, len));
+		fclose(f);
 	}
 
 	/* Failed to write the duid? scrub it, we cannot use it */
 	if (x < 1) {
 		len = 0;
-		unlink (DUIDFILE);
+		unlink(DUIDFILE);
 	}
 
-	return (len);
+	return len;
 }
 #endif

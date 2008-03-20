@@ -40,80 +40,82 @@
 static int loglevel = LOG_WARNING;
 static char logprefix[12] = {0};
 
-int logtolevel (const char *priority)
+int
+logtolevel(const char *priority)
 {
 	CODE *c;
 
-	if (isdigit ((int) *priority))
-		return (atoi (priority));
-
+	if (isdigit((int)*priority))
+		return atoi(priority);
 	for (c = prioritynames; c->c_name; c++)
-		if (! strcasecmp (priority, c->c_name))
-			return (c->c_val);
-
-	return (-1);
+		if (!strcasecmp(priority, c->c_name))
+			return c->c_val;
+	return -1;
 }
 
-static const char *leveltolog (int level) {
+static const char *
+leveltolog(int level) {
 	CODE *c;
 
 	for (c = prioritynames; c->c_name; c++)
 		if (c->c_val == level)
-			return (c->c_name);
-
-	return (NULL);
+			return c->c_name;
+	return NULL;
 }
 
-void setloglevel (int level)
+void
+setloglevel(int level)
 {
 	loglevel = level;
 }
 
-void setlogprefix (const char *prefix)
+void
+setlogprefix(const char *prefix)
 {
-	snprintf (logprefix, sizeof (logprefix), "%s", prefix);
+	snprintf(logprefix, sizeof(logprefix), "%s", prefix);
 }
 
-void logger (int level, const char *fmt, ...)
+void
+logger(int level, const char *fmt, ...)
 {
-	va_list p;
-	va_list p2;
+	va_list p, p2;
 	FILE *f = stderr;
+	size_t len, fmt2len;
+	char *fmt2, *pf;
 
-	va_start (p, fmt);
-	va_copy (p2, p);
+	va_start(p, fmt);
+	va_copy(p2, p);
 
 	if (level <= LOG_ERR || level <= loglevel) {
 		if (level == LOG_DEBUG || level == LOG_INFO)
 			f = stdout;
-		fprintf (f, "%s, %s", leveltolog (level), logprefix);
-		vfprintf (f, fmt, p);
-		fputc ('\n', f);
+		fprintf(f, "%s, %s", leveltolog(level), logprefix);
+		vfprintf(f, fmt, p);
+		fputc('\n', f);
 
 		/* stdout, stderr may be re-directed to some kind of buffer.
 		 * So we always flush to ensure it's written. */
-		fflush (f);
+		fflush(f);
 	}
 
 	if (level < LOG_DEBUG || level <= loglevel) {
-		size_t len = strlen (logprefix);
-		size_t fmt2len = strlen (fmt) + len + 1;
-		char *fmt2 = malloc (sizeof (char) * fmt2len);
-		char *pf = fmt2;
+		len = strlen(logprefix);
+		fmt2len = strlen(fmt) + len + 1;
+		fmt2 = pf = malloc(sizeof(char) * fmt2len);
 		if (fmt2) {
-			memcpy (pf, logprefix, len);
+			memcpy(pf, logprefix, len);
 			pf += len;
-			strlcpy (pf, fmt, fmt2len - len);
-			vsyslog (level, fmt2, p2);
-			free (fmt2);
+			strlcpy(pf, fmt, fmt2len - len);
+			vsyslog(level, fmt2, p2);
+			free(fmt2);
 		} else {
-			vsyslog (level, fmt, p2);
-			syslog (LOG_ERR, "logger: memory exhausted");
-			exit (EXIT_FAILURE);
+			vsyslog(level, fmt, p2);
+			syslog(LOG_ERR, "logger: memory exhausted");
+			exit(EXIT_FAILURE);
 		}
 	}
 
-	va_end (p2);
-	va_end (p);
+	va_end(p2);
+	va_end(p);
 }
 
