@@ -110,7 +110,7 @@ write_info(const struct interface *iface, const struct dhcp *dhcp,
 	   const struct options *options, bool overwrite)
 {
 	FILE *f;
-	struct route *route;
+	struct rt *route;
 	struct stat sb;
 	struct in_addr addr;
 	bool doneone;
@@ -324,7 +324,7 @@ read_info(const struct interface *iface, struct dhcp *dhcp)
 	char *p;
 	struct stat sb;
 	char *pp, *dest, *net, *gate;
-	struct route *route;
+	struct rt *route;
 
 	if (stat(iface->infofile, &sb) != 0) {
 		logger(LOG_ERR, "lease information file `%s' does not exist",

@@ -92,14 +92,14 @@
 #define NSTAILQ_FOREACH(var, head, field) \
 		if (head) STAILQ_FOREACH (var, head, field)
 
-struct route
+struct rt
 {
 	struct in_addr destination; 
 	struct in_addr netmask;
 	struct in_addr gateway;
-	STAILQ_ENTRY (route) entries;
+	STAILQ_ENTRY (rt) entries;
 };
-STAILQ_HEAD (route_head, route);
+STAILQ_HEAD (route_head, rt);
 
 struct address
 {

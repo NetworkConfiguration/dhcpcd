@@ -253,9 +253,9 @@ in_addresses(const struct address_head *addresses, struct in_addr address)
 }
 
 static bool
-in_routes(const struct route_head *routes, struct route *route)
+in_routes(const struct route_head *routes, struct rt *route)
 {
-	const struct route *r;
+	const struct rt *r;
 
 	if (! routes)
 		return false;
@@ -532,9 +532,9 @@ int
 configure (const struct options *options, struct interface *iface,
 	   const struct dhcp *dhcp, bool up)
 {
-	struct route *route = NULL;
+	struct rt *route = NULL;
 	struct route_head *new_routes = NULL;
-	struct route *new_route = NULL;
+	struct rt *new_route = NULL;
 	char *newhostname = NULL;
 	char *curhostname = NULL;
 	int remember;
@@ -680,8 +680,8 @@ configure (const struct options *options, struct interface *iface,
 				new_routes = xmalloc(sizeof(*new_routes));
 				STAILQ_INIT(new_routes);
 			}
-			new_route = xmalloc(sizeof (struct route));
-			memcpy(new_route, route, sizeof (*new_route));
+			new_route = xmalloc(sizeof(*new_route));
+			memcpy(new_route, route, sizeof(*new_route));
 			STAILQ_INSERT_TAIL(new_routes, new_route, entries);
 		}
 #ifdef THERE_IS_NO_FORK

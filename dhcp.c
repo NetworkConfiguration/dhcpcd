@@ -403,7 +403,7 @@ decode_CSR(const unsigned char *p, int len)
 	unsigned int cidr;
 	unsigned int ocets;
 	struct route_head *routes = NULL;
-	struct route *route;
+	struct rt *route;
 
 	/* Minimum is 5 -first is CIDR and a router length of 4 */
 	if (len < 5)
@@ -579,7 +579,7 @@ decode_routes(const unsigned char *data, int length)
 {
 	int i;
 	struct route_head *head = NULL;
-	struct route *route;
+	struct rt *route;
 	
 	for (i = 0; i < length; i += 8) {
 		if (! head) {
@@ -602,7 +602,7 @@ decode_routers(const unsigned char *data, int length)
 {
 	int i;
 	struct route_head *head = NULL;
-	struct route *route = NULL;
+	struct rt *route = NULL;
 
 	for (i = 0; i < length; i += 4) {
 		if (! head) {

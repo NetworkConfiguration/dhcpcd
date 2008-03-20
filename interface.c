@@ -81,8 +81,8 @@ free_address(struct address_head *addresses)
 void
 free_route(struct route_head *routes)
 {
-	struct route *p;
-	struct route *n;
+	struct rt *p;
+	struct rt *n;
 
 	if (!routes)
 		return;

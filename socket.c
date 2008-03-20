@@ -384,7 +384,7 @@ get_packet(const struct interface *iface, unsigned char *data,
 		struct udp_dhcp_packet *packet;
 	} pay;
 	struct timespec ts;
-	size_t len
+	size_t len;
 	unsigned char *payload;
 	bool have_data;
 
