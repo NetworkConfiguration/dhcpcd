@@ -539,8 +539,6 @@ configure (const struct options *options, struct interface *iface,
 	char *curhostname = NULL;
 	int remember;
 	unsigned short mtu;
-	struct in_addr td;
-	struct in_addr tg;
 	struct in_addr dest;
 	struct in_addr mask;
 	struct in_addr gate;
@@ -638,10 +636,10 @@ configure (const struct options *options, struct interface *iface,
 	    options->metric > 0 &&
 	    dhcp->netmask.s_addr != INADDR_BROADCAST)
 	{
-		td.s_addr = dhcp->address.s_addr & dhcp->netmask.s_addr;
-		tg.s_addr = 0;
-		add_route (iface->name, td, dhcp->netmask, tg, options->metric);
-		del_route (iface->name, td, dhcp->netmask, tg, 0);
+		dest.s_addr = dhcp->address.s_addr & dhcp->netmask.s_addr;
+		gate.s_addr = 0;
+		add_route (iface->name, dest, dhcp->netmask, gate, options->metric);
+		del_route (iface->name, dest, dhcp->netmask, gate, 0);
 	}
 #endif
 
