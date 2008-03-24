@@ -47,9 +47,10 @@
 
 #include "config.h"
 #include "dhcp.h"
-#include "interface.h"
+#include "if.h"
 #include "logger.h"
 #include "socket.h"
+#include "bpf-filter.h"
 
 void
 setup_packet_filters(void)

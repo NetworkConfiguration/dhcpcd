@@ -147,6 +147,8 @@ void log_route(struct in_addr, struct in_addr, struct in_addr, int, int, int);
 int inet_ntocidr(struct in_addr);
 int inet_cidrtoaddr(int, struct in_addr *);
 
+int do_interface(const char *, unsigned char *, size_t *, struct in_addr *,
+		 bool, bool);
 int if_address(const char *, struct in_addr, struct in_addr, struct in_addr,
 	       int del);
 int if_route(const char *, struct in_addr, struct in_addr, struct in_addr,

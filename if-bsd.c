@@ -48,7 +48,7 @@
 #include "config.h"
 #include "common.h"
 #include "dhcp.h"
-#include "interface.h"
+#include "if.h"
 #include "logger.h"
 
 /* Darwin doesn't define this for some very odd reason */
@@ -164,7 +164,7 @@ if_route(const char *ifname, struct in_addr destination,
 			rtm.hdr.rtm_flags |= RTF_HOST;
 
 		hwaddr = xmalloc(sizeof(unsigned char) * HWADDR_LEN);
-		_do_interface(ifname, hwaddr, &hwlen, NULL, false, false);
+		do_interface(ifname, hwaddr, &hwlen, NULL, false, false);
 		memset(&su, 0, sizeof(su));
 		su.sdl.sdl_len = sizeof(su.sdl);
 		su.sdl.sdl_family = AF_LINK;

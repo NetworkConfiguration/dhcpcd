@@ -29,6 +29,9 @@
 #include <sys/ioctl.h>
 
 #include <arpa/inet.h>
+#ifdef AF_LINK
+# include <net/if_dl.h>
+#endif
 
 #include <ctype.h>
 #include <errno.h>
@@ -150,7 +153,7 @@ hwaddr_aton(unsigned char *buffer, const char *addr)
 	return len;
 }
 
-static int
+int
 do_interface(const char *ifname,
 	     _unused unsigned char *hwaddr, _unused size_t *hwlen,
 	     struct in_addr *addr, bool flush, bool get)
