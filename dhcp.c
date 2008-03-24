@@ -635,32 +635,6 @@ free_route(struct route_head *routes)
 	free(routes);
 }
 
-static bool
-dhcp_add_address(struct address_head **addresses,
-		 const unsigned char *data, int length)
-{
-	int i;
-	struct address *address;
-
-	for (i = 0; i < length; i += 4) {
-		/* Sanity check */
-		if (i + 4 > length) {
-			logger(LOG_ERR, "invalid address length");
-			return false;
-		}
-
-		if (*addresses == NULL) {
-			*addresses = xmalloc(sizeof(**addresses));
-			STAILQ_INIT(*addresses);
-		}
-		address = xzalloc(sizeof(*address));
-		memcpy(&address->address.s_addr, data + i, 4);
-		STAILQ_INSERT_TAIL(*addresses, address, entries);
-	}
-
-	return true;
-}
-
 #ifdef ENABLE_INFO
 static char *
 decode_sipservers(const unsigned char *data, int length)
@@ -765,7 +739,7 @@ decode_routers(const unsigned char *data, int length)
 {
 	int i;
 	struct route_head *head = NULL;
-	struct rt *route = NULL;
+	struct rt *route;
 
 	for (i = 0; i < length; i += 4) {
 		if (! head) {
@@ -778,6 +752,58 @@ decode_routers(const unsigned char *data, int length)
 	}
 
 	return head;
+}
+
+static bool
+add_addr(struct address_head **addresses,
+	 const unsigned char *data, size_t length, char option)
+{
+	size_t i;
+	struct address *address;
+
+	for (i = 0; i < length; i += 4) {
+		/* Sanity check */
+		if (i + 4 > length) {
+			logger(LOG_ERR, "invalid length %lu for option %i",
+			       length, option);
+			return false;
+		}
+
+		if (*addresses == NULL) {
+			*addresses = xmalloc(sizeof(**addresses));
+			STAILQ_INIT(*addresses);
+		}
+		address = xzalloc(sizeof(*address));
+		memcpy(&address->address.s_addr, data + i, 4);
+		STAILQ_INSERT_TAIL(*addresses, address, entries);
+	}
+
+	return true;
+}
+
+static bool
+get_string(char **ptr, const unsigned char *data, size_t len)
+{
+	if (*ptr)
+		free(*ptr);
+	*ptr = xmalloc(len + 1);
+	memcpy(*ptr, data, len);
+	(*ptr)[len] = '\0';
+	return true;
+}
+
+static bool
+get_value(void *ptr, const unsigned char *data, size_t len,
+	  char option, size_t lencheck)
+{
+	if (lencheck && len != lencheck) {
+		logger(LOG_ERR, "invalid length %lu for option %i",
+		       len, option);
+		return false;
+	}
+
+	memcpy(ptr, data, len);
+	return true;
 }
 
 int
@@ -812,13 +838,25 @@ parse_dhcpmessage(struct dhcp *dhcp, const struct dhcp_message *message)
 	strlcpy(dhcp->servername, (char *)message->servername,
 		sizeof(dhcp->servername));
 
+/* Handy macros to make the get_* functions easier to use */
+#define GET_UINT8(var)    get_value(&(var), p, length, option, sizeof(uint8_t))
+#define GET_UINT16(var)   get_value(&(var), p, length, option, sizeof(uint16_t))
+#define GET_UINT32(var)   get_value(&(var), p, length, option, sizeof(uint32_t))
+#define GET_UINT16_H(var) if (GET_UINT16(var)) var = ntohs(var)
+#define GET_UINT32_H(var) if (GET_UINT32(var)) var = ntohl(var)
+#define GET_STR(var)      get_string(&(var), p, length)
+#define GET_ADDR(var)     add_addr(&var, p, length, option)
+
 #define LEN_ERR \
 	{ \
-		logger(LOG_ERR, "invalid length %d for option %d", \
-		       length, option); \
+		logger (LOG_ERR, "invalid length %d for option %d", \
+			length, option); \
 		p += length; \
 		continue; \
 	}
+#define LENGTH(_length)     if (length != _length)   LEN_ERR;
+#define MIN_LENGTH(_length) if (length < _length)    LEN_ERR;
+#define MULT_LENGTH(_mult)  if (length % _mult != 0) LEN_ERR;
 
 parse_start:
 	while (p < end) {
@@ -839,31 +877,6 @@ parse_start:
 			retval = -1;
 			goto eexit;
 		}
-
-#define LENGTH(_length) \
-		if (length != _length) \
-		LEN_ERR;
-#define MIN_LENGTH(_length) \
-		if (length < _length) \
-		LEN_ERR;
-#define MULT_LENGTH(_mult) \
-		if (length % _mult != 0) \
-		LEN_ERR;
-#define GET_UINT8(_val) \
-		LENGTH(sizeof(uint8_t)); \
-		memcpy(&_val, p, sizeof(uint8_t));
-#define GET_UINT16(_val) \
-		LENGTH (sizeof(uint16_t)); \
-		memcpy(&_val, p, sizeof(uint16_t));
-#define GET_UINT32(_val) \
-		LENGTH (sizeof(uint32_t)); \
-		memcpy(&_val, p, sizeof(uint32_t));
-#define GET_UINT16_H(_val) \
-		GET_UINT16(_val); \
-		_val = ntohs(_val);
-#define GET_UINT32_H(_val) \
-		GET_UINT32(_val); \
-		_val = ntohl(_val);
 
 		switch (option) {
 		case DHCP_MESSAGETYPE:
@@ -902,61 +915,38 @@ parse_start:
 				dhcp->mtu = 0;
 			}
 			break;
-
-#undef GET_UINT32_H
-#undef GET_UINT32
-#undef GET_UINT16_H
-#undef GET_UINT16
-#undef GET_UINT8
-
-#define GETSTR(_var) { \
-	MIN_LENGTH(sizeof(char)); \
-	if (_var) free (_var); \
-	_var = xmalloc((size_t)length + 1); \
-	memcpy(_var, p, (size_t)length); \
-	memset(_var + length, 0, 1); \
-}
 		case DHCP_HOSTNAME:
-			GETSTR(dhcp->hostname);
+			GET_STR(dhcp->hostname);
 			break;
 		case DHCP_DNSDOMAIN:
-			GETSTR(dhcp->dnsdomain);
+			GET_STR(dhcp->dnsdomain);
 			break;
 		case DHCP_MESSAGE:
-			GETSTR(dhcp->message);
+			GET_STR(dhcp->message);
 			break;
 #ifdef ENABLE_INFO
 		case DHCP_ROOTPATH:
-			GETSTR(dhcp->rootpath);
+			GET_STR(dhcp->rootpath);
 			break;
 #endif
 #ifdef ENABLE_NIS
 		case DHCP_NISDOMAIN:
-			GETSTR(dhcp->nisdomain);
+			GET_STR(dhcp->nisdomain);
 			break;
 #endif
-#undef GETSTR
-
-#define GETADDR(_var) \
-	MULT_LENGTH (4); \
-	if (! dhcp_add_address (&_var, p, length)) { \
-		retval = -1; \
-		goto eexit; \
-	}
 		case DHCP_DNSSERVER:
-			GETADDR(dhcp->dnsservers);
+			GET_ADDR(dhcp->dnsservers);
 			break;
 #ifdef ENABLE_NTP
 		case DHCP_NTPSERVER:
-			GETADDR(dhcp->ntpservers);
+			GET_ADDR(dhcp->ntpservers);
 			break;
 #endif
 #ifdef ENABLE_NIS
 		case DHCP_NISSERVER:
-			GETADDR(dhcp->nisservers);
+			GET_ADDR(dhcp->nisservers);
 			break;
 #endif
-#undef GETADDR
 
 		case DHCP_DNSSEARCH:
 			MIN_LENGTH(1);
@@ -967,38 +957,32 @@ parse_start:
 				decode_search(p, length, dhcp->dnssearch);
 			}
 			break;
-
 		case DHCP_CSR:
 			MIN_LENGTH(5);
 			free_route(csr);
 			csr = decode_CSR(p, length);
 			break;
-
 		case DHCP_MSCSR:
 			MIN_LENGTH(5);
 			free_route(mscsr);
 			mscsr = decode_CSR(p, length);
 			break;
-
 #ifdef ENABLE_INFO
 		case DHCP_SIPSERVER:
 			free(dhcp->sipservers);
 			dhcp->sipservers = decode_sipservers(p, length);
 			break;
 #endif
-
 		case DHCP_STATICROUTE:
 			MULT_LENGTH(8);
 			free_route(routes);
 			routes = decode_routes(p, length);
 			break;
-
 		case DHCP_ROUTERS:
 			MULT_LENGTH(4);
 			free_route(routers);
 			routers = decode_routers(p, length);
 			break;
-
 		case DHCP_OPTIONSOVERLOADED:
 			LENGTH(1);
 			/* The overloaded option in an overloaded option
@@ -1011,21 +995,14 @@ parse_start:
 					parse_sname = true;
 			}
 			break;
-
 		case DHCP_FQDN:
 			/* We ignore replies about FQDN */
 			break;
-
-#undef LENGTH
-#undef MIN_LENGTH
-#undef MULT_LENGTH
-
 		default:
 			logger (LOG_DEBUG,
 			       	"no facility to parse DHCP code %u", option);
 				break;
 		}
-
 		p += length;
 	}
 
