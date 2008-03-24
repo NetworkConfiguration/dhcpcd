@@ -25,7 +25,9 @@
  * SUCH DAMAGE.
  */
 
-#define SYSLOG_NAMES
+#ifndef SYSLOG_NAMES
+# define SYSLOG_NAMES
+#endif
 
 #include <ctype.h>
 #include <stdarg.h>

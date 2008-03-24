@@ -488,6 +488,7 @@ log_route(struct in_addr destination, struct in_addr netmask,
 	free(dstd);
 }
 
+
 int
 add_address(const char *ifname, struct in_addr address,
 	    struct in_addr netmask, struct in_addr broadcast)

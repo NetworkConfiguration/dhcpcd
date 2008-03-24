@@ -210,12 +210,12 @@ main(int argc, char **argv)
 		case 'd':
 			debug++;
 			switch (debug) {
-				case 1:
-					setloglevel(LOG_DEBUG);
-					break;
-				case 2:
-					options->daemonise = false;
-					break;
+			case 1:
+				setloglevel(LOG_DEBUG);
+				break;
+			case 2:
+				options->daemonise = false;
+				break;
 			}
 			break;
 #ifdef THERE_IS_NO_FORK
@@ -224,7 +224,7 @@ main(int argc, char **argv)
 			close_fds();
 			break;
 		case 'g':
-			dhcpcd_skiproutes = xstrdup (optarg);
+			dhcpcd_skiproutes = xstrdup(optarg);
 			break;
 #endif
 		case 'h':

@@ -37,7 +37,9 @@
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#define __FAVOR_BSD /* Nasty hack so we can use BSD semantics for UDP */
 #include <netinet/udp.h>
+#undef __FAVOUR_BSD
 #include <stdint.h>
 
 #include "dhcpcd.h"
