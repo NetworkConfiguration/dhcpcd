@@ -29,7 +29,7 @@
 #define INFO_H
 
 #include "dhcpcd.h"
-#include "interface.h"
+#include "if.h"
 #include "dhcp.h"
 
 #ifdef ENABLE_INFO

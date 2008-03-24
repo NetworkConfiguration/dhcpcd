@@ -28,6 +28,12 @@
 #ifndef DHCP_H
 #define DHCP_H
 
+#ifdef __linux__
+#  include "queue.h" /* not all libc's support queue.h, so include our own */ 
+#else
+#  include <sys/queue.h>
+#endif
+
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
@@ -35,7 +41,7 @@
 #include <stdint.h>
 
 #include "dhcpcd.h"
-#include "interface.h"
+#include "if.h"
 
 /* Max MTU - defines dhcp option length */
 #define MTU_MAX             1500
@@ -126,6 +132,23 @@ struct fqdn
 	char *name;
 };
 
+/* We use these structures to handle multiple routes and addresses */
+struct rt
+{
+	struct in_addr destination; 
+	struct in_addr netmask;
+	struct in_addr gateway;
+	STAILQ_ENTRY (rt) entries;
+};
+STAILQ_HEAD (route_head, rt);
+
+struct address
+{
+	struct in_addr address;
+	STAILQ_ENTRY (address) entries;
+};
+STAILQ_HEAD (address_head, address);
+
 struct dhcp
 {
 	char version[11];
@@ -210,7 +233,10 @@ struct udp_dhcp_packet
 
 ssize_t send_message(const struct interface *, const struct dhcp *,
 		     uint32_t, char, const struct options *);
+void free_address(struct address_head *);
 void free_dhcp(struct dhcp *);
+void free_route(struct route_head *);
 int parse_dhcpmessage (struct dhcp *, const struct dhcp_message *);
+int valid_dhcp_packet(unsigned char *);
 
 #endif

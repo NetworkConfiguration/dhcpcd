@@ -31,7 +31,7 @@
 #ifdef ENABLE_ARP
 #include <netinet/in.h>
 
-#include "interface.h"
+#include "if.h"
 
 int arp_claim(struct interface *, struct in_addr);
 #endif

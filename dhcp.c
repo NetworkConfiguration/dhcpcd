@@ -30,6 +30,9 @@
 #include <sys/time.h>
 
 #include <netinet/in.h>
+#define __FAVOR_BSD /* Nasty hack so we can use BSD semantics for UDP */
+#include <netinet/udp.h>
+#undef __FAVOR_BSD
 #include <net/if_arp.h>
 #include <arpa/inet.h>
 
@@ -46,7 +49,6 @@
 #include "common.h"
 #include "dhcpcd.h"
 #include "dhcp.h"
-#include "interface.h"
 #include "logger.h"
 #include "socket.h"
 
@@ -87,6 +89,133 @@ dhcp_message(int type)
 			return d->name;
 
 	return NULL;
+}
+
+static uint16_t
+checksum(unsigned char *addr, uint16_t len)
+{
+	uint32_t sum = 0;
+	union
+	{
+		unsigned char *addr;
+		uint16_t *i;
+	} p;
+	uint16_t nleft = len;
+	uint8_t a = 0;
+
+	p.addr = addr;
+	while (nleft > 1) {
+		sum += *p.i++;
+		nleft -= 2;
+	}
+
+	if (nleft == 1) {
+		memcpy(&a, p.i, 1);
+		sum += ntohs(a) << 8;
+	}
+
+	sum = (sum >> 16) + (sum & 0xffff);
+	sum += (sum >> 16);
+
+	return ~sum;
+}
+
+static void
+make_dhcp_packet(struct udp_dhcp_packet *packet,
+		 const unsigned char *data, size_t length,
+		 struct in_addr source, struct in_addr dest)
+{
+	struct ip *ip = &packet->ip;
+	struct udphdr *udp = &packet->udp;
+
+	/* OK, this is important :)
+	 * We copy the data to our packet and then create a small part of the
+	 * ip structure and an invalid ip_len (basically udp length).
+	 * We then fill the udp structure and put the checksum
+	 * of the whole packet into the udp checksum.
+	 * Finally we complete the ip structure and ip checksum.
+	 * If we don't do the ordering like so then the udp checksum will be
+	 * broken, so find another way of doing it! */
+
+	memcpy(&packet->dhcp, data, length);
+
+	ip->ip_p = IPPROTO_UDP;
+	ip->ip_src.s_addr = source.s_addr;
+	if (dest.s_addr == 0)
+		ip->ip_dst.s_addr = INADDR_BROADCAST;
+	else
+		ip->ip_dst.s_addr = dest.s_addr;
+
+	udp->uh_sport = htons(DHCP_CLIENT_PORT);
+	udp->uh_dport = htons(DHCP_SERVER_PORT);
+	udp->uh_ulen = htons(sizeof(*udp) + length);
+	ip->ip_len = udp->uh_ulen;
+	udp->uh_sum = checksum((unsigned char *)packet, sizeof(*packet));
+
+	ip->ip_v = IPVERSION;
+	ip->ip_hl = 5;
+	ip->ip_id = 0;
+	ip->ip_tos = IPTOS_LOWDELAY;
+	ip->ip_len = htons (sizeof(*ip) + sizeof(*udp) + length);
+	ip->ip_id = 0;
+	ip->ip_off = htons(IP_DF); /* Don't fragment */
+	ip->ip_ttl = IPDEFTTL;
+
+	ip->ip_sum = checksum((unsigned char *)ip, sizeof(*ip));
+}
+
+int
+valid_dhcp_packet(unsigned char *data)
+{
+	union
+	{
+		unsigned char *data;
+		struct udp_dhcp_packet *packet;
+	} d;
+	uint16_t bytes;
+	uint16_t ipsum;
+	uint16_t iplen;
+	uint16_t udpsum;
+	struct in_addr source;
+	struct in_addr dest;
+	int retval = 0;
+
+	d.data = data;
+	bytes = ntohs(d.packet->ip.ip_len);
+	ipsum = d.packet->ip.ip_sum;
+	iplen = d.packet->ip.ip_len;
+	udpsum = d.packet->udp.uh_sum;
+
+	d.data = data;
+	d.packet->ip.ip_sum = 0;
+	if (ipsum != checksum((unsigned char *)&d.packet->ip,
+			      sizeof(d.packet->ip)))
+	{
+		logger(LOG_DEBUG, "bad IP header checksum, ignoring");
+		retval = -1;
+		goto eexit;
+	}
+
+	memcpy(&source, &d.packet->ip.ip_src, sizeof(d.packet->ip.ip_src));
+	memcpy(&dest, &d.packet->ip.ip_dst, sizeof(d.packet->ip.ip_dst));
+	memset(&d.packet->ip, 0, sizeof(d.packet->ip));
+	d.packet->udp.uh_sum = 0;
+
+	d.packet->ip.ip_p = IPPROTO_UDP;
+	memcpy(&d.packet->ip.ip_src, &source, sizeof(d.packet->ip.ip_src));
+	memcpy(&d.packet->ip.ip_dst, &dest, sizeof(d.packet->ip.ip_dst));
+	d.packet->ip.ip_len = d.packet->udp.uh_ulen;
+	if (udpsum && udpsum != checksum(d.data, bytes)) {
+		logger(LOG_ERR, "bad UDP checksum, ignoring");
+		retval = -1;
+	}
+
+eexit:
+	d.packet->ip.ip_sum = ipsum;
+	d.packet->ip.ip_len = iplen;
+	d.packet->udp.uh_sum = udpsum;
+
+	return retval;
 }
 
 ssize_t
@@ -451,6 +580,23 @@ decode_CSR(const unsigned char *p, int len)
 }
 
 void
+free_address(struct address_head *addresses)
+{
+	struct address *p;
+	struct address *n;
+
+	if (!addresses)
+		return;
+	p = STAILQ_FIRST(addresses);
+	while (p) {
+		n = STAILQ_NEXT(p, entries); 
+		free(p);
+		p = n;
+	}
+	free(addresses);
+}
+
+void
 free_dhcp(struct dhcp *dhcp)
 {
 	if (! dhcp)
@@ -470,6 +616,23 @@ free_dhcp(struct dhcp *dhcp)
 		free(dhcp->fqdn->name);
 		free(dhcp->fqdn);
 	}
+}
+
+void
+free_route(struct route_head *routes)
+{
+	struct rt *p;
+	struct rt *n;
+
+	if (!routes)
+		return;
+	p = STAILQ_FIRST(routes);
+	while (p) {
+		n = STAILQ_NEXT(p, entries);
+		free(p);
+		p = n;
+	}
+	free(routes);
 }
 
 static bool

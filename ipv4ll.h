@@ -31,7 +31,7 @@
 #ifdef ENABLE_IPV4LL
 
 #include "dhcp.h"
-#include "interface.h"
+#include "if.h"
 
 int ipv4ll_get_address(struct interface *, struct dhcp *);
 

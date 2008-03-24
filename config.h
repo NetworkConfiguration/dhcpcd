@@ -77,7 +77,7 @@
 #define PIDFILE             STATEDIR "/run/" PACKAGE "-%s.pid"
 
 #ifndef INFODIR
-# define INFODIR            "/var/lib/dhcpcd"
+# define INFODIR            "/var/db"
 #endif
 #define INFOFILE            INFODIR "/" PACKAGE "-%s.info"
 #define DUIDFILE            INFODIR "/" PACKAGE ".duid"

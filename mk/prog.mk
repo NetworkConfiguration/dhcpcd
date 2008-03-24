@@ -3,6 +3,9 @@
 
 # Copyright 2008 Roy Marples <roy@marples.name>
 
+include ${MK}/cc.mk
+include ${MK}/os.mk
+
 BINDIR?=	${PREFIX}/usr/bin
 BINMODE?=	0755
 OBJS+=		${SRCS:.c=.o}

@@ -31,12 +31,9 @@
 #include <stdbool.h>
 
 #include "dhcp.h"
-#include "interface.h"
+#include "if.h"
 
 void setup_packet_filters(void);
-void make_dhcp_packet(struct udp_dhcp_packet *, const unsigned char *,
-		      size_t, struct in_addr, struct in_addr);
-
 int open_socket(struct interface *, int);
 ssize_t send_packet(const struct interface *, int,
 		    const unsigned char *, size_t);

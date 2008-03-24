@@ -54,7 +54,7 @@
 #include "dhcp.h"
 #include "dhcpcd.h"
 #include "info.h"
-#include "interface.h"
+#include "if.h"
 #ifdef ENABLE_IPV4LL
 # include "ipv4ll.h"
 #endif

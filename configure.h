@@ -29,7 +29,7 @@
 #define DHCPCONFIG_H
 
 #include "dhcpcd.h"
-#include "interface.h"
+#include "if.h"
 #include "dhcp.h"
 
 int configure(const struct options *, struct interface *,

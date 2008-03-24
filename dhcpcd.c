@@ -48,7 +48,7 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 #include "client.h"
 #include "dhcpcd.h"
 #include "dhcp.h"
-#include "interface.h"
+#include "if.h"
 #include "logger.h"
 #include "socket.h"
 #include "version.h"

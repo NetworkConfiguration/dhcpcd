@@ -35,7 +35,7 @@
 #  define DUID_LEN 128 + 2
 #endif
 
-#include "interface.h"
+#include "if.h"
 
 size_t get_duid(unsigned char *, const struct interface *);
 #endif

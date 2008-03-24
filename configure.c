@@ -53,7 +53,7 @@
 #ifdef ENABLE_INFO
 # include "info.h"
 #endif
-#include "interface.h"
+#include "if.h"
 #include "dhcpcd.h"
 #include "logger.h"
 #include "signal.h"

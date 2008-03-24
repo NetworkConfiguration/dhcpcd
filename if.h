@@ -92,22 +92,6 @@
 #define NSTAILQ_FOREACH(var, head, field) \
 		if (head) STAILQ_FOREACH (var, head, field)
 
-struct rt
-{
-	struct in_addr destination; 
-	struct in_addr netmask;
-	struct in_addr gateway;
-	STAILQ_ENTRY (rt) entries;
-};
-STAILQ_HEAD (route_head, rt);
-
-struct address
-{
-	struct in_addr address;
-	STAILQ_ENTRY (address) entries;
-};
-STAILQ_HEAD (address_head, address);
-
 struct interface
 {
 	char name[IF_NAMESIZE];
@@ -138,8 +122,6 @@ struct interface
 	size_t clientid_len;
 };
 
-void free_address(struct address_head *);
-void free_route(struct route_head *);
 uint32_t get_netmask(uint32_t);
 char *hwaddr_ntoa(const unsigned char *, size_t);
 size_t hwaddr_aton(unsigned char *, const char *);
@@ -154,15 +136,19 @@ int flush_addresses(const char *);
 in_addr_t get_address(const char *);
 int has_address(const char *, struct in_addr);
 
-int add_route(const char *, struct in_addr, struct in_addr, struct in_addr, int);
-int change_route(const char *, struct in_addr, struct in_addr, struct in_addr, int);
-int del_route(const char *, struct in_addr, struct in_addr, struct in_addr, int);
+int add_route(const char *, struct in_addr, struct in_addr, struct in_addr,
+	      int);
+int change_route(const char *, struct in_addr, struct in_addr, struct in_addr,
+		 int);
+int del_route(const char *, struct in_addr, struct in_addr, struct in_addr,
+	      int);
+void log_route(struct in_addr, struct in_addr, struct in_addr, int, int, int);
 
 int inet_ntocidr(struct in_addr);
 int inet_cidrtoaddr(int, struct in_addr *);
 
-#ifdef __linux__
-typedef int (*netlink_callback)(struct nlmsghdr *, void *);
-int send_netlink(struct nlmsghdr *, netlink_callback, void *);
-#endif
+int if_address(const char *, struct in_addr, struct in_addr, struct in_addr,
+	       int del);
+int if_route(const char *, struct in_addr, struct in_addr, struct in_addr,
+	     int metric, int change, int del);
 #endif

@@ -38,7 +38,7 @@
 #include "config.h"
 #include "common.h"
 #include "dhcp.h"
-#include "interface.h"
+#include "if.h"
 #include "logger.h"
 #include "info.h"
 
