@@ -764,7 +764,7 @@ add_addr(struct address_head **addresses,
 	for (i = 0; i < length; i += 4) {
 		/* Sanity check */
 		if (i + 4 > length) {
-			logger(LOG_ERR, "invalid length %lu for option %i",
+			logger(LOG_ERR, "invalid length %zu for option %i",
 			       length, option);
 			return false;
 		}
@@ -797,7 +797,7 @@ get_value(void *ptr, const unsigned char *data, size_t len,
 	  char option, size_t lencheck)
 {
 	if (lencheck && len != lencheck) {
-		logger(LOG_ERR, "invalid length %lu for option %i",
+		logger(LOG_ERR, "invalid length %zu for option %i",
 		       len, option);
 		return false;
 	}
