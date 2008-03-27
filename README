@@ -16,8 +16,10 @@ man dhcpcd for command line options
 
 Notes
 -----
-If you're cross compiling you may need to send HAVE_FORK=yes or HAVE_FORK=no
-to the make command to avoid to automatic test.
+If you're cross compiling you may need to set the below knobs to avoid
+automatic tests.
+HAVE_FORK=yes | no
+OS=BSD | Linux
 
 We try and detect how to restart ntp and ypbind, you can override this with
 HAVE_INIT=no or force one of these values
