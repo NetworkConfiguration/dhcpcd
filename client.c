@@ -500,7 +500,7 @@ wait_for_packet(struct pollfd *fds, struct if_state *state,
 	fds[POLLFD_IFACE].fd = iface->fd;
 
 	if ((options->timeout == 0 && state->xid) ||
-	    (dhcp->leasetime == (unsigned)-1 &&
+	    (dhcp->leasetime == ~0U &&
 	     state->state == STATE_BOUND))
 	{
 		logger(LOG_DEBUG, "waiting for infinity");
@@ -921,7 +921,7 @@ handle_dhcp(struct if_state *state, int type, const struct options *options)
 		if (state->timeout == 0)
 			state->timeout = DEFAULT_LEASETIME;
 		state->state = STATE_INIT;
-	} else if (dhcp->leasetime == (unsigned)-1) {
+	} else if (dhcp->leasetime == ~0U) {
 		dhcp->renewaltime = dhcp->rebindtime = dhcp->leasetime;
 		state->timeout = 1; /* So we wait for infinity */
 		logger(LOG_INFO, "leased %s for infinity",
