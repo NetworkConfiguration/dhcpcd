@@ -34,7 +34,6 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 #include <arpa/inet.h>
 
 #include <errno.h>
-#include <fcntl.h>
 #include <getopt.h>
 #include <paths.h>
 #include <signal.h>
@@ -617,11 +616,7 @@ main(int argc, char **argv)
 			goto abort;
 		}
 
-		/* dhcpcd.sh should not interhit this fd */
-		if ((i = fcntl(pidfd, F_GETFD, 0)) == -1 ||
-		    fcntl(pidfd, F_SETFD, i | FD_CLOEXEC) == -1)
-			logger(LOG_ERR, "fcntl: %s", strerror(errno));
-
+		close_on_exec(pidfd);
 		writepid(pidfd, getpid());
 		logger(LOG_INFO, PACKAGE " " VERSION " starting");
 	}
