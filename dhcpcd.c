@@ -539,15 +539,6 @@ main(int argc, char **argv)
 		goto abort;
 	}
 
-	if (mkdir (ETCDIR, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP
-		   | S_IROTH | S_IXOTH) &&
-	    errno != EEXIST)
-	{
-		logger(LOG_ERR, "mkdir(\"%s\",0): %s\n",
-		       ETCDIR, strerror(errno));
-		goto abort;
-	}
-
 	if (options->test) {
 		if (options->dorequest || options->doinform) {
 			logger(LOG_ERR,
