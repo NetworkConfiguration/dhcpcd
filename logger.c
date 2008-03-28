@@ -74,7 +74,7 @@ setloglevel(int level)
 void
 setlogprefix(const char *prefix)
 {
-	snprintf(logprefix, sizeof(logprefix), "%s", prefix);
+	strlcpy(logprefix, prefix, sizeof(logprefix));
 }
 
 void
