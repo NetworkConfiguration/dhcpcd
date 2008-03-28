@@ -6,8 +6,7 @@ SRC_IF=		if-linux.c
 
 CFLAGS+=	-D_BSD_SOURCE -D_XOPEN_SOURCE=600
 LIBRT=		-lrt
-
-CFLAGS+=	-DINFODIR=\"/var/lib/dhcpcd\"
+INFODIR=	/var/lib/dhcpcd
 
 # Work out if our fork() works or not
 _HAVE_FORK_SH= if test "${HAVE_FORK}" = "yes"; then \
@@ -26,6 +25,3 @@ _HAVE_FORK_SH= if test "${HAVE_FORK}" = "yes"; then \
 	fi;
 _HAVE_FORK!=	${_HAVE_FORK_SH}
 CFLAGS+=	${_HAVE_FORK}$(shell ${_HAVE_FORK_SH})
-
-_install_infodir:
-	${INSTALL} -d ${DESTDIR}/var/
