@@ -11,6 +11,7 @@ BINMODE?=	0755
 OBJS+=		${SRCS:.c=.o}
 
 INSTALL?=	install
+SED?=		sed
 
 all: ${PROG} ${MAN}
 
@@ -28,6 +29,7 @@ ${PROG}: ${SCRIPTS} ${OBJS}
 _proginstall: ${PROG}
 	${INSTALL} -d ${DESTDIR}${BINDIR}
 	${INSTALL} -m ${BINMODE} ${PROG} ${DESTDIR}${BINDIR}
+	${INSTALL} -d ${DESTDIR}${INFODIR}
 
 include ${MK}/depend.mk
 include ${MK}/man.mk

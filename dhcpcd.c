@@ -29,7 +29,6 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 
 #include <sys/file.h>
 #include <sys/types.h>
-#include <sys/stat.h>
 
 #include <arpa/inet.h>
 
@@ -529,15 +528,6 @@ main(int argc, char **argv)
 
 	chdir("/");
 	umask(022);
-
-	if (mkdir(INFODIR, S_IRUSR | S_IWUSR |S_IXUSR | S_IRGRP | S_IXGRP
-		  | S_IROTH | S_IXOTH) &&
-	    errno != EEXIST)
-	{
-		logger(LOG_ERR, "mkdir(\"%s\",0): %s\n",
-		       INFODIR, strerror(errno));
-		goto abort;
-	}
 
 	if (options->test) {
 		if (options->dorequest || options->doinform) {

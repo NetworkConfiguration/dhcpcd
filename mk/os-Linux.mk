@@ -27,3 +27,5 @@ _HAVE_FORK_SH= if test "${HAVE_FORK}" = "yes"; then \
 _HAVE_FORK!=	${_HAVE_FORK_SH}
 CFLAGS+=	${_HAVE_FORK}$(shell ${_HAVE_FORK_SH})
 
+_install_infodir:
+	${INSTALL} -d ${DESTDIR}/var/

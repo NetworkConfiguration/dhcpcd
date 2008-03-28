@@ -3,3 +3,5 @@
 
 SRC_SOCKET=	bpf.c
 SRC_IF=		if-bsd.c
+
+INFODIR?=	/var/db
