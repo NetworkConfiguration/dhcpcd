@@ -397,50 +397,41 @@ send_message(const struct interface *iface, const struct dhcp *dhcp,
 		*p++ = DHCP_PARAMETERREQUESTLIST;
 		n_params = p;
 		*p++ = 0;
-		/* Only request DNSSERVER in discover to keep the packets small.
-		 * RFC2131 Section 3.5 states that the REQUEST must include the
-		 * list from the DISCOVER message, so I think this is ok. */
+		if (type != DHCP_INFORM) {
+			*p++ = DHCP_RENEWALTIME;
+			*p++ = DHCP_REBINDTIME;
+		}
+		*p++ = DHCP_NETMASK;
+		*p++ = DHCP_BROADCAST;
 
-		if (type == DHCP_DISCOVER && !options->test)
-			*p++ = DHCP_DNSSERVER;
-		else {
-			if (type != DHCP_INFORM) {
-				*p++ = DHCP_RENEWALTIME;
-				*p++ = DHCP_REBINDTIME;
-			}
-			*p++ = DHCP_NETMASK;
-			*p++ = DHCP_BROADCAST;
-
-			/* -S means request CSR and MSCSR
-			 * -SS means only request MSCSR incase DHCP message
-			 *  is too big */
-			if (options->domscsr < 2)
-				*p++ = DHCP_CSR;
-			if (options->domscsr > 0)
-				*p++ = DHCP_MSCSR;
-			/* RFC 3442 states classless static routes should be
-			 * before routers and static routes as classless static
-			 * routes override them both */
-			*p++ = DHCP_STATICROUTE;
-			*p++ = DHCP_ROUTERS;
-			*p++ = DHCP_HOSTNAME;
-			*p++ = DHCP_DNSSEARCH;
-			*p++ = DHCP_DNSDOMAIN;
-			*p++ = DHCP_DNSSERVER;
+		/* -S means request CSR and MSCSR
+		 * -SS means only request MSCSR incase DHCP message
+		 *  is too big */
+		if (options->domscsr < 2)
+			*p++ = DHCP_CSR;
+		if (options->domscsr > 0)
+			*p++ = DHCP_MSCSR;
+		/* RFC 3442 states classless static routes should be
+		 * before routers and static routes as classless static
+		 * routes override them both */
+		*p++ = DHCP_STATICROUTE;
+		*p++ = DHCP_ROUTERS;
+		*p++ = DHCP_HOSTNAME;
+		*p++ = DHCP_DNSSEARCH;
+		*p++ = DHCP_DNSDOMAIN;
+		*p++ = DHCP_DNSSERVER;
 #ifdef ENABLE_NIS
-			*p++ = DHCP_NISDOMAIN;
-			*p++ = DHCP_NISSERVER;
+		*p++ = DHCP_NISDOMAIN;
+		*p++ = DHCP_NISSERVER;
 #endif
 #ifdef ENABLE_NTP
-			*p++ = DHCP_NTPSERVER;
+		*p++ = DHCP_NTPSERVER;
 #endif
-			*p++ = DHCP_MTU;
+		*p++ = DHCP_MTU;
 #ifdef ENABLE_INFO
-			*p++ = DHCP_ROOTPATH;
-			*p++ = DHCP_SIPSERVER;
+		*p++ = DHCP_ROOTPATH;
+		*p++ = DHCP_SIPSERVER;
 #endif
-		}
-
 		*n_params = p - n_params - 1;
 	}
 	*p++ = DHCP_END;
