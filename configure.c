@@ -59,6 +59,7 @@
 #include "signal.h"
 #include "socket.h"
 
+#ifdef ENABLE_RESOLVCONF
 static int
 file_in_path(const char *file)
 {
@@ -86,6 +87,7 @@ file_in_path(const char *file)
 	free(path);
 	return(retval);
 }
+#endif
 
 /* IMPORTANT: Ensure that the last parameter is NULL when calling */
 static int
@@ -153,7 +155,7 @@ exec_cmd(const char *cmd, const char *args, ...)
 }
 
 static void
-exec_script(const char *script, const char *infofile, const char *arg)
+exec_script(const char *script, _unused const char *infofile, const char *arg)
 {
 	struct stat buf;
 
@@ -229,28 +231,16 @@ make_resolv(const char *ifname, const struct dhcp *dhcp)
 	return 0;
 }
 
+#ifdef ENABLE_RESOLVCONF
 static void
 restore_resolv(const char *ifname)
 {
-#ifdef ENABLE_RESOLVCONF
 	if (file_in_path("resolvconf") == 0) {
 		logger(LOG_DEBUG, "removing information from resolvconf");
 		exec_cmd("resolvconf", "-d", ifname, (char *)NULL);
 	}
+}
 #endif
-}
-
-static bool
-in_addresses(const struct address_head *addresses, struct in_addr address)
-{
-	const struct address *addr;
-
-	STAILQ_FOREACH (addr, addresses, entries)
-		if (addr->address.s_addr == address.s_addr)
-			return true;
-
-	return false;
-}
 
 static bool
 in_routes(const struct route_head *routes, struct rt *route)
@@ -270,6 +260,18 @@ in_routes(const struct route_head *routes, struct rt *route)
 }
 
 #ifdef ENABLE_NTP
+static bool
+in_addresses(const struct address_head *addresses, struct in_addr address)
+{
+	const struct address *addr;
+
+	STAILQ_FOREACH (addr, addresses, entries)
+		if (addr->address.s_addr == address.s_addr)
+			return true;
+
+	return false;
+}
+
 static int
 _make_ntp(const char *file, const char *ifname, const struct dhcp *dhcp)
 {
@@ -539,9 +541,11 @@ configure (const struct options *options, struct interface *iface,
 	char *curhostname = NULL;
 	int remember;
 	unsigned short mtu;
+#if defined(ENABLE_IPV4LL) || defined(__linux__)
 	struct in_addr dest;
 	struct in_addr mask;
 	struct in_addr gate;
+#endif
 
 #ifdef ENABLE_IPV4LL
 	bool haslinklocal = false;
@@ -596,7 +600,9 @@ configure (const struct options *options, struct interface *iface,
 			}
 		}
 
+#ifdef ENABLE_RESOLVCONF
 		restore_resolv(iface->name);
+#endif
 		exec_script(options->script, iface->infofile, "down");
 
 		return 0;
