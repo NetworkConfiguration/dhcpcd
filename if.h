@@ -134,6 +134,8 @@ int do_mtu(const char *, short int);
 int add_address(const char *, struct in_addr, struct in_addr, struct in_addr);
 int del_address(const char *, struct in_addr, struct in_addr);
 int flush_addresses(const char *);
+#define flush_addresses(ifname) \
+	do_interface(ifname, NULL, NULL, NULL, true, false)
 in_addr_t get_address(const char *);
 int has_address(const char *, struct in_addr);
 

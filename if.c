@@ -480,16 +480,6 @@ del_route(const char *ifname, struct in_addr destination,
 	return retval;
 }
 
-int
-flush_addresses(const char *ifname)
-{
-	int retval;
-	retval = do_interface(ifname, NULL, NULL, NULL, true, false);
-	if (retval == -1)
-		logger(LOG_ERR, "do_interface: %s", strerror(errno));
-	return retval;
-}
-
 in_addr_t
 get_address(const char *ifname)
 {
