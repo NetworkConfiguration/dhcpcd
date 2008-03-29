@@ -51,7 +51,6 @@
 #include "common.h"
 #include "dhcp.h"
 #include "if.h"
-#include "logger.h"
 
 /* This netlink stuff is overly compex IMO.
  * The BSD implementation is much cleaner and a lot less code.
@@ -67,7 +66,7 @@ send_netlink(struct nlmsghdr *hdr)
 	struct iovec iov;
 	struct msghdr msg;
 	static unsigned int seq;
-	char *buffer;
+	char *buffer = NULL;
 	ssize_t bytes;
 	union
 	{
@@ -77,18 +76,13 @@ send_netlink(struct nlmsghdr *hdr)
 	int len, l;
 	struct nlmsgerr *err;
 
-	if ((s = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE)) == -1) {
-		logger(LOG_ERR, "socket: %s", strerror(errno));
+	if ((s = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE)) == -1)
 		return -1;
-	}
 
 	memset(&nl, 0, sizeof(nl));
 	nl.nl_family = AF_NETLINK;
-	if (bind(s, (struct sockaddr *)&nl, sizeof(nl)) == -1) {
-		logger(LOG_ERR, "bind: %s", strerror(errno));
-		close(s);
-		return -1;
-	}
+	if (bind(s, (struct sockaddr *)&nl, sizeof(nl)) == -1)
+		goto eexit;
 
 	memset(&iov, 0, sizeof(iov));
 	iov.iov_base = hdr;
@@ -104,11 +98,8 @@ send_netlink(struct nlmsghdr *hdr)
 	hdr->nlmsg_flags |= NLM_F_ACK;
 	hdr->nlmsg_seq = ++seq;
 
-	if (sendmsg(s, &msg, 0) == -1) {
-		logger(LOG_ERR, "write: %s", strerror(errno));
-		close(s);
-		return -1;
-	}
+	if (sendmsg(s, &msg, 0) == -1)
+		goto eexit;
 
 	buffer = xzalloc(sizeof(char) * BUFFERLEN);
 	iov.iov_base = buffer;
@@ -118,20 +109,18 @@ send_netlink(struct nlmsghdr *hdr)
 		bytes = recvmsg(s, &msg, 0);
 
 		if (bytes == -1) {
-			if (errno != EINTR)
-				logger (LOG_ERR, "recvmsg: %s",
-					strerror(errno));
-			continue;
+			if (errno == EINTR)
+				continue;
+			goto eexit;
 		}
 
 		if (bytes == 0) {
-			logger(LOG_ERR, "netlink: EOF");
+			errno = ENODATA;
 			goto eexit;
 		}
 
 		if (msg.msg_namelen != sizeof(nl)) {
-			logger(LOG_ERR,
-			       "netlink: sender address length mismatch");
+			errno = EBADMSG;
 			goto eexit;
 		}
 
@@ -141,12 +130,7 @@ send_netlink(struct nlmsghdr *hdr)
 			err = (struct nlmsgerr *)NLMSG_DATA(h.nlm);
 
 			if (l < 0 || len > bytes) {
-				if (msg.msg_flags & MSG_TRUNC)
-					logger(LOG_ERR,
-					       "netlink: truncated message");
-				else
-					logger(LOG_ERR,
-					       "netlink: malformed message");
+				errno = EBADMSG;
 				goto eexit;
 			}
 
@@ -162,14 +146,11 @@ send_netlink(struct nlmsghdr *hdr)
 			}
 
 			/* We get an NLMSG_ERROR back with a code of zero for success */
-			if (h.nlm->nlmsg_type != NLMSG_ERROR) {
-				logger(LOG_ERR, "netlink: unexpected reply %d",
-				       h.nlm->nlmsg_type);
-				goto eexit;
-			}
+			if (h.nlm->nlmsg_type != NLMSG_ERROR)
+				continue;
 
 			if ((unsigned)l < sizeof(*err)) {
-				logger(LOG_ERR, "netlink: error truncated");
+				errno = EBADMSG;
 				goto eexit;
 			}
 
@@ -180,9 +161,6 @@ send_netlink(struct nlmsghdr *hdr)
 			}
 
 			errno = -err->error;
-			/* Don't report on something already existing */
-			if (errno != EEXIST)
-				logger(LOG_ERR, "netlink: %s", strerror(errno));
 			goto eexit;
 		}
 	}
@@ -204,8 +182,7 @@ add_attr_l(struct nlmsghdr *n, unsigned int maxlen, int type,
 	struct rtattr *rta;
 
 	if (NLMSG_ALIGN(n->nlmsg_len) + RTA_ALIGN(len) > maxlen) {
-		logger(LOG_ERR, "add_attr_l: message exceeded bound of %d\n",
-		       maxlen);
+		errno = ENOBUFS;
 		return -1;
 	}
 
@@ -225,8 +202,7 @@ add_attr_32(struct nlmsghdr *n, unsigned int maxlen, int type, uint32_t data)
 	struct rtattr *rta;
 
 	if (NLMSG_ALIGN(n->nlmsg_len) + len > maxlen) {
-		logger(LOG_ERR, "add_attr32: message exceeded bound of %d\n",
-		       maxlen);
+		errno = ENOBUFS;
 		return -1;
 	}
 
@@ -259,7 +235,7 @@ if_address(const char *ifname,
 	   struct in_addr broadcast, int del)
 {
 	struct nlma *nlm;
-	int retval;
+	int retval = 0;
 
 	nlm = xzalloc(sizeof(*nlm));
 	nlm->hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifaddrmsg));
@@ -268,9 +244,8 @@ if_address(const char *ifname,
 		nlm->hdr.nlmsg_flags |= NLM_F_CREATE | NLM_F_REPLACE;
 	nlm->hdr.nlmsg_type = del ? RTM_DELADDR : RTM_NEWADDR;
 	if (!(nlm->ifa.ifa_index = if_nametoindex(ifname))) {
-		logger(LOG_ERR, "if_nametoindex: no index for interface `%s'",
-		       ifname);
 		free(nlm);
+		errno = ENODEV;
 		return -1;
 	}
 	nlm->ifa.ifa_family = AF_INET;
@@ -284,7 +259,8 @@ if_address(const char *ifname,
 		add_attr_l(&nlm->hdr, sizeof(*nlm), IFA_BROADCAST,
 			   &broadcast.s_addr, sizeof(broadcast.s_addr));
 
-	retval = send_netlink(&nlm->hdr);
+	if (send_netlink(&nlm->hdr) == -1)
+		retval = -1;
 	free(nlm);
 	return retval;
 }
@@ -296,13 +272,12 @@ if_route(const char *ifname,
 {
 	struct nlmr *nlm;
 	unsigned int ifindex;
-	int retval;
+	int retval = 0;
 
 	log_route(destination, netmask, gateway, metric, change, del);
 
 	if (!(ifindex = if_nametoindex(ifname))) {
-		logger(LOG_ERR, "if_nametoindex: no index for interface `%s'",
-		       ifname);
+		errno = ENODEV;
 		return -1;
 	}
 
@@ -341,7 +316,8 @@ if_route(const char *ifname,
 	add_attr_32(&nlm->hdr, sizeof(*nlm), RTA_OIF, ifindex);
 	add_attr_32(&nlm->hdr, sizeof(*nlm), RTA_PRIORITY, metric);
 
-	retval = send_netlink(&nlm->hdr);
+	if (send_netlink(&nlm->hdr) == -1)
+		retval = -1;
 	free(nlm);
 	return retval;
 }

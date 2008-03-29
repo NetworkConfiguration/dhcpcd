@@ -401,6 +401,9 @@ client_setup(struct if_state *state, const struct options *options)
 		if (options->doduid) {
 			duid = xmalloc(DUID_LEN);
 			duid_len = get_duid(duid, iface);
+			if (duid_len == 0)
+				logger(LOG_ERR, "get_duid: %s",
+				       strerror(errno));
 		}
 
 		if (duid_len > 0) {
@@ -451,8 +454,10 @@ do_socket(struct if_state *state, int mode)
 
 	state->interface->fd = -1; 
 	if (mode == SOCKET_OPEN) 
-		if (open_socket(state->interface, ETHERTYPE_IP) == -1)
+		if (open_socket(state->interface, ETHERTYPE_IP) == -1) {
+			logger(LOG_ERR, "open_socket: %s", strerror(errno));
 			return false;
+		}
 	state->socket = mode;
 	return true;
 }
@@ -609,9 +614,7 @@ handle_signal (int sig, struct if_state *state,  const struct options *options)
 		if (!IN_LINKLOCAL(ntohl(state->dhcp->address.s_addr))) {
 				do_socket(state, SOCKET_OPEN);
 				state->xid = (uint32_t)random();
-				if ((open_socket(state->interface, false)) >= 0)
-					_send_message(state, DHCP_RELEASE,
-						      options);
+				_send_message(state, DHCP_RELEASE, options);
 				do_socket(state, SOCKET_CLOSED);
 			}
 			unlink(state->interface->infofile);
@@ -1081,8 +1084,10 @@ dhcp_run(const struct options *options, int *pidfd)
 	int sig;
 
 	iface = read_interface(options->interface, options->metric);
-	if (!iface)
+	if (!iface) {
+		logger(LOG_ERR, "read_interface: %s", strerror(errno));
 		goto eexit;
+	}
 
 	state = xzalloc(sizeof(*state));
 	state->dhcp = xzalloc(sizeof(*state->dhcp));

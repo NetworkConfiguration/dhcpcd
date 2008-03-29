@@ -177,10 +177,8 @@ do_interface(const char *ifname,
 	struct sockaddr_dl sdl;
 #endif
 
-	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-		logger(LOG_ERR, "socket: %s", strerror(errno));
+	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
 		return -1;
-	}
 
 	/* Not all implementations return the needed buffer size for
 	 * SIOGIFCONF so we loop like so for all until it works */
@@ -190,8 +188,6 @@ do_interface(const char *ifname,
 		ifc.ifc_buf = xmalloc((size_t)len);
 		if (ioctl(s, SIOCGIFCONF, &ifc) == -1) {
 			if (errno != EINVAL || lastlen != 0) {
-				logger(LOG_ERR, "ioctl SIOCGIFCONF: %s",
-				       strerror(errno));
 				close(s);
 				free(ifc.ifc_buf);	
 				return -1;
@@ -235,12 +231,8 @@ do_interface(const char *ifname,
 		if (ifr->ifr_addr.sa_family == AF_INET)	{
 			memcpy(&address, &ifr->ifr_addr, sizeof(address));
 			if (flush) {
-				if (ioctl(s, SIOCGIFNETMASK, ifr) == -1) {
-					logger(LOG_ERR,
-					       "ioctl SIOCGIFNETMASK: %s",
-					       strerror(errno));
+				if (ioctl(s, SIOCGIFNETMASK, ifr) == -1)
 					continue;
-				}
 				memcpy(&netmask, &ifr->ifr_addr,
 				       sizeof(netmask));
 
@@ -282,17 +274,13 @@ read_interface (const char *ifname, _unused int metric)
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
 
-	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-		logger(LOG_ERR, "socket: %s", strerror(errno));
+	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
 		return NULL;
-	}
 
 #ifdef __linux__
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
-	if (ioctl(s, SIOCGIFHWADDR, &ifr) == -1) {
-		logger(LOG_ERR, "ioctl SIOCGIFHWADDR: %s", strerror(errno));
-		goto exit;
-	}
+	if (ioctl(s, SIOCGIFHWADDR, &ifr) == -1)
+		goto eexit;
 
 	switch (ifr.ifr_hwaddr.sa_family) {
 	case ARPHRD_ETHER:
@@ -308,7 +296,7 @@ read_interface (const char *ifname, _unused int metric)
 		logger (LOG_ERR,
 			"interface is not Ethernet, FireWire, " \
 			"InfiniBand or Token Ring");
-		goto exit;
+		goto eexit;
 	}
 
 	hwaddr = xmalloc(sizeof(unsigned char) * HWADDR_LEN);
@@ -317,25 +305,19 @@ read_interface (const char *ifname, _unused int metric)
 #else
 	ifr.ifr_metric = metric;
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
-	if (ioctl(s, SIOCSIFMETRIC, &ifr) == -1) {
-		logger(LOG_ERR, "ioctl SIOCSIFMETRIC: %s", strerror(errno));
-		goto exit;
-	}
+	if (ioctl(s, SIOCSIFMETRIC, &ifr) == -1)
+		goto eexit;
 
 	hwaddr = xmalloc(sizeof(unsigned char) * HWADDR_LEN);
-	if (do_interface(ifname, hwaddr, &hwlen, NULL, false, false) != 1) {
-		logger(LOG_ERR, "could not find interface %s", ifname);
-		goto exit;
-	}
+	if (do_interface(ifname, hwaddr, &hwlen, NULL, false, false) != 1)
+		goto eexit;
 
 	family = ARPHRD_ETHER;
 #endif
 
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
-	if (ioctl(s, SIOCGIFMTU, &ifr) == -1) {
-		logger(LOG_ERR, "ioctl SIOCGIFMTU: %s", strerror(errno));
-		goto exit;
-	}
+	if (ioctl(s, SIOCGIFMTU, &ifr) == -1)
+		goto eexit;
 
 	if (ifr.ifr_mtu < MTU_MIN) {
 		logger(LOG_DEBUG, "MTU of %d is too low, setting to %d",
@@ -343,9 +325,7 @@ read_interface (const char *ifname, _unused int metric)
 		ifr.ifr_mtu = MTU_MIN;
 		strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
 		if (ioctl(s, SIOCSIFMTU, &ifr) == -1) {
-			logger(LOG_ERR, "ioctl SIOCSIFMTU,: %s",
-			       strerror(errno));
-			goto exit;
+			goto eexit;
 		}
 	}
 	mtu = ifr.ifr_mtu;
@@ -356,18 +336,13 @@ read_interface (const char *ifname, _unused int metric)
 	if ((p = strchr(ifr.ifr_name, ':')))
 		*p = '\0';
 #endif
-	if (ioctl(s, SIOCGIFFLAGS, &ifr) == -1) {
-		logger(LOG_ERR, "ioctl SIOCGIFFLAGS: %s", strerror(errno));
-		goto exit;
-	}
+	if (ioctl(s, SIOCGIFFLAGS, &ifr) == -1)
+		goto eexit;
 
 	if (!(ifr.ifr_flags & IFF_UP) || !(ifr.ifr_flags & IFF_RUNNING)) {
 		ifr.ifr_flags |= IFF_UP | IFF_RUNNING;
-		if (ioctl(s, SIOCSIFFLAGS, &ifr) != 0) {
-			logger(LOG_ERR, "ioctl SIOCSIFFLAGS: %s",
-			       strerror(errno));
-			goto exit;
-		}
+		if (ioctl(s, SIOCSIFFLAGS, &ifr) != 0)
+			goto eexit;
 	}
 
 	iface = xzalloc(sizeof(*iface));
@@ -391,7 +366,7 @@ read_interface (const char *ifname, _unused int metric)
 	iface->listen_fd = -1;
 #endif
 
-exit:
+eexit:
 	close(s);
 	free(hwaddr);
 	return iface;
@@ -404,21 +379,16 @@ get_mtu(const char *ifname)
 	int r;
 	int s;
 
-	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-		logger(LOG_ERR, "socket: %s", strerror(errno));
+	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
 		return -1;
-	}
 
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
 	r = ioctl(s, SIOCGIFMTU, &ifr);
 	close(s);
 
-	if (r == -1) {
-		logger(LOG_ERR, "ioctl SIOCGIFMTU: %s", strerror(errno));
+	if (r == -1)
 		return -1;
-	}
-
 	return ifr.ifr_mtu;
 }
 
@@ -429,10 +399,8 @@ set_mtu(const char *ifname, short int mtu)
 	int r;
 	int s;
 
-	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-		logger(LOG_ERR, "socket: %s", strerror(errno));
+	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
 		return -1;
-	}
 
 	memset(&ifr, 0, sizeof(ifr));
 	logger(LOG_DEBUG, "setting MTU to %d", mtu);
@@ -440,10 +408,6 @@ set_mtu(const char *ifname, short int mtu)
 	ifr.ifr_mtu = mtu;
 	r = ioctl(s, SIOCSIFMTU, &ifr);
 	close(s);
-
-	if (r == -1)
-		logger(LOG_ERR, "ioctl SIOCSIFMTU: %s", strerror(errno));
-
 	return r == 0 ? 0 : -1;
 }
 
@@ -494,63 +458,86 @@ int
 add_address(const char *ifname, struct in_addr address,
 	    struct in_addr netmask, struct in_addr broadcast)
 {
+	int retval;
+
 	logger(LOG_INFO, "adding IP address %s/%d",
 	       inet_ntoa(address), inet_ntocidr(netmask));
-
-	return if_address(ifname, address, netmask, broadcast, 0);
+	retval = if_address(ifname, address, netmask, broadcast, 0);
+	if (retval == -1)
+		logger(LOG_ERR, "if_address: %s", strerror(errno));
+	return retval;
 }
 
 int
 del_address(const char *ifname, struct in_addr address, struct in_addr netmask)
 {
 	struct in_addr t;
+	int retval;
 
 	logger(LOG_INFO, "removing IP address %s/%d",
 	       inet_ntoa(address), inet_ntocidr(netmask));
-
 	t.s_addr = 0;
-	return if_address(ifname, address, netmask, t, 1);
+	retval = if_address(ifname, address, netmask, t, 1);
+	if (retval == -1)
+		logger(LOG_ERR, "if_address: %s", strerror(errno));
+	return retval;
 }
 
 int
 add_route(const char *ifname, struct in_addr destination,
 	  struct in_addr netmask, struct in_addr gateway, int metric)
 {
-	return if_route(ifname, destination, netmask, gateway, metric, 0, 0);
-}
+	int retval;
 
-int
-change_route(const char *ifname, struct in_addr destination,
-	      struct in_addr netmask, struct in_addr gateway, int metric)
-{
-	return if_route(ifname, destination, netmask, gateway, metric, 1, 0);
+	retval = if_route(ifname, destination, netmask, gateway, metric, 0, 0);
+	if (retval == -1)
+		logger(LOG_ERR, "if_route: %s", strerror(errno));
+	return retval;
 }
 
 int
 del_route(const char *ifname, struct in_addr destination,
 	  struct in_addr netmask, struct in_addr gateway, int metric)
 {
-	return if_route(ifname, destination, netmask, gateway, metric, 0, 1);
+	int retval;
+
+	retval = if_route(ifname, destination, netmask, gateway, metric, 0, 1);
+	if (retval == -1)
+		logger(LOG_ERR, "if_route: %s", strerror(errno));
+	return retval;
 }
 
 int
 flush_addresses(const char *ifname)
 {
-	return do_interface(ifname, NULL, NULL, NULL, true, false);
+	int retval;
+	retval = do_interface(ifname, NULL, NULL, NULL, true, false);
+	if (retval == -1)
+		logger(LOG_ERR, "do_interface: %s", strerror(errno));
+	return retval;
 }
 
 in_addr_t
 get_address(const char *ifname)
 {
 	struct in_addr address;
+	int retval;
 
-	if (do_interface(ifname, NULL, NULL, &address, false, true) > 0)
+	retval = do_interface(ifname, NULL, NULL, &address, false, true);
+	if (retval > 0)
 		return address.s_addr;
-	return 0;
+	if (retval == -1)
+		logger(LOG_ERR, "do_interface: %s", strerror(errno));
+	return retval;
 }
 
 int
 has_address(const char *ifname, struct in_addr address)
 {
-	return do_interface(ifname, NULL, NULL, &address, false, false);
+	int retval;
+
+	retval = do_interface(ifname, NULL, NULL, &address, false, false);
+	if (retval == -1)
+		logger(LOG_ERR, "do_interface: %s", strerror(errno));
+	return retval;
 }

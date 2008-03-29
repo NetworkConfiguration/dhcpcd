@@ -38,7 +38,6 @@
 #include "config.h"
 #include "common.h"
 #include "duid.h"
-#include "logger.h"
 
 #ifdef ENABLE_DUID
 
@@ -72,14 +71,14 @@ get_duid(unsigned char *duid, const struct interface *iface)
 		if (len)
 			return len;
 	} else {
-		if (errno != ENOENT) {
-			logger(LOG_ERR, "fopen `%s': %s",
-			       DUIDFILE, strerror(errno));
+		if (errno != ENOENT)
 			return 0;
-		}
 	}
 
 	/* No file? OK, lets make one based on our interface */
+	if (!(f = fopen(DUIDFILE, "w")))
+		return 0;
+	
 	type = htons(1); /* DUI-D-LLT */
 	memcpy(p, &type, 2);
 	p += 2;
@@ -101,12 +100,8 @@ get_duid(unsigned char *duid, const struct interface *iface)
 
 	len = p - duid;
 
-	if (!(f = fopen(DUIDFILE, "w")))
-		logger(LOG_ERR, "fopen `%s': %s", DUIDFILE, strerror(errno));
-	else {
-		x = fprintf(f, "%s\n", hwaddr_ntoa(duid, len));
-		fclose(f);
-	}
+	x = fprintf(f, "%s\n", hwaddr_ntoa(duid, len));
+	fclose(f);
 
 	/* Failed to write the duid? scrub it, we cannot use it */
 	if (x < 1) {

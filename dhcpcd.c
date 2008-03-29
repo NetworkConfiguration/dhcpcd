@@ -259,7 +259,7 @@ main(int argc, char **argv)
 				goto abort;
 			}
 			errno = 0;
-			options->leasetime = (uint32_t)strtol (optarg, NULL, 0);
+			options->leasetime = (uint32_t)strtol(optarg, NULL, 0);
 			if (errno == EINVAL || errno == ERANGE) {
 				logger(LOG_ERR, "`%s' out of range", optarg);
 				goto abort;
@@ -605,8 +605,10 @@ main(int argc, char **argv)
 	/* Seed random */
 	srandomdev();
 
+#ifdef __linux
 	/* Massage our filters per platform */
 	setup_packet_filters();
+#endif
 
 	if (dhcp_run(options, &pidfd) == 0)
 		retval = EXIT_SUCCESS;

@@ -33,7 +33,10 @@
 #include "dhcp.h"
 #include "if.h"
 
+#ifdef __linux__
 void setup_packet_filters(void);
+#endif
+
 int open_socket(struct interface *, int);
 ssize_t send_packet(const struct interface *, int,
 		    const unsigned char *, size_t);

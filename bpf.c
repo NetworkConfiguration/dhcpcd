@@ -48,15 +48,8 @@
 #include "config.h"
 #include "dhcp.h"
 #include "if.h"
-#include "logger.h"
 #include "socket.h"
 #include "bpf-filter.h"
-
-void
-setup_packet_filters(void)
-{
-	/* Empty function */
-}
 
 int
 open_socket(struct interface *iface, int protocol)
@@ -76,26 +69,19 @@ open_socket(struct interface *iface, int protocol)
 	} while (fd == -1 && errno == EBUSY);
 	free(device);
 
-	if (fd == -1) {
-		logger(LOG_ERR, "unable to open a BPF device");
+	if (fd == -1)
 		return -1;
-	}
 
 	close_on_exec(fd);
-
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, iface->name, sizeof(ifr.ifr_name));
 	if (ioctl(fd, BIOCSETIF, &ifr) == -1) {
-		logger(LOG_ERR,
-		       "cannot attach interface `%s' to bpf device `%s': %s",
-		       iface->name, device, strerror(errno));
 		close(fd);
 		return -1;
 	}
 
 	/* Get the required BPF buffer length from the kernel. */
 	if (ioctl(fd, BIOCGBLEN, &buf) == -1) {
-		logger (LOG_ERR, "ioctl BIOCGBLEN: %s", strerror(errno));
 		close(fd);
 		return -1;
 	}
@@ -103,7 +89,6 @@ open_socket(struct interface *iface, int protocol)
 
 	flags = 1;
 	if (ioctl(fd, BIOCIMMEDIATE, &flags) == -1) {
-		logger(LOG_ERR, "ioctl BIOCIMMEDIATE: %s", strerror(errno));
 		close(fd);
 		return -1;
 	}
@@ -117,7 +102,6 @@ open_socket(struct interface *iface, int protocol)
 		pf.bf_len = sizeof(dhcp_bpf_filter)/sizeof(dhcp_bpf_filter[0]);
 	}
 	if (ioctl(fd, BIOCSETF, &pf) == -1) {
-		logger(LOG_ERR, "ioctl BIOCSETF: %s", strerror(errno));
 		close(fd);
 		return -1;
 	}
@@ -133,28 +117,18 @@ ssize_t
 send_packet(const struct interface *iface, int type,
 	    const unsigned char *data, size_t len)
 {
-	ssize_t retval = -1;
 	struct iovec iov[2];
 	struct ether_header hw;
 
-	if (iface->family == ARPHRD_ETHER) {
-		memset(&hw, 0, sizeof(hw));
-		memset(&hw.ether_dhost, 0xff, ETHER_ADDR_LEN);
-		hw.ether_type = htons(type);
-
-		iov[0].iov_base = &hw;
-		iov[0].iov_len = sizeof(hw);
-	} else {
-		logger(LOG_ERR, "unsupported interace type %d", iface->family);
-		return -1;
-	}
+	memset(&hw, 0, sizeof(hw));
+	memset(&hw.ether_dhost, 0xff, ETHER_ADDR_LEN);
+	hw.ether_type = htons(type);
+	iov[0].iov_base = &hw;
+	iov[0].iov_len = sizeof(hw);
 	iov[1].iov_base = (unsigned char *)data;
 	iov[1].iov_len = len;
 
-	if ((retval = writev(iface->fd, iov, 2)) == -1)
-		logger(LOG_ERR, "writev: %s", strerror(errno));
-
-	return retval;
+	return writev(iface->fd, iov, 2);
 }
 
 /* BPF requires that we read the entire buffer.
@@ -190,7 +164,6 @@ get_packet(const struct interface *iface, unsigned char *data,
 		*buffer_len = read(iface->fd, bpf.buffer, iface->buffer_length);
 		*buffer_pos = 0;
 		if (*buffer_len < 1) {
-			logger(LOG_ERR, "read: %s", strerror(errno));
 			ts.tv_sec = 3;
 			ts.tv_nsec = 0;
 			nanosleep(&ts, NULL);

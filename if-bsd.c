@@ -49,7 +49,6 @@
 #include "common.h"
 #include "dhcp.h"
 #include "if.h"
-#include "logger.h"
 
 /* Darwin doesn't define this for some very odd reason */
 #ifndef SA_SIZE
@@ -64,16 +63,15 @@ if_address(const char *ifname, struct in_addr address,
 	   struct in_addr netmask, struct in_addr broadcast, int del)
 {
 	int s;
+	int retval;
 	struct ifaliasreq ifa;
 	union {
 		struct sockaddr *sa;
 		struct sockaddr_in *sin;
 	} _s;
 
-	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-		logger(LOG_ERR, "socket: %s", strerror(errno));
+	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
 		return -1;
-	}
 
 	memset(&ifa, 0, sizeof(ifa));
 	strlcpy(ifa.ifra_name, ifname, sizeof(ifa.ifra_name));
@@ -90,16 +88,9 @@ if_address(const char *ifname, struct in_addr address,
 		ADDADDR(ifa.ifra_broadaddr, broadcast);
 #undef ADDADDR
 
-	if (ioctl(s, del ? SIOCDIFADDR : SIOCAIFADDR, &ifa) == -1) {
-		logger(LOG_ERR, "ioctl %s: %s",
-		       del ? "SIOCDIFADDR" : "SIOCAIFADDR",
-		       strerror(errno));
-		close(s);
-		return -1;
-	}
-
+	retval = ioctl(s, del ? SIOCDIFADDR : SIOCAIFADDR, &ifa);
 	close(s);
-	return 0;
+	return retval;
 }
 
 int
@@ -127,16 +118,14 @@ if_route(const char *ifname, struct in_addr destination,
 	size_t l;
 	unsigned char *hwaddr;
 	size_t hwlen = 0;
+	int retval = 0;
 
 	log_route(destination, netmask, gateway, metric, change, del);
 
-	if ((s = socket(PF_ROUTE, SOCK_RAW, 0)) == -1) {
-		logger(LOG_ERR, "socket: %s", strerror(errno));
+	if ((s = socket(PF_ROUTE, SOCK_RAW, 0)) == -1)
 		return -1;
-	}
 
 	memset(&rtm, 0, sizeof(rtm));
-
 	rtm.hdr.rtm_version = RTM_VERSION;
 	rtm.hdr.rtm_seq = ++seq;
 	rtm.hdr.rtm_type = change ? RTM_CHANGE : del ? RTM_DELETE : RTM_ADD;
@@ -187,14 +176,8 @@ if_route(const char *ifname, struct in_addr destination,
 #undef ADDADDR
 
 	rtm.hdr.rtm_msglen = l = bp - (char *)&rtm;
-	if (write(s, &rtm, l) == -1) {
-		/* Don't report error about routes already existing */
-		if (errno != EEXIST)
-			logger(LOG_ERR, "write: %s", strerror(errno));
-		close(s);
-		return -1;
-	}
-
+	if (write(s, &rtm, l) == -1)
+		retval = -1;
 	close(s);
-	return 0;
+	return retval;
 }

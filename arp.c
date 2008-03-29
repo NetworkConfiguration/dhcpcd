@@ -106,6 +106,8 @@ send_arp(const struct interface *iface, int op, struct in_addr sip,
 
 	retval = send_packet(iface, ETHERTYPE_ARP,
 			     (unsigned char *) arp, arphdr_len(arp));
+	if (retval == -1)
+		logger(LOG_ERR,"send_packet: %s", strerror(errno));
 	free(arp);
 	return retval;
 }
@@ -150,8 +152,10 @@ arp_claim(struct interface *iface, struct in_addr address)
 		       "checking %s is available on attached networks",
 		       inet_ntoa(address));
 
-	if (!open_socket(iface, ETHERTYPE_ARP))
+	if (!open_socket(iface, ETHERTYPE_ARP)) {
+		logger (LOG_ERR, "open_socket: %s", strerror(errno));
 		return -1;
+	}
 
 	fds[0].fd = signal_fd();
 	fds[1].fd = iface->fd;

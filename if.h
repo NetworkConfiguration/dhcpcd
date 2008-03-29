@@ -138,8 +138,6 @@ int has_address(const char *, struct in_addr);
 
 int add_route(const char *, struct in_addr, struct in_addr, struct in_addr,
 	      int);
-int change_route(const char *, struct in_addr, struct in_addr, struct in_addr,
-		 int);
 int del_route(const char *, struct in_addr, struct in_addr, struct in_addr,
 	      int);
 void log_route(struct in_addr, struct in_addr, struct in_addr, int, int, int);

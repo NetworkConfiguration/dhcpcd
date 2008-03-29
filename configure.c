@@ -644,8 +644,8 @@ configure (const struct options *options, struct interface *iface,
 	{
 		dest.s_addr = dhcp->address.s_addr & dhcp->netmask.s_addr;
 		gate.s_addr = 0;
-		add_route (iface->name, dest, dhcp->netmask, gate, options->metric);
-		del_route (iface->name, dest, dhcp->netmask, gate, 0);
+		add_route(iface->name, dest, dhcp->netmask, gate, options->metric);
+		del_route(iface->name, dest, dhcp->netmask, gate, 0);
 	}
 #endif
 

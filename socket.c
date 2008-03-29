@@ -53,7 +53,6 @@
 #include "config.h"
 #include "dhcp.h"
 #include "if.h"
-#include "logger.h"
 #include "socket.h"
 #include "bpf-filter.h"
 
@@ -85,6 +84,42 @@ setup_packet_filters(void)
 	arp_bpf_filter[2].k -= ETH_HLEN;
 }
 
+static int open_listen_socket(struct interface *iface)
+{
+	int fd;
+	union sockunion {
+		struct sockaddr sa;
+		struct sockaddr_in sin;
+	} su;
+	struct ifreq ifr;
+	int n = 1;
+
+	if ((fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
+		return -1;
+
+	memset(&su, 0, sizeof(su));
+	su.sin.sin_family = AF_INET;
+	su.sin.sin_port = htons(DHCP_CLIENT_PORT);
+	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &n, sizeof(n)) == -1)
+		goto eexit;
+	if (setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &n, sizeof(n)) == -1)
+		goto eexit;
+	memset(&ifr, 0, sizeof(ifr));
+	strncpy(ifr.ifr_name, iface->name, sizeof(ifr.ifr_name));
+	if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, &ifr, sizeof(ifr)) == -1)
+		goto eexit;
+	if (bind(fd, &su.sa, sizeof(su)) == -1)
+		goto eexit;
+
+	iface->listen_fd = fd;
+	close_on_exec(fd);
+	return 0;
+
+eexit:
+	close(fd);
+	return -1;
+}
+
 int
 open_socket(struct interface *iface, int protocol)
 {
@@ -96,60 +131,25 @@ open_socket(struct interface *iface, int protocol)
 		struct sockaddr_storage ss;
 	} su;
 	struct sock_fprog pf;
-	struct ifreq ifr;
-	int n = 1;
 
 	/* We need to bind to a port, otherwise Linux generate ICMP messages
 	 * that cannot contect the port when we have an address.
 	 * We don't actually use this fd at all, instead using our packet
 	 * filter socket. */
-	if (iface->listen_fd == -1 && protocol == ETHERTYPE_IP) {
-		if ((fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
-			logger(LOG_ERR, "socket: %s", strerror(errno));
-		} else {
-			memset(&su, 0, sizeof(su));
-			su.sin.sin_family = AF_INET;
-			su.sin.sin_port = htons(DHCP_CLIENT_PORT);
-			if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR,
-				       &n, sizeof(n)) == -1)
-				logger(LOG_ERR, "SO_REUSEADDR: %s",
-				       strerror(errno));
-			if (setsockopt(fd, SOL_SOCKET, SO_RCVBUF,
-				       &n, sizeof(n)) == -1)
-				logger(LOG_ERR, "SO_RCVBUF: %s",
-				       strerror(errno));
-			memset (&ifr, 0, sizeof(ifr));
-			strncpy (ifr.ifr_name, iface->name,
-				 sizeof(ifr.ifr_name));
-			if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE,
-				       &ifr, sizeof(ifr)) == -1)
-				logger(LOG_ERR, "SO_SOBINDTODEVICE: %s",
-				       strerror(errno));
-			if (bind(fd, &su.sa, sizeof(su)) == -1) {
-				logger(LOG_ERR, "bind: %s", strerror(errno));
-				close(fd);
-			} else {
-				iface->listen_fd = fd;
-				close_on_exec(fd);
-			}
-		}
-	}
+	if (iface->listen_fd == -1 && protocol == ETHERTYPE_IP)
+		if (open_listen_socket(iface) == -1)
+			return -1;
 
-	if ((fd = socket(PF_PACKET, SOCK_DGRAM, htons(protocol))) == -1) {
-		logger(LOG_ERR, "socket: %s", strerror(errno));
+	if ((fd = socket(PF_PACKET, SOCK_DGRAM, htons(protocol))) == -1)
 		return -1;
-	}
+	
 	close_on_exec(fd);
-
 	memset(&su, 0, sizeof(su));
 	su.sll.sll_family = PF_PACKET;
 	su.sll.sll_protocol = htons(protocol);
 	if (!(su.sll.sll_ifindex = if_nametoindex(iface->name))) {
-		logger(LOG_ERR,
-		       "if_nametoindex: no index for interface `%s'",
-		       iface->name);
-		close(fd);
-		return -1;
+		errno = ENOENT;
+		goto eexit;
 	}
 
 	/* Install the DHCP filter */
@@ -162,17 +162,10 @@ open_socket(struct interface *iface, int protocol)
 		pf.len = sizeof(dhcp_bpf_filter) / sizeof(dhcp_bpf_filter[0]);
 	}
 	if (setsockopt(fd, SOL_SOCKET, SO_ATTACH_FILTER, &pf, sizeof(pf)) != 0)
-	{
-		logger(LOG_ERR, "SO_ATTACH_FILTER: %s", strerror(errno));
-		close(fd);
-		return -1;
-	}
+		goto eexit;
 
-	if (bind(fd, &su.sa, sizeof(su)) == -1) {
-		logger(LOG_ERR, "bind: %s", strerror(errno));
-		close(fd);
-		return -1;
-	}
+	if (bind(fd, &su.sa, sizeof(su)) == -1)
+		goto eexit;
 
 	if (iface->fd > -1)
 		close(iface->fd);
@@ -181,6 +174,10 @@ open_socket(struct interface *iface, int protocol)
 	iface->buffer_length = BUFFER_LENGTH;
 
 	return fd;
+
+eexit:
+	close(fd);
+	return -1;
 }
 
 ssize_t
@@ -192,15 +189,13 @@ send_packet(const struct interface *iface, int type,
 		struct sockaddr_ll sll;
 		struct sockaddr_storage ss;
 	} su;
-	ssize_t retval;
 
 	memset(&su, 0, sizeof(su));
 	su.sll.sll_family = AF_PACKET;
 	su.sll.sll_protocol = htons(type);
 
 	if (!(su.sll.sll_ifindex = if_nametoindex(iface->name))) {
-		logger(LOG_ERR, "if_nametoindex: no index for interface `%s'",
-		       iface->name);
+		errno = ENOENT;
 		return -1;
 	}
 
@@ -212,9 +207,7 @@ send_packet(const struct interface *iface, int type,
 	else
 		memset(&su.sll.sll_addr, 0xff, iface->hwlen);
 
-	if ((retval = sendto(iface->fd, data, len,0,&su.sa,sizeof(su))) == -1)
-		logger(LOG_ERR, "sendto: %s", strerror(errno));
-	return retval;
+	return sendto(iface->fd, data, len,0,&su.sa,sizeof(su));
 }
 
 /* Linux has no need for the buffer as we can read as much as we want.
@@ -238,7 +231,6 @@ get_packet(const struct interface *iface, unsigned char *data,
 	bytes = read(iface->fd, buffer, iface->buffer_length);
 
 	if (bytes == -1) {
-		logger(LOG_ERR, "read: %s", strerror(errno));
 		ts.tv_sec = 3;
 		ts.tv_nsec = 0;
 		nanosleep(&ts, NULL);
@@ -254,13 +246,13 @@ get_packet(const struct interface *iface, unsigned char *data,
 
 	if ((unsigned)bytes < (sizeof(pay.packet->ip) +sizeof(pay.packet->udp)))
 	{
-		logger(LOG_DEBUG, "message too short, ignoring");
+		errno = EBADMSG;
 		return -1;
 	}
 
 	pay.buffer = buffer;
 	if (bytes < ntohs(pay.packet->ip.ip_len)) {
-		logger(LOG_DEBUG, "truncated packet, ignoring");
+		errno = EBADMSG;
 		return -1;
 	}
 

@@ -435,7 +435,7 @@ read_info(const struct interface *iface, struct dhcp *dhcp)
 			}
 		} else if (strcmp(var, "GATEWAYS") == 0) {
 			p = value;
-			while ((value = strsep (&p, " "))) {
+			while ((value = strsep(&p, " "))) {
 				route = xzalloc(sizeof(*route));
 				if (parse_address(&route->gateway, value,
 						  "GATEWAYS"))

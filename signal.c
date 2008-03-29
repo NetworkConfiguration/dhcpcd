@@ -35,7 +35,6 @@
 #include <unistd.h>
 
 #include "common.h"
-#include "logger.h"
 #include "signal.h"
 
 static int signal_pipe[2];
@@ -57,13 +56,10 @@ signal_handler(int sig)
 	/* Add a signal to our stack */
 	while (signals[i])
 		i++;
-	if (i > sizeof(signals) / sizeof(signals[0]))
-		logger(LOG_ERR, "signal buffer overrun");
-	else
+	if (i <= sizeof(signals) / sizeof(signals[0]))
 		signals[i] = sig;
 
-	if (write(signal_pipe[1], &sig, sizeof(sig)) == -1)
-		logger(LOG_ERR, "Could not send signal: %s", strerror(errno));
+	write(signal_pipe[1], &sig, sizeof(sig));
 
 	/* Restore errno */
 	errno = serrno;
@@ -128,10 +124,8 @@ signal_init(void)
 {
 	struct sigaction sa;
 
-	if (pipe(signal_pipe) == -1) {
-		logger(LOG_ERR, "pipe: %s", strerror(errno));
+	if (pipe(signal_pipe) == -1)
 		return -1;
-	}
 
 	/* Stop any scripts from inheriting us */
 	close_on_exec(signal_pipe[0]);
@@ -142,10 +136,8 @@ signal_init(void)
 	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = SIG_DFL;
 	sa.sa_flags = SA_NOCLDSTOP | SA_NOCLDWAIT;
-	if (sigaction(SIGCHLD, &sa, NULL) == -1) {
-		logger(LOG_ERR, "sigaction: %s", strerror(errno));
+	if (sigaction(SIGCHLD, &sa, NULL) == -1)
 		return -1;
-	}
 
 	memset(signals, 0, sizeof(signals));
 	return 0;
@@ -162,10 +154,8 @@ signal_setup(void)
 	sigemptyset(&sa.sa_mask);
 
 	for (i = 0; i < sizeof(handle_sigs) / sizeof(handle_sigs[0]); i++)
-		if (sigaction(handle_sigs[i], &sa, NULL) == -1) {
-			logger(LOG_ERR, "sigaction: %s", strerror(errno));
+		if (sigaction(handle_sigs[i], &sa, NULL) == -1)
 			return -1;
-		}
 	
 	return 0;
 }
@@ -181,10 +171,8 @@ signal_reset(void)
 	sigemptyset(&sa.sa_mask);
 
 	for (i = 0; i < sizeof(handle_sigs) / sizeof(handle_sigs[0]); i++)
-		if (sigaction(handle_sigs[i], &sa, NULL) == -1) {
-			logger(LOG_ERR, "sigaction: %s", strerror(errno));
+		if (sigaction(handle_sigs[i], &sa, NULL) == -1)
 			return -1;
-		}
-
+	
 	return 0;
 }

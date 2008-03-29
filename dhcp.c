@@ -455,6 +455,8 @@ send_message(const struct interface *iface, const struct dhcp *dhcp,
 	retval = send_packet(iface, ETHERTYPE_IP, (unsigned char *)packet,
 			     message_length +
 			     sizeof(packet->ip) + sizeof(packet->udp));
+	if (retval == -1)
+		logger(LOG_ERR, "send_packet: %s", strerror(errno));
 	free(packet);
 	return retval;
 }
