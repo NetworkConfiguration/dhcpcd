@@ -127,8 +127,9 @@ char *hwaddr_ntoa(const unsigned char *, size_t);
 size_t hwaddr_aton(unsigned char *, const char *);
 
 struct interface *read_interface(const char *, int);
-int get_mtu(const char *);
-int set_mtu(const char *, short int);
+int do_mtu(const char *, short int);
+#define get_mtu(iface) do_mtu(iface, 0)
+#define set_mtu(iface, mtu) do_mtu(iface, mtu)
 
 int add_address(const char *, struct in_addr, struct in_addr, struct in_addr);
 int del_address(const char *, struct in_addr, struct in_addr);

@@ -258,7 +258,7 @@ do_interface(const char *ifname,
 }
 
 struct interface *
-read_interface (const char *ifname, _unused int metric)
+read_interface(const char *ifname, _unused int metric)
 {
 	int s;
 	struct ifreq ifr;
@@ -292,11 +292,6 @@ read_interface (const char *ifname, _unused int metric)
 	case ARPHRD_INFINIBAND:
 		hwlen = INFINIBAND_ADDR_LEN;
 		break;
-	default:
-		logger (LOG_ERR,
-			"interface is not Ethernet, FireWire, " \
-			"InfiniBand or Token Ring");
-		goto eexit;
 	}
 
 	hwaddr = xmalloc(sizeof(unsigned char) * HWADDR_LEN);
@@ -319,14 +314,12 @@ read_interface (const char *ifname, _unused int metric)
 	if (ioctl(s, SIOCGIFMTU, &ifr) == -1)
 		goto eexit;
 
+	/* Ensure that the MTU is big enough for DHCP */
 	if (ifr.ifr_mtu < MTU_MIN) {
-		logger(LOG_DEBUG, "MTU of %d is too low, setting to %d",
-		       ifr.ifr_mtu, MTU_MIN);
 		ifr.ifr_mtu = MTU_MIN;
 		strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
-		if (ioctl(s, SIOCSIFMTU, &ifr) == -1) {
+		if (ioctl(s, SIOCSIFMTU, &ifr) == -1)
 			goto eexit;
-		}
 	}
 	mtu = ifr.ifr_mtu;
 
@@ -357,9 +350,6 @@ read_interface (const char *ifname, _unused int metric)
 	iface->arpable = !(ifr.ifr_flags & (IFF_NOARP | IFF_LOOPBACK));
 	iface->mtu = iface->previous_mtu = mtu;
 
-	logger(LOG_INFO, "hardware address = %s",
-	       hwaddr_ntoa(iface->hwaddr, iface->hwlen));
-
 	/* 0 is a valid fd, so init to -1 */
 	iface->fd = -1;
 #ifdef __linux__
@@ -373,7 +363,7 @@ eexit:
 }
 
 int
-get_mtu(const char *ifname)
+do_mtu(const char *ifname, short int mtu)
 {
 	struct ifreq ifr;
 	int r;
@@ -384,31 +374,12 @@ get_mtu(const char *ifname)
 
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
-	r = ioctl(s, SIOCGIFMTU, &ifr);
+	ifr.ifr_mtu = mtu;
+	r = ioctl(s, mtu ? SIOCSIFMTU : SIOCGIFMTU, &ifr);
 	close(s);
-
 	if (r == -1)
 		return -1;
 	return ifr.ifr_mtu;
-}
-
-int
-set_mtu(const char *ifname, short int mtu)
-{
-	struct ifreq ifr;
-	int r;
-	int s;
-
-	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
-		return -1;
-
-	memset(&ifr, 0, sizeof(ifr));
-	logger(LOG_DEBUG, "setting MTU to %d", mtu);
-	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
-	ifr.ifr_mtu = mtu;
-	r = ioctl(s, SIOCSIFMTU, &ifr);
-	close(s);
-	return r == 0 ? 0 : -1;
 }
 
 static void

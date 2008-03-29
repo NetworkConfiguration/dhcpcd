@@ -1089,6 +1089,9 @@ dhcp_run(const struct options *options, int *pidfd)
 		goto eexit;
 	}
 
+	logger(LOG_INFO, "hardware address = %s",
+	       hwaddr_ntoa(iface->hwaddr, iface->hwlen));
+
 	state = xzalloc(sizeof(*state));
 	state->dhcp = xzalloc(sizeof(*state->dhcp));
 	state->pidfd = pidfd;
