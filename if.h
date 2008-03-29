@@ -137,7 +137,8 @@ int flush_addresses(const char *);
 #define flush_addresses(ifname) \
 	do_interface(ifname, NULL, NULL, NULL, true, false)
 in_addr_t get_address(const char *);
-int has_address(const char *, struct in_addr);
+#define has_address(ifname, addr) \
+	do_interface(ifname, NULL, NULL, (struct in_addr *)&(addr), false, false)
 
 int add_route(const char *, struct in_addr, struct in_addr, struct in_addr,
 	      int);

@@ -493,14 +493,3 @@ get_address(const char *ifname)
 		logger(LOG_ERR, "do_interface: %s", strerror(errno));
 	return retval;
 }
-
-int
-has_address(const char *ifname, struct in_addr address)
-{
-	int retval;
-
-	retval = do_interface(ifname, NULL, NULL, &address, false, false);
-	if (retval == -1)
-		logger(LOG_ERR, "do_interface: %s", strerror(errno));
-	return retval;
-}
