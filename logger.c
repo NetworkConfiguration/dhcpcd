@@ -105,7 +105,7 @@ logger(int level, const char *fmt, ...)
 		fmt2len = strlen(fmt) + len + 1;
 		fmt2 = pf = malloc(sizeof(char) * fmt2len);
 		if (fmt2) {
-			memcpy(pf, logprefix, len);
+			strlcpy(pf, logprefix, len);
 			pf += len;
 			strlcpy(pf, fmt, fmt2len - len);
 			vsyslog(level, fmt2, p2);
