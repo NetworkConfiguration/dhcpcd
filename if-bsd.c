@@ -120,8 +120,6 @@ if_route(const char *ifname, struct in_addr destination,
 	size_t hwlen = 0;
 	int retval = 0;
 
-	log_route(destination, netmask, gateway, metric, change, del);
-
 	if ((s = socket(PF_ROUTE, SOCK_RAW, 0)) == -1)
 		return -1;
 

@@ -274,7 +274,6 @@ if_route(const char *ifname,
 	unsigned int ifindex;
 	int retval = 0;
 
-	log_route(destination, netmask, gateway, metric, change, del);
 
 	if (!(ifindex = if_nametoindex(ifname))) {
 		errno = ENODEV;

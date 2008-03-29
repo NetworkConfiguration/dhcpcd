@@ -411,9 +411,9 @@ set_mtu(const char *ifname, short int mtu)
 	return r == 0 ? 0 : -1;
 }
 
-void
+static void
 log_route(struct in_addr destination, struct in_addr netmask,
-	  struct in_addr gateway, _unused int metric, int change, int del)
+	  struct in_addr gateway, _unused int metric, int del)
 {
 	char *dstd = xstrdup(inet_ntoa(destination));
 
@@ -426,7 +426,7 @@ log_route(struct in_addr destination, struct in_addr netmask,
 	if (gateway.s_addr == destination.s_addr ||
 	    gateway.s_addr == INADDR_ANY)
 		logger(LOG_INFO, "%s route to %s/%d" METRIC,
-		       change ? "changing" : del ? "removing" : "adding",
+		       del ? "removing" : "adding",
 		       dstd, inet_ntocidr(netmask)
 #ifdef __linux__
 		       , metric
@@ -434,7 +434,7 @@ log_route(struct in_addr destination, struct in_addr netmask,
 		      );
 	else if (destination.s_addr == INADDR_ANY)
 		logger(LOG_INFO, "%s default route via %s" METRIC,
-		       change ? "changing" : del ? "removing" : "adding",
+		       del ? "removing" : "adding",
 		       inet_ntoa(gateway)
 
 #ifdef __linux__
@@ -443,7 +443,7 @@ log_route(struct in_addr destination, struct in_addr netmask,
 		      );
 	else
 		logger(LOG_INFO, "%s route to %s/%d via %s" METRIC,
-		       change ? "changing" : del ? "removing" : "adding",
+		       del ? "removing" : "adding",
 		       dstd, inet_ntocidr(netmask), inet_ntoa(gateway)
 #ifdef __linux__
 		       , metric
@@ -489,6 +489,7 @@ add_route(const char *ifname, struct in_addr destination,
 {
 	int retval;
 
+	log_route(destination, netmask, gateway, metric, 0);
 	retval = if_route(ifname, destination, netmask, gateway, metric, 0, 0);
 	if (retval == -1)
 		logger(LOG_ERR, "if_route: %s", strerror(errno));
@@ -501,6 +502,7 @@ del_route(const char *ifname, struct in_addr destination,
 {
 	int retval;
 
+	log_route(destination, netmask, gateway, metric, 1);
 	retval = if_route(ifname, destination, netmask, gateway, metric, 0, 1);
 	if (retval == -1)
 		logger(LOG_ERR, "if_route: %s", strerror(errno));
