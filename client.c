@@ -370,8 +370,7 @@ client_setup(struct if_state *state, const struct options *options)
 			if (options->doinform &&
 			    has_address(iface->name, dhcp->address) < 1)
 			{
-				add_address(iface->name, dhcp->address,
-					    dhcp->netmask, dhcp->broadcast);
+				/* add_address */
 				iface->previous_address = dhcp->address;
 				iface->previous_netmask = dhcp->netmask;
 			}
@@ -916,8 +915,7 @@ handle_dhcp(struct if_state *state, int type, const struct options *options)
 		logger(LOG_INFO, "received approval for %s",
 		       inet_ntoa(dhcp->address));
 		if (iface->previous_netmask.s_addr != dhcp->netmask.s_addr) {
-			add_address(iface->name, dhcp->address,
-				    dhcp->netmask, dhcp->broadcast);
+			/* add_address */
 			iface->previous_netmask.s_addr = dhcp->netmask.s_addr;
 		}
 		state->timeout = options->leasetime;

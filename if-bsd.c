@@ -96,7 +96,7 @@ if_address(const char *ifname, struct in_addr address,
 int
 if_route(const char *ifname, struct in_addr destination,
 	 struct in_addr netmask, struct in_addr gateway,
-	 int metric, int change, int del)
+	 int metric, int action)
 {
 	int s;
 	static int seq;
@@ -126,7 +126,12 @@ if_route(const char *ifname, struct in_addr destination,
 	memset(&rtm, 0, sizeof(rtm));
 	rtm.hdr.rtm_version = RTM_VERSION;
 	rtm.hdr.rtm_seq = ++seq;
-	rtm.hdr.rtm_type = change ? RTM_CHANGE : del ? RTM_DELETE : RTM_ADD;
+	if (action == 0)
+		rtm.hdr.rtm_type = RTM_CHANGE;
+	else if (action > 0)
+		rtm.hdr.rtm_type = RTM_ADD;
+	else
+		rtm.hdr.rtm_type = RTM_DELETE;
 	rtm.hdr.rtm_flags = RTF_UP | RTF_STATIC;
 
 	/* This order is important */

@@ -59,6 +59,106 @@
 #include "signal.h"
 #include "socket.h"
 
+static void
+log_route(const struct in_addr *destination,
+	  const struct in_addr *netmask,
+	  const struct in_addr *gateway, _unused int metric, int del)
+{
+	char *dstd = xstrdup(inet_ntoa(*destination));
+
+#ifdef __linux__
+#define METRIC " metric %d"
+#else
+#define METRIC ""
+#endif
+
+	if (gateway->s_addr == destination->s_addr ||
+	    gateway->s_addr == INADDR_ANY)
+		logger(LOG_INFO, "%s route to %s/%d" METRIC,
+		       del ? "removing" : "adding",
+		       dstd, inet_ntocidr(*netmask)
+#ifdef __linux__
+		       , metric
+#endif
+		      );
+	else if (destination->s_addr == INADDR_ANY)
+		logger(LOG_INFO, "%s default route via %s" METRIC,
+		       del ? "removing" : "adding",
+		       inet_ntoa(*gateway)
+
+#ifdef __linux__
+		       , metric
+#endif
+		      );
+	else
+		logger(LOG_INFO, "%s route to %s/%d via %s" METRIC,
+		       del ? "removing" : "adding",
+		       dstd, inet_ntocidr(*netmask), inet_ntoa(*gateway)
+#ifdef __linux__
+		       , metric
+#endif
+		      );
+
+	free(dstd);
+}
+
+static int
+a_address(const char *ifname, const struct in_addr *address,
+	  const struct in_addr *netmask, const struct in_addr *broadcast)
+{
+	int retval;
+
+	logger(LOG_INFO, "adding IP address %s/%d",
+	       inet_ntoa(*address), inet_ntocidr(*netmask));
+	retval = add_address(ifname, address, netmask, broadcast);
+	if (retval == -1)
+		logger(LOG_ERR, "if_address: %s", strerror(errno));
+	return retval;
+}
+
+static int
+d_address(const char *ifname,
+	  const struct in_addr *address, const struct in_addr *netmask)
+{
+	int retval;
+
+	logger(LOG_INFO, "removing IP address %s/%d",
+	       inet_ntoa(*address), inet_ntocidr(*netmask));
+	retval = del_address(ifname, address, netmask);
+	if (retval == -1)
+		logger(LOG_ERR, "del_address: %s", strerror(errno));
+	return retval;
+}
+
+
+static int
+a_route(const char *ifname, const struct in_addr *destination,
+	const struct in_addr *netmask, const struct in_addr *gateway,
+	int metric)
+{
+	int retval;
+
+	log_route(destination, netmask, gateway, metric, 0);
+	retval = add_route(ifname, destination, netmask, gateway, metric);
+	if (retval == -1)
+		logger(LOG_ERR, "add_route: %s", strerror(errno));
+	return retval;
+}
+
+static int
+d_route(const char *ifname, const struct in_addr *destination,
+	const struct in_addr *netmask, const struct in_addr *gateway,
+	int metric)
+{
+	int retval;
+
+	log_route(destination, netmask, gateway, metric, 1);
+	retval = del_route(ifname, destination, netmask, gateway, metric);
+	if (retval == -1)
+		logger(LOG_ERR, "del_route: %s", strerror(errno));
+	return retval;
+}
+
 #ifdef ENABLE_RESOLVCONF
 static int
 file_in_path(const char *file)
@@ -565,8 +665,8 @@ configure (const struct options *options, struct interface *iface,
 	NSTAILQ_FOREACH(route, iface->previous_routes, entries)
 		if ((route->destination.s_addr || options->dogateway) &&
 		    (!up || !in_routes(dhcp->routes, route)))
-			del_route(iface->name, route->destination,
-				  route->netmask, route->gateway,
+			del_route(iface->name, &route->destination,
+				  &route->netmask, &route->gateway,
 				  options->metric);
 	/* If we aren't up, then reset the interface as much as we can */
 	if (!up) {
@@ -624,8 +724,8 @@ configure (const struct options *options, struct interface *iface,
 
 	/* This also changes netmask */
 	if (!options->doinform || !has_address (iface->name, dhcp->address))
-		if (add_address(iface->name, dhcp->address, dhcp->netmask,
-				 dhcp->broadcast) == -1 &&
+		if (a_address(iface->name, &dhcp->address, &dhcp->netmask,
+				 &dhcp->broadcast) == -1 &&
 		    errno != EEXIST)
 			return false;
 
@@ -633,8 +733,8 @@ configure (const struct options *options, struct interface *iface,
 	if (iface->previous_address.s_addr != dhcp->address.s_addr &&
 	    iface->previous_address.s_addr != 0 &&
 	    ! options->keep_address)
-		del_address(iface->name,
-			    iface->previous_address, iface->previous_netmask);
+		d_address(iface->name,
+			    &iface->previous_address, &iface->previous_netmask);
 
 #ifdef __linux__
 	/* On linux, we need to change the subnet route to have our metric. */
@@ -644,8 +744,8 @@ configure (const struct options *options, struct interface *iface,
 	{
 		dest.s_addr = dhcp->address.s_addr & dhcp->netmask.s_addr;
 		gate.s_addr = 0;
-		add_route(iface->name, dest, dhcp->netmask, gate, options->metric);
-		del_route(iface->name, dest, dhcp->netmask, gate, 0);
+		a_route(iface->name, &dest, &dhcp->netmask, &gate, options->metric);
+		d_route(iface->name, &dest, &dhcp->netmask, &gate, 0);
 	}
 #endif
 
@@ -673,9 +773,9 @@ configure (const struct options *options, struct interface *iface,
 		    ! options->dogateway)
 			continue;
 
-		remember = add_route(iface->name, route->destination,
-				     route->netmask,  route->gateway,
-				     options->metric);
+		remember = a_route(iface->name, &route->destination,
+				   &route->netmask, &route->gateway,
+				   options->metric);
 		/* If we failed to add the route, we may have already added it
 		   ourselves. If so, remember it again. */
 		if (remember < 0 && in_routes(iface->previous_routes, route))
@@ -725,8 +825,8 @@ configure (const struct options *options, struct interface *iface,
 		dest.s_addr = htonl(LINKLOCAL_ADDR);
 		mask.s_addr = htonl(LINKLOCAL_MASK);
 		gate.s_addr = 0;
-		remember = add_route(iface->name, dest, mask, gate,
-				     options->metric);
+		remember = d_route(iface->name, &dest, &mask, &gate,
+				   options->metric);
 
 		if (remember >= 0) {
 			if (! new_routes) {

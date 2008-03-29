@@ -46,7 +46,6 @@
 #include "common.h"
 #include "dhcp.h"
 #include "if.h"
-#include "logger.h"
 
 int
 inet_ntocidr(struct in_addr address)
@@ -382,103 +381,6 @@ do_mtu(const char *ifname, short int mtu)
 	return ifr.ifr_mtu;
 }
 
-static void
-log_route(struct in_addr destination, struct in_addr netmask,
-	  struct in_addr gateway, _unused int metric, int del)
-{
-	char *dstd = xstrdup(inet_ntoa(destination));
-
-#ifdef __linux__
-#define METRIC " metric %d"
-#else
-#define METRIC ""
-#endif
-
-	if (gateway.s_addr == destination.s_addr ||
-	    gateway.s_addr == INADDR_ANY)
-		logger(LOG_INFO, "%s route to %s/%d" METRIC,
-		       del ? "removing" : "adding",
-		       dstd, inet_ntocidr(netmask)
-#ifdef __linux__
-		       , metric
-#endif
-		      );
-	else if (destination.s_addr == INADDR_ANY)
-		logger(LOG_INFO, "%s default route via %s" METRIC,
-		       del ? "removing" : "adding",
-		       inet_ntoa(gateway)
-
-#ifdef __linux__
-		       , metric
-#endif
-		      );
-	else
-		logger(LOG_INFO, "%s route to %s/%d via %s" METRIC,
-		       del ? "removing" : "adding",
-		       dstd, inet_ntocidr(netmask), inet_ntoa(gateway)
-#ifdef __linux__
-		       , metric
-#endif
-		      );
-
-	free(dstd);
-}
-
-
-int
-add_address(const char *ifname, struct in_addr address,
-	    struct in_addr netmask, struct in_addr broadcast)
-{
-	int retval;
-
-	logger(LOG_INFO, "adding IP address %s/%d",
-	       inet_ntoa(address), inet_ntocidr(netmask));
-	retval = if_address(ifname, address, netmask, broadcast, 0);
-	if (retval == -1)
-		logger(LOG_ERR, "if_address: %s", strerror(errno));
-	return retval;
-}
-
-int
-del_address(const char *ifname, struct in_addr address, struct in_addr netmask)
-{
-	struct in_addr t;
-	int retval;
-
-	logger(LOG_INFO, "removing IP address %s/%d",
-	       inet_ntoa(address), inet_ntocidr(netmask));
-	t.s_addr = 0;
-	retval = if_address(ifname, address, netmask, t, 1);
-	if (retval == -1)
-		logger(LOG_ERR, "if_address: %s", strerror(errno));
-	return retval;
-}
-
-int
-add_route(const char *ifname, struct in_addr destination,
-	  struct in_addr netmask, struct in_addr gateway, int metric)
-{
-	int retval;
-
-	log_route(destination, netmask, gateway, metric, 0);
-	retval = if_route(ifname, destination, netmask, gateway, metric, 0, 0);
-	if (retval == -1)
-		logger(LOG_ERR, "if_route: %s", strerror(errno));
-	return retval;
-}
-
-int
-del_route(const char *ifname, struct in_addr destination,
-	  struct in_addr netmask, struct in_addr gateway, int metric)
-{
-	int retval;
-
-	log_route(destination, netmask, gateway, metric, 1);
-	retval = if_route(ifname, destination, netmask, gateway, metric, 0, 1);
-	if (retval == -1)
-		logger(LOG_ERR, "if_route: %s", strerror(errno));
-	return retval;
-}
 
 in_addr_t
 get_address(const char *ifname)
@@ -489,7 +391,5 @@ get_address(const char *ifname)
 	retval = do_interface(ifname, NULL, NULL, &address, false, true);
 	if (retval > 0)
 		return address.s_addr;
-	if (retval == -1)
-		logger(LOG_ERR, "do_interface: %s", strerror(errno));
 	return retval;
 }

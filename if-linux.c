@@ -231,8 +231,8 @@ struct nlmr
 
 int
 if_address(const char *ifname,
-	   struct in_addr address, struct in_addr netmask,
-	   struct in_addr broadcast, int del)
+	   const struct in_addr *address, const struct in_addr *netmask,
+	   const struct in_addr *broadcast, int action)
 {
 	struct nlma *nlm;
 	int retval = 0;
@@ -240,24 +240,26 @@ if_address(const char *ifname,
 	nlm = xzalloc(sizeof(*nlm));
 	nlm->hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifaddrmsg));
 	nlm->hdr.nlmsg_flags = NLM_F_REQUEST;
-	if (!del)
+	if (action >= 0) {
 		nlm->hdr.nlmsg_flags |= NLM_F_CREATE | NLM_F_REPLACE;
-	nlm->hdr.nlmsg_type = del ? RTM_DELADDR : RTM_NEWADDR;
+		nlm->hdr.nlmsg_type = RTM_NEWADDR;
+	} else
+		nlm->hdr.nlmsg_type = RTM_DELADDR;
 	if (!(nlm->ifa.ifa_index = if_nametoindex(ifname))) {
 		free(nlm);
 		errno = ENODEV;
 		return -1;
 	}
 	nlm->ifa.ifa_family = AF_INET;
-	nlm->ifa.ifa_prefixlen = inet_ntocidr(netmask);
+	nlm->ifa.ifa_prefixlen = inet_ntocidr(*netmask);
 	/* This creates the aliased interface */
 	add_attr_l(&nlm->hdr, sizeof(*nlm), IFA_LABEL,
 		   ifname, strlen(ifname) + 1);
 	add_attr_l(&nlm->hdr, sizeof(*nlm), IFA_LOCAL,
-		   &address.s_addr, sizeof(address.s_addr));
-	if (!del)
+		   &address->s_addr, sizeof(address->s_addr));
+	if (action >= 0)
 		add_attr_l(&nlm->hdr, sizeof(*nlm), IFA_BROADCAST,
-			   &broadcast.s_addr, sizeof(broadcast.s_addr));
+			   &broadcast->s_addr, sizeof(broadcast->s_addr));
 
 	if (send_netlink(&nlm->hdr) == -1)
 		retval = -1;
@@ -267,8 +269,8 @@ if_address(const char *ifname,
 
 int
 if_route(const char *ifname,
-	 struct in_addr destination, struct in_addr netmask,
-	 struct in_addr gateway, int metric, int change, int del)
+	 const struct in_addr *destination, const struct in_addr *netmask,
+	 const struct in_addr *gateway, int metric, int action)
 {
 	struct nlmr *nlm;
 	unsigned int ifindex;
@@ -282,35 +284,37 @@ if_route(const char *ifname,
 
 	nlm = xzalloc(sizeof(*nlm));
 	nlm->hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
-	if (change)
+	nlm->hdr.nlmsg_type = RTM_NEWROUTE;
+	if (action == 0)
 		nlm->hdr.nlmsg_flags = NLM_F_REPLACE;
-	else if (!del)
+	else if (action > 0)
 		nlm->hdr.nlmsg_flags = NLM_F_CREATE | NLM_F_EXCL;
+	else
+		nlm->hdr.nlmsg_type = RTM_DELROUTE;
 	nlm->hdr.nlmsg_flags |= NLM_F_REQUEST;
-	nlm->hdr.nlmsg_type = del ? RTM_DELROUTE : RTM_NEWROUTE;
 	nlm->rt.rtm_family = AF_INET;
 	nlm->rt.rtm_table = RT_TABLE_MAIN;
 
-	if (del)
+	if (action < 0)
 		nlm->rt.rtm_scope = RT_SCOPE_NOWHERE;
 	else {
 		nlm->hdr.nlmsg_flags |= NLM_F_CREATE | NLM_F_EXCL;
 		nlm->rt.rtm_protocol = RTPROT_BOOT;
-		if (netmask.s_addr == INADDR_BROADCAST ||
-		    gateway.s_addr == INADDR_ANY)
+		if (netmask->s_addr == INADDR_BROADCAST ||
+		    gateway->s_addr == INADDR_ANY)
 			nlm->rt.rtm_scope = RT_SCOPE_LINK;
 		else
 			nlm->rt.rtm_scope = RT_SCOPE_UNIVERSE;
 		nlm->rt.rtm_type = RTN_UNICAST;
 	}
 
-	nlm->rt.rtm_dst_len = inet_ntocidr(netmask);
+	nlm->rt.rtm_dst_len = inet_ntocidr(*netmask);
 	add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_DST,
-		   &destination.s_addr, sizeof(destination.s_addr));
-	if (netmask.s_addr != INADDR_BROADCAST &&
-	    destination.s_addr != gateway.s_addr)
+		   &destination->s_addr, sizeof(destination->s_addr));
+	if (netmask->s_addr != INADDR_BROADCAST &&
+	    destination->s_addr != gateway->s_addr)
 		add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_GATEWAY,
-			   &gateway.s_addr, sizeof(gateway.s_addr));
+			   &gateway->s_addr, sizeof(gateway->s_addr));
 
 	add_attr_32(&nlm->hdr, sizeof(*nlm), RTA_OIF, ifindex);
 	add_attr_32(&nlm->hdr, sizeof(*nlm), RTA_PRIORITY, metric);

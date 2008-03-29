@@ -51,7 +51,7 @@
 
 #ifdef ENABLE_DUID
 #ifndef DUID_LEN
-#  define DUID_LEN				128 + 2
+#  define DUID_LEN			128 + 2
 #endif
 #endif
 
@@ -131,27 +131,28 @@ int do_mtu(const char *, short int);
 #define get_mtu(iface) do_mtu(iface, 0)
 #define set_mtu(iface, mtu) do_mtu(iface, mtu)
 
-int add_address(const char *, struct in_addr, struct in_addr, struct in_addr);
-int del_address(const char *, struct in_addr, struct in_addr);
-int flush_addresses(const char *);
+#define add_address(ifname, addr, mask, brd) \
+	if_address(ifname, &(addr), &(mask), brd, 1)
+#define del_address(ifname, addr, mask) \
+	if_address(ifname, &(addr), &(mask), NULL, -1)
 #define flush_addresses(ifname) \
 	do_interface(ifname, NULL, NULL, NULL, true, false)
 in_addr_t get_address(const char *);
 #define has_address(ifname, addr) \
 	do_interface(ifname, NULL, NULL, (struct in_addr *)&(addr), false, false)
 
-int add_route(const char *, struct in_addr, struct in_addr, struct in_addr,
-	      int);
-int del_route(const char *, struct in_addr, struct in_addr, struct in_addr,
-	      int);
+#define add_route(ifname, dest, mask, gate, metric) \
+	if_route(ifname, dest, mask, gate, metric, 1)
+#define del_route(ifname, dest, mask, gate, metric) \
+	if_route(ifname, dest, mask, gate, metric, -1)
 
 int inet_ntocidr(struct in_addr);
 int inet_cidrtoaddr(int, struct in_addr *);
 
 int do_interface(const char *, unsigned char *, size_t *, struct in_addr *,
 		 bool, bool);
-int if_address(const char *, struct in_addr, struct in_addr, struct in_addr,
-	       int del);
-int if_route(const char *, struct in_addr, struct in_addr, struct in_addr,
-	     int metric, int change, int del);
+int if_address(const char *, const struct in_addr *, const struct in_addr *,
+	       const struct in_addr *, int);
+int if_route(const char *, const struct in_addr *, const struct in_addr *,
+	     const struct in_addr *, int, int);
 #endif
