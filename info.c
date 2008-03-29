@@ -115,7 +115,7 @@ write_info(const struct interface *iface, const struct dhcp *dhcp,
 	struct in_addr addr;
 	bool doneone;
 
-	if (options->test)
+	if (options->options & DHCPCD_TEST)
 		f = stdout;
 	else {
 		if (!overwrite && stat(iface->infofile, &sb) == 0)
@@ -205,8 +205,8 @@ write_info(const struct interface *iface, const struct dhcp *dhcp,
 	if (dhcp->servername[0])
 		print_clean(f, "DHCPSNAME", dhcp->servername);
 
-	if (!options->doinform && dhcp->address.s_addr) {
-		if (!options->test)
+	if (!(options->options & DHCPCD_INFORM) && dhcp->address.s_addr) {
+		if (!(options->options & DHCPCD_TEST))
 			fprintf(f, "LEASEDFROM='%u'\n", dhcp->leasedfrom);
 		fprintf(f, "LEASETIME='%u'\n", dhcp->leasetime);
 		fprintf(f, "RENEWALTIME='%u'\n", dhcp->renewaltime);
@@ -251,7 +251,7 @@ write_info(const struct interface *iface, const struct dhcp *dhcp,
 	}
 #endif
 
-	if (!options->test)
+	if (!(options->options & DHCPCD_TEST))
 		fclose(f);
 	return true;
 }

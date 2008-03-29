@@ -631,8 +631,8 @@ lookuphostname(char *hostname, const struct dhcp *dhcp,
 }
 
 int
-configure (const struct options *options, struct interface *iface,
-	   const struct dhcp *dhcp, bool up)
+configure(const struct options *options, struct interface *iface,
+	  const struct dhcp *dhcp, bool up)
 {
 	struct rt *route = NULL;
 	struct route_head *new_routes = NULL;
@@ -663,7 +663,8 @@ configure (const struct options *options, struct interface *iface,
 	 * Always do this as the interface may have >1 address not added by us
 	 * so the routes we added may still exist. */
 	NSTAILQ_FOREACH(route, iface->previous_routes, entries)
-		if ((route->destination.s_addr || options->dogateway) &&
+		if ((route->destination.s_addr ||
+		     options->options & DHCPCD_GATEWAY) &&
 		    (!up || !in_routes(dhcp->routes, route)))
 			del_route(iface->name, &route->destination,
 				  &route->netmask, &route->gateway,
@@ -689,10 +690,10 @@ configure (const struct options *options, struct interface *iface,
 
 		/* Only reset things if we had set them before */
 		if (iface->previous_address.s_addr != 0) {
-			if (!options->keep_address) {
+			if (!(options->options & DHCPCD_KEEPADDRESS)) {
 				del_address(iface->name,
-					    iface->previous_address,
-					    iface->previous_netmask);
+					    &iface->previous_address,
+					    &iface->previous_netmask);
 				memset(&iface->previous_address,
 				       0, sizeof (iface->previous_address));
 				memset(&iface->previous_netmask,
@@ -711,7 +712,7 @@ configure (const struct options *options, struct interface *iface,
 	/* Set the MTU requested.
 	 * If the DHCP server no longer sends one OR it's invalid then
 	 * we restore the original MTU */
-	if (options->domtu) {
+	if (options->options & DHCPCD_MTU) {
 		mtu = iface->mtu;
 		if (dhcp->mtu)
 			mtu = dhcp->mtu;
@@ -723,18 +724,19 @@ configure (const struct options *options, struct interface *iface,
 	}
 
 	/* This also changes netmask */
-	if (!options->doinform || !has_address (iface->name, dhcp->address))
+	if (!(options->options & DHCPCD_INFORM) ||
+	    !has_address (iface->name, dhcp->address))
 		if (a_address(iface->name, &dhcp->address, &dhcp->netmask,
-				 &dhcp->broadcast) == -1 &&
+			      &dhcp->broadcast) == -1 &&
 		    errno != EEXIST)
 			return false;
 
 	/* Now delete the old address if different */
 	if (iface->previous_address.s_addr != dhcp->address.s_addr &&
 	    iface->previous_address.s_addr != 0 &&
-	    ! options->keep_address)
+	    !(options->options & DHCPCD_KEEPADDRESS))
 		d_address(iface->name,
-			    &iface->previous_address, &iface->previous_netmask);
+			  &iface->previous_address, &iface->previous_netmask);
 
 #ifdef __linux__
 	/* On linux, we need to change the subnet route to have our metric. */
@@ -770,7 +772,7 @@ configure (const struct options *options, struct interface *iface,
 		/* Don't set default routes if not asked to */
 		if (route->destination.s_addr == 0 &&
 		    route->netmask.s_addr == 0 &&
-		    ! options->dogateway)
+		    !(options->options & DHCPCD_GATEWAY))
 			continue;
 
 		remember = a_route(iface->name, &route->destination,
@@ -782,7 +784,7 @@ configure (const struct options *options, struct interface *iface,
 			remember = 1;
 
 		if (remember >= 0) {
-			if (! new_routes) {
+			if (!new_routes) {
 				new_routes = xmalloc(sizeof(*new_routes));
 				STAILQ_INIT(new_routes);
 			}
@@ -793,7 +795,7 @@ configure (const struct options *options, struct interface *iface,
 #ifdef THERE_IS_NO_FORK
 		/* If we have daemonised yet we need to record which routes
 		 * we failed to add so we can skip them */
-		else if (!options->daemonised) {
+		else if (!(options->options & DAEMONISED)) {
 			/* We can never have more than 255 / 4 routes,
 			 * so 3 chars is plently */
 			if (*skipp)
@@ -818,18 +820,18 @@ configure (const struct options *options, struct interface *iface,
 #ifdef ENABLE_IPV4LL
 	/* Ensure we always add the link local route if we got a private
 	 * address and isn't link local itself */
-	if (options->doipv4ll &&
+	if (options->options & DHCPCD_IPV4LL &&
 	    !haslinklocal &&
 	    IN_PRIVATE(ntohl(dhcp->address.s_addr)))
 	{
 		dest.s_addr = htonl(LINKLOCAL_ADDR);
 		mask.s_addr = htonl(LINKLOCAL_MASK);
 		gate.s_addr = 0;
-		remember = d_route(iface->name, &dest, &mask, &gate,
+		remember = a_route(iface->name, &dest, &mask, &gate,
 				   options->metric);
 
 		if (remember >= 0) {
-			if (! new_routes) {
+			if (!new_routes) {
 				new_routes = xmalloc(sizeof(*new_routes));
 				STAILQ_INIT(new_routes);
 			}
@@ -846,18 +848,19 @@ configure (const struct options *options, struct interface *iface,
 		free_route(iface->previous_routes);
 	iface->previous_routes = new_routes;
 
-	if (options->dodns && dhcp->dnsservers)
+	if (options->options & DHCPCD_DNS && dhcp->dnsservers)
 		make_resolv(iface->name, dhcp);
 	else
 		logger(LOG_DEBUG, "no dns information to write");
 
 #ifdef ENABLE_NTP
-	if (options->dontp && dhcp->ntpservers)
+	if (options->options & DHCPCD_NTP && dhcp->ntpservers)
 		make_ntp(iface->name, dhcp);
 #endif
 
 #ifdef ENABLE_NIS
-	if (options->donis && (dhcp->nisservers || dhcp->nisdomain))
+	if (options->options & DHCPCD_NIS &&
+	    (dhcp->nisservers || dhcp->nisdomain))
 		make_nis(iface->name, dhcp);
 #endif
 

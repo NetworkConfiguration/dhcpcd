@@ -132,9 +132,9 @@ int do_mtu(const char *, short int);
 #define set_mtu(iface, mtu) do_mtu(iface, mtu)
 
 #define add_address(ifname, addr, mask, brd) \
-	if_address(ifname, &(addr), &(mask), brd, 1)
+	if_address(ifname, addr, mask, brd, 1)
 #define del_address(ifname, addr, mask) \
-	if_address(ifname, &(addr), &(mask), NULL, -1)
+	if_address(ifname, addr, mask, NULL, -1)
 #define flush_addresses(ifname) \
 	do_interface(ifname, NULL, NULL, NULL, true, false)
 in_addr_t get_address(const char *);

@@ -173,22 +173,15 @@ main(int argc, char **argv)
 	snprintf(options->classid, CLASS_ID_MAX_LEN, "%s %s",
 		 PACKAGE, VERSION);
 
-	options->doarp = true;
-	options->dodns = true;
-	options->domtu = true;
-	options->donis = true;
-	options->dontp = true;
-	options->dogateway = true;
-	options->daemonise = true;
-	options->doinform = false;
-	options->doipv4ll = true;
-	options->doduid = true;
+	options->options |= DHCPCD_ARP | DHCPCD_DNS | DHCPCD_MTU |
+		DHCPCD_NIS | DHCPCD_NTP | DHCPCD_GATEWAY |
+		DHCPCD_DAEMONISE | DHCPCD_IPV4LL | DHCPCD_DUID;
 	options->timeout = DEFAULT_TIMEOUT;
 
 	gethostname(options->hostname, sizeof(options->hostname));
 	if (strcmp(options->hostname, "(none)") == 0 ||
 	    strcmp(options->hostname, "localhost") == 0)
-		memset(options->hostname, 0, sizeof(options->hostname));
+		*options->hostname = '\0';
 
 	/* Don't set any optional arguments here so we retain POSIX
 	 * compatibility with getopt */
@@ -213,13 +206,13 @@ main(int argc, char **argv)
 				setloglevel(LOG_DEBUG);
 				break;
 			case 2:
-				options->daemonise = false;
+				options->options &= ~DHCPCD_DAEMONISE;
 				break;
 			}
 			break;
 #ifdef THERE_IS_NO_FORK
 		case 'f':
-			options->daemonised = true;
+			options->options |= DHCPCD_DAEMONISED;
 			close_fds();
 			break;
 		case 'g':
@@ -241,7 +234,7 @@ main(int argc, char **argv)
 		case 'i':
 			if (!optarg) {
 				*options->classid = '\0';
-			} else if (strlen (optarg) > CLASS_ID_MAX_LEN) {
+			} else if (strlen(optarg) > CLASS_ID_MAX_LEN) {
 				logger(LOG_ERR,
 				       "`%s' too long for ClassID string,"
 				       " max is %d", optarg, CLASS_ID_MAX_LEN);
@@ -278,11 +271,11 @@ main(int argc, char **argv)
 			sig = SIGALRM;
 			break;
 		case 'p':
-			options->persistent = true;
+			options->options |= DHCPCD_PERSISTENT;
 			break;
 		case 's':
-			options->doinform = true;
-			options->doarp = false;
+			options->options |= DHCPCD_INFORM;
+			options->options &= ~DHCPCD_ARP;
 			if (!optarg || strlen(optarg) == 0) {
 				options->request_address.s_addr = 0;
 				break;
@@ -303,10 +296,10 @@ main(int argc, char **argv)
 			}
 			/* FALLTHROUGH */
 		case 'r':
-			if (!options->doinform)
-				options->dorequest = true;
+			if (!(options->options & DHCPCD_INFORM))
+				options->options |= DHCPCD_REQUEST;
 			if (strlen(optarg) > 0 &&
-			    ! inet_aton(optarg, &options->request_address))
+			    !inet_aton(optarg, &options->request_address))
 			{ 
 				logger(LOG_ERR,
 				       "`%s' is not a valid IP address",
@@ -315,7 +308,7 @@ main(int argc, char **argv)
 			}
 			break;
 		case 't':
-			options->timeout = atoint (optarg);
+			options->timeout = atoint(optarg);
 			if (options->timeout < 0) {
 				logger (LOG_ERR, "timeout must be a positive value");
 				goto abort;
@@ -332,8 +325,8 @@ main(int argc, char **argv)
 					goto abort;
 				}
 				userclasses++;
-				memcpy (options->userclass + j + 1 ,
-					optarg, strlen(optarg));
+				memcpy(options->userclass + j + 1 ,
+				       optarg, strlen(optarg));
 				options->userclass[j] = strlen(optarg);
 				options->userclass_len += (strlen(optarg)) + 1;
 			break;
@@ -345,14 +338,14 @@ main(int argc, char **argv)
 			logger (LOG_ERR, "arp not compiled into dhcpcd");
 			goto abort;
 #endif
-			options->doarp = false;
+			options->options &= ~DHCPCD_ARP;
 			break;
 		case 'E':
 #ifndef ENABLE_INFO
 			logger (LOG_ERR, "info not compiled into dhcpcd");
 			goto abort;
 #endif
-			options->dolastlease = true;
+			options->options |= DHCPCD_LASTLEASE;
 			break;
 		case 'F':
 			if (!optarg) {
@@ -372,7 +365,7 @@ main(int argc, char **argv)
 			}
 			break;
 		case 'G':
-			options->dogateway = false;
+			options->options &= ~DHCPCD_GATEWAY;
 			break;
 		case 'H':
 			options->dohostname++;
@@ -388,24 +381,24 @@ main(int argc, char **argv)
 				if (strlcpy(options->clientid, optarg,
 					    sizeof(options->clientid)) == 0)
 					/* empty string disabled duid */
-					options->doduid = false;
+					options->options &= ~DHCPCD_DUID;
 			} else {
 				memset(options->clientid, 0,
 				       sizeof(options->clientid));
-				options->doduid = false;
+				options->options &= ~DHCPCD_DUID;
 			}
 			break;
 		case 'L':
-			options->doipv4ll = false;
+			options->options &= ~DHCPCD_IPV4LL;
 			break;
 		case 'M':
-			options->domtu = false;
+			options->options &= ~DHCPCD_MTU;
 			break;
 		case 'N':
-			options->dontp = false;
+			options->options &= ~DHCPCD_NTP;
 			break;
 		case 'R':
-			options->dodns = false;
+			options->options &= ~DHCPCD_DNS;
 			break;
 		case 'S':
 			options->domscsr++;
@@ -415,11 +408,10 @@ main(int argc, char **argv)
 			logger(LOG_ERR, "info support not compiled into dhcpcd");
 			goto abort;
 #endif
-			options->test = true;
-			options->persistent = true;
+			options->options |= DHCPCD_TEST | DHCPCD_PERSISTENT;
 			break;
 		case 'Y':
-			options->donis = false;
+			options->options &= ~DHCPCD_NIS;
 			break;
 		case '?':
 			usage();
@@ -504,10 +496,12 @@ main(int argc, char **argv)
 	} else
 		options->fqdn = FQDN_DISABLE;
 
-	if (options->request_address.s_addr == 0 && options->doinform) {
+	if (options->request_address.s_addr == 0 &&
+	    options->options & DHCPCD_INFORM)
+	{
 		if ((options->request_address.s_addr =
 		     get_address(options->interface)) != 0)
-			options->keep_address = true;
+			options->options |= DHCPCD_KEEPADDRESS;
 	}
 
 	if (IN_LINKLOCAL(ntohl (options->request_address.s_addr))) {
@@ -530,14 +524,15 @@ main(int argc, char **argv)
 	chdir("/");
 	umask(022);
 
-	if (options->test) {
-		if (options->dorequest || options->doinform) {
+	if (options->options & DHCPCD_TEST) {
+		if (options->options & DHCPCD_REQUEST ||
+		    options->options & DHCPCD_INFORM) {
 			logger(LOG_ERR,
 			       "cannot test with --inform or --request");
 			goto abort;
 		}
 
-		if (options->dolastlease) {
+		if (options->options & DHCPCD_LASTLEASE) {
 			logger(LOG_ERR, "cannot test with --lastlease");
 			goto abort;
 		}
@@ -572,7 +567,9 @@ main(int argc, char **argv)
 			goto abort;	
 	}
 
-	if (!options->test && !options->daemonised) {
+	if (!(options->options & DHCPCD_TEST) &&
+	    !(options->options & DHCPCD_DAEMONISED))
+	{
 		if ((pid = read_pid(options->pidfile)) > 0 &&
 		    kill(pid, 0) == 0)
 		{

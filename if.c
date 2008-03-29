@@ -236,8 +236,8 @@ do_interface(const char *ifname,
 				       sizeof(netmask));
 
 				if (del_address(ifname,
-						address.sin_addr,
-						netmask.sin_addr) == -1)
+						&address.sin_addr,
+						&netmask.sin_addr) == -1)
 					retval = -1;
 			} else if (get) {
 				addr->s_addr = address.sin_addr.s_addr;

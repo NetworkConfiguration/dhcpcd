@@ -35,16 +35,15 @@
 #include <netinet/in.h>
 
 #include <limits.h>
-#include <stdbool.h>
 
 #include "common.h"
 
-#define DEFAULT_TIMEOUT     20
-#define DEFAULT_LEASETIME   3600        /* 1 hour */
+#define DEFAULT_TIMEOUT		20
+#define DEFAULT_LEASETIME	3600        /* 1 hour */
 
-#define CLASS_ID_MAX_LEN    48
-#define CLIENT_ID_MAX_LEN   48
-#define USERCLASS_MAX_LEN   255
+#define CLASS_ID_MAX_LEN	48
+#define CLIENT_ID_MAX_LEN	48
+#define USERCLASS_MAX_LEN	255
 
 #ifdef THERE_IS_NO_FORK 
 extern char dhcpcd[PATH_MAX];
@@ -52,6 +51,24 @@ extern char **dhcpcd_argv;
 extern int dhcpcd_argc;
 extern char *dhcpcd_skiproutes;
 #endif
+
+#define DHCPCD_ARP		(1 << 0)
+#define DHCPCD_DNS		(1 << 1)
+#define DHCPCD_DOMAIN		(1 << 2)
+#define DHCPCD_GATEWAY		(1 << 3)
+#define DHCPCD_MTU		(1 << 4)
+#define DHCPCD_NIS		(1 << 5)
+#define DHCPCD_NTP		(1 << 6)
+#define DHCPCD_LASTLEASE	(1 << 7)
+#define DHCPCD_INFORM		(1 << 8)
+#define DHCPCD_REQUEST		(1 << 9)
+#define DHCPCD_IPV4LL		(1 << 10)
+#define DHCPCD_DUID		(1 << 11)
+#define DHCPCD_PERSISTENT	(1 << 12)
+#define DHCPCD_KEEPADDRESS	(1 << 13)
+#define DHCPCD_DAEMONISE	(1 << 14)
+#define DHCPCD_DAEMONISED	(1 << 15)
+#define DHCPCD_TEST		(1 << 16)
 
 struct options {
 	char interface[IF_NAMESIZE];
@@ -64,30 +81,13 @@ struct options {
 	uint32_t leasetime;
 	time_t timeout;
 	int metric;
+	int options;
 
-	bool doarp;
-	bool dodns;
-	bool dodomainname;
-	bool dogateway;
 	int  dohostname;
-	bool domtu;
-	bool donis;
-	bool dontp;
-	bool dolastlease;
-	bool doinform;
-	bool dorequest;
-	bool doipv4ll;
-	bool doduid;
 	int domscsr;
 
 	struct in_addr request_address;
 	struct in_addr request_netmask;
-
-	bool persistent;
-	bool keep_address;
-	bool daemonise;
-	bool daemonised;
-	bool test;
 
 	char *script;
 	char pidfile[PATH_MAX];
