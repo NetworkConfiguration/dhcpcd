@@ -59,8 +59,9 @@
 #endif
 
 int
-if_address(const char *ifname, struct in_addr address,
-	   struct in_addr netmask, struct in_addr broadcast, int del)
+if_address(const char *ifname, const struct in_addr *address,
+	   const struct in_addr *netmask, const struct in_addr *broadcast,
+	   int action)
 {
 	int s;
 	int retval;
@@ -82,21 +83,24 @@ if_address(const char *ifname, struct in_addr address,
 	_s.sin->sin_len = sizeof(*_s.sin); \
 	memcpy(&_s.sin->sin_addr, &_addr, sizeof(_s.sin->sin_addr));
 
-	ADDADDR(ifa.ifra_addr, address);
-	ADDADDR(ifa.ifra_mask, netmask);
-	if (!del)
-		ADDADDR(ifa.ifra_broadaddr, broadcast);
+	ADDADDR(ifa.ifra_addr, *address);
+	ADDADDR(ifa.ifra_mask, *netmask);
+	if (action >= 0)
+		ADDADDR(ifa.ifra_broadaddr, *broadcast);
 #undef ADDADDR
 
-	retval = ioctl(s, del ? SIOCDIFADDR : SIOCAIFADDR, &ifa);
+	if (action < 0)
+		retval = ioctl(s, SIOCDIFADDR, &ifa);
+	else
+		retval = ioctl(s, SIOCDIFADDR, &ifa);
 	close(s);
 	return retval;
 }
 
 int
-if_route(const char *ifname, struct in_addr destination,
-	 struct in_addr netmask, struct in_addr gateway,
-	 int metric, int action)
+if_route(const char *ifname, const struct in_addr *destination,
+	 const struct in_addr *netmask, const struct in_addr *gateway,
+	 _unused int metric, int action)
 {
 	int s;
 	static int seq;
@@ -146,13 +150,13 @@ if_route(const char *ifname, struct in_addr destination,
 	memcpy (bp, &(su), l); \
 	bp += l;
 
-	ADDADDR (destination);
+	ADDADDR(*destination);
 
-	if (netmask.s_addr == INADDR_BROADCAST ||
-	    gateway.s_addr == INADDR_ANY)
+	if (netmask->s_addr == INADDR_BROADCAST ||
+	    gateway->s_addr == INADDR_ANY)
 	{
 		/* Make us a link layer socket */
-		if (netmask.s_addr == INADDR_BROADCAST) 
+		if (netmask->s_addr == INADDR_BROADCAST) 
 			rtm.hdr.rtm_flags |= RTF_HOST;
 
 		hwaddr = xmalloc(sizeof(unsigned char) * HWADDR_LEN);
@@ -172,10 +176,10 @@ if_route(const char *ifname, struct in_addr destination,
 		free(hwaddr);
 	} else {
 		rtm.hdr.rtm_flags |= RTF_GATEWAY;
-		ADDADDR(gateway);
+		ADDADDR(*gateway);
 	}
 
-	ADDADDR(netmask);
+	ADDADDR(*netmask);
 #undef ADDADDR
 
 	rtm.hdr.rtm_msglen = l = bp - (char *)&rtm;
