@@ -666,9 +666,9 @@ configure(const struct options *options, struct interface *iface,
 		if ((route->destination.s_addr ||
 		     options->options & DHCPCD_GATEWAY) &&
 		    (!up || !in_routes(dhcp->routes, route)))
-			del_route(iface->name, &route->destination,
-				  &route->netmask, &route->gateway,
-				  options->metric);
+			d_route(iface->name, &route->destination,
+				&route->netmask, &route->gateway,
+				options->metric);
 	/* If we aren't up, then reset the interface as much as we can */
 	if (!up) {
 		if (iface->previous_routes) {
