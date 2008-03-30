@@ -691,9 +691,9 @@ configure(const struct options *options, struct interface *iface,
 		/* Only reset things if we had set them before */
 		if (iface->previous_address.s_addr != 0) {
 			if (!(options->options & DHCPCD_KEEPADDRESS)) {
-				del_address(iface->name,
-					    &iface->previous_address,
-					    &iface->previous_netmask);
+				d_address(iface->name,
+					  &iface->previous_address,
+					  &iface->previous_netmask);
 				memset(&iface->previous_address,
 				       0, sizeof (iface->previous_address));
 				memset(&iface->previous_netmask,

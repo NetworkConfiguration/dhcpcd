@@ -81,18 +81,19 @@ if_address(const char *ifname, const struct in_addr *address,
 	_s.sa = &_var; \
 	_s.sin->sin_family = AF_INET; \
 	_s.sin->sin_len = sizeof(*_s.sin); \
-	memcpy(&_s.sin->sin_addr, &_addr, sizeof(_s.sin->sin_addr));
+	memcpy(&_s.sin->sin_addr, _addr, sizeof(_s.sin->sin_addr));
 
-	ADDADDR(ifa.ifra_addr, *address);
-	ADDADDR(ifa.ifra_mask, *netmask);
-	if (action >= 0)
-		ADDADDR(ifa.ifra_broadaddr, *broadcast);
+	ADDADDR(ifa.ifra_addr, address);
+	ADDADDR(ifa.ifra_mask, netmask);
+	if (action >= 0) {
+		ADDADDR(ifa.ifra_broadaddr, broadcast);
+	}
 #undef ADDADDR
 
 	if (action < 0)
 		retval = ioctl(s, SIOCDIFADDR, &ifa);
 	else
-		retval = ioctl(s, SIOCDIFADDR, &ifa);
+		retval = ioctl(s, SIOCAIFADDR, &ifa);
 	close(s);
 	return retval;
 }
@@ -145,12 +146,12 @@ if_route(const char *ifname, const struct in_addr *destination,
 	memset (&su, 0, sizeof(su)); \
 	su.sin.sin_family = AF_INET; \
 	su.sin.sin_len = sizeof(su.sin); \
-	memcpy (&su.sin.sin_addr, &_addr, sizeof(su.sin.sin_addr)); \
+	memcpy (&su.sin.sin_addr, _addr, sizeof(su.sin.sin_addr)); \
 	l = SA_SIZE (&(su.sa)); \
 	memcpy (bp, &(su), l); \
 	bp += l;
 
-	ADDADDR(*destination);
+	ADDADDR(destination);
 
 	if (netmask->s_addr == INADDR_BROADCAST ||
 	    gateway->s_addr == INADDR_ANY)
@@ -176,10 +177,10 @@ if_route(const char *ifname, const struct in_addr *destination,
 		free(hwaddr);
 	} else {
 		rtm.hdr.rtm_flags |= RTF_GATEWAY;
-		ADDADDR(*gateway);
+		ADDADDR(gateway);
 	}
 
-	ADDADDR(*netmask);
+	ADDADDR(netmask);
 #undef ADDADDR
 
 	rtm.hdr.rtm_msglen = l = bp - (char *)&rtm;

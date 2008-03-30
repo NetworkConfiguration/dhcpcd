@@ -172,7 +172,7 @@ get_packet(const struct interface *iface, unsigned char *data,
 	} else
 		bpf.buffer += *buffer_pos;
 
-	while (bpf.packet) {
+	do {
 		len = 0;
 		have_data = false;
 
@@ -211,10 +211,7 @@ get_packet(const struct interface *iface, unsigned char *data,
 
 		if (have_data)
 			return len;
-
-		if (*buffer_pos == 0)
-			break;
-	}
+	} while (*buffer_pos);
 
 	/* No valid packets left, so return */
 	*buffer_pos = 0;
