@@ -182,7 +182,7 @@ eexit:
 
 ssize_t
 send_packet(const struct interface *iface, int type,
-	    const unsigned char *data, size_t len)
+	    const unsigned char *data, ssize_t len)
 {
 	union sockunion {
 		struct sockaddr sa;
@@ -214,7 +214,7 @@ send_packet(const struct interface *iface, int type,
  * We only have the buffer listed to keep the same API. */
 ssize_t
 get_packet(const struct interface *iface, unsigned char *data,
-	   unsigned char *buffer, size_t *buffer_len, size_t *buffer_pos)
+	   unsigned char *buffer, ssize_t *buffer_len, ssize_t *buffer_pos)
 {
 	ssize_t bytes;
 	union

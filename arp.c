@@ -126,8 +126,8 @@ arp_claim(struct interface *iface, struct in_addr address)
 		{ -1, POLLIN, 0 },
 		{ -1, POLLIN, 0 }
 	};
-	size_t bufpos = 0;
-	size_t buflen = iface->buffer_length;
+	ssize_t bufpos = 0;
+	ssize_t buflen = iface->buffer_length;
 	int bytes;
 	int s = 0;
 	struct timeval stopat;

@@ -39,7 +39,7 @@ void setup_packet_filters(void);
 
 int open_socket(struct interface *, int);
 ssize_t send_packet(const struct interface *, int,
-		    const unsigned char *, size_t);
+		    const unsigned char *, ssize_t);
 ssize_t get_packet(const struct interface *, unsigned char *,
-		   unsigned char *, size_t *, size_t *);
+		   unsigned char *, ssize_t *, ssize_t *);
 #endif

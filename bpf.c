@@ -115,7 +115,7 @@ open_socket(struct interface *iface, int protocol)
 
 ssize_t
 send_packet(const struct interface *iface, int type,
-	    const unsigned char *data, size_t len)
+	    const unsigned char *data, ssize_t len)
 {
 	struct iovec iov[2];
 	struct ether_header hw;
@@ -135,7 +135,7 @@ send_packet(const struct interface *iface, int type,
  * So we pass the buffer in the API so we can loop on >1 dhcp packet. */
 ssize_t
 get_packet(const struct interface *iface, unsigned char *data,
-	   unsigned char *buffer, size_t *buffer_len, size_t *buffer_pos)
+	   unsigned char *buffer, ssize_t *buffer_len, ssize_t *buffer_pos)
 {
 	union
 	{
@@ -153,7 +153,7 @@ get_packet(const struct interface *iface, unsigned char *data,
 		struct udp_dhcp_packet *packet;
 	} pay;
 	struct timespec ts;
-	size_t len;
+	ssize_t len;
 	unsigned char *payload;
 	bool have_data;
 
@@ -204,7 +204,7 @@ get_packet(const struct interface *iface, unsigned char *data,
 		/* Update the buffer_pos pointer */
 		bpf.buffer += BPF_WORDALIGN(bpf.packet->bh_hdrlen +
 					    bpf.packet->bh_caplen);
-		if ((unsigned)(bpf.buffer - buffer) < *buffer_len)
+		if (bpf.buffer - buffer < *buffer_len)
 			*buffer_pos = bpf.buffer - buffer;
 		else
 			*buffer_pos = 0;

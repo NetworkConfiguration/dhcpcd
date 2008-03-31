@@ -123,8 +123,8 @@ struct if_state {
 	bool daemonised;
 	bool persistent;
 	unsigned char *buffer;
-	size_t buffer_len;
-	size_t buffer_pos;
+	ssize_t buffer_len;
+	ssize_t buffer_pos;
 };
 
 static pid_t
