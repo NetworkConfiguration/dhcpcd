@@ -69,6 +69,8 @@ extern char *dhcpcd_skiproutes;
 #define DHCPCD_DAEMONISE	(1 << 14)
 #define DHCPCD_DAEMONISED	(1 << 15)
 #define DHCPCD_TEST		(1 << 16)
+#define DHCPCD_FORKED		(1 << 17)
+#define DHCPCD_HOSTNAME		(1 << 18)
 
 struct options {
 	char interface[IF_NAMESIZE];
@@ -83,7 +85,7 @@ struct options {
 	int metric;
 	int options;
 
-	int  dohostname;
+	int dohostname;
 	int domscsr;
 
 	struct in_addr request_address;

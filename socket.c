@@ -26,14 +26,19 @@
 
 #include <sys/types.h>
 #include <sys/ioctl.h>
-#include <sys/param.h>
 #include <sys/socket.h>
-#include <sys/uio.h>
 
 #include <net/if.h>
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+
+#ifdef __linux__
+# include <asm/types.h> /* needed for 2.4 kernels for the below header */
+# include <linux/filter.h>
+# include <netpacket/packet.h>
+# define bpf_insn sock_filter
+#endif
 
 #include <errno.h>
 #include <fcntl.h>
@@ -43,17 +48,10 @@
 #include <time.h>
 #include <unistd.h>
 
-#ifdef __linux__
-# include <asm/types.h> /* needed for 2.4 kernels for the below header */
-# include <linux/filter.h>
-# include <netpacket/packet.h>
-# define bpf_insn sock_filter
-#endif
-
 #include "config.h"
+#include "common.h"
 #include "dhcp.h"
-#include "if.h"
-#include "socket.h"
+#include "net.h"
 #include "bpf-filter.h"
 
 /* A suitably large buffer for all transactions.
@@ -69,10 +67,10 @@ static const uint8_t ipv4_bcast_addr[] = {
 	0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff
 };
 
-
 void
 setup_packet_filters(void)
 {
+#ifdef __linux__
 	/* We need to massage the filters for Linux cooked packets */
 	dhcp_bpf_filter[1].jf = 0; /* skip the IP packet type check */
 	dhcp_bpf_filter[2].k -= ETH_HLEN;
@@ -82,48 +80,18 @@ setup_packet_filters(void)
 
 	arp_bpf_filter[1].jf = 0; /* skip the IP packet type check */
 	arp_bpf_filter[2].k -= ETH_HLEN;
-}
 
-static int open_listen_socket(struct interface *iface)
-{
-	int fd;
-	union sockunion {
-		struct sockaddr sa;
-		struct sockaddr_in sin;
-	} su;
-	struct ifreq ifr;
-	int n = 1;
-
-	if ((fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
-		return -1;
-
-	memset(&su, 0, sizeof(su));
-	su.sin.sin_family = AF_INET;
-	su.sin.sin_port = htons(DHCP_CLIENT_PORT);
-	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &n, sizeof(n)) == -1)
-		goto eexit;
-	if (setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &n, sizeof(n)) == -1)
-		goto eexit;
-	memset(&ifr, 0, sizeof(ifr));
-	strncpy(ifr.ifr_name, iface->name, sizeof(ifr.ifr_name));
-	if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, &ifr, sizeof(ifr)) == -1)
-		goto eexit;
-	if (bind(fd, &su.sa, sizeof(su)) == -1)
-		goto eexit;
-
-	iface->listen_fd = fd;
-	close_on_exec(fd);
-	return 0;
-
-eexit:
-	close(fd);
-	return -1;
+	/* Some buggy Linux kernels do not work with ~0U.
+	 * 65536 should be enough for anyone ;) */
+	dhcp_bpf_filter[9].k = 65536;
+	arp_bpf_filter[5].k = 65536;
+#endif
 }
 
 int
 open_socket(struct interface *iface, int protocol)
 {
-	int fd;
+	int s;
 	union sockunion {
 		struct sockaddr sa;
 		struct sockaddr_in sin;
@@ -132,18 +100,10 @@ open_socket(struct interface *iface, int protocol)
 	} su;
 	struct sock_fprog pf;
 
-	/* We need to bind to a port, otherwise Linux generate ICMP messages
-	 * that cannot contect the port when we have an address.
-	 * We don't actually use this fd at all, instead using our packet
-	 * filter socket. */
-	if (iface->listen_fd == -1 && protocol == ETHERTYPE_IP)
-		if (open_listen_socket(iface) == -1)
-			return -1;
-
-	if ((fd = socket(PF_PACKET, SOCK_DGRAM, htons(protocol))) == -1)
+	if ((s = socket(PF_PACKET, SOCK_DGRAM, htons(protocol))) == -1)
 		return -1;
 	
-	close_on_exec(fd);
+	close_on_exec(s);
 	memset(&su, 0, sizeof(su));
 	su.sll.sll_family = PF_PACKET;
 	su.sll.sll_protocol = htons(protocol);
@@ -161,28 +121,28 @@ open_socket(struct interface *iface, int protocol)
 		pf.filter = dhcp_bpf_filter;
 		pf.len = sizeof(dhcp_bpf_filter) / sizeof(dhcp_bpf_filter[0]);
 	}
-	if (setsockopt(fd, SOL_SOCKET, SO_ATTACH_FILTER, &pf, sizeof(pf)) != 0)
+	if (setsockopt(s, SOL_SOCKET, SO_ATTACH_FILTER, &pf, sizeof(pf)) != 0)
 		goto eexit;
 
-	if (bind(fd, &su.sa, sizeof(su)) == -1)
+	if (bind(s, &su.sa, sizeof(su)) == -1)
 		goto eexit;
 
 	if (iface->fd > -1)
 		close(iface->fd);
-	iface->fd = fd;
+	iface->fd = s;
 	iface->socket_protocol = protocol;
 	iface->buffer_length = BUFFER_LENGTH;
 
-	return fd;
+	return s;
 
 eexit:
-	close(fd);
+	close(s);
 	return -1;
 }
 
 ssize_t
 send_packet(const struct interface *iface, int type,
-	    const unsigned char *data, ssize_t len)
+	    const uint8_t *data, ssize_t len)
 {
 	union sockunion {
 		struct sockaddr sa;
@@ -213,16 +173,12 @@ send_packet(const struct interface *iface, int type,
 /* Linux has no need for the buffer as we can read as much as we want.
  * We only have the buffer listed to keep the same API. */
 ssize_t
-get_packet(const struct interface *iface, unsigned char *data,
-	   unsigned char *buffer, ssize_t *buffer_len, ssize_t *buffer_pos)
+get_packet(const struct interface *iface, uint8_t *data,
+	   uint8_t *buffer, ssize_t *buffer_len, ssize_t *buffer_pos)
 {
 	ssize_t bytes;
-	union
-	{
-		unsigned char *buffer;
-		struct udp_dhcp_packet *packet;
-	} pay;
 	struct timespec ts;
+	const uint8_t *p;
 
 	/* We don't use the given buffer, but we need to rewind the position */
 	*buffer_pos = 0;
@@ -244,23 +200,10 @@ get_packet(const struct interface *iface, unsigned char *data,
 		return bytes;
 	}
 
-	if ((unsigned)bytes < (sizeof(pay.packet->ip) +sizeof(pay.packet->udp)))
-	{
-		errno = EBADMSG;
-		return -1;
-	}
-
-	pay.buffer = buffer;
-	if (bytes < ntohs(pay.packet->ip.ip_len)) {
-		errno = EBADMSG;
-		return -1;
-	}
-
-	if (valid_dhcp_packet(buffer) == -1)
+	if (valid_udp_packet(buffer) != 0)
 		return -1;
 
-	bytes = ntohs(pay.packet->ip.ip_len) -
-		(sizeof(pay.packet->ip) + sizeof(pay.packet->udp));
-	memcpy(data, &pay.packet->dhcp, bytes);
+	bytes = get_udp_data(&p, buffer);
+	memcpy(data, p, bytes);
 	return bytes;
 }

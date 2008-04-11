@@ -18,7 +18,6 @@ Notes
 -----
 If you're cross compiling you may need to set the below knobs to avoid
 automatic tests.
-HAVE_FORK=yes | no
 OS=BSD | Linux
 
 We try and detect how to restart ntp and ypbind, you can override this with
@@ -31,6 +30,9 @@ SYSV     (SYSV style - /etc/init.d/ntpd restart)
 
 You can change the default dir where dhcpcd stores it's .info files with
 INFODIR=/var/db
+
+If you're building for a NOMMU system where fork() does not work, youu should
+add -DTHERE_IS_NO_FORK to your CFLAGS.
 
 We now default to using -std=c99. For 64-bit linux, this always works, but
 for 32-bit linux it requires either gnu99 or a patch to asm/types.h.

@@ -37,17 +37,8 @@
 #include <netinet/if_ether.h>
 
 #include <limits.h>
-#include <stdbool.h>
 
 #include "config.h"
-
-#ifdef __linux__
-#  include <asm/types.h> /* needed for 2.4 kernels for the below header */
-#  include <linux/netlink.h>
-#  include "queue.h" /* not all libc's support queue.h, so include our own */ 
-#else
-#  include <sys/queue.h>
-#endif
 
 #ifdef ENABLE_DUID
 #ifndef DUID_LEN
@@ -89,8 +80,20 @@
 # define IN_LINKLOCAL(addr) ((addr & IN_CLASSB_NET) == LINKLOCAL_ADDR)
 #endif
 
-#define NSTAILQ_FOREACH(var, head, field) \
-		if (head) STAILQ_FOREACH (var, head, field)
+/* There is an argument that this should be converted to an STAIL using
+ * queue(3). However, that isn't readily available on all libc's that
+ * dhcpcd works on. The only benefit of STAILQ over this is the ability to
+ * quickly loop backwards through the list - currently we reverse the list
+ * and then move through it forwards. This isn't that much of a big deal
+ * though as the norm is to just have one default route, and an IPV4LL route.
+ * You can (and do) get more routes in the DHCP message, but not enough to
+ * really warrant a change to STAIL queue for performance reasons. */
+struct rt {
+	struct in_addr dest;
+	struct in_addr net;
+	struct in_addr gate;
+	struct rt *next;
+};
 
 struct interface
 {
@@ -98,23 +101,24 @@ struct interface
 	sa_family_t family;
 	unsigned char hwaddr[HWADDR_LEN];
 	size_t hwlen;
-	bool arpable;
-	unsigned short mtu;
+	int arpable;
 
 	int fd;
+	int udp_fd;
 	size_t buffer_length;
 
 #ifdef __linux__
-	int listen_fd;
 	int socket_protocol;
 #endif
 
+	char leasefile[PATH_MAX];
 	char infofile[PATH_MAX];
 
-	unsigned short previous_mtu;
-	struct in_addr previous_address;
-	struct in_addr previous_netmask;
-	struct route_head *previous_routes;
+	unsigned short initial_mtu;
+	unsigned short mtu;
+	struct in_addr addr;
+	struct in_addr net;
+	struct rt *routes;
 
 	time_t start_uptime;
 
@@ -131,28 +135,46 @@ int do_mtu(const char *, short int);
 #define get_mtu(iface) do_mtu(iface, 0)
 #define set_mtu(iface, mtu) do_mtu(iface, mtu)
 
-#define add_address(ifname, addr, mask, brd) \
-	if_address(ifname, addr, mask, brd, 1)
-#define del_address(ifname, addr, mask) \
-	if_address(ifname, addr, mask, NULL, -1)
-#define flush_addresses(ifname) \
-	do_interface(ifname, NULL, NULL, NULL, true, false)
-in_addr_t get_address(const char *);
-#define has_address(ifname, addr) \
-	do_interface(ifname, NULL, NULL, (struct in_addr *)&(addr), false, false)
+int inet_ntocidr(struct in_addr);
+int inet_cidrtoaddr(int, struct in_addr *);
 
+int do_interface(const char *, unsigned char *, size_t *,
+		 struct in_addr *, struct in_addr *, int);
+int if_address(const char *, const struct in_addr *, const struct in_addr *,
+	       const struct in_addr *, int);
+#define add_address(ifname, addr, net, brd) \
+	if_address(ifname, addr, net, brd, 1)
+#define del_address(ifname, addr, net) \
+	if_address(ifname, addr, net, NULL, -1)
+#define has_address(ifname, addr, net) \
+	do_interface(ifname, NULL, NULL, addr, net, 0)
+#define get_address(ifname, addr, net) \
+	do_interface(ifname, NULL, NULL, addr, net, 1)
+
+int if_route(const char *, const struct in_addr *, const struct in_addr *,
+	     const struct in_addr *, int, int);
 #define add_route(ifname, dest, mask, gate, metric) \
 	if_route(ifname, dest, mask, gate, metric, 1)
 #define del_route(ifname, dest, mask, gate, metric) \
 	if_route(ifname, dest, mask, gate, metric, -1)
+void free_routes(struct rt *);
 
-int inet_ntocidr(struct in_addr);
-int inet_cidrtoaddr(int, struct in_addr *);
+int open_udp_socket(struct interface *);
+ssize_t make_udp_packet(uint8_t **, const uint8_t *, size_t,
+			struct in_addr, struct in_addr);
+ssize_t get_udp_data(const uint8_t **, const uint8_t *);
+int valid_udp_packet(uint8_t *);
 
-int do_interface(const char *, unsigned char *, size_t *, struct in_addr *,
-		 bool, bool);
-int if_address(const char *, const struct in_addr *, const struct in_addr *,
-	       const struct in_addr *, int);
-int if_route(const char *, const struct in_addr *, const struct in_addr *,
-	     const struct in_addr *, int, int);
+#ifdef __linux__
+void setup_packet_filters(void);
+#endif
+int open_socket(struct interface *, int);
+ssize_t send_packet(const struct interface *, int,
+		    const uint8_t *, ssize_t);
+ssize_t get_packet(const struct interface *, uint8_t *,
+		   uint8_t *, ssize_t *, ssize_t *);
+
+#ifdef ENABLE_ARP
+int arp_claim(struct interface *, struct in_addr);
+#endif
 #endif

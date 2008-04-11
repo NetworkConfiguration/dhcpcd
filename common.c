@@ -76,11 +76,8 @@ void srandomdev(void)
 	unsigned long seed;
 
 	fd = open("/dev/urandom", 0);
-	if (fd == -1 || read(fd,  &seed, sizeof(seed)) == -1) {
-		logger(LOG_WARNING, "Could not read from /dev/urandom: %s",
-		       strerror(errno));
+	if (fd == -1 || read(fd,  &seed, sizeof(seed)) == -1)
 		seed = time(0);
-	}
 	if (fd >= 0)
 		close(fd);
 
@@ -118,10 +115,8 @@ close_fds(void)
 {
 	int fd;
 
-	if ((fd = open("/dev/null", O_RDWR)) == -1) {
-		logger(LOG_ERR, "open `/dev/null': %s", strerror(errno));
+	if ((fd = open("/dev/null", O_RDWR)) == -1)
 		return -1;
-	}
 
 	dup2(fd, fileno(stdin));
 	dup2(fd, fileno(stdout));
@@ -166,20 +161,14 @@ get_time(struct timeval *tp)
 		posix_clock_set = 1;
 	}
 
-	if (clock_gettime(posix_clock, &ts) == -1) {
-		logger(LOG_ERR, "clock_gettime: %s", strerror(errno));
+	if (clock_gettime(posix_clock, &ts) == -1)
 		return -1;
-	}
 
 	tp->tv_sec = ts.tv_sec;
 	tp->tv_usec = ts.tv_nsec / 1000;
 	return 0;
 #else
-	if (gettimeofday(tp, NULL) == -1) {
-		logger(LOG_ERR, "gettimeofday: %s", strerror(errno));
-		return -1;
-	}
-	return 0;
+	return gettimeofday(tp, NULL);
 #endif
 }
 
@@ -190,24 +179,22 @@ uptime(void)
 
 	if (get_time(&tp) == -1)
 		return -1;
-
 	return tp.tv_sec;
 }
 
-void
+int
 writepid(int fd, pid_t pid)
 {
 	char spid[16];
 	ssize_t len;
 
-	if (ftruncate(fd, (off_t)0) == -1) {
-		logger(LOG_ERR, "ftruncate: %s", strerror(errno));
-	} else {
-		snprintf(spid, sizeof(spid), "%u", pid);
-		len = pwrite(fd, spid, strlen(spid), (off_t)0);
-		if (len != (ssize_t)strlen(spid))
-			logger(LOG_ERR, "pwrite: %s", strerror(errno));
-	}
+	if (ftruncate(fd, (off_t)0) == -1)
+		return -1;
+	snprintf(spid, sizeof(spid), "%u", pid);
+	len = pwrite(fd, spid, strlen(spid), (off_t)0);
+	if (len != (ssize_t)strlen(spid))
+		return -1;
+	return 0;
 }
 
 void *
@@ -217,7 +204,7 @@ xmalloc(size_t s)
 
 	if (value)
 		return value;
-	logger (LOG_ERR, "memory exhausted");
+	logger(LOG_ERR, "memory exhausted");
 	exit (EXIT_FAILURE);
 	/* NOTREACHED */
 }

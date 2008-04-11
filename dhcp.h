@@ -28,22 +28,13 @@
 #ifndef DHCP_H
 #define DHCP_H
 
-#ifdef __linux__
-#  include "queue.h" /* not all libc's support queue.h, so include our own */ 
-#else
-#  include <sys/queue.h>
-#endif
+#include <arpa/inet.h>
 
-#include <netinet/in_systm.h>
-#include <netinet/in.h>
-#include <netinet/ip.h>
-#define __FAVOR_BSD /* Nasty hack so we can use BSD semantics for UDP */
-#include <netinet/udp.h>
-#undef __FAVOUR_BSD
 #include <stdint.h>
 
+#include "config.h"
 #include "dhcpcd.h"
-#include "if.h"
+#include "net.h"
 
 /* Max MTU - defines dhcp option length */
 #define MTU_MAX             1500
@@ -76,7 +67,7 @@ enum DHCP_OPTIONS
 	DHCP_PAD                    = 0,
 	DHCP_NETMASK                = 1,
 	DHCP_TIMEROFFSET            = 2,
-	DHCP_ROUTERS                = 3,
+	DHCP_ROUTER                 = 3,
 	DHCP_TIMESERVER             = 4,
 	DHCP_NAMESERVER             = 5,
 	DHCP_DNSSERVER              = 6,
@@ -98,7 +89,7 @@ enum DHCP_OPTIONS
 	DHCP_LEASETIME              = 51,
 	DHCP_OPTIONSOVERLOADED      = 52,
 	DHCP_MESSAGETYPE            = 53,
-	DHCP_SERVERIDENTIFIER       = 54,
+	DHCP_SERVERID               = 54,
 	DHCP_PARAMETERREQUESTLIST   = 55,
 	DHCP_MESSAGE                = 56,
 	DHCP_MAXMESSAGESIZE         = 57,
@@ -134,63 +125,6 @@ struct fqdn
 	char *name;
 };
 
-/* We use these structures to handle multiple routes and addresses */
-struct rt
-{
-	struct in_addr destination; 
-	struct in_addr netmask;
-	struct in_addr gateway;
-	STAILQ_ENTRY (rt) entries;
-};
-STAILQ_HEAD (route_head, rt);
-
-struct address
-{
-	struct in_addr address;
-	STAILQ_ENTRY (address) entries;
-};
-STAILQ_HEAD (address_head, address);
-
-struct dhcp
-{
-	char version[11];
-
-	struct in_addr serveraddress;
-	char serverhw[IF_NAMESIZE];
-	char servername[64];
-
-	struct in_addr address;
-	struct in_addr netmask;
-	struct in_addr broadcast;
-	unsigned short mtu;
-
-	uint32_t leasedfrom;
-	uint32_t leasetime;
-	uint32_t renewaltime;
-	uint32_t rebindtime;
-
-	struct route_head *routes;
-
-	char *hostname;
-	struct fqdn *fqdn;
-
-	struct address_head *dnsservers;
-	char *dnsdomain;
-	char *dnssearch;
-
-	struct address_head *ntpservers;
-
-	struct address_head *nisservers;
-	char *nisdomain;
-
-	char *sipservers;
-
-	char *message;
-	char *rootpath;
-
-	bool frominfo;
-};
-
 /* Sizes for DHCP options */
 #define DHCP_CHADDR_LEN         16
 #define SERVERNAME_LEN          64
@@ -206,12 +140,11 @@ struct dhcp
 /* Some crappy DHCP servers require the BOOTP minimum length */
 #define BOOTP_MESSAGE_LENTH_MIN 300
 
-struct dhcp_message
-{
-	unsigned char op;           /* message type */
-	unsigned char hwtype;       /* hardware address type */
-	unsigned char hwlen;        /* hardware address length */
-	unsigned char hwopcount;        /* should be zero in client message */
+struct dhcp_message {
+	uint8_t op;           /* message type */
+	uint8_t hwtype;       /* hardware address type */
+	uint8_t hwlen;        /* hardware address length */
+	uint8_t hwopcount;    /* should be zero in client message */
 	uint32_t xid;            /* transaction id */
 	uint16_t secs;           /* elapsed time in sec. from boot */
 	uint16_t flags;
@@ -219,26 +152,42 @@ struct dhcp_message
 	uint32_t yiaddr;         /* 'your' client IP address */
 	uint32_t siaddr;         /* should be zero in client's messages */
 	uint32_t giaddr;         /* should be zero in client's messages */
-	unsigned char chaddr[DHCP_CHADDR_LEN];  /* client's hardware address */
-	unsigned char servername[SERVERNAME_LEN];    /* server host name */
-	unsigned char bootfile[BOOTFILE_LEN];    /* boot file name */
+	uint8_t chaddr[DHCP_CHADDR_LEN];  /* client's hardware address */
+	uint8_t servername[SERVERNAME_LEN];    /* server host name */
+	uint8_t bootfile[BOOTFILE_LEN];    /* boot file name */
 	uint32_t cookie;
-	unsigned char options[DHCP_OPTION_LEN]; /* message options - cookie */
+	uint8_t options[DHCP_OPTION_LEN]; /* message options - cookie */
 };
 
-struct udp_dhcp_packet
-{
-	struct ip ip;
-	struct udphdr udp;
-	struct dhcp_message dhcp;
+struct dhcp_lease {
+	struct in_addr addr;
+	struct in_addr net;
+	uint32_t leasetime;
+	uint32_t renewaltime;
+	uint32_t rebindtime;
+	struct in_addr server;
+	uint32_t leasedfrom;
+	uint8_t frominfo;
 };
 
-ssize_t send_message(const struct interface *, const struct dhcp *,
-		     uint32_t, char, const struct options *);
-void free_address(struct address_head *);
-void free_dhcp(struct dhcp *);
-void free_route(struct route_head *);
-int parse_dhcpmessage (struct dhcp *, const struct dhcp_message *);
+const uint8_t *get_option(const struct dhcp_message *, uint8_t);
+char *get_option_string(const struct dhcp_message *, uint8_t);
+int get_option_addr(uint32_t *a, const struct dhcp_message *dhcp, uint8_t option);
+int get_option_uint32(uint32_t *i, const struct dhcp_message *dhcp, uint8_t option);
+int get_option_uint16(uint16_t *i, const struct dhcp_message *dhcp, uint8_t option);
+int get_option_uint8(uint8_t *i, const struct dhcp_message *dhcp, uint8_t option);
+struct rt *get_option_routes(const struct dhcp_message *dhcp);
+struct rt *decode_rfc3442(const uint8_t *);
+ssize_t make_message(struct dhcp_message **,
+			const struct interface *, const struct dhcp_lease *,
+	     		uint32_t, uint8_t, const struct options *);
 int valid_dhcp_packet(unsigned char *);
 
+ssize_t write_lease(const struct interface *, const struct dhcp_message *);
+struct dhcp_message *read_lease(const struct interface *iface);
+
+#ifdef ENABLE_INFO
+char *clean_metas(const char *cstr);
+ssize_t write_options(FILE *f, const struct dhcp_message *dhcp);
+#endif
 #endif

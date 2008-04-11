@@ -26,15 +26,11 @@
 
 #include <sys/types.h>
 #include <sys/ioctl.h>
-#include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
 
 #include <net/bpf.h>
 #include <net/if.h>
-#include <netinet/in_systm.h>
-#include <netinet/in.h>
-#include <netinet/udp.h>
 #include <arpa/inet.h>
 
 #include <errno.h>
@@ -42,13 +38,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <unistd.h>
 
 #include "config.h"
+#include "common.h"
 #include "dhcp.h"
-#include "if.h"
-#include "socket.h"
+#include "logger.h"
+#include "net.h"
 #include "bpf-filter.h"
 
 int
@@ -60,6 +56,7 @@ open_socket(struct interface *iface, int protocol)
 	int flags;
 	struct ifreq ifr;
 	int buf = 0;
+	struct bpf_version pv;
 	struct bpf_program pf;
 
 	device = xmalloc(sizeof(char) * PATH_MAX);
@@ -72,26 +69,27 @@ open_socket(struct interface *iface, int protocol)
 	if (fd == -1)
 		return -1;
 
-	close_on_exec(fd);
-	memset(&ifr, 0, sizeof(ifr));
-	strlcpy(ifr.ifr_name, iface->name, sizeof(ifr.ifr_name));
-	if (ioctl(fd, BIOCSETIF, &ifr) == -1) {
-		close(fd);
-		return -1;
+	if (ioctl(fd, BIOCVERSION, &pv) == -1)
+		goto eexit;
+	if (pv.bv_major != BPF_MAJOR_VERSION ||
+	    pv.bv_minor < BPF_MINOR_VERSION) {
+		logger(LOG_ERR, "BPF version mismatch - recompile " PACKAGE);
+		goto eexit;
 	}
 
+	memset(&ifr, 0, sizeof(ifr));
+	strlcpy(ifr.ifr_name, iface->name, sizeof(ifr.ifr_name));
+	if (ioctl(fd, BIOCSETIF, &ifr) == -1)
+		goto eexit;
+
 	/* Get the required BPF buffer length from the kernel. */
-	if (ioctl(fd, BIOCGBLEN, &buf) == -1) {
-		close(fd);
-		return -1;
-	}
+	if (ioctl(fd, BIOCGBLEN, &buf) == -1)
+		goto eexit;
 	iface->buffer_length = buf;
 
 	flags = 1;
-	if (ioctl(fd, BIOCIMMEDIATE, &flags) == -1) {
-		close(fd);
-		return -1;
-	}
+	if (ioctl(fd, BIOCIMMEDIATE, &flags) == -1)
+		goto eexit;
 
 	/* Install the DHCP filter */
 	if (protocol == ETHERTYPE_ARP) {
@@ -101,16 +99,20 @@ open_socket(struct interface *iface, int protocol)
 		pf.bf_insns = dhcp_bpf_filter;
 		pf.bf_len = sizeof(dhcp_bpf_filter)/sizeof(dhcp_bpf_filter[0]);
 	}
-	if (ioctl(fd, BIOCSETF, &pf) == -1) {
-		close(fd);
-		return -1;
-	}
+	if (ioctl(fd, BIOCSETF, &pf) == -1)
+		goto eexit;
 
 	if (iface->fd > -1)
 		close(iface->fd);
+
+	close_on_exec(fd);
 	iface->fd = fd;
 
 	return fd;
+
+eexit:
+	close(fd);
+	return -1;
 }
 
 ssize_t
@@ -147,15 +149,10 @@ get_packet(const struct interface *iface, unsigned char *data,
 		unsigned char *buffer;
 		struct ether_header *hw;
 	} hdr;
-	union
-	{
-		unsigned char *buffer;
-		struct udp_dhcp_packet *packet;
-	} pay;
 	struct timespec ts;
 	ssize_t len;
 	unsigned char *payload;
-	bool have_data;
+	const uint8_t *d;
 
 	bpf.buffer = buffer;
 
@@ -172,15 +169,14 @@ get_packet(const struct interface *iface, unsigned char *data,
 	} else
 		bpf.buffer += *buffer_pos;
 
-	do {
-		len = 0;
-		have_data = false;
-
-		/* Ensure that the entire packet is in our buffer */
-		if (*buffer_pos +
-		    bpf.packet->bh_hdrlen +
-		    bpf.packet->bh_caplen > (unsigned)*buffer_len)
-			break;
+	for (; bpf.buffer - buffer < *buffer_len; 
+		bpf.buffer += BPF_WORDALIGN(bpf.packet->bh_hdrlen +
+					    bpf.packet->bh_caplen),
+		*buffer_pos = bpf.buffer - buffer)
+	{
+		/* Ensure we have the whole packet */
+		if (bpf.packet->bh_caplen != bpf.packet->bh_datalen)
+			continue;
 
 		hdr.buffer = bpf.buffer + bpf.packet->bh_hdrlen;
 		payload = hdr.buffer + sizeof(*hdr.hw);
@@ -189,29 +185,15 @@ get_packet(const struct interface *iface, unsigned char *data,
 		if (hdr.hw->ether_type == htons (ETHERTYPE_ARP)) {
 			len = bpf.packet->bh_caplen - sizeof(*hdr.hw);
 			memcpy(data, payload, len);
-			have_data = true;
+			return len;
 		} else {
-			if (valid_dhcp_packet(payload) >= 0) {
-				pay.buffer = payload;
-				len = ntohs(pay.packet->ip.ip_len) -
-					sizeof(pay.packet->ip) -
-					sizeof(pay.packet->udp);
-				memcpy(data, &pay.packet->dhcp, len);
-				have_data = true;
+			if (valid_udp_packet(payload) >= 0) {
+				len = get_udp_data(&d, payload);
+				memcpy(data, d, len);
+				return len;
 			}
 		}
-
-		/* Update the buffer_pos pointer */
-		bpf.buffer += BPF_WORDALIGN(bpf.packet->bh_hdrlen +
-					    bpf.packet->bh_caplen);
-		if (bpf.buffer - buffer < *buffer_len)
-			*buffer_pos = bpf.buffer - buffer;
-		else
-			*buffer_pos = 0;
-
-		if (have_data)
-			return len;
-	} while (*buffer_pos);
+	}
 
 	/* No valid packets left, so return */
 	*buffer_pos = 0;

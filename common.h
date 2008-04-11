@@ -29,6 +29,7 @@
 #define COMMON_H
 
 /* string.h pulls in features.h so the below define checks work */
+#include <sys/types.h>
 #include <sys/time.h>
 #include <stdio.h>
 #include <string.h>
@@ -59,7 +60,7 @@ int close_on_exec(int);
 ssize_t get_line(char **, size_t *, FILE *);
 int get_time(struct timeval *);
 time_t uptime(void);
-void writepid(int, pid_t);
+int writepid(int, pid_t);
 void *xrealloc(void *, size_t);
 void *xmalloc(size_t);
 void *xzalloc(size_t);

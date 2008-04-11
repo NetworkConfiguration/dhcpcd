@@ -28,18 +28,7 @@
 #ifndef SOCKET_H
 #define SOCKET_H
 
-#include <stdbool.h>
-
 #include "dhcp.h"
-#include "if.h"
+#include "net.h"
 
-#ifdef __linux__
-void setup_packet_filters(void);
-#endif
-
-int open_socket(struct interface *, int);
-ssize_t send_packet(const struct interface *, int,
-		    const unsigned char *, ssize_t);
-ssize_t get_packet(const struct interface *, unsigned char *,
-		   unsigned char *, ssize_t *, ssize_t *);
 #endif

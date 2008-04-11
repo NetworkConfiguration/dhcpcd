@@ -35,8 +35,6 @@
 #define ENABLE_NTP
 #define ENABLE_NIS
 #define ENABLE_INFO
-/* Define this to enable some compatability with 1.x and 2.x info files */
-/* #define ENABLE_INFO_COMPAT */
 
 /* IPV4LL, aka ZeroConf, aka APIPA, aka RFC 3927.
  * Needs ARP. */
@@ -51,9 +49,7 @@
 /* resolvconf is framework for multiple interfaces to manage resolv.conf */
 #define ENABLE_RESOLVCONF
 
-/* Some systems do not have a working fork.
- * The Makefile will attempt to work it out, but if it fails to feel free to
- * define it here. */
+/* Some systems do not have a working fork. */
 /* #define THERE_IS_NO_FORK */
 
 /* Packname name and pathname definitions. */
@@ -79,6 +75,7 @@
 #ifndef INFODIR
 # define INFODIR            "/var/db"
 #endif
+#define LEASEFILE           INFODIR "/" PACKAGE "-%s.lease"
 #define INFOFILE            INFODIR "/" PACKAGE "-%s.info"
 #define DUIDFILE            INFODIR "/" PACKAGE ".duid"
 

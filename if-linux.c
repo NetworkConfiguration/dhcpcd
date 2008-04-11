@@ -50,7 +50,7 @@
 #include "config.h"
 #include "common.h"
 #include "dhcp.h"
-#include "if.h"
+#include "net.h"
 
 /* This netlink stuff is overly compex IMO.
  * The BSD implementation is much cleaner and a lot less code.
@@ -300,8 +300,7 @@ if_route(const char *ifname,
 	else {
 		nlm->hdr.nlmsg_flags |= NLM_F_CREATE | NLM_F_EXCL;
 		nlm->rt.rtm_protocol = RTPROT_BOOT;
-		if (netmask->s_addr == INADDR_BROADCAST ||
-		    gateway->s_addr == INADDR_ANY)
+		if (gateway->s_addr == INADDR_ANY)
 			nlm->rt.rtm_scope = RT_SCOPE_LINK;
 		else
 			nlm->rt.rtm_scope = RT_SCOPE_UNIVERSE;
@@ -311,10 +310,8 @@ if_route(const char *ifname,
 	nlm->rt.rtm_dst_len = inet_ntocidr(*netmask);
 	add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_DST,
 		   &destination->s_addr, sizeof(destination->s_addr));
-	if (netmask->s_addr != INADDR_BROADCAST &&
-	    destination->s_addr != gateway->s_addr)
-		add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_GATEWAY,
-			   &gateway->s_addr, sizeof(gateway->s_addr));
+	add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_GATEWAY,
+		   &gateway->s_addr, sizeof(gateway->s_addr));
 
 	add_attr_32(&nlm->hdr, sizeof(*nlm), RTA_OIF, ifindex);
 	add_attr_32(&nlm->hdr, sizeof(*nlm), RTA_PRIORITY, metric);

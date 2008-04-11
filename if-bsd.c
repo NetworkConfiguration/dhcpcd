@@ -48,7 +48,7 @@
 #include "config.h"
 #include "common.h"
 #include "dhcp.h"
-#include "if.h"
+#include "net.h"
 
 /* Darwin doesn't define this for some very odd reason */
 #ifndef SA_SIZE
@@ -138,6 +138,8 @@ if_route(const char *ifname, const struct in_addr *destination,
 	else
 		rtm.hdr.rtm_type = RTM_DELETE;
 	rtm.hdr.rtm_flags = RTF_UP | RTF_STATIC;
+	if (netmask->s_addr == INADDR_BROADCAST)
+		rtm.hdr.rtm_flags |= RTF_HOST;
 
 	/* This order is important */
 	rtm.hdr.rtm_addrs = RTA_DST | RTA_GATEWAY | RTA_NETMASK;
@@ -153,15 +155,11 @@ if_route(const char *ifname, const struct in_addr *destination,
 
 	ADDADDR(destination);
 
-	if (netmask->s_addr == INADDR_BROADCAST ||
-	    gateway->s_addr == INADDR_ANY)
+	if (gateway->s_addr == INADDR_ANY)
 	{
 		/* Make us a link layer socket */
-		if (netmask->s_addr == INADDR_BROADCAST) 
-			rtm.hdr.rtm_flags |= RTF_HOST;
-
 		hwaddr = xmalloc(sizeof(unsigned char) * HWADDR_LEN);
-		do_interface(ifname, hwaddr, &hwlen, NULL, false, false);
+		do_interface(ifname, hwaddr, &hwlen, NULL, 0, 0);
 		memset(&su, 0, sizeof(su));
 		su.sdl.sdl_len = sizeof(su.sdl);
 		su.sdl.sdl_family = AF_LINK;

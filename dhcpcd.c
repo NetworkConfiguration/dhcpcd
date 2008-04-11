@@ -37,7 +37,6 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 #include <getopt.h>
 #include <paths.h>
 #include <signal.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -47,10 +46,9 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 #include "client.h"
 #include "dhcpcd.h"
 #include "dhcp.h"
-#include "if.h"
+#include "net.h"
 #include "logger.h"
 #include "socket.h"
-#include "version.h"
 
 static int doversion = 0;
 static int dohelp = 0;
@@ -339,6 +337,8 @@ main(int argc, char **argv)
 			goto abort;
 #endif
 			options->options &= ~DHCPCD_ARP;
+			/* IPv4LL requires ARP */
+			options->options &= ~DHCPCD_IPV4LL;
 			break;
 		case 'E':
 #ifndef ENABLE_INFO
@@ -368,7 +368,7 @@ main(int argc, char **argv)
 			options->options &= ~DHCPCD_GATEWAY;
 			break;
 		case 'H':
-			options->dohostname++;
+			options->options |= DHCPCD_HOSTNAME;
 			break;
 		case 'I':
 			if (optarg) {
@@ -499,8 +499,9 @@ main(int argc, char **argv)
 	if (options->request_address.s_addr == 0 &&
 	    options->options & DHCPCD_INFORM)
 	{
-		if ((options->request_address.s_addr =
-		     get_address(options->interface)) != 0)
+		if (get_address(options->interface,
+				&options->request_address,
+				&options->request_netmask) == 0)
 			options->options |= DHCPCD_KEEPADDRESS;
 	}
 
@@ -625,8 +626,6 @@ abort:
 	 * clears this, so just do it here to be safe */
 	free(dhcpcd_skiproutes);
 #endif
-
-	logger(LOG_INFO, "exiting");
 
 	exit(retval);
 	/* NOTREACHED */
