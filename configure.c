@@ -47,7 +47,6 @@
 #include "logger.h"
 #include "net.h"
 #include "signal.h"
-#include "socket.h"
 
 int
 exec_cmd(const char *cmd, const char *args, ...)

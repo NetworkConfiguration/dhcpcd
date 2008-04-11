@@ -48,7 +48,6 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 #include "dhcp.h"
 #include "net.h"
 #include "logger.h"
-#include "socket.h"
 
 static int doversion = 0;
 static int dohelp = 0;
