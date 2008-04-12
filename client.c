@@ -538,6 +538,17 @@ client_setup(struct if_state *state, const struct options *options)
 			/* The inform address HAS to be configured for it to
 			 * work with most DHCP servers */
 			/* add_address */
+			addr.s_addr = lease->addr.s_addr | ~lease->net.s_addr;
+			logger(LOG_DEBUG, "adding IP address %s/%d",
+			       inet_ntoa(lease->addr),
+			       inet_ntocidr(lease->net));
+			if (add_address(iface->name, &lease->addr,
+					&lease->net, &addr) == -1)
+			{
+				logger(LOG_ERR, "add_address: %s",
+				       strerror(errno));
+				return -1;
+			}
 			iface->addr.s_addr = lease->addr.s_addr;
 			iface->net.s_addr = lease->net.s_addr;
 		}
@@ -787,6 +798,9 @@ handle_timeout(struct if_state *state, const struct options *options)
 			logger(LOG_ERR, "timed out");
 
 		do_socket(state, SOCKET_CLOSED);
+
+		if (options->options & DHCPCD_INFORM)
+			return -1;
 
 #ifdef ENABLE_INFO
 		if (!(state->options & DHCPCD_TEST) &&

@@ -206,7 +206,8 @@ as above, but sends a DHCP inform instead of a request. This requires the
 interface to be configured first. This does not get a lease as such, just
 notifies the DHCP server of the
 .Ar address
-we are using.
+we are using. If we fail to contact a DHCP server then we return a failure
+instead of falling back on IPv4LL.
 .It Fl t , -timeout Ar seconds
 Timeout after
 .Ar seconds ,
