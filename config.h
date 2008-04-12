@@ -30,11 +30,7 @@
 /* You can enable/disable various chunks of optional code here.
  * You would only do this to try and shrink the end binary if dhcpcd
  * was running on a low memory device */
-
 #define ENABLE_ARP
-#define ENABLE_NTP
-#define ENABLE_NIS
-#define ENABLE_INFO
 
 /* IPV4LL, aka ZeroConf, aka APIPA, aka RFC 3927.
  * Needs ARP. */
@@ -46,9 +42,6 @@
  * See RFC 3315 for details on this. */
 #define ENABLE_DUID
 
-/* resolvconf is framework for multiple interfaces to manage resolv.conf */
-#define ENABLE_RESOLVCONF
-
 /* Some systems do not have a working fork. */
 /* #define THERE_IS_NO_FORK */
 
@@ -58,15 +51,6 @@
 
 #define ETCDIR              "/etc"
 #define RESOLVFILE          ETCDIR "/resolv.conf"
-
-#define NISFILE             ETCDIR "/yp.conf"
-
-#define NTPFILE             ETCDIR "/ntp.conf"
-#define NTPDRIFTFILE        ETCDIR "/ntp.drift"
-#define NTPLOGFILE          "/var/log/ntp.log"
-
-#define OPENNTPFILE         ETCDIR "/ntpd.conf"
-
 #define DEFAULT_SCRIPT      ETCDIR "/" PACKAGE ".sh"
 
 #define STATEDIR            "/var"
@@ -78,53 +62,5 @@
 #define LEASEFILE           INFODIR "/" PACKAGE "-%s.lease"
 #define INFOFILE            INFODIR "/" PACKAGE "-%s.info"
 #define DUIDFILE            INFODIR "/" PACKAGE ".duid"
-
-/* OPENRC is Open Run Control, forked from Gentoo's baselayout package
- * BSDRC is BSD style Run Control
- * SLACKRC is Slackware Run Control
- * SERVICE is RedHat service command
- * SYSV should cover everthing else */
-#ifdef ENABLE_OPENRC
-# define SERVICE             "OPENRC"
-# define NISSERVICE          ETCDIR "/init.d/ypbind"
-# define NISRESTARTARGS      "--nodeps", "--quiet", "conditionalrestart"
-# define NTPSERVICE          ETCDIR "/init.d/ntpd"
-# define NTPRESTARTARGS      "--nodeps", "--quiet", "conditionalrestart"
-#endif
-#if ENABLE_BSDRC
-# define SERVICE             "BSDRC"
-# define NISSERVICE          ETCDIR "/rc.d/ypbind"
-# define NISRESTARTARGS      "restart"
-# define NTPSERVICE          ETCDIR "/rc.d/ntpd"
-# define NTPRESTARTARGS      "restart"
-#endif
-#if ENABLE_SLACKRC
-# define SERVICE             "SLACKRC"
-# define NISSERVICE          ETCDIR "/rc.d/rc.ypbind"
-# define NISRESTARTARGS      "restart"
-# define NTPSERVICE          ETCDIR "/rc.d/rc.ntpd"
-# define NTPRESTARTARGS      "restart"
-#endif
-#if ENABLE_SERVICE
-# define SERVICE             "SERVICE"
-# define NISSERVICE          "service"
-# define NISRESTARTARGS      "ypbind", "restart"
-# define NTPSERVICE          "service"
-# define NTPRESTARTARGS      "ntpd", "restart"
-#endif
-#if ENABLE_SYSV
-# define SERVICE             "SYSV"
-# define NISSERVICE          ETCDIR "/init.d/ypbind"
-# define NISRESTARTARGS      "restart"
-# define NTPSERVICE          ETCDIR "/init.d/ntpd"
-# define NTPRESTARTARGS      "restart"
-#endif
-
-#ifndef NISSERVICE
-# undef ENABLE_NIS
-#endif
-#ifndef NTPSERVICE
-# undef ENABLE_NTP
-#endif
 
 #endif

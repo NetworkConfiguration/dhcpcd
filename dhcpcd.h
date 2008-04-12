@@ -53,12 +53,9 @@ extern char *dhcpcd_skiproutes;
 #endif
 
 #define DHCPCD_ARP		(1 << 0)
-#define DHCPCD_DNS		(1 << 1)
 #define DHCPCD_DOMAIN		(1 << 2)
 #define DHCPCD_GATEWAY		(1 << 3)
 #define DHCPCD_MTU		(1 << 4)
-#define DHCPCD_NIS		(1 << 5)
-#define DHCPCD_NTP		(1 << 6)
 #define DHCPCD_LASTLEASE	(1 << 7)
 #define DHCPCD_INFORM		(1 << 8)
 #define DHCPCD_REQUEST		(1 << 9)

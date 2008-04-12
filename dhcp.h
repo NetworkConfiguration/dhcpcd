@@ -186,8 +186,6 @@ int valid_dhcp_packet(unsigned char *);
 ssize_t write_lease(const struct interface *, const struct dhcp_message *);
 struct dhcp_message *read_lease(const struct interface *iface);
 
-#ifdef ENABLE_INFO
 char *clean_metas(const char *cstr);
 ssize_t write_options(FILE *f, const struct dhcp_message *dhcp);
-#endif
 #endif

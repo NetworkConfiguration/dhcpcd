@@ -1,46 +1,256 @@
 #!/bin/sh
+# 
+# dhcpcd - DHCP client daemon
+# Copyright 2006-2008 Roy Marples <roy@marples.name>
+# All rights reserved
 #
-#  This is a sample /etc/dhcpcd.sh script.
-#  /etc/dhcpcd.sh script is executed by dhcpcd daemon
-#  any time it configures or shuts down interface.
-#  The following parameters are passed to dhcpcd.exe script:
-#  $1 = HostInfoFilePath, e.g  "/var/lib/dhcpcd/dhcpcd-eth0.info"
-#  $2 = "up" if interface has been configured with the same
-#       IP address as before reboot;
-#  $2 = "down" if interface has been shut down;
-#  $2 = "new" if interface has been configured with new IP address;
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
 #
-#  Sanity checks
+# THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
 
-if [ $# -lt 2 ]; then
-	logger -s -p local0.err -t dhcpcd.sh "wrong usage"
-	exit 1
-fi
-
-hostinfo="$1"
+info="$1"
 state="$2"
 
-# Reading HostInfo file for configuration parameters
-[ -e "${hostinfo}" ] && . "${hostinfo}"
+[ -e "${info}" ] && . "${info}"
 
-case "${state}" in
-	up)
-	logger -s -p local0.info -t dhcpcd.sh \
-	"interface ${INTERFACE} has been configured with old IP=${IPADDR}"
-	# Put your code here for when the interface has been brought up with an
-	# old IP address here
-	;;
+do_hooks()
+{
+	local x= retval=0
+	for x in /etc/dhcpcd/"$1"-hook /etc/dhcpcd/"$1"-hook.d/*; do
+		if [ -e "${x}" ]; then
+			. "${x}"
+			retval=$((${retval} + $?))
+		fi
+	done
+	return ${retval}
+}
 
-	new)
-	logger -s -p local0.info -t dhcpcd.sh \
-	"interface ${INTERFACE} has been configured with new IP=${IPADDR}"
-	# Put your code here for when the interface has been brought up with a
-	# new IP address
-	;;
+# Try and locate a service pidfile
+service_pid()
+{
+	local service="$1" x=
+	for x in "${service}".pid \
+		"${service}"/pid \
+		"${service}"/"${service}".pid;
+	do
+		if [ -s "/var/run/${x}" ]; then
+			echo "/var/run/${x}"
+			return 0
+		fi
+	done
+	return 1
+}
 
-	down) logger -s -p local0.info -t dhcpcd.sh \
-	"interface ${INTERFACE} has been brought down"
-	# Put your code here for the when the interface has been shut down
-	;;
-esac
-exit 0
+# Try and detect how to handle services so we're pretty
+# platform independant
+do_service()
+{
+	local service="$1" action="$2"
+	shift; shift
+
+	# If restarting check if service is running or not if we can
+	if [ "${action}" = "restart" ]; then
+		pidfile=$(service_pid "${service}")
+		[ -s "${pidfile}" ] || return 0
+		kill -0 $(cat "${pidfile}") 2>/dev/null || return 0
+	fi
+
+	if type rc-service >/dev/null 2>/dev/null; then
+		rc-service "${service}" --nodeps "${action}" "$@"
+	elif [ -x /sbin/service ]; then
+		service "${service}" "${action}" "$@"
+	elif [ -x /etc/init.d/"${service}" -a -x /sbin/runscript ]; then
+		/etc/init.d/"${service}" --quiet --nodeps "${action}" "$@"
+	elif [ -x /etc/init.d/"${service}" ]; then
+		/etc/init.d/"${service}" "${action}" "$@"
+	elif [ -x /etc/rc.d/"${service}" ]; then
+		/etc/rc.d/"${service}" "${action}" "$@" 
+	elif [ -x /etc/rc.d/rc."${service}" ]; then
+		/etc/rc.d/rc."${service}" "${action}" "$@"
+	else
+		echo "Don't know how to interact with services on this platform" >&2
+		return 1
+	fi
+}
+
+yesno()
+{
+	[ -z "$1" ] && return 2
+
+	case "$1" in
+		[Yy][Ee][Ss]|[Tt][Rr][Uu][Ee]|[Oo][Nn]|1) return 0;;
+		[Nn][Oo]|[Ff][Aa][Ll][Ss][Ee]|[Oo][Ff][Ff]|0) return 1;;
+	esac
+	return 2
+}
+
+save_conf()
+{
+	if [ -e "$1" ]; then
+		rm -f "$1"-pre."${INTERFACE}"
+		mv -f "$1" "$1"-pre."${INTERFACE}"
+	fi
+}
+
+restore_conf()
+{
+	[ -e "$1"-pre."${INTERFACE}" ] || return 1
+	rm -f "$1"
+	mv -f "$1"-pre."${INTERFACE}" "$1"
+}
+
+make_nis_conf() {
+	yesno "${PEERNIS}" || return 0
+	[ -z "${NISDOMAIN}" -a -z "${NISSERVER}" ] && return 0
+	local cf=/etc/yp.conf."${INTERFACE}" prefix= x= pidfile=
+	echo "# Generated by dhcpcd for interface ${INTERFACE}" > "${cf}"
+	if [ -n "${NISDOMAIN}" ]; then
+		domainname "${NISDOMAIN}"
+		if [ -n "${NISSERVER}" ]; then
+			prefix="domain ${NISDOMAIN} server "
+		else
+			echo "domain ${NISDOMAIN} broadcast" >> "${cf}"
+		fi
+	else
+		prefix="ypserver "
+	fi
+	for x in ${NISSERVER}; do
+		echo "${prefix}${x}" >> "${cf}"
+	done
+	save_conf /etc/yp.conf
+	mv -f "${cf}" /etc/yp.conf
+	pidfile="$(service_pidfile ypbind)"
+	if [ -s "${pidfile}" ]; then
+		kill -HUP "${pidfile}"
+	fi
+}
+
+restore_nis_conf()
+{
+	yesno "${PEERNIS}" || return 0
+	restore_conf /etc/yp.conf || return 0
+	pidfile="$(service_pidfile ypbind)"
+	if [ -s "${pidfile}" ]; then
+		kill -HUP "${pidfile}"
+	fi
+}
+
+make_ntp_conf()
+{
+	yesno "${PEERNTP}" || return 0
+	[ -z "${NTPSERVER}" ] && return 0
+	local cf=/etc/ntp.conf."${INTERFACE}" x=
+	echo "# Generated by dhcpcd for interface ${INTERFACE}" > "${cf}"
+	echo "restrict default noquery notrust nomodify" >> "${cf}"
+	echo "restrict 127.0.0.1" >> "${cf}"
+	for x in ${NTPSERVER}; do
+		echo "restrict ${x} nomodify notrap noquery" >> "${cf}"
+		echo "server ${x}" >> "${cf}"
+	done
+	if type cmp >/dev/null 2>&1; then
+		cmp -s /etc/ntp.conf "${cf}"
+	elif type diff >/dev/null 2>&1; then
+		diff -q /etc/ntp.conf "${cf}" >/dev/null
+	else
+		false
+	fi
+	if [ $? = 0 ]; then
+		rm -f "${cf}"
+	else
+		save_conf /etc/ntp.conf
+		mv -f "${cf}" /etc/ntp.conf
+		do_service ntp restart
+	fi
+}
+
+restore_ntp_conf()
+{
+	yesno "${PEERNTP}" || return 0
+	restore_conf /etc/ntp.conf || return 0
+	do_service ntp restart
+}
+
+make_resolv_conf()
+{
+	yesno "${PEERDNS}" || return 0
+	if [ -z "${DNSSERVER}" -a -z "${DNSDOMAIN}" -a -z "${DNSSEARCH}" ]; then
+		return 0
+	fi
+	local x= conf="# Generated by dhcpcd for interface ${INTERFACE}\n"
+	if [ -n "${DNSSEARCH}" ]; then
+		conf="${conf}search ${DNSSEARCH}\n"
+	elif [ -n "${DNSDOMAIN}" ]; then
+		conf="${conf}search ${DNSDOMAIN}\n"
+	fi
+	for x in ${DNSSERVER}; do
+		conf="${conf}nameserver ${x}\n"
+	done
+	if type resolvconf >/dev/null 2>&1; then
+		printf "${conf}" | resolvconf -a "${INTERFACE}"
+	else
+		save_conf /etc/resolv.conf
+		printf "${conf}" > /etc/resolv.conf
+		do_service nscd restart
+	fi
+}
+
+restore_resolv_conf()
+{
+	yesno "${PEERDNS}" || return 0
+	if type resolvconf >/dev/null 2>&1; then
+		resolvconf -d "${INTERFACE}"
+	else
+		restore_conf /etc/resolv.conf || return 0
+		do_service nscd restart
+	fi
+}
+
+need_hostname()
+{
+	case "$(hostname)" in
+		""|"(none)"|localhost) return 0;;
+	esac
+	return 1
+}
+
+make_hostname()
+{
+	[ -z "${HOSTNAME}" ] && return 0
+	if need_hostname || yesno "${PEERHOSTNAME}"; then
+		hostname "${HOSTNAME}"
+	fi
+}
+
+do_hooks enter
+
+# Don't do anything by default when we go down
+if [ "${state}" = "down" ]; then
+	restore_resolv_conf
+	restore_nis_conf
+	restore_ntp_conf
+	exit $? 
+fi
+
+make_resolv_conf
+make_hostname
+make_nis_conf
+make_ntp_conf
+
+do_hooks exit

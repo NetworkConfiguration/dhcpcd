@@ -31,11 +31,15 @@ _proginstall: ${PROG}
 	${INSTALL} -m ${BINMODE} ${PROG} ${DESTDIR}${BINDIR}
 	${INSTALL} -d ${DESTDIR}${INFODIR}
 
+_scriptinstall: ${SCRIPT}
+	${INSTALL} -d ${DESTDIR}${SCRIPTDIR}
+	${INSTALL} -m ${BINMODE} ${SCRIPT} ${DESTDIR}${SCRIPTDIR}
+
 include ${MK}/depend.mk
 include ${MK}/man.mk
 include ${MK}/dist.mk
 
-install: _proginstall maninstall
+install: _proginstall _scriptinstall maninstall
 
 clean:
 	rm -f ${OBJS} ${PROG} _${PROG}.c _${PROG}.o ${CLEANFILES}

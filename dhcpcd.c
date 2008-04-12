@@ -170,15 +170,19 @@ main(int argc, char **argv)
 	snprintf(options->classid, CLASS_ID_MAX_LEN, "%s %s",
 		 PACKAGE, VERSION);
 
-	options->options |= DHCPCD_ARP | DHCPCD_DNS | DHCPCD_MTU |
-		DHCPCD_NIS | DHCPCD_NTP | DHCPCD_GATEWAY |
-		DHCPCD_DAEMONISE | DHCPCD_IPV4LL | DHCPCD_DUID;
+	options->options |= DHCPCD_GATEWAY | DHCPCD_IPV4LL | DHCPCD_DUID |
+		DHCPCD_DAEMONISE;
 	options->timeout = DEFAULT_TIMEOUT;
 
 	gethostname(options->hostname, sizeof(options->hostname));
 	if (strcmp(options->hostname, "(none)") == 0 ||
 	    strcmp(options->hostname, "localhost") == 0)
 		*options->hostname = '\0';
+
+	setenv("PEERDNS", "yes", 1);
+	setenv("PEERHOSTNAME", "no", 1);
+	setenv("PEERNIS", "yes", 1);
+	setenv("PEERNTP", "yes", 1);
 
 	/* Don't set any optional arguments here so we retain POSIX
 	 * compatibility with getopt */
@@ -340,10 +344,6 @@ main(int argc, char **argv)
 			options->options &= ~DHCPCD_IPV4LL;
 			break;
 		case 'E':
-#ifndef ENABLE_INFO
-			logger (LOG_ERR, "info not compiled into dhcpcd");
-			goto abort;
-#endif
 			options->options |= DHCPCD_LASTLEASE;
 			break;
 		case 'F':
@@ -367,7 +367,7 @@ main(int argc, char **argv)
 			options->options &= ~DHCPCD_GATEWAY;
 			break;
 		case 'H':
-			options->options |= DHCPCD_HOSTNAME;
+			setenv("PEERHOSTNAME", "yes", 1);
 			break;
 		case 'I':
 			if (optarg) {
@@ -394,23 +394,19 @@ main(int argc, char **argv)
 			options->options &= ~DHCPCD_MTU;
 			break;
 		case 'N':
-			options->options &= ~DHCPCD_NTP;
+			setenv("PEERNTP", "no", 1);
 			break;
 		case 'R':
-			options->options &= ~DHCPCD_DNS;
+			setenv("PEERDNS", "no", 1);
 			break;
 		case 'S':
 			options->domscsr++;
 			break;
 		case 'T':
-#ifndef ENABLE_INFO
-			logger(LOG_ERR, "info support not compiled into dhcpcd");
-			goto abort;
-#endif
 			options->options |= DHCPCD_TEST | DHCPCD_PERSISTENT;
 			break;
 		case 'Y':
-			options->options &= ~DHCPCD_NIS;
+			setenv("PEERNIS", "no", 1);
 			break;
 		case '?':
 			usage();
@@ -429,26 +425,11 @@ main(int argc, char **argv)
 #ifdef ENABLE_DUID
 			" DUID"
 #endif
-#ifdef ENABLE_INFO
-			" INFO"
-#endif
 #ifdef ENABLE_INFO_COMPAT
 			" INFO_COMPAT"
 #endif
 #ifdef ENABLE_IPV4LL
 			" IPV4LL"
-#endif
-#ifdef ENABLE_NIS
-			" NIS"
-#endif
-#ifdef ENABLE_NTP
-			" NTP"
-#endif
-#ifdef SERVICE
-			" " SERVICE
-#endif
-#ifdef ENABLE_RESOLVCONF
-			" RESOLVCONF"
 #endif
 #ifdef THERE_IS_NO_FORK
 			" THERE_IS_NO_FORK"
@@ -603,7 +584,7 @@ main(int argc, char **argv)
 	/* Seed random */
 	srandomdev();
 
-#ifdef __linux
+#ifdef __linux__
 	/* Massage our filters per platform */
 	setup_packet_filters();
 #endif

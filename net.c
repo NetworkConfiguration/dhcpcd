@@ -358,9 +358,7 @@ read_interface(const char *ifname, _unused int metric)
 	iface = xzalloc(sizeof(*iface));
 	strlcpy(iface->name, ifname, IF_NAMESIZE);
 	snprintf(iface->leasefile, PATH_MAX, LEASEFILE, ifname);
-#ifdef ENABLE_INFO
 	snprintf(iface->infofile, PATH_MAX, INFOFILE, ifname);
-#endif
 	memcpy(&iface->hwaddr, hwaddr, hwlen);
 	iface->hwlen = hwlen;
 

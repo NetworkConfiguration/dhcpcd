@@ -53,12 +53,6 @@
 #include "logger.h"
 #include "signal.h"
 
-#ifdef THERE_IS_NO_FORK
-# ifndef ENABLE_INFO
- #  error "Non MMU requires ENABLE_INFO to work"
-# endif
-#endif
-
 #ifdef ENABLE_IPV4LL
 # ifndef ENABLE_ARP
  # error "IPv4LL requires ENABLE_ARP to work"
@@ -333,7 +327,6 @@ get_lease(struct dhcp_lease *lease, const struct dhcp_message *dhcp)
 	lease->frominfo = 0;
 }
 
-#ifdef ENABLE_INFO
 static int
 get_old_lease(struct if_state *state, const struct options *options)
 {
@@ -410,7 +403,6 @@ get_old_lease(struct if_state *state, const struct options *options)
 	state->dhcp = dhcp;
 	return 0;
 }
-#endif
 
 static int
 client_setup(struct if_state *state, const struct options *options)
@@ -430,9 +422,7 @@ client_setup(struct if_state *state, const struct options *options)
 	     options->options & DHCPCD_REQUEST ||
 	     options->options & DHCPCD_DAEMONISED))
 	{
-#ifdef ENABLE_INFO
 		if (!get_old_lease(state, options))
-#endif
 			return -1;
 		state->timeout = 0;
 
@@ -802,7 +792,6 @@ handle_timeout(struct if_state *state, const struct options *options)
 		if (options->options & DHCPCD_INFORM)
 			return -1;
 
-#ifdef ENABLE_INFO
 		if (!(state->options & DHCPCD_TEST) &&
 		    (state->options & DHCPCD_IPV4LL ||
 		     state->options & DHCPCD_LASTLEASE))
@@ -816,7 +805,6 @@ handle_timeout(struct if_state *state, const struct options *options)
 			} else if (errno == EINTR)
 				return 0;
 		}
-#endif
 
 #ifdef ENABLE_IPV4LL
 		if (!(state->options & DHCPCD_TEST) &&
@@ -842,7 +830,6 @@ handle_timeout(struct if_state *state, const struct options *options)
 		}
 #endif
 
-#if defined (ENABLE_INFO) || defined (ENABLE_IPV4LL)
 		if (lease->addr.s_addr) {
 			if (!(state->options & DHCPCD_DAEMONISED) &&
 			    IN_LINKLOCAL(ntohl(lease->addr.s_addr)))
@@ -871,7 +858,6 @@ handle_timeout(struct if_state *state, const struct options *options)
 			state->xid = 0;
 			return 0;
 		}
-#endif
 
 		if (!(state->options & DHCPCD_DAEMONISED))
 			return -1;
@@ -1004,13 +990,11 @@ handle_dhcp(struct if_state *state, struct dhcp_message *dhcp, const struct opti
 			logger(LOG_INFO, "offered %s", addr);
 		free(addr);
 
-#ifdef ENABLE_INFO
 		if (options->options & DHCPCD_TEST) {
 			write_info(iface, dhcp, lease, options, 0);
 			errno = 0;
 			return -1;
 		}
-#endif
 
 		free(dhcp);
 		send_message(state, DHCP_REQUEST, options);

@@ -122,22 +122,12 @@ signal_read(struct pollfd *fd)
 int
 signal_init(void)
 {
-	struct sigaction sa;
-
 	if (pipe(signal_pipe) == -1)
 		return -1;
 
 	/* Stop any scripts from inheriting us */
 	close_on_exec(signal_pipe[0]);
 	close_on_exec(signal_pipe[1]);
-
-	/* Ignore child signals and don't make zombies.
-	 * Because we do this, we don't need to be in signal_setup */
-	memset(&sa, 0, sizeof(sa));
-	sa.sa_handler = SIG_DFL;
-	sa.sa_flags = SA_NOCLDSTOP | SA_NOCLDWAIT;
-	if (sigaction(SIGCHLD, &sa, NULL) == -1)
-		return -1;
 
 	memset(signals, 0, sizeof(signals));
 	return 0;

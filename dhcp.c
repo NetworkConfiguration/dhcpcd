@@ -60,8 +60,8 @@ const struct dhcp_option dhcp_options[] = {
 	{ DHCP_NETMASK,		OPT_IPV4R,	NULL },
 	{ DHCP_BROADCAST,	OPT_IPV4R,	NULL },
 	{ DHCP_LEASETIME,	OPT_UINT32,	NULL },
-	{ DHCP_RENEWALTIME,	OPT_UINT32R,	"RENEWALTIME" },
-	{ DHCP_REBINDTIME,	OPT_UINT32R,	"REBINDTIME" },
+	{ DHCP_RENEWALTIME,	OPT_UINT32R,	NULL },
+	{ DHCP_REBINDTIME,	OPT_UINT32R,	NULL },
 	{ DHCP_MTU,		OPT_UINT16R,	"MTU" },
 	{ DHCP_STATICROUTE,	OPT_IPV4R,	NULL },
 	{ DHCP_ROUTER,		OPT_IPV4R,	NULL },
@@ -69,17 +69,11 @@ const struct dhcp_option dhcp_options[] = {
 	{ DHCP_DNSSERVER,	OPT_IPV4R,	"DNSSERVER" },
 	{ DHCP_DNSDOMAIN,	OPT_STRINGR,	"DNSDOMAIN" },
 	{ DHCP_DNSSEARCH,	OPT_STRINGR | OPT_RFC3397,	"DNSSEARCH" },
-#ifdef ENABLE_NTP
 	{ DHCP_NTPSERVER,	OPT_IPV4R,	"NTPSERVER" },
-#endif
-#ifdef ENABLE_NIS
 	{ DHCP_NISSERVER,	OPT_IPV4R,	"NISSERVER" },
 	{ DHCP_NISDOMAIN,	OPT_IPV4R,	"NISDOMAIN" },
-#endif
-#ifdef ENABLE_INFO
 	{ DHCP_ROOTPATH,	OPT_STRINGR,	"ROOTPATH" },
 	{ DHCP_SIPSERVER,	OPT_STRINGR | OPT_RFC3361,	"SIPSERVER" },
-#endif
 	{ DHCP_MESSAGE,		OPT_STRING,	NULL},
 	{ 0, 0, NULL }
 };
@@ -332,7 +326,6 @@ decode_rfc3442(const uint8_t *data)
 	return routes;
 }
 
-#ifdef ENABLE_INFO
 static char *
 decode_rfc3361(const uint8_t *data)
 {
@@ -380,7 +373,6 @@ decode_rfc3361(const uint8_t *data)
 
 	return sip;
 }
-#endif
 
 char *
 get_option_string(const struct dhcp_message *dhcp, uint8_t option)
@@ -750,7 +742,6 @@ read_lease(const struct interface *iface)
 	return dhcp;
 }
 
-#ifdef ENABLE_INFO
 /* Create a malloced string of cstr, changing ' to '\''
  * so the contents work in a shell */
 char *
@@ -854,4 +845,3 @@ write_options(FILE *f, const struct dhcp_message *dhcp)
 	}
 	return retval;
 }
-#endif
