@@ -699,7 +699,7 @@ write_lease(const struct interface *iface, const struct dhcp_message *dhcp)
 	uint8_t l;
 	uint8_t o = 0;
 
-	fd = open(iface->leasefile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	fd = open(iface->leasefile, O_WRONLY | O_CREAT | O_TRUNC, 0600);
 	if (fd == -1)
 		return -1;
 
