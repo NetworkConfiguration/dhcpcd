@@ -79,7 +79,8 @@ will also attempt to restart the respective services to notify them of the
 change.
 If the hostname is currenly blank, (null) or localhost then
 .Nm
-will set the hostname to the one supplied by the DHCP server.
+will set the hostname to the one supplied by the DHCP server, or look it up
+in DNS if none supplied.
 .Nm
 then daemonises and waits for the lease renewal time to lapse.
 Then it attempts to renew its lease and reconfigure if the new lease changes.
@@ -231,7 +232,8 @@ dhcpcd itself never does any DNS updates.
 .It Fl H , --sethostname
 Forces
 .Nm
-to set the hostname as supplied by the DHCP server.
+to set the hostname as supplied by the DHCP server, or look it up
+in DNS if none supplied.
 .It Fl I , -clientid Ar clientid
 Send
 .Ar clientid

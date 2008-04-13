@@ -1,5 +1,4 @@
 #!/bin/sh
-# 
 # dhcpcd - DHCP client daemon
 # Copyright 2006-2008 Roy Marples <roy@marples.name>
 # All rights reserved
@@ -230,11 +229,23 @@ need_hostname()
 	return 1
 }
 
+lookup_hostname()
+{
+	if type host >/dev/null 2>&1; then
+		host "${IPADDR}" | sed 's/.* domain name pointer \(.*\)./\1/'
+	elif type dig >/dev/null 2>&1; then
+		dig +short -x "${IPADDR}" | sed 's/\.$//'
+	else
+		return 1
+	fi
+}
+
 make_hostname()
 {
-	[ -z "${HOSTNAME}" ] && return 0
-	if need_hostname || yesno "${PEERHOSTNAME}"; then
-		hostname "${HOSTNAME}"
+	if yesno "${PEERHOSTNAME}" || need_hostname; then
+		local name="${HOSTNAME}"
+		[ -z "${name}" ] && name="$(lookup_hostname)"
+		[ -n "${name}" ] && hostname "${name}"
 	fi
 }
 
