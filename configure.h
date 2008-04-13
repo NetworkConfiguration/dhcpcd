@@ -32,7 +32,6 @@
 #include "dhcp.h"
 #include "net.h"
 
-int exec_cmd(const char *, const char *, ...);
 int write_info(const struct interface *, const struct dhcp_message *,
 	const struct dhcp_lease *, const struct options *, int);
 int configure(struct interface *, const struct dhcp_message *,

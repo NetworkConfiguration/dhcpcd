@@ -33,7 +33,6 @@
 
 #include <errno.h>
 #include <signal.h>
-#include <stdarg.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -46,12 +45,10 @@
 #include "net.h"
 #include "signal.h"
 
-int
-exec_cmd(const char *cmd, const char *args, ...)
+static int
+exec_script(const char *cmd, const char *arg1, const char *arg2)
 {
-	va_list va;
-	char **argv;
-	int n = 1;
+	char *const argv[4] = { (char *)cmd, (char *)arg1, (char *)arg2, NULL};
 	int ret = 0;
 	pid_t pid;
 	pid_t wpid;
@@ -59,19 +56,7 @@ exec_cmd(const char *cmd, const char *args, ...)
 	sigset_t full;
 	sigset_t old;
 
-	va_start(va, args);
-	while (va_arg(va, char *) != NULL)
-		n++;
-	va_end(va);
-	argv = xmalloc(sizeof(char *) * (n + 2));
-
-	va_start(va, args);
-	n = 2;
-	argv[0] = (char *)cmd;
-	argv[1] = (char *)args;
-	while ((argv[n] = va_arg(va, char *)) != NULL)
-		n++;
-	va_end(va);
+	logger(LOG_DEBUG, "exec `%s' `%s' `%s'", cmd, arg1, arg2);
 
 	/* OK, we need to block signals */
 	sigfillset(&full);
@@ -86,17 +71,16 @@ exec_cmd(const char *cmd, const char *args, ...)
 
 	switch (pid) {
 	case -1:
-		logger(LOG_ERR, "vfork: %s", strerror(errno));
+		logger(LOG_ERR, "fork: %s", strerror(errno));
 		ret = -1;
 		break;
 	case 0:
 #ifndef THERE_IS_NO_FORK
 		signal_reset();
 #endif
-		sigprocmask (SIG_SETMASK, &old, NULL);
-		if (execvp(cmd, argv) && errno != ENOENT)
-			logger (LOG_ERR, "error executing \"%s\": %s",
-				cmd, strerror(errno));
+		sigprocmask(SIG_SETMASK, &old, NULL);
+		execvp(cmd, argv);
+		logger(LOG_ERR, "%s: %s", cmd, strerror(errno));
 		_exit(111);
 		/* NOTREACHED */
 	}
@@ -107,7 +91,6 @@ exec_cmd(const char *cmd, const char *args, ...)
 
 	/* Restore our signals */
 	sigprocmask(SIG_SETMASK, &old, NULL);
-	free(argv);
 
 	/* Wait for the script to finish */
 	do {
@@ -120,25 +103,7 @@ exec_cmd(const char *cmd, const char *args, ...)
 		ret = WEXITSTATUS(status);
 	else
 		ret = -1;
-	if (ret != 0)
-		logger(LOG_ERR, "%s exited non zero", cmd);
 	return ret;
-}
-
-/* IMPORTANT: Ensure that the last parameter is NULL when calling */
-static void
-exec_script(const char *script, _unused const char *infofile, const char *arg)
-{
-	struct stat buf;
-
-	if (stat(script, &buf) == -1) {
-		if (strcmp(script, DEFAULT_SCRIPT) != 0)
-			logger(LOG_ERR, "`%s': %s", script, strerror(ENOENT));
-		return;
-	}
-
-	logger(LOG_DEBUG, "exec \"%s\" \"%s\" \"%s\"", script, infofile, arg);
-	exec_cmd(script, infofile, arg, (char *)NULL);
 }
 
 static struct rt *
@@ -550,7 +515,6 @@ configure(struct interface *iface, const struct dhcp_message *dhcp,
 		}
 
 		exec_script(options->script, iface->infofile, "down");
-
 		return 0;
 	}
 
@@ -607,6 +571,5 @@ configure(struct interface *iface, const struct dhcp_message *dhcp,
 			logger(LOG_ERR, "write_lease: %s", strerror(errno));
 
 	exec_script(options->script, iface->infofile, up ? "new" : "up");
-
 	return 0;
 }

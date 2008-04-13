@@ -835,7 +835,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 			    IN_LINKLOCAL(ntohl(lease->addr.s_addr)))
 				logger(LOG_WARNING, "using IPV4LL address %s",
 				       inet_ntoa(lease->addr));
-			if (configure(iface, state->dhcp, lease, options, 1) == -1 &&
+			if (configure(iface, state->dhcp, lease, options, 1) != 0 &&
 			    !(state->options & DHCPCD_DAEMONISED))
 				return -1;
 
@@ -930,9 +930,10 @@ handle_timeout(struct if_state *state, const struct options *options)
 }
 
 static int
-handle_dhcp(struct if_state *state, struct dhcp_message *dhcp, const struct options *options)
+handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp, const struct options *options)
 {
 	struct timespec ts;
+	struct dhcp_message *dhcp = *dhcpp;
 	struct interface *iface = state->interface;
 	struct dhcp_lease *lease = &state->lease;
 	char *addr;
@@ -951,7 +952,6 @@ handle_dhcp(struct if_state *state, struct dhcp_message *dhcp, const struct opti
 		addr = get_option_string(dhcp, DHCP_MESSAGE);
 		logger(LOG_INFO, "received NAK: %s", addr);
 		free(addr);
-		free(dhcp);
 		state->state = STATE_INIT;
 		state->timeout = 0;
 		state->xid = 0;
@@ -1063,6 +1063,7 @@ handle_dhcp(struct if_state *state, struct dhcp_message *dhcp, const struct opti
 	if (state->dhcp)
 		free(state->dhcp);
 	state->dhcp = dhcp;
+	*dhcpp = NULL;
 		
 	if (options->options & DHCPCD_INFORM) {
 		if (options->request_address.s_addr != 0)
@@ -1133,13 +1134,12 @@ handle_dhcp(struct if_state *state, struct dhcp_message *dhcp, const struct opti
 	}
 
 	state->xid = 0;
-
-	if (configure(iface, dhcp, &state->lease, options, 1) == -1 && 
-	    !(state->options & DHCPCD_DAEMONISED))
+	if (configure(iface, dhcp, &state->lease, options, 1) != 0)
 		return -1;
 
-	if (!(state->options & DHCPCD_DAEMONISED)
-			&& state->options & DHCPCD_DAEMONISE) {
+	if (!(state->options & DHCPCD_DAEMONISED) &&
+	    state->options & DHCPCD_DAEMONISE)
+	{
 		switch (daemonise(state->pidfd)) {
 		case 0:
 			state->options |= DHCPCD_DAEMONISED;
@@ -1188,15 +1188,11 @@ handle_packet(struct if_state *state, const struct options *options)
 			       dhcp->xid, state->xid);
 			continue;
 		}
-		if (handle_dhcp(state, dhcp, options) == 0)
+		if (handle_dhcp(state, &dhcp, options) == 0)
 			return 0;
 	} while (state->buffer_pos != 0);
-
-	if (state->options & DHCPCD_FORKED)
-		return -1;
-
 	free(dhcp);
-	return 0;
+	return -1;
 }
 
 int
