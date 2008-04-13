@@ -1182,6 +1182,10 @@ handle_packet(struct if_state *state, const struct options *options)
 			       &state->buffer_len, &state->buffer_pos) == -1)
 			break;
 
+		if (dhcp->cookie != htonl(MAGIC_COOKIE)) {
+			logger(LOG_DEBUG, "bogus cookie, ignoring");
+			continue;
+		}
 		if (state->xid != dhcp->xid) {
 			logger(LOG_DEBUG,
 			       "ignoring packet with xid 0x%x as"
