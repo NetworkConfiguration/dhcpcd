@@ -827,6 +827,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 				state->dhcp = xmalloc(sizeof(*state->dhcp));
 			memset(state->dhcp, 0, sizeof(*state->dhcp));
 			state->dhcp->yiaddr = lease->addr.s_addr;
+			state->dhcp->options[0] = DHCP_END;
 		}
 #endif
 
