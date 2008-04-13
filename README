@@ -20,14 +20,6 @@ If you're cross compiling you may need to set the below knobs to avoid
 automatic tests.
 OS=BSD | Linux
 
-We try and detect how to restart ntp and ypbind, you can override this with
-HAVE_INIT=no or force one of these values
-OPENRC   (OpenRC as used by Gentoo (forked from baselayout))
-BSDRC    (BSD RC system - /etc/rc.d/ntpd restart )
-SERVICE  (RedHat service command - service ntpd restart)
-SLACKRC  (Slackware RC system - /etc/rc.d/rc.ntpd restart)
-SYSV     (SYSV style - /etc/init.d/ntpd restart)
-
 You can change the default dir where dhcpcd stores it's .info files with
 INFODIR=/var/db
 
