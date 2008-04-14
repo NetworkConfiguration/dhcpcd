@@ -235,11 +235,6 @@ hostname. Valid values for
 are none, ptr and both.
 .Nm
 dhcpcd itself never does any DNS updates.
-.It Fl H , --sethostname
-Forces
-.Nm
-to set the hostname as supplied by the DHCP server, or look it up
-in DNS if none supplied.
 .It Fl I , -clientid Ar clientid
 Send
 .Ar clientid
@@ -275,6 +270,9 @@ off.
 Don't request or claim the address by ARP.
 .It Fl G , -nogateway
 Don't set any default routes.
+.It Fl H , -nohostname
+Don't request a hostname. If the current hostname is blank, localhost or
+(none) then the hostnam will be looked up in DNS and set to that.
 .It Fl L , -noipv4ll
 Don't use IPv4LL at all.
 .It Fl M , -nomtu

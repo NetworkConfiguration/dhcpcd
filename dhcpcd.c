@@ -72,7 +72,7 @@ static const struct option longopts[] = {
 	{"lastlease",   no_argument,        NULL, 'E'},
 	{"fqdn",        optional_argument,  NULL, 'F'},
 	{"nogateway",   no_argument,        NULL, 'G'},
-	{"sethostname", no_argument,        NULL, 'H'},
+	{"nohostname",  no_argument,        NULL, 'H'},
 	{"clientid",    optional_argument,  NULL, 'I'},
 	{"noipv4ll",    no_argument,        NULL, 'L'},
 	{"nomtu",       no_argument,        NULL, 'M'},
@@ -160,7 +160,7 @@ main(int argc, char **argv)
 	int sig = 0;
 	int retval = EXIT_FAILURE;
 	char *p;
-	int doopts = 1, dodns = 1, dohostname = 0, donis = 1, dontp = 1;
+	int doopts = 1, dodns = 1, dohostname = 1, donis = 1, dontp = 1;
 
 	/* Close any un-needed fd's */
 	for (i = getdtablesize() - 1; i >= 3; --i)
@@ -370,7 +370,7 @@ main(int argc, char **argv)
 			options->options &= ~DHCPCD_GATEWAY;
 			break;
 		case 'H':
-			dohostname = 1;
+			dohostname = 0;
 			break;
 		case 'I':
 			if (optarg) {
