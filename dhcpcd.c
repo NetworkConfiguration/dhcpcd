@@ -62,6 +62,7 @@ static const struct option longopts[] = {
 	{"leasetime",   required_argument,  NULL, 'l'},
 	{"metric",      required_argument,  NULL, 'm'},
 	{"renew",       no_argument,        NULL, 'n'},
+	{"option",	required_argument,  NULL, 'o'},
 	{"persistent",  no_argument,        NULL, 'p'},
 	{"inform",      optional_argument,  NULL, 's'},
 	{"request",     optional_argument,  NULL, 'r'},
@@ -76,6 +77,7 @@ static const struct option longopts[] = {
 	{"noipv4ll",    no_argument,        NULL, 'L'},
 	{"nomtu",       no_argument,        NULL, 'M'},
 	{"nontp",       no_argument,        NULL, 'N'},
+	{"nooptions",   no_argument,        NULL, 'O'},
 	{"nodns",       no_argument,        NULL, 'R'},
 	{"msscr",       no_argument,        NULL, 'S'},
 	{"test",        no_argument,        NULL, 'T'},
@@ -136,9 +138,9 @@ read_pid(const char *pidfile)
 static void
 usage(void)
 {
-	printf("usage: "PACKAGE" [-adknpEGHMNRSTY] [-c script] [-h hostname] [-i classID]\n"
-	       "              [-l leasetime] [-m metric] [-r ipaddress] [-s ipaddress]\n"
-	       "              [-t timeout] [-u userclass] [-F none | ptr | both]\n"
+	printf("usage: "PACKAGE" [-adknpEGHMNORSTY] [-c script] [-h hostname] [-i classID]\n"
+	       "              [-l leasetime] [-m metric] [-o option] [-r ipaddress]\n"
+	       "              [-s ipaddress] [-t timeout] [-u userclass] [-F none | ptr | both]\n"
 	       "              [-I clientID] <interface>\n");
 }
 
@@ -158,6 +160,7 @@ main(int argc, char **argv)
 	int sig = 0;
 	int retval = EXIT_FAILURE;
 	char *p;
+	int doopts = 1, dodns = 1, dohostname = 0, donis = 1, dontp = 1;
 
 	/* Close any un-needed fd's */
 	for (i = getdtablesize() - 1; i >= 3; --i)
@@ -179,15 +182,10 @@ main(int argc, char **argv)
 	    strcmp(options->hostname, "localhost") == 0)
 		*options->hostname = '\0';
 
-	setenv("PEERDNS", "yes", 1);
-	setenv("PEERHOSTNAME", "no", 1);
-	setenv("PEERNIS", "yes", 1);
-	setenv("PEERNTP", "yes", 1);
-
 	/* Don't set any optional arguments here so we retain POSIX
 	 * compatibility with getopt */
 	while ((opt = getopt_long(argc, argv, EXTRA_OPTS
-				  "c:dh:i:kl:m:npr:s:t:u:xAEF:GHI:LMNRSTY",
+				  "c:dh:i:kl:m:no:pr:s:t:u:xAEF:GHI:LMNORSTY",
 				  longopts, &option_index)) != -1)
 	{
 		switch (opt) {
@@ -271,6 +269,11 @@ main(int argc, char **argv)
 		case 'n':
 			sig = SIGALRM;
 			break;
+		case 'o':
+			if (make_reqmask(options, &optarg) != 0) {
+				logger(LOG_ERR, "unknown option `%s'", optarg);
+				goto abort;
+			}
 		case 'p':
 			options->options |= DHCPCD_PERSISTENT;
 			break;
@@ -367,7 +370,7 @@ main(int argc, char **argv)
 			options->options &= ~DHCPCD_GATEWAY;
 			break;
 		case 'H':
-			setenv("PEERHOSTNAME", "yes", 1);
+			dohostname = 1;
 			break;
 		case 'I':
 			if (optarg) {
@@ -394,10 +397,13 @@ main(int argc, char **argv)
 			options->options &= ~DHCPCD_MTU;
 			break;
 		case 'N':
-			setenv("PEERNTP", "no", 1);
+			dontp = 0;
+			break;
+		case 'O':
+			doopts = 0;
 			break;
 		case 'R':
-			setenv("PEERDNS", "no", 1);
+			dodns = 0;
 			break;
 		case 'S':
 			options->domscsr++;
@@ -406,7 +412,7 @@ main(int argc, char **argv)
 			options->options |= DHCPCD_TEST | DHCPCD_PERSISTENT;
 			break;
 		case 'Y':
-			setenv("PEERNIS", "no", 1);
+			donis = 0;
 			break;
 		case '?':
 			usage();
@@ -439,6 +445,22 @@ main(int argc, char **argv)
 
 	if (dohelp)
 		usage();
+
+	if (doopts) {
+		if (dodns) {
+			add_reqmask(options->reqmask, DHCP_DNSSERVER);
+			add_reqmask(options->reqmask, DHCP_DNSDOMAIN);
+			add_reqmask(options->reqmask, DHCP_DNSSEARCH);
+		}
+		if (dohostname)
+			add_reqmask(options->reqmask, DHCP_HOSTNAME);
+		if (donis) {
+			add_reqmask(options->reqmask, DHCP_NISSERVER);
+			add_reqmask(options->reqmask, DHCP_NISDOMAIN);
+		}
+		if (dontp)
+			add_reqmask(options->reqmask, DHCP_NTPSERVER);
+	}
 
 #ifdef THERE_IS_NO_FORK
 	dhcpcd_argv = argv;

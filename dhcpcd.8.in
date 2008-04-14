@@ -29,12 +29,13 @@
 .Nd an RFC 2131 compliant DHCP client
 .Sh SYNOPSIS
 .Nm
-.Op Fl dknpAEGHMLNRSTY
+.Op Fl dknpAEGHMOLNRSTY
 .Op Fl c , -script Ar script
 .Op Fl h , -hostname Ar hostname
 .Op Fl i , -classid Ar classid
 .Op Fl l , -leasetime Ar seconds
 .Op Fl m , -metric Ar metric
+.Op Fl o , -option Ar option
 .Op Fl r , -request Ar address
 .Op Fl t , -timeout Ar seconds
 .Op Fl u , -userclass Ar class
@@ -167,6 +168,11 @@ presently only Linux
 .Pc .
 Route metrics allow the addition of routes to the same destination across
 different interfaces, the lower the metric the more it is preferred.
+.It Fl o , -option Ar option
+Request the DHCP
+.Ar option
+variable for use in
+.Pa @PREFIX@/etc/dhcpcd.sh .
 .It Fl n , -renew
 Notifies an existing
 .Nm
@@ -278,6 +284,8 @@ Don't set the MTU of the
 Don't touch
 .Pa /etc/ntpd.conf
 or restart the ntp service.
+.It Fl O , -nooptions
+Don't request any options beyond what is needed to configure the interface.
 .It Fl R , -nodns
 Don't send DNS information to resolvconf or touch
 .Pa /etc/resolv.conf .

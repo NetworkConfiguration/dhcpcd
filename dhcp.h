@@ -170,6 +170,9 @@ struct dhcp_lease {
 	uint8_t frominfo;
 };
 
+#define add_reqmask(var, val) (var[val >> 3] |= 1 << (val & 7))
+#define has_reqmask(var, val) (var[val >> 3] & (1 << (val & 7)))
+int make_reqmask(struct options *options, char **opts);
 const uint8_t *get_option(const struct dhcp_message *, uint8_t);
 char *get_option_string(const struct dhcp_message *, uint8_t);
 int get_option_addr(uint32_t *a, const struct dhcp_message *dhcp, uint8_t option);

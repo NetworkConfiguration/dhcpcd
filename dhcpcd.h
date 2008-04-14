@@ -76,6 +76,7 @@ struct options {
 	char classid[CLASS_ID_MAX_LEN];
 	char clientid[CLIENT_ID_MAX_LEN];
 	char userclass[USERCLASS_MAX_LEN];
+	uint8_t reqmask[256 / 8];
 	size_t userclass_len;
 	uint32_t leasetime;
 	time_t timeout;

@@ -65,18 +65,45 @@ const struct dhcp_option dhcp_options[] = {
 	{ DHCP_MTU,		OPT_UINT16R,	"MTU" },
 	{ DHCP_STATICROUTE,	OPT_IPV4R,	NULL },
 	{ DHCP_ROUTER,		OPT_IPV4R,	NULL },
-	{ DHCP_HOSTNAME,	OPT_STRINGR,	"HOSTNAME" },
-	{ DHCP_DNSSERVER,	OPT_IPV4R,	"DNSSERVER" },
-	{ DHCP_DNSDOMAIN,	OPT_STRINGR,	"DNSDOMAIN" },
-	{ DHCP_DNSSEARCH,	OPT_STRINGR | OPT_RFC3397,	"DNSSEARCH" },
-	{ DHCP_NTPSERVER,	OPT_IPV4R,	"NTPSERVER" },
-	{ DHCP_NISSERVER,	OPT_IPV4R,	"NISSERVER" },
-	{ DHCP_NISDOMAIN,	OPT_IPV4R,	"NISDOMAIN" },
-	{ DHCP_ROOTPATH,	OPT_STRINGR,	"ROOTPATH" },
-	{ DHCP_SIPSERVER,	OPT_STRINGR | OPT_RFC3361,	"SIPSERVER" },
+	{ DHCP_HOSTNAME,	OPT_STRING,	"HOSTNAME" },
+	{ DHCP_DNSSERVER,	OPT_IPV4,	"DNSSERVER" },
+	{ DHCP_DNSDOMAIN,	OPT_STRING,	"DNSDOMAIN" },
+	{ DHCP_DNSSEARCH,	OPT_STRING | OPT_RFC3397,	"DNSSEARCH" },
+	{ DHCP_NTPSERVER,	OPT_IPV4,	"NTPSERVER" },
+	{ DHCP_NISSERVER,	OPT_IPV4,	"NISSERVER" },
+	{ DHCP_NISDOMAIN,	OPT_IPV4,	"NISDOMAIN" },
+	{ DHCP_ROOTPATH,	OPT_STRING,	"ROOTPATH" },
+	{ DHCP_SIPSERVER,	OPT_STRING | OPT_RFC3361,	"SIPSERVER" },
 	{ DHCP_MESSAGE,		OPT_STRING,	NULL},
 	{ 0, 0, NULL }
 };
+
+int make_reqmask(struct options *options, char **opts)
+{
+	char *token;
+	char *p = *opts;
+	uint8_t i;
+	const char *v;
+	int max = sizeof(dhcp_options) / sizeof(dhcp_options[0]);
+
+	while ((token = strsep(&p, ","))) {
+		for (i = 0; i < max; i++) {
+			if (!(v = dhcp_options[i].var))
+				continue;
+			if (strcmp(v, token) == 0) {
+				add_reqmask(options->reqmask,
+					    dhcp_options[i].option);
+				break;
+			}
+		}
+		if (i >= max) {
+			*opts = token;
+			errno = ENOENT;
+			return -1;
+		}
+	}
+	return 0;
+}
 
 static int
 valid_length(uint8_t option, const uint8_t *data, int *type)
@@ -512,6 +539,7 @@ make_message(struct dhcp_message **message,
 	time_t up = uptime() - iface->start_uptime;
 	uint32_t ul;
 	uint16_t sz;
+	uint8_t o;
 
 	dhcp = xzalloc(sizeof (*dhcp));
 	m = (uint8_t *)dhcp;
@@ -656,9 +684,11 @@ make_message(struct dhcp_message **message,
 		n_params = p;
 		*p++ = 0;
 		for (l = 0; l < sizeof(dhcp_options) / sizeof(dhcp_options[0]); l++) {
-			if (!(dhcp_options[l].type & OPT_REQUEST))
+			o = dhcp_options[l].option;
+			if (!(dhcp_options[l].type & OPT_REQUEST) &&
+			    !has_reqmask(options->reqmask, o))
 				continue;
-			switch (dhcp_options[l].option) {
+			switch (o) {
 			case DHCP_RENEWALTIME:	/* FALLTHROUGH */
 			case DHCP_REBINDTIME:
 				if (type == DHCP_INFORM)
@@ -669,7 +699,7 @@ make_message(struct dhcp_message **message,
 					continue;
 				break;
 			}
-			*p++ = dhcp_options[l].option;
+			*p++ = o;
 		}
 		if (options->domscsr)
 			*p++ = DHCP_MSCSR;
