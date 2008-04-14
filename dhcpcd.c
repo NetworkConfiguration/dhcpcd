@@ -172,8 +172,8 @@ main(int argc, char **argv)
 	snprintf(options->classid, CLASS_ID_MAX_LEN, "%s %s",
 		 PACKAGE, VERSION);
 
-	options->options |= DHCPCD_GATEWAY | DHCPCD_IPV4LL | DHCPCD_DUID |
-		DHCPCD_DAEMONISE;
+	options->options |= DHCPCD_GATEWAY | DHCPCD_ARP | DHCPCD_IPV4LL |
+		DHCPCD_DUID | DHCPCD_DAEMONISE;
 	options->timeout = DEFAULT_TIMEOUT;
 
 	gethostname(options->hostname, sizeof(options->hostname));
