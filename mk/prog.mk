@@ -10,6 +10,8 @@ BINDIR?=	${PREFIX}/usr/bin
 BINMODE?=	0755
 OBJS+=		${SRCS:.c=.o}
 
+SYSCONFDIR?=	${PREFIX}/etc
+
 INSTALL?=	install
 SED?=		sed
 
@@ -32,8 +34,8 @@ _proginstall: ${PROG}
 	${INSTALL} -d ${DESTDIR}${INFODIR}
 
 _scriptinstall: ${SCRIPT}
-	${INSTALL} -d ${DESTDIR}${SCRIPTDIR}
-	${INSTALL} -m ${BINMODE} ${SCRIPT} ${DESTDIR}${SCRIPTDIR}
+	${INSTALL} -d ${DESTDIR}${SYSCONFDIR}
+	${INSTALL} -m ${BINMODE} ${SCRIPT} ${DESTDIR}${SYSCONFDIR}
 
 include ${MK}/depend.mk
 include ${MK}/man.mk

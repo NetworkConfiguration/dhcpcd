@@ -47,20 +47,24 @@
 
 /* Packname name and pathname definitions. */
 
-#define PACKAGE             "dhcpcd"
+#define PACKAGE			"dhcpcd"
 
-#define ETCDIR              "/etc"
-#define RESOLVFILE          ETCDIR "/resolv.conf"
-#define DEFAULT_SCRIPT      ETCDIR "/" PACKAGE ".sh"
-
-#define STATEDIR            "/var"
-#define PIDFILE             STATEDIR "/run/" PACKAGE "-%s.pid"
-
-#ifndef INFODIR
-# define INFODIR            "/var/db"
+#define RESOLVFILE		"/etc/resolv.conf"
+#ifndef SYSCONFDIR
+# define SYSCONFDIR		"/etc"
 #endif
-#define LEASEFILE           INFODIR "/" PACKAGE "-%s.lease"
-#define INFOFILE            INFODIR "/" PACKAGE "-%s.info"
-#define DUIDFILE            INFODIR "/" PACKAGE ".duid"
+#define DEFAULTSCRIPT		SYSCONFDIR "/" PACKAGE ".sh"
+
+#ifndef RUNDIR
+# define RUNDIR			"/var/run"
+#endif
+#define PIDFILE			RUNDIR "/" PACKAGE "-%s.pid"
+
+#ifndef DBDIR
+# define DBDIR			"/var/db"
+#endif
+#define LEASEFILE		DBDIR "/" PACKAGE "-%s.lease"
+#define INFOFILE		DBDIR "/" PACKAGE "-%s.info"
+#define DUIDFILE		DBDIR "/" PACKAGE ".duid"
 
 #endif

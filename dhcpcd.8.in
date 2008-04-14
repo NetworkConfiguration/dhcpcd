@@ -111,7 +111,7 @@ can use the
 option.
 .Ss Hooking into DHCP events
 .Nm
-will run @PREFIX@/etc/dhcpcd.sh, or the script specified by the
+will run @SYSCONFDIR@/dhcpcd.sh, or the script specified by the
 .Fl c , -script
 option. It will set $1 to a shell compatible file that holds various
 configuration settings obtained from the DHCP server and $2 to either
@@ -172,7 +172,7 @@ different interfaces, the lower the metric the more it is preferred.
 Request the DHCP
 .Ar option
 variable for use in
-.Pa @PREFIX@/etc/dhcpcd.sh .
+.Pa @SYSCONFDIR@/dhcpcd.sh .
 .It Fl n , -renew
 Notifies an existing
 .Nm
@@ -330,15 +330,15 @@ requires a Berkley Packet Filter, or BPF device on BSD based systems and a
 Linux Socket Filter, or LPF device on Linux based systems.
 .Sh FILES
 .Bl -ohang
-.It Pa @PREFIX@/etc/dhcpcd.sh
+.It Pa @SYSCONFDIR@/dhcpcd.sh
 Bourne shell script that is run when we configure or deconfigure an interface.
-.It Pa @INFODIR@/dhcpcd.duid
+.It Pa @DBDIR@/dhcpcd.duid
 Text file that holds the DUID used to identify the host.
-.It Pa @INFODIR@/dhcpcd- Ns Ar interface Ns .info
+.It Pa @DBDIR@/dhcpcd- Ns Ar interface Ns .info
 Bourne shell file that holds the DHCP values used in configuring the interface.
 This path is passed as the first argument to
-.Pa @PREFIX@/etc/dhcpcd.sh .
-.It Pa @INFODIR@/dhcpcd- Ns Ar interface Ns .lease
+.Pa @SYSCONFDIR@/dhcpcd.sh .
+.It Pa @DBDIR@/dhcpcd- Ns Ar interface Ns .lease
 The actual DHCP message send by the server. We use this when reading the last
 lease and use the files mtime as when it was issued.
 .El

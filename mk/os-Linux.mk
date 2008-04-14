@@ -6,7 +6,7 @@ SRC_IF=		if-linux.c
 
 CFLAGS+=	-D_BSD_SOURCE -D_XOPEN_SOURCE=600
 LIBRT=		-lrt
-INFODIR=	/var/lib/dhcpcd
+DBDIR=		/var/lib/dhcpcd
 
 # Work out if our fork() works or not
 _HAVE_FORK_SH= if test "${HAVE_FORK}" = "yes"; then \

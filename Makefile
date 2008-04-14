@@ -13,7 +13,7 @@ VERSION=	3.3.0-alpha1
 CLEANFILES=	dhcpcd.8
 
 BINDIR=		${PREFIX}/sbin
-SCRIPTDIR=	${PREFIX}/etc
+SYSCONFDIR?=	${PREFIX}/etc
 
 .SUFFIXES:	.in
 
@@ -21,8 +21,9 @@ MK=		mk
 include ${MK}/prog.mk
 
 CFLAGS+=	-DVERSION=\"${VERSION}\"
-CFLAGS+=	-DINFODIR=\"${INFODIR}\"
+CFLAGS+=	-DSYSCONFDIR=\"${SYSCONFDIR}\"
+CFLAGS+=	-DDBDIR=\"${DBDIR}\"
 LDADD+=		${LIBRT}
 
 .in:
-	${SED} 's:@PREFIX@:${PREFIX}:g; s:@INFODIR@:${INFODIR}:g' $< > $@
+	${SED} 's:@SYSCONFDIR@:${SYSCONFDIR}:g; s:@DBDIR@:${DBDIR}:g' $< > $@

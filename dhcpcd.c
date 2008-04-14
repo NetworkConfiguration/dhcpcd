@@ -169,7 +169,7 @@ main(int argc, char **argv)
 	openlog(PACKAGE, LOG_PID, LOG_LOCAL0);
 
 	options = xzalloc(sizeof(*options));
-	options->script = (char *)DEFAULT_SCRIPT;
+	options->script = (char *)DEFAULTSCRIPT;
 	snprintf(options->classid, CLASS_ID_MAX_LEN, "%s %s",
 		 PACKAGE, VERSION);
 
