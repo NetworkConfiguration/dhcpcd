@@ -167,7 +167,9 @@ make_ntp_conf()
 		echo "restrict ${x} nomodify notrap noquery" >> "${cf}"
 		echo "server ${x}" >> "${cf}"
 	done
-	if type cmp >/dev/null 2>&1; then
+	if [ ! -e /etc/ntp.conf ]; then
+		true
+	elif type cmp >/dev/null 2>&1; then
 		cmp -s /etc/ntp.conf "${cf}"
 	elif type diff >/dev/null 2>&1; then
 		diff -q /etc/ntp.conf "${cf}" >/dev/null
