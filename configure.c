@@ -371,50 +371,42 @@ write_info(const struct interface *iface, const struct dhcp_message *dhcp,
 	}
 
 	if (dhcp->yiaddr) {
-		fprintf(f, "IPADDR=%s\n", inet_ntoa(iface->addr));
-		fprintf(f, "NETMASK=%s\n", inet_ntoa(iface->net));
+		fprintf(f, "IPADDR='%s'\n", inet_ntoa(iface->addr));
+		fprintf(f, "NETMASK='%s'\n", inet_ntoa(iface->net));
 		addr.s_addr = dhcp->yiaddr & iface->net.s_addr;
-		fprintf(f, "NETWORK=%s\n", inet_ntoa(addr));
+		fprintf(f, "NETWORK='%s'\n", inet_ntoa(addr));
 		if (get_option_addr(&addr.s_addr, dhcp, DHCP_BROADCAST) == -1)
 			addr.s_addr = dhcp->yiaddr | ~iface->net.s_addr;
-		fprintf(f, "BROADCAST=%s\n", inet_ntoa(addr));
+		fprintf(f, "BROADCAST='%s'\n", inet_ntoa(addr));
 
 		ort = get_option_routes(dhcp);
 		doneone = 0;
-		fprintf(f, "ROUTES=");
+		fprintf(f, "ROUTES='");
 		for (rt = ort; rt; rt = rt->next) {
 			if (rt->dest.s_addr == 0)
 				continue;
 			if (doneone)
 				fputc(' ', f);
-			else {
-				fputc('\'', f);
+			else
 				doneone = 1;
-			}
 			fprintf(f, "%s", inet_ntoa(rt->dest));
 			fprintf(f, ",%s", inet_ntoa(rt->net));
 			fprintf(f, ",%s", inet_ntoa(rt->gate));
 		}
-		if (doneone)
-			fputc('\'', f);
-		fputc('\n', f);
+		fprintf(f, "'\n");
 
 		doneone = 0;
-		fprintf(f, "GATEWAYS=");
+		fprintf(f, "GATEWAYS='");
 		for (rt = ort; rt; rt = rt->next) {
 			if (rt->dest.s_addr != 0)
 				continue;
 			if (doneone)
 				fputc(' ', f);
-			else {
-				fputc('\'', f);
+			else
 				doneone = 1;
-			}
 			fprintf(f, "%s", inet_ntoa(rt->gate));
 		}
-		if (doneone)
-			fputc('\'', f);
-		fputc('\n', f);
+		fprintf(f, "'\n");
 		free_routes(ort);
 	}
 
@@ -437,18 +429,18 @@ write_info(const struct interface *iface, const struct dhcp_message *dhcp,
 
 	if (!(options->options & DHCPCD_INFORM) && dhcp->yiaddr) {
 		if (!(options->options & DHCPCD_TEST))
-			fprintf(f, "LEASEDFROM=%u\n", lease->leasedfrom);
-		fprintf(f, "LEASETIME=%u\n", lease->leasetime);
-		fprintf(f, "RENEWALTIME=%u\n", lease->renewaltime);
-		fprintf(f, "REBINDTIME=%u\n", lease->rebindtime);
+			fprintf(f, "LEASEDFROM='%u'\n", lease->leasedfrom);
+		fprintf(f, "LEASETIME='%u'\n", lease->leasetime);
+		fprintf(f, "RENEWALTIME='%u'\n", lease->renewaltime);
+		fprintf(f, "REBINDTIME='%u'\n", lease->rebindtime);
 	}
 	print_clean(f, "INTERFACE", iface->name);
 	print_clean(f, "CLASSID", options->classid);
 	if (iface->clientid_len > 0) {
-		fprintf(f, "CLIENTID=%s\n",
+		fprintf(f, "CLIENTID='%s'\n",
 			hwaddr_ntoa(iface->clientid, iface->clientid_len));
 	}
-	fprintf(f, "DHCPCHADDR=%s\n",
+	fprintf(f, "DHCPCHADDR='%s'\n",
 		hwaddr_ntoa(iface->hwaddr, iface->hwlen));
 
 	if (!(options->options & DHCPCD_TEST))
