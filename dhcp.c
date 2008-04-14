@@ -25,6 +25,7 @@
  * SUCH DAMAGE.
  */
 
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
@@ -101,7 +102,7 @@ const struct dhcp_option dhcp_options[] = {
 	{ DHCP_NISDOMAIN,		IPV4,	"NISDOMAIN" },
 	{ DHCP_NISSERVER,		IPV4,	"NISSERVER" },
 	{ DHCP_NTPSERVER,		IPV4,	"NTPSERVER" },
-	{ DHCP_VENDORSPECIFICINFO,	0,	"VENDORSPECIFICINFO" },
+	{ DHCP_VENDORSPECIFICINFO,	STRING,	"VENDORSPECIFICINFO" },
 	{ DHCP_NETBIOSNAMESERVER,	IPV4,	"NETBIOSNAMESERVER" },
 	{ DHCP_NETBIOSDGRAMSERVER,	IPV4,	"NETBIOSDGRAMSERVER" },
 	{ DHCP_NETBIOSNODETYPE,		UINT8,	"NETBIOSNODETYPE" },
@@ -177,7 +178,7 @@ valid_length(uint8_t option, const uint8_t *data, int *type)
 		if (type)
 			*type = t;
 		
-		if (dhcp_options[i].type & STRING)
+		if (t == 0 || t & STRING)
 			return 0;
 
 		sz = 0;
@@ -830,39 +831,36 @@ read_lease(const struct interface *iface)
 	return dhcp;
 }
 
-/* Create a malloced string of cstr, changing ' to '\''
- * so the contents work in a shell */
-char *
-clean_metas(const char *cstr)
+ssize_t
+write_string(FILE *f, const uint8_t *data, ssize_t len)
 {
-	const char *p = cstr;
-	char *new;
-	char *n;
-	size_t len;
-	size_t pos;
+	uint8_t c;
+	const uint8_t *e;
+	ssize_t bytes = 0;
 
-	if (cstr == NULL || (len = strlen(cstr)) == 0)
-		return (xstrdup(""));
-
-	n = new = xmalloc(sizeof(char) * len + 2);
-	do
-		if (*p == '\'') {
-			pos = n - new;
-			len += 4;
-			new = xrealloc(new, sizeof(char) * len + 1);
-			n = new + pos;
-			*n++ = '\'';
-			*n++ = '\\';
-			*n++ = '\'';
-			*n++ = '\'';
-		} else
-			*n++ = *p;
-	while (*p++);
-
-	/* Terminate the sucker */
-	*n = '\0';
-
-	return new;
+	if (!len)
+		len = *data++;
+	e = data + len;
+	while (data < e) {
+		c = *data++;
+		if (!isascii(c) || !isprint(c)) {
+			bytes += fprintf(f, "\\%03o", c);
+			continue;
+		}
+		switch (c) {
+			case '"':  /* FALLTHROUGH */
+			case '\'': /* FALLTHROUGH */
+			case '$':  /* FALLTHROUGH */
+			case '`':  /* FALLTHROUGH */
+			case '\\': /* FALLTHROUGH */
+			case ' ':  /* FALLTHROUGH */	
+				if (fputc('\\', f))
+					bytes++;
+		}
+		if (fputc(c, f))
+			bytes++;
+	}
+	return bytes;
 }
 
 ssize_t
@@ -870,8 +868,6 @@ write_options(FILE *f, const struct dhcp_message *dhcp)
 {
 	uint8_t i;
 	const uint8_t *p, *e, *t;
-	char *s;
-	char *c;
 	uint32_t u32;
 	uint16_t u16;
 	uint8_t u8;
@@ -879,32 +875,16 @@ write_options(FILE *f, const struct dhcp_message *dhcp)
 	ssize_t retval = 0;
 
 	for (i = 0; i < sizeof(dhcp_options) / sizeof(dhcp_options[0]); i++) {
-		if (!dhcp_options[i].var || !dhcp_options[i].type)
+		if (!dhcp_options[i].var)
 			continue;
 
-		retval += fprintf(f, "%s='", dhcp_options[i].var);
+		retval += fprintf(f, "%s=", dhcp_options[i].var);
 
 		/* Unknown type, so just print escape codes */
-		if (dhcp_options[i].type == 0) {
+		if (dhcp_options[i].type == STRING) {
 			p = get_option(dhcp, dhcp_options[i].option);
-			if (p) {
-				u8 = *p++;
-				e = p + u8;
-				while (p < e) {
-					u8 = *p++;
-					retval += fprintf(f, "\\%03d", u8);
-				}
-			}
-		}
-
-		if (dhcp_options[i].type & STRING) {
-			s = get_option_string(dhcp, dhcp_options[i].option);
-			if (s) {
-				c = clean_metas(s);
-				retval += fprintf(f, "%s", c);
-				free(c);
-				free(s);
-			} 
+			if (p)
+				retval += write_string(f, p, 0);
 		}
 
 		if ((dhcp_options[i].type & IPV4 ||
@@ -915,17 +895,19 @@ write_options(FILE *f, const struct dhcp_message *dhcp)
 			t = p;
 			e = p + u8;
 			while (p < e) {
-				if (t != p)
-					retval += fprintf(f, " ");
+				if (p != t)
+					retval += fprintf(f, "\\ ");
 				if (dhcp_options[i].type & UINT8) {
 					retval += fprintf(f, "%d", *p);
 					p++;
 				} else if (dhcp_options[i].type & UINT16) {
 					memcpy(&u16, p, sizeof(u16));
+					u16 = ntohs(u16);
 					retval += fprintf(f, "%d", *p);
 					p += sizeof(u16);
 				} else if (dhcp_options[i].type & UINT32) {
 					memcpy(&u32, p, sizeof(u32));
+					u32 = ntohl(u32);
 					retval += fprintf(f, "%d", *p);
 					p += sizeof(u32);
 				} else if (dhcp_options[i].type & IPV4) {
@@ -952,7 +934,7 @@ write_options(FILE *f, const struct dhcp_message *dhcp)
 				retval += fprintf(f, "%d", u16);
 		}
 
-		retval += fprintf(f, "'\n");
+		retval += fprintf(f, "\n");
 	}
 	return retval;
 }

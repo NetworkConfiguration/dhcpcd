@@ -215,11 +215,11 @@ struct dhcp_lease {
 int make_reqmask(struct options *options, char **opts);
 const uint8_t *get_option(const struct dhcp_message *, uint8_t);
 char *get_option_string(const struct dhcp_message *, uint8_t);
-int get_option_addr(uint32_t *a, const struct dhcp_message *dhcp, uint8_t option);
-int get_option_uint32(uint32_t *i, const struct dhcp_message *dhcp, uint8_t option);
-int get_option_uint16(uint16_t *i, const struct dhcp_message *dhcp, uint8_t option);
-int get_option_uint8(uint8_t *i, const struct dhcp_message *dhcp, uint8_t option);
-struct rt *get_option_routes(const struct dhcp_message *dhcp);
+int get_option_addr(uint32_t *, const struct dhcp_message *, uint8_t);
+int get_option_uint32(uint32_t *, const struct dhcp_message *, uint8_t);
+int get_option_uint16(uint16_t *, const struct dhcp_message *, uint8_t);
+int get_option_uint8(uint8_t *, const struct dhcp_message *, uint8_t);
+struct rt *get_option_routes(const struct dhcp_message *);
 struct rt *decode_rfc3442(const uint8_t *);
 ssize_t make_message(struct dhcp_message **,
 			const struct interface *, const struct dhcp_lease *,
@@ -229,6 +229,6 @@ int valid_dhcp_packet(unsigned char *);
 ssize_t write_lease(const struct interface *, const struct dhcp_message *);
 struct dhcp_message *read_lease(const struct interface *iface);
 
-char *clean_metas(const char *cstr);
-ssize_t write_options(FILE *f, const struct dhcp_message *dhcp);
+ssize_t write_string(FILE *f, const uint8_t *, ssize_t);
+ssize_t write_options(FILE *f, const struct dhcp_message *);
 #endif
