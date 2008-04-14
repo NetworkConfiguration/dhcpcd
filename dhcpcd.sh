@@ -72,7 +72,7 @@ do_service()
 	fi
 
 	if type rc-service >/dev/null 2>/dev/null; then
-		rc-service "${service}" --nodeps "${action}" "$@"
+		rc-service "${service}" -- --nodeps "${action}" "$@"
 	elif [ -x /sbin/service ]; then
 		service "${service}" "${action}" "$@"
 	elif [ -x /etc/init.d/"${service}" -a -x /sbin/runscript ]; then
