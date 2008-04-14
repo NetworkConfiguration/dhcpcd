@@ -35,17 +35,17 @@
 #include "common.h"
 #include "dhcp.h"
 
-#define OPT_REQUEST	(1 << 0)
-#define OPT_UINT8	(1 << 1)
-#define OPT_UINT16	(1 << 2)
-#define OPT_UINT32	(1 << 3)
-#define OPT_IPV4	(1 << 4)
-#define OPT_STRING	(1 << 5)
-#define OPT_ARRAY	(1 << 6) /* Not impletmented yet! */
-#define OPT_RFC3361	(1 << 7)
-#define OPT_RFC3397	(1 << 8)
+#define REQUEST	(1 << 0)
+#define UINT8	(1 << 1)
+#define UINT16	(1 << 2)
+#define UINT32	(1 << 3)
+#define IPV4	(1 << 4)
+#define STRING	(1 << 5)
+#define ARRAY	(1 << 6)
+#define RFC3361	(1 << 7)
+#define RFC3397	(1 << 8)
 
-#define OPT_IPV4R	OPT_IPV4 | OPT_REQUEST
+#define IPV4R	IPV4 | REQUEST
 
 struct dhcp_option {
 	uint8_t option;
@@ -54,80 +54,80 @@ struct dhcp_option {
 };
 
 const struct dhcp_option dhcp_options[] = {
-	{ DHCP_NETMASK,		OPT_IPV4R,	NULL },
-	{ DHCP_TIMEOFFSET,	OPT_UINT32,	"TIMEOFFSET" },
-	{ DHCP_ROUTER,		OPT_IPV4R,	NULL },
-	{ DHCP_TIMESERVER,	OPT_IPV4,	"TIMESERVER" },
-	{ DHCP_NAMESERVER,	OPT_IPV4,	"NAMESERVER" },
-	{ DHCP_DNSSERVER,	OPT_IPV4,	"DNSSERVER" },
-	{ DHCP_LOGSERVER,	OPT_IPV4,	"LOGSERVER" },
-	{ DHCP_COOKIESERVER,	OPT_IPV4,	"COOKIESERVER" },
-	{ DHCP_LPRSERVER,	OPT_IPV4,	"LPRSERVER" },
-	{ DHCP_IMPRESSSERVER,	OPT_IPV4,	"IMPRESSSERVER" },
-	{ DHCP_RESOURCELOCATIONSERVER,	OPT_IPV4,	"RESOURCELOCATIONSERVER" },
-	{ DHCP_HOSTNAME,	OPT_STRING,	"HOSTNAME" },
-	{ DHCP_BOOTFILESIZE,	OPT_UINT16,	"BOOTFILESIZE" },
-	{ DHCP_MERITDUMPFILE,	OPT_STRING,	"MERITDUMPFILE" },
-	{ DHCP_DNSDOMAIN,	OPT_STRING,	"DNSDOMAIN" },
-	{ DHCP_SWAPSERVER,	OPT_IPV4,	"SWAPSERVER" },
-	{ DHCP_ROOTPATH,	OPT_STRING,	"ROOTPATH" },
-	{ DHCP_EXTENSIONSPATH,	OPT_STRING,	"EXTENSIONSPATH" },
+	{ DHCP_NETMASK,			IPV4R,	NULL },
+	{ DHCP_TIMEOFFSET,		UINT32,	"TIMEOFFSET" },
+	{ DHCP_ROUTER,			IPV4R,	NULL },
+	{ DHCP_TIMESERVER,		IPV4,	"TIMESERVER" },
+	{ DHCP_NAMESERVER,		IPV4,	"NAMESERVER" },
+	{ DHCP_DNSSERVER,		IPV4,	"DNSSERVER" },
+	{ DHCP_LOGSERVER,		IPV4,	"LOGSERVER" },
+	{ DHCP_COOKIESERVER,		IPV4,	"COOKIESERVER" },
+	{ DHCP_LPRSERVER,		IPV4,	"LPRSERVER" },
+	{ DHCP_IMPRESSSERVER,		IPV4,	"IMPRESSSERVER" },
+	{ DHCP_RESOURCELOCATIONSERVER,	IPV4,	"RESOURCELOCATIONSERVER" },
+	{ DHCP_HOSTNAME,		STRING,	"HOSTNAME" },
+	{ DHCP_BOOTFILESIZE,		UINT16,	"BOOTFILESIZE" },
+	{ DHCP_MERITDUMPFILE,		STRING,	"MERITDUMPFILE" },
+	{ DHCP_DNSDOMAIN,		STRING,	"DNSDOMAIN" },
+	{ DHCP_SWAPSERVER,		IPV4,	"SWAPSERVER" },
+	{ DHCP_ROOTPATH,		STRING,	"ROOTPATH" },
+	{ DHCP_EXTENSIONSPATH,		STRING,	"EXTENSIONSPATH" },
 
-	{ DHCP_IPFORWARDING,	OPT_UINT8,	"IPFORWARDING" },
-	{ DHCP_NONLOCALSOURCEROUTING,	OPT_UINT8,	"NONLOCALSOURCEROUTING" },
-	{ DHCP_POLICYFILTER,	OPT_IPV4,	"POLICYFILTER" },
-	{ DHCP_MAXDGRAMSIZE,	OPT_UINT16,	"MAXDGRAMSIZE" },
-	{ DHCP_DEFAULTIPTTL,	OPT_UINT16,	"DEFAULTIPTTL" },
-	{ DHCP_PATHMTUAGINGTIMEOUT, OPT_UINT32,	"PATHMTUAGINGTIMEOUT" },
-	{ DHCP_PATHMTUPLATEAUTABLE, OPT_UINT16 | OPT_ARRAY, "PATHMTUPLATEAUTABLE" },
+	{ DHCP_IPFORWARDING,		UINT8,	"IPFORWARDING" },
+	{ DHCP_NONLOCALSOURCEROUTING,	UINT8,	"NONLOCALSOURCEROUTING" },
+	{ DHCP_POLICYFILTER,		IPV4,	"POLICYFILTER" },
+	{ DHCP_MAXDGRAMSIZE,		UINT16,	"MAXDGRAMSIZE" },
+	{ DHCP_DEFAULTIPTTL,		UINT16,	"DEFAULTIPTTL" },
+	{ DHCP_PATHMTUAGINGTIMEOUT,	UINT32,	"PATHMTUAGINGTIMEOUT" },
+	{ DHCP_PATHMTUPLATEAUTABLE, UINT16 | ARRAY, "PATHMTUPLATEAUTABLE" },
 
-	{ DHCP_MTU,		OPT_UINT16,	"MTU" },
-	{ DHCP_ALLSUBNETSLOCAL,	OPT_UINT8,	"ALLSUBNETSLOCAL" },
-	{ DHCP_BROADCAST,	OPT_IPV4R,	NULL },
-	{ DHCP_MASKDISCOVERY,	OPT_UINT8,	"MASKDISCOVERY" },
-	{ DHCP_MASKSUPPLIER,	OPT_UINT8,	"MASKSUPPLIER" },
-	{ DHCP_ROUTERDISCOVERY,	OPT_UINT8,	"ROUTERDISCOVERY" },
-	{ DHCP_ROUTERSOLICITATIONADDR, OPT_UINT8,	"ROUTERSOLICITATIONADDR" },
-	{ DHCP_STATICROUTE,	OPT_IPV4R,	NULL },
+	{ DHCP_MTU,			UINT16,	"MTU" },
+	{ DHCP_ALLSUBNETSLOCAL,		UINT8,	"ALLSUBNETSLOCAL" },
+	{ DHCP_BROADCAST,		IPV4R,	NULL },
+	{ DHCP_MASKDISCOVERY,		UINT8,	"MASKDISCOVERY" },
+	{ DHCP_MASKSUPPLIER,		UINT8,	"MASKSUPPLIER" },
+	{ DHCP_ROUTERDISCOVERY,		UINT8,	"ROUTERDISCOVERY" },
+	{ DHCP_ROUTERSOLICITATIONADDR,	UINT8,	"ROUTERSOLICITATIONADDR" },
+	{ DHCP_STATICROUTE,		IPV4R,	NULL },
 
-	{ DHCP_TRAILERENCAPSULATION, OPT_UINT8,	"TRAILERENCAPSULATION" },
-	{ DHCP_ARPCACHETIMEOUT,	OPT_UINT32,	"ARPCACHETIMEOUT" },
-	{ DHCP_ETHERNETENCAPSULATION, OPT_UINT8,	"ETHERNETENCAPSULATION" },
+	{ DHCP_TRAILERENCAPSULATION,	UINT8,	"TRAILERENCAPSULATION" },
+	{ DHCP_ARPCACHETIMEOUT,		UINT32,	"ARPCACHETIMEOUT" },
+	{ DHCP_ETHERNETENCAPSULATION,	UINT8,	"ETHERNETENCAPSULATION" },
 
-	{ DHCP_TCPDEFAULTTTL,	OPT_UINT8,	"TCPDEFAULTTTL" },
-	{ DHCP_TCPKEEPALIVEINTERVAL,	OPT_UINT32,	"TCPKEEPALIVEINTERVAL" },
-	{ DHCP_TCPKEEPALIVEGARBAGE,	OPT_UINT8,	"TCPKEEPALIVEGARBAGE" },
+	{ DHCP_TCPDEFAULTTTL,		UINT8,	"TCPDEFAULTTTL" },
+	{ DHCP_TCPKEEPALIVEINTERVAL,	UINT32,	"TCPKEEPALIVEINTERVAL" },
+	{ DHCP_TCPKEEPALIVEGARBAGE,	UINT8,	"TCPKEEPALIVEGARBAGE" },
 
-	{ DHCP_NISDOMAIN,	OPT_IPV4,	"NISDOMAIN" },
-	{ DHCP_NISSERVER,	OPT_IPV4,	"NISSERVER" },
-	{ DHCP_NTPSERVER,	OPT_IPV4,	"NTPSERVER" },
-	{ DHCP_VENDORSPECIFICINFO, 0,			"VENDORSPECIFICINFO" },
-	{ DHCP_NETBIOSNAMESERVER,	OPT_IPV4,	"NETBIOSNAMESERVER" },
-	{ DHCP_NETBIOSDGRAMSERVER,	OPT_IPV4,	"NETBIOSDGRAMSERVER" },
-	{ DHCP_NETBIOSNODETYPE,	OPT_UINT8,		"NETBIOSNODETYPE" },
-	{ DHCP_NETBIOSSCOPE,	0,			"NETBIOSSCOPE" },
-	{ DHCP_XFONTSERVER,	OPT_IPV4,		"XFONTSERVER" },
-	{ DHCP_XDISPLAYMANAGER,	OPT_IPV4,		"XDISPLAYMANAGER" },
-	{ DHCP_NISPLUSDOMAIN,	OPT_IPV4,		"NISPLUSDOMAIN" },
-	{ DHCP_NISPLUSSERVER,	OPT_IPV4,		"NISPLUSSERVER" },
-	{ DHCP_MOBILEIPHOMEAGENT,	OPT_IPV4,	"MOBILEIPHOMEAGENT" },
-	{ DHCP_SMTPSERVER,	OPT_IPV4,		"SMTPSERVER" },
-	{ DHCP_POP3SERVER,	OPT_IPV4,		"POP3SERVER" },
-	{ DHCP_NNTPSERVER,	OPT_IPV4,		"NNTPSERVER" },
-	{ DHCP_WWWSERVER,	OPT_IPV4,		"WWWSERVER" },
-	{ DHCP_FINGERSERVER,	OPT_IPV4,		"FINGERSERVER" },
-	{ DHCP_IRCSERVER,	OPT_IPV4,		"IRCSERVER" },
-	{ DHCP_STREETTALKSERVER,	OPT_IPV4,	"STREETTALKSERVER" },
-	{ DHCP_STREETTALKDASERVER,	OPT_IPV4,	"STREETTALKDASERVER" },
+	{ DHCP_NISDOMAIN,		IPV4,	"NISDOMAIN" },
+	{ DHCP_NISSERVER,		IPV4,	"NISSERVER" },
+	{ DHCP_NTPSERVER,		IPV4,	"NTPSERVER" },
+	{ DHCP_VENDORSPECIFICINFO,	0,	"VENDORSPECIFICINFO" },
+	{ DHCP_NETBIOSNAMESERVER,	IPV4,	"NETBIOSNAMESERVER" },
+	{ DHCP_NETBIOSDGRAMSERVER,	IPV4,	"NETBIOSDGRAMSERVER" },
+	{ DHCP_NETBIOSNODETYPE,		UINT8,	"NETBIOSNODETYPE" },
+	{ DHCP_NETBIOSSCOPE,		0,	"NETBIOSSCOPE" },
+	{ DHCP_XFONTSERVER,		IPV4,	"XFONTSERVER" },
+	{ DHCP_XDISPLAYMANAGER,		IPV4,	"XDISPLAYMANAGER" },
+	{ DHCP_NISPLUSDOMAIN,		IPV4,	"NISPLUSDOMAIN" },
+	{ DHCP_NISPLUSSERVER,		IPV4,	"NISPLUSSERVER" },
+	{ DHCP_MOBILEIPHOMEAGENT,	IPV4,	"MOBILEIPHOMEAGENT" },
+	{ DHCP_SMTPSERVER,		IPV4,	"SMTPSERVER" },
+	{ DHCP_POP3SERVER,		IPV4,	"POP3SERVER" },
+	{ DHCP_NNTPSERVER,		IPV4,	"NNTPSERVER" },
+	{ DHCP_WWWSERVER,		IPV4,	"WWWSERVER" },
+	{ DHCP_FINGERSERVER,		IPV4,	"FINGERSERVER" },
+	{ DHCP_IRCSERVER,		IPV4,	"IRCSERVER" },
+	{ DHCP_STREETTALKSERVER,	IPV4,	"STREETTALKSERVER" },
+	{ DHCP_STREETTALKDASERVER,	IPV4,	"STREETTALKDASERVER" },
 
-	{ DHCP_LEASETIME,	OPT_UINT32,	NULL },
-	{ DHCP_SERVERID,	OPT_IPV4,	"SERVERID" },
-	{ DHCP_RENEWALTIME,	OPT_UINT32 | OPT_REQUEST,	NULL },
-	{ DHCP_REBINDTIME,	OPT_UINT32 | OPT_REQUEST,	NULL },
+	{ DHCP_LEASETIME,		UINT32,			NULL },
+	{ DHCP_SERVERID,		IPV4,			"SERVERID" },
+	{ DHCP_RENEWALTIME,		UINT32 | REQUEST,	NULL },
+	{ DHCP_REBINDTIME,		UINT32 | REQUEST,	NULL },
 
-	{ DHCP_MESSAGE,		OPT_STRING,	NULL},
-	{ DHCP_DNSSEARCH,	OPT_STRING | OPT_RFC3397,	"DNSSEARCH" },
-	{ DHCP_SIPSERVER,	OPT_STRING | OPT_RFC3361,	"SIPSERVER" },
+	{ DHCP_MESSAGE,			STRING,			NULL},
+	{ DHCP_DNSSEARCH,		STRING | RFC3397,	"DNSSEARCH" },
+	{ DHCP_SIPSERVER,		STRING | RFC3361,	"SIPSERVER" },
 	{ 0, 0, NULL }
 };
 
@@ -174,16 +174,16 @@ valid_length(uint8_t option, const uint8_t *data, int *type)
 		if (type)
 			*type = dhcp_options[i].type;
 		
-		if (dhcp_options[i].type & OPT_STRING)
+		if (dhcp_options[i].type & STRING)
 			return 0;
 
-		if (dhcp_options[i].type & OPT_UINT32) {
+		if (dhcp_options[i].type & UINT32) {
 			if (l == sizeof(uint32_t))
 				return 0;
 			return -1;
 		}
 
-		if (dhcp_options[i].type & OPT_IPV4)
+		if (dhcp_options[i].type & IPV4)
 			return l % sizeof(uint32_t);
 	}
 
@@ -466,7 +466,7 @@ get_option_string(const struct dhcp_message *dhcp, uint8_t option)
 	if (!p)
 		return NULL;
 
-	if (type & OPT_RFC3397) {
+	if (type & RFC3397) {
 		type = decode_rfc3397(p, NULL);
 		if (!type) {
 			errno = EINVAL;
@@ -477,7 +477,7 @@ get_option_string(const struct dhcp_message *dhcp, uint8_t option)
 		return s;
 	}
 
-	if (type & OPT_RFC3361)
+	if (type & RFC3361)
 		return decode_rfc3361(p);
 
 
@@ -738,7 +738,7 @@ make_message(struct dhcp_message **message,
 		*p++ = 0;
 		for (l = 0; l < sizeof(dhcp_options) / sizeof(dhcp_options[0]); l++) {
 			o = dhcp_options[l].option;
-			if (!(dhcp_options[l].type & OPT_REQUEST) &&
+			if (!(dhcp_options[l].type & REQUEST) &&
 			    !has_reqmask(options->reqmask, o))
 				continue;
 			switch (o) {
@@ -879,7 +879,7 @@ write_options(FILE *f, const struct dhcp_message *dhcp)
 
 		retval += fprintf(f, "%s='", dhcp_options[i].var);
 
-		if (dhcp_options[i].type & OPT_STRING) {
+		if (dhcp_options[i].type & STRING) {
 			s = get_option_string(dhcp, dhcp_options[i].type);
 			if (s) {
 				c = clean_metas(s);
@@ -889,35 +889,51 @@ write_options(FILE *f, const struct dhcp_message *dhcp)
 			} 
 		}
 
-		if (dhcp_options[i].type & OPT_UINT32) {
+		if ((dhcp_options[i].type & IPV4 ||
+				dhcp_options[i].type & ARRAY) &&
+			(p = get_option(dhcp, dhcp_options[i].option)))
+		{
+			u8 = *p++;
+			t = p;
+			e = p + u8;
+			while (p < e) {
+				if (t != p)
+					retval += fprintf(f, " ");
+				if (dhcp_options[i].type & UINT8) {
+					retval += fprintf(f, "%d", *p);
+					p++;
+				} else if (dhcp_options[i].type & UINT16) {
+					memcpy(&u16, p, sizeof(u16));
+					retval += fprintf(f, "%d", *p);
+					p += sizeof(u16);
+				} else if (dhcp_options[i].type & UINT32) {
+					memcpy(&u32, p, sizeof(u32));
+					retval += fprintf(f, "%d", *p);
+					p += sizeof(u32);
+				} else if (dhcp_options[i].type & IPV4) {
+					memcpy(&addr.s_addr, p,
+							sizeof(addr.s_addr));
+					retval += fprintf(f, "%s",
+							inet_ntoa(addr));
+					p += sizeof(addr.s_addr);
+				} else
+					/* Sanity check */
+					p = e;
+			}
+		}
+
+		if (dhcp_options[i].type & UINT32) {
 			if (get_option_uint32(&u32, dhcp,
 						dhcp_options[i].option) == 0)
 				retval += fprintf(f, "%d", u32);
 		}
 
-		if (dhcp_options[i].type & OPT_UINT16) {
+		if (dhcp_options[i].type & UINT16) {
 			if (get_option_uint16(&u16, dhcp,
 						dhcp_options[i].option) == 0)
 				retval += fprintf(f, "%d", u16);
 		}
 
-		if (dhcp_options[i].type & OPT_IPV4) {
-			p = get_option(dhcp, dhcp_options[i].option);
-			if (p) {
-				u8 = *p++;
-				t = p;
-				e = p + u8;
-				while (p < e) {
-					memcpy(&addr.s_addr, p,
-							sizeof(addr.s_addr));
-					if (t != p)
-						retval += fprintf(f, " ");
-					retval += fprintf(f, "%s",
-							inet_ntoa(addr));
-					p += sizeof(addr.s_addr);
-				}
-			}
-		}
 		retval += fprintf(f, "'\n");
 	}
 	return retval;
