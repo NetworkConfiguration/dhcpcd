@@ -163,6 +163,8 @@ valid_length(uint8_t option, const uint8_t *data, int *type)
 {
 	uint8_t l = *data;
 	uint8_t i;
+	size_t sz;
+	int t;
 
 	if (l == 0)
 		return -1;
@@ -171,20 +173,24 @@ valid_length(uint8_t option, const uint8_t *data, int *type)
 		if (dhcp_options[i].option != option)
 			continue;
 		
+		t = dhcp_options[i].type;
 		if (type)
-			*type = dhcp_options[i].type;
+			*type = t;
 		
 		if (dhcp_options[i].type & STRING)
 			return 0;
 
-		if (dhcp_options[i].type & UINT32) {
-			if (l == sizeof(uint32_t))
-				return 0;
-			return -1;
-		}
+		sz = 0;
+		if (t & UINT32 || t & IPV4)
+			sz = sizeof(uint32_t);
+		if (t & UINT16)
+			sz = sizeof(uint16_t);
+		if (t & UINT8)
+			sz = sizeof(uint8_t);
 
-		if (dhcp_options[i].type & IPV4)
-			return l % sizeof(uint32_t);
+		if (t & IPV4 || t & ARRAY)
+			return l % sz;
+		return (l == sz ? 0 : -1);
 	}
 
 	/* unknown option, so let it pass */
@@ -479,7 +485,6 @@ get_option_string(const struct dhcp_message *dhcp, uint8_t option)
 
 	if (type & RFC3361)
 		return decode_rfc3361(p);
-
 
 	l = *p++;
 	s = xmalloc(sizeof(char) * (l + 1));
@@ -880,7 +885,7 @@ write_options(FILE *f, const struct dhcp_message *dhcp)
 		retval += fprintf(f, "%s='", dhcp_options[i].var);
 
 		if (dhcp_options[i].type & STRING) {
-			s = get_option_string(dhcp, dhcp_options[i].type);
+			s = get_option_string(dhcp, dhcp_options[i].option);
 			if (s) {
 				c = clean_metas(s);
 				retval += fprintf(f, "%s", c);
