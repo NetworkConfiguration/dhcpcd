@@ -105,7 +105,7 @@ const struct dhcp_option dhcp_options[] = {
 	{ DHCP_NETBIOSNAMESERVER,	IPV4,	"NETBIOSNAMESERVER" },
 	{ DHCP_NETBIOSDGRAMSERVER,	IPV4,	"NETBIOSDGRAMSERVER" },
 	{ DHCP_NETBIOSNODETYPE,		UINT8,	"NETBIOSNODETYPE" },
-	{ DHCP_NETBIOSSCOPE,		0,	"NETBIOSSCOPE" },
+	{ DHCP_NETBIOSSCOPE,		STRING,	"NETBIOSSCOPE" },
 	{ DHCP_XFONTSERVER,		IPV4,	"XFONTSERVER" },
 	{ DHCP_XDISPLAYMANAGER,		IPV4,	"XDISPLAYMANAGER" },
 	{ DHCP_NISPLUSDOMAIN,		IPV4,	"NISPLUSDOMAIN" },
@@ -883,6 +883,19 @@ write_options(FILE *f, const struct dhcp_message *dhcp)
 			continue;
 
 		retval += fprintf(f, "%s='", dhcp_options[i].var);
+
+		/* Unknown type, so just print escape codes */
+		if (dhcp_options[i].type == 0) {
+			p = get_option(dhcp, dhcp_options[i].option);
+			if (p) {
+				u8 = *p++;
+				e = p + u8;
+				while (p < e) {
+					u8 = *p++;
+					retval += fprintf(f, "\\%03d", u8);
+				}
+			}
+		}
 
 		if (dhcp_options[i].type & STRING) {
 			s = get_option_string(dhcp, dhcp_options[i].option);
