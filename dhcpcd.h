@@ -55,7 +55,6 @@ extern char *dhcpcd_skiproutes;
 #define DHCPCD_ARP		(1 << 0)
 #define DHCPCD_DOMAIN		(1 << 2)
 #define DHCPCD_GATEWAY		(1 << 3)
-#define DHCPCD_MTU		(1 << 4)
 #define DHCPCD_LASTLEASE	(1 << 7)
 #define DHCPCD_INFORM		(1 << 8)
 #define DHCPCD_REQUEST		(1 << 9)
@@ -82,8 +81,6 @@ struct options {
 	time_t timeout;
 	int metric;
 	int options;
-
-	int dohostname;
 	int domscsr;
 
 	struct in_addr request_address;

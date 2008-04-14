@@ -114,8 +114,6 @@ struct interface
 	char leasefile[PATH_MAX];
 	char infofile[PATH_MAX];
 
-	unsigned short initial_mtu;
-	unsigned short mtu;
 	struct in_addr addr;
 	struct in_addr net;
 	struct rt *routes;

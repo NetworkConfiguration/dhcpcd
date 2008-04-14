@@ -115,6 +115,13 @@ restore_conf()
 	mv -f "$1"-pre."${INTERFACE}" "$1"
 }
 
+make_mtu()
+{
+	if [ -n "${MTU}" ]; then
+		ifconfig "${INTERFACE}" mtu "${MTU}"
+	fi
+}
+
 make_nis_conf() {
 	[ -z "${NISDOMAIN}" -a -z "${NISSERVER}" ] && return 0
 	local cf=/etc/yp.conf."${INTERFACE}" prefix= x= pidfile=
@@ -253,6 +260,7 @@ if [ "${state}" = "down" ]; then
 	exit $? 
 fi
 
+make_mtu
 make_resolv_conf
 make_hostname
 make_nis_conf

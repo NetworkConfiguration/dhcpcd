@@ -75,7 +75,6 @@ static const struct option longopts[] = {
 	{"nohostname",  no_argument,        NULL, 'H'},
 	{"clientid",    optional_argument,  NULL, 'I'},
 	{"noipv4ll",    no_argument,        NULL, 'L'},
-	{"nomtu",       no_argument,        NULL, 'M'},
 	{"nontp",       no_argument,        NULL, 'N'},
 	{"nooptions",   no_argument,        NULL, 'O'},
 	{"nodns",       no_argument,        NULL, 'R'},
@@ -138,7 +137,7 @@ read_pid(const char *pidfile)
 static void
 usage(void)
 {
-	printf("usage: "PACKAGE" [-adknpEGHMNORSTY] [-c script] [-h hostname] [-i classID]\n"
+	printf("usage: "PACKAGE" [-adknpEGHNORSTY] [-c script] [-h hostname] [-i classID]\n"
 	       "              [-l leasetime] [-m metric] [-o option] [-r ipaddress]\n"
 	       "              [-s ipaddress] [-t timeout] [-u userclass] [-F none | ptr | both]\n"
 	       "              [-I clientID] <interface>\n");
@@ -185,7 +184,7 @@ main(int argc, char **argv)
 	/* Don't set any optional arguments here so we retain POSIX
 	 * compatibility with getopt */
 	while ((opt = getopt_long(argc, argv, EXTRA_OPTS
-				  "c:dh:i:kl:m:no:pr:s:t:u:xAEF:GHI:LMNORSTY",
+				  "c:dh:i:kl:m:no:pr:s:t:u:xAEF:GHI:LNORSTY",
 				  longopts, &option_index)) != -1)
 	{
 		switch (opt) {
@@ -392,9 +391,6 @@ main(int argc, char **argv)
 			break;
 		case 'L':
 			options->options &= ~DHCPCD_IPV4LL;
-			break;
-		case 'M':
-			options->options &= ~DHCPCD_MTU;
 			break;
 		case 'N':
 			dontp = 0;

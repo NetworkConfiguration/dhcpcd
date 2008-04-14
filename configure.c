@@ -453,7 +453,6 @@ configure(struct interface *iface, const struct dhcp_message *dhcp,
 	  const struct dhcp_lease *lease, const struct options *options,
 	int up)
 {
-	unsigned short mtu;
 	struct in_addr addr;
 	struct in_addr net;
 	struct in_addr brd;
@@ -476,12 +475,6 @@ configure(struct interface *iface, const struct dhcp_message *dhcp,
 
 	/* If we aren't up, then reset the interface as much as we can */
 	if (!up) {
-		/* Restore the original MTU value */
-		if (iface->initial_mtu != iface->mtu) {
-			set_mtu(iface->name, iface->initial_mtu);
-			iface->mtu = iface->initial_mtu;
-		}
-
 		/* If we haven't created an info file, do so now */
 		if (!lease->frominfo) {
 			if (write_info(iface, dhcp, lease, options, 0) == -1)
@@ -509,16 +502,6 @@ configure(struct interface *iface, const struct dhcp_message *dhcp,
 		exec_script(options->script, iface->infofile, "down");
 		return 0;
 	}
-
-	if (options->options & DHCPCD_MTU)
-		if (get_option_uint16(&mtu, dhcp, DHCP_MTU) == 0)
-			if (mtu != iface->mtu && mtu >= MTU_MIN) {
-				if (set_mtu(iface->name, mtu) == 0)
-					iface->mtu = mtu;
-				else
-					logger(LOG_ERR, "set_mtu: %s",
-							strerror(errno));
-			}
 
 	/* This also changes netmask */
 	if (!(options->options & DHCPCD_INFORM) ||

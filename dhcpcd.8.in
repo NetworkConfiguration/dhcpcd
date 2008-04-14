@@ -29,7 +29,7 @@
 .Nd an RFC 2131 compliant DHCP client
 .Sh SYNOPSIS
 .Nm
-.Op Fl dknpAEGHMOLNRSTY
+.Op Fl dknpAEGHOLNRSTY
 .Op Fl c , -script Ar script
 .Op Fl h , -hostname Ar hostname
 .Op Fl i , -classid Ar classid
@@ -275,9 +275,6 @@ Don't request a hostname. If the current hostname is blank, localhost or
 (none) then the hostnam will be looked up in DNS and set to that.
 .It Fl L , -noipv4ll
 Don't use IPv4LL at all.
-.It Fl M , -nomtu
-Don't set the MTU of the
-.Ar interface .
 .It Fl N , -nontp
 Don't touch
 .Pa /etc/ntpd.conf

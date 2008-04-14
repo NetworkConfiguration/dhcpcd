@@ -364,7 +364,6 @@ read_interface(const char *ifname, _unused int metric)
 
 	iface->family = family;
 	iface->arpable = !(ifr.ifr_flags & (IFF_NOARP | IFF_LOOPBACK));
-	iface->mtu = iface->initial_mtu = mtu;
 
 	/* 0 is a valid fd, so init to -1 */
 	iface->fd = -1;
