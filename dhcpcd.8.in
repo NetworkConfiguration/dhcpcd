@@ -284,13 +284,11 @@ Don't request any options beyond what is needed to configure the interface.
 .It Fl R , -nodns
 Don't send DNS information to resolvconf or touch
 .Pa /etc/resolv.conf .
-.It Fl T , -test
-On receipt of discover messages, simply print the contents of the DHCP
-message to the console.
-.Nm
-will not configure the
-.Ar interface ,
-touch any files or restart any services.
+.It Fl T, -test
+On receipt of discover messages we just call @SYSCONFDIR@/dhcpcd.sh with the
+reason of TEST which echo's the DHCP variables found in the message to the
+console. The interface configuration isn't touched and neither are any
+configuration files.
 .It Fl Y , -nonis
 Don't touch
 .Pa /etc/yp.conf
@@ -331,10 +329,6 @@ Linux Socket Filter, or LPF device on Linux based systems.
 Bourne shell script that is run when we configure or deconfigure an interface.
 .It Pa @DBDIR@/dhcpcd.duid
 Text file that holds the DUID used to identify the host.
-.It Pa @DBDIR@/dhcpcd- Ns Ar interface Ns .info
-Bourne shell file that holds the DHCP values used in configuring the interface.
-This path is passed as the first argument to
-.Pa @SYSCONFDIR@/dhcpcd.sh .
 .It Pa @DBDIR@/dhcpcd- Ns Ar interface Ns .lease
 The actual DHCP message send by the server. We use this when reading the last
 lease and use the files mtime as when it was issued.

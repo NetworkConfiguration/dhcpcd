@@ -9,13 +9,13 @@ SRCS+=		${SRC_IF} ${SRC_SOCKET}
 SCRIPT=		dhcpcd.sh
 MAN=		dhcpcd.8
 
-VERSION=	3.3.0-alpha1
-CLEANFILES=	dhcpcd.8
+VERSION=	4.0.0-alpha1
+CLEANFILES=	dhcpcd.sh dhcpcd.8
 
 BINDIR=		${PREFIX}/sbin
 SYSCONFDIR?=	${PREFIX}/etc
 
-.SUFFIXES:	.in
+.SUFFIXES:	.in .sh.in
 
 MK=		mk
 include ${MK}/prog.mk
@@ -27,3 +27,7 @@ LDADD+=		${LIBRT}
 
 .in:
 	${SED} 's:@SYSCONFDIR@:${SYSCONFDIR}:g; s:@DBDIR@:${DBDIR}:g' $< > $@
+
+.sh.in.sh:
+	${SED} 's:@SYSCONFDIR@:${SYSCONFDIR}:g' $< > $@
+

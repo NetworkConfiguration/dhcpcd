@@ -95,6 +95,7 @@ struct if_state {
 	int options;
 	struct interface *interface;
 	struct dhcp_message *dhcp;
+	struct dhcp_message *old_dhcp;
 	struct dhcp_lease lease;
 	time_t start;
 	time_t last_sent;
@@ -139,8 +140,8 @@ get_dhcp_op(uint8_t type)
 	return NULL;
 }
 
-static pid_t
-daemonise(int *pidfd)
+static int
+daemonise(struct if_state *state, const struct options *options)
 {
 	pid_t pid;
 	sigset_t full;
@@ -149,6 +150,10 @@ daemonise(int *pidfd)
 	char **argv;
 	int i;
 #endif
+
+	if (state->options & DHCPCD_DAEMONISED ||
+	    !(options->options & DHCPCD_DAEMONISE))
+		return 0;
 
 	sigfillset(&full);
 	sigprocmask(SIG_SETMASK, &full, &old);
@@ -202,13 +207,21 @@ daemonise(int *pidfd)
 
 	/* Done with the fd now */
 	if (pid != 0) {
-		writepid(*pidfd, pid);
-		close(*pidfd);
-		*pidfd = -1;
+		writepid(*state->pidfd, pid);
+		close(*state->pidfd);
+		*state->pidfd = -1;
 	}
 
 	sigprocmask(SIG_SETMASK, &old, NULL);
-	return pid;
+
+	state->state = STATE_BOUND;
+	if (pid == 0) {
+		state->options |= DHCPCD_DAEMONISED;
+		return 0;
+		}
+	
+	state->options |= DHCPCD_PERSISTENT | DHCPCD_FORKED;
+	return -1;
 }
 
 
@@ -316,7 +329,7 @@ static void
 get_lease(struct dhcp_lease *lease, const struct dhcp_message *dhcp)
 {
 	lease->addr.s_addr = dhcp->yiaddr;
-	if (get_option_addr(&lease->net.s_addr, dhcp, DHCP_NETMASK) == -1)
+	if (get_option_addr(&lease->net.s_addr, dhcp, DHCP_SUBNETMASK) == -1)
 		lease->net.s_addr = get_netmask(dhcp->yiaddr);
 	if (get_option_uint32(&lease->leasetime, dhcp, DHCP_LEASETIME) != 0)
 		lease->leasetime = DEFAULT_LEASETIME;
@@ -372,7 +385,8 @@ get_old_lease(struct if_state *state, const struct options *options)
 
 	/* Ok, lets use this */
 	if (IN_LINKLOCAL(dhcp->yiaddr)) {
-		free(state->dhcp);
+		free(state->old_dhcp);
+		state->old_dhcp = state->dhcp;
 		state->dhcp = dhcp;
 		return 0;
 	}
@@ -399,7 +413,8 @@ get_old_lease(struct if_state *state, const struct options *options)
 		offset = 0;
 	state->timeout = lease->renewaltime - offset;
 	iface->start_uptime = uptime();
-	free(state->dhcp);
+	free(state->old_dhcp);
+	state->old_dhcp = state->dhcp;
 	state->dhcp = dhcp;
 	return 0;
 }
@@ -611,11 +626,14 @@ send_message(struct if_state *state, int type, const struct options *options)
 }
 
 static void
-drop_config(struct if_state *state, const struct options *options)
+drop_config(struct if_state *state, const char *reason, const struct options *options)
 {
-	if (!(state->options & DHCPCD_PERSISTENT))
-		configure(state->interface, state->dhcp,
-			&state->lease, options, 0);
+	configure(state->interface, reason, NULL, state->dhcp,
+		  &state->lease, options, 0);
+	free(state->old_dhcp);
+	state->old_dhcp = NULL;
+	free(state->dhcp);
+	state->dhcp = NULL;
 
 	state->lease.addr.s_addr = 0;
 }
@@ -715,9 +733,11 @@ handle_signal(int sig, struct if_state *state,  const struct options *options)
 	switch (sig) {
 	case SIGINT:
 		logger(LOG_INFO, "received SIGINT, stopping");
+		drop_config(state, "STOP", options);
 		return -1;
 	case SIGTERM:
 		logger(LOG_INFO, "received SIGTERM, stopping");
+		drop_config(state, "STOP", options);
 		return -1;
 
 	case SIGALRM:
@@ -750,13 +770,13 @@ handle_signal(int sig, struct if_state *state,  const struct options *options)
 
 		logger (LOG_INFO, "received SIGHUP, releasing lease");
 		if (!IN_LINKLOCAL(ntohl(lease->addr.s_addr))) {
-				do_socket(state, SOCKET_OPEN);
-				state->xid = (uint32_t)random();
-				send_message(state, DHCP_RELEASE, options);
-				do_socket(state, SOCKET_CLOSED);
-			}
-			unlink(state->interface->infofile);
-			return -1;
+			do_socket(state, SOCKET_OPEN);
+			state->xid = (uint32_t)random();
+			send_message(state, DHCP_RELEASE, options);
+			do_socket(state, SOCKET_CLOSED);
+		}
+		drop_config(state, "RELEASE", options);
+		return -1;
 
 	default:
 		logger (LOG_ERR,
@@ -772,96 +792,80 @@ handle_timeout(struct if_state *state, const struct options *options)
 {
 	struct dhcp_lease *lease = &state->lease;
 	struct interface *iface = state->interface;
+	int gotlease = -1;
+	char *reason = NULL;
 
 	/* No NAK, so reset the backoff */
 	state->nakoff = 1;
 
 	if (state->state == STATE_INIT && state->xid != 0) {
-		if (iface->addr.s_addr != 0 &&
-		    !IN_LINKLOCAL(ntohl(iface->addr.s_addr)) &&
-		    !(state->options & DHCPCD_INFORM))
-		{
-			logger(LOG_ERR, "lost lease");
-			if (!(state->options & DHCPCD_PERSISTENT))
-				drop_config(state, options);
-		} else if (!IN_LINKLOCAL(ntohl(iface->addr.s_addr)))
-			logger(LOG_ERR, "timed out");
+		if (!IN_LINKLOCAL(ntohl(iface->addr.s_addr))) {
+			if (iface->addr.s_addr != 0 &&
+			    !(state->options & DHCPCD_INFORM))
+				logger(LOG_ERR, "lost lease");
+			else
+				logger(LOG_ERR, "timed out");
+		}
 
 		do_socket(state, SOCKET_CLOSED);
 
 		if (options->options & DHCPCD_INFORM)
 			return -1;
 
-		if (!(state->options & DHCPCD_TEST) &&
-		    (state->options & DHCPCD_IPV4LL ||
-		     state->options & DHCPCD_LASTLEASE))
+		if (state->options & DHCPCD_IPV4LL ||
+		    state->options & DHCPCD_LASTLEASE)
 		{
 			errno = 0;
-			if (get_old_lease(state, options) != 0) {
-				if (errno == EINTR)
-					return 0;
-				if (state->options & DHCPCD_LASTLEASE)
-					return -1;
+			gotlease = get_old_lease(state, options);
+			if (gotlease == 0) {
+				if (!(state->options & DHCPCD_DAEMONISED))
+					reason = "REBOOT";
 			} else if (errno == EINTR)
 				return 0;
 		}
 
 #ifdef ENABLE_IPV4LL
-		if (!(state->options & DHCPCD_TEST) &&
-		    state->options & DHCPCD_IPV4LL &&
-		    (!lease->addr.s_addr ||
-		     (!IN_LINKLOCAL(ntohl(lease->addr.s_addr)) &&
-		      !(state->options & DHCPCD_LASTLEASE))))
-		{
+		if (state->options & DHCPCD_IPV4LL && gotlease != -1) {
 			logger(LOG_INFO, "probing for an IPV4LL address");
-			if (ipv4ll_get_address(iface, lease) == -1) {
-				if (!(state->options & DHCPCD_DAEMONISED))
-					return -1;
-
-				/* start over */
-				state->xid = 0;
-				return 0;
-			}
-			state->timeout = lease->renewaltime;
-			if (!state->dhcp)
+			errno = 0;
+			gotlease = ipv4ll_get_address(iface, lease);
+			if (gotlease != 0) {
+				if (errno == EINTR)
+					return 0;
+			} else {
+				free(state->old_dhcp);
+				state->old_dhcp = state->dhcp;
 				state->dhcp = xmalloc(sizeof(*state->dhcp));
-			memset(state->dhcp, 0, sizeof(*state->dhcp));
-			state->dhcp->yiaddr = lease->addr.s_addr;
-			state->dhcp->options[0] = DHCP_END;
+				memset(state->dhcp, 0, sizeof(*state->dhcp));
+				state->dhcp->yiaddr = lease->addr.s_addr;
+				state->dhcp->options[0] = DHCP_END;
+				reason = "IPV4LL";
+			}
 		}
 #endif
 
-		if (lease->addr.s_addr) {
-			if (!(state->options & DHCPCD_DAEMONISED) &&
-			    IN_LINKLOCAL(ntohl(lease->addr.s_addr)))
-				logger(LOG_WARNING, "using IPV4LL address %s",
-				       inet_ntoa(lease->addr));
-			if (configure(iface, state->dhcp, lease, options, 1) != 0 &&
-			    !(state->options & DHCPCD_DAEMONISED))
-				return -1;
-
-			state->state = STATE_BOUND;
-			if (!(state->options & DHCPCD_DAEMONISED) &&
-					options->options & DHCPCD_DAEMONISE) {
-				switch (daemonise(state->pidfd)) {
-				case -1:
-					return -1;
-				case 0:
-					state->options |= DHCPCD_DAEMONISED;
-					return 0;
-				default:
-					state->options |= DHCPCD_PERSISTENT | DHCPCD_FORKED;
-					return -1;
-				}
-			}
-
-			state->timeout = lease->renewaltime;
-			state->xid = 0;
-			return 0;
+		if (gotlease != 0) {
+			if (state->dhcp && !IN_LINKLOCAL(state->dhcp->yiaddr))
+				reason = "EXPIRE";
+			if (!reason)
+				reason = "FAIL";
+			drop_config(state, reason, options);
+			if (!(state->options & DHCPCD_DAEMONISED))
+			    return -1;
 		}
-
-		if (!(state->options & DHCPCD_DAEMONISED))
-			return -1;
+		if (!(state->options & DHCPCD_DAEMONISED) &&
+		    IN_LINKLOCAL(ntohl(lease->addr.s_addr)))
+			logger(LOG_WARNING, "using IPV4LL address %s",
+			       inet_ntoa(lease->addr));
+		if (!reason)
+			reason = "TIMEOUT";
+		if (configure(iface, reason,
+			      state->dhcp, state->old_dhcp,
+			      lease, options, 1) == 0)
+			daemonise(state, options);
+		state->timeout = lease->renewaltime;
+		state->xid = 0;
+		return 0;
 	}
 
 	switch (state->state) {
@@ -942,6 +946,7 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp, const struct op
 	uint8_t type;
 	struct timeval tv;
 	int r;
+	const char *reason = NULL;
 
 	if (get_option_uint8(&type, dhcp, DHCP_MESSAGETYPE) == -1) {
 		logger(LOG_ERR, "no DHCP type in message");
@@ -991,9 +996,9 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp, const struct op
 			logger(LOG_INFO, "offered %s", addr);
 		free(addr);
 
-		if (options->options & DHCPCD_TEST) {
-			write_info(iface, dhcp, lease, options, 0);
-			errno = 0;
+		if (state->options & DHCPCD_TEST) {
+			exec_script(options->script, iface->name,
+				    "TEST", dhcp, NULL);
 			return -1;
 		}
 
@@ -1061,11 +1066,11 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp, const struct op
 	}
 #endif
 
-	if (state->dhcp)
-		free(state->dhcp);
+	free(state->old_dhcp);
+	state->old_dhcp = state->dhcp;
 	state->dhcp = dhcp;
 	*dhcpp = NULL;
-		
+
 	if (options->options & DHCPCD_INFORM) {
 		if (options->request_address.s_addr != 0)
 			lease->addr.s_addr = options->request_address.s_addr;
@@ -1078,6 +1083,7 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp, const struct op
 		if (state->timeout == 0)
 			state->timeout = DEFAULT_LEASETIME;
 		state->state = STATE_INIT;
+		reason = "INFORM";
 	} else {
 		if (gettimeofday(&tv, NULL) == 0)
 			lease->leasedfrom = tv.tv_sec;
@@ -1135,25 +1141,21 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp, const struct op
 	}
 
 	state->xid = 0;
-	if (configure(iface, dhcp, &state->lease, options, 1) != 0)
+	if (!reason) {
+		if (state->old_dhcp) {
+			if (state->old_dhcp->yiaddr == dhcp->yiaddr &&
+			    lease->server.s_addr)
+				reason = "RENEW";
+			else
+				reason = "REBIND";
+		} else
+			reason = "BOUND";
+	}	
+	r = configure(iface, reason, dhcp, state->old_dhcp,
+		      &state->lease, options, 1);
+	if (r != 0)
 		return -1;
-
-	if (!(state->options & DHCPCD_DAEMONISED) &&
-	    state->options & DHCPCD_DAEMONISE)
-	{
-		switch (daemonise(state->pidfd)) {
-		case 0:
-			state->options |= DHCPCD_DAEMONISED;
-			return 0;
-		case -1:
-			return -1;
-		default:
-			state->options |= DHCPCD_PERSISTENT | DHCPCD_FORKED;
-			return -1;
-		}
-	}
-
-	return 0;
+	return daemonise(state, options);
 }
 
 static int
@@ -1261,7 +1263,6 @@ dhcp_run(const struct options *options, int *pidfd)
 eexit:
 	if (iface) {
 		do_socket(state, SOCKET_CLOSED);
-		drop_config(state, options);
 		free_routes(iface->routes);
 		free(iface->clientid);
 		free(iface);
@@ -1274,6 +1275,7 @@ eexit:
 			unlink(options->pidfile);
 		free(state->buffer);
 		free(state->dhcp);
+		free(state->old_dhcp);
 		free(state);
 	}
 

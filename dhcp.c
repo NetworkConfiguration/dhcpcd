@@ -39,12 +39,16 @@
 #define REQUEST	(1 << 0)
 #define UINT8	(1 << 1)
 #define UINT16	(1 << 2)
-#define UINT32	(1 << 3)
-#define IPV4	(1 << 4)
-#define STRING	(1 << 5)
-#define ARRAY	(1 << 6)
-#define RFC3361	(1 << 7)
-#define RFC3397	(1 << 8)
+#define SINT16	(1 << 3)
+#define UINT32	(1 << 4)
+#define SINT32	(1 << 5)
+#define IPV4	(1 << 6)
+#define STRING	(1 << 7)
+#define PAIR	(1 << 8)
+#define ARRAY	(1 << 9)
+#define RFC3361	(1 << 10)
+#define RFC3397	(1 << 11)
+#define RFC3442 (1 << 12)
 
 #define IPV4R	IPV4 | REQUEST
 
@@ -55,80 +59,93 @@ struct dhcp_option {
 };
 
 const struct dhcp_option dhcp_options[] = {
-	{ DHCP_NETMASK,			IPV4R,	NULL },
-	{ DHCP_TIMEOFFSET,		UINT32,	"TIMEOFFSET" },
-	{ DHCP_ROUTER,			IPV4R,	NULL },
-	{ DHCP_TIMESERVER,		IPV4,	"TIMESERVER" },
-	{ DHCP_NAMESERVER,		IPV4,	"NAMESERVER" },
-	{ DHCP_DNSSERVER,		IPV4,	"DNSSERVER" },
-	{ DHCP_LOGSERVER,		IPV4,	"LOGSERVER" },
-	{ DHCP_COOKIESERVER,		IPV4,	"COOKIESERVER" },
-	{ DHCP_LPRSERVER,		IPV4,	"LPRSERVER" },
-	{ DHCP_IMPRESSSERVER,		IPV4,	"IMPRESSSERVER" },
-	{ DHCP_RESOURCELOCATIONSERVER,	IPV4,	"RESOURCELOCATIONSERVER" },
-	{ DHCP_HOSTNAME,		STRING,	"HOSTNAME" },
-	{ DHCP_BOOTFILESIZE,		UINT16,	"BOOTFILESIZE" },
-	{ DHCP_MERITDUMPFILE,		STRING,	"MERITDUMPFILE" },
-	{ DHCP_DNSDOMAIN,		STRING,	"DNSDOMAIN" },
-	{ DHCP_SWAPSERVER,		IPV4,	"SWAPSERVER" },
-	{ DHCP_ROOTPATH,		STRING,	"ROOTPATH" },
-	{ DHCP_EXTENSIONSPATH,		STRING,	"EXTENSIONSPATH" },
-
-	{ DHCP_IPFORWARDING,		UINT8,	"IPFORWARDING" },
-	{ DHCP_NONLOCALSOURCEROUTING,	UINT8,	"NONLOCALSOURCEROUTING" },
-	{ DHCP_POLICYFILTER,		IPV4,	"POLICYFILTER" },
-	{ DHCP_MAXDGRAMSIZE,		UINT16,	"MAXDGRAMSIZE" },
-	{ DHCP_DEFAULTIPTTL,		UINT16,	"DEFAULTIPTTL" },
-	{ DHCP_PATHMTUAGINGTIMEOUT,	UINT32,	"PATHMTUAGINGTIMEOUT" },
-	{ DHCP_PATHMTUPLATEAUTABLE, UINT16 | ARRAY, "PATHMTUPLATEAUTABLE" },
-
-	{ DHCP_MTU,			UINT16,	"MTU" },
-	{ DHCP_ALLSUBNETSLOCAL,		UINT8,	"ALLSUBNETSLOCAL" },
-	{ DHCP_BROADCAST,		IPV4R,	NULL },
-	{ DHCP_MASKDISCOVERY,		UINT8,	"MASKDISCOVERY" },
-	{ DHCP_MASKSUPPLIER,		UINT8,	"MASKSUPPLIER" },
-	{ DHCP_ROUTERDISCOVERY,		UINT8,	"ROUTERDISCOVERY" },
-	{ DHCP_ROUTERSOLICITATIONADDR,	UINT8,	"ROUTERSOLICITATIONADDR" },
-	{ DHCP_STATICROUTE,		IPV4R,	NULL },
-
-	{ DHCP_TRAILERENCAPSULATION,	UINT8,	"TRAILERENCAPSULATION" },
-	{ DHCP_ARPCACHETIMEOUT,		UINT32,	"ARPCACHETIMEOUT" },
-	{ DHCP_ETHERNETENCAPSULATION,	UINT8,	"ETHERNETENCAPSULATION" },
-
-	{ DHCP_TCPDEFAULTTTL,		UINT8,	"TCPDEFAULTTTL" },
-	{ DHCP_TCPKEEPALIVEINTERVAL,	UINT32,	"TCPKEEPALIVEINTERVAL" },
-	{ DHCP_TCPKEEPALIVEGARBAGE,	UINT8,	"TCPKEEPALIVEGARBAGE" },
-
-	{ DHCP_NISDOMAIN,		IPV4,	"NISDOMAIN" },
-	{ DHCP_NISSERVER,		IPV4,	"NISSERVER" },
-	{ DHCP_NTPSERVER,		IPV4,	"NTPSERVER" },
-	{ DHCP_VENDORSPECIFICINFO,	STRING,	"VENDORSPECIFICINFO" },
-	{ DHCP_NETBIOSNAMESERVER,	IPV4,	"NETBIOSNAMESERVER" },
-	{ DHCP_NETBIOSDGRAMSERVER,	IPV4,	"NETBIOSDGRAMSERVER" },
-	{ DHCP_NETBIOSNODETYPE,		UINT8,	"NETBIOSNODETYPE" },
-	{ DHCP_NETBIOSSCOPE,		STRING,	"NETBIOSSCOPE" },
-	{ DHCP_XFONTSERVER,		IPV4,	"XFONTSERVER" },
-	{ DHCP_XDISPLAYMANAGER,		IPV4,	"XDISPLAYMANAGER" },
-	{ DHCP_NISPLUSDOMAIN,		IPV4,	"NISPLUSDOMAIN" },
-	{ DHCP_NISPLUSSERVER,		IPV4,	"NISPLUSSERVER" },
-	{ DHCP_MOBILEIPHOMEAGENT,	IPV4,	"MOBILEIPHOMEAGENT" },
-	{ DHCP_SMTPSERVER,		IPV4,	"SMTPSERVER" },
-	{ DHCP_POP3SERVER,		IPV4,	"POP3SERVER" },
-	{ DHCP_NNTPSERVER,		IPV4,	"NNTPSERVER" },
-	{ DHCP_WWWSERVER,		IPV4,	"WWWSERVER" },
-	{ DHCP_FINGERSERVER,		IPV4,	"FINGERSERVER" },
-	{ DHCP_IRCSERVER,		IPV4,	"IRCSERVER" },
-	{ DHCP_STREETTALKSERVER,	IPV4,	"STREETTALKSERVER" },
-	{ DHCP_STREETTALKDASERVER,	IPV4,	"STREETTALKDASERVER" },
-
-	{ DHCP_LEASETIME,		UINT32,			NULL },
-	{ DHCP_SERVERID,		IPV4,			"SERVERID" },
-	{ DHCP_RENEWALTIME,		UINT32 | REQUEST,	NULL },
-	{ DHCP_REBINDTIME,		UINT32 | REQUEST,	NULL },
-
-	{ DHCP_MESSAGE,			STRING,			NULL},
-	{ DHCP_DNSSEARCH,		STRING | RFC3397,	"DNSSEARCH" },
-	{ DHCP_SIPSERVER,		STRING | RFC3361,	"SIPSERVER" },
+	{ 1,	IPV4 | REQUEST,	"subnet_mask" },
+	{ 2,	UINT32,		"time_offset" },
+	{ 3,	IPV4 | ARRAY | REQUEST,	"routers" },
+	{ 4,	IPV4 | ARRAY,	"time_servers" },
+	{ 5,	IPV4 | ARRAY,	"ien116_name_servers" },
+	{ 6,	IPV4 | ARRAY,	"domain_name_servers" },
+	{ 7,	IPV4 | ARRAY,	"log_servers" },
+	{ 8,	IPV4 | ARRAY,	"cookie_servers" },
+	{ 9, 	IPV4 | ARRAY,	"lpr_servers" },
+	{ 10,	IPV4 | ARRAY,	"impress_servers" },
+	{ 11,	IPV4 | ARRAY,	"resource_location_servers" },
+	{ 12,	STRING,		"host_name" },
+	{ 13,	UINT16,		"boot_size" },
+	{ 14,	STRING,		"merit_dump" },
+	{ 15,	STRING,		"domain_name" },
+	{ 16,	IPV4,		"swap_server" },
+	{ 17,	STRING,		"root_path" },
+	{ 18,	STRING,		"extensions_path" },
+	{ 19,	UINT8,		"ip_forwarding" },
+	{ 20,	UINT8,		"non_local_source_routing" },
+	{ 21,	IPV4 | ARRAY,	"policy_filter" },
+	{ 22,	SINT16,		"max_dgram_reassembly" },
+	{ 23,	UINT16,		"default_ip_ttl" },
+	{ 24,	UINT32,		"path_mtu_aging_timeout" },
+	{ 25,	UINT16 | ARRAY,	"path_mtu_plateau_table" },
+	{ 26,	UINT16,		"interface_mtu" },
+	{ 27,	UINT8,		"all_subnets_local" },
+	{ 28,	IPV4 | REQUEST,	"broadcast_address" },
+	{ 29,	UINT8,		"perform_mask_discovery" },
+	{ 30,	UINT8,		"mask_supplier" },
+	{ 31,	UINT8,		"router_discovery" },
+	{ 32,	IPV4,		"router_solicitation_address" },
+	{ 33,	IPV4 | ARRAY | REQUEST,	"static_routes" },
+	{ 34,	UINT8,		"trailer_encapsulation" },
+	{ 35, 	UINT32,		"arp_cache_timeout" },
+	{ 36,	UINT16,		"ieee802_3_encapsulation" },
+	{ 37,	UINT8,		"default_tcp_ttl" },
+	{ 38,	UINT32,		"tcp_keepalive_interval" },
+	{ 39,	UINT8,		"tcp_keepalive_garbage" },
+	{ 30,	STRING,		"nis_domain" },
+	{ 31,	IPV4 | ARRAY,	"nis_servers" },
+	{ 32,	IPV4 | ARRAY,	"ntp_servers" },
+	{ 43,	STRING,		"vendor_encapsulated_options" },
+	{ 44,	IPV4 | ARRAY,	"netbios_name_servers" },
+	{ 45,	IPV4,		"netbios_dd_server" },
+	{ 46,	UINT8,		"netbios_node_type" },
+	{ 47,	STRING,		"netbios_scope" },
+	{ 48,	IPV4 | ARRAY,	"font_servers" },
+	{ 49,	IPV4 | ARRAY,	"x_display_manager" },
+	{ 50, 	IPV4,		"dhcp_requested_address" },
+	{ 51,	UINT32 | REQUEST,	"dhcp_lease_time" },
+	{ 52,	UINT8,		"dhcp_option_overload" },
+	{ 53,	UINT8,		"dhcp_message_type" },
+	{ 54,	IPV4,		"dhcp_server_identifier" },
+	{ 55,	UINT8 | ARRAY,	"dhcp_parameter_request_list" },
+	{ 56,	STRING,		"dhcp_message" },
+	{ 57,	UINT16,		"dhcp_max_message_size" },
+	{ 58,	UINT32 | REQUEST,	"dhcp_renewal_time" },
+	{ 59,	UINT32 | REQUEST,	"dhcp_rebinding_time" },
+	{ 64,	STRING,		"nisplus_domain" },
+	{ 65,	IPV4 | ARRAY,	"nisplus_servers" },
+	{ 66,	STRING,		"tftp_server_name" },
+	{ 67,	STRING,		"bootfile_name" },
+	{ 68,	IPV4 | ARRAY,	"mobile_ip_home_agent" },
+	{ 69,	IPV4 | ARRAY,	"smtp_server" },
+	{ 70,	IPV4 | ARRAY,	"pop_server" },
+	{ 71,	IPV4 | ARRAY,	"nntp_server" },
+	{ 72,	IPV4 | ARRAY,	"www_server" },
+	{ 73,	IPV4 | ARRAY,	"finger_server" },
+	{ 74,	IPV4 | ARRAY,	"irc_server" },
+	{ 75,	IPV4 | ARRAY,	"streettalk_server" },
+	{ 76,	IPV4 | ARRAY,	"streettalk_directory_assistance_server" },
+	{ 77,	STRING,		"user_class" },
+	{ 85,	IPV4 | ARRAY,	"nds_servers" },
+	{ 86,	STRING,		"nds_tree_name" },
+	{ 87,	STRING,		"nds_context" },
+	{ 88,	STRING | RFC3397,	"bcms_controller_names" },
+	{ 89,	IPV4 | ARRAY,	"bcms_controller_address" },
+	{ 91,	UINT32,		"client_last_transaction_time" },
+	{ 92,	IPV4 | ARRAY,	"associated_ip" },
+	{ 98,	STRING,		"uap_servers" },
+	{ 112,	IPV4 | ARRAY,	"netinfo_server_address" },
+	{ 113,	STRING,		"netinfo_server_tag" },
+	{ 114,	STRING,		"default_url" },
+	{ 118,	IPV4,		"subnet_selection" },
+	{ 119,	STRING | RFC3397,	"domain_search" },
+	{ 121,  RFC3442,	"classless_static_routes" },
 	{ 0, 0, NULL }
 };
 
@@ -693,7 +710,7 @@ make_message(struct dhcp_message **message,
 			lease->addr.s_addr != iface->addr.s_addr &&
 			!IN_LINKLOCAL(ntohl(lease->addr.s_addr)))
 		{
-			PUTADDR(DHCP_ADDRESS, lease->addr);
+			PUTADDR(DHCP_IPADDRESS, lease->addr);
 			if (lease->server.s_addr)
 				PUTADDR(DHCP_SERVERID, lease->server);
 		}
@@ -832,19 +849,29 @@ read_lease(const struct interface *iface)
 }
 
 ssize_t
-write_string(FILE *f, const uint8_t *data, ssize_t len)
+print_string(char *s, const uint8_t *data, ssize_t len)
 {
 	uint8_t c;
 	const uint8_t *e;
 	ssize_t bytes = 0;
+	ssize_t r;
 
-	if (!len)
-		len = *data++;
-	e = data + len;
+	c = *data++;
+	e = data + c;
 	while (data < e) {
 		c = *data++;
 		if (!isascii(c) || !isprint(c)) {
-			bytes += fprintf(f, "\\%03o", c);
+			if (s) {
+				if (len < 5) {
+					errno = ENOBUFS;
+					return -1;
+				}
+				r = snprintf(s, len, "\\%03o", c);
+				len -= r;
+				bytes += r;
+				s += r;
+			} else
+				bytes += 4;
 			continue;
 		}
 		switch (c) {
@@ -853,88 +880,184 @@ write_string(FILE *f, const uint8_t *data, ssize_t len)
 			case '$':  /* FALLTHROUGH */
 			case '`':  /* FALLTHROUGH */
 			case '\\': /* FALLTHROUGH */
-			case ' ':  /* FALLTHROUGH */	
-				if (fputc('\\', f))
-					bytes++;
+				if (s) {
+					if (len < 3) {
+						errno = ENOBUFS;
+						return -1;
+					}
+					*s++ = '\\';
+					len--;
+				}
+				bytes++;
+				break;
 		}
-		if (fputc(c, f))
-			bytes++;
+		if (s) {
+			*s++ = c;
+			len--;
+		}
+		bytes++;
 	}
+
+	/* NULL */
+	if (s)
+		*s = '\0';
+	bytes++;
 	return bytes;
 }
 
-ssize_t
-write_options(FILE *f, const struct dhcp_message *dhcp)
+static ssize_t
+print_option(char *s, int type, const uint8_t *data, ssize_t len)
 {
-	uint8_t i;
+	const uint8_t *e, *t;
+	uint8_t u8;
+	uint16_t u16;
+	int16_t s16;
+	uint32_t u32;
+	int32_t s32;
+	struct in_addr addr;
+	ssize_t bytes = 0;
+	ssize_t l;
+
+	if (!type || type & STRING)
+		return print_string(s, data, len);
+
+	if (!s) {
+		if (type & UINT8)
+			l = 3;
+		else if (type & UINT16)
+			l = 5;
+		else if (type & SINT16)
+			l = 6;
+		else if (type & UINT32)
+			l = 10;
+		else if (type & SINT32)
+			l = 11;
+		else if (type & IPV4)
+			l = 16;
+		else {
+			errno = EINVAL;
+			return -1;
+		}
+		return (l + 1) * *data;
+	}
+
+	l = *data++;
+	t = data;
+	e = data + l;
+	while (data < e) {
+		if (data != t) {
+			*s++ = ' ';
+			bytes++;
+			len--;
+		}
+		if (type & UINT8) {
+			l = snprintf(s, len, "%d", *data);
+			data++;
+		} else if (type & UINT16) {
+			memcpy(&u16, data, sizeof(u16));
+			u16 = ntohs(u16);
+			l = snprintf(s, len, "%d", u16);
+			data += sizeof(u16);
+		} else if (type & SINT16) {
+			memcpy(&s16, data, sizeof(s16));
+			s16 = ntohs(s16);
+			l = snprintf(s, len, "%d", s16);
+			data += sizeof(s16);
+		} else if (type & UINT32) {
+			memcpy(&u32, data, sizeof(u32));
+			u32 = ntohl(u32);
+			l = snprintf(s, len, "%d", u32);
+			data += sizeof(u32);
+		} else if (type & SINT32) {
+			memcpy(&s32, data, sizeof(s32));
+			s32 = ntohl(s32);
+			l = snprintf(s, len, "%d", s32);
+			data += sizeof(s32);
+		} else if (type & IPV4) {
+			memcpy(&addr.s_addr, data, sizeof(addr.s_addr));
+			l = snprintf(s, len, "%s", inet_ntoa(addr));
+			data += sizeof(addr.s_addr);
+		}
+		len -= l;
+		bytes += l;
+		s += l;
+	}
+
+	return bytes;
+}
+
+static int
+_setenv(const char *prefix, const char *var, const char *value)
+{
+	size_t len = strlen(prefix) + strlen(var) + 3;
+	char *name = xmalloc(len);
+	int r;
+
+	snprintf(name, len, "%s_%s", prefix, var);
+	if (value)
+		r = setenv(name, value, 1);
+	else
+		r = unsetenv(name);
+	free(name);
+	return r;
+}
+
+int
+configure_env(const char *prefix, const struct dhcp_message *dhcp)
+{
+	int i;
 	const uint8_t *p, *e, *t;
 	uint32_t u32;
 	uint16_t u16;
 	uint8_t u8;
 	struct in_addr addr;
-	ssize_t retval = 0;
+	struct in_addr net;
+	struct in_addr brd;
+	char *val;
+	const struct dhcp_option *opt;
+	ssize_t len;
+	char cidr[4];
+
+	if (dhcp->yiaddr) {
+		/* Set some useful variables that we drive from the DHCP
+		 * message but are not necessarily in the options */
+		addr.s_addr = dhcp->yiaddr;
+		_setenv(prefix, "ip_address", inet_ntoa(addr));
+		if (get_option_addr(&net.s_addr, dhcp, DHCP_SUBNETMASK) == -1) {
+			net.s_addr = get_netmask(addr.s_addr);
+			_setenv(prefix, "subnet_mask", inet_ntoa(net));
+		}
+		i = inet_ntocidr(net);
+		snprintf(cidr, sizeof(cidr), "%d", inet_ntocidr(net));
+		_setenv(prefix, "subnet_cidr", cidr);
+		if (get_option_addr(&brd.s_addr, dhcp, DHCP_BROADCAST) == -1) {
+			brd.s_addr = addr.s_addr | ~net.s_addr;
+			_setenv(prefix, "broadcast_address", inet_ntoa(net));
+		}
+		addr.s_addr = dhcp->yiaddr & net.s_addr;
+		_setenv(prefix, "network_address", inet_ntoa(addr));
+
+	} else {
+		_setenv(prefix, "ip_address", NULL);
+		_setenv(prefix, "subnet_cidr", NULL);
+		_setenv(prefix, "network_address", NULL);
+	}
 
 	for (i = 0; i < sizeof(dhcp_options) / sizeof(dhcp_options[0]); i++) {
-		if (!dhcp_options[i].var)
+		opt = &dhcp_options[i];
+		if (!opt->var)
 			continue;
-
-		retval += fprintf(f, "%s=", dhcp_options[i].var);
-
-		/* Unknown type, so just print escape codes */
-		if (dhcp_options[i].type == STRING) {
-			p = get_option(dhcp, dhcp_options[i].option);
-			if (p)
-				retval += write_string(f, p, 0);
+		val = NULL;
+		p = get_option(dhcp, opt->option);
+		if (p) {
+			len = print_option(NULL, opt->type, p, 0);
+			if (len < 0)
+				return -1;
+			val = xmalloc(len);
+			print_option(val, opt->type, p, len);
 		}
-
-		if ((dhcp_options[i].type & IPV4 ||
-				dhcp_options[i].type & ARRAY) &&
-			(p = get_option(dhcp, dhcp_options[i].option)))
-		{
-			u8 = *p++;
-			t = p;
-			e = p + u8;
-			while (p < e) {
-				if (p != t)
-					retval += fprintf(f, "\\ ");
-				if (dhcp_options[i].type & UINT8) {
-					retval += fprintf(f, "%d", *p);
-					p++;
-				} else if (dhcp_options[i].type & UINT16) {
-					memcpy(&u16, p, sizeof(u16));
-					u16 = ntohs(u16);
-					retval += fprintf(f, "%d", *p);
-					p += sizeof(u16);
-				} else if (dhcp_options[i].type & UINT32) {
-					memcpy(&u32, p, sizeof(u32));
-					u32 = ntohl(u32);
-					retval += fprintf(f, "%d", *p);
-					p += sizeof(u32);
-				} else if (dhcp_options[i].type & IPV4) {
-					memcpy(&addr.s_addr, p,
-							sizeof(addr.s_addr));
-					retval += fprintf(f, "%s",
-							inet_ntoa(addr));
-					p += sizeof(addr.s_addr);
-				} else
-					/* Sanity check */
-					p = e;
-			}
-		}
-
-		if (dhcp_options[i].type & UINT32) {
-			if (get_option_uint32(&u32, dhcp,
-						dhcp_options[i].option) == 0)
-				retval += fprintf(f, "%d", u32);
-		}
-
-		if (dhcp_options[i].type & UINT16) {
-			if (get_option_uint16(&u16, dhcp,
-						dhcp_options[i].option) == 0)
-				retval += fprintf(f, "%d", u16);
-		}
-
-		retval += fprintf(f, "\n");
+		_setenv(prefix, opt->var, val);
+		free(val);
 	}
-	return retval;
+	return 0;
 }

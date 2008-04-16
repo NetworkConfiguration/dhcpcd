@@ -64,7 +64,6 @@
 # define DBDIR			"/var/db"
 #endif
 #define LEASEFILE		DBDIR "/" PACKAGE "-%s.lease"
-#define INFOFILE		DBDIR "/" PACKAGE "-%s.info"
 #define DUIDFILE		DBDIR "/" PACKAGE ".duid"
 
 #endif

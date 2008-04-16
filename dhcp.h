@@ -65,56 +65,17 @@
 enum DHCP_OPTIONS
 {
 	DHCP_PAD                    = 0,
-	DHCP_NETMASK                = 1,
-	DHCP_TIMEOFFSET             = 2,
+	DHCP_SUBNETMASK             = 1,
 	DHCP_ROUTER                 = 3,
-	DHCP_TIMESERVER             = 4,
-	DHCP_NAMESERVER             = 5,
 	DHCP_DNSSERVER              = 6,
-	DHCP_LOGSERVER              = 7,
-	DHCP_COOKIESERVER           = 8,
-	DHCP_LPRSERVER              = 9,
-	DHCP_IMPRESSSERVER          = 10,
-	DHCP_RESOURCELOCATIONSERVER = 11,
 	DHCP_HOSTNAME               = 12,
-	DHCP_BOOTFILESIZE           = 13,
-	DHCP_MERITDUMPFILE          = 14,
 	DHCP_DNSDOMAIN              = 15,
-	DHCP_SWAPSERVER             = 16,
-	DHCP_ROOTPATH               = 17,
-	DHCP_EXTENSIONSPATH         = 18,
-	DHCP_IPFORWARDING           = 19,
-	DHCP_NONLOCALSOURCEROUTING  = 20,
-	DHCP_POLICYFILTER           = 21,
-	DHCP_MAXDGRAMSIZE           = 22,
-	DHCP_DEFAULTIPTTL           = 23,
-	DHCP_PATHMTUAGINGTIMEOUT    = 24,
-	DHCP_PATHMTUPLATEAUTABLE    = 25,
-	DHCP_MTU                    = 26,
-	DHCP_ALLSUBNETSLOCAL        = 27,
 	DHCP_BROADCAST              = 28,
-	DHCP_MASKDISCOVERY          = 29,
-	DHCP_MASKSUPPLIER           = 30,
-	DHCP_ROUTERDISCOVERY        = 31,
-	DHCP_ROUTERSOLICITATIONADDR = 32,
 	DHCP_STATICROUTE            = 33,
-	DHCP_TRAILERENCAPSULATION   = 34,
-	DHCP_ARPCACHETIMEOUT        = 35,
-	DHCP_ETHERNETENCAPSULATION  = 36,
-	DHCP_TCPDEFAULTTTL          = 37,
-	DHCP_TCPKEEPALIVEINTERVAL   = 38,
-	DHCP_TCPKEEPALIVEGARBAGE    = 39,
 	DHCP_NISDOMAIN              = 40,
 	DHCP_NISSERVER              = 41,
 	DHCP_NTPSERVER              = 42,
-	DHCP_VENDORSPECIFICINFO     = 43,
-	DHCP_NETBIOSNAMESERVER      = 44,
-	DHCP_NETBIOSDGRAMSERVER     = 45,
-	DHCP_NETBIOSNODETYPE        = 46,
-	DHCP_NETBIOSSCOPE           = 47,
-	DHCP_XFONTSERVER            = 48,
-	DHCP_XDISPLAYMANAGER        = 49,
-	DHCP_ADDRESS                = 50,
+	DHCP_IPADDRESS              = 50,
 	DHCP_LEASETIME              = 51,
 	DHCP_OPTIONSOVERLOADED      = 52,
 	DHCP_MESSAGETYPE            = 53,
@@ -126,21 +87,9 @@ enum DHCP_OPTIONS
 	DHCP_REBINDTIME             = 59,
 	DHCP_CLASSID                = 60,
 	DHCP_CLIENTID               = 61,
-	DHCP_NISPLUSDOMAIN          = 64,
-	DHCP_NISPLUSSERVER          = 65,
-	DHCP_MOBILEIPHOMEAGENT      = 68,
-	DHCP_SMTPSERVER             = 69,
-	DHCP_POP3SERVER             = 70,
-	DHCP_NNTPSERVER             = 71,
-	DHCP_WWWSERVER              = 72,
-	DHCP_FINGERSERVER           = 73,
-	DHCP_IRCSERVER              = 74,
-	DHCP_STREETTALKSERVER       = 75,
-	DHCP_STREETTALKDASERVER     = 76,
 	DHCP_USERCLASS              = 77,  /* RFC 3004 */
 	DHCP_FQDN                   = 81,
 	DHCP_DNSSEARCH              = 119, /* RFC 3397 */
-	DHCP_SIPSERVER              = 120, /* RFC 3361 */
 	DHCP_CSR                    = 121, /* RFC 3442 */
 	DHCP_MSCSR                  = 249, /* MS code for RFC 3442 */
 	DHCP_END                    = 255
@@ -221,6 +170,8 @@ int get_option_uint16(uint16_t *, const struct dhcp_message *, uint8_t);
 int get_option_uint8(uint8_t *, const struct dhcp_message *, uint8_t);
 struct rt *get_option_routes(const struct dhcp_message *);
 struct rt *decode_rfc3442(const uint8_t *);
+int configure_env(const char *, const struct dhcp_message *);
+
 ssize_t make_message(struct dhcp_message **,
 			const struct interface *, const struct dhcp_lease *,
 	     		uint32_t, uint8_t, const struct options *);
@@ -228,7 +179,4 @@ int valid_dhcp_packet(unsigned char *);
 
 ssize_t write_lease(const struct interface *, const struct dhcp_message *);
 struct dhcp_message *read_lease(const struct interface *iface);
-
-ssize_t write_string(FILE *f, const uint8_t *, ssize_t);
-ssize_t write_options(FILE *f, const struct dhcp_message *);
 #endif

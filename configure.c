@@ -45,10 +45,11 @@
 #include "net.h"
 #include "signal.h"
 
-static int
-exec_script(const char *cmd, const char *arg1, const char *arg2)
+int
+exec_script(const char *script, const char *iface, const char *reason,
+	    const struct dhcp_message *dhcpn, const struct dhcp_message *dhcpo)
 {
-	char *const argv[4] = { (char *)cmd, (char *)arg1, (char *)arg2, NULL};
+	char *const argv[2] = { (char *)script, NULL };
 	int ret = 0;
 	pid_t pid;
 	pid_t wpid;
@@ -56,7 +57,7 @@ exec_script(const char *cmd, const char *arg1, const char *arg2)
 	sigset_t full;
 	sigset_t old;
 
-	logger(LOG_DEBUG, "exec `%s' `%s' `%s'", cmd, arg1, arg2);
+	logger(LOG_DEBUG, "exec `%s'", script);
 
 	/* OK, we need to block signals */
 	sigfillset(&full);
@@ -79,8 +80,14 @@ exec_script(const char *cmd, const char *arg1, const char *arg2)
 		signal_reset();
 #endif
 		sigprocmask(SIG_SETMASK, &old, NULL);
-		execvp(cmd, argv);
-		logger(LOG_ERR, "%s: %s", cmd, strerror(errno));
+		if (dhcpo)
+			configure_env("old", dhcpo);
+		if (dhcpn)
+			configure_env("new", dhcpn);
+		setenv("interface", iface, 1);
+		setenv("reason", reason, 1);
+		execvp(script, argv);
+		logger(LOG_ERR, "%s: %s", script, strerror(errno));
 		_exit(111);
 		/* NOTREACHED */
 	}
@@ -99,6 +106,8 @@ exec_script(const char *cmd, const char *arg1, const char *arg2)
 			logger(LOG_ERR, "waitpid: %s", strerror(errno));
 	} while (!WIFEXITED(status) && !WIFSIGNALED(status));
 
+	if (WIFSIGNALED(status))
+		logger(LOG_ERR, "script signaled");
 	if (WIFEXITED(status))
 		ret = WEXITSTATUS(status);
 	else
@@ -336,116 +345,9 @@ configure_routes(struct interface *iface, const struct dhcp_message *dhcp,
 	return retval;
 }
 
-static void
-print_clean(FILE *f, const char *name, const char *value)
-{
-        fprintf(f, "%s=", name);
-	if (value)
-		write_string(f, (const uint8_t*)value, strlen(value));
-	fputc('\n', f);
-}
-
 int
-write_info(const struct interface *iface, const struct dhcp_message *dhcp,
-	   const struct dhcp_lease *lease, const struct options *options,
-	int overwrite)
-{
-	FILE *f;
-	struct rt *rt, *ort;
-	struct stat sb;
-	struct in_addr addr;
-	int doneone;
-
-	if (options->options & DHCPCD_TEST)
-		f = stdout;
-	else {
-		if (!overwrite && stat(iface->infofile, &sb) == 0)
-			return 0;
-
-		if ((f = fopen(iface->infofile, "w")) == NULL)
-			return -1;
-	}
-
-	if (dhcp->yiaddr) {
-		fprintf(f, "IPADDR=%s\n", inet_ntoa(iface->addr));
-		fprintf(f, "NETMASK=%s\n", inet_ntoa(iface->net));
-		addr.s_addr = dhcp->yiaddr & iface->net.s_addr;
-		fprintf(f, "NETWORK=%s\n", inet_ntoa(addr));
-		if (get_option_addr(&addr.s_addr, dhcp, DHCP_BROADCAST) == -1)
-			addr.s_addr = dhcp->yiaddr | ~iface->net.s_addr;
-		fprintf(f, "BROADCAST=%s\n", inet_ntoa(addr));
-
-		ort = get_option_routes(dhcp);
-		doneone = 0;
-		fprintf(f, "ROUTES=");
-		for (rt = ort; rt; rt = rt->next) {
-			if (rt->dest.s_addr == 0)
-				continue;
-			if (doneone)
-				fprintf(f, "\\ ");
-			else
-				doneone = 1;
-			fprintf(f, "%s", inet_ntoa(rt->dest));
-			fprintf(f, ",%s", inet_ntoa(rt->net));
-			fprintf(f, ",%s", inet_ntoa(rt->gate));
-		}
-		fputc('\n', f);
-
-		doneone = 0;
-		fprintf(f, "GATEWAYS=");
-		for (rt = ort; rt; rt = rt->next) {
-			if (rt->dest.s_addr != 0)
-				continue;
-			if (doneone)
-				fprintf(f, "\\ ");
-			else
-				doneone = 1;
-			fprintf(f, "%s", inet_ntoa(rt->gate));
-		}
-		fputc('\n', f);
-		free_routes(ort);
-	}
-
-	write_options(f, dhcp);
-
-/*  FIXME
-	if (dhcp->fqdn) {
-		fprintf(f, "FQDNFLAGS='%u'\n", dhcp->fqdn->flags);
-		fprintf(f, "FQDNRCODE1='%u'\n", dhcp->fqdn->r1);
-		fprintf(f, "FQDNRCODE2='%u'\n", dhcp->fqdn->r2);
-		print_clean(f, "FQDNHOSTNAME", dhcp->fqdn->name);
-	}
-*/
-	if (dhcp->siaddr) {
-		addr.s_addr = dhcp->siaddr;
-		fprintf(f, "DHCPSID=%s\n", inet_ntoa(addr));
-	}
-	if (dhcp->servername[0])
-		print_clean(f, "DHCPSNAME", (const char *)dhcp->servername);
-
-	if (!(options->options & DHCPCD_INFORM) && dhcp->yiaddr) {
-		if (!(options->options & DHCPCD_TEST))
-			fprintf(f, "LEASEDFROM=%u\n", lease->leasedfrom);
-		fprintf(f, "LEASETIME=%u\n", lease->leasetime);
-		fprintf(f, "RENEWALTIME=%u\n", lease->renewaltime);
-		fprintf(f, "REBINDTIME=%u\n", lease->rebindtime);
-	}
-	print_clean(f, "INTERFACE", iface->name);
-	print_clean(f, "CLASSID", options->classid);
-	if (iface->clientid_len > 0) {
-		fprintf(f, "CLIENTID=%s\n",
-			hwaddr_ntoa(iface->clientid, iface->clientid_len));
-	}
-	fprintf(f, "DHCPCHADDR=%s\n",
-		hwaddr_ntoa(iface->hwaddr, iface->hwlen));
-
-	if (!(options->options & DHCPCD_TEST))
-		fclose(f);
-	return 0;
-}
-
-int
-configure(struct interface *iface, const struct dhcp_message *dhcp,
+configure(struct interface *iface, const char *reason,
+	  const struct dhcp_message *dhcp, const struct dhcp_message *old,
 	  const struct dhcp_lease *lease, const struct options *options,
 	int up)
 {
@@ -463,7 +365,7 @@ configure(struct interface *iface, const struct dhcp_message *dhcp,
 	else {
 		addr.s_addr = dhcp->yiaddr;
 		/* Ensure we have all the needed values */
-		if (get_option_addr(&net.s_addr, dhcp, DHCP_NETMASK) == -1)
+		if (get_option_addr(&net.s_addr, dhcp, DHCP_SUBNETMASK) == -1)
 			net.s_addr = get_netmask(addr.s_addr);
 		if (get_option_addr(&brd.s_addr, dhcp, DHCP_BROADCAST) == -1)
 			brd.s_addr = addr.s_addr | ~net.s_addr;
@@ -471,13 +373,6 @@ configure(struct interface *iface, const struct dhcp_message *dhcp,
 
 	/* If we aren't up, then reset the interface as much as we can */
 	if (!up) {
-		/* If we haven't created an info file, do so now */
-		if (!lease->frominfo) {
-			if (write_info(iface, dhcp, lease, options, 0) == -1)
-				logger(LOG_ERR, "write_info: %s",
-					strerror(errno));
-		}
-
 		/* Only reset things if we had set them before */
 		if (iface->addr.s_addr != 0) {
 			if (!(options->options & DHCPCD_KEEPADDRESS)) {
@@ -495,7 +390,7 @@ configure(struct interface *iface, const struct dhcp_message *dhcp,
 			}
 		}
 
-		exec_script(options->script, iface->infofile, "down");
+		exec_script(options->script, iface->name, reason, NULL, old);
 		return 0;
 	}
 
@@ -537,10 +432,9 @@ configure(struct interface *iface, const struct dhcp_message *dhcp,
 	iface->net.s_addr = net.s_addr;
 
 	if (!lease->frominfo)
-		write_info(iface, dhcp, lease, options, 1);
 		if (write_lease(iface, dhcp) == -1)
 			logger(LOG_ERR, "write_lease: %s", strerror(errno));
 
-	exec_script(options->script, iface->infofile, up ? "new" : "up");
+	exec_script(options->script, iface->name, reason, dhcp, old);
 	return 0;
 }

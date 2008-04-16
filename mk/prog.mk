@@ -15,9 +15,9 @@ SYSCONFDIR?=	${PREFIX}/etc
 INSTALL?=	install
 SED?=		sed
 
-all: ${PROG} ${MAN}
+all: ${PROG} ${SCRIPT} ${MAN}
 
-${PROG}: ${SCRIPTS} ${OBJS}
+${PROG}: ${OBJS}
 	${CC} ${LDFLAGS} -o $@ ${OBJS} ${LDADD}
 
 # We could save about 600 bytes by building it like this

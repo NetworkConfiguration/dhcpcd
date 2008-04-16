@@ -32,9 +32,10 @@
 #include "dhcp.h"
 #include "net.h"
 
-int write_info(const struct interface *, const struct dhcp_message *,
-	const struct dhcp_lease *, const struct options *, int);
-int configure(struct interface *, const struct dhcp_message *,
-		const struct dhcp_lease *, const struct options *, int);
+int exec_script(const char *, const char *, const char *,
+		const struct dhcp_message *, const struct dhcp_message *);
+int configure(struct interface *, const char *,
+	      const struct dhcp_message *, const struct dhcp_message *,
+	      const struct dhcp_lease *, const struct options *, int);
 
 #endif

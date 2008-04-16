@@ -112,7 +112,6 @@ struct interface
 #endif
 
 	char leasefile[PATH_MAX];
-	char infofile[PATH_MAX];
 
 	struct in_addr addr;
 	struct in_addr net;
