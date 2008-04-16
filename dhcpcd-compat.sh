@@ -26,7 +26,7 @@ done
 
 x="down"
 case "${reason}" in
-	RENEW) "up";;
+	RENEW) x="up";;
 	BOUND|INFORM|REBIND|REBOOT|TEST|TIMEOUT|IPV4LL) x="new";;
 esac
 set -- "" "${x}"
