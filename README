@@ -1,4 +1,4 @@
-dhcpcd-3 - DHCP client daemon
+dhcpcd-4 - DHCP client daemon
 Copyright 2006-2008 Roy Marples <roy@marples.name>
 
 
@@ -33,6 +33,9 @@ linux-2.6.24 finally ships with a working 32-bit header.
 If your linux headers are older, or your distro hasn't patched them you can
 set CSTD=gnu99 to work around this.
 
+If you require compatibility with dhcpcd-3 and older style variables,
+you can install dhcpcd-compat.sh into the directory /etc/dhcpcd-enter-hook.d
+We don't install this by default.
 
 ChangeLog
 ---------
