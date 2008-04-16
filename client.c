@@ -793,7 +793,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 	struct dhcp_lease *lease = &state->lease;
 	struct interface *iface = state->interface;
 	int gotlease = -1;
-	char *reason = NULL;
+	const char *reason = NULL;
 
 	/* No NAK, so reset the backoff */
 	state->nakoff = 1;

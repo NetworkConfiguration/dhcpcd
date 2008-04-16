@@ -848,7 +848,7 @@ read_lease(const struct interface *iface)
 	return dhcp;
 }
 
-ssize_t
+static ssize_t
 print_string(char *s, const uint8_t *data, ssize_t len)
 {
 	uint8_t c;
@@ -909,7 +909,6 @@ static ssize_t
 print_option(char *s, int type, const uint8_t *data, ssize_t len)
 {
 	const uint8_t *e, *t;
-	uint8_t u8;
 	uint16_t u16;
 	int16_t s16;
 	uint32_t u32;
@@ -1005,11 +1004,8 @@ _setenv(const char *prefix, const char *var, const char *value)
 int
 configure_env(const char *prefix, const struct dhcp_message *dhcp)
 {
-	int i;
-	const uint8_t *p, *e, *t;
-	uint32_t u32;
-	uint16_t u16;
-	uint8_t u8;
+	unsigned int i;
+	const uint8_t *p;
 	struct in_addr addr;
 	struct in_addr net;
 	struct in_addr brd;
