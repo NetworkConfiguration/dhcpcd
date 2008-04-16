@@ -13,7 +13,7 @@ VERSION=	4.0.0-alpha1
 CLEANFILES=	dhcpcd.sh dhcpcd.8
 
 BINDIR=		${PREFIX}/sbin
-SYSCONFDIR?=	${PREFIX}/etc
+SYSCONFDIR?=	${PREFIX}/etc/${PROG}
 
 .SUFFIXES:	.in .sh.in
 
