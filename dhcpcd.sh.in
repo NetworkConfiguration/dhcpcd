@@ -279,7 +279,7 @@ run_reason()
 		r=$?
 		;;
 	BOUND|INFORM|REBIND|REBOOT|RENEW|TIMEOUT)
-		make_mtu
+		set_mtu
 		r=$((${r} + $?))
 		make_resolv_conf
 		r=$((${r} + $?))
