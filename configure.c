@@ -241,7 +241,8 @@ configure_routes(struct interface *iface, const struct dhcp_message *dhcp,
 			/* Check that we did add this route or not */
 			sk = skp = xstrdup(dhcpcd_skiproutes);
 			while ((token = strsep(&skp, ","))) {
-				if (isdigit((unsigned)*token) && atoi(token) == i)
+				if (isdigit((unsigned char)*token) &&
+				    atoi(token) == i)
 					break;
 			}
 			free(sk);
