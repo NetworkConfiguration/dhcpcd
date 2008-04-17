@@ -39,7 +39,6 @@
 #include <netinet/ether.h>
 #include <netpacket/packet.h>
 
-#include <ctype.h>
 #include <errno.h>
 #include <stddef.h>
 #include <stdio.h>

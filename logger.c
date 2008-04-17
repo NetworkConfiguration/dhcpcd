@@ -47,7 +47,7 @@ logtolevel(const char *priority)
 {
 	CODE *c;
 
-	if (isdigit((int)*priority))
+	if (isdigit((unsigned)*priority))
 		return atoi(priority);
 	for (c = prioritynames; c->c_name; c++)
 		if (!strcasecmp(priority, c->c_name))

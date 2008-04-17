@@ -37,7 +37,6 @@
 #include <net/route.h>
 #include <netinet/in.h>
 
-#include <ctype.h>
 #include <errno.h>
 #include <stddef.h>
 #include <stdio.h>
