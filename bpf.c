@@ -35,6 +35,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <paths.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -50,21 +51,26 @@
 int
 open_socket(struct interface *iface, int protocol)
 {
-	int n = 0;
 	int fd = -1;
-	char *device;
 	int flags;
 	struct ifreq ifr;
 	int buf = 0;
 	struct bpf_version pv;
 	struct bpf_program pf;
 
+#ifdef _PATH_BPF
+	fd = open(_PATH_BPF, O_RDWR);
+#else
+	char *device;
+	int n = 0;
+
 	device = xmalloc(sizeof(char) * PATH_MAX);
 	do {
-		snprintf(device, PATH_MAX, "/dev/bpf%d",  n++);
+		snprintf(device, PATH_MAX, "/dev/bpf%d", n++);
 		fd = open(device, O_RDWR);
 	} while (fd == -1 && errno == EBUSY);
 	free(device);
+#endif
 
 	if (fd == -1)
 		return -1;
