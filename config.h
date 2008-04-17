@@ -49,21 +49,20 @@
 
 #define PACKAGE			"dhcpcd"
 
-#define RESOLVFILE		"/etc/resolv.conf"
 #ifndef SYSCONFDIR
-# define SYSCONFDIR		"/etc"
+# define SYSCONFDIR		"/etc/" PACKAGE
 #endif
-#define DEFAULTSCRIPT		SYSCONFDIR "/" PACKAGE ".sh"
-
 #ifndef RUNDIR
 # define RUNDIR			"/var/run"
 #endif
-#define PIDFILE			RUNDIR "/" PACKAGE "-%s.pid"
-
 #ifndef DBDIR
 # define DBDIR			"/var/db"
 #endif
+
+#define RESOLVFILE		"/etc/resolv.conf"
+#define DEFAULTSCRIPT		SYSCONFDIR "/" PACKAGE ".sh"
+#define DUIDFILE		SYSCONFDIR "/" PACKAGE ".duid"
 #define LEASEFILE		DBDIR "/" PACKAGE "-%s.lease"
-#define DUIDFILE		DBDIR "/" PACKAGE ".duid"
+#define PIDFILE			RUNDIR "/" PACKAGE "-%s.pid"
 
 #endif
