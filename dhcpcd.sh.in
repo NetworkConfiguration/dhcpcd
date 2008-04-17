@@ -24,19 +24,6 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-# OK, this is dhcpcd.sh which is very similar to dhclient-script.
-# Some differences :)
-# 1) The dhcpcd binary configures the interface and routes.
-#    This is so that one script (hopefully!) fits all platforms as the
-#    userland tools vary too much, especially on Linux.
-# 2) We also ship with hooks dir support.
-#    This is meant to be used by applications to install into - the
-#    user is meant to use the top hook script.
-# 3) We support all reasons and variables that dhclient-script does, plus
-#    extra reasons TEST, INFORM and IPV4LL.
-
-# FIXME Move the above into a dhcpcd.sh man page :)
-
 do_hooks()
 {
 	local x= r=0
@@ -47,65 +34,6 @@ do_hooks()
 		fi
 	done
 	return ${r}
-}
-
-# Try and locate a service pidfile
-service_pid()
-{
-	local service="$1" x=
-	for x in "${service}".pid \
-		"${service}"/pid \
-		"${service}"/"${service}".pid;
-	do
-		if [ -s "/var/run/${x}" ]; then
-			echo "/var/run/${x}"
-			return 0
-		fi
-	done
-	return 1
-}
-
-# Try and detect how to handle services so we're pretty
-# platform independant
-do_service()
-{
-	local service="$1" action="$2"
-	shift; shift
-
-	# If restarting check if service is running or not if we can
-	if [ "${action}" = "restart" ]; then
-		pidfile=$(service_pid "${service}")
-		[ -s "${pidfile}" ] || return 0
-		kill -0 $(cat "${pidfile}") 2>/dev/null || return 0
-	fi
-
-	if type rc-service >/dev/null 2>/dev/null; then
-		rc-service "${service}" -- --nodeps "${action}" "$@"
-	elif [ -x /sbin/service ]; then
-		service "${service}" "${action}" "$@"
-	elif [ -x /etc/init.d/"${service}" -a -x /sbin/runscript ]; then
-		/etc/init.d/"${service}" --quiet --nodeps "${action}" "$@"
-	elif [ -x /etc/init.d/"${service}" ]; then
-		/etc/init.d/"${service}" "${action}" "$@"
-	elif [ -x /etc/rc.d/"${service}" ]; then
-		/etc/rc.d/"${service}" "${action}" "$@" 
-	elif [ -x /etc/rc.d/rc."${service}" ]; then
-		/etc/rc.d/rc."${service}" "${action}" "$@"
-	else
-		echo "Don't know how to interact with services on this platform" >&2
-		return 1
-	fi
-}
-
-yesno()
-{
-	[ -z "$1" ] && return 2
-
-	case "$1" in
-		[Yy][Ee][Ss]|[Tt][Rr][Uu][Ee]|[Oo][Nn]|1) return 0;;
-		[Nn][Oo]|[Ff][Aa][Ll][Ss][Ee]|[Oo][Ff][Ff]|0) return 1;;
-	esac
-	return 2
 }
 
 save_conf()
@@ -121,83 +49,6 @@ restore_conf()
 	[ -e "$1"-pre."${interface}" ] || return 1
 	rm -f "$1"
 	mv -f "$1"-pre."${interface}" "$1"
-}
-
-set_mtu()
-{
-	if [ -n "${new_mtu}" ]; then
-		ifconfig "${interface}" mtu "${new_mtu}"
-	fi
-}
-
-make_nis_conf() {
-	[ -z "${new_nis_domain}" -a -z "${new_nis_servers}" ] && return 0
-	local cf=/etc/yp.conf."${interface}" prefix= x= pidfile=
-	echo "${signature}" > "${cf}"
-	if [ -n "${new_nis_domain}" ]; then
-		domainname "${new_nis_domain}"
-		if [ -n "${new_nis_server}" ]; then
-			prefix="domain ${new_nis_domain} server "
-		else
-			echo "domain ${new_nis_domain} broadcast" >> "${cf}"
-		fi
-	else
-		prefix="ypserver "
-	fi
-	for x in ${new_nis_servers}; do
-		echo "${prefix}${x}" >> "${cf}"
-	done
-	save_conf /etc/yp.conf
-	mv -f "${cf}" /etc/yp.conf
-	pidfile="$(service_pidfile ypbind)"
-	if [ -s "${pidfile}" ]; then
-		kill -HUP "${pidfile}"
-	fi
-}
-
-restore_nis_conf()
-{
-	[ -n "${old_nis_domain}" ] && domainname ""
-	restore_conf /etc/yp.conf || return 0
-	pidfile="$(service_pidfile ypbind)"
-	if [ -s "${pidfile}" ]; then
-		kill -HUP "${pidfile}"
-	fi
-}
-
-make_ntp_conf()
-{
-	[ -z "${new_ntp_servers}" ] && return 0
-	local cf=/etc/ntp.conf."${interface}" x=
-	echo "${signature}" > "${cf}"
-	echo "restrict default noquery notrust nomodify" >> "${cf}"
-	echo "restrict 127.0.0.1" >> "${cf}"
-	for x in ${new_ntp_servers}; do
-		echo "restrict ${x} nomodify notrap noquery" >> "${cf}"
-		echo "server ${x}" >> "${cf}"
-	done
-	if [ ! -e /etc/ntp.conf ]; then
-		true
-	elif type cmp >/dev/null 2>&1; then
-		cmp -s /etc/ntp.conf "${cf}"
-	elif type diff >/dev/null 2>&1; then
-		diff -q /etc/ntp.conf "${cf}" >/dev/null
-	else
-		false
-	fi
-	if [ $? = 0 ]; then
-		rm -f "${cf}"
-	else
-		save_conf /etc/ntp.conf
-		mv -f "${cf}" /etc/ntp.conf
-		do_service ntp restart
-	fi
-}
-
-restore_ntp_conf()
-{
-	restore_conf /etc/ntp.conf || return 0
-	do_service ntp restart
 }
 
 make_resolv_conf()
@@ -221,7 +72,6 @@ make_resolv_conf()
 	else
 		save_conf /etc/resolv.conf
 		printf "${conf}" > /etc/resolv.conf
-		do_service nscd restart
 	fi
 }
 
@@ -231,7 +81,6 @@ restore_resolv_conf()
 		resolvconf -d "${interface}" -f
 	else
 		restore_conf /etc/resolv.conf || return 0
-		do_service nscd restart
 	fi
 }
 
@@ -257,7 +106,7 @@ lookup_hostname()
 
 set_hostname()
 {
-	if need_hostname || [ -n "${oldhostname}" ]; then
+	if [ -n "${oldhostname}" ] || need_hostname; then
 		local name="${new_hostname}"
 		[ -z "${name}" ] && name="$(lookup_hostname)"
 		[ -n "${name}" ] && hostname "${name}"
@@ -270,45 +119,24 @@ run_test()
 	env | grep "^\(new_\|old_\)" | sort
 }
 
-run_reason()
-{
-	local r=0
-	case "${reason}" in
-	TEST)
-		run_test
-		r=$?
-		;;
-	BOUND|INFORM|REBIND|REBOOT|RENEW|TIMEOUT)
-		set_mtu
-		r=$((${r} + $?))
-		make_resolv_conf
-		r=$((${r} + $?))
-		set_hostname
-		r=$((${r} + $?))
-		make_nis_conf
-		r=$((${r} + $?))
-		make_ntp_conf
-		r=$((${r} + $?))
-		;;
-	EXPIRE|FAIL|IPV4LL|RELEASE|STOP)
-		restore_resolv_conf
-		r=$((${r} + $?))
-		restore_nis_conf
-		r=$((${r} + $?))
-		restore_ntp_conf
-		r=$((${r} + $?))
-		;;
-	*)
-		echo "unsupported reason ${reason}" >&2
-		return 1
-		;;
-	esac
-	return ${r}
-}
-
 signature="# Generated by dhcpcd for ${interface}"
 
 # We should do something with exit codes really
 do_hooks enter
-run_reason
+case "${reason}" in
+	TEST)
+		run_test
+		;;
+	BOUND|INFORM|REBIND|REBOOT|RENEW|TIMEOUT)
+		make_resolv_conf
+		set_hostname
+		;;
+	EXPIRE|FAIL|IPV4LL|RELEASE|STOP)
+		restore_resolv_conf
+		;;
+	*)
+		echo "unsupported reason ${reason}" >&2
+		false
+		;;
+esac
 do_hooks exit

@@ -20,10 +20,10 @@ If you're cross compiling you may need to set the below knobs to avoid
 automatic tests.
 OS=BSD | Linux
 
-You can change the default dir where dhcpcd stores it's .info files with
-INFODIR=/var/db
+You can change the default dir where dhcpcd stores it's .lease files with
+DBDIR=/var/db
 
-If you're building for a NOMMU system where fork() does not work, youu should
+If you're building for a NOMMU system where fork() does not work, you should
 add -DTHERE_IS_NO_FORK to your CFLAGS.
 
 We now default to using -std=c99. For 64-bit linux, this always works, but
@@ -34,8 +34,15 @@ If your linux headers are older, or your distro hasn't patched them you can
 set CSTD=gnu99 to work around this.
 
 If you require compatibility with dhcpcd-3 and older style variables,
-you can install dhcpcd-compat.sh into the directory /etc/dhcpcd-enter-hook.d
+you can install dhcpcd-compat into the directory /etc/dhcpcd/enter-hook.d
 We don't install this by default.
+
+
+Hooks
+-----
+We provide example exit hooks for NTP and ypbind (Linux).
+There are not installed by default as they are platform dependant.
+
 
 ChangeLog
 ---------

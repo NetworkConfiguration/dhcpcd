@@ -98,9 +98,9 @@ const struct dhcp_option dhcp_options[] = {
 	{ 37,	UINT8,		"default_tcp_ttl" },
 	{ 38,	UINT32,		"tcp_keepalive_interval" },
 	{ 39,	UINT8,		"tcp_keepalive_garbage" },
-	{ 30,	STRING,		"nis_domain" },
-	{ 31,	IPV4 | ARRAY,	"nis_servers" },
-	{ 32,	IPV4 | ARRAY,	"ntp_servers" },
+	{ 40,	STRING,		"nis_domain" },
+	{ 41,	IPV4 | ARRAY,	"nis_servers" },
+	{ 42,	IPV4 | ARRAY,	"ntp_servers" },
 	{ 43,	STRING,		"vendor_encapsulated_options" },
 	{ 44,	IPV4 | ARRAY,	"netbios_name_servers" },
 	{ 45,	IPV4,		"netbios_dd_server" },
@@ -394,7 +394,6 @@ decode_rfc3442(const uint8_t *data)
 	e = p + l;
 	while (p < e) {
 		cidr = *p++;
-		printf ("cd %d\n", cidr);
 		if (cidr > 32) {
 			free_routes(routes);
 			errno = EINVAL;
@@ -761,8 +760,8 @@ make_message(struct dhcp_message **message,
 		*p++ = 0;
 		for (l = 0; l < sizeof(dhcp_options) / sizeof(dhcp_options[0]); l++) {
 			o = dhcp_options[l].option;
-			if (!(dhcp_options[l].type & REQUEST) &&
-			    !has_reqmask(options->reqmask, o))
+			if (!(dhcp_options[l].type & REQUEST || 
+			      has_reqmask(options->reqmask, o)))
 				continue;
 			switch (o) {
 			case DHCP_RENEWALTIME:	/* FALLTHROUGH */

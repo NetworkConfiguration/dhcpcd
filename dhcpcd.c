@@ -273,6 +273,7 @@ main(int argc, char **argv)
 				logger(LOG_ERR, "unknown option `%s'", optarg);
 				goto abort;
 			}
+			break;
 		case 'p':
 			options->options |= DHCPCD_PERSISTENT;
 			break;
