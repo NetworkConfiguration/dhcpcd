@@ -36,11 +36,13 @@ set CSTD=gnu99 to work around this.
 If you require compatibility with dhcpcd-3 and older style variables,
 you can install dhcpcd-compat into the directory /etc/dhcpcd/enter-hook.d
 We don't install this by default.
+You should also add -DCMDLINE_COMPAT to your CFLAGS if you need to be fully
+commandline compatible with prior versions.
 
 
 Hooks
 -----
-We provide example exit hooks for NTP and ypbind (Linux).
+We provide example exit hooks for NTP (www.ntp.org) and ypbind (Linux).
 There are not installed by default as they are platform dependant.
 
 
