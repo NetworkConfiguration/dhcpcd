@@ -106,8 +106,8 @@ lookup_hostname()
 
 set_hostname()
 {
-	if [ -n "${oldhostname}" ] || need_hostname; then
-		local name="${new_hostname}"
+	if [ -n "${old_host_name}" ] || need_hostname; then
+		local name="${new_host_name}"
 		[ -z "${name}" ] && name="$(lookup_hostname)"
 		[ -n "${name}" ] && hostname "${name}"
 	fi

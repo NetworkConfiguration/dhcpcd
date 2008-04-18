@@ -4,11 +4,11 @@
 MANPREFIX?=	/usr/share
 MANDIR?=	${MANPREFIX}/man/man
 MANMODE?=	0444
-MINSTALL?=	${INSTALL} -m ${MANMODE}
 
-man: ${MAN}
+man: ${MAN5} ${MAN8}
 
-# We cheat as all our pages go into section 8
 maninstall: man
+	${INSTALL} -d ${DESTDIR}${MANDIR}5
+	${INSTALL} -m ${MANMODE} ${MAN8} ${DESTDIR}${MANDIR}5
 	${INSTALL} -d ${DESTDIR}${MANDIR}8
-	for man in ${MAN}; do ${MINSTALL} $$man ${DESTDIR}${MANDIR}8; done
+	${INSTALL} -m ${MANMODE} ${MAN8} ${DESTDIR}${MANDIR}8

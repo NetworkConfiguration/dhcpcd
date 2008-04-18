@@ -29,7 +29,7 @@
 .Nd an RFC 2131 compliant DHCP client
 .Sh SYNOPSIS
 .Nm
-.Op Fl dknpAEGHOLNRSTY
+.Op Fl dknpAEGLSTV
 .Op Fl c , -script Ar script
 .Op Fl h , -hostname Ar hostname
 .Op Fl i , -classid Ar classid
@@ -41,6 +41,7 @@
 .Op Fl u , -userclass Ar class
 .Op Fl F , -fqdn Ar FQDN
 .Op Fl I , -clientid Ar clientid
+.Op Fl O , -nooption Ar option
 .Ar interface
 .Nm
 .Fl k , -release
@@ -68,16 +69,6 @@ will then write DNS information to
 .Xr resolvconf 8 ,
 if available, otherwise directly to
 .Pa /etc/resolv.conf .
-.Nm
-will also configure
-.Pa /etc/yp.conf
-and
-.Pa /etc/ntpd.conf
-with NIS and NTP information if the DHCP server provided them.
-If those file contents changed, then
-.Nm
-will also attempt to restart the respective services to notify them of the
-change.
 If the hostname is currenly blank, (null) or localhost then
 .Nm
 will set the hostname to the one supplied by the DHCP server, or look it up
@@ -113,10 +104,13 @@ option.
 .Nm
 will run @SYSCONFDIR@/dhcpcd.sh, or the script specified by the
 .Fl c , -script
-option. It will set $1 to a shell compatible file that holds various
-configuration settings obtained from the DHCP server and $2 to either
-up, down or new depending on the state of
-.Nm .
+option. This script will configure
+.Pa /etc/resolv.conf
+and the
+.Xr hostname 3
+if possible. It will also run custom hook scripts if defined. See
+.Xr dhcpcd.sh 8
+for more details.
 .Nm
 ignores the exist code of the script.
 .Ss Fine tuning
@@ -228,7 +222,7 @@ Tags the DHCP message with the userclass
 .Ar class .
 DHCP servers use this give memebers of the class DHCP options other than the
 default, without having to know things like hardware address or hostname.
-.If Fl F , -fqdn Ar fqdn
+.It Fl F , -fqdn Ar fqdn
 Requests that the DHCP server updates DNS using FQDN instead of just a
 hostname. Valid values for
 .Ar fqdn
@@ -248,16 +242,6 @@ the first byte. Ethernet is 01, and the hardware address in the example is
 is a blank string, then we disable DUID support and use a
 .Ar clientid
 as shown above.
-.It Fl S, -mscsr
-Microsoft have their own code for Classless Static Routes
-.Po
-RFC 3442
-.Pc .
-You can use this option to request this as well as the normal CSR. Another
-instace of this option only requests the Microsoft CSR to prevent DHCP message
-over-running its maximum size. DHCP server administrators should update their
-CSR code from the Microsoft specific one to the RFC compliant one as the
-content is fully compatible.
 .El
 .Ss Restriciting behaviour
 .Nm
@@ -270,29 +254,19 @@ off.
 Don't request or claim the address by ARP.
 .It Fl G , -nogateway
 Don't set any default routes.
-.It Fl H , -nohostname
-Don't request a hostname. If the current hostname is blank, localhost or
-(none) then the hostnam will be looked up in DNS and set to that.
 .It Fl L , -noipv4ll
 Don't use IPv4LL at all.
-.It Fl N , -nontp
-Don't touch
-.Pa /etc/ntpd.conf
-or restart the ntp service.
-.It Fl O , -nooptions
-Don't request any options beyond what is needed to configure the interface.
-.It Fl R , -nodns
-Don't send DNS information to resolvconf or touch
-.Pa /etc/resolv.conf .
+.It Fl O , -nooption Ar option
+Don't request the specified option. If no option given, then don't request
+any options other than those to configure the interface and routing.
 .It Fl T, -test
 On receipt of discover messages we just call @SYSCONFDIR@/dhcpcd.sh with the
 reason of TEST which echo's the DHCP variables found in the message to the
 console. The interface configuration isn't touched and neither are any
 configuration files.
-.It Fl Y , -nonis
-Don't touch
-.Pa /etc/yp.conf
-or restart the ypbind service.
+.It Fl V, -variables
+Display a list of option codes and the associated variable for use in
+.Xr dhcpcd.sh 8 .
 .El
 .Sh NOTES
 Because
@@ -334,11 +308,10 @@ The actual DHCP message send by the server. We use this when reading the last
 lease and use the files mtime as when it was issued.
 .El
 .Sh SEE ALSO
-.Xr ntp 1 ,
+.Xr dhcpcd.conf 5 ,
+.Xr dhcpcd.sh 8 ,
 .Xr resolv.conf 5 ,
 .Xr resolvconf 8 ,
-.Xr yp.conf 5 ,
-.Xr ypbind 8
 .Sh STANDARDS
 RFC 2131, RFC 2132, RFC 2855, RFC 3004, RFC 3361, RFC 3397, RFC 3442, RFC 3927,
 RFC 4361, RFC 4390, RFC 4702.

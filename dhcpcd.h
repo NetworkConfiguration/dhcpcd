@@ -81,7 +81,6 @@ struct options {
 	time_t timeout;
 	int metric;
 	int options;
-	int domscsr;
 
 	struct in_addr request_address;
 	struct in_addr request_netmask;

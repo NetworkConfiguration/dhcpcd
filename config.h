@@ -60,6 +60,7 @@
 #endif
 
 #define RESOLVFILE		"/etc/resolv.conf"
+#define CONFIGFILE		SYSCONFDIR "/" PACKAGE ".conf"
 #define DEFAULTSCRIPT		SYSCONFDIR "/" PACKAGE ".sh"
 #define DUIDFILE		SYSCONFDIR "/" PACKAGE ".duid"
 #define LEASEFILE		DBDIR "/" PACKAGE "-%s.lease"

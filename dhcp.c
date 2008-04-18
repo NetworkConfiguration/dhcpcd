@@ -145,11 +145,24 @@ const struct dhcp_option dhcp_options[] = {
 	{ 114,	STRING,		"default_url" },
 	{ 118,	IPV4,		"subnet_selection" },
 	{ 119,	STRING | RFC3397,	"domain_search" },
-	{ 121,  RFC3442,	"classless_static_routes" },
+	{ 121,  RFC3442 | REQUEST,	"classless_static_routes" },
+	{ 249,  RFC3442,	"ms-classless_static_routes" },
 	{ 0, 0, NULL }
 };
 
-int make_reqmask(struct options *options, char **opts)
+void
+print_options(void)
+{
+	unsigned int i;
+
+	for (i = 0; i < sizeof(dhcp_options) / sizeof(dhcp_options[0]); i++)
+		if (dhcp_options[i].var)
+			printf("%03d %s\n",
+				dhcp_options[i].option,
+				dhcp_options[i].var);
+}
+
+int make_reqmask(struct options *options, char **opts, int add)
 {
 	char *token;
 	char *p = *opts;
@@ -157,13 +170,19 @@ int make_reqmask(struct options *options, char **opts)
 	const char *v;
 	int max = sizeof(dhcp_options) / sizeof(dhcp_options[0]);
 
-	while ((token = strsep(&p, ","))) {
+	while ((token = strsep(&p, ", "))) {
+		if (*token == '\0')
+			continue;
 		for (i = 0; i < max; i++) {
 			if (!(v = dhcp_options[i].var))
 				continue;
 			if (strcmp(v, token) == 0) {
-				add_reqmask(options->reqmask,
-					    dhcp_options[i].option);
+				if (add == 1)
+					add_reqmask(options->reqmask,
+						    dhcp_options[i].option);
+				else
+					del_reqmask(options->reqmask,
+						    dhcp_options[i].option);
 				break;
 			}
 		}
@@ -769,15 +788,9 @@ make_message(struct dhcp_message **message,
 				if (type == DHCP_INFORM)
 					continue;
 				break;
-			case DHCP_CSR:
-				if (options->domscsr > 1)
-					continue;
-				break;
 			}
 			*p++ = o;
 		}
-		if (options->domscsr)
-			*p++ = DHCP_MSCSR;
 		*n_params = p - n_params - 1;
 	}
 	*p++ = DHCP_END;

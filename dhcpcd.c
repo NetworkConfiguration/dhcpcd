@@ -51,7 +51,6 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 
 static int doversion = 0;
 static int dohelp = 0;
-#define EXTRA_OPTS
 static const struct option longopts[] = {
 	{"arp",         no_argument,        NULL, 'a'},
 	{"script",      required_argument,  NULL, 'c'},
@@ -62,7 +61,7 @@ static const struct option longopts[] = {
 	{"leasetime",   required_argument,  NULL, 'l'},
 	{"metric",      required_argument,  NULL, 'm'},
 	{"renew",       no_argument,        NULL, 'n'},
-	{"option",	required_argument,  NULL, 'o'},
+	{"option",      required_argument,  NULL, 'o'},
 	{"persistent",  no_argument,        NULL, 'p'},
 	{"inform",      optional_argument,  NULL, 's'},
 	{"request",     optional_argument,  NULL, 'r'},
@@ -72,20 +71,23 @@ static const struct option longopts[] = {
 	{"lastlease",   no_argument,        NULL, 'E'},
 	{"fqdn",        optional_argument,  NULL, 'F'},
 	{"nogateway",   no_argument,        NULL, 'G'},
-	{"nohostname",  no_argument,        NULL, 'H'},
 	{"clientid",    optional_argument,  NULL, 'I'},
 	{"noipv4ll",    no_argument,        NULL, 'L'},
-	{"nontp",       no_argument,        NULL, 'N'},
-	{"nooptions",   no_argument,        NULL, 'O'},
-	{"nodns",       no_argument,        NULL, 'R'},
-	{"msscr",       no_argument,        NULL, 'S'},
+	{"nooption",    optional_argument,  NULL, 'O'},
 	{"test",        no_argument,        NULL, 'T'},
-	{"nonis",       no_argument,        NULL, 'Y'},
+	{"variables",   no_argument,        NULL, 'V'},
 	{"help",        no_argument,        &dohelp, 1},
 	{"version",     no_argument,        &doversion, 1},
 #ifdef THERE_IS_NO_FORK
 	{"daemonised",	no_argument,        NULL, 'f'},
 	{"skiproutes",  required_argument,  NULL, 'g'},
+#endif
+#ifdef CMDLINE_COMPAT
+	{"nohostname",  no_argument,        NULL, 'H'},
+	{"nodns",       no_argument,        NULL, 'R'},
+	{"nontp",       no_argument,        NULL, 'N'},
+	{"nonis",       no_argument,        NULL, 'Y'},
+	{"msscr",       no_argument,        NULL, 'S'},
 #endif
 	{NULL,          0,                  NULL, 0}
 };
@@ -95,8 +97,13 @@ char dhcpcd[PATH_MAX];
 char **dhcpcd_argv = NULL;
 int dhcpcd_argc = 0;
 char *dhcpcd_skiproutes = NULL;
-#undef EXTRA_OPTS
 #define EXTRA_OPTS "fg:"
+#elif CMDLINE_COMAPT
+# define EXTRA_OPTS "NRSY"
+#endif
+
+#ifndef EXTRA_OPTS
+# define EXTRA_OPTS
 #endif
 
 static int
@@ -137,29 +144,203 @@ read_pid(const char *pidfile)
 static void
 usage(void)
 {
-	printf("usage: "PACKAGE" [-adknpEGHNORSTY] [-c script] [-h hostname] [-i classID]\n"
+	printf("usage: "PACKAGE" [-adknpEGHLOSTV] [-c script] [-h hostname] [-i classID]\n"
 	       "              [-l leasetime] [-m metric] [-o option] [-r ipaddress]\n"
 	       "              [-s ipaddress] [-t timeout] [-u userclass] [-F none | ptr | both]\n"
 	       "              [-I clientID] <interface>\n");
+}
+
+static int
+parse_option(int opt, char *oarg, struct options *options)
+{
+	static int userclasses = 0;
+	int i;
+	int j;
+	char *p;
+
+	switch(opt) {
+	case 'h':
+		if (!oarg)
+			*options->hostname = '\0';
+		else if (strlen(oarg) > MAXHOSTNAMELEN) {
+			logger(LOG_ERR,
+				"`%s' too long for HostName string, max is %d",
+				oarg, MAXHOSTNAMELEN);
+			return -1;
+		} else
+			strlcpy(options->hostname, oarg,
+				sizeof(options->hostname));
+		break;
+	case 'i':
+		if (!oarg) {
+			*options->classid = '\0';
+		} else if (strlen(oarg) > CLASS_ID_MAX_LEN) {
+			logger(LOG_ERR,
+			       "`%s' too long for ClassID string, max is %d",
+			       oarg, CLASS_ID_MAX_LEN);
+			return -1;
+		} else
+			strlcpy(options->classid, oarg,
+				sizeof(options->classid));
+		break;
+	case 'l':
+		if (*oarg == '-') {
+			logger(LOG_ERR,
+			       "leasetime must be a positive value");
+			return -1;
+		}
+		errno = 0;
+		options->leasetime = (uint32_t)strtol(oarg, NULL, 0);
+		if (errno == EINVAL || errno == ERANGE) {
+			logger(LOG_ERR, "`%s' out of range", oarg);
+			return -1;
+		}
+		break;
+	case 'm':
+		options->metric = atoint(oarg);
+		if (options->metric < 0) {
+			logger(LOG_ERR, "metric must be a positive value");
+			return -1;
+		}
+		break;
+	case 'o':
+		if (make_reqmask(options, &oarg, 1) != 0) {
+			logger(LOG_ERR, "unknown option `%s'", oarg);
+			return -1;
+		}
+		break;
+	case 'p':
+		options->options |= DHCPCD_PERSISTENT;
+		break;
+	case 's':
+		options->options |= DHCPCD_INFORM;
+		options->options &= ~DHCPCD_ARP;
+		if (!oarg || strlen(optarg) == 0) {
+			options->request_address.s_addr = 0;
+			break;
+		} else {
+			if ((p = strchr(oarg, '/'))) {
+				/* nullify the slash, so the -r option
+				 * can read the address */
+				*p++ = '\0';
+				if (sscanf(p, "%d", &i) != 1 ||
+				    inet_cidrtoaddr(i, &options->request_netmask) != 0)
+				{
+					logger(LOG_ERR,
+					       "`%s' is not a valid CIDR",
+					       p);
+					return -1;
+				}
+			}
+		}
+		/* FALLTHROUGH */
+	case 'r':
+		if (!(options->options & DHCPCD_INFORM))
+			options->options |= DHCPCD_REQUEST;
+		if (strlen(oarg) > 0 &&
+		    !inet_aton(oarg, &options->request_address))
+		{ 
+			logger(LOG_ERR, "`%s' is not a valid IP address",
+			       oarg);
+			return -1;
+		}
+		break;
+	case 't':
+		options->timeout = atoint(oarg);
+		if (options->timeout < 0) {
+			logger (LOG_ERR, "timeout must be a positive value");
+			return -1;
+		}
+		break;
+	case 'u':
+		j = 0;
+		for (i = 0; i < userclasses; i++)
+			j += (int)options->userclass[j] + 1;
+			if (j + 1 + strlen(oarg) > USERCLASS_MAX_LEN) {
+				logger(LOG_ERR,
+				       "userclass overrun, max is %d",
+				       USERCLASS_MAX_LEN);
+				return -1;
+			}
+			userclasses++;
+			memcpy(options->userclass + j + 1 ,
+			       oarg, strlen(optarg));
+			options->userclass[j] = strlen(oarg);
+			options->userclass_len += (strlen(oarg)) + 1;
+		break;
+	case 'A':
+		options->options &= ~DHCPCD_ARP;
+		/* IPv4LL requires ARP */
+		options->options &= ~DHCPCD_IPV4LL;
+		break;
+	case 'E':
+		options->options |= DHCPCD_LASTLEASE;
+		break;
+	case 'F':
+		if (!oarg) {
+			options->fqdn = FQDN_BOTH;
+			break;
+		}
+		if (strncmp(oarg, "none", strlen(optarg)) == 0)
+			options->fqdn = FQDN_NONE;
+		else if (strncmp(oarg, "ptr", strlen(optarg)) == 0)
+			options->fqdn = FQDN_PTR;
+		else if (strncmp(oarg, "both", strlen(optarg)) == 0)
+			options->fqdn = FQDN_BOTH;
+		else {
+			logger(LOG_ERR, "invalid value `%s' for FQDN",
+			       oarg);
+			return -1;
+		}
+		break;
+	case 'G':
+		options->options &= ~DHCPCD_GATEWAY;
+		break;
+	case 'I':
+		if (oarg) {
+			if (strlen(oarg) > CLIENT_ID_MAX_LEN) {
+				logger(LOG_ERR, "`%s' is too long for"
+				       " ClientID, max is %d",
+				       oarg, CLIENT_ID_MAX_LEN);
+				return -1;
+			}
+			if (strlcpy(options->clientid, oarg,
+				    sizeof(options->clientid)) == 0)
+				/* empty string disabled duid */
+				options->options &= ~DHCPCD_DUID;
+		} else {
+			memset(options->clientid, 0,
+			       sizeof(options->clientid));
+			options->options &= ~DHCPCD_DUID;
+		}
+		break;
+	case 'L':
+		options->options &= ~DHCPCD_IPV4LL;
+		break;
+	default:
+		return 0;
+	}
+
+	return 1;
 }
 
 int
 main(int argc, char **argv)
 {
 	struct options *options;
-	int userclasses = 0;
 	int opt;
 	int option_index = 0;
 	char *prefix;
 	pid_t pid;
 	int debug = 0;
-	int i;
-	int j;
+	int i, r;
+	unsigned int u;
 	int pidfd = -1;
 	int sig = 0;
 	int retval = EXIT_FAILURE;
-	char *p;
-	int doopts = 1, dodns = 1, dohostname = 1, donis = 1, dontp = 1;
+	char *line, *option, *buffer = NULL;
+	size_t len = 0;
+	FILE *f;
 
 	/* Close any un-needed fd's */
 	for (i = getdtablesize() - 1; i >= 3; --i)
@@ -181,10 +362,53 @@ main(int argc, char **argv)
 	    strcmp(options->hostname, "localhost") == 0)
 		*options->hostname = '\0';
 
+	/* Parse our options file */
+	f = fopen(CONFIGFILE, "r");
+	if (f) {
+		while ((get_line(&buffer, &len, f))) {
+			line = buffer;
+			option = strsep(&line, " ");
+			if (!option || *option == '\0' || *option == '#')
+				continue;
+			for (u = 0; u < sizeof(longopts) / sizeof(longopts[0]);
+					u++)
+			{
+				if (strcmp(longopts[u].name, option) == 0) {
+					r = parse_option(longopts[u].val, line,
+							options);
+					if (r == 1)
+						break;
+					free(buffer);
+					fclose(f);
+					if (r == 0)
+						usage();
+					goto abort;
+				}
+			}
+		}
+		free(buffer);
+		fclose(f);
+	} else {
+		if (errno != ENOENT) {
+			logger(LOG_ERR, "fopen `%s': %s", CONFIGFILE,
+					strerror(errno));
+			goto abort;
+		}
+	}
+
+#ifdef CMDLINE_COMAPT
+	add_reqmask(options->reqmask, DHCP_DNSSERVER);
+	add_reqmask(options->reqmask, DHCP_DNSDOMAIN);
+	add_reqmask(options->reqmask, DHCP_DNSSEARCH);
+	add_reqmask(options->reqmask, DHCP_NISSERVER);
+	add_reqmask(options->reqmask, DHCP_NISDOMAIN);
+	add_reqmask(options->reqmask, DHCP_NTPSERVER);
+#endif
+
 	/* Don't set any optional arguments here so we retain POSIX
 	 * compatibility with getopt */
 	while ((opt = getopt_long(argc, argv, EXTRA_OPTS
-				  "c:dh:i:kl:m:no:pr:s:t:u:xAEF:GHI:LNORSTY",
+				  "c:dh:i:kl:m:no:pr:s:t:u:xAEF:GHI:LO:STV",
 				  longopts, &option_index)) != -1)
 	{
 		switch (opt) {
@@ -194,18 +418,15 @@ main(int argc, char **argv)
 			logger(LOG_ERR,	"option `%s' should set a flag",
 			       longopts[option_index].name);
 			goto abort;
-		case 'c':
-			options->script = optarg;
-			break;
 		case 'd':
 			debug++;
 			switch (debug) {
-			case 1:
-				setloglevel(LOG_DEBUG);
-				break;
-			case 2:
-				options->options &= ~DHCPCD_DAEMONISE;
-				break;
+				case 1:
+					setloglevel(LOG_DEBUG);
+					break;
+				case 2:
+					options->options &= ~DHCPCD_DAEMONISE;
+					break;
 			}
 			break;
 #ifdef THERE_IS_NO_FORK
@@ -217,205 +438,55 @@ main(int argc, char **argv)
 			dhcpcd_skiproutes = xstrdup(optarg);
 			break;
 #endif
-		case 'h':
-			if (!optarg)
-				*options->hostname = '\0';
-			else if (strlen(optarg) > MAXHOSTNAMELEN) {
-				logger(LOG_ERR,
-					"`%s' too long for HostName string,"
-					" max is %d", optarg, MAXHOSTNAMELEN);
-				goto abort;
-			} else
-				strlcpy(options->hostname, optarg,
-					sizeof(options->hostname));
-			break;
-		case 'i':
-			if (!optarg) {
-				*options->classid = '\0';
-			} else if (strlen(optarg) > CLASS_ID_MAX_LEN) {
-				logger(LOG_ERR,
-				       "`%s' too long for ClassID string,"
-				       " max is %d", optarg, CLASS_ID_MAX_LEN);
-				goto abort;
-			} else
-				strlcpy(options->classid, optarg,
-					sizeof(options->classid));
-			break;
 		case 'k':
 			sig = SIGHUP;
-			break;
-		case 'l':
-			if (*optarg == '-') {
-				logger(LOG_ERR,
-				       "leasetime must be a positive value");
-				goto abort;
-			}
-			errno = 0;
-			options->leasetime = (uint32_t)strtol(optarg, NULL, 0);
-			if (errno == EINVAL || errno == ERANGE) {
-				logger(LOG_ERR, "`%s' out of range", optarg);
-				goto abort;
-			}
-			break;
-		case 'm':
-			options->metric = atoint(optarg);
-			if (options->metric < 0) {
-				logger(LOG_ERR,
-				       "metric must be a positive value");
-				goto abort;
-			}
 			break;
 		case 'n':
 			sig = SIGALRM;
 			break;
-		case 'o':
-			if (make_reqmask(options, &optarg) != 0) {
-				logger(LOG_ERR, "unknown option `%s'", optarg);
-				goto abort;
-			}
-			break;
-		case 'p':
-			options->options |= DHCPCD_PERSISTENT;
-			break;
-		case 's':
-			options->options |= DHCPCD_INFORM;
-			options->options &= ~DHCPCD_ARP;
-			if (!optarg || strlen(optarg) == 0) {
-				options->request_address.s_addr = 0;
-				break;
-			} else {
-				if ((p = strchr(optarg, '/'))) {
-					/* nullify the slash, so the -r option
-					 * can read the address */
-					*p++ = '\0';
-					if (sscanf(p, "%d", &i) != 1 ||
-					    inet_cidrtoaddr(i, &options->request_netmask) != 0)
-					{
-						logger(LOG_ERR,
-						       "`%s' is not a valid CIDR",
-						       p);
-						goto abort;
-					}
-				}
-			}
-			/* FALLTHROUGH */
-		case 'r':
-			if (!(options->options & DHCPCD_INFORM))
-				options->options |= DHCPCD_REQUEST;
-			if (strlen(optarg) > 0 &&
-			    !inet_aton(optarg, &options->request_address))
-			{ 
-				logger(LOG_ERR,
-				       "`%s' is not a valid IP address",
-				       optarg);
-				goto abort;
-			}
-			break;
-		case 't':
-			options->timeout = atoint(optarg);
-			if (options->timeout < 0) {
-				logger (LOG_ERR, "timeout must be a positive value");
-				goto abort;
-			}
-			break;
-		case 'u':
-			j = 0;
-			for (i = 0; i < userclasses; i++)
-				j += (int)options->userclass[j] + 1;
-				if (j + 1 + strlen(optarg) > USERCLASS_MAX_LEN) {
-					logger(LOG_ERR,
-					       "userclass overrun, max is %d",
-					       USERCLASS_MAX_LEN);
-					goto abort;
-				}
-				userclasses++;
-				memcpy(options->userclass + j + 1 ,
-				       optarg, strlen(optarg));
-				options->userclass[j] = strlen(optarg);
-				options->userclass_len += (strlen(optarg)) + 1;
-			break;
 		case 'x':
 			sig = SIGTERM;
 			break;
-		case 'A':
-#ifndef ENABLE_ARP
-			logger (LOG_ERR, "arp not compiled into dhcpcd");
-			goto abort;
-#endif
-			options->options &= ~DHCPCD_ARP;
-			/* IPv4LL requires ARP */
-			options->options &= ~DHCPCD_IPV4LL;
-			break;
-		case 'E':
-			options->options |= DHCPCD_LASTLEASE;
-			break;
-		case 'F':
-			if (!optarg) {
-				options->fqdn = FQDN_BOTH;
-				break;
-			}
-			if (strncmp(optarg, "none", strlen(optarg)) == 0)
-				options->fqdn = FQDN_NONE;
-			else if (strncmp(optarg, "ptr", strlen(optarg)) == 0)
-				options->fqdn = FQDN_PTR;
-			else if (strncmp(optarg, "both", strlen(optarg)) == 0)
-				options->fqdn = FQDN_BOTH;
-			else {
-				logger(LOG_ERR, "invalid value `%s' for FQDN",
-				       optarg);
-				goto abort;
-			}
-			break;
-		case 'G':
-			options->options &= ~DHCPCD_GATEWAY;
-			break;
-		case 'H':
-			dohostname = 0;
-			break;
-		case 'I':
-			if (optarg) {
-				if (strlen(optarg) > CLIENT_ID_MAX_LEN) {
-					logger(LOG_ERR, "`%s' is too long for"
-					       " ClientID, max is %d",
-					       optarg, CLIENT_ID_MAX_LEN);
-					goto abort;
-				}
-				if (strlcpy(options->clientid, optarg,
-					    sizeof(options->clientid)) == 0)
-					/* empty string disabled duid */
-					options->options &= ~DHCPCD_DUID;
-			} else {
-				memset(options->clientid, 0,
-				       sizeof(options->clientid));
-				options->options &= ~DHCPCD_DUID;
-			}
-			break;
-		case 'L':
-			options->options &= ~DHCPCD_IPV4LL;
-			break;
-		case 'N':
-			dontp = 0;
-			break;
 		case 'O':
-			doopts = 0;
-			break;
-		case 'R':
-			dodns = 0;
-			break;
-		case 'S':
-			options->domscsr++;
+			if (make_reqmask(options, &optarg, -1) != 0) {
+				logger(LOG_ERR, "unknown option `%s'", optarg);
+				return -1;
+			}
 			break;
 		case 'T':
 			options->options |= DHCPCD_TEST | DHCPCD_PERSISTENT;
 			break;
-		case 'Y':
-			donis = 0;
+		case 'V':
+			print_options();
+			goto abort;
+#ifdef CMDLINE_COMPAT
+		case 'H':
 			break;
+		case 'N':
+			del_reqmask(options->reqmask, DHCP_NTPSERVER);
+			break;
+		case 'R':
+			del_reqmask(options->reqmask, DHCP_DNSSERVER);
+			del_reqmask(options->reqmask, DHCP_DNSDOMAIN);
+			del_reqmask(options->reqmask, DHCP_DNSSEARCH);
+			break;
+		case 'S':
+			add_mask(options->requmask, DHCP_MSCR);
+			break;
+		case 'Y':
+			del_reqmask(options->reqmask, DHCP_NISSERVER);
+			del_reqmask(options->reqmask, DHCP_NISDOMAIN);
+			break;
+#endif
 		case '?':
 			usage();
 			goto abort;
 		default:
-			usage();
+			i = parse_option(opt, optarg, options);
+			if (i == 1)
+				break;
+			if (i == 0)
+				usage();
 			goto abort;
 		}
 	}
@@ -428,9 +499,6 @@ main(int argc, char **argv)
 #ifdef ENABLE_DUID
 			" DUID"
 #endif
-#ifdef ENABLE_INFO_COMPAT
-			" INFO_COMPAT"
-#endif
 #ifdef ENABLE_IPV4LL
 			" IPV4LL"
 #endif
@@ -442,22 +510,6 @@ main(int argc, char **argv)
 
 	if (dohelp)
 		usage();
-
-	if (doopts) {
-		if (dodns) {
-			add_reqmask(options->reqmask, DHCP_DNSSERVER);
-			add_reqmask(options->reqmask, DHCP_DNSDOMAIN);
-			add_reqmask(options->reqmask, DHCP_DNSSEARCH);
-		}
-		if (dohostname)
-			add_reqmask(options->reqmask, DHCP_HOSTNAME);
-		if (donis) {
-			add_reqmask(options->reqmask, DHCP_NISSERVER);
-			add_reqmask(options->reqmask, DHCP_NISDOMAIN);
-		}
-		if (dontp)
-			add_reqmask(options->reqmask, DHCP_NTPSERVER);
-	}
 
 #ifdef THERE_IS_NO_FORK
 	dhcpcd_argv = argv;
