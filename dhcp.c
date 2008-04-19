@@ -214,7 +214,7 @@ valid_length(uint8_t option, const uint8_t *data, int *type)
 		if (type)
 			*type = t;
 		
-		if (t == 0 || t & STRING)
+		if (t == 0 || t & STRING || t & RFC3442)
 			return 0;
 
 		sz = 0;
@@ -342,15 +342,15 @@ get_option_uint8(uint8_t *i, const struct dhcp_message *dhcp, uint8_t option)
  * seperated string. Returns length of string (including 
  * terminating zero) or zero on error. out may be NULL
  * to just determine output length. */
-static unsigned int
-decode_rfc3397(const uint8_t *p, char *out)
+static ssize_t
+decode_rfc3397(char *out, ssize_t len, const uint8_t *p)
 {
-	uint8_t len = *p++;
+	uint8_t ln = *p++;
 	const uint8_t *r, *q = p;
 	unsigned int count = 0, l, hops;
 	uint8_t ltype;
 
-	while (q - p < len) {
+	while (q - p < ln) {
 		r = NULL;
 		hops = 0;
 		while ((l = *q++)) {
@@ -367,15 +367,21 @@ decode_rfc3397(const uint8_t *p, char *out)
 				if (hops > 255)
 					return 0;
 				q = p + l;
-				if (q - p >= len)
+				if (q - p >= ln)
 					return 0;
 			} else {
 				/* straightforward name segment, add with '.' */
 				count += l + 1;
 				if (out) {
+					if (l + 1 > len) {
+						errno = ENOBUFS;
+						return -1;
+					}
 					memcpy(out, q, l);
 					out += l;
 					*out++ = '.';
+					len -= l;
+					len--;
 				}
 				q += l;
 			}
@@ -394,8 +400,82 @@ decode_rfc3397(const uint8_t *p, char *out)
 	return count;  
 }
 
-struct rt *
-decode_rfc3442(const uint8_t *data)
+static ssize_t
+decode_rfc3442(char *out, ssize_t len, const uint8_t *p)
+{
+	const uint8_t *e;
+	ssize_t bytes = 0;
+	ssize_t b;
+	uint8_t l;
+	uint8_t cidr;
+	uint8_t ocets;
+	struct in_addr addr;
+	char *o = out;
+
+	l = *p++;
+	/* Minimum is 5 -first is CIDR and a router length of 4 */
+	if (l < 5) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	e = p + l;
+	while (p < e) {
+		cidr = *p++;
+		if (cidr > 32) {
+			errno = EINVAL;
+			return -1;
+		}
+		ocets = (cidr + 7) / 8;
+		if (!out) {
+			p += 4 + ocets;
+			bytes += ((4 * 4) * 3) + 1;
+			continue;
+		}
+		if ((((4 * 4) * 3) + 1) > len) {
+			errno = ENOBUFS;
+			return -1;
+		}
+		if (o != out) {
+			*o++ = ' ';
+			len--;
+		}
+		/* If we have ocets then we have a destination and netmask */
+		if (ocets > 0) {
+			addr.s_addr = 0;
+			memcpy(&addr.s_addr, p, (size_t)ocets);
+			b = snprintf(o, len, "%s", inet_ntoa(addr));
+			o += b;
+			len -= b;
+			addr.s_addr = 0;
+			memset(&addr.s_addr, 255, (size_t)ocets - 1);
+			memset((uint8_t *)&addr.s_addr +
+			       (ocets - 1),
+			       (256 - (1 << (32 - cidr) % 8)), 1);
+			b = snprintf(o, len, " %s", inet_ntoa(addr));
+			o += b;
+			len -= b;
+			p += ocets;
+		} else {
+			b = snprintf(o, len, "0.0.0.0 0.0.0.0");
+			o += b;
+			len =- b;
+		}
+
+		/* Finally, snag the router */
+		memcpy(&addr.s_addr, p, 4);
+		p += 4;
+		b = snprintf(o, len, " %s", inet_ntoa(addr));
+		o += b;
+		len -= b;
+	}
+	if (out)
+		return o - out;
+	return bytes;
+}
+
+static struct rt *
+decode_rfc3442_rt(const uint8_t *data)
 {
 	const uint8_t *p = data;
 	const uint8_t *e;
@@ -420,10 +500,10 @@ decode_rfc3442(const uint8_t *data)
 		}
 
 		if (rt) {
-			rt->next = xmalloc(sizeof(*rt));
+			rt->next = xzalloc(sizeof(*rt));
 			rt = rt->next;
 		} else {
-			routes = rt = xmalloc(sizeof(*routes));
+			routes = rt = xzalloc(sizeof(*routes));
 		}
 		rt->next = NULL;
 
@@ -467,9 +547,9 @@ decode_rfc3361(const uint8_t *data)
 	len--;
 	switch (enc) {
 	case 0:
-		if ((l = decode_rfc3397(data, NULL)) > 0) {
-			sip = xmalloc(len);
-			decode_rfc3397(data, sip);
+		if ((l = decode_rfc3397(NULL, 0, data)) > 0) {
+			sip = xmalloc(l);
+			decode_rfc3397(sip, l, data);
 		}
 		break;
 	case 1:
@@ -509,13 +589,13 @@ get_option_string(const struct dhcp_message *dhcp, uint8_t option)
 		return NULL;
 
 	if (type & RFC3397) {
-		type = decode_rfc3397(p, NULL);
+		type = decode_rfc3397(NULL, 0, p);
 		if (!type) {
 			errno = EINVAL;
 			return NULL;
 		}
 		s = xmalloc(sizeof(char) * type);
-		decode_rfc3397(p, s);
+		decode_rfc3397(s, type, p);
 		return s;
 	}
 
@@ -576,7 +656,7 @@ get_option_routes(const struct dhcp_message *dhcp)
 	if (!p)
 		p = get_option(dhcp, DHCP_MSCSR);
 	if (p) {
-		routes = decode_rfc3442(p);
+		routes = decode_rfc3442_rt(p);
 		if (routes)
 			return routes;
 	}
@@ -861,15 +941,14 @@ read_lease(const struct interface *iface)
 }
 
 static ssize_t
-print_string(char *s, const uint8_t *data, ssize_t len)
+print_string(char *s, ssize_t len, const uint8_t *data, ssize_t datal)
 {
 	uint8_t c;
 	const uint8_t *e;
 	ssize_t bytes = 0;
 	ssize_t r;
 
-	c = *data++;
-	e = data + c;
+	e = data + datal;
 	while (data < e) {
 		c = *data++;
 		if (!isascii(c) || !isprint(c)) {
@@ -918,7 +997,7 @@ print_string(char *s, const uint8_t *data, ssize_t len)
 }
 
 static ssize_t
-print_option(char *s, int type, const uint8_t *data, ssize_t len)
+print_option(char *s, ssize_t len, int type, const uint8_t *data)
 {
 	const uint8_t *e, *t;
 	uint16_t u16;
@@ -928,9 +1007,26 @@ print_option(char *s, int type, const uint8_t *data, ssize_t len)
 	struct in_addr addr;
 	ssize_t bytes = 0;
 	ssize_t l;
+	char *tmp;
 
-	if (!type || type & STRING)
-		return print_string(s, data, len);
+	if (type & RFC3397) {
+		l = decode_rfc3397(NULL, 0, data);
+		if (l < 1)
+			return l;
+		tmp = xmalloc(l);
+		decode_rfc3397(tmp, l, data);
+		l = print_string(s, len, (uint8_t *)tmp, l - 1);
+		free(tmp);
+		return l;
+	}
+
+	if (type & RFC3442)
+		return decode_rfc3442(s, len, data);
+
+	if (!type || type & STRING) {
+		l = *data++;
+		return print_string(s, len, data, l);
+	}
 
 	if (!s) {
 		if (type & UINT8)
@@ -1058,11 +1154,11 @@ configure_env(const char *prefix, const struct dhcp_message *dhcp)
 		val = NULL;
 		p = get_option(dhcp, opt->option);
 		if (p) {
-			len = print_option(NULL, opt->type, p, 0);
+			len = print_option(NULL, 0, opt->type, p);
 			if (len < 0)
 				return -1;
 			val = xmalloc(len);
-			print_option(val, opt->type, p, len);
+			print_option(val, len, opt->type, p);
 		}
 		_setenv(prefix, opt->var, val);
 		free(val);
