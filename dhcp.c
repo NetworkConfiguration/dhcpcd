@@ -373,7 +373,7 @@ decode_rfc3397(char *out, ssize_t len, const uint8_t *p)
 				/* straightforward name segment, add with '.' */
 				count += l + 1;
 				if (out) {
-					if (l + 1 > len) {
+					if ((ssize_t)l + 1 > len) {
 						errno = ENOBUFS;
 						return -1;
 					}
