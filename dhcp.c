@@ -373,7 +373,7 @@ decode_rfc3397(char *out, ssize_t len, const uint8_t *p)
 				/* straightforward name segment, add with '.' */
 				count += l + 1;
 				if (out) {
-					if ((ssize_t)l + 1 > len) {
+					if (l + 1 > len) {
 						errno = ENOBUFS;
 						return -1;
 					}
@@ -429,10 +429,10 @@ decode_rfc3442(char *out, ssize_t len, const uint8_t *p)
 		ocets = (cidr + 7) / 8;
 		if (!out) {
 			p += 4 + ocets;
-			bytes += ((4 * 4) * 3) + 1;
+			bytes += ((4 * 4) * 2) + 4;
 			continue;
 		}
-		if ((((4 * 4) * 3) + 1) > len) {
+		if ((((4 * 4) * 2) + 4) > len) {
 			errno = ENOBUFS;
 			return -1;
 		}
@@ -444,23 +444,12 @@ decode_rfc3442(char *out, ssize_t len, const uint8_t *p)
 		if (ocets > 0) {
 			addr.s_addr = 0;
 			memcpy(&addr.s_addr, p, (size_t)ocets);
-			b = snprintf(o, len, "%s", inet_ntoa(addr));
-			o += b;
-			len -= b;
-			addr.s_addr = 0;
-			memset(&addr.s_addr, 255, (size_t)ocets - 1);
-			memset((uint8_t *)&addr.s_addr +
-			       (ocets - 1),
-			       (256 - (1 << (32 - cidr) % 8)), 1);
-			b = snprintf(o, len, " %s", inet_ntoa(addr));
-			o += b;
-			len -= b;
+			b = snprintf(o, len, "%s/%d", inet_ntoa(addr), cidr);
 			p += ocets;
-		} else {
-			b = snprintf(o, len, "0.0.0.0 0.0.0.0");
-			o += b;
-			len =- b;
-		}
+		} else
+			b = snprintf(o, len, "0.0.0.0/0");
+		o += b;
+		len -= b;
 
 		/* Finally, snag the router */
 		memcpy(&addr.s_addr, p, 4);
@@ -469,6 +458,7 @@ decode_rfc3442(char *out, ssize_t len, const uint8_t *p)
 		o += b;
 		len -= b;
 	}
+
 	if (out)
 		return o - out;
 	return bytes;
