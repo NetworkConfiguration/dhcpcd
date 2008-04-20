@@ -141,8 +141,8 @@ eexit:
 }
 
 ssize_t
-send_packet(const struct interface *iface, int type,
-	    const uint8_t *data, ssize_t len)
+send_raw_packet(const struct interface *iface, int type,
+		const uint8_t *data, ssize_t len)
 {
 	union sockunion {
 		struct sockaddr sa;
@@ -153,12 +153,10 @@ send_packet(const struct interface *iface, int type,
 	memset(&su, 0, sizeof(su));
 	su.sll.sll_family = AF_PACKET;
 	su.sll.sll_protocol = htons(type);
-
 	if (!(su.sll.sll_ifindex = if_nametoindex(iface->name))) {
 		errno = ENOENT;
 		return -1;
 	}
-
 	su.sll.sll_hatype = htons(iface->family);
 	su.sll.sll_halen = iface->hwlen;
 	if (iface->family == ARPHRD_INFINIBAND)
@@ -167,7 +165,7 @@ send_packet(const struct interface *iface, int type,
 	else
 		memset(&su.sll.sll_addr, 0xff, iface->hwlen);
 
-	return sendto(iface->fd, data, len,0,&su.sa,sizeof(su));
+	return sendto(iface->fd, data, len, 0, &su.sa, sizeof(su));
 }
 
 /* Linux has no need for the buffer as we can read as much as we want.

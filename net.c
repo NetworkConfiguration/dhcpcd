@@ -443,6 +443,23 @@ eexit:
         return -1;
 }
 
+ssize_t
+send_packet(const struct interface *iface, struct in_addr to,
+	    const uint8_t *data, ssize_t len)
+{
+	union sockunion {
+		struct sockaddr sa;
+		struct sockaddr_in sin;
+	} su;
+
+	memset(&su, 0, sizeof(su));
+	su.sin.sin_family = AF_INET;
+	su.sin.sin_addr.s_addr = to.s_addr;
+	su.sin.sin_port = htons(DHCP_SERVER_PORT);
+
+	return sendto(iface->udp_fd, data, len, 0, &su.sa, sizeof(su));
+}
+
 struct udp_dhcp_packet
 {
 	struct ip ip;
@@ -648,8 +665,8 @@ send_arp(const struct interface *iface, int op, struct in_addr sip,
 	}
 	memcpy(ar_tpa(arp), &tip, (size_t)arp->ar_pln);
 
-	retval = send_packet(iface, ETHERTYPE_ARP,
-			     (unsigned char *) arp, arphdr_len(arp));
+	retval = send_raw_packet(iface, ETHERTYPE_ARP,
+				 (uint8_t *)arp, arphdr_len(arp));
 	if (retval == -1)
 		logger(LOG_ERR,"send_packet: %s", strerror(errno));
 	free(arp);

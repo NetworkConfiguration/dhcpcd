@@ -601,10 +601,12 @@ send_message(struct if_state *state, int type, const struct options *options)
 	struct dhcp_message *dhcp;
 	uint8_t *udp;
 	ssize_t len;
-	ssize_t retval;
+	ssize_t r;
 	struct in_addr from;
 	struct in_addr to;
 
+	logger(LOG_DEBUG, "sending %s with xid 0x%x",
+	       get_dhcp_op(type), state->xid);
 	state->last_type = type;
 	state->last_sent = uptime();
 	len = make_message(&dhcp, state->interface, &state->lease, state->xid,
@@ -614,15 +616,19 @@ send_message(struct if_state *state, int type, const struct options *options)
 		to.s_addr = state->lease.server.s_addr;
 	else
 		to.s_addr = 0;
-	len = make_udp_packet(&udp, (uint8_t *)dhcp, len, from, to);
-	free(dhcp);
-	logger(LOG_DEBUG, "sending %s with xid 0x%x",
-		get_dhcp_op(type), state->xid);
-	retval = send_packet(state->interface, ETHERTYPE_IP, udp, len);
-	if (retval == -1)
-		logger(LOG_ERR, "send_packet: %s", strerror(errno));
-	free(udp);
-	return retval;
+	if (to.s_addr) {
+		r = send_packet(state->interface, to, (uint8_t *)dhcp, len);
+		if (r == -1)
+			logger(LOG_ERR, "send_packet: %s", strerror(errno));
+	} else {
+		len = make_udp_packet(&udp, (uint8_t *)dhcp, len, from, to);
+		free(dhcp);
+		r = send_raw_packet(state->interface, ETHERTYPE_IP, udp, len);
+		if (r == -1)
+			logger(LOG_ERR, "send_raw_packet: %s", strerror(errno));
+		free(udp);
+	}
+	return r;
 }
 
 static void
@@ -809,7 +815,8 @@ handle_timeout(struct if_state *state, const struct options *options)
 
 		do_socket(state, SOCKET_CLOSED);
 
-		if (options->options & DHCPCD_INFORM)
+		if (options->options & DHCPCD_INFORM ||
+		    options->options & DHCPCD_TEST)
 			return -1;
 
 		if (state->options & DHCPCD_IPV4LL ||

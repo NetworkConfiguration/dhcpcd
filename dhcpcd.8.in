@@ -132,7 +132,9 @@ You can use this option to specify the
 sent, or an empty string to
 stop any
 .Ar hostname
-from being sent.
+from being sent. If
+.Ar hostname
+is an FQDN (ie, contains a .) then it will be encoded as such.
 .It Fl i , -classid Ar classid
 Override the DHCP vendor
 .Ar classid

@@ -696,8 +696,8 @@ make_message(struct dhcp_message **message,
 	     uint32_t xid, uint8_t type, const struct options *options)
 {
 	struct dhcp_message *dhcp;
-	uint8_t *m;
-	uint8_t *p;
+	uint8_t *d, *m, *p;
+	const char *c;
 	uint8_t *n_params = NULL;
 	size_t l;
 	time_t up = uptime() - iface->start_uptime;
@@ -826,8 +826,9 @@ make_message(struct dhcp_message **message,
 			} else {
 				/* Draft IETF DHC-FQDN option (81) */
 				*p++ = DHCP_FQDN;
-				*p++ = (l = strlen(options->hostname)) + 3;
-				/* Flags: 0000NEOS
+				*p++ = strlen(options->hostname) + 5;
+				/*
+				 * Flags: 0000NEOS
 				 * S: 1 => Client requests Server to update
 				 *         a RR in DNS as well as PTR
 				 * O: 1 => Server indicates to client that
@@ -836,11 +837,20 @@ make_message(struct dhcp_message **message,
 				 * N: 1 => Client requests Server to not
 				 *         update DNS
 				 */
-				*p++ = options->fqdn & 0x9;
+				*p++ = (options->fqdn & 0x9) | 0x4;
 				*p++ = 0; /* from server for PTR RR */
 				*p++ = 0; /* from server for A RR if S=1 */
-				memcpy(p, options->hostname, l);
-				p += l;
+				c = options->hostname;
+				d = p++;
+				while (*c) {
+					if (*c == '.') {
+						*d = p - d - 1;
+						d = p++;
+					} else
+						*p++ = (uint8_t) *c;
+					c++;
+				}
+				*p ++ = 0;
 			}
 		}
 

@@ -166,8 +166,10 @@ int valid_udp_packet(uint8_t *);
 void setup_packet_filters(void);
 #endif
 int open_socket(struct interface *, int);
-ssize_t send_packet(const struct interface *, int,
+ssize_t send_packet(const struct interface *, struct in_addr, 
 		    const uint8_t *, ssize_t);
+ssize_t send_raw_packet(const struct interface *, int,
+			const uint8_t *, ssize_t);
 ssize_t get_packet(const struct interface *, uint8_t *,
 		   uint8_t *, ssize_t *, ssize_t *);
 

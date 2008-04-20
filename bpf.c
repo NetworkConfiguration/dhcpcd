@@ -122,8 +122,8 @@ eexit:
 }
 
 ssize_t
-send_packet(const struct interface *iface, int type,
-	    const unsigned char *data, ssize_t len)
+send_raw_packet(const struct interface *iface, int type,
+		const unsigned char *data, ssize_t len)
 {
 	struct iovec iov[2];
 	struct ether_header hw;
