@@ -360,7 +360,7 @@ main(int argc, char **argv)
 	int pidfd = -1;
 	int sig = 0;
 	int retval = EXIT_FAILURE;
-	char *line, *option, *buffer = NULL;
+	char *line, *option, *p, *buffer = NULL;
 	size_t len = 0;
 	FILE *f;
 
@@ -393,10 +393,17 @@ main(int argc, char **argv)
 			option = strsep(&line, " ");
 			if (!option || *option == '\0' || *option == '#')
 				continue;
-			/* Trim whitespace */
-			if (line)
-				while (*line == ' ' || *line == '\t')
+			/* Trim leading whitespace */
+			if (line) {
+				while (*line != '\0' && (*line == ' ' || *line == '\t'))
 					line++;
+			}
+			/* Trim trailing whitespace */
+			if (line && *line) {
+				p = line + strlen(line) - 1;
+				while (p != line && (*p == ' ' || *p == '\t'))
+					*p-- = '\0';
+			}
 			r = parse_config_line(option, line, options);
 			if (r != 1)
 				break;
