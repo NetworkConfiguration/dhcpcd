@@ -347,7 +347,7 @@ decode_rfc3397(char *out, ssize_t len, const uint8_t *p)
 {
 	uint8_t ln = *p++;
 	const uint8_t *r, *q = p;
-	unsigned int count = 0, l, hops;
+	int count = 0, l, hops;
 	uint8_t ltype;
 
 	while (q - p < ln) {
