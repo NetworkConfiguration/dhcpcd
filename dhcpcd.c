@@ -324,6 +324,29 @@ parse_option(int opt, char *oarg, struct options *options)
 	return 1;
 }
 
+static int
+parse_config_line(const char *opt, char *line, struct options *options)
+{
+	unsigned int i;
+
+	for (i = 0; i < sizeof(longopts) / sizeof(longopts[0]); i++) {
+		if (strcmp(longopts[i].name, opt) != 0)
+			continue;
+
+		if (longopts[i].has_arg == required_argument && !line) {
+			fprintf(stderr,
+				"dhcpcd: option requires an argument -- %s\n",
+				opt);
+			return -1;
+		}
+
+		return parse_option(longopts[i].val, line, options);
+	}
+
+	fprintf(stderr, "dhcpcd: unknown option -- %s\n", opt);
+	return -1;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -334,7 +357,6 @@ main(int argc, char **argv)
 	pid_t pid;
 	int debug = 0;
 	int i, r;
-	unsigned int u;
 	int pidfd = -1;
 	int sig = 0;
 	int retval = EXIT_FAILURE;
@@ -365,29 +387,26 @@ main(int argc, char **argv)
 	/* Parse our options file */
 	f = fopen(CONFIGFILE, "r");
 	if (f) {
+		r = 1;
 		while ((get_line(&buffer, &len, f))) {
 			line = buffer;
 			option = strsep(&line, " ");
 			if (!option || *option == '\0' || *option == '#')
 				continue;
-			for (u = 0; u < sizeof(longopts) / sizeof(longopts[0]);
-					u++)
-			{
-				if (strcmp(longopts[u].name, option) == 0) {
-					r = parse_option(longopts[u].val, line,
-							options);
-					if (r == 1)
-						break;
-					free(buffer);
-					fclose(f);
-					if (r == 0)
-						usage();
-					goto abort;
-				}
-			}
+			/* Trim whitespace */
+			if (line)
+				while (*line == ' ' || *line == '\t')
+					line++;
+			r = parse_config_line(option, line, options);
+			if (r != 1)
+				break;
 		}
 		free(buffer);
 		fclose(f);
+		if (r == 0)
+			usage();
+		if (r != 1)
+			goto abort;
 	} else {
 		if (errno != ENOENT) {
 			logger(LOG_ERR, "fopen `%s': %s", CONFIGFILE,
