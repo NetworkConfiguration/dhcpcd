@@ -94,14 +94,23 @@ need_hostname()
 
 lookup_hostname()
 {
+	local h=
+	# Silly ISC programs love to send error text to stdout
 	if type host >/dev/null 2>&1; then
-		host "${new_ip_address}" | \
-		sed 's/.* domain name pointer \(.*\)./\1/'
+		h=`host ${new_ip_address}`
+		if [ $? = 0 ]; then 
+			echo "${h}" \
+			| sed 's/.* domain name pointer \(.*\)./\1/'
+			return 0
+		fi
 	elif type dig >/dev/null 2>&1; then
-		dig +short -x "${new_ip_address}" | sed 's/\.$//'
-	else
-		return 1
+		h=`dig +short -x ${new_ip_address}`
+		if [ $? = 0 ]; then
+			echo "${h}" | sed 's/\.$//'
+			return 0
+		fi
 	fi
+	return 1
 }
 
 set_hostname()
