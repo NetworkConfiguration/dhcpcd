@@ -218,7 +218,7 @@ daemonise(struct if_state *state, const struct options *options)
 	if (pid == 0) {
 		state->options |= DHCPCD_DAEMONISED;
 		return 0;
-		}
+	}
 	
 	state->options |= DHCPCD_PERSISTENT | DHCPCD_FORKED;
 	return -1;
@@ -869,7 +869,8 @@ handle_timeout(struct if_state *state, const struct options *options)
 		if (configure(iface, reason,
 			      state->dhcp, state->old_dhcp,
 			      lease, options, 1) == 0)
-			daemonise(state, options);
+			if (daemonise(state, options) == -1)
+				return -1;
 		state->timeout = lease->renewaltime;
 		state->xid = 0;
 		return 0;
