@@ -22,7 +22,7 @@ make_ntp_conf()
 		echo "server ${x}" >> "${cf}"
 	done
 	if [ ! -e /etc/ntp.conf ]; then
-		true
+		false	
 	elif type cmp >/dev/null 2>&1; then
 		cmp -s /etc/ntp.conf "${cf}"
 	elif type diff >/dev/null 2>&1; then
