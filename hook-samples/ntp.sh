@@ -1,4 +1,3 @@
-#!/bin/sh
 # Sample exit hook script for ntp
 
 # Detect OpenRC or BSD rc

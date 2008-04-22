@@ -42,7 +42,8 @@ commandline compatible with prior versions.
 
 Hooks
 -----
-We provide example exit hooks for NTP (www.ntp.org) and ypbind (Linux).
+We provide example exit hooks for looking up the hostname in DNS,
+NTP (www.ntp.org) and ypbind (Linux).
 There are not installed by default as they are platform dependant.
 
 

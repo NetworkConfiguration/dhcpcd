@@ -1,4 +1,3 @@
-#!/bin/sh
 # Sample exit hook for ypbind
 # This script is only suitable for the Linux version.
 
