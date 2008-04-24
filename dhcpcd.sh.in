@@ -27,7 +27,9 @@
 do_hooks()
 {
 	local x= r=0
-	for x in @SYSCONFDIR@/dhcpcd-"$1"-hook.d/* @SYSCONFDIR@/dhcpcd-"$1"-hook; do
+	for x in @SYSCONFDIR@/dhcpcd-"$1"-hook.d/* \
+		@SYSCONFDIR@/dhcpcd-"$1"-hook \
+	; do
 		if [ -e "${x}" ]; then
 			. "${x}"
 			r=$((${r} + $?))
