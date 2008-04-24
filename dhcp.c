@@ -1139,13 +1139,21 @@ configure_env(const char *prefix, const struct dhcp_message *dhcp)
 			_setenv(prefix, "broadcast_address", inet_ntoa(net));
 		}
 		addr.s_addr = dhcp->yiaddr & net.s_addr;
-		_setenv(prefix, "network_address", inet_ntoa(addr));
-
+		_setenv(prefix, "network_number", inet_ntoa(addr));
 	} else {
 		_setenv(prefix, "ip_address", NULL);
 		_setenv(prefix, "subnet_cidr", NULL);
-		_setenv(prefix, "network_address", NULL);
+		_setenv(prefix, "network_number", NULL);
 	}
+
+	if (*dhcp->bootfile)
+		_setenv(prefix, "filename", (char *)dhcp->bootfile);
+	else
+		_setenv(prefix, "filename", NULL);
+	if (*dhcp->servername)
+		_setenv(prefix, "server_name", (char *)dhcp->servername);
+	else
+		_setenv(prefix, "server_name", NULL);
 
 	for (i = 0; i < sizeof(dhcp_options) / sizeof(dhcp_options[0]); i++) {
 		opt = &dhcp_options[i];
