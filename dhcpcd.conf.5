@@ -57,6 +57,9 @@ if a FQDN (ie, contains a .) then it will be encoded a such.
 .It Ic fqdn Op none | ptr | both
 none disables FQDN encoding, ptr just asks the DHCP server to update the PTR
 record of the host in DNS whereas both also updates the A record.
+.It interface Ar interface
+Subsequent options are only parsed for this
+.Ar interface .
 .It Ic leasetime Ar seconds
 Request a leasetime of
 .Ar seconds .

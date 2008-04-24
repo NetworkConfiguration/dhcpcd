@@ -371,6 +371,7 @@ main(int argc, char **argv)
 	size_t len = 0;
 	FILE *f;
 	char *cf = NULL;
+	char *intf = NULL;
 
 	/* Close any un-needed fd's */
 	for (i = getdtablesize() - 1; i >= 3; --i)
@@ -502,11 +503,21 @@ main(int argc, char **argv)
 			}
 			if (lp)
 				*lp = '\0';
+			if (strcmp(option, "interface") == 0) {
+				free(intf);
+				intf = xstrdup(line);
+				continue;
+			}
+			/* If we're in an interface block don't use these
+			 * options unless it's for us */
+			if (intf && strcmp(intf, options->interface) != 0)
+				continue;
 			r = parse_config_line(option, line, options);
 			if (r != 1)
 				break;
 		}
 		free(buffer);
+		free(intf);
 		fclose(f);
 		if (r == 0)
 			usage();
