@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd Apr 18, 2008
+.Dd Apr 24, 2008
 .Dt DHCPCD.CONF 5 SMM
 .Sh NAME
 .Nm dhcpcd.conf
@@ -34,7 +34,10 @@ can do everything from the command line, there are cases where it's just easier
 to do it once in a configuration file. Most of the options found in
 .Xr dhcpcd 8
 can be used here. The first word on the line is the option and the rest of the
-line is the value. Blank lines and lines starting with # are ignored.
+line is the value. Leading and trailing whitespace for the option and value
+are trimmed. You can escape characters in the value using the \ character.
+.Pp
+Blank lines and lines starting with # are ignored.
 .Pp
 Here's a list of available options:
 .Bl -tag -width indent

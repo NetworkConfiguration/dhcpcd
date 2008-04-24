@@ -330,7 +330,8 @@ parse_config_line(const char *opt, char *line, struct options *options)
 	unsigned int i;
 
 	for (i = 0; i < sizeof(longopts) / sizeof(longopts[0]); i++) {
-		if (strcmp(longopts[i].name, opt) != 0)
+		if (!longopts[i].name ||
+		    strcmp(longopts[i].name, opt) != 0)
 			continue;
 
 		if (longopts[i].has_arg == required_argument && !line) {
@@ -360,7 +361,8 @@ main(int argc, char **argv)
 	int pidfd = -1;
 	int sig = 0;
 	int retval = EXIT_FAILURE;
-	char *line, *option, *p, *buffer = NULL;
+	char *line, *option, *p, *lp, *buffer = NULL;
+	char lt = '\\';
 	size_t len = 0;
 	FILE *f;
 
@@ -390,7 +392,9 @@ main(int argc, char **argv)
 		r = 1;
 		while ((get_line(&buffer, &len, f))) {
 			line = buffer;
-			option = strsep(&line, " ");
+			while ((option = strsep(&line, " \t")))
+				if (*option != '\0')
+					break;
 			if (!option || *option == '\0' || *option == '#')
 				continue;
 			/* Trim leading whitespace */
@@ -401,9 +405,27 @@ main(int argc, char **argv)
 			/* Trim trailing whitespace */
 			if (line && *line) {
 				p = line + strlen(line) - 1;
-				while (p != line && (*p == ' ' || *p == '\t'))
+				while (p != line && (*p == ' ' || *p == '\t')) {
+					/* Remember the last char trimmed */
+					lt = *p;
 					*p-- = '\0';
+				}
 			}
+			/* Process escapes */
+			lp = p = line;
+			while (p && *p) {
+				if (*p == '\\')
+					p++;
+				/* EOL? */
+				if (*p == '\0') {
+					/* Restore the last char trimmed */
+					*lp++ = lt;
+					break;
+				}
+				*lp++ = *p++;
+			}
+			if (lp)
+				*lp = '\0';
 			r = parse_config_line(option, line, options);
 			if (r != 1)
 				break;
