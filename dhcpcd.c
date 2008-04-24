@@ -49,12 +49,17 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 #include "net.h"
 #include "logger.h"
 
+/* Don't set any optional arguments here so we retain POSIX
+ * compatibility with getopt */
+#define OPTS "c:df:h:i:kl:m:no:pr:s:t:u:xAEF:GHI:LO:STV"
+
 static int doversion = 0;
 static int dohelp = 0;
 static const struct option longopts[] = {
 	{"arp",         no_argument,        NULL, 'a'},
 	{"script",      required_argument,  NULL, 'c'},
 	{"debug",       no_argument,        NULL, 'd'},
+	{"config",	required_argument,  NULL, 'f'},
 	{"hostname",    optional_argument,  NULL, 'h'},
 	{"classid",     optional_argument,  NULL, 'i'},
 	{"release",     no_argument,        NULL, 'k'},
@@ -79,8 +84,8 @@ static const struct option longopts[] = {
 	{"help",        no_argument,        &dohelp, 1},
 	{"version",     no_argument,        &doversion, 1},
 #ifdef THERE_IS_NO_FORK
-	{"daemonised",	no_argument,        NULL, 'f'},
-	{"skiproutes",  required_argument,  NULL, 'g'},
+	{"daemonised",	no_argument,        NULL, 'X'},
+	{"skiproutes",  required_argument,  NULL, 'Z'},
 #endif
 #ifdef CMDLINE_COMPAT
 	{"nohostname",  no_argument,        NULL, 'H'},
@@ -97,7 +102,7 @@ char dhcpcd[PATH_MAX];
 char **dhcpcd_argv = NULL;
 int dhcpcd_argc = 0;
 char *dhcpcd_skiproutes = NULL;
-#define EXTRA_OPTS "fg:"
+#define EXTRA_OPTS "XZ:"
 #elif CMDLINE_COMAPT
 # define EXTRA_OPTS "NRSY"
 #endif
@@ -144,7 +149,7 @@ read_pid(const char *pidfile)
 static void
 usage(void)
 {
-	printf("usage: "PACKAGE" [-adknpEGHLOSTV] [-c script] [-h hostname] [-i classID]\n"
+	printf("usage: "PACKAGE" [-adknpEGHLOSTV] [-c script] [-f file ] [-h hostname] [-i classID]\n"
 	       "              [-l leasetime] [-m metric] [-o option] [-r ipaddress]\n"
 	       "              [-s ipaddress] [-t timeout] [-u userclass] [-F none | ptr | both]\n"
 	       "              [-I clientID] <interface>\n");
@@ -365,6 +370,7 @@ main(int argc, char **argv)
 	char lt = '\\';
 	size_t len = 0;
 	FILE *f;
+	char *cf = NULL;
 
 	/* Close any un-needed fd's */
 	for (i = getdtablesize() - 1; i >= 3; --i)
@@ -372,8 +378,18 @@ main(int argc, char **argv)
 
 	openlog(PACKAGE, LOG_PID, LOG_LOCAL0);
 
+#ifdef THERE_IS_NO_FORK
+	dhcpcd_argv = argv;
+	dhcpcd_argc = argc;
+	if (!realpath(argv[0], dhcpcd)) {
+		fprintf(stderr, "unable to resolve the path `%s': %s",
+				argv[0], strerror(errno));
+		goto abort;
+	}
+#endif
+
 	options = xzalloc(sizeof(*options));
-	options->script = (char *)DEFAULTSCRIPT;
+	options->script = (char *)SCRIPT;
 	snprintf(options->classid, CLASS_ID_MAX_LEN, "%s %s",
 		 PACKAGE, VERSION);
 
@@ -386,8 +402,68 @@ main(int argc, char **argv)
 	    strcmp(options->hostname, "localhost") == 0)
 		*options->hostname = '\0';
 
+	while ((opt = getopt_long(argc, argv, OPTS EXTRA_OPTS,
+				  longopts, &option_index)) != -1)
+	{
+		switch (opt) {
+		case 0:
+			if (longopts[option_index].flag)
+				break;
+			logger(LOG_ERR,	"option `%s' should set a flag",
+			       longopts[option_index].name);
+			goto abort;
+		case 'f':
+			cf = optarg;
+			break;
+		case '?':
+			usage();
+			goto abort;
+		}
+	}
+
+	if (doversion) {
+		printf(""PACKAGE" "VERSION"\n");
+		printf("Compile time options:"
+#ifdef ENABLE_ARP
+			" ARP"
+#endif
+#ifdef ENABLE_DUID
+			" DUID"
+#endif
+#ifdef ENABLE_IPV4LL
+			" IPV4LL"
+#endif
+#ifdef THERE_IS_NO_FORK
+			" THERE_IS_NO_FORK"
+#endif
+			"\n");
+	}
+
+	if (dohelp)
+		usage();
+
+	if (optind < argc) {
+		if (strlen(argv[optind]) > IF_NAMESIZE) {
+			logger(LOG_ERR,
+			       "`%s' too long for an interface name (max=%d)",
+			       argv[optind], IF_NAMESIZE);
+			goto abort;
+		}
+		strlcpy(options->interface, argv[optind],
+			sizeof(options->interface));
+	} else {
+		/* If only version was requested then exit now */
+		if (doversion || dohelp) {
+			retval = 0;
+			goto abort;
+		}
+
+		logger(LOG_ERR, "no interface specified");
+		goto abort;
+	}
+
 	/* Parse our options file */
-	f = fopen(CONFIGFILE, "r");
+	f = fopen(cf ? cf : CONFIGFILE, "r");
 	if (f) {
 		r = 1;
 		while ((get_line(&buffer, &len, f))) {
@@ -437,8 +513,8 @@ main(int argc, char **argv)
 		if (r != 1)
 			goto abort;
 	} else {
-		if (errno != ENOENT) {
-			logger(LOG_ERR, "fopen `%s': %s", CONFIGFILE,
+		if (errno != ENOENT || cf) {
+			logger(LOG_ERR, "fopen `%s': %s", cf ? cf : CONFIGFILE,
 					strerror(errno));
 			goto abort;
 		}
@@ -453,19 +529,11 @@ main(int argc, char **argv)
 	add_reqmask(options->reqmask, DHCP_NTPSERVER);
 #endif
 
-	/* Don't set any optional arguments here so we retain POSIX
-	 * compatibility with getopt */
-	while ((opt = getopt_long(argc, argv, EXTRA_OPTS
-				  "c:dh:i:kl:m:no:pr:s:t:u:xAEF:GHI:LO:STV",
+	optind = 0;
+	while ((opt = getopt_long(argc, argv, OPTS EXTRA_OPTS,
 				  longopts, &option_index)) != -1)
 	{
 		switch (opt) {
-		case 0:
-			if (longopts[option_index].flag)
-				break;
-			logger(LOG_ERR,	"option `%s' should set a flag",
-			       longopts[option_index].name);
-			goto abort;
 		case 'd':
 			debug++;
 			switch (debug) {
@@ -477,12 +545,14 @@ main(int argc, char **argv)
 					break;
 			}
 			break;
-#ifdef THERE_IS_NO_FORK
 		case 'f':
+			break;
+#ifdef THERE_IS_NO_FORK
+		case 'X':
 			options->options |= DHCPCD_DAEMONISED;
 			close_fds();
 			break;
-		case 'g':
+		case 'Z':
 			dhcpcd_skiproutes = xstrdup(optarg);
 			break;
 #endif
@@ -526,9 +596,6 @@ main(int argc, char **argv)
 			del_reqmask(options->reqmask, DHCP_NISDOMAIN);
 			break;
 #endif
-		case '?':
-			usage();
-			goto abort;
 		default:
 			i = parse_option(opt, optarg, options);
 			if (i == 1)
@@ -538,57 +605,6 @@ main(int argc, char **argv)
 			goto abort;
 		}
 	}
-	if (doversion) {
-		printf(""PACKAGE" "VERSION"\n");
-		printf("Compile time options:"
-#ifdef ENABLE_ARP
-			" ARP"
-#endif
-#ifdef ENABLE_DUID
-			" DUID"
-#endif
-#ifdef ENABLE_IPV4LL
-			" IPV4LL"
-#endif
-#ifdef THERE_IS_NO_FORK
-			" THERE_IS_NO_FORK"
-#endif
-			"\n");
-	}
-
-	if (dohelp)
-		usage();
-
-#ifdef THERE_IS_NO_FORK
-	dhcpcd_argv = argv;
-	dhcpcd_argc = argc;
-	if (!realpath(argv[0], dhcpcd)) {
-		logger(LOG_ERR, "unable to resolve the path `%s': %s",
-		       argv[0], strerror(errno));
-		goto abort;
-	}
-#endif
-
-	if (optind < argc) {
-		if (strlen(argv[optind]) > IF_NAMESIZE) {
-			logger(LOG_ERR,
-			       "`%s' too long for an interface name (max=%d)",
-			       argv[optind], IF_NAMESIZE);
-			goto abort;
-		}
-		strlcpy(options->interface, argv[optind],
-			sizeof(options->interface));
-	} else {
-		/* If only version was requested then exit now */
-		if (doversion || dohelp) {
-			retval = 0;
-			goto abort;
-		}
-
-		logger(LOG_ERR, "no interface specified");
-		goto abort;
-	}
-
 	if (strchr(options->hostname, '.')) {
 		if (options->fqdn == FQDN_DISABLE)
 			options->fqdn = FQDN_BOTH;

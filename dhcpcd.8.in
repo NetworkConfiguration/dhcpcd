@@ -31,6 +31,7 @@
 .Nm
 .Op Fl dknpAEGLSTV
 .Op Fl c , -script Ar script
+.Op Fl f , -config Ar file
 .Op Fl h , -hostname Ar hostname
 .Op Fl i , -classid Ar classid
 .Op Fl l , -leasetime Ar seconds
@@ -115,13 +116,17 @@ ignores the exist code of the script.
 .Ss Fine tuning
 You can fine tune the behaviour of
 .Nm
-with the following options :-
+with the following options:
 .Bl -tag -width indent
 .It Fl d , -debug
 Echo debug and informational messages to the console.
 Subsequent debug options stop
 .Nm
 from daemonising.
+.It Fl f , -config Ar file
+Specify a config to load instead of @SYSCONFDIR@/dhcpcd.conf.
+.Nm
+always processes the config file before any command line options.
 .It Fl h , -hostname Ar hostname
 By default,
 .Nm

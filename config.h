@@ -61,7 +61,7 @@
 
 #define RESOLVFILE		"/etc/resolv.conf"
 #define CONFIGFILE		SYSCONFDIR "/" PACKAGE ".conf"
-#define DEFAULTSCRIPT		SYSCONFDIR "/" PACKAGE ".sh"
+#define SCRIPT			SYSCONFDIR "/" PACKAGE ".sh"
 #define DUIDFILE		SYSCONFDIR "/" PACKAGE ".duid"
 #define LEASEFILE		DBDIR "/" PACKAGE "-%s.lease"
 #define PIDFILE			RUNDIR "/" PACKAGE "-%s.pid"
