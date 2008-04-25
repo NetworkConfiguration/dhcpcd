@@ -46,7 +46,6 @@
 /* #define THERE_IS_NO_FORK */
 
 /* Packname name and pathname definitions. */
-
 #define PACKAGE			"dhcpcd"
 
 #ifndef SYSCONFDIR

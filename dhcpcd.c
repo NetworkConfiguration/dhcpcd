@@ -103,7 +103,7 @@ char **dhcpcd_argv = NULL;
 int dhcpcd_argc = 0;
 char *dhcpcd_skiproutes = NULL;
 #define EXTRA_OPTS "XZ:"
-#elif CMDLINE_COMAPT
+#elif defined(CMDLINE_COMPAT)
 # define EXTRA_OPTS "NRSY"
 #endif
 
@@ -341,7 +341,7 @@ parse_config_line(const char *opt, char *line, struct options *options)
 
 		if (longopts[i].has_arg == required_argument && !line) {
 			fprintf(stderr,
-				"dhcpcd: option requires an argument -- %s\n",
+				PACKAGE ": option requires an argument -- %s\n",
 				opt);
 			return -1;
 		}
@@ -349,7 +349,7 @@ parse_config_line(const char *opt, char *line, struct options *options)
 		return parse_option(longopts[i].val, line, options);
 	}
 
-	fprintf(stderr, "dhcpcd: unknown option -- %s\n", opt);
+	fprintf(stderr, PACKAGE ": unknown option -- %s\n", opt);
 	return -1;
 }
 
@@ -600,7 +600,7 @@ main(int argc, char **argv)
 			del_reqmask(options->reqmask, DHCP_DNSSEARCH);
 			break;
 		case 'S':
-			add_mask(options->requmask, DHCP_MSCR);
+			add_reqmask(options->reqmask, DHCP_MSCSR);
 			break;
 		case 'Y':
 			del_reqmask(options->reqmask, DHCP_NISSERVER);
