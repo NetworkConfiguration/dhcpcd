@@ -112,7 +112,7 @@ if possible. It will also run custom hook scripts if defined. See
 .Xr dhcpcd.sh 8
 for more details.
 .Nm
-ignores the exist code of the script.
+ignores the exit code of the script.
 .Ss Fine tuning
 You can fine tune the behaviour of
 .Nm
