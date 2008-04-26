@@ -102,7 +102,7 @@ open_socket(struct interface *iface, int protocol)
 
 	if ((s = socket(PF_PACKET, SOCK_DGRAM, htons(protocol))) == -1)
 		return -1;
-	
+
 	close_on_exec(s);
 	memset(&su, 0, sizeof(su));
 	su.sll.sll_family = PF_PACKET;

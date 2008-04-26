@@ -158,8 +158,8 @@ print_options(void)
 	for (i = 0; i < sizeof(dhcp_options) / sizeof(dhcp_options[0]); i++)
 		if (dhcp_options[i].var)
 			printf("%03d %s\n",
-				dhcp_options[i].option,
-				dhcp_options[i].var);
+			       dhcp_options[i].option,
+			       dhcp_options[i].var);
 }
 
 int make_reqmask(struct options *options, char **opts, int add)
@@ -209,11 +209,11 @@ valid_length(uint8_t option, const uint8_t *data, int *type)
 	for (i = 0; i < sizeof(dhcp_options) / sizeof(dhcp_options[0]); i++) {
 		if (dhcp_options[i].option != option)
 			continue;
-		
+
 		t = dhcp_options[i].type;
 		if (type)
 			*type = t;
-		
+
 		if (t == 0 || t & STRING || t & RFC3442)
 			return 0;
 
@@ -730,8 +730,7 @@ make_message(struct dhcp_message **message,
 	case ARPHRD_ETHER:
 	case ARPHRD_IEEE802:
 		dhcp->hwlen = ETHER_ADDR_LEN;
-		memcpy(&dhcp->chaddr, &iface->hwaddr,
-		       ETHER_ADDR_LEN);
+		memcpy(&dhcp->chaddr, &iface->hwaddr, ETHER_ADDR_LEN);
 		break;
 	case ARPHRD_IEEE1394:
 	case ARPHRD_INFINIBAND:
@@ -795,8 +794,8 @@ make_message(struct dhcp_message **message,
 			p += 4; \
 		}
 		if (lease->addr.s_addr &&
-			lease->addr.s_addr != iface->addr.s_addr &&
-			!IN_LINKLOCAL(ntohl(lease->addr.s_addr)))
+		    lease->addr.s_addr != iface->addr.s_addr &&
+		    !IN_LINKLOCAL(ntohl(lease->addr.s_addr)))
 		{
 			PUTADDR(DHCP_IPADDRESS, lease->addr);
 			if (lease->server.s_addr)
@@ -925,7 +924,7 @@ read_lease(const struct interface *iface)
 	int fd;
 	struct dhcp_message *dhcp;
 	ssize_t bytes;
-	
+
 	fd = open(iface->leasefile, O_RDONLY);
 	if (fd == -1)
 		return NULL;

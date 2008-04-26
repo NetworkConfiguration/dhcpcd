@@ -169,8 +169,8 @@ parse_option(int opt, char *oarg, struct options *options)
 			*options->hostname = '\0';
 		else if (strlen(oarg) > MAXHOSTNAMELEN) {
 			logger(LOG_ERR,
-				"`%s' too long for HostName string, max is %d",
-				oarg, MAXHOSTNAMELEN);
+			       "`%s' too long for HostName string, max is %d",
+			       oarg, MAXHOSTNAMELEN);
 			return -1;
 		} else
 			strlcpy(options->hostname, oarg,
@@ -261,17 +261,17 @@ parse_option(int opt, char *oarg, struct options *options)
 		j = 0;
 		for (i = 0; i < userclasses; i++)
 			j += (int)options->userclass[j] + 1;
-			if (j + 1 + strlen(oarg) > USERCLASS_MAX_LEN) {
-				logger(LOG_ERR,
-				       "userclass overrun, max is %d",
-				       USERCLASS_MAX_LEN);
-				return -1;
-			}
-			userclasses++;
-			memcpy(options->userclass + j + 1 ,
-			       oarg, strlen(optarg));
-			options->userclass[j] = strlen(oarg);
-			options->userclass_len += (strlen(oarg)) + 1;
+		if (j + 1 + strlen(oarg) > USERCLASS_MAX_LEN) {
+			logger(LOG_ERR,
+			       "userclass overrun, max is %d",
+			       USERCLASS_MAX_LEN);
+			return -1;
+		}
+		userclasses++;
+		memcpy(options->userclass + j + 1 ,
+		       oarg, strlen(optarg));
+		options->userclass[j] = strlen(oarg);
+		options->userclass_len += (strlen(oarg)) + 1;
 		break;
 	case 'A':
 		options->options &= ~DHCPCD_ARP;
@@ -384,7 +384,7 @@ main(int argc, char **argv)
 	dhcpcd_argc = argc;
 	if (!realpath(argv[0], dhcpcd)) {
 		fprintf(stderr, "unable to resolve the path `%s': %s",
-				argv[0], strerror(errno));
+			argv[0], strerror(errno));
 		goto abort;
 	}
 #endif
@@ -426,18 +426,18 @@ main(int argc, char **argv)
 		printf(""PACKAGE" "VERSION"\n");
 		printf("Compile time options:"
 #ifdef ENABLE_ARP
-			" ARP"
+		       " ARP"
 #endif
 #ifdef ENABLE_DUID
-			" DUID"
+		       " DUID"
 #endif
 #ifdef ENABLE_IPV4LL
-			" IPV4LL"
+		       " IPV4LL"
 #endif
 #ifdef THERE_IS_NO_FORK
-			" THERE_IS_NO_FORK"
+		       " THERE_IS_NO_FORK"
 #endif
-			"\n");
+		       "\n");
 	}
 
 	if (dohelp)
@@ -535,7 +535,7 @@ main(int argc, char **argv)
 	} else {
 		if (errno != ENOENT || cf) {
 			logger(LOG_ERR, "fopen `%s': %s", cf ? cf : CONFIGFILE,
-					strerror(errno));
+			       strerror(errno));
 			goto abort;
 		}
 	}
@@ -557,12 +557,12 @@ main(int argc, char **argv)
 		case 'd':
 			debug++;
 			switch (debug) {
-				case 1:
-					setloglevel(LOG_DEBUG);
-					break;
-				case 2:
-					options->options &= ~DHCPCD_DAEMONISE;
-					break;
+			case 1:
+				setloglevel(LOG_DEBUG);
+				break;
+			case 2:
+				options->options &= ~DHCPCD_DAEMONISE;
+				break;
 			}
 			break;
 		case 'f':

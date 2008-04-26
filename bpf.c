@@ -176,9 +176,9 @@ get_packet(const struct interface *iface, unsigned char *data,
 		bpf.buffer += *buffer_pos;
 
 	for (; bpf.buffer - buffer < *buffer_len; 
-		bpf.buffer += BPF_WORDALIGN(bpf.packet->bh_hdrlen +
-					    bpf.packet->bh_caplen),
-		*buffer_pos = bpf.buffer - buffer)
+	     bpf.buffer += BPF_WORDALIGN(bpf.packet->bh_hdrlen +
+					 bpf.packet->bh_caplen),
+	     *buffer_pos = bpf.buffer - buffer)
 	{
 		/* Ensure we have the whole packet */
 		if (bpf.packet->bh_caplen != bpf.packet->bh_datalen)

@@ -411,36 +411,36 @@ free_routes(struct rt *routes)
 int
 open_udp_socket(struct interface *iface)
 {
-        int s;
-        union sockunion {
-                struct sockaddr sa;
-                struct sockaddr_in sin;
-        } su;
-        int n = 1;
+	int s;
+	union sockunion {
+		struct sockaddr sa;
+		struct sockaddr_in sin;
+	} su;
+	int n = 1;
 
-        if ((s = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
-                return -1;
+	if ((s = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
+		return -1;
 
-        memset(&su, 0, sizeof(su));
-        su.sin.sin_family = AF_INET;
-        su.sin.sin_port = htons(DHCP_CLIENT_PORT);
+	memset(&su, 0, sizeof(su));
+	su.sin.sin_family = AF_INET;
+	su.sin.sin_port = htons(DHCP_CLIENT_PORT);
 	su.sin.sin_addr.s_addr = iface->addr.s_addr;
-        if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &n, sizeof(n)) == -1)
-                goto eexit;
+	if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &n, sizeof(n)) == -1)
+		goto eexit;
 	/* As we don't actually use this socket for anything, set
 	 * the receiver buffer to 1 */
-        if (setsockopt(s, SOL_SOCKET, SO_RCVBUF, &n, sizeof(n)) == -1)
-                goto eexit;
-        if (bind(s, &su.sa, sizeof(su)) == -1)
-                goto eexit;
+	if (setsockopt(s, SOL_SOCKET, SO_RCVBUF, &n, sizeof(n)) == -1)
+		goto eexit;
+	if (bind(s, &su.sa, sizeof(su)) == -1)
+		goto eexit;
 
-        iface->udp_fd = s;
-        close_on_exec(s);
-        return 0;
+	iface->udp_fd = s;
+	close_on_exec(s);
+	return 0;
 
 eexit:
-        close(s);
-        return -1;
+	close(s);
+	return -1;
 }
 
 ssize_t

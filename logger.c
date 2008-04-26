@@ -120,4 +120,3 @@ logger(int level, const char *fmt, ...)
 	va_end(p2);
 	va_end(p);
 }
-

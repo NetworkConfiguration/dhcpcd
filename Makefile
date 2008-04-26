@@ -11,7 +11,7 @@ CONF=		dhcpcd.conf
 MAN5=		dhcpcd.conf.5
 MAN8=		dhcpcd.8 dhcpcd.sh.8
 
-VERSION=	4.0.0-alpha2
+VERSION=	4.0.0-alpha3
 CLEANFILES=	dhcpcd.sh dhcpcd.8 dhcpcd.sh.8
 
 BINDIR=		${PREFIX}/sbin

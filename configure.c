@@ -181,7 +181,7 @@ in_routes(const struct rt *routes, const struct rt *rt)
 
 static int
 configure_routes(struct interface *iface, const struct dhcp_message *dhcp,
-		const struct options *options)
+		 const struct options *options)
 {
 	struct rt *rt, *ort;
 	struct rt *rtn = NULL, *nr = NULL;
@@ -350,7 +350,7 @@ int
 configure(struct interface *iface, const char *reason,
 	  const struct dhcp_message *dhcp, const struct dhcp_message *old,
 	  const struct dhcp_lease *lease, const struct options *options,
-	int up)
+	  int up)
 {
 	struct in_addr addr;
 	struct in_addr net;
@@ -379,13 +379,13 @@ configure(struct interface *iface, const char *reason,
 			if (!(options->options & DHCPCD_KEEPADDRESS)) {
 				delete_routes(iface, options->metric);
 				logger(LOG_DEBUG, "deleting IP address %s/%d",
-					inet_ntoa(iface->addr),
-					inet_ntocidr(iface->net));
+				       inet_ntoa(iface->addr),
+				       inet_ntocidr(iface->net));
 				if (del_address(iface->name, &iface->addr,
 						&iface->net) == -1 &&
-				   errno != ENOENT) 
+				    errno != ENOENT) 
 					logger(LOG_ERR, "del_address: %s",
-							strerror(errno));
+					       strerror(errno));
 				iface->addr.s_addr = 0;
 				iface->net.s_addr = 0;
 			}
@@ -399,7 +399,7 @@ configure(struct interface *iface, const char *reason,
 	if (!(options->options & DHCPCD_INFORM) ||
 	    !has_address(iface->name, &addr, &net)) {
 		logger(LOG_DEBUG, "adding IP address %s/%d",
-			inet_ntoa(addr), inet_ntocidr(net));
+		       inet_ntoa(addr), inet_ntocidr(net));
 		if (add_address(iface->name, &addr, &net, &brd) == -1 &&
 		    errno != EEXIST)
 		{
@@ -428,7 +428,7 @@ configure(struct interface *iface, const char *reason,
 
 	configure_routes(iface, dhcp, options);
 	up = (iface->addr.s_addr != addr.s_addr ||
-			iface->net.s_addr != net.s_addr);
+	      iface->net.s_addr != net.s_addr);
 	iface->addr.s_addr = addr.s_addr;
 	iface->net.s_addr = net.s_addr;
 

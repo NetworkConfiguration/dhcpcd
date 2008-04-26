@@ -146,7 +146,7 @@ signal_setup(void)
 	for (i = 0; i < sizeof(handle_sigs) / sizeof(handle_sigs[0]); i++)
 		if (sigaction(handle_sigs[i], &sa, NULL) == -1)
 			return -1;
-	
+
 	return 0;
 }
 
@@ -163,6 +163,6 @@ signal_reset(void)
 	for (i = 0; i < sizeof(handle_sigs) / sizeof(handle_sigs[0]); i++)
 		if (sigaction(handle_sigs[i], &sa, NULL) == -1)
 			return -1;
-	
+
 	return 0;
 }
