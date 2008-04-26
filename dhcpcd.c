@@ -367,7 +367,7 @@ main(int argc, char **argv)
 	int sig = 0;
 	int retval = EXIT_FAILURE;
 	char *line, *option, *p, *lp, *buffer = NULL;
-	char lt = '\\';
+	char lt;
 	size_t len = 0;
 	FILE *f;
 	char *cf = NULL;
@@ -480,12 +480,21 @@ main(int argc, char **argv)
 					line++;
 			}
 			/* Trim trailing whitespace */
+			lt = '\\';
 			if (line && *line) {
 				p = line + strlen(line) - 1;
 				while (p != line && (*p == ' ' || *p == '\t')) {
 					/* Remember the last char trimmed */
 					lt = *p;
 					*p-- = '\0';
+				}
+			}
+			/* Remove quotes if present */
+			if (line && *line == '"') {
+				p = line + strlen(line) - 1;
+				if (*p == '"') {
+					line++;
+					*p = '\0';
 				}
 			}
 			/* Process escapes */
