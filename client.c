@@ -832,7 +832,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 		}
 
 #ifdef ENABLE_IPV4LL
-		if (state->options & DHCPCD_IPV4LL && gotlease != -1) {
+		if (state->options & DHCPCD_IPV4LL && gotlease != 0) {
 			logger(LOG_INFO, "probing for an IPV4LL address");
 			errno = 0;
 			gotlease = ipv4ll_get_address(iface, lease);
