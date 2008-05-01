@@ -405,6 +405,22 @@ main(int argc, char **argv)
 		DHCPCD_DAEMONISE | DHCPCD_CLIENTID;
 	options->timeout = DEFAULT_TIMEOUT;
 
+#ifdef CMDLINE_COMPAT
+	add_reqmask(options->reqmask, DHCP_DNSSERVER);
+	add_reqmask(options->reqmask, DHCP_DNSDOMAIN);
+	add_reqmask(options->reqmask, DHCP_DNSSEARCH);
+	add_reqmask(options->reqmask, DHCP_NISSERVER);
+	add_reqmask(options->reqmask, DHCP_NISDOMAIN);
+	add_reqmask(options->reqmask, DHCP_NTPSERVER);
+
+	/* If the duid file exists, then enable duid by default
+	 * This means we don't break existing clients that easily :) */
+	if ((f = fopen(DUIDFILE, "r"))) {
+		options->options |= DHCPCD_DUID;
+		fclose(f);
+	}
+#endif
+
 	gethostname(options->hostname, sizeof(options->hostname));
 	if (strcmp(options->hostname, "(none)") == 0 ||
 	    strcmp(options->hostname, "localhost") == 0)
@@ -546,15 +562,6 @@ main(int argc, char **argv)
 			goto abort;
 		}
 	}
-
-#ifdef CMDLINE_COMAPT
-	add_reqmask(options->reqmask, DHCP_DNSSERVER);
-	add_reqmask(options->reqmask, DHCP_DNSDOMAIN);
-	add_reqmask(options->reqmask, DHCP_DNSSEARCH);
-	add_reqmask(options->reqmask, DHCP_NISSERVER);
-	add_reqmask(options->reqmask, DHCP_NISDOMAIN);
-	add_reqmask(options->reqmask, DHCP_NTPSERVER);
-#endif
 
 	optind = 0;
 	while ((opt = getopt_long(argc, argv, OPTS EXTRA_OPTS,

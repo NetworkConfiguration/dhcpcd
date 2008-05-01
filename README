@@ -47,6 +47,9 @@ commandline compatible with prior versions.
 dhcpcd-3 enabled DUID support by default - this has changed in dhcpcd-4.
 You can enable it via the --duid, -D command line option or by using the
 duid directive in dhcpcd.conf.
+If CMDLINE_COMPAT is defined the we renable DUID support by default IF
+the dhcpcd.duid file exits. This keeps the clients working as they were,
+which is good.
 
 dhcpcd-4 is NOT fully commandline compatible with dhcpcd-2 and older and
 changes the meaning of some options.
