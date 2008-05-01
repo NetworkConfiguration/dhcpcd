@@ -67,6 +67,7 @@ extern char *dhcpcd_skiproutes;
 #define DHCPCD_TEST		(1 << 16)
 #define DHCPCD_FORKED		(1 << 17)
 #define DHCPCD_HOSTNAME		(1 << 18)
+#define DHCPCD_CLIENTID		(1 << 19)
 
 struct options {
 	char interface[IF_NAMESIZE];

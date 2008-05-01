@@ -764,10 +764,12 @@ make_message(struct dhcp_message **message,
 		p += 2;
 	}
 
-	*p++ = DHCP_CLIENTID;
-	*p++ = iface->clientid_len;
-	memcpy(p, iface->clientid, iface->clientid_len);
-	p+= iface->clientid_len;
+	if (iface->clientid_len > 0) {
+		*p++ = DHCP_CLIENTID;
+		*p++ = iface->clientid_len;
+		memcpy(p, iface->clientid, iface->clientid_len);
+		p+= iface->clientid_len;
+	}
 
 	if (type != DHCP_DECLINE && type != DHCP_RELEASE) {
 		if (options->userclass_len > 0) {

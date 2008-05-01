@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd Apr 24, 2008
+.Dd May 01, 2008
 .Dt DHCPCD.CONF 5 SMM
 .Sh NAME
 .Nm dhcpcd.conf
@@ -41,19 +41,29 @@ Blank lines and lines starting with # are ignored.
 .Pp
 Here's a list of available options:
 .Bl -tag -width indent
-.It Ic option Ar dhcp-option
-Requests the
-.Ar dhcp-option
-from the server. It can be a variable to be used in
-.Xr dhcpcd.sh 8
-or the numerical value. You can specify more seperated by commas, spaces or
-more option lines.
+.It Ic classid Ar string
+Change the default classid sent from dhcpcd-version. If not set then none
+is sent.
+.It Ic clientid Ar string
+Change the default clientid sent from the interface hardware address.
+If the string is of the format 01:02:03 then it is encoded as hex.
+If not set then none is sent.
+.It Ic duid
+Generate an
+.Rs
+.%T "RFC 4361"
+.Re
+compliant clientid. This requires persistent storage
+and not all DHCP servers work with it so it's not enabled by default.
+The duid generated will be held in
+.Pa @SYSCONFDIR@/dhcpcd.duid
+and should not be copied to other hosts.
 .It Ic hostname Ar name
 Sends specified
 .Ar hostname 
-o the DHCP server so it can be registered in DNS. If
+to the DHCP server so it can be registered in DNS. If
 .Ar hostname
-if a FQDN (ie, contains a .) then it will be encoded a such.
+if a FQDN (ie, contains a .) then it will be encoded as such.
 .It Ic fqdn Op none | ptr | both
 none disables FQDN encoding, ptr just asks the DHCP server to update the PTR
 record of the host in DNS whereas both also updates the A record.
@@ -63,24 +73,6 @@ Subsequent options are only parsed for this
 .It Ic leasetime Ar seconds
 Request a leasetime of
 .Ar seconds .
-.It Ic timeout Ar seconds
-The default timeout for waiting for a DHCP response is 20 seconds which may
-be too long or too short and can be changed here.
-.It Ic classid Ar string
-Change the default classid sent from dhcpcd-version. If not set then none
-is sent.
-.It Ic clientid Ar string
-By default,
-.Nm dhcpcd
-sends a Client Node Identifier
-.Rs
-.%T "RFC 4361"
-.Re
-as the ClientID. Not setting anything causes the interface MAC address to
-be sent instead. Otherwise, it sends the string specified. If the string
-is of the format 01:02:03 then it encodes it.
-.It Ic userclass Ar string
-Tag the DHCP messages with the userclass. You can specify more than one.
 .It Ic noarp
 Don't send any ARP requests. This also disables IPv4LL.
 .It Ic nogateway
@@ -91,6 +83,18 @@ See
 .Rs
 .%T "RFC 3927"
 .Re
+.It Ic option Ar dhcp-option
+Requests the
+.Ar dhcp-option
+from the server. It can be a variable to be used in
+.Xr dhcpcd.sh 8
+or the numerical value. You can specify more seperated by commas, spaces or
+more option lines.
+.It Ic timeout Ar seconds
+The default timeout for waiting for a DHCP response is 20 seconds which may
+be too long or too short and can be changed here.
+.It Ic userclass Ar string
+Tag the DHCP messages with the userclass. You can specify more than one.
 .Sh SEE ALSO
 .Xr dhcpcd.sh 8 ,
 .Xr dhcpcd 8

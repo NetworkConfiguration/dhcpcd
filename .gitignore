@@ -2,5 +2,7 @@
 version.h
 dhcpcd
 dhcpcd.8
+dhcpcd.conf.5
 dhcpcd.sh
+dhcpcd.sh.8
 dhcpcd-*.bz2

@@ -51,12 +51,11 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 
 /* Don't set any optional arguments here so we retain POSIX
  * compatibility with getopt */
-#define OPTS "c:df:h:i:kl:m:no:pr:s:t:u:xAEF:GHI:LO:STV"
+#define OPTS "c:df:h:i:kl:m:no:pr:s:t:u:xADEF:GHI:LO:STV"
 
 static int doversion = 0;
 static int dohelp = 0;
 static const struct option longopts[] = {
-	{"arp",         no_argument,        NULL, 'a'},
 	{"script",      required_argument,  NULL, 'c'},
 	{"debug",       no_argument,        NULL, 'd'},
 	{"config",	required_argument,  NULL, 'f'},
@@ -74,6 +73,8 @@ static const struct option longopts[] = {
 	{"userclass",   required_argument,  NULL, 'u'},
 	{"exit",        no_argument,        NULL, 'x'},
 	{"lastlease",   no_argument,        NULL, 'E'},
+	{"noarp",       no_argument,        NULL, 'A'},
+	{"duid",        no_argument,        NULL, 'D'},
 	{"fqdn",        optional_argument,  NULL, 'F'},
 	{"nogateway",   no_argument,        NULL, 'G'},
 	{"clientid",    optional_argument,  NULL, 'I'},
@@ -89,12 +90,13 @@ static const struct option longopts[] = {
 #endif
 #ifdef CMDLINE_COMPAT
 	{"nohostname",  no_argument,        NULL, 'H'},
-	{"nodns",       no_argument,        NULL, 'R'},
+	{"nomtu",       no_argument,        NULL, 'M'},
 	{"nontp",       no_argument,        NULL, 'N'},
-	{"nonis",       no_argument,        NULL, 'Y'},
+	{"nodns",       no_argument,        NULL, 'R'},
 	{"msscr",       no_argument,        NULL, 'S'},
+	{"nonis",       no_argument,        NULL, 'Y'},
 #endif
-	{NULL,          0,                  NULL, 0}
+	{NULL,          0,                  NULL, '\0'}
 };
 
 #ifdef THERE_IS_NO_FORK
@@ -103,8 +105,8 @@ char **dhcpcd_argv = NULL;
 int dhcpcd_argc = 0;
 char *dhcpcd_skiproutes = NULL;
 #define EXTRA_OPTS "XZ:"
-#elif defined(CMDLINE_COMPAT)
-# define EXTRA_OPTS "NRSY"
+#elif CMDLINE_COMAPT
+# define EXTRA_OPTS "HMNRSY"
 #endif
 
 #ifndef EXTRA_OPTS
@@ -149,9 +151,9 @@ read_pid(const char *pidfile)
 static void
 usage(void)
 {
-	printf("usage: "PACKAGE" [-adknpEGHLOSTV] [-c script] [-f file ] [-h hostname] [-i classID]\n"
-	       "              [-l leasetime] [-m metric] [-o option] [-r ipaddress]\n"
-	       "              [-s ipaddress] [-t timeout] [-u userclass] [-F none | ptr | both]\n"
+	printf("usage: "PACKAGE" [-dknpADEGHLOSTV] [-c script] [-f file ] [-h hostname]\n"
+	       "              [-i classID ] [-l leasetime] [-m metric] [-o option] [-r ipaddr]\n"
+	       "              [-s ipaddr] [-t timeout] [-u userclass] [-F none|ptr|both]\n"
 	       "              [-I clientID] <interface>\n");
 }
 
@@ -278,6 +280,9 @@ parse_option(int opt, char *oarg, struct options *options)
 		/* IPv4LL requires ARP */
 		options->options &= ~DHCPCD_IPV4LL;
 		break;
+	case 'D':
+		options->options |= DHCPCD_DUID;
+		break;
 	case 'E':
 		options->options |= DHCPCD_LASTLEASE;
 		break;
@@ -310,13 +315,15 @@ parse_option(int opt, char *oarg, struct options *options)
 				return -1;
 			}
 			if (strlcpy(options->clientid, oarg,
-				    sizeof(options->clientid)) == 0)
+				    sizeof(options->clientid)) == 0) {
 				/* empty string disabled duid */
 				options->options &= ~DHCPCD_DUID;
+				options->options &= ~DHCPCD_CLIENTID;
+			}
 		} else {
-			memset(options->clientid, 0,
-			       sizeof(options->clientid));
+			options->clientid[0] = '\0';
 			options->options &= ~DHCPCD_DUID;
+			options->options &= ~DHCPCD_CLIENTID;
 		}
 		break;
 	case 'L':
@@ -395,7 +402,7 @@ main(int argc, char **argv)
 		 PACKAGE, VERSION);
 
 	options->options |= DHCPCD_GATEWAY | DHCPCD_ARP | DHCPCD_IPV4LL |
-		DHCPCD_DUID | DHCPCD_DAEMONISE;
+		DHCPCD_DAEMONISE | DHCPCD_CLIENTID;
 	options->timeout = DEFAULT_TIMEOUT;
 
 	gethostname(options->hostname, sizeof(options->hostname));
@@ -598,7 +605,8 @@ main(int argc, char **argv)
 			print_options();
 			goto abort;
 #ifdef CMDLINE_COMPAT
-		case 'H':
+		case 'H': /* FALLTHROUGH */
+		case 'M':
 			break;
 		case 'N':
 			del_reqmask(options->reqmask, DHCP_NTPSERVER);

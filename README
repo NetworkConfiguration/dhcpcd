@@ -5,12 +5,7 @@ Copyright 2006-2008 Roy Marples <roy@marples.name>
 Installation
 ------------
 Edit config.h to match your building requirements.
-
-Take special note of ENABLE_DUID and unset it if the target media is 
-volatile, like say a LiveCD.
-
 Then just make; make install
-
 man dhcpcd for command line options
 
 
@@ -33,18 +28,28 @@ linux-2.6.24 finally ships with a working 32-bit header.
 If your linux headers are older, or your distro hasn't patched them you can
 set CSTD=gnu99 to work around this.
 
-If you require compatibility with dhcpcd-3 and older style variables,
-you can install dhcpcd-compat into the directory /etc/dhcpcd/enter-hook.d
-We don't install this by default.
-You should also add -DCMDLINE_COMPAT to your CFLAGS if you need to be fully
-commandline compatible with prior versions.
-
 
 Hooks
 -----
 We provide example exit hooks for looking up the hostname in DNS,
 NTP (www.ntp.org) and ypbind (Linux).
 There are not installed by default as they are platform dependant.
+
+
+Compatibility
+-------------
+If you require compatibility with dhcpcd-3 and older style variables,
+you can install dhcpcd-compat into the directory /etc/dhcpcd/enter-hook.d
+We don't install this by default.
+You should also add -DCMDLINE_COMPAT to your CFLAGS if you need to be fully
+commandline compatible with prior versions.
+
+dhcpcd-3 enabled DUID support by default - this has changed in dhcpcd-4.
+You can enable it via the --duid, -D command line option or by using the
+duid directive in dhcpcd.conf.
+
+dhcpcd-4 is NOT fully commandline compatible with dhcpcd-2 and older and
+changes the meaning of some options.
 
 
 ChangeLog

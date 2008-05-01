@@ -478,7 +478,7 @@ client_setup(struct if_state *state, const struct options *options)
 			memcpy(iface->clientid + 1,
 			       options->clientid, iface->clientid_len - 1);
 		}
-	} else {
+	} else if (options->options & DHCPCD_CLIENTID) {
 #ifdef ENABLE_DUID
 		if (options->options & DHCPCD_DUID) {
 			duid = xmalloc(DUID_LEN);

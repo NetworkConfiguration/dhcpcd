@@ -22,14 +22,14 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd Apr 24, 2008
+.Dd May 01, 2008
 .Dt DHCPCD 8 SMM
 .Sh NAME
 .Nm dhcpcd
 .Nd an RFC 2131 compliant DHCP client
 .Sh SYNOPSIS
 .Nm
-.Op Fl dknpAEGLSTV
+.Op Fl dknpADEGLSTV
 .Op Fl c , -script Ar script
 .Op Fl f , -config Ar file
 .Op Fl h , -hostname Ar hostname
@@ -144,7 +144,8 @@ is an FQDN (ie, contains a .) then it will be encoded as such.
 Override the DHCP vendor
 .Ar classid
 field we send. The default is
-dhcpcd-<version>.
+dhcpcd <version>.
+If not set then none is sent.
 .It Fl k , -release
 This causes an existing
 .Nm
@@ -229,6 +230,16 @@ Tags the DHCP message with the userclass
 .Ar class .
 DHCP servers use this give memebers of the class DHCP options other than the
 default, without having to know things like hardware address or hostname.
+.It Fl D , -duid 
+Generate an
+.Rs
+.%T "RFC 4361"
+.Re
+compliant clientid. This requires persistent storage
+and not all DHCP servers work with it so it's not enabled by default.
+The DUID generated will be held in
+.Pa @SYSCONFDIR@/dhcpcd.duid
+and should not be copied to other hosts.
 .It Fl F , -fqdn Ar fqdn
 Requests that the DHCP server updates DNS using FQDN instead of just a
 hostname. Valid values for
@@ -237,18 +248,9 @@ are none, ptr and both.
 .Nm
 dhcpcd itself never does any DNS updates.
 .It Fl I , -clientid Ar clientid
-Send
-.Ar clientid
-as a client identifier string. If
-.Ar clientid
-matches a hardware address format, such as 01:00:01:02:03:04:05 then we encode
-it as that, otherwise as a string. You need to specify the hardware type in
-the first byte. Ethernet is 01, and the hardware address in the example is
-00:01:02:03:04:05. If the
-.Ar clientid
-is a blank string, then we disable DUID support and use a
-.Ar clientid
-as shown above.
+Change the default clientid sent from the interface hardware address.
+If the string is of the format 01:02:03 then it is encoded as hex.
+If not set then none is sent.
 .El
 .Ss Restriciting behaviour
 .Nm
@@ -277,31 +279,6 @@ Display a list of option codes and the associated variable for use in
 .Xr dhcpcd.sh 8 .
 .El
 .Sh NOTES
-Because
-.Nm
-supports InfiniBand, we put a Node-specific Client Identifier in the
-ClientID field. This is required by RFC 4390. It's also required for DHCP IPv6
-which
-.Nm
-should support one day. However, some DHCP servers have no idea what this is
-and reject the message as they do not understand type 255. This is not
-conformant with RFC 2132 and the server should be fixed. Also, some DHCP
-server configurations require an ethernet hardware address of 6 hexacdecimal
-numbers in the ClientID which is the default behaviour of most other DHCP
-clients. If your DHCP server is as desribed above, you should fix the server,
-or if that is not an option you can compile DUID support out of
-.Nm
-or use the
-.Fl I , -clientid Ar clientid
-option and set
-.Ar clientid
-to ''.
-.Pp
-ISC dhcpd, dnsmasq, udhcpd and Microsoft DHCP server 2003 default configurations
-work just fine with the default
-.Nm
-configuration.
-.Pp
 .Nm
 requires a Berkley Packet Filter, or BPF device on BSD based systems and a
 Linux Socket Filter, or LPF device on Linux based systems.
