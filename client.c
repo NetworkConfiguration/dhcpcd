@@ -385,10 +385,15 @@ get_old_lease(struct if_state *state, const struct options *options)
 
 	/* Ok, lets use this */
 	if (IN_LINKLOCAL(dhcp->yiaddr)) {
-		free(state->old_dhcp);
-		state->old_dhcp = state->dhcp;
-		state->dhcp = dhcp;
-		return 0;
+		if (options->options & DHCPCD_IPV4LL) {
+			free(state->old_dhcp);
+			state->old_dhcp = state->dhcp;
+			state->dhcp = dhcp;
+			return 0;
+		}
+		lease->addr.s_addr = 0;
+		free(dhcp);
+		return -1;
 	}
 #endif
 
@@ -405,6 +410,7 @@ get_old_lease(struct if_state *state, const struct options *options)
 	{
 		logger(LOG_ERR, "lease expired %u seconds ago",
 		       offset + lease->leasetime);
+		lease->addr.s_addr = 0;
 		free(dhcp);
 		return -1;
 	}

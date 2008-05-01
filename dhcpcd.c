@@ -403,8 +403,14 @@ main(int argc, char **argv)
 	snprintf(options->classid, CLASS_ID_MAX_LEN, "%s %s",
 		 PACKAGE, VERSION);
 
-	options->options |= DHCPCD_GATEWAY | DHCPCD_ARP | DHCPCD_IPV4LL |
-		DHCPCD_DAEMONISE | DHCPCD_CLIENTID;
+	options->options |= DHCPCD_GATEWAY | DHCPCD_DAEMONISE | DHCPCD_CLIENTID;
+#ifdef ENABLE_ARP
+	options->options |= DHCPCD_ARP;
+ #ifdef ENABLE_IPV4LL
+	options->options |= DHCPCD_IPV4LL;
+ #endif
+#endif
+
 	options->timeout = DEFAULT_TIMEOUT;
 
 #ifdef CMDLINE_COMPAT
