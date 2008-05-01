@@ -105,7 +105,9 @@ char **dhcpcd_argv = NULL;
 int dhcpcd_argc = 0;
 char *dhcpcd_skiproutes = NULL;
 #define EXTRA_OPTS "XZ:"
-#elif CMDLINE_COMAPT
+#endif
+
+#ifdef CMDLINE_COMPAT
 # define EXTRA_OPTS "HMNRSY"
 #endif
 
