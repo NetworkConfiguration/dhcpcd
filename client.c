@@ -237,23 +237,30 @@ get_duid(unsigned char *duid, const struct interface *iface)
 	time_t t;
 	int x = 0;
 	unsigned char *p = duid;
-	size_t len = 0;
-	char *line = NULL;
+	size_t len = 0, l = 0;
+	char *buffer = NULL, *line, *option;
 
 	/* If we already have a DUID then use it as it's never supposed
 	 * to change once we have one even if the interfaces do */
 	if ((f = fopen(DUIDFILE, "r"))) {
-		get_line(&line, &len, f);
-		if (line) {
-			len = hwaddr_aton(NULL, line);
-			if (len && len <= DUID_LEN)
-				hwaddr_aton(duid, line);
-			free(line);
-		} else
-			len = 0;
+		while ((get_line(&buffer, &len, f))) {
+			line = buffer;
+			while ((option = strsep(&line, " \t")))
+				if (*option != '\0')
+					break;
+			if (!option || *option == '\0' || *option == '#')
+				continue;
+			l = hwaddr_aton(NULL, option);
+			if (l && l <= DUID_LEN) {
+				hwaddr_aton(duid, option);
+				break;
+			}
+			l = 0;
+		}
 		fclose(f);
-		if (len)
-			return len;
+		free(buffer);
+		if (l)
+			return l;
 	} else {
 		if (errno != ENOENT)
 			return 0;
