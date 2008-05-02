@@ -423,10 +423,12 @@ main(int argc, char **argv)
 
 	/* If the duid file exists, then enable duid by default
 	 * This means we don't break existing clients that easily :) */
+# ifdef ENABLE_DUID
 	if ((f = fopen(DUIDFILE, "r"))) {
 		options->options |= DHCPCD_DUID;
 		fclose(f);
 	}
+# endif
 #endif
 
 	gethostname(options->hostname, sizeof(options->hostname));
