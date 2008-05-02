@@ -51,7 +51,7 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 
 /* Don't set any optional arguments here so we retain POSIX
  * compatibility with getopt */
-#define OPTS "c:df:h:i:kl:m:no:pr:s:t:u:xADEF:GHI:LO:STV"
+#define OPTS "c:df:h:i:kl:m:no:pr:s:t:u:xADEF:GI:LO:TV"
 
 static int doversion = 0;
 static int dohelp = 0;
@@ -72,9 +72,9 @@ static const struct option longopts[] = {
 	{"timeout",     required_argument,  NULL, 't'},
 	{"userclass",   required_argument,  NULL, 'u'},
 	{"exit",        no_argument,        NULL, 'x'},
-	{"lastlease",   no_argument,        NULL, 'E'},
 	{"noarp",       no_argument,        NULL, 'A'},
 	{"duid",        no_argument,        NULL, 'D'},
+	{"lastlease",   no_argument,        NULL, 'E'},
 	{"fqdn",        optional_argument,  NULL, 'F'},
 	{"nogateway",   no_argument,        NULL, 'G'},
 	{"clientid",    optional_argument,  NULL, 'I'},
@@ -153,7 +153,7 @@ read_pid(const char *pidfile)
 static void
 usage(void)
 {
-	printf("usage: "PACKAGE" [-dknpADEGHLOSTV] [-c script] [-f file ] [-h hostname]\n"
+	printf("usage: "PACKAGE" [-dknpxADEGHLOSTV] [-c script] [-f file ] [-h hostname]\n"
 	       "              [-i classID ] [-l leasetime] [-m metric] [-o option] [-r ipaddr]\n"
 	       "              [-s ipaddr] [-t timeout] [-u userclass] [-F none|ptr|both]\n"
 	       "              [-I clientID] <interface>\n");
@@ -665,7 +665,7 @@ main(int argc, char **argv)
 			options->options |= DHCPCD_KEEPADDRESS;
 	}
 
-	if (IN_LINKLOCAL(ntohl (options->request_address.s_addr))) {
+	if (IN_LINKLOCAL(ntohl(options->request_address.s_addr))) {
 		logger(LOG_ERR,
 		       "you are not allowed to request a link local address");
 		goto abort;
@@ -778,7 +778,6 @@ abort:
 		close(pidfd);
 		unlink(options->pidfile);
 	}
-
 	free(options);
 
 #ifdef THERE_IS_NO_FORK
