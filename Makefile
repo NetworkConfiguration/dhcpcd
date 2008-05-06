@@ -3,7 +3,7 @@
 # Copyright 2008 Roy Marples <roy@marples.name>
 
 PROG=		dhcpcd
-VERSION=	4.0.0-alpha4
+VERSION=	4.0.0-beta1
 
 SRCS=		common.c dhcp.c dhcpcd.c logger.c net.c signal.c
 SRCS+=		configure.c client.c
