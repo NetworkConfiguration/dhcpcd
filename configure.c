@@ -52,7 +52,6 @@ exec_script(const char *script, const char *iface, const char *reason,
 	char *const argv[2] = { (char *)script, NULL };
 	int ret = 0;
 	pid_t pid;
-	pid_t wpid;
 	int status = 0;
 	sigset_t full;
 	sigset_t old;
@@ -100,19 +99,15 @@ exec_script(const char *script, const char *iface, const char *reason,
 	sigprocmask(SIG_SETMASK, &old, NULL);
 
 	/* Wait for the script to finish */
-	do {
-		wpid = waitpid(pid, &status, 0);
-		if (wpid < 1)
+	while (waitpid(pid, &status, 0) == -1) {
+		if (errno != EINTR) {
 			logger(LOG_ERR, "waitpid: %s", strerror(errno));
-	} while (!WIFEXITED(status) && !WIFSIGNALED(status));
+			status = -1;
+			break;
+		}
+	}
 
-	if (WIFSIGNALED(status))
-		logger(LOG_ERR, "script signaled");
-	if (WIFEXITED(status))
-		ret = WEXITSTATUS(status);
-	else
-		ret = -1;
-	return ret;
+	return status;
 }
 
 static struct rt *
