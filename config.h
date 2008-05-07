@@ -36,6 +36,15 @@
  * Needs ARP. */
 #define ENABLE_IPV4LL
 
+/*
+ * By default we don't add a local link route if we got a routeable address.
+ * This is because dhcpcd can't really decide which interface should allow
+ * link local routing when we have more than one interface.
+ * Ideally the host network scripts should add the link local route for us.
+ * If not, you can define this to get dhcpcd to always add the link local route.
+ */
+// #define ENABLE_IPV4LL_ALWAYSROUTE 
+
 /* We will auto create a DUID_LLT file if it doesn't exist.
  * You can always create your own DUID file that just contains the
  * hex string that represents the DUID.

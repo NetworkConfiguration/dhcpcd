@@ -204,15 +204,15 @@ configure_routes(struct interface *iface, const struct dhcp_message *dhcp,
 
 	ort = get_option_routes(dhcp);
 
-#ifdef ENABLE_IPV4LL
+#ifdef ENABLE_IPV4LL_ALWAYSROUTE
 	if (options->options & DHCPCD_IPV4LL &&
 	    IN_PRIVATE(ntohl(dhcp->yiaddr)))
 	{
 		for (rt = ort; rt; rt = rt->next) {
-			/* Check if we have already got a link locale route dished
-			 * out by the DHCP server */
+			/* Check if we have already got a link locale route
+			 * dished out by the DHCP server */
 			if (rt->dest.s_addr == htonl(LINKLOCAL_ADDR) &&
-					rt->net.s_addr == htonl(LINKLOCAL_MASK))
+			    rt->net.s_addr == htonl(LINKLOCAL_MASK))
 				break;
 			rtn = rt;
 		}
