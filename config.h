@@ -45,7 +45,9 @@
  */
 // #define ENABLE_IPV4LL_ALWAYSROUTE 
 
-/* We will auto create a DUID_LLT file if it doesn't exist.
+/* Allow dhcpcd to create a DUID (LLT) and use it to make an IAID for the
+ * ClientID. Even enabled here, we need a config directive to actually use it
+ * so this toggle is just to remove it from dhcpcd to make the binary smaller.
  * You can always create your own DUID file that just contains the
  * hex string that represents the DUID.
  * See RFC 3315 for details on this. */
