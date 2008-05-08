@@ -1,9 +1,9 @@
-# Makefile based on BSD's pmake.
+# Makefile based on BSD make.
 # Our mk stubs also work with GNU make.
 # Copyright 2008 Roy Marples <roy@marples.name>
 
 PROG=		dhcpcd
-VERSION=	4.0.0-beta1
+VERSION=	4.0.0-beta2
 
 SRCS=		common.c dhcp.c dhcpcd.c logger.c net.c signal.c
 SRCS+=		configure.c client.c
