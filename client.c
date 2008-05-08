@@ -921,7 +921,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 			break;
 		}
 		state->state = STATE_RENEWING;
-		state->xid = (uint32_t) random ();
+		state->xid = (uint32_t)random();
 		/* FALLTHROUGH */
 	case STATE_RENEWING:
 		iface->start_uptime = uptime();
@@ -1156,9 +1156,9 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 				logger(LOG_DEBUG, "rebind in %u seconds",
 				       lease->rebindtime);
 
+			state->timeout = lease->renewaltime;
 		}
 
-		state->timeout = lease->renewaltime;
 		state->state = STATE_BOUND;
 	}
 
