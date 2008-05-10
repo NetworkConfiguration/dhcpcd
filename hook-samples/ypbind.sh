@@ -13,7 +13,7 @@ make_yp_conf()
 	echo "${signature}" > "${cf}"
 	if [ -n "${new_nis_domain}" ]; then
 		domainname "${new_nis_domain}"
-		if [ -n "${new_nis_server}" ]; then
+		if [ -n "${new_nis_servers}" ]; then
 			prefix="domain ${new_nis_domain} server "
 		else
 			echo "domain ${new_nis_domain} broadcast" >> "${cf}"
