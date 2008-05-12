@@ -650,11 +650,17 @@ main(int argc, char **argv)
 			goto abort;
 		}
 	}
-	if (strchr(options->hostname, '.')) {
+
+	if ((p = strchr(options->hostname, '.'))) {
 		if (options->fqdn == FQDN_DISABLE)
-			options->fqdn = FQDN_BOTH;
-	} else
-		options->fqdn = FQDN_DISABLE;
+			*p = '\0';
+	} else {
+		if (options->fqdn != FQDN_DISABLE) {
+			logger(LOG_WARNING, "hostname `%s' is not a FQDN",
+			       options->hostname);
+			options->fqdn = FQDN_DISABLE;
+		}
+	}
 
 	if (options->request_address.s_addr == 0 &&
 	    options->options & DHCPCD_INFORM)
