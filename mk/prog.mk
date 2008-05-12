@@ -16,7 +16,7 @@ SYSCONFDIR?=	${PREFIX}/etc
 INSTALL?=	install
 SED?=		sed
 
-all: ${PROG} ${SCRIPT} ${MAN}
+all: ${PROG} ${SCRIPT} man
 
 ${PROG}: ${OBJS}
 	${CC} ${LDFLAGS} -o $@ ${OBJS} ${LDADD}
