@@ -55,7 +55,7 @@
 /* Our aggregate option buffer.
  * We ONLY use this when options are split, which for most purposes is
  * practically never. See RFC3396 for details. */
-static uint8_t dhcp_opt_buffer[sizeof(struct dhcp_message)];
+static uint8_t *dhcp_opt_buffer = NULL;
 
 struct dhcp_option {
 	uint8_t option;
@@ -255,7 +255,9 @@ _get_option(const struct dhcp_message *dhcp, uint8_t opt, int *len, int *type)
 		o = *p++;
 		if (o == opt) {
 			if (op) {
-				if (!bp)
+				if (!dhcp_opt_buffer)
+					dhcp_opt_buffer = xmalloc(sizeof(struct dhcp_message));
+				if (!bp) 
 					bp = dhcp_opt_buffer;
 				memcpy(bp, op, ol);
 				bp += ol;
