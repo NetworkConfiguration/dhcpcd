@@ -52,6 +52,11 @@
 
 #define IPV4R	IPV4 | REQUEST
 
+/* Our aggregate option buffer.
+ * We ONLY use this when options are split, which for most purposes is
+ * practically never. See RFC3396 for details. */
+static uint8_t dhcp_opt_buffer[sizeof(struct dhcp_message)];
+
 struct dhcp_option {
 	uint8_t option;
 	int type;
@@ -196,14 +201,13 @@ int make_reqmask(struct options *options, char **opts, int add)
 }
 
 static int
-valid_length(uint8_t option, const uint8_t *data, int *type)
+valid_length(uint8_t option, int dl, int *type)
 {
-	uint8_t l = *data;
 	uint8_t i;
-	size_t sz;
+	ssize_t sz;
 	int t;
 
-	if (l == 0)
+	if (dl == 0)
 		return -1;
 
 	for (i = 0; i < sizeof(dhcp_opts) / sizeof(dhcp_opts[0]); i++) {
@@ -226,30 +230,39 @@ valid_length(uint8_t option, const uint8_t *data, int *type)
 			sz = sizeof(uint8_t);
 
 		if (t & IPV4 || t & ARRAY)
-			return l % sz;
-		return (l == sz ? 0 : -1);
+			return dl % sz;
+		return (dl == sz ? 0 : -1);
 	}
 
 	/* unknown option, so let it pass */
 	return 0;
 }
 
+#define get_option(dhcp, opt) _get_option(dhcp, opt, NULL, NULL)
 static const uint8_t *
-_get_option(const struct dhcp_message *dhcp, uint8_t opt, int *type)
+_get_option(const struct dhcp_message *dhcp, uint8_t opt, int *len, int *type)
 {
 	const uint8_t *p = dhcp->options;
 	const uint8_t *e = p + sizeof(dhcp->options);
-	uint8_t l;
+	uint8_t l, ol = 0;
 	uint8_t o = 0;
 	uint8_t overl = 0;
+	uint8_t *bp = NULL;
+	const uint8_t *op = NULL;
+	int bl = 0;
 
 	while (p < e) {
 		o = *p++;
 		if (o == opt) {
-			if (valid_length(o, p, type) != -1)
-				return p;
-			errno = EINVAL;
-			return NULL;
+			if (op) {
+				if (!bp)
+					bp = dhcp_opt_buffer;
+				memcpy(bp, op, ol);
+				bp += ol;
+			}
+			ol = *p;
+			op = p + 1;
+			bl += ol;
 		}
 		switch (o) {
 		case DHCP_PAD:
@@ -265,10 +278,8 @@ _get_option(const struct dhcp_message *dhcp, uint8_t opt, int *type)
 				overl &= ~2;
 				p = dhcp->servername;
 				e = p + sizeof(dhcp->servername);
-			} else {
-				errno = ENOENT;
-				return NULL;
-			}
+			} else
+				goto exit;
 			break;
 		case DHCP_OPTIONSOVERLOADED:
 			/* Ensure we only get this option once */
@@ -280,14 +291,21 @@ _get_option(const struct dhcp_message *dhcp, uint8_t opt, int *type)
 		p += l;
 	}
 
+exit:
+	if (valid_length(o, bl, type) == -1) {
+		errno = EINVAL;
+		return NULL;
+	}
+	if (len)
+		*len = bl;
+	if (bp) {
+		memcpy(bp, op, ol);
+		return (const uint8_t *)&dhcp_opt_buffer;
+	}
+	if (op)
+		return op;
 	errno = ENOENT;
 	return NULL;
-}
-
-const uint8_t *
-get_option(const struct dhcp_message *dhcp, uint8_t opt)
-{
-	return _get_option(dhcp, opt, NULL);
 }
 
 int
@@ -297,7 +315,7 @@ get_option_addr(uint32_t *a, const struct dhcp_message *dhcp, uint8_t option)
 
 	if (!p)
 		return -1;
-	memcpy(a, p + 1, sizeof(*a));
+	memcpy(a, p, sizeof(*a));
 	return 0;
 }
 
@@ -321,7 +339,7 @@ get_option_uint16(uint16_t *i, const struct dhcp_message *dhcp, uint8_t option)
 
 	if (!p)
 		return -1;
-	memcpy(&d, p + 1, sizeof(d));
+	memcpy(&d, p, sizeof(d));
 	*i = ntohs(d);
 	return 0;
 }
@@ -333,7 +351,7 @@ get_option_uint8(uint8_t *i, const struct dhcp_message *dhcp, uint8_t option)
 
 	if (!p)
 		return -1;
-	*i = *(p + 1);
+	*i = *(p);
 	return 0;
 }
 
@@ -342,14 +360,13 @@ get_option_uint8(uint8_t *i, const struct dhcp_message *dhcp, uint8_t option)
  * terminating zero) or zero on error. out may be NULL
  * to just determine output length. */
 static ssize_t
-decode_rfc3397(char *out, ssize_t len, const uint8_t *p)
+decode_rfc3397(char *out, ssize_t len, int pl, const uint8_t *p)
 {
-	uint8_t ln = *p++;
 	const uint8_t *r, *q = p;
 	int count = 0, l, hops;
 	uint8_t ltype;
 
-	while (q - p < ln) {
+	while (q - p < pl) {
 		r = NULL;
 		hops = 0;
 		while ((l = *q++)) {
@@ -366,7 +383,7 @@ decode_rfc3397(char *out, ssize_t len, const uint8_t *p)
 				if (hops > 255)
 					return 0;
 				q = p + l;
-				if (q - p >= ln)
+				if (q - p >= pl)
 					return 0;
 			} else {
 				/* straightforward name segment, add with '.' */
@@ -400,25 +417,23 @@ decode_rfc3397(char *out, ssize_t len, const uint8_t *p)
 }
 
 static ssize_t
-decode_rfc3442(char *out, ssize_t len, const uint8_t *p)
+decode_rfc3442(char *out, ssize_t len, int pl, const uint8_t *p)
 {
 	const uint8_t *e;
 	ssize_t bytes = 0;
 	ssize_t b;
-	uint8_t l;
 	uint8_t cidr;
 	uint8_t ocets;
 	struct in_addr addr;
 	char *o = out;
 
-	l = *p++;
 	/* Minimum is 5 -first is CIDR and a router length of 4 */
-	if (l < 5) {
+	if (pl < 5) {
 		errno = EINVAL;
 		return -1;
 	}
 
-	e = p + l;
+	e = p + pl;
 	while (p < e) {
 		cidr = *p++;
 		if (cidr > 32) {
@@ -464,22 +479,20 @@ decode_rfc3442(char *out, ssize_t len, const uint8_t *p)
 }
 
 static struct rt *
-decode_rfc3442_rt(const uint8_t *data)
+decode_rfc3442_rt(int dl, const uint8_t *data)
 {
 	const uint8_t *p = data;
 	const uint8_t *e;
-	uint8_t l;
 	uint8_t cidr;
 	uint8_t ocets;
 	struct rt *routes = NULL;
 	struct rt *rt = NULL;
 
-	l = *p++;
 	/* Minimum is 5 -first is CIDR and a router length of 4 */
-	if (l < 5)
+	if (dl < 5)
 		return NULL;
 
-	e = p + l;
+	e = p + dl;
 	while (p < e) {
 		cidr = *p++;
 		if (cidr > 32) {
@@ -518,36 +531,35 @@ decode_rfc3442_rt(const uint8_t *data)
 }
 
 static char *
-decode_rfc3361(const uint8_t *data)
+decode_rfc3361(int dl, const uint8_t *data)
 {
-	uint8_t len = *data++;
 	uint8_t enc;
 	unsigned int l;
 	char *sip = NULL;
 	struct in_addr addr;
 	char *p;
 
-	if (len < 2) {
+	if (dl < 2) {
 		errno = EINVAL;
 		return 0;
 	}
 
 	enc = *data++;
-	len--;
+	dl--;
 	switch (enc) {
 	case 0:
-		if ((l = decode_rfc3397(NULL, 0, data)) > 0) {
+		if ((l = decode_rfc3397(NULL, 0, dl, data)) > 0) {
 			sip = xmalloc(l);
-			decode_rfc3397(sip, l, data);
+			decode_rfc3397(sip, l, dl, data);
 		}
 		break;
 	case 1:
-		if (len == 0 || len % 4 != 0) {
+		if (dl == 0 || dl % 4 != 0) {
 			errno = EINVAL;
 			break;
 		}
 		addr.s_addr = INADDR_BROADCAST;
-		l = ((len / sizeof(addr.s_addr)) * ((4 * 4) + 1)) + 1;
+		l = ((dl / sizeof(addr.s_addr)) * ((4 * 4) + 1)) + 1;
 		sip = p = xmalloc(l);
 		while (l != 0) {
 			memcpy(&addr.s_addr, data, sizeof(addr.s_addr));
@@ -569,32 +581,31 @@ char *
 get_option_string(const struct dhcp_message *dhcp, uint8_t option)
 {
 	int type;
+	int len;
 	const uint8_t *p;
-	uint8_t l;
 	char *s;
 
-	p =  _get_option(dhcp, option, &type);
+	p =  _get_option(dhcp, option, &len, &type);
 	if (!p)
 		return NULL;
 
 	if (type & RFC3397) {
-		type = decode_rfc3397(NULL, 0, p);
+		type = decode_rfc3397(NULL, 0, len, p);
 		if (!type) {
 			errno = EINVAL;
 			return NULL;
 		}
 		s = xmalloc(sizeof(char) * type);
-		decode_rfc3397(s, type, p);
+		decode_rfc3397(s, type, len, p);
 		return s;
 	}
 
 	if (type & RFC3361)
-		return decode_rfc3361(p);
+		return decode_rfc3361(len, p);
 
-	l = *p++;
-	s = xmalloc(sizeof(char) * (l + 1));
-	memcpy(s, p, l);
-	s[l] = '\0';
+	s = xmalloc(sizeof(char) * (len + 1));
+	memcpy(s, p, len);
+	s[len] = '\0';
 	return s;
 }
 
@@ -637,24 +648,23 @@ get_option_routes(const struct dhcp_message *dhcp)
 	const uint8_t *e;
 	struct rt *routes = NULL;
 	struct rt *route = NULL;
-	uint8_t l;
+	int len;
 
 	/* If we have CSR's then we MUST use these only */
 	p = get_option(dhcp, DHCP_CSR);
 	/* Check for crappy MS option */
 	if (!p)
-		p = get_option(dhcp, DHCP_MSCSR);
+		p = _get_option(dhcp, DHCP_MSCSR, &len, NULL);
 	if (p) {
-		routes = decode_rfc3442_rt(p);
+		routes = decode_rfc3442_rt(len, p);
 		if (routes)
 			return routes;
 	}
 
 	/* OK, get our static routes first. */
-	p = get_option(dhcp, DHCP_STATICROUTE);
+	p = _get_option(dhcp, DHCP_STATICROUTE, &len, NULL);
 	if (p) {
-		l = *p++;
-		e = p + l;
+		e = p + len;
 		while (p < e) {
 			if (route) {
 				route->next = xmalloc(sizeof(*route));
@@ -671,10 +681,9 @@ get_option_routes(const struct dhcp_message *dhcp)
 	}
 
 	/* Now grab our routers */
-	p = get_option(dhcp, DHCP_ROUTER);
+	p = _get_option(dhcp, DHCP_ROUTER, &len, NULL);
 	if (p) {
-		l = *p++;
-		e = p + l;
+		e = p + len;
 		while (p < e) {
 			if (route) {
 				route->next = xzalloc(sizeof(*route));
@@ -941,14 +950,14 @@ read_lease(const struct interface *iface)
 }
 
 static ssize_t
-print_string(char *s, ssize_t len, const uint8_t *data, ssize_t datal)
+print_string(char *s, ssize_t len, int dl, const uint8_t *data)
 {
 	uint8_t c;
 	const uint8_t *e;
 	ssize_t bytes = 0;
 	ssize_t r;
 
-	e = data + datal;
+	e = data + dl;
 	while (data < e) {
 		c = *data++;
 		if (!isascii(c) || !isprint(c)) {
@@ -997,7 +1006,7 @@ print_string(char *s, ssize_t len, const uint8_t *data, ssize_t datal)
 }
 
 static ssize_t
-print_option(char *s, ssize_t len, int type, const uint8_t *data)
+print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data)
 {
 	const uint8_t *e, *t;
 	uint16_t u16;
@@ -1010,23 +1019,21 @@ print_option(char *s, ssize_t len, int type, const uint8_t *data)
 	char *tmp;
 
 	if (type & RFC3397) {
-		l = decode_rfc3397(NULL, 0, data);
+		l = decode_rfc3397(NULL, 0, dl, data);
 		if (l < 1)
 			return l;
 		tmp = xmalloc(l);
-		decode_rfc3397(tmp, l, data);
-		l = print_string(s, len, (uint8_t *)tmp, l - 1);
+		decode_rfc3397(tmp, l, dl, data);
+		l = print_string(s, len, l - 1, (uint8_t *)tmp);
 		free(tmp);
 		return l;
 	}
 
 	if (type & RFC3442)
-		return decode_rfc3442(s, len, data);
+		return decode_rfc3442(s, len, dl, data);
 
-	if (!type || type & STRING) {
-		l = *data++;
-		return print_string(s, len, data, l);
-	}
+	if (!type || type & STRING)
+		return print_string(s, len, dl, data);
 
 	if (!s) {
 		if (type & UINT8)
@@ -1045,12 +1052,11 @@ print_option(char *s, ssize_t len, int type, const uint8_t *data)
 			errno = EINVAL;
 			return -1;
 		}
-		return (l + 1) * *data;
+		return (l + 1) * dl;
 	}
 
-	l = *data++;
 	t = data;
-	e = data + l;
+	e = data + dl;
 	while (data < e) {
 		if (data != t) {
 			*s++ = ' ';
@@ -1084,7 +1090,8 @@ print_option(char *s, ssize_t len, int type, const uint8_t *data)
 			memcpy(&addr.s_addr, data, sizeof(addr.s_addr));
 			l = snprintf(s, len, "%s", inet_ntoa(addr));
 			data += sizeof(addr.s_addr);
-		}
+		} else
+			l = 0;
 		len -= l;
 		bytes += l;
 		s += l;
@@ -1108,6 +1115,7 @@ configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp)
 {
 	unsigned int i;
 	const uint8_t *p;
+	int pl;
 	struct in_addr addr;
 	struct in_addr net;
 	struct in_addr brd;
@@ -1168,16 +1176,16 @@ configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp)
 		if (!opt->var)
 			continue;
 		val = NULL;
-		p = get_option(dhcp, opt->option);
+		p = _get_option(dhcp, opt->option, &pl, NULL);
 		if (!p)
 			continue;
-		len = print_option(NULL, 0, opt->type, p);
+		len = print_option(NULL, 0, opt->type, pl, p);
 		if (len < 0)
 			return -1;
 		e = strlen(prefix) + strlen(opt->var) + len + 4;
 		v = val = *ep++ = xmalloc(e);
 		v += snprintf(val, e, "%s_%s=", prefix, opt->var);
-		print_option(v, len, opt->type, p);
+		print_option(v, len, opt->type, pl, p);
 	}
 
 	return ep - env;
