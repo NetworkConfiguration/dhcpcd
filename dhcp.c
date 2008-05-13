@@ -241,6 +241,7 @@ _get_option(const struct dhcp_message *dhcp, uint8_t opt, int *type)
 	const uint8_t *e = p + sizeof(dhcp->options);
 	uint8_t l;
 	uint8_t o = 0;
+	uint8_t overl = 0;
 
 	while (p < e) {
 		o = *p++;
@@ -254,26 +255,22 @@ _get_option(const struct dhcp_message *dhcp, uint8_t opt, int *type)
 		case DHCP_PAD:
 			continue;
 		case DHCP_END:
-			if (o) {
-				if (o & 1) {
-					/* bit 1 set means parse boot file */
-					o &= ~1;
-					p = dhcp->bootfile;
-					e = p + sizeof(dhcp->bootfile);
-				} else if (o & 2) {
-					/* bit 2 set means parse server name */
-					o &= ~2;
-					p = dhcp->servername;
-					e = p + sizeof(dhcp->servername);
-				}
+			if (overl & 1) {
+				/* bit 1 set means parse boot file */
+				overl &= ~1;
+				p = dhcp->bootfile;
+				e = p + sizeof(dhcp->bootfile);
+			} else if (overl & 2) {
+				/* bit 2 set means parse server name */
+				overl &= ~2;
+				p = dhcp->servername;
+				e = p + sizeof(dhcp->servername);
 			}
 			break;
 		case DHCP_OPTIONSOVERLOADED:
 			/* Ensure we only get this option once */
-			if (!(o & 4)) {
-				o = p[1];
-				o |= 4;
-			}
+			if (! overl)
+				overl = p[1];
 			break;
 		}
 			
