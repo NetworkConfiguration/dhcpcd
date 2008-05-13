@@ -58,7 +58,7 @@ struct dhcp_option {
 	const char *var;
 };
 
-const struct dhcp_option dhcp_options[] = {
+const struct dhcp_option dhcp_opts[] = {
 	{ 1,	IPV4 | REQUEST,	"subnet_mask" },
 	{ 2,	UINT32,		"time_offset" },
 	{ 3,	IPV4 | ARRAY | REQUEST,	"routers" },
@@ -155,11 +155,11 @@ print_options(void)
 {
 	unsigned int i;
 
-	for (i = 0; i < sizeof(dhcp_options) / sizeof(dhcp_options[0]); i++)
-		if (dhcp_options[i].var)
+	for (i = 0; i < sizeof(dhcp_opts) / sizeof(dhcp_opts[0]); i++)
+		if (dhcp_opts[i].var)
 			printf("%03d %s\n",
-			       dhcp_options[i].option,
-			       dhcp_options[i].var);
+			       dhcp_opts[i].option,
+			       dhcp_opts[i].var);
 }
 
 int make_reqmask(struct options *options, char **opts, int add)
@@ -168,21 +168,21 @@ int make_reqmask(struct options *options, char **opts, int add)
 	char *p = *opts;
 	uint8_t i;
 	const char *v;
-	int max = sizeof(dhcp_options) / sizeof(dhcp_options[0]);
+	int max = sizeof(dhcp_opts) / sizeof(dhcp_opts[0]);
 
 	while ((token = strsep(&p, ", "))) {
 		if (*token == '\0')
 			continue;
 		for (i = 0; i < max; i++) {
-			if (!(v = dhcp_options[i].var))
+			if (!(v = dhcp_opts[i].var))
 				continue;
 			if (strcmp(v, token) == 0) {
 				if (add == 1)
 					add_reqmask(options->reqmask,
-						    dhcp_options[i].option);
+						    dhcp_opts[i].option);
 				else
 					del_reqmask(options->reqmask,
-						    dhcp_options[i].option);
+						    dhcp_opts[i].option);
 				break;
 			}
 		}
@@ -206,11 +206,11 @@ valid_length(uint8_t option, const uint8_t *data, int *type)
 	if (l == 0)
 		return -1;
 
-	for (i = 0; i < sizeof(dhcp_options) / sizeof(dhcp_options[0]); i++) {
-		if (dhcp_options[i].option != option)
+	for (i = 0; i < sizeof(dhcp_opts) / sizeof(dhcp_opts[0]); i++) {
+		if (dhcp_opts[i].option != option)
 			continue;
 
-		t = dhcp_options[i].type;
+		t = dhcp_opts[i].type;
 		if (type)
 			*type = t;
 
@@ -858,9 +858,9 @@ make_message(struct dhcp_message **message,
 		*p++ = DHCP_PARAMETERREQUESTLIST;
 		n_params = p;
 		*p++ = 0;
-		for (l = 0; l < sizeof(dhcp_options) / sizeof(dhcp_options[0]); l++) {
-			o = dhcp_options[l].option;
-			if (!(dhcp_options[l].type & REQUEST || 
+		for (l = 0; l < sizeof(dhcp_opts) / sizeof(dhcp_opts[0]); l++) {
+			o = dhcp_opts[l].option;
+			if (!(dhcp_opts[l].type & REQUEST || 
 			      has_reqmask(options->reqmask, o)))
 				continue;
 			switch (o) {
@@ -1094,83 +1094,92 @@ print_option(char *s, ssize_t len, int type, const uint8_t *data)
 	return bytes;
 }
 
-static int
-_setenv(const char *prefix, const char *var, const char *value)
+static void
+_setenv(char ***e, const char *prefix, const char *var, const char *value)
 {
-	size_t len = strlen(prefix) + strlen(var) + 3;
-	char *name = xmalloc(len);
-	int r;
+	size_t len = strlen(prefix) + strlen(var) + strlen(value) + 4;
 
-	snprintf(name, len, "%s_%s", prefix, var);
-	if (value)
-		r = setenv(name, value, 1);
-	else
-		r = unsetenv(name);
-	free(name);
-	return r;
+	**e = xmalloc(len);
+	snprintf(**e, len, "%s_%s=%s", prefix, var, value);
+	(*e)++;
 }
 
-int
-configure_env(const char *prefix, const struct dhcp_message *dhcp)
+ssize_t
+configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp)
 {
 	unsigned int i;
 	const uint8_t *p;
 	struct in_addr addr;
 	struct in_addr net;
 	struct in_addr brd;
-	char *val;
+	char *val, *v;
 	const struct dhcp_option *opt;
-	ssize_t len;
+	ssize_t len, e = 0;
+	char **ep;
 	char cidr[4];
+	uint8_t overl;
+	
+	get_option_uint8(&overl, dhcp, DHCP_OPTIONSOVERLOADED);
 
+	if (!env) {
+		for (i = 0; i < sizeof(dhcp_opts) / sizeof(dhcp_opts[0]); i++) {
+			opt = &dhcp_opts[i];
+			if (!opt->var)
+				continue;
+			if (get_option(dhcp, opt->option))
+				e++;
+		}
+		if (dhcp->yiaddr)
+			e += 5;
+		if (*dhcp->bootfile && !(overl & 1))
+			e++;
+		if (*dhcp->servername && !(overl & 2))
+			e++;
+		return e;
+	}
+
+	ep = env;
 	if (dhcp->yiaddr) {
-		/* Set some useful variables that we drive from the DHCP
+		/* Set some useful variables that we derive from the DHCP
 		 * message but are not necessarily in the options */
 		addr.s_addr = dhcp->yiaddr;
-		_setenv(prefix, "ip_address", inet_ntoa(addr));
+		_setenv(&ep, prefix, "ip_address", inet_ntoa(addr));
 		if (get_option_addr(&net.s_addr, dhcp, DHCP_SUBNETMASK) == -1) {
 			net.s_addr = get_netmask(addr.s_addr);
-			_setenv(prefix, "subnet_mask", inet_ntoa(net));
+			_setenv(&ep, prefix, "subnet_mask", inet_ntoa(net));
 		}
 		i = inet_ntocidr(net);
 		snprintf(cidr, sizeof(cidr), "%d", inet_ntocidr(net));
-		_setenv(prefix, "subnet_cidr", cidr);
+		_setenv(&ep, prefix, "subnet_cidr", cidr);
 		if (get_option_addr(&brd.s_addr, dhcp, DHCP_BROADCAST) == -1) {
 			brd.s_addr = addr.s_addr | ~net.s_addr;
-			_setenv(prefix, "broadcast_address", inet_ntoa(net));
+			_setenv(&ep, prefix, "broadcast_address", inet_ntoa(net));
 		}
 		addr.s_addr = dhcp->yiaddr & net.s_addr;
-		_setenv(prefix, "network_number", inet_ntoa(addr));
-	} else {
-		_setenv(prefix, "ip_address", NULL);
-		_setenv(prefix, "subnet_cidr", NULL);
-		_setenv(prefix, "network_number", NULL);
+		_setenv(&ep, prefix, "network_number", inet_ntoa(addr));
 	}
 
-	if (*dhcp->bootfile)
-		_setenv(prefix, "filename", (char *)dhcp->bootfile);
-	else
-		_setenv(prefix, "filename", NULL);
-	if (*dhcp->servername)
-		_setenv(prefix, "server_name", (char *)dhcp->servername);
-	else
-		_setenv(prefix, "server_name", NULL);
+	if (*dhcp->bootfile && !(overl & 1))
+		_setenv(&ep, prefix, "filename", (char *)dhcp->bootfile);
+	if (*dhcp->servername && !(overl & 2))
+		_setenv(&ep, prefix, "server_name", (char *)dhcp->servername);
 
-	for (i = 0; i < sizeof(dhcp_options) / sizeof(dhcp_options[0]); i++) {
-		opt = &dhcp_options[i];
+	for (i = 0; i < sizeof(dhcp_opts) / sizeof(dhcp_opts[0]); i++) {
+		opt = &dhcp_opts[i];
 		if (!opt->var)
 			continue;
 		val = NULL;
 		p = get_option(dhcp, opt->option);
-		if (p) {
-			len = print_option(NULL, 0, opt->type, p);
-			if (len < 0)
-				return -1;
-			val = xmalloc(len);
-			print_option(val, len, opt->type, p);
-		}
-		_setenv(prefix, opt->var, val);
-		free(val);
+		if (!p)
+			continue;
+		len = print_option(NULL, 0, opt->type, p);
+		if (len < 0)
+			return -1;
+		e = strlen(prefix) + strlen(opt->var) + len + 4;
+		v = val = *ep++ = xmalloc(e);
+		v += snprintf(val, e, "%s_%s=", prefix, opt->var);
+		print_option(v, len, opt->type, p);
 	}
-	return 0;
+
+	return ep - env;
 }

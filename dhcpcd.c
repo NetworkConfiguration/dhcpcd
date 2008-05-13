@@ -661,6 +661,8 @@ main(int argc, char **argv)
 			options->fqdn = FQDN_DISABLE;
 		}
 	}
+	if (options->fqdn != FQDN_DISABLE)
+		del_reqmask(options->reqmask, DHCP_HOSTNAME);
 
 	if (options->request_address.s_addr == 0 &&
 	    options->options & DHCPCD_INFORM)

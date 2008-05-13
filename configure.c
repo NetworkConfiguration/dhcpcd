@@ -45,11 +45,16 @@
 #include "net.h"
 #include "signal.h"
 
+#define DEFAULT_PATH	"PATH=/usr/bin:/usr/sbin:/bin:/sbin"
+
 int
 exec_script(const char *script, const char *iface, const char *reason,
 	    const struct dhcp_message *dhcpn, const struct dhcp_message *dhcpo)
 {
 	char *const argv[2] = { (char *)script, NULL };
+	char **env = NULL, **ep;
+	char *path;
+	ssize_t e, elen;
 	int ret = 0;
 	pid_t pid;
 	int status = 0;
@@ -57,6 +62,38 @@ exec_script(const char *script, const char *iface, const char *reason,
 	sigset_t old;
 
 	logger(LOG_DEBUG, "exec `%s'", script);
+
+	/* Make our env */
+	elen = 3;
+	env = xmalloc(sizeof(char *) * (elen + 1));
+	path = getenv("PATH");
+	if (path) {
+		e = strlen("PATH") + strlen(path) + 2;
+		env[0] = xmalloc(e);
+		snprintf(env[0], e, "PATH=%s", path);
+	} else
+		env[0] = xstrdup(DEFAULT_PATH);
+	e = strlen("interface") + strlen(iface) + 2;
+	env[1] = xmalloc(e);
+	snprintf(env[1], e, "interface=%s", iface);
+	e = strlen("reason") + strlen(reason) + 2;
+	env[2] = xmalloc(e);
+	snprintf(env[2], e, "reason=%s", reason);
+	if (dhcpo) {
+		e = configure_env(NULL, NULL, dhcpo);
+		if (e > 0) {
+			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
+			elen += configure_env(env + elen, "old", dhcpo);
+		}
+	}
+	if (dhcpn) {
+		e = configure_env(NULL, NULL, dhcpn);
+		if (e > 0) {
+			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
+			elen += configure_env(env + elen, "new", dhcpn);
+		}
+	}
+	env[elen] = '\0';
 
 	/* OK, we need to block signals */
 	sigfillset(&full);
@@ -79,13 +116,7 @@ exec_script(const char *script, const char *iface, const char *reason,
 		signal_reset();
 #endif
 		sigprocmask(SIG_SETMASK, &old, NULL);
-		if (dhcpo)
-			configure_env("old", dhcpo);
-		if (dhcpn)
-			configure_env("new", dhcpn);
-		setenv("interface", iface, 1);
-		setenv("reason", reason, 1);
-		execvp(script, argv);
+		execve(script, argv, env);
 		logger(LOG_ERR, "%s: %s", script, strerror(errno));
 		_exit(111);
 		/* NOTREACHED */
@@ -106,6 +137,12 @@ exec_script(const char *script, const char *iface, const char *reason,
 			break;
 		}
 	}
+
+	/* Cleanup */
+	ep = env;
+	while (*ep)
+		free(*ep++);
+	free(env);
 
 	return status;
 }

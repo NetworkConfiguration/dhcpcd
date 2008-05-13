@@ -171,7 +171,7 @@ int get_option_uint32(uint32_t *, const struct dhcp_message *, uint8_t);
 int get_option_uint16(uint16_t *, const struct dhcp_message *, uint8_t);
 int get_option_uint8(uint8_t *, const struct dhcp_message *, uint8_t);
 struct rt *get_option_routes(const struct dhcp_message *);
-int configure_env(const char *, const struct dhcp_message *);
+ssize_t configure_env(char **, const char *, const struct dhcp_message *);
 
 ssize_t make_message(struct dhcp_message **,
 			const struct interface *, const struct dhcp_lease *,
