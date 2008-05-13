@@ -353,6 +353,7 @@ configure_routes(struct interface *iface, const struct dhcp_message *dhcp,
 		else if (!(options->options & DHCPCD_DAEMONISED)) {
 			/* We can never have more than 255 / 4 routes,
 			 * so 3 chars is plently */
+			printf("foo\n");
 			if (*skipp)
 				*skipp++ = ',';
 			skipp += snprintf(skipp,
@@ -367,14 +368,15 @@ configure_routes(struct interface *iface, const struct dhcp_message *dhcp,
 	iface->routes = nr;
 
 #ifdef THERE_IS_NO_FORK
-	if (*dhcpcd_skiproutes)
-		*skipp = '\0';
-	else {
-		free(dhcpcd_skiproutes);
-		dhcpcd_skiproutes = NULL;
+	if (dhcpcd_skiproutes) {
+		if (*dhcpcd_skiproutes)
+			*skipp = '\0';
+		else {
+			free(dhcpcd_skiproutes);
+			dhcpcd_skiproutes = NULL;
+		}
 	}
 #endif
-
 
 	return retval;
 }

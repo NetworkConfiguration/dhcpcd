@@ -455,7 +455,7 @@ client_setup(struct if_state *state, const struct options *options)
 	     options->options & DHCPCD_REQUEST ||
 	     options->options & DHCPCD_DAEMONISED))
 	{
-		if (!get_old_lease(state, options))
+		if (get_old_lease(state, options) != 0)
 			return -1;
 		state->timeout = 0;
 
