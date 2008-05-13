@@ -265,15 +265,17 @@ _get_option(const struct dhcp_message *dhcp, uint8_t opt, int *type)
 				overl &= ~2;
 				p = dhcp->servername;
 				e = p + sizeof(dhcp->servername);
+			} else {
+				errno = ENOENT;
+				return NULL;
 			}
 			break;
 		case DHCP_OPTIONSOVERLOADED:
 			/* Ensure we only get this option once */
-			if (! overl)
+			if (!overl)
 				overl = p[1];
 			break;
 		}
-			
 		l = *p++;
 		p += l;
 	}
@@ -1114,8 +1116,8 @@ configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp)
 	ssize_t len, e = 0;
 	char **ep;
 	char cidr[4];
-	uint8_t overl;
-	
+	uint8_t overl = 0;
+
 	get_option_uint8(&overl, dhcp, DHCP_OPTIONSOVERLOADED);
 
 	if (!env) {
