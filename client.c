@@ -191,7 +191,7 @@ daemonise(struct if_state *state, const struct options *options)
 
 	switch (pid = vfork()) {
 		case -1:
-			logger(LOG_ERR, "vfork: %s", strerror (errno));
+			logger(LOG_ERR, "vfork: %s", strerror(errno));
 			_exit(EXIT_FAILURE);
 		case 0:
 			signal_reset();

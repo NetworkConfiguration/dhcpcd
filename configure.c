@@ -109,7 +109,11 @@ exec_script(const char *script, const char *iface, const char *reason,
 
 	switch (pid) {
 	case -1:
+#ifdef THERE_IS_NO_FORK
+		logger(LOG_ERR, "vfork: %s", strerror(errno));
+#else
 		logger(LOG_ERR, "fork: %s", strerror(errno));
+#endif
 		ret = -1;
 		break;
 	case 0:
