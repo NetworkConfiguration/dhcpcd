@@ -25,10 +25,6 @@
  * SUCH DAMAGE.
  */
 
-#ifndef SYSLOG_NAMES
-# define SYSLOG_NAMES
-#endif
-
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -42,26 +38,38 @@
 static int loglevel = LOG_WARNING;
 static char logprefix[12] = {0};
 
+struct logname {
+	int level;
+	const char *name;
+};
+static const struct logname const lognames[] = {
+	{ LOG_DEBUG,	"debug" },
+	{ LOG_INFO,	"info" },
+	{ LOG_WARNING,	"warning" },
+	{ LOG_ERR,	"err" },
+	{ -1,		NULL }
+};
+
 int
 logtolevel(const char *priority)
 {
-	CODE *c;
+	const struct logname *lt;
 
 	if (isdigit((unsigned char)*priority))
 		return atoi(priority);
-	for (c = prioritynames; c->c_name; c++)
-		if (!strcasecmp(priority, c->c_name))
-			return c->c_val;
+	for (lt = lognames; lt->name; lt++)
+		if (!strcasecmp(priority, lt->name))
+			return lt->level;
 	return -1;
 }
 
 static const char *
 leveltolog(int level) {
-	CODE *c;
+	const struct logname *lt;
 
-	for (c = prioritynames; c->c_name; c++)
-		if (c->c_val == level)
-			return c->c_name;
+	for (lt = lognames; lt->name; lt++) 
+		if (lt->level == level)
+			return lt->name;
 	return NULL;
 }
 

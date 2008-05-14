@@ -26,7 +26,7 @@ ${PROG}: ${OBJS}
 small: ${SRCS}
 	echo "" > _${PROG}.c
 	for src in ${SRCS}; do echo "#include \"$$src\"" >> _${PROG}.c; done
-	${CC} ${CFLAGS} -DSYSLOG_NAMES -c _${PROG}.c -o _${PROG}.o
+	${CC} ${CFLAGS} -c _${PROG}.c -o _${PROG}.o
 	${CC} ${LDFLAGS} -o ${PROG} _${PROG}.o ${LDADD}
 
 _proginstall: ${PROG}
