@@ -116,10 +116,10 @@ open_socket(struct interface *iface, int protocol)
 	memset(&pf, 0, sizeof(pf));
 	if (protocol == ETHERTYPE_ARP) {
 		pf.filter = arp_bpf_filter;
-		pf.len = sizeof(arp_bpf_filter) / sizeof(arp_bpf_filter[0]);
+		pf.len = arp_bpf_filter_len;
 	} else {
 		pf.filter = dhcp_bpf_filter;
-		pf.len = sizeof(dhcp_bpf_filter) / sizeof(dhcp_bpf_filter[0]);
+		pf.len = dhcp_bpf_filter_len;
 	}
 	if (setsockopt(s, SOL_SOCKET, SO_ATTACH_FILTER, &pf, sizeof(pf)) != 0)
 		goto eexit;

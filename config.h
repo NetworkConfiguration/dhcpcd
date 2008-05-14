@@ -76,4 +76,6 @@
 #define LEASEFILE		DBDIR "/" PACKAGE "-%s.lease"
 #define PIDFILE			RUNDIR "/" PACKAGE "-%s.pid"
 
+#define UNCONST(a)	((void *)(unsigned long)(const void *)(a))
+
 #endif
