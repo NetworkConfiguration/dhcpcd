@@ -103,15 +103,15 @@ open_socket(struct interface *iface, int protocol)
 	/* Install the DHCP filter */
 	if (protocol == ETHERTYPE_ARP) {
 		pf.bf_insns = arp_bpf_filter;
-		pf.bf_len = sizeof(arp_bpf_filter) / sizeof(arp_bpf_filter[0]);
+		pf.bf_len = arp_bpf_filter_len;
 	} else {
 		pf.bf_insns = dhcp_bpf_filter;
-		pf.bf_len = sizeof(dhcp_bpf_filter)/sizeof(dhcp_bpf_filter[0]);
+		pf.bf_len = dhcp_bpf_filter_len;
 	}
 	if (ioctl(fd, BIOCSETF, &pf) == -1)
 		goto eexit;
 
-	if (iface->fd > -1)
+	if (iface->fd != -1)
 		close(iface->fd);
 
 	close_on_exec(fd);
@@ -136,7 +136,7 @@ send_raw_packet(const struct interface *iface, int type,
 	hw.ether_type = htons(type);
 	iov[0].iov_base = &hw;
 	iov[0].iov_len = sizeof(hw);
-	iov[1].iov_base = (unsigned char *)data;
+	iov[1].iov_base = UNCONST(data);
 	iov[1].iov_len = len;
 
 	return writev(iface->fd, iov, 2);
