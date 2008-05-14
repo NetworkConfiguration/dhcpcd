@@ -1185,6 +1185,8 @@ handle_packet(struct if_state *state, const struct options *options)
 {
 	struct interface *iface = state->interface;
 	struct dhcp_message *dhcp;
+	uint8_t *p;
+	ssize_t bytes;
 
 	/* Allocate our buffer space for BPF.
 	 * We cannot do this until we have opened our socket as we don't
@@ -1199,13 +1201,11 @@ handle_packet(struct if_state *state, const struct options *options)
 	 * the first one fails for any reason, we can use the next. */
 
 	dhcp = xmalloc(sizeof(*dhcp));
-
 	do {
-		if (get_packet(iface, (uint8_t *)dhcp,
-			       state->buffer,
-			       &state->buffer_len, &state->buffer_pos) == -1)
+		bytes = get_packet(iface, (uint8_t *)dhcp, state->buffer,
+				   &state->buffer_len, &state->buffer_pos);
+		if (bytes == -1)
 			break;
-
 		if (dhcp->cookie != htonl(MAGIC_COOKIE)) {
 			logger(LOG_DEBUG, "bogus cookie, ignoring");
 			continue;
@@ -1216,6 +1216,15 @@ handle_packet(struct if_state *state, const struct options *options)
 			       " it's not ours (0x%x)",
 			       dhcp->xid, state->xid);
 			continue;
+		}
+		/* We should ensure that the packet is terminated correctly
+		 * if we have space for the terminator */
+		if ((size_t)bytes < sizeof(struct dhcp_message)) {
+			p = (uint8_t *)dhcp + bytes - 1;
+			while (p > dhcp->options && *p == DHCP_PAD)
+				p--;
+			if (*p != DHCP_END)
+				*++p = DHCP_END;
 		}
 		if (handle_dhcp(state, &dhcp, options) == 0)
 			return 0;
