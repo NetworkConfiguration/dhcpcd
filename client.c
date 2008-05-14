@@ -116,7 +116,7 @@ struct dhcp_op {
         const char *name;
 };
 
-static struct dhcp_op dhcp_ops[] = {
+static const struct dhcp_op const dhcp_ops[] = {
 	{ DHCP_DISCOVER, "DHCP_DISCOVER" },
 	{ DHCP_OFFER,    "DHCP_OFFER" },
 	{ DHCP_REQUEST,  "DHCP_REQUEST" },
@@ -131,12 +131,11 @@ static struct dhcp_op dhcp_ops[] = {
 static const char *
 get_dhcp_op(uint8_t type)
 {
-	struct dhcp_op *d;
+	const struct dhcp_op *d;
 
 	for (d = dhcp_ops; d->name; d++)
 		if (d->value == type)
 			return d->name;
-
 	return NULL;
 }
 
