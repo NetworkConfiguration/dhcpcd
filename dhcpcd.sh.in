@@ -104,7 +104,7 @@ set_hostname()
 
 run_test()
 {
-	env | grep "^\(interface\|reason\)="
+	env | grep "^\(interface\|pid\|reason\)="
 	env | grep "^\(new_\|old_\)" | sort
 }
 

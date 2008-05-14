@@ -65,7 +65,7 @@ exec_script(const char *script, const char *iface, const char *reason,
 	logger(LOG_DEBUG, "exec `%s'", script);
 
 	/* Make our env */
-	elen = 3;
+	elen = 4;
 	env = xmalloc(sizeof(char *) * (elen + 1));
 	path = getenv("PATH");
 	if (path) {
@@ -80,6 +80,9 @@ exec_script(const char *script, const char *iface, const char *reason,
 	e = strlen("reason") + strlen(reason) + 2;
 	env[2] = xmalloc(e);
 	snprintf(env[2], e, "reason=%s", reason);
+	e = 20;
+	env[3] = xmalloc(e);
+	snprintf(env[3], e, "pid=%d", getpid());
 	if (dhcpo) {
 		e = configure_env(NULL, NULL, dhcpo);
 		if (e > 0) {
