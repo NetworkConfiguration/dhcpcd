@@ -52,12 +52,13 @@ int
 open_socket(struct interface *iface, int protocol)
 {
 	int fd = -1;
-	int flags;
 	struct ifreq ifr;
 	int buf = 0;
 	struct bpf_version pv;
 	struct bpf_program pf;
-
+#ifdef BIOCIMMEDIATE
+	int flags;
+#endif
 #ifdef _PATH_BPF
 	fd = open(_PATH_BPF, O_RDWR);
 #else
@@ -93,9 +94,11 @@ open_socket(struct interface *iface, int protocol)
 		goto eexit;
 	iface->buffer_length = buf;
 
+#ifdef BIOCIMMEDIATE
 	flags = 1;
 	if (ioctl(fd, BIOCIMMEDIATE, &flags) == -1)
 		goto eexit;
+#endif
 
 	/* Install the DHCP filter */
 	if (protocol == ETHERTYPE_ARP) {
