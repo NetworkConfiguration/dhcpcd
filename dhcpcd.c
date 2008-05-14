@@ -449,6 +449,9 @@ main(int argc, char **argv)
 		case 'f':
 			cf = optarg;
 			break;
+		case 'V':
+			print_options();
+			goto abort;
 		case '?':
 			usage();
 			goto abort;
@@ -618,9 +621,6 @@ main(int argc, char **argv)
 		case 'T':
 			options->options |= DHCPCD_TEST | DHCPCD_PERSISTENT;
 			break;
-		case 'V':
-			print_options();
-			goto abort;
 #ifdef CMDLINE_COMPAT
 		case 'H': /* FALLTHROUGH */
 		case 'M':
