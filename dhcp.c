@@ -57,13 +57,13 @@
  * practically never. See RFC3396 for details. */
 static uint8_t *dhcp_opt_buffer = NULL;
 
-struct dhcp_option {
+struct dhcp_opt {
 	uint8_t option;
 	int type;
 	const char *var;
 };
 
-const struct dhcp_option dhcp_opts[] = {
+static const struct dhcp_opt const dhcp_opts[] = {
 	{ 1,	IPV4 | REQUEST,	"subnet_mask" },
 	{ 2,	UINT32,		"time_offset" },
 	{ 3,	IPV4 | ARRAY | REQUEST,	"routers" },
@@ -158,40 +158,36 @@ const struct dhcp_option dhcp_opts[] = {
 void
 print_options(void)
 {
-	unsigned int i;
+	const struct dhcp_opt *opt;
 
-	for (i = 0; i < sizeof(dhcp_opts) / sizeof(dhcp_opts[0]); i++)
-		if (dhcp_opts[i].var)
-			printf("%03d %s\n",
-			       dhcp_opts[i].option,
-			       dhcp_opts[i].var);
+	for (opt = dhcp_opts; opt->option; opt++)
+		if (opt->var)
+			printf("%03d %s\n", opt->option, opt->var);
 }
 
 int make_reqmask(struct options *options, char **opts, int add)
 {
 	char *token;
 	char *p = *opts;
-	uint8_t i;
-	const char *v;
-	int max = sizeof(dhcp_opts) / sizeof(dhcp_opts[0]);
+	const struct dhcp_opt *opt;
 
 	while ((token = strsep(&p, ", "))) {
 		if (*token == '\0')
 			continue;
-		for (i = 0; i < max; i++) {
-			if (!(v = dhcp_opts[i].var))
+		for (opt = dhcp_opts; opt->option; opt++) {
+			if (!opt->var)
 				continue;
-			if (strcmp(v, token) == 0) {
+			if (strcmp(opt->var, token) == 0) {
 				if (add == 1)
 					add_reqmask(options->reqmask,
-						    dhcp_opts[i].option);
+						    opt->option);
 				else
 					del_reqmask(options->reqmask,
-						    dhcp_opts[i].option);
+						    opt->option);
 				break;
 			}
 		}
-		if (i >= max) {
+		if (!opt->option) {
 			*opts = token;
 			errno = ENOENT;
 			return -1;
@@ -203,33 +199,30 @@ int make_reqmask(struct options *options, char **opts, int add)
 static int
 valid_length(uint8_t option, int dl, int *type)
 {
-	uint8_t i;
+	const struct dhcp_opt *opt;
 	ssize_t sz;
-	int t;
 
 	if (dl == 0)
 		return -1;
 
-	for (i = 0; i < sizeof(dhcp_opts) / sizeof(dhcp_opts[0]); i++) {
-		if (dhcp_opts[i].option != option)
+	for (opt = dhcp_opts; opt->option; opt++) {
+		if (opt->option != option)
 			continue;
 
-		t = dhcp_opts[i].type;
 		if (type)
-			*type = t;
+			*type = opt->type;
 
-		if (t == 0 || t & STRING || t & RFC3442)
+		if (opt->type == 0 || opt->type & STRING || opt->type & RFC3442)
 			return 0;
 
 		sz = 0;
-		if (t & UINT32 || t & IPV4)
+		if (opt->type & UINT32 || opt->type & IPV4)
 			sz = sizeof(uint32_t);
-		if (t & UINT16)
+		if (opt->type & UINT16)
 			sz = sizeof(uint16_t);
-		if (t & UINT8)
+		if (opt->type & UINT8)
 			sz = sizeof(uint8_t);
-
-		if (t & IPV4 || t & ARRAY)
+		if (opt->type & IPV4 || opt->type & ARRAY)
 			return dl % sz;
 		return (dl == sz ? 0 : -1);
 	}
@@ -721,7 +714,7 @@ make_message(struct dhcp_message **message,
 	time_t up = uptime() - iface->start_uptime;
 	uint32_t ul;
 	uint16_t sz;
-	uint8_t o;
+	const struct dhcp_opt *opt;
 
 	dhcp = xzalloc(sizeof (*dhcp));
 	m = (uint8_t *)dhcp;
@@ -876,19 +869,18 @@ make_message(struct dhcp_message **message,
 		*p++ = DHCP_PARAMETERREQUESTLIST;
 		n_params = p;
 		*p++ = 0;
-		for (l = 0; l < sizeof(dhcp_opts) / sizeof(dhcp_opts[0]); l++) {
-			o = dhcp_opts[l].option;
-			if (!(dhcp_opts[l].type & REQUEST || 
-			      has_reqmask(options->reqmask, o)))
+		for (opt = dhcp_opts; opt->option; opt++) {
+			if (!(opt->type & REQUEST || 
+			      has_reqmask(options->reqmask, opt->option)))
 				continue;
-			switch (o) {
+			switch (opt->option) {
 			case DHCP_RENEWALTIME:	/* FALLTHROUGH */
 			case DHCP_REBINDTIME:
 				if (type == DHCP_INFORM)
 					continue;
 				break;
 			}
-			*p++ = o;
+			*p++ = opt->option;
 		}
 		*n_params = p - n_params - 1;
 	}
@@ -1130,7 +1122,7 @@ configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp)
 	struct in_addr net;
 	struct in_addr brd;
 	char *val, *v;
-	const struct dhcp_option *opt;
+	const struct dhcp_opt *opt;
 	ssize_t len, e = 0;
 	char **ep;
 	char cidr[4];
@@ -1139,8 +1131,7 @@ configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp)
 	get_option_uint8(&overl, dhcp, DHCP_OPTIONSOVERLOADED);
 
 	if (!env) {
-		for (i = 0; i < sizeof(dhcp_opts) / sizeof(dhcp_opts[0]); i++) {
-			opt = &dhcp_opts[i];
+		for (opt = dhcp_opts; opt->option; opt++) {
 			if (!opt->var)
 				continue;
 			if (get_option(dhcp, opt->option))
@@ -1181,8 +1172,7 @@ configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp)
 	if (*dhcp->servername && !(overl & 2))
 		_setenv(&ep, prefix, "server_name", (char *)dhcp->servername);
 
-	for (i = 0; i < sizeof(dhcp_opts) / sizeof(dhcp_opts[0]); i++) {
-		opt = &dhcp_opts[i];
+	for (opt = dhcp_opts; opt->option; opt++) {
 		if (!opt->var)
 			continue;
 		val = NULL;
