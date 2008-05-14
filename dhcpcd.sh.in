@@ -89,9 +89,10 @@ restore_resolv_conf()
 need_hostname()
 {
 	case "$(hostname)" in
-		""|"(none)"|localhost|"${old_host_name}") return 0;;
+		""|"(none)"|localhost)	[ -n "${new_host_name}" ];;
+		"${old_host_name}") 	true;;
+		*) 			false;;
 	esac
-	return 1
 }
 
 set_hostname()
