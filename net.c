@@ -745,8 +745,8 @@ arp_claim(struct interface *iface, struct in_addr address)
 		if (!(fds[1].revents & POLLIN))
 			continue;
 
-		for (;;) {
-			memset(arp_reply, 0, sizeof(arp_reply));
+		do {
+			memset(&arp_reply, 0, sizeof(arp_reply));
 			bytes = get_packet(iface, &arp_reply, sizeof(arp_reply));
 			if (bytes <= 0)
 				break;
@@ -783,7 +783,7 @@ arp_claim(struct interface *iface, struct in_addr address)
 			       hwaddr_ntoa((unsigned char *)&reply_mac, (size_t)reply.ar_hln));
 			retval = -1;
 			goto eexit;
-		}
+		} while (iface->buffer_pos != 0);
 	}
 
 eexit:
