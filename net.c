@@ -468,17 +468,16 @@ struct udp_dhcp_packet
 static uint16_t
 checksum(const void *data, uint16_t len)
 {
-	const uint8_t *addr = data;
+	const uint16_t *addr = data;
 	uint32_t sum = 0;
 
 	while (len > 1) {
-		sum += addr[0] + addr[1] * 256;
-		addr += 2;
+		sum += *addr++;
 		len -= 2;
 	}
 
 	if (len == 1)
-		sum += *addr;
+		sum += *(const uint8_t *)addr;
 
 	sum = (sum >> 16) + (sum & 0xffff);
 	sum += (sum >> 16);
