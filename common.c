@@ -42,6 +42,10 @@
 #include "common.h"
 #include "logger.h"
 
+#ifndef _PATH_DEVNULL
+#  define _PATH_DEVNULL "/dev/null"
+#endif
+
 /* Handy routine to read very long lines in text files.
  * This means we read the whole line and avoid any nasty buffer overflows. */
 ssize_t
