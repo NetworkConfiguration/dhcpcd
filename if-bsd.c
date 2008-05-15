@@ -154,8 +154,7 @@ if_route(const char *ifname, const struct in_addr *destination,
 
 	ADDADDR(destination);
 
-	if (gateway->s_addr == INADDR_ANY)
-	{
+	if (gateway->s_addr == INADDR_ANY) {
 		/* Make us a link layer socket */
 		hwaddr = xmalloc(sizeof(unsigned char) * HWADDR_LEN);
 		do_interface(ifname, hwaddr, &hwlen, NULL, 0, 0);
