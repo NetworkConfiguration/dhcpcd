@@ -213,7 +213,7 @@ parse_option(int opt, char *oarg, struct options *options)
 		}
 		break;
 	case 'o':
-		if (make_reqmask(options, &oarg, 1) != 0) {
+		if (make_reqmask(options->reqmask, &oarg, 1) != 0) {
 			logger(LOG_ERR, "unknown option `%s'", oarg);
 			return -1;
 		}
@@ -613,7 +613,11 @@ main(int argc, char **argv)
 			sig = SIGTERM;
 			break;
 		case 'O':
-			if (make_reqmask(options, &optarg, -1) != 0) {
+			if (make_reqmask(options->reqmask, &optarg, -1) != 0) {
+				logger(LOG_ERR, "unknown option `%s'", optarg);
+				return -1;
+			}
+			if (make_reqmask(options->nomask, &optarg, 1) != 0) {
 				logger(LOG_ERR, "unknown option `%s'", optarg);
 				return -1;
 			}

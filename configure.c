@@ -49,10 +49,11 @@
 #define DEFAULT_PATH	"PATH=/usr/bin:/usr/sbin:/bin:/sbin"
 
 int
-exec_script(const char *script, const char *iface, const char *reason,
+exec_script(const struct options *options, const char *iface,
+	    const char *reason,
 	    const struct dhcp_message *dhcpn, const struct dhcp_message *dhcpo)
 {
-	char *const argv[2] = { (char *)script, NULL };
+	char *const argv[2] = { (char *)options->script, NULL };
 	char **env = NULL, **ep;
 	char *path;
 	ssize_t e, elen;
@@ -62,7 +63,7 @@ exec_script(const char *script, const char *iface, const char *reason,
 	sigset_t full;
 	sigset_t old;
 
-	logger(LOG_DEBUG, "exec `%s'", script);
+	logger(LOG_DEBUG, "exec `%s'", options->script);
 
 	/* Make our env */
 	elen = 4;
@@ -84,17 +85,17 @@ exec_script(const char *script, const char *iface, const char *reason,
 	env[3] = xmalloc(e);
 	snprintf(env[3], e, "pid=%d", getpid());
 	if (dhcpo) {
-		e = configure_env(NULL, NULL, dhcpo);
+		e = configure_env(NULL, NULL, dhcpo, options);
 		if (e > 0) {
 			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
-			elen += configure_env(env + elen, "old", dhcpo);
+			elen += configure_env(env + elen, "old", dhcpo, options);
 		}
 	}
 	if (dhcpn) {
-		e = configure_env(NULL, NULL, dhcpn);
+		e = configure_env(NULL, NULL, dhcpn, options);
 		if (e > 0) {
 			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
-			elen += configure_env(env + elen, "new", dhcpn);
+			elen += configure_env(env + elen, "new", dhcpn, options);
 		}
 	}
 	env[elen] = '\0';
@@ -124,8 +125,8 @@ exec_script(const char *script, const char *iface, const char *reason,
 		signal_reset();
 #endif
 		sigprocmask(SIG_SETMASK, &old, NULL);
-		execve(script, argv, env);
-		logger(LOG_ERR, "%s: %s", script, strerror(errno));
+		execve(options->script, argv, env);
+		logger(LOG_ERR, "%s: %s", options->script, strerror(errno));
 		_exit(111);
 		/* NOTREACHED */
 	}
@@ -433,7 +434,7 @@ configure(struct interface *iface, const char *reason,
 			}
 		}
 
-		exec_script(options->script, iface->name, reason, NULL, old);
+		exec_script(options, iface->name, reason, NULL, old);
 		return 0;
 	}
 
@@ -478,6 +479,6 @@ configure(struct interface *iface, const char *reason,
 		if (write_lease(iface, dhcp) == -1)
 			logger(LOG_ERR, "write_lease: %s", strerror(errno));
 
-	exec_script(options->script, iface->name, reason, dhcp, old);
+	exec_script(options, iface->name, reason, dhcp, old);
 	return 0;
 }

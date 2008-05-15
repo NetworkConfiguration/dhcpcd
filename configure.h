@@ -32,7 +32,7 @@
 #include "dhcp.h"
 #include "net.h"
 
-int exec_script(const char *, const char *, const char *,
+int exec_script(const struct options *, const char *, const char *,
 		const struct dhcp_message *, const struct dhcp_message *);
 int configure(struct interface *, const char *,
 	      const struct dhcp_message *, const struct dhcp_message *,

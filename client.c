@@ -1018,8 +1018,7 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 		free(addr);
 
 		if (state->options & DHCPCD_TEST) {
-			exec_script(options->script, iface->name,
-				    "TEST", dhcp, NULL);
+			exec_script(options, iface->name, "TEST", dhcp, NULL);
 			return -1;
 		}
 

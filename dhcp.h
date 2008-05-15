@@ -162,7 +162,7 @@ struct dhcp_lease {
 #define add_reqmask(var, val) (var[val >> 3] |= 1 << (val & 7))
 #define del_reqmask(var, val) (var[val >> 3] &= ~(1 << (val & 7)))
 #define has_reqmask(var, val) (var[val >> 3] & (1 << (val & 7)))
-int make_reqmask(struct options *, char **, int);
+int make_reqmask(uint8_t *, char **, int);
 void print_options(void);
 const uint8_t *get_option(const struct dhcp_message *, uint8_t);
 char *get_option_string(const struct dhcp_message *, uint8_t);
@@ -171,7 +171,8 @@ int get_option_uint32(uint32_t *, const struct dhcp_message *, uint8_t);
 int get_option_uint16(uint16_t *, const struct dhcp_message *, uint8_t);
 int get_option_uint8(uint8_t *, const struct dhcp_message *, uint8_t);
 struct rt *get_option_routes(const struct dhcp_message *);
-ssize_t configure_env(char **, const char *, const struct dhcp_message *);
+ssize_t configure_env(char **, const char *, const struct dhcp_message *,
+		      const struct options *);
 
 ssize_t make_message(struct dhcp_message **,
 			const struct interface *, const struct dhcp_lease *,

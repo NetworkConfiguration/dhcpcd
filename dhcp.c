@@ -165,7 +165,7 @@ print_options(void)
 			printf("%03d %s\n", opt->option, opt->var);
 }
 
-int make_reqmask(struct options *options, char **opts, int add)
+int make_reqmask(uint8_t *mask, char **opts, int add)
 {
 	char *token;
 	char *p = *opts;
@@ -179,10 +179,10 @@ int make_reqmask(struct options *options, char **opts, int add)
 				continue;
 			if (strcmp(opt->var, token) == 0) {
 				if (add == 1)
-					add_reqmask(options->reqmask,
+					add_reqmask(mask,
 						    opt->option);
 				else
-					del_reqmask(options->reqmask,
+					del_reqmask(mask,
 						    opt->option);
 				break;
 			}
@@ -1113,7 +1113,8 @@ _setenv(char ***e, const char *prefix, const char *var, const char *value)
 }
 
 ssize_t
-configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp)
+configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
+	      const struct options *options)
 {
 	unsigned int i;
 	const uint8_t *p;
@@ -1133,6 +1134,8 @@ configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp)
 	if (!env) {
 		for (opt = dhcp_opts; opt->option; opt++) {
 			if (!opt->var)
+				continue;
+			if (has_reqmask(options->nomask, opt->option))
 				continue;
 			if (get_option(dhcp, opt->option))
 				e++;
@@ -1174,6 +1177,8 @@ configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp)
 
 	for (opt = dhcp_opts; opt->option; opt++) {
 		if (!opt->var)
+			continue;
+		if (has_reqmask(options->nomask, opt->option))
 			continue;
 		val = NULL;
 		p = _get_option(dhcp, opt->option, &pl, NULL);
