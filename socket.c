@@ -100,7 +100,6 @@ open_socket(struct interface *iface, int protocol)
 	if ((s = socket(PF_PACKET, SOCK_DGRAM, htons(protocol))) == -1)
 		return -1;
 
-	close_on_exec(s);
 	memset(&su, 0, sizeof(su));
 	su.sll.sll_family = PF_PACKET;
 	su.sll.sll_protocol = htons(protocol);
@@ -129,9 +128,11 @@ open_socket(struct interface *iface, int protocol)
 		close(iface->fd);
 	iface->fd = s;
 	iface->socket_protocol = protocol;
-	iface->buffer_size = BUFFER_LENGTH;
-	iface->buffer = xmalloc(iface->buffer_size);
-	iface->buffer_len = iface->buffer_pos = 0;
+	if (iface->buffer == NULL) {
+		iface->buffer_size = BUFFER_LENGTH;
+		iface->buffer = xmalloc(iface->buffer_size);
+		iface->buffer_len = iface->buffer_pos = 0;
+	}
 	return s;
 
 eexit:
