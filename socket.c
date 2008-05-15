@@ -174,10 +174,19 @@ get_packet(struct interface *iface, void *data, ssize_t len)
 	ssize_t bytes;
 	const uint8_t *p;
 
+	if (iface->buffer_pos > iface->buffer_len) {
+		iface->buffer_len = iface->buffer_pos = 0;
+		return 0;
+	}
+
 	bytes = read(iface->fd, iface->buffer, iface->buffer_size);
 
 	if (bytes == -1)
 		return errno == EAGAIN ? 0 : -1;
+
+	/* So our loops to us work correctly */
+	iface->buffer_len = bytes;
+	iface->buffer_pos = iface->buffer_len + 1;
 
 	/* If it's an ARP reply, then just send it back */
 	if (iface->socket_protocol == ETHERTYPE_ARP)

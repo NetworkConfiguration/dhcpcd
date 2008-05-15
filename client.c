@@ -1188,15 +1188,12 @@ handle_packet(struct if_state *state, const struct options *options)
 	 * the first one fails for any reason, we can use the next. */
 
 	dhcp = xmalloc(sizeof(*dhcp));
-	do {
+	for(;;) {
 		memset(dhcp, 0, sizeof(*dhcp));
 		bytes = get_packet(iface, dhcp, sizeof(*dhcp));
-		if (bytes == -1)
+		printf ("bb %d\n", bytes);
+		if (bytes == -1 || bytes == 0)
 			break;
-		if (bytes == 0) {
-			free(dhcp);
-			return 0;
-		}
 		if (dhcp->cookie != htonl(MAGIC_COOKIE)) {
 			logger(LOG_DEBUG, "bogus cookie, ignoring");
 			continue;
@@ -1219,7 +1216,7 @@ handle_packet(struct if_state *state, const struct options *options)
 		}
 		if (handle_dhcp(state, &dhcp, options) == 0)
 			return 0;
-	} while (iface->buffer_len != 0);
+	}
 
 	free(dhcp);
 	return -1;

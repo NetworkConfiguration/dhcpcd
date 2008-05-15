@@ -159,10 +159,11 @@ get_packet(struct interface *iface, void *data, ssize_t len)
 	ssize_t bytes;
 	const unsigned char *payload, *d;
 
-	if ((size_t)len > iface->buffer_size) {
-		errno = ENOBUFS;
-		return -1;
+	if (iface->buffer_pos > iface->buffer_len) {
+		iface->buffer_len = iface->buffer_pos = 0;
+		return 0;
 	}
+
 	for (;;) {
 		if (iface->buffer_len == 0) {
 			bytes = read(iface->fd, iface->buffer,
