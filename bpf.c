@@ -153,22 +153,24 @@ get_packet(struct interface *iface, void *data, ssize_t len)
 {
 	struct bpf_hdr packet;
 	struct ether_header hw;
-	ssize_t cur_len;
+	ssize_t bytes;
 	const unsigned char *payload, *d;
 
+	if ((size_t)len > iface->buffer_size) {
+		errno = ENOBUFS;
+		return -1;
+	}
 	for (;;) {
 		if (iface->buffer_len == 0) {
-			cur_len = read(iface->fd, iface->buffer,
-				       iface->buffer_size);
-			if (cur_len == -1)
+			bytes = read(iface->fd, iface->buffer,
+				     iface->buffer_size);
+			if (bytes == -1)
 				return errno == EAGAIN ? 0 : -1;
-			else if ((size_t)cur_len < sizeof(packet))
+			else if ((size_t)bytes < sizeof(packet))
 				return -1;
-			iface->buffer_len = cur_len;
+			iface->buffer_len = bytes;
 		}
-
-		cur_len = -1;
-
+		bytes = -1;
 		memcpy(&packet, iface->buffer + iface->buffer_pos,
 		       sizeof(packet));
 		if (packet.bh_caplen != packet.bh_datalen)
@@ -179,19 +181,23 @@ get_packet(struct interface *iface, void *data, ssize_t len)
 		memcpy(&hw, iface->buffer + packet.bh_hdrlen, sizeof(hw));
 		payload = iface->buffer + packet.bh_hdrlen + sizeof(hw);
 		if (hw.ether_type == htons(ETHERTYPE_ARP)) {
-			cur_len = packet.bh_caplen - sizeof(hw);
-			memcpy(data, payload, len);
+			bytes = packet.bh_caplen - sizeof(hw);
+			if (bytes > len)
+				bytes = len;
+			memcpy(data, payload, bytes);
 		} else if (valid_udp_packet(payload) >= 0) {
-			cur_len = get_udp_data(&d, payload);
-			memcpy(data, d, cur_len);
+			bytes = get_udp_data(&d, payload);
+			if (bytes > len)
+				bytes = len;
+			memcpy(data, d, bytes);
 		} else
-			cur_len = -1;
+			bytes = -1;
 next:
 		iface->buffer_pos += BPF_WORDALIGN(packet.bh_hdrlen +
 						   packet.bh_caplen);
 		if (iface->buffer_pos >= iface->buffer_len)
 			iface->buffer_len = iface->buffer_pos = 0;
-		if (cur_len != -1)
-			return cur_len;
+		if (bytes != -1)
+			return bytes;
 	}
 }

@@ -105,7 +105,7 @@ struct interface
 
 	int fd;
 	int udp_fd;
-	size_t buffer_size, buffer_pos, buffer_len;
+	size_t buffer_size, buffer_len, buffer_pos;
 	unsigned char *buffer;
 
 #ifdef __linux__

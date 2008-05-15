@@ -285,7 +285,6 @@ read_interface(const char *ifname, _unused int metric)
 	unsigned char *hwaddr = NULL;
 	size_t hwlen = 0;
 	sa_family_t family = 0;
-	unsigned short mtu;
 #ifdef __linux__
 	char *p;
 #endif
@@ -340,7 +339,6 @@ read_interface(const char *ifname, _unused int metric)
 		if (ioctl(s, SIOCSIFMTU, &ifr) == -1)
 			goto eexit;
 	}
-	mtu = ifr.ifr_mtu;
 
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
 #ifdef __linux__

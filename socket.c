@@ -54,11 +54,8 @@
 #include "net.h"
 #include "bpf-filter.h"
 
-/* A suitably large buffer for all transactions.
- * BPF buffer size is set by the kernel, so no define. */
-#ifdef __linux__
-# define BUFFER_LENGTH 4096
-#endif
+/* A suitably large buffer for all transactions. */
+#define BUFFER_LENGTH 4096
 
 /* Broadcast address for IPoIB */
 static const uint8_t ipv4_bcast_addr[] = {
@@ -91,7 +88,7 @@ setup_packet_filters(void)
 int
 open_socket(struct interface *iface, int protocol)
 {
-	int flags, s;
+	int s;
 	union sockunion {
 		struct sockaddr sa;
 		struct sockaddr_in sin;
@@ -132,7 +129,9 @@ open_socket(struct interface *iface, int protocol)
 		close(iface->fd);
 	iface->fd = s;
 	iface->socket_protocol = protocol;
-	iface->buffer_length = 0;
+	iface->buffer_size = BUFFER_LENGTH;
+	iface->buffer = xmalloc(iface->buffer_size);
+	iface->buffer_len = iface->buffer_pos = 0;
 	return s;
 
 eexit:
@@ -168,29 +167,27 @@ send_raw_packet(const struct interface *iface, int type,
 	return sendto(iface->fd, data, len, 0, &su.sa, sizeof(su));
 }
 
-/* Linux has no need for the buffer as we can read as much as we want.
- * We only have the buffer listed to keep the same API. */
 ssize_t
 get_packet(struct interface *iface, void *data, ssize_t len)
 {
 	ssize_t bytes;
-	struct timespec ts;
 	const uint8_t *p;
 
-	memset(data, 0, len);
-	bytes = read(iface->fd, data, len);
+	bytes = read(iface->fd, iface->buffer, iface->buffer_size);
 
 	if (bytes == -1)
-		return errno == EGAIN ? 0 : -1;
+		return errno == EAGAIN ? 0 : -1;
 
 	/* If it's an ARP reply, then just send it back */
 	if (iface->socket_protocol == ETHERTYPE_ARP)
 		return bytes;
 
-	if (valid_udp_packet(data) != 0)
+	if (valid_udp_packet(iface->buffer) != 0)
 		return -1;
 
-	bytes = get_udp_data(&p, buffer);
-	memmove(data, p, bytes);
+	bytes = get_udp_data(&p, iface->buffer);
+	if (bytes > len)
+		bytes = len;
+	memcpy(data, p, bytes);
 	return bytes;
 }

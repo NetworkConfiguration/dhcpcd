@@ -1188,7 +1188,8 @@ handle_packet(struct if_state *state, const struct options *options)
 	 * the first one fails for any reason, we can use the next. */
 
 	dhcp = xmalloc(sizeof(*dhcp));
-	do {	
+	do {
+		memset(dhcp, 0, sizeof(*dhcp));
 		bytes = get_packet(iface, dhcp, sizeof(*dhcp));
 		if (bytes == -1)
 			break;
@@ -1287,6 +1288,7 @@ eexit:
 		do_socket(state, SOCKET_CLOSED);
 		free_routes(iface->routes);
 		free(iface->clientid);
+		free(iface->buffer);
 		free(iface);
 	}
 
