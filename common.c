@@ -36,7 +36,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <unistd.h>
 
 #include "common.h"
@@ -74,25 +73,6 @@ get_line(char **line, size_t *len, FILE *fp)
 
 	return last;
 }
-
-/* OK, this should be in dhcpcd.c
- * It's here to make dhcpcd more readable */
-#if HAVE_SRANDOMDEV
-#else
-void srandomdev(void)
-{
-	int fd;
-	unsigned long seed;
-
-	fd = open("/dev/urandom", 0);
-	if (fd == -1 || read(fd,  &seed, sizeof(seed)) == -1)
-		seed = time(0);
-	if (fd >= 0)
-		close(fd);
-
-	srandom(seed);
-}
-#endif
 
 /* strlcpy is nice, shame glibc does not define it */
 #if HAVE_STRLCPY

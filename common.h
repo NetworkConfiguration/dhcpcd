@@ -29,6 +29,7 @@
 #define COMMON_H
 
 /* string.h pulls in features.h so the below define checks work */
+#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/time.h>
 #include <stdio.h>
@@ -40,6 +41,10 @@
 # define _unused
 #endif
 
+#ifdef __GLIBC__
+#define arc4random (uint32_t)random
+#endif
+
 #ifndef HAVE_STRLCPY
 #  define HAVE_STRLCPY 1
 #endif
@@ -49,14 +54,6 @@
 #    undef HAVE_STRLCPY
 size_t strlcpy(char *, const char *, size_t);
 #  endif
-#endif
-
-#ifndef HAVE_SRANDOMDEV
-#  define HAVE_SRANDOMDEV 1
-#endif
-#if defined(__GLIBC__) || defined(__NetBSD__)
-#  undef HAVE_SRANDOMDEV
-void srandomdev(void);
 #endif
 
 #ifndef HAVE_CLOSEFROM

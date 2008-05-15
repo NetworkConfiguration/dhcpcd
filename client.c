@@ -307,7 +307,7 @@ ipv4ll_get_address(struct interface *iface, struct dhcp_lease *lease) {
 
 	for (;;) {
 		addr.s_addr = htonl(LINKLOCAL_ADDR |
-				    (((uint32_t)abs((int)random())
+				    (((uint32_t)abs((int)arc4random())
 				      % 0xFD00) + 0x0100));
 		errno = 0;
 		if (!arp_claim(iface, addr))
@@ -786,7 +786,7 @@ handle_signal(int sig, struct if_state *state,  const struct options *options)
 		logger (LOG_INFO, "received SIGHUP, releasing lease");
 		if (!IN_LINKLOCAL(ntohl(lease->addr.s_addr))) {
 			do_socket(state, SOCKET_OPEN);
-			state->xid = (uint32_t)random();
+			state->xid = arc4random();
 			send_message(state, DHCP_RELEASE, options);
 			do_socket(state, SOCKET_CLOSED);
 		}
@@ -887,7 +887,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 
 	switch (state->state) {
 	case STATE_INIT:
-		state->xid = (uint32_t) random ();
+		state->xid = arc4random();
 		do_socket(state, SOCKET_OPEN);
 		state->timeout = options->timeout;
 		iface->start_uptime = uptime ();
@@ -917,7 +917,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 			break;
 		}
 		state->state = STATE_RENEWING;
-		state->xid = (uint32_t)random();
+		state->xid = arc4random();
 		/* FALLTHROUGH */
 	case STATE_RENEWING:
 		iface->start_uptime = uptime();
@@ -932,7 +932,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 		lease->addr.s_addr = 0;
 		do_socket(state, SOCKET_OPEN);
 		if (state->xid == 0)
-			state->xid = (uint32_t)random();
+			state->xid = arc4random();
 		lease->server.s_addr = 0;
 		send_message(state, DHCP_REQUEST, options);
 		state->timeout = lease->leasetime - lease->rebindtime;
