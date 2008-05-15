@@ -783,7 +783,7 @@ arp_claim(struct interface *iface, struct in_addr address)
 			       hwaddr_ntoa((unsigned char *)&reply_mac, (size_t)reply.ar_hln));
 			retval = -1;
 			goto eexit;
-		} while (iface->buffer_pos != 0);
+		} while (iface->buffer_len != 0);
 	}
 
 eexit:

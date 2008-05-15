@@ -92,7 +92,7 @@ open_socket(struct interface *iface, int protocol)
 	/* Get the required BPF buffer length from the kernel. */
 	if (ioctl(fd, BIOCGBLEN, &buf_len) == -1)
 		goto eexit;
-	if (iface->buffer_size != buf_len) {
+	if (iface->buffer_size != (size_t)buf_len) {
 		free(iface->buffer);
 		iface->buffer_size = buf_len;
 		iface->buffer = xmalloc(buf_len);
@@ -172,6 +172,7 @@ get_packet(struct interface *iface, void *data, ssize_t len)
 			else if ((size_t)bytes < sizeof(packet))
 				return -1;
 			iface->buffer_len = bytes;
+			iface->buffer_pos = 0;
 		}
 		bytes = -1;
 		memcpy(&packet, iface->buffer + iface->buffer_pos,

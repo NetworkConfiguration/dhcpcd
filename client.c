@@ -1219,7 +1219,7 @@ handle_packet(struct if_state *state, const struct options *options)
 		}
 		if (handle_dhcp(state, &dhcp, options) == 0)
 			return 0;
-	} while (iface->buffer_pos != 0);
+	} while (iface->buffer_len != 0);
 
 	free(dhcp);
 	return -1;
