@@ -53,7 +53,7 @@ exec_script(const struct options *options, const char *iface,
 	    const char *reason,
 	    const struct dhcp_message *dhcpn, const struct dhcp_message *dhcpo)
 {
-	char *const argv[2] = { (char *)options->script, NULL };
+	char *const argv[2] = { UNCONST(options->script), NULL };
 	char **env = NULL, **ep;
 	char *path;
 	ssize_t e, elen;

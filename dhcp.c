@@ -1171,9 +1171,9 @@ configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 	}
 
 	if (*dhcp->bootfile && !(overl & 1))
-		_setenv(&ep, prefix, "filename", (char *)dhcp->bootfile);
+		_setenv(&ep, prefix, "filename", (const char *)dhcp->bootfile);
 	if (*dhcp->servername && !(overl & 2))
-		_setenv(&ep, prefix, "server_name", (char *)dhcp->servername);
+		_setenv(&ep, prefix, "server_name", (const char *)dhcp->servername);
 
 	for (opt = dhcp_opts; opt->option; opt++) {
 		if (!opt->var)

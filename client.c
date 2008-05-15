@@ -193,8 +193,8 @@ daemonise(struct if_state *state, const struct options *options)
 			signal_reset();
 			sigprocmask(SIG_SETMASK, &old, NULL);
 			execvp(dhcpcd, argv);
-			logger(LOG_ERR, "execl `%s': %s", dhcpcd, 
-			       strerror(errno));
+			/* Must not use stdio here. */
+			write(STDERR_FILENO, "exec failed\n", 12);
 			_exit(EXIT_FAILURE);
 	}
 

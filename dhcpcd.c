@@ -399,7 +399,7 @@ main(int argc, char **argv)
 #endif
 
 	options = xzalloc(sizeof(*options));
-	options->script = (char *)SCRIPT;
+	options->script = SCRIPT;
 	snprintf(options->classid, CLASS_ID_MAX_LEN, "%s %s",
 		 PACKAGE, VERSION);
 
