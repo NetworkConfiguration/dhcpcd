@@ -1016,7 +1016,8 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 
 		if (state->options & DHCPCD_TEST) {
 			exec_script(options, iface->name, "TEST", dhcp, NULL);
-			return -1;
+			free(dhcp);
+			return 0;
 		}
 
 		free(dhcp);
@@ -1213,8 +1214,11 @@ handle_packet(struct if_state *state, const struct options *options)
 			if (*p != DHCP_END)
 				*++p = DHCP_END;
 		}
-		if (handle_dhcp(state, &dhcp, options) == 0)
+		if (handle_dhcp(state, &dhcp, options) == 0) {
+			if (state->options & DHCPCD_TEST)
+				return -1;
 			return 0;
+		}
 		if (state->options & DHCPCD_FORKED)
 			return -1;
 	}
