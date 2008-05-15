@@ -171,7 +171,7 @@ parse_option(int opt, char *oarg, struct options *options)
 	case 'h':
 		if (!oarg)
 			*options->hostname = '\0';
-		else if (strlen(oarg) > MAXHOSTNAMELEN) {
+		else if (strlen(oarg) >= MAXHOSTNAMELEN) {
 			logger(LOG_ERR,
 			       "`%s' too long for HostName string, max is %d",
 			       oarg, MAXHOSTNAMELEN);
@@ -183,7 +183,7 @@ parse_option(int opt, char *oarg, struct options *options)
 	case 'i':
 		if (!oarg) {
 			*options->classid = '\0';
-		} else if (strlen(oarg) > CLASS_ID_MAX_LEN) {
+		} else if (strlen(oarg) >= CLASS_ID_MAX_LEN) {
 			logger(LOG_ERR,
 			       "`%s' too long for ClassID string, max is %d",
 			       oarg, CLASS_ID_MAX_LEN);
@@ -265,7 +265,7 @@ parse_option(int opt, char *oarg, struct options *options)
 		j = 0;
 		for (i = 0; i < userclasses; i++)
 			j += (int)options->userclass[j] + 1;
-		if (j + 1 + strlen(oarg) > USERCLASS_MAX_LEN) {
+		if (j + 1 + strlen(oarg) >= USERCLASS_MAX_LEN) {
 			logger(LOG_ERR,
 			       "userclass overrun, max is %d",
 			       USERCLASS_MAX_LEN);
@@ -310,7 +310,7 @@ parse_option(int opt, char *oarg, struct options *options)
 		break;
 	case 'I':
 		if (oarg) {
-			if (strlen(oarg) > CLIENT_ID_MAX_LEN) {
+			if (strlen(oarg) >= CLIENT_ID_MAX_LEN) {
 				logger(LOG_ERR, "`%s' is too long for"
 				       " ClientID, max is %d",
 				       oarg, CLIENT_ID_MAX_LEN);
@@ -382,10 +382,7 @@ main(int argc, char **argv)
 	char *cf = NULL;
 	char *intf = NULL;
 
-	/* Close any un-needed fd's */
-	for (i = getdtablesize() - 1; i >= 3; --i)
-		close (i);
-
+	closefrom(3);
 	openlog(PACKAGE, LOG_PID, LOG_LOCAL0);
 
 #ifdef THERE_IS_NO_FORK
@@ -480,7 +477,7 @@ main(int argc, char **argv)
 		usage();
 
 	if (optind < argc) {
-		if (strlen(argv[optind]) > IF_NAMESIZE) {
+		if (strlen(argv[optind]) >= IF_NAMESIZE) {
 			logger(LOG_ERR,
 			       "`%s' too long for an interface name (max=%d)",
 			       argv[optind], IF_NAMESIZE);

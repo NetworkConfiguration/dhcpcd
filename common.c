@@ -109,6 +109,20 @@ strlcpy(char *dst, const char *src, size_t size)
 }
 #endif
 
+#ifndef HAVE_CLOSEFROM
+int
+closefrom(int fd)
+{
+	int max = getdtablesize();
+	int i;
+	int r = 0;
+
+	for (i = fd; i < max; i++)
+		r += close(i);
+	return r;
+}
+#endif
+
 /* Close our fd's */
 int
 close_fds(void)

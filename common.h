@@ -55,6 +55,12 @@ size_t strlcpy(char *, const char *, size_t);
 void srandomdev(void);
 #endif
 
+#define HAVE_CLOSEFROM
+#if defined(__linux__) || defined(__FreeBSD__)
+#  undef HAVE_CLOSEFROM
+int closefrom(int);
+#endif
+
 int close_fds(void);
 int close_on_exec(int);
 ssize_t get_line(char **, size_t *, FILE *);
