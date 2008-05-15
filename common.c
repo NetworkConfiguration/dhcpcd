@@ -25,10 +25,14 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/param.h>
 #include <sys/time.h>
 
 #include <errno.h>
 #include <fcntl.h>
+#ifdef BSD
+#  include <paths.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -69,7 +73,8 @@ get_line(char **line, size_t *len, FILE *fp)
 
 /* OK, this should be in dhcpcd.c
  * It's here to make dhcpcd more readable */
-#ifndef HAVE_SRANDOMDEV
+#if HAVE_SRANDOMDEV
+#else
 void srandomdev(void)
 {
 	int fd;
@@ -86,7 +91,8 @@ void srandomdev(void)
 #endif
 
 /* strlcpy is nice, shame glibc does not define it */
-#ifndef HAVE_STRLCPY
+#if HAVE_STRLCPY
+#else
 size_t
 strlcpy(char *dst, const char *src, size_t size)
 {
@@ -109,7 +115,8 @@ strlcpy(char *dst, const char *src, size_t size)
 }
 #endif
 
-#ifndef HAVE_CLOSEFROM
+#if HAVE_CLOSEFROM
+#else
 int
 closefrom(int fd)
 {
@@ -129,7 +136,7 @@ close_fds(void)
 {
 	int fd;
 
-	if ((fd = open("/dev/null", O_RDWR)) == -1)
+	if ((fd = open(_PATH_DEVNULL, O_RDWR)) == -1)
 		return -1;
 
 	dup2(fd, fileno(stdin));

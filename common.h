@@ -40,22 +40,28 @@
 # define _unused
 #endif
 
-#define HAVE_STRLCPY
+#ifndef HAVE_STRLCPY
+#  define HAVE_STRLCPY 1
+#endif
 /* Only GLIBC doesn't support strlcpy */
 #ifdef __GLIBC__
-#  if ! defined(__UCLIBC__) && ! defined (__dietlibc__)
+#  if !defined(__UCLIBC__) && !defined (__dietlibc__)
 #    undef HAVE_STRLCPY
 size_t strlcpy(char *, const char *, size_t);
 #  endif
 #endif
 
-#define HAVE_SRANDOMDEV
+#ifndef HAVE_SRANDOMDEV
+#  define HAVE_SRANDOMDEV 1
+#endif
 #if defined(__GLIBC__) || defined(__NetBSD__)
 #  undef HAVE_SRANDOMDEV
 void srandomdev(void);
 #endif
 
-#define HAVE_CLOSEFROM
+#ifndef HAVE_CLOSEFROM
+#define HAVE_CLOSEFROM 1
+#endif
 #if defined(__linux__) || defined(__FreeBSD__)
 #  undef HAVE_CLOSEFROM
 int closefrom(int);
