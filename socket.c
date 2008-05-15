@@ -91,7 +91,7 @@ setup_packet_filters(void)
 int
 open_socket(struct interface *iface, int protocol)
 {
-	int s;
+	int flags, s;
 	union sockunion {
 		struct sockaddr sa;
 		struct sockaddr_in sin;
@@ -126,13 +126,13 @@ open_socket(struct interface *iface, int protocol)
 
 	if (bind(s, &su.sa, sizeof(su)) == -1)
 		goto eexit;
-
+	if (close_on_exec(s) == -1)
+		goto eexit;
 	if (iface->fd > -1)
 		close(iface->fd);
 	iface->fd = s;
 	iface->socket_protocol = protocol;
-	iface->buffer_length = BUFFER_LENGTH;
-
+	iface->buffer_length = 0;
 	return s;
 
 eexit:
@@ -142,7 +142,7 @@ eexit:
 
 ssize_t
 send_raw_packet(const struct interface *iface, int type,
-		const uint8_t *data, ssize_t len)
+		const void *data, ssize_t len)
 {
 	union sockunion {
 		struct sockaddr sa;
@@ -171,37 +171,26 @@ send_raw_packet(const struct interface *iface, int type,
 /* Linux has no need for the buffer as we can read as much as we want.
  * We only have the buffer listed to keep the same API. */
 ssize_t
-get_packet(const struct interface *iface, uint8_t *data,
-	   uint8_t *buffer, ssize_t *buffer_len, ssize_t *buffer_pos)
+get_packet(struct interface *iface, void *data, ssize_t len)
 {
 	ssize_t bytes;
 	struct timespec ts;
 	const uint8_t *p;
 
-	/* We don't use the given buffer, but we need to rewind the position */
-	*buffer_pos = 0;
+	memset(data, 0, len);
+	bytes = read(iface->fd, data, len);
 
-	memset(buffer, 0, iface->buffer_length);
-	bytes = read(iface->fd, buffer, iface->buffer_length);
+	if (bytes == -1)
+		return errno == EGAIN ? 0 : -1;
 
-	if (bytes == -1) {
-		ts.tv_sec = 3;
-		ts.tv_nsec = 0;
-		nanosleep(&ts, NULL);
-		return -1;
-	}
-
-	*buffer_len = bytes;
 	/* If it's an ARP reply, then just send it back */
-	if (iface->socket_protocol == ETHERTYPE_ARP) {
-		memcpy(data, buffer, bytes);
+	if (iface->socket_protocol == ETHERTYPE_ARP)
 		return bytes;
-	}
 
-	if (valid_udp_packet(buffer) != 0)
+	if (valid_udp_packet(data) != 0)
 		return -1;
 
 	bytes = get_udp_data(&p, buffer);
-	memcpy(data, p, bytes);
+	memmove(data, p, bytes);
 	return bytes;
 }

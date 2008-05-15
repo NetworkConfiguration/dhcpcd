@@ -221,7 +221,7 @@ do_interface(const char *ifname,
 		len *= 2;
 	}
 
-	for (p = ifc.ifc_buf; p < ifc.ifc_buf + ifc.ifc_len;) {
+	for (p = (char *)ifc.ifc_buf; p < (char *)ifc.ifc_buf + ifc.ifc_len;) {
 		/* Cast the ifc buffer to an ifreq cleanly */
 		ifreqs.buffer = p;
 		ifr = ifreqs.ifr;
@@ -468,27 +468,19 @@ struct udp_dhcp_packet
 };
 
 static uint16_t
-checksum(uint8_t *addr, uint16_t len)
+checksum(const void *data, uint16_t len)
 {
+	const uint8_t *addr = data;
 	uint32_t sum = 0;
-	union
-	{
-		uint8_t *addr;
-		uint16_t *i;
-	} p;
-	uint16_t nleft = len;
-	uint8_t a = 0;
 
-	p.addr = addr;
-	while (nleft > 1) {
-		sum += *p.i++;
-		nleft -= 2;
+	while (len > 1) {
+		sum += addr[0] + addr[1] * 256;
+		addr += 2;
+		len -= 2;
 	}
 
-	if (nleft == 1) {
-		memcpy(&a, p.i, 1);
-		sum += ntohs(a) << 8;
-	}
+	if (len == 1)
+		sum += *addr;
 
 	sum = (sum >> 16) + (sum & 0xffff);
 	sum += (sum >> 16);
@@ -530,7 +522,7 @@ make_udp_packet(uint8_t **packet, const uint8_t *data, size_t length,
 	udp->uh_dport = htons(DHCP_SERVER_PORT);
 	udp->uh_ulen = htons(sizeof(*udp) + length);
 	ip->ip_len = udp->uh_ulen;
-	udp->uh_sum = checksum((uint8_t *)udpp, sizeof(*udpp));
+	udp->uh_sum = checksum(udpp, sizeof(*udpp));
 
 	ip->ip_v = IPVERSION;
 	ip->ip_hl = 5;
@@ -541,7 +533,7 @@ make_udp_packet(uint8_t **packet, const uint8_t *data, size_t length,
 	ip->ip_off = htons(IP_DF); /* Don't fragment */
 	ip->ip_ttl = IPDEFTTL;
 
-	ip->ip_sum = checksum((uint8_t *)ip, sizeof(*ip));
+	ip->ip_sum = checksum(ip, sizeof(*ip));
 
 	*packet = (uint8_t *)udpp;
 	return sizeof(*ip) + sizeof(*udp) + length;
@@ -550,27 +542,17 @@ make_udp_packet(uint8_t **packet, const uint8_t *data, size_t length,
 ssize_t
 get_udp_data(const uint8_t **data, const uint8_t *udp)
 {
-	union
-	{
-		const uint8_t *data;
-		const struct udp_dhcp_packet *packet;
-	} d;
+	struct udp_dhcp_packet packet;
 
-	d.data = udp;
-	*data = (const uint8_t *)&d.packet->dhcp;
-	return ntohs(d.packet->ip.ip_len) -
-		sizeof(d.packet->ip) -
-		sizeof(d.packet->udp);
+	memcpy(&packet, udp, sizeof(packet));
+	*data = udp + offsetof(struct udp_dhcp_packet, dhcp);
+	return ntohs(packet.ip.ip_len) - sizeof(packet.ip) - sizeof(packet.udp);
 }
 
 int
-valid_udp_packet(uint8_t *data)
+valid_udp_packet(const uint8_t *data)
 {
-	union
-	{
-		uint8_t *data;
-		struct udp_dhcp_packet *packet;
-	} d;
+	struct udp_dhcp_packet packet;
 	uint16_t bytes;
 	uint16_t ipsum;
 	uint16_t iplen;
@@ -579,38 +561,31 @@ valid_udp_packet(uint8_t *data)
 	struct in_addr dest;
 	int retval = 0;
 
-	d.data = data;
-	bytes = ntohs(d.packet->ip.ip_len);
-	ipsum = d.packet->ip.ip_sum;
-	iplen = d.packet->ip.ip_len;
-	udpsum = d.packet->udp.uh_sum;
+	memcpy(&packet, data, sizeof(packet));
+	bytes = ntohs(packet.ip.ip_len);
+	ipsum = packet.ip.ip_sum;
+	iplen = packet.ip.ip_len;
+	udpsum = packet.udp.uh_sum;
 
-	d.data = data;
-	d.packet->ip.ip_sum = 0;
-	if (ipsum != checksum((uint8_t *)&d.packet->ip, sizeof(d.packet->ip))) {
+	if (0 != checksum(&packet.ip, sizeof(packet.ip))) {
 		errno = EINVAL;
-		retval = -1;
-		goto eexit;
+		return -1;
 	}
 
-	memcpy(&source, &d.packet->ip.ip_src, sizeof(d.packet->ip.ip_src));
-	memcpy(&dest, &d.packet->ip.ip_dst, sizeof(d.packet->ip.ip_dst));
-	memset(&d.packet->ip, 0, sizeof(d.packet->ip));
-	d.packet->udp.uh_sum = 0;
+	packet.ip.ip_sum = 0;
+	memcpy(&source, &packet.ip.ip_src, sizeof(packet.ip.ip_src));
+	memcpy(&dest, &packet.ip.ip_dst, sizeof(packet.ip.ip_dst));
+	memset(&packet.ip, 0, sizeof(packet.ip));
+	packet.udp.uh_sum = 0;
 
-	d.packet->ip.ip_p = IPPROTO_UDP;
-	memcpy(&d.packet->ip.ip_src, &source, sizeof(d.packet->ip.ip_src));
-	memcpy(&d.packet->ip.ip_dst, &dest, sizeof(d.packet->ip.ip_dst));
-	d.packet->ip.ip_len = d.packet->udp.uh_ulen;
-	if (udpsum && udpsum != checksum(d.data, bytes)) {
+	packet.ip.ip_p = IPPROTO_UDP;
+	memcpy(&packet.ip.ip_src, &source, sizeof(packet.ip.ip_src));
+	memcpy(&packet.ip.ip_dst, &dest, sizeof(packet.ip.ip_dst));
+	packet.ip.ip_len = packet.udp.uh_ulen;
+	if (udpsum && udpsum != checksum(&packet, bytes)) {
 		errno = EINVAL;
 		retval = -1;
 	}
-
-eexit:
-	d.packet->ip.ip_sum = ipsum;
-	d.packet->ip.ip_len = iplen;
-	d.packet->udp.uh_sum = udpsum;
 
 	return retval;
 }
@@ -622,28 +597,16 @@ eexit:
 #define NCLAIMS                 2
 #define CLAIM_INTERVAL          200
 
-/* Linux does not seem to define these handy macros */
-#ifndef ar_sha
-#define ar_sha(ap) (((caddr_t)((ap) + 1)) + 0)
-#define ar_spa(ap) (((caddr_t)((ap) + 1)) + (ap)->ar_hln)
-#define ar_tha(ap) (((caddr_t)((ap) + 1)) + (ap)->ar_hln + (ap)->ar_pln)
-#define ar_tpa(ap) (((caddr_t)((ap) + 1)) + 2 * (ap)->ar_hln + (ap)->ar_pln)
-#endif
-
-#ifndef arphdr_len
-#define arphdr_len2(ar_hln, ar_pln) (sizeof(struct arphdr) + \
-				     2 * (ar_hln) + 2 * (ar_pln))
-#define arphdr_len(ap) (arphdr_len2((ap)->ar_hln, (ap)->ar_pln))
-#endif
-
 static int
 send_arp(const struct interface *iface, int op, struct in_addr sip,
 	 const unsigned char *taddr, struct in_addr tip)
 {
 	struct arphdr *arp;
-	size_t arpsize = arphdr_len2(iface->hwlen, sizeof(sip));
-	caddr_t tha;
+	size_t arpsize;
+	unsigned char *p;
 	int retval;
+
+	arpsize = sizeof(*arp) + 2 * iface->hwlen + 2 *sizeof(sip);
 
 	arp = xzalloc(arpsize);
 	arp->ar_hrd = htons(iface->family);
@@ -651,22 +614,21 @@ send_arp(const struct interface *iface, int op, struct in_addr sip,
 	arp->ar_hln = iface->hwlen;
 	arp->ar_pln = sizeof(sip);
 	arp->ar_op = htons(op);
-	memcpy(ar_sha(arp), iface->hwaddr, (size_t)arp->ar_hln);
-	memcpy(ar_spa(arp), &sip, (size_t)arp->ar_pln);
-	if (taddr) {
-		/* NetBSD can return NULL from ar_tha, which is probably wrong
-		 * but we still need to deal with it */
-		if (! (tha = ar_tha(arp))) {
-			free(arp);
-			errno = EINVAL;
-			return -1;
-		}
-		memcpy(tha, taddr, (size_t)arp->ar_hln);
-	}
-	memcpy(ar_tpa(arp), &tip, (size_t)arp->ar_pln);
+	p = (unsigned char *)arp;
+	p += sizeof(*arp);
+	memcpy(p, iface->hwaddr, iface->hwlen);
+	p += iface->hwlen;
+	memcpy(p, &sip, sizeof(sip));
+	p += sizeof(sip);
 
-	retval = send_raw_packet(iface, ETHERTYPE_ARP,
-				 (uint8_t *)arp, arphdr_len(arp));
+	if (taddr != NULL)
+		memcpy(p, taddr, iface->hwlen);
+	else
+		memset(p, 0, iface->hwlen);
+	p += iface->hwlen;
+	memcpy(p, &tip, sizeof(tip));
+
+	retval = send_raw_packet(iface, ETHERTYPE_ARP, arp, arpsize);
 	if (retval == -1)
 		logger(LOG_ERR,"send_packet: %s", strerror(errno));
 	free(arp);
@@ -676,9 +638,11 @@ send_arp(const struct interface *iface, int op, struct in_addr sip,
 int
 arp_claim(struct interface *iface, struct in_addr address)
 {
-	struct arphdr *reply = NULL;
+	struct arphdr reply;
+	uint8_t arp_reply[sizeof(reply) + 2 * 4 /* IPv4 */ + 2 * 8 /* EUI64 */];
+	struct in_addr reply_ipv4;
+	struct ether_addr reply_mac;
 	long timeout = 0;
-	unsigned char *buffer;
 	int retval = -1;
 	int nprobes = 0;
 	int nclaims = 0;
@@ -687,20 +651,10 @@ arp_claim(struct interface *iface, struct in_addr address)
 		{ -1, POLLIN, 0 },
 		{ -1, POLLIN, 0 }
 	};
-	ssize_t bufpos = 0;
-	ssize_t buflen = iface->buffer_length;
 	int bytes;
 	int s = 0;
 	struct timeval stopat;
 	struct timeval now;
-	union {
-		unsigned char *c;
-		struct in_addr *a;
-	} rp;
-	union {
-		unsigned char *c;
-		struct ether_addr *a;
-	} rh;
 
 	if (!iface->arpable) {
 		logger(LOG_DEBUG, "interface `%s' is not ARPable", iface->name);
@@ -721,12 +675,8 @@ arp_claim(struct interface *iface, struct in_addr address)
 	fds[0].fd = signal_fd();
 	fds[1].fd = iface->fd;
 	memset(&null_address, 0, sizeof(null_address));
-	buffer = xmalloc(iface->buffer_length);
-	reply = xmalloc(iface->buffer_length);
 
 	for (;;) {
-		bufpos = 0;
-		buflen = iface->buffer_length;
 		s = 0;
 
 		/* Only poll if we have a timeout */
@@ -797,53 +747,50 @@ arp_claim(struct interface *iface, struct in_addr address)
 		if (!(fds[1].revents & POLLIN))
 			continue;
 
-		memset(buffer, 0, buflen);
-		do {
-			memset(reply, 0, iface->buffer_length);
-			if ((bytes = get_packet(iface, (unsigned char *) reply,
-						buffer,
-						&buflen, &bufpos)) == -1)
+		for (;;) {
+			memset(arp_reply, 0, sizeof(arp_reply));
+			bytes = get_packet(iface, &arp_reply, sizeof(arp_reply));
+			if (bytes <= 0)
 				break;
 
+			memcpy(&reply, arp_reply, sizeof(reply));
 			/* Only these types are recognised */
-			if (reply->ar_op != htons(ARPOP_REPLY))
+			if (reply.ar_op != htons(ARPOP_REPLY))
 				continue;
 
 			/* Protocol must be IP. */
-			if (reply->ar_pro != htons(ETHERTYPE_IP))
+			if (reply.ar_pro != htons(ETHERTYPE_IP))
 				continue;
-			if (reply->ar_pln != sizeof(address))
+			if (reply.ar_pln != sizeof(reply_ipv4))
 				continue;
-			if ((unsigned)bytes < sizeof(reply) +
-			    2 * (4 +reply->ar_hln))
+			if ((size_t)bytes < sizeof(reply) + 2 * (4 + reply.ar_hln) ||
+			    reply.ar_hln > 8)
 				continue;
 
-			rp.c = (unsigned char *)ar_spa(reply);
-			rh.c = (unsigned char *)ar_sha(reply);
+			memcpy(&reply_mac, arp_reply + sizeof(reply), reply.ar_hln);
+			memcpy(&reply_ipv4, arp_reply + sizeof(reply) + reply.ar_hln, reply.ar_hln);
 
 			/* Ensure the ARP reply is for the our address */
-			if (rp.a->s_addr != address.s_addr)
+			if (reply_ipv4.s_addr != address.s_addr)
 				continue;
 
 			/* Some systems send a reply back from our hwaddress,
 			 * which is wierd */
-			if (reply->ar_hln == iface->hwlen &&
-			    memcmp(rh.c, iface->hwaddr, iface->hwlen) == 0)
+			if (reply.ar_hln == iface->hwlen &&
+			    memcmp(&reply_mac, iface->hwaddr, iface->hwlen) == 0)
 				continue;
 
 			logger(LOG_ERR, "ARPOP_REPLY received from %s (%s)",
-			       inet_ntoa(*rp.a),
-			       hwaddr_ntoa(rh.c, (size_t)reply->ar_hln));
+			       inet_ntoa(reply_ipv4),
+			       hwaddr_ntoa((unsigned char *)&reply_mac, (size_t)reply.ar_hln));
 			retval = -1;
 			goto eexit;
-		} while (bufpos != 0);
+		}
 	}
 
 eexit:
 	close(iface->fd);
 	iface->fd = -1;
-	free(buffer);
-	free(reply);
 	return retval;
 }
 #endif

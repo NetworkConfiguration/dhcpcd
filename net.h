@@ -105,7 +105,8 @@ struct interface
 
 	int fd;
 	int udp_fd;
-	size_t buffer_length;
+	size_t buffer_size, buffer_pos, buffer_len;
+	unsigned char *buffer;
 
 #ifdef __linux__
 	int socket_protocol;
@@ -160,7 +161,7 @@ int open_udp_socket(struct interface *);
 ssize_t make_udp_packet(uint8_t **, const uint8_t *, size_t,
 			struct in_addr, struct in_addr);
 ssize_t get_udp_data(const uint8_t **, const uint8_t *);
-int valid_udp_packet(uint8_t *);
+int valid_udp_packet(const uint8_t *);
 
 #ifdef __linux__
 void setup_packet_filters(void);
@@ -169,9 +170,8 @@ int open_socket(struct interface *, int);
 ssize_t send_packet(const struct interface *, struct in_addr, 
 		    const uint8_t *, ssize_t);
 ssize_t send_raw_packet(const struct interface *, int,
-			const uint8_t *, ssize_t);
-ssize_t get_packet(const struct interface *, uint8_t *,
-		   uint8_t *, ssize_t *, ssize_t *);
+			const void *, ssize_t);
+ssize_t get_packet(struct interface *, void *, ssize_t);
 
 #ifdef ENABLE_ARP
 int arp_claim(struct interface *, struct in_addr);

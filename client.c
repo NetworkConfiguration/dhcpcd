@@ -105,9 +105,6 @@ struct if_state {
 	time_t nakoff;
 	uint32_t xid;
 	int socket;
-	unsigned char *buffer;
-	ssize_t buffer_len;
-	ssize_t buffer_pos;
 	int *pidfd;
 };
 
@@ -1186,24 +1183,19 @@ handle_packet(struct if_state *state, const struct options *options)
 	uint8_t *p;
 	ssize_t bytes;
 
-	/* Allocate our buffer space for BPF.
-	 * We cannot do this until we have opened our socket as we don't
-	 * know how much of a buffer we need until then. */
-	if (!state->buffer)
-		state->buffer = xmalloc(iface->buffer_length);
-	state->buffer_len = iface->buffer_length;
-	state->buffer_pos = 0;
-
 	/* We loop through until our buffer is empty.
 	 * The benefit is that if we get >1 DHCP packet in our buffer and
 	 * the first one fails for any reason, we can use the next. */
 
 	dhcp = xmalloc(sizeof(*dhcp));
-	do {
-		bytes = get_packet(iface, (uint8_t *)dhcp, state->buffer,
-				   &state->buffer_len, &state->buffer_pos);
+	do {	
+		bytes = get_packet(iface, dhcp, sizeof(*dhcp));
 		if (bytes == -1)
 			break;
+		if (bytes == 0) {
+			free(dhcp);
+			return 0;
+		}
 		if (dhcp->cookie != htonl(MAGIC_COOKIE)) {
 			logger(LOG_DEBUG, "bogus cookie, ignoring");
 			continue;
@@ -1226,7 +1218,8 @@ handle_packet(struct if_state *state, const struct options *options)
 		}
 		if (handle_dhcp(state, &dhcp, options) == 0)
 			return 0;
-	} while (state->buffer_pos != 0);
+	} while (iface->buffer_pos != 0);
+
 	free(dhcp);
 	return -1;
 }
@@ -1302,7 +1295,6 @@ eexit:
 			retval = 0;
 		if (state->options & DHCPCD_DAEMONISED)
 			unlink(options->pidfile);
-		free(state->buffer);
 		free(state->dhcp);
 		free(state->old_dhcp);
 		free(state);

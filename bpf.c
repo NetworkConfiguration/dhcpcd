@@ -53,14 +53,14 @@ open_socket(struct interface *iface, int protocol)
 {
 	int fd = -1;
 	struct ifreq ifr;
-	int buf = 0;
+	int buf_len = 0;
 	struct bpf_version pv;
 	struct bpf_program pf;
 #ifdef BIOCIMMEDIATE
 	int flags;
 #endif
 #ifdef _PATH_BPF
-	fd = open(_PATH_BPF, O_RDWR);
+	fd = open(_PATH_BPF, O_RDWR | O_NONBLOCK);
 #else
 	char *device;
 	int n = 0;
@@ -68,7 +68,7 @@ open_socket(struct interface *iface, int protocol)
 	device = xmalloc(sizeof(char) * PATH_MAX);
 	do {
 		snprintf(device, PATH_MAX, "/dev/bpf%d", n++);
-		fd = open(device, O_RDWR);
+		fd = open(device, O_RDWR | O_NONBLOCK);
 	} while (fd == -1 && errno == EBUSY);
 	free(device);
 #endif
@@ -90,9 +90,11 @@ open_socket(struct interface *iface, int protocol)
 		goto eexit;
 
 	/* Get the required BPF buffer length from the kernel. */
-	if (ioctl(fd, BIOCGBLEN, &buf) == -1)
+	if (ioctl(fd, BIOCGBLEN, &buf_len) == -1)
 		goto eexit;
-	iface->buffer_length = buf;
+	iface->buffer_size = buf_len;
+	iface->buffer = xmalloc(buf_len);
+	iface->buffer_len = iface->buffer_pos = 0;
 
 #ifdef BIOCIMMEDIATE
 	flags = 1;
@@ -120,13 +122,15 @@ open_socket(struct interface *iface, int protocol)
 	return fd;
 
 eexit:
+	free(iface->buffer);
+	iface->buffer = NULL;
 	close(fd);
 	return -1;
 }
 
 ssize_t
 send_raw_packet(const struct interface *iface, int type,
-		const unsigned char *data, ssize_t len)
+		const void *data, ssize_t len)
 {
 	struct iovec iov[2];
 	struct ether_header hw;
@@ -145,66 +149,49 @@ send_raw_packet(const struct interface *iface, int type,
 /* BPF requires that we read the entire buffer.
  * So we pass the buffer in the API so we can loop on >1 dhcp packet. */
 ssize_t
-get_packet(const struct interface *iface, unsigned char *data,
-	   unsigned char *buffer, ssize_t *buffer_len, ssize_t *buffer_pos)
+get_packet(struct interface *iface, void *data, ssize_t len)
 {
-	union
-	{
-		unsigned char *buffer;
-		struct bpf_hdr *packet;
-	} bpf;
-	union
-	{
-		unsigned char *buffer;
-		struct ether_header *hw;
-	} hdr;
-	struct timespec ts;
-	ssize_t len;
-	unsigned char *payload;
-	const uint8_t *d;
+	struct bpf_hdr packet;
+	struct ether_header hw;
+	ssize_t cur_len;
+	const unsigned char *payload, *d;
 
-	bpf.buffer = buffer;
-
-	if (*buffer_pos < 1) {
-		memset(bpf.buffer, 0, iface->buffer_length);
-		*buffer_len = read(iface->fd, bpf.buffer, iface->buffer_length);
-		*buffer_pos = 0;
-		if (*buffer_len < 1) {
-			ts.tv_sec = 3;
-			ts.tv_nsec = 0;
-			nanosleep(&ts, NULL);
-			return -1;
+	for (;;) {
+		if (iface->buffer_len == 0) {
+			cur_len = read(iface->fd, iface->buffer,
+				       iface->buffer_size);
+			if (cur_len == -1)
+				return errno == EAGAIN ? 0 : -1;
+			else if ((size_t)cur_len < sizeof(packet))
+				return -1;
+			iface->buffer_len = cur_len;
 		}
-	} else
-		bpf.buffer += *buffer_pos;
 
-	for (; bpf.buffer - buffer < *buffer_len; 
-	     bpf.buffer += BPF_WORDALIGN(bpf.packet->bh_hdrlen +
-					 bpf.packet->bh_caplen),
-	     *buffer_pos = bpf.buffer - buffer)
-	{
-		/* Ensure we have the whole packet */
-		if (bpf.packet->bh_caplen != bpf.packet->bh_datalen)
-			continue;
+		cur_len = -1;
 
-		hdr.buffer = bpf.buffer + bpf.packet->bh_hdrlen;
-		payload = hdr.buffer + sizeof(*hdr.hw);
-
-		/* If it's an ARP reply, then just send it back */
-		if (hdr.hw->ether_type == htons (ETHERTYPE_ARP)) {
-			len = bpf.packet->bh_caplen - sizeof(*hdr.hw);
+		memcpy(&packet, iface->buffer + iface->buffer_pos,
+		       sizeof(packet));
+		if (packet.bh_caplen != packet.bh_datalen)
+			goto next; /* Incomplete packet, drop. */
+		if (iface->buffer_pos + packet.bh_caplen + packet.bh_hdrlen >
+		    iface->buffer_len)
+			goto next; /* Packet beyond buffer, drop. */
+		memcpy(&hw, iface->buffer + packet.bh_hdrlen, sizeof(hw));
+		payload = iface->buffer + packet.bh_hdrlen + sizeof(hw);
+		if (hw.ether_type == htons(ETHERTYPE_ARP)) {
+			cur_len = packet.bh_caplen - sizeof(hw);
 			memcpy(data, payload, len);
-			return len;
-		} else {
-			if (valid_udp_packet(payload) >= 0) {
-				len = get_udp_data(&d, payload);
-				memcpy(data, d, len);
-				return len;
-			}
-		}
+		} else if (valid_udp_packet(payload) >= 0) {
+			cur_len = get_udp_data(&d, payload);
+			memcpy(data, d, cur_len);
+		} else
+			cur_len = -1;
+next:
+		iface->buffer_pos += BPF_WORDALIGN(packet.bh_hdrlen +
+						   packet.bh_caplen);
+		if (iface->buffer_pos >= iface->buffer_len)
+			iface->buffer_len = iface->buffer_pos = 0;
+		if (cur_len != -1)
+			return cur_len;
 	}
-
-	/* No valid packets left, so return */
-	*buffer_pos = 0;
-	return -1;
 }
