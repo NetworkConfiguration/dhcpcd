@@ -44,7 +44,7 @@
 #include "dhcpcd.h"
 #include "logger.h"
 #include "net.h"
-#include "signal.h"
+#include "signals.h"
 
 #define DEFAULT_PATH	"PATH=/usr/bin:/usr/sbin:/bin:/sbin"
 

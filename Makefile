@@ -5,7 +5,7 @@
 PROG=		dhcpcd
 VERSION=	4.0.0-beta3
 
-SRCS=		common.c dhcp.c dhcpcd.c logger.c net.c signal.c
+SRCS=		common.c dhcp.c dhcpcd.c logger.c net.c signals.c
 SRCS+=		configure.c client.c
 SRCS+=		${SRC_IF} ${SRC_SOCKET}
 SCRIPT=		dhcpcd.sh

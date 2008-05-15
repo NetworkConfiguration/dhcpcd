@@ -51,7 +51,7 @@
 #include "dhcpcd.h"
 #include "net.h"
 #include "logger.h"
-#include "signal.h"
+#include "signals.h"
 
 #ifdef ENABLE_IPV4LL
 # ifndef ENABLE_ARP

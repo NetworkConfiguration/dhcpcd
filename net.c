@@ -62,7 +62,7 @@
 #include "dhcp.h"
 #include "logger.h"
 #include "net.h"
-#include "signal.h"
+#include "signals.h"
 
 int
 inet_ntocidr(struct in_addr address)

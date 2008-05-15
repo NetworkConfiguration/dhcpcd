@@ -35,7 +35,7 @@
 #include <unistd.h>
 
 #include "common.h"
-#include "signal.h"
+#include "signals.h"
 
 static int signal_pipe[2];
 static int signals[5];
@@ -133,14 +133,14 @@ signal_init(void)
 	return 0;
 }
 
-int
-signal_setup(void)
+static int
+_signal_setup(void (*func)(int))
 {
 	unsigned int i;
 	struct sigaction sa;
 
 	memset(&sa, 0, sizeof(sa));
-	sa.sa_handler = signal_handler;
+	sa.sa_handler = func;
 	sigemptyset(&sa.sa_mask);
 
 	for (i = 0; i < sizeof(handle_sigs) / sizeof(handle_sigs[0]); i++)
@@ -151,18 +151,13 @@ signal_setup(void)
 }
 
 int
+signal_setup(void)
+{
+	return _signal_setup(signal_handler);
+}
+
+int
 signal_reset(void)
 {
-	struct sigaction sa;
-	unsigned int i;
-
-	memset(&sa, 0, sizeof(sa));
-	sa.sa_handler = SIG_DFL;
-	sigemptyset(&sa.sa_mask);
-
-	for (i = 0; i < sizeof(handle_sigs) / sizeof(handle_sigs[0]); i++)
-		if (sigaction(handle_sigs[i], &sa, NULL) == -1)
-			return -1;
-
-	return 0;
+	return _signal_setup(SIG_DFL);
 }
