@@ -92,9 +92,12 @@ open_socket(struct interface *iface, int protocol)
 	/* Get the required BPF buffer length from the kernel. */
 	if (ioctl(fd, BIOCGBLEN, &buf_len) == -1)
 		goto eexit;
-	iface->buffer_size = buf_len;
-	iface->buffer = xmalloc(buf_len);
-	iface->buffer_len = iface->buffer_pos = 0;
+	if (iface->buffer_size != buf_len) {
+		free(iface->buffer);
+		iface->buffer_size = buf_len;
+		iface->buffer = xmalloc(buf_len);
+		iface->buffer_len = iface->buffer_pos = 0;
+	}
 
 #ifdef BIOCIMMEDIATE
 	flags = 1;
