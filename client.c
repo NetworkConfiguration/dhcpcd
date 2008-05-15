@@ -1191,7 +1191,6 @@ handle_packet(struct if_state *state, const struct options *options)
 	for(;;) {
 		memset(dhcp, 0, sizeof(*dhcp));
 		bytes = get_packet(iface, dhcp, sizeof(*dhcp));
-		printf ("bb %d\n", bytes);
 		if (bytes == -1 || bytes == 0)
 			break;
 		if (dhcp->cookie != htonl(MAGIC_COOKIE)) {
@@ -1216,6 +1215,8 @@ handle_packet(struct if_state *state, const struct options *options)
 		}
 		if (handle_dhcp(state, &dhcp, options) == 0)
 			return 0;
+		if (state->options & DHCPCD_FORKED)
+			return -1;
 	}
 
 	free(dhcp);
