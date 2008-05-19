@@ -58,7 +58,7 @@ get_line(char **line, size_t *len, FILE *fp)
 	while(!feof(fp)) {
 		if (*line == NULL || last != 0) {
 			*len += BUFSIZ;
-			*line = realloc(*line, *len);
+			*line = xrealloc(*line, *len);
 		}
 		p = *line + last;
 		memset(p, 0, BUFSIZ);
