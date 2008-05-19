@@ -20,14 +20,14 @@ CLEANFILES+=	dhcpcd.sh
 FILES=		dhcpcd.conf
 FILESDIR=	${SYSCONFDIR}
 
-.SUFFIXES:	.in .sh.in
-
 MK=		mk
 include ${MK}/prog.mk
 
 CFLAGS+=	-DSYSCONFDIR=\"${SYSCONFDIR}\"
 CFLAGS+=	-DDBDIR=\"${DBDIR}\"
 LDADD+=		${LIBRT}
+
+.SUFFIXES:	.in .sh.in
 
 .in:
 	${SED} 's:@SYSCONFDIR@:${SYSCONFDIR}:g; s:@DBDIR@:${DBDIR}:g' $< > $@
