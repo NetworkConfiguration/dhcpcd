@@ -70,13 +70,22 @@
 # define DBDIR			"/var/db"
 #endif
 
-#define RESOLVFILE		"/etc/resolv.conf"
-#define CONFIGFILE		SYSCONFDIR "/" PACKAGE ".conf"
-#define SCRIPT			SYSCONFDIR "/" PACKAGE ".sh"
-#define DUIDFILE		SYSCONFDIR "/" PACKAGE ".duid"
-#define LEASEFILE		DBDIR "/" PACKAGE "-%s.lease"
-#define PIDFILE			RUNDIR "/" PACKAGE "-%s.pid"
+#ifndef CONFIGFILE
+# define CONFIGFILE		SYSCONFDIR "/" PACKAGE ".conf"
+#endif
+#ifndef SCRIPT
+# define SCRIPT			SYSCONFDIR "/" PACKAGE ".sh"
+#endif
+#ifndef DUIDFILE
+# define DUIDFILE		SYSCONFDIR "/" PACKAGE ".duid"
+#endif
+#ifndef LEASEFILE
+# define LEASEFILE		DBDIR "/" PACKAGE "-%s.lease"
+#endif
+#ifndef PIDFILE
+# define PIDFILE			RUNDIR "/" PACKAGE "-%s.pid"
+#endif
 
-#define UNCONST(a)	((void *)(unsigned long)(const void *)(a))
+#define UNCONST(a)		((void *)(unsigned long)(const void *)(a))
 
 #endif
