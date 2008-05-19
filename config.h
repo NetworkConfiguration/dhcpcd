@@ -83,7 +83,7 @@
 # define LEASEFILE		DBDIR "/" PACKAGE "-%s.lease"
 #endif
 #ifndef PIDFILE
-# define PIDFILE			RUNDIR "/" PACKAGE "-%s.pid"
+# define PIDFILE		RUNDIR "/" PACKAGE "-%s.pid"
 #endif
 
 #define UNCONST(a)		((void *)(unsigned long)(const void *)(a))
