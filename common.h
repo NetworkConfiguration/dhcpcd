@@ -29,9 +29,9 @@
 #define COMMON_H
 
 /* string.h pulls in features.h so the below define checks work */
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -41,8 +41,12 @@
 # define _unused
 #endif
 
-#ifdef __GLIBC__
-#define arc4random (uint32_t)random
+#ifndef HAVE_ARC4RANDOM
+# ifdef __GLIBC__
+uint32_t arc4random(void);
+#else
+# define HAVE_ARC4RANDOM
+# endif
 #endif
 
 #ifndef HAVE_STRLCPY

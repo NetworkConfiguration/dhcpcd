@@ -33,9 +33,11 @@
 #ifdef BSD
 #  include <paths.h>
 #endif
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "common.h"
@@ -73,6 +75,27 @@ get_line(char **line, size_t *len, FILE *fp)
 
 	return last;
 }
+
+/* Simple hack to return a random number without arc4random */
+#ifndef HAVE_ARC4RANDOM
+uint32_t arc4random(void)
+{
+	int fd;
+	static unsigned long seed = 0;
+
+	if (!seed) {
+		fd = open("/dev/urandom", 0);
+		if (fd == -1 || read(fd,  &seed, sizeof(seed)) == -1)
+			seed = time(0);
+		if (fd >= 0)
+			close(fd);
+
+		srandom(seed);
+	}
+
+	return (uint32_t)random();
+}
+#endif
 
 /* strlcpy is nice, shame glibc does not define it */
 #if HAVE_STRLCPY

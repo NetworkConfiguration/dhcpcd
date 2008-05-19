@@ -40,9 +40,6 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifdef __GLIBC__
-#  include <time.h> /* for srandomdev */
-#endif
 #include <unistd.h>
 
 #include "config.h"
@@ -135,22 +132,6 @@ atoint(const char *s)
 
 	return (int)n;
 }
-
-#ifdef __GLIBC__
-static void srandomdev(void)
-{
-	int fd;
-	unsigned long seed;
-
-	fd = open("/dev/urandom", 0);
-	if (fd == -1 || read(fd,  &seed, sizeof(seed)) == -1)
-		seed = time(0);
-	if (fd >= 0)
-		close(fd);
-
-	srandom(seed);
-}
-#endif
 
 static pid_t
 read_pid(const char *pidfile)
@@ -788,11 +769,6 @@ main(int argc, char **argv)
 		writepid(pidfd, getpid());
 		logger(LOG_INFO, PACKAGE " " VERSION " starting");
 	}
-
-#ifdef __GLIBC__
-	/* We need to seed random for our fake arc4random call */
-	srandomdev();
-#endif
 
 #ifdef __linux__
 	/* Massage our filters per platform */
