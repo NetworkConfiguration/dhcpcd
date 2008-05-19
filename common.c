@@ -67,7 +67,7 @@ get_line(char **line, size_t *len, FILE *fp)
 		memset(p, 0, BUFSIZ);
 		fgets(p, BUFSIZ, fp);
 		last += strlen(p);
-	} while (! feof(fp) && (*line)[last - 1] != '\n');
+	} while (!feof(fp) && (*line)[last - 1] != '\n');
 
 	/* Trim the trailing newline */
 	if (**line && (*line)[last - 1] == '\n')
@@ -263,7 +263,7 @@ xstrdup(const char *str)
 {
 	char *value;
 
-	if (! str)
+	if (!str)
 		return NULL;
 
 	if ((value = strdup(str)))
