@@ -27,6 +27,9 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#define PACKAGE			"dhcpcd"
+#define VERSION			"4.0.0-beta4"
+
 /* You can enable/disable various chunks of optional code here.
  * You would only do this to try and shrink the end binary if dhcpcd
  * was running on a low memory device */
@@ -56,9 +59,7 @@
 /* Some systems do not have a working fork. */
 /* #define THERE_IS_NO_FORK */
 
-/* Packname name and pathname definitions. */
-#define PACKAGE			"dhcpcd"
-
+/* Paths to things */
 #ifndef SYSCONFDIR
 # define SYSCONFDIR		"/etc/" PACKAGE
 #endif

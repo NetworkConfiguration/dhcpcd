@@ -3,8 +3,6 @@
 # Copyright 2008 Roy Marples <roy@marples.name>
 
 PROG=		dhcpcd
-VERSION=	4.0.0-beta3
-
 SRCS=		common.c dhcp.c dhcpcd.c logger.c net.c signals.c
 SRCS+=		configure.c client.c
 SRCS+=		${SRC_IF} ${SRC_SOCKET}
@@ -22,7 +20,6 @@ SYSCONFDIR?=	${PREFIX}/etc/${PROG}
 MK=		mk
 include ${MK}/prog.mk
 
-CFLAGS+=	-DVERSION=\"${VERSION}\"
 CFLAGS+=	-DSYSCONFDIR=\"${SYSCONFDIR}\"
 CFLAGS+=	-DDBDIR=\"${DBDIR}\"
 LDADD+=		${LIBRT}
