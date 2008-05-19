@@ -6,14 +6,19 @@ PROG=		dhcpcd
 SRCS=		common.c dhcp.c dhcpcd.c logger.c net.c signals.c
 SRCS+=		configure.c client.c
 SRCS+=		${SRC_IF} ${SRC_SOCKET}
-SCRIPT=		dhcpcd.sh
-CONF=		dhcpcd.conf
-MAN5=		dhcpcd.conf.5
-MAN8=		dhcpcd.8 dhcpcd.sh.8
-CLEANFILES=	dhcpcd.sh dhcpcd.conf.5 dhcpcd.8 dhcpcd.sh.8
 
 BINDIR=		${PREFIX}/sbin
-SYSCONFDIR?=	${PREFIX}/etc/${PROG}
+SYSCONFDIR?=	${PREFIX}/etc/dhcpcd
+
+MAN=		dhcpcd.conf.5 dhcpcd.8 dhcpcd.sh.8
+CLEANFILES=	dhcpcd.conf.5 dhcpcd.8 dhcpcd.sh.8
+
+SCRIPTS=	dhcpcd.sh
+SCRIPTSDIR=	${SYSCONFDIR}
+CLEANFILES+=	dhcpcd.sh
+
+FILES=		dhcpcd.conf
+FILESDIR=	${SYSCONFDIR}
 
 .SUFFIXES:	.in .sh.in
 
@@ -29,4 +34,3 @@ LDADD+=		${LIBRT}
 
 .sh.in.sh:
 	${SED} 's:@SYSCONFDIR@:${SYSCONFDIR}:g' $< > $@
-
