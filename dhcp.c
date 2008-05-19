@@ -654,7 +654,7 @@ get_option_routes(const struct dhcp_message *dhcp)
 	int len;
 
 	/* If we have CSR's then we MUST use these only */
-	p = get_option(dhcp, DHCP_CSR);
+	p = _get_option(dhcp, DHCP_CSR, &len, NULL);
 	/* Check for crappy MS option */
 	if (!p)
 		p = _get_option(dhcp, DHCP_MSCSR, &len, NULL);
