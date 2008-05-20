@@ -186,7 +186,7 @@ add_environ(struct options *options, const char *value, int uniq)
 				lst[i] = xrealloc(lst[i], l + lv + 2);
 				lst[i][l] = ' ';
 				memcpy(lst[i] + l + 1, p, lv);
-				lst[i][l + lv + 2] = '\0';
+				lst[i][l + lv + 1] = '\0';
 			}
 			free(match);
 			return lst[i];
@@ -198,7 +198,8 @@ add_environ(struct options *options, const char *value, int uniq)
 	newlist[i] = xstrdup(value);
 	newlist[i + 1] = NULL;
 	options->environ = newlist;
-	return (newlist[i]);
+	free(match);
+	return newlist[i];
 }
 
 static int
