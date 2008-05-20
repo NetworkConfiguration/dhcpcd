@@ -20,11 +20,8 @@ CLEANFILES+=	dhcpcd.sh
 FILES=		dhcpcd.conf
 FILESDIR=	${SYSCONFDIR}
 
-MK=		mk
-include ${MK}/prog.mk
-
-CFLAGS+=	-DSYSCONFDIR=\"${SYSCONFDIR}\"
-CFLAGS+=	-DDBDIR=\"${DBDIR}\"
+CPPFLAGS+=	-DSYSCONFDIR=\"${SYSCONFDIR}\"
+CPPFLAGS+=	-DDBDIR=\"${DBDIR}\"
 LDADD+=		${LIBRT}
 
 .SUFFIXES:	.in .sh.in
@@ -34,3 +31,6 @@ LDADD+=		${LIBRT}
 
 .sh.in.sh:
 	${SED} 's:@SYSCONFDIR@:${SYSCONFDIR}:g' $< > $@
+
+MK=		mk
+include ${MK}/prog.mk
