@@ -4,7 +4,7 @@
 SRC_PF=		lpf.c
 SRC_IF=		if-linux.c
 
-CFLAGS+=	-D_BSD_SOURCE -D_XOPEN_SOURCE=600
+CPPFLAGS+=	-D_BSD_SOURCE -D_XOPEN_SOURCE=600
 LIBRT=		-lrt
 
 # Satisfy FHS
