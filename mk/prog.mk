@@ -18,6 +18,9 @@ SED?=		sed
 
 all: ${PROG} ${SCRIPTS} _man
 
+.c.o:
+	${CC} ${CFLAGS} ${CPPFLAGS} -c $< -o $@
+
 ${PROG}: ${OBJS}
 	${CC} ${LDFLAGS} -o $@ ${OBJS} ${LDADD}
 
