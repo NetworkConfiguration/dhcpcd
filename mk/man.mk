@@ -10,11 +10,11 @@ MANMODE?=	0444
 
 _MAN5_SH=	for man in ${MAN}; do case $$man in *.5) echo $$man;; esac; done
 _MAN5!=		${_MAN5_SH}
-MAN5=		${_MAN5}$(shell ${_MAN5_SH}
+MAN5=		${_MAN5}$(shell ${_MAN5_SH})
 
 _MAN8_SH=	for man in ${MAN}; do case $$man in *.8) echo $$man;; esac; done
 _MAN8!=		${_MAN8_SH}
-MAN8=		${_MAN8}$(shell ${_MAN8_SH}
+MAN8=		${_MAN8}$(shell ${_MAN8_SH})
 
 _man: ${MAN}
 
