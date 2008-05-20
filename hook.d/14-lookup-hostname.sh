@@ -1,4 +1,4 @@
-# Sample exit hook to lookup the hostname in DNS if not set
+# Lookup the hostname in DNS if not set
 
 lookup_hostname()
 {
@@ -21,26 +21,13 @@ lookup_hostname()
 	return 1
 }
 
-do_hostname()
+set_hostname()
 {
-	if [ -z "${new_host_name}" ] && need_hostname; then
-		local hname="$(lookup_hostname)"
-		if [ -n "${hname}" ]; then
-			hostname "${hname}"
-		fi
+	if [ -z "${new_host_name}" ]
+		export new_host_name="$(lookup_hostname)"
 	fi
 }
 
 case "${reason}" in
-	TEST)
-		;;
-	BOUND|INFORM|REBIND|REBOOT|RENEW|TIMEOUT)
-		do_hostname
-		;;
-	EXPIRE|FAIL|IPV4LL|RELEASE|STOP)
-		;;
-	*)
-		echo "lookup_hostname: unsupported reason ${reason}" >&2
-		false
-		;;
+	BOUND|INFORM|REBIND|REBOOT|RENEW|TIMEOUT)	set_hostname;;
 esac

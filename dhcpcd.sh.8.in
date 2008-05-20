@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd May 02, 2008
+.Dd May 20, 2008
 .Dt DHCPCD.SH 8 SMM
 .Sh NAME
 .Nm dhcpcd.sh
@@ -31,9 +31,9 @@
 .Nm
 is used by
 .Xr dhcpcd 8
-to configure
+to run any system or user defined hook scripts, which include configuring
 .Pa /etc/resolv.conf
-and run any system or user defined hook scripts.
+and the hostname.
 Each time
 .Nm
 is invoked,
@@ -78,18 +78,13 @@ interface. This is primarily used to test the variables are filled correctly
 for the script to process them.
 .El
 .Sh FILES 
-Before
+When
 .Nm
 runs, it loads
-.Pa @SYSCONFDIR@/dhcpcd-enter-hook
+.Pa @SYSCONFDIR@/dhcpcd-hook
 and any scripts found in
-.Pa @SYSCONFDIR@/dhcpcd-enter-hook.d .
-Then it runs itself, configuring
-.Pa /etc/resolv.conf .
-Finally it loads
-.Pa @SYSCONFDIR@/dhcpcd-exit-hook
-and any scripts found in
-.Pa @SYSCONFDIR@/dhcpcd-exit-hook.d .
+.Pa @SYSCONFDIR@/dhcpcd-hook.d
+in a lexical order.
 .Sh SEE ALSO
 .Xr dhcpcd 8
 .Sh AUTHORS

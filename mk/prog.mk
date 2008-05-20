@@ -5,16 +5,9 @@
 
 include ${MK}/cc.mk
 include ${MK}/os.mk
+include ${MK}/sys.mk
 
-BINDIR?=	${PREFIX}/usr/bin
-BINMODE?=	0755
-NONBINMODE?=	0644
 OBJS+=		${SRCS:.c=.o}
-
-SYSCONFDIR?=	${PREFIX}/etc
-
-INSTALL?=	install
-SED?=		sed
 
 all: ${PROG} ${SCRIPTS} _man
 
@@ -44,6 +37,7 @@ include ${MK}/man.mk
 include ${MK}/dist.mk
 
 install: _proginstall _scriptsinstall _filesinstall _maninstall
+	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@; cd ..; done
 
 clean:
 	rm -f ${OBJS} ${PROG} _${PROG}.c _${PROG}.o ${CLEANFILES}

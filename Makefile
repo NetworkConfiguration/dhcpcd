@@ -24,6 +24,8 @@ CPPFLAGS+=	-DSYSCONFDIR=\"${SYSCONFDIR}\"
 CPPFLAGS+=	-DDBDIR=\"${DBDIR}\"
 LDADD+=		${LIBRT}
 
+SUBDIRS=	hook.d
+
 .SUFFIXES:	.in .sh.in
 
 .in:
