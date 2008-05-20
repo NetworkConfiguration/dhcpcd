@@ -40,7 +40,7 @@ make HOOKSCRIPTS=50-ntp.sh install
 Compatibility
 -------------
 If you require compatibility with dhcpcd-3 and older style variables,
-you can install dhcpcd-compat into the directory /etc/dhcpcd/enter-hook.d
+you can install 50-dhcpcd-compat.sh into the directory /libexec/dhcpcd.hook.d
 We don't install this by default.
 You should also add -DCMDLINE_COMPAT to your CFLAGS if you need to be fully
 commandline compatible with prior versions.
