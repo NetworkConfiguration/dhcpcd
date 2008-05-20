@@ -86,6 +86,13 @@ Don't send any ARP requests.
 This also disables IPv4LL.
 .It Ic nogateway
 Don't install any default routes.
+.It Ic nohook Ar script
+Don't run this hook script.
+Matches full name, or prefixed with 2 numbers optionally ending with .sh.
+Example for not running the hook script to configure
+.Pa /etc/resolv.conf :-
+.Nm dhcpcd
+-C resolv.conf
 .It Ic noipv4ll
 Don't attempt to obtain an IPv4LL address if we failed to get one via DHCP.
 See

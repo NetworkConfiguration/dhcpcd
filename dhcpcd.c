@@ -51,7 +51,7 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 
 /* Don't set any optional arguments here so we retain POSIX
  * compatibility with getopt */
-#define OPTS "c:df:h:i:kl:m:no:pr:s:t:u:xADEF:GI:LO:TV"
+#define OPTS "c:df:h:i:kl:m:no:pr:s:t:u:xAC:DEF:GI:LO:TV"
 
 static int doversion = 0;
 static int dohelp = 0;
@@ -73,6 +73,7 @@ static const struct option longopts[] = {
 	{"userclass",   required_argument,  NULL, 'u'},
 	{"exit",        no_argument,        NULL, 'x'},
 	{"noarp",       no_argument,        NULL, 'A'},
+	{"nohook",	required_argument,  NULL, 'C'},
 	{"duid",        no_argument,        NULL, 'D'},
 	{"lastlease",   no_argument,        NULL, 'E'},
 	{"fqdn",        optional_argument,  NULL, 'F'},
@@ -156,7 +157,48 @@ usage(void)
 	printf("usage: "PACKAGE" [-dknpxADEGHLOSTV] [-c script] [-f file ] [-h hostname]\n"
 	       "              [-i classID ] [-l leasetime] [-m metric] [-o option] [-r ipaddr]\n"
 	       "              [-s ipaddr] [-t timeout] [-u userclass] [-F none|ptr|both]\n"
-	       "              [-I clientID] <interface>\n");
+	       "              [-I clientID] [-C hookscript] <interface>\n");
+}
+
+static char * 
+add_environ(struct options *options, const char *value, int uniq)
+{
+	char **newlist;
+	char **lst = options->environ;
+	size_t i = 0, l, lv;
+	char *match = NULL, *p;
+
+	match = xstrdup(value);
+	p = strchr(match, '=');
+	if (p)
+		*p++ = '\0';
+	l = strlen(match);
+
+	while (lst && lst[i]) {
+		if (match && strncmp(lst[i], match, l) == 0) {
+			if (uniq) {
+				free(lst[i]);
+				lst[i] = xstrdup(value);
+			} else {
+				/* Append a space and the value to it */
+				l = strlen(lst[i]);
+				lv = strlen(p);
+				lst[i] = xrealloc(lst[i], l + lv + 2);
+				lst[i][l] = ' ';
+				memcpy(lst[i] + l + 1, p, lv);
+				lst[i][l + lv + 2] = '\0';
+			}
+			free(match);
+			return lst[i];
+		}
+		i++;
+	}
+
+	newlist = xrealloc(lst, sizeof(char *) * (i + 2));
+	newlist[i] = xstrdup(value);
+	newlist[i + 1] = NULL;
+	options->environ = newlist;
+	return (newlist[i]);
 }
 
 static int
@@ -166,6 +208,7 @@ parse_option(int opt, char *oarg, struct options *options)
 	int i;
 	int j;
 	char *p;
+	size_t s;
 
 	switch(opt) {
 	case 'h':
@@ -281,6 +324,16 @@ parse_option(int opt, char *oarg, struct options *options)
 		options->options &= ~DHCPCD_ARP;
 		/* IPv4LL requires ARP */
 		options->options &= ~DHCPCD_IPV4LL;
+		break;
+	case 'C':
+		/* Commas to spaces for shell */
+		while ((p = strchr(oarg, ',')))
+			*p = ' ';
+		s = strlen("skip_hooks=") + strlen(oarg) + 1;
+		p = xmalloc(sizeof(char) * s);
+		snprintf(p, s, "skip_hooks=%s", oarg);
+		add_environ(options, p, 0);
+		free(p);
 		break;
 	case 'D':
 		options->options |= DHCPCD_DUID;
@@ -783,6 +836,12 @@ abort:
 	if (pidfd > -1) {
 		close(pidfd);
 		unlink(options->pidfile);
+	}
+	if (options->environ) {
+		len = 0;
+		while (options->environ[len])
+			free(options->environ[len++]);
+		free(options->environ);
 	}
 	free(options);
 

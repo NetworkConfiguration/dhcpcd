@@ -98,6 +98,19 @@ exec_script(const struct options *options, const char *iface,
 			elen += configure_env(env + elen, "new", dhcpn, options);
 		}
 	}
+	/* Add our base environment */
+	if (options->environ) {
+		e = 0;
+		while (options->environ[e++])
+			;
+		env = xrealloc(env, sizeof(char *) * (elen + e + 1));
+		e = 0;
+		while (options->environ[e]) {
+			env[elen + e] = xstrdup(options->environ[e]);
+			e++;
+		}
+		elen += e;
+	}
 	env[elen] = '\0';
 
 	/* OK, we need to block signals */
