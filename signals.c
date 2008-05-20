@@ -134,7 +134,7 @@ signal_init(void)
 }
 
 static int
-_signal_setup(void (*func)(int))
+signal_handle(void (*func)(int))
 {
 	unsigned int i;
 	struct sigaction sa;
@@ -153,11 +153,11 @@ _signal_setup(void (*func)(int))
 int
 signal_setup(void)
 {
-	return _signal_setup(signal_handler);
+	return signal_handle(signal_handler);
 }
 
 int
 signal_reset(void)
 {
-	return _signal_setup(SIG_DFL);
+	return signal_handle(SIG_DFL);
 }

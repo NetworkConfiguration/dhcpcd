@@ -237,9 +237,9 @@ free_option_buffer(void)
 	free(dhcp_opt_buffer);
 }
 
-#define get_option(dhcp, opt) _get_option(dhcp, opt, NULL, NULL)
+#define get_option_raw(dhcp, opt) get_option(dhcp, opt, NULL, NULL)
 static const uint8_t *
-_get_option(const struct dhcp_message *dhcp, uint8_t opt, int *len, int *type)
+get_option(const struct dhcp_message *dhcp, uint8_t opt, int *len, int *type)
 {
 	const uint8_t *p = dhcp->options;
 	const uint8_t *e = p + sizeof(dhcp->options);
@@ -314,7 +314,7 @@ exit:
 int
 get_option_addr(uint32_t *a, const struct dhcp_message *dhcp, uint8_t option)
 {
-	const uint8_t *p = get_option(dhcp, option);
+	const uint8_t *p = get_option_raw(dhcp, option);
 
 	if (!p)
 		return -1;
@@ -337,7 +337,7 @@ get_option_uint32(uint32_t *i, const struct dhcp_message *dhcp, uint8_t option)
 int
 get_option_uint16(uint16_t *i, const struct dhcp_message *dhcp, uint8_t option)
 {
-	const uint8_t *p = get_option(dhcp, option);
+	const uint8_t *p = get_option_raw(dhcp, option);
 	uint16_t d;
 
 	if (!p)
@@ -350,7 +350,7 @@ get_option_uint16(uint16_t *i, const struct dhcp_message *dhcp, uint8_t option)
 int
 get_option_uint8(uint8_t *i, const struct dhcp_message *dhcp, uint8_t option)
 {
-	const uint8_t *p = get_option(dhcp, option);
+	const uint8_t *p = get_option_raw(dhcp, option);
 
 	if (!p)
 		return -1;
@@ -588,7 +588,7 @@ get_option_string(const struct dhcp_message *dhcp, uint8_t option)
 	const uint8_t *p;
 	char *s;
 
-	p =  _get_option(dhcp, option, &len, &type);
+	p = get_option(dhcp, option, &len, &type);
 	if (!p)
 		return NULL;
 
@@ -654,10 +654,10 @@ get_option_routes(const struct dhcp_message *dhcp)
 	int len;
 
 	/* If we have CSR's then we MUST use these only */
-	p = _get_option(dhcp, DHCP_CSR, &len, NULL);
+	p = get_option(dhcp, DHCP_CSR, &len, NULL);
 	/* Check for crappy MS option */
 	if (!p)
-		p = _get_option(dhcp, DHCP_MSCSR, &len, NULL);
+		p = get_option(dhcp, DHCP_MSCSR, &len, NULL);
 	if (p) {
 		routes = decode_rfc3442_rt(len, p);
 		if (routes)
@@ -665,7 +665,7 @@ get_option_routes(const struct dhcp_message *dhcp)
 	}
 
 	/* OK, get our static routes first. */
-	p = _get_option(dhcp, DHCP_STATICROUTE, &len, NULL);
+	p = get_option(dhcp, DHCP_STATICROUTE, &len, NULL);
 	if (p) {
 		e = p + len;
 		while (p < e) {
@@ -684,7 +684,7 @@ get_option_routes(const struct dhcp_message *dhcp)
 	}
 
 	/* Now grab our routers */
-	p = _get_option(dhcp, DHCP_ROUTER, &len, NULL);
+	p = get_option(dhcp, DHCP_ROUTER, &len, NULL);
 	if (p) {
 		e = p + len;
 		while (p < e) {
@@ -1103,7 +1103,7 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data)
 }
 
 static void
-_setenv(char ***e, const char *prefix, const char *var, const char *value)
+setvar(char ***e, const char *prefix, const char *var, const char *value)
 {
 	size_t len = strlen(prefix) + strlen(var) + strlen(value) + 4;
 
@@ -1137,7 +1137,7 @@ configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 				continue;
 			if (has_reqmask(options->nomask, opt->option))
 				continue;
-			if (get_option(dhcp, opt->option))
+			if (get_option_raw(dhcp, opt->option))
 				e++;
 		}
 		if (dhcp->yiaddr)
@@ -1154,26 +1154,26 @@ configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 		/* Set some useful variables that we derive from the DHCP
 		 * message but are not necessarily in the options */
 		addr.s_addr = dhcp->yiaddr;
-		_setenv(&ep, prefix, "ip_address", inet_ntoa(addr));
+		setvar(&ep, prefix, "ip_address", inet_ntoa(addr));
 		if (get_option_addr(&net.s_addr, dhcp, DHCP_SUBNETMASK) == -1) {
 			net.s_addr = get_netmask(addr.s_addr);
-			_setenv(&ep, prefix, "subnet_mask", inet_ntoa(net));
+			setvar(&ep, prefix, "subnet_mask", inet_ntoa(net));
 		}
 		i = inet_ntocidr(net);
 		snprintf(cidr, sizeof(cidr), "%d", inet_ntocidr(net));
-		_setenv(&ep, prefix, "subnet_cidr", cidr);
+		setvar(&ep, prefix, "subnet_cidr", cidr);
 		if (get_option_addr(&brd.s_addr, dhcp, DHCP_BROADCAST) == -1) {
 			brd.s_addr = addr.s_addr | ~net.s_addr;
-			_setenv(&ep, prefix, "broadcast_address", inet_ntoa(net));
+			setvar(&ep, prefix, "broadcast_address", inet_ntoa(net));
 		}
 		addr.s_addr = dhcp->yiaddr & net.s_addr;
-		_setenv(&ep, prefix, "network_number", inet_ntoa(addr));
+		setvar(&ep, prefix, "network_number", inet_ntoa(addr));
 	}
 
 	if (*dhcp->bootfile && !(overl & 1))
-		_setenv(&ep, prefix, "filename", (const char *)dhcp->bootfile);
+		setvar(&ep, prefix, "filename", (const char *)dhcp->bootfile);
 	if (*dhcp->servername && !(overl & 2))
-		_setenv(&ep, prefix, "server_name", (const char *)dhcp->servername);
+		setvar(&ep, prefix, "server_name", (const char *)dhcp->servername);
 
 	for (opt = dhcp_opts; opt->option; opt++) {
 		if (!opt->var)
@@ -1181,7 +1181,7 @@ configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 		if (has_reqmask(options->nomask, opt->option))
 			continue;
 		val = NULL;
-		p = _get_option(dhcp, opt->option, &pl, NULL);
+		p = get_option(dhcp, opt->option, &pl, NULL);
 		if (!p)
 			continue;
 		len = print_option(NULL, 0, opt->type, pl, p);
