@@ -40,6 +40,7 @@
 .Op Fl r , -request Ar address
 .Op Fl t , -timeout Ar seconds
 .Op Fl u , -userclass Ar class
+.Op Fl C , -nohook Ar hook
 .Op Fl F , -fqdn Ar FQDN
 .Op Fl I , -clientid Ar clientid
 .Op Fl O , -nooption Ar option
@@ -239,6 +240,11 @@ not enabled by default.
 The DUID generated will be held in
 .Pa @SYSCONFDIR@/dhcpcd.duid
 and should not be copied to other hosts.
+.It Fl E , -lastlease
+If
+.Nm
+cannot obtain a lease, then try to use the last lease we got for the
+interface if it hasn't yet expired.
 .It Fl F , -fqdn Ar fqdn
 Requests that the DHCP server updates DNS using FQDN instead of just a
 hostname.
