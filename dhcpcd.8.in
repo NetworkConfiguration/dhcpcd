@@ -272,7 +272,7 @@ Here are some option that deal with turning these bits off.
 Don't request or claim the address by ARP.
 .It Fl G , -nogateway
 Don't set any default routes.
-.It Ic nohook Ar script
+.It Ic C, -nohook Ar script
 Don't run this hook script.
 Matches full name, or prefixed with 2 numbers optionally ending with .sh.
 Example for not running the hook script to configure
