@@ -289,6 +289,9 @@ requires a Berkley Packet Filter, or BPF device on BSD based systems and a
 Linux Socket Filter, or LPF device on Linux based systems.
 .Sh FILES
 .Bl -ohang
+.It Pa @SYSCONFDIR@/dhcpcd.conf
+Configuration file for dhcpcd.
+If you always use the same options, put them here.
 .It Pa @SCRIPT@
 Bourne shell script that is run when we configure or deconfigure an interface.
 .It Pa @SYSCONFDIR@/dhcpcd.duid
