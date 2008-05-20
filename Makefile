@@ -7,7 +7,6 @@ SRCS=		common.c dhcp.c dhcpcd.c logger.c net.c signals.c
 SRCS+=		configure.c client.c
 SRCS+=		${SRC_IF} ${SRC_SOCKET}
 
-CONFIG=		${SYSCONFDIR}/dhcpcd.conf
 SCRIPTDIR=	${PREFIX}/libexec
 SCRIPT=		${SCRIPTDIR}/dhcpcd.sh
 HOOKDIR=	${SCRIPTDIR}/dhcpcd.hook.d
@@ -26,8 +25,8 @@ FILES=		dhcpcd.conf
 FILESDIR=	${SYSCONFDIR}
 
 CPPFLAGS+=	-DDBDIR=\"${DBDIR}\"
-CPPFLAGS+=	-DCONFIG=\"${CONFIG}\"
 CPPFLAGS+=	-DSCRIPT=\"${SCRIPT}\"
+CPPFLAGS+=	-DSYSCONFDIR=\"${SYSCONFDIR}\"
 LDADD+=		${LIBRT}
 
 SUBDIRS=	hook.d
