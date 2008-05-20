@@ -5,13 +5,14 @@
 PROG=		dhcpcd
 SRCS=		common.c dhcp.c dhcpcd.c logger.c net.c signals.c
 SRCS+=		configure.c client.c
-SRCS+=		${SRC_IF} ${SRC_SOCKET}
+SRCS+=		${SRC_IF} ${SRC_PF}
 
 SCRIPTDIR=	${PREFIX}/libexec
 SCRIPT=		${SCRIPTDIR}/dhcpcd.sh
 HOOKDIR=	${SCRIPTDIR}/dhcpcd.hook.d
 
 BINDIR=		${PREFIX}/sbin
+DBDIR=		/var/db
 SYSCONFDIR?=	${PREFIX}/etc
 
 MAN=		dhcpcd.conf.5 dhcpcd.8 dhcpcd.sh.8

@@ -1,12 +1,15 @@
 # Setup OS specific variables
 # Copyright 2008 Roy Marples <roy@marples.name>
 
-SRC_SOCKET=	socket.c
+SRC_PF=		lpf.c
 SRC_IF=		if-linux.c
 
 CFLAGS+=	-D_BSD_SOURCE -D_XOPEN_SOURCE=600
 LIBRT=		-lrt
+
+# Satisfy FHS
 DBDIR=		/var/lib/dhcpcd
+SCRIPTDIR=	${PREFIX}/lib/dhcpcd
 
 # Work out if our fork() works or not
 _HAVE_FORK_SH= if test "${HAVE_FORK}" = "yes"; then \
