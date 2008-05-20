@@ -31,19 +31,21 @@
 Although
 .Nm dhcpcd
 can do everything from the command line, there are cases where it's just easier
-to do it once in a configuration file. Most of the options found in
+to do it once in a configuration file.
+Most of the options found in
 .Xr dhcpcd 8
-can be used here. The first word on the line is the option and the rest of the
-line is the value. Leading and trailing whitespace for the option and value
-are trimmed. You can escape characters in the value using the \\ character.
+can be used here.
+The first word on the line is the option and the rest of the line is the value.
+Leading and trailing whitespace for the option and value are trimmed.
+You can escape characters in the value using the \\ character.
 .Pp
 Blank lines and lines starting with # are ignored.
 .Pp
 Here's a list of available options:
 .Bl -tag -width indent
 .It Ic classid Ar string
-Change the default classid sent from dhcpcd-version. If not set then none
-is sent.
+Change the default classid sent from dhcpcd-version.
+If not set then none is sent.
 .It Ic clientid Ar string
 Change the default clientid sent from the interface hardware address.
 If the string is of the format 01:02:03 then it is encoded as hex.
@@ -53,8 +55,9 @@ Generate an
 .Rs
 .%T "RFC 4361"
 .Re
-compliant clientid. This requires persistent storage
-and not all DHCP servers work with it so it's not enabled by default.
+compliant clientid.
+This requires persistent storage and not all DHCP servers work with it so it's
+not enabled by default.
 The duid generated will be held in
 .Pa @SYSCONFDIR@/dhcpcd.duid
 and should not be copied to other hosts.
@@ -79,7 +82,8 @@ Subsequent options are only parsed for this
 Request a leasetime of
 .Ar seconds .
 .It Ic noarp
-Don't send any ARP requests. This also disables IPv4LL.
+Don't send any ARP requests.
+This also disables IPv4LL.
 .It Ic nogateway
 Don't install any default routes.
 .It Ic noipv4ll
@@ -91,10 +95,11 @@ See
 .It Ic option Ar dhcp-option
 Requests the
 .Ar dhcp-option
-from the server. It can be a variable to be used in
+from the server.
+It can be a variable to be used in
 .Xr dhcpcd.sh 8
-or the numerical value. You can specify more seperated by commas, spaces or
-more option lines.
+or the numerical value.
+You can specify more seperated by commas, spaces or more option lines.
 .It Ic script Ar script
 Use
 .Ar script
@@ -104,7 +109,8 @@ instead of the default
 The default timeout for waiting for a DHCP response is 20 seconds which may
 be too long or too short and can be changed here.
 .It Ic userclass Ar string
-Tag the DHCP messages with the userclass. You can specify more than one.
+Tag the DHCP messages with the userclass.
+You can specify more than one.
 .El
 .Sh SEE ALSO
 .Xr dhcpcd.sh 8 ,

@@ -192,15 +192,14 @@ You can use this option to stop this from happening.
 .Nm
 normally sends a DHCP Broadcast to find servers to offer an address.
 .Nm
-will then request the address used. You can use this option to skip the
-broadcast step and just request an
+will then request the address used.
+You can use this option to skip the broadcast step and just request an
 .Ar address .
-The downside is if you request
-an
+The downside is if you request an
 .Ar address
 the DHCP server does not know about or the DHCP server is not
-authorative, it will remain silent. In this situation, we go back to the init
-state and broadcast again.
+authorative, it will remain silent.
+In this situation, we go back to the init state and broadcast again.
 If no
 .Ar address
 is given then we use the first address currently assigned to the
@@ -208,12 +207,13 @@ is given then we use the first address currently assigned to the
 .It Fl s , -inform Op Ar address Op / Ar cidr
 Behaves exactly like
 .Fl r , -request
-as above, but sends a DHCP inform instead of a request. This requires the
-interface to be configured first. This does not get a lease as such, just
-notifies the DHCP server of the
+as above, but sends a DHCP inform instead of a request.
+This requires the interface to be configured first.
+This does not get a lease as such, just notifies the DHCP server of the
 .Ar address
-we are using. If we fail to contact a DHCP server then we return a failure
-instead of falling back on IPv4LL.
+we are using.
+If we fail to contact a DHCP server then we return a failure instead of falling
+back on IPv4LL.
 .It Fl t , -timeout Ar seconds
 Timeout after
 .Ar seconds ,
@@ -233,14 +233,16 @@ Generate an
 .Rs
 .%T "RFC 4361"
 .Re
-compliant clientid. This requires persistent storage
-and not all DHCP servers work with it so it's not enabled by default.
+compliant clientid.
+This requires persistent storage and not all DHCP servers work with it so it's
+not enabled by default.
 The DUID generated will be held in
 .Pa @SYSCONFDIR@/dhcpcd.duid
 and should not be copied to other hosts.
 .It Fl F , -fqdn Ar fqdn
 Requests that the DHCP server updates DNS using FQDN instead of just a
-hostname. Valid values for
+hostname.
+Valid values for
 .Ar fqdn
 are none, ptr and both.
 The current hostname or the hostname specified using the
@@ -255,10 +257,10 @@ If not set then none is sent.
 .El
 .Ss Restriciting behaviour
 .Nm
-will try to do as much as it can by default. However, there are sometimes
-situations where you don't want the things to be configured exactly how the
-the DHCP server wants. Here are some option that deal with turning these bits
-off.
+will try to do as much as it can by default.
+However, there are sometimes situations where you don't want the things to be
+configured exactly how the the DHCP server wants.
+Here are some option that deal with turning these bits off.
 .Bl -tag -width indent
 .It Fl A , -noarp
 Don't request or claim the address by ARP.
@@ -267,14 +269,16 @@ Don't set any default routes.
 .It Fl L , -noipv4ll
 Don't use IPv4LL at all.
 .It Fl O , -nooption Ar option
-Don't request the specified option. If no option given, then don't request
-any options other than those to configure the interface and routing.
+Don't request the specified option.
+If no option given, then don't request any options other than those to
+configure the interface and routing.
 .It Fl T, -test
 On receipt of discover messages we just call
 .Pa @SCRIPT@
 with the reason of TEST which echo's the DHCP variables found in the message
-to the console. The interface configuration isn't touched and neither are any
-configuration files.
+to the console.
+The interface configuration isn't touched and neither are any configuration
+files.
 .It Fl V, -variables
 Display a list of option codes and the associated variable for use in
 .Xr dhcpcd.sh 8 .
