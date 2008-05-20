@@ -359,11 +359,11 @@ get_old_lease(struct if_state *state, const struct options *options)
 	if ((dhcp = read_lease(iface)) == NULL) {
 		if (errno != ENOENT)
 			logger(LOG_INFO, "read_lease: %s", strerror(errno));
-		return -1;
+		goto eexit;
 	}
 	if (stat(iface->leasefile, &sb) == -1) {
 		logger(LOG_ERR, "stat: %s", strerror(errno));
-		return -1;
+		goto eexit;
 	}
 	get_lease(&state->lease, dhcp);
 	lease->frominfo = 1;
@@ -378,33 +378,32 @@ get_old_lease(struct if_state *state, const struct options *options)
 	if (options->options & DHCPCD_ARP &&
 	    (options->options & DHCPCD_LASTLEASE ||
 	     (options->options & DHCPCD_IPV4LL &&
-	      IN_LINKLOCAL(ntohl(lease->addr.s_addr)))) &&
-	    arp_claim(iface, lease->addr))
-	{
-		lease->addr.s_addr = 0;
-		free(dhcp);
-		return -1;
+	      IN_LINKLOCAL(ntohl(dhcp->yiaddr))))) {
+		if (arp_claim(iface, lease->addr) == -1)
+			goto eexit;
 	}
 
 	/* Ok, lets use this */
-	if (IN_LINKLOCAL(dhcp->yiaddr)) {
+	if (IN_LINKLOCAL(ntohl(dhcp->yiaddr))) {
 		if (options->options & DHCPCD_IPV4LL) {
 			free(state->old_dhcp);
 			state->old_dhcp = state->dhcp;
 			state->dhcp = dhcp;
 			return 0;
 		}
-		lease->addr.s_addr = 0;
-		free(dhcp);
-		return -1;
+		goto eexit;
 	}
+#endif
+
+#ifndef THERE_IS_NO_FORK
+	if (!(state->options & DHCPCD_LASTLEASE))
+		goto eexit;
 #endif
 
 	/* Ensure that we can still use the lease */
 	if (gettimeofday(&tv, NULL) == -1) {
 		logger(LOG_ERR, "gettimeofday: %s", strerror(errno));
-		free(dhcp);
-		return -1;
+		goto eexit;
 	}
 
 	offset = tv.tv_sec - lease->leasedfrom;
@@ -413,9 +412,7 @@ get_old_lease(struct if_state *state, const struct options *options)
 	{
 		logger(LOG_ERR, "lease expired %u seconds ago",
 		       offset + lease->leasetime);
-		lease->addr.s_addr = 0;
-		free(dhcp);
-		return -1;
+		goto eexit;
 	}
 
 	if (lease->leasedfrom == 0)
@@ -426,6 +423,11 @@ get_old_lease(struct if_state *state, const struct options *options)
 	state->old_dhcp = state->dhcp;
 	state->dhcp = dhcp;
 	return 0;
+
+eexit:
+	lease->addr.s_addr = 0;
+	free(dhcp);
+	return -1;
 }
 
 static int
@@ -858,6 +860,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 				memset(state->dhcp, 0, sizeof(*state->dhcp));
 				state->dhcp->yiaddr = lease->addr.s_addr;
 				state->dhcp->options[0] = DHCP_END;
+				state->lease.frominfo = 0;
 				reason = "IPV4LL";
 			}
 		}
