@@ -17,11 +17,15 @@ restore_conf()
 	mv -f "$1"-pre."${interface}" "$1"
 }
 
+# We source each script into this one so that scripts run earlier can
+# remove variables from the environment so later scripts don't see them.
+# Thus, the user can create their dhcpcd.hook script to configure
+# /etc/resolv.conf how they want and stop the system scripts ever updating it.
 for hook in \
-	@SYSCONFDIR@/dhcpcd-hook \
-	@SYSCONFDIR@/dhcpcd-hook.d/* \
+	@SYSCONFDIR@/dhcpcd.hook \
+	@HOOKDIR@/*
 do
-	if [ -f "${x}" ]; then
-		. "${x}"
+	if [ -f "${hook}" ]; then
+		. "${hook}"
 	fi
 done

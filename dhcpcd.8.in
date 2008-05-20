@@ -102,7 +102,7 @@ can use the
 option.
 .Ss Hooking into DHCP events
 .Nm
-will run @SYSCONFDIR@/dhcpcd.sh, or the script specified by the
+will run @SCRIPT@, or the script specified by the
 .Fl c , -script
 option. This script will configure
 .Pa /etc/resolv.conf
@@ -172,7 +172,7 @@ different interfaces, the lower the metric the more it is preferred.
 Request the DHCP
 .Ar option
 variable for use in
-.Pa @SYSCONFDIR@/dhcpcd.sh .
+.Pa @SCRIPT@ .
 .It Fl n , -renew
 Notifies an existing
 .Nm
@@ -271,7 +271,7 @@ Don't request the specified option. If no option given, then don't request
 any options other than those to configure the interface and routing.
 .It Fl T, -test
 On receipt of discover messages we just call
-.Pa @SYSCONFDIR@/dhcpcd.sh
+.Pa @SCRIPT@
 with the reason of TEST which echo's the DHCP variables found in the message
 to the console. The interface configuration isn't touched and neither are any
 configuration files.
@@ -285,7 +285,7 @@ requires a Berkley Packet Filter, or BPF device on BSD based systems and a
 Linux Socket Filter, or LPF device on Linux based systems.
 .Sh FILES
 .Bl -ohang
-.It Pa @SYSCONFDIR@/dhcpcd.sh
+.It Pa @SCRIPT@
 Bourne shell script that is run when we configure or deconfigure an interface.
 .It Pa @SYSCONFDIR@/dhcpcd.duid
 Text file that holds the DUID used to identify the host.

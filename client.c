@@ -238,7 +238,7 @@ get_duid(unsigned char *duid, const struct interface *iface)
 
 	/* If we already have a DUID then use it as it's never supposed
 	 * to change once we have one even if the interfaces do */
-	if ((f = fopen(DUIDFILE, "r"))) {
+	if ((f = fopen(DUID, "r"))) {
 		while ((get_line(&buffer, &len, f))) {
 			line = buffer;
 			while ((option = strsep(&line, " \t")))
@@ -263,7 +263,7 @@ get_duid(unsigned char *duid, const struct interface *iface)
 	}
 
 	/* No file? OK, lets make one based on our interface */
-	if (!(f = fopen(DUIDFILE, "w")))
+	if (!(f = fopen(DUID, "w")))
 		return 0;
 
 	type = htons(1); /* DUI-D-LLT */
@@ -293,7 +293,7 @@ get_duid(unsigned char *duid, const struct interface *iface)
 	/* Failed to write the duid? scrub it, we cannot use it */
 	if (x < 1) {
 		len = 0;
-		unlink(DUIDFILE);
+		unlink(DUID);
 	}
 
 	return len;

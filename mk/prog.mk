@@ -28,7 +28,7 @@ small: ${SRCS}
 _proginstall: ${PROG}
 	${INSTALL} -d ${DESTDIR}${BINDIR}
 	${INSTALL} -m ${BINMODE} ${PROG} ${DESTDIR}${BINDIR}
-	${INSTALL} -d ${DESTDIR}${INFODIR}
+	${INSTALL} -d ${DESTDIR}${DBDIR}
 
 include ${MK}/depend.mk
 include ${MK}/files.mk

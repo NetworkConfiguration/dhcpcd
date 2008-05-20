@@ -81,9 +81,9 @@ for the script to process them.
 When
 .Nm
 runs, it loads
-.Pa @SYSCONFDIR@/dhcpcd-hook
+.Pa @SYSCONFDIR@/dhcpcd.hook
 and any scripts found in
-.Pa @SYSCONFDIR@/dhcpcd-hook.d
+.Pa @HOOKDIR@
 in a lexical order.
 .Sh SEE ALSO
 .Xr dhcpcd 8

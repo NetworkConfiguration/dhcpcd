@@ -7,32 +7,43 @@ SRCS=		common.c dhcp.c dhcpcd.c logger.c net.c signals.c
 SRCS+=		configure.c client.c
 SRCS+=		${SRC_IF} ${SRC_SOCKET}
 
+CONFIG=		${SYSCONFDIR}/dhcpcd.conf
+SCRIPTDIR=	${PREFIX}/libexec
+SCRIPT=		${SCRIPTDIR}/dhcpcd.sh
+HOOKDIR=	${SCRIPTDIR}/dhcpcd.hook.d
+
 BINDIR=		${PREFIX}/sbin
-SYSCONFDIR?=	${PREFIX}/etc/dhcpcd
+SYSCONFDIR?=	${PREFIX}/etc
 
 MAN=		dhcpcd.conf.5 dhcpcd.8 dhcpcd.sh.8
 CLEANFILES=	dhcpcd.conf.5 dhcpcd.8 dhcpcd.sh.8
 
 SCRIPTS=	dhcpcd.sh
-SCRIPTSDIR=	${SYSCONFDIR}
+SCRIPTSDIR=	${SCRIPTDIR}
 CLEANFILES+=	dhcpcd.sh
 
 FILES=		dhcpcd.conf
 FILESDIR=	${SYSCONFDIR}
 
-CPPFLAGS+=	-DSYSCONFDIR=\"${SYSCONFDIR}\"
 CPPFLAGS+=	-DDBDIR=\"${DBDIR}\"
+CPPFLAGS+=	-DCONFIG=\"${CONFIG}\"
+CPPFLAGS+=	-DSCRIPT=\"${SCRIPT}\"
 LDADD+=		${LIBRT}
 
 SUBDIRS=	hook.d
 
 .SUFFIXES:	.in .sh.in
 
+SED_DBDIR=	-e 's:@DBDIR@:${DBDIR}:g'
+SED_HOOKDIR=	-e 's:@HOOKDIR@:${HOOKDIR}:g'
+SED_SCRIPT=	-e 's:@SCRIPT@:${SCRIPT}:g'
+SED_SYS=	-e 's:@SYSCONFDIR@:${SYSCONFDIR}:g'
+
 .in:
-	${SED} 's:@SYSCONFDIR@:${SYSCONFDIR}:g; s:@DBDIR@:${DBDIR}:g' $< > $@
+	${SED} ${SED_DBDIR} ${SED_HOOKDIR} ${SED_SCRIPT} ${SED_SYS} $< > $@
 
 .sh.in.sh:
-	${SED} 's:@SYSCONFDIR@:${SYSCONFDIR}:g' $< > $@
+	${SED} ${SED_HOOKDIR} ${SED_SCRIPT} ${SED_SYS} $< > $@
 
 MK=		mk
 include ${MK}/prog.mk

@@ -421,7 +421,7 @@ main(int argc, char **argv)
 	/* If the duid file exists, then enable duid by default
 	 * This means we don't break existing clients that easily :) */
 # ifdef ENABLE_DUID
-	if ((f = fopen(DUIDFILE, "r"))) {
+	if ((f = fopen(DUID, "r"))) {
 		options->options |= DHCPCD_DUID;
 		fclose(f);
 	}
@@ -497,7 +497,7 @@ main(int argc, char **argv)
 	}
 
 	/* Parse our options file */
-	f = fopen(cf ? cf : CONFIGFILE, "r");
+	f = fopen(cf ? cf : CONFIG, "r");
 	if (f) {
 		r = 1;
 		while ((get_line(&buffer, &len, f))) {
@@ -567,7 +567,7 @@ main(int argc, char **argv)
 			goto abort;
 	} else {
 		if (errno != ENOENT || cf) {
-			logger(LOG_ERR, "fopen `%s': %s", cf ? cf : CONFIGFILE,
+			logger(LOG_ERR, "fopen `%s': %s", cf ? cf : CONFIG,
 			       strerror(errno));
 			goto abort;
 		}

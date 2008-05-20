@@ -63,6 +63,9 @@
 #ifndef SYSCONFDIR
 # define SYSCONFDIR		"/etc/" PACKAGE
 #endif
+#ifndef LIBEXECDIR
+# define LIBEXECDIR		"/libexec"
+#endif
 #ifndef RUNDIR
 # define RUNDIR			"/var/run"
 #endif
@@ -70,14 +73,14 @@
 # define DBDIR			"/var/db"
 #endif
 
-#ifndef CONFIGFILE
-# define CONFIGFILE		SYSCONFDIR "/" PACKAGE ".conf"
+#ifndef CONFIG
+# define CONFIG			SYSCONFDIR "/" PACKAGE ".conf"
 #endif
 #ifndef SCRIPT
-# define SCRIPT			SYSCONFDIR "/" PACKAGE ".sh"
+# define SCRIPT			LIBEXECDIR "/" PACKAGE ".sh"
 #endif
-#ifndef DUIDFILE
-# define DUIDFILE		SYSCONFDIR "/" PACKAGE ".duid"
+#ifndef DUID
+# define DUID			SYSCONFDIR "/" PACKAGE ".duid"
 #endif
 #ifndef LEASEFILE
 # define LEASEFILE		DBDIR "/" PACKAGE "-%s.lease"

@@ -31,9 +31,10 @@ set CSTD=gnu99 to work around this.
 
 Hooks
 -----
-We provide example exit hooks for looking up the hostname in DNS,
-NTP (www.ntp.org) and ypbind (Linux).
-There are not installed by default as they are platform dependant.
+Not all the hooks in hook.d are installed by default.
+By default we install 01-test.sh, 10-resolv.conf.sh and 15-hostname.sh.
+To add more simply add them in the HOOKSCRIPTS variable.
+make HOOKSCRIPTS=50-ntp.sh install
 
 
 Compatibility

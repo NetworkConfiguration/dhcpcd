@@ -1,7 +1,10 @@
 # rules to install manpages
 # Copyright 2008 Roy Marples <roy@marples.name>
 
-MANPREFIX?=	/usr/share
+_MANPREFIX_SH=	if [ -n "${PREFIX}" ]; then echo "${PREFIX}"; else echo "/usr/share"; fi
+_MANPREFIX!=	${_MANPREFIX_SH}
+MANPREFIX?=	${_MANPREFIX}$(shell ${_MANPREFIX_SH})
+
 MANDIR?=	${MANPREFIX}/man/man
 MANMODE?=	0444
 

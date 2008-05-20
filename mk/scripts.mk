@@ -6,6 +6,6 @@ include ${MK}/sys.mk
 SCRIPTSDIR?=	${BINDIR}
 SCRIPTSMODE?=	${BINMODE}
 
-_scriptsinstall:
+_scriptsinstall: ${SCRIPTS}
 	${INSTALL} -d ${DESTDIR}${SCRIPTSDIR}
 	${INSTALL} -m ${SCRIPTSMODE} ${SCRIPTS} ${DESTDIR}${SCRIPTSDIR}
