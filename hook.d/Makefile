@@ -5,5 +5,7 @@ SCRIPTS=	${SYSTEMSCRIPTS} ${HOOKSCRIPTS}
 SCRIPTSDIR=	${HOOKDIR}
 
 MK=		../mk
+include ${MK}/os.mk
+include ${MK}/sys.mk
 include ${MK}/scripts.mk
 install: _scriptsinstall

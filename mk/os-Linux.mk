@@ -27,4 +27,4 @@ _HAVE_FORK_SH= if test "${HAVE_FORK}" = "yes"; then \
 		rm -f .fork.c .fork; \
 	fi;
 _HAVE_FORK!=	${_HAVE_FORK_SH}
-CFLAGS+=	${_HAVE_FORK}$(shell ${_HAVE_FORK_SH})
+CPPFLAGS+=	${_HAVE_FORK}$(shell ${_HAVE_FORK_SH})

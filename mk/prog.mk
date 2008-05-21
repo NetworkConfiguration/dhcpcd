@@ -4,8 +4,6 @@
 # Copyright 2008 Roy Marples <roy@marples.name>
 
 include ${MK}/cc.mk
-include ${MK}/os.mk
-include ${MK}/sys.mk
 
 OBJS+=		${SRCS:.c=.o}
 
