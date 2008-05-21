@@ -589,7 +589,7 @@ get_option_string(const struct dhcp_message *dhcp, uint8_t option)
 	char *s;
 
 	p = get_option(dhcp, option, &len, &type);
-	if (!p)
+	if (!p || *p == '\0')
 		return NULL;
 
 	if (type & RFC3397) {
@@ -1034,8 +1034,12 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data)
 	if (type & RFC3442)
 		return decode_rfc3442(s, len, dl, data);
 
-	if (!type || type & STRING)
+	if (type & STRING) {
+		/* Some DHCP servers return NULL strings */
+		if (*data == '\0')
+			return 0;
 		return print_string(s, len, dl, data);
+	}
 
 	if (!s) {
 		if (type & UINT8)
@@ -1190,7 +1194,8 @@ configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 		e = strlen(prefix) + strlen(opt->var) + len + 4;
 		v = val = *ep++ = xmalloc(e);
 		v += snprintf(val, e, "%s_%s=", prefix, opt->var);
-		print_option(v, len, opt->type, pl, p);
+		if (len != 0)
+			print_option(v, len, opt->type, pl, p);
 	}
 
 	return ep - env;
