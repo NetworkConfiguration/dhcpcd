@@ -163,9 +163,6 @@ ssize_t make_udp_packet(uint8_t **, const uint8_t *, size_t,
 ssize_t get_udp_data(const uint8_t **, const uint8_t *);
 int valid_udp_packet(const uint8_t *);
 
-#ifdef __linux__
-void setup_packet_filters(void);
-#endif
 int open_socket(struct interface *, int);
 ssize_t send_packet(const struct interface *, struct in_addr, 
 		    const uint8_t *, ssize_t);

@@ -824,11 +824,6 @@ main(int argc, char **argv)
 		logger(LOG_INFO, PACKAGE " " VERSION " starting");
 	}
 
-#ifdef __linux__
-	/* Massage our filters per platform */
-	setup_packet_filters();
-#endif
-
 	if (dhcp_run(options, &pidfd) == 0)
 		retval = EXIT_SUCCESS;
 
