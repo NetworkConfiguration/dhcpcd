@@ -107,10 +107,10 @@ open_socket(struct interface *iface, int protocol)
 
 	/* Install the DHCP filter */
 	if (protocol == ETHERTYPE_ARP) {
-		pf.bf_insns = arp_bpf_filter;
+		pf.bf_insns = UNCONST(arp_bpf_filter);
 		pf.bf_len = arp_bpf_filter_len;
 	} else {
-		pf.bf_insns = dhcp_bpf_filter;
+		pf.bf_insns = UNCONST(dhcp_bpf_filter);
 		pf.bf_len = dhcp_bpf_filter_len;
 	}
 	if (ioctl(fd, BIOCSETF, &pf) == -1)
