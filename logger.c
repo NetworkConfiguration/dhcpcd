@@ -97,9 +97,11 @@ logger(int level, const char *fmt, ...)
 	va_copy(p2, p);
 
 	if (level <= LOG_ERR || level <= loglevel) {
-		if (level == LOG_DEBUG || level == LOG_INFO)
+		if (level == LOG_DEBUG || level == LOG_INFO) {
 			f = stdout;
-		fprintf(f, "%s, %s", leveltolog(level), logprefix);
+			fprintf(f, "[%s] ", leveltolog(level));
+		}
+		fprintf(f, "%s", logprefix);
 		vfprintf(f, fmt, p);
 		fputc('\n', f);
 
