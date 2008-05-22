@@ -46,7 +46,7 @@ static const struct logname const lognames[] = {
 	{ LOG_DEBUG,	"debug" },
 	{ LOG_INFO,	"info" },
 	{ LOG_WARNING,	"warning" },
-	{ LOG_ERR,	"err" },
+	{ LOG_ERR,	"error" },
 	{ -1,		NULL }
 };
 
