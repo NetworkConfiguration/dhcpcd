@@ -61,7 +61,7 @@
 
 /* Paths to things */
 #ifndef SYSCONFDIR
-# define SYSCONFDIR		"/etc/" PACKAGE
+# define SYSCONFDIR		"/etc"
 #endif
 #ifndef LIBEXECDIR
 # define LIBEXECDIR		"/libexec"
