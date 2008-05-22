@@ -7,11 +7,9 @@ SRC_IF=		if-linux.c
 CPPFLAGS+=	-D_BSD_SOURCE -D_XOPEN_SOURCE=600
 LIBRT=		-lrt
 
-# Satisfy FHS
-DBDIR=		/var/lib/dhcpcd
-SCRIPTDIR=	${PREFIX}/lib/dhcpcd
-
-# Work out if our fork() works or not
+# Work out if our fork() works or not.
+# If cross-compiling, you'll need to set HAVE_FORK to yes or no depending
+# on your target arch.
 _HAVE_FORK_SH= if test "${HAVE_FORK}" = "yes"; then \
 		echo ""; \
 	elif test -n "${HAVE_FORK}"; then \

@@ -15,11 +15,13 @@ If you're cross compiling you may need to set the below knobs to avoid
 automatic tests.
 OS=BSD | Linux
 
-You can change the default dir where dhcpcd stores it's .lease files with
-DBDIR=/var/db
-
 If you're building for a NOMMU system where fork() does not work, you should
 add -DTHERE_IS_NO_FORK to your CFLAGS.
+
+You can change the default dir with these knobs.
+For example, to satisfy FHS compliance you would do this:-
+LIBEXECDIR=/lib/dhcpcd
+DBDIR=/var/lib/dhcpcd
 
 We now default to using -std=c99. For 64-bit linux, this always works, but
 for 32-bit linux it requires either gnu99 or a patch to asm/types.h.
@@ -40,7 +42,7 @@ make HOOKSCRIPTS=50-ntp.sh install
 Compatibility
 -------------
 If you require compatibility with dhcpcd-3 and older style variables,
-you can install 50-dhcpcd-compat.sh into the directory /libexec/dhcpcd.hook.d
+you can install 50-dhcpcd-compat.sh into the directory $LIBEXECDIR/dhcpcd.hook.d
 We don't install this by default.
 You should also add -DCMDLINE_COMPAT to your CFLAGS if you need to be fully
 commandline compatible with prior versions.
