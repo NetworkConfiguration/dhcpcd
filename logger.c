@@ -63,16 +63,6 @@ logtolevel(const char *priority)
 	return -1;
 }
 
-static const char *
-leveltolog(int level) {
-	const struct logname *lt;
-
-	for (lt = lognames; lt->name; lt++) 
-		if (lt->level == level)
-			return lt->name;
-	return NULL;
-}
-
 void
 setloglevel(int level)
 {
@@ -97,10 +87,6 @@ logger(int level, const char *fmt, ...)
 	va_copy(p2, p);
 
 	if (level <= LOG_ERR || level <= loglevel) {
-		if (level == LOG_DEBUG || level == LOG_INFO) {
-			f = stdout;
-			fprintf(f, "[%s] ", leveltolog(level));
-		}
 		fprintf(f, "%s", logprefix);
 		vfprintf(f, fmt, p);
 		fputc('\n', f);
