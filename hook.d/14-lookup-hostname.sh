@@ -23,7 +23,7 @@ lookup_hostname()
 
 set_hostname()
 {
-	if [ -z "${new_host_name}" ]
+	if [ -z "${new_host_name}" ]; then
 		export new_host_name="$(lookup_hostname)"
 	fi
 }
