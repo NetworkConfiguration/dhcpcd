@@ -30,7 +30,7 @@ CPPFLAGS+=	-DSCRIPT=\"${SCRIPT}\"
 CPPFLAGS+=	-DSYSCONFDIR=\"${SYSCONFDIR}\"
 LDADD+=		${LIBRT}
 
-SUBDIRS=	hook.d
+SUBDIRS=	dhcpcd-hooks
 
 .SUFFIXES:	.in .sh.in
 
