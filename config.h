@@ -77,7 +77,7 @@
 # define CONFIG			SYSCONFDIR "/" PACKAGE ".conf"
 #endif
 #ifndef SCRIPT
-# define SCRIPT			LIBEXECDIR "/" PACKAGE ".sh"
+# define SCRIPT			LIBEXECDIR "/" PACKAGE "-run-hooks"
 #endif
 #ifndef DUID
 # define DUID			SYSCONFDIR "/" PACKAGE ".duid"

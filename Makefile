@@ -8,19 +8,19 @@ SRCS+=		configure.c client.c
 SRCS+=		${SRC_IF} ${SRC_PF}
 
 LIBEXECDIR=	${PREFIX}/libexec
-SCRIPT=		${LIBEXECDIR}/dhcpcd.sh
-HOOKDIR=	${LIBEXECDIR}/dhcpcd.hook.d
+SCRIPT=		${LIBEXECDIR}/dhcpcd-run-hooks
+HOOKDIR=	${LIBEXECDIR}/dhcpcd-hooks
 
 BINDIR=		${PREFIX}/sbin
 DBDIR=		/var/db
 SYSCONFDIR?=	${PREFIX}/etc
 
-MAN=		dhcpcd.conf.5 dhcpcd.8 dhcpcd.sh.8
-CLEANFILES=	dhcpcd.conf.5 dhcpcd.8 dhcpcd.sh.8
+MAN=		dhcpcd.conf.5 dhcpcd.8 dhcpcd-run-hooks.8
+CLEANFILES=	dhcpcd.conf.5 dhcpcd.8 dhcpcd-run-hooks.8
 
-SCRIPTS=	dhcpcd.sh
+SCRIPTS=	dhcpcd-run-hooks
 SCRIPTSDIR=	${LIBEXECDIR}
-CLEANFILES+=	dhcpcd.sh
+CLEANFILES+=	dhcpcd-run-hooks
 
 FILES=		dhcpcd.conf
 FILESDIR=	${SYSCONFDIR}

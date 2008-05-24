@@ -101,7 +101,7 @@ Requests the
 .Ar dhcp-option
 from the server.
 It can be a variable to be used in
-.Xr dhcpcd.sh 8
+.Xr dhcpcd-run-hooks 8
 or the numerical value.
 You can specify more seperated by commas, spaces or more option lines.
 .It Ic script Ar script
@@ -117,7 +117,7 @@ Tag the DHCP messages with the userclass.
 You can specify more than one.
 .El
 .Sh SEE ALSO
-.Xr dhcpcd.sh 8 ,
+.Xr dhcpcd-run-hooks 8 ,
 .Xr dhcpcd 8
 .Sh AUTHORS
 .An Roy Marples <roy@marples.name>

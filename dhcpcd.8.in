@@ -120,7 +120,7 @@ You can disable each script by using the
 .Fl C , -nohook
 option.
 See
-.Xr dhcpcd.sh 8
+.Xr dhcpcd-run-hooks 8
 for details on how these scripts work.
 .Nm
 currently ignores the exit code of the script.
@@ -304,7 +304,7 @@ The interface configuration isn't touched and neither are any configuration
 files.
 .It Fl V, -variables
 Display a list of option codes and the associated variable for use in
-.Xr dhcpcd.sh 8 .
+.Xr dhcpcd-run-hooks 8 .
 .El
 .Sh NOTES
 .Nm
@@ -330,7 +330,7 @@ lease and use the files mtime as when it was issued.
 .El
 .Sh SEE ALSO
 .Xr dhcpcd.conf 5 ,
-.Xr dhcpcd.sh 8 ,
+.Xr dhcpcd-run-hooks 8 ,
 .Xr resolv.conf 5 ,
 .Xr resolvconf 8 ,
 .Sh STANDARDS
