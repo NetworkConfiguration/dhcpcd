@@ -1,6 +1,6 @@
 SCRIPTDIR?=	${PREFIX}/libexec
-HOOKDIR?=	${SCRIPTDIR}/dhcpcd.hook.d
-SYSTEMSCRIPTS=	01-test.sh 10-resolv.conf.sh 15-hostname.sh
+HOOKDIR?=	${SCRIPTDIR}/dhcpcd-hooks
+SYSTEMSCRIPTS=	01-test 10-resolv.conf 15-hostname
 SCRIPTS=	${SYSTEMSCRIPTS} ${HOOKSCRIPTS}
 SCRIPTSDIR=	${HOOKDIR}
 
