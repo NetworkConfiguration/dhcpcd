@@ -129,6 +129,11 @@ You can fine tune the behaviour of
 .Nm
 with the following options:
 .Bl -tag -width indent
+.It Fl c , -script Ar script
+Use this
+.Ar script
+instead of the default
+.Pa @SCRIPT@ .
 .It Fl d , -debug
 Echo debug and informational messages to the console.
 Subsequent debug options stop
