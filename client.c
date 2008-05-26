@@ -1266,7 +1266,6 @@ dhcp_run(const struct options *options, int *pidfd)
 		goto eexit;
 
 	fds[POLLFD_SIGNAL].fd = signal_fd();
-
 	for (;;) {
 		retval = wait_for_packet(fds, state, options);
 

@@ -163,13 +163,13 @@ get_packet(struct interface *iface, void *data, ssize_t len)
 		return errno == EAGAIN ? 0 : -1;
 
 	/* If it's an ARP reply, then just send it back */
-	if (iface->socket_protocol == ETHERTYPE_ARP)
-		return bytes;
-
-	if (valid_udp_packet(iface->buffer) != 0)
-		return -1;
-
-	bytes = get_udp_data(&p, iface->buffer);
+	if (iface->socket_protocol == ETHERTYPE_ARP) {
+		p = iface->buffer;
+	} else {
+		if (valid_udp_packet(iface->buffer) != 0)
+			return -1;
+		bytes = get_udp_data(&p, iface->buffer);
+	}
 	if (bytes > len)
 		bytes = len;
 	memcpy(data, p, bytes);
