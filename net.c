@@ -746,13 +746,13 @@ arp_claim(struct interface *iface, struct in_addr address)
 		if (!(fds[1].revents & POLLIN))
 			continue;
 		for(;;) {
-			memset(&arp_reply, 0, sizeof(arp_reply));
+			memset(arp_reply, 0, sizeof(arp_reply));
 			bytes = get_packet(iface,
-					   &arp_reply, sizeof(arp_reply));
+					   arp_reply, sizeof(arp_reply));
 			if (bytes == -1 || bytes == 0)
 				break;
 
-			memcpy(&reply, &arp_reply, sizeof(reply));
+			memcpy(&reply, arp_reply, sizeof(reply));
 			/* Only these types are recognised */
 			if (reply.ar_op != htons(ARPOP_REPLY))
 				continue;
