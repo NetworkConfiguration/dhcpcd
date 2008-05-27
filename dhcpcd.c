@@ -439,16 +439,6 @@ main(int argc, char **argv)
 	closefrom(3);
 	openlog(PACKAGE, LOG_PID, LOG_LOCAL0);
 
-#ifdef THERE_IS_NO_FORK
-	dhcpcd_argv = argv;
-	dhcpcd_argc = argc;
-	if (!realpath(argv[0], dhcpcd)) {
-		fprintf(stderr, "unable to resolve the path `%s': %s",
-			argv[0], strerror(errno));
-		goto abort;
-	}
-#endif
-
 	options = xzalloc(sizeof(*options));
 	options->script = SCRIPT;
 	snprintf(options->classid, CLASS_ID_MAX_LEN, "%s %s",
@@ -480,6 +470,16 @@ main(int argc, char **argv)
 		fclose(f);
 	}
 # endif
+#endif
+
+#ifdef THERE_IS_NO_FORK
+	dhcpcd_argv = argv;
+	dhcpcd_argc = argc;
+	if (!realpath(argv[0], dhcpcd)) {
+		fprintf(stderr, "unable to resolve the path `%s': %s",
+			argv[0], strerror(errno));
+		goto abort;
+	}
 #endif
 
 	gethostname(options->hostname, sizeof(options->hostname));
