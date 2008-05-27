@@ -212,6 +212,9 @@ parse_option(int opt, char *oarg, struct options *options)
 	size_t s;
 
 	switch(opt) {
+	case 'c':
+		options->script = oarg;
+		break;
 	case 'h':
 		if (!oarg)
 			*options->hostname = '\0';
