@@ -33,7 +33,6 @@
 int signal_init(void);
 int signal_setup(void);
 int signal_reset(void);
-int signal_clear(void);
 int signal_fd(void);
 int signal_exists(const struct pollfd *);
 int signal_read(struct pollfd *);

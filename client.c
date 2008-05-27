@@ -145,6 +145,9 @@ daemonise(struct if_state *state, const struct options *options)
 #ifdef THERE_IS_NO_FORK
 	char **argv;
 	int i;
+#else
+	char buf = '\0';
+	int sidpipe[2];
 #endif
 
 	if (state->options & DHCPCD_DAEMONISED ||
@@ -155,6 +158,12 @@ daemonise(struct if_state *state, const struct options *options)
 	sigprocmask(SIG_SETMASK, &full, &old);
 
 #ifndef THERE_IS_NO_FORK
+	/* Setup a signal pipe so parent knows when to exit. */
+	if (pipe(sidpipe) == -1) {
+		logger(LOG_ERR,"pipe: %s", strerror(errno));
+		return -1;
+	}
+
 	logger(LOG_DEBUG, "forking to background");
 	switch (pid = fork()) {
 		case -1:
@@ -163,13 +172,17 @@ daemonise(struct if_state *state, const struct options *options)
 			/* NOTREACHED */
 		case 0:
 			setsid();
+			/* Notify parent it's safe to exit as we've detached. */
+			write(sidpipe[1], &buf, 1);
 			close_fds();
-			/* Clear pending signals */
-			signal_clear();
 			break;
 		default:
 			/* Reset signals as we're the parent about to exit. */
 			signal_reset();
+			/* Wait for child to detach */
+			close(sidpipe[1]);
+			read(sidpipe[0], &buf, 1);
+			close(sidpipe[0]);
 			break;
 	}
 #else
