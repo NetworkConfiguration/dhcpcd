@@ -143,11 +143,12 @@ signal_handle(void (*func)(int), int restore)
 	sa.sa_handler = func;
 	sigemptyset(&sa.sa_mask);
 
-	for (i = 0; i < sizeof(handle_sigs) / sizeof(handle_sigs[0]); i++)
+	for (i = 0; i < sizeof(handle_sigs) / sizeof(handle_sigs[0]); i++) {
 		if (sigaction(handle_sigs[i], &sa, &sa_old) == -1)
 			return -1;
 		if (restore && sigaction(handle_sigs[i], &sa_old, NULL) == -1)
 				return -1;
+	}
 	return 0;
 }
 
