@@ -770,7 +770,7 @@ arp_claim(struct interface *iface, struct in_addr address)
 			       arp_reply + sizeof(reply), reply.ar_hln);
 			memcpy(&reply_ipv4,
 			       arp_reply + sizeof(reply) + reply.ar_hln,
-			       reply.ar_hln);
+			       reply.ar_pln);
 
 			/* Ensure the ARP reply is for the our address */
 			if (reply_ipv4.s_addr != address.s_addr)
