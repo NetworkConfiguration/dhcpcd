@@ -683,15 +683,8 @@ arp_claim(struct interface *iface, struct in_addr address)
 		if (timeout > 0) {
 			s = poll(fds, 2, timeout);
 			if (s == -1) {
-				if (errno == EINTR) {
-					if (signal_exists(NULL) == -1) {
-						errno = 0;
-						continue;
-					} else
-						break;
-				}
-
-				logger(LOG_ERR, "poll: `%s'", strerror(errno));
+				if (errno != EINTR)
+					logger(LOG_ERR, "poll: `%s'", strerror(errno));
 				break;
 			}
 		}
@@ -743,6 +736,12 @@ arp_claim(struct interface *iface, struct in_addr address)
 			continue;
 		}
 
+		/* Check if signalled */
+		if ((fds[0].revents & POLLIN)) {
+			errno = EINTR;
+			return -1;
+		}
+
 		if (!(fds[1].revents & POLLIN))
 			continue;
 		for(;;) {
@@ -787,6 +786,7 @@ arp_claim(struct interface *iface, struct in_addr address)
 			       inet_ntoa(reply_ipv4),
 			       hwaddr_ntoa((unsigned char *)&reply_mac,
 					   (size_t)reply.ar_hln));
+			errno = EEXIST;
 			retval = -1;
 			goto eexit;
 		}
