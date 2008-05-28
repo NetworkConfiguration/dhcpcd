@@ -57,8 +57,9 @@
 # ifndef ENABLE_ARP
  # error "IPv4LL requires ENABLE_ARP to work"
 # endif
-#define IPV4LL_LEASETIME 	20
-#define MAX_CONFLICTS		10
+# define IPV4LL_LEASETIME 	2
+# define MAX_CONFLICTS		10
+# define DEFEND_INTERVAL	10
 #endif
 
 /* Some platforms don't define INFTIM */
@@ -317,6 +318,14 @@ get_duid(unsigned char *duid, const struct interface *iface)
 #endif
 
 #ifdef ENABLE_IPV4LL
+static void
+ipv4ll_lease(struct dhcp_lease *lease)
+{
+	lease->leasetime = IPV4LL_LEASETIME;
+	lease->renewaltime = lease->leasetime * 0.5;
+	lease->rebindtime = lease->leasetime * 0.875;
+}
+
 static int
 ipv4ll_get_address(struct interface *iface, struct dhcp_lease *lease) {
 	struct in_addr addr;
@@ -334,12 +343,7 @@ ipv4ll_get_address(struct interface *iface, struct dhcp_lease *lease) {
 			return -1;
 	}
 	lease->addr.s_addr = addr.s_addr;
-
-	/* Finally configure some DHCP like lease times */
-	lease->leasetime = IPV4LL_LEASETIME;
-	lease->renewaltime = lease->leasetime * 0.5;
-	lease->rebindtime = lease->leasetime * 0.875;
-
+	ipv4ll_lease(lease);
 	return 0;
 }
 #endif
@@ -347,7 +351,17 @@ ipv4ll_get_address(struct interface *iface, struct dhcp_lease *lease) {
 static void
 get_lease(struct dhcp_lease *lease, const struct dhcp_message *dhcp)
 {
+	lease->frominfo = 0;
 	lease->addr.s_addr = dhcp->yiaddr;
+
+#ifdef ENABLE_IPV4LL
+	if (IN_LINKLOCAL(ntohl(dhcp->yiaddr))) {
+		lease->net.s_addr = LINKLOCAL_MASK;
+		ipv4ll_lease(lease);
+		return;
+	}
+#endif
+
 	if (get_option_addr(&lease->net.s_addr, dhcp, DHCP_SUBNETMASK) == -1)
 		lease->net.s_addr = get_netmask(dhcp->yiaddr);
 	if (get_option_uint32(&lease->leasetime, dhcp, DHCP_LEASETIME) != 0)
@@ -356,7 +370,6 @@ get_lease(struct dhcp_lease *lease, const struct dhcp_message *dhcp)
 		lease->renewaltime = 0;
 	if (get_option_uint32(&lease->rebindtime, dhcp, DHCP_REBINDTIME) != 0)
 		lease->rebindtime = 0;
-	lease->frominfo = 0;
 }
 
 static int
@@ -841,7 +854,10 @@ handle_timeout(struct if_state *state, const struct options *options)
 	state->nakoff = 1;
 
 	if (state->state == STATE_INIT && state->xid != 0) {
-		if (!IN_LINKLOCAL(ntohl(iface->addr.s_addr))) {
+		if (IN_LINKLOCAL(ntohl(iface->addr.s_addr))) {
+			if (!(state->options & DHCPCD_DAEMONISED))
+				logger(LOG_ERR, "timed out");
+		} else {
 			if (iface->addr.s_addr != 0 &&
 			    !(state->options & DHCPCD_INFORM))
 				logger(LOG_ERR, "lost lease");
@@ -870,7 +886,6 @@ handle_timeout(struct if_state *state, const struct options *options)
 #ifdef ENABLE_IPV4LL
 		if (state->options & DHCPCD_IPV4LL && gotlease != 0) {
 			logger(LOG_INFO, "probing for an IPV4LL address");
-			errno = 0;
 			gotlease = ipv4ll_get_address(iface, lease);
 			if (gotlease != 0) {
 				if (errno == EINTR)
@@ -903,6 +918,9 @@ handle_timeout(struct if_state *state, const struct options *options)
 		    IN_LINKLOCAL(ntohl(lease->addr.s_addr)))
 			logger(LOG_WARNING, "using IPV4LL address %s",
 			       inet_ntoa(lease->addr));
+		state->timeout = lease->renewaltime;
+		state->xid = 0;
+		state->state = STATE_BOUND;
 		if (!reason)
 			reason = "TIMEOUT";
 		if (configure(iface, reason,
@@ -910,8 +928,6 @@ handle_timeout(struct if_state *state, const struct options *options)
 			      lease, options, 1) == 0)
 			if (daemonise(state, options) == -1)
 				return -1;
-		state->timeout = lease->renewaltime;
-		state->xid = 0;
 		return 0;
 	}
 
@@ -922,8 +938,9 @@ handle_timeout(struct if_state *state, const struct options *options)
 		state->timeout = options->timeout;
 		iface->start_uptime = uptime ();
 		if (lease->addr.s_addr == 0) {
-			if (!IN_LINKLOCAL(ntohl(iface->addr.s_addr)))
-				logger(LOG_INFO, "broadcasting for a lease");
+			if (IN_LINKLOCAL(ntohl(iface->addr.s_addr)))
+				state->timeout = DEFEND_INTERVAL;
+			logger(LOG_INFO, "broadcasting for a lease");
 			send_message (state, DHCP_DISCOVER, options);
 		} else if (state->options & DHCPCD_INFORM) {
 			logger(LOG_INFO, "broadcasting inform for %s",
