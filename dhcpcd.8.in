@@ -165,7 +165,7 @@ This causes an existing
 .Nm
 process running on the
 .Ar interface
-to release it's lease, deconfigure the
+to release its lease, deconfigure the
 .Ar interface
 and then exit.
 .It Fl l , -leasetime Ar seconds
@@ -244,6 +244,14 @@ Tags the DHCP message with the userclass
 .Ar class .
 DHCP servers use this give memebers of the class DHCP options other than the
 default, without having to know things like hardware address or hostname.
+.It Fl x , -exit
+This causes an existing
+.Nm
+process running on the
+.Ar interface
+to deconfigure the
+.Ar interface
+and exit.
 .It Fl D , -duid 
 Generate an
 .Rs
