@@ -57,7 +57,8 @@
 # ifndef ENABLE_ARP
  # error "IPv4LL requires ENABLE_ARP to work"
 # endif
-#define IPV4LL_LEASETIME 20
+#define IPV4LL_LEASETIME 	20
+#define MAX_CONFLICTS		10
 #endif
 
 /* Some platforms don't define INFTIM */
@@ -319,19 +320,19 @@ get_duid(unsigned char *duid, const struct interface *iface)
 static int
 ipv4ll_get_address(struct interface *iface, struct dhcp_lease *lease) {
 	struct in_addr addr;
+	int conflicts = 0;
 
 	for (;;) {
 		addr.s_addr = htonl(LINKLOCAL_ADDR |
 				    (((uint32_t)abs((int)arc4random())
 				      % 0xFD00) + 0x0100));
-		errno = 0;
 		if (!arp_claim(iface, addr))
 			break;
-		/* Our ARP may have been interrupted */
-		if (errno)
+		if (errno != EEXIST)
+			return -1;
+		if (++conflicts >= MAX_CONFLICTS)
 			return -1;
 	}
-
 	lease->addr.s_addr = addr.s_addr;
 
 	/* Finally configure some DHCP like lease times */
@@ -874,6 +875,8 @@ handle_timeout(struct if_state *state, const struct options *options)
 			if (gotlease != 0) {
 				if (errno == EINTR)
 					return 0;
+				logger(LOG_ERR, "failed to find a free IPV4LL"
+						" address");
 			} else {
 				free(state->old_dhcp);
 				state->old_dhcp = state->dhcp;
@@ -1214,7 +1217,6 @@ handle_packet(struct if_state *state, const struct options *options)
 	/* We loop through until our buffer is empty.
 	 * The benefit is that if we get >1 DHCP packet in our buffer and
 	 * the first one fails for any reason, we can use the next. */
-
 	dhcp = xmalloc(sizeof(*dhcp));
 	for(;;) {
 		memset(dhcp, 0, sizeof(*dhcp));
