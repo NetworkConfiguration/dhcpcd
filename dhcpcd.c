@@ -338,6 +338,7 @@ parse_option(int opt, char *oarg, struct options *options)
 			*p = ' ';
 		s = strlen("skip_hooks=") + olen + 1;
 		p = xmalloc(sizeof(char) * s);
+		snprintf(p, s, "skip_hooks=%s", oarg);
 		add_environ(options, p, 0);
 		free(p);
 		break;
