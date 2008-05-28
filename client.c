@@ -427,7 +427,13 @@ get_old_lease(struct if_state *state, const struct options *options)
 	{
 		logger(LOG_ERR, "lease expired %u seconds ago",
 		       offset + lease->leasetime);
-		goto eexit;
+		/* Persistent interfaces should still try and use the lease
+		 * if we can't contact a DHCP server. We just set the timeout
+		 * to 1 second. */
+		if (state->options & DHCPCD_PERSISTENT)
+			offset = lease->renewaltime - 1;
+		else
+			goto eexit;
 	}
 
 	if (lease->leasedfrom == 0)
