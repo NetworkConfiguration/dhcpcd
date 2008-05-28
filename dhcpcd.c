@@ -210,6 +210,12 @@ parse_option(int opt, char *oarg, struct options *options)
 	int j;
 	char *p;
 	size_t s;
+	size_t olen;
+
+	if (oarg)
+		olen = strlen(oarg);
+	else
+		olen = 0;
 
 	switch(opt) {
 	case 'c':
@@ -218,7 +224,7 @@ parse_option(int opt, char *oarg, struct options *options)
 	case 'h':
 		if (!oarg)
 			*options->hostname = '\0';
-		else if (strlen(oarg) >= MAXHOSTNAMELEN) {
+		else if (olen >= MAXHOSTNAMELEN) {
 			logger(LOG_ERR,
 			       "`%s' too long for HostName string, max is %d",
 			       oarg, MAXHOSTNAMELEN);
@@ -230,7 +236,7 @@ parse_option(int opt, char *oarg, struct options *options)
 	case 'i':
 		if (!oarg) {
 			*options->classid = '\0';
-		} else if (strlen(oarg) >= CLASS_ID_MAX_LEN) {
+		} else if (olen >= CLASS_ID_MAX_LEN) {
 			logger(LOG_ERR,
 			       "`%s' too long for ClassID string, max is %d",
 			       oarg, CLASS_ID_MAX_LEN);
@@ -271,7 +277,7 @@ parse_option(int opt, char *oarg, struct options *options)
 	case 's':
 		options->options |= DHCPCD_INFORM;
 		options->options &= ~DHCPCD_ARP;
-		if (!oarg || strlen(optarg) == 0) {
+		if (!oarg || olen == 0) {
 			options->request_address.s_addr = 0;
 			break;
 		} else {
@@ -293,9 +299,7 @@ parse_option(int opt, char *oarg, struct options *options)
 	case 'r':
 		if (!(options->options & DHCPCD_INFORM))
 			options->options |= DHCPCD_REQUEST;
-		if (strlen(oarg) > 0 &&
-		    !inet_aton(oarg, &options->request_address))
-		{ 
+		if (olen > 0 && !inet_aton(oarg, &options->request_address)) {
 			logger(LOG_ERR, "`%s' is not a valid IP address",
 			       oarg);
 			return -1;
@@ -312,17 +316,16 @@ parse_option(int opt, char *oarg, struct options *options)
 		j = 0;
 		for (i = 0; i < userclasses; i++)
 			j += (int)options->userclass[j] + 1;
-		if (j + 1 + strlen(oarg) >= USERCLASS_MAX_LEN) {
+		if (j + 1 + olen >= USERCLASS_MAX_LEN) {
 			logger(LOG_ERR,
 			       "userclass overrun, max is %d",
 			       USERCLASS_MAX_LEN);
 			return -1;
 		}
 		userclasses++;
-		memcpy(options->userclass + j + 1 ,
-		       oarg, strlen(optarg));
-		options->userclass[j] = strlen(oarg);
-		options->userclass_len += (strlen(oarg)) + 1;
+		memcpy(options->userclass + j + 1, oarg, olen);
+		options->userclass[j] = olen;
+		options->userclass_len += olen + 1;
 		break;
 	case 'A':
 		options->options &= ~DHCPCD_ARP;
@@ -333,9 +336,8 @@ parse_option(int opt, char *oarg, struct options *options)
 		/* Commas to spaces for shell */
 		while ((p = strchr(oarg, ',')))
 			*p = ' ';
-		s = strlen("skip_hooks=") + strlen(oarg) + 1;
+		s = strlen("skip_hooks=") + olen + 1;
 		p = xmalloc(sizeof(char) * s);
-		snprintf(p, s, "skip_hooks=%s", oarg);
 		add_environ(options, p, 0);
 		free(p);
 		break;
@@ -350,11 +352,11 @@ parse_option(int opt, char *oarg, struct options *options)
 			options->fqdn = FQDN_BOTH;
 			break;
 		}
-		if (strncmp(oarg, "none", strlen(optarg)) == 0)
+		if (strcmp(oarg, "none") == 0)
 			options->fqdn = FQDN_NONE;
-		else if (strncmp(oarg, "ptr", strlen(optarg)) == 0)
+		else if (strcmp(oarg, "ptr") == 0)
 			options->fqdn = FQDN_PTR;
-		else if (strncmp(oarg, "both", strlen(optarg)) == 0)
+		else if (strcmp(oarg, "both") == 0)
 			options->fqdn = FQDN_BOTH;
 		else {
 			logger(LOG_ERR, "invalid value `%s' for FQDN",
@@ -367,7 +369,7 @@ parse_option(int opt, char *oarg, struct options *options)
 		break;
 	case 'I':
 		if (oarg) {
-			if (strlen(oarg) >= CLIENT_ID_MAX_LEN) {
+			if (olen >= CLIENT_ID_MAX_LEN) {
 				logger(LOG_ERR, "`%s' is too long for"
 				       " ClientID, max is %d",
 				       oarg, CLIENT_ID_MAX_LEN);
