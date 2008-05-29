@@ -938,8 +938,10 @@ handle_timeout(struct if_state *state, const struct options *options)
 		state->timeout = options->timeout;
 		iface->start_uptime = uptime ();
 		if (lease->addr.s_addr == 0) {
+#ifdef ENABLE_IPV4LL
 			if (IN_LINKLOCAL(ntohl(iface->addr.s_addr)))
 				state->timeout = DEFEND_INTERVAL;
+#endif
 			logger(LOG_INFO, "broadcasting for a lease");
 			send_message (state, DHCP_DISCOVER, options);
 		} else if (state->options & DHCPCD_INFORM) {

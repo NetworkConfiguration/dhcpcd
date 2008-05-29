@@ -33,11 +33,17 @@
 /* You can enable/disable various chunks of optional code here.
  * You would only do this to try and shrink the end binary if dhcpcd
  * was running on a low memory device */
-#define ENABLE_ARP
+#ifndef DISABLE_ARP
+# define ENABLE_ARP
+#endif
 
 /* IPV4LL, aka ZeroConf, aka APIPA, aka RFC 3927.
  * Needs ARP. */
-#define ENABLE_IPV4LL
+#ifndef DISABLE_IPV4LL
+# ifdef ENABLE_ARP
+#  define ENABLE_IPV4LL
+# endif
+#endif
 
 /*
  * By default we don't add a local link route if we got a routeable address.
@@ -54,7 +60,9 @@
  * You can always create your own DUID file that just contains the
  * hex string that represents the DUID.
  * See RFC 3315 for details on this. */
-#define ENABLE_DUID
+#ifndef DISABLE_DUID
+# define ENABLE_DUID
+#endif
 
 /* Some systems do not have a working fork. */
 /* #define THERE_IS_NO_FORK */
