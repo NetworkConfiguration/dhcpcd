@@ -276,6 +276,7 @@ parse_option(int opt, char *oarg, struct options *options)
 		break;
 	case 's':
 		options->options |= DHCPCD_INFORM;
+		options->options |= DHCPCD_PERSISTENT;
 		options->options &= ~DHCPCD_ARP;
 		if (!oarg || olen == 0) {
 			options->request_address.s_addr = 0;
