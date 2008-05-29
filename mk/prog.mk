@@ -38,7 +38,7 @@ install: _proginstall _scriptsinstall _filesinstall _maninstall
 	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@; cd ..; done
 
 clean:
-	rm -f ${OBJS} ${PROG} _${PROG}.c _${PROG}.o ${CLEANFILES}
+	rm -f ${OBJS} ${PROG} _${PROG}.c _${PROG}.o ${PROG}.core ${CLEANFILES}
 
 LINTFLAGS?=	-hx
 LINTFLAGS+=	-X 159,247,352
