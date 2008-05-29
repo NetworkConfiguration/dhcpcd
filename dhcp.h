@@ -164,7 +164,6 @@ struct dhcp_lease {
 #define has_reqmask(var, val) (var[val >> 3] & (1 << (val & 7)))
 int make_reqmask(uint8_t *, char **, int);
 void print_options(void);
-//const uint8_t *get_option(const struct dhcp_message *, uint8_t);
 char *get_option_string(const struct dhcp_message *, uint8_t);
 int get_option_addr(uint32_t *, const struct dhcp_message *, uint8_t);
 int get_option_uint32(uint32_t *, const struct dhcp_message *, uint8_t);
