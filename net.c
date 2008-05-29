@@ -633,17 +633,15 @@ int
 arp_claim(struct interface *iface, struct in_addr address)
 {
 	struct arphdr reply;
-	uint8_t arp_reply[sizeof(reply) + 2 * 4 /* IPv4 */ + 2 * 8 /* EUI64 */];
-	uint8_t *p;
-	struct ether_addr reply_smac;
-	struct in_addr reply_sipv4;
-	struct ether_addr reply_tmac;
-	struct in_addr reply_tipv4;
+	struct in_addr reply_s;
+	struct in_addr reply_t;
+	uint8_t arp_reply[sizeof(reply) + 2 * sizeof(reply_s) + 2 * HWADDR_LEN];
+	uint8_t *hw_s, *hw_t;
 	long timeout;
 	int retval = -1;
 	int nprobes = 0;
 	int nclaims = 0;
-	struct in_addr null_address;
+	struct in_addr null_addr;
 	struct pollfd fds[] = {
 		{ -1, POLLIN, 0 },
 		{ -1, POLLIN, 0 }
@@ -676,7 +674,7 @@ arp_claim(struct interface *iface, struct in_addr address)
 
 	fds[0].fd = signal_fd();
 	fds[1].fd = iface->fd;
-	memset(&null_address, 0, sizeof(null_address));
+	memset(&null_addr, 0, sizeof(null_addr));
 
 	for (;;) {
 		s = 0;
@@ -708,7 +706,7 @@ arp_claim(struct interface *iface, struct in_addr address)
 				logger(LOG_DEBUG, "sending ARP probe #%d",
 				       nprobes);
 				if (send_arp(iface, ARPOP_REQUEST,
-					     null_address, NULL,
+					     null_addr, NULL,
 					     address) == -1)
 					break;
 
@@ -762,41 +760,39 @@ arp_claim(struct interface *iface, struct in_addr address)
 			if (bytes == -1 || bytes == 0)
 				break;
 
+			/* We must have a full ARP header */
+			if ((size_t)bytes < sizeof(reply))
+				continue;
 			memcpy(&reply, arp_reply, sizeof(reply));
 			/* Protocol must be IP. */
 			if (reply.ar_pro != htons(ETHERTYPE_IP))
 				continue;
-			if (reply.ar_pln != sizeof(reply_sipv4))
+			if (reply.ar_pln != sizeof(reply_s))
 				continue;
-			if ((size_t)bytes < sizeof(reply) + 2 *
-			    (4 + reply.ar_hln) ||
-			    reply.ar_hln > 8)
-				continue;
-
 			/* Only these types are recognised */
 			if (reply.ar_op != htons(ARPOP_REPLY) &&
 			    reply.ar_op != htons(ARPOP_REQUEST))
 				continue;
 
-			/* Copy out the ARP packet */
-			p = arp_reply + sizeof(reply);
-			memcpy(&reply_smac, p, reply.ar_hln);
-			p += reply.ar_hln;
-			memcpy(&reply_sipv4, p, reply.ar_pln);
-			p += reply.ar_pln;
-			memcpy(&reply_tmac, p, reply.ar_hln);
-			p += reply.ar_hln;
-			memcpy(&reply_tipv4, p, reply.ar_pln);
+			/* Get pointers to the hardware addreses */
+			hw_s = arp_reply + sizeof(reply);
+			hw_t = hw_s + reply.ar_pln;
+			/* Ensure we got all the data */
+			if ((hw_t + reply.ar_hln + reply.ar_pln) - arp_reply > bytes)
+				continue;
+			/* Copy out the IP addresses */
+			memcpy(&reply_s, hw_s + reply.ar_hln, reply.ar_pln);
+			memcpy(&reply_t, hw_t + reply.ar_hln, reply.ar_pln);
 
 			/* Check for conflict */
-			if (reply_sipv4.s_addr == address.s_addr ||
-			    (reply_tipv4.s_addr == address.s_addr &&
+			if (reply_s.s_addr == address.s_addr ||
+			    (reply_t.s_addr == address.s_addr &&
 			     reply.ar_op == htons(ARPOP_REQUEST) &&
-			     memcmp(&reply_smac, iface->hwaddr,
-			            iface->hwlen) != 0))
+			     (iface->hwlen != reply.ar_hln ||
+			      memcmp(hw_s, iface->hwaddr, iface->hwlen) != 0)))
 			{
 				logger(LOG_ERR, "hardware address %s claims %s",
-				       hwaddr_ntoa((unsigned char *)&reply_smac,
+				       hwaddr_ntoa((unsigned char *)hw_s,
 				                   (size_t)reply.ar_hln),
 				       inet_ntoa(address));
 				errno = EEXIST;

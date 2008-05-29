@@ -1107,7 +1107,6 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 	if (options->options & DHCPCD_ARP &&
 	    iface->addr.s_addr != lease->addr.s_addr)
 	{
-		errno = 0;
 		if (arp_claim(iface, lease->addr) && errno != EINTR) {
 			free(dhcp);
 			do_socket(state, SOCKET_OPEN);
