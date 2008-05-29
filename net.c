@@ -591,12 +591,6 @@ valid_udp_packet(const uint8_t *data)
 }
 
 #ifdef ENABLE_ARP
-/* These are really for IPV4LL */
-#define NPROBES                 3
-#define PROBE_INTERVAL          200
-#define NCLAIMS                 2
-#define CLAIM_INTERVAL          200
-
 static int
 send_arp(const struct interface *iface, int op, struct in_addr sip,
 	 const unsigned char *taddr, struct in_addr tip)
@@ -640,9 +634,12 @@ arp_claim(struct interface *iface, struct in_addr address)
 {
 	struct arphdr reply;
 	uint8_t arp_reply[sizeof(reply) + 2 * 4 /* IPv4 */ + 2 * 8 /* EUI64 */];
-	struct in_addr reply_ipv4;
-	struct ether_addr reply_mac;
-	long timeout = 0;
+	uint8_t *p;
+	struct ether_addr reply_smac;
+	struct in_addr reply_sipv4;
+	struct ether_addr reply_tmac;
+	struct in_addr reply_tipv4;
+	long timeout;
 	int retval = -1;
 	int nprobes = 0;
 	int nclaims = 0;
@@ -667,7 +664,12 @@ arp_claim(struct interface *iface, struct in_addr address)
 		       "checking %s is available on attached networks",
 		       inet_ntoa(address));
 
-	if (!open_socket(iface, ETHERTYPE_ARP)) {
+	timeout = arc4random() % PROBE_WAIT;
+	if (get_time(&stopat) != 0)
+		return -1;
+	stopat.tv_usec += timeout * 1000;
+
+	if (open_socket(iface, ETHERTYPE_ARP) == -1) {
 		logger (LOG_ERR, "open_socket: %s", strerror(errno));
 		return -1;
 	}
@@ -681,19 +683,28 @@ arp_claim(struct interface *iface, struct in_addr address)
 
 		/* Only poll if we have a timeout */
 		if (timeout > 0) {
+			/* Obey IPV4LL timings, but make us faster for
+			 * routeable addresses */
+			if (IN_LINKLOCAL(htonl(address.s_addr)))
+				timeout *= 1000;
+			else
+				timeout *= 200;
 			s = poll(fds, 2, timeout);
 			if (s == -1) {
 				if (errno != EINTR)
-					logger(LOG_ERR, "poll: `%s'", strerror(errno));
+					logger(LOG_ERR, "poll: `%s'",
+					       strerror(errno));
 				break;
 			}
 		}
 
 		/* Timed out */
 		if (s == 0) {
-			if (nprobes < NPROBES) {
-				nprobes ++;
-				timeout = PROBE_INTERVAL;
+			if (nprobes < PROBE_NUM) {
+				nprobes++;
+				timeout = (arc4random() %
+					   (PROBE_MAX - PROBE_MIN)) +
+					  PROBE_MIN;
 				logger(LOG_DEBUG, "sending ARP probe #%d",
 				       nprobes);
 				if (send_arp(iface, ARPOP_REQUEST,
@@ -703,12 +714,12 @@ arp_claim(struct interface *iface, struct in_addr address)
 
 				/* IEEE1394 cannot set ARP target address
 				 * according to RFC2734 */
-				if (nprobes >= NPROBES &&
+				if (nprobes >= PROBE_NUM &&
 				    iface->family == ARPHRD_IEEE1394)
-					nclaims = NCLAIMS;
-			} else if (nclaims < NCLAIMS) {
-				nclaims ++;
-				timeout = CLAIM_INTERVAL;
+					nclaims = ANNOUNCE_NUM;
+			} else if (nclaims < ANNOUNCE_NUM) {
+				nclaims++;
+				timeout = ANNOUNCE_INTERVAL;
 				logger(LOG_DEBUG, "sending ARP claim #%d",
 				       nclaims);
 				if (send_arp(iface, ARPOP_REQUEST,
@@ -724,7 +735,7 @@ arp_claim(struct interface *iface, struct in_addr address)
 			/* Setup our stop time */
 			if (get_time(&stopat) != 0)
 				break;
-			stopat.tv_usec += timeout;
+			stopat.tv_usec += timeout * 1000;
 			continue;
 		}
 
@@ -752,43 +763,46 @@ arp_claim(struct interface *iface, struct in_addr address)
 				break;
 
 			memcpy(&reply, arp_reply, sizeof(reply));
-			/* Only these types are recognised */
-			if (reply.ar_op != htons(ARPOP_REPLY))
-				continue;
 			/* Protocol must be IP. */
 			if (reply.ar_pro != htons(ETHERTYPE_IP))
 				continue;
-			if (reply.ar_pln != sizeof(reply_ipv4))
+			if (reply.ar_pln != sizeof(reply_sipv4))
 				continue;
 			if ((size_t)bytes < sizeof(reply) + 2 *
 			    (4 + reply.ar_hln) ||
 			    reply.ar_hln > 8)
 				continue;
 
-			memcpy(&reply_mac,
-			       arp_reply + sizeof(reply), reply.ar_hln);
-			memcpy(&reply_ipv4,
-			       arp_reply + sizeof(reply) + reply.ar_hln,
-			       reply.ar_pln);
-
-			/* Ensure the ARP reply is for the our address */
-			if (reply_ipv4.s_addr != address.s_addr)
+			/* Only these types are recognised */
+			if (reply.ar_op != htons(ARPOP_REPLY) &&
+			    reply.ar_op != htons(ARPOP_REQUEST))
 				continue;
 
-			/* Some systems send a reply back from our hwaddress,
-			 * which is wierd */
-			if (reply.ar_hln == iface->hwlen &&
-			    memcmp(&reply_mac, iface->hwaddr,
-				   iface->hwlen) == 0)
-				continue;
+			/* Copy out the ARP packet */
+			p = arp_reply + sizeof(reply);
+			memcpy(&reply_smac, p, reply.ar_hln);
+			p += reply.ar_hln;
+			memcpy(&reply_sipv4, p, reply.ar_pln);
+			p += reply.ar_pln;
+			memcpy(&reply_tmac, p, reply.ar_hln);
+			p += reply.ar_hln;
+			memcpy(&reply_tipv4, p, reply.ar_pln);
 
-			logger(LOG_ERR, "ARPOP_REPLY received from %s (%s)",
-			       inet_ntoa(reply_ipv4),
-			       hwaddr_ntoa((unsigned char *)&reply_mac,
-					   (size_t)reply.ar_hln));
-			errno = EEXIST;
-			retval = -1;
-			goto eexit;
+			/* Check for conflict */
+			if (reply_sipv4.s_addr == address.s_addr ||
+			    (reply_tipv4.s_addr == address.s_addr &&
+			     reply.ar_op == htons(ARPOP_REQUEST) &&
+			     memcmp(&reply_smac, iface->hwaddr,
+			            iface->hwlen) != 0))
+			{
+				logger(LOG_ERR, "hardware address %s claims %s",
+				       hwaddr_ntoa((unsigned char *)&reply_smac,
+				                   (size_t)reply.ar_hln),
+				       inet_ntoa(address));
+				errno = EEXIST;
+				retval = -1;
+				goto eexit;
+			}
 		}
 	}
 
