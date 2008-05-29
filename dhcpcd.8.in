@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd May 28, 2008
+.Dd May 29, 2008
 .Dt DHCPCD 8 SMM
 .Sh NAME
 .Nm dhcpcd
@@ -38,6 +38,7 @@
 .Op Fl m , -metric Ar metric
 .Op Fl o , -option Ar option
 .Op Fl r , -request Ar address
+.Op Fl s , -inform Ar address Ns Op Ar /cidr
 .Op Fl t , -timeout Ar seconds
 .Op Fl u , -userclass Ar class
 .Op Fl C , -nohook Ar hook
@@ -220,11 +221,10 @@ If no
 .Ar address
 is given then we use the first address currently assigned to the
 .Ar interface .
-.It Fl s , -inform Op Ar address Op / Ar cidr
+.It Fl s , -inform Op Ar address Ns Op Ar /cidr
 Behaves exactly like
 .Fl r , -request
-as above, but sends a DHCP inform instead of a request.
-This requires the interface to be configured first.
+as above, but sends a DHCP INFORM instead of a REQUEST.
 This does not get a lease as such, just notifies the DHCP server of the
 .Ar address
 we are using.
