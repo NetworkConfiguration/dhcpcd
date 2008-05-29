@@ -171,14 +171,15 @@ ssize_t send_raw_packet(const struct interface *, int,
 ssize_t get_packet(struct interface *, void *, ssize_t);
 
 #ifdef ENABLE_ARP
-/* These are really for IPV4LL */
-#define PROBE_WAIT		1
-#define PROBE_NUM		3
-#define PROBE_MIN		1
-#define PROBE_MAX		2
-#define ANNOUNCE_WAIT		2
-#define ANNOUNCE_NUM		2
-#define ANNOUNCE_INTERVAL	2
+/* These are really for IPV4LL, RFC 3927.
+ * We multiply some numbers by 1000 so they are suitable for use in poll(). */
+#define PROBE_WAIT		 1 * 1000
+#define PROBE_NUM		 3
+#define PROBE_MIN		 1 * 1000
+#define PROBE_MAX		 2 * 1000
+#define ANNOUNCE_WAIT		 2 * 1000
+#define ANNOUNCE_NUM		 2
+#define ANNOUNCE_INTERVAL	 2 * 1000
 #define MAX_CONFLICTS		10
 #define RATE_LIMIT_INTERVAL	60
 #define DEFEND_INTERVAL		10

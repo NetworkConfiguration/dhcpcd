@@ -683,10 +683,8 @@ arp_claim(struct interface *iface, struct in_addr address)
 		if (timeout > 0) {
 			/* Obey IPV4LL timings, but make us faster for
 			 * routeable addresses */
-			if (IN_LINKLOCAL(htonl(address.s_addr)))
-				timeout *= 1000;
-			else
-				timeout *= 200;
+			if (!IN_LINKLOCAL(htonl(address.s_addr)))
+				timeout /= 6;
 			s = poll(fds, 2, timeout);
 			if (s == -1) {
 				if (errno != EINTR)

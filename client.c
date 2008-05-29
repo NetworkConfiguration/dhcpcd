@@ -58,8 +58,6 @@
  # error "IPv4LL requires ENABLE_ARP to work"
 # endif
 # define IPV4LL_LEASETIME 	2
-# define MAX_CONFLICTS		10
-# define DEFEND_INTERVAL	10
 #endif
 
 /* Some platforms don't define INFTIM */
