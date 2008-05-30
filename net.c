@@ -647,7 +647,7 @@ arp_claim(struct interface *iface, struct in_addr address)
 		{ -1, POLLIN, 0 }
 	};
 	int bytes;
-	int s = 0;
+	int s;
 	struct timeval stopat;
 	struct timeval now;
 
@@ -656,7 +656,7 @@ arp_claim(struct interface *iface, struct in_addr address)
 		return 0;
 	}
 
-	if (!IN_LINKLOCAL(ntohl(iface->addr.s_addr)) &&
+	if (!IN_LINKLOCAL(ntohl(iface->addr.s_addr)) || 
 	    !IN_LINKLOCAL(ntohl(address.s_addr)))
 		logger(LOG_INFO,
 		       "checking %s is available on attached networks",
@@ -677,8 +677,6 @@ arp_claim(struct interface *iface, struct in_addr address)
 	memset(&null_addr, 0, sizeof(null_addr));
 
 	for (;;) {
-		s = 0;
-
 		/* Only poll if we have a timeout */
 		if (timeout > 0) {
 			/* Obey IPV4LL timings, but make us faster for
@@ -692,7 +690,8 @@ arp_claim(struct interface *iface, struct in_addr address)
 					       strerror(errno));
 				break;
 			}
-		}
+		} else
+			s = 0;
 
 		/* Timed out */
 		if (s == 0) {
@@ -774,7 +773,7 @@ arp_claim(struct interface *iface, struct in_addr address)
 
 			/* Get pointers to the hardware addreses */
 			hw_s = arp_reply + sizeof(reply);
-			hw_t = hw_s + reply.ar_pln;
+			hw_t = hw_s + reply.ar_hln + reply.ar_pln;
 			/* Ensure we got all the data */
 			if ((hw_t + reply.ar_hln + reply.ar_pln) - arp_reply > bytes)
 				continue;
