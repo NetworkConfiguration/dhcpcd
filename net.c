@@ -715,12 +715,17 @@ arp_claim(struct interface *iface, struct in_addr address)
 			} else if (nclaims < ANNOUNCE_NUM) {
 				nclaims++;
 				timeout = ANNOUNCE_INTERVAL;
-				logger(LOG_DEBUG, "sending ARP claim #%d",
-				       nclaims);
-				if (send_arp(iface, ARPOP_REQUEST,
-					     address, iface->hwaddr,
-					     address) == -1)
-					break;
+				/* Kernel will send the last ARP when we add
+				 * the address. */
+				if (nclaims < ANNOUNCE_NUM) {
+					logger(LOG_DEBUG,
+					       "sending ARP claim #%d",
+					       nclaims);
+					if (send_arp(iface, ARPOP_REQUEST,
+						     address, iface->hwaddr,
+						     address) == -1)
+						break;
+				}
 			} else {
 				/* No replies, so done */
 				retval = 0;
