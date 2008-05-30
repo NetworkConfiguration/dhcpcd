@@ -327,12 +327,17 @@ ipv4ll_lease(struct dhcp_lease *lease)
 static int
 ipv4ll_get_address(struct interface *iface, struct dhcp_lease *lease) {
 	struct in_addr addr;
+	struct in_addr old;
 	int conflicts = 0;
 
+	old.s_addr = 0;
 	for (;;) {
 		addr.s_addr = htonl(LINKLOCAL_ADDR |
 				    (((uint32_t)abs((int)arc4random())
 				      % 0xFD00) + 0x0100));
+		if (addr.s_addr == old.s_addr)
+			continue;
+		old.s_addr = addr.s_addr;
 		if (!arp_claim(iface, addr))
 			break;
 		if (errno != EEXIST)
