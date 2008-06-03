@@ -340,6 +340,7 @@ read_interface(const char *ifname, _unused int metric)
 			goto eexit;
 	}
 
+	/* Bring the interface up if it's down */
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
 #ifdef __linux__
 	/* We can only bring the real interface up */
@@ -348,9 +349,8 @@ read_interface(const char *ifname, _unused int metric)
 #endif
 	if (ioctl(s, SIOCGIFFLAGS, &ifr) == -1)
 		goto eexit;
-
-	if (!(ifr.ifr_flags & IFF_UP) || !(ifr.ifr_flags & IFF_RUNNING)) {
-		ifr.ifr_flags |= IFF_UP | IFF_RUNNING;
+	if (!(ifr.ifr_flags & IFF_UP)) {
+		ifr.ifr_flags |= IFF_UP;
 		if (ioctl(s, SIOCSIFFLAGS, &ifr) != 0)
 			goto eexit;
 	}
