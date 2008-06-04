@@ -1,0 +1,7 @@
+# Hook for NetworkManager, relies on D-Bus
+
+if type dbus-send >/dev/null 2>&1; then
+	dbus-send --system --dest=com.redhat.dhcp \
+		--type=method_call /com/redhat/dhcp/"${interface}" \
+		com.redhat.dhcp.set 'string:'"`env`"
+fi
