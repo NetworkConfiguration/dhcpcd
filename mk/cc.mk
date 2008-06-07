@@ -21,3 +21,8 @@ _CC_FLAGS_SH=	if ! test -d .git; then echo ""; else for f in ${_CCFLAGS}; do \
 		done; fi
 _CC_FLAGS!=	${_CC_FLAGS_SH}
 CFLAGS+=	${_CC_FLAGS}$(shell ${_CC_FLAGS_SH})
+
+_GGDB_SH=	if test "${DEBUG}" = "yes"; then echo "-ggdb -DDEBUG"; else echo ""; fi
+_GGDB!=		${_GGDB_SH}
+GGDB=		${_GGDB}$(shell ${_GGDB_SH})
+CFLAGS+=	${GGDB}
