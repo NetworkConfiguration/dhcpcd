@@ -28,7 +28,7 @@
 #define CONFIG_H
 
 #define PACKAGE			"dhcpcd"
-#define VERSION			"4.0.0-beta5"
+#define VERSION			"4.0.0-beta6"
 
 /* You can enable/disable various chunks of optional code here.
  * You would only do this to try and shrink the end binary if dhcpcd
@@ -97,6 +97,5 @@
 # define PIDFILE		RUNDIR "/" PACKAGE "-%s.pid"
 #endif
 
-#define UNCONST(a)		((void *)(unsigned long)(const void *)(a))
 
 #endif
