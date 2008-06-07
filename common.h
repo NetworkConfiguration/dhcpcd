@@ -35,6 +35,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#define UNCONST(a)		((void *)(unsigned long)(const void *)(a))
+
 #if __GNUC__ > 2 || defined(__INTEL_COMPILER)
 # define _unused __attribute__((__unused__))
 #else
@@ -70,6 +72,7 @@ int closefrom(int);
 
 int close_fds(void);
 int close_on_exec(int);
+int fd_hasdata(int);
 ssize_t get_line(char **, size_t *, FILE *);
 int get_time(struct timeval *);
 time_t uptime(void);

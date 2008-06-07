@@ -33,6 +33,7 @@
 #ifdef BSD
 #  include <paths.h>
 #endif
+#include <poll.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -147,6 +148,25 @@ close_fds(void)
 	dup2(fd, fileno(stderr));
 	if (fd > 2)
 		close(fd);
+	return 0;
+}
+
+int
+fd_hasdata(int fd)
+{
+	struct pollfd fds;
+	int retval;
+
+	if (fd == -1)
+		return -1;
+	fds.fd = fd;
+	fds.events = POLLIN;
+	fds.revents = 0;
+	retval = poll(&fds, 1, 0);
+	if (retval == -1)
+		return -1;
+	if (retval > 0 && fds.revents & POLLIN)
+		return retval;
 	return 0;
 }
 
