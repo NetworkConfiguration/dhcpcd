@@ -73,9 +73,9 @@ signal_fd(void)
 
 /* Check if we have a signal or not */
 int
-signal_exists(const struct pollfd *fd)
+signal_exists(int fd)
 {
-	if (signals[0] || (fd && fd->revents & POLLIN))
+	if (signals[0] || fd_hasdata(fd) == 1)
 		return 0;
 	return -1;
 }
@@ -84,7 +84,7 @@ signal_exists(const struct pollfd *fd)
  * no signal, -1 on error (and sets errno appropriately), and
  * your signal on success */
 int
-signal_read(struct pollfd *fd)
+signal_read(int fd)
 {
 	int sig = -1;
 	unsigned int i = 0;
@@ -101,19 +101,12 @@ signal_read(struct pollfd *fd)
 		}
 	}
 
-	if (fd && fd->revents & POLLIN) {
+	if (fd_hasdata(fd) == 1) {
 		memset(buf, 0, sizeof(buf));
 		bytes = read(signal_pipe[0], buf, sizeof(buf));
-
 		if (bytes >= sizeof(sig))
 			memcpy(&sig, buf, sizeof(sig));
-
-		/* We need to clear us from rset if nothing left in the buffer
-		 * in case we are called many times */
-		if (bytes == sizeof(sig))
-			fd->revents = 0;
 	}
-
 	return sig;
 }
 
