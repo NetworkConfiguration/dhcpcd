@@ -38,7 +38,7 @@
 
 #include "common.h"
 
-#define DEFAULT_TIMEOUT		20
+#define DEFAULT_TIMEOUT		30
 #define DEFAULT_LEASETIME	3600        /* 1 hour */
 
 #define CLASS_ID_MAX_LEN	48
