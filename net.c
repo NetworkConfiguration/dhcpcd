@@ -367,6 +367,9 @@ read_interface(const char *ifname, _unused int metric)
 	/* 0 is a valid fd, so init to -1 */
 	iface->fd = -1;
 	iface->udp_fd = -1;
+#ifdef ENABLE_ARP
+	iface->arp_fd = -1;
+#endif
 
 eexit:
 	close(s);
@@ -464,6 +467,7 @@ struct udp_dhcp_packet
 	struct udphdr udp;
 	struct dhcp_message dhcp;
 };
+const size_t udp_dhcp_len = sizeof(struct udp_dhcp_packet);
 
 static uint16_t
 checksum(const void *data, uint16_t len)
@@ -591,9 +595,8 @@ valid_udp_packet(const uint8_t *data)
 }
 
 #ifdef ENABLE_ARP
-static int
-send_arp(const struct interface *iface, int op, struct in_addr sip,
-	 const unsigned char *taddr, struct in_addr tip)
+int
+send_arp(const struct interface *iface, int op, in_addr_t sip, in_addr_t tip)
 {
 	struct arphdr *arp;
 	size_t arpsize;
@@ -602,7 +605,7 @@ send_arp(const struct interface *iface, int op, struct in_addr sip,
 
 	arpsize = sizeof(*arp) + 2 * iface->hwlen + 2 *sizeof(sip);
 
-	arp = xzalloc(arpsize);
+	arp = xmalloc(arpsize);
 	arp->ar_hrd = htons(iface->family);
 	arp->ar_pro = htons(ETHERTYPE_IP);
 	arp->ar_hln = iface->hwlen;
@@ -614,199 +617,15 @@ send_arp(const struct interface *iface, int op, struct in_addr sip,
 	p += iface->hwlen;
 	memcpy(p, &sip, sizeof(sip));
 	p += sizeof(sip);
-
-	if (taddr != NULL)
-		memcpy(p, taddr, iface->hwlen);
-	else
-		memset(p, 0, iface->hwlen);
+	/* ARP requests should ignore this, but we fill with 0xff
+	 * for broadcast. */
+	memset(p, 0xff, iface->hwlen);
 	p += iface->hwlen;
 	memcpy(p, &tip, sizeof(tip));
 
 	retval = send_raw_packet(iface, ETHERTYPE_ARP, arp, arpsize);
-	if (retval == -1)
-		logger(LOG_ERR,"send_packet: %s", strerror(errno));
 	free(arp);
 	return retval;
 }
-
-int
-arp_claim(struct interface *iface, struct in_addr address)
-{
-	struct arphdr reply;
-	struct in_addr reply_s;
-	struct in_addr reply_t;
-	uint8_t arp_reply[sizeof(reply) + 2 * sizeof(reply_s) + 2 * HWADDR_LEN];
-	uint8_t *hw_s, *hw_t;
-	long timeout;
-	int retval = -1;
-	int nprobes = 0;
-	int nclaims = 0;
-	struct in_addr null_addr;
-	struct pollfd fds[] = {
-		{ -1, POLLIN, 0 },
-		{ -1, POLLIN, 0 }
-	};
-	int bytes;
-	int s;
-	struct timeval stopat;
-	struct timeval now;
-
-	if (!iface->arpable) {
-		logger(LOG_DEBUG, "interface `%s' is not ARPable", iface->name);
-		return 0;
-	}
-
-	if (!IN_LINKLOCAL(ntohl(iface->addr.s_addr)) || 
-	    !IN_LINKLOCAL(ntohl(address.s_addr)))
-		logger(LOG_INFO,
-		       "checking %s is available on attached networks",
-		       inet_ntoa(address));
-
-	timeout = arc4random() % PROBE_WAIT;
-	if (get_time(&stopat) != 0)
-		return -1;
-	stopat.tv_usec += timeout * 1000;
-
-	if (open_socket(iface, ETHERTYPE_ARP) == -1) {
-		logger (LOG_ERR, "open_socket: %s", strerror(errno));
-		return -1;
-	}
-
-	fds[0].fd = signal_fd();
-	fds[1].fd = iface->fd;
-	memset(&null_addr, 0, sizeof(null_addr));
-
-	for (;;) {
-		/* Only poll if we have a timeout */
-		if (timeout > 0) {
-			/* Obey IPV4LL timings, but make us faster for
-			 * routeable addresses */
-			if (!IN_LINKLOCAL(htonl(address.s_addr)))
-				timeout /= 6;
-			s = poll(fds, 2, timeout);
-			if (s == -1) {
-				if (errno != EINTR)
-					logger(LOG_ERR, "poll: `%s'",
-					       strerror(errno));
-				break;
-			}
-		} else
-			s = 0;
-
-		/* Timed out */
-		if (s == 0) {
-			if (nprobes < PROBE_NUM) {
-				nprobes++;
-				timeout = (arc4random() %
-					   (PROBE_MAX - PROBE_MIN)) +
-					  PROBE_MIN;
-				logger(LOG_DEBUG, "sending ARP probe #%d",
-				       nprobes);
-				if (send_arp(iface, ARPOP_REQUEST,
-					     null_addr, NULL,
-					     address) == -1)
-					break;
-
-				/* IEEE1394 cannot set ARP target address
-				 * according to RFC2734 */
-				if (nprobes >= PROBE_NUM &&
-				    iface->family == ARPHRD_IEEE1394)
-					nclaims = ANNOUNCE_NUM;
-			} else if (nclaims < ANNOUNCE_NUM) {
-				nclaims++;
-				timeout = ANNOUNCE_INTERVAL;
-				/* Kernel will send the last ARP when we add
-				 * the address. */
-				if (nclaims < ANNOUNCE_NUM) {
-					logger(LOG_DEBUG,
-					       "sending ARP claim #%d",
-					       nclaims);
-					if (send_arp(iface, ARPOP_REQUEST,
-						     address, iface->hwaddr,
-						     address) == -1)
-						break;
-				}
-			} else {
-				/* No replies, so done */
-				retval = 0;
-				break;
-			}
-
-			/* Setup our stop time */
-			if (get_time(&stopat) != 0)
-				break;
-			stopat.tv_usec += timeout * 1000;
-			continue;
-		}
-
-		/* We maybe ARP flooded, so check our time */
-		if (get_time(&now) != 0)
-			break;
-		if (timercmp(&now, &stopat, >)) {
-			timeout = 0;
-			continue;
-		}
-
-		/* Check if signalled */
-		if ((fds[0].revents & POLLIN)) {
-			errno = EINTR;
-			return -1;
-		}
-
-		if (!(fds[1].revents & POLLIN))
-			continue;
-		for(;;) {
-			memset(arp_reply, 0, sizeof(arp_reply));
-			bytes = get_packet(iface,
-					   arp_reply, sizeof(arp_reply));
-			if (bytes == -1 || bytes == 0)
-				break;
-
-			/* We must have a full ARP header */
-			if ((size_t)bytes < sizeof(reply))
-				continue;
-			memcpy(&reply, arp_reply, sizeof(reply));
-			/* Protocol must be IP. */
-			if (reply.ar_pro != htons(ETHERTYPE_IP))
-				continue;
-			if (reply.ar_pln != sizeof(reply_s))
-				continue;
-			/* Only these types are recognised */
-			if (reply.ar_op != htons(ARPOP_REPLY) &&
-			    reply.ar_op != htons(ARPOP_REQUEST))
-				continue;
-
-			/* Get pointers to the hardware addreses */
-			hw_s = arp_reply + sizeof(reply);
-			hw_t = hw_s + reply.ar_hln + reply.ar_pln;
-			/* Ensure we got all the data */
-			if ((hw_t + reply.ar_hln + reply.ar_pln) - arp_reply > bytes)
-				continue;
-			/* Copy out the IP addresses */
-			memcpy(&reply_s, hw_s + reply.ar_hln, reply.ar_pln);
-			memcpy(&reply_t, hw_t + reply.ar_hln, reply.ar_pln);
-
-			/* Check for conflict */
-			if (reply_s.s_addr == address.s_addr ||
-			    (reply_t.s_addr == address.s_addr &&
-			     reply.ar_op == htons(ARPOP_REQUEST) &&
-			     (iface->hwlen != reply.ar_hln ||
-			      memcmp(hw_s, iface->hwaddr, iface->hwlen) != 0)))
-			{
-				logger(LOG_ERR, "hardware address %s claims %s",
-				       hwaddr_ntoa((unsigned char *)hw_s,
-				                   (size_t)reply.ar_hln),
-				       inet_ntoa(address));
-				errno = EEXIST;
-				retval = -1;
-				goto eexit;
-			}
-		}
-	}
-
-eexit:
-	close(iface->fd);
-	iface->fd = -1;
-	return retval;
-}
 #endif
+

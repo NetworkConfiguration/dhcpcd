@@ -107,17 +107,15 @@ struct interface
 	int udp_fd;
 	size_t buffer_size, buffer_len, buffer_pos;
 	unsigned char *buffer;
-
-#ifdef __linux__
-	int socket_protocol;
+#ifdef ENABLE_ARP
+	int arp_fd;
 #endif
-
-	char leasefile[PATH_MAX];
 
 	struct in_addr addr;
 	struct in_addr net;
 	struct rt *routes;
 
+	char leasefile[PATH_MAX];
 	time_t start_uptime;
 
 	unsigned char *clientid;
@@ -158,6 +156,7 @@ int if_route(const char *, const struct in_addr *, const struct in_addr *,
 void free_routes(struct rt *);
 
 int open_udp_socket(struct interface *);
+const size_t udp_dhcp_len;
 ssize_t make_udp_packet(uint8_t **, const uint8_t *, size_t,
 			struct in_addr, struct in_addr);
 ssize_t get_udp_data(const uint8_t **, const uint8_t *);
@@ -168,21 +167,9 @@ ssize_t send_packet(const struct interface *, struct in_addr,
 		    const uint8_t *, ssize_t);
 ssize_t send_raw_packet(const struct interface *, int,
 			const void *, ssize_t);
-ssize_t get_packet(struct interface *, void *, ssize_t);
+ssize_t get_raw_packet(struct interface *, int, void *, ssize_t);
 
 #ifdef ENABLE_ARP
-/* These are really for IPV4LL, RFC 3927.
- * We multiply some numbers by 1000 so they are suitable for use in poll(). */
-#define PROBE_WAIT		 1 * 1000
-#define PROBE_NUM		 3
-#define PROBE_MIN		 1 * 1000
-#define PROBE_MAX		 2 * 1000
-#define ANNOUNCE_WAIT		 2 * 1000
-#define ANNOUNCE_NUM		 2
-#define ANNOUNCE_INTERVAL	 2 * 1000
-#define MAX_CONFLICTS		10
-#define RATE_LIMIT_INTERVAL	60
-#define DEFEND_INTERVAL		10
-int arp_claim(struct interface *, struct in_addr);
+int send_arp(const struct interface *, int, in_addr_t, in_addr_t);
 #endif
 #endif

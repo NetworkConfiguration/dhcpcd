@@ -433,7 +433,7 @@ main(int argc, char **argv)
 	pid_t pid;
 	int debug = 0;
 	int i, r;
-	int pidfd = -1;
+	int pid_fd = -1;
 	int sig = 0;
 	int retval = EXIT_FAILURE;
 	char *line, *option, *p, *lp, *buffer = NULL;
@@ -810,9 +810,9 @@ main(int argc, char **argv)
 			goto abort;
 		}
 
-		pidfd = open(options->pidfile,
+		pid_fd = open(options->pidfile,
 			     O_WRONLY | O_CREAT | O_NONBLOCK, 0664);
-		if (pidfd == -1) {
+		if (pid_fd == -1) {
 			logger(LOG_ERR, "open `%s': %s",
 			       options->pidfile, strerror(errno));
 			goto abort;
@@ -820,24 +820,24 @@ main(int argc, char **argv)
 
 		/* Lock the file so that only one instance of dhcpcd runs
 		 * on an interface */
-		if (flock(pidfd, LOCK_EX | LOCK_NB) == -1) {
+		if (flock(pid_fd, LOCK_EX | LOCK_NB) == -1) {
 			logger(LOG_ERR, "flock `%s': %s",
 			       options->pidfile, strerror(errno));
 			goto abort;
 		}
 
-		close_on_exec(pidfd);
-		writepid(pidfd, getpid());
+		close_on_exec(pid_fd);
+		writepid(pid_fd, getpid());
 		logger(LOG_INFO, PACKAGE " " VERSION " starting");
 	}
 
-	if (dhcp_run(options, &pidfd) == 0)
+	if (dhcp_run(options, &pid_fd) == 0)
 		retval = EXIT_SUCCESS;
 
 abort:
 	/* If we didn't daemonise then we need to punt the pidfile now */
-	if (pidfd > -1) {
-		close(pidfd);
+	if (pid_fd > -1) {
+		close(pid_fd);
 		unlink(options->pidfile);
 	}
 	if (options->environ) {

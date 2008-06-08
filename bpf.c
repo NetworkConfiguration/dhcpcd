@@ -52,6 +52,7 @@ int
 open_socket(struct interface *iface, int protocol)
 {
 	int fd = -1;
+	int *fdp;
 	struct ifreq ifr;
 	int buf_len = 0;
 	struct bpf_version pv;
@@ -106,22 +107,24 @@ open_socket(struct interface *iface, int protocol)
 #endif
 
 	/* Install the DHCP filter */
+#ifdef ENABLE_ARP
 	if (protocol == ETHERTYPE_ARP) {
 		pf.bf_insns = UNCONST(arp_bpf_filter);
 		pf.bf_len = arp_bpf_filter_len;
-	} else {
+		fdp = &iface->arp_fd;
+	} else
+#endif
+	{
 		pf.bf_insns = UNCONST(dhcp_bpf_filter);
 		pf.bf_len = dhcp_bpf_filter_len;
+		fdp = &iface->fd;
 	}
 	if (ioctl(fd, BIOCSETF, &pf) == -1)
 		goto eexit;
-
-	if (iface->fd != -1)
-		close(iface->fd);
-
 	close_on_exec(fd);
-	iface->fd = fd;
-
+	if (*fdp != -1)
+		close(*fdp);
+	*fdp = fd;
 	return fd;
 
 eexit:
@@ -132,7 +135,7 @@ eexit:
 }
 
 ssize_t
-send_raw_packet(const struct interface *iface, int type,
+send_raw_packet(const struct interface *iface, int protocol,
 		const void *data, ssize_t len)
 {
 	struct iovec iov[2];
@@ -140,7 +143,7 @@ send_raw_packet(const struct interface *iface, int type,
 
 	memset(&hw, 0, sizeof(hw));
 	memset(&hw.ether_dhost, 0xff, ETHER_ADDR_LEN);
-	hw.ether_type = htons(type);
+	hw.ether_type = htons(protocol);
 	iov[0].iov_base = &hw;
 	iov[0].iov_len = sizeof(hw);
 	iov[1].iov_base = UNCONST(data);
@@ -150,19 +153,27 @@ send_raw_packet(const struct interface *iface, int type,
 }
 
 /* BPF requires that we read the entire buffer.
- * So we pass the buffer in the API so we can loop on >1 dhcp packet. */
+ * So we pass the buffer in the API so we can loop on >1 packet. */
 ssize_t
-get_packet(struct interface *iface, void *data, ssize_t len)
+get_raw_packet(struct interface *iface, _unused int protocol,
+	       void *data, ssize_t len)
 {
+	int fd;
 	struct bpf_hdr packet;
 	struct ether_header hw;
 	ssize_t bytes;
-	const unsigned char *payload, *d;
+	const unsigned char *payload;
+
+#ifdef ENABLE_ARP
+	if (procotol == ETHERTYPE_ARP)
+		fd = iface->arp_fd;
+	else
+#endif
+		fd = iface->fd;
 
 	for (;;) {
 		if (iface->buffer_len == 0) {
-			bytes = read(iface->fd, iface->buffer,
-				     iface->buffer_size);
+			bytes = read(fd, iface->buffer, iface->buffer_size);
 			if (bytes == -1)
 				return errno == EAGAIN ? 0 : -1;
 			else if ((size_t)bytes < sizeof(packet))
@@ -178,20 +189,11 @@ get_packet(struct interface *iface, void *data, ssize_t len)
 		if (iface->buffer_pos + packet.bh_caplen + packet.bh_hdrlen >
 		    iface->buffer_len)
 			goto next; /* Packet beyond buffer, drop. */
-		memcpy(&hw, iface->buffer + packet.bh_hdrlen, sizeof(hw));
 		payload = iface->buffer + packet.bh_hdrlen + sizeof(hw);
-		if (hw.ether_type == htons(ETHERTYPE_ARP)) {
-			bytes = packet.bh_caplen - sizeof(hw);
-			if (bytes > len)
-				bytes = len;
-			memcpy(data, payload, bytes);
-		} else if (valid_udp_packet(payload) >= 0) {
-			bytes = get_udp_data(&d, payload);
-			if (bytes > len)
-				bytes = len;
-			memcpy(data, d, bytes);
-		} else
-			bytes = -1;
+		bytes = packet.bh_caplen - sizeof(hw);
+		if (bytes > len)
+			bytes = len;
+		memcpy(data, payload, bytes);
 next:
 		iface->buffer_pos += BPF_WORDALIGN(packet.bh_hdrlen +
 						   packet.bh_caplen);
