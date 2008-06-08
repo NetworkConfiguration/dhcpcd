@@ -291,7 +291,7 @@ If not set then none is sent.
 will try to do as much as it can by default.
 However, there are sometimes situations where you don't want the things to be
 configured exactly how the the DHCP server wants.
-Here are some option that deal with turning these bits off.
+Here are some options that deal with turning these bits off.
 .Bl -tag -width indent
 .It Fl A , -noarp
 Don't request or claim the address by ARP.
