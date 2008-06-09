@@ -498,7 +498,7 @@ client_setup(struct if_state *state, const struct options *options)
 			iface->addr.s_addr = lease->addr.s_addr;
 			iface->net.s_addr = lease->net.s_addr;
 			get_option_addr(&lease->server.s_addr,
-					state->dhcp, DHCP_SERVERID);
+					state->offer, DHCP_SERVERID);
 		}
 #endif
 	} else {
