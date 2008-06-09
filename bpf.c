@@ -165,7 +165,7 @@ get_raw_packet(struct interface *iface, _unused int protocol,
 	const unsigned char *payload;
 
 #ifdef ENABLE_ARP
-	if (procotol == ETHERTYPE_ARP)
+	if (protocol == ETHERTYPE_ARP)
 		fd = iface->arp_fd;
 	else
 #endif
