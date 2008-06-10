@@ -713,8 +713,7 @@ wait_for_packet(struct if_state *state)
 				timeout = b.tv_sec * 1000 + b.tv_usec / 1000;
 			}
 		}
-
-		if (timeout == 0)
+		if (timeout <= 0)
 			return 0;
 		if (state->interface->fd != -1) {
 			fds[nfds].fd = state->interface->fd;
