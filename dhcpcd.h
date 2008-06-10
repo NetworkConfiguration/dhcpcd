@@ -61,7 +61,6 @@ extern char *dhcpcd_skiproutes;
 #define DHCPCD_IPV4LL		(1 << 10)
 #define DHCPCD_DUID		(1 << 11)
 #define DHCPCD_PERSISTENT	(1 << 12)
-#define DHCPCD_KEEPADDRESS	(1 << 13)
 #define DHCPCD_DAEMONISE	(1 << 14)
 #define DHCPCD_DAEMONISED	(1 << 15)
 #define DHCPCD_TEST		(1 << 16)

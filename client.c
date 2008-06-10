@@ -571,7 +571,7 @@ client_setup(struct if_state *state, const struct options *options)
 			while (get_address(iface->name, &addr, &net) == 1) {
 				logger(LOG_DEBUG, "deleting IP address %s/%d",
 				       inet_ntoa(addr),
-				       inet_ntocidr(lease->net));
+				       inet_ntocidr(net));
 				if (del_address(iface->name, &addr, &net) == -1)
 				{
 					logger(LOG_ERR, "delete_address: %s",

@@ -727,12 +727,16 @@ main(int argc, char **argv)
 		del_reqmask(options->reqmask, DHCP_HOSTNAME);
 
 	if (options->request_address.s_addr == 0 &&
-	    options->options & DHCPCD_INFORM)
+	    (options->options & DHCPCD_INFORM ||
+	     options->options & DHCPCD_REQUEST))
 	{
 		if (get_address(options->interface,
 				&options->request_address,
-				&options->request_netmask) == 0)
-			options->options |= DHCPCD_KEEPADDRESS;
+				&options->request_netmask) != 1)
+		{
+			logger(LOG_ERR, "no existing address");
+			goto abort;
+		}
 	}
 
 	if (IN_LINKLOCAL(ntohl(options->request_address.s_addr))) {

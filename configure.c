@@ -432,19 +432,17 @@ configure(struct interface *iface, const char *reason,
 	if (!up) {
 		/* Only reset things if we had set them before */
 		if (iface->addr.s_addr != 0) {
-			if (!(options->options & DHCPCD_KEEPADDRESS)) {
-				delete_routes(iface, options->metric);
-				logger(LOG_DEBUG, "deleting IP address %s/%d",
-				       inet_ntoa(iface->addr),
-				       inet_ntocidr(iface->net));
-				if (del_address(iface->name, &iface->addr,
-						&iface->net) == -1 &&
-				    errno != ENOENT) 
-					logger(LOG_ERR, "del_address: %s",
-					       strerror(errno));
-				iface->addr.s_addr = 0;
-				iface->net.s_addr = 0;
-			}
+			delete_routes(iface, options->metric);
+			logger(LOG_DEBUG, "deleting IP address %s/%d",
+			       inet_ntoa(iface->addr),
+			       inet_ntocidr(iface->net));
+			if (del_address(iface->name, &iface->addr,
+					&iface->net) == -1 &&
+			    errno != ENOENT) 
+				logger(LOG_ERR, "del_address: %s",
+				       strerror(errno));
+			iface->addr.s_addr = 0;
+			iface->net.s_addr = 0;
 		}
 
 		exec_script(options, iface->name, reason, NULL, old);
@@ -466,8 +464,7 @@ configure(struct interface *iface, const char *reason,
 
 	/* Now delete the old address if different */
 	if (iface->addr.s_addr != addr.s_addr &&
-	    iface->addr.s_addr != 0 &&
-	    !(options->options & DHCPCD_KEEPADDRESS))
+	    iface->addr.s_addr != 0) 
 		del_address(iface->name, &iface->addr, &iface->net);
 
 #ifdef __linux__
