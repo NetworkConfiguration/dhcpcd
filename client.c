@@ -948,8 +948,8 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 				logger(LOG_ERR, "timed out");
 		}
 		do_socket(state, SOCKET_CLOSED);
-		if (options->options & DHCPCD_INFORM ||
-		    options->options & DHCPCD_TEST)
+		if (state->options & DHCPCD_INFORM ||
+		    state->options & DHCPCD_TEST)
 			return -1;
 
 		if (state->options & DHCPCD_IPV4LL ||
@@ -1337,9 +1337,11 @@ handle_dhcp_packet(struct if_state *state, const struct options *options)
 		}
 		free(packet);
 		if (handle_dhcp(state, &dhcp, options) == 0) {
+			/* Fake the fact we forked so we return 0 to userland */
 			if (state->options & DHCPCD_TEST)
-				return -1;
-			return 0;
+				state->options |= DHCPCD_FORKED;
+			else
+				return 0;
 		}
 		if (state->options & DHCPCD_FORKED)
 			return -1;
