@@ -830,7 +830,8 @@ main(int argc, char **argv)
 			goto abort;
 		}
 
-		close_on_exec(pid_fd);
+		if (set_cloexec(pid_fd) == -1)
+			goto abort;
 		writepid(pid_fd, getpid());
 		logger(LOG_INFO, PACKAGE " " VERSION " starting");
 	}

@@ -171,12 +171,26 @@ fd_hasdata(int fd)
 }
 
 int
-close_on_exec(int fd)
+set_cloexec(int fd)
 {
 	int flags;
 
 	if ((flags = fcntl(fd, F_GETFD, 0)) == -1
 	    || fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == -1)
+	{
+		logger(LOG_ERR, "fcntl: %s", strerror(errno));
+		return -1;
+	}
+	return 0;
+}
+
+int
+set_nonblock(int fd)
+{
+	int flags;
+
+	if ((flags = fcntl(fd, F_GETFL, 0)) == -1
+	    || fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
 	{
 		logger(LOG_ERR, "fcntl: %s", strerror(errno));
 		return -1;

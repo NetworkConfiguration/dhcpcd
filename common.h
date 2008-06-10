@@ -71,7 +71,8 @@ int closefrom(int);
 #endif
 
 int close_fds(void);
-int close_on_exec(int);
+int set_cloexec(int);
+int set_nonblock(int);
 int fd_hasdata(int);
 ssize_t get_line(char **, size_t *, FILE *);
 int get_time(struct timeval *);

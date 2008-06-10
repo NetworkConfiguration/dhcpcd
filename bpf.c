@@ -121,7 +121,8 @@ open_socket(struct interface *iface, int protocol)
 	}
 	if (ioctl(fd, BIOCSETF, &pf) == -1)
 		goto eexit;
-	close_on_exec(fd);
+	if (set_cloexec(fd) == -1)
+		goto eexit;
 	if (*fdp != -1)
 		close(*fdp);
 	*fdp = fd;

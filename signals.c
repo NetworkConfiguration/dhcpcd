@@ -38,7 +38,6 @@
 #include "signals.h"
 
 static int signal_pipe[2];
-static int signals[5];
 
 static const int handle_sigs[] = {
 	SIGHUP,
@@ -50,17 +49,9 @@ static const int handle_sigs[] = {
 static void
 signal_handler(int sig)
 {
-	unsigned int i = 0;
 	int serrno = errno;
 
-	/* Add a signal to our stack */
-	while (signals[i])
-		i++;
-	if (i <= sizeof(signals) / sizeof(signals[0]))
-		signals[i] = sig;
-
 	write(signal_pipe[1], &sig, sizeof(sig));
-
 	/* Restore errno */
 	errno = serrno;
 }
@@ -75,7 +66,7 @@ signal_fd(void)
 int
 signal_exists(int fd)
 {
-	if (signals[0] || fd_hasdata(fd) == 1)
+	if (fd_hasdata(fd) == 1)
 		return 0;
 	return -1;
 }
@@ -87,19 +78,8 @@ int
 signal_read(int fd)
 {
 	int sig = -1;
-	unsigned int i = 0;
 	char buf[16];
 	size_t bytes;
-
-	/* Pop a signal off the our stack */
-	if (signals[0]) {
-		sig = signals[0];
-		while (i < (sizeof(signals) / sizeof(signals[0])) - 1) {
-			signals[i] = signals[i + 1];
-			if (!signals[++i])
-				break;
-		}
-	}
 
 	if (fd_hasdata(fd) == 1) {
 		memset(buf, 0, sizeof(buf));
@@ -117,12 +97,14 @@ signal_init(void)
 {
 	if (pipe(signal_pipe) == -1)
 		return -1;
-
+	/* Don't block on read */
+	if (set_nonblock(signal_pipe[0]) == -1)
+		return -1;
 	/* Stop any scripts from inheriting us */
-	close_on_exec(signal_pipe[0]);
-	close_on_exec(signal_pipe[1]);
-
-	memset(signals, 0, sizeof(signals));
+	if (set_cloexec(signal_pipe[0]) == -1)
+		return -1;
+	if (set_cloexec(signal_pipe[1]) == -1)
+		return -1;
 	return 0;
 }
 

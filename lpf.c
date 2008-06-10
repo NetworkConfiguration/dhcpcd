@@ -102,12 +102,11 @@ open_socket(struct interface *iface, int protocol)
 	}
 	if (setsockopt(s, SOL_SOCKET, SO_ATTACH_FILTER, &pf, sizeof(pf)) != 0)
 		goto eexit;
-	if ((flags = fcntl(s, F_GETFL, 0)) == -1
-	    || fcntl(s, F_SETFL, flags | O_NONBLOCK) == -1)
+	if (set_cloexec(s) == -1)
+		goto eexit;
+	if (set_nonblock(s) == -1)
 		goto eexit;
 	if (bind(s, &su.sa, sizeof(su)) == -1)
-		goto eexit;
-	if (close_on_exec(s) == -1)
 		goto eexit;
 #ifdef ENABLE_ARP
 	if (protocol == ETHERTYPE_ARP)

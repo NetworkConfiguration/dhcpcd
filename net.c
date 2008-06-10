@@ -436,7 +436,7 @@ open_udp_socket(struct interface *iface)
 		goto eexit;
 
 	iface->udp_fd = s;
-	close_on_exec(s);
+	set_cloexec(s);
 	return 0;
 
 eexit:
