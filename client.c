@@ -465,7 +465,6 @@ client_setup(struct if_state *state, const struct options *options)
 	struct interface *iface = state->interface;
 	struct dhcp_lease *lease = &state->lease;
 	struct in_addr addr;
-	struct in_addr net;
 	size_t duid_len = 0;
 #ifdef ENABLE_DUID
 	unsigned char *duid = NULL;
@@ -504,6 +503,23 @@ client_setup(struct if_state *state, const struct options *options)
 	} else {
 		lease->addr.s_addr = options->request_address.s_addr;
 		lease->net.s_addr = options->request_netmask.s_addr;
+	}
+
+	/* If INFORMing, ensure the interface has the address */
+	if (state->options & DHCPCD_INFORM &&
+	    has_address(iface->name, &lease->addr, &lease->net) < 1)
+	{
+		addr.s_addr = lease->addr.s_addr | ~lease->net.s_addr;
+		logger(LOG_DEBUG, "adding IP address %s/%d",
+		       inet_ntoa(lease->addr), inet_ntocidr(lease->net));
+		if (add_address(iface->name, &lease->addr,
+				&lease->net, &addr) == -1)
+		{
+			logger(LOG_ERR, "add_address: %s", strerror(errno));
+			return -1;
+		}
+		iface->addr.s_addr = lease->addr.s_addr;
+		iface->net.s_addr = lease->net.s_addr;
 	}
 
 	if (*options->clientid) {
@@ -557,47 +573,6 @@ client_setup(struct if_state *state, const struct options *options)
 			iface->clientid = xmalloc(iface->clientid_len);
 			*iface->clientid = iface->family;
 			memcpy(iface->clientid + 1, iface->hwaddr, iface->hwlen);
-		}
-	}
-
-	/* Remove all existing addresses.
-	 * After all, we ARE a DHCP client whose job it is to configure the
-	 * interface. We only do this on start, so persistent addresses
-	 * can be added afterwards by the user if needed. */
-	if (!(options->options & DHCPCD_TEST) &&
-	    !(options->options & DHCPCD_DAEMONISED))
-	{
-		if (!(options->options & DHCPCD_INFORM)) {
-			while (get_address(iface->name, &addr, &net) == 1) {
-				logger(LOG_DEBUG, "deleting IP address %s/%d",
-				       inet_ntoa(addr),
-				       inet_ntocidr(net));
-				if (del_address(iface->name, &addr, &net) == -1)
-				{
-					logger(LOG_ERR, "delete_address: %s",
-					       strerror(errno));
-					break;
-				}
-			}
-		} else if (has_address(iface->name,
-				       &lease->addr, &lease->net) < 1)
-		{
-			/* The inform address HAS to be configured for it to
-			 * work with most DHCP servers */
-			/* add_address */
-			addr.s_addr = lease->addr.s_addr | ~lease->net.s_addr;
-			logger(LOG_DEBUG, "adding IP address %s/%d",
-			       inet_ntoa(lease->addr),
-			       inet_ntocidr(lease->net));
-			if (add_address(iface->name, &lease->addr,
-					&lease->net, &addr) == -1)
-			{
-				logger(LOG_ERR, "add_address: %s",
-				       strerror(errno));
-				return -1;
-			}
-			iface->addr.s_addr = lease->addr.s_addr;
-			iface->net.s_addr = lease->net.s_addr;
 		}
 	}
 
@@ -755,11 +730,13 @@ handle_signal(int sig, struct if_state *state,  const struct options *options)
 	switch (sig) {
 	case SIGINT:
 		logger(LOG_INFO, "received SIGINT, stopping");
-		drop_config(state, "STOP", options);
+		if (!(state->options & DHCPCD_PERSISTENT))
+			drop_config(state, "STOP", options);
 		return -1;
 	case SIGTERM:
 		logger(LOG_INFO, "received SIGTERM, stopping");
-		drop_config(state, "STOP", options);
+		if (!(state->options & DHCPCD_PERSISTENT))
+			drop_config(state, "STOP", options);
 		return -1;
 
 	case SIGALRM:
@@ -831,13 +808,10 @@ static int bind_dhcp(struct if_state *state, const struct options *options)
 			lease->addr.s_addr = options->request_address.s_addr;
 		else
 			lease->addr.s_addr = iface->addr.s_addr;
-
 		logger(LOG_INFO, "received approval for %s",
 		       inet_ntoa(lease->addr));
-		state->timeout = options->leasetime;
-		if (state->timeout == 0)
-			state->timeout = DEFAULT_LEASETIME;
-		state->state = STATE_INIT;
+		state->state = STATE_BOUND;
+		state->lease.leasetime = ~0U;
 		reason = "INFORM";
 	} else if (IN_LINKLOCAL(htonl(lease->addr.s_addr))) {
 		if (lease->addr.s_addr != iface->addr.s_addr)
@@ -1252,9 +1226,11 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 	case STATE_REQUESTING:
 	case STATE_RENEWING:
 	case STATE_REBINDING:
-		saddr.s_addr = dhcp->yiaddr;
-		logger(LOG_INFO, "lease of %s acknowledged",
-		       inet_ntoa(saddr));
+		if (!(state->options & DHCPCD_INFORM)) {
+			saddr.s_addr = dhcp->yiaddr;
+			logger(LOG_INFO, "lease of %s acknowledged",
+			       inet_ntoa(saddr));
+		}
 		break;
 	default:
 		logger(LOG_ERR, "wrong state %d", state->state);

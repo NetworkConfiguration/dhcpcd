@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd Jun 07, 2008
+.Dd Jun 11, 2008
 .Dt DHCPCD 8 SMM
 .Sh NAME
 .Nm dhcpcd
@@ -88,14 +88,6 @@ aka Zeroconf, aka APIPA
 Once obtained it will probe every 10 seconds for a DHCP server to get a
 proper address.
 .Pp
-Even when
-.Nm
-obtains a proper lease, it will still add a Local Link route
-.Po
-165.254.0.0/16
-.Pc
-so that the host can communicate with clients using these addresses.
-.Pp
 When using IPv4LL,
 .Nm
 will always succeed and return a 0 exit code. To disable this behaviour, you
@@ -158,7 +150,7 @@ from being sent.
 .It Fl i , -classid Ar classid
 Override the DHCP vendor
 .Ar classid
-field we send. The default is
+field sent. The default is
 dhcpcd <version>.
 If not set then none is sent.
 .It Fl k , -release
@@ -219,16 +211,23 @@ authorative, it will remain silent.
 In this situation, we go back to the init state and broadcast again.
 If no
 .Ar address
-is given then we use the first address currently assigned to the
-.Ar interface .
+is given then the first address currently assigned to the
+.Ar interface
+is used.
 .It Fl s , -inform Op Ar address Ns Op Ar /cidr
 Behaves exactly like
 .Fl r , -request
 as above, but sends a DHCP INFORM instead of a REQUEST.
 This does not get a lease as such, just notifies the DHCP server of the
 .Ar address
-we are using.
-If we fail to contact a DHCP server then we return a failure instead of falling
+in use.
+.Nm
+remains running and pretends it has an infinite lease.
+.Nm
+will not de-configure the interface when it exits.
+If
+.Nm
+fails to contact a DHCP server then it returns a failure instead of falling
 back on IPv4LL.
 .It Fl t , -timeout Ar seconds
 Timeout after
@@ -266,10 +265,11 @@ and should not be copied to other hosts.
 .It Fl E , -lastlease
 If
 .Nm
-cannot obtain a lease, then try to use the last lease we got for the interface.
+cannot obtain a lease, then try to use the last lease acquired for the
+interface.
 If the
 .Fl p, -persistent
-option is not given then we only use the lease if it hasn't expired.
+option is not given then the lease is used if it hasn't expired.
 .It Fl F , -fqdn Ar fqdn
 Requests that the DHCP server updates DNS using FQDN instead of just a
 hostname.
@@ -311,7 +311,7 @@ Don't request the specified option.
 If no option given, then don't request any options other than those to
 configure the interface and routing.
 .It Fl T, -test
-On receipt of discover messages we just call
+On receipt of OFFER messages just call
 .Pa @SCRIPT@
 with the reason of TEST which echo's the DHCP variables found in the message
 to the console.
@@ -333,7 +333,7 @@ If you always use the same options, put them here.
 .It Pa @SYSCONFDIR@/dhcpcd.duid
 Text file that holds the DUID used to identify the host.
 .It Pa @SCRIPT@
-Bourne shell script that is run when we configure or deconfigure an interface.
+Bourne shell script that is run to configure or deconfigure an interface.
 .It Pa @HOOKDIR@
 A directory containing bourne shell scripts that are run by the above script.
 Each script can be disabled by using the
