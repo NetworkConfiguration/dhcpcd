@@ -75,7 +75,6 @@ open_socket(struct interface *iface, int protocol)
 		struct sockaddr_storage ss;
 	} su;
 	struct sock_fprog pf;
-	int flags;
 	int *fd;
 
 	if ((s = socket(PF_PACKET, SOCK_DGRAM, htons(protocol))) == -1)
