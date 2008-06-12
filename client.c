@@ -1160,6 +1160,8 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 		free(addr);
 		state->state = STATE_INIT;
 		state->timeout = 0;
+		lease->addr.s_addr = 0;
+		timerclear(&state->stop);
 
 		/* If we constantly get NAKS then we should slowly back off */
 		if (state->nakoff > 0) {
