@@ -686,6 +686,7 @@ main(int argc, char **argv)
 #ifdef CMDLINE_COMPAT
 		case 'H': /* FALLTHROUGH */
 		case 'M':
+			del_reqmask(options->reqmask, DHCP_MTU);
 			break;
 		case 'N':
 			del_reqmask(options->reqmask, DHCP_NTPSERVER);

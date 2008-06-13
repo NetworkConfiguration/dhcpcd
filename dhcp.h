@@ -70,6 +70,7 @@ enum DHCP_OPTIONS
 	DHCP_DNSSERVER              = 6,
 	DHCP_HOSTNAME               = 12,
 	DHCP_DNSDOMAIN              = 15,
+	DHCP_MTU                    = 26,
 	DHCP_BROADCAST              = 28,
 	DHCP_STATICROUTE            = 33,
 	DHCP_NISDOMAIN              = 40,
