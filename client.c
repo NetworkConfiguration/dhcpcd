@@ -906,6 +906,11 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 	struct timeval tv;
 
 	timerclear(&tv);
+	/* Clear our timers and counters as we've failed.
+	 * We'll either abort or move to another state with new timers */
+	timerclear(&state->stop);
+	state->messages = 0;
+	state->timeout = 0;
 
 	switch (state->state) {
 	case STATE_DISCOVERING:
@@ -944,11 +949,9 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 		    state->offer->yiaddr != iface->addr.s_addr)
 		{
 			state->state = STATE_PROBING;
-			state->timeout = 0;
 			state->claims = 0;
 			state->probes = 0;
 			state->conflicts = 0;
-			timerclear(&state->stop);
 			return 0;
 		}
 #endif
@@ -985,8 +988,6 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 		timeradd(&state->start, &tv, &state->stop);
 
 	/* This effectively falls through into the handle_timeout funtion */
-	state->timeout = 0;
-	state->messages = 0;
 	return 0;
 }
 
