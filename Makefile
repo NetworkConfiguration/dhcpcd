@@ -7,7 +7,7 @@ SRCS=		common.c dhcp.c dhcpcd.c logger.c net.c signals.c
 SRCS+=		configure.c client.c
 SRCS+=		${SRC_IF} ${SRC_PF}
 
-LIBEXECDIR=	${PREFIX}/libexec
+LIBEXECDIR?=	${PREFIX}/libexec
 SCRIPT=		${LIBEXECDIR}/dhcpcd-run-hooks
 HOOKDIR=	${LIBEXECDIR}/dhcpcd-hooks
 
