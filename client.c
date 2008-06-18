@@ -959,10 +959,7 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 		if (gotlease == 0)
 			return bind_dhcp(state, options);
 
-		if (state->new && !IN_LINKLOCAL(state->new->yiaddr))
-			reason = "EXPIRE";
-		else
-			reason = "FAIL";
+		reason = "FAIL";
 		drop_config(state, reason, options);
 		if (!(state->options & DHCPCD_DAEMONISED))
 			return -1;
@@ -975,6 +972,8 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 		break;
 	case STATE_REBINDING:
 		logger(LOG_ERR, "failed to rebind, attempting to discover");
+		reason = "EXPIRE";
+		drop_config(state, reason, options);
 		state->state = STATE_INIT;
 		break;
 	default:
@@ -983,8 +982,7 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 	}
 
 	get_time(&state->start);
-	tv.tv_usec = 0;
-	if (tv.tv_sec != 0)
+	if (timerisset(&tv))
 		timeradd(&state->start, &tv, &state->stop);
 
 	/* This effectively falls through into the handle_timeout funtion */
