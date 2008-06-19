@@ -86,7 +86,6 @@ uint32_t arc4random(void)
 			seed = time(0);
 		if (fd >= 0)
 			close(fd);
-
 		srandom(seed);
 	}
 
