@@ -66,7 +66,7 @@ exec_script(const struct options *options, const char *iface,
 	logger(LOG_DEBUG, "exec `%s'", options->script);
 
 	/* Make our env */
-	elen = 4;
+	elen = 5;
 	env = xmalloc(sizeof(char *) * (elen + 1));
 	path = getenv("PATH");
 	if (path) {
@@ -84,6 +84,8 @@ exec_script(const struct options *options, const char *iface,
 	e = 20;
 	env[3] = xmalloc(e);
 	snprintf(env[3], e, "pid=%d", getpid());
+	env[4] = xmalloc(e);
+	snprintf(env[4], e, "metric=%d", options->metric);
 	if (dhcpo) {
 		e = configure_env(NULL, NULL, dhcpo, options);
 		if (e > 0) {
