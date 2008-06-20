@@ -40,7 +40,7 @@
 # define bpf_insn sock_filter
 # define BPF_SKIPTYPE
 # define BPF_ETHCOOK		-ETH_HLEN
-# define BPF_WHOLEPACKET	65535 /* work around buggy LPF filters */
+# define BPF_WHOLEPACKET	0x0fffffff /* work around buggy LPF filters */
 #endif
 
 #include <errno.h>
