@@ -665,8 +665,8 @@ wait_for_packet(struct if_state *state)
 {
 	struct pollfd fds[3]; /* iface, arp, signal */
 	int retval, timeout, nfds = 0;
-	time_t start, now;
-	struct timeval n, a, b;
+	time_t start;
+	struct timeval now, d;
 
 	/* We always listen to signals */
 	fds[nfds].fd = state->signal_fd;
@@ -678,14 +678,13 @@ wait_for_packet(struct if_state *state)
 		timeout = INFTIM;
 	} else {
 		timeout = state->timeout;
-		if (state->stop.tv_sec || state->stop.tv_usec) {
-			get_time(&n);
-			a.tv_sec = state->timeout / 1000;
-			a.tv_usec = (state->timeout % 1000) * 1000;
-			timeradd(&n, &a, &b);
-			if (timercmp(&state->stop, &b, <)) {
-				timersub(&state->stop, &n, &b);
-				timeout = b.tv_sec * 1000 + b.tv_usec / 1000;
+		if (timerisset(&state->stop)) {
+			get_time(&now);
+			if (timercmp(&state->stop, &now, >)) {
+				timersub(&state->stop, &now, &d);
+				retval = d.tv_sec * 1000 + (d.tv_usec + 999) / 1000;
+				if (retval < timeout)
+					timeout = retval;
 			}
 		}
 		if (timeout <= 0)
@@ -709,8 +708,7 @@ wait_for_packet(struct if_state *state)
 	start = uptime();
 	retval = poll(fds, nfds, timeout);
 	if (timeout != INFTIM) {
-		now = uptime();
-		state->timeout -= now - start;
+		state->timeout -= uptime() - start;
 		if (state->timeout < 0)
 			state->timeout = 0;
 	}
@@ -813,10 +811,10 @@ static int bind_dhcp(struct if_state *state, const struct options *options)
 		state->state = STATE_BOUND;
 		state->lease.leasetime = ~0U;
 		reason = "INFORM";
-	} else if (IN_LINKLOCAL(htonl(lease->addr.s_addr))) {
-		if (lease->addr.s_addr != iface->addr.s_addr)
-			logger(LOG_INFO, "using IPv4LL address %s",
-			       inet_ntoa(lease->addr));
+	} else if (IN_LINKLOCAL(htonl(state->new->yiaddr))) {
+		get_lease(lease, state->new);
+		logger(LOG_INFO, "using IPv4LL address %s",
+		       inet_ntoa(lease->addr));
 		state->state = STATE_INIT;
 		state->timeout = 0;
 		reason = "IPV4LL";
@@ -1052,70 +1050,68 @@ handle_timeout(struct if_state *state, const struct options *options)
 		if (timercmp(&tv, &state->stop, >))
 			return handle_timeout_fail(state, options);
 	}
+	timerclear(&tv);
 
 	switch (state->state) {
-	case STATE_INIT:
+	case STATE_INIT:  /* FALLTHROUGH */
+	case STATE_BOUND: /* FALLTHROUGH */
+	case STATE_RENEW_REQUESTED:
 		do_socket(state, SOCKET_OPEN);
 		state->xid = arc4random();
 		state->messages = 0;
+		state->nakoff = 1;
 		iface->start_uptime = uptime();
-		if (!IN_LINKLOCAL(htonl(iface->addr.s_addr))) {
+		get_time(&state->start);
+		timerclear(&state->stop);
+	}
+
+	switch(state->state) {
+	case STATE_INIT:
+		if (!(state->state && DHCPCD_DAEMONISED) &&
+		    !IN_LINKLOCAL(htonl(iface->addr.s_addr)))
+		{
 			get_time(&state->start);
 			tv.tv_sec = options->timeout;
-			tv.tv_usec = 0;
 			timeradd(&state->start, &tv, &state->stop);
 		}
 		if (lease->addr.s_addr == 0 ||
 		    IN_LINKLOCAL(ntohl(iface->addr.s_addr)))
 		{
 			logger(LOG_INFO, "broadcasting for a lease");
-			send_message(state, DHCP_DISCOVER, options);
 			state->state = STATE_DISCOVERING;
 		} else if (state->options & DHCPCD_INFORM) {
 			logger(LOG_INFO, "broadcasting inform for %s",
 			       inet_ntoa(lease->addr));
-			send_message(state, DHCP_INFORM, options);
 			state->state = STATE_REQUESTING;
 		} else {
 			logger(LOG_INFO, "broadcasting for a lease of %s",
 			       inet_ntoa(lease->addr));
-			send_message(state, DHCP_REQUEST, options);
 			state->state = STATE_REQUESTING;
 		}
 		break;
-	case STATE_DISCOVERING:
-		send_message(state, DHCP_DISCOVER, options);
-		break;
 	case STATE_RENEW_REQUESTED:
-		do_socket(state, SOCKET_OPEN);
-		state->xid = arc4random();
-		state->messages = 0;
-		iface->start_uptime = uptime();
-		/* FALLTHROUGH */
-	case STATE_REQUESTING:
-		send_message(state, DHCP_REQUEST, options);
-		break;
-	case STATE_BOUND:
-		do_socket(state, SOCKET_OPEN);
 		if (IN_LINKLOCAL(ntohl(lease->addr.s_addr))) {
 			lease->addr.s_addr = 0;
 			state->state = STATE_INIT;
-			state->xid = 0;
+			state->timeout = 0;
 			break;
 		}
 		logger(LOG_INFO, "renewing lease of %s",inet_ntoa(lease->addr));
 		state->state = STATE_RENEWING;
-		state->xid = arc4random();
-		state->messages = 0;
-		state->nakoff = 1;
-		iface->start_uptime = uptime();
-		get_time(&state->start);
-		tv.tv_sec = lease->rebindtime - lease->renewaltime;
-		tv.tv_usec = 0;
-		timeradd(&state->start, &tv, &state->stop);
+		break;
+	}
+
+	switch (state->state) {
+	case STATE_DISCOVERING:
+		send_message(state, DHCP_DISCOVER, options);
+		break;
+	case STATE_REQUESTING:
+		if (state->options & DHCPCD_INFORM) {
+			send_message(state, DHCP_INFORM, options);
+			break;
+		}
 		/* FALLTHROUGH */
-	case STATE_RENEWING:
-		/* FALLTHROUGH */
+	case STATE_RENEWING:   /* FALLTHROUGH */
 	case STATE_REBINDING:
 		send_message(state, DHCP_REQUEST, options);
 		break;
@@ -1151,6 +1147,9 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 		logger(LOG_ERR, "no DHCP type in message");
 		return -1;
 	}
+
+	/* reset the message counter */
+	state->messages = 0;
 
 	/* We should restart on a NAK */
 	if (type == DHCP_NAK) {
