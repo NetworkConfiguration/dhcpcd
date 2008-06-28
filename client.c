@@ -1090,6 +1090,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 		}
 		break;
 	case STATE_RENEW_REQUESTED:
+	case STATE_BOUND:
 		if (IN_LINKLOCAL(ntohl(lease->addr.s_addr))) {
 			lease->addr.s_addr = 0;
 			state->state = STATE_INIT;
