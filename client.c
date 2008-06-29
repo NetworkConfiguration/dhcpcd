@@ -531,7 +531,7 @@ client_setup(struct if_state *state, const struct options *options)
 		} else {
 			/* Nope, so mark it as-is */
 			len = strlen(options->clientid) + 1;
-			iface->clientid = xmalloc(len + 1);
+			iface->clientid = xmalloc(len + 2);
 			iface->clientid[0] = len;
 			iface->clientid[1] = 0; /* string */
 			memcpy(iface->clientid + 2, options->clientid, len);
@@ -549,9 +549,8 @@ client_setup(struct if_state *state, const struct options *options)
 			logger(LOG_INFO, "DUID = %s",
 			       hwaddr_ntoa(duid, len));
 
-			len += 5;
-			iface->clientid = xmalloc(len);
-			iface->clientid[0] = len;
+			iface->clientid = xmalloc(len + 6);
+			iface->clientid[0] = len + 5;
 			iface->clientid[1] = 255; /* RFC 4361 */
 
 			/* IAID is 4 bytes, so if the iface name is 4 bytes
@@ -570,10 +569,10 @@ client_setup(struct if_state *state, const struct options *options)
 #endif
 		if (len == 0) {
 			len = iface->hwlen + 1;
-			iface->clientid = xmalloc(len);
+			iface->clientid = xmalloc(len + 1);
 			iface->clientid[0] = len;
 			iface->clientid[1] = iface->family;
-			memcpy(iface->clientid + 1, iface->hwaddr, iface->hwlen);
+			memcpy(iface->clientid + 2, iface->hwaddr, iface->hwlen);
 		}
 	}
 

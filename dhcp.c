@@ -775,7 +775,7 @@ make_message(struct dhcp_message **message,
 		p += 2;
 	}
 
-	if (iface->clientid[0]) {
+	if (iface->clientid) {
 		*p++ = DHCP_CLIENTID;
 		memcpy(p, iface->clientid, iface->clientid[0] + 1);
 		p += iface->clientid[0] + 1;
