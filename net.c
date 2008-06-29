@@ -160,7 +160,8 @@ hwaddr_aton(unsigned char *buffer, const char *addr)
 			errno = EINVAL;
 			return 0;
 		}
-		p++;
+		if (*p)
+			p++;
 		if (bp)
 			*bp++ = (unsigned char)strtol(c, NULL, 16);
 		else
