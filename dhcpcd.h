@@ -41,8 +41,8 @@
 #define DEFAULT_TIMEOUT		30
 #define DEFAULT_LEASETIME	3600        /* 1 hour */
 
-#define CLASS_ID_MAX_LEN	48
-#define CLIENT_ID_MAX_LEN	48
+#define CLASSID_MAX_LEN		48
+#define CLIENTID_MAX_LEN	48
 #define USERCLASS_MAX_LEN	255
 
 #ifdef THERE_IS_NO_FORK 
@@ -72,12 +72,11 @@ struct options {
 	char interface[IF_NAMESIZE];
 	char hostname[MAXHOSTNAMELEN];
 	int fqdn;
-	char classid[CLASS_ID_MAX_LEN];
-	char clientid[CLIENT_ID_MAX_LEN];
-	char userclass[USERCLASS_MAX_LEN];
+	char classid[CLASSID_MAX_LEN + 1];
+	char clientid[CLIENTID_MAX_LEN + 1];
+	char userclass[USERCLASS_MAX_LEN + 1];
 	uint8_t reqmask[256 / 8];
 	uint8_t nomask[256 / 8];
-	size_t userclass_len;
 	uint32_t leasetime;
 	time_t timeout;
 	int metric;

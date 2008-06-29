@@ -119,7 +119,6 @@ struct interface
 	time_t start_uptime;
 
 	unsigned char *clientid;
-	size_t clientid_len;
 };
 
 uint32_t get_netmask(uint32_t);

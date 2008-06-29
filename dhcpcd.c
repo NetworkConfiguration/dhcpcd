@@ -205,9 +205,7 @@ add_environ(struct options *options, const char *value, int uniq)
 static int
 parse_option(int opt, char *oarg, struct options *options)
 {
-	static int userclasses = 0;
 	int i;
-	int j;
 	char *p;
 	size_t s;
 	size_t olen;
@@ -236,14 +234,16 @@ parse_option(int opt, char *oarg, struct options *options)
 	case 'i':
 		if (!oarg) {
 			*options->classid = '\0';
-		} else if (olen >= CLASS_ID_MAX_LEN) {
+		} else if (olen >= CLASSID_MAX_LEN) {
 			logger(LOG_ERR,
 			       "`%s' too long for ClassID string, max is %d",
-			       oarg, CLASS_ID_MAX_LEN);
+			       oarg, CLASSID_MAX_LEN);
 			return -1;
-		} else
-			strlcpy(options->classid, oarg,
+		} else {
+			options->classid[0] = strlen(oarg);
+			strlcpy(options->classid + 1, oarg,
 				sizeof(options->classid));
+		}
 		break;
 	case 'l':
 		if (*oarg == '-') {
@@ -314,19 +314,16 @@ parse_option(int opt, char *oarg, struct options *options)
 		}
 		break;
 	case 'u':
-		j = 0;
-		for (i = 0; i < userclasses; i++)
-			j += (int)options->userclass[j] + 1;
-		if (j + 1 + olen >= USERCLASS_MAX_LEN) {
+		if (options->userclass[0] + olen + 1 >= USERCLASS_MAX_LEN) {
 			logger(LOG_ERR,
 			       "userclass overrun, max is %d",
 			       USERCLASS_MAX_LEN);
 			return -1;
 		}
-		userclasses++;
-		memcpy(options->userclass + j + 1, oarg, olen);
-		options->userclass[j] = olen;
-		options->userclass_len += olen + 1;
+		p = options->userclass + options->userclass[0] + 1;
+		*p++ = olen;
+		memcpy(p, oarg, olen);
+		options->userclass[0] += olen + 1;
 		break;
 	case 'A':
 		options->options &= ~DHCPCD_ARP;
@@ -371,18 +368,20 @@ parse_option(int opt, char *oarg, struct options *options)
 		break;
 	case 'I':
 		if (oarg) {
-			if (olen >= CLIENT_ID_MAX_LEN) {
+			if (olen >= CLIENTID_MAX_LEN) {
 				logger(LOG_ERR, "`%s' is too long for"
 				       " ClientID, max is %d",
-				       oarg, CLIENT_ID_MAX_LEN);
+				       oarg, CLIENTID_MAX_LEN);
 				return -1;
 			}
-			if (strlcpy(options->clientid, oarg,
-				    sizeof(options->clientid)) == 0) {
+			if (strlcpy(options->clientid + 1, oarg,
+				    CLIENTID_MAX_LEN) == 0)
+			{
 				/* empty string disabled duid */
 				options->options &= ~DHCPCD_DUID;
 				options->options &= ~DHCPCD_CLIENTID;
-			}
+			} else
+				options->clientid[0] = strlen(oarg);
 		} else {
 			options->clientid[0] = '\0';
 			options->options &= ~DHCPCD_DUID;
@@ -448,8 +447,8 @@ main(int argc, char **argv)
 
 	options = xzalloc(sizeof(*options));
 	options->script = SCRIPT;
-	snprintf(options->classid, CLASS_ID_MAX_LEN, "%s %s",
-		 PACKAGE, VERSION);
+	options->classid[0] = snprintf(options->classid + 1, CLASSID_MAX_LEN,
+				       "%s %s", PACKAGE, VERSION);
 
 	options->options |= DHCPCD_GATEWAY | DHCPCD_DAEMONISE | DHCPCD_CLIENTID;
 #ifdef ENABLE_ARP

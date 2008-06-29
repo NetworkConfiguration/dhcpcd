@@ -465,7 +465,7 @@ client_setup(struct if_state *state, const struct options *options)
 	struct interface *iface = state->interface;
 	struct dhcp_lease *lease = &state->lease;
 	struct in_addr addr;
-	size_t duid_len = 0;
+	size_t len = 0;
 #ifdef ENABLE_DUID
 	unsigned char *duid = NULL;
 	uint32_t ul;
@@ -524,54 +524,55 @@ client_setup(struct if_state *state, const struct options *options)
 
 	if (*options->clientid) {
 		/* Attempt to see if the ClientID is a hardware address */
-		iface->clientid_len = hwaddr_aton(NULL, options->clientid);
-		if (iface->clientid_len) {
-			iface->clientid = xmalloc(iface->clientid_len);
-			hwaddr_aton(iface->clientid, options->clientid);
+		if ((len = hwaddr_aton(NULL, options->clientid))) {
+			iface->clientid = xmalloc(len + 1);
+			iface->clientid[0] = len;
+			hwaddr_aton(iface->clientid + 1, options->clientid);
 		} else {
 			/* Nope, so mark it as-is */
-			iface->clientid_len = strlen(options->clientid) + 1;
-			iface->clientid = xmalloc(iface->clientid_len);
-			*iface->clientid = '\0';
-			memcpy(iface->clientid + 1,
-			       options->clientid, iface->clientid_len - 1);
+			len = strlen(options->clientid) + 1;
+			iface->clientid = xmalloc(len + 1);
+			iface->clientid[0] = len;
+			iface->clientid[1] = 0; /* string */
+			memcpy(iface->clientid + 2, options->clientid, len);
 		}
 	} else if (options->options & DHCPCD_CLIENTID) {
 #ifdef ENABLE_DUID
 		if (options->options & DHCPCD_DUID) {
 			duid = xmalloc(DUID_LEN);
-			duid_len = get_duid(duid, iface);
-			if (duid_len == 0)
+			if ((len = get_duid(duid, iface)) == 0)
 				logger(LOG_ERR, "get_duid: %s",
 				       strerror(errno));
 		}
 
-		if (duid_len > 0) {
+		if (len > 0) {
 			logger(LOG_INFO, "DUID = %s",
-			       hwaddr_ntoa(duid, duid_len));
+			       hwaddr_ntoa(duid, len));
 
-			iface->clientid_len = duid_len + 5;
-			iface->clientid = xmalloc(iface->clientid_len);
-			*iface->clientid = 255; /* RFC 4361 */
+			len += 5;
+			iface->clientid = xmalloc(len);
+			iface->clientid[0] = len;
+			iface->clientid[1] = 255; /* RFC 4361 */
 
 			/* IAID is 4 bytes, so if the iface name is 4 bytes
 			 * use it */
 			if (strlen(iface->name) == 4) {
-				memcpy(iface->clientid + 1, iface->name, 4);
+				memcpy(iface->clientid + 2, iface->name, 4);
 			} else {
 				/* Name isn't 4 bytes, so use the index */
 				ul = htonl(if_nametoindex(iface->name));
-				memcpy(iface->clientid + 1, &ul, 4);
+				memcpy(iface->clientid + 2, &ul, 4);
 			}
 
-			memcpy(iface->clientid + 5, duid, duid_len);
+			memcpy(iface->clientid + 6, duid, len);
 			free(duid);
 		}
 #endif
-		if (duid_len == 0) {
-			iface->clientid_len = iface->hwlen + 1;
-			iface->clientid = xmalloc(iface->clientid_len);
-			*iface->clientid = iface->family;
+		if (len == 0) {
+			len = iface->hwlen + 1;
+			iface->clientid = xmalloc(len);
+			iface->clientid[0] = len;
+			iface->clientid[1] = iface->family;
 			memcpy(iface->clientid + 1, iface->hwaddr, iface->hwlen);
 		}
 	}

@@ -775,26 +775,23 @@ make_message(struct dhcp_message **message,
 		p += 2;
 	}
 
-	if (iface->clientid_len > 0) {
+	if (iface->clientid[0]) {
 		*p++ = DHCP_CLIENTID;
-		*p++ = iface->clientid_len;
-		memcpy(p, iface->clientid, iface->clientid_len);
-		p+= iface->clientid_len;
+		memcpy(p, iface->clientid, iface->clientid[0] + 1);
+		p += iface->clientid[0] + 1;
 	}
 
 	if (type != DHCP_DECLINE && type != DHCP_RELEASE) {
-		if (options->userclass_len > 0) {
+		if (options->userclass[0]) {
 			*p++ = DHCP_USERCLASS;
-			*p++ = options->userclass_len;
-			memcpy(p, &options->userclass, options->userclass_len);
-			p += options->userclass_len;
+			memcpy(p, options->userclass, options->userclass[0] + 1);
+			p += options->userclass[0] + 1;
 		}
 
-		if (*options->classid > 0) {
+		if (options->classid[0]) {
 			*p++ = DHCP_CLASSID;
-			*p++ = l = strlen(options->classid);
-			memcpy(p, options->classid, l);
-			p += l;
+			memcpy(p, options->classid, options->classid[0] + 1);
+			p += options->classid[0] + 1;
 		}
 	}
 
