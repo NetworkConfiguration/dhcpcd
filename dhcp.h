@@ -76,6 +76,7 @@ enum DHCP_OPTIONS
 	DHCP_NISDOMAIN              = 40,
 	DHCP_NISSERVER              = 41,
 	DHCP_NTPSERVER              = 42,
+	DHCP_VENDOR                 = 43,
 	DHCP_IPADDRESS              = 50,
 	DHCP_LEASETIME              = 51,
 	DHCP_OPTIONSOVERLOADED      = 52,

@@ -39,11 +39,12 @@
 #include "common.h"
 
 #define DEFAULT_TIMEOUT		30
-#define DEFAULT_LEASETIME	3600        /* 1 hour */
+#define DEFAULT_LEASETIME	3600	/* 1 hour */
 
 #define CLASSID_MAX_LEN		48
 #define CLIENTID_MAX_LEN	48
 #define USERCLASS_MAX_LEN	255
+#define VENDOR_MAX_LEN		255
 
 #ifdef THERE_IS_NO_FORK 
 extern char dhcpcd[PATH_MAX];
@@ -72,9 +73,12 @@ struct options {
 	char interface[IF_NAMESIZE];
 	char hostname[MAXHOSTNAMELEN];
 	int fqdn;
-	char classid[CLASSID_MAX_LEN + 1];
+	uint8_t classid[CLASSID_MAX_LEN + 1];
 	char clientid[CLIENTID_MAX_LEN + 1];
-	char userclass[USERCLASS_MAX_LEN + 1];
+	uint8_t userclass[USERCLASS_MAX_LEN + 1];
+#ifdef ENABLE_VENDOR
+	uint8_t vendor[VENDOR_MAX_LEN + 1];
+#endif
 	uint8_t reqmask[256 / 8];
 	uint8_t nomask[256 / 8];
 	uint32_t leasetime;

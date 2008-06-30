@@ -863,6 +863,15 @@ make_message(struct dhcp_message **message,
 			}
 		}
 
+#ifdef ENABLE_VENDOR
+		/* vendor is already encoded correctly, so just add it */
+		if (options->vendor[0]) {
+			*p++ = DHCP_VENDOR;
+			memcpy(p, options->vendor, options->vendor[0] + 1);
+			p += options->vendor[0] + 1;
+		}
+#endif
+
 		*p++ = DHCP_PARAMETERREQUESTLIST;
 		n_params = p;
 		*p++ = 0;

@@ -51,7 +51,7 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 
 /* Don't set any optional arguments here so we retain POSIX
  * compatibility with getopt */
-#define OPTS "c:df:h:i:kl:m:no:pr:s:t:u:xAC:DEF:GI:KLO:TV"
+#define OPTS "c:df:h:i:kl:m:no:pr:s:t:u:v:xAC:DEF:GI:KLO:TV"
 
 static int doversion = 0;
 static int dohelp = 0;
@@ -71,6 +71,7 @@ static const struct option longopts[] = {
 	{"request",     optional_argument,  NULL, 'r'},
 	{"timeout",     required_argument,  NULL, 't'},
 	{"userclass",   required_argument,  NULL, 'u'},
+	{"vendor",      required_argument,  NULL, 'v'},
 	{"exit",        no_argument,        NULL, 'x'},
 	{"noarp",       no_argument,        NULL, 'A'},
 	{"nohook",	required_argument,  NULL, 'C'},
@@ -208,8 +209,12 @@ parse_option(int opt, char *oarg, struct options *options)
 {
 	int i;
 	char *p;
-	size_t s;
-	size_t olen;
+	size_t olen, s;
+	uint8_t *u;
+#ifdef ENABLE_VENDOR
+	int j;
+	struct in_addr addr;
+#endif
 
 	if (oarg)
 		olen = strlen(oarg);
@@ -242,7 +247,7 @@ parse_option(int opt, char *oarg, struct options *options)
 			return -1;
 		} else {
 			options->classid[0] = strlen(oarg);
-			strlcpy(options->classid + 1, oarg,
+			strlcpy((char *)options->classid + 1, oarg,
 				sizeof(options->classid));
 		}
 		break;
@@ -321,10 +326,70 @@ parse_option(int opt, char *oarg, struct options *options)
 			       USERCLASS_MAX_LEN);
 			return -1;
 		}
-		p = options->userclass + options->userclass[0] + 1;
-		*p++ = olen;
-		memcpy(p, oarg, olen);
+		u = options->userclass + options->userclass[0] + 1;
+		*u++ = olen;
+		memcpy(u, oarg, olen);
 		options->userclass[0] += olen + 1;
+		break;
+	case 'v':
+#ifdef ENABLE_VENDOR
+		p = strchr(oarg, ',');
+		if (!p || !p[1]) {
+			logger(LOG_ERR, "invalid vendor format");
+			return -1;
+		}
+		*p = '\0';
+		i = atoint(oarg);
+		oarg = p + 1;
+		if (i < 1 || i > 254) {
+			logger(LOG_ERR, "vendor option should be between"
+					" 1 and 254 inclusive");
+			return -1;
+		}
+		/* string */
+		j = 0;
+		if (*oarg == '"') {
+			p = oarg + strlen(oarg) - 1;
+			if (*p == '"') {
+				oarg++;
+				*p = '\0';
+			}
+		} else {
+			/* hex encoding */
+			errno = 0;
+			s = hwaddr_aton(NULL, oarg);
+			if (s > 0)
+				j = 1;
+			else {
+				if (inet_aton(oarg, &addr) == 1) {
+					s = sizeof(addr.s_addr);
+					j = 2;
+				}
+			}
+		}
+		if (j == 0)
+			s = strlen(oarg);
+		/* Need to include then len char */
+		if (options->vendor[0] + s + 1 > VENDOR_MAX_LEN) {
+			logger(LOG_ERR, "vendor option is too long");
+			return -1;
+		}
+		u = options->vendor + options->vendor[0] + 1;
+		options->vendor[0] += s + 2;
+		*u++ = (uint8_t)i;
+		*u++ = (uint8_t)s;
+		switch(j) {
+		case 0:
+			memcpy(u, oarg, s);
+			break;
+		case 1:	
+			hwaddr_aton(u, oarg);
+			break;
+		case 2:
+			memcpy(u, &addr.s_addr, s);
+			break;
+		}
+#endif
 		break;
 	case 'A':
 		options->options &= ~DHCPCD_ARP;
@@ -451,7 +516,7 @@ main(int argc, char **argv)
 
 	options = xzalloc(sizeof(*options));
 	strlcpy(options->script, SCRIPT, sizeof(options->script));
-	options->classid[0] = snprintf(options->classid + 1, CLASSID_MAX_LEN,
+	options->classid[0] = snprintf((char *)options->classid + 1, CLASSID_MAX_LEN,
 				       "%s %s", PACKAGE, VERSION);
 
 	options->options |= DHCPCD_GATEWAY | DHCPCD_DAEMONISE | DHCPCD_CLIENTID;
@@ -530,6 +595,9 @@ main(int argc, char **argv)
 #endif
 #ifdef ENABLE_IPV4LL
 		       " IPV4LL"
+#endif
+#ifdef ENABLE_VENDOR
+		       " VENDOR"
 #endif
 #ifdef THERE_IS_NO_FORK
 		       " THERE_IS_NO_FORK"
@@ -842,6 +910,14 @@ main(int argc, char **argv)
 		writepid(pid_fd, getpid());
 		logger(LOG_INFO, PACKAGE " " VERSION " starting");
 	}
+
+#ifdef ENABLE_VENDOR
+	/* Terminate the encapsulated options */
+	if (options->vendor[0]) {
+		options->vendor[0]++;
+		options->vendor[options->vendor[0]] = DHCP_END;
+	}
+#endif
 
 	if (dhcp_run(options, &pid_fd) == 0)
 		retval = EXIT_SUCCESS;

@@ -41,6 +41,7 @@
 .Op Fl s , -inform Ar address Ns Op Ar /cidr
 .Op Fl t , -timeout Ar seconds
 .Op Fl u , -userclass Ar class
+.Op Fl v , -vendor Ar code , Ar value
 .Op Fl C , -nohook Ar hook
 .Op Fl F , -fqdn Ar FQDN
 .Op Fl I , -clientid Ar clientid
@@ -149,7 +150,7 @@ stop any
 .Ar hostname
 from being sent.
 .It Fl i , -classid Ar classid
-Override the DHCP vendor
+Override the
 .Ar classid
 field sent. The default is
 dhcpcd <version>.
@@ -244,6 +245,18 @@ Tags the DHCP message with the userclass
 .Ar class .
 DHCP servers use this give memebers of the class DHCP options other than the
 default, without having to know things like hardware address or hostname.
+.It Fl v , -vendor Ar code , Ns Ar value
+Add an enscapulated vendor option.
+.Ar code
+should be between 1 and 254 inclusive.
+Examples.
+.Pp
+Set the vendor option 01 with an IP address.
+.D1 dhcpcd -v 01,192.168.0.2 eth0
+Set the vendor option 02 with a hex code.
+.D1 dhcpcd -v 02,01:02:03:04:05 eth0
+Do the above and set a third option with a string and not an IP address.
+.D1 dhcpcd -v 01,192.168.0.2 -v 02,01:02:03:04:05 -v 03,\e"192.168.0.2\e" eth0
 .It Fl x , -exit
 This causes an existing
 .Nm

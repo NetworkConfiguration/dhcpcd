@@ -33,6 +33,24 @@
 /* You can enable/disable various chunks of optional code here.
  * You would only do this to try and shrink the end binary if dhcpcd
  * was running on a low memory device */
+
+/* Disable everything we possibly can. */
+#ifdef MINIMAL
+# ifndef DISABLE_ARP
+#  define DISABLE_ARP
+# endif
+# ifndef DISABLE_IPV4LL
+#  define DISABLE_IPV4LL
+# endif
+# ifndef DISABLE_DUID
+#  define DISABLE_DUID
+# endif
+# ifndef DISABLE_VENDOR
+#  define DISABLE_VENDOR
+# endif
+#endif
+
+/* Enable ARP by default. */
 #ifndef DISABLE_ARP
 # define ENABLE_ARP
 #endif
@@ -62,6 +80,13 @@
  * See RFC 3315 for details on this. */
 #ifndef DISABLE_DUID
 # define ENABLE_DUID
+#endif
+
+/* Allow dhcpcd to send encapsulated vendor options (code 43).
+ * Although this is enabled by default, only custom networks would really
+ * need it. */
+#ifndef DISABLE_VENDOR
+# define ENABLE_VENDOR
 #endif
 
 /* Some systems do not have a working fork. */
@@ -96,6 +121,5 @@
 #ifndef PIDFILE
 # define PIDFILE		RUNDIR "/" PACKAGE "-%s.pid"
 #endif
-
 
 #endif
