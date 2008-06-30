@@ -790,11 +790,13 @@ make_message(struct dhcp_message **message,
 		}
 #endif
 
+#ifdef ENABLE_CLASSID
 		if (options->classid[0]) {
 			*p++ = DHCP_CLASSID;
 			memcpy(p, options->classid, options->classid[0] + 1);
 			p += options->classid[0] + 1;
 		}
+#endif
 	}
 
 	if (type == DHCP_DISCOVER || type == DHCP_REQUEST) {

@@ -39,6 +39,9 @@
 # ifndef DISABLE_ARP
 #  define DISABLE_ARP
 # endif
+# ifndef DISABLE_CLASSID
+#  define DISABLE_CLASSID
+# endif
 # ifndef DISABLE_CLIENTID
 #  define DISABLE_CLIENTID
 # endif
@@ -59,6 +62,11 @@
 /* Enable ARP by default. */
 #ifndef DISABLE_ARP
 # define ENABLE_ARP
+#endif
+
+/* Allow dhcpcd to send a ClassID */
+#ifndef DISABLE_CLASSID
+# define ENABLE_CLASSID
 #endif
 
 /* Send a ClientID in all messages. */

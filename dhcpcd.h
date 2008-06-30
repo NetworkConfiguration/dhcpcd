@@ -73,7 +73,9 @@ struct options {
 	char interface[IF_NAMESIZE];
 	char hostname[MAXHOSTNAMELEN];
 	int fqdn;
+#ifdef ENABLE_CLASSID
 	uint8_t classid[CLASSID_MAX_LEN + 1];
+#endif
 #ifdef ENABLE_CLIENTID
 	char clientid[CLIENTID_MAX_LEN + 1];
 #endif

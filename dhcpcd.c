@@ -238,6 +238,7 @@ parse_option(int opt, char *oarg, struct options *options)
 				sizeof(options->hostname));
 		break;
 	case 'i':
+#ifdef ENABLE_CLASSID
 		if (!oarg) {
 			*options->classid = '\0';
 		} else if (olen >= CLASSID_MAX_LEN) {
@@ -250,6 +251,7 @@ parse_option(int opt, char *oarg, struct options *options)
 			strlcpy((char *)options->classid + 1, oarg,
 				sizeof(options->classid));
 		}
+#endif
 		break;
 	case 'l':
 		if (*oarg == '-') {
@@ -520,8 +522,10 @@ main(int argc, char **argv)
 
 	options = xzalloc(sizeof(*options));
 	strlcpy(options->script, SCRIPT, sizeof(options->script));
+#ifdef ENABLE_CLASSID
 	options->classid[0] = snprintf((char *)options->classid + 1, CLASSID_MAX_LEN,
 				       "%s %s", PACKAGE, VERSION);
+#endif
 
 	options->options |= DHCPCD_GATEWAY | DHCPCD_DAEMONISE;
 #ifdef ENABLE_ARP
@@ -595,6 +599,9 @@ main(int argc, char **argv)
 		printf("Compile time options:"
 #ifdef ENABLE_ARP
 		       " ARP"
+#endif
+#ifdef ENABLE_CLASSID
+		       " CLASSID"
 #endif
 #ifdef ENABLE_CLIENTID
 		       " CLIENTID"
