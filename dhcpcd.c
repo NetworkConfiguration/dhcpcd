@@ -435,6 +435,7 @@ parse_option(int opt, char *oarg, struct options *options)
 		options->options &= ~DHCPCD_GATEWAY;
 		break;
 	case 'I':
+#ifdef ENABLE_CLIENTID
 		if (oarg) {
 			if (olen >= CLIENTID_MAX_LEN) {
 				logger(LOG_ERR, "`%s' is too long for"
@@ -455,6 +456,7 @@ parse_option(int opt, char *oarg, struct options *options)
 			options->options &= ~DHCPCD_DUID;
 			options->options &= ~DHCPCD_CLIENTID;
 		}
+#endif
 		break;
 	case 'K':
 		options->options &= ~DHCPCD_DAEMONISE;
@@ -521,14 +523,16 @@ main(int argc, char **argv)
 	options->classid[0] = snprintf((char *)options->classid + 1, CLASSID_MAX_LEN,
 				       "%s %s", PACKAGE, VERSION);
 
-	options->options |= DHCPCD_GATEWAY | DHCPCD_DAEMONISE | DHCPCD_CLIENTID;
+	options->options |= DHCPCD_GATEWAY | DHCPCD_DAEMONISE;
 #ifdef ENABLE_ARP
 	options->options |= DHCPCD_ARP;
  #ifdef ENABLE_IPV4LL
 	options->options |= DHCPCD_IPV4LL;
  #endif
 #endif
-
+#ifdef ENABLE_CLIENTID
+	options->options |= DHCPCD_CLIENTID;
+#endif
 	options->timeout = DEFAULT_TIMEOUT;
 
 #ifdef CMDLINE_COMPAT
@@ -592,11 +596,17 @@ main(int argc, char **argv)
 #ifdef ENABLE_ARP
 		       " ARP"
 #endif
+#ifdef ENABLE_CLIENTID
+		       " CLIENTID"
+#endif
 #ifdef ENABLE_DUID
 		       " DUID"
 #endif
 #ifdef ENABLE_IPV4LL
 		       " IPV4LL"
+#endif
+#ifdef ENABLE_USERCLASS
+		       " USERCLASS"
 #endif
 #ifdef ENABLE_VENDOR
 		       " VENDOR"

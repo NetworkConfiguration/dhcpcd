@@ -39,6 +39,9 @@
 # ifndef DISABLE_ARP
 #  define DISABLE_ARP
 # endif
+# ifndef DISABLE_CLIENTID
+#  define DISABLE_CLIENTID
+# endif
 # ifndef DISABLE_IPV4LL
 #  define DISABLE_IPV4LL
 # endif
@@ -58,6 +61,23 @@
 # define ENABLE_ARP
 #endif
 
+/* Send a ClientID in all messages. */
+#ifndef DISABLE_CLIENTID
+# define ENABLE_CLIENTID
+#endif
+
+/* Allow dhcpcd to create a DUID (LLT) and use it to make an IAID for the
+ * ClientID. Even enabled here, we need a config directive to actually use it
+ * so this toggle is just to remove it from dhcpcd to make the binary smaller.
+ * You can always create your own DUID file that just contains the
+ * hex string that represents the DUID.
+ * See RFC 3315 for details on this. */
+#ifndef DISABLE_DUID
+# ifdef ENABLE_CLIENTID
+#  define ENABLE_DUID
+# endif
+#endif
+
 /* IPV4LL, aka ZeroConf, aka APIPA, aka RFC 3927.
  * Needs ARP. */
 #ifndef DISABLE_IPV4LL
@@ -74,16 +94,6 @@
  * If not, you can define this to get dhcpcd to always add the link local route.
  */
 // #define ENABLE_IPV4LL_ALWAYSROUTE 
-
-/* Allow dhcpcd to create a DUID (LLT) and use it to make an IAID for the
- * ClientID. Even enabled here, we need a config directive to actually use it
- * so this toggle is just to remove it from dhcpcd to make the binary smaller.
- * You can always create your own DUID file that just contains the
- * hex string that represents the DUID.
- * See RFC 3315 for details on this. */
-#ifndef DISABLE_DUID
-# define ENABLE_DUID
-#endif
 
 /* Allow dhcpcd to send user class options. */
 #ifndef DISABLE_USERCLASS

@@ -465,7 +465,9 @@ client_setup(struct if_state *state, const struct options *options)
 	struct interface *iface = state->interface;
 	struct dhcp_lease *lease = &state->lease;
 	struct in_addr addr;
+#ifdef ENABLE_CLIENTID
 	size_t len = 0;
+#endif
 #ifdef ENABLE_DUID
 	unsigned char *duid = NULL;
 	uint32_t ul;
@@ -522,6 +524,7 @@ client_setup(struct if_state *state, const struct options *options)
 		iface->net.s_addr = lease->net.s_addr;
 	}
 
+#ifdef ENABLE_CLIENTID
 	if (*options->clientid) {
 		/* Attempt to see if the ClientID is a hardware address */
 		if ((len = hwaddr_aton(NULL, options->clientid))) {
@@ -575,6 +578,7 @@ client_setup(struct if_state *state, const struct options *options)
 			memcpy(iface->clientid + 2, iface->hwaddr, iface->hwlen);
 		}
 	}
+#endif
 
 	return 0;
 }
