@@ -51,7 +51,7 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 
 /* Don't set any optional arguments here so we retain POSIX
  * compatibility with getopt */
-#define OPTS "c:df:h:i:kl:m:no:pr:s:t:u:xAC:DEF:GI:LO:TV"
+#define OPTS "c:df:h:i:kl:m:no:pr:s:t:u:xAC:DEF:GI:KLO:TV"
 
 static int doversion = 0;
 static int dohelp = 0;
@@ -79,6 +79,7 @@ static const struct option longopts[] = {
 	{"fqdn",        optional_argument,  NULL, 'F'},
 	{"nogateway",   no_argument,        NULL, 'G'},
 	{"clientid",    optional_argument,  NULL, 'I'},
+	{"nodaemonise", no_argument,        NULL, 'K'},
 	{"noipv4ll",    no_argument,        NULL, 'L'},
 	{"nooption",    optional_argument,  NULL, 'O'},
 	{"test",        no_argument,        NULL, 'T'},
@@ -154,7 +155,7 @@ read_pid(const char *pidfile)
 static void
 usage(void)
 {
-	printf("usage: "PACKAGE" [-dknpxADEGHLOSTV] [-c script] [-f file ] [-h hostname]\n"
+	printf("usage: "PACKAGE" [-dknpxADEGHKLOTV] [-c script] [-f file ] [-h hostname]\n"
 	       "              [-i classID ] [-l leasetime] [-m metric] [-o option] [-r ipaddr]\n"
 	       "              [-s ipaddr] [-t timeout] [-u userclass] [-F none|ptr|both]\n"
 	       "              [-I clientID] [-C hookscript] <interface>\n");
@@ -387,6 +388,9 @@ parse_option(int opt, char *oarg, struct options *options)
 			options->options &= ~DHCPCD_DUID;
 			options->options &= ~DHCPCD_CLIENTID;
 		}
+		break;
+	case 'K':
+		options->options &= ~DHCPCD_DAEMONISE;
 		break;
 	case 'L':
 		options->options &= ~DHCPCD_IPV4LL;
@@ -738,6 +742,9 @@ main(int argc, char **argv)
 			goto abort;
 		}
 	}
+
+	if (!(options->options & DHCPCD_DAEMONISE))
+		options->timeout = 0;
 
 	if (IN_LINKLOCAL(ntohl(options->request_address.s_addr))) {
 		logger(LOG_ERR,

@@ -22,14 +22,14 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd Jun 18, 2008
+.Dd Jun 30, 2008
 .Dt DHCPCD 8 SMM
 .Sh NAME
 .Nm dhcpcd
 .Nd an RFC 2131 compliant DHCP client
 .Sh SYNOPSIS
 .Nm
-.Op Fl dknpADEGLSTV
+.Op Fl dknpADEGKLSTV
 .Op Fl c , -script Ar script
 .Op Fl f , -config Ar file
 .Op Fl h , -hostname Ar hostname
@@ -306,6 +306,13 @@ Matches full name, or prefixed with 2 numbers optionally ending with
 .Pp
 So to stop dhcpcd from touching your DNS or MTU settings you would do:-
 .D1 dhcpcd -C resolv.conf -C mtu eth0
+.It Fl K , -nodaemonise
+Don't daemonise when we acquire a lease.
+This disables the
+.Fl t, -timeout
+option.
+This is mainly useful for running under the control of another process, such
+as a debugger or a network manager.
 .It Fl L , -noipv4ll
 Don't use IPv4LL at all.
 .It Fl O , -nooption Ar option
