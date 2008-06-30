@@ -320,6 +320,7 @@ parse_option(int opt, char *oarg, struct options *options)
 		}
 		break;
 	case 'u':
+#ifdef ENABLE_USERCLASS
 		if (options->userclass[0] + olen + 1 >= USERCLASS_MAX_LEN) {
 			logger(LOG_ERR,
 			       "userclass overrun, max is %d",
@@ -330,6 +331,7 @@ parse_option(int opt, char *oarg, struct options *options)
 		*u++ = olen;
 		memcpy(u, oarg, olen);
 		options->userclass[0] += olen + 1;
+#endif
 		break;
 	case 'v':
 #ifdef ENABLE_VENDOR

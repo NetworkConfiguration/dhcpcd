@@ -782,11 +782,13 @@ make_message(struct dhcp_message **message,
 	}
 
 	if (type != DHCP_DECLINE && type != DHCP_RELEASE) {
+#ifdef ENABLE_USERCLASS
 		if (options->userclass[0]) {
 			*p++ = DHCP_USERCLASS;
 			memcpy(p, options->userclass, options->userclass[0] + 1);
 			p += options->userclass[0] + 1;
 		}
+#endif
 
 		if (options->classid[0]) {
 			*p++ = DHCP_CLASSID;

@@ -45,6 +45,9 @@
 # ifndef DISABLE_DUID
 #  define DISABLE_DUID
 # endif
+# ifndef DISABLE_USERCLASS
+#  define DISABLE_USERCLASS
+# endif
 # ifndef DISABLE_VENDOR
 #  define DISABLE_VENDOR
 # endif
@@ -80,6 +83,11 @@
  * See RFC 3315 for details on this. */
 #ifndef DISABLE_DUID
 # define ENABLE_DUID
+#endif
+
+/* Allow dhcpcd to send user class options. */
+#ifndef DISABLE_USERCLASS
+# define ENABLE_USERCLASS
 #endif
 
 /* Allow dhcpcd to send encapsulated vendor options (code 43).

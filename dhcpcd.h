@@ -75,7 +75,9 @@ struct options {
 	int fqdn;
 	uint8_t classid[CLASSID_MAX_LEN + 1];
 	char clientid[CLIENTID_MAX_LEN + 1];
+#ifdef ENABLE_USERCLASS
 	uint8_t userclass[USERCLASS_MAX_LEN + 1];
+#endif
 #ifdef ENABLE_VENDOR
 	uint8_t vendor[VENDOR_MAX_LEN + 1];
 #endif
