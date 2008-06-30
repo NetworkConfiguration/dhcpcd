@@ -159,17 +159,16 @@ send_raw_packet(const struct interface *iface, int protocol,
 }
 
 ssize_t
-get_raw_packet(struct interface *iface, _unused int protocol,
-	       void *data, ssize_t len)
+get_raw_packet(struct interface *iface, int protocol, void *data, ssize_t len)
 {
 	ssize_t bytes;
-	int fd;
+	int fd = -1;
 
+	if (protocol == ETHERTYPE_ARP) {
 #ifdef ENABLE_ARP
-	if (protocol == ETHERTYPE_ARP)
 		fd = iface->arp_fd;
-	else
 #endif
+	} else
 		fd = iface->fd;
 	bytes = read(fd, data, len);
 	if (bytes == -1)
