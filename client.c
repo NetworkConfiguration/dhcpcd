@@ -959,8 +959,10 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 
 		reason = "FAIL";
 		drop_config(state, reason, options);
-		if (!(state->options & DHCPCD_DAEMONISED))
+		if (!(state->options & DHCPCD_DAEMONISED) &&
+		    (state->options & DHCPCD_DAEMONISE))
 			return -1;
+		state->state = STATE_INIT;
 		break;
 	case STATE_RENEWING:
 		logger(LOG_ERR, "failed to renew, attempting to rebind");
@@ -1068,6 +1070,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 	switch(state->state) {
 	case STATE_INIT:
 		if (!(state->state && DHCPCD_DAEMONISED) &&
+		    options->timeout &&		
 		    !IN_LINKLOCAL(htonl(iface->addr.s_addr)))
 		{
 			get_time(&state->start);
