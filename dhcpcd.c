@@ -217,7 +217,7 @@ parse_option(int opt, char *oarg, struct options *options)
 
 	switch(opt) {
 	case 'c':
-		options->script = oarg;
+		strlcpy(options->script, oarg, sizeof(options->script));
 		break;
 	case 'h':
 		if (!oarg)
@@ -446,7 +446,7 @@ main(int argc, char **argv)
 	openlog(PACKAGE, LOG_PID, LOG_LOCAL0);
 
 	options = xzalloc(sizeof(*options));
-	options->script = SCRIPT;
+	strlcpy(options->script, SCRIPT, sizeof(options->script));
 	options->classid[0] = snprintf(options->classid + 1, CLASSID_MAX_LEN,
 				       "%s %s", PACKAGE, VERSION);
 

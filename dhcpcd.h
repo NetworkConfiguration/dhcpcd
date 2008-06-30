@@ -86,7 +86,7 @@ struct options {
 	struct in_addr request_netmask;
 
 	char **environ;
-	const char *script;
+	char script[PATH_MAX];
 	char pidfile[PATH_MAX];
 };
 
