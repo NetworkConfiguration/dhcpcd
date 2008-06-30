@@ -52,7 +52,7 @@ int
 open_socket(struct interface *iface, int protocol)
 {
 	int fd = -1;
-	int *fdp;
+	int *fdp = NULL;
 	struct ifreq ifr;
 	int buf_len = 0;
 	struct bpf_version pv;
@@ -107,14 +107,13 @@ open_socket(struct interface *iface, int protocol)
 #endif
 
 	/* Install the DHCP filter */
-#ifdef ENABLE_ARP
 	if (protocol == ETHERTYPE_ARP) {
+#ifdef ENABLE_ARP
 		pf.bf_insns = UNCONST(arp_bpf_filter);
 		pf.bf_len = arp_bpf_filter_len;
 		fdp = &iface->arp_fd;
-	} else
 #endif
-	{
+	} else {
 		pf.bf_insns = UNCONST(dhcp_bpf_filter);
 		pf.bf_len = dhcp_bpf_filter_len;
 		fdp = &iface->fd;
@@ -123,9 +122,11 @@ open_socket(struct interface *iface, int protocol)
 		goto eexit;
 	if (set_cloexec(fd) == -1)
 		goto eexit;
-	if (*fdp != -1)
-		close(*fdp);
-	*fdp = fd;
+	if (fdp) {
+		if (*fdp != -1)
+			close(*fdp);
+		*fdp = fd;
+	}
 	return fd;
 
 eexit:
@@ -156,20 +157,20 @@ send_raw_packet(const struct interface *iface, int protocol,
 /* BPF requires that we read the entire buffer.
  * So we pass the buffer in the API so we can loop on >1 packet. */
 ssize_t
-get_raw_packet(struct interface *iface, _unused int protocol,
+get_raw_packet(struct interface *iface, int protocol,
 	       void *data, ssize_t len)
 {
-	int fd;
+	int fd = -1;
 	struct bpf_hdr packet;
 	struct ether_header hw;
 	ssize_t bytes;
 	const unsigned char *payload;
 
+	if (protocol == ETHERTYPE_ARP) {
 #ifdef ENABLE_ARP
-	if (protocol == ETHERTYPE_ARP)
 		fd = iface->arp_fd;
-	else
 #endif
+	} else
 		fd = iface->fd;
 
 	for (;;) {
