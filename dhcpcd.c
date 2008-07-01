@@ -595,7 +595,7 @@ main(int argc, char **argv)
 	}
 
 	if (doversion) {
-		printf(""PACKAGE" "VERSION"\n");
+		printf(""PACKAGE" "VERSION"\n%s\n", copyright);
 		printf("Compile time options:"
 #ifdef ENABLE_ARP
 		       " ARP"
