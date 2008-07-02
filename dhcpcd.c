@@ -445,14 +445,13 @@ parse_option(int opt, char *oarg, struct options *options)
 				       oarg, CLIENTID_MAX_LEN);
 				return -1;
 			}
-			if (strlcpy(options->clientid + 1, oarg,
+			if (strlcpy(options->clientid, oarg,
 				    CLIENTID_MAX_LEN) == 0)
 			{
 				/* empty string disabled duid */
 				options->options &= ~DHCPCD_DUID;
 				options->options &= ~DHCPCD_CLIENTID;
-			} else
-				options->clientid[0] = strlen(oarg);
+			}
 		} else {
 			options->clientid[0] = '\0';
 			options->options &= ~DHCPCD_DUID;

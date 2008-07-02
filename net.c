@@ -148,15 +148,15 @@ hwaddr_aton(unsigned char *buffer, const char *addr)
 	while (*p) {
 		c[0] = *p++;
 		c[1] = *p++;
-		/* Ensure that next data is EOL or a seperator with data */
-		if (!(*p == '\0' || (*p == ':' && *(p + 1) != '\0'))) {
-			errno = EINVAL;
-			return 0;
-		}
 		/* Ensure that digits are hex */
 		if (isxdigit((unsigned char)c[0]) == 0 ||
 		    isxdigit((unsigned char)c[1]) == 0)
 		{
+			errno = EINVAL;
+			return 0;
+		}
+		/* Ensure that next data is EOL or a seperator with data */
+		if (!(*p == '\0' || (*p == ':' && *(p + 1) != '\0'))) {
 			errno = EINVAL;
 			return 0;
 		}
