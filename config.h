@@ -39,39 +39,17 @@
 # ifndef DISABLE_ARP
 #  define DISABLE_ARP
 # endif
-# ifndef DISABLE_CLASSID
-#  define DISABLE_CLASSID
-# endif
-# ifndef DISABLE_CLIENTID
-#  define DISABLE_CLIENTID
-# endif
 # ifndef DISABLE_IPV4LL
 #  define DISABLE_IPV4LL
 # endif
 # ifndef DISABLE_DUID
 #  define DISABLE_DUID
 # endif
-# ifndef DISABLE_USERCLASS
-#  define DISABLE_USERCLASS
-# endif
-# ifndef DISABLE_VENDOR
-#  define DISABLE_VENDOR
-# endif
 #endif
 
 /* Enable ARP by default. */
 #ifndef DISABLE_ARP
 # define ENABLE_ARP
-#endif
-
-/* Allow dhcpcd to send a ClassID */
-#ifndef DISABLE_CLASSID
-# define ENABLE_CLASSID
-#endif
-
-/* Send a ClientID in all messages. */
-#ifndef DISABLE_CLIENTID
-# define ENABLE_CLIENTID
 #endif
 
 /* Allow dhcpcd to create a DUID (LLT) and use it to make an IAID for the
@@ -81,9 +59,7 @@
  * hex string that represents the DUID.
  * See RFC 3315 for details on this. */
 #ifndef DISABLE_DUID
-# ifdef ENABLE_CLIENTID
-#  define ENABLE_DUID
-# endif
+# define ENABLE_DUID
 #endif
 
 /* IPV4LL, aka ZeroConf, aka APIPA, aka RFC 3927.
@@ -102,18 +78,6 @@
  * If not, you can define this to get dhcpcd to always add the link local route.
  */
 // #define ENABLE_IPV4LL_ALWAYSROUTE 
-
-/* Allow dhcpcd to send user class options. */
-#ifndef DISABLE_USERCLASS
-# define ENABLE_USERCLASS
-#endif
-
-/* Allow dhcpcd to send encapsulated vendor options (code 43).
- * Although this is enabled by default, only custom networks would really
- * need it. */
-#ifndef DISABLE_VENDOR
-# define ENABLE_VENDOR
-#endif
 
 /* Some systems do not have a working fork. */
 /* #define THERE_IS_NO_FORK */

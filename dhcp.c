@@ -710,7 +710,6 @@ make_message(struct dhcp_message **message,
 	uint8_t *d, *m, *p;
 	const char *c;
 	uint8_t *n_params = NULL;
-	size_t l;
 	time_t up = uptime() - iface->start_uptime;
 	uint32_t ul;
 	uint16_t sz;
@@ -782,21 +781,17 @@ make_message(struct dhcp_message **message,
 	}
 
 	if (type != DHCP_DECLINE && type != DHCP_RELEASE) {
-#ifdef ENABLE_USERCLASS
 		if (options->userclass[0]) {
 			*p++ = DHCP_USERCLASS;
 			memcpy(p, options->userclass, options->userclass[0] + 1);
 			p += options->userclass[0] + 1;
 		}
-#endif
 
-#ifdef ENABLE_CLASSID
 		if (options->classid[0]) {
 			*p++ = DHCP_CLASSID;
 			memcpy(p, options->classid, options->classid[0] + 1);
 			p += options->classid[0] + 1;
 		}
-#endif
 	}
 
 	if (type == DHCP_DISCOVER || type == DHCP_REQUEST) {
@@ -833,13 +828,12 @@ make_message(struct dhcp_message **message,
 		if (options->hostname[0]) {
 			if (options->fqdn == FQDN_DISABLE) {
 				*p++ = DHCP_HOSTNAME;
-				*p++ = l = strlen(options->hostname);
-				memcpy(p, options->hostname, l);
-				p += l;
+				memcpy(p, options->hostname, options->hostname[0] + 1);
+				p += options->hostname[0] + 1;
 			} else {
 				/* Draft IETF DHC-FQDN option (81) */
 				*p++ = DHCP_FQDN;
-				*p++ = strlen(options->hostname) + 5;
+				*p++ = options->hostname[0] + 4;
 				/*
 				 * Flags: 0000NEOS
 				 * S: 1 => Client requests Server to update
@@ -853,7 +847,7 @@ make_message(struct dhcp_message **message,
 				*p++ = (options->fqdn & 0x9) | 0x4;
 				*p++ = 0; /* from server for PTR RR */
 				*p++ = 0; /* from server for A RR if S=1 */
-				c = options->hostname;
+				c = options->hostname + 1;
 				d = p++;
 				while (*c) {
 					if (*c == '.') {
@@ -867,14 +861,12 @@ make_message(struct dhcp_message **message,
 			}
 		}
 
-#ifdef ENABLE_VENDOR
 		/* vendor is already encoded correctly, so just add it */
 		if (options->vendor[0]) {
 			*p++ = DHCP_VENDOR;
 			memcpy(p, options->vendor, options->vendor[0] + 1);
 			p += options->vendor[0] + 1;
 		}
-#endif
 
 		*p++ = DHCP_PARAMETERREQUESTLIST;
 		n_params = p;

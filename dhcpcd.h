@@ -73,18 +73,10 @@ struct options {
 	char interface[IF_NAMESIZE];
 	char hostname[MAXHOSTNAMELEN];
 	int fqdn;
-#ifdef ENABLE_CLASSID
 	uint8_t classid[CLASSID_MAX_LEN + 1];
-#endif
-#ifdef ENABLE_CLIENTID
 	char clientid[CLIENTID_MAX_LEN + 1];
-#endif
-#ifdef ENABLE_USERCLASS
 	uint8_t userclass[USERCLASS_MAX_LEN + 1];
-#endif
-#ifdef ENABLE_VENDOR
 	uint8_t vendor[VENDOR_MAX_LEN + 1];
-#endif
 	uint8_t reqmask[256 / 8];
 	uint8_t nomask[256 / 8];
 	uint32_t leasetime;
