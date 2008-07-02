@@ -155,6 +155,11 @@ hwaddr_aton(unsigned char *buffer, const char *addr)
 			errno = EINVAL;
 			return 0;
 		}
+		/* We should have at least two entries 00:01 */
+		if (len == 0 && *p == '\0') {
+			errno = EINVAL;
+			return 0;
+		}
 		/* Ensure that next data is EOL or a seperator with data */
 		if (!(*p == '\0' || (*p == ':' && *(p + 1) != '\0'))) {
 			errno = EINVAL;
@@ -164,12 +169,8 @@ hwaddr_aton(unsigned char *buffer, const char *addr)
 			p++;
 		if (bp)
 			*bp++ = (unsigned char)strtol(c, NULL, 16);
-		else
-			len++;
+		len++;
 	}
-
-	if (bp)
-		return bp - buffer;
 	return len;
 }
 
