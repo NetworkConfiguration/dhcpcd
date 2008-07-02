@@ -878,7 +878,7 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (sig != 0) {
+	if (sig != 0 && !(options->options & DHCPCD_DAEMONISED)) {
 		i = -1;
 		pid = read_pid(options->pidfile);
 		if (pid != 0)
