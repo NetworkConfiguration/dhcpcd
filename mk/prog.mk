@@ -7,6 +7,16 @@ include ${MK}/cc.mk
 
 OBJS+=		${SRCS:.c=.o}
 
+# This is for NetBSD which has two dynamic linkers and we need to
+# use the right one.
+_DYNLINK_SH=		if test "${PREFIX}" = "" -o "${PREFIX}" = "/" && test -e /libexec/ld.elf_so; then \
+				echo "-Wl,-dynamic-linker=/libexec/ld.elf_so"; \
+			else \
+				echo ""; \
+			fi
+_DYNLINK!=		${_DYNLINK_SH}
+LDFLAGS+=		${_DYNLINK}$(shell ${_DYNLINK_SH})
+
 all: ${PROG} ${SCRIPTS} _man
 
 .c.o:
@@ -20,7 +30,7 @@ ${PROG}: ${OBJS}
 small: ${SRCS}
 	echo "" > _${PROG}.c
 	for src in ${SRCS}; do echo "#include \"$$src\"" >> _${PROG}.c; done
-	${CC} ${CPPFLAGS} -c _${PROG}.c -o _${PROG}.o
+	${CC} ${CFLAGS} ${CPPFLAGS} -c _${PROG}.c -o _${PROG}.o
 	${CC} ${LDFLAGS} -o ${PROG} _${PROG}.o ${LDADD}
 
 _proginstall: ${PROG}
