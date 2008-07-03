@@ -151,6 +151,11 @@ send_raw_packet(const struct interface *iface, int protocol,
 	iov[1].iov_base = UNCONST(data);
 	iov[1].iov_len = len;
 
+#ifdef __PCC__
+	/* Work around PCC not respecting the packed ether_header */
+	iov[0].iov_len = 14;
+#endif
+	
 	return writev(iface->fd, iov, 2);
 }
 
@@ -193,6 +198,11 @@ get_raw_packet(struct interface *iface, int protocol,
 			goto next; /* Packet beyond buffer, drop. */
 		payload = iface->buffer + packet.bh_hdrlen + sizeof(hw);
 		bytes = packet.bh_caplen - sizeof(hw);
+#ifdef __PCC__
+		/* Work around PCC not respecting the packed ether_header */
+		payload -= sizeof(hw) - 14;
+		bytes += sizeof(hw) - 14;
+#endif
 		if (bytes > len)
 			bytes = len;
 		memcpy(data, payload, bytes);
