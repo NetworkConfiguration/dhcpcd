@@ -523,19 +523,9 @@ client_setup(struct if_state *state, const struct options *options)
 	}
 
 	if (*options->clientid) {
-		/* Attempt to see if the ClientID is a hardware address */
-		if ((len = hwaddr_aton(NULL, options->clientid))) {
-			iface->clientid = xmalloc(len + 1);
-			iface->clientid[0] = len;
-			hwaddr_aton(iface->clientid + 1, options->clientid);
-		} else {
-			/* Nope, so mark it as-is */
-			len = strlen(options->clientid) + 1;
-			iface->clientid = xmalloc(len + 2);
-			iface->clientid[0] = len;
-			iface->clientid[1] = 0; /* string */
-			memcpy(iface->clientid + 2, options->clientid, len);
-		}
+		iface->clientid = xmalloc(options->clientid[0] + 1);
+		memcpy(iface->clientid,
+		       options->clientid, options->clientid[0] + 1);
 	} else if (options->options & DHCPCD_CLIENTID) {
 #ifdef ENABLE_DUID
 		if (options->options & DHCPCD_DUID) {

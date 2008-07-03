@@ -205,70 +205,76 @@ add_environ(struct options *options, const char *value, int uniq)
 	return newlist[i];
 }
 
+#define parse_string(buf, len, arg) parse_string_hwaddr(buf, len, arg, 0)
 static ssize_t
-parse_string(char *buffer, ssize_t len, char *oarg)
+parse_string_hwaddr(char *sbuf, ssize_t slen, char *str, int clid)
 {
 	ssize_t l;
+	char *p;
 	int i;
-	char *p, *bp = buffer;
 	char c[4];
 
 	/* If surrounded by quotes then it's a string */
-	if (*oarg == '"') {
-		oarg++;
-		len = strlen(oarg);
-		p = oarg + len - 1;
+	if (*str == '"') {
+		str++;
+		l = strlen(str);
+		p = str + l - 1;
 		if (*p == '"')
 			*p = '\0';
 	} else {
-		l = hwaddr_aton(NULL, oarg);
+		l = hwaddr_aton(NULL, str);
 		if (l > 1) {
-			if (l > len) {
+			if (l > slen) {
 				errno = ENOBUFS;
 				return -1;
 			}
-			hwaddr_aton((uint8_t*)buffer, oarg);
+			hwaddr_aton((uint8_t *)sbuf, str);
 			return l;
 		}
 	}
 
 	/* Process escapes */
-	p = oarg;
 	l = 0;
+	/* If processing a string on the clientid, first byte should be
+	 * 0 to indicate a non hardware type */
+	if (clid) {
+		*sbuf++ = 0;
+		l++;
+	}
 	c[3] = '\0';
-	while (*p) {
-		if (++l > len) {
+	while (*str) {
+		if (++l > slen) {
 			errno = ENOBUFS;
 			return -1;
 		}
-		if (*p == '\\') {
-			p++;
-			switch(*p++) {
+		if (*str == '\\') {
+			str++;
+			switch(*str++) {
 			case '\0':
 				break;
 			case 'b':
-				*bp++ = '\b';
+				*sbuf++ = '\b';
 				break;
 			case 'n':
-				*bp++ = '\n';
+				*sbuf++ = '\n';
 				break;
 			case 'r':
-				*bp++ = '\r';
+				*sbuf++ = '\r';
 				break;
 			case 't':
-				*bp++ = '\t';
+				*sbuf++ = '\t';
 				break;
 			case 'x':
 				/* Grab a hex code */
 				c[1] = '\0';
 				for (i = 0; i < 2; i++) {
-					if (isxdigit((unsigned char)*p) == 0)
+					if (isxdigit((unsigned char)*str) == 0)
 						break;
-					c[i] = *p++;
+					c[i] = *str++;
 				}
 				if (c[1] != '\0') {
 					c[2] = '\0';
-					*bp++ = strtol(c, NULL, 16);
+					*sbuf++ = strtol(c, NULL, 16);
 				} else
 					l--;
 				break;
@@ -276,23 +282,23 @@ parse_string(char *buffer, ssize_t len, char *oarg)
 				/* Grab an octal code */
 				c[2] = '\0';
 				for (i = 0; i < 3; i++) {
-					if (*p < '0' || *p > '7')
+					if (*str < '0' || *str > '7')
 						break;
-					c[i] = *p++;
+					c[i] = *str++;
 				}
 				if (c[2] != '\0') {
 					i = strtol(c, NULL, 8);
 					if (i > 255)
 						i = 255;
-					*bp ++= i;
+					*sbuf ++= i;
 				} else
 					l--;
 				break;
 			default:
-				*bp++ = *p++;
+				*sbuf++ = *str++;
 			}
 		} else
-			*bp++ = *p++;
+			*sbuf++ = *str++;
 	}
 	return l;
 }
@@ -492,13 +498,15 @@ parse_option(int opt, char *oarg, struct options *options)
 		options->options &= ~DHCPCD_GATEWAY;
 		break;
 	case 'I':
+		/* Strings have a type of 0 */;
+		options->classid[1] = 0;
 		if (oarg)
-			s = parse_string((char *)options->classid + 1,
-					 CLIENTID_MAX_LEN, oarg);
+			s = parse_string_hwaddr((char *)options->clientid + 1,
+						CLIENTID_MAX_LEN, oarg, 1);
 		else
 			s = 0;
 		if (s == -1) {
-			logger(LOG_ERR, "classid: %s", strerror(errno));
+			logger(LOG_ERR, "clientid: %s", strerror(errno));
 			return -1;
 		}
 		options->clientid[0] = (uint8_t)s;
