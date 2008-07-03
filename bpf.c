@@ -143,19 +143,13 @@ send_raw_packet(const struct interface *iface, int protocol,
 	struct iovec iov[2];
 	struct ether_header hw;
 
-	memset(&hw, 0, sizeof(hw));
+	memset(&hw, 0, ETHER_HDR_LEN);
 	memset(&hw.ether_dhost, 0xff, ETHER_ADDR_LEN);
 	hw.ether_type = htons(protocol);
 	iov[0].iov_base = &hw;
-	iov[0].iov_len = sizeof(hw);
+	iov[0].iov_len = ETHER_HDR_LEN;
 	iov[1].iov_base = UNCONST(data);
 	iov[1].iov_len = len;
-
-#ifdef __PCC__
-	/* Work around PCC not respecting the packed ether_header */
-	iov[0].iov_len = 14;
-#endif
-	
 	return writev(iface->fd, iov, 2);
 }
 
@@ -167,7 +161,6 @@ get_raw_packet(struct interface *iface, int protocol,
 {
 	int fd = -1;
 	struct bpf_hdr packet;
-	struct ether_header hw;
 	ssize_t bytes;
 	const unsigned char *payload;
 
@@ -196,13 +189,8 @@ get_raw_packet(struct interface *iface, int protocol,
 		if (iface->buffer_pos + packet.bh_caplen + packet.bh_hdrlen >
 		    iface->buffer_len)
 			goto next; /* Packet beyond buffer, drop. */
-		payload = iface->buffer + packet.bh_hdrlen + sizeof(hw);
-		bytes = packet.bh_caplen - sizeof(hw);
-#ifdef __PCC__
-		/* Work around PCC not respecting the packed ether_header */
-		payload -= sizeof(hw) - 14;
-		bytes += sizeof(hw) - 14;
-#endif
+		payload = iface->buffer + packet.bh_hdrlen + ETHER_HDR_LEN;
+		bytes = packet.bh_caplen - ETHER_HDR_LEN;
 		if (bytes > len)
 			bytes = len;
 		memcpy(data, payload, bytes);
