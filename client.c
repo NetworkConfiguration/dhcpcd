@@ -1152,7 +1152,7 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 	/* We should restart on a NAK */
 	if (type == DHCP_NAK) {
 		addr = get_option_string(dhcp, DHCP_MESSAGE);
-		logger(LOG_INFO, "received NAK: %s", addr);
+		logger(LOG_WARNING, "received NAK: %s", addr);
 		free(addr);
 		state->state = STATE_INIT;
 		state->timeout = 0;
