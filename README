@@ -16,11 +16,11 @@ automatic tests.
 OS=BSD | Linux
 
 If size is your thing, you can remove all non-essential userland options
-by adding -DMINIMAL to your CFLAGS. This currently shaves off around 6k.
+by adding -DMINIMAL to your CPPFLAGS. This currently shaves off around 6k.
 You can save a futher 600 bytes or so by using the small make target.
 
 If you're building for a NOMMU system where fork() does not work, you should
-add -DTHERE_IS_NO_FORK to your CFLAGS.
+add -DTHERE_IS_NO_FORK to your CPPFLAGS.
 
 You can change the default dir with these knobs.
 For example, to satisfy FHS compliance you would do this:-
@@ -48,7 +48,7 @@ Compatibility
 If you require compatibility with dhcpcd-3 and older style variables,
 you can install 50-dhcpcd-compat into the directory $LIBEXECDIR/dhcpcd-hooks
 We don't install this by default.
-You should also add -DCMDLINE_COMPAT to your CFLAGS if you need to be fully
+You should also add -DCMDLINE_COMPAT to your CPPFLAGS if you need to be fully
 commandline compatible with prior versions.
 
 dhcpcd-3 enabled DUID support by default - this has changed in dhcpcd-4.
