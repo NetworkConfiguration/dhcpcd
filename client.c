@@ -544,9 +544,13 @@ client_setup(struct if_state *state, const struct options *options)
 			iface->clientid[1] = 255; /* RFC 4361 */
 
 			/* IAID is 4 bytes, so if the iface name is 4 bytes
-			 * use it */
-			if (strlen(iface->name) == 4) {
-				memcpy(iface->clientid + 2, iface->name, 4);
+			 * or less, use it */
+			ul = strlen(iface->name);
+			if (ul < 5) {
+				memcpy(iface->clientid + 2, iface->name, ul);
+				if (ul < 4)
+					memset(iface->clientid + 2 + ul,
+					       0, 4 - ul);
 			} else {
 				/* Name isn't 4 bytes, so use the index */
 				ul = htonl(if_nametoindex(iface->name));
