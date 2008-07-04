@@ -42,24 +42,11 @@
 # ifndef DISABLE_IPV4LL
 #  define DISABLE_IPV4LL
 # endif
-# ifndef DISABLE_DUID
-#  define DISABLE_DUID
-# endif
 #endif
 
 /* Enable ARP by default. */
 #ifndef DISABLE_ARP
 # define ENABLE_ARP
-#endif
-
-/* Allow dhcpcd to create a DUID (LLT) and use it to make an IAID for the
- * ClientID. Even enabled here, we need a config directive to actually use it
- * so this toggle is just to remove it from dhcpcd to make the binary smaller.
- * You can always create your own DUID file that just contains the
- * hex string that represents the DUID.
- * See RFC 3315 for details on this. */
-#ifndef DISABLE_DUID
-# define ENABLE_DUID
 #endif
 
 /* IPV4LL, aka ZeroConf, aka APIPA, aka RFC 3927.

@@ -264,7 +264,7 @@ daemonise(struct if_state *state, const struct options *options)
 	return -1;
 }
 
-#ifdef ENABLE_DUID
+#ifndef MINIMAL
 #define THIRTY_YEARS_IN_SECONDS    946707779
 static size_t
 get_duid(unsigned char *duid, const struct interface *iface)
@@ -465,8 +465,8 @@ client_setup(struct if_state *state, const struct options *options)
 	struct interface *iface = state->interface;
 	struct dhcp_lease *lease = &state->lease;
 	struct in_addr addr;
+#ifndef MINIMAL
 	size_t len = 0;
-#ifdef ENABLE_DUID
 	unsigned char *duid = NULL;
 	uint32_t ul;
 #endif
@@ -522,12 +522,12 @@ client_setup(struct if_state *state, const struct options *options)
 		iface->net.s_addr = lease->net.s_addr;
 	}
 
+#ifndef MINIMAL
 	if (*options->clientid) {
 		iface->clientid = xmalloc(options->clientid[0] + 1);
 		memcpy(iface->clientid,
 		       options->clientid, options->clientid[0] + 1);
 	} else if (options->options & DHCPCD_CLIENTID) {
-#ifdef ENABLE_DUID
 		if (options->options & DHCPCD_DUID) {
 			duid = xmalloc(DUID_LEN);
 			if ((len = get_duid(duid, iface)) == 0)
@@ -556,7 +556,6 @@ client_setup(struct if_state *state, const struct options *options)
 			memcpy(iface->clientid + 6, duid, len);
 			free(duid);
 		}
-#endif
 		if (len == 0) {
 			len = iface->hwlen + 1;
 			iface->clientid = xmalloc(len + 1);
@@ -565,6 +564,7 @@ client_setup(struct if_state *state, const struct options *options)
 			memcpy(iface->clientid + 2, iface->hwaddr, iface->hwlen);
 		}
 	}
+#endif
 
 	return 0;
 }

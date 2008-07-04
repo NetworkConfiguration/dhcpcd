@@ -707,13 +707,16 @@ make_message(struct dhcp_message **message,
 	     uint32_t xid, uint8_t type, const struct options *options)
 {
 	struct dhcp_message *dhcp;
-	uint8_t *d, *m, *p;
-	const char *c;
+	uint8_t *m, *p;
 	uint8_t *n_params = NULL;
 	time_t up = uptime() - iface->start_uptime;
 	uint32_t ul;
 	uint16_t sz;
 	const struct dhcp_opt *opt;
+#ifndef MINIMAL
+	uint8_t *d;
+	const char *c;
+#endif
 
 	dhcp = xzalloc(sizeof (*dhcp));
 	m = (uint8_t *)dhcp;
@@ -774,6 +777,7 @@ make_message(struct dhcp_message **message,
 		p += 2;
 	}
 
+#ifndef MINIMAL
 	if (iface->clientid) {
 		*p++ = DHCP_CLIENTID;
 		memcpy(p, iface->clientid, iface->clientid[0] + 1);
@@ -793,6 +797,7 @@ make_message(struct dhcp_message **message,
 			p += options->classid[0] + 1;
 		}
 	}
+#endif
 
 	if (type == DHCP_DISCOVER || type == DHCP_REQUEST) {
 #define PUTADDR(_type, _val) \
@@ -825,6 +830,7 @@ make_message(struct dhcp_message **message,
 	    type == DHCP_INFORM ||
 	    type == DHCP_REQUEST)
 	{
+#ifndef MINIMAL
 		if (options->hostname[0]) {
 			if (options->fqdn == FQDN_DISABLE) {
 				*p++ = DHCP_HOSTNAME;
@@ -867,6 +873,7 @@ make_message(struct dhcp_message **message,
 			memcpy(p, options->vendor, options->vendor[0] + 1);
 			p += options->vendor[0] + 1;
 		}
+#endif
 
 		*p++ = DHCP_PARAMETERREQUESTLIST;
 		n_params = p;

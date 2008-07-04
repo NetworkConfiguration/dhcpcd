@@ -40,10 +40,8 @@
 
 #include "config.h"
 
-#ifdef ENABLE_DUID
 #ifndef DUID_LEN
 #  define DUID_LEN			128 + 2
-#endif
 #endif
 
 #define EUI64_ADDR_LEN			8

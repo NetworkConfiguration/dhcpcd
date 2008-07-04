@@ -158,10 +158,12 @@ read_pid(const char *pidfile)
 static void
 usage(void)
 {
+#ifndef MINIMAL
 	printf("usage: "PACKAGE" [-dknpqxADEGHKLOTV] [-c script] [-f file ] [-h hostname]\n"
 	       "              [-i classID ] [-l leasetime] [-m metric] [-o option] [-r ipaddr]\n"
 	       "              [-s ipaddr] [-t timeout] [-u userclass] [-F none|ptr|both]\n"
 	       "              [-I clientID] [-C hookscript] <interface>\n");
+#endif
 }
 
 static char * 
@@ -206,6 +208,7 @@ add_environ(struct options *options, const char *value, int uniq)
 	return newlist[i];
 }
 
+#ifndef MINIMAL
 #define parse_string(buf, len, arg) parse_string_hwaddr(buf, len, arg, 0)
 static ssize_t
 parse_string_hwaddr(char *sbuf, ssize_t slen, char *str, int clid)
@@ -303,6 +306,7 @@ parse_string_hwaddr(char *sbuf, ssize_t slen, char *str, int clid)
 	}
 	return l;
 }
+#endif
 
 static int
 parse_option(int opt, char *oarg, struct options *options)
@@ -310,13 +314,16 @@ parse_option(int opt, char *oarg, struct options *options)
 	int i;
 	char *p;
 	ssize_t s;
+#ifndef MINIMAL
 	struct in_addr addr;
+#endif
 
 	switch(opt) {
 	case 'c':
 		strlcpy(options->script, oarg, sizeof(options->script));
 		break;
 	case 'h':
+#ifndef MINIMAL
 		if (oarg)
 			s = parse_string(options->hostname + 1,
 					 MAXHOSTNAMELEN, oarg);
@@ -327,8 +334,10 @@ parse_option(int opt, char *oarg, struct options *options)
 			return -1;
 		}
 		options->hostname[0] = (uint8_t)s;
+#endif
 		break;
 	case 'i':
+#ifndef MINIMAL
 		if (oarg)
 			s = parse_string((char *)options->classid + 1,
 					 CLASSID_MAX_LEN, oarg);
@@ -339,8 +348,10 @@ parse_option(int opt, char *oarg, struct options *options)
 			return -1;
 		}
 		*options->classid = (uint8_t)s;
+#endif
 		break;
 	case 'l':
+#ifndef MINIMAL
 		if (*oarg == '-') {
 			logger(LOG_ERR,
 			       "leasetime must be a positive value");
@@ -352,6 +363,7 @@ parse_option(int opt, char *oarg, struct options *options)
 			logger(LOG_ERR, "`%s' out of range", oarg);
 			return -1;
 		}
+#endif
 		break;
 	case 'm':
 		options->metric = atoint(oarg);
@@ -412,6 +424,7 @@ parse_option(int opt, char *oarg, struct options *options)
 		}
 		break;
 	case 'u':
+#ifndef MINIMAL
 		s = USERCLASS_MAX_LEN - options->userclass[0] - 1;
 		s = parse_string((char *)options->userclass + options->userclass[0] + 2,
 				 s, oarg);
@@ -423,8 +436,10 @@ parse_option(int opt, char *oarg, struct options *options)
 			options->userclass[options->userclass[0] + 1] = s;
 			options->userclass[0] += s + 1;
 		}
+#endif
 		break;
 	case 'v':
+#ifndef MINIMAL
 		p = strchr(oarg, ',');
 		if (!p || !p[1]) {
 			logger(LOG_ERR, "invalid vendor format");
@@ -459,6 +474,7 @@ parse_option(int opt, char *oarg, struct options *options)
 			options->vendor[options->vendor[0] + 2] = s;
 			options->vendor[0] += s + 2;
 		}
+#endif
 		break;
 	case 'A':
 		options->options &= ~DHCPCD_ARP;
@@ -482,6 +498,7 @@ parse_option(int opt, char *oarg, struct options *options)
 		options->options |= DHCPCD_LASTLEASE;
 		break;
 	case 'F':
+#ifndef MINIMAL
 		if (!oarg) {
 			options->fqdn = FQDN_BOTH;
 			break;
@@ -497,11 +514,13 @@ parse_option(int opt, char *oarg, struct options *options)
 			       oarg);
 			return -1;
 		}
+#endif
 		break;
 	case 'G':
 		options->options &= ~DHCPCD_GATEWAY;
 		break;
 	case 'I':
+#ifndef MINIMAL
 		/* Strings have a type of 0 */;
 		options->classid[1] = 0;
 		if (oarg)
@@ -518,6 +537,7 @@ parse_option(int opt, char *oarg, struct options *options)
 			options->options &= ~DHCPCD_DUID;
 			options->options &= ~DHCPCD_CLIENTID;
 		}
+#endif
 		break;
 	case 'K':
 		options->options &= ~DHCPCD_DAEMONISE;
@@ -579,11 +599,14 @@ main(int argc, char **argv)
 	openlog(PACKAGE, LOG_PID, LOG_LOCAL0);
 
 	options = xzalloc(sizeof(*options));
+	options->options |= DHCPCD_GATEWAY | DHCPCD_DAEMONISE;
+#ifndef MINIMAL
+	options->options |= DHCPCD_CLIENTID;
 	strlcpy(options->script, SCRIPT, sizeof(options->script));
 	options->classid[0] = snprintf((char *)options->classid + 1, CLASSID_MAX_LEN,
 				       "%s %s", PACKAGE, VERSION);
 
-	options->options |= DHCPCD_CLIENTID | DHCPCD_GATEWAY | DHCPCD_DAEMONISE;
+#endif
 #ifdef ENABLE_ARP
 	options->options |= DHCPCD_ARP;
  #ifdef ENABLE_IPV4LL
@@ -602,12 +625,10 @@ main(int argc, char **argv)
 
 	/* If the duid file exists, then enable duid by default
 	 * This means we don't break existing clients that easily :) */
-# ifdef ENABLE_DUID
 	if ((f = fopen(DUID, "r"))) {
 		options->options |= DHCPCD_DUID;
 		fclose(f);
 	}
-# endif
 #endif
 
 #ifdef THERE_IS_NO_FORK
@@ -620,11 +641,13 @@ main(int argc, char **argv)
 	}
 #endif
 
+#ifndef MINIMAL
 	gethostname(options->hostname + 1, sizeof(options->hostname));
 	if (strcmp(options->hostname + 1, "(none)") == 0 ||
 	    strcmp(options->hostname + 1, "localhost") == 0)
 		options->hostname[1] = '\0';
 	*options->hostname = strlen(options->hostname + 1);
+#endif
 
 	while ((opt = getopt_long(argc, argv, OPTS EXTRA_OPTS,
 				  longopts, &option_index)) != -1)
@@ -654,11 +677,11 @@ main(int argc, char **argv)
 #ifdef ENABLE_ARP
 		       " ARP"
 #endif
-#ifdef ENABLE_DUID
-		       " DUID"
-#endif
 #ifdef ENABLE_IPV4LL
 		       " IPV4LL"
+#endif
+#ifdef MINIMAL
+		       " MINIMAL"
 #endif
 #ifdef THERE_IS_NO_FORK
 		       " THERE_IS_NO_FORK"
@@ -821,6 +844,7 @@ main(int argc, char **argv)
 		}
 	}
 
+#ifndef MINIMAL
 	if ((p = strchr(options->hostname, '.'))) {
 		if (options->fqdn == FQDN_DISABLE)
 			*p = '\0';
@@ -833,6 +857,7 @@ main(int argc, char **argv)
 	}
 	if (options->fqdn != FQDN_DISABLE)
 		del_reqmask(options->reqmask, DHCP_HOSTNAME);
+#endif
 
 	if (options->request_address.s_addr == 0 &&
 	    (options->options & DHCPCD_INFORM ||
@@ -947,11 +972,13 @@ main(int argc, char **argv)
 		logger(LOG_INFO, PACKAGE " " VERSION " starting");
 	}
 
+#ifndef MINIMAL
 	/* Terminate the encapsulated options */
 	if (options->vendor[0]) {
 		options->vendor[0]++;
 		options->vendor[options->vendor[0]] = DHCP_END;
 	}
+#endif
 
 	if (dhcp_run(options, &pid_fd) == 0)
 		retval = EXIT_SUCCESS;

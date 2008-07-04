@@ -71,17 +71,11 @@ extern char *dhcpcd_skiproutes;
 
 struct options {
 	char interface[IF_NAMESIZE];
-	char hostname[MAXHOSTNAMELEN];
-	int fqdn;
-	uint8_t classid[CLASSID_MAX_LEN + 1];
-	char clientid[CLIENTID_MAX_LEN + 1];
-	uint8_t userclass[USERCLASS_MAX_LEN + 1];
-	uint8_t vendor[VENDOR_MAX_LEN + 1];
+	int metric;
 	uint8_t reqmask[256 / 8];
 	uint8_t nomask[256 / 8];
 	uint32_t leasetime;
 	time_t timeout;
-	int metric;
 	int options;
 
 	struct in_addr request_address;
@@ -90,6 +84,15 @@ struct options {
 	char **environ;
 	char script[PATH_MAX];
 	char pidfile[PATH_MAX];
+
+#ifndef MINIMAL
+	char hostname[MAXHOSTNAMELEN];
+	int fqdn;
+	uint8_t classid[CLASSID_MAX_LEN + 1];
+	char clientid[CLIENTID_MAX_LEN + 1];
+	uint8_t userclass[USERCLASS_MAX_LEN + 1];
+	uint8_t vendor[VENDOR_MAX_LEN + 1];
+#endif
 };
 
 #endif
