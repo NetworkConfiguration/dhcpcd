@@ -63,7 +63,7 @@ exec_script(const struct options *options, const char *iface,
 	sigset_t full;
 	sigset_t old;
 
-	logger(LOG_DEBUG, "exec `%s'", options->script);
+	logger(LOG_DEBUG, "executing `%s'", options->script);
 
 	/* Make our env */
 	elen = 5;
