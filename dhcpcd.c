@@ -600,12 +600,13 @@ main(int argc, char **argv)
 
 	options = xzalloc(sizeof(*options));
 	options->options |= DHCPCD_GATEWAY | DHCPCD_DAEMONISE;
+	options->timeout = DEFAULT_TIMEOUT;
+	strlcpy(options->script, SCRIPT, sizeof(options->script));
+
 #ifndef MINIMAL
 	options->options |= DHCPCD_CLIENTID;
-	strlcpy(options->script, SCRIPT, sizeof(options->script));
 	options->classid[0] = snprintf((char *)options->classid + 1, CLASSID_MAX_LEN,
 				       "%s %s", PACKAGE, VERSION);
-
 #endif
 #ifdef ENABLE_ARP
 	options->options |= DHCPCD_ARP;
@@ -613,7 +614,6 @@ main(int argc, char **argv)
 	options->options |= DHCPCD_IPV4LL;
  #endif
 #endif
-	options->timeout = DEFAULT_TIMEOUT;
 
 #ifdef CMDLINE_COMPAT
 	add_reqmask(options->reqmask, DHCP_DNSSERVER);
