@@ -35,7 +35,7 @@
 #include "common.h"
 #include "logger.h"
 
-static int loglevel = LOG_WARNING;
+static int loglevel = LOG_INFO;
 static char logprefix[12] = {0};
 
 struct logname {

@@ -52,7 +52,7 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 
 /* Don't set any optional arguments here so we retain POSIX
  * compatibility with getopt */
-#define OPTS "c:df:h:i:kl:m:no:pr:s:t:u:v:xAC:DEF:GI:KLO:TV"
+#define OPTS "c:df:h:i:kl:m:no:pqr:s:t:u:v:xAC:DEF:GI:KLO:TV"
 
 static int doversion = 0;
 static int dohelp = 0;
@@ -68,6 +68,7 @@ static const struct option longopts[] = {
 	{"renew",       no_argument,        NULL, 'n'},
 	{"option",      required_argument,  NULL, 'o'},
 	{"persistent",  no_argument,        NULL, 'p'},
+	{"quiet",       no_argument,        NULL, 'q'},
 	{"inform",      optional_argument,  NULL, 's'},
 	{"request",     optional_argument,  NULL, 'r'},
 	{"timeout",     required_argument,  NULL, 't'},
@@ -157,7 +158,7 @@ read_pid(const char *pidfile)
 static void
 usage(void)
 {
-	printf("usage: "PACKAGE" [-dknpxADEGHKLOTV] [-c script] [-f file ] [-h hostname]\n"
+	printf("usage: "PACKAGE" [-dknpqxADEGHKLOTV] [-c script] [-f file ] [-h hostname]\n"
 	       "              [-i classID ] [-l leasetime] [-m metric] [-o option] [-r ipaddr]\n"
 	       "              [-s ipaddr] [-t timeout] [-u userclass] [-F none|ptr|both]\n"
 	       "              [-I clientID] [-C hookscript] <interface>\n");
@@ -367,6 +368,9 @@ parse_option(int opt, char *oarg, struct options *options)
 		break;
 	case 'p':
 		options->options |= DHCPCD_PERSISTENT;
+		break;
+	case 'q':
+		setloglevel(LOG_WARNING);
 		break;
 	case 's':
 		options->options |= DHCPCD_INFORM;
