@@ -994,6 +994,10 @@ handle_timeout(struct if_state *state, const struct options *options)
 		if (iface->arp_fd == -1)
 			open_socket(iface, ETHERTYPE_ARP);
 		if (state->probes < PROBE_NUM) {
+			if (state->probes == 0)
+				logger(LOG_INFO, "checking %s is available"
+				       " on attached networks",
+				       inet_ntoa(lease->addr));
 			state->probes++;
 			logger(LOG_DEBUG, "sending ARP probe #%d",
 			       state->probes);
