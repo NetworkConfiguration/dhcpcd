@@ -990,6 +990,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 	struct interface *iface = state->interface;
 	int i;
 	struct timeval tv;
+	struct in_addr addr;
 
 #ifdef ENABLE_ARP
 	switch (state->state) {
@@ -998,10 +999,12 @@ handle_timeout(struct if_state *state, const struct options *options)
 		if (iface->arp_fd == -1)
 			open_socket(iface, ETHERTYPE_ARP);
 		if (state->probes < PROBE_NUM) {
-			if (state->probes == 0)
+			if (state->probes == 0) {
+				addr.s_addr = state->offer->yiaddr;
 				logger(LOG_INFO, "checking %s is available"
 				       " on attached networks",
-				       inet_ntoa(lease->addr));
+				       inet_ntoa(addr));
+			}
 			state->probes++;
 			logger(LOG_DEBUG, "sending ARP probe #%d",
 			       state->probes);
