@@ -151,7 +151,7 @@ static const struct dhcp_opt const dhcp_opts[] = {
 	{ 118,	IPV4,		"subnet_selection" },
 	{ 119,	STRING | RFC3397,	"domain_search" },
 	{ 121,  RFC3442 | REQUEST,	"classless_static_routes" },
-	{ 249,  RFC3442,	"ms-classless_static_routes" },
+	{ 249,  RFC3442,	"ms_classless_static_routes" },
 	{ 0, 0, NULL }
 };
 
