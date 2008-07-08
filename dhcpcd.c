@@ -52,7 +52,7 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 
 /* Don't set any optional arguments here so we retain POSIX
  * compatibility with getopt */
-#define OPTS "c:df:h:i:kl:m:no:pqr:s:t:u:v:xAC:DEF:GI:KLO:TV"
+#define OPTS "c:df:h:i:kl:m:no:pqr:s:t:u:v:xAC:DEF:GI:LO:TVX"
 
 static int doversion = 0;
 static int dohelp = 0;
@@ -82,15 +82,15 @@ static const struct option longopts[] = {
 	{"fqdn",        optional_argument,  NULL, 'F'},
 	{"nogateway",   no_argument,        NULL, 'G'},
 	{"clientid",    optional_argument,  NULL, 'I'},
-	{"nodaemonise", no_argument,        NULL, 'K'},
 	{"noipv4ll",    no_argument,        NULL, 'L'},
 	{"nooption",    optional_argument,  NULL, 'O'},
 	{"test",        no_argument,        NULL, 'T'},
 	{"variables",   no_argument,        NULL, 'V'},
+	{"nodaemonise", no_argument,        NULL, 'X'},
 	{"help",        no_argument,        &dohelp, 1},
 	{"version",     no_argument,        &doversion, 1},
 #ifdef THERE_IS_NO_FORK
-	{"daemonised",	no_argument,        NULL, 'X'},
+	{"daemonised",	no_argument,        NULL, 'z'},
 	{"skiproutes",  required_argument,  NULL, 'Z'},
 #endif
 #ifdef CMDLINE_COMPAT
@@ -109,7 +109,7 @@ char dhcpcd[PATH_MAX];
 char **dhcpcd_argv = NULL;
 int dhcpcd_argc = 0;
 char *dhcpcd_skiproutes = NULL;
-#define EXTRA_OPTS "XZ:"
+#define EXTRA_OPTS "zZ:"
 #endif
 
 #ifdef CMDLINE_COMPAT
@@ -539,11 +539,19 @@ parse_option(int opt, char *oarg, struct options *options)
 		}
 #endif
 		break;
-	case 'K':
-		options->options &= ~DHCPCD_DAEMONISE;
-		break;
 	case 'L':
 		options->options &= ~DHCPCD_IPV4LL;
+		break;
+	case 'O':
+		if (make_reqmask(options->reqmask, &optarg, -1) != 0 ||
+		    make_reqmask(options->nomask, &optarg, 1) != 0)
+		{
+			logger(LOG_ERR, "unknown option `%s'", optarg);
+			return -1;
+		}
+		break;
+	case 'Z':
+		options->options &= ~DHCPCD_DAEMONISE;
 		break;
 	default:
 		return 0;
@@ -783,7 +791,7 @@ main(int argc, char **argv)
 		case 'f':
 			break;
 #ifdef THERE_IS_NO_FORK
-		case 'X':
+		case 'z':
 			options->options |= DHCPCD_DAEMONISED;
 			close_fds();
 			break;
@@ -799,16 +807,6 @@ main(int argc, char **argv)
 			break;
 		case 'x':
 			sig = SIGTERM;
-			break;
-		case 'O':
-			if (make_reqmask(options->reqmask, &optarg, -1) != 0) {
-				logger(LOG_ERR, "unknown option `%s'", optarg);
-				return -1;
-			}
-			if (make_reqmask(options->nomask, &optarg, 1) != 0) {
-				logger(LOG_ERR, "unknown option `%s'", optarg);
-				return -1;
-			}
 			break;
 		case 'T':
 			options->options |= DHCPCD_TEST | DHCPCD_PERSISTENT;
