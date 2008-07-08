@@ -550,7 +550,7 @@ parse_option(int opt, char *oarg, struct options *options)
 			return -1;
 		}
 		break;
-	case 'Z':
+	case 'X':
 		options->options &= ~DHCPCD_DAEMONISE;
 		break;
 	default:
