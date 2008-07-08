@@ -218,7 +218,7 @@ daemonise(struct if_state *state, const struct options *options)
 	logger(LOG_INFO, "forking to background");
 
 	/* We need to add --daemonise to our options */
-	argv = xmalloc (sizeof(char *) * (dhcpcd_argc + 4));
+	argv = xmalloc(sizeof(char *) * (dhcpcd_argc + 4));
 	argv[0] = dhcpcd;
 	for (i = 1; i < dhcpcd_argc; i++)
 		argv[i] = dhcpcd_argv[i];
