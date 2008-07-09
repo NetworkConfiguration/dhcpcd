@@ -618,7 +618,7 @@ int
 send_arp(const struct interface *iface, int op, in_addr_t sip, in_addr_t tip)
 {
 	struct arphdr *arp;
-	size_t arpsize, l;
+	size_t arpsize;
 	uint8_t *p;
 	int retval;
 
@@ -645,9 +645,8 @@ send_arp(const struct interface *iface, int op, in_addr_t sip, in_addr_t tip)
 	memcpy(p, &tip, sizeof(tip));
 	p += sizeof(tip);
 	/* Zero pad if needed */
-	l = p - (uint8_t *)arp;
-	if (l < arpsize)
-		memset(p, 0, arpsize - l);
+	while (p < (uint8_t *)arp + arpsize)
+		*p++ = '\0';
 
 	retval = send_raw_packet(iface, ETHERTYPE_ARP, arp, arpsize);
 	free(arp);
