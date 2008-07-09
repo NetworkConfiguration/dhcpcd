@@ -618,19 +618,21 @@ int
 send_arp(const struct interface *iface, int op, in_addr_t sip, in_addr_t tip)
 {
 	struct arphdr *arp;
-	size_t arpsize;
-	unsigned char *p;
+	size_t arpsize, l;
+	uint8_t *p;
 	int retval;
 
 	arpsize = sizeof(*arp) + 2 * iface->hwlen + 2 *sizeof(sip);
-
+	/* Ensure that our packet is of the minimum size */
+	if (arpsize < ETHER_MIN_LEN - ETHER_HDR_LEN)
+		arpsize = ETHER_MIN_LEN - ETHER_HDR_LEN;
 	arp = xmalloc(arpsize);
 	arp->ar_hrd = htons(iface->family);
 	arp->ar_pro = htons(ETHERTYPE_IP);
 	arp->ar_hln = iface->hwlen;
 	arp->ar_pln = sizeof(sip);
 	arp->ar_op = htons(op);
-	p = (unsigned char *)arp;
+	p = (uint8_t *)arp;
 	p += sizeof(*arp);
 	memcpy(p, iface->hwaddr, iface->hwlen);
 	p += iface->hwlen;
@@ -641,6 +643,11 @@ send_arp(const struct interface *iface, int op, in_addr_t sip, in_addr_t tip)
 	memset(p, 0xff, iface->hwlen);
 	p += iface->hwlen;
 	memcpy(p, &tip, sizeof(tip));
+	p += sizeof(tip);
+	/* Zero pad if needed */
+	l = p - (uint8_t *)arp;
+	if (l < arpsize)
+		memset(p, 0, arpsize - l);
 
 	retval = send_raw_packet(iface, ETHERTYPE_ARP, arp, arpsize);
 	free(arp);
