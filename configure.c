@@ -470,7 +470,9 @@ configure(struct interface *iface, const char *reason,
 		logger(LOG_DEBUG, "deleting IP address %s/%d",
 		       inet_ntoa(iface->addr),
 		       inet_ntocidr(iface->net));
-		del_address(iface->name, &iface->addr, &iface->net);
+		if (del_address(iface->name, &iface->addr, &iface->net) == -1
+		    && errno != ENOENT) 
+			logger(LOG_ERR, "del_address: %s", strerror(errno));
 	}
 
 #ifdef __linux__
