@@ -131,6 +131,7 @@ int do_mtu(const char *, short int);
 int inet_ntocidr(struct in_addr);
 int inet_cidrtoaddr(int, struct in_addr *);
 
+int up_interface(const char *);
 int do_interface(const char *, unsigned char *, size_t *,
 		 struct in_addr *, struct in_addr *, int);
 int if_address(const char *, const struct in_addr *, const struct in_addr *,

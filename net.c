@@ -278,6 +278,38 @@ do_interface(const char *ifname,
 	return retval;
 }
 
+int
+up_interface(const char *ifname)
+{
+	int s;
+	struct ifreq ifr;
+	int retval = -1;
+#ifdef __linux__
+	char *p;
+#endif
+
+	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+		return -1;
+	memset(&ifr, 0, sizeof(ifr));
+	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
+#ifdef __linux__
+	/* We can only bring the real interface up */
+	if ((p = strchr(ifr.ifr_name, ':')))
+		*p = '\0';
+#endif
+	if (ioctl(s, SIOCGIFFLAGS, &ifr) == 0) {
+		if ((ifr.ifr_flags & IFF_UP))
+			retval = 0;
+		else {
+			ifr.ifr_flags |= IFF_UP;
+			if (ioctl(s, SIOCSIFFLAGS, &ifr) == 0)
+				retval = 0;
+		}
+	}
+	close(s);
+	return retval;
+}
+
 struct interface *
 read_interface(const char *ifname, _unused int metric)
 {
@@ -287,9 +319,6 @@ read_interface(const char *ifname, _unused int metric)
 	unsigned char *hwaddr = NULL;
 	size_t hwlen = 0;
 	sa_family_t family = 0;
-#ifdef __linux__
-	char *p;
-#endif
 
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
@@ -342,20 +371,8 @@ read_interface(const char *ifname, _unused int metric)
 			goto eexit;
 	}
 
-	/* Bring the interface up if it's down */
-	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
-#ifdef __linux__
-	/* We can only bring the real interface up */
-	if ((p = strchr(ifr.ifr_name, ':')))
-		*p = '\0';
-#endif
-	if (ioctl(s, SIOCGIFFLAGS, &ifr) == -1)
+	if (up_interface(ifname) != 0)
 		goto eexit;
-	if (!(ifr.ifr_flags & IFF_UP)) {
-		ifr.ifr_flags |= IFF_UP;
-		if (ioctl(s, SIOCSIFFLAGS, &ifr) != 0)
-			goto eexit;
-	}
 
 	iface = xzalloc(sizeof(*iface));
 	strlcpy(iface->name, ifname, IF_NAMESIZE);

@@ -585,17 +585,11 @@ do_socket(struct if_state *state, int mode)
 		state->interface->udp_fd = -1;
 	}
 
-	/* We need to bind to a port, otherwise we generate ICMP messages
-	 * that cannot connect the port when we have an address.
-	 * We don't actually use this fd at all, instead using our packet
-	 * filter socket. */
 	if (mode == SOCKET_OPEN &&
 	    state->interface->udp_fd == -1 &&
-	    state->lease.addr.s_addr != 0)
-		if (open_udp_socket(state->interface) == -1) {
-			logger(LOG_ERR, "open_udp_socket: %s", strerror(errno));
-			return -1;
-		}
+	    state->lease.addr.s_addr != 0 &&
+	    open_udp_socket(state->interface) == -1)
+		logger(LOG_ERR, "open_udp_socket: %s", strerror(errno));
 
 	if (mode == SOCKET_OPEN) 
 		if (open_socket(state->interface, ETHERTYPE_IP) == -1) {
@@ -615,12 +609,22 @@ send_message(struct if_state *state, int type, const struct options *options)
 	ssize_t r;
 	struct in_addr from;
 	struct in_addr to;
+	in_addr_t a = 0;
 
 	logger(LOG_DEBUG, "sending %s with xid 0x%x",
 	       get_dhcp_op(type), state->xid);
 	state->messages++;
+	/* If we couldn't open a UDP port for our IP address
+	 * then we cannot renew.
+	 * This could happen if our IP was pulled out from underneath us. */
+	if (state->interface->udp_fd == -1) {
+		a = state->interface->addr.s_addr;
+		state->interface->addr.s_addr = 0;
+	}
 	len = make_message(&dhcp, state->interface, &state->lease, state->xid,
 			   type, options);
+	if (state->interface->udp_fd == -1)
+		state->interface->addr.s_addr = a;
 	from.s_addr = dhcp->ciaddr;
 	if (from.s_addr)
 		to.s_addr = state->lease.server.s_addr;
@@ -634,9 +638,17 @@ send_message(struct if_state *state, int type, const struct options *options)
 		len = make_udp_packet(&udp, (uint8_t *)dhcp, len, from, to);
 		free(dhcp);
 		r = send_raw_packet(state->interface, ETHERTYPE_IP, udp, len);
+		free(udp);
 		if (r == -1)
 			logger(LOG_ERR, "send_raw_packet: %s", strerror(errno));
-		free(udp);
+	}
+
+	/* Failed to send the packet? Return to the init state */
+	if (r == -1) {
+		state->state = STATE_INIT;
+		state->timeout = 0;
+		timerclear(&state->stop);
+		do_socket(state, SOCKET_CLOSED);
 	}
 	return r;
 }
@@ -710,6 +722,24 @@ wait_for_packet(struct if_state *state)
 		if (errno == EINTR)
 			return 0;
 		logger(LOG_ERR, "poll: %s", strerror(errno));
+	} else if (retval != 0) {
+		/* Check if any of the fd's have an error */
+		while (nfds-- > 0) {
+			if (fds[nfds].revents & POLLERR) {
+				logger(LOG_ERR, "error on fd %d", fds[nfds].fd);
+				switch(state->state) {
+				case STATE_INIT: /* FALLTHROUGH */
+				case STATE_DISCOVERING: /* FALLTHROUGH */
+				case STATE_REQUESTING: /* FALLTHROUGH */
+					state->state = STATE_INIT;
+				default:
+					state->state = STATE_RENEW_REQUESTED;
+				}
+				state->timeout = 0;
+				timerclear(&state->stop);
+				return 0;
+			}
+		}
 	}
 	return retval;
 }
@@ -1059,6 +1089,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 	case STATE_INIT:  /* FALLTHROUGH */
 	case STATE_BOUND: /* FALLTHROUGH */
 	case STATE_RENEW_REQUESTED:
+		up_interface(iface->name);
 		do_socket(state, SOCKET_OPEN);
 		state->xid = arc4random();
 		state->messages = 0;
