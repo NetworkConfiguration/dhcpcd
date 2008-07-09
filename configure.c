@@ -404,6 +404,21 @@ configure_routes(struct interface *iface, const struct dhcp_message *dhcp,
 	return retval;
 }
 
+static int
+delete_address(struct interface *iface)
+{
+	int retval;
+	logger(LOG_DEBUG, "deleting IP address %s/%d",
+	       inet_ntoa(iface->addr),
+	       inet_ntocidr(iface->net));
+	retval = del_address(iface->name, &iface->addr, &iface->net);
+	if (retval == -1 && errno != ENOENT) 
+		logger(LOG_ERR, "del_address: %s", strerror(errno));
+	iface->addr.s_addr = 0;
+	iface->net.s_addr = 0;
+	return retval;
+}
+
 int
 configure(struct interface *iface, const char *reason,
 	  const struct dhcp_message *dhcp, const struct dhcp_message *old,
@@ -435,16 +450,7 @@ configure(struct interface *iface, const char *reason,
 		/* Only reset things if we had set them before */
 		if (iface->addr.s_addr != 0) {
 			delete_routes(iface, options->metric);
-			logger(LOG_DEBUG, "deleting IP address %s/%d",
-			       inet_ntoa(iface->addr),
-			       inet_ntocidr(iface->net));
-			if (del_address(iface->name, &iface->addr,
-					&iface->net) == -1 &&
-			    errno != ENOENT) 
-				logger(LOG_ERR, "del_address: %s",
-				       strerror(errno));
-			iface->addr.s_addr = 0;
-			iface->net.s_addr = 0;
+			delete_address(iface);
 		}
 
 		exec_script(options, iface->name, reason, NULL, old);
@@ -466,14 +472,8 @@ configure(struct interface *iface, const char *reason,
 
 	/* Now delete the old address if different */
 	if (iface->addr.s_addr != addr.s_addr &&
-	    iface->addr.s_addr != 0) {
-		logger(LOG_DEBUG, "deleting IP address %s/%d",
-		       inet_ntoa(iface->addr),
-		       inet_ntocidr(iface->net));
-		if (del_address(iface->name, &iface->addr, &iface->net) == -1
-		    && errno != ENOENT) 
-			logger(LOG_ERR, "del_address: %s", strerror(errno));
-	}
+	    iface->addr.s_addr != 0)
+		delete_address(iface);
 
 #ifdef __linux__
 	/* On linux, we need to change the subnet route to have our metric. */
