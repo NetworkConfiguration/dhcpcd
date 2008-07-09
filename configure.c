@@ -466,8 +466,12 @@ configure(struct interface *iface, const char *reason,
 
 	/* Now delete the old address if different */
 	if (iface->addr.s_addr != addr.s_addr &&
-	    iface->addr.s_addr != 0) 
+	    iface->addr.s_addr != 0) {
+		logger(LOG_DEBUG, "deleting IP address %s/%d",
+		       inet_ntoa(iface->addr),
+		       inet_ntocidr(iface->net));
 		del_address(iface->name, &iface->addr, &iface->net);
+	}
 
 #ifdef __linux__
 	/* On linux, we need to change the subnet route to have our metric. */
