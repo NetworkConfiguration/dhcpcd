@@ -1134,6 +1134,8 @@ handle_timeout(struct if_state *state, const struct options *options)
 		}
 		logger(LOG_INFO, "renewing lease of %s",inet_ntoa(lease->addr));
 		state->state = STATE_RENEWING;
+		tv.tv_sec = lease->rebindtime - lease->renewaltime;
+		timeradd(&state->start, &tv, &state->stop);
 		break;
 	}
 
