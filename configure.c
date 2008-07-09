@@ -193,11 +193,11 @@ delete_route(const char *iface, struct rt *rt, int metric)
 	int retval;
 
 	addr = xstrdup(inet_ntoa(rt->dest));
-	logger(LOG_DEBUG, "removing route %s/%d via %s",
-			addr, inet_ntocidr(rt->net), inet_ntoa(rt->gate));
+	logger(LOG_DEBUG, "deleting route %s/%d via %s",
+	       addr, inet_ntocidr(rt->net), inet_ntoa(rt->gate));
 	free(addr);
 	retval = del_route(iface, &rt->dest, &rt->net, &rt->gate, metric);
-	if (retval != 0)
+	if (retval != 0 && errno != ENOENT)
 		logger(LOG_ERR," del_route: %s", strerror(errno));
 	return retval;
 
