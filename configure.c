@@ -63,7 +63,7 @@ exec_script(const struct options *options, const char *iface,
 	sigset_t full;
 	sigset_t old;
 
-	logger(LOG_DEBUG, "executing `%s'", options->script);
+	logger(LOG_DEBUG, "executing `%s', reason %s", options->script, reason);
 
 	/* Make our env */
 	elen = 5;
@@ -197,10 +197,9 @@ delete_route(const char *iface, struct rt *rt, int metric)
 	       addr, inet_ntocidr(rt->net), inet_ntoa(rt->gate));
 	free(addr);
 	retval = del_route(iface, &rt->dest, &rt->net, &rt->gate, metric);
-	if (retval != 0 && errno != ENOENT)
+	if (retval != 0 && errno != ENOENT && errno != ESRCH)
 		logger(LOG_ERR," del_route: %s", strerror(errno));
 	return retval;
-
 }
 
 static int
