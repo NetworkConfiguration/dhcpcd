@@ -149,6 +149,8 @@ int if_route(const char *, const struct in_addr *, const struct in_addr *,
 	     const struct in_addr *, int, int);
 #define add_route(ifname, dest, mask, gate, metric) \
 	if_route(ifname, dest, mask, gate, metric, 1)
+#define change_route(ifname, dest, mask, gate, metric) \
+	if_route(ifname, dest, mask, gate, metric, 0)
 #define del_route(ifname, dest, mask, gate, metric) \
 	if_route(ifname, dest, mask, gate, metric, -1)
 void free_routes(struct rt *);
