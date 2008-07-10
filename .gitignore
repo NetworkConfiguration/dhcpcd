@@ -1,5 +1,6 @@
 *.o
 version.h
+_dhcpcd.c
 dhcpcd
 dhcpcd.8
 dhcpcd.conf.5
