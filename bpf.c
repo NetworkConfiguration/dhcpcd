@@ -142,6 +142,7 @@ send_raw_packet(const struct interface *iface, int protocol,
 {
 	struct iovec iov[2];
 	struct ether_header hw;
+	int fd;
 
 	memset(&hw, 0, ETHER_HDR_LEN);
 	memset(&hw.ether_dhost, 0xff, ETHER_ADDR_LEN);
@@ -150,7 +151,13 @@ send_raw_packet(const struct interface *iface, int protocol,
 	iov[0].iov_len = ETHER_HDR_LEN;
 	iov[1].iov_base = UNCONST(data);
 	iov[1].iov_len = len;
-	return writev(iface->fd, iov, 2);
+#ifdef ENABLE_ARP
+	if (protocol == ETHERTYPE_ARP)
+		fd = iface->arp_fd;
+	else
+#endif
+		fd = iface->fd;
+	return writev(fd, iov, 2);
 }
 
 /* BPF requires that we read the entire buffer.
