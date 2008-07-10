@@ -1086,8 +1086,10 @@ handle_timeout(struct if_state *state, const struct options *options)
 			state->claims++;
 			logger(LOG_DEBUG, "sending ARP announce #%d",
 			       state->claims);
-			send_arp(iface, ARPOP_REQUEST,
-				 state->new->yiaddr, state->new->yiaddr);
+			i = send_arp(iface, ARPOP_REQUEST,
+				     state->new->yiaddr, state->new->yiaddr);
+			if (i == -1)
+				logger(LOG_ERR, "send_arp: %s", strerror(errno));
 			if (state->claims < ANNOUNCE_NUM)
 				tv.tv_sec = ANNOUNCE_INTERVAL;
 			else if (IN_LINKLOCAL(htonl(lease->addr.s_addr))) {
