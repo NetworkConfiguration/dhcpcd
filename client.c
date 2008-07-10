@@ -491,9 +491,9 @@ client_setup(struct if_state *state, const struct options *options)
 #ifdef THERE_IS_NO_FORK
 		if (options->options & DHCPCD_DAEMONISED) {
 			state->state = STATE_BOUND;
-			tv.sec = state->lease.renewaltime;
+			tv.tv_sec = state->lease.renewaltime;
 			get_time(&state->timeout);
-			timeradd(&state->timeout, tv, &state->timeout);
+			timeradd(&state->timeout, &tv, &state->timeout);
 			iface->addr.s_addr = lease->addr.s_addr;
 			iface->net.s_addr = lease->net.s_addr;
 			get_option_addr(&lease->server.s_addr,
