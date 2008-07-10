@@ -76,8 +76,7 @@
 #define STATE_PROBING		8
 #define STATE_ANNOUNCING	9
 
-/* Constants taken from RFC 2131. 
- * We multiply some numbers by 1000 so they are suitable for use in poll(). */
+/* Constants taken from RFC 2131. */
 #define T1			0.5
 #define T2			0.875
 #define DHCP_BASE		4
@@ -91,8 +90,7 @@
 #define SOCKET_CLOSED           0
 #define SOCKET_OPEN             1
 
-/* These are really for IPV4LL, RFC 3927.
- * We multiply some numbers by 1000 so they are suitable for use in poll(). */
+/* These are for IPV4LL, RFC 3927. */
 #define PROBE_WAIT		 1
 #define PROBE_NUM		 3
 #define PROBE_MIN		 1
