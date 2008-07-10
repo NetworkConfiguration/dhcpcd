@@ -742,8 +742,27 @@ wait_for_packet(struct if_state *state)
 		if (errno == EINTR)
 			return 0;
 		logger(LOG_ERR, "poll: %s", strerror(errno));
-	} else if (retval != 0) {
-		/* Check if any of the fd's have an error */
+	} else if (retval != 0 && !(fds[0].revents & POLLIN)) {
+		/* Check if any of the fd's have an error
+		 * if there is no data on the signal fd. */
+		while (--nfds > 0) {
+			if (fds[nfds].revents & POLLERR) {
+				logger(LOG_ERR, "error on fd %d", fds[nfds].fd);
+				switch (state->state) {
+				case STATE_INIT:        /* FALLTHROUGH */
+				case STATE_DISCOVERING: /* FALLTHROUGH */
+				case STATE_REQUESTING:
+					state->state = STATE_INIT;
+					break;
+				default:
+					state->state = STATE_RENEW_REQUESTED;
+					break;
+				}
+				timerclear(&state->timeout);
+				timerclear(&state->stop);
+				return 0;
+			}
+		}
 	}
 	return retval;
 }
