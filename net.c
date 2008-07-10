@@ -647,7 +647,6 @@ send_arp(const struct interface *iface, int op, in_addr_t sip, in_addr_t tip)
 	/* Zero pad if needed */
 	while (p < (uint8_t *)arp + arpsize)
 		*p++ = '\0';
-
 	retval = send_raw_packet(iface, ETHERTYPE_ARP, arp, arpsize);
 	free(arp);
 	return retval;
