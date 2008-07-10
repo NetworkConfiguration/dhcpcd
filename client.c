@@ -1065,7 +1065,9 @@ handle_timeout(struct if_state *state, const struct options *options)
 				tv.tv_sec = ANNOUNCE_WAIT;
 			get_time(&state->timeout);
 			timeradd(&state->timeout, &tv, &state->timeout);
-			send_arp(iface, ARPOP_REQUEST, 0, state->offer->yiaddr);
+			i = send_arp(iface, ARPOP_REQUEST, 0, state->offer->yiaddr);
+			if (i == -1)
+				logger(LOG_ERR, "send_arp: %s", strerror(errno));
 			return 0;
 		} else {
 			/* We've waited for ANNOUNCE_WAIT after the final probe
