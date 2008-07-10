@@ -686,11 +686,11 @@ wait_for_packet(struct if_state *state)
 		timeout = INFTIM;
 	} else {
 		timersub(&state->timeout, &now, &d);
-		timeout  = d.tv_sec * 1000 + (d.tv_usec + 999) / 1000;
+		timeout  = (d.tv_sec * 1000 + (d.tv_usec + 999)) / 1000;
 		if (timerisset(&state->stop)) {
 			if (timercmp(&state->stop, &now, >)) {
 				timersub(&state->stop, &now, &d);
-				retval = d.tv_sec * 1000 + (d.tv_usec + 999) / 1000;
+				retval = (d.tv_sec * 1000 + (d.tv_usec + 999)) / 1000;
 				if (retval < timeout)
 					timeout = retval;
 			}
