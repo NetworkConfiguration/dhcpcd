@@ -91,11 +91,6 @@
 #define SOCKET_CLOSED           0
 #define SOCKET_OPEN             1
 
-/* Indexes for pollfds */
-#define POLLFD_SIGNAL           0
-#define POLLFD_IFACE            1 
-#define POLLFD_ARP		2
-
 /* These are really for IPV4LL, RFC 3927.
  * We multiply some numbers by 1000 so they are suitable for use in poll(). */
 #define PROBE_WAIT		 1
