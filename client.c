@@ -670,8 +670,9 @@ static int
 wait_for_packet(struct if_state *state)
 {
 	struct pollfd fds[3]; /* iface, arp, signal */
-	int retval, timeout, nfds = 0;
-	struct timeval now, d;
+	int retval, nfds = 0;
+	time_t timeout = 0;
+	struct timeval now, d, *ref;
 	static time_t last_stop_sec = 0, last_timeout_sec = 0;
 	static long int last_stop_usec = 0, last_timeout_usec = 0;
 
@@ -679,24 +680,10 @@ wait_for_packet(struct if_state *state)
 	fds[nfds].fd = state->signal_fd;
 	fds[nfds].events = POLLIN;
 	nfds++;
-
-	get_time(&now);
 	if (state->lease.leasetime == ~0U && state->state == STATE_BOUND) {
 		logger(LOG_DEBUG, "waiting for infinity");
 		timeout = INFTIM;
 	} else {
-		timersub(&state->timeout, &now, &d);
-		timeout  = (d.tv_sec * 1000 + (d.tv_usec + 999)) / 1000;
-		if (timerisset(&state->stop)) {
-			if (timercmp(&state->stop, &now, >)) {
-				timersub(&state->stop, &now, &d);
-				retval = (d.tv_sec * 1000 + (d.tv_usec + 999)) / 1000;
-				if (retval < timeout)
-					timeout = retval;
-			}
-		}
-		if (timeout <= 0)
-			return 0;
 		if (state->interface->fd != -1) {
 			fds[nfds].fd = state->interface->fd;
 			fds[nfds].events = POLLIN;
@@ -710,6 +697,23 @@ wait_for_packet(struct if_state *state)
 		}
 #endif
 
+	}
+
+wait_again:
+	get_time(&now);
+	if (timeout != INFTIM) {
+		if (timerisset(&state->stop) &&
+		    timercmp(&state->stop, &now, >) &&
+		    timercmp(&state->stop, &state->timeout, <))
+			ref = &state->stop;
+		else if (timercmp(&state->timeout, &now, <))
+			return 0;
+		else
+			ref = &state->timeout;
+		timersub(ref, &now, &d);
+		/* This should be safe and not overflow as the biggest
+		 * diff is uint32_t seconds from the DHCP message. */
+		timeout = (d.tv_sec * 1000) + ((d.tv_usec + 999) / 1000);
 		/* Only report waiting time if changed */
 		if (last_stop_sec != state->stop.tv_sec ||
 		    last_stop_usec != state->stop.tv_usec ||
@@ -723,6 +727,9 @@ wait_for_packet(struct if_state *state)
 			last_timeout_sec = state->timeout.tv_sec;
 			last_timeout_usec = state->timeout.tv_usec;
 		}
+		/* However, we could overflow INT_MAX and annoy poll. */
+		if (timeout < 0 || timeout > INT_MAX)
+			timeout = INT_MAX;
 	}
 
 	retval = poll(fds, nfds, timeout);
@@ -735,7 +742,11 @@ wait_for_packet(struct if_state *state)
 		if (errno == EINTR)
 			return 0;
 		logger(LOG_ERR, "poll: %s", strerror(errno));
-	} else if (retval != 0 && !(fds[0].revents & POLLIN)) {
+	} else if (retval == 0) {
+		/* If our timeout overflowed, wait again. */
+		if (timeout == INT_MAX)
+			goto wait_again;
+	} else if (!(fds[0].revents & POLLIN)) {
 		/* Check if any of the fd's have an error
 		 * if there is no data on the signal fd. */
 		while (--nfds > 0) {
