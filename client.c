@@ -898,7 +898,7 @@ static int bind_dhcp(struct if_state *state, const struct options *options)
 			       inet_ntoa(lease->addr), lease->leasetime);
 
 			if (lease->rebindtime >= lease->leasetime) {
-				lease->rebindtime = (lease->leasetime * T2);
+				lease->rebindtime = lease->leasetime * T2;
 				logger(LOG_ERR,
 				       "rebind time greater than lease "
 				       "time, forcing to %u seconds",
@@ -906,7 +906,7 @@ static int bind_dhcp(struct if_state *state, const struct options *options)
 			}
 
 			if (lease->renewaltime > lease->rebindtime) {
-				lease->renewaltime = (lease->leasetime * T1);
+				lease->renewaltime = lease->leasetime * T1;
 				logger(LOG_ERR,
 				       "renewal time greater than rebind time, "
 				       "forcing to %u seconds",
@@ -914,7 +914,7 @@ static int bind_dhcp(struct if_state *state, const struct options *options)
 			}
 
 			if (!lease->renewaltime) {
-				lease->renewaltime = (lease->leasetime * T1);
+				lease->renewaltime = lease->leasetime * T1;
 				logger(LOG_INFO,
 				       "no renewal time supplied, assuming %d seconds",
 				       lease->renewaltime);
@@ -923,7 +923,7 @@ static int bind_dhcp(struct if_state *state, const struct options *options)
 				       lease->renewaltime);
 
 			if (!lease->rebindtime) {
-				lease->rebindtime = (lease->leasetime * T2);
+				lease->rebindtime = lease->leasetime * T2;
 				logger(LOG_INFO,
 				       "no rebind time supplied, assuming %d seconds",
 				       lease->rebindtime);
