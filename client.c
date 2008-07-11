@@ -1435,7 +1435,6 @@ handle_arp_packet(struct if_state *state)
 	struct interface *iface = state->interface;
 
 	state->fail.s_addr = 0;
-
 	for(;;) {
 		bytes = get_raw_packet(iface, ETHERTYPE_ARP,
 				       arp_reply, sizeof(arp_reply));
@@ -1461,6 +1460,10 @@ handle_arp_packet(struct if_state *state)
 		/* Ensure we got all the data */
 		if ((hw_t + reply.ar_hln + reply.ar_pln) - arp_reply > bytes)
 			continue;
+		/* Ignore messages from ourself */
+		if (reply.ar_hln == iface->hwlen &&
+		    memcmp(hw_s, iface->hwaddr, iface->hwlen) == 0)
+			continue;
 		/* Copy out the IP addresses */
 		memcpy(&reply_s, hw_s + reply.ar_hln, reply.ar_pln);
 		memcpy(&reply_t, hw_t + reply.ar_hln, reply.ar_pln);
@@ -1468,21 +1471,13 @@ handle_arp_packet(struct if_state *state)
 		/* Check for conflict */
 		if (state->offer && 
 		    (reply_s == state->offer->yiaddr ||
-		     (reply_s == 0 &&
-		      reply_t == state->offer->yiaddr &&
-		      reply.ar_op == htons(ARPOP_REQUEST) &&
-		      (iface->hwlen != reply.ar_hln ||
-		       memcmp(hw_s, iface->hwaddr, iface->hwlen) != 0))))
+		     (reply_s == 0 && reply_t == state->offer->yiaddr)))
 			state->fail.s_addr = state->offer->yiaddr;
 
 		/* Handle IPv4LL conflicts */
 		if (IN_LINKLOCAL(htonl(iface->addr.s_addr)) &&
 		    (reply_s == iface->addr.s_addr ||
-		     (reply_s == 0 &&
-		      reply_t == iface->addr.s_addr &&
-		      reply.ar_op == htons(ARPOP_REQUEST) &&
-		      (iface->hwlen != reply.ar_hln ||
-		       memcmp(hw_s, iface->hwaddr, iface->hwlen) != 0))))
+		     (reply_s == 0 && reply_t == iface->addr.s_addr)))
 			state->fail.s_addr = iface->addr.s_addr;
 
 		if (state->fail.s_addr) {
