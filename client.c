@@ -80,9 +80,9 @@
 #define T1			0.5
 #define T2			0.875
 #define DHCP_BASE		4
+#define DHCP_MAX		64
 #define DHCP_RAND_MIN		-1
 #define DHCP_RAND_MAX		1
-#define DHCP_MAX		64
 
 /* We should define a maximum for the NAK exponential backoff */ 
 #define NAKOFF_MAX              60
@@ -101,6 +101,16 @@
 #define MAX_CONFLICTS		10
 #define RATE_LIMIT_INTERVAL	60
 #define DEFEND_INTERVAL		10
+
+
+/* number of usecs in a second. */
+#define USECS_SECOND		1000000
+/* As we use timevals, we should use the usec part for
+ * greater randomisation. */
+#define DHCP_RAND_MIN_U		DHCP_RAND_MIN * USECS_SECOND
+#define DHCP_RAND_MAX_U		DHCP_RAND_MAX * USECS_SECOND
+#define PROBE_MIN_U		PROBE_MIN * USECS_SECOND
+#define PROBE_MAX_U		PROBE_MAX * USECS_SECOND
 
 struct if_state {
 	int options;
@@ -1070,8 +1080,9 @@ handle_timeout(struct if_state *state, const struct options *options)
 			logger(LOG_DEBUG, "sending ARP probe #%d",
 			       state->probes);
 			if (state->probes < PROBE_NUM) 
-				tv.tv_sec = (arc4random() %
-					     (PROBE_MAX - PROBE_MIN)) + PROBE_MIN;
+				tv.tv_usec = (arc4random() %
+					      (PROBE_MAX_U - PROBE_MIN_U)) +
+					     PROBE_MIN_U;
 			else
 				tv.tv_sec = ANNOUNCE_WAIT;
 			get_time(&state->timeout);
@@ -1207,8 +1218,8 @@ handle_timeout(struct if_state *state, const struct options *options)
 			break;
 		}
 	}
-	tv.tv_sec += (arc4random() % (DHCP_RAND_MAX - DHCP_RAND_MIN)) +
-		DHCP_RAND_MIN;
+	tv.tv_usec += (arc4random() % (DHCP_RAND_MAX_U - DHCP_RAND_MIN_U)) +
+		DHCP_RAND_MIN_U;
 	timeradd(&state->timeout, &tv, &state->timeout);
 	return 0;
 }
