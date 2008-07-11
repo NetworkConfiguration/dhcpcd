@@ -638,10 +638,10 @@ send_arp(const struct interface *iface, int op, in_addr_t sip, in_addr_t tip)
 	p += iface->hwlen;
 	memcpy(p, &sip, sizeof(sip));
 	p += sizeof(sip);
-	/* ARP requests should ignore this, but we fill with 0xff
-	 * for broadcast. */
-	memset(p, 0xff, iface->hwlen);
-	p += iface->hwlen;
+	/* ARP requests should ignore this */
+	retval = iface->hwlen;
+	while (retval--)
+		*p++ = '\0';
 	memcpy(p, &tip, sizeof(tip));
 	p += sizeof(tip);
 	/* Zero pad if needed */
