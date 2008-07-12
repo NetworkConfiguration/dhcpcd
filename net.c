@@ -624,8 +624,8 @@ send_arp(const struct interface *iface, int op, in_addr_t sip, in_addr_t tip)
 
 	arpsize = sizeof(*arp) + 2 * iface->hwlen + 2 *sizeof(sip);
 	/* Ensure that our packet is of the minimum size */
-	if (arpsize < ETHER_MIN_LEN - ETHER_HDR_LEN)
-		arpsize = ETHER_MIN_LEN - ETHER_HDR_LEN;
+	if (arpsize < ETHERMIN)
+		arpsize = ETHERMIN;
 	arp = xmalloc(arpsize);
 	arp->ar_hrd = htons(iface->family);
 	arp->ar_pro = htons(ETHERTYPE_IP);
