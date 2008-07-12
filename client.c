@@ -504,9 +504,12 @@ client_setup(struct if_state *state, const struct options *options)
 		if (options->options & DHCPCD_DAEMONISED) {
 			iface->addr.s_addr = lease->addr.s_addr;
 			iface->net.s_addr = lease->net.s_addr;
+			state->new = state->offer;
+			state->offer = NULL;
 			get_option_addr(&lease->server.s_addr,
-					state->offer, DHCP_SERVERID);
+					state->new, DHCP_SERVERID);
 #ifdef ENABLE_ARP
+			open_socket(iface, ETHERTYPE_ARP);
 			state->state = STATE_ANNOUNCING;
 			tv.tv_sec = ANNOUNCE_INTERVAL;
 #else
