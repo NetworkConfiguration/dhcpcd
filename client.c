@@ -73,8 +73,9 @@
 #define STATE_REBINDING         5
 #define STATE_REBOOT            6
 #define STATE_RENEW_REQUESTED   7
-#define STATE_PROBING		8
-#define STATE_ANNOUNCING	9
+#define STATE_INIT_IPV4LL	8
+#define STATE_PROBING		9
+#define STATE_ANNOUNCING	10
 
 /* Constants taken from RFC 2131. */
 #define T1			0.5
@@ -83,6 +84,7 @@
 #define DHCP_MAX		64
 #define DHCP_RAND_MIN		-1
 #define DHCP_RAND_MAX		1
+#define DHCP_ARP_FAIL		10
 
 /* We should define a maximum for the NAK exponential backoff */ 
 #define NAKOFF_MAX              60
@@ -500,14 +502,19 @@ client_setup(struct if_state *state, const struct options *options)
 		}
 #ifdef THERE_IS_NO_FORK
 		if (options->options & DHCPCD_DAEMONISED) {
-			state->state = STATE_BOUND;
-			tv.tv_sec = state->lease.renewaltime;
-			get_time(&state->timeout);
-			timeradd(&state->timeout, &tv, &state->timeout);
 			iface->addr.s_addr = lease->addr.s_addr;
 			iface->net.s_addr = lease->net.s_addr;
 			get_option_addr(&lease->server.s_addr,
 					state->offer, DHCP_SERVERID);
+#ifdef ENABLE_ARP
+			state->state = STATE_ANNOUNCING;
+			tv.tv_sec = ANNOUNCE_INTERVAL;
+#else
+			state->state = STATE_BOUND;
+			tv.tv_sec = state->lease.renewaltime;
+#endif
+			get_time(&state->timeout);
+			timeradd(&state->timeout, &tv, &state->timeout);
 		}
 #endif
 	} else {
@@ -586,13 +593,21 @@ client_setup(struct if_state *state, const struct options *options)
 static int 
 do_socket(struct if_state *state, int mode)
 {
-	if (state->interface->fd >= 0) {
+	if (state->interface->fd != -1) {
 		close(state->interface->fd);
 		state->interface->fd = -1;
 	}
-	if (mode == SOCKET_CLOSED && state->interface->udp_fd >= 0) {
-		close(state->interface->udp_fd);
-		state->interface->udp_fd = -1;
+	if (mode == SOCKET_CLOSED) {
+		if (state->interface->udp_fd != -1) {
+			close(state->interface->udp_fd);
+			state->interface->udp_fd = -1;
+		}
+#ifdef ENABLE_ARP
+		if (state->interface->arp_fd != -1) {
+			close(state->interface->arp_fd);
+			state->interface->arp_fd = -1;
+		}
+#endif
 	}
 
 	if (mode == SOCKET_OPEN &&
@@ -624,6 +639,8 @@ send_message(struct if_state *state, int type, const struct options *options)
 	logger(LOG_DEBUG, "sending %s with xid 0x%x",
 	       get_dhcp_op(type), state->xid);
 	state->messages++;
+	if (state->messages < 0)
+		state->messages = INT_MAX;
 	/* If we couldn't open a UDP port for our IP address
 	 * then we cannot renew.
 	 * This could happen if our IP was pulled out from underneath us. */
@@ -706,7 +723,6 @@ wait_for_packet(struct if_state *state)
 			nfds++;
 		}
 #endif
-
 	}
 
 wait_again:
@@ -723,14 +739,14 @@ wait_again:
 		timersub(ref, &now, &d);
 		/* This should be safe and not overflow as the biggest
 		 * diff is uint32_t seconds from the DHCP message. */
-		timeout = (d.tv_sec * 1000) + ((d.tv_usec + 999) / 1000);
+		timeout = d.tv_sec * 1000 + (d.tv_usec + 999) / 1000;
 		/* Only report waiting time if changed */
 		if (last_stop_sec != state->stop.tv_sec ||
 		    last_stop_usec != state->stop.tv_usec ||
 		    last_timeout_sec != state->timeout.tv_sec ||
 		    last_timeout_usec != state->timeout.tv_usec)
 		{
-			logger(LOG_DEBUG, "waiting for %0.3f seconds",
+			logger(LOG_DEBUG, "waiting for %0.2f seconds",
 			       (float)timeout / 1000);
 			last_stop_sec = state->stop.tv_sec;
 			last_stop_usec = state->stop.tv_usec;
@@ -857,6 +873,7 @@ static int bind_dhcp(struct if_state *state, const struct options *options)
 	state->old = state->new;
 	state->new = state->offer;
 	state->offer = NULL;
+	state->messages = 0;
 #ifdef ENABLE_ARP
 	state->conflicts = 0;
 	state->defend = 0;
@@ -1028,6 +1045,7 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 			return -1;
 		state->state = STATE_INIT;
 		break;
+	
 	case STATE_RENEWING:
 		logger(LOG_ERR, "failed to renew, attempting to rebind");
 		lease->addr.s_addr = 0;
@@ -1058,15 +1076,23 @@ handle_timeout(struct if_state *state, const struct options *options)
 {
 	struct dhcp_lease *lease = &state->lease;
 	struct interface *iface = state->interface;
-	int i;
+	int i = 0;
 	struct timeval tv;
 	struct in_addr addr;
+	suseconds_t usec;
 
 #ifdef ENABLE_ARP
 	timerclear(&tv);
 	switch (state->state) {
+	case STATE_INIT_IPV4LL:
+		logger(LOG_INFO, "probing for an IPV4LL address");
+		state->state = STATE_PROBING;
+		free(state->offer);
+		state->offer = ipv4ll_get_dhcp(0);
+		state->claims = 0;
+		state->probes = 0;
+		/* FALLTHROUGH */
 	case STATE_PROBING:
-		timerclear(&state->stop);
 		if (iface->arp_fd == -1)
 			open_socket(iface, ETHERTYPE_ARP);
 		if (state->probes < PROBE_NUM) {
@@ -1085,25 +1111,19 @@ handle_timeout(struct if_state *state, const struct options *options)
 					     PROBE_MIN_U;
 			else
 				tv.tv_sec = ANNOUNCE_WAIT;
-			get_time(&state->timeout);
-			timeradd(&state->timeout, &tv, &state->timeout);
 			i = send_arp(iface, ARPOP_REQUEST, 0, state->offer->yiaddr);
 			if (i == -1)
 				logger(LOG_ERR, "send_arp: %s", strerror(errno));
-			return 0;
+			i = 0;
 		} else {
 			/* We've waited for ANNOUNCE_WAIT after the final probe
 			 * so the address is now ours */
-			get_time(&tv);
 			i = bind_dhcp(state, options);
 			state->state = STATE_ANNOUNCING;
-			state->timeout.tv_sec = ANNOUNCE_INTERVAL;
-			state->timeout.tv_usec = 0;
-			timeradd(&state->timeout, &tv, &state->timeout);
-			return i;
+			tv.tv_sec = ANNOUNCE_INTERVAL;
 		}
+		break;
 	case STATE_ANNOUNCING:
-		timerclear(&state->stop);
 		if (state->claims < ANNOUNCE_NUM) {
 			state->claims++;
 			logger(LOG_DEBUG, "sending ARP announce #%d",
@@ -1115,8 +1135,11 @@ handle_timeout(struct if_state *state, const struct options *options)
 			if (state->claims < ANNOUNCE_NUM)
 				tv.tv_sec = ANNOUNCE_INTERVAL;
 			else if (IN_LINKLOCAL(htonl(lease->addr.s_addr))) {
+				/* We should pretend to be at the end of the DHCP negotation cycle */
 				state->state = STATE_INIT;
-				timerclear(&state->timeout);
+				state->messages = DHCP_MAX / DHCP_BASE;
+				timerclear(&state->stop);
+				goto dhcp_timeout;
 			} else {
 				state->state = STATE_BOUND;
 				tv.tv_sec = lease->renewaltime -
@@ -1124,17 +1147,20 @@ handle_timeout(struct if_state *state, const struct options *options)
 				close(iface->arp_fd);
 				iface->arp_fd = -1;
 			}
-			if (timerisset(&tv)) {
-				get_time(&state->timeout);
-				timeradd(&state->timeout, &tv, &state->timeout);
-			}	
+			i = 0;
 		}
-		return 0;
+		break;
+	}
+	if (timerisset(&tv)) {
+		timerclear(&state->stop);
+		get_time(&state->timeout);
+		timeradd(&state->timeout, &tv, &state->timeout);
+		return i;
 	}
 #endif
 
-	get_time(&state->timeout);
 	if (timerisset(&state->stop)) {
+		get_time(&state->timeout);
 		if (timercmp(&state->timeout, &state->stop, >))
 			return handle_timeout_fail(state, options);
 	}
@@ -1147,7 +1173,6 @@ handle_timeout(struct if_state *state, const struct options *options)
 		up_interface(iface->name);
 		do_socket(state, SOCKET_OPEN);
 		state->xid = arc4random();
-		state->messages = 0;
 		state->nakoff = 1;
 		iface->start_uptime = uptime();
 		get_time(&state->start);
@@ -1210,6 +1235,8 @@ handle_timeout(struct if_state *state, const struct options *options)
 		break;
 	}
 
+dhcp_timeout:
+	get_time(&state->timeout);
 	tv.tv_sec = DHCP_BASE;
 	for (i = 1; i < state->messages; i++) {
 		tv.tv_sec *= 2;
@@ -1218,9 +1245,17 @@ handle_timeout(struct if_state *state, const struct options *options)
 			break;
 		}
 	}
-	tv.tv_usec += (arc4random() % (DHCP_RAND_MAX_U - DHCP_RAND_MIN_U)) +
+	usec = (arc4random() % (DHCP_RAND_MAX_U - DHCP_RAND_MIN_U)) +
 		DHCP_RAND_MIN_U;
-	timeradd(&state->timeout, &tv, &state->timeout);
+	if ((signed)usec > 0) {
+		tv.tv_usec = usec;
+		timeradd(&state->timeout, &tv, &state->timeout);
+	} else {
+		timeradd(&state->timeout, &tv, &state->timeout);
+		tv.tv_sec = 0;
+		tv.tv_usec = abs(usec);
+		timersub(&state->timeout, &tv, &state->timeout);
+	}
 	return 0;
 }
 
@@ -1494,7 +1529,7 @@ handle_arp_packet(struct if_state *state)
 static int
 handle_arp_fail(struct if_state *state, const struct options *options)
 {
-	struct timespec ts;
+	struct timeval tv;
 	time_t up;
 
 	if (IN_LINKLOCAL(htonl(state->fail.s_addr))) {
@@ -1502,46 +1537,35 @@ handle_arp_fail(struct if_state *state, const struct options *options)
 			up = uptime();
 			if (state->defend + DEFEND_INTERVAL > up) {
 				drop_config(state, "FAIL", options);
-				state->state = STATE_PROBING;
-				state->claims = 0;
-				state->probes = 0;
-				state->conflicts = 0;
-				timerclear(&state->timeout);
-				timerclear(&state->stop);
-			} else
+				state->conflicts = -1;
+				/* drop through to set conflicts to 0 */
+			} else {
 				state->defend = up;
-			return 0;
+				return 0;
+			}
 		}
-
+		do_socket(state, SOCKET_CLOSED);
 		state->conflicts++;
-		state->claims = 0;
-		state->probes = 0;
-		state->state = STATE_PROBING;
-		timerclear(&state->timeout);
+		state->state = STATE_INIT_IPV4LL;
 		timerclear(&state->stop);
-		free(state->offer);
-		if (state->conflicts > MAX_CONFLICTS) {
-			/* RFC 3927 says we should rate limit */
-			logger(LOG_INFO, "sleeping for %d seconds",
-			       RATE_LIMIT_INTERVAL);
-			ts.tv_sec = RATE_LIMIT_INTERVAL;
-			ts.tv_nsec = 0;
-			nanosleep(&ts, NULL);
-		}
-		state->offer = ipv4ll_get_dhcp(0);
+		if (state->conflicts > MAX_CONFLICTS)
+			tv.tv_sec = RATE_LIMIT_INTERVAL;
+		else
+			tv.tv_sec = PROBE_WAIT;
+		tv.tv_usec = 0;
+		get_time(&state->timeout);
+		timeradd(&state->timeout, &tv, &state->timeout);
 		return 0;
 	}
 
 	do_socket(state, SOCKET_OPEN);
 	send_message(state, DHCP_DECLINE, options);
+	do_socket(state, SOCKET_CLOSED);
 	state->state = STATE_INIT;
-	timerclear(&state->timeout);
-	/* RFC 2131 says that we should wait for 10 seconds
-	 * before doing anything else */
-	logger(LOG_INFO, "sleeping for 10 seconds");
-	ts.tv_sec = 10;
-	ts.tv_nsec = 0;
-	nanosleep(&ts, NULL);
+	get_time(&state->timeout);
+	tv.tv_sec = DHCP_ARP_FAIL;
+	tv.tv_usec = 0;
+	timeradd(&state->timeout, &tv, &state->timeout);
 	return 0;
 }
 #endif
