@@ -1082,7 +1082,6 @@ handle_timeout(struct if_state *state, const struct options *options)
 	int i = 0;
 	struct timeval tv;
 	struct in_addr addr;
-	suseconds_t usec;
 
 #ifdef ENABLE_ARP
 	timerclear(&tv);
@@ -1248,17 +1247,9 @@ dhcp_timeout:
 			break;
 		}
 	}
-	usec = (arc4random() % (DHCP_RAND_MAX_U - DHCP_RAND_MIN_U)) +
-		DHCP_RAND_MIN_U;
-	if ((signed)usec > 0) {
-		tv.tv_usec = usec;
-		timeradd(&state->timeout, &tv, &state->timeout);
-	} else {
-		timeradd(&state->timeout, &tv, &state->timeout);
-		tv.tv_sec = 0;
-		tv.tv_usec = abs(usec);
-		timersub(&state->timeout, &tv, &state->timeout);
-	}
+	tv.tv_sec += DHCP_RAND_MIN;
+	tv.tv_usec = arc4random() % (DHCP_RAND_MAX_U - DHCP_RAND_MIN_U);
+	timeradd(&state->timeout, &tv, &state->timeout);
 	return 0;
 }
 
