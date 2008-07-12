@@ -98,7 +98,13 @@
 #define PROBE_MIN		 1
 #define PROBE_MAX		 2
 #define ANNOUNCE_WAIT		 2
-#define ANNOUNCE_NUM		 2
+/* BSD systems always do a grauitous ARP when assigning an address,
+ * so we can do one less announce. */
+#ifdef BSD
+# define ANNOUNCE_NUM		 1
+#else
+# define ANNOUNCE_NUM		 2
+#endif
 #define ANNOUNCE_INTERVAL	 2
 #define MAX_CONFLICTS		10
 #define RATE_LIMIT_INTERVAL	60
