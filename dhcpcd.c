@@ -870,9 +870,6 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (!(options->options & DHCPCD_DAEMONISE))
-		options->timeout = 0;
-
 	if (IN_LINKLOCAL(ntohl(options->request_address.s_addr))) {
 		logger(LOG_ERR,
 		       "you are not allowed to request a link local address");
