@@ -23,8 +23,8 @@ restore_conf()
 # /etc/resolv.conf how they want and stop the system scripts ever updating it.
 for hook in \
 	@SYSCONFDIR@/dhcpcd.enter-hook \
-	@HOOKDIR@/*
-	@SYSCONFDIR@/dhcpcd.exit-hook \
+	@HOOKDIR@/* \
+	@SYSCONFDIR@/dhcpcd.exit-hook
 do
 	for skip in ${skip_hooks}; do
 		case "${hook}" in
