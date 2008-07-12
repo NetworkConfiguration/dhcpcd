@@ -311,7 +311,7 @@ Here are some options that deal with turning these bits off.
 Quiet
 .Nm
 on the command line, only warnings and errors will be displayed.
-The messagea are still logged though.
+The messages are still logged though.
 .It Fl A , -noarp
 Don't request or claim the address by ARP.
 This also disables IPv4LL.
