@@ -623,9 +623,6 @@ send_arp(const struct interface *iface, int op, in_addr_t sip, in_addr_t tip)
 	int retval;
 
 	arpsize = sizeof(*arp) + 2 * iface->hwlen + 2 *sizeof(sip);
-	/* Ensure that our packet is of the minimum size */
-	if (arpsize < ETHERMIN)
-		arpsize = ETHERMIN;
 	arp = xmalloc(arpsize);
 	arp->ar_hrd = htons(iface->family);
 	arp->ar_pro = htons(ETHERTYPE_IP);
@@ -644,9 +641,6 @@ send_arp(const struct interface *iface, int op, in_addr_t sip, in_addr_t tip)
 		*p++ = '\0';
 	memcpy(p, &tip, sizeof(tip));
 	p += sizeof(tip);
-	/* Zero pad if needed */
-	while (p < (uint8_t *)arp + arpsize)
-		*p++ = '\0';
 	retval = send_raw_packet(iface, ETHERTYPE_ARP, arp, arpsize);
 	free(arp);
 	return retval;
