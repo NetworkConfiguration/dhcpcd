@@ -1087,11 +1087,12 @@ handle_timeout(struct if_state *state, const struct options *options)
 	struct interface *iface = state->interface;
 	int i = 0;
 	struct timeval tv;
+#ifdef ENABLE_ARP
 	struct in_addr addr;
 
-#ifdef ENABLE_ARP
 	timerclear(&tv);
 	switch (state->state) {
+#ifdef ENABLE_IPV4LL
 	case STATE_INIT_IPV4LL:
 		logger(LOG_INFO, "probing for an IPV4LL address");
 		state->state = STATE_PROBING;
@@ -1100,6 +1101,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 		state->claims = 0;
 		state->probes = 0;
 		/* FALLTHROUGH */
+#endif
 	case STATE_PROBING:
 		if (iface->arp_fd == -1)
 			open_socket(iface, ETHERTYPE_ARP);
@@ -1243,7 +1245,9 @@ handle_timeout(struct if_state *state, const struct options *options)
 		break;
 	}
 
+#ifdef ENABLE_ARP
 dhcp_timeout:
+#endif
 	get_time(&state->timeout);
 	tv.tv_sec = DHCP_BASE;
 	for (i = 1; i < state->messages; i++) {
