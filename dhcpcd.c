@@ -917,18 +917,15 @@ main(int argc, char **argv)
 			logger(LOG_INFO, "sending signal %d to pid %d",
 			       sig, pid);
 
-		if (!pid || (i = kill(pid, sig)))
+		if (!pid || (i = kill(pid, sig))) {
 			logger(sig == SIGALRM ? LOG_INFO : LOG_ERR,
 			       ""PACKAGE" not running");
-
-		if (pid != 0 && (sig != SIGALRM || i != 0))
 			unlink(options->pidfile);
-
+		}
 		if (i == 0) {
 			retval = EXIT_SUCCESS;
 			goto abort;
 		}
-
 		if (sig != SIGALRM)
 			goto abort;	
 	}

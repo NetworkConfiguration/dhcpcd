@@ -737,14 +737,16 @@ wait_for_packet(struct if_state *state)
 wait_again:
 	get_time(&now);
 	if (timeout != INFTIM) {
+		ref = NULL;
 		if (timerisset(&state->stop) &&
-		    timercmp(&state->stop, &now, >) &&
-		    timercmp(&state->stop, &state->timeout, <))
+		    timercmp(&state->stop, &now, >))
 			ref = &state->stop;
-		else if (timercmp(&state->timeout, &now, <))
-			return 0;
-		else
+		if (timerisset(&state->timeout) &&
+		    timercmp(&state->timeout, &now, >) &&
+		    (!ref || timercmp(&state->timeout, ref, <)))
 			ref = &state->timeout;
+		if (!ref)
+			return 0;
 		timersub(ref, &now, &d);
 		/* This should be safe and not overflow as the biggest
 		 * diff is uint32_t seconds from the DHCP message. */
@@ -822,52 +824,51 @@ handle_signal(int sig, struct if_state *state,  const struct options *options)
 		if (!(state->options & DHCPCD_PERSISTENT))
 			drop_config(state, "STOP", options);
 		return -1;
-
 	case SIGALRM:
-		logger (LOG_INFO, "received SIGALRM, renewing lease");
-		switch (state->state) {
-		case STATE_BOUND:
-		case STATE_RENEWING:
-		case STATE_REBINDING:
-		case STATE_ANNOUNCING:
-			state->state = STATE_RENEW_REQUESTED;
-			break;
-		case STATE_RENEW_REQUESTED:
-		case STATE_REQUESTING:
-			state->state = STATE_INIT;
-			break;
-		}
-		timerclear(&state->timeout);
-		timerclear(&state->stop);
-		return 0;
-
+		logger(LOG_INFO, "received SIGALRM, renewing lease");
+		break;
 	case SIGHUP:
-		if (state->state != STATE_BOUND &&
-		    state->state != STATE_RENEWING &&
-		    state->state != STATE_REBINDING)
-		{
-			logger(LOG_ERR,
-			       "received SIGHUP, but no lease to release");
-			return -1;
-		}
-
-		logger (LOG_INFO, "received SIGHUP, releasing lease");
-		if (!IN_LINKLOCAL(ntohl(lease->addr.s_addr))) {
-			do_socket(state, SOCKET_OPEN);
-			state->xid = arc4random();
-			send_message(state, DHCP_RELEASE, options);
-			do_socket(state, SOCKET_CLOSED);
-		}
-		drop_config(state, "RELEASE", options);
-		return -1;
-
+		logger(LOG_INFO, "received SIGHUP, releasing lease");
+		break;
 	default:
 		logger (LOG_ERR,
 			"received signal %d, but don't know what to do with it",
 			sig);
+		return 0;
 	}
 
-	return -1;
+	switch (state->state) {
+	case STATE_INIT:
+	case STATE_PROBING:
+	case STATE_ANNOUNCING:
+	case STATE_BOUND:
+	case STATE_RENEWING:
+	case STATE_REBINDING:
+		switch (sig) {
+		case SIGALRM:
+			state->state = STATE_RENEW_REQUESTED;
+			break;
+		case SIGHUP:
+			if (lease->addr.s_addr &&
+			    !IN_LINKLOCAL(ntohl(lease->addr.s_addr)))
+			{
+				do_socket(state, SOCKET_OPEN);
+				state->xid = arc4random();
+				send_message(state, DHCP_RELEASE, options);
+				do_socket(state, SOCKET_CLOSED);
+			}
+			drop_config(state, "RELEASE", options);
+			return -1;
+		}
+		break;
+	default:
+		state->state = STATE_INIT;
+		break;
+	}
+
+	timerclear(&state->timeout);
+	timerclear(&state->stop);
+	return 0;
 }
 
 static int bind_dhcp(struct if_state *state, const struct options *options)
@@ -1148,6 +1149,8 @@ handle_timeout(struct if_state *state, const struct options *options)
 				/* We should pretend to be at the end of the DHCP negotation cycle */
 				state->state = STATE_INIT;
 				state->messages = DHCP_MAX / DHCP_BASE;
+				state->probes = 0;
+				state->claims = 0;
 				timerclear(&state->stop);
 				goto dhcp_timeout;
 			} else {
@@ -1215,12 +1218,21 @@ handle_timeout(struct if_state *state, const struct options *options)
 		}
 		break;
 	case STATE_RENEW_REQUESTED:
+		if (IN_LINKLOCAL(ntohl(lease->addr.s_addr))) {
+			state->state = STATE_PROBING;
+			free(state->offer);
+			state->offer = read_lease(state->interface);
+			state->probes = 0;
+			state->claims = 0;
+			timerclear(&state->timeout);
+			return 0;
+		}
 	case STATE_BOUND:
 		if (IN_LINKLOCAL(ntohl(lease->addr.s_addr))) {
 			lease->addr.s_addr = 0;
 			state->state = STATE_INIT;
 			timerclear(&state->timeout);
-			break;
+			return 0;
 		}
 		logger(LOG_INFO, "renewing lease of %s",inet_ntoa(lease->addr));
 		state->state = STATE_RENEWING;
