@@ -373,7 +373,8 @@ ipv4ll_get_dhcp(uint32_t old_addr)
 		dhcp->yiaddr = htonl(LINKLOCAL_ADDR |
 				     (((uint32_t)abs((int)arc4random())
 				       % 0xFD00) + 0x0100));
-		if (dhcp->yiaddr != old_addr)
+		if (dhcp->yiaddr != old_addr &&
+		    IN_LINKLOCAL(ntohl(dhcp->yiaddr)))
 			break;
 	}
 	return dhcp;
