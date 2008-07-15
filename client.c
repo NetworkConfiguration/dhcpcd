@@ -402,21 +402,21 @@ get_old_lease(struct if_state *state)
 {
 	struct interface *iface = state->interface;
 	struct dhcp_lease *lease = &state->lease;
-	struct dhcp_message *dhcp;
+	struct dhcp_message *dhcp = NULL;
 	struct timeval tv;
 	unsigned int offset = 0;
 	struct stat sb;
 
+	if (stat(iface->leasefile, &sb) == -1) {
+		if (errno != ENOENT)
+			logger(LOG_ERR, "stat: %s", strerror(errno));
+		goto eexit;
+	}
 	if (!IN_LINKLOCAL(ntohl(iface->addr.s_addr)))
 		logger(LOG_INFO, "trying to use old lease in `%s'",
 		       iface->leasefile);
 	if ((dhcp = read_lease(iface)) == NULL) {
-		if (errno != ENOENT)
-			logger(LOG_INFO, "read_lease: %s", strerror(errno));
-		goto eexit;
-	}
-	if (stat(iface->leasefile, &sb) == -1) {
-		logger(LOG_ERR, "stat: %s", strerror(errno));
+		logger(LOG_INFO, "read_lease: %s", strerror(errno));
 		goto eexit;
 	}
 	get_lease(&state->lease, dhcp);
