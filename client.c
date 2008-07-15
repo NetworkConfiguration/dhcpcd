@@ -791,6 +791,7 @@ wait_again:
 		while (--nfds > 0) {
 			if (fds[nfds].revents & POLLERR) {
 				logger(LOG_ERR, "error on fd %d", fds[nfds].fd);
+				do_socket(state, SOCKET_CLOSED);
 				switch (state->state) {
 				case STATE_INIT:        /* FALLTHROUGH */
 				case STATE_DISCOVERING: /* FALLTHROUGH */
@@ -839,6 +840,7 @@ handle_signal(int sig, struct if_state *state,  const struct options *options)
 		return 0;
 	}
 
+	do_socket(state, SOCKET_CLOSED);
 	switch (state->state) {
 	case STATE_INIT:
 	case STATE_PROBING:
