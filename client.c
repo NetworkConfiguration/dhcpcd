@@ -792,16 +792,7 @@ wait_again:
 			if (fds[nfds].revents & POLLERR) {
 				logger(LOG_ERR, "error on fd %d", fds[nfds].fd);
 				do_socket(state, SOCKET_CLOSED);
-				switch (state->state) {
-				case STATE_INIT:        /* FALLTHROUGH */
-				case STATE_DISCOVERING: /* FALLTHROUGH */
-				case STATE_REQUESTING:
-					state->state = STATE_INIT;
-					break;
-				default:
-					state->state = STATE_RENEW_REQUESTED;
-					break;
-				}
+				state->state = STATE_RENEW_REQUESTED;
 				timerclear(&state->timeout);
 				timerclear(&state->stop);
 				return 0;
@@ -829,49 +820,29 @@ handle_signal(int sig, struct if_state *state,  const struct options *options)
 		return -1;
 	case SIGALRM:
 		logger(LOG_INFO, "received SIGALRM, renewing lease");
-		break;
+		do_socket(state, SOCKET_CLOSED);
+		state->state = STATE_RENEW_REQUESTED;
+		timerclear(&state->timeout);
+		timerclear(&state->stop);
+		return 0;
 	case SIGHUP:
 		logger(LOG_INFO, "received SIGHUP, releasing lease");
-		break;
+		if (lease->addr.s_addr &&
+		    !IN_LINKLOCAL(ntohl(lease->addr.s_addr)))
+		{
+			do_socket(state, SOCKET_OPEN);
+			state->xid = arc4random();
+			send_message(state, DHCP_RELEASE, options);
+			do_socket(state, SOCKET_CLOSED);
+		}
+		drop_config(state, "RELEASE", options);
+		return -1;
 	default:
 		logger (LOG_ERR,
 			"received signal %d, but don't know what to do with it",
 			sig);
-		return 0;
 	}
 
-	do_socket(state, SOCKET_CLOSED);
-	switch (state->state) {
-	case STATE_INIT:
-	case STATE_PROBING:
-	case STATE_ANNOUNCING:
-	case STATE_BOUND:
-	case STATE_RENEWING:
-	case STATE_REBINDING:
-		switch (sig) {
-		case SIGALRM:
-			state->state = STATE_RENEW_REQUESTED;
-			break;
-		case SIGHUP:
-			if (lease->addr.s_addr &&
-			    !IN_LINKLOCAL(ntohl(lease->addr.s_addr)))
-			{
-				do_socket(state, SOCKET_OPEN);
-				state->xid = arc4random();
-				send_message(state, DHCP_RELEASE, options);
-				do_socket(state, SOCKET_CLOSED);
-			}
-			drop_config(state, "RELEASE", options);
-			return -1;
-		}
-		break;
-	default:
-		state->state = STATE_INIT;
-		break;
-	}
-
-	timerclear(&state->timeout);
-	timerclear(&state->stop);
 	return 0;
 }
 
@@ -1231,8 +1202,11 @@ handle_timeout(struct if_state *state, const struct options *options)
 			timerclear(&state->timeout);
 			return 0;
 		}
+		/* FALLTHROUGH */
 	case STATE_BOUND:
-		if (IN_LINKLOCAL(ntohl(lease->addr.s_addr))) {
+		if (lease->addr.s_addr == 0 ||
+		    IN_LINKLOCAL(ntohl(lease->addr.s_addr)))
+		{
 			lease->addr.s_addr = 0;
 			state->state = STATE_INIT;
 			timerclear(&state->timeout);
