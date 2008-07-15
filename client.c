@@ -737,12 +737,13 @@ wait_for_packet(struct if_state *state)
 wait_again:
 	get_time(&now);
 	if (timeout != INFTIM) {
+		if (!timerisset(&state->timeout))
+			return 0;
 		ref = NULL;
 		if (timerisset(&state->stop) &&
 		    timercmp(&state->stop, &now, >))
 			ref = &state->stop;
-		if (timerisset(&state->timeout) &&
-		    timercmp(&state->timeout, &now, >) &&
+		if (timercmp(&state->timeout, &now, >) &&
 		    (!ref || timercmp(&state->timeout, ref, <)))
 			ref = &state->timeout;
 		if (!ref)
