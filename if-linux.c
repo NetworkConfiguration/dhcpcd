@@ -93,7 +93,7 @@ get_netlink(int fd, int flags,
 		bytes = recv(fd, buffer, BUFFERLEN, flags);
 		if (bytes == -1) {
 			if (errno == EAGAIN) {
-				r == 0;
+				r = 0;
 				goto eexit;
 			}
 			if (errno == EINTR)
