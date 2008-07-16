@@ -185,3 +185,57 @@ if_route(const char *ifname, const struct in_addr *destination,
 	close(s);
 	return retval;
 }
+
+int
+open_link_socket(struct interface *iface)
+{
+	int fd;
+
+	fd = socket(PF_ROUTE, SOCK_RAW, 0);
+	if (fd == -1)
+		return -1;
+	set_cloexec(fd);
+	if (iface->link_fd != -1)
+		close(iface->link_fd);
+	iface->link_fd = fd;
+	return 0;
+}
+
+#define BUFFER_LEN	2048
+int
+link_changed(struct interface *iface)
+{
+	char buffer[2048], *p;
+	ssize_t bytes;
+	struct rt_msghdr *rtm;
+	struct if_msghdr *ifm;
+	int i;
+
+	if ((i = if_nametoindex(iface->name)) == -1)
+		return -1;
+	for (;;) {
+		bytes = recv(iface->link_fd, buffer, BUFFER_LEN, MSG_DONTWAIT);
+		if (bytes == -1) {
+			if (errno == EAGAIN)
+				return 0;
+			if (errno == EINTR)
+				continue;
+			return -1;
+		}
+		for (p = buffer; bytes > 0;
+		     bytes -= ((struct rt_msghdr *)p)->rtm_msglen,
+		     p += ((struct rt_msghdr *)p)->rtm_msglen)
+		{
+			rtm = (struct rt_msghdr *)p;
+			if (rtm->rtm_type != RTM_IFINFO)
+				continue;
+			ifm = (struct if_msghdr *)p;
+			if (ifm->ifm_index != i)
+				continue;
+
+			/* Link changed */
+			return 1;
+		}
+	}
+	return 0;
+}

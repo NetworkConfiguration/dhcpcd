@@ -22,14 +22,14 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd Jul 12, 2008
+.Dd Jul 16, 2008
 .Dt DHCPCD 8 SMM
 .Sh NAME
 .Nm dhcpcd
 .Nd an RFC 2131 compliant DHCP client
 .Sh SYNOPSIS
 .Nm
-.Op Fl dknpqADEGLSTXV
+.Op Fl dknpqADEGKLSTVWX
 .Op Fl c , -script Ar script
 .Op Fl f , -config Ar file
 .Op Fl h , -hostname Ar hostname
@@ -299,6 +299,10 @@ itself never does any DNS updates.
 Change the default clientid sent from the interface hardware address.
 If the string is of the format 01:02:03 then it is encoded as hex.
 If not set then none is sent.
+.It Fl W , -nowait
+Don't wait for a DHCP lease, background immediately.
+This is useful for startup scripts which don't disable link messages for
+carrier status.
 .El
 .Ss Restriciting behaviour
 .Nm
@@ -315,8 +319,6 @@ The messages are still logged though.
 .It Fl A , -noarp
 Don't request or claim the address by ARP.
 This also disables IPv4LL.
-.It Fl G , -nogateway
-Don't set any default routes.
 .It Fl C , -nohook Ar script
 Don't run this hook script.
 Matches full name, or prefixed with 2 numbers optionally ending with
@@ -324,10 +326,11 @@ Matches full name, or prefixed with 2 numbers optionally ending with
 .Pp
 So to stop dhcpcd from touching your DNS or MTU settings you would do:-
 .D1 dhcpcd -C resolv.conf -C mtu eth0
-.It Fl X , -nodaemonise
-Don't daemonise when we acquire a lease.
-This is mainly useful for running under the control of another process, such
-as a debugger or a network manager.
+.It Fl G , -nogateway
+Don't set any default routes.
+.It Fl K , -nolink
+Don't receive link messages for carrier status.
+You should only have to use this with buggy device drivers.
 .It Fl L , -noipv4ll
 Don't use IPv4LL at all.
 .It Fl O , -nooption Ar option
@@ -344,6 +347,10 @@ files.
 .It Fl V, -variables
 Display a list of option codes and the associated variable for use in
 .Xr dhcpcd-run-hooks 8 .
+.It Fl X , -nodaemonise
+Don't daemonise when we acquire a lease.
+This is mainly useful for running under the control of another process, such
+as a debugger or a network manager.
 .El
 .Sh NOTES
 .Nm

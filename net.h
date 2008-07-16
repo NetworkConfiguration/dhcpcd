@@ -71,8 +71,8 @@
 #endif
 
 #define LINKLOCAL_ADDR	0xa9fe0000
-#define LINKLOCAL_MASK	0xffff0000
-#define LINKLOCAL_BRDC	0xa9feffff
+#define LINKLOCAL_MASK	IN_CLASSB_NET
+#define LINKLOCAL_BRDC	(LINKLOCAL_ADDR | ~LINKLOCAL_MASK)
 
 #ifndef IN_LINKLOCAL
 # define IN_LINKLOCAL(addr) ((addr & IN_CLASSB_NET) == LINKLOCAL_ADDR)
@@ -103,11 +103,12 @@ struct interface
 
 	int raw_fd;
 	int udp_fd;
-	size_t buffer_size, buffer_len, buffer_pos;
-	unsigned char *buffer;
 #ifdef ENABLE_ARP
 	int arp_fd;
 #endif
+	int link_fd;
+	size_t buffer_size, buffer_len, buffer_pos;
+	unsigned char *buffer;
 
 	struct in_addr addr;
 	struct in_addr net;
@@ -172,4 +173,8 @@ ssize_t get_raw_packet(struct interface *, int, void *, ssize_t);
 #ifdef ENABLE_ARP
 int send_arp(const struct interface *, int, in_addr_t, in_addr_t);
 #endif
+
+int open_link_socket(struct interface *);
+int link_changed(struct interface *);
+int carrier_status(const char *);
 #endif

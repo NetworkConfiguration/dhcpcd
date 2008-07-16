@@ -76,6 +76,7 @@
 #define STATE_INIT_IPV4LL	8
 #define STATE_PROBING		9
 #define STATE_ANNOUNCING	10
+#define STATE_CARRIER		11
 
 /* Constants taken from RFC 2131. */
 #define T1			0.5
@@ -691,7 +692,8 @@ send_message(struct if_state *state, int type, const struct options *options)
 }
 
 static void
-drop_config(struct if_state *state, const char *reason, const struct options *options)
+drop_config(struct if_state *state, const char *reason,
+	    const struct options *options)
 {
 	configure(state->interface, reason, NULL, state->new,
 		  &state->lease, options, 0);
@@ -717,7 +719,17 @@ wait_for_packet(struct if_state *state)
 	fds[nfds].fd = state->signal_fd;
 	fds[nfds].events = POLLIN;
 	nfds++;
-	if (state->lease.leasetime == ~0U && state->state == STATE_BOUND) {
+	/* And links */
+	if (state->interface->link_fd != -1) {
+		fds[nfds].fd = state->interface->link_fd;
+		fds[nfds].events = POLLIN;
+		nfds++;
+	}
+	if (state->state == STATE_CARRIER) {
+		timeout = INFTIM;
+	} else if (state->lease.leasetime == ~0U &&
+		   state->state == STATE_BOUND)
+	{
 		logger(LOG_DEBUG, "waiting for infinity");
 		timeout = INFTIM;
 	} else {
@@ -1035,7 +1047,10 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 		logger(LOG_ERR, "failed to renew, attempting to rebind");
 		lease->addr.s_addr = 0;
 		state->state = STATE_REBINDING;
-		tv.tv_sec = lease->rebindtime - lease->renewaltime;
+		if (lease->server.s_addr == 0)
+			tv.tv_sec = options->timeout;
+		else
+			tv.tv_sec = lease->rebindtime - lease->renewaltime;
 		break;
 	case STATE_REBINDING:
 		logger(LOG_ERR, "failed to rebind, attempting to discover");
@@ -1155,9 +1170,14 @@ handle_timeout(struct if_state *state, const struct options *options)
 	timerclear(&tv);
 
 	switch (state->state) {
-	case STATE_INIT:  /* FALLTHROUGH */
-	case STATE_BOUND: /* FALLTHROUGH */
 	case STATE_RENEW_REQUESTED:
+		/* If a renew was requested (ie, didn't timeout)
+		 * we need to remove the server address so we enter the
+		 * INIT-REBOOT state correctly. */
+		lease->server.s_addr = 0;
+		/* FALLTHROUGH */
+	case STATE_INIT:  /* FALLTHROUGH */
+	case STATE_BOUND:
 		up_interface(iface->name);
 		do_socket(state, SOCKET_OPEN);
 		state->xid = arc4random();
@@ -1201,6 +1221,13 @@ handle_timeout(struct if_state *state, const struct options *options)
 			state->claims = 0;
 			timerclear(&state->timeout);
 			return 0;
+		}
+		if (lease->addr.s_addr) {
+			logger(LOG_INFO, "renewing lease of %s",inet_ntoa(lease->addr));
+			state->state = STATE_RENEWING;
+			tv.tv_sec = options->timeout;
+			timeradd(&state->start, &tv, &state->stop);
+			break;
 		}
 		/* FALLTHROUGH */
 	case STATE_BOUND:
@@ -1564,6 +1591,37 @@ handle_arp_fail(struct if_state *state, const struct options *options)
 }
 #endif
 
+static int
+handle_link(struct if_state *state)
+{
+	int retval;
+
+	retval = link_changed(state->interface);
+	if (retval == -1) {
+		logger(LOG_ERR, "link_changed: %s", strerror(errno));
+		return -1;
+	}
+	if (retval == 0)
+		return 0;
+	switch (carrier_status(state->interface->name)) {
+	case -1:
+		logger(LOG_ERR, "carrier_status: %s", strerror(errno));
+		return -1;
+	case 0:
+		logger(LOG_INFO, "carrier lost");
+		state->state = STATE_CARRIER;
+		do_socket(state, SOCKET_CLOSED);
+		break;
+	default:
+		logger(LOG_INFO, "carrier acquired");
+		state->state = STATE_RENEW_REQUESTED;
+		break;
+	}
+	timerclear(&state->timeout);
+	timerclear(&state->stop);
+	return 0;
+}
+
 int
 dhcp_run(const struct options *options, int *pid_fd)
 {
@@ -1593,6 +1651,18 @@ dhcp_run(const struct options *options, int *pid_fd)
 		goto eexit;
 
 	state->signal_fd = signal_fd();
+	if (state->options & DHCPCD_LINK) {
+		open_link_socket(iface);
+		if (carrier_status(iface->name) == 0) {
+			if (!(state->options & DHCPCD_NOWAIT))
+				logger(LOG_INFO, "waiting for carrier");
+			state->state = STATE_CARRIER;
+		}
+	}
+
+	if (state->options & DHCPCD_NOWAIT)
+		if (daemonise(state, options) == -1)
+			goto eexit;
 
 	for (;;) {
 		retval = wait_for_packet(state);
@@ -1607,10 +1677,12 @@ dhcp_run(const struct options *options, int *pid_fd)
 				/* The interupt will be handled above */
 				retval = 0;
 		} else if (retval > 0) {
-			if (fd_hasdata(state->interface->raw_fd) == 1)
+			if (fd_hasdata(iface->link_fd) == 1)
+				retval = handle_link(state);
+			else if (fd_hasdata(iface->raw_fd) == 1)
 				retval = handle_dhcp_packet(state, options);
 #ifdef ENABLE_ARP
-			else if (fd_hasdata(state->interface->arp_fd) == 1) {
+			else if (fd_hasdata(iface->arp_fd) == 1) {
 				retval = handle_arp_packet(state);
 				if (retval == -1)
 					retval = handle_arp_fail(state, options);

@@ -52,7 +52,7 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 
 /* Don't set any optional arguments here so we retain POSIX
  * compatibility with getopt */
-#define OPTS "c:df:h:i:kl:m:no:pqr:s:t:u:v:xAC:DEF:GI:LO:TVX"
+#define OPTS "c:df:h:i:kl:m:no:pqr:s:t:u:v:xAC:DEF:GI:KLO:TVWX"
 
 static int doversion = 0;
 static int dohelp = 0;
@@ -82,10 +82,12 @@ static const struct option longopts[] = {
 	{"fqdn",        optional_argument,  NULL, 'F'},
 	{"nogateway",   no_argument,        NULL, 'G'},
 	{"clientid",    optional_argument,  NULL, 'I'},
+	{"nolink",      no_argument,        NULL, 'K'},
 	{"noipv4ll",    no_argument,        NULL, 'L'},
 	{"nooption",    optional_argument,  NULL, 'O'},
 	{"test",        no_argument,        NULL, 'T'},
 	{"variables",   no_argument,        NULL, 'V'},
+	{"nowait",      no_argument,        NULL, 'W'},
 	{"nodaemonise", no_argument,        NULL, 'X'},
 	{"help",        no_argument,        &dohelp, 1},
 	{"version",     no_argument,        &doversion, 1},
@@ -539,6 +541,9 @@ parse_option(int opt, char *oarg, struct options *options)
 		}
 #endif
 		break;
+	case 'K':
+		options->options &= ~DHCPCD_LINK;
+		break;
 	case 'L':
 		options->options &= ~DHCPCD_IPV4LL;
 		break;
@@ -549,6 +554,9 @@ parse_option(int opt, char *oarg, struct options *options)
 			logger(LOG_ERR, "unknown option `%s'", optarg);
 			return -1;
 		}
+		break;
+	case 'W':
+		options->options |= DHCPCD_NOWAIT;
 		break;
 	case 'X':
 		options->options &= ~DHCPCD_DAEMONISE;
@@ -622,6 +630,8 @@ main(int argc, char **argv)
 	options->options |= DHCPCD_IPV4LL;
  #endif
 #endif
+
+	options->options |= DHCPCD_LINK;
 
 #ifdef CMDLINE_COMPAT
 	add_reqmask(options->reqmask, DHCP_DNSSERVER);

@@ -43,6 +43,9 @@
 #define __FAVOR_BSD /* Nasty glibc hack so we can use BSD semantics for UDP */
 #include <netinet/udp.h>
 #undef __FAVOR_BSD
+#ifdef SIOCGIFMEDIA
+#include <net/if_media.h>
+#endif
 #include <arpa/inet.h>
 #ifdef AF_LINK
 # include <net/if_dl.h>
@@ -310,6 +313,51 @@ up_interface(const char *ifname)
 	return retval;
 }
 
+int
+carrier_status(const char *ifname)
+{
+	int s;
+	struct ifreq ifr;
+	int retval = -1;
+#ifdef SIOCGIFMEDIA
+	struct ifmediareq ifmr;
+#endif
+#ifdef __linux__
+	char *p;
+#endif
+
+	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+		return -1;
+	memset(&ifr, 0, sizeof(ifr));
+	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
+#ifdef __linux__
+	/* We can only test the real interface up */
+	if ((p = strchr(ifr.ifr_name, ':')))
+		*p = '\0';
+#endif
+	if ((retval = ioctl(s, SIOCGIFFLAGS, &ifr)) == 0) {
+		if (ifr.ifr_flags & IFF_UP && ifr.ifr_flags & IFF_RUNNING)
+			retval = 1;
+		else
+			retval = 0;
+	}
+
+#ifdef SIOCGIFMEDIA
+	if (retval == 1) {
+		memset(&ifmr, 0, sizeof(ifmr));
+		strncpy(ifmr.ifm_name, ifr.ifr_name, sizeof(ifmr.ifm_name));
+		if (ioctl(s, SIOCGIFMEDIA, &ifmr) != -1 &&
+		    ifmr.ifm_status & IFM_AVALID)
+		{
+			if (!(ifmr.ifm_status & IFM_ACTIVE))
+				retval = 0;
+		}
+	}
+#endif
+	close(s);
+	return retval;
+}
+
 struct interface *
 read_interface(const char *ifname, _unused int metric)
 {
@@ -389,6 +437,7 @@ read_interface(const char *ifname, _unused int metric)
 #ifdef ENABLE_ARP
 	iface->arp_fd = -1;
 #endif
+	iface->link_fd = -1;
 
 eexit:
 	close(s);

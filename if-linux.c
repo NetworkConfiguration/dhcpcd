@@ -46,128 +46,178 @@
 #include <string.h>
 #include <unistd.h>
 
+/* Support older kernels */
+#ifndef IFLA_WIRELESS
+# define IFLA_WIRELSSS (IFLFA_MASTER + 1)
+#endif
+
 #include "config.h"
 #include "common.h"
 #include "dhcp.h"
 #include "net.h"
 
-/* This netlink stuff is overly compex IMO.
- * The BSD implementation is much cleaner and a lot less code.
- * send_netlink handles the actual transmission so we can work out
- * if there was an error or not. */
 #define BUFFERLEN 256
+
+int
+open_link_socket(struct interface *iface)
+{
+	int fd;
+	struct sockaddr_nl nl;
+
+	if ((fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE)) == -1)
+		return -1;
+	memset(&nl, 0, sizeof(nl));
+	nl.nl_family = AF_NETLINK;
+	nl.nl_groups = RTMGRP_LINK;
+	if (bind(fd, (struct sockaddr *)&nl, sizeof(nl)) == -1)
+		return -1;
+	set_cloexec(fd);
+	if (iface->link_fd != -1)
+		close(iface->link_fd);
+	iface->link_fd = fd;
+	return 0;
+}
+
+static int
+get_netlink(int fd, int flags,
+	    int (*callback)(struct nlmsghdr *, const char *),
+	    const char *ifname)
+{
+	char *buffer = NULL;
+	ssize_t bytes;
+	struct nlmsghdr *nlm;
+	int r = -1;
+
+	buffer = xzalloc(sizeof(char) * BUFFERLEN);
+	for (;;) {
+		bytes = recv(fd, buffer, BUFFERLEN, flags);
+		if (bytes == -1) {
+			if (errno == EAGAIN) {
+				r == 0;
+				goto eexit;
+			}
+			if (errno == EINTR)
+				continue;
+			goto eexit;
+		}
+		for (nlm = (struct nlmsghdr *)buffer;
+		     NLMSG_OK(nlm, (size_t)bytes);
+		     nlm = NLMSG_NEXT(nlm, bytes))
+		{
+			r = callback(nlm, ifname);
+			if (r != 0)
+				goto eexit;
+		}
+	}
+
+eexit:
+	free(buffer);
+	return r;
+}
+
+static int
+err_netlink(struct nlmsghdr *nlm, _unused const char *ifname)
+{
+	struct nlmsgerr *err;
+	int l;
+
+	if (nlm->nlmsg_type != NLMSG_ERROR)
+		return 0;
+	l = nlm->nlmsg_len - sizeof(*nlm);
+	if ((size_t)l < sizeof(*err)) {
+		errno = EBADMSG;
+		return -1;
+	}
+	err = (struct nlmsgerr *)NLMSG_DATA(nlm);
+	if (err->error == 0)
+		return l;
+	errno = -err->error;
+	return -1;
+}
+
+static int
+link_netlink(struct nlmsghdr *nlm, const char *ifname)
+{
+	int len;
+	struct rtattr *rta;
+	struct ifinfomsg *ifi;
+	char ifn[IF_NAMESIZE + 1];
+
+	if (nlm->nlmsg_type != RTM_NEWLINK && nlm->nlmsg_type != RTM_DELLINK)
+		return 0;
+	len = nlm->nlmsg_len - sizeof(*nlm);
+	if ((size_t)len < sizeof(*ifi)) {
+		errno = EBADMSG;
+		return -1;
+	}
+	ifi = NLMSG_DATA(nlm);
+	if (ifi->ifi_flags & IFF_LOOPBACK)
+		return 0;
+	rta = (struct rtattr *) ((char *)ifi + NLMSG_ALIGN(sizeof(*ifi)));
+	len = NLMSG_PAYLOAD(nlm, sizeof(*ifi));
+	*ifn = '\0';
+	while (RTA_OK(rta, len)) {
+		switch (rta->rta_type) {
+		case IFLA_WIRELESS:
+			/* Ignore wireless messages */
+			if (nlm->nlmsg_type == RTM_NEWLINK &&
+			    ifi->ifi_change  == 0)
+				return 0;
+			break;
+		case IFLA_IFNAME:
+			strlcpy(ifn, RTA_DATA(rta), sizeof(ifn));
+			break;
+		}
+		rta = RTA_NEXT(rta, len);
+	}
+
+	if (strncmp(ifname, ifn, sizeof(ifn)) == 0)
+		return 1;
+	return 0;
+}
+
+int
+link_changed(struct interface *iface)
+{
+	return get_netlink(iface->link_fd, MSG_DONTWAIT,
+			   &link_netlink, iface->name);
+}
+
 static int
 send_netlink(struct nlmsghdr *hdr)
 {
-	int s;
-	pid_t mypid = getpid ();
+	int fd, r;
 	struct sockaddr_nl nl;
 	struct iovec iov;
 	struct msghdr msg;
 	static unsigned int seq;
-	char *buffer = NULL;
-	ssize_t bytes;
-	union
-	{
-		char *buffer;
-		struct nlmsghdr *nlm;
-	} h;
-	int len, l;
-	struct nlmsgerr *err;
 
-	if ((s = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE)) == -1)
+	if ((fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE)) == -1)
 		return -1;
-
 	memset(&nl, 0, sizeof(nl));
 	nl.nl_family = AF_NETLINK;
-	if (bind(s, (struct sockaddr *)&nl, sizeof(nl)) == -1)
-		goto eexit;
-
+	if (bind(fd, (struct sockaddr *)&nl, sizeof(nl)) == -1) {
+		close(fd);
+		return -1;
+	}
 	memset(&iov, 0, sizeof(iov));
 	iov.iov_base = hdr;
 	iov.iov_len = hdr->nlmsg_len;
-
 	memset(&msg, 0, sizeof(msg));
 	msg.msg_name = &nl;
 	msg.msg_namelen = sizeof(nl);
 	msg.msg_iov = &iov;
 	msg.msg_iovlen = 1;
-
 	/* Request a reply */
 	hdr->nlmsg_flags |= NLM_F_ACK;
 	hdr->nlmsg_seq = ++seq;
 
-	if (sendmsg(s, &msg, 0) == -1)
-		goto eexit;
-
-	buffer = xzalloc(sizeof(char) * BUFFERLEN);
-	iov.iov_base = buffer;
-
-	for (;;) {
-		iov.iov_len = BUFFERLEN;
-		bytes = recvmsg(s, &msg, 0);
-
-		if (bytes == -1) {
-			if (errno == EINTR)
-				continue;
-			goto eexit;
-		}
-
-		if (bytes == 0) {
-			errno = ENODATA;
-			goto eexit;
-		}
-
-		if (msg.msg_namelen != sizeof(nl)) {
-			errno = EBADMSG;
-			goto eexit;
-		}
-
-		for (h.buffer = buffer; bytes >= (signed) sizeof(*h.nlm); ) {
-			len = h.nlm->nlmsg_len;
-			l = len - sizeof(*h.nlm);
-			err = (struct nlmsgerr *)NLMSG_DATA(h.nlm);
-
-			if (l < 0 || len > bytes) {
-				errno = EBADMSG;
-				goto eexit;
-			}
-
-			/* Ensure it's our message */
-			if (nl.nl_pid != 0 ||
-			    (pid_t)h.nlm->nlmsg_pid != mypid ||
-			    h.nlm->nlmsg_seq != seq)
-			{
-				/* Next Message */
-				bytes -= NLMSG_ALIGN(len);
-				h.buffer += NLMSG_ALIGN(len);
-				continue;
-			}
-
-			/* We get an NLMSG_ERROR back with a code of zero for success */
-			if (h.nlm->nlmsg_type != NLMSG_ERROR)
-				continue;
-
-			if ((unsigned)l < sizeof(*err)) {
-				errno = EBADMSG;
-				goto eexit;
-			}
-
-			if (err->error == 0) {
-				close(s);
-				free(buffer);
-				return l;
-			}
-
-			errno = -err->error;
-			goto eexit;
-		}
-	}
-
-eexit:
-	close(s);
-	free(buffer);
-	return -1;
+	if (sendmsg(fd, &msg, 0) != -1)
+		r = get_netlink(fd, 0, &err_netlink, NULL);
+	else
+		r = -1;
+	close(fd);
+	return r;
 }
 
 #define NLMSG_TAIL(nmsg) \
