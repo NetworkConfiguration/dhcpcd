@@ -112,7 +112,7 @@ open_socket(struct interface *iface, int protocol)
 		fd = &iface->arp_fd;
 	else
 #endif
-		fd = &iface->fd;
+		fd = &iface->raw_fd;
 	if (*fd != -1)
 		close(*fd);
 	*fd = s;
@@ -153,7 +153,7 @@ send_raw_packet(const struct interface *iface, int protocol,
 		fd = iface->arp_fd;
 	else
 #endif
-		fd = iface->fd;
+		fd = iface->raw_fd;
 
 	return sendto(fd, data, len, 0, &su.sa, sizeof(su));
 }
@@ -169,7 +169,7 @@ get_raw_packet(struct interface *iface, int protocol, void *data, ssize_t len)
 		fd = iface->arp_fd;
 #endif
 	} else
-		fd = iface->fd;
+		fd = iface->raw_fd;
 	bytes = read(fd, data, len);
 	if (bytes == -1)
 		return errno == EAGAIN ? 0 : -1;

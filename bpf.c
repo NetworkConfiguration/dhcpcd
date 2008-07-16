@@ -116,7 +116,7 @@ open_socket(struct interface *iface, int protocol)
 	} else {
 		pf.bf_insns = UNCONST(dhcp_bpf_filter);
 		pf.bf_len = dhcp_bpf_filter_len;
-		fdp = &iface->fd;
+		fdp = &iface->raw_fd;
 	}
 	if (ioctl(fd, BIOCSETF, &pf) == -1)
 		goto eexit;
@@ -156,7 +156,7 @@ send_raw_packet(const struct interface *iface, int protocol,
 		fd = iface->arp_fd;
 	else
 #endif
-		fd = iface->fd;
+		fd = iface->raw_fd;
 	return writev(fd, iov, 2);
 }
 
@@ -176,7 +176,7 @@ get_raw_packet(struct interface *iface, int protocol,
 		fd = iface->arp_fd;
 #endif
 	} else
-		fd = iface->fd;
+		fd = iface->raw_fd;
 
 	for (;;) {
 		if (iface->buffer_len == 0) {

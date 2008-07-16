@@ -603,9 +603,9 @@ client_setup(struct if_state *state, const struct options *options)
 static int 
 do_socket(struct if_state *state, int mode)
 {
-	if (state->interface->fd != -1) {
-		close(state->interface->fd);
-		state->interface->fd = -1;
+	if (state->interface->raw_fd != -1) {
+		close(state->interface->raw_fd);
+		state->interface->raw_fd = -1;
 	}
 	if (mode == SOCKET_CLOSED) {
 		if (state->interface->udp_fd != -1) {
@@ -721,8 +721,8 @@ wait_for_packet(struct if_state *state)
 		logger(LOG_DEBUG, "waiting for infinity");
 		timeout = INFTIM;
 	} else {
-		if (state->interface->fd != -1) {
-			fds[nfds].fd = state->interface->fd;
+		if (state->interface->raw_fd != -1) {
+			fds[nfds].fd = state->interface->raw_fd;
 			fds[nfds].events = POLLIN;
 			nfds++;
 		}
@@ -1607,7 +1607,7 @@ dhcp_run(const struct options *options, int *pid_fd)
 				/* The interupt will be handled above */
 				retval = 0;
 		} else if (retval > 0) {
-			if (fd_hasdata(state->interface->fd) == 1)
+			if (fd_hasdata(state->interface->raw_fd) == 1)
 				retval = handle_dhcp_packet(state, options);
 #ifdef ENABLE_ARP
 			else if (fd_hasdata(state->interface->arp_fd) == 1) {
