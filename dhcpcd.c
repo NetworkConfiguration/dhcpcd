@@ -610,9 +610,15 @@ main(int argc, char **argv)
 	FILE *f;
 	char *cf = NULL;
 	char *intf = NULL;
+#ifdef THERE_IS_NO_FORK
+	char argvp[PATH_MAX];
+	char *path, *token;
+	struct stat sb;
+#endif
 
 	closefrom(3);
 	openlog(PACKAGE, LOG_PID, LOG_LOCAL0);
+	setlogprefix(PACKAGE ": ");
 
 	options = xzalloc(sizeof(*options));
 	options->options |= DHCPCD_GATEWAY | DHCPCD_DAEMONISE;
@@ -652,9 +658,20 @@ main(int argc, char **argv)
 #ifdef THERE_IS_NO_FORK
 	dhcpcd_argv = argv;
 	dhcpcd_argc = argc;
-	if (!realpath(argv[0], dhcpcd)) {
-		fprintf(stderr, "unable to resolve the path `%s': %s",
-			argv[0], strerror(errno));
+	if (*argv[0] == '/' || *argv[0] == '.')
+		strncpy(argvp, argv[0], sizeof(argvp));
+	else {
+		p = path = xstrdup(getenv("PATH"));
+		while ((token = strsep(&p, ":"))) {
+			snprintf(argvp, sizeof(argvp), "%s/%s", token, argv[0]);
+			if (stat(argvp, &sb) == 0)
+				break;
+		}
+		free(path);
+	}
+	if (!realpath(argvp, dhcpcd)) {
+		logger(LOG_ERR, "unable to resolve the path `%s': %s\n",
+		       argv[0], strerror(errno));
 		goto abort;
 	}
 #endif
