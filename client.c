@@ -1170,15 +1170,9 @@ handle_timeout(struct if_state *state, const struct options *options)
 	timerclear(&tv);
 
 	switch (state->state) {
-	case STATE_RENEW_REQUESTED:
-		/* If a renew was requested (ie, didn't timeout)
-		 * we need to remove the server address so we enter the
-		 * INIT-REBOOT state correctly. */
-		lease->server.s_addr = 0;
-		state->messages = 0;
-		/* FALLTHROUGH */
 	case STATE_INIT:  /* FALLTHROUGH */
-	case STATE_BOUND:
+	case STATE_BOUND: /* FALLTHROUGH */
+	case STATE_RENEW_REQUESTED:
 		up_interface(iface->name);
 		do_socket(state, SOCKET_OPEN);
 		state->xid = arc4random();
@@ -1214,6 +1208,12 @@ handle_timeout(struct if_state *state, const struct options *options)
 		}
 		break;
 	case STATE_RENEW_REQUESTED:
+		/* If a renew was requested (ie, didn't timeout)
+		 * we need to remove the server address so we enter the
+		 * INIT-REBOOT state correctly. */
+		lease->server.s_addr = 0;
+		state->messages = 0;
+#ifdef ENABLE_IPV4LL
 		if (IN_LINKLOCAL(ntohl(lease->addr.s_addr))) {
 			state->state = STATE_PROBING;
 			free(state->offer);
@@ -1223,8 +1223,10 @@ handle_timeout(struct if_state *state, const struct options *options)
 			timerclear(&state->timeout);
 			return 0;
 		}
+#endif
 		if (lease->addr.s_addr) {
-			logger(LOG_INFO, "renewing lease of %s",inet_ntoa(lease->addr));
+			logger(LOG_INFO, "renewing lease of %s",
+			       inet_ntoa(lease->addr));
 			state->state = STATE_RENEWING;
 			tv.tv_sec = options->timeout;
 			timeradd(&state->start, &tv, &state->stop);
