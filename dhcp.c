@@ -720,7 +720,7 @@ make_message(struct dhcp_message **message,
 
 	dhcp = xzalloc(sizeof (*dhcp));
 	m = (uint8_t *)dhcp;
-	p = (uint8_t *)&dhcp->options;
+	p = dhcp->options;
 
 	if ((type == DHCP_INFORM ||
 	     type == DHCP_RELEASE ||
