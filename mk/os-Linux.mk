@@ -15,7 +15,7 @@ _HAVE_FORK_SH= if test "${HAVE_FORK}" = "yes"; then \
 	elif test -n "${HAVE_FORK}"; then \
 		echo "-DTHERE_IS_NO_FORK"; \
 	else \
-		printf '\#include <stdlib.h>\n\#include <unistd.h>\nint main (void) { pid_t pid = fork(); if (pid == -1) exit (-1); exit (0); }\n' > .fork.c; \
+		printf '\#include <stdlib.h>\n\#include <unistd.h>\nint main (void) { pid_t pid = fork(); if (pid == -1) exit (EXIT_FAILURE); exit (EXIT_SUCCESS); }\n' > .fork.c; \
 		${CC} .fork.c -o .fork >/dev/null 2>&1; \
 		if ./.fork; then \
 			echo ""; \
