@@ -1175,6 +1175,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 		 * we need to remove the server address so we enter the
 		 * INIT-REBOOT state correctly. */
 		lease->server.s_addr = 0;
+		state->messages = 0;
 		/* FALLTHROUGH */
 	case STATE_INIT:  /* FALLTHROUGH */
 	case STATE_BOUND:
