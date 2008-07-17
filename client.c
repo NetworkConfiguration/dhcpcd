@@ -359,13 +359,13 @@ ipv4ll_get_dhcp(uint32_t old_addr)
 	/* Put some LL options in */
 	p = dhcp->options;
 	*p++ = DHCP_SUBNETMASK;
-	*p += sizeof(u32);
-	u32 = LINKLOCAL_MASK;
+	*p++ = sizeof(u32);
+	u32 = htonl(LINKLOCAL_MASK);
 	memcpy(p, &u32, sizeof(u32));
 	p += sizeof(u32);
 	*p++ = DHCP_BROADCAST;
-	*p += sizeof(u32);
-	u32 = LINKLOCAL_BRDC;
+	*p++ = sizeof(u32);
+	u32 = htonl(LINKLOCAL_BRDC);
 	memcpy(p, &u32, sizeof(u32));
 	p += sizeof(u32);
 	*p++ = DHCP_END;
