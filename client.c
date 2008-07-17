@@ -1699,6 +1699,8 @@ dhcp_run(const struct options *options, int *pid_fd)
 eexit:
 	if (iface) {
 		do_socket(state, SOCKET_CLOSED);
+		if (iface->link_fd != -1)
+		    close(iface->link_fd);
 		free_routes(iface->routes);
 		free(iface->clientid);
 		free(iface->buffer);
