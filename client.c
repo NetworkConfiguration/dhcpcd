@@ -1328,6 +1328,27 @@ dhcp_timeout:
 	return 0;
 }
 
+static void
+log_dhcp(int lvl, const char *msg, const struct dhcp_message *dhcp)
+{
+	char *addr;
+	struct in_addr server;
+	int r;
+
+	server.s_addr = dhcp->yiaddr;
+	addr = xstrdup(inet_ntoa(server));
+	r = get_option_addr(&server.s_addr, dhcp, DHCP_SERVERID);
+	if (dhcp->servername[0] && r == 0)
+		logger(lvl, "%s %s from %s `%s'", msg,
+		       addr, inet_ntoa(server),
+		       dhcp->servername);
+	else if (r == 0)
+		logger(lvl, "%s %s from %s", msg, addr, inet_ntoa(server));
+	else
+		logger(lvl, "%s %s", msg, addr);
+	free(addr);
+}
+
 static int
 handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 	    const struct options *options)
@@ -1337,12 +1358,10 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 	struct interface *iface = state->interface;
 	struct dhcp_lease *lease = &state->lease;
 	char *addr;
-	struct in_addr saddr;
 	uint8_t type;
-	int r;
 
 	if (get_option_uint8(&type, dhcp, DHCP_MESSAGETYPE) == -1) {
-		logger(LOG_ERR, "no DHCP type in message");
+		log_dhcp(LOG_ERR, "no DHCP type in", dhcp);
 		return -1;
 	}
 
@@ -1352,7 +1371,7 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 	/* We should restart on a NAK */
 	if (type == DHCP_NAK) {
 		addr = get_option_string(dhcp, DHCP_MESSAGE);
-		logger(LOG_WARNING, "received NAK: %s", addr);
+		log_dhcp(LOG_WARNING, "NAK for", dhcp);
 		free(addr);
 		state->state = STATE_INIT;
 		timerclear(&state->timeout);
@@ -1379,18 +1398,8 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 
 	if (type == DHCP_OFFER && state->state == STATE_DISCOVERING) {
 		lease->addr.s_addr = dhcp->yiaddr;
-		addr = xstrdup(inet_ntoa(lease->addr));
-		r = get_option_addr(&lease->server.s_addr, dhcp, DHCP_SERVERID);
-		if (dhcp->servername[0] && r == 0)
-			logger(LOG_INFO, "offered %s from %s `%s'",
-			       addr, inet_ntoa(lease->server),
-			       dhcp->servername);
-		else if (r == 0)
-			logger(LOG_INFO, "offered %s from %s",
-			       addr, inet_ntoa(lease->server));
-		else
-			logger(LOG_INFO, "offered %s", addr);
-		free(addr);
+		get_option_addr(&lease->server.s_addr, dhcp, DHCP_SERVERID);
+		log_dhcp(LOG_INFO, "offered", dhcp);
 
 		if (state->options & DHCPCD_TEST) {
 			exec_script(options, iface->name, "TEST", dhcp, NULL);
@@ -1405,16 +1414,14 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 	}
 
 	if (type == DHCP_OFFER) {
-		saddr.s_addr = dhcp->yiaddr;
-		logger(LOG_INFO, "got subsequent offer of %s, ignoring ",
-		       inet_ntoa(saddr));
+		log_dhcp(LOG_INFO, "ignoring offer of", dhcp);
 		free(dhcp);
 		return 0;
 	}
 
 	/* We should only be dealing with acks */
 	if (type != DHCP_ACK) {
-		logger(LOG_ERR, "%d not an ACK or OFFER", type);
+		log_dhcp(LOG_ERR, "not ACK or OFFER", dhcp);
 		free(dhcp);
 		return 0;
 	}
@@ -1425,19 +1432,9 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 	case STATE_RENEWING:
 	case STATE_REBINDING:
 		if (!(state->options & DHCPCD_INFORM)) {
-			addr = xstrdup(inet_ntoa(lease->addr));
-			r = get_option_addr(&lease->server.s_addr,
-					    dhcp, DHCP_SERVERID);
-			if (dhcp->servername[0] && r == 0)
-				logger(LOG_INFO, "acknowledged %s from %s `%s'",
-				       addr, inet_ntoa(lease->server),
-				       dhcp->servername);
-			else if (r == 0)
-				logger(LOG_INFO, "acknowledged %s from %s",
-				       addr, inet_ntoa(lease->server));
-			else
-				logger(LOG_INFO, "acknowledged %s", addr);
-			free(addr);
+			get_option_addr(&lease->server.s_addr,
+					dhcp, DHCP_SERVERID);
+			log_dhcp(LOG_INFO, "acknowledged", dhcp);
 		}
 		break;
 	default:
