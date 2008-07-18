@@ -610,12 +610,16 @@ client_setup(struct if_state *state, const struct options *options)
 	}
 
 	if (options->timeout > 0 &&
-	    state->options & DHCPCD_DAEMONISE &&
 	    !(state->options & DHCPCD_BACKGROUND))
 	{
 		tv.tv_sec = options->timeout;
 		tv.tv_usec = 0;
-		timeradd(&state->start, &tv, &state->exit);
+		if (state->options & DHCPCD_IPV4LL) {
+			timeradd(&state->start, &tv, &state->stop);
+			tv.tv_sec = 10;
+			timeradd(&state->stop, &tv, &state->exit);
+		} else
+			timeradd(&state->start, &tv, &state->exit);
 	}
 	return 0;
 }
@@ -904,6 +908,7 @@ static int bind_dhcp(struct if_state *state, const struct options *options)
 	state->new = state->offer;
 	state->offer = NULL;
 	state->messages = 0;
+	timerclear(&state->exit);
 #ifdef ENABLE_ARP
 	state->conflicts = 0;
 	state->defend = 0;
@@ -1019,6 +1024,7 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 	state->messages = 0;
 
 	switch (state->state) {
+	case STATE_INIT:	/* FALLTHROUGH */
 	case STATE_DISCOVERING: /* FALLTHROUGH */
 	case STATE_REQUESTING:
 		if (IN_LINKLOCAL(ntohl(iface->addr.s_addr))) {
@@ -1233,16 +1239,16 @@ handle_timeout(struct if_state *state, const struct options *options)
 
 	timerclear(&tv);
 	switch (state->state) {
-	case STATE_INIT:  /* FALLTHROUGH */
 	case STATE_BOUND: /* FALLTHROUGH */
 	case STATE_RENEW_REQUESTED:
+		get_time(&state->start);
+		timerclear(&state->stop);
+	case STATE_INIT:  /* FALLTHROUGH */
 		up_interface(iface->name);
 		do_socket(state, SOCKET_OPEN);
 		state->xid = arc4random();
 		state->nakoff = 1;
 		iface->start_uptime = uptime();
-		get_time(&state->start);
-		timerclear(&state->stop);
 		break;
 	default:
 		if (!timerisset(&state->stop))
