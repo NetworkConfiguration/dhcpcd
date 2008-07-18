@@ -600,7 +600,7 @@ client_setup(struct if_state *state, const struct options *options)
 	if (state->options & DHCPCD_LINK) {
 		open_link_socket(iface);
 		if (carrier_status(iface->name) == 0) {
-			if (!(state->options & DHCPCD_NOWAIT))
+			if (!(state->options & DHCPCD_BACKGROUND))
 				logger(LOG_INFO, "waiting for carrier");
 			state->state = STATE_CARRIER;
 			tv.tv_sec = options->timeout;
@@ -1683,7 +1683,7 @@ dhcp_run(const struct options *options, int *pid_fd)
 
 	state->signal_fd = signal_fd();
 
-	if (state->options & DHCPCD_NOWAIT)
+	if (state->options & DHCPCD_BACKGROUND)
 		if (daemonise(state, options) == -1)
 			goto eexit;
 

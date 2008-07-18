@@ -52,11 +52,12 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 
 /* Don't set any optional arguments here so we retain POSIX
  * compatibility with getopt */
-#define OPTS "c:df:h:i:kl:m:no:pqr:s:t:u:v:xAC:DEF:GI:KLO:TVWX"
+#define OPTS "bc:df:h:i:kl:m:no:pqr:s:t:u:v:xAC:DEF:GI:KLO:TVX"
 
 static int doversion = 0;
 static int dohelp = 0;
 static const struct option longopts[] = {
+	{"background",  no_argument,        NULL, 'b'},
 	{"script",      required_argument,  NULL, 'c'},
 	{"debug",       no_argument,        NULL, 'd'},
 	{"config",	required_argument,  NULL, 'f'},
@@ -87,8 +88,6 @@ static const struct option longopts[] = {
 	{"nooption",    optional_argument,  NULL, 'O'},
 	{"test",        no_argument,        NULL, 'T'},
 	{"variables",   no_argument,        NULL, 'V'},
-	{"nowait",      no_argument,        NULL, 'W'},
-	{"nodaemonise", no_argument,        NULL, 'X'},
 	{"help",        no_argument,        &dohelp, 1},
 	{"version",     no_argument,        &doversion, 1},
 #ifdef THERE_IS_NO_FORK
@@ -321,6 +320,9 @@ parse_option(int opt, char *oarg, struct options *options)
 #endif
 
 	switch(opt) {
+	case 'b':
+		options->options |= DHCPCD_BACKGROUND;
+		break;
 	case 'c':
 		strlcpy(options->script, oarg, sizeof(options->script));
 		break;
@@ -554,9 +556,6 @@ parse_option(int opt, char *oarg, struct options *options)
 			logger(LOG_ERR, "unknown option `%s'", optarg);
 			return -1;
 		}
-		break;
-	case 'W':
-		options->options |= DHCPCD_NOWAIT;
 		break;
 	case 'X':
 		options->options &= ~DHCPCD_DAEMONISE;
