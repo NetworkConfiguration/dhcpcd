@@ -52,7 +52,7 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 
 /* Don't set any optional arguments here so we retain POSIX
  * compatibility with getopt */
-#define OPTS "bc:df:h:i:kl:m:no:pqr:s:t:u:v:xAC:DEF:GI:KLO:TVX"
+#define OPTS "bc:df:h:i:kl:m:no:pqr:s:t:u:v:xABC:DEF:GI:KLO:TV"
 
 static int doversion = 0;
 static int dohelp = 0;
@@ -77,6 +77,7 @@ static const struct option longopts[] = {
 	{"vendor",      required_argument,  NULL, 'v'},
 	{"exit",        no_argument,        NULL, 'x'},
 	{"noarp",       no_argument,        NULL, 'A'},
+	{"nobackground",no_argument,        NULL, 'B'},
 	{"nohook",	required_argument,  NULL, 'C'},
 	{"duid",        no_argument,        NULL, 'D'},
 	{"lastlease",   no_argument,        NULL, 'E'},
@@ -485,6 +486,9 @@ parse_option(int opt, char *oarg, struct options *options)
 		/* IPv4LL requires ARP */
 		options->options &= ~DHCPCD_IPV4LL;
 		break;
+	case 'B':
+		options->options &= ~DHCPCD_DAEMONISE;
+		break;
 	case 'C':
 		/* Commas to spaces for shell */
 		while ((p = strchr(oarg, ',')))
@@ -556,9 +560,6 @@ parse_option(int opt, char *oarg, struct options *options)
 			logger(LOG_ERR, "unknown option `%s'", optarg);
 			return -1;
 		}
-		break;
-	case 'X':
-		options->options &= ~DHCPCD_DAEMONISE;
 		break;
 	default:
 		return 0;

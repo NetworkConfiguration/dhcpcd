@@ -29,7 +29,7 @@
 .Nd an RFC 2131 compliant DHCP client
 .Sh SYNOPSIS
 .Nm
-.Op Fl bdknpqADEGKLSTVX
+.Op Fl bdknpqABDEGKLSTV
 .Op Fl c , -script Ar script
 .Op Fl f , -config Ar file
 .Op Fl h , -hostname Ar hostname
@@ -319,6 +319,10 @@ The messages are still logged though.
 .It Fl A , -noarp
 Don't request or claim the address by ARP.
 This also disables IPv4LL.
+.It Fl B , -nobackground
+Don't run in the background when we acquire a lease.
+This is mainly useful for running under the control of another process, such
+as a debugger or a network manager.
 .It Fl C , -nohook Ar script
 Don't run this hook script.
 Matches full name, or prefixed with 2 numbers optionally ending with
@@ -347,10 +351,6 @@ files.
 .It Fl V, -variables
 Display a list of option codes and the associated variable for use in
 .Xr dhcpcd-run-hooks 8 .
-.It Fl X , -nodaemonise
-Don't daemonise when we acquire a lease.
-This is mainly useful for running under the control of another process, such
-as a debugger or a network manager.
 .El
 .Sh NOTES
 .Nm
