@@ -131,6 +131,7 @@ struct if_state {
 	struct timeval start;
 	struct timeval timeout;
 	struct timeval stop;
+	struct timeval exit;
 	int state;
 	int messages;
 	time_t nakoff;
@@ -264,14 +265,13 @@ daemonise(struct if_state *state, const struct options *options)
 		*state->pid_fd = -1;
 	}
 
-	sigprocmask(SIG_SETMASK, &old, NULL);
-
 	state->state = STATE_BOUND;
+	timerclear(&state->exit);
+	sigprocmask(SIG_SETMASK, &old, NULL);
 	if (pid == 0) {
 		state->options |= DHCPCD_DAEMONISED;
 		return 0;
 	}
-
 	state->options |= DHCPCD_PERSISTENT | DHCPCD_FORKED;
 	return -1;
 }
@@ -492,6 +492,7 @@ client_setup(struct if_state *state, const struct options *options)
 	state->nakoff = 1;
 	state->options = options->options;
 	timerclear(&tv);
+	get_time(&state->start);
 
 	if (options->request_address.s_addr == 0 &&
 	    (options->options & DHCPCD_INFORM ||
@@ -524,8 +525,7 @@ client_setup(struct if_state *state, const struct options *options)
 			state->state = STATE_BOUND;
 			tv.tv_sec = state->lease.renewaltime;
 #endif
-			get_time(&state->timeout);
-			timeradd(&state->timeout, &tv, &state->timeout);
+			timeradd(&state->start, &tv, &state->timeout);
 		}
 #endif
 	} else {
@@ -599,17 +599,18 @@ client_setup(struct if_state *state, const struct options *options)
 #endif
 	if (state->options & DHCPCD_LINK) {
 		open_link_socket(iface);
-		if (carrier_status(iface->name) == 0) {
-			if (!(state->options & DHCPCD_BACKGROUND))
-				logger(LOG_INFO, "waiting for carrier");
+		if (carrier_status(iface->name) == 0)
 			state->state = STATE_CARRIER;
-			tv.tv_sec = options->timeout;
-			tv.tv_usec = 0;
-			get_time(&state->start);
-			timeradd(&state->start, &tv, &state->stop);
-		}
 	}
 
+	if (options->timeout > 0 &&
+	    state->options & DHCPCD_DAEMONISE &&
+	    !(state->options & DHCPCD_BACKGROUND))
+	{
+		tv.tv_sec = options->timeout;
+		tv.tv_usec = 0;
+		timeradd(&state->start, &tv, &state->exit);
+	}
 	return 0;
 }
 
@@ -739,8 +740,12 @@ wait_for_packet(struct if_state *state)
 	}
 
 	ref = NULL;
+	if (timerisset(&state->exit) &&
+	    timercmp(&state->exit, &now, >))
+		ref = &state->exit;
 	if (timerisset(&state->stop) &&
-	    timercmp(&state->stop, &now, >))
+	    timercmp(&state->stop, &now, >) &&
+	    (!ref || timercmp(&state->stop, ref, <)))
 		ref = &state->stop;
 	if (timerisset(&state->timeout) &&
 	    timercmp(&state->timeout, &now, >) &&
@@ -750,11 +755,14 @@ wait_for_packet(struct if_state *state)
 	if (state->lease.leasetime == ~0U &&
 	    state->state == STATE_BOUND)
 	{
-		logger(LOG_DEBUG, "waiting for infinity");
+		if (last_stop_sec != INFTIM)
+			logger(LOG_DEBUG, "waiting for infinity");
 		timeout = INFTIM;
-	} else if (state->state == STATE_CARRIER && !ref)
+	} else if (state->state == STATE_CARRIER && !ref) {
+		if (last_stop_sec != INFTIM)
+			logger(LOG_DEBUG, "waiting for carrier");
 		timeout = INFTIM;
-	else {
+	} else {
 		if (state->interface->raw_fd != -1) {
 			fds[nfds].fd = state->interface->raw_fd;
 			fds[nfds].events = POLLIN;
@@ -771,7 +779,9 @@ wait_for_packet(struct if_state *state)
 
 wait_again:
 	get_time(&now);
-	if (timeout != INFTIM) {
+	if (timeout == INFTIM)
+		last_stop_sec = INFTIM;
+	else {
 		if (!ref)
 			return 0;
 		timersub(ref, &now, &d);
@@ -1184,9 +1194,14 @@ handle_timeout(struct if_state *state, const struct options *options)
 	}
 #endif
 
+	if (timerisset(&state->exit)) {
+		get_time(&tv);
+		if (timercmp(&tv, &state->exit, >))
+			return handle_timeout_fail(state, options);
+	}
 	if (timerisset(&state->stop)) {
-		get_time(&state->timeout);
-		if (timercmp(&state->timeout, &state->stop, >))
+		get_time(&tv);
+		if (timercmp(&tv, &state->stop, >))
 			return handle_timeout_fail(state, options);
 	}
 	timerclear(&tv);
@@ -1206,10 +1221,9 @@ handle_timeout(struct if_state *state, const struct options *options)
 
 	switch(state->state) {
 	case STATE_CARRIER:
-		logger(LOG_INFO, "waiting for carrier");
-		get_time(&state->start);
-		tv.tv_sec = options->timeout;
-		timeradd(&state->start, &tv, &state->stop);
+		if (timerisset(&state->exit))
+			logger(LOG_INFO, "waiting for carrier");
+		timerclear(&state->timeout);
 		return 0;
 	case STATE_INIT:
 		if (!(state->state && DHCPCD_DAEMONISED) &&
@@ -1408,9 +1422,19 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 	case STATE_RENEWING:
 	case STATE_REBINDING:
 		if (!(state->options & DHCPCD_INFORM)) {
-			saddr.s_addr = dhcp->yiaddr;
-			logger(LOG_INFO, "lease of %s acknowledged",
-			       inet_ntoa(saddr));
+			addr = xstrdup(inet_ntoa(lease->addr));
+			r = get_option_addr(&lease->server.s_addr,
+					    dhcp, DHCP_SERVERID);
+			if (dhcp->servername[0] && r == 0)
+				logger(LOG_INFO, "acknowledged %s from %s `%s'",
+				       addr, inet_ntoa(lease->server),
+				       dhcp->servername);
+			else if (r == 0)
+				logger(LOG_INFO, "acknowledged %s from %s",
+				       addr, inet_ntoa(lease->server));
+			else
+				logger(LOG_INFO, "acknowledged %s", addr);
+			free(addr);
 		}
 		break;
 	default:
@@ -1658,7 +1682,7 @@ dhcp_run(const struct options *options, int *pid_fd)
 {
 	struct interface *iface;
 	struct if_state *state = NULL;
-	int retval = -1;
+	int retval = 0;
 	int sig;
 
 	iface = read_interface(options->interface, options->metric);
@@ -1688,8 +1712,6 @@ dhcp_run(const struct options *options, int *pid_fd)
 			goto eexit;
 
 	for (;;) {
-		retval = wait_for_packet(state);
-
 		/* We should always handle our signals first */
 		if ((sig = (signal_read(state->signal_fd))) != -1) {
 			retval = handle_signal(sig, state, options);
@@ -1700,12 +1722,20 @@ dhcp_run(const struct options *options, int *pid_fd)
 				/* The interupt will be handled above */
 				retval = 0;
 		} else if (retval > 0) {
-			if (fd_hasdata(iface->link_fd) == 1)
+			if (fd_hasdata(iface->link_fd) == 1) {
 				retval = handle_link(state);
-			else if (fd_hasdata(iface->raw_fd) == 1)
+				if (retval == 0 &&
+				    state->state == STATE_RENEW_REQUESTED)
+					/* Fallthrough to handle_timeout */
+					continue;
+			} else if (fd_hasdata(iface->raw_fd) == 1) {
 				retval = handle_dhcp_packet(state, options);
+				if (retval == 0 &&
+				    state->state == STATE_REQUESTING)
+					/* Fallthrough to handle_timeout */
+					continue;
 #ifdef ENABLE_ARP
-			else if (fd_hasdata(iface->arp_fd) == 1) {
+			} else if (fd_hasdata(iface->arp_fd) == 1) {
 				retval = handle_arp_packet(state);
 				if (retval == -1)
 					retval = handle_arp_fail(state, options);
@@ -1714,9 +1744,9 @@ dhcp_run(const struct options *options, int *pid_fd)
 			else
 				retval = 0;
 		}
-
 		if (retval != 0)
 			break;
+		retval = wait_for_packet(state);
 	}
 
 eexit:
