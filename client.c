@@ -76,7 +76,6 @@
 #define STATE_INIT_IPV4LL	8
 #define STATE_PROBING		9
 #define STATE_ANNOUNCING	10
-#define STATE_CARRIER		11
 
 /* Constants taken from RFC 2131. */
 #define T1			0.5
@@ -139,6 +138,7 @@ struct if_state {
 	int socket;
 	int *pid_fd;
 	int signal_fd;
+	int carrier;
 #ifdef ENABLE_ARP
 	int probes;
 	int claims;
@@ -147,6 +147,9 @@ struct if_state {
 	struct in_addr fail;
 #endif
 };
+
+#define LINK_UP 	1
+#define LINK_DOWN 	-1
 
 struct dhcp_op {
         uint8_t value;
@@ -599,8 +602,11 @@ client_setup(struct if_state *state, const struct options *options)
 #endif
 	if (state->options & DHCPCD_LINK) {
 		open_link_socket(iface);
-		if (carrier_status(iface->name) == 0)
-			state->state = STATE_CARRIER;
+		if (carrier_status(iface->name) == 0) {
+			if (state->options & DHCPCD_DAEMONISE)
+				logger(LOG_INFO, "waiting for carrier");
+			state->carrier = LINK_DOWN;
+		}
 	}
 
 	if (options->timeout > 0 &&
@@ -660,6 +666,8 @@ send_message(struct if_state *state, int type, const struct options *options)
 	struct in_addr to;
 	in_addr_t a = 0;
 
+	if (state->carrier == LINK_DOWN)
+		return 0;	
 	logger(LOG_DEBUG, "sending %s with xid 0x%x",
 	       get_dhcp_op(type), state->xid);
 	state->messages++;
@@ -765,7 +773,7 @@ wait_for_packet(struct if_state *state)
 		if (last_stop_sec != INFTIM)
 			logger(LOG_DEBUG, "waiting for infinity");
 		timeout = INFTIM;
-	} else if (state->state == STATE_CARRIER && !ref) {
+	} else if (state->carrier == LINK_DOWN && !ref) {
 		if (last_stop_sec != INFTIM)
 			logger(LOG_DEBUG, "waiting for carrier");
 		timeout = INFTIM;
@@ -928,7 +936,7 @@ static int bind_dhcp(struct if_state *state, const struct options *options)
 
 		if (lease->leasetime == ~0U) {
 			lease->renewaltime = lease->rebindtime = lease->leasetime;
-			state->timeout.tv_sec = 1; /* So we wait for infinity */
+			state->stop.tv_sec = 1; /* So we wait for infinity */
 			logger(LOG_INFO, "leased %s for infinity",
 			       inet_ntoa(lease->addr));
 			state->state = STATE_BOUND;
@@ -972,14 +980,14 @@ static int bind_dhcp(struct if_state *state, const struct options *options)
 
 			tv.tv_sec = lease->renewaltime;
 			tv.tv_usec = 0;
-			get_time(&state->timeout);
-			timeradd(&state->timeout, &tv, &state->timeout);
+			get_time(&state->stop);
+			timeradd(&state->stop, &tv, &state->stop);
 		}
 		state->state = STATE_BOUND;
 	}
 
 	state->xid = 0;
-	timerclear(&state->stop);
+	timerclear(&state->timeout);
 	if (!reason) {
 		if (state->old) {
 			if (state->old->yiaddr == state->new->yiaddr &&
@@ -1007,14 +1015,10 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 	struct timeval tv;
 
 	timerclear(&tv);
-	/* Clear our timers and counters as we've failed.
-	 * We'll either abort or move to another state with new timers */
-	timerclear(&state->timeout);
 	timerclear(&state->stop);
 	state->messages = 0;
 
 	switch (state->state) {
-	case STATE_CARRIER:     /* FALLTHROUGH */
 	case STATE_DISCOVERING: /* FALLTHROUGH */
 	case STATE_REQUESTING:
 		if (IN_LINKLOCAL(ntohl(iface->addr.s_addr))) {
@@ -1032,13 +1036,13 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 		    state->options & DHCPCD_TEST)
 			return -1;
 
-		if (state->state != STATE_CARRIER &&
+		if (state->carrier != LINK_DOWN &&
 		    (state->options & DHCPCD_IPV4LL ||
 		     state->options & DHCPCD_LASTLEASE))
 			gotlease = get_old_lease(state);
 
 #ifdef ENABLE_IPV4LL
-		if (state->state != STATE_CARRIER &&
+		if (state->carrier != LINK_DOWN &&
 		    state->options & DHCPCD_IPV4LL &&
 		    gotlease != 0)
 		{
@@ -1057,6 +1061,8 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 			state->claims = 0;
 			state->probes = 0;
 			state->conflicts = 0;
+			/* Fallthrough */
+			state->timeout.tv_sec = 1;
 			return 0;
 		}
 #endif
@@ -1072,11 +1078,15 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 		if (!(state->options & DHCPCD_DAEMONISED) &&
 		    (state->options & DHCPCD_DAEMONISE))
 			return -1;
-		if (state->state == STATE_CARRIER)
+		if (state->carrier == LINK_DOWN)
 			return 0;
 		state->state = STATE_INIT;
 		break;
-	
+	case STATE_BOUND:
+		logger(LOG_INFO, "renewing lease of %s",inet_ntoa(lease->addr));
+		state->state = STATE_RENEWING;
+		tv.tv_sec = lease->rebindtime - lease->renewaltime;
+		break;
 	case STATE_RENEWING:
 		logger(LOG_ERR, "failed to renew, attempting to rebind");
 		lease->addr.s_addr = 0;
@@ -1092,6 +1102,11 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 		drop_config(state, reason, options);
 		state->state = STATE_INIT;
 		break;
+	case STATE_PROBING:    /* FALLTHROUGH */
+	case STATE_ANNOUNCING:
+		/* We should have lost carrier here and exit timer went */
+		logger(LOG_ERR, "timed out");
+		return -1;
 	default:
 		logger(LOG_DEBUG, "handle_timeout_failed: invalid state %d",
 		       state->state);
@@ -1115,8 +1130,26 @@ handle_timeout(struct if_state *state, const struct options *options)
 #ifdef ENABLE_ARP
 	struct in_addr addr;
 
+	if (timerisset(&state->exit)) {
+		get_time(&tv);
+		if (timercmp(&tv, &state->exit, >))
+			return handle_timeout_fail(state, options);
+	}
+
 	timerclear(&state->timeout);
 	timerclear(&tv);
+
+#ifdef ENABLE_IPV4LL
+	if (state->state == STATE_RENEW_REQUESTED &&
+	    IN_LINKLOCAL(ntohl(lease->addr.s_addr)))
+	{
+		state->state = STATE_PROBING;
+		free(state->offer);
+		state->offer = read_lease(state->interface);
+		state->probes = 0;
+		state->claims = 0;
+	}
+#endif
 	switch (state->state) {
 #ifdef ENABLE_IPV4LL
 	case STATE_INIT_IPV4LL:
@@ -1171,7 +1204,8 @@ handle_timeout(struct if_state *state, const struct options *options)
 			if (state->claims < ANNOUNCE_NUM)
 				tv.tv_sec = ANNOUNCE_INTERVAL;
 			else if (IN_LINKLOCAL(htonl(lease->addr.s_addr))) {
-				/* We should pretend to be at the end of the DHCP negotation cycle */
+				/* We should pretend to be at the end
+				 * of the DHCP negotation cycle */
 				state->state = STATE_INIT;
 				state->messages = DHCP_MAX / DHCP_BASE;
 				state->probes = 0;
@@ -1197,18 +1231,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 	}
 #endif
 
-	if (timerisset(&state->exit)) {
-		get_time(&tv);
-		if (timercmp(&tv, &state->exit, >))
-			return handle_timeout_fail(state, options);
-	}
-	if (timerisset(&state->stop)) {
-		get_time(&tv);
-		if (timercmp(&tv, &state->stop, >))
-			return handle_timeout_fail(state, options);
-	}
 	timerclear(&tv);
-
 	switch (state->state) {
 	case STATE_INIT:  /* FALLTHROUGH */
 	case STATE_BOUND: /* FALLTHROUGH */
@@ -1220,23 +1243,35 @@ handle_timeout(struct if_state *state, const struct options *options)
 		iface->start_uptime = uptime();
 		get_time(&state->start);
 		timerclear(&state->stop);
+		break;
+	default:
+		if (!timerisset(&state->stop))
+			break;
+		get_time(&tv);
+		if (timercmp(&tv, &state->stop, >))
+			return handle_timeout_fail(state, options);
+		break;
 	}
 
 	switch(state->state) {
-	case STATE_CARRIER:
-		if (timerisset(&state->exit))
-			logger(LOG_INFO, "waiting for carrier");
-		timerclear(&state->timeout);
-		return 0;
-	case STATE_INIT:
-		if (!(state->state && DHCPCD_DAEMONISED) &&
-		    options->timeout &&		
-		    !IN_LINKLOCAL(htonl(iface->addr.s_addr)))
-		{
-			get_time(&state->start);
+	case STATE_RENEW_REQUESTED:
+		/* If a renew was requested (ie, didn't timeout)
+		 * we need to remove the server address so we enter the
+		 * INIT-REBOOT state correctly. */
+		lease->server.s_addr = 0;
+		state->messages = 0;
+		if (lease->addr.s_addr) {
+			logger(LOG_INFO, "renewing lease of %s",
+			       inet_ntoa(lease->addr));
+			state->state = STATE_RENEWING;
 			tv.tv_sec = options->timeout;
 			timeradd(&state->start, &tv, &state->stop);
+			break;
 		}
+		/* FALLTHROUGH */
+	case STATE_INIT:
+		if (state->carrier == LINK_DOWN)
+			return 0;
 		if (lease->addr.s_addr == 0 ||
 		    IN_LINKLOCAL(ntohl(iface->addr.s_addr)))
 		{
@@ -1252,41 +1287,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 			state->state = STATE_REQUESTING;
 		}
 		break;
-	case STATE_RENEW_REQUESTED:
-		/* If a renew was requested (ie, didn't timeout)
-		 * we need to remove the server address so we enter the
-		 * INIT-REBOOT state correctly. */
-		lease->server.s_addr = 0;
-		state->messages = 0;
-#ifdef ENABLE_IPV4LL
-		if (IN_LINKLOCAL(ntohl(lease->addr.s_addr))) {
-			state->state = STATE_PROBING;
-			free(state->offer);
-			state->offer = read_lease(state->interface);
-			state->probes = 0;
-			state->claims = 0;
-			timerclear(&state->timeout);
-			return 0;
-		}
-#endif
-		if (lease->addr.s_addr) {
-			logger(LOG_INFO, "renewing lease of %s",
-			       inet_ntoa(lease->addr));
-			state->state = STATE_RENEWING;
-			tv.tv_sec = options->timeout;
-			timeradd(&state->start, &tv, &state->stop);
-			break;
-		}
-		/* FALLTHROUGH */
 	case STATE_BOUND:
-		if (lease->addr.s_addr == 0 ||
-		    IN_LINKLOCAL(ntohl(lease->addr.s_addr)))
-		{
-			lease->addr.s_addr = 0;
-			state->state = STATE_INIT;
-			timerclear(&state->timeout);
-			return 0;
-		}
 		logger(LOG_INFO, "renewing lease of %s",inet_ntoa(lease->addr));
 		state->state = STATE_RENEWING;
 		tv.tv_sec = lease->rebindtime - lease->renewaltime;
@@ -1664,12 +1665,15 @@ handle_link(struct if_state *state)
 		return -1;
 	case 0:
 		logger(LOG_INFO, "carrier lost");
-		state->state = STATE_CARRIER;
+		state->carrier = LINK_DOWN;
 		do_socket(state, SOCKET_CLOSED);
+		if (state->state != STATE_BOUND)
+			timerclear(&state->stop);
 		break;
 	default:
 		logger(LOG_INFO, "carrier acquired");
 		state->state = STATE_RENEW_REQUESTED;
+		state->carrier = LINK_UP;
 		timerclear(&state->stop);
 		break;
 	}
