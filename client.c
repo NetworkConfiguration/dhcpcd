@@ -740,17 +740,24 @@ wait_for_packet(struct if_state *state)
 	}
 
 	ref = NULL;
-	if (timerisset(&state->exit) &&
-	    timercmp(&state->exit, &now, >))
-		ref = &state->exit;
-	if (timerisset(&state->stop) &&
-	    timercmp(&state->stop, &now, >) &&
-	    (!ref || timercmp(&state->stop, ref, <)))
-		ref = &state->stop;
-	if (timerisset(&state->timeout) &&
-	    timercmp(&state->timeout, &now, >) &&
-	    (!ref || timercmp(&state->timeout, ref, <)))
-		ref = &state->timeout;
+	if (timerisset(&state->exit)) {
+	    	if (timercmp(&state->exit, &now, <=))
+			return 0;
+		else
+			ref = &state->exit;
+	}
+	if (timerisset(&state->stop)) {
+		if (timercmp(&state->stop, &now, <=))
+			return 0;
+	    	else if (!ref || timercmp(&state->stop, ref, <))
+			ref = &state->stop;
+	}
+	if (timerisset(&state->timeout)) {
+	    	if (timercmp(&state->timeout, &now, <=))
+			return 0;
+		else if (!ref || timercmp(&state->timeout, ref, <))
+			ref = &state->timeout;
+	}
 
 	if (state->lease.leasetime == ~0U &&
 	    state->state == STATE_BOUND)
@@ -807,11 +814,6 @@ wait_again:
 	}
 
 	retval = poll(fds, nfds, timeout);
-	if (timeout != INFTIM) {
-		get_time(&now);
-		if (timercmp(&now, &state->timeout, >))
-			timerclear(&state->timeout);
-	}
 	if (retval == -1) {
 		if (errno == EINTR)
 			return 0;
@@ -1113,6 +1115,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 #ifdef ENABLE_ARP
 	struct in_addr addr;
 
+	timerclear(&state->timeout);
 	timerclear(&tv);
 	switch (state->state) {
 #ifdef ENABLE_IPV4LL
@@ -1733,7 +1736,7 @@ dhcp_run(const struct options *options, int *pid_fd)
 				if (retval == 0 &&
 				    (state->state == STATE_REQUESTING ||
 				     state->state == STATE_INIT ||
-				     state->state == STATE_PROBING)
+				     state->state == STATE_PROBING))
 					/* Fallthrough to handle_timeout */
 					continue;
 #ifdef ENABLE_ARP
