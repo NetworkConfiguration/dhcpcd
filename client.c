@@ -1731,7 +1731,9 @@ dhcp_run(const struct options *options, int *pid_fd)
 			} else if (fd_hasdata(iface->raw_fd) == 1) {
 				retval = handle_dhcp_packet(state, options);
 				if (retval == 0 &&
-				    state->state == STATE_REQUESTING)
+				    (state->state == STATE_REQUESTING ||
+				     state->state == STATE_INIT ||
+				     state->state == STATE_PROBING)
 					/* Fallthrough to handle_timeout */
 					continue;
 #ifdef ENABLE_ARP
