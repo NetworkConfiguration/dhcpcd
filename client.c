@@ -597,6 +597,18 @@ client_setup(struct if_state *state, const struct options *options)
 		}
 	}
 #endif
+	if (state->options & DHCPCD_LINK) {
+		open_link_socket(iface);
+		if (carrier_status(iface->name) == 0) {
+			if (!(state->options & DHCPCD_NOWAIT))
+				logger(LOG_INFO, "waiting for carrier");
+			state->state = STATE_CARRIER;
+			tv.tv_sec = options->timeout;
+			tv.tv_usec = 0;
+			get_time(&state->start);
+			timeradd(&state->start, &tv, &state->stop);
+		}
+	}
 
 	return 0;
 }
@@ -725,14 +737,24 @@ wait_for_packet(struct if_state *state)
 		fds[nfds].events = POLLIN;
 		nfds++;
 	}
-	if (state->state == STATE_CARRIER) {
-		timeout = INFTIM;
-	} else if (state->lease.leasetime == ~0U &&
-		   state->state == STATE_BOUND)
+
+	ref = NULL;
+	if (timerisset(&state->stop) &&
+	    timercmp(&state->stop, &now, >))
+		ref = &state->stop;
+	if (timerisset(&state->timeout) &&
+	    timercmp(&state->timeout, &now, >) &&
+	    (!ref || timercmp(&state->timeout, ref, <)))
+		ref = &state->timeout;
+
+	if (state->lease.leasetime == ~0U &&
+	    state->state == STATE_BOUND)
 	{
 		logger(LOG_DEBUG, "waiting for infinity");
 		timeout = INFTIM;
-	} else {
+	} else if (state->state == STATE_CARRIER && !ref)
+		timeout = INFTIM;
+	else {
 		if (state->interface->raw_fd != -1) {
 			fds[nfds].fd = state->interface->raw_fd;
 			fds[nfds].events = POLLIN;
@@ -750,15 +772,6 @@ wait_for_packet(struct if_state *state)
 wait_again:
 	get_time(&now);
 	if (timeout != INFTIM) {
-		if (!timerisset(&state->timeout))
-			return 0;
-		ref = NULL;
-		if (timerisset(&state->stop) &&
-		    timercmp(&state->stop, &now, >))
-			ref = &state->stop;
-		if (timercmp(&state->timeout, &now, >) &&
-		    (!ref || timercmp(&state->timeout, ref, <)))
-			ref = &state->timeout;
 		if (!ref)
 			return 0;
 		timersub(ref, &now, &d);
@@ -989,8 +1002,8 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 	state->messages = 0;
 
 	switch (state->state) {
-	case STATE_DISCOVERING:
-		/* FALLTHROUGH */
+	case STATE_CARRIER:     /* FALLTHROUGH */
+	case STATE_DISCOVERING: /* FALLTHROUGH */
 	case STATE_REQUESTING:
 		if (IN_LINKLOCAL(ntohl(iface->addr.s_addr))) {
 			if (!(state->options & DHCPCD_DAEMONISED))
@@ -1007,12 +1020,16 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 		    state->options & DHCPCD_TEST)
 			return -1;
 
-		if (state->options & DHCPCD_IPV4LL ||
-		    state->options & DHCPCD_LASTLEASE)
+		if (state->state != STATE_CARRIER &&
+		    (state->options & DHCPCD_IPV4LL ||
+		     state->options & DHCPCD_LASTLEASE))
 			gotlease = get_old_lease(state);
 
 #ifdef ENABLE_IPV4LL
-		if (state->options & DHCPCD_IPV4LL && gotlease != 0) {
+		if (state->state != STATE_CARRIER &&
+		    state->options & DHCPCD_IPV4LL &&
+		    gotlease != 0)
+		{
 			logger(LOG_INFO, "probing for an IPV4LL address");
 			free(state->offer);
 			state->offer = ipv4ll_get_dhcp(0);
@@ -1035,11 +1052,16 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 		if (gotlease == 0)
 			return bind_dhcp(state, options);
 
-		reason = "FAIL";
+		if (iface->addr.s_addr)
+			reason = "EXPIRE";
+		else
+			reason = "FAIL";
 		drop_config(state, reason, options);
 		if (!(state->options & DHCPCD_DAEMONISED) &&
 		    (state->options & DHCPCD_DAEMONISE))
 			return -1;
+		if (state->state == STATE_CARRIER)
+			return 0;
 		state->state = STATE_INIT;
 		break;
 	
@@ -1183,6 +1205,12 @@ handle_timeout(struct if_state *state, const struct options *options)
 	}
 
 	switch(state->state) {
+	case STATE_CARRIER:
+		logger(LOG_INFO, "waiting for carrier");
+		get_time(&state->start);
+		tv.tv_sec = options->timeout;
+		timeradd(&state->start, &tv, &state->stop);
+		return 0;
 	case STATE_INIT:
 		if (!(state->state && DHCPCD_DAEMONISED) &&
 		    options->timeout &&		
@@ -1618,10 +1646,10 @@ handle_link(struct if_state *state)
 	default:
 		logger(LOG_INFO, "carrier acquired");
 		state->state = STATE_RENEW_REQUESTED;
+		timerclear(&state->stop);
 		break;
 	}
 	timerclear(&state->timeout);
-	timerclear(&state->stop);
 	return 0;
 }
 
@@ -1654,14 +1682,6 @@ dhcp_run(const struct options *options, int *pid_fd)
 		goto eexit;
 
 	state->signal_fd = signal_fd();
-	if (state->options & DHCPCD_LINK) {
-		open_link_socket(iface);
-		if (carrier_status(iface->name) == 0) {
-			if (!(state->options & DHCPCD_NOWAIT))
-				logger(LOG_INFO, "waiting for carrier");
-			state->state = STATE_CARRIER;
-		}
-	}
 
 	if (state->options & DHCPCD_NOWAIT)
 		if (daemonise(state, options) == -1)
