@@ -268,7 +268,6 @@ daemonise(struct if_state *state, const struct options *options)
 		*state->pid_fd = -1;
 	}
 
-	state->state = STATE_BOUND;
 	timerclear(&state->exit);
 	sigprocmask(SIG_SETMASK, &old, NULL);
 	if (pid == 0) {
