@@ -608,16 +608,14 @@ client_setup(struct if_state *state, const struct options *options)
 		}
 	}
 
-	if (options->timeout > 0) {
+	if (options->timeout > 0 && !(state->options & DHCPCD_BACKGROUND)) {
 		tv.tv_sec = options->timeout;
 		tv.tv_usec = 0;
 		if (state->options & DHCPCD_IPV4LL) {
 			timeradd(&state->start, &tv, &state->stop);
-			if (!(state->options & DHCPCD_BACKGROUND)) {
-				tv.tv_sec = 10;
-				timeradd(&state->stop, &tv, &state->exit);
-			}
-		} else if (!(state->options & DHCPCD_BACKGROUND))
+			tv.tv_sec = 10;
+			timeradd(&state->stop, &tv, &state->exit);
+		} else
 			timeradd(&state->start, &tv, &state->exit);
 	}
 	return 0;
@@ -1020,6 +1018,7 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 
 	timerclear(&tv);
 	timerclear(&state->stop);
+	timerclear(&state->exit);
 	state->messages = 0;
 
 	switch (state->state) {
@@ -1066,8 +1065,6 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 			state->claims = 0;
 			state->probes = 0;
 			state->conflicts = 0;
-			/* Fallthrough */
-			state->timeout.tv_sec = 1;
 			return 0;
 		}
 #endif
@@ -1083,10 +1080,8 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 		if (!(state->options & DHCPCD_DAEMONISED) &&
 		    (state->options & DHCPCD_DAEMONISE))
 			return -1;
-		if (state->carrier == LINK_DOWN)
-			return 0;
-		state->state = STATE_INIT;
-		break;
+		state->state = STATE_RENEW_REQUESTED;
+		return 0;
 	case STATE_BOUND:
 		logger(LOG_INFO, "renewing lease of %s",inet_ntoa(lease->addr));
 		state->state = STATE_RENEWING;
@@ -1135,13 +1130,12 @@ handle_timeout(struct if_state *state, const struct options *options)
 #ifdef ENABLE_ARP
 	struct in_addr addr;
 
+	timerclear(&state->timeout);
 	if (timerisset(&state->exit)) {
 		get_time(&tv);
 		if (timercmp(&tv, &state->exit, >))
 			return handle_timeout_fail(state, options);
 	}
-
-	timerclear(&state->timeout);
 	timerclear(&tv);
 
 #ifdef ENABLE_IPV4LL
@@ -1216,6 +1210,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 				state->probes = 0;
 				state->claims = 0;
 				timerclear(&state->stop);
+				logger(LOG_INFO, "broadcasting for a lease");
 				goto dhcp_timeout;
 			} else {
 				state->state = STATE_BOUND;
@@ -1242,7 +1237,8 @@ handle_timeout(struct if_state *state, const struct options *options)
 	case STATE_RENEW_REQUESTED:
 		get_time(&state->start);
 		timerclear(&state->stop);
-	case STATE_INIT:  /* FALLTHROUGH */
+		/* FALLTHROUGH */
+	case STATE_INIT:
 		up_interface(iface->name);
 		do_socket(state, SOCKET_OPEN);
 		state->xid = arc4random();
