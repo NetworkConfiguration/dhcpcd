@@ -671,7 +671,7 @@ send_arp(const struct interface *iface, int op, in_addr_t sip, in_addr_t tip)
 	uint8_t *p;
 	int retval;
 
-	arpsize = sizeof(*arp) + 2 * iface->hwlen + 2 *sizeof(sip);
+	arpsize = sizeof(*arp) + 2 * iface->hwlen + 2 * sizeof(sip);
 	arp = xmalloc(arpsize);
 	arp->ar_hrd = htons(iface->family);
 	arp->ar_pro = htons(ETHERTYPE_IP);
