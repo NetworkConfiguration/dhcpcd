@@ -749,6 +749,7 @@ wait_for_packet(struct if_state *state)
 	}
 
 	ref = NULL;
+	get_time(&now);
 	if (timerisset(&state->exit)) {
 	    	if (timercmp(&state->exit, &now, <=))
 			return 0;
