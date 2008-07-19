@@ -411,7 +411,7 @@ delete_address(struct interface *iface)
 	       inet_ntoa(iface->addr),
 	       inet_ntocidr(iface->net));
 	retval = del_address(iface->name, &iface->addr, &iface->net);
-	if (retval == -1 && errno != ENOENT) 
+	if (retval == -1 && errno != ENOENT && errno != EADDRNOTAVAIL) 
 		logger(LOG_ERR, "del_address: %s", strerror(errno));
 	iface->addr.s_addr = 0;
 	iface->net.s_addr = 0;
