@@ -1240,7 +1240,6 @@ handle_timeout(struct if_state *state, const struct options *options)
 		timerclear(&state->stop);
 		/* FALLTHROUGH */
 	case STATE_INIT:
-		up_interface(iface->name);
 		do_socket(state, SOCKET_OPEN);
 		state->xid = arc4random();
 		state->nakoff = 1;
