@@ -523,11 +523,12 @@ client_setup(struct if_state *state, const struct options *options)
 			open_socket(iface, ETHERTYPE_ARP);
 			state->state = STATE_ANNOUNCING;
 			tv.tv_sec = ANNOUNCE_INTERVAL;
+			timeradd(&state->start, &tv, &state->timeout);
 #else
 			state->state = STATE_BOUND;
 			tv.tv_sec = state->lease.renewaltime;
+			timeradd(&state->start, &tv, &state->stop);
 #endif
-			timeradd(&state->start, &tv, &state->timeout);
 		}
 #endif
 	} else {
@@ -608,7 +609,10 @@ client_setup(struct if_state *state, const struct options *options)
 		}
 	}
 
-	if (options->timeout > 0 && !(state->options & DHCPCD_BACKGROUND)) {
+	if (options->timeout > 0 &&
+	    !(state->options & DHCPCD_BACKGROUND) &&
+	    !(state->options & DHCPCD_DAEMONISED))
+	{
 		tv.tv_sec = options->timeout;
 		tv.tv_usec = 0;
 		if (state->options & DHCPCD_IPV4LL) {
@@ -1203,7 +1207,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 				logger(LOG_ERR, "send_arp: %s", strerror(errno));
 			if (state->claims < ANNOUNCE_NUM)
 				tv.tv_sec = ANNOUNCE_INTERVAL;
-			else if (IN_LINKLOCAL(htonl(lease->addr.s_addr))) {
+			else if (IN_LINKLOCAL(htonl(state->new->yiaddr))) {
 				/* We should pretend to be at the end
 				 * of the DHCP negotation cycle */
 				state->state = STATE_INIT;
