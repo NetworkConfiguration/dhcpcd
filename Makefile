@@ -46,6 +46,6 @@ SED_SYS=	-e 's:@SYSCONFDIR@:${SYSCONFDIR}:g'
 	${SED} ${SED_HOOKDIR} ${SED_SCRIPT} ${SED_SYS} $< > $@
 
 MK=		mk
-include ${MK}/os.mk
 include ${MK}/sys.mk
+include ${MK}/os.mk
 include ${MK}/prog.mk

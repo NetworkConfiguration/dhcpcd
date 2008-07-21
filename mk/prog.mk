@@ -7,18 +7,19 @@ include ${MK}/cc.mk
 
 OBJS+=		${SRCS:.c=.o}
 
-# This is for NetBSD which has a different libc in /lib which we need
-# to link to if installing in /
+# If building for /, ensure we use the libc in / if different from
+# the default one in /usr/lib
+LINK_RPATH?=		-Wl,-rpath
 _RPATH_SH=		if test "${PREFIX}" = "" -o "${PREIX}" = "/"; then \
-				echo "-Wl,-rpath=${PREFIX}/${LIBNAME}"; \
+				echo "${LINK_RPATH}=${PREFIX}/${LIBNAME}"; \
 			else \
 				echo ""; \
 			fi
 _RPATH!=		${_RPATH_SH}
 LDFLAGS+=		${_RPATH}$(shell ${_RPATH_SH})
 
-# This is for NetBSD which has different dynamic linker in /lib which we need
-# to use to if installing in /
+# If building for /, ensure we use the linker in /libexec if different from
+# the default one in /usr/libexec
 _DYNLINK_SH=		if test "${PREFIX}" = "" -o "${PREFIX}" = "/" && test -e /libexec/ld.elf_so; then \
 				echo "-Wl,-dynamic-linker=/libexec/ld.elf_so"; \
 			else \
