@@ -268,10 +268,10 @@ daemonise(struct if_state *state, const struct options *options)
 		*state->pid_fd = -1;
 	}
 
-	timerclear(&state->exit);
 	sigprocmask(SIG_SETMASK, &old, NULL);
 	if (pid == 0) {
 		state->options |= DHCPCD_DAEMONISED;
+		timerclear(&state->exit);
 		return 0;
 	}
 	state->options |= DHCPCD_PERSISTENT | DHCPCD_FORKED;
@@ -736,7 +736,7 @@ drop_config(struct if_state *state, const char *reason,
 static int
 wait_for_packet(struct if_state *state)
 {
-	struct pollfd fds[3]; /* iface, arp, signal */
+	struct pollfd fds[4]; /* signal, link, raw, arp */
 	int retval, nfds = 0;
 	time_t timeout = 0;
 	struct timeval now, d, *ref;
@@ -838,19 +838,6 @@ wait_again:
 		/* If our timeout overflowed, wait again. */
 		if (timeout == INT_MAX)
 			goto wait_again;
-	} else if (!(fds[0].revents & POLLIN)) {
-		/* Check if any of the fd's have an error
-		 * if there is no data on the signal fd. */
-		while (--nfds > 0) {
-			if (fds[nfds].revents & POLLERR) {
-				logger(LOG_ERR, "error on fd %d", fds[nfds].fd);
-				do_socket(state, SOCKET_CLOSED);
-				state->state = STATE_RENEW_REQUESTED;
-				timerclear(&state->timeout);
-				timerclear(&state->stop);
-				return 0;
-			}
-		}
 	}
 	return retval;
 }
@@ -1217,7 +1204,6 @@ handle_timeout(struct if_state *state, const struct options *options)
 				state->probes = 0;
 				state->claims = 0;
 				timerclear(&state->stop);
-				logger(LOG_INFO, "broadcasting for a lease");
 				goto dhcp_timeout;
 			} else {
 				state->state = STATE_BOUND;
@@ -1361,7 +1347,7 @@ static int
 handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 	    const struct options *options)
 {
-	struct timespec ts;
+	struct timeval tv;
 	struct dhcp_message *dhcp = *dhcpp;
 	struct interface *iface = state->interface;
 	struct dhcp_lease *lease = &state->lease;
@@ -1381,22 +1367,22 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 		addr = get_option_string(dhcp, DHCP_MESSAGE);
 		log_dhcp(LOG_WARNING, "NAK for", dhcp);
 		free(addr);
+		free(dhcp);
 		state->state = STATE_INIT;
 		timerclear(&state->timeout);
-		timerclear(&state->stop);
 		lease->addr.s_addr = 0;
 
 		/* If we constantly get NAKS then we should slowly back off */
 		if (state->nakoff > 0) {
-			logger(LOG_DEBUG, "sleeping for %lu seconds",
-			       (unsigned long)state->nakoff);
-			ts.tv_sec = state->nakoff;
-			ts.tv_nsec = 0;
+			tv.tv_sec = state->nakoff;
+			tv.tv_usec = 0;
 			state->nakoff *= 2;
 			if (state->nakoff > NAKOFF_MAX)
 				state->nakoff = NAKOFF_MAX;
-			nanosleep(&ts, NULL);
-		}
+			get_time(&state->stop);
+			timeradd(&state->stop, &tv, &state->stop);
+		} else
+			timerclear(&state->stop);
 
 		return 0;
 	}
