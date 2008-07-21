@@ -600,14 +600,11 @@ client_setup(struct if_state *state, const struct options *options)
 		}
 	}
 #endif
+
 	if (state->options & DHCPCD_LINK) {
 		open_link_socket(iface);
-		if (carrier_status(iface->name) == 0) {
-			if (state->options & DHCPCD_DAEMONISE &&
-			    !(state->options & DHCPCD_BACKGROUND))
-				logger(LOG_INFO, "waiting for carrier");
+		if (carrier_status(iface->name) == 0)
 			state->carrier = LINK_DOWN;
-		}
 	}
 
 	if (options->timeout > 0 &&
@@ -1026,7 +1023,8 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 			if (iface->addr.s_addr != 0 &&
 			    !(state->options & DHCPCD_INFORM))
 				logger(LOG_ERR, "lost lease");
-			else
+			else if (state->carrier != LINK_DOWN || 
+				!(state->options & DHCPCD_DAEMONISED)) 
 				logger(LOG_ERR, "timed out");
 		}
 		do_socket(state, SOCKET_CLOSED);
@@ -1224,7 +1222,13 @@ handle_timeout(struct if_state *state, const struct options *options)
 	}
 #endif
 
+	if (timerisset(&state->stop)) {
+		get_time(&tv);
+		if (timercmp(&tv, &state->stop, >))
+			return handle_timeout_fail(state, options);
+	}
 	timerclear(&tv);
+
 	switch (state->state) {
 	case STATE_BOUND: /* FALLTHROUGH */
 	case STATE_RENEW_REQUESTED:
@@ -1236,13 +1240,6 @@ handle_timeout(struct if_state *state, const struct options *options)
 		state->xid = arc4random();
 		state->nakoff = 1;
 		iface->start_uptime = uptime();
-		break;
-	default:
-		if (!timerisset(&state->stop))
-			break;
-		get_time(&tv);
-		if (timercmp(&tv, &state->stop, >))
-			return handle_timeout_fail(state, options);
 		break;
 	}
 
@@ -1709,6 +1706,9 @@ dhcp_run(const struct options *options, int *pid_fd)
 	if (state->options & DHCPCD_BACKGROUND)
 		if (daemonise(state, options) == -1)
 			goto eexit;
+
+	if (state->carrier == LINK_DOWN)
+		logger(LOG_INFO, "waiting for carrier");
 
 	for (;;) {
 		/* We should always handle our signals first */
