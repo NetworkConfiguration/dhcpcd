@@ -1615,7 +1615,10 @@ handle_arp_fail(struct if_state *state, const struct options *options)
 	time_t up;
 
 	if (IN_LINKLOCAL(htonl(state->fail.s_addr))) {
-		if (state->fail.s_addr == state->interface->addr.s_addr) {
+		if (state->fail.s_addr == state->interface->addr.s_addr &&
+		    state->state != STATE_PROBING &&
+		    state->state != STATE_ANNOUNCING)
+		{
 			up = uptime();
 			if (state->defend + DEFEND_INTERVAL > up) {
 				drop_config(state, "FAIL", options);
