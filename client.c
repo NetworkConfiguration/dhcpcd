@@ -610,16 +610,17 @@ client_setup(struct if_state *state, const struct options *options)
 	}
 
 	if (options->timeout > 0 &&
-	    !(state->options & DHCPCD_BACKGROUND) &&
 	    !(state->options & DHCPCD_DAEMONISED))
 	{
 		tv.tv_sec = options->timeout;
 		tv.tv_usec = 0;
 		if (state->options & DHCPCD_IPV4LL) {
 			timeradd(&state->start, &tv, &state->stop);
-			tv.tv_sec = 10;
-			timeradd(&state->stop, &tv, &state->exit);
-		} else
+			if (!(state->options & DHCPCD_BACKGROUND)) {
+				tv.tv_sec = 10;
+				timeradd(&state->stop, &tv, &state->exit);
+			}
+		} else if (!(state->options & DHCPCD_BACKGROUND))
 			timeradd(&state->start, &tv, &state->exit);
 	}
 	return 0;
