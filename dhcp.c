@@ -295,7 +295,7 @@ get_option(const struct dhcp_message *dhcp, uint8_t opt, int *len, int *type)
 	}
 
 exit:
-	if (valid_length(o, bl, type) == -1) {
+	if (valid_length(opt, bl, type) == -1) {
 		errno = EINVAL;
 		return NULL;
 	}
@@ -583,7 +583,7 @@ decode_rfc3361(int dl, const uint8_t *data)
 char *
 get_option_string(const struct dhcp_message *dhcp, uint8_t option)
 {
-	int type;
+	int type = 0;
 	int len;
 	const uint8_t *p;
 	char *s;
