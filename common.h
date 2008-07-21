@@ -65,7 +65,7 @@ size_t strlcpy(char *, const char *, size_t);
 #ifndef HAVE_CLOSEFROM
 #define HAVE_CLOSEFROM 1
 #endif
-#if defined(__linux__) || defined(__FreeBSD__)
+#if defined(__linux__) || defined(__FreeBSD__) || defined(__APPLE__)
 #  undef HAVE_CLOSEFROM
 int closefrom(int);
 #endif
