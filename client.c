@@ -603,7 +603,8 @@ client_setup(struct if_state *state, const struct options *options)
 	if (state->options & DHCPCD_LINK) {
 		open_link_socket(iface);
 		if (carrier_status(iface->name) == 0) {
-			if (state->options & DHCPCD_DAEMONISE)
+			if (state->options & DHCPCD_DAEMONISE &&
+			    !(state->options & DHCPCD_BACKGROUND))
 				logger(LOG_INFO, "waiting for carrier");
 			state->carrier = LINK_DOWN;
 		}
