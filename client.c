@@ -720,13 +720,14 @@ static void
 drop_config(struct if_state *state, const char *reason,
 	    const struct options *options)
 {
-	configure(state->interface, reason, NULL, state->new,
-		  &state->lease, options, 0);
-	free(state->old);
-	state->old = NULL;
-	free(state->new);
-	state->new = NULL;
-
+	if (state->new) {
+		configure(state->interface, reason, NULL, state->new,
+			  &state->lease, options, 0);
+		free(state->old);
+		state->old = NULL;
+		free(state->new);
+		state->new = NULL;
+	}
 	state->lease.addr.s_addr = 0;
 }
 
@@ -1246,7 +1247,6 @@ handle_timeout(struct if_state *state, const struct options *options)
 	case STATE_INIT:
 		do_socket(state, SOCKET_OPEN);
 		state->xid = arc4random();
-		state->nakoff = 1;
 		iface->start_uptime = uptime();
 		break;
 	}
@@ -1328,8 +1328,12 @@ log_dhcp(int lvl, const char *msg, const struct dhcp_message *dhcp)
 	struct in_addr server;
 	int r;
 
-	server.s_addr = dhcp->yiaddr;
-	addr = xstrdup(inet_ntoa(server));
+	if (strcmp(msg, "NAK:") == 0)
+		addr = get_option_string(dhcp, DHCP_MESSAGE);
+	else {
+		server.s_addr = dhcp->yiaddr;
+		addr = xstrdup(inet_ntoa(server));
+	}
 	r = get_option_addr(&server.s_addr, dhcp, DHCP_SERVERID);
 	if (dhcp->servername[0] && r == 0)
 		logger(lvl, "%s %s from %s `%s'", msg,
@@ -1350,7 +1354,6 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 	struct dhcp_message *dhcp = *dhcpp;
 	struct interface *iface = state->interface;
 	struct dhcp_lease *lease = &state->lease;
-	char *addr;
 	uint8_t type;
 
 	if (get_option_uint8(&type, dhcp, DHCP_MESSAGETYPE) == -1) {
@@ -1363,26 +1366,23 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 
 	/* We should restart on a NAK */
 	if (type == DHCP_NAK) {
-		addr = get_option_string(dhcp, DHCP_MESSAGE);
-		log_dhcp(LOG_WARNING, "NAK for", dhcp);
-		free(addr);
-		free(dhcp);
+		log_dhcp(LOG_WARNING, "NAK:", dhcp);
+		drop_config(state, "EXPIRE", options);
+		do_socket(state, SOCKET_CLOSED);
 		state->state = STATE_INIT;
-		timerclear(&state->timeout);
-		lease->addr.s_addr = 0;
-
 		/* If we constantly get NAKS then we should slowly back off */
-		if (state->nakoff > 0) {
+		if (state->nakoff == 0) {
+			state->nakoff = 1;
+			timerclear(&state->timeout);
+		} else {
 			tv.tv_sec = state->nakoff;
 			tv.tv_usec = 0;
 			state->nakoff *= 2;
 			if (state->nakoff > NAKOFF_MAX)
 				state->nakoff = NAKOFF_MAX;
-			get_time(&state->stop);
-			timeradd(&state->stop, &tv, &state->stop);
-		} else
-			timerclear(&state->stop);
-
+			get_time(&state->timeout);
+			timeradd(&state->timeout, &tv, &state->timeout);
+		} 
 		return 0;
 	}
 
@@ -1396,26 +1396,22 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 
 		if (state->options & DHCPCD_TEST) {
 			exec_script(options, iface->name, "TEST", dhcp, NULL);
-			free(dhcp);
 			return 0;
 		}
 
-		free(dhcp);
 		state->state = STATE_REQUESTING;
 		timerclear(&state->timeout);
-		return 0;
+		return 1;
 	}
 
 	if (type == DHCP_OFFER) {
 		log_dhcp(LOG_INFO, "ignoring offer of", dhcp);
-		free(dhcp);
 		return 0;
 	}
 
 	/* We should only be dealing with acks */
 	if (type != DHCP_ACK) {
 		log_dhcp(LOG_ERR, "not ACK or OFFER", dhcp);
-		free(dhcp);
 		return 0;
 	}
 	    
@@ -1449,7 +1445,7 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 		state->probes = 0;
 		state->conflicts = 0;
 		timerclear(&state->stop);
-		return 0;
+		return 1;
 	}
 #endif
 
@@ -1461,7 +1457,7 @@ handle_dhcp_packet(struct if_state *state, const struct options *options)
 {
 	uint8_t *packet;
 	struct interface *iface = state->interface;
-	struct dhcp_message *dhcp;
+	struct dhcp_message *dhcp = NULL;
 	const uint8_t *pp;
 	uint8_t *p;
 	ssize_t bytes;
@@ -1471,7 +1467,6 @@ handle_dhcp_packet(struct if_state *state, const struct options *options)
 	 * The benefit is that if we get >1 DHCP packet in our buffer and
 	 * the first one fails for any reason, we can use the next. */
 	packet = xmalloc(udp_dhcp_len);
-	dhcp = xmalloc(sizeof(*dhcp));
 	for(;;) {
 		bytes = get_raw_packet(iface, ETHERTYPE_IP,
 				       packet, udp_dhcp_len);
@@ -1488,6 +1483,8 @@ handle_dhcp_packet(struct if_state *state, const struct options *options)
 			logger(LOG_ERR, "packet greater than DHCP size");
 			continue;
 		}
+		if (!dhcp)
+			dhcp = xmalloc(sizeof(*dhcp));
 		memcpy(dhcp, pp, bytes);
 		if (dhcp->cookie != htonl(MAGIC_COOKIE)) {
 			logger(LOG_DEBUG, "bogus cookie, ignoring");
@@ -1509,16 +1506,10 @@ handle_dhcp_packet(struct if_state *state, const struct options *options)
 			if (*p != DHCP_END)
 				*++p = DHCP_END;
 		}
-		free(packet);
-		if (handle_dhcp(state, &dhcp, options) == 0) {
-			/* Fake the fact we forked so we return 0 to userland */
-			if (state->options & DHCPCD_TEST)
-				state->options |= DHCPCD_FORKED;
-			else
-				return 0;
-		}
-		if (state->options & DHCPCD_FORKED)
-			return -1;
+		retval = handle_dhcp(state, &dhcp, options);
+		if (retval == 0 && state->options & DHCPCD_TEST)
+			state->options |= DHCPCD_FORKED;
+		break;
 	}
 
 	free(packet);
@@ -1728,12 +1719,6 @@ dhcp_run(const struct options *options, int *pid_fd)
 				retval = handle_link(state);
 			} else if (fd_hasdata(iface->raw_fd) == 1) {
 				retval = handle_dhcp_packet(state, options);
-				if (retval == 0 &&
-				    (state->state == STATE_REQUESTING ||
-				     state->state == STATE_INIT ||
-				     state->state == STATE_PROBING))
-					/* Fallthrough to handle_timeout */
-					continue;
 #ifdef ENABLE_ARP
 			} else if (fd_hasdata(iface->arp_fd) == 1) {
 				retval = handle_arp_packet(state);
