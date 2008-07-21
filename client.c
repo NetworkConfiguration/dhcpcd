@@ -1057,7 +1057,7 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 			state->claims = 0;
 			state->probes = 0;
 			state->conflicts = 0;
-			return 0;
+			return 1;
 		}
 #endif
 
@@ -1073,9 +1073,11 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 		    (state->options & DHCPCD_DAEMONISE))
 			return -1;
 		state->state = STATE_RENEW_REQUESTED;
-		return 0;
+		return 1;
 	case STATE_BOUND:
 		logger(LOG_INFO, "renewing lease of %s",inet_ntoa(lease->addr));
+		do_socket(state, SOCKET_OPEN);
+		state->xid = arc4random();
 		state->state = STATE_RENEWING;
 		tv.tv_sec = lease->rebindtime - lease->renewaltime;
 		break;
@@ -1089,10 +1091,14 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 			tv.tv_sec = lease->rebindtime - lease->renewaltime;
 		break;
 	case STATE_REBINDING:
-		logger(LOG_ERR, "failed to rebind, attempting to discover");
-		reason = "EXPIRE";
-		drop_config(state, reason, options);
-		state->state = STATE_INIT;
+		logger(LOG_ERR, "failed to rebind");
+		if (state->options & DHCPCD_IPV4LL)
+			state->state = STATE_INIT_IPV4LL;
+		else {
+			reason = "EXPIRE";
+			drop_config(state, reason, options);
+			state->state = STATE_INIT;
+		}
 		break;
 	case STATE_PROBING:    /* FALLTHROUGH */
 	case STATE_ANNOUNCING:
@@ -1109,7 +1115,7 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 		timeradd(&state->start, &tv, &state->stop);
 
 	/* This effectively falls through into the handle_timeout funtion */
-	return 0;
+	return 1;
 }
 
 static int
@@ -1205,12 +1211,14 @@ handle_timeout(struct if_state *state, const struct options *options)
 				goto dhcp_timeout;
 			} else {
 				state->state = STATE_BOUND;
-				tv.tv_sec = lease->renewaltime -
-					(ANNOUNCE_INTERVAL * ANNOUNCE_NUM);
 				close(iface->arp_fd);
 				iface->arp_fd = -1;
+				tv.tv_sec = lease->renewaltime -
+					(ANNOUNCE_INTERVAL * ANNOUNCE_NUM);
+				get_time(&state->stop);
+				timeradd(&state->stop, &tv, &state->stop);
+				return 0;
 			}
-			i = 0;
 		}
 		break;
 	}
@@ -1276,12 +1284,6 @@ handle_timeout(struct if_state *state, const struct options *options)
 			       inet_ntoa(lease->addr));
 			state->state = STATE_REQUESTING;
 		}
-		break;
-	case STATE_BOUND:
-		logger(LOG_INFO, "renewing lease of %s",inet_ntoa(lease->addr));
-		state->state = STATE_RENEWING;
-		tv.tv_sec = lease->rebindtime - lease->renewaltime;
-		timeradd(&state->start, &tv, &state->stop);
 		break;
 	}
 
@@ -1651,6 +1653,8 @@ handle_link(struct if_state *state)
 	}
 	if (retval == 0)
 		return 0;
+
+	timerclear(&state->timeout);
 	switch (carrier_status(state->interface->name)) {
 	case -1:
 		logger(LOG_ERR, "carrier_status: %s", strerror(errno));
@@ -1661,16 +1665,15 @@ handle_link(struct if_state *state)
 		do_socket(state, SOCKET_CLOSED);
 		if (state->state != STATE_BOUND)
 			timerclear(&state->stop);
-		break;
+		return 0;
 	default:
 		logger(LOG_INFO, "carrier acquired");
 		state->state = STATE_RENEW_REQUESTED;
 		state->carrier = LINK_UP;
 		timerclear(&state->stop);
-		break;
+		return 1;
 	}
-	timerclear(&state->timeout);
-	return 0;
+	/* NOTREACHED */
 }
 
 int
@@ -1723,10 +1726,6 @@ dhcp_run(const struct options *options, int *pid_fd)
 		} else if (retval > 0) {
 			if (fd_hasdata(iface->link_fd) == 1) {
 				retval = handle_link(state);
-				if (retval == 0 &&
-				    state->state == STATE_RENEW_REQUESTED)
-					/* Fallthrough to handle_timeout */
-					continue;
 			} else if (fd_hasdata(iface->raw_fd) == 1) {
 				retval = handle_dhcp_packet(state, options);
 				if (retval == 0 &&
@@ -1745,9 +1744,12 @@ dhcp_run(const struct options *options, int *pid_fd)
 			else
 				retval = 0;
 		}
-		if (retval != 0)
+		if (retval == -1) 
 			break;
-		retval = wait_for_packet(state);
+		if (retval == 0)
+			retval = wait_for_packet(state);
+		else
+			retval = 0;
 	}
 
 eexit:
