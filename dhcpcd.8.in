@@ -334,9 +334,11 @@ So to stop dhcpcd from touching your DNS or MTU settings you would do:-
 Don't set any default routes.
 .It Fl K , -nolink
 Don't receive link messages for carrier status.
-You should only have to use this with buggy device drivers.
+You should only have to use this with buggy device drivers or running
+.Nm
+through a network manager.
 .It Fl L , -noipv4ll
-Don't use IPv4LL at all.
+Don't use IPv4LL (aka APIPA, aka Bonjour, aka ZeroConf).
 .It Fl O , -nooption Ar option
 Don't request the specified option.
 If no option given, then don't request any options other than those to
