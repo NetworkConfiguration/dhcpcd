@@ -1593,17 +1593,21 @@ handle_arp_fail(struct if_state *state, const struct options *options)
 	time_t up;
 
 	if (IN_LINKLOCAL(htonl(state->fail.s_addr))) {
-		if (state->fail.s_addr == state->interface->addr.s_addr &&
-		    state->state != STATE_PROBING)
-		{
-			up = uptime();
-			if (state->defend + DEFEND_INTERVAL > up) {
-				drop_config(state, "FAIL", options);
-				state->conflicts = -1;
-				/* drop through to set conflicts to 0 */
-			} else {
-				state->defend = up;
-				return 0;
+		if (state->fail.s_addr == state->interface->addr.s_addr) {
+			if (state->state == STATE_PROBING)
+				/* This should only happen when SIGALRM or
+				 * link when down/up and we have a conflict. */
+				drop_config(state, "EXPIRE", options);
+			else {
+				up = uptime();
+				if (state->defend + DEFEND_INTERVAL > up) {
+					drop_config(state, "EXPIRE", options);
+					state->conflicts = -1;
+					/* drop through to set conflicts to 0 */
+				} else {
+					state->defend = up;
+					return 0;
+				}
 			}
 		}
 		do_socket(state, SOCKET_CLOSED);
