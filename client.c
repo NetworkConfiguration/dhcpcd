@@ -149,6 +149,7 @@ struct if_state {
 };
 
 #define LINK_UP 	1
+#define LINK_UNKNOWN	0
 #define LINK_DOWN 	-1
 
 struct dhcp_op {
@@ -603,8 +604,16 @@ client_setup(struct if_state *state, const struct options *options)
 
 	if (state->options & DHCPCD_LINK) {
 		open_link_socket(iface);
-		if (carrier_status(iface->name) == 0)
+		switch (carrier_status(iface->name)) {
+		case 0:
 			state->carrier = LINK_DOWN;
+			break;
+		case 1:
+			state->carrier = LINK_UP;
+			break;
+		default:
+			state->carrier = LINK_UNKNOWN;
+		}
 	}
 
 	if (options->timeout > 0 &&
@@ -1661,20 +1670,25 @@ handle_link(struct if_state *state)
 		logger(LOG_ERR, "carrier_status: %s", strerror(errno));
 		return -1;
 	case 0:
-		logger(LOG_INFO, "carrier lost");
-		state->carrier = LINK_DOWN;
-		do_socket(state, SOCKET_CLOSED);
-		if (state->state != STATE_BOUND)
-			timerclear(&state->stop);
-		return 0;
+		if (state->carrier != LINK_DOWN) {
+			logger(LOG_INFO, "carrier lost");
+			state->carrier = LINK_DOWN;
+			do_socket(state, SOCKET_CLOSED);
+			if (state->state != STATE_BOUND)
+				timerclear(&state->stop);
+		}
+		break;
 	default:
-		logger(LOG_INFO, "carrier acquired");
-		state->state = STATE_RENEW_REQUESTED;
-		state->carrier = LINK_UP;
-		timerclear(&state->stop);
-		return 1;
+		if (state->carrier != LINK_UP) {
+			logger(LOG_INFO, "carrier acquired");
+			state->state = STATE_RENEW_REQUESTED;
+			state->carrier = LINK_UP;
+			timerclear(&state->stop);
+			return 1;
+		}
+		break;
 	}
-	/* NOTREACHED */
+	return 0;
 }
 
 int
