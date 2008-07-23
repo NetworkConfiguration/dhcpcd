@@ -247,7 +247,7 @@ to wait forever to get a lease.
 .It Fl u , -userclass Ar class
 Tags the DHCP message with the userclass
 .Ar class .
-DHCP servers use this give memebers of the class DHCP options other than the
+DHCP servers use this give members of the class DHCP options other than the
 default, without having to know things like hardware address or hostname.
 .It Fl v , -vendor Ar code , Ns Ar value
 Add an enscapulated vendor option.
