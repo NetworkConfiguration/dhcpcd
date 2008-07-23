@@ -1077,7 +1077,8 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 		return 1;
 	case STATE_BOUND:
 		logger(LOG_INFO, "renewing lease of %s",inet_ntoa(lease->addr));
-		do_socket(state, SOCKET_OPEN);
+		if (state->carrier != LINK_DOWN)
+			do_socket(state, SOCKET_OPEN);
 		state->xid = arc4random();
 		state->state = STATE_RENEWING;
 		tv.tv_sec = lease->rebindtime - lease->renewaltime;
@@ -1093,7 +1094,8 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 		break;
 	case STATE_REBINDING:
 		logger(LOG_ERR, "failed to rebind");
-		if (state->options & DHCPCD_IPV4LL)
+		if (state->options & DHCPCD_IPV4LL &&
+		    state->carrier != LINK_DOWN)
 			state->state = STATE_INIT_IPV4LL;
 		else {
 			reason = "EXPIRE";
@@ -1306,6 +1308,10 @@ handle_timeout(struct if_state *state, const struct options *options)
 #ifdef ENABLE_ARP
 dhcp_timeout:
 #endif
+	if (state->carrier == LINK_DOWN) {
+		timerclear(&state->timeout);
+		return 0;
+	}
 	get_time(&state->timeout);
 	tv.tv_sec = DHCP_BASE;
 	for (i = 1; i < state->messages; i++) {
