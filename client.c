@@ -702,7 +702,7 @@ send_message(struct if_state *state, int type, const struct options *options)
 		to.s_addr = state->lease.server.s_addr;
 	else
 		to.s_addr = 0;
-	if (to.s_addr) {
+	if (to.s_addr && to.s_addr != INADDR_BROADCAST) {
 		r = send_packet(state->interface, to, (uint8_t *)dhcp, len);
 		if (r == -1)
 			logger(LOG_ERR, "send_packet: %s", strerror(errno));
@@ -1094,23 +1094,18 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 		break;
 	case STATE_RENEWING:
 		logger(LOG_ERR, "failed to renew, attempting to rebind");
-		lease->addr.s_addr = 0;
 		state->state = STATE_REBINDING;
 		if (lease->server.s_addr == 0)
 			tv.tv_sec = options->timeout;
 		else
 			tv.tv_sec = lease->rebindtime - lease->renewaltime;
+		lease->server.s_addr = 0;
 		break;
 	case STATE_REBINDING:
 		logger(LOG_ERR, "failed to rebind");
-		if (state->options & DHCPCD_IPV4LL &&
-		    state->carrier != LINK_DOWN)
-			state->state = STATE_INIT_IPV4LL;
-		else {
-			reason = "EXPIRE";
-			drop_config(state, reason, options);
-			state->state = STATE_INIT;
-		}
+		reason = "EXPIRE";
+		drop_config(state, reason, options);
+		state->state = STATE_INIT;
 		break;
 	case STATE_PROBING:    /* FALLTHROUGH */
 	case STATE_ANNOUNCING:
@@ -1294,6 +1289,12 @@ handle_timeout(struct if_state *state, const struct options *options)
 			logger(LOG_INFO, "broadcasting for a lease of %s",
 			       inet_ntoa(lease->addr));
 			state->state = STATE_REQUESTING;
+		}
+		if (!lease->addr.s_addr && !timerisset(&state->stop)) {
+			tv.tv_sec = DHCP_MAX + DHCP_RAND_MIN;
+			tv.tv_usec = arc4random() % (DHCP_RAND_MAX_U - DHCP_RAND_MIN_U);
+			get_time(&state->stop);
+			timeradd(&state->stop, &tv, &state->stop);
 		}
 		break;
 	}
@@ -1607,45 +1608,51 @@ handle_arp_fail(struct if_state *state, const struct options *options)
 	struct timeval tv;
 	time_t up;
 
-	if (IN_LINKLOCAL(htonl(state->fail.s_addr))) {
-		if (state->fail.s_addr == state->interface->addr.s_addr) {
-			if (state->state == STATE_PROBING)
-				/* This should only happen when SIGALRM or
-				 * link when down/up and we have a conflict. */
-				drop_config(state, "EXPIRE", options);
-			else {
-				up = uptime();
-				if (state->defend + DEFEND_INTERVAL > up) {
-					drop_config(state, "EXPIRE", options);
-					state->conflicts = -1;
-					/* drop through to set conflicts to 0 */
-				} else {
-					state->defend = up;
-					return 0;
-				}
-			}
-		}
+	if (!IN_LINKLOCAL(htonl(state->fail.s_addr))) {
+		do_socket(state, SOCKET_OPEN);
+		send_message(state, DHCP_DECLINE, options);
 		do_socket(state, SOCKET_CLOSED);
-		state->conflicts++;
-		state->state = STATE_INIT_IPV4LL;
-		timerclear(&state->stop);
-		if (state->conflicts > MAX_CONFLICTS)
-			tv.tv_sec = RATE_LIMIT_INTERVAL;
-		else
-			tv.tv_sec = PROBE_WAIT;
-		tv.tv_usec = 0;
+		state->state = STATE_INIT;
 		get_time(&state->timeout);
+		tv.tv_sec = DHCP_ARP_FAIL;
+		tv.tv_usec = 0;
 		timeradd(&state->timeout, &tv, &state->timeout);
 		return 0;
 	}
 
-	do_socket(state, SOCKET_OPEN);
-	send_message(state, DHCP_DECLINE, options);
+	if (state->fail.s_addr == state->interface->addr.s_addr) {
+		if (state->state == STATE_PROBING)
+			/* This should only happen when SIGALRM or
+			 * link when down/up and we have a conflict. */
+			drop_config(state, "EXPIRE", options);
+		else {
+			up = uptime();
+			if (state->defend + DEFEND_INTERVAL > up) {
+				drop_config(state, "EXPIRE", options);
+				state->conflicts = -1;
+				/* drop through to set conflicts to 0 */
+			} else {
+				state->defend = up;
+				return 0;
+			}
+		}
+	}
 	do_socket(state, SOCKET_CLOSED);
-	state->state = STATE_INIT;
-	get_time(&state->timeout);
-	tv.tv_sec = DHCP_ARP_FAIL;
+	state->conflicts++;
+	timerclear(&state->stop);
+	if (state->conflicts > MAX_CONFLICTS) {
+		logger(LOG_ERR, "failed to obtain an IPv4LL address");
+		state->state = STATE_INIT;
+		timerclear(&state->timeout);
+		if (!(state->options & DHCPCD_DAEMONISED) &&
+		    (state->options & DHCPCD_DAEMONISE))
+			return -1;
+		return 1;
+	}
+	state->state = STATE_INIT_IPV4LL;
+	tv.tv_sec = PROBE_WAIT;
 	tv.tv_usec = 0;
+	get_time(&state->timeout);
 	timeradd(&state->timeout, &tv, &state->timeout);
 	return 0;
 }
