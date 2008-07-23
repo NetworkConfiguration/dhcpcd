@@ -87,14 +87,11 @@ struct options {
 	char script[PATH_MAX];
 	char pidfile[PATH_MAX];
 
-#ifndef MINIMAL
 	char hostname[MAXHOSTNAMELEN];
 	int fqdn;
 	uint8_t classid[CLASSID_MAX_LEN + 1];
 	char clientid[CLIENTID_MAX_LEN + 1];
 	uint8_t userclass[USERCLASS_MAX_LEN + 1];
 	uint8_t vendor[VENDOR_MAX_LEN + 1];
-#endif
 };
-
 #endif

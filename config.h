@@ -30,33 +30,6 @@
 #define PACKAGE			"dhcpcd"
 #define VERSION			"4.0.0-rc2"
 
-/* You can enable/disable various chunks of optional code here.
- * You would only do this to try and shrink the end binary if dhcpcd
- * was running on a low memory device */
-
-/* Disable everything we possibly can. */
-#ifdef MINIMAL
-# ifndef DISABLE_ARP
-#  define DISABLE_ARP
-# endif
-# ifndef DISABLE_IPV4LL
-#  define DISABLE_IPV4LL
-# endif
-#endif
-
-/* Enable ARP by default. */
-#ifndef DISABLE_ARP
-# define ENABLE_ARP
-#endif
-
-/* IPV4LL, aka ZeroConf, aka APIPA, aka RFC 3927.
- * Needs ARP. */
-#ifndef DISABLE_IPV4LL
-# ifdef ENABLE_ARP
-#  define ENABLE_IPV4LL
-# endif
-#endif
-
 /*
  * By default we don't add a local link route if we got a routeable address.
  * This is because dhcpcd can't really decide which interface should allow
@@ -64,7 +37,7 @@
  * Ideally the host network scripts should add the link local route for us.
  * If not, you can define this to get dhcpcd to always add the link local route.
  */
-// #define ENABLE_IPV4LL_ALWAYSROUTE 
+// #define IPV4LL_ALWAYSROUTE 
 
 /* Some systems do not have a working fork. */
 /* #define THERE_IS_NO_FORK */

@@ -53,12 +53,7 @@
 #include "logger.h"
 #include "signals.h"
 
-#ifdef ENABLE_IPV4LL
-# ifndef ENABLE_ARP
- # error "IPv4LL requires ENABLE_ARP to work"
-# endif
-# define IPV4LL_LEASETIME 	2
-#endif
+#define IPV4LL_LEASETIME 	2
 
 /* Some platforms don't define INFTIM */
 #ifndef INFTIM
@@ -139,13 +134,11 @@ struct if_state {
 	int *pid_fd;
 	int signal_fd;
 	int carrier;
-#ifdef ENABLE_ARP
 	int probes;
 	int claims;
 	int conflicts;
 	time_t defend;
 	struct in_addr fail;
-#endif
 };
 
 #define LINK_UP 	1
@@ -279,7 +272,6 @@ daemonise(struct if_state *state, const struct options *options)
 	return -1;
 }
 
-#ifndef MINIMAL
 #define THIRTY_YEARS_IN_SECONDS    946707779
 static size_t
 get_duid(unsigned char *duid, const struct interface *iface)
@@ -348,9 +340,7 @@ get_duid(unsigned char *duid, const struct interface *iface)
 	}
 	return len;
 }
-#endif
 
-#ifdef ENABLE_IPV4LL
 static struct dhcp_message*
 ipv4ll_get_dhcp(uint32_t old_addr)
 {
@@ -383,7 +373,6 @@ ipv4ll_get_dhcp(uint32_t old_addr)
 	}
 	return dhcp;
 }
-#endif
 
 static void
 get_lease(struct dhcp_lease *lease, const struct dhcp_message *dhcp)
@@ -520,16 +509,10 @@ client_setup(struct if_state *state, const struct options *options)
 			state->offer = NULL;
 			get_option_addr(&lease->server.s_addr,
 					state->new, DHCP_SERVERID);
-#ifdef ENABLE_ARP
 			open_socket(iface, ETHERTYPE_ARP);
 			state->state = STATE_ANNOUNCING;
 			tv.tv_sec = ANNOUNCE_INTERVAL;
 			timeradd(&state->start, &tv, &state->timeout);
-#else
-			state->state = STATE_BOUND;
-			tv.tv_sec = state->lease.renewaltime;
-			timeradd(&state->start, &tv, &state->stop);
-#endif
 		}
 #endif
 	} else {
@@ -645,12 +628,10 @@ do_socket(struct if_state *state, int mode)
 			close(state->interface->udp_fd);
 			state->interface->udp_fd = -1;
 		}
-#ifdef ENABLE_ARP
 		if (state->interface->arp_fd != -1) {
 			close(state->interface->arp_fd);
 			state->interface->arp_fd = -1;
 		}
-#endif
 	}
 
 	if (mode == SOCKET_OPEN &&
@@ -798,13 +779,11 @@ wait_for_packet(struct if_state *state)
 			fds[nfds].events = POLLIN;
 			nfds++;
 		}
-#ifdef ENABLE_ARP
 		if (state->interface->arp_fd != -1) {
 			fds[nfds].fd = state->interface->arp_fd;
 			fds[nfds].events = POLLIN;
 			nfds++;
 		}
-#endif
 	}
 
 wait_again:
@@ -907,10 +886,8 @@ static int bind_dhcp(struct if_state *state, const struct options *options)
 	state->offer = NULL;
 	state->messages = 0;
 	timerclear(&state->exit);
-#ifdef ENABLE_ARP
 	state->conflicts = 0;
 	state->defend = 0;
-#endif
 
 	if (options->options & DHCPCD_INFORM) {
 		if (options->request_address.s_addr != 0)
@@ -1047,7 +1024,6 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 		     state->options & DHCPCD_LASTLEASE))
 			gotlease = get_old_lease(state);
 
-#ifdef ENABLE_IPV4LL
 		if (state->carrier != LINK_DOWN &&
 		    state->options & DHCPCD_IPV4LL &&
 		    gotlease != 0)
@@ -1057,9 +1033,7 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 			state->offer = ipv4ll_get_dhcp(0);
 			gotlease = 0;
 		}
-#endif
 
-#ifdef ENABLE_ARP
 		if (gotlease == 0 &&
 		    state->offer->yiaddr != iface->addr.s_addr)
 		{
@@ -1069,7 +1043,6 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 			state->conflicts = 0;
 			return 1;
 		}
-#endif
 
 		if (gotlease == 0)
 			return bind_dhcp(state, options);
@@ -1132,7 +1105,6 @@ handle_timeout(struct if_state *state, const struct options *options)
 	struct interface *iface = state->interface;
 	int i = 0;
 	struct timeval tv;
-#ifdef ENABLE_ARP
 	struct in_addr addr;
 
 	timerclear(&state->timeout);
@@ -1143,7 +1115,6 @@ handle_timeout(struct if_state *state, const struct options *options)
 	}
 	timerclear(&tv);
 
-#ifdef ENABLE_IPV4LL
 	if (state->state == STATE_RENEW_REQUESTED &&
 	    IN_LINKLOCAL(ntohl(lease->addr.s_addr)))
 	{
@@ -1153,9 +1124,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 		state->probes = 0;
 		state->claims = 0;
 	}
-#endif
 	switch (state->state) {
-#ifdef ENABLE_IPV4LL
 	case STATE_INIT_IPV4LL:
 		logger(LOG_INFO, "probing for an IPV4LL address");
 		state->state = STATE_PROBING;
@@ -1164,7 +1133,6 @@ handle_timeout(struct if_state *state, const struct options *options)
 		state->claims = 0;
 		state->probes = 0;
 		/* FALLTHROUGH */
-#endif
 	case STATE_PROBING:
 		if (iface->arp_fd == -1)
 			open_socket(iface, ETHERTYPE_ARP);
@@ -1235,7 +1203,6 @@ handle_timeout(struct if_state *state, const struct options *options)
 		timeradd(&state->timeout, &tv, &state->timeout);
 		return i;
 	}
-#endif
 
 	if (timerisset(&state->stop)) {
 		get_time(&tv);
@@ -1315,9 +1282,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 		break;
 	}
 
-#ifdef ENABLE_ARP
 dhcp_timeout:
-#endif
 	if (state->carrier == LINK_DOWN) {
 		timerclear(&state->timeout);
 		return 0;
@@ -1451,7 +1416,6 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 	state->offer = dhcp;
 	*dhcpp = NULL;
 
-#ifdef ENABLE_ARP
 	if (state->options & DHCPCD_ARP &&
 	    iface->addr.s_addr != state->offer->yiaddr)
 	{
@@ -1463,7 +1427,6 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 		timerclear(&state->stop);
 		return 1;
 	}
-#endif
 
 	return bind_dhcp(state, options);		
 }
@@ -1533,7 +1496,6 @@ handle_dhcp_packet(struct if_state *state, const struct options *options)
 	return retval;
 }
 
-#ifdef ENABLE_ARP
 static int
 handle_arp_packet(struct if_state *state)
 {
@@ -1656,7 +1618,6 @@ handle_arp_fail(struct if_state *state, const struct options *options)
 	timeradd(&state->timeout, &tv, &state->timeout);
 	return 0;
 }
-#endif
 
 static int
 handle_link(struct if_state *state)
@@ -1750,14 +1711,11 @@ dhcp_run(const struct options *options, int *pid_fd)
 				retval = handle_link(state);
 			} else if (fd_hasdata(iface->raw_fd) == 1) {
 				retval = handle_dhcp_packet(state, options);
-#ifdef ENABLE_ARP
 			} else if (fd_hasdata(iface->arp_fd) == 1) {
 				retval = handle_arp_packet(state);
 				if (retval == -1)
 					retval = handle_arp_fail(state, options);
-			}
-#endif
-			else
+			} else
 				retval = 0;
 		}
 		if (retval == -1) 

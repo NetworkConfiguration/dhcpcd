@@ -434,9 +434,7 @@ read_interface(const char *ifname, _unused int metric)
 	/* 0 is a valid fd, so init to -1 */
 	iface->raw_fd = -1;
 	iface->udp_fd = -1;
-#ifdef ENABLE_ARP
 	iface->arp_fd = -1;
-#endif
 	iface->link_fd = -1;
 
 eexit:
@@ -662,7 +660,6 @@ valid_udp_packet(const uint8_t *data)
 	return retval;
 }
 
-#ifdef ENABLE_ARP
 int
 send_arp(const struct interface *iface, int op, in_addr_t sip, in_addr_t tip)
 {
@@ -694,5 +691,3 @@ send_arp(const struct interface *iface, int op, in_addr_t sip, in_addr_t tip)
 	free(arp);
 	return retval;
 }
-#endif
-

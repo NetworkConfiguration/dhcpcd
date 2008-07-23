@@ -103,9 +103,7 @@ struct interface
 
 	int raw_fd;
 	int udp_fd;
-#ifdef ENABLE_ARP
 	int arp_fd;
-#endif
 	int link_fd;
 	size_t buffer_size, buffer_len, buffer_pos;
 	unsigned char *buffer;
@@ -170,9 +168,7 @@ ssize_t send_raw_packet(const struct interface *, int,
 			const void *, ssize_t);
 ssize_t get_raw_packet(struct interface *, int, void *, ssize_t);
 
-#ifdef ENABLE_ARP
 int send_arp(const struct interface *, int, in_addr_t, in_addr_t);
-#endif
 
 int open_link_socket(struct interface *);
 int link_changed(struct interface *);

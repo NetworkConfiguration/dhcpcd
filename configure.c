@@ -259,7 +259,7 @@ configure_routes(struct interface *iface, const struct dhcp_message *dhcp,
 
 	ort = get_option_routes(dhcp);
 
-#ifdef ENABLE_IPV4LL_ALWAYSROUTE
+#ifdef IPV4LL_ALWAYSROUTE
 	if (options->options & DHCPCD_IPV4LL &&
 	    IN_PRIVATE(ntohl(dhcp->yiaddr)))
 	{

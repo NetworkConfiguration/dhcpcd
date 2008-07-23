@@ -621,23 +621,13 @@ main(int argc, char **argv)
 	setlogprefix(PACKAGE ": ");
 
 	options = xzalloc(sizeof(*options));
-	options->options |= DHCPCD_GATEWAY | DHCPCD_DAEMONISE;
+	options->options |= DHCPCD_CLIENTID | DHCPCD_GATEWAY | DHCPCD_DAEMONISE;
+	options->options |= DHCPCD_ARP | DHCPCD_IPV4LL | DHCPCD_LINK;
 	options->timeout = DEFAULT_TIMEOUT;
 	strlcpy(options->script, SCRIPT, sizeof(options->script));
 
-#ifndef MINIMAL
-	options->options |= DHCPCD_CLIENTID;
 	options->classid[0] = snprintf((char *)options->classid + 1, CLASSID_MAX_LEN,
 				       "%s %s", PACKAGE, VERSION);
-#endif
-#ifdef ENABLE_ARP
-	options->options |= DHCPCD_ARP;
- #ifdef ENABLE_IPV4LL
-	options->options |= DHCPCD_IPV4LL;
- #endif
-#endif
-
-	options->options |= DHCPCD_LINK;
 
 #ifdef CMDLINE_COMPAT
 	add_reqmask(options->reqmask, DHCP_DNSSERVER);
@@ -676,13 +666,11 @@ main(int argc, char **argv)
 	}
 #endif
 
-#ifndef MINIMAL
 	gethostname(options->hostname + 1, sizeof(options->hostname));
 	if (strcmp(options->hostname + 1, "(none)") == 0 ||
 	    strcmp(options->hostname + 1, "localhost") == 0)
 		options->hostname[1] = '\0';
 	*options->hostname = strlen(options->hostname + 1);
-#endif
 
 	while ((opt = getopt_long(argc, argv, OPTS EXTRA_OPTS,
 				  longopts, &option_index)) != -1)
@@ -706,23 +694,8 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (doversion) {
+	if (doversion)
 		printf(""PACKAGE" "VERSION"\n%s\n", copyright);
-		printf("Compile time options:"
-#ifdef ENABLE_ARP
-		       " ARP"
-#endif
-#ifdef ENABLE_IPV4LL
-		       " IPV4LL"
-#endif
-#ifdef MINIMAL
-		       " MINIMAL"
-#endif
-#ifdef THERE_IS_NO_FORK
-		       " THERE_IS_NO_FORK"
-#endif
-		       "\n");
-	}
 
 	if (dohelp)
 		usage();
@@ -869,7 +842,6 @@ main(int argc, char **argv)
 		}
 	}
 
-#ifndef MINIMAL
 	if ((p = strchr(options->hostname, '.'))) {
 		if (options->fqdn == FQDN_DISABLE)
 			*p = '\0';
@@ -882,7 +854,6 @@ main(int argc, char **argv)
 	}
 	if (options->fqdn != FQDN_DISABLE)
 		del_reqmask(options->reqmask, DHCP_HOSTNAME);
-#endif
 
 	if (options->request_address.s_addr == 0 &&
 	    (options->options & DHCPCD_INFORM ||
@@ -991,13 +962,11 @@ main(int argc, char **argv)
 		logger(LOG_INFO, PACKAGE " " VERSION " starting");
 	}
 
-#ifndef MINIMAL
 	/* Terminate the encapsulated options */
 	if (options->vendor[0]) {
 		options->vendor[0]++;
 		options->vendor[options->vendor[0]] = DHCP_END;
 	}
-#endif
 
 	if (dhcp_run(options, &pid_fd) == 0)
 		retval = EXIT_SUCCESS;

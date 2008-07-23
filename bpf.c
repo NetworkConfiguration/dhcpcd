@@ -108,11 +108,9 @@ open_socket(struct interface *iface, int protocol)
 
 	/* Install the DHCP filter */
 	if (protocol == ETHERTYPE_ARP) {
-#ifdef ENABLE_ARP
 		pf.bf_insns = UNCONST(arp_bpf_filter);
 		pf.bf_len = arp_bpf_filter_len;
 		fdp = &iface->arp_fd;
-#endif
 	} else {
 		pf.bf_insns = UNCONST(dhcp_bpf_filter);
 		pf.bf_len = dhcp_bpf_filter_len;
@@ -151,11 +149,9 @@ send_raw_packet(const struct interface *iface, int protocol,
 	iov[0].iov_len = ETHER_HDR_LEN;
 	iov[1].iov_base = UNCONST(data);
 	iov[1].iov_len = len;
-#ifdef ENABLE_ARP
 	if (protocol == ETHERTYPE_ARP)
 		fd = iface->arp_fd;
 	else
-#endif
 		fd = iface->raw_fd;
 	return writev(fd, iov, 2);
 }
@@ -171,11 +167,9 @@ get_raw_packet(struct interface *iface, int protocol,
 	ssize_t bytes;
 	const unsigned char *payload;
 
-	if (protocol == ETHERTYPE_ARP) {
-#ifdef ENABLE_ARP
+	if (protocol == ETHERTYPE_ARP)
 		fd = iface->arp_fd;
-#endif
-	} else
+	else
 		fd = iface->raw_fd;
 
 	for (;;) {
