@@ -115,6 +115,14 @@
 #define PROBE_MIN_U		PROBE_MIN * USECS_SECOND
 #define PROBE_MAX_U		PROBE_MAX * USECS_SECOND
 
+#define timernorm(tvp)						\
+	do {							\
+		while ((tvp)->tv_usec >= 1000000) {		\
+			(tvp)->tv_sec++;			\
+			(tvp)->tv_usec -= 1000000;		\
+		}						\
+	} while (0 /* CONSTCOND */);				\
+
 struct if_state {
 	int options;
 	struct interface *interface;
@@ -722,12 +730,12 @@ drop_config(struct if_state *state, const char *reason,
 }
 
 static int
-wait_for_packet(struct if_state *state)
+wait_for_fd(struct if_state *state, int *fd)
 {
 	struct pollfd fds[4]; /* signal, link, raw, arp */
-	int retval, nfds = 0;
-	time_t timeout = 0;
-	struct timeval now, d, *ref;
+	int r, i, nfds = 0;
+	struct timeval now, tout, *ref;
+	time_t msecs = -1;
 	static time_t last_stop_sec = 0, last_timeout_sec = 0;
 	static long int last_stop_usec = 0, last_timeout_usec = 0;
 
@@ -745,22 +753,24 @@ wait_for_packet(struct if_state *state)
 	ref = NULL;
 	clock_monotonic(&now);
 	if (timerisset(&state->exit)) {
-	    	if (timercmp(&state->exit, &now, <=))
-			return 0;
-		else
+	    	if (timercmp(&state->exit, &now, >))
 			ref = &state->exit;
+		else
+			return 0;
 	}
 	if (timerisset(&state->stop)) {
-		if (timercmp(&state->stop, &now, <=))
+		if (timercmp(&state->stop, &now, >)) {
+	    		if (!ref || timercmp(&state->stop, ref, <))
+				ref = &state->stop;
+		} else
 			return 0;
-	    	else if (!ref || timercmp(&state->stop, ref, <))
-			ref = &state->stop;
 	}
 	if (timerisset(&state->timeout)) {
-	    	if (timercmp(&state->timeout, &now, <=))
+	    	if (timercmp(&state->timeout, &now, >)) {
+			if (!ref || timercmp(&state->timeout, ref, <))
+				ref = &state->timeout;
+		} else
 			return 0;
-		else if (!ref || timercmp(&state->timeout, ref, <))
-			ref = &state->timeout;
 	}
 
 	if (state->lease.leasetime == ~0U &&
@@ -768,11 +778,11 @@ wait_for_packet(struct if_state *state)
 	{
 		if (last_stop_sec != INFTIM)
 			logger(LOG_DEBUG, "waiting for infinity");
-		timeout = INFTIM;
+		ref = NULL;
 	} else if (state->carrier == LINK_DOWN && !ref) {
 		if (last_stop_sec != INFTIM)
 			logger(LOG_DEBUG, "waiting for carrier");
-		timeout = INFTIM;
+		ref = NULL;
 	} else {
 		if (state->interface->raw_fd != -1) {
 			fds[nfds].fd = state->interface->raw_fd;
@@ -786,46 +796,40 @@ wait_for_packet(struct if_state *state)
 		}
 	}
 
-wait_again:
-	clock_monotonic(&now);
-	if (timeout == INFTIM)
-		last_stop_sec = INFTIM;
-	else {
-		if (!ref)
-			return 0;
-		timersub(ref, &now, &d);
-		/* This should be safe and not overflow as the biggest
-		 * diff is uint32_t seconds from the DHCP message. */
-		timeout = d.tv_sec * 1000 + (d.tv_usec + 999) / 1000;
+	if (ref) {
+		timersub(ref, &now, &tout);
+		msecs = tout.tv_sec * 1000 + (tout.tv_usec + 999) / 1000;
 		/* Only report waiting time if changed */
 		if (last_stop_sec != state->stop.tv_sec ||
 		    last_stop_usec != state->stop.tv_usec ||
 		    last_timeout_sec != state->timeout.tv_sec ||
 		    last_timeout_usec != state->timeout.tv_usec)
 		{
-			logger(LOG_DEBUG, "waiting for %0.2f seconds",
-			       (float)timeout / 1000);
+			logger(LOG_DEBUG, "waiting for %.2f seconds",
+				(float)msecs / 1000);
 			last_stop_sec = state->stop.tv_sec;
 			last_stop_usec = state->stop.tv_usec;
 			last_timeout_sec = state->timeout.tv_sec;
 			last_timeout_usec = state->timeout.tv_usec;
 		}
-		/* However, we could overflow INT_MAX and annoy poll. */
-		if (timeout < 0 || timeout > INT_MAX)
-			timeout = INT_MAX;
 	}
 
-	retval = poll(fds, nfds, timeout);
-	if (retval == -1) {
-		if (errno == EINTR)
-			return 0;
-		logger(LOG_ERR, "poll: %s", strerror(errno));
-	} else if (retval == 0) {
-		/* If our timeout overflowed, wait again. */
-		if (timeout == INT_MAX)
-			goto wait_again;
+	r = poll(fds, nfds, msecs);
+	if (r == -1) {
+		if (errno != EINTR)
+			logger(LOG_ERR, "poll: %s", strerror(errno));
+		return -1;
 	}
-	return retval;
+
+	if (r != 0) {
+		/* We're only interested in the first ready fd */
+		for (i = 0; i < nfds; i++)
+			if (fds[i].revents & POLLIN) {
+				*fd = fds[i].fd;
+				break;
+			}
+	}
+	return r;
 }
 
 static int
@@ -1146,11 +1150,12 @@ handle_timeout(struct if_state *state, const struct options *options)
 			state->probes++;
 			logger(LOG_DEBUG, "sending ARP probe #%d",
 			       state->probes);
-			if (state->probes < PROBE_NUM) 
-				tv.tv_usec = (arc4random() %
-					      (PROBE_MAX_U - PROBE_MIN_U)) +
-					     PROBE_MIN_U;
-			else
+			if (state->probes < PROBE_NUM) {
+				tv.tv_sec = PROBE_MIN_U;
+				tv.tv_usec = arc4random() %
+					(PROBE_MAX_U - PROBE_MIN_U);
+				timernorm(&tv);
+			} else
 				tv.tv_sec = ANNOUNCE_WAIT;
 			i = send_arp(iface, ARPOP_REQUEST, 0, state->offer->yiaddr);
 			if (i == -1)
@@ -1260,6 +1265,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 		if (!lease->addr.s_addr && !timerisset(&state->stop)) {
 			tv.tv_sec = DHCP_MAX + DHCP_RAND_MIN;
 			tv.tv_usec = arc4random() % (DHCP_RAND_MAX_U - DHCP_RAND_MIN_U);
+			timernorm(&tv);
 			clock_monotonic(&state->stop);
 			timeradd(&state->stop, &tv, &state->stop);
 		}
@@ -1298,6 +1304,7 @@ dhcp_timeout:
 	}
 	tv.tv_sec += DHCP_RAND_MIN;
 	tv.tv_usec = arc4random() % (DHCP_RAND_MAX_U - DHCP_RAND_MIN_U);
+	timernorm(&tv);
 	timeradd(&state->timeout, &tv, &state->timeout);
 	return 0;
 }
@@ -1664,8 +1671,7 @@ dhcp_run(const struct options *options, int *pid_fd)
 {
 	struct interface *iface;
 	struct if_state *state = NULL;
-	int retval = 0;
-	int sig;
+	int fd, r = 0, sig;
 
 	iface = read_interface(options->interface, options->metric);
 	if (!iface) {
@@ -1697,33 +1703,33 @@ dhcp_run(const struct options *options, int *pid_fd)
 		logger(LOG_INFO, "waiting for carrier");
 
 	for (;;) {
-		/* We should always handle our signals first */
-		if ((sig = (signal_read(state->signal_fd))) != -1) {
-			retval = handle_signal(sig, state, options);
-		} else if (retval == 0)
-			retval = handle_timeout(state, options);
-		else if (retval == -1) {
-			if (errno == EINTR)
-				/* The interupt will be handled above */
-				retval = 0;
-		} else if (retval > 0) {
-			if (fd_hasdata(iface->link_fd) == 1) {
-				retval = handle_link(state);
-			} else if (fd_hasdata(iface->raw_fd) == 1) {
-				retval = handle_dhcp_packet(state, options);
-			} else if (fd_hasdata(iface->arp_fd) == 1) {
-				retval = handle_arp_packet(state);
-				if (retval == -1)
-					retval = handle_arp_fail(state, options);
-			} else
-				retval = 0;
+		if (r == 0) {
+			r = handle_timeout(state, options);
+			if (r == 1) {
+				r = 0;
+				continue;
+			}
 		}
-		if (retval == -1) 
+		fd = -1;
+		r = wait_for_fd(state, &fd);
+		if (r == -1 && errno == EINTR)
+			r = 0;
+		else if (r > 0) {
+			if (fd == state->signal_fd) {
+			    	if ((sig = signal_read()) != -1)
+					r = handle_signal(sig, state, options);
+			} else if (fd == iface->link_fd)
+				r = handle_link(state);
+			else if (fd == iface->raw_fd)
+				r = handle_dhcp_packet(state, options);
+			else if (fd == iface->arp_fd) {
+				if ((r = handle_arp_packet(state)) -1)
+					r = handle_arp_fail(state, options);
+			} else
+				r = 0;
+		}
+		if (r == -1)
 			break;
-		if (retval == 0)
-			retval = wait_for_packet(state);
-		else
-			retval = 0;
 	}
 
 eexit:
@@ -1739,7 +1745,7 @@ eexit:
 
 	if (state) {
 		if (state->options & DHCPCD_FORKED)
-			retval = 0;
+			r = 0;
 		if (state->options & DHCPCD_DAEMONISED)
 			unlink(options->pidfile);
 		free(state->offer);
@@ -1748,5 +1754,5 @@ eexit:
 		free(state);
 	}
 
-	return retval;
+	return r;
 }

@@ -74,7 +74,6 @@ int closefrom(int);
 int close_fds(void);
 int set_cloexec(int);
 int set_nonblock(int);
-int fd_hasdata(int);
 ssize_t get_line(char **, size_t *, FILE *);
 int clock_monotonic(struct timeval *);
 time_t uptime(void);
