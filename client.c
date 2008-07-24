@@ -1151,7 +1151,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 			logger(LOG_DEBUG, "sending ARP probe #%d",
 			       state->probes);
 			if (state->probes < PROBE_NUM) {
-				tv.tv_sec = PROBE_MIN_U;
+				tv.tv_sec = PROBE_MIN;
 				tv.tv_usec = arc4random() %
 					(PROBE_MAX_U - PROBE_MIN_U);
 				timernorm(&tv);
@@ -1671,7 +1671,7 @@ dhcp_run(const struct options *options, int *pid_fd)
 {
 	struct interface *iface;
 	struct if_state *state = NULL;
-	int fd, r = 0, sig;
+	int fd = -1, r = 0, sig;
 
 	iface = read_interface(options->interface, options->metric);
 	if (!iface) {
@@ -1703,17 +1703,8 @@ dhcp_run(const struct options *options, int *pid_fd)
 		logger(LOG_INFO, "waiting for carrier");
 
 	for (;;) {
-		if (r == 0) {
+		if (r == 0)
 			r = handle_timeout(state, options);
-			if (r == 1) {
-				r = 0;
-				continue;
-			}
-		}
-		fd = -1;
-		r = wait_for_fd(state, &fd);
-		if (r == -1 && errno == EINTR)
-			r = 0;
 		else if (r > 0) {
 			if (fd == state->signal_fd) {
 			    	if ((sig = signal_read()) != -1)
@@ -1723,13 +1714,20 @@ dhcp_run(const struct options *options, int *pid_fd)
 			else if (fd == iface->raw_fd)
 				r = handle_dhcp_packet(state, options);
 			else if (fd == iface->arp_fd) {
-				if ((r = handle_arp_packet(state)) -1)
+				if ((r = handle_arp_packet(state)) == -1)
 					r = handle_arp_fail(state, options);
 			} else
 				r = 0;
 		}
 		if (r == -1)
 			break;
+		if (r == 0) {
+			fd = -1;
+			r = wait_for_fd(state, &fd);
+			if (r == -1 && errno == EINTR)
+				r = 0;
+		} else
+			r = 0;
 	}
 
 eexit:
