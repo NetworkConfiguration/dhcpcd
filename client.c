@@ -453,7 +453,7 @@ get_old_lease(struct if_state *state)
 	iface->start_uptime = uptime();
 	tv.tv_sec = lease->renewaltime - offset;
 	tv.tv_usec = 0;
-	get_time(&state->timeout);
+	clock_monotonic(&state->timeout);
 	timeradd(&state->timeout, &tv, &state->timeout);
 	free(state->old);
 	state->old = state->new;
@@ -484,7 +484,7 @@ client_setup(struct if_state *state, const struct options *options)
 	state->nakoff = 1;
 	state->options = options->options;
 	timerclear(&tv);
-	get_time(&state->start);
+	clock_monotonic(&state->start);
 
 	if (options->request_address.s_addr == 0 &&
 	    (options->options & DHCPCD_INFORM ||
@@ -743,7 +743,7 @@ wait_for_packet(struct if_state *state)
 	}
 
 	ref = NULL;
-	get_time(&now);
+	clock_monotonic(&now);
 	if (timerisset(&state->exit)) {
 	    	if (timercmp(&state->exit, &now, <=))
 			return 0;
@@ -787,7 +787,7 @@ wait_for_packet(struct if_state *state)
 	}
 
 wait_again:
-	get_time(&now);
+	clock_monotonic(&now);
 	if (timeout == INFTIM)
 		last_stop_sec = INFTIM;
 	else {
@@ -960,7 +960,7 @@ static int bind_dhcp(struct if_state *state, const struct options *options)
 
 			tv.tv_sec = lease->renewaltime;
 			tv.tv_usec = 0;
-			get_time(&state->stop);
+			clock_monotonic(&state->stop);
 			timeradd(&state->stop, &tv, &state->stop);
 		}
 		state->state = STATE_BOUND;
@@ -1090,7 +1090,7 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 		       state->state);
 	}
 
-	get_time(&state->start);
+	clock_monotonic(&state->start);
 	if (timerisset(&tv))
 		timeradd(&state->start, &tv, &state->stop);
 
@@ -1109,7 +1109,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 
 	timerclear(&state->timeout);
 	if (timerisset(&state->exit)) {
-		get_time(&tv);
+		clock_monotonic(&tv);
 		if (timercmp(&tv, &state->exit, >))
 			return handle_timeout_fail(state, options);
 	}
@@ -1190,7 +1190,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 				iface->arp_fd = -1;
 				tv.tv_sec = lease->renewaltime -
 					(ANNOUNCE_INTERVAL * ANNOUNCE_NUM);
-				get_time(&state->stop);
+				clock_monotonic(&state->stop);
 				timeradd(&state->stop, &tv, &state->stop);
 				return 0;
 			}
@@ -1199,13 +1199,13 @@ handle_timeout(struct if_state *state, const struct options *options)
 	}
 	if (timerisset(&tv)) {
 		timerclear(&state->stop);
-		get_time(&state->timeout);
+		clock_monotonic(&state->timeout);
 		timeradd(&state->timeout, &tv, &state->timeout);
 		return i;
 	}
 
 	if (timerisset(&state->stop)) {
-		get_time(&tv);
+		clock_monotonic(&tv);
 		if (timercmp(&tv, &state->stop, >))
 			return handle_timeout_fail(state, options);
 	}
@@ -1214,7 +1214,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 	switch (state->state) {
 	case STATE_BOUND: /* FALLTHROUGH */
 	case STATE_RENEW_REQUESTED:
-		get_time(&state->start);
+		clock_monotonic(&state->start);
 		timerclear(&state->stop);
 		/* FALLTHROUGH */
 	case STATE_INIT:
@@ -1260,7 +1260,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 		if (!lease->addr.s_addr && !timerisset(&state->stop)) {
 			tv.tv_sec = DHCP_MAX + DHCP_RAND_MIN;
 			tv.tv_usec = arc4random() % (DHCP_RAND_MAX_U - DHCP_RAND_MIN_U);
-			get_time(&state->stop);
+			clock_monotonic(&state->stop);
 			timeradd(&state->stop, &tv, &state->stop);
 		}
 		break;
@@ -1287,7 +1287,7 @@ dhcp_timeout:
 		timerclear(&state->timeout);
 		return 0;
 	}
-	get_time(&state->timeout);
+	clock_monotonic(&state->timeout);
 	tv.tv_sec = DHCP_BASE;
 	for (i = 1; i < state->messages; i++) {
 		tv.tv_sec *= 2;
@@ -1361,7 +1361,7 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 			state->nakoff *= 2;
 			if (state->nakoff > NAKOFF_MAX)
 				state->nakoff = NAKOFF_MAX;
-			get_time(&state->timeout);
+			clock_monotonic(&state->timeout);
 			timeradd(&state->timeout, &tv, &state->timeout);
 		} 
 		return 0;
@@ -1575,7 +1575,7 @@ handle_arp_fail(struct if_state *state, const struct options *options)
 		send_message(state, DHCP_DECLINE, options);
 		do_socket(state, SOCKET_CLOSED);
 		state->state = STATE_INIT;
-		get_time(&state->timeout);
+		clock_monotonic(&state->timeout);
 		tv.tv_sec = DHCP_ARP_FAIL;
 		tv.tv_usec = 0;
 		timeradd(&state->timeout, &tv, &state->timeout);
@@ -1614,7 +1614,7 @@ handle_arp_fail(struct if_state *state, const struct options *options)
 	state->state = STATE_INIT_IPV4LL;
 	tv.tv_sec = PROBE_WAIT;
 	tv.tv_usec = 0;
-	get_time(&state->timeout);
+	clock_monotonic(&state->timeout);
 	timeradd(&state->timeout, &tv, &state->timeout);
 	return 0;
 }

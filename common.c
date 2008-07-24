@@ -203,7 +203,7 @@ set_nonblock(int fd)
  * platforms.
  */
 int
-get_time(struct timeval *tp)
+clock_monotonic(struct timeval *tp)
 {
 #if defined(_POSIX_MONOTONIC_CLOCK) && defined(CLOCK_MONOTONIC)
 	struct timespec ts;
@@ -232,11 +232,11 @@ get_time(struct timeval *tp)
 time_t
 uptime(void)
 {
-	struct timeval tp;
+	struct timeval tv;
 
-	if (get_time(&tp) == -1)
+	if (clock_monotonic(&tv) == -1)
 		return -1;
-	return tp.tv_sec;
+	return tv.tv_sec;
 }
 
 int

@@ -76,7 +76,7 @@ int set_cloexec(int);
 int set_nonblock(int);
 int fd_hasdata(int);
 ssize_t get_line(char **, size_t *, FILE *);
-int get_time(struct timeval *);
+int clock_monotonic(struct timeval *);
 time_t uptime(void);
 int writepid(int, pid_t);
 void *xrealloc(void *, size_t);
