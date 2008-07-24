@@ -854,7 +854,7 @@ handle_signal(int sig, struct if_state *state,  const struct options *options)
 		state->state = STATE_RENEW_REQUESTED;
 		timerclear(&state->timeout);
 		timerclear(&state->stop);
-		return 0;
+		return 1;
 	case SIGHUP:
 		logger(LOG_INFO, "received SIGHUP, releasing lease");
 		if (lease->addr.s_addr &&
@@ -1178,9 +1178,10 @@ handle_timeout(struct if_state *state, const struct options *options)
 				     state->new->yiaddr, state->new->yiaddr);
 			if (i == -1)
 				logger(LOG_ERR, "send_arp: %s", strerror(errno));
-			if (state->claims < ANNOUNCE_NUM)
+			if (state->claims < ANNOUNCE_NUM) {
 				tv.tv_sec = ANNOUNCE_INTERVAL;
-			else if (IN_LINKLOCAL(htonl(state->new->yiaddr))) {
+				i = 0;
+			} else if (IN_LINKLOCAL(htonl(state->new->yiaddr))) {
 				/* We should pretend to be at the end
 				 * of the DHCP negotation cycle */
 				state->state = STATE_INIT;
@@ -1724,8 +1725,10 @@ dhcp_run(const struct options *options, int *pid_fd)
 		if (r == 0) {
 			fd = -1;
 			r = wait_for_fd(state, &fd);
-			if (r == -1 && errno == EINTR)
-				r = 0;
+			if (r == -1 && errno == EINTR) {
+				r = 1;
+				fd = state->signal_fd;
+			}
 		} else
 			r = 0;
 	}
