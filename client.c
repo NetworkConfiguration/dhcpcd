@@ -738,6 +738,7 @@ wait_for_fd(struct if_state *state, int *fd)
 	time_t msecs = -1;
 	static time_t last_stop_sec = 0, last_timeout_sec = 0;
 	static long int last_stop_usec = 0, last_timeout_usec = 0;
+	double secs;
 
 	/* We always listen to signals */
 	fds[nfds].fd = state->signal_fd;
@@ -798,20 +799,20 @@ wait_for_fd(struct if_state *state, int *fd)
 
 	if (ref) {
 		timersub(ref, &now, &tout);
-		msecs = tout.tv_sec * 1000 + (tout.tv_usec + 999) / 1000;
+		secs = tout.tv_sec * 1.0 + tout.tv_usec * 1.0e-6;
 		/* Only report waiting time if changed */
 		if (last_stop_sec != state->stop.tv_sec ||
 		    last_stop_usec != state->stop.tv_usec ||
 		    last_timeout_sec != state->timeout.tv_sec ||
 		    last_timeout_usec != state->timeout.tv_usec)
 		{
-			logger(LOG_DEBUG, "waiting for %.2f seconds",
-				(float)msecs / 1000);
+			logger(LOG_DEBUG, "waiting for %0.2f seconds", secs);
 			last_stop_sec = state->stop.tv_sec;
 			last_stop_usec = state->stop.tv_usec;
 			last_timeout_sec = state->timeout.tv_sec;
 			last_timeout_usec = state->timeout.tv_usec;
 		}
+		msecs = tout.tv_sec * 1000 + (tout.tv_usec + 999) / 1000;
 	}
 
 	r = poll(fds, nfds, msecs);
