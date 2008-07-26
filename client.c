@@ -395,7 +395,7 @@ get_lease(struct dhcp_lease *lease, const struct dhcp_message *dhcp)
 	if (get_option_uint32(&lease->leasetime, dhcp, DHCP_LEASETIME) == 0) {
 		/* Ensure that we can use the lease */
 		clock_monotonic(&tv);
-		if (tv.tv_sec + lease->leasetime < tv.tv_sec) {
+		if (tv.tv_sec + (time_t)lease->leasetime < tv.tv_sec) {
 			logger(LOG_WARNING, "lease of %u would overflow, "
 			       "treating as infinite", lease->leasetime);
 			lease->leasetime = ~0U; /* Infinite lease */
