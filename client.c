@@ -469,10 +469,8 @@ get_old_lease(struct if_state *state)
 	if (lease->leasedfrom == 0)
 		offset = 0;
 	iface->start_uptime = uptime();
-	tv.tv_sec = lease->renewaltime - offset;
-	tv.tv_usec = 0;
 	clock_monotonic(&state->timeout);
-	timeradd(&state->timeout, &tv, &state->timeout);
+	state->timeout.tv_sec += lease->renewaltime - offset;
 	free(state->old);
 	state->old = state->new;
 	state->new = NULL;
@@ -529,8 +527,9 @@ client_setup(struct if_state *state, const struct options *options)
 					state->new, DHCP_SERVERID);
 			open_socket(iface, ETHERTYPE_ARP);
 			state->state = STATE_ANNOUNCING;
-			tv.tv_sec = ANNOUNCE_INTERVAL;
-			timeradd(&state->start, &tv, &state->timeout);
+			state->timeout.tv_sec = state->start.tv_sec;
+			state->timeout.tv_usec = state->start.tv_usec;
+			state->timeout.tv_sec += ANNOUNCE_INTERVAL;
 		}
 #endif
 	} else {
@@ -623,13 +622,18 @@ client_setup(struct if_state *state, const struct options *options)
 		tv.tv_sec = options->timeout;
 		tv.tv_usec = 0;
 		if (state->options & DHCPCD_IPV4LL) {
-			timeradd(&state->start, &tv, &state->stop);
+			state->stop.tv_sec = state->start.tv_sec;
+			state->stop.tv_usec = state->stop.tv_usec;
+			state->stop.tv_sec += options->timeout;
 			if (!(state->options & DHCPCD_BACKGROUND)) {
-				tv.tv_sec = 10;
-				timeradd(&state->stop, &tv, &state->exit);
+				state->exit.tv_sec = state->stop.tv_sec + 10;
+				state->exit.tv_usec = state->stop.tv_usec;
 			}
-		} else if (!(state->options & DHCPCD_BACKGROUND))
-			timeradd(&state->start, &tv, &state->exit);
+		} else if (!(state->options & DHCPCD_BACKGROUND)) {
+			state->exit.tv_sec = state->start.tv_sec;
+			state->exit.tv_usec = state->start.tv_sec;
+			state->stop.tv_sec += options->timeout;
+		}
 	}
 	return 0;
 }
@@ -973,10 +977,8 @@ static int bind_dhcp(struct if_state *state, const struct options *options)
 				logger(LOG_DEBUG, "rebind in %u seconds",
 				       lease->rebindtime);
 
-			tv.tv_sec = lease->renewaltime;
-			tv.tv_usec = 0;
 			clock_monotonic(&state->stop);
-			timeradd(&state->stop, &tv, &state->stop);
+			state->stop.tv_sec += lease->renewaltime;
 		}
 		state->state = STATE_BOUND;
 	}
@@ -1205,10 +1207,9 @@ handle_timeout(struct if_state *state, const struct options *options)
 				state->state = STATE_BOUND;
 				close(iface->arp_fd);
 				iface->arp_fd = -1;
-				tv.tv_sec = lease->renewaltime -
-					(ANNOUNCE_INTERVAL * ANNOUNCE_NUM);
 				clock_monotonic(&state->stop);
-				timeradd(&state->stop, &tv, &state->stop);
+				state->stop.tv_sec += lease->renewaltime -
+					(ANNOUNCE_INTERVAL * ANNOUNCE_NUM);
 				return 0;
 			}
 		}
@@ -1252,8 +1253,9 @@ handle_timeout(struct if_state *state, const struct options *options)
 			logger(LOG_INFO, "renewing lease of %s",
 			       inet_ntoa(lease->addr));
 			state->state = STATE_RENEWING;
-			tv.tv_sec = options->timeout;
-			timeradd(&state->start, &tv, &state->stop);
+			state->stop.tv_sec = state->start.tv_sec;
+			state->stop.tv_usec = state->stop.tv_usec;
+			state->stop.tv_sec += options->timeout;
 			break;
 		}
 		/* FALLTHROUGH */
@@ -1350,7 +1352,6 @@ static int
 handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 	    const struct options *options)
 {
-	struct timeval tv;
 	struct dhcp_message *dhcp = *dhcpp;
 	struct interface *iface = state->interface;
 	struct dhcp_lease *lease = &state->lease;
@@ -1375,13 +1376,11 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 			state->nakoff = 1;
 			timerclear(&state->timeout);
 		} else {
-			tv.tv_sec = state->nakoff;
-			tv.tv_usec = 0;
+			clock_monotonic(&state->timeout);
+			state->timeout.tv_sec += state->nakoff;
 			state->nakoff *= 2;
 			if (state->nakoff > NAKOFF_MAX)
 				state->nakoff = NAKOFF_MAX;
-			clock_monotonic(&state->timeout);
-			timeradd(&state->timeout, &tv, &state->timeout);
 		} 
 		return 0;
 	}
@@ -1393,12 +1392,10 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 		lease->addr.s_addr = dhcp->yiaddr;
 		get_option_addr(&lease->server.s_addr, dhcp, DHCP_SERVERID);
 		log_dhcp(LOG_INFO, "offered", dhcp);
-
 		if (state->options & DHCPCD_TEST) {
 			exec_script(options, iface->name, "TEST", dhcp, NULL);
 			return 0;
 		}
-
 		state->state = STATE_REQUESTING;
 		timerclear(&state->timeout);
 		return 1;
@@ -1439,10 +1436,10 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 	    iface->addr.s_addr != state->offer->yiaddr)
 	{
 		state->state = STATE_PROBING;
-		timerclear(&state->timeout);
 		state->claims = 0;
 		state->probes = 0;
 		state->conflicts = 0;
+		timerclear(&state->timeout);
 		timerclear(&state->stop);
 		return 1;
 	}
@@ -1586,7 +1583,6 @@ handle_arp_packet(struct if_state *state)
 static int
 handle_arp_fail(struct if_state *state, const struct options *options)
 {
-	struct timeval tv;
 	time_t up;
 
 	if (!IN_LINKLOCAL(htonl(state->fail.s_addr))) {
@@ -1595,9 +1591,7 @@ handle_arp_fail(struct if_state *state, const struct options *options)
 		do_socket(state, SOCKET_CLOSED);
 		state->state = STATE_INIT;
 		clock_monotonic(&state->timeout);
-		tv.tv_sec = DHCP_ARP_FAIL;
-		tv.tv_usec = 0;
-		timeradd(&state->timeout, &tv, &state->timeout);
+		state->timeout.tv_sec += DHCP_ARP_FAIL;
 		return 0;
 	}
 
@@ -1631,10 +1625,8 @@ handle_arp_fail(struct if_state *state, const struct options *options)
 		return 1;
 	}
 	state->state = STATE_INIT_IPV4LL;
-	tv.tv_sec = PROBE_WAIT;
-	tv.tv_usec = 0;
 	clock_monotonic(&state->timeout);
-	timeradd(&state->timeout, &tv, &state->timeout);
+	state->timeout.tv_sec += PROBE_WAIT;
 	return 0;
 }
 
