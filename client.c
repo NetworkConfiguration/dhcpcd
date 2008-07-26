@@ -121,7 +121,7 @@
 			(tvp)->tv_sec++;			\
 			(tvp)->tv_usec -= 1000000;		\
 		}						\
-	} while (0 /* CONSTCOND */);				\
+	} while (0 /* CONSTCOND */);
 
 struct if_state {
 	int options;
@@ -385,12 +385,22 @@ ipv4ll_get_dhcp(uint32_t old_addr)
 static void
 get_lease(struct dhcp_lease *lease, const struct dhcp_message *dhcp)
 {
+	struct timeval tv;
+
 	lease->frominfo = 0;
 	lease->addr.s_addr = dhcp->yiaddr;
 
 	if (get_option_addr(&lease->net.s_addr, dhcp, DHCP_SUBNETMASK) == -1)
 		lease->net.s_addr = get_netmask(dhcp->yiaddr);
-	if (get_option_uint32(&lease->leasetime, dhcp, DHCP_LEASETIME) != 0)
+	if (get_option_uint32(&lease->leasetime, dhcp, DHCP_LEASETIME) == 0) {
+		/* Ensure that we can use the lease */
+		clock_monotonic(&tv);
+		if (tv.tv_sec + lease->leasetime < tv.tv_sec) {
+			logger(LOG_WARNING, "lease of %u would overflow, "
+			       "treating as infinite", lease->leasetime);
+			lease->leasetime = ~0U; /* Infinite lease */
+		}
+	} else
 		lease->leasetime = DEFAULT_LEASETIME;
 	if (get_option_uint32(&lease->renewaltime, dhcp, DHCP_RENEWALTIME) != 0)
 		lease->renewaltime = 0;
