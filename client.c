@@ -799,13 +799,13 @@ wait_for_fd(struct if_state *state, int *fd)
 
 	if (ref) {
 		timersub(ref, &now, &tout);
-		secs = tout.tv_sec * 1.0 + tout.tv_usec * 1.0e-6;
 		/* Only report waiting time if changed */
 		if (last_stop_sec != state->stop.tv_sec ||
 		    last_stop_usec != state->stop.tv_usec ||
 		    last_timeout_sec != state->timeout.tv_sec ||
 		    last_timeout_usec != state->timeout.tv_usec)
 		{
+			secs = tout.tv_sec * 1.0 + tout.tv_usec * 1.0e-6;
 			logger(LOG_DEBUG, "waiting for %0.2f seconds", secs);
 			last_stop_sec = state->stop.tv_sec;
 			last_stop_usec = state->stop.tv_usec;
