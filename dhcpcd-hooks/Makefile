@@ -1,4 +1,4 @@
-LIBEXECDIR=	${PREFIX}/libexec
+LIBEXECDIR?=	${PREFIX}/libexec
 HOOKDIR=	${LIBEXECDIR}/dhcpcd-hooks
 SYSTEMSCRIPTS=	01-test 10-mtu 20-resolv.conf 30-hostname
 FILES=		${SYSTEMSCRIPTS} ${HOOKSCRIPTS}

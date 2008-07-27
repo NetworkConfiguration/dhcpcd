@@ -12,7 +12,7 @@ SCRIPT=		${LIBEXECDIR}/dhcpcd-run-hooks
 HOOKDIR=	${LIBEXECDIR}/dhcpcd-hooks
 
 BINDIR=		${PREFIX}/sbin
-DBDIR=		/var/db
+DBDIR?=		/var/db
 SYSCONFDIR?=	${PREFIX}/etc
 
 MAN=		dhcpcd.conf.5 dhcpcd.8 dhcpcd-run-hooks.8
