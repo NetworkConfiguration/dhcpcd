@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd Jul 18, 2008
+.Dd Jul 27, 2008
 .Dt DHCPCD 8 SMM
 .Sh NAME
 .Nm dhcpcd
@@ -205,28 +205,31 @@ Sometimes, this isn't desirable if for example you have root mounted over NFS.
 You can use this option to stop this from happening.
 .It Fl r , -request Op Ar address
 .Nm
-normally sends a DHCP Broadcast to find servers to offer an address.
+normally sends a DHCP DISCOVER to find servers to offer an address.
 .Nm
 will then request the address used.
-You can use this option to skip the broadcast step and just request an
+You can use this option to skip the BROADCAST step and just request the
 .Ar address .
 The downside is if you request an
 .Ar address
 the DHCP server does not know about or the DHCP server is not
 authorative, it will remain silent.
-In this situation, we go back to the init state and broadcast again.
+In this situation, we go back to the init state and DISCOVER again.
 If no
 .Ar address
 is given then the first address currently assigned to the
 .Ar interface
 is used.
 .It Fl s , -inform Op Ar address Ns Op Ar /cidr
-Behaves exactly like
+Behaves like
 .Fl r , -request
 as above, but sends a DHCP INFORM instead of a REQUEST.
 This does not get a lease as such, just notifies the DHCP server of the
 .Ar address
 in use.
+You should also include the optional
+.Ar cidr
+network number in-case the address is not already configured on the interface.
 .Nm
 remains running and pretends it has an infinite lease.
 .Nm
@@ -256,11 +259,11 @@ should be between 1 and 254 inclusive.
 Examples.
 .Pp
 Set the vendor option 01 with an IP address.
-.D1 dhcpcd -v 01,192.168.0.2 eth0
+.D1 dhcpcd \-v 01,192.168.0.2 eth0
 Set the vendor option 02 with a hex code.
-.D1 dhcpcd -v 02,01:02:03:04:05 eth0
+.D1 dhcpcd \-v 02,01:02:03:04:05 eth0
 Do the above and set a third option with a string and not an IP address.
-.D1 dhcpcd -v 01,192.168.0.2 -v 02,01:02:03:04:05 -v 03,\e"192.168.0.2\e" eth0
+.D1 dhcpcd \-v 01,192.168.0.2 \-v 02,01:02:03:04:05 \-v 03,\e"192.168.0.2\e" eth0
 .It Fl x , -exit
 This causes an existing
 .Nm
