@@ -1191,27 +1191,29 @@ handle_timeout(struct if_state *state, const struct options *options)
 				     state->new->yiaddr, state->new->yiaddr);
 			if (i == -1)
 				logger(LOG_ERR, "send_arp: %s", strerror(errno));
-			if (state->claims < ANNOUNCE_NUM) {
-				tv.tv_sec = ANNOUNCE_INTERVAL;
-				i = 0;
-			} else if (IN_LINKLOCAL(htonl(state->new->yiaddr))) {
-				/* We should pretend to be at the end
-				 * of the DHCP negotation cycle */
-				state->state = STATE_INIT;
-				state->messages = DHCP_MAX / DHCP_BASE;
-				state->probes = 0;
-				state->claims = 0;
-				timerclear(&state->stop);
-				goto dhcp_timeout;
-			} else {
-				state->state = STATE_BOUND;
-				close(iface->arp_fd);
-				iface->arp_fd = -1;
+		}
+		if (state->claims < ANNOUNCE_NUM) {
+			tv.tv_sec = ANNOUNCE_INTERVAL;
+			i = 0;
+		} else if (IN_LINKLOCAL(htonl(state->new->yiaddr))) {
+			/* We should pretend to be at the end
+			 * of the DHCP negotation cycle */
+			state->state = STATE_INIT;
+			state->messages = DHCP_MAX / DHCP_BASE;
+			state->probes = 0;
+			state->claims = 0;
+			timerclear(&state->stop);
+			goto dhcp_timeout;
+		} else {
+			state->state = STATE_BOUND;
+			close(iface->arp_fd);
+			iface->arp_fd = -1;
+			if (lease->leasetime != ~0U) {
 				clock_monotonic(&state->stop);
 				state->stop.tv_sec += lease->renewaltime -
 					(ANNOUNCE_INTERVAL * ANNOUNCE_NUM);
-				return 0;
 			}
+			return 0;
 		}
 		break;
 	}
