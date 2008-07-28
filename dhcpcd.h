@@ -93,5 +93,8 @@ struct options {
 	char clientid[CLIENTID_MAX_LEN + 1];
 	uint8_t userclass[USERCLASS_MAX_LEN + 1];
 	uint8_t vendor[VENDOR_MAX_LEN + 1];
+
+	size_t blacklist_len;
+	in_addr_t *blacklist;
 };
 #endif

@@ -52,7 +52,7 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 
 /* Don't set any optional arguments here so we retain POSIX
  * compatibility with getopt */
-#define OPTS "bc:df:h:i:kl:m:no:pqr:s:t:u:v:xABC:DEF:GI:KLO:TV"
+#define OPTS "bc:df:h:i:kl:m:no:pqr:s:t:u:v:xABC:DEF:GI:KLO:TVX:"
 
 static int doversion = 0;
 static int dohelp = 0;
@@ -89,6 +89,7 @@ static const struct option longopts[] = {
 	{"nooption",    optional_argument,  NULL, 'O'},
 	{"test",        no_argument,        NULL, 'T'},
 	{"variables",   no_argument,        NULL, 'V'},
+	{"blacklist",   required_argument,  NULL, 'X'},
 	{"help",        no_argument,        &dohelp, 1},
 	{"version",     no_argument,        &doversion, 1},
 #ifdef THERE_IS_NO_FORK
@@ -160,12 +161,10 @@ read_pid(const char *pidfile)
 static void
 usage(void)
 {
-#ifndef MINIMAL
 	printf("usage: "PACKAGE" [-dknpqxADEGHKLOTV] [-c script] [-f file ] [-h hostname]\n"
 	       "              [-i classID ] [-l leasetime] [-m metric] [-o option] [-r ipaddr]\n"
 	       "              [-s ipaddr] [-t timeout] [-u userclass] [-F none|ptr|both]\n"
-	       "              [-I clientID] [-C hookscript] <interface>\n");
-#endif
+	       "              [-I clientID] [-C hookscript] [-X ipaddr] <interface>\n");
 }
 
 static char * 
@@ -560,6 +559,17 @@ parse_option(int opt, char *oarg, struct options *options)
 			logger(LOG_ERR, "unknown option `%s'", optarg);
 			return -1;
 		}
+		break;
+	case 'X':
+		if (!inet_aton(oarg, &addr)) {
+			logger(LOG_ERR, "`%s' is not a valid IP address",
+			       oarg);
+			return -1;
+		}
+		options->blacklist = xrealloc(options->blacklist,
+		    sizeof(in_addr_t) * (options->blacklist_len + 1));
+		options->blacklist[options->blacklist_len] = addr.s_addr;
+		options->blacklist_len++;
 		break;
 	default:
 		return 0;
@@ -983,6 +993,7 @@ abort:
 			free(options->environ[len++]);
 		free(options->environ);
 	}
+	free(options->blacklist);
 	free(options);
 
 #ifdef THERE_IS_NO_FORK

@@ -46,6 +46,7 @@
 .Op Fl F , -fqdn Ar FQDN
 .Op Fl I , -clientid Ar clientid
 .Op Fl O , -nooption Ar option
+.Op Fl X , -blacklist Ar address
 .Ar interface
 .Nm
 .Fl k , -release
@@ -354,6 +355,13 @@ files.
 .It Fl V, -variables
 Display a list of option codes and the associated variable for use in
 .Xr dhcpcd-run-hooks 8 .
+.It Fl X, -blacklist Ar address
+Ignores all DHCP messages which have this
+.Ar address
+as the server ID.
+This may be expanded in future releases to ignore all packets
+matching either the IP or hardware
+.Ar address .
 .El
 .Sh NOTES
 .Nm

@@ -1330,13 +1330,13 @@ log_dhcp(int lvl, const char *msg, const struct dhcp_message *dhcp)
 	struct in_addr server;
 	int r;
 
+	r = get_option_addr(&server.s_addr, dhcp, DHCP_SERVERID);
 	if (strcmp(msg, "NAK:") == 0)
 		addr = get_option_string(dhcp, DHCP_MESSAGE);
 	else {
 		server.s_addr = dhcp->yiaddr;
 		addr = xstrdup(inet_ntoa(server));
 	}
-	r = get_option_addr(&server.s_addr, dhcp, DHCP_SERVERID);
 	if (dhcp->servername[0] && r == 0)
 		logger(lvl, "%s %s from %s `%s'", msg,
 		       addr, inet_ntoa(server),
@@ -1356,14 +1356,38 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 	struct interface *iface = state->interface;
 	struct dhcp_lease *lease = &state->lease;
 	uint8_t type;
-
-	if (get_option_uint8(&type, dhcp, DHCP_MESSAGETYPE) == -1) {
-		log_dhcp(LOG_ERR, "no DHCP type in", dhcp);
-		return -1;
-	}
+	struct in_addr server;
+	size_t i;
 
 	/* reset the message counter */
 	state->messages = 0;
+
+	/* We have to have DHCP type to work */
+	if (get_option_uint8(&type, dhcp, DHCP_MESSAGETYPE) == -1) {
+		log_dhcp(LOG_ERR, "no DHCP type in", dhcp);
+		return 0;
+	}
+
+	/* Ensure that it's not from a blacklisted server.
+	 * We should expand this to check IP and/or hardware address
+	 * at the packet level. */
+	if (options->blacklist_len != 0 &&
+	    get_option_addr(&server.s_addr, dhcp, DHCP_SERVERID) == 0)
+	{
+		for (i = 0; i < options->blacklist_len; i++) {
+			if (options->blacklist[i] != server.s_addr)
+				continue;
+			if (dhcp->servername[0])
+				logger(LOG_WARNING,
+				       "ignoring blacklisted server %s `%s'",
+					inet_ntoa(server), dhcp->servername);
+			else
+				logger(LOG_WARNING,
+				       "ignoring blacklisted server %s",
+				       inet_ntoa(server));
+			return 0;
+		}
+	}
 
 	/* We should restart on a NAK */
 	if (type == DHCP_NAK) {
