@@ -1509,11 +1509,21 @@ handle_dhcp_packet(struct if_state *state, const struct options *options)
 			logger(LOG_DEBUG, "bogus cookie, ignoring");
 			continue;
 		}
+		/* Ensure it's the right transaction */
 		if (state->xid != dhcp->xid) {
 			logger(LOG_DEBUG,
 			       "ignoring packet with xid 0x%x as"
 			       " it's not ours (0x%x)",
 			       dhcp->xid, state->xid);
+			continue;
+		}
+		/* Ensure packet is for us */
+		if (iface->hwlen <= sizeof(dhcp->chaddr) &&
+		    memcmp(dhcp->chaddr, iface->hwaddr, iface->hwlen))
+		{
+			logger(LOG_DEBUG, "xid 0x%x is not for our hwaddr %s",
+			       dhcp->xid,
+			       hwaddr_ntoa(dhcp->chaddr, sizeof(dhcp->chaddr)));
 			continue;
 		}
 		/* We should ensure that the packet is terminated correctly
