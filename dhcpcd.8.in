@@ -90,7 +90,7 @@ proper address.
 .Pp
 When using IPv4LL,
 .Nm
-nearly always succeeds and return a 0 exit code.
+nearly always succeeds and returns an exit code of 0.
 In the rare case it fails, it normally means that there is a reverse ARP proxy
 installed which always defeats IPv4LL probing.
 To disable this behaviour, you can use the
