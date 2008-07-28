@@ -68,29 +68,29 @@ from a DHCP server and configures the network
 of the
 machine on which it is running. 
 .Nm
-will then run the configuration script which writes DNS information to
+then runs the configuration script which writes DNS information to
 .Xr resolvconf 8 ,
 if available, otherwise directly to
 .Pa /etc/resolv.conf .
 If the hostname is currenly blank, (null) or localhost then
 .Nm
-will set the hostname to the one supplied by the DHCP server.
+sets the hostname to the one supplied by the DHCP server.
 .Nm
 then daemonises and waits for the lease renewal time to lapse.
 Then it attempts to renew its lease and reconfigure if the new lease changes.
 .Ss Local Link configuration
 If
 .Nm
-failed to obtain a lease, it will probe for a valid IPv4LL address
+failed to obtain a lease, it probes for a valid IPv4LL address
 .Po
 aka ZeroConf, aka APIPA
 .Pc .
-Once obtained it will restart the process of looking for a DHCP server to get a
+Once obtained it restarts the process of looking for a DHCP server to get a
 proper address.
 .Pp
 When using IPv4LL,
 .Nm
-will nearly always succeed and return a 0 exit code.
+nearly always succeeds and return a 0 exit code.
 In the rare case it fails, it normally means that there is a reverse ARP proxy
 installed which always defeats IPv4LL probing.
 To disable this behaviour, you can use the
@@ -98,12 +98,12 @@ To disable this behaviour, you can use the
 option.
 .Ss Hooking into DHCP events
 .Nm
-will run
+runs
 .Pa @SCRIPT@ ,
 or the script specified by the
 .Fl c , -script
 option.
-This script will run each script found in
+This script runs each script found in
 .Pa @HOOKDIR@
 in a lexical order.
 The default installation supplies the scripts
@@ -147,7 +147,7 @@ always processes the config file before any command line options.
 .It Fl h , -hostname Ar hostname
 By default,
 .Nm
-will send the current hostname to the DHCP server so it can register in DNS.
+sends the current hostname to the DHCP server so it can register in DNS.
 You can use this option to specify the
 .Ar hostname
 sent, or an empty string to
@@ -208,7 +208,7 @@ You can use this option to stop this from happening.
 .Nm
 normally sends a DHCP DISCOVER to find servers to offer an address.
 .Nm
-will then request the address used.
+then requests the address used.
 You can use this option to skip the BROADCAST step and just request the
 .Ar address .
 The downside is if you request an
@@ -279,9 +279,10 @@ Generate an
 compliant clientid.
 This requires persistent storage and not all DHCP servers work with it so it's
 not enabled by default.
-The DUID generated will be held in
+.Nm
+generates the DUID and stores in it
 .Pa @SYSCONFDIR@/dhcpcd.duid
-and should not be copied to other hosts.
+This file should not be copied to other hosts.
 .It Fl E , -lastlease
 If
 .Nm
