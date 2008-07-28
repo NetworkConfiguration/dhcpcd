@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd Jul 27, 2008
+.Dd Jul 28, 2008
 .Dt DHCPCD 8 SMM
 .Sh NAME
 .Nm dhcpcd
@@ -56,9 +56,7 @@
 .Sh DESCRIPTION
 .Nm
 is an implementation of the DHCP client specified in
-.Rs
-.%T "RFC 2131"
-.Re
+.Li RFC 2131 .
 .Nm
 gets the host information
 .Po 
@@ -69,7 +67,7 @@ from a DHCP server and configures the network
 of the
 machine on which it is running. 
 .Nm
-will then write DNS information to
+will then run the configuration script which writes DNS information to
 .Xr resolvconf 8 ,
 if available, otherwise directly to
 .Pa /etc/resolv.conf .
@@ -84,15 +82,17 @@ If
 .Nm
 failed to obtain a lease, it will probe for a valid IPv4LL address
 .Po
-aka Zeroconf, aka APIPA
+aka ZeroConf, aka APIPA
 .Pc .
 Once obtained it will restart the process of looking for a DHCP server to get a
 proper address.
 .Pp
 When using IPv4LL,
 .Nm
-will always succeed and return a 0 exit code. To disable this behaviour, you
-can use the
+will nearly always succeed and return a 0 exit code.
+In the rare case it fails, it normally means that there is a reverse ARP proxy
+installed which always defeats IPv4LL probing.
+To disable this behaviour, you can use the
 .Fl L , -noipv4ll
 option.
 .Ss Hooking into DHCP events
@@ -274,9 +274,7 @@ to deconfigure the
 and exit.
 .It Fl D , -duid 
 Generate an
-.Rs
-.%T "RFC 4361"
-.Re
+.Li RFC 4361
 compliant clientid.
 This requires persistent storage and not all DHCP servers work with it so it's
 not enabled by default.
