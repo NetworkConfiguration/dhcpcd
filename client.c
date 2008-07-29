@@ -505,7 +505,8 @@ client_setup(struct if_state *state, const struct options *options)
 	if (options->request_address.s_addr == 0 &&
 	    (options->options & DHCPCD_INFORM ||
 	     options->options & DHCPCD_REQUEST ||
-	     options->options & DHCPCD_DAEMONISED))
+	     (options->options & DHCPCD_DAEMONISED &&
+	      !(options->options & DHCPCD_BACKGROUND))))
 	{
 		if (get_old_lease(state) != 0)
 			return -1;
@@ -1733,7 +1734,8 @@ dhcp_run(const struct options *options, int *pid_fd)
 
 	state->signal_fd = signal_fd();
 
-	if (state->options & DHCPCD_BACKGROUND)
+	if (state->options & DHCPCD_BACKGROUND &&
+	    !(state->options & DHCPCD_DAEMONISED))
 		if (daemonise(state, options) == -1)
 			goto eexit;
 
