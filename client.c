@@ -789,12 +789,16 @@ wait_for_fd(struct if_state *state, int *fd)
 	if (state->lease.leasetime == ~0U &&
 	    state->state == STATE_BOUND)
 	{
-		if (last_stop_sec != INFTIM)
+		if (last_stop_sec != INFTIM) {
 			logger(LOG_DEBUG, "waiting for infinity");
+			last_stop_sec = INFTIM;
+		}
 		ref = NULL;
 	} else if (state->carrier == LINK_DOWN && !ref) {
-		if (last_stop_sec != INFTIM)
+		if (last_stop_sec != INFTIM) {
 			logger(LOG_DEBUG, "waiting for carrier");
+			last_stop_sec = INFTIM;
+		}
 		ref = NULL;
 	} else {
 		if (state->interface->raw_fd != -1) {
