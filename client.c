@@ -710,13 +710,12 @@ send_message(struct if_state *state, int type, const struct options *options)
 			logger(LOG_ERR, "send_packet: %s", strerror(errno));
 	} else {
 		len = make_udp_packet(&udp, (uint8_t *)dhcp, len, from, to);
-		free(dhcp);
 		r = send_raw_packet(state->interface, ETHERTYPE_IP, udp, len);
 		free(udp);
 		if (r == -1)
 			logger(LOG_ERR, "send_raw_packet: %s", strerror(errno));
 	}
-
+	free(dhcp);
 	/* Failed to send the packet? Return to the init state */
 	if (r == -1) {
 		state->state = STATE_INIT;
