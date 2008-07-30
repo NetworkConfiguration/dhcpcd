@@ -483,15 +483,26 @@ open_udp_socket(struct interface *iface)
 		struct sockaddr sa;
 		struct sockaddr_in sin;
 	} su;
-	int n = 1;
+	int n;
+#ifdef SO_BINDTODEVICE
+	struct ifreq ifr;
+#endif
 
 	if ((s = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
 		return -1;
 
+	n = 1;
 	if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &n, sizeof(n)) == -1)
 		goto eexit;
-	/* As we don't actually use this socket for anything, set
-	 * the receiver buffer to 1 */
+#ifdef SO_BINDTODEVICE
+	memset(&ifr, 0, sizeof(ifr));
+	strlcpy(ifr.ifr_name, iface->name, sizeof(ifr.ifr_name));
+	if (setsockopt(s, SOL_SOCKET, SO_BINDTODEVICE, &ifr, sizeof(ifr)) == -1)
+		goto eexit;
+#endif
+	/* As we don't use this socket for receiving, set the
+	 * receive buffer to 1 */
+	n = 1;
 	if (setsockopt(s, SOL_SOCKET, SO_RCVBUF, &n, sizeof(n)) == -1)
 		goto eexit;
 	memset(&su, 0, sizeof(su));
