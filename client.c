@@ -1258,7 +1258,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 			       inet_ntoa(lease->addr));
 			state->state = STATE_RENEWING;
 			state->stop.tv_sec = state->start.tv_sec;
-			state->stop.tv_usec = state->stop.tv_usec;
+			state->stop.tv_usec = state->start.tv_usec;
 			state->stop.tv_sec += options->timeout;
 			break;
 		}
