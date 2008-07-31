@@ -47,6 +47,8 @@
 #  define _PATH_DEVNULL "/dev/null"
 #endif
 
+int clock_monotonic = 0;
+
 /* Handy routine to read very long lines in text files.
  * This means we read the whole line and avoid any nasty buffer overflows. */
 ssize_t
@@ -183,20 +185,32 @@ set_nonblock(int fd)
  * platforms.
  */
 int
-clock_monotonic(struct timeval *tp)
+get_monotonic(struct timeval *tp)
 {
 #if defined(_POSIX_MONOTONIC_CLOCK) && defined(CLOCK_MONOTONIC)
 	struct timespec ts;
 	static clockid_t posix_clock;
 	static int posix_clock_set = 0;
 
+#ifdef FORCE_MONOTONIC
 	if (!posix_clock_set) {
-		if (sysconf(_SC_MONOTONIC_CLOCK) >= 0)
+		posix_clock = CLOCK_MONOTONIC;
+		posix_clock_set = 1;
+		clock_monotonic = 1;
+	}
+#else
+	if (!posix_clock_set) {
+		if (sysconf(_SC_MONOTONIC_CLOCK) >= 0) {
 			posix_clock = CLOCK_MONOTONIC;
-		else
+			clock_monotonic = 1;
+		} else {
 			posix_clock = CLOCK_REALTIME;
+			logger(LOG_WARNING, "host does not support a monotonic clock");
+		}
+
 		posix_clock_set = 1;
 	}
+#endif
 
 	if (clock_gettime(posix_clock, &ts) == -1)
 		return -1;
@@ -214,7 +228,7 @@ uptime(void)
 {
 	struct timeval tv;
 
-	if (clock_monotonic(&tv) == -1)
+	if (get_monotonic(&tv) == -1)
 		return -1;
 	return tv.tv_sec;
 }
