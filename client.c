@@ -744,7 +744,7 @@ drop_config(struct if_state *state, const char *reason,
 static int
 wait_for_fd(struct if_state *state, int *fd)
 {
-	struct fd_set fds;
+	fd_set fds;
 	struct interface *iface = state->interface;
 	int r, maxfd;
 	struct timeval now, *ref;
