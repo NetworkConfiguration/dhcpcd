@@ -25,6 +25,7 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/select.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -35,7 +36,6 @@
 #endif
 
 #include <errno.h>
-#include <poll.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -744,23 +744,30 @@ drop_config(struct if_state *state, const char *reason,
 static int
 wait_for_fd(struct if_state *state, int *fd)
 {
-	struct pollfd fds[4]; /* signal, link, raw, arp */
-	int r, i, nfds = 0;
-	struct timeval now, tout, *ref;
-	time_t msecs = -1;
+	struct fd_set fds;
+	struct interface *iface = state->interface;
+	int r, maxfd;
+	struct timeval now, *ref;
 	static time_t last_stop_sec = 0, last_timeout_sec = 0;
 	static long int last_stop_usec = 0, last_timeout_usec = 0;
 	double secs;
 
+	/* NOTE: We use select over poll here because it saves any
+	 * nasty overflow issues converting a timeval to an
+	 * int containing milliseconds - a DHCP lease can easily
+	 * exceed this on 32-bit platforms.
+	 * We could of course loop using INT_MAX, but it makes
+	 * the binary size about 200 bytes bigger than select as well. */
+
+	FD_ZERO(&fds);
 	/* We always listen to signals */
-	fds[nfds].fd = state->signal_fd;
-	fds[nfds].events = POLLIN;
-	nfds++;
+	FD_SET(state->signal_fd, &fds);
+	maxfd = state->signal_fd;
 	/* And links */
-	if (state->interface->link_fd != -1) {
-		fds[nfds].fd = state->interface->link_fd;
-		fds[nfds].events = POLLIN;
-		nfds++;
+	if (iface->link_fd != -1) {
+		FD_SET(iface->link_fd, &fds);
+		if (iface->link_fd > maxfd)
+			maxfd = iface->link_fd;
 	}
 
 	ref = NULL;
@@ -801,50 +808,51 @@ wait_for_fd(struct if_state *state, int *fd)
 		}
 		ref = NULL;
 	} else {
-		if (state->interface->raw_fd != -1) {
-			fds[nfds].fd = state->interface->raw_fd;
-			fds[nfds].events = POLLIN;
-			nfds++;
+		if (iface->raw_fd != -1) {
+			FD_SET(iface->raw_fd, &fds);
+			if (iface->raw_fd > maxfd)
+				maxfd = iface->raw_fd;
 		}
-		if (state->interface->arp_fd != -1) {
-			fds[nfds].fd = state->interface->arp_fd;
-			fds[nfds].events = POLLIN;
-			nfds++;
+		if (iface->arp_fd != -1) {
+			FD_SET(iface->arp_fd, &fds);
+			if (iface->arp_fd > maxfd)
+				maxfd = iface->arp_fd;
 		}
 	}
 
 	if (ref) {
-		timersub(ref, &now, &tout);
+		timersub(ref, &now, &now);
+		ref = &now;
 		/* Only report waiting time if changed */
 		if (last_stop_sec != state->stop.tv_sec ||
 		    last_stop_usec != state->stop.tv_usec ||
 		    last_timeout_sec != state->timeout.tv_sec ||
 		    last_timeout_usec != state->timeout.tv_usec)
 		{
-			secs = tout.tv_sec * 1.0 + tout.tv_usec * 1.0e-6;
+			secs = now.tv_sec * 1.0 + now.tv_usec * 1.0e-6;
 			logger(LOG_DEBUG, "waiting for %0.2f seconds", secs);
 			last_stop_sec = state->stop.tv_sec;
 			last_stop_usec = state->stop.tv_usec;
 			last_timeout_sec = state->timeout.tv_sec;
 			last_timeout_usec = state->timeout.tv_usec;
 		}
-		msecs = tout.tv_sec * 1000 + (tout.tv_usec + 999) / 1000;
 	}
 
-	r = poll(fds, nfds, msecs);
+	r = select(maxfd + 1, &fds, NULL, NULL, ref);
 	if (r == -1) {
 		if (errno != EINTR)
 			logger(LOG_ERR, "poll: %s", strerror(errno));
 		return -1;
 	}
-
 	if (r != 0) {
-		/* We're only interested in the first ready fd */
-		for (i = 0; i < nfds; i++)
-			if (fds[i].revents & POLLIN) {
-				*fd = fds[i].fd;
-				break;
-			}
+		if (FD_ISSET(state->signal_fd, &fds))
+			*fd = state->signal_fd;
+		else if (iface->link_fd != -1 && FD_ISSET(iface->link_fd, &fds))
+			*fd = iface->link_fd;
+		else if (iface->raw_fd != -1 && FD_ISSET(iface->raw_fd, &fds))
+			*fd = iface->raw_fd;
+		else if (iface->arp_fd != -1 && FD_ISSET(iface->arp_fd, &fds))
+			*fd = iface->arp_fd;
 	}
 	return r;
 }
@@ -906,9 +914,9 @@ static int bind_dhcp(struct if_state *state, const struct options *options)
 	state->new = state->offer;
 	state->offer = NULL;
 	state->messages = 0;
-	timerclear(&state->exit);
 	state->conflicts = 0;
 	state->defend = 0;
+	timerclear(&state->exit);
 
 	if (options->options & DHCPCD_INFORM) {
 		if (options->request_address.s_addr != 0)
@@ -937,10 +945,10 @@ static int bind_dhcp(struct if_state *state, const struct options *options)
 
 		if (lease->leasetime == ~0U) {
 			lease->renewaltime = lease->rebindtime = lease->leasetime;
-			state->stop.tv_sec = 1; /* So we wait for infinity */
 			logger(LOG_INFO, "leased %s for infinity",
 			       inet_ntoa(lease->addr));
 			state->state = STATE_BOUND;
+			timerclear(&state->stop);
 		} else {
 			logger(LOG_INFO, "leased %s for %u seconds",
 			       inet_ntoa(lease->addr), lease->leasetime);
