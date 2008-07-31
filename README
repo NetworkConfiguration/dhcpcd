@@ -18,6 +18,12 @@ OS=BSD | Linux
 If you're building for a NOMMU system where fork() does not work, you should
 add -DTHERE_IS_NO_FORK to your CPPFLAGS.
 
+dhcpcd will try and use a monotonic clock when possible.
+Some libc implementations do not correctly report that they have a monotonic
+clock, but they have the headers to make it work. dhcpcd will warn about this.
+To force the use of a monotonic clock you can add -DFORCE_MONOTONIC
+to your CPPFLAGS.
+
 You can change the default dir with these knobs.
 For example, to satisfy FHS compliance you would do this:-
 LIBEXECDIR=/lib/dhcpcd
