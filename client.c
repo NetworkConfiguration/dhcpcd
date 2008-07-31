@@ -927,6 +927,7 @@ static int bind_dhcp(struct if_state *state, const struct options *options)
 		       inet_ntoa(lease->addr));
 		state->state = STATE_BOUND;
 		state->lease.leasetime = ~0U;
+		timerclear(&state->stop);
 		reason = "INFORM";
 	} else if (IN_LINKLOCAL(htonl(state->new->yiaddr))) {
 		get_lease(lease, state->new);
