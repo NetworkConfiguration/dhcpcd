@@ -25,6 +25,11 @@
  * SUCH DAMAGE.
  */
 
+#ifdef __APPLE__
+#  include <mach/mach_time.h>
+#  include <mach/kern_return.h>
+#endif
+
 #include <sys/param.h>
 #include <sys/time.h>
 
@@ -184,7 +189,7 @@ set_nonblock(int fd)
  * Which is why we use CLOCK_MONOTONIC, but it is not available on all
  * platforms.
  */
-#define NO_MONOTONIC "host does not support a montonic clock - timing can skew"
+#define NO_MONOTONIC "host does not support a monotonic clock - timing can skew"
 int
 get_monotonic(struct timeval *tp)
 {
@@ -193,30 +198,58 @@ get_monotonic(struct timeval *tp)
 	struct timespec ts;
 	static clockid_t posix_clock;
 
-	if (!posix_clock_set) {
+	if (posix_clock_set == 0) {
 		if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0) {
 			posix_clock = CLOCK_MONOTONIC;
 			clock_monotonic = 1;
-		} else {
-			posix_clock = CLOCK_REALTIME;
-			logger(LOG_WARNING, NO_MONOTONIC);
 		}
 		posix_clock_set = 1;
 	}
 
-	if (clock_gettime(posix_clock, &ts) == -1)
-		return -1;
+	if (clock_monotonic) {
+		if (clock_gettime(posix_clock, &ts) == 0) {
+			tp->tv_sec = ts.tv_sec;
+			tp->tv_usec = ts.tv_nsec / 1000;
+			return 0;
+		}
+	}
+#elif defined(__APPLE__)
+#define NSEC_PER_SEC 1000000000
+	/* We can use mach kernel functions here.
+	 * This is crap though - why can't they implement clock_gettime?*/
+	static struct mach_timebase_info info = { 0, 0 };
+	static double factor = 0.0;
+	uint64_t nano;
+	long rem;
 
-	tp->tv_sec = ts.tv_sec;
-	tp->tv_usec = ts.tv_nsec / 1000;
-	return 0;
-#else
+	if (posix_clock_set == 0) {
+		if (mach_timebase_info(&info) == KERN_SUCCESS) {
+			factor = (double)info.numer / (double)info.denom;
+			clock_monotonic = 1;	
+		}
+		posix_clock_set = 1;
+	}
+	if (clock_monotonic) {
+		nano = mach_absolute_time();
+		if ((info.denom != 1 ¦¦ info.numer != 1) && factor != 0.0)
+			nano *= factor;
+		tp.tv_sec = nano / NSEC_PER_SEC;
+		rem = nano % NSEC_PER_SEC;
+		if (rem < 0) {
+			tp.tv_sec--;
+			rem += NSEC_PER_SEC;
+		}
+		tp.tv_usec = rem / 1000;
+		return 0;
+	}
+#endif
+
+	/* Something above failed, so fall back to gettimeofday */
 	if (!posix_clock_set) {
 		logger(LOG_WARNING, NO_MONOTONIC);
 		posix_clock_set = 1;
 	}
 	return gettimeofday(tp, NULL);
-#endif
 }
 
 time_t
