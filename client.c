@@ -807,6 +807,8 @@ wait_for_fd(struct if_state *state, int *fd)
 	}
 
 	ref = get_lowest_timer(state);
+	if (ref && timerneg(ref))
+		return 0;
 
 	if (state->lease.leasetime == ~0U &&
 	    state->state == STATE_BOUND)
@@ -857,7 +859,7 @@ wait_for_fd(struct if_state *state, int *fd)
 
 	if (r == -1) {
 		if (errno != EINTR)
-			logger(LOG_ERR, "poll: %s", strerror(errno));
+			logger(LOG_ERR, "select: %s", strerror(errno));
 		return -1;
 	}
 	if (r != 0) {
