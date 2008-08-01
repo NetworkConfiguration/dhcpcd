@@ -1355,26 +1355,25 @@ dhcp_timeout:
 static void
 log_dhcp(int lvl, const char *msg, const struct dhcp_message *dhcp)
 {
-	char *addr;
-	struct in_addr server;
+	char *a;
+	struct in_addr addr;
 	int r;
 
-	r = get_option_addr(&server.s_addr, dhcp, DHCP_SERVERID);
 	if (strcmp(msg, "NAK:") == 0)
-		addr = get_option_string(dhcp, DHCP_MESSAGE);
+		a = get_option_string(dhcp, DHCP_MESSAGE);
 	else {
-		server.s_addr = dhcp->yiaddr;
-		addr = xstrdup(inet_ntoa(server));
+		addr.s_addr = dhcp->yiaddr;
+		a = xstrdup(inet_ntoa(addr));
 	}
+	r = get_option_addr(&addr.s_addr, dhcp, DHCP_SERVERID);
 	if (dhcp->servername[0] && r == 0)
-		logger(lvl, "%s %s from %s `%s'", msg,
-		       addr, inet_ntoa(server),
-		       dhcp->servername);
+		logger(lvl, "%s %s from %s `%s'", msg, a,
+		       inet_ntoa(addr), dhcp->servername);
 	else if (r == 0)
-		logger(lvl, "%s %s from %s", msg, addr, inet_ntoa(server));
+		logger(lvl, "%s %s from %s", msg, a, inet_ntoa(addr));
 	else
-		logger(lvl, "%s %s", msg, addr);
-	free(addr);
+		logger(lvl, "%s %s", msg, a);
+	free(a);
 }
 
 static int
