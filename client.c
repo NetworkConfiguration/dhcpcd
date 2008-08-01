@@ -870,7 +870,7 @@ wait_for_fd(struct if_state *state, int *fd)
 		else if (iface->arp_fd != -1 && FD_ISSET(iface->arp_fd, &fds))
 			*fd = iface->arp_fd;
 	} else {
-		/* select and poll are CAN timeout BEFORE the timeout.
+		/* select and poll CAN timeout BEFORE the timeout.
 		 * This is a sad state of affairs, so we need to reduce the
 		 * lowest timeout to -1 so it REALLY has timed out. */
 		ref = get_lowest_timer(state);

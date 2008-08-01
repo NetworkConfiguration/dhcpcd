@@ -184,13 +184,14 @@ set_nonblock(int fd)
  * Which is why we use CLOCK_MONOTONIC, but it is not available on all
  * platforms.
  */
+#define NO_MONOTONIC "host does not support a montonic clock - timing can skew"
 int
 get_monotonic(struct timeval *tp)
 {
+	static int posix_clock_set = 0;
 #if defined(_POSIX_MONOTONIC_CLOCK) && defined(CLOCK_MONOTONIC)
 	struct timespec ts;
 	static clockid_t posix_clock;
-	static int posix_clock_set = 0;
 
 #ifdef FORCE_MONOTONIC
 	if (!posix_clock_set) {
@@ -205,7 +206,7 @@ get_monotonic(struct timeval *tp)
 			clock_monotonic = 1;
 		} else {
 			posix_clock = CLOCK_REALTIME;
-			logger(LOG_WARNING, "host does not support a monotonic clock");
+			logger(LOG_WARNING, NO_MONOTONIC);
 		}
 
 		posix_clock_set = 1;
@@ -219,6 +220,11 @@ get_monotonic(struct timeval *tp)
 	tp->tv_usec = ts.tv_nsec / 1000;
 	return 0;
 #else
+
+	if (!posix_clock_set) {
+		logger(LOG_WARNING, NO_MONOTONIC);
+		posix_clock_set = 1;
+	}
 	return gettimeofday(tp, NULL);
 #endif
 }
