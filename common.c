@@ -193,25 +193,16 @@ get_monotonic(struct timeval *tp)
 	struct timespec ts;
 	static clockid_t posix_clock;
 
-#ifdef FORCE_MONOTONIC
 	if (!posix_clock_set) {
-		posix_clock = CLOCK_MONOTONIC;
-		posix_clock_set = 1;
-		clock_monotonic = 1;
-	}
-#else
-	if (!posix_clock_set) {
-		if (sysconf(_SC_MONOTONIC_CLOCK) >= 0) {
+		if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0) {
 			posix_clock = CLOCK_MONOTONIC;
 			clock_monotonic = 1;
 		} else {
 			posix_clock = CLOCK_REALTIME;
 			logger(LOG_WARNING, NO_MONOTONIC);
 		}
-
 		posix_clock_set = 1;
 	}
-#endif
 
 	if (clock_gettime(posix_clock, &ts) == -1)
 		return -1;
@@ -220,7 +211,6 @@ get_monotonic(struct timeval *tp)
 	tp->tv_usec = ts.tv_nsec / 1000;
 	return 0;
 #else
-
 	if (!posix_clock_set) {
 		logger(LOG_WARNING, NO_MONOTONIC);
 		posix_clock_set = 1;
