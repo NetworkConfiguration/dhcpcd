@@ -231,15 +231,15 @@ get_monotonic(struct timeval *tp)
 	}
 	if (clock_monotonic) {
 		nano = mach_absolute_time();
-		if ((info.denom != 1 ¦¦ info.numer != 1) && factor != 0.0)
+		if ((info.denom != 1 || info.numer != 1) && factor != 0.0)
 			nano *= factor;
-		tp.tv_sec = nano / NSEC_PER_SEC;
+		tp->tv_sec = nano / NSEC_PER_SEC;
 		rem = nano % NSEC_PER_SEC;
 		if (rem < 0) {
-			tp.tv_sec--;
+			tp->tv_sec--;
 			rem += NSEC_PER_SEC;
 		}
-		tp.tv_usec = rem / 1000;
+		tp->tv_usec = rem / 1000;
 		return 0;
 	}
 #endif
