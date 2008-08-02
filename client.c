@@ -25,7 +25,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/select.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -36,6 +35,7 @@
 #endif
 
 #include <errno.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -782,33 +782,27 @@ get_lowest_timer(struct if_state *state)
 static int
 wait_for_fd(struct if_state *state, int *fd)
 {
-	fd_set fds;
+	struct pollfd fds[4]; /* signal, link, raw, arp */
 	struct interface *iface = state->interface;
-	int r, maxfd;
+	int i, r, nfds = 0, msecs = -1;
 	struct timeval start, stop, diff, *ref;
 	static int lastinf = 0;
 
-	/* NOTE: We use select over poll here because it saves any
-	 * nasty overflow issues converting a timeval to an
-	 * int containing milliseconds - a DHCP lease can easily
-	 * exceed this on 32-bit platforms.
-	 * We could of course loop using INT_MAX, but it makes
-	 * the binary size about 200 bytes bigger than select as well. */
-
-	FD_ZERO(&fds);
-	/* We always listen to signals */
-	FD_SET(state->signal_fd, &fds);
-	maxfd = state->signal_fd;
-	/* And links */
-	if (iface->link_fd != -1) {
-		FD_SET(iface->link_fd, &fds);
-		if (iface->link_fd > maxfd)
-			maxfd = iface->link_fd;
-	}
-
+	/* Ensure that we haven't already timed out */
 	ref = get_lowest_timer(state);
 	if (ref && timerneg(ref))
 		return 0;
+
+	/* We always listen to signals */
+	fds[nfds].fd = state->signal_fd;
+	fds[nfds].events = POLLIN;
+	nfds++;
+	/* And links */
+	if (iface->link_fd != -1) {
+		fds[nfds].fd = iface->link_fd;
+		fds[nfds].events = POLLIN;
+		nfds++;
+	}
 
 	if (state->lease.leasetime == ~0U &&
 	    state->state == STATE_BOUND)
@@ -829,55 +823,58 @@ wait_for_fd(struct if_state *state, int *fd)
 			ref = NULL;
 	} else {
 		if (iface->raw_fd != -1) {
-			FD_SET(iface->raw_fd, &fds);
-			if (iface->raw_fd > maxfd)
-				maxfd = iface->raw_fd;
+			fds[nfds].fd = iface->raw_fd;
+			fds[nfds].events = POLLIN;
+			nfds++;
 		}
 		if (iface->arp_fd != -1) {
-			FD_SET(iface->arp_fd, &fds);
-			if (iface->arp_fd > maxfd)
-				maxfd = iface->arp_fd;
+			fds[nfds].fd = iface->arp_fd;
+			fds[nfds].events = POLLIN;
+			nfds++;
 		}
-	}
-
-	/* Don't use the actual ref as some select implementations
-	 * stupidly modify it. */
-	if (ref) {
-		lastinf = 0;
-		diff.tv_sec = ref->tv_sec;
-		diff.tv_usec = ref->tv_usec;
-		ref = &diff;
 	}
 
 	/* Wait and then reduce the timers.
-	 * If we reduce a timer to zero, set it negative to indicate timeout. */
-	get_monotonic(&start);
-	r = select(maxfd + 1, &fds, NULL, NULL, ref);
-	get_monotonic(&stop);
-	timersub(&stop, &start, &diff);
-	reduce_timers(state, &diff);
+	 * If we reduce a timer to zero, set it negative to indicate timeout.
+	 * We cannot reliably use select as there is no guarantee we will
+	 * actually wait the whole time if greater than 31 days according
+	 * to POSIX. So we loop on poll if needed as it's limitation of
+	 * MAX_INT milliseconds is known. */
+	for (;;) {
+		get_monotonic(&start);
+		if (ref) {
+			lastinf = 0;
+			if (ref->tv_sec > INT_MAX / 1000 ||
+			    (ref->tv_sec == INT_MAX / 1000 &&
+			     (ref->tv_usec + 999) / 1000 > INT_MAX % 1000))
+				msecs = INT_MAX;
+			else
+				msecs = ref->tv_sec * 1000 +
+					(ref->tv_usec + 999) / 1000;
+		} else
+			msecs = -1;
+		r = poll(fds, nfds, msecs);
+		get_monotonic(&stop);
+		timersub(&stop, &start, &diff);
+		reduce_timers(state, &diff);
+		if (r == -1) {
+			if (errno != EINTR)
+				logger(LOG_ERR, "poll: %s", strerror(errno));
+			return -1;
+		}
+		if (r)
+			break;
+		/* We should not have an infinite timeout if we get here */
+		if (timerneg(ref))
+			return 0;
+	}
 
-	if (r == -1) {
-		if (errno != EINTR)
-			logger(LOG_ERR, "select: %s", strerror(errno));
-		return -1;
-	}
-	if (r != 0) {
-		if (FD_ISSET(state->signal_fd, &fds))
-			*fd = state->signal_fd;
-		else if (iface->link_fd != -1 && FD_ISSET(iface->link_fd, &fds))
-			*fd = iface->link_fd;
-		else if (iface->raw_fd != -1 && FD_ISSET(iface->raw_fd, &fds))
-			*fd = iface->raw_fd;
-		else if (iface->arp_fd != -1 && FD_ISSET(iface->arp_fd, &fds))
-			*fd = iface->arp_fd;
-	} else {
-		/* select and poll CAN timeout BEFORE the timeout.
-		 * This is a sad state of affairs, so we need to reduce the
-		 * lowest timeout to -1 so it REALLY has timed out. */
-		ref = get_lowest_timer(state);
-		ref->tv_sec = -1;
-	}
+	/* We configured our array in the order we should deal with them */
+	for (i = 0; i < nfds; i++)
+		if (fds[i].revents & POLLIN) {
+			*fd = fds[i].fd;
+			return r;
+		}
 	return r;
 }
 
