@@ -839,7 +839,7 @@ wait_for_fd(struct if_state *state, int *fd)
 	 * We cannot reliably use select as there is no guarantee we will
 	 * actually wait the whole time if greater than 31 days according
 	 * to POSIX. So we loop on poll if needed as it's limitation of
-	 * MAX_INT milliseconds is known. */
+	 * INT_MAX milliseconds is known. */
 	for (;;) {
 		get_monotonic(&start);
 		if (ref) {
