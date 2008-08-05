@@ -854,9 +854,11 @@ main(int argc, char **argv)
 		}
 	}
 
-	if ((p = strchr(options->hostname, '.'))) {
-		if (options->fqdn == FQDN_DISABLE)
+	if ((p = strchr(options->hostname + 1, '.'))) {
+		if (options->fqdn == FQDN_DISABLE) {
 			*p = '\0';
+			options->hostname[0] = strlen(options->hostname + 1);
+		}
 	} else {
 		if (options->fqdn != FQDN_DISABLE) {
 			logger(LOG_WARNING, "hostname `%s' is not a FQDN",
