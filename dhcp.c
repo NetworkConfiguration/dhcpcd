@@ -713,10 +713,8 @@ make_message(struct dhcp_message **message,
 	uint32_t ul;
 	uint16_t sz;
 	const struct dhcp_opt *opt;
-#ifndef MINIMAL
 	uint8_t *d;
-	const char *c;
-#endif
+	const char *c, *e;
 
 	dhcp = xzalloc(sizeof (*dhcp));
 	m = (uint8_t *)dhcp;
@@ -854,8 +852,9 @@ make_message(struct dhcp_message **message,
 				*p++ = 0; /* from server for PTR RR */
 				*p++ = 0; /* from server for A RR if S=1 */
 				c = options->hostname + 1;
+				e = c + options->hostname[0];
 				d = p++;
-				while (*c) {
+				while (c < e) {
 					if (*c == '.') {
 						*d = p - d - 1;
 						d = p++;
@@ -863,7 +862,7 @@ make_message(struct dhcp_message **message,
 						*p++ = (uint8_t) *c;
 					c++;
 				}
-				*p ++ = 0;
+				*p++ = 0;
 			}
 		}
 
