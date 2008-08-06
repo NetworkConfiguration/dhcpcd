@@ -496,11 +496,9 @@ client_setup(struct if_state *state, const struct options *options)
 	struct dhcp_lease *lease = &state->lease;
 	struct in_addr addr;
 	struct timeval tv;
-#ifndef MINIMAL
 	size_t len = 0;
 	unsigned char *duid = NULL;
 	uint32_t ul;
-#endif
 
 	state->state = STATE_INIT;
 	state->nakoff = 1;
@@ -558,7 +556,6 @@ client_setup(struct if_state *state, const struct options *options)
 		iface->net.s_addr = lease->net.s_addr;
 	}
 
-#ifndef MINIMAL
 	if (*options->clientid) {
 		iface->clientid = xmalloc(options->clientid[0] + 1);
 		memcpy(iface->clientid,
@@ -604,7 +601,6 @@ client_setup(struct if_state *state, const struct options *options)
 			memcpy(iface->clientid + 2, iface->hwaddr, iface->hwlen);
 		}
 	}
-#endif
 
 	if (state->options & DHCPCD_LINK) {
 		open_link_socket(iface);

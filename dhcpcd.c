@@ -209,7 +209,6 @@ add_environ(struct options *options, const char *value, int uniq)
 	return newlist[i];
 }
 
-#ifndef MINIMAL
 #define parse_string(buf, len, arg) parse_string_hwaddr(buf, len, arg, 0)
 static ssize_t
 parse_string_hwaddr(char *sbuf, ssize_t slen, char *str, int clid)
@@ -307,7 +306,6 @@ parse_string_hwaddr(char *sbuf, ssize_t slen, char *str, int clid)
 	}
 	return l;
 }
-#endif
 
 static int
 parse_option(int opt, char *oarg, struct options *options)
@@ -315,9 +313,7 @@ parse_option(int opt, char *oarg, struct options *options)
 	int i;
 	char *p;
 	ssize_t s;
-#ifndef MINIMAL
 	struct in_addr addr;
-#endif
 
 	switch(opt) {
 	case 'b':
@@ -327,7 +323,6 @@ parse_option(int opt, char *oarg, struct options *options)
 		strlcpy(options->script, oarg, sizeof(options->script));
 		break;
 	case 'h':
-#ifndef MINIMAL
 		if (oarg)
 			s = parse_string(options->hostname + 1,
 					 MAXHOSTNAMELEN, oarg);
@@ -338,10 +333,8 @@ parse_option(int opt, char *oarg, struct options *options)
 			return -1;
 		}
 		options->hostname[0] = (uint8_t)s;
-#endif
 		break;
 	case 'i':
-#ifndef MINIMAL
 		if (oarg)
 			s = parse_string((char *)options->classid + 1,
 					 CLASSID_MAX_LEN, oarg);
@@ -352,10 +345,8 @@ parse_option(int opt, char *oarg, struct options *options)
 			return -1;
 		}
 		*options->classid = (uint8_t)s;
-#endif
 		break;
 	case 'l':
-#ifndef MINIMAL
 		if (*oarg == '-') {
 			logger(LOG_ERR,
 			       "leasetime must be a positive value");
@@ -367,7 +358,6 @@ parse_option(int opt, char *oarg, struct options *options)
 			logger(LOG_ERR, "`%s' out of range", oarg);
 			return -1;
 		}
-#endif
 		break;
 	case 'm':
 		options->metric = atoint(oarg);
@@ -428,7 +418,6 @@ parse_option(int opt, char *oarg, struct options *options)
 		}
 		break;
 	case 'u':
-#ifndef MINIMAL
 		s = USERCLASS_MAX_LEN - options->userclass[0] - 1;
 		s = parse_string((char *)options->userclass + options->userclass[0] + 2,
 				 s, oarg);
@@ -440,10 +429,8 @@ parse_option(int opt, char *oarg, struct options *options)
 			options->userclass[options->userclass[0] + 1] = s;
 			options->userclass[0] += s + 1;
 		}
-#endif
 		break;
 	case 'v':
-#ifndef MINIMAL
 		p = strchr(oarg, ',');
 		if (!p || !p[1]) {
 			logger(LOG_ERR, "invalid vendor format");
@@ -478,7 +465,6 @@ parse_option(int opt, char *oarg, struct options *options)
 			options->vendor[options->vendor[0] + 2] = s;
 			options->vendor[0] += s + 2;
 		}
-#endif
 		break;
 	case 'A':
 		options->options &= ~DHCPCD_ARP;
@@ -505,7 +491,6 @@ parse_option(int opt, char *oarg, struct options *options)
 		options->options |= DHCPCD_LASTLEASE;
 		break;
 	case 'F':
-#ifndef MINIMAL
 		if (!oarg) {
 			options->fqdn = FQDN_BOTH;
 			break;
@@ -521,13 +506,11 @@ parse_option(int opt, char *oarg, struct options *options)
 			       oarg);
 			return -1;
 		}
-#endif
 		break;
 	case 'G':
 		options->options &= ~DHCPCD_GATEWAY;
 		break;
 	case 'I':
-#ifndef MINIMAL
 		/* Strings have a type of 0 */;
 		options->classid[1] = 0;
 		if (oarg)
@@ -544,7 +527,6 @@ parse_option(int opt, char *oarg, struct options *options)
 			options->options &= ~DHCPCD_DUID;
 			options->options &= ~DHCPCD_CLIENTID;
 		}
-#endif
 		break;
 	case 'K':
 		options->options &= ~DHCPCD_LINK;
