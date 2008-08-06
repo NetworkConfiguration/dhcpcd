@@ -713,8 +713,6 @@ make_message(struct dhcp_message **message,
 	uint32_t ul;
 	uint16_t sz;
 	const struct dhcp_opt *opt;
-	uint8_t *d;
-	const char *c, *e;
 
 	dhcp = xzalloc(sizeof (*dhcp));
 	m = (uint8_t *)dhcp;
@@ -832,9 +830,9 @@ make_message(struct dhcp_message **message,
 				memcpy(p, options->hostname, options->hostname[0] + 1);
 				p += options->hostname[0] + 1;
 			} else {
-				/* Draft IETF DHC-FQDN option (81) */
+				/* IETF DHC-FQDN option (81), RFC4702 */
 				*p++ = DHCP_FQDN;
-				*p++ = options->hostname[0] + 5;
+				*p++ = options->hostname[0] + 3;
 				/*
 				 * Flags: 0000NEOS
 				 * S: 1 => Client requests Server to update
@@ -845,22 +843,19 @@ make_message(struct dhcp_message **message,
 				 * N: 1 => Client requests Server to not
 				 *         update DNS
 				 */
-				*p++ = (options->fqdn & 0x9) | 0x4;
+				*p++ = (options->fqdn & 0x9);
+				/* FIXME: We should use DNS format as 
+				 * RFC4702 claims ASCII is deprecated.
+				 * However I cannot find anything that says
+				 * what this encoding actually is, so we
+				 * use ASCII.
+				 * To flip the encoding bit, set it like so
+				 * *p++ = (options->fqdn & 0x9) | 0x4; */
 				*p++ = 0; /* from server for PTR RR */
 				*p++ = 0; /* from server for A RR if S=1 */
-				c = options->hostname + 1;
-				e = c + options->hostname[0];
-				d = p++;
-				while (c < e) {
-					if (*c == '.') {
-						*d = p - d - 1;
-						d = p++;
-					} else
-						*p++ = (uint8_t) *c;
-					c++;
-				}
-				*d = p - d - 1;
-				*p++ = 0;
+				memcpy(p, options->hostname + 1, 
+				       options->hostname[0]);
+				p += options->hostname[0];
 			}
 		}
 
