@@ -101,7 +101,7 @@ enum DHCP_OPTIONS
  * byte (see buildmsg.c), hsnybble to create order
  * and to allow 0x00 to mean disable
  */
-enum FQQN {
+enum FQDN {
 	FQDN_DISABLE    = 0x00,
 	FQDN_NONE       = 0x18,
 	FQDN_PTR        = 0x20,
