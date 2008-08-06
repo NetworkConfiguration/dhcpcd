@@ -501,6 +501,8 @@ parse_option(int opt, char *oarg, struct options *options)
 			options->fqdn = FQDN_PTR;
 		else if (strcmp(oarg, "both") == 0)
 			options->fqdn = FQDN_BOTH;
+		else if (strcmp(oarg, "disable") == 0)
+			options->fqdn = FQDN_DISABLE;
 		else {
 			logger(LOG_ERR, "invalid value `%s' for FQDN",
 			       oarg);
