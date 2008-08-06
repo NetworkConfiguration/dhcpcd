@@ -1034,7 +1034,8 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 
 	timerclear(&state->stop);
 	timerclear(&state->exit);
-	state->messages = 0;
+	if (state->state != STATE_DISCOVERING)
+		state->messages = 0;
 
 	switch (state->state) {
 	case STATE_INIT:	/* FALLTHROUGH */
@@ -1077,7 +1078,8 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 			state->state = STATE_PROBING;
 			state->claims = 0;
 			state->probes = 0;
-			state->conflicts = 0;
+			if (iface->addr.s_addr)
+				state->conflicts = 0;
 			return 1;
 		}
 
