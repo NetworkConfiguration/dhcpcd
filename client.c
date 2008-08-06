@@ -1157,12 +1157,11 @@ handle_timeout(struct if_state *state, const struct options *options)
 	}
 	switch (state->state) {
 	case STATE_INIT_IPV4LL:
-		logger(LOG_INFO, "probing for an IPV4LL address");
 		state->state = STATE_PROBING;
 		free(state->offer);
 		state->offer = ipv4ll_get_dhcp(0);
-		state->claims = 0;
 		state->probes = 0;
+		state->claims = 0;
 		/* FALLTHROUGH */
 	case STATE_PROBING:
 		if (iface->arp_fd == -1)
