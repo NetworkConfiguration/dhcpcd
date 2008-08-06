@@ -834,7 +834,7 @@ make_message(struct dhcp_message **message,
 			} else {
 				/* Draft IETF DHC-FQDN option (81) */
 				*p++ = DHCP_FQDN;
-				*p++ = options->hostname[0] + 4;
+				*p++ = options->hostname[0] + 5;
 				/*
 				 * Flags: 0000NEOS
 				 * S: 1 => Client requests Server to update
@@ -859,6 +859,7 @@ make_message(struct dhcp_message **message,
 						*p++ = (uint8_t) *c;
 					c++;
 				}
+				*d = p - d - 1;
 				*p++ = 0;
 			}
 		}
