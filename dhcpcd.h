@@ -41,7 +41,7 @@
 #define DEFAULT_TIMEOUT		30
 #define DEFAULT_LEASETIME	3600	/* 1 hour */
 
-#define HOSTNAME_MAX_LEN	254	/* Trailing NULL for FQDN */
+#define HOSTNAME_MAX_LEN	253	/* Initial len + trailing 0 for FQDN */
 #define CLASSID_MAX_LEN		48
 #define CLIENTID_MAX_LEN	48
 #define USERCLASS_MAX_LEN	255
