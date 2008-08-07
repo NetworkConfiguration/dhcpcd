@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd June 30, 2008
+.Dd August 7, 2008
 .Dt DHCPCD.CONF 5 SMM
 .Sh NAME
 .Nm dhcpcd.conf
@@ -75,6 +75,9 @@ The current hostname or the hostname specified using the
 option must be a FQDN.
 .Nm dhcpcd
 itself never does any DNS updates.
+.Nm dhcpcd
+encodes the FQDN hostname as specified in
+.Li RFC1035 .
 .It Ic interface Ar interface
 Subsequent options are only parsed for this
 .Ar interface .

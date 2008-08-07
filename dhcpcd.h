@@ -41,6 +41,7 @@
 #define DEFAULT_TIMEOUT		30
 #define DEFAULT_LEASETIME	3600	/* 1 hour */
 
+#define HOSTNAME_MAX_LEN	254	/* Trailing NULL for FQDN */
 #define CLASSID_MAX_LEN		48
 #define CLIENTID_MAX_LEN	48
 #define USERCLASS_MAX_LEN	255
@@ -87,7 +88,7 @@ struct options {
 	char script[PATH_MAX];
 	char pidfile[PATH_MAX];
 
-	char hostname[MAXHOSTNAMELEN];
+	char hostname[HOSTNAME_MAX_LEN + 1];
 	int fqdn;
 	uint8_t classid[CLASSID_MAX_LEN + 1];
 	char clientid[CLIENTID_MAX_LEN + 1];

@@ -325,7 +325,7 @@ parse_option(int opt, char *oarg, struct options *options)
 	case 'h':
 		if (oarg)
 			s = parse_string(options->hostname + 1,
-					 MAXHOSTNAMELEN, oarg);
+					 HOSTNAME_MAX_LEN, oarg);
 		else
 			s = 0;
 		if (s == -1) {
