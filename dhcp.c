@@ -701,13 +701,37 @@ get_option_routes(const struct dhcp_message *dhcp)
 	return routes;
 }
 
+static size_t
+encode_rfc1035(const char *src, uint8_t *dst, size_t len)
+{
+	const char *c = src;
+	uint8_t *p = dst;
+	uint8_t *lp = p++;
+
+	while (c < src + len) {
+		if (*c == '\0')
+			break;
+		if (*c == '.') {
+			*lp = p - lp - 1;
+			if (*lp == 0)
+				return p - dst;
+			lp = p++;
+		} else
+			*p++ = (uint8_t) *c;
+		c++;
+	}
+	*lp = p - lp - 1;
+	*p++ = '\0';
+	return p - dst;
+}
+
 ssize_t
 make_message(struct dhcp_message **message,
 	     const struct interface *iface, const struct dhcp_lease *lease,
 	     uint32_t xid, uint8_t type, const struct options *options)
 {
 	struct dhcp_message *dhcp;
-	uint8_t *m, *p;
+	uint8_t *m, *lp, *p;
 	uint8_t *n_params = NULL;
 	time_t up = uptime() - iface->start_uptime;
 	uint32_t ul;
@@ -832,7 +856,8 @@ make_message(struct dhcp_message **message,
 			} else {
 				/* IETF DHC-FQDN option (81), RFC4702 */
 				*p++ = DHCP_FQDN;
-				*p++ = options->hostname[0] + 3;
+				lp = p;
+				*p++ = 3;
 				/*
 				 * Flags: 0000NEOS
 				 * S: 1 => Client requests Server to update
@@ -843,19 +868,13 @@ make_message(struct dhcp_message **message,
 				 * N: 1 => Client requests Server to not
 				 *         update DNS
 				 */
-				*p++ = (options->fqdn & 0x9);
-				/* FIXME: We should use DNS format as 
-				 * RFC4702 claims ASCII is deprecated.
-				 * However I cannot find anything that says
-				 * what this encoding actually is, so we
-				 * use ASCII.
-				 * To flip the encoding bit, set it like so
-				 * *p++ = (options->fqdn & 0x9) | 0x4; */
+				*p++ = (options->fqdn & 0x09) | 0x04;
 				*p++ = 0; /* from server for PTR RR */
 				*p++ = 0; /* from server for A RR if S=1 */
-				memcpy(p, options->hostname + 1, 
-				       options->hostname[0]);
-				p += options->hostname[0];
+				ul = encode_rfc1035(options->hostname + 1, p,
+						    options->hostname[0]);
+				*lp += ul;
+				p += ul;
 			}
 		}
 
