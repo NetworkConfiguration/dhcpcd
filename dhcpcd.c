@@ -842,21 +842,6 @@ main(int argc, char **argv)
 		}
 	}
 
-	if ((p = strchr(options->hostname + 1, '.'))) {
-		if (options->fqdn == FQDN_DISABLE) {
-			*p = '\0';
-			options->hostname[0] = strlen(options->hostname + 1);
-		}
-	} else {
-		if (options->fqdn != FQDN_DISABLE) {
-			logger(LOG_WARNING, "hostname `%s' is not a FQDN",
-			       options->hostname);
-			options->fqdn = FQDN_DISABLE;
-		}
-	}
-	if (options->fqdn != FQDN_DISABLE)
-		del_reqmask(options->reqmask, DHCP_HOSTNAME);
-
 	if (options->request_address.s_addr == 0 &&
 	    (options->options & DHCPCD_INFORM ||
 	     options->options & DHCPCD_REQUEST))
