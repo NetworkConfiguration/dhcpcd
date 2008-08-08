@@ -137,6 +137,7 @@ static const struct dhcp_opt const dhcp_opts[] = {
 	{ 75,	IPV4 | ARRAY,	"streettalk_server" },
 	{ 76,	IPV4 | ARRAY,	"streettalk_directory_assistance_server" },
 	{ 77,	STRING,		"user_class" },
+	{ 81,	STRING | RFC3397,	"fqdn_name" },
 	{ 85,	IPV4 | ARRAY,	"nds_servers" },
 	{ 86,	STRING,		"nds_tree_name" },
 	{ 87,	STRING,		"nds_context" },
@@ -372,7 +373,9 @@ decode_rfc3397(char *out, ssize_t len, int pl, const uint8_t *p)
 	while (q - p < pl) {
 		r = NULL;
 		hops = 0;
-		while ((l = *q++)) {
+		/* We check we are inside our length again incase
+		 * the data is NOT terminated correctly. */
+		while ((l = *q++) && q - p < pl) {
 			ltype = l & 0xc0;
 			if (ltype == 0x80 || ltype == 0x40)
 				return 0;
@@ -708,6 +711,8 @@ encode_rfc1035(const char *src, uint8_t *dst, size_t len)
 	uint8_t *p = dst;
 	uint8_t *lp = p++;
 
+	if (len == 0)
+		return 0;
 	while (c < src + len) {
 		if (*c == '\0')
 			break;
@@ -852,33 +857,32 @@ make_message(struct dhcp_message **message,
 	    type == DHCP_REQUEST)
 	{
 		if (options->hostname[0]) {
-			if (options->fqdn == FQDN_DISABLE) {
-				*p++ = DHCP_HOSTNAME;
-				memcpy(p, options->hostname, options->hostname[0] + 1);
-				p += options->hostname[0] + 1;
-			} else {
-				/* IETF DHC-FQDN option (81), RFC4702 */
-				*p++ = DHCP_FQDN;
-				lp = p;
-				*p++ = 3;
-				/*
-				 * Flags: 0000NEOS
-				 * S: 1 => Client requests Server to update
-				 *         a RR in DNS as well as PTR
-				 * O: 1 => Server indicates to client that
-				 *         DNS has been updated
-				 * E: 1 => Name data is DNS format
-				 * N: 1 => Client requests Server to not
-				 *         update DNS
-				 */
-				*p++ = (options->fqdn & 0x09) | 0x04;
-				*p++ = 0; /* from server for PTR RR */
-				*p++ = 0; /* from server for A RR if S=1 */
-				ul = encode_rfc1035(options->hostname + 1, p,
-						    options->hostname[0]);
-				*lp += ul;
-				p += ul;
-			}
+			*p++ = DHCP_HOSTNAME;
+			memcpy(p, options->hostname, options->hostname[0] + 1);
+			p += options->hostname[0] + 1;
+		}
+		if (options->fqdn != FQDN_DISABLE) {
+			/* IETF DHC-FQDN option (81), RFC4702 */
+			*p++ = DHCP_FQDN;
+			lp = p;
+			*p++ = 3;
+			/*
+			 * Flags: 0000NEOS
+			 * S: 1 => Client requests Server to update
+			 *         a RR in DNS as well as PTR
+			 * O: 1 => Server indicates to client that
+			 *         DNS has been updated
+			 * E: 1 => Name data is DNS format
+			 * N: 1 => Client requests Server to not
+			 *         update DNS
+			 */
+			*p++ = (options->fqdn & 0x09) | 0x04;
+			*p++ = 0; /* from server for PTR RR */
+			*p++ = 0; /* from server for A RR if S=1 */
+			ul = encode_rfc1035(options->hostname + 1, p,
+					options->hostname[0]);
+			*lp += ul;
+			p += ul;
 		}
 
 		/* vendor is already encoded correctly, so just add it */
@@ -1210,6 +1214,11 @@ configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 		p = get_option(dhcp, opt->option, &pl, NULL);
 		if (!p)
 			continue;
+		/* We only want the FQDN name */
+		if (opt->option == DHCP_FQDN) {
+			p += 3;
+			pl -= 3;
+		}
 		len = print_option(NULL, 0, opt->type, pl, p);
 		if (len < 0)
 			return -1;
