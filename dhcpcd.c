@@ -952,7 +952,7 @@ main(int argc, char **argv)
 	/* Terminate the encapsulated options */
 	if (options->vendor[0]) {
 		options->vendor[0]++;
-		options->vendor[options->vendor[0]] = DHCP_END;
+		options->vendor[options->vendor[0]] = DHO_END;
 	}
 
 	if (dhcp_run(options, &pid_fd) == 0)

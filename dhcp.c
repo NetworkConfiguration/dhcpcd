@@ -269,9 +269,9 @@ get_option(const struct dhcp_message *dhcp, uint8_t opt, int *len, int *type)
 			bl += ol;
 		}
 		switch (o) {
-		case DHCP_PAD:
+		case DHO_PAD:
 			continue;
-		case DHCP_END:
+		case DHO_END:
 			if (overl & 1) {
 				/* bit 1 set means parse boot file */
 				overl &= ~1;
@@ -285,7 +285,7 @@ get_option(const struct dhcp_message *dhcp, uint8_t opt, int *len, int *type)
 			} else
 				goto exit;
 			break;
-		case DHCP_OPTIONSOVERLOADED:
+		case DHO_OPTIONSOVERLOADED:
 			/* Ensure we only get this option once */
 			if (!overl)
 				overl = p[1];
@@ -657,10 +657,10 @@ get_option_routes(const struct dhcp_message *dhcp)
 	int len;
 
 	/* If we have CSR's then we MUST use these only */
-	p = get_option(dhcp, DHCP_CSR, &len, NULL);
+	p = get_option(dhcp, DHO_CSR, &len, NULL);
 	/* Check for crappy MS option */
 	if (!p)
-		p = get_option(dhcp, DHCP_MSCSR, &len, NULL);
+		p = get_option(dhcp, DHO_MSCSR, &len, NULL);
 	if (p) {
 		routes = decode_rfc3442_rt(len, p);
 		if (routes)
@@ -668,7 +668,7 @@ get_option_routes(const struct dhcp_message *dhcp)
 	}
 
 	/* OK, get our static routes first. */
-	p = get_option(dhcp, DHCP_STATICROUTE, &len, NULL);
+	p = get_option(dhcp, DHO_STATICROUTE, &len, NULL);
 	if (p) {
 		e = p + len;
 		while (p < e) {
@@ -687,7 +687,7 @@ get_option_routes(const struct dhcp_message *dhcp)
 	}
 
 	/* Now grab our routers */
-	p = get_option(dhcp, DHCP_ROUTER, &len, NULL);
+	p = get_option(dhcp, DHO_ROUTER, &len, NULL);
 	if (p) {
 		e = p + len;
 		while (p < e) {
@@ -788,12 +788,12 @@ make_message(struct dhcp_message **message,
 	dhcp->xid = xid;
 	dhcp->cookie = htonl(MAGIC_COOKIE);
 
-	*p++ = DHCP_MESSAGETYPE; 
+	*p++ = DHO_MESSAGETYPE; 
 	*p++ = 1;
 	*p++ = type;
 
 	if (type == DHCP_REQUEST) {
-		*p++ = DHCP_MAXMESSAGESIZE;
+		*p++ = DHO_MAXMESSAGESIZE;
 		*p++ = 2;
 		sz = get_mtu(iface->name);
 		if (sz < MTU_MIN) {
@@ -806,20 +806,20 @@ make_message(struct dhcp_message **message,
 	}
 
 	if (iface->clientid) {
-		*p++ = DHCP_CLIENTID;
+		*p++ = DHO_CLIENTID;
 		memcpy(p, iface->clientid, iface->clientid[0] + 1);
 		p += iface->clientid[0] + 1;
 	}
 
 	if (type != DHCP_DECLINE && type != DHCP_RELEASE) {
 		if (options->userclass[0]) {
-			*p++ = DHCP_USERCLASS;
+			*p++ = DHO_USERCLASS;
 			memcpy(p, options->userclass, options->userclass[0] + 1);
 			p += options->userclass[0] + 1;
 		}
 
 		if (options->classid[0]) {
-			*p++ = DHCP_CLASSID;
+			*p++ = DHO_CLASSID;
 			memcpy(p, options->classid, options->classid[0] + 1);
 			p += options->classid[0] + 1;
 		}
@@ -837,14 +837,14 @@ make_message(struct dhcp_message **message,
 		    lease->addr.s_addr != iface->addr.s_addr &&
 		    !IN_LINKLOCAL(ntohl(lease->addr.s_addr)))
 		{
-			PUTADDR(DHCP_IPADDRESS, lease->addr);
+			PUTADDR(DHO_IPADDRESS, lease->addr);
 			if (lease->server.s_addr)
-				PUTADDR(DHCP_SERVERID, lease->server);
+				PUTADDR(DHO_SERVERID, lease->server);
 		}
 #undef PUTADDR
 
 		if (options->leasetime != 0) {
-			*p++ = DHCP_LEASETIME;
+			*p++ = DHO_LEASETIME;
 			*p++ = 4;
 			ul = htonl(options->leasetime);
 			memcpy(p, &ul, 4);
@@ -857,13 +857,13 @@ make_message(struct dhcp_message **message,
 	    type == DHCP_REQUEST)
 	{
 		if (options->hostname[0]) {
-			*p++ = DHCP_HOSTNAME;
+			*p++ = DHO_HOSTNAME;
 			memcpy(p, options->hostname, options->hostname[0] + 1);
 			p += options->hostname[0] + 1;
 		}
 		if (options->fqdn != FQDN_DISABLE) {
 			/* IETF DHC-FQDN option (81), RFC4702 */
-			*p++ = DHCP_FQDN;
+			*p++ = DHO_FQDN;
 			lp = p;
 			*p++ = 3;
 			/*
@@ -887,12 +887,12 @@ make_message(struct dhcp_message **message,
 
 		/* vendor is already encoded correctly, so just add it */
 		if (options->vendor[0]) {
-			*p++ = DHCP_VENDOR;
+			*p++ = DHO_VENDOR;
 			memcpy(p, options->vendor, options->vendor[0] + 1);
 			p += options->vendor[0] + 1;
 		}
 
-		*p++ = DHCP_PARAMETERREQUESTLIST;
+		*p++ = DHO_PARAMETERREQUESTLIST;
 		n_params = p;
 		*p++ = 0;
 		for (opt = dhcp_opts; opt->option; opt++) {
@@ -900,8 +900,8 @@ make_message(struct dhcp_message **message,
 			      has_reqmask(options->reqmask, opt->option)))
 				continue;
 			switch (opt->option) {
-			case DHCP_RENEWALTIME:	/* FALLTHROUGH */
-			case DHCP_REBINDTIME:
+			case DHO_RENEWALTIME:	/* FALLTHROUGH */
+			case DHO_REBINDTIME:
 				if (type == DHCP_INFORM)
 					continue;
 				break;
@@ -910,14 +910,14 @@ make_message(struct dhcp_message **message,
 		}
 		*n_params = p - n_params - 1;
 	}
-	*p++ = DHCP_END;
+	*p++ = DHO_END;
 
 #ifdef BOOTP_MESSAGE_LENTH_MIN
 	/* Some crappy DHCP servers think they have to obey the BOOTP minimum
 	 * message length.
 	 * They are wrong, but we should still cater for them. */
 	while (p - m < BOOTP_MESSAGE_LENTH_MIN)
-		*p++ = DHCP_PAD;
+		*p++ = DHO_PAD;
 #endif
 
 	*message = dhcp;
@@ -941,12 +941,12 @@ write_lease(const struct interface *iface, const struct dhcp_message *dhcp)
 	/* Only write as much as we need */
 	while (p < e) {
 		o = *p;
-		if (o == DHCP_END) {
+		if (o == DHO_END) {
 			bytes = p - (const uint8_t *)dhcp;
 			break;
 		}
 		p++;
-		if (o != DHCP_PAD) {
+		if (o != DHO_PAD) {
 			l = *p++;
 			p += l;
 		}
@@ -1159,7 +1159,7 @@ configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 	char cidr[4];
 	uint8_t overl = 0;
 
-	get_option_uint8(&overl, dhcp, DHCP_OPTIONSOVERLOADED);
+	get_option_uint8(&overl, dhcp, DHO_OPTIONSOVERLOADED);
 
 	if (!env) {
 		for (opt = dhcp_opts; opt->option; opt++) {
@@ -1185,14 +1185,14 @@ configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 		 * message but are not necessarily in the options */
 		addr.s_addr = dhcp->yiaddr;
 		setvar(&ep, prefix, "ip_address", inet_ntoa(addr));
-		if (get_option_addr(&net.s_addr, dhcp, DHCP_SUBNETMASK) == -1) {
+		if (get_option_addr(&net.s_addr, dhcp, DHO_SUBNETMASK) == -1) {
 			net.s_addr = get_netmask(addr.s_addr);
 			setvar(&ep, prefix, "subnet_mask", inet_ntoa(net));
 		}
 		i = inet_ntocidr(net);
 		snprintf(cidr, sizeof(cidr), "%d", inet_ntocidr(net));
 		setvar(&ep, prefix, "subnet_cidr", cidr);
-		if (get_option_addr(&brd.s_addr, dhcp, DHCP_BROADCAST) == -1) {
+		if (get_option_addr(&brd.s_addr, dhcp, DHO_BROADCAST) == -1) {
 			brd.s_addr = addr.s_addr | ~net.s_addr;
 			setvar(&ep, prefix, "broadcast_address", inet_ntoa(net));
 		}
@@ -1215,7 +1215,7 @@ configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 		if (!p)
 			continue;
 		/* We only want the FQDN name */
-		if (opt->option == DHCP_FQDN) {
+		if (opt->option == DHO_FQDN) {
 			p += 3;
 			pl -= 3;
 		}

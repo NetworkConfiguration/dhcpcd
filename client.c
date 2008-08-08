@@ -360,17 +360,17 @@ ipv4ll_get_dhcp(uint32_t old_addr)
 	dhcp = xzalloc(sizeof(*dhcp));
 	/* Put some LL options in */
 	p = dhcp->options;
-	*p++ = DHCP_SUBNETMASK;
+	*p++ = DHO_SUBNETMASK;
 	*p++ = sizeof(u32);
 	u32 = htonl(LINKLOCAL_MASK);
 	memcpy(p, &u32, sizeof(u32));
 	p += sizeof(u32);
-	*p++ = DHCP_BROADCAST;
+	*p++ = DHO_BROADCAST;
 	*p++ = sizeof(u32);
 	u32 = htonl(LINKLOCAL_BRDC);
 	memcpy(p, &u32, sizeof(u32));
 	p += sizeof(u32);
-	*p++ = DHCP_END;
+	*p++ = DHO_END;
 
 	for (;;) {
 		dhcp->yiaddr = htonl(LINKLOCAL_ADDR |
@@ -397,9 +397,9 @@ get_lease(struct dhcp_lease *lease, const struct dhcp_message *dhcp)
 	lease->frominfo = 0;
 	lease->addr.s_addr = dhcp->yiaddr;
 
-	if (get_option_addr(&lease->net.s_addr, dhcp, DHCP_SUBNETMASK) == -1)
+	if (get_option_addr(&lease->net.s_addr, dhcp, DHO_SUBNETMASK) == -1)
 		lease->net.s_addr = get_netmask(dhcp->yiaddr);
-	if (get_option_uint32(&lease->leasetime, dhcp, DHCP_LEASETIME) == 0) {
+	if (get_option_uint32(&lease->leasetime, dhcp, DHO_LEASETIME) == 0) {
 		/* Ensure that we can use the lease */
 		t = 0;
 		if (t + (time_t)lease->leasetime < t) {
@@ -409,9 +409,9 @@ get_lease(struct dhcp_lease *lease, const struct dhcp_message *dhcp)
 		}
 	} else
 		lease->leasetime = DEFAULT_LEASETIME;
-	if (get_option_uint32(&lease->renewaltime, dhcp, DHCP_RENEWALTIME) != 0)
+	if (get_option_uint32(&lease->renewaltime, dhcp, DHO_RENEWALTIME) != 0)
 		lease->renewaltime = 0;
-	if (get_option_uint32(&lease->rebindtime, dhcp, DHCP_REBINDTIME) != 0)
+	if (get_option_uint32(&lease->rebindtime, dhcp, DHO_REBINDTIME) != 0)
 		lease->rebindtime = 0;
 }
 
@@ -1354,12 +1354,12 @@ log_dhcp(int lvl, const char *msg, const struct dhcp_message *dhcp)
 	int r;
 
 	if (strcmp(msg, "NAK:") == 0)
-		a = get_option_string(dhcp, DHCP_MESSAGE);
+		a = get_option_string(dhcp, DHO_MESSAGE);
 	else {
 		addr.s_addr = dhcp->yiaddr;
 		a = xstrdup(inet_ntoa(addr));
 	}
-	r = get_option_addr(&addr.s_addr, dhcp, DHCP_SERVERID);
+	r = get_option_addr(&addr.s_addr, dhcp, DHO_SERVERID);
 	if (dhcp->servername[0] && r == 0)
 		logger(lvl, "%s %s from %s `%s'", msg, a,
 		       inet_ntoa(addr), dhcp->servername);
@@ -1386,7 +1386,7 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 	state->messages = 0;
 
 	/* We have to have DHCP type to work */
-	if (get_option_uint8(&type, dhcp, DHCP_MESSAGETYPE) == -1) {
+	if (get_option_uint8(&type, dhcp, DHO_MESSAGETYPE) == -1) {
 		log_dhcp(LOG_ERR, "no DHCP type in", dhcp);
 		return 0;
 	}
@@ -1395,7 +1395,7 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 	 * We should expand this to check IP and/or hardware address
 	 * at the packet level. */
 	if (options->blacklist_len != 0 &&
-	    get_option_addr(&addr.s_addr, dhcp, DHCP_SERVERID) == 0)
+	    get_option_addr(&addr.s_addr, dhcp, DHO_SERVERID) == 0)
 	{
 		for (i = 0; i < options->blacklist_len; i++) {
 			if (options->blacklist[i] != addr.s_addr)
@@ -1437,7 +1437,7 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 
 	if (type == DHCP_OFFER && state->state == STATE_DISCOVERING) {
 		lease->addr.s_addr = dhcp->yiaddr;
-		get_option_addr(&lease->server.s_addr, dhcp, DHCP_SERVERID);
+		get_option_addr(&lease->server.s_addr, dhcp, DHO_SERVERID);
 		log_dhcp(LOG_INFO, "offered", dhcp);
 		if (state->options & DHCPCD_TEST) {
 			exec_script(options, iface->name, "TEST", dhcp, NULL);
@@ -1466,7 +1466,7 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 	case STATE_REBINDING:
 		if (!(state->options & DHCPCD_INFORM)) {
 			get_option_addr(&lease->server.s_addr,
-					dhcp, DHCP_SERVERID);
+					dhcp, DHO_SERVERID);
 			log_dhcp(LOG_INFO, "acknowledged", dhcp);
 		}
 		break;
@@ -1560,10 +1560,10 @@ handle_dhcp_packet(struct if_state *state, const struct options *options)
 		 * if we have space for the terminator */
 		if ((size_t)bytes < sizeof(struct dhcp_message)) {
 			p = (uint8_t *)dhcp + bytes - 1;
-			while (p > dhcp->options && *p == DHCP_PAD)
+			while (p > dhcp->options && *p == DHO_PAD)
 				p--;
-			if (*p != DHCP_END)
-				*++p = DHCP_END;
+			if (*p != DHO_END)
+				*++p = DHO_END;
 		}
 		retval = handle_dhcp(state, &dhcp, options);
 		if (retval == 0 && state->options & DHCPCD_TEST)

@@ -438,9 +438,9 @@ configure(struct interface *iface, const char *reason,
 	else {
 		addr.s_addr = dhcp->yiaddr;
 		/* Ensure we have all the needed values */
-		if (get_option_addr(&net.s_addr, dhcp, DHCP_SUBNETMASK) == -1)
+		if (get_option_addr(&net.s_addr, dhcp, DHO_SUBNETMASK) == -1)
 			net.s_addr = get_netmask(addr.s_addr);
-		if (get_option_addr(&brd.s_addr, dhcp, DHCP_BROADCAST) == -1)
+		if (get_option_addr(&brd.s_addr, dhcp, DHO_BROADCAST) == -1)
 			brd.s_addr = addr.s_addr | ~net.s_addr;
 	}
 
