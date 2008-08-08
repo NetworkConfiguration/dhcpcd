@@ -712,8 +712,11 @@ encode_rfc1035(const char *src, uint8_t *dst, size_t len)
 		if (*c == '\0')
 			break;
 		if (*c == '.') {
+			/* Skip the trailing . */
+			if (c == src + len - 1)
+				break;
 			*lp = p - lp - 1;
-			if (*lp == 0)
+			if (*lp == '\0')
 				return p - dst;
 			lp = p++;
 		} else
