@@ -332,6 +332,10 @@ parse_option(int opt, char *oarg, struct options *options)
 			logger(LOG_ERR, "hostname: %s", strerror(errno));
 			return -1;
 		}
+		if (s != 0 && options->hostname[1] == '.') {
+			logger(LOG_ERR, "hostname cannot begin with a .");
+			return -1;
+		}
 		options->hostname[0] = (uint8_t)s;
 		break;
 	case 'i':
