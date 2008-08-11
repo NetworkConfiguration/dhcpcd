@@ -47,13 +47,6 @@
 #define USERCLASS_MAX_LEN	255
 #define VENDOR_MAX_LEN		255
 
-#ifdef THERE_IS_NO_FORK 
-extern char dhcpcd[PATH_MAX];
-extern char **dhcpcd_argv;
-extern int dhcpcd_argc;
-extern char *dhcpcd_skiproutes;
-#endif
-
 #define DHCPCD_ARP		(1 << 0)
 #define DHCPCD_DOMAIN		(1 << 2)
 #define DHCPCD_GATEWAY		(1 << 3)
