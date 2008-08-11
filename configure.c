@@ -48,20 +48,48 @@
 
 #define DEFAULT_PATH	"PATH=/usr/bin:/usr/sbin:/bin:/sbin"
 
+
+static int
+exec_script(char *const *argv, char *const *env)
+{
+	pid_t pid;
+	sigset_t full;
+	sigset_t old;
+
+	/* OK, we need to block signals */
+	sigfillset(&full);
+	sigprocmask(SIG_SETMASK, &full, &old);
+	signal_reset();
+
+	switch (pid = vfork()) {
+	case -1:
+		logger(LOG_ERR, "vfork: %s", strerror(errno));
+		break;
+	case 0:
+		sigprocmask(SIG_SETMASK, &old, NULL);
+		execve(argv[0], argv, env);
+		logger(LOG_ERR, "%s: %s", argv[0], strerror(errno));
+		_exit(127);
+		/* NOTREACHED */
+	}
+
+	/* Restore our signals */
+	signal_setup();
+	sigprocmask(SIG_SETMASK, &old, NULL);
+	return pid;
+}
+
 int
-exec_script(const struct options *options, const char *iface,
-	    const char *reason,
-	    const struct dhcp_message *dhcpn, const struct dhcp_message *dhcpo)
+run_script(const struct options *options, const char *iface,
+           const char *reason,
+           const struct dhcp_message *dhcpn, const struct dhcp_message *dhcpo)
 {
 	char *const argv[2] = { UNCONST(options->script), NULL };
 	char **env = NULL, **ep;
 	char *path;
 	ssize_t e, elen;
-	int ret = 0;
 	pid_t pid;
 	int status = 0;
-	sigset_t full;
-	sigset_t old;
 
 	logger(LOG_DEBUG, "executing `%s', reason %s", options->script, reason);
 
@@ -115,50 +143,17 @@ exec_script(const struct options *options, const char *iface,
 	}
 	env[elen] = '\0';
 
-	/* OK, we need to block signals */
-	sigfillset(&full);
-	sigprocmask(SIG_SETMASK, &full, &old);
-
-#ifdef THERE_IS_NO_FORK
-	signal_reset();
-	pid = vfork();
-#else
-	pid = fork();
-#endif
-
-	switch (pid) {
-	case -1:
-#ifdef THERE_IS_NO_FORK
-		logger(LOG_ERR, "vfork: %s", strerror(errno));
-#else
-		logger(LOG_ERR, "fork: %s", strerror(errno));
-#endif
-		ret = -1;
-		break;
-	case 0:
-#ifndef THERE_IS_NO_FORK
-		signal_reset();
-#endif
-		sigprocmask(SIG_SETMASK, &old, NULL);
-		execve(options->script, argv, env);
-		logger(LOG_ERR, "%s: %s", options->script, strerror(errno));
-		_exit(111);
-		/* NOTREACHED */
-	}
-
-#ifdef THERE_IS_NO_FORK
-	signal_setup();
-#endif
-
-	/* Restore our signals */
-	sigprocmask(SIG_SETMASK, &old, NULL);
-
-	/* Wait for the script to finish */
-	while (waitpid(pid, &status, 0) == -1) {
-		if (errno != EINTR) {
-			logger(LOG_ERR, "waitpid: %s", strerror(errno));
-			status = -1;
-			break;
+	pid = exec_script(argv, env);
+	if (pid == -1)
+		status = -1;
+	else if (pid != 0) {
+		/* Wait for the script to finish */
+		while (waitpid(pid, &status, 0) == -1) {
+			if (errno != EINTR) {
+				logger(LOG_ERR, "waitpid: %s", strerror(errno));
+				status = -1;
+				break;
+			}
 		}
 	}
 
@@ -167,7 +162,6 @@ exec_script(const struct options *options, const char *iface,
 	while (*ep)
 		free(*ep++);
 	free(env);
-
 	return status;
 }
 
@@ -375,7 +369,7 @@ configure(struct interface *iface, const char *reason,
 			delete_address(iface);
 		}
 
-		exec_script(options, iface->name, reason, NULL, old);
+		run_script(options, iface->name, reason, NULL, old);
 		return 0;
 	}
 
@@ -419,6 +413,6 @@ configure(struct interface *iface, const char *reason,
 		if (write_lease(iface, dhcp) == -1)
 			logger(LOG_ERR, "write_lease: %s", strerror(errno));
 
-	exec_script(options, iface->name, reason, dhcp, old);
+	run_script(options, iface->name, reason, dhcp, old);
 	return 0;
 }

@@ -1393,7 +1393,7 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 		get_option_addr(&lease->server.s_addr, dhcp, DHO_SERVERID);
 		log_dhcp(LOG_INFO, "offered", dhcp);
 		if (state->options & DHCPCD_TEST) {
-			exec_script(options, iface->name, "TEST", dhcp, NULL);
+			run_script(options, iface->name, "TEST", dhcp, NULL);
 			return 0;
 		}
 		state->state = STATE_REQUESTING;
