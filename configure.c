@@ -244,19 +244,6 @@ configure_routes(struct interface *iface, const struct dhcp_message *dhcp,
 	int retval = 0;
 	char *addr;
 
-#ifdef THERE_IS_NO_FORK
-	char *skipp;
-	size_t skiplen;
-	int skip = 0;
-
-	free(dhcpcd_skiproutes);
-	/* We can never have more than 255 routes. So we need space
-	 * for 255 3 digit numbers and commas */
-	skiplen = 255 * 4 + 1;
-	skipp = dhcpcd_skiproutes = xmalloc(sizeof(char) * skiplen);
-	*skipp = '\0';
-#endif
-
 	ort = get_option_routes(dhcp);
 
 #ifdef IPV4LL_ALWAYSROUTE
@@ -283,43 +270,6 @@ configure_routes(struct interface *iface, const struct dhcp_message *dhcp,
 			else
 				ort = rt;
 		}
-	}
-#endif
-
-#ifdef THERE_IS_NO_FORK
-	if (dhcpcd_skiproutes) {
-		int i = -1;
-		char *sk, *skp, *token;
-		free_routes(iface->routes);
-		for (rt = ort; rt; rt = rt->next) {
-			i++;
-			/* Check that we did add this route or not */
-			sk = skp = xstrdup(dhcpcd_skiproutes);
-			while ((token = strsep(&skp, ","))) {
-				if (isdigit((unsigned char)*token) &&
-				    atoi(token) == i)
-					break;
-			}
-			free(sk);
-			if (token)
-				continue;
-			if (nr) {
-				rtn->next = xmalloc(sizeof(*rtn));
-				rtn = rtn->next;
-			} else {
-				nr = rtn = xmalloc(sizeof(*rtn));
-			}
-			rtn->dest.s_addr = rt->dest.s_addr;
-			rtn->net.s_addr = rt->net.s_addr;
-			rtn->gate.s_addr = rt->gate.s_addr;
-			rtn->next = NULL;
-		}
-		iface->routes = nr;
-		nr = NULL;
-
-		/* We no longer need this */
-		free(dhcpcd_skiproutes);
-		dhcpcd_skiproutes = NULL;
 	}
 #endif
 
@@ -369,37 +319,10 @@ configure_routes(struct interface *iface, const struct dhcp_message *dhcp,
 			rtn->gate.s_addr = rt->gate.s_addr;
 			rtn->next = NULL;
 		}
-#ifdef THERE_IS_NO_FORK
-		/* If we have daemonised yet we need to record which routes
-		 * we failed to add so we can skip them */
-		else if (!(options->options & DHCPCD_DAEMONISED)) {
-			/* We can never have more than 255 / 4 routes,
-			 * so 3 chars is plently */
-			printf("foo\n");
-			if (*skipp)
-				*skipp++ = ',';
-			skipp += snprintf(skipp,
-					  dhcpcd_skiproutes + skiplen - skipp,
-					  "%d", skip);
-		}
-		skip++;
-#endif
 	}
 	free_routes(ort);
 	free_routes(iface->routes);
 	iface->routes = nr;
-
-#ifdef THERE_IS_NO_FORK
-	if (dhcpcd_skiproutes) {
-		if (*dhcpcd_skiproutes)
-			*skipp = '\0';
-		else {
-			free(dhcpcd_skiproutes);
-			dhcpcd_skiproutes = NULL;
-		}
-	}
-#endif
-
 	return retval;
 }
 

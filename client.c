@@ -182,19 +182,17 @@ get_dhcp_op(uint8_t type)
 	return NULL;
 }
 
+#ifdef THERE_IS_NO_FORK
+#define daemonise(a,b) 0
+#else
 static int
 daemonise(struct if_state *state, const struct options *options)
 {
 	pid_t pid;
 	sigset_t full;
 	sigset_t old;
-#ifdef THERE_IS_NO_FORK
-	char **argv;
-	int i;
-#else
 	char buf = '\0';
 	int sidpipe[2];
-#endif
 
 	if (state->options & DHCPCD_DAEMONISED ||
 	    !(options->options & DHCPCD_DAEMONISE))
@@ -203,7 +201,6 @@ daemonise(struct if_state *state, const struct options *options)
 	sigfillset(&full);
 	sigprocmask(SIG_SETMASK, &full, &old);
 
-#ifndef THERE_IS_NO_FORK
 	/* Setup a signal pipe so parent knows when to exit. */
 	if (pipe(sidpipe) == -1) {
 		logger(LOG_ERR,"pipe: %s", strerror(errno));
@@ -233,36 +230,6 @@ daemonise(struct if_state *state, const struct options *options)
 			close(sidpipe[0]);
 			break;
 	}
-#else
-	logger(LOG_INFO, "forking to background");
-
-	/* We need to add --daemonise to our options */
-	argv = xmalloc(sizeof(char *) * (dhcpcd_argc + 4));
-	argv[0] = dhcpcd;
-	for (i = 1; i < dhcpcd_argc; i++)
-		argv[i] = dhcpcd_argv[i];
-	argv[i] = (char *)"--daemonised";
-	if (dhcpcd_skiproutes) {
-		argv[++i] = (char *)"--skiproutes";
-		argv[++i] = dhcpcd_skiproutes;
-	}
-	argv[i + 1] = NULL;
-
-	switch (pid = vfork()) {
-		case -1:
-			logger(LOG_ERR, "vfork: %s", strerror(errno));
-			_exit(EXIT_FAILURE);
-		case 0:
-			signal_reset();
-			sigprocmask(SIG_SETMASK, &old, NULL);
-			execvp(dhcpcd, argv);
-			/* Must not use stdio here. */
-			write(STDERR_FILENO, "exec failed\n", 12);
-			_exit(EXIT_FAILURE);
-	}
-
-	free(argv);
-#endif
 
 	/* Done with the fd now */
 	if (pid != 0) {
@@ -280,6 +247,7 @@ daemonise(struct if_state *state, const struct options *options)
 	state->options |= DHCPCD_PERSISTENT | DHCPCD_FORKED;
 	return -1;
 }
+#endif
 
 #define THIRTY_YEARS_IN_SECONDS    946707779
 static size_t
@@ -446,10 +414,8 @@ get_old_lease(struct if_state *state)
 	dhcp->servername[0] = '\0';
 
 	if (!IN_LINKLOCAL(ntohl(dhcp->yiaddr))) {
-#ifndef THERE_IS_NO_FORK
 		if (!(state->options & DHCPCD_LASTLEASE))
 			goto eexit;
-#endif
 
 		/* Ensure that we can still use the lease */
 		if (gettimeofday(&tv, NULL) == -1) {
@@ -521,19 +487,6 @@ client_setup(struct if_state *state, const struct options *options)
 			logger(LOG_ERR, "cannot request a link local address");
 			return -1;
 		}
-#ifdef THERE_IS_NO_FORK
-		if (options->options & DHCPCD_DAEMONISED) {
-			iface->addr.s_addr = lease->addr.s_addr;
-			iface->net.s_addr = lease->net.s_addr;
-			state->new = state->offer;
-			state->offer = NULL;
-			get_option_addr(&lease->server.s_addr,
-					state->new, DHCP_SERVERID);
-			open_socket(iface, ETHERTYPE_ARP);
-			state->state = STATE_ANNOUNCING;
-			state->timeout.tv_sec = ANNOUNCE_INTERVAL;
-		}
-#endif
 	} else {
 		lease->addr.s_addr = options->request_address.s_addr;
 		lease->net.s_addr = options->request_netmask.s_addr;

@@ -28,7 +28,6 @@
 const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 
 #include <sys/file.h>
-#include <sys/stat.h>
 #include <sys/types.h>
 
 #include <arpa/inet.h>
@@ -92,10 +91,6 @@ static const struct option longopts[] = {
 	{"blacklist",   required_argument,  NULL, 'X'},
 	{"help",        no_argument,        &dohelp, 1},
 	{"version",     no_argument,        &doversion, 1},
-#ifdef THERE_IS_NO_FORK
-	{"daemonised",	no_argument,        NULL, 'z'},
-	{"skiproutes",  required_argument,  NULL, 'Z'},
-#endif
 #ifdef CMDLINE_COMPAT
 	{"nohostname",  no_argument,        NULL, 'H'},
 	{"nomtu",       no_argument,        NULL, 'M'},
@@ -106,14 +101,6 @@ static const struct option longopts[] = {
 #endif
 	{NULL,          0,                  NULL, '\0'}
 };
-
-#ifdef THERE_IS_NO_FORK
-char dhcpcd[PATH_MAX];
-char **dhcpcd_argv = NULL;
-int dhcpcd_argc = 0;
-char *dhcpcd_skiproutes = NULL;
-#define EXTRA_OPTS "zZ:"
-#endif
 
 #ifdef CMDLINE_COMPAT
 # define EXTRA_OPTS "HMNRSY"
@@ -608,11 +595,6 @@ main(int argc, char **argv)
 	FILE *f;
 	char *cf = NULL;
 	char *intf = NULL;
-#ifdef THERE_IS_NO_FORK
-	char argvp[PATH_MAX];
-	char *path, *token;
-	struct stat sb;
-#endif
 
 	closefrom(3);
 	/* Saves calling fflush(stream) in the logger */
@@ -642,27 +624,6 @@ main(int argc, char **argv)
 	if ((f = fopen(DUID, "r"))) {
 		options->options |= DHCPCD_DUID;
 		fclose(f);
-	}
-#endif
-
-#ifdef THERE_IS_NO_FORK
-	dhcpcd_argv = argv;
-	dhcpcd_argc = argc;
-	if (*argv[0] == '/' || *argv[0] == '.')
-		strncpy(argvp, argv[0], sizeof(argvp));
-	else {
-		p = path = xstrdup(getenv("PATH"));
-		while ((token = strsep(&p, ":"))) {
-			snprintf(argvp, sizeof(argvp), "%s/%s", token, argv[0]);
-			if (stat(argvp, &sb) == 0)
-				break;
-		}
-		free(path);
-	}
-	if (!realpath(argvp, dhcpcd)) {
-		logger(LOG_ERR, "unable to resolve the path `%s': %s\n",
-		       argv[0], strerror(errno));
-		goto abort;
 	}
 #endif
 
@@ -790,15 +751,6 @@ main(int argc, char **argv)
 			break;
 		case 'f':
 			break;
-#ifdef THERE_IS_NO_FORK
-		case 'z':
-			options->options |= DHCPCD_DAEMONISED;
-			close_fds();
-			break;
-		case 'Z':
-			dhcpcd_skiproutes = xstrdup(optarg);
-			break;
-#endif
 		case 'k':
 			sig = SIGHUP;
 			break;
@@ -841,6 +793,10 @@ main(int argc, char **argv)
 			goto abort;
 		}
 	}
+
+#ifdef THERE_IS_NO_FORK
+	options->options &= ~DHCPCD_DAEMONISE;
+#endif
 
 	if (options->request_address.s_addr == 0 &&
 	    (options->options & DHCPCD_INFORM ||
@@ -972,13 +928,6 @@ abort:
 	}
 	free(options->blacklist);
 	free(options);
-
-#ifdef THERE_IS_NO_FORK
-	/* There may have been an error before the dhcp_run function
-	 * clears this, so just do it here to be safe */
-	free(dhcpcd_skiproutes);
-#endif
-
 	exit(retval);
 	/* NOTREACHED */
 }
