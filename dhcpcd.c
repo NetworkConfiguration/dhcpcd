@@ -41,6 +41,7 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "config.h"
 #include "client.h"
