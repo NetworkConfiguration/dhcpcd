@@ -425,7 +425,7 @@ get_old_lease(struct if_state *state)
 
 		offset = tv.tv_sec - lease->leasedfrom;
 		if (lease->leasedfrom &&
-		    tv.tv_sec - lease->leasedfrom > lease->leasetime)
+		    tv.tv_sec - lease->leasedfrom > (time_t)lease->leasetime)
 		{
 			logger(LOG_ERR, "lease expired %u seconds ago",
 			       offset + lease->leasetime);
@@ -490,6 +490,16 @@ client_setup(struct if_state *state, const struct options *options)
 	} else {
 		lease->addr.s_addr = options->request_address.s_addr;
 		lease->net.s_addr = options->request_netmask.s_addr;
+	}
+
+	if (options->options & DHCPCD_REQUEST &&
+	    state->options & DHCPCD_ARP &&
+	    !state->offer)
+	{
+		state->offer = xzalloc(sizeof(*state->offer));
+		state->offer->yiaddr = options->request_address.s_addr;
+		state->state = STATE_PROBING;
+		state->xid = arc4random();
 	}
 
 	/* If INFORMing, ensure the interface has the address */
@@ -887,6 +897,8 @@ static int bind_dhcp(struct if_state *state, const struct options *options)
 	state->conflicts = 0;
 	state->defend = 0;
 	timerclear(&state->exit);
+	if (clock_monotonic)
+		get_monotonic(&lease->boundtime);
 
 	if (options->options & DHCPCD_INFORM) {
 		if (options->request_address.s_addr != 0)
@@ -1094,6 +1106,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 	struct interface *iface = state->interface;
 	int i = 0;
 	struct in_addr addr;
+	struct timeval tv;
 
 	timerclear(&state->timeout);
 	if (timerneg(&state->exit))
@@ -1200,9 +1213,16 @@ handle_timeout(struct if_state *state, const struct options *options)
 			close(iface->arp_fd);
 			iface->arp_fd = -1;
 			if (lease->leasetime != ~0U) {
-				state->stop.tv_sec = lease->renewaltime -
-					(ANNOUNCE_INTERVAL * ANNOUNCE_NUM);
+				state->stop.tv_sec = lease->renewaltime;
 				state->stop.tv_usec = 0;
+				if (clock_monotonic) {
+					get_monotonic(&tv);
+					timersub(&tv, &lease->boundtime, &tv);
+					timersub(&state->stop, &tv, &state->stop);
+				} else {
+					state->stop.tv_sec -=
+						(ANNOUNCE_INTERVAL * ANNOUNCE_NUM);
+				}
 				logger(LOG_DEBUG, "renew in %ld seconds",
 				       state->stop.tv_sec);
 			}
@@ -1297,6 +1317,8 @@ dhcp_timeout:
 		/* FALLTHROUGH */
 	case STATE_RENEWING:   /* FALLTHROUGH */
 	case STATE_REBINDING:
+		if (iface->raw_fd == -1)
+			do_socket(state, SOCKET_OPEN);
 		send_message(state, DHCP_REQUEST, options);
 		break;
 	}
@@ -1445,6 +1467,10 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 					dhcp, DHO_SERVERID);
 			log_dhcp(LOG_INFO, "acknowledged", dhcp);
 		}
+		if (!state->offer) {
+			state->offer = dhcp;
+			*dhcpp = NULL;
+		}
 		break;
 	default:
 		logger(LOG_ERR, "wrong state %d", state->state);
@@ -1452,10 +1478,11 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 
 	do_socket(state, SOCKET_CLOSED);
 	r = bind_dhcp(state, options);
-	if (!state->options & DHCPCD_ARP) {
-		logger(LOG_DEBUG, "renew in %u seconds", lease->renewaltime);
+	if (!(state->options & DHCPCD_ARP)) {
+		logger(LOG_DEBUG, "renew in %ld seconds", state->stop.tv_sec);
 		return r;
 	}
+	state->state = STATE_ANNOUNCING;
 	if (state->options & DHCPCD_FORKED)
 		return r;
 	return 1;
@@ -1608,14 +1635,20 @@ static int
 handle_arp_fail(struct if_state *state, const struct options *options)
 {
 	time_t up;
+	int cookie = state->offer->cookie;
 
 	if (!IN_LINKLOCAL(htonl(state->fail.s_addr))) {
+		state->state = STATE_INIT;
+		free(state->offer);
+		state->offer = NULL;
+		state->lease.addr.s_addr = 0;
+		if (!cookie)
+			return 1;
+		state->timeout.tv_sec = DHCP_ARP_FAIL;
+		state->timeout.tv_usec = 0;
 		do_socket(state, SOCKET_OPEN);
 		send_message(state, DHCP_DECLINE, options);
 		do_socket(state, SOCKET_CLOSED);
-		state->state = STATE_INIT;
-		state->timeout.tv_sec = DHCP_ARP_FAIL;
-		state->timeout.tv_usec = 0;
 		return 0;
 	}
 
