@@ -865,7 +865,11 @@ main(int argc, char **argv)
 			       ""PACKAGE" not running");
 			unlink(options->pidfile);
 		}
-		if (i == 0 && (sig == SIGTERM || sig == SIGHUP)) {
+		if (i == 0) {
+			if (sig == SIGALRM) {
+				retval = EXIT_SUCCESS;
+				goto abort;
+			}
 			/* Spin until it exits */
 			logger(LOG_INFO, "waiting for pid %d to exit", pid);
 			ts.tv_sec = 0;
