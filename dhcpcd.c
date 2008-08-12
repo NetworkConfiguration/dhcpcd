@@ -595,6 +595,7 @@ main(int argc, char **argv)
 	FILE *f;
 	char *cf = NULL;
 	char *intf = NULL;
+	struct timespec ts;
 
 	closefrom(3);
 	/* Saves calling fflush(stream) in the logger */
@@ -863,8 +864,20 @@ main(int argc, char **argv)
 			       ""PACKAGE" not running");
 			unlink(options->pidfile);
 		}
-		if (i == 0) {
-			retval = EXIT_SUCCESS;
+		if (i == 0 && (sig == SIGTERM || sig == SIGHUP)) {
+			/* Spin until it exits */
+			logger(LOG_INFO, "waiting for pid %d to exit", pid);
+			ts.tv_sec = 0;
+			ts.tv_nsec = 100000000; /* 10th of a second */
+			for(i = 0; i < 100; i++) {
+				nanosleep(&ts, NULL);
+				if (read_pid(options->pidfile) == 0) {
+					retval = EXIT_SUCCESS;
+					break;
+				}
+			}
+			if (retval != EXIT_SUCCESS)
+				logger(LOG_ERR, "pid %d failed to exit", pid);
 			goto abort;
 		}
 		if (sig != SIGALRM)
