@@ -1150,14 +1150,19 @@ handle_timeout(struct if_state *state, const struct options *options)
 		} else {
 			/* We've waited for ANNOUNCE_WAIT after the final probe
 			 * so the address is now ours */
-			i = bind_dhcp(state, options);
-			state->state = STATE_ANNOUNCING;
-			state->timeout.tv_sec = ANNOUNCE_INTERVAL;
-			state->timeout.tv_usec = 0;
-			return i;
+			if (IN_LINKLOCAL(htonl(state->offer->yiaddr))) {
+				i = bind_dhcp(state, options);
+				state->state = STATE_ANNOUNCING;
+				state->timeout.tv_sec = ANNOUNCE_INTERVAL;
+				state->timeout.tv_usec = 0;
+				return i;
+			}
+			state->state = STATE_REQUESTING;
 		}
 		break;
 	case STATE_ANNOUNCING:
+		if (iface->arp_fd == -1)
+			open_socket(iface, ETHERTYPE_ARP);
 		if (state->claims < ANNOUNCE_NUM) {
 			state->claims++;
 			if (state->claims < ANNOUNCE_NUM) {
@@ -1198,8 +1203,8 @@ handle_timeout(struct if_state *state, const struct options *options)
 				state->stop.tv_sec = lease->renewaltime -
 					(ANNOUNCE_INTERVAL * ANNOUNCE_NUM);
 				state->stop.tv_usec = 0;
-				logger(LOG_DEBUG, "renew in %0.2f seconds",
-				       timeval_to_double(&state->stop));
+				logger(LOG_DEBUG, "renew in %ld seconds",
+				       state->stop.tv_sec);
 			}
 		}
 		return 0;
@@ -1396,8 +1401,26 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 			run_script(options, iface->name, "TEST", dhcp, NULL);
 			return 0;
 		}
-		state->state = STATE_REQUESTING;
+		free(state->offer);
+		state->offer = dhcp;
+		*dhcpp = NULL;
 		timerclear(&state->timeout);
+		if (state->options & DHCPCD_ARP &&
+		    iface->addr.s_addr != state->offer->yiaddr)
+		{
+			/* If the interface already has the address configured
+			 * then we can't ARP for duplicate detection. */
+			addr.s_addr = state->offer->yiaddr;
+			if (!has_address(iface->name, &addr, NULL)) {
+				state->state = STATE_PROBING;
+				state->claims = 0;
+				state->probes = 0;
+				state->conflicts = 0;
+				timerclear(&state->stop);
+				return 1;
+			}
+		}
+		state->state = STATE_REQUESTING;
 		return 1;
 	}
 
@@ -1428,30 +1451,14 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 	}
 
 	do_socket(state, SOCKET_CLOSED);
-	free(state->offer);
-	state->offer = dhcp;
-	*dhcpp = NULL;
-
-	if (state->options & DHCPCD_ARP &&
-	    iface->addr.s_addr != state->offer->yiaddr)
-	{
-		/* If the interface already has the address configured then
-		 * we can't ARP for duplicate detection. */
-		addr.s_addr = state->offer->yiaddr;
-		if (!has_address(iface->name, &addr, NULL)) {
-			state->state = STATE_PROBING;
-			state->claims = 0;
-			state->probes = 0;
-			state->conflicts = 0;
-			timerclear(&state->timeout);
-			timerclear(&state->stop);
-			return 1;
-		}
-	}
-
 	r = bind_dhcp(state, options);
-	logger(LOG_DEBUG, "renew in %u seconds", lease->renewaltime);
-	return r;
+	if (!state->options & DHCPCD_ARP) {
+		logger(LOG_DEBUG, "renew in %u seconds", lease->renewaltime);
+		return r;
+	}
+	if (state->options & DHCPCD_FORKED)
+		return r;
+	return 1;
 }
 
 static int
