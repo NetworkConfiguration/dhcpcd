@@ -3,7 +3,7 @@
 need_hostname()
 {
 	case "$(hostname)" in
-	""|"(none)"|localhost)
+	""|"(none)"|localhost|localhost.localdomain)
 		[ -n "${new_host_name}" -o -n "${new_fqdn_name}" ];;
 	"${old_host_name}"|"${old_fqdn_name}")
 		true;;
