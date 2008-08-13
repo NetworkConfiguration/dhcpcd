@@ -350,10 +350,12 @@ configure(struct interface *iface, const char *reason,
 #endif
 
 	/* Grab our IP config */
-	if (dhcp == NULL || dhcp->yiaddr == 0)
+	if (dhcp == NULL)
 		up = 0;
 	else {
 		addr.s_addr = dhcp->yiaddr;
+		if (addr.s_addr == 0)
+			addr.s_addr = lease->addr.s_addr;
 		/* Ensure we have all the needed values */
 		if (get_option_addr(&net.s_addr, dhcp, DHO_SUBNETMASK) == -1)
 			net.s_addr = get_netmask(addr.s_addr);

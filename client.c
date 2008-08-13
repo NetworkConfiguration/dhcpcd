@@ -1252,7 +1252,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 		 * INIT-REBOOT state correctly. */
 		lease->server.s_addr = 0;
 		state->messages = 0;
-		if (lease->addr.s_addr) {
+		if (lease->addr.s_addr && !(state->options & DHCPCD_INFORM)) {
 			logger(LOG_INFO, "renewing lease of %s",
 			       inet_ntoa(lease->addr));
 			state->state = STATE_RENEWING;
@@ -1467,10 +1467,9 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 					dhcp, DHO_SERVERID);
 			log_dhcp(LOG_INFO, "acknowledged", dhcp);
 		}
-		if (!state->offer) {
-			state->offer = dhcp;
-			*dhcpp = NULL;
-		}
+		free(state->offer);
+		state->offer = dhcp;
+		*dhcpp = NULL;
 		break;
 	default:
 		logger(LOG_ERR, "wrong state %d", state->state);
@@ -1479,8 +1478,9 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 	do_socket(state, SOCKET_CLOSED);
 	r = bind_dhcp(state, options);
 	if (!(state->options & DHCPCD_ARP)) {
-		logger(LOG_DEBUG, "renew in %ld seconds",
-		       (long int)state->stop.tv_sec);
+		if (!(state->options & DHCPCD_INFORM))
+			logger(LOG_DEBUG, "renew in %ld seconds",
+			       (long int)state->stop.tv_sec);
 		return r;
 	}
 	state->state = STATE_ANNOUNCING;
