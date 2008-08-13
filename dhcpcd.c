@@ -397,7 +397,7 @@ parse_option(int opt, char *oarg, struct options *options)
 	case 'r':
 		if (!(options->options & DHCPCD_INFORM))
 			options->options |= DHCPCD_REQUEST;
-		if (*oarg && !inet_aton(oarg, &options->request_address)) {
+		if (oarg && !inet_aton(oarg, &options->request_address)) {
 			logger(LOG_ERR, "`%s' is not a valid IP address",
 			       oarg);
 			return -1;
