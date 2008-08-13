@@ -245,7 +245,7 @@ do_interface(const char *ifname,
 			sdl = xmalloc(ifr->ifr_addr.sa_len);
 			memcpy(sdl, &ifr->ifr_addr, ifr->ifr_addr.sa_len);
 			*hwlen = sdl->sdl_alen;
-			memcpy(hwaddr, LLADDR(sdl), (size_t)sdl->sdl_alen);
+			memcpy(hwaddr, LLADDR(sdl), *hwlen);
 			free(sdl);
 			retval = 1;
 			break;
