@@ -87,7 +87,7 @@ enum DHO
 	DHO_MAXMESSAGESIZE         = 57,
 	DHO_RENEWALTIME            = 58,
 	DHO_REBINDTIME             = 59,
-	DHO_CLASSID                = 60,
+	DHO_VENDORCLASSID          = 60,
 	DHO_CLIENTID               = 61,
 	DHO_USERCLASS              = 77,  /* RFC 3004 */
 	DHO_FQDN                   = 81,

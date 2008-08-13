@@ -42,7 +42,7 @@
 #define DEFAULT_LEASETIME	3600	/* 1 hour */
 
 #define HOSTNAME_MAX_LEN	250	/* 255 - 3 (FQDN) - 2 (DNS enc) */
-#define CLASSID_MAX_LEN		48
+#define VENDORCLASSID_MAX_LEN	48
 #define CLIENTID_MAX_LEN	48
 #define USERCLASS_MAX_LEN	255
 #define VENDOR_MAX_LEN		255
@@ -83,7 +83,7 @@ struct options {
 
 	char hostname[HOSTNAME_MAX_LEN + 1];
 	int fqdn;
-	uint8_t classid[CLASSID_MAX_LEN + 1];
+	uint8_t vendorclassid[VENDORCLASSID_MAX_LEN + 1];
 	char clientid[CLIENTID_MAX_LEN + 1];
 	uint8_t userclass[USERCLASS_MAX_LEN + 1];
 	uint8_t vendor[VENDOR_MAX_LEN + 1];

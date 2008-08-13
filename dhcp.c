@@ -828,10 +828,11 @@ make_message(struct dhcp_message **message,
 			p += options->userclass[0] + 1;
 		}
 
-		if (options->classid[0]) {
-			*p++ = DHO_CLASSID;
-			memcpy(p, options->classid, options->classid[0] + 1);
-			p += options->classid[0] + 1;
+		if (options->vendorclassid[0]) {
+			*p++ = DHO_VENDORCLASSID;
+			memcpy(p, options->vendorclassid,
+			       options->vendorclassid[0] + 1);
+			p += options->vendorclassid[0] + 1;
 		}
 	}
 

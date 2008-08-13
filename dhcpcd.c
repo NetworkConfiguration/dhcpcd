@@ -58,48 +58,49 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 static int doversion = 0;
 static int dohelp = 0;
 static const struct option longopts[] = {
-	{"background",  no_argument,        NULL, 'b'},
-	{"script",      required_argument,  NULL, 'c'},
-	{"debug",       no_argument,        NULL, 'd'},
-	{"config",	required_argument,  NULL, 'f'},
-	{"hostname",    optional_argument,  NULL, 'h'},
-	{"classid",     optional_argument,  NULL, 'i'},
-	{"release",     no_argument,        NULL, 'k'},
-	{"leasetime",   required_argument,  NULL, 'l'},
-	{"metric",      required_argument,  NULL, 'm'},
-	{"renew",       no_argument,        NULL, 'n'},
-	{"option",      required_argument,  NULL, 'o'},
-	{"persistent",  no_argument,        NULL, 'p'},
-	{"quiet",       no_argument,        NULL, 'q'},
-	{"request",     optional_argument,  NULL, 'r'},
-	{"inform",      optional_argument,  NULL, 's'},
-	{"timeout",     required_argument,  NULL, 't'},
-	{"userclass",   required_argument,  NULL, 'u'},
-	{"vendor",      required_argument,  NULL, 'v'},
-	{"exit",        no_argument,        NULL, 'x'},
-	{"noarp",       no_argument,        NULL, 'A'},
-	{"nobackground",no_argument,        NULL, 'B'},
-	{"nohook",	required_argument,  NULL, 'C'},
-	{"duid",        no_argument,        NULL, 'D'},
-	{"lastlease",   no_argument,        NULL, 'E'},
-	{"fqdn",        optional_argument,  NULL, 'F'},
-	{"nogateway",   no_argument,        NULL, 'G'},
-	{"clientid",    optional_argument,  NULL, 'I'},
-	{"nolink",      no_argument,        NULL, 'K'},
-	{"noipv4ll",    no_argument,        NULL, 'L'},
-	{"nooption",    optional_argument,  NULL, 'O'},
-	{"test",        no_argument,        NULL, 'T'},
-	{"variables",   no_argument,        NULL, 'V'},
-	{"blacklist",   required_argument,  NULL, 'X'},
-	{"help",        no_argument,        &dohelp, 1},
-	{"version",     no_argument,        &doversion, 1},
+	{"background",    no_argument,        NULL, 'b'},
+	{"script",        required_argument,  NULL, 'c'},
+	{"debug",         no_argument,        NULL, 'd'},
+	{"config",        required_argument,  NULL, 'f'},
+	{"hostname",      optional_argument,  NULL, 'h'},
+	{"vendorclassid", optional_argument,  NULL, 'i'},
+	{"release",       no_argument,        NULL, 'k'},
+	{"leasetime",     required_argument,  NULL, 'l'},
+	{"metric",        required_argument,  NULL, 'm'},
+	{"renew",         no_argument,        NULL, 'n'},
+	{"option",        required_argument,  NULL, 'o'},
+	{"persistent",    no_argument,        NULL, 'p'},
+	{"quiet",         no_argument,        NULL, 'q'},
+	{"request",       optional_argument,  NULL, 'r'},
+	{"inform",        optional_argument,  NULL, 's'},
+	{"timeout",       required_argument,  NULL, 't'},
+	{"userclass",     required_argument,  NULL, 'u'},
+	{"vendor",        required_argument,  NULL, 'v'},
+	{"exit",          no_argument,        NULL, 'x'},
+	{"noarp",         no_argument,        NULL, 'A'},
+	{"nobackground",  no_argument,        NULL, 'B'},
+	{"nohook",	  required_argument,  NULL, 'C'},
+	{"duid",          no_argument,        NULL, 'D'},
+	{"lastlease",     no_argument,        NULL, 'E'},
+	{"fqdn",          optional_argument,  NULL, 'F'},
+	{"nogateway",     no_argument,        NULL, 'G'},
+	{"clientid",      optional_argument,  NULL, 'I'},
+	{"nolink",        no_argument,        NULL, 'K'},
+	{"noipv4ll",      no_argument,        NULL, 'L'},
+	{"nooption",      optional_argument,  NULL, 'O'},
+	{"test",          no_argument,        NULL, 'T'},
+	{"variables",     no_argument,        NULL, 'V'},
+	{"blacklist",     required_argument,  NULL, 'X'},
+	{"help",          no_argument,        &dohelp, 1},
+	{"version",       no_argument,        &doversion, 1},
 #ifdef CMDLINE_COMPAT
-	{"nohostname",  no_argument,        NULL, 'H'},
-	{"nomtu",       no_argument,        NULL, 'M'},
-	{"nontp",       no_argument,        NULL, 'N'},
-	{"nodns",       no_argument,        NULL, 'R'},
-	{"msscr",       no_argument,        NULL, 'S'},
-	{"nonis",       no_argument,        NULL, 'Y'},
+	{"classid",       optional_argument,  NULL, 'i'},
+	{"nohostname",    no_argument,        NULL, 'H'},
+	{"nomtu",         no_argument,        NULL, 'M'},
+	{"nontp",         no_argument,        NULL, 'N'},
+	{"nodns",         no_argument,        NULL, 'R'},
+	{"msscr",         no_argument,        NULL, 'S'},
+	{"nonis",         no_argument,        NULL, 'Y'},
 #endif
 	{NULL,          0,                  NULL, '\0'}
 };
@@ -329,15 +330,15 @@ parse_option(int opt, char *oarg, struct options *options)
 		break;
 	case 'i':
 		if (oarg)
-			s = parse_string((char *)options->classid + 1,
-					 CLASSID_MAX_LEN, oarg);
+			s = parse_string((char *)options->vendorclassid + 1,
+					 VENDORCLASSID_MAX_LEN, oarg);
 		else
 			s = 0;
 		if (s == -1) {
-			logger(LOG_ERR, "classid: %s", strerror(errno));
+			logger(LOG_ERR, "vendorclassid: %s", strerror(errno));
 			return -1;
 		}
-		*options->classid = (uint8_t)s;
+		*options->vendorclassid = (uint8_t)s;
 		break;
 	case 'l':
 		if (*oarg == '-') {
@@ -507,7 +508,7 @@ parse_option(int opt, char *oarg, struct options *options)
 		break;
 	case 'I':
 		/* Strings have a type of 0 */;
-		options->classid[1] = 0;
+		options->clientid[1] = 0;
 		if (oarg)
 			s = parse_string_hwaddr((char *)options->clientid + 1,
 						CLIENTID_MAX_LEN, oarg, 1);
@@ -611,8 +612,9 @@ main(int argc, char **argv)
 	options->timeout = DEFAULT_TIMEOUT;
 	strlcpy(options->script, SCRIPT, sizeof(options->script));
 
-	options->classid[0] = snprintf((char *)options->classid + 1, CLASSID_MAX_LEN,
-				       "%s %s", PACKAGE, VERSION);
+	options->vendorclassid[0] = snprintf((char *)options->vendorclassid + 1,
+					     VENDORCLASSID_MAX_LEN,
+					     "%s %s", PACKAGE, VERSION);
 
 #ifdef CMDLINE_COMPAT
 	add_reqmask(options->reqmask, DHCP_DNSSERVER);
