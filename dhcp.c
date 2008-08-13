@@ -168,9 +168,9 @@ print_options(void)
 
 int make_reqmask(uint8_t *mask, char **opts, int add)
 {
-	char *token;
-	char *p = *opts;
+	char *token, *p = *opts, *t;
 	const struct dhcp_opt *opt;
+	int match, n;
 
 	while ((token = strsep(&p, ", "))) {
 		if (*token == '\0')
@@ -178,7 +178,17 @@ int make_reqmask(uint8_t *mask, char **opts, int add)
 		for (opt = dhcp_opts; opt->option; opt++) {
 			if (!opt->var)
 				continue;
-			if (strcmp(opt->var, token) == 0) {
+			match = 0;
+			if (strcmp(opt->var, token) == 0)
+				match = 1;
+			else {
+				errno = 0;
+				n = strtol(token, &t, 0);
+				if (errno == 0 && !*t)
+					if (opt->option == n)
+						match = 1;
+			}
+			if (match) {	
 				if (add == 1)
 					add_reqmask(mask,
 						    opt->option);
