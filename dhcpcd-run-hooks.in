@@ -23,7 +23,7 @@ clean_conf()
 		for x in $(sed -n "s/${m1}//p" "${cft}"); do
 			if [ ! -s /var/run/dhcpcd-${x}.pid ]; then
 				m1="^${signtaure_base}${x}$"
-				m2="^${signature_base_end} ${x}$"
+				m2="^${signature_base_end}${x}$"
 				sed "/${m1}/,/${m2}/d" "${cft}" >"${cft}".tmp
 				mv -f "${cft}".tmp "${cft}"
 			fi
