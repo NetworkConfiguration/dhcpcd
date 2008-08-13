@@ -1224,7 +1224,7 @@ handle_timeout(struct if_state *state, const struct options *options)
 						(ANNOUNCE_INTERVAL * ANNOUNCE_NUM);
 				}
 				logger(LOG_DEBUG, "renew in %ld seconds",
-				       state->stop.tv_sec);
+				       (long int)state->stop.tv_sec);
 			}
 		}
 		return 0;
@@ -1479,7 +1479,8 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 	do_socket(state, SOCKET_CLOSED);
 	r = bind_dhcp(state, options);
 	if (!(state->options & DHCPCD_ARP)) {
-		logger(LOG_DEBUG, "renew in %ld seconds", state->stop.tv_sec);
+		logger(LOG_DEBUG, "renew in %ld seconds",
+		       (long int)state->stop.tv_sec);
 		return r;
 	}
 	state->state = STATE_ANNOUNCING;
