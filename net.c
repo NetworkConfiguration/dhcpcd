@@ -194,9 +194,8 @@ do_interface(const char *ifname,
 	struct sockaddr_in address;
 	struct ifreq *ifr;
 	struct sockaddr_in netmask;
-
 #ifdef AF_LINK
-	struct sockaddr_dl sdl;
+	struct sockaddr_dl *sdl;
 #endif
 
 	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
@@ -243,10 +242,11 @@ do_interface(const char *ifname,
 
 #ifdef AF_LINK
 		if (hwaddr && hwlen && ifr->ifr_addr.sa_family == AF_LINK) {
-			memcpy(&sdl, &ifr->ifr_addr, sizeof(sdl));
-			*hwlen = sdl.sdl_alen;
-			memcpy(hwaddr, sdl.sdl_data + sdl.sdl_nlen,
-			       (size_t)sdl.sdl_alen);
+			sdl = xmalloc(ifr->ifr_addr.sa_len);
+			memcpy(sdl, &ifr->ifr_addr, ifr->ifr_addr.sa_len);
+			*hwlen = sdl->sdl_alen;
+			memcpy(hwaddr, LLADDR(sdl), (size_t)sdl->sdl_alen);
+			free(sdl);
 			retval = 1;
 			break;
 		}
