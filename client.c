@@ -1740,13 +1740,12 @@ dhcp_run(const struct options *options, int *pid_fd)
 		logger(LOG_ERR, "read_interface: %s", strerror(errno));
 		goto eexit;
 	}
-
 	logger(LOG_DEBUG, "hardware address = %s",
 	       hwaddr_ntoa(iface->hwaddr, iface->hwlen));
-
 	state = xzalloc(sizeof(*state));
 	state->pid_fd = pid_fd;
 	state->interface = iface;
+	run_script(options, iface->name, "PREINIT", NULL, NULL);
 
 	if (client_setup(state, options) == -1)
 		goto eexit;
@@ -1754,7 +1753,6 @@ dhcp_run(const struct options *options, int *pid_fd)
 		goto eexit;
 	if (signal_setup() == -1)
 		goto eexit;
-
 	state->signal_fd = signal_fd();
 
 	if (state->options & DHCPCD_BACKGROUND &&
