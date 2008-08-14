@@ -803,38 +803,9 @@ main(int argc, char **argv)
 	options->options &= ~DHCPCD_DAEMONISE;
 #endif
 
-	if (options->request_address.s_addr == 0 &&
-	    (options->options & DHCPCD_INFORM ||
-	     options->options & DHCPCD_REQUEST))
-	{
-		if (get_address(options->interface,
-				&options->request_address,
-				&options->request_netmask) != 1)
-		{
-			logger(LOG_ERR, "no existing address");
-			goto abort;
-		}
-	}
-
-	if (IN_LINKLOCAL(ntohl(options->request_address.s_addr))) {
-		logger(LOG_ERR,
-		       "you are not allowed to request a link local address");
-		goto abort;
-	}
-
 	if (geteuid())
 		logger(LOG_WARNING, PACKAGE " will not work correctly unless"
 		       " run as root");
-
-	prefix = xmalloc(sizeof(char) * (IF_NAMESIZE + 3));
-	snprintf(prefix, IF_NAMESIZE, "%s: ", options->interface);
-	setlogprefix(prefix);
-	snprintf(options->pidfile, sizeof(options->pidfile), PIDFILE,
-		 options->interface);
-	free(prefix);
-
-	chdir("/");
-	umask(022);
 
 	if (options->options & DHCPCD_TEST) {
 		if (options->options & DHCPCD_REQUEST ||
@@ -855,6 +826,39 @@ main(int argc, char **argv)
 			goto abort;
 		}
 	}
+
+	prefix = xmalloc(sizeof(char) * (IF_NAMESIZE + 3));
+	snprintf(prefix, IF_NAMESIZE, "%s: ", options->interface);
+	setlogprefix(prefix);
+	snprintf(options->pidfile, sizeof(options->pidfile), PIDFILE,
+		 options->interface);
+	free(prefix);
+
+	if (options->request_address.s_addr == 0 &&
+	    (options->options & DHCPCD_INFORM ||
+	     options->options & DHCPCD_REQUEST))
+	{
+		errno = 0;
+		if (get_address(options->interface,
+				&options->request_address,
+				&options->request_netmask) != 1)
+		{
+			if (errno)
+				logger(LOG_ERR, "get_address: %s",
+				       strerror(errno));
+			else
+				logger(LOG_ERR, "no existing address");
+			goto abort;
+		}
+	}
+	if (IN_LINKLOCAL(ntohl(options->request_address.s_addr))) {
+		logger(LOG_ERR,
+		       "you are not allowed to request a link local address");
+		goto abort;
+	}
+
+	chdir("/");
+	umask(022);
 
 	if (sig != 0 && !(options->options & DHCPCD_DAEMONISED)) {
 		i = -1;
