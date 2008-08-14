@@ -183,7 +183,7 @@ do_interface(const char *ifname,
 {
 	int s;
 	struct ifconf ifc;
-	int retval = 0;
+	int retval = 0, found = 0;
 	int len = 10 * sizeof(struct ifreq);
 	int lastlen = 0;
 	char *p;
@@ -240,6 +240,8 @@ do_interface(const char *ifname,
 		if (strcmp(ifname, ifr->ifr_name) != 0)
 			continue;
 
+		found = 1;
+
 #ifdef AF_LINK
 		if (hwaddr && hwlen && ifr->ifr_addr.sa_family == AF_LINK) {
 			sdl = xmalloc(ifr->ifr_addr.sa_len);
@@ -275,6 +277,8 @@ do_interface(const char *ifname,
 
 	}
 
+	if (!found)
+		errno = ENXIO;
 	close(s);
 	free(ifc.ifc_buf);
 	return retval;
