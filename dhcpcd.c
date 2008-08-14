@@ -864,8 +864,8 @@ main(int argc, char **argv)
 			       sig, pid);
 
 		if (!pid || (i = kill(pid, sig))) {
-			logger(sig == SIGALRM ? LOG_INFO : LOG_ERR,
-			       ""PACKAGE" not running");
+			if (sig != SIGALRM)
+				logger(LOG_ERR, ""PACKAGE" not running");
 			unlink(options->pidfile);
 		}
 		if (i == 0) {
