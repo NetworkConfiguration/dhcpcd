@@ -7,6 +7,21 @@ signature="${signature_base}${interface}"
 signature_base_end="# End of dhcpcd from "
 signature_end="${signature_base_end}${interface}"
 
+# Ensure that all arguments are unique
+uniqify()
+{
+	local result=
+
+	while [ -n "$1" ]; do
+		case " ${result} " in
+		*" $1 "*);;
+		*) result="${result}${result:+ }$1";;
+		esac
+		shift
+	done
+	echo "${result}"
+}
+
 # Clean a configuration file of our current signature and stale ones
 clean_conf()
 {
