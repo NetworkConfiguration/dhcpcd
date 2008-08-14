@@ -689,7 +689,7 @@ static void
 drop_config(struct if_state *state, const char *reason,
 	    const struct options *options)
 {
-	if (state->new) {
+	if (state->new || strcmp(reason, "FAIL") == 0) {
 		configure(state->interface, reason, NULL, state->new,
 			  &state->lease, options, 0);
 		free(state->old);
