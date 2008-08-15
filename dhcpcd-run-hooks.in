@@ -36,6 +36,48 @@ list_interfaces()
 	echo "${interfaces}"
 }
 
+# We normally use sed to extract values using a key from a list of files
+# but sed may not always be available at the time.
+key_get_value()
+{
+	local key="$1" value= x= line=
+
+	shift
+	if type sed >/dev/null 2>&1; then
+		sed -n "s/^${key} //p" $@
+	else
+		for x; do
+			while read line; do
+				case "${line}" in
+				"${key} "*) echo "${line##${key} }";;
+				esac
+			done < "${x}"
+		done
+	fi
+}
+
+# We normally use sed to remove markers from a configuration file
+# but sed may not always be available at the time.
+remove_markers()
+{
+	local m1="$1" m2="$2" x= line= in_marker=0
+
+	shift; shift
+	if type sed >/dev/null 2>&1; then
+		sed "/^${m1}/,/^${m2}/d" $@
+	else
+		for x; do
+			while read line; do
+				case "${line}" in
+				"${m1}"*) in_marker=1;;
+				"${m2}"*) in_marker=0;;
+				*) [ ${in_marker} = 0 ] && echo "${line}";;
+				esac
+			done < "${x}"
+		done
+	fi
+}
+
 # Compare two files
 # It different, replace first with second otherwise remove second
 change_file()
