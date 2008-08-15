@@ -44,12 +44,12 @@ key_get_value()
 
 	shift
 	if type sed >/dev/null 2>&1; then
-		sed -n "s/^${key} //p" $@
+		sed -n "s/^${key}//p" $@
 	else
 		for x; do
 			while read line; do
 				case "${line}" in
-				"${key} "*) echo "${line##${key} }";;
+				"${key}"*) echo "${line##${key}}";;
 				esac
 			done < "${x}"
 		done
