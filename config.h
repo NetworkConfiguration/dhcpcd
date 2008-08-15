@@ -28,7 +28,7 @@
 #define CONFIG_H
 
 #define PACKAGE			"dhcpcd"
-#define VERSION			"4.0.0-rc4"
+#define VERSION			"4.0.0-rc5"
 
 /*
  * By default we don't add a local link route if we got a routeable address.
