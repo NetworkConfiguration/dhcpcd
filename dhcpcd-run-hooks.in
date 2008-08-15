@@ -41,7 +41,7 @@ list_interfaces()
 change_file()
 {
 	if type cmp >/dev/null 2>&1; then
-		cmp -s "$1" "$2}"
+		cmp -s "$1" "$2"
 	elif type diff >/dev/null 2>&1; then
 		diff -q "$1" "$2" >/dev/null
 	else
