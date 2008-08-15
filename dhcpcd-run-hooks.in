@@ -87,7 +87,8 @@ change_file()
 	elif type diff >/dev/null 2>&1; then
 		diff -q "$1" "$2" >/dev/null
 	else
-		false
+		# Hopefully we're only working on small text files ...
+		[ "$(cat "$1")" = "$(cat "$2")" ]
 	fi
 	if [ $? -eq 0 ]; then
 		rm -f "$2"
