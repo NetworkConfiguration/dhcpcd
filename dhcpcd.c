@@ -536,7 +536,7 @@ parse_option(int opt, char *oarg, struct options *options)
 		    make_option_mask(options->requiremask, &oarg, -1) != 0 ||
 		    make_option_mask(options->nomask, &oarg, 1) != 0)
 		{
-			logger(LOG_ERR, "unknown option `%s'", optarg);
+			logger(LOG_ERR, "unknown option `%s'", oarg);
 			return -1;
 		}
 		break;
