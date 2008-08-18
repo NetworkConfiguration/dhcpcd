@@ -270,7 +270,7 @@ writepid(int fd, pid_t pid)
 
 	if (ftruncate(fd, (off_t)0) == -1)
 		return -1;
-	snprintf(spid, sizeof(spid), "%u", pid);
+	snprintf(spid, sizeof(spid), "%u\n", pid);
 	len = pwrite(fd, spid, strlen(spid), (off_t)0);
 	if (len != (ssize_t)strlen(spid))
 		return -1;
