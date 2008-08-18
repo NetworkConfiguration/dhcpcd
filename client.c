@@ -1431,7 +1431,9 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 		log_dhcp(LOG_INFO, "offered", dhcp);
 		if (state->options & DHCPCD_TEST) {
 			run_script(options, iface->name, "TEST", dhcp, NULL);
-			return 0;
+			/* Fake the fact we forked so we return 0 to userland */
+			state->options |= DHCPCD_FORKED;
+			return -1;
 		}
 		free(state->offer);
 		state->offer = dhcp;
