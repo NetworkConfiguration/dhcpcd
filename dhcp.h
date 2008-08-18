@@ -154,10 +154,10 @@ struct dhcp_lease {
 	uint8_t frominfo;
 };
 
-#define add_reqmask(var, val) (var[val >> 3] |= 1 << (val & 7))
-#define del_reqmask(var, val) (var[val >> 3] &= ~(1 << (val & 7)))
-#define has_reqmask(var, val) (var[val >> 3] & (1 << (val & 7)))
-int make_reqmask(uint8_t *, char **, int);
+#define add_option_mask(var, val) (var[val >> 3] |= 1 << (val & 7))
+#define del_option_mask(var, val) (var[val >> 3] &= ~(1 << (val & 7)))
+#define has_option_mask(var, val) (var[val >> 3] & (1 << (val & 7)))
+int make_option_mask(uint8_t *, char **, int);
 void print_options(void);
 char *get_option_string(const struct dhcp_message *, uint8_t);
 int get_option_addr(uint32_t *, const struct dhcp_message *, uint8_t);

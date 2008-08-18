@@ -166,7 +166,7 @@ print_options(void)
 			printf("%03d %s\n", opt->option, opt->var);
 }
 
-int make_reqmask(uint8_t *mask, char **opts, int add)
+int make_option_mask(uint8_t *mask, char **opts, int add)
 {
 	char *token, *p = *opts, *t;
 	const struct dhcp_opt *opt;
@@ -190,11 +190,11 @@ int make_reqmask(uint8_t *mask, char **opts, int add)
 			}
 			if (match) {	
 				if (add == 1)
-					add_reqmask(mask,
-						    opt->option);
+					add_option_mask(mask,
+							opt->option);
 				else
-					del_reqmask(mask,
-						    opt->option);
+					del_option_mask(mask,
+							opt->option);
 				break;
 			}
 		}
@@ -908,7 +908,7 @@ make_message(struct dhcp_message **message,
 		*p++ = 0;
 		for (opt = dhcp_opts; opt->option; opt++) {
 			if (!(opt->type & REQUEST || 
-			      has_reqmask(options->reqmask, opt->option)))
+			      has_option_mask(options->requestmask, opt->option)))
 				continue;
 			switch (opt->option) {
 			case DHO_RENEWALTIME:	/* FALLTHROUGH */
@@ -1176,7 +1176,7 @@ configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 		for (opt = dhcp_opts; opt->option; opt++) {
 			if (!opt->var)
 				continue;
-			if (has_reqmask(options->nomask, opt->option))
+			if (has_option_mask(options->nomask, opt->option))
 				continue;
 			if (get_option_raw(dhcp, opt->option))
 				e++;
@@ -1219,7 +1219,7 @@ configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 	for (opt = dhcp_opts; opt->option; opt++) {
 		if (!opt->var)
 			continue;
-		if (has_reqmask(options->nomask, opt->option))
+		if (has_option_mask(options->nomask, opt->option))
 			continue;
 		val = NULL;
 		p = get_option(dhcp, opt->option, &pl, NULL);

@@ -68,7 +68,8 @@
 struct options {
 	char interface[IF_NAMESIZE];
 	int metric;
-	uint8_t reqmask[256 / 8];
+	uint8_t requestmask[256 / 8];
+	uint8_t requiremask[256 / 8];
 	uint8_t nomask[256 / 8];
 	uint32_t leasetime;
 	time_t timeout;

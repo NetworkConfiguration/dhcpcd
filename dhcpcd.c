@@ -53,7 +53,7 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 
 /* Don't set any optional arguments here so we retain POSIX
  * compatibility with getopt */
-#define OPTS "bc:df:h:i:kl:m:no:pqr:s:t:u:v:xABC:DEF:GI:KLO:TVX:"
+#define OPTS "bc:df:h:i:kl:m:no:pqr:s:t:u:v:xABC:DEF:GI:KLO:Q:TVX:"
 
 static int doversion = 0;
 static int dohelp = 0;
@@ -88,6 +88,7 @@ static const struct option longopts[] = {
 	{"nolink",        no_argument,        NULL, 'K'},
 	{"noipv4ll",      no_argument,        NULL, 'L'},
 	{"nooption",      optional_argument,  NULL, 'O'},
+	{"require",       required_argument,  NULL, 'Q'},
 	{"test",          no_argument,        NULL, 'T'},
 	{"variables",     no_argument,        NULL, 'V'},
 	{"blacklist",     required_argument,  NULL, 'X'},
@@ -154,7 +155,7 @@ usage(void)
 	printf("usage: "PACKAGE" [-dknpqxADEGHKLOTV] [-c script] [-f file ] [-h hostname]\n"
 	       "              [-i classID ] [-l leasetime] [-m metric] [-o option] [-r ipaddr]\n"
 	       "              [-s ipaddr] [-t timeout] [-u userclass] [-F none|ptr|both]\n"
-	       "              [-I clientID] [-C hookscript] [-X ipaddr] <interface>\n");
+	       "              [-I clientID] [-C hookscript] [-Q option] [-X ipaddr] <interface>\n");
 }
 
 static char * 
@@ -361,7 +362,7 @@ parse_option(int opt, char *oarg, struct options *options)
 		}
 		break;
 	case 'o':
-		if (make_reqmask(options->reqmask, &oarg, 1) != 0) {
+		if (make_option_mask(options->requestmask, &oarg, 1) != 0) {
 			logger(LOG_ERR, "unknown option `%s'", oarg);
 			return -1;
 		}
@@ -531,10 +532,19 @@ parse_option(int opt, char *oarg, struct options *options)
 		options->options &= ~DHCPCD_IPV4LL;
 		break;
 	case 'O':
-		if (make_reqmask(options->reqmask, &optarg, -1) != 0 ||
-		    make_reqmask(options->nomask, &optarg, 1) != 0)
+		if (make_option_mask(options->requestmask, &oarg, -1) != 0 ||
+		    make_option_mask(options->requiremask, &oarg, -1) != 0 ||
+		    make_option_mask(options->nomask, &oarg, 1) != 0)
 		{
 			logger(LOG_ERR, "unknown option `%s'", optarg);
+			return -1;
+		}
+		break;
+	case 'Q':
+		if (make_option_mask(options->requiremask, &oarg, 1) != 0 ||
+		    make_option_mask(options->requestmask, &oarg, 1) != 0)
+		{
+			logger(LOG_ERR, "unknown option `%s'", oarg);
 			return -1;
 		}
 		break;
@@ -617,12 +627,12 @@ main(int argc, char **argv)
 					     "%s %s", PACKAGE, VERSION);
 
 #ifdef CMDLINE_COMPAT
-	add_reqmask(options->reqmask, DHO_DNSSERVER);
-	add_reqmask(options->reqmask, DHO_DNSDOMAIN);
-	add_reqmask(options->reqmask, DHO_DNSSEARCH);
-	add_reqmask(options->reqmask, DHO_NISSERVER);
-	add_reqmask(options->reqmask, DHO_NISDOMAIN);
-	add_reqmask(options->reqmask, DHO_NTPSERVER);
+	add_requestmask(options->requestmask, DHO_DNSSERVER);
+	add_requestmask(options->reqmask, DHO_DNSDOMAIN);
+	add_requestmask(options->reqmask, DHO_DNSSEARCH);
+	add_requestmask(options->reqmask, DHO_NISSERVER);
+	add_requestmask(options->reqmask, DHO_NISDOMAIN);
+	add_requestmask(options->reqmask, DHO_NTPSERVER);
 
 	/* If the duid file exists, then enable duid by default
 	 * This means we don't break existing clients that easily :) */
@@ -771,22 +781,22 @@ main(int argc, char **argv)
 #ifdef CMDLINE_COMPAT
 		case 'H': /* FALLTHROUGH */
 		case 'M':
-			del_reqmask(options->reqmask, DHO_MTU);
+			del_requestmask(options->reqmask, DHO_MTU);
 			break;
 		case 'N':
-			del_reqmask(options->reqmask, DHO_NTPSERVER);
+			del_requestmask(options->reqmask, DHO_NTPSERVER);
 			break;
 		case 'R':
-			del_reqmask(options->reqmask, DHO_DNSSERVER);
-			del_reqmask(options->reqmask, DHO_DNSDOMAIN);
-			del_reqmask(options->reqmask, DHO_DNSSEARCH);
+			del_requestmask(options->reqmask, DHO_DNSSERVER);
+			del_requestmask(options->reqmask, DHO_DNSDOMAIN);
+			del_requestmask(options->reqmask, DHO_DNSSEARCH);
 			break;
 		case 'S':
-			add_reqmask(options->reqmask, DHO_MSCSR);
+			add_requestmask(options->reqmask, DHO_MSCSR);
 			break;
 		case 'Y':
-			del_reqmask(options->reqmask, DHO_NISSERVER);
-			del_reqmask(options->reqmask, DHO_NISDOMAIN);
+			del_requestmask(options->reqmask, DHO_NISSERVER);
+			del_requestmask(options->reqmask, DHO_NISDOMAIN);
 			break;
 #endif
 		default:

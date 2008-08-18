@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd August 13, 2008
+.Dd August 18, 2008
 .Dt DHCPCD 8 SMM
 .Sh NAME
 .Nm dhcpcd
@@ -46,6 +46,7 @@
 .Op Fl F , -fqdn Ar FQDN
 .Op Fl I , -clientid Ar clientid
 .Op Fl O , -nooption Ar option
+.Op Fl Q , -require Ar option
 .Op Fl X , -blacklist Ar address
 .Ar interface
 .Nm
@@ -351,6 +352,10 @@ Don't use IPv4LL (aka APIPA, aka Bonjour, aka ZeroConf).
 Don't request the specified option.
 If no option given, then don't request any options other than those to
 configure the interface and routing.
+.It Fl Q , -require Ar option
+Requires the
+.Ar option
+to be present in all DHCP messages, otherwise the message is ignored.
 .It Fl T, -test
 On receipt of OFFER messages just call
 .Pa @SCRIPT@

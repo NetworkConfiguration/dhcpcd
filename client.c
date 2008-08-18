@@ -1357,7 +1357,7 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 	struct dhcp_message *dhcp = *dhcpp;
 	struct interface *iface = state->interface;
 	struct dhcp_lease *lease = &state->lease;
-	uint8_t type;
+	uint8_t type, tmp;
 	struct in_addr addr;
 	size_t i;
 	int r;
@@ -1414,6 +1414,16 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 
 	/* No NAK, so reset the backoff */
 	state->nakoff = 1;
+
+	/* Ensure that all required options are present */
+	for (i = 1; i < 255; i++) {
+		if (has_option_mask(options->requiremask, i) &&
+		    get_option_uint8(&tmp, dhcp, i) != 0)
+		{
+			log_dhcp(LOG_WARNING, "reject", dhcp);
+			return 0;
+		}
+	}
 
 	if (type == DHCP_OFFER && state->state == STATE_DISCOVERING) {
 		lease->addr.s_addr = dhcp->yiaddr;

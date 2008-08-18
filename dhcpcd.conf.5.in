@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd August 17, 2008
+.Dd August 18, 2008
 .Dt DHCPCD.CONF 5 SMM
 .Sh NAME
 .Nm dhcpcd.conf
@@ -103,14 +103,22 @@ See
 .It Ic nolink
 Don't receive link messages about carrier status.
 You should only set this for buggy interface drivers.
-.It Ic option Ar dhcp-option
+.It Ic option Ar option
 Requests the
-.Ar dhcp-option
+.Ar option
 from the server.
 It can be a variable to be used in
 .Xr dhcpcd-run-hooks 8
 or the numerical value.
-You can specify more seperated by commas, spaces or more option lines.
+You can specify more options seperated by commas, spaces or more option lines.
+.It Ic require Ar option
+Requires the
+.Ar option
+to be present in all DHCP messages, otherwise the message is ignored.
+It can be a variable to be used in
+.Xr dhcpcd-run-hooks 8
+or the numerical value.
+You can specify more options seperated by commas, spaces or more require lines.
 .It Ic script Ar script
 Use
 .Ar script
