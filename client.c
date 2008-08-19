@@ -1757,7 +1757,8 @@ dhcp_run(const struct options *options, int *pid_fd)
 	state = xzalloc(sizeof(*state));
 	state->pid_fd = pid_fd;
 	state->interface = iface;
-	run_script(options, iface->name, "PREINIT", NULL, NULL);
+	if (!(options->options & DHCPCD_TEST))
+		run_script(options, iface->name, "PREINIT", NULL, NULL);
 
 	if (client_setup(state, options) == -1)
 		goto eexit;
