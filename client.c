@@ -1247,15 +1247,15 @@ handle_timeout(struct if_state *state, const struct options *options)
 
 	switch(state->state) {
 	case STATE_RENEW_REQUESTED:
-		/* If a renew was requested (ie, didn't timeout)
-		 * we need to remove the server address so we enter the
-		 * INIT-REBOOT state correctly. */
+		/* If a renew was requested (ie, didn't timeout) we actually
+		 * enter the REBIND state so that we broadcast to all servers.
+		 * We need to do this for when we change networks. */
 		lease->server.s_addr = 0;
 		state->messages = 0;
 		if (lease->addr.s_addr && !(state->options & DHCPCD_INFORM)) {
-			logger(LOG_INFO, "renewing lease of %s",
+			logger(LOG_INFO, "rebinding lease of %s",
 			       inet_ntoa(lease->addr));
-			state->state = STATE_RENEWING;
+			state->state = STATE_REBINDING;
 			state->stop.tv_sec = options->timeout;
 			state->stop.tv_usec = 0;
 			break;
