@@ -67,7 +67,7 @@ static const struct option longopts[] = {
 	{"release",       no_argument,        NULL, 'k'},
 	{"leasetime",     required_argument,  NULL, 'l'},
 	{"metric",        required_argument,  NULL, 'm'},
-	{"renew",         no_argument,        NULL, 'n'},
+	{"rebind",        no_argument,        NULL, 'n'},
 	{"option",        required_argument,  NULL, 'o'},
 	{"persistent",    no_argument,        NULL, 'p'},
 	{"quiet",         no_argument,        NULL, 'q'},
@@ -96,6 +96,7 @@ static const struct option longopts[] = {
 	{"version",       no_argument,        &doversion, 1},
 #ifdef CMDLINE_COMPAT
 	{"classid",       optional_argument,  NULL, 'i'},
+	{"renew",         no_argument,        NULL, 'n'},
 	{"nohostname",    no_argument,        NULL, 'H'},
 	{"nomtu",         no_argument,        NULL, 'M'},
 	{"nontp",         no_argument,        NULL, 'N'},

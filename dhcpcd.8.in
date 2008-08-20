@@ -169,6 +169,8 @@ process running on the
 to release its lease, deconfigure the
 .Ar interface
 and then exit.
+.Nm
+then waits until this process has exited.
 .It Fl l , -leasetime Ar seconds
 Request a specific lease time in
 .Ar seconds .
@@ -190,17 +192,27 @@ Request the DHCP
 .Ar option
 variable for use in
 .Pa @SCRIPT@ .
-.It Fl n , -renew
+.It Fl n , -rebind
 Notifies an existing
 .Nm
 process running on the
 .Ar interface
-to renew it's lease.
+to rebind it's lease.
 .Nm
 will not re-configure itself or use any other command line arguments.
+.Nm
+will timeout the rebind after 30 seconds at which point the lease will be
+expired and
+.Nm
+will enter the discovery state to obtain a new lease.
+Use the
+.Fl t , -timeout
+option to change this.
 If
 .Nm
 is not running, then it starts up as normal.
+This option used to be renew, but rebind is more accurate as we need to
+broadcast the request instead of unicasting.
 .It Fl p , -persistent
 .Nm
 normally deconfigures the
