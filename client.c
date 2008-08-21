@@ -612,7 +612,6 @@ do_socket(struct if_state *state, int mode)
 
 	if (mode == SOCKET_OPEN &&
 	    state->interface->udp_fd == -1 &&
-	    state->lease.addr.s_addr != 0 &&
 	    open_udp_socket(state->interface) == -1)
 		logger(LOG_ERR, "open_udp_socket: %s", strerror(errno));
 
