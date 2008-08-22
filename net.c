@@ -81,7 +81,7 @@ inet_ntocidr(struct in_addr address)
 }
 
 int
-inet_cidrtoaddr (int cidr, struct in_addr *addr)
+inet_cidrtoaddr(int cidr, struct in_addr *addr)
 {
 	int ocets;
 
