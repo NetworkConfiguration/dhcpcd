@@ -610,9 +610,17 @@ do_socket(struct if_state *state, int mode)
 		}
 	}
 
+	/* Always have the UDP socket open to avoid the kernel sending
+	 * ICMP unreachable messages. */
+	/* For systems without SO_BINDTODEVICE, (ie BSD ones) we may get an
+	 * error or EADDRINUSE when binding to INADDR_ANY as another dhcpcd
+	 * instance could be running.
+	 * Oddly enough, we don't care about this as the socket is there
+	 * just to please the kernel - we don't care for reading from it. */
 	if (mode == SOCKET_OPEN &&
 	    state->interface->udp_fd == -1 &&
-	    open_udp_socket(state->interface) == -1)
+	    open_udp_socket(state->interface) == -1 &&
+	    (errno != EADDRINUSE || state->interface->addr.s_addr != 0))
 		logger(LOG_ERR, "open_udp_socket: %s", strerror(errno));
 
 	if (mode == SOCKET_OPEN) 
