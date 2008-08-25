@@ -628,12 +628,12 @@ main(int argc, char **argv)
 					     "%s %s", PACKAGE, VERSION);
 
 #ifdef CMDLINE_COMPAT
-	add_requestmask(options->requestmask, DHO_DNSSERVER);
-	add_requestmask(options->reqmask, DHO_DNSDOMAIN);
-	add_requestmask(options->reqmask, DHO_DNSSEARCH);
-	add_requestmask(options->reqmask, DHO_NISSERVER);
-	add_requestmask(options->reqmask, DHO_NISDOMAIN);
-	add_requestmask(options->reqmask, DHO_NTPSERVER);
+	add_option_mask(options->requestmask, DHO_DNSSERVER);
+	add_option_mask(options->requestmask, DHO_DNSDOMAIN);
+	add_option_mask(options->requestmask, DHO_DNSSEARCH);
+	add_option_mask(options->requestmask, DHO_NISSERVER);
+	add_option_mask(options->requestmask, DHO_NISDOMAIN);
+	add_option_mask(options->requestmask, DHO_NTPSERVER);
 
 	/* If the duid file exists, then enable duid by default
 	 * This means we don't break existing clients that easily :) */
@@ -782,22 +782,22 @@ main(int argc, char **argv)
 #ifdef CMDLINE_COMPAT
 		case 'H': /* FALLTHROUGH */
 		case 'M':
-			del_requestmask(options->reqmask, DHO_MTU);
+			del_option_mask(options->requestmask, DHO_MTU);
 			break;
 		case 'N':
-			del_requestmask(options->reqmask, DHO_NTPSERVER);
+			del_option_mask(options->requestmask, DHO_NTPSERVER);
 			break;
 		case 'R':
-			del_requestmask(options->reqmask, DHO_DNSSERVER);
-			del_requestmask(options->reqmask, DHO_DNSDOMAIN);
-			del_requestmask(options->reqmask, DHO_DNSSEARCH);
+			del_option_mask(options->requestmask, DHO_DNSSERVER);
+			del_option_mask(options->requestmask, DHO_DNSDOMAIN);
+			del_option_mask(options->requestmask, DHO_DNSSEARCH);
 			break;
 		case 'S':
-			add_requestmask(options->reqmask, DHO_MSCSR);
+			add_option_mask(options->requestmask, DHO_MSCSR);
 			break;
 		case 'Y':
-			del_requestmask(options->reqmask, DHO_NISSERVER);
-			del_requestmask(options->reqmask, DHO_NISDOMAIN);
+			del_option_mask(options->requestmask, DHO_NISSERVER);
+			del_option_mask(options->requestmask, DHO_NISDOMAIN);
 			break;
 #endif
 		default:
