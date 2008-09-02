@@ -27,6 +27,7 @@
 
 #include <sys/types.h>
 #include <sys/ioctl.h>
+#include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 
@@ -35,9 +36,9 @@
 #include <arpa/inet.h>
 #include <netinet/in_systm.h>
 #ifdef __linux__
-#include <linux/wireless.h>
-#include <netinet/ether.h>
-#include <netpacket/packet.h>
+# include <linux/wireless.h>
+# include <netinet/ether.h>
+# include <netpacket/packet.h>
 #endif
 #include <netinet/in.h>
 #include <netinet/ip.h>
@@ -45,7 +46,10 @@
 #include <netinet/udp.h>
 #undef __FAVOR_BSD
 #ifdef SIOCGIFMEDIA
-#include <net/if_media.h>
+# include <net/if_media.h>
+#endif
+#ifdef BSD
+# include <net80211/ieee80211_ioctl.h>
 #endif
 #include <arpa/inet.h>
 #ifdef AF_LINK
@@ -184,8 +188,12 @@ init_interface(const char *ifname)
 	int s, arpable;
 	struct ifreq ifr;
 	struct interface *iface = NULL;
-#ifdef SIOCGIWNAME
+#if defined(SIOCGIWNAME)
 	struct iwreq iwr;
+#elif defined(SIOCG80211NWID)
+	struct ieee80211_nwid nwid;
+#elif defined(IEEE80211_IOC_SSID)
+	struct ieee80211req ireq;
 #endif
 
 	memset(&ifr, 0, sizeof(ifr));
@@ -231,18 +239,8 @@ init_interface(const char *ifname)
 	iface->family = ARPHRD_ETHER;
 #endif
 
-#ifdef SIOCGIWNAME
-	memset(&iwr, 0, sizeof(iwr));
-	strlcpy(iwr.ifr_name, ifname, sizeof(iwr.ifr_name));
-	/* Check for wireless */
-	if (ioctl(s, SIOCGIWNAME, &iwr) != -1)
-		iface->metric += 100;
-#endif
-
-	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
 	if (ioctl(s, SIOCGIFMTU, &ifr) == -1)
 		goto eexit;
-
 	/* Ensure that the MTU is big enough for DHCP */
 	if (ifr.ifr_mtu < MTU_MIN) {
 		ifr.ifr_mtu = MTU_MIN;
@@ -251,10 +249,33 @@ init_interface(const char *ifname)
 			goto eexit;
 	}
 
+	/* If the interface is wireless, add 100 to the metric.
+	 * We do this so we prefer other interfaces if they provide
+	 * similar configuration on the same subnet. */
+#if defined(SIOCGIWNAME) /* Linux */
+	memset(&iwr, 0, sizeof(iwr));
+	strlcpy(iwr.ifr_name, ifname, sizeof(iwr.ifr_name));
+	if (ioctl(s, SIOCGIWNAME, &iwr) != -1)
+		iface->metric += 100;
+#elif defined(SIOCG80211NWID) /* NetBSD */
+	memset(&nwid, 0, sizeof(nwid));
+	ifr.ifr_data = (void *)&nwid;
+	if (ioctl(s, SIOCG80211NWID) != -1)
+		iface->metric += 100;
+#elif defined(IEEE80211_IOC_SSID) /* FreeBSD */
+	memset(&ireq, 0, sizeof(ireq));
+	strlcpy(ireq.i_name, ifname, sizeof(ireq.i_name));
+	ireq.i_type = IEEE80211_IOC_NUMSSIDS;
+	ireq.i_val = 3;
+	if ((x = ioctl(s, SIOCG80211, &ireq)) != -1)
+		iface->metric += 100; 
+#endif
+
 	if (up_interface(ifname) != 0)
 		goto eexit;
 
-	snprintf(iface->leasefile, PATH_MAX, LEASEFILE, ifname);
+	snprintf(iface->leasefile, sizeof(iface->leasefile),
+		 LEASEFILE, ifname);
 	iface->arpable = arpable;
 
 	/* 0 is a valid fd, so init to -1 */
