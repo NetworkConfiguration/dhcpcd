@@ -376,7 +376,7 @@ discover_interfaces(int argc, char * const *argv)
 	FILE *f;
 	char *buffer = NULL, *p;
 	size_t len = 0, ln = 0, n;
-	int i, s;
+	int i;
 	struct interface *ifaces = NULL, *ifp, *ifl;
 
 	if ((f = fopen("/proc/net/dev", "r"))) {
@@ -403,7 +403,7 @@ discover_interfaces(int argc, char * const *argv)
 				if (i == argc)
 					continue;
 			}
-			if (ifp = init_interface(p)) {
+			if ((ifp = init_interface(p))) {
 				if (ifl)
 					ifl->next =ifp; 
 				else
