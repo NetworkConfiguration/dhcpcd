@@ -28,6 +28,7 @@
 #ifndef DHCPCD_H
 #define DHCPCD_H
 
+#include <sys/socket.h>
 #include <net/if.h>
 
 #include <limits.h>

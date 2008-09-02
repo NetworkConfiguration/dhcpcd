@@ -267,7 +267,7 @@ init_interface(const char *ifname)
 	strlcpy(ireq.i_name, ifname, sizeof(ireq.i_name));
 	ireq.i_type = IEEE80211_IOC_NUMSSIDS;
 	ireq.i_val = 3;
-	if ((x = ioctl(s, SIOCG80211, &ireq)) != -1)
+	if (ioctl(s, SIOCG80211, &ireq) != -1)
 		iface->metric += 100; 
 #endif
 

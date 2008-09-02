@@ -28,6 +28,7 @@
 #ifndef IF_OPTIONS_H
 #define IF_OPTIONS_H
 
+#include <sys/socket.h>
 #include <net/if.h>
 #include <netinet/in.h>
 
