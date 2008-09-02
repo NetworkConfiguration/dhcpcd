@@ -28,14 +28,9 @@
 #ifndef DHCPCONFIG_H
 #define DHCPCONFIG_H
 
-#include "dhcpcd.h"
-#include "dhcp.h"
 #include "net.h"
 
-int run_script(const struct options *, const char *, const char *,
-	       const struct dhcp_message *, const struct dhcp_message *);
-int configure(struct interface *, const char *,
-	      const struct dhcp_message *, const struct dhcp_message *,
-	      const struct dhcp_lease *, const struct options *, int);
+int run_script(const struct interface *, const char *);
+int configure(struct interface *, const char *);
 
 #endif

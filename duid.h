@@ -25,18 +25,11 @@
  * SUCH DAMAGE.
  */
 
-#ifndef LOGGER_H
-#define LOGGER_H
+#ifndef DUID_H
+#define DUID_H
 
-#if defined(__GNUC__)
-#  define _PRINTF_LIKE(_one, _two)  __attribute__ ((__format__ (__printf__, _one, _two)))
-#else
-#  define _PRINTF_LIKE(_one, _two)
-#endif
+#include "net.h"
 
-#include <syslog.h>
-
-void setloglevel(int);
-void logger(int, const char *, ...) _PRINTF_LIKE (2, 3);
+size_t get_duid(unsigned char *duid, const struct interface *iface);
 
 #endif

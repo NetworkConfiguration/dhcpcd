@@ -37,6 +37,15 @@
 
 #define UNCONST(a)		((void *)(unsigned long)(const void *)(a))
 
+#define timeval_to_double(tv) ((tv)->tv_sec * 1.0 + (tv)->tv_usec * 1.0e-6)
+#define timernorm(tvp)						\
+	do {							\
+		while ((tvp)->tv_usec >= 1000000) {		\
+			(tvp)->tv_sec++;			\
+			(tvp)->tv_usec -= 1000000;		\
+		}						\
+	} while (0 /* CONSTCOND */);
+
 #if __GNUC__ > 2 || defined(__INTEL_COMPILER)
 # define _unused __attribute__((__unused__))
 #else

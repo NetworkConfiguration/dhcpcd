@@ -25,18 +25,17 @@
  * SUCH DAMAGE.
  */
 
-#ifndef LOGGER_H
-#define LOGGER_H
+#ifndef BIND_H
+#define BIND_H
 
-#if defined(__GNUC__)
-#  define _PRINTF_LIKE(_one, _two)  __attribute__ ((__format__ (__printf__, _one, _two)))
+#include "config.h"
+#include "dhcpcd.h"
+#ifdef THERE_IS_NO_FORK
+#define daemonise() {}
 #else
-#  define _PRINTF_LIKE(_one, _two)
+pid_t daemonise(void);
 #endif
 
-#include <syslog.h>
-
-void setloglevel(int);
-void logger(int, const char *, ...) _PRINTF_LIKE (2, 3);
-
+extern int can_daemonise;
+void bind_interface(struct interface *);
 #endif

@@ -55,12 +55,6 @@ signal_handler(int sig)
 	errno = serrno;
 }
 
-int
-signal_fd(void)
-{
-	return (signal_pipe[0]);
-}
-
 /* Read a signal from the signal pipe. Returns 0 if there is
  * no signal, -1 on error (and sets errno appropriately), and
  * your signal on success */
@@ -93,7 +87,7 @@ signal_init(void)
 		return -1;
 	if (set_cloexec(signal_pipe[1]) == -1)
 		return -1;
-	return 0;
+	return signal_pipe[0];
 }
 
 static int
@@ -123,3 +117,4 @@ signal_reset(void)
 {
 	return signal_handle(SIG_DFL);
 }
+

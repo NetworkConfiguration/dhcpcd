@@ -28,7 +28,7 @@
 #define CONFIG_H
 
 #define PACKAGE			"dhcpcd"
-#define VERSION			"4.0.0"
+#define VERSION			"4.0.99"
 
 /*
  * By default we don't add a local link route if we got a routeable address.
@@ -69,7 +69,7 @@
 # define LEASEFILE		DBDIR "/" PACKAGE "-%s.lease"
 #endif
 #ifndef PIDFILE
-# define PIDFILE		RUNDIR "/" PACKAGE "-%s.pid"
+# define PIDFILE		RUNDIR "/" PACKAGE "%s%s.pid"
 #endif
 
 #endif

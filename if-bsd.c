@@ -58,7 +58,7 @@
 #endif
 
 int
-if_address(const char *ifname, const struct in_addr *address,
+if_address(const struct interface *iface, const struct in_addr *address,
 	   const struct in_addr *netmask, const struct in_addr *broadcast,
 	   int action)
 {
@@ -74,7 +74,7 @@ if_address(const char *ifname, const struct in_addr *address,
 		return -1;
 
 	memset(&ifa, 0, sizeof(ifa));
-	strlcpy(ifa.ifra_name, ifname, sizeof(ifa.ifra_name));
+	strlcpy(ifa.ifra_name, iface->name, sizeof(ifa.ifra_name));
 
 #define ADDADDR(_var, _addr) \
 	_s.sa = &_var; \
@@ -98,7 +98,7 @@ if_address(const char *ifname, const struct in_addr *address,
 }
 
 int
-if_route(const char *ifname, const struct in_addr *destination,
+if_route(const struct interface *iface, const struct in_addr *destination,
 	 const struct in_addr *netmask, const struct in_addr *gateway,
 	 _unused int metric, int action)
 {
@@ -120,8 +120,6 @@ if_route(const char *ifname, const struct in_addr *destination,
 	} rtm;
 	char *bp = rtm.buffer;
 	size_t l;
-	unsigned char *hwaddr;
-	size_t hwlen = 0;
 	int retval = 0;
 
 	if ((s = socket(PF_ROUTE, SOCK_RAW, 0)) == -1)
@@ -156,21 +154,18 @@ if_route(const char *ifname, const struct in_addr *destination,
 
 	if (gateway->s_addr == INADDR_ANY) {
 		/* Make us a link layer socket */
-		hwaddr = xmalloc(sizeof(unsigned char) * HWADDR_LEN);
-		do_interface(ifname, hwaddr, &hwlen, NULL, 0, 0);
 		memset(&su, 0, sizeof(su));
 		su.sdl.sdl_len = sizeof(su.sdl);
 		su.sdl.sdl_family = AF_LINK;
-		su.sdl.sdl_nlen = strlen(ifname);
-		memcpy(&su.sdl.sdl_data, ifname, (size_t)su.sdl.sdl_nlen);
-		su.sdl.sdl_alen = hwlen;
+		su.sdl.sdl_nlen = strlen(iface->name);
+		memcpy(&su.sdl.sdl_data, iface->name, (size_t)su.sdl.sdl_nlen);
+		su.sdl.sdl_alen = iface->hwlen;
 		memcpy(((unsigned char *)&su.sdl.sdl_data) + su.sdl.sdl_nlen,
-		       hwaddr, (size_t)su.sdl.sdl_alen);
+		       iface->hwaddr, (size_t)su.sdl.sdl_alen);
 
 		l = SA_SIZE(&(su.sa));
 		memcpy(bp, &su, l);
 		bp += l;
-		free(hwaddr);
 	} else {
 		rtm.hdr.rtm_flags |= RTF_GATEWAY;
 		ADDADDR(gateway);
@@ -187,34 +182,28 @@ if_route(const char *ifname, const struct in_addr *destination,
 }
 
 int
-open_link_socket(struct interface *iface)
+open_link_socket(void)
 {
 	int fd;
 
 	fd = socket(PF_ROUTE, SOCK_RAW, 0);
-	if (fd == -1)
-		return -1;
-	set_cloexec(fd);
-	if (iface->link_fd != -1)
-		close(iface->link_fd);
-	iface->link_fd = fd;
-	return 0;
+	if (fd != -1)
+		set_cloexec(fd);
+	return fd;
 }
 
 #define BUFFER_LEN	2048
 int
-link_changed(struct interface *iface)
+link_changed(int fd, const struct interface *ifaces)
 {
 	char buffer[2048], *p;
 	ssize_t bytes;
 	struct rt_msghdr *rtm;
 	struct if_msghdr *ifm;
-	int i;
+	const struct interface *iface;
 
-	if ((i = if_nametoindex(iface->name)) == -1)
-		return -1;
 	for (;;) {
-		bytes = recv(iface->link_fd, buffer, BUFFER_LEN, MSG_DONTWAIT);
+		bytes = recv(fd, buffer, BUFFER_LEN, MSG_DONTWAIT);
 		if (bytes == -1) {
 			if (errno == EAGAIN)
 				return 0;
@@ -230,12 +219,19 @@ link_changed(struct interface *iface)
 			if (rtm->rtm_type != RTM_IFINFO)
 				continue;
 			ifm = (struct if_msghdr *)p;
-			if (ifm->ifm_index != i)
-				continue;
-
-			/* Link changed */
-			return 1;
+			for (iface = ifaces; iface; iface = iface->next)
+				if (ifm->ifm_index == if_nametoindex(iface->name))
+					return 1;
 		}
 	}
 	return 0;
+}
+
+struct interface *
+discover_interfaces(int argc, char * const *argv)
+{
+	struct interface *ifaces = NULL;
+
+	do_interface(NULL, &ifaces, argc, argv, NULL, NULL, 2);
+	return ifaces;
 }

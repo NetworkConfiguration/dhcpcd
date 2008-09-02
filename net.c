@@ -35,6 +35,7 @@
 #include <arpa/inet.h>
 #include <netinet/in_systm.h>
 #ifdef __linux__
+#include <linux/wireless.h>
 #include <netinet/ether.h>
 #include <netpacket/packet.h>
 #endif
@@ -63,6 +64,7 @@
 #include "common.h"
 #include "dhcp.h"
 #include "logger.h"
+#include "if-options.h"
 #include "net.h"
 #include "signals.h"
 
@@ -176,10 +178,119 @@ hwaddr_aton(unsigned char *buffer, const char *addr)
 	return len;
 }
 
+struct interface *
+init_interface(const char *ifname)
+{
+	int s, arpable;
+	struct ifreq ifr;
+	struct interface *iface = NULL;
+#ifdef SIOCGIWNAME
+	struct iwreq iwr;
+#endif
+
+	memset(&ifr, 0, sizeof(ifr));
+	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
+
+	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+		return NULL;
+
+	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
+	if (ioctl(s, SIOCGIFFLAGS, &ifr) == -1)
+		goto eexit;
+	if (ifr.ifr_flags & IFF_LOOPBACK || ifr.ifr_flags & IFF_POINTOPOINT)
+		goto eexit;
+	arpable = !(ifr.ifr_flags & IFF_NOARP);
+
+	iface = xzalloc(sizeof(*iface));
+	strlcpy(iface->name, ifname, sizeof(iface->name));
+	iface->metric = 100 + if_nametoindex(iface->name);
+
+#ifdef SIOCGIFHWADDR
+	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
+	if (ioctl(s, SIOCGIFHWADDR, &ifr) == -1)
+		goto eexit;
+
+	switch (ifr.ifr_hwaddr.sa_family) {
+	case ARPHRD_ETHER:
+	case ARPHRD_IEEE802:
+		iface->hwlen = ETHER_ADDR_LEN;
+		break;
+	case ARPHRD_IEEE1394:
+		iface->hwlen = EUI64_ADDR_LEN;
+	case ARPHRD_INFINIBAND:
+		iface->hwlen = INFINIBAND_ADDR_LEN;
+		break;
+	default:
+		logger(LOG_ERR, "%s: unsupported media family", iface->name);
+		goto eexit;
+	}
+	memcpy(iface->hwaddr, ifr.ifr_hwaddr.sa_data, iface->hwlen);
+	iface->family = ifr.ifr_hwaddr.sa_family;
+		
+#else
+	iface->family = ARPHRD_ETHER;
+#endif
+
+#ifdef SIOCGIWNAME
+	memset(&iwr, 0, sizeof(iwr));
+	strlcpy(iwr.ifr_name, ifname, sizeof(iwr.ifr_name));
+	/* Check for wireless */
+	if (ioctl(s, SIOCGIWNAME, &iwr) != -1)
+		iface->metric += 100;
+#endif
+
+	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
+	if (ioctl(s, SIOCGIFMTU, &ifr) == -1)
+		goto eexit;
+
+	/* Ensure that the MTU is big enough for DHCP */
+	if (ifr.ifr_mtu < MTU_MIN) {
+		ifr.ifr_mtu = MTU_MIN;
+		strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
+		if (ioctl(s, SIOCSIFMTU, &ifr) == -1)
+			goto eexit;
+	}
+
+	if (up_interface(ifname) != 0)
+		goto eexit;
+
+	snprintf(iface->leasefile, PATH_MAX, LEASEFILE, ifname);
+	iface->arpable = arpable;
+
+	/* 0 is a valid fd, so init to -1 */
+	iface->raw_fd = -1;
+	iface->udp_fd = -1;
+	iface->arp_fd = -1;
+	close(s);
+	return iface;
+
+eexit:
+	free(iface);
+	close(s);
+	return NULL;
+}
+
+void
+free_interface(struct interface *iface)
+{
+	if (!iface)
+		return;
+	if (iface->state) {
+		free_options(iface->state->options);
+		free(iface->state->old);
+		free(iface->state->new);
+		free(iface->state->offer);
+		free(iface->state);
+	}
+	free(iface->clientid);
+	free(iface);
+}
+
 int
 do_interface(const char *ifname,
-	     _unused unsigned char *hwaddr, _unused size_t *hwlen,
-	     struct in_addr *addr, struct in_addr *net, int get)
+	     _unused struct interface **ifaces,
+	     _unused int argc, _unused char * const *argv,
+	     struct in_addr *addr, struct in_addr *net, int act)
 {
 	int s;
 	struct ifconf ifc;
@@ -195,7 +306,9 @@ do_interface(const char *ifname,
 	struct ifreq *ifr;
 	struct sockaddr_in netmask;
 #ifdef AF_LINK
+	int n;
 	struct sockaddr_dl *sdl;
+	struct interface *ifp, *ifl = NULL, *ifn = NULL;
 #endif
 
 	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
@@ -237,29 +350,49 @@ do_interface(const char *ifname,
 #endif
 			p += sizeof(*ifr);
 
-		if (strcmp(ifname, ifr->ifr_name) != 0)
+		if (ifname && strcmp(ifname, ifr->ifr_name) != 0)
 			continue;
 
 		found = 1;
 
 #ifdef AF_LINK
-		if (hwaddr && hwlen && ifr->ifr_addr.sa_family == AF_LINK) {
+		/* Interface discovery for BSD's */
+		if (act == 2 && ifr->ifr_addr.sa_family == AF_LINK) {
+			for (ifp = *ifaces; ifp; ifp = ifp->next) {
+				ifl = ifp;
+				if (strcmp(ifp->name, ifr->ifr_name) == 0)
+					break;
+			}
+			if (ifp)
+				continue;
+			if (argc > 0) {
+				for (n = 0; n < argc; n++)
+					if (strcmp(ifr->ifr_name, argv[n]) == 0)
+						break;
+				if (n == argc)
+					continue;
+			}
+			ifn = init_interface(ifr->ifr_name);
+			if (!ifn)
+				continue;
+			if (ifl)
+				ifp = ifl->next = ifn;
+			else
+				ifp = *ifaces = ifn;
 			sdl = xmalloc(ifr->ifr_addr.sa_len);
 			memcpy(sdl, &ifr->ifr_addr, ifr->ifr_addr.sa_len);
-			*hwlen = sdl->sdl_alen;
-			memcpy(hwaddr, LLADDR(sdl), *hwlen);
+			ifp->hwlen = sdl->sdl_alen;
+			memcpy(ifp->hwaddr, LLADDR(sdl), sdl->sdl_alen);
 			free(sdl);
-			retval = 1;
-			break;
 		}
 #endif
 
-		if (ifr->ifr_addr.sa_family == AF_INET)	{
+		if (ifr->ifr_addr.sa_family == AF_INET && addr)	{
 			memcpy(&address, &ifr->ifr_addr, sizeof(address));
 			if (ioctl(s, SIOCGIFNETMASK, ifr) == -1)
 				continue;
 			memcpy(&netmask, &ifr->ifr_addr, sizeof(netmask));
-			if (get) {
+			if (act == 1) {
 				addr->s_addr = address.sin_addr.s_addr;
 				net->s_addr = netmask.sin_addr.s_addr;
 				retval = 1;
@@ -361,90 +494,6 @@ carrier_status(const char *ifname)
 	return retval;
 }
 
-struct interface *
-read_interface(const char *ifname, _unused int metric)
-{
-	int s;
-	struct ifreq ifr;
-	struct interface *iface = NULL;
-	unsigned char *hwaddr = NULL;
-	size_t hwlen = 0;
-	sa_family_t family = 0;
-
-	memset(&ifr, 0, sizeof(ifr));
-	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
-
-	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
-		return NULL;
-
-#ifdef __linux__
-	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
-	if (ioctl(s, SIOCGIFHWADDR, &ifr) == -1)
-		goto eexit;
-
-	switch (ifr.ifr_hwaddr.sa_family) {
-	case ARPHRD_ETHER:
-	case ARPHRD_IEEE802:
-		hwlen = ETHER_ADDR_LEN;
-		break;
-	case ARPHRD_IEEE1394:
-		hwlen = EUI64_ADDR_LEN;
-	case ARPHRD_INFINIBAND:
-		hwlen = INFINIBAND_ADDR_LEN;
-		break;
-	}
-
-	hwaddr = xmalloc(sizeof(unsigned char) * HWADDR_LEN);
-	memcpy(hwaddr, ifr.ifr_hwaddr.sa_data, hwlen);
-	family = ifr.ifr_hwaddr.sa_family;
-#else
-	ifr.ifr_metric = metric;
-	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
-	if (ioctl(s, SIOCSIFMETRIC, &ifr) == -1)
-		goto eexit;
-
-	hwaddr = xmalloc(sizeof(unsigned char) * HWADDR_LEN);
-	if (do_interface(ifname, hwaddr, &hwlen, NULL, NULL, 0) != 1)
-		goto eexit;
-
-	family = ARPHRD_ETHER;
-#endif
-
-	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
-	if (ioctl(s, SIOCGIFMTU, &ifr) == -1)
-		goto eexit;
-
-	/* Ensure that the MTU is big enough for DHCP */
-	if (ifr.ifr_mtu < MTU_MIN) {
-		ifr.ifr_mtu = MTU_MIN;
-		strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
-		if (ioctl(s, SIOCSIFMTU, &ifr) == -1)
-			goto eexit;
-	}
-
-	if (up_interface(ifname) != 0)
-		goto eexit;
-
-	iface = xzalloc(sizeof(*iface));
-	strlcpy(iface->name, ifname, IF_NAMESIZE);
-	snprintf(iface->leasefile, PATH_MAX, LEASEFILE, ifname);
-	memcpy(&iface->hwaddr, hwaddr, hwlen);
-	iface->hwlen = hwlen;
-
-	iface->family = family;
-	iface->arpable = !(ifr.ifr_flags & (IFF_NOARP | IFF_LOOPBACK));
-
-	/* 0 is a valid fd, so init to -1 */
-	iface->raw_fd = -1;
-	iface->udp_fd = -1;
-	iface->arp_fd = -1;
-	iface->link_fd = -1;
-
-eexit:
-	close(s);
-	free(hwaddr);
-	return iface;
-}
 
 int
 do_mtu(const char *ifname, short int mtu)

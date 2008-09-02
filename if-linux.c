@@ -40,6 +40,7 @@
 #include <netpacket/packet.h>
 
 #include <errno.h>
+#include <ctype.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -59,7 +60,7 @@
 #define BUFFERLEN 256
 
 int
-open_link_socket(struct interface *iface)
+open_link_socket(void)
 {
 	int fd;
 	struct sockaddr_nl nl;
@@ -72,16 +73,13 @@ open_link_socket(struct interface *iface)
 	if (bind(fd, (struct sockaddr *)&nl, sizeof(nl)) == -1)
 		return -1;
 	set_cloexec(fd);
-	if (iface->link_fd != -1)
-		close(iface->link_fd);
-	iface->link_fd = fd;
-	return 0;
+	return fd;
 }
 
 static int
 get_netlink(int fd, int flags,
-	    int (*callback)(struct nlmsghdr *, const char *),
-	    const char *ifname)
+	    int (*callback)(struct nlmsghdr *, const struct interface *),
+	    const struct interface *iface)
 {
 	char *buffer = NULL;
 	ssize_t bytes;
@@ -104,7 +102,7 @@ get_netlink(int fd, int flags,
 		     NLMSG_OK(nlm, (size_t)bytes);
 		     nlm = NLMSG_NEXT(nlm, bytes))
 		{
-			r = callback(nlm, ifname);
+			r = callback(nlm, iface);
 			if (r != 0)
 				goto eexit;
 		}
@@ -116,7 +114,7 @@ eexit:
 }
 
 static int
-err_netlink(struct nlmsghdr *nlm, _unused const char *ifname)
+err_netlink(struct nlmsghdr *nlm, _unused const struct interface *iface)
 {
 	struct nlmsgerr *err;
 	int l;
@@ -136,12 +134,13 @@ err_netlink(struct nlmsghdr *nlm, _unused const char *ifname)
 }
 
 static int
-link_netlink(struct nlmsghdr *nlm, const char *ifname)
+link_netlink(struct nlmsghdr *nlm, const struct interface *ifaces)
 {
 	int len;
 	struct rtattr *rta;
 	struct ifinfomsg *ifi;
 	char ifn[IF_NAMESIZE + 1];
+	const struct interface *iface;
 
 	if (nlm->nlmsg_type != RTM_NEWLINK && nlm->nlmsg_type != RTM_DELLINK)
 		return 0;
@@ -171,16 +170,16 @@ link_netlink(struct nlmsghdr *nlm, const char *ifname)
 		rta = RTA_NEXT(rta, len);
 	}
 
-	if (strncmp(ifname, ifn, sizeof(ifn)) == 0)
-		return 1;
+	for (iface = ifaces; iface; iface = iface->next)
+		if (strcmp(iface->name, ifn) == 0)
+			return 1;
 	return 0;
 }
 
 int
-link_changed(struct interface *iface)
+link_changed(int fd, const struct interface *iface)
 {
-	return get_netlink(iface->link_fd, MSG_DONTWAIT,
-			   &link_netlink, iface->name);
+	return get_netlink(fd, MSG_DONTWAIT, &link_netlink, iface);
 }
 
 static int
@@ -279,7 +278,7 @@ struct nlmr
 };
 
 int
-if_address(const char *ifname,
+if_address(const struct interface *iface,
 	   const struct in_addr *address, const struct in_addr *netmask,
 	   const struct in_addr *broadcast, int action)
 {
@@ -294,7 +293,7 @@ if_address(const char *ifname,
 		nlm->hdr.nlmsg_type = RTM_NEWADDR;
 	} else
 		nlm->hdr.nlmsg_type = RTM_DELADDR;
-	if (!(nlm->ifa.ifa_index = if_nametoindex(ifname))) {
+	if (!(nlm->ifa.ifa_index = if_nametoindex(iface->name))) {
 		free(nlm);
 		errno = ENODEV;
 		return -1;
@@ -303,7 +302,7 @@ if_address(const char *ifname,
 	nlm->ifa.ifa_prefixlen = inet_ntocidr(*netmask);
 	/* This creates the aliased interface */
 	add_attr_l(&nlm->hdr, sizeof(*nlm), IFA_LABEL,
-		   ifname, strlen(ifname) + 1);
+		   iface->name, strlen(iface->name) + 1);
 	add_attr_l(&nlm->hdr, sizeof(*nlm), IFA_LOCAL,
 		   &address->s_addr, sizeof(address->s_addr));
 	if (action >= 0)
@@ -317,7 +316,7 @@ if_address(const char *ifname,
 }
 
 int
-if_route(const char *ifname,
+if_route(const struct interface *iface,
 	 const struct in_addr *destination, const struct in_addr *netmask,
 	 const struct in_addr *gateway, int metric, int action)
 {
@@ -326,7 +325,7 @@ if_route(const char *ifname,
 	int retval = 0;
 
 
-	if (!(ifindex = if_nametoindex(ifname))) {
+	if (!(ifindex = if_nametoindex(iface->name))) {
 		errno = ENODEV;
 		return -1;
 	}
@@ -369,4 +368,50 @@ if_route(const char *ifname,
 		retval = -1;
 	free(nlm);
 	return retval;
+}
+
+struct interface *
+discover_interfaces(int argc, char * const *argv)
+{
+	FILE *f;
+	char *buffer = NULL, *p;
+	size_t len = 0, ln = 0, n;
+	int i, s;
+	struct interface *ifaces = NULL, *ifp, *ifl;
+
+	if ((f = fopen("/proc/net/dev", "r"))) {
+		while (get_line(&buffer, &len, f)) {
+			if (++ln < 2)
+				continue;
+			p = buffer;
+			while (isspace((unsigned int)*p))
+				p++;
+			n = strcspn(p, ": \t");
+			p[n]= '\0';
+			ifl = NULL;
+			for (ifp = ifaces; ifp; ifp = ifp->next) {
+				if (strcmp(ifp->name, p) == 0)
+					break;
+				ifl = ifp;
+			}
+			if (ifp)
+				continue;
+			if (argc > 0) {
+				for (i = 0; i < argc; i++)
+					if (strcmp(argv[i], p) == 0)
+						break;
+				if (i == argc)
+					continue;
+			}
+			if (ifp = init_interface(p)) {
+				if (ifl)
+					ifl->next =ifp; 
+				else
+					ifaces = ifp;
+			}
+		}
+		fclose(f);
+		free(buffer);
+	}
+	return ifaces;
 }

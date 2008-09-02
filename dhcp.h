@@ -29,12 +29,9 @@
 #define DHCP_H
 
 #include <arpa/inet.h>
+#include <netinet/in.h>
 
 #include <stdint.h>
-
-#include "config.h"
-#include "dhcpcd.h"
-#include "net.h"
 
 /* Max MTU - defines dhcp option length */
 #define MTU_MAX             1500
@@ -60,6 +57,24 @@
 #define DHCP_NAK            6
 #define DHCP_RELEASE        7
 #define DHCP_INFORM         8
+
+/* Constants taken from RFC 2131. */
+#define T1			0.5
+#define T2			0.875
+#define DHCP_BASE		4
+#define DHCP_MAX		64
+#define DHCP_RAND_MIN		-1
+#define DHCP_RAND_MAX		1
+#define DHCP_ARP_FAIL		10
+
+/* number of usecs in a second. */
+#define USECS_SECOND		1000000
+/* As we use timevals, we should use the usec part for
+ * greater randomisation. */
+#define DHCP_RAND_MIN_U		DHCP_RAND_MIN * USECS_SECOND
+#define DHCP_RAND_MAX_U		DHCP_RAND_MAX * USECS_SECOND
+#define PROBE_MIN_U		PROBE_MIN * USECS_SECOND
+#define PROBE_MAX_U		PROBE_MAX * USECS_SECOND
 
 /* DHCP options */
 enum DHO
@@ -154,25 +169,4 @@ struct dhcp_lease {
 	uint8_t frominfo;
 };
 
-#define add_option_mask(var, val) (var[val >> 3] |= 1 << (val & 7))
-#define del_option_mask(var, val) (var[val >> 3] &= ~(1 << (val & 7)))
-#define has_option_mask(var, val) (var[val >> 3] & (1 << (val & 7)))
-int make_option_mask(uint8_t *, char **, int);
-void print_options(void);
-char *get_option_string(const struct dhcp_message *, uint8_t);
-int get_option_addr(uint32_t *, const struct dhcp_message *, uint8_t);
-int get_option_uint32(uint32_t *, const struct dhcp_message *, uint8_t);
-int get_option_uint16(uint16_t *, const struct dhcp_message *, uint8_t);
-int get_option_uint8(uint8_t *, const struct dhcp_message *, uint8_t);
-struct rt *get_option_routes(const struct dhcp_message *);
-ssize_t configure_env(char **, const char *, const struct dhcp_message *,
-		      const struct options *);
-
-ssize_t make_message(struct dhcp_message **,
-			const struct interface *, const struct dhcp_lease *,
-	     		uint32_t, uint8_t, const struct options *);
-int valid_dhcp_packet(unsigned char *);
-
-ssize_t write_lease(const struct interface *, const struct dhcp_message *);
-struct dhcp_message *read_lease(const struct interface *iface);
 #endif

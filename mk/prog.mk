@@ -36,14 +36,6 @@ all: ${PROG} ${SCRIPTS} _man
 ${PROG}: ${OBJS}
 	${CC} ${LDFLAGS} -o $@ ${OBJS} ${LDADD}
 
-# We could save about 600 bytes by building it like this
-# instead of the more traditional method above
-small: ${SRCS}
-	echo "" > _${PROG}.c
-	for src in ${SRCS}; do echo "#include \"$$src\"" >> _${PROG}.c; done
-	${CC} ${CFLAGS} ${CPPFLAGS} -c _${PROG}.c -o _${PROG}.o
-	${CC} ${LDFLAGS} -o ${PROG} _${PROG}.o ${LDADD}
-
 _proginstall: ${PROG}
 	${INSTALL} -d ${DESTDIR}${BINDIR}
 	${INSTALL} -m ${BINMODE} ${PROG} ${DESTDIR}${BINDIR}

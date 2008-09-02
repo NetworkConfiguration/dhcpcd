@@ -25,11 +25,20 @@
  * SUCH DAMAGE.
  */
 
-#ifndef CLIENT_H
-#define CLIENT_H
+#ifndef ELOOP_H
+#define ELOOP_H
+
+#include <time.h>
 
 #include "dhcpcd.h"
 
-int dhcp_run(const struct options *, int *);
+void add_event(int fd, void (*)(struct interface *), struct interface *);
+void delete_event(int fd);
+void add_timeout_sec(time_t, void (*)(struct interface *), struct interface *);
+void add_timeout_tv(const struct timeval *,
+		    void (*)(struct interface *), struct interface *);
+void delete_timeout(void (*)(struct interface *), struct interface *);
+void delete_timeouts(struct interface *, void (*)(struct interface *), ...);
+void start_eloop(void);
 
 #endif

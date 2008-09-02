@@ -40,14 +40,13 @@
 #include "config.h"
 #include "common.h"
 #include "configure.h"
-#include "dhcp.h"
-#include "dhcpcd.h"
+#include "dhcpf.h"
+#include "if-options.h"
 #include "logger.h"
 #include "net.h"
 #include "signals.h"
 
 #define DEFAULT_PATH	"PATH=/usr/bin:/usr/sbin:/bin:/sbin"
-
 
 static int
 exec_script(char *const *argv, char *const *env)
@@ -80,18 +79,18 @@ exec_script(char *const *argv, char *const *env)
 }
 
 int
-run_script(const struct options *options, const char *iface,
-           const char *reason,
-           const struct dhcp_message *dhcpn, const struct dhcp_message *dhcpo)
+run_script(const struct interface *iface, const char *reason)
 {
-	char *const argv[2] = { UNCONST(options->script), NULL };
+	char *const argv[2] = { UNCONST(iface->state->options->script), NULL };
 	char **env = NULL, **ep;
 	char *path;
 	ssize_t e, elen;
 	pid_t pid;
 	int status = 0;
+	const struct if_options *ifo = iface->state->options;
 
-	logger(LOG_DEBUG, "executing `%s', reason %s", options->script, reason);
+	logger(LOG_DEBUG, "%s: executing `%s', reason %s",
+	       iface->name, argv[0], reason);
 
 	/* Make our env */
 	elen = 5;
@@ -103,9 +102,9 @@ run_script(const struct options *options, const char *iface,
 		snprintf(env[0], e, "PATH=%s", path);
 	} else
 		env[0] = xstrdup(DEFAULT_PATH);
-	e = strlen("interface") + strlen(iface) + 2;
+	e = strlen("interface") + strlen(iface->name) + 2;
 	env[1] = xmalloc(e);
-	snprintf(env[1], e, "interface=%s", iface);
+	snprintf(env[1], e, "interface=%s", iface->name);
 	e = strlen("reason") + strlen(reason) + 2;
 	env[2] = xmalloc(e);
 	snprintf(env[2], e, "reason=%s", reason);
@@ -113,30 +112,32 @@ run_script(const struct options *options, const char *iface,
 	env[3] = xmalloc(e);
 	snprintf(env[3], e, "pid=%d", getpid());
 	env[4] = xmalloc(e);
-	snprintf(env[4], e, "metric=%d", options->metric);
-	if (dhcpo) {
-		e = configure_env(NULL, NULL, dhcpo, options);
+	snprintf(env[4], e, "metric=%d", iface->metric);
+	if (iface->state->old) {
+		e = configure_env(NULL, NULL, iface->state->old, ifo);
 		if (e > 0) {
 			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
-			elen += configure_env(env + elen, "old", dhcpo, options);
+			elen += configure_env(env + elen, "old",
+					iface->state->old, ifo);
 		}
 	}
-	if (dhcpn) {
-		e = configure_env(NULL, NULL, dhcpn, options);
+	if (iface->state->new) {
+		e = configure_env(NULL, NULL, iface->state->new, ifo);
 		if (e > 0) {
 			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
-			elen += configure_env(env + elen, "new", dhcpn, options);
+			elen += configure_env(env + elen, "new",
+					iface->state->new, ifo);
 		}
 	}
 	/* Add our base environment */
-	if (options->environ) {
+	if (ifo->environ) {
 		e = 0;
-		while (options->environ[e++])
+		while (ifo->environ[e++])
 			;
 		env = xrealloc(env, sizeof(char *) * (elen + e + 1));
 		e = 0;
-		while (options->environ[e]) {
-			env[elen + e] = xstrdup(options->environ[e]);
+		while (ifo->environ[e]) {
+			env[elen + e] = xstrdup(ifo->environ[e]);
 			e++;
 		}
 		elen += e;
@@ -181,13 +182,13 @@ reverse_routes(struct rt *routes)
 }
 
 static int
-delete_route(const char *iface, struct rt *rt, int metric)
+delete_route(const struct interface *iface, struct rt *rt, int metric)
 {
 	char *addr;
 	int retval;
 
 	addr = xstrdup(inet_ntoa(rt->dest));
-	logger(LOG_DEBUG, "deleting route %s/%d via %s",
+	logger(LOG_DEBUG, "%s: deleting route %s/%d via %s", iface->name,
 	       addr, inet_ntocidr(rt->net), inet_ntoa(rt->gate));
 	free(addr);
 	retval = del_route(iface, &rt->dest, &rt->net, &rt->gate, metric);
@@ -206,7 +207,7 @@ delete_routes(struct interface *iface, int metric)
 	rt = reverse_routes(iface->routes);
 	while (rt) {
 		rtn = rt->next;
-		retval += delete_route(iface->name, rt, metric);
+		retval += delete_route(iface, rt, metric);
 		free(rt);
 		rt = rtn;
 	}
@@ -229,9 +230,9 @@ in_routes(const struct rt *routes, const struct rt *rt)
 }
 
 static int
-configure_routes(struct interface *iface, const struct dhcp_message *dhcp,
-		 const struct options *options)
+configure_routes(struct interface *iface, const struct dhcp_message *dhcp)
 {
+	const struct if_options *ifo = iface->state->options;
 	struct rt *rt, *ort;
 	struct rt *rtn = NULL, *nr = NULL;
 	int remember;
@@ -241,7 +242,7 @@ configure_routes(struct interface *iface, const struct dhcp_message *dhcp,
 	ort = get_option_routes(dhcp);
 
 #ifdef IPV4LL_ALWAYSROUTE
-	if (options->options & DHCPCD_IPV4LL &&
+	if (ifo->options & DHCPCD_IPV4LL &&
 	    IN_PRIVATE(ntohl(dhcp->yiaddr)))
 	{
 		for (rt = ort; rt; rt = rt->next) {
@@ -272,22 +273,22 @@ configure_routes(struct interface *iface, const struct dhcp_message *dhcp,
 	iface->routes = reverse_routes(iface->routes);
 	for (rt = iface->routes; rt; rt = rt->next)
 		if (in_routes(ort, rt) != 0)
-			delete_route(iface->name, rt, options->metric);
+			delete_route(iface, rt, iface->metric);
 
 	for (rt = ort; rt; rt = rt->next) {
 		/* Don't set default routes if not asked to */
 		if (rt->dest.s_addr == 0 &&
 		    rt->net.s_addr == 0 &&
-		    !(options->options & DHCPCD_GATEWAY))
+		    !(ifo->options & DHCPCD_GATEWAY))
 			continue;
 
 		addr = xstrdup(inet_ntoa(rt->dest));
-		logger(LOG_DEBUG, "adding route to %s/%d via %s",
-			addr, inet_ntocidr(rt->net), inet_ntoa(rt->gate));
+		logger(LOG_DEBUG, "%s: adding route to %s/%d via %s",
+		       iface->name, addr,
+		       inet_ntocidr(rt->net), inet_ntoa(rt->gate));
 		free(addr);
-		remember = add_route(iface->name, &rt->dest,
-				     &rt->net, &rt->gate,
-				     options->metric);
+		remember = add_route(iface, &rt->dest,
+				     &rt->net, &rt->gate, iface->metric);
 		retval += remember;
 
 		/* If we failed to add the route, we may have already added it
@@ -324,10 +325,11 @@ static int
 delete_address(struct interface *iface)
 {
 	int retval;
-	logger(LOG_DEBUG, "deleting IP address %s/%d",
+	logger(LOG_DEBUG, "%s: deleting IP address %s/%d",
+	       iface->name,
 	       inet_ntoa(iface->addr),
 	       inet_ntocidr(iface->net));
-	retval = del_address(iface->name, &iface->addr, &iface->net);
+	retval = del_address(iface, &iface->addr, &iface->net);
 	if (retval == -1 && errno != EADDRNOTAVAIL) 
 		logger(LOG_ERR, "del_address: %s", strerror(errno));
 	iface->addr.s_addr = 0;
@@ -336,11 +338,9 @@ delete_address(struct interface *iface)
 }
 
 int
-configure(struct interface *iface, const char *reason,
-	  const struct dhcp_message *dhcp, const struct dhcp_message *old,
-	  const struct dhcp_lease *lease, const struct options *options,
-	  int up)
+configure(struct interface *iface, const char *reason)
 {
+	struct dhcp_message *dhcp = iface->state->new;
 	struct in_addr addr;
 	struct in_addr net;
 	struct in_addr brd;
@@ -350,37 +350,32 @@ configure(struct interface *iface, const char *reason,
 #endif
 
 	/* Grab our IP config */
-	if (dhcp == NULL)
-		up = 0;
-	else {
+	if (dhcp) {
 		addr.s_addr = dhcp->yiaddr;
 		if (addr.s_addr == 0)
-			addr.s_addr = lease->addr.s_addr;
+			addr.s_addr = iface->state->lease.addr.s_addr;
 		/* Ensure we have all the needed values */
 		if (get_option_addr(&net.s_addr, dhcp, DHO_SUBNETMASK) == -1)
 			net.s_addr = get_netmask(addr.s_addr);
 		if (get_option_addr(&brd.s_addr, dhcp, DHO_BROADCAST) == -1)
 			brd.s_addr = addr.s_addr | ~net.s_addr;
-	}
-
-	/* If we aren't up, then reset the interface as much as we can */
-	if (!up) {
+	} else {
 		/* Only reset things if we had set them before */
 		if (iface->addr.s_addr != 0) {
-			delete_routes(iface, options->metric);
+			delete_routes(iface, iface->metric);
 			delete_address(iface);
 		}
 
-		run_script(options, iface->name, reason, NULL, old);
+		run_script(iface, reason);
 		return 0;
 	}
 
 	/* This also changes netmask */
-	if (!(options->options & DHCPCD_INFORM) ||
+	if (!(iface->state->options->options & DHCPCD_INFORM) ||
 	    !has_address(iface->name, &addr, &net)) {
-		logger(LOG_DEBUG, "adding IP address %s/%d",
-		       inet_ntoa(addr), inet_ntocidr(net));
-		if (add_address(iface->name, &addr, &net, &brd) == -1 &&
+		logger(LOG_DEBUG, "%s: adding IP address %s/%d",
+		       iface->name, inet_ntoa(addr), inet_ntocidr(net));
+		if (add_address(iface, &addr, &net, &brd) == -1 &&
 		    errno != EEXIST)
 		{
 			logger(LOG_ERR, "add_address: %s", strerror(errno));
@@ -395,26 +390,25 @@ configure(struct interface *iface, const char *reason,
 
 #ifdef __linux__
 	/* On linux, we need to change the subnet route to have our metric. */
-	if (iface->addr.s_addr != lease->addr.s_addr &&
-	    options->metric > 0 && net.s_addr != INADDR_BROADCAST)
+	if (iface->addr.s_addr != iface->state->lease.addr.s_addr &&
+	    iface->metric > 0 &&
+	    net.s_addr != INADDR_BROADCAST)
 	{
 		dest.s_addr = addr.s_addr & net.s_addr;
 		gate.s_addr = 0;
-		add_route(iface->name, &dest, &net, &gate, options->metric);
-		del_route(iface->name, &dest, &net, &gate, 0);
+		add_route(iface, &dest, &net, &gate, iface->metric);
+		del_route(iface, &dest, &net, &gate, 0);
 	}
 #endif
 
-	configure_routes(iface, dhcp, options);
-	up = (iface->addr.s_addr != addr.s_addr ||
-	      iface->net.s_addr != net.s_addr);
+	configure_routes(iface, dhcp);
 	iface->addr.s_addr = addr.s_addr;
 	iface->net.s_addr = net.s_addr;
 
-	if (!lease->frominfo)
+	if (!iface->state->lease.frominfo)
 		if (write_lease(iface, dhcp) == -1)
 			logger(LOG_ERR, "write_lease: %s", strerror(errno));
 
-	run_script(options, iface->name, reason, dhcp, old);
+	run_script(iface, reason);
 	return 0;
 }

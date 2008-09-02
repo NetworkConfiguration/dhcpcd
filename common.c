@@ -284,7 +284,7 @@ xmalloc(size_t s)
 
 	if (value)
 		return value;
-	logger(LOG_ERR, "memory exhausted");
+	logger(LOG_ERR, "memory exhausted (xalloc %zu bytes)", s);
 	exit (EXIT_FAILURE);
 	/* NOTREACHED */
 }
@@ -305,7 +305,7 @@ xrealloc(void *ptr, size_t s)
 
 	if (value)
 		return (value);
-	logger(LOG_ERR, "memory exhausted");
+	logger(LOG_ERR, "memory exhausted (xrealloc %zu bytes)", s);
 	exit(EXIT_FAILURE);
 	/* NOTREACHED */
 }
@@ -321,7 +321,7 @@ xstrdup(const char *str)
 	if ((value = strdup(str)))
 		return value;
 
-	logger(LOG_ERR, "memory exhausted");
+	logger(LOG_ERR, "memory exhausted (xstrdup)");
 	exit(EXIT_FAILURE);
 	/* NOTREACHED */
 }

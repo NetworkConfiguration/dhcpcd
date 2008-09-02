@@ -25,18 +25,25 @@
  * SUCH DAMAGE.
  */
 
-#ifndef LOGGER_H
-#define LOGGER_H
+#ifndef ARP_H
+#define ARP_H
 
-#if defined(__GNUC__)
-#  define _PRINTF_LIKE(_one, _two)  __attribute__ ((__format__ (__printf__, _one, _two)))
-#else
-#  define _PRINTF_LIKE(_one, _two)
-#endif
+#include "dhcpcd.h"
 
-#include <syslog.h>
+/* These are for IPV4LL, RFC 3927.
+ * We put them here as we use the timings for all ARP foo. */
+#define PROBE_WAIT		 1
+#define PROBE_NUM		 3
+#define PROBE_MIN		 1
+#define PROBE_MAX		 2
+#define ANNOUNCE_WAIT		 2
+#define ANNOUNCE_NUM		 2
+#define ANNOUNCE_INTERVAL	 2
+#define MAX_CONFLICTS		10
+#define RATE_LIMIT_INTERVAL	60
+#define DEFEND_INTERVAL		10
 
-void setloglevel(int);
-void logger(int, const char *, ...) _PRINTF_LIKE (2, 3);
-
+void send_arp_announce(struct interface *);
+void send_arp_probe(struct interface *);
+void handle_arp_packet(struct interface *);
 #endif

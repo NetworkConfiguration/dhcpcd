@@ -25,18 +25,31 @@
  * SUCH DAMAGE.
  */
 
-#ifndef LOGGER_H
-#define LOGGER_H
+#ifndef DHCPF_H
+#define DHCPF_H
 
-#if defined(__GNUC__)
-#  define _PRINTF_LIKE(_one, _two)  __attribute__ ((__format__ (__printf__, _one, _two)))
-#else
-#  define _PRINTF_LIKE(_one, _two)
-#endif
+#include "dhcp.h"
+#include "if-options.h"
+#include "net.h"
 
-#include <syslog.h>
+#define add_option_mask(var, val) (var[val >> 3] |= 1 << (val & 7))
+#define del_option_mask(var, val) (var[val >> 3] &= ~(1 << (val & 7)))
+#define has_option_mask(var, val) (var[val >> 3] & (1 << (val & 7)))
+int make_option_mask(uint8_t *, const char *, int);
+void print_options(void);
+char *get_option_string(const struct dhcp_message *, uint8_t);
+int get_option_addr(uint32_t *, const struct dhcp_message *, uint8_t);
+int get_option_uint32(uint32_t *, const struct dhcp_message *, uint8_t);
+int get_option_uint16(uint16_t *, const struct dhcp_message *, uint8_t);
+int get_option_uint8(uint8_t *, const struct dhcp_message *, uint8_t);
+struct rt *get_option_routes(const struct dhcp_message *);
+ssize_t configure_env(char **, const char *, const struct dhcp_message *,
+		      const struct if_options *);
 
-void setloglevel(int);
-void logger(int, const char *, ...) _PRINTF_LIKE (2, 3);
+ssize_t make_message(struct dhcp_message **, const struct interface *, uint8_t);
+int valid_dhcp_packet(unsigned char *);
 
+ssize_t write_lease(const struct interface *, const struct dhcp_message *);
+struct dhcp_message *read_lease(const struct interface *);
+void get_lease(struct dhcp_lease *, const struct dhcp_message *);
 #endif

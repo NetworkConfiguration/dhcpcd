@@ -43,21 +43,8 @@ make HOOKSCRIPTS=50-ntp install
 
 Compatibility
 -------------
-If you require compatibility with dhcpcd-3 and older style variables,
-you can install 50-dhcpcd-compat into the directory $LIBEXECDIR/dhcpcd-hooks
-We don't install this by default.
-You should also add -DCMDLINE_COMPAT to your CPPFLAGS if you need to be fully
-commandline compatible with prior versions.
-
-dhcpcd-3 enabled DUID support by default - this has changed in dhcpcd-4.
-You can enable it via the --duid, -D command line option or by using the
-duid directive in dhcpcd.conf.
-If CMDLINE_COMPAT is defined the we renable DUID support by default IF
-the dhcpcd.duid file exits. This keeps the clients working as they were,
-which is good.
-
-dhcpcd-4 is NOT fully commandline compatible with dhcpcd-2 and older and
-changes the meaning of some options.
+dhcpcd-4.1 is only fully command line compatible with dhcpcd-4.0
+For compatibility with older versions, use dhcpcd-4.0
 
 
 ChangeLog

@@ -36,7 +36,6 @@
 #include "logger.h"
 
 static int loglevel = LOG_INFO;
-static char logprefix[12] = {0};
 
 void
 setloglevel(int level)
@@ -45,45 +44,19 @@ setloglevel(int level)
 }
 
 void
-setlogprefix(const char *prefix)
-{
-	strlcpy(logprefix, prefix, sizeof(logprefix));
-}
-
-void
 logger(int level, const char *fmt, ...)
 {
 	va_list p, p2;
 	FILE *f = stderr;
-	size_t len, fmt2len;
-	char *fmt2, *pf;
 
 	va_start(p, fmt);
 	va_copy(p2, p);
-
 	if (level <= LOG_ERR || level <= loglevel) {
-		fprintf(f, "%s", logprefix);
 		vfprintf(f, fmt, p);
 		fputc('\n', f);
 	}
-
-	if (level < LOG_DEBUG || level <= loglevel) {
-		len = strlen(logprefix);
-		fmt2len = strlen(fmt) + len + 1;
-		fmt2 = pf = malloc(sizeof(char) * fmt2len);
-		if (fmt2) {
-			strlcpy(pf, logprefix, fmt2len);
-			pf += len;
-			strlcpy(pf, fmt, fmt2len - len);
-			vsyslog(level, fmt2, p2);
-			free(fmt2);
-		} else {
-			vsyslog(level, fmt, p2);
-			syslog(LOG_ERR, "logger: memory exhausted");
-			exit(EXIT_FAILURE);
-		}
-	}
-
+	if (level < LOG_DEBUG || level <= loglevel)
+		vsyslog(level, fmt, p2);
 	va_end(p2);
 	va_end(p);
 }
