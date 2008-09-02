@@ -481,7 +481,7 @@ carrier_status(const char *ifname)
 #ifdef SIOCGIFMEDIA
 	if (retval == 1) {
 		memset(&ifmr, 0, sizeof(ifmr));
-		strncpy(ifmr.ifm_name, ifr.ifr_name, sizeof(ifmr.ifm_name));
+		strlcpy(ifmr.ifm_name, ifr.ifr_name, sizeof(ifmr.ifm_name));
 		if (ioctl(s, SIOCGIFMEDIA, &ifmr) != -1 &&
 		    ifmr.ifm_status & IFM_AVALID)
 		{

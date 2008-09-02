@@ -759,7 +759,7 @@ main(int argc, char **argv)
 	/* Saves calling fflush(stream) in the logger */
 	setlinebuf(stdout);
 	openlog(PACKAGE, LOG_PID, LOG_LOCAL0);
-	strncpy(cffile, CONFIG, sizeof(cffile));
+	strlcpy(cffile, CONFIG, sizeof(cffile));
 
 	/* Test for --help and --version */
 	if (argc > 1) {
