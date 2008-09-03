@@ -31,29 +31,32 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 
+#include <arpa/inet.h>
 #include <net/if.h>
 #include <net/if_arp.h>
-#include <arpa/inet.h>
 #include <netinet/in_systm.h>
-#ifdef __linux__
-# include <linux/wireless.h>
-# include <netinet/ether.h>
-# include <netpacket/packet.h>
-#endif
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #define __FAVOR_BSD /* Nasty glibc hack so we can use BSD semantics for UDP */
 #include <netinet/udp.h>
 #undef __FAVOR_BSD
+#ifdef AF_LINK
+# include <net/if_dl.h>
+#endif
 #ifdef SIOCGIFMEDIA
 # include <net/if_media.h>
 #endif
 #ifdef BSD
 # include <net80211/ieee80211_ioctl.h>
 #endif
-#include <arpa/inet.h>
-#ifdef AF_LINK
-# include <net/if_dl.h>
+#ifdef __linux__
+# define SIOCGIWNAME 0x8B01
+/* FIXME: Some linux kernel verisons DO NOT like this include
+ * They have the error:
+ * /usr/include/linux/if.h:92: error: redefinition of `struct ifmap'
+ * We work around this by defining the above ioctl and using an ifreq
+ * structure which seems to work fine. */
+//# include <linux/wireless.h>
 #endif
 
 #include <ctype.h>
@@ -189,7 +192,8 @@ init_interface(const char *ifname)
 	struct ifreq ifr;
 	struct interface *iface = NULL;
 #if defined(SIOCGIWNAME)
-	struct iwreq iwr;
+//	FIXME: See comment in includes above
+//	struct iwreq iwr;
 #elif defined(SIOCG80211NWID)
 	struct ieee80211_nwid nwid;
 #elif defined(IEEE80211_IOC_SSID)
@@ -253,9 +257,7 @@ init_interface(const char *ifname)
 	 * We do this so we prefer other interfaces if they provide
 	 * similar configuration on the same subnet. */
 #if defined(SIOCGIWNAME) /* Linux */
-	memset(&iwr, 0, sizeof(iwr));
-	strlcpy(iwr.ifr_name, ifname, sizeof(iwr.ifr_name));
-	if (ioctl(s, SIOCGIWNAME, &iwr) != -1)
+	if (ioctl(s, SIOCGIWNAME, &ifr) != -1)
 		iface->metric += 100;
 #elif defined(SIOCG80211NWID) /* NetBSD */
 	memset(&nwid, 0, sizeof(nwid));
