@@ -45,19 +45,34 @@ struct sockaddr_un sun;
 static char buffer[1024];
 static char *argvp[255];
 
+static int fds[5];
+
+static void
+remove_control_data(void *arg)
+{
+	size_t i;
+
+	for (i = 0; i < sizeof(fds); i++) {
+		if (&fds[i] == arg) {
+			close(fds[i]);
+			delete_event(fds[i]);
+			fds[i] = -1;
+		}
+	}
+}
+
 static void
 handle_control_data(void *arg)
 {
 	ssize_t bytes;
-	int argc, s = (int)arg;
+	int argc, *s = arg;
 	char *e, *p;
 	char **ap;
 
 	for (;;) {
-		bytes = read(s, buffer, sizeof(buffer));
+		bytes = read(*s, buffer, sizeof(buffer));
 		if (bytes == -1 || bytes == 0) {
-			close(s);
-			delete_event(s);
+			remove_control_data(arg);
 			return;
 		}
 		p = buffer;
@@ -78,12 +93,21 @@ handle_control(_unused void *arg)
 {
 	struct sockaddr_un run;
 	socklen_t len;
-	int s;
+	size_t i;
+
+	for (i = 0; i < sizeof(fds); i++) {
+		if (fds[i] == -1)
+			break;
+	}
+	if (i >= sizeof(fds))
+		return;
 
 	len = sizeof(run);
-	if ((s = accept(fd, (struct sockaddr *)&run, &len)) == -1)
+	if ((fds[i] = accept(fd, (struct sockaddr *)&run, &len)) == -1)
 		return;
-	add_event(s, handle_control_data, (void *)s);
+	add_event(fds[i], handle_control_data, &fds[i]);
+	/* Timeout the connection after 5 minutes - should be plenty */
+	add_timeout_sec(300, remove_control_data, &fds[i]);
 }
 
 static int
@@ -109,11 +133,12 @@ start_control(void)
 	    chmod(CONTROLSOCKET, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP) == -1 ||
 	    set_cloexec(fd) == -1 ||
 	    set_nonblock(fd) == -1 ||
-	    listen(fd, 0) == -1)
+	    listen(fd, sizeof(fds)) == -1)
 	{
 		close(fd);
 		return -1;
 	}
+	memset(fds, -1, sizeof(fds));
 	add_event(fd, handle_control, NULL);
 	return fd;
 }
