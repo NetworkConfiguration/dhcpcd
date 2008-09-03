@@ -50,6 +50,7 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 #include "config.h"
 #include "common.h"
 #include "configure.h"
+#include "control.h"
 #include "dhcpcd.h"
 #include "dhcpf.h"
 #include "duid.h"
@@ -63,12 +64,12 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 /* We should define a maximum for the NAK exponential backoff */ 
 #define NAKOFF_MAX              60
 
+int master = 0;
 int pidfd = -1;
 static int linkfd = -1;
 static char cffile[PATH_MAX];
 static char pidfile[PATH_MAX] = { '\0' };
 static struct interface *ifaces = NULL;
-
 
 struct dhcp_op {
 	uint8_t value;
@@ -140,13 +141,18 @@ cleanup(void)
 	if (linkfd != -1)
 		close(linkfd);
 	if (pidfd > -1) {
+		if (master) {
+			if (stop_control() == -1)
+				logger(LOG_ERR, "stop_control: %s",
+				       strerror(errno));
+		}
 		close(pidfd);
 		unlink(pidfile);
 	}
 }
 
 void
-handle_exit_timeout(_unused struct interface *iface)
+handle_exit_timeout(_unused void *arg)
 {
 	logger(LOG_ERR, "timed out");
 	exit(EXIT_FAILURE);
@@ -186,7 +192,7 @@ close_sockets(struct interface *iface)
 
 static void
 send_message(struct interface *iface, int type,
-	     void (*function)(struct interface *))
+	     void (*callback)(void *))
 {
 	struct if_state *state = iface->state;
 	struct dhcp_message *dhcp;
@@ -196,7 +202,7 @@ send_message(struct interface *iface, int type,
 	in_addr_t a = 0;
 	struct timeval tv;
 
-	if (!function)
+	if (!callback)
 		logger(LOG_DEBUG, "%s: sending %s with xid 0x%x",
 		       iface->name, get_dhcp_op(type), state->xid);
 	else {
@@ -243,31 +249,33 @@ send_message(struct interface *iface, int type,
 			       iface->name, strerror(errno));
 	}
 	free(dhcp);
-	if (function)
-		add_timeout_tv(&tv, function, iface);
+	if (callback)
+		add_timeout_tv(&tv, callback, iface);
 }
 
 static void
-send_discover(struct interface *iface)
+send_discover(void *arg)
 {
-	send_message(iface, DHCP_DISCOVER, send_discover);
+	send_message((struct interface *)arg, DHCP_DISCOVER, send_discover);
 }
 
 void
-send_request(struct interface *iface)
+send_request(void *arg)
 {
-	send_message(iface, DHCP_REQUEST, send_request);
+	send_message((struct interface *)arg, DHCP_REQUEST, send_request);
 }
 
 static void
-send_renew(struct interface *iface)
+send_renew(void *arg)
 {
-	send_message(iface, DHCP_REQUEST, send_renew);
+	send_message((struct interface *)arg, DHCP_REQUEST, send_renew);
 }
 
 void
-start_renew(struct interface *iface)
+start_renew(void *arg)
 {
+	struct interface *iface = arg;
+
 	logger(LOG_INFO, "%s: renewing lease of %s",
 			iface->name, inet_ntoa(iface->state->lease.addr));
 	iface->state->state = DHS_RENEWING;
@@ -276,14 +284,16 @@ start_renew(struct interface *iface)
 }
 
 static void
-send_rebind(struct interface *iface)
+send_rebind(void *arg)
 {
-	send_message(iface, DHCP_REQUEST, send_rebind);
+	send_message((struct interface *)arg, DHCP_REQUEST, send_rebind);
 }
 
 void
-start_rebind(struct interface *iface)
+start_rebind(void *arg)
 {
+	struct interface *iface = arg;
+
 	logger(LOG_ERR, "%s: failed to renew, attmepting to rebind",
 			iface->name);
 	iface->state->state = DHS_REBINDING;
@@ -293,8 +303,9 @@ start_rebind(struct interface *iface)
 }
 
 void
-start_expire(struct interface *iface)
+start_expire(void *arg)
 {
+	struct interface *iface = arg;
 	int ll = IN_LINKLOCAL(htonl(iface->state->lease.addr.s_addr));
 
 	logger(LOG_ERR, "%s: lease expired", iface->name);
@@ -468,8 +479,9 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 }
 
 static void
-handle_dhcp_packet(struct interface *iface)
+handle_dhcp_packet(void *arg)
 {
+	struct interface *iface = arg;
 	uint8_t *packet;
 	struct dhcp_message *dhcp = NULL;
 	const uint8_t *pp;
@@ -552,8 +564,9 @@ open_sockets(struct interface *iface)
 }
 
 static void
-handle_link(struct interface *iface)
+handle_link(_unused void *arg)
 {
+	struct interface *iface;
 	int retval;
 
 	retval = link_changed(linkfd, ifaces);
@@ -593,8 +606,9 @@ handle_link(struct interface *iface)
 }
 
 void
-start_discover(struct interface *iface)
+start_discover(void *arg)
 {
+	struct interface *iface = arg;
 	struct if_options *ifo = iface->state->options;
 
 	iface->state->state = DHS_DISCOVERING;
@@ -630,9 +644,24 @@ start_reboot(struct interface *iface)
 	send_rebind(iface);
 }
 
-void
-start_interface(struct interface *iface)
+static void
+send_release(struct interface *iface)
 {
+	if (iface->state->lease.addr.s_addr &&
+	    !IN_LINKLOCAL(htonl(iface->state->lease.addr.s_addr)))
+	{
+		logger(LOG_INFO, "%s: releasing lease of %s",
+				iface->name, inet_ntoa(iface->state->lease.addr));
+		open_sockets(iface);
+		send_message(iface, DHCP_RELEASE, NULL);
+	}
+}
+
+void
+start_interface(void *arg)
+{
+	struct interface *iface = arg;
+
 	iface->start_uptime = uptime();
 	if (!iface->state->lease.addr.s_addr)
 		start_discover(iface);
@@ -643,25 +672,18 @@ start_interface(struct interface *iface)
 }
 
 static void
-init_state(struct interface *iface, int argc, char **argv)
+configure_interface(struct interface *iface, int argc, char **argv)
 {
-	struct if_state *ifs;
+	struct if_state *ifs = iface->state;
 	struct if_options *ifo;
 	uint8_t *duid;
 	size_t len = 0, ifl;
 
-	if (iface->state) {
-		ifs = iface->state;
-		free_options(ifs->options);
-	} else
-		ifs = iface->state = xzalloc(sizeof(*ifs));
-
-	ifs->state = DHS_INIT;
-	ifs->nakoff = 1;
+	free_options(ifs->options);
 	ifo = ifs->options = read_config(cffile, iface->name);
 	add_options(ifo, argc, argv);
 
-	if (ifo->metric)
+	if (ifo->metric != -1)
 		iface->metric = ifo->metric;
 
 	if (*ifo->clientid) {
@@ -696,10 +718,26 @@ init_state(struct interface *iface, int argc, char **argv)
 		}
 	}
 
-	if (!(ifo->options & DHCPCD_TEST))
+}
+
+static void
+init_state(struct interface *iface, int argc, char **argv)
+{
+	struct if_state *ifs;
+
+	if (iface->state) {
+		ifs = iface->state;
+	} else
+		ifs = iface->state = xzalloc(sizeof(*ifs));
+
+	ifs->state = DHS_INIT;
+	ifs->nakoff = 1;
+	configure_interface(iface, argc, argv);
+
+	if (!(ifs->options->options & DHCPCD_TEST))
 		run_script(iface, "PREINIT");
 
-	if (ifo->options & DHCPCD_LINK) {
+	if (ifs->options->options & DHCPCD_LINK) {
 		switch (carrier_status(iface->name)) {
 		case 0:
 			ifs->carrier = LINK_DOWN;
@@ -719,9 +757,11 @@ init_state(struct interface *iface, int argc, char **argv)
 }
 
 static void
-handle_signal(struct interface *iface)
+handle_signal(_unused void *arg)
 {
+	struct interface *iface;
 	int sig = signal_read();
+	int do_reboot = 0, do_release = 0;
 
 	switch (sig) {
 	case SIGINT:
@@ -729,6 +769,14 @@ handle_signal(struct interface *iface)
 		break;
 	case SIGTERM:
 		logger(LOG_INFO, "received SIGTERM, stopping");
+		break;
+	case SIGALRM:
+		logger(LOG_INFO, "received SIGALRM, rebinding lease");
+		do_reboot = 1;
+		break;
+	case SIGHUP:
+		logger(LOG_INFO, "received SIGHUP, releasing lease");
+		do_release = 1;
 		break;
 	default:
 		logger (LOG_ERR,
@@ -740,10 +788,89 @@ handle_signal(struct interface *iface)
 	for (iface = ifaces; iface; iface = iface->next) {
 		if (!iface->state)
 			continue;
-		if (!(iface->state->options->options & DHCPCD_PERSISTENT))
-			drop_config(iface, "STOP");
+		if (do_reboot)
+			start_reboot(iface);
+		else {
+			if (do_release)
+				send_release(iface);
+			if (!(iface->state->options->options & DHCPCD_PERSISTENT))
+				drop_config(iface, do_release ? "RELEASE" : "STOP");
+		}
 	}
 	exit(EXIT_FAILURE);
+}
+
+int
+handle_args(int argc, char **argv)
+{
+	struct interface *ifs, *ifp, *ifl = NULL, *ifn;
+	int do_exit = 0, do_release = 0, do_reboot = 0, opt, oi = 0;
+
+	optind = 0;
+	while ((opt = getopt_long(argc, argv, IF_OPTS, cf_options, &oi)) != -1)
+	{
+		switch (opt) {
+		case 'k':
+			do_release = 1;
+			break;
+		case 'n':
+			do_reboot = 1;
+			break;
+		case 'x':
+			do_exit = 1;
+			break;
+		}
+	}
+
+	/* We only deal with one interface here */
+	if (optind == argc) {
+		logger(LOG_ERR, "handle_args: no interface");
+		return -1;
+	}
+
+	if (do_release || do_reboot || do_exit) {
+		oi = optind;
+		while (oi < argc) {
+			for (ifp = ifaces; ifp && (ifn = ifp->next, 1); ifp = ifn) {
+				if (strcmp(ifp->name, argv[oi]) == 0) {
+					if (do_release)
+						send_release(ifp);
+					if (do_exit || do_release) {
+						drop_config(ifp, do_release ? "RELEASE" : "STOP");
+						close_sockets(ifp);
+						delete_timeout(NULL, ifp);
+						if (ifl)
+							ifl->next = ifp->next;
+						else
+							ifaces = ifp->next;
+						free_interface(ifp);
+						continue;
+					} else if (do_reboot) {
+						configure_interface(ifp, argc, argv);
+						start_reboot(ifp);
+					}
+				}
+				ifl = ifp;
+			}
+			oi++;
+		}
+		return 0;
+	}
+
+	if ((ifs = discover_interfaces(argc, argv))) {
+		argc += optind;
+		argv -= optind;
+		for (ifp = ifs; ifp; ifp = ifp->next)
+			init_state(ifp, argc, argv);
+		if (ifaces) {
+			ifp = ifaces;
+			while (ifp->next)
+				ifp = ifp->next;
+			ifp->next = ifs;
+		} else
+			ifaces = ifs;
+	}
+	return 0;
 }
 
 int
@@ -751,7 +878,7 @@ main(int argc, char **argv)
 {
 	struct if_options *ifo;
 	struct interface *iface;
-	int opt, oi = 0, test = 0, signal_fd, sig = 0, i;
+	int opt, oi = 0, test = 0, signal_fd, sig = 0, i, control_fd;
 	pid_t pid;
 	struct timespec ts;
 
@@ -781,6 +908,12 @@ main(int argc, char **argv)
 		case 'f':
 			strlcpy(cffile, optarg, sizeof(cffile));
 			break;
+		case 'k':
+			sig = SIGHUP;
+			break;
+		case 'n':
+			sig = SIGALRM;
+			break;
 		case 'x':
 			sig = SIGTERM;
 			break;
@@ -803,26 +936,44 @@ main(int argc, char **argv)
 			usage();
 		exit(EXIT_FAILURE);
 	}
+
+	/* If we have any other args, we should run as a single dhcpcd instance
+	 * for that interface. */
+	if (optind == argc - 1)
+		snprintf(pidfile, sizeof(pidfile), PIDFILE, "-", argv[optind]);
+	else {
+		snprintf(pidfile, sizeof(pidfile), PIDFILE, "", "");
+		master = 1;
+	}
+	
 	if (test)
 		ifo->options |= DHCPCD_TEST | DHCPCD_PERSISTENT;
 #ifdef THERE_IS_NO_FORK
 	ifo->options &= ~DHCPCD_DAEMONISE;
 #endif
 
-	/* If we have any other args, we should run as a single dhcpcd instance
-	 * for that interface. */
-	if (optind == argc - 1)
-		snprintf(pidfile, sizeof(pidfile), PIDFILE, "-", argv[optind]);
-	else
-		snprintf(pidfile, sizeof(pidfile), PIDFILE, "", "");
+	chdir("/");
+	umask(022);
+	atexit(cleanup);
+
+	if (!master) {
+		control_fd = open_control();
+		if (control_fd != -1) {
+			logger(LOG_INFO, "sending commands to master dhcpcd process");
+			i = send_control(argc, argv);
+			if (i > 0) {
+				logger(LOG_DEBUG, "send OK");
+				exit(EXIT_SUCCESS);
+			} else {
+				logger(LOG_ERR, "failed to send commands");
+				exit(EXIT_FAILURE);
+			}
+		}
+	}
 
 	if (geteuid())
 		logger(LOG_WARNING, PACKAGE " will not work correctly unless"
 		       " run as root");
-
-	chdir("/");
-	umask(022);
-	atexit(cleanup);
 
 	if (sig != 0) {
 		i = -1;
@@ -885,6 +1036,13 @@ main(int argc, char **argv)
 	if (signal_setup() == -1)
 		exit(EXIT_FAILURE);
 	add_event(signal_fd, handle_signal, NULL);
+
+	if (master) {
+		if (start_control() == -1) {
+			logger(LOG_ERR, "start_control: %s", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+	}
 
 	if (ifo->options & DHCPCD_LINK) {
 		linkfd = open_link_socket();

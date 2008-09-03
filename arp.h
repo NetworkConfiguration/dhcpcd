@@ -28,8 +28,6 @@
 #ifndef ARP_H
 #define ARP_H
 
-#include "dhcpcd.h"
-
 /* These are for IPV4LL, RFC 3927.
  * We put them here as we use the timings for all ARP foo. */
 #define PROBE_WAIT		 1
@@ -43,7 +41,6 @@
 #define RATE_LIMIT_INTERVAL	60
 #define DEFEND_INTERVAL		10
 
-void send_arp_announce(struct interface *);
-void send_arp_probe(struct interface *);
-void handle_arp_packet(struct interface *);
+void send_arp_announce(void *);
+void send_arp_probe(void *);
 #endif

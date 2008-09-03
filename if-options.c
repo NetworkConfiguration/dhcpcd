@@ -293,6 +293,8 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		}
 		*ifo->vendorclassid = (uint8_t)s;
 		break;
+	case 'k':
+		break;
 	case 'l':
 		if (*arg == '-') {
 			logger(LOG_ERR,
@@ -312,6 +314,8 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			logger(LOG_ERR, "metric must be a positive value");
 			return -1;
 		}
+		break;
+	case 'n':
 		break;
 	case 'o':
 		if (make_option_mask(ifo->requestmask, arg, 1) != 0) {
@@ -557,6 +561,7 @@ read_config(const char *file, const char *ifname)
 	ifo->options |= DHCPCD_CLIENTID | DHCPCD_GATEWAY | DHCPCD_DAEMONISE;
 	ifo->options |= DHCPCD_ARP | DHCPCD_IPV4LL | DHCPCD_LINK;
 	ifo->timeout = DEFAULT_TIMEOUT;
+	ifo->metric = -1;
 	gethostname(ifo->hostname + 1, sizeof(ifo->hostname));
 	if (strcmp(ifo->hostname + 1, "(none)") == 0 ||
 	    strcmp(ifo->hostname + 1, "localhost") == 0)
@@ -642,12 +647,14 @@ free_options(struct if_options *ifo)
 {
 	size_t i;
 
-	if (ifo->environ) {
-		i = 0;
-		while (ifo->environ[i])
-			free(ifo->environ[i++]);
-		free(ifo->environ);
+	if (ifo) {
+		if (ifo->environ) {
+			i = 0;
+			while (ifo->environ[i])
+				free(ifo->environ[i++]);
+			free(ifo->environ);
+		}
+		free(ifo->blacklist);
+		free(ifo);
 	}
-	free(ifo->blacklist);
-	free(ifo);
 }

@@ -28,8 +28,6 @@
 #ifndef IPV4LL_H
 #define IPV4LL_H
 
-#include "net.h"
-
-void start_ipv4ll(struct interface *);
-void handle_ipv4ll_failure(struct interface *);
+void start_ipv4ll(void *);
+void handle_ipv4ll_failure(void *);
 #endif

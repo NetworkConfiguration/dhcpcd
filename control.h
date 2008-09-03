@@ -1,7 +1,8 @@
-/*
+/* 
  * dhcpcd - DHCP client daemon
  * Copyright 2006-2008 Roy Marples <roy@marples.name>
- *
+ * All rights reserved
+
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -24,55 +25,14 @@
  * SUCH DAMAGE.
  */
 
-#ifndef CONFIG_H
-#define CONFIG_H
+#ifndef CONTROL_H
+#define CONTROL_H
 
-#define PACKAGE			"dhcpcd"
-#define VERSION			"4.0.99"
+#include "dhcpcd.h"
 
-/*
- * By default we don't add a local link route if we got a routeable address.
- * This is because dhcpcd can't really decide which interface should allow
- * link local routing when we have more than one interface.
- * Ideally the host network scripts should add the link local route for us.
- * If not, you can define this to get dhcpcd to always add the link local route.
- */
-// #define IPV4LL_ALWAYSROUTE 
-
-/* Some systems do not have a working fork. */
-/* #define THERE_IS_NO_FORK */
-
-/* Paths to things */
-#ifndef SYSCONFDIR
-# define SYSCONFDIR		"/etc"
-#endif
-#ifndef LIBEXECDIR
-# define LIBEXECDIR		"/libexec"
-#endif
-#ifndef RUNDIR
-# define RUNDIR			"/var/run"
-#endif
-#ifndef DBDIR
-# define DBDIR			"/var/db"
-#endif
-
-#ifndef CONFIG
-# define CONFIG			SYSCONFDIR "/" PACKAGE ".conf"
-#endif
-#ifndef SCRIPT
-# define SCRIPT			LIBEXECDIR "/" PACKAGE "-run-hooks"
-#endif
-#ifndef DUID
-# define DUID			SYSCONFDIR "/" PACKAGE ".duid"
-#endif
-#ifndef LEASEFILE
-# define LEASEFILE		DBDIR "/" PACKAGE "-%s.lease"
-#endif
-#ifndef PIDFILE
-# define PIDFILE		RUNDIR "/" PACKAGE "%s%s.pid"
-#endif
-#ifndef CONTROLSOCKET
-# define CONTROLSOCKET		RUNDIR "/" PACKAGE ".sock"
-#endif
+int start_control(void);
+int stop_control(void);
+int open_control(void);
+int send_control(int, char * const *);
 
 #endif

@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd September 1, 2008
+.Dd September 3, 2008
 .Dt DHCPCD 8 SMM
 .Sh NAME
 .Nm dhcpcd
@@ -436,9 +436,10 @@ RFC 3442, RFC 3927, RFC 4361, RFC 4390, RFC 4702.
 .Sh AUTHORS
 .An Roy Marples <roy@marples.name>
 .Sh BUGS
-You cannot release a lease - this will be fixed before the first release.
-.Pp
-You cannot dynamically add or remove interfaces either manually or detected.
+.Nm
+does not wait for commands to complete when sending them to the master
+.Nm
+process.
 .Pp
 One of the goals for one instance managing multiple interfaces is more
 intelligent route and configuration management.

@@ -52,9 +52,10 @@ handle_arp_failure(struct interface *iface)
 	add_timeout_sec(DHCP_ARP_FAIL, start_interface, iface);
 }
 
-void
-handle_arp_packet(struct interface *iface)
+static void
+handle_arp_packet(void *arg)
 {
+	struct interface *iface = arg;
 	struct arphdr reply;
 	uint32_t reply_s;
 	uint32_t reply_t;
@@ -123,8 +124,9 @@ handle_arp_packet(struct interface *iface)
 }
 
 void
-send_arp_announce(struct interface *iface)
+send_arp_announce(void *arg)
 {
+	struct interface *iface = arg;
 	struct if_state *state = iface->state;
 	struct timeval tv;
 
@@ -167,8 +169,9 @@ send_arp_announce(struct interface *iface)
 }
 
 void
-send_arp_probe(struct interface *iface)
+send_arp_probe(void *arg)
 {
+	struct interface *iface = arg;
 	struct if_state *state = iface->state;
 	struct in_addr addr;
 	struct timeval tv;

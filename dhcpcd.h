@@ -28,7 +28,6 @@
 #ifndef DHCPCD_H
 #define DHCPCD_H
 
-#include <sys/socket.h>
 #include <net/if.h>
 
 #include <limits.h>
@@ -105,14 +104,15 @@ struct interface
 };
 
 extern int pidfd;
-void handle_exit_timeout(struct interface *);
-void send_request(struct interface *);
-void start_interface(struct interface *);
-void start_discover(struct interface *);
-void start_renew(struct interface *);
-void start_rebind(struct interface *);
+int handle_args(int, char **);
+void handle_exit_timeout(void *);
+void send_request(void *);
+void start_interface(void *);
+void start_discover(void *);
+void start_renew(void *);
+void start_rebind(void *);
 void start_reboot(struct interface *);
-void start_expire(struct interface *);
+void start_expire(void *);
 void send_decline(struct interface *);
 void close_sockets(struct interface *);
 void drop_config(struct interface *, const char *);

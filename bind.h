@@ -29,7 +29,6 @@
 #define BIND_H
 
 #include "config.h"
-#include "dhcpcd.h"
 #ifdef THERE_IS_NO_FORK
 #define daemonise() {}
 #else
@@ -37,5 +36,5 @@ pid_t daemonise(void);
 #endif
 
 extern int can_daemonise;
-void bind_interface(struct interface *);
+void bind_interface(void *);
 #endif

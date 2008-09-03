@@ -41,16 +41,16 @@ static struct timeval now = {0, 0};
 
 static struct event {
 	int fd;
-	void (*callback)(struct interface *);
-	struct interface *iface;
+	void (*callback)(void *);
+	void *arg;
 	struct event *next;
 } *events = NULL;
 static struct event *free_events = NULL;
 
 static struct timeout {
 	struct timeval when;
-	void (*callback)(struct interface *);
-	struct interface *iface;
+	void (*callback)(void *);
+	void *arg;
 	struct timeout *next;
 } *timeouts = NULL;
 static struct timeout *free_timeouts = NULL;
@@ -93,7 +93,7 @@ cleanup(void)
 #endif
 
 void
-add_event(int fd, void (*callback)(struct interface *), struct interface *iface)
+add_event(int fd, void (*callback)(void *), void *arg)
 {
 	struct event *e, *last = NULL;
 
@@ -101,7 +101,7 @@ add_event(int fd, void (*callback)(struct interface *), struct interface *iface)
 	for (e = events; e; e = e->next) {
 		if (e->fd == fd) {
 			e->callback = callback;
-			e->iface = iface;
+			e->arg = arg;
 			return;
 		}
 		last = e;
@@ -115,7 +115,7 @@ add_event(int fd, void (*callback)(struct interface *), struct interface *iface)
 		e = xmalloc(sizeof(*e));
 	e->fd = fd;
 	e->callback = callback;
-	e->iface = iface;
+	e->arg = arg;
 	e->next = NULL;
 	if (last)
 		last->next = e;
@@ -144,7 +144,7 @@ delete_event(int fd)
 
 void
 add_timeout_tv(const struct timeval *when,
-	       void (*callback)(struct interface *), struct interface *iface)
+	       void (*callback)(void *), void *arg)
 {
 	struct timeval w;
 	struct timeout *t, *tt = NULL;
@@ -154,7 +154,7 @@ add_timeout_tv(const struct timeval *when,
 
 	/* Remove existing timeout if present */
 	for (t = timeouts; t; t = t->next) {
-		if (t->callback == callback && t->iface == iface) {
+		if (t->callback == callback && t->arg == arg) {
 			if (tt)
 				tt->next = t->next;
 			else
@@ -176,7 +176,7 @@ add_timeout_tv(const struct timeval *when,
 	t->when.tv_sec = w.tv_sec;
 	t->when.tv_usec = w.tv_usec;
 	t->callback = callback;
-	t->iface = iface;
+	t->arg = arg;
 
 	/* The timeout list should be in chronological order,
 	 * soonest first.
@@ -199,30 +199,30 @@ add_timeout_tv(const struct timeval *when,
 
 void
 add_timeout_sec(time_t when,
-		void (*callback)(struct interface *), struct interface *iface)
+		void (*callback)(void *), void *arg)
 {
 	struct timeval tv;
 
 	tv.tv_sec = when;
 	tv.tv_usec = 0;
-	add_timeout_tv(&tv, callback, iface);
+	add_timeout_tv(&tv, callback, arg);
 }
 
 /* This deletes all timeouts for the interface EXCEPT for ones with the
  * callbacks given. Handy for deleting everything apart from the expire
  * timeout. */
 void
-delete_timeouts(struct interface *iface,
-		void (*callback)(struct interface *), ...)
+delete_timeouts(void *arg,
+		void (*callback)(void *), ...)
 {
 	struct timeout *t, *tt, *last = NULL;
 	va_list va;
-	void (*f)(struct interface *);
+	void (*f)(void *);
 
 	for (t = timeouts; t && (tt = t->next, 1); t = tt) {
-		if (t->iface == iface && t->callback != callback) {
+		if (t->arg == arg && t->callback != callback) {
 			va_start(va, callback);
-			while ((f = va_arg(va, void (*)(struct interface *))))
+			while ((f = va_arg(va, void (*)(void *))))
 				if (f == t->callback)
 					break;
 			va_end(va);
@@ -240,12 +240,12 @@ delete_timeouts(struct interface *iface,
 }
 
 void
-delete_timeout(void (*callback)(struct interface *), struct interface *iface)
+delete_timeout(void (*callback)(void *), void *arg)
 {
 	struct timeout *t, *tt, *last = NULL;
 
 	for (t = timeouts; t && (tt = t->next, 1); t = tt) {
-		if (t->iface == iface &&
+		if (t->arg == arg &&
 		    (!callback || t->callback == callback))
 		{
 			if (last)
@@ -281,7 +281,7 @@ start_eloop(void)
 			if (timercmp(&now, &timeouts->when, >)) {
 				t = timeouts;
 				timeouts = timeouts->next;
-				t->callback(t->iface);
+				t->callback(t->arg);
 				t->next = free_timeouts;
 				free_timeouts = t;
 				continue;
@@ -338,7 +338,7 @@ start_eloop(void)
 				continue;
 			for (e = events; e; e = e->next) {
 				if (e->fd == fds[i].fd) {
-					e->callback(e->iface);
+					e->callback(e->arg);
 					break;
 				}
 			}

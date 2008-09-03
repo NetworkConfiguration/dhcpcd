@@ -98,8 +98,10 @@ daemonise(void)
 }
 #endif
 
-void bind_interface(struct interface *iface)
+void
+bind_interface(void *arg)
 {
+	struct interface *iface = arg;
 	struct if_state *state = iface->state;
 	struct if_options *ifo = state->options;
 	struct dhcp_lease *lease = &state->lease;

@@ -73,8 +73,10 @@ make_ipv4ll_lease(uint32_t old_addr)
 }
 
 void
-start_ipv4ll(struct interface *iface)
+start_ipv4ll(void *arg)
 {
+	struct interface *iface = arg;
+
 	iface->state->probes = 0;
 	iface->state->claims = 0;
 	if (iface->addr.s_addr) {
@@ -94,8 +96,9 @@ start_ipv4ll(struct interface *iface)
 }
 
 void
-handle_ipv4ll_failure(struct interface *iface)
+handle_ipv4ll_failure(void *arg)
 {
+	struct interface *iface = arg;
 	time_t up;
 
 	if (iface->state->fail.s_addr == iface->state->lease.addr.s_addr) {

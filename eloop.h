@@ -32,13 +32,12 @@
 
 #include "dhcpcd.h"
 
-void add_event(int fd, void (*)(struct interface *), struct interface *);
+void add_event(int fd, void (*)(void *), void *);
 void delete_event(int fd);
-void add_timeout_sec(time_t, void (*)(struct interface *), struct interface *);
-void add_timeout_tv(const struct timeval *,
-		    void (*)(struct interface *), struct interface *);
-void delete_timeout(void (*)(struct interface *), struct interface *);
-void delete_timeouts(struct interface *, void (*)(struct interface *), ...);
+void add_timeout_sec(time_t, void (*)(void *), void *);
+void add_timeout_tv(const struct timeval *, void (*)(void *), void *);
+void delete_timeout(void (*)(void *), void *);
+void delete_timeouts(void *, void (*)(void *), ...);
 void start_eloop(void);
 
 #endif
