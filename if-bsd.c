@@ -224,7 +224,6 @@ link_changed(int fd, const struct interface *ifaces)
 					return 1;
 		}
 	}
-	return 0;
 }
 
 struct interface *
