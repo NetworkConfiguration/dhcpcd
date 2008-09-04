@@ -686,6 +686,7 @@ configure_interface(struct interface *iface, int argc, char **argv)
 	if (ifo->metric != -1)
 		iface->metric = ifo->metric;
 
+	free(iface->clientid);
 	if (*ifo->clientid) {
 		iface->clientid = xmalloc(ifo->clientid[0] + 1);
 		memcpy(iface->clientid, ifo->clientid, ifo->clientid[0] + 1);
