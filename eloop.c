@@ -236,6 +236,7 @@ delete_timeouts(void *arg,
 				continue;
 			}
 		}
+		last = t;
 	}
 }
 
