@@ -245,11 +245,13 @@ valid_length(uint8_t option, int dl, int *type)
 	return 0;
 }
 
+#ifdef DEBUG_MEMORY
 static void
 free_option_buffer(void)
 {
 	free(dhcp_opt_buffer);
 }
+#endif
 
 #define get_option_raw(dhcp, opt) get_option(dhcp, opt, NULL, NULL)
 static const uint8_t *
@@ -270,7 +272,9 @@ get_option(const struct dhcp_message *dhcp, uint8_t opt, int *len, int *type)
 			if (op) {
 				if (!dhcp_opt_buffer) {
 					dhcp_opt_buffer = xmalloc(sizeof(struct dhcp_message));
+#ifdef DEBUG_MEMORY
 					atexit(free_option_buffer);
+#endif
 				}
 				if (!bp) 
 					bp = dhcp_opt_buffer;
