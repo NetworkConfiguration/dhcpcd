@@ -804,7 +804,7 @@ handle_signal(_unused void *arg)
 int
 handle_args(int argc, char **argv)
 {
-	struct interface *ifs, *ifp, *ifl = NULL, *ifn;
+	struct interface *ifs, *ifp, *ifl = NULL;
 	int do_exit = 0, do_release = 0, do_reboot = 0, opt, oi = 0;
 
 	optind = 0;
@@ -830,30 +830,29 @@ handle_args(int argc, char **argv)
 	}
 
 	if (do_release || do_reboot || do_exit) {
-		oi = optind;
-		while (oi < argc) {
-			for (ifp = ifaces; ifp && (ifn = ifp->next, 1); ifp = ifn) {
-				if (strcmp(ifp->name, argv[oi]) == 0) {
-					if (do_release)
-						send_release(ifp);
-					if (do_exit || do_release) {
-						drop_config(ifp, do_release ? "RELEASE" : "STOP");
-						close_sockets(ifp);
-						delete_timeout(NULL, ifp);
-						if (ifl)
-							ifl->next = ifp->next;
-						else
-							ifaces = ifp->next;
-						free_interface(ifp);
-						continue;
-					} else if (do_reboot) {
-						configure_interface(ifp, argc, argv);
-						start_reboot(ifp);
-					}
-				}
+		for (oi = optind; oi < argc; oi++) {
+			for (ifp = ifaces; ifp; ifp = ifp->next) {
+				if (strcmp(ifp->name, argv[oi]) == 0)
+					break;
 				ifl = ifp;
 			}
-			oi++;
+			if (!ifp)
+				continue;
+			if (do_release)
+				send_release(ifp);
+			if (do_exit || do_release) {
+				drop_config(ifp, do_release ? "RELEASE" : "STOP");
+				close_sockets(ifp);
+				delete_timeout(NULL, ifp);
+				if (ifl)
+					ifl->next = ifp->next;
+				else
+					ifaces = ifp->next;
+				free_interface(ifp);
+			} else if (do_reboot) {
+				configure_interface(ifp, argc, argv);
+				start_reboot(ifp);
+			}
 		}
 		return 0;
 	}
