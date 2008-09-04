@@ -66,6 +66,8 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 
 int master = 0;
 int pidfd = -1;
+static char **ifv = NULL;
+static int ifc = 0;
 static int linkfd = -1;
 static char cffile[PATH_MAX];
 static char pidfile[PATH_MAX] = { '\0' };
@@ -195,6 +197,7 @@ stop_interface(struct interface *iface)
 {
 	struct interface *ifp, *ifl = NULL;
 
+	logger(LOG_ERR, "%s: removing interface", iface->name);
 	drop_config(iface, "STOP");
 	close_sockets(iface);
 	delete_timeout(NULL, iface);
@@ -272,8 +275,6 @@ send_message(struct interface *iface, int type,
 	}
 	free(dhcp);
 	if (r == -1) {
-		logger(LOG_ERR, "%s: removing interface from dhcpcd",
-		       iface->name);
 		stop_interface(iface);
 	} else {
 		if (callback)
@@ -592,44 +593,29 @@ open_sockets(struct interface *iface)
 }
 
 static void
-handle_link(_unused void *arg)
+handle_carrier(struct interface *iface)
 {
-	struct interface *iface;
-	int retval;
-
-	retval = link_changed(linkfd, ifaces);
-	if (retval == -1) {
-		logger(LOG_ERR, "link_changed: %s", strerror(errno));
+	if (!(iface->state->options->options & DHCPCD_LINK))
 		return;
-	}
-	if (retval == 0)
-		return;
-	for (iface = ifaces; iface; iface = iface->next) {
-		if (iface->state->options->options & DHCPCD_LINK) {
-			switch (carrier_status(iface->name)) {
-			case -1:
-				logger(LOG_ERR, "carrier_status: %s",
-				       strerror(errno));
-				break;
-			case 0:
-				if (iface->state->carrier != LINK_DOWN) {
-					iface->state->carrier = LINK_DOWN;
-					logger(LOG_INFO, "%s: carrier lost",
-					       iface->name);
-					close_sockets(iface);
-					delete_timeouts(iface, start_expire, NULL);
-				}
-				break;
-			default:
-				if (iface->state->carrier != LINK_UP) {
-					iface->state->carrier = LINK_UP;
-					logger(LOG_INFO, "%s: carrier acquired",
-					       iface->name);
-					start_interface(iface);
-				}
-				break;
-			}
+	switch (carrier_status(iface->name)) {
+	case -1:
+		logger(LOG_ERR, "carrier_status: %s", strerror(errno));
+		break;
+	case 0:
+		if (iface->state->carrier != LINK_DOWN) {
+			iface->state->carrier = LINK_DOWN;
+			logger(LOG_INFO, "%s: carrier lost", iface->name);
+			close_sockets(iface);
+			delete_timeouts(iface, start_expire, NULL);
 		}
+		break;
+	default:
+		if (iface->state->carrier != LINK_UP) {
+			iface->state->carrier = LINK_UP;
+			logger(LOG_INFO, "%s: carrier acquired", iface->name);
+			start_interface(iface);
+		}
+		break;
 	}
 }
 
@@ -783,6 +769,43 @@ init_state(struct interface *iface, int argc, char **argv)
 		logger(LOG_INFO, "%s: waiting for carrier", iface->name);
 	else
 		start_interface(iface);
+}
+
+static void
+handle_new_interface(const char *name)
+{
+	struct interface *ifs, *ifp;
+	const char * const argv[] = { "dhcpcd", name };
+	int i;
+
+	/* If running off an interface list, check it's in it. */
+	if (ifc) {
+		for (i = 0; i < ifc; i++)
+			if (strcmp(ifv[i], name) == 0)
+				break;
+		if (i >= ifc)
+			return;
+	}
+
+	if ((ifs = discover_interfaces(2, UNCONST(argv)))) {
+		for (ifp = ifs; ifp; ifp = ifp->next)
+			init_state(ifp, 2, UNCONST(argv));
+		if (ifaces) {
+			ifp = ifaces;
+			while (ifp->next)
+				ifp = ifp->next;
+			ifp->next = ifs;
+		} else
+			ifaces = ifs;
+	}
+}
+
+static void
+handle_link(_unused void *arg)
+{
+	if (manage_link(linkfd, ifaces, handle_carrier,
+			handle_new_interface, stop_interface) == -1)
+		logger(LOG_ERR, "manage_link: %s", strerror(errno));
 }
 
 static void
@@ -1091,13 +1114,15 @@ main(int argc, char **argv)
 	}
 	free_options(ifo);
 
-	argc -= optind;
-	argv += optind;
-	ifaces = discover_interfaces(argc, argv);
-	argc += optind;
-	argv -= optind;
+	ifc = argc - optind;
+	ifv = argv + optind;
+	ifaces = discover_interfaces(ifc, ifv);
 	for (iface = ifaces; iface; iface = iface->next)
 		init_state(iface, argc, argv);
+	if (!ifaces && ifc == 1) {
+		logger(LOG_ERR, "interface `%s' does not exist", ifv[0]);
+		exit(EXIT_FAILURE);
+	}
 	start_eloop();
 	/* NOTREACHED */
 }

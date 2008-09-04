@@ -187,23 +187,29 @@ open_link_socket(void)
 	int fd;
 
 	fd = socket(PF_ROUTE, SOCK_RAW, 0);
-	if (fd != -1)
+	if (fd != -1) {
 		set_cloexec(fd);
+		set_nonblock(fd);
+	}
 	return fd;
 }
 
 #define BUFFER_LEN	2048
 int
-link_changed(int fd, const struct interface *ifaces)
+manage_link(int fd, struct interface *ifaces,
+	    void (*if_carrier)(struct interface *),
+	    void (*if_add)(const char *),
+	    void (*if_remove)(struct interface *))
 {
 	char buffer[2048], *p;
 	ssize_t bytes;
 	struct rt_msghdr *rtm;
+	struct if_announcemsghdr *ifa;
 	struct if_msghdr *ifm;
-	const struct interface *iface;
+	struct interface *iface;
 
 	for (;;) {
-		bytes = recv(fd, buffer, BUFFER_LEN, MSG_DONTWAIT);
+		bytes = read(fd, buffer, BUFFER_LEN);
 		if (bytes == -1) {
 			if (errno == EAGAIN)
 				return 0;
@@ -216,12 +222,31 @@ link_changed(int fd, const struct interface *ifaces)
 		     p += ((struct rt_msghdr *)p)->rtm_msglen)
 		{
 			rtm = (struct rt_msghdr *)p;
-			if (rtm->rtm_type != RTM_IFINFO)
-				continue;
-			ifm = (struct if_msghdr *)p;
-			for (iface = ifaces; iface; iface = iface->next)
-				if (ifm->ifm_index == if_nametoindex(iface->name))
-					return 1;
+			switch(rtm->rtm_type) {
+			case RTM_IFANNOUNCE:
+				ifa = (struct if_announcemsghdr *)p;
+				switch(ifa->ifan_what) {
+				case IFAN_ARRIVAL:
+					if_add(ifa->ifan_name);
+					break;
+				case IFAN_DEPARTURE:
+					for (iface = ifaces; iface; iface = iface->next)
+						if (strcmp(ifa->ifan_name, iface->name) == 0) {
+							if_remove(iface);
+							break;
+						}
+					break;
+				}
+				break;
+			case RTM_IFINFO:
+				ifm = (struct if_msghdr *)p;
+				for (iface = ifaces; iface; iface = iface->next)
+					if (ifm->ifm_index == if_nametoindex(iface->name)) {
+						if_carrier(iface);
+						break;
+					}
+				break;
+			}
 		}
 	}
 }
