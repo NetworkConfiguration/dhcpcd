@@ -961,6 +961,7 @@ main(int argc, char **argv)
 	struct if_options *ifo;
 	struct interface *iface;
 	int opt, oi = 0, test = 0, signal_fd, sig = 0, i, control_fd;
+	int background;
 	pid_t pid;
 	struct timespec ts;
 
@@ -1137,11 +1138,15 @@ main(int argc, char **argv)
 
 	if (!(ifo->options & DHCPCD_DAEMONISE))
 		can_daemonise = 0;
-	if (can_daemonise && !(ifo->options & DHCPCD_BACKGROUND)) {
-		oi = ifo->timeout;
-		if (ifo->options & DHCPCD_IPV4LL)
-			oi += 10;
-		add_timeout_sec(oi, handle_exit_timeout, NULL);
+	if (can_daemonise) {
+		if (ifo->options & DHCPCD_BACKGROUND)
+			background = 1;
+		else {
+			oi = ifo->timeout;
+			if (ifo->options & DHCPCD_IPV4LL)
+				oi += 10;
+			add_timeout_sec(oi, handle_exit_timeout, NULL);
+		}
 	}
 	free_options(ifo);
 
@@ -1154,6 +1159,8 @@ main(int argc, char **argv)
 		logger(LOG_ERR, "interface `%s' does not exist", ifv[0]);
 		exit(EXIT_FAILURE);
 	}
+	if (background)
+		daemonise();
 	start_eloop();
 	/* NOTREACHED */
 }
