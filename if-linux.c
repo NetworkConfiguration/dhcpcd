@@ -176,10 +176,12 @@ link_netlink(struct nlmsghdr *nlm, const struct interface *ifaces)
 	return 0;
 }
 
-int
-link_changed(int fd, const struct interface *iface)
+manage_link(int fd, struct interface *ifaces,
+	    void (*if_carrier)(struct interface *),
+	    void (*if_add)(const char *),
+	    void (*if_remove)(struct interface *))
 {
-	return get_netlink(fd, MSG_DONTWAIT, &link_netlink, iface);
+	return get_netlink(fd, MSG_DONTWAIT, &link_netlink, ifaces);
 }
 
 static int
