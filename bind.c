@@ -93,6 +93,7 @@ daemonise(void)
 		pidfd = -1;
 		exit(EXIT_SUCCESS);
 	}
+	daemonised = 1;
 	sigprocmask(SIG_SETMASK, &old, NULL);
 	return pid;
 }
