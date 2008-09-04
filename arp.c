@@ -40,6 +40,41 @@
 #include "logger.h"
 #include "net.h"
 
+#define ARP_LEN \
+	(sizeof(struct arphdr) + (2 * sizeof(uint32_t)) + (2 * HWADDR_LEN))
+
+static uint8_t arp_buffer[ARP_LEN];
+
+static int
+send_arp(const struct interface *iface, int op, in_addr_t sip, in_addr_t tip)
+{
+	struct arphdr ar;
+	size_t len;
+	uint8_t *p;
+	int retval;
+
+	ar.ar_hrd = htons(iface->family);
+	ar.ar_pro = htons(ETHERTYPE_IP);
+	ar.ar_hln = iface->hwlen;
+	ar.ar_pln = sizeof(sip);
+	ar.ar_op = htons(op);
+	p = arp_buffer;
+	p += sizeof(ar);
+	memcpy(p, iface->hwaddr, iface->hwlen);
+	p += iface->hwlen;
+	memcpy(p, &sip, sizeof(sip));
+	p += sizeof(sip);
+	/* ARP requests should ignore this */
+	retval = iface->hwlen;
+	while (retval--)
+		*p++ = '\0';
+	memcpy(p, &tip, sizeof(tip));
+	p += sizeof(tip);
+	len = sizeof(ar) + 2 * iface->hwlen + 2 * sizeof(sip);
+	retval = send_raw_packet(iface, ETHERTYPE_ARP, arp_buffer, len);
+	return retval;
+}
+
 static void
 handle_arp_failure(struct interface *iface)
 {
@@ -56,10 +91,9 @@ static void
 handle_arp_packet(void *arg)
 {
 	struct interface *iface = arg;
-	struct arphdr reply;
+	struct arphdr ar;
 	uint32_t reply_s;
 	uint32_t reply_t;
-	uint8_t arp_reply[sizeof(reply) + 2 * sizeof(reply_s) + 2 * HWADDR_LEN];
 	uint8_t *hw_s, *hw_t;
 	ssize_t bytes;
 	struct if_state *state = iface->state;
@@ -67,36 +101,36 @@ handle_arp_packet(void *arg)
 	state->fail.s_addr = 0;
 	for(;;) {
 		bytes = get_raw_packet(iface, ETHERTYPE_ARP,
-				       arp_reply, sizeof(arp_reply));
+				       arp_buffer, sizeof(arp_buffer));
 		if (bytes == 0 || bytes == -1)
 			return;
 		/* We must have a full ARP header */
-		if ((size_t)bytes < sizeof(reply))
+		if ((size_t)bytes < sizeof(ar))
 			continue;
-		memcpy(&reply, arp_reply, sizeof(reply));
+		memcpy(&ar, arp_buffer, sizeof(ar));
 		/* Protocol must be IP. */
-		if (reply.ar_pro != htons(ETHERTYPE_IP))
+		if (ar.ar_pro != htons(ETHERTYPE_IP))
 			continue;
-		if (reply.ar_pln != sizeof(reply_s))
+		if (ar.ar_pln != sizeof(reply_s))
 			continue;
 		/* Only these types are recognised */
-		if (reply.ar_op != htons(ARPOP_REPLY) &&
-		    reply.ar_op != htons(ARPOP_REQUEST))
+		if (ar.ar_op != htons(ARPOP_REPLY) &&
+		    ar.ar_op != htons(ARPOP_REQUEST))
 			continue;
 
 		/* Get pointers to the hardware addreses */
-		hw_s = arp_reply + sizeof(reply);
-		hw_t = hw_s + reply.ar_hln + reply.ar_pln;
+		hw_s = arp_buffer + sizeof(ar);
+		hw_t = hw_s + ar.ar_hln + ar.ar_pln;
 		/* Ensure we got all the data */
-		if ((hw_t + reply.ar_hln + reply.ar_pln) - arp_reply > bytes)
+		if ((hw_t + ar.ar_hln + ar.ar_pln) - arp_buffer > bytes)
 			continue;
 		/* Ignore messages from ourself */
-		if (reply.ar_hln == iface->hwlen &&
+		if (ar.ar_hln == iface->hwlen &&
 		    memcmp(hw_s, iface->hwaddr, iface->hwlen) == 0)
 			continue;
 		/* Copy out the IP addresses */
-		memcpy(&reply_s, hw_s + reply.ar_hln, reply.ar_pln);
-		memcpy(&reply_t, hw_t + reply.ar_hln, reply.ar_pln);
+		memcpy(&reply_s, hw_s + ar.ar_hln, ar.ar_pln);
+		memcpy(&reply_t, hw_t + ar.ar_hln, ar.ar_pln);
 
 		/* Check for conflict */
 		if (state->offer && 
@@ -114,7 +148,7 @@ handle_arp_packet(void *arg)
 			logger(LOG_ERR, "%s: hardware address %s claims %s",
 			       iface->name,
 			       hwaddr_ntoa((unsigned char *)hw_s,
-					   (size_t)reply.ar_hln),
+					   (size_t)ar.ar_hln),
 			       inet_ntoa(state->fail));
 			errno = EEXIST;
 			handle_arp_failure(iface);
@@ -205,3 +239,4 @@ send_arp_probe(void *arg)
 	if (send_arp(iface, ARPOP_REQUEST, 0, state->offer->yiaddr) == -1)
 		logger(LOG_ERR, "send_arp: %s", strerror(errno));
 }
+

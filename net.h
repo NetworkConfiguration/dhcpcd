@@ -148,8 +148,6 @@ ssize_t send_raw_packet(const struct interface *, int,
 			const void *, ssize_t);
 ssize_t get_raw_packet(struct interface *, int, void *, ssize_t);
 
-int send_arp(const struct interface *, int, in_addr_t, in_addr_t);
-
 int open_link_socket(void);
 int link_changed(int, const struct interface *);
 int carrier_status(const char *);

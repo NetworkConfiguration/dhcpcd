@@ -75,6 +75,8 @@
 #include "net.h"
 #include "signals.h"
 
+static char hwaddr_buffer[(HWADDR_LEN * 3) + 1];
+
 int
 inet_ntocidr(struct in_addr address)
 {
@@ -132,8 +134,7 @@ get_netmask(uint32_t addr)
 char *
 hwaddr_ntoa(const unsigned char *hwaddr, size_t hwlen)
 {
-	static char buffer[(HWADDR_LEN * 3) + 1];
-	char *p = buffer;
+	char *p = hwaddr_buffer;
 	size_t i;
 
 	for (i = 0; i < hwlen && i < HWADDR_LEN; i++) {
@@ -144,7 +145,7 @@ hwaddr_ntoa(const unsigned char *hwaddr, size_t hwlen)
 
 	*p ++= '\0';
 
-	return buffer;
+	return hwaddr_buffer;
 }
 
 size_t
@@ -553,10 +554,7 @@ int
 open_udp_socket(struct interface *iface)
 {
 	int s;
-	union sockunion {
-		struct sockaddr sa;
-		struct sockaddr_in sin;
-	} su;
+	struct sockaddr_in sin;
 	int n;
 #ifdef SO_BINDTODEVICE
 	struct ifreq ifr;
@@ -579,11 +577,11 @@ open_udp_socket(struct interface *iface)
 	n = 1;
 	if (setsockopt(s, SOL_SOCKET, SO_RCVBUF, &n, sizeof(n)) == -1)
 		goto eexit;
-	memset(&su, 0, sizeof(su));
-	su.sin.sin_family = AF_INET;
-	su.sin.sin_port = htons(DHCP_CLIENT_PORT);
-	su.sin.sin_addr.s_addr = iface->addr.s_addr;
-	if (bind(s, &su.sa, sizeof(su)) == -1)
+	memset(&sin, 0, sizeof(sin));
+	sin.sin_family = AF_INET;
+	sin.sin_port = htons(DHCP_CLIENT_PORT);
+	sin.sin_addr.s_addr = iface->addr.s_addr;
+	if (bind(s, (struct sockaddr *)&sin, sizeof(sin)) == -1)
 		goto eexit;
 
 	iface->udp_fd = s;
@@ -599,17 +597,14 @@ ssize_t
 send_packet(const struct interface *iface, struct in_addr to,
 	    const uint8_t *data, ssize_t len)
 {
-	union sockunion {
-		struct sockaddr sa;
-		struct sockaddr_in sin;
-	} su;
+	struct sockaddr_in sin;
 
-	memset(&su, 0, sizeof(su));
-	su.sin.sin_family = AF_INET;
-	su.sin.sin_addr.s_addr = to.s_addr;
-	su.sin.sin_port = htons(DHCP_SERVER_PORT);
-
-	return sendto(iface->udp_fd, data, len, 0, &su.sa, sizeof(su));
+	memset(&sin, 0, sizeof(sin));
+	sin.sin_family = AF_INET;
+	sin.sin_addr.s_addr = to.s_addr;
+	sin.sin_port = htons(DHCP_SERVER_PORT);
+	return sendto(iface->udp_fd, data, len, 0,
+		      (struct sockaddr *)&sin, sizeof(sin));
 }
 
 struct udp_dhcp_packet
@@ -745,34 +740,3 @@ valid_udp_packet(const uint8_t *data)
 	return retval;
 }
 
-int
-send_arp(const struct interface *iface, int op, in_addr_t sip, in_addr_t tip)
-{
-	struct arphdr *arp;
-	size_t arpsize;
-	uint8_t *p;
-	int retval;
-
-	arpsize = sizeof(*arp) + 2 * iface->hwlen + 2 * sizeof(sip);
-	arp = xmalloc(arpsize);
-	arp->ar_hrd = htons(iface->family);
-	arp->ar_pro = htons(ETHERTYPE_IP);
-	arp->ar_hln = iface->hwlen;
-	arp->ar_pln = sizeof(sip);
-	arp->ar_op = htons(op);
-	p = (uint8_t *)arp;
-	p += sizeof(*arp);
-	memcpy(p, iface->hwaddr, iface->hwlen);
-	p += iface->hwlen;
-	memcpy(p, &sip, sizeof(sip));
-	p += sizeof(sip);
-	/* ARP requests should ignore this */
-	retval = iface->hwlen;
-	while (retval--)
-		*p++ = '\0';
-	memcpy(p, &tip, sizeof(tip));
-	p += sizeof(tip);
-	retval = send_raw_packet(iface, ETHERTYPE_ARP, arp, arpsize);
-	free(arp);
-	return retval;
-}
