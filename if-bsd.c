@@ -207,7 +207,6 @@ manage_link(int fd,
 	struct rt_msghdr *rtm;
 	struct if_announcemsghdr *ifa;
 	struct if_msghdr *ifm;
-	struct interface *iface;
 
 	for (;;) {
 		bytes = read(fd, buffer, BUFFER_LEN);
@@ -233,6 +232,7 @@ manage_link(int fd,
 				case IFAN_DEPARTURE:
 					if_remove(ifa->ifan_name);
 					break;
+				}
 				break;
 			case RTM_IFINFO:
 				ifm = (struct if_msghdr *)p;
