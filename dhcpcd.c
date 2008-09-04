@@ -191,6 +191,28 @@ close_sockets(struct interface *iface)
 }
 
 static void
+stop_interface(struct interface *iface)
+{
+	struct interface *ifp, *ifl = NULL;
+
+	drop_config(iface, "STOP");
+	close_sockets(iface);
+	delete_timeout(NULL, iface);
+	for (ifp = ifaces; ifp; ifp = ifp->next) {
+		if (ifp == iface)
+			break;
+		ifl = ifp;
+	}
+	if (ifl)
+		ifl->next = iface->next;
+	else
+		ifaces = iface->next;
+	free_interface(ifp);
+	if (!master)
+		exit(EXIT_FAILURE);
+}
+
+static void
 send_message(struct interface *iface, int type,
 	     void (*callback)(void *))
 {
@@ -249,8 +271,14 @@ send_message(struct interface *iface, int type,
 			       iface->name, strerror(errno));
 	}
 	free(dhcp);
-	if (callback)
-		add_timeout_tv(&tv, callback, iface);
+	if (r == -1) {
+		logger(LOG_ERR, "%s: removing interface from dhcpcd",
+		       iface->name);
+		stop_interface(iface);
+	} else {
+		if (callback)
+			add_timeout_tv(&tv, callback, iface);
+	}
 }
 
 static void
