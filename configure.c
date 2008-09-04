@@ -166,21 +166,6 @@ run_script(const struct interface *iface, const char *reason)
 	return status;
 }
 
-static struct rt *
-reverse_routes(struct rt *routes)
-{
-	struct rt *rt;
-	struct rt *rtn = NULL;
-	
-	while (routes) {
-		rt = routes->next;
-		routes->next = rtn;
-		rtn = routes;
-		routes = rt;
-	}
-	return rtn;
-}
-
 static int
 delete_route(const struct interface *iface, struct rt *rt, int metric)
 {
@@ -198,16 +183,16 @@ delete_route(const struct interface *iface, struct rt *rt, int metric)
 }
 
 static int
-delete_routes(struct interface *iface, int metric)
+delete_routes(struct interface *iface)
 {
 	struct rt *rt;
 	struct rt *rtn;
 	int retval = 0;
 
-	rt = reverse_routes(iface->routes);
+	rt = iface->routes;
 	while (rt) {
 		rtn = rt->next;
-		retval += delete_route(iface, rt, metric);
+		retval += delete_route(iface, rt, iface->metric);
 		free(rt);
 		rt = rtn;
 	}
@@ -268,9 +253,7 @@ configure_routes(struct interface *iface, const struct dhcp_message *dhcp)
 	}
 #endif
 
-	/* Now remove old routes we no longer use.
- 	 * We should do this in reverse order. */
-	iface->routes = reverse_routes(iface->routes);
+	/* Now remove old routes we no longer use. */
 	for (rt = iface->routes; rt; rt = rt->next)
 		if (in_routes(ort, rt) != 0)
 			delete_route(iface, rt, iface->metric);
@@ -300,19 +283,13 @@ configure_routes(struct interface *iface, const struct dhcp_message *dhcp)
 			if (in_routes(iface->routes, rt) == 0)
 				remember = 1;
 		}
-
-		/* This login is split from above due to the #ifdef below */
 		if (remember >= 0) {
-			if (nr) {
-				rtn->next = xmalloc(sizeof(*rtn));
-				rtn = rtn->next;
-			} else {
-				nr = rtn = xmalloc(sizeof(*rtn));
-			}
+			rtn = xmalloc(sizeof(*rtn));
 			rtn->dest.s_addr = rt->dest.s_addr;
 			rtn->net.s_addr = rt->net.s_addr;
 			rtn->gate.s_addr = rt->gate.s_addr;
-			rtn->next = NULL;
+			rtn->next = nr;
+			nr = rtn;
 		}
 	}
 	free_routes(ort);
@@ -347,6 +324,7 @@ configure(struct interface *iface, const char *reason)
 #ifdef __linux__
 	struct in_addr dest;
 	struct in_addr gate;
+	struct rt *rt = NULL;
 #endif
 
 	/* Grab our IP config */
@@ -362,7 +340,7 @@ configure(struct interface *iface, const char *reason)
 	} else {
 		/* Only reset things if we had set them before */
 		if (iface->addr.s_addr != 0) {
-			delete_routes(iface, iface->metric);
+			delete_routes(iface);
 			delete_address(iface);
 		}
 
@@ -398,12 +376,23 @@ configure(struct interface *iface, const char *reason)
 		gate.s_addr = 0;
 		add_route(iface, &dest, &net, &gate, iface->metric);
 		del_route(iface, &dest, &net, &gate, 0);
+		rt = xmalloc(sizeof(*rt));
+		rt->dest.s_addr = dest.s_addr;
+		rt->net.s_addr = net.s_addr;
+		rt->gate.s_addr = gate.s_addr;
 	}
 #endif
 
 	configure_routes(iface, dhcp);
 	iface->addr.s_addr = addr.s_addr;
 	iface->net.s_addr = net.s_addr;
+
+#ifdef __linux__
+	if (rt) {
+		rt->next = iface->routes;
+		iface->routes = rt;
+	}
+#endif
 
 	if (!iface->state->lease.frominfo)
 		if (write_lease(iface, dhcp) == -1)
