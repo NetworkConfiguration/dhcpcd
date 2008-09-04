@@ -961,7 +961,7 @@ main(int argc, char **argv)
 	struct if_options *ifo;
 	struct interface *iface;
 	int opt, oi = 0, test = 0, signal_fd, sig = 0, i, control_fd;
-	int background;
+	int background = 0;
 	pid_t pid;
 	struct timespec ts;
 
