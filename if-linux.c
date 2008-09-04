@@ -59,6 +59,10 @@
 
 #define BUFFERLEN 256
 
+static void (*nl_carrier)(const char *) = NULL;
+static void (*nl_add)(const char *) = NULL;
+static void (*nl_remove)(const char *) = NULL;
+
 int
 open_link_socket(void)
 {
@@ -78,8 +82,7 @@ open_link_socket(void)
 
 static int
 get_netlink(int fd, int flags,
-	    int (*callback)(struct nlmsghdr *, const struct interface *),
-	    const struct interface *iface)
+	    int (*callback)(struct nlmsghdr *))
 {
 	char *buffer = NULL;
 	ssize_t bytes;
@@ -102,7 +105,7 @@ get_netlink(int fd, int flags,
 		     NLMSG_OK(nlm, (size_t)bytes);
 		     nlm = NLMSG_NEXT(nlm, bytes))
 		{
-			r = callback(nlm, iface);
+			r = callback(nlm);
 			if (r != 0)
 				goto eexit;
 		}
@@ -114,7 +117,7 @@ eexit:
 }
 
 static int
-err_netlink(struct nlmsghdr *nlm, _unused const struct interface *iface)
+err_netlink(struct nlmsghdr *nlm)
 {
 	struct nlmsgerr *err;
 	int l;
@@ -134,13 +137,12 @@ err_netlink(struct nlmsghdr *nlm, _unused const struct interface *iface)
 }
 
 static int
-link_netlink(struct nlmsghdr *nlm, const struct interface *ifaces)
+link_netlink(struct nlmsghdr *nlm)
 {
 	int len;
 	struct rtattr *rta;
 	struct ifinfomsg *ifi;
 	char ifn[IF_NAMESIZE + 1];
-	const struct interface *iface;
 
 	if (nlm->nlmsg_type != RTM_NEWLINK && nlm->nlmsg_type != RTM_DELLINK)
 		return 0;
@@ -151,7 +153,7 @@ link_netlink(struct nlmsghdr *nlm, const struct interface *ifaces)
 	}
 	ifi = NLMSG_DATA(nlm);
 	if (ifi->ifi_flags & IFF_LOOPBACK)
-		return 0;
+		return 1;
 	rta = (struct rtattr *) ((char *)ifi + NLMSG_ALIGN(sizeof(*ifi)));
 	len = NLMSG_PAYLOAD(nlm, sizeof(*ifi));
 	*ifn = '\0';
@@ -160,8 +162,8 @@ link_netlink(struct nlmsghdr *nlm, const struct interface *ifaces)
 		case IFLA_WIRELESS:
 			/* Ignore wireless messages */
 			if (nlm->nlmsg_type == RTM_NEWLINK &&
-			    ifi->ifi_change  == 0)
-				return 0;
+			    ifi->ifi_change == 0)
+				return 1;
 			break;
 		case IFLA_IFNAME:
 			strlcpy(ifn, RTA_DATA(rta), sizeof(ifn));
@@ -169,19 +171,31 @@ link_netlink(struct nlmsghdr *nlm, const struct interface *ifaces)
 		}
 		rta = RTA_NEXT(rta, len);
 	}
-
-	for (iface = ifaces; iface; iface = iface->next)
-		if (strcmp(iface->name, ifn) == 0)
-			return 1;
-	return 0;
+	if (nlm->nlmsg_type == RTM_NEWLINK) {
+		if (ifi->ifi_change == ~0U) {
+			if (nl_add)
+				nl_add(ifn);
+		} else {
+			if (nl_carrier)
+				nl_carrier(ifn);
+		}
+	} else {
+		if (nl_remove)
+			nl_remove(ifn);
+	}
+	return 1;
 }
 
-manage_link(int fd, struct interface *ifaces,
-	    void (*if_carrier)(struct interface *),
+int
+manage_link(int fd,
+	    void (*if_carrier)(const char *),
 	    void (*if_add)(const char *),
-	    void (*if_remove)(struct interface *))
+	    void (*if_remove)(const char *))
 {
-	return get_netlink(fd, MSG_DONTWAIT, &link_netlink, ifaces);
+	nl_carrier = if_carrier;
+	nl_add = if_add;
+	nl_remove = if_remove;
+	return get_netlink(fd, MSG_DONTWAIT, &link_netlink);
 }
 
 static int
@@ -214,7 +228,7 @@ send_netlink(struct nlmsghdr *hdr)
 	hdr->nlmsg_seq = ++seq;
 
 	if (sendmsg(fd, &msg, 0) != -1)
-		r = get_netlink(fd, 0, &err_netlink, NULL);
+		r = get_netlink(fd, 0, &err_netlink);
 	else
 		r = -1;
 	close(fd);

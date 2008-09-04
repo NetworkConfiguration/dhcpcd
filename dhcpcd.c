@@ -197,7 +197,7 @@ stop_interface(struct interface *iface)
 {
 	struct interface *ifp, *ifl = NULL;
 
-	logger(LOG_ERR, "%s: removing interface", iface->name);
+	logger(LOG_INFO, "%s: removing interface", iface->name);
 	drop_config(iface, "STOP");
 	close_sockets(iface);
 	delete_timeout(NULL, iface);
@@ -593,9 +593,14 @@ open_sockets(struct interface *iface)
 }
 
 static void
-handle_carrier(struct interface *iface)
+handle_carrier(const char *ifname)
 {
-	if (!(iface->state->options->options & DHCPCD_LINK))
+	struct interface *iface;
+
+	for (iface = ifaces; iface; iface = iface->next)
+		if (strcmp(iface->name, ifname) == 0)
+			break;
+	if (!iface || !(iface->state->options->options & DHCPCD_LINK))
 		return;
 	switch (carrier_status(iface->name)) {
 	case -1:
@@ -772,39 +777,59 @@ init_state(struct interface *iface, int argc, char **argv)
 }
 
 static void
-handle_new_interface(const char *name)
+handle_new_interface(const char *ifname)
 {
-	struct interface *ifs, *ifp;
-	const char * const argv[] = { "dhcpcd", name };
+	struct interface *ifs, *ifp, *ifn, *ifl = NULL;
+	const char * const argv[] = { "dhcpcd", ifname };
 	int i;
 
 	/* If running off an interface list, check it's in it. */
 	if (ifc) {
 		for (i = 0; i < ifc; i++)
-			if (strcmp(ifv[i], name) == 0)
+			if (strcmp(ifv[i], ifname) == 0)
 				break;
 		if (i >= ifc)
 			return;
 	}
 
 	if ((ifs = discover_interfaces(2, UNCONST(argv)))) {
-		for (ifp = ifs; ifp; ifp = ifp->next)
+		for (ifp = ifs; ifp; ifp = ifp->next) {
+			/* Check if we already have the interface */
+			for (ifn = ifaces; ifn; ifn = ifn->next) {
+				if (strcmp(ifn->name, ifp->name) == 0)
+					break;
+				ifl = ifn;
+			}
+			if (ifn)
+				continue;
 			init_state(ifp, 2, UNCONST(argv));
-		if (ifaces) {
-			ifp = ifaces;
-			while (ifp->next)
-				ifp = ifp->next;
-			ifp->next = ifs;
-		} else
-			ifaces = ifs;
+			if (ifl)
+				ifl->next = ifp;
+			else
+				ifaces = ifp;
+		}
 	}
+}
+
+static void
+handle_remove_interface(const char *ifname)
+{
+	struct interface *iface;
+
+	for (iface = ifaces; iface; iface = iface->next)
+		if (strcmp(iface->name, ifname) == 0)
+			break;
+	if (iface && iface->state->options->options & DHCPCD_LINK)
+		stop_interface(iface);
 }
 
 static void
 handle_link(_unused void *arg)
 {
-	if (manage_link(linkfd, ifaces, handle_carrier,
-			handle_new_interface, stop_interface) == -1)
+	if (manage_link(linkfd,
+			handle_carrier,
+			handle_new_interface,
+			handle_remove_interface) == -1)
 		logger(LOG_ERR, "manage_link: %s", strerror(errno));
 }
 
@@ -855,7 +880,7 @@ handle_signal(_unused void *arg)
 int
 handle_args(int argc, char **argv)
 {
-	struct interface *ifs, *ifp, *ifl = NULL;
+	struct interface *ifs, *ifp, *ifl = NULL, *ifn;
 	int do_exit = 0, do_release = 0, do_reboot = 0, opt, oi = 0;
 
 	optind = 0;
@@ -892,6 +917,7 @@ handle_args(int argc, char **argv)
 			if (do_release)
 				send_release(ifp);
 			if (do_exit || do_release) {
+				logger(LOG_INFO, "%s: removing interface", ifp->name);
 				drop_config(ifp, do_release ? "RELEASE" : "STOP");
 				close_sockets(ifp);
 				delete_timeout(NULL, ifp);
@@ -911,15 +937,20 @@ handle_args(int argc, char **argv)
 	if ((ifs = discover_interfaces(argc, argv))) {
 		argc += optind;
 		argv -= optind;
-		for (ifp = ifs; ifp; ifp = ifp->next)
-			init_state(ifp, argc, argv);
-		if (ifaces) {
-			ifp = ifaces;
-			while (ifp->next)
-				ifp = ifp->next;
-			ifp->next = ifs;
-		} else
-			ifaces = ifs;
+		for (ifp = ifs; ifp; ifp = ifp->next) {
+			for (ifn = ifaces; ifn; ifn = ifn->next) {
+				if (strcmp(ifn->name, ifp->name) == 0)
+					break;
+				ifl = ifn;
+			}
+			if (!ifn) {
+				init_state(ifp, argc, argv);
+				if (ifl)
+					ifl->next = ifp;
+				else
+					ifaces = ifp;
+			}
+		}
 	}
 	return 0;
 }

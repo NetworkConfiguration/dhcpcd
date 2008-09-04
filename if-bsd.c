@@ -196,12 +196,13 @@ open_link_socket(void)
 
 #define BUFFER_LEN	2048
 int
-manage_link(int fd, struct interface *ifaces,
-	    void (*if_carrier)(struct interface *),
+manage_link(int fd,
+	    void (*if_carrier)(const char *),
 	    void (*if_add)(const char *),
-	    void (*if_remove)(struct interface *))
+	    void (*if_remove)(const char *))
 {
 	char buffer[2048], *p;
+	char ifname[IFNAMSIZ + 1];
 	ssize_t bytes;
 	struct rt_msghdr *rtm;
 	struct if_announcemsghdr *ifa;
@@ -230,21 +231,14 @@ manage_link(int fd, struct interface *ifaces,
 					if_add(ifa->ifan_name);
 					break;
 				case IFAN_DEPARTURE:
-					for (iface = ifaces; iface; iface = iface->next)
-						if (strcmp(ifa->ifan_name, iface->name) == 0) {
-							if_remove(iface);
-							break;
-						}
+					if_remove(ifa->ifan_name);
 					break;
-				}
 				break;
 			case RTM_IFINFO:
 				ifm = (struct if_msghdr *)p;
-				for (iface = ifaces; iface; iface = iface->next)
-					if (ifm->ifm_index == if_nametoindex(iface->name)) {
-						if_carrier(iface);
-						break;
-					}
+				memset(ifname, 0, sizeof(ifname));
+				if (if_indextoname(ifm->ifm_index, ifname))
+					if_carrier(ifname);
 				break;
 			}
 		}
