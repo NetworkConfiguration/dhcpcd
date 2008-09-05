@@ -1004,6 +1004,10 @@ main(int argc, char **argv)
 		case 'n':
 			sig = SIGALRM;
 			break;
+		case 'q':
+			setloglevel(LOG_WARNING);
+			options |= DHCPCD_QUIET;
+			break;
 		case 'x':
 			sig = SIGTERM;
 			break;
@@ -1062,7 +1066,7 @@ main(int argc, char **argv)
 				exit(EXIT_FAILURE);
 			}
 		} else {
-			if (errno != EEXIST)
+			if (errno != ENOENT)
 				logger(LOG_ERR, "open_control: %m");
 		}
 	}

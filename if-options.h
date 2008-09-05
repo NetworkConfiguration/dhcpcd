@@ -64,7 +64,8 @@
 #define DHCPCD_HOSTNAME		(1 << 18)
 #define DHCPCD_CLIENTID		(1 << 19)
 #define DHCPCD_LINK		(1 << 20)
-#define DHCPCD_BACKGROUND	(1 << 21)
+#define DHCPCD_QUIET		(1 << 21) 
+#define DHCPCD_BACKGROUND	(1 << 22)
 
 extern const struct option cf_options[];
 

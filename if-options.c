@@ -261,6 +261,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	case 'd': /* FALLTHROUGH */
 	case 'k': /* FALLTHROUGH */
 	case 'n': /* FALLTHROUGH */
+	case 'q': /* FALLTHROUGH */
 	case 'x': /* FALLTHROUGH */
 	case 'B': /* FALLTHROUGH */
 	case 'T': /* We need to handle non interface options */
@@ -324,9 +325,6 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		break;
 	case 'p':
 		ifo->options |= DHCPCD_PERSISTENT;
-		break;
-	case 'q':
-		setloglevel(LOG_WARNING);
 		break;
 	case 's':
 		ifo->options |= DHCPCD_INFORM;

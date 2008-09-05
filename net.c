@@ -234,7 +234,11 @@ init_interface(const char *ifname)
 		iface->hwlen = INFINIBAND_ADDR_LEN;
 		break;
 	default:
-		logger(LOG_ERR, "%s: unsupported media family", iface->name);
+		/* Don't needlessly spam console on startup */
+		if (!(options & DHCPCD_MASTER &&
+		    !(options & DHCPCD_DAEMONISED) &&
+		    options & DHCPCD_QUIET))
+			logger(LOG_ERR, "%s: unsupported media family", iface->name);
 		goto eexit;
 	}
 	memcpy(iface->hwaddr, ifr.ifr_hwaddr.sa_data, iface->hwlen);
