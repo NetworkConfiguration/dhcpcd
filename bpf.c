@@ -39,12 +39,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #include "config.h"
 #include "common.h"
 #include "dhcp.h"
-#include "logger.h"
 #include "net.h"
 #include "bpf-filter.h"
 
@@ -81,7 +81,7 @@ open_socket(struct interface *iface, int protocol)
 		goto eexit;
 	if (pv.bv_major != BPF_MAJOR_VERSION ||
 	    pv.bv_minor < BPF_MINOR_VERSION) {
-		logger(LOG_ERR, "BPF version mismatch - recompile " PACKAGE);
+		syslog(LOG_ERR, "BPF version mismatch - recompile");
 		goto eexit;
 	}
 

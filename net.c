@@ -65,12 +65,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #include "config.h"
 #include "common.h"
 #include "dhcp.h"
-#include "logger.h"
 #include "if-options.h"
 #include "net.h"
 #include "signals.h"
@@ -238,7 +238,7 @@ init_interface(const char *ifname)
 		if (!(options & DHCPCD_MASTER &&
 		    !(options & DHCPCD_DAEMONISED) &&
 		    options & DHCPCD_QUIET))
-			logger(LOG_ERR, "%s: unsupported media family", iface->name);
+			syslog(LOG_ERR, "%s: unsupported media family", iface->name);
 		goto eexit;
 	}
 	memcpy(iface->hwaddr, ifr.ifr_hwaddr.sa_data, iface->hwlen);

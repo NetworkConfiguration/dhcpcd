@@ -4,7 +4,7 @@
 
 PROG=		dhcpcd
 SRCS=		arp.c bind.c common.c control.c dhcp.c dhcpcd.c duid.c eloop.c
-SRCS+=		if-options.c ipv4ll.c logger.c net.c signals.c
+SRCS+=		if-options.c ipv4ll.c net.c signals.c
 SRCS+=		configure.c
 SRCS+=		${SRC_IF} ${SRC_PF}
 

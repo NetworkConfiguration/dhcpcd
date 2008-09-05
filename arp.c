@@ -28,6 +28,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #include "arp.h"
@@ -37,7 +38,6 @@
 #include "eloop.h"
 #include "if-options.h"
 #include "ipv4ll.h"
-#include "logger.h"
 #include "net.h"
 
 #define ARP_LEN \
@@ -145,7 +145,7 @@ handle_arp_packet(void *arg)
 			state->fail.s_addr = iface->addr.s_addr;
 
 		if (state->fail.s_addr) {
-			logger(LOG_ERR, "%s: hardware address %s claims %s",
+			syslog(LOG_ERR, "%s: hardware address %s claims %s",
 			       iface->name,
 			       hwaddr_ntoa((unsigned char *)hw_s,
 					   (size_t)ar.ar_hln),
@@ -169,17 +169,17 @@ send_arp_announce(void *arg)
 		add_event(iface->arp_fd, handle_arp_packet, iface);
 	}
 	if (++state->claims < ANNOUNCE_NUM)	
-		logger(LOG_DEBUG,
+		syslog(LOG_DEBUG,
 		       "%s: sending ARP announce (%d of %d), "
 		       "next in %d.00 seconds",
 		       iface->name, state->claims, ANNOUNCE_NUM, ANNOUNCE_WAIT);
 	else
-		logger(LOG_DEBUG,
+		syslog(LOG_DEBUG,
 		       "%s: sending ARP announce (%d of %d)",
 		       iface->name, state->claims, ANNOUNCE_NUM);
 	if (send_arp(iface, ARPOP_REQUEST,
 		     state->new->yiaddr, state->new->yiaddr) == -1)
-		logger(LOG_ERR, "send_arp: %m");
+		syslog(LOG_ERR, "send_arp: %m");
 	if (state->claims < ANNOUNCE_NUM) {
 		add_timeout_sec(ANNOUNCE_WAIT, send_arp_announce, iface);
 		return;
@@ -216,9 +216,9 @@ send_arp_probe(void *arg)
 	}
 	if (state->probes == 0) {
 		addr.s_addr = state->offer->yiaddr;
-		logger(LOG_INFO, "%s: checking %s is available"
-				" on attached networks",
-				iface->name, inet_ntoa(addr));
+		syslog(LOG_INFO, "%s: checking %s is available"
+		       " on attached networks",
+		       iface->name, inet_ntoa(addr));
 	}
 	if (++state->probes < PROBE_NUM) {
 		tv.tv_sec = PROBE_MIN;
@@ -233,10 +233,9 @@ send_arp_probe(void *arg)
 		else
 			add_timeout_tv(&tv, send_request, iface);
 	}
-	logger(LOG_DEBUG,
-		"%s: sending ARP probe (%d of %d), next in %0.2f seconds",
-		iface->name, state->probes, PROBE_NUM,  timeval_to_double(&tv));
+	syslog(LOG_DEBUG,
+	       "%s: sending ARP probe (%d of %d), next in %0.2f seconds",
+	       iface->name, state->probes, PROBE_NUM,  timeval_to_double(&tv));
 	if (send_arp(iface, ARPOP_REQUEST, 0, state->offer->yiaddr) == -1)
-		logger(LOG_ERR, "send_arp: %m");
+		syslog(LOG_ERR, "send_arp: %m");
 }
-

@@ -36,6 +36,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <unistd.h>
 #include <time.h>
 
@@ -43,7 +44,6 @@
 #include "common.h"
 #include "dhcpf.h"
 #include "if-options.h"
-#include "logger.h"
 #include "net.h"
 
 /* Don't set any optional arguments here so we retain POSIX
@@ -99,7 +99,7 @@ atoint(const char *s)
 	if ((errno != 0 && n == 0) || s == t ||
 	    (errno == ERANGE && (n == LONG_MAX || n == LONG_MIN)))
 	{
-		logger(LOG_ERR, "`%s' out of range", s);
+		syslog(LOG_ERR, "`%s' out of range", s);
 		return -1;
 	}
 
@@ -276,11 +276,11 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		else
 			s = 0;
 		if (s == -1) {
-			logger(LOG_ERR, "hostname: %m");
+			syslog(LOG_ERR, "hostname: %m");
 			return -1;
 		}
 		if (s != 0 && ifo->hostname[1] == '.') {
-			logger(LOG_ERR, "hostname cannot begin with a .");
+			syslog(LOG_ERR, "hostname cannot begin with a .");
 			return -1;
 		}
 		ifo->hostname[0] = (uint8_t)s;
@@ -292,34 +292,34 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		else
 			s = 0;
 		if (s == -1) {
-			logger(LOG_ERR, "vendorclassid: %m");
+			syslog(LOG_ERR, "vendorclassid: %m");
 			return -1;
 		}
 		*ifo->vendorclassid = (uint8_t)s;
 		break;
 	case 'l':
 		if (*arg == '-') {
-			logger(LOG_ERR,
+			syslog(LOG_ERR,
 			       "leasetime must be a positive value");
 			return -1;
 		}
 		errno = 0;
 		ifo->leasetime = (uint32_t)strtol(arg, NULL, 0);
 		if (errno == EINVAL || errno == ERANGE) {
-			logger(LOG_ERR, "`%s' out of range", arg);
+			syslog(LOG_ERR, "`%s' out of range", arg);
 			return -1;
 		}
 		break;
 	case 'm':
 		ifo->metric = atoint(arg);
 		if (ifo->metric < 0) {
-			logger(LOG_ERR, "metric must be a positive value");
+			syslog(LOG_ERR, "metric must be a positive value");
 			return -1;
 		}
 		break;
 	case 'o':
 		if (make_option_mask(ifo->requestmask, arg, 1) != 0) {
-			logger(LOG_ERR, "unknown option `%s'", arg);
+			syslog(LOG_ERR, "unknown option `%s'", arg);
 			return -1;
 		}
 		break;
@@ -341,7 +341,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 				if (sscanf(p, "%d", &i) != 1 ||
 				    inet_cidrtoaddr(i, &ifo->request_netmask) != 0)
 				{
-					logger(LOG_ERR,
+					syslog(LOG_ERR,
 					       "`%s' is not a valid CIDR",
 					       p);
 					return -1;
@@ -353,7 +353,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		if (!(ifo->options & DHCPCD_INFORM))
 			ifo->options |= DHCPCD_REQUEST;
 		if (arg && !inet_aton(arg, &ifo->request_address)) {
-			logger(LOG_ERR, "`%s' is not a valid IP address",
+			syslog(LOG_ERR, "`%s' is not a valid IP address",
 			       arg);
 			return -1;
 		}
@@ -361,7 +361,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	case 't':
 		ifo->timeout = atoint(arg);
 		if (ifo->timeout < 0) {
-			logger (LOG_ERR, "timeout must be a positive value");
+			syslog (LOG_ERR, "timeout must be a positive value");
 			return -1;
 		}
 		break;
@@ -370,7 +370,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		s = parse_string((char *)ifo->userclass + ifo->userclass[0] + 2,
 				 s, arg);
 		if (s == -1) {
-			logger(LOG_ERR, "userclass: %m");
+			syslog(LOG_ERR, "userclass: %m");
 			return -1;
 		}
 		if (s != 0) {
@@ -381,14 +381,14 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	case 'v':
 		p = strchr(arg, ',');
 		if (!p || !p[1]) {
-			logger(LOG_ERR, "invalid vendor format");
+			syslog(LOG_ERR, "invalid vendor format");
 			return -1;
 		}
 		*p = '\0';
 		i = atoint(arg);
 		arg = p + 1;
 		if (i < 1 || i > 254) {
-			logger(LOG_ERR, "vendor option should be between"
+			syslog(LOG_ERR, "vendor option should be between"
 					" 1 and 254 inclusive");
 			return -1;
 		}
@@ -405,7 +405,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 					 s, arg);
 		}
 		if (s == -1) {
-			logger(LOG_ERR, "vendor: %m");
+			syslog(LOG_ERR, "vendor: %m");
 			return -1;
 		}
 		if (s != 0) {
@@ -449,7 +449,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		else if (strcmp(arg, "disable") == 0)
 			ifo->fqdn = FQDN_DISABLE;
 		else {
-			logger(LOG_ERR, "invalid value `%s' for FQDN", arg);
+			syslog(LOG_ERR, "invalid value `%s' for FQDN", arg);
 			return -1;
 		}
 		break;
@@ -465,7 +465,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		else
 			s = 0;
 		if (s == -1) {
-			logger(LOG_ERR, "clientid: %m");
+			syslog(LOG_ERR, "clientid: %m");
 			return -1;
 		}
 		ifo->clientid[0] = (uint8_t)s;
@@ -485,7 +485,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		    make_option_mask(ifo->requiremask, arg, -1) != 0 ||
 		    make_option_mask(ifo->nomask, arg, 1) != 0)
 		{
-			logger(LOG_ERR, "unknown option `%s'", arg);
+			syslog(LOG_ERR, "unknown option `%s'", arg);
 			return -1;
 		}
 		break;
@@ -493,13 +493,13 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		if (make_option_mask(ifo->requiremask, arg, 1) != 0 ||
 		    make_option_mask(ifo->requestmask, arg, 1) != 0)
 		{
-			logger(LOG_ERR, "unknown option `%s'", arg);
+			syslog(LOG_ERR, "unknown option `%s'", arg);
 			return -1;
 		}
 		break;
 	case 'X':
 		if (!inet_aton(arg, &addr)) {
-			logger(LOG_ERR, "`%s' is not a valid IP address",
+			syslog(LOG_ERR, "`%s' is not a valid IP address",
 			       arg);
 			return -1;
 		}

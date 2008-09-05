@@ -27,6 +27,7 @@
 
 #include <signal.h>
 #include <stdlib.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #include "arp.h"
@@ -37,7 +38,6 @@
 #include "dhcpf.h"
 #include "eloop.h"
 #include "if-options.h"
-#include "logger.h"
 #include "net.h"
 #include "signals.h"
 
@@ -57,13 +57,13 @@ daemonise(void)
 	sigprocmask(SIG_SETMASK, &full, &old);
 	/* Setup a signal pipe so parent knows when to exit. */
 	if (pipe(sidpipe) == -1) {
-		logger(LOG_ERR, "pipe: %m");
+		syslog(LOG_ERR, "pipe: %m");
 		return -1;
 	}
-	logger(LOG_INFO, "forking to background");
+	syslog(LOG_INFO, "forking to background");
 	switch (pid = fork()) {
 		case -1:
-			logger(LOG_ERR, "fork: %m");
+			syslog(LOG_ERR, "fork: %m");
 			exit(EXIT_FAILURE);
 			/* NOTREACHED */
 		case 0:
@@ -116,7 +116,7 @@ bind_interface(void *arg)
 	state->offer = NULL;
 	get_lease(lease, state->new);
 	if (IN_LINKLOCAL(htonl(state->new->yiaddr))) {
-		logger(LOG_INFO, "%s: using IPv4LL address %s",
+		syslog(LOG_INFO, "%s: using IPv4LL address %s",
 		       iface->name, inet_ntoa(lease->addr));
 		lease->leasetime = ~0U;
 		reason = "IPV4LL";
@@ -125,7 +125,7 @@ bind_interface(void *arg)
 			lease->addr.s_addr = ifo->request_address.s_addr;
 		else
 			lease->addr.s_addr = iface->addr.s_addr;
-		logger(LOG_INFO, "%s: received approval for %s", iface->name,
+		syslog(LOG_INFO, "%s: received approval for %s", iface->name,
 		       inet_ntoa(lease->addr));
 		lease->leasetime = ~0U;
 		reason = "INFORM";
@@ -136,19 +136,19 @@ bind_interface(void *arg)
 			reason = "TIMEOUT";
 		if (lease->leasetime == ~0U) {
 			lease->renewaltime = lease->rebindtime = lease->leasetime;
-			logger(LOG_INFO, "%s: leased %s for infinity",
+			syslog(LOG_INFO, "%s: leased %s for infinity",
 			       iface->name, inet_ntoa(lease->addr));
 		} else {
 			if (lease->rebindtime >= lease->leasetime) {
 				lease->rebindtime = lease->leasetime * T2;
-				logger(LOG_ERR,
+				syslog(LOG_ERR,
 				       "%s: rebind time greater than lease "
 				       "time, forcing to %u seconds",
 				       iface->name, lease->rebindtime);
 			}
 			if (lease->renewaltime > lease->rebindtime) {
 				lease->renewaltime = lease->leasetime * T1;
-				logger(LOG_ERR,
+				syslog(LOG_ERR,
 				       "%s: renewal time greater than rebind "
 				       "time, forcing to %u seconds",
 				       iface->name, lease->renewaltime);
@@ -157,7 +157,7 @@ bind_interface(void *arg)
 				lease->renewaltime = lease->leasetime * T1;
 			if (!lease->rebindtime)
 				lease->rebindtime = lease->leasetime * T2;
-			logger(LOG_INFO,
+			syslog(LOG_INFO,
 			       "%s: leased %s for %u seconds", iface->name,
 			       inet_ntoa(lease->addr), lease->leasetime);
 		}

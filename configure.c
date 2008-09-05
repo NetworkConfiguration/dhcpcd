@@ -35,6 +35,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #include "config.h"
@@ -42,7 +43,6 @@
 #include "configure.h"
 #include "dhcpf.h"
 #include "if-options.h"
-#include "logger.h"
 #include "net.h"
 #include "signals.h"
 
@@ -62,12 +62,12 @@ exec_script(char *const *argv, char *const *env)
 
 	switch (pid = vfork()) {
 	case -1:
-		logger(LOG_ERR, "vfork: %m");
+		syslog(LOG_ERR, "vfork: %m");
 		break;
 	case 0:
 		sigprocmask(SIG_SETMASK, &old, NULL);
 		execve(argv[0], argv, env);
-		logger(LOG_ERR, "%s: %m", argv[0]);
+		syslog(LOG_ERR, "%s: %m", argv[0]);
 		_exit(127);
 		/* NOTREACHED */
 	}
@@ -89,7 +89,7 @@ run_script(const struct interface *iface, const char *reason)
 	int status = 0;
 	const struct if_options *ifo = iface->state->options;
 
-	logger(LOG_DEBUG, "%s: executing `%s', reason %s",
+	syslog(LOG_DEBUG, "%s: executing `%s', reason %s",
 	       iface->name, argv[0], reason);
 
 	/* Make our env */
@@ -151,7 +151,7 @@ run_script(const struct interface *iface, const char *reason)
 		/* Wait for the script to finish */
 		while (waitpid(pid, &status, 0) == -1) {
 			if (errno != EINTR) {
-				logger(LOG_ERR, "waitpid: %m");
+				syslog(LOG_ERR, "waitpid: %m");
 				status = -1;
 				break;
 			}
@@ -173,12 +173,12 @@ delete_route(const struct interface *iface, struct rt *rt, int metric)
 	int retval;
 
 	addr = xstrdup(inet_ntoa(rt->dest));
-	logger(LOG_DEBUG, "%s: deleting route %s/%d via %s", iface->name,
+	syslog(LOG_DEBUG, "%s: deleting route %s/%d via %s", iface->name,
 	       addr, inet_ntocidr(rt->net), inet_ntoa(rt->gate));
 	free(addr);
 	retval = del_route(iface, &rt->dest, &rt->net, &rt->gate, metric);
 	if (retval != 0 && errno != ENOENT && errno != ESRCH)
-		logger(LOG_ERR," del_route: %m");
+		syslog(LOG_ERR," del_route: %m");
 	return retval;
 }
 
@@ -266,7 +266,7 @@ configure_routes(struct interface *iface, const struct dhcp_message *dhcp)
 			continue;
 
 		addr = xstrdup(inet_ntoa(rt->dest));
-		logger(LOG_DEBUG, "%s: adding route to %s/%d via %s",
+		syslog(LOG_DEBUG, "%s: adding route to %s/%d via %s",
 		       iface->name, addr,
 		       inet_ntocidr(rt->net), inet_ntoa(rt->gate));
 		free(addr);
@@ -278,7 +278,7 @@ configure_routes(struct interface *iface, const struct dhcp_message *dhcp)
 		   ourselves. If so, remember it again. */
 		if (remember < 0) {
 			if (errno != EEXIST)
-				logger(LOG_ERR, "add_route: %m");
+				syslog(LOG_ERR, "add_route: %m");
 			if (in_routes(iface->routes, rt) == 0)
 				remember = 1;
 		}
@@ -301,13 +301,13 @@ static int
 delete_address(struct interface *iface)
 {
 	int retval;
-	logger(LOG_DEBUG, "%s: deleting IP address %s/%d",
+	syslog(LOG_DEBUG, "%s: deleting IP address %s/%d",
 	       iface->name,
 	       inet_ntoa(iface->addr),
 	       inet_ntocidr(iface->net));
 	retval = del_address(iface, &iface->addr, &iface->net);
 	if (retval == -1 && errno != EADDRNOTAVAIL) 
-		logger(LOG_ERR, "del_address: %m");
+		syslog(LOG_ERR, "del_address: %m");
 	iface->addr.s_addr = 0;
 	iface->net.s_addr = 0;
 	return retval;
@@ -350,12 +350,12 @@ configure(struct interface *iface, const char *reason)
 	/* This also changes netmask */
 	if (!(iface->state->options->options & DHCPCD_INFORM) ||
 	    !has_address(iface->name, &addr, &net)) {
-		logger(LOG_DEBUG, "%s: adding IP address %s/%d",
+		syslog(LOG_DEBUG, "%s: adding IP address %s/%d",
 		       iface->name, inet_ntoa(addr), inet_ntocidr(net));
 		if (add_address(iface, &addr, &net, &brd) == -1 &&
 		    errno != EEXIST)
 		{
-			logger(LOG_ERR, "add_address: %m");
+			syslog(LOG_ERR, "add_address: %m");
 			return -1;
 		}
 	}
@@ -395,7 +395,7 @@ configure(struct interface *iface, const char *reason)
 
 	if (!iface->state->lease.frominfo)
 		if (write_lease(iface, dhcp) == -1)
-			logger(LOG_ERR, "write_lease: %m");
+			syslog(LOG_ERR, "write_lease: %m");
 
 	run_script(iface, reason);
 	return 0;

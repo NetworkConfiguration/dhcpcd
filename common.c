@@ -41,11 +41,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <time.h>
 #include <unistd.h>
 
 #include "common.h"
-#include "logger.h"
 
 #ifndef _PATH_DEVNULL
 #  define _PATH_DEVNULL "/dev/null"
@@ -163,7 +163,7 @@ set_cloexec(int fd)
 	if ((flags = fcntl(fd, F_GETFD, 0)) == -1
 	    || fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == -1)
 	{
-		logger(LOG_ERR, "fcntl: %m");
+		syslog(LOG_ERR, "fcntl: %m");
 		return -1;
 	}
 	return 0;
@@ -177,7 +177,7 @@ set_nonblock(int fd)
 	if ((flags = fcntl(fd, F_GETFL, 0)) == -1
 	    || fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
 	{
-		logger(LOG_ERR, "fcntl: %m");
+		syslog(LOG_ERR, "fcntl: %m");
 		return -1;
 	}
 	return 0;
@@ -245,7 +245,7 @@ get_monotonic(struct timeval *tp)
 
 	/* Something above failed, so fall back to gettimeofday */
 	if (!posix_clock_set) {
-		logger(LOG_WARNING, NO_MONOTONIC);
+		syslog(LOG_WARNING, NO_MONOTONIC);
 		posix_clock_set = 1;
 	}
 	return gettimeofday(tp, NULL);
@@ -283,7 +283,7 @@ xmalloc(size_t s)
 
 	if (value)
 		return value;
-	logger(LOG_ERR, "memory exhausted (xalloc %zu bytes)", s);
+	syslog(LOG_ERR, "memory exhausted (xalloc %zu bytes)", s);
 	exit (EXIT_FAILURE);
 	/* NOTREACHED */
 }
@@ -304,7 +304,7 @@ xrealloc(void *ptr, size_t s)
 
 	if (value)
 		return (value);
-	logger(LOG_ERR, "memory exhausted (xrealloc %zu bytes)", s);
+	syslog(LOG_ERR, "memory exhausted (xrealloc %zu bytes)", s);
 	exit(EXIT_FAILURE);
 	/* NOTREACHED */
 }
@@ -320,7 +320,7 @@ xstrdup(const char *str)
 	if ((value = strdup(str)))
 		return value;
 
-	logger(LOG_ERR, "memory exhausted (xstrdup)");
+	syslog(LOG_ERR, "memory exhausted (xstrdup)");
 	exit(EXIT_FAILURE);
 	/* NOTREACHED */
 }

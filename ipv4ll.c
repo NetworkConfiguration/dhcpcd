@@ -28,6 +28,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #include "arp.h"
@@ -36,7 +37,6 @@
 #include "eloop.h"
 #include "if-options.h"
 #include "ipv4ll.h"
-#include "logger.h"
 #include "net.h"
 
 static struct dhcp_message*
@@ -87,7 +87,7 @@ start_ipv4ll(void *arg)
 		}
 	}
 
-	logger(LOG_INFO, "%s: probing for an IPv4LL address", iface->name);
+	syslog(LOG_INFO, "%s: probing for an IPv4LL address", iface->name);
 	delete_timeout(NULL, iface);
 	iface->state->state = DHS_PROBING;
 	free(iface->state->offer);
@@ -118,7 +118,7 @@ handle_ipv4ll_failure(void *arg)
 
 	close_sockets(iface);
 	if (++iface->state->conflicts > MAX_CONFLICTS) {
-		logger(LOG_ERR, "%s: failed to acquire an IPv4LL address",
+		syslog(LOG_ERR, "%s: failed to acquire an IPv4LL address",
 				iface->name);
 		iface->state->interval = RATE_LIMIT_INTERVAL / 2;
 		start_discover(iface);

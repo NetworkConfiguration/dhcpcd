@@ -26,16 +26,16 @@
  */
 
 #include <sys/time.h>
+
 #include <errno.h>
 #include <limits.h>
 #include <poll.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <syslog.h>
 
 #include "common.h"
 #include "eloop.h"
-#include "logger.h"
-#include "net.h"
 
 static struct timeval now = {0, 0};
 
@@ -305,7 +305,7 @@ start_eloop(void)
 		for (e = events; e; e = e->next)
 			nfds++;
 		if (msecs == -1 && nfds == 0) {
-			logger(LOG_ERR, "nothing to do");
+			syslog(LOG_ERR, "nothing to do");
 			exit(EXIT_FAILURE);
 		}
 		if (nfds > fds_len) {
@@ -326,7 +326,7 @@ start_eloop(void)
 				get_monotonic(&now);
 				continue;
 			}
-			logger(LOG_ERR, "poll: %m");
+			syslog(LOG_ERR, "poll: %m");
 			exit(EXIT_FAILURE);
 		}
 
