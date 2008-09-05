@@ -42,12 +42,10 @@
  * uClibc does support it, but it's not enabled by default. */
 #ifndef HAVE_PRINTF_M
 # ifdef __GLIBC__
-#  if !defined(__UCLIBC__) && !defined (__dietlibc__)
-#   define HAVE_PRINT_M 1
-#  endif
+#  define HAVE_PRINTF_M 1
 # endif
-# ifndef HAVE_PRINT_M
-#  define HAVE_PRINT_M 0
+# ifndef HAVE_PRINTF_M
+#  define HAVE_PRINTF_M 0
 # endif
 #endif
 
