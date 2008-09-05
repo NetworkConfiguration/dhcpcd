@@ -37,7 +37,7 @@
  * Ideally the host network scripts should add the link local route for us.
  * If not, you can define this to get dhcpcd to always add the link local route.
  */
-// #define IPV4LL_ALWAYSROUTE 
+/* #define IPV4LL_ALWAYSROUTE */
 
 /* Some systems do not have a working fork. */
 /* #define THERE_IS_NO_FORK */

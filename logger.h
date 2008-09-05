@@ -28,15 +28,21 @@
 #ifndef LOGGER_H
 #define LOGGER_H
 
+/* We use %m in our logger strings to signal error message.
+ * POSIX allows this in the syslog function.
+ * We also use this GCC attribute to ensure parameters match the format.
+ * However, printf POSIX does not define %m (only glibc does).
+ * This state of affairs will give you a big warning about this if
+ * you use the -pedantic GCC option. It is safe to ignore it. */
 #if defined(__GNUC__)
-#  define _PRINTF_LIKE(_one, _two)  __attribute__ ((__format__ (__printf__, _one, _two)))
+#  define _printf_like(_one, _two) __attribute__((__format__(__printf__, _one, _two)))
 #else
-#  define _PRINTF_LIKE(_one, _two)
+#  define _printf_like(_one, _two)
 #endif
 
 #include <syslog.h>
 
 void setloglevel(int);
-void logger(int, const char *, ...) _PRINTF_LIKE (2, 3);
+void logger(int, const char *, ...) _printf_like(2, 3);
 
 #endif

@@ -275,7 +275,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		else
 			s = 0;
 		if (s == -1) {
-			logger(LOG_ERR, "hostname: %s", strerror(errno));
+			logger(LOG_ERR, "hostname: %m");
 			return -1;
 		}
 		if (s != 0 && ifo->hostname[1] == '.') {
@@ -291,7 +291,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		else
 			s = 0;
 		if (s == -1) {
-			logger(LOG_ERR, "vendorclassid: %s", strerror(errno));
+			logger(LOG_ERR, "vendorclassid: %m");
 			return -1;
 		}
 		*ifo->vendorclassid = (uint8_t)s;
@@ -372,7 +372,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		s = parse_string((char *)ifo->userclass + ifo->userclass[0] + 2,
 				 s, arg);
 		if (s == -1) {
-			logger(LOG_ERR, "userclass: %s", strerror(errno));
+			logger(LOG_ERR, "userclass: %m");
 			return -1;
 		}
 		if (s != 0) {
@@ -407,7 +407,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 					 s, arg);
 		}
 		if (s == -1) {
-			logger(LOG_ERR, "vendor: %s", strerror(errno));
+			logger(LOG_ERR, "vendor: %m");
 			return -1;
 		}
 		if (s != 0) {
@@ -467,7 +467,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		else
 			s = 0;
 		if (s == -1) {
-			logger(LOG_ERR, "clientid: %s", strerror(errno));
+			logger(LOG_ERR, "clientid: %m");
 			return -1;
 		}
 		ifo->clientid[0] = (uint8_t)s;

@@ -33,7 +33,6 @@
 #include <sys/param.h>
 #include <sys/time.h>
 
-#include <errno.h>
 #include <fcntl.h>
 #ifdef BSD
 #  include <paths.h>
@@ -164,7 +163,7 @@ set_cloexec(int fd)
 	if ((flags = fcntl(fd, F_GETFD, 0)) == -1
 	    || fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == -1)
 	{
-		logger(LOG_ERR, "fcntl: %s", strerror(errno));
+		logger(LOG_ERR, "fcntl: %m");
 		return -1;
 	}
 	return 0;
@@ -178,7 +177,7 @@ set_nonblock(int fd)
 	if ((flags = fcntl(fd, F_GETFL, 0)) == -1
 	    || fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
 	{
-		logger(LOG_ERR, "fcntl: %s", strerror(errno));
+		logger(LOG_ERR, "fcntl: %m");
 		return -1;
 	}
 	return 0;

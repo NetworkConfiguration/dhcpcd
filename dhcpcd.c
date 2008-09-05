@@ -145,8 +145,7 @@ cleanup(void)
 	if (pidfd > -1) {
 		if (options & DHCPCD_MASTER) {
 			if (stop_control() == -1)
-				logger(LOG_ERR, "stop_control: %s",
-				       strerror(errno));
+				logger(LOG_ERR, "stop_control: %m");
 		}
 		close(pidfd);
 		unlink(pidfile);
@@ -263,15 +262,13 @@ send_message(struct interface *iface, int type,
 	if (to.s_addr && to.s_addr != INADDR_BROADCAST) {
 		r = send_packet(iface, to, (uint8_t *)dhcp, len);
 		if (r == -1)
-			logger(LOG_ERR, "%s: send_packet: %s",
-			       iface->name, strerror(errno));
+			logger(LOG_ERR, "%s: send_packet: %m", iface->name);
 	} else {
 		len = make_udp_packet(&udp, (uint8_t *)dhcp, len, from, to);
 		r = send_raw_packet(iface, ETHERTYPE_IP, udp, len);
 		free(udp);
 		if (r == -1)
-			logger(LOG_ERR, "%s: send_raw_packet: %s",
-			       iface->name, strerror(errno));
+			logger(LOG_ERR, "%s: send_raw_packet: %m", iface->name);
 	}
 	free(dhcp);
 	if (r == -1) {
@@ -587,11 +584,11 @@ open_sockets(struct interface *iface)
 		close(iface->udp_fd);
 	if (open_udp_socket(iface) == -1 &&
 	    (errno != EADDRINUSE || iface->addr.s_addr != 0))
-		logger(LOG_ERR, "open_udp_socket: %s", strerror(errno));
+		logger(LOG_ERR, "%s: open_udp_socket: %m", iface->name);
 	if (iface->raw_fd != -1)
 		delete_event(iface->raw_fd);
 	if (open_socket(iface, ETHERTYPE_IP) == -1)
-		logger(LOG_ERR, "open_socket: %s", strerror(errno));
+		logger(LOG_ERR, "%s: open_socket: %m", iface->name);
 	if (iface->raw_fd != -1)
 		add_event(iface->raw_fd, handle_dhcp_packet, iface);
 }
@@ -608,7 +605,7 @@ handle_carrier(const char *ifname)
 		return;
 	switch (carrier_status(iface->name)) {
 	case -1:
-		logger(LOG_ERR, "carrier_status: %s", strerror(errno));
+		logger(LOG_ERR, "carrier_status: %m");
 		break;
 	case 0:
 		if (iface->state->carrier != LINK_DOWN) {
@@ -717,7 +714,7 @@ configure_interface(struct interface *iface, int argc, char **argv)
 		if (ifo->options & DHCPCD_DUID) {
 			duid = xmalloc(DUID_LEN);
 			if ((len = get_duid(duid, iface)) == 0)
-				logger(LOG_ERR, "get_duid: %s", strerror(errno));
+				logger(LOG_ERR, "get_duid: %m");
 		}
 		if (len > 0) {
 			iface->clientid = xmalloc(len + 6);
@@ -834,7 +831,7 @@ handle_link(_unused void *arg)
 			handle_carrier,
 			handle_new_interface,
 			handle_remove_interface) == -1)
-		logger(LOG_ERR, "manage_link: %s", strerror(errno));
+		logger(LOG_ERR, "manage_link: %m");
 }
 
 static void
@@ -973,6 +970,7 @@ main(int argc, char **argv)
 	setlinebuf(stdout);
 	openlog(PACKAGE, LOG_PID, LOG_LOCAL0);
 	strlcpy(cffile, CONFIG, sizeof(cffile));
+	options = DHCPCD_DAEMONISE;
 
 	/* Test for --help and --version */
 	if (argc > 1) {
@@ -984,8 +982,6 @@ main(int argc, char **argv)
 			exit(EXIT_SUCCESS);
 		}
 	}
-
-	options = DHCPCD_DAEMONISE;
 
 	while ((opt = getopt_long(argc, argv, IF_OPTS, cf_options, &oi)) != -1)
 	{
@@ -1105,15 +1101,13 @@ main(int argc, char **argv)
 
 		pidfd = open(pidfile, O_WRONLY | O_CREAT | O_NONBLOCK, 0664);
 		if (pidfd == -1) {
-			logger(LOG_ERR, "open `%s': %s",
-			       pidfile, strerror(errno));
+			logger(LOG_ERR, "open `%s': %m", pidfile);
 			exit(EXIT_FAILURE);
 		}
 		/* Lock the file so that only one instance of dhcpcd runs
 		 * on an interface */
 		if (flock(pidfd, LOCK_EX | LOCK_NB) == -1) {
-			logger(LOG_ERR, "flock `%s': %s",
-			       pidfile, strerror(errno));
+			logger(LOG_ERR, "flock `%s': %m", pidfile);
 			exit(EXIT_FAILURE);
 		}
 		if (set_cloexec(pidfd) == -1)
@@ -1131,7 +1125,7 @@ main(int argc, char **argv)
 
 	if (options & DHCPCD_MASTER) {
 		if (start_control() == -1) {
-			logger(LOG_ERR, "start_control: %s", strerror(errno));
+			logger(LOG_ERR, "start_control: %m");
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -1139,8 +1133,7 @@ main(int argc, char **argv)
 	if (ifo->options & DHCPCD_LINK) {
 		linkfd = open_link_socket();
 		if (linkfd == -1)
-			logger(LOG_ERR, "open_link_socket: %s",
-					strerror(errno));
+			logger(LOG_ERR, "open_link_socket: %m");
 		else
 			add_event(linkfd, handle_link, NULL);
 	}

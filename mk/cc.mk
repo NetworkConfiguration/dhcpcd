@@ -10,11 +10,14 @@ _CSTD!=		${_CSTD_SH}
 CFLAGS+=	${_CSTD}$(shell ${_CSTD_SH})
 
 # Try and use some good cc flags if we're building from git
-_CCFLAGS=	-pedantic -Wall -Wunused -Wimplicit -Wshadow -Wformat=2 \
-		-Wmissing-declarations -Wno-missing-prototypes -Wwrite-strings \
-		-Wbad-function-cast -Wnested-externs -Wcomment -Winline \
-		-Wchar-subscripts -Wcast-align -Wno-format-nonliteral \
-		-Wdeclaration-after-statement -Wsequence-point -Wextra
+# We don't use -pedantic as it will warn about our perfectly valid
+# use of %m in our logger.
+_CCFLAGS=	-Wall -Wextra -Wimplicit -Wshadow -Wformat=2 \
+		-Wmissing-prototypes -Wmissing-declarations \
+		-Wmissing-noreturn -Wmissing-format-attribute \
+		-Wredundant-decls  -Wnested-externs \
+		-Winline -Wwrite-strings -Wcast-align -Wcast-qual -Wpointer-arith \
+		-Wdeclaration-after-statement -Wsequence-point
 _CC_FLAGS_SH=	if ! test -d .git; then echo ""; else for f in ${_CCFLAGS}; do \
 		if ${CC} $$f -S -o /dev/null -xc /dev/null >/dev/null 2>&1; \
 		then printf "%s" "$$f "; fi \

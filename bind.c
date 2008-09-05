@@ -25,7 +25,6 @@
  * SUCH DAMAGE.
  */
 
-#include <errno.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -58,13 +57,13 @@ daemonise(void)
 	sigprocmask(SIG_SETMASK, &full, &old);
 	/* Setup a signal pipe so parent knows when to exit. */
 	if (pipe(sidpipe) == -1) {
-		logger(LOG_ERR, "pipe: %s", strerror(errno));
+		logger(LOG_ERR, "pipe: %m");
 		return -1;
 	}
 	logger(LOG_INFO, "forking to background");
 	switch (pid = fork()) {
 		case -1:
-			logger(LOG_ERR, "fork: %s", strerror(errno));
+			logger(LOG_ERR, "fork: %m");
 			exit(EXIT_FAILURE);
 			/* NOTREACHED */
 		case 0:

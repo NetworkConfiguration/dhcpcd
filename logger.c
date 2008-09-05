@@ -26,6 +26,7 @@
  */
 
 #include <ctype.h>
+#include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,7 +34,25 @@
 #include <syslog.h>
 
 #include "common.h"
+#include "dhcpcd.h"
+#include "if-options.h"
 #include "logger.h"
+
+/* For printf implementation that lack %m conversion in printf.
+ * uClibc does support it, but it's not enabled by default. */
+#ifndef HAVE_PRINTF_M
+# ifdef __GLIBC__
+#  if !defined(__UCLIBC__) && !defined (__dietlibc__)
+#   define HAVE_PRINT_M 1
+#  endif
+# endif
+# ifndef HAVE_PRINT_M
+#  define HAVE_PRINT_M 0
+# endif
+#endif
+
+/* Mac length of format string when we don't have printf with %m */
+#define FMT_LEN 1024
 
 static int loglevel = LOG_INFO;
 
@@ -46,17 +65,55 @@ setloglevel(int level)
 void
 logger(int level, const char *fmt, ...)
 {
-	va_list p, p2;
+	va_list va1, va2;
 	FILE *f = stderr;
+#if HAVE_PRINTF_M
+#else
+	char fm[FMT_LEN];
+	char *fp, *e = NULL, *ep;
+	const char *p;
+	size_t el = 0, fl = sizeof(fm);
+#endif
 
-	va_start(p, fmt);
-	va_copy(p2, p);
-	if (level <= LOG_ERR || level <= loglevel) {
-		vfprintf(f, fmt, p);
+	va_start(va1, fmt);
+	va_copy(va2, va1);
+	if (!(options & DHCPCD_DAEMONISED) &&
+	    (level <= LOG_ERR || level <= loglevel))
+	{
+#if HAVE_PRINTF_M
+		vfprintf(f, fmt, va1);
+#else
+		for (p = fmt, fp = fm; *p; p++) {
+			if (*p == '%' && p[1] == 'm') {
+				if (!e) {
+					e = strerror(errno);
+					el = strlen(e);
+				}
+				ep = e;
+				while (fl && *ep) {
+					*fp++ = *ep++;
+					fl--;
+				}
+				p++;
+			} else if (*p == '%' && p[1] == '%' && fl > 2) {
+				*fp++ = '%';
+				*fp++ = '%';
+				p++;
+				fl -= 2;
+			} else {
+				if (fl > 1) {
+					*fp++ = *p;
+					fl--;
+				}
+			}
+		}
+		*fp = '\0';
+		vfprintf(f, fm, va1);
+#endif
 		fputc('\n', f);
 	}
 	if (level < LOG_DEBUG || level <= loglevel)
-		vsyslog(level, fmt, p2);
-	va_end(p2);
-	va_end(p);
+		vsyslog(level, fmt, va2);
+	va_end(va2);
+	va_end(va1);
 }

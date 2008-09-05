@@ -62,12 +62,12 @@ exec_script(char *const *argv, char *const *env)
 
 	switch (pid = vfork()) {
 	case -1:
-		logger(LOG_ERR, "vfork: %s", strerror(errno));
+		logger(LOG_ERR, "vfork: %m");
 		break;
 	case 0:
 		sigprocmask(SIG_SETMASK, &old, NULL);
 		execve(argv[0], argv, env);
-		logger(LOG_ERR, "%s: %s", argv[0], strerror(errno));
+		logger(LOG_ERR, "%s: %m", argv[0]);
 		_exit(127);
 		/* NOTREACHED */
 	}
@@ -151,7 +151,7 @@ run_script(const struct interface *iface, const char *reason)
 		/* Wait for the script to finish */
 		while (waitpid(pid, &status, 0) == -1) {
 			if (errno != EINTR) {
-				logger(LOG_ERR, "waitpid: %s", strerror(errno));
+				logger(LOG_ERR, "waitpid: %m");
 				status = -1;
 				break;
 			}
@@ -178,7 +178,7 @@ delete_route(const struct interface *iface, struct rt *rt, int metric)
 	free(addr);
 	retval = del_route(iface, &rt->dest, &rt->net, &rt->gate, metric);
 	if (retval != 0 && errno != ENOENT && errno != ESRCH)
-		logger(LOG_ERR," del_route: %s", strerror(errno));
+		logger(LOG_ERR," del_route: %m");
 	return retval;
 }
 
@@ -278,8 +278,7 @@ configure_routes(struct interface *iface, const struct dhcp_message *dhcp)
 		   ourselves. If so, remember it again. */
 		if (remember < 0) {
 			if (errno != EEXIST)
-				logger(LOG_ERR, "add_route: %s",
-				       strerror(errno));
+				logger(LOG_ERR, "add_route: %m");
 			if (in_routes(iface->routes, rt) == 0)
 				remember = 1;
 		}
@@ -308,7 +307,7 @@ delete_address(struct interface *iface)
 	       inet_ntocidr(iface->net));
 	retval = del_address(iface, &iface->addr, &iface->net);
 	if (retval == -1 && errno != EADDRNOTAVAIL) 
-		logger(LOG_ERR, "del_address: %s", strerror(errno));
+		logger(LOG_ERR, "del_address: %m");
 	iface->addr.s_addr = 0;
 	iface->net.s_addr = 0;
 	return retval;
@@ -356,7 +355,7 @@ configure(struct interface *iface, const char *reason)
 		if (add_address(iface, &addr, &net, &brd) == -1 &&
 		    errno != EEXIST)
 		{
-			logger(LOG_ERR, "add_address: %s", strerror(errno));
+			logger(LOG_ERR, "add_address: %m");
 			return -1;
 		}
 	}
@@ -396,7 +395,7 @@ configure(struct interface *iface, const char *reason)
 
 	if (!iface->state->lease.frominfo)
 		if (write_lease(iface, dhcp) == -1)
-			logger(LOG_ERR, "write_lease: %s", strerror(errno));
+			logger(LOG_ERR, "write_lease: %m");
 
 	run_script(iface, reason);
 	return 0;

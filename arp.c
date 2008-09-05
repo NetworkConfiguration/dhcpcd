@@ -43,11 +43,10 @@
 #define ARP_LEN \
 	(sizeof(struct arphdr) + (2 * sizeof(uint32_t)) + (2 * HWADDR_LEN))
 
-static uint8_t arp_buffer[ARP_LEN];
-
 static int
 send_arp(const struct interface *iface, int op, in_addr_t sip, in_addr_t tip)
 {
+	uint8_t arp_buffer[ARP_LEN];
 	struct arphdr ar;
 	size_t len;
 	uint8_t *p;
@@ -91,6 +90,7 @@ static void
 handle_arp_packet(void *arg)
 {
 	struct interface *iface = arg;
+	uint8_t arp_buffer[ARP_LEN];
 	struct arphdr ar;
 	uint32_t reply_s;
 	uint32_t reply_t;
@@ -179,7 +179,7 @@ send_arp_announce(void *arg)
 		       iface->name, state->claims, ANNOUNCE_NUM);
 	if (send_arp(iface, ARPOP_REQUEST,
 		     state->new->yiaddr, state->new->yiaddr) == -1)
-		logger(LOG_ERR, "send_arp: %s", strerror(errno));
+		logger(LOG_ERR, "send_arp: %m");
 	if (state->claims < ANNOUNCE_NUM) {
 		add_timeout_sec(ANNOUNCE_WAIT, send_arp_announce, iface);
 		return;
@@ -237,6 +237,6 @@ send_arp_probe(void *arg)
 		"%s: sending ARP probe (%d of %d), next in %0.2f seconds",
 		iface->name, state->probes, PROBE_NUM,  timeval_to_double(&tv));
 	if (send_arp(iface, ARPOP_REQUEST, 0, state->offer->yiaddr) == -1)
-		logger(LOG_ERR, "send_arp: %s", strerror(errno));
+		logger(LOG_ERR, "send_arp: %m");
 }
 
