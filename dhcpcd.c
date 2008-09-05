@@ -70,7 +70,7 @@ static char **ifv = NULL;
 static int ifc = 0;
 static int linkfd = -1;
 static char *cffile = NULL;
-static char pidfile[PATH_MAX] = { '\0' };
+static char *pidfile;
 static struct interface *ifaces = NULL;
 
 struct dhcp_op {
@@ -150,6 +150,9 @@ cleanup(void)
 		close(pidfd);
 		unlink(pidfile);
 	}
+#ifdef DEBUG_MEMORY
+	free(pidfile);
+#endif
 }
 
 _noreturn void
@@ -962,6 +965,7 @@ main(int argc, char **argv)
 	struct if_options *ifo;
 	struct interface *iface;
 	int opt, oi = 0, signal_fd, sig = 0, i, control_fd;
+	size_t len;
 	pid_t pid;
 	struct timespec ts;
 
@@ -1028,10 +1032,12 @@ main(int argc, char **argv)
 
 	/* If we have any other args, we should run as a single dhcpcd instance
 	 * for that interface. */
-	if (optind == argc - 1 && !(options & DHCPCD_TEST))
-		snprintf(pidfile, sizeof(pidfile), PIDFILE, "-", argv[optind]);
-	else {
-		snprintf(pidfile, sizeof(pidfile), PIDFILE, "", "");
+	len = strlen(PIDFILE) + IF_NAMESIZE + 2;
+	pidfile = xmalloc(len);
+	if (optind == argc - 1 && !(options & DHCPCD_TEST)) {
+		snprintf(pidfile, len, PIDFILE, "-", argv[optind]);
+	} else {
+		snprintf(pidfile, len, PIDFILE, "", "");
 		options |= DHCPCD_MASTER;
 	}
 	
