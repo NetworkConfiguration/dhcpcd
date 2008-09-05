@@ -47,8 +47,10 @@
 	} while (0 /* CONSTCOND */);
 
 #if __GNUC__ > 2 || defined(__INTEL_COMPILER)
-# define _unused __attribute__((__unused__))
+# define _noreturn __attribute__((__noreturn__))
+# define _unused    __attribute__((__unused__))
 #else
+# define _noreturn
 # define _unused
 #endif
 

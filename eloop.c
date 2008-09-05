@@ -261,7 +261,7 @@ delete_timeout(void (*callback)(void *), void *arg)
 	}
 }
 
-void
+_noreturn void
 start_eloop(void)
 {
 	int msecs, n;
@@ -326,7 +326,7 @@ start_eloop(void)
 				get_monotonic(&now);
 				continue;
 			}
-			logger(LOG_ERR, "poll: %s", strerror(errno));
+			logger(LOG_ERR, "poll: %m");
 			exit(EXIT_FAILURE);
 		}
 

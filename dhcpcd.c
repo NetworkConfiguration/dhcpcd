@@ -153,7 +153,7 @@ cleanup(void)
 	}
 }
 
-void
+_noreturn void
 handle_exit_timeout(_unused void *arg)
 {
 	logger(LOG_ERR, "timed out");
