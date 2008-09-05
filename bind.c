@@ -173,6 +173,10 @@ bind_interface(void *arg)
 		} else
 			reason = "BOUND";
 	}
+	if (options & DHCPCD_TEST) {
+		run_script(iface, "TEST");
+		exit(EXIT_SUCCESS);
+	}
 	if (lease->leasetime == ~0U)
 		lease->renewaltime = lease->rebindtime = lease->leasetime;
 	else {

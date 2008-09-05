@@ -457,13 +457,17 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 		lease->addr.s_addr = dhcp->yiaddr;
 		get_option_addr(&lease->server.s_addr, dhcp, DHO_SERVERID);
 		log_dhcp(LOG_INFO, "offered", iface, dhcp);
-		if (ifo->options & DHCPCD_TEST) {
-			run_script(iface, "TEST");
-			exit(EXIT_SUCCESS);
-		}
 		free(state->offer);
 		state->offer = dhcp;
 		*dhcpp = NULL;
+		if (options & DHCPCD_TEST) {
+			free(state->old);
+			state->old = state->new;
+			state->new = state->offer;
+			state->offer = NULL;
+			run_script(iface, "TEST");
+			exit(EXIT_SUCCESS);
+		}
 		delete_timeout(send_discover, iface);
 		if (ifo->options & DHCPCD_ARP &&
 		    iface->addr.s_addr != state->offer->yiaddr)
@@ -1029,7 +1033,7 @@ main(int argc, char **argv)
 
 	/* If we have any other args, we should run as a single dhcpcd instance
 	 * for that interface. */
-	if (optind == argc - 1)
+	if (optind == argc - 1 && !(options & DHCPCD_TEST))
 		snprintf(pidfile, sizeof(pidfile), PIDFILE, "-", argv[optind]);
 	else {
 		snprintf(pidfile, sizeof(pidfile), PIDFILE, "", "");

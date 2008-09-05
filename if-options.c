@@ -262,7 +262,8 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	case 'k': /* FALLTHROUGH */
 	case 'n': /* FALLTHROUGH */
 	case 'x': /* FALLTHROUGH */
-	case 'B': /* We need to handle non interface options */
+	case 'B': /* FALLTHROUGH */
+	case 'T': /* We need to handle non interface options */
 		break;
 	case 'c':
 		strlcpy(ifo->script, arg, sizeof(ifo->script));
