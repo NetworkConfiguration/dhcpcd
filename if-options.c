@@ -39,8 +39,8 @@
 #include <unistd.h>
 #include <time.h>
 
-#include "common.h"
 #include "config.h"
+#include "common.h"
 #include "dhcpf.h"
 #include "if-options.h"
 #include "logger.h"
@@ -567,7 +567,7 @@ read_config(const char *file, const char *ifname)
 					     "%s %s", PACKAGE, VERSION);
 
 	/* Parse our options file */
-	f = fopen(file, "r");
+	f = fopen(file ? file : CONFIG, "r");
 	if (!f)
 		return ifo;
 

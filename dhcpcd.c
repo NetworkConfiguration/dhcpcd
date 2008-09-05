@@ -69,7 +69,7 @@ int pidfd = -1;
 static char **ifv = NULL;
 static int ifc = 0;
 static int linkfd = -1;
-static char cffile[PATH_MAX];
+static char *cffile = NULL;
 static char pidfile[PATH_MAX] = { '\0' };
 static struct interface *ifaces = NULL;
 
@@ -755,7 +755,7 @@ init_state(struct interface *iface, int argc, char **argv)
 	ifs->nakoff = 1;
 	configure_interface(iface, argc, argv);
 
-	if (!(ifs->options->options & DHCPCD_TEST))
+	if (!(options & DHCPCD_TEST))
 		run_script(iface, "PREINIT");
 
 	if (ifs->options->options & DHCPCD_LINK) {
@@ -969,7 +969,6 @@ main(int argc, char **argv)
 	/* Saves calling fflush(stream) in the logger */
 	setlinebuf(stdout);
 	openlog(PACKAGE, LOG_PID, LOG_LOCAL0);
-	strlcpy(cffile, CONFIG, sizeof(cffile));
 	options = DHCPCD_DAEMONISE;
 
 	/* Test for --help and --version */
@@ -993,7 +992,7 @@ main(int argc, char **argv)
 			setloglevel(LOG_DEBUG);
 			break;
 		case 'f':
-			strlcpy(cffile, optarg, sizeof(cffile));
+			cffile = optarg;
 			break;
 		case 'k':
 			sig = SIGHUP;
@@ -1037,7 +1036,7 @@ main(int argc, char **argv)
 	}
 	
 #ifdef THERE_IS_NO_FORK
-	ifo->options &= ~DHCPCD_DAEMONISE;
+	options &= ~DHCPCD_DAEMONISE;
 #endif
 
 	chdir("/");
@@ -1056,6 +1055,9 @@ main(int argc, char **argv)
 				logger(LOG_ERR, "failed to send commands");
 				exit(EXIT_FAILURE);
 			}
+		} else {
+			if (errno != EEXIST)
+				logger(LOG_ERR, "open_control: %m");
 		}
 	}
 
