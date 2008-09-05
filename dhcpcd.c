@@ -64,7 +64,7 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 /* We should define a maximum for the NAK exponential backoff */ 
 #define NAKOFF_MAX              60
 
-int master = 0;
+int options = 0;
 int pidfd = -1;
 static char **ifv = NULL;
 static int ifc = 0;
@@ -143,7 +143,7 @@ cleanup(void)
 	if (linkfd != -1)
 		close(linkfd);
 	if (pidfd > -1) {
-		if (master) {
+		if (options & DHCPCD_MASTER) {
 			if (stop_control() == -1)
 				logger(LOG_ERR, "stop_control: %s",
 				       strerror(errno));
@@ -211,7 +211,7 @@ stop_interface(struct interface *iface)
 	else
 		ifaces = iface->next;
 	free_interface(ifp);
-	if (!master)
+	if (!(options & DHCPCD_MASTER))
 		exit(EXIT_FAILURE);
 }
 
@@ -960,8 +960,7 @@ main(int argc, char **argv)
 {
 	struct if_options *ifo;
 	struct interface *iface;
-	int opt, oi = 0, test = 0, signal_fd, sig = 0, i, control_fd;
-	int background = 0;
+	int opt, oi = 0, signal_fd, sig = 0, i, control_fd;
 	pid_t pid;
 	struct timespec ts;
 
@@ -982,9 +981,14 @@ main(int argc, char **argv)
 		}
 	}
 
+	options = DHCPCD_DAEMONISE;
+
 	while ((opt = getopt_long(argc, argv, IF_OPTS, cf_options, &oi)) != -1)
 	{
 		switch (opt) {
+		case 'b':
+			options |= DHCPCD_BACKGROUND;
+			break;
 		case 'd':
 			setloglevel(LOG_DEBUG);
 			break;
@@ -1000,8 +1004,11 @@ main(int argc, char **argv)
 		case 'x':
 			sig = SIGTERM;
 			break;
+		case 'B':
+			options &= ~DHCPCD_DAEMONISE;
+			break;
 		case 'T':
-			test = 1;
+			options |= DHCPCD_TEST | DHCPCD_PERSISTENT;
 			break;
 		case 'V':
 			print_options();
@@ -1026,11 +1033,9 @@ main(int argc, char **argv)
 		snprintf(pidfile, sizeof(pidfile), PIDFILE, "-", argv[optind]);
 	else {
 		snprintf(pidfile, sizeof(pidfile), PIDFILE, "", "");
-		master = 1;
+		options |= DHCPCD_MASTER;
 	}
 	
-	if (test)
-		ifo->options |= DHCPCD_TEST | DHCPCD_PERSISTENT;
 #ifdef THERE_IS_NO_FORK
 	ifo->options &= ~DHCPCD_DAEMONISE;
 #endif
@@ -1039,7 +1044,7 @@ main(int argc, char **argv)
 	umask(022);
 	atexit(cleanup);
 
-	if (!master) {
+	if (!(options & DHCPCD_MASTER)) {
 		control_fd = open_control();
 		if (control_fd != -1) {
 			logger(LOG_INFO, "sending commands to master dhcpcd process");
@@ -1084,7 +1089,7 @@ main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
-	if (!(ifo->options & DHCPCD_TEST)) {
+	if (!(options & DHCPCD_TEST)) {
 		if ((pid = read_pid()) > 0 &&
 		    kill(pid, 0) == 0)
 		{
@@ -1120,7 +1125,7 @@ main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	add_event(signal_fd, handle_signal, NULL);
 
-	if (master) {
+	if (options & DHCPCD_MASTER) {
 		if (start_control() == -1) {
 			logger(LOG_ERR, "start_control: %s", strerror(errno));
 			exit(EXIT_FAILURE);
@@ -1136,17 +1141,11 @@ main(int argc, char **argv)
 			add_event(linkfd, handle_link, NULL);
 	}
 
-	if (!(ifo->options & DHCPCD_DAEMONISE))
-		can_daemonise = 0;
-	if (can_daemonise) {
-		if (ifo->options & DHCPCD_BACKGROUND)
-			background = 1;
-		else {
-			oi = ifo->timeout;
-			if (ifo->options & DHCPCD_IPV4LL)
-				oi += 10;
-			add_timeout_sec(oi, handle_exit_timeout, NULL);
-		}
+	if (options & DHCPCD_DAEMONISE && !(options & DHCPCD_BACKGROUND)) {
+		oi = ifo->timeout;
+		if (ifo->options & DHCPCD_IPV4LL)
+			oi += 10;
+		add_timeout_sec(oi, handle_exit_timeout, NULL);
 	}
 	free_options(ifo);
 
@@ -1159,7 +1158,7 @@ main(int argc, char **argv)
 		logger(LOG_ERR, "interface `%s' does not exist", ifv[0]);
 		exit(EXIT_FAILURE);
 	}
-	if (background)
+	if (options & DHCPCD_BACKGROUND)
 		daemonise();
 	start_eloop();
 	/* NOTREACHED */

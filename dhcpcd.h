@@ -105,6 +105,7 @@ struct interface
 };
 
 extern int pidfd;
+extern int options;
 
 int handle_args(int, char **);
 void handle_exit_timeout(void *);

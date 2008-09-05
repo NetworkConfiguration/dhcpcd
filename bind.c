@@ -42,9 +42,6 @@
 #include "net.h"
 #include "signals.h"
 
-static int daemonised = 0;
-int can_daemonise = 1;
-
 #ifndef THERE_IS_NO_FORK
 pid_t
 daemonise(void)
@@ -55,7 +52,7 @@ daemonise(void)
 	char buf = '\0';
 	int sidpipe[2];
 
-	if (daemonised || !can_daemonise)
+	if (options & DHCPCD_DAEMONISED || !(options & DHCPCD_DAEMONISE))
 		return 0;
 	sigfillset(&full);
 	sigprocmask(SIG_SETMASK, &full, &old);
@@ -93,7 +90,7 @@ daemonise(void)
 		pidfd = -1;
 		exit(EXIT_SUCCESS);
 	}
-	daemonised = 1;
+	options |= DHCPCD_DAEMONISED;
 	sigprocmask(SIG_SETMASK, &old, NULL);
 	return pid;
 }

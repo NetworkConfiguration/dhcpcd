@@ -257,13 +257,15 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	struct in_addr addr;
 
 	switch(opt) {
-	case 'b':
-		ifo->options |= DHCPCD_BACKGROUND;
+	case 'b': /* FALLTHROUGH */
+	case 'd': /* FALLTHROUGH */
+	case 'k': /* FALLTHROUGH */
+	case 'n': /* FALLTHROUGH */
+	case 'x': /* FALLTHROUGH */
+	case 'B': /* We need to handle non interface options */
 		break;
 	case 'c':
 		strlcpy(ifo->script, arg, sizeof(ifo->script));
-		break;
-	case 'd':
 		break;
 	case 'h':
 		if (arg)
@@ -293,8 +295,6 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		}
 		*ifo->vendorclassid = (uint8_t)s;
 		break;
-	case 'k':
-		break;
 	case 'l':
 		if (*arg == '-') {
 			logger(LOG_ERR,
@@ -314,8 +314,6 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			logger(LOG_ERR, "metric must be a positive value");
 			return -1;
 		}
-		break;
-	case 'n':
 		break;
 	case 'o':
 		if (make_option_mask(ifo->requestmask, arg, 1) != 0) {
@@ -417,15 +415,10 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			ifo->vendor[0] += s + 2;
 		}
 		break;
-	case 'x':
-		break;
 	case 'A':
 		ifo->options &= ~DHCPCD_ARP;
 		/* IPv4LL requires ARP */
 		ifo->options &= ~DHCPCD_IPV4LL;
-		break;
-	case 'B':
-		ifo->options &= ~DHCPCD_DAEMONISE;
 		break;
 	case 'C':
 		/* Commas to spaces for shell */

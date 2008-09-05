@@ -60,7 +60,7 @@
 #define DHCPCD_DAEMONISE	(1 << 14)
 #define DHCPCD_DAEMONISED	(1 << 15)
 #define DHCPCD_TEST		(1 << 16)
-#define DHCPCD_FORKED		(1 << 17)
+#define DHCPCD_MASTER		(1 << 17)
 #define DHCPCD_HOSTNAME		(1 << 18)
 #define DHCPCD_CLIENTID		(1 << 19)
 #define DHCPCD_LINK		(1 << 20)

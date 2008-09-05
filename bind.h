@@ -35,6 +35,5 @@
 pid_t daemonise(void);
 #endif
 
-extern int can_daemonise;
 void bind_interface(void *);
 #endif
