@@ -443,10 +443,8 @@ static ssize_t
 decode_rfc3442(char *out, ssize_t len, int pl, const uint8_t *p)
 {
 	const uint8_t *e;
-	ssize_t bytes = 0;
-	ssize_t b;
+	ssize_t b, bytes = 0, ocets;
 	uint8_t cidr;
-	uint8_t ocets;
 	struct in_addr addr;
 	char *o = out;
 
@@ -480,7 +478,7 @@ decode_rfc3442(char *out, ssize_t len, int pl, const uint8_t *p)
 		/* If we have ocets then we have a destination and netmask */
 		if (ocets > 0) {
 			addr.s_addr = 0;
-			memcpy(&addr.s_addr, p, (size_t)ocets);
+			memcpy(&addr.s_addr, p, ocets);
 			b = snprintf(o, len, "%s/%d", inet_ntoa(addr), cidr);
 			p += ocets;
 		} else
@@ -507,7 +505,7 @@ decode_rfc3442_rt(int dl, const uint8_t *data)
 	const uint8_t *p = data;
 	const uint8_t *e;
 	uint8_t cidr;
-	uint8_t ocets;
+	size_t ocets;
 	struct rt *routes = NULL;
 	struct rt *rt = NULL;
 
@@ -535,8 +533,8 @@ decode_rfc3442_rt(int dl, const uint8_t *data)
 		ocets = (cidr + 7) / 8;
 		/* If we have ocets then we have a destination and netmask */
 		if (ocets > 0) {
-			memcpy(&rt->dest.s_addr, p, (size_t)ocets);
-			memset(&rt->net.s_addr, 255, (size_t)ocets - 1);
+			memcpy(&rt->dest.s_addr, p, ocets);
+			memset(&rt->net.s_addr, 255, ocets);
 			memset((uint8_t *)&rt->net.s_addr +
 			       (ocets - 1),
 			       (256 - (1 << (32 - cidr) % 8)), 1);
