@@ -655,6 +655,10 @@ start_reboot(struct interface *iface)
 {
 	struct if_options *ifo = iface->state->options;
 
+	if (ifo->options & DHCPCD_LINK && iface->state->carrier == LINK_DOWN) {
+		syslog(LOG_INFO, "%s: waiting for carrier", iface->name);
+		return;
+	}
 	syslog(LOG_INFO, "%s: rebinding lease of %s",
 	       iface->name, inet_ntoa(iface->state->lease.addr));
 	iface->state->state = DHS_REBINDING;
