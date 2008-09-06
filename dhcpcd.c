@@ -650,7 +650,6 @@ start_discover(void *arg)
 	send_discover(iface);
 }
 
-
 void
 start_reboot(struct interface *iface)
 {

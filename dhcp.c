@@ -535,8 +535,7 @@ decode_rfc3442_rt(int dl, const uint8_t *data)
 		if (ocets > 0) {
 			memcpy(&rt->dest.s_addr, p, ocets);
 			memset(&rt->net.s_addr, 255, ocets);
-			memset((uint8_t *)&rt->net.s_addr +
-			       (ocets - 1),
+			memset((uint8_t *)&rt->net.s_addr + (ocets - 1),
 			       (256 - (1 << (32 - cidr) % 8)), 1);
 			p += ocets;
 		} else {
