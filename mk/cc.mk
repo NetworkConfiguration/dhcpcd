@@ -21,7 +21,7 @@ _CCFLAGS=	-Wall -Wextra -Wimplicit -Wshadow -Wformat=2 \
 		-Wdeclaration-after-statement -Wsequence-point
 _CC_FLAGS_SH=	if ! test -d .git; then echo ""; else for f in ${_CCFLAGS}; do \
 		if echo "int main(void) { return 0;} " | \
-		${CC} $$f -E -c -o /dev/null - >/dev/null 2>&1; \
+		${CC} $$f -S -xc -o /dev/null - ; \
 		then printf "%s" "$$f "; fi \
 		done; fi
 _CC_FLAGS!=	${_CC_FLAGS_SH}
