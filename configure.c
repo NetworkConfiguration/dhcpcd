@@ -301,6 +301,7 @@ static int
 delete_address(struct interface *iface)
 {
 	int retval;
+
 	syslog(LOG_DEBUG, "%s: deleting IP address %s/%d",
 	       iface->name,
 	       inet_ntoa(iface->addr),
@@ -323,7 +324,6 @@ configure(struct interface *iface, const char *reason)
 #ifdef __linux__
 	struct in_addr dest;
 	struct in_addr gate;
-	struct rt *rt = NULL;
 #endif
 
 	/* Grab our IP config */
@@ -336,6 +336,10 @@ configure(struct interface *iface, const char *reason)
 			net.s_addr = get_netmask(addr.s_addr);
 		if (get_option_addr(&brd.s_addr, dhcp, DHO_BROADCAST) == -1)
 			brd.s_addr = addr.s_addr | ~net.s_addr;
+#ifdef __linux__
+		dest.s_addr = addr.s_addr & net.s_addr;
+		gate.s_addr = 0;
+#endif
 	} else {
 		/* Only reset things if we had set them before */
 		if (iface->addr.s_addr != 0) {
@@ -367,31 +371,20 @@ configure(struct interface *iface, const char *reason)
 
 #ifdef __linux__
 	/* On linux, we need to change the subnet route to have our metric. */
-	if (iface->addr.s_addr != iface->state->lease.addr.s_addr &&
-	    iface->metric > 0 &&
-	    net.s_addr != INADDR_BROADCAST)
+	if (iface->metric > 0 && 
+	    (net.s_addr != iface->net.s_addr ||
+	     dest.s_addr != (iface->addr.s_addr & iface->net.s_addr)))
 	{
-		dest.s_addr = addr.s_addr & net.s_addr;
-		gate.s_addr = 0;
-		add_route(iface, &dest, &net, &gate, iface->metric);
+		iface->addr.s_addr = addr.s_addr;
+		iface->net.s_addr = net.s_addr;
+		change_route(iface, &dest, &net, &gate, iface->metric);
 		del_route(iface, &dest, &net, &gate, 0);
-		rt = xmalloc(sizeof(*rt));
-		rt->dest.s_addr = dest.s_addr;
-		rt->net.s_addr = net.s_addr;
-		rt->gate.s_addr = gate.s_addr;
 	}
 #endif
 
-	configure_routes(iface, dhcp);
 	iface->addr.s_addr = addr.s_addr;
 	iface->net.s_addr = net.s_addr;
-
-#ifdef __linux__
-	if (rt) {
-		rt->next = iface->routes;
-		iface->routes = rt;
-	}
-#endif
+	configure_routes(iface, dhcp);
 
 	if (!iface->state->lease.frominfo)
 		if (write_lease(iface, dhcp) == -1)

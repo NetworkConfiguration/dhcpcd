@@ -132,6 +132,8 @@ int if_route(const struct interface *, const struct in_addr *,
 	if_route(iface, dest, mask, gate, metric, 0)
 #define del_route(iface, dest, mask, gate, metric) \
 	if_route(iface, dest, mask, gate, metric, -1)
+#define del_src_route(iface, dest, mask, gate, metric) \
+	if_route(iface, dest, mask, gate, metric, -2)
 void free_routes(struct rt *);
 
 int open_udp_socket(struct interface *);

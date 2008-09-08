@@ -351,7 +351,7 @@ if_route(const struct interface *iface,
 	nlm->hdr.nlmsg_type = RTM_NEWROUTE;
 	if (action == 0)
 		nlm->hdr.nlmsg_flags = NLM_F_REPLACE;
-	else if (action > 0)
+	else if (action  == 1)
 		nlm->hdr.nlmsg_flags = NLM_F_CREATE | NLM_F_EXCL;
 	else
 		nlm->hdr.nlmsg_type = RTM_DELROUTE;
@@ -359,11 +359,12 @@ if_route(const struct interface *iface,
 	nlm->rt.rtm_family = AF_INET;
 	nlm->rt.rtm_table = RT_TABLE_MAIN;
 
-	if (action < 0)
+	if (action == -1 || action == -2)
 		nlm->rt.rtm_scope = RT_SCOPE_NOWHERE;
 	else {
 		nlm->hdr.nlmsg_flags |= NLM_F_CREATE | NLM_F_EXCL;
-		nlm->rt.rtm_protocol = RTPROT_BOOT;
+		/* We only change route metrics for kernel routes */
+		nlm->rt.rtm_protocol = action ? RTPROT_BOOT : RTPROT_KERNEL;
 		if (gateway->s_addr == INADDR_ANY)
 			nlm->rt.rtm_scope = RT_SCOPE_LINK;
 		else
@@ -374,6 +375,10 @@ if_route(const struct interface *iface,
 	nlm->rt.rtm_dst_len = inet_ntocidr(*netmask);
 	add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_DST,
 		   &destination->s_addr, sizeof(destination->s_addr));
+	if (action != 1) {
+		add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_PREFSRC,
+			   &iface->addr.s_addr, sizeof(iface->addr.s_addr));
+	}
 	add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_GATEWAY,
 		   &gateway->s_addr, sizeof(gateway->s_addr));
 
