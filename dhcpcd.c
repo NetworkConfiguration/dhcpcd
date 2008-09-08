@@ -300,18 +300,6 @@ send_renew(void *arg)
 	send_message((struct interface *)arg, DHCP_REQUEST, send_renew);
 }
 
-void
-start_renew(void *arg)
-{
-	struct interface *iface = arg;
-
-	syslog(LOG_INFO, "%s: renewing lease of %s",
-	       iface->name, inet_ntoa(iface->state->lease.addr));
-	iface->state->state = DHS_RENEWING;
-	iface->state->xid = arc4random();
-	send_renew(iface);
-}
-
 static void
 send_rebind(void *arg)
 {
@@ -648,6 +636,20 @@ start_discover(void *arg)
 	}
 	syslog(LOG_INFO, "%s: broadcasting for a lease", iface->name);
 	send_discover(iface);
+}
+
+
+void
+start_renew(void *arg)
+{
+	struct interface *iface = arg;
+
+	syslog(LOG_INFO, "%s: renewing lease of %s",
+	       iface->name, inet_ntoa(iface->state->lease.addr));
+	iface->state->state = DHS_RENEWING;
+	iface->state->xid = arc4random();
+	open_sockets(iface);
+	send_renew(iface);
 }
 
 void
