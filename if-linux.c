@@ -398,7 +398,7 @@ discover_interfaces(int argc, char * const *argv)
 	char *buffer = NULL, *p;
 	size_t len = 0, ln = 0, n;
 	int i;
-	struct interface *ifaces = NULL, *ifp, *ifl;
+	struct interface *ifs = NULL, *ifp, *ifl;
 
 	if ((f = fopen("/proc/net/dev", "r"))) {
 		while (get_line(&buffer, &len, f)) {
@@ -410,7 +410,7 @@ discover_interfaces(int argc, char * const *argv)
 			n = strcspn(p, ": \t");
 			p[n]= '\0';
 			ifl = NULL;
-			for (ifp = ifaces; ifp; ifp = ifp->next) {
+			for (ifp = ifs; ifp; ifp = ifp->next) {
 				if (strcmp(ifp->name, p) == 0)
 					break;
 				ifl = ifp;
@@ -426,9 +426,9 @@ discover_interfaces(int argc, char * const *argv)
 			}
 			if ((ifp = init_interface(p))) {
 				if (ifl)
-					ifl->next =ifp; 
+					ifl->next = ifp; 
 				else
-					ifaces = ifp;
+					ifs = ifp;
 			}
 		}
 		fclose(f);
