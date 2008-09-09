@@ -57,8 +57,8 @@ send_arp(const struct interface *iface, int op, in_addr_t sip, in_addr_t tip)
 	ar.ar_hln = iface->hwlen;
 	ar.ar_pln = sizeof(sip);
 	ar.ar_op = htons(op);
-	p = arp_buffer;
-	p += sizeof(ar);
+	memcpy(arp_buffer, &ar, sizeof(ar));
+	p = arp_buffer + sizeof(ar);
 	memcpy(p, iface->hwaddr, iface->hwlen);
 	p += iface->hwlen;
 	memcpy(p, &sip, sizeof(sip));
@@ -69,7 +69,7 @@ send_arp(const struct interface *iface, int op, in_addr_t sip, in_addr_t tip)
 		*p++ = '\0';
 	memcpy(p, &tip, sizeof(tip));
 	p += sizeof(tip);
-	len = sizeof(ar) + 2 * iface->hwlen + 2 * sizeof(sip);
+	len = p - arp_buffer;
 	retval = send_raw_packet(iface, ETHERTYPE_ARP, arp_buffer, len);
 	return retval;
 }
