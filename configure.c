@@ -43,6 +43,7 @@
 #include "configure.h"
 #include "dhcpf.h"
 #include "if-options.h"
+#include "if-pref.h"
 #include "net.h"
 #include "signals.h"
 
@@ -83,17 +84,18 @@ run_script(const struct interface *iface, const char *reason)
 {
 	char *const argv[2] = { UNCONST(iface->state->options->script), NULL };
 	char **env = NULL, **ep;
-	char *path;
-	ssize_t e, elen;
+	char *path, *p;
+	ssize_t e, elen, l;
 	pid_t pid;
 	int status = 0;
 	const struct if_options *ifo = iface->state->options;
+	const struct interface *ifp;
 
 	syslog(LOG_DEBUG, "%s: executing `%s', reason %s",
 	       iface->name, argv[0], reason);
 
 	/* Make our env */
-	elen = 5;
+	elen = 6;
 	env = xmalloc(sizeof(char *) * (elen + 1));
 	path = getenv("PATH");
 	if (path) {
@@ -113,6 +115,21 @@ run_script(const struct interface *iface, const char *reason)
 	snprintf(env[3], e, "pid=%d", getpid());
 	env[4] = xmalloc(e);
 	snprintf(env[4], e, "metric=%d", iface->metric);
+	l = e = strlen("interface_order=");
+	for (ifp = ifaces; ifp; ifp = ifp->next)
+		e += strlen(ifp->name) + 1;
+	p = env[5] = xmalloc(e);
+	strlcpy(p, "interface_order=", e);
+	e -= l;
+	p += l;
+	for (ifp = ifaces; ifp; ifp = ifp->next) {
+		l = strlcpy(p, ifp->name, e);
+		p += l;
+		e -= l;
+		*p++ = ' ';
+		e--;
+	}
+	*--p = '\0';
 	if (iface->state->old) {
 		e = configure_env(NULL, NULL, iface->state->old, ifo);
 		if (e > 0) {
@@ -325,6 +342,10 @@ configure(struct interface *iface, const char *reason)
 	struct in_addr dest;
 	struct in_addr gate;
 #endif
+
+	/* As we are now adjusting an interface, we need to ensure
+	 * we have them in the right order for routing and configuration. */
+	sort_interfaces();
 
 	/* Grab our IP config */
 	if (dhcp) {

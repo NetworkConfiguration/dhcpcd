@@ -315,7 +315,7 @@ free_interface(struct interface *iface)
 
 int
 do_interface(const char *ifname,
-	     _unused struct interface **ifaces,
+	     _unused struct interface **ifs,
 	     _unused int argc, _unused char * const *argv,
 	     struct in_addr *addr, struct in_addr *net, int act)
 {
@@ -385,7 +385,7 @@ do_interface(const char *ifname,
 #ifdef AF_LINK
 		/* Interface discovery for BSD's */
 		if (act == 2 && ifr->ifr_addr.sa_family == AF_LINK) {
-			for (ifp = *ifaces; ifp; ifp = ifp->next) {
+			for (ifp = *ifs; ifp; ifp = ifp->next) {
 				ifl = ifp;
 				if (strcmp(ifp->name, ifr->ifr_name) == 0)
 					break;
@@ -405,7 +405,7 @@ do_interface(const char *ifname,
 			if (ifl)
 				ifp = ifl->next = ifn;
 			else
-				ifp = *ifaces = ifn;
+				ifp = *ifs = ifn;
 			sdl = xmalloc(ifr->ifr_addr.sa_len);
 			memcpy(sdl, &ifr->ifr_addr, ifr->ifr_addr.sa_len);
 			ifp->hwlen = sdl->sdl_alen;

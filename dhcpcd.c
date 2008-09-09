@@ -57,6 +57,7 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 #include "duid.h"
 #include "eloop.h"
 #include "if-options.h"
+#include "if-pref.h"
 #include "ipv4ll.h"
 #include "net.h"
 #include "signals.h"
@@ -66,12 +67,13 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 
 int options = 0;
 int pidfd = -1;
+struct interface *ifaces = NULL;
+
 static char **ifv = NULL;
 static int ifc = 0;
 static int linkfd = -1;
 static char *cffile = NULL;
 static char *pidfile;
-static struct interface *ifaces = NULL;
 
 struct dhcp_op {
 	uint8_t value;
@@ -329,7 +331,7 @@ start_expire(void *arg)
 	delete_timeout(NULL, iface);
 	drop_config(iface, "EXPIRE");
 	iface->state->interval = 0;
-	if (iface->state->carrier != LINK_DOWN) {
+	if (iface->carrier != LINK_DOWN) {
 		if (ll)
 			start_interface(iface);
 		else
@@ -599,16 +601,16 @@ handle_carrier(const char *ifname)
 		syslog(LOG_ERR, "carrier_status: %m");
 		break;
 	case 0:
-		if (iface->state->carrier != LINK_DOWN) {
-			iface->state->carrier = LINK_DOWN;
+		if (iface->carrier != LINK_DOWN) {
+			iface->carrier = LINK_DOWN;
 			syslog(LOG_INFO, "%s: carrier lost", iface->name);
 			close_sockets(iface);
 			delete_timeouts(iface, start_expire, NULL);
 		}
 		break;
 	default:
-		if (iface->state->carrier != LINK_UP) {
-			iface->state->carrier = LINK_UP;
+		if (iface->carrier != LINK_UP) {
+			iface->carrier = LINK_UP;
 			syslog(LOG_INFO, "%s: carrier acquired", iface->name);
 			start_interface(iface);
 		}
@@ -657,7 +659,7 @@ start_reboot(struct interface *iface)
 {
 	struct if_options *ifo = iface->state->options;
 
-	if (ifo->options & DHCPCD_LINK && iface->state->carrier == LINK_DOWN) {
+	if (ifo->options & DHCPCD_LINK && iface->carrier == LINK_DOWN) {
 		syslog(LOG_INFO, "%s: waiting for carrier", iface->name);
 		return;
 	}
@@ -689,6 +691,11 @@ void
 start_interface(void *arg)
 {
 	struct interface *iface = arg;
+
+	if (iface->carrier == LINK_DOWN) {
+		syslog(LOG_INFO, "%s: waiting for carrier", iface->name);
+		return;
+	}
 
 	iface->start_uptime = uptime();
 	if (!iface->state->lease.addr.s_addr)
@@ -763,26 +770,19 @@ init_state(struct interface *iface, int argc, char **argv)
 	ifs->nakoff = 1;
 	configure_interface(iface, argc, argv);
 
-	if (!(options & DHCPCD_TEST))
-		run_script(iface, "PREINIT");
-
 	if (ifs->options->options & DHCPCD_LINK) {
 		switch (carrier_status(iface->name)) {
 		case 0:
-			ifs->carrier = LINK_DOWN;
+			iface->carrier = LINK_DOWN;
 			break;
 		case 1:
-			ifs->carrier = LINK_UP;
+			iface->carrier = LINK_UP;
 			break;
 		default:
-			ifs->carrier = LINK_UNKNOWN;
+			iface->carrier = LINK_UNKNOWN;
 		}
-	}
-
-	if (ifs->carrier == LINK_DOWN)
-		syslog(LOG_INFO, "%s: waiting for carrier", iface->name);
-	else
-		start_interface(iface);
+	} else
+		iface->carrier = LINK_UNKNOWN;
 }
 
 static void
@@ -812,6 +812,8 @@ handle_new_interface(const char *ifname)
 			if (ifn)
 				continue;
 			init_state(ifp, 2, UNCONST(argv));
+			run_script(ifp, "PREINIT");
+			start_interface(ifp);
 			if (ifl)
 				ifl->next = ifp;
 			else
@@ -859,7 +861,6 @@ handle_signal(_unused void *arg)
 	case SIGALRM:
 		syslog(LOG_INFO, "received SIGALRM, rebinding lease");
 		do_reboot = 1;
-		break;
 	case SIGHUP:
 		syslog(LOG_INFO, "received SIGHUP, releasing lease");
 		do_release = 1;
@@ -871,9 +872,13 @@ handle_signal(_unused void *arg)
 		return;
 	}
 
-	for (iface = ifaces; iface; iface = iface->next) {
-		if (!iface->state)
-			continue;
+	/* As drop_config could re-arrange the order, we do it like this. */
+	for (;;) {
+		for (iface = ifaces; iface; iface = iface->next)
+			if (iface->state && iface->state->new)
+				break;
+		if (!iface)
+			break;
 		if (do_reboot)
 			start_reboot(iface);
 		else {
@@ -940,6 +945,7 @@ handle_args(int argc, char **argv)
 				start_reboot(ifp);
 			}
 		}
+		sort_interfaces();
 		return 0;
 	}
 
@@ -954,12 +960,15 @@ handle_args(int argc, char **argv)
 			}
 			if (!ifn) {
 				init_state(ifp, argc, argv);
+				run_script(ifp, "PREINIT");
+				start_interface(ifp);
 				if (ifl)
 					ifl->next = ifp;
 				else
 					ifaces = ifp;
 			}
 		}
+		sort_interfaces();
 	}
 	return 0;
 }
@@ -1165,14 +1174,21 @@ main(int argc, char **argv)
 	ifc = argc - optind;
 	ifv = argv + optind;
 	ifaces = discover_interfaces(ifc, ifv);
-	for (iface = ifaces; iface; iface = iface->next)
-		init_state(iface, argc, argv);
 	if (!ifaces && ifc == 1) {
 		syslog(LOG_ERR, "interface `%s' does not exist", ifv[0]);
 		exit(EXIT_FAILURE);
 	}
 	if (options & DHCPCD_BACKGROUND)
 		daemonise();
+	for (iface = ifaces; iface; iface = iface->next)
+		init_state(iface, argc, argv);
+	sort_interfaces();
+	if (!(options & DHCPCD_TEST)) {
+		for (iface = ifaces; iface; iface = iface->next) {
+			run_script(iface, "PREINIT");
+			start_interface(iface);
+		}
+	}
 	start_eloop();
 	/* NOTREACHED */
 }

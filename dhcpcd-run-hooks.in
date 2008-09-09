@@ -25,15 +25,26 @@ uniqify()
 }
 
 # List interface config files in a dir
-# We may wish to control the order at some point rather than just lexical
+# If dhcpcd is running as a single instance then it will have a list of
+# interfaces in the preferred order.
+# Otherwise we just use what we have.
 list_interfaces()
 {
-	local x= interfaces=
+	local i= x= ifaces=
+	for i in ${interface_order}; do
+		[ -e "$1"/${i} ] && ifaces="${ifaces}${ifaces:+ }${i}"
+	done
 	for x in "$1"/*; do
 		[ -e "${x}" ] || continue
-		interfaces="${interfaces}${interfaces:+ }${x##*/}"
+		for i in ${interface_order}; do
+			if [ ${i} = "${x##*/}" ]; then
+				unset x
+				break
+			fi
+		done
+		[ -n "${x}" ] && ifaces="${ifaces}${ifaces:+ }${x##*/}"
 	done
-	echo "${interfaces}"
+	echo "${ifaces}"
 }
 
 # We normally use sed to extract values using a key from a list of files

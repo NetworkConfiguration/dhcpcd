@@ -67,7 +67,6 @@ struct if_state {
 	time_t nakoff;
 	uint32_t xid;
 	int socket;
-	int carrier;
 	int probes;
 	int claims;
 	int conflicts;
@@ -84,6 +83,7 @@ struct interface
 	unsigned char hwaddr[HWADDR_LEN];
 	size_t hwlen;
 	int metric;
+	int carrier;
 	int arpable;
 
 	int raw_fd;
@@ -106,6 +106,7 @@ struct interface
 
 extern int pidfd;
 extern int options;
+extern struct interface *ifaces;
 
 int handle_args(int, char **);
 void handle_exit_timeout(void *);

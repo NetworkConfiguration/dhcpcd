@@ -248,8 +248,8 @@ manage_link(int fd,
 struct interface *
 discover_interfaces(int argc, char * const *argv)
 {
-	struct interface *ifaces = NULL;
+	struct interface *ifs = NULL;
 
-	do_interface(NULL, &ifaces, argc, argv, NULL, NULL, 2);
-	return ifaces;
+	do_interface(NULL, &ifs, argc, argv, NULL, NULL, 2);
+	return ifs;
 }
