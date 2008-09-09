@@ -434,5 +434,5 @@ discover_interfaces(int argc, char * const *argv)
 		fclose(f);
 		free(buffer);
 	}
-	return ifaces;
+	return ifs;
 }
