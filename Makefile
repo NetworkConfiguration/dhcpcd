@@ -33,7 +33,7 @@ LDADD+=		${LIBRT}
 
 SUBDIRS=	dhcpcd-hooks
 
-.SUFFIXES:	.in .sh.in
+.SUFFIXES:	.in
 
 SED_DBDIR=	-e 's:@DBDIR@:${DBDIR}:g'
 SED_HOOKDIR=	-e 's:@HOOKDIR@:${HOOKDIR}:g'
@@ -42,9 +42,6 @@ SED_SYS=	-e 's:@SYSCONFDIR@:${SYSCONFDIR}:g'
 
 .in:
 	${SED} ${SED_DBDIR} ${SED_HOOKDIR} ${SED_SCRIPT} ${SED_SYS} $< > $@
-
-.sh.in.sh:
-	${SED} ${SED_HOOKDIR} ${SED_SCRIPT} ${SED_SYS} $< > $@
 
 MK=		mk
 include ${MK}/sys.mk
