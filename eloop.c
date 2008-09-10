@@ -58,40 +58,6 @@ static struct timeout *free_timeouts = NULL;
 static struct pollfd *fds = NULL;
 static size_t fds_len = 0;
 
-#ifdef DEBUG_MEMORY
-/* Define this to free all malloced memory.
- * Normally we don't do this as the OS will do it for us at exit,
- * but it's handy for debugging other leaks in valgrind. */
-static void
-cleanup(void)
-{
-	struct event *e;
-	struct timeout *t;
-
-	while (events) {
-		e = events->next;
-		free(events);
-		events = e;
-	}
-	while (free_events) {
-		e = free_events->next;
-		free(free_events);
-		free_events = e;
-	}
-	while (timeouts) {
-		t = timeouts->next;
-		free(timeouts);
-		timeouts = t;
-	}
-	while (free_timeouts) {
-		t = free_timeouts->next;
-		free(free_timeouts);
-		free_timeouts = t;
-	}
-	free(fds);
-}
-#endif
-
 void
 add_event(int fd, void (*callback)(void *), void *arg)
 {
@@ -260,6 +226,40 @@ delete_timeout(void (*callback)(void *), void *arg)
 		last = t;
 	}
 }
+
+#ifdef DEBUG_MEMORY
+/* Define this to free all malloced memory.
+ * Normally we don't do this as the OS will do it for us at exit,
+ * but it's handy for debugging other leaks in valgrind. */
+static void
+cleanup(void)
+{
+	struct event *e;
+	struct timeout *t;
+
+	while (events) {
+		e = events->next;
+		free(events);
+		events = e;
+	}
+	while (free_events) {
+		e = free_events->next;
+		free(free_events);
+		free_events = e;
+	}
+	while (timeouts) {
+		t = timeouts->next;
+		free(timeouts);
+		timeouts = t;
+	}
+	while (free_timeouts) {
+		t = free_timeouts->next;
+		free(free_timeouts);
+		free_timeouts = t;
+	}
+	free(fds);
+}
+#endif
 
 _noreturn void
 start_eloop(void)
