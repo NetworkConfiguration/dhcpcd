@@ -208,12 +208,12 @@ close_sockets(struct interface *iface)
 }
 
 static void
-stop_interface(struct interface *iface)
+stop_interface(struct interface *iface, const char *reason)
 {
 	struct interface *ifp, *ifl = NULL;
 
 	syslog(LOG_INFO, "%s: removing interface", iface->name);
-	drop_config(iface, "STOP");
+	drop_config(iface, reason ? reason : "STOP");
 	close_sockets(iface);
 	delete_timeout(NULL, iface);
 	for (ifp = ifaces; ifp; ifp = ifp->next) {
@@ -222,9 +222,9 @@ stop_interface(struct interface *iface)
 		ifl = ifp;
 	}
 	if (ifl)
-		ifl->next = iface->next;
+		ifl->next = ifp->next;
 	else
-		ifaces = iface->next;
+		ifaces = ifp->next;
 	free_interface(ifp);
 	if (!(options & DHCPCD_MASTER))
 		exit(EXIT_FAILURE);
@@ -288,7 +288,7 @@ send_message(struct interface *iface, int type,
 	}
 	free(dhcp);
 	if (r == -1) {
-		stop_interface(iface);
+		stop_interface(iface, "STOP");
 	} else {
 		if (callback)
 			add_timeout_tv(&tv, callback, iface);
@@ -842,7 +842,7 @@ handle_remove_interface(const char *ifname)
 		if (strcmp(iface->name, ifname) == 0)
 			break;
 	if (iface && iface->state->options->options & DHCPCD_LINK)
-		stop_interface(iface);
+		stop_interface(iface, "STOP");
 }
 
 static void
@@ -858,7 +858,7 @@ handle_link(_unused void *arg)
 static void
 handle_signal(_unused void *arg)
 {
-	struct interface *iface;
+	struct interface *iface, *ifl;
 	int sig = signal_read();
 	int do_reboot = 0, do_release = 0;
 
@@ -885,18 +885,20 @@ handle_signal(_unused void *arg)
 
 	/* As drop_config could re-arrange the order, we do it like this. */
 	for (;;) {
+		/* Be sane and drop the last config first */
+		ifl = NULL;
 		for (iface = ifaces; iface; iface = iface->next)
 			if (iface->state && iface->state->new)
-				break;
-		if (!iface)
+				ifl = iface;
+		if (!ifl)
 			break;
 		if (do_reboot)
-			start_reboot(iface);
+			start_reboot(ifl);
 		else {
 			if (do_release)
-				send_release(iface);
-			if (!(iface->state->options->options & DHCPCD_PERSISTENT))
-				drop_config(iface, do_release ? "RELEASE" : "STOP");
+				send_release(ifl);
+			if (!(ifl->state->options->options & DHCPCD_PERSISTENT))
+				drop_config(ifl, do_release ? "RELEASE" : "STOP");
 		}
 	}
 	exit(EXIT_FAILURE);
@@ -905,7 +907,7 @@ handle_signal(_unused void *arg)
 int
 handle_args(int argc, char **argv)
 {
-	struct interface *ifs, *ifp, *ifl = NULL, *ifn;
+	struct interface *ifs, *ifp, *ifl, *ifn;
 	int do_exit = 0, do_release = 0, do_reboot = 0, opt, oi = 0;
 
 	optind = 0;
@@ -932,25 +934,15 @@ handle_args(int argc, char **argv)
 
 	if (do_release || do_reboot || do_exit) {
 		for (oi = optind; oi < argc; oi++) {
-			for (ifp = ifaces; ifp; ifp = ifp->next) {
+			for (ifp = ifaces; ifp; ifp = ifp->next)
 				if (strcmp(ifp->name, argv[oi]) == 0)
 					break;
-				ifl = ifp;
-			}
 			if (!ifp)
 				continue;
 			if (do_release)
 				send_release(ifp);
 			if (do_exit || do_release) {
-				syslog(LOG_INFO, "%s: removing interface", ifp->name);
-				drop_config(ifp, do_release ? "RELEASE" : "STOP");
-				close_sockets(ifp);
-				delete_timeout(NULL, ifp);
-				if (ifl)
-					ifl->next = ifp->next;
-				else
-					ifaces = ifp->next;
-				free_interface(ifp);
+				stop_interface(ifp, do_release ? "RELEASE" : "STOP");
 			} else if (do_reboot) {
 				configure_interface(ifp, argc, argv);
 				start_reboot(ifp);
@@ -964,6 +956,7 @@ handle_args(int argc, char **argv)
 		argc += optind;
 		argv -= optind;
 		for (ifp = ifs; ifp; ifp = ifp->next) {
+			ifl = NULL;
 			for (ifn = ifaces; ifn; ifn = ifn->next) {
 				if (strcmp(ifn->name, ifp->name) == 0)
 					break;
