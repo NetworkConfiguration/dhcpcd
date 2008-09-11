@@ -180,11 +180,10 @@ void
 drop_config(struct interface *iface, const char *reason)
 {
 	if (iface->state->new || strcmp(reason, "FAIL") == 0) {
-		free(iface->state->new);
+		free(iface->state->old);
+		iface->state->old = iface->state->new;
 		iface->state->new = NULL;
 		configure(iface, reason);
-		free(iface->state->old);
-		iface->state->old = NULL;
 	}
 	iface->state->lease.addr.s_addr = 0;
 }
