@@ -51,41 +51,43 @@
 #define OPTS "bc:df:h:i:kl:m:no:pqr:s:t:u:v:xABC:DEF:GI:KLO:Q:TVX:"
 
 const struct option cf_options[] = {
-	{"background",    no_argument,        NULL, 'b'},
-	{"script",        required_argument,  NULL, 'c'},
-	{"debug",         no_argument,        NULL, 'd'},
-	{"config",        required_argument,  NULL, 'f'},
-	{"hostname",      optional_argument,  NULL, 'h'},
-	{"vendorclassid", optional_argument,  NULL, 'i'},
-	{"release",       no_argument,        NULL, 'k'},
-	{"leasetime",     required_argument,  NULL, 'l'},
-	{"metric",        required_argument,  NULL, 'm'},
-	{"rebind",        no_argument,        NULL, 'n'},
-	{"option",        required_argument,  NULL, 'o'},
-	{"persistent",    no_argument,        NULL, 'p'},
-	{"quiet",         no_argument,        NULL, 'q'},
-	{"request",       optional_argument,  NULL, 'r'},
-	{"inform",        optional_argument,  NULL, 's'},
-	{"timeout",       required_argument,  NULL, 't'},
-	{"userclass",     required_argument,  NULL, 'u'},
-	{"vendor",        required_argument,  NULL, 'v'},
-	{"exit",          no_argument,        NULL, 'x'},
-	{"noarp",         no_argument,        NULL, 'A'},
-	{"nobackground",  no_argument,        NULL, 'B'},
-	{"nohook",	  required_argument,  NULL, 'C'},
-	{"duid",          no_argument,        NULL, 'D'},
-	{"lastlease",     no_argument,        NULL, 'E'},
-	{"fqdn",          optional_argument,  NULL, 'F'},
-	{"nogateway",     no_argument,        NULL, 'G'},
-	{"clientid",      optional_argument,  NULL, 'I'},
-	{"nolink",        no_argument,        NULL, 'K'},
-	{"noipv4ll",      no_argument,        NULL, 'L'},
-	{"nooption",      optional_argument,  NULL, 'O'},
-	{"require",       required_argument,  NULL, 'Q'},
-	{"test",          no_argument,        NULL, 'T'},
-	{"variables",     no_argument,        NULL, 'V'},
-	{"blacklist",     required_argument,  NULL, 'X'},
-	{NULL,            0,                  NULL, '\0'}
+	{"background",      no_argument,       NULL, 'b'},
+	{"script",          required_argument, NULL, 'c'},
+	{"debug",           no_argument,       NULL, 'd'},
+	{"config",          required_argument, NULL, 'f'},
+	{"hostname",        optional_argument, NULL, 'h'},
+	{"vendorclassid",   optional_argument, NULL, 'i'},
+	{"release",         no_argument,       NULL, 'k'},
+	{"leasetime",       required_argument, NULL, 'l'},
+	{"metric",          required_argument, NULL, 'm'},
+	{"rebind",          no_argument,       NULL, 'n'},
+	{"option",          required_argument, NULL, 'o'},
+	{"persistent",      no_argument,       NULL, 'p'},
+	{"quiet",           no_argument,       NULL, 'q'},
+	{"request",         optional_argument, NULL, 'r'},
+	{"inform",          optional_argument, NULL, 's'},
+	{"timeout",         required_argument, NULL, 't'},
+	{"userclass",       required_argument, NULL, 'u'},
+	{"vendor",          required_argument, NULL, 'v'},
+	{"exit",            no_argument,       NULL, 'x'},
+	{"allowinterfaces", required_argument, NULL, 'z'},
+	{"noarp",           no_argument,       NULL, 'A'},
+	{"nobackground",    no_argument,       NULL, 'B'},
+	{"nohook",          required_argument, NULL, 'C'},
+	{"duid",            no_argument,       NULL, 'D'},
+	{"lastlease",       no_argument,       NULL, 'E'},
+	{"fqdn",            optional_argument, NULL, 'F'},
+	{"nogateway",       no_argument,       NULL, 'G'},
+	{"clientid",        optional_argument, NULL, 'I'},
+	{"nolink",          no_argument,       NULL, 'K'},
+	{"noipv4ll",        no_argument,       NULL, 'L'},
+	{"nooption",        optional_argument, NULL, 'O'},
+	{"require",         required_argument, NULL, 'Q'},
+	{"test",            no_argument,       NULL, 'T'},
+	{"variables",       no_argument,       NULL, 'V'},
+	{"blacklist",       required_argument, NULL, 'X'},
+	{"denyinterfaces",  required_argument, NULL, 'Z'},
+	{NULL,              0,                 NULL, '\0'}
 };
 
 static int
@@ -246,6 +248,22 @@ parse_string_hwaddr(char *sbuf, ssize_t slen, const char *str, int clid)
 	if (punt_last)
 		*--sbuf = '\0';
 	return l;
+}
+
+static char **
+splitv(int *argc, char **argv, const char *arg)
+{
+	char **v = argv;
+	char *o = xstrdup(arg), *p, *t;
+
+	p = o;
+	while ((t = strsep(&p, ", "))) {
+		(*argc)++;
+		v = xrealloc(v, *argc);
+		v[(*argc) - 1] = xstrdup(t);
+	}
+	free(o);
+	return v;	
 }
 
 static int
@@ -417,6 +435,11 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			ifo->vendor[0] += s + 2;
 		}
 		break;
+	case 'z':
+		/* We only set this if we haven't got any interfaces */
+		if (!ifaces)
+			ifav = splitv(&ifac, ifav, arg);
+		break;
 	case 'A':
 		ifo->options &= ~DHCPCD_ARP;
 		/* IPv4LL requires ARP */
@@ -513,6 +536,11 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		    sizeof(in_addr_t) * (ifo->blacklist_len + 1));
 		ifo->blacklist[ifo->blacklist_len] = addr.s_addr;
 		ifo->blacklist_len++;
+		break;
+	case 'Z':
+		/* We only set this if we haven't got any interfaces */
+		if (!ifaces)
+			ifdv = splitv(&ifdc, ifdv, arg);
 		break;
 	default:
 		return 0;

@@ -106,6 +106,10 @@ struct interface
 
 extern int pidfd;
 extern int options;
+extern int ifac;
+extern char **ifav;
+extern int ifdc;
+extern char **ifdv;
 extern struct interface *ifaces;
 
 int handle_args(int, char **);

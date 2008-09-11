@@ -41,6 +41,7 @@
 
 #include <errno.h>
 #include <ctype.h>
+#include <fnmatch.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -397,7 +398,6 @@ discover_interfaces(int argc, char * const *argv)
 	FILE *f;
 	char *buffer = NULL, *p;
 	size_t len = 0, ln = 0, n;
-	int i;
 	struct interface *ifs = NULL, *ifp, *ifl;
 
 	if ((f = fopen("/proc/net/dev", "r"))) {
@@ -418,10 +418,21 @@ discover_interfaces(int argc, char * const *argv)
 			if (ifp)
 				continue;
 			if (argc > 0) {
-				for (i = 0; i < argc; i++)
-					if (strcmp(argv[i], p) == 0)
+				for (n = 0; n < argc; n++)
+					if (strcmp(argv[n], p) == 0)
 						break;
-				if (i == argc)
+				if (n == argc)
+					continue;
+			} else {
+				for (n = 0; n < ifdc; n++)
+					if (!fnmatch(ifdv[n], ifr->ifr_name, 0))
+						break;
+				if (n < ifdc)
+					continue;
+				for (n = 0; n < ifac; n++)
+					if (!fnmatch(ifav[n], ifr->ifr_name, 0))
+						break;
+				if (ifac && n == ifac)
 					continue;
 			}
 			if ((ifp = init_interface(p))) {

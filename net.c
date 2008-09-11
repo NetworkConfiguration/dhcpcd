@@ -61,6 +61,7 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <fnmatch.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -397,6 +398,17 @@ do_interface(const char *ifname,
 					if (strcmp(ifr->ifr_name, argv[n]) == 0)
 						break;
 				if (n == argc)
+					continue;
+			} else {
+				for (n = 0; n < ifdc; n++)
+					if (!fnmatch(ifdv[n], ifr->ifr_name, 0))
+						break;
+				if (n < ifdc)
+					continue;
+				for (n = 0; n < ifac; n++)
+					if (!fnmatch(ifav[n], ifr->ifr_name, 0))
+						break;
+				if (ifac && n == ifac)
 					continue;
 			}
 			ifn = init_interface(ifr->ifr_name);

@@ -68,6 +68,10 @@ const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
 int options = 0;
 int pidfd = -1;
 struct interface *ifaces = NULL;
+int ifac = 0;
+char **ifav = NULL;
+int ifdc = 0;
+char **ifdv = NULL;
 
 static char **ifv = NULL;
 static int ifc = 0;
@@ -134,12 +138,20 @@ cleanup(void)
 {
 #ifdef DEBUG_MEMORY
 	struct interface *iface;
+	int i;
 
 	while (ifaces) {
 		iface = ifaces;
 		ifaces = iface->next;
 		free_interface(iface);
 	}
+
+	for (i = 0; i < ifac; i++)
+		free(ifav[i]);
+	free(ifav);
+	for (i = 0; i < ifdc; i++)
+		free(ifdv[i]);
+	free(ifdv);
 #endif
 
 	if (linkfd != -1)
@@ -986,7 +998,6 @@ main(int argc, char **argv)
 	closefrom(3);
 	openlog(PACKAGE, LOG_PERROR, LOG_DAEMON);
 	setlogmask(LOG_UPTO(LOG_INFO));
-	options = DHCPCD_DAEMONISE;
 
 	/* Test for --help and --version */
 	if (argc > 1) {
@@ -999,6 +1010,7 @@ main(int argc, char **argv)
 		}
 	}
 
+	i = 0;
 	while ((opt = getopt_long(argc, argv, IF_OPTS, cf_options, &oi)) != -1)
 	{
 		switch (opt) {
@@ -1018,7 +1030,7 @@ main(int argc, char **argv)
 			sig = SIGTERM;
 			break;
 		case 'T':
-			options |= DHCPCD_TEST | DHCPCD_PERSISTENT;
+			i = 1;
 			break;
 		case 'V':
 			print_options();
@@ -1036,12 +1048,15 @@ main(int argc, char **argv)
 			usage();
 		exit(EXIT_FAILURE);
 	}
+	options = ifo->options;
+	if (i)
+		options |= DHCPCD_TEST | DHCPCD_PERSISTENT;
 
 #ifdef THERE_IS_NO_FORK
 	options &= ~DHCPCD_DAEMONISE;
 #endif
 
-	if (ifo->options & DHCPCD_QUIET)
+	if (options & DHCPCD_QUIET)
 		setlogmask(LOG_UPTO(LOG_WARNING));
 
 	/* If we have any other args, we should run as a single dhcpcd instance

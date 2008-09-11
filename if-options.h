@@ -36,8 +36,8 @@
 #include <limits.h>
 
 /* Don't set any optional arguments here so we retain POSIX
- *  * compatibility with getopt */
-#define IF_OPTS "bc:df:h:i:kl:m:no:pqr:s:t:u:v:xABC:DEF:GI:KLO:Q:TVX:"
+ * compatibility with getopt */
+#define IF_OPTS "bc:df:h:i:kl:m:no:pqr:s:t:u:v:xz:ABC:DEF:GI:KLO:Q:TVX:Z:"
 
 #define DEFAULT_TIMEOUT		30
 #define DEFAULT_LEASETIME	3600	/* 1 hour */
