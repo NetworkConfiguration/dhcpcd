@@ -257,14 +257,14 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	struct in_addr addr;
 
 	switch(opt) {
-	case 'b': /* FALLTHROUGH */
 	case 'd': /* FALLTHROUGH */
 	case 'k': /* FALLTHROUGH */
 	case 'n': /* FALLTHROUGH */
-	case 'q': /* FALLTHROUGH */
 	case 'x': /* FALLTHROUGH */
-	case 'B': /* FALLTHROUGH */
 	case 'T': /* We need to handle non interface options */
+		break;
+	case 'b':
+		ifo->options |= DHCPCD_BACKGROUND;
 		break;
 	case 'c':
 		strlcpy(ifo->script, arg, sizeof(ifo->script));
@@ -325,6 +325,9 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		break;
 	case 'p':
 		ifo->options |= DHCPCD_PERSISTENT;
+		break;
+	case 'q':
+		ifo->options |= DHCPCD_QUIET;
 		break;
 	case 's':
 		ifo->options |= DHCPCD_INFORM;
@@ -418,6 +421,9 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		ifo->options &= ~DHCPCD_ARP;
 		/* IPv4LL requires ARP */
 		ifo->options &= ~DHCPCD_IPV4LL;
+		break;
+	case 'B':
+		ifo->options &= ~DHCPCD_DAEMONISE;
 		break;
 	case 'C':
 		/* Commas to spaces for shell */

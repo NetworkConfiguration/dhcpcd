@@ -1002,9 +1002,6 @@ main(int argc, char **argv)
 	while ((opt = getopt_long(argc, argv, IF_OPTS, cf_options, &oi)) != -1)
 	{
 		switch (opt) {
-		case 'b':
-			options |= DHCPCD_BACKGROUND;
-			break;
 		case 'd':
 			setlogmask(LOG_UPTO(LOG_DEBUG));
 			break;
@@ -1017,15 +1014,8 @@ main(int argc, char **argv)
 		case 'n':
 			sig = SIGALRM;
 			break;
-		case 'q':
-			setlogmask(LOG_UPTO(LOG_WARNING));
-			options |= DHCPCD_QUIET;
-			break;
 		case 'x':
 			sig = SIGTERM;
-			break;
-		case 'B':
-			options &= ~DHCPCD_DAEMONISE;
 			break;
 		case 'T':
 			options |= DHCPCD_TEST | DHCPCD_PERSISTENT;
@@ -1047,6 +1037,13 @@ main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
+#ifdef THERE_IS_NO_FORK
+	options &= ~DHCPCD_DAEMONISE;
+#endif
+
+	if (ifo->options & DHCPCD_QUIET)
+		setlogmask(LOG_UPTO(LOG_WARNING));
+
 	/* If we have any other args, we should run as a single dhcpcd instance
 	 * for that interface. */
 	len = strlen(PIDFILE) + IF_NAMESIZE + 2;
@@ -1057,10 +1054,6 @@ main(int argc, char **argv)
 		snprintf(pidfile, len, PIDFILE, "", "");
 		options |= DHCPCD_MASTER;
 	}
-	
-#ifdef THERE_IS_NO_FORK
-	options &= ~DHCPCD_DAEMONISE;
-#endif
 
 	chdir("/");
 	umask(022);
