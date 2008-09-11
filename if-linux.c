@@ -398,6 +398,7 @@ discover_interfaces(int argc, char * const *argv)
 	FILE *f;
 	char *buffer = NULL, *p;
 	size_t len = 0, ln = 0, n;
+	int i;
 	struct interface *ifs = NULL, *ifp, *ifl;
 
 	if ((f = fopen("/proc/net/dev", "r"))) {
@@ -418,21 +419,21 @@ discover_interfaces(int argc, char * const *argv)
 			if (ifp)
 				continue;
 			if (argc > 0) {
-				for (n = 0; n < argc; n++)
-					if (strcmp(argv[n], p) == 0)
+				for (i = 0; i < argc; i++)
+					if (strcmp(argv[i], p) == 0)
 						break;
-				if (n == argc)
+				if (i == argc)
 					continue;
 			} else {
-				for (n = 0; n < ifdc; n++)
-					if (!fnmatch(ifdv[n], ifr->ifr_name, 0))
+				for (i = 0; i < ifdc; i++)
+					if (!fnmatch(ifdv[i], p, 0))
 						break;
-				if (n < ifdc)
+				if (i < ifdc)
 					continue;
-				for (n = 0; n < ifac; n++)
-					if (!fnmatch(ifav[n], ifr->ifr_name, 0))
+				for (i = 0; i < ifac; i++)
+					if (!fnmatch(ifav[i], p, 0))
 						break;
-				if (ifac && n == ifac)
+				if (ifac && i == ifac)
 					continue;
 			}
 			if ((ifp = init_interface(p))) {

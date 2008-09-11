@@ -259,7 +259,7 @@ splitv(int *argc, char **argv, const char *arg)
 	p = o;
 	while ((t = strsep(&p, ", "))) {
 		(*argc)++;
-		v = xrealloc(v, *argc);
+		v = xrealloc(v, sizeof(char *) * ((*argc)));
 		v[(*argc) - 1] = xstrdup(t);
 	}
 	free(o);
