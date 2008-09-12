@@ -94,7 +94,6 @@ struct interface
 
 	struct in_addr addr;
 	struct in_addr net;
-	struct rt *routes;
 
 	char leasefile[PATH_MAX];
 	time_t start_uptime;

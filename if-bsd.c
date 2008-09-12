@@ -116,7 +116,7 @@ if_route(const struct interface *iface, const struct in_addr *destination,
 	struct rtm 
 	{
 		struct rt_msghdr hdr;
-		char buffer[sizeof(su) * 3];
+		char buffer[sizeof(su) * 5];
 	} rtm;
 	char *bp = rtm.buffer;
 	size_t l;
@@ -140,6 +140,7 @@ if_route(const struct interface *iface, const struct in_addr *destination,
 
 	/* This order is important */
 	rtm.hdr.rtm_addrs = RTA_DST | RTA_GATEWAY | RTA_NETMASK;
+	rtm.hdr.rtm_addrs |= RTA_IFP | RTA_IFA;
 
 #define ADDADDR(_addr) \
 	memset (&su, 0, sizeof(su)); \
@@ -172,6 +173,20 @@ if_route(const struct interface *iface, const struct in_addr *destination,
 	}
 
 	ADDADDR(netmask);
+	/* Make us a link layer socket for IFP */
+	memset(&su, 0, sizeof(su));
+	su.sdl.sdl_len = sizeof(su.sdl);
+	su.sdl.sdl_family = AF_LINK;
+	su.sdl.sdl_nlen = strlen(iface->name);
+	memcpy(&su.sdl.sdl_data, iface->name, (size_t)su.sdl.sdl_nlen);
+	su.sdl.sdl_alen = iface->hwlen;
+	memcpy(((unsigned char *)&su.sdl.sdl_data) + su.sdl.sdl_nlen,
+	       iface->hwaddr, (size_t)su.sdl.sdl_alen);
+
+	l = SA_SIZE(&(su.sa));
+	memcpy(bp, &su, l);
+	bp += l;
+	ADDADDR(&iface->addr); /* IFA */
 #undef ADDADDR
 
 	rtm.hdr.rtm_msglen = l = bp - (char *)&rtm;

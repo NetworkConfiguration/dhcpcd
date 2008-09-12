@@ -79,18 +79,11 @@
 # define IN_LINKLOCAL(addr) ((addr & IN_CLASSB_NET) == LINKLOCAL_ADDR)
 #endif
 
-/* There is an argument that this should be converted to an STAIL using
- * queue(3). However, that isn't readily available on all libc's that
- * dhcpcd works on. The only benefit of STAILQ over this is the ability to
- * quickly loop backwards through the list - currently we reverse the list
- * and then move through it forwards. This isn't that much of a big deal
- * though as the norm is to just have one default route, and an IPV4LL route.
- * You can (and do) get more routes in the DHCP message, but not enough to
- * really warrant a change to STAIL queue for performance reasons. */
 struct rt {
 	struct in_addr dest;
 	struct in_addr net;
 	struct in_addr gate;
+	const struct interface *iface;
 	struct rt *next;
 };
 
