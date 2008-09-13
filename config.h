@@ -30,15 +30,6 @@
 #define PACKAGE			"dhcpcd"
 #define VERSION			"4.0.99"
 
-/*
- * By default we don't add a local link route if we got a routeable address.
- * This is because dhcpcd can't really decide which interface should allow
- * link local routing when we have more than one interface.
- * Ideally the host network scripts should add the link local route for us.
- * If not, you can define this to get dhcpcd to always add the link local route.
- */
-/* #define IPV4LL_ALWAYSROUTE */
-
 /* Some systems do not have a working fork. */
 /* #define THERE_IS_NO_FORK */
 
