@@ -365,7 +365,8 @@ if_route(const struct interface *iface,
 	else {
 		nlm->hdr.nlmsg_flags |= NLM_F_CREATE | NLM_F_EXCL;
 		/* We only change route metrics for kernel routes */
-		if (action == 0 && netmask->s_addr == iface->net.s_addr)
+		if (destination->s_addr == (iface->addr.s_addr & iface->net.s_addr) &&
+		    netmask->s_addr == iface->net.s_addr)
 			nlm->rt.rtm_protocol = RTPROT_KERNEL;
 		else
 			nlm->rt.rtm_protocol = RTPROT_BOOT;
