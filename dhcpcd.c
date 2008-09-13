@@ -617,6 +617,7 @@ handle_carrier(const char *ifname)
 			syslog(LOG_INFO, "%s: carrier lost", iface->name);
 			close_sockets(iface);
 			delete_timeouts(iface, start_expire, NULL);
+			drop_config(iface, "EXPIRE");	
 		}
 		break;
 	default:
