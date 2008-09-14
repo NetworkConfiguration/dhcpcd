@@ -116,9 +116,9 @@ if_route(const struct interface *iface, const struct in_addr *destination,
 	struct rtm 
 	{
 		struct rt_msghdr hdr;
-		char buffer[sizeof(su) * 5];
+		char buffer[sizeof(su) * 4];
 	} rtm;
-	char *bp = rtm.buffer;
+	char *bp = rtm.buffer, *p;
 	size_t l;
 	int retval = 0;
 
@@ -137,57 +137,48 @@ if_route(const struct interface *iface, const struct in_addr *destination,
 	rtm.hdr.rtm_flags = RTF_UP | RTF_STATIC;
 	if (netmask->s_addr == INADDR_BROADCAST)
 		rtm.hdr.rtm_flags |= RTF_HOST;
+	else
+		rtm.hdr.rtm_flags |= RTF_GATEWAY;
 
 	/* This order is important */
-	rtm.hdr.rtm_addrs = RTA_DST | RTA_GATEWAY | RTA_NETMASK;
-	rtm.hdr.rtm_addrs |= RTA_IFP | RTA_IFA;
+	rtm.hdr.rtm_addrs = RTA_DST | RTA_NETMASK | RTA_IFP;
+	if (gateway->s_addr != INADDR_ANY)
+		rtm.hdr.rtm_addrs |= RTA_GATEWAY;
 
+#define ADDSU(_su) \
+	l = SA_SIZE(&(_su.sa)); \
+	memcpy(bp, &(_su), l); \
+	bp += l;
 #define ADDADDR(_addr) \
 	memset (&su, 0, sizeof(su)); \
 	su.sin.sin_family = AF_INET; \
 	su.sin.sin_len = sizeof(su.sin); \
 	memcpy (&su.sin.sin_addr, _addr, sizeof(su.sin.sin_addr)); \
-	l = SA_SIZE (&(su.sa)); \
-	memcpy (bp, &(su), l); \
-	bp += l;
+	ADDSU(su);
 
 	ADDADDR(destination);
-
-	if (gateway->s_addr == INADDR_ANY) {
-		/* Make us a link layer socket */
-		memset(&su, 0, sizeof(su));
-		su.sdl.sdl_len = sizeof(su.sdl);
-		su.sdl.sdl_family = AF_LINK;
-		su.sdl.sdl_nlen = strlen(iface->name);
-		memcpy(&su.sdl.sdl_data, iface->name, (size_t)su.sdl.sdl_nlen);
-		su.sdl.sdl_alen = iface->hwlen;
-		memcpy(((unsigned char *)&su.sdl.sdl_data) + su.sdl.sdl_nlen,
-		       iface->hwaddr, (size_t)su.sdl.sdl_alen);
-
-		l = SA_SIZE(&(su.sa));
-		memcpy(bp, &su, l);
-		bp += l;
-	} else {
-		rtm.hdr.rtm_flags |= RTF_GATEWAY;
+	if (gateway->s_addr != INADDR_ANY)
 		ADDADDR(gateway);
-	}
 
-	ADDADDR(netmask);
+	/* Ensure that netmask is set correctly */
+	memset (&su, 0, sizeof(su));
+	su.sin.sin_family = AF_INET;
+	su.sin.sin_len = sizeof(su.sin);
+	memcpy (&su.sin.sin_addr, &netmask->s_addr, sizeof(su.sin.sin_addr));
+	p = su.sa.sa_len + (char *)&su;
+	for (su.sa.sa_len = 0; p > (char *)&su; )
+		if (*--p != 0) {
+			su.sa.sa_len = 1 + p - (char *)&su;
+			break;
+		}
+	ADDSU(su);
+
 	/* Make us a link layer socket for IFP */
 	memset(&su, 0, sizeof(su));
-	su.sdl.sdl_len = sizeof(su.sdl);
 	su.sdl.sdl_family = AF_LINK;
-	su.sdl.sdl_nlen = strlen(iface->name);
-	memcpy(&su.sdl.sdl_data, iface->name, (size_t)su.sdl.sdl_nlen);
-	su.sdl.sdl_alen = iface->hwlen;
-	memcpy(((unsigned char *)&su.sdl.sdl_data) + su.sdl.sdl_nlen,
-	       iface->hwaddr, (size_t)su.sdl.sdl_alen);
-
-	l = SA_SIZE(&(su.sa));
-	memcpy(bp, &su, l);
-	bp += l;
-	ADDADDR(&iface->addr); /* IFA */
-#undef ADDADDR
+	su.sdl.sdl_len = sizeof(su.sdl);
+	link_addr(iface->name, &su.sdl);
+	ADDSU(su);
 
 	rtm.hdr.rtm_msglen = l = bp - (char *)&rtm;
 	if (write(s, &rtm, l) == -1)
