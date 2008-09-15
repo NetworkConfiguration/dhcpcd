@@ -510,6 +510,8 @@ configure(struct interface *iface, const char *reason)
 	iface->addr.s_addr = addr.s_addr;
 	iface->net.s_addr = net.s_addr;
 	build_routes();
+	if (arp_flush() == -1)
+		syslog(LOG_ERR, "arp_flush: %m");
 	if (!iface->state->lease.frominfo)
 		if (write_lease(iface, dhcp) == -1)
 			syslog(LOG_ERR, "write_lease: %m");

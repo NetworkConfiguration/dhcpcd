@@ -25,11 +25,12 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/param.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/sysctl.h>
+#include <sys/types.h>
 
 #include <arpa/inet.h>
 #include <net/if_dl.h>
@@ -183,6 +184,44 @@ if_route(const struct interface *iface, const struct in_addr *dest,
 	rtm.hdr.rtm_msglen = l = bp - (char *)&rtm;
 	if (write(s, &rtm, l) == -1)
 		retval = -1;
+	close(s);
+	return retval;
+}
+
+int
+arp_flush(void)
+{
+	int s, mib[6], retval = 0;
+	size_t buffer_len = 0;
+	char *buffer, *e, *p;
+	struct rt_msghdr *rtm;
+
+	if ((s = socket(PF_ROUTE, SOCK_RAW, 0)) == -1)
+		return -1;
+	mib[0] = CTL_NET;
+	mib[1] = PF_ROUTE;
+	mib[2] = 0;
+	mib[3] = AF_INET;
+	mib[4] = NET_RT_FLAGS;
+	mib[5] = RTF_LLINFO;
+	printf ("sizeof %d\n", sizeof(mib));
+	if (sysctl(mib, 6, NULL, &buffer_len, NULL, 0) == -1)
+		return -1;
+	if (buffer_len == 0)
+		return 0;
+	buffer = xmalloc(buffer_len);
+	if (sysctl(mib, 6, buffer, &buffer_len, NULL, 0) == -1)
+		return -1;
+	e = buffer + buffer_len;
+	for (p = buffer; p < e; p += rtm->rtm_msglen) {
+		rtm = (struct rt_msghdr *)(void *)p;
+		rtm->rtm_type = RTM_DELETE;
+		if (write(s, rtm, rtm->rtm_msglen) == -1) {
+			retval = -1;
+			break;
+		}
+	}
+	free(buffer);
 	close(s);
 	return retval;
 }
