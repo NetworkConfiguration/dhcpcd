@@ -204,7 +204,6 @@ arp_flush(void)
 	mib[3] = AF_INET;
 	mib[4] = NET_RT_FLAGS;
 	mib[5] = RTF_LLINFO;
-	printf ("sizeof %d\n", sizeof(mib));
 	if (sysctl(mib, 6, NULL, &buffer_len, NULL, 0) == -1)
 		return -1;
 	if (buffer_len == 0)
