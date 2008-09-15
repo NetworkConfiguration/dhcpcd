@@ -37,7 +37,7 @@
 
 /* Don't set any optional arguments here so we retain POSIX
  * compatibility with getopt */
-#define IF_OPTS "bc:df:h:i:kl:m:no:pqr:s:t:u:v:xz:ABC:DEF:GI:KLO:Q:TVX:Z:"
+#define IF_OPTS "bc:df:h:i:kl:m:no:pqr:s:t:u:v:xy:z:ABC:DEF:GI:KLO:Q:TVX:Z:"
 
 #define DEFAULT_TIMEOUT		30
 #define DEFAULT_REBOOT		10

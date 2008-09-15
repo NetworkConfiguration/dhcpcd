@@ -46,10 +46,6 @@
 #include "if-options.h"
 #include "net.h"
 
-/* Don't set any optional arguments here so we retain POSIX
- * compatibility with getopt */
-#define OPTS "bc:df:h:i:kl:m:no:pqr:s:t:u:v:xy:z:ABC:DEF:GI:KLO:Q:TVX:Z:"
-
 const struct option cf_options[] = {
 	{"background",      no_argument,       NULL, 'b'},
 	{"script",          required_argument, NULL, 'c'},
