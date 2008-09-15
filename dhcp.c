@@ -1254,7 +1254,6 @@ get_lease(struct dhcp_lease *lease, const struct dhcp_message *dhcp)
 {
 	time_t t;
 
-	lease->frominfo = 0;
 	lease->addr.s_addr = dhcp->yiaddr;
 	if (get_option_addr(&lease->net.s_addr, dhcp, DHO_SUBNETMASK) == -1)
 		lease->net.s_addr = get_netmask(dhcp->yiaddr);

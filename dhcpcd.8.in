@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd September 11, 2008
+.Dd September 15, 2008
 .Dt DHCPCD 8 SMM
 .Sh NAME
 .Nm dhcpcd
@@ -42,6 +42,7 @@
 .Op Fl t , -timeout Ar seconds
 .Op Fl u , -userclass Ar class
 .Op Fl v , -vendor Ar code , Ar value
+.Op Fl y , -reboot Ar seconds
 .Op Fl z , -allowinterfaces Ar pattern
 .Op Fl C , -nohook Ar hook
 .Op Fl F , -fqdn Ar FQDN
@@ -304,6 +305,14 @@ to deconfigure the
 and exit.
 .Nm
 then waits until this process has exited.
+.It Fl y , -reboot Ar seconds
+Allow
+.Ar reboot
+seconds before moving to the discover phase if we have an old lease to use.
+The default is 10 seconds.
+A setting if 0 seconds causes
+.Nm
+to skip the reboot phase and go straight into discover.
 .It Fl D , -duid 
 Generate an
 .Li RFC 4361

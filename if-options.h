@@ -40,6 +40,7 @@
 #define IF_OPTS "bc:df:h:i:kl:m:no:pqr:s:t:u:v:xz:ABC:DEF:GI:KLO:Q:TVX:Z:"
 
 #define DEFAULT_TIMEOUT		30
+#define DEFAULT_REBOOT		10
 #define DEFAULT_LEASETIME	3600	/* 1 hour */
 
 #define HOSTNAME_MAX_LEN	250	/* 255 - 3 (FQDN) - 2 (DNS enc) */
@@ -76,6 +77,7 @@ struct if_options {
 	uint8_t nomask[256 / 8];
 	uint32_t leasetime;
 	time_t timeout;
+	time_t reboot;
 	int options;
 
 	struct in_addr request_address;

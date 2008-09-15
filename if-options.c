@@ -48,7 +48,7 @@
 
 /* Don't set any optional arguments here so we retain POSIX
  * compatibility with getopt */
-#define OPTS "bc:df:h:i:kl:m:no:pqr:s:t:u:v:xABC:DEF:GI:KLO:Q:TVX:"
+#define OPTS "bc:df:h:i:kl:m:no:pqr:s:t:u:v:xy:z:ABC:DEF:GI:KLO:Q:TVX:Z:"
 
 const struct option cf_options[] = {
 	{"background",      no_argument,       NULL, 'b'},
@@ -70,6 +70,7 @@ const struct option cf_options[] = {
 	{"userclass",       required_argument, NULL, 'u'},
 	{"vendor",          required_argument, NULL, 'v'},
 	{"exit",            no_argument,       NULL, 'x'},
+	{"reboot",          required_argument, NULL, 'y'},
 	{"allowinterfaces", required_argument, NULL, 'z'},
 	{"noarp",           no_argument,       NULL, 'A'},
 	{"nobackground",    no_argument,       NULL, 'B'},
@@ -382,7 +383,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	case 't':
 		ifo->timeout = atoint(arg);
 		if (ifo->timeout < 0) {
-			syslog (LOG_ERR, "timeout must be a positive value");
+			syslog(LOG_ERR, "timeout must be a positive value");
 			return -1;
 		}
 		break;
@@ -433,6 +434,13 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			ifo->vendor[ifo->vendor[0] + 1] = i;
 			ifo->vendor[ifo->vendor[0] + 2] = s;
 			ifo->vendor[0] += s + 2;
+		}
+		break;
+	case 'y':
+		ifo->reboot = atoint(arg);
+		if (ifo->reboot < 0) {
+			syslog(LOG_ERR, "reboot must be a positive value");
+			return -1;
 		}
 		break;
 	case 'z':
@@ -587,6 +595,7 @@ read_config(const char *file, const char *ifname)
 	ifo->options |= DHCPCD_CLIENTID | DHCPCD_GATEWAY | DHCPCD_DAEMONISE;
 	ifo->options |= DHCPCD_ARP | DHCPCD_IPV4LL | DHCPCD_LINK;
 	ifo->timeout = DEFAULT_TIMEOUT;
+	ifo->reboot = DEFAULT_REBOOT;
 	ifo->metric = -1;
 	gethostname(ifo->hostname + 1, sizeof(ifo->hostname));
 	if (strcmp(ifo->hostname + 1, "(none)") == 0 ||

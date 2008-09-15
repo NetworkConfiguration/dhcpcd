@@ -127,7 +127,7 @@ read_pid(void)
 static void
 usage(void)
 {
-	printf("usage: "PACKAGE" [-dknpqxADEGHKLOTV] [-c script] [-f file ] [-h hostname]\n"
+	printf("usage: "PACKAGE" [-dknpqxyADEGHKLOTV] [-c script] [-f file ] [-h hostname]\n"
 	       "              [-i classID ] [-l leasetime] [-m metric] [-o option] [-r ipaddr]\n"
 	       "              [-s ipaddr] [-t timeout] [-u userclass] [-F none|ptr|both]\n"
 	       "              [-I clientID] [-C hookscript] [-Q option] [-X ipaddr] <interface>\n");
@@ -326,7 +326,7 @@ start_rebind(void *arg)
 
 	syslog(LOG_ERR, "%s: failed to renew, attmepting to rebind",
 	       iface->name);
-	iface->state->state = DHS_REBINDING;
+	iface->state->state = DHS_REBIND;
 	delete_timeout(send_renew, iface);
 	iface->state->lease.server.s_addr = 0;
 	send_rebind(iface);
@@ -336,14 +336,20 @@ void
 start_expire(void *arg)
 {
 	struct interface *iface = arg;
-	int ll = IN_LINKLOCAL(htonl(iface->state->lease.addr.s_addr));
+
+	if (iface->addr.s_addr == 0) {
+		/* We failed to reboot, so enter discovery. */
+		iface->state->interval = 0;
+		start_discover(iface);
+		return;
+	}
 
 	syslog(LOG_ERR, "%s: lease expired", iface->name);
 	delete_timeout(NULL, iface);
 	drop_config(iface, "EXPIRE");
 	iface->state->interval = 0;
 	if (iface->carrier != LINK_DOWN) {
-		if (ll)
+		if (IN_LINKLOCAL(htonl(iface->state->lease.addr.s_addr)))
 			start_interface(iface);
 		else
 			start_ipv4ll(iface);
@@ -454,7 +460,8 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 		}
 	}
 
-	if (type == DHCP_OFFER && state->state == DHS_DISCOVERING) {
+	if (type == DHCP_OFFER && state->state == DHS_DISCOVER) {
+		lease->frominfo = 0;
 		lease->addr.s_addr = dhcp->yiaddr;
 		get_option_addr(&lease->server.s_addr, dhcp, DHO_SERVERID);
 		log_dhcp(LOG_INFO, "offered", iface, dhcp);
@@ -477,7 +484,6 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 			 * then we can't ARP for duplicate detection. */
 			addr.s_addr = state->offer->yiaddr;
 			if (!has_address(iface->name, &addr, NULL)) {
-				state->state = DHS_PROBING;
 				state->claims = 0;
 				state->probes = 0;
 				state->conflicts = 0;
@@ -485,7 +491,7 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 				return;
 			}
 		}
-		state->state = DHS_REQUESTING;
+		state->state = DHS_REQUEST;
 		send_request(iface);
 		return;
 	}
@@ -509,6 +515,7 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 	*dhcpp = NULL;
 	/* Delete all timeouts for this interface. */
 	delete_timeout(NULL, iface);
+	lease->frominfo = 0;
 	bind_interface(iface);
 }
 
@@ -636,7 +643,7 @@ start_discover(void *arg)
 	struct interface *iface = arg;
 	struct if_options *ifo = iface->state->options;
 
-	iface->state->state = DHS_DISCOVERING;
+	iface->state->state = DHS_DISCOVER;
 	iface->state->xid = arc4random();
 	open_sockets(iface);
 	delete_timeout(NULL, iface);
@@ -660,10 +667,20 @@ start_renew(void *arg)
 
 	syslog(LOG_INFO, "%s: renewing lease of %s",
 	       iface->name, inet_ntoa(iface->state->lease.addr));
-	iface->state->state = DHS_RENEWING;
+	iface->state->state = DHS_RENEW;
 	iface->state->xid = arc4random();
 	open_sockets(iface);
 	send_renew(iface);
+}
+
+static void
+start_timeout(void *arg)
+{
+	struct interface *iface = arg;
+
+	bind_interface(iface);
+	iface->state->interval = 0;
+	start_discover(iface);
 }
 
 void
@@ -675,15 +692,33 @@ start_reboot(struct interface *iface)
 		syslog(LOG_INFO, "%s: waiting for carrier", iface->name);
 		return;
 	}
+	if (ifo->reboot == 0) {
+		start_discover(iface);
+		return;
+	}
+	if (IN_LINKLOCAL(htonl(iface->state->lease.addr.s_addr))) {
+		if (ifo->options & DHCPCD_IPV4LL) {
+			iface->state->claims = 0;
+			send_arp_announce(iface);
+		} else
+			start_discover(iface);
+		return;
+	}
 	syslog(LOG_INFO, "%s: rebinding lease of %s",
 	       iface->name, inet_ntoa(iface->state->lease.addr));
-	iface->state->state = DHS_REBINDING;
+	iface->state->state = DHS_REBOOT;
 	iface->state->xid = arc4random();
 	iface->state->lease.server.s_addr = 0;
 	delete_timeout(NULL, iface);
-	add_timeout_sec(ifo->timeout, start_expire, iface);
+	if (ifo->options & DHCPCD_LASTLEASE && iface->state->lease.frominfo)
+		add_timeout_sec(ifo->reboot, start_timeout, iface);
+	else
+		add_timeout_sec(ifo->reboot, start_expire, iface);
 	open_sockets(iface);
-	send_rebind(iface);
+	if (ifo->options & DHCPCD_ARP)
+		send_arp_probe(iface);
+	else
+		send_request(iface);
 }
 
 static void
@@ -703,6 +738,9 @@ void
 start_interface(void *arg)
 {
 	struct interface *iface = arg;
+	struct stat st;
+	struct timeval now;
+	uint32_t l;
 
 	if (iface->carrier == LINK_DOWN) {
 		syslog(LOG_INFO, "%s: waiting for carrier", iface->name);
@@ -710,9 +748,36 @@ start_interface(void *arg)
 	}
 
 	iface->start_uptime = uptime();
-	if (!iface->state->lease.addr.s_addr)
+	iface->state->offer = read_lease(iface);
+/*	if (iface->state->offer) {
+		if (IN_LINKLOCAL(htonl(iface->state->offer->yiaddr))) {
+			free(iface->state->offer);
+			iface->state->offer = NULL;
+		}
+	} */
+	if (iface->state->offer) {
+		get_lease(&iface->state->lease, iface->state->offer);
+		iface->state->lease.frominfo = 1;
+		/* Offset lease times and check expiry */
+		if (stat(iface->leasefile, &st) == 0 &&
+		    get_option_uint32(&l, iface->state->offer, DHO_LEASETIME) == 0)
+		{
+			gettimeofday(&now, NULL);
+			if ((time_t)l < now.tv_sec - st.st_mtime) {
+				free(iface->state->offer);
+				iface->state->offer = NULL;
+			} else {
+				l = now.tv_sec - st.st_mtime;
+				iface->state->lease.leasetime -= l;
+				iface->state->lease.renewaltime -= l;
+				iface->state->lease.rebindtime -= l;
+			}
+		}
+	}
+	if (!iface->state->offer)
 		start_discover(iface);
-	else if (IN_LINKLOCAL(htonl(iface->state->lease.addr.s_addr)))
+	else if (IN_LINKLOCAL(htonl(iface->state->lease.addr.s_addr)) &&
+		 iface->state->options->options & DHCPCD_IPV4LL)
 		start_ipv4ll(iface);
 	else
 		start_reboot(iface);
@@ -861,7 +926,7 @@ handle_signal(_unused void *arg)
 {
 	struct interface *iface, *ifl;
 	int sig = signal_read();
-	int do_reboot = 0, do_release = 0;
+	int do_release = 0;
 
 	switch (sig) {
 	case SIGINT:
@@ -872,15 +937,17 @@ handle_signal(_unused void *arg)
 		break;
 	case SIGALRM:
 		syslog(LOG_INFO, "received SIGALRM, rebinding lease");
-		do_reboot = 1;
+		for (iface = ifaces; iface; iface = iface->next)
+			start_reboot(iface);
+		return;
 	case SIGHUP:
 		syslog(LOG_INFO, "received SIGHUP, releasing lease");
 		do_release = 1;
 		break;
 	default:
-		syslog (LOG_ERR,
-			"received signal %d, but don't know what to do with it",
-			sig);
+		syslog(LOG_ERR,
+		       "received signal %d, but don't know what to do with it",
+		       sig);
 		return;
 	}
 
@@ -893,14 +960,10 @@ handle_signal(_unused void *arg)
 				ifl = iface;
 		if (!ifl)
 			break;
-		if (do_reboot)
-			start_reboot(ifl);
-		else {
-			if (do_release)
-				send_release(ifl);
-			if (!(ifl->state->options->options & DHCPCD_PERSISTENT))
-				drop_config(ifl, do_release ? "RELEASE" : "STOP");
-		}
+		if (do_release)
+			send_release(ifl);
+		if (!(ifl->state->options->options & DHCPCD_PERSISTENT))
+			drop_config(ifl, do_release ? "RELEASE" : "STOP");
 	}
 	exit(EXIT_FAILURE);
 }
@@ -1102,6 +1165,8 @@ main(int argc, char **argv)
 			unlink(pidfile);
 			exit(EXIT_FAILURE);
 		}
+		if (sig == SIGALRM)
+			exit(EXIT_SUCCESS);
 		/* Spin until it exits */
 		syslog(LOG_INFO, "waiting for pid %d to exit", pid);
 		ts.tv_sec = 0;
