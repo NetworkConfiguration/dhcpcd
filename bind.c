@@ -108,7 +108,6 @@ bind_interface(void *arg)
 	delete_timeout(handle_exit_timeout, NULL);
 	if (clock_monotonic)
 		get_monotonic(&lease->boundtime);
-	state->state = DHS_BOUND;
 	state->xid = 0;
 	free(state->old);
 	state->old = state->new;
@@ -169,7 +168,9 @@ bind_interface(void *arg)
 				reason = "RENEW";
 			else
 				reason = "REBIND";
-		} else
+		} else if (state->state == DHS_REBOOT)
+			reason = "REBOOT";
+		else
 			reason = "BOUND";
 	}
 	if (options & DHCPCD_TEST) {
@@ -185,6 +186,7 @@ bind_interface(void *arg)
 	}
 	configure(iface, reason);
 	daemonise();
+	state->state = DHS_BOUND;
 	if (ifo->options & DHCPCD_ARP) {
 		state->claims = 0;
 		send_arp_announce(iface);
