@@ -1016,9 +1016,7 @@ handle_args(int argc, char **argv)
 		return 0;
 	}
 
-	if ((ifs = discover_interfaces(argc, argv))) {
-		argc += optind;
-		argv -= optind;
+	if ((ifs = discover_interfaces(argc - optind, argv + optind))) {
 		for (ifp = ifs; ifp; ifp = ifp->next) {
 			ifl = NULL;
 			for (ifn = ifaces; ifn; ifn = ifn->next) {
