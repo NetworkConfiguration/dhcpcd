@@ -98,8 +98,8 @@ if_address(const struct interface *iface, const struct in_addr *address,
 }
 
 int
-if_route(const struct interface *iface, const struct in_addr *destination,
-	 const struct in_addr *netmask, const struct in_addr *gateway,
+if_route(const struct interface *iface, const struct in_addr *dest,
+	 const struct in_addr *net, const struct in_addr *gate,
 	 _unused int metric, int action)
 {
 	int s;
@@ -122,6 +122,17 @@ if_route(const struct interface *iface, const struct in_addr *destination,
 	size_t l;
 	int retval = 0;
 
+#define ADDSU(_su) \
+	l = SA_SIZE(&(_su.sa)); \
+	memcpy(bp, &(_su), l); \
+	bp += l;
+#define ADDADDR(_addr) \
+	memset (&su, 0, sizeof(su)); \
+	su.sin.sin_family = AF_INET; \
+	su.sin.sin_len = sizeof(su.sin); \
+	memcpy (&su.sin.sin_addr, _addr, sizeof(su.sin.sin_addr)); \
+	ADDSU(su);
+
 	if ((s = socket(PF_ROUTE, SOCK_RAW, 0)) == -1)
 		return -1;
 
@@ -134,37 +145,26 @@ if_route(const struct interface *iface, const struct in_addr *destination,
 		rtm.hdr.rtm_type = RTM_ADD;
 	else
 		rtm.hdr.rtm_type = RTM_DELETE;
-	rtm.hdr.rtm_flags = RTF_UP | RTF_STATIC;
-	if (netmask->s_addr == INADDR_BROADCAST)
+	rtm.hdr.rtm_flags = RTF_UP;
+	/* None interface subnet routes are static. */
+	if (gate->s_addr != INADDR_ANY ||
+	    net->s_addr != iface->net.s_addr ||
+	    dest->s_addr != (iface->addr.s_addr & iface->net.s_addr))
+		rtm.hdr.rtm_flags |= RTF_STATIC;
+	if (net->s_addr == INADDR_BROADCAST)
 		rtm.hdr.rtm_flags |= RTF_HOST;
-	else
+	if (gate->s_addr != INADDR_ANY)	
 		rtm.hdr.rtm_flags |= RTF_GATEWAY;
+	rtm.hdr.rtm_addrs = RTA_DST | RTA_GATEWAY | RTA_NETMASK | RTA_IFP;
 
-	/* This order is important */
-	rtm.hdr.rtm_addrs = RTA_DST | RTA_NETMASK | RTA_IFP;
-	if (gateway->s_addr != INADDR_ANY)
-		rtm.hdr.rtm_addrs |= RTA_GATEWAY;
-
-#define ADDSU(_su) \
-	l = SA_SIZE(&(_su.sa)); \
-	memcpy(bp, &(_su), l); \
-	bp += l;
-#define ADDADDR(_addr) \
-	memset (&su, 0, sizeof(su)); \
-	su.sin.sin_family = AF_INET; \
-	su.sin.sin_len = sizeof(su.sin); \
-	memcpy (&su.sin.sin_addr, _addr, sizeof(su.sin.sin_addr)); \
-	ADDSU(su);
-
-	ADDADDR(destination);
-	if (gateway->s_addr != INADDR_ANY)
-		ADDADDR(gateway);
+	ADDADDR(dest);
+	ADDADDR(gate);
 
 	/* Ensure that netmask is set correctly */
 	memset (&su, 0, sizeof(su));
 	su.sin.sin_family = AF_INET;
 	su.sin.sin_len = sizeof(su.sin);
-	memcpy (&su.sin.sin_addr, &netmask->s_addr, sizeof(su.sin.sin_addr));
+	memcpy (&su.sin.sin_addr, &net->s_addr, sizeof(su.sin.sin_addr));
 	p = su.sa.sa_len + (char *)&su;
 	for (su.sa.sa_len = 0; p > (char *)&su; )
 		if (*--p != 0) {
