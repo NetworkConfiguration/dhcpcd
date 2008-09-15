@@ -49,6 +49,7 @@
 
 #define DEFAULT_PATH	"PATH=/usr/bin:/usr/sbin:/bin:/sbin"
 
+/* Some systems have route metrics */
 #ifndef HAVE_ROUTE_METRIC
 # ifdef __linux__
 #  define HAVE_ROUTE_METRIC 1
@@ -228,14 +229,26 @@ n_route(struct rt *rt, const struct interface *iface)
 		return -1;
 
 	addr = xstrdup(inet_ntoa(rt->dest));
-	syslog(LOG_DEBUG, "%s: adding route to %s/%d via %s",
+	if (rt->gate.s_addr == INADDR_ANY)
+		syslog(LOG_DEBUG, "%s: adding route to %s/%d",
+			iface->name, addr, inet_ntocidr(rt->net));
+	else
+		syslog(LOG_DEBUG, "%s: adding route to %s/%d via %s",
 			iface->name, addr,
 			inet_ntocidr(rt->net), inet_ntoa(rt->gate));
 	free(addr);
 	if (!add_route(iface, &rt->dest, &rt->net, &rt->gate, iface->metric))
 		return 0;
-	if (errno != EEXIST)
-		syslog(LOG_ERR, "add_route: %m");
+	if (errno == EEXIST) {
+		/* Pretend we added the subnet route */
+		if (rt->dest.s_addr == (iface->addr.s_addr & iface->net.s_addr) &&
+		    rt->net.s_addr == iface->net.s_addr &&
+		    rt->gate.s_addr == 0)
+			return 0;
+		else
+			return -1;
+	}
+	syslog(LOG_ERR, "add_route: %m");
 	return -1;
 }
 
@@ -255,10 +268,16 @@ c_route(struct rt *ort, struct rt *nrt, const struct interface *iface)
 			iface->name, addr,
 			inet_ntocidr(nrt->net), inet_ntoa(nrt->gate));
 	free(addr);
+#if HAVE_ROUTE_METRIC
 	del_route(ort->iface, &ort->dest, &ort->net, &ort->gate, ort->iface->metric);
 	if (!add_route(iface, &nrt->dest, &nrt->net, &nrt->gate, iface->metric))
 		return 0;
 	syslog(LOG_ERR, "add_route: %m");
+#else
+	if (!change_route(iface, &ort->dest, &ort->net, &nrt->gate, iface->metric))
+		return 0;
+	syslog(LOG_ERR, "change_route: %m");
+#endif
 	return -1;
 }
 
@@ -270,13 +289,30 @@ d_route(struct rt *rt, const struct interface *iface, int metric)
 	int retval;
 
 	addr = xstrdup(inet_ntoa(rt->dest));
-	syslog(LOG_DEBUG, "%s: deleting route %s/%d via %s", iface->name,
-	       addr, inet_ntocidr(rt->net), inet_ntoa(rt->gate));
+	if (rt->gate.s_addr == INADDR_ANY)
+		syslog(LOG_DEBUG, "%s: deleting route %s/%d", iface->name,
+		       addr, inet_ntocidr(rt->net));
+	else
+		syslog(LOG_DEBUG, "%s: deleting route %s/%d via %s",
+		       iface->name, addr,
+		       inet_ntocidr(rt->net), inet_ntoa(rt->gate));
 	free(addr);
 	retval = del_route(iface, &rt->dest, &rt->net, &rt->gate, metric);
 	if (retval != 0 && errno != ENOENT && errno != ESRCH)
 		syslog(LOG_ERR," del_route: %m");
 	return retval;
+}
+
+static struct rt *
+add_subnet_route(struct rt *rt, const struct interface *iface)
+{
+	struct rt *r = xmalloc(sizeof(*r));
+
+	r->dest.s_addr = iface->addr.s_addr & iface->net.s_addr;
+	r->net.s_addr = iface->net.s_addr;
+	r->gate.s_addr = 0;
+	r->next = rt;
+	return r;
 }
 
 static void
@@ -292,6 +328,7 @@ remove_routes(const struct interface *iface)
 		dnr = get_option_routes(iface->state->new);
 
 	dor = get_option_routes(iface->state->old);
+	dor = add_subnet_route(dor, iface);
 	for (rt = dor; rt && (rtn = rt->next, 1); rt = rtn) {
 		rt->iface = iface;
 		/* Do we still have the route? */
@@ -311,6 +348,7 @@ remove_routes(const struct interface *iface)
 				if (ifp == iface || !ifp->state->new)
 					continue;
 				irts = get_option_routes(ifp->state->new);
+				irts = add_subnet_route(irts, ifp);
 				if ((irt = find_route(irts, rt, &lirt, NULL)))
 					break;
 				free_routes(irts);
@@ -345,6 +383,7 @@ build_routes(void)
 		if (!ifp->state->new)
 			continue;
 		dnr = get_option_routes(ifp->state->new);
+		dnr = add_subnet_route(dnr, ifp);
 		for (rt = dnr; rt && (rtn = rt->next, 1); rt = rtn) {
 			rt->iface = ifp;
 			/* Is this route already in our table? */
@@ -408,10 +447,7 @@ configure(struct interface *iface, const char *reason)
 	struct in_addr addr;
 	struct in_addr net;
 	struct in_addr brd;
-#if HAVE_ROUTE_METRIC
-	struct in_addr dest;
-	struct in_addr gate;
-#endif
+	struct rt rt;
 
 	/* As we are now adjusting an interface, we need to ensure
 	 * we have them in the right order for routing and configuration. */
@@ -427,10 +463,9 @@ configure(struct interface *iface, const char *reason)
 			net.s_addr = get_netmask(addr.s_addr);
 		if (get_option_addr(&brd.s_addr, dhcp, DHO_BROADCAST) == -1)
 			brd.s_addr = addr.s_addr | ~net.s_addr;
-#if HAVE_ROUTE_METRIC
-		dest.s_addr = addr.s_addr & net.s_addr;
-		gate.s_addr = 0;
-#endif
+		rt.dest.s_addr = addr.s_addr & net.s_addr;
+		rt.net.s_addr = net.s_addr;
+		rt.gate.s_addr = 0;
 	} else {
 		/* Only reset things if we had set them before */
 		if (iface->addr.s_addr != 0) {
@@ -460,17 +495,16 @@ configure(struct interface *iface, const char *reason)
 	    iface->addr.s_addr != 0)
 		delete_address(iface);
 
+	/* We need to delete the subnet route to have our metric or
+	 * prefer the interface. */
 #if HAVE_ROUTE_METRIC
-	/* We need to change the subnet route to have our metric. */
 	if (iface->metric > 0 && 
-	    (net.s_addr != iface->net.s_addr ||
-	     dest.s_addr != (iface->addr.s_addr & iface->net.s_addr)))
-	{
-		iface->addr.s_addr = addr.s_addr;
-		iface->net.s_addr = net.s_addr;
-		change_route(iface, &dest, &net, &gate, iface->metric);
-		del_route(iface, &dest, &net, &gate, 0);
-	}
+	    (rt.net.s_addr != iface->net.s_addr ||
+	     rt.dest.s_addr != (iface->addr.s_addr & iface->net.s_addr)))
+		del_route(iface, &rt.dest, &rt.net, &rt.gate, 0);
+#else
+	if (!find_route(routes, &rt, NULL, NULL))
+		del_route(iface, &rt.dest, &rt.net, &rt.gate, 0);
 #endif
 
 	iface->addr.s_addr = addr.s_addr;
