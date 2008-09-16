@@ -96,6 +96,8 @@ static const struct dhcp_op const dhcp_ops[] = {
 	{ 0, NULL }
 };
 
+static void send_release(struct interface *);
+
 static const char *
 get_dhcp_op(uint8_t type)
 {
@@ -207,13 +209,18 @@ close_sockets(struct interface *iface)
 	}
 }
 
+
 static void
 stop_interface(struct interface *iface, const char *reason)
 {
 	struct interface *ifp, *ifl = NULL;
 
 	syslog(LOG_INFO, "%s: removing interface", iface->name);
+	if (iface->state->options->options & DHCPCD_RELEASE)
+		send_release(iface);
 	drop_config(iface, reason ? reason : "STOP");
+	if (iface->state->options->options & DHCPCD_RELEASE)
+		unlink(iface->leasefile);
 	close_sockets(iface);
 	delete_timeout(NULL, iface);
 	for (ifp = ifaces; ifp; ifp = ifp->next) {
@@ -347,6 +354,7 @@ start_expire(void *arg)
 	syslog(LOG_ERR, "%s: lease expired", iface->name);
 	delete_timeout(NULL, iface);
 	drop_config(iface, "EXPIRE");
+	unlink(iface->leasefile);
 	iface->state->interval = 0;
 	if (iface->carrier != LINK_DOWN) {
 		if (IN_LINKLOCAL(htonl(iface->state->lease.addr.s_addr)))
@@ -434,6 +442,7 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 	if (type == DHCP_NAK) {
 		log_dhcp(LOG_WARNING, "NAK:", iface, dhcp);
 		drop_config(iface, "EXPIRE");
+		unlink(iface->leasefile);
 		delete_event(iface->raw_fd);
 		close(iface->raw_fd);
 		iface->raw_fd = -1;
@@ -605,6 +614,19 @@ open_sockets(struct interface *iface)
 }
 
 static void
+send_release(struct interface *iface)
+{
+	if (iface->state->lease.addr.s_addr &&
+	    !IN_LINKLOCAL(htonl(iface->state->lease.addr.s_addr)))
+	{
+		syslog(LOG_INFO, "%s: releasing lease of %s",
+		       iface->name, inet_ntoa(iface->state->lease.addr));
+		open_sockets(iface);
+		send_message(iface, DHCP_RELEASE, NULL);
+	}
+}
+
+static void
 handle_carrier(const char *ifname)
 {
 	struct interface *iface;
@@ -719,19 +741,6 @@ start_reboot(struct interface *iface)
 		send_arp_probe(iface);
 	else
 		send_request(iface);
-}
-
-static void
-send_release(struct interface *iface)
-{
-	if (iface->state->lease.addr.s_addr &&
-	    !IN_LINKLOCAL(htonl(iface->state->lease.addr.s_addr)))
-	{
-		syslog(LOG_INFO, "%s: releasing lease of %s",
-		       iface->name, inet_ntoa(iface->state->lease.addr));
-		open_sockets(iface);
-		send_message(iface, DHCP_RELEASE, NULL);
-	}
 }
 
 void
@@ -960,10 +969,12 @@ handle_signal(_unused void *arg)
 				ifl = iface;
 		if (!ifl)
 			break;
-		if (do_release)
+		if (do_release || ifl->state->options->options & DHCPCD_RELEASE)
 			send_release(ifl);
 		if (!(ifl->state->options->options & DHCPCD_PERSISTENT))
 			drop_config(ifl, do_release ? "RELEASE" : "STOP");
+		if (do_release || ifl->state->options->options & DHCPCD_RELEASE)
+			unlink(ifl->leasefile);
 	}
 	exit(EXIT_FAILURE);
 }
@@ -1004,7 +1015,7 @@ handle_args(int argc, char **argv)
 			if (!ifp)
 				continue;
 			if (do_release)
-				send_release(ifp);
+				ifp->state->options->options |= DHCPCD_RELEASE;
 			if (do_exit || do_release) {
 				stop_interface(ifp, do_release ? "RELEASE" : "STOP");
 			} else if (do_reboot) {

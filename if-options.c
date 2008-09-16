@@ -273,7 +273,6 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 
 	switch(opt) {
 	case 'd': /* FALLTHROUGH */
-	case 'k': /* FALLTHROUGH */
 	case 'n': /* FALLTHROUGH */
 	case 'x': /* FALLTHROUGH */
 	case 'T': /* We need to handle non interface options */
@@ -311,6 +310,9 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			return -1;
 		}
 		*ifo->vendorclassid = (uint8_t)s;
+		break;
+	case 'k':
+		ifo->options |= DHCPCD_RELEASE;
 		break;
 	case 'l':
 		if (*arg == '-') {

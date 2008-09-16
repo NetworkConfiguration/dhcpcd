@@ -50,6 +50,7 @@
 #define VENDOR_MAX_LEN		255
 
 #define DHCPCD_ARP		(1 << 0)
+#define DHCPCD_RELEASE		(1 << 1)
 #define DHCPCD_DOMAIN		(1 << 2)
 #define DHCPCD_GATEWAY		(1 << 3)
 #define DHCPCD_LASTLEASE	(1 << 7)
