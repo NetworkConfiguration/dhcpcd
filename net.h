@@ -113,9 +113,9 @@ int if_address(const struct interface *,
 #define del_address(iface, addr, net) \
 	if_address(iface, addr, net, NULL, -1)
 #define has_address(iface, addr, net) \
-	do_interface(iface, NULL, 0, NULL, addr, net, 0)
+	do_interface(iface, NULL, NULL, 0, NULL, addr, net, 0)
 #define get_address(iface, addr, net) \
-	do_interface(iface, NULL, 0, NULL, addr, net, 1)
+	do_interface(iface, NULL, NULL, 0, NULL, addr, net, 1)
 
 int if_route(const struct interface *, const struct in_addr *,
 	     const struct in_addr *, const struct in_addr *, int, int);
