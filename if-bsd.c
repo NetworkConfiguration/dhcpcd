@@ -39,15 +39,18 @@
 #include <netinet/in.h>
 
 #include <errno.h>
+#include <fnmatch.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #include "config.h"
 #include "common.h"
 #include "dhcp.h"
+#include "if-options.h"
 #include "net.h"
 
 /* Darwin doesn't define this for some very odd reason */
@@ -289,11 +292,68 @@ manage_link(int fd,
 	}
 }
 
+static void
+discover_link(struct interface **ifs, int argc, char * const *argv,
+	      struct ifreq *ifr)
+{
+	struct interface *ifp, *ifl = NULL;
+	struct sockaddr_dl *sdl;
+	int n;
+
+	if (ifr->ifr_addr.sa_family != AF_LINK)
+		return;
+	for (ifp = *ifs; ifp; ifp = ifp->next) {
+		if (strcmp(ifp->name, ifr->ifr_name) == 0)
+			return;
+		ifl = ifp;
+	}
+	if (argc > 0) {
+		for (n = 0; n < argc; n++)
+			if (strcmp(ifr->ifr_name, argv[n]) == 0)
+				return;
+	} else {
+		for (n = 0; n < ifdc; n++)
+			if (fnmatch(ifdv[n], ifr->ifr_name, 0) == 0)
+				return;
+		for (n = 0; n < ifac; n++)
+			if (fnmatch(ifav[n], ifr->ifr_name, 0) == 0)
+				break;
+		if (ifac && n == ifac)
+			return;
+	}
+	if (!(ifp = init_interface(ifr->ifr_name)))
+		return;
+	sdl = xmalloc(ifr->ifr_addr.sa_len);
+    	memcpy(sdl, &ifr->ifr_addr, ifr->ifr_addr.sa_len);
+	switch(sdl->sdl_type) {
+	case IFT_ETHER:
+		ifp->family = ARPHRD_ETHER;
+		ifp->hwlen = sdl->sdl_alen;
+		memcpy(ifp->hwaddr, LLADDR(sdl), sdl->sdl_alen);
+		break;
+	default:
+		/* Don't needlessly spam console on startup */
+		if (!(options & DHCPCD_MASTER &&
+		    !(options & DHCPCD_DAEMONISED) &&
+		    options & DHCPCD_QUIET))
+			syslog(LOG_ERR, "%s: unsupported interface type",
+			       ifr->ifr_name);
+		free(ifp);
+		ifp = NULL;
+		break;
+	}
+	free(sdl);
+	if (ifp && ifl)
+		ifl->next = ifp;
+	else
+		*ifs = ifp;
+}
+
 struct interface *
 discover_interfaces(int argc, char * const *argv)
 {
 	struct interface *ifs = NULL;
 
-	do_interface(NULL, &ifs, argc, argv, NULL, NULL, 2);
+	do_interface(NULL, discover_link, &ifs, argc, argv, NULL, NULL, 2);
 	return ifs;
 }

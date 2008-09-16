@@ -47,6 +47,7 @@
 # include <net/if_media.h>
 #endif
 #ifdef BSD
+# include <net/if_types.h>
 # include <net80211/ieee80211_ioctl.h>
 #endif
 #ifdef __linux__
@@ -61,7 +62,6 @@
 
 #include <ctype.h>
 #include <errno.h>
-#include <fnmatch.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -138,7 +138,7 @@ hwaddr_ntoa(const unsigned char *hwaddr, size_t hwlen)
 	char *p = hwaddr_buffer;
 	size_t i;
 
-	for (i = 0; i < hwlen && i < sizeof(hwaddr_buffer) / 3; i++) {
+	for (i = 0; i < hwlen && i < HWADDR_LEN; i++) {
 		if (i > 0)
 			*p ++= ':';
 		p += snprintf(p, 3, "%.2x", hwaddr[i]);
@@ -244,9 +244,6 @@ init_interface(const char *ifname)
 	}
 	memcpy(iface->hwaddr, ifr.ifr_hwaddr.sa_data, iface->hwlen);
 	iface->family = ifr.ifr_hwaddr.sa_family;
-		
-#else
-	iface->family = ARPHRD_ETHER;
 #endif
 
 	if (ioctl(s, SIOCGIFMTU, &ifr) == -1)
@@ -316,8 +313,8 @@ free_interface(struct interface *iface)
 
 int
 do_interface(const char *ifname,
-	     _unused struct interface **ifs,
-	     _unused int argc, _unused char * const *argv,
+	     void (*do_link)(struct interface **, int, char * const *, struct ifreq *),
+	     struct interface **ifs, int argc, char * const *argv,
 	     struct in_addr *addr, struct in_addr *net, int act)
 {
 	int s;
@@ -333,11 +330,6 @@ do_interface(const char *ifname,
 	struct sockaddr_in address;
 	struct ifreq *ifr;
 	struct sockaddr_in netmask;
-#ifdef AF_LINK
-	int n;
-	struct sockaddr_dl *sdl;
-	struct interface *ifp, *ifl = NULL, *ifn = NULL;
-#endif
 
 	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
 		return -1;
@@ -383,48 +375,11 @@ do_interface(const char *ifname,
 
 		found = 1;
 
-#ifdef AF_LINK
 		/* Interface discovery for BSD's */
-		if (act == 2 && ifr->ifr_addr.sa_family == AF_LINK) {
-			for (ifp = *ifs; ifp; ifp = ifp->next) {
-				ifl = ifp;
-				if (strcmp(ifp->name, ifr->ifr_name) == 0)
-					break;
-			}
-			if (ifp)
-				continue;
-			if (argc > 0) {
-				for (n = 0; n < argc; n++)
-					if (strcmp(ifr->ifr_name, argv[n]) == 0)
-						break;
-				if (n == argc)
-					continue;
-			} else {
-				for (n = 0; n < ifdc; n++)
-					if (!fnmatch(ifdv[n], ifr->ifr_name, 0))
-						break;
-				if (n < ifdc)
-					continue;
-				for (n = 0; n < ifac; n++)
-					if (!fnmatch(ifav[n], ifr->ifr_name, 0))
-						break;
-				if (ifac && n == ifac)
-					continue;
-			}
-			ifn = init_interface(ifr->ifr_name);
-			if (!ifn)
-				continue;
-			if (ifl)
-				ifp = ifl->next = ifn;
-			else
-				ifp = *ifs = ifn;
-			sdl = xmalloc(ifr->ifr_addr.sa_len);
-			memcpy(sdl, &ifr->ifr_addr, ifr->ifr_addr.sa_len);
-			ifp->hwlen = sdl->sdl_alen;
-			memcpy(ifp->hwaddr, LLADDR(sdl), sdl->sdl_alen);
-			free(sdl);
+		if (act == 2 && do_link) {
+			do_link(ifs, argc, argv, ifr);
+			continue;
 		}
-#endif
 
 		if (ifr->ifr_addr.sa_family == AF_INET && addr)	{
 			memcpy(&address, &ifr->ifr_addr, sizeof(address));
