@@ -310,7 +310,9 @@ discover_link(struct interface **ifs, int argc, char * const *argv,
 	if (argc > 0) {
 		for (n = 0; n < argc; n++)
 			if (strcmp(ifr->ifr_name, argv[n]) == 0)
-				return;
+				break;
+		if (n == argc)
+			return;
 	} else {
 		for (n = 0; n < ifdc; n++)
 			if (fnmatch(ifdv[n], ifr->ifr_name, 0) == 0)
@@ -343,7 +345,7 @@ discover_link(struct interface **ifs, int argc, char * const *argv,
 		break;
 	}
 	free(sdl);
-	if (ifp && ifl)
+	if (ifl)
 		ifl->next = ifp;
 	else
 		*ifs = ifp;
