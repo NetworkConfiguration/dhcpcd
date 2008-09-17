@@ -738,7 +738,7 @@ start_reboot(struct interface *iface)
 		add_timeout_sec(ifo->reboot, start_expire, iface);
 	open_sockets(iface);
 	if (ifo->options & DHCPCD_ARP &&
-	    !has_address(iface, &iface->state->lease.addr, NULL))
+	    !has_address(iface->name, &iface->state->lease.addr, NULL))
 	{
 		iface->state->probes = 0;
 		send_arp_probe(iface);
