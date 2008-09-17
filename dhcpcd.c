@@ -737,9 +737,12 @@ start_reboot(struct interface *iface)
 	else
 		add_timeout_sec(ifo->reboot, start_expire, iface);
 	open_sockets(iface);
-	if (ifo->options & DHCPCD_ARP)
+	if (ifo->options & DHCPCD_ARP &&
+	    !has_address(iface, &iface->state->lease.addr, NULL))
+	{
+		iface->state->probes = 0;
 		send_arp_probe(iface);
-	else
+	} else
 		send_request(iface);
 }
 
@@ -947,7 +950,7 @@ handle_signal(_unused void *arg)
 	case SIGALRM:
 		syslog(LOG_INFO, "received SIGALRM, rebinding lease");
 		for (iface = ifaces; iface; iface = iface->next)
-			start_reboot(iface);
+			start_interface(iface);
 		return;
 	case SIGHUP:
 		syslog(LOG_INFO, "received SIGHUP, releasing lease");
