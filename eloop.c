@@ -117,6 +117,11 @@ add_timeout_tv(const struct timeval *when,
 
 	get_monotonic(&now);
 	timeradd(&now, when, &w);
+	/* Check for time_t overflow. */
+	if (timercmp(&w, &now, <)) {
+		errno = ERANGE;
+		return;
+	}
 
 	/* Remove existing timeout if present */
 	for (t = timeouts; t; t = t->next) {
