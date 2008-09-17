@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd September 15, 2008
+.Dd September 17, 2008
 .Dt DHCPCD 8 SMM
 .Sh NAME
 .Nm dhcpcd
@@ -107,8 +107,16 @@ can be run per interface or as a single instance to manage all interfaces.
 If a list of interfaces are given on the command line, then
 .Nm
 only works with those interfaces.
-If no interfaces are given then we discover available interfaces and
-attempt to configure all of them.
+If no interfaces are given then 
+.Nm
+discovers available interfaces and attempts to configure them.
+.Pp
+Interfaces are preferred by carrier, DHCP lease/IPv4LL and then lowest metric.
+For systems that support route metrics, each route will be tagged with the
+metric, otherwise 
+.Nm
+changes the routes to use the interface with the same route and the lowest
+metric.
 See options below for controlling what interfaces we allow and deny through
 the use of patterns.
 .Ss Hooking into DHCP events
@@ -193,14 +201,11 @@ By default
 does not request any lease time and leaves the it in the hands of the
 DHCP server.
 .It Fl m , -metric Ar metric
-Added routes will use the
-.Ar metric
-on systems where this is supported
-.Po
-presently only Linux
-.Pc .
-Route metrics allow the addition of routes to the same destination across
-different interfaces, the lower the metric the more it is preferred.
+Metrics are used to prefer an interface over another one, lowest wins.
+.Nm
+will supply a default metic of 200 +
+.Xr if_nametoindex 3 .
+An extra 100 will be added for wireless interfaces.
 .It Fl o , -option Ar option
 Request the DHCP
 .Ar option
@@ -456,6 +461,7 @@ running on the
 .Xr dhcpcd-run-hooks 8 ,
 .Xr resolv.conf 5 ,
 .Xr resolvconf 8 ,
+.Xr if_nametoindex 3,
 .Xr fnmatch 3
 .Sh STANDARDS
 RFC 2131, RFC 2132, RFC 2855, RFC 3004, RFC 3361, RFC 3396, RFC 3397,
