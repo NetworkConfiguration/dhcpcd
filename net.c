@@ -40,24 +40,8 @@
 #define __FAVOR_BSD /* Nasty glibc hack so we can use BSD semantics for UDP */
 #include <netinet/udp.h>
 #undef __FAVOR_BSD
-#ifdef AF_LINK
-# include <net/if_dl.h>
-#endif
 #ifdef SIOCGIFMEDIA
 # include <net/if_media.h>
-#endif
-#ifdef BSD
-# include <net/if_types.h>
-# include <net80211/ieee80211_ioctl.h>
-#endif
-#ifdef __linux__
-# define SIOCGIWNAME 0x8B01
-/* FIXME: Some linux kernel verisons DO NOT like this include
- * They have the error:
- * /usr/include/linux/if.h:92: error: redefinition of `struct ifmap'
- * We work around this by defining the above ioctl and using an ifreq
- * structure which seems to work fine. */
-//# include <linux/wireless.h>
 #endif
 
 #include <ctype.h>
@@ -193,14 +177,6 @@ init_interface(const char *ifname)
 	int s, arpable;
 	struct ifreq ifr;
 	struct interface *iface = NULL;
-#if defined(SIOCGIWNAME)
-//	FIXME: See comment in includes above
-//	struct iwreq iwr;
-#elif defined(SIOCG80211NWID)
-	struct ieee80211_nwid nwid;
-#elif defined(IEEE80211_IOC_SSID)
-	struct ieee80211req ireq;
-#endif
 
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
@@ -217,7 +193,11 @@ init_interface(const char *ifname)
 
 	iface = xzalloc(sizeof(*iface));
 	strlcpy(iface->name, ifname, sizeof(iface->name));
-	iface->metric = 100 + if_nametoindex(iface->name);
+	/* We reserve the 100 range for virtual interfaces, if and when
+	 * we can work them out. */
+	iface->metric = 200 + if_nametoindex(iface->name);
+	if (if_wireless(ifname) == 0)
+		iface->metric += 100;
 
 #ifdef SIOCGIFHWADDR
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
@@ -239,7 +219,8 @@ init_interface(const char *ifname)
 		if (!(options & DHCPCD_MASTER &&
 		    !(options & DHCPCD_DAEMONISED) &&
 		    options & DHCPCD_QUIET))
-			syslog(LOG_ERR, "%s: unsupported media family", iface->name);
+			syslog(LOG_ERR, "%s: unsupported media family",
+			       iface->name);
 		goto eexit;
 	}
 	memcpy(iface->hwaddr, ifr.ifr_hwaddr.sa_data, iface->hwlen);
@@ -256,32 +237,11 @@ init_interface(const char *ifname)
 			goto eexit;
 	}
 
-	/* If the interface is wireless, add 100 to the metric.
-	 * We do this so we prefer other interfaces if they provide
-	 * similar configuration on the same subnet. */
-#if defined(SIOCGIWNAME) /* Linux */
-	if (ioctl(s, SIOCGIWNAME, &ifr) != -1)
-		iface->metric += 100;
-#elif defined(SIOCG80211NWID) /* NetBSD */
-	memset(&nwid, 0, sizeof(nwid));
-	ifr.ifr_data = (void *)&nwid;
-	if (ioctl(s, SIOCG80211NWID) != -1)
-		iface->metric += 100;
-#elif defined(IEEE80211_IOC_SSID) /* FreeBSD */
-	memset(&ireq, 0, sizeof(ireq));
-	strlcpy(ireq.i_name, ifname, sizeof(ireq.i_name));
-	ireq.i_type = IEEE80211_IOC_NUMSSIDS;
-	if (ioctl(s, SIOCG80211, &ireq) != -1)
-		iface->metric += 100; 
-#endif
-
 	if (up_interface(ifname) != 0)
 		goto eexit;
-
 	snprintf(iface->leasefile, sizeof(iface->leasefile),
 		 LEASEFILE, ifname);
 	iface->arpable = arpable;
-
 	/* 0 is a valid fd, so init to -1 */
 	iface->raw_fd = -1;
 	iface->udp_fd = -1;

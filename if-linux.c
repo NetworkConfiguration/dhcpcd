@@ -39,6 +39,14 @@
 #include <netinet/ether.h>
 #include <netpacket/packet.h>
 
+# define SIOCGIWNAME 0x8B01
+/* FIXME: Some linux kernel verisons DO NOT like this include
+ * They have the error:
+ * /usr/include/linux/if.h:92: error: redefinition of `struct ifmap'
+ * We work around this by defining the above ioctl and using an ifreq
+ * structure which seems to work fine. */
+//# include <linux/wireless.h>
+
 #include <errno.h>
 #include <ctype.h>
 #include <fnmatch.h>
@@ -63,6 +71,22 @@
 static void (*nl_carrier)(const char *) = NULL;
 static void (*nl_add)(const char *) = NULL;
 static void (*nl_remove)(const char *) = NULL;
+
+int
+if_wireless(const char *ifname)
+{
+	int s, retval = -1;
+	struct ifreq ifr;
+
+	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+		return retval;
+	memset(&ifr, 0, sizeof(ifr));
+	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
+	if (ioctl(s, SIOCGIWNAME, &ifr) == 0)
+		retval = 0;
+	close(s);
+	return retval;
+}
 
 int
 open_link_socket(void)

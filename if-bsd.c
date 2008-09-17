@@ -37,6 +37,7 @@
 #include <net/if_types.h>
 #include <net/route.h>
 #include <netinet/in.h>
+#include <net80211/ieee80211_ioctl.h>
 
 #include <errno.h>
 #include <fnmatch.h>
@@ -60,6 +61,37 @@
 	   sizeof(long)		:				\
 	   1 + ( (((struct sockaddr *)(sa))->sa_len - 1) | (sizeof(long) - 1) ) )
 #endif
+
+int
+if_wireless(const char *ifname)
+{
+	int s, retval = -1;
+#if defined(SIOCG80211NWID)
+	struct ifreq ifr;
+	struct ieee80211_nwid nwid;
+#elif defined(IEEE80211_IOC_SSID)
+	struct ieee80211req ireq;
+#endif
+
+	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+		return retval;
+#if defined(SIOCG80211NWID) /* NetBSD */
+	memset(&ifr, 0, sizeof(ifr));
+	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
+	memset(&nwid, 0, sizeof(nwid));
+	ifr.ifr_data = (void *)&nwid;
+	if (ioctl(s, SIOCG80211NWID, &ifr) == 0)
+		retval = 0;
+#elif defined(IEEE80211_IOC_SSID) /* FreeBSD */
+	memset(&ireq, 0, sizeof(ireq));
+	strlcpy(ireq.i_name, ifname, sizeof(ireq.i_name));
+	ireq.i_type = IEEE80211_IOC_NUMSSIDS;
+	if (ioctl(s, SIOCG80211, &ireq) == 0)
+		retval = 0;
+#endif
+	close(s);
+	return retval;
+}
 
 int
 if_address(const struct interface *iface, const struct in_addr *address,
