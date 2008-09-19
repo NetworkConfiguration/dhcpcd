@@ -90,7 +90,7 @@ remove_markers()
 }
 
 # Compare two files
-# It different, replace first with second otherwise remove second
+# If different, replace first with second otherwise remove second
 change_file()
 {
 	if type cmp >/dev/null 2>&1; then
