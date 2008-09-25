@@ -1,9 +1,0 @@
-*.o
-version.h
-_dhcpcd.c
-dhcpcd
-dhcpcd.8
-dhcpcd.conf.5
-dhcpcd-run-hooks
-dhcpcd-run-hooks.8
-dhcpcd-*.bz2
