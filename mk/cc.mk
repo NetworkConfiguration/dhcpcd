@@ -19,7 +19,7 @@ _CCFLAGS=	-Wall -Wextra -Wimplicit -Wshadow -Wformat=2 \
 		-Winline -Wwrite-strings -Wcast-align -Wcast-qual \
 		-Wpointer-arith \
 		-Wdeclaration-after-statement -Wsequence-point
-_CC_FLAGS_SH=	if ! test -d .git; then echo ""; else for f in ${_CCFLAGS}; do \
+_CC_FLAGS_SH=	if ! test -d .svn; then echo ""; else for f in ${_CCFLAGS}; do \
 		if echo "int main(void) { return 0;} " | \
 		${CC} $$f -S -xc -o /dev/null - ; \
 		then printf "%s" "$$f "; fi \

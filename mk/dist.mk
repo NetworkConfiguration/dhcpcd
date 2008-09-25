@@ -18,7 +18,10 @@ SNAPDIR=	${DISTPREFIX}-${SNAP}
 SNAPFILE=	${SNAPDIR}.tar.bz2
 
 dist:
-	git archive --prefix=${DISTPREFIX}/ ${GITREF} | bzip2 > ${DISTFILE}
+	svn export . ${DISTPREFIX}
+	tar cjpf ${DISTFILE} ${DISTPREFIX}
+	rm -rf ${DISTPREFIX}
+	#git archive --prefix=${DISTPREFIX}/ ${GITREF} | bzip2 > ${DISTFILE}
 
 snapshot:
 	mkdir /tmp/${SNAPDIR}
