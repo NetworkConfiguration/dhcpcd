@@ -1,4 +1,4 @@
-# rules to make a distribution tarball from a git repo
+# rules to make a distribution tarball from a svn repo
 # Copyright 2008 Roy Marples <roy@marples.name>
 
 GITREF?=	HEAD
@@ -18,7 +18,9 @@ SNAPDIR=	${DISTPREFIX}-${SNAP}
 SNAPFILE=	${SNAPDIR}.tar.bz2
 
 dist:
-	git archive --prefix=${DISTPREFIX}/ ${GITREF} | bzip2 > ${DISTFILE}
+	svn export . ${DISTPREFIX}
+	tar cjpf ${DISTFILE} ${DISTPREFIX}
+	rm -rf ${DISTPREFIX}
 
 snapshot:
 	mkdir /tmp/${SNAPDIR}
