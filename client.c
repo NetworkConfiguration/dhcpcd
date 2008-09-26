@@ -362,7 +362,8 @@ get_lease(struct dhcp_lease *lease, const struct dhcp_message *dhcp)
 {
 	time_t t;
 
-	lease->frominfo = 0;
+	if (lease->frominfo)
+		return;
 	lease->addr.s_addr = dhcp->yiaddr;
 
 	if (get_option_addr(&lease->net.s_addr, dhcp, DHO_SUBNETMASK) == -1)
@@ -405,6 +406,7 @@ get_old_lease(struct if_state *state)
 		logger(LOG_INFO, "read_lease: %s", strerror(errno));
 		goto eexit;
 	}
+	lease->frominfo = 0;
 	get_lease(&state->lease, dhcp);
 	lease->frominfo = 1;
 	lease->leasedfrom = sb.st_mtime;
@@ -437,12 +439,11 @@ get_old_lease(struct if_state *state)
 			else
 				goto eexit;
 		}
+		lease->leasetime -= offset;
+		lease->rebindtime -= offset;
+		lease->renewaltime -= offset;
 	}
 
-	if (lease->leasedfrom == 0)
-		offset = 0;
-	iface->start_uptime = uptime();
-	state->timeout.tv_sec = lease->renewaltime - offset;
 	free(state->old);
 	state->old = state->new;
 	state->new = NULL;
@@ -1001,7 +1002,7 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 {
 	struct dhcp_lease *lease = &state->lease;
 	struct interface *iface = state->interface;
-	int gotlease = -1;
+	int gotlease = -1, r;
 	const char *reason = NULL;
 
 	timerclear(&state->stop);
@@ -1045,7 +1046,8 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 		}
 
 		if (gotlease == 0 &&
-		    state->offer->yiaddr != iface->addr.s_addr)
+		    state->offer->yiaddr != iface->addr.s_addr &&
+		    state->options & DHCPCD_ARP)
 		{
 			state->state = STATE_PROBING;
 			state->claims = 0;
@@ -1055,9 +1057,12 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 			return 1;
 		}
 
-		if (gotlease == 0)
-			return bind_dhcp(state, options);
-
+		if (gotlease == 0) {
+			r = bind_dhcp(state, options);
+			logger(LOG_DEBUG, "renew in %ld seconds",
+				(long int)state->stop.tv_sec);
+			return r;
+		}
 		if (iface->addr.s_addr)
 			reason = "EXPIRE";
 		else
@@ -1170,7 +1175,9 @@ handle_timeout(struct if_state *state, const struct options *options)
 		} else {
 			/* We've waited for ANNOUNCE_WAIT after the final probe
 			 * so the address is now ours */
-			if (IN_LINKLOCAL(htonl(state->offer->yiaddr))) {
+			if (state->lease.frominfo ||
+			    IN_LINKLOCAL(htonl(state->offer->yiaddr)))
+			{
 				i = bind_dhcp(state, options);
 				state->state = STATE_ANNOUNCING;
 				state->timeout.tv_sec = ANNOUNCE_INTERVAL;
@@ -1495,6 +1502,7 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 	}
 
 	do_socket(state, SOCKET_CLOSED);
+	lease->frominfo = 0;
 	r = bind_dhcp(state, options);
 	if (!(state->options & DHCPCD_ARP)) {
 		if (!(state->options & DHCPCD_INFORM))
