@@ -179,7 +179,7 @@ parse_string_hwaddr(char *sbuf, ssize_t slen, const char *str, int clid)
 	l = 0;
 	/* If processing a string on the clientid, first byte should be
 	 * 0 to indicate a non hardware type */
-	if (clid) {
+	if (clid && *str) {
 		*sbuf++ = 0;
 		l++;
 	}
