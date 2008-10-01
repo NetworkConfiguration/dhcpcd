@@ -783,14 +783,17 @@ main(int argc, char **argv)
 		case 'H': /* FALLTHROUGH */
 		case 'M':
 			del_option_mask(options->requestmask, DHO_MTU);
+			add_environ(options, "skip_hook=mtu", 0);
 			break;
 		case 'N':
 			del_option_mask(options->requestmask, DHO_NTPSERVER);
+			add_environ(options, "skip_hook=ntp.conf", 0);
 			break;
 		case 'R':
 			del_option_mask(options->requestmask, DHO_DNSSERVER);
 			del_option_mask(options->requestmask, DHO_DNSDOMAIN);
 			del_option_mask(options->requestmask, DHO_DNSSEARCH);
+			add_environ(options, "skip_hook=resolv.conf", 0);
 			break;
 		case 'S':
 			add_option_mask(options->requestmask, DHO_MSCSR);
@@ -798,6 +801,7 @@ main(int argc, char **argv)
 		case 'Y':
 			del_option_mask(options->requestmask, DHO_NISSERVER);
 			del_option_mask(options->requestmask, DHO_NISDOMAIN);
+			add_environ(options, "skip_hook=yp.conf", 0);
 			break;
 #endif
 		default:
