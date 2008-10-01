@@ -1261,11 +1261,10 @@ main(int argc, char **argv)
 	for (iface = ifaces; iface; iface = iface->next)
 		init_state(iface, argc, argv);
 	sort_interfaces();
-	if (!(options & DHCPCD_TEST)) {
-		for (iface = ifaces; iface; iface = iface->next) {
+	for (iface = ifaces; iface; iface = iface->next) {
+		if (!(options & DHCPCD_TEST))
 			run_script(iface, "PREINIT");
-			start_interface(iface);
-		}
+		start_interface(iface);
 	}
 	start_eloop();
 	/* NOTREACHED */
