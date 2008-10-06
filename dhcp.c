@@ -912,13 +912,10 @@ make_message(struct dhcp_message **message,
 			if (!(opt->type & REQUEST || 
 			      has_option_mask(ifo->requestmask, opt->option)))
 				continue;
-			switch (opt->option) {
-				case DHO_RENEWALTIME:	/* FALLTHROUGH */
-				case DHO_REBINDTIME:
-					if (type == DHCP_INFORM)
-						continue;
-					break;
-			}
+			if (type == DHCP_INFORM &&
+			    (opt->option == DHO_RENEWALTIME ||
+			     opt->option == DHO_REBINDTIME))
+				continue;
 			*p++ = opt->option;
 		}
 		*n_params = p - n_params - 1;
