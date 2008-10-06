@@ -985,7 +985,7 @@ handle_signal(_unused void *arg)
 int
 handle_args(int argc, char **argv)
 {
-	struct interface *ifs, *ifp, *ifl, *ifn;
+	struct interface *ifs, *ifp, *ifl, *ifn, *ift;
 	int do_exit = 0, do_release = 0, do_reboot = 0, opt, oi = 0;
 
 	optind = 0;
@@ -1010,7 +1010,7 @@ handle_args(int argc, char **argv)
 		return -1;
 	}
 
-	if (do_release || do_reboot || do_exit) {
+	if (do_release || do_exit) {
 		for (oi = optind; oi < argc; oi++) {
 			for (ifp = ifaces; ifp; ifp = ifp->next)
 				if (strcmp(ifp->name, argv[oi]) == 0)
@@ -1019,26 +1019,27 @@ handle_args(int argc, char **argv)
 				continue;
 			if (do_release)
 				ifp->state->options->options |= DHCPCD_RELEASE;
-			if (do_exit || do_release) {
-				stop_interface(ifp, do_release ? "RELEASE" : "STOP");
-			} else if (do_reboot) {
-				configure_interface(ifp, argc, argv);
-				start_reboot(ifp);
-			}
+			stop_interface(ifp, do_release ? "RELEASE" : "STOP");
 		}
 		sort_interfaces();
 		return 0;
 	}
 
 	if ((ifs = discover_interfaces(argc - optind, argv + optind))) {
-		for (ifp = ifs; ifp; ifp = ifp->next) {
+		for (ifp = ifs; ifp && (ift = ifp->next, 1); ifp = ift) {
 			ifl = NULL;
 			for (ifn = ifaces; ifn; ifn = ifn->next) {
 				if (strcmp(ifn->name, ifp->name) == 0)
 					break;
 				ifl = ifn;
 			}
-			if (!ifn) {
+			if (ifn) {
+				if (do_reboot) {
+					configure_interface(ifn, argc, argv);
+					start_reboot(ifn);
+				}
+			} else {
+				ifp->next = NULL;
 				init_state(ifp, argc, argv);
 				run_script(ifp, "PREINIT");
 				start_interface(ifp);
