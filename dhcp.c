@@ -743,6 +743,13 @@ encode_rfc1035(const char *src, uint8_t *dst, size_t len)
 	return p - dst;
 }
 
+#define PUTADDR(_type, _val) \
+{ \
+	*p++ = _type; \
+	*p++ = 4; \
+	memcpy(p, &_val.s_addr, 4); \
+	p += 4; \
+}
 ssize_t
 make_message(struct dhcp_message **message,
 	     const struct interface *iface, const struct dhcp_lease *lease,
@@ -802,7 +809,16 @@ make_message(struct dhcp_message **message,
 	*p++ = 1;
 	*p++ = type;
 
-	if (type == DHCP_REQUEST) {
+	if (iface->clientid) {
+		*p++ = DHO_CLIENTID;
+		memcpy(p, iface->clientid, iface->clientid[0] + 1);
+		p += iface->clientid[0] + 1;
+	}
+
+	if (type == DHCP_DISCOVER ||
+	    type == DHCP_INFORM ||
+	    type == DHCP_REQUEST)
+	{
 		*p++ = DHO_MAXMESSAGESIZE;
 		*p++ = 2;
 		sz = get_mtu(iface->name);
@@ -813,15 +829,7 @@ make_message(struct dhcp_message **message,
 		sz = htons(sz);
 		memcpy(p, &sz, 2);
 		p += 2;
-	}
 
-	if (iface->clientid) {
-		*p++ = DHO_CLIENTID;
-		memcpy(p, iface->clientid, iface->clientid[0] + 1);
-		p += iface->clientid[0] + 1;
-	}
-
-	if (type != DHCP_DECLINE && type != DHCP_RELEASE) {
 		if (options->userclass[0]) {
 			*p++ = DHO_USERCLASS;
 			memcpy(p, options->userclass, options->userclass[0] + 1);
@@ -834,39 +842,26 @@ make_message(struct dhcp_message **message,
 			       options->vendorclassid[0] + 1);
 			p += options->vendorclassid[0] + 1;
 		}
-	}
 
-	if (type == DHCP_DISCOVER || type == DHCP_REQUEST) {
-#define PUTADDR(_type, _val) \
-		{ \
-			*p++ = _type; \
-			*p++ = 4; \
-			memcpy(p, &_val.s_addr, 4); \
-			p += 4; \
-		}
-		if (lease->addr.s_addr &&
-		    lease->addr.s_addr != iface->addr.s_addr &&
-		    !IN_LINKLOCAL(ntohl(lease->addr.s_addr)))
-		{
-			PUTADDR(DHO_IPADDRESS, lease->addr);
-			if (lease->server.s_addr)
-				PUTADDR(DHO_SERVERID, lease->server);
-		}
-#undef PUTADDR
+		if (type != DHCP_INFORM) {
+			if (lease->addr.s_addr &&
+			    lease->addr.s_addr != iface->addr.s_addr &&
+			    !IN_LINKLOCAL(ntohl(lease->addr.s_addr)))
+			{
+				PUTADDR(DHO_IPADDRESS, lease->addr);
+				if (lease->server.s_addr)
+					PUTADDR(DHO_SERVERID, lease->server);
+			}
 
-		if (options->leasetime != 0) {
-			*p++ = DHO_LEASETIME;
-			*p++ = 4;
-			ul = htonl(options->leasetime);
-			memcpy(p, &ul, 4);
-			p += 4;
+			if (options->leasetime != 0) {
+				*p++ = DHO_LEASETIME;
+				*p++ = 4;
+				ul = htonl(options->leasetime);
+				memcpy(p, &ul, 4);
+				p += 4;
+			}
 		}
-	}
 
-	if (type == DHCP_DISCOVER ||
-	    type == DHCP_INFORM ||
-	    type == DHCP_REQUEST)
-	{
 		if (options->hostname[0]) {
 			*p++ = DHO_HOSTNAME;
 			memcpy(p, options->hostname, options->hostname[0] + 1);
