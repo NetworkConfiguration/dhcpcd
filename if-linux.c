@@ -68,9 +68,9 @@
 
 #define BUFFERLEN 256
 
-static void (*nl_carrier)(const char *) = NULL;
-static void (*nl_add)(const char *) = NULL;
-static void (*nl_remove)(const char *) = NULL;
+static void (*nl_carrier)(const char *);
+static void (*nl_add)(const char *);
+static void (*nl_remove)(const char *);
 
 int
 if_wireless(const char *ifname)

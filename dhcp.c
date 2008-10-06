@@ -56,7 +56,7 @@
 /* Our aggregate option buffer.
  * We ONLY use this when options are split, which for most purposes is
  * practically never. See RFC3396 for details. */
-static uint8_t *dhcp_opt_buffer = NULL;
+static uint8_t *dhcp_opt_buffer;
 
 struct dhcp_opt {
 	uint8_t option;

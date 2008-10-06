@@ -73,10 +73,10 @@ char **ifav = NULL;
 int ifdc = 0;
 char **ifdv = NULL;
 
-static char **ifv = NULL;
-static int ifc = 0;
+static char **ifv;
+static int ifc;
 static int linkfd = -1;
-static char *cffile = NULL;
+static char *cffile;
 static char *pidfile;
 
 struct dhcp_op {

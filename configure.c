@@ -59,7 +59,7 @@
 # endif
 #endif
 
-static struct rt *routes = NULL;
+static struct rt *routes;
 
 static int
 exec_script(char *const *argv, char *const *env)

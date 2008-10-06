@@ -37,26 +37,26 @@
 #include "common.h"
 #include "eloop.h"
 
-static struct timeval now = {0, 0};
+static struct timeval now;
 
 static struct event {
 	int fd;
 	void (*callback)(void *);
 	void *arg;
 	struct event *next;
-} *events = NULL;
-static struct event *free_events = NULL;
+} *events;
+static struct event *free_events;
 
 static struct timeout {
 	struct timeval when;
 	void (*callback)(void *);
 	void *arg;
 	struct timeout *next;
-} *timeouts = NULL;
-static struct timeout *free_timeouts = NULL;
+} *timeouts;
+static struct timeout *free_timeouts;
 
-static struct pollfd *fds = NULL;
-static size_t fds_len = 0;
+static struct pollfd *fds;
+static size_t fds_len;
 
 void
 add_event(int fd, void (*callback)(void *), void *arg)
