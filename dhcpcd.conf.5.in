@@ -152,4 +152,4 @@ If not set then none is sent.
 .Sh AUTHORS
 .An Roy Marples <roy@marples.name>
 .Sh BUGS
-Please report them to http://bugs.marples.name
+Please report them to http://roy.marples.name/projects/dhcpcd
