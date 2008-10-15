@@ -281,7 +281,7 @@ manage_link(int fd,
 	    void (*if_add)(const char *),
 	    void (*if_remove)(const char *))
 {
-	char buffer[2048], *p;
+	char buffer[2048], *p, *e;
 	char ifname[IF_NAMESIZE];
 	ssize_t bytes;
 	struct rt_msghdr *rtm;
@@ -297,14 +297,12 @@ manage_link(int fd,
 				continue;
 			return -1;
 		}
-		for (p = buffer; bytes > 0;
-		     bytes -= ((struct rt_msghdr *)p)->rtm_msglen,
-		     p += ((struct rt_msghdr *)p)->rtm_msglen)
-		{
-			rtm = (struct rt_msghdr *)p;
+		e = buffer + bytes;
+		for (p = buffer; p < e; p += rtm->rtm_msglen) {
+			rtm = (struct rt_msghdr *)(void *)p;
 			switch(rtm->rtm_type) {
 			case RTM_IFANNOUNCE:
-				ifa = (struct if_announcemsghdr *)p;
+				ifa = (struct if_announcemsghdr *)(void *)p;
 				switch(ifa->ifan_what) {
 				case IFAN_ARRIVAL:
 					if_add(ifa->ifan_name);
@@ -315,7 +313,7 @@ manage_link(int fd,
 				}
 				break;
 			case RTM_IFINFO:
-				ifm = (struct if_msghdr *)p;
+				ifm = (struct if_msghdr *)(void *)p;
 				memset(ifname, 0, sizeof(ifname));
 				if (if_indextoname(ifm->ifm_index, ifname))
 					if_carrier(ifname);
@@ -358,8 +356,7 @@ discover_link(struct interface **ifs, int argc, char * const *argv,
 	}
 	if (!(ifp = init_interface(ifr->ifr_name)))
 		return;
-	sdl = xmalloc(ifr->ifr_addr.sa_len);
-    	memcpy(sdl, &ifr->ifr_addr, ifr->ifr_addr.sa_len);
+	sdl = (struct sockaddr_dl *)&ifr->ifr_addr;
 	switch(sdl->sdl_type) {
 	case IFT_ETHER:
 		ifp->family = ARPHRD_ETHER;
@@ -377,7 +374,6 @@ discover_link(struct interface **ifs, int argc, char * const *argv,
 		ifp = NULL;
 		break;
 	}
-	free(sdl);
 	if (ifl)
 		ifl->next = ifp;
 	else
