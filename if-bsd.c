@@ -33,6 +33,7 @@
 #include <sys/types.h>
 
 #include <arpa/inet.h>
+#include <net/if.h>
 #include <net/if_dl.h>
 #include <net/if_types.h>
 #include <net/route.h>
@@ -281,7 +282,7 @@ manage_link(int fd,
 	    void (*if_remove)(const char *))
 {
 	char buffer[2048], *p;
-	char ifname[IFNAMSIZ + 1];
+	char ifname[IF_NAMESIZE];
 	ssize_t bytes;
 	struct rt_msghdr *rtm;
 	struct if_announcemsghdr *ifa;
