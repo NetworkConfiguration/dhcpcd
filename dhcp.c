@@ -815,6 +815,23 @@ make_message(struct dhcp_message **message,
 		p += iface->clientid[0] + 1;
 	}
 
+	if (lease->addr.s_addr && !IN_LINKLOCAL(htonl(lease->addr.s_addr))) {
+		if (type == DHCP_DECLINE ||
+		    type == DHCP_DISCOVER ||
+		    (type == DHCP_REQUEST &&
+		     lease->addr.s_addr != iface->addr.s_addr))
+		{
+			PUTADDR(DHO_IPADDRESS, lease->addr);
+			if (lease->server.s_addr)
+				PUTADDR(DHO_SERVERID, lease->server);
+		}
+	}
+
+	if (type == DHCP_RELEASE) {
+		if (lease->server.s_addr)
+			PUTADDR(DHO_SERVERID, lease->server);
+	}
+
 	if (type == DHCP_DISCOVER ||
 	    type == DHCP_INFORM ||
 	    type == DHCP_REQUEST)
@@ -844,15 +861,6 @@ make_message(struct dhcp_message **message,
 		}
 
 		if (type != DHCP_INFORM) {
-			if (lease->addr.s_addr &&
-			    lease->addr.s_addr != iface->addr.s_addr &&
-			    !IN_LINKLOCAL(ntohl(lease->addr.s_addr)))
-			{
-				PUTADDR(DHO_IPADDRESS, lease->addr);
-				if (lease->server.s_addr)
-					PUTADDR(DHO_SERVERID, lease->server);
-			}
-
 			if (options->leasetime != 0) {
 				*p++ = DHO_LEASETIME;
 				*p++ = 4;
