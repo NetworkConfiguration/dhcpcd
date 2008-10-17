@@ -356,7 +356,7 @@ discover_link(struct interface **ifs, int argc, char * const *argv,
 	}
 	if (!(ifp = init_interface(ifr->ifr_name)))
 		return;
-	sdl = (struct sockaddr_dl *)&ifr->ifr_addr;
+	sdl = (struct sockaddr_dl *)(void *)&ifr->ifr_addr;
 	switch(sdl->sdl_type) {
 	case IFT_ETHER:
 		ifp->family = ARPHRD_ETHER;
