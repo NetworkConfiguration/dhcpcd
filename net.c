@@ -285,6 +285,7 @@ do_interface(const char *ifname,
 	char *p, *e;
 	in_addr_t address, netmask;
 	struct ifreq *ifr;
+	struct sockaddr_in *sin;
 
 	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
 		return -1;
@@ -312,7 +313,7 @@ do_interface(const char *ifname,
 		len *= 2;
 	}
 
-	e = ifc.ifc_buf + ifc.ifc_len;
+	e = (char *)ifc.ifc_buf + ifc.ifc_len;
 	for (p = ifc.ifc_buf; p < e;) {
 		ifr = (struct ifreq *)p;
 
@@ -336,12 +337,14 @@ do_interface(const char *ifname,
 		}
 
 		if (ifr->ifr_addr.sa_family == AF_INET && addr)	{
-			address = ((struct sockaddr_in *)&ifr->ifr_addr)
-				  ->sin_addr.s_addr;
+			sin = (struct sockaddr_in *)&ifr->ifr_addr;
+			address = sin->sin_addr.s_addr;
+			/* Some platforms only partially fill the bits
+			 * set by the netmask, so we need to zero it now. */
+			sin->sin_addr.s_addr = 0;
 			if (ioctl(s, SIOCGIFNETMASK, ifr) == -1)
 				continue;
-			netmask = ((struct sockaddr_in *)&ifr->ifr_addr)
-				  ->sin_addr.s_addr;
+			netmask = sin->sin_addr.s_addr;
 			if (act == 1) {
 				addr->s_addr = address;
 				net->s_addr = netmask;
