@@ -479,7 +479,8 @@ configure(struct interface *iface, const char *reason)
 
 	/* This also changes netmask */
 	if (!(iface->state->options->options & DHCPCD_INFORM) ||
-	    !has_address(iface->name, &addr, &net)) {
+	    !has_address(iface->name, &addr, &net))
+	{
 		syslog(LOG_DEBUG, "%s: adding IP address %s/%d",
 		       iface->name, inet_ntoa(addr), inet_ntocidr(net));
 		if (add_address(iface, &addr, &net, &brd) == -1 &&
@@ -512,7 +513,8 @@ configure(struct interface *iface, const char *reason)
 	build_routes();
 	if (arp_flush() == -1)
 		syslog(LOG_ERR, "arp_flush: %m");
-	if (!iface->state->lease.frominfo)
+	if (!iface->state->lease.frominfo &&
+	    !(iface->state->options->options & DHCPCD_INFORM))
 		if (write_lease(iface, dhcp) == -1)
 			syslog(LOG_ERR, "write_lease: %m");
 	run_script(iface, reason);

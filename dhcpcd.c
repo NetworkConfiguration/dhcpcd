@@ -303,6 +303,12 @@ send_message(struct interface *iface, int type,
 }
 
 static void
+send_inform(void *arg)
+{
+	send_message((struct interface *)arg, DHCP_INFORM, send_inform);
+}
+
+static void
 send_discover(void *arg)
 {
 	send_message((struct interface *)arg, DHCP_DISCOVER, send_discover);
@@ -726,8 +732,13 @@ start_reboot(struct interface *iface)
 			start_discover(iface);
 		return;
 	}
-	syslog(LOG_INFO, "%s: rebinding lease of %s",
-	       iface->name, inet_ntoa(iface->state->lease.addr));
+	if (ifo->options & DHCPCD_INFORM) {
+		syslog(LOG_INFO, "%s: informing address of %s",
+		       iface->name, inet_ntoa(iface->state->lease.addr));
+	} else {
+		syslog(LOG_INFO, "%s: rebinding lease of %s",
+		       iface->name, inet_ntoa(iface->state->lease.addr));
+	}
 	iface->state->state = DHS_REBOOT;
 	iface->state->xid = arc4random();
 	iface->state->lease.server.s_addr = 0;
@@ -742,7 +753,9 @@ start_reboot(struct interface *iface)
 	{
 		iface->state->probes = 0;
 		send_arp_probe(iface);
-	} else
+	} else if (ifo->options & DHCPCD_INFORM)
+		send_inform(iface);
+	else
 		send_request(iface);
 }
 
@@ -762,9 +775,25 @@ start_interface(void *arg)
 
 	iface->start_uptime = uptime();
 	if (ifo->request_address.s_addr) {
+		/* This also changes netmask */
+		if (iface->state->options->options & DHCPCD_INFORM &&
+		   !has_address(iface->name, &ifo->request_address,
+				&ifo->request_netmask))
+		{
+			syslog(LOG_DEBUG, "%s: adding IP address %s/%d",
+			       iface->name, inet_ntoa(ifo->request_address),
+			       inet_ntocidr(ifo->request_netmask));
+			if (add_address(iface, &ifo->request_address,
+					&ifo->request_netmask, NULL) == -1 &&
+			    errno != EEXIST)
+			{
+				syslog(LOG_ERR, "add_address: %m");
+			}
+		}
 		iface->state->offer = xzalloc(sizeof(*iface->state->offer));
 		iface->state->offer->yiaddr = ifo->request_address.s_addr;
-		ifo->request_address.s_addr = 0;
+		if (ifo->options & DHCPCD_REQUEST)
+			ifo->request_address.s_addr = 0;
 	} else
 	    iface->state->offer = read_lease(iface);
 /*	if (iface->state->offer) {
@@ -835,7 +864,7 @@ configure_interface(struct interface *iface, int argc, char **argv)
 				memcpy(iface->clientid + 2, iface->name, ifl);
 				if (ifl < 4)
 					memset(iface->clientid + 2 + ifl,
-							0, 4 - ifl);
+					       0, 4 - ifl);
 			} else {
 				ifl = htonl(if_nametoindex(iface->name));
 				memcpy(iface->clientid + 2, &ifl, 4);
@@ -845,7 +874,8 @@ configure_interface(struct interface *iface, int argc, char **argv)
 			iface->clientid = xmalloc(len + 1);
 			iface->clientid[0] = len;
 			iface->clientid[1] = iface->family;
-			memcpy(iface->clientid + 2, iface->hwaddr, iface->hwlen);
+			memcpy(iface->clientid + 2, iface->hwaddr,
+			       iface->hwlen);
 		}
 	}
 
@@ -980,8 +1010,12 @@ handle_signal(_unused void *arg)
 			break;
 		if (do_release || ifl->state->options->options & DHCPCD_RELEASE)
 			send_release(ifl);
-		if (!(ifl->state->options->options & DHCPCD_PERSISTENT))
+		if ((ifl->state->options->options & DHCPCD_PERSISTENT)) {
+			free(ifl->state->new);
+			ifl->state->new = NULL;
+		} else {
 			drop_config(ifl, do_release ? "RELEASE" : "STOP");
+		}
 		if (do_release || ifl->state->options->options & DHCPCD_RELEASE)
 			unlink(ifl->leasefile);
 	}

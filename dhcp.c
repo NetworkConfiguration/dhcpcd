@@ -1198,10 +1198,10 @@ configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 	}
 
 	ep = env;
-	if (dhcp->yiaddr) {
+	if (dhcp->yiaddr || dhcp->ciaddr) {
 		/* Set some useful variables that we derive from the DHCP
 		 * message but are not necessarily in the options */
-		addr.s_addr = dhcp->yiaddr;
+		addr.s_addr = dhcp->yiaddr ? dhcp->yiaddr : dhcp->ciaddr;
 		setvar(&ep, prefix, "ip_address", inet_ntoa(addr));
 		if (get_option_addr(&net.s_addr, dhcp, DHO_SUBNETMASK) == -1) {
 			net.s_addr = get_netmask(addr.s_addr);

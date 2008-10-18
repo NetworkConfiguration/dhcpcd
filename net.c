@@ -287,9 +287,8 @@ do_interface(const char *ifname,
 		char *buffer;
 		struct ifreq *ifr;
 	} ifreqs;
-	struct sockaddr_in address;
+	in_addr_t address, netmask;
 	struct ifreq *ifr;
-	struct sockaddr_in netmask;
 
 	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
 		return -1;
@@ -347,14 +346,13 @@ do_interface(const char *ifname,
 				continue;
 			memcpy(&netmask, &ifr->ifr_addr, sizeof(netmask));
 			if (act == 1) {
-				addr->s_addr = address.sin_addr.s_addr;
-				net->s_addr = netmask.sin_addr.s_addr;
+				addr->s_addr = address;
+				net->s_addr = netmask;
 				retval = 1;
 				break;
 			} else {
-				if (address.sin_addr.s_addr == addr->s_addr &&
-				    (!net ||
-				     netmask.sin_addr.s_addr == net->s_addr))
+				if (address == addr->s_addr &&
+				    (!net || netmask == net->s_addr))
 				{
 					retval = 1;
 					break;

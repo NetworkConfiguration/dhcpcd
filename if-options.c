@@ -347,8 +347,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		ifo->options |= DHCPCD_QUIET;
 		break;
 	case 's':
-		ifo->options |= DHCPCD_INFORM;
-		ifo->options |= DHCPCD_PERSISTENT;
+		ifo->options |= DHCPCD_INFORM | DHCPCD_PERSISTENT;
 		ifo->options &= ~DHCPCD_ARP;
 		if (!arg || *arg == '\0') {
 			ifo->request_address.s_addr = 0;

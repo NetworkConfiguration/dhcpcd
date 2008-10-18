@@ -121,7 +121,7 @@ if_address(const struct interface *iface, const struct in_addr *address,
 
 	ADDADDR(ifa.ifra_addr, address);
 	ADDADDR(ifa.ifra_mask, netmask);
-	if (action >= 0) {
+	if (action >= 0 && broadcast) {
 		ADDADDR(ifa.ifra_broadaddr, broadcast);
 	}
 #undef ADDADDR
