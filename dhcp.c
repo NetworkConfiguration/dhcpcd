@@ -1088,17 +1088,22 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data)
 	if (!s) {
 		if (type & UINT8)
 			l = 3;
-		else if (type & UINT16)
+		else if (type & UINT16) {
 			l = 5;
-		else if (type & SINT16)
+			dl /= 2;
+		} else if (type & SINT16) {
 			l = 6;
-		else if (type & UINT32)
+			dl /= 2;
+		} else if (type & UINT32) {
 			l = 10;
-		else if (type & SINT32)
+			dl /= 4;
+		} else if (type & SINT32) {
 			l = 11;
-		else if (type & IPV4)
+			dl /= 4;
+		} else if (type & IPV4) {
 			l = 16;
-		else {
+			dl /= 4;
+		} else {
 			errno = EINVAL;
 			return -1;
 		}
@@ -1188,7 +1193,7 @@ configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 			if (get_option_raw(dhcp, opt->option))
 				e++;
 		}
-		if (dhcp->yiaddr)
+		if (dhcp->yiaddr || dhcp->ciaddr)
 			e += 5;
 		if (*dhcp->bootfile && !(overl & 1))
 			e++;
