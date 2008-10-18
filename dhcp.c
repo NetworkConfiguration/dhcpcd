@@ -831,13 +831,12 @@ make_message(struct dhcp_message **message,
 			if (lease->server.s_addr)
 				PUTADDR(DHO_SERVERID, lease->server);
 		}
-	}
 
-	if (type == DHCP_RELEASE) {
-		if (lease->server.s_addr)
+		if (type == DHCP_RELEASE) {
+		    if (lease->server.s_addr)
 			PUTADDR(DHO_SERVERID, lease->server);
+		}
 	}
-
 
 	if (type == DHCP_DISCOVER ||
 	    type == DHCP_INFORM ||

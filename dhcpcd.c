@@ -746,31 +746,11 @@ start_reboot(struct interface *iface)
 		send_request(iface);
 }
 
-static void
-start_request(struct interface *iface)
-{
-	struct if_options *ifo = iface->state->options;
-
-	syslog(LOG_INFO, "%s: requesting lease of %s",
-		iface->name, inet_ntoa(ifo->request_address));
-	iface->state->state = DHS_REQUEST;
-	iface->state->xid = arc4random();
-	open_sockets(iface);
-	delete_timeout(NULL, iface);
-	iface->state->offer = xzalloc(sizeof(*iface->state->offer));
-	iface->state->offer->yiaddr = ifo->request_address.s_addr;
-	get_lease(&iface->state->lease, iface->state->offer);
-	iface->state->lease.frominfo = 1;
-	/* We should only go into this request loop once */
-	ifo->request_address.s_addr = 0;
-	add_timeout_sec(10, start_discover, iface);
-	send_request(iface);
-}
-
 void
 start_interface(void *arg)
 {
 	struct interface *iface = arg;
+	struct if_options *ifo = iface->state->options;
 	struct stat st;
 	struct timeval now;
 	uint32_t l;
@@ -781,11 +761,12 @@ start_interface(void *arg)
 	}
 
 	iface->start_uptime = uptime();
-	if (iface->state->options->request_address.s_addr) {
-		start_request(iface);
-		return;
-	}
-	iface->state->offer = read_lease(iface);
+	if (ifo->request_address.s_addr) {
+		iface->state->offer = xzalloc(sizeof(*iface->state->offer));
+		iface->state->offer->yiaddr = ifo->request_address.s_addr;
+		ifo->request_address.s_addr = 0;
+	} else
+	    iface->state->offer = read_lease(iface);
 /*	if (iface->state->offer) {
 		if (IN_LINKLOCAL(htonl(iface->state->offer->yiaddr))) {
 			free(iface->state->offer);
