@@ -346,7 +346,7 @@ if_address(const struct interface *iface,
 		   iface->name, strlen(iface->name) + 1);
 	add_attr_l(&nlm->hdr, sizeof(*nlm), IFA_LOCAL,
 		   &address->s_addr, sizeof(address->s_addr));
-	if (action >= 0)
+	if (action >= 0 && broadcast)
 		add_attr_l(&nlm->hdr, sizeof(*nlm), IFA_BROADCAST,
 			   &broadcast->s_addr, sizeof(broadcast->s_addr));
 

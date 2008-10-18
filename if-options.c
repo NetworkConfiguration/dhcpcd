@@ -267,7 +267,7 @@ static int
 parse_option(struct if_options *ifo, int opt, const char *arg)
 {
 	int i;
-	char *p;
+	char *p = NULL;
 	ssize_t s;
 	struct in_addr addr;
 
@@ -376,6 +376,9 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			       arg);
 			return -1;
 		}
+		/* Restore the slash */
+		if (ifo->options & DHCPCD_INFORM && p)
+			*--p = '/';
 		break;
 	case 't':
 		ifo->timeout = atoint(arg);
