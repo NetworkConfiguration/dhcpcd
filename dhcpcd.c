@@ -792,6 +792,7 @@ start_interface(void *arg)
 		}
 		iface->state->offer = xzalloc(sizeof(*iface->state->offer));
 		iface->state->offer->yiaddr = ifo->request_address.s_addr;
+		*iface->state->offer->options = DHO_END;
 		if (ifo->options & DHCPCD_REQUEST)
 			ifo->request_address.s_addr = 0;
 	} else
