@@ -282,11 +282,7 @@ do_interface(const char *ifname,
 	int retval = 0, found = 0;
 	int len = 10 * sizeof(struct ifreq);
 	int lastlen = 0;
-	char *p;
-	union {
-		char *buffer;
-		struct ifreq *ifr;
-	} ifreqs;
+	char *p, *e;
 	in_addr_t address, netmask;
 	struct ifreq *ifr;
 
@@ -316,10 +312,9 @@ do_interface(const char *ifname,
 		len *= 2;
 	}
 
-	for (p = (char *)ifc.ifc_buf; p < (char *)ifc.ifc_buf + ifc.ifc_len;) {
-		/* Cast the ifc buffer to an ifreq cleanly */
-		ifreqs.buffer = p;
-		ifr = ifreqs.ifr;
+	e = ifc.ifc_buf + ifc.ifc_len;
+	for (p = ifc.ifc_buf; p < e;) {
+		ifr = (struct ifreq *)p;
 
 #ifndef __linux__
 		if (ifr->ifr_addr.sa_len > sizeof(ifr->ifr_ifru))
@@ -341,10 +336,12 @@ do_interface(const char *ifname,
 		}
 
 		if (ifr->ifr_addr.sa_family == AF_INET && addr)	{
-			memcpy(&address, &ifr->ifr_addr, sizeof(address));
+			address = ((struct sockaddr_in *)&ifr->ifr_addr)
+				  ->sin_addr.s_addr;
 			if (ioctl(s, SIOCGIFNETMASK, ifr) == -1)
 				continue;
-			memcpy(&netmask, &ifr->ifr_addr, sizeof(netmask));
+			netmask = ((struct sockaddr_in *)&ifr->ifr_addr)
+				  ->sin_addr.s_addr;
 			if (act == 1) {
 				addr->s_addr = address;
 				net->s_addr = netmask;
