@@ -315,7 +315,7 @@ do_interface(const char *ifname,
 
 	e = (char *)ifc.ifc_buf + ifc.ifc_len;
 	for (p = ifc.ifc_buf; p < e;) {
-		ifr = (struct ifreq *)p;
+		ifr = (struct ifreq *)(void *)p;
 
 #ifndef __linux__
 		if (ifr->ifr_addr.sa_len > sizeof(ifr->ifr_ifru))
@@ -337,7 +337,7 @@ do_interface(const char *ifname,
 		}
 
 		if (ifr->ifr_addr.sa_family == AF_INET && addr)	{
-			sin = (struct sockaddr_in *)&ifr->ifr_addr;
+			sin = (struct sockaddr_in *)(void *)&ifr->ifr_addr;
 			address = sin->sin_addr.s_addr;
 			/* Some platforms only partially fill the bits
 			 * set by the netmask, so we need to zero it now. */
