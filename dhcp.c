@@ -534,13 +534,8 @@ decode_rfc3442_rt(int dl, const uint8_t *data)
 		/* If we have ocets then we have a destination and netmask */
 		if (ocets > 0) {
 			memcpy(&rt->dest.s_addr, p, ocets);
-			memset(&rt->net.s_addr, 255, ocets);
-			memset((uint8_t *)&rt->net.s_addr + (ocets - 1),
-			       (256 - (1 << (32 - cidr) % 8)), 1);
 			p += ocets;
-		} else {
-			rt->dest.s_addr = 0;
-			rt->net.s_addr = 0;
+			rt->net.s_addr = htonl(~0 << (32 - cidr));
 		}
 
 		/* Finally, snag the router */
