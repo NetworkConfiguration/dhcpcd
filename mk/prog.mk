@@ -33,7 +33,7 @@ all: ${PROG} ${SCRIPTS} _man
 .c.o:
 	${CC} ${CFLAGS} ${CPPFLAGS} -c $< -o $@
 
-${PROG}: ${OBJS}
+${PROG}: .depend ${OBJS}
 	${CC} ${LDFLAGS} -o $@ ${OBJS} ${LDADD}
 
 _proginstall: ${PROG}
