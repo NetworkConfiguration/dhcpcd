@@ -10,4 +10,5 @@ depend: .depend
 
 # Nasty hack for gmake which does not automatically include .depend
 # if it exists, unlike every other make implementation.
-include $(shell if test -e .depend; then echo .depend; else echo ""; fi)
+INC_DEPEND=$(shell if test -e .depend; then echo .depend; else echo ""; fi)
+include ${INC_DEPEND}
