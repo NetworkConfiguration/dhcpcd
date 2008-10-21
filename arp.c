@@ -81,10 +81,17 @@ handle_arp_failure(struct interface *iface)
 		handle_ipv4ll_failure(iface);
 		return;
 	}
-	if (!iface->state->lease.frominfo)
+	if (iface->state->lease.frominfo)
+		unlink(iface->leasefile);
+	else
 		send_decline(iface);
 	close_sockets(iface);
-	add_timeout_sec(DHCP_ARP_FAIL, start_interface, iface);
+	delete_timeout(NULL, iface);
+
+	if (iface->state->lease.frominfo)
+		start_interface(iface);
+	else
+		add_timeout_sec(DHCP_ARP_FAIL, start_interface, iface);
 }
 
 static void
