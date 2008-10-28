@@ -28,4 +28,14 @@ case "${reason}" in
 RENEW) x="up";;
 BOUND|INFORM|REBIND|REBOOT|TEST|TIMEOUT|IPV4LL) x="new";;
 esac
-set -- "" "${x}"
+
+if [ "${reason}" != "down" ]; then
+	rm -f /var/lib/dhcpcd-"${INTERFACE}".info
+	for x in IPADDR INTERFACE NETMASK BROADCAST NETWORK DHCPSID GATEWAYS \
+		DNSSERVERS DNSDOMAIN DNSSEARCH NISDOMAIN NISSERVERS \
+		NTPSERVERS GATEWAY DNS; do
+		eval echo "${x}=\'\$${x}\'" >> /var/lib/dhcpcd-"${INTERFACE}".info
+	done
+fi
+
+set -- /var/lib/dhcpcd-"${INTERFACE}".info "${x}"
