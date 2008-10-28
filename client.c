@@ -1666,17 +1666,19 @@ handle_arp_fail(struct if_state *state, const struct options *options)
 	int cookie = state->offer->cookie;
 
 	if (!IN_LINKLOCAL(htonl(state->fail.s_addr))) {
+		if (cookie) {
+			state->timeout.tv_sec = DHCP_ARP_FAIL;
+			state->timeout.tv_usec = 0;
+			do_socket(state, SOCKET_OPEN);
+			send_message(state, DHCP_DECLINE, options);
+			do_socket(state, SOCKET_CLOSED);
+		}
 		state->state = STATE_INIT;
 		free(state->offer);
 		state->offer = NULL;
 		state->lease.addr.s_addr = 0;
 		if (!cookie)
 			return 1;
-		state->timeout.tv_sec = DHCP_ARP_FAIL;
-		state->timeout.tv_usec = 0;
-		do_socket(state, SOCKET_OPEN);
-		send_message(state, DHCP_DECLINE, options);
-		do_socket(state, SOCKET_CLOSED);
 		return 0;
 	}
 
