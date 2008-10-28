@@ -53,6 +53,8 @@
 
 #define IPV4R	IPV4 | REQUEST
 
+#define DAD	"Duplicate address detected"
+
 /* Our aggregate option buffer.
  * We ONLY use this when options are split, which for most purposes is
  * practically never. See RFC3396 for details. */
@@ -760,6 +762,7 @@ make_message(struct dhcp_message **message,
 	time_t up = uptime() - iface->start_uptime;
 	uint32_t ul;
 	uint16_t sz;
+	size_t len;
 	const struct dhcp_opt *opt;
 	const struct if_options *ifo = iface->state->options;
 	const struct dhcp_lease *lease = &iface->state->lease;
@@ -794,15 +797,18 @@ make_message(struct dhcp_message **message,
 	case ARPHRD_IEEE1394:
 	case ARPHRD_INFINIBAND:
 		dhcp->hwlen = 0;
-		if (dhcp->ciaddr == 0)
+		if (dhcp->ciaddr == 0 &&
+		    type != DHCP_DECLINE && type != DHCP_RELEASE)
 			dhcp->flags = htons(BROADCAST_FLAG);
 		break;
 	}
 
-	if (up < 0 || up > (time_t)UINT16_MAX)
-		dhcp->secs = htons((uint16_t)UINT16_MAX);
-	else
-		dhcp->secs = htons(up);
+	if (type != DHCP_DECLINE && type != DHCP_RELEASE) {
+		if (up < 0 || up > (time_t)UINT16_MAX)
+			dhcp->secs = htons((uint16_t)UINT16_MAX);
+		else
+			dhcp->secs = htons(up);
+	}
 	dhcp->xid = iface->state->xid;
 	dhcp->cookie = htonl(MAGIC_COOKIE);
 
@@ -831,6 +837,14 @@ make_message(struct dhcp_message **message,
 		    if (lease->server.s_addr)
 			PUTADDR(DHO_SERVERID, lease->server);
 		}
+	}
+
+	if (type == DHCP_DECLINE) {
+		*p++ = DHO_MESSAGE;
+		len = strlen(DAD);
+		*p++ = len;
+		memcpy(p, DAD, len);
+		p += len;
 	}
 
 	if (type == DHCP_DISCOVER ||
