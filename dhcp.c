@@ -537,7 +537,7 @@ decode_rfc3442_rt(int dl, const uint8_t *data)
 		if (ocets > 0) {
 			memcpy(&rt->dest.s_addr, p, ocets);
 			p += ocets;
-			rt->net.s_addr = htonl(~0 << (32 - cidr));
+			rt->net.s_addr = htonl(~0U << (32 - cidr));
 		}
 
 		/* Finally, snag the router */
