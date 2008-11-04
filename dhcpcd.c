@@ -774,6 +774,10 @@ start_interface(void *arg)
 	}
 
 	iface->start_uptime = uptime();
+	if (options & DHCPCD_TEST) {
+		start_discover(iface);
+		return;
+	}
 	if (ifo->request_address.s_addr) {
 		/* This also changes netmask */
 		if (iface->state->options->options & DHCPCD_INFORM &&
