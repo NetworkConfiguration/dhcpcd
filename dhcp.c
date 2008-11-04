@@ -1008,13 +1008,21 @@ static ssize_t
 print_string(char *s, ssize_t len, int dl, const uint8_t *data)
 {
 	uint8_t c;
-	const uint8_t *e;
+	const uint8_t *e, *p;
 	ssize_t bytes = 0;
 	ssize_t r;
 
 	e = data + dl;
 	while (data < e) {
 		c = *data++;
+		if (c == '\0') {
+			/* If rest is all NULL, skip it. */
+			for (p = data; p < e; p++)
+				if (*p != '\0')
+					break;
+			if (p == e)
+				break;
+		}
 		if (!isascii(c) || !isprint(c)) {
 			if (s) {
 				if (len < 5) {
