@@ -437,7 +437,7 @@ discover_interfaces(int argc, char * const *argv)
 	struct interface *ifs = NULL, *ifp, *ifl;
 
 	if ((f = fopen("/proc/net/dev", "r"))) {
-		while (p = get_line(f)) {
+		while ((p = get_line(f))) {
 			if (++ln < 2)
 				continue;
 			n = strcspn(p, ": \t");
