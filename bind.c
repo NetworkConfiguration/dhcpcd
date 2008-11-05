@@ -81,14 +81,6 @@ daemonise(void)
 			close(sidpipe[0]);
 			write(sidpipe[1], &buf, 1);
 			close(sidpipe[1]);
-
-			break;
-		default:
-			signal_reset();
-			/* Wait for child to detach */
-			close(sidpipe[1]);
-			read(sidpipe[0], &buf, 1);
-			close(sidpipe[0]);
 			if ((fd = open(_PATH_DEVNULL, O_RDWR, 0)) != -1) {
 				dup2(fd, STDIN_FILENO);
 				dup2(fd, STDOUT_FILENO);
@@ -96,6 +88,13 @@ daemonise(void)
 				if (fd > STDERR_FILENO)
 					close(fd);
 			}
+			break;
+		default:
+			signal_reset();
+			/* Wait for child to detach */
+			close(sidpipe[1]);
+			read(sidpipe[0], &buf, 1);
+			close(sidpipe[0]);
 			break;
 	}
 	/* Done with the fd now */
