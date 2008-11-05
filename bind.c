@@ -25,6 +25,11 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/param.h>
+#include <fcntl.h>
+#ifdef BSD
+#  include <paths.h>
+#endif
 #include <signal.h>
 #include <stdlib.h>
 #include <syslog.h>
@@ -41,6 +46,10 @@
 #include "net.h"
 #include "signals.h"
 
+#ifndef _PATH_DEVNULL
+#  define _PATH_DEVNULL "/dev/null"
+#endif
+
 #ifndef THERE_IS_NO_FORK
 pid_t
 daemonise(void)
@@ -49,7 +58,7 @@ daemonise(void)
 	sigset_t full;
 	sigset_t old;
 	char buf = '\0';
-	int sidpipe[2];
+	int sidpipe[2], fd;
 
 	if (options & DHCPCD_DAEMONISED || !(options & DHCPCD_DAEMONISE))
 		return 0;
@@ -72,7 +81,7 @@ daemonise(void)
 			close(sidpipe[0]);
 			write(sidpipe[1], &buf, 1);
 			close(sidpipe[1]);
-			close_fds();
+
 			break;
 		default:
 			signal_reset();
@@ -80,6 +89,13 @@ daemonise(void)
 			close(sidpipe[1]);
 			read(sidpipe[0], &buf, 1);
 			close(sidpipe[0]);
+			if ((fd = open(_PATH_DEVNULL, O_RDWR, 0)) != -1) {
+				dup2(fd, STDIN_FILENO);
+				dup2(fd, STDOUT_FILENO);
+				dup2(fd, STDERR_FILENO);
+				if (fd > STDERR_FILENO)
+					close(fd);
+			}
 			break;
 	}
 	/* Done with the fd now */

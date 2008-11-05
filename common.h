@@ -84,7 +84,6 @@ size_t strlcpy(char *, const char *, size_t);
 int closefrom(int);
 #endif
 
-int close_fds(void);
 int set_cloexec(int);
 int set_nonblock(int);
 ssize_t get_line(char **, size_t *, FILE *);

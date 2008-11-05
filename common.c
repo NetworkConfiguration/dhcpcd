@@ -138,23 +138,6 @@ closefrom(int fd)
 }
 #endif
 
-/* Close our fd's */
-int
-close_fds(void)
-{
-	int fd;
-
-	if ((fd = open(_PATH_DEVNULL, O_RDWR)) == -1)
-		return -1;
-
-	dup2(fd, fileno(stdin));
-	dup2(fd, fileno(stdout));
-	dup2(fd, fileno(stderr));
-	if (fd > 2)
-		close(fd);
-	return 0;
-}
-
 int
 set_cloexec(int fd)
 {
