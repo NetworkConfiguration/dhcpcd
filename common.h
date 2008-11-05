@@ -86,7 +86,7 @@ int closefrom(int);
 
 int set_cloexec(int);
 int set_nonblock(int);
-ssize_t get_line(char **, size_t *, FILE *);
+char *get_line(FILE * restrict);
 extern int clock_monotonic;
 int get_monotonic(struct timeval *);
 time_t uptime(void);

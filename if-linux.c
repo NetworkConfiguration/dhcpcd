@@ -431,18 +431,15 @@ struct interface *
 discover_interfaces(int argc, char * const *argv)
 {
 	FILE *f;
-	char *buffer = NULL, *p;
-	size_t len = 0, ln = 0, n;
+	char *p;
+	size_t ln = 0, n;
 	int i;
 	struct interface *ifs = NULL, *ifp, *ifl;
 
 	if ((f = fopen("/proc/net/dev", "r"))) {
-		while (get_line(&buffer, &len, f)) {
+		while (p = get_line(f)) {
 			if (++ln < 2)
 				continue;
-			p = buffer;
-			while (isspace((unsigned int)*p))
-				p++;
 			n = strcspn(p, ": \t");
 			p[n]= '\0';
 			ifl = NULL;
@@ -479,7 +476,6 @@ discover_interfaces(int argc, char * const *argv)
 			}
 		}
 		fclose(f);
-		free(buffer);
 	}
 	return ifs;
 }

@@ -586,8 +586,7 @@ read_config(const char *file, const char *ifname)
 {
 	struct if_options *ifo;
 	FILE *f;
-	size_t len = 0;
-	char *line, *option, *p, *buffer = NULL;
+	char *line, *option, *p;
 	int skip = 0;
 
 	/* Seed our default options */
@@ -612,18 +611,8 @@ read_config(const char *file, const char *ifname)
 	if (!f)
 		return ifo;
 
-	while ((get_line(&buffer, &len, f))) {
-		line = buffer;
-		while ((option = strsep(&line, " \t")))
-			if (*option != '\0')
-				break;
-		if (!option || *option == '\0' || *option == '#')
-			continue;
-		/* Trim leading whitespace */
-		if (line) {
-			while (*line != '\0' && (*line == ' ' || *line == '\t'))
-				line++;
-		}
+	while ((line = get_line(f))) {
+		option = strsep(&line, " \t");
 		/* Trim trailing whitespace */
 		if (line && *line) {
 			p = line + strlen(line) - 1;
@@ -646,7 +635,6 @@ read_config(const char *file, const char *ifname)
 			break;
 		}
 	}
-	free(buffer);
 	fclose(f);
 
 	/* Terminate the encapsulated options */

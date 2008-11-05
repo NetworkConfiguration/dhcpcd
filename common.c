@@ -51,31 +51,64 @@
 #  define _PATH_DEVNULL "/dev/null"
 #endif
 
-int clock_monotonic = 0;
+int clock_monotonic;
+static char *lbuf;
+static size_t lbuf_len;
+
+#ifdef DEBUG_MEMORY
+static void
+free_lbuf(void)
+{
+	free(lbuf);
+}
+#endif
 
 /* Handy routine to read very long lines in text files.
- * This means we read the whole line and avoid any nasty buffer overflows. */
-ssize_t
-get_line(char **line, size_t *len, FILE *fp)
+ * This means we read the whole line and avoid any nasty buffer overflows.
+ * We strip leading space and avoid comment lines, making the code that calls
+ * us smaller.
+ * As we don't use threads, this API is clean too. */
+char *
+get_line(FILE * restrict fp)
 {
-	char *p;
-	size_t last = 0;
+	char *p, *e;
+	size_t last;
 
-	while(!feof(fp)) {
-		if (*line == NULL || last != 0) {
-			*len += BUFSIZ;
-			*line = xrealloc(*line, *len);
+again:
+	if (feof(fp))
+		return NULL;
+
+#ifdef DEBUG_MEMORY
+	if (!lbuf)
+		atexit(free_lbuf);
+#endif
+
+	last = 0;
+	do {
+		if (!lbuf || last != 0) {
+			lbuf_len += BUFSIZ;
+			lbuf = xrealloc(lbuf, lbuf_len);
 		}
-		p = *line + last;
+		p = lbuf + last;
 		memset(p, 0, BUFSIZ);
 		fgets(p, BUFSIZ, fp);
 		last += strlen(p);
-		if (last && (*line)[last - 1] == '\n') {
-			(*line)[last - 1] = '\0';
+		if (last && lbuf[last - 1] == '\n') {
+			lbuf[last - 1] = '\0';
 			break;
 		}
+	} while(!feof(fp));
+	if (!last)
+		return NULL;
+
+	e = p + last - 1;
+	for (p = lbuf; p < e; p++) {
+		if (*p != ' ' && *p != '\t')
+			break;
 	}
-	return last;
+	if (p == e || *p == '#' || *p == ';')
+		goto again;
+	return p;
 }
 
 /* Simple hack to return a random number without arc4random */

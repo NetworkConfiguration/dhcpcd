@@ -47,30 +47,23 @@ get_duid(unsigned char *duid, const struct interface *iface)
 	time_t t;
 	int x = 0;
 	unsigned char *p = duid;
-	size_t len = 0, l = 0;
-	char *buffer = NULL, *line, *option;
+	size_t len = 0;
+	char *line;
 
 	/* If we already have a DUID then use it as it's never supposed
 	 * to change once we have one even if the interfaces do */
 	if ((f = fopen(DUID, "r"))) {
-		while ((get_line(&buffer, &len, f))) {
-			line = buffer;
-			while ((option = strsep(&line, " \t")))
-				if (*option != '\0')
-					break;
-			if (!option || *option == '\0' || *option == '#')
-				continue;
-			l = hwaddr_aton(NULL, option);
-			if (l && l <= DUID_LEN) {
-				hwaddr_aton(duid, option);
+		while ((line = get_line(f))) {
+			len = hwaddr_aton(NULL, line);
+			if (len && len <= DUID_LEN) {
+				hwaddr_aton(duid, line);
 				break;
 			}
-			l = 0;
+			len = 0;
 		}
 		fclose(f);
-		free(buffer);
-		if (l)
-			return l;
+		if (len)
+			return len;
 	} else {
 		if (errno != ENOENT)
 			return 0;
