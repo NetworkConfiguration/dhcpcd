@@ -268,19 +268,14 @@ c_route(struct rt *ort, struct rt *nrt, const struct interface *iface)
 			iface->name, addr,
 			inet_ntocidr(nrt->net), inet_ntoa(nrt->gate));
 	free(addr);
-#if HAVE_ROUTE_METRIC
+	/* We don't call change_route because it doesn't work when something
+	 * has already used it. */
 	del_route(ort->iface, &ort->dest, &ort->net, &ort->gate, ort->iface->metric);
 	if (!add_route(iface, &nrt->dest, &nrt->net, &nrt->gate, iface->metric))
 		return 0;
 	syslog(LOG_ERR, "add_route: %m");
-#else
-	if (!change_route(iface, &ort->dest, &ort->net, &nrt->gate, iface->metric))
-		return 0;
-	syslog(LOG_ERR, "change_route: %m");
-#endif
 	return -1;
 }
-
 
 static int
 d_route(struct rt *rt, const struct interface *iface, int metric)
