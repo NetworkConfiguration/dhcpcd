@@ -25,6 +25,8 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+
 #ifdef __APPLE__
 #  include <mach/mach_time.h>
 #  include <mach/kern_return.h>
@@ -69,7 +71,7 @@ free_lbuf(void)
  * us smaller.
  * As we don't use threads, this API is clean too. */
 char *
-get_line(FILE * restrict fp)
+get_line(FILE * __restrict fp)
 {
 	char *p, *e;
 	size_t last;

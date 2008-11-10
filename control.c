@@ -88,6 +88,7 @@ handle_control_data(void *arg)
 	}
 }
 
+/* ARGSUSED */
 static void
 handle_control(_unused void *arg)
 {

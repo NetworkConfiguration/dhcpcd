@@ -84,7 +84,7 @@ struct dhcp_op {
 	const char *name;
 };
 
-static const struct dhcp_op const dhcp_ops[] = {
+static const struct dhcp_op dhcp_ops[] = {
 	{ DHCP_DISCOVER, "DHCP_DISCOVER" },
 	{ DHCP_OFFER,    "DHCP_OFFER" },
 	{ DHCP_REQUEST,  "DHCP_REQUEST" },
@@ -171,6 +171,7 @@ cleanup(void)
 #endif
 }
 
+/* ARGSUSED */
 _noreturn void
 handle_exit_timeout(_unused void *arg)
 {
@@ -964,6 +965,7 @@ handle_remove_interface(const char *ifname)
 		stop_interface(iface, "STOP");
 }
 
+/* ARGSUSED */
 static void
 handle_link(_unused void *arg)
 {
@@ -974,6 +976,7 @@ handle_link(_unused void *arg)
 		syslog(LOG_ERR, "manage_link: %m");
 }
 
+/* ARGSUSED */
 static void
 handle_signal(_unused void *arg)
 {

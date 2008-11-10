@@ -34,6 +34,7 @@
 #include <limits.h>
 
 #include "dhcp.h"
+#include "if-options.h"
 
 #define HWADDR_LEN 20
 

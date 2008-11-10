@@ -30,8 +30,6 @@
 
 #include <time.h>
 
-#include "dhcpcd.h"
-
 void add_event(int fd, void (*)(void *), void *);
 void delete_event(int fd);
 void add_timeout_sec(time_t, void (*)(void *), void *);

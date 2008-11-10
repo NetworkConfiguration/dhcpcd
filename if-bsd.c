@@ -134,6 +134,7 @@ if_address(const struct interface *iface, const struct in_addr *address,
 	return retval;
 }
 
+/* ARGSUSED4 */
 int
 if_route(const struct interface *iface, const struct in_addr *dest,
 	 const struct in_addr *net, const struct in_addr *gate,

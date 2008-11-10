@@ -56,6 +56,11 @@
 # define _unused
 #endif
 
+/* We require a c99 compiler, but we need this define to satisfy lint */
+#ifndef __restrict
+# define __restrict restrict
+#endif
+
 #ifndef HAVE_ARC4RANDOM
 # ifdef __GLIBC__
 uint32_t arc4random(void);
@@ -86,7 +91,7 @@ int closefrom(int);
 
 int set_cloexec(int);
 int set_nonblock(int);
-char *get_line(FILE * restrict);
+char *get_line(FILE * __restrict);
 extern int clock_monotonic;
 int get_monotonic(struct timeval *);
 time_t uptime(void);
