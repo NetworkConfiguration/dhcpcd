@@ -774,7 +774,7 @@ make_message(struct dhcp_message **message,
 	if ((type == DHCP_INFORM ||
 	     type == DHCP_RELEASE ||
 	     type == DHCP_REQUEST) &&
-	    !IN_LINKLOCAL(ntohl(iface->addr.s_addr)))
+	     !IN_LINKLOCAL(ntohl(iface->addr.s_addr)))
 	{
 		dhcp->ciaddr = iface->addr.s_addr;
 		/* Just incase we haven't actually configured the address yet */

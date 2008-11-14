@@ -87,7 +87,6 @@ handle_arp_failure(struct interface *iface)
 		send_decline(iface);
 	close_sockets(iface);
 	delete_timeout(NULL, iface);
-
 	if (iface->state->lease.frominfo)
 		start_interface(iface);
 	else

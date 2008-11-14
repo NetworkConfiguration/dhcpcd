@@ -801,7 +801,7 @@ start_interface(void *arg)
 		if (ifo->options & DHCPCD_REQUEST)
 			ifo->request_address.s_addr = 0;
 	} else
-	    iface->state->offer = read_lease(iface);
+		iface->state->offer = read_lease(iface);
 /*	if (iface->state->offer) {
 		if (IN_LINKLOCAL(htonl(iface->state->offer->yiaddr))) {
 			free(iface->state->offer);
@@ -811,10 +811,16 @@ start_interface(void *arg)
 	if (iface->state->offer) {
 		get_lease(&iface->state->lease, iface->state->offer);
 		iface->state->lease.frominfo = 1;
-		/* Offset lease times and check expiry */
-		if (stat(iface->leasefile, &st) == 0 &&
-		    get_option_uint32(&l, iface->state->offer, DHO_LEASETIME) == 0)
+		if (IN_LINKLOCAL(htonl(iface->state->offer->yiaddr))) {
+			if (iface->state->offer->yiaddr == iface->addr.s_addr) {
+				free(iface->state->offer);
+				iface->state->offer = NULL;
+			}
+		} else if (stat(iface->leasefile, &st) == 0 &&
+			   get_option_uint32(&l, iface->state->offer,
+			   		     DHO_LEASETIME) == 0)
 		{
+			/* Offset lease times and check expiry */
 			gettimeofday(&now, NULL);
 			if ((time_t)l < now.tv_sec - st.st_mtime) {
 				free(iface->state->offer);

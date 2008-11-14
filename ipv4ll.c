@@ -87,7 +87,7 @@ start_ipv4ll(void *arg)
 		}
 	}
 
-	/* We maybe rebooting of an IPv4LL address. */
+	/* We maybe rebooting an IPv4LL address. */
 	if (!iface->state->offer ||
 	    !IN_LINKLOCAL(htonl(iface->state->offer->yiaddr)))
 	{
