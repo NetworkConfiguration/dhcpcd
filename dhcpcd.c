@@ -1307,10 +1307,19 @@ main(int argc, char **argv)
 	ifc = argc - optind;
 	ifv = argv + optind;
 	ifaces = discover_interfaces(ifc, ifv);
-	if (!ifaces && ifc == 1) {
-		syslog(LOG_ERR, "interface `%s' does not exist", ifv[0]);
+	for (i = 0; i < ifc; i++) {
+		for (iface = ifaces; iface; iface = iface->next)
+			if (strcmp(iface->name, ifv[i]) == 0)
+				break;
+		if (!iface)
+			syslog(LOG_ERR, "%s: invalid interface", ifv[i]);
+	}
+	if (!ifaces) {
+		if (ifc == 0)
+			syslog(LOG_ERR, "no valid interfaces found");
 		exit(EXIT_FAILURE);
 	}
+
 	if (options & DHCPCD_BACKGROUND)
 		daemonise();
 	for (iface = ifaces; iface; iface = iface->next)
