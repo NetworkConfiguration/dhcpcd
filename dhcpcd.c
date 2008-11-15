@@ -1312,12 +1312,19 @@ main(int argc, char **argv)
 			if (strcmp(iface->name, ifv[i]) == 0)
 				break;
 		if (!iface)
-			syslog(LOG_ERR, "%s: invalid interface", ifv[i]);
+			syslog(LOG_ERR, "%s: interface not found or invalid",
+			       ifv[i]);
 	}
 	if (!ifaces) {
 		if (ifc == 0)
 			syslog(LOG_ERR, "no valid interfaces found");
-		exit(EXIT_FAILURE);
+		if (!(options & DHCPCD_BACKGROUND) || 
+		    !(options & DHCPCD_LINK))
+		{
+			syslog(LOG_ERR, "aborting as we're not backgrounding"
+			       " with link detection");
+			exit(EXIT_FAILURE);
+		}
 	}
 
 	if (options & DHCPCD_BACKGROUND)
