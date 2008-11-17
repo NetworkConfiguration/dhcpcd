@@ -857,6 +857,12 @@ configure_interface(struct interface *iface, int argc, char **argv)
 	if (ifo->metric != -1)
 		iface->metric = ifo->metric;
 
+	/* If we haven't specified a ClientID and our hardware address
+	 * length is greater than DHCP_CHADDR_LEN then we enforce a ClientID
+	 * of the hardware address family and the hardware address. */
+	if (!(ifo->options & DHCPCD_CLIENTID) && iface->hwlen > DHCP_CHADDR_LEN)
+		ifo->options |= DHCPCD_CLIENTID;
+
 	free(iface->clientid);
 	if (*ifo->clientid) {
 		iface->clientid = xmalloc(ifo->clientid[0] + 1);

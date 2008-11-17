@@ -1,4 +1,4 @@
-dhcpcd-4 - DHCP client daemon
+dhcpcd - DHCP client daemon
 Copyright 2006-2008 Roy Marples <roy@marples.name>
 
 
@@ -43,9 +43,13 @@ make HOOKSCRIPTS=50-ntp install
 
 Compatibility
 -------------
-dhcpcd-4.1 is only fully command line compatible with dhcpcd-4.0
+dhcpcd-5.0 is only fully command line compatible with dhcpcd-4.0
 For compatibility with older versions, use dhcpcd-4.0
 
+dhcpcd no longer sends a default ClientID for ethernet interfaces.
+This is so we can re-use the address the kernel DHCP client found.
+To retain the old behaviour of sending a default ClientID based on the
+hardware address for interface, simply add the keyword clientid to dhcpcd.conf.
 
 ChangeLog
 ---------

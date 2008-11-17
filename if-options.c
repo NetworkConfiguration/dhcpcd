@@ -467,7 +467,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		free(p);
 		break;
 	case 'D':
-		ifo->options |= DHCPCD_DUID;
+		ifo->options |= DHCPCD_CLIENTID | DHCPCD_DUID;
 		break;
 	case 'E':
 		ifo->options |= DHCPCD_LASTLEASE;
@@ -505,11 +505,8 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			syslog(LOG_ERR, "clientid: %m");
 			return -1;
 		}
+		ifo->options |= DHCPCD_CLIENTID;
 		ifo->clientid[0] = (uint8_t)s;
-		if (s == 0) {
-			ifo->options &= ~DHCPCD_DUID;
-			ifo->options &= ~DHCPCD_CLIENTID;
-		}
 		break;
 	case 'K':
 		ifo->options &= ~DHCPCD_LINK;
@@ -591,7 +588,7 @@ read_config(const char *file, const char *ifname)
 
 	/* Seed our default options */
 	ifo = xzalloc(sizeof(*ifo));
-	ifo->options |= DHCPCD_CLIENTID | DHCPCD_GATEWAY | DHCPCD_DAEMONISE;
+	ifo->options |= DHCPCD_GATEWAY | DHCPCD_DAEMONISE;
 	ifo->options |= DHCPCD_ARP | DHCPCD_IPV4LL | DHCPCD_LINK;
 	ifo->timeout = DEFAULT_TIMEOUT;
 	ifo->reboot = DEFAULT_REBOOT;
