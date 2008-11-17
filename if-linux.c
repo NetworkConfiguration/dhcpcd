@@ -431,7 +431,8 @@ struct interface *
 discover_interfaces(int argc, char * const *argv)
 {
 	FILE *f;
-	char *p;
+	char ifn[IF_NAMESIZE];
+	char *p, *c;
 	size_t ln = 0, n;
 	int i;
 	struct interface *ifs = NULL, *ifp, *ifl;
@@ -451,11 +452,18 @@ discover_interfaces(int argc, char * const *argv)
 			if (ifp)
 				continue;
 			if (argc > 0) {
-				for (i = 0; i < argc; i++)
-					if (strcmp(argv[i], p) == 0)
+				for (i = 0; i < argc; i++) {
+					/* Check the real interface name */
+					strlcpy(ifn, argv[i], sizeof(ifn));
+					c = strchr(ifn, ':');
+					if (c)
+						*c = '\0';
+					if (strcmp(ifn, p) == 0)
 						break;
+				}
 				if (i == argc)
 					continue;
+				p = argv[i];
 			} else {
 				for (i = 0; i < ifdc; i++)
 					if (!fnmatch(ifdv[i], p, 0))

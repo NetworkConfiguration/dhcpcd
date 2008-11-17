@@ -487,6 +487,7 @@ open_udp_socket(struct interface *iface)
 	int n;
 #ifdef SO_BINDTODEVICE
 	struct ifreq ifr;
+	char *p;
 #endif
 
 	if ((s = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
@@ -498,6 +499,10 @@ open_udp_socket(struct interface *iface)
 #ifdef SO_BINDTODEVICE
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, iface->name, sizeof(ifr.ifr_name));
+	/* We can only bind to the real device */
+	p = strchr(ifr.ifr_name, ':');
+	if (p)
+		*p = '\0';
 	if (setsockopt(s, SOL_SOCKET, SO_BINDTODEVICE, &ifr, sizeof(ifr)) == -1)
 		goto eexit;
 #endif

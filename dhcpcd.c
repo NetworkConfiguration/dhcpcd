@@ -860,7 +860,7 @@ configure_interface(struct interface *iface, int argc, char **argv)
 	/* If we haven't specified a ClientID and our hardware address
 	 * length is greater than DHCP_CHADDR_LEN then we enforce a ClientID
 	 * of the hardware address family and the hardware address. */
-	if (!(ifo->options & DHCPCD_CLIENTID) && iface->hwlen > DHCP_CHADDR_LEN)
+	if (iface->hwlen > DHCP_CHADDR_LEN)
 		ifo->options |= DHCPCD_CLIENTID;
 
 	free(iface->clientid);
