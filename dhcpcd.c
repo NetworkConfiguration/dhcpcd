@@ -890,7 +890,6 @@ configure_interface(struct interface *iface, int argc, char **argv)
 			       iface->hwlen);
 		}
 	}
-
 }
 
 static void
