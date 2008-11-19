@@ -217,12 +217,16 @@ send_arp_probe(void *arg)
 	struct in_addr addr;
 	struct timeval tv;
 
+	if (state->offer)
+		addr.s_addr = state->offer->yiaddr;
+	else
+		addr.s_addr = iface->addr.s_addr;
+
 	if (iface->arp_fd == -1) {
 		open_socket(iface, ETHERTYPE_ARP);
 		add_event(iface->arp_fd, handle_arp_packet, iface);
 	}
 	if (state->probes == 0) {
-		addr.s_addr = state->offer->yiaddr;
 		syslog(LOG_INFO, "%s: checking %s is available"
 		       " on attached networks",
 		       iface->name, inet_ntoa(addr));
@@ -235,7 +239,7 @@ send_arp_probe(void *arg)
 	} else {
 		tv.tv_sec = ANNOUNCE_WAIT;
 		tv.tv_usec = 0;
-		if (IN_LINKLOCAL(htonl(state->offer->yiaddr)))
+		if (IN_LINKLOCAL(htonl(addr.s_addr)))
 			add_timeout_tv(&tv, bind_interface, iface);
 		else
 			add_timeout_tv(&tv, send_request, iface);
@@ -243,6 +247,6 @@ send_arp_probe(void *arg)
 	syslog(LOG_DEBUG,
 	       "%s: sending ARP probe (%d of %d), next in %0.2f seconds",
 	       iface->name, state->probes, PROBE_NUM,  timeval_to_double(&tv));
-	if (send_arp(iface, ARPOP_REQUEST, 0, state->offer->yiaddr) == -1)
+	if (send_arp(iface, ARPOP_REQUEST, 0, addr.s_addr) == -1)
 		syslog(LOG_ERR, "send_arp: %m");
 }
