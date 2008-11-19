@@ -1286,7 +1286,7 @@ get_lease(struct dhcp_lease *lease, const struct dhcp_message *dhcp)
 		if (now.tv_sec + (time_t)lease->leasetime < now.tv_sec)
 			lease->leasetime = ~0U; /* Infinite lease */
 	} else
-		lease->leasetime = DEFAULT_LEASETIME;
+		lease->leasetime = ~0U; /* Default to infinite lease */
 	if (get_option_uint32(&lease->renewaltime, dhcp, DHO_RENEWALTIME) != 0)
 		lease->renewaltime = 0;
 	if (get_option_uint32(&lease->rebindtime, dhcp, DHO_REBINDTIME) != 0)
