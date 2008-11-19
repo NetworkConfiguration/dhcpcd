@@ -127,13 +127,9 @@ enum FQDN {
 #define DHCP_CHADDR_LEN         16
 #define SERVERNAME_LEN          64
 #define BOOTFILE_LEN            128
-#define DHCP_UDP_LEN            (20 + 8)
-#define DHCP_BASE_LEN           (4 + 4 + 2 + 2 + 4 + 4 + 4 + 4 + 4)
-#define DHCP_RESERVE_LEN        (4 + 4 + 4 + 4 + 2)
-#define DHCP_FIXED_LEN          (DHCP_BASE_LEN + DHCP_CHADDR_LEN + \
-				 + SERVERNAME_LEN + BOOTFILE_LEN)
-#define DHCP_OPTION_LEN         (MTU_MAX - DHCP_FIXED_LEN - DHCP_UDP_LEN \
-				 - DHCP_RESERVE_LEN)
+#define DHCP_UDP_LEN            (14 + 20 + 8)
+#define DHCP_FIXED_LEN          (DHCP_UDP_LEN + 226)
+#define DHCP_OPTION_LEN         (MTU_MAX - DHCP_FIXED_LEN)
 
 /* Some crappy DHCP servers require the BOOTP minimum length */
 #define BOOTP_MESSAGE_LENTH_MIN 300
