@@ -41,7 +41,6 @@
 
 #define DEFAULT_TIMEOUT		30
 #define DEFAULT_REBOOT		10
-#define DEFAULT_LEASETIME	3600	/* 1 hour */
 
 #define HOSTNAME_MAX_LEN	250	/* 255 - 3 (FQDN) - 2 (DNS enc) */
 #define VENDORCLASSID_MAX_LEN	48
