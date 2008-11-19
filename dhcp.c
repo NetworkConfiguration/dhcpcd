@@ -1277,7 +1277,11 @@ get_lease(struct dhcp_lease *lease, const struct dhcp_message *dhcp)
 {
 	struct timeval now;
 
-	lease->addr.s_addr = dhcp->yiaddr;
+	/* BOOTP does not set yiaddr for replies when ciaddr is set. */
+	if (dhcp->yiaddr)
+		lease->addr.s_addr = dhcp->yiaddr;
+	else
+		lease->addr.s_addr = dhcp->ciaddr;
 	if (get_option_addr(&lease->net.s_addr, dhcp, DHO_SUBNETMASK) == -1)
 		lease->net.s_addr = get_netmask(dhcp->yiaddr);
 	if (get_option_uint32(&lease->leasetime, dhcp, DHO_LEASETIME) == 0) {

@@ -217,9 +217,12 @@ send_arp_probe(void *arg)
 	struct in_addr addr;
 	struct timeval tv;
 
-	if (state->offer)
-		addr.s_addr = state->offer->yiaddr;
-	else
+	if (state->offer) {
+		if (state->offer->yiaddr)
+			addr.s_addr = state->offer->yiaddr;
+		else
+			addr.s_addr = state->offer->ciaddr;
+	} else
 		addr.s_addr = iface->addr.s_addr;
 
 	if (iface->arp_fd == -1) {
@@ -239,7 +242,10 @@ send_arp_probe(void *arg)
 	} else {
 		tv.tv_sec = ANNOUNCE_WAIT;
 		tv.tv_usec = 0;
-		if (IN_LINKLOCAL(htonl(addr.s_addr)))
+		/* We will bind IPv4LL and BOOTP addresses */
+		if ((state->lease.server.s_addr == 0 &&
+		     state->lease.frominfo == 0) ||
+		    IN_LINKLOCAL(htonl(addr.s_addr)))
 			add_timeout_tv(&tv, bind_interface, iface);
 		else
 			add_timeout_tv(&tv, send_request, iface);

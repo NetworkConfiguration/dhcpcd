@@ -417,11 +417,9 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 	/* reset the message counter */
 	state->interval = 0;
 
-	/* We have to have DHCP type to work */
-	if (get_option_uint8(&type, dhcp, DHO_MESSAGETYPE) == -1) {
-		log_dhcp(LOG_ERR, "no DHCP type in", iface, dhcp);
-		return;
-	}
+	/* We may have found a BOOTP server */
+	if (get_option_uint8(&type, dhcp, DHO_MESSAGETYPE) == -1) 
+		type = 0;
 
 	/* Ensure that it's not from a blacklisted server.
 	 * We should expand this to check IP and/or hardware address
@@ -476,10 +474,14 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 		}
 	}
 
-	if (type == DHCP_OFFER && state->state == DHS_DISCOVER) {
+	if ((type == 0 || type == DHCP_OFFER) &&
+	    state->state == DHS_DISCOVER)
+	{
 		lease->frominfo = 0;
 		lease->addr.s_addr = dhcp->yiaddr;
-		get_option_addr(&lease->server.s_addr, dhcp, DHO_SERVERID);
+		lease->server.s_addr = 0;
+		if (type)
+			get_option_addr(&lease->server.s_addr, dhcp, DHO_SERVERID);
 		log_dhcp(LOG_INFO, "offered", iface, dhcp);
 		free(state->offer);
 		state->offer = dhcp;
@@ -507,24 +509,30 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 				return;
 			}
 		}
-		state->state = DHS_REQUEST;
-		send_request(iface);
-		return;
+		/* We don't request BOOTP addresses */
+		if (type) {
+			state->state = DHS_REQUEST;
+			send_request(iface);
+			return;
+		}
 	}
 
-	if (type == DHCP_OFFER) {
-		log_dhcp(LOG_INFO, "ignoring offer of", iface, dhcp);
-		return;
+	if (type) {
+		if (type == DHCP_OFFER) {
+			log_dhcp(LOG_INFO, "ignoring offer of", iface, dhcp);
+			return;
+		}
+
+		/* We should only be dealing with acks */
+		if (type != DHCP_ACK) {
+			log_dhcp(LOG_ERR, "not ACK or OFFER", iface, dhcp);
+			return;
+		}
+
+		if (!(ifo->options & DHCPCD_INFORM))
+			log_dhcp(LOG_INFO, "acknowledged", iface, dhcp);
 	}
 
-	/* We should only be dealing with acks */
-	if (type != DHCP_ACK) {
-		log_dhcp(LOG_ERR, "not ACK or OFFER", iface, dhcp);
-		return;
-	}
-
-	if (!(ifo->options & DHCPCD_INFORM))
-		log_dhcp(LOG_INFO, "acknowledged", iface, dhcp);
 	close_sockets(iface);
 	free(state->offer);
 	state->offer = dhcp;
