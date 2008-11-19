@@ -638,8 +638,6 @@ valid_udp_packet(const uint8_t *data)
 {
 	struct udp_dhcp_packet packet;
 	uint16_t bytes, udpsum;
-	struct in_addr dest, source;
-	int retval = 0;
 
 	memcpy(&packet, data, sizeof(packet));
 	if (checksum(&packet.ip, sizeof(packet.ip)) != 0) {
@@ -648,22 +646,21 @@ valid_udp_packet(const uint8_t *data)
 	}
 
 	bytes = ntohs(packet.ip.ip_len);
-	packet.ip.ip_sum = 0;
-	memcpy(&source, &packet.ip.ip_src, sizeof(packet.ip.ip_src));
-	memcpy(&dest, &packet.ip.ip_dst, sizeof(packet.ip.ip_dst));
-	memset(&packet.ip, 0, sizeof(packet.ip));
 	udpsum = packet.udp.uh_sum;
 	packet.udp.uh_sum = 0;
-
-	packet.ip.ip_p = IPPROTO_UDP;
-	memcpy(&packet.ip.ip_src, &source, sizeof(packet.ip.ip_src));
-	memcpy(&packet.ip.ip_dst, &dest, sizeof(packet.ip.ip_dst));
+	packet.ip.ip_hl = 0;
+	packet.ip.ip_v = 0;
+	packet.ip.ip_tos = 0;
 	packet.ip.ip_len = packet.udp.uh_ulen;
+	packet.ip.ip_id = 0;
+	packet.ip.ip_off = 0;
+	packet.ip.ip_ttl = 0;
+	packet.ip.ip_sum = 0;
 	if (udpsum && checksum(&packet, bytes) != udpsum) {
 		errno = EINVAL;
-		retval = -1;
+		return -1;
 	}
 
-	return retval;
+	return 0;
 }
 
