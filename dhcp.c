@@ -374,7 +374,8 @@ get_option_uint8(uint8_t *i, const struct dhcp_message *dhcp, uint8_t option)
 
 	if (!p)
 		return -1;
-	*i = *(p);
+	if (i)
+		*i = *(p);
 	return 0;
 }
 
@@ -774,7 +775,7 @@ make_message(struct dhcp_message **message,
 	if ((type == DHCP_INFORM ||
 	     type == DHCP_RELEASE ||
 	     type == DHCP_REQUEST) &&
-	     !IN_LINKLOCAL(ntohl(iface->addr.s_addr)))
+	    !IN_LINKLOCAL(ntohl(iface->addr.s_addr)))
 	{
 		dhcp->ciaddr = iface->addr.s_addr;
 		/* Just incase we haven't actually configured the address yet */
@@ -960,6 +961,12 @@ write_lease(const struct interface *iface, const struct dhcp_message *dhcp)
 	const uint8_t *e = p + sizeof(dhcp->options);
 	uint8_t l;
 	uint8_t o = 0;
+
+	/* We don't write BOOTP leases */
+	if (is_bootp(dhcp)) {
+		unlink(iface->leasefile);
+		return 0;
+	}
 
 	fd = open(iface->leasefile, O_WRONLY | O_CREAT | O_TRUNC, 0400);
 	if (fd == -1)

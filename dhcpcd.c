@@ -264,19 +264,20 @@ send_message(struct interface *iface, int type,
 		tv.tv_sec = state->interval + DHCP_RAND_MIN;
 		tv.tv_usec = arc4random() % (DHCP_RAND_MAX_U - DHCP_RAND_MIN_U);
 		syslog(LOG_DEBUG,
-		       "%s: sending %s with xid 0x%x, next in %0.2f seconds",
+		       "%s: sending %s (xid 0x%x), next in %0.2f seconds",
 		       iface->name, get_dhcp_op(type), state->xid,
 		       timeval_to_double(&tv));
 	}
 	/* If we couldn't open a UDP port for our IP address
 	 * then we cannot renew.
-	 * This could happen if our IP was pulled out from underneath us. */
-	if (iface->udp_fd == -1) {
+	 * This could happen if our IP was pulled out from underneath us.
+	 * Also, we should not unicast from a BOOTP lease. */
+	if (iface->udp_fd == -1 || is_bootp(iface->state->new)) {
 		a = iface->addr.s_addr;
 		iface->addr.s_addr = 0;
 	}
 	len = make_message(&dhcp, iface, type);
-	if (iface->udp_fd == -1)
+	if (a)
 		iface->addr.s_addr = a;
 	from.s_addr = dhcp->ciaddr;
 	if (from.s_addr)
@@ -363,12 +364,8 @@ start_expire(void *arg)
 	drop_config(iface, "EXPIRE");
 	unlink(iface->leasefile);
 	iface->state->interval = 0;
-	if (iface->carrier != LINK_DOWN) {
-		if (IN_LINKLOCAL(htonl(iface->state->lease.addr.s_addr)))
-			start_interface(iface);
-		else
-			start_ipv4ll(iface);
-	}
+	if (iface->carrier != LINK_DOWN)
+		start_interface(iface);
 }
 
 void
@@ -534,9 +531,13 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 	}
 
 	close_sockets(iface);
-	free(state->offer);
-	state->offer = dhcp;
-	*dhcpp = NULL;
+	/* BOOTP could have already assigned this above, so check we still
+	 * have a pointer. */
+	if (*dhcpp) {
+		free(state->offer);
+		state->offer = dhcp;
+		*dhcpp = NULL;
+	}
 	/* Delete all timeouts for this interface. */
 	delete_timeout(NULL, iface);
 	lease->frominfo = 0;
@@ -783,6 +784,9 @@ start_interface(void *arg)
 	}
 
 	iface->start_uptime = uptime();
+	free(iface->state->offer);
+	iface->state->offer = NULL;
+
 	if (options & DHCPCD_TEST) {
 		start_discover(iface);
 		return;
