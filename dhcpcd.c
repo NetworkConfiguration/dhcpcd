@@ -1109,6 +1109,7 @@ handle_args(int argc, char **argv)
 					configure_interface(ifn, argc, argv);
 					start_reboot(ifn);
 				}
+				free(ifp);
 			} else {
 				ifp->next = NULL;
 				init_state(ifp, argc, argv);
