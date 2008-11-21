@@ -521,10 +521,14 @@ parse_option(int opt, char *oarg, struct options *options)
 			return -1;
 		}
 		options->clientid[0] = (uint8_t)s;
+#ifdef CMDLINE_COMPAT
 		if (s == 0) {
 			options->options &= ~DHCPCD_DUID;
 			options->options &= ~DHCPCD_CLIENTID;
 		}
+#else
+		options->options |= DHCPCD_CLIENTID;
+#endif
 		break;
 	case 'K':
 		options->options &= ~DHCPCD_LINK;
@@ -618,7 +622,7 @@ main(int argc, char **argv)
 	setlogprefix(PACKAGE ": ");
 
 	options = xzalloc(sizeof(*options));
-	options->options |= DHCPCD_CLIENTID | DHCPCD_GATEWAY | DHCPCD_DAEMONISE;
+	options->options |= DHCPCD_GATEWAY | DHCPCD_DAEMONISE;
 	options->options |= DHCPCD_ARP | DHCPCD_IPV4LL | DHCPCD_LINK;
 	options->timeout = DEFAULT_TIMEOUT;
 	strlcpy(options->script, SCRIPT, sizeof(options->script));
@@ -628,6 +632,7 @@ main(int argc, char **argv)
 					     "%s %s", PACKAGE, VERSION);
 
 #ifdef CMDLINE_COMPAT
+	options->options |= DHCPCD_CLIENTID;
 	add_option_mask(options->requestmask, DHO_DNSSERVER);
 	add_option_mask(options->requestmask, DHO_DNSDOMAIN);
 	add_option_mask(options->requestmask, DHO_DNSSEARCH);

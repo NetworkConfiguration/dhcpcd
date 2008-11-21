@@ -520,12 +520,18 @@ client_setup(struct if_state *state, const struct options *options)
 		iface->net.s_addr = lease->net.s_addr;
 	}
 
+       /* If we haven't specified a ClientID and our hardware address 
+	* length is greater than DHCP_CHADDR_LEN then we enforce a ClientID 
+	* of the hardware address family and the hardware address. */ 
+	if (!(state->options & DHCPCD_CLIENTID) && iface->hwlen > DHCP_CHADDR_LEN) 
+		state->options |= DHCPCD_CLIENTID; 
+ 
 	if (*options->clientid) {
 		iface->clientid = xmalloc(options->clientid[0] + 1);
 		memcpy(iface->clientid,
 		       options->clientid, options->clientid[0] + 1);
-	} else if (options->options & DHCPCD_CLIENTID) {
-		if (options->options & DHCPCD_DUID) {
+	} else if (state->options & DHCPCD_CLIENTID) {
+		if (state->options & DHCPCD_DUID) {
 			duid = xmalloc(DUID_LEN);
 			if ((len = get_duid(duid, iface)) == 0)
 				logger(LOG_ERR, "get_duid: %s",

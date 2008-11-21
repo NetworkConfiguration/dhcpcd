@@ -56,6 +56,13 @@ If CMDLINE_COMPAT is defined the we renable DUID support by default IF
 the dhcpcd.duid file exits. This keeps the clients working as they were,
 which is good.
 
+dhcpcd no longer sends a default ClientID for ethernet interfaces. 
+This is so we can re-use the address the kernel DHCP client found. 
+To retain the old behaviour of sending a default ClientID based on the 
+hardware address for interface, simply add the keyword clientid to dhcpcd.conf.
+If CMDLINE_COMPAT is defined, we renable the sending of ClientID by default
+AND adding clientid to dhcpcd.conf causes it NOT to be sent.
+
 dhcpcd-4 is NOT fully commandline compatible with dhcpcd-2 and older and
 changes the meaning of some options.
 
