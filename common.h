@@ -56,9 +56,16 @@
 # define _unused
 #endif
 
-/* We require a c99 compiler, but we need this define to satisfy lint */
+/* We don't really need this as our supported systems define __restrict
+ * automatically for us, but it is here for completeness. */
 #ifndef __restrict
-# define __restrict restrict
+# if defined(__lint__)
+#  define __restrict
+# elif __STDC_VERSION__ >= 199901L
+#  define __restrict restrict
+# elif !(2 < __GNUC__ || (2 == __GNU_C && 95 <= __GNUC_VERSION__))
+#  define __restrict
+# endif
 #endif
 
 #ifndef HAVE_ARC4RANDOM
