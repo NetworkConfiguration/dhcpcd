@@ -1356,5 +1356,5 @@ main(int argc, char **argv)
 		start_interface(iface);
 	}
 	start_eloop();
-	/* NOTREACHED */
+	exit(EXIT_SUCCESS);
 }
