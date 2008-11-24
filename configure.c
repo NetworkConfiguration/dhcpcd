@@ -301,8 +301,13 @@ d_route(struct rt *rt, const struct interface *iface, int metric)
 static struct rt *
 add_subnet_route(struct rt *rt, const struct interface *iface)
 {
-	struct rt *r = xmalloc(sizeof(*r));
+	struct rt *r;
 
+	/* We don't have subnet routes with host masks */
+	if (iface->net.s_addr == INADDR_BROADCAST)
+		return rt;
+	
+	r = xmalloc(sizeof(*r));
 	r->dest.s_addr = iface->addr.s_addr & iface->net.s_addr;
 	r->net.s_addr = iface->net.s_addr;
 	r->gate.s_addr = 0;
@@ -493,15 +498,16 @@ configure(struct interface *iface, const char *reason)
 
 	/* We need to delete the subnet route to have our metric or
 	 * prefer the interface. */
+	if (iface->net.s_addr != INADDR_BROADCAST) {
 #if HAVE_ROUTE_METRIC
-	if (iface->metric > 0 && 
-	    (rt.net.s_addr != iface->net.s_addr ||
-	     rt.dest.s_addr != (iface->addr.s_addr & iface->net.s_addr)))
-		del_route(iface, &rt.dest, &rt.net, &rt.gate, 0);
+		if (iface->metric > 0 && 
+		    (rt.net.s_addr != iface->net.s_addr ||
+		     rt.dest.s_addr !=(iface->addr.s_addr & iface->net.s_addr)))
 #else
-	if (!find_route(routes, &rt, NULL, NULL))
-		del_route(iface, &rt.dest, &rt.net, &rt.gate, 0);
+		if (!find_route(routes, &rt, NULL, NULL))
 #endif
+			del_route(iface, &rt.dest, &rt.net, &rt.gate, 0);
+	}
 
 	iface->addr.s_addr = addr.s_addr;
 	iface->net.s_addr = net.s_addr;
