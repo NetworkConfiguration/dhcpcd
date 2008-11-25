@@ -68,8 +68,13 @@ struct dhcp_opt {
 
 static const struct dhcp_opt const dhcp_opts[] = {
 	{ 1,	IPV4 | REQUEST,	"subnet_mask" },
-	{ 2,	UINT32,		"time_offset" },
+	/* RFC 3442 states that the CSR has to come before all other routes.
+	 * For completeness, we also specify static routes, then routers. */
+	{ 121,  RFC3442 | REQUEST,	"classless_static_routes" },
+	{ 249,  RFC3442,	"ms_classless_static_routes" },
+	{ 33,	IPV4 | ARRAY | REQUEST,	"static_routes" },
 	{ 3,	IPV4 | ARRAY | REQUEST,	"routers" },
+	{ 2,	UINT32,		"time_offset" },
 	{ 4,	IPV4 | ARRAY,	"time_servers" },
 	{ 5,	IPV4 | ARRAY,	"ien116_name_servers" },
 	{ 6,	IPV4 | ARRAY,	"domain_name_servers" },
@@ -99,7 +104,6 @@ static const struct dhcp_opt const dhcp_opts[] = {
 	{ 30,	UINT8,		"mask_supplier" },
 	{ 31,	UINT8,		"router_discovery" },
 	{ 32,	IPV4,		"router_solicitation_address" },
-	{ 33,	IPV4 | ARRAY | REQUEST,	"static_routes" },
 	{ 34,	UINT8,		"trailer_encapsulation" },
 	{ 35, 	UINT32,		"arp_cache_timeout" },
 	{ 36,	UINT16,		"ieee802_3_encapsulation" },
@@ -154,8 +158,6 @@ static const struct dhcp_opt const dhcp_opts[] = {
 	{ 114,	STRING,		"default_url" },
 	{ 118,	IPV4,		"subnet_selection" },
 	{ 119,	STRING | RFC3397,	"domain_search" },
-	{ 121,  RFC3442 | REQUEST,	"classless_static_routes" },
-	{ 249,  RFC3442,	"ms_classless_static_routes" },
 	{ 0, 0, NULL }
 };
 
