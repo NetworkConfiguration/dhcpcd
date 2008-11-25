@@ -199,10 +199,10 @@ if_route(const struct interface *iface, const struct in_addr *dest,
 	ADDADDR(gate);
 
 	/* Ensure that netmask is set correctly */
-	memset (&su, 0, sizeof(su));
+	memset(&su, 0, sizeof(su));
 	su.sin.sin_family = AF_INET;
 	su.sin.sin_len = sizeof(su.sin);
-	memcpy (&su.sin.sin_addr, &net->s_addr, sizeof(su.sin.sin_addr));
+	memcpy(&su.sin.sin_addr, &net->s_addr, sizeof(su.sin.sin_addr));
 	p = su.sa.sa_len + (char *)&su;
 	for (su.sa.sa_len = 0; p > (char *)&su; )
 		if (*--p != 0) {
