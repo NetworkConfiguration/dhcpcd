@@ -325,7 +325,6 @@ if_route(const char *ifname,
 	unsigned int ifindex;
 	int retval = 0;
 
-
 	if (!(ifindex = if_nametoindex(ifname))) {
 		errno = ENODEV;
 		return -1;
@@ -336,7 +335,7 @@ if_route(const char *ifname,
 	nlm->hdr.nlmsg_type = RTM_NEWROUTE;
 	if (action == 0)
 		nlm->hdr.nlmsg_flags = NLM_F_REPLACE;
-	else if (action > 0)
+	else if (action == 1)
 		nlm->hdr.nlmsg_flags = NLM_F_CREATE | NLM_F_EXCL;
 	else
 		nlm->hdr.nlmsg_type = RTM_DELROUTE;
@@ -344,12 +343,14 @@ if_route(const char *ifname,
 	nlm->rt.rtm_family = AF_INET;
 	nlm->rt.rtm_table = RT_TABLE_MAIN;
 
-	if (action < 0)
+	if (action == -1 || action == -2)
 		nlm->rt.rtm_scope = RT_SCOPE_NOWHERE;
 	else {
 		nlm->hdr.nlmsg_flags |= NLM_F_CREATE | NLM_F_EXCL;
 		nlm->rt.rtm_protocol = RTPROT_BOOT;
-		if (gateway->s_addr == INADDR_ANY)
+		if (gateway->s_addr == INADDR_ANY ||
+		    (gateway->s_addr == destination->s_addr &&
+		     netmask->s_addr == INADDR_BROADCAST))
 			nlm->rt.rtm_scope = RT_SCOPE_LINK;
 		else
 			nlm->rt.rtm_scope = RT_SCOPE_UNIVERSE;
@@ -359,8 +360,11 @@ if_route(const char *ifname,
 	nlm->rt.rtm_dst_len = inet_ntocidr(*netmask);
 	add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_DST,
 		   &destination->s_addr, sizeof(destination->s_addr));
-	add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_GATEWAY,
-		   &gateway->s_addr, sizeof(gateway->s_addr));
+	/* If destination == gateway then don't add the gateway */
+	if (destination->s_addr != gateway->s_addr ||
+	    netmask->s_addr != INADDR_BROADCAST)
+		add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_GATEWAY,
+			   &gateway->s_addr, sizeof(gateway->s_addr));
 
 	add_attr_32(&nlm->hdr, sizeof(*nlm), RTA_OIF, ifindex);
 	add_attr_32(&nlm->hdr, sizeof(*nlm), RTA_PRIORITY, metric);
