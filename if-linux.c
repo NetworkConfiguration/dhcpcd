@@ -365,7 +365,6 @@ if_route(const struct interface *iface,
 	unsigned int ifindex;
 	int retval = 0;
 
-
 	if (!(ifindex = if_nametoindex(iface->name))) {
 		errno = ENODEV;
 		return -1;
@@ -376,7 +375,7 @@ if_route(const struct interface *iface,
 	nlm->hdr.nlmsg_type = RTM_NEWROUTE;
 	if (action == 0)
 		nlm->hdr.nlmsg_flags = NLM_F_REPLACE;
-	else if (action  == 1)
+	else if (action == 1)
 		nlm->hdr.nlmsg_flags = NLM_F_CREATE | NLM_F_EXCL;
 	else
 		nlm->hdr.nlmsg_type = RTM_DELROUTE;
@@ -389,12 +388,15 @@ if_route(const struct interface *iface,
 	else {
 		nlm->hdr.nlmsg_flags |= NLM_F_CREATE | NLM_F_EXCL;
 		/* We only change route metrics for kernel routes */
-		if (destination->s_addr == (iface->addr.s_addr & iface->net.s_addr) &&
+		if (destination->s_addr ==
+		    (iface->addr.s_addr & iface->net.s_addr) &&
 		    netmask->s_addr == iface->net.s_addr)
 			nlm->rt.rtm_protocol = RTPROT_KERNEL;
 		else
 			nlm->rt.rtm_protocol = RTPROT_BOOT;
-		if (gateway->s_addr == INADDR_ANY)
+		if (gateway->s_addr == INADDR_ANY ||
+		    (gateway->s_addr == destination->s_addr &&
+		     netmask->s_addr == INADDR_BROADCAST))
 			nlm->rt.rtm_scope = RT_SCOPE_LINK;
 		else
 			nlm->rt.rtm_scope = RT_SCOPE_UNIVERSE;
@@ -408,8 +410,11 @@ if_route(const struct interface *iface,
 		add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_PREFSRC,
 			   &iface->addr.s_addr, sizeof(iface->addr.s_addr));
 	}
-	add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_GATEWAY,
-		   &gateway->s_addr, sizeof(gateway->s_addr));
+	/* If destination == gateway then don't add the gateway */
+	if (destination->s_addr != gateway->s_addr ||
+	    netmask->s_addr != INADDR_BROADCAST)
+		add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_GATEWAY,
+			   &gateway->s_addr, sizeof(gateway->s_addr));
 
 	add_attr_32(&nlm->hdr, sizeof(*nlm), RTA_OIF, ifindex);
 	add_attr_32(&nlm->hdr, sizeof(*nlm), RTA_PRIORITY, metric);
