@@ -406,7 +406,7 @@ if_route(const struct interface *iface,
 	nlm->rt.rtm_dst_len = inet_ntocidr(*netmask);
 	add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_DST,
 		   &destination->s_addr, sizeof(destination->s_addr));
-	if (action != 1) {
+	if (nlm->rt.rtm_protocol == RTPROT_KERNEL) {
 		add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_PREFSRC,
 			   &iface->addr.s_addr, sizeof(iface->addr.s_addr));
 	}
