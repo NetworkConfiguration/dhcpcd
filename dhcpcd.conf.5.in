@@ -47,6 +47,13 @@ Here's a list of available options:
 Background immediately.
 This is useful for startup scripts which don't disable link messages for
 carrier status.
+.It Ic blacklist Ar address
+Ignores all DHCP messages which have this
+.Ar address
+as the server ID.
+This may be expanded in future releases to ignore all packets
+matching either the IP or hardware
+.Ar address .
 .It Ic clientid Ar string
 Send the
 .Ar clientid .
