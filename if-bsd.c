@@ -98,7 +98,7 @@ if_address(const char *ifname, const struct in_addr *address,
 }
 
 int
-if_route(const char *ifname, const struct in_addr *destination,
+if_route(const struct interface *iface, const struct in_addr *destination,
 	 const struct in_addr *netmask, const struct in_addr *gateway,
 	 _unused int metric, int action)
 {
@@ -172,7 +172,7 @@ if_route(const char *ifname, const struct in_addr *destination,
 	memset(&su, 0, sizeof(su));
 	su.sdl.sdl_family = AF_LINK;
 	su.sdl.sdl_len = sizeof(su.sdl);
-	link_addr(ifname, &su.sdl);
+	link_addr(iface->name, &su.sdl);
 	ADDSU(su);
 
 	rtm.hdr.rtm_msglen = l = bp - (char *)&rtm;
