@@ -1736,7 +1736,6 @@ handle_link(struct if_state *state)
 	if (retval == 0)
 		return 0;
 
-	timerclear(&state->timeout);
 	switch (carrier_status(state->interface->name)) {
 	case -1:
 		logger(LOG_ERR, "carrier_status: %s", strerror(errno));
@@ -1746,6 +1745,7 @@ handle_link(struct if_state *state)
 			logger(LOG_INFO, "carrier lost");
 			state->carrier = LINK_DOWN;
 			do_socket(state, SOCKET_CLOSED);
+			timerclear(&state->timeout);
 			if (state->state != STATE_BOUND)
 				timerclear(&state->stop);
 		}
@@ -1755,6 +1755,7 @@ handle_link(struct if_state *state)
 			logger(LOG_INFO, "carrier acquired");
 			state->state = STATE_RENEW_REQUESTED;
 			state->carrier = LINK_UP;
+			timerclear(&state->timeout);
 			timerclear(&state->stop);
 			return 1;
 		}
