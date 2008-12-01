@@ -265,6 +265,9 @@ arp_flush(void)
 	e = buffer + buffer_len;
 	for (p = buffer; p < e; p += rtm->rtm_msglen) {
 		rtm = (struct rt_msghdr *)(void *)p;
+		/* Don't delete manually added entries. */
+		if (rtm->rtm_flags & RTF_STATIC)
+			continue;
 		rtm->rtm_type = RTM_DELETE;
 		if (write(s, rtm, rtm->rtm_msglen) == -1) {
 			retval = -1;
