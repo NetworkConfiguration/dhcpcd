@@ -218,12 +218,10 @@ find_route(struct rt *rts, const struct rt *r, struct rt **lrt,
 }
 
 static void
-desc_route(int action, const struct rt *rt, const char *ifname)
+desc_route(const char *cmd, const struct rt *rt, const char *ifname)
 {
 	char *addr;
-	const char *cmd;
 
-	cmd = action == 1 ? "adding" : "deleting"; 
 	addr = xstrdup(inet_ntoa(rt->dest));
 	if (rt->gate.s_addr == INADDR_ANY)
 		syslog(LOG_DEBUG, "%s: %s route to %s/%d", ifname, cmd,
@@ -247,7 +245,7 @@ n_route(struct rt *rt, const struct interface *iface)
 	    !(iface->state->options->options & DHCPCD_GATEWAY))
 		return -1;
 
-	desc_route(1, rt, iface->name);
+	desc_route("adding", rt, iface->name);
 	if (!add_route(iface, &rt->dest, &rt->net, &rt->gate, iface->metric))
 		return 0;
 	if (errno == EEXIST) {
@@ -266,19 +264,13 @@ n_route(struct rt *rt, const struct interface *iface)
 static int
 c_route(struct rt *ort, struct rt *nrt, const struct interface *iface)
 {
-	char *addr;
-
 	/* Don't set default routes if not asked to */
 	if (nrt->dest.s_addr == 0 &&
 	    nrt->net.s_addr == 0 &&
 	    !(iface->state->options->options & DHCPCD_GATEWAY))
 		return -1;
 
-	addr = xstrdup(inet_ntoa(nrt->dest));
-	syslog(LOG_DEBUG, "%s: changing route to %s/%d via %s",
-			iface->name, addr,
-			inet_ntocidr(nrt->net), inet_ntoa(nrt->gate));
-	free(addr);
+	desc_route("changing", nrt, iface->name);
 	/* We don't call change_route because it doesn't work when something
 	 * has already used it. */
 	del_route(ort->iface, &ort->dest, &ort->net, &ort->gate, ort->iface->metric);
@@ -293,7 +285,7 @@ d_route(struct rt *rt, const struct interface *iface, int metric)
 {
 	int retval;
 
-	desc_route(-1, rt, iface->name);
+	desc_route("deleting", rt, iface->name);
 	retval = del_route(iface, &rt->dest, &rt->net, &rt->gate, metric);
 	if (retval != 0 && errno != ENOENT && errno != ESRCH)
 		syslog(LOG_ERR,"%s: del_route: %m", iface->name);
