@@ -217,26 +217,37 @@ find_route(struct rt *rts, const struct rt *r, struct rt **lrt,
 	return NULL;
 }
 
+static void
+desc_route(int action, const struct rt *rt, const char *ifname)
+{
+	char *addr;
+	const char *cmd;
+
+	cmd = action == 1 ? "adding" : "deleting"; 
+	addr = xstrdup(inet_ntoa(rt->dest));
+	if (rt->gate.s_addr == INADDR_ANY)
+		syslog(LOG_DEBUG, "%s: %s route to %s/%d", ifname, cmd,
+		       addr, inet_ntocidr(rt->net));
+	else if (rt->gate.s_addr == rt->dest.s_addr &&
+		 rt->net.s_addr == INADDR_BROADCAST)
+		syslog(LOG_DEBUG, "%s: %s host route to %s", ifname, cmd,
+		       addr);
+	else
+		syslog(LOG_DEBUG, "%s: %s route to %s/%d via %s", ifname, cmd,
+		       addr, inet_ntocidr(rt->net), inet_ntoa(rt->gate));
+	free(addr);
+}
+
 static int
 n_route(struct rt *rt, const struct interface *iface)
 {
-	char *addr;
-
 	/* Don't set default routes if not asked to */
 	if (rt->dest.s_addr == 0 &&
 	    rt->net.s_addr == 0 &&
 	    !(iface->state->options->options & DHCPCD_GATEWAY))
 		return -1;
 
-	addr = xstrdup(inet_ntoa(rt->dest));
-	if (rt->gate.s_addr == INADDR_ANY)
-		syslog(LOG_DEBUG, "%s: adding route to %s/%d",
-			iface->name, addr, inet_ntocidr(rt->net));
-	else
-		syslog(LOG_DEBUG, "%s: adding route to %s/%d via %s",
-			iface->name, addr,
-			inet_ntocidr(rt->net), inet_ntoa(rt->gate));
-	free(addr);
+	desc_route(1, rt, iface->name);
 	if (!add_route(iface, &rt->dest, &rt->net, &rt->gate, iface->metric))
 		return 0;
 	if (errno == EEXIST) {
@@ -248,7 +259,7 @@ n_route(struct rt *rt, const struct interface *iface)
 		else
 			return -1;
 	}
-	syslog(LOG_ERR, "add_route: %m");
+	syslog(LOG_ERR, "%s: add_route: %m", iface->name);
 	return -1;
 }
 
@@ -273,28 +284,19 @@ c_route(struct rt *ort, struct rt *nrt, const struct interface *iface)
 	del_route(ort->iface, &ort->dest, &ort->net, &ort->gate, ort->iface->metric);
 	if (!add_route(iface, &nrt->dest, &nrt->net, &nrt->gate, iface->metric))
 		return 0;
-	syslog(LOG_ERR, "add_route: %m");
+	syslog(LOG_ERR, "%s: add_route: %m", iface->name);
 	return -1;
 }
 
 static int
 d_route(struct rt *rt, const struct interface *iface, int metric)
 {
-	char *addr;
 	int retval;
 
-	addr = xstrdup(inet_ntoa(rt->dest));
-	if (rt->gate.s_addr == INADDR_ANY)
-		syslog(LOG_DEBUG, "%s: deleting route %s/%d", iface->name,
-		       addr, inet_ntocidr(rt->net));
-	else
-		syslog(LOG_DEBUG, "%s: deleting route %s/%d via %s",
-		       iface->name, addr,
-		       inet_ntocidr(rt->net), inet_ntoa(rt->gate));
-	free(addr);
+	desc_route(-1, rt, iface->name);
 	retval = del_route(iface, &rt->dest, &rt->net, &rt->gate, metric);
 	if (retval != 0 && errno != ENOENT && errno != ESRCH)
-		syslog(LOG_ERR," del_route: %m");
+		syslog(LOG_ERR,"%s: del_route: %m", iface->name);
 	return retval;
 }
 
