@@ -113,11 +113,12 @@ if_address(const struct interface *iface, const struct in_addr *address,
 	memset(&ifa, 0, sizeof(ifa));
 	strlcpy(ifa.ifra_name, iface->name, sizeof(ifa.ifra_name));
 
-#define ADDADDR(_var, _addr) \
+#define ADDADDR(_var, _addr) { \
 	_s.sa = &_var; \
 	_s.sin->sin_family = AF_INET; \
 	_s.sin->sin_len = sizeof(*_s.sin); \
-	memcpy(&_s.sin->sin_addr, _addr, sizeof(_s.sin->sin_addr));
+	memcpy(&_s.sin->sin_addr, _addr, sizeof(_s.sin->sin_addr)); \
+}
 
 	ADDADDR(ifa.ifra_addr, address);
 	ADDADDR(ifa.ifra_mask, netmask);
@@ -141,7 +142,6 @@ if_route(const struct interface *iface, const struct in_addr *dest,
 	 _unused int metric, int action)
 {
 	int s;
-	static int seq;
 	union sockunion {
 		struct sockaddr sa;
 		struct sockaddr_in sin;
@@ -160,23 +160,25 @@ if_route(const struct interface *iface, const struct in_addr *dest,
 	size_t l;
 	int retval = 0;
 
-#define ADDSU(_su) \
+#define ADDSU(_su) { \
 	l = SA_SIZE(&(_su.sa)); \
 	memcpy(bp, &(_su), l); \
-	bp += l;
-#define ADDADDR(_addr) \
+	bp += l; \
+} 
+#define ADDADDR(_addr) { \
 	memset (&su, 0, sizeof(su)); \
 	su.sin.sin_family = AF_INET; \
 	su.sin.sin_len = sizeof(su.sin); \
 	memcpy (&su.sin.sin_addr, _addr, sizeof(su.sin.sin_addr)); \
-	ADDSU(su);
+	ADDSU(su); \
+}
 
 	if ((s = socket(PF_ROUTE, SOCK_RAW, 0)) == -1)
 		return -1;
 
 	memset(&rtm, 0, sizeof(rtm));
 	rtm.hdr.rtm_version = RTM_VERSION;
-	rtm.hdr.rtm_seq = ++seq;
+	rtm.hdr.rtm_seq = 1;
 	if (action == 0)
 		rtm.hdr.rtm_type = RTM_CHANGE;
 	else if (action > 0)
@@ -189,34 +191,46 @@ if_route(const struct interface *iface, const struct in_addr *dest,
 	    net->s_addr != iface->net.s_addr ||
 	    dest->s_addr != (iface->addr.s_addr & iface->net.s_addr))
 		rtm.hdr.rtm_flags |= RTF_STATIC;
-	if (net->s_addr == INADDR_BROADCAST)
+	rtm.hdr.rtm_addrs = RTA_DST | RTA_GATEWAY;
+	if (dest->s_addr == gate->s_addr && net->s_addr == INADDR_BROADCAST)
 		rtm.hdr.rtm_flags |= RTF_HOST;
-	if (gate->s_addr != INADDR_ANY)	
-		rtm.hdr.rtm_flags |= RTF_GATEWAY;
-	rtm.hdr.rtm_addrs = RTA_DST | RTA_GATEWAY | RTA_NETMASK | RTA_IFP;
+	else {
+		rtm.hdr.rtm_addrs |= RTA_NETMASK;
+		if (rtm.hdr.rtm_flags & RTF_STATIC)
+			rtm.hdr.rtm_flags |= RTF_GATEWAY;
+		if (action >= 0)
+			rtm.hdr.rtm_addrs |= RTA_IFA;
+	}
 
 	ADDADDR(dest);
-	ADDADDR(gate);
+	if (rtm.hdr.rtm_flags & RTF_HOST ||
+	    !(rtm.hdr.rtm_flags & RTF_STATIC))
+	{
+		/* Make us a link layer socket for the host gateway */
+		memset(&su, 0, sizeof(su));
+		su.sdl.sdl_len = sizeof(struct sockaddr_dl);
+		link_addr(iface->name, &su.sdl);
+		ADDSU(su);
+	} else
+		ADDADDR(gate);
 
-	/* Ensure that netmask is set correctly */
-	memset(&su, 0, sizeof(su));
-	su.sin.sin_family = AF_INET;
-	su.sin.sin_len = sizeof(su.sin);
-	memcpy(&su.sin.sin_addr, &net->s_addr, sizeof(su.sin.sin_addr));
-	p = su.sa.sa_len + (char *)&su;
-	for (su.sa.sa_len = 0; p > (char *)&su; )
-		if (*--p != 0) {
-			su.sa.sa_len = 1 + p - (char *)&su;
-			break;
-		}
-	ADDSU(su);
+	if (rtm.hdr.rtm_addrs & RTA_NETMASK) {
+		/* Ensure that netmask is set correctly */
+		memset(&su, 0, sizeof(su));
+		su.sin.sin_family = AF_INET;
+		su.sin.sin_len = sizeof(su.sin);
+		memcpy(&su.sin.sin_addr, &net->s_addr, sizeof(su.sin.sin_addr));
+		p = su.sa.sa_len + (char *)&su;
+		for (su.sa.sa_len = 0; p > (char *)&su;)
+			if (*--p != 0) {
+				su.sa.sa_len = 1 + p - (char *)&su;
+				break;
+			}
+		ADDSU(su);
+	}
 
-	/* Make us a link layer socket for IFP */
-	memset(&su, 0, sizeof(su));
-	su.sdl.sdl_family = AF_LINK;
-	su.sdl.sdl_len = sizeof(su.sdl);
-	link_addr(iface->name, &su.sdl);
-	ADDSU(su);
+	if (rtm.hdr.rtm_addrs & RTA_IFA)
+		ADDADDR(&iface->addr);
 
 	rtm.hdr.rtm_msglen = l = bp - (char *)&rtm;
 	if (write(s, &rtm, l) == -1)
