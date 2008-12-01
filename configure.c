@@ -405,16 +405,12 @@ configure(struct interface *iface, const char *reason,
 	}
 #endif
 
-	configure_routes(iface, dhcp, options);
-	up = (iface->addr.s_addr != addr.s_addr ||
-	      iface->net.s_addr != net.s_addr);
 	iface->addr.s_addr = addr.s_addr;
 	iface->net.s_addr = net.s_addr;
-
+	configure_routes(iface, dhcp, options);
 	if (!lease->frominfo)
 		if (write_lease(iface, dhcp) == -1)
 			logger(LOG_ERR, "write_lease: %s", strerror(errno));
-
 	run_script(options, iface->name, reason, dhcp, old);
 	return 0;
 }
