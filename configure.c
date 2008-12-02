@@ -220,9 +220,9 @@ find_route(struct rt *rts, const struct rt *r, struct rt **lrt,
 static void
 desc_route(const char *cmd, const struct rt *rt, const char *ifname)
 {
-	char *addr;
+	char addr[sizeof("000.000.000.000") + 1];
 
-	addr = xstrdup(inet_ntoa(rt->dest));
+	strlcpy(addr, inet_ntoa(rt->dest), sizeof(addr));
 	if (rt->gate.s_addr == INADDR_ANY)
 		syslog(LOG_DEBUG, "%s: %s route to %s/%d", ifname, cmd,
 		       addr, inet_ntocidr(rt->net));
@@ -233,7 +233,6 @@ desc_route(const char *cmd, const struct rt *rt, const char *ifname)
 	else
 		syslog(LOG_DEBUG, "%s: %s route to %s/%d via %s", ifname, cmd,
 		       addr, inet_ntocidr(rt->net), inet_ntoa(rt->gate));
-	free(addr);
 }
 
 static int
