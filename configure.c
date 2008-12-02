@@ -370,7 +370,7 @@ remove_routes(const struct interface *iface)
 static void
 build_routes(void)
 {
-	struct rt *nrs = NULL, *dnr, *or, *rt, *rtn, *rtl;
+	struct rt *nrs = NULL, *dnr, *or, *rt, *rtn, *rtl, *lrt = NULL;
 	const struct interface *ifp;
 
 	for (ifp = ifaces; ifp; ifp = ifp->next) {
@@ -378,7 +378,7 @@ build_routes(void)
 			continue;
 		dnr = get_option_routes(ifp->state->new);
 		dnr = add_subnet_route(dnr, ifp);
-		for (rt = dnr; rt && (rtn = rt->next, 1); rt = rtn) {
+		for (rt = dnr; rt && (rtn = rt->next, 1); lrt = rt, rt = rtn) {
 			rt->iface = ifp;
 			/* Is this route already in our table? */
 			if ((find_route(nrs, rt, NULL, NULL)))
@@ -391,6 +391,8 @@ build_routes(void)
 					else
 						routes = or->next;
 					rt = or;
+					rt->iface = ifp;
+					lrt = NULL;
 				} else {
 					if (c_route(or, rt, ifp) == 0) {
 						if (rtl)
@@ -407,7 +409,8 @@ build_routes(void)
 			}
 			if (dnr == rt)
 				dnr = rtn;
-			rt->iface = ifp;
+			else if (lrt)
+				lrt->next = rtn;
 			rt->next = nrs;
 			nrs = rt;
 		}
@@ -466,7 +469,6 @@ configure(struct interface *iface, const char *reason)
 			remove_routes(iface);
 			delete_address(iface);
 		}
-
 		run_script(iface, reason);
 		return 0;
 	}
@@ -498,6 +500,7 @@ configure(struct interface *iface, const char *reason)
 		    (rt.net.s_addr != iface->net.s_addr ||
 		     rt.dest.s_addr !=(iface->addr.s_addr & iface->net.s_addr)))
 #else
+		rt.iface = iface;
 		if (!find_route(routes, &rt, NULL, NULL))
 #endif
 			del_route(iface, &rt.dest, &rt.net, &rt.gate, 0);
