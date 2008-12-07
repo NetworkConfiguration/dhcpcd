@@ -125,6 +125,8 @@ It can be a variable to be used in
 .Xr dhcpcd-run-hooks 8
 or the numerical value.
 You can specify more options seperated by commas, spaces or more option lines.
+.Ic quiet
+Supress any dhcpcd output to the console, except for errors.
 .It Ic require Ar option
 Requires the
 .Ar option
