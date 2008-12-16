@@ -81,13 +81,13 @@ again:
 		return NULL;
 
 #ifdef DEBUG_MEMORY
-	if (!lbuf)
+	if (lbuf == NULL)
 		atexit(free_lbuf);
 #endif
 
 	last = 0;
 	do {
-		if (!lbuf || last != 0) {
+		if (lbuf == NULL || last != 0) {
 			lbuf_len += BUFSIZ;
 			lbuf = xrealloc(lbuf, lbuf_len);
 		}
@@ -95,12 +95,12 @@ again:
 		memset(p, 0, BUFSIZ);
 		fgets(p, BUFSIZ, fp);
 		last += strlen(p);
-		if (last && lbuf[last - 1] == '\n') {
+		if (last != 0 && lbuf[last - 1] == '\n') {
 			lbuf[last - 1] = '\0';
 			break;
 		}
 	} while(!feof(fp));
-	if (!last)
+	if (last == 0)
 		return NULL;
 
 	e = p + last - 1;
@@ -118,9 +118,9 @@ again:
 uint32_t arc4random(void)
 {
 	int fd;
-	static unsigned long seed = 0;
+	static unsigned long seed;
 
-	if (!seed) {
+	if (seed == 0) {
 		fd = open("/dev/urandom", 0);
 		if (fd == -1 || read(fd,  &seed, sizeof(seed)) == -1)
 			seed = time(0);
@@ -215,7 +215,7 @@ get_monotonic(struct timeval *tp)
 	struct timespec ts;
 	static clockid_t posix_clock;
 
-	if (posix_clock_set == 0) {
+	if (!posix_clock_set) {
 		if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0) {
 			posix_clock = CLOCK_MONOTONIC;
 			clock_monotonic = posix_clock_set = 1;
@@ -238,7 +238,7 @@ get_monotonic(struct timeval *tp)
 	uint64_t nano;
 	long rem;
 
-	if (posix_clock_set == 0) {
+	if (!posix_clock_set) {
 		if (mach_timebase_info(&info) == KERN_SUCCESS) {
 			factor = (double)info.numer / (double)info.denom;
 			clock_monotonic = posix_clock_set = 1;
@@ -297,7 +297,7 @@ xmalloc(size_t s)
 {
 	void *value = malloc(s);
 
-	if (value)
+	if (value != NULL)
 		return value;
 	syslog(LOG_ERR, "memory exhausted (xalloc %zu bytes)", s);
 	exit (EXIT_FAILURE);
@@ -318,8 +318,8 @@ xrealloc(void *ptr, size_t s)
 {
 	void *value = realloc(ptr, s);
 
-	if (value)
-		return (value);
+	if (value != NULL)
+		return value;
 	syslog(LOG_ERR, "memory exhausted (xrealloc %zu bytes)", s);
 	exit(EXIT_FAILURE);
 	/* NOTREACHED */
@@ -330,10 +330,10 @@ xstrdup(const char *str)
 {
 	char *value;
 
-	if (!str)
+	if (str = NULL)
 		return NULL;
 
-	if ((value = strdup(str)))
+	if ((value = strdup(str)) != NULL)
 		return value;
 
 	syslog(LOG_ERR, "memory exhausted (xstrdup)");
