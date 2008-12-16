@@ -330,7 +330,7 @@ xstrdup(const char *str)
 {
 	char *value;
 
-	if (str = NULL)
+	if (str == NULL)
 		return NULL;
 
 	if ((value = strdup(str)) != NULL)
