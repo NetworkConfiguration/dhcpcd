@@ -448,11 +448,12 @@ configure(struct interface *iface, const char *reason)
 
 	/* We need to delete the subnet route to have our metric or
 	 * prefer the interface. */
-	if (iface->net.s_addr != INADDR_BROADCAST) {
-		rt = get_subnet_route(dhcp);
+	rt = get_subnet_route(dhcp);
+	if (rt != NULL) {
 		rt->iface = iface;
 		if (!find_route(routes, rt, NULL, NULL))
 			del_route(iface, &rt->dest, &rt->net, &rt->gate, 0);
+		free(rt);
 	}
 
 	build_routes();
