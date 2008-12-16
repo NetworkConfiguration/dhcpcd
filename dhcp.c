@@ -1292,7 +1292,9 @@ get_lease(struct dhcp_lease *lease, const struct dhcp_message *dhcp)
 	else
 		lease->addr.s_addr = dhcp->ciaddr;
 	if (get_option_addr(&lease->net.s_addr, dhcp, DHO_SUBNETMASK) == -1)
-		lease->net.s_addr = get_netmask(dhcp->yiaddr);
+		lease->net.s_addr = get_netmask(lease->addr.s_addr);
+	if (get_option_addr(&lease->brd.s_addr, dhcp, DHO_BROADCAST) == -1)
+		lease->brd.s_addr = lease->addr.s_addr | ~lease->net.s_addr;
 	if (get_option_uint32(&lease->leasetime, dhcp, DHO_LEASETIME) == 0) {
 		/* Ensure that we can use the lease */
 		get_monotonic(&now);

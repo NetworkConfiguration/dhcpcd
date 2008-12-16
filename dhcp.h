@@ -156,6 +156,7 @@ struct dhcp_message {
 struct dhcp_lease {
 	struct in_addr addr;
 	struct in_addr net;
+	struct in_addr brd;
 	uint32_t leasetime;
 	uint32_t renewaltime;
 	uint32_t rebindtime;
