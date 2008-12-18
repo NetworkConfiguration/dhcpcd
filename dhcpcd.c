@@ -316,7 +316,7 @@ send_discover(void *arg)
 	send_message((struct interface *)arg, DHCP_DISCOVER, send_discover);
 }
 
-void
+static void
 send_request(void *arg)
 {
 	send_message((struct interface *)arg, DHCP_REQUEST, send_request);

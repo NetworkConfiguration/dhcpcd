@@ -113,7 +113,6 @@ extern struct interface *ifaces;
 
 int handle_args(int, char **);
 void handle_exit_timeout(void *);
-void send_request(void *);
 void start_interface(void *);
 void start_discover(void *);
 void start_request(void *);
