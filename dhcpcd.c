@@ -502,14 +502,14 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 				state->claims = 0;
 				state->probes = 0;
 				state->conflicts = 0;
+				state->state = DHS_PROBE;
 				send_arp_probe(iface);
 				return;
 			}
 		}
 		/* We don't request BOOTP addresses */
 		if (type) {
-			state->state = DHS_REQUEST;
-			send_request(iface);
+			start_request(iface);
 			return;
 		}
 	}
@@ -697,6 +697,14 @@ start_discover(void *arg)
 	send_discover(iface);
 }
 
+void
+start_request(void *arg)
+{
+	struct interface *iface = arg;
+
+	iface->state->state = DHS_REQUEST;
+	send_request(iface);
+}
 
 void
 start_renew(void *arg)
@@ -766,6 +774,7 @@ start_reboot(struct interface *iface)
 	} else if (ifo->options & DHCPCD_INFORM)
 		send_inform(iface);
 	else
+		/* We don't start_request as that would change state */
 		send_request(iface);
 }
 

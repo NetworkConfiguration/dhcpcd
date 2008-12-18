@@ -47,7 +47,8 @@ enum DHS {
 	DHS_REBIND,
 	DHS_REBOOT,
 	DHS_RENEW_REQUESTED,
-	DHS_INIT_IPV4LL
+	DHS_INIT_IPV4LL,
+	DHS_PROBE
 };
 
 #define LINK_UP 	1
@@ -115,6 +116,7 @@ void handle_exit_timeout(void *);
 void send_request(void *);
 void start_interface(void *);
 void start_discover(void *);
+void start_request(void *);
 void start_renew(void *);
 void start_rebind(void *);
 void start_reboot(struct interface *);
