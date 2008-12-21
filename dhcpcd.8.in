@@ -495,11 +495,3 @@ does not wait for commands to complete when sending them to the master
 process, nor does it echo its progress to stderr.
 This is a behaviour change dhcpcd-4 and may need to be addressed if
 there is sufficient need.
-.Pp
-BSD systems do not correctly handle manual removal or changing of
-subnet routes which where added by the kernel when an address was added.
-You can find discussion here:
-.D1 http://mail-index.netbsd.org/tech-net/2008/12/03/msg000896.html
-and a patch for NetBSD here:
-.D1 http://mail-index.netbsd.org/tech-net/2008/12/14/msg000907.html
-Other BSD systems will need equivalent patches.

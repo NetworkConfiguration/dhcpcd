@@ -4,9 +4,10 @@ Copyright 2006-2008 Roy Marples <roy@marples.name>
 
 Installation
 ------------
-Edit config.h to match your building requirements.
 Then just make; make install
 man dhcpcd for command line options
+man dhcpcd.conf for configuration options
+man dhcpcd-run-hooks to learn how to hook scripts into dhcpcd events
 
 
 Notes
@@ -32,6 +33,12 @@ linux-2.6.24 finally ships with a working 32-bit header.
 If your linux headers are older, or your distro hasn't patched them you can
 set CSTD=gnu99 to work around this.
 
+Some BSD systems do not allow the manipulation of automatically added subnet
+routes. You can find discussion here:
+    http://mail-index.netbsd.org/tech-net/2008/12/03/msg000896.html
+BSD systems where this has been fixed are:
+    NetBSD-5.99.6
+
 
 Hooks
 -----
@@ -50,6 +57,7 @@ dhcpcd no longer sends a default ClientID for ethernet interfaces.
 This is so we can re-use the address the kernel DHCP client found.
 To retain the old behaviour of sending a default ClientID based on the
 hardware address for interface, simply add the keyword clientid to dhcpcd.conf.
+
 
 ChangeLog
 ---------
