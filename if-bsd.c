@@ -84,7 +84,7 @@ getifssid(const char *ifname, char *ssid)
 	ifr.ifr_data = (void *)&nwid;
 	if (ioctl(s, SIOCG80211NWID, &ifr) == 0) {
 		retval = nwid.i_len;
-		memcpy(nwid.i_nwid, ssid, nwid.i_len);
+		memcpy(ssid, nwid.i_nwid, nwid.i_len);
 		ssid[nwid.i_len] = '\0';
 	}
 #elif defined(IEEE80211_IOC_SSID) /* FreeBSD */
@@ -95,7 +95,7 @@ getifssid(const char *ifname, char *ssid)
 	ireq.i_data = &nwid;
 	if (ioctl(s, SIOCG80211, &ireq) == 0) {
 		retval = ireq.i_len;
-		memcpy(nwid, ssid, ireq.i_len);
+		memcpy(ssid, nwid, ireq.i_len);
 		ssid[ireq.i_len] = '\0';
 	}
 #endif
