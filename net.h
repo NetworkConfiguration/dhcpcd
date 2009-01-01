@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright 2006-2008 Roy Marples <roy@marples.name>
+ * Copyright 2006-2009 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -91,7 +91,7 @@ uint32_t get_netmask(uint32_t);
 char *hwaddr_ntoa(const unsigned char *, size_t);
 size_t hwaddr_aton(unsigned char *, const char *);
 
-int if_wireless(const char *);
+int getifssid(const char *, char *);
 struct interface *init_interface(const char *);
 struct interface *discover_interfaces(int, char * const *);
 void free_interface(struct interface *);

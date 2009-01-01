@@ -100,7 +100,7 @@ struct if_options {
 	in_addr_t *blacklist;
 };
 
-struct if_options *read_config(const char *, const char *);
+struct if_options *read_config(const char *, const char *, const char *);
 int add_options(struct if_options *, int, char **);
 void free_options(struct if_options *);
 

@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright 2006-2008 Roy Marples <roy@marples.name>
+ * Copyright 2006-2009 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -37,6 +37,7 @@
 #include "if-options.h"
 
 #define HWADDR_LEN 20
+#define IF_SSIDSIZE 33
 
 enum DHS {
 	DHS_INIT,
@@ -85,6 +86,7 @@ struct interface
 	int metric;
 	int carrier;
 	int arpable;
+	char ssid[IF_SSIDSIZE];
 
 	int raw_fd;
 	int udp_fd;

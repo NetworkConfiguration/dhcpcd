@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright 2006-2008 Roy Marples <roy@marples.name>
+ * Copyright 2006-2009 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -64,7 +64,7 @@
 #endif
 
 int
-if_wireless(const char *ifname)
+getifssid(const char *ifname, char *ssid)
 {
 	int s, retval = -1;
 #if defined(SIOCG80211NWID)
@@ -72,6 +72,7 @@ if_wireless(const char *ifname)
 	struct ieee80211_nwid nwid;
 #elif defined(IEEE80211_IOC_SSID)
 	struct ieee80211req ireq;
+	char nwid[IEEE80211_NWID_LEN + 1];
 #endif
 
 	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
@@ -81,14 +82,22 @@ if_wireless(const char *ifname)
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
 	memset(&nwid, 0, sizeof(nwid));
 	ifr.ifr_data = (void *)&nwid;
-	if (ioctl(s, SIOCG80211NWID, &ifr) == 0)
-		retval = 0;
+	if (ioctl(s, SIOCG80211NWID, &ifr) == 0) {
+		retval = nwid.i_len;
+		memcpy(nwid.i_nwid, ssid, nwid.i_len);
+		ssid[nwid.i_len] = '\0';
+	}
 #elif defined(IEEE80211_IOC_SSID) /* FreeBSD */
 	memset(&ireq, 0, sizeof(ireq));
 	strlcpy(ireq.i_name, ifname, sizeof(ireq.i_name));
-	ireq.i_type = IEEE80211_IOC_NUMSSIDS;
-	if (ioctl(s, SIOCG80211, &ireq) == 0)
-		retval = 0;
+	ireq.i_type = IEEE80211_IOC_SSID;
+	ireq.i_val = -1;
+	ireq.i_data = &nwid;
+	if (ioctl(s, SIOCG80211, &ireq) == 0) {
+		retval = ireq.i_len;
+		memcpy(nwid, ssid, ireq.i_len);
+		ssid[ireq.i_len] = '\0';
+	}
 #endif
 	close(s);
 	return retval;

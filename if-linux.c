@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright 2006-2008 Roy Marples <roy@marples.name>
+ * Copyright 2006-2009 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -36,6 +36,7 @@
 #include <arpa/inet.h>
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
+#include <linux/wireless.h>
 #include <netinet/ether.h>
 #include <netpacket/packet.h>
 
@@ -73,17 +74,22 @@ static void (*nl_add)(const char *);
 static void (*nl_remove)(const char *);
 
 int
-if_wireless(const char *ifname)
+getifssid(const char *ifname, char *ssid)
 {
-	int s, retval = -1;
-	struct ifreq ifr;
+	int s, retval;
+	struct iwreq iwr;
 
 	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
-		return retval;
-	memset(&ifr, 0, sizeof(ifr));
-	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
-	if (ioctl(s, SIOCGIWNAME, &ifr) == 0)
-		retval = 0;
+		return -1;
+	memset(&iwr, 0, sizeof(iwr));
+	strlcpy(iwr.ifr_name, ifname, sizeof(iwr.ifr_name));
+	iwr.u.essid.pointer = ssid;
+	iwr.u.essid.length = IF_SSIDSIZE - 1;
+
+	if (ioctl(s, SIOCGIWESSID, &iwr) == 0)
+		retval = iwr.u.essid.length;
+	else
+		retval = -1;
 	close(s);
 	return retval;
 }

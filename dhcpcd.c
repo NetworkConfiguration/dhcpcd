@@ -73,6 +73,8 @@ char **ifav = NULL;
 int ifdc = 0;
 char **ifdv = NULL;
 
+static char **margv;
+static int margc;
 static char **ifv;
 static int ifc;
 static int linkfd = -1;
@@ -643,9 +645,66 @@ send_release(struct interface *iface)
 }
 
 static void
+configure_interface(struct interface *iface, int argc, char **argv)
+{
+	struct if_state *ifs = iface->state;
+	struct if_options *ifo;
+	uint8_t *duid;
+	size_t len = 0, ifl;
+
+	free_options(ifs->options);
+	ifo = ifs->options = read_config(cffile, iface->name, iface->ssid);
+	add_options(ifo, argc, argv);
+
+	if (ifo->metric != -1)
+		iface->metric = ifo->metric;
+
+	/* If we haven't specified a ClientID and our hardware address
+	 * length is greater than DHCP_CHADDR_LEN then we enforce a ClientID
+	 * of the hardware address family and the hardware address. */
+	if (iface->hwlen > DHCP_CHADDR_LEN)
+		ifo->options |= DHCPCD_CLIENTID;
+
+	free(iface->clientid);
+	if (*ifo->clientid) {
+		iface->clientid = xmalloc(ifo->clientid[0] + 1);
+		memcpy(iface->clientid, ifo->clientid, ifo->clientid[0] + 1);
+	} else if (ifo->options & DHCPCD_CLIENTID) {
+		if (ifo->options & DHCPCD_DUID) {
+			duid = xmalloc(DUID_LEN);
+			if ((len = get_duid(duid, iface)) == 0)
+				syslog(LOG_ERR, "get_duid: %m");
+		}
+		if (len > 0) {
+			iface->clientid = xmalloc(len + 6);
+			iface->clientid[0] = len + 5;
+			iface->clientid[1] = 255; /* RFC 4361 */
+			ifl = strlen(iface->name);
+			if (ifl < 5) {
+				memcpy(iface->clientid + 2, iface->name, ifl);
+				if (ifl < 4)
+					memset(iface->clientid + 2 + ifl,
+					       0, 4 - ifl);
+			} else {
+				ifl = htonl(if_nametoindex(iface->name));
+				memcpy(iface->clientid + 2, &ifl, 4);
+			}
+		} else if (len == 0) {
+			len = iface->hwlen + 1;
+			iface->clientid = xmalloc(len + 1);
+			iface->clientid[0] = len;
+			iface->clientid[1] = iface->family;
+			memcpy(iface->clientid + 2, iface->hwaddr,
+			       iface->hwlen);
+		}
+	}
+}
+
+static void
 handle_carrier(const char *ifname)
 {
 	struct interface *iface;
+	char ssid[IF_SSIDSIZE];
 
 	for (iface = ifaces; iface; iface = iface->next)
 		if (strcmp(iface->name, ifname) == 0)
@@ -669,6 +728,12 @@ handle_carrier(const char *ifname)
 		if (iface->carrier != LINK_UP) {
 			iface->carrier = LINK_UP;
 			syslog(LOG_INFO, "%s: carrier acquired", iface->name);
+			/* We need to reconfigre for if ssid changed */
+			getifssid(iface->name, ssid);
+			if (strcmp(iface->ssid, ssid) != 0) {
+				strlcpy(ssid, iface->ssid, sizeof(iface->ssid));
+				configure_interface(iface, margc, margv);
+			}
 			start_interface(iface);
 		}
 		break;
@@ -887,62 +952,6 @@ start_interface(void *arg)
 		start_ipv4ll(iface);
 	else
 		start_reboot(iface);
-}
-
-static void
-configure_interface(struct interface *iface, int argc, char **argv)
-{
-	struct if_state *ifs = iface->state;
-	struct if_options *ifo;
-	uint8_t *duid;
-	size_t len = 0, ifl;
-
-	free_options(ifs->options);
-	ifo = ifs->options = read_config(cffile, iface->name);
-	add_options(ifo, argc, argv);
-
-	if (ifo->metric != -1)
-		iface->metric = ifo->metric;
-
-	/* If we haven't specified a ClientID and our hardware address
-	 * length is greater than DHCP_CHADDR_LEN then we enforce a ClientID
-	 * of the hardware address family and the hardware address. */
-	if (iface->hwlen > DHCP_CHADDR_LEN)
-		ifo->options |= DHCPCD_CLIENTID;
-
-	free(iface->clientid);
-	if (*ifo->clientid) {
-		iface->clientid = xmalloc(ifo->clientid[0] + 1);
-		memcpy(iface->clientid, ifo->clientid, ifo->clientid[0] + 1);
-	} else if (ifo->options & DHCPCD_CLIENTID) {
-		if (ifo->options & DHCPCD_DUID) {
-			duid = xmalloc(DUID_LEN);
-			if ((len = get_duid(duid, iface)) == 0)
-				syslog(LOG_ERR, "get_duid: %m");
-		}
-		if (len > 0) {
-			iface->clientid = xmalloc(len + 6);
-			iface->clientid[0] = len + 5;
-			iface->clientid[1] = 255; /* RFC 4361 */
-			ifl = strlen(iface->name);
-			if (ifl < 5) {
-				memcpy(iface->clientid + 2, iface->name, ifl);
-				if (ifl < 4)
-					memset(iface->clientid + 2 + ifl,
-					       0, 4 - ifl);
-			} else {
-				ifl = htonl(if_nametoindex(iface->name));
-				memcpy(iface->clientid + 2, &ifl, 4);
-			}
-		} else if (len == 0) {
-			len = iface->hwlen + 1;
-			iface->clientid = xmalloc(len + 1);
-			iface->clientid[0] = len;
-			iface->clientid[1] = iface->family;
-			memcpy(iface->clientid + 2, iface->hwaddr,
-			       iface->hwlen);
-		}
-	}
 }
 
 static void
@@ -1217,7 +1226,9 @@ main(int argc, char **argv)
 		}
 	}
 
-	ifo = read_config(cffile, NULL);
+	margv = argv;
+	margc = argc;
+	ifo = read_config(cffile, NULL, NULL);
 	opt = add_options(ifo, argc, argv);
 	if (opt != 1) {
 		if (opt == 0)

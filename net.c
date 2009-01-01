@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright 2006-2008 Roy Marples <roy@marples.name>
+ * Copyright 2006-2009 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -196,7 +196,7 @@ init_interface(const char *ifname)
 	/* We reserve the 100 range for virtual interfaces, if and when
 	 * we can work them out. */
 	iface->metric = 200 + if_nametoindex(iface->name);
-	if (if_wireless(ifname) == 0)
+	if (getifssid(ifname, iface->ssid) != -1)
 		iface->metric += 100;
 
 #ifdef SIOCGIFHWADDR

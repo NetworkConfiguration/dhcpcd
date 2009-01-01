@@ -662,7 +662,7 @@ parse_config_line(struct if_options *ifo, const char *opt, char *line)
 }
 
 struct if_options *
-read_config(const char *file, const char *ifname)
+read_config(const char *file, const char *ifname, const char *ssid)
 {
 	struct if_options *ifo;
 	FILE *f;
@@ -704,6 +704,14 @@ read_config(const char *file, const char *ifname)
 		/* Start of an interface block, skip if not ours */
 		if (strcmp(option, "interface") == 0) {
 			if (ifname && line && strcmp(line, ifname) == 0)
+				skip = 0;
+			else
+				skip = 1;
+			continue;
+		}
+		/* Start of an ssid block, skip if not ours */
+		if (strcmp(option, "ssid") == 0) {
+			if (ssid && line && strcmp(line, ssid) == 0)
 				skip = 0;
 			else
 				skip = 1;

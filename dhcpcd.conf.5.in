@@ -175,6 +175,9 @@ Use
 .Ar script
 instead of the default
 .Pa @SCRIPT@ .
+.It Ic ssid Ar ssid
+Subsequent options are only parsed for this wireless
+.Ar ssid .
 .It Ic static Ar value
 Configures a static
 .Ar value .
