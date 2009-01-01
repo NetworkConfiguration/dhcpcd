@@ -1,4 +1,4 @@
-.\" Copyright 2006-2008 Roy Marples
+.\" Copyright 2006-2009 Roy Marples
 .\" All rights reserved
 .\"
 .\" Redistribution and use in source and binary forms, with or without
@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd December 16, 2008
+.Dd January 1, 2009
 .Dt DHCPCD.CONF 5 SMM
 .Sh NAME
 .Nm dhcpcd.conf
@@ -175,6 +175,21 @@ Use
 .Ar script
 instead of the default
 .Pa @SCRIPT@ .
+.It Ic static Ar value
+Configures a static
+.Ar value .
+If you set
+.Ic ip_address
+then
+.Nm dhcpcd
+will not attempt to obtain a lease and just use the value for the address with
+an infinite lease time.
+.Pp
+Here is an example which configures a static address, routes and dns.
+.D1 interface eth0
+.D1 static ip_address=192.168.0.10/24
+.D1 static routers=192.168.0.1
+.D1 static domain_name_servers=192.168.0.1
 .It Ic timeout Ar seconds
 The default timeout for waiting for a DHCP response is 30 seconds which may
 be too long or too short and can be changed here.

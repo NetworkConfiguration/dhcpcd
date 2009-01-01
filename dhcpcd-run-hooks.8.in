@@ -1,4 +1,4 @@
-.\" Copyright 2006-2008 Roy Marples
+.\" Copyright 2006-2009 Roy Marples
 .\" All rights reserved
 .\"
 .\" Redistribution and use in source and binary forms, with or without
@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd October 07, 2008
+.Dd January 1, 2008
 .Dt DHCPCD.SH 8 SMM
 .Sh NAME
 .Nm dhcpcd-run-hooks
@@ -83,7 +83,7 @@ dhcpcd has rebound to a new DHCP server.
 .It Dv REBOOT
 dhcpcd successfully requested a lease from a DHCP server.
 .It Dv EXPIRE
-dhcpcd's lease expired and it failed to obtain a new one.
+dhcpcd's lease or state expired and it failed to obtain a new one.
 .It Dv IPV4LL
 dhcpcd failed to contact any DHCP servers but did obtain an IPV4LL address.
 .It Dv FAIL
@@ -95,6 +95,9 @@ dhcpcd received an OFFER from a DHCP server but will not configure the
 interface.
 This is primarily used to test the variables are filled correctly for the
 script to process them.
+.It Dv STATIC
+dhcpcd has been configured with a static configuration which has not been
+obtained from a DHCP server.
 .El
 .Sh FILES 
 When

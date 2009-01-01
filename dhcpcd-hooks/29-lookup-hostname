@@ -30,5 +30,5 @@ set_hostname()
 }
 
 case "${reason}" in
-BOUND|INFORM|REBIND|REBOOT|RENEW|TIMEOUT)	set_hostname;;
+BOUND|INFORM|REBIND|REBOOT|RENEW|TIMEOUT|STATIC)	set_hostname;;
 esac

@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright 2006-2008 Roy Marples <roy@marples.name>
+ * Copyright 2006-2009 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -129,7 +129,13 @@ bind_interface(void *arg)
 	state->new = state->offer;
 	state->offer = NULL;
 	get_lease(lease, state->new);
-	if (IN_LINKLOCAL(htonl(state->new->yiaddr))) {
+	if (ifo->options & DHCPCD_STATIC) {
+		syslog(LOG_INFO, "%s: using static address %s",
+		       iface->name, inet_ntoa(lease->addr));
+		lease->leasetime = ~0U;
+		lease->net.s_addr = ifo->request_netmask.s_addr;
+		reason = "STATIC";
+	} else if (IN_LINKLOCAL(htonl(state->new->yiaddr))) {
 		syslog(LOG_INFO, "%s: using IPv4LL address %s",
 		       iface->name, inet_ntoa(lease->addr));
 		lease->leasetime = ~0U;
@@ -146,7 +152,7 @@ bind_interface(void *arg)
 	} else {
 		if (gettimeofday(&tv, NULL) == 0)
 			lease->leasedfrom = tv.tv_sec;
-		if (lease->frominfo)
+		else if (lease->frominfo)
 			reason = "TIMEOUT";
 		if (lease->leasetime == ~0U) {
 			lease->renewaltime = lease->rebindtime = lease->leasetime;
@@ -176,7 +182,7 @@ bind_interface(void *arg)
 			       inet_ntoa(lease->addr), lease->leasetime);
 		}
 	}
-	if (!reason) {
+	if (reason == NULL) {
 		if (state->old) {
 			if (state->old->yiaddr == state->new->yiaddr &&
 			    lease->server.s_addr)

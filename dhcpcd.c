@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright 2006-2008 Roy Marples <roy@marples.name>
+ * Copyright 2006-2009 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * SUCH DAMAGE.
  */
 
-const char copyright[] = "Copyright (c) 2006-2008 Roy Marples";
+const char copyright[] = "Copyright (c) 2006-2009 Roy Marples";
 
 #include <sys/file.h>
 #include <sys/stat.h>
@@ -778,6 +778,28 @@ start_reboot(struct interface *iface)
 		send_request(iface);
 }
 
+static void
+start_static(struct interface *iface)
+{
+	struct dhcp_message *dhcp;
+	struct if_options *ifo = iface->state->options;
+	uint8_t *p;
+	uint32_t u32;
+
+	dhcp = xzalloc(sizeof(*dhcp));
+	dhcp->yiaddr = ifo->request_address.s_addr;
+	p = dhcp->options;
+	*p++ = DHO_SUBNETMASK;
+	*p++ = sizeof(u32);
+	u32 = ifo->request_netmask.s_addr;
+	memcpy(p, &u32, sizeof(u32));
+	*p++ = DHO_END;
+
+	iface->state->offer = dhcp;
+	delete_timeout(NULL, iface);
+	bind_interface(iface);
+}
+
 void
 start_interface(void *arg)
 {
@@ -798,6 +820,10 @@ start_interface(void *arg)
 
 	if (options & DHCPCD_TEST) {
 		start_discover(iface);
+		return;
+	}
+	if (ifo->options & DHCPCD_STATIC) {
+		start_static(iface);
 		return;
 	}
 	if (ifo->request_address.s_addr) {

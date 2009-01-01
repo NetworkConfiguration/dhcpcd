@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright 2006-2008 Roy Marples <roy@marples.name>
+ * Copyright 2006-2009 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -80,6 +80,7 @@ const struct option cf_options[] = {
 	{"noipv4ll",        no_argument,       NULL, 'L'},
 	{"nooption",        optional_argument, NULL, 'O'},
 	{"require",         required_argument, NULL, 'Q'},
+	{"static",          required_argument, NULL, 'S'},
 	{"test",            no_argument,       NULL, 'T'},
 	{"variables",       no_argument,       NULL, 'V'},
 	{"blacklist",       required_argument, NULL, 'X'},
@@ -263,13 +264,40 @@ splitv(int *argc, char **argv, const char *arg)
 	return v;	
 }
 
+
+static int
+parse_addr(struct in_addr *addr, struct in_addr *net, const char *arg)
+{
+	char *p;
+	int i;
+
+	if (arg == NULL || *arg == '\0')
+		return 0;
+	if ((p = strchr(arg, '/')) != NULL) {
+		*p++ = '\0';
+		if (net != NULL &&
+		    (sscanf(p, "%d", &i) != 1 ||
+		     inet_cidrtoaddr(i, net) != 0))
+		{
+			syslog(LOG_ERR, "`%s' is not a valid CIDR", p);
+			return -1;
+		}
+	}
+	if (addr != NULL && inet_aton(arg, addr) == 0) {
+		syslog(LOG_ERR, "`%s' is not a valid IP address", arg);
+		return -1;
+	}
+	return 0;
+}
+
 static int
 parse_option(struct if_options *ifo, int opt, const char *arg)
 {
 	int i;
-	char *p = NULL;
+	char *p = NULL, *np;
 	ssize_t s;
 	struct in_addr addr;
+	struct rt *rt;
 
 	switch(opt) {
 	case 'd': /* FALLTHROUGH */
@@ -351,34 +379,17 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		ifo->options &= ~DHCPCD_ARP;
 		if (!arg || *arg == '\0') {
 			ifo->request_address.s_addr = 0;
-			break;
 		} else {
-			if ((p = strchr(arg, '/'))) {
-				/* nullify the slash, so the -r option
-				 * can read the address */
-				*p++ = '\0';
-				if (sscanf(p, "%d", &i) != 1 ||
-				    inet_cidrtoaddr(i, &ifo->request_netmask) != 0)
-				{
-					syslog(LOG_ERR,
-					       "`%s' is not a valid CIDR",
-					       p);
-					return -1;
-				}
-			}
+			if (parse_addr(&ifo->request_address,
+				       &ifo->request_netmask,
+				       arg) != 0)
+				return -1;
 		}
-		/* FALLTHROUGH */
+		break;
 	case 'r':
-		if (!(ifo->options & DHCPCD_INFORM))
-			ifo->options |= DHCPCD_REQUEST;
-		if (arg && !inet_aton(arg, &ifo->request_address)) {
-			syslog(LOG_ERR, "`%s' is not a valid IP address",
-			       arg);
+		ifo->options |= DHCPCD_REQUEST;
+		if (parse_addr(&ifo->request_address, NULL, arg) != 0)
 			return -1;
-		}
-		/* Restore the slash */
-		if (ifo->options & DHCPCD_INFORM && p)
-			*--p = '/';
 		break;
 	case 't':
 		ifo->timeout = atoint(arg);
@@ -531,6 +542,78 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			return -1;
 		}
 		break;
+	case 'S':
+		p = strchr(arg, '=');
+		if (p == NULL) {
+			syslog(LOG_ERR, "static assignment required");
+			return -1;
+		}
+		p++;
+		if (strncmp(arg, "ip_address=", strlen("ip_address=")) == 0) {
+			if (parse_addr(&ifo->request_address,
+				       &ifo->request_netmask, p) != 0)
+				return -1;
+
+			ifo->options |= DHCPCD_STATIC;
+		} else if (strncmp(arg, "routes=", strlen("routes=")) == 0 ||
+			   strncmp(arg, "static_routes=", strlen("static_routes=")) == 0 ||
+			   strncmp(arg, "classless_static_routes=", strlen("classless_static_routes=")) == 0 ||
+			   strncmp(arg, "ms_classless_static_routes=", strlen("ms_classless_static_routes=")) == 0)
+		{
+			np = strchr(p, ' ');
+			if (np == NULL) {
+				syslog(LOG_ERR, "all routes need a gateway");
+				return -1;
+			}
+			*np++ = '\0';
+			while (*np == ' ')
+				np++;
+			if (ifo->routes == NULL) {
+				rt = ifo->routes = xmalloc(sizeof(*rt));
+			} else {
+				rt = ifo->routes;
+				while (rt->next)
+					rt = rt->next;
+				rt->next = xmalloc(sizeof(*rt));
+				rt = rt->next;
+			}
+			rt->next = NULL;
+			if (parse_addr(&rt->dest, &rt->net, p) == -1 ||
+			    parse_addr(&rt->gate, NULL, np) == -1)
+				return -1;
+		} else if (strncmp(arg, "routers=", strlen("routers=")) == 0) {
+			if (ifo->routes == NULL) {
+				rt = ifo->routes = xzalloc(sizeof(*rt));
+			} else {
+				rt = ifo->routes;
+				while (rt->next)
+					rt = rt->next;
+				rt->next = xmalloc(sizeof(*rt));
+				rt = rt->next;
+			}
+			rt->dest.s_addr = 0;
+			rt->net.s_addr = 0;
+			rt->next = NULL;
+			if (parse_addr(&rt->gate, NULL, p) == -1)
+				return -1;
+		} else {
+			s = 0;
+			if (ifo->config != NULL) {
+				while (ifo->config[s] != NULL) {
+					if (strncmp(ifo->config[s], arg, p - arg) == 0) {
+						printf("match\n");
+						free(ifo->config[s]);
+						ifo->config[s] = xstrdup(arg);
+						return 1;
+					}
+					s++;
+				}
+			}
+			ifo->config = xrealloc(ifo->config, sizeof(char *) * (s + 2));
+			ifo->config[s] = xstrdup(arg);
+			ifo->config[s + 1] = NULL;
+		}
+		break;
 	case 'X':
 		if (!inet_aton(arg, &addr)) {
 			syslog(LOG_ERR, "`%s' is not a valid IP address",
@@ -674,6 +757,13 @@ free_options(struct if_options *ifo)
 				free(ifo->environ[i++]);
 			free(ifo->environ);
 		}
+		if (ifo->config) {
+			i = 0;
+			while (ifo->config[i])
+				free(ifo->config[i++]);
+			free(ifo->config);
+		}
+		free_routes(ifo->routes);
 		free(ifo->blacklist);
 		free(ifo);
 	}

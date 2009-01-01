@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright 2006-2008 Roy Marples <roy@marples.name>
+ * Copyright 2006-2009 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -52,6 +52,7 @@
 #define DHCPCD_RELEASE		(1 << 1)
 #define DHCPCD_DOMAIN		(1 << 2)
 #define DHCPCD_GATEWAY		(1 << 3)
+#define DHCPCD_STATIC		(1 << 4)
 #define DHCPCD_LASTLEASE	(1 << 7)
 #define DHCPCD_INFORM		(1 << 8)
 #define DHCPCD_REQUEST		(1 << 9)
@@ -82,6 +83,8 @@ struct if_options {
 
 	struct in_addr request_address;
 	struct in_addr request_netmask;
+	struct rt *routes;
+	char **config;
 
 	char **environ;
 	char script[PATH_MAX];

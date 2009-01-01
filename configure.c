@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright 2006-2008 Roy Marples <roy@marples.name>
+ * Copyright 2006-2009 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -91,6 +91,50 @@ exec_script(char *const *argv, char *const *env)
 	return pid;
 }
 
+static char *
+make_var(const char *prefix, const char *var)
+{
+	size_t len;
+	char *v;
+
+	len = strlen(prefix) + strlen(var) + 2;
+	v = xmalloc(len);
+	snprintf(v, len, "%s_%s", prefix, var);
+	return v;
+}
+
+
+static void
+append_config(char ***env, ssize_t *len,
+	      const char *prefix, const char *const *config)
+{
+	ssize_t i, j, e1;
+	char **ne, *eq;
+
+	if (config == NULL)
+		return;
+
+	ne = *env;
+	for (i = 0; config[i] != NULL; i++) {
+		eq = strchr(config[i], '=');
+		e1 = eq - config[i] + 1;
+		for (j = 0; j < *len; j++) {
+			if (strncmp(ne[j] + strlen(prefix) + 1, config[i], e1) == 0) {
+				free(ne[j]);
+				ne[j] = make_var(prefix, config[i]);
+				break;
+			}
+		}
+		if (j == *len) {
+			j++;
+			ne = xrealloc(ne, sizeof(char *) * (j + 1));
+			ne[j - 1] = make_var(prefix, config[i]);
+			*len = j;
+		}
+	}
+	*env = ne;
+}
+
 int
 run_script(const struct interface *iface, const char *reason)
 {
@@ -149,6 +193,8 @@ run_script(const struct interface *iface, const char *reason)
 			elen += configure_env(env + elen, "old",
 					iface->state->old, ifo);
 		}
+		append_config(&env, &elen, "old",
+			      (const char *const *)ifo->config);
 	}
 	if (iface->state->new) {
 		e = configure_env(NULL, NULL, iface->state->new, ifo);
@@ -157,7 +203,10 @@ run_script(const struct interface *iface, const char *reason)
 			elen += configure_env(env + elen, "new",
 					iface->state->new, ifo);
 		}
+		append_config(&env, &elen, "new",
+			      (const char *const *)ifo->config);
 	}
+
 	/* Add our base environment */
 	if (ifo->environ) {
 		e = 0;
@@ -332,6 +381,30 @@ add_subnet_route(struct rt *rt, const struct interface *iface)
 	return r;
 }
 
+static struct rt *
+get_routes(const struct interface *iface) {
+	struct rt *rt, *nrt, *r = NULL;
+
+	if (iface->state->options->routes != NULL) {
+		for (rt = iface->state->options->routes;
+		     rt != NULL;
+		     rt = rt->next)
+		{
+			if (r == NULL)
+				r = nrt = xmalloc(sizeof(*r));
+			else {
+				r->next = xmalloc(sizeof(*r));
+				r = r->next;
+			}
+			memcpy(r, rt, sizeof(*r));
+			r->next = NULL;
+		}
+		return nrt;
+	}
+
+	return get_option_routes(iface->state->new);
+}
+
 static void
 build_routes()
 {
@@ -341,7 +414,7 @@ build_routes()
 	for (ifp = ifaces; ifp; ifp = ifp->next) {
 		if (ifp->state->new == NULL)
 			continue;
-		dnr = get_option_routes(ifp->state->new);
+		dnr = get_routes(ifp);
 		dnr = add_subnet_route(dnr, ifp);
 		for (rt = dnr; rt && (rtn = rt->next, 1); lrt = rt, rt = rtn) {
 			rt->iface = ifp;

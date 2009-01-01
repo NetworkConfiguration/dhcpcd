@@ -1,4 +1,4 @@
-.\" Copyright 2006-2008 Roy Marples
+.\" Copyright 2006-2009 Roy Marples
 .\" All rights reserved
 .\"
 .\" Redistribution and use in source and binary forms, with or without
@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd December 16, 2008
+.Dd January 1, 2009
 .Dt DHCPCD 8 SMM
 .Sh NAME
 .Nm dhcpcd
@@ -49,6 +49,7 @@
 .Op Fl I , -clientid Ar clientid
 .Op Fl O , -nooption Ar option
 .Op Fl Q , -require Ar option
+.Op Fl S , -static Ar value
 .Op Fl X , -blacklist Ar address
 .Op Fl Z , -denyinterfaces Ar pattern
 .Op interface
@@ -424,6 +425,21 @@ To enforce that
 only responds to DHCP servers and not BOOTP servers, you can
 .Fl Q
 .Ar dhcp_message_type .
+.It Fl S, -static Ar value
+Configures a static
+.Ar value .
+If you set
+.Ic ip_address
+then
+.Nm
+will not attempt to obtain a lease and just use the value for the address with
+an infinite lease time.
+.Pp
+Here is an example which configures a static address, routes and dns.
+.D1 dhcpcd -S ip_address=192.168.0.10/24 \e
+.D1 -S routers=192.168.0.1 \e
+.D1 -S domain_name_servers=192.168.0.1 \e
+.D1 eth0
 .It Fl T, -test
 On receipt of OFFER messages just call
 .Pa @SCRIPT@
