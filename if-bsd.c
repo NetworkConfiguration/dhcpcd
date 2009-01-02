@@ -212,15 +212,11 @@ if_route(const struct interface *iface, const struct in_addr *dest,
 	}
 
 	ADDADDR(dest);
-	if (rtm.hdr.rtm_flags & RTF_HOST) {
+	if (rtm.hdr.rtm_flags & RTF_HOST || !(rtm.hdr.rtm_flags & RTF_STATIC)) {
 		/* Make us a link layer socket for the host gateway */
 		memset(&su, 0, sizeof(su));
 		su.sdl.sdl_len = sizeof(struct sockaddr_dl);
 		link_addr(iface->name, &su.sdl);
-		ADDSU(su);
-	} else if (!(rtm.hdr.rtm_flags & RTF_STATIC)) {
-		memset(&su, 0, sizeof(su));
-		su.sdl.sdl_index = if_nametoindex(iface->name);
 		ADDSU(su);
 	} else
 		ADDADDR(gate);
