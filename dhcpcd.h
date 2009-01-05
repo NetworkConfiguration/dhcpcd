@@ -113,7 +113,7 @@ extern int ifdc;
 extern char **ifdv;
 extern struct interface *ifaces;
 
-int handle_args(int, char **);
+int handle_args(int, int, char **);
 void handle_exit_timeout(void *);
 void start_interface(void *);
 void start_discover(void *);

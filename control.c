@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright 2006-2008 Roy Marples <roy@marples.name>
+ * Copyright 2006-2009 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -84,7 +84,7 @@ handle_control_data(void *arg)
 			*ap++ = p;
 			p += strlen(p) + 1;
 		}
-		handle_args(argc, argvp);
+		handle_args(*s, argc, argvp);
 	}
 }
 

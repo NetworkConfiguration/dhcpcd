@@ -1098,10 +1098,17 @@ handle_signal(_unused void *arg)
 }
 
 int
-handle_args(int argc, char **argv)
+handle_args(int fd, int argc, char **argv)
 {
 	struct interface *ifs, *ifp, *ifl, *ifn, *ift;
 	int do_exit = 0, do_release = 0, do_reboot = 0, opt, oi = 0;
+
+	if (strcmp(*argv, "--version") == 0) {
+		if (fd != -1) {
+			write(fd, VERSION, strlen(VERSION));
+			return 0;
+		}
+	}
 
 	optind = 0;
 	while ((opt = getopt_long(argc, argv, IF_OPTS, cf_options, &oi)) != -1)
