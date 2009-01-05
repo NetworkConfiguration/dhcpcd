@@ -1126,7 +1126,7 @@ handle_args(int fd, int argc, char **argv)
 		}
 	}
 
-	/* We only deal with one interface here */
+	/* We need at least one interface */
 	if (optind == argc) {
 		syslog(LOG_ERR, "handle_args: no interface");
 		return -1;
