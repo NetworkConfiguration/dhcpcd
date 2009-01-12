@@ -1243,7 +1243,7 @@ configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 		setvar(&ep, prefix, "subnet_cidr", cidr);
 		if (get_option_addr(&brd.s_addr, dhcp, DHO_BROADCAST) == -1) {
 			brd.s_addr = addr.s_addr | ~net.s_addr;
-			setvar(&ep, prefix, "broadcast_address", inet_ntoa(net));
+			setvar(&ep, prefix, "broadcast_address", inet_ntoa(brd));
 		}
 		addr.s_addr = dhcp->yiaddr & net.s_addr;
 		setvar(&ep, prefix, "network_number", inet_ntoa(addr));
