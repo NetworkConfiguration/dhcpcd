@@ -26,6 +26,7 @@
  */
 
 #include <sys/stat.h>
+#include <sys/uio.h>
 #include <sys/wait.h>
 
 #include <netinet/in.h>
@@ -135,17 +136,41 @@ append_config(char ***env, ssize_t *len,
 	*env = ne;
 }
 
+static size_t
+arraytostr(const char *const *argv, char **s)
+{
+	const char *const *ap;
+	char *p;
+	size_t len, l;
+
+	len = 0;
+	ap = argv;
+	while (*ap)
+		len += strlen(*ap++) + 1;
+	*s = p = xmalloc(len);
+	ap = argv;
+	while (*ap) {
+		l = strlen(*ap) + 1;
+		memcpy(p, *ap, l);
+		p += l;
+		ap++;
+	}
+	return len;
+}
+
 int
 run_script(const struct interface *iface, const char *reason)
 {
 	char *const argv[2] = { UNCONST(iface->state->options->script), NULL };
 	char **env = NULL, **ep;
-	char *path, *p;
+	char *path, *p, *bigenv;
 	ssize_t e, elen, l;
 	pid_t pid;
 	int status = 0;
 	const struct if_options *ifo = iface->state->options;
 	const struct interface *ifp;
+	const struct fd_list *fd;
+	struct iovec iov[2];
 
 	syslog(LOG_DEBUG, "%s: executing `%s', reason %s",
 	       iface->name, argv[0], reason);
@@ -235,6 +260,23 @@ run_script(const struct interface *iface, const char *reason)
 			}
 		}
 	}
+
+	/* Send to our listeners */
+	bigenv = NULL;
+	for (fd = fds; fd != NULL; fd = fd->next) {
+		if (fd->listener) {
+			if (bigenv == NULL) {
+				elen = arraytostr((const char *const *)env,
+						&bigenv);
+				iov[0].iov_base = &elen;
+				iov[0].iov_len = sizeof(size_t);
+				iov[1].iov_base = bigenv;
+				iov[1].iov_len = elen;
+			}
+			writev(fd->fd, iov, 2);
+		}
+	}
+	free(bigenv);
 
 	/* Cleanup */
 	ep = env;

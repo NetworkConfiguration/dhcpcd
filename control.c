@@ -36,56 +36,61 @@
 
 #include "config.h"
 #include "common.h"
+#include "dhcpcd.h"
 #include "control.h"
 #include "eloop.h"
-#include "dhcpcd.h"
 
 static int fd = -1;
 struct sockaddr_un sun;
 static char buffer[1024];
 static char *argvp[255];
 
-static int fds[5];
+struct fd_list *fds = NULL;
 
 static void
 remove_control_data(void *arg)
 {
-	size_t i;
+	struct fd_list *l, *last = NULL;
 
-	for (i = 0; i < sizeof(fds); i++) {
-		if (&fds[i] == arg) {
-			close(fds[i]);
-			delete_event(fds[i]);
-			fds[i] = -1;
+	for (l = fds; l != NULL; l = l->next) {
+		if (l == arg) {
+			close(l->fd);
+			delete_event(l->fd);
+			if (last == NULL)
+				fds = l->next;
+			else
+				last->next = l->next;
+			free(l);
+			break;
 		}
+		last = l;
 	}
 }
 
 static void
 handle_control_data(void *arg)
 {
+	struct fd_list *l = arg;
 	ssize_t bytes;
-	int argc, *s = arg;
+	int argc;
 	char *e, *p;
 	char **ap;
 
-	for (;;) {
-		bytes = read(*s, buffer, sizeof(buffer));
-		if (bytes == -1 || bytes == 0) {
-			remove_control_data(arg);
-			return;
-		}
-		p = buffer;
-		e = buffer + bytes;
-		argc = 0;
-		ap = argvp;
-		while (p < e && (size_t)argc < sizeof(argvp)) {
-			argc++;
-			*ap++ = p;
-			p += strlen(p) + 1;
-		}
-		handle_args(*s, argc, argvp);
+	bytes = read(l->fd, buffer, sizeof(buffer));
+	if (bytes == -1 || bytes == 0) {
+		remove_control_data(l);
+		return;
 	}
+	p = buffer;
+	e = buffer + bytes;
+	argc = 0;
+	ap = argvp;
+	while (p < e && (size_t)argc < sizeof(argvp)) {
+		argc++;
+		*ap++ = p;
+		p += strlen(p) + 1;
+	}
+	handle_args(l, argc, argvp);
 }
 
 /* ARGSUSED */
@@ -94,21 +99,18 @@ handle_control(_unused void *arg)
 {
 	struct sockaddr_un run;
 	socklen_t len;
-	size_t i;
-
-	for (i = 0; i < sizeof(fds); i++) {
-		if (fds[i] == -1)
-			break;
-	}
-	if (i >= sizeof(fds))
-		return;
+	struct fd_list *l;
+	int f;
 
 	len = sizeof(run);
-	if ((fds[i] = accept(fd, (struct sockaddr *)&run, &len)) == -1)
+	if ((f = accept(fd, (struct sockaddr *)&run, &len)) == -1)
 		return;
-	add_event(fds[i], handle_control_data, &fds[i]);
-	/* Timeout the connection after 5 minutes - should be plenty */
-	add_timeout_sec(300, remove_control_data, &fds[i]);
+	l = xmalloc(sizeof(*l));
+	l->fd = f;
+	l->listener = 0;
+	l->next = fds;
+	fds = l;
+	add_event(l->fd, handle_control_data, l);
 }
 
 static int
@@ -139,7 +141,6 @@ start_control(void)
 		close(fd);
 		return -1;
 	}
-	memset(fds, -1, sizeof(fds));
 	add_event(fd, handle_control, NULL);
 	return fd;
 }
@@ -148,10 +149,22 @@ int
 stop_control(void)
 {
 	int retval = 0;
+	struct fd_list *l, *ll;
+
+	delete_event(fd);
 	if (close(fd) == -1)
 		retval = 1;
+	fd = -1;
 	if (unlink(CONTROLSOCKET) == -1)
 		retval = -1;
+	l = fds;
+	while (l != NULL) {
+		ll = l->next;
+		delete_event(l->fd);
+		close(l->fd);
+		free(l);
+		l = ll;
+	}
 	return retval;
 }
 

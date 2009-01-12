@@ -1098,14 +1098,34 @@ handle_signal(_unused void *arg)
 }
 
 int
-handle_args(int fd, int argc, char **argv)
+handle_args(struct fd_list *fd, int argc, char **argv)
 {
 	struct interface *ifs, *ifp, *ifl, *ifn, *ift;
 	int do_exit = 0, do_release = 0, do_reboot = 0, opt, oi = 0;
+	char *s, *p;
+	size_t l, len;
 
-	if (strcmp(*argv, "--version") == 0) {
-		if (fd != -1) {
-			write(fd, VERSION, strlen(VERSION));
+	if (fd != NULL) {
+		if (strcmp(*argv, "--version") == 0) {
+			write(fd->fd, VERSION, strlen(VERSION));
+			return 0;
+		} else if (strcmp(*argv, "--listinterfaces") == 0) {
+			l = 0;
+			for (ifp = ifaces; ifp; ifp = ifp->next)
+				l += strlen(ifp->name) + 1;
+			s = p = xmalloc(l);
+			for (ifp = ifaces; ifp; ifp = ifp->next) {
+				len = strlen(ifp->name);
+				memcpy(p, ifp->name, len);
+				p += len;
+				*p++ = ' ';
+			}
+			*--p = '\0';
+			write(fd->fd, s, l);
+			free(s);
+			return 0;
+		} else if (strcmp(*argv, "--listen") == 0) {
+			fd->listener = 1;
 			return 0;
 		}
 	}

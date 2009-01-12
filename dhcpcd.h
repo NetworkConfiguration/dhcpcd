@@ -33,6 +33,7 @@
 
 #include <limits.h>
 
+#include "control.h"
 #include "dhcp.h"
 #include "if-options.h"
 
@@ -113,7 +114,7 @@ extern int ifdc;
 extern char **ifdv;
 extern struct interface *ifaces;
 
-int handle_args(int, int, char **);
+int handle_args(struct fd_list *, int, char **);
 void handle_exit_timeout(void *);
 void start_interface(void *);
 void start_discover(void *);

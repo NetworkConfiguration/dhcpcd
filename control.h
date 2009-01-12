@@ -30,6 +30,13 @@
 
 #include "dhcpcd.h"
 
+struct fd_list {
+	int fd;
+	int listener;
+	struct fd_list *next;
+};
+extern struct fd_list *fds;
+
 int start_control(void);
 int stop_control(void);
 int open_control(void);
