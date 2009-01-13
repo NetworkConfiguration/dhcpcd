@@ -65,6 +65,7 @@ struct if_state {
 	struct dhcp_message *new;
 	struct dhcp_message *old;
 	struct dhcp_lease lease;
+	const char *reason;
 	time_t interval;
 	time_t nakoff;
 	uint32_t xid;

@@ -30,7 +30,8 @@
 
 #include "net.h"
 
-int run_script(const struct interface *, const char *);
-int configure(struct interface *, const char *);
+int send_state(int, const struct interface *);
+int run_script(const struct interface *);
+int configure(struct interface *);
 
 #endif

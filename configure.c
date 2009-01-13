@@ -158,48 +158,32 @@ arraytostr(const char *const *argv, char **s)
 	return len;
 }
 
-int
-run_script(const struct interface *iface, const char *reason)
+static ssize_t
+make_env(const struct interface *iface, char ***argv)
 {
-	char *const argv[2] = { UNCONST(iface->state->options->script), NULL };
-	char **env = NULL, **ep;
-	char *path, *p, *bigenv;
+	char **env, *p;
 	ssize_t e, elen, l;
-	pid_t pid;
-	int status = 0;
 	const struct if_options *ifo = iface->state->options;
 	const struct interface *ifp;
-	const struct fd_list *fd;
-	struct iovec iov[2];
-
-	syslog(LOG_DEBUG, "%s: executing `%s', reason %s",
-	       iface->name, argv[0], reason);
 
 	/* Make our env */
-	elen = 6;
+	elen = 5;
 	env = xmalloc(sizeof(char *) * (elen + 1));
-	path = getenv("PATH");
-	if (path) {
-		e = strlen("PATH") + strlen(path) + 2;
-		env[0] = xmalloc(e);
-		snprintf(env[0], e, "PATH=%s", path);
-	} else
-		env[0] = xstrdup(DEFAULT_PATH);
 	e = strlen("interface") + strlen(iface->name) + 2;
+	env[0] = xmalloc(e);
+	snprintf(env[0], e, "interface=%s", iface->name);
+	e = strlen("reason") + strlen(iface->state->reason) + 2;
 	env[1] = xmalloc(e);
-	snprintf(env[1], e, "interface=%s", iface->name);
-	e = strlen("reason") + strlen(reason) + 2;
-	env[2] = xmalloc(e);
-	snprintf(env[2], e, "reason=%s", reason);
+	snprintf(env[1], e, "reason=%s", iface->state->reason);
 	e = 20;
+	env[2] = xmalloc(e);
+	snprintf(env[2], e, "pid=%d", getpid());
 	env[3] = xmalloc(e);
-	snprintf(env[3], e, "pid=%d", getpid());
-	env[4] = xmalloc(e);
-	snprintf(env[4], e, "metric=%d", iface->metric);
+	snprintf(env[3], e, "metric=%d", iface->metric);
 	l = e = strlen("interface_order=");
 	for (ifp = ifaces; ifp; ifp = ifp->next)
 		e += strlen(ifp->name) + 1;
-	p = env[5] = xmalloc(e);
+	p = env[4] = xmalloc(e);
 	strlcpy(p, "interface_order=", e);
 	e -= l;
 	p += l;
@@ -247,6 +231,62 @@ run_script(const struct interface *iface, const char *reason)
 	}
 	env[elen] = '\0';
 
+	*argv = env;
+	return elen;
+}
+
+int
+send_state(int fd, const struct interface *iface)
+{
+	char **env, **ep, *s;
+	ssize_t elen;
+	struct iovec iov[2];
+	int retval;
+
+	retval = 0;
+	make_env(iface, &env);
+	elen = arraytostr((const char *const *)env, &s);
+	iov[0].iov_base = &elen;
+	iov[0].iov_len = sizeof(ssize_t);
+	iov[1].iov_base = s;
+	iov[1].iov_len = elen;
+	retval = writev(fd, iov, 2);
+	ep = env;
+	while (*ep)
+		free(*ep++);
+	free(env);
+	free(s);
+	return retval;
+}
+
+int
+run_script(const struct interface *iface)
+{
+	char *const argv[2] = { UNCONST(iface->state->options->script), NULL };
+	char **env = NULL, **ep;
+	char *path, *bigenv;
+	ssize_t e, elen = 0;
+	pid_t pid;
+	int status = 0;
+	const struct fd_list *fd;
+	struct iovec iov[2];
+
+	syslog(LOG_DEBUG, "%s: executing `%s', reason %s",
+	       iface->name, argv[0], iface->state->reason);
+
+	/* Make our env */
+	elen = make_env(iface, &env);
+	env = xrealloc(env, sizeof(char *) * (elen + 2));
+	/* Add path to it */
+	path = getenv("PATH");
+	if (path) {
+		e = strlen("PATH") + strlen(path) + 2;
+		env[elen] = xmalloc(e);
+		snprintf(env[elen], e, "PATH=%s", path);
+	} else
+		env[elen] = xstrdup(DEFAULT_PATH);
+	env[++elen] = '\0';
+
 	pid = exec_script(argv, env);
 	if (pid == -1)
 		status = -1;
@@ -269,7 +309,7 @@ run_script(const struct interface *iface, const char *reason)
 				elen = arraytostr((const char *const *)env,
 						&bigenv);
 				iov[0].iov_base = &elen;
-				iov[0].iov_len = sizeof(size_t);
+				iov[0].iov_len = sizeof(ssize_t);
 				iov[1].iov_base = bigenv;
 				iov[1].iov_len = elen;
 			}
@@ -518,7 +558,7 @@ delete_address(struct interface *iface)
 }
 
 int
-configure(struct interface *iface, const char *reason)
+configure(struct interface *iface)
 {
 	struct dhcp_message *dhcp = iface->state->new;
 	struct dhcp_lease *lease = &iface->state->lease;
@@ -533,7 +573,7 @@ configure(struct interface *iface, const char *reason)
 			build_routes();
 			delete_address(iface);
 		}
-		run_script(iface, reason);
+		run_script(iface);
 		return 0;
 	}
 
@@ -578,6 +618,6 @@ configure(struct interface *iface, const char *reason)
 	    !(iface->state->options->options & DHCPCD_INFORM))
 		if (write_lease(iface, dhcp) == -1)
 			syslog(LOG_ERR, "write_lease: %m");
-	run_script(iface, reason);
+	run_script(iface);
 	return 0;
 }

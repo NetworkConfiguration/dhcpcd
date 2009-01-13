@@ -118,8 +118,8 @@ bind_interface(void *arg)
 	struct if_options *ifo = state->options;
 	struct dhcp_lease *lease = &state->lease;
 	struct timeval tv;
-	const char *reason = NULL;
 
+	state->reason = NULL;
 	delete_timeout(handle_exit_timeout, NULL);
 	if (clock_monotonic)
 		get_monotonic(&lease->boundtime);
@@ -134,12 +134,12 @@ bind_interface(void *arg)
 		       iface->name, inet_ntoa(lease->addr));
 		lease->leasetime = ~0U;
 		lease->net.s_addr = ifo->request_netmask.s_addr;
-		reason = "STATIC";
+		state->reason = "STATIC";
 	} else if (IN_LINKLOCAL(htonl(state->new->yiaddr))) {
 		syslog(LOG_INFO, "%s: using IPv4LL address %s",
 		       iface->name, inet_ntoa(lease->addr));
 		lease->leasetime = ~0U;
-		reason = "IPV4LL";
+		state->reason = "IPV4LL";
 	} else if (ifo->options & DHCPCD_INFORM) {
 		if (ifo->request_address.s_addr != 0)
 			lease->addr.s_addr = ifo->request_address.s_addr;
@@ -148,12 +148,12 @@ bind_interface(void *arg)
 		syslog(LOG_INFO, "%s: received approval for %s", iface->name,
 		       inet_ntoa(lease->addr));
 		lease->leasetime = ~0U;
-		reason = "INFORM";
+		state->reason = "INFORM";
 	} else {
 		if (gettimeofday(&tv, NULL) == 0)
 			lease->leasedfrom = tv.tv_sec;
 		else if (lease->frominfo)
-			reason = "TIMEOUT";
+			state->reason = "TIMEOUT";
 		if (lease->leasetime == ~0U) {
 			lease->renewaltime = lease->rebindtime = lease->leasetime;
 			syslog(LOG_INFO, "%s: leased %s for infinity",
@@ -182,21 +182,22 @@ bind_interface(void *arg)
 			       inet_ntoa(lease->addr), lease->leasetime);
 		}
 	}
-	if (reason == NULL) {
+	if (options & DHCPCD_TEST) {
+		state->reason = "TEST";
+		run_script(iface);
+		exit(EXIT_SUCCESS);
+	}
+	if (state->reason == NULL) {
 		if (state->old) {
 			if (state->old->yiaddr == state->new->yiaddr &&
 			    lease->server.s_addr)
-				reason = "RENEW";
+				state->reason = "RENEW";
 			else
-				reason = "REBIND";
+				state->reason = "REBIND";
 		} else if (state->state == DHS_REBOOT)
-			reason = "REBOOT";
+			state->reason = "REBOOT";
 		else
-			reason = "BOUND";
-	}
-	if (options & DHCPCD_TEST) {
-		run_script(iface, "TEST");
-		exit(EXIT_SUCCESS);
+			state->reason = "BOUND";
 	}
 	if (lease->leasetime == ~0U)
 		lease->renewaltime = lease->rebindtime = lease->leasetime;
@@ -205,7 +206,7 @@ bind_interface(void *arg)
 		add_timeout_sec(lease->rebindtime, start_rebind, iface);
 		add_timeout_sec(lease->leasetime, start_expire, iface);
 	}
-	configure(iface, reason);
+	configure(iface);
 	daemonise();
 	state->state = DHS_BOUND;
 	if (ifo->options & DHCPCD_ARP) {

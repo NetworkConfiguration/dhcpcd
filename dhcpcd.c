@@ -188,7 +188,11 @@ drop_config(struct interface *iface, const char *reason)
 		free(iface->state->old);
 		iface->state->old = iface->state->new;
 		iface->state->new = NULL;
-		configure(iface, reason);
+		if (reason == NULL)
+			iface->state->reason = "EXPIRE";
+		else
+			iface->state->reason = reason;
+		configure(iface);
 	}
 	iface->state->lease.addr.s_addr = 0;
 }
@@ -490,7 +494,8 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 			state->old = state->new;
 			state->new = state->offer;
 			state->offer = NULL;
-			run_script(iface, "TEST");
+			state->reason = "TEST";
+			run_script(iface);
 			exit(EXIT_SUCCESS);
 		}
 		delete_timeout(send_discover, iface);
@@ -965,6 +970,7 @@ init_state(struct interface *iface, int argc, char **argv)
 		ifs = iface->state = xzalloc(sizeof(*ifs));
 
 	ifs->state = DHS_INIT;
+	ifs->reason = "PREINIT";
 	ifs->nakoff = 1;
 	configure_interface(iface, argc, argv);
 
@@ -1010,7 +1016,7 @@ handle_new_interface(const char *ifname)
 			if (ifn)
 				continue;
 			init_state(ifp, 2, UNCONST(argv));
-			run_script(ifp, "PREINIT");
+			run_script(ifp);
 			start_interface(ifp);
 			if (ifl)
 				ifl->next = ifp;
@@ -1103,13 +1109,15 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 	struct interface *ifs, *ifp, *ifl, *ifn, *ift;
 	int do_exit = 0, do_release = 0, do_reboot = 0, opt, oi = 0;
 	char *s, *p;
-	size_t l, len;
+	ssize_t l, len;
+	struct iovec iov[2];
 
 	if (fd != NULL) {
+		/* Special commands for our control socket */
 		if (strcmp(*argv, "--version") == 0) {
 			write(fd->fd, VERSION, strlen(VERSION));
 			return 0;
-		} else if (strcmp(*argv, "--listinterfaces") == 0) {
+		} else if (strcmp(*argv, "--getinterfaces") == 0) {
 			l = 0;
 			for (ifp = ifaces; ifp; ifp = ifp->next)
 				l += strlen(ifp->name) + 1;
@@ -1121,8 +1129,20 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 				*p++ = ' ';
 			}
 			*--p = '\0';
-			write(fd->fd, s, l);
+			iov[0].iov_base = &l;
+			iov[0].iov_len = sizeof(ssize_t);
+			iov[1].iov_base = s;
+			iov[1].iov_len = l;
+			writev(fd->fd, iov, 2);
 			free(s);
+			return 0;
+		} else if (strcmp(*argv, "--getstates") == 0) {
+			l = 0;
+			for (ifp = ifaces; ifp; ifp = ifp->next)
+				l++;
+			write(fd->fd, &l, sizeof(l));
+			for (ifp = ifaces; ifp; ifp = ifp->next)
+				send_state(fd->fd, ifp);
 			return 0;
 		} else if (strcmp(*argv, "--listen") == 0) {
 			fd->listener = 1;
@@ -1184,7 +1204,7 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 			} else {
 				ifp->next = NULL;
 				init_state(ifp, argc, argv);
-				run_script(ifp, "PREINIT");
+				run_script(ifp);
 				start_interface(ifp);
 				if (ifl)
 					ifl->next = ifp;
@@ -1425,7 +1445,7 @@ main(int argc, char **argv)
 	sort_interfaces();
 	for (iface = ifaces; iface; iface = iface->next) {
 		if (!(options & DHCPCD_TEST))
-			run_script(iface, "PREINIT");
+			run_script(iface);
 		start_interface(iface);
 	}
 	start_eloop();
