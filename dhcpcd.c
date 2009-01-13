@@ -1115,7 +1115,12 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 	if (fd != NULL) {
 		/* Special commands for our control socket */
 		if (strcmp(*argv, "--version") == 0) {
-			write(fd->fd, VERSION, strlen(VERSION));
+			l = strlen(VERSION);
+			iov[0].iov_base = &l;
+			iov[0].iov_len = sizeof(ssize_t);
+			iov[1].iov_base = UNCONST(VERSION);
+			iov[1].iov_len = l;
+			writev(fd->fd, iov, 2);
 			return 0;
 		} else if (strcmp(*argv, "--getinterfaces") == 0) {
 			l = 0;
