@@ -184,16 +184,11 @@ handle_exit_timeout(_unused void *arg)
 void
 drop_config(struct interface *iface, const char *reason)
 {
-	if (iface->state->new || strcmp(reason, "FAIL") == 0) {
-		free(iface->state->old);
-		iface->state->old = iface->state->new;
-		iface->state->new = NULL;
-		if (reason == NULL)
-			iface->state->reason = "EXPIRE";
-		else
-			iface->state->reason = reason;
-		configure(iface);
-	}
+	free(iface->state->old);
+	iface->state->old = iface->state->new;
+	iface->state->new = NULL;
+	iface->state->reason = reason;
+	configure(iface);
 	iface->state->lease.addr.s_addr = 0;
 }
 
@@ -726,7 +721,7 @@ handle_carrier(const char *ifname)
 			syslog(LOG_INFO, "%s: carrier lost", iface->name);
 			close_sockets(iface);
 			delete_timeouts(iface, start_expire, NULL);
-			drop_config(iface, "NOCARRIER");	
+			drop_config(iface, "NOCARRIER");
 		}
 		break;
 	default:
@@ -739,6 +734,8 @@ handle_carrier(const char *ifname)
 				strlcpy(ssid, iface->ssid, sizeof(iface->ssid));
 				configure_interface(iface, margc, margv);
 			}
+			iface->state->reason = "CARRIER";
+			run_script(iface);
 			start_interface(iface);
 		}
 		break;
@@ -973,18 +970,25 @@ init_state(struct interface *iface, int argc, char **argv)
 	ifs->reason = "PREINIT";
 	ifs->nakoff = 1;
 	configure_interface(iface, argc, argv);
+	if (!(options & DHCPCD_TEST))
+		run_script(iface);
 
 	if (ifs->options->options & DHCPCD_LINK) {
 		switch (carrier_status(iface->name)) {
 		case 0:
 			iface->carrier = LINK_DOWN;
+			ifs->reason = "NOCARRIER";
 			break;
 		case 1:
 			iface->carrier = LINK_UP;
+			ifs->reason = "CARRIER";
 			break;
 		default:
 			iface->carrier = LINK_UNKNOWN;
+			return;
 		}
+		if (!(options & DHCPCD_TEST))
+			run_script(iface);
 	} else
 		iface->carrier = LINK_UNKNOWN;
 }
@@ -1016,7 +1020,6 @@ handle_new_interface(const char *ifname)
 			if (ifn)
 				continue;
 			init_state(ifp, 2, UNCONST(argv));
-			run_script(ifp);
 			start_interface(ifp);
 			if (ifl)
 				ifl->next = ifp;
@@ -1209,7 +1212,6 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 			} else {
 				ifp->next = NULL;
 				init_state(ifp, argc, argv);
-				run_script(ifp);
 				start_interface(ifp);
 				if (ifl)
 					ifl->next = ifp;
@@ -1448,11 +1450,8 @@ main(int argc, char **argv)
 	for (iface = ifaces; iface; iface = iface->next)
 		init_state(iface, argc, argv);
 	sort_interfaces();
-	for (iface = ifaces; iface; iface = iface->next) {
-		if (!(options & DHCPCD_TEST))
-			run_script(iface);
+	for (iface = ifaces; iface; iface = iface->next)
 		start_interface(iface);
-	}
 	start_eloop();
 	exit(EXIT_SUCCESS);
 }

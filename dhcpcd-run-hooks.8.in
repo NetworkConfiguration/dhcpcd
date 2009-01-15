@@ -71,6 +71,9 @@ could be invoked:
 .Bl -tag -width PREINIT
 .It Dv PREINIT
 dhcpcd is starting up and any pre-initialisation should be done.
+.It Dv CARRIER
+dhcpcd has detected the carrier is up.
+This is generally just a notification and no action need be taken.
 .It Dv INFORM
 dhcpcd informed a DHCP server about it's address and obtained other
 configuration details.
