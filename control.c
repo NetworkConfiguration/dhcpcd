@@ -54,7 +54,7 @@ remove_control_data(void *arg)
 
 	for (l = fds; l != NULL; l = l->next) {
 		if (l == arg) {
-			shutdown(l->fd, SHUT_RDWR);
+			close(l->fd);
 			delete_event(l->fd);
 			if (last == NULL)
 				fds = l->next;
