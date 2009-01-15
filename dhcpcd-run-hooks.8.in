@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd January 1, 2008
+.Dd January 15, 2009
 .Dt DHCPCD.SH 8 SMM
 .Sh NAME
 .Nm dhcpcd-run-hooks
@@ -68,7 +68,7 @@ argument.
 Here's a list of reasons why
 .Nm
 could be invoked:
-.Bl -tag -width indent
+.Bl -tag -width PREINIT
 .It Dv PREINIT
 dhcpcd is starting up and any pre-initialisation should be done.
 .It Dv INFORM
@@ -82,22 +82,30 @@ dhcpcd renewed it's lease.
 dhcpcd has rebound to a new DHCP server.
 .It Dv REBOOT
 dhcpcd successfully requested a lease from a DHCP server.
-.It Dv EXPIRE
-dhcpcd's lease or state expired and it failed to obtain a new one.
 .It Dv IPV4LL
 dhcpcd failed to contact any DHCP servers but did obtain an IPV4LL address.
-.It Dv FAIL
-dhcpcd failed to contact any DHCP servers or use an old lease.
+.It Dv STATIC
+dhcpcd has been configured with a static configuration which has not been
+obtained from a DHCP server.
 .It Dv TIMEOUT
 dhcpcd failed to contact any DHCP servers but was able to use an old lease.
+.It Dv EXPIRE
+dhcpcd's lease or state expired and it failed to obtain a new one.
+.It Dv NAK
+dhcpcd received a NAK from the DHCP server.
+This should be treated as EXPIRE.
+.It Dv NOCARRIER
+dhcpcd lost the carrier.
+The cable may have been unplugged or association to the wireless point lost.
+.It Dv FAIL
+dhcpcd failed to contact any DHCP servers or use an old lease.
+.It Dv STOP
+dhcpcd will stop running on the interface.
 .It Dv TEST
 dhcpcd received an OFFER from a DHCP server but will not configure the
 interface.
 This is primarily used to test the variables are filled correctly for the
 script to process them.
-.It Dv STATIC
-dhcpcd has been configured with a static configuration which has not been
-obtained from a DHCP server.
 .El
 .Sh FILES 
 When

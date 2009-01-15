@@ -449,7 +449,7 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 	/* We should restart on a NAK */
 	if (type == DHCP_NAK) {
 		log_dhcp(LOG_WARNING, "NAK:", iface, dhcp);
-		drop_config(iface, "EXPIRE");
+		drop_config(iface, "NAK");
 		unlink(iface->leasefile);
 		delete_event(iface->raw_fd);
 		close(iface->raw_fd);
@@ -726,7 +726,7 @@ handle_carrier(const char *ifname)
 			syslog(LOG_INFO, "%s: carrier lost", iface->name);
 			close_sockets(iface);
 			delete_timeouts(iface, start_expire, NULL);
-			drop_config(iface, "EXPIRE");	
+			drop_config(iface, "NOCARRIER");	
 		}
 		break;
 	default:
