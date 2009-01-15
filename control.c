@@ -54,7 +54,7 @@ remove_control_data(void *arg)
 
 	for (l = fds; l != NULL; l = l->next) {
 		if (l == arg) {
-			close(l->fd);
+			shutdown(l->fd, SHUT_RDWR);
 			delete_event(l->fd);
 			if (last == NULL)
 				fds = l->next;
@@ -152,19 +152,21 @@ stop_control(void)
 	struct fd_list *l, *ll;
 
 	delete_event(fd);
-	l = fds;
-	while (l != NULL) {
-		ll = l->next;
-		delete_event(l->fd);
-		close(l->fd);
-		free(l);
-		l = ll;
-	}
-	if (close(fd) == -1)
+	if (shutdown(fd, SHUT_RDWR) == -1)
 		retval = 1;
 	fd = -1;
 	if (unlink(CONTROLSOCKET) == -1)
 		retval = -1;
+
+	l = fds;
+	while (l != NULL) {
+		ll = l->next;
+		delete_event(l->fd);
+		shutdown(l->fd, SHUT_RDWR);
+		free(l);
+		l = ll;
+	}
+
 	return retval;
 }
 
