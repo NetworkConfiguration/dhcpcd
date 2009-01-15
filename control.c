@@ -152,11 +152,6 @@ stop_control(void)
 	struct fd_list *l, *ll;
 
 	delete_event(fd);
-	if (close(fd) == -1)
-		retval = 1;
-	fd = -1;
-	if (unlink(CONTROLSOCKET) == -1)
-		retval = -1;
 	l = fds;
 	while (l != NULL) {
 		ll = l->next;
@@ -165,6 +160,11 @@ stop_control(void)
 		free(l);
 		l = ll;
 	}
+	if (close(fd) == -1)
+		retval = 1;
+	fd = -1;
+	if (unlink(CONTROLSOCKET) == -1)
+		retval = -1;
 	return retval;
 }
 
