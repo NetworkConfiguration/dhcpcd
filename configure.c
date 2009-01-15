@@ -236,7 +236,7 @@ make_env(const struct interface *iface, char ***argv)
 }
 
 int
-send_state(int fd, const struct interface *iface)
+send_interface(int fd, const struct interface *iface)
 {
 	char **env, **ep, *s;
 	ssize_t elen;

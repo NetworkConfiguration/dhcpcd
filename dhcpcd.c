@@ -1111,46 +1111,42 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 {
 	struct interface *ifs, *ifp, *ifl, *ifn, *ift;
 	int do_exit = 0, do_release = 0, do_reboot = 0, opt, oi = 0;
-	char *s, *p;
-	ssize_t l, len;
+	ssize_t len;
 	struct iovec iov[2];
 
 	if (fd != NULL) {
 		/* Special commands for our control socket */
 		if (strcmp(*argv, "--version") == 0) {
-			l = strlen(VERSION) + 1;
-			iov[0].iov_base = &l;
+			len = strlen(VERSION) + 1;
+			iov[0].iov_base = &len;
 			iov[0].iov_len = sizeof(ssize_t);
 			iov[1].iov_base = UNCONST(VERSION);
-			iov[1].iov_len = l;
+			iov[1].iov_len = len;
 			writev(fd->fd, iov, 2);
 			return 0;
 		} else if (strcmp(*argv, "--getinterfaces") == 0) {
-			l = 0;
-			for (ifp = ifaces; ifp; ifp = ifp->next)
-				l += strlen(ifp->name) + 1;
-			s = p = xmalloc(l);
-			for (ifp = ifaces; ifp; ifp = ifp->next) {
-				len = strlen(ifp->name);
-				memcpy(p, ifp->name, len);
-				p += len;
-				*p++ = ' ';
+			len = 0;
+			if (argv[1] == NULL ) {
+				for (ifp = ifaces; ifp; ifp = ifp->next)
+					len++;
+				write(fd->fd, &len, sizeof(len));
+				for (ifp = ifaces; ifp; ifp = ifp->next)
+					send_interface(fd->fd, ifp);
+				return 0;
 			}
-			*--p = '\0';
-			iov[0].iov_base = &l;
-			iov[0].iov_len = sizeof(ssize_t);
-			iov[1].iov_base = s;
-			iov[1].iov_len = l;
-			writev(fd->fd, iov, 2);
-			free(s);
-			return 0;
-		} else if (strcmp(*argv, "--getstates") == 0) {
-			l = 0;
-			for (ifp = ifaces; ifp; ifp = ifp->next)
-				l++;
-			write(fd->fd, &l, sizeof(l));
-			for (ifp = ifaces; ifp; ifp = ifp->next)
-				send_state(fd->fd, ifp);
+			opt = 0;
+			while (argv[++opt] != NULL) {
+				for (ifp = ifaces; ifp; ifp = ifp->next)
+					if (strcmp(argv[opt], ifp->name) == 0)
+						len++;
+			}
+			write(fd->fd, &len, sizeof(len));
+			opt = 0;
+			while (argv[++opt] != NULL) {
+				for (ifp = ifaces; ifp; ifp = ifp->next)
+					if (strcmp(argv[opt], ifp->name) == 0)
+						send_interface(fd->fd, ifp);
+			}
 			return 0;
 		} else if (strcmp(*argv, "--listen") == 0) {
 			fd->listener = 1;
