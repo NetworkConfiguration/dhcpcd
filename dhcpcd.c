@@ -1115,7 +1115,7 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 	if (fd != NULL) {
 		/* Special commands for our control socket */
 		if (strcmp(*argv, "--version") == 0) {
-			l = strlen(VERSION);
+			l = strlen(VERSION) + 1;
 			iov[0].iov_base = &l;
 			iov[0].iov_len = sizeof(ssize_t);
 			iov[1].iov_base = UNCONST(VERSION);
