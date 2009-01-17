@@ -1126,7 +1126,7 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 			return 0;
 		} else if (strcmp(*argv, "--getinterfaces") == 0) {
 			len = 0;
-			if (argv[1] == NULL) {
+			if (argc == 1) {
 				for (ifp = ifaces; ifp; ifp = ifp->next)
 					len++;
 				write(fd->fd, &len, sizeof(len));
