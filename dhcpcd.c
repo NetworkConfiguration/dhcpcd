@@ -189,6 +189,8 @@ drop_config(struct interface *iface, const char *reason)
 	iface->state->new = NULL;
 	iface->state->reason = reason;
 	configure(iface);
+	free(iface->state->old);
+	iface->state->old = NULL;
 	iface->state->lease.addr.s_addr = 0;
 }
 
