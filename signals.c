@@ -39,10 +39,11 @@
 static int signal_pipe[2];
 
 static const int handle_sigs[] = {
-	SIGHUP,
 	SIGALRM,
-	SIGTERM,
-	SIGINT
+	SIGHUP,
+	SIGINT,
+	SIGPIPE,
+	SIGTERM
 };
 
 static void
