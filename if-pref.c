@@ -36,6 +36,12 @@ ifcmp(struct interface *si, struct interface *ti)
 {
 	int sill, till;
 
+	if (si->state && !ti->state)
+		return -1;
+	if (!si->state && ti->state)
+		return 1;
+	if (!si->state && !ti->state)
+		return 0;
 	/* If one has a lease and the other not, it takes precedence. */
 	if (si->state->new && !ti->state->new)
 		return -1;
