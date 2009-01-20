@@ -215,16 +215,13 @@ close_sockets(struct interface *iface)
 
 
 static void
-stop_interface(struct interface *iface, const char *reason)
+stop_interface(struct interface *iface)
 {
 	struct interface *ifp, *ifl = NULL;
 
 	syslog(LOG_INFO, "%s: removing interface", iface->name);
-	if (iface->state->options->options & DHCPCD_RELEASE)
-		send_release(iface);
-	drop_config(iface, reason ? reason : "STOP");
-	if (iface->state->options->options & DHCPCD_RELEASE)
-		unlink(iface->leasefile);
+	if (strcmp(iface->state->reason, "RELEASE") != 0)
+		drop_config(iface, "STOP");
 	close_sockets(iface);
 	delete_timeout(NULL, iface);
 	for (ifp = ifaces; ifp; ifp = ifp->next) {
@@ -300,7 +297,7 @@ send_message(struct interface *iface, int type,
 	}
 	free(dhcp);
 	if (r == -1) {
-		stop_interface(iface, "STOP");
+		stop_interface(iface);
 	} else {
 		if (callback)
 			add_timeout_tv(&tv, callback, iface);
@@ -643,6 +640,7 @@ send_release(struct interface *iface)
 		       iface->name, inet_ntoa(iface->state->lease.addr));
 		open_sockets(iface);
 		send_message(iface, DHCP_RELEASE, NULL);
+		drop_config(iface, "RELEASE");
 	}
 }
 
@@ -737,7 +735,7 @@ handle_carrier(const char *ifname)
 				configure_interface(iface, margc, margv);
 			}
 			iface->state->reason = "CARRIER";
-			run_script(iface);
+			configure(iface);
 			start_interface(iface);
 		}
 		break;
@@ -973,7 +971,7 @@ init_state(struct interface *iface, int argc, char **argv)
 	ifs->nakoff = 1;
 	configure_interface(iface, argc, argv);
 	if (!(options & DHCPCD_TEST))
-		run_script(iface);
+		configure(iface);
 
 	if (ifs->options->options & DHCPCD_LINK) {
 		switch (carrier_status(iface->name)) {
@@ -990,7 +988,7 @@ init_state(struct interface *iface, int argc, char **argv)
 			return;
 		}
 		if (!(options & DHCPCD_TEST))
-			run_script(iface);
+			configure(iface);
 	} else
 		iface->carrier = LINK_UNKNOWN;
 }
@@ -1037,10 +1035,10 @@ handle_remove_interface(const char *ifname)
 	struct interface *iface;
 
 	for (iface = ifaces; iface; iface = iface->next)
-		if (strcmp(iface->name, ifname) == 0)
+		if (strcmp(iface->name, ifname) == 0) {
+			stop_interface(iface);
 			break;
-	if (iface && iface->state->options->options & DHCPCD_LINK)
-		stop_interface(iface, "STOP");
+		}
 }
 
 /* ARGSUSED */
@@ -1078,6 +1076,9 @@ handle_signal(_unused void *arg)
 		syslog(LOG_INFO, "received SIGHUP, releasing lease");
 		do_release = 1;
 		break;
+	case SIGPIPE:
+		syslog(LOG_WARNING, "received SIGPIPE");
+		return;
 	default:
 		syslog(LOG_ERR,
 		       "received signal %d, but don't know what to do with it",
@@ -1089,21 +1090,18 @@ handle_signal(_unused void *arg)
 	for (;;) {
 		/* Be sane and drop the last config first */
 		ifl = NULL;
-		for (iface = ifaces; iface; iface = iface->next)
-			if (iface->state && iface->state->new)
-				ifl = iface;
-		if (!ifl)
-			break;
-		if (do_release || ifl->state->options->options & DHCPCD_RELEASE)
-			send_release(ifl);
-		if ((ifl->state->options->options & DHCPCD_PERSISTENT)) {
-			free(ifl->state->new);
-			ifl->state->new = NULL;
-		} else {
-			drop_config(ifl, do_release ? "RELEASE" : "STOP");
+		for (iface = ifaces; iface; iface = iface->next) {
+			if (iface->next == NULL)
+				break;
+			ifl = iface;
 		}
-		if (do_release || ifl->state->options->options & DHCPCD_RELEASE)
-			unlink(ifl->leasefile);
+		if (iface == NULL)
+			break;
+		if (iface->carrier != LINK_DOWN &&
+		    (do_release ||
+		     iface->state->options->options & DHCPCD_RELEASE))
+			send_release(iface);
+		stop_interface(iface);
 	}
 	exit(EXIT_FAILURE);
 }
@@ -1187,9 +1185,11 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 				continue;
 			if (do_release)
 				ifp->state->options->options |= DHCPCD_RELEASE;
-			stop_interface(ifp, do_release ? "RELEASE" : "STOP");
+			if (ifp->state->options->options & DHCPCD_RELEASE &&
+			    ifp->carrier != LINK_DOWN)
+				send_release(ifp);
+			stop_interface(ifp);
 		}
-		sort_interfaces();
 		return 0;
 	}
 
