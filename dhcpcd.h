@@ -88,6 +88,7 @@ struct interface
 	int metric;
 	int carrier;
 	int arpable;
+	int wireless;
 	char ssid[IF_SSIDSIZE];
 
 	int raw_fd;

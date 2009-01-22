@@ -196,8 +196,10 @@ init_interface(const char *ifname)
 	/* We reserve the 100 range for virtual interfaces, if and when
 	 * we can work them out. */
 	iface->metric = 200 + if_nametoindex(iface->name);
-	if (getifssid(ifname, iface->ssid) != -1)
+	if (getifssid(ifname, iface->ssid) != -1) {
+		iface->wireless = 1;
 		iface->metric += 100;
+	}
 
 #ifdef SIOCGIFHWADDR
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
