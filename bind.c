@@ -159,24 +159,24 @@ bind_interface(void *arg)
 			syslog(LOG_INFO, "%s: leased %s for infinity",
 			       iface->name, inet_ntoa(lease->addr));
 		} else {
-			if (lease->rebindtime >= lease->leasetime) {
+			if (lease->rebindtime == 0)
+				lease->rebindtime = lease->leasetime * T2;
+			else if (lease->rebindtime >= lease->leasetime) {
 				lease->rebindtime = lease->leasetime * T2;
 				syslog(LOG_ERR,
 				       "%s: rebind time greater than lease "
 				       "time, forcing to %u seconds",
 				       iface->name, lease->rebindtime);
 			}
-			if (lease->renewaltime > lease->rebindtime) {
+			if (lease->renewaltime == 0)
+				lease->renewaltime = lease->leasetime * T1;
+			else if (lease->renewaltime > lease->rebindtime) {
 				lease->renewaltime = lease->leasetime * T1;
 				syslog(LOG_ERR,
 				       "%s: renewal time greater than rebind "
 				       "time, forcing to %u seconds",
 				       iface->name, lease->renewaltime);
 			}
-			if (!lease->renewaltime)
-				lease->renewaltime = lease->leasetime * T1;
-			if (!lease->rebindtime)
-				lease->rebindtime = lease->leasetime * T2;
 			syslog(LOG_INFO,
 			       "%s: leased %s for %u seconds", iface->name,
 			       inet_ntoa(lease->addr), lease->leasetime);
