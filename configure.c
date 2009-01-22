@@ -168,8 +168,6 @@ make_env(const struct interface *iface, char ***argv)
 
 	/* Make our env */
 	elen = 6;
-	if (iface->wireless)
-		elen++;
 	env = xmalloc(sizeof(char *) * (elen + 1));
 	e = strlen("interface") + strlen(iface->name) + 2;
 	env[0] = xmalloc(e);
@@ -200,9 +198,17 @@ make_env(const struct interface *iface, char ***argv)
 	}
 	*--p = '\0';
 	if (iface->wireless) {
-		e = strlen("ssid=") + strlen(iface->ssid) + 2;
-		env[6] = xmalloc(e);
-		snprintf(env[6], e, "ssid=%s", iface->ssid);
+		e = strlen("new_ssid=") + strlen(iface->ssid) + 2;
+		if (iface->state->new != NULL) {
+			env = xrealloc(env, sizeof(char *) * (elen + 2));
+			env[elen] = xmalloc(e);
+			snprintf(env[elen++], e, "new_ssid=%s", iface->ssid);
+		}
+		if (iface->state->old != NULL) {
+			env = xrealloc(env, sizeof(char *) * (elen + 2));
+			env[elen] = xmalloc(e);
+			snprintf(env[elen++], e, "old_ssid=%s", iface->ssid);
+		}
 	}
 	if (iface->state->old) {
 		e = configure_env(NULL, NULL, iface->state->old, ifo);
