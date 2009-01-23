@@ -34,11 +34,13 @@
 #include <sys/param.h>
 
 #include <arpa/inet.h>
+#include <net/if.h>
+#include <netinet/ether.h>
+#include <netpacket/packet.h>
+
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <linux/wireless.h>
-#include <netinet/ether.h>
-#include <netpacket/packet.h>
 
 # define SIOCGIWNAME 0x8B01
 /* FIXME: Some linux kernel verisons DO NOT like this include
