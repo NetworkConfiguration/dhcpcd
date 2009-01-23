@@ -199,12 +199,16 @@ make_env(const struct interface *iface, char ***argv)
 	*--p = '\0';
 	if (iface->wireless) {
 		e = strlen("new_ssid=") + strlen(iface->ssid) + 2;
-		if (iface->state->new != NULL) {
+		if (iface->state->new != NULL ||
+		    strcmp(iface->state->reason, "CARRIER") == 0)
+		{
 			env = xrealloc(env, sizeof(char *) * (elen + 2));
 			env[elen] = xmalloc(e);
 			snprintf(env[elen++], e, "new_ssid=%s", iface->ssid);
 		}
-		if (iface->state->old != NULL) {
+		if (iface->state->old != NULL ||
+		    strcmp(iface->state->reason, "NOCARRIER") == 0)
+		{
 			env = xrealloc(env, sizeof(char *) * (elen + 2));
 			env[elen] = xmalloc(e);
 			snprintf(env[elen++], e, "old_ssid=%s", iface->ssid);
