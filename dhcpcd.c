@@ -728,11 +728,14 @@ handle_carrier(const char *ifname)
 		if (iface->carrier != LINK_UP) {
 			iface->carrier = LINK_UP;
 			syslog(LOG_INFO, "%s: carrier acquired", iface->name);
-			/* We need to reconfigre for if ssid changed */
-			getifssid(iface->name, ssid);
-			if (strcmp(iface->ssid, ssid) != 0) {
-				strlcpy(ssid, iface->ssid, sizeof(iface->ssid));
-				configure_interface(iface, margc, margv);
+			if (iface->wireless) {
+				/* We need to reconfigre for if ssid changed */
+				memset(ssid, 0, sizeof(ssid));
+				getifssid(iface->name, ssid);
+				if (strcmp(iface->ssid, ssid) != 0) {
+					strlcpy(iface->ssid, ssid, sizeof(iface->ssid));
+					configure_interface(iface, margc, margv);
+				}
 			}
 			iface->state->reason = "CARRIER";
 			configure(iface);
