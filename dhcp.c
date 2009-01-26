@@ -726,7 +726,7 @@ encode_rfc1035(const char *src, uint8_t *dst)
 
 	if (*src == '\0')
 		return 0;
-	while (*src) {
+	for (; *src; src++) {
 		if (*src == '\0')
 			break;
 		if (*src == '.') {
@@ -739,7 +739,6 @@ encode_rfc1035(const char *src, uint8_t *dst)
 			lp = p++;
 		} else
 			*p++ = (uint8_t)*src;
-		src++;
 	}
 	*lp = p - lp - 1;
 	*p++ = '\0';
