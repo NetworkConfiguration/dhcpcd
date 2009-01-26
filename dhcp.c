@@ -719,28 +719,27 @@ get_option_routes(const struct dhcp_message *dhcp)
 }
 
 static size_t
-encode_rfc1035(const char *src, uint8_t *dst, size_t len)
+encode_rfc1035(const char *src, uint8_t *dst)
 {
-	const char *c = src;
 	uint8_t *p = dst;
 	uint8_t *lp = p++;
 
-	if (len == 0)
+	if (*src == '\0')
 		return 0;
-	while (c < src + len) {
-		if (*c == '\0')
+	while (*src) {
+		if (*src == '\0')
 			break;
-		if (*c == '.') {
+		if (*src == '.') {
 			/* Skip the trailing . */
-			if (c == src + len - 1)
+			if (src[1] == '\0')
 				break;
 			*lp = p - lp - 1;
 			if (*lp == '\0')
 				return p - dst;
 			lp = p++;
 		} else
-			*p++ = (uint8_t) *c;
-		c++;
+			*p++ = (uint8_t)*src;
+		src++;
 	}
 	*lp = p - lp - 1;
 	*p++ = '\0';
@@ -894,16 +893,13 @@ make_message(struct dhcp_message **message,
 		if (options->hostname[0]) {
 			*p++ = DHO_HOSTNAME;
 			hp = strchr(options->hostname, '.');
-			if (hp) {
-				*p++ = hp - options->hostname;
-				memcpy(p, options->hostname, hp - options->hostname);
-				p += hp - options->hostname;
-			} else {
+			if (hp)
+				len = hp - options->hostname;
+			else
 				len = strlen(options->hostname);
-				*p++ = len;
-				memcpy(p, options->hostname, len);
-				p += len;
-			}
+			*p++ = len;
+			memcpy(p, options->hostname, len);
+			p += len;
 		}
 		if (options->fqdn != FQDN_DISABLE) {
 			/* IETF DHC-FQDN option (81), RFC4702 */
@@ -923,8 +919,7 @@ make_message(struct dhcp_message **message,
 			*p++ = (options->fqdn & 0x09) | 0x04;
 			*p++ = 0; /* from server for PTR RR */
 			*p++ = 0; /* from server for A RR if S=1 */
-			ul = encode_rfc1035(options->hostname, p,
-					    strlen(options->hostname));
+			ul = encode_rfc1035(options->hostname, p);
 			*lp += ul;
 			p += ul;
 		}
