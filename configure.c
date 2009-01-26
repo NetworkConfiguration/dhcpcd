@@ -62,6 +62,7 @@
 
 static struct rt *routes;
 
+
 static int
 exec_script(char *const *argv, char *const *env)
 {
@@ -386,6 +387,33 @@ desc_route(const char *cmd, const struct rt *rt, const char *ifname)
 	else
 		syslog(LOG_DEBUG, "%s: %s route to %s/%d via %s", ifname, cmd,
 		       addr, inet_ntocidr(rt->net), inet_ntoa(rt->gate));
+}
+
+/* If something other than dhcpcd removes a route,
+ * we need to remove it from our internal table. */
+int
+route_deleted(const struct in_addr *dst,
+	      const struct in_addr *net,
+	      const struct in_addr *gate)
+{
+	struct rt rt, *f, *l;
+
+	rt.dest.s_addr = dst->s_addr;
+	rt.net.s_addr = net->s_addr;
+	rt.gate.s_addr = gate->s_addr;
+	rt.iface = NULL;
+	rt.next = NULL;
+
+	f = find_route(routes, &rt, &l, NULL);
+	if (f == NULL)
+		return 0;
+	desc_route("removing", f, f->iface->name);
+	if (l)
+		l->next = f->next;
+	else
+		routes = f->next;
+	free(f);
+	return 1;
 }
 
 static int

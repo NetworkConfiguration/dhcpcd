@@ -51,9 +51,13 @@
 
 #include "config.h"
 #include "common.h"
+#include "configure.h"
 #include "dhcp.h"
 #include "if-options.h"
 #include "net.h"
+
+#define ROUNDUP(a) \
+	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
 
 /* Darwin doesn't define this for some very odd reason */
 #ifndef SA_SIZE
@@ -312,6 +316,9 @@ manage_link(int fd,
 	struct rt_msghdr *rtm;
 	struct if_announcemsghdr *ifa;
 	struct if_msghdr *ifm;
+	struct in_addr dst, net, gate;
+	struct sockaddr *sa;
+	struct sockaddr_in *sin;
 
 	for (;;) {
 		bytes = read(fd, buffer, BUFFER_LEN);
@@ -342,6 +349,31 @@ manage_link(int fd,
 				memset(ifname, 0, sizeof(ifname));
 				if (if_indextoname(ifm->ifm_index, ifname))
 					if_carrier(ifname);
+				break;
+			case RTM_DELETE:
+				if (!(rtm->rtm_addrs & RTA_DST) ||
+				    !(rtm->rtm_addrs & RTA_GATEWAY) ||
+				    !(rtm->rtm_addrs & RTA_NETMASK))
+					break;
+				if (rtm->rtm_pid == getpid())
+					break;
+				sa = (struct sockaddr *)(rtm + 1);
+				if (sa->sa_family != AF_INET)
+					break;
+				sin = (struct sockaddr_in *)sa;
+				memcpy(&dst.s_addr, &sin->sin_addr.s_addr,
+					sizeof(dst.s_addr));
+				sa = (struct sockaddr *)
+				    (ROUNDUP(sa->sa_len) + (char *)sa);
+				sin = (struct sockaddr_in *)sa;
+				memcpy(&gate.s_addr, &sin->sin_addr.s_addr,
+					sizeof(gate.s_addr));
+				sa = (struct sockaddr *)
+				    (ROUNDUP(sa->sa_len) + (char *)sa);
+				sin = (struct sockaddr_in *)sa;
+				memcpy(&net.s_addr, &sin->sin_addr.s_addr,
+					sizeof(net.s_addr));
+				route_deleted(&dst, &net, &gate);
 				break;
 			}
 		}
