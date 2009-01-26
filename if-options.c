@@ -313,7 +313,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		break;
 	case 'h':
 		if (arg)
-			s = parse_string(ifo->hostname + 1,
+			s = parse_string(ifo->hostname,
 					 HOSTNAME_MAX_LEN, arg);
 		else
 			s = 0;
@@ -321,11 +321,10 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			syslog(LOG_ERR, "hostname: %m");
 			return -1;
 		}
-		if (s != 0 && ifo->hostname[1] == '.') {
+		if (s != 0 && ifo->hostname[0] == '.') {
 			syslog(LOG_ERR, "hostname cannot begin with a .");
 			return -1;
 		}
-		ifo->hostname[0] = (uint8_t)s;
 		break;
 	case 'i':
 		if (arg)
