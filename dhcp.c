@@ -766,6 +766,7 @@ make_message(struct dhcp_message **message,
 	uint32_t ul;
 	uint16_t sz;
 	size_t len;
+	const char *hp;
 	const struct dhcp_opt *opt;
 	const struct if_options *ifo = iface->state->options;
 	const struct dhcp_lease *lease = &iface->state->lease;
@@ -889,10 +890,23 @@ make_message(struct dhcp_message **message,
 			}
 		}
 
+		/* Regardless of RFC2132, we should always send a hostname
+		 * upto the first dot (the short hostname) as otherwise
+		 * confuses some DHCP servers when updating DNS.
+		 * The FQDN option should be used if a FQDN is required. */
 		if (ifo->hostname[0]) {
 			*p++ = DHO_HOSTNAME;
-			memcpy(p, ifo->hostname, ifo->hostname[0] + 1);
-			p += ifo->hostname[0] + 1;
+			hp = strchr(ifo->hostname, '.');
+			if (hp) {
+				*p++ = hp - ifo->hostname;
+				memcpy(p, ifo->hostname, hp - ifo->hostname);
+				p += hp - ifo->hostname;
+			} else {
+				len = strlen(ifo->hostname);
+				*p++ = len;
+				memcpy(p, ifo->hostname, len);
+				p += len;
+			}
 		}
 		if (ifo->fqdn != FQDN_DISABLE) {
 			/* IETF DHC-FQDN option (81), RFC4702 */
@@ -912,8 +926,8 @@ make_message(struct dhcp_message **message,
 			*p++ = (ifo->fqdn & 0x09) | 0x04;
 			*p++ = 0; /* from server for PTR RR */
 			*p++ = 0; /* from server for A RR if S=1 */
-			ul = encode_rfc1035(ifo->hostname + 1, p,
-					    ifo->hostname[0]);
+			ul = encode_rfc1035(ifo->hostname, p,
+					    strlen(ifo->hostname));
 			*lp += ul;
 			p += ul;
 		}

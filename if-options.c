@@ -676,13 +676,12 @@ read_config(const char *file, const char *ifname, const char *ssid)
 	ifo->timeout = DEFAULT_TIMEOUT;
 	ifo->reboot = DEFAULT_REBOOT;
 	ifo->metric = -1;
-	gethostname(ifo->hostname + 1, HOSTNAME_MAX_LEN);
+	gethostname(ifo->hostname, HOSTNAME_MAX_LEN);
 	/* Ensure that the hostname is NULL terminated */
-	ifo->hostname[HOSTNAME_MAX_LEN + 1] = '\0';
-	if (strcmp(ifo->hostname + 1, "(none)") == 0 ||
-	    strcmp(ifo->hostname + 1, "localhost") == 0)
-		ifo->hostname[1] = '\0';
-	*ifo->hostname = strlen(ifo->hostname + 1);
+	ifo->hostname[HOSTNAME_MAX_LEN] = '\0';
+	if (strcmp(ifo->hostname, "(none)") == 0 ||
+	    strcmp(ifo->hostname, "localhost") == 0)
+		ifo->hostname[0] = '\0';
 	strlcpy(ifo->script, SCRIPT, sizeof(ifo->script));
 	ifo->vendorclassid[0] = snprintf((char *)ifo->vendorclassid + 1,
 					     VENDORCLASSID_MAX_LEN,

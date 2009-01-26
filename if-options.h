@@ -88,8 +88,8 @@ struct if_options {
 
 	char **environ;
 	char script[PATH_MAX];
-
-	char hostname[HOSTNAME_MAX_LEN + 2];
+	
+	char hostname[HOSTNAME_MAX_LEN + 1]; /* We don't store the lenth */
 	int fqdn;
 	uint8_t vendorclassid[VENDORCLASSID_MAX_LEN + 2];
 	char clientid[CLIENTID_MAX_LEN + 2];
