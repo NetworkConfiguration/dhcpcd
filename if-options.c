@@ -325,6 +325,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			syslog(LOG_ERR, "hostname cannot begin with a .");
 			return -1;
 		}
+		ifo->hostname[s] = '\0';
 		break;
 	case 'i':
 		if (arg)
