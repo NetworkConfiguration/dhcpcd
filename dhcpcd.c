@@ -648,7 +648,9 @@ main(int argc, char **argv)
 	}
 #endif
 
-	gethostname(options->hostname + 1, sizeof(options->hostname));
+	gethostname(options->hostname + 1, HOSTNAME_MAX_LEN);
+	/* Ensure that the hostname is NULL terminated */ 
+	options->hostname[HOSTNAME_MAX_LEN + 1] = '\0';
 	if (strcmp(options->hostname + 1, "(none)") == 0 ||
 	    strcmp(options->hostname + 1, "localhost") == 0)
 		options->hostname[1] = '\0';
