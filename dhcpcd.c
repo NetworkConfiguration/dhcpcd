@@ -648,13 +648,12 @@ main(int argc, char **argv)
 	}
 #endif
 
-	gethostname(options->hostname + 1, HOSTNAME_MAX_LEN);
+	gethostname(options->hostname, HOSTNAME_MAX_LEN);
 	/* Ensure that the hostname is NULL terminated */ 
-	options->hostname[HOSTNAME_MAX_LEN + 1] = '\0';
-	if (strcmp(options->hostname + 1, "(none)") == 0 ||
-	    strcmp(options->hostname + 1, "localhost") == 0)
-		options->hostname[1] = '\0';
-	*options->hostname = strlen(options->hostname + 1);
+	options->hostname[HOSTNAME_MAX_LEN] = '\0';
+	if (strcmp(options->hostname, "(none)") == 0 ||
+	    strcmp(options->hostname, "localhost") == 0)
+		options->hostname[0] = '\0';
 
 	while ((opt = getopt_long(argc, argv, OPTS EXTRA_OPTS,
 				  longopts, &option_index)) != -1)
