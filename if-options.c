@@ -676,7 +676,9 @@ read_config(const char *file, const char *ifname, const char *ssid)
 	ifo->timeout = DEFAULT_TIMEOUT;
 	ifo->reboot = DEFAULT_REBOOT;
 	ifo->metric = -1;
-	gethostname(ifo->hostname + 1, sizeof(ifo->hostname));
+	gethostname(ifo->hostname + 1, HOSTNAME_MAX_LEN);
+	/* Ensure that the hostname is NULL terminated */
+	ifo->hostname[HOSTNAME_MAX_LEN + 1] = '\0';
 	if (strcmp(ifo->hostname + 1, "(none)") == 0 ||
 	    strcmp(ifo->hostname + 1, "localhost") == 0)
 		ifo->hostname[1] = '\0';
