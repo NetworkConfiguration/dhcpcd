@@ -118,6 +118,7 @@ int
 init_socket(void)
 {
 	sock_fd = _open_link_socket(&sock_nl);
+	set_cloexec(sock_fd);
 	return sock_fd;
 }
 

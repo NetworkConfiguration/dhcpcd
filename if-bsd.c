@@ -78,7 +78,7 @@ init_socket(void)
 	set_cloexec(a_fd);
 	if ((r_fd = socket(PF_ROUTE, SOCK_RAW, 0)) == -1)
 		return -1;
-	set_cloexec(a_fd);
+	set_cloexec(r_fd);
 	return 0;
 }
 
@@ -315,7 +315,7 @@ manage_link(int fd,
 	struct rt_msghdr *rtm;
 	struct if_announcemsghdr *ifa;
 	struct if_msghdr *ifm;
-	struct in_addr dst, net, gate;
+	struct rt rt;
 	struct sockaddr *sa;
 	struct sockaddr_in *sin;
 
@@ -359,20 +359,22 @@ manage_link(int fd,
 				sa = (struct sockaddr *)(rtm + 1);
 				if (sa->sa_family != AF_INET)
 					break;
+				rt.next = NULL;
+				rt.iface = NULL;
 				sin = (struct sockaddr_in *)sa;
-				memcpy(&dst.s_addr, &sin->sin_addr.s_addr,
-					sizeof(dst.s_addr));
+				memcpy(&rt.dest.s_addr, &sin->sin_addr.s_addr,
+					sizeof(rt.dest.s_addr));
 				sa = (struct sockaddr *)
 				    (ROUNDUP(sa->sa_len) + (char *)sa);
 				sin = (struct sockaddr_in *)sa;
-				memcpy(&gate.s_addr, &sin->sin_addr.s_addr,
-					sizeof(gate.s_addr));
+				memcpy(&rt.gate.s_addr, &sin->sin_addr.s_addr,
+					sizeof(rt.gate.s_addr));
 				sa = (struct sockaddr *)
 				    (ROUNDUP(sa->sa_len) + (char *)sa);
 				sin = (struct sockaddr_in *)sa;
-				memcpy(&net.s_addr, &sin->sin_addr.s_addr,
-					sizeof(net.s_addr));
-				route_deleted(&dst, &net, &gate);
+				memcpy(&rt.net.s_addr, &sin->sin_addr.s_addr,
+					sizeof(rt.net.s_addr));
+				route_deleted(&rt);
 				break;
 			}
 		}

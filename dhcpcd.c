@@ -1416,7 +1416,10 @@ main(int argc, char **argv)
 		}
 	}
 
-	init_socket();
+	if (init_socket() == -1) {
+		syslog(LOG_ERR, "init_socket: %m");
+		exit(EXIT_FAILURE);
+	}
 	if (ifo->options & DHCPCD_LINK) {
 		linkfd = open_link_socket();
 		if (linkfd == -1)
