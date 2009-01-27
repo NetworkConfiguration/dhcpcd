@@ -399,7 +399,7 @@ route_deleted(const struct rt *rt)
 	f = find_route(routes, rt, &l, NULL);
 	if (f == NULL)
 		return 0;
-	desc_route("removing", f, rt->iface->name);
+	desc_route("removing", f, f->iface->name);
 	if (l)
 		l->next = f->next;
 	else
