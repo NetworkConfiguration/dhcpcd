@@ -78,9 +78,9 @@ static char **margv;
 static int margc;
 static char **ifv;
 static int ifc;
-static int linkfd = -1;
 static char *cffile;
 static char *pidfile;
+static int linkfd = -1;
 
 struct dhcp_op {
 	uint8_t value;
@@ -214,6 +214,16 @@ close_sockets(struct interface *iface)
 	}
 }
 
+struct interface *
+find_interface(const char *ifname)
+{
+	struct interface *ifp;
+	
+	for (ifp = ifaces; ifp; ifp = ifp->next)
+		if (strcmp(ifp->name, ifname) == 0)
+			return ifp;
+	return NULL;
+}
 
 static void
 stop_interface(struct interface *iface)
@@ -1024,11 +1034,11 @@ handle_new_interface(const char *ifname)
 			if (ifn)
 				continue;
 			init_state(ifp, 2, UNCONST(argv));
-			start_interface(ifp);
 			if (ifl)
 				ifl->next = ifp;
 			else
 				ifaces = ifp;
+			start_interface(ifp);
 		}
 	}
 }
@@ -1038,11 +1048,9 @@ handle_remove_interface(const char *ifname)
 {
 	struct interface *iface;
 
-	for (iface = ifaces; iface; iface = iface->next)
-		if (strcmp(iface->name, ifname) == 0) {
-			stop_interface(iface);
-			break;
-		}
+	iface = find_interface(ifname);
+	if (iface != NULL)
+		stop_interface(iface);
 }
 
 /* ARGSUSED */
@@ -1395,7 +1403,7 @@ main(int argc, char **argv)
 
 	syslog(LOG_INFO, "version " VERSION " starting");
 
-	if ((signal_fd =signal_init()) == -1)
+	if ((signal_fd = signal_init()) == -1)
 		exit(EXIT_FAILURE);
 	if (signal_setup() == -1)
 		exit(EXIT_FAILURE);
@@ -1408,6 +1416,7 @@ main(int argc, char **argv)
 		}
 	}
 
+	init_socket();
 	if (ifo->options & DHCPCD_LINK) {
 		linkfd = open_link_socket();
 		if (linkfd == -1)

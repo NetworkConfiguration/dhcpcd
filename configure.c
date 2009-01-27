@@ -392,22 +392,14 @@ desc_route(const char *cmd, const struct rt *rt, const char *ifname)
 /* If something other than dhcpcd removes a route,
  * we need to remove it from our internal table. */
 int
-route_deleted(const struct in_addr *dst,
-	      const struct in_addr *net,
-	      const struct in_addr *gate)
+route_deleted(const struct rt *rt)
 {
-	struct rt rt, *f, *l;
+	struct rt *f, *l;
 
-	rt.dest.s_addr = dst->s_addr;
-	rt.net.s_addr = net->s_addr;
-	rt.gate.s_addr = gate->s_addr;
-	rt.iface = NULL;
-	rt.next = NULL;
-
-	f = find_route(routes, &rt, &l, NULL);
+	f = find_route(routes, rt, &l, NULL);
 	if (f == NULL)
 		return 0;
-	desc_route("removing", f, f->iface->name);
+	desc_route("removing", f, rt->iface->name);
 	if (l)
 		l->next = f->next;
 	else

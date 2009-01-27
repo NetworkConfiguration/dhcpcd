@@ -66,6 +66,7 @@
 
 #include "config.h"
 #include "common.h"
+#include "configure.h"
 #include "dhcp.h"
 #include "net.h"
 
@@ -74,6 +75,9 @@
 static void (*nl_carrier)(const char *);
 static void (*nl_add)(const char *);
 static void (*nl_remove)(const char *);
+
+static int sock_fd;
+static struct sockaddr_nl sock_nl;
 
 int
 getifssid(const char *ifname, char *ssid)
@@ -96,21 +100,35 @@ getifssid(const char *ifname, char *ssid)
 	return retval;
 }
 
-int
-open_link_socket(void)
+static int
+_open_link_socket(struct sockaddr_nl *nl)
 {
 	int fd;
-	struct sockaddr_nl nl;
 
 	if ((fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE)) == -1)
 		return -1;
-	memset(&nl, 0, sizeof(nl));
-	nl.nl_family = AF_NETLINK;
-	nl.nl_groups = RTMGRP_LINK;
-	if (bind(fd, (struct sockaddr *)&nl, sizeof(nl)) == -1)
+	nl->nl_family = AF_NETLINK;
+	if (bind(fd, (struct sockaddr *)nl, sizeof(*nl)) == -1)
 		return -1;
 	set_cloexec(fd);
 	return fd;
+}
+
+int
+init_socket(void)
+{
+	sock_fd = _open_link_socket(&sock_nl);
+	return sock_fd;
+}
+
+int
+open_link_socket(void)
+{
+	struct sockaddr_nl snl;
+
+	memset(&snl, 0, sizeof(snl));
+	snl.nl_groups = RTMGRP_LINK | RTMGRP_IPV4_ROUTE;
+	return _open_link_socket(&snl);
 }
 
 static int
@@ -170,12 +188,72 @@ err_netlink(struct nlmsghdr *nlm)
 }
 
 static int
+link_delroute(struct nlmsghdr *nlm)
+{
+	int len, idx, metric;
+	struct rtattr *rta;
+	struct rtmsg *rtm;
+	struct rt rt;
+	char ifn[IF_NAMESIZE + 1];
+
+	len = nlm->nlmsg_len - sizeof(*nlm);
+	if ((size_t)len < sizeof(*rtm)) {
+		errno = EBADMSG;
+		return -1;
+	}
+	rtm = NLMSG_DATA(nlm);
+	if (rtm->rtm_type != RTN_UNICAST ||
+	    rtm->rtm_table != RT_TABLE_MAIN ||
+	    rtm->rtm_family != AF_INET ||
+	    nlm->nlmsg_pid == (uint32_t)getpid())
+		return 1;
+	rta = (struct rtattr *) ((char *)rtm + NLMSG_ALIGN(sizeof(*rtm)));
+	len = NLMSG_PAYLOAD(nlm, sizeof(*rtm));
+	rt.iface = NULL;
+	rt.next = NULL;
+	metric = 0;
+	while (RTA_OK(rta, len)) {
+		switch (rta->rta_type) {
+		case RTA_DST:
+			memcpy(&rt.dest.s_addr, RTA_DATA(rta),
+			       sizeof(rt.dest.s_addr));
+			break;
+		case RTA_GATEWAY:
+			memcpy(&rt.gate.s_addr, RTA_DATA(rta),
+			       sizeof(rt.gate.s_addr));
+			break;
+		case RTA_OIF:
+			idx = *(int *)RTA_DATA(rta);
+			if (if_indextoname(idx, ifn))
+				rt.iface = find_interface(ifn);
+			break;
+		case RTA_PRIORITY:
+			metric = *(int *)RTA_DATA(rta);
+			break;
+		}
+		rta = RTA_NEXT(rta, len);
+	}
+	if (rt.iface != NULL) {
+		if (metric == rt.iface->metric) {
+			if (rt.dest.s_addr == INADDR_BROADCAST)
+				rt.dest.s_addr = INADDR_ANY;
+			inet_cidrtoaddr(rtm->rtm_dst_len, &rt.net);
+			route_deleted(&rt);
+		}
+	}
+	return 1;
+}
+
+static int
 link_netlink(struct nlmsghdr *nlm)
 {
 	int len;
 	struct rtattr *rta;
 	struct ifinfomsg *ifi;
 	char ifn[IF_NAMESIZE + 1];
+
+	if (nlm->nlmsg_type == RTM_DELROUTE)
+		return link_delroute(nlm);
 
 	if (nlm->nlmsg_type != RTM_NEWLINK && nlm->nlmsg_type != RTM_DELLINK)
 		return 0;
@@ -234,37 +312,27 @@ manage_link(int fd,
 static int
 send_netlink(struct nlmsghdr *hdr)
 {
-	int fd, r;
-	struct sockaddr_nl nl;
+	int r;
 	struct iovec iov;
 	struct msghdr msg;
 	static unsigned int seq;
 
-	if ((fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE)) == -1)
-		return -1;
-	memset(&nl, 0, sizeof(nl));
-	nl.nl_family = AF_NETLINK;
-	if (bind(fd, (struct sockaddr *)&nl, sizeof(nl)) == -1) {
-		close(fd);
-		return -1;
-	}
 	memset(&iov, 0, sizeof(iov));
 	iov.iov_base = hdr;
 	iov.iov_len = hdr->nlmsg_len;
 	memset(&msg, 0, sizeof(msg));
-	msg.msg_name = &nl;
-	msg.msg_namelen = sizeof(nl);
+	msg.msg_name = &sock_nl;
+	msg.msg_namelen = sizeof(sock_nl);
 	msg.msg_iov = &iov;
 	msg.msg_iovlen = 1;
 	/* Request a reply */
 	hdr->nlmsg_flags |= NLM_F_ACK;
 	hdr->nlmsg_seq = ++seq;
 
-	if (sendmsg(fd, &msg, 0) != -1)
-		r = get_netlink(fd, 0, &err_netlink);
+	if (sendmsg(sock_fd, &msg, 0) != -1)
+		r = get_netlink(sock_fd, 0, &err_netlink);
 	else
 		r = -1;
-	close(fd);
 	return r;
 }
 

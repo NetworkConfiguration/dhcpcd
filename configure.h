@@ -33,8 +33,5 @@
 int send_interface(int, const struct interface *);
 int run_script(const struct interface *);
 int configure(struct interface *);
-int route_deleted(const struct in_addr *,
-		  const struct in_addr *,
-		  const struct in_addr *);
-
+int route_deleted(const struct rt *);
 #endif

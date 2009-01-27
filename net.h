@@ -145,6 +145,7 @@ ssize_t send_raw_packet(const struct interface *, int,
 			const void *, ssize_t);
 ssize_t get_raw_packet(struct interface *, int, void *, ssize_t);
 
+int init_socket(void);
 int open_link_socket(void);
 int manage_link(int,
 		void (*)(const char *),

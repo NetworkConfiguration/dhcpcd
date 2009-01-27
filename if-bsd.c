@@ -67,10 +67,25 @@
 	   1 + ( (((struct sockaddr *)(sa))->sa_len - 1) | (sizeof(long) - 1) ) )
 #endif
 
+static int a_fd = -1;
+static int r_fd = -1;
+
+int
+init_socket(void)
+{
+	if ((a_fd = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+		return -1;
+	set_cloexec(a_fd);
+	if ((r_fd = socket(PF_ROUTE, SOCK_RAW, 0)) == -1)
+		return -1;
+	set_cloexec(a_fd);
+	return 0;
+}
+
 int
 getifssid(const char *ifname, char *ssid)
 {
-	int s, retval = -1;
+	int retval = -1;
 #if defined(SIOCG80211NWID)
 	struct ifreq ifr;
 	struct ieee80211_nwid nwid;
@@ -79,14 +94,12 @@ getifssid(const char *ifname, char *ssid)
 	char nwid[IEEE80211_NWID_LEN + 1];
 #endif
 
-	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
-		return retval;
 #if defined(SIOCG80211NWID) /* NetBSD */
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
 	memset(&nwid, 0, sizeof(nwid));
 	ifr.ifr_data = (void *)&nwid;
-	if (ioctl(s, SIOCG80211NWID, &ifr) == 0) {
+	if (ioctl(a_fd, SIOCG80211NWID, &ifr) == 0) {
 		retval = nwid.i_len;
 		memcpy(ssid, nwid.i_nwid, nwid.i_len);
 		ssid[nwid.i_len] = '\0';
@@ -97,13 +110,12 @@ getifssid(const char *ifname, char *ssid)
 	ireq.i_type = IEEE80211_IOC_SSID;
 	ireq.i_val = -1;
 	ireq.i_data = &nwid;
-	if (ioctl(s, SIOCG80211, &ireq) == 0) {
+	if (ioctl(a_fd, SIOCG80211, &ireq) == 0) {
 		retval = ireq.i_len;
 		memcpy(ssid, nwid, ireq.i_len);
 		ssid[ireq.i_len] = '\0';
 	}
 #endif
-	close(s);
 	return retval;
 }
 
@@ -112,16 +124,12 @@ if_address(const struct interface *iface, const struct in_addr *address,
 	   const struct in_addr *netmask, const struct in_addr *broadcast,
 	   int action)
 {
-	int s;
 	int retval;
 	struct ifaliasreq ifa;
 	union {
 		struct sockaddr *sa;
 		struct sockaddr_in *sin;
 	} _s;
-
-	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
-		return -1;
 
 	memset(&ifa, 0, sizeof(ifa));
 	strlcpy(ifa.ifra_name, iface->name, sizeof(ifa.ifra_name));
@@ -141,10 +149,9 @@ if_address(const struct interface *iface, const struct in_addr *address,
 #undef ADDADDR
 
 	if (action < 0)
-		retval = ioctl(s, SIOCDIFADDR, &ifa);
+		retval = ioctl(a_fd, SIOCDIFADDR, &ifa);
 	else
-		retval = ioctl(s, SIOCAIFADDR, &ifa);
-	close(s);
+		retval = ioctl(a_fd, SIOCAIFADDR, &ifa);
 	return retval;
 }
 
@@ -154,7 +161,6 @@ if_route(const struct interface *iface, const struct in_addr *dest,
 	 const struct in_addr *net, const struct in_addr *gate,
 	 _unused int metric, int action)
 {
-	int s;
 	union sockunion {
 		struct sockaddr sa;
 		struct sockaddr_in sin;
@@ -185,9 +191,6 @@ if_route(const struct interface *iface, const struct in_addr *dest,
 	memcpy (&su.sin.sin_addr, _addr, sizeof(su.sin.sin_addr)); \
 	ADDSU(su); \
 }
-
-	if ((s = socket(PF_ROUTE, SOCK_RAW, 0)) == -1)
-		return -1;
 
 	memset(&rtm, 0, sizeof(rtm));
 	rtm.hdr.rtm_version = RTM_VERSION;
@@ -244,22 +247,19 @@ if_route(const struct interface *iface, const struct in_addr *dest,
 		ADDADDR(&iface->addr);
 
 	rtm.hdr.rtm_msglen = l = bp - (char *)&rtm;
-	if (write(s, &rtm, l) == -1)
+	if (write(r_fd, &rtm, l) == -1)
 		retval = -1;
-	close(s);
 	return retval;
 }
 
 int
 arp_flush(void)
 {
-	int s, mib[6], retval = 0;
+	int mib[6], retval = 0;
 	size_t buffer_len = 0;
 	char *buffer, *e, *p;
 	struct rt_msghdr *rtm;
 
-	if ((s = socket(PF_ROUTE, SOCK_RAW, 0)) == -1)
-		return -1;
 	mib[0] = CTL_NET;
 	mib[1] = PF_ROUTE;
 	mib[2] = 0;
@@ -280,13 +280,12 @@ arp_flush(void)
 		if (rtm->rtm_flags & RTF_STATIC)
 			continue;
 		rtm->rtm_type = RTM_DELETE;
-		if (write(s, rtm, rtm->rtm_msglen) == -1) {
+		if (write(r_fd, rtm, rtm->rtm_msglen) == -1) {
 			retval = -1;
 			break;
 		}
 	}
 	free(buffer);
-	close(s);
 	return retval;
 }
 
