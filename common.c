@@ -94,7 +94,8 @@ again:
 		}
 		p = lbuf + last;
 		memset(p, 0, BUFSIZ);
-		fgets(p, BUFSIZ, fp);
+		if (fgets(p, BUFSIZ, fp) == NULL)
+			break;
 		last += strlen(p);
 		if (last != 0 && lbuf[last - 1] == '\n') {
 			lbuf[last - 1] = '\0';

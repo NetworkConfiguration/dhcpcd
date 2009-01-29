@@ -116,16 +116,15 @@ static pid_t
 read_pid(void)
 {
 	FILE *fp;
-	pid_t pid = 0;
+	pid_t pid;
 
 	if ((fp = fopen(pidfile, "r")) == NULL) {
 		errno = ENOENT;
 		return 0;
 	}
-
-	fscanf(fp, "%d", &pid);
+	if (fscanf(fp, "%d", &pid) != 1)
+		pid = 0;
 	fclose(fp);
-
 	return pid;
 }
 
@@ -1141,7 +1140,9 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 			if (argc == 1) {
 				for (ifp = ifaces; ifp; ifp = ifp->next)
 					len++;
-				write(fd->fd, &len, sizeof(len));
+				len = write(fd->fd, &len, sizeof(len));
+				if (len != sizeof(len))
+					return -1;
 				for (ifp = ifaces; ifp; ifp = ifp->next)
 					send_interface(fd->fd, ifp);
 				return 0;
@@ -1152,7 +1153,9 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 					if (strcmp(argv[opt], ifp->name) == 0)
 						len++;
 			}
-			write(fd->fd, &len, sizeof(len));
+			len = write(fd->fd, &len, sizeof(len));
+			if (len != sizeof(len))
+				return -1;
 			opt = 0;
 			while (argv[++opt] != NULL) {
 				for (ifp = ifaces; ifp; ifp = ifp->next)
@@ -1321,7 +1324,8 @@ main(int argc, char **argv)
 		options |= DHCPCD_MASTER;
 	}
 
-	chdir("/");
+	if (chdir("/") == -1)
+		syslog(LOG_ERR, "failed to chdir to /: %m");
 	umask(022);
 	atexit(cleanup);
 

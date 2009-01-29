@@ -79,7 +79,8 @@ daemonise(void)
 			setsid();
 			/* Notify parent it's safe to exit as we've detached. */
 			close(sidpipe[0]);
-			write(sidpipe[1], &buf, 1);
+			if (write(sidpipe[1], &buf, 1) == -1)
+				syslog(LOG_ERR, "failed to notify parent: %m");
 			close(sidpipe[1]);
 			if ((fd = open(_PATH_DEVNULL, O_RDWR, 0)) != -1) {
 				dup2(fd, STDIN_FILENO);
@@ -93,7 +94,8 @@ daemonise(void)
 			signal_reset();
 			/* Wait for child to detach */
 			close(sidpipe[1]);
-			read(sidpipe[0], &buf, 1);
+			if (read(sidpipe[0], &buf, 1) == -1)
+				syslog(LOG_ERR, "failed to read child: %m");
 			close(sidpipe[0]);
 			break;
 	}
