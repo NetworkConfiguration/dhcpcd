@@ -217,7 +217,8 @@ daemonise(struct if_state *state, const struct options *options)
 			setsid();
 			/* Notify parent it's safe to exit as we've detached. */
 			close(sidpipe[0]);
-			write(sidpipe[1], &buf, 1);
+			if (write(sidpipe[1], &buf, 1) != 1)
+				logger(LOG_ERR, "write: %s", strerror(errno));
 			close(sidpipe[1]);
 			close_fds();
 			break;
@@ -226,7 +227,8 @@ daemonise(struct if_state *state, const struct options *options)
 			signal_reset();
 			/* Wait for child to detach */
 			close(sidpipe[1]);
-			read(sidpipe[0], &buf, 1);
+			if (read(sidpipe[0], &buf, 1) != 1)
+				logger(LOG_ERR, "read: %s", strerror(errno));
 			close(sidpipe[0]);
 			break;
 	}
