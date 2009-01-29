@@ -1325,7 +1325,7 @@ main(int argc, char **argv)
 	}
 
 	if (chdir("/") == -1)
-		syslog(LOG_ERR, "failed to chdir to /: %m");
+		syslog(LOG_ERR, "chdir `/': %m");
 	umask(022);
 	atexit(cleanup);
 
