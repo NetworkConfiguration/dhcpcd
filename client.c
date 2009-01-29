@@ -1581,10 +1581,8 @@ handle_dhcp_packet(struct if_state *state, const struct options *options)
 		}
 		/* We should ensure that the packet is terminated correctly
 		 * if we have space for the terminator */
-		if ((size_t)bytes < sizeof(struct dhcp_message)) {
-			p = (uint8_t *)dhcp + bytes - 1;
-			while (p > dhcp->options && *p == DHO_PAD)
-				p--;
+		if ((size_t)bytes != sizeof(*dhcp)) {
+			p = (uint8_t *)dhcp + (bytes - 1);
 			if (*p != DHO_END)
 				*++p = DHO_END;
 		}
