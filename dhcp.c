@@ -892,7 +892,7 @@ make_message(struct dhcp_message **message,
 		 * upto the first dot (the short hostname) as otherwise
 		 * confuses some DHCP servers when updating DNS.
 		 * The FQDN option should be used if a FQDN is required. */
-		if (ifo->hostname[0]) {
+		if (ifo->options & DHCPCD_HOSTNAME && ifo->hostname[0]) {
 			*p++ = DHO_HOSTNAME;
 			hp = strchr(ifo->hostname, '.');
 			if (hp)
@@ -903,7 +903,7 @@ make_message(struct dhcp_message **message,
 			memcpy(p, ifo->hostname, len);
 			p += len;
 		}
-		if (ifo->fqdn != FQDN_DISABLE) {
+		if (ifo->fqdn != FQDN_DISABLE && ifo->hostname[0]) {
 			/* IETF DHC-FQDN option (81), RFC4702 */
 			*p++ = DHO_FQDN;
 			lp = p;

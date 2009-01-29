@@ -312,20 +312,23 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		strlcpy(ifo->script, arg, sizeof(ifo->script));
 		break;
 	case 'h':
-		if (arg)
+		if (arg) {
 			s = parse_string(ifo->hostname,
 					 HOSTNAME_MAX_LEN, arg);
+			if (s == -1) {
+				syslog(LOG_ERR, "hostname: %m");
+				return -1;
+			}
+			if (s != 0 && ifo->hostname[0] == '.') {
+				syslog(LOG_ERR, "hostname cannot begin with .");
+				return -1;
+			}
+			ifo->hostname[s] = '\0';
+		}
+		if (ifo->hostname[0] == '\0')
+			ifo->options &= ~DHCPCD_HOSTNAME;
 		else
-			s = 0;
-		if (s == -1) {
-			syslog(LOG_ERR, "hostname: %m");
-			return -1;
-		}
-		if (s != 0 && ifo->hostname[0] == '.') {
-			syslog(LOG_ERR, "hostname cannot begin with a .");
-			return -1;
-		}
-		ifo->hostname[s] = '\0';
+			ifo->options |= DHCPCD_HOSTNAME;
 		break;
 	case 'i':
 		if (arg)
@@ -676,16 +679,16 @@ read_config(const char *file, const char *ifname, const char *ssid)
 	ifo->timeout = DEFAULT_TIMEOUT;
 	ifo->reboot = DEFAULT_REBOOT;
 	ifo->metric = -1;
+	strlcpy(ifo->script, SCRIPT, sizeof(ifo->script));
 	gethostname(ifo->hostname, HOSTNAME_MAX_LEN);
 	/* Ensure that the hostname is NULL terminated */
 	ifo->hostname[HOSTNAME_MAX_LEN] = '\0';
 	if (strcmp(ifo->hostname, "(none)") == 0 ||
 	    strcmp(ifo->hostname, "localhost") == 0)
 		ifo->hostname[0] = '\0';
-	strlcpy(ifo->script, SCRIPT, sizeof(ifo->script));
 	ifo->vendorclassid[0] = snprintf((char *)ifo->vendorclassid + 1,
-					     VENDORCLASSID_MAX_LEN,
-					     "%s %s", PACKAGE, VERSION);
+					 VENDORCLASSID_MAX_LEN,
+					 "%s %s", PACKAGE, VERSION);
 
 	/* Parse our options file */
 	f = fopen(file ? file : CONFIG, "r");
@@ -698,8 +701,8 @@ read_config(const char *file, const char *ifname, const char *ssid)
 		if (line && *line) {
 			p = line + strlen(line) - 1;
 			while (p != line &&
-					(*p == ' ' || *p == '\t') &&
-					*(p - 1) != '\\')
+			       (*p == ' ' || *p == '\t') &&
+			       *(p - 1) != '\\')
 				*p-- = '\0';
 		}
 		/* Start of an interface block, skip if not ours */
