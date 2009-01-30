@@ -562,7 +562,6 @@ handle_dhcp_packet(void *arg)
 	uint8_t *packet;
 	struct dhcp_message *dhcp = NULL;
 	const uint8_t *pp;
-	uint8_t *p;
 	ssize_t bytes;
 
 	/* We loop through until our buffer is empty.
@@ -583,7 +582,7 @@ handle_dhcp_packet(void *arg)
 			continue;
 		}
 		if (!dhcp)
-			dhcp = xmalloc(sizeof(*dhcp));
+			dhcp = xzalloc(sizeof(*dhcp));
 		memcpy(dhcp, pp, bytes);
 		if (dhcp->cookie != htonl(MAGIC_COOKIE)) {
 			syslog(LOG_DEBUG, "%s: bogus cookie, ignoring",
@@ -606,13 +605,6 @@ handle_dhcp_packet(void *arg)
 			       iface->name, dhcp->xid,
 			       hwaddr_ntoa(dhcp->chaddr, sizeof(dhcp->chaddr)));
 			continue;
-		}
-		/* We should ensure that the packet is terminated correctly
-		 * if we have space for the terminator */
-		if ((size_t)bytes != sizeof(*dhcp)) {
-			p = (uint8_t *)dhcp + (bytes - 1);
-			if (*p != DHO_END)
-				*++p = DHO_END;
 		}
 		handle_dhcp(iface, &dhcp);
 		if (iface->raw_fd == -1)
