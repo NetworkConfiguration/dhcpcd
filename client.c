@@ -1531,7 +1531,6 @@ handle_dhcp_packet(struct if_state *state, const struct options *options)
 	struct interface *iface = state->interface;
 	struct dhcp_message *dhcp = NULL;
 	const uint8_t *pp;
-	uint8_t *p;
 	ssize_t bytes;
 	int retval = -1;
 
@@ -1556,7 +1555,7 @@ handle_dhcp_packet(struct if_state *state, const struct options *options)
 			continue;
 		}
 		if (!dhcp)
-			dhcp = xmalloc(sizeof(*dhcp));
+			dhcp = xzalloc(sizeof(*dhcp));
 		memcpy(dhcp, pp, bytes);
 		if (dhcp->cookie != htonl(MAGIC_COOKIE)) {
 			logger(LOG_DEBUG, "bogus cookie, ignoring");
@@ -1578,13 +1577,6 @@ handle_dhcp_packet(struct if_state *state, const struct options *options)
 			       dhcp->xid,
 			       hwaddr_ntoa(dhcp->chaddr, sizeof(dhcp->chaddr)));
 			continue;
-		}
-		/* We should ensure that the packet is terminated correctly
-		 * if we have space for the terminator */
-		if ((size_t)bytes != sizeof(*dhcp)) {
-			p = (uint8_t *)dhcp + (bytes - 1);
-			if (*p != DHO_END)
-				*++p = DHO_END;
 		}
 		retval = handle_dhcp(state, &dhcp, options);
 		if (retval == 0 && state->options & DHCPCD_TEST)
