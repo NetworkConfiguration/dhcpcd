@@ -242,13 +242,7 @@ send_arp_probe(void *arg)
 	} else {
 		tv.tv_sec = ANNOUNCE_WAIT;
 		tv.tv_usec = 0;
-		/* We will bind IPv4LL and BOOTP addresses */
-		if ((state->lease.server.s_addr == 0 &&
-		     state->lease.frominfo == 0) ||
-		    IN_LINKLOCAL(htonl(addr.s_addr)))
-			add_timeout_tv(&tv, bind_interface, iface);
-		else
-			add_timeout_tv(&tv, start_request, iface);
+		add_timeout_tv(&tv, bind_interface, iface);
 	}
 	syslog(LOG_DEBUG,
 	       "%s: sending ARP probe (%d of %d), next in %0.2f seconds",

@@ -503,23 +503,14 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 			exit(EXIT_SUCCESS);
 		}
 		delete_timeout(send_discover, iface);
-		if (ifo->options & DHCPCD_ARP &&
-		    iface->addr.s_addr != state->offer->yiaddr)
-		{
-			/* If the interface already has the address configured
-			 * then we can't ARP for duplicate detection. */
-			addr.s_addr = state->offer->yiaddr;
-			if (!has_address(iface->name, &addr, NULL)) {
-				state->claims = 0;
-				state->probes = 0;
-				state->conflicts = 0;
-				state->state = DHS_PROBE;
-				send_arp_probe(iface);
-				return;
-			}
-		}
 		/* We don't request BOOTP addresses */
 		if (type) {
+			/* We used to ARP check here, but that seems to be in
+			 * violation of RFC2131 where it only describes
+			 * DECLINE after REQUEST.
+			 * It also seems that some MS DHCP servers actually
+			 * ignore DECLINE if no REQUEST, ie we decline a
+			 * DISCOVER. */
 			start_request(iface);
 			return;
 		}
@@ -541,7 +532,6 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 			log_dhcp(LOG_INFO, "acknowledged", iface, dhcp);
 	}
 
-	close_sockets(iface);
 	/* BOOTP could have already assigned this above, so check we still
 	 * have a pointer. */
 	if (*dhcpp) {
@@ -549,9 +539,26 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 		state->offer = dhcp;
 		*dhcpp = NULL;
 	}
-	/* Delete all timeouts for this interface. */
-	delete_timeout(NULL, iface);
 	lease->frominfo = 0;
+
+	delete_timeout(NULL, iface);
+	if (ifo->options & DHCPCD_ARP &&
+	    iface->addr.s_addr != state->offer->yiaddr)
+	{
+		/* If the interface already has the address configured
+		 * then we can't ARP for duplicate detection. */
+		addr.s_addr = state->offer->yiaddr;
+		if (!has_address(iface->name, &addr, NULL)) {
+			state->claims = 0;
+			state->probes = 0;
+			state->conflicts = 0;
+			state->state = DHS_PROBE;
+			send_arp_probe(iface);
+			return;
+		}
+	}
+
+	close_sockets(iface);
 	bind_interface(iface);
 }
 
@@ -836,15 +843,10 @@ start_reboot(struct interface *iface)
 	else
 		add_timeout_sec(ifo->reboot, start_expire, iface);
 	open_sockets(iface);
-	if (ifo->options & DHCPCD_ARP &&
-	    !has_address(iface->name, &iface->state->lease.addr, NULL))
-	{
-		iface->state->probes = 0;
-		send_arp_probe(iface);
-	} else if (ifo->options & DHCPCD_INFORM)
+	/* Don't bother ARP checking as the server could NAK us first. */
+	if (ifo->options & DHCPCD_INFORM)
 		send_inform(iface);
 	else
-		/* We don't start_request as that would change state */
 		send_request(iface);
 }
 
