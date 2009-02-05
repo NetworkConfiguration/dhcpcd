@@ -223,6 +223,6 @@ If not set then none is sent.
 .Xr if_nametoindex 3 ,
 .Xr fnmatch 3
 .Sh AUTHORS
-.An Roy Marples <roy@marples.name>
+.An Roy Marples Aq roy@marples.name
 .Sh BUGS
 Please report them to http://roy.marples.name/projects/dhcpcd
