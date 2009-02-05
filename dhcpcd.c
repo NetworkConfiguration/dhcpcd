@@ -1115,7 +1115,9 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 	struct interface *ifs, *ifp, *ifl, *ifn, *ift;
 	int do_exit = 0, do_release = 0, do_reboot = 0, opt, oi = 0;
 	ssize_t len;
+	size_t l;
 	struct iovec iov[2];
+	char *tmp, *p;
 
 	if (fd != NULL) {
 		/* Special commands for our control socket */
@@ -1160,6 +1162,21 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 			return 0;
 		}
 	}
+
+	/* Log the command */
+	len = 0;
+	for (opt = 0; opt < argc; opt++)
+		len += strlen(argv[opt]) + 1;
+	tmp = p = xmalloc(len + 1);
+	for (opt = 0; opt < argc; opt++) {
+		l = strlen(argv[opt]);
+		strlcpy(p, argv[opt], l + 1);
+		p += l;
+		*p++ = ' ';
+	}
+	*--p = '\0';
+	syslog(LOG_INFO, "control command: %s", tmp);
+	free(tmp);
 
 	optind = 0;
 	while ((opt = getopt_long(argc, argv, IF_OPTS, cf_options, &oi)) != -1)
