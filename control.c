@@ -76,11 +76,12 @@ handle_control_data(void *arg)
 	char *e, *p;
 	char **ap;
 
-	bytes = read(l->fd, buffer, sizeof(buffer));
+	bytes = read(l->fd, buffer, sizeof(buffer) - 1);
 	if (bytes == -1 || bytes == 0) {
 		remove_control_data(l);
 		return;
 	}
+	buffer[bytes] = '\0';
 	p = buffer;
 	e = buffer + bytes;
 	argc = 0;
