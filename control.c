@@ -41,10 +41,10 @@
 #include "eloop.h"
 
 static int fd = -1;
-struct sockaddr_un sun;
 static char buffer[1024];
 static char *argvp[255];
 
+struct sockaddr_un sun;
 struct fd_list *fds = NULL;
 
 static void
@@ -134,7 +134,8 @@ start_control(void)
 		return -1;
 	unlink(CONTROLSOCKET);
 	if (bind(fd, (struct sockaddr *)&sun, len) == -1 ||
-	    chmod(CONTROLSOCKET, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP) == -1 ||
+	    chmod(CONTROLSOCKET,
+		S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP) == -1 ||
 	    set_cloexec(fd) == -1 ||
 	    set_nonblock(fd) == -1 ||
 	    listen(fd, sizeof(fds)) == -1)

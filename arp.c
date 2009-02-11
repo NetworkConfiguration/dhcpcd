@@ -40,7 +40,7 @@
 #include "ipv4ll.h"
 #include "net.h"
 
-#define ARP_LEN \
+#define ARP_LEN								\
 	(sizeof(struct arphdr) + (2 * sizeof(uint32_t)) + (2 * HWADDR_LEN))
 
 static int
@@ -108,7 +108,7 @@ handle_arp_packet(void *arg)
 	state->fail.s_addr = 0;
 	for(;;) {
 		bytes = get_raw_packet(iface, ETHERTYPE_ARP,
-				       arp_buffer, sizeof(arp_buffer));
+		    arp_buffer, sizeof(arp_buffer));
 		if (bytes == 0 || bytes == -1)
 			return;
 		/* We must have a full ARP header */
@@ -142,21 +142,21 @@ handle_arp_packet(void *arg)
 		/* Check for conflict */
 		if (state->offer && 
 		    (reply_s == state->offer->yiaddr ||
-		     (reply_s == 0 && reply_t == state->offer->yiaddr)))
+			(reply_s == 0 && reply_t == state->offer->yiaddr)))
 			state->fail.s_addr = state->offer->yiaddr;
 
 		/* Handle IPv4LL conflicts */
 		if (IN_LINKLOCAL(htonl(iface->addr.s_addr)) &&
 		    (reply_s == iface->addr.s_addr ||
-		     (reply_s == 0 && reply_t == iface->addr.s_addr)))
+			(reply_s == 0 && reply_t == iface->addr.s_addr)))
 			state->fail.s_addr = iface->addr.s_addr;
 
 		if (state->fail.s_addr) {
 			syslog(LOG_ERR, "%s: hardware address %s claims %s",
-			       iface->name,
-			       hwaddr_ntoa((unsigned char *)hw_s,
-					   (size_t)ar.ar_hln),
-			       inet_ntoa(state->fail));
+			    iface->name,
+			    hwaddr_ntoa((unsigned char *)hw_s,
+				(size_t)ar.ar_hln),
+			    inet_ntoa(state->fail));
 			errno = EEXIST;
 			handle_arp_failure(iface);
 			return;
@@ -177,15 +177,15 @@ send_arp_announce(void *arg)
 	}
 	if (++state->claims < ANNOUNCE_NUM)	
 		syslog(LOG_DEBUG,
-		       "%s: sending ARP announce (%d of %d), "
-		       "next in %d.00 seconds",
-		       iface->name, state->claims, ANNOUNCE_NUM, ANNOUNCE_WAIT);
+		    "%s: sending ARP announce (%d of %d), "
+		    "next in %d.00 seconds",
+		    iface->name, state->claims, ANNOUNCE_NUM, ANNOUNCE_WAIT);
 	else
 		syslog(LOG_DEBUG,
-		       "%s: sending ARP announce (%d of %d)",
-		       iface->name, state->claims, ANNOUNCE_NUM);
+		    "%s: sending ARP announce (%d of %d)",
+		    iface->name, state->claims, ANNOUNCE_NUM);
 	if (send_arp(iface, ARPOP_REQUEST,
-		     state->new->yiaddr, state->new->yiaddr) == -1)
+		state->new->yiaddr, state->new->yiaddr) == -1)
 		syslog(LOG_ERR, "send_arp: %m");
 	if (state->claims < ANNOUNCE_NUM) {
 		add_timeout_sec(ANNOUNCE_WAIT, send_arp_announce, iface);
@@ -231,8 +231,8 @@ send_arp_probe(void *arg)
 	}
 	if (state->probes == 0) {
 		syslog(LOG_INFO, "%s: checking %s is available"
-		       " on attached networks",
-		       iface->name, inet_ntoa(addr));
+		    " on attached networks",
+		    iface->name, inet_ntoa(addr));
 	}
 	if (++state->probes < PROBE_NUM) {
 		tv.tv_sec = PROBE_MIN;
@@ -245,8 +245,8 @@ send_arp_probe(void *arg)
 		add_timeout_tv(&tv, bind_interface, iface);
 	}
 	syslog(LOG_DEBUG,
-	       "%s: sending ARP probe (%d of %d), next in %0.2f seconds",
-	       iface->name, state->probes, PROBE_NUM,  timeval_to_double(&tv));
+	    "%s: sending ARP probe (%d of %d), next in %0.2f seconds",
+	    iface->name, state->probes, PROBE_NUM,  timeval_to_double(&tv));
 	if (send_arp(iface, ARPOP_REQUEST, 0, addr.s_addr) == -1)
 		syslog(LOG_ERR, "send_arp: %m");
 }

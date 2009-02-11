@@ -180,8 +180,8 @@ set_cloexec(int fd)
 {
 	int flags;
 
-	if ((flags = fcntl(fd, F_GETFD, 0)) == -1
-	    || fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == -1)
+	if ((flags = fcntl(fd, F_GETFD, 0)) == -1 ||
+	    fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == -1)
 	{
 		syslog(LOG_ERR, "fcntl: %m");
 		return -1;
@@ -194,8 +194,8 @@ set_nonblock(int fd)
 {
 	int flags;
 
-	if ((flags = fcntl(fd, F_GETFL, 0)) == -1
-	    || fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
+	if ((flags = fcntl(fd, F_GETFL, 0)) == -1 ||
+	    fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
 	{
 		syslog(LOG_ERR, "fcntl: %m");
 		return -1;

@@ -72,7 +72,6 @@ inet_ntocidr(struct in_addr address)
 		cidr++;
 		mask <<= 1;
 	}
-
 	return cidr;
 }
 
@@ -90,8 +89,9 @@ inet_cidrtoaddr(int cidr, struct in_addr *addr)
 	addr->s_addr = 0;
 	if (ocets > 0) {
 		memset(&addr->s_addr, 255, (size_t)ocets - 1);
-		memset((unsigned char *)&addr->s_addr + (ocets - 1),
-		       (256 - (1 << (32 - cidr) % 8)), 1);
+	
+	memset((unsigned char *)&addr->s_addr + (ocets - 1),
+		    (256 - (1 << (32 - cidr) % 8)), 1);
 	}
 
 	return 0;
@@ -219,10 +219,10 @@ init_interface(const char *ifname)
 	default:
 		/* Don't needlessly spam console on startup */
 		if (!(options & DHCPCD_MASTER &&
-		    !(options & DHCPCD_DAEMONISED) &&
-		    options & DHCPCD_QUIET))
+			!(options & DHCPCD_DAEMONISED) &&
+			options & DHCPCD_QUIET))
 			syslog(LOG_ERR, "%s: unsupported media family",
-			       iface->name);
+			    iface->name);
 		goto eexit;
 	}
 	memcpy(iface->hwaddr, ifr.ifr_hwaddr.sa_data, iface->hwlen);
@@ -242,7 +242,7 @@ init_interface(const char *ifname)
 	if (up_interface(ifname) != 0)
 		goto eexit;
 	snprintf(iface->leasefile, sizeof(iface->leasefile),
-		 LEASEFILE, ifname);
+	    LEASEFILE, ifname);
 	iface->arpable = arpable;
 	/* 0 is a valid fd, so init to -1 */
 	iface->raw_fd = -1;
@@ -275,9 +275,9 @@ free_interface(struct interface *iface)
 
 int
 do_interface(const char *ifname,
-	     void (*do_link)(struct interface **, int, char * const *, struct ifreq *),
-	     struct interface **ifs, int argc, char * const *argv,
-	     struct in_addr *addr, struct in_addr *net, int act)
+    void (*do_link)(struct interface **, int, char * const *, struct ifreq *),
+    struct interface **ifs, int argc, char * const *argv,
+    struct in_addr *addr, struct in_addr *net, int act)
 {
 	int s;
 	struct ifconf ifc;
@@ -322,7 +322,7 @@ do_interface(const char *ifname,
 #ifndef __linux__
 		if (ifr->ifr_addr.sa_len > sizeof(ifr->ifr_ifru))
 			p += offsetof(struct ifreq, ifr_ifru) +
-				ifr->ifr_addr.sa_len;
+			    ifr->ifr_addr.sa_len;
 		else
 #endif
 			p += sizeof(*ifr);
@@ -505,7 +505,8 @@ open_udp_socket(struct interface *iface)
 	p = strchr(ifr.ifr_name, ':');
 	if (p)
 		*p = '\0';
-	if (setsockopt(s, SOL_SOCKET, SO_BINDTODEVICE, &ifr, sizeof(ifr)) == -1)
+	if (setsockopt(s, SOL_SOCKET, SO_BINDTODEVICE, &ifr,
+		sizeof(ifr)) == -1)
 		goto eexit;
 #endif
 	/* As we don't use this socket for receiving, set the
@@ -531,7 +532,7 @@ eexit:
 
 ssize_t
 send_packet(const struct interface *iface, struct in_addr to,
-	    const uint8_t *data, ssize_t len)
+    const uint8_t *data, ssize_t len)
 {
 	struct sockaddr_in sin;
 
@@ -540,7 +541,7 @@ send_packet(const struct interface *iface, struct in_addr to,
 	sin.sin_addr.s_addr = to.s_addr;
 	sin.sin_port = htons(DHCP_SERVER_PORT);
 	return sendto(iface->udp_fd, data, len, 0,
-		      (struct sockaddr *)&sin, sizeof(sin));
+	    (struct sockaddr *)&sin, sizeof(sin));
 }
 
 struct udp_dhcp_packet
@@ -576,7 +577,7 @@ checksum(const void *data, uint16_t len)
 
 ssize_t
 make_udp_packet(uint8_t **packet, const uint8_t *data, size_t length,
-		struct in_addr source, struct in_addr dest)
+    struct in_addr source, struct in_addr dest)
 {
 	struct udp_dhcp_packet *udpp;
 	struct ip *ip;
@@ -632,7 +633,9 @@ get_udp_data(const uint8_t **data, const uint8_t *udp)
 
 	memcpy(&packet, udp, sizeof(packet));
 	*data = udp + offsetof(struct udp_dhcp_packet, dhcp);
-	return ntohs(packet.ip.ip_len) - sizeof(packet.ip) - sizeof(packet.udp);
+	return ntohs(packet.ip.ip_len) -
+	    sizeof(packet.ip) -
+	    sizeof(packet.udp);
 }
 
 int

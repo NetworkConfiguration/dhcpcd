@@ -108,7 +108,7 @@ make_var(const char *prefix, const char *var)
 
 static void
 append_config(char ***env, ssize_t *len,
-	      const char *prefix, const char *const *config)
+    const char *prefix, const char *const *config)
 {
 	ssize_t i, j, e1;
 	char **ne, *eq;
@@ -121,7 +121,9 @@ append_config(char ***env, ssize_t *len,
 		eq = strchr(config[i], '=');
 		e1 = eq - config[i] + 1;
 		for (j = 0; j < *len; j++) {
-			if (strncmp(ne[j] + strlen(prefix) + 1, config[i], e1) == 0) {
+			if (strncmp(ne[j] + strlen(prefix) + 1,
+				config[i], e1) == 0)
+			{
 				free(ne[j]);
 				ne[j] = make_var(prefix, config[i]);
 				break;
@@ -220,20 +222,20 @@ make_env(const struct interface *iface, char ***argv)
 		if (e > 0) {
 			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
 			elen += configure_env(env + elen, "old",
-					iface->state->old, ifo);
+			    iface->state->old, ifo);
 		}
 		append_config(&env, &elen, "old",
-			      (const char *const *)ifo->config);
+		    (const char *const *)ifo->config);
 	}
 	if (iface->state->new) {
 		e = configure_env(NULL, NULL, iface->state->new, ifo);
 		if (e > 0) {
 			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
 			elen += configure_env(env + elen, "new",
-					iface->state->new, ifo);
+			    iface->state->new, ifo);
 		}
 		append_config(&env, &elen, "new",
-			      (const char *const *)ifo->config);
+		    (const char *const *)ifo->config);
 	}
 
 	/* Add our base environment */
@@ -292,7 +294,7 @@ run_script(const struct interface *iface)
 	struct iovec iov[2];
 
 	syslog(LOG_DEBUG, "%s: executing `%s', reason %s",
-	       iface->name, argv[0], iface->state->reason);
+	    iface->name, argv[0], iface->state->reason);
 
 	/* Make our env */
 	elen = make_env(iface, &env);
@@ -327,7 +329,7 @@ run_script(const struct interface *iface)
 		if (fd->listener) {
 			if (bigenv == NULL) {
 				elen = arraytostr((const char *const *)env,
-						&bigenv);
+				    &bigenv);
 				iov[0].iov_base = &elen;
 				iov[0].iov_len = sizeof(ssize_t);
 				iov[1].iov_base = bigenv;
@@ -348,7 +350,7 @@ run_script(const struct interface *iface)
 
 static struct rt *
 find_route(struct rt *rts, const struct rt *r, struct rt **lrt,
-	   const struct rt *srt)
+    const struct rt *srt)
 {
 	struct rt *rt;
 
@@ -357,7 +359,8 @@ find_route(struct rt *rts, const struct rt *r, struct rt **lrt,
 	for (rt = rts; rt; rt = rt->next) {
 		if (rt->dest.s_addr == r->dest.s_addr &&
 #if HAVE_ROUTE_METRIC
-		    (srt || (!rt->iface || rt->iface->metric == r->iface->metric)) &&
+		    (srt || (!rt->iface ||
+			rt->iface->metric == r->iface->metric)) &&
 #endif
                     (!srt || srt != rt) &&
 		    rt->net.s_addr == r->net.s_addr)
@@ -376,17 +379,17 @@ desc_route(const char *cmd, const struct rt *rt, const char *ifname)
 	strlcpy(addr, inet_ntoa(rt->dest), sizeof(addr));
 	if (rt->gate.s_addr == INADDR_ANY)
 		syslog(LOG_DEBUG, "%s: %s route to %s/%d", ifname, cmd,
-		       addr, inet_ntocidr(rt->net));
+		    addr, inet_ntocidr(rt->net));
 	else if (rt->gate.s_addr == rt->dest.s_addr &&
-		 rt->net.s_addr == INADDR_BROADCAST)
+	    rt->net.s_addr == INADDR_BROADCAST)
 		syslog(LOG_DEBUG, "%s: %s host route to %s", ifname, cmd,
-		       addr);
+		    addr);
 	else if (rt->dest.s_addr == INADDR_ANY && rt->net.s_addr == INADDR_ANY)
 		syslog(LOG_DEBUG, "%s: %s default route via %s", ifname, cmd,
-		       inet_ntoa(rt->gate));
+		    inet_ntoa(rt->gate));
 	else
 		syslog(LOG_DEBUG, "%s: %s route to %s/%d via %s", ifname, cmd,
-		       addr, inet_ntocidr(rt->net), inet_ntoa(rt->gate));
+		    addr, inet_ntocidr(rt->net), inet_ntoa(rt->gate));
 }
 
 /* If something other than dhcpcd removes a route,
@@ -445,8 +448,10 @@ c_route(struct rt *ort, struct rt *nrt, const struct interface *iface)
 	desc_route("changing", nrt, iface->name);
 	/* We don't call change_route because it doesn't work when something
 	 * has already used it. */
-	del_route(ort->iface, &ort->dest, &ort->net, &ort->gate, ort->iface->metric);
-	if (!add_route(iface, &nrt->dest, &nrt->net, &nrt->gate, iface->metric))
+	del_route(ort->iface, &ort->dest, &ort->net, &ort->gate,
+	    ort->iface->metric);
+	if (!add_route(iface, &nrt->dest, &nrt->net, &nrt->gate,
+		iface->metric))
 		return 0;
 	syslog(LOG_ERR, "%s: add_route: %m", iface->name);
 	return -1;
@@ -585,9 +590,9 @@ delete_address(struct interface *iface)
 	int retval;
 
 	syslog(LOG_DEBUG, "%s: deleting IP address %s/%d",
-	       iface->name,
-	       inet_ntoa(iface->addr),
-	       inet_ntocidr(iface->net));
+	    iface->name,
+	    inet_ntoa(iface->addr),
+	    inet_ntocidr(iface->net));
 	retval = del_address(iface, &iface->addr, &iface->net);
 	if (retval == -1 && errno != EADDRNOTAVAIL) 
 		syslog(LOG_ERR, "del_address: %m");
@@ -621,10 +626,10 @@ configure(struct interface *iface)
 	    !has_address(iface->name, &lease->addr, &lease->net))
 	{
 		syslog(LOG_DEBUG, "%s: adding IP address %s/%d",
-		       iface->name, inet_ntoa(lease->addr),
-		       inet_ntocidr(lease->net));
+		    iface->name, inet_ntoa(lease->addr),
+		    inet_ntocidr(lease->net));
 		if (add_address(iface,
-				&lease->addr, &lease->net, &lease->brd) == -1 &&
+			&lease->addr, &lease->net, &lease->brd) == -1 &&
 		    errno != EEXIST)
 		{
 			syslog(LOG_ERR, "add_address: %m");

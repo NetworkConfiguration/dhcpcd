@@ -71,33 +71,33 @@ daemonise(void)
 	}
 	syslog(LOG_INFO, "forking to background");
 	switch (pid = fork()) {
-		case -1:
-			syslog(LOG_ERR, "fork: %m");
-			exit(EXIT_FAILURE);
-			/* NOTREACHED */
-		case 0:
-			setsid();
-			/* Notify parent it's safe to exit as we've detached. */
-			close(sidpipe[0]);
-			if (write(sidpipe[1], &buf, 1) == -1)
-				syslog(LOG_ERR, "failed to notify parent: %m");
-			close(sidpipe[1]);
-			if ((fd = open(_PATH_DEVNULL, O_RDWR, 0)) != -1) {
-				dup2(fd, STDIN_FILENO);
-				dup2(fd, STDOUT_FILENO);
-				dup2(fd, STDERR_FILENO);
-				if (fd > STDERR_FILENO)
-					close(fd);
-			}
-			break;
-		default:
-			signal_reset();
-			/* Wait for child to detach */
-			close(sidpipe[1]);
-			if (read(sidpipe[0], &buf, 1) == -1)
-				syslog(LOG_ERR, "failed to read child: %m");
-			close(sidpipe[0]);
-			break;
+	case -1:
+		syslog(LOG_ERR, "fork: %m");
+		exit(EXIT_FAILURE);
+		/* NOTREACHED */
+	case 0:
+		setsid();
+		/* Notify parent it's safe to exit as we've detached. */
+		close(sidpipe[0]);
+		if (write(sidpipe[1], &buf, 1) == -1)
+			syslog(LOG_ERR, "failed to notify parent: %m");
+		close(sidpipe[1]);
+		if ((fd = open(_PATH_DEVNULL, O_RDWR, 0)) != -1) {
+			dup2(fd, STDIN_FILENO);
+			dup2(fd, STDOUT_FILENO);
+			dup2(fd, STDERR_FILENO);
+			if (fd > STDERR_FILENO)
+				close(fd);
+		}
+		break;
+	default:
+		signal_reset();
+		/* Wait for child to detach */
+		close(sidpipe[1]);
+		if (read(sidpipe[0], &buf, 1) == -1)
+			syslog(LOG_ERR, "failed to read child: %m");
+		close(sidpipe[0]);
+		break;
 	}
 	/* Done with the fd now */
 	if (pid != 0) {
@@ -133,13 +133,13 @@ bind_interface(void *arg)
 	get_lease(lease, state->new);
 	if (ifo->options & DHCPCD_STATIC) {
 		syslog(LOG_INFO, "%s: using static address %s",
-		       iface->name, inet_ntoa(lease->addr));
+		    iface->name, inet_ntoa(lease->addr));
 		lease->leasetime = ~0U;
 		lease->net.s_addr = ifo->request_netmask.s_addr;
 		state->reason = "STATIC";
 	} else if (IN_LINKLOCAL(htonl(state->new->yiaddr))) {
 		syslog(LOG_INFO, "%s: using IPv4LL address %s",
-		       iface->name, inet_ntoa(lease->addr));
+		    iface->name, inet_ntoa(lease->addr));
 		lease->leasetime = ~0U;
 		state->reason = "IPV4LL";
 	} else if (ifo->options & DHCPCD_INFORM) {
@@ -148,7 +148,7 @@ bind_interface(void *arg)
 		else
 			lease->addr.s_addr = iface->addr.s_addr;
 		syslog(LOG_INFO, "%s: received approval for %s", iface->name,
-		       inet_ntoa(lease->addr));
+		    inet_ntoa(lease->addr));
 		lease->leasetime = ~0U;
 		state->reason = "INFORM";
 	} else {
@@ -157,31 +157,33 @@ bind_interface(void *arg)
 		else if (lease->frominfo)
 			state->reason = "TIMEOUT";
 		if (lease->leasetime == ~0U) {
-			lease->renewaltime = lease->rebindtime = lease->leasetime;
+			lease->renewaltime =
+			    lease->rebindtime =
+			    lease->leasetime;
 			syslog(LOG_INFO, "%s: leased %s for infinity",
-			       iface->name, inet_ntoa(lease->addr));
+			    iface->name, inet_ntoa(lease->addr));
 		} else {
 			if (lease->rebindtime == 0)
 				lease->rebindtime = lease->leasetime * T2;
 			else if (lease->rebindtime >= lease->leasetime) {
 				lease->rebindtime = lease->leasetime * T2;
 				syslog(LOG_ERR,
-				       "%s: rebind time greater than lease "
-				       "time, forcing to %u seconds",
-				       iface->name, lease->rebindtime);
+				    "%s: rebind time greater than lease "
+				    "time, forcing to %u seconds",
+				    iface->name, lease->rebindtime);
 			}
 			if (lease->renewaltime == 0)
 				lease->renewaltime = lease->leasetime * T1;
 			else if (lease->renewaltime > lease->rebindtime) {
 				lease->renewaltime = lease->leasetime * T1;
 				syslog(LOG_ERR,
-				       "%s: renewal time greater than rebind "
-				       "time, forcing to %u seconds",
-				       iface->name, lease->renewaltime);
+				    "%s: renewal time greater than rebind "
+				    "time, forcing to %u seconds",
+				    iface->name, lease->renewaltime);
 			}
 			syslog(LOG_INFO,
-			       "%s: leased %s for %u seconds", iface->name,
-			       inet_ntoa(lease->addr), lease->leasetime);
+			    "%s: leased %s for %u seconds", iface->name,
+			    inet_ntoa(lease->addr), lease->leasetime);
 		}
 	}
 	if (options & DHCPCD_TEST) {

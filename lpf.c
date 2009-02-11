@@ -60,8 +60,8 @@
 /* Broadcast address for IPoIB */
 static const uint8_t ipv4_bcast_addr[] = {
 	0x00, 0xff, 0xff, 0xff,
-	0xff, 0x12, 0x40, 0x1b, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff
+		0xff, 0x12, 0x40, 0x1b, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff
 };
 
 int
@@ -120,7 +120,7 @@ eexit:
 
 ssize_t
 send_raw_packet(const struct interface *iface, int protocol,
-		const void *data, ssize_t len)
+    const void *data, ssize_t len)
 {
 	union sockunion {
 		struct sockaddr sa;
@@ -140,7 +140,7 @@ send_raw_packet(const struct interface *iface, int protocol,
 	su.sll.sll_halen = iface->hwlen;
 	if (iface->family == ARPHRD_INFINIBAND)
 		memcpy(&su.sll.sll_addr,
-		       &ipv4_bcast_addr, sizeof(ipv4_bcast_addr));
+		    &ipv4_bcast_addr, sizeof(ipv4_bcast_addr));
 	else
 		memset(&su.sll.sll_addr, 0xff, iface->hwlen);
 	if (protocol == ETHERTYPE_ARP)

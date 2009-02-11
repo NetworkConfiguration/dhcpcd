@@ -63,8 +63,8 @@ make_ipv4ll_lease(uint32_t old_addr)
 
 	for (;;) {
 		dhcp->yiaddr = htonl(LINKLOCAL_ADDR |
-				     (((uint32_t)abs((int)arc4random())
-				       % 0xFD00) + 0x0100));
+		    (((uint32_t)abs((int)arc4random())
+			% 0xFD00) + 0x0100));
 		if (dhcp->yiaddr != old_addr &&
 		    IN_LINKLOCAL(ntohl(dhcp->yiaddr)))
 			break;
@@ -91,7 +91,8 @@ start_ipv4ll(void *arg)
 	if (!iface->state->offer ||
 	    !IN_LINKLOCAL(htonl(iface->state->offer->yiaddr)))
 	{
-		syslog(LOG_INFO, "%s: probing for an IPv4LL address", iface->name);
+		syslog(LOG_INFO, "%s: probing for an IPv4LL address",
+		    iface->name);
 		delete_timeout(NULL, iface);
 		free(iface->state->offer);
 		iface->state->offer = make_ipv4ll_lease(0);
@@ -122,7 +123,7 @@ handle_ipv4ll_failure(void *arg)
 	iface->state->offer = NULL;
 	if (++iface->state->conflicts > MAX_CONFLICTS) {
 		syslog(LOG_ERR, "%s: failed to acquire an IPv4LL address",
-				iface->name);
+		    iface->name);
 		iface->state->interval = RATE_LIMIT_INTERVAL / 2;
 		start_discover(iface);
 	} else {

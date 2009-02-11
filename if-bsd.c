@@ -56,15 +56,16 @@
 #include "if-options.h"
 #include "net.h"
 
-#define ROUNDUP(a) \
+#define ROUNDUP(a)							\
 	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
 
 /* Darwin doesn't define this for some very odd reason */
 #ifndef SA_SIZE
-# define SA_SIZE(sa)						\
-	(  (!(sa) || ((struct sockaddr *)(sa))->sa_len == 0) ?	\
-	   sizeof(long)		:				\
-	   1 + ( (((struct sockaddr *)(sa))->sa_len - 1) | (sizeof(long) - 1) ) )
+# define SA_SIZE(sa)							\
+	(  (!(sa) || ((struct sockaddr *)(sa))->sa_len == 0) ?		\
+	    sizeof(long)		:				\
+	    1 + ( (((struct sockaddr *)(sa))->sa_len - 1) |		\
+		(sizeof(long) - 1) ) )
 #endif
 
 static int a_fd = -1;
@@ -121,8 +122,8 @@ getifssid(const char *ifname, char *ssid)
 
 int
 if_address(const struct interface *iface, const struct in_addr *address,
-	   const struct in_addr *netmask, const struct in_addr *broadcast,
-	   int action)
+    const struct in_addr *netmask, const struct in_addr *broadcast,
+    int action)
 {
 	int retval;
 	struct ifaliasreq ifa;
@@ -134,12 +135,12 @@ if_address(const struct interface *iface, const struct in_addr *address,
 	memset(&ifa, 0, sizeof(ifa));
 	strlcpy(ifa.ifra_name, iface->name, sizeof(ifa.ifra_name));
 
-#define ADDADDR(_var, _addr) { \
-	_s.sa = &_var; \
-	_s.sin->sin_family = AF_INET; \
-	_s.sin->sin_len = sizeof(*_s.sin); \
-	memcpy(&_s.sin->sin_addr, _addr, sizeof(_s.sin->sin_addr)); \
-}
+#define ADDADDR(_var, _addr) {						\
+		_s.sa = &_var;						\
+		_s.sin->sin_family = AF_INET;				\
+		_s.sin->sin_len = sizeof(*_s.sin);			\
+		memcpy(&_s.sin->sin_addr, _addr, sizeof(_s.sin->sin_addr)); \
+	}
 
 	ADDADDR(ifa.ifra_addr, address);
 	ADDADDR(ifa.ifra_mask, netmask);
@@ -158,8 +159,8 @@ if_address(const struct interface *iface, const struct in_addr *address,
 /* ARGSUSED4 */
 int
 if_route(const struct interface *iface, const struct in_addr *dest,
-	 const struct in_addr *net, const struct in_addr *gate,
-	 _unused int metric, int action)
+    const struct in_addr *net, const struct in_addr *gate,
+    _unused int metric, int action)
 {
 	union sockunion {
 		struct sockaddr sa;
@@ -179,18 +180,18 @@ if_route(const struct interface *iface, const struct in_addr *dest,
 	size_t l;
 	int retval = 0;
 
-#define ADDSU(_su) { \
-	l = SA_SIZE(&(_su.sa)); \
-	memcpy(bp, &(_su), l); \
-	bp += l; \
-} 
-#define ADDADDR(_addr) { \
-	memset (&su, 0, sizeof(su)); \
-	su.sin.sin_family = AF_INET; \
-	su.sin.sin_len = sizeof(su.sin); \
-	memcpy (&su.sin.sin_addr, _addr, sizeof(su.sin.sin_addr)); \
-	ADDSU(su); \
-}
+#define ADDSU(_su) {							\
+		l = SA_SIZE(&(_su.sa));					\
+		memcpy(bp, &(_su), l);					\
+		bp += l;						\
+	} 
+#define ADDADDR(_addr) {						\
+		memset (&su, 0, sizeof(su));				\
+		su.sin.sin_family = AF_INET;				\
+		su.sin.sin_len = sizeof(su.sin);			\
+		memcpy (&su.sin.sin_addr, _addr, sizeof(su.sin.sin_addr)); \
+		ADDSU(su);						\
+	}
 
 	memset(&rtm, 0, sizeof(rtm));
 	rtm.hdr.rtm_version = RTM_VERSION;
@@ -219,7 +220,9 @@ if_route(const struct interface *iface, const struct in_addr *dest,
 	}
 
 	ADDADDR(dest);
-	if (rtm.hdr.rtm_flags & RTF_HOST || !(rtm.hdr.rtm_flags & RTF_STATIC)) {
+	if (rtm.hdr.rtm_flags & RTF_HOST ||
+	    !(rtm.hdr.rtm_flags & RTF_STATIC))
+	{
 		/* Make us a link layer socket for the host gateway */
 		memset(&su, 0, sizeof(su));
 		su.sdl.sdl_len = sizeof(struct sockaddr_dl);
@@ -305,9 +308,9 @@ open_link_socket(void)
 #define BUFFER_LEN	2048
 int
 manage_link(int fd,
-	    void (*if_carrier)(const char *),
-	    void (*if_add)(const char *),
-	    void (*if_remove)(const char *))
+    void (*if_carrier)(const char *),
+    void (*if_add)(const char *),
+    void (*if_remove)(const char *))
 {
 	char buffer[2048], *p, *e;
 	char ifname[IF_NAMESIZE];
@@ -363,17 +366,17 @@ manage_link(int fd,
 				rt.iface = NULL;
 				sin = (struct sockaddr_in *)sa;
 				memcpy(&rt.dest.s_addr, &sin->sin_addr.s_addr,
-					sizeof(rt.dest.s_addr));
+				    sizeof(rt.dest.s_addr));
 				sa = (struct sockaddr *)
 				    (ROUNDUP(sa->sa_len) + (char *)sa);
 				sin = (struct sockaddr_in *)sa;
 				memcpy(&rt.gate.s_addr, &sin->sin_addr.s_addr,
-					sizeof(rt.gate.s_addr));
+				    sizeof(rt.gate.s_addr));
 				sa = (struct sockaddr *)
 				    (ROUNDUP(sa->sa_len) + (char *)sa);
 				sin = (struct sockaddr_in *)sa;
 				memcpy(&rt.net.s_addr, &sin->sin_addr.s_addr,
-					sizeof(rt.net.s_addr));
+				    sizeof(rt.net.s_addr));
 				route_deleted(&rt);
 				break;
 			}
@@ -383,7 +386,7 @@ manage_link(int fd,
 
 static void
 discover_link(struct interface **ifs, int argc, char * const *argv,
-	      struct ifreq *ifr)
+    struct ifreq *ifr)
 {
 	struct interface *ifp, *ifl = NULL;
 	struct sockaddr_dl *sdl;
@@ -424,10 +427,10 @@ discover_link(struct interface **ifs, int argc, char * const *argv,
 	default:
 		/* Don't needlessly spam console on startup */
 		if (!(options & DHCPCD_MASTER &&
-		    !(options & DHCPCD_DAEMONISED) &&
-		    options & DHCPCD_QUIET))
+			!(options & DHCPCD_DAEMONISED) &&
+			options & DHCPCD_QUIET))
 			syslog(LOG_ERR, "%s: unsupported interface type",
-			       ifr->ifr_name);
+			    ifr->ifr_name);
 		free(ifp);
 		ifp = NULL;
 		break;

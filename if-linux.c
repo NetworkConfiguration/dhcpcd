@@ -134,7 +134,7 @@ open_link_socket(void)
 
 static int
 get_netlink(int fd, int flags,
-	    int (*callback)(struct nlmsghdr *))
+    int (*callback)(struct nlmsghdr *))
 {
 	char *buffer = NULL;
 	ssize_t bytes;
@@ -217,11 +217,11 @@ link_delroute(struct nlmsghdr *nlm)
 		switch (rta->rta_type) {
 		case RTA_DST:
 			memcpy(&rt.dest.s_addr, RTA_DATA(rta),
-			       sizeof(rt.dest.s_addr));
+			    sizeof(rt.dest.s_addr));
 			break;
 		case RTA_GATEWAY:
 			memcpy(&rt.gate.s_addr, RTA_DATA(rta),
-			       sizeof(rt.gate.s_addr));
+			    sizeof(rt.gate.s_addr));
 			break;
 		case RTA_OIF:
 			idx = *(int *)RTA_DATA(rta);
@@ -300,9 +300,9 @@ link_netlink(struct nlmsghdr *nlm)
 
 int
 manage_link(int fd,
-	    void (*if_carrier)(const char *),
-	    void (*if_add)(const char *),
-	    void (*if_remove)(const char *))
+    void (*if_carrier)(const char *),
+    void (*if_add)(const char *),
+    void (*if_remove)(const char *))
 {
 	nl_carrier = if_carrier;
 	nl_add = if_add;
@@ -337,12 +337,12 @@ send_netlink(struct nlmsghdr *hdr)
 	return r;
 }
 
-#define NLMSG_TAIL(nmsg) \
+#define NLMSG_TAIL(nmsg)						\
 	((struct rtattr *)(((ptrdiff_t)(nmsg))+NLMSG_ALIGN((nmsg)->nlmsg_len)))
 
 static int
 add_attr_l(struct nlmsghdr *n, unsigned int maxlen, int type,
-	   const void *data, int alen)
+    const void *data, int alen)
 {
 	int len = RTA_LENGTH(alen);
 	struct rtattr *rta;
@@ -397,8 +397,8 @@ struct nlmr
 
 int
 if_address(const struct interface *iface,
-	   const struct in_addr *address, const struct in_addr *netmask,
-	   const struct in_addr *broadcast, int action)
+    const struct in_addr *address, const struct in_addr *netmask,
+    const struct in_addr *broadcast, int action)
 {
 	struct nlma *nlm;
 	int retval = 0;
@@ -420,12 +420,12 @@ if_address(const struct interface *iface,
 	nlm->ifa.ifa_prefixlen = inet_ntocidr(*netmask);
 	/* This creates the aliased interface */
 	add_attr_l(&nlm->hdr, sizeof(*nlm), IFA_LABEL,
-		   iface->name, strlen(iface->name) + 1);
+	    iface->name, strlen(iface->name) + 1);
 	add_attr_l(&nlm->hdr, sizeof(*nlm), IFA_LOCAL,
-		   &address->s_addr, sizeof(address->s_addr));
+	    &address->s_addr, sizeof(address->s_addr));
 	if (action >= 0 && broadcast)
 		add_attr_l(&nlm->hdr, sizeof(*nlm), IFA_BROADCAST,
-			   &broadcast->s_addr, sizeof(broadcast->s_addr));
+		    &broadcast->s_addr, sizeof(broadcast->s_addr));
 
 	if (send_netlink(&nlm->hdr) == -1)
 		retval = -1;
@@ -435,8 +435,8 @@ if_address(const struct interface *iface,
 
 int
 if_route(const struct interface *iface,
-	 const struct in_addr *destination, const struct in_addr *netmask,
-	 const struct in_addr *gateway, int metric, int action)
+    const struct in_addr *destination, const struct in_addr *netmask,
+    const struct in_addr *gateway, int metric, int action)
 {
 	struct nlmr *nlm;
 	unsigned int ifindex;
@@ -473,7 +473,7 @@ if_route(const struct interface *iface,
 			nlm->rt.rtm_protocol = RTPROT_BOOT;
 		if (gateway->s_addr == INADDR_ANY ||
 		    (gateway->s_addr == destination->s_addr &&
-		     netmask->s_addr == INADDR_BROADCAST))
+			netmask->s_addr == INADDR_BROADCAST))
 			nlm->rt.rtm_scope = RT_SCOPE_LINK;
 		else
 			nlm->rt.rtm_scope = RT_SCOPE_UNIVERSE;
@@ -482,16 +482,16 @@ if_route(const struct interface *iface,
 
 	nlm->rt.rtm_dst_len = inet_ntocidr(*netmask);
 	add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_DST,
-		   &destination->s_addr, sizeof(destination->s_addr));
+	    &destination->s_addr, sizeof(destination->s_addr));
 	if (nlm->rt.rtm_protocol == RTPROT_KERNEL) {
 		add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_PREFSRC,
-			   &iface->addr.s_addr, sizeof(iface->addr.s_addr));
+		    &iface->addr.s_addr, sizeof(iface->addr.s_addr));
 	}
 	/* If destination == gateway then don't add the gateway */
 	if (destination->s_addr != gateway->s_addr ||
 	    netmask->s_addr != INADDR_BROADCAST)
 		add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_GATEWAY,
-			   &gateway->s_addr, sizeof(gateway->s_addr));
+		    &gateway->s_addr, sizeof(gateway->s_addr));
 
 	add_attr_32(&nlm->hdr, sizeof(*nlm), RTA_OIF, ifindex);
 	add_attr_32(&nlm->hdr, sizeof(*nlm), RTA_PRIORITY, metric);

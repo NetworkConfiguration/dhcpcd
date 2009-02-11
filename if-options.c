@@ -277,7 +277,7 @@ parse_addr(struct in_addr *addr, struct in_addr *net, const char *arg)
 		*p++ = '\0';
 		if (net != NULL &&
 		    (sscanf(p, "%d", &i) != 1 ||
-		     inet_cidrtoaddr(i, net) != 0))
+			inet_cidrtoaddr(i, net) != 0))
 		{
 			syslog(LOG_ERR, "`%s' is not a valid CIDR", p);
 			return -1;
@@ -314,13 +314,14 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	case 'h':
 		if (arg) {
 			s = parse_string(ifo->hostname,
-					 HOSTNAME_MAX_LEN, arg);
+			    HOSTNAME_MAX_LEN, arg);
 			if (s == -1) {
 				syslog(LOG_ERR, "hostname: %m");
 				return -1;
 			}
 			if (s != 0 && ifo->hostname[0] == '.') {
-				syslog(LOG_ERR, "hostname cannot begin with .");
+				syslog(LOG_ERR,
+				    "hostname cannot begin with .");
 				return -1;
 			}
 			ifo->hostname[s] = '\0';
@@ -333,7 +334,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	case 'i':
 		if (arg)
 			s = parse_string((char *)ifo->vendorclassid + 1,
-					 VENDORCLASSID_MAX_LEN, arg);
+			    VENDORCLASSID_MAX_LEN, arg);
 		else
 			s = 0;
 		if (s == -1) {
@@ -348,7 +349,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	case 'l':
 		if (*arg == '-') {
 			syslog(LOG_ERR,
-			       "leasetime must be a positive value");
+			    "leasetime must be a positive value");
 			return -1;
 		}
 		errno = 0;
@@ -384,8 +385,8 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			ifo->request_address.s_addr = 0;
 		} else {
 			if (parse_addr(&ifo->request_address,
-				       &ifo->request_netmask,
-				       arg) != 0)
+				&ifo->request_netmask,
+				arg) != 0)
 				return -1;
 		}
 		break;
@@ -403,8 +404,9 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		break;
 	case 'u':
 		s = USERCLASS_MAX_LEN - ifo->userclass[0] - 1;
-		s = parse_string((char *)ifo->userclass + ifo->userclass[0] + 2,
-				 s, arg);
+		s = parse_string((char *)ifo->userclass +
+		    ifo->userclass[0] + 2,
+		    s, arg);
 		if (s == -1) {
 			syslog(LOG_ERR, "userclass: %m");
 			return -1;
@@ -425,7 +427,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		arg = p + 1;
 		if (i < 1 || i > 254) {
 			syslog(LOG_ERR, "vendor option should be between"
-					" 1 and 254 inclusive");
+			    " 1 and 254 inclusive");
 			return -1;
 		}
 		s = VENDOR_MAX_LEN - ifo->vendor[0] - 2;
@@ -435,10 +437,10 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 				errno = ENOBUFS;
 			} else
 				memcpy(ifo->vendor + ifo->vendor[0] + 3,
-				       &addr.s_addr, sizeof(addr.s_addr));
+				    &addr.s_addr, sizeof(addr.s_addr));
 		} else {
-			s = parse_string((char *)ifo->vendor + ifo->vendor[0] + 3,
-					 s, arg);
+			s = parse_string((char *)ifo->vendor +
+			    ifo->vendor[0] + 3, s, arg);
 		}
 		if (s == -1) {
 			syslog(LOG_ERR, "vendor: %m");
@@ -512,7 +514,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		ifo->clientid[1] = 0;
 		if (arg)
 			s = parse_string_hwaddr((char *)ifo->clientid + 1,
-						CLIENTID_MAX_LEN, arg, 1);
+			    CLIENTID_MAX_LEN, arg, 1);
 		else
 			s = 0;
 		if (s == -1) {
@@ -554,14 +556,14 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		p++;
 		if (strncmp(arg, "ip_address=", strlen("ip_address=")) == 0) {
 			if (parse_addr(&ifo->request_address,
-				       &ifo->request_netmask, p) != 0)
+				&ifo->request_netmask, p) != 0)
 				return -1;
 
 			ifo->options |= DHCPCD_STATIC;
 		} else if (strncmp(arg, "routes=", strlen("routes=")) == 0 ||
-			   strncmp(arg, "static_routes=", strlen("static_routes=")) == 0 ||
-			   strncmp(arg, "classless_static_routes=", strlen("classless_static_routes=")) == 0 ||
-			   strncmp(arg, "ms_classless_static_routes=", strlen("ms_classless_static_routes=")) == 0)
+		    strncmp(arg, "static_routes=", strlen("static_routes=")) == 0 ||
+		    strncmp(arg, "classless_static_routes=", strlen("classless_static_routes=")) == 0 ||
+		    strncmp(arg, "ms_classless_static_routes=", strlen("ms_classless_static_routes=")) == 0)
 		{
 			np = strchr(p, ' ');
 			if (np == NULL) {
@@ -603,8 +605,9 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			s = 0;
 			if (ifo->config != NULL) {
 				while (ifo->config[s] != NULL) {
-					if (strncmp(ifo->config[s], arg, p - arg) == 0) {
-						printf("match\n");
+					if (strncmp(ifo->config[s], arg,
+						p - arg) == 0)
+					{
 						free(ifo->config[s]);
 						ifo->config[s] = xstrdup(arg);
 						return 1;
@@ -612,7 +615,8 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 					s++;
 				}
 			}
-			ifo->config = xrealloc(ifo->config, sizeof(char *) * (s + 2));
+			ifo->config = xrealloc(ifo->config,
+			    sizeof(char *) * (s + 2));
 			ifo->config[s] = xstrdup(arg);
 			ifo->config[s + 1] = NULL;
 		}
@@ -620,7 +624,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	case 'X':
 		if (!inet_aton(arg, &addr)) {
 			syslog(LOG_ERR, "`%s' is not a valid IP address",
-			       arg);
+			    arg);
 			return -1;
 		}
 		ifo->blacklist = xrealloc(ifo->blacklist,
@@ -652,8 +656,8 @@ parse_config_line(struct if_options *ifo, const char *opt, char *line)
 
 		if (cf_options[i].has_arg == required_argument && !line) {
 			fprintf(stderr,
-				PACKAGE ": option requires an argument -- %s\n",
-				opt);
+			    PACKAGE ": option requires an argument -- %s\n",
+			    opt);
 			return -1;
 		}
 
@@ -687,8 +691,8 @@ read_config(const char *file, const char *ifname, const char *ssid)
 	    strcmp(ifo->hostname, "localhost") == 0)
 		ifo->hostname[0] = '\0';
 	ifo->vendorclassid[0] = snprintf((char *)ifo->vendorclassid + 1,
-					 VENDORCLASSID_MAX_LEN,
-					 "%s %s", PACKAGE, VERSION);
+	    VENDORCLASSID_MAX_LEN,
+	    "%s %s", PACKAGE, VERSION);
 
 	/* Parse our options file */
 	f = fopen(file ? file : CONFIG, "r");
@@ -701,8 +705,8 @@ read_config(const char *file, const char *ifname, const char *ssid)
 		if (line && *line) {
 			p = line + strlen(line) - 1;
 			while (p != line &&
-			       (*p == ' ' || *p == '\t') &&
-			       *(p - 1) != '\\')
+			    (*p == ' ' || *p == '\t') &&
+			    *(p - 1) != '\\')
 				*p-- = '\0';
 		}
 		/* Start of an interface block, skip if not ours */
