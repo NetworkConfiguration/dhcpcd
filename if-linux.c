@@ -42,14 +42,6 @@
 #include <linux/rtnetlink.h>
 #include <linux/wireless.h>
 
-# define SIOCGIWNAME 0x8B01
-/* FIXME: Some linux kernel verisons DO NOT like this include
- * They have the error:
- * /usr/include/linux/if.h:92: error: redefinition of `struct ifmap'
- * We work around this by defining the above ioctl and using an ifreq
- * structure which seems to work fine. */
-//# include <linux/wireless.h>
-
 #include <errno.h>
 #include <ctype.h>
 #include <fnmatch.h>

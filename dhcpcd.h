@@ -77,8 +77,7 @@ struct if_state {
 	struct in_addr fail;
 };
 
-struct interface
-{
+struct interface {
 	char name[IF_NAMESIZE];
 	struct if_state *state;
 

@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon
- * Copyright 2006-2008 Roy Marples <roy@marples.name>
+ * Copyright 2006-2009 Roy Marples <roy@marples.name>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,7 +37,7 @@
 # include <asm/types.h> /* needed for 2.4 kernels for the below header */
 # include <linux/filter.h>
 # include <netpacket/packet.h>
-# define bpf_insn sock_filter
+# define bpf_insn		sock_filter
 # define BPF_SKIPTYPE
 # define BPF_ETHCOOK		-ETH_HLEN
 # define BPF_WHOLEPACKET	0x0fffffff /* work around buggy LPF filters */
@@ -60,8 +60,8 @@
 /* Broadcast address for IPoIB */
 static const uint8_t ipv4_bcast_addr[] = {
 	0x00, 0xff, 0xff, 0xff,
-		0xff, 0x12, 0x40, 0x1b, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff
+	0xff, 0x12, 0x40, 0x1b, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff
 };
 
 int

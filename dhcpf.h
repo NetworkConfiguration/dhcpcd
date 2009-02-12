@@ -49,7 +49,8 @@ struct rt *get_option_routes(const struct dhcp_message *);
 ssize_t configure_env(char **, const char *, const struct dhcp_message *,
     const struct if_options *);
 
-ssize_t make_message(struct dhcp_message **, const struct interface *, uint8_t);
+ssize_t make_message(struct dhcp_message **, const struct interface *,
+    uint8_t);
 int valid_dhcp_packet(unsigned char *);
 
 ssize_t write_lease(const struct interface *, const struct dhcp_message *);

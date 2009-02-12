@@ -66,9 +66,9 @@
  * 192.168/16
  */
 #ifndef IN_PRIVATE
-# define IN_PRIVATE(addr) (((addr & IN_CLASSA_NET) == 0x0a000000) || \
-			   ((addr & 0xfff00000)    == 0xac100000) || \
-			   ((addr & IN_CLASSB_NET) == 0xc0a80000))
+# define IN_PRIVATE(addr) (((addr & IN_CLASSA_NET) == 0x0a000000) ||	\
+	    ((addr & 0xfff00000)    == 0xac100000) ||			\
+	    ((addr & IN_CLASSB_NET) == 0xc0a80000))
 #endif
 
 #define LINKLOCAL_ADDR	0xa9fe0000
@@ -103,30 +103,31 @@ int inet_ntocidr(struct in_addr);
 int inet_cidrtoaddr(int, struct in_addr *);
 
 int up_interface(const char *);
-int do_interface(const char *, void (*)(struct interface **, int, char * const *, struct ifreq *),
-		 struct interface **, int, char * const *,
-		 struct in_addr *, struct in_addr *, int);
+int do_interface(const char *,
+    void (*)(struct interface **, int, char * const *, struct ifreq *),
+    struct interface **, int, char * const *,
+    struct in_addr *, struct in_addr *, int);
 int if_address(const struct interface *,
-	       const struct in_addr *, const struct in_addr *,
-	       const struct in_addr *, int);
-#define add_address(iface, addr, net, brd) \
+    const struct in_addr *, const struct in_addr *,
+    const struct in_addr *, int);
+#define add_address(iface, addr, net, brd)				\
 	if_address(iface, addr, net, brd, 1)
-#define del_address(iface, addr, net) \
+#define del_address(iface, addr, net)					\
 	if_address(iface, addr, net, NULL, -1)
-#define has_address(iface, addr, net) \
+#define has_address(iface, addr, net)					\
 	do_interface(iface, NULL, NULL, 0, NULL, addr, net, 0)
-#define get_address(iface, addr, net) \
+#define get_address(iface, addr, net)					\
 	do_interface(iface, NULL, NULL, 0, NULL, addr, net, 1)
 
 int if_route(const struct interface *, const struct in_addr *,
-	     const struct in_addr *, const struct in_addr *, int, int);
-#define add_route(iface, dest, mask, gate, metric) \
+    const struct in_addr *, const struct in_addr *, int, int);
+#define add_route(iface, dest, mask, gate, metric)			\
 	if_route(iface, dest, mask, gate, metric, 1)
-#define change_route(iface, dest, mask, gate, metric) \
+#define change_route(iface, dest, mask, gate, metric)			\
 	if_route(iface, dest, mask, gate, metric, 0)
-#define del_route(iface, dest, mask, gate, metric) \
+#define del_route(iface, dest, mask, gate, metric)			\
 	if_route(iface, dest, mask, gate, metric, -1)
-#define del_src_route(iface, dest, mask, gate, metric) \
+#define del_src_route(iface, dest, mask, gate, metric)			\
 	if_route(iface, dest, mask, gate, metric, -2)
 int arp_flush(void);
 void free_routes(struct rt *);
@@ -134,22 +135,22 @@ void free_routes(struct rt *);
 int open_udp_socket(struct interface *);
 const size_t udp_dhcp_len;
 ssize_t make_udp_packet(uint8_t **, const uint8_t *, size_t,
-			struct in_addr, struct in_addr);
+    struct in_addr, struct in_addr);
 ssize_t get_udp_data(const uint8_t **, const uint8_t *);
 int valid_udp_packet(const uint8_t *);
 
 int open_socket(struct interface *, int);
 ssize_t send_packet(const struct interface *, struct in_addr, 
-		    const uint8_t *, ssize_t);
+    const uint8_t *, ssize_t);
 ssize_t send_raw_packet(const struct interface *, int,
-			const void *, ssize_t);
+    const void *, ssize_t);
 ssize_t get_raw_packet(struct interface *, int, void *, ssize_t);
 
 int init_socket(void);
 int open_link_socket(void);
 int manage_link(int,
-		void (*)(const char *),
-		void (*)(const char *),
-		void (*)(const char *));
+    void (*)(const char *),
+    void (*)(const char *),
+    void (*)(const char *));
 int carrier_status(const char *);
 #endif
