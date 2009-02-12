@@ -77,8 +77,7 @@
 #define PROBE_MAX_U		PROBE_MAX * USECS_SECOND
 
 /* DHCP options */
-enum DHO
-{
+enum DHO {
 	DHO_PAD                    = 0,
 	DHO_SUBNETMASK             = 1,
 	DHO_ROUTER                 = 3,

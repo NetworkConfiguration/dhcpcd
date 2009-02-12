@@ -30,7 +30,7 @@
 
 #include "config.h"
 #ifdef THERE_IS_NO_FORK
-#define daemonise() {}
+# define daemonise() {}
 #else
 pid_t daemonise(void);
 #endif

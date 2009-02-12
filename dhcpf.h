@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright 2006-2008 Roy Marples <roy@marples.name>
+ * Copyright 2006-2009 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -42,12 +42,12 @@ int get_option_addr(uint32_t *, const struct dhcp_message *, uint8_t);
 int get_option_uint32(uint32_t *, const struct dhcp_message *, uint8_t);
 int get_option_uint16(uint16_t *, const struct dhcp_message *, uint8_t);
 int get_option_uint8(uint8_t *, const struct dhcp_message *, uint8_t);
-#define is_bootp(m) (m && \
-	!IN_LINKLOCAL(htonl((m)->yiaddr)) && \
-	get_option_uint8(NULL, m, DHO_MESSAGETYPE) == -1)
+#define is_bootp(m) (m &&						\
+	    !IN_LINKLOCAL(htonl((m)->yiaddr)) &&			\
+	    get_option_uint8(NULL, m, DHO_MESSAGETYPE) == -1)
 struct rt *get_option_routes(const struct dhcp_message *);
 ssize_t configure_env(char **, const char *, const struct dhcp_message *,
-		      const struct if_options *);
+    const struct if_options *);
 
 ssize_t make_message(struct dhcp_message **, const struct interface *, uint8_t);
 int valid_dhcp_packet(unsigned char *);
