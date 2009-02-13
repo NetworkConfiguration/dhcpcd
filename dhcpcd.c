@@ -1129,6 +1129,14 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 			iov[1].iov_len = len;
 			writev(fd->fd, iov, 2);
 			return 0;
+		} else if (strcmp(*argv, "--getconfigfile") == 0) {
+			len = strlen(cffile ? cffile : CONFIG) + 1;
+			iov[0].iov_base = &len;
+			iov[0].iov_len = sizeof(ssize_t);
+			iov[1].iov_base = cffile ? cffile : UNCONST(CONFIG);
+			iov[1].iov_len = len;
+			writev(fd->fd, iov, 2);
+			return 0;
 		} else if (strcmp(*argv, "--getinterfaces") == 0) {
 			len = 0;
 			if (argc == 1) {
