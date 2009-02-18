@@ -114,7 +114,7 @@ If a list of interfaces are given on the command line, then
 only works with those interfaces, otherwise
 .Nm
 discovers available interfaces.
-If link management is enabled and none or more than one interfaces are given,
+If link management is enabled and no interfaces are given on the command line,
 .Nm
 forks to the background right away.
 .Pp

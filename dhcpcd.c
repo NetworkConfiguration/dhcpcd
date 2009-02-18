@@ -1460,10 +1460,8 @@ main(int argc, char **argv)
 
 	ifc = argc - optind;
 	ifv = argv + optind;
-	if (ifc != 1) {
-		if (options & (DHCPCD_LINK | DHCPCD_DAEMONISE))
-			daemonise();
-	}
+	if (ifc == 0 && options & (DHCPCD_LINK | DHCPCD_DAEMONISE))
+		daemonise();
 
 	ifaces = discover_interfaces(ifc, ifv);
 	for (i = 0; i < ifc; i++) {
