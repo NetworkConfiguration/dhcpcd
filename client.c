@@ -685,7 +685,9 @@ send_message(struct if_state *state, int type, const struct options *options)
 	if (r == -1) {
 		state->state = STATE_INIT;
 		timerclear(&state->timeout);
-		timerclear(&state->stop);
+		/* We need to set a timeout so we fall through gracefully */
+		state->stop.tv_sec = 1;
+		state->stop.tv_usec = 0;
 		do_socket(state, SOCKET_CLOSED);
 	}
 	return r;
