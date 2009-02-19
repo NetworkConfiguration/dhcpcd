@@ -1041,6 +1041,7 @@ handle_timeout_fail(struct if_state *state, const struct options *options)
 		{
 			logger(LOG_INFO, "probing for an IPV4LL address");
 			free(state->offer);
+			lease->frominfo = 0;
 			state->offer = ipv4ll_get_dhcp(0);
 			gotlease = 0;
 		}
