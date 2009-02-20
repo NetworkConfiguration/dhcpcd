@@ -310,22 +310,10 @@ send_message(struct interface *iface, int type,
 			syslog(LOG_ERR, "%s: send_raw_packet: %m", iface->name);
 	}
 	free(dhcp);
-	if (r == -1) {
-		/* We failed to send a packet?
-		 * This should only happen if the link has gone down whilst
-		 * we are working and managed to get here before we processed
-		 * the link down message.
-		 * Or we could be configured not to look at them or it's a
-		 * buggy driver. Either way, we need to drop everything
-		 * and start over. */
-		drop_config(iface, "EXPIRE");
-		close_sockets(iface);
-		delete_timeout(NULL, iface);
-		add_timeout_sec(DHCP_ARP_FAIL, start_interface, iface);
-	} else {
-		if (callback)
-			add_timeout_tv(&tv, callback, iface);
-	}
+	/* Even if we fail to send a packet we should continue as we are
+	 * as our failure timeouts will change out codepath when needed. */
+	if (callback)
+		add_timeout_tv(&tv, callback, iface);
 }
 
 static void
