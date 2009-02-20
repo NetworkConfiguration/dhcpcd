@@ -318,7 +318,7 @@ send_message(struct interface *iface, int type,
 		 * Or we could be configured not to look at them or it's a
 		 * buggy driver. Either way, we need to drop everything
 		 * and start over. */
-		drop_config(iface, "STOP");
+		drop_config(iface, "EXPIRE");
 		close_sockets(iface);
 		delete_timeout(NULL, iface);
 		add_timeout_sec(DHCP_ARP_FAIL, start_interface, iface);
