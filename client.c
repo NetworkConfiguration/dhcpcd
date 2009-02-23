@@ -837,12 +837,24 @@ wait_for_fd(struct if_state *state, int *fd)
 	}
 
 	/* We configured our array in the order we should deal with them */
-	for (i = 0; i < nfds; i++)
-		if (fds[i].revents & POLLIN) {
+	for (i = 0; i < nfds; i++) {
+		if (fds[i].revents & POLLERR) {
+			syslog(LOG_ERR, "poll: POLLERR on fd %d", fds[i].fd);
+			errno = EBADF;
+			return -1;
+		}
+		if (fds[i].revents & POLLNVAL) {
+			syslog(LOG_ERR, "poll: POLLNVAL on fd %d", fds[i].fd);
+			errno = EINVAL;
+			return -1;
+		}
+		if (fds[i].revents & (POLLIN | POLLHUP)) {
 			*fd = fds[i].fd;
 			return r;
 		}
-	return r;
+	}
+	/* We should never get here. */
+	return 0;
 }
 
 static int
