@@ -40,7 +40,6 @@
 
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
-#include <linux/wireless.h>
 
 #include <errno.h>
 #include <ctype.h>
@@ -52,8 +51,13 @@
 #include <unistd.h>
 
 /* Support older kernels */
-#ifndef IFLA_WIRELESS
-# define IFLA_WIRELSSS (IFLFA_MASTER + 1)
+#ifdef IFLA_WIRELESS
+# ifndef __user
+#  define __user
+# endif
+# include <wireless.h>
+#else
+# define IFLA_WIRELESS (IFLA_MASTER + 1)
 #endif
 
 #include "config.h"
@@ -74,6 +78,7 @@ static struct sockaddr_nl sock_nl;
 int
 getifssid(const char *ifname, char *ssid)
 {
+#ifdef SIOCGIWESSID
 	int s, retval;
 	struct iwreq iwr;
 
@@ -90,6 +95,11 @@ getifssid(const char *ifname, char *ssid)
 		retval = -1;
 	close(s);
 	return retval;
+#else
+	/* Stop gcc warning about unused paramters */
+	ifname = ssid;
+	return -1;
+#endif
 }
 
 static int
