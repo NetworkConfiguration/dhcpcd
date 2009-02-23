@@ -52,10 +52,8 @@
 
 /* Support older kernels */
 #ifdef IFLA_WIRELESS
-# ifndef __user
-#  define __user
-# endif
-# include <wireless.h>
+# include <linux/if.h>
+# include <linux/wireless.h>
 #else
 # define IFLA_WIRELESS (IFLA_MASTER + 1)
 #endif
