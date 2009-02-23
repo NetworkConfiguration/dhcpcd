@@ -300,7 +300,6 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	struct rt *rt;
 
 	switch(opt) {
-	case 'd': /* FALLTHROUGH */
 	case 'n': /* FALLTHROUGH */
 	case 'x': /* FALLTHROUGH */
 	case 'T': /* We need to handle non interface options */
@@ -310,6 +309,9 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		break;
 	case 'c':
 		strlcpy(ifo->script, arg, sizeof(ifo->script));
+		break;
+	case 'd':
+		ifo->options |= DHCPCD_DEBUG;
 		break;
 	case 'h':
 		if (arg) {

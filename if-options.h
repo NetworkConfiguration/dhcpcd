@@ -53,6 +53,7 @@
 #define DHCPCD_DOMAIN		(1 << 2)
 #define DHCPCD_GATEWAY		(1 << 3)
 #define DHCPCD_STATIC		(1 << 4)
+#define DHCPCD_DEBUG		(1 << 5)
 #define DHCPCD_LASTLEASE	(1 << 7)
 #define DHCPCD_INFORM		(1 << 8)
 #define DHCPCD_REQUEST		(1 << 9)

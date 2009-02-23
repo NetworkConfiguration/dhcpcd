@@ -1281,9 +1281,6 @@ main(int argc, char **argv)
 	while ((opt = getopt_long(argc, argv, IF_OPTS, cf_options, &oi)) != -1)
 	{
 		switch (opt) {
-		case 'd':
-			setlogmask(LOG_UPTO(LOG_DEBUG));
-			break;
 		case 'f':
 			cffile = optarg;
 			break;
@@ -1325,7 +1322,9 @@ main(int argc, char **argv)
 	options &= ~DHCPCD_DAEMONISE;
 #endif
 
-	if (options & DHCPCD_QUIET)
+	if (options & DHCPCD_DEBUG)
+		setlogmask(LOG_UPTO(LOG_DEBUG));
+	else if (options & DHCPCD_QUIET)
 		setlogmask(LOG_UPTO(LOG_WARNING));
 
 	/* If we have any other args, we should run as a single dhcpcd instance
