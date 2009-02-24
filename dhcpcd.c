@@ -1495,7 +1495,7 @@ main(int argc, char **argv)
 		for (iface = ifaces; iface; iface = iface->next)
 			*ifp++ = iface;
 		ifp = ifs;
-		while (--len != 0)
+		while (len-- != 0)
 			start_interface(*ifp++);
 		free(ifs);
 	}
