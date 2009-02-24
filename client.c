@@ -1261,6 +1261,8 @@ handle_timeout(struct if_state *state, const struct options *options)
 		timerclear(&state->stop);
 		/* FALLTHROUGH */
 	case STATE_INIT:
+		if (state->carrier == LINK_DOWN)
+			return 0;
 		do_socket(state, SOCKET_OPEN);
 		state->xid = arc4random();
 		iface->start_uptime = uptime();
@@ -1284,8 +1286,6 @@ handle_timeout(struct if_state *state, const struct options *options)
 		}
 		/* FALLTHROUGH */
 	case STATE_INIT:
-		if (state->carrier == LINK_DOWN)
-			return 0;
 		if (lease->addr.s_addr == 0 ||
 		    IN_LINKLOCAL(ntohl(iface->addr.s_addr)))
 		{
