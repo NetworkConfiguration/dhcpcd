@@ -560,7 +560,6 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 		}
 	}
 
-	close_sockets(iface);
 	bind_interface(iface);
 }
 
@@ -747,7 +746,7 @@ handle_carrier(const char *ifname)
 				}
 			}
 			iface->state->reason = "CARRIER";
-			configure(iface);
+			run_script(iface);
 			start_interface(iface);
 		}
 		break;
@@ -974,7 +973,7 @@ init_state(struct interface *iface, int argc, char **argv)
 	ifs->nakoff = 1;
 	configure_interface(iface, argc, argv);
 	if (!(options & DHCPCD_TEST))
-		configure(iface);
+		run_script(iface);
 
 	if (ifs->options->options & DHCPCD_LINK) {
 		switch (carrier_status(iface->name)) {
@@ -991,7 +990,7 @@ init_state(struct interface *iface, int argc, char **argv)
 			return;
 		}
 		if (!(options & DHCPCD_TEST))
-			configure(iface);
+			run_script(iface);
 	} else
 		iface->carrier = LINK_UNKNOWN;
 }

@@ -121,6 +121,8 @@ bind_interface(void *arg)
 	struct dhcp_lease *lease = &state->lease;
 	struct timeval tv;
 
+	/* We're binding an address now - ensure that sockets are closed */
+	close_sockets(iface);
 	state->reason = NULL;
 	delete_timeout(handle_exit_timeout, NULL);
 	if (clock_monotonic)
