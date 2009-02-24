@@ -199,7 +199,6 @@ send_arp_announce(void *arg)
 		state->claims = 0;
 		tv.tv_sec = state->interval - DHCP_RAND_MIN;
 		tv.tv_usec = arc4random() % (DHCP_RAND_MAX_U - DHCP_RAND_MIN_U);
-		tv.tv_sec = 3; /* test easier */
 		timernorm(&tv);
 		add_timeout_tv(&tv, start_discover, iface);
 	} else {
