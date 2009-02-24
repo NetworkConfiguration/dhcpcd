@@ -1255,7 +1255,7 @@ int
 main(int argc, char **argv)
 {
 	struct if_options *ifo;
-	struct interface *iface, **ifs, **ifp;
+	struct interface *iface;
 	int opt, oi = 0, signal_fd, sig = 0, i, control_fd;
 	size_t len;
 	pid_t pid;
@@ -1482,22 +1482,11 @@ main(int argc, char **argv)
 
 	if (options & DHCPCD_BACKGROUND)
 		daemonise();
-	for (iface = ifaces, len = 0; iface; iface = iface->next, len++)
+	for (iface = ifaces; iface; iface = iface->next)
 		init_state(iface, argc, argv);
 	sort_interfaces();
-	/* When we start an interface, it could be stopped right away or
-	 * the order could change.
-	 * We also don't want to start an interface more than once.
-	 * So we store an array of ifaces instead of relying on ->next. */
-	if (len != 0) {
-		ifs = ifp = xmalloc(sizeof(*iface) * len);
-		for (iface = ifaces; iface; iface = iface->next)
-			*ifp++ = iface;
-		ifp = ifs;
-		while (len-- != 0)
-			start_interface(*ifp++);
-		free(ifs);
-	}
+	for (iface = ifaces; iface; iface = iface->next)
+		add_timeout_sec(0, start_interface, iface);
 
 	start_eloop();
 	exit(EXIT_SUCCESS);
