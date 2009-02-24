@@ -33,13 +33,18 @@
 #include <sys/ioctl.h>
 #include <sys/param.h>
 
+#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
+
+/* Support older kernels */
+#ifndef IFLA_WIRELESS
+# define IFLA_WIRELESS (IFLA_MASTER + 1)
+#endif
+
 #include <arpa/inet.h>
 #include <net/if.h>
 #include <netinet/ether.h>
 #include <netpacket/packet.h>
-
-#include <linux/netlink.h>
-#include <linux/rtnetlink.h>
 
 #include <errno.h>
 #include <ctype.h>
@@ -49,14 +54,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
-/* Support older kernels */
-#ifdef IFLA_WIRELESS
-# include <linux/if.h>
-# include <linux/wireless.h>
-#else
-# define IFLA_WIRELESS (IFLA_MASTER + 1)
-#endif
 
 #include "config.h"
 #include "common.h"
@@ -72,33 +69,6 @@ static void (*nl_remove)(const char *);
 
 static int sock_fd;
 static struct sockaddr_nl sock_nl;
-
-int
-getifssid(const char *ifname, char *ssid)
-{
-#ifdef SIOCGIWESSID
-	int s, retval;
-	struct iwreq iwr;
-
-	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
-		return -1;
-	memset(&iwr, 0, sizeof(iwr));
-	strlcpy(iwr.ifr_name, ifname, sizeof(iwr.ifr_name));
-	iwr.u.essid.pointer = ssid;
-	iwr.u.essid.length = IF_SSIDSIZE - 1;
-
-	if (ioctl(s, SIOCGIWESSID, &iwr) == 0)
-		retval = iwr.u.essid.length;
-	else
-		retval = -1;
-	close(s);
-	return retval;
-#else
-	/* Stop gcc warning about unused paramters */
-	ifname = ssid;
-	return -1;
-#endif
-}
 
 static int
 _open_link_socket(struct sockaddr_nl *nl)
