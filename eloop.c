@@ -312,8 +312,9 @@ start_eloop(void)
 		}
 		if (nfds > fds_len) {
 			free(fds);
-			fds = xmalloc(sizeof(*fds) * nfds);
-			fds_len = nfds;
+			/* Allocate 5 more than we need for future use */
+			fds_len = nfds + 5;
+			fds = xmalloc(sizeof(*fds) * fds_len);
 		}
 		nfds = 0;
 		for (e = events; e; e = e->next) {
