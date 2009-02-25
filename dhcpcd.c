@@ -1446,18 +1446,21 @@ main(int argc, char **argv)
 			add_event(linkfd, handle_link, NULL);
 	}
 
-	if (options & DHCPCD_DAEMONISE && !(options & DHCPCD_BACKGROUND)) {
+	ifc = argc - optind;
+	ifv = argv + optind;
+	if (options & DHCPCD_BACKGROUND ||
+	    (ifc == 0 &&
+		options & DHCPCD_LINK &&
+		options & DHCPCD_DAEMONISE))
+	{
+		daemonise();
+	} else if (options & DHCPCD_DAEMONISE) {
 		oi = ifo->timeout;
 		if (ifo->options & DHCPCD_IPV4LL)
 			oi += 10;
 		add_timeout_sec(oi, handle_exit_timeout, NULL);
 	}
 	free_options(ifo);
-
-	ifc = argc - optind;
-	ifv = argv + optind;
-	if (ifc == 0 && options & (DHCPCD_LINK | DHCPCD_DAEMONISE))
-		daemonise();
 
 	ifaces = discover_interfaces(ifc, ifv);
 	for (i = 0; i < ifc; i++) {
@@ -1471,17 +1474,13 @@ main(int argc, char **argv)
 	if (!ifaces) {
 		if (ifc == 0)
 			syslog(LOG_ERR, "no valid interfaces found");
-		if (!(options & DHCPCD_BACKGROUND) || 
-		    !(options & DHCPCD_LINK))
-		{
+		if (!(options & DHCPCD_LINK)) {
 			syslog(LOG_ERR, "aborting as we're not backgrounding"
 			    " with link detection");
 			exit(EXIT_FAILURE);
 		}
 	}
 
-	if (options & DHCPCD_BACKGROUND)
-		daemonise();
 	for (iface = ifaces; iface; iface = iface->next)
 		init_state(iface, argc, argv);
 	sort_interfaces();
