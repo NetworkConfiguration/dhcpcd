@@ -105,7 +105,8 @@ change_file()
 		rm -f "$2"
 		return 1
 	fi
-	mv -f "$2" "$1"
+	cat "$2" > "$1"
+	rm -f "$2"
 	return 0
 }
 
