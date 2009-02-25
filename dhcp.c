@@ -816,7 +816,7 @@ make_message(struct dhcp_message **message,
 	}
 	dhcp->xid = iface->state->xid;
 	dhcp->cookie = htonl(MAGIC_COOKIE);
-#if 0
+
 	*p++ = DHO_MESSAGETYPE; 
 	*p++ = 1;
 	*p++ = type;
@@ -952,7 +952,7 @@ make_message(struct dhcp_message **message,
 		*n_params = p - n_params - 1;
 	}
 	*p++ = DHO_END;
-#endif
+
 #ifdef BOOTP_MESSAGE_LENTH_MIN
 	/* Some crappy DHCP servers think they have to obey the BOOTP minimum
 	 * message length.
