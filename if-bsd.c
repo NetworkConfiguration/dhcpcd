@@ -364,17 +364,17 @@ manage_link(int fd,
 					break;
 				rt.next = NULL;
 				rt.iface = NULL;
-				sin = (struct sockaddr_in *)sa;
+				sin = (struct sockaddr_in *)(void *)sa;
 				memcpy(&rt.dest.s_addr, &sin->sin_addr.s_addr,
 				    sizeof(rt.dest.s_addr));
 				sa = (struct sockaddr *)
 				    (ROUNDUP(sa->sa_len) + (char *)sa);
-				sin = (struct sockaddr_in *)sa;
+				sin = (struct sockaddr_in *)(void *)sa;
 				memcpy(&rt.gate.s_addr, &sin->sin_addr.s_addr,
 				    sizeof(rt.gate.s_addr));
 				sa = (struct sockaddr *)
 				    (ROUNDUP(sa->sa_len) + (char *)sa);
-				sin = (struct sockaddr_in *)sa;
+				sin = (struct sockaddr_in *)(void *)sa;
 				memcpy(&rt.net.s_addr, &sin->sin_addr.s_addr,
 				    sizeof(rt.net.s_addr));
 				route_deleted(&rt);
