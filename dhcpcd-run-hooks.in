@@ -114,17 +114,17 @@ change_file()
 save_conf()
 {
 	if [ -f "$1" ]; then
-		rm -f "$1"-pre."${interface}"
-		mv -f "$1" "$1"-pre."${interface}"
+		rm -f "${1}-pre.${interface}"
+		cat "$1" > "${1}-pre.${interface}"
 	fi
 }
 
 # Restore a config file
 restore_conf()
 {
-	[ -f "$1"-pre."${interface}" ] || return 1
-	rm -f "$1"
-	mv -f "$1"-pre."${interface}" "$1"
+	[ -f "${1}-pre.${interface}" ] || return 1
+	cat "${1}-pre.${interface}" > "$1"
+	rm -f "${1}-pre.${interface}"
 }
 
 
