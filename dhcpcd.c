@@ -420,8 +420,9 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 	struct dhcp_message *dhcp = *dhcpp;
 	struct dhcp_lease *lease = &state->lease;
 	uint8_t type, tmp;
-	struct in_addr addr;
+	struct in_addr addr, addr2;
 	size_t i;
+	char *a;
 
 	/* reset the message counter */
 	state->interval = 0;
@@ -433,22 +434,46 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 	/* Ensure that it's not from a blacklisted server.
 	 * We should expand this to check IP and/or hardware address
 	 * at the packet level. */
-	if (ifo->blacklist_len != 0 &&
-	    get_option_addr(&addr.s_addr, dhcp, DHO_SERVERID) == 0)
-	{
-		for (i = 0; i < ifo->blacklist_len; i++) {
-			if (ifo->blacklist[i] != addr.s_addr)
-				continue;
-			if (dhcp->servername[0])
-				syslog(LOG_WARNING,
-				    "%s: ignoring blacklisted server %s `%s'",
-				    iface->name,
-				    inet_ntoa(addr), dhcp->servername);
-			else
-				syslog(LOG_WARNING,
-				    "%s: ignoring blacklisted server %s",
-				    iface->name, inet_ntoa(addr));
-			return;
+	if (ifo->blacklist_len != 0) {
+		if (get_option_addr(&addr.s_addr, dhcp, DHO_SERVERID) != 0)
+			addr.s_addr = 0;
+		for (i = 0; i < ifo->blacklist_len; i += 2) {
+		if (ifo->blacklist[i] ==
+			    (addr.s_addr & ifo->blacklist[i + 1]))
+			{
+				if (dhcp->servername[0])
+					syslog(LOG_WARNING,
+					    "%s: blacklisted server %s `%s'",
+					    iface->name,
+					    inet_ntoa(addr), dhcp->servername);
+				else
+					syslog(LOG_WARNING,
+					    "%s: blacklisted server %s",
+					    iface->name, inet_ntoa(addr));
+				return;
+			}
+			if (ifo->blacklist[i] ==
+			    (dhcp->yiaddr & ifo->blacklist[i + 1]))
+			{
+				addr2.s_addr = dhcp->yiaddr;
+				a = xstrdup(inet_ntoa(addr2));
+				if (dhcp->servername[0])
+					syslog(LOG_WARNING,
+					    "%s: blacklisted offer"
+					    " %s from %s `%s'",
+					    iface->name, a,
+					    inet_ntoa(addr), dhcp->servername);
+				else if (addr.s_addr)
+					syslog(LOG_WARNING,
+					    "%s: blacklisted offer %s from %s",
+					    iface->name, a, inet_ntoa(addr));
+				else
+					syslog(LOG_WARNING,
+					    "%s: blacklisted offer %s",
+					    iface->name, a);
+				free(a);
+				return;
+			}
 		}
 	}
 

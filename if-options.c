@@ -287,6 +287,8 @@ parse_addr(struct in_addr *addr, struct in_addr *net, const char *arg)
 		syslog(LOG_ERR, "`%s' is not a valid IP address", arg);
 		return -1;
 	}
+	if (p)
+		*--p = '/';
 	return 0;
 }
 
@@ -296,7 +298,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	int i;
 	char *p = NULL, *np;
 	ssize_t s;
-	struct in_addr addr;
+	struct in_addr addr, addr2;
 	struct rt *rt;
 
 	switch(opt) {
@@ -624,15 +626,13 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		}
 		break;
 	case 'X':
-		if (!inet_aton(arg, &addr)) {
-			syslog(LOG_ERR, "`%s' is not a valid IP address",
-			    arg);
+		addr2.s_addr = ~0U;
+		if (parse_addr(&addr, &addr2, arg) != 0)
 			return -1;
-		}
 		ifo->blacklist = xrealloc(ifo->blacklist,
-		    sizeof(in_addr_t) * (ifo->blacklist_len + 1));
-		ifo->blacklist[ifo->blacklist_len] = addr.s_addr;
-		ifo->blacklist_len++;
+		    sizeof(in_addr_t) * (ifo->blacklist_len + 2));
+		ifo->blacklist[ifo->blacklist_len++] = addr.s_addr;
+		ifo->blacklist[ifo->blacklist_len++] = addr2.s_addr;
 		break;
 	case 'Z':
 		/* We only set this if we haven't got any interfaces */
