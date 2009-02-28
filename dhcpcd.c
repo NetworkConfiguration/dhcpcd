@@ -606,7 +606,7 @@ handle_dhcp_packet(void *arg)
 		    packet, udp_dhcp_len);
 		if (bytes == 0 || bytes == -1)
 			break;
-		if (valid_udp_packet(packet) == -1)
+		if (valid_udp_packet(packet, bytes) == -1)
 			continue;
 		bytes = get_udp_data(&pp, packet);
 		if ((size_t)bytes > sizeof(*dhcp)) {

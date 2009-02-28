@@ -639,18 +639,26 @@ get_udp_data(const uint8_t **data, const uint8_t *udp)
 }
 
 int
-valid_udp_packet(const uint8_t *data)
+valid_udp_packet(const uint8_t *data, size_t data_len)
 {
 	struct udp_dhcp_packet packet;
 	uint16_t bytes, udpsum;
 
-	memcpy(&packet, data, sizeof(packet));
+	if (data_len > sizeof(packet)) {
+		errno = EINVAL;
+		return -1;
+	}
+	memcpy(&packet, data, data_len);
 	if (checksum(&packet.ip, sizeof(packet.ip)) != 0) {
 		errno = EINVAL;
 		return -1;
 	}
 
 	bytes = ntohs(packet.ip.ip_len);
+	if (data_len < bytes) {
+		errno = EINVAL;
+		return -1;
+	}
 	udpsum = packet.udp.uh_sum;
 	packet.udp.uh_sum = 0;
 	packet.ip.ip_hl = 0;
@@ -668,4 +676,3 @@ valid_udp_packet(const uint8_t *data)
 
 	return 0;
 }
-
