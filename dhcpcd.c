@@ -770,6 +770,7 @@ handle_carrier(const char *ifname)
 					configure_interface(iface, margc, margv);
 				}
 			}
+			iface->state->interval = 0;
 			iface->state->reason = "CARRIER";
 			run_script(iface);
 			start_interface(iface);
