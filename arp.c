@@ -193,8 +193,9 @@ send_arp_announce(void *arg)
 	}
 	if (IN_LINKLOCAL(htonl(state->new->yiaddr))) {
 		/* We should pretend to be at the end
-		 * of the DHCP negotation cycle */
-		state->interval = 64;
+		 * of the DHCP negotation cycle unless we rebooted */
+		if (state->interval != 0)
+			state->interval = 64;
 		state->probes = 0;
 		state->claims = 0;
 		tv.tv_sec = state->interval - DHCP_RAND_MIN;

@@ -364,9 +364,9 @@ start_expire(void *arg)
 {
 	struct interface *iface = arg;
 
+	iface->state->interval = 0;
 	if (iface->addr.s_addr == 0) {
 		/* We failed to reboot, so enter discovery. */
-		iface->state->interval = 0;
 		start_discover(iface);
 		return;
 	}
@@ -375,7 +375,6 @@ start_expire(void *arg)
 	delete_timeout(NULL, iface);
 	drop_config(iface, "EXPIRE");
 	unlink(iface->leasefile);
-	iface->state->interval = 0;
 	if (iface->carrier != LINK_DOWN)
 		start_interface(iface);
 }
