@@ -80,7 +80,7 @@ inet_cidrtoaddr(int cidr, struct in_addr *addr)
 {
 	int ocets;
 
-	if (cidr < 0 || cidr > 32) {
+	if (cidr < 1 || cidr > 32) {
 		errno = EINVAL;
 		return -1;
 	}
