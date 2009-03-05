@@ -137,7 +137,7 @@ bind_interface(void *arg)
 		syslog(LOG_INFO, "%s: using static address %s",
 		    iface->name, inet_ntoa(lease->addr));
 		lease->leasetime = ~0U;
-		lease->net.s_addr = ifo->request_netmask.s_addr;
+		lease->net.s_addr = ifo->req_mask.s_addr;
 		state->reason = "STATIC";
 	} else if (IN_LINKLOCAL(htonl(state->new->yiaddr))) {
 		syslog(LOG_INFO, "%s: using IPv4LL address %s",
@@ -145,8 +145,8 @@ bind_interface(void *arg)
 		lease->leasetime = ~0U;
 		state->reason = "IPV4LL";
 	} else if (ifo->options & DHCPCD_INFORM) {
-		if (ifo->request_address.s_addr != 0)
-			lease->addr.s_addr = ifo->request_address.s_addr;
+		if (ifo->req_addr.s_addr != 0)
+			lease->addr.s_addr = ifo->req_addr.s_addr;
 		else
 			lease->addr.s_addr = iface->addr.s_addr;
 		syslog(LOG_INFO, "%s: received approval for %s", iface->name,

@@ -82,8 +82,8 @@ struct if_options {
 	time_t reboot;
 	int options;
 
-	struct in_addr request_address;
-	struct in_addr request_netmask;
+	struct in_addr req_addr;
+	struct in_addr req_mask;
 	struct rt *routes;
 	char **config;
 

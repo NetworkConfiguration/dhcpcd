@@ -271,8 +271,13 @@ parse_addr(struct in_addr *addr, struct in_addr *net, const char *arg)
 	char *p;
 	int i;
 
-	if (arg == NULL || *arg == '\0')
+	if (arg == NULL || *arg == '\0') {
+		if (addr != NULL)
+			addr->s_addr = 0;
+		if (net != NULL)
+			net->s_addr = 0;
 		return 0;
+	}
 	if ((p = strchr(arg, '/')) != NULL) {
 		*p++ = '\0';
 		if (net != NULL &&
@@ -282,13 +287,16 @@ parse_addr(struct in_addr *addr, struct in_addr *net, const char *arg)
 			syslog(LOG_ERR, "`%s' is not a valid CIDR", p);
 			return -1;
 		}
-	}
+	} 
+
 	if (addr != NULL && inet_aton(arg, addr) == 0) {
 		syslog(LOG_ERR, "`%s' is not a valid IP address", arg);
 		return -1;
 	}
-	if (p)
+	if (p != NULL)
 		*--p = '/';
+	else if (net != NULL)
+		net->s_addr = get_netmask(addr->s_addr);
 	return 0;
 }
 
@@ -382,22 +390,23 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	case 'q':
 		ifo->options |= DHCPCD_QUIET;
 		break;
+	case 'r':
+		ifo->options |= DHCPCD_REQUEST;
+		if (parse_addr(&ifo->req_addr, NULL, arg) != 0)
+			return -1;
+		ifo->req_mask.s_addr = 0;
+		break;
 	case 's':
 		ifo->options |= DHCPCD_INFORM | DHCPCD_PERSISTENT;
 		ifo->options &= ~DHCPCD_ARP;
-		if (!arg || *arg == '\0') {
-			ifo->request_address.s_addr = 0;
-		} else {
-			if (parse_addr(&ifo->request_address,
-				&ifo->request_netmask,
+		if (arg && *arg != '\0') {
+			if (parse_addr(&ifo->req_addr, &ifo->req_mask,
 				arg) != 0)
 				return -1;
+		} else {
+			ifo->req_addr.s_addr = 0;
+			ifo->req_mask.s_addr = 0;
 		}
-		break;
-	case 'r':
-		ifo->options |= DHCPCD_REQUEST;
-		if (parse_addr(&ifo->request_address, NULL, arg) != 0)
-			return -1;
 		break;
 	case 't':
 		ifo->timeout = atoint(arg);
@@ -559,8 +568,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		}
 		p++;
 		if (strncmp(arg, "ip_address=", strlen("ip_address=")) == 0) {
-			if (parse_addr(&ifo->request_address,
-				&ifo->request_netmask, p) != 0)
+			if (parse_addr(&ifo->req_addr, &ifo->req_mask, p) != 0)
 				return -1;
 
 			ifo->options |= DHCPCD_STATIC;

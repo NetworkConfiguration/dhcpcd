@@ -437,7 +437,7 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 		if (get_option_addr(&addr.s_addr, dhcp, DHO_SERVERID) != 0)
 			addr.s_addr = 0;
 		for (i = 0; i < ifo->blacklist_len; i += 2) {
-		if (ifo->blacklist[i] ==
+			if (ifo->blacklist[i] ==
 			    (addr.s_addr & ifo->blacklist[i + 1]))
 			{
 				if (dhcp->servername[0])
@@ -832,6 +832,49 @@ start_timeout(void *arg)
 	start_discover(iface);
 }
 
+static struct dhcp_message *
+dhcp_message_new(struct in_addr *addr, struct in_addr *mask)
+{
+	struct dhcp_message *dhcp;
+	uint8_t *p;
+
+	dhcp = xzalloc(sizeof(*dhcp));
+	dhcp->yiaddr = addr->s_addr;
+	p = dhcp->options;
+	if (mask && mask->s_addr != INADDR_ANY) {
+		*p++ = DHO_SUBNETMASK;
+		*p++ = sizeof(mask->s_addr);
+		memcpy(p, &mask->s_addr, sizeof(mask->s_addr));
+	}
+	*p++ = DHO_END;
+	return dhcp;
+}
+
+static void
+start_static(struct interface *iface)
+{
+	struct if_options *ifo = iface->state->options;
+
+	iface->state->offer = dhcp_message_new(&ifo->req_addr, &ifo->req_mask);
+	delete_timeout(NULL, iface);
+	bind_interface(iface);
+}
+
+static void
+start_inform(struct interface *iface)
+{
+	struct if_options *ifo = iface->state->options;
+
+	ifo->options |= DHCPCD_STATIC;
+	start_static(iface);
+	ifo->options &= ~DHCPCD_STATIC;
+
+	iface->state->state = DHS_INFORM;
+	iface->state->xid = arc4random();
+	open_sockets(iface);
+	send_inform(iface);
+}
+
 void
 start_reboot(struct interface *iface)
 {
@@ -839,6 +882,10 @@ start_reboot(struct interface *iface)
 
 	if (ifo->options & DHCPCD_LINK && iface->carrier == LINK_DOWN) {
 		syslog(LOG_INFO, "%s: waiting for carrier", iface->name);
+		return;
+	}
+	if (ifo->options & DHCPCD_STATIC) {
+		start_static(iface);
 		return;
 	}
 	if (ifo->reboot == 0) {
@@ -866,7 +913,8 @@ start_reboot(struct interface *iface)
 	delete_timeout(NULL, iface);
 	if (ifo->options & DHCPCD_LASTLEASE && iface->state->lease.frominfo)
 		add_timeout_sec(ifo->reboot, start_timeout, iface);
-	else
+	else if (!(ifo->options & DHCPCD_INFORM &&
+		options & (DHCPCD_MASTER | DHCPCD_DAEMONISED)))
 		add_timeout_sec(ifo->reboot, start_expire, iface);
 	open_sockets(iface);
 	/* Don't bother ARP checking as the server could NAK us first. */
@@ -874,28 +922,6 @@ start_reboot(struct interface *iface)
 		send_inform(iface);
 	else
 		send_request(iface);
-}
-
-static void
-start_static(struct interface *iface)
-{
-	struct dhcp_message *dhcp;
-	struct if_options *ifo = iface->state->options;
-	uint8_t *p;
-	uint32_t u32;
-
-	dhcp = xzalloc(sizeof(*dhcp));
-	dhcp->yiaddr = ifo->request_address.s_addr;
-	p = dhcp->options;
-	*p++ = DHO_SUBNETMASK;
-	*p++ = sizeof(u32);
-	u32 = ifo->request_netmask.s_addr;
-	memcpy(p, &u32, sizeof(u32));
-	*p++ = DHO_END;
-
-	iface->state->offer = dhcp;
-	delete_timeout(NULL, iface);
-	bind_interface(iface);
 }
 
 void
@@ -924,27 +950,24 @@ start_interface(void *arg)
 		start_static(iface);
 		return;
 	}
-	if (ifo->request_address.s_addr) {
-		/* This also changes netmask */
-		if (iface->state->options->options & DHCPCD_INFORM &&
-		    !has_address(iface->name, &ifo->request_address,
-			&ifo->request_netmask))
-		{
-			syslog(LOG_DEBUG, "%s: adding IP address %s/%d",
-			    iface->name, inet_ntoa(ifo->request_address),
-			    inet_ntocidr(ifo->request_netmask));
-			if (add_address(iface, &ifo->request_address,
-				&ifo->request_netmask, NULL) == -1 &&
-			    errno != EEXIST)
-			{
-				syslog(LOG_ERR, "add_address: %m");
-			}
-		}
-		iface->state->offer = xzalloc(sizeof(*iface->state->offer));
-		iface->state->offer->yiaddr = ifo->request_address.s_addr;
-		*iface->state->offer->options = DHO_END;
+	if (ifo->options & DHCPCD_INFORM) {
+		start_inform(iface);
+		return;
+	}
+	if (ifo->req_addr.s_addr) {
+		iface->state->offer = dhcp_message_new(&ifo->req_addr,
+		    &ifo->req_mask);
 		if (ifo->options & DHCPCD_REQUEST)
-			ifo->request_address.s_addr = 0;
+			ifo->req_addr.s_addr = 0;
+		else {
+			iface->state->reason = "STATIC";
+			iface->state->new = iface->state->offer;
+			iface->state->offer = NULL;
+			get_lease(&iface->state->lease, iface->state->new);
+			configure(iface);
+			start_inform(iface);
+			return;
+		}
 	} else
 		iface->state->offer = read_lease(iface);
 	if (iface->state->offer) {
@@ -1131,6 +1154,30 @@ handle_signal(_unused void *arg)
 	exit(EXIT_FAILURE);
 }
 
+static void
+reconf_reboot(struct interface *iface, int argc, char **argv)
+{
+	const struct if_options *ifo;
+	int opt;
+	
+	ifo = iface->state->options;
+	opt = ifo->options;
+	configure_interface(iface, argc, argv);
+	ifo = iface->state->options;
+	iface->state->interval = 0;
+	if ((ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC) &&
+		iface->addr.s_addr != ifo->req_addr.s_addr) ||
+	    (opt & (DHCPCD_INFORM | DHCPCD_STATIC) &&
+		!(ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC))))
+	{
+		drop_config(iface, "EXPIRE");
+	} else {
+		free(iface->state->offer);
+		iface->state->offer = NULL;
+	}
+	start_interface(iface);
+}
+
 int
 handle_args(struct fd_list *fd, int argc, char **argv)
 {
@@ -1256,11 +1303,9 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 				ifl = ifn;
 			}
 			if (ifn) {
-				if (do_reboot) {
-					configure_interface(ifn, argc, argv);
-					start_reboot(ifn);
-				}
-				free(ifp);
+				if (do_reboot)
+					reconf_reboot(ifn, argc, argv);
+				free_interface(ifp);
 			} else {
 				ifp->next = NULL;
 				init_state(ifp, argc, argv);
