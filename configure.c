@@ -481,7 +481,7 @@ get_subnet_route(struct dhcp_message *dhcp)
 	/* Ensure we have all the needed values */
 	if (get_option_addr(&net, dhcp, DHO_SUBNETMASK) == -1)
 		net = get_netmask(addr);
-	if (net == INADDR_BROADCAST)
+	if (net == INADDR_BROADCAST || net == INADDR_ANY)
 		return NULL;
 	rt = malloc(sizeof(*rt));
 	rt->dest.s_addr = addr & net;
@@ -495,8 +495,8 @@ add_subnet_route(struct rt *rt, const struct interface *iface)
 {
 	struct rt *r;
 
-	/* We don't have subnet routes with host masks */
-	if (iface->net.s_addr == INADDR_BROADCAST)
+	if (iface->net.s_addr == INADDR_BROADCAST ||
+	    iface->net.s_addr == INADDR_ANY)
 		return rt;
 	
 	r = xmalloc(sizeof(*r));
@@ -509,13 +509,15 @@ add_subnet_route(struct rt *rt, const struct interface *iface)
 
 static struct rt *
 get_routes(const struct interface *iface) {
-	struct rt *rt, *nrt, *r = NULL;
+	struct rt *rt, *nrt = NULL, *r = NULL;
 
 	if (iface->state->options->routes != NULL) {
 		for (rt = iface->state->options->routes;
 		     rt != NULL;
 		     rt = rt->next)
 		{
+			if (rt->gate.s_addr == 0)
+				break;
 			if (r == NULL)
 				r = nrt = xmalloc(sizeof(*r));
 			else {
