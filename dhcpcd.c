@@ -411,6 +411,17 @@ log_dhcp(int lvl, const char *msg,
 	free(a);
 }
 
+static int
+blacklisted_ip(const struct if_options *ifo, in_addr_t addr)
+{
+	size_t i;
+	
+	for (i = 0; i < ifo->blacklist_len; i += 2)
+		if (ifo->blacklist[i] == (addr & ifo->blacklist[i + 1]))
+			return 1;
+	return 0;
+}
+
 static void
 handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 {
@@ -419,9 +430,8 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 	struct dhcp_message *dhcp = *dhcpp;
 	struct dhcp_lease *lease = &state->lease;
 	uint8_t type, tmp;
-	struct in_addr addr, addr2;
+	struct in_addr addr;
 	size_t i;
-	char *a;
 
 	/* reset the message counter */
 	state->interval = 0;
@@ -429,52 +439,6 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 	/* We may have found a BOOTP server */
 	if (get_option_uint8(&type, dhcp, DHO_MESSAGETYPE) == -1) 
 		type = 0;
-
-	/* Ensure that it's not from a blacklisted server.
-	 * We should expand this to check IP and/or hardware address
-	 * at the packet level. */
-	if (ifo->blacklist_len != 0) {
-		if (get_option_addr(&addr.s_addr, dhcp, DHO_SERVERID) != 0)
-			addr.s_addr = 0;
-		for (i = 0; i < ifo->blacklist_len; i += 2) {
-			if (ifo->blacklist[i] ==
-			    (addr.s_addr & ifo->blacklist[i + 1]))
-			{
-				if (dhcp->servername[0])
-					syslog(LOG_WARNING,
-					    "%s: blacklisted server %s `%s'",
-					    iface->name,
-					    inet_ntoa(addr), dhcp->servername);
-				else
-					syslog(LOG_WARNING,
-					    "%s: blacklisted server %s",
-					    iface->name, inet_ntoa(addr));
-				return;
-			}
-			if (ifo->blacklist[i] ==
-			    (dhcp->yiaddr & ifo->blacklist[i + 1]))
-			{
-				addr2.s_addr = dhcp->yiaddr;
-				a = xstrdup(inet_ntoa(addr2));
-				if (dhcp->servername[0])
-					syslog(LOG_WARNING,
-					    "%s: blacklisted offer"
-					    " %s from %s `%s'",
-					    iface->name, a,
-					    inet_ntoa(addr), dhcp->servername);
-				else if (addr.s_addr)
-					syslog(LOG_WARNING,
-					    "%s: blacklisted offer %s from %s",
-					    iface->name, a, inet_ntoa(addr));
-				else
-					syslog(LOG_WARNING,
-					    "%s: blacklisted offer %s",
-					    iface->name, a);
-				free(a);
-				return;
-			}
-		}
-	}
 
 	/* We should restart on a NAK */
 	if (type == DHCP_NAK) {
@@ -514,7 +478,8 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 		lease->addr.s_addr = dhcp->yiaddr;
 		lease->server.s_addr = 0;
 		if (type)
-			get_option_addr(&lease->server.s_addr, dhcp, DHO_SERVERID);
+			get_option_addr(&lease->server.s_addr, dhcp,
+			    DHO_SERVERID);
 		log_dhcp(LOG_INFO, "offered", iface, dhcp);
 		free(state->offer);
 		state->offer = dhcp;
@@ -595,6 +560,7 @@ handle_dhcp_packet(void *arg)
 	struct dhcp_message *dhcp = NULL;
 	const uint8_t *pp;
 	ssize_t bytes;
+	struct in_addr from;
 
 	/* We loop through until our buffer is empty.
 	 * The benefit is that if we get >1 DHCP packet in our buffer and
@@ -605,35 +571,45 @@ handle_dhcp_packet(void *arg)
 		    packet, udp_dhcp_len);
 		if (bytes == 0 || bytes == -1)
 			break;
-		if (valid_udp_packet(packet, bytes) == -1)
+		if (valid_udp_packet(packet, bytes, &from) == -1) {
+			syslog(LOG_ERR, "%s: invalid UDP packet from %s",
+			    iface->name, inet_ntoa(from));
 			continue;
+		}
+		if (blacklisted_ip(iface->state->options, from.s_addr)) {
+			syslog(LOG_WARNING,
+			    "%s: blacklisted DHCP packet from %s",
+			    iface->name, inet_ntoa(from));
+			continue;
+		}
 		bytes = get_udp_data(&pp, packet);
 		if ((size_t)bytes > sizeof(*dhcp)) {
-			syslog(LOG_ERR, "%s: packet greater than DHCP size",
-			    iface->name);
+			syslog(LOG_ERR,
+			    "%s: packet greater than DHCP size from %s",
+			    iface->name, inet_ntoa(from));
 			continue;
 		}
 		if (!dhcp)
 			dhcp = xzalloc(sizeof(*dhcp));
 		memcpy(dhcp, pp, bytes);
 		if (dhcp->cookie != htonl(MAGIC_COOKIE)) {
-			syslog(LOG_DEBUG, "%s: bogus cookie, ignoring",
-			    iface->name);
+			syslog(LOG_DEBUG, "%s: bogus cookie from %s",
+			    iface->name, inet_ntoa(from));
 			continue;
 		}
 		/* Ensure it's the right transaction */
 		if (iface->state->xid != dhcp->xid) {
 			syslog(LOG_DEBUG,
-			    "%s: ignoring packet with xid 0x%x as"
-			    " it's not ours (0x%x)",
-			    iface->name, dhcp->xid, iface->state->xid);
+			    "%s: wrong xid 0x%x (expecting 0x%x) from %s",
+			    iface->name, dhcp->xid, iface->state->xid,
+			    inet_ntoa(from));
 			continue;
 		}
 		/* Ensure packet is for us */
 		if (iface->hwlen <= sizeof(dhcp->chaddr) &&
 		    memcmp(dhcp->chaddr, iface->hwaddr, iface->hwlen))
 		{
-			syslog(LOG_DEBUG, "%s: xid 0x%x is not for our hwaddr %s",
+			syslog(LOG_DEBUG, "%s: xid 0x%x is not for hwaddr %s",
 			    iface->name, dhcp->xid,
 			    hwaddr_ntoa(dhcp->chaddr, sizeof(dhcp->chaddr)));
 			continue;

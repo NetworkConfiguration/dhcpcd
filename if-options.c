@@ -634,9 +634,10 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		}
 		break;
 	case 'X':
-		addr2.s_addr = ~0U;
 		if (parse_addr(&addr, &addr2, arg) != 0)
 			return -1;
+		if (strchr(arg, '/') == NULL)
+			addr2.s_addr = INADDR_BROADCAST;
 		ifo->blacklist = xrealloc(ifo->blacklist,
 		    sizeof(in_addr_t) * (ifo->blacklist_len + 2));
 		ifo->blacklist[ifo->blacklist_len++] = addr.s_addr;

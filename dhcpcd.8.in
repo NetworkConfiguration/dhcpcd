@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd February 27, 2009
+.Dd March 10, 2009
 .Dt DHCPCD 8 SMM
 .Sh NAME
 .Nm dhcpcd
@@ -452,15 +452,8 @@ files.
 Display a list of option codes and the associated variable for use in
 .Xr dhcpcd-run-hooks 8 .
 .It Fl X, -blacklist Ar address Ns Op Ar /cidr
-Ignores all DHCP messages which have this
-.Ar address
-as the server ID or offered address.
-If
-.Ar cidr
-is given then we match against that network as well.
-This may be expanded in future releases to ignore all packets
-matching either the IP or hardware
-.Ar address .
+Ignore all packets from
+.Ar address Ns Op Ar /cidr .
 .It Fl Z , -denyinterfaces Ar pattern
 When discovering interfaces, the interface name must not match
 .Ar pattern

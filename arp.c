@@ -40,7 +40,7 @@
 #include "ipv4ll.h"
 #include "net.h"
 
-#define ARP_LEN								\
+#define ARP_LEN								      \
 	(sizeof(struct arphdr) + (2 * sizeof(uint32_t)) + (2 * HWADDR_LEN))
 
 static int
@@ -140,7 +140,7 @@ handle_arp_packet(void *arg)
 		memcpy(&reply_t, hw_t + ar.ar_hln, ar.ar_pln);
 
 		/* Check for conflict */
-		if (state->offer && 
+		if (state->offer &&
 		    (reply_s == state->offer->yiaddr ||
 			(reply_s == 0 && reply_t == state->offer->yiaddr)))
 			state->fail.s_addr = state->offer->yiaddr;
