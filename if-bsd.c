@@ -256,43 +256,6 @@ if_route(const struct interface *iface, const struct in_addr *dest,
 }
 
 int
-arp_flush(void)
-{
-	int mib[6], retval = 0;
-	size_t buffer_len = 0;
-	char *buffer, *e, *p;
-	struct rt_msghdr *rtm;
-
-	mib[0] = CTL_NET;
-	mib[1] = PF_ROUTE;
-	mib[2] = 0;
-	mib[3] = AF_INET;
-	mib[4] = NET_RT_FLAGS;
-	mib[5] = RTF_LLINFO;
-	if (sysctl(mib, 6, NULL, &buffer_len, NULL, 0) == -1)
-		return -1;
-	if (buffer_len == 0)
-		return 0;
-	buffer = xmalloc(buffer_len);
-	if (sysctl(mib, 6, buffer, &buffer_len, NULL, 0) == -1)
-		return -1;
-	e = buffer + buffer_len;
-	for (p = buffer; p < e; p += rtm->rtm_msglen) {
-		rtm = (struct rt_msghdr *)(void *)p;
-		/* Don't delete manually added entries. */
-		if (rtm->rtm_flags & RTF_STATIC)
-			continue;
-		rtm->rtm_type = RTM_DELETE;
-		if (write(r_fd, rtm, rtm->rtm_msglen) == -1) {
-			retval = -1;
-			break;
-		}
-	}
-	free(buffer);
-	return retval;
-}
-
-int
 open_link_socket(void)
 {
 	int fd;

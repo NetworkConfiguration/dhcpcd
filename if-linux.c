@@ -472,13 +472,6 @@ if_route(const struct interface *iface,
 	return retval;
 }
 
-/* No need to explicity flush arp on Linux */
-int
-arp_flush(void)
-{
-	return 0;
-}
-
 struct interface *
 discover_interfaces(int argc, char * const *argv)
 {

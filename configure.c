@@ -446,8 +446,9 @@ c_route(struct rt *ort, struct rt *nrt, const struct interface *iface)
 		return -1;
 
 	desc_route("changing", nrt, iface->name);
-	/* We don't call change_route because it doesn't work when something
-	 * has already used it. */
+	/* We delete and add the route so that we can change metric.
+	 * This also has the nice side effect of flushing ARP entries so
+	 * we don't have to do that manually. */
 	del_route(ort->iface, &ort->dest, &ort->net, &ort->gate,
 	    ort->iface->metric);
 	if (!add_route(iface, &nrt->dest, &nrt->net, &nrt->gate,
@@ -658,8 +659,6 @@ configure(struct interface *iface)
 	}
 
 	build_routes();
-	if (arp_flush() == -1)
-		syslog(LOG_ERR, "arp_flush: %m");
 	if (!iface->state->lease.frominfo &&
 	    !(iface->state->options->options & DHCPCD_INFORM))
 		if (write_lease(iface, dhcp) == -1)
