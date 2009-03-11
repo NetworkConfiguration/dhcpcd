@@ -24,6 +24,7 @@
 .\"
 .Dd November 18, 2008
 .Dt DHCPCD 8 SMM
+.Os
 .Sh NAME
 .Nm dhcpcd
 .Nd an RFC 2131 compliant DHCP client
