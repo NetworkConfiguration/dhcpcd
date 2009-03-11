@@ -24,6 +24,7 @@
 .\"
 .Dd January 15, 2009
 .Dt DHCPCD.SH 8 SMM
+.Os
 .Sh NAME
 .Nm dhcpcd-run-hooks
 .Nd DHCP client configuration script 
