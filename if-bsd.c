@@ -38,7 +38,11 @@
 #include <net/if_types.h>
 #include <net/route.h>
 #include <netinet/in.h>
-#include <net80211/ieee80211_ioctl.h>
+#ifdef __DragonFly__
+#  include <netproto/802_11/ieee80211_ioctl.h>
+#else
+#  include <net80211/ieee80211_ioctl.h>
+#endif
 
 #include <errno.h>
 #include <fnmatch.h>
