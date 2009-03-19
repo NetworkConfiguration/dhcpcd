@@ -59,7 +59,6 @@ const char copyright[] = "Copyright (c) 2006-2009 Roy Marples";
 #include "configure.h"
 #include "control.h"
 #include "dhcpcd.h"
-#include "dhcpf.h"
 #include "duid.h"
 #include "eloop.h"
 #include "if-options.h"

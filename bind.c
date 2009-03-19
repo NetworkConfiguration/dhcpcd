@@ -40,7 +40,6 @@
 #include "common.h"
 #include "configure.h"
 #include "dhcpcd.h"
-#include "dhcpf.h"
 #include "eloop.h"
 #include "if-options.h"
 #include "net.h"

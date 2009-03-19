@@ -42,7 +42,6 @@
 #include "config.h"
 #include "common.h"
 #include "configure.h"
-#include "dhcpf.h"
 #include "if-options.h"
 #include "if-pref.h"
 #include "net.h"

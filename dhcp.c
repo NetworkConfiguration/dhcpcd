@@ -35,7 +35,6 @@
 #include "config.h"
 #include "common.h"
 #include "dhcp.h"
-#include "dhcpf.h"
 
 #define REQUEST	(1 << 0)
 #define UINT8	(1 << 1)
