@@ -63,10 +63,6 @@
 
 #define BUFFERLEN 256
 
-static void (*nl_carrier)(const char *);
-static void (*nl_add)(const char *);
-static void (*nl_remove)(const char *);
-
 static int sock_fd;
 static struct sockaddr_nl sock_nl;
 
@@ -253,30 +249,17 @@ link_netlink(struct nlmsghdr *nlm)
 		}
 		rta = RTA_NEXT(rta, len);
 	}
-	if (nlm->nlmsg_type == RTM_NEWLINK) {
-		if (ifi->ifi_change == ~0U) {
-			if (nl_add)
-				nl_add(ifn);
-		} else {
-			if (nl_carrier)
-				nl_carrier(ifn);
-		}
-	} else {
-		if (nl_remove)
-			nl_remove(ifn);
-	}
+	if (nlm->nlmsg_type == RTM_NEWLINK)
+		len = ifi->ifi_change == ~0U ? 1 : 0;
+	else
+		len = -1;
+	handle_interface(len, ifn);
 	return 1;
 }
 
 int
-manage_link(int fd,
-    void (*if_carrier)(const char *),
-    void (*if_add)(const char *),
-    void (*if_remove)(const char *))
+manage_link(int fd)
 {
-	nl_carrier = if_carrier;
-	nl_add = if_add;
-	nl_remove = if_remove;
 	return get_netlink(fd, MSG_DONTWAIT, &link_netlink);
 }
 

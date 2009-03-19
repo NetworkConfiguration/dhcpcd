@@ -35,6 +35,10 @@ const char copyright[] = "Copyright (c) 2006-2009 Roy Marples";
 #include <arpa/inet.h>
 #include <net/route.h>
 
+#ifdef __linux__
+#  include <linux/rtnetlink.h>
+#endif
+
 #include <ctype.h>
 #include <errno.h>
 #include <getopt.h>
