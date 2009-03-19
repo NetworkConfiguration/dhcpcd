@@ -78,6 +78,7 @@ const struct option cf_options[] = {
 	{"clientid",        optional_argument, NULL, 'I'},
 	{"nolink",          no_argument,       NULL, 'K'},
 	{"noipv4ll",        no_argument,       NULL, 'L'},
+	{"destination",     required_argument, NULL, 'N'},
 	{"nooption",        optional_argument, NULL, 'O'},
 	{"require",         required_argument, NULL, 'Q'},
 	{"static",          required_argument, NULL, 'S'},
@@ -543,6 +544,16 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	case 'L':
 		ifo->options &= ~DHCPCD_IPV4LL;
 		break;
+	case 'N':
+		if (make_option_mask(ifo->dstmask, arg, 2) != 0) {
+			if (errno == EINVAL)
+				syslog(LOG_ERR, "option `%s' does not take"
+				    " an IPv4 address", arg);
+			else
+				syslog(LOG_ERR, "unknown otpion `%s'", arg);
+			return -1;
+		}
+		break;
 	case 'O':
 		if (make_option_mask(ifo->requestmask, arg, -1) != 0 ||
 		    make_option_mask(ifo->requiremask, arg, -1) != 0 ||
@@ -608,8 +619,8 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 				rt->next = xmalloc(sizeof(*rt));
 				rt = rt->next;
 			}
-			rt->dest.s_addr = 0;
-			rt->net.s_addr = 0;
+			rt->dest.s_addr = INADDR_ANY;
+			rt->net.s_addr = INADDR_ANY;
 			rt->next = NULL;
 			if (parse_addr(&rt->gate, NULL, p) == -1)
 				return -1;

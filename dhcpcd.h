@@ -82,6 +82,7 @@ struct interface {
 	char name[IF_NAMESIZE];
 	struct if_state *state;
 
+	int flags;
 	sa_family_t family;
 	unsigned char hwaddr[HWADDR_LEN];
 	size_t hwlen;
@@ -118,6 +119,9 @@ extern struct interface *ifaces;
 
 struct interface *find_interface(const char *);
 int handle_args(struct fd_list *, int, char **);
+void handle_interface(int, const char *);
+void handle_ifa(int, const char *,
+    struct in_addr *, struct in_addr *, struct in_addr *);
 void handle_exit_timeout(void *);
 void start_interface(void *);
 void start_discover(void *);

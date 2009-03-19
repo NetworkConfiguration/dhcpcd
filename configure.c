@@ -497,9 +497,12 @@ add_subnet_route(struct rt *rt, const struct interface *iface)
 	struct rt *r;
 
 	if (iface->net.s_addr == INADDR_BROADCAST ||
-	    iface->net.s_addr == INADDR_ANY)
+	    iface->net.s_addr == INADDR_ANY ||
+	    (iface->state->options->options &
+	     (DHCPCD_INFORM | DHCPCD_STATIC) &&
+	     iface->state->options->req_addr.s_addr == INADDR_ANY))
 		return rt;
-	
+
 	r = xmalloc(sizeof(*r));
 	r->dest.s_addr = iface->addr.s_addr & iface->net.s_addr;
 	r->net.s_addr = iface->net.s_addr;
@@ -534,8 +537,8 @@ get_routes(const struct interface *iface) {
 	return get_option_routes(iface->state->new);
 }
 
-static void
-build_routes()
+void
+build_routes(void)
 {
 	struct rt *nrs = NULL, *dnr, *or, *rt, *rtn, *rtl, *lrt = NULL;
 	const struct interface *ifp;
@@ -591,7 +594,12 @@ static int
 delete_address(struct interface *iface)
 {
 	int retval;
+	struct if_options *ifo;
 
+	ifo = iface->state->options;
+	if (ifo->options & DHCPCD_INFORM ||
+	    (ifo->options & DHCPCD_STATIC && ifo->req_addr.s_addr == 0))
+		return 0;
 	syslog(LOG_DEBUG, "%s: deleting IP address %s/%d",
 	    iface->name,
 	    inet_ntoa(iface->addr),
@@ -616,10 +624,9 @@ configure(struct interface *iface)
 	sort_interfaces();
 
 	if (dhcp == NULL) {
-		if (iface->addr.s_addr != 0) {
-			build_routes();
+		build_routes();
+		if (iface->addr.s_addr != 0)
 			delete_address(iface);
-		}
 		run_script(iface);
 		return 0;
 	}

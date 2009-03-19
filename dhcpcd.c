@@ -33,6 +33,7 @@ const char copyright[] = "Copyright (c) 2006-2009 Roy Marples";
 #include <sys/uio.h>
 
 #include <arpa/inet.h>
+#include <net/route.h>
 
 #include <ctype.h>
 #include <errno.h>
@@ -663,7 +664,11 @@ configure_interface(struct interface *iface, int argc, char **argv)
 	free_options(ifs->options);
 	ifo = ifs->options = read_config(cffile, iface->name, iface->ssid);
 	add_options(ifo, argc, argv);
-
+	if (iface->flags & IFF_NOARP)
+		ifo->options &= ~(DHCPCD_ARP | DHCPCD_IPV4LL);
+	if (ifo->options & DHCPCD_LINK && carrier_status(iface->name) == -1)
+		ifo->options &= ~DHCPCD_LINK;
+	
 	if (ifo->metric != -1)
 		iface->metric = ifo->metric;
 
@@ -821,17 +826,44 @@ dhcp_message_new(struct in_addr *addr, struct in_addr *mask)
 		*p++ = DHO_SUBNETMASK;
 		*p++ = sizeof(mask->s_addr);
 		memcpy(p, &mask->s_addr, sizeof(mask->s_addr));
+		p+= sizeof(mask->s_addr);
 	}
 	*p++ = DHO_END;
 	return dhcp;
 }
 
+static int
+handle_3rdparty(struct interface *iface)
+{
+	struct if_options *ifo;
+	struct in_addr addr, net, dst;
+	
+	ifo = iface->state->options;
+	if (ifo->req_addr.s_addr != INADDR_ANY)
+		return 0;
+
+	if (get_address(iface->name, &addr, &net, &dst) == 1)
+		handle_ifa(RTM_NEWADDR, iface->name, &addr, &net, &dst);
+	else {
+		syslog(LOG_INFO,
+			"%s: waiting for 3rd party to configure IP address",
+			iface->name);
+		iface->state->reason = "3RDPARTY";
+		run_script(iface);
+	}
+	return 1;
+}
+
 static void
 start_static(struct interface *iface)
 {
-	struct if_options *ifo = iface->state->options;
+	struct if_options *ifo;
 
-	iface->state->offer = dhcp_message_new(&ifo->req_addr, &ifo->req_mask);
+	if (handle_3rdparty(iface))
+		return;
+	ifo = iface->state->options;
+	iface->state->offer =
+	    dhcp_message_new(&ifo->req_addr, &ifo->req_mask);
 	delete_timeout(NULL, iface);
 	bind_interface(iface);
 }
@@ -839,11 +871,12 @@ start_static(struct interface *iface)
 static void
 start_inform(struct interface *iface)
 {
-	struct if_options *ifo = iface->state->options;
+	if (handle_3rdparty(iface))
+		return;
 
-	ifo->options |= DHCPCD_STATIC;
+	iface->state->options->options |= DHCPCD_STATIC;
 	start_static(iface);
-	ifo->options &= ~DHCPCD_STATIC;
+	iface->state->options->options &= ~DHCPCD_STATIC;
 
 	iface->state->state = DHS_INFORM;
 	iface->state->xid = arc4random();
@@ -909,6 +942,7 @@ start_interface(void *arg)
 	struct timeval now;
 	uint32_t l;
 
+	handle_carrier(iface->name);
 	if (iface->carrier == LINK_DOWN) {
 		syslog(LOG_INFO, "%s: waiting for carrier", iface->name);
 		return;
@@ -930,9 +964,14 @@ start_interface(void *arg)
 		start_inform(iface);
 		return;
 	}
+	if (iface->hwlen == 0 && ifo->clientid[0] == '\0') {
+		syslog(LOG_WARNING, "%s: needs a clientid to configure",
+			iface->name);
+		return;
+	}
 	if (ifo->req_addr.s_addr) {
-		iface->state->offer = dhcp_message_new(&ifo->req_addr,
-		    &ifo->req_mask);
+		iface->state->offer =
+		    dhcp_message_new(&ifo->req_addr, &ifo->req_mask);
 		if (ifo->options & DHCPCD_REQUEST)
 			ifo->req_addr.s_addr = 0;
 		else {
@@ -1019,12 +1058,22 @@ init_state(struct interface *iface, int argc, char **argv)
 		iface->carrier = LINK_UNKNOWN;
 }
 
-static void
-handle_new_interface(const char *ifname)
+void
+handle_interface(int action, const char *ifname)
 {
 	struct interface *ifs, *ifp, *ifn, *ifl = NULL;
 	const char * const argv[] = { "dhcpcd", ifname };
 	int i;
+
+	if (action == -1) {
+		ifp = find_interface(ifname);
+		if (ifp != NULL)
+			stop_interface(ifp);
+		return;
+	} else if (action == 0) {
+		handle_carrier(ifname);
+		return;
+	}
 
 	/* If running off an interface list, check it's in it. */
 	if (ifc) {
@@ -1055,24 +1104,91 @@ handle_new_interface(const char *ifname)
 	}
 }
 
-static void
-handle_remove_interface(const char *ifname)
+static int
+dhcp_message_add_addr(struct dhcp_message *dhcp, char c, struct in_addr *addr)
 {
-	struct interface *iface;
+	uint8_t *p;
+	size_t len;
 
-	iface = find_interface(ifname);
-	if (iface != NULL)
-		stop_interface(iface);
+	p = dhcp->options;
+	while (*p != DHO_END) {
+		p++;
+		p += *p + 1;
+	}
+
+	len = p - (uint8_t *)dhcp;
+	if (len + 6 > sizeof(*dhcp)) {
+		errno = ENOMEM;
+		return -1;
+	}
+
+	*p++ = c;
+	*p++ = sizeof(addr->s_addr);
+	memcpy(p, &addr->s_addr, sizeof(addr->s_addr));
+	p += sizeof(addr->s_addr);
+	*p = DHO_END;
+	return 0;
+}
+
+void
+handle_ifa(int type, const char *ifname,
+    struct in_addr *addr, struct in_addr *net, struct in_addr *dst)
+{
+	struct interface *ifp;
+	struct if_options *ifo;
+	int i;
+
+	if (addr->s_addr == INADDR_ANY)
+		return;
+	for (ifp = ifaces; ifp; ifp = ifp->next)
+		if (strcmp(ifp->name, ifname) == 0)
+			break;
+	if (ifp == NULL)
+		return;
+	ifo = ifp->state->options;
+	if ((ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC)) == 0 ||
+	    ifo->req_addr.s_addr != INADDR_ANY)
+		return;
+	
+	switch (type) {
+	case RTM_DELADDR:
+		if (ifp->state->new &&
+		    ifp->state->new->yiaddr == addr->s_addr)
+			drop_config(ifp, "EXPIRE");
+		break;
+	case RTM_NEWADDR:
+		if (ifo->options & DHCPCD_INFORM) {
+			ifp->state->state = DHS_INFORM;
+			ifp->state->xid = arc4random();
+			ifp->addr = *addr;
+			ifp->net = *net;
+			ifp->state->lease.server = *dst;
+			open_sockets(ifp);
+			send_inform(ifp);
+		} else {
+			free(ifp->state->old);
+			ifp->state->old = ifp->state->new;
+			ifp->state->new = dhcp_message_new(addr, net);
+			if (dst) {
+				for (i = 1; i < 255; i++)
+					if (has_option_mask(ifo->dstmask, i))
+						dhcp_message_add_addr(
+							ifp->state->new,
+							i, dst);
+			}
+			ifp->state->reason = "STATIC";
+			build_routes();
+			run_script(ifp);
+		}
+		break;
+	}
 }
 
 /* ARGSUSED */
 static void
 handle_link(_unused void *arg)
 {
-	if (manage_link(linkfd,
-		handle_carrier,
-		handle_new_interface,
-		handle_remove_interface) == -1)
+	if (manage_link(linkfd))
 		syslog(LOG_ERR, "manage_link: %m");
 }
 

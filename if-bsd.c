@@ -60,17 +60,16 @@
 #include "if-options.h"
 #include "net.h"
 
-#define ROUNDUP(a)							\
+#define ROUNDUP(a)							      \
 	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
+#define ADVANCE(x, n) (x += ROUNDUP((n)->sa_len))
 
-/* Darwin doesn't define this for some very odd reason */
-#ifndef SA_SIZE
-# define SA_SIZE(sa)							\
-	(  (!(sa) || ((struct sockaddr *)(sa))->sa_len == 0) ?		\
-	    sizeof(long)		:				\
-	    1 + ( (((struct sockaddr *)(sa))->sa_len - 1) |		\
-		(sizeof(long) - 1) ) )
-#endif
+/* FIXME: Why do we need to check for sa_family 255 */
+#define COPYOUT(sin, sa)						      \
+	sin.s_addr = ((sa) != NULL && ((sa)->sa_family == AF_INET ||	      \
+		(sa)->sa_family == 255))				      \
+	    ?								      \
+	    (((struct sockaddr_in *)sa)->sin_addr).s_addr : 0
 
 static int a_fd = -1;
 static int r_fd = -1;
@@ -139,11 +138,11 @@ if_address(const struct interface *iface, const struct in_addr *address,
 	memset(&ifa, 0, sizeof(ifa));
 	strlcpy(ifa.ifra_name, iface->name, sizeof(ifa.ifra_name));
 
-#define ADDADDR(_var, _addr) {						\
-		_s.sa = &_var;						\
-		_s.sin->sin_family = AF_INET;				\
-		_s.sin->sin_len = sizeof(*_s.sin);			\
-		memcpy(&_s.sin->sin_addr, _addr, sizeof(_s.sin->sin_addr)); \
+#define ADDADDR(_var, _addr) {						      \
+		_s.sa = &_var;						      \
+		_s.sin->sin_family = AF_INET;				      \
+		_s.sin->sin_len = sizeof(*_s.sin);			      \
+		memcpy(&_s.sin->sin_addr, _addr, sizeof(_s.sin->sin_addr));   \
 	}
 
 	ADDADDR(ifa.ifra_addr, address);
@@ -184,17 +183,17 @@ if_route(const struct interface *iface, const struct in_addr *dest,
 	size_t l;
 	int retval = 0;
 
-#define ADDSU(_su) {							\
-		l = SA_SIZE(&(_su.sa));					\
-		memcpy(bp, &(_su), l);					\
-		bp += l;						\
-	} 
-#define ADDADDR(_addr) {						\
-		memset (&su, 0, sizeof(su));				\
-		su.sin.sin_family = AF_INET;				\
-		su.sin.sin_len = sizeof(su.sin);			\
-		memcpy (&su.sin.sin_addr, _addr, sizeof(su.sin.sin_addr)); \
-		ADDSU(su);						\
+#define ADDSU(_su) {							      \
+		l = ROUNDUP(_su.sa.sa_len);				      \
+		memcpy(bp, &(_su), l);					      \
+		bp += l;						      \
+	}
+#define ADDADDR(_a) {							      \
+		memset (&su, 0, sizeof(su));				      \
+		su.sin.sin_family = AF_INET;				      \
+		su.sin.sin_len = sizeof(su.sin);			      \
+		memcpy (&su.sin.sin_addr, _a, sizeof(su.sin.sin_addr));	      \
+		ADDSU(su);						      \
 	}
 
 	memset(&rtm, 0, sizeof(rtm));
@@ -272,22 +271,38 @@ open_link_socket(void)
 	return fd;
 }
 
+static void
+get_addrs(int type, char *cp, struct sockaddr **sa)
+{
+	int i;
+
+	for (i = 0; i < RTAX_MAX; i++) {
+		if (type & (1 << i)) {
+			sa[i] = (struct sockaddr *)cp;
+#ifdef DEBUG
+			printf ("got %d %d %s\n", i, sa[i]->sa_family,
+			    inet_ntoa(((struct sockaddr_in *)sa[i])->
+				sin_addr));
+#endif
+			ADVANCE(cp, sa[i]);
+		} else
+			sa[i] = NULL;
+	}
+}
+
 #define BUFFER_LEN	2048
 int
-manage_link(int fd,
-    void (*if_carrier)(const char *),
-    void (*if_add)(const char *),
-    void (*if_remove)(const char *))
+manage_link(int fd)
 {
-	char buffer[2048], *p, *e;
+	char buffer[2048], *p, *e, *cp;
 	char ifname[IF_NAMESIZE];
 	ssize_t bytes;
 	struct rt_msghdr *rtm;
-	struct if_announcemsghdr *ifa;
+	struct if_announcemsghdr *ifan;
 	struct if_msghdr *ifm;
+	struct ifa_msghdr *ifam;
 	struct rt rt;
-	struct sockaddr *sa;
-	struct sockaddr_in *sin;
+	struct sockaddr *sa, *rti_info[RTAX_MAX];
 
 	for (;;) {
 		bytes = read(fd, buffer, BUFFER_LEN);
@@ -303,13 +318,13 @@ manage_link(int fd,
 			rtm = (struct rt_msghdr *)(void *)p;
 			switch(rtm->rtm_type) {
 			case RTM_IFANNOUNCE:
-				ifa = (struct if_announcemsghdr *)(void *)p;
-				switch(ifa->ifan_what) {
+				ifan = (struct if_announcemsghdr *)(void *)p;
+				switch(ifan->ifan_what) {
 				case IFAN_ARRIVAL:
-					if_add(ifa->ifan_name);
+					handle_interface(1, ifan->ifan_name);
 					break;
 				case IFAN_DEPARTURE:
-					if_remove(ifa->ifan_name);
+					handle_interface(-1, ifan->ifan_name);
 					break;
 				}
 				break;
@@ -317,7 +332,7 @@ manage_link(int fd,
 				ifm = (struct if_msghdr *)(void *)p;
 				memset(ifname, 0, sizeof(ifname));
 				if (if_indextoname(ifm->ifm_index, ifname))
-					if_carrier(ifname);
+					handle_interface(0, ifname);
 				break;
 			case RTM_DELETE:
 				if (!(rtm->rtm_addrs & RTA_DST) ||
@@ -326,25 +341,29 @@ manage_link(int fd,
 					break;
 				if (rtm->rtm_pid == getpid())
 					break;
-				sa = (struct sockaddr *)(rtm + 1);
+				cp = (char *)(void *)(rtm + 1);
+				sa = (struct sockaddr *)(void *)cp;
 				if (sa->sa_family != AF_INET)
 					break;
-				rt.next = NULL;
+				get_addrs(rtm->rtm_addrs, cp, rti_info);
 				rt.iface = NULL;
-				sin = (struct sockaddr_in *)(void *)sa;
-				memcpy(&rt.dest.s_addr, &sin->sin_addr.s_addr,
-				    sizeof(rt.dest.s_addr));
-				sa = (struct sockaddr *)
-				    (ROUNDUP(sa->sa_len) + (char *)sa);
-				sin = (struct sockaddr_in *)(void *)sa;
-				memcpy(&rt.gate.s_addr, &sin->sin_addr.s_addr,
-				    sizeof(rt.gate.s_addr));
-				sa = (struct sockaddr *)
-				    (ROUNDUP(sa->sa_len) + (char *)sa);
-				sin = (struct sockaddr_in *)(void *)sa;
-				memcpy(&rt.net.s_addr, &sin->sin_addr.s_addr,
-				    sizeof(rt.net.s_addr));
+				rt.next = NULL;
+				COPYOUT(rt.dest, rti_info[RTAX_DST]);
+				COPYOUT(rt.net, rti_info[RTAX_NETMASK]);
+				COPYOUT(rt.gate, rti_info[RTAX_GATEWAY]);
 				route_deleted(&rt);
+				break;
+			case RTM_DELADDR:
+			case RTM_NEWADDR:
+				ifam = (struct ifa_msghdr *)(void *)p;
+				cp = (char *)(void *)(ifam + 1);
+				get_addrs(ifam->ifam_addrs, cp, rti_info);
+				COPYOUT(rt.dest, rti_info[RTAX_IFA]);
+				COPYOUT(rt.net, rti_info[RTAX_NETMASK]);
+				COPYOUT(rt.gate, rti_info[RTAX_BRD]);
+				if (if_indextoname(ifam->ifam_index, ifname))
+					handle_ifa(rtm->rtm_type, ifname,
+					    &rt.dest, &rt.net, &rt.gate);
 				break;
 			}
 		}
@@ -391,15 +410,12 @@ discover_link(struct interface **ifs, int argc, char * const *argv,
 		ifp->hwlen = sdl->sdl_alen;
 		memcpy(ifp->hwaddr, LLADDR(sdl), sdl->sdl_alen);
 		break;
-	default:
-		/* Don't needlessly spam console on startup */
-		if (!(options & DHCPCD_MASTER &&
-			!(options & DHCPCD_DAEMONISED) &&
-			options & DHCPCD_QUIET))
-			syslog(LOG_ERR, "%s: unsupported interface type",
-			    ifr->ifr_name);
-		free(ifp);
-		ifp = NULL;
+	case IFT_LOOP:
+		/* We don't allow loopback unless requested */
+		if (argc == 0 && ifac == 0) {
+			free(ifp);
+			ifp = NULL;
+		}
 		break;
 	}
 	if (ifl)
@@ -413,6 +429,7 @@ discover_interfaces(int argc, char * const *argv)
 {
 	struct interface *ifs = NULL;
 
-	do_interface(NULL, discover_link, &ifs, argc, argv, NULL, NULL, 2);
+	do_interface(NULL, discover_link, &ifs, argc, argv,
+			NULL, NULL, NULL, 2);
 	return ifs;
 }

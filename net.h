@@ -106,7 +106,7 @@ int up_interface(const char *);
 int do_interface(const char *,
     void (*)(struct interface **, int, char * const *, struct ifreq *),
     struct interface **, int, char * const *,
-    struct in_addr *, struct in_addr *, int);
+    struct in_addr *, struct in_addr *, struct in_addr *, int);
 int if_address(const struct interface *,
     const struct in_addr *, const struct in_addr *,
     const struct in_addr *, int);
@@ -115,9 +115,9 @@ int if_address(const struct interface *,
 #define del_address(iface, addr, net)					\
 	if_address(iface, addr, net, NULL, -1)
 #define has_address(iface, addr, net)					\
-	do_interface(iface, NULL, NULL, 0, NULL, addr, net, 0)
-#define get_address(iface, addr, net)					\
-	do_interface(iface, NULL, NULL, 0, NULL, addr, net, 1)
+	do_interface(iface, NULL, NULL, 0, NULL, addr, net, NULL, 0)
+#define get_address(iface, addr, net, dst)				\
+	do_interface(iface, NULL, NULL, 0, NULL, addr, net, dst, 1)
 
 int if_route(const struct interface *, const struct in_addr *,
     const struct in_addr *, const struct in_addr *, int, int);
@@ -147,9 +147,6 @@ ssize_t get_raw_packet(struct interface *, int, void *, ssize_t);
 
 int init_socket(void);
 int open_link_socket(void);
-int manage_link(int,
-    void (*)(const char *),
-    void (*)(const char *),
-    void (*)(const char *));
+int manage_link(int);
 int carrier_status(const char *);
 #endif

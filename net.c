@@ -174,7 +174,7 @@ hwaddr_aton(unsigned char *buffer, const char *addr)
 struct interface *
 init_interface(const char *ifname)
 {
-	int s, arpable;
+	int s;
 	struct ifreq ifr;
 	struct interface *iface = NULL;
 
@@ -187,12 +187,10 @@ init_interface(const char *ifname)
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
 	if (ioctl(s, SIOCGIFFLAGS, &ifr) == -1)
 		goto eexit;
-	if (ifr.ifr_flags & IFF_LOOPBACK || ifr.ifr_flags & IFF_POINTOPOINT)
-		goto eexit;
-	arpable = !(ifr.ifr_flags & IFF_NOARP);
 
 	iface = xzalloc(sizeof(*iface));
 	strlcpy(iface->name, ifname, sizeof(iface->name));
+	iface->flags = ifr.ifr_flags;
 	/* We reserve the 100 range for virtual interfaces, if and when
 	 * we can work them out. */
 	iface->metric = 200 + if_nametoindex(iface->name);
@@ -243,7 +241,6 @@ init_interface(const char *ifname)
 		goto eexit;
 	snprintf(iface->leasefile, sizeof(iface->leasefile),
 	    LEASEFILE, ifname);
-	iface->arpable = arpable;
 	/* 0 is a valid fd, so init to -1 */
 	iface->raw_fd = -1;
 	iface->udp_fd = -1;
@@ -277,7 +274,7 @@ int
 do_interface(const char *ifname,
     void (*do_link)(struct interface **, int, char * const *, struct ifreq *),
     struct interface **ifs, int argc, char * const *argv,
-    struct in_addr *addr, struct in_addr *net, int act)
+    struct in_addr *addr, struct in_addr *net, struct in_addr *dst, int act)
 {
 	int s;
 	struct ifconf ifc;
@@ -348,6 +345,16 @@ do_interface(const char *ifname,
 				continue;
 			netmask = sin->sin_addr.s_addr;
 			if (act == 1) {
+				if (dst) {
+					sin = (struct sockaddr_in *)
+						(void *)&ifr->ifr_dstaddr;
+					if (ioctl(s, SIOCGIFDSTADDR, ifr)
+					    == -1)
+						dst->s_addr = INADDR_ANY;
+					else
+						dst->s_addr =
+						    sin->sin_addr.s_addr;
+				}
 				addr->s_addr = address;
 				net->s_addr = netmask;
 				retval = 1;
@@ -436,12 +443,10 @@ carrier_status(const char *ifname)
 	if (retval == 1) {
 		memset(&ifmr, 0, sizeof(ifmr));
 		strlcpy(ifmr.ifm_name, ifr.ifr_name, sizeof(ifmr.ifm_name));
+		retval = -1;
 		if (ioctl(s, SIOCGIFMEDIA, &ifmr) != -1 &&
 		    ifmr.ifm_status & IFM_AVALID)
-		{
-			if (!(ifmr.ifm_status & IFM_ACTIVE))
-				retval = 0;
-		}
+			retval = (ifmr.ifm_status & IFM_ACTIVE) ? 1 : 0;
 	}
 #endif
 	close(s);

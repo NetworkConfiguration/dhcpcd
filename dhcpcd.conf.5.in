@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd March 10, 2009
+.Dd March 19, 2009
 .Dt DHCPCD.CONF 5 SMM
 .Os
 .Sh NAME
@@ -143,9 +143,15 @@ It can be a variable to be used in
 .Xr dhcpcd-run-hooks 8
 or the numerical value.
 You can specify more options seperated by commas, spaces or more option lines.
-.Ic quiet
+.It Ic destination Ar option
+If
+.Nm
+detects an address added to a point to point interface (PPP, TUN, etc) then
+it will set the listed DHCP options to the destination address of the
+interface.
+.It Ic quiet
 Supress any dhcpcd output to the console, except for errors.
-.Ic reboot Ar seconds
+.It Ic reboot Ar seconds
 Allow
 .Ar reboot
 seconds before moving to the discover phase if we have an old lease to use.
@@ -192,6 +198,13 @@ Here is an example which configures a static address, routes and dns.
 .D1 static ip_address=192.168.0.10/24
 .D1 static routers=192.168.0.1
 .D1 static domain_name_servers=192.168.0.1
+.Pp
+Here is an example for PPP which gives the destination a default route.
+It uses the special destination keyword to insert the destination address
+into the value.
+.D1 interface ppp0
+.D1 static ip_address=
+.D1 destination routers
 .It Ic timeout Ar seconds
 The default timeout for waiting for a DHCP response is 30 seconds which may
 be too long or too short and can be changed here.

@@ -195,8 +195,13 @@ int make_option_mask(uint8_t *mask, const char *opts, int add)
 					if (opt->option == n)
 						match = 1;
 			}
-			if (match) {	
-				if (add == 1)
+			if (match) {
+				if (add == 2 && !(opt->type & IPV4)) {
+					free(o);
+					errno = EINVAL;
+					return -1;
+				}
+				if (add == 1 || add == 2)
 					add_option_mask(mask,
 					    opt->option);
 				else
