@@ -94,7 +94,7 @@ open_link_socket(void)
 	struct sockaddr_nl snl;
 
 	memset(&snl, 0, sizeof(snl));
-	snl.nl_groups = RTMGRP_LINK | RTMGRP_IPV4_ROUTE;
+	snl.nl_groups = RTMGRP_LINK | RTMGRP_IPV4_ROUTE | RTMGRP_IPV4_IFADDR;
 	return _open_link_socket(&snl);
 }
 
@@ -155,13 +155,16 @@ err_netlink(struct nlmsghdr *nlm)
 }
 
 static int
-link_delroute(struct nlmsghdr *nlm)
+link_route(struct nlmsghdr *nlm)
 {
 	int len, idx, metric;
 	struct rtattr *rta;
 	struct rtmsg *rtm;
 	struct rt rt;
 	char ifn[IF_NAMESIZE + 1];
+
+	if (nlm->nlmsg_type != RTM_DELROUTE)
+		return 0;
 
 	len = nlm->nlmsg_len - sizeof(*nlm);
 	if ((size_t)len < sizeof(*rtm)) {
@@ -212,6 +215,55 @@ link_delroute(struct nlmsghdr *nlm)
 }
 
 static int
+link_addr(struct nlmsghdr *nlm)
+{
+	int len;
+	struct rtattr *rta;
+	struct ifaddrmsg *ifa;
+	struct in_addr addr, net, dest;
+	char ifn[IF_NAMESIZE + 1];
+	struct interface *iface;
+
+	if (nlm->nlmsg_type != RTM_DELADDR && nlm->nlmsg_type != RTM_NEWADDR)
+		return 0;
+
+	len = nlm->nlmsg_len - sizeof(*nlm);
+	if ((size_t)len < sizeof(*ifa)) {
+		errno = EBADMSG;
+		return -1;
+	}
+	if (nlm->nlmsg_pid == (uint32_t)getpid())
+		return 1;
+	ifa = NLMSG_DATA(nlm);
+	if (if_indextoname(ifa->ifa_index, ifn) == NULL)
+		return -1;
+	iface = find_interface(ifn);
+	if (iface == NULL)
+		return 1;
+	rta = (struct rtattr *) IFA_RTA(ifa);
+	len = NLMSG_PAYLOAD(nlm, sizeof(*ifa));
+	addr.s_addr = dest.s_addr = INADDR_ANY;
+	inet_cidrtoaddr(ifa->ifa_prefixlen, &net);
+	while (RTA_OK(rta, len)) {
+		switch (rta->rta_type) {
+		case IFA_ADDRESS:
+			if (iface->flags & IFF_POINTOPOINT) {
+				memcpy(&dest.s_addr, RTA_DATA(rta),
+				    sizeof(addr.s_addr));
+			}
+			break;
+		case IFA_LOCAL:
+			memcpy(&addr.s_addr, RTA_DATA(rta),
+			    sizeof(addr.s_addr));
+			break;
+		}
+		rta = RTA_NEXT(rta, len);
+	}
+	handle_ifa(nlm->nlmsg_type, ifn, &addr, &net, &dest);
+	return 1;
+}
+
+static int
 link_netlink(struct nlmsghdr *nlm)
 {
 	int len;
@@ -219,8 +271,12 @@ link_netlink(struct nlmsghdr *nlm)
 	struct ifinfomsg *ifi;
 	char ifn[IF_NAMESIZE + 1];
 
-	if (nlm->nlmsg_type == RTM_DELROUTE)
-		return link_delroute(nlm);
+	len = link_route(nlm);
+	if (len != 0)
+		return len;
+	len = link_addr(nlm);
+	if (len != 0)
+		return len;
 
 	if (nlm->nlmsg_type != RTM_NEWLINK && nlm->nlmsg_type != RTM_DELLINK)
 		return 0;

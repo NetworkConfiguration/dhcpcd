@@ -1192,7 +1192,7 @@ handle_ifa(int type, const char *ifname,
 static void
 handle_link(_unused void *arg)
 {
-	if (manage_link(linkfd))
+	if (manage_link(linkfd) == -1)
 		syslog(LOG_ERR, "manage_link: %m");
 }
 
