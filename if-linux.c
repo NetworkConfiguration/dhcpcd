@@ -561,6 +561,14 @@ discover_interfaces(int argc, char * const *argv)
 					continue;
 			}
 			if ((ifp = init_interface(p))) {
+				/* Don't allow loopback unless explicit */
+				if (ifp->flags & IFF_LOOPBACK &&
+				    argc == 0 &&
+				    ifdc == 0)
+				{
+					free_interface(ifp);
+					continue;
+				}
 				if (ifl)
 					ifl->next = ifp; 
 				else
