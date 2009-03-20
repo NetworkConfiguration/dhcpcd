@@ -44,7 +44,8 @@ static const int handle_sigs[] = {
 	SIGHUP,
 	SIGINT,
 	SIGPIPE,
-	SIGTERM
+	SIGTERM,
+	SIGUSR1,
 };
 
 static void

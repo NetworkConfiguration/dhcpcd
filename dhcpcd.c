@@ -1224,7 +1224,7 @@ handle_signal(_unused void *arg)
 		for (iface = ifaces; iface; iface = iface->next)
 			if (iface->state->new)
 				configure(iface);
-		break;
+		return;
 	case SIGPIPE:
 		syslog(LOG_WARNING, "received SIGPIPE");
 		return;
