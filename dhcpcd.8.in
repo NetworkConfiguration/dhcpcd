@@ -179,6 +179,9 @@ will re-apply IP address, routing and run
 for each interface.
 This is useful so that a 3rd party such as PPP or VPN can change the routing
 table and / or DNS, etc and then instruct dhcpcd to put things back afterwards.
+.Nm
+does not read a new configuration when this happens - you should rebind if you
+need that functionality.
 .It Fl f , -config Ar file
 Specify a config to load instead of
 .Pa @SYSCONFDIR@/dhcpcd.conf .
