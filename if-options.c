@@ -49,6 +49,7 @@ const struct option cf_options[] = {
 	{"background",      no_argument,       NULL, 'b'},
 	{"script",          required_argument, NULL, 'c'},
 	{"debug",           no_argument,       NULL, 'd'},
+	{"reconfigure",     no_argument,       NULL, 'e'},
 	{"config",          required_argument, NULL, 'f'},
 	{"hostname",        optional_argument, NULL, 'h'},
 	{"vendorclassid",   optional_argument, NULL, 'i'},
@@ -310,6 +311,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	struct rt *rt;
 
 	switch(opt) {
+	case 'e': /* FALLTHROUGH */
 	case 'n': /* FALLTHROUGH */
 	case 'x': /* FALLTHROUGH */
 	case 'T': /* We need to handle non interface options */

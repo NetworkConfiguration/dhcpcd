@@ -135,7 +135,7 @@ read_pid(void)
 static void
 usage(void)
 {
-	printf("usage: "PACKAGE" [-dknpqxyADEGHKLOTV] [-c script] [-f file ]"
+	printf("usage: "PACKAGE" [-deknpqxyADEGHKLOTV] [-c script] [-f file ]"
 	    " [-h hostname]\n"
 	    "              [-i classID ] [-l leasetime] [-m metric]"
 	    " [-o option] [-r ipaddr]\n"
@@ -1219,6 +1219,12 @@ handle_signal(_unused void *arg)
 		syslog(LOG_INFO, "received SIGHUP, releasing lease");
 		do_release = 1;
 		break;
+	case SIGUSR1:
+		syslog(LOG_INFO, "received SIGUSR, reconfiguring");
+		for (iface = ifaces; iface; iface = iface->next)
+			if (iface->state->new)
+				configure(iface);
+		break;
 	case SIGPIPE:
 		syslog(LOG_WARNING, "received SIGPIPE");
 		return;
@@ -1277,7 +1283,8 @@ int
 handle_args(struct fd_list *fd, int argc, char **argv)
 {
 	struct interface *ifs, *ifp, *ifl, *ifn, *ift;
-	int do_exit = 0, do_release = 0, do_reboot = 0, opt, oi = 0;
+	int do_exit = 0, do_release = 0, do_reboot = 0, do_reconf = 0;
+	int opt, oi = 0;
 	ssize_t len;
 	size_t l;
 	struct iovec iov[2];
@@ -1354,6 +1361,9 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 	while ((opt = getopt_long(argc, argv, IF_OPTS, cf_options, &oi)) != -1)
 	{
 		switch (opt) {
+		case 'e':
+			do_reconf = 1;
+			break;
 		case 'k':
 			do_release = 1;
 			break;
@@ -1400,6 +1410,8 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 			if (ifn) {
 				if (do_reboot)
 					reconf_reboot(ifn, argc, argv);
+				else if (do_reconf && ifn->state->new)
+					configure(ifn);
 				free_interface(ifp);
 			} else {
 				ifp->next = NULL;
@@ -1445,6 +1457,9 @@ main(int argc, char **argv)
 	while ((opt = getopt_long(argc, argv, IF_OPTS, cf_options, &oi)) != -1)
 	{
 		switch (opt) {
+		case 'e':
+			sig = SIGUSR1;
+			break;
 		case 'f':
 			cffile = optarg;
 			break;
