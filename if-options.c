@@ -400,7 +400,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		break;
 	case 's':
 		ifo->options |= DHCPCD_INFORM | DHCPCD_PERSISTENT;
-		ifo->options &= ~DHCPCD_ARP;
+		ifo->options &= ~(DHCPCD_ARP | DHCPCD_STATIC);
 		if (arg && *arg != '\0') {
 			if (parse_addr(&ifo->req_addr, &ifo->req_mask,
 				arg) != 0)
@@ -584,6 +584,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 				return -1;
 
 			ifo->options |= DHCPCD_STATIC;
+			ifo->options &= ~DHCPCD_INFORM;
 		} else if (strncmp(arg, "routes=", strlen("routes=")) == 0 ||
 		    strncmp(arg, "static_routes=", strlen("static_routes=")) == 0 ||
 		    strncmp(arg, "classless_static_routes=", strlen("classless_static_routes=")) == 0 ||
