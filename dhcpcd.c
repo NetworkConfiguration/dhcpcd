@@ -979,7 +979,10 @@ start_interface(void *arg)
 	}
 	if (iface->hwlen == 0 && ifo->clientid[0] == '\0') {
 		syslog(LOG_WARNING, "%s: needs a clientid to configure",
-			iface->name);
+		    iface->name);
+		drop_config(iface, "FAIL");
+		close_sockets(iface);
+		delete_timeout(NULL, iface);
 		return;
 	}
 	if (ifo->req_addr.s_addr) {

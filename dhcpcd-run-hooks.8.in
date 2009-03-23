@@ -107,7 +107,7 @@ The cable may have been unplugged or association to the wireless point lost.
 dhcpcd failed to operate on the interface.
 This normally happens when dhcpcd does not support the raw interface, which
 means it cannot work as a DHCP or ZeroConf client.
-Static configuration is still allowed.
+Static configuration and DHCP INFORM is still allowed.
 .It Dv STOP
 dhcpcd stopped running on the interface.
 .It Dv TEST
