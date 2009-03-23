@@ -261,6 +261,7 @@ send_message(struct interface *iface, int type,
     void (*callback)(void *))
 {
 	struct if_state *state = iface->state;
+	struct if_options *ifo = state->options;
 	struct dhcp_message *dhcp;
 	uint8_t *udp;
 	ssize_t len, r;
@@ -290,7 +291,9 @@ send_message(struct interface *iface, int type,
 	 * then we cannot renew.
 	 * This could happen if our IP was pulled out from underneath us.
 	 * Also, we should not unicast from a BOOTP lease. */
-	if (iface->udp_fd == -1 || is_bootp(iface->state->new)) {
+	if (iface->udp_fd == -1 ||
+	    (!(ifo->options & DHCPCD_INFORM) && is_bootp(iface->state->new)))
+	{
 		a = iface->addr.s_addr;
 		iface->addr.s_addr = 0;
 	}
@@ -596,6 +599,13 @@ handle_dhcp_packet(void *arg)
 			    iface->name, inet_ntoa(from));
 			continue;
 		}
+		if (iface->flags & IFF_POINTOPOINT &&
+		    iface->state->lease.server.s_addr != from.s_addr)
+		{
+			syslog(LOG_WARNING,
+			    "%s: server %s is not destination",
+			    iface->name, inet_ntoa(from));
+		}
 		bytes = get_udp_data(&pp, packet);
 		if ((size_t)bytes > sizeof(*dhcp)) {
 			syslog(LOG_ERR,
@@ -679,6 +689,8 @@ configure_interface(struct interface *iface, int argc, char **argv)
 	add_options(ifo, argc, argv);
 	if (iface->flags & IFF_NOARP)
 		ifo->options &= ~(DHCPCD_ARP | DHCPCD_IPV4LL);
+	if (iface->flags & IFF_POINTOPOINT && !(ifo->options & DHCPCD_INFORM))
+		ifo->options |= DHCPCD_STATIC;
 	if (ifo->options & DHCPCD_LINK && carrier_status(iface->name) == -1)
 		ifo->options &= ~DHCPCD_LINK;
 	
@@ -859,8 +871,8 @@ handle_3rdparty(struct interface *iface)
 		handle_ifa(RTM_NEWADDR, iface->name, &addr, &net, &dst);
 	else {
 		syslog(LOG_INFO,
-			"%s: waiting for 3rd party to configure IP address",
-			iface->name);
+		    "%s: waiting for 3rd party to configure IP address",
+		    iface->name);
 		iface->state->reason = "3RDPARTY";
 		run_script(iface);
 	}
@@ -1173,6 +1185,19 @@ handle_ifa(int type, const char *ifname,
 			drop_config(ifp, "EXPIRE");
 		break;
 	case RTM_NEWADDR:
+		free(ifp->state->old);
+		ifp->state->old = ifp->state->new;
+		ifp->state->new = dhcp_message_new(addr, net);
+		if (dst) {
+			for (i = 1; i < 255; i++)
+				if (has_option_mask(ifo->dstmask, i))
+					dhcp_message_add_addr(
+						ifp->state->new,
+						i, dst);
+		}
+		ifp->state->reason = "STATIC";
+		build_routes();
+		run_script(ifp);
 		if (ifo->options & DHCPCD_INFORM) {
 			ifp->state->state = DHS_INFORM;
 			ifp->state->xid = arc4random();
@@ -1181,20 +1206,6 @@ handle_ifa(int type, const char *ifname,
 			ifp->state->lease.server = *dst;
 			open_sockets(ifp);
 			send_inform(ifp);
-		} else {
-			free(ifp->state->old);
-			ifp->state->old = ifp->state->new;
-			ifp->state->new = dhcp_message_new(addr, net);
-			if (dst) {
-				for (i = 1; i < 255; i++)
-					if (has_option_mask(ifo->dstmask, i))
-						dhcp_message_add_addr(
-							ifp->state->new,
-							i, dst);
-			}
-			ifp->state->reason = "STATIC";
-			build_routes();
-			run_script(ifp);
 		}
 		break;
 	}
