@@ -310,8 +310,18 @@ send_message(struct interface *iface, int type,
 		len = make_udp_packet(&udp, (uint8_t *)dhcp, len, from, to);
 		r = send_raw_packet(iface, ETHERTYPE_IP, udp, len);
 		free(udp);
-		if (r == -1)
+		/* If we failed to send a raw packet this normally means
+		 * we don't have the ability to work beneath the IP layer
+		 * for this interface.
+		 * As such we remove it from consideration without actually
+		 * stopping the interface. */
+		if (r == -1) {
 			syslog(LOG_ERR, "%s: send_raw_packet: %m", iface->name);
+			drop_config(iface, "FAIL");
+			close_sockets(iface);
+			delete_timeout(NULL, iface);
+			callback = NULL;
+		}
 	}
 	free(dhcp);
 	/* Even if we fail to send a packet we should continue as we are

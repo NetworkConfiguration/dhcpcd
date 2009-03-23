@@ -408,7 +408,10 @@ discover_link(struct interface **ifs, int argc, char * const *argv,
 	case IFT_ETHER:
 		ifp->family = ARPHRD_ETHER;
 		ifp->hwlen = sdl->sdl_alen;
-		memcpy(ifp->hwaddr, LLADDR(sdl), sdl->sdl_alen);
+		break;
+	case IFT_IEEE1394:
+		ifp->family = ARPHRD_IEEE1394;
+		ifp->hwlen = sdl->sdl_alen;
 		break;
 	case IFT_LOOP:
 		/* We don't allow loopback unless requested */
@@ -418,6 +421,8 @@ discover_link(struct interface **ifs, int argc, char * const *argv,
 		}
 		break;
 	}
+	if (ifp && ifp->hwlen)
+		memcpy(ifp->hwaddr, LLADDR(sdl), ifp->hwlen);
 	if (ifl)
 		ifl->next = ifp;
 	else
