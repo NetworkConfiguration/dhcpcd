@@ -600,7 +600,7 @@ handle_dhcp_packet(void *arg)
 			continue;
 		}
 		if (iface->flags & IFF_POINTOPOINT &&
-		    iface->state->lease.server.s_addr != from.s_addr)
+		    iface->dst.s_addr != from.s_addr)
 		{
 			syslog(LOG_WARNING,
 			    "%s: server %s is not destination",
@@ -687,10 +687,11 @@ configure_interface(struct interface *iface, int argc, char **argv)
 	free_options(ifs->options);
 	ifo = ifs->options = read_config(cffile, iface->name, iface->ssid);
 	add_options(ifo, argc, argv);
-	if (iface->flags & IFF_NOARP)
-		ifo->options &= ~(DHCPCD_ARP | DHCPCD_IPV4LL);
 	if (iface->flags & IFF_POINTOPOINT && !(ifo->options & DHCPCD_INFORM))
 		ifo->options |= DHCPCD_STATIC;
+	if (iface->flags & IFF_NOARP ||
+	    ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC))
+		ifo->options &= ~(DHCPCD_ARP | DHCPCD_IPV4LL);
 	if (ifo->options & DHCPCD_LINK && carrier_status(iface->name) == -1)
 		ifo->options &= ~DHCPCD_LINK;
 	
@@ -1132,32 +1133,6 @@ handle_interface(int action, const char *ifname)
 	}
 }
 
-static int
-dhcp_message_add_addr(struct dhcp_message *dhcp, char c, struct in_addr *addr)
-{
-	uint8_t *p;
-	size_t len;
-
-	p = dhcp->options;
-	while (*p != DHO_END) {
-		p++;
-		p += *p + 1;
-	}
-
-	len = p - (uint8_t *)dhcp;
-	if (len + 6 > sizeof(*dhcp)) {
-		errno = ENOMEM;
-		return -1;
-	}
-
-	*p++ = c;
-	*p++ = sizeof(addr->s_addr);
-	memcpy(p, &addr->s_addr, sizeof(addr->s_addr));
-	p += sizeof(addr->s_addr);
-	*p = DHO_END;
-	return 0;
-}
-
 void
 handle_ifa(int type, const char *ifname,
     struct in_addr *addr, struct in_addr *net, struct in_addr *dst)
@@ -1188,12 +1163,14 @@ handle_ifa(int type, const char *ifname,
 		free(ifp->state->old);
 		ifp->state->old = ifp->state->new;
 		ifp->state->new = dhcp_message_new(addr, net);
+		ifp->dst.s_addr = dst ? dst->s_addr : INADDR_ANY;
 		if (dst) {
 			for (i = 1; i < 255; i++)
-				if (has_option_mask(ifo->dstmask, i))
+				if (i != DHO_ROUTER &&
+				    has_option_mask(ifo->dstmask, i))
 					dhcp_message_add_addr(
 						ifp->state->new,
-						i, dst);
+						i, *dst);
 		}
 		ifp->state->reason = "STATIC";
 		build_routes();
@@ -1201,9 +1178,10 @@ handle_ifa(int type, const char *ifname,
 		if (ifo->options & DHCPCD_INFORM) {
 			ifp->state->state = DHS_INFORM;
 			ifp->state->xid = arc4random();
+			ifp->state->lease.server.s_addr =
+				dst ? dst->s_addr : INADDR_ANY;
 			ifp->addr = *addr;
 			ifp->net = *net;
-			ifp->state->lease.server = *dst;
 			open_sockets(ifp);
 			send_inform(ifp);
 		}

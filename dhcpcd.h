@@ -100,6 +100,7 @@ struct interface {
 
 	struct in_addr addr;
 	struct in_addr net;
+	struct in_addr dst;
 
 	char leasefile[PATH_MAX];
 	time_t start_uptime;

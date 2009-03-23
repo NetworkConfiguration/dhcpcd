@@ -186,6 +186,7 @@ struct rt *get_option_routes(const struct dhcp_message *);
 ssize_t configure_env(char **, const char *, const struct dhcp_message *,
     const struct if_options *);
 
+int dhcp_message_add_addr(struct dhcp_message *, uint8_t, struct in_addr);
 ssize_t make_message(struct dhcp_message **, const struct interface *,
     uint8_t);
 int valid_dhcp_packet(unsigned char *);

@@ -42,6 +42,7 @@
 #include "config.h"
 #include "common.h"
 #include "configure.h"
+#include "dhcp.h"
 #include "if-options.h"
 #include "if-pref.h"
 #include "net.h"
@@ -513,7 +514,8 @@ add_subnet_route(struct rt *rt, const struct interface *iface)
 }
 
 static struct rt *
-get_routes(const struct interface *iface) {
+get_routes(const struct interface *iface)
+{
 	struct rt *rt, *nrt = NULL, *r = NULL;
 
 	if (iface->state->options->routes != NULL) {
@@ -538,6 +540,22 @@ get_routes(const struct interface *iface) {
 	return get_option_routes(iface->state->new);
 }
 
+static struct rt *
+add_destination_route(struct rt *rt, const struct interface *iface)
+{
+	struct rt *r;
+
+	if (!(iface->flags & IFF_POINTOPOINT) ||
+	    !has_option_mask(iface->state->options->dstmask, DHO_ROUTER))
+		return rt;
+	r = xmalloc(sizeof(*r));
+	r->dest.s_addr = INADDR_ANY;
+	r->net.s_addr = INADDR_ANY;
+	r->gate.s_addr = iface->dst.s_addr;
+	r->next = rt;
+	return r;
+}
+
 void
 build_routes(void)
 {
@@ -549,6 +567,7 @@ build_routes(void)
 			continue;
 		dnr = get_routes(ifp);
 		dnr = add_subnet_route(dnr, ifp);
+		dnr = add_destination_route(dnr, ifp);
 		for (rt = dnr; rt && (rtn = rt->next, 1); lrt = rt, rt = rtn) {
 			rt->iface = ifp;
 			/* Is this route already in our table? */
@@ -618,6 +637,7 @@ configure(struct interface *iface)
 {
 	struct dhcp_message *dhcp = iface->state->new;
 	struct dhcp_lease *lease = &iface->state->lease;
+	struct if_options *ifo = iface->state->options;
 	struct rt *rt;
 
 	/* As we are now adjusting an interface, we need to ensure
@@ -633,7 +653,7 @@ configure(struct interface *iface)
 	}
 
 	/* This also changes netmask */
-	if (!(iface->state->options->options & DHCPCD_INFORM) ||
+	if (!(ifo->options & DHCPCD_INFORM) ||
 	    !has_address(iface->name, &lease->addr, &lease->net))
 	{
 		syslog(LOG_DEBUG, "%s: adding IP address %s/%d",
@@ -668,7 +688,7 @@ configure(struct interface *iface)
 
 	build_routes();
 	if (!iface->state->lease.frominfo &&
-	    !(iface->state->options->options & DHCPCD_INFORM))
+	    !(ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC)))
 		if (write_lease(iface, dhcp) == -1)
 			syslog(LOG_ERR, "write_lease: %m");
 	run_script(iface);
