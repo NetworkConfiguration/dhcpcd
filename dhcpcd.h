@@ -39,7 +39,7 @@
 
 #define HWADDR_LEN 20
 #define IF_SSIDSIZE 33
-#define PROFILE_LEN 32
+#define PROFILE_LEN 64
 
 enum DHS {
 	DHS_INIT,
