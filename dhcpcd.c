@@ -677,16 +677,13 @@ send_release(struct interface *iface)
 }
 
 static void
-configure_interface(struct interface *iface, int argc, char **argv)
+configure_interface1(struct interface *iface)
 {
 	struct if_state *ifs = iface->state;
-	struct if_options *ifo;
+	struct if_options *ifo = ifs->options;
 	uint8_t *duid;
 	size_t len = 0, ifl;
 
-	free_options(ifs->options);
-	ifo = ifs->options = read_config(cffile, iface->name, iface->ssid);
-	add_options(ifo, argc, argv);
 	if (iface->flags & IFF_POINTOPOINT && !(ifo->options & DHCPCD_INFORM))
 		ifo->options |= DHCPCD_STATIC;
 	if (iface->flags & IFF_NOARP ||
@@ -739,11 +736,42 @@ configure_interface(struct interface *iface, int argc, char **argv)
 	}
 }
 
+int
+select_profile(struct interface *iface, const char *profile)
+{
+	struct if_options *ifo;
+
+	ifo = read_config(cffile, iface->name, iface->ssid, profile);
+	if (ifo == NULL) {
+		syslog(LOG_DEBUG, "%s: no profile %s", iface->name, profile);
+		return -1;
+	}
+	if (profile != NULL) {
+		strlcpy(iface->state->profile, profile,
+		    sizeof(iface->state->profile));
+		syslog(LOG_INFO, "%s: selected profile %s",
+		    iface->name, profile);
+	} else
+		*iface->state->profile = '\0';
+	free_options(iface->state->options);
+	iface->state->options = ifo;
+	configure_interface1(iface);
+	return 0;
+}
+
+static void
+configure_interface(struct interface *iface, int argc, char **argv)
+{
+	select_profile(iface, NULL);
+	add_options(iface->state->options, argc, argv);
+	configure_interface1(iface);
+}
+
+
 static void
 handle_carrier(const char *ifname)
 {
 	struct interface *iface;
-	char ssid[IF_SSIDSIZE];
 
 	for (iface = ifaces; iface; iface = iface->next)
 		if (strcmp(iface->name, ifname) == 0)
@@ -767,15 +795,9 @@ handle_carrier(const char *ifname)
 		if (iface->carrier != LINK_UP) {
 			iface->carrier = LINK_UP;
 			syslog(LOG_INFO, "%s: carrier acquired", iface->name);
-			if (iface->wireless) {
-				/* We need to reconfigre for if ssid changed */
-				memset(ssid, 0, sizeof(ssid));
-				getifssid(iface->name, ssid);
-				if (strcmp(iface->ssid, ssid) != 0) {
-					strlcpy(iface->ssid, ssid, sizeof(iface->ssid));
-					configure_interface(iface, margc, margv);
-				}
-			}
+			if (iface->wireless)
+				getifssid(iface->name, iface->ssid);
+			configure_interface(iface, margc, margv);
 			iface->state->interval = 0;
 			iface->state->reason = "CARRIER";
 			run_script(iface);
@@ -982,6 +1004,10 @@ start_interface(void *arg)
 		start_discover(iface);
 		return;
 	}
+	if (iface->state->arping_index < ifo->arping_len) {
+		start_arping(iface);
+		return;
+	}
 	if (ifo->options & DHCPCD_STATIC) {
 		start_static(iface);
 		return;
@@ -1179,7 +1205,7 @@ handle_ifa(int type, const char *ifname,
 			ifp->state->state = DHS_INFORM;
 			ifp->state->xid = arc4random();
 			ifp->state->lease.server.s_addr =
-				dst ? dst->s_addr : INADDR_ANY;
+			    dst ? dst->s_addr : INADDR_ANY;
 			ifp->addr = *addr;
 			ifp->net = *net;
 			open_sockets(ifp);
@@ -1488,7 +1514,7 @@ main(int argc, char **argv)
 
 	margv = argv;
 	margc = argc;
-	ifo = read_config(cffile, NULL, NULL);
+	ifo = read_config(cffile, NULL, NULL, NULL);
 	opt = add_options(ifo, argc, argv);
 	if (opt != 1) {
 		if (opt == 0)

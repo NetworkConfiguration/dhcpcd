@@ -104,6 +104,9 @@ handle_arp_packet(void *arg)
 	uint8_t *hw_s, *hw_t;
 	ssize_t bytes;
 	struct if_state *state = iface->state;
+	struct if_options *opts = state->options;
+	const char *hwaddr;
+	struct in_addr ina;
 
 	state->fail.s_addr = 0;
 	for(;;) {
@@ -138,6 +141,28 @@ handle_arp_packet(void *arg)
 		/* Copy out the IP addresses */
 		memcpy(&reply_s, hw_s + ar.ar_hln, ar.ar_pln);
 		memcpy(&reply_t, hw_t + ar.ar_hln, ar.ar_pln);
+
+		/* Check for arping */
+		if (state->arping_index &&
+		    state->arping_index <= opts->arping_len &&
+		    (reply_s == opts->arping[state->arping_index - 1] ||
+			(reply_s == 0 &&
+			    reply_t == opts->arping[state->arping_index - 1])))
+		{
+			ina.s_addr = reply_s;
+			hwaddr = hwaddr_ntoa((unsigned char *)hw_s,
+			    (size_t)ar.ar_hln);
+			syslog(LOG_INFO,
+			    "%s: found %s on hardware address %s",
+			    iface->name, inet_ntoa(ina), hwaddr);
+			if (select_profile(iface, hwaddr) == -1 &&
+			    errno == ENOENT)
+				select_profile(iface, inet_ntoa(ina));
+			close_sockets(iface);
+			delete_timeout(NULL, iface);
+			start_interface(iface);
+			return;
+		}
 
 		/* Check for conflict */
 		if (state->offer &&
@@ -216,8 +241,13 @@ send_arp_probe(void *arg)
 	struct if_state *state = iface->state;
 	struct in_addr addr;
 	struct timeval tv;
+	int arping = 0;
 
-	if (state->offer) {
+	if (state->probes == 0 &&
+	    state->arping_index < state->options->arping_len) {
+		addr.s_addr = state->options->arping[state->arping_index++];
+		arping = 1;
+	} else if (state->offer) {
 		if (state->offer->yiaddr)
 			addr.s_addr = state->offer->yiaddr;
 		else
@@ -230,9 +260,12 @@ send_arp_probe(void *arg)
 		add_event(iface->arp_fd, handle_arp_packet, iface);
 	}
 	if (state->probes == 0) {
-		syslog(LOG_INFO, "%s: checking %s is available"
-		    " on attached networks",
-		    iface->name, inet_ntoa(addr));
+		if (arping)
+			syslog(LOG_INFO, "%s: searching for %s",
+			    iface->name, inet_ntoa(addr));
+		else
+			syslog(LOG_INFO, "%s: checking for %s",
+			    iface->name, inet_ntoa(addr));
 	}
 	if (++state->probes < PROBE_NUM) {
 		tv.tv_sec = PROBE_MIN;
@@ -242,11 +275,26 @@ send_arp_probe(void *arg)
 	} else {
 		tv.tv_sec = ANNOUNCE_WAIT;
 		tv.tv_usec = 0;
-		add_timeout_tv(&tv, bind_interface, iface);
+		if (arping) {
+			state->probes = 0;
+			if (state->arping_index < state->options->arping_len)
+				add_timeout_tv(&tv, send_arp_probe, iface);
+			else
+				add_timeout_tv(&tv, start_interface, iface);
+		} else
+			add_timeout_tv(&tv, bind_interface, iface);
 	}
 	syslog(LOG_DEBUG,
 	    "%s: sending ARP probe (%d of %d), next in %0.2f seconds",
 	    iface->name, state->probes, PROBE_NUM,  timeval_to_double(&tv));
 	if (send_arp(iface, ARPOP_REQUEST, 0, addr.s_addr) == -1)
 		syslog(LOG_ERR, "send_arp: %m");
+}
+
+void
+start_arping(struct interface *iface)
+{
+	iface->state->probes = 0;
+	iface->state->arping_index = 0;
+	send_arp_probe(iface);
 }

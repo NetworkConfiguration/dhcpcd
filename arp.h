@@ -41,6 +41,9 @@
 #define RATE_LIMIT_INTERVAL	60
 #define DEFEND_INTERVAL		10
 
+#include "dhcpcd.h"
+
 void send_arp_announce(void *);
 void send_arp_probe(void *);
+void start_arping(struct interface *);
 #endif

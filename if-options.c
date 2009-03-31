@@ -46,6 +46,7 @@
 #include "net.h"
 
 const struct option cf_options[] = {
+	{"arping",          required_argument, NULL, 'a'},
 	{"background",      no_argument,       NULL, 'b'},
 	{"script",          required_argument, NULL, 'c'},
 	{"debug",           no_argument,       NULL, 'd'},
@@ -311,6 +312,13 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	struct rt *rt;
 
 	switch(opt) {
+	case 'a':
+		if (parse_addr(&addr, NULL, arg) != 0)
+			return -1;
+		ifo->arping = xrealloc(ifo->arping,
+		    sizeof(in_addr_t) * (ifo->arping_len + 1));
+		ifo->arping[ifo->arping_len++] = addr.s_addr;
+		break;
 	case 'e': /* FALLTHROUGH */
 	case 'n': /* FALLTHROUGH */
 	case 'x': /* FALLTHROUGH */
@@ -693,12 +701,13 @@ parse_config_line(struct if_options *ifo, const char *opt, char *line)
 }
 
 struct if_options *
-read_config(const char *file, const char *ifname, const char *ssid)
+read_config(const char *file,
+    const char *ifname, const char *ssid, const char *profile)
 {
 	struct if_options *ifo;
 	FILE *f;
 	char *line, *option, *p;
-	int skip = 0;
+	int skip = 0, have_profile = 0;
 
 	/* Seed our default options */
 	ifo = xzalloc(sizeof(*ifo));
@@ -749,16 +758,30 @@ read_config(const char *file, const char *ifname, const char *ssid)
 				skip = 1;
 			continue;
 		}
+		/* Start of a profile block, skip if not ours */
+		if (strcmp(option, "profile") == 0) {
+			if (profile && line && strcmp(line, profile) == 0) {
+				skip = 0;
+				have_profile = 1;
+			} else
+				skip = 1;
+			continue;
+		}
 		if (skip)
 			continue;
-		if (parse_config_line(ifo, option, line) != 1) {
+		if (parse_config_line(ifo, option, line) != 1)
 			break;
-		}
 	}
 	fclose(f);
 
+	if (profile && !have_profile) {
+		free_options(ifo);
+		errno = ENOENT;
+		ifo = NULL;
+	}
+
 	/* Terminate the encapsulated options */
-	if (ifo->vendor[0]) {
+	if (ifo && ifo->vendor[0]) {
 		ifo->vendor[0]++;
 		ifo->vendor[ifo->vendor[0]] = DHO_END;
 	}

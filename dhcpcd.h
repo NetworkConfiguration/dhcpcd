@@ -39,6 +39,7 @@
 
 #define HWADDR_LEN 20
 #define IF_SSIDSIZE 33
+#define PROFILE_LEN 32
 
 enum DHS {
 	DHS_INIT,
@@ -60,6 +61,7 @@ enum DHS {
 
 struct if_state {
 	enum DHS state;
+	char profile[PROFILE_LEN];
 	struct if_options *options;
 	struct dhcp_message *sent;
 	struct dhcp_message *offer;
@@ -76,6 +78,7 @@ struct if_state {
 	int conflicts;
 	time_t defend;
 	struct in_addr fail;
+	size_t arping_index;
 };
 
 struct interface {
@@ -134,5 +137,6 @@ void start_expire(void *);
 void send_decline(struct interface *);
 void close_sockets(struct interface *);
 void drop_config(struct interface *, const char *);
+int select_profile(struct interface *, const char *);
 
 #endif

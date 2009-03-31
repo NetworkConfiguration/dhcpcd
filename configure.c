@@ -202,6 +202,11 @@ make_env(const struct interface *iface, char ***argv)
 		e--;
 	}
 	*--p = '\0';
+	if (*iface->state->profile) {
+		e = strlen("profile=") + strlen(iface->state->profile) + 2;
+		env[elen] = xmalloc(e);
+		snprintf(env[elen++], e, "profile=%s", iface->state->profile);
+	}
 	if (iface->wireless) {
 		e = strlen("new_ssid=") + strlen(iface->ssid) + 2;
 		if (iface->state->new != NULL ||
