@@ -1389,7 +1389,12 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 
 	/* We have to have DHCP type to work */
 	if (get_option_uint8(&type, dhcp, DHO_MESSAGETYPE) == -1) {
-		log_dhcp(LOG_ERR, "no DHCP type in", dhcp);
+		logger(LOG_ERR, "ignoring message; no DHCP type");
+		return 0;
+	}
+	/* Every DHCP message should include ServerID */
+	if (get_option_addr(&addr.s_addr, dhcp, DHO_SERVERID) == -1) {
+		logger(LOG_ERR, "ignoring message; no Server ID");
 		return 0;
 	}
 
