@@ -456,6 +456,12 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 	/* We may have found a BOOTP server */
 	if (get_option_uint8(&type, dhcp, DHO_MESSAGETYPE) == -1) 
 		type = 0;
+	else if (get_option_addr(&addr.s_addr, dhcp, DHO_SERVERID) == -1) {
+		/* We should ignore invalid NAK messages without a ServerID */
+		syslog(LOG_WARNING, "%s: ignoring DHCP message; no Server ID",
+		    iface->name);
+		return;
+	}
 
 	/* We should restart on a NAK */
 	if (type == DHCP_NAK) {
@@ -494,9 +500,8 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 		lease->frominfo = 0;
 		lease->addr.s_addr = dhcp->yiaddr;
 		lease->server.s_addr = 0;
-		if (type)
-			get_option_addr(&lease->server.s_addr, dhcp,
-			    DHO_SERVERID);
+		if (type != 0)
+			lease->server.s_addr = addr.s_addr;
 		log_dhcp(LOG_INFO, "offered", iface, dhcp);
 		free(state->offer);
 		state->offer = dhcp;
