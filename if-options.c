@@ -45,8 +45,14 @@
 #include "if-options.h"
 #include "net.h"
 
+/* These options only make sense in the config file, so don't use any
+   valid short options for them */
+#define O_BASE		MAX('z', 'Z') + 1
+#define O_ALOWIF	O_BASE + 1
+#define O_DENYIF	O_BASE + 2
+#define O_ARPING	O_BASE + 3
+
 const struct option cf_options[] = {
-	{"arping",          required_argument, NULL, 'a'},
 	{"background",      no_argument,       NULL, 'b'},
 	{"script",          required_argument, NULL, 'c'},
 	{"debug",           no_argument,       NULL, 'd'},
@@ -68,7 +74,6 @@ const struct option cf_options[] = {
 	{"vendor",          required_argument, NULL, 'v'},
 	{"exit",            no_argument,       NULL, 'x'},
 	{"reboot",          required_argument, NULL, 'y'},
-	{"allowinterfaces", required_argument, NULL, 'z'},
 	{"noarp",           no_argument,       NULL, 'A'},
 	{"nobackground",    no_argument,       NULL, 'B'},
 	{"nohook",          required_argument, NULL, 'C'},
@@ -86,7 +91,9 @@ const struct option cf_options[] = {
 	{"test",            no_argument,       NULL, 'T'},
 	{"variables",       no_argument,       NULL, 'V'},
 	{"blacklist",       required_argument, NULL, 'X'},
-	{"denyinterfaces",  required_argument, NULL, 'Z'},
+	{"allowinterfaces", required_argument, NULL, O_ALOWIF},
+	{"denyinterfaces",  required_argument, NULL, O_DENYIF},
+	{"arping",          required_argument, NULL, O_ARPING},
 	{NULL,              0,                 NULL, '\0'}
 };
 
@@ -266,7 +273,6 @@ splitv(int *argc, char **argv, const char *arg)
 	return v;	
 }
 
-
 static int
 parse_addr(struct in_addr *addr, struct in_addr *net, const char *arg)
 {
@@ -312,13 +318,6 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	struct rt *rt;
 
 	switch(opt) {
-	case 'a':
-		if (parse_addr(&addr, NULL, arg) != 0)
-			return -1;
-		ifo->arping = xrealloc(ifo->arping,
-		    sizeof(in_addr_t) * (ifo->arping_len + 1));
-		ifo->arping[ifo->arping_len++] = addr.s_addr;
-		break;
 	case 'e': /* FALLTHROUGH */
 	case 'n': /* FALLTHROUGH */
 	case 'x': /* FALLTHROUGH */
@@ -481,11 +480,6 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			syslog(LOG_ERR, "reboot must be a positive value");
 			return -1;
 		}
-		break;
-	case 'z':
-		/* We only set this if we haven't got any interfaces */
-		if (!ifaces)
-			ifav = splitv(&ifac, ifav, arg);
 		break;
 	case 'A':
 		ifo->options &= ~DHCPCD_ARP;
@@ -664,7 +658,19 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		ifo->blacklist[ifo->blacklist_len++] = addr.s_addr;
 		ifo->blacklist[ifo->blacklist_len++] = addr2.s_addr;
 		break;
-	case 'Z':
+	case O_ARPING:
+		if (parse_addr(&addr, NULL, arg) != 0)
+			return -1;
+		ifo->arping = xrealloc(ifo->arping,
+		    sizeof(in_addr_t) * (ifo->arping_len + 1));
+		ifo->arping[ifo->arping_len++] = addr.s_addr;
+		break;
+	case O_ALOWIF:
+		/* We only set this if we haven't got any interfaces */
+		if (!ifaces)
+			ifav = splitv(&ifac, ifav, arg);
+		break;
+	case O_DENYIF:
 		/* We only set this if we haven't got any interfaces */
 		if (!ifaces)
 			ifdv = splitv(&ifdc, ifdv, arg);

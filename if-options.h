@@ -37,7 +37,7 @@
 
 /* Don't set any optional arguments here so we retain POSIX
  * compatibility with getopt */
-#define IF_OPTS "a:bc:def:h:i:kl:m:no:pqr:s:t:u:v:xy:z:ABC:DEF:GI:KLN:O:Q:TVX:Z:"
+#define IF_OPTS "bc:def:h:i:kl:m:no:pqr:s:t:u:v:xy:ABC:DEF:GI:KLN:O:Q:TVX:"
 
 #define DEFAULT_TIMEOUT		30
 #define DEFAULT_REBOOT		10
@@ -91,7 +91,7 @@ struct if_options {
 	char **environ;
 	char script[PATH_MAX];
 	
-	char hostname[HOSTNAME_MAX_LEN + 1]; /* We don't store the lenth */
+	char hostname[HOSTNAME_MAX_LEN + 1]; /* We don't store the length */
 	int fqdn;
 	uint8_t vendorclassid[VENDORCLASSID_MAX_LEN + 2];
 	char clientid[CLIENTID_MAX_LEN + 2];
