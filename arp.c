@@ -243,9 +243,8 @@ send_arp_probe(void *arg)
 	struct timeval tv;
 	int arping = 0;
 
-	if (state->probes == 0 &&
-	    state->arping_index < state->options->arping_len) {
-		addr.s_addr = state->options->arping[state->arping_index++];
+	if (state->arping_index < state->options->arping_len) {
+		addr.s_addr = state->options->arping[state->arping_index];
 		arping = 1;
 	} else if (state->offer) {
 		if (state->offer->yiaddr)
@@ -277,7 +276,7 @@ send_arp_probe(void *arg)
 		tv.tv_usec = 0;
 		if (arping) {
 			state->probes = 0;
-			if (state->arping_index < state->options->arping_len)
+			if (++state->arping_index < state->options->arping_len)
 				add_timeout_tv(&tv, send_arp_probe, iface);
 			else
 				add_timeout_tv(&tv, start_interface, iface);
@@ -286,7 +285,8 @@ send_arp_probe(void *arg)
 	}
 	syslog(LOG_DEBUG,
 	    "%s: sending ARP probe (%d of %d), next in %0.2f seconds",
-	    iface->name, state->probes, PROBE_NUM,  timeval_to_double(&tv));
+	    iface->name, state->probes ? state->probes : PROBE_NUM, PROBE_NUM,
+	    timeval_to_double(&tv));
 	if (send_arp(iface, ARPOP_REQUEST, 0, addr.s_addr) == -1)
 		syslog(LOG_ERR, "send_arp: %m");
 }
