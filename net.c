@@ -40,12 +40,17 @@
 #define __FAVOR_BSD /* Nasty glibc hack so we can use BSD semantics for UDP */
 #include <netinet/udp.h>
 #undef __FAVOR_BSD
+#ifdef AF_PACKET
+#  include <netpacket/packet.h>
+#endif
 #ifdef SIOCGIFMEDIA
-# include <net/if_media.h>
+#  include <net/if_media.h>
 #endif
 
 #include <ctype.h>
 #include <errno.h>
+#include <ifaddrs.h>
+#include <fnmatch.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -199,29 +204,6 @@ init_interface(const char *ifname)
 		iface->metric += 100;
 	}
 
-#ifdef SIOCGIFHWADDR
-	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
-	if (ioctl(s, SIOCGIFHWADDR, &ifr) == -1)
-		goto eexit;
-
-	switch (ifr.ifr_hwaddr.sa_family) {
-	case ARPHRD_ETHER:
-	case ARPHRD_IEEE802:
-		iface->hwlen = ETHER_ADDR_LEN;
-		break;
-	case ARPHRD_IEEE1394:
-		iface->hwlen = EUI64_ADDR_LEN;
-	case ARPHRD_INFINIBAND:
-		iface->hwlen = INFINIBAND_ADDR_LEN;
-		break;
-	default:
-		iface->hwlen = 0;
-	}
-	iface->family = ifr.ifr_hwaddr.sa_family;
-	if (iface->hwlen != 0)
-		memcpy(iface->hwaddr, ifr.ifr_hwaddr.sa_data, iface->hwlen);
-#endif
-
 	if (ioctl(s, SIOCGIFMTU, &ifr) == -1)
 		goto eexit;
 	/* Ensure that the MTU is big enough for DHCP */
@@ -265,114 +247,146 @@ free_interface(struct interface *iface)
 	free(iface);
 }
 
-int
-do_interface(const char *ifname,
-    void (*do_link)(struct interface **, int, char * const *, struct ifreq *),
-    struct interface **ifs, int argc, char * const *argv,
-    struct in_addr *addr, struct in_addr *net, struct in_addr *dst, int act)
+struct interface *
+discover_interfaces(int argc, char * const *argv)
 {
-	int s;
-	struct ifconf ifc;
-	int retval = 0, found = 0;
-	int len = 10 * sizeof(struct ifreq);
-	int lastlen = 0;
-	char *p, *e;
-	in_addr_t address, netmask;
-	struct ifreq *ifr;
-	struct sockaddr_in *sin;
+	struct ifaddrs *ifaddrs, *ifa;
+	char *p;
+	int i;
+	struct interface *ifp, *ifs, *ifl;
+#ifdef __linux__
+	char ifn[IF_NAMESIZE];
+#endif
+#ifdef AF_LINK
+	const struct sockaddr_dl *sdl;
+#elif AF_PACKET
+	const struct sockaddr_ll *sll;
+#endif
 
-	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
-		return -1;
+	if (getifaddrs(&ifaddrs) == -1)
+		return NULL;
 
-	/* Not all implementations return the needed buffer size for
-	 * SIOGIFCONF so we loop like so for all until it works */
-	memset(&ifc, 0, sizeof(ifc));
-	for (;;) {
-		ifc.ifc_len = len;
-		ifc.ifc_buf = xmalloc((size_t)len);
-		if (ioctl(s, SIOCGIFCONF, &ifc) == -1) {
-			if (errno != EINVAL || lastlen != 0) {
-				close(s);
-				free(ifc.ifc_buf);	
-				return -1;
+	ifs = ifl = NULL;
+	for (ifa = ifaddrs; ifa; ifa = ifa->ifa_next) {
+#ifdef AF_LINK
+		if (ifa->ifa_addr->sa_family != AF_LINK)
+			continue;
+#elif AF_PACKET
+		if (ifa->ifa_addr->sa_family != AF_PACKET)
+			continue;
+#endif
+		if (argc > 0) {
+			for (i = 0; i < argc; i++) {
+#ifdef __linux__
+				/* Check the real interface name */
+				strlcpy(ifn, argv[i], sizeof(ifn));
+				p = strchr(ifn, ':');
+				if (p)
+					*p = '\0';
+				if (strcmp(ifn, ifa->ifa_name) == 0)
+					break;
+#else
+				if (strcmp(argv[i], ifa->ifa_name) == 0)
+					break;
+#endif
+			}
+			if (i == argc)
+				continue;
+			p = argv[i];
+		} else {
+			for (i = 0; i < ifdc; i++)
+				if (!fnmatch(ifdv[i], ifa->ifa_name, 0))
+					break;
+			if (i < ifdc)
+				continue;
+			for (i = 0; i < ifac; i++)
+				if (!fnmatch(ifav[i], ifa->ifa_name, 0))
+					break;
+			if (ifac && i == ifac)
+				continue;
+			p = ifa->ifa_name;
+		}
+		if ((ifp = init_interface(p)) == NULL)
+			continue;
+		/* Don't allow loopback unless explicit */
+		if (ifp->flags & IFF_LOOPBACK) {
+			if (argc == 0 && ifdc == 0) {
+				free_interface(ifp);
+				continue;
 			}
 		} else {
-			if (ifc.ifc_len == lastlen)
+#ifdef AF_LINK
+			sdl = (const struct sockaddr_dl *)(void *)ifa->ifa_addr;
+			switch(sdl->sdl_type) {
+			case IFT_ETHER:
+				ifp->family = ARPHRD_ETHER;
 				break;
-			lastlen = ifc.ifc_len;
-		}
-
-		free(ifc.ifc_buf);
-		ifc.ifc_buf = NULL;
-		len *= 2;
-	}
-
-	e = (char *)ifc.ifc_buf + ifc.ifc_len;
-	for (p = ifc.ifc_buf; p < e;) {
-		ifr = (struct ifreq *)(void *)p;
-
-#ifndef __linux__
-		if (ifr->ifr_addr.sa_len > sizeof(ifr->ifr_ifru))
-			p += offsetof(struct ifreq, ifr_ifru) +
-			    ifr->ifr_addr.sa_len;
-		else
-#endif
-			p += sizeof(*ifr);
-
-		if (ifname && strcmp(ifname, ifr->ifr_name) != 0)
-			continue;
-
-		found = 1;
-
-		/* Interface discovery for BSD's */
-		if (act == 2 && do_link) {
-			do_link(ifs, argc, argv, ifr);
-			continue;
-		}
-
-		if (ifr->ifr_addr.sa_family == AF_INET && addr)	{
-			sin = (struct sockaddr_in *)(void *)&ifr->ifr_addr;
-			address = sin->sin_addr.s_addr;
-			/* Some platforms only partially fill the bits
-			 * set by the netmask, so we need to zero it now. */
-			sin->sin_addr.s_addr = 0;
-			if (ioctl(s, SIOCGIFNETMASK, ifr) == -1)
-				continue;
-			netmask = sin->sin_addr.s_addr;
-			if (act == 1) {
-				if (dst) {
-					sin = (struct sockaddr_in *)
-						(void *)&ifr->ifr_dstaddr;
-					if (ioctl(s, SIOCGIFDSTADDR, ifr)
-					    == -1)
-						dst->s_addr = INADDR_ANY;
-					else
-						dst->s_addr =
-						    sin->sin_addr.s_addr;
-				}
-				addr->s_addr = address;
-				net->s_addr = netmask;
-				retval = 1;
+			case IFT_IEEE1394:
+				ifp->family = ARPHRD_IEEE1394;
 				break;
-			} else {
-				if (address == addr->s_addr &&
-				    (!net || netmask == net->s_addr))
-				{
-					retval = 1;
-					break;
-				}
 			}
+			ifp->hwlen = sdl->sdl_alen;
+			memcpy(ifp->hwaddr, LLADDR(sdl), ifp->hwlen);
+#elif AF_PACKET
+			sll = (const struct sockaddr_ll *)(void *)ifa->ifa_addr;
+			ifp->family = sll->sll_hatype;
+			ifp->hwlen = sll->sll_halen;
+			if (ifp->hwlen != 0)
+				memcpy(ifp->hwaddr, sll->sll_addr, ifp->hwlen);
+#endif
 		}
-
+		if (ifl)
+			ifl->next = ifp; 
+		else
+			ifs = ifp;
+		ifl = ifp;
 	}
-
-	if (!found)
-		errno = ENXIO;
-	close(s);
-	free(ifc.ifc_buf);
-	return retval;
+	freeifaddrs(ifaddrs);
+	return ifs;
 }
 
+int
+do_address(const char *ifname,
+    struct in_addr *addr, struct in_addr *net, struct in_addr *dst, int act)
+{
+	struct ifaddrs *ifaddrs, *ifa;
+	const struct sockaddr_in *a, *n, *d;
+	int retval;
+
+	if (getifaddrs(&ifaddrs) == -1)
+		return -1;
+
+	retval = 0;
+	for (ifa = ifaddrs; ifa; ifa = ifa->ifa_next) {
+		if (ifa->ifa_addr->sa_family != AF_INET ||
+		    strcmp(ifa->ifa_name, ifname) != 0)
+			continue;
+		a = (const struct sockaddr_in *)(void *)&ifa->ifa_addr;
+		n = (const struct sockaddr_in *)(void *)&ifa->ifa_netmask;
+		if (ifa->ifa_flags & IFF_POINTOPOINT)
+			d = (const struct sockaddr_in *)
+				(void *)&ifa->ifa_ifu.ifu_dstaddr;
+		else
+			d = NULL;
+		if (act == 1) {
+			addr->s_addr = a->sin_addr.s_addr;
+			net->s_addr = n->sin_addr.s_addr;
+			if (dst && ifa->ifa_flags & IFF_POINTOPOINT)
+				dst->s_addr = d->sin_addr.s_addr;
+			retval = 1;
+			break;
+		}
+		if (addr->s_addr == a->sin_addr.s_addr &&
+		    (net == NULL || net->s_addr == n->sin_addr.s_addr))
+		{
+			retval = 1;
+			break;
+		}
+	}
+	freeifaddrs(ifaddrs);
+	return retval;
+}
+	
 int
 up_interface(const char *ifname)
 {

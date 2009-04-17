@@ -66,8 +66,8 @@
  * 192.168/16
  */
 #ifndef IN_PRIVATE
-# define IN_PRIVATE(addr) (((addr & IN_CLASSA_NET) == 0x0a000000) ||	\
-	    ((addr & 0xfff00000)    == 0xac100000) ||			\
+# define IN_PRIVATE(addr) (((addr & IN_CLASSA_NET) == 0x0a000000) ||	      \
+	    ((addr & 0xfff00000)    == 0xac100000) ||			      \
 	    ((addr & IN_CLASSB_NET) == 0xc0a80000))
 #endif
 
@@ -103,31 +103,29 @@ int inet_ntocidr(struct in_addr);
 int inet_cidrtoaddr(int, struct in_addr *);
 
 int up_interface(const char *);
-int do_interface(const char *,
-    void (*)(struct interface **, int, char * const *, struct ifreq *),
-    struct interface **, int, char * const *,
+int do_address(const char *,
     struct in_addr *, struct in_addr *, struct in_addr *, int);
 int if_address(const struct interface *,
     const struct in_addr *, const struct in_addr *,
     const struct in_addr *, int);
-#define add_address(iface, addr, net, brd)				\
+#define add_address(iface, addr, net, brd)				      \
 	if_address(iface, addr, net, brd, 1)
-#define del_address(iface, addr, net)					\
+#define del_address(iface, addr, net)					      \
 	if_address(iface, addr, net, NULL, -1)
-#define has_address(iface, addr, net)					\
-	do_interface(iface, NULL, NULL, 0, NULL, addr, net, NULL, 0)
-#define get_address(iface, addr, net, dst)				\
-	do_interface(iface, NULL, NULL, 0, NULL, addr, net, dst, 1)
+#define has_address(iface, addr, net)					      \
+	do_address(iface, addr, net, NULL, 0)
+#define get_address(iface, addr, net, dst)				      \
+	do_address(iface, addr, net, dst, 1)
 
 int if_route(const struct interface *, const struct in_addr *,
     const struct in_addr *, const struct in_addr *, int, int);
-#define add_route(iface, dest, mask, gate, metric)			\
+#define add_route(iface, dest, mask, gate, metric)			      \
 	if_route(iface, dest, mask, gate, metric, 1)
-#define change_route(iface, dest, mask, gate, metric)			\
+#define change_route(iface, dest, mask, gate, metric)			      \
 	if_route(iface, dest, mask, gate, metric, 0)
-#define del_route(iface, dest, mask, gate, metric)			\
+#define del_route(iface, dest, mask, gate, metric)			      \
 	if_route(iface, dest, mask, gate, metric, -1)
-#define del_src_route(iface, dest, mask, gate, metric)			\
+#define del_src_route(iface, dest, mask, gate, metric)			      \
 	if_route(iface, dest, mask, gate, metric, -2)
 void free_routes(struct rt *);
 

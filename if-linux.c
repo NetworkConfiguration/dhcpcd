@@ -29,7 +29,6 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/param.h>
 
@@ -41,14 +40,8 @@
 # define IFLA_WIRELESS (IFLA_MASTER + 1)
 #endif
 
-#include <arpa/inet.h>
-#include <net/if.h>
-#include <netinet/ether.h>
-#include <netpacket/packet.h>
-
 #include <errno.h>
 #include <ctype.h>
-#include <fnmatch.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -509,72 +502,4 @@ if_route(const struct interface *iface,
 		retval = -1;
 	free(nlm);
 	return retval;
-}
-
-struct interface *
-discover_interfaces(int argc, char * const *argv)
-{
-	FILE *f;
-	char ifn[IF_NAMESIZE];
-	char *p, *c;
-	size_t ln = 0, n;
-	int i;
-	struct interface *ifs = NULL, *ifp, *ifl;
-
-	if ((f = fopen("/proc/net/dev", "r"))) {
-		while ((p = get_line(f))) {
-			if (++ln < 2)
-				continue;
-			n = strcspn(p, ": \t");
-			p[n]= '\0';
-			ifl = NULL;
-			for (ifp = ifs; ifp; ifp = ifp->next) {
-				if (strcmp(ifp->name, p) == 0)
-					break;
-				ifl = ifp;
-			}
-			if (ifp)
-				continue;
-			if (argc > 0) {
-				for (i = 0; i < argc; i++) {
-					/* Check the real interface name */
-					strlcpy(ifn, argv[i], sizeof(ifn));
-					c = strchr(ifn, ':');
-					if (c)
-						*c = '\0';
-					if (strcmp(ifn, p) == 0)
-						break;
-				}
-				if (i == argc)
-					continue;
-				p = argv[i];
-			} else {
-				for (i = 0; i < ifdc; i++)
-					if (!fnmatch(ifdv[i], p, 0))
-						break;
-				if (i < ifdc)
-					continue;
-				for (i = 0; i < ifac; i++)
-					if (!fnmatch(ifav[i], p, 0))
-						break;
-				if (ifac && i == ifac)
-					continue;
-			}
-			if ((ifp = init_interface(p))) {
-				/* Don't allow loopback unless explicit */
-				if (ifp->flags & IFF_LOOPBACK &&
-				    (argc != 0 || ifdc != 0))
-				{
-					free_interface(ifp);
-					continue;
-				}
-				if (ifl)
-					ifl->next = ifp; 
-				else
-					ifs = ifp;
-			}
-		}
-		fclose(f);
-	}
-	return ifs;
 }
