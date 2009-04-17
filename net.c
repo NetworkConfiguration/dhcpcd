@@ -275,12 +275,14 @@ discover_interfaces(int argc, char * const *argv)
 #ifdef AF_LINK
 		if (ifa->ifa_addr->sa_family != AF_LINK)
 			continue;
+#ifdef __NetBSD__
 		/* FIXME: Why do I get 2 AF_LINK addresses per interface? */
 		for (ifp = ifs; ifp; ifp = ifp->next)
 			if (strcmp(ifp->name, ifa->ifa_name) == 0)
 				break;
 		if (ifp)
 			continue;
+#endif
 #elif AF_PACKET
 		if (ifa->ifa_addr->sa_family != AF_PACKET)
 			continue;
@@ -336,6 +338,9 @@ discover_interfaces(int argc, char * const *argv)
 				break;
 			}
 			ifp->hwlen = sdl->sdl_alen;
+#ifndef CLLADDR
+#  define CLLADDR(s) ((const char *)((s)->sdl_data + (s)->sdl_nlen))
+#endif
 			memcpy(ifp->hwaddr, CLLADDR(sdl), ifp->hwlen);
 #elif AF_PACKET
 			sll = (const struct sockaddr_ll *)(void *)ifa->ifa_addr;

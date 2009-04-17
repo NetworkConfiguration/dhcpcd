@@ -28,6 +28,7 @@
 const char copyright[] = "Copyright (c) 2006-2009 Roy Marples";
 
 #include <sys/file.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/uio.h>
