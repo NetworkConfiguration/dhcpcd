@@ -48,9 +48,7 @@
 /* These options only make sense in the config file, so don't use any
    valid short options for them */
 #define O_BASE		MAX('z', 'Z') + 1
-#define O_ALOWIF	O_BASE + 1
-#define O_DENYIF	O_BASE + 2
-#define O_ARPING	O_BASE + 3
+#define O_ARPING	O_BASE + 1
 
 const struct option cf_options[] = {
 	{"background",      no_argument,       NULL, 'b'},
@@ -73,6 +71,7 @@ const struct option cf_options[] = {
 	{"userclass",       required_argument, NULL, 'u'},
 	{"vendor",          required_argument, NULL, 'v'},
 	{"exit",            no_argument,       NULL, 'x'},
+	{"allowinterfaces", required_argument, NULL, 'z'},
 	{"reboot",          required_argument, NULL, 'y'},
 	{"noarp",           no_argument,       NULL, 'A'},
 	{"nobackground",    no_argument,       NULL, 'B'},
@@ -91,8 +90,7 @@ const struct option cf_options[] = {
 	{"test",            no_argument,       NULL, 'T'},
 	{"variables",       no_argument,       NULL, 'V'},
 	{"blacklist",       required_argument, NULL, 'X'},
-	{"allowinterfaces", required_argument, NULL, O_ALOWIF},
-	{"denyinterfaces",  required_argument, NULL, O_DENYIF},
+	{"denyinterfaces",  required_argument, NULL, 'Z'},
 	{"arping",          required_argument, NULL, O_ARPING},
 	{NULL,              0,                 NULL, '\0'}
 };
@@ -481,6 +479,11 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			return -1;
 		}
 		break;
+	case 'z':
+		/* We only set this if we haven't got any interfaces */
+		if (!ifaces)
+			ifav = splitv(&ifac, ifav, arg);
+		break;
 	case 'A':
 		ifo->options &= ~DHCPCD_ARP;
 		/* IPv4LL requires ARP */
@@ -658,22 +661,17 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		ifo->blacklist[ifo->blacklist_len++] = addr.s_addr;
 		ifo->blacklist[ifo->blacklist_len++] = addr2.s_addr;
 		break;
+	case 'Z':
+		/* We only set this if we haven't got any interfaces */
+		if (!ifaces)
+			ifdv = splitv(&ifdc, ifdv, arg);
+		break;
 	case O_ARPING:
 		if (parse_addr(&addr, NULL, arg) != 0)
 			return -1;
 		ifo->arping = xrealloc(ifo->arping,
 		    sizeof(in_addr_t) * (ifo->arping_len + 1));
 		ifo->arping[ifo->arping_len++] = addr.s_addr;
-		break;
-	case O_ALOWIF:
-		/* We only set this if we haven't got any interfaces */
-		if (!ifaces)
-			ifav = splitv(&ifac, ifav, arg);
-		break;
-	case O_DENYIF:
-		/* We only set this if we haven't got any interfaces */
-		if (!ifaces)
-			ifdv = splitv(&ifdc, ifdv, arg);
 		break;
 	default:
 		return 0;
