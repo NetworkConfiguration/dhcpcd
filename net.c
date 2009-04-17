@@ -34,6 +34,10 @@
 #include <arpa/inet.h>
 #include <net/if.h>
 #include <net/if_arp.h>
+#ifdef AF_LINK
+#  include <net/if_dl.h>
+#  include <net/if_types.h>
+#endif
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
@@ -271,6 +275,12 @@ discover_interfaces(int argc, char * const *argv)
 #ifdef AF_LINK
 		if (ifa->ifa_addr->sa_family != AF_LINK)
 			continue;
+		/* FIXME: Why do I get 2 AF_LINK addresses per interface? */
+		for (ifp = ifs; ifp; ifp = ifp->next)
+			if (strcmp(ifp->name, ifa->ifa_name) == 0)
+				break;
+		if (ifp)
+			continue;
 #elif AF_PACKET
 		if (ifa->ifa_addr->sa_family != AF_PACKET)
 			continue;
@@ -326,7 +336,7 @@ discover_interfaces(int argc, char * const *argv)
 				break;
 			}
 			ifp->hwlen = sdl->sdl_alen;
-			memcpy(ifp->hwaddr, LLADDR(sdl), ifp->hwlen);
+			memcpy(ifp->hwaddr, CLLADDR(sdl), ifp->hwlen);
 #elif AF_PACKET
 			sll = (const struct sockaddr_ll *)(void *)ifa->ifa_addr;
 			ifp->family = sll->sll_hatype;
@@ -364,8 +374,12 @@ do_address(const char *ifname,
 		a = (const struct sockaddr_in *)(void *)&ifa->ifa_addr;
 		n = (const struct sockaddr_in *)(void *)&ifa->ifa_netmask;
 		if (ifa->ifa_flags & IFF_POINTOPOINT)
-			d = (const struct sockaddr_in *)
-				(void *)&ifa->ifa_ifu.ifu_dstaddr;
+			d = (const struct sockaddr_in *)(void *)
+#ifdef __linux__
+				&ifa->ifa_ifu.ifu_dstaddr;
+#else
+				&ifa->ifa_dstaddr;
+#endif
 		else
 			d = NULL;
 		if (act == 1) {
