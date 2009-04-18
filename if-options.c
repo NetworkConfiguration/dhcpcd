@@ -49,6 +49,7 @@
    valid short options for them */
 #define O_BASE		MAX('z', 'Z') + 1
 #define O_ARPING	O_BASE + 1
+#define O_FALLBACK	O_BASE + 2
 
 const struct option cf_options[] = {
 	{"background",      no_argument,       NULL, 'b'},
@@ -92,6 +93,7 @@ const struct option cf_options[] = {
 	{"blacklist",       required_argument, NULL, 'X'},
 	{"denyinterfaces",  required_argument, NULL, 'Z'},
 	{"arping",          required_argument, NULL, O_ARPING},
+	{"fallback",        required_argument, NULL, O_FALLBACK},
 	{NULL,              0,                 NULL, '\0'}
 };
 
@@ -673,6 +675,10 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		    sizeof(in_addr_t) * (ifo->arping_len + 1));
 		ifo->arping[ifo->arping_len++] = addr.s_addr;
 		break;
+	case O_FALLBACK:
+		free(ifo->fallback);
+		ifo->fallback = xstrdup(arg);
+		break;
 	default:
 		return 0;
 	}
@@ -831,7 +837,9 @@ free_options(struct if_options *ifo)
 			free(ifo->config);
 		}
 		free_routes(ifo->routes);
+		free(ifo->arping);
 		free(ifo->blacklist);
+		free(ifo->fallback);
 		free(ifo);
 	}
 }

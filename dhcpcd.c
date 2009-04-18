@@ -766,6 +766,17 @@ select_profile(struct interface *iface, const char *profile)
 }
 
 static void
+start_fallback(void *arg)
+{
+	struct interface *iface;
+
+	iface = (struct interface *)arg;
+	select_profile(iface, iface->state->options->fallback);
+	configure_interface1(iface);
+	start_interface(iface);
+}
+
+static void
 configure_interface(struct interface *iface, int argc, char **argv)
 {
 	select_profile(iface, NULL);
@@ -773,12 +784,13 @@ configure_interface(struct interface *iface, int argc, char **argv)
 	configure_interface1(iface);
 }
 
-
 static void
 handle_carrier(const char *ifname)
 {
 	struct interface *iface;
 
+	if (!(options & DHCPCD_LINK))
+		return;
 	for (iface = ifaces; iface; iface = iface->next)
 		if (strcmp(iface->name, ifname) == 0)
 			break;
@@ -823,7 +835,9 @@ start_discover(void *arg)
 	iface->state->xid = arc4random();
 	open_sockets(iface);
 	delete_timeout(NULL, iface);
-	if (ifo->options & DHCPCD_IPV4LL &&
+	if (ifo->fallback)
+		add_timeout_sec(ifo->timeout, start_fallback, iface);
+	else if (ifo->options & DHCPCD_IPV4LL &&
 	    !IN_LINKLOCAL(htonl(iface->addr.s_addr)))
 	{
 		if (IN_LINKLOCAL(htonl(iface->state->fail.s_addr)))
@@ -974,7 +988,10 @@ start_reboot(struct interface *iface)
 	iface->state->xid = arc4random();
 	iface->state->lease.server.s_addr = 0;
 	delete_timeout(NULL, iface);
-	if (ifo->options & DHCPCD_LASTLEASE && iface->state->lease.frominfo)
+	if (ifo->fallback)
+		add_timeout_sec(ifo->reboot, start_fallback, iface);
+	else if (ifo->options & DHCPCD_LASTLEASE &&
+	    iface->state->lease.frominfo)
 		add_timeout_sec(ifo->reboot, start_timeout, iface);
 	else if (!(ifo->options & DHCPCD_INFORM &&
 		options & (DHCPCD_MASTER | DHCPCD_DAEMONISED)))

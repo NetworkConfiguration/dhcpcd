@@ -102,6 +102,7 @@ struct if_options {
 	in_addr_t *blacklist;
 	size_t arping_len;
 	in_addr_t *arping;
+	char *fallback;
 };
 
 struct if_options *read_config(const char *,
