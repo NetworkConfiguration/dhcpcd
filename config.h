@@ -28,7 +28,7 @@
 #define CONFIG_H
 
 #define PACKAGE			"dhcpcd"
-#define VERSION			"4.99.16"
+#define VERSION			"4.99.17"
 
 /* Some systems do not have a working fork. */
 /* #define THERE_IS_NO_FORK */

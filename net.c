@@ -279,6 +279,13 @@ discover_interfaces(int argc, char * const *argv)
 		if (ifa->ifa_addr->sa_family != AF_PACKET)
 			continue;
 #endif
+		/* It's possible for an interface to have >1 AF_LINK.
+		 * For our purposes, we use the first one. */
+		for (ifp = ifs; ifp; ifp = ifp->next)
+			if (strcmp(ifp->name, ifa->ifa_name) == 0)
+				break;
+		if (ifp)
+			continue;
 		if (argc > 0) {
 			for (i = 0; i < argc; i++) {
 #ifdef __linux__
