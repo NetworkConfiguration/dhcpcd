@@ -173,6 +173,8 @@ link_route(struct nlmsghdr *nlm)
 	rta = (struct rtattr *) ((char *)rtm + NLMSG_ALIGN(sizeof(*rtm)));
 	len = NLMSG_PAYLOAD(nlm, sizeof(*rtm));
 	rt.iface = NULL;
+	rt.dest.s_addr = INADDR_ANY;
+	rt.gate.s_addr = INADDR_ANY;
 	rt.next = NULL;
 	metric = 0;
 	while (RTA_OK(rta, len)) {
@@ -236,6 +238,7 @@ link_addr(struct nlmsghdr *nlm)
 	rta = (struct rtattr *) IFA_RTA(ifa);
 	len = NLMSG_PAYLOAD(nlm, sizeof(*ifa));
 	addr.s_addr = dest.s_addr = INADDR_ANY;
+	dest.s_addr = INADDR_ANY;
 	inet_cidrtoaddr(ifa->ifa_prefixlen, &net);
 	while (RTA_OK(rta, len)) {
 		switch (rta->rta_type) {
