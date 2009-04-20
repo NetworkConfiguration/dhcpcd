@@ -379,11 +379,7 @@ do_address(const char *ifname,
 		n = (const struct sockaddr_in *)(void *)&ifa->ifa_netmask;
 		if (ifa->ifa_flags & IFF_POINTOPOINT)
 			d = (const struct sockaddr_in *)(void *)
-#ifdef __linux__
-				&ifa->ifa_ifu.ifu_dstaddr;
-#else
 				&ifa->ifa_dstaddr;
-#endif
 		else
 			d = NULL;
 		if (act == 1) {
