@@ -49,11 +49,11 @@ list_interfaces()
 # but sed may not always be available at the time.
 key_get_value()
 {
-	local key=$1 value= x= line=
+	local key="$1" value= x= line=
 
 	shift
 	if type sed >/dev/null 2>&1; then
-		sed -n "s/^${key}//p" $@
+		sed -n "s/^$key//p" $@
 	else
 		for x; do
 			while read line; do
@@ -69,7 +69,7 @@ key_get_value()
 # but sed may not always be available at the time.
 remove_markers()
 {
-	local m1=$1 m2=$2 x= line= in_marker=0
+	local m1="$1" m2="$2" x= line= in_marker=0
 
 	shift; shift
 	if type sed >/dev/null 2>&1; then
