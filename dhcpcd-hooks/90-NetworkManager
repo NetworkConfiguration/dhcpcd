@@ -1,8 +1,0 @@
-# Hook for NetworkManager-0.7.0
-# NOTE: NetworkManager will override the script dhcpcd calls, so this hook
-# only makes sense if NetworkManager is patched NOT to override the
-# script dhcpcd would call.
-
-if [ -x /usr/libexec/nm-dhcp-client.action ]; then
-	/usr/libexec/nm-dhcp-client.action
-fi
