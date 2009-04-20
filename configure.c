@@ -182,16 +182,16 @@ make_env(const struct interface *iface, char ***argv)
 	env[2] = xmalloc(e);
 	snprintf(env[2], e, "pid=%d", getpid());
 	env[3] = xmalloc(e);
-	snprintf(env[3], e, "metric=%d", iface->metric);
+	snprintf(env[3], e, "ifmetric=%d", iface->metric);
 	env[4] = xmalloc(e);
-	snprintf(env[4], e, "wireless=%d", iface->wireless);
+	snprintf(env[4], e, "ifwireless=%d", iface->wireless);
 	env[5] = xmalloc(e);
-	snprintf(env[5], e, "flags=%u", iface->flags);
-	l = e = strlen("interface_order=");
+	snprintf(env[5], e, "ifflags=%u", iface->flags);
+	l = e = strlen("iforder=");
 	for (ifp = ifaces; ifp; ifp = ifp->next)
 		e += strlen(ifp->name) + 1;
 	p = env[6] = xmalloc(e);
-	strlcpy(p, "interface_order=", e);
+	strlcpy(p, "iforder=", e);
 	e -= l;
 	p += l;
 	for (ifp = ifaces; ifp; ifp = ifp->next) {
