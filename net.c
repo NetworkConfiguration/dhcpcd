@@ -321,7 +321,7 @@ discover_interfaces(int argc, char * const *argv)
 			continue;
 		/* Don't allow loopback unless explicit */
 		if (ifp->flags & IFF_LOOPBACK) {
-			if (argc == 0 && ifdc == 0) {
+			if (argc == 0 && ifac == 0) {
 				free_interface(ifp);
 				continue;
 			}
