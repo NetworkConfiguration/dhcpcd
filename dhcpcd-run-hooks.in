@@ -29,12 +29,12 @@ uniqify()
 list_interfaces()
 {
 	local i= x= ifaces=
-	for i in $iforder; do
+	for i in $interface_order; do
 		[ -e "$1/$i" ] && ifaces="$ifaces${ifaces:+ }$i"
 	done
 	for x in "$1"/*; do
 		[ -e "$x" ] || continue
-		for i in $iforder; do
+		for i in $interface_order; do
 			if [ $i = "${x##*/}" ]; then
 				unset x
 				break

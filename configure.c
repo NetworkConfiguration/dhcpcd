@@ -187,11 +187,11 @@ make_env(const struct interface *iface, char ***argv)
 	snprintf(env[4], e, "ifwireless=%d", iface->wireless);
 	env[5] = xmalloc(e);
 	snprintf(env[5], e, "ifflags=%u", iface->flags);
-	l = e = strlen("iforder=");
+	l = e = strlen("interface_order=");
 	for (ifp = ifaces; ifp; ifp = ifp->next)
 		e += strlen(ifp->name) + 1;
 	p = env[6] = xmalloc(e);
-	strlcpy(p, "iforder=", e);
+	strlcpy(p, "interface_order=", e);
 	e -= l;
 	p += l;
 	for (ifp = ifaces; ifp; ifp = ifp->next) {
