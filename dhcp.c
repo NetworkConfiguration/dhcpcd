@@ -161,10 +161,39 @@ static const struct dhcp_opt const dhcp_opts[] = {
 	{ 0, 0, NULL }
 };
 
+static const char *if_params[] = {
+	"interface",
+	"reason",
+	"pid",
+	"ifmetric",
+	"ifwireless",
+	"ifflags",
+y	"profile",
+	"interface_order",
+	NULL
+};
+
+static const char *dhcp_params[] = {
+	"ip_address",
+	"subnet_cidr",
+	"network_number",
+	"ssid",
+	"filename",
+	"server_name",
+	NULL
+};
+
 void
 print_options(void)
 {
 	const struct dhcp_opt *opt;
+	const char **p;
+
+	for (p = if_params; *p; p++)
+		printf(" -  %s\n", *p);
+
+	for (p = dhcp_params; *p; p++)
+		printf("    %s\n", *p);
 
 	for (opt = dhcp_opts; opt->option; opt++)
 		if (opt->var)
