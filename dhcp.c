@@ -168,7 +168,7 @@ static const char *if_params[] = {
 	"ifmetric",
 	"ifwireless",
 	"ifflags",
-y	"profile",
+	"profile",
 	"interface_order",
 	NULL
 };
