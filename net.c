@@ -375,8 +375,8 @@ do_address(const char *ifname,
 		if (ifa->ifa_addr->sa_family != AF_INET ||
 		    strcmp(ifa->ifa_name, ifname) != 0)
 			continue;
-		a = (const struct sockaddr_in *)(void *)&ifa->ifa_addr;
-		n = (const struct sockaddr_in *)(void *)&ifa->ifa_netmask;
+		a = (const struct sockaddr_in *)(void *)ifa->ifa_addr;
+		n = (const struct sockaddr_in *)(void *)ifa->ifa_netmask;
 		if (ifa->ifa_flags & IFF_POINTOPOINT)
 			d = (const struct sockaddr_in *)(void *)
 				&ifa->ifa_dstaddr;

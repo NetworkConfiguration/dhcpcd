@@ -562,7 +562,7 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 		/* If the interface already has the address configured
 		 * then we can't ARP for duplicate detection. */
 		addr.s_addr = state->offer->yiaddr;
-		if (!has_address(iface->name, &addr, NULL)) {
+		if (has_address(iface->name, &addr, NULL) != 1) {
 			state->claims = 0;
 			state->probes = 0;
 			state->conflicts = 0;
