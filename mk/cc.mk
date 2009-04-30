@@ -15,7 +15,7 @@ _CCFLAGS=	-pedantic -Wall -Wunused -Wimplicit -Wshadow -Wformat=2 \
 		-Wbad-function-cast -Wnested-externs -Wcomment -Winline \
 		-Wchar-subscripts -Wcast-align -Wno-format-nonliteral \
 		-Wdeclaration-after-statement -Wsequence-point -Wextra
-_CC_FLAGS_SH=	if ! test -d .svn; then echo ""; else for f in ${_CCFLAGS}; do \
+_CC_FLAGS_SH=	if ! test -d .git; then echo ""; else for f in ${_CCFLAGS}; do \
 		if ${CC} $$f -S -o /dev/null -xc /dev/null >/dev/null 2>&1; \
 		then printf "%s" "$$f "; fi \
 		done; fi
