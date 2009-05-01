@@ -1,5 +1,5 @@
 # Quick and dirty scripts
-# Copyright 2008 Roy Marples <roy@marples.name>
+# Copyright (c) 2008 Roy Marples <roy@marples.name>
 
 SCRIPTSDIR?=	${BINDIR}
 SCRIPTSMODE?=	${BINMODE}

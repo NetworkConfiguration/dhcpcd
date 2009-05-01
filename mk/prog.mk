@@ -1,7 +1,7 @@
 # rules to build a program 
 # based on FreeBSD's bsd.prog.mk
 
-# Copyright 2008 Roy Marples <roy@marples.name>
+# Copyright (c) 2008 Roy Marples <roy@marples.name>
 
 include ${MK}/cc.mk
 

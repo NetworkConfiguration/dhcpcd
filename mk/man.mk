@@ -1,5 +1,5 @@
 # rules to install manpages
-# Copyright 2008 Roy Marples <roy@marples.name>
+# Copyright (c) 2008 Roy Marples <roy@marples.name>
 
 _MANPREFIX_SH=	if [ -n "${PREFIX}" ]; then echo "${PREFIX}"; else echo "/usr/share"; fi
 _MANPREFIX!=	${_MANPREFIX_SH}

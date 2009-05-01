@@ -1,5 +1,5 @@
 # Setup OS specific variables
-# Copyright 2008 Roy Marples <roy@marples.name>
+# Copyright (c) 2008 Roy Marples <roy@marples.name>
 
 _OS_SH=	case `uname -s` in Linux) echo "Linux";; Darwin) echo "Darwin";;  *) echo "BSD";; esac
 _OS!=		${_OS_SH}

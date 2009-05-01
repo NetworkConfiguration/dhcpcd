@@ -1,5 +1,5 @@
 # Quick and dirty files
-# Copyright 2008 Roy Marples <roy@marples.name>
+# Copyright (c) 2008 Roy Marples <roy@marples.name>
 
 FILESDIR?=	${BINDIR}
 FILESMODE?=	${NONBINMODE}
