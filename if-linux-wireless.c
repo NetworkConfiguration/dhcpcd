@@ -44,6 +44,7 @@
 #include <linux/rtnetlink.h>
 /* Support older kernels */
 #ifdef IFLA_WIRELESS
+# include <linux/if.h>
 # include <linux/wireless.h>
 #else
 # define IFLA_WIRELESS (IFLA_MASTER + 1)
