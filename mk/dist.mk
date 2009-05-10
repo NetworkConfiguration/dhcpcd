@@ -30,3 +30,13 @@ snapshot:
 	ls -l ${SNAPFILE}
 
 snap: snapshot
+
+import-bsd:
+	rm -rf /tmp/${DISTPREFIX}/
+	git checkout-index -a --prefix=/tmp/${DISTPREFIX}/
+	cd /tmp/${DISTPREFIX}; rm -rf Makefile mk \
+		if-linux.c if-linux-wireless.c lpf.c \
+		dhcpcd-hooks/Makefile dhcpcd-hooks/50-dhcpcd-compat \
+		dhcpcd-hooks/50-yp.conf
+
+import: import-bsd
