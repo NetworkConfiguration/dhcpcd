@@ -272,6 +272,8 @@ discover_interfaces(int argc, char * const *argv)
 
 	ifs = ifl = NULL;
 	for (ifa = ifaddrs; ifa; ifa = ifa->ifa_next) {
+		if (ifa->ifa_addr == NULL) /* should not happen */
+			continue;
 #ifdef AF_LINK
 		if (ifa->ifa_addr->sa_family != AF_LINK)
 			continue;
@@ -372,6 +374,8 @@ do_address(const char *ifname,
 
 	retval = 0;
 	for (ifa = ifaddrs; ifa; ifa = ifa->ifa_next) {
+		if (ifa->ifa_addr == NULL) /* should not happen */
+			continue;
 		if (ifa->ifa_addr->sa_family != AF_INET ||
 		    strcmp(ifa->ifa_name, ifname) != 0)
 			continue;
