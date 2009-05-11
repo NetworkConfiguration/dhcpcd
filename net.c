@@ -272,15 +272,16 @@ discover_interfaces(int argc, char * const *argv)
 
 	ifs = ifl = NULL;
 	for (ifa = ifaddrs; ifa; ifa = ifa->ifa_next) {
-		if (ifa->ifa_addr == NULL)
-			continue;
+		if (ifa->ifa_addr != NULL) {
 #ifdef AF_LINK
-		if (ifa->ifa_addr->sa_family != AF_LINK)
-			continue;
+			if (ifa->ifa_addr->sa_family != AF_LINK)
+				continue;
 #elif AF_PACKET
-		if (ifa->ifa_addr->sa_family != AF_PACKET)
-			continue;
+			if (ifa->ifa_addr->sa_family != AF_PACKET)
+				continue;
 #endif
+		}
+
 		/* It's possible for an interface to have >1 AF_LINK.
 		 * For our purposes, we use the first one. */
 		for (ifp = ifs; ifp; ifp = ifp->next)
@@ -327,7 +328,7 @@ discover_interfaces(int argc, char * const *argv)
 				free_interface(ifp);
 				continue;
 			}
-		} else {
+		} else if (ifa->ifa_addr != NULL) {
 #ifdef AF_LINK
 			sdl = (const struct sockaddr_dl *)(void *)ifa->ifa_addr;
 			switch(sdl->sdl_type) {
