@@ -344,7 +344,8 @@ run_script(const struct interface *iface)
 				iov[1].iov_base = bigenv;
 				iov[1].iov_len = elen;
 			}
-			writev(fd->fd, iov, 2);
+			if (writev(fd->fd, iov, 2) == -1)
+				syslog(LOG_ERR, "writev: %m");
 		}
 	}
 	free(bigenv);

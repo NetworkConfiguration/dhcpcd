@@ -1365,7 +1365,10 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 			iov[0].iov_len = sizeof(ssize_t);
 			iov[1].iov_base = UNCONST(VERSION);
 			iov[1].iov_len = len;
-			writev(fd->fd, iov, 2);
+			if (writev(fd->fd, iov, 2) == -1) {
+				syslog(LOG_ERR, "writev: %m");
+				return -1;
+			}
 			return 0;
 		} else if (strcmp(*argv, "--getconfigfile") == 0) {
 			len = strlen(cffile ? cffile : CONFIG) + 1;
@@ -1373,7 +1376,10 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 			iov[0].iov_len = sizeof(ssize_t);
 			iov[1].iov_base = cffile ? cffile : UNCONST(CONFIG);
 			iov[1].iov_len = len;
-			writev(fd->fd, iov, 2);
+			if (writev(fd->fd, iov, 2) == -1) {
+				syslog(LOG_ERR, "writev: %m");
+				return -1;
+			}
 			return 0;
 		} else if (strcmp(*argv, "--getinterfaces") == 0) {
 			len = 0;
