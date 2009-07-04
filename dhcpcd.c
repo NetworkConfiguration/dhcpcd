@@ -497,7 +497,8 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 		lease->addr.s_addr = dhcp->yiaddr;
 		lease->server.s_addr = INADDR_ANY;
 		if (type != 0)
-			get_option_addr(&lease->server.s_addr, dhcp, DHO_SERVERID);
+			get_option_addr(&lease->server.s_addr,
+			    dhcp, DHO_SERVERID);
 		log_dhcp(LOG_INFO, "offered", iface, dhcp);
 		free(state->offer);
 		state->offer = dhcp;
@@ -551,6 +552,11 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 	lease->frominfo = 0;
 
 	delete_timeout(NULL, iface);
+	/* We now have an offer, so close the DHCP sockets.
+	 * This allows us to safely ARP when broken DHCP servers send an ACK
+	 * follows by an invalid NAK. */
+	close_sockets(iface);
+
 	if (ifo->options & DHCPCD_ARP &&
 	    iface->addr.s_addr != state->offer->yiaddr)
 	{
