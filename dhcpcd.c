@@ -430,6 +430,19 @@ blacklisted_ip(const struct if_options *ifo, in_addr_t addr)
 	return 0;
 }
 
+static int
+whitelisted_ip(const struct if_options *ifo, in_addr_t addr)
+{
+	size_t i;
+
+	if (ifo->whitelist_len == 0)
+		return -1;
+	for (i = 0; i < ifo->whitelist_len; i += 2)
+		if (ifo->whitelist[i] == (addr & ifo->whitelist[i + 1]))
+			return 1;
+	return 0;
+}
+
 static void
 handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 {
@@ -585,6 +598,7 @@ handle_dhcp_packet(void *arg)
 	const uint8_t *pp;
 	ssize_t bytes;
 	struct in_addr from;
+	int i;
 
 	/* We loop through until our buffer is empty.
 	 * The benefit is that if we get >1 DHCP packet in our buffer and
@@ -600,7 +614,15 @@ handle_dhcp_packet(void *arg)
 			    iface->name, inet_ntoa(from));
 			continue;
 		}
-		if (blacklisted_ip(iface->state->options, from.s_addr)) {
+		i = whitelisted_ip(iface->state->options, from.s_addr);
+		if (i == 0) {
+			syslog(LOG_WARNING,
+			    "%s: non whitelisted DHCP packet from %s",
+			    iface->name, inet_ntoa(from));
+			continue;
+		} else if (i != 1 &&
+		    blacklisted_ip(iface->state->options, from.s_addr) == 1)
+		{
 			syslog(LOG_WARNING,
 			    "%s: blacklisted DHCP packet from %s",
 			    iface->name, inet_ntoa(from));
