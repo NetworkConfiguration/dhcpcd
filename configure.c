@@ -483,7 +483,8 @@ d_route(struct rt *rt, const struct interface *iface, int metric)
 static struct rt *
 get_subnet_route(struct dhcp_message *dhcp)
 {
-	in_addr_t addr, net;
+	in_addr_t addr;
+	struct in_addr net;
 	struct rt *rt;
 
 	addr = dhcp->yiaddr;
@@ -491,12 +492,12 @@ get_subnet_route(struct dhcp_message *dhcp)
 		addr = dhcp->ciaddr;
 	/* Ensure we have all the needed values */
 	if (get_option_addr(&net, dhcp, DHO_SUBNETMASK) == -1)
-		net = get_netmask(addr);
-	if (net == INADDR_BROADCAST || net == INADDR_ANY)
+		net.s_addr = get_netmask(addr);
+	if (net.s_addr == INADDR_BROADCAST || net.s_addr == INADDR_ANY)
 		return NULL;
 	rt = malloc(sizeof(*rt));
-	rt->dest.s_addr = addr & net;
-	rt->net.s_addr = net;
+	rt->dest.s_addr = addr & net.s_addr;
+	rt->net.s_addr = net.s_addr;
 	rt->gate.s_addr = 0;
 	return rt;
 }

@@ -405,7 +405,7 @@ log_dhcp(int lvl, const char *msg,
 		a = xstrdup(inet_ntoa(addr));
 	} else
 		a = NULL;
-	r = get_option_addr(&addr.s_addr, dhcp, DHO_SERVERID);
+	r = get_option_addr(&addr, dhcp, DHO_SERVERID);
 	if (dhcp->servername[0] && r == 0)
 		syslog(lvl, "%s: %s %s from %s `%s'", iface->name, msg, a,
 		    inet_ntoa(addr), dhcp->servername);
@@ -464,7 +464,7 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 	if (type == DHCP_NAK) {
 		/* For NAK, only check if we require the ServerID */
 		if (has_option_mask(ifo->requiremask, DHO_SERVERID) &&
-		    get_option_addr(&addr.s_addr, dhcp, DHO_SERVERID) == -1)
+		    get_option_addr(&addr, dhcp, DHO_SERVERID) == -1)
 		{
 			log_dhcp(LOG_WARNING, "reject NAK", iface, dhcp);
 			return;
@@ -510,7 +510,7 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 		lease->addr.s_addr = dhcp->yiaddr;
 		lease->server.s_addr = INADDR_ANY;
 		if (type != 0)
-			get_option_addr(&lease->server.s_addr,
+			get_option_addr(&lease->server,
 			    dhcp, DHO_SERVERID);
 		log_dhcp(LOG_INFO, "offered", iface, dhcp);
 		free(state->offer);
