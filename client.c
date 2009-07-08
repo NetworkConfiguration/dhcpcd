@@ -368,7 +368,7 @@ get_lease(struct dhcp_lease *lease, const struct dhcp_message *dhcp)
 		return;
 	lease->addr.s_addr = dhcp->yiaddr;
 
-	if (get_option_addr(&lease->net.s_addr, dhcp, DHO_SUBNETMASK) == -1)
+	if (get_option_addr(&lease->net, dhcp, DHO_SUBNETMASK) == -1)
 		lease->net.s_addr = get_netmask(dhcp->yiaddr);
 	if (get_option_uint32(&lease->leasetime, dhcp, DHO_LEASETIME) == 0) {
 		/* Ensure that we can use the lease */
@@ -1361,7 +1361,7 @@ log_dhcp(int lvl, const char *msg, const struct dhcp_message *dhcp)
 		addr.s_addr = dhcp->yiaddr;
 		a = xstrdup(inet_ntoa(addr));
 	}
-	r = get_option_addr(&addr.s_addr, dhcp, DHO_SERVERID);
+	r = get_option_addr(&addr, dhcp, DHO_SERVERID);
 	if (dhcp->servername[0] && r == 0)
 		logger(lvl, "%s %s from %s `%s'", msg, a,
 		       inet_ntoa(addr), dhcp->servername);
@@ -1393,7 +1393,7 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 		return 0;
 	}
 	/* Every DHCP message should include ServerID */
-	if (get_option_addr(&addr.s_addr, dhcp, DHO_SERVERID) == -1) {
+	if (get_option_addr(&addr, dhcp, DHO_SERVERID) == -1) {
 		logger(LOG_ERR, "ignoring message; no Server ID");
 		return 0;
 	}
@@ -1402,7 +1402,7 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 	 * We should expand this to check IP and/or hardware address
 	 * at the packet level. */
 	if (options->blacklist_len != 0 &&
-	    get_option_addr(&addr.s_addr, dhcp, DHO_SERVERID) == 0)
+	    get_option_addr(&addr, dhcp, DHO_SERVERID) == 0)
 	{
 		for (i = 0; i < options->blacklist_len; i++) {
 			if (options->blacklist[i] != addr.s_addr)
@@ -1454,7 +1454,7 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 
 	if (type == DHCP_OFFER && state->state == STATE_DISCOVERING) {
 		lease->addr.s_addr = dhcp->yiaddr;
-		get_option_addr(&lease->server.s_addr, dhcp, DHO_SERVERID);
+		get_option_addr(&lease->server, dhcp, DHO_SERVERID);
 		log_dhcp(LOG_INFO, "offered", dhcp);
 		if (state->options & DHCPCD_TEST) {
 			run_script(options, iface->name, "TEST", dhcp, NULL);
@@ -1487,7 +1487,7 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 	case STATE_RENEWING:
 	case STATE_REBINDING:
 		if (!(state->options & DHCPCD_INFORM)) {
-			get_option_addr(&lease->server.s_addr,
+			get_option_addr(&lease->server,
 					dhcp, DHO_SERVERID);
 			log_dhcp(LOG_INFO, "acknowledged", dhcp);
 		}
