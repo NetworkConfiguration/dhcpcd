@@ -1677,6 +1677,16 @@ main(int argc, char **argv)
 			exit(EXIT_FAILURE);
 		}
 
+		/* Ensure we have the needed directories */
+		if (mkdir(RUNDIR, 0755) == -1 && errno != EEXIST) {
+			syslog(LOG_ERR, "mkdir `%s': %m", RUNDIR);
+			exit(EXIT_FAILURE);
+		}
+		if (mkdir(DBDIR, 0755) == -1 && errno != EEXIST) {
+			syslog(LOG_ERR, "mkdir `%s': %m", DBDIR);
+			exit(EXIT_FAILURE);
+		}
+
 		pidfd = open(pidfile, O_WRONLY | O_CREAT | O_NONBLOCK, 0664);
 		if (pidfd == -1) {
 			syslog(LOG_ERR, "open `%s': %m", pidfile);
