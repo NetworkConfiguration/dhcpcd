@@ -71,7 +71,7 @@ signal_read(void)
 
 	memset(buf, 0, sizeof(buf));
 	bytes = read(signal_pipe[0], buf, sizeof(buf));
-	if (bytes >= 0 && bytes >= sizeof(sig))
+	if (bytes >= 0 && (size_t)bytes >= sizeof(sig))
 		memcpy(&sig, buf, sizeof(sig));
 	return sig;
 }
