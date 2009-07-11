@@ -253,7 +253,7 @@ stop_interface(struct interface *iface)
 	else
 		ifaces = ifp->next;
 	free_interface(ifp);
-	if (!(options & DHCPCD_MASTER))
+	if (!(options & (DHCPCD_MASTER | DHCPCD_TEST)))
 		exit(EXIT_FAILURE);
 }
 
@@ -984,9 +984,13 @@ start_inform(struct interface *iface)
 	if (handle_3rdparty(iface))
 		return;
 
-	iface->state->options->options |= DHCPCD_STATIC;
-	start_static(iface);
-	iface->state->options->options &= ~DHCPCD_STATIC;
+	if (options & DHCPCD_TEST) {
+		iface->addr.s_addr = iface->state->options->req_addr.s_addr;
+		iface->net.s_addr = iface->state->options->req_mask.s_addr;
+	} else {
+		iface->state->options->options |= DHCPCD_STATIC;
+		start_static(iface);
+	}
 
 	iface->state->state = DHS_INFORM;
 	iface->state->xid = arc4random();
@@ -1065,10 +1069,6 @@ start_interface(void *arg)
 	free(iface->state->offer);
 	iface->state->offer = NULL;
 
-	if (options & DHCPCD_TEST) {
-		start_discover(iface);
-		return;
-	}
 	if (iface->state->arping_index < ifo->arping_len) {
 		start_arping(iface);
 		return;
@@ -1327,6 +1327,9 @@ handle_signal(_unused void *arg)
 		    sig);
 		return;
 	}
+
+	if (options & DHCPCD_TEST)
+		exit(EXIT_FAILURE);
 
 	/* As drop_config could re-arrange the order, we do it like this. */
 	for (;;) {
@@ -1593,9 +1596,11 @@ main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 	options = ifo->options;
-	if (i)
+	if (i != 0) {
 		options |= DHCPCD_TEST | DHCPCD_PERSISTENT;
-
+		options &= ~DHCPCD_DAEMONISE;
+	}
+	
 #ifdef THERE_IS_NO_FORK
 	options &= ~DHCPCD_DAEMONISE;
 #endif
@@ -1605,22 +1610,24 @@ main(int argc, char **argv)
 	else if (options & DHCPCD_QUIET)
 		setlogmask(LOG_UPTO(LOG_WARNING));
 
-	/* If we have any other args, we should run as a single dhcpcd instance
-	 * for that interface. */
-	len = strlen(PIDFILE) + IF_NAMESIZE + 2;
-	pidfile = xmalloc(len);
-	if (optind == argc - 1 && !(options & DHCPCD_TEST)) {
-		snprintf(pidfile, len, PIDFILE, "-", argv[optind]);
-	} else {
-		snprintf(pidfile, len, PIDFILE, "", "");
-		options |= DHCPCD_MASTER;
+	if (!(options & DHCPCD_TEST)) {
+		/* If we have any other args, we should run as a single dhcpcd
+		 *  instance for that interface. */
+		len = strlen(PIDFILE) + IF_NAMESIZE + 2;
+		pidfile = xmalloc(len);
+		if (optind == argc - 1)
+			snprintf(pidfile, len, PIDFILE, "-", argv[optind]);
+		else {
+			snprintf(pidfile, len, PIDFILE, "", "");
+			options |= DHCPCD_MASTER;
+		}
 	}
 
 	if (chdir("/") == -1)
 		syslog(LOG_ERR, "chdir `/': %m");
 	atexit(cleanup);
 
-	if (!(options & DHCPCD_MASTER)) {
+	if (!(options & (DHCPCD_MASTER | DHCPCD_TEST))) {
 		control_fd = open_control();
 		if (control_fd != -1) {
 			syslog(LOG_INFO,
