@@ -708,6 +708,7 @@ send_release(struct interface *iface)
 		open_sockets(iface);
 		send_message(iface, DHCP_RELEASE, NULL);
 		drop_config(iface, "RELEASE");
+		unlink(iface->leasefile);
 	}
 }
 
