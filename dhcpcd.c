@@ -409,10 +409,14 @@ log_dhcp(int lvl, const char *msg,
 	if (dhcp->servername[0] && r == 0)
 		syslog(lvl, "%s: %s %s from %s `%s'", iface->name, msg, a,
 		    inet_ntoa(addr), dhcp->servername);
-	else if (r == 0)
-		syslog(lvl, "%s: %s %s from %s",
-		    iface->name, msg, a, inet_ntoa(addr));
-	else if (a != NULL)
+	else if (r == 0) {
+		if (a == NULL)
+			syslog(lvl, "%s: %s from %s",
+			    iface->name, msg, inet_ntoa(addr));
+		else
+			syslog(lvl, "%s: %s %s from %s",
+			    iface->name, msg, a, inet_ntoa(addr));
+	} else if (a != NULL)
 		syslog(lvl, "%s: %s %s", iface->name, msg, a);
 	else
 		syslog(lvl, "%s: %s", iface->name, msg);
