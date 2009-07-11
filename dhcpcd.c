@@ -475,8 +475,10 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 		}
 		/* We should restart on a NAK */
 		log_dhcp(LOG_WARNING, "NAK:", iface, dhcp);
-		drop_config(iface, "NAK");
-		unlink(iface->leasefile);
+		if (!(options & DHCPCD_TEST)) {
+			drop_config(iface, "NAK");
+			unlink(iface->leasefile);
+		}
 		delete_event(iface->raw_fd);
 		close(iface->raw_fd);
 		iface->raw_fd = -1;
