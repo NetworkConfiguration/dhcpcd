@@ -23,6 +23,7 @@ for x; do
 	--mandir) MANDIR=$var;;
 	--with-ccopts|CFLAGS) CFLAGS=$var;;
 	CPPFLAGS) CPPFLAGS=$var;;
+	--with-hook|--with-hooks|HOOKSCRIPTS) HOOKSCRIPTS=$var;;
 	esac
 done
 
@@ -68,6 +69,13 @@ if [ -n "$CPPLAGS" ]; then
 fi
 
 if [ "$DEBUG" != no -a "$DEBUG" != false ]; then
+	echo "Enabling memory debugging"
+	echo "CPPFLAGS+=	-DDEBUG_MEMORY" >>$CONFIG_MK
+elif [ -d .git ]; then
+	printf "Found git ... "
+	DEBUG=yes
+fi
+if [ "$DEBUG" != no -a "$DEBUG" != false ] || [ -e .git ]; then
 	echo "Adding debugging CFLAGS"
 	cat <<EOF >>$CONFIG_MK
 CFLAGS+=	-Wall -Wextra -Wimplicit -Wshadow -Wformat=2
@@ -77,7 +85,6 @@ CFLAGS+=	-Wredundant-decls  -Wnested-externs
 CFLAGS+=	-Winline -Wwrite-strings -Wcast-align -Wcast-qual
 CFLAGS+=	-Wpointer-arith
 CFLAGS+=	-Wdeclaration-after-statement -Wsequence-point
-CPPFLAGS+=	-DDEBUG_MEMORY
 EOF
 fi
 
@@ -176,3 +183,30 @@ else
 	echo "#include \"compat/strlcpy.h\"" >>$CONFIG_H
 fi
 rm -f _strlcpy.c _strlcpy
+
+cd dhcpcd-hooks
+HOOKS=
+for x in $HOOKSCRIPTS; do
+	printf "Finding hook $x ... "
+	for h in [0-9][0-9]"-$x" [0-9][0-9]"-$x.sh" [0-9][0-9]"-$x.conf"; do
+		[ -e "$h" ] && break
+	done
+	if [ ! -e "$h" ]; then
+		echo "no"
+	else
+		echo "$h"
+		HOOKS="$HOOKS${HOOKS:+ }$h"
+	fi
+done
+cd -
+echo "HOOKSCRIPTS=	$HOOKS" >>$CONFIG_MK
+
+echo
+echo "   SYSCONFDIR =		$SYSCONFDIR"
+echo "   SBINDIR =		$SBINDIR"
+echo "   LIBEXECDIR =		$LIBEXECDIR"
+echo "   DBDIR =		$DBDIR"
+echo "   RUNDIR =		$RUNDIR"
+echo "   MANDIR =		$MANDIR"
+echo "   HOOKSCRIPTS =	$HOOKSCRIPTS"
+echo

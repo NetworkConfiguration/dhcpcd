@@ -61,7 +61,9 @@
 int clock_monotonic;
 static char *lbuf;
 static size_t lbuf_len;
+#ifdef DEBUG_MEMORY
 static char lbuf_set;
+#endif
 
 #ifdef DEBUG_MEMORY
 static void
