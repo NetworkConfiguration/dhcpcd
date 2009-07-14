@@ -97,15 +97,22 @@ Linux)
 	;;
 esac
 
+# Even if we build for $PREFIX, the clueless user might move us to /
+LDELF=/libexec/ld.elf_so
+if [ -e "$LDELF" ]; then
+	echo "Linking against $LDELF"
+	echo "LDFLAGS+=		-Wl,-dynamic-linker=$LDELF" >>$CONFIG_MK
+fi
+
 printf "Testing for arc4random support ... "
 cat <<EOF >_arc4random.c
 #include <stdlib.h>
 int main(void) {
-	uint32_t = arc4random();
+	uint32_t r = arc4random();
 	return 0;
 }
 EOF
-if $CC _arc4random.c -o _random 2>/dev/null; then
+if $CC _arc4random.c -o _arc4random 2>/dev/null; then
 	echo "yes"
 else
 	echo "no"
@@ -118,7 +125,7 @@ printf "Testing for closefrom support ... "
 cat <<EOF >_closefrom.c
 #include <unistd.h>
 int main(void) {
-	int = closefrom(3);
+	int r = closefrom(3);
 	return 0;
 }
 EOF
@@ -169,4 +176,3 @@ else
 	echo "#include \"compat/strlcpy.h\"" >>$CONFIG_H
 fi
 rm -f _strlcpy.c _strlcpy
-

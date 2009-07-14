@@ -29,6 +29,7 @@
 #define COMMON_H
 
 #include <stdio.h>
+#include <time.h>
 
 #include "config.h"
 #include "defs.h"
