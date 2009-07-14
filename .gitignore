@@ -1,6 +1,8 @@
 .depend
 *.o
 *.bz2
+config.h
+config.mk
 dhcpcd
 dhcpcd.conf.5
 dhcpcd.core

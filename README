@@ -4,7 +4,7 @@ Copyright (c) 2006-2009 Roy Marples <roy@marples.name>
 
 Installation
 ------------
-Then just make; make install
+configure; make; make install
 man dhcpcd for command line options
 man dhcpcd.conf for configuration options
 man dhcpcd-run-hooks to learn how to hook scripts into dhcpcd events
@@ -12,19 +12,18 @@ man dhcpcd-run-hooks to learn how to hook scripts into dhcpcd events
 
 Notes
 -----
-If you're cross compiling you may need to set the below knobs to avoid
-automatic tests.
-OS=BSD | Linux
+If you're cross compiling you may need set the platform if OS is different
+from the host.
+--platform=Linux
 
 If you're building for an MMU-less system where fork() does not work, you
-should add -DTHERE_IS_NO_FORK to your CPPFLAGS.
+should configure --disable-fork.
 This also puts the --no-background flag on and stops the --background flag
 from working.
 
-You can change the default dir with these knobs.
+You can change the default dirs with these knobs.
 For example, to satisfy FHS compliance you would do this:-
-LIBEXECDIR=/lib/dhcpcd
-DBDIR=/var/lib/dhcpcd
+configure --libexecdir=/lib/dhcpcd dbdir=/var/lib/dhcpcd
 
 We now default to using -std=c99. For 64-bit linux, this always works, but
 for 32-bit linux it requires either gnu99 or a patch to asm/types.h.

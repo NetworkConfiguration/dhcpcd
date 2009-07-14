@@ -1,13 +1,14 @@
-LIBEXECDIR?=	${PREFIX}/libexec
-HOOKDIR=	${LIBEXECDIR}/dhcpcd-hooks
-SYSTEMSCRIPTS=	01-test 10-mtu 20-resolv.conf 29-lookup-hostname 30-hostname
-FILES=		${SYSTEMSCRIPTS} ${HOOKSCRIPTS}
-FILESDIR=	${HOOKDIR}
+TOP?=	../
+include ${TOP}/Makefile.inc
+include ${TOP}/config.mk
+
+SCRIPTSDIR=	${LIBEXECDIR}/dhcpcd-hooks
+SCRIPTS=	01-test 10-mtu 20-resolv.conf 29-lookup-hostname 30-hostname
+FILES=		${SCRIPTS} ${HOOKSCRIPTS}
 
 all:
 
-MK=		../mk
-include ${MK}/os.mk
-include ${MK}/sys.mk
-include ${MK}/files.mk
-install: _filesinstall
+install:
+	${INSTALL} -d ${DESTDIR}${SCRIPTSDIR}
+	${INSTALL} -m ${NONBINMODE} ${SCRIPTS} ${DESTDIR}${SCRIPTSDIR}
+

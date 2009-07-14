@@ -1,0 +1,172 @@
+#!/bin/sh
+# Try and be like autotools configure, but without autotools
+
+for x; do
+	opt=${x%%=*}
+	var=${x#*=}
+	case "$opt" in
+	--platform) PLATFORM=$var;;
+	--with-cc|CC) CC=$var;;
+	--debug) DEBUG=$var;;
+	--disable-debug) DEBUG=no;;
+	--enable-debug) DEBUG=yes;;
+	--fork) FORK=$var;;
+	--disable-fork) FORK=no;;
+	--enable-fork) FORK=yes;;
+	--prefix) PREFIX=$var;;
+	--sysconfdir) SYSCONFDIR=$var;;
+	--bindir) BINDIR=$var;;
+	--libexecdir) LIBEXECDIR=$var;;
+	--statedir) STATEDIR=$var;;
+	--dbdir) DBDIR=$var;;
+	--rundir) RUNDIR=$var;;
+	--mandir) MANDIR=$var;;
+	--with-ccopts|CFLAGS) CFLAGS=$var;;
+	CPPFLAGS) CPPFLAGS=$var;;
+	esac
+done
+
+: ${PLATFORM:=`uname -s`}
+: ${CC:=cc}
+: ${DEBUG:=no}
+: ${FORK:=yes}
+: ${PREFIX:=}
+: ${SYSCONFDIR:=$PREFIX/etc}
+: ${SBINDIR:=$PREFIX/sbin}
+: ${LIBNAME:=lib}
+: ${LIBEXECDIR:=$PREFIX/libexec}
+: ${STATEDIR:=/var}
+: ${DBDIR:=$STATEDIR/db}
+: ${RUNDIR:=$STATEDIR/run}
+: ${MANDIR:=${PREFIX:-/usr}/share/man}
+
+CONFIG_H=config.h
+CONFIG_MK=config.mk
+
+rm -f $CONFIG_H $CONFIG_MK
+echo "# $PLATFORM" >$CONFIG_MK
+echo "/* $PLATFORM */" >$CONFIG_H
+
+echo "Configuring dhcpcd for ... $PLATFORM"
+
+for x in SYSCONFDIR SBINDIR LIBNAME LIBEXECDIR DBDIR RUNDIR MANDIR; do
+	eval v=\$$x
+	echo "$x=		$v" >>$CONFIG_MK
+	echo "#define $x	\"$v\"" >>$CONFIG_H
+done
+
+if [ "$CC" != cc ]; then
+	echo "Using compiler $CC"
+	echo "CC=		$CC" >>$CONFIG_MK
+fi
+
+if [ -n "$CFLAGS" ]; then
+	echo "CFLAGS=		$CFLAGS" >>$CONFIG_MK
+fi
+if [ -n "$CPPLAGS" ]; then
+	echo "CPPLAGS=		$CPPLAGS" >>$CONFIG_MK
+fi
+
+if [ "$DEBUG" != no -a "$DEBUG" != false ]; then
+	echo "Adding debugging CFLAGS"
+	cat <<EOF >>$CONFIG_MK
+CFLAGS+=	-Wall -Wextra -Wimplicit -Wshadow -Wformat=2
+CFLAGS+=	-Wmissing-prototypes -Wmissing-declarations
+CFLAGS+=	-Wmissing-noreturn -Wmissing-format-attribute
+CFLAGS+=	-Wredundant-decls  -Wnested-externs
+CFLAGS+=	-Winline -Wwrite-strings -Wcast-align -Wcast-qual
+CFLAGS+=	-Wpointer-arith
+CFLAGS+=	-Wdeclaration-after-statement -Wsequence-point
+CPPFLAGS+=	-DDEBUG_MEMORY
+EOF
+fi
+
+if [ -n "$FORK" -a "$FORK" != yes -a "$FORK" != true ]; then
+	echo "There is no fork"
+	echo "CPPFLAGS+=	-DTHERE_IS_NO_FORK" >>$CONFIG_MK
+fi
+
+case "$PLATFORM" in
+Linux)
+	echo "CPPFLAGS+=	-D_BSD_SOURCE -D_XOPEN_SOURCE=600" >>$CONFIG_MK
+	echo "SRCS+=		if-linux.c if-linux-wireless.c lpf.c" >>$CONFIG_MK
+	echo "LDADD+=		-lrt" >>$CONFIG_MK
+	;;
+*)
+	echo "SRCS+=		bpf.c if-bsd.c" >>$CONFIG_MK
+	;;
+esac
+
+printf "Testing for arc4random support ... "
+cat <<EOF >_arc4random.c
+#include <stdlib.h>
+int main(void) {
+	uint32_t = arc4random();
+	return 0;
+}
+EOF
+if $CC _arc4random.c -o _random 2>/dev/null; then
+	echo "yes"
+else
+	echo "no"
+	echo "SRCS+=		compat/arc4random.c" >>$CONFIG_MK
+	echo "#include \"compat/arc4random.h\"" >>$CONFIG_H
+fi
+rm -f _arc4random.c _arc4random
+
+printf "Testing for closefrom support ... "
+cat <<EOF >_closefrom.c
+#include <unistd.h>
+int main(void) {
+	int = closefrom(3);
+	return 0;
+}
+EOF
+if $CC _closefrom.c -o _closefrom 2>/dev/null; then
+	echo "yes"
+else
+	echo "no"
+	echo "SRCS+=		compat/closefrom.c" >>$CONFIG_MK
+	echo "#include \"compat/closefrom.h\"" >>$CONFIG_H
+fi
+rm -f _closefrom.c _closefrom
+
+printf "Testing for getline support ... "
+cat <<EOF >_getline.c
+#define _GNU_SOURCE
+#include <stdio.h>
+int main(void) {
+	char *buf = NULL;
+	size_t n = 0;
+	getline(&buf, &n, stdin);
+	return 0;
+}
+EOF
+if $CC _getline.c -o _getline 2>/dev/null; then
+	echo "yes"
+else
+	echo "no"
+	echo "SRCS+=		compat/getline.c" >>$CONFIG_MK
+	echo "#include \"compat/getline.h\"" >>$CONFIG_H
+fi
+rm -f _getline.c _getline
+
+printf "Testing for strlcpy support ... "
+cat <<EOF >_strlcpy.c
+#include <string.h>
+int main(void) {
+	const char s1[] = "foo";
+	char s2[10];
+	strlcpy(s2, s1, sizeof(s2));
+	return 0;
+}
+EOF
+if $CC _strlcpy.c -o _strlcpy 2>/dev/null; then
+	echo "yes"
+else
+	echo "no"
+	echo "SRCS+=		compat/strlcpy.c" >>$CONFIG_MK
+	echo "#include \"compat/strlcpy.h\"" >>$CONFIG_H
+fi
+rm -f _strlcpy.c _strlcpy
+
