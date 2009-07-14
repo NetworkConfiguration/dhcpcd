@@ -4,7 +4,7 @@ Copyright (c) 2006-2009 Roy Marples <roy@marples.name>
 
 Installation
 ------------
-configure; make; make install
+./configure; make; make install
 man dhcpcd for command line options
 man dhcpcd.conf for configuration options
 man dhcpcd-run-hooks to learn how to hook scripts into dhcpcd events
@@ -17,13 +17,13 @@ from the host.
 --platform=Linux
 
 If you're building for an MMU-less system where fork() does not work, you
-should configure --disable-fork.
+should c./onfigure --disable-fork.
 This also puts the --no-background flag on and stops the --background flag
 from working.
 
 You can change the default dirs with these knobs.
 For example, to satisfy FHS compliance you would do this:-
-configure --libexecdir=/lib/dhcpcd dbdir=/var/lib/dhcpcd
+./configure --libexecdir=/lib/dhcpcd dbdir=/var/lib/dhcpcd
 
 We now default to using -std=c99. For 64-bit linux, this always works, but
 for 32-bit linux it requires either gnu99 or a patch to asm/types.h.
@@ -44,9 +44,11 @@ Hooks
 Not all the hooks in dhcpcd-hooks are installed by default.
 By default we install 01-test, 10-mtu, 20-resolv.conf,
 29-lookup-hostname and 30-hostname.
-The default dhcpcd.conf does disable the lookup-hostname hook by default.
-To add more simply add them in the HOOKSCRIPTS variable.
-make HOOKSCRIPTS=50-ntp install
+The default dhcpcd.conf disables the lookup-hostname hook by default.
+To add more simply
+configure -with-hooks=50-ntp.conf
+or override the make install target
+make HOOKSCRIPTS=50-ntp.conf install
 
 
 Compatibility
