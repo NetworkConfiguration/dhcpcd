@@ -50,11 +50,20 @@ echo "/* $PLATFORM */" >$CONFIG_H
 
 echo "Configuring dhcpcd for ... $PLATFORM"
 
-for x in SYSCONFDIR SBINDIR LIBNAME LIBEXECDIR DBDIR RUNDIR MANDIR; do
+for x in SYSCONFDIR SBINDIR LIBEXECDIR DBDIR RUNDIR; do
+	# Make files look nice for import
+	l=$((10 - ${#x}))
+	if [ $l -gt 2 ]; then
+		t="	"
+	else
+		t=
+	fi
 	eval v=\$$x
-	echo "$x=		$v" >>$CONFIG_MK
-	echo "#define $x	\"$v\"" >>$CONFIG_H
+	echo "$x=$t	$v" >>$CONFIG_MK
+	echo "#define $x$t	\"$v\"" >>$CONFIG_H
 done
+echo "LIBNAME=	$LIBNAME" >>$CONFIG_MK
+echo "MANDIR=		$MANDIR" >>$CONFIG_MK
 
 if [ "$CC" != cc ]; then
 	echo "Using compiler $CC"
@@ -108,7 +117,7 @@ esac
 LDELF=/libexec/ld.elf_so
 if [ -e "$LDELF" ]; then
 	echo "Linking against $LDELF"
-	echo "LDFLAGS+=		-Wl,-dynamic-linker=$LDELF" >>$CONFIG_MK
+	echo "LDFLAGS+=	-Wl,-dynamic-linker=$LDELF" >>$CONFIG_MK
 fi
 
 printf "Testing for arc4random support ... "

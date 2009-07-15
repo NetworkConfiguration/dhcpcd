@@ -50,11 +50,12 @@ DISTFILE?=	${DISTPREFIX}.tar.bz2
 
 CLEANFILES+=	*.tar.bz2
 
+.PHONY:		import import-bsd
+
 .SUFFIXES:	.in
 
 .in:
 	${SED} ${SED_DBDIR} ${SED_HOOKDIR} ${SED_SCRIPT} ${SED_SYS} $< > $@
-
 
 all: ${PROG} ${SCRIPTS} ${MAN5} ${MAN8}
 
@@ -97,5 +98,17 @@ clean:
 
 dist:
 	git archive --prefix=${DISTPREFIX}/ ${GITREF} | bzip2 > ${DISTFILE}
+
+import-bsd:
+	rm -rf /tmp/${DISTPREFIX}
+	${INSTALL} -d /tmp/${DISTPREFIX}
+	cp ${SRCS} *.in /tmp/${DISTPREFIX}
+	cp $$(${CC} ${LDFLAGS} -o $@ ${OBJS} ${LDADD} | \
+		sed -e 's/^.*c //g' -e 's/\\//g' .depend | \
+		tr ' ' '\n' | \
+		sort -u) /tmp/${DISTPREFIX}
+	cd dhcpcd-hooks; ${MAKE} DISTPREFIX=${DISTPREFIX} $@
+
+import: import-bsd
 
 include Makefile.inc

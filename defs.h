@@ -30,23 +30,6 @@
 #define PACKAGE			"dhcpcd"
 #define VERSION			"5.0.6"
 
-/* Some systems do not have a working fork. */
-/* #define THERE_IS_NO_FORK */
-
-/* Paths to things */
-#ifndef SYSCONFDIR
-# define SYSCONFDIR		"/etc"
-#endif
-#ifndef LIBEXECDIR
-# define LIBEXECDIR		"/libexec"
-#endif
-#ifndef RUNDIR
-# define RUNDIR			"/var/run"
-#endif
-#ifndef DBDIR
-# define DBDIR			"/var/db"
-#endif
-
 #ifndef CONFIG
 # define CONFIG			SYSCONFDIR "/" PACKAGE ".conf"
 #endif
