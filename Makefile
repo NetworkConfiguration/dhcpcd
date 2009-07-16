@@ -103,8 +103,8 @@ import-bsd:
 	rm -rf /tmp/${DISTPREFIX}
 	${INSTALL} -d /tmp/${DISTPREFIX}
 	cp ${SRCS} *.in /tmp/${DISTPREFIX}
-	cp $$(${CC} ${LDFLAGS} -o $@ ${OBJS} ${LDADD} | \
-		sed -e 's/^.*c //g' -e 's/\\//g' .depend | \
+	cp $$(${CC} ${CPPFLAGS} -MM ${SRCS} | \
+		sed -e 's/^.*c //g' -e 's/\\//g' | \
 		tr ' ' '\n' | \
 		sort -u) /tmp/${DISTPREFIX}
 	cd dhcpcd-hooks; ${MAKE} DISTPREFIX=${DISTPREFIX} $@
