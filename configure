@@ -120,6 +120,24 @@ if [ -e "$LDELF" ]; then
 	echo "LDFLAGS+=	-Wl,-dynamic-linker=$LDELF" >>$CONFIG_MK
 fi
 
+# We require the libc to support non standard functions, like getifaddrs
+printf "Testing for getifaddrs support ... "
+cat <<EOF >_getifaddrs.c
+#include <sys/types.h>
+#include <ifaddrs.h>
+int main(void) {
+	struct ifaddrs *ifap;
+	return getifaddrs(&ifap);
+}
+EOF
+if $CC _getifaddrs.c -o _getifaddrs 2>/dev/null; then
+	echo "yes"
+else
+	echo "no"
+	echo "libc support for getifaddrs is required - aborting" >&2
+	exit 1
+fi
+
 printf "Testing for arc4random support ... "
 cat <<EOF >_arc4random.c
 #include <stdlib.h>
