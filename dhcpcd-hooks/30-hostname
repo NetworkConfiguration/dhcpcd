@@ -17,7 +17,7 @@ set_hostname()
 	if need_hostname; then
 		if [ -n "$new_host_name" ]; then
 			hostname "$new_host_name"
-		else
+		elif [ -n "$new_fqdn_name" ]; then
 			hostname "$new_fqdn_name"
 		fi
 	fi
