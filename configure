@@ -228,7 +228,7 @@ for x in $HOOKSCRIPTS; do
 		HOOKS="$HOOKS${HOOKS:+ }$h"
 	fi
 done
-cd -
+cd ..
 echo "HOOKSCRIPTS=	$HOOKS" >>$CONFIG_MK
 
 echo
