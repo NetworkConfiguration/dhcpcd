@@ -321,7 +321,8 @@ send_message(struct interface *iface, int type,
 		 * stopping the interface. */
 		if (r == -1) {
 			syslog(LOG_ERR, "%s: send_raw_packet: %m", iface->name);
-			drop_config(iface, "FAIL");
+			if (!(options & DHCPCD_TEST))
+				drop_config(iface, "FAIL");
 			close_sockets(iface);
 			delete_timeout(NULL, iface);
 			callback = NULL;
