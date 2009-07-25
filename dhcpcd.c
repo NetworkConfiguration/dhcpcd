@@ -1467,7 +1467,7 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 	while ((opt = getopt_long(argc, argv, IF_OPTS, cf_options, &oi)) != -1)
 	{
 		switch (opt) {
-		case 'e':
+		case 'g':
 			do_reconf = 1;
 			break;
 		case 'k':
@@ -1563,11 +1563,11 @@ main(int argc, char **argv)
 	while ((opt = getopt_long(argc, argv, IF_OPTS, cf_options, &oi)) != -1)
 	{
 		switch (opt) {
-		case 'e':
-			sig = SIGUSR1;
-			break;
 		case 'f':
 			cffile = optarg;
+			break;
+		case 'g':
+			sig = SIGUSR1;
 			break;
 		case 'k':
 			sig = SIGHUP;
