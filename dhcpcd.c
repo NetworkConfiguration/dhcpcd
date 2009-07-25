@@ -137,14 +137,15 @@ read_pid(void)
 static void
 usage(void)
 {
-	printf("usage: "PACKAGE" [-deknpqxyADEGHKLOTV] [-c script] [-f file ]"
-	    " [-h hostname]\n"
-	    "              [-i classID ] [-l leasetime] [-m metric]"
-	    " [-o option] [-r ipaddr]\n"
-	    "              [-s ipaddr] [-t timeout] [-u userclass]"
-	    " [-F none|ptr|both]\n"
-	    "              [-I clientID] [-C hookscript] [-Q option]"
-	    " [-X ipaddr] <interface>\n");
+	printf("usage: "PACKAGE" [-dgknpqxyADEGHKLOTV] [-c script] [-f file]"
+	    " [-e var=val]\n"
+	    "              [-h hostname] [-i classID ] [-l leasetime]"
+	    " [-m metric] [-o option]\n"
+	    "              [-r ipaddr] [-s ipaddr] [-t timeout]"
+	    " [-u userclass]\n"
+	    "              [-F none|ptr|both] [-I clientID] [-C hookscript]"
+	    " [-Q option]\n"
+	    "              [-X ipaddr] <interface>\n");
 }
 
 static void
