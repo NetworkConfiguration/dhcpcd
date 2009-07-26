@@ -23,7 +23,8 @@ for x; do
 	--mandir) MANDIR=$var;;
 	--with-ccopts|CFLAGS) CFLAGS=$var;;
 	CPPFLAGS) CPPFLAGS=$var;;
-	--with-hook|--with-hooks|HOOKSCRIPTS) HOOKSCRIPTS=$var;;
+	--with-hook|--with-hooks) HOOKSCRIPTS="$HOOKSCRIPTS $var";;
+	HOOKSCRIPTS) HOOKSCRIPTS=$var;;
 	*) echo "$0: WARNING: unknown option $opt" >&2;;
 	esac
 done
