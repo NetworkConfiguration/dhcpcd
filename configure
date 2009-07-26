@@ -23,7 +23,7 @@ for x; do
 	--mandir) MANDIR=$var;;
 	--with-ccopts|CFLAGS) CFLAGS=$var;;
 	CPPFLAGS) CPPFLAGS=$var;;
-	--with-hook) HOOKSCRIPTS="$HOOKSCRIPTS $var";;
+	--with-hook) HOOKSCRIPTS="$HOOKSCRIPTS${HOOKSCRIPTS:+ }$var";;
 	--with-hooks|HOOKSCRIPTS) HOOKSCRIPTS=$var;;
 	--build) BUILD=$var;;
 	--host) HOST=$var;;
@@ -104,6 +104,11 @@ if [ -z "$CC" ]; then
 		done
 		[ -n "$CC" ] && break
 	done
+	if [ -z "$CC" ]; then
+		echo
+		echo "no suitable compiler found - aborting" >&2
+		exit 1
+	fi
 else
 	echo "Using compiler $CC"
 fi
