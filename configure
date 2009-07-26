@@ -17,7 +17,7 @@ for x; do
 	--sysconfdir) SYSCONFDIR=$var;;
 	--bindir) BINDIR=$var;;
 	--libexecdir) LIBEXECDIR=$var;;
-	--statedir) STATEDIR=$var;;
+	--statedir|--localstatedir) STATEDIR=$var;;
 	--dbdir) DBDIR=$var;;
 	--rundir) RUNDIR=$var;;
 	--mandir) MANDIR=$var;;
@@ -25,6 +25,8 @@ for x; do
 	CPPFLAGS) CPPFLAGS=$var;;
 	--with-hook|--with-hooks) HOOKSCRIPTS="$HOOKSCRIPTS $var";;
 	HOOKSCRIPTS) HOOKSCRIPTS=$var;;
+	--build) ;; # Should we extract platform from --build?
+	--data-dir|--info-dir|--lib-dir|--host) ;; # ignore autotools
 	*) echo "$0: WARNING: unknown option $opt" >&2;;
 	esac
 done
