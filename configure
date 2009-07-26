@@ -166,7 +166,7 @@ fi
 
 abort=false
 # We require the libc to support non standard functions, like getifaddrs
-printf "Testing for getifaddrs support ... "
+printf "Testing for getifaddrs ... "
 cat <<EOF >_getifaddrs.c
 #include <sys/types.h>
 #include <ifaddrs.h>
@@ -185,7 +185,7 @@ fi
 rm -f _getifaddrs.c _getifaddrs
 $abort && exit 1
 
-printf "Testing for arc4random support ... "
+printf "Testing for arc4random ... "
 cat <<EOF >_arc4random.c
 #include <stdlib.h>
 int main(void) {
@@ -202,7 +202,7 @@ else
 fi
 rm -f _arc4random.c _arc4random
 
-printf "Testing for closefrom support ... "
+printf "Testing for closefrom ... "
 cat <<EOF >_closefrom.c
 #include <unistd.h>
 int main(void) {
@@ -219,7 +219,7 @@ else
 fi
 rm -f _closefrom.c _closefrom
 
-printf "Testing for getline support ... "
+printf "Testing for getline ... "
 cat <<EOF >_getline.c
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -239,7 +239,7 @@ else
 fi
 rm -f _getline.c _getline
 
-printf "Testing for strlcpy support ... "
+printf "Testing for strlcpy ... "
 cat <<EOF >_strlcpy.c
 #include <string.h>
 int main(void) {
