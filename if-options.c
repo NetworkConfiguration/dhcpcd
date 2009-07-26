@@ -320,6 +320,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	struct rt *rt;
 
 	switch(opt) {
+	case 'f': /* FALLTHROUGH */
 	case 'g': /* FALLTHROUGH */
 	case 'n': /* FALLTHROUGH */
 	case 'x': /* FALLTHROUGH */
@@ -754,8 +755,11 @@ read_config(const char *file,
 
 	/* Parse our options file */
 	f = fopen(file ? file : CONFIG, "r");
-	if (!f)
+	if (f == NULL) {
+		if (file != NULL)
+			syslog(LOG_ERR, "fopen `%s': %m", file);
 		return ifo;
+	}
 
 	while ((line = get_line(f))) {
 		option = strsep(&line, " \t");
