@@ -27,7 +27,7 @@ CLEANFILES+=	.depend
 FILES=		dhcpcd.conf
 FILESDIR=	${SYSCONFDIR}
 
-LDFLAGS+=	-Wl,-rpath=${PREFIX}/${LIBNAME}
+LDFLAGS+=	-Wl,-rpath=${LIBDIR}
 
 SUBDIRS=	dhcpcd-hooks
 

@@ -14,10 +14,10 @@ Notes
 -----
 If you're cross compiling you may need set the platform if OS is different
 from the host.
---platform=Linux
+--target=sparc-sun-netbsd5.0
 
 If you're building for an MMU-less system where fork() does not work, you
-should c./onfigure --disable-fork.
+should ./configure --disable-fork.
 This also puts the --no-background flag on and stops the --background flag
 from working.
 
@@ -46,9 +46,7 @@ By default we install 01-test, 10-mtu, 20-resolv.conf,
 29-lookup-hostname and 30-hostname.
 The default dhcpcd.conf disables the lookup-hostname hook by default.
 To add more simply
-configure -with-hooks=50-ntp.conf
-or override the make install target
-make HOOKSCRIPTS=50-ntp.conf install
+./configure -with-hook=ntp.conf
 
 
 Compatibility

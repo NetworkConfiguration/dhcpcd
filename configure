@@ -5,7 +5,7 @@ for x; do
 	opt=${x%%=*}
 	var=${x#*=}
 	case "$opt" in
-	--platform) PLATFORM=$var;;
+	--os|OS) OS=$var;;
 	--with-cc|CC) CC=$var;;
 	--debug) DEBUG=$var;;
 	--disable-debug) DEBUG=no;;
@@ -23,22 +23,23 @@ for x; do
 	--mandir) MANDIR=$var;;
 	--with-ccopts|CFLAGS) CFLAGS=$var;;
 	CPPFLAGS) CPPFLAGS=$var;;
-	--with-hook|--with-hooks) HOOKSCRIPTS="$HOOKSCRIPTS $var";;
-	HOOKSCRIPTS) HOOKSCRIPTS=$var;;
-	--build) ;; # Should we extract platform from --build?
-	--data-dir|--info-dir|--lib-dir|--host) ;; # ignore autotools
+	--with-hook) HOOKSCRIPTS="$HOOKSCRIPTS $var";;
+	--with-hooks|HOOKSCRIPTS) HOOKSCRIPTS=$var;;
+	--build) BUILD=$var;;
+	--host) HOST=$var;;
+	--target) TARGET=$var;;
+	--libdir) LIBDIR=$var;;
+	--datadir|--infodir) ;; # ignore autotools
 	*) echo "$0: WARNING: unknown option $opt" >&2;;
 	esac
 done
 
-: ${PLATFORM:=`uname -s`}
-: ${CC:=cc}
 : ${DEBUG:=no}
 : ${FORK:=yes}
 : ${PREFIX:=}
 : ${SYSCONFDIR:=$PREFIX/etc}
 : ${SBINDIR:=$PREFIX/sbin}
-: ${LIBNAME:=lib}
+: ${LIBDIR:=$PREFIX/lib}
 : ${LIBEXECDIR:=$PREFIX/libexec}
 : ${STATEDIR:=/var}
 : ${DBDIR:=$STATEDIR/db}
@@ -48,16 +49,38 @@ done
 CONFIG_H=config.h
 CONFIG_MK=config.mk
 
-rm -f $CONFIG_H $CONFIG_MK
-echo "# $PLATFORM" >$CONFIG_MK
-echo "/* $PLATFORM */" >$CONFIG_H
+if [ -z "$BUILD" ]; then
+	BUILD=`uname -m`-unknown-`uname -s | tr '[:upper:]' '[:lower:]'`
+fi
+if [ -z "$HOST" ]; then
+	[ -z "$TARGET" ] && TARGET=$BUILD
+	HOST=$TARGET
+fi
+if [ -z "$TARGET" ]; then
+	[ -z "$HOST" ] && HOST=$BUILD
+	TARGET=$HOST
+fi
 
-echo "Configuring dhcpcd for ... $PLATFORM"
+if [ -z "$OS" ]; then
+	# Derive OS from cpu-manufacturer-os-kernel
+	CPU=${TARGET%%-*}
+	REST=${TARGET#*-}
+	MANU=${REST%%-*}
+	REST=${REST#*-}
+	OS=${REST%%-*}
+	REST=${REST#*-}
+	KERNEL=${REST%%-*}
+fi
+
+echo "Configuring dhcpcd for ... $OS"
+rm -f $CONFIG_H $CONFIG_MK
+echo "# $OS" >$CONFIG_MK
+echo "/* $OS */" >$CONFIG_H
 
 for x in SYSCONFDIR SBINDIR LIBEXECDIR DBDIR RUNDIR; do
 	# Make files look nice for import
 	l=$((10 - ${#x}))
-	if [ $l -gt 2 ]; then
+	if [ $l -gt 3 ]; then
 		t="	"
 	else
 		t=
@@ -66,13 +89,25 @@ for x in SYSCONFDIR SBINDIR LIBEXECDIR DBDIR RUNDIR; do
 	echo "$x=$t	$v" >>$CONFIG_MK
 	echo "#define $x$t	\"$v\"" >>$CONFIG_H
 done
-echo "LIBNAME=	$LIBNAME" >>$CONFIG_MK
+echo "LIBDIR=		$LIBDIR" >>$CONFIG_MK
 echo "MANDIR=		$MANDIR" >>$CONFIG_MK
 
-if [ "$CC" != cc ]; then
+if [ -z "$CC" ]; then
+	printf "Looking for compiler ... "
+	for b in $TARGET- ""; do
+		for cc in icc gcc pcc cc; do
+			if type $b$cc >/dev/null 2>&1; then
+				CC=$b$cc
+				echo "$CC"
+				break
+			fi
+		done
+		[ -n "$CC" ] && break
+	done
+else
 	echo "Using compiler $CC"
-	echo "CC=		$CC" >>$CONFIG_MK
 fi
+echo "CC=		$CC" >>$CONFIG_MK
 
 if [ -n "$CFLAGS" ]; then
 	echo "CFLAGS=		$CFLAGS" >>$CONFIG_MK
@@ -106,8 +141,8 @@ if [ -n "$FORK" -a "$FORK" != yes -a "$FORK" != true ]; then
 	echo "CPPFLAGS+=	-DTHERE_IS_NO_FORK" >>$CONFIG_MK
 fi
 
-case "$PLATFORM" in
-Linux)
+case "$OS" in
+linux)
 	echo "CPPFLAGS+=	-D_BSD_SOURCE -D_XOPEN_SOURCE=600" >>$CONFIG_MK
 	echo "SRCS+=		if-linux.c if-linux-wireless.c lpf.c" >>$CONFIG_MK
 	echo "LDADD+=		-lrt" >>$CONFIG_MK
@@ -238,6 +273,7 @@ echo "HOOKSCRIPTS=	$HOOKS" >>$CONFIG_MK
 echo
 echo "   SYSCONFDIR =		$SYSCONFDIR"
 echo "   SBINDIR =		$SBINDIR"
+echo "   LIBDIR =		$LIBDIR"
 echo "   LIBEXECDIR =		$LIBEXECDIR"
 echo "   DBDIR =		$DBDIR"
 echo "   RUNDIR =		$RUNDIR"
