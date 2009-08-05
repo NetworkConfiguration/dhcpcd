@@ -95,7 +95,7 @@ echo "MANDIR=		$MANDIR" >>$CONFIG_MK
 if [ -z "$CC" ]; then
 	printf "Looking for compiler ... "
 	for b in $TARGET- ""; do
-		for cc in icc gcc pcc cc; do
+		for cc in gcc pcc icc cc; do
 			if type $b$cc >/dev/null 2>&1; then
 				CC=$b$cc
 				echo "$CC"
@@ -124,11 +124,13 @@ fi
 if [ "$DEBUG" != no -a "$DEBUG" != false ]; then
 	echo "Enabling memory debugging"
 	echo "CPPFLAGS+=	-DDEBUG_MEMORY" >>$CONFIG_MK
-elif [ -d .git ]; then
+elif [ -z "$DEBUG" -a -d .git ]; then
 	printf "Found git ... "
 	DEBUG=yes
+else
+	DEBUG=no
 fi
-if [ "$DEBUG" != no -a "$DEBUG" != false ] || [ -e .git ]; then
+if [ "$DEBUG" != no -a "$DEBUG" != false ]; then
 	echo "Adding debugging CFLAGS"
 	cat <<EOF >>$CONFIG_MK
 CFLAGS+=	-Wall -Wextra -Wimplicit -Wshadow -Wformat=2
