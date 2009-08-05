@@ -360,6 +360,9 @@ discover_interfaces(int argc, char * const *argv)
 				memcpy(ifp->hwaddr, sll->sll_addr, ifp->hwlen);
 #endif
 
+		}
+
+		if (!(ifp->flags & IFF_POINTOPOINT)) {
 			switch(ifp->family) {
 			case ARPHRD_ETHER: /* FALLTHROUGH */
 			case ARPHRD_IEEE1394:
@@ -369,10 +372,10 @@ discover_interfaces(int argc, char * const *argv)
 					free_interface(ifp);
 					continue;
 				}
-				syslog(LOG_WARNING, "%s: unknown hardware family", p);
+				syslog(LOG_WARNING,
+				    "%s: unknown hardware family", p);
 			}
 		}
-
 		if (ifl)
 			ifl->next = ifp; 
 		else
