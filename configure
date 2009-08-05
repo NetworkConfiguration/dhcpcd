@@ -34,7 +34,6 @@ for x; do
 	esac
 done
 
-: ${DEBUG:=no}
 : ${FORK:=yes}
 : ${PREFIX:=}
 : ${SYSCONFDIR:=$PREFIX/etc}
