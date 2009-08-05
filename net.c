@@ -218,21 +218,20 @@ init_interface(const char *ifname)
 			goto eexit;
 	}
 
-	if (up_interface(ifname) != 0)
-		goto eexit;
 	snprintf(iface->leasefile, sizeof(iface->leasefile),
 	    LEASEFILE, ifname);
 	/* 0 is a valid fd, so init to -1 */
 	iface->raw_fd = -1;
 	iface->udp_fd = -1;
 	iface->arp_fd = -1;
-	close(s);
-	return iface;
+	goto exit;
 
 eexit:
 	free(iface);
+	iface = NULL;
+exit:
 	close(s);
-	return NULL;
+	return iface;
 }
 
 void
@@ -322,6 +321,15 @@ discover_interfaces(int argc, char * const *argv)
 		}
 		if ((ifp = init_interface(p)) == NULL)
 			continue;
+
+		/* Bring the interface up */
+		if (!(ifp->flags & IFF_UP) && up_interface(p) != 0)
+			/* Some drivers return ENODEV here when they are disabled by a switch.
+			 * We just blunder on as the carrier will be down anyway.
+			 * When the switch is enabled, it should bring the interface up.
+			 * Then we'll spot the carrier and start working. */
+			syslog(LOG_ERR, "%s: up_interface: %m", p);
+
 		/* Don't allow loopback unless explicit */
 		if (ifp->flags & IFF_LOOPBACK) {
 			if (argc == 0 && ifac == 0) {
@@ -364,6 +372,7 @@ discover_interfaces(int argc, char * const *argv)
 				syslog(LOG_WARNING, "%s: unknown hardware family", p);
 			}
 		}
+
 		if (ifl)
 			ifl->next = ifp; 
 		else
