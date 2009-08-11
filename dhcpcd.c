@@ -1752,7 +1752,7 @@ main(int argc, char **argv)
 	    (ifc == 0 && options & DHCPCD_LINK && options & DHCPCD_DAEMONISE))
 	{
 		daemonise();
-	} else if (options & DHCPCD_DAEMONISE) {
+	} else if (options & DHCPCD_DAEMONISE && ifo->timeout > 0) {
 		oi = ifo->timeout;
 		if (ifo->options & DHCPCD_IPV4LL)
 			oi += 10;
