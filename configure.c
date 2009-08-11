@@ -654,10 +654,12 @@ configure(struct interface *iface)
 	sort_interfaces();
 
 	if (dhcp == NULL) {
-		build_routes();
-		if (iface->addr.s_addr != 0)
-			delete_address(iface);
-		run_script(iface);
+		if (!(ifo->options & DHCPCD_PERSISTENT)) {
+			build_routes();
+			if (iface->addr.s_addr != 0)
+				delete_address(iface);
+			run_script(iface);
+		}
 		return 0;
 	}
 
