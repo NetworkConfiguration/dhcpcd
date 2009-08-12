@@ -99,7 +99,7 @@ inet_cidrtoaddr(int cidr, struct in_addr *addr)
 	if (ocets > 0) {
 		memset(&addr->s_addr, 255, (size_t)ocets - 1);
 	
-	memset((unsigned char *)&addr->s_addr + (ocets - 1),
+		memset((unsigned char *)&addr->s_addr + (ocets - 1),
 		    (256 - (1 << (32 - cidr) % 8)), 1);
 	}
 
@@ -399,7 +399,7 @@ do_address(const char *ifname,
 		n = (const struct sockaddr_in *)(void *)ifa->ifa_netmask;
 		if (ifa->ifa_flags & IFF_POINTOPOINT)
 			d = (const struct sockaddr_in *)(void *)
-				ifa->ifa_dstaddr;
+			    ifa->ifa_dstaddr;
 		else
 			d = NULL;
 		if (act == 1) {
