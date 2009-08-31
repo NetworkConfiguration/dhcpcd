@@ -1188,7 +1188,6 @@ void
 handle_interface(int action, const char *ifname)
 {
 	struct interface *ifs, *ifp, *ifn, *ifl = NULL;
-	const char * const argv[] = { "dhcpcd", ifname };
 	int i;
 
 	if (action == -1) {
@@ -1210,23 +1209,24 @@ handle_interface(int action, const char *ifname)
 			return;
 	}
 
-	if ((ifs = discover_interfaces(2, UNCONST(argv)))) {
-		for (ifp = ifs; ifp; ifp = ifp->next) {
-			/* Check if we already have the interface */
-			for (ifn = ifaces; ifn; ifn = ifn->next) {
-				if (strcmp(ifn->name, ifp->name) == 0)
-					break;
-				ifl = ifn;
-			}
-			if (ifn)
-				continue;
-			init_state(ifp, 2, UNCONST(argv));
-			if (ifl)
-				ifl->next = ifp;
-			else
-				ifaces = ifp;
-			start_interface(ifp);
+	ifs = discover_interfaces(0, NULL);
+	for (ifp = ifs; ifp; ifp = ifp->next) {
+		if (strcmp(ifp->name, ifname) != 0)
+			continue;
+		/* Check if we already have the interface */
+		for (ifn = ifaces; ifn; ifn = ifn->next) {
+			if (strcmp(ifn->name, ifp->name) == 0)
+				break;
+			ifl = ifn;
 		}
+		if (ifn)
+			continue;
+		init_state(ifp, 0, NULL);
+		if (ifl)
+			ifl->next = ifp;
+		else
+			ifaces = ifp;
+		start_interface(ifp);
 	}
 }
 
