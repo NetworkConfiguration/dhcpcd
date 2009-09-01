@@ -307,6 +307,11 @@ discover_interfaces(int argc, char * const *argv)
 				continue;
 			p = argv[i];
 		} else {
+			/* -1 means we're discovering against a specific
+			 * interface, but we still need the below rules
+			 * to apply. */
+			if (argc == -1 && strcmp(argv[0], ifa->ifa_name) != 0)
+				continue;
 			for (i = 0; i < ifdc; i++)
 				if (!fnmatch(ifdv[i], ifa->ifa_name, 0))
 					break;
