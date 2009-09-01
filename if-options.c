@@ -203,20 +203,24 @@ parse_string_hwaddr(char *sbuf, ssize_t slen, const char *str, int clid)
 		}
 		if (*str == '\\') {
 			str++;
-			switch(*str++) {
+			switch(*str) {
 			case '\0':
 				break;
 			case 'b':
 				*sbuf++ = '\b';
+				str++;
 				break;
 			case 'n':
 				*sbuf++ = '\n';
+				str++;
 				break;
 			case 'r':
 				*sbuf++ = '\r';
+				str++;
 				break;
 			case 't':
 				*sbuf++ = '\t';
+				str++;
 				break;
 			case 'x':
 				/* Grab a hex code */
