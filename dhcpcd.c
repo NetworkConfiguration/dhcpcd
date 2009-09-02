@@ -1187,6 +1187,7 @@ void
 handle_interface(int action, const char *ifname)
 {
 	struct interface *ifs, *ifp, *ifn, *ifl = NULL;
+	const char * const argv[] = { ifname }; 
 	int i;
 
 	if (action == -1) {
@@ -1208,7 +1209,7 @@ handle_interface(int action, const char *ifname)
 			return;
 	}
 
-	ifs = discover_interfaces(0, NULL);
+	ifs = discover_interfaces(-1, UNCONST(argv));
 	for (ifp = ifs; ifp; ifp = ifp->next) {
 		if (strcmp(ifp->name, ifname) != 0)
 			continue;
