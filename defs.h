@@ -28,7 +28,7 @@
 #define CONFIG_H
 
 #define PACKAGE			"dhcpcd"
-#define VERSION			"5.0.99"
+#define VERSION			"5.1.0"
 
 #ifndef CONFIG
 # define CONFIG			SYSCONFDIR "/" PACKAGE ".conf"
