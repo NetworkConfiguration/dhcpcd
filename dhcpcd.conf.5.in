@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd September 1, 2009
+.Dd September 2, 2009
 .Dt DHCPCD.CONF 5 SMM
 .Os
 .Sh NAME
@@ -268,7 +268,7 @@ Set the vendor option 02 with a hex code.
 Set the vendor option 03 with an IP address as a string.
 .D1 vendor 03,\e"192.168.0.2\e"
 Set un-encapulated vendor option to hello world.
-.D1 vendor ,\e"hello world\e"
+.D1 vendor ,"hello world"
 .It Ic vendorclassid Ar string
 Change the default vendorclassid sent from dhcpcd-version.
 If not set then none is sent.
