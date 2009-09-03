@@ -34,6 +34,8 @@ for x; do
 	esac
 done
 
+: ${SED:=sed}
+
 : ${FORK:=yes}
 : ${PREFIX:=}
 : ${SYSCONFDIR:=$PREFIX/etc}
@@ -165,6 +167,10 @@ if [ -e "$LDELF" ]; then
 	echo "LDFLAGS+=	-Wl,-dynamic-linker=$LDELF" >>$CONFIG_MK
 fi
 
+# Add CPPFLAGS and CFLAGS to CC for testing features
+XCC="$CC `$SED -n -e 's/CPPLAGS+=*\(.*\)/\1/p' $CONFIG_MK`"
+XCC="$XCC `$SED -n -e 's/CFLAGS+=*\(.*\)/\1/p' $CONFIG_MK`"
+
 abort=false
 # We require the libc to support non standard functions, like getifaddrs
 printf "Testing for getifaddrs ... "
@@ -176,7 +182,7 @@ int main(void) {
 	return getifaddrs(&ifap);
 }
 EOF
-if $CC _getifaddrs.c -o _getifaddrs 2>/dev/null; then
+if $XCC _getifaddrs.c -o _getifaddrs 2>/dev/null; then
 	echo "yes"
 else
 	echo "no"
@@ -194,7 +200,7 @@ int main(void) {
 	return 0;
 }
 EOF
-if $CC _arc4random.c -o _arc4random 2>/dev/null; then
+if $XCC _arc4random.c -o _arc4random 2>/dev/null; then
 	echo "yes"
 else
 	echo "no"
@@ -211,7 +217,7 @@ int main(void) {
 	return 0;
 }
 EOF
-if $CC _closefrom.c -o _closefrom 2>/dev/null; then
+if $XCC _closefrom.c -o _closefrom 2>/dev/null; then
 	echo "yes"
 else
 	echo "no"
@@ -231,7 +237,7 @@ int main(void) {
 	return 0;
 }
 EOF
-if $CC _getline.c -o _getline 2>/dev/null; then
+if $XCC _getline.c -o _getline 2>/dev/null; then
 	echo "yes"
 else
 	echo "no"
@@ -250,7 +256,7 @@ int main(void) {
 	return 0;
 }
 EOF
-if $CC _strlcpy.c -o _strlcpy 2>/dev/null; then
+if $XCC _strlcpy.c -o _strlcpy 2>/dev/null; then
 	echo "yes"
 else
 	echo "no"
