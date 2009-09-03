@@ -15,7 +15,7 @@ for x; do
 	--enable-fork) FORK=yes;;
 	--prefix) PREFIX=$var;;
 	--sysconfdir) SYSCONFDIR=$var;;
-	--bindir) BINDIR=$var;;
+	--bindir|--sbindir) SBINDIR=$var;;
 	--libexecdir) LIBEXECDIR=$var;;
 	--statedir|--localstatedir) STATEDIR=$var;;
 	--dbdir) DBDIR=$var;;
@@ -30,6 +30,7 @@ for x; do
 	--target) TARGET=$var;;
 	--libdir) LIBDIR=$var;;
 	--datadir|--infodir) ;; # ignore autotools
+	--help) echo "See the README file for available options"; exit 0;;
 	*) echo "$0: WARNING: unknown option $opt" >&2;;
 	esac
 done
