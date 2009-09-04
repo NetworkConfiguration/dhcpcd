@@ -123,12 +123,12 @@ if [ -n "$CPPLAGS" ]; then
 	echo "CPPLAGS=		$CPPLAGS" >>$CONFIG_MK
 fi
 
-if [ -z "$DEBUG" -a -d .git ]; then
-	printf "Found git ... "
-	DEBUG=yes
-elif [ "$DEBUG" != no -a "$DEBUG" != false ]; then
+if [ -n "$DEBUG" -a "$DEBUG" != no -a "$DEBUG" != false ]; then
 	echo "Enabling memory debugging"
 	echo "CPPFLAGS+=	-DDEBUG_MEMORY" >>$CONFIG_MK
+elif [ -z "$DEBUG" -a -d .git ]; then
+	printf "Found git ... "
+	DEBUG=yes
 else
 	DEBUG=no
 fi
