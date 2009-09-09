@@ -258,8 +258,10 @@ parse_string_hwaddr(char *sbuf, ssize_t slen, const char *str, int clid)
 		} else
 			*sbuf++ = *str++;
 	}
-	if (punt_last)
+	if (punt_last) {
 		*--sbuf = '\0';
+		l--;
+	}
 	return l;
 }
 
