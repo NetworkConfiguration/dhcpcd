@@ -1500,6 +1500,7 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 	}
 
 	lease->frominfo = 0;
+	do_socket(state, SOCKET_CLOSED);
 	if (state->options & DHCPCD_ARP &&
 	    iface->addr.s_addr != state->offer->yiaddr)
 	{
@@ -1516,7 +1517,6 @@ handle_dhcp(struct if_state *state, struct dhcp_message **dhcpp,
 		}
 	}
 
-	do_socket(state, SOCKET_CLOSED);
 	r = bind_dhcp(state, options);
 	if (!(state->options & DHCPCD_ARP)) {
 		if (!(state->options & DHCPCD_INFORM))
