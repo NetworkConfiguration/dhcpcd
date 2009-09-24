@@ -18,7 +18,7 @@ _CCFLAGS=	-Wall -Wextra -Wimplicit -Wshadow -Wformat=2 \
 		-Wredundant-decls  -Wnested-externs \
 		-Winline -Wwrite-strings -Wcast-align -Wcast-qual \
 		-Wpointer-arith \
-		-Wdeclaration-after-statement -Wsequence-point
+		-Wdeclaration-after-statement -Wsequence-point -fno-common
 _CC_FLAGS_SH=	if ! test -d .git; then echo ""; else for f in ${_CCFLAGS}; do \
 		if echo "int main(void) { return 0;} " | \
 		${CC} $$f -S -xc -o /dev/null - ; \
