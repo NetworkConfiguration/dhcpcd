@@ -142,6 +142,7 @@ CFLAGS+=	-Wredundant-decls  -Wnested-externs
 CFLAGS+=	-Winline -Wwrite-strings -Wcast-align -Wcast-qual
 CFLAGS+=	-Wpointer-arith
 CFLAGS+=	-Wdeclaration-after-statement -Wsequence-point
+CFLAGS+=	-fno-common
 EOF
 fi
 
