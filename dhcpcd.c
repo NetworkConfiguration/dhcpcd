@@ -773,6 +773,9 @@ configure_interface1(struct interface *iface)
 			    iface->hwlen);
 		}
 	}
+	if (ifo->options & DHCPCD_CLIENTID)
+		syslog(LOG_DEBUG, "%s: using ClientID %s", iface->name,
+		    hwaddr_ntoa(iface->clientid + 1, *iface->clientid));
 }
 
 int
