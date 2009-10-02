@@ -82,7 +82,7 @@ echo "/* $OS */" >$CONFIG_H
 for x in SYSCONFDIR SBINDIR LIBEXECDIR DBDIR RUNDIR; do
 	# Make files look nice for import
 	l=$((10 - ${#x}))
-	if [ $l -gt 3 ]; then
+	if [ $l -gt 2 ]; then
 		t="	"
 	else
 		t=
