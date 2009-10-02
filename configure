@@ -80,15 +80,14 @@ echo "# $OS" >$CONFIG_MK
 echo "/* $OS */" >$CONFIG_H
 
 for x in SYSCONFDIR SBINDIR LIBEXECDIR DBDIR RUNDIR; do
+	eval v=\$$x
 	# Make files look nice for import
 	l=$((10 - ${#x}))
-	if [ $l -gt 2 ]; then
-		t="	"
-	else
-		t=
-	fi
-	eval v=\$$x
+	unset t
+	[ $l -gt 3 ] && t="	"
 	echo "$x=$t	$v" >>$CONFIG_MK
+	unset t
+	[ $l -gt 2 ] && t="	"
 	echo "#define $x$t	\"$v\"" >>$CONFIG_H
 done
 echo "LIBDIR=		$LIBDIR" >>$CONFIG_MK
