@@ -72,6 +72,7 @@ const struct option cf_options[] = {
 	{"timeout",         required_argument, NULL, 't'},
 	{"userclass",       required_argument, NULL, 'u'},
 	{"vendor",          required_argument, NULL, 'v'},
+	{"wait",            no_argument,       NULL, 'w'},
 	{"exit",            no_argument,       NULL, 'x'},
 	{"allowinterfaces", required_argument, NULL, 'z'},
 	{"reboot",          required_argument, NULL, 'y'},
@@ -329,6 +330,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	case 'f': /* FALLTHROUGH */
 	case 'g': /* FALLTHROUGH */
 	case 'n': /* FALLTHROUGH */
+	case 'w': /* FALLTHROUGH */
 	case 'x': /* FALLTHROUGH */
 	case 'T': /* We need to handle non interface options */
 		break;

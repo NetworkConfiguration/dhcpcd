@@ -137,7 +137,7 @@ read_pid(void)
 static void
 usage(void)
 {
-	printf("usage: "PACKAGE" [-dgknpqxyADEGHKLOTV] [-c script] [-f file]"
+	printf("usage: "PACKAGE" [-dgknpqwxyADEGHKLOTV] [-c script] [-f file]"
 	    " [-e var=val]\n"
 	    "              [-h hostname] [-i classID ] [-l leasetime]"
 	    " [-m metric] [-o option]\n"
@@ -1545,7 +1545,7 @@ main(int argc, char **argv)
 {
 	struct if_options *ifo;
 	struct interface *iface;
-	int opt, oi = 0, signal_fd, sig = 0, i, control_fd;
+	int opt, oi = 0, signal_fd, sig = 0, i, control_fd, wflag = 0;
 	size_t len;
 	pid_t pid;
 	struct timespec ts;
@@ -1581,6 +1581,9 @@ main(int argc, char **argv)
 		case 'n':
 			sig = SIGALRM;
 			break;
+		case 'w':
+			wflag = 1;
+			break;
 		case 'x':
 			sig = SIGTERM;
 			break;
@@ -1610,6 +1613,8 @@ main(int argc, char **argv)
 		options |= DHCPCD_TEST | DHCPCD_PERSISTENT;
 		options &= ~DHCPCD_DAEMONISE;
 	}
+	if (wflag != 0)
+		options |= DHCPCD_WAITIP;
 	
 #ifdef THERE_IS_NO_FORK
 	options &= ~DHCPCD_DAEMONISE;
@@ -1754,7 +1759,10 @@ main(int argc, char **argv)
 	ifc = argc - optind;
 	ifv = argv + optind;
 	if (options & DHCPCD_BACKGROUND ||
-	    (ifc == 0 && options & DHCPCD_LINK && options & DHCPCD_DAEMONISE))
+	    (ifc == 0 &&
+		options & DHCPCD_LINK &&
+		options & DHCPCD_DAEMONISE &&
+		!(options & DHCPCD_WAITIP)))
 	{
 		daemonise();
 	} else if (options & DHCPCD_DAEMONISE && ifo->timeout > 0) {
