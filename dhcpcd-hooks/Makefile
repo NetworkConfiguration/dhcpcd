@@ -12,6 +12,6 @@ install:
 	${INSTALL} -d ${DESTDIR}${SCRIPTSDIR}
 	${INSTALL} -m ${NONBINMODE} ${SCRIPTS} ${DESTDIR}${SCRIPTSDIR}
 
-import-bsd:
+import:
 	${INSTALL} -d /tmp/${DISTPREFIX}/dhcpcd-hooks
 	cp ${SCRIPTS} 50-ntp.conf /tmp/${DISTPREFIX}/dhcpcd-hooks

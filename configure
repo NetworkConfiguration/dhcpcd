@@ -205,7 +205,7 @@ if $XCC _arc4random.c -o _arc4random 2>/dev/null; then
 	echo "yes"
 else
 	echo "no"
-	echo "SRCS+=		compat/arc4random.c" >>$CONFIG_MK
+	echo "COMPAT_SRCS+=	compat/arc4random.c" >>$CONFIG_MK
 	echo "#include \"compat/arc4random.h\"" >>$CONFIG_H
 fi
 rm -f _arc4random.c _arc4random
@@ -222,7 +222,7 @@ if $XCC _closefrom.c -o _closefrom 2>/dev/null; then
 	echo "yes"
 else
 	echo "no"
-	echo "SRCS+=		compat/closefrom.c" >>$CONFIG_MK
+	echo "COMPAT_SRCS+=	compat/closefrom.c" >>$CONFIG_MK
 	echo "#include \"compat/closefrom.h\"" >>$CONFIG_H
 fi
 rm -f _closefrom.c _closefrom
@@ -242,7 +242,7 @@ if $XCC _getline.c -o _getline 2>/dev/null; then
 	echo "yes"
 else
 	echo "no"
-	echo "SRCS+=		compat/getline.c" >>$CONFIG_MK
+	echo "COMPAT_SRCS+=	compat/getline.c" >>$CONFIG_MK
 	echo "#include \"compat/getline.h\"" >>$CONFIG_H
 fi
 rm -f _getline.c _getline
@@ -261,7 +261,7 @@ if $XCC _strlcpy.c -o _strlcpy 2>/dev/null; then
 	echo "yes"
 else
 	echo "no"
-	echo "SRCS+=		compat/strlcpy.c" >>$CONFIG_MK
+	echo "COMPAT_SRCS+=	compat/strlcpy.c" >>$CONFIG_MK
 	echo "#include \"compat/strlcpy.h\"" >>$CONFIG_H
 fi
 rm -f _strlcpy.c _strlcpy

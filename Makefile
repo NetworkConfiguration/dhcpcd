@@ -10,7 +10,7 @@ CSTD?=		c99
 CFLAGS+=	-std=${CSTD}
 include config.mk
 
-OBJS+=		${SRCS:.c=.o}
+OBJS+=		${SRCS:.c=.o} ${COMPAT_SRCS:.c=.o}
 
 SCRIPT=		${LIBEXECDIR}/dhcpcd-run-hooks
 HOOKDIR=	${LIBEXECDIR}/dhcpcd-hooks
@@ -62,8 +62,8 @@ all: ${PROG} ${SCRIPTS} ${MAN5} ${MAN8}
 .c.o:
 	${CC} ${CFLAGS} ${CPPFLAGS} -c $< -o $@
 
-.depend: ${SRCS}
-	${CC} ${CPPFLAGS} -MM ${SRCS} > .depend
+.depend: ${SRCS} ${COMPAT_SRCS}
+	${CC} ${CPPFLAGS} -MM ${SRCS} ${COMPAT_SRCS} > .depend
 
 depend: .depend
 
@@ -99,16 +99,22 @@ clean:
 dist:
 	git archive --prefix=${DISTPREFIX}/ ${GITREF} | bzip2 > ${DISTFILE}
 
-import-bsd:
+import:
 	rm -rf /tmp/${DISTPREFIX}
 	${INSTALL} -d /tmp/${DISTPREFIX}
-	cp ${SRCS} *.in /tmp/${DISTPREFIX}
+	cp ${SRCS} dhcpcd.conf *.in /tmp/${DISTPREFIX}
 	cp $$(${CC} ${CPPFLAGS} -MM ${SRCS} | \
 		sed -e 's/^.*c //g' -e 's/\\//g' | \
 		tr ' ' '\n' | \
 		sort -u) /tmp/${DISTPREFIX}
+	if test -n "${COMPAT_SRCS}"; then \
+		${INSTALL} -d /tmp/${DISTPREFIX}/compat; \
+		cp ${COMPAT_SRCS} /tmp/${DISTPREFIX}/compat; \
+		cp $$(${CC} ${CPPFLAGS} -MM ${COMPAT_SRCS} | \
+			sed -e 's/^.*c //g' -e 's/\\//g' | \
+			tr ' ' '\n' | \
+			sort -u) /tmp/${DISTPREFIX}/compat; \
+	fi;
 	cd dhcpcd-hooks; ${MAKE} DISTPREFIX=${DISTPREFIX} $@
-
-import: import-bsd
 
 include Makefile.inc
