@@ -1766,10 +1766,7 @@ main(int argc, char **argv)
 	{
 		daemonise();
 	} else if (options & DHCPCD_DAEMONISE && ifo->timeout > 0) {
-		oi = ifo->timeout;
-		if (ifo->options & DHCPCD_IPV4LL)
-			oi += 10;
-		add_timeout_sec(oi, handle_exit_timeout, NULL);
+		add_timeout_sec(ifo->timeout, handle_exit_timeout, NULL);
 	}
 	free_options(ifo);
 
