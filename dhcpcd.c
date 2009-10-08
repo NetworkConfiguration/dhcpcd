@@ -185,11 +185,18 @@ cleanup(void)
 }
 
 /* ARGSUSED */
-_noreturn void
+void
 handle_exit_timeout(_unused void *arg)
 {
+	int timeout;
+
 	syslog(LOG_ERR, "timed out");
-	exit(EXIT_FAILURE);
+	if (!(options & DHCPCD_TIMEOUT_IPV4LL))
+		exit(EXIT_FAILURE);
+	options &= ~DHCPCD_TIMEOUT_IPV4LL;
+	timeout = (PROBE_NUM * PROBE_MAX) + PROBE_WAIT + 1;
+	syslog(LOG_WARNING, "allowing %d seconds for IPv4LL timeout", timeout);
+	add_timeout_sec(timeout, handle_exit_timeout, NULL);
 }
 
 void
@@ -1766,6 +1773,8 @@ main(int argc, char **argv)
 	{
 		daemonise();
 	} else if (options & DHCPCD_DAEMONISE && ifo->timeout > 0) {
+		if (options & DHCPCD_IPV4LL)
+			options |= DHCPCD_TIMEOUT_IPV4LL;
 		add_timeout_sec(ifo->timeout, handle_exit_timeout, NULL);
 	}
 	free_options(ifo);
