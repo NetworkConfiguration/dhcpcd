@@ -1792,6 +1792,8 @@ main(int argc, char **argv)
 	if (!ifaces) {
 		if (ifc == 0)
 			syslog(LOG_ERR, "no valid interfaces found");
+		else
+			exit(EXIT_FAILURE);
 		if (!(options & DHCPCD_LINK)) {
 			syslog(LOG_ERR, "aborting as we're not backgrounding"
 			    " with link detection");
