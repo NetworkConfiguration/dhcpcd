@@ -39,12 +39,18 @@ BSD systems where this has been fixed are:
     NetBSD-5.0
 
 
+To prepare dhcpcd for import into a platform source tree (like NetBSD)
+you can use the make import target to create /tmp/dhcpcd-$version and
+populate it with all the source files and hooks needed.
+
+
 Hooks
 -----
 Not all the hooks in dhcpcd-hooks are installed by default.
 By default we install 01-test, 10-mtu, 20-resolv.conf,
 29-lookup-hostname and 30-hostname.
 The default dhcpcd.conf disables the lookup-hostname hook by default.
+The configure program attempts to find hooks for systems you have installed.
 To add more simply
 ./configure -with-hook=ntp.conf
 

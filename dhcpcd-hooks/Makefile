@@ -14,4 +14,5 @@ install:
 
 import:
 	${INSTALL} -d /tmp/${DISTPREFIX}/dhcpcd-hooks
-	cp ${SCRIPTS} 50-ntp.conf /tmp/${DISTPREFIX}/dhcpcd-hooks
+	${INSTALL} -m ${NONBINMODE} ${SCRIPTS} /tmp/${DISTPREFIX}/dhcpcd-hooks
+

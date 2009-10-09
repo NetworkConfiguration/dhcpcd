@@ -48,6 +48,24 @@ done
 : ${RUNDIR:=$STATEDIR/run}
 : ${MANDIR:=${PREFIX:-/usr}/share/man}
 
+_which()
+{
+	x="$(which "$1" 2>/dev/null)"
+	if [ -n "$x" ]; then
+		echo "$x"
+		return 0
+	fi
+	for x in /sbin/"$1" /usr/sbin/"$1" \
+		/usr/pkg/sbin/"$1" /usr/local/sbin/"$1"
+	do
+		if [ -e "$x" ]; then
+			echo "$x"
+			return 0
+		fi
+	done
+	return 1
+}
+
 CONFIG_H=config.h
 CONFIG_MK=config.mk
 
@@ -266,8 +284,31 @@ else
 fi
 rm -f _strlcpy.c _strlcpy
 
-cd dhcpcd-hooks
 HOOKS=
+printf "Checking for ntpd ... "
+NTPD=$(_which ntpd)
+if [ -n "$NTPD" ]; then
+	echo "$NTPD (50-ntp.conf)"
+	HOOKS="$HOOKS${HOOKS:+ }50-ntp.conf"
+else
+	echo "not found"
+fi
+
+printf "Checking for ypind ... "
+YPBIND=$(_which ypbind)
+if [ -n "$YPBIND" ]; then
+	if strings "$YPBIND" | grep -q yp.conf; then
+		YPHOOK="50-yp.conf"
+	else
+		YPHOOK="50-ypbind"
+	fi
+	echo "$YPBIND ($YPHOOK)"
+	HOOKS="$HOOKS${HOOKS:+ }$YPHOOK"
+else
+	echo "not found"
+fi
+
+cd dhcpcd-hooks
 for x in $HOOKSCRIPTS; do
 	printf "Finding hook $x ... "
 	for h in [0-9][0-9]"-$x" [0-9][0-9]"-$x.sh" [0-9][0-9]"-$x.conf"; do
@@ -291,5 +332,5 @@ echo "   LIBEXECDIR =		$LIBEXECDIR"
 echo "   DBDIR =		$DBDIR"
 echo "   RUNDIR =		$RUNDIR"
 echo "   MANDIR =		$MANDIR"
-echo "   HOOKSCRIPTS =	$HOOKSCRIPTS"
+echo "   HOOKSCRIPTS =	$HOOKS"
 echo

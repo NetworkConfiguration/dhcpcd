@@ -1,0 +1,56 @@
+# Sample dhcpcd hook for ypbind
+# This script is only suitable for the Linux version.
+
+# Distributions may want to just have their command here instead of this
+if [ -x /etc/rc.d/ypbind ]; then
+	ypbind_restart_cmd="/etc/rc.d/ypbind restart"
+elif [ -x /usr/local/etc/rc.d/ypbind ]; then
+	ypbind_restart_cmd="/usr/local/etc/rc.d/ypbind restart"
+fi
+
+make_yp_binding()
+{
+	[ -z "$new_nis_domain" ] && return
+
+	local cf=/var/yp/binding/"$new_nis_domain".ypservers
+	if [ -n "$new_nis_servers" ]; then
+		local ncf="$cf.$interface" x=
+		rm -f "$ncf"
+		for x in $new_nis_servers; do
+			echo "$x" >> "$ncf"
+		done
+		if change_file "$cf" "$ncf"; then
+			if [ -n "$ypbind_restart_cmd" ]; then
+				eval $ypbind_restart_cmd
+			fi
+		fi
+	else
+		if [ -e "$cf" ]; then
+			rm "$cf"
+			if [ -n "$ypbind_restart_cmd" ]; then
+				eval $ypbind_restart_cmd
+			fi
+		fi
+	fi
+}
+
+restore_yp_binding()
+{
+	[ -z "$old_nis_domain" ] && return
+
+	if restore_conf /var/yp/binding/"$old_nis_domain".ypservers; then
+		if [ -n "$ypbind_restart_cmd" ]; then
+			eval $ypbind_restart_cmd
+		fi
+	elif [ -e /var/yp/binding/"$old_nis_domain".ypservers ]; then
+		rm /var/yp/binding/"$old_nis_domain".ypservers
+		if [ -n "$ypbind_restart_cmd" ]; then
+			eval $ypbind_restart_cmd
+		fi
+	fi
+}
+
+case "$reason" in
+BOUND|INFORM|REBIND|REBOOT|RENEW|TIMEOUT|STATIC)	make_yp_binding;;
+EXPIRE|FAIL|IPV4LL|NAK|NOCARRIER|RELEASE|STOP)		restore_yp_binding;;
+esac
