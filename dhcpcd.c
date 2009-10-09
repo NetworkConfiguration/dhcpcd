@@ -394,12 +394,6 @@ start_expire(void *arg)
 		start_interface(iface);
 }
 
-void
-send_decline(struct interface *iface)
-{
-	send_message(iface, DHCP_DECLINE, NULL);
-}
-
 static void
 log_dhcp(int lvl, const char *msg,
     const struct interface *iface, const struct dhcp_message *dhcp)
@@ -720,6 +714,13 @@ send_release(struct interface *iface)
 		drop_config(iface, "RELEASE");
 	}
 	unlink(iface->leasefile);
+}
+
+void
+send_decline(struct interface *iface)
+{
+	open_sockets(iface);
+	send_message(iface, DHCP_DECLINE, NULL);
 }
 
 static void
