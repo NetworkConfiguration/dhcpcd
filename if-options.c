@@ -330,7 +330,6 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	case 'f': /* FALLTHROUGH */
 	case 'g': /* FALLTHROUGH */
 	case 'n': /* FALLTHROUGH */
-	case 'w': /* FALLTHROUGH */
 	case 'x': /* FALLTHROUGH */
 	case 'T': /* We need to handle non interface options */
 		break;
@@ -508,6 +507,9 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			ifo->vendor[ifo->vendor[0] + 2] = s;
 			ifo->vendor[0] += s + 2;
 		}
+		break;
+	case 'w':
+		ifo->options |= DHCPCD_WAITIP;
 		break;
 	case 'y':
 		ifo->reboot = atoint(arg);

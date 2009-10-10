@@ -1553,7 +1553,7 @@ main(int argc, char **argv)
 {
 	struct if_options *ifo;
 	struct interface *iface;
-	int opt, oi = 0, signal_fd, sig = 0, i, control_fd, wflag = 0;
+	int opt, oi = 0, signal_fd, sig = 0, i, control_fd;
 	size_t len;
 	pid_t pid;
 	struct timespec ts;
@@ -1589,9 +1589,6 @@ main(int argc, char **argv)
 		case 'n':
 			sig = SIGALRM;
 			break;
-		case 'w':
-			wflag = 1;
-			break;
 		case 'x':
 			sig = SIGTERM;
 			break;
@@ -1621,8 +1618,6 @@ main(int argc, char **argv)
 		options |= DHCPCD_TEST | DHCPCD_PERSISTENT;
 		options &= ~DHCPCD_DAEMONISE;
 	}
-	if (wflag != 0)
-		options |= DHCPCD_WAITIP;
 	
 #ifdef THERE_IS_NO_FORK
 	options &= ~DHCPCD_DAEMONISE;
