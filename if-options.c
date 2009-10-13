@@ -72,7 +72,7 @@ const struct option cf_options[] = {
 	{"timeout",         required_argument, NULL, 't'},
 	{"userclass",       required_argument, NULL, 'u'},
 	{"vendor",          required_argument, NULL, 'v'},
-	{"wait",            no_argument,       NULL, 'w'},
+	{"waitip",          no_argument,       NULL, 'w'},
 	{"exit",            no_argument,       NULL, 'x'},
 	{"allowinterfaces", required_argument, NULL, 'z'},
 	{"reboot",          required_argument, NULL, 'y'},
