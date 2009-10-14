@@ -250,6 +250,81 @@ free_interface(struct interface *iface)
 	free(iface);
 }
 
+int
+carrier_status(struct interface *iface)
+{
+	int s, ret;
+	struct ifreq ifr;
+#ifdef SIOCGIFMEDIA
+	struct ifmediareq ifmr;
+#endif
+#ifdef __linux__
+	char *p;
+#endif
+
+	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+		return -1;
+	memset(&ifr, 0, sizeof(ifr));
+	strlcpy(ifr.ifr_name, iface->name, sizeof(ifr.ifr_name));
+#ifdef __linux__
+	/* We can only test the real interface up */
+	if ((p = strchr(ifr.ifr_name, ':')))
+		*p = '\0';
+#endif
+
+	if (ioctl(s, SIOCGIFFLAGS, &ifr) == -1) {
+		close(s);
+		return -1;
+	}
+	iface->flags = ifr.ifr_flags;
+
+	ret = -1;
+#ifdef SIOCGIFMEDIA
+	memset(&ifmr, 0, sizeof(ifmr));
+	strlcpy(ifmr.ifm_name, iface->name, sizeof(ifmr.ifm_name));
+	if (ioctl(s, SIOCGIFMEDIA, &ifmr) != -1 &&
+	    ifmr.ifm_status & IFM_AVALID)
+		ret = (ifmr.ifm_status & IFM_ACTIVE) ? 1 : 0;
+#endif
+	close(s);
+	if (ret == -1)
+		ret = (ifr.ifr_flags & IFF_RUNNING) ? 1 : 0;
+	return ret;
+}
+
+int
+up_interface(struct interface *iface)
+{
+	int s;
+	struct ifreq ifr;
+	int retval = -1;
+#ifdef __linux__
+	char *p;
+#endif
+
+	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+		return -1;
+	memset(&ifr, 0, sizeof(ifr));
+	strlcpy(ifr.ifr_name, iface->name, sizeof(ifr.ifr_name));
+#ifdef __linux__
+	/* We can only bring the real interface up */
+	if ((p = strchr(ifr.ifr_name, ':')))
+		*p = '\0';
+#endif
+	if (ioctl(s, SIOCGIFFLAGS, &ifr) == 0) {
+		if ((ifr.ifr_flags & IFF_UP))
+			retval = 0;
+		else {
+			ifr.ifr_flags |= IFF_UP;
+			if (ioctl(s, SIOCSIFFLAGS, &ifr) == 0)
+				retval = 0;
+		}
+		iface->flags = ifr.ifr_flags;
+	}
+	close(s);
+	return retval;
+}
+
 struct interface *
 discover_interfaces(int argc, char * const *argv)
 {
@@ -327,13 +402,13 @@ discover_interfaces(int argc, char * const *argv)
 		if ((ifp = init_interface(p)) == NULL)
 			continue;
 
-		/* Bring the interface up */
-		if (!(ifp->flags & IFF_UP) && up_interface(p) != 0)
-			/* Some drivers return ENODEV here when they are disabled by a switch.
-			 * We just blunder on as the carrier will be down anyway.
-			 * When the switch is enabled, it should bring the interface up.
-			 * Then we'll spot the carrier and start working. */
-			syslog(LOG_ERR, "%s: up_interface: %m", p);
+		/* Bring the interface up if not already */
+		if (!(ifp->flags & IFF_UP) &&
+#ifdef SIOCGIFMEDIA
+		    carrier_status(ifp) != -1 &&
+#endif
+		    up_interface(ifp) != 0)
+			syslog(LOG_ERR, "%s: up_interface: %m", ifp->name);
 
 		/* Don't allow loopback unless explicit */
 		if (ifp->flags & IFF_LOOPBACK) {
@@ -433,82 +508,6 @@ do_address(const char *ifname,
 	freeifaddrs(ifaddrs);
 	return retval;
 }
-	
-int
-up_interface(const char *ifname)
-{
-	int s;
-	struct ifreq ifr;
-	int retval = -1;
-#ifdef __linux__
-	char *p;
-#endif
-
-	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
-		return -1;
-	memset(&ifr, 0, sizeof(ifr));
-	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
-#ifdef __linux__
-	/* We can only bring the real interface up */
-	if ((p = strchr(ifr.ifr_name, ':')))
-		*p = '\0';
-#endif
-	if (ioctl(s, SIOCGIFFLAGS, &ifr) == 0) {
-		if ((ifr.ifr_flags & IFF_UP))
-			retval = 0;
-		else {
-			ifr.ifr_flags |= IFF_UP;
-			if (ioctl(s, SIOCSIFFLAGS, &ifr) == 0)
-				retval = 0;
-		}
-	}
-	close(s);
-	return retval;
-}
-
-int
-carrier_status(const char *ifname)
-{
-	int s;
-	struct ifreq ifr;
-	int retval = -1;
-#ifdef SIOCGIFMEDIA
-	struct ifmediareq ifmr;
-#endif
-#ifdef __linux__
-	char *p;
-#endif
-
-	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
-		return -1;
-	memset(&ifr, 0, sizeof(ifr));
-	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
-#ifdef __linux__
-	/* We can only test the real interface up */
-	if ((p = strchr(ifr.ifr_name, ':')))
-		*p = '\0';
-#endif
-	if ((retval = ioctl(s, SIOCGIFFLAGS, &ifr)) == 0) {
-		if (ifr.ifr_flags & IFF_UP && ifr.ifr_flags & IFF_RUNNING)
-			retval = 1;
-		else
-			retval = 0;
-	}
-
-#ifdef SIOCGIFMEDIA
-	if (retval == 1) {
-		memset(&ifmr, 0, sizeof(ifmr));
-		strlcpy(ifmr.ifm_name, ifr.ifr_name, sizeof(ifmr.ifm_name));
-		retval = -1;
-		if (ioctl(s, SIOCGIFMEDIA, &ifmr) != -1 &&
-		    ifmr.ifm_status & IFM_AVALID)
-			retval = (ifmr.ifm_status & IFM_ACTIVE) ? 1 : 0;
-	}
-#endif
-	close(s);
-	return retval;
-}
-
 
 int
 do_mtu(const char *ifname, short int mtu)

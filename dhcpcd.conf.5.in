@@ -272,8 +272,6 @@ Set un-encapulated vendor option to hello world.
 .It Ic vendorclassid Ar string
 Change the default vendorclassid sent from dhcpcd-version.
 If not set then none is sent.
-.It Ic waitip
-Wait for an address to be assigned before forking to the background.
 .El
 .Sh SEE ALSO
 .Xr dhcpcd-run-hooks 8 ,

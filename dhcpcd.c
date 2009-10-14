@@ -736,7 +736,7 @@ configure_interface1(struct interface *iface)
 	if (iface->flags & IFF_NOARP ||
 	    ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC))
 		ifo->options &= ~(DHCPCD_ARP | DHCPCD_IPV4LL);
-	if (ifo->options & DHCPCD_LINK && carrier_status(iface->name) == -1)
+	if (ifo->options & DHCPCD_LINK && carrier_status(iface) == -1)
 		ifo->options &= ~DHCPCD_LINK;
 	
 	if (ifo->metric != -1)
@@ -832,6 +832,7 @@ static void
 handle_carrier(const char *ifname)
 {
 	struct interface *iface;
+	int carrier;
 
 	if (!(options & DHCPCD_LINK))
 		return;
@@ -840,11 +841,10 @@ handle_carrier(const char *ifname)
 			break;
 	if (!iface || !(iface->state->options->options & DHCPCD_LINK))
 		return;
-	switch (carrier_status(iface->name)) {
-	case -1:
-		syslog(LOG_ERR, "carrier_status: %m");
-		break;
-	case 0:
+	carrier = carrier_status(iface);
+	if (carrier == -1)
+		syslog(LOG_ERR, "%s: carrier_status: %m", ifname);
+	else if (carrier == 0 || !(iface->flags & IFF_RUNNING)) {
 		if (iface->carrier != LINK_DOWN) {
 			iface->carrier = LINK_DOWN;
 			syslog(LOG_INFO, "%s: carrier lost", iface->name);
@@ -852,8 +852,7 @@ handle_carrier(const char *ifname)
 			delete_timeouts(iface, start_expire, NULL);
 			drop_config(iface, "NOCARRIER");
 		}
-		break;
-	default:
+	} else if (carrier == 1 && (iface->flags & IFF_RUNNING)) {
 		if (iface->carrier != LINK_UP) {
 			iface->carrier = LINK_UP;
 			syslog(LOG_INFO, "%s: carrier acquired", iface->name);
@@ -865,7 +864,6 @@ handle_carrier(const char *ifname)
 			run_script(iface);
 			start_interface(iface);
 		}
-		break;
 	}
 }
 
@@ -1176,7 +1174,7 @@ init_state(struct interface *iface, int argc, char **argv)
 		run_script(iface);
 
 	if (ifs->options->options & DHCPCD_LINK) {
-		switch (carrier_status(iface->name)) {
+		switch (carrier_status(iface)) {
 		case 0:
 			iface->carrier = LINK_DOWN;
 			ifs->reason = "NOCARRIER";
@@ -1676,6 +1674,10 @@ main(int argc, char **argv)
 		if (pid == 0 || kill(pid, sig) != 0) {
 			if (sig != SIGALRM)
 				syslog(LOG_ERR, ""PACKAGE" not running");
+			if (pid != 0 && errno != ESRCH) {
+				syslog(LOG_ERR, "kill: %m");
+				exit(EXIT_FAILURE);
+			}
 			unlink(pidfile);
 			if (sig != SIGALRM)
 				exit(EXIT_FAILURE);
@@ -1761,19 +1763,6 @@ main(int argc, char **argv)
 
 	ifc = argc - optind;
 	ifv = argv + optind;
-	if (options & DHCPCD_BACKGROUND ||
-	    (ifc == 0 &&
-		options & DHCPCD_LINK &&
-		options & DHCPCD_DAEMONISE &&
-		!(options & DHCPCD_WAITIP)))
-	{
-		daemonise();
-	} else if (options & DHCPCD_DAEMONISE && ifo->timeout > 0) {
-		if (options & DHCPCD_IPV4LL)
-			options |= DHCPCD_TIMEOUT_IPV4LL;
-		add_timeout_sec(ifo->timeout, handle_exit_timeout, NULL);
-	}
-	free_options(ifo);
 
 	ifaces = discover_interfaces(ifc, ifv);
 	for (i = 0; i < ifc; i++) {
@@ -1790,14 +1779,31 @@ main(int argc, char **argv)
 		else
 			exit(EXIT_FAILURE);
 		if (!(options & DHCPCD_LINK)) {
-			syslog(LOG_ERR, "aborting as we're not backgrounding"
-			    " with link detection");
+			syslog(LOG_ERR,
+			    "aborting as link detection is disabled");
 			exit(EXIT_FAILURE);
 		}
 	}
 
-	for (iface = ifaces; iface; iface = iface->next)
+	if (options & DHCPCD_BACKGROUND)
+		daemonise();
+
+	opt = 0;
+	for (iface = ifaces; iface; iface = iface->next) {
 		init_state(iface, argc, argv);
+		if (iface->carrier != LINK_DOWN)
+			opt = 1;
+	}
+	if (options & DHCPCD_LINK && opt == 0) {
+		syslog(LOG_WARNING, "no interfaces have a carrier");
+		daemonise();
+	} else if (options & DHCPCD_DAEMONISE && ifo->timeout > 0) {
+		if (options & DHCPCD_IPV4LL)
+			options |= DHCPCD_TIMEOUT_IPV4LL;
+		add_timeout_sec(ifo->timeout, handle_exit_timeout, NULL);
+	}
+	free_options(ifo);
+
 	sort_interfaces();
 	for (iface = ifaces; iface; iface = iface->next)
 		add_timeout_sec(0, start_interface, iface);

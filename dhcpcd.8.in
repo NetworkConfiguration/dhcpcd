@@ -30,7 +30,7 @@
 .Nd an RFC 2131 compliant DHCP client
 .Sh SYNOPSIS
 .Nm
-.Op Fl bdgknpqwABDEGKLTV
+.Op Fl bdgknpqABDEGKLTV
 .Op Fl c , -script Ar script
 .Op Fl e , -env Ar value
 .Op Fl f , -config Ar file
@@ -339,8 +339,6 @@ Set the vendor option 03 with an IP address as a string.
 .D1 dhcpcd \-v 03,\e"192.168.0.2\e" eth0
 Set un-encapulated vendor option to hello world.
 .D1 dhcpcd \-v ,"hello world" eth0
-.It Fl w , -waitip
-Wait for an address to be assigned before forking to the background.
 .It Fl x , -exit
 This will signal an existing
 .Nm
