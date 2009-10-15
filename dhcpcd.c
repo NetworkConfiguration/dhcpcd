@@ -1229,13 +1229,19 @@ handle_interface(int action, const char *ifname)
 				break;
 			ifl = ifn;
 		}
-		if (ifn)
-			continue;
+		if (ifn) {
+			/* The flags and hwaddr could have changed */
+			ifn->flags = ifp->flags;
+			ifn->hwlen = ifp->hwlen;
+			if (ifp->hwlen != 0)
+				memcpy(ifn->hwaddr, ifp->hwaddr, ifn->hwlen);
+		} else {
+			if (ifl)
+				ifl->next = ifp;
+			else
+				ifaces = ifp;
+		}
 		init_state(ifp, 0, NULL);
-		if (ifl)
-			ifl->next = ifp;
-		else
-			ifaces = ifp;
 		start_interface(ifp);
 	}
 }
