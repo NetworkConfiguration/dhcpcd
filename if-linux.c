@@ -74,8 +74,11 @@ _open_link_socket(struct sockaddr_nl *nl)
 }
 
 int
-init_socket(void)
+init_sockets(void)
 {
+	if ((socket_afnet = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+		return -1;
+	set_cloexec(socket_afnet);
 	sock_fd = _open_link_socket(&sock_nl);
 	set_cloexec(sock_fd);
 	return sock_fd;

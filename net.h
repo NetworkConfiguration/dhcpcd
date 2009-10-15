@@ -87,6 +87,8 @@ struct rt {
 	struct rt *next;
 };
 
+extern int socket_afnet;
+
 uint32_t get_netmask(uint32_t);
 char *hwaddr_ntoa(const unsigned char *, size_t);
 size_t hwaddr_aton(unsigned char *, const char *);
@@ -143,7 +145,7 @@ ssize_t send_raw_packet(const struct interface *, int,
     const void *, ssize_t);
 ssize_t get_raw_packet(struct interface *, int, void *, ssize_t);
 
-int init_socket(void);
+int init_sockets(void);
 int open_link_socket(void);
 int manage_link(int);
 int carrier_status(struct interface *);

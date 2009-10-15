@@ -1749,7 +1749,7 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (init_socket() == -1) {
+	if (init_sockets() == -1) {
 		syslog(LOG_ERR, "init_socket: %m");
 		exit(EXIT_FAILURE);
 	}
