@@ -427,19 +427,17 @@ discover_interfaces(int argc, char * const *argv)
 #endif
 		}
 
-		if (!(ifp->flags & IFF_POINTOPOINT)) {
-			switch(ifp->family) {
-			case ARPHRD_ETHER: /* FALLTHROUGH */
-			case ARPHRD_IEEE1394:
-				break;
-			default:
-				if (argc == 0 && ifac == 0) {
-					free_interface(ifp);
-					continue;
-				}
+		/* We only work on ethernet by default */
+		if (!(ifp->flags & IFF_POINTOPOINT) &&
+		    ifp->family != ARPHRD_ETHER)
+		{
+			if (argc == 0 && ifac == 0) {
+				free_interface(ifp);
+				continue;
+			}
+			if (ifp->family != ARPHRD_IEEE1394)
 				syslog(LOG_WARNING,
 				    "%s: unknown hardware family", p);
-			}
 		}
 		if (ifl)
 			ifl->next = ifp; 
