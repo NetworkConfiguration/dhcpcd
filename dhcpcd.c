@@ -1800,7 +1800,10 @@ main(int argc, char **argv)
 		if (iface->carrier != LINK_DOWN)
 			opt = 1;
 	}
-	if (options & DHCPCD_LINK && opt == 0) {
+	if (opt == 0 &&
+	    options & DHCPCD_LINK &&
+	    !(options & DHCPCD_WAITIP))
+	{
 		syslog(LOG_WARNING, "no interfaces have a carrier");
 		daemonise();
 	} else if (options & DHCPCD_DAEMONISE && ifo->timeout > 0) {
