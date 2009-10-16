@@ -1,6 +1,8 @@
 #!/bin/sh
 # Try and be like autotools configure, but without autotools
 
+HOOKSET=false
+
 for x; do
 	opt=${x%%=*}
 	var=${x#*=}
@@ -24,7 +26,7 @@ for x; do
 	--with-ccopts|CFLAGS) CFLAGS=$var;;
 	CPPFLAGS) CPPFLAGS=$var;;
 	--with-hook) HOOKSCRIPTS="$HOOKSCRIPTS${HOOKSCRIPTS:+ }$var";;
-	--with-hooks|HOOKSCRIPTS) HOOKSCRIPTS=$var;;
+	--with-hooks|HOOKSCRIPTS) HOOKSCRIPTS=$var; HOOKSET=true;;
 	--build) BUILD=$var;;
 	--host) HOST=$var;;
 	--target) TARGET=$var;;
@@ -285,27 +287,29 @@ fi
 rm -f _strlcpy.c _strlcpy
 
 HOOKS=
-printf "Checking for ntpd ... "
-NTPD=$(_which ntpd)
-if [ -n "$NTPD" ]; then
-	echo "$NTPD (50-ntp.conf)"
-	HOOKS="$HOOKS${HOOKS:+ }50-ntp.conf"
-else
-	echo "not found"
-fi
-
-printf "Checking for ypind ... "
-YPBIND=$(_which ypbind)
-if [ -n "$YPBIND" ]; then
-	if strings "$YPBIND" | grep -q yp.conf; then
-		YPHOOK="50-yp.conf"
+if ! $HOOKSET; then
+	printf "Checking for ntpd ... "
+	NTPD=$(_which ntpd)
+	if [ -n "$NTPD" ]; then
+		echo "$NTPD (50-ntp.conf)"
+		HOOKS="$HOOKS${HOOKS:+ }50-ntp.conf"
 	else
-		YPHOOK="50-ypbind"
+		echo "not found"
 	fi
-	echo "$YPBIND ($YPHOOK)"
-	HOOKS="$HOOKS${HOOKS:+ }$YPHOOK"
-else
-	echo "not found"
+
+	printf "Checking for ypind ... "
+	YPBIND=$(_which ypbind)
+	if [ -n "$YPBIND" ]; then
+		if strings "$YPBIND" | grep -q yp.conf; then
+			YPHOOK="50-yp.conf"
+		else
+			YPHOOK="50-ypbind"
+		fi
+		echo "$YPBIND ($YPHOOK)"
+		HOOKS="$HOOKS${HOOKS:+ }$YPHOOK"
+	else
+		echo "not found"
+	fi
 fi
 
 cd dhcpcd-hooks
