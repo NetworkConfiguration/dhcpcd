@@ -322,7 +322,10 @@ for x in $HOOKSCRIPTS; do
 		echo "no"
 	else
 		echo "$h"
-		HOOKS="$HOOKS${HOOKS:+ }$h"
+		case " $HOOKS " in
+		*" $h "*)	;;
+		*)		HOOKS="$HOOKS${HOOKS:+ }$h";;
+		esac
 	fi
 done
 cd ..
