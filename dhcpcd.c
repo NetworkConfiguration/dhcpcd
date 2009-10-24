@@ -918,7 +918,7 @@ start_rebind(void *arg)
 {
 	struct interface *iface = arg;
 
-	syslog(LOG_ERR, "%s: failed to renew, attmepting to rebind",
+	syslog(LOG_ERR, "%s: failed to renew, attempting to rebind",
 	    iface->name);
 	iface->state->state = DHS_REBIND;
 	delete_timeout(send_renew, iface);
