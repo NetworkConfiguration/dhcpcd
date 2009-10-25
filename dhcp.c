@@ -717,8 +717,9 @@ get_option_routes(const char *ifname, const struct dhcp_message *dhcp)
 	if (p) {
 		routes = decode_rfc3442_rt(len, p);
 		if (routes) {
-			syslog(LOG_DEBUG, "%s: using Classless Static Routes (RFC3442)",
-			       ifname);
+			syslog(LOG_DEBUG,
+			    "%s: using Classless Static Routes (RFC3442)",
+			    ifname);
 			return routes;
 		}
 	}
