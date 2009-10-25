@@ -1770,6 +1770,11 @@ main(int argc, char **argv)
 	ifc = argc - optind;
 	ifv = argv + optind;
 
+	/* When running dhcpcd against a single interface, we need to retain
+	 * the old behaviour of waiting for an IP address */
+	if (ifc == 1)
+		options |= DHCPCD_WAITIP;
+
 	ifaces = discover_interfaces(ifc, ifv);
 	for (i = 0; i < ifc; i++) {
 		for (iface = ifaces; iface; iface = iface->next)
