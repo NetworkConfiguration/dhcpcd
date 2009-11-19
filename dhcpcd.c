@@ -1630,7 +1630,7 @@ main(int argc, char **argv)
 	if (options & DHCPCD_DEBUG)
 		setlogmask(LOG_UPTO(LOG_DEBUG));
 	else if (options & DHCPCD_QUIET)
-		setlogmask(LOG_UPTO(LOG_WARNING));
+		close(STDERR_FILENO);
 
 	if (!(options & DHCPCD_TEST)) {
 		/* If we have any other args, we should run as a single dhcpcd
