@@ -572,7 +572,12 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 		state->offer = dhcp;
 		*dhcpp = NULL;
 	}
+
 	lease->frominfo = 0;
+	lease->addr.s_addr = dhcp->yiaddr;
+	lease->server.s_addr = INADDR_ANY;
+	if (type != 0)
+		get_option_addr(&lease->server,	dhcp, DHO_SERVERID);
 
 	delete_timeout(NULL, iface);
 	/* We now have an offer, so close the DHCP sockets.
@@ -710,6 +715,7 @@ send_release(struct interface *iface)
 		syslog(LOG_INFO, "%s: releasing lease of %s",
 		    iface->name, inet_ntoa(iface->state->lease.addr));
 		open_sockets(iface);
+		iface->state->xid = arc4random();
 		send_message(iface, DHCP_RELEASE, NULL);
 		drop_config(iface, "RELEASE");
 	}
