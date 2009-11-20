@@ -42,6 +42,9 @@ BSD systems where this has been fixed are:
 To prepare dhcpcd for import into a platform source tree (like NetBSD)
 you can use the make import target to create /tmp/dhcpcd-$version and
 populate it with all the source files and hooks needed.
+In this instance, you may wish to disable some configured tests when
+the binary has to run on older versions which lack support, such as getline.
+./configure --without-getline
 
 
 Hooks

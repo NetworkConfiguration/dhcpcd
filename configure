@@ -2,6 +2,10 @@
 # Try and be like autotools configure, but without autotools
 
 HOOKSET=false
+ARC4RANDOM=
+CLOSEFROM=
+GETLINE=
+STRLCPY=
 
 for x; do
 	opt=${x%%=*}
@@ -31,6 +35,10 @@ for x; do
 	--host) HOST=$var;;
 	--target) TARGET=$var;;
 	--libdir) LIBDIR=$var;;
+	--without-arc4random) ARC4RANDOM=no;;
+	--without-closefrom) CLOSEFROM=no;;
+	--without-getline) GETLINE=no;;
+	--without-strlcpy) STRLCPY=no;;
 	--datadir|--infodir) ;; # ignore autotools
 	--help) echo "See the README file for available options"; exit 0;;
 	*) echo "$0: WARNING: unknown option $opt" >&2;;
@@ -213,42 +221,53 @@ fi
 rm -f _getifaddrs.c _getifaddrs
 $abort && exit 1
 
-printf "Testing for arc4random ... "
-cat <<EOF >_arc4random.c
+if [ -z "$ARC4RANDOM" ]; then
+	printf "Testing for arc4random ... "
+	cat <<EOF >_arc4random.c
 #include <stdlib.h>
 int main(void) {
 	uint32_t r = arc4random();
 	return 0;
 }
 EOF
-if $XCC _arc4random.c -o _arc4random 2>/dev/null; then
-	echo "yes"
-else
-	echo "no"
+	if $XCC _arc4random.c -o _arc4random 2>/dev/null; then
+		ARC4RANDOM=yes
+	else
+		ARC4RANDOM=no
+	fi
+	echo "$ARC4RANDOM"
+	rm -f _arc4random.c _arc4random
+fi
+if [ "$ARC4RANDOM" = no ]; then
 	echo "COMPAT_SRCS+=	compat/arc4random.c" >>$CONFIG_MK
 	echo "#include \"compat/arc4random.h\"" >>$CONFIG_H
 fi
-rm -f _arc4random.c _arc4random
 
-printf "Testing for closefrom ... "
-cat <<EOF >_closefrom.c
+if [ -z "$CLOSEFROM" ]; then
+	printf "Testing for closefrom ... "
+	cat <<EOF >_closefrom.c
 #include <unistd.h>
 int main(void) {
 	int r = closefrom(3);
 	return 0;
 }
 EOF
-if $XCC _closefrom.c -o _closefrom 2>/dev/null; then
-	echo "yes"
-else
-	echo "no"
+	if $XCC _closefrom.c -o _closefrom 2>/dev/null; then
+		CLOSEFROM=yes
+	else
+		CLOSEFROM=no
+	fi
+	echo "$CLOSEFROM"
+	rm -f _closefrom.c _closefrom
+fi
+if [ "$CLOSEFROM" = no ]; then
 	echo "COMPAT_SRCS+=	compat/closefrom.c" >>$CONFIG_MK
 	echo "#include \"compat/closefrom.h\"" >>$CONFIG_H
 fi
-rm -f _closefrom.c _closefrom
 
-printf "Testing for getline ... "
-cat <<EOF >_getline.c
+if [ -z "$GETLINE" ]; then
+	printf "Testing for getline ... "
+	cat <<EOF >_getline.c
 #define _GNU_SOURCE
 #include <stdio.h>
 int main(void) {
@@ -258,17 +277,22 @@ int main(void) {
 	return 0;
 }
 EOF
-if $XCC _getline.c -o _getline 2>/dev/null; then
-	echo "yes"
-else
-	echo "no"
+	if $XCC _getline.c -o _getline 2>/dev/null; then
+		GETLINE=yes
+	else
+		GETLINE=no
+	fi
+	echo "$GETLINE"
+	rm -f _getline.c _getline
+fi
+if [ "$GETLINE" = no ]; then
 	echo "COMPAT_SRCS+=	compat/getline.c" >>$CONFIG_MK
 	echo "#include \"compat/getline.h\"" >>$CONFIG_H
 fi
-rm -f _getline.c _getline
 
-printf "Testing for strlcpy ... "
-cat <<EOF >_strlcpy.c
+if [ -z "$STRLCPY" ]; then
+	printf "Testing for strlcpy ... "
+	cat <<EOF >_strlcpy.c
 #include <string.h>
 int main(void) {
 	const char s1[] = "foo";
@@ -277,14 +301,18 @@ int main(void) {
 	return 0;
 }
 EOF
-if $XCC _strlcpy.c -o _strlcpy 2>/dev/null; then
-	echo "yes"
-else
-	echo "no"
+	if $XCC _strlcpy.c -o _strlcpy 2>/dev/null; then
+		STRLCPY=yes
+	else
+		STRLCPY=no
+	fi
+	echo "$STRLCPY"
+	rm -f _strlcpy.c _strlcpy
+fi
+if [ "$STRLCPY" = no ]; then
 	echo "COMPAT_SRCS+=	compat/strlcpy.c" >>$CONFIG_MK
 	echo "#include \"compat/strlcpy.h\"" >>$CONFIG_H
 fi
-rm -f _strlcpy.c _strlcpy
 
 HOOKS=
 if ! $HOOKSET; then
