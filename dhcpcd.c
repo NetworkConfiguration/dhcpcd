@@ -1806,16 +1806,38 @@ main(int argc, char **argv)
 		if (iface->carrier != LINK_DOWN)
 			opt = 1;
 	}
-	if (opt == 0 &&
-	    options & DHCPCD_LINK &&
-	    !(options & DHCPCD_WAITIP))
-	{
-		syslog(LOG_WARNING, "no interfaces have a carrier");
-		daemonise();
-	} else if (options & DHCPCD_DAEMONISE && ifo->timeout > 0) {
-		if (options & DHCPCD_IPV4LL)
-			options |= DHCPCD_TIMEOUT_IPV4LL;
-		add_timeout_sec(ifo->timeout, handle_exit_timeout, NULL);
+
+	if (!(options & DHCPCD_BACKGROUND)) {
+		/* If we don't have a carrier, we may have to wait for a second
+		 * before one becomes available if we brought an interface up. */
+		if (opt == 0 &&
+		    options & DHCPCD_LINK &&
+		    options & DHCPCD_WAITUP &&
+		    !(options & DHCPCD_WAITIP))
+		{
+			ts.tv_sec = 1;
+			ts.tv_nsec = 0;
+			nanosleep(&ts, NULL);
+			for (iface = ifaces; iface; iface = iface->next) {
+				handle_carrier(iface->name);
+				if (iface->carrier != LINK_DOWN) {
+					opt = 1;
+					break;
+				}
+			}
+		}
+		if (opt == 0 &&
+		    options & DHCPCD_LINK &&
+		    !(options & DHCPCD_WAITIP))
+		{
+			syslog(LOG_WARNING, "no interfaces have a carrier");
+			daemonise();
+		} else if (options & DHCPCD_DAEMONISE && ifo->timeout > 0) {
+			if (options & DHCPCD_IPV4LL)
+				options |= DHCPCD_TIMEOUT_IPV4LL;
+			add_timeout_sec(ifo->timeout, handle_exit_timeout, NULL);
+		}
+
 	}
 	free_options(ifo);
 
