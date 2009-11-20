@@ -57,7 +57,7 @@ CLEANFILES+=	*.tar.bz2
 .in:
 	${SED} ${SED_DBDIR} ${SED_HOOKDIR} ${SED_SCRIPT} ${SED_SYS} $< > $@
 
-all: ${PROG} ${SCRIPTS} ${MAN5} ${MAN8}
+all: config.h ${PROG} ${SCRIPTS} ${MAN5} ${MAN8}
 
 .c.o:
 	${CC} ${CFLAGS} ${CPPFLAGS} -c $< -o $@
@@ -106,6 +106,7 @@ import:
 	cp $$(${CC} ${CPPFLAGS} -MM ${SRCS} | \
 		sed -e 's/^.*c //g' -e 's/\\//g' | \
 		tr ' ' '\n' | \
+		sed -e '/^compat\//d' | \
 		sort -u) /tmp/${DISTPREFIX}
 	if test -n "${COMPAT_SRCS}"; then \
 		${INSTALL} -d /tmp/${DISTPREFIX}/compat; \
