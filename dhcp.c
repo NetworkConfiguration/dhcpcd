@@ -1393,4 +1393,6 @@ get_lease(struct dhcp_lease *lease, const struct dhcp_message *dhcp)
 		lease->renewaltime = 0;
 	if (get_option_uint32(&lease->rebindtime, dhcp, DHO_REBINDTIME) != 0)
 		lease->rebindtime = 0;
+	if (get_option_addr(&lease->server, dhcp, DHO_SERVERID) != 0)
+		lease->server.s_addr = INADDR_ANY;
 }
