@@ -704,6 +704,8 @@ open_sockets(struct interface *iface)
 static void
 send_release(struct interface *iface)
 {
+	struct timespec ts;
+
 	if (iface->state->lease.addr.s_addr &&
 	    !IN_LINKLOCAL(htonl(iface->state->lease.addr.s_addr)))
 	{
@@ -712,6 +714,10 @@ send_release(struct interface *iface)
 		open_sockets(iface);
 		iface->state->xid = arc4random();
 		send_message(iface, DHCP_RELEASE, NULL);
+		/* Give the packet a chance to go before dropping the ip */
+		ts.tv_sec = 1;
+		ts.tv_nsec = 0;
+		nanosleep(&ts, NULL);
 		drop_config(iface, "RELEASE");
 	}
 	unlink(iface->leasefile);
