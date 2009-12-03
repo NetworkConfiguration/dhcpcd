@@ -72,6 +72,11 @@ const char copyright[] = "Copyright (c) 2006-2009 Roy Marples";
 /* We should define a maximum for the NAK exponential backoff */ 
 #define NAKOFF_MAX              60
 
+/* Wait N nanoseconds between sending a RELEASE and dropping the address.
+ * This gives the kernel enough time to actually send it. */
+#define RELEASE_DELAY_S		0
+#define RELEASE_DELAY_NS	10000000
+
 int options = 0;
 int pidfd = -1;
 struct interface *ifaces = NULL;
@@ -715,8 +720,8 @@ send_release(struct interface *iface)
 		iface->state->xid = arc4random();
 		send_message(iface, DHCP_RELEASE, NULL);
 		/* Give the packet a chance to go before dropping the ip */
-		ts.tv_sec = 1;
-		ts.tv_nsec = 0;
+		ts.tv_sec = RELEASE_DELAY_S;
+		ts.tv_nsec = RELEASE_DELAY_NS;
 		nanosleep(&ts, NULL);
 		drop_config(iface, "RELEASE");
 	}
