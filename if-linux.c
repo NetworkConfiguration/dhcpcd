@@ -177,6 +177,7 @@ link_route(struct nlmsghdr *nlm)
 	len = NLMSG_PAYLOAD(nlm, sizeof(*rtm));
 	rt.iface = NULL;
 	rt.dest.s_addr = INADDR_ANY;
+	rt.net.s_addr = INADDR_ANY;
 	rt.gate.s_addr = INADDR_ANY;
 	rt.next = NULL;
 	metric = 0;
@@ -203,8 +204,6 @@ link_route(struct nlmsghdr *nlm)
 	}
 	if (rt.iface != NULL) {
 		if (metric == rt.iface->metric) {
-			if (rt.dest.s_addr == INADDR_BROADCAST)
-				rt.dest.s_addr = INADDR_ANY;
 			inet_cidrtoaddr(rtm->rtm_dst_len, &rt.net);
 			route_deleted(&rt);
 		}
