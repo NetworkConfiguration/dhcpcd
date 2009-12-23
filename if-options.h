@@ -73,6 +73,7 @@
 #define DHCPCD_TIMEOUT_IPV4LL	(1 << 24)
 #define DHCPCD_WAITIP		(1 << 25)
 #define DHCPCD_WAITUP		(1 << 26)
+#define DHCPCD_CSR_WARNED	(1 << 27)
 
 extern const struct option cf_options[];
 
