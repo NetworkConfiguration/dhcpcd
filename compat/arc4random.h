@@ -30,5 +30,7 @@
 
 #include <stdint.h>
 
+void arc4random_stir(void);
+void arc4random_addrandom(unsigned char *, int);
 uint32_t arc4random(void);
 #endif
