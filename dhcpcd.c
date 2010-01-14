@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2009 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2010 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * SUCH DAMAGE.
  */
 
-const char copyright[] = "Copyright (c) 2006-2009 Roy Marples";
+const char copyright[] = "Copyright (c) 2006-2010 Roy Marples";
 
 #include <sys/file.h>
 #include <sys/socket.h>
@@ -269,6 +269,22 @@ stop_interface(struct interface *iface)
 	free_interface(ifp);
 	if (!(options & (DHCPCD_MASTER | DHCPCD_TEST)))
 		exit(EXIT_FAILURE);
+}
+
+static uint32_t
+dhcp_xid(struct interface *iface)
+{
+	uint32_t xid;
+
+	if (iface->state->options->options & DHCPCD_XID_HWADDR &&
+	    iface->hwlen >= sizeof(xid)) 
+		/* The lower bits are probably more unique on the network */
+		memcpy(&xid, (iface->hwaddr + iface->hwlen) - sizeof(xid),
+		    sizeof(xid));
+	else
+		xid = arc4random();
+
+	return xid;
 }
 
 static void
@@ -717,7 +733,7 @@ send_release(struct interface *iface)
 		syslog(LOG_INFO, "%s: releasing lease of %s",
 		    iface->name, inet_ntoa(iface->state->lease.addr));
 		open_sockets(iface);
-		iface->state->xid = arc4random();
+		iface->state->xid = dhcp_xid(iface);
 		send_message(iface, DHCP_RELEASE, NULL);
 		/* Give the packet a chance to go before dropping the ip */
 		ts.tv_sec = RELEASE_DELAY_S;
@@ -886,7 +902,7 @@ start_discover(void *arg)
 	struct if_options *ifo = iface->state->options;
 
 	iface->state->state = DHS_DISCOVER;
-	iface->state->xid = arc4random();
+	iface->state->xid = dhcp_xid(iface);
 	open_sockets(iface);
 	delete_timeout(NULL, iface);
 	if (ifo->fallback)
@@ -920,7 +936,7 @@ start_renew(void *arg)
 	syslog(LOG_INFO, "%s: renewing lease of %s",
 	    iface->name, inet_ntoa(iface->state->lease.addr));
 	iface->state->state = DHS_RENEW;
-	iface->state->xid = arc4random();
+	iface->state->xid = dhcp_xid(iface);
 	open_sockets(iface);
 	send_renew(iface);
 }
@@ -1020,7 +1036,7 @@ start_inform(struct interface *iface)
 	}
 
 	iface->state->state = DHS_INFORM;
-	iface->state->xid = arc4random();
+	iface->state->xid = dhcp_xid(iface);
 	open_sockets(iface);
 	send_inform(iface);
 }
@@ -1058,7 +1074,7 @@ start_reboot(struct interface *iface)
 		    iface->name, inet_ntoa(iface->state->lease.addr));
 	}
 	iface->state->state = DHS_REBOOT;
-	iface->state->xid = arc4random();
+	iface->state->xid = dhcp_xid(iface);
 	iface->state->lease.server.s_addr = 0;
 	delete_timeout(NULL, iface);
 	if (ifo->fallback)
@@ -1302,7 +1318,7 @@ handle_ifa(int type, const char *ifname,
 		run_script(ifp);
 		if (ifo->options & DHCPCD_INFORM) {
 			ifp->state->state = DHS_INFORM;
-			ifp->state->xid = arc4random();
+			ifp->state->xid = dhcp_xid(ifp);
 			ifp->state->lease.server.s_addr =
 			    dst ? dst->s_addr : INADDR_ANY;
 			ifp->addr = *addr;

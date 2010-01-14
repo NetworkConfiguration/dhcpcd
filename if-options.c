@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2009 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2010 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -83,6 +83,7 @@ const struct option cf_options[] = {
 	{"lastlease",       no_argument,       NULL, 'E'},
 	{"fqdn",            optional_argument, NULL, 'F'},
 	{"nogateway",       no_argument,       NULL, 'G'},
+	{"xidhwaddr",       no_argument,       NULL, 'H'}, 
 	{"clientid",        optional_argument, NULL, 'I'},
 	{"nolink",          no_argument,       NULL, 'K'},
 	{"noipv4ll",        no_argument,       NULL, 'L'},
@@ -567,6 +568,9 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		break;
 	case 'G':
 		ifo->options &= ~DHCPCD_GATEWAY;
+		break;
+	case 'H':
+		ifo->options |= DHCPCD_XID_HWADDR;
 		break;
 	case 'I':
 		/* Strings have a type of 0 */;
