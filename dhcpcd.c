@@ -1158,13 +1158,14 @@ start_interface(void *arg)
 				free(iface->state->offer);
 				iface->state->offer = NULL;
 			}
-		} else if (stat(iface->leasefile, &st) == 0 &&
-		    get_option_uint32(&l, iface->state->offer,
-			DHO_LEASETIME) == 0)
+		} else if (iface->state->lease.leasetime != ~0U &&
+		    stat(iface->leasefile, &st) == 0)
 		{
 			/* Offset lease times and check expiry */
 			gettimeofday(&now, NULL);
-			if ((time_t)l < now.tv_sec - st.st_mtime) {
+			if ((time_t)iface->state->lease.leasetime <
+			    now.tv_sec - st.st_mtime)
+			{
 				free(iface->state->offer);
 				iface->state->offer = NULL;
 			} else {
