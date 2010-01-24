@@ -421,7 +421,7 @@ get_option_uint8(uint8_t *i, const struct dhcp_message *dhcp, uint8_t option)
 }
 
 /* Decode an RFC3397 DNS search order option into a space
- * seperated string. Returns length of string (including 
+ * separated string. Returns length of string (including
  * terminating zero) or zero on error. out may be NULL
  * to just determine output length. */
 static ssize_t
