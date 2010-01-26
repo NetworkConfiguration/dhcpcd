@@ -403,6 +403,7 @@ start_expire(void *arg)
 	iface->state->interval = 0;
 	if (iface->addr.s_addr == 0) {
 		/* We failed to reboot, so enter discovery. */
+		iface->state->lease.addr.s_addr = 0;
 		start_discover(iface);
 		return;
 	}
@@ -1166,6 +1167,8 @@ start_interface(void *arg)
 			if ((time_t)iface->state->lease.leasetime <
 			    now.tv_sec - st.st_mtime)
 			{
+				syslog(LOG_DEBUG,
+				    "%s: discarding expired lease", iface->name);
 				free(iface->state->offer);
 				iface->state->offer = NULL;
 			} else {
