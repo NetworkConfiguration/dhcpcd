@@ -1171,6 +1171,7 @@ start_interface(void *arg)
 				    "%s: discarding expired lease", iface->name);
 				free(iface->state->offer);
 				iface->state->offer = NULL;
+				iface->state->lease.addr.s_addr = 0;
 			} else {
 				l = now.tv_sec - st.st_mtime;
 				iface->state->lease.leasetime -= l;
