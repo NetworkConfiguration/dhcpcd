@@ -142,7 +142,7 @@ read_pid(void)
 static void
 usage(void)
 {
-	printf("usage: "PACKAGE" [-dgknpqwxyADEGHKLOTV] [-c script] [-f file]"
+	printf("usage: "PACKAGE" [-dgknpqwxyADEGHJKLOTV] [-c script] [-f file]"
 	    " [-e var=val]\n"
 	    "              [-h hostname] [-i classID ] [-l leasetime]"
 	    " [-m metric] [-o option]\n"
@@ -776,6 +776,15 @@ configure_interface1(struct interface *iface)
 	 * of the hardware address family and the hardware address. */
 	if (iface->hwlen > DHCP_CHADDR_LEN)
 		ifo->options |= DHCPCD_CLIENTID;
+
+	/* Firewire and InfiniBand interfaces require ClientID and
+	 * the broadcast option being set. */
+	switch (iface->family) {
+	case ARPHRD_IEEE1394:	/* FALLTHROUGH */
+	case ARPHRD_INFINIBAND:
+		ifo->options |= DHCPCD_CLIENTID | DHCPCD_BROADCAST;
+		break;
+	}
 
 	free(iface->clientid);
 	if (*ifo->clientid) {

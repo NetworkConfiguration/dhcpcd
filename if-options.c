@@ -85,6 +85,7 @@ const struct option cf_options[] = {
 	{"nogateway",       no_argument,       NULL, 'G'},
 	{"xidhwaddr",       no_argument,       NULL, 'H'}, 
 	{"clientid",        optional_argument, NULL, 'I'},
+	{"broadcast",       no_argument,       NULL, 'J'},
 	{"nolink",          no_argument,       NULL, 'K'},
 	{"noipv4ll",        no_argument,       NULL, 'L'},
 	{"destination",     required_argument, NULL, 'N'},
@@ -586,6 +587,9 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		}
 		ifo->options |= DHCPCD_CLIENTID;
 		ifo->clientid[0] = (uint8_t)s;
+		break;
+	case 'J':
+		ifo->options |= DHCPCD_BROADCAST;
 		break;
 	case 'K':
 		ifo->options &= ~DHCPCD_LINK;
