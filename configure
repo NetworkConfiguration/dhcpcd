@@ -189,10 +189,11 @@ case "$OS" in
 linux)
 	echo "CPPFLAGS+=	-D_BSD_SOURCE -D_XOPEN_SOURCE=600" >>$CONFIG_MK
 	echo "SRCS+=		if-linux.c if-linux-wireless.c lpf.c" >>$CONFIG_MK
+	echo "SRCS+=		platform-linux.c" >>$CONFIG_MK
 	echo "LDADD+=		-lrt" >>$CONFIG_MK
 	;;
 *)
-	echo "SRCS+=		bpf.c if-bsd.c" >>$CONFIG_MK
+	echo "SRCS+=		bpf.c if-bsd.c platform-bsd.c" >>$CONFIG_MK
 	;;
 esac
 
