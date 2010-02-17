@@ -540,6 +540,7 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 	{
 		lease->frominfo = 0;
 		lease->addr.s_addr = dhcp->yiaddr;
+		lease->cookie = dhcp->cookie;
 		if (type == 0 ||
 		    get_option_addr(&lease->server, dhcp, DHO_SERVERID) != 0)
 			lease->server.s_addr = INADDR_ANY;
@@ -728,8 +729,8 @@ send_release(struct interface *iface)
 {
 	struct timespec ts;
 
-	if (iface->state->lease.addr.s_addr &&
-	    !IN_LINKLOCAL(htonl(iface->state->lease.addr.s_addr)))
+	if (iface->state->new != NULL &&
+	    iface->state->new->cookie == htonl(MAGIC_COOKIE))
 	{
 		syslog(LOG_INFO, "%s: releasing lease of %s",
 		    iface->name, inet_ntoa(iface->state->lease.addr));
@@ -1064,21 +1065,20 @@ start_reboot(struct interface *iface)
 		start_static(iface);
 		return;
 	}
-	if (ifo->reboot == 0) {
+	if (ifo->reboot == 0 || iface->state->offer == NULL) {
 		start_discover(iface);
 		return;
 	}
-	if (IN_LINKLOCAL(htonl(iface->state->lease.addr.s_addr))) {
+	if (ifo->options & DHCPCD_INFORM) {
+		syslog(LOG_INFO, "%s: informing address of %s",
+		    iface->name, inet_ntoa(iface->state->lease.addr));
+	} else if (iface->state->offer->cookie == 0) {
 		if (ifo->options & DHCPCD_IPV4LL) {
 			iface->state->claims = 0;
 			send_arp_announce(iface);
 		} else
 			start_discover(iface);
 		return;
-	}
-	if (ifo->options & DHCPCD_INFORM) {
-		syslog(LOG_INFO, "%s: informing address of %s",
-		    iface->name, inet_ntoa(iface->state->lease.addr));
 	} else {
 		syslog(LOG_INFO, "%s: rebinding lease of %s",
 		    iface->name, inet_ntoa(iface->state->lease.addr));
@@ -1161,7 +1161,7 @@ start_interface(void *arg)
 	if (iface->state->offer) {
 		get_lease(&iface->state->lease, iface->state->offer);
 		iface->state->lease.frominfo = 1;
-		if (IN_LINKLOCAL(htonl(iface->state->offer->yiaddr))) {
+		if (iface->state->offer->cookie == 0) {
 			if (iface->state->offer->yiaddr ==
 			    iface->addr.s_addr)
 			{
@@ -1189,9 +1189,9 @@ start_interface(void *arg)
 			}
 		}
 	}
-	if (!iface->state->offer)
+	if (iface->state->offer == NULL)
 		start_discover(iface);
-	else if (IN_LINKLOCAL(htonl(iface->state->lease.addr.s_addr)) &&
+	else if (iface->state->offer->cookie == 0 &&
 	    iface->state->options->options & DHCPCD_IPV4LL)
 		start_ipv4ll(iface);
 	else

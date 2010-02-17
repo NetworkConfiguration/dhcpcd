@@ -99,6 +99,8 @@ start_ipv4ll(void *arg)
 		iface->state->offer = make_ipv4ll_lease(0);
 		iface->state->lease.frominfo = 0;
 	}
+	/* Ensure we don't have a cookie */
+	iface->state->offer->cookie = 0;
 	send_arp_probe(iface);
 }
 
