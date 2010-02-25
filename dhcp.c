@@ -362,7 +362,7 @@ exit:
 		*len = bl;
 	if (bp) {
 		memcpy(bp, op, ol);
-		return (const uint8_t *)&opt_buffer;
+		return (const uint8_t *)opt_buffer;
 	}
 	if (op)
 		return op;
