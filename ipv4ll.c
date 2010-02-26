@@ -78,6 +78,7 @@ start_ipv4ll(void *arg)
 {
 	struct interface *iface = arg;
 
+	delete_timeouts(iface, start_expire, NULL);
 	iface->state->probes = 0;
 	iface->state->claims = 0;
 	if (iface->addr.s_addr) {
