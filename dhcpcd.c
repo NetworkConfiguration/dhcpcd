@@ -231,6 +231,7 @@ close_sockets(struct interface *iface)
 		iface->raw_fd = -1;
 	}
 	if (iface->udp_fd != -1) {
+		/* we don't listen to events on the udp */
 		close(iface->udp_fd);
 		iface->udp_fd = -1;
 	}
@@ -711,17 +712,20 @@ handle_dhcp_packet(void *arg)
 static void
 open_sockets(struct interface *iface)
 {
-	if (iface->udp_fd != -1)
-		close(iface->udp_fd);
-	if (open_udp_socket(iface) == -1 &&
-	    (errno != EADDRINUSE || iface->addr.s_addr != 0))
-		syslog(LOG_ERR, "%s: open_udp_socket: %m", iface->name);
-	if (iface->raw_fd != -1)
-		delete_event(iface->raw_fd);
-	if (open_socket(iface, ETHERTYPE_IP) == -1)
-		syslog(LOG_ERR, "%s: open_socket: %m", iface->name);
-	if (iface->raw_fd != -1)
-		add_event(iface->raw_fd, handle_dhcp_packet, iface);
+	if (iface->raw_fd == -1) {
+		if (open_socket(iface, ETHERTYPE_IP) == -1)
+			syslog(LOG_ERR, "%s: open_socket: %m", iface->name);
+		else
+			add_event(iface->raw_fd, handle_dhcp_packet, iface);
+	}
+	if (iface->udp_fd == -1 &&
+	    iface->addr.s_addr != 0 &&
+	    iface->state->offer != NULL &&
+	    iface->state->offer->cookie == htonl(MAGIC_COOKIE))
+	{
+		if (open_udp_socket(iface) == -1 && errno != EADDRINUSE)
+			syslog(LOG_ERR, "%s: open_udp_socket: %m", iface->name);
+	}
 }
 
 static void
