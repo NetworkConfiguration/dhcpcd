@@ -25,9 +25,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/param.h>
-#include <sys/sysctl.h>
-
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>

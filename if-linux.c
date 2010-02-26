@@ -59,6 +59,32 @@
 static int sock_fd;
 static struct sockaddr_nl sock_nl;
 
+int
+if_init(struct interface *iface)
+{
+	char path[PATH_MAX];
+	FILE *fp;
+	int n;
+
+	/* We enable promote_secondaries so that we can do this
+	 * add 192.168.1.2/24
+	 * add 192.168.1.3/24
+	 * del 192.168.1.2/24
+	 * and the subnet mask moves onto 192.168.1.3/24
+	 * This matches the behaviour of BSD which makes coding dhcpcd
+	 * a little easier as there's just one behaviour. */
+	snprintf(path, sizeof(path),
+	    "/proc/sys/net/ipv4/conf/%s/promote_secondaries",
+	    iface->name);
+
+	fp = fopen(path, "w");
+	if (fp == NULL)
+		return errno == ENOENT ? 0 : -1;
+	n = fprintf(fp, "1");
+	fclose(fp);
+	return n == -1 ? -1 : 0;
+}
+
 static int
 _open_link_socket(struct sockaddr_nl *nl)
 {
