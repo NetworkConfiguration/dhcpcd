@@ -104,7 +104,7 @@ import:
 	${INSTALL} -d /tmp/${DISTPREFIX}
 	cp ${SRCS} dhcpcd.conf *.in /tmp/${DISTPREFIX}
 	cp $$(${CC} ${CPPFLAGS} -MM ${SRCS} | \
-		sed -e 's/^.*c //g' -e 's/\\//g' | \
+		sed -e 's/^.*\.c //g' -e 's/.*\.c$$//g' -e 's/\\//g' | \
 		tr ' ' '\n' | \
 		sed -e '/^compat\//d' | \
 		sort -u) /tmp/${DISTPREFIX}
@@ -112,7 +112,7 @@ import:
 		${INSTALL} -d /tmp/${DISTPREFIX}/compat; \
 		cp ${COMPAT_SRCS} /tmp/${DISTPREFIX}/compat; \
 		cp $$(${CC} ${CPPFLAGS} -MM ${COMPAT_SRCS} | \
-			sed -e 's/^.*c //g' -e 's/\\//g' | \
+			sed -e 's/^.*c //g' -e 's/.*\.c$$//g' -e 's/\\//g' | \
 			tr ' ' '\n' | \
 			sort -u) /tmp/${DISTPREFIX}/compat; \
 	fi;
