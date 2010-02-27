@@ -720,8 +720,8 @@ open_sockets(struct interface *iface)
 	}
 	if (iface->udp_fd == -1 &&
 	    iface->addr.s_addr != 0 &&
-	    iface->state->offer != NULL &&
-	    iface->state->offer->cookie == htonl(MAGIC_COOKIE))
+	    iface->state->new != NULL &&
+	    iface->state->new->cookie == htonl(MAGIC_COOKIE))
 	{
 		if (open_udp_socket(iface) == -1 && errno != EADDRINUSE)
 			syslog(LOG_ERR, "%s: open_udp_socket: %m", iface->name);
