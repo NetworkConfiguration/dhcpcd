@@ -765,6 +765,9 @@ configure_interface1(struct interface *iface)
 	uint8_t *duid;
 	size_t len = 0, ifl;
 
+	/* Do any platform specific configuration */
+	if_conf(iface);
+
 	if (iface->flags & IFF_POINTOPOINT && !(ifo->options & DHCPCD_INFORM))
 		ifo->options |= DHCPCD_STATIC;
 	if (iface->flags & IFF_NOARP ||

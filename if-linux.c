@@ -85,6 +85,26 @@ if_init(struct interface *iface)
 	return n == -1 ? -1 : 0;
 }
 
+int
+if_conf(struct interface *iface)
+{
+	char path[PATH_MAX], buf[1];
+	FILE *fp;
+
+	/* Some qeth setups require the use of the broadcast flag. */
+	snprintf(path, sizeof(path),
+	    "/sys/class/net/%s/device/layer2",
+	    iface->name);
+
+	fp = fopen(path, "r");
+	if (fp == NULL)
+		return errno == ENOENT ? 0 : -1;
+	if (fgets(buf, sizeof(buf), fp) != NULL && buf[0] == '0')
+		iface->state->options->options |= DHCPCD_BROADCAST;
+	fclose(fp);
+	return 0;
+}
+
 static int
 _open_link_socket(struct sockaddr_nl *nl)
 {
