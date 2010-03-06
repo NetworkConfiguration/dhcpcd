@@ -85,17 +85,20 @@ hardware_platform(void)
 	if (fp == NULL)
 		return NULL;
 
+	p = NULL;
 	while ((buf = get_line(fp))) {
 		if (strncmp(buf, mproc, strlen(mproc)) == 0) {
 			p = strchr(buf, ':');
 			if (p != NULL && ++p != NULL) {
 				while (*p == ' ')
 					p++;
-				return p;
+				break;
 			}
 		}
 	}
+	fclose(fp);
 
-	errno = ESRCH;
-	return NULL;
+	if (p == NULL)
+		errno = ESRCH;
+	return p;
 }
