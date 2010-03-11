@@ -38,6 +38,7 @@ const char copyright[] = "Copyright (c) 2006-2010 Roy Marples";
 #include <net/route.h>
 
 #ifdef __linux__
+#  include <asm/types.h> /* for systems with broken headers */
 #  include <linux/rtnetlink.h>
 #endif
 
