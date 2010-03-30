@@ -74,9 +74,10 @@ getifssid(const char *ifname, char *ssid)
 	iwr.u.essid.pointer = ssid;
 	iwr.u.essid.length = IF_SSIDSIZE - 1;
 
-	if (ioctl(s, SIOCGIWESSID, &iwr) == 0)
+	if (ioctl(s, SIOCGIWESSID, &iwr) == 0) {
 		retval = iwr.u.essid.length;
-	else
+		ssid[retval] = '\0';
+	} else
 		retval = -1;
 	close(s);
 	return retval;
