@@ -91,7 +91,6 @@ struct interface {
 	size_t hwlen;
 	int metric;
 	int carrier;
-	int arpable;
 	int wireless;
 	char ssid[IF_SSIDSIZE];
 
