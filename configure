@@ -256,7 +256,7 @@ if [ -z "$CLOSEFROM" ]; then
 	cat <<EOF >_closefrom.c
 #include <unistd.h>
 int main(void) {
-	int r = closefrom(3);
+	closefrom(3);
 	return 0;
 }
 EOF
