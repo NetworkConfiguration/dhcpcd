@@ -597,8 +597,15 @@ add_router_host_route(struct rt *rt, const struct interface *ifp)
 		}
 		if (rtn != rtp)
 			continue;
+		if (ifp->flags & IFF_NOARP) {
+			syslog(LOG_WARNING,
+			    "%s: forcing router %s through interface",
+			    ifp->name, inet_ntoa(rtp->gate));
+			rtp->gate.s_addr = 0;
+			continue;
+		}
 		syslog(LOG_WARNING, "%s: router %s requires a host route",
-		       ifp->name, inet_ntoa(rtp->gate));
+		    ifp->name, inet_ntoa(rtp->gate));
 		rtn = xmalloc(sizeof(*rtn));
 		rtn->dest.s_addr = rtp->gate.s_addr;
 		rtn->net.s_addr = INADDR_BROADCAST;
