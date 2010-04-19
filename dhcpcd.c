@@ -218,26 +218,6 @@ drop_config(struct interface *iface, const char *reason)
 	iface->state->lease.addr.s_addr = 0;
 }
 
-void
-close_sockets(struct interface *iface)
-{
-	if (iface->arp_fd != -1) {
-		delete_event(iface->arp_fd);
-		close(iface->arp_fd);
-		iface->arp_fd = -1;
-	}
-	if (iface->raw_fd != -1) {
-		delete_event(iface->raw_fd);
-		close(iface->raw_fd);
-		iface->raw_fd = -1;
-	}
-	if (iface->udp_fd != -1) {
-		/* we don't listen to events on the udp */
-		close(iface->udp_fd);
-		iface->udp_fd = -1;
-	}
-}
-
 struct interface *
 find_interface(const char *ifname)
 {
@@ -320,6 +300,10 @@ send_message(struct interface *iface, int type,
 		    iface->name, get_dhcp_op(type), state->xid,
 		    timeval_to_double(&tv));
 	}
+
+	/* Ensure sockets are open. */
+	open_sockets(iface);
+
 	/* If we couldn't open a UDP port for our IP address
 	 * then we cannot renew.
 	 * This could happen if our IP was pulled out from underneath us.
@@ -340,8 +324,10 @@ send_message(struct interface *iface, int type,
 		to.s_addr = 0;
 	if (to.s_addr && to.s_addr != INADDR_BROADCAST) {
 		r = send_packet(iface, to, (uint8_t *)dhcp, len);
-		if (r == -1)
+		if (r == -1) {
 			syslog(LOG_ERR, "%s: send_packet: %m", iface->name);
+			close_sockets(iface);
+		}
 	} else {
 		len = make_udp_packet(&udp, (uint8_t *)dhcp, len, from, to);
 		r = send_raw_packet(iface, ETHERTYPE_IP, udp, len);
@@ -361,6 +347,7 @@ send_message(struct interface *iface, int type,
 		}
 	}
 	free(dhcp);
+
 	/* Even if we fail to send a packet we should continue as we are
 	 * as our failure timeouts will change out codepath when needed. */
 	if (callback)
@@ -507,11 +494,7 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 			drop_config(iface, "NAK");
 			unlink(iface->leasefile);
 		}
-		delete_event(iface->raw_fd);
-		close(iface->raw_fd);
-		iface->raw_fd = -1;
-		close(iface->udp_fd);
-		iface->udp_fd = -1;
+		close_sockets(iface);
 		/* If we constantly get NAKS then we should slowly back off */
 		add_timeout_sec(state->nakoff, start_interface, iface);
 		state->nakoff *= 2;
@@ -711,25 +694,6 @@ handle_dhcp_packet(void *arg)
 }
 
 static void
-open_sockets(struct interface *iface)
-{
-	if (iface->raw_fd == -1) {
-		if (open_socket(iface, ETHERTYPE_IP) == -1)
-			syslog(LOG_ERR, "%s: open_socket: %m", iface->name);
-		else
-			add_event(iface->raw_fd, handle_dhcp_packet, iface);
-	}
-	if (iface->udp_fd == -1 &&
-	    iface->addr.s_addr != 0 &&
-	    iface->state->new != NULL &&
-	    iface->state->new->cookie == htonl(MAGIC_COOKIE))
-	{
-		if (open_udp_socket(iface) == -1 && errno != EADDRINUSE)
-			syslog(LOG_ERR, "%s: open_udp_socket: %m", iface->name);
-	}
-}
-
-static void
 send_release(struct interface *iface)
 {
 	struct timespec ts;
@@ -739,7 +703,6 @@ send_release(struct interface *iface)
 	{
 		syslog(LOG_INFO, "%s: releasing lease of %s",
 		    iface->name, inet_ntoa(iface->state->lease.addr));
-		open_sockets(iface);
 		iface->state->xid = dhcp_xid(iface);
 		send_message(iface, DHCP_RELEASE, NULL);
 		/* Give the packet a chance to go before dropping the ip */
@@ -754,7 +717,6 @@ send_release(struct interface *iface)
 void
 send_decline(struct interface *iface)
 {
-	open_sockets(iface);
 	send_message(iface, DHCP_DECLINE, NULL);
 }
 
@@ -922,7 +884,6 @@ start_discover(void *arg)
 
 	iface->state->state = DHS_DISCOVER;
 	iface->state->xid = dhcp_xid(iface);
-	open_sockets(iface);
 	delete_timeout(NULL, iface);
 	if (ifo->fallback)
 		add_timeout_sec(ifo->timeout, start_fallback, iface);
@@ -956,7 +917,6 @@ start_renew(void *arg)
 	    iface->name, inet_ntoa(iface->state->lease.addr));
 	iface->state->state = DHS_RENEW;
 	iface->state->xid = dhcp_xid(iface);
-	open_sockets(iface);
 	send_renew(iface);
 }
 
@@ -970,8 +930,6 @@ start_rebind(void *arg)
 	iface->state->state = DHS_REBIND;
 	delete_timeout(send_renew, iface);
 	iface->state->lease.server.s_addr = 0;
-	if (iface->raw_fd == -1)
-		open_sockets(iface);
 	send_rebind(iface);
 }
 
@@ -1056,7 +1014,6 @@ start_inform(struct interface *iface)
 
 	iface->state->state = DHS_INFORM;
 	iface->state->xid = dhcp_xid(iface);
-	open_sockets(iface);
 	send_inform(iface);
 }
 
@@ -1103,7 +1060,6 @@ start_reboot(struct interface *iface)
 	else if (!(ifo->options & DHCPCD_INFORM &&
 		options & (DHCPCD_MASTER | DHCPCD_DAEMONISED)))
 		add_timeout_sec(ifo->reboot, start_expire, iface);
-	open_sockets(iface);
 	/* Don't bother ARP checking as the server could NAK us first. */
 	if (ifo->options & DHCPCD_INFORM)
 		send_inform(iface);
@@ -1345,7 +1301,6 @@ handle_ifa(int type, const char *ifname,
 			    dst ? dst->s_addr : INADDR_ANY;
 			ifp->addr = *addr;
 			ifp->net = *net;
-			open_sockets(ifp);
 			send_inform(ifp);
 		}
 		break;
@@ -1600,6 +1555,45 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 		sort_interfaces();
 	}
 	return 0;
+}
+
+void
+open_sockets(struct interface *iface)
+{
+	if (iface->raw_fd == -1) {
+		if (open_socket(iface, ETHERTYPE_IP) == -1)
+			syslog(LOG_ERR, "%s: open_socket: %m", iface->name);
+		else
+			add_event(iface->raw_fd, handle_dhcp_packet, iface);
+	}
+	if (iface->udp_fd == -1 &&
+	    iface->addr.s_addr != 0 &&
+	    iface->state->new != NULL &&
+	    iface->state->new->cookie == htonl(MAGIC_COOKIE))
+	{
+		if (open_udp_socket(iface) == -1 && errno != EADDRINUSE)
+			syslog(LOG_ERR, "%s: open_udp_socket: %m", iface->name);
+	}
+}
+
+void
+close_sockets(struct interface *iface)
+{
+	if (iface->arp_fd != -1) {
+		delete_event(iface->arp_fd);
+		close(iface->arp_fd);
+		iface->arp_fd = -1;
+	}
+	if (iface->raw_fd != -1) {
+		delete_event(iface->raw_fd);
+		close(iface->raw_fd);
+		iface->raw_fd = -1;
+	}
+	if (iface->udp_fd != -1) {
+		/* we don't listen to events on the udp */
+		close(iface->udp_fd);
+		iface->udp_fd = -1;
+	}
 }
 
 int
