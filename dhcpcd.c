@@ -1673,7 +1673,7 @@ main(int argc, char **argv)
 
 	if (options & DHCPCD_DEBUG)
 		setlogmask(LOG_UPTO(LOG_DEBUG));
-	else if (options & DHCPCD_QUIET)
+	if (options & DHCPCD_QUIET)
 		close(STDERR_FILENO);
 
 	if (!(options & DHCPCD_TEST)) {
