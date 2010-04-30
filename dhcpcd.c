@@ -410,6 +410,7 @@ log_dhcp(int lvl, const char *msg,
     const struct interface *iface, const struct dhcp_message *dhcp,
     const struct in_addr *from)
 {
+	const char *tfrom;
 	char *a;
 	struct in_addr addr;
 	int r;
@@ -421,19 +422,23 @@ log_dhcp(int lvl, const char *msg,
 		a = xstrdup(inet_ntoa(addr));
 	} else
 		a = NULL;
+
+	tfrom = "from";
 	r = get_option_addr(&addr, dhcp, DHO_SERVERID);
 	if (dhcp->servername[0] && r == 0)
-		syslog(lvl, "%s: %s %s from %s `%s'", iface->name, msg, a,
-		    inet_ntoa(addr), dhcp->servername);
+		syslog(lvl, "%s: %s %s %s %s `%s'", iface->name, msg, a,
+		    tfrom, inet_ntoa(addr), dhcp->servername);
 	else {
-		if (r != 0)
+		if (r != 0) {
+			tfrom = "via";
 			addr = *from;
+		}
 		if (a == NULL)
-			syslog(lvl, "%s: %s from %s",
-			    iface->name, msg, inet_ntoa(addr));
+			syslog(lvl, "%s: %s %s %s",
+			    iface->name, msg, tfrom, inet_ntoa(addr));
 		else
-			syslog(lvl, "%s: %s %s from %s",
-			    iface->name, msg, a, inet_ntoa(addr));
+			syslog(lvl, "%s: %s %s %s %s",
+			    iface->name, msg, a, tfrom, inet_ntoa(addr));
 	}
 	free(a);
 }
