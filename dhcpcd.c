@@ -1883,10 +1883,7 @@ main(int argc, char **argv)
 		{
 			syslog(LOG_WARNING, "no interfaces have a carrier");
 			daemonise();
-		} else if (ifo->timeout > 0 &&
-			   (options & DHCPCD_DAEMONISE ||
-			    options & DHCPCD_TEST))
-		{
+		} else if (ifo->timeout > 0) {
 			if (options & DHCPCD_IPV4LL)
 				options |= DHCPCD_TIMEOUT_IPV4LL;
 			add_timeout_sec(ifo->timeout, handle_exit_timeout,
