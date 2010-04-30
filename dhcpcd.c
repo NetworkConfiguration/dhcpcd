@@ -407,7 +407,8 @@ start_expire(void *arg)
 
 static void
 log_dhcp(int lvl, const char *msg,
-    const struct interface *iface, const struct dhcp_message *dhcp, const struct in_addr *from)
+    const struct interface *iface, const struct dhcp_message *dhcp,
+    const struct in_addr *from)
 {
 	char *a;
 	struct in_addr addr;
@@ -424,17 +425,16 @@ log_dhcp(int lvl, const char *msg,
 	if (dhcp->servername[0] && r == 0)
 		syslog(lvl, "%s: %s %s from %s `%s'", iface->name, msg, a,
 		    inet_ntoa(addr), dhcp->servername);
-	else if (r == 0) {
+	else {
+		if (r != 0)
+			addr = *from;
 		if (a == NULL)
 			syslog(lvl, "%s: %s from %s",
 			    iface->name, msg, inet_ntoa(addr));
 		else
 			syslog(lvl, "%s: %s %s from %s",
 			    iface->name, msg, a, inet_ntoa(addr));
-	} else if (a != NULL)
-		syslog(lvl, "%s: %s %s from %s", iface->name, msg, a, inet_ntoa(*from));
-	else
-		syslog(lvl, "%s: %s from %s", iface->name, msg, inet_ntoa(*from));
+	}
 	free(a);
 }
 
@@ -558,13 +558,15 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp, const struct i
 
 	if (type) {
 		if (type == DHCP_OFFER) {
-			log_dhcp(LOG_INFO, "ignoring offer of", iface, dhcp, from);
+			log_dhcp(LOG_INFO, "ignoring offer of",
+			    iface, dhcp, from);
 			return;
 		}
 
 		/* We should only be dealing with acks */
 		if (type != DHCP_ACK) {
-			log_dhcp(LOG_ERR, "not ACK or OFFER", iface, dhcp, from);
+			log_dhcp(LOG_ERR, "not ACK or OFFER",
+			    iface, dhcp, from);
 			return;
 		}
 
@@ -1141,7 +1143,8 @@ start_interface(void *arg)
 			    now.tv_sec - st.st_mtime)
 			{
 				syslog(LOG_DEBUG,
-				    "%s: discarding expired lease", iface->name);
+				    "%s: discarding expired lease",
+				    iface->name);
 				free(iface->state->offer);
 				iface->state->offer = NULL;
 				iface->state->lease.addr.s_addr = 0;
