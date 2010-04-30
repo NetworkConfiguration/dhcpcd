@@ -1607,7 +1607,7 @@ main(int argc, char **argv)
 	struct timespec ts;
 
 	closefrom(3);
-	openlog(PACKAGE, LOG_PERROR, LOG_DAEMON);
+	openlog(PACKAGE, LOG_PERROR | LOG_PID, LOG_DAEMON);
 	setlogmask(LOG_UPTO(LOG_INFO));
 
 	/* Test for --help and --version */
