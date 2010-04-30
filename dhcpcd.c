@@ -1878,12 +1878,15 @@ main(int argc, char **argv)
 		{
 			syslog(LOG_WARNING, "no interfaces have a carrier");
 			daemonise();
-		} else if (options & DHCPCD_DAEMONISE && ifo->timeout > 0) {
+		} else if (ifo->timeout > 0 &&
+			   (options & DHCPCD_DAEMONISE ||
+			    options & DHCPCD_TEST))
+		{
 			if (options & DHCPCD_IPV4LL)
 				options |= DHCPCD_TIMEOUT_IPV4LL;
-			add_timeout_sec(ifo->timeout, handle_exit_timeout, NULL);
+			add_timeout_sec(ifo->timeout, handle_exit_timeout,
+			    NULL);
 		}
-
 	}
 	free_options(ifo);
 
