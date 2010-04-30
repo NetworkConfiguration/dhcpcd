@@ -407,7 +407,7 @@ start_expire(void *arg)
 
 static void
 log_dhcp(int lvl, const char *msg,
-    const struct interface *iface, const struct dhcp_message *dhcp)
+    const struct interface *iface, const struct dhcp_message *dhcp, const struct in_addr *from)
 {
 	char *a;
 	struct in_addr addr;
@@ -432,9 +432,9 @@ log_dhcp(int lvl, const char *msg,
 			syslog(lvl, "%s: %s %s from %s",
 			    iface->name, msg, a, inet_ntoa(addr));
 	} else if (a != NULL)
-		syslog(lvl, "%s: %s %s", iface->name, msg, a);
+		syslog(lvl, "%s: %s %s from %s", iface->name, msg, a, inet_ntoa(*from));
 	else
-		syslog(lvl, "%s: %s", iface->name, msg);
+		syslog(lvl, "%s: %s from %s", iface->name, msg, inet_ntoa(*from));
 	free(a);
 }
 
@@ -463,7 +463,7 @@ whitelisted_ip(const struct if_options *ifo, in_addr_t addr)
 }
 
 static void
-handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
+handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp, const struct in_addr *from)
 {
 	struct if_state *state = iface->state;
 	struct if_options *ifo = state->options;
@@ -485,11 +485,11 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 		if (has_option_mask(ifo->requiremask, DHO_SERVERID) &&
 		    get_option_addr(&addr, dhcp, DHO_SERVERID) == -1)
 		{
-			log_dhcp(LOG_WARNING, "reject NAK", iface, dhcp);
+			log_dhcp(LOG_WARNING, "reject NAK", iface, dhcp, from);
 			return;
 		}
 		/* We should restart on a NAK */
-		log_dhcp(LOG_WARNING, "NAK:", iface, dhcp);
+		log_dhcp(LOG_WARNING, "NAK:", iface, dhcp, from);
 		if (!(options & DHCPCD_TEST)) {
 			drop_config(iface, "NAK");
 			unlink(iface->leasefile);
@@ -512,7 +512,7 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 			 * To ignore bootp, require dhcp_message_type instead. */
 			if (type == 0 && i == DHO_SERVERID)
 				continue;
-			log_dhcp(LOG_WARNING, "reject DHCP", iface, dhcp);
+			log_dhcp(LOG_WARNING, "reject DHCP", iface, dhcp, from);
 			return;
 		}
 	}		
@@ -529,7 +529,7 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 		if (type == 0 ||
 		    get_option_addr(&lease->server, dhcp, DHO_SERVERID) != 0)
 			lease->server.s_addr = INADDR_ANY;
-		log_dhcp(LOG_INFO, "offered", iface, dhcp);
+		log_dhcp(LOG_INFO, "offered", iface, dhcp, from);
 		free(state->offer);
 		state->offer = dhcp;
 		*dhcpp = NULL;
@@ -558,18 +558,18 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp)
 
 	if (type) {
 		if (type == DHCP_OFFER) {
-			log_dhcp(LOG_INFO, "ignoring offer of", iface, dhcp);
+			log_dhcp(LOG_INFO, "ignoring offer of", iface, dhcp, from);
 			return;
 		}
 
 		/* We should only be dealing with acks */
 		if (type != DHCP_ACK) {
-			log_dhcp(LOG_ERR, "not ACK or OFFER", iface, dhcp);
+			log_dhcp(LOG_ERR, "not ACK or OFFER", iface, dhcp, from);
 			return;
 		}
 
 		if (!(ifo->options & DHCPCD_INFORM))
-			log_dhcp(LOG_INFO, "acknowledged", iface, dhcp);
+			log_dhcp(LOG_INFO, "acknowledged", iface, dhcp, from);
 	}
 
 	/* BOOTP could have already assigned this above, so check we still
@@ -685,7 +685,7 @@ handle_dhcp_packet(void *arg)
 			    hwaddr_ntoa(dhcp->chaddr, sizeof(dhcp->chaddr)));
 			continue;
 		}
-		handle_dhcp(iface, &dhcp);
+		handle_dhcp(iface, &dhcp, &from);
 		if (iface->raw_fd == -1)
 			break;
 	}
