@@ -73,7 +73,7 @@ daemonise(void)
 		syslog(LOG_ERR, "pipe: %m");
 		return -1;
 	}
-	syslog(LOG_INFO, "forking to background");
+	syslog(LOG_DEBUG, "forking to background");
 	switch (pid = fork()) {
 	case -1:
 		syslog(LOG_ERR, "fork: %m");
@@ -105,6 +105,7 @@ daemonise(void)
 	}
 	/* Done with the fd now */
 	if (pid != 0) {
+		syslog(LOG_INFO, "forked to background, child pid %d",pid);
 		writepid(pidfd, pid);
 		close(pidfd);
 		pidfd = -1;
