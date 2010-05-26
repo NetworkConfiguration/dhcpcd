@@ -144,6 +144,7 @@ handle_ipv4ll_failure(void *arg)
 	close_sockets(iface);
 	free(iface->state->offer);
 	iface->state->offer = NULL;
+	delete_timeout(NULL, iface);
 	if (++iface->state->conflicts > MAX_CONFLICTS) {
 		syslog(LOG_ERR, "%s: failed to acquire an IPv4LL address",
 		    iface->name);
