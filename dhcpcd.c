@@ -1324,71 +1324,8 @@ handle_link(_unused void *arg)
 		syslog(LOG_ERR, "manage_link: %m");
 }
 
-/* ARGSUSED */
 static void
-handle_signal(_unused void *arg)
-{
-	struct interface *iface, *ifl;
-	int sig = signal_read();
-	int do_release = 0;
-
-	switch (sig) {
-	case SIGINT:
-		syslog(LOG_INFO, "received SIGINT, stopping");
-		break;
-	case SIGTERM:
-		syslog(LOG_INFO, "received SIGTERM, stopping");
-		break;
-	case SIGALRM:
-		syslog(LOG_INFO, "received SIGALRM, rebinding lease");
-		for (iface = ifaces; iface; iface = iface->next)
-			start_interface(iface);
-		return;
-	case SIGHUP:
-		syslog(LOG_INFO, "received SIGHUP, releasing lease");
-		do_release = 1;
-		break;
-	case SIGUSR1:
-		syslog(LOG_INFO, "received SIGUSR, reconfiguring");
-		for (iface = ifaces; iface; iface = iface->next)
-			if (iface->state->new)
-				configure(iface);
-		return;
-	case SIGPIPE:
-		syslog(LOG_WARNING, "received SIGPIPE");
-		return;
-	default:
-		syslog(LOG_ERR,
-		    "received signal %d, but don't know what to do with it",
-		    sig);
-		return;
-	}
-
-	if (options & DHCPCD_TEST)
-		exit(EXIT_FAILURE);
-
-	/* As drop_config could re-arrange the order, we do it like this. */
-	for (;;) {
-		/* Be sane and drop the last config first */
-		ifl = NULL;
-		for (iface = ifaces; iface; iface = iface->next) {
-			if (iface->next == NULL)
-				break;
-			ifl = iface;
-		}
-		if (iface == NULL)
-			break;
-		if (iface->carrier != LINK_DOWN &&
-		    (do_release ||
-			iface->state->options->options & DHCPCD_RELEASE))
-			send_release(iface);
-		stop_interface(iface);
-	}
-	exit(EXIT_FAILURE);
-}
-
-static void
-reconf_reboot(struct interface *iface, int argc, char **argv)
+reboot(struct interface *iface, int argc, char **argv)
 {
 	const struct if_options *ifo;
 	int opt;
@@ -1411,10 +1348,135 @@ reconf_reboot(struct interface *iface, int argc, char **argv)
 	start_interface(iface);
 }
 
+static void
+reconf_reboot(int action, int argc, char **argv, int oi)
+{
+	struct interface *ifl, *ifn, *ifp, *ifs, *ift;
+	
+	ifs = discover_interfaces(argc - oi, argv + oi);
+	if (ifs == NULL)
+		return;
+
+	/* Remove any old interfaces */
+	if (ifaces) {
+		for (ifl = NULL; ifl != ifaces;) {
+			/* Work our way backwards */
+			for (ifp = ifaces; ifp; ifp = ifp->next)
+				if (ifp->next == ifl) {
+					ifl = ifp;
+					break;
+				}
+			for (ifn = ifs; ifn; ifn = ifn->next)
+				if (strcmp(ifn->name, ifp->name) == 0)
+					break;
+			if (ifn == NULL)
+				stop_interface(ifp);
+		}
+	}
+	
+	for (ifp = ifs; ifp && (ift = ifp->next, 1); ifp = ift) {
+		ifl = NULL;
+		for (ifn = ifaces; ifn; ifn = ifn->next) {
+			if (strcmp(ifn->name, ifp->name) == 0)
+				break;
+			ifl = ifn;
+		}
+		if (ifn) {
+			if (action)
+				reboot(ifn, argc, argv);
+			else if (ifn->state->new)
+				configure(ifn);
+			free_interface(ifp);
+		} else {
+			ifp->next = NULL;
+			init_state(ifp, argc, argv);
+			start_interface(ifp);
+			if (ifl)
+				ifl->next = ifp;
+			else
+				ifaces = ifp;
+		}
+	}
+
+	sort_interfaces();
+}
+
+/* ARGSUSED */
+static void
+handle_signal(_unused void *arg)
+{
+	struct interface *ifp, *ifl;
+	struct if_options *ifo;
+	int sig = signal_read();
+	int do_release, do_rebind;
+
+	do_rebind = do_release = 0;
+	switch (sig) {
+	case SIGINT:
+		syslog(LOG_INFO, "received SIGINT, stopping");
+		break;
+	case SIGTERM:
+		syslog(LOG_INFO, "received SIGTERM, stopping");
+		break;
+	case SIGALRM:
+		syslog(LOG_INFO, "received SIGALRM, rebinding");
+		ifo = read_config(cffile, NULL, NULL, NULL);
+		/* We need to preserve these two options. */
+		if (options & DHCPCD_MASTER)
+			ifo->options |= DHCPCD_MASTER;
+		if (options & DHCPCD_DAEMONISED)
+			ifo->options |= DHCPCD_DAEMONISED;
+		options = ifo->options;
+		free_options(ifo);
+		reconf_reboot(1, 0, NULL, 0);
+		return;
+	case SIGHUP:
+		syslog(LOG_INFO, "received SIGHUP, releasing");
+		do_release = 1;
+		break;
+	case SIGUSR1:
+		syslog(LOG_INFO, "received SIGUSR, reconfiguring");
+		for (ifp = ifaces; ifp; ifp = ifp->next)
+			if (ifp->state->new)
+				configure(ifp);
+		return;
+	case SIGPIPE:
+		syslog(LOG_WARNING, "received SIGPIPE");
+		return;
+	default:
+		syslog(LOG_ERR,
+		    "received signal %d, but don't know what to do with it",
+		    sig);
+		return;
+	}
+
+	if (options & DHCPCD_TEST)
+		exit(EXIT_FAILURE);
+
+	/* As drop_config could re-arrange the order, we do it like this. */
+	for (;;) {
+		/* Be sane and drop the last config first */
+		ifl = NULL;
+		for (ifp = ifaces; ifp; ifp = ifp->next) {
+			if (ifp->next == NULL)
+				break;
+			ifl = ifp;
+		}
+		if (ifp == NULL)
+			break;
+		if (ifp->carrier != LINK_DOWN &&
+		    (do_release ||
+			ifp->state->options->options & DHCPCD_RELEASE))
+			send_release(ifp);
+		stop_interface(ifp);
+	}
+	exit(EXIT_FAILURE);
+}
+
 int
 handle_args(struct fd_list *fd, int argc, char **argv)
 {
-	struct interface *ifs, *ifp, *ifl, *ifn, *ift;
+	struct interface *ifp;
 	int do_exit = 0, do_release = 0, do_reboot = 0, do_reconf = 0;
 	int opt, oi = 0;
 	ssize_t len;
@@ -1537,32 +1599,7 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 		return 0;
 	}
 
-	if ((ifs = discover_interfaces(argc - optind, argv + optind))) {
-		for (ifp = ifs; ifp && (ift = ifp->next, 1); ifp = ift) {
-			ifl = NULL;
-			for (ifn = ifaces; ifn; ifn = ifn->next) {
-				if (strcmp(ifn->name, ifp->name) == 0)
-					break;
-				ifl = ifn;
-			}
-			if (ifn) {
-				if (do_reboot)
-					reconf_reboot(ifn, argc, argv);
-				else if (do_reconf && ifn->state->new)
-					configure(ifn);
-				free_interface(ifp);
-			} else {
-				ifp->next = NULL;
-				init_state(ifp, argc, argv);
-				start_interface(ifp);
-				if (ifl)
-					ifl->next = ifp;
-				else
-					ifaces = ifp;
-			}
-		}
-		sort_interfaces();
-	}
+	reconf_reboot(do_reboot, argc, argv, optind);
 	return 0;
 }
 
