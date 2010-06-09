@@ -94,6 +94,9 @@ install: _proginstall _scriptsinstall _maninstall _confinstall
 clean:
 	rm -f ${OBJS} ${PROG} ${PROG}.core ${CLEANFILES}
 
+distclean: clean
+	rm -f .depend config.h config.mk
+
 dist:
 	git archive --prefix=${DISTPREFIX}/ ${GITREF} | bzip2 > ${DISTFILE}
 
