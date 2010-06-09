@@ -524,9 +524,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		}
 		break;
 	case 'z':
-		/* We only set this if we haven't got any interfaces */
-		if (!ifaces)
-			ifav = splitv(&ifac, ifav, arg);
+		ifav = splitv(&ifac, ifav, arg);
 		break;
 	case 'A':
 		ifo->options &= ~DHCPCD_ARP;
@@ -712,9 +710,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		ifo->blacklist[ifo->blacklist_len++] = addr2.s_addr;
 		break;
 	case 'Z':
-		/* We only set this if we haven't got any interfaces */
-		if (!ifaces)
-			ifdv = splitv(&ifdc, ifdv, arg);
+		ifdv = splitv(&ifdc, ifdv, arg);
 		break;
 	case O_ARPING:
 		if (parse_addr(&addr, NULL, arg) != 0)
@@ -849,8 +845,7 @@ read_config(const char *file,
 		}
 		if (skip)
 			continue;
-		if (parse_config_line(ifo, option, line) != 1)
-			break;
+		parse_config_line(ifo, option, line);
 	}
 	fclose(f);
 

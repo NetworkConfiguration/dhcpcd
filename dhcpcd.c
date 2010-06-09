@@ -1369,8 +1369,10 @@ reconf_reboot(int action, int argc, char **argv, int oi)
 			for (ifn = ifs; ifn; ifn = ifn->next)
 				if (strcmp(ifn->name, ifp->name) == 0)
 					break;
-			if (ifn == NULL)
+			if (ifn == NULL) {
+				ifl = ifp->next;
 				stop_interface(ifp);
+			}
 		}
 	}
 	
@@ -1408,7 +1410,7 @@ handle_signal(_unused void *arg)
 	struct interface *ifp, *ifl;
 	struct if_options *ifo;
 	int sig = signal_read();
-	int do_release, do_rebind;
+	int do_release, do_rebind, i;
 
 	do_rebind = do_release = 0;
 	switch (sig) {
@@ -1420,7 +1422,18 @@ handle_signal(_unused void *arg)
 		break;
 	case SIGALRM:
 		syslog(LOG_INFO, "received SIGALRM, rebinding");
+		for (i = 0; i < ifac; i++)
+			free(ifav[i]);
+		free(ifav);
+		ifav = NULL;
+		ifac = 0;
+		for (i = 0; i < ifdc; i++)
+			free(ifdv[i]);
+		free(ifdv);
+		ifdc = 0;
+		ifdv = NULL;
 		ifo = read_config(cffile, NULL, NULL, NULL);
+		add_options(ifo, margc, margv);
 		/* We need to preserve these two options. */
 		if (options & DHCPCD_MASTER)
 			ifo->options |= DHCPCD_MASTER;
