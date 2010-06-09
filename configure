@@ -13,6 +13,7 @@ HOST=
 TARGET=
 DEBUG=
 FORK=
+INCLUDEDIR=
 
 for x; do
 	opt=${x%%=*}
@@ -26,7 +27,7 @@ for x; do
 	--fork) FORK=$var;;
 	--disable-fork) FORK=no;;
 	--enable-fork) FORK=yes;;
-	--prefix) PREFIX=$var;;
+	--prefix) prefix=$var;;
 	--sysconfdir) SYSCONFDIR=$var;;
 	--bindir|--sbindir) SBINDIR=$var;;
 	--libexecdir) LIBEXECDIR=$var;;
@@ -46,7 +47,9 @@ for x; do
 	--without-closefrom) CLOSEFROM=no;;
 	--without-getline) GETLINE=no;;
 	--without-strlcpy) STRLCPY=no;;
+	--includedir) eval INCLUDEDIR="$INCLUDEDIR${INCLUDEDIR:+ }$var";;
 	--datadir|--infodir) ;; # ignore autotools
+	--disable-maintainer-mode|--disable-dependency-tracking) ;;
 	--help) echo "See the README file for available options"; exit 0;;
 	*) echo "$0: WARNING: unknown option $opt" >&2;;
 	esac
@@ -55,7 +58,7 @@ done
 : ${SED:=sed}
 
 : ${FORK:=yes}
-: ${PREFIX:=}
+: ${PREFIX:=$prefix}
 : ${SYSCONFDIR:=$PREFIX/etc}
 : ${SBINDIR:=$PREFIX/sbin}
 : ${LIBDIR:=$PREFIX/lib}
@@ -64,6 +67,14 @@ done
 : ${DBDIR:=$STATEDIR/db}
 : ${RUNDIR:=$STATEDIR/run}
 : ${MANDIR:=${PREFIX:-/usr}/share/man}
+
+eval SYSCONFDIR="$SYSCONFDIR"
+eval LIBDIR="$LIBDIR"
+eval LIBEXECDIR="$LIBEXECDIR"
+eval STATEDIR="$STATEDIR"
+eval DBDIR="$DBDIR"
+eval RUNDIR="$RUNDIR"
+eval MANDIR="$MANDIR"
 
 _which()
 {
@@ -87,7 +98,7 @@ CONFIG_H=config.h
 CONFIG_MK=config.mk
 
 if [ -z "$BUILD" ]; then
-	BUILD=`uname -m`-unknown-`uname -s | tr '[:upper:]' '[:lower:]'`
+	BUILD=`uname -m`-`uname -s | tr '[:upper:]' '[:lower:]'`
 fi
 if [ -z "$HOST" ]; then
 	[ -z "$TARGET" ] && TARGET=$BUILD
@@ -102,11 +113,26 @@ if [ -z "$OS" ]; then
 	# Derive OS from cpu-manufacturer-os-kernel
 	CPU=${TARGET%%-*}
 	REST=${TARGET#*-}
-	MANU=${REST%%-*}
-	REST=${REST#*-}
-	OS=${REST%%-*}
-	REST=${REST#*-}
-	KERNEL=${REST%%-*}
+	if [ "$CPU" != "$REST" ]; then
+		MANU=${REST%%-*}
+		REST=${REST#*-}
+		if [ "$MANU" != "$REST" ]; then
+			OS=${REST%%-*}
+			REST=${REST#*-}
+			if [ "$OS" != "$REST" ]; then
+				KERNEL=${REST%%-*}
+			else
+				# 3 tupple
+				KERNEL=$OS
+				OS=$MANU
+				MANU=
+			fi
+		else
+			# 2 tupple
+			OS=$MANU
+			MANU=
+		fi
+	fi
 fi
 
 echo "Configuring dhcpcd for ... $OS"
@@ -156,6 +182,9 @@ fi
 if [ -n "$CPPLAGS" ]; then
 	echo "CPPLAGS=		$CPPLAGS" >>$CONFIG_MK
 fi
+for x in $INCLUDEDIR; do
+	echo "CPPFLAGS+=	-I$x" >>$CONFIG_MK
+done
 
 if [ -n "$DEBUG" -a "$DEBUG" != no -a "$DEBUG" != false ]; then
 	echo "Enabling memory debugging"
@@ -197,11 +226,12 @@ linux)
 	;;
 esac
 
-# Even if we build for $PREFIX, the clueless user might move us to /
+# NetBSD: Even if we build for $PREFIX, the clueless user might move us to /
 LDELF=/libexec/ld.elf_so
 if [ -e "$LDELF" ]; then
 	echo "Linking against $LDELF"
 	echo "LDFLAGS+=	-Wl,-dynamic-linker=$LDELF" >>$CONFIG_MK
+	echo "LDFLAGS+=	-Wl,-rpath=${LIBDIR}" >>$CONFIG_MK
 fi
 
 # Add CPPFLAGS and CFLAGS to CC for testing features

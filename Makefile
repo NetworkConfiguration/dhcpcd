@@ -27,8 +27,6 @@ CLEANFILES+=	.depend
 FILES=		dhcpcd.conf
 FILESDIR=	${SYSCONFDIR}
 
-LDFLAGS+=	-Wl,-rpath=${LIBDIR}
-
 SUBDIRS=	dhcpcd-hooks
 
 SED_DBDIR=	-e 's:@DBDIR@:${DBDIR}:g'
