@@ -1325,7 +1325,7 @@ handle_link(_unused void *arg)
 }
 
 static void
-reboot(struct interface *iface, int argc, char **argv)
+if_reboot(struct interface *iface, int argc, char **argv)
 {
 	const struct if_options *ifo;
 	int opt;
@@ -1385,7 +1385,7 @@ reconf_reboot(int action, int argc, char **argv, int oi)
 		}
 		if (ifn) {
 			if (action)
-				reboot(ifn, argc, argv);
+				if_reboot(ifn, argc, argv);
 			else if (ifn->state->new)
 				configure(ifn);
 			free_interface(ifp);
