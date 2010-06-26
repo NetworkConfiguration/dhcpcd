@@ -195,7 +195,6 @@ void
 handle_exit_timeout(_unused void *arg)
 {
 	int timeout;
-	struct interface *ifp;
 
 	syslog(LOG_ERR, "timed out");
 	if (!(options & DHCPCD_TIMEOUT_IPV4LL)) {
@@ -207,9 +206,6 @@ handle_exit_timeout(_unused void *arg)
 	}
 	options &= ~DHCPCD_TIMEOUT_IPV4LL;
 	timeout = (PROBE_NUM * PROBE_MAX) + PROBE_WAIT + 1;
-	/* Add an extra second per interface */
-	for (ifp = ifaces; ifp; ifp = ifp->next)
-		timeout++;
 	syslog(LOG_WARNING, "allowing %d seconds for IPv4LL timeout", timeout);
 	add_timeout_sec(timeout, handle_exit_timeout, NULL);
 }
