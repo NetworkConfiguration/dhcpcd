@@ -198,8 +198,13 @@ handle_exit_timeout(_unused void *arg)
 	struct interface *ifp;
 
 	syslog(LOG_ERR, "timed out");
-	if (!(options & DHCPCD_TIMEOUT_IPV4LL))
-		exit(EXIT_FAILURE);
+	if (!(options & DHCPCD_TIMEOUT_IPV4LL)) {
+		if (options & DHCPCD_MASTER) {
+			daemonise();
+			return;
+		} else
+			exit(EXIT_FAILURE);
+	}
 	options &= ~DHCPCD_TIMEOUT_IPV4LL;
 	timeout = (PROBE_NUM * PROBE_MAX) + PROBE_WAIT + 1;
 	/* Add an extra second per interface */
