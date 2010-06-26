@@ -91,17 +91,19 @@ remove_markers()
 # If different, replace first with second otherwise remove second
 change_file()
 {
-	if type cmp >/dev/null 2>&1; then
-		cmp -s "$1" "$2"
-	elif type diff >/dev/null 2>&1; then
-		diff -q "$1" "$2" >/dev/null
-	else
-		# Hopefully we're only working on small text files ...
-		[ "$(cat "$1")" = "$(cat "$2")" ]
-	fi
-	if [ $? -eq 0 ]; then
-		rm -f "$2"
-		return 1
+	if [ -e "$1" ]; then
+		if type cmp >/dev/null 2>&1; then
+			cmp -s "$1" "$2"
+		elif type diff >/dev/null 2>&1; then
+			diff -q "$1" "$2" >/dev/null
+		else
+			# Hopefully we're only working on small text files ...
+			[ "$(cat "$1")" = "$(cat "$2")" ]
+		fi
+		if [ $? -eq 0 ]; then
+			rm -f "$2"
+			return 1
+		fi
 	fi
 	cat "$2" > "$1"
 	rm -f "$2"
