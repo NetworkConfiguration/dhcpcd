@@ -109,6 +109,14 @@ if [ -z "$TARGET" ]; then
 	TARGET=$HOST
 fi
 
+# Debian and Slackware have linux in different places when dealing with
+# autoconf, so we deal with that here.
+if [ -z "$OS" ]; then
+	case "$TARGET" in
+	*-linux-*|linux-*|*-linux|linux) OS=linux;;
+	esac
+fi
+
 if [ -z "$OS" ]; then
 	# Derive OS from cpu-manufacturer-os-kernel
 	CPU=${TARGET%%-*}
