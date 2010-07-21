@@ -54,8 +54,6 @@
 #include "dhcp.h"
 #include "net.h"
 
-#define BUFFERLEN 256
-
 static int sock_fd;
 static struct sockaddr_nl sock_nl;
 
@@ -144,14 +142,38 @@ static int
 get_netlink(int fd, int flags,
     int (*callback)(struct nlmsghdr *))
 {
-	char *buffer = NULL;
-	ssize_t bytes;
+	char *buf = NULL, *nbuf;
+	ssize_t buflen = 0, bytes;
 	struct nlmsghdr *nlm;
 	int r = -1;
 
-	buffer = xzalloc(sizeof(char) * BUFFERLEN);
 	for (;;) {
-		bytes = recv(fd, buffer, BUFFERLEN, flags);
+		bytes = recv(fd, NULL, 0,
+		    flags | MSG_PEEK | MSG_DONTWAIT | MSG_TRUNC);
+		if (bytes == -1) {
+			if (errno == EAGAIN) {
+				r = 0;
+				goto eexit;
+			}
+			if (errno == EINTR)
+				continue;
+			goto eexit;
+		} else if (bytes == buflen) {
+			/* Support kernels older than 2.6.22 */
+			if (bytes == 0)
+				bytes = 512;
+			else
+				bytes *= 2;
+		}
+		if (buflen < bytes) {
+			/* Alloc 1 more so we work with older kernels */
+			buflen = bytes + 1;
+			nbuf = realloc(buf, buflen);
+			if (nbuf == NULL)
+				goto eexit;
+			buf = nbuf;
+		}
+		bytes = recv(fd, buf, buflen, flags);
 		if (bytes == -1) {
 			if (errno == EAGAIN) {
 				r = 0;
@@ -161,7 +183,7 @@ get_netlink(int fd, int flags,
 				continue;
 			goto eexit;
 		}
-		for (nlm = (struct nlmsghdr *)buffer;
+		for (nlm = (struct nlmsghdr *)buf;
 		     NLMSG_OK(nlm, (size_t)bytes);
 		     nlm = NLMSG_NEXT(nlm, bytes))
 		{
@@ -172,7 +194,7 @@ get_netlink(int fd, int flags,
 	}
 
 eexit:
-	free(buffer);
+	free(buf);
 	return r;
 }
 
