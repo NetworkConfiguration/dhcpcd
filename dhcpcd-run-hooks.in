@@ -133,9 +133,9 @@ syslog()
 	local lvl="$1"
 
 	[ -n "$lvl" ] && shift
-	if [ -n "$@" ]; then
+	if [ -n "$*" ]; then
 		if type logger >/dev/null 2>&1; then
-			logger -t dhcpcd -p daemon."$lvl" -s "$@"
+			logger -t dhcpcd -p daemon."$lvl" -s "$*"
 		fi
 	fi
 }
