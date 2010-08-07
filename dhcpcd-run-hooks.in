@@ -9,6 +9,13 @@ signature_base_end="# End of dhcpcd"
 signature_end="$signature_base_end $from $interface"
 state_dir=/var/run/dhcpcd
 
+if_up=false
+if_down=false
+case "$reason" in
+BOUND|INFORM|REBIND|REBOOT|RENEW|TIMEOUT|STATIC)	if_up=true;;
+PREINIT|EXPIRE|FAIL|IPV4LL|NAK|NOCARRIER|RELEASE|STOP)	if_down=true;;
+esac
+
 # Ensure that all arguments are unique
 uniqify()
 {
