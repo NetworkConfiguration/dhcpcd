@@ -1796,7 +1796,7 @@ main(int argc, char **argv)
 		exit(EXIT_SUCCESS);
 	}
 
-	if (!(options & (DHCPCD_MASTER | DHCPCD_TEST | DHCPCD_DUMPLEASE))) {
+	if (!(options & (DHCPCD_MASTER | DHCPCD_TEST))) {
 		control_fd = open_control();
 		if (control_fd != -1) {
 			syslog(LOG_INFO,
