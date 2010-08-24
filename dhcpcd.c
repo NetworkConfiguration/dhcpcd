@@ -88,6 +88,7 @@ char **ifdv = NULL;
 
 static char **margv;
 static int margc;
+static struct if_options *if_options;
 static char **ifv;
 static int ifc;
 static char *cffile;
@@ -160,6 +161,8 @@ cleanup(void)
 #ifdef DEBUG_MEMORY
 	struct interface *iface;
 	int i;
+
+	free_options(if_options);
 
 	while (ifaces) {
 		iface = ifaces;
@@ -1663,7 +1666,6 @@ close_sockets(struct interface *iface)
 int
 main(int argc, char **argv)
 {
-	struct if_options *ifo;
 	struct interface *iface;
 	int opt, oi = 0, signal_fd, sig = 0, i, control_fd;
 	size_t len;
@@ -1721,14 +1723,14 @@ main(int argc, char **argv)
 
 	margv = argv;
 	margc = argc;
-	ifo = read_config(cffile, NULL, NULL, NULL);
-	opt = add_options(ifo, argc, argv);
+	if_options = read_config(cffile, NULL, NULL, NULL);
+	opt = add_options(if_options, argc, argv);
 	if (opt != 1) {
 		if (opt == 0)
 			usage();
 		exit(EXIT_FAILURE);
 	}
-	options = ifo->options;
+	options = if_options->options;
 	if (i != 0) {
 		if (i == 1)
 			options |= DHCPCD_TEST;
@@ -1769,7 +1771,7 @@ main(int argc, char **argv)
 			syslog(LOG_ERR, "dumplease requires an interface");
 			exit(EXIT_FAILURE);
 		}
-		iface = xzalloc(sizeof(*iface));
+		ifaces = iface = xzalloc(sizeof(*iface));
 		strlcpy(iface->name, argv[optind], sizeof(iface->name));
 		snprintf(iface->leasefile, sizeof(iface->leasefile),
 		    LEASEFILE, iface->name);
@@ -1896,7 +1898,7 @@ main(int argc, char **argv)
 		syslog(LOG_ERR, "init_socket: %m");
 		exit(EXIT_FAILURE);
 	}
-	if (ifo->options & DHCPCD_LINK) {
+	if (if_options->options & DHCPCD_LINK) {
 		linkfd = open_link_socket();
 		if (linkfd == -1)
 			syslog(LOG_ERR, "open_link_socket: %m");
@@ -1968,14 +1970,15 @@ main(int argc, char **argv)
 		{
 			syslog(LOG_WARNING, "no interfaces have a carrier");
 			daemonise();
-		} else if (ifo->timeout > 0) {
+		} else if (if_options->timeout > 0) {
 			if (options & DHCPCD_IPV4LL)
 				options |= DHCPCD_TIMEOUT_IPV4LL;
-			add_timeout_sec(ifo->timeout, handle_exit_timeout,
-			    NULL);
+			add_timeout_sec(if_options->timeout,
+			    handle_exit_timeout, NULL);
 		}
 	}
-	free_options(ifo);
+	free_options(if_options);
+	if_options = NULL;
 
 	sort_interfaces();
 	for (iface = ifaces; iface; iface = iface->next)

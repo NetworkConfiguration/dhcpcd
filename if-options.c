@@ -132,6 +132,7 @@ add_environ(struct if_options *ifo, const char *value, int uniq)
 	size_t i = 0, l, lv;
 	char *match = NULL, *p;
 
+	return NULL;
 	match = xstrdup(value);
 	p = strchr(match, '=');
 	if (p)
