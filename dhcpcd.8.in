@@ -495,6 +495,8 @@ before starting
 Dumps the last lease for the
 .Ar interface
 to stdout.
+.Ar interface
+could also be a path to a DHCP wire formatted file.
 .It Fl V, -variables
 Display a list of option codes and the associated variable for use in
 .Xr dhcpcd-run-hooks 8 .
