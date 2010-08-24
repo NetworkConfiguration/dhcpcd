@@ -1776,8 +1776,9 @@ main(int argc, char **argv)
 		snprintf(iface->leasefile, sizeof(iface->leasefile),
 		    LEASEFILE, iface->name);
 		iface->state = xzalloc(sizeof(*iface->state));
-		select_profile(iface, NULL);
-		add_options(iface->state->options, argc, argv);
+		iface->state->options = xzalloc(sizeof(*iface->state->options));
+		strlcpy(iface->state->options->script, if_options->script,
+		    sizeof(iface->state->options->script));
 		iface->state->new = read_lease(iface);
 		if (iface->state->new == NULL && errno == ENOENT) {
 			syslog(LOG_ERR, "%s: no lease to dump", iface->name);
