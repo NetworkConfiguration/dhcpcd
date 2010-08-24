@@ -2,5 +2,7 @@
 
 if [ "$reason" = "TEST" ]; then
 	set | grep "^\(interface\|metric\|pid\|reason\|skip_hooks\)=" | sort
+fi
+if [ "$reason" = "TEST" -o "$reason" = "DUMP" ]; then
 	set | grep "^\(new_\|old_\)" | sort
 fi

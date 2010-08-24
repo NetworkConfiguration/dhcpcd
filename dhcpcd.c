@@ -1707,6 +1707,9 @@ main(int argc, char **argv)
 		case 'T':
 			i = 1;
 			break;
+		case 'U':
+			i = 2;
+			break;
 		case 'V':
 			print_options();
 			exit(EXIT_SUCCESS);
@@ -1727,7 +1730,11 @@ main(int argc, char **argv)
 	}
 	options = ifo->options;
 	if (i != 0) {
-		options |= DHCPCD_TEST | DHCPCD_PERSISTENT;
+		if (i == 1)
+			options |= DHCPCD_TEST;
+		else
+			options |= DHCPCD_DUMPLEASE;
+		options |= DHCPCD_PERSISTENT;
 		options &= ~DHCPCD_DAEMONISE;
 	}
 	
@@ -1740,7 +1747,7 @@ main(int argc, char **argv)
 	if (options & DHCPCD_QUIET)
 		close(STDERR_FILENO);
 
-	if (!(options & DHCPCD_TEST)) {
+	if (!(options & (DHCPCD_TEST | DHCPCD_DUMPLEASE))) {
 		/* If we have any other args, we should run as a single dhcpcd
 		 *  instance for that interface. */
 		len = strlen(PIDFILE) + IF_NAMESIZE + 2;
@@ -1757,7 +1764,29 @@ main(int argc, char **argv)
 		syslog(LOG_ERR, "chdir `/': %m");
 	atexit(cleanup);
 
-	if (!(options & (DHCPCD_MASTER | DHCPCD_TEST))) {
+	if (options & DHCPCD_DUMPLEASE) {
+		if (optind != argc - 1) {
+			syslog(LOG_ERR, "dumplease requires an interface");
+			exit(EXIT_FAILURE);
+		}
+		iface = xzalloc(sizeof(*iface));
+		strlcpy(iface->name, argv[optind], sizeof(iface->name));
+		snprintf(iface->leasefile, sizeof(iface->leasefile),
+		    LEASEFILE, iface->name);
+		iface->state = xzalloc(sizeof(*iface->state));
+		select_profile(iface, NULL);
+		add_options(iface->state->options, argc, argv);
+		iface->state->new = read_lease(iface);
+		if (iface->state->new == NULL && errno == ENOENT) {
+			syslog(LOG_ERR, "%s: no lease to dump", iface->name);
+			exit(EXIT_FAILURE);
+		}
+		iface->state->reason = "DUMP";
+		run_script(iface);
+		exit(EXIT_SUCCESS);
+	}
+
+	if (!(options & (DHCPCD_MASTER | DHCPCD_TEST | DHCPCD_DUMPLEASE))) {
 		control_fd = open_control();
 		if (control_fd != -1) {
 			syslog(LOG_INFO,
