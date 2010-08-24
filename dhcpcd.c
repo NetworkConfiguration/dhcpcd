@@ -1780,8 +1780,10 @@ main(int argc, char **argv)
 		strlcpy(iface->state->options->script, if_options->script,
 		    sizeof(iface->state->options->script));
 		iface->state->new = read_lease(iface);
-		if (iface->state->new == NULL && errno == ENOENT) {
-			syslog(LOG_ERR, "%s: no lease to dump", iface->name);
+		if (iface->state->new == NULL) {
+			if (errno == ENOENT)
+				syslog(LOG_ERR, "%s: no lease to dump",
+				    iface->name);
 			exit(EXIT_FAILURE);
 		}
 		iface->state->reason = "DUMP";
