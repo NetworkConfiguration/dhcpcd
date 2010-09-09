@@ -1091,12 +1091,16 @@ start_interface(void *arg)
 	struct stat st;
 	struct timeval now;
 	uint32_t l;
+	int nolease;
 
 	handle_carrier(iface->name);
 	if (iface->carrier == LINK_DOWN) {
 		syslog(LOG_INFO, "%s: waiting for carrier", iface->name);
 		return;
 	}
+
+	/* We don't want to read the old lease if we NAK an old test */
+	nolease = iface->state->offer && options & DHCPCD_TEST;
 
 	iface->start_uptime = uptime();
 	free(iface->state->offer);
@@ -1136,7 +1140,7 @@ start_interface(void *arg)
 			start_inform(iface);
 			return;
 		}
-	} else
+	} else if (!nolease)
 		iface->state->offer = read_lease(iface);
 	if (iface->state->offer) {
 		get_lease(&iface->state->lease, iface->state->offer);
