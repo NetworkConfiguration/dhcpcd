@@ -47,6 +47,9 @@ for x; do
 	--without-closefrom) CLOSEFROM=no;;
 	--without-getline) GETLINE=no;;
 	--without-strlcpy) STRLCPY=no;;
+	--serviceexists) SERVICEEXISTS=$var;;
+	--servicecmd) SERVICECMD=$var;;
+	--servicestatus) SERVICESTATUS=$var;;
 	--includedir) eval INCLUDEDIR="$INCLUDEDIR${INCLUDEDIR:+ }$var";;
 	--datadir|--infodir) ;; # ignore autotools
 	--disable-maintainer-mode|--disable-dependency-tracking) ;;
@@ -359,6 +362,83 @@ if [ "$STRLCPY" = no ]; then
 	echo "COMPAT_SRCS+=	compat/strlcpy.c" >>$CONFIG_MK
 	echo "#include \"compat/strlcpy.h\"" >>$CONFIG_H
 fi
+
+if [ -z "$SERVICECMD" ]; then
+	printf "Checking for OpenRC ... "
+	if [ -x /sbin/rc-service ]; then
+		SERVICEEXISTS="/sbin/rc-service -e \$1"
+		SERVICECMD="/sbin/rc-service \$1 -- -D \$2"
+		echo "yes"
+	else
+		echo "no"
+	fi
+fi
+if [ -z "$SERVICECMD"]; then
+	printf "Checking for invoke-rc.d ... "
+	if [ -x /usr/sbin/invoke-rc.d ]; then
+		SERVICEEXISTS="/usr/sbin/invoke-rc.d --query --quiet \$1 start >/dev/null 2>&1 || [ \$? = 104 ]"
+		SERVICECMD="/usr/sbin/invoke-rc.d \$1 \$2"
+		echo "yes"
+	else
+		echo "no"
+	fi
+fi
+if [ -z "$SERVICECMD" ]; then
+	printf "Checking for service ... "
+	if [ -x /sbin/service ]; then
+		SERVICEEXISTS="/sbin/service \$1 >/dev/null 2>&1"
+		SERVICECMD="/sbin/service \$1 \$2"
+		echo "yes"
+	else
+		echo "no"
+	fi
+fi
+if [ -z "$SERVICECMD" ]; then
+	for x in /etc/init.d/rc.d /etc/rc.d /etc/init.d; do
+		printf "Checking for $x ... "
+		if [ -d $x ]; then
+			SERVICEEXISTS="[ -x $x/\$1 ]"
+			SERVICECMD="$x/\$1 \$2"
+			echo "yes"
+			break
+		else
+			echo "no"
+		fi
+	done
+fi
+if [ -e /etc/arch-release ]; then
+	echo "Overriding service status check for Arch Linux"
+	SERVICESTATUS="[ -e /var/run/daemons/$1 ]"
+	echo "yes"
+fi
+
+if [ -z "$SERVICEEXISTS" -o -z "$SERVICECMD" ]; then
+	echo "WARNING! No means of interacting with system services detected!"
+	SERVICEEXISTS="return 1"
+	SERVICECMD="return 1"
+fi
+if [ -z "$SERVICESTATUS" ]; then
+	SERVICESTATUS="service_command \$1 status >/dev/null 2>&1"
+fi
+# Transform for a make file
+SERVICEEXISTS=$(echo "$SERVICEEXISTS" | sed \
+	-e 's:\\:\\\\:g' \
+	-e 's:\&:\\\&:g' \
+	-e 's:\$:\$\$:g' \
+)
+echo "SERVICEEXISTS=	$SERVICEEXISTS" >>config.mk
+SERVICECMD=$(echo "$SERVICECMD" | sed \
+	-e 's:\\:\\\\:g' \
+	-e 's:\&:\\\&:g' \
+	-e 's:\$:\$\$:g' \
+)
+echo "SERVICECMD=	$SERVICECMD" >>config.mk
+SERVICESTATUS=$(echo "$SERVICESTATUS" | sed \
+	-e 's:\\:\\\\:g' \
+	-e 's:\&:\\\&:g' \
+	-e 's:\$:\$\$:g' \
+)
+echo "SERVICESTATUS=	$SERVICESTATUS" >>config.mk
 
 HOOKS=
 if ! $HOOKSET; then

@@ -38,6 +38,10 @@ routes. You can find discussion here:
 BSD systems where this has been fixed are:
     NetBSD-5.0
 
+We try and detect how dhcpcd should interact with system services during the
+configure stage. If we cannot auto-detect how do to this, or it is wrong then
+you can change this by passing shell commands to --service-exists,
+--servicecmd and optionally --servicestatus.
 
 To prepare dhcpcd for import into a platform source tree (like NetBSD)
 you can use the make import target to create /tmp/dhcpcd-$version and

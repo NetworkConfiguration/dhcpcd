@@ -147,6 +147,33 @@ syslog()
 	fi
 }
 
+# Check a system service exists 
+service_exists()
+{
+	@SERVICEEXISTS@
+}
+
+# Send a command to a system service
+service_cmd()
+{
+	@SERVICECMD@
+}
+
+# Send a command to a system service if it is running
+service_status()
+{
+	@SERVICESTATUS@
+}
+
+# Handy macros for our hooks
+service_command()
+{
+	service_exists $1 && service_cmd $1 $2
+}
+service_condcommand()
+{
+	service_exists $1 && service_status $1 && service_cmd $1 $2
+}
 
 # We source each script into this one so that scripts run earlier can
 # remove variables from the environment so later scripts don't see them.
