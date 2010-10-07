@@ -117,7 +117,6 @@ dhcpcd received an OFFER from a DHCP server but will not configure the
 interface.
 This is primarily used to test the variables are filled correctly for the
 script to process them.
-
 .El
 .Sh FILES 
 When
