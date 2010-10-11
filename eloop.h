@@ -30,9 +30,13 @@
 
 #include <time.h>
 
-#define add_timeout_tv(a, b, c) add_q_timeout_tv(0, a, b, c)
-#define add_timeout_sec(a, b, c) add_q_timeout_sec(0, a, b, c)
-#define delete_timeout(a, b) delete_q_timeout(0, a, b)
+#ifndef ELOOP_QUEUE
+  #define ELOOP_QUEUE 0
+#endif
+
+#define add_timeout_tv(a, b, c) add_q_timeout_tv(ELOOP_QUEUE, a, b, c)
+#define add_timeout_sec(a, b, c) add_q_timeout_sec(ELOOP_QUEUE, a, b, c)
+#define delete_timeout(a, b) delete_q_timeout(ELOOP_QUEUE, a, b)
 
 void add_event(int fd, void (*)(void *), void *);
 void delete_event(int fd);
