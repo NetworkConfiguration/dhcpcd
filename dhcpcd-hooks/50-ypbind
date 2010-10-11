@@ -65,7 +65,7 @@ restore_yp_binding()
 
 if [ "$reason" = PREINIT ]; then
 	rm -f "$ypbind_dir/$interface"
-else if $if_up || $if_down; then
+elif $if_up || $if_down; then
 	if [ -n "$new_nis_domain" ]; then
 		make_yp_binding
 	elif [ -n "$old_nis_domain" ]; then
