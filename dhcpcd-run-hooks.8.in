@@ -27,7 +27,7 @@
 .Os
 .Sh NAME
 .Nm dhcpcd-run-hooks
-.Nd DHCP client configuration script 
+.Nd DHCP client configuration script
 .Sh DESCRIPTION
 .Nm
 is used by
@@ -35,7 +35,7 @@ is used by
 to run any system and user defined hook scripts.
 System hook scripts are found in
 .Pa @HOOKDIR@
-and the user defined hooks are 
+and the user defined hooks are
 .Pa @SYSCONFDIR@/dhcpcd.enter-hook .
 and
 .Pa @SYSCONFDIR@/dhcpcd.exit-hook .
@@ -110,7 +110,7 @@ means it cannot work as a DHCP or ZeroConf client.
 Static configuration and DHCP INFORM is still allowed.
 .It Dv STOP
 dhcpcd stopped running on the interface.
-.iT Dv DUMP
+.It Dv DUMP
 dhcpcd has been asked to dump the last lease for the interface.
 .It Dv TEST
 dhcpcd received an OFFER from a DHCP server but will not configure the
@@ -118,7 +118,7 @@ interface.
 This is primarily used to test the variables are filled correctly for the
 script to process them.
 .El
-.Sh FILES 
+.Sh FILES
 When
 .Nm
 runs, it loads
