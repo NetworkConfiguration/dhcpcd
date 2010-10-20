@@ -232,6 +232,11 @@ linux)
 	echo "SRCS+=		platform-linux.c" >>$CONFIG_MK
 	echo "LDADD+=		-lrt" >>$CONFIG_MK
 	;;
+kfreebsd)
+	echo "SRCS+=		bpf.c if-bsd.c platform-bsd.c" >>$CONFIG_MK
+	echo "COMPAT_SRCS+=	compat/linkaddr.c" >>$CONFIG_MK
+	echo "LDADD+=		-lrt" >>$CONFIG_MK
+	;;
 *)
 	echo "SRCS+=		bpf.c if-bsd.c platform-bsd.c" >>$CONFIG_MK
 	;;
