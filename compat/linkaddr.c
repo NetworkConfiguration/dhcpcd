@@ -111,7 +111,7 @@ link_addr(addr, sdl)
 			break;
 		}
 		break;
-	} while (cp < cplim); 
+	} while (cp < cplim);
 	sdl->sdl_alen = cp - LLADDR(sdl);
 	newaddr = cp - (char *)(void *)sdl;
 	if ((size_t) newaddr > sizeof(*sdl))
