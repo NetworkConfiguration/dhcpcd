@@ -378,7 +378,7 @@ if [ -z "$SERVICECMD" ]; then
 		echo "no"
 	fi
 fi
-if [ -z "$SERVICECMD"]; then
+if [ -z "$SERVICECMD" ]; then
 	printf "Checking for invoke-rc.d ... "
 	if [ -x /usr/sbin/invoke-rc.d ]; then
 		SERVICEEXISTS="/usr/sbin/invoke-rc.d --query --quiet \$1 start >/dev/null 2>&1 || [ \$? = 104 ]"
