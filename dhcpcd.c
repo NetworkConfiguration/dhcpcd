@@ -809,6 +809,9 @@ configure_interface1(struct interface *iface)
 	if (ifo->options & DHCPCD_CLIENTID)
 		syslog(LOG_DEBUG, "%s: using ClientID %s", iface->name,
 		    hwaddr_ntoa(iface->clientid + 1, *iface->clientid));
+	else
+		syslog(LOG_DEBUG, "%s: using hwaddr %s", iface->name,
+		    hwaddr_ntoa(iface->hwaddr, iface->hwlen));
 }
 
 int
