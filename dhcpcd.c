@@ -815,11 +815,14 @@ int
 select_profile(struct interface *iface, const char *profile)
 {
 	struct if_options *ifo;
+	int ret;
 
+	ret = 0;
 	ifo = read_config(cffile, iface->name, iface->ssid, profile);
 	if (ifo == NULL) {
 		syslog(LOG_DEBUG, "%s: no profile %s", iface->name, profile);
-		return -1;
+		ret = -1;
+		goto exit;
 	}
 	if (profile != NULL) {
 		strlcpy(iface->state->profile, profile,
@@ -830,8 +833,11 @@ select_profile(struct interface *iface, const char *profile)
 		*iface->state->profile = '\0';
 	free_options(iface->state->options);
 	iface->state->options = ifo;
-	configure_interface1(iface);
-	return 0;
+
+exit:
+	if (profile)
+		configure_interface1(iface);
+	return ret;
 }
 
 static void
@@ -841,7 +847,6 @@ start_fallback(void *arg)
 
 	iface = (struct interface *)arg;
 	select_profile(iface, iface->state->options->fallback);
-	configure_interface1(iface);
 	start_interface(iface);
 }
 
