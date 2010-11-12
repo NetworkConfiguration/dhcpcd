@@ -1281,6 +1281,7 @@ handle_interface(int action, const char *ifname)
 	}
 }
 
+#ifdef RTM_CHGADDR
 void
 handle_hwaddr(const char *ifname, unsigned char *hwaddr, size_t hwlen)
 {
@@ -1315,6 +1316,7 @@ handle_hwaddr(const char *ifname, unsigned char *hwaddr, size_t hwlen)
 		}
 	free(hwaddr);
 }
+#endif
 
 void
 handle_ifa(int type, const char *ifname,
