@@ -1282,6 +1282,41 @@ handle_interface(int action, const char *ifname)
 }
 
 void
+handle_hwaddr(const char *ifname, unsigned char *hwaddr, size_t hwlen)
+{
+	struct interface *ifp;
+	struct if_options *ifo;
+
+	for (ifp = ifaces; ifp; ifp = ifp->next)
+		if (strcmp(ifp->name, ifname) == 0 && ifp->hwlen <= hwlen) {
+			ifo = ifp->state->options;
+			if (!(ifo->options &
+			    (DHCPCD_INFORM | DHCPCD_STATIC | DHCPCD_CLIENTID))
+	    		    && ifp->state->new != NULL &&
+			    ifp->state->new->cookie == htonl(MAGIC_COOKIE))
+			{
+				syslog(LOG_INFO,
+				    "%s: expiring for new hardware address",
+				    ifp->name);
+				drop_config(ifp, "EXPIRE");
+			}
+			memcpy(ifp->hwaddr, hwaddr, hwlen);
+			ifp->hwlen = hwlen;
+			if (!(ifo->options &
+			    (DHCPCD_INFORM | DHCPCD_STATIC | DHCPCD_CLIENTID)))
+			{
+				syslog(LOG_DEBUG, "%s: using hwaddr %s",
+				    ifp->name,
+		    		    hwaddr_ntoa(ifp->hwaddr, ifp->hwlen));
+				ifp->state->interval = 0;
+				ifp->state->nakoff = 1;
+				start_interface(ifp);
+			}
+		}
+	free(hwaddr);
+}
+
+void
 handle_ifa(int type, const char *ifname,
     struct in_addr *addr, struct in_addr *net, struct in_addr *dst)
 {
