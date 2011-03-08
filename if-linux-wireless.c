@@ -41,6 +41,7 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 
+#include <linux/types.h>
 #include <linux/rtnetlink.h>
 /* Support older kernels */
 #ifdef IFLA_WIRELESS
