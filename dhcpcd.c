@@ -528,7 +528,17 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp, const struct i
 			log_dhcp(LOG_WARNING, "reject DHCP", iface, dhcp, from);
 			return;
 		}
-	}		
+	}
+
+	/* Ensure that the address offered is valid */
+	if ((type == 0 || type == DHCP_OFFER || type == DHCP_ACK) &&
+	    (dhcp->ciaddr == INADDR_ANY || dhcp->ciaddr == INADDR_BROADCAST) &&
+	    (dhcp->yiaddr == INADDR_ANY || dhcp->yiaddr == INADDR_BROADCAST))
+	{
+		log_dhcp(LOG_WARNING, "reject invalid address",
+		    iface, dhcp, from);
+		return;
+	}
 
 	/* No NAK, so reset the backoff */
 	state->nakoff = 1;
