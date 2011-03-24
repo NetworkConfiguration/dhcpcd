@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2010 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2011 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -664,9 +664,11 @@ build_routes(void)
 			/* Is this route already in our table? */
 			if ((find_route(nrs, rt, NULL, NULL)) != NULL)
 				continue;
+			rt->src.s_addr = ifp->addr.s_addr;
 			/* Do we already manage it? */
 			if ((or = find_route(routes, rt, &rtl, NULL))) {
 				if (or->iface != ifp ||
+				    or->src.s_addr != ifp->addr.s_addr ||
 				    rt->gate.s_addr != or->gate.s_addr)
 				{
 					if (c_route(or, rt, ifp) != 0)
