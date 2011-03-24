@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2009 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2011 Roy Marples <roy@marples.name>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,7 +36,7 @@
 #ifdef __linux__
 # include <asm/types.h> /* needed for 2.4 kernels for the below header */
 # include <linux/filter.h>
-# include <netpacket/packet.h>
+# include <linux/if_packet.h>
 # define bpf_insn		sock_filter
 # define BPF_SKIPTYPE
 # define BPF_ETHCOOK		-ETH_HLEN
@@ -76,6 +76,9 @@ open_socket(struct interface *iface, int protocol)
 	} su;
 	struct sock_fprog pf;
 	int *fd;
+#ifdef PACKET_AUXDATA
+	int n;
+#endif
 
 	if ((s = socket(PF_PACKET, SOCK_DGRAM, htons(protocol))) == -1)
 		return -1;
@@ -98,6 +101,13 @@ open_socket(struct interface *iface, int protocol)
 	}
 	if (setsockopt(s, SOL_SOCKET, SO_ATTACH_FILTER, &pf, sizeof(pf)) != 0)
 		goto eexit;
+#ifdef PACKET_AUXDATA
+	n = 1;
+	if (setsockopt(s, SOL_PACKET, PACKET_AUXDATA, &n, sizeof(n)) != 0) {
+		if (errno != ENOPROTOOPT)
+			goto eexit;
+	}
+#endif
 	if (set_cloexec(s) == -1)
 		goto eexit;
 	if (set_nonblock(s) == -1)
@@ -152,17 +162,53 @@ send_raw_packet(const struct interface *iface, int protocol,
 }
 
 ssize_t
-get_raw_packet(struct interface *iface, int protocol, void *data, ssize_t len)
+get_raw_packet(struct interface *iface, int protocol,
+    void *data, ssize_t len, int *partialcsum)
 {
+	struct iovec iov = {
+		.iov_base = data,
+		.iov_len = len,
+	};
+	struct msghdr msg = {
+		.msg_iov = &iov,
+		.msg_iovlen = 1,
+	};
+#ifdef PACKET_AUXDATA
+	unsigned char cmsgbuf[CMSG_LEN(sizeof(struct tpacket_auxdata))];
+	struct cmsghdr *cmsg;
+	struct tpacket_auxdata *aux;
+#endif
+
 	ssize_t bytes;
 	int fd = -1;
+
+#ifdef PACKET_AUXDATA
+	msg.msg_control = cmsgbuf;
+	msg.msg_controllen = sizeof(cmsgbuf);
+#endif
 
 	if (protocol == ETHERTYPE_ARP)
 		fd = iface->arp_fd;
 	else
 		fd = iface->raw_fd;
-	bytes = read(fd, data, len);
+	bytes = recvmsg(fd, &msg, 0);
 	if (bytes == -1)
 		return errno == EAGAIN ? 0 : -1;
+	if (partialcsum != NULL) {
+		*partialcsum = 0;
+#ifdef PACKET_AUXDATA
+		for (cmsg = CMSG_FIRSTHDR(&msg);
+		     cmsg;
+		     cmsg = CMSG_NXTHDR(&msg, cmsg))
+		{
+			if (cmsg->cmsg_level == SOL_PACKET &&
+			    cmsg->cmsg_type == PACKET_AUXDATA) {
+				aux = (void *)CMSG_DATA(cmsg);
+				*partialcsum = aux->tp_status &
+				    TP_STATUS_CSUMNOTREADY;
+			}
+		}
+#endif
+	}
 	return bytes;
 }

@@ -641,7 +641,7 @@ handle_dhcp_packet(void *arg)
 	const uint8_t *pp;
 	ssize_t bytes;
 	struct in_addr from;
-	int i;
+	int i, partialcsum = 0;
 
 	/* We loop through until our buffer is empty.
 	 * The benefit is that if we get >1 DHCP packet in our buffer and
@@ -649,10 +649,10 @@ handle_dhcp_packet(void *arg)
 	packet = xmalloc(udp_dhcp_len);
 	for(;;) {
 		bytes = get_raw_packet(iface, ETHERTYPE_IP,
-		    packet, udp_dhcp_len);
+		    packet, udp_dhcp_len, &partialcsum);
 		if (bytes == 0 || bytes == -1)
 			break;
-		if (valid_udp_packet(packet, bytes, &from) == -1) {
+		if (valid_udp_packet(packet, bytes, &from, partialcsum) == -1) {
 			syslog(LOG_ERR, "%s: invalid UDP packet from %s",
 			    iface->name, inet_ntoa(from));
 			continue;
