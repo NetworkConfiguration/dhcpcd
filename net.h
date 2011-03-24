@@ -140,7 +140,7 @@ extern const size_t udp_dhcp_len;
 ssize_t make_udp_packet(uint8_t **, const uint8_t *, size_t,
     struct in_addr, struct in_addr);
 ssize_t get_udp_data(const uint8_t **, const uint8_t *);
-int valid_udp_packet(const uint8_t *, size_t, struct in_addr *, int noudpcsum);
+int valid_udp_packet(const uint8_t *, size_t, struct in_addr *, int);
 
 int open_socket(struct interface *, int);
 ssize_t send_packet(const struct interface *, struct in_addr, 
