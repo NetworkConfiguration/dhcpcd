@@ -929,7 +929,11 @@ start_discover(void *arg)
 		else
 			add_timeout_sec(ifo->timeout, start_ipv4ll, iface);
 	}
-	syslog(LOG_INFO, "%s: broadcasting for a lease", iface->name);
+	if (ifo->options & DHCPCD_REQUEST)
+		syslog(LOG_INFO, "%s: broadcasting for a lease (requesting %s)",
+		    iface->name, inet_ntoa(ifo->req_addr));
+	else
+		syslog(LOG_INFO, "%s: broadcasting for a lease", iface->name);
 	send_discover(iface);
 }
 
