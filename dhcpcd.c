@@ -2025,17 +2025,20 @@ main(int argc, char **argv)
 				}
 			}
 		}
+		if (options & DHCPCD_MASTER)
+			i = if_options->timeout;
+		else
+			i = ifaces->state->options->timeout;
 		if (opt == 0 &&
 		    options & DHCPCD_LINK &&
 		    !(options & DHCPCD_WAITIP))
 		{
 			syslog(LOG_WARNING, "no interfaces have a carrier");
 			daemonise();
-		} else if (if_options->timeout > 0) {
+		} else if (i > 0) {
 			if (options & DHCPCD_IPV4LL)
 				options |= DHCPCD_TIMEOUT_IPV4LL;
-			add_timeout_sec(if_options->timeout,
-			    handle_exit_timeout, NULL);
+			add_timeout_sec(i, handle_exit_timeout, NULL);
 		}
 	}
 	free_options(if_options);
