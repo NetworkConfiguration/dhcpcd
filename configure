@@ -414,8 +414,7 @@ if [ -z "$SERVICECMD" ]; then
 fi
 if [ -e /etc/arch-release ]; then
 	echo "Overriding service status check for Arch Linux"
-	SERVICESTATUS="[ -e /var/run/daemons/$1 ]"
-	echo "yes"
+	SERVICESTATUS="[ -e /var/run/daemons/\$1 ]"
 fi
 
 if [ -z "$SERVICEEXISTS" -o -z "$SERVICECMD" ]; then
