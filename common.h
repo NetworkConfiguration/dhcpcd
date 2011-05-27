@@ -28,8 +28,8 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+#include <sys/time.h>
 #include <stdio.h>
-#include <time.h>
 
 #include "config.h"
 #include "defs.h"
