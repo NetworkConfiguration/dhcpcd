@@ -20,7 +20,7 @@ esac
 uniqify()
 {
 	local result= i=
-	for i; do
+	for i do
 		case " $result " in
 			*" $i "*);;
 			*) result="$result $i";;
@@ -62,7 +62,7 @@ key_get_value()
 	if type sed >/dev/null 2>&1; then
 		sed -n "s/^$key//p" $@
 	else
-		for x; do
+		for x do
 			while read line; do
 				case "$line" in
 				"$key"*) echo "${line##$key}";;
@@ -82,7 +82,7 @@ remove_markers()
 	if type sed >/dev/null 2>&1; then
 		sed "/^$m1/,/^$m2/d" $@
 	else
-		for x; do
+		for x do
 			while read line; do
 				case "$line" in
 				"$m1"*) in_marker=1;;
@@ -172,7 +172,7 @@ valid_domainname_list()
 {
 	local name
 
-	for name in $@; do
+	for name do
 		valid_domainname "$name" || return $?
 	done
 	return 0
