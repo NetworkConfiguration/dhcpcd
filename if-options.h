@@ -40,7 +40,7 @@
 #define IF_OPTS "bc:de:f:gh:i:kl:m:no:pqr:s:t:u:v:wxy:z:ABC:DEF:GHI:JKLO:Q:S:TUVW:X:Z:"
 
 #define DEFAULT_TIMEOUT		30
-#define DEFAULT_REBOOT		10
+#define DEFAULT_REBOOT		5
 
 #define HOSTNAME_MAX_LEN	250	/* 255 - 3 (FQDN) - 2 (DNS enc) */
 #define VENDORCLASSID_MAX_LEN	255

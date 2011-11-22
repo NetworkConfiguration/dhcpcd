@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd April 9, 2011
+.Dd November 22, 2011
 .Dt DHCPCD 8 SMM
 .Os
 .Sh NAME
@@ -352,7 +352,7 @@ then waits until this process has exited.
 Allow
 .Ar reboot
 seconds before moving to the discover phase if we have an old lease to use.
-The default is 10 seconds.
+The default is 5 seconds.
 A setting of 0 seconds causes
 .Nm
 to skip the reboot phase and go straight into discover.

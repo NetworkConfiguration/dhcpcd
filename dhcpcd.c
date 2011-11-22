@@ -208,7 +208,7 @@ handle_exit_timeout(_unused void *arg)
 			exit(EXIT_FAILURE);
 	}
 	options &= ~DHCPCD_TIMEOUT_IPV4LL;
-	timeout = (PROBE_NUM * PROBE_MAX) + PROBE_WAIT + 1;
+	timeout = (PROBE_NUM * PROBE_MAX) + (PROBE_WAIT * 2);
 	syslog(LOG_WARNING, "allowing %d seconds for IPv4LL timeout", timeout);
 	add_timeout_sec(timeout, handle_exit_timeout, NULL);
 }
@@ -915,19 +915,31 @@ start_discover(void *arg)
 {
 	struct interface *iface = arg;
 	struct if_options *ifo = iface->state->options;
+	int timeout = ifo->timeout;
+
+	/* If we're rebooting and we're not daemonised then we need
+	 * to shorten the normal timeout to ensure we try correctly
+	 * for a fallback or IPv4LL address. */
+	if (iface->state->state == DHS_REBOOT &&
+	    !(options & DHCPCD_DAEMONISED))
+	{
+		timeout -= ifo->reboot;
+		if (timeout <= 0)
+			timeout = 2;
+	}
 
 	iface->state->state = DHS_DISCOVER;
 	iface->state->xid = dhcp_xid(iface);
 	delete_timeout(NULL, iface);
 	if (ifo->fallback)
-		add_timeout_sec(ifo->timeout, start_fallback, iface);
+		add_timeout_sec(timeout, start_fallback, iface);
 	else if (ifo->options & DHCPCD_IPV4LL &&
 	    !IN_LINKLOCAL(htonl(iface->addr.s_addr)))
 	{
 		if (IN_LINKLOCAL(htonl(iface->state->fail.s_addr)))
 			add_timeout_sec(RATE_LIMIT_INTERVAL, start_ipv4ll, iface);
 		else
-			add_timeout_sec(ifo->timeout, start_ipv4ll, iface);
+			add_timeout_sec(timeout, start_ipv4ll, iface);
 	}
 	if (ifo->options & DHCPCD_REQUEST)
 		syslog(LOG_INFO, "%s: broadcasting for a lease (requesting %s)",
