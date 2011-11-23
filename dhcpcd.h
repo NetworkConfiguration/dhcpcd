@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2010 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2011 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -122,6 +122,7 @@ extern struct interface *ifaces;
 
 struct interface *find_interface(const char *);
 int handle_args(struct fd_list *, int, char **);
+void handle_carrier(int, int, const char *);
 void handle_interface(int, const char *);
 void handle_hwaddr(const char *, unsigned char *, size_t);
 void handle_ifa(int, const char *,

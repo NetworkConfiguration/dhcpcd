@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2010 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2011 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -371,11 +371,14 @@ link_netlink(struct nlmsghdr *nlm)
 		}
 		rta = RTA_NEXT(rta, len);
 	}
-	if (nlm->nlmsg_type == RTM_NEWLINK)
-		len = ifi->ifi_change == ~0U ? 1 : 0;
-	else
-		len = -1;
-	handle_interface(len, ifn);
+
+	if (nlm->nlmsg_type == RTM_DELLINK) {
+		handle_interface(-1, ifn);
+		return 1;
+	}
+
+	handle_carrier(ifi->ifi_flags & IFF_RUNNING ? 1 : -1,
+	    ifi->ifi_flags, ifn);
 	return 1;
 }
 

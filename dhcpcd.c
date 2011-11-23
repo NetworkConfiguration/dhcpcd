@@ -871,8 +871,8 @@ configure_interface(struct interface *iface, int argc, char **argv)
 	configure_interface1(iface);
 }
 
-static void
-handle_carrier(const char *ifname)
+void
+handle_carrier(int action, int flags, const char *ifname)
 {
 	struct interface *iface;
 	int carrier;
@@ -882,9 +882,19 @@ handle_carrier(const char *ifname)
 	for (iface = ifaces; iface; iface = iface->next)
 		if (strcmp(iface->name, ifname) == 0)
 			break;
-	if (!iface || !(iface->state->options->options & DHCPCD_LINK))
+	if (!iface) {
+		if (options & DHCPCD_LINK)
+			handle_interface(1, ifname);
 		return;
-	carrier = carrier_status(iface);
+	}
+	if (!(iface->state->options->options & DHCPCD_LINK))
+		return;
+	if (action == 0)
+		carrier = carrier_status(iface);
+	else {
+		carrier = action == 1 ? 1 : 0;
+		iface->flags = flags;
+	}
 	if (carrier == -1)
 		syslog(LOG_ERR, "%s: carrier_status: %m", ifname);
 	else if (carrier == 0 || !(iface->flags & IFF_RUNNING)) {
@@ -1127,7 +1137,7 @@ start_interface(void *arg)
 	uint32_t l;
 	int nolease;
 
-	handle_carrier(iface->name);
+	handle_carrier(0, 0, iface->name);
 	if (iface->carrier == LINK_DOWN) {
 		syslog(LOG_INFO, "%s: waiting for carrier", iface->name);
 		return;
@@ -1254,9 +1264,6 @@ handle_interface(int action, const char *ifname)
 		ifp = find_interface(ifname);
 		if (ifp != NULL)
 			stop_interface(ifp);
-		return;
-	} else if (action == 0) {
-		handle_carrier(ifname);
 		return;
 	}
 
@@ -2030,7 +2037,7 @@ main(int argc, char **argv)
 			ts.tv_nsec = 0;
 			nanosleep(&ts, NULL);
 			for (iface = ifaces; iface; iface = iface->next) {
-				handle_carrier(iface->name);
+				handle_carrier(0, 0, iface->name);
 				if (iface->carrier != LINK_DOWN) {
 					opt = 1;
 					break;
