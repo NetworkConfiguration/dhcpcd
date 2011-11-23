@@ -897,7 +897,7 @@ handle_carrier(int action, int flags, const char *ifname)
 	}
 	if (carrier == -1)
 		syslog(LOG_ERR, "%s: carrier_status: %m", ifname);
-	else if (carrier == 0 || !(iface->flags & IFF_RUNNING)) {
+	else if (carrier == 0 || !(iface->flags & (IFF_UP || IFF_RUNNING))) {
 		if (iface->carrier != LINK_DOWN) {
 			iface->carrier = LINK_DOWN;
 			syslog(LOG_INFO, "%s: carrier lost", iface->name);
@@ -905,7 +905,7 @@ handle_carrier(int action, int flags, const char *ifname)
 			delete_timeouts(iface, start_expire, NULL);
 			drop_config(iface, "NOCARRIER");
 		}
-	} else if (carrier == 1 && (iface->flags & IFF_RUNNING)) {
+	} else if (carrier == 1 && (iface->flags & (IFF_UP || IFF_RUNNING))) {
 		if (iface->carrier != LINK_UP) {
 			iface->carrier = LINK_UP;
 			syslog(LOG_INFO, "%s: carrier acquired", iface->name);

@@ -366,14 +366,11 @@ manage_link(int fd)
 					break;
 				switch (ifm->ifm_data.ifi_link_state) {
 				case LINK_STATE_DOWN:
-					len = 1;
-					break;
-				case LINK_STATE_UP:
 					len = -1;
 					break;
 				default:
-					len = ifm->ifm_flags & IFF_RUNNING
-					    ? 1 : -1;
+					len = ifm->ifm_flags &
+					    (IFF_UP || IFF_RUNNING) ? 1 : -1;
 					break;
 				}
 				handle_carrier(len, ifm->ifm_flags, ifname);
