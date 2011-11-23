@@ -40,6 +40,13 @@
 # define IFLA_WIRELESS (IFLA_MASTER + 1)
 #endif
 
+/* For some reason, glibc doesn't include newer flags from linux/if.h
+ * However, we cannot include linux/if.h directly as it conflicts
+ * with the glibc version. D'oh! */
+#ifndef IFF_LOWER_UP
+#define IFF_LOWER_UP	0x10000		/* driver signals L1 up		*/
+#endif
+
 #include <errno.h>
 #include <ctype.h>
 #include <stddef.h>
@@ -373,6 +380,15 @@ link_netlink(struct nlmsghdr *nlm)
 	}
 
 	if (nlm->nlmsg_type == RTM_DELLINK) {
+		handle_interface(-1, ifn);
+		return 1;
+	}
+
+	/* Bridge interfaces set IFF_LOWER_UP when they have a valid
+	 * hardware address. To trigger a valid hardware address pickup
+	 * we need to pretend that that don't exist until they have
+	 * IFF_LOWER_UP set. */
+	if (ifi->ifi_flags & IFF_MASTER && !(ifi->ifi_flags & IFF_LOWER_UP)) {
 		handle_interface(-1, ifn);
 		return 1;
 	}
