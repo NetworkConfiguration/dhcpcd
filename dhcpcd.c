@@ -1436,25 +1436,6 @@ reconf_reboot(int action, int argc, char **argv, int oi)
 	if (ifs == NULL)
 		return;
 
-	/* Remove any old interfaces */
-	if (ifaces) {
-		for (ifl = NULL; ifl != ifaces;) {
-			/* Work our way backwards */
-			for (ifp = ifaces; ifp; ifp = ifp->next)
-				if (ifp->next == ifl) {
-					ifl = ifp;
-					break;
-				}
-			for (ifn = ifs; ifn; ifn = ifn->next)
-				if (strcmp(ifn->name, ifp->name) == 0)
-					break;
-			if (ifn == NULL) {
-				ifl = ifp->next;
-				stop_interface(ifp);
-			}
-		}
-	}
-	
 	for (ifp = ifs; ifp && (ift = ifp->next, 1); ifp = ift) {
 		ifl = NULL;
 		for (ifn = ifaces; ifn; ifn = ifn->next) {
