@@ -369,8 +369,8 @@ manage_link(int fd)
 					len = -1;
 					break;
 				default:
-					len = ifm->ifm_flags &
-					    (IFF_UP || IFF_RUNNING) ? 1 : -1;
+					len = ~ifm->ifm_flags &
+					    (IFF_UP | IFF_RUNNING) ? -1 : 1;
 					break;
 				}
 				handle_carrier(len, ifm->ifm_flags, ifname);
