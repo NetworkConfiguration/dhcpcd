@@ -63,7 +63,6 @@
 
 static struct rt *routes;
 
-
 static int
 exec_script(char *const *argv, char *const *env)
 {
@@ -471,10 +470,8 @@ c_route(struct rt *ort, struct rt *nrt, const struct interface *iface)
 	/* We delete and add the route so that we can change metric.
 	 * This also has the nice side effect of flushing ARP entries so
 	 * we don't have to do that manually. */
-	del_route(ort->iface, &ort->dest, &ort->net, &ort->gate,
-	    ort->iface->metric);
-	if (!add_route(iface, &nrt->dest, &nrt->net, &nrt->gate,
-		iface->metric))
+	del_route(ort->iface, &ort->dest, &ort->net, &ort->gate, ort->metric);
+	if (!add_route(iface, &nrt->dest, &nrt->net, &nrt->gate, nrt->metric))
 		return 0;
 	syslog(LOG_ERR, "%s: add_route: %m", iface->name);
 	return -1;
@@ -661,6 +658,7 @@ build_routes(void)
 		dnr = add_destination_route(dnr, ifp);
 		for (rt = dnr; rt && (rtn = rt->next, 1); lrt = rt, rt = rtn) {
 			rt->iface = ifp;
+			rt->metric = ifp->metric;
 			/* Is this route already in our table? */
 			if ((find_route(nrs, rt, NULL, NULL)) != NULL)
 				continue;
@@ -669,7 +667,8 @@ build_routes(void)
 			if ((or = find_route(routes, rt, &rtl, NULL))) {
 				if (or->iface != ifp ||
 				    or->src.s_addr != ifp->addr.s_addr ||
-				    rt->gate.s_addr != or->gate.s_addr)
+				    rt->gate.s_addr != or->gate.s_addr ||
+				    rt->metric != or->metric)
 				{
 					if (c_route(or, rt, ifp) != 0)
 						continue;
