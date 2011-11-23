@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2010 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2011 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -266,18 +266,17 @@ valid_length(uint8_t option, int dl, int *type)
 			*type = opt->type;
 
 		if (opt->type == 0 ||
-		    opt->type & STRING ||
-		    opt->type & RFC3442)
+		    opt->type & (STRING | RFC3442))
 			return 0;
 
 		sz = 0;
-		if (opt->type & UINT32 || opt->type & IPV4)
+		if (opt->type & (UINT32 | IPV4))
 			sz = sizeof(uint32_t);
 		if (opt->type & UINT16)
 			sz = sizeof(uint16_t);
 		if (opt->type & UINT8)
 			sz = sizeof(uint8_t);
-		if (opt->type & IPV4 || opt->type & ARRAY)
+		if (opt->type & (IPV4 | ARRAY))
 			return dl % sz;
 		return (dl == sz ? 0 : -1);
 	}

@@ -376,9 +376,8 @@ manage_link(int fd)
 				handle_carrier(len, ifm->ifm_flags, ifname);
 				break;
 			case RTM_DELETE:
-				if (!(rtm->rtm_addrs & RTA_DST) ||
-				    !(rtm->rtm_addrs & RTA_GATEWAY) ||
-				    !(rtm->rtm_addrs & RTA_NETMASK))
+				if (~rtm->rtm_addrs &
+				    (RTA_DST | RTA_GATEWAY | RTA_NETMASK))
 					break;
 				if (rtm->rtm_pid == getpid())
 					break;
