@@ -109,6 +109,7 @@ enum DHO {
 	DHO_FQDN                   = 81,
 	DHO_DNSSEARCH              = 119, /* RFC 3397 */
 	DHO_CSR                    = 121, /* RFC 3442 */
+	DHO_SIXRD                  = 212, /* RFC 5969 */
 	DHO_MSCSR                  = 249, /* MS code for RFC 3442 */
 	DHO_END                    = 255
 };

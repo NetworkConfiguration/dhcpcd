@@ -50,6 +50,7 @@
 #define RFC3361	(1 << 10)
 #define RFC3397	(1 << 11)
 #define RFC3442 (1 << 12)
+#define RFC5969 (1 << 13)
 
 #define IPV4R	IPV4 | REQUEST
 
@@ -159,6 +160,7 @@ static const struct dhcp_opt const dhcp_opts[] = {
 	{ 114,	STRING,		"default_url" },
 	{ 118,	IPV4,		"subnet_selection" },
 	{ 119,	STRING | RFC3397,	"domain_search" },
+	{ 212,  RFC5969,	"sixrd" },
 	{ 0, 0, NULL }
 };
 
@@ -266,7 +268,7 @@ valid_length(uint8_t option, int dl, int *type)
 			*type = opt->type;
 
 		if (opt->type == 0 ||
-		    opt->type & (STRING | RFC3442))
+		    opt->type & (STRING | RFC3442 | RFC5969))
 			return 0;
 
 		sz = 0;
@@ -633,6 +635,74 @@ decode_rfc3361(int dl, const uint8_t *data)
 	}
 
 	return sip;
+}
+
+/* Decode an RFC5969 6rd order option into a space
+ * separated string. Returns length of string (including
+ * terminating zero) or zero on error. */
+static ssize_t
+decode_rfc5969(char *out, ssize_t len, int pl, const uint8_t *p)
+{
+	uint8_t ipv4masklen, ipv6prefixlen;
+	uint8_t ipv6prefix[16];
+	uint8_t br[4];
+	int i;
+	ssize_t b, bytes = 0;
+
+	if (pl < 22) {
+		errno = EINVAL;
+		return 0;
+	}
+	
+	ipv4masklen = *p++;
+	pl--;
+	ipv6prefixlen = *p++;
+	pl--;
+	
+	for (i = 0; i < 16; i++) {
+		ipv6prefix[i] = *p++;
+		pl--;
+	}
+	if (out) {
+		b= snprintf(out, len,
+		    "%d %d "
+		    "%02x%02x:%02x%02x:"
+		    "%02x%02x:%02x%02x:"
+		    "%02x%02x:%02x%02x:"
+		    "%02x%02x:%02x%02x",
+		    ipv4masklen, ipv6prefixlen,
+		    ipv6prefix[0], ipv6prefix[1], ipv6prefix[2], ipv6prefix[3],
+		    ipv6prefix[4], ipv6prefix[5], ipv6prefix[6], ipv6prefix[7],
+		    ipv6prefix[8], ipv6prefix[9], ipv6prefix[10],ipv6prefix[11],
+		    ipv6prefix[12],ipv6prefix[13],ipv6prefix[14], ipv6prefix[15]
+		);
+		    
+		len -= b;
+		out += b;
+		bytes += b;
+	} else {
+		bytes += 16 * 2 + 8 + 2 + 1 + 2;
+	}
+
+	while (pl >= 4) {
+		br[0] = *p++;
+		br[1] = *p++;
+		br[2] = *p++;
+		br[3] = *p++;
+		pl -= 4;
+		
+		if (out) {
+			b= snprintf(out, len, " %d.%d.%d.%d",
+			    br[0], br[1], br[2], br[3]);
+			len -= b;
+			out += b;
+			bytes += b;
+		} else {
+			bytes += (4 * 4);
+		}
+	}
+	
+	return bytes;
 }
 
 char *
@@ -1196,6 +1266,9 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data)
 
 	if (type & RFC3442)
 		return decode_rfc3442(s, len, dl, data);
+
+	if (type & RFC5969)
+		return decode_rfc5969(s, len, dl, data);
 
 	if (type & STRING) {
 		/* Some DHCP servers return NULL strings */
