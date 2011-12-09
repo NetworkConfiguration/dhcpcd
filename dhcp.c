@@ -160,6 +160,7 @@ static const struct dhcp_opt const dhcp_opts[] = {
 	{ 114,	STRING,		"default_url" },
 	{ 118,	IPV4,		"subnet_selection" },
 	{ 119,	STRING | RFC3397,	"domain_search" },
+	{ 120,	STRING | RFC3361,	"sip_server" },
 	{ 212,  RFC5969,	"sixrd" },
 	{ 0, 0, NULL }
 };
@@ -621,11 +622,11 @@ decode_rfc3361(int dl, const uint8_t *data)
 		addr.s_addr = INADDR_BROADCAST;
 		l = ((dl / sizeof(addr.s_addr)) * ((4 * 4) + 1)) + 1;
 		sip = p = xmalloc(l);
-		while (l != 0) {
+		while (dl != 0) {
 			memcpy(&addr.s_addr, data, sizeof(addr.s_addr));
 			data += sizeof(addr.s_addr);
 			p += snprintf(p, l - (p - sip), "%s ", inet_ntoa(addr));
-			l -= sizeof(addr.s_addr);
+			dl -= sizeof(addr.s_addr);
 		}
 		*--p = '\0';
 		break;
@@ -1260,6 +1261,15 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data)
 		tmp = xmalloc(l);
 		decode_rfc3397(tmp, l, dl, data);
 		l = print_string(s, len, l - 1, (uint8_t *)tmp);
+		free(tmp);
+		return l;
+	}
+
+	if (type & RFC3361) {
+		if ((tmp = decode_rfc3361(dl, data)) == NULL)
+			return -1;
+		l = strlen(tmp);
+		print_string(s, len, l, (uint8_t *)tmp);
 		free(tmp);
 		return l;
 	}
