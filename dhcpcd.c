@@ -1355,43 +1355,42 @@ handle_ifa(int type, const char *ifname,
 			break;
 	if (ifp == NULL)
 		return;
+
+	if (type == RTM_DELADDR) {
+		if (ifp->state->new &&
+		    ifp->state->new->yiaddr == addr->s_addr)
+			drop_config(ifp, "EXPIRE");
+		return;
+	}
+
+	if (type != RTM_NEWADDR)
+		return;
+
 	ifo = ifp->state->options;
 	if ((ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC)) == 0 ||
 	    ifo->req_addr.s_addr != INADDR_ANY)
 		return;
-	
-	switch (type) {
-	case RTM_DELADDR:
-		if (ifp->state->new &&
-		    ifp->state->new->yiaddr == addr->s_addr)
-			drop_config(ifp, "EXPIRE");
-		break;
-	case RTM_NEWADDR:
-		free(ifp->state->old);
-		ifp->state->old = ifp->state->new;
-		ifp->state->new = dhcp_message_new(addr, net);
-		ifp->dst.s_addr = dst ? dst->s_addr : INADDR_ANY;
-		if (dst) {
-			for (i = 1; i < 255; i++)
-				if (i != DHO_ROUTER &&
-				    has_option_mask(ifo->dstmask, i))
-					dhcp_message_add_addr(
-						ifp->state->new,
-						i, *dst);
-		}
-		ifp->state->reason = "STATIC";
-		build_routes();
-		run_script(ifp);
-		if (ifo->options & DHCPCD_INFORM) {
-			ifp->state->state = DHS_INFORM;
-			ifp->state->xid = dhcp_xid(ifp);
-			ifp->state->lease.server.s_addr =
-			    dst ? dst->s_addr : INADDR_ANY;
-			ifp->addr = *addr;
-			ifp->net = *net;
-			send_inform(ifp);
-		}
-		break;
+
+	free(ifp->state->old);
+	ifp->state->old = ifp->state->new;
+	ifp->state->new = dhcp_message_new(addr, net);
+	ifp->dst.s_addr = dst ? dst->s_addr : INADDR_ANY;
+	if (dst) {
+		for (i = 1; i < 255; i++)
+			if (i != DHO_ROUTER && has_option_mask(ifo->dstmask,i))
+				dhcp_message_add_addr(ifp->state->new, i, *dst);
+	}
+	ifp->state->reason = "STATIC";
+	build_routes();
+	run_script(ifp);
+	if (ifo->options & DHCPCD_INFORM) {
+		ifp->state->state = DHS_INFORM;
+		ifp->state->xid = dhcp_xid(ifp);
+		ifp->state->lease.server.s_addr =
+		    dst ? dst->s_addr : INADDR_ANY;
+		ifp->addr = *addr;
+		ifp->net = *net;
+		send_inform(ifp);
 	}
 }
 
