@@ -1269,7 +1269,7 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data)
 		if ((tmp = decode_rfc3361(dl, data)) == NULL)
 			return -1;
 		l = strlen(tmp);
-		print_string(s, len, l, (uint8_t *)tmp);
+		l = print_string(s, len, l - 1, (uint8_t *)tmp);
 		free(tmp);
 		return l;
 	}
