@@ -131,7 +131,7 @@ handle_ipv4ll_failure(void *arg)
 			syslog(LOG_DEBUG,
 			    "%s: IPv4LL %d second defence failed",
 			    iface->name, DEFEND_INTERVAL);
-			drop_config(iface, "EXPIRE");
+			drop_dhcp(iface, "EXPIRE");
 			iface->state->conflicts = -1;
 		} else {
 			syslog(LOG_DEBUG, "%s: defended IPv4LL address",

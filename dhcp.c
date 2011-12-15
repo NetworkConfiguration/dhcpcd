@@ -426,7 +426,7 @@ get_option_uint8(uint8_t *i, const struct dhcp_message *dhcp, uint8_t option)
  * separated string. Returns length of string (including
  * terminating zero) or zero on error. out may be NULL
  * to just determine output length. */
-static ssize_t
+ssize_t
 decode_rfc3397(char *out, ssize_t len, int pl, const uint8_t *p)
 {
 	const uint8_t *r, *q = p;
@@ -1355,16 +1355,6 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data)
 	}
 
 	return bytes;
-}
-
-static void
-setvar(char ***e, const char *prefix, const char *var, const char *value)
-{
-	size_t len = strlen(prefix) + strlen(var) + strlen(value) + 4;
-
-	**e = xmalloc(len);
-	snprintf(**e, len, "%s_%s=%s", prefix, var, value);
-	(*e)++;
 }
 
 ssize_t

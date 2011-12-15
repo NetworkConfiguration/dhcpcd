@@ -46,6 +46,7 @@
 #include "dhcp.h"
 #include "if-options.h"
 #include "if-pref.h"
+#include "ipv6rs.h"
 #include "net.h"
 #include "signals.h"
 
@@ -168,6 +169,14 @@ make_env(const struct interface *iface, char ***argv)
 	ssize_t e, elen, l;
 	const struct if_options *ifo = iface->state->options;
 	const struct interface *ifp;
+	int dhcp, ra;
+
+	dhcp = 0;
+	ra = 0;
+	if (strcmp(iface->state->reason, "ROUTERADVERT") == 0)
+		ra = 1;
+	else
+		dhcp = 1;
 
 	/* When dumping the lease, we only want to report interface and
 	   reason - the other interface variables are meaningless */
@@ -235,7 +244,7 @@ make_env(const struct interface *iface, char ***argv)
 			snprintf(env[elen++], e, "old_ssid=%s", iface->ssid);
 		}
 	}
-	if (iface->state->old) {
+	if (dhcp && iface->state->old) {
 		e = configure_env(NULL, NULL, iface->state->old, ifo);
 		if (e > 0) {
 			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
@@ -247,7 +256,7 @@ make_env(const struct interface *iface, char ***argv)
 	}
 
 dumplease:
-	if (iface->state->new) {
+	if (dhcp && iface->state->new) {
 		e = configure_env(NULL, NULL, iface->state->new, ifo);
 		if (e > 0) {
 			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
@@ -256,6 +265,13 @@ dumplease:
 		}
 		append_config(&env, &elen, "new",
 		    (const char *const *)ifo->config);
+	}
+	if (ra) {
+		e = ipv6rs_env(NULL, NULL, iface);
+		if (e > 0) {
+			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
+			elen += ipv6rs_env(env + elen, "new", iface);
+		}
 	}
 
 	/* Add our base environment */

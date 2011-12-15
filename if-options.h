@@ -77,6 +77,7 @@
 #define DHCPCD_XID_HWADDR	(1 << 28)
 #define DHCPCD_BROADCAST	(1 << 29)
 #define DHCPCD_DUMPLEASE	(1 << 30)
+#define DHCPCD_IPV6RS		(1 << 31)
 
 extern const struct option cf_options[];
 

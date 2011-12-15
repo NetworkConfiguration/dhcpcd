@@ -200,6 +200,27 @@ get_monotonic(struct timeval *tp)
 	return gettimeofday(tp, NULL);
 }
 
+ssize_t
+setvar(char ***e, const char *prefix, const char *var, const char *value)
+{
+	size_t len = strlen(prefix) + strlen(var) + strlen(value) + 4;
+
+	**e = xmalloc(len);
+	snprintf(**e, len, "%s_%s=%s", prefix, var, value);
+	(*e)++;
+	return len;
+}
+
+ssize_t
+setvard(char ***e, const char *prefix, const char *var, int value)
+{
+	char buffer[32];
+
+	snprintf(buffer, sizeof(buffer), "%d", value);
+	return setvar(e, prefix, var, buffer);
+}
+
+
 time_t
 uptime(void)
 {
