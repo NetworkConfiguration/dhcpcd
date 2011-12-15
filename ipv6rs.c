@@ -259,7 +259,7 @@ ipv6rs_handledata(_unused void *arg)
 	struct icmp6_hdr *icp;
 	struct interface *ifp;
 	const char *sfrom;
-	struct nd_router_advert *radvert;
+	struct nd_router_advert *nd_ra;
 	struct nd_opt_prefix_info *pi;
 	struct nd_opt_mtu *mtu;
 	struct nd_opt_rdnss *rdnss;
@@ -338,7 +338,6 @@ ipv6rs_handledata(_unused void *arg)
 
 	syslog(LOG_INFO, "%s: Router Advertisement from %s", ifp->name, sfrom);
 	delete_timeouts(ifp, NULL);
-	radvert = (struct nd_router_advert *)icp;
 
 	for (rap = ifp->ras; rap; rap = rap->next) {
 		if (memcmp(rap->from.s6_addr, from.sin6_addr.s6_addr,
@@ -356,7 +355,8 @@ ipv6rs_handledata(_unused void *arg)
 	}
 
 	get_monotonic(&rap->received);
-	rap->lifetime = ntohl(icp->icmp6_dataun.icmp6_un_data32);
+	nd_ra = (struct nd_router_advert *)icp;
+	rap->lifetime = ntohs(nd_ra->nd_ra_router_lifetime);
 
 	len -= sizeof(struct nd_router_advert);
 	p = ((uint8_t *)icp) + sizeof(struct nd_router_advert);
