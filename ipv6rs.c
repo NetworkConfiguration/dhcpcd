@@ -207,7 +207,7 @@ ipv6rs_sendprobe(void *arg)
 	if (sendmsg(sock, &sndhdr, 0) == -1)
 		syslog(LOG_ERR, "%s: sendmsg: %m", ifp->name);
 
-	if (++ifp->rsprobes < MAX_RTR_SOLICITATIONS)
+	if (ifp->rsprobes++ < MAX_RTR_SOLICITATIONS)
 		add_timeout_sec(RTR_SOLICITATION_INTERVAL,
 		    ipv6rs_sendprobe, ifp);
 	else
@@ -519,6 +519,7 @@ ipv6rs_handledata(_unused void *arg)
 	if (options & DHCPCD_TEST)
 		exit(EXIT_SUCCESS);
 
+	delete_q_timeout(0, handle_exit_timeout, NULL);
 	delete_timeouts(ifp, NULL);
 	ipv6rs_expire(ifp);
 	daemonise();

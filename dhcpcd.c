@@ -244,14 +244,14 @@ stop_interface(struct interface *iface)
 	struct interface *ifp, *ifl = NULL;
 
 	syslog(LOG_INFO, "%s: removing interface", iface->name);
-	if (strcmp(iface->state->reason, "RELEASE") != 0)
-		drop_dhcp(iface, "STOP");
 	if (iface->ras) {
 		ipv6rs_free(iface);
 		iface->ras = NULL;
 		iface->state->reason = "ROUTERADVERT";
 		run_script(iface);
 	}
+	if (strcmp(iface->state->reason, "RELEASE") != 0)
+		drop_dhcp(iface, "STOP");
 	close_sockets(iface);
 	delete_timeout(NULL, iface);
 	for (ifp = ifaces; ifp; ifp = ifp->next) {

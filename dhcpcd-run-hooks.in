@@ -12,9 +12,11 @@ state_dir=/var/run/dhcpcd
 if_up=false
 if_down=false
 case "$reason" in
-BOUND|INFORM|REBIND|REBOOT|RENEW|TIMEOUT|STATIC|ROUTERADVERT)	if_up=true;;
-PREINIT|EXPIRE|FAIL|IPV4LL|NAK|NOCARRIER|RELEASE|STOP)		if_down=true;;
+BOUND|INFORM|REBIND|REBOOT|RENEW|TIMEOUT|STATIC)	if_up=true;;
+PREINIT|EXPIRE|FAIL|IPV4LL|NAK|NOCARRIER|RELEASE|STOP)	if_down=true;;
 esac
+
+[ "$reason" = ROUTERADVERT -a "$ra_count" != 0 ] && if_up=true
 
 # Ensure that all arguments are unique
 uniqify()
