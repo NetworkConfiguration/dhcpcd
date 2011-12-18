@@ -1905,7 +1905,7 @@ main(int argc, char **argv)
 			if (sig != SIGALRM)
 				exit(EXIT_FAILURE);
 		} else {
-			if (sig == SIGALRM)
+			if (sig == SIGALRM || sig == SIGUSR1)
 				exit(EXIT_SUCCESS);
 			/* Spin until it exits */
 			syslog(LOG_INFO, "waiting for pid %d to exit", pid);
