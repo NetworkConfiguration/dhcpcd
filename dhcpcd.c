@@ -1377,7 +1377,9 @@ handle_ifa(int type, const char *ifname,
 	if (type == RTM_DELADDR) {
 		if (ifp->state->new &&
 		    ifp->state->new->yiaddr == addr->s_addr)
-			drop_dhcp(ifp, "EXPIRE");
+			syslog(LOG_INFO, "%s: removing IP address %s/%d",
+			    ifp->name, inet_ntoa(ifp->state->lease.addr),
+			    inet_ntocidr(ifp->state->lease.net));
 		return;
 	}
 
