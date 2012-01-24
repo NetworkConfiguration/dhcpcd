@@ -168,7 +168,7 @@ echo "MANDIR=		$MANDIR" >>$CONFIG_MK
 if [ -z "$CC" ]; then
 	printf "Looking for compiler ... "
 	for b in $TARGET- ""; do
-		for cc in gcc pcc icc cc; do
+		for cc in clang gcc pcc icc cc; do
 			if type $b$cc >/dev/null 2>&1; then
 				CC=$b$cc
 				echo "$CC"
@@ -185,6 +185,7 @@ if [ -z "$CC" ]; then
 else
 	echo "Using compiler $CC"
 fi
+$CC --version | $SED -e '1!d'
 echo "CC=		$CC" >>$CONFIG_MK
 
 if [ -n "$CFLAGS" ]; then
