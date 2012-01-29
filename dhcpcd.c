@@ -1162,7 +1162,7 @@ start_interface(void *arg)
 	free(iface->state->offer);
 	iface->state->offer = NULL;
 
-	if (ifo->options & DHCPCD_IPV6RS)
+	if (options & DHCPCD_IPV6RS && ifo->options & DHCPCD_IPV6RS)
 		ipv6rs_start(iface);
 
 	if (iface->state->arping_index < ifo->arping_len) {
