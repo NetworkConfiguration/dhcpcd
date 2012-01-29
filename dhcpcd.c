@@ -912,13 +912,13 @@ handle_carrier(int action, int flags, const char *ifname)
 			syslog(LOG_INFO, "%s: carrier lost", iface->name);
 			close_sockets(iface);
 			delete_timeouts(iface, start_expire, NULL);
-			drop_dhcp(iface, "NOCARRIER");
 			if (iface->ras) {
 				ipv6rs_free(iface);
 				iface->ras = NULL;
 				iface->state->reason = "ROUTERADVERT";
 				run_script(iface);
 			}
+			drop_dhcp(iface, "NOCARRIER");
 		}
 	} else if (carrier == 1 && !(~iface->flags & (IFF_UP | IFF_RUNNING))) {
 		if (iface->carrier != LINK_UP) {
