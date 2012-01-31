@@ -356,9 +356,18 @@ manage_link(int fd)
 				case LINK_STATE_DOWN:
 					len = -1;
 					break;
+				case LINK_STATE_UP:
+					len = 1;
+					break;
 				default:
-					len = ~ifm->ifm_flags &
-					    (IFF_UP | IFF_RUNNING) ? -1 : 1;
+					/* handle_carrier will re-load
+					 * the interface flags and check for
+					 * IFF_RUNNING as some drivers that
+					 * don't handle link state also don't
+					 * set IFF_RUNNING when this routing
+					 * message is generated.
+					 * As such, it is a race ...*/
+					len = 0;
 					break;
 				}
 				handle_carrier(len, ifm->ifm_flags, ifname);
