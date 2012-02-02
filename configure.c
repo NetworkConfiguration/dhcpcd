@@ -221,7 +221,7 @@ make_env(const struct interface *iface, const char *reason, char ***argv)
 		e--;
 	}
 	*--p = '\0';
-	if (iface->state->new || iface->ras) {
+	if ((dhcp && iface->state->new) || (ra && iface->ras)) {
 		env[8] = strdup("if_up=true");
 		env[9] = strdup("if_down=false");
 	} else {
