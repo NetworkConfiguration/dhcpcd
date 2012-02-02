@@ -247,8 +247,7 @@ stop_interface(struct interface *iface)
 	if (iface->ras) {
 		ipv6rs_free(iface);
 		iface->ras = NULL;
-		iface->state->reason = "ROUTERADVERT";
-		run_script(iface);
+		run_script_reason(iface, "ROUTERADVERT");
 	}
 	if (strcmp(iface->state->reason, "RELEASE") != 0)
 		drop_dhcp(iface, "STOP");
@@ -915,8 +914,7 @@ handle_carrier(int action, int flags, const char *ifname)
 			if (iface->ras) {
 				ipv6rs_free(iface);
 				iface->ras = NULL;
-				iface->state->reason = "ROUTERADVERT";
-				run_script(iface);
+				run_script_reason(iface, "ROUTERADVERT");
 			}
 			drop_dhcp(iface, "NOCARRIER");
 		}
@@ -1603,8 +1601,11 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 		} else if (strcmp(*argv, "--getinterfaces") == 0) {
 			len = 0;
 			if (argc == 1) {
-				for (ifp = ifaces; ifp; ifp = ifp->next)
+				for (ifp = ifaces; ifp; ifp = ifp->next) {
 					len++;
+					if (ifp->ras)
+						len++;
+				}
 				len = write(fd->fd, &len, sizeof(len));
 				if (len != sizeof(len))
 					return -1;
@@ -1615,8 +1616,11 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 			opt = 0;
 			while (argv[++opt] != NULL) {
 				for (ifp = ifaces; ifp; ifp = ifp->next)
-					if (strcmp(argv[opt], ifp->name) == 0)
+					if (strcmp(argv[opt], ifp->name) == 0) {
 						len++;
+						if (ifp->ras)
+							len++;
+					}
 			}
 			len = write(fd->fd, &len, sizeof(len));
 			if (len != sizeof(len))
