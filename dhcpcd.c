@@ -69,6 +69,7 @@ const char copyright[] = "Copyright (c) 2006-2012 Roy Marples";
 #include "ipv4ll.h"
 #include "ipv6rs.h"
 #include "net.h"
+#include "platform.h"
 #include "signals.h"
 
 /* We should define a maximum for the NAK exponential backoff */ 
@@ -1991,6 +1992,8 @@ main(int argc, char **argv)
 	}
 #endif
 
+	if (options & DHCPCD_IPV6RS && !check_ipv6())
+		options &= ~DHCPCD_IPV6RS;
 	if (options & DHCPCD_IPV6RS) {
 		ipv6rsfd = ipv6rs_open();
 		if (ipv6rsfd == -1) {

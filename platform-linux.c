@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2010 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2012 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -101,4 +101,12 @@ hardware_platform(void)
 	if (p == NULL)
 		errno = ESRCH;
 	return p;
+}
+
+int
+check_ipv6(void)
+{
+    
+    // FIXME: Add IPv6 detection here
+    return 1;
 }
