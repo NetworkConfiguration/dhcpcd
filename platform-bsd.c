@@ -71,12 +71,12 @@ int
 check_ipv6(void)
 {
 
-	if (!inet6_sysctl(IPV6CTL_ACCEPT_RTADV)) {
+	if (inet6_sysctl(IPV6CTL_ACCEPT_RTADV) != 1) {
 		syslog(LOG_WARNING,
 		    "Kernel is not configured to accept IPv6 RAs");
 		return 0;
 	}
-	if (inet6_sysctl(IPV6CTL_FORWARDING)) {
+	if (inet6_sysctl(IPV6CTL_FORWARDING) != 0) {
 		syslog(LOG_WARNING,
 		    "Kernel is configured as a router, not a host");
 		return 0;
