@@ -27,7 +27,9 @@
 
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 
 #include "common.h"
 #include "platform.h"
@@ -103,10 +105,35 @@ hardware_platform(void)
 	return p;
 }
 
+static int
+check_proc_int(const char *path)
+{
+	FILE *fp;
+	char *buf;
+
+	fp = fopen(path, "r");
+	if (fp == NULL)
+		return -1;
+	buf = get_line(fp);
+	fclose(fp);
+	if (buf == NULL)
+		return -1;
+	return atoi(buf);
+}
+
 int
 check_ipv6(void)
 {
-    
-    // FIXME: Add IPv6 detection here
-    return 1;
+
+	if (check_proc_int("/proc/sys/net/ipv6/conf/all/accept_ra") != 1) {
+		syslog(LOG_WARNING,
+		    "Kernel is not configured to accept IPv6 RAs");
+		return 0;
+	}
+	if (check_proc_int("/proc/sys/net/ipv6/conf/all/forwarding") != 0) {
+		syslog(LOG_WARNING,
+		    "Kernel is configured as a router, not a host");
+		return 0;
+	}
+	return 1;
 }
