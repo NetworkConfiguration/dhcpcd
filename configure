@@ -282,7 +282,7 @@ if [ -z "$ARC4RANDOM" ]; then
 	cat <<EOF >_arc4random.c
 #include <stdlib.h>
 int main(void) {
-	uint32_t r = arc4random();
+	arc4random();
 	return 0;
 }
 EOF
