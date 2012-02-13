@@ -335,15 +335,27 @@ ipv6rs_handledata(_unused void *arg)
 		    sfrom);
 		return;
 	}
-
-	syslog(LOG_INFO, "%s: Router Advertisement from %s", ifp->name, sfrom);
-	delete_timeouts(ifp, NULL);
-
 	for (rap = ifp->ras; rap; rap = rap->next) {
 		if (memcmp(rap->from.s6_addr, from.sin6_addr.s6_addr,
 		    sizeof(rap->from.s6_addr)) == 0)
 			break;
 	}
+
+	/* We don't want to spam the log with the fact we got an RA every
+	 * 30 seconds or so, so only spam the log if it's different. */
+	if (options & DHCPCD_DEBUG || rap == NULL ||
+	    (rap->expired || rap->data_len != len ||
+	     memcmp(rap->data, (unsigned char *)icp, rap->data_len) != 0))
+	{
+		if (rap) {
+			free(rap->data);
+			rap->data_len = 0;
+		}
+		syslog(LOG_INFO, "%s: Router Advertisement from %s",
+		    ifp->name, sfrom);
+	}
+	delete_timeouts(ifp, NULL);
+
 	if (rap == NULL) {
 		rap = xmalloc(sizeof(*rap));
 		rap->next = ifp->ras;
@@ -352,11 +364,18 @@ ipv6rs_handledata(_unused void *arg)
 		memcpy(rap->from.s6_addr, from.sin6_addr.s6_addr,
 		    sizeof(rap->from.s6_addr));
 		strlcpy(rap->sfrom, sfrom, sizeof(rap->sfrom));
+		rap->data_len = 0;
+	}
+	if (rap->data_len == 0) {
+		rap->data = xmalloc(len);
+		memcpy(rap->data, icp, len);
+		rap->data_len = len;
 	}
 
 	get_monotonic(&rap->received);
 	nd_ra = (struct nd_router_advert *)icp;
 	rap->lifetime = ntohs(nd_ra->nd_ra_router_lifetime);
+	rap->expired = 0;
 
 	len -= sizeof(struct nd_router_advert);
 	p = ((uint8_t *)icp) + sizeof(struct nd_router_advert);
@@ -622,6 +641,7 @@ ipv6rs_free(struct interface *ifp)
 
 	for (rap = ifp->ras; rap && (ran = rap->next, 1); rap = ran) {
 		ipv6rs_free_opts(rap);
+		free(rap->data);
 		free(rap);
 	}
 }
@@ -652,7 +672,7 @@ ipv6rs_expire(void *arg)
 		if (timercmp(&now, &expire, >)) {
 			syslog(LOG_INFO, "%s: %s: expired Router Advertisement",
 			    ifp->name, rap->sfrom);
-			expired = 1;
+			rap->expired = expired = 1;
 			if (ral)
 				ral->next = ran;
 			else
@@ -675,6 +695,7 @@ ipv6rs_expire(void *arg)
 				syslog(LOG_INFO,
 				    "%s: %s: expired option %d",
 				    ifp->name, rap->sfrom, rao->type);
+				rap->expired = expired = 1;
 				if (raol)
 					raol = raon;
 				else
