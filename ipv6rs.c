@@ -274,6 +274,7 @@ ipv6rs_handledata(_unused void *arg)
 	struct ra_opt *rao, *raol;
 	char *opt;
 	struct timeval expire;
+	int has_dns;
 
 	len = recvmsg(sock, &rcvhdr, 0);
 	if (len == -1) {
@@ -381,6 +382,7 @@ ipv6rs_handledata(_unused void *arg)
 	p = ((uint8_t *)icp) + sizeof(struct nd_router_advert);
 	olen = 0;
 	lifetime = ~0U;
+	has_dns = 0;
 	for (olen = 0; len > 0; p += olen, len -= olen) {
 		if ((size_t)len < sizeof(struct nd_opt_hdr)) {
 			syslog(LOG_ERR, "%s: Short option", ifp->name);
@@ -466,6 +468,7 @@ ipv6rs_handledata(_unused void *arg)
 						    '\0';
 					} else
 						opt = xstrdup(cbp);
+					has_dns = 1;
 				}
 		        	op += sizeof(addr.s6_addr);
 			}
@@ -532,10 +535,16 @@ ipv6rs_handledata(_unused void *arg)
 	if (options & DHCPCD_TEST)
 		exit(EXIT_SUCCESS);
 
-	delete_q_timeout(0, handle_exit_timeout, NULL);
+	if (has_dns)
+		delete_q_timeout(0, handle_exit_timeout, NULL);
 	delete_timeouts(ifp, NULL);
 	ipv6rs_expire(ifp);
-	daemonise();
+	if (has_dns)
+		daemonise();
+	else if (options & DHCPCD_DAEMONISE && !(options & DHCPCD_DAEMONISED))
+		syslog(LOG_WARNING,
+		    "%s: did not fork due to an absent RDNSS option in the RA",
+		    ifp->name);
 }
 
 ssize_t
