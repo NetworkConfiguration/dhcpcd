@@ -1162,8 +1162,12 @@ start_interface(void *arg)
 	free(iface->state->offer);
 	iface->state->offer = NULL;
 
-	if (options & DHCPCD_IPV6RS && ifo->options & DHCPCD_IPV6RS)
-		ipv6rs_start(iface);
+	if (options & DHCPCD_IPV6RS && ifo->options & DHCPCD_IPV6RS) {
+		if (check_ipv6(iface->name) == 1)
+			ipv6rs_start(iface);
+		else
+			ifo->options &= ~DHCPCD_IPV6RS;
+	}
 
 	if (iface->state->arping_index < ifo->arping_len) {
 		start_arping(iface);
@@ -1993,7 +1997,7 @@ main(int argc, char **argv)
 	}
 #endif
 
-	if (options & DHCPCD_IPV6RS && !check_ipv6())
+	if (options & DHCPCD_IPV6RS && !check_ipv6(NULL))
 		options &= ~DHCPCD_IPV6RS;
 	if (options & DHCPCD_IPV6RS) {
 		ipv6rsfd = ipv6rs_open();

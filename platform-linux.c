@@ -121,19 +121,33 @@ check_proc_int(const char *path)
 	return atoi(buf);
 }
 
-int
-check_ipv6(void)
-{
+static const char *prefix = "/proc/sys/net/ipv6/conf";
 
-	if (check_proc_int("/proc/sys/net/ipv6/conf/all/accept_ra") != 1) {
+int
+check_ipv6(const char *ifname)
+{
+	int r;
+	char path[256];
+
+	if (ifname == NULL)
+		ifname = "all";
+
+	snprintf(path, sizeof(path), "%s/%s/accept_ra", prefix, ifname);
+	r = check_proc_int(path);
+	if (r != 1 && r != 2) {
 		syslog(LOG_WARNING,
-		    "Kernel is not configured to accept IPv6 RAs");
+		    "%s: not configured to accept IPv6 RAs", ifname);
 		return 0;
 	}
-	if (check_proc_int("/proc/sys/net/ipv6/conf/all/forwarding") != 0) {
-		syslog(LOG_WARNING,
-		    "Kernel is configured as a router, not a host");
-		return 0;
+
+	if (r != 2) {
+		snprintf(path, sizeof(path), "%s/%s/forwarding",
+		    prefix, ifname);
+		if (check_proc_int(path) != 0) {
+			syslog(LOG_WARNING,
+			    "%s: configured as a router, not a host", ifname);
+			return 0;
+		}
 	}
 	return 1;
 }
