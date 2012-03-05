@@ -21,7 +21,11 @@ need_hostname()
 try_hostname()
 {
 	if valid_domainname "$1"; then
-		hostname "$1"
+		if [ -w /proc/sys/kernel/hostname ]; then
+			echo "$1" >/proc/sys/kernel/hostname
+		else
+			hostname "$1"
+		fi
 	else
 		syslog err "Invalid hostname: $1"
 	fi
