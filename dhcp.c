@@ -772,7 +772,7 @@ route_netmask(uint32_t ip_in)
  * Otherwise we add static routes and then routers. */
 struct rt *
 get_option_routes(const struct dhcp_message *dhcp,
-    const char *ifname, int *opts)
+    const char *ifname, unsigned long long *opts)
 {
 	const uint8_t *p;
 	const uint8_t *e;

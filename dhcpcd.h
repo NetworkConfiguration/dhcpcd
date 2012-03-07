@@ -143,7 +143,7 @@ struct interface {
 };
 
 extern int pidfd;
-extern int options;
+extern unsigned long long options;
 extern int ifac;
 extern char **ifav;
 extern int ifdc;

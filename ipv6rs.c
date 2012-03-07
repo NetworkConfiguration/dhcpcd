@@ -468,7 +468,8 @@ ipv6rs_handledata(_unused void *arg)
 						    '\0';
 					} else
 						opt = xstrdup(cbp);
-					has_dns = 1;
+					if (lifetime > 0)
+						has_dns = 1;
 				}
 		        	op += sizeof(addr.s6_addr);
 			}
@@ -534,6 +535,10 @@ ipv6rs_handledata(_unused void *arg)
 	run_script_reason(ifp, options & DHCPCD_TEST ? "TEST" : "ROUTERADVERT");
 	if (options & DHCPCD_TEST)
 		exit(EXIT_SUCCESS);
+
+	/* If we don't require RDNSS then set has_dns = 1 so we fork */
+	if (!(ifp->state->options->options & DHCPCD_IPV6RA_REQRDNSS))
+		has_dns = 1;
 
 	if (has_dns)
 		delete_q_timeout(0, handle_exit_timeout, NULL);

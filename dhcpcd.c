@@ -80,7 +80,7 @@ const char copyright[] = "Copyright (c) 2006-2012 Roy Marples";
 #define RELEASE_DELAY_S		0
 #define RELEASE_DELAY_NS	10000000
 
-int options = 0;
+unsigned long long options = 0;
 int pidfd = -1;
 struct interface *ifaces = NULL;
 int ifac = 0;
