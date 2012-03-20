@@ -92,6 +92,16 @@ static unsigned char *rcvbuf;
 static unsigned char ansbuf[1500];
 static char ntopbuf[INET6_ADDRSTRLEN];
 
+#if DEBUG_MEMORY
+static void
+ipv6rs_cleanup(void)
+{
+
+	free(sndbuf);
+	free(rcvbuf);
+}
+#endif
+
 int
 ipv6rs_open(void)
 {
@@ -125,6 +135,10 @@ ipv6rs_open(void)
 		&filt, sizeof(filt)) == -1)
 		return -1;
 
+#if DEBUG_MEMORY
+	atexit(ipv6rs_cleanup);
+#endif
+
 	len = CMSG_SPACE(sizeof(struct in6_pktinfo)) + CMSG_SPACE(sizeof(int));
 	sndbuf = xzalloc(len);
 	if (sndbuf == NULL)
@@ -154,6 +168,7 @@ ipv6rs_makeprobe(struct interface *ifp)
 	struct nd_router_solicit *rs;
 	struct nd_opt_hdr *nd;
 
+	free(ifp->rs);
 	ifp->rslen = sizeof(*rs) + ROUNDUP8(ifp->hwlen + 2);
 	ifp->rs = xzalloc(ifp->rslen);
 	if (ifp->rs == NULL)
@@ -355,7 +370,6 @@ ipv6rs_handledata(_unused void *arg)
 		syslog(LOG_INFO, "%s: Router Advertisement from %s",
 		    ifp->name, sfrom);
 	}
-	delete_timeouts(ifp, NULL);
 
 	if (rap == NULL) {
 		rap = xmalloc(sizeof(*rap));
@@ -542,7 +556,7 @@ ipv6rs_handledata(_unused void *arg)
 
 	if (has_dns)
 		delete_q_timeout(0, handle_exit_timeout, NULL);
-	delete_timeouts(ifp, NULL);
+	delete_timeout(NULL, ifp);
 	ipv6rs_expire(ifp);
 	if (has_dns)
 		daemonise();
@@ -653,11 +667,14 @@ ipv6rs_free(struct interface *ifp)
 {
 	struct ra *rap, *ran;
 
+	free(ifp->rs);
+	ifp->rs = NULL;
 	for (rap = ifp->ras; rap && (ran = rap->next, 1); rap = ran) {
 		ipv6rs_free_opts(rap);
 		free(rap->data);
 		free(rap);
 	}
+	ifp->ras = NULL;
 }
 
 void
@@ -732,7 +749,7 @@ int
 ipv6rs_start(struct interface *ifp)
 {
 
-	delete_timeouts(ifp, NULL);
+	delete_timeout(NULL, ifp);
 
 	/* Always make a new probe as the underlying hardware
 	 * address could have changed. */
