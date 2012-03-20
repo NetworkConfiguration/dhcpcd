@@ -792,8 +792,8 @@ get_option_routes(const struct dhcp_message *dhcp,
 			    "%s: using Classless Static Routes (RFC3442)",
 			    ifname);
 			*opts |= DHCPCD_CSR_WARNED;
-			return routes;
 		}
+		return routes;
 	}
 
 	/* OK, get our static routes first. */
