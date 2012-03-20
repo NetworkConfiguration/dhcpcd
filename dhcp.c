@@ -787,13 +787,15 @@ get_option_routes(const struct dhcp_message *dhcp,
 		p = get_option(dhcp, DHO_MSCSR, &len, NULL);
 	if (p) {
 		routes = decode_rfc3442_rt(len, p);
-		if (routes && !(*opts & DHCPCD_CSR_WARNED)) {
-			syslog(LOG_DEBUG,
-			    "%s: using Classless Static Routes (RFC3442)",
-			    ifname);
-			*opts |= DHCPCD_CSR_WARNED;
+		if (routes) {
+			if (!(*opts & DHCPCD_CSR_WARNED)) {
+				syslog(LOG_DEBUG,
+				    "%s: using Classless Static Routes",
+				    ifname);
+				*opts |= DHCPCD_CSR_WARNED;
+			}
+			return routes;
 		}
-		return routes;
 	}
 
 	/* OK, get our static routes first. */
