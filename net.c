@@ -449,9 +449,11 @@ discover_interfaces(int argc, char * const *argv)
 			case IFT_IEEE1394:
 				ifp->family = ARPHRD_IEEE1394;
 				break;
+#ifdef IFT_INFINIBAND
 			case IFT_INFINIBAND:
 				ifp->family = ARPHRD_INFINIBAND;
 				break;
+#endif
 			}
 			ifp->hwlen = sdl->sdl_alen;
 #ifndef CLLADDR
