@@ -478,8 +478,6 @@ ipv6rs_handledata(_unused void *arg)
 							l + strlen(cbp) + 2);
 						opt[l] = ' ';
 						strcpy(opt + l + 1, cbp);
-						opt[l + strlen(cbp) + l + 1] =
-						    '\0';
 					} else
 						opt = xstrdup(cbp);
 					if (lifetime > 0)
