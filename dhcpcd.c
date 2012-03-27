@@ -1533,7 +1533,7 @@ handle_signal(_unused void *arg)
 			ifo->options |= DHCPCD_DAEMONISED;
 		options = ifo->options;
 		free_options(ifo);
-		reconf_reboot(1, 0, NULL, 0);
+		reconf_reboot(1, ifc, ifv, 0);
 		return;
 	case SIGHUP:
 		syslog(LOG_INFO, "received SIGHUP, releasing");
