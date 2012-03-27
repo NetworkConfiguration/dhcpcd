@@ -730,6 +730,7 @@ build_routes(void)
 				lrt->next = rtn;
 			rt->next = nrs;
 			nrs = rt;
+			rt = lrt; /* When we loop this makes lrt correct */
 		}
 		free_routes(dnr);
 	}
