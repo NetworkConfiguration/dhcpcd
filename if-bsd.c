@@ -90,6 +90,15 @@ if_conf(_unused struct interface *iface)
 	return 0;
 }
 
+#ifdef DEBUG_MEMORY
+static void
+cleanup(void)
+{
+
+	free(link_buf);
+}
+#endif
+
 int
 init_sockets(void)
 {
@@ -129,6 +138,7 @@ getifssid(const char *ifname, char *ssid)
 	strlcpy(ireq.i_name, ifname, sizeof(ireq.i_name));
 	ireq.i_type = IEEE80211_IOC_SSID;
 	ireq.i_val = -1;
+	memset(nwid, 0, sizeof(nwid));
 	ireq.i_data = &nwid;
 	if (ioctl(socket_afnet, SIOCG80211, &ireq) == 0) {
 		retval = ireq.i_len;
@@ -266,6 +276,11 @@ int
 open_link_socket(void)
 {
 	int fd;
+
+#ifdef DEBUG_MEMORY
+	if (link_buf == NULL)
+		atexit(cleanup);
+#endif
 
 	fd = socket(PF_ROUTE, SOCK_RAW, 0);
 	if (fd != -1) {
