@@ -528,15 +528,13 @@ if_address(const struct interface *iface,
 }
 
 int
-if_route(const struct interface *iface,
-    const struct in_addr *destination, const struct in_addr *netmask,
-    const struct in_addr *gateway, int metric, int action)
+if_route(const struct rt *rt, int action)
 {
 	struct nlmr *nlm;
 	unsigned int ifindex;
 	int retval = 0;
 
-	if (!(ifindex = if_nametoindex(iface->name))) {
+	if (!(ifindex = if_nametoindex(rt->iface->name))) {
 		errno = ENODEV;
 		return -1;
 	}
@@ -559,36 +557,36 @@ if_route(const struct interface *iface,
 	else {
 		nlm->hdr.nlmsg_flags |= NLM_F_CREATE | NLM_F_EXCL;
 		/* We only change route metrics for kernel routes */
-		if (destination->s_addr ==
-		    (iface->addr.s_addr & iface->net.s_addr) &&
-		    netmask->s_addr == iface->net.s_addr)
+		if (rt->dest.s_addr ==
+		    (rt->iface->addr.s_addr & rt->iface->net.s_addr) &&
+		    rt->net.s_addr == rt->iface->net.s_addr)
 			nlm->rt.rtm_protocol = RTPROT_KERNEL;
 		else
 			nlm->rt.rtm_protocol = RTPROT_BOOT;
-		if (gateway->s_addr == INADDR_ANY ||
-		    (gateway->s_addr == destination->s_addr &&
-			netmask->s_addr == INADDR_BROADCAST))
+		if (rt->gate.s_addr == INADDR_ANY ||
+		    (rt->gate.s_addr == rt->dest.s_addr &&
+			rt->net.s_addr == INADDR_BROADCAST))
 			nlm->rt.rtm_scope = RT_SCOPE_LINK;
 		else
 			nlm->rt.rtm_scope = RT_SCOPE_UNIVERSE;
 		nlm->rt.rtm_type = RTN_UNICAST;
 	}
 
-	nlm->rt.rtm_dst_len = inet_ntocidr(*netmask);
+	nlm->rt.rtm_dst_len = inet_ntocidr(&rt->net);
 	add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_DST,
-	    &destination->s_addr, sizeof(destination->s_addr));
+	    &rt->dest.s_addr, sizeof(rt->dest.s_addr));
 	if (nlm->rt.rtm_protocol == RTPROT_KERNEL) {
 		add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_PREFSRC,
-		    &iface->addr.s_addr, sizeof(iface->addr.s_addr));
+		    &rt->iface->addr.s_addr, sizeof(rt->iface->addr.s_addr));
 	}
 	/* If destination == gateway then don't add the gateway */
-	if (destination->s_addr != gateway->s_addr ||
-	    netmask->s_addr != INADDR_BROADCAST)
+	if (rt->dest.s_addr != rt->gate.s_addr ||
+	    rt->net.s_addr != INADDR_BROADCAST)
 		add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_GATEWAY,
-		    &gateway->s_addr, sizeof(gateway->s_addr));
+		    &rt->gate.s_addr, sizeof(rt->gate.s_addr));
 
 	add_attr_32(&nlm->hdr, sizeof(*nlm), RTA_OIF, ifindex);
-	add_attr_32(&nlm->hdr, sizeof(*nlm), RTA_PRIORITY, metric);
+	add_attr_32(&nlm->hdr, sizeof(*nlm), RTA_PRIORITY, rt->metric);
 
 	if (send_netlink(&nlm->hdr) == -1)
 		retval = -1;

@@ -187,9 +187,7 @@ if_address(const struct interface *iface, const struct in_addr *address,
 
 /* ARGSUSED4 */
 int
-if_route(const struct interface *iface, const struct in_addr *dest,
-    const struct in_addr *net, const struct in_addr *gate,
-    _unused int metric, int action)
+if_route(const struct rt *rt, int action)
 {
 	union sockunion {
 		struct sockaddr sa;
@@ -233,12 +231,13 @@ if_route(const struct interface *iface, const struct in_addr *dest,
 		rtm.hdr.rtm_type = RTM_DELETE;
 	rtm.hdr.rtm_flags = RTF_UP;
 	/* None interface subnet routes are static. */
-	if (gate->s_addr != INADDR_ANY ||
-	    net->s_addr != iface->net.s_addr ||
-	    dest->s_addr != (iface->addr.s_addr & iface->net.s_addr))
+	if (rt->gate.s_addr != INADDR_ANY ||
+	    rt->net.s_addr != rt->iface->net.s_addr ||
+	    rt->dest.s_addr != (rt->iface->addr.s_addr & rt->iface->net.s_addr))
 		rtm.hdr.rtm_flags |= RTF_STATIC;
 	rtm.hdr.rtm_addrs = RTA_DST | RTA_GATEWAY;
-	if (dest->s_addr == gate->s_addr && net->s_addr == INADDR_BROADCAST)
+	if (rt->dest.s_addr == rt->gate.s_addr &&
+	    rt->net.s_addr == INADDR_BROADCAST)
 		rtm.hdr.rtm_flags |= RTF_HOST;
 	else {
 		rtm.hdr.rtm_addrs |= RTA_NETMASK;
@@ -248,23 +247,23 @@ if_route(const struct interface *iface, const struct in_addr *dest,
 			rtm.hdr.rtm_addrs |= RTA_IFA;
 	}
 
-	ADDADDR(dest);
+	ADDADDR(&rt->dest);
 	if (rtm.hdr.rtm_flags & RTF_HOST ||
 	    !(rtm.hdr.rtm_flags & RTF_STATIC))
 	{
 		/* Make us a link layer socket for the host gateway */
 		memset(&su, 0, sizeof(su));
 		su.sdl.sdl_len = sizeof(struct sockaddr_dl);
-		link_addr(iface->name, &su.sdl);
+		link_addr(rt->iface->name, &su.sdl);
 		ADDSU(su);
 	} else
-		ADDADDR(gate);
+		ADDADDR(&rt->gate);
 
 	if (rtm.hdr.rtm_addrs & RTA_NETMASK)
-		ADDADDR(net);
+		ADDADDR(&rt->net);
 
 	if (rtm.hdr.rtm_addrs & RTA_IFA)
-		ADDADDR(&iface->addr);
+		ADDADDR(&rt->iface->addr);
 
 	rtm.hdr.rtm_msglen = l = bp - (char *)&rtm;
 	if (write(r_fd, &rtm, l) == -1)
