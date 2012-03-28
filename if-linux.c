@@ -572,7 +572,7 @@ if_route(const struct rt *rt, int action)
 		nlm->rt.rtm_type = RTN_UNICAST;
 	}
 
-	nlm->rt.rtm_dst_len = inet_ntocidr(&rt->net);
+	nlm->rt.rtm_dst_len = inet_ntocidr(rt->net);
 	add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_DST,
 	    &rt->dest.s_addr, sizeof(rt->dest.s_addr));
 	if (nlm->rt.rtm_protocol == RTPROT_KERNEL) {
