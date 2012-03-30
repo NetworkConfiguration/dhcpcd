@@ -822,7 +822,7 @@ configure_interface1(struct interface *iface)
 					memset(iface->clientid + 2 + ifl,
 					    0, 4 - ifl);
 			} else {
-				ifl = htonl(if_nametoindex(iface->name));
+				ifl = htonl(iface->index);
 				memcpy(iface->clientid + 2, &ifl, 4);
 			}
 		} else if (len == 0) {

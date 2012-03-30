@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2011 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2012 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -110,6 +110,7 @@ struct interface {
 	char name[IF_NAMESIZE];
 	struct if_state *state;
 
+	unsigned int index;
 	int flags;
 	sa_family_t family;
 	unsigned char hwaddr[HWADDR_LEN];

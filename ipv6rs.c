@@ -208,7 +208,7 @@ ipv6rs_sendprobe(void *arg)
 	cm->cmsg_type = IPV6_PKTINFO;
 	cm->cmsg_len = CMSG_LEN(sizeof(pi));
 	memset(&pi, 0, sizeof(pi));
-	pi.ipi6_ifindex = if_nametoindex(ifp->name);
+	pi.ipi6_ifindex = ifp->index;
 	memcpy(CMSG_DATA(cm), &pi, sizeof(pi));
 
 	/* Hop limit */
@@ -344,7 +344,7 @@ ipv6rs_handledata(_unused void *arg)
 	}
 
 	for (ifp = ifaces; ifp; ifp = ifp->next)
-		if (if_nametoindex(ifp->name) == (unsigned int)pkt.ipi6_ifindex)
+		if (ifp->index == pkt.ipi6_ifindex)
 			break;
 	if (ifp == NULL) {
 		syslog(LOG_ERR,"received RA for unexpected interface from %s",

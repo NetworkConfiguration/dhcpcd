@@ -86,10 +86,7 @@ open_socket(struct interface *iface, int protocol)
 	memset(&su, 0, sizeof(su));
 	su.sll.sll_family = PF_PACKET;
 	su.sll.sll_protocol = htons(protocol);
-	if (!(su.sll.sll_ifindex = if_nametoindex(iface->name))) {
-		errno = ENOENT;
-		goto eexit;
-	}
+	su.sll.sll_ifindex = iface->index;
 	/* Install the DHCP filter */
 	memset(&pf, 0, sizeof(pf));
 	if (protocol == ETHERTYPE_ARP) {
@@ -142,10 +139,7 @@ send_raw_packet(const struct interface *iface, int protocol,
 	memset(&su, 0, sizeof(su));
 	su.sll.sll_family = AF_PACKET;
 	su.sll.sll_protocol = htons(protocol);
-	if (!(su.sll.sll_ifindex = if_nametoindex(iface->name))) {
-		errno = ENOENT;
-		return -1;
-	}
+	su.sll.sll_ifindex = iface->index;
 	su.sll.sll_hatype = htons(iface->family);
 	su.sll.sll_halen = iface->hwlen;
 	if (iface->family == ARPHRD_INFINIBAND)

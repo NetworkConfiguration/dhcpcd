@@ -96,7 +96,6 @@ char *hwaddr_ntoa(const unsigned char *, size_t);
 size_t hwaddr_aton(unsigned char *, const char *);
 
 int getifssid(const char *, char *);
-struct interface *init_interface(const char *);
 struct interface *discover_interfaces(int, char * const *);
 void free_interface(struct interface *);
 int do_mtu(const char *, short int);

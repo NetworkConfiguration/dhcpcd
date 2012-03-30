@@ -505,11 +505,7 @@ if_address(const struct interface *iface,
 		nlm->hdr.nlmsg_type = RTM_NEWADDR;
 	} else
 		nlm->hdr.nlmsg_type = RTM_DELADDR;
-	if (!(nlm->ifa.ifa_index = if_nametoindex(iface->name))) {
-		free(nlm);
-		errno = ENODEV;
-		return -1;
-	}
+	nlm->ifa.ifa_index = iface->index;
 	nlm->ifa.ifa_family = AF_INET;
 	nlm->ifa.ifa_prefixlen = inet_ntocidr(*netmask);
 	/* This creates the aliased interface */
@@ -531,13 +527,7 @@ int
 if_route(const struct rt *rt, int action)
 {
 	struct nlmr *nlm;
-	unsigned int ifindex;
 	int retval = 0;
-
-	if (!(ifindex = if_nametoindex(rt->iface->name))) {
-		errno = ENODEV;
-		return -1;
-	}
 
 	nlm = xzalloc(sizeof(*nlm));
 	nlm->hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
@@ -585,7 +575,7 @@ if_route(const struct rt *rt, int action)
 		add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_GATEWAY,
 		    &rt->gate.s_addr, sizeof(rt->gate.s_addr));
 
-	add_attr_32(&nlm->hdr, sizeof(*nlm), RTA_OIF, ifindex);
+	add_attr_32(&nlm->hdr, sizeof(*nlm), RTA_OIF, rt->iface->index);
 	add_attr_32(&nlm->hdr, sizeof(*nlm), RTA_PRIORITY, rt->metric);
 
 	if (send_netlink(&nlm->hdr) == -1)
