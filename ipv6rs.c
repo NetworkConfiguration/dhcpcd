@@ -344,7 +344,7 @@ ipv6rs_handledata(_unused void *arg)
 	}
 
 	for (ifp = ifaces; ifp; ifp = ifp->next)
-		if (ifp->index == pkt.ipi6_ifindex)
+		if (ifp->index == (unsigned int)pkt.ipi6_ifindex)
 			break;
 	if (ifp == NULL) {
 		syslog(LOG_ERR,"received RA for unexpected interface from %s",
