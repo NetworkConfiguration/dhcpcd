@@ -1499,12 +1499,12 @@ reconf_reboot(int action, int argc, char **argv, int oi)
 static void
 handle_signal(_unused void *arg)
 {
-	struct interface *ifp, *ifl;
+	struct interface *ifp;
 	struct if_options *ifo;
 	int sig = signal_read();
-	int do_release, do_rebind, i;
+	int do_release, i;
 
-	do_rebind = do_release = 0;
+	do_release = 0;
 	switch (sig) {
 	case SIGINT:
 		syslog(LOG_INFO, "received SIGINT, stopping");
@@ -1561,11 +1561,9 @@ handle_signal(_unused void *arg)
 	/* As drop_dhcp could re-arrange the order, we do it like this. */
 	for (;;) {
 		/* Be sane and drop the last config first */
-		ifl = NULL;
 		for (ifp = ifaces; ifp; ifp = ifp->next) {
 			if (ifp->next == NULL)
 				break;
-			ifl = ifp;
 		}
 		if (ifp == NULL)
 			break;
@@ -1582,7 +1580,7 @@ int
 handle_args(struct fd_list *fd, int argc, char **argv)
 {
 	struct interface *ifp;
-	int do_exit = 0, do_release = 0, do_reboot = 0, do_reconf = 0;
+	int do_exit = 0, do_release = 0, do_reboot = 0;
 	int opt, oi = 0;
 	ssize_t len;
 	size_t l;
@@ -1673,7 +1671,7 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 	{
 		switch (opt) {
 		case 'g':
-			do_reconf = 1;
+			/* Assumed if below not set */
 			break;
 		case 'k':
 			do_release = 1;

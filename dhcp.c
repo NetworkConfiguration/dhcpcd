@@ -1361,7 +1361,6 @@ ssize_t
 configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
     const struct if_options *ifo)
 {
-	unsigned int i;
 	const uint8_t *p;
 	int pl;
 	struct in_addr addr;
@@ -1404,7 +1403,6 @@ configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 			net.s_addr = get_netmask(addr.s_addr);
 			setvar(&ep, prefix, "subnet_mask", inet_ntoa(net));
 		}
-		i = inet_ntocidr(net);
 		snprintf(cidr, sizeof(cidr), "%d", inet_ntocidr(net));
 		setvar(&ep, prefix, "subnet_cidr", cidr);
 		if (get_option_addr(&brd, dhcp, DHO_BROADCAST) == -1) {
