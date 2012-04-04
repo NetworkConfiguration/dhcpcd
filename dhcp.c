@@ -280,7 +280,7 @@ valid_length(uint8_t option, int dl, int *type)
 		if (opt->type & UINT8)
 			sz = sizeof(uint8_t);
 		if (opt->type & (IPV4 | ARRAY))
-			return dl % sz;
+			sz = dl % sizeof(uint32_t);
 		return (dl == sz ? 0 : -1);
 	}
 

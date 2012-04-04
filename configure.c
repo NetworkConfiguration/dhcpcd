@@ -307,7 +307,6 @@ send_interface1(int fd, const struct interface *iface, const char *reason)
 	struct iovec iov[2];
 	int retval;
 
-	retval = 0;
 	make_env(iface, reason, &env);
 	elen = arraytostr((const char *const *)env, &s);
 	iov[0].iov_base = &elen;
