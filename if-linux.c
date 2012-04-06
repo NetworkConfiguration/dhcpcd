@@ -190,7 +190,7 @@ get_netlink(int fd, int flags,
 				continue;
 			goto eexit;
 		}
-		for (nlm = (struct nlmsghdr *)buf;
+		for (nlm = (struct nlmsghdr *)(void *)buf;
 		     NLMSG_OK(nlm, (size_t)bytes);
 		     nlm = NLMSG_NEXT(nlm, bytes))
 		{
@@ -248,7 +248,7 @@ link_route(struct nlmsghdr *nlm)
 	    rtm->rtm_family != AF_INET ||
 	    nlm->nlmsg_pid == (uint32_t)getpid())
 		return 1;
-	rta = (struct rtattr *) ((char *)rtm + NLMSG_ALIGN(sizeof(*rtm)));
+	rta = (struct rtattr *)(void *)((char *)rtm +NLMSG_ALIGN(sizeof(*rtm)));
 	len = NLMSG_PAYLOAD(nlm, sizeof(*rtm));
 	rt.iface = NULL;
 	rt.dest.s_addr = INADDR_ANY;
@@ -361,7 +361,7 @@ link_netlink(struct nlmsghdr *nlm)
 	ifi = NLMSG_DATA(nlm);
 	if (ifi->ifi_flags & IFF_LOOPBACK)
 		return 1;
-	rta = (struct rtattr *) ((char *)ifi + NLMSG_ALIGN(sizeof(*ifi)));
+	rta = (struct rtattr *)(void *)((char *)ifi +NLMSG_ALIGN(sizeof(*ifi)));
 	len = NLMSG_PAYLOAD(nlm, sizeof(*ifi));
 	*ifn = '\0';
 	while (RTA_OK(rta, len)) {
