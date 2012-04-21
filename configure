@@ -419,7 +419,7 @@ if [ -e /etc/arch-release ]; then
 fi
 
 if [ -z "$SERVICEEXISTS" -o -z "$SERVICECMD" ]; then
-	echo "WARNING! No means of interacting with system services detected!"
+	echo "$0: WARNING: No means of interacting with system services detected!"
 	SERVICEEXISTS="return 1"
 	SERVICECMD="return 1"
 fi
