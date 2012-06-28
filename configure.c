@@ -172,7 +172,12 @@ make_env(const struct interface *iface, const char *reason, char ***argv)
 	int dhcp, ra;
 
 	dhcp = ra = 0;
-	if (strcmp(reason, "ROUTERADVERT") == 0)
+	if (strcmp(reason, "TEST") == 0) {
+		if (iface->ras)
+			ra = 1;
+		else
+			dhcp = 1;
+	} else if (strcmp(reason, "ROUTERADVERT") == 0)
 		ra = 1;
 	else
 		dhcp = 1;
