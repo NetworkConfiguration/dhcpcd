@@ -2,8 +2,8 @@
 
 PROG=		dhcpcd
 SRCS=		arp.c bind.c common.c control.c dhcp.c dhcpcd.c duid.c eloop.c
-SRCS+=		if-options.c if-pref.c ipv4ll.c ipv6rs.c net.c signals.c
-SRCS+=		configure.c
+SRCS+=		configure.c if-options.c if-pref.c ipv4ll.c net.c signals.c
+SRCS+=		ipv6.c ipv6rs.c ipv6ns.c
 
 CFLAGS?=	-O2
 CSTD?=		c99

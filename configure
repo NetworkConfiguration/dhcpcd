@@ -13,6 +13,7 @@ HOST=
 TARGET=
 DEBUG=
 FORK=
+STATIC=
 INCLUDEDIR=
 
 for x do
@@ -27,6 +28,8 @@ for x do
 	--fork) FORK=$var;;
 	--disable-fork) FORK=no;;
 	--enable-fork) FORK=yes;;
+	--disable-static) STATIC=no;;
+	--enable-static) STATIC=yes;;
 	--prefix) prefix=$var;;
 	--sysconfdir) SYSCONFDIR=$var;;
 	--bindir|--sbindir) SBINDIR=$var;;
@@ -193,6 +196,12 @@ if [ -n "$CFLAGS" ]; then
 fi
 if [ -n "$CPPLAGS" ]; then
 	echo "CPPLAGS=		$CPPLAGS" >>$CONFIG_MK
+fi
+if [ -n "$LDFLAGS" ]; then
+	echo "LDFLAGS=		$LDFLAGS" >>$CONFIG_MK
+fi
+if [ "$STATIC" = yes ]; then
+	echo "LDFLAGS+=	-static" >>$CONFIG_MK
 fi
 for x in $INCLUDEDIR; do
 	echo "CPPFLAGS+=	-I$x" >>$CONFIG_MK
@@ -368,6 +377,34 @@ fi
 if [ "$STRLCPY" = no ]; then
 	echo "COMPAT_SRCS+=	compat/strlcpy.c" >>$CONFIG_MK
 	echo "#include \"compat/strlcpy.h\"" >>$CONFIG_H
+fi
+
+if [ -z "$TAILQ_FOREACH_SAFE" ]; then
+	printf "Testing for TAILQ_FOREACH_SAFE ... "
+	cat <<EOF >_queue.c
+#include <sys/queue.h>
+int main(void) {
+#ifndef TAILQ_FOREACH_SAFE
+#error TAILQ_FOREACH_SAFE
+#endif
+	return 0;
+}
+EOF
+	if $XCC _queue.c -o _queue 2>/dev/null; then
+		TAILQ_FOREACH_SAFE=yes
+	else
+		TAILQ_FOREACH_SAFE=no
+	fi
+	echo "$TAILQ_FOREACH_SAFE"
+	rm -f _queue.c _queue
+fi
+if [ "$TAILQ_FOREACH_SAFE" = no ]; then
+	cat <<EOF >>$CONFIG_H
+#define	TAILQ_FOREACH_SAFE(var, head, field, next)			\
+	for ((var) = TAILQ_FIRST((head));				\
+	    (var) && ((next) = TAILQ_NEXT((var), field), 1);		\
+	    (var) = (next))
+EOF
 fi
 
 if [ -z "$SERVICECMD" ]; then

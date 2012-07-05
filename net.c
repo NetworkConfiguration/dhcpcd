@@ -70,7 +70,7 @@
 #include "net.h"
 #include "signals.h"
 
-static char hwaddr_buffer[(HWADDR_LEN * 3) + 1];
+static char hwaddr_buffer[(HWADDR_LEN * 3) + 1 + 1024];
 
 int socket_afnet = -1;
 
@@ -133,7 +133,7 @@ hwaddr_ntoa(const unsigned char *hwaddr, size_t hwlen)
 	char *p = hwaddr_buffer;
 	size_t i;
 
-	for (i = 0; i < hwlen && i < HWADDR_LEN; i++) {
+	for (i = 0; i < hwlen; i++) {
 		if (i > 0)
 			*p ++= ':';
 		p += snprintf(p, 3, "%.2x", hwaddr[i]);

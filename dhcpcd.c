@@ -67,6 +67,8 @@ const char copyright[] = "Copyright (c) 2006-2012 Roy Marples";
 #include "if-options.h"
 #include "if-pref.h"
 #include "ipv4ll.h"
+#include "ipv6.h"
+#include "ipv6ns.h"
 #include "ipv6rs.h"
 #include "net.h"
 #include "platform.h"
@@ -80,7 +82,6 @@ const char copyright[] = "Copyright (c) 2006-2012 Roy Marples";
 #define RELEASE_DELAY_S		0
 #define RELEASE_DELAY_NS	10000000
 
-unsigned long long options = 0;
 int pidfd = -1;
 struct interface *ifaces = NULL;
 int ifac = 0;
@@ -95,7 +96,7 @@ static char **ifv;
 static int ifc;
 static char *cffile;
 static char *pidfile;
-static int linkfd = -1, ipv6rsfd = -1;
+static int linkfd = -1, ipv6rsfd = -1, ipv6nsfd = -1;
 
 struct dhcp_op {
 	uint8_t value;
@@ -254,15 +255,8 @@ stop_interface(struct interface *iface)
 	struct interface *ifp, *ifl = NULL;
 
 	syslog(LOG_INFO, "%s: removing interface", iface->name);
-	if (iface->ras) {
-		ipv6rs_free(iface);
-		iface->ras = NULL;
-		run_script_reason(iface, "ROUTERADVERT");
-	}
-	if (strcmp(iface->state->reason, "RELEASE") != 0)
-		drop_dhcp(iface, "STOP");
-	close_sockets(iface);
-	delete_timeout(NULL, iface);
+
+	// Remove the interface from our list
 	for (ifp = ifaces; ifp; ifp = ifp->next) {
 		if (ifp == iface)
 			break;
@@ -272,6 +266,12 @@ stop_interface(struct interface *iface)
 		ifl->next = ifp->next;
 	else
 		ifaces = ifp->next;
+
+	ipv6rs_drop(iface);
+	if (strcmp(iface->state->reason, "RELEASE") != 0)
+		drop_dhcp(iface, "STOP");
+	close_sockets(iface);
+	delete_timeout(NULL, iface);
 	free_interface(ifp);
 	if (!(options & (DHCPCD_MASTER | DHCPCD_TEST)))
 		exit(EXIT_FAILURE);
@@ -922,11 +922,7 @@ handle_carrier(int action, int flags, const char *ifname)
 			syslog(LOG_INFO, "%s: carrier lost", iface->name);
 			close_sockets(iface);
 			delete_timeouts(iface, start_expire, NULL);
-			if (iface->ras) {
-				ipv6rs_free(iface);
-				iface->ras = NULL;
-				run_script_reason(iface, "ROUTERADVERT");
-			}
+			ipv6rs_drop(iface);
 			drop_dhcp(iface, "NOCARRIER");
 		}
 	} else if (carrier == 1 && !(~iface->flags & IFF_UP)) {
@@ -1616,7 +1612,7 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 			if (argc == 1) {
 				for (ifp = ifaces; ifp; ifp = ifp->next) {
 					len++;
-					if (ifp->ras)
+					if (ipv6rs_has_ra(ifp))
 						len++;
 				}
 				len = write(fd->fd, &len, sizeof(len));
@@ -1631,7 +1627,7 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 				for (ifp = ifaces; ifp; ifp = ifp->next)
 					if (strcmp(argv[opt], ifp->name) == 0) {
 						len++;
-						if (ifp->ras)
+						if (ipv6rs_has_ra(ifp))
 							len++;
 					}
 			}
@@ -1914,7 +1910,7 @@ main(int argc, char **argv)
 			syslog(LOG_INFO, "sending signal %d to pid %d",
 			    sig, pid);
 		if (pid == 0 || kill(pid, sig) != 0) {
-			if (sig != SIGALRM)
+			if (sig != SIGALRM && errno != EPERM)
 				syslog(LOG_ERR, ""PACKAGE" not running");
 			if (pid != 0 && errno != ESRCH) {
 				syslog(LOG_ERR, "kill: %m");
@@ -2006,6 +2002,10 @@ main(int argc, char **argv)
 
 	if (options & DHCPCD_IPV6RS && !check_ipv6(NULL))
 		options &= ~DHCPCD_IPV6RS;
+	if (options & DHCPCD_IPV6RS && ipv6_open() == -1) {
+		options &= ~DHCPCD_IPV6RS;
+		syslog(LOG_ERR, "ipv6_open: %m");
+	}
 	if (options & DHCPCD_IPV6RS) {
 		ipv6rsfd = ipv6rs_open();
 		if (ipv6rsfd == -1) {
@@ -2014,6 +2014,15 @@ main(int argc, char **argv)
 		} else {
 			add_event(ipv6rsfd, ipv6rs_handledata, NULL);
 //			atexit(restore_rtadv);
+		}
+		if (options & DHCPCD_IPV6RA_OWN ||
+		    options & DHCPCD_IPV6RA_OWN_DEFAULT)
+		{
+			ipv6nsfd = ipv6ns_open();
+			if (ipv6nsfd == -1)
+				syslog(LOG_ERR, "ipv6nd: %m");
+			else
+				add_event(ipv6nsfd, ipv6ns_handledata, NULL);
 		}
 	}
 

@@ -59,6 +59,7 @@
 #include "common.h"
 #include "configure.h"
 #include "dhcp.h"
+#include "ipv6.h"
 #include "net.h"
 
 static int sock_fd;
@@ -582,4 +583,86 @@ if_route(const struct rt *rt, int action)
 		retval = -1;
 	free(nlm);
 	return retval;
+}
+
+int
+if_address6(const struct interface *ifp, const struct ipv6_addr *ap, int action)
+{
+	struct nlma *nlm;
+	int retval = 0;
+
+	nlm = xzalloc(sizeof(*nlm));
+	nlm->hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifaddrmsg));
+	nlm->hdr.nlmsg_flags = NLM_F_REQUEST;
+	if (action >= 0) {
+		nlm->hdr.nlmsg_flags |= NLM_F_CREATE | NLM_F_REPLACE;
+		nlm->hdr.nlmsg_type = RTM_NEWADDR;
+	} else
+		nlm->hdr.nlmsg_type = RTM_DELADDR;
+	nlm->ifa.ifa_index = ifp->index;
+	nlm->ifa.ifa_family = AF_INET6;
+	nlm->ifa.ifa_prefixlen = ap->prefix_len;
+	/* This creates the aliased interface */
+	add_attr_l(&nlm->hdr, sizeof(*nlm), IFA_LABEL,
+	    ifp->name, strlen(ifp->name) + 1);
+	add_attr_l(&nlm->hdr, sizeof(*nlm), IFA_LOCAL,
+	    &ap->addr.s6_addr, sizeof(ap->addr.s6_addr));
+
+	if (send_netlink(&nlm->hdr) == -1)
+		retval = -1;
+	free(nlm);
+	return retval;
+}
+
+int
+if_route6(const struct rt6 *rt, int action)
+{
+	struct nlmr *nlm;
+	int retval = 0;
+
+	nlm = xzalloc(sizeof(*nlm));
+	nlm->hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
+	nlm->hdr.nlmsg_type = RTM_NEWROUTE;
+	nlm->hdr.nlmsg_flags = NLM_F_REQUEST;
+	if (action == 0)
+		nlm->hdr.nlmsg_flags |= NLM_F_REPLACE;
+	else if (action == 1)
+		nlm->hdr.nlmsg_flags |= NLM_F_CREATE | NLM_F_EXCL;
+	else
+		nlm->hdr.nlmsg_type = RTM_DELROUTE;
+	nlm->rt.rtm_family = AF_INET6;
+	nlm->rt.rtm_table = RT_TABLE_MAIN;
+
+	if (action == -1 || action == -2)
+		nlm->rt.rtm_scope = RT_SCOPE_NOWHERE;
+	else {
+		nlm->hdr.nlmsg_flags |= NLM_F_CREATE | NLM_F_EXCL;
+		/* None interface subnet routes are static. */
+		if (IN6_IS_ADDR_UNSPECIFIED(&rt->gate)) {
+			nlm->rt.rtm_protocol = RTPROT_KERNEL;
+			nlm->rt.rtm_scope = RT_SCOPE_LINK;
+		} else
+			nlm->rt.rtm_protocol = RTPROT_BOOT;
+		nlm->rt.rtm_type = RTN_UNICAST;
+	}
+
+	nlm->rt.rtm_dst_len = ipv6_prefixlen(&rt->net);
+	add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_DST,
+	    &rt->dest.s6_addr, sizeof(rt->dest.s6_addr));
+
+	/* If destination == gateway then don't add the gateway */
+	if (!IN6_IS_ADDR_UNSPECIFIED(&rt->gate) &&
+	    !IN6_ARE_ADDR_EQUAL(&rt->dest, &rt->gate))
+		add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_GATEWAY,
+		    &rt->gate.s6_addr, sizeof(rt->gate.s6_addr));
+
+	add_attr_32(&nlm->hdr, sizeof(*nlm), RTA_OIF, rt->iface->index);
+	add_attr_32(&nlm->hdr, sizeof(*nlm), RTA_PRIORITY, rt->metric);
+
+	if (send_netlink(&nlm->hdr) == -1)
+		retval = -1;
+	free(nlm);
+	return retval;
+	errno = ENOTSUP;
+	return -1;
 }

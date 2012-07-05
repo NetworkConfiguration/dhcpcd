@@ -32,6 +32,7 @@
 #include <syslog.h>
 
 #include "common.h"
+#include "if-options.h"
 #include "platform.h"
 
 static const char *mproc = 
@@ -71,6 +72,9 @@ static const char *mproc =
 	NULL
 #endif
 	;
+
+char **restore;
+ssize_t nrestore;
 
 char *
 hardware_platform(void)
@@ -121,23 +125,73 @@ check_proc_int(const char *path)
 	return atoi(buf);
 }
 
+static ssize_t
+write_path(const char *path, const char *val)
+{
+	FILE *fp;
+	ssize_t r;
+
+	fp = fopen(path, "w");
+	if (fp == NULL)
+		return -1;
+	r = fprintf(fp, "%s\n", val);
+	fclose(fp);
+	return r;
+}
+
 static const char *prefix = "/proc/sys/net/ipv6/conf";
+
+static void
+restore_kernel_ra(void)
+{
+	char path[256];
+
+	for (nrestore--; nrestore >= 0; nrestore--) {
+		syslog(LOG_INFO, "%s: restoring Kernel IPv6 RA support",
+		       restore[nrestore]);
+		snprintf(path, sizeof(path), "%s/%s/accept_ra",
+			 prefix, restore[nrestore]);
+		if (write_path(path, "1") == -1)
+			syslog(LOG_ERR, "write_path: %s: %m", path);
+#ifdef DEBUG_MEMORY
+		free(restore[nrestore]);
+#endif
+	}
+#ifdef DEBUG_MEMORY
+	free(restore);
+#endif
+}
 
 int
 check_ipv6(const char *ifname)
 {
-	int r;
+	int r, ex;
 	char path[256];
 
-	if (ifname == NULL)
+	if (ifname == NULL) {
 		ifname = "all";
+		ex = 1;
+	} else
+		ex = 0;
 
 	snprintf(path, sizeof(path), "%s/%s/accept_ra", prefix, ifname);
 	r = check_proc_int(path);
-	if (r != 1 && r != 2) {
-		syslog(LOG_WARNING,
-		    "%s: not configured to accept IPv6 RAs", ifname);
-		return 0;
+	if (r == 0)
+		options |= DHCPCD_IPV6RA_OWN;
+	else if (options & DHCPCD_IPV6RA_OWN) {
+		syslog(LOG_INFO, "disabling Kernel IPv6 RA support");
+		if (write_path(path, "0") == -1) {
+			syslog(LOG_ERR, "write_path: %s: %m", path);
+			return 0;
+		}
+		restore = realloc(restore, (nrestore + 1) * sizeof(char *));
+		if (restore == NULL) {
+			syslog(LOG_ERR, "realloc: %m");
+			exit(EXIT_FAILURE);
+		}
+		restore[nrestore++] = xstrdup(ifname);
+		if (ex)
+			atexit(restore_kernel_ra);
 	}
 
 	if (r != 2) {
