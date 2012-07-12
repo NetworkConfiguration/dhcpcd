@@ -146,7 +146,15 @@ restore_kernel_ra(void)
 {
 	char path[256];
 
+#ifndef DEBUG_MEMORY
+	if (options & DHCPCD_FORKED)
+		return;
+#endif
+
 	for (nrestore--; nrestore >= 0; nrestore--) {
+#ifdef DEBUG_MEMORY
+		if (!(options & DHCPCD_FORKED)) {
+#endif
 		syslog(LOG_INFO, "%s: restoring Kernel IPv6 RA support",
 		       restore[nrestore]);
 		snprintf(path, sizeof(path), "%s/%s/accept_ra",
@@ -154,6 +162,7 @@ restore_kernel_ra(void)
 		if (write_path(path, "1") == -1)
 			syslog(LOG_ERR, "write_path: %s: %m", path);
 #ifdef DEBUG_MEMORY
+		}
 		free(restore[nrestore]);
 #endif
 	}
@@ -179,7 +188,8 @@ check_ipv6(const char *ifname)
 	if (r == 0)
 		options |= DHCPCD_IPV6RA_OWN;
 	else if (options & DHCPCD_IPV6RA_OWN) {
-		syslog(LOG_INFO, "disabling Kernel IPv6 RA support");
+		syslog(LOG_INFO, "%s: disabling Kernel IPv6 RA support",
+		    ifname);
 		if (write_path(path, "0") == -1) {
 			syslog(LOG_ERR, "write_path: %s: %m", path);
 			return 0;

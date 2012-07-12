@@ -263,14 +263,14 @@ ipv6rs_free_opts(struct ra *rap)
 }
 
 static void
-ipv6rs_drop_addrs(struct ra *rap)
+ipv6rs_freedrop_addrs(struct ra *rap, int drop)
 {
 	struct ipv6_addr *ap;
 
 	while ((ap = TAILQ_FIRST(&rap->addrs))) {
 		TAILQ_REMOVE(&rap->addrs, ap, next);
-		if ((options & DHCPCD_IPV6RA_OWN)) {
-		syslog(LOG_INFO, "%s: deleting address %s",
+		if (drop && (options & DHCPCD_IPV6RA_OWN)) {
+			syslog(LOG_INFO, "%s: deleting address %s",
 			    rap->iface->name, ap->saddr);
 			if (del_address6(rap->iface, ap) == -1)
 				syslog(LOG_ERR, "del_address6 %m");
@@ -279,13 +279,13 @@ ipv6rs_drop_addrs(struct ra *rap)
 	}
 }
 
-void ipv6rs_drop_ra(struct ra *rap)
+void ipv6rs_freedrop_ra(struct ra *rap, int drop)
 {
 
 	delete_timeout(NULL, rap->iface);
 	delete_timeout(NULL, rap);
 	TAILQ_REMOVE(&ipv6_routers, rap, next);
-	ipv6rs_drop_addrs(rap);
+	ipv6rs_freedrop_addrs(rap, drop);
 	ipv6rs_free_opts(rap);
 	free(rap->data);
 	free(rap->ns);
@@ -303,7 +303,7 @@ ipv6rs_free(struct interface *ifp)
 	n = 0;
 	TAILQ_FOREACH_SAFE(rap, &ipv6_routers, next, ran) {
 		if (rap->iface == ifp) {
-			ipv6rs_drop_ra(rap);
+			ipv6rs_free_ra(rap);
 			n++;
 		}
 	}

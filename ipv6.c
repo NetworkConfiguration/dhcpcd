@@ -54,7 +54,12 @@ static struct rt6head *routes;
 static void
 ipv6_cleanup()
 {
+	struct rt6 *rt;
 
+	while ((rt = TAILQ_FIRST(routes))) {
+		TAILQ_REMOVE(routes, rt, next);
+		free(rt);
+	}
 	free(routes);
 }
 #endif

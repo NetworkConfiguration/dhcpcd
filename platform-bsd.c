@@ -80,6 +80,8 @@ static void
 restore_kernel_ra(void)
 {
 
+	if (!(options & DHCPCD_FORKED))
+		return;
 	syslog(LOG_INFO, "restoring Kernel IPv6 RA support");
 	if (set_inet6_sysctl(IPV6CTL_ACCEPT_RTADV, 1) == -1)
 		syslog(LOG_ERR, "IPV6CTL_ACCEPT_RTADV: %m");
