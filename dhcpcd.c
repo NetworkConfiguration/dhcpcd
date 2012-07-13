@@ -785,6 +785,12 @@ configure_interface1(struct interface *iface)
 	if (ifo->metric != -1)
 		iface->metric = ifo->metric;
 
+	/* We want to disable kernel interface RA as early as possible. */
+	if (options & DHCPCD_IPV6RS && ifo->options & DHCPCD_IPV6RS) {
+		if (check_ipv6(iface->name) != 1)
+			ifo->options &= ~DHCPCD_IPV6RS;
+	}
+
 	/* If we haven't specified a ClientID and our hardware address
 	 * length is greater than DHCP_CHADDR_LEN then we enforce a ClientID
 	 * of the hardware address family and the hardware address. */
@@ -1167,12 +1173,8 @@ start_interface(void *arg)
 	free(iface->state->offer);
 	iface->state->offer = NULL;
 
-	if (options & DHCPCD_IPV6RS && ifo->options & DHCPCD_IPV6RS) {
-		if (check_ipv6(iface->name) == 1)
-			ipv6rs_start(iface);
-		else
-			ifo->options &= ~DHCPCD_IPV6RS;
-	}
+	if (options & DHCPCD_IPV6RS && ifo->options & DHCPCD_IPV6RS)
+		ipv6rs_start(iface);
 
 	if (iface->state->arping_index < ifo->arping_len) {
 		start_arping(iface);

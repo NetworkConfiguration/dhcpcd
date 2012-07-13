@@ -174,7 +174,7 @@ restore_kernel_ra(void)
 int
 check_ipv6(const char *ifname)
 {
-	int r, ex;
+	int r, ex, i;
 	char path[256];
 
 	if (ifname == NULL) {
@@ -194,12 +194,18 @@ check_ipv6(const char *ifname)
 			syslog(LOG_ERR, "write_path: %s: %m", path);
 			return 0;
 		}
-		restore = realloc(restore, (nrestore + 1) * sizeof(char *));
-		if (restore == NULL) {
-			syslog(LOG_ERR, "realloc: %m");
-			exit(EXIT_FAILURE);
+		for (i = 0; i < nrestore; i++)
+			if (strcmp(restore[i], ifname) == 0)
+				break;
+		if (i == nrestore) {
+			restore = realloc(restore,
+			    (nrestore + 1) * sizeof(char *));
+			if (restore == NULL) {
+				syslog(LOG_ERR, "realloc: %m");
+				exit(EXIT_FAILURE);
+			}
+			restore[nrestore++] = xstrdup(ifname);
 		}
-		restore[nrestore++] = xstrdup(ifname);
 		if (ex)
 			atexit(restore_kernel_ra);
 	}
