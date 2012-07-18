@@ -537,8 +537,8 @@ ipv6rs_handledata(_unused void *arg)
 				cbp = inet_ntop(AF_INET6, ap->addr.s6_addr,
 				    ntopbuf, INET6_ADDRSTRLEN);
 				if (cbp)
-					memcpy(ap->saddr, cbp,
-					    sizeof(ap->saddr));
+					snprintf(ap->saddr, sizeof(ap->saddr),
+					    "%s/%d", cbp, ap->prefix_len);
 				else
 					ap->saddr[0] = '\0';
 				TAILQ_INSERT_TAIL(&rap->addrs, ap, next);
@@ -553,6 +553,15 @@ ipv6rs_handledata(_unused void *arg)
 			    ntohl(pi->nd_opt_pi_valid_time);
 			ap->prefix_pltime =
 			    ntohl(pi->nd_opt_pi_preferred_time);
+			if (opt) {
+				l = strlen(opt);
+				opt = xrealloc(opt,
+					l + strlen(ap->saddr) + 2);
+				opt[l] = ' ';
+				strcpy(opt + l + 1, ap->saddr);
+			} else
+				opt = xstrdup(ap->saddr);
+			lifetime = ap->prefix_vltime;
 			break;
 
 		case ND_OPT_MTU:
@@ -653,7 +662,7 @@ ipv6rs_handledata(_unused void *arg)
 
 	if (new_rap)
 		add_router(rap);
-	if (options & DHCPCD_IPV6RA_OWN) {
+	if (options & DHCPCD_IPV6RA_OWN && !(options & DHCPCD_TEST)) {
 		TAILQ_FOREACH(ap, &rap->addrs, next) {
 			syslog(ap->new ? LOG_INFO : LOG_DEBUG,
 			    "%s: adding address %s",
@@ -669,7 +678,8 @@ ipv6rs_handledata(_unused void *arg)
 				    ap->prefix_pltime);
 		}
 	}
-	ipv6_build_routes();
+	if (!(options & DHCPCD_TEST))
+		ipv6_build_routes();
 	run_script_reason(ifp, options & DHCPCD_TEST ? "TEST" : "ROUTERADVERT");
 	if (options & DHCPCD_TEST)
 		exit(EXIT_SUCCESS);
@@ -723,7 +733,7 @@ ipv6rs_env(char **env, const char *prefix, const struct interface *ifp)
 	char buffer[32];
 	const char *optn;
 
-	i = 1;
+	i = 0;
 	l = 0;
 	get_monotonic(&now);
 	TAILQ_FOREACH(rap, &ipv6_routers, next) {
@@ -743,7 +753,6 @@ ipv6rs_env(char **env, const char *prefix, const struct interface *ifp)
 			if (env == NULL) {
 				switch (rao->type) {
 				case ND_OPT_PREFIX_INFORMATION:
-					l += 4;
 					break;
 				default:
 					l++;
@@ -769,35 +778,11 @@ ipv6rs_env(char **env, const char *prefix, const struct interface *ifp)
 			snprintf(buffer, sizeof(buffer), "ra%d_%s", i, optn);
 			setvar(&env, prefix, buffer, rao->option);
 			l++;
-#if 0
-			switch (rao->type) {
-			case ND_OPT_PREFIX_INFORMATION:
-				snprintf(buffer, sizeof(buffer),
-				    "ra%d_prefix_len", i);
-				snprintf(buffer2, sizeof(buffer2),
-				    "%d", rap->prefix_len);
-				setvar(&env, prefix, buffer, buffer2);
-
-				snprintf(buffer, sizeof(buffer),
-				    "ra%d_prefix_vltime", i);
-				snprintf(buffer2, sizeof(buffer2),
-				    "%d", rap->prefix_vltime);
-				setvar(&env, prefix, buffer, buffer2);
-
-				snprintf(buffer, sizeof(buffer),
-				    "ra%d_prefix_pltime", i);
-				snprintf(buffer2, sizeof(buffer2),
-				    "%d", rap->prefix_pltime);
-				setvar(&env, prefix, buffer, buffer2);
-				l += 3;
-				break;
-			}
-#endif		
 		}
 	}
 
 	if (env)
-		setvard(&env, prefix, "ra_count", i - 1);
+		setvard(&env, prefix, "ra_count", i);
 	l++;
 	return l;
 }
