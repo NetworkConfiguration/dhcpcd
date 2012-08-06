@@ -614,10 +614,32 @@ if_address6(const struct interface *ifp, const struct ipv6_addr *ap, int action)
 	return retval;
 }
 
+static int
+rta_add_attr_32(struct rtattr *rta, unsigned int maxlen,
+    int type, uint32_t data)
+{
+	unsigned int len = RTA_LENGTH(sizeof(data));
+	struct rtattr *subrta;
+
+	if (RTA_ALIGN(rta->rta_len) + len > maxlen) {
+		errno = ENOBUFS;
+		return -1;
+	}
+
+	subrta = (struct rtattr*)(((char*)rta) + RTA_ALIGN(rta->rta_len));
+	subrta->rta_type = type;
+	subrta->rta_len = len;
+	memcpy(RTA_DATA(subrta), &data, sizeof(data));
+	rta->rta_len = NLMSG_ALIGN(rta->rta_len) + len;
+	return 0;
+}
+
 int
 if_route6(const struct rt6 *rt, int action)
 {
 	struct nlmr *nlm;
+	char metricsbuf[32];
+	struct rtattr *metrics = (void *)metricsbuf;
 	int retval = 0;
 
 	nlm = xzalloc(sizeof(*nlm));
@@ -658,6 +680,14 @@ if_route6(const struct rt6 *rt, int action)
 
 	add_attr_32(&nlm->hdr, sizeof(*nlm), RTA_OIF, rt->iface->index);
 	add_attr_32(&nlm->hdr, sizeof(*nlm), RTA_PRIORITY, rt->metric);
+
+	if (rt->mtu) {
+		metrics->rta_type = RTA_METRICS;
+		metrics->rta_len = RTA_LENGTH(0);
+		rta_add_attr_32(metrics, sizeof(metricsbuf), RTAX_MTU, rt->mtu);
+		add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_METRICS,
+		    RTA_DATA(metrics), RTA_PAYLOAD(metrics));
+	}
 
 	if (send_netlink(&nlm->hdr) == -1)
 		retval = -1;
