@@ -326,7 +326,11 @@ send_message(struct interface *iface, int type,
 	}
 
 	/* Ensure sockets are open. */
-	open_sockets(iface);
+	if (open_sockets(iface) == -1) {
+		if (!(options & DHCPCD_TEST))
+			drop_dhcp(iface, "FAIL");
+		return;
+	}
 
 	/* If we couldn't open a UDP port for our IP address
 	 * then we cannot renew.
@@ -1710,11 +1714,13 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 	return 0;
 }
 
-void
+int
 open_sockets(struct interface *iface)
 {
+	int r = 0;
+
 	if (iface->raw_fd == -1) {
-		if (open_socket(iface, ETHERTYPE_IP) == -1)
+		if ((r = open_socket(iface, ETHERTYPE_IP)) == -1)
 			syslog(LOG_ERR, "%s: open_socket: %m", iface->name);
 		else
 			add_event(iface->raw_fd, handle_dhcp_packet, iface);
@@ -1725,9 +1731,12 @@ open_sockets(struct interface *iface)
 	    (iface->state->new->cookie == htonl(MAGIC_COOKIE) ||
 	    iface->state->options->options & DHCPCD_INFORM))
 	{
-		if (open_udp_socket(iface) == -1 && errno != EADDRINUSE)
+		if (open_udp_socket(iface) == -1 && errno != EADDRINUSE) {
 			syslog(LOG_ERR, "%s: open_udp_socket: %m", iface->name);
+			r = -1;
+		}
 	}
+	return r;
 }
 
 void
