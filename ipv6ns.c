@@ -60,7 +60,7 @@
 //#define DEBUG_NS
 
 static int sock;
-static struct sockaddr_in6 allrouters, from;
+static struct sockaddr_in6 from;
 static struct msghdr sndhdr;
 static struct iovec sndiov[2];
 static unsigned char *sndbuf;
@@ -87,13 +87,6 @@ ipv6ns_open(void)
 	int len;
 	struct icmp6_filter filt;
 
-	memset(&allrouters, 0, sizeof(allrouters));
-	allrouters.sin6_family = AF_INET6;
-#ifdef SIN6_LEN
-	allrouters.sin6_len = sizeof(allrouters);
-#endif
-	if (inet_pton(AF_INET6, ALLROUTERS, &allrouters.sin6_addr.s6_addr) != 1)
-		return -1;
 	sock = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
 	if (sock == -1)
 		return -1;
@@ -180,8 +173,13 @@ ipv6ns_sendprobe(void *arg)
 			return;
 	}
 
-	dst = allrouters;
-	//dst.sin6_scope_id = ifp->linkid;
+	memset(&dst, 0, sizeof(dst));
+	dst.sin6_family = AF_INET6;
+#ifdef SIN6_LEN
+	dst.sin6_len = sizeof(dst);
+#endif
+	memcpy(&dst.sin6_addr, &rap->from, sizeof(dst.sin6_addr));
+	//dst.sin6_scope_id = rap->iface->index;
 
 	sndhdr.msg_name = (caddr_t)&dst;
 	sndhdr.msg_iov[0].iov_base = rap->ns;
