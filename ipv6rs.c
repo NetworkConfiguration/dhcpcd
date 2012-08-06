@@ -447,6 +447,9 @@ ipv6rs_handledata(_unused void *arg)
 		if (rap) {
 			free(rap->data);
 			rap->data_len = 0;
+			free(rap->ns);
+			rap->ns = NULL;
+			rap->nslen = 0;
 		}
 		syslog(LOG_INFO, "%s: Router Advertisement from %s",
 		    ifp->name, sfrom);
@@ -473,6 +476,13 @@ ipv6rs_handledata(_unused void *arg)
 	nd_ra = (struct nd_router_advert *)icp;
 	rap->flags = nd_ra->nd_ra_flags_reserved;
 	rap->lifetime = ntohs(nd_ra->nd_ra_router_lifetime);
+	if (nd_ra->nd_ra_reachable) {
+		rap->reachable = ntohl(nd_ra->nd_ra_reachable);
+		if (rap->reachable > MAX_REACHABLE_TIME)
+			rap->reachable = 0;
+	}
+	if (nd_ra->nd_ra_retransmit)
+		rap->retrans = ntohl(nd_ra->nd_ra_retransmit);
 	rap->expired = 0;
 
 	len -= sizeof(struct nd_router_advert);
@@ -706,8 +716,7 @@ ipv6rs_handledata(_unused void *arg)
 	    options & DHCPCD_IPV6RA_OWN_DEFAULT)
 	{
 		rap->nsprobes = 0;
-		add_timeout_sec(REACHABLE_TIME, ipv6ns_unreachable, rap);
-		add_timeout_sec(DELAY_FIRST_PROBE_TIME, ipv6ns_sendprobe, rap);
+		ipv6ns_sendprobe(rap);
 	}
 }
 

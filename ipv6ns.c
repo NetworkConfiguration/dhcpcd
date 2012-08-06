@@ -158,6 +158,20 @@ ipv6ns_makeprobe(struct ra *rap)
 	return 0;
 }
 
+static void
+ipv6ns_unreachable(void *arg)
+{
+	struct ra *rap = arg;
+
+	/* We could add an unreachable flag and persist the information,
+	 * but that is more effort than it's probably worth. */
+	syslog(LOG_WARNING, "%s: %s is unreachable, expiring it",
+	    rap->iface->name, rap->sfrom);
+	rap->expired = 1;
+	ipv6_build_routes();
+	run_script_reason(rap->iface, "ROUTERADVERT"); /* XXX not RA */
+}
+
 void
 ipv6ns_sendprobe(void *arg)
 {
@@ -168,7 +182,7 @@ ipv6ns_sendprobe(void *arg)
 	int hoplimit = HOPLIMIT;
 	struct timeval tv, rtv;
 
-	if (!rap->nsprobes) {
+	if (!rap->ns) {
 		if (ipv6ns_makeprobe(rap) == -1)
 			return;
 	}
@@ -208,26 +222,18 @@ ipv6ns_sendprobe(void *arg)
 	if (sendmsg(sock, &sndhdr, 0) == -1)
 		syslog(LOG_ERR, "%s: sendmsg: %m", rap->iface->name);
 
-	tv.tv_sec = RETRANS_TIMER;
-	tv.tv_usec = MIN_RANDOM_FACTOR;
+
+	ms_to_tv(&tv, rap->retrans ? rap->retrans : RETRANS_TIMER);
+	ms_to_tv(&rtv, MIN_RANDOM_FACTOR);
+	timeradd(&tv, &rtv, &tv);
 	rtv.tv_sec = 0;
 	rtv.tv_usec = arc4random() % (MAX_RANDOM_FACTOR - MIN_RANDOM_FACTOR);
 	timeradd(&tv, &rtv, &tv);
 	add_timeout_tv(&tv, ipv6ns_sendprobe, rap);
-}
 
-void
-ipv6ns_unreachable(void *arg)
-{
-	struct ra *rap = arg;
-
-	/* We could add an unreachable flag and persist the information,
-	 * but that is more effort than it's probably worth. */
-	syslog(LOG_WARNING, "%s: %s is unreachable, expiring it",
-	    rap->iface->name, rap->sfrom);
-	rap->expired = 1;
-	ipv6_build_routes();
-	run_script_reason(rap->iface, "ROUTERADVERT"); /* XXX not RA */
+	if (rap->nsprobes++ == 0)
+		add_timeout_sec(DELAY_FIRST_PROBE_TIME,
+		    ipv6ns_unreachable, rap);
 }
 
 /* ARGSUSED */
@@ -244,6 +250,7 @@ ipv6ns_handledata(_unused void *arg)
 	struct nd_neighbor_advert *nd_na;
 	struct ra *rap;
 	int is_router, is_solicited;
+	struct timeval tv;
 
 	len = recvmsg(sock, &rcvhdr, 0);
 	if (len == -1) {
@@ -340,8 +347,14 @@ ipv6ns_handledata(_unused void *arg)
 	}
 
 	if (is_solicited) {
-		rap->nsprobes = 1;
-		add_timeout_sec(REACHABLE_TIME, ipv6ns_unreachable, rap);
-		add_timeout_sec(DELAY_FIRST_PROBE_TIME, ipv6ns_sendprobe, rap);
+		rap->nsprobes = 0;
+		if (rap->reachable) {
+			ms_to_tv(&tv, rap->reachable);
+		} else {
+			tv.tv_sec = REACHABLE_TIME;
+			tv.tv_usec = 0;
+		}
+		add_timeout_tv(&tv, ipv6ns_sendprobe, rap);
+		delete_timeout(ipv6ns_unreachable, rap);
 	}
 }
