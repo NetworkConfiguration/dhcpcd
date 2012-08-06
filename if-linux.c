@@ -589,6 +589,7 @@ int
 if_address6(const struct interface *ifp, const struct ipv6_addr *ap, int action)
 {
 	struct nlma *nlm;
+	struct ifa_cacheinfo cinfo;
 	int retval = 0;
 
 	nlm = xzalloc(sizeof(*nlm));
@@ -607,6 +608,14 @@ if_address6(const struct interface *ifp, const struct ipv6_addr *ap, int action)
 	    ifp->name, strlen(ifp->name) + 1);
 	add_attr_l(&nlm->hdr, sizeof(*nlm), IFA_LOCAL,
 	    &ap->addr.s6_addr, sizeof(ap->addr.s6_addr));
+
+	if (action >= 0) {
+		memset(&cinfo, 0, sizeof(cinfo));
+		cinfo.ifa_prefered = ap->prefix_pltime;
+		cinfo.ifa_valid = ap->prefix_vltime;
+		add_attr_l(&nlm->hdr, sizeof(*nlm), IFA_CACHEINFO,
+		    &cinfo, sizeof(cinfo));
+	}
 
 	if (send_netlink(&nlm->hdr) == -1)
 		retval = -1;
