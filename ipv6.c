@@ -367,12 +367,13 @@ ipv6_build_routes(void)
 	TAILQ_FOREACH(rap, &ipv6_routers, next) {
 		if (rap->expired)
 			continue;
-		if (options & DHCPCD_IPV6RA_OWN)
+		if (options & DHCPCD_IPV6RA_OWN) {
 			TAILQ_FOREACH(addr, &rap->addrs, next) {
 				rt = make_prefix(rap, addr);
 				if (rt)
 					TAILQ_INSERT_TAIL(&dnr, rt, next);
 			}
+		}
 		rt = make_router(rap);
 		if (rt)
 			TAILQ_INSERT_TAIL(&dnr, rt, next);
