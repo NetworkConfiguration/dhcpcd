@@ -163,7 +163,7 @@ printf("usage: "PACKAGE"\t[-ABbDdEGgHJKkLnpqTVw]\n"
 	"\t\t[-z, --allowinterfaces pattern] [interface] [...]\n"
 	"       "PACKAGE"\t-k, --release [interface]\n"
 	"       "PACKAGE"\t-U, --dumplease interface\n"
-	"       "PACKAGE"\t-v, --version\n"
+	"       "PACKAGE"\t--version\n"
 	"       "PACKAGE"\t-x, --exit [interface]\n");
 }
 
