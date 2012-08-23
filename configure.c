@@ -695,8 +695,10 @@ build_routes(void)
 		dnr = get_routes(ifp);
 		dnr = massage_host_routes(dnr, ifp);
 		dnr = add_subnet_route(dnr, ifp);
-		dnr = add_router_host_route(dnr, ifp);
-		dnr = add_destination_route(dnr, ifp);
+		if (ifp->state->options->options & DHCPCD_GATEWAY) {
+			dnr = add_router_host_route(dnr, ifp);
+			dnr = add_destination_route(dnr, ifp);
+		}
 		for (rt = dnr; rt && (rtn = rt->next, 1); lrt = rt, rt = rtn) {
 			rt->iface = ifp;
 			rt->metric = ifp->metric;
