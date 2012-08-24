@@ -153,6 +153,8 @@ get_netlink(int fd, int flags,
 	char *buf = NULL, *nbuf;
 	ssize_t buflen = 0, bytes;
 	struct nlmsghdr *nlm;
+	struct sockaddr_nl nladdr;
+	socklen_t nladdr_len = sizeof(nladdr);
 	int r = -1;
 
 	for (;;) {
@@ -181,7 +183,8 @@ get_netlink(int fd, int flags,
 				goto eexit;
 			buf = nbuf;
 		}
-		bytes = recv(fd, buf, buflen, flags);
+		bytes = recvfrom(fd, buf, buflen, flags,
+		    (struct sockaddr *)&nladdr, &nladdr_len);
 		if (bytes == -1) {
 			if (errno == EAGAIN) {
 				r = 0;
@@ -191,6 +194,16 @@ get_netlink(int fd, int flags,
 				continue;
 			goto eexit;
 		}
+
+		/* Check sender */
+		if (nladdr_len != sizeof(nladdr)) {
+			errno = EINVAL;
+			goto eexit;
+		}
+		/* Ignore message if it is not from kernel */
+		if (nladdr.nl_pid != 0)
+			continue;
+
 		for (nlm = (struct nlmsghdr *)(void *)buf;
 		     NLMSG_OK(nlm, (size_t)bytes);
 		     nlm = NLMSG_NEXT(nlm, bytes))
