@@ -759,15 +759,9 @@ ipv6rs_env(char **env, const char *prefix, const struct interface *ifp)
 		TAILQ_FOREACH(rao, &rap->options, next) {
 			if (rao->option == NULL)
 				continue;
-			if (env == NULL) {
-				switch (rao->type) {
-				case ND_OPT_PREFIX_INFORMATION:
-					break;
-				default:
-					l++;
-				}
+			l++;
+			if (env == NULL)
 				continue;
-			}
 			switch (rao->type) {
 			case ND_OPT_PREFIX_INFORMATION:
 				optn = "prefix";
@@ -786,7 +780,6 @@ ipv6rs_env(char **env, const char *prefix, const struct interface *ifp)
 			}
 			snprintf(buffer, sizeof(buffer), "ra%d_%s", i, optn);
 			setvar(&env, prefix, buffer, rao->option);
-			l++;
 		}
 	}
 
