@@ -186,20 +186,22 @@ ipv6rs_open(void)
 static int
 ipv6rs_makeprobe(struct interface *ifp)
 {
+	struct rs_state *state;
 	struct nd_router_solicit *rs;
 	struct nd_opt_hdr *nd;
 
-	free(ifp->rs);
-	ifp->rslen = sizeof(*rs) + ROUNDUP8(ifp->hwlen + 2);
-	ifp->rs = xzalloc(ifp->rslen);
-	if (ifp->rs == NULL)
+	state = RS_STATE(ifp);
+	free(state->rs);
+	state->rslen = sizeof(*rs) + ROUNDUP8(ifp->hwlen + 2);
+	state->rs = xzalloc(state->rslen);
+	if (state->rs == NULL)
 		return -1;
-	rs = (struct nd_router_solicit *)(void *)ifp->rs;
+	rs = (struct nd_router_solicit *)(void *)state->rs;
 	rs->nd_rs_type = ND_ROUTER_SOLICIT;
 	rs->nd_rs_code = 0;
 	rs->nd_rs_cksum = 0;
 	rs->nd_rs_reserved = 0;
-	nd = (struct nd_opt_hdr *)(ifp->rs + sizeof(*rs));
+	nd = (struct nd_opt_hdr *)(state->rs + sizeof(*rs));
 	nd->nd_opt_type = ND_OPT_SOURCE_LINKADDR;
 	nd->nd_opt_len = (ROUNDUP8(ifp->hwlen + 2)) >> 3;
 	memcpy(nd + 1, ifp->hwaddr, ifp->hwlen);
@@ -210,6 +212,7 @@ static void
 ipv6rs_sendprobe(void *arg)
 {
 	struct interface *ifp = arg;
+	struct rs_state *state;
 	struct sockaddr_in6 dst;
 	struct cmsghdr *cm;
 	struct in6_pktinfo pi;
@@ -218,10 +221,10 @@ ipv6rs_sendprobe(void *arg)
 	dst = allrouters;
 	//dst.sin6_scope_id = ifp->linkid;
 
-	ipv6rs_makeprobe(ifp);
+	state = RS_STATE(ifp);
 	sndhdr.msg_name = (caddr_t)&dst;
-	sndhdr.msg_iov[0].iov_base = ifp->rs;
-	sndhdr.msg_iov[0].iov_len = ifp->rslen;
+	sndhdr.msg_iov[0].iov_base = state->rs;
+	sndhdr.msg_iov[0].iov_len = state->rslen;
 
 	/* Set the outbound interface */
 	cm = CMSG_FIRSTHDR(&sndhdr);
@@ -243,7 +246,7 @@ ipv6rs_sendprobe(void *arg)
 	if (sendmsg(sock, &sndhdr, 0) == -1)
 		syslog(LOG_ERR, "%s: sendmsg: %m", ifp->name);
 
-	if (ifp->rsprobes++ < MAX_RTR_SOLICITATIONS)
+	if (state->rsprobes++ < MAX_RTR_SOLICITATIONS)
 		add_timeout_sec(RTR_SOLICITATION_INTERVAL,
 		    ipv6rs_sendprobe, ifp);
 	else
@@ -295,11 +298,16 @@ void ipv6rs_freedrop_ra(struct ra *rap, int drop)
 ssize_t
 ipv6rs_free(struct interface *ifp)
 {
+	struct rs_state *state;
 	struct ra *rap, *ran;
 	ssize_t n;
 
-	free(ifp->rs);
-	ifp->rs = NULL;
+	state = RS_STATE(ifp);
+	if (state) {
+		free(state->rs);
+		free(state);
+		ifp->if_data[IF_DATA_IPV6RS] = NULL;
+	}
 	n = 0;
 	TAILQ_FOREACH_SAFE(rap, &ipv6_routers, next, ran) {
 		if (rap->iface == ifp) {
@@ -313,6 +321,7 @@ ipv6rs_free(struct interface *ifp)
 static int
 rtpref(struct ra *rap)
 {
+
 	switch (rap->flags & ND_RA_FLAG_RTPREF_MASK) {
 	case ND_RA_FLAG_RTPREF_HIGH:
 		return (RTPREF_HIGH);
@@ -849,16 +858,23 @@ ipv6rs_expire(void *arg)
 int
 ipv6rs_start(struct interface *ifp)
 {
+	struct rs_state *state;
 
 	delete_timeout(NULL, ifp);
+
+	state = RS_STATE(ifp);
+	if (state == NULL) {
+		ifp->if_data[IF_DATA_IPV6RS] = xzalloc(sizeof(*state));
+		state = RS_STATE(ifp);
+	}
 
 	/* Always make a new probe as the underlying hardware
 	 * address could have changed. */
 	ipv6rs_makeprobe(ifp);
-	if (ifp->rs == NULL)
+	if (state->rs == NULL)
 		return -1;
 
-	ifp->rsprobes = 0;
+	state->rsprobes = 0;
 	ipv6rs_sendprobe(ifp);
 	return 0;
 }
