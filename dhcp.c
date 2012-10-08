@@ -951,7 +951,7 @@ make_message(struct dhcp_message **message,
 		else
 			dhcp->secs = htons(up);
 	}
-	dhcp->xid = iface->state->xid;
+	dhcp->xid = htonl(iface->state->xid);
 	dhcp->cookie = htonl(MAGIC_COOKIE);
 
 	*p++ = DHO_MESSAGETYPE; 

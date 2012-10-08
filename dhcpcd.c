@@ -718,10 +718,10 @@ handle_dhcp_packet(void *arg)
 			continue;
 		}
 		/* Ensure it's the right transaction */
-		if (iface->state->xid != dhcp->xid) {
+		if (iface->state->xid != ntohl(dhcp->xid)) {
 			syslog(LOG_DEBUG,
 			    "%s: wrong xid 0x%x (expecting 0x%x) from %s",
-			    iface->name, dhcp->xid, iface->state->xid,
+			    iface->name, ntohl(dhcp->xid), iface->state->xid,
 			    inet_ntoa(from));
 			continue;
 		}
@@ -730,7 +730,7 @@ handle_dhcp_packet(void *arg)
 		    memcmp(dhcp->chaddr, iface->hwaddr, iface->hwlen))
 		{
 			syslog(LOG_DEBUG, "%s: xid 0x%x is not for hwaddr %s",
-			    iface->name, dhcp->xid,
+			    iface->name, ntohl(dhcp->xid),
 			    hwaddr_ntoa(dhcp->chaddr, sizeof(dhcp->chaddr)));
 			continue;
 		}
