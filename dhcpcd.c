@@ -33,6 +33,7 @@ const char copyright[] = "Copyright (c) 2006-2012 Roy Marples";
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/uio.h>
+#include <sys/utsname.h>
 
 #include <arpa/inet.h>
 #include <net/route.h>
@@ -82,6 +83,7 @@ const char copyright[] = "Copyright (c) 2006-2012 Roy Marples";
 #define RELEASE_DELAY_S		0
 #define RELEASE_DELAY_NS	10000000
 
+char vendor[VENDORCLASSID_MAX_LEN];
 int pidfd = -1;
 struct interface *ifaces = NULL;
 int ifac = 0;
@@ -1773,6 +1775,8 @@ main(int argc, char **argv)
 	size_t len;
 	pid_t pid;
 	struct timespec ts;
+	struct utsname utn;
+	const char *platform;
 
 	closefrom(3);
 	openlog(PACKAGE, LOG_PERROR | LOG_PID, LOG_DAEMON);
@@ -1788,6 +1792,16 @@ main(int argc, char **argv)
 			exit(EXIT_SUCCESS);
 		}
 	}
+
+	platform = hardware_platform();
+	if (uname(&utn) == 0)
+		snprintf(vendor, VENDORCLASSID_MAX_LEN,
+		    "%s-%s:%s-%s:%s%s%s", PACKAGE, VERSION,
+		    utn.sysname, utn.release, utn.machine,
+		    platform ? ":" : "", platform ? platform : "");
+	else
+		snprintf(vendor, VENDORCLASSID_MAX_LEN,
+		    "%s-%s", PACKAGE, VERSION);
 
 	i = 0;
 	while ((opt = getopt_long(argc, argv, IF_OPTS, cf_options, &oi)) != -1)

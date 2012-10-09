@@ -119,6 +119,7 @@ struct interface {
 	struct interface *next;
 };
 
+extern char vendor[VENDORCLASSID_MAX_LEN];
 extern int pidfd;
 extern int ifac;
 extern char **ifav;

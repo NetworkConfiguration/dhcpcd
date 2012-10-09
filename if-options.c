@@ -26,7 +26,6 @@
  */
 
 #include <sys/types.h>
-#include <sys/utsname.h>
 
 #include <arpa/inet.h>
 
@@ -804,9 +803,8 @@ read_config(const char *file,
 {
 	struct if_options *ifo;
 	FILE *f;
-	char *line, *option, *p, *platform;
+	char *line, *option, *p;
 	int skip = 0, have_profile = 0;
-	struct utsname utn;
 
 	/* Seed our default options */
 	ifo = xzalloc(sizeof(*ifo));
@@ -824,16 +822,8 @@ read_config(const char *file,
 	    strcmp(ifo->hostname, "localhost") == 0)
 		ifo->hostname[0] = '\0';
 
-	platform = hardware_platform();
-	if (uname(&utn) == 0)
-		ifo->vendorclassid[0] = snprintf((char *)ifo->vendorclassid + 1,
-		    VENDORCLASSID_MAX_LEN,
-	            "%s-%s:%s-%s:%s%s%s", PACKAGE, VERSION,
-		    utn.sysname, utn.release, utn.machine,
-		    platform ? ":" : "", platform ? platform : "");
-	else
-		ifo->vendorclassid[0] = snprintf((char *)ifo->vendorclassid + 1,
-		    VENDORCLASSID_MAX_LEN, "%s-%s", PACKAGE, VERSION);
+	ifo->vendorclassid[0] = strlen(vendor);
+	memcpy(ifo->vendorclassid + 1, vendor, ifo->vendorclassid[0]);
 
 	/* Parse our options file */
 	f = fopen(file ? file : CONFIG, "r");
