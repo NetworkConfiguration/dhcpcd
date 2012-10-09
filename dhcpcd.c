@@ -775,7 +775,7 @@ configure_interface1(struct interface *iface)
 	struct if_state *ifs = iface->state;
 	struct if_options *ifo = ifs->options;
 	uint8_t *duid;
-	size_t len = 0, ifl;
+	size_t len, ifl;
 
 	/* Do any platform specific configuration */
 	if_conf(iface);
@@ -820,6 +820,7 @@ configure_interface1(struct interface *iface)
 		iface->clientid = xmalloc(ifo->clientid[0] + 1);
 		memcpy(iface->clientid, ifo->clientid, ifo->clientid[0] + 1);
 	} else if (ifo->options & DHCPCD_CLIENTID) {
+		len = 0;
 		if (ifo->options & DHCPCD_DUID) {
 			duid = xmalloc(DUID_LEN);
 			if ((len = get_duid(duid, iface)) == 0)
@@ -839,6 +840,7 @@ configure_interface1(struct interface *iface)
 				ifl = htonl(iface->index);
 				memcpy(iface->clientid + 2, &ifl, 4);
 			}
+			memcpy(iface->clientid + 6, duid, len);
 		} else if (len == 0) {
 			len = iface->hwlen + 1;
 			iface->clientid = xmalloc(len + 1);
