@@ -1784,7 +1784,8 @@ int
 main(int argc, char **argv)
 {
 	struct interface *iface;
-	int opt, oi = 0, signal_fd, sig = 0, i, control_fd, family = 0;
+	uint16_t family = 0;
+	int opt, oi = 0, signal_fd, sig = 0, i, control_fd;
 	size_t len;
 	pid_t pid;
 	struct timespec ts;

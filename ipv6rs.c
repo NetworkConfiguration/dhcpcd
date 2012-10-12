@@ -385,7 +385,7 @@ ipv6rs_handledata(_unused void *arg)
 	struct ipv6_addr *ap;
 	char *opt, *tmp;
 	struct timeval expire;
-	int has_dns, new_rap, new_data;
+	uint8_t has_dns, new_rap, new_data;
 
 	len = recvmsg(sock, &rcvhdr, 0);
 	if (len == -1) {

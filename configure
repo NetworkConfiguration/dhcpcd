@@ -224,7 +224,7 @@ CFLAGS+=	-Wmissing-prototypes -Wmissing-declarations
 CFLAGS+=	-Wmissing-noreturn -Wmissing-format-attribute
 CFLAGS+=	-Wredundant-decls  -Wnested-externs
 CFLAGS+=	-Winline -Wwrite-strings -Wcast-align -Wcast-qual
-CFLAGS+=	-Wpointer-arith
+CFLAGS+=	-Wpointer-arith -Wstrict-overflow
 CFLAGS+=	-Wdeclaration-after-statement -Wsequence-point
 CFLAGS+=	-fno-common
 EOF
