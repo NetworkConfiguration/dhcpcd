@@ -597,7 +597,6 @@ dhcp6_handledata(_unused void *arg)
 	free(state->old);
 	state->old = state->new;
 	state->old_len = state->new_len;
-	state->new = malloc(len);
 	state->new = m;
 	memcpy(m, r, len);
 	state->new_len = len;
