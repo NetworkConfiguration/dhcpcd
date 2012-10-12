@@ -945,6 +945,7 @@ handle_carrier(int action, int flags, const char *ifname)
 			syslog(LOG_INFO, "%s: carrier lost", iface->name);
 			close_sockets(iface);
 			delete_timeouts(iface, start_expire, NULL);
+			dhcp6_drop(iface);
 			ipv6rs_drop(iface);
 			drop_dhcp(iface, "NOCARRIER");
 		}
@@ -1639,6 +1640,8 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 			if (argc == 1) {
 				for (ifp = ifaces; ifp; ifp = ifp->next) {
 					len++;
+					if (D6_STATE_RUNNING(ifp))
+						len++;
 					if (ipv6rs_has_ra(ifp))
 						len++;
 				}
@@ -1654,6 +1657,8 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 				for (ifp = ifaces; ifp; ifp = ifp->next)
 					if (strcmp(argv[opt], ifp->name) == 0) {
 						len++;
+						if (D6_STATE_RUNNING(ifp))
+							len++;
 						if (ipv6rs_has_ra(ifp))
 							len++;
 					}

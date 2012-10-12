@@ -380,6 +380,10 @@ send_interface(int fd, const struct interface *iface)
 		if (send_interface1(fd, iface, "ROUTERADVERT") == -1)
 			retval = -1;
 	}
+	if (D6_STATE_RUNNING(iface)) {
+		if (send_interface1(fd, iface, "INFORM6") == -1)
+			retval = -1;
+	}
 	return retval;
 }
 
