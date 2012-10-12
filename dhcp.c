@@ -37,23 +37,6 @@
 #include "common.h"
 #include "dhcp.h"
 
-#define REQUEST	(1 << 0)
-#define UINT8	(1 << 1)
-#define UINT16	(1 << 2)
-#define SINT16	(1 << 3)
-#define UINT32	(1 << 4)
-#define SINT32	(1 << 5)
-#define IPV4	(1 << 6)
-#define STRING	(1 << 7)
-#define PAIR	(1 << 8)
-#define ARRAY	(1 << 9)
-#define RFC3361	(1 << 10)
-#define RFC3397	(1 << 11)
-#define RFC3442 (1 << 12)
-#define RFC5969 (1 << 13)
-
-#define IPV4R	IPV4 | REQUEST
-
 #define DAD	"Duplicate address detected"
 
 /* Our aggregate option buffer.
@@ -61,13 +44,7 @@
  * practically never. See RFC3396 for details. */
 static uint8_t *opt_buffer;
 
-struct dhcp_opt {
-	uint8_t option;
-	int type;
-	const char *var;
-};
-
-static const struct dhcp_opt const dhcp_opts[] = {
+const struct dhcp_opt const dhcp_opts[] = {
 	{ 1,	IPV4 | REQUEST,	"subnet_mask" },
 		/* RFC 3442 states that the CSR has to come before all other
 		 * routes. For completeness, we also specify static routes,
@@ -165,23 +142,10 @@ static const struct dhcp_opt const dhcp_opts[] = {
 	{ 0, 0, NULL }
 };
 
-static const char *if_params[] = {
-	"interface",
-	"reason",
-	"pid",
-	"ifmetric",
-	"ifwireless",
-	"ifflags",
-	"profile",
-	"interface_order",
-	NULL
-};
-
 static const char *dhcp_params[] = {
 	"ip_address",
 	"subnet_cidr",
 	"network_number",
-	"ssid",
 	"filename",
 	"server_name",
 	NULL
@@ -193,9 +157,6 @@ print_options(void)
 	const struct dhcp_opt *opt;
 	const char **p;
 
-	for (p = if_params; *p; p++)
-		printf(" -  %s\n", *p);
-
 	for (p = dhcp_params; *p; p++)
 		printf("    %s\n", *p);
 
@@ -204,7 +165,8 @@ print_options(void)
 			printf("%03d %s\n", opt->option, opt->var);
 }
 
-int make_option_mask(uint8_t *mask, const char *opts, int add)
+int make_option_mask(const struct dhcp_opt *dopts,
+    uint8_t *mask, const char *opts, int add)
 {
 	char *token, *o, *p, *t;
 	const struct dhcp_opt *opt;
@@ -214,7 +176,7 @@ int make_option_mask(uint8_t *mask, const char *opts, int add)
 	while ((token = strsep(&p, ", "))) {
 		if (*token == '\0')
 			continue;
-		for (opt = dhcp_opts; opt->option; opt++) {
+		for (opt = dopts; opt->option; opt++) {
 			if (!opt->var)
 				continue;
 			match = 0;
@@ -1177,7 +1139,7 @@ read_lease(const struct interface *iface)
 	return dhcp;
 }
 
-static ssize_t
+ssize_t
 print_string(char *s, ssize_t len, int dl, const uint8_t *data)
 {
 	uint8_t c;
@@ -1243,7 +1205,7 @@ print_string(char *s, ssize_t len, int dl, const uint8_t *data)
 	return bytes;
 }
 
-static ssize_t
+ssize_t
 print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data)
 {
 	const uint8_t *e, *t;
@@ -1254,7 +1216,8 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data)
 	struct in_addr addr;
 	ssize_t bytes = 0;
 	ssize_t l;
-	char *tmp;
+	char *tmp, ntopbuf[INET6_ADDRSTRLEN];
+	const char *addr6;
 
 	if (type & RFC3397) {
 		l = decode_rfc3397(NULL, 0, dl, data);
@@ -1289,6 +1252,22 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data)
 		return print_string(s, len, dl, data);
 	}
 
+	/* DHCPv6 status code */
+	if (type & SCODE && dl >= (int)sizeof(u16)) {
+		if (s) {
+			memcpy(&u16, data, sizeof(u16));
+			u16 = ntohs(u16);
+			l = snprintf(s, len, "%d ", u16);
+			len -= l;
+		} else
+			l = 7;
+		data += sizeof(u16);
+		dl -= sizeof(u16);
+		if (dl)
+			l += print_option(s, len, STRING, dl, data);
+		return l;
+	}
+
 	if (!s) {
 		if (type & UINT8)
 			l = 3;
@@ -1307,6 +1286,11 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data)
 		} else if (type & IPV4) {
 			l = 16;
 			dl /= 4;
+		} else if (type & IPV6) {
+			l = INET6_ADDRSTRLEN;
+			dl /= 16;
+		} else if (type & BINHEX) {
+			l = 2;
 		} else {
 			errno = EINVAL;
 			return -1;
@@ -1317,7 +1301,7 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data)
 	t = data;
 	e = data + dl;
 	while (data < e) {
-		if (data != t) {
+		if (data != t && type != BINHEX) {
 			*s++ = ' ';
 			bytes++;
 			len--;
@@ -1349,6 +1333,14 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data)
 			memcpy(&addr.s_addr, data, sizeof(addr.s_addr));
 			l = snprintf(s, len, "%s", inet_ntoa(addr));
 			data += sizeof(addr.s_addr);
+		} else if (type & IPV6) {
+			addr6 = inet_ntop(AF_INET6, data,
+			    ntopbuf, sizeof(ntopbuf));
+			l = snprintf(s, len, "%s", addr6);
+			data += 16;
+		} else if (type & BINHEX) {
+			l = snprintf(s, len, "%.2x", data[0]);
+			data++; 
 		} else
 			l = 0;
 		len -= l;

@@ -63,6 +63,7 @@ const char copyright[] = "Copyright (c) 2006-2012 Roy Marples";
 #include "configure.h"
 #include "control.h"
 #include "dhcpcd.h"
+#include "dhcp6.h"
 #include "duid.h"
 #include "eloop.h"
 #include "if-options.h"
@@ -150,7 +151,7 @@ static void
 usage(void)
 {
 
-printf("usage: "PACKAGE"\t[-ABbDdEGgHJKkLnpqTVw]\n"
+printf("usage: "PACKAGE"\t[-46ABbDdEGgHJKkLnpqTVw]\n"
 	"\t\t[-C, --nohook hook] [-c, --script script]\n"
 	"\t\t[-e, --env value] [-F, --fqdn FQDN] [-f, --config file]\n"
 	"\t\t[-h, --hostname hostname] [-I, --clientid clientid]\n"
@@ -269,6 +270,7 @@ stop_interface(struct interface *iface)
 	else
 		ifaces = ifp->next;
 
+	dhcp6_drop(iface);
 	ipv6rs_drop(iface);
 	if (strcmp(iface->state->reason, "RELEASE") != 0)
 		drop_dhcp(iface, "STOP");
@@ -818,6 +820,9 @@ configure_interface1(struct interface *iface)
 
 	free(iface->clientid);
 	iface->clientid = NULL;
+	if (!(ifo->options & DHCPCD_IPV4))
+		return;
+
 	if (*ifo->clientid) {
 		iface->clientid = xmalloc(ifo->clientid[0] + 1);
 		memcpy(iface->clientid, ifo->clientid, ifo->clientid[0] + 1);
@@ -1185,7 +1190,8 @@ start_interface(void *arg)
 	free(iface->state->offer);
 	iface->state->offer = NULL;
 
-	if (options & DHCPCD_IPV6RS && ifo->options & DHCPCD_IPV6RS)
+	if (options & DHCPCD_IPV6RS && ifo->options & DHCPCD_IPV6RS &&
+	    !(ifo->options & DHCPCD_INFORM))
 		ipv6rs_start(iface);
 
 	if (iface->state->arping_index < ifo->arping_len) {
@@ -1196,6 +1202,13 @@ start_interface(void *arg)
 		start_static(iface);
 		return;
 	}
+
+	if (ifo->options & DHCPCD_INFORM && ifo->options & DHCPCD_IPV6)
+		dhcp6_start(iface, 0);
+
+	if (!(ifo->options & DHCPCD_IPV4))
+		return;
+
 	if (ifo->options & DHCPCD_INFORM) {
 		start_inform(iface);
 		return;
@@ -1771,7 +1784,7 @@ int
 main(int argc, char **argv)
 {
 	struct interface *iface;
-	int opt, oi = 0, signal_fd, sig = 0, i, control_fd;
+	int opt, oi = 0, signal_fd, sig = 0, i, control_fd, family = 0;
 	size_t len;
 	pid_t pid;
 	struct timespec ts;
@@ -1807,6 +1820,12 @@ main(int argc, char **argv)
 	while ((opt = getopt_long(argc, argv, IF_OPTS, cf_options, &oi)) != -1)
 	{
 		switch (opt) {
+		case '4':
+			family = AF_INET;
+			break;
+		case '6':
+			family = AF_INET6;
+			break;
 		case 'f':
 			cffile = optarg;
 			break;
@@ -1829,7 +1848,16 @@ main(int argc, char **argv)
 			i = 2;
 			break;
 		case 'V':
-			print_options();
+			printf("Interface options:\n");
+			if_printoptions();
+			if (family == 0 || family == AF_INET) {
+				printf("\nDHCPv4 options:\n");
+				print_options();
+			}
+			if (family == 0 || family == AF_INET6) {
+				printf("\nDHCPv6 options:\n");
+				dhcp6_printoptions();
+			}
 			exit(EXIT_SUCCESS);
 		case '?':
 			usage();

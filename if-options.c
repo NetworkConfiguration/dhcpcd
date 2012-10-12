@@ -42,6 +42,8 @@
 
 #include "config.h"
 #include "common.h"
+#include "dhcp.h"
+#include "dhcp6.h"
 #include "if-options.h"
 #include "net.h"
 #include "platform.h"
@@ -114,6 +116,8 @@ const struct option cf_options[] = {
 	{"ipv6ra_fork",     no_argument,       NULL, O_IPV6RA_FORK},
 	{"ipv6ra_own",      no_argument,       NULL, O_IPV6RA_OWN},
 	{"ipv6ra_own_default", no_argument,    NULL, O_IPV6RA_OWN_D},
+	{"ipv4only",        no_argument,       NULL, '4'},
+	{"ipv6only",        no_argument,       NULL, '6'},
 	{NULL,              0,                 NULL, '\0'}
 };
 
@@ -334,6 +338,26 @@ parse_addr(struct in_addr *addr, struct in_addr *net, const char *arg)
 	return 0;
 }
 
+static const char * 
+set_option_space(const char *arg, const struct dhcp_opt **d,
+    struct if_options *ifo,
+    uint8_t *request[], uint8_t *require[], uint8_t *no[])
+{
+
+	if (strncmp(arg, "dhcp6_", strlen("dhcp6_")) == 0) {
+		*d = dhcp6_opts;
+		*request = ifo->requestmask6;
+		*require = ifo->requiremask6;
+		*no = ifo->nomask6;
+		return arg + strlen("dhcp6_");
+	}
+	*d = dhcp_opts;
+	*request = ifo->requestmask;
+	*require = ifo->requiremask;
+	*no = ifo->nomask;
+	return arg;
+}
+
 static int
 parse_option(struct if_options *ifo, int opt, const char *arg)
 {
@@ -342,6 +366,8 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	ssize_t s;
 	struct in_addr addr, addr2;
 	struct rt *rt;
+	const struct dhcp_opt const *d;
+	uint8_t *request, *require, *no;
 
 	switch(opt) {
 	case 'f': /* FALLTHROUGH */
@@ -419,7 +445,8 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		}
 		break;
 	case 'o':
-		if (make_option_mask(ifo->requestmask, arg, 1) != 0) {
+		arg = set_option_space(arg, &d, ifo, &request, &require, &no);
+		if (make_option_mask(d, request, arg, 1) != 0) {
 			syslog(LOG_ERR, "unknown option `%s'", arg);
 			return -1;
 		}
@@ -437,6 +464,12 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		ifo->req_mask.s_addr = 0;
 		break;
 	case 's':
+		if (ifo->options & DHCPCD_IPV6 &&
+		    !(ifo->options & DHCPCD_IPV4))
+		{
+			ifo->options |= DHCPCD_INFORM;
+			break;
+		}
 		if (arg && *arg != '\0') {
 			if (parse_addr(&ifo->req_addr, &ifo->req_mask,
 				arg) != 0)
@@ -612,17 +645,19 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		ifo->options &= ~DHCPCD_IPV4LL;
 		break;
 	case 'O':
-		if (make_option_mask(ifo->requestmask, arg, -1) != 0 ||
-		    make_option_mask(ifo->requiremask, arg, -1) != 0 ||
-		    make_option_mask(ifo->nomask, arg, 1) != 0)
+		arg = set_option_space(arg, &d, ifo, &request, &require, &no);
+		if (make_option_mask(d, request, arg, -1) != 0 ||
+		    make_option_mask(d, require, arg, -1) != 0 ||
+		    make_option_mask(d, no, arg, 1) != 0)
 		{
 			syslog(LOG_ERR, "unknown option `%s'", arg);
 			return -1;
 		}
 		break;
 	case 'Q':
-		if (make_option_mask(ifo->requiremask, arg, 1) != 0 ||
-		    make_option_mask(ifo->requestmask, arg, 1) != 0)
+		arg = set_option_space(arg, &d, ifo, &request, &require, &no);
+		if (make_option_mask(d, require, arg, 1) != 0 ||
+		    make_option_mask(d, request, arg, 1) != 0)
 		{
 			syslog(LOG_ERR, "unknown option `%s'", arg);
 			return -1;
@@ -730,6 +765,14 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	case 'Z':
 		ifdv = splitv(&ifdc, ifdv, arg);
 		break;
+	case '4':
+		ifo->options &= ~(DHCPCD_IPV6 | DHCPCD_IPV6RS);
+		ifo->options |= DHCPCD_IPV4;
+		break;
+	case '6':
+		ifo->options &= ~DHCPCD_IPV4;
+		ifo->options |= DHCPCD_IPV6 | DHCPCD_IPV6RS;
+		break;
 	case O_ARPING:
 		if (parse_addr(&addr, NULL, arg) != 0)
 			return -1;
@@ -738,7 +781,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		ifo->arping[ifo->arping_len++] = addr.s_addr;
 		break;
 	case O_DESTINATION:
-		if (make_option_mask(ifo->dstmask, arg, 2) != 0) {
+		if (make_option_mask(dhcp_opts, ifo->dstmask, arg, 2) != 0) {
 			if (errno == EINVAL)
 				syslog(LOG_ERR, "option `%s' does not take"
 				    " an IPv4 address", arg);
@@ -808,9 +851,10 @@ read_config(const char *file,
 
 	/* Seed our default options */
 	ifo = xzalloc(sizeof(*ifo));
+	ifo->options |= DHCPCD_IPV4 | DHCPCD_IPV4LL;
 	ifo->options |= DHCPCD_GATEWAY | DHCPCD_DAEMONISE | DHCPCD_LINK;
-	ifo->options |= DHCPCD_ARP | DHCPCD_IPV4LL;
-	ifo->options |= DHCPCD_IPV6RS | DHCPCD_IPV6RA_REQRDNSS;
+	ifo->options |= DHCPCD_ARP;
+	ifo->options |= DHCPCD_IPV6 | DHCPCD_IPV6RS | DHCPCD_IPV6RA_REQRDNSS;
 	ifo->timeout = DEFAULT_TIMEOUT;
 	ifo->reboot = DEFAULT_REBOOT;
 	ifo->metric = -1;

@@ -44,6 +44,7 @@
 #include "common.h"
 #include "configure.h"
 #include "dhcp.h"
+#include "dhcp6.h"
 #include "if-options.h"
 #include "if-pref.h"
 #include "ipv6rs.h"
@@ -53,6 +54,28 @@
 #define DEFAULT_PATH	"PATH=/usr/bin:/usr/sbin:/bin:/sbin"
 
 static struct rt *routes;
+
+static const char *if_params[] = {
+	"interface",
+	"reason",
+	"pid",
+	"ifmetric",
+	"ifwireless",
+	"ifflags",
+	"ssid",
+	"profile",
+	"interface_order",
+	NULL
+};
+
+void
+if_printoptions(void)
+{
+	const char **p;
+
+	for (p = if_params; *p; p++)
+		printf(" -  %s\n", *p);
+}
 
 static int
 exec_script(char *const *argv, char *const *env)
@@ -159,15 +182,21 @@ make_env(const struct interface *iface, const char *reason, char ***argv)
 	ssize_t e, elen, l;
 	const struct if_options *ifo = iface->state->options;
 	const struct interface *ifp;
-	int dhcp, ra;
+	int dhcp, dhcp6, ra;
+	const struct dhcp6_state *d6_state;
 
-	dhcp = ra = 0;
+	dhcp = dhcp6 = ra = 0;
+	d6_state = D6_STATE(iface);
 	if (strcmp(reason, "TEST") == 0) {
-		if (ipv6rs_has_ra(iface))
+		if (d6_state && d6_state->new)
+			dhcp6 = 1;
+		else if (ipv6rs_has_ra(iface))
 			ra = 1;
 		else
 			dhcp = 1;
-	} else if (strcmp(reason, "ROUTERADVERT") == 0)
+	} else if (reason[strlen(reason) - 1] == '6')
+		dhcp6 = 1;
+	else if (strcmp(reason, "ROUTERADVERT") == 0)
 		ra = 1;
 	else
 		dhcp = 1;
@@ -219,7 +248,10 @@ make_env(const struct interface *iface, const char *reason, char ***argv)
 	if (strcmp(reason, "TEST") == 0) {
 		env[8] = strdup("if_up=false");
 		env[9] = strdup("if_down=false");
-	} else if ((dhcp && iface->state->new) || (ra && ipv6rs_has_ra(iface))){
+	} else if ((dhcp && iface->state->new) ||
+	    (dhcp6 && d6_state->new) ||
+	    (ra && ipv6rs_has_ra(iface)))
+	{
 		env[8] = strdup("if_up=true");
 		env[9] = strdup("if_down=false");
 	} else {
@@ -258,6 +290,15 @@ make_env(const struct interface *iface, const char *reason, char ***argv)
 		append_config(&env, &elen, "old",
 		    (const char *const *)ifo->config);
 	}
+	if (dhcp6 && d6_state->old) {
+		e = dhcp6_env(NULL, NULL, iface,
+		    d6_state->old, d6_state->old_len);
+		if (e > 0) {
+			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
+			elen += dhcp6_env(env + elen, "old", iface,
+			    d6_state->old, d6_state->old_len);
+		}
+	}
 
 dumplease:
 	if (dhcp && iface->state->new) {
@@ -269,6 +310,15 @@ dumplease:
 		}
 		append_config(&env, &elen, "new",
 		    (const char *const *)ifo->config);
+	}
+	if (dhcp6 && d6_state->new) {
+		e = dhcp6_env(NULL, NULL, iface,
+		    d6_state->new, d6_state->new_len);
+		if (e > 0) {
+			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
+			elen += dhcp6_env(env + elen, "new", iface,
+			    d6_state->new, d6_state->new_len);
+		}
 	}
 	if (ra) {
 		e = ipv6rs_env(NULL, NULL, iface);

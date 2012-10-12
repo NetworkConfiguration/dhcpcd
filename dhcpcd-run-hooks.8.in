@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd March 19, 2012
+.Dd October 11, 2012
 .Dt DHCPCD-RUN-HOOKS 8
 .Os
 .Sh NAME
@@ -75,7 +75,7 @@ dhcpcd is starting up and any pre-initialisation should be done.
 .It Dv CARRIER
 dhcpcd has detected the carrier is up.
 This is generally just a notification and no action need be taken.
-.It Dv INFORM
+.It Dv INFORM | Dv INFORM6
 dhcpcd informed a DHCP server about it's address and obtained other
 configuration details.
 .It Dv BOUND
@@ -110,7 +110,7 @@ dhcpcd failed to operate on the interface.
 This normally happens when dhcpcd does not support the raw interface, which
 means it cannot work as a DHCP or ZeroConf client.
 Static configuration and DHCP INFORM is still allowed.
-.It Dv STOP
+.It Dv STOP | Dv STOP6
 dhcpcd stopped running on the interface.
 .It Dv DUMP
 dhcpcd has been asked to dump the last lease for the interface.

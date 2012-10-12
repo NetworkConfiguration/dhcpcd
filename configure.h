@@ -30,6 +30,7 @@
 
 #include "net.h"
 
+void if_printoptions(void);
 int send_interface(int, const struct interface *);
 int run_script_reason(const struct interface *, const char *);
 void build_routes(void);

@@ -2,11 +2,14 @@
 # dhcpcd client configuration script 
 
 # Handy variables and functions for our hooks to use
-if [ "$reason" = ROUTERADVERT ]; then
-	ifsuffix=":ra"
-else
-	ifsuffix=
-fi
+case "$reason" in
+	ROUTERADVERT)
+		ifsuffix=":ra";;
+	INFORM6|BOUND6|RENEW6|REBIND6|EXPIRE6|RELEASE6|STOP6)
+		ifsuffix=":dhcp6";;
+	*)
+		ifsuffix=;;
+esac
 ifname="$interface$ifsuffix"
 
 from=from

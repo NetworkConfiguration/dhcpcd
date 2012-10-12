@@ -33,26 +33,30 @@
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 
+#ifdef __linux__
+#  define _LINUX_IN6_H
+#  include <linux/ipv6.h>
+#endif
+
 #include <errno.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
 
-#ifdef __linux__
-#  define _LINUX_IN6_H
-#  include <linux/ipv6.h>
-#endif
-
 #define ELOOP_QUEUE 1
 #include "bind.h"
 #include "common.h"
 #include "configure.h"
 #include "dhcpcd.h"
+#include "dhcp6.h"
 #include "eloop.h"
 #include "ipv6.h"
 #include "ipv6ns.h"
 #include "ipv6rs.h"
+
+/* Debugging Router Solicitations is a lot of spam, so disable it */
+//#define DEBUG_RS
 
 #define RTR_SOLICITATION_INTERVAL       4 /* seconds */
 #define MAX_RTR_SOLICITATIONS           3 /* times */
@@ -379,9 +383,9 @@ ipv6rs_handledata(_unused void *arg)
 	struct nd_opt_hdr *ndo;
 	struct ra_opt *rao;
 	struct ipv6_addr *ap;
-	char *opt;
+	char *opt, *tmp;
 	struct timeval expire;
-	int has_dns, new_rap;
+	int has_dns, new_rap, new_data;
 
 	len = recvmsg(sock, &rcvhdr, 0);
 	if (len == -1) {
@@ -438,7 +442,9 @@ ipv6rs_handledata(_unused void *arg)
 		if (ifp->index == (unsigned int)pkt.ipi6_ifindex)
 			break;
 	if (ifp == NULL) {
-		syslog(LOG_ERR, "RA for unexpected interface from %s", sfrom);
+#ifdef DEBUG_RS
+		syslog(LOG_DEBUG, "RA for unexpected interface from %s", sfrom);
+#endif
 		return;
 	}
 	TAILQ_FOREACH(rap, &ipv6_routers, next) {
@@ -460,9 +466,11 @@ ipv6rs_handledata(_unused void *arg)
 			rap->ns = NULL;
 			rap->nslen = 0;
 		}
+		new_data = 1;
 		syslog(LOG_INFO, "%s: Router Advertisement from %s",
 		    ifp->name, sfrom);
-	}
+	} else
+		new_data = 0;
 
 	if (rap == NULL) {
 		rap = xzalloc(sizeof(*rap));
@@ -642,7 +650,10 @@ ipv6rs_handledata(_unused void *arg)
 				    ifp->name);
 			} else {
 				opt = xmalloc(l);
-				decode_rfc3397(opt, l, n, op);
+				tmp = xmalloc(l);
+				decode_rfc3397(tmp, l, n, op);
+				l = print_string(opt, l, l - 1, (uint8_t *)tmp);
+				free(tmp);
 			}
 			break;
 		}
@@ -691,7 +702,7 @@ ipv6rs_handledata(_unused void *arg)
 			else if (ipv6_remove_subnet(rap, ap) == -1)
 				syslog(LOG_ERR, "ipv6_remove_subnet %m");
 			else
-				syslog(ap->new ? LOG_INFO : LOG_DEBUG,
+				syslog(LOG_DEBUG,
 				    "%s: vltime %d seconds, pltime %d seconds",
 				    ifp->name, ap->prefix_vltime,
 				    ap->prefix_pltime);
@@ -701,7 +712,7 @@ ipv6rs_handledata(_unused void *arg)
 		ipv6_build_routes();
 	run_script_reason(ifp, options & DHCPCD_TEST ? "TEST" : "ROUTERADVERT");
 	if (options & DHCPCD_TEST)
-		exit(EXIT_SUCCESS);
+		goto handle_flag;
 
 	/* If we don't require RDNSS then set has_dns = 1 so we fork */
 	if (!(ifp->state->options->options & DHCPCD_IPV6RA_REQRDNSS))
@@ -714,7 +725,8 @@ ipv6rs_handledata(_unused void *arg)
 	ipv6rs_expire(ifp);
 	if (has_dns)
 		daemonise();
-	else if (options & DHCPCD_DAEMONISE && !(options & DHCPCD_DAEMONISED))
+	else if (options & DHCPCD_DAEMONISE &&
+	    !(options & DHCPCD_DAEMONISED) && new_data)
 		syslog(LOG_WARNING,
 		    "%s: did not fork due to an absent RDNSS option in the RA",
 		    ifp->name);
@@ -726,6 +738,22 @@ ipv6rs_handledata(_unused void *arg)
 	{
 		rap->nsprobes = 0;
 		ipv6ns_sendprobe(rap);
+	}
+
+handle_flag:
+	if (rap->flags & ND_RA_FLAG_MANAGED) {
+		if (new_data)
+			syslog(LOG_WARNING, "%s: no support for DHCPv6 management",
+			    ifp->name);
+//		if (dhcp6_start(ifp, 1) == -1)
+//			syslog(LOG_ERR, "dhcp6_start: %s: %m", ifp->name);
+	} else if (rap->flags & ND_RA_FLAG_OTHER) {
+		if (dhcp6_start(ifp, 0) == -1)
+			syslog(LOG_ERR, "dhcp6_start: %s: %m", ifp->name);
+	} else {
+		if (new_data)
+			syslog(LOG_DEBUG, "%s: No DHCPv6 instruction in RA",
+			    ifp->name);
 	}
 }
 

@@ -65,6 +65,7 @@
 #include "config.h"
 #include "common.h"
 #include "dhcp.h"
+#include "dhcp6.h"
 #include "if-options.h"
 #include "ipv6rs.h"
 #include "net.h"
@@ -187,6 +188,7 @@ free_interface(struct interface *iface)
 {
 	if (!iface)
 		return;
+	dhcp6_free(iface);
 	ipv6rs_free(iface);
 	if (iface->state) {
 		free_options(iface->state->options);
