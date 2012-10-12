@@ -352,7 +352,14 @@ ipv6_remove_subnet(struct ra *rap, struct ipv6_addr *addr)
 #else
 		if (!find_route6(routes, rt))
 #endif
+		{
 			r = del_route6(rt);
+			/* If the subnet route didn't exist, don't
+			 * moan about it.
+			 * We currently do this to silence FreeBSD-7 */
+			if (r == -1 && errno == ESRCH)
+				r = 0;
+		}
 		free(rt);
 	}
 	return r;

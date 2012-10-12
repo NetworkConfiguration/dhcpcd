@@ -699,13 +699,14 @@ ipv6rs_handledata(_unused void *arg)
 			    ifp->name, ap->saddr);
 			if (add_address6(ifp, ap) == -1)
 				syslog(LOG_ERR, "add_address6 %m");
-			else if (ipv6_remove_subnet(rap, ap) == -1)
-				syslog(LOG_ERR, "ipv6_remove_subnet %m");
-			else
+			else {
+				if (ipv6_remove_subnet(rap, ap) == -1)
+					syslog(LOG_ERR,"ipv6_remove_subnet %m");
 				syslog(LOG_DEBUG,
 				    "%s: vltime %d seconds, pltime %d seconds",
 				    ifp->name, ap->prefix_vltime,
 				    ap->prefix_pltime);
+			}
 		}
 	}
 	if (!(options & DHCPCD_TEST))
