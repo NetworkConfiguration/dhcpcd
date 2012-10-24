@@ -250,7 +250,7 @@ validate_length(uint8_t option, int dl, int *type)
 		/* If we don't know the size, assume it's valid */
 		if (sz == 0)
 			return dl;
-		return (sz < dl ? -1 : sz);
+		return (dl < sz ? -1 : sz);
 	}
 
 	/* unknown option, so let it pass */
