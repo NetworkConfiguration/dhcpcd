@@ -215,7 +215,7 @@ int make_option_mask(const struct dhcp_opt *dopts,
 }
 
 static int
-valid_length(uint8_t option, int dl, int *type)
+validate_length(uint8_t option, int dl, int *type)
 {
 	const struct dhcp_opt *opt;
 	ssize_t sz;
@@ -245,17 +245,20 @@ valid_length(uint8_t option, int dl, int *type)
 		if (opt->type & UINT8)
 			sz = sizeof(uint8_t);
 		/* If we don't know the size, assume it's valid */
-		return (sz == 0 || dl == sz ? 0 : -1);
+		if (sz == 0)
+			return dl;
+		return sz;
 	}
 
 	/* unknown option, so let it pass */
-	return 0;
+	return dl;
 }
 
 #ifdef DEBUG_MEMORY
 static void
 free_option_buffer(void)
 {
+
 	free(opt_buffer);
 }
 #endif
@@ -271,7 +274,7 @@ get_option(const struct dhcp_message *dhcp, uint8_t opt, int *len, int *type)
 	uint8_t overl = 0;
 	uint8_t *bp = NULL;
 	const uint8_t *op = NULL;
-	int bl = 0;
+	ssize_t bl = 0;
 
 	while (p < e) {
 		o = *p++;
@@ -320,7 +323,9 @@ get_option(const struct dhcp_message *dhcp, uint8_t opt, int *len, int *type)
 	}
 
 exit:
-	if (valid_length(opt, bl, type) == -1) {
+
+	bl = validate_length(opt, bl, type);
+	if (bl == -1) {
 		errno = EINVAL;
 		return NULL;
 	}
