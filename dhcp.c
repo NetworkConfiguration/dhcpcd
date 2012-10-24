@@ -232,7 +232,7 @@ validate_length(uint8_t option, int dl, int *type)
 
 		if (opt->type == 0 ||
 		    opt->type & (STRING | RFC3442 | RFC5969))
-			return 0;
+			return dl;
 
 		if (opt->type & IPV4 && opt->type & ARRAY)
 			return (dl % sizeof(uint32_t) == 0 ? 0 : -1);
