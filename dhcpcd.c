@@ -1020,8 +1020,9 @@ start_renew(void *arg)
 
 	syslog(LOG_INFO, "%s: renewing lease of %s",
 	    iface->name, inet_ntoa(lease->addr));
-	syslog(LOG_DEBUG, "%s: rebind in %u seconds",
-	   iface->name, lease->rebindtime - lease->renewaltime);
+	syslog(LOG_DEBUG, "%s: rebind in %u seconds, expire in %u seconds",
+	    iface->name, lease->rebindtime - lease->renewaltime,
+	    lease->leasetime - lease->renewaltime);
 	iface->state->state = DHS_RENEW;
 	iface->state->xid = dhcp_xid(iface);
 	send_renew(iface);
@@ -1035,8 +1036,8 @@ start_rebind(void *arg)
 
 	syslog(LOG_ERR, "%s: failed to renew, attempting to rebind",
 	    iface->name);
-	syslog(LOG_DEBUG, "%s: expre in %u seconds",
-	   iface->name, lease->leasetime - lease->rebindtime);
+	syslog(LOG_DEBUG, "%s: expire in %u seconds",
+	    iface->name, lease->leasetime - lease->rebindtime);
 	iface->state->state = DHS_REBIND;
 	delete_timeout(send_renew, iface);
 	iface->state->lease.server.s_addr = 0;
