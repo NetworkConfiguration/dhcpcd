@@ -401,14 +401,14 @@ EOF
 fi
 if [ "$TAILQ_FOREACH_SAFE" = no ]; then
 	cat <<EOF >>$CONFIG_H
-#define	TAILQ_FOREACH_SAFE(var, head, field, next)			\
-	for ((var) = TAILQ_FIRST((head));				\
-	    (var) && ((next) = TAILQ_NEXT((var), field), 1);		\
+#define	TAILQ_FOREACH_SAFE(var, head, field, next)			\\
+	for ((var) = TAILQ_FIRST((head));				\\
+	    (var) && ((next) = TAILQ_NEXT((var), field), 1);		\\
 	    (var) = (next))
-#define TAILQ_FOREACH_REVERSE_SAFE(var, head, headname, field, prev)	\
-        for ((var) = TAILQ_LAST((head), headname);			\
-                (var) && ((prev) = TAILQ_PREV((var), headname, field), 1);\
-                (var) = (prev))
+#define TAILQ_FOREACH_REVERSE_SAFE(var, head, headname, field, prev)	\\
+	for ((var) = TAILQ_LAST((head), headname);			\\
+	    (var) && ((prev) = TAILQ_PREV((var), headname, field), 1);  \\
+	    (var) = (prev))
 EOF
 fi
 
