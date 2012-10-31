@@ -948,6 +948,21 @@ ipv6rs_expire(void *arg)
 		}
 	
 		TAILQ_FOREACH_SAFE(rao, &rap->options, next, raon) {
+			if (rap->expired) {
+				switch(rao->type) {
+				case ND_OPT_RDNSS: /* FALLTHROUGH */
+				case ND_OPT_DNSSL:
+					/* RFC6018 end of section 5.2 states
+					 * that if tha RA has a lifetime of 0
+					 * then we should expire these
+					 * options */
+					TAILQ_REMOVE(&rap->options, rao, next);
+					expired = 1;
+					free(rao->option);
+					free(rao);
+					continue;
+				}
+			}
 			if (!timerisset(&rao->expire))
 				continue;
 			if (timercmp(&now, &rao->expire, >)) {
