@@ -405,7 +405,7 @@ ipv6rs_handledata(_unused void *arg)
 	struct ipv6_addr *ap;
 	char *opt, *tmp;
 	struct timeval expire;
-	uint8_t has_prefix, has_dns, new_rap, new_data;
+	uint8_t has_dns, new_rap, new_data;
 
 	len = recvmsg(sock, &rcvhdr, 0);
 	if (len == -1) {
@@ -526,7 +526,7 @@ ipv6rs_handledata(_unused void *arg)
 	p = ((uint8_t *)icp) + sizeof(struct nd_router_advert);
 	olen = 0;
 	lifetime = ~0U;
-	has_prefix = has_dns = 0;
+	has_dns = 0;
 	for (olen = 0; len > 0; p += olen, len -= olen) {
 		if ((size_t)len < sizeof(struct nd_opt_hdr)) {
 			syslog(LOG_ERR, "%s: Short option", ifp->name);
@@ -609,8 +609,6 @@ ipv6rs_handledata(_unused void *arg)
 			} else
 				opt = xstrdup(ap->saddr);
 			lifetime = ap->prefix_vltime;
-			if (lifetime > 0)
-				has_prefix = 1;
 			break;
 
 		case ND_OPT_MTU:
@@ -743,11 +741,11 @@ ipv6rs_handledata(_unused void *arg)
 	if (!(ifp->state->options->options & DHCPCD_IPV6RA_REQRDNSS))
 		has_dns = 1;
 
-	if (has_prefix && has_dns)
+	if (has_dns)
 		delete_q_timeout(0, handle_exit_timeout, NULL);
 	delete_timeout(NULL, ifp);
 	delete_timeout(NULL, rap); /* reachable timer */
-	if (has_prefix && has_dns)
+	if (has_dns)
 		daemonise();
 	else if (options & DHCPCD_DAEMONISE &&
 	    !(options & DHCPCD_DAEMONISED) && new_data)
