@@ -219,7 +219,7 @@ dhcp6_makevendor(struct dhcp6_option *o)
 		o->code = htons(D6_OPTION_VENDOR);
 		o->len = htons(len);
 		p = D6_OPTION_DATA(o);
-		u32 = DHCPCD_IANA_PEN;
+		u32 = htonl(DHCPCD_IANA_PEN);
 		memcpy(p, &u32, sizeof(u32));
 		p += sizeof(u32);
 #ifdef VENDOR_SPLIT
