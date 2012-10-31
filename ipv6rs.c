@@ -453,6 +453,17 @@ ipv6rs_handledata(_unused void *arg)
 			break;
 	}
 
+	nd_ra = (struct nd_router_advert *)icp;
+	/* If the lifetime of the router is zero, just expire it
+	 * if we already have it and move on. */
+	if (nd_ra->nd_ra_router_lifetime == 0) {
+		if (rap) {
+			rap->lifetime = 0;
+			ipv6rs_expire(ifp);
+		}
+		return;
+	}
+
 	/* We don't want to spam the log with the fact we got an RA every
 	 * 30 seconds or so, so only spam the log if it's different. */
 	if (options & DHCPCD_DEBUG || rap == NULL ||
@@ -490,7 +501,6 @@ ipv6rs_handledata(_unused void *arg)
 	}
 
 	get_monotonic(&rap->received);
-	nd_ra = (struct nd_router_advert *)icp;
 	rap->flags = nd_ra->nd_ra_flags_reserved;
 	rap->lifetime = ntohs(nd_ra->nd_ra_router_lifetime);
 	if (nd_ra->nd_ra_reachable) {
