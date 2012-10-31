@@ -56,14 +56,8 @@
 #define __UNCONST(a) ((void *)(unsigned long)(const void *)(a))
 #endif
 
-/*
- * We presently don't have an IANA PEN, although I have applied for one.
- * This means we can't really identify ourselves to a DHCPv6 server
- * unlike our DHCPv4 stack.
- * This blows chunks, but you maybe able to use your own or the
- * IANA reserved one of 0.
- */
-//#define DHCPCD_IANA_PEN 0
+/* DHCPCD Project has been assigned an IANA PEN of 40712 */
+#define DHCPCD_IANA_PEN 40712
 
 /* Unsure if I want this */
 //#define VENDOR_SPLIT
