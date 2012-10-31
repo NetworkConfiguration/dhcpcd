@@ -767,6 +767,8 @@ handle_flag:
 		if (new_data)
 			syslog(LOG_WARNING, "%s: no support for DHCPv6 management",
 			    ifp->name);
+		if (options & DHCPCD_TEST)
+			exit(EXIT_SUCCESS);
 //		if (dhcp6_start(ifp, 1) == -1)
 //			syslog(LOG_ERR, "dhcp6_start: %s: %m", ifp->name);
 	} else if (rap->flags & ND_RA_FLAG_OTHER) {
@@ -776,11 +778,12 @@ handle_flag:
 		if (new_data)
 			syslog(LOG_DEBUG, "%s: No DHCPv6 instruction in RA",
 			    ifp->name);
+		if (options & DHCPCD_TEST)
+			exit(EXIT_SUCCESS);
 	}
 
 	/* Expire should be called last as the rap object could be destroyed */
-	if (!(options & DHCPCD_TEST))
-		ipv6rs_expire(ifp);
+	ipv6rs_expire(ifp);
 }
 
 int
@@ -804,9 +807,11 @@ ipv6rs_env(char **env, const char *prefix, const struct interface *ifp)
 	int i;
 	char buffer[32];
 	const char *optn;
+	char **pref, **mtu, **rdnss, **dnssl, ***var, *new;
 
 	i = 0;
 	l = 0;
+	pref = rdnss = dnssl = NULL;
 	get_monotonic(&now);
 	TAILQ_FOREACH(rap, &ipv6_routers, next) {
 		i++;
@@ -822,27 +827,46 @@ ipv6rs_env(char **env, const char *prefix, const struct interface *ifp)
 		TAILQ_FOREACH(rao, &rap->options, next) {
 			if (rao->option == NULL)
 				continue;
-			l++;
-			if (env == NULL)
-				continue;
 			switch (rao->type) {
 			case ND_OPT_PREFIX_INFORMATION:
 				optn = "prefix";
+				var = &pref;
 				break;
 			case ND_OPT_MTU:
 				optn = "mtu";
+				var = &mtu;
 				break;
 			case ND_OPT_RDNSS:
 				optn = "rdnss";
+				var = &rdnss;	
 				break;
 			case ND_OPT_DNSSL:
 				optn = "dnssl";
+				var = &dnssl;
 				break;
 			default:
 				continue;
 			}
-			snprintf(buffer, sizeof(buffer), "ra%d_%s", i, optn);
-			setvar(&env, prefix, buffer, rao->option);
+			if (*var == NULL) {
+				*var = env ? env : &new;
+				l++;
+			} else if (env) {
+				new = realloc(**var,
+				    strlen(**var) + 1 +
+				    strlen(rao->option) + 1);
+				if (new) {
+					**var = new;
+					new += strlen(new);
+					*new++ = ' ';
+					strcpy(new, rao->option);
+					continue;
+				}
+			}
+			if (env) {
+				snprintf(buffer, sizeof(buffer),
+				    "ra%d_%s", i, optn);
+				setvar(&env, prefix, buffer, rao->option);
+			}
 		}
 	}
 
@@ -876,7 +900,7 @@ ipv6rs_expire(void *arg)
 	struct ipv6_addr *ap, *apn;
 	struct ra_opt *rao, *raon;
 	struct timeval now, lt, expire, next;
-	int expired;
+	int expired, valid;
 
 	ifp = arg;
 	get_monotonic(&now);
@@ -890,6 +914,7 @@ ipv6rs_expire(void *arg)
 		lt.tv_usec = 0;
 		timeradd(&rap->received, &lt, &expire);
 		if (timercmp(&now, &expire, >)) {
+			valid = 0;
 			if (!rap->expired) {
 				syslog(LOG_INFO,
 				    "%s: %s: expired default Router",
@@ -897,6 +922,7 @@ ipv6rs_expire(void *arg)
 				rap->expired = expired = 1;
 			}
 		} else {
+			valid = 1;
 			timersub(&expire, &now, &lt);
 			if (!timerisset(&next) || timercmp(&next, &lt, >))
 				next = lt;
@@ -936,10 +962,16 @@ ipv6rs_expire(void *arg)
 				free(rao);
 				continue;
 			}
+			valid = 1;
 			timersub(&rao->expire, &now, &lt);
 			if (!timerisset(&next) || timercmp(&next, &lt, >))
 				next = lt;
 		}
+
+		/* No valid lifetimes are left on the RA, so we might
+		 * as well punt it. */
+		if (!valid)
+			ipv6rs_free_ra(rap);
 	}
 
 	if (timerisset(&next))
