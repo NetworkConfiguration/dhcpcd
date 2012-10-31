@@ -437,6 +437,7 @@ ipv6_build_routes(void)
 	 * If we own the default route, but not RA management itself
 	 * then we need to preserve the last best default route we had */
 	TAILQ_FOREACH_REVERSE_SAFE(rt, routes, rt6head, next, rtn) {
+		TAILQ_REMOVE(routes, rt, next);
 		if (find_route6(nrs, rt) == NULL) {
 			if (!have_default &&
 			    (options & DHCPCD_IPV6RA_OWN_DEFAULT) &&
@@ -451,6 +452,7 @@ ipv6_build_routes(void)
 		}
 		free(rt);
 	}
+
 	free(routes);
 	routes = nrs;
 }
