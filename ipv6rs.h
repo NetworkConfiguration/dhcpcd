@@ -67,7 +67,6 @@ struct ra {
 
 extern TAILQ_HEAD(rahead, ra) ipv6_routers;
 
-
 struct rs_state {
 	unsigned char *rs;
 	size_t rslen;

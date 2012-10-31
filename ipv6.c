@@ -218,14 +218,14 @@ desc_route(const char *cmd, const struct rt6 *rt)
 	gate = inet_ntop(AF_INET6, &rt->gate.s6_addr,
 	    gatebuf, INET6_ADDRSTRLEN);
 	if (IN6_ARE_ADDR_EQUAL(&rt->gate, &in6addr_any))
-		syslog(LOG_DEBUG, "%s: %s route to %s/%d", ifname, cmd,
+		syslog(LOG_INFO, "%s: %s route to %s/%d", ifname, cmd,
 		    dest, ipv6_prefixlen(&rt->net));
 	else if (IN6_ARE_ADDR_EQUAL(&rt->dest, &in6addr_any) &&
 	    IN6_ARE_ADDR_EQUAL(&rt->net, &in6addr_any))
-		syslog(LOG_DEBUG, "%s: %s default route via %s", ifname, cmd,
+		syslog(LOG_INFO, "%s: %s default route via %s", ifname, cmd,
 		    gate);
 	else
-		syslog(LOG_DEBUG, "%s: %s route to %s/%d via %s", ifname, cmd,
+		syslog(LOG_INFO, "%s: %s route to %s/%d via %s", ifname, cmd,
 		    dest, ipv6_prefixlen(&rt->net), gate);
 }
 
@@ -374,7 +374,7 @@ ipv6_build_routes(void)
 {
 	struct rt6head dnr, *nrs;
 	struct rt6 *rt, *rtn, *or;
-	struct ra *rap, *ran;
+	struct ra *rap;
 	struct ipv6_addr *addr;
 	int have_default;
 
@@ -383,8 +383,6 @@ ipv6_build_routes(void)
 
 	TAILQ_INIT(&dnr);
 	TAILQ_FOREACH(rap, &ipv6_routers, next) {
-		if (rap->expired)
-			continue;
 		if (options & DHCPCD_IPV6RA_OWN) {
 			TAILQ_FOREACH(addr, &rap->addrs, next) {
 				rt = make_prefix(rap, addr);
@@ -392,9 +390,11 @@ ipv6_build_routes(void)
 					TAILQ_INSERT_TAIL(&dnr, rt, next);
 			}
 		}
-		rt = make_router(rap);
-		if (rt)
-			TAILQ_INSERT_TAIL(&dnr, rt, next);
+		if (!rap->expired) {
+			rt = make_router(rap);
+			if (rt)
+				TAILQ_INSERT_TAIL(&dnr, rt, next);
+		}
 	}
 
 	nrs = xmalloc(sizeof(*nrs));
@@ -436,7 +436,7 @@ ipv6_build_routes(void)
 	/* Remove old routes we used to manage
 	 * If we own the default route, but not RA management itself
 	 * then we need to preserve the last best default route we had */
-	TAILQ_FOREACH_SAFE(rt, routes, next, rtn) {
+	TAILQ_FOREACH_REVERSE_SAFE(rt, routes, rt6head, next, rtn) {
 		if (find_route6(nrs, rt) == NULL) {
 			if (!have_default &&
 			    (options & DHCPCD_IPV6RA_OWN_DEFAULT) &&
@@ -453,10 +453,4 @@ ipv6_build_routes(void)
 	}
 	free(routes);
 	routes = nrs;
-
-	/* Now drop expired routers */
-	TAILQ_FOREACH_SAFE(rap, &ipv6_routers, next, ran) {
-		if (rap->expired)
-			ipv6rs_drop_ra(rap);
-	}
 }
