@@ -269,6 +269,21 @@ ipv6rs_free_opts(struct ra *rap)
 	}
 }
 
+static int
+ipv6rs_addrexists(struct ipv6_addr *a)
+{
+	struct ra *rap;
+	struct ipv6_addr *ap;
+
+	TAILQ_FOREACH(rap, &ipv6_routers, next) {
+		TAILQ_FOREACH(ap, &rap->addrs, next) {
+			if (memcmp(&ap->addr, &a->addr, sizeof(a->addr)) == 0)
+				return 1;
+		}
+	}
+	return 0;
+}
+
 static void
 ipv6rs_freedrop_addrs(struct ra *rap, int drop)
 {
@@ -276,7 +291,12 @@ ipv6rs_freedrop_addrs(struct ra *rap, int drop)
 
 	while ((ap = TAILQ_FIRST(&rap->addrs))) {
 		TAILQ_REMOVE(&rap->addrs, ap, next);
-		if (drop && (options & DHCPCD_IPV6RA_OWN)) {
+		/* Only drop the address if no other RAs have assigned it.
+		 * This is safe because the RA is removed from the list
+		 * before we are called. */
+		if (drop && (options & DHCPCD_IPV6RA_OWN) &&
+		    !ipv6rs_addrexists(ap))
+		{
 			syslog(LOG_INFO, "%s: deleting address %s",
 			    rap->iface->name, ap->saddr);
 			if (del_address6(rap->iface, ap) == -1)
