@@ -100,6 +100,7 @@ static int ifc;
 static char *cffile;
 static char *pidfile;
 static int linkfd = -1, ipv6rsfd = -1, ipv6nsfd = -1;
+static uint8_t *packet;
 
 struct dhcp_op {
 	uint8_t value;
@@ -191,6 +192,7 @@ cleanup(void)
 	for (i = 0; i < ifdc; i++)
 		free(ifdv[i]);
 	free(ifdv);
+	free(packet);
 #endif
 
 	if (linkfd != -1)
@@ -664,7 +666,6 @@ static void
 handle_dhcp_packet(void *arg)
 {
 	struct interface *iface = arg;
-	uint8_t *packet;
 	struct dhcp_message *dhcp = NULL;
 	const uint8_t *pp;
 	ssize_t bytes;
@@ -674,7 +675,8 @@ handle_dhcp_packet(void *arg)
 	/* We loop through until our buffer is empty.
 	 * The benefit is that if we get >1 DHCP packet in our buffer and
 	 * the first one fails for any reason, we can use the next. */
-	packet = xmalloc(udp_dhcp_len);
+	if (packet == NULL)
+		packet = xmalloc(udp_dhcp_len);
 	for(;;) {
 		bytes = get_raw_packet(iface, ETHERTYPE_IP,
 		    packet, udp_dhcp_len, &partialcsum);
@@ -743,6 +745,7 @@ handle_dhcp_packet(void *arg)
 			break;
 	}
 	free(packet);
+	packet = NULL;
 	free(dhcp);
 }
 
