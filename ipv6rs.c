@@ -619,8 +619,7 @@ ipv6rs_handledata(_unused void *arg)
 				    ifp->name, mtuv);
 				break;
 			}
-			if (rap->mtu == 0 || mtuv < rap->mtu)
-				rap->mtu = mtuv;
+			rap->mtu = mtuv;
 			snprintf(buf, sizeof(buf), "%d", mtuv);
 			opt = xstrdup(buf);
 			break;
@@ -801,6 +800,7 @@ ssize_t
 ipv6rs_env(char **env, const char *prefix, const struct interface *ifp)
 {
 	ssize_t l;
+	size_t len;
 	struct timeval now;
 	const struct ra *rap;
 	const struct ra_opt *rao;
@@ -811,7 +811,6 @@ ipv6rs_env(char **env, const char *prefix, const struct interface *ifp)
 
 	i = 0;
 	l = 0;
-	pref = rdnss = dnssl = NULL;
 	get_monotonic(&now);
 	TAILQ_FOREACH(rap, &ipv6_routers, next) {
 		i++;
@@ -824,10 +823,12 @@ ipv6rs_env(char **env, const char *prefix, const struct interface *ifp)
 		}
 		l++;
 
+		pref = mtu = rdnss = dnssl = NULL;
 		TAILQ_FOREACH(rao, &rap->options, next) {
 			if (rao->option == NULL)
 				continue;
-			switch (rao->type) {
+			var = NULL;
+			switch(rao->type) {
 			case ND_OPT_PREFIX_INFORMATION:
 				optn = "prefix";
 				var = &pref;
@@ -851,6 +852,30 @@ ipv6rs_env(char **env, const char *prefix, const struct interface *ifp)
 				*var = env ? env : &new;
 				l++;
 			} else if (env) {
+				/* With single only options, last one takes
+				 * precedence */
+				if (rao->type == ND_OPT_MTU) {
+					new = strchr(**var, '=');
+					if (new == NULL) {
+						syslog(LOG_ERR, "new is null");
+						continue;
+					} else
+						new++;
+					len = (new - **var) + strlen(rao->option) + 1;
+					if (len > strlen(**var))
+						new = realloc(**var, len);
+					else
+						new = **var;
+					if (new) {
+						**var = new;
+						new = strchr(**var, '=');
+						if (new)
+							strcpy(new + 1, rao->option);
+						else
+							syslog(LOG_ERR, "new is null");
+					}
+					continue;
+				}
 				new = realloc(**var,
 				    strlen(**var) + 1 +
 				    strlen(rao->option) + 1);
