@@ -51,6 +51,7 @@
 
 #define D6_OPTION_CLIENTID		1
 #define D6_OPTION_SERVERID		2
+#define D6_OPTION_IA_NA			3
 #define D6_OPTION_ORO			6
 #define D6_OPTION_IA_ADDR		5
 #define D6_OPTION_PREFERENCE		7
@@ -73,6 +74,7 @@
 #define D6_OPTION_BCMS_SERVER_A		34
 
 #include "dhcp.h"
+#include "ipv6.h"
 extern const struct dhcp_opt const dhcp6_opts[];
 
 struct dhcp6_message {
@@ -87,6 +89,48 @@ struct dhcp6_option {
 	/* followed by data */
 } _packed;
 
+struct dhcp6_status {
+	uint16_t code;
+	uint16_t len;
+	uint16_t status;
+	/* followed by message */
+} _packed;
+
+#define D6_STATUS_OK		0
+#define D6_STATUS_FAIL		1
+#define D6_STATUS_NOADDR	2
+#define D6_STATUS_NOBINDING	3
+#define D6_STATUS_NOTONLINK	4
+#define D6_STATUS_USEMULTICAST	5
+
+#define SOL_MAX_DELAY		1
+#define SOL_TIMEOUT		1
+#define SOL_MAX_RT		120
+#define REQ_TIMEOUT		1
+#define REQ_MAX_RT		30
+#define REQ_MAX_RC		10
+#define CNF_MAX_DELAY		1
+#define CNF_TIMEOUT		1
+#define CNF_MAX_RT		4
+#define CNF_MAX_RD		10
+#define REN_TIMEOUT		10
+#define REN_MAX_RT		600
+#define REB_TIMEOUT		10
+#define REB_MAX_RT		600
+#define INF_MAX_DELAY		1
+#define INF_TIMEOUT		1
+#define INF_MAX_RT		120
+#define REL_TIMEOUT		1
+#define REL_MAX_RC		5
+#define DEC_TIMEOUT		1
+#define DEC_MAX_RC		5
+#define REC_TIMEOUT		2
+#define REC_MAX_RC		8
+#define HOP_COUNT_LIMIT		32
+
+#define DHCP6_RAND_MIN		-100
+#define DHCP6_RAND_MAX		100
+ 
 enum DH6S {
 	DH6S_INIT,
 	DH6S_DISCOVER,
@@ -102,17 +146,38 @@ enum DH6S {
 
 struct dhcp6_state {
 	enum DH6S state;
+	uint8_t iaid[4];
 	time_t start_uptime;
-	int interval;
+
+	/* Message retransmission timings */
+	struct timeval RT;
+	int RTC;
+	int IRT;
+	int MRC;
+	int MRT;
+	void (*MRCcallback)(void *);
+
 	struct dhcp6_message *send;
 	size_t send_len;
+	struct dhcp6_message *recv;
+	size_t recv_len;
 	struct dhcp6_message *new;
 	size_t new_len;
 	struct dhcp6_message *old;
 	size_t old_len;
+
+	uint32_t renew;
+	uint32_t rebind;
+	uint32_t expire;
+	struct ipv6_addrhead addrs;
+	uint32_t lowpl;
+	char leasefile[PATH_MAX];
 };
 
-#define D6_STATE(ifp) ((struct dhcp6_state *)(ifp)->if_data[IF_DATA_DHCP6])
+#define D6_STATE(ifp)							       \
+	((struct dhcp6_state *)(ifp)->if_data[IF_DATA_DHCP6])
+#define D6_CSTATE(ifp)							       \
+	((const struct dhcp6_state *)(ifp)->if_data[IF_DATA_DHCP6])
 #define D6_STATE_RUNNING(ifp) (D6_STATE((ifp)) && D6_STATE((ifp))->new)
 #define D6_FIRST_OPTION(m)						       \
     ((struct dhcp6_option *)						       \
@@ -132,6 +197,7 @@ struct dhcp6_state {
     ((const uint8_t *)(o) + sizeof(struct dhcp6_option))
 
 void dhcp6_printoptions(void);
+int dhcp6_addrexists(const struct ipv6_addr *);
 int dhcp6_start(struct interface *, int);
 ssize_t dhcp6_env(char **, const char *, const struct interface *,
     const struct dhcp6_message *, ssize_t);

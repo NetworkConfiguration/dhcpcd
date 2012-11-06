@@ -37,10 +37,15 @@
 #define UNCONST(a)		((void *)(unsigned long)(const void *)(a))
 
 #define timeval_to_double(tv) ((tv)->tv_sec * 1.0 + (tv)->tv_usec * 1.0e-6)
+#define tv_to_ms(ms, tv) 						\
+	do {								\
+		ms = (tv)->tv_sec * 1000;				\
+		ms += (tv)->tv_usec / 1000;				\
+	} while (0 /* CONSTCOND */);
 #define ms_to_tv(tv, ms) 						\
 	do {								\
-		(tv)->tv_sec = (ms / 1000);				\
-		(tv)->tv_usec = ((ms % 1000) * 1000);			\
+		(tv)->tv_sec = ms / 1000;				\
+		(tv)->tv_usec = (ms - (tv)->tv_sec * 1000) * 1000;	\
 	} while (0 /* CONSTCOND */);
 #define timernorm(tvp)							\
 	do {								\

@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd October 11, 2012
+.Dd November 6, 2012
 .Dt DHCPCD-RUN-HOOKS 8
 .Os
 .Sh NAME
@@ -78,13 +78,13 @@ This is generally just a notification and no action need be taken.
 .It Dv INFORM | Dv INFORM6
 dhcpcd informed a DHCP server about it's address and obtained other
 configuration details.
-.It Dv BOUND
+.It Dv BOUND | Dv BOUND6
 dhcpcd obtained a new lease from a DHCP server.
-.It Dv RENEW
+.It Dv RENEW | Dv RENEW6
 dhcpcd renewed it's lease.
-.It Dv REBIND
+.It Dv REBIND | Dv REBIND6
 dhcpcd has rebound to a new DHCP server.
-.It Dv REBOOT
+.It Dv REBOOT | Dv REBOOT6
 dhcpcd successfully requested a lease from a DHCP server.
 .It Dv IPV4LL
 dhcpcd failed to contact any DHCP servers but did obtain an IPV4LL address.

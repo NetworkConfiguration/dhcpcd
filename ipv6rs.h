@@ -55,7 +55,7 @@ struct ra {
 	uint32_t reachable;
 	uint32_t retrans;
 	uint32_t mtu;
-	TAILQ_HEAD(, ipv6_addr) addrs;
+	struct ipv6_addrhead addrs;
 	TAILQ_HEAD(, ra_opt) options;
 	
 	unsigned char *ns;
@@ -79,6 +79,8 @@ int ipv6rs_open(void);
 void ipv6rs_handledata(void *);
 int ipv6rs_start(struct interface *);
 ssize_t ipv6rs_env(char **, const char *, const struct interface *);
+const struct ipv6_addr * ipv6rs_findprefix(const struct ipv6_addr *);
+int ipv6rs_addrexists(const struct ipv6_addr *);
 void ipv6rs_freedrop_ra(struct ra *, int);
 #define ipv6rs_free_ra(ra) ipv6rs_freedrop_ra((ra),  0)
 #define ipv6rs_drop_ra(ra) ipv6rs_freedrop_ra((ra),  1)

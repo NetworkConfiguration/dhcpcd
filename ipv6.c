@@ -39,6 +39,7 @@
 #include "common.h"
 #include "configure.h"
 #include "dhcpcd.h"
+#include "dhcp6.h"
 #include "ipv6.h"
 #include "ipv6rs.h"
 
@@ -47,7 +48,6 @@
 #  define s6_addr32 __u6_addr.__u6_addr32
 #endif
 
-int socket_afnet6;
 static struct rt6head *routes;
 
 #ifdef DEBUG_MEMORY
@@ -64,19 +64,18 @@ ipv6_cleanup()
 }
 #endif
 
-int
-ipv6_open(void)
+int ipv6_init(void)
 {
-	socket_afnet6 = socket(AF_INET6, SOCK_DGRAM, 0);
-	if (socket_afnet6 == -1)
+
+	routes = malloc(sizeof(*routes));
+	if (routes == NULL)
 		return -1;
-	set_cloexec(socket_afnet6);
-	routes = xmalloc(sizeof(*routes));
+
 	TAILQ_INIT(routes);
 #ifdef DEBUG_MEMORY
 	atexit(ipv6_cleanup);
 #endif
-	return socket_afnet6;
+	return 0;
 }
 
 struct in6_addr *
@@ -116,7 +115,7 @@ ipv6_makeaddr(struct in6_addr *addr, const char *ifname,
 {
 	struct in6_addr *lla;
 
-	if (prefix_len > 64) {
+	if (prefix_len < 0 || prefix_len > 64) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -131,6 +130,26 @@ ipv6_makeaddr(struct in6_addr *addr, const char *ifname,
 	addr->s6_addr32[2] = lla->s6_addr32[2];
 	addr->s6_addr32[3] = lla->s6_addr32[3];
 	free(lla);
+	return 0;
+}
+
+int
+ipv6_makeprefix(struct in6_addr *prefix, const struct in6_addr *addr, int len)
+{
+	int bytelen, bitlen;
+
+	if (len < 0 || len > 128) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	bytelen = len / NBBY;
+	bitlen = len % NBBY;
+	memcpy(&prefix->s6_addr, &addr->s6_addr, bytelen);
+	if (bitlen != 0)
+		prefix->s6_addr[bytelen] >>= NBBY - bitlen;
+	memset((char *)prefix->s6_addr + bytelen, 0,
+	    sizeof(prefix->s6_addr) - bytelen);
 	return 0;
 }
 
@@ -188,6 +207,36 @@ ipv6_prefixlen(const struct in6_addr *mask)
 	}
 
 	return x * NBBY + y;
+}
+
+ssize_t
+ipv6_addaddrs(const struct interface *ifp, struct ipv6_addrhead *addrs)
+{
+	struct ipv6_addr *ap;
+	ssize_t i;
+
+	i = 0;
+	TAILQ_FOREACH(ap, addrs, next) {
+		if (ap->prefix_vltime == 0 ||
+		    IN6_IS_ADDR_UNSPECIFIED(&ap->addr))
+			continue;
+		syslog(ap->new ? LOG_INFO : LOG_DEBUG,
+		    "%s: adding address %s",
+		    ifp->name, ap->saddr);
+		if (add_address6(ifp, ap) == -1)
+			syslog(LOG_ERR, "add_address6 %m");
+		else {
+			i++;
+			if (ipv6_removesubnet(ifp, ap) == -1)
+				syslog(LOG_ERR,"ipv6_removesubnet %m");
+			syslog(LOG_DEBUG,
+			    "%s: pltime %d seconds, vltime %d seconds",
+			    ifp->name, ap->prefix_pltime,
+			    ap->prefix_vltime);
+		}
+	}
+
+	return i;
 }
 
 static struct rt6 *
@@ -284,39 +333,43 @@ d_route(struct rt6 *rt)
 }
 
 static struct rt6 *
-make_route(struct ra *rap)
+make_route(const struct interface *ifp, struct ra *rap)
 {
 	struct rt6 *r;
 
 	r = xzalloc(sizeof(*r));
 	r->ra = rap;
-	r->iface = rap->iface;
-	r->metric = rap->iface->metric;
-	r->mtu = rap->mtu;
+	r->iface = ifp;
+	r->metric = ifp->metric;
+	if (rap)
+		r->mtu = rap->mtu;
+	else
+		r->mtu = 0;
 	return r;
 }
 
 static struct rt6 *
-make_prefix(struct ra *rap, struct ipv6_addr *addr)
+make_prefix(const struct interface * ifp,struct ra *rap, struct ipv6_addr *addr)
 {
 	struct rt6 *r;
 
 	if (addr == NULL || addr->prefix_len > 128)
 		return NULL;
 
-	r = make_route(rap);
+	r = make_route(ifp, rap);
 	r->dest = addr->prefix;
 	ipv6_mask(&r->net, addr->prefix_len);
 	r->gate = in6addr_any;
 	return r;
 }
 
+
 static struct rt6 *
 make_router(struct ra *rap)
 {
 	struct rt6 *r;
 
-	r = make_route(rap);
+	r = make_route(rap->iface, rap);
 	r->dest = in6addr_any;
 	r->net = in6addr_any;
 	r->gate = rap->from;
@@ -324,7 +377,7 @@ make_router(struct ra *rap)
 }
 
 int
-ipv6_remove_subnet(struct ra *rap, struct ipv6_addr *addr)
+ipv6_removesubnet(const struct interface *ifp, struct ipv6_addr *addr)
 {
 	struct rt6 *rt;
 #if HAVE_ROUTE_METRIC
@@ -335,9 +388,9 @@ ipv6_remove_subnet(struct ra *rap, struct ipv6_addr *addr)
 	/* We need to delete the subnet route to have our metric or
 	 * prefer the interface. */
 	r = 0;
-	rt = make_prefix(rap, addr);
+	rt = make_prefix(ifp, NULL, addr);
 	if (rt) {
-		rt->iface = rap->iface;
+		rt->iface = ifp;
 #ifdef __linux__
 		rt->metric = 256;
 #else
@@ -370,22 +423,34 @@ ipv6_remove_subnet(struct ra *rap, struct ipv6_addr *addr)
 	    IN6_ARE_ADDR_EQUAL(&((rtp)->net), &in6addr_any))
 
 void
-ipv6_build_routes(void)
+ipv6_buildroutes(void)
 {
 	struct rt6head dnr, *nrs;
 	struct rt6 *rt, *rtn, *or;
 	struct ra *rap;
 	struct ipv6_addr *addr;
+	const struct interface *ifp;
+	const struct dhcp6_state *d6_state;
 	int have_default;
 
 	if (!(options & (DHCPCD_IPV6RA_OWN | DHCPCD_IPV6RA_OWN_DEFAULT)))
 		return;
 
 	TAILQ_INIT(&dnr);
+	for (ifp = ifaces; ifp; ifp = ifp->next) {
+		d6_state = D6_CSTATE(ifp);
+		if (d6_state && d6_state->state == DH6S_BOUND) {
+			TAILQ_FOREACH(addr, &d6_state->addrs, next) {
+				rt = make_prefix(ifp, NULL, addr);
+				if (rt)
+					TAILQ_INSERT_TAIL(&dnr, rt, next);
+			}
+		}
+	}
 	TAILQ_FOREACH(rap, &ipv6_routers, next) {
 		if (options & DHCPCD_IPV6RA_OWN) {
 			TAILQ_FOREACH(addr, &rap->addrs, next) {
-				rt = make_prefix(rap, addr);
+				rt = make_prefix(rap->iface, rap, addr);
 				if (rt)
 					TAILQ_INSERT_TAIL(&dnr, rt, next);
 			}

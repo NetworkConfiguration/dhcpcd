@@ -28,7 +28,7 @@
 #define CONFIG_H
 
 #define PACKAGE			"dhcpcd"
-#define VERSION			"5.99.1"
+#define VERSION			"5.99.2"
 
 #ifndef CONFIG
 # define CONFIG			SYSCONFDIR "/" PACKAGE ".conf"
@@ -41,6 +41,9 @@
 #endif
 #ifndef LEASEFILE
 # define LEASEFILE		DBDIR "/" PACKAGE "-%s.lease"
+#endif
+#ifndef LEASEFILE6
+# define LEASEFILE6		DBDIR "/" PACKAGE "-%s.lease6"
 #endif
 #ifndef PIDFILE
 # define PIDFILE		RUNDIR "/" PACKAGE "%s%s.pid"

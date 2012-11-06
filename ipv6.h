@@ -32,8 +32,6 @@
 
 #include <netinet/in.h>
 
-#include "ipv6rs.h"
-
 #define ALLROUTERS "ff02::2"
 #define HOPLIMIT 255
 
@@ -49,6 +47,7 @@ struct ipv6_addr {
 	int new;
 	char saddr[INET6_ADDRSTRLEN];
 };
+TAILQ_HEAD(ipv6_addrhead, ipv6_addr);
 
 struct rt6 {
 	TAILQ_ENTRY(rt6) next;
@@ -62,15 +61,15 @@ struct rt6 {
 };
 TAILQ_HEAD(rt6head, rt6);
 
-extern int socket_afnet6;
-
-int ipv6_open(void);
+int ipv6_init(void);
 struct in6_addr *ipv6_linklocal(const char *);
 int ipv6_makeaddr(struct in6_addr *, const char *, const struct in6_addr *, int);
+int ipv6_makeprefix(struct in6_addr *, const struct in6_addr *, int);
 int ipv6_mask(struct in6_addr *, int);
 int ipv6_prefixlen(const struct in6_addr *);
-int ipv6_remove_subnet(struct ra *, struct ipv6_addr *);
-void ipv6_build_routes(void);
+ssize_t ipv6_addaddrs(const struct interface *, struct ipv6_addrhead *);
+int ipv6_removesubnet(const struct interface *, struct ipv6_addr *);
+void ipv6_buildroutes(void);
 void ipv6_drop(struct interface *);
 
 #endif

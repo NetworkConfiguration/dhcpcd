@@ -168,7 +168,7 @@ ipv6ns_unreachable(void *arg)
 	syslog(LOG_WARNING, "%s: %s is unreachable, expiring it",
 	    rap->iface->name, rap->sfrom);
 	rap->expired = 1;
-	ipv6_build_routes();
+	ipv6_buildroutes();
 	run_script_reason(rap->iface, "ROUTERADVERT"); /* XXX not RA */
 }
 
@@ -341,7 +341,7 @@ ipv6ns_handledata(_unused void *arg)
 		syslog(LOG_INFO, "%s: %s is no longer a router",
 		    ifp->name, sfrom);
 		rap->expired = 1;
-		ipv6_build_routes();
+		ipv6_buildroutes();
 		run_script_reason(ifp, "ROUTERADVERT");
 		return;
 	}

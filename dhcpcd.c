@@ -217,7 +217,7 @@ handle_exit_timeout(_unused void *arg)
 	int timeout;
 
 	syslog(LOG_ERR, "timed out");
-	if (!(options & DHCPCD_TIMEOUT_IPV4LL)) {
+	if (!(options & DHCPCD_IPV4) || !(options & DHCPCD_TIMEOUT_IPV4LL)) {
 		if (options & DHCPCD_MASTER) {
 			daemonise();
 			return;
@@ -1216,8 +1216,12 @@ start_interface(void *arg)
 		return;
 	}
 
-	if (ifo->options & DHCPCD_INFORM && ifo->options & DHCPCD_IPV6)
-		dhcp6_start(iface, 0);
+	if (ifo->options & DHCPCD_IPV6) {
+		if (ifo->options & DHCPCD_INFORM)
+			dhcp6_start(iface, 0);
+		else if (!(ifo->options & DHCPCD_IPV6RS))
+			dhcp6_start(iface, 1);
+	}
 
 	if (!(ifo->options & DHCPCD_IPV4))
 		return;
@@ -2081,12 +2085,12 @@ main(int argc, char **argv)
 	}
 #endif
 
+	if (options & DHCPCD_IPV6 && ipv6_init() == -1) {
+		options &= ~DHCPCD_IPV6;
+		syslog(LOG_ERR, "ipv6_init: %m");
+	}
 	if (options & DHCPCD_IPV6RS && !check_ipv6(NULL))
 		options &= ~DHCPCD_IPV6RS;
-	if (options & DHCPCD_IPV6RS && ipv6_open() == -1) {
-		options &= ~DHCPCD_IPV6RS;
-		syslog(LOG_ERR, "ipv6_open: %m");
-	}
 	if (options & DHCPCD_IPV6RS) {
 		ipv6rsfd = ipv6rs_open();
 		if (ipv6rsfd == -1) {

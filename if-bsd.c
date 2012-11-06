@@ -276,9 +276,13 @@ if_route(const struct rt *rt, int action)
 int
 if_address6(const struct interface *ifp, const struct ipv6_addr *a, int action)
 {
+	int s, r;
 	struct in6_aliasreq ifa;
 	struct in6_addr mask;
 
+	s = socket(AF_INET6, SOCK_DGRAM, 0);
+	if (s == -1)
+		return -1;
 	memset(&ifa, 0, sizeof(ifa));
 	strlcpy(ifa.ifra_name, ifp->name, sizeof(ifa.ifra_name));
 
@@ -295,8 +299,9 @@ if_address6(const struct interface *ifp, const struct ipv6_addr *a, int action)
 	ifa.ifra_lifetime.ia6t_pltime = a->prefix_pltime;
 #undef ADDADDR
 
-	return ioctl(socket_afnet6,
-	    action < 0 ? SIOCDIFADDR_IN6 : SIOCAIFADDR_IN6, &ifa);
+	r = ioctl(s, action < 0 ? SIOCDIFADDR_IN6 : SIOCAIFADDR_IN6, &ifa);
+	close(s);
+	return r;
 }
 
 int

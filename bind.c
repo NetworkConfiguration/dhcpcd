@@ -64,6 +64,7 @@ daemonise(void)
 	char buf = '\0';
 	int sidpipe[2], fd;
 
+	delete_timeout(handle_exit_timeout, NULL);
 	if (options & DHCPCD_DAEMONISED || !(options & DHCPCD_DAEMONISE))
 		return 0;
 	sigfillset(&full);
@@ -130,7 +131,6 @@ bind_interface(void *arg)
 	/* We're binding an address now - ensure that sockets are closed */
 	close_sockets(iface);
 	state->reason = NULL;
-	delete_timeout(handle_exit_timeout, NULL);
 	if (clock_monotonic)
 		get_monotonic(&lease->boundtime);
 	state->xid = 0;

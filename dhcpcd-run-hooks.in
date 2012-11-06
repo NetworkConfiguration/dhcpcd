@@ -5,7 +5,7 @@
 case "$reason" in
 	ROUTERADVERT)
 		ifsuffix=":ra";;
-	INFORM6|BOUND6|RENEW6|REBIND6|EXPIRE6|RELEASE6|STOP6)
+	INFORM6|BOUND6|RENEW6|REBIND6|REBOOT6|EXPIRE6|RELEASE6|STOP6)
 		ifsuffix=":dhcp6";;
 	*)
 		ifsuffix=;;
