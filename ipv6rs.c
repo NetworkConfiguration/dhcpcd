@@ -687,10 +687,13 @@ ipv6rs_handledata(_unused void *arg)
 				syslog(LOG_ERR, "%s: invalid DNSSL option",
 				    ifp->name);
 			} else {
-				opt = xmalloc(l);
 				tmp = xmalloc(l);
 				decode_rfc3397(tmp, l, n, op);
-				l = print_string(opt, l, l - 1, (uint8_t *)tmp);
+				n = print_string(NULL, 0,
+				    l - 1, (const uint8_t *)tmp);
+				opt = xmalloc(n);
+				print_string(opt, n,
+				    l - 1, (const uint8_t *)tmp);
 				free(tmp);
 			}
 			break;
