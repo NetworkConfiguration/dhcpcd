@@ -401,10 +401,12 @@ get_option_uint8(uint8_t *i, const struct dhcp_message *dhcp, uint8_t option)
 ssize_t
 decode_rfc3397(char *out, ssize_t len, int pl, const uint8_t *p)
 {
+	const char *start;
 	const uint8_t *r, *q = p;
 	int count = 0, l, hops;
 	uint8_t ltype;
 
+	start = out;
 	while (q - p < pl) {
 		r = NULL;
 		hops = 0;
@@ -444,15 +446,19 @@ decode_rfc3397(char *out, ssize_t len, int pl, const uint8_t *p)
 			}
 		}
 		/* change last dot to space */
-		if (out)
+		if (out && out != start)
 			*(out - 1) = ' ';
 		if (r)
 			q = r;
 	}
 
 	/* change last space to zero terminator */
-	if (out)
-		*(out - 1) = 0;
+	if (out) {
+		if (out != start)
+			*(out - 1) = '\0';
+		else if (len > 0)
+			*out = '\0';
+	}
 
 	return count;  
 }
