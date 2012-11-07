@@ -520,7 +520,8 @@ ipv6rs_handledata(_unused void *arg)
 	}
 	if (nd_ra->nd_ra_retransmit)
 		rap->retrans = ntohl(nd_ra->nd_ra_retransmit);
-	rap->expired = (rap->lifetime == 0);
+	if (rap->lifetime)
+		rap->expired = 0;
 
 	len -= sizeof(struct nd_router_advert);
 	p = ((uint8_t *)icp) + sizeof(struct nd_router_advert);
@@ -731,11 +732,14 @@ ipv6rs_handledata(_unused void *arg)
 		add_router(rap);
 	if (options & DHCPCD_IPV6RA_OWN && !(options & DHCPCD_TEST))
 		ipv6_addaddrs(ifp, &rap->addrs);
-	if (!(options & DHCPCD_TEST))
-		ipv6_buildroutes();
-	run_script_reason(ifp, options & DHCPCD_TEST ? "TEST" : "ROUTERADVERT");
-	if (options & DHCPCD_TEST)
+	if (options & DHCPCD_TEST) {
+		run_script_reason(ifp, "TEST");
 		goto handle_flag;
+	}
+	ipv6_buildroutes();
+	/* We will get run by the expire function */
+	if (rap->lifetime)
+		run_script_reason(ifp, "ROUTERADVERT");
 
 	/* If we don't require RDNSS then set has_dns = 1 so we fork */
 	if (!(ifp->state->options->options & DHCPCD_IPV6RA_REQRDNSS))
