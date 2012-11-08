@@ -402,11 +402,13 @@ ssize_t
 decode_rfc3397(char *out, ssize_t len, int pl, const uint8_t *p)
 {
 	const char *start;
+	ssize_t start_len;
 	const uint8_t *r, *q = p;
 	int count = 0, l, hops;
 	uint8_t ltype;
 
 	start = out;
+	start_len = len;
 	while (q - p < pl) {
 		r = NULL;
 		hops = 0;
@@ -456,7 +458,7 @@ decode_rfc3397(char *out, ssize_t len, int pl, const uint8_t *p)
 	if (out) {
 		if (out != start)
 			*(out - 1) = '\0';
-		else if (len > 0)
+		else if (start_len > 0)
 			*out = '\0';
 	}
 
