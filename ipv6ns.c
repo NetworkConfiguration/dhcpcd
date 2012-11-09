@@ -223,7 +223,7 @@ ipv6ns_sendprobe(void *arg)
 		syslog(LOG_ERR, "%s: sendmsg: %m", rap->iface->name);
 
 
-	ms_to_tv(&tv, rap->retrans ? rap->retrans : RETRANS_TIMER);
+	ms_to_tv(&tv, rap->retrans == 0 ? RETRANS_TIMER : rap->retrans);
 	ms_to_tv(&rtv, MIN_RANDOM_FACTOR);
 	timeradd(&tv, &rtv, &tv);
 	rtv.tv_sec = 0;
