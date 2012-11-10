@@ -55,6 +55,9 @@ signal_handle(void (*func)(int), sigset_t *oldset)
 	sa.sa_handler = func;
 	sigemptyset(&sa.sa_mask);
 
+	if (oldset)
+		sigemptyset(&newset);
+
 	for (i = 0; handle_sigs[i]; i++) {
 		if (sigaction(handle_sigs[i], &sa, NULL) == -1)
 			return -1;

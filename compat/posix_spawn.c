@@ -63,7 +63,7 @@ posix_spawnattr_handle(const posix_spawnattr_t *attrp)
 		sigprocmask(SIG_SETMASK, &attrp->posix_attr_sigmask, NULL);
 
 	if (attrp->posix_attr_flags & POSIX_SPAWN_SETSIGDEF) {
-		sa.sa_flags = 0;
+		memset(&sa, 0, sizeof(sa));
 		sa.sa_handler = SIG_DFL;
 		for (i = 1; i < _NSIG; i++) {
 			if (sigismember(&attrp->posix_attr_sigdefault, i)) {
