@@ -295,10 +295,9 @@ start_eloop(const sigset_t *cursigs)
 	const struct timespec *tsp;
 
 	for (;;) {
-		get_monotonic(&now);
-
 		/* Run all timeouts first */
 		if (timeouts) {
+			get_monotonic(&now);
 			if (timercmp(&now, &timeouts->when, >)) {
 				t = timeouts;
 				timeouts = timeouts->next;
@@ -340,8 +339,13 @@ start_eloop(const sigset_t *cursigs)
 		/* Process any triggered events. */
 		if (n) {
 			for (e = events; e; e = e->next) {
-				if (FD_ISSET(e->fd, &read_fds))
+				if (FD_ISSET(e->fd, &read_fds)) {
 					e->callback(e->arg);
+					/* We need to break here as the
+					 * callback could destroy the next
+					 * fd to process. */
+					break;
+				}
 			}
 		}
 	}
