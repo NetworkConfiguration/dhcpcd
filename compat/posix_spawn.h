@@ -28,6 +28,8 @@
 #ifndef POSIX_SPAWN_H
 #define POSIX_SPAWN_H
 
+#include <signal.h>
+
 typedef struct {
 	short posix_attr_flags;
 #define POSIX_SPAWN_SETSIGDEF		0x10

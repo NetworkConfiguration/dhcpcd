@@ -42,6 +42,11 @@
 #include "../common.h"
 #include "posix_spawn.h"
 
+/* Guess */
+#ifndef _SIG_MAXSIG
+#define _SIG_MAXSIG SIGPWR
+#endif
+
 extern char **environ;
 
 static int
