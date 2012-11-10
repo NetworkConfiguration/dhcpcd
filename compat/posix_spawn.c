@@ -42,9 +42,13 @@
 #include "../common.h"
 #include "posix_spawn.h"
 
+#ifndef _NSIG
+#ifdef _SIG_MAXSIG
+#define _NSIG _SIG_MAXSIG + 1
+#else
 /* Guess */
-#ifndef _SIG_MAXSIG
-#define _SIG_MAXSIG SIGPWR
+#define _NSIG SIGPWR + 1
+#endif
 #endif
 
 extern char **environ;
@@ -61,7 +65,7 @@ posix_spawnattr_handle(const posix_spawnattr_t *attrp)
 	if (attrp->posix_attr_flags & POSIX_SPAWN_SETSIGDEF) {
 		sa.sa_flags = 0;
 		sa.sa_handler = SIG_DFL;
-		for (i = 1; i <= _SIG_MAXSIG; i++) {
+		for (i = 1; i < _NSIG; i++) {
 			if (sigismember(&attrp->posix_attr_sigdefault, i)) {
 				if (sigaction(i, &sa, NULL) == -1)
 					return -1;
