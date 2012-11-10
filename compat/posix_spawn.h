@@ -25,15 +25,22 @@
  * SUCH DAMAGE.
  */
 
-#ifndef SIGNALS_H
-#define SIGNALS_H
+#ifndef POSIX_SPAWN_H
+#define POSIX_SPAWN_H
 
-extern const int handle_sigs[];
+typedef struct {
+	short posix_attr_flags;
+#define POSIX_SPAWN_SETSIGDEF		0x10
+#define POSIX_SPAWN_SETSIGMASK		0x20
+	sigset_t posix_attr_sigmask;
+	sigset_t posix_attr_sigdefault;
+} posix_spawnattr_t;
 
-int signal_init(void);
-int signal_setup(void (*)(int), sigset_t *);
-int signal_reset(void);
-int signal_read(void);
-int signal_block(int);
+int posix_spawn(pid_t *, const char *, void *, const posix_spawnattr_t *,
+	char *const [], char *const []);
+int posix_spawnattr_init(posix_spawnattr_t *);
+int posix_spawnattr_setflags(posix_spawnattr_t *, short);
+int posix_spawnattr_setsigmask(posix_spawnattr_t *, const sigset_t *);
+int posix_spawnattr_setsigdefault(posix_spawnattr_t *, const sigset_t *);
 
 #endif

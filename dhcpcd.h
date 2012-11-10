@@ -120,6 +120,7 @@ struct interface {
 };
 
 extern char vendor[VENDORCLASSID_MAX_LEN];
+extern sigset_t dhcpcd_sigset;
 extern int pidfd;
 extern int ifac;
 extern char **ifav;
@@ -135,6 +136,7 @@ void handle_hwaddr(const char *, unsigned char *, size_t);
 void handle_ifa(int, const char *,
     struct in_addr *, struct in_addr *, struct in_addr *);
 void handle_exit_timeout(void *);
+void handle_signal(int);
 void start_interface(void *);
 void start_discover(void *);
 void start_request(void *);

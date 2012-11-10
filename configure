@@ -412,6 +412,31 @@ if [ "$TAILQ_FOREACH_SAFE" = no ]; then
 EOF
 fi
 
+if [ -z "$POSIX_SPAWN" ]; then
+	printf "Testing for posix_spawn ... "
+	cat <<EOF >_posix_spawn.c
+#include <spawn.h>
+#include <stdlib.h>
+int main(void) {
+	posix_spawn(NULL, NULL, NULL, NULL, NULL, NULL);
+	return 0;
+}
+EOF
+	if $XCC _posix_spawn.c -o _posix_spawn 2>/dev/null; then
+		POSIX_SPAWN=yes
+	else
+		POSIX_SPAWN=no
+	fi
+	echo "$POSIX_SPAWN"
+	rm -f _posix_spawn.c _posix_spawn
+fi
+if [ "$POSIX_SPAWN" = no ]; then
+	echo "COMPAT_SRCS+=	compat/posix_spawn.c" >>$CONFIG_MK
+	echo "#include \"compat/posix_spawn.h\"" >>$CONFIG_H
+else
+	echo "#include <spawn.h>" >>$CONFIG_H
+fi
+
 if [ -z "$SERVICECMD" ]; then
 	printf "Checking for OpenRC ... "
 	if [ -x /sbin/rc-service ]; then

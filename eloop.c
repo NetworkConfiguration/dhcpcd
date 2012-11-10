@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2010 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2012 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -30,11 +30,13 @@
 #include <errno.h>
 #include <limits.h>
 #include <poll.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <syslog.h>
 
 #include "common.h"
+#include "dhcpcd.h"
 #include "eloop.h"
 
 static struct timeval now;
@@ -55,9 +57,6 @@ static struct timeout {
 	struct timeout *next;
 } *timeouts;
 static struct timeout *free_timeouts;
-
-static struct pollfd *fds;
-static size_t fds_len;
 
 void
 add_event(int fd, void (*callback)(void *), void *arg)
@@ -274,7 +273,6 @@ cleanup(void)
 		free(free_timeouts);
 		free_timeouts = t;
 	}
-	free(fds);
 }
 
 void
@@ -286,18 +284,20 @@ eloop_init(void)
 #endif
 
 _noreturn void
-start_eloop(void)
+start_eloop(const sigset_t *cursigs)
 {
-	int msecs, n;
-	nfds_t nfds, i;
+	int n, max_fd;
+	fd_set read_fds, error_fds;
 	struct event *e;
 	struct timeout *t;
 	struct timeval tv;
+	struct timespec ts;
+	const struct timespec *tsp;
 
 	for (;;) {
-		/* Run all timeouts first.
-		 * When we have one that has not yet occured,
-		 * calculate milliseconds until it does for use in poll. */
+		get_monotonic(&now);
+
+		/* Run all timeouts first */
 		if (timeouts) {
 			if (timercmp(&now, &timeouts->when, >)) {
 				t = timeouts;
@@ -308,61 +308,40 @@ start_eloop(void)
 				continue;
 			}
 			timersub(&timeouts->when, &now, &tv);
-			if (tv.tv_sec > INT_MAX / 1000 ||
-			    (tv.tv_sec == INT_MAX / 1000 &&
-				(tv.tv_usec + 999) / 1000 > INT_MAX % 1000))
-				msecs = INT_MAX;
-			else
-				msecs = tv.tv_sec * 1000 +
-				    (tv.tv_usec + 999) / 1000;
+			ts.tv_sec = tv.tv_sec;
+			ts.tv_nsec = tv.tv_usec * 1000;
+			tsp = &ts;
 		} else
-			/* No timeouts, so wait forever. */
-			msecs = -1;
+			/* No timeouts, so wait forever */
+			tsp = NULL;
 
-		/* Allocate memory for our pollfds as and when needed.
-		 * We don't bother shrinking it. */
-		nfds = 0;
-		for (e = events; e; e = e->next)
-			nfds++;
-		if (msecs == -1 && nfds == 0) {
+		max_fd = -1;
+		FD_ZERO(&read_fds);
+		FD_ZERO(&error_fds);
+		for (e = events; e; e = e->next) {
+			FD_SET(e->fd, &read_fds);
+			if (e->fd > max_fd)
+				max_fd = e->fd;
+		}
+		if (tsp == NULL && max_fd == -1) {
 			syslog(LOG_ERR, "nothing to do");
 			exit(EXIT_FAILURE);
 		}
-		if (nfds > fds_len) {
-			free(fds);
-			/* Allocate 5 more than we need for future use */
-			fds_len = nfds + 5;
-			fds = xmalloc(sizeof(*fds) * fds_len);
-		}
-		nfds = 0;
-		for (e = events; e; e = e->next) {
-			fds[nfds].fd = e->fd;
-			fds[nfds].events = POLLIN;
-			fds[nfds].revents = 0;
-			nfds++;
-		}
-		n = poll(fds, nfds, msecs);
+
+		n = pselect(max_fd + 1, &read_fds, NULL, &error_fds,
+		    tsp, cursigs);
 		if (n == -1) {
-			if (errno == EAGAIN || errno == EINTR) {
-				get_monotonic(&now);
+			if (errno == EINTR)
 				continue;
-			}
-			syslog(LOG_ERR, "poll: %m");
+			syslog(LOG_ERR, "pselect: %m");
 			exit(EXIT_FAILURE);
 		}
-
-		/* Get the now time and process any triggered events. */
-		get_monotonic(&now);
-		if (n == 0)
-			continue;
-		for (i = 0; i < nfds; i++) {
-			if (!(fds[i].revents & (POLLIN | POLLHUP)))
-				continue;
+		
+		/* Process any triggered events. */
+		if (n) {
 			for (e = events; e; e = e->next) {
-				if (e->fd == fds[i].fd) {
+				if (FD_ISSET(e->fd, &read_fds))
 					e->callback(e->arg);
-					break;
-				}
 			}
 		}
 	}

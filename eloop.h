@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2010 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2012 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -28,6 +28,7 @@
 #ifndef ELOOP_H
 #define ELOOP_H
 
+#include <signal.h>
 #include <time.h>
 
 #ifndef ELOOP_QUEUE
@@ -47,6 +48,6 @@ void add_q_timeout_tv(int queue, const struct timeval *, void (*)(void *),
 void delete_q_timeout(int, void (*)(void *), void *);
 void delete_q_timeouts(int, void *, void (*)(void *), ...);
 void eloop_init(void);
-void start_eloop(void);
+void start_eloop(const sigset_t *);
 
 #endif

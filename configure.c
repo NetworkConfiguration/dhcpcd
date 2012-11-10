@@ -35,6 +35,8 @@
 #include <ctype.h>
 #include <errno.h>
 #include <signal.h>
+/* We can't include spawn.h here because it may not exist.
+ * config.h will pull it in, or our compat one. */
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
@@ -81,29 +83,25 @@ static int
 exec_script(char *const *argv, char *const *env)
 {
 	pid_t pid;
-	sigset_t full;
-	sigset_t old;
+	posix_spawnattr_t attr;
+	sigset_t defsigs;
+	int i;
 
-	/* OK, we need to block signals */
-	sigfillset(&full);
-	sigprocmask(SIG_SETMASK, &full, &old);
-	signal_reset();
-
-	switch (pid = vfork()) {
-	case -1:
-		syslog(LOG_ERR, "vfork: %m");
-		break;
-	case 0:
-		sigprocmask(SIG_SETMASK, &old, NULL);
-		execve(argv[0], argv, env);
-		syslog(LOG_ERR, "%s: %m", argv[0]);
-		_exit(127);
-		/* NOTREACHED */
-	}
-
-	/* Restore our signals */
-	signal_setup();
-	sigprocmask(SIG_SETMASK, &old, NULL);
+	/* posix_spawn is a safe way of executing another image
+	 * and changing signals back to how they should be. */
+	if (posix_spawnattr_init(&attr) == -1)
+		return -1;
+	posix_spawnattr_setflags(&attr,
+	    POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF);
+	sigemptyset(&defsigs);
+	for (i = 0; i < handle_sigs[i]; i++)
+		sigaddset(&defsigs, handle_sigs[i]);
+	posix_spawnattr_setsigdefault(&attr, &defsigs);
+	posix_spawnattr_setsigmask(&attr, &dhcpcd_sigset);
+	errno = 0;
+	i = posix_spawn(&pid, argv[0], NULL, &attr, argv, env);
+	if (i)
+		return -1;
 	return pid;
 }
 
@@ -423,9 +421,10 @@ run_script_reason(const struct interface *iface, const char *reason)
 	env[++elen] = '\0';
 
 	pid = exec_script(argv, env);
-	if (pid == -1)
+	if (pid == -1) {
+		syslog(LOG_ERR, "exec_script: %m");
 		status = -1;
-	else if (pid != 0) {
+	} else if (pid != 0) {
 		/* Wait for the script to finish */
 		while (waitpid(pid, &status, 0) == -1) {
 			if (errno != EINTR) {

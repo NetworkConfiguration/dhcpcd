@@ -92,15 +92,17 @@ char **ifav = NULL;
 int ifdc = 0;
 char **ifdv = NULL;
 
-static char **margv;
-static int margc;
-static struct if_options *if_options;
-static char **ifv;
-static int ifc;
+sigset_t dhcpcd_sigset;
+
 static char *cffile;
+static struct if_options *if_options;
 static char *pidfile;
 static int linkfd = -1, ipv6rsfd = -1, ipv6nsfd = -1;
 static uint8_t *packet;
+static char **ifv;
+static int ifc;
+static char **margv;
+static int margc;
 
 struct dhcp_op {
 	uint8_t value;
@@ -1538,13 +1540,11 @@ reconf_reboot(int action, int argc, char **argv, int oi)
 	sort_interfaces();
 }
 
-/* ARGSUSED */
-static void
-handle_signal(_unused void *arg)
+void
+handle_signal(int sig)
 {
 	struct interface *ifp;
 	struct if_options *ifo;
-	int sig = signal_read();
 	int do_release, i;
 
 	do_release = 0;
@@ -1809,7 +1809,7 @@ main(int argc, char **argv)
 {
 	struct interface *iface;
 	uint16_t family = 0;
-	int opt, oi = 0, signal_fd, sig = 0, i, control_fd;
+	int opt, oi = 0, sig = 0, i, control_fd;
 	size_t len;
 	pid_t pid;
 	struct timespec ts;
@@ -2059,11 +2059,15 @@ main(int argc, char **argv)
 	eloop_init();
 #endif
 
-	if ((signal_fd = signal_init()) == -1)
+	/* This blocks all signals we're interested in.
+	 * eloop uses pselect(2) so that the signals are unblocked
+	 * when we're testing fd's.
+	 * This allows us to ensure a consistent state is maintained
+	 * regardless of when we are interrupted .*/
+	if (signal_setup(handle_signal, &dhcpcd_sigset) == -1) {
+		syslog(LOG_ERR, "signal_setup: %m");
 		exit(EXIT_FAILURE);
-	if (signal_setup() == -1)
-		exit(EXIT_FAILURE);
-	add_event(signal_fd, handle_signal, NULL);
+	}
 
 	if (options & DHCPCD_MASTER) {
 		if (start_control() == -1)
@@ -2196,6 +2200,6 @@ main(int argc, char **argv)
 	for (iface = ifaces; iface; iface = iface->next)
 		add_timeout_sec(0, start_interface, iface);
 
-	start_eloop();
+	start_eloop(&dhcpcd_sigset);
 	exit(EXIT_SUCCESS);
 }

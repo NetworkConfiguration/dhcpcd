@@ -59,16 +59,12 @@ pid_t
 daemonise(void)
 {
 	pid_t pid;
-	sigset_t full;
-	sigset_t old;
 	char buf = '\0';
 	int sidpipe[2], fd;
 
 	delete_timeout(handle_exit_timeout, NULL);
 	if (options & DHCPCD_DAEMONISED || !(options & DHCPCD_DAEMONISE))
 		return 0;
-	sigfillset(&full);
-	sigprocmask(SIG_SETMASK, &full, &old);
 	/* Setup a signal pipe so parent knows when to exit. */
 	if (pipe(sidpipe) == -1) {
 		syslog(LOG_ERR, "pipe: %m");
@@ -96,7 +92,6 @@ daemonise(void)
 		}
 		break;
 	default:
-		signal_reset();
 		/* Wait for child to detach */
 		close(sidpipe[1]);
 		if (read(sidpipe[0], &buf, 1) == -1)
@@ -114,7 +109,6 @@ daemonise(void)
 		exit(EXIT_SUCCESS);
 	}
 	options |= DHCPCD_DAEMONISED;
-	sigprocmask(SIG_SETMASK, &old, NULL);
 	return pid;
 }
 #endif
