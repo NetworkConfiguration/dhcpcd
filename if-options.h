@@ -85,6 +85,7 @@
 #define DHCPCD_IPV4			(1ULL << 35)
 #define DHCPCD_FORKED			(1ULL << 36)
 #define DHCPCD_IPV6			(1ULL << 37)
+#define DHCPCD_STARTED			(1ULL << 38)
 
 extern const struct option cf_options[];
 

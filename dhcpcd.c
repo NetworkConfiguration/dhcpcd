@@ -208,6 +208,9 @@ cleanup(void)
 #ifdef DEBUG_MEMORY
 	free(pidfile);
 #endif
+
+	if (options & DHCPCD_STARTED && !(options & DHCPCD_FORKED))
+		syslog(LOG_INFO, "exited");
 }
 
 /* ARGSUSED */
@@ -2050,6 +2053,7 @@ main(int argc, char **argv)
 	}
 
 	syslog(LOG_INFO, "version " VERSION " starting");
+	options |= DHCPCD_STARTED;
 
 #ifdef DEBUG_MEMORY
 	eloop_init();
