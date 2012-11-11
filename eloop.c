@@ -287,7 +287,7 @@ _noreturn void
 start_eloop(const sigset_t *cursigs)
 {
 	int n, max_fd;
-	fd_set read_fds, error_fds;
+	fd_set read_fds;
 	struct event *e;
 	struct timeout *t;
 	struct timeval tv;
@@ -316,7 +316,6 @@ start_eloop(const sigset_t *cursigs)
 
 		max_fd = -1;
 		FD_ZERO(&read_fds);
-		FD_ZERO(&error_fds);
 		for (e = events; e; e = e->next) {
 			FD_SET(e->fd, &read_fds);
 			if (e->fd > max_fd)
@@ -327,8 +326,7 @@ start_eloop(const sigset_t *cursigs)
 			exit(EXIT_FAILURE);
 		}
 
-		n = pselect(max_fd + 1, &read_fds, NULL, &error_fds,
-		    tsp, cursigs);
+		n = pselect(max_fd + 1, &read_fds, NULL, NULL, tsp, cursigs);
 		if (n == -1) {
 			if (errno == EINTR)
 				continue;
