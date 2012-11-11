@@ -101,8 +101,10 @@ exec_script(char *const *argv, char *const *env)
 	posix_spawnattr_setsigmask(&attr, &dhcpcd_sigset);
 	errno = 0;
 	i = posix_spawn(&pid, argv[0], NULL, &attr, argv, env);
-	if (i)
+	if (i) {
+		errno = i;
 		return -1;
+	}
 	return pid;
 }
 
@@ -422,10 +424,9 @@ run_script_reason(const struct interface *iface, const char *reason)
 	env[++elen] = '\0';
 
 	pid = exec_script(argv, env);
-	if (pid == -1) {
-		syslog(LOG_ERR, "exec_script: %m");
-		status = -1;
-	} else if (pid != 0) {
+	if (pid == -1)
+		syslog(LOG_ERR, "exec_script: %s: %m", argv[0]);
+	else if (pid != 0) {
 		/* Wait for the script to finish */
 		while (waitpid(pid, &status, 0) == -1) {
 			if (errno != EINTR) {
@@ -462,7 +463,7 @@ run_script_reason(const struct interface *iface, const char *reason)
 	while (*ep)
 		free(*ep++);
 	free(env);
-	return status;
+	return WEXITSTATUS(status);
 }
 
 static struct rt *

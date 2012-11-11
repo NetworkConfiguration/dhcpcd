@@ -26,9 +26,7 @@
  */
 
 /* This implementation of posix_spawn is only suitable for the needs of dhcpcd
- * but it could easily be extended to other applications.
- * Also, it does rely on the system being able to modify signals safely within
- * the vfork process which is undefined behaviour, but seems sane in testing. */
+ * but it could easily be extended to other applications. */
 
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -86,7 +84,12 @@ posix_spawn(pid_t *pid, const char * path,
 	volatile int error;
 
 	error = 0;
+#ifdef THERE_IS_NO_FORK
+	/* Pray we can sanely modify signal foo */
 	p = vfork();
+#else
+	p = fork();
+#endif
 	switch (p) {
 	case -1:
 		return errno;
