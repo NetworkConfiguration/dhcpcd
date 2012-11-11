@@ -84,6 +84,7 @@ exec_script(char *const *argv, char *const *env)
 {
 	pid_t pid;
 	posix_spawnattr_t attr;
+	short flags;
 	sigset_t defsigs;
 	int i;
 
@@ -91,8 +92,8 @@ exec_script(char *const *argv, char *const *env)
 	 * and changing signals back to how they should be. */
 	if (posix_spawnattr_init(&attr) == -1)
 		return -1;
-	posix_spawnattr_setflags(&attr,
-	    POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF);
+	flags = POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF;
+	posix_spawnattr_setflags(&attr, flags);
 	sigemptyset(&defsigs);
 	for (i = 0; i < handle_sigs[i]; i++)
 		sigaddset(&defsigs, handle_sigs[i]);
@@ -429,10 +430,13 @@ run_script_reason(const struct interface *iface, const char *reason)
 		while (waitpid(pid, &status, 0) == -1) {
 			if (errno != EINTR) {
 				syslog(LOG_ERR, "waitpid: %m");
-				status = -1;
+				status = 0;
 				break;
 			}
 		}
+		if (WEXITSTATUS(status) == 127)
+			syslog(LOG_ERR, "exec_script: %s: WEXITSTATUS %d",
+			    argv[0], WEXITSTATUS(status));
 	}
 
 	/* Send to our listeners */
