@@ -277,7 +277,7 @@ stop_interface(struct interface *iface)
 	else
 		ifaces = ifp->next;
 
-	dhcp6_drop(iface);
+	dhcp6_drop(iface, NULL);
 	ipv6rs_drop(iface);
 	if (strcmp(iface->state->reason, "RELEASE") != 0)
 		drop_dhcp(iface, "STOP");
@@ -955,7 +955,7 @@ handle_carrier(int action, int flags, const char *ifname)
 			syslog(LOG_INFO, "%s: carrier lost", iface->name);
 			close_sockets(iface);
 			delete_timeouts(iface, start_expire, NULL);
-			dhcp6_drop(iface);
+			dhcp6_drop(iface, "EXPIRE6");
 			ipv6rs_drop(iface);
 			drop_dhcp(iface, "NOCARRIER");
 		}

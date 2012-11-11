@@ -1507,7 +1507,7 @@ dhcp6_start(struct interface *ifp, int manage)
 }
 
 static void
-dhcp6_freedrop(struct interface *ifp, int drop)
+dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 {
 	struct dhcp6_state *state;
 
@@ -1515,8 +1515,11 @@ dhcp6_freedrop(struct interface *ifp, int drop)
 	state = D6_STATE(ifp);
 	if (state) {
 		dhcp6_freedrop_addrs(ifp, drop);
-		if (drop && state->new)
-			run_script_reason(ifp, "STOP6");
+		if (drop && state->new) {
+			if (reason == NULL)
+				reason = "STOP6";
+			run_script_reason(ifp, reason);
+		}
 		free(state->send);
 		free(state->recv);
 		free(state->new);
@@ -1538,17 +1541,17 @@ dhcp6_freedrop(struct interface *ifp, int drop)
 }
 
 void
-dhcp6_drop(struct interface *ifp)
+dhcp6_drop(struct interface *ifp, const char *reason)
 {
 
-	dhcp6_freedrop(ifp, 1);
+	dhcp6_freedrop(ifp, 1, reason);
 }
 
 void
 dhcp6_free(struct interface *ifp)
 {
 
-	dhcp6_freedrop(ifp, 0);
+	dhcp6_freedrop(ifp, 0, NULL);
 }
 
 ssize_t

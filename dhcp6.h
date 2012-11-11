@@ -202,6 +202,6 @@ int dhcp6_start(struct interface *, int);
 ssize_t dhcp6_env(char **, const char *, const struct interface *,
     const struct dhcp6_message *, ssize_t);
 void dhcp6_free(struct interface *);
-void dhcp6_drop(struct interface *);
+void dhcp6_drop(struct interface *, const char *);
 
 #endif
