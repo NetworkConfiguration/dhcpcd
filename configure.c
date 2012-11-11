@@ -435,9 +435,14 @@ run_script_reason(const struct interface *iface, const char *reason)
 				break;
 			}
 		}
-		if (WEXITSTATUS(status) == 127)
-			syslog(LOG_ERR, "exec_script: %s: WEXITSTATUS %d",
-			    argv[0], WEXITSTATUS(status));
+		if (WIFEXITED(status)) {
+			if (WEXITSTATUS(status))
+				syslog(LOG_ERR,
+				    "exec_script: %s: WEXITSTATUS %d",
+				    argv[0], WEXITSTATUS(status));
+		} else if (WIFSIGNALED(status))
+			syslog(LOG_ERR, "exec_sript: %s: %s",
+			    argv[0], strsignal(WTERMSIG(status)));
 	}
 
 	/* Send to our listeners */
