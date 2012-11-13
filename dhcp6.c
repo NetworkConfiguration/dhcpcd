@@ -1097,6 +1097,7 @@ dhcp6_readlease(struct interface *ifp)
 	gettimeofday(&now, NULL);
 	if ((time_t)state->expire < now.tv_sec - st.st_mtime) {
 		syslog(LOG_DEBUG, "%s: discarding expired lease", ifp->name);
+		dhcp6_freedrop_addrs(ifp, 0);
 		goto ex;
 	}
 
