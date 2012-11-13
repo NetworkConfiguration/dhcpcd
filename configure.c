@@ -447,7 +447,7 @@ run_script_reason(const struct interface *iface, const char *reason)
 
 	/* Send to our listeners */
 	bigenv = NULL;
-	for (fd = fds; fd != NULL; fd = fd->next) {
+	for (fd = control_fds; fd != NULL; fd = fd->next) {
 		if (fd->listener) {
 			if (bigenv == NULL) {
 				elen = arraytostr((const char *const *)env,
