@@ -37,23 +37,27 @@
 #define UNCONST(a)		((void *)(unsigned long)(const void *)(a))
 
 #define timeval_to_double(tv) ((tv)->tv_sec * 1.0 + (tv)->tv_usec * 1.0e-6)
-#define tv_to_ms(ms, tv) 						\
-	do {								\
-		ms = (tv)->tv_sec * 1000;				\
-		ms += (tv)->tv_usec / 1000;				\
-	} while (0 /* CONSTCOND */);
-#define ms_to_tv(tv, ms) 						\
-	do {								\
-		(tv)->tv_sec = ms / 1000;				\
-		(tv)->tv_usec = (ms - (tv)->tv_sec * 1000) * 1000;	\
-	} while (0 /* CONSTCOND */);
-#define timernorm(tvp)							\
-	do {								\
-		while ((tvp)->tv_usec >= 1000000) {			\
-			(tvp)->tv_sec++;				\
-			(tvp)->tv_usec -= 1000000;			\
-		}							\
-	} while (0 /* CONSTCOND */);
+#define timernorm(tv) do {						\
+	while ((tv)->tv_usec >= 1000000) {				\
+		(tv)->tv_sec++;						\
+		(tv)->tv_usec -= 1000000;				\
+	}								\
+} while (0 /* CONSTCOND */);
+#define tv_to_ms(ms, tv) do {						\
+	ms = (tv)->tv_sec * 1000;					\
+	ms += (tv)->tv_usec / 1000;					\
+} while (0 /* CONSTCOND */);
+#define ms_to_tv(tv, ms) do { 						\
+	(tv)->tv_sec = ms / 1000;					\
+	(tv)->tv_usec = (ms - ((tv)->tv_sec * 1000)) * 1000;		\
+} while (0 /* CONSTCOND */);
+
+#ifndef TIMEVAL_TO_TIMESPEC
+#define	TIMEVAL_TO_TIMESPEC(tv, ts) do {				\
+	(ts)->tv_sec = (tv)->tv_sec;					\
+	(ts)->tv_nsec = (tv)->tv_usec * 1000;				\
+} while (0 /* CONSTCOND */)
+#endif
 
 #if __GNUC__ > 2 || defined(__INTEL_COMPILER)
 # define _noreturn __attribute__((__noreturn__))

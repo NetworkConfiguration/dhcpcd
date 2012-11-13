@@ -309,8 +309,7 @@ eloop_start(const sigset_t *cursigs)
 				continue;
 			}
 			timersub(&timeouts->when, &now, &tv);
-			ts.tv_sec = tv.tv_sec;
-			ts.tv_nsec = tv.tv_usec * 1000;
+			TIMEVAL_TO_TIMESPEC(&tv, &ts);
 			tsp = &ts;
 		} else
 			/* No timeouts, so wait forever */

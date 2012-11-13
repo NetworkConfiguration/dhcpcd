@@ -330,6 +330,7 @@ send_message(struct interface *iface, int type,
 		}
 		tv.tv_sec = state->interval + DHCP_RAND_MIN;
 		tv.tv_usec = arc4random() % (DHCP_RAND_MAX_U - DHCP_RAND_MIN_U);
+		timernorm(&tv);
 		syslog(LOG_DEBUG,
 		    "%s: sending %s (xid 0x%x), next in %0.2f seconds",
 		    iface->name, get_dhcp_op(type), state->xid,
