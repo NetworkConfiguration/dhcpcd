@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2008 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2012 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -28,6 +28,7 @@
 #ifndef IPV4LL_H
 #define IPV4LL_H
 
-void start_ipv4ll(void *);
-void handle_ipv4ll_failure(void *);
+void ipv4ll_start(void *);
+void ipv4ll_handle_failure(void *);
+
 #endif

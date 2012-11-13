@@ -1002,9 +1002,9 @@ start_discover(void *arg)
 	{
 		if (IN_LINKLOCAL(htonl(iface->state->fail.s_addr)))
 			eloop_timeout_add_sec(RATE_LIMIT_INTERVAL,
-			    start_ipv4ll, iface);
+			    ipv4ll_start, iface);
 		else
-			eloop_timeout_add_sec(timeout, start_ipv4ll, iface);
+			eloop_timeout_add_sec(timeout, ipv4ll_start, iface);
 	}
 	if (ifo->options & DHCPCD_REQUEST)
 		syslog(LOG_INFO, "%s: broadcasting for a lease (requesting %s)",
@@ -1284,7 +1284,7 @@ start_interface(void *arg)
 		start_discover(iface);
 	else if (iface->state->offer->cookie == 0 &&
 	    iface->state->options->options & DHCPCD_IPV4LL)
-		start_ipv4ll(iface);
+		ipv4ll_start(iface);
 	else
 		start_reboot(iface);
 }

@@ -41,7 +41,7 @@
 #include "net.h"
 
 static struct dhcp_message *
-make_ipv4ll_lease(uint32_t addr)
+ipv4ll_make_lease(uint32_t addr)
 {
 	uint32_t u32;
 	struct dhcp_message *dhcp;
@@ -67,7 +67,7 @@ make_ipv4ll_lease(uint32_t addr)
 }
 
 static struct dhcp_message *
-find_ipv4ll_lease(uint32_t old_addr)
+ipv4ll_find_lease(uint32_t old_addr)
 {
 	uint32_t addr;
 
@@ -79,78 +79,78 @@ find_ipv4ll_lease(uint32_t old_addr)
 		    IN_LINKLOCAL(ntohl(addr)))
 			break;
 	}
-	return make_ipv4ll_lease(addr);
+	return ipv4ll_make_lease(addr);
 }
 
 void
-start_ipv4ll(void *arg)
+ipv4ll_start(void *arg)
 {
-	struct interface *iface = arg;
+	struct interface *ifp = arg;
 	uint32_t addr;
 
-	eloop_timeout_delete(NULL, iface);
-	iface->state->probes = 0;
-	iface->state->claims = 0;
-	if (iface->addr.s_addr) {
-		iface->state->conflicts = 0;
-		if (IN_LINKLOCAL(htonl(iface->addr.s_addr))) {
-			send_arp_announce(iface);
+	eloop_timeout_delete(NULL, ifp);
+	ifp->state->probes = 0;
+	ifp->state->claims = 0;
+	if (ifp->addr.s_addr) {
+		ifp->state->conflicts = 0;
+		if (IN_LINKLOCAL(htonl(ifp->addr.s_addr))) {
+			send_arp_announce(ifp);
 			return;
 		}
 	}
 
-	if (iface->state->offer == NULL)
+	if (ifp->state->offer == NULL)
 		addr = 0;
 	else {
-		addr = iface->state->offer->yiaddr;
-		free(iface->state->offer);
+		addr = ifp->state->offer->yiaddr;
+		free(ifp->state->offer);
 	}
 	/* We maybe rebooting an IPv4LL address. */
 	if (!IN_LINKLOCAL(htonl(addr))) {
 		syslog(LOG_INFO, "%s: probing for an IPv4LL address",
-		    iface->name);
+		    ifp->name);
 		addr = 0;
 	}
 	if (addr == 0)
-		iface->state->offer = find_ipv4ll_lease(addr);
+		ifp->state->offer = ipv4ll_find_lease(addr);
 	else
-		iface->state->offer = make_ipv4ll_lease(addr);
-	iface->state->lease.frominfo = 0;
-	send_arp_probe(iface);
+		ifp->state->offer = ipv4ll_make_lease(addr);
+	ifp->state->lease.frominfo = 0;
+	send_arp_probe(ifp);
 }
 
 void
-handle_ipv4ll_failure(void *arg)
+ipv4ll_handle_failure(void *arg)
 {
-	struct interface *iface = arg;
+	struct interface *ifp = arg;
 	time_t up;
 
-	if (iface->state->fail.s_addr == iface->addr.s_addr) {
+	if (ifp->state->fail.s_addr == ifp->addr.s_addr) {
 		up = uptime();
-		if (iface->state->defend + DEFEND_INTERVAL > up) {
+		if (ifp->state->defend + DEFEND_INTERVAL > up) {
 			syslog(LOG_DEBUG,
 			    "%s: IPv4LL %d second defence failed",
-			    iface->name, DEFEND_INTERVAL);
-			drop_dhcp(iface, "EXPIRE");
-			iface->state->conflicts = -1;
+			    ifp->name, DEFEND_INTERVAL);
+			drop_dhcp(ifp, "EXPIRE");
+			ifp->state->conflicts = -1;
 		} else {
 			syslog(LOG_DEBUG, "%s: defended IPv4LL address",
-			    iface->name);
-			iface->state->defend = up;
+			    ifp->name);
+			ifp->state->defend = up;
 			return;
 		}
 	}
 
-	close_sockets(iface);
-	free(iface->state->offer);
-	iface->state->offer = NULL;
-	eloop_timeout_delete(NULL, iface);
-	if (++iface->state->conflicts > MAX_CONFLICTS) {
+	close_sockets(ifp);
+	free(ifp->state->offer);
+	ifp->state->offer = NULL;
+	eloop_timeout_delete(NULL, ifp);
+	if (++ifp->state->conflicts > MAX_CONFLICTS) {
 		syslog(LOG_ERR, "%s: failed to acquire an IPv4LL address",
-		    iface->name);
-		iface->state->interval = RATE_LIMIT_INTERVAL / 2;
-		start_discover(iface);
+		    ifp->name);
+		ifp->state->interval = RATE_LIMIT_INTERVAL / 2;
+		start_discover(ifp);
 	} else {
-		eloop_timeout_add_sec(PROBE_WAIT, start_ipv4ll, iface);
+		eloop_timeout_add_sec(PROBE_WAIT, ipv4ll_start, ifp);
 	}
 }

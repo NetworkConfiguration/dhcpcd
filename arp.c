@@ -86,7 +86,7 @@ handle_arp_failure(struct interface *ifp)
 	    (ifp->state->new != NULL &&
 		ifp->state->new->cookie != htonl(MAGIC_COOKIE)))
 	{
-		handle_ipv4ll_failure(ifp);
+		ipv4ll_handle_failure(ifp);
 		return;
 	}
 
