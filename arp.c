@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2011 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2012 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -45,7 +45,7 @@
 	(sizeof(struct arphdr) + (2 * sizeof(uint32_t)) + (2 * HWADDR_LEN))
 
 static int
-send_arp(const struct interface *iface, int op, in_addr_t sip, in_addr_t tip)
+send_arp(const struct interface *ifp, int op, in_addr_t sip, in_addr_t tip)
 {
 	uint8_t arp_buffer[ARP_LEN];
 	struct arphdr ar;
@@ -53,72 +53,72 @@ send_arp(const struct interface *iface, int op, in_addr_t sip, in_addr_t tip)
 	uint8_t *p;
 	int retval;
 
-	ar.ar_hrd = htons(iface->family);
+	ar.ar_hrd = htons(ifp->family);
 	ar.ar_pro = htons(ETHERTYPE_IP);
-	ar.ar_hln = iface->hwlen;
+	ar.ar_hln = ifp->hwlen;
 	ar.ar_pln = sizeof(sip);
 	ar.ar_op = htons(op);
 	memcpy(arp_buffer, &ar, sizeof(ar));
 	p = arp_buffer + sizeof(ar);
-	memcpy(p, iface->hwaddr, iface->hwlen);
-	p += iface->hwlen;
+	memcpy(p, ifp->hwaddr, ifp->hwlen);
+	p += ifp->hwlen;
 	memcpy(p, &sip, sizeof(sip));
 	p += sizeof(sip);
 	/* ARP requests should ignore this */
-	retval = iface->hwlen;
+	retval = ifp->hwlen;
 	while (retval--)
 		*p++ = '\0';
 	memcpy(p, &tip, sizeof(tip));
 	p += sizeof(tip);
 	len = p - arp_buffer;
-	retval = send_raw_packet(iface, ETHERTYPE_ARP, arp_buffer, len);
+	retval = send_raw_packet(ifp, ETHERTYPE_ARP, arp_buffer, len);
 	return retval;
 }
 
 static void
-handle_arp_failure(struct interface *iface)
+handle_arp_failure(struct interface *ifp)
 {
 
 	/* If we failed without a magic cookie then we need to try
 	 * and defend our IPv4LL address. */
-	if ((iface->state->offer != NULL &&
-		iface->state->offer->cookie != htonl(MAGIC_COOKIE)) ||
-	    (iface->state->new != NULL &&
-		iface->state->new->cookie != htonl(MAGIC_COOKIE)))
+	if ((ifp->state->offer != NULL &&
+		ifp->state->offer->cookie != htonl(MAGIC_COOKIE)) ||
+	    (ifp->state->new != NULL &&
+		ifp->state->new->cookie != htonl(MAGIC_COOKIE)))
 	{
-		handle_ipv4ll_failure(iface);
+		handle_ipv4ll_failure(ifp);
 		return;
 	}
 
-	unlink(iface->leasefile);
-	if (!iface->state->lease.frominfo)
-		send_decline(iface);
-	close_sockets(iface);
-	delete_timeout(NULL, iface);
-	if (iface->state->lease.frominfo)
-		start_interface(iface);
+	unlink(ifp->leasefile);
+	if (!ifp->state->lease.frominfo)
+		send_decline(ifp);
+	close_sockets(ifp);
+	eloop_timeout_delete(NULL, ifp);
+	if (ifp->state->lease.frominfo)
+		start_interface(ifp);
 	else
-		add_timeout_sec(DHCP_ARP_FAIL, start_interface, iface);
+		eloop_timeout_add_sec(DHCP_ARP_FAIL, start_interface, ifp);
 }
 
 static void
 handle_arp_packet(void *arg)
 {
-	struct interface *iface = arg;
+	struct interface *ifp = arg;
 	uint8_t arp_buffer[ARP_LEN];
 	struct arphdr ar;
 	uint32_t reply_s;
 	uint32_t reply_t;
 	uint8_t *hw_s, *hw_t;
 	ssize_t bytes;
-	struct if_state *state = iface->state;
+	struct if_state *state = ifp->state;
 	struct if_options *opts = state->options;
 	const char *hwaddr;
 	struct in_addr ina;
 
 	state->fail.s_addr = 0;
 	for(;;) {
-		bytes = get_raw_packet(iface, ETHERTYPE_ARP,
+		bytes = get_raw_packet(ifp, ETHERTYPE_ARP,
 		    arp_buffer, sizeof(arp_buffer), NULL);
 		if (bytes == 0 || bytes == -1)
 			return;
@@ -143,8 +143,8 @@ handle_arp_packet(void *arg)
 		if ((hw_t + ar.ar_hln + ar.ar_pln) - arp_buffer > bytes)
 			continue;
 		/* Ignore messages from ourself */
-		if (ar.ar_hln == iface->hwlen &&
-		    memcmp(hw_s, iface->hwaddr, iface->hwlen) == 0)
+		if (ar.ar_hln == ifp->hwlen &&
+		    memcmp(hw_s, ifp->hwaddr, ifp->hwlen) == 0)
 			continue;
 		/* Copy out the IP addresses */
 		memcpy(&reply_s, hw_s + ar.ar_hln, ar.ar_pln);
@@ -162,13 +162,13 @@ handle_arp_packet(void *arg)
 			    (size_t)ar.ar_hln);
 			syslog(LOG_INFO,
 			    "%s: found %s on hardware address %s",
-			    iface->name, inet_ntoa(ina), hwaddr);
-			if (select_profile(iface, hwaddr) == -1 &&
+			    ifp->name, inet_ntoa(ina), hwaddr);
+			if (select_profile(ifp, hwaddr) == -1 &&
 			    errno == ENOENT)
-				select_profile(iface, inet_ntoa(ina));
-			close_sockets(iface);
-			delete_timeout(NULL, iface);
-			start_interface(iface);
+				select_profile(ifp, inet_ntoa(ina));
+			close_sockets(ifp);
+			eloop_timeout_delete(NULL, ifp);
+			start_interface(ifp);
 			return;
 		}
 
@@ -179,19 +179,19 @@ handle_arp_packet(void *arg)
 			state->fail.s_addr = state->offer->yiaddr;
 
 		/* Handle IPv4LL conflicts */
-		if (IN_LINKLOCAL(htonl(iface->addr.s_addr)) &&
-		    (reply_s == iface->addr.s_addr ||
-			(reply_s == 0 && reply_t == iface->addr.s_addr)))
-			state->fail.s_addr = iface->addr.s_addr;
+		if (IN_LINKLOCAL(htonl(ifp->addr.s_addr)) &&
+		    (reply_s == ifp->addr.s_addr ||
+			(reply_s == 0 && reply_t == ifp->addr.s_addr)))
+			state->fail.s_addr = ifp->addr.s_addr;
 
 		if (state->fail.s_addr) {
 			syslog(LOG_ERR, "%s: hardware address %s claims %s",
-			    iface->name,
+			    ifp->name,
 			    hwaddr_ntoa((unsigned char *)hw_s,
 				(size_t)ar.ar_hln),
 			    inet_ntoa(state->fail));
 			errno = EEXIST;
-			handle_arp_failure(iface);
+			handle_arp_failure(ifp);
 			return;
 		}
 	}
@@ -200,30 +200,30 @@ handle_arp_packet(void *arg)
 void
 send_arp_announce(void *arg)
 {
-	struct interface *iface = arg;
-	struct if_state *state = iface->state;
+	struct interface *ifp = arg;
+	struct if_state *state = ifp->state;
 	struct timeval tv;
 
 	if (state->new == NULL)
 		return;
-	if (iface->arp_fd == -1) {
-		open_socket(iface, ETHERTYPE_ARP);
-		add_event(iface->arp_fd, handle_arp_packet, iface);
+	if (ifp->arp_fd == -1) {
+		open_socket(ifp, ETHERTYPE_ARP);
+		eloop_event_add(ifp->arp_fd, handle_arp_packet, ifp);
 	}
 	if (++state->claims < ANNOUNCE_NUM)	
 		syslog(LOG_DEBUG,
 		    "%s: sending ARP announce (%d of %d), "
 		    "next in %d.00 seconds",
-		    iface->name, state->claims, ANNOUNCE_NUM, ANNOUNCE_WAIT);
+		    ifp->name, state->claims, ANNOUNCE_NUM, ANNOUNCE_WAIT);
 	else
 		syslog(LOG_DEBUG,
 		    "%s: sending ARP announce (%d of %d)",
-		    iface->name, state->claims, ANNOUNCE_NUM);
-	if (send_arp(iface, ARPOP_REQUEST,
+		    ifp->name, state->claims, ANNOUNCE_NUM);
+	if (send_arp(ifp, ARPOP_REQUEST,
 		state->new->yiaddr, state->new->yiaddr) == -1)
 		syslog(LOG_ERR, "send_arp: %m");
 	if (state->claims < ANNOUNCE_NUM) {
-		add_timeout_sec(ANNOUNCE_WAIT, send_arp_announce, iface);
+		eloop_timeout_add_sec(ANNOUNCE_WAIT, send_arp_announce, ifp);
 		return;
 	}
 	if (state->new->cookie != htonl(MAGIC_COOKIE)) {
@@ -236,19 +236,19 @@ send_arp_announce(void *arg)
 		tv.tv_sec = state->interval - DHCP_RAND_MIN;
 		tv.tv_usec = arc4random() % (DHCP_RAND_MAX_U - DHCP_RAND_MIN_U);
 		timernorm(&tv);
-		add_timeout_tv(&tv, start_discover, iface);
+		eloop_timeout_add_tv(&tv, start_discover, ifp);
 	} else {
-		delete_event(iface->arp_fd);
-		close(iface->arp_fd);
-		iface->arp_fd = -1;
+		eloop_event_delete(ifp->arp_fd);
+		close(ifp->arp_fd);
+		ifp->arp_fd = -1;
 	}
 }
 
 void
 send_arp_probe(void *arg)
 {
-	struct interface *iface = arg;
-	struct if_state *state = iface->state;
+	struct interface *ifp = arg;
+	struct if_state *state = ifp->state;
 	struct in_addr addr;
 	struct timeval tv;
 	int arping = 0;
@@ -262,49 +262,50 @@ send_arp_probe(void *arg)
 		else
 			addr.s_addr = state->offer->ciaddr;
 	} else
-		addr.s_addr = iface->addr.s_addr;
+		addr.s_addr = ifp->addr.s_addr;
 
-	if (iface->arp_fd == -1) {
-		open_socket(iface, ETHERTYPE_ARP);
-		add_event(iface->arp_fd, handle_arp_packet, iface);
+	if (ifp->arp_fd == -1) {
+		open_socket(ifp, ETHERTYPE_ARP);
+		eloop_event_add(ifp->arp_fd, handle_arp_packet, ifp);
 	}
 	if (state->probes == 0) {
 		if (arping)
 			syslog(LOG_INFO, "%s: searching for %s",
-			    iface->name, inet_ntoa(addr));
+			    ifp->name, inet_ntoa(addr));
 		else
 			syslog(LOG_INFO, "%s: checking for %s",
-			    iface->name, inet_ntoa(addr));
+			    ifp->name, inet_ntoa(addr));
 	}
 	if (++state->probes < PROBE_NUM) {
 		tv.tv_sec = PROBE_MIN;
 		tv.tv_usec = arc4random() % (PROBE_MAX_U - PROBE_MIN_U);
 		timernorm(&tv);
-		add_timeout_tv(&tv, send_arp_probe, iface);
+		eloop_timeout_add_tv(&tv, send_arp_probe, ifp);
 	} else {
 		tv.tv_sec = ANNOUNCE_WAIT;
 		tv.tv_usec = 0;
 		if (arping) {
 			state->probes = 0;
 			if (++state->arping_index < state->options->arping_len)
-				add_timeout_tv(&tv, send_arp_probe, iface);
+				eloop_timeout_add_tv(&tv, send_arp_probe, ifp);
 			else
-				add_timeout_tv(&tv, start_interface, iface);
+				eloop_timeout_add_tv(&tv, start_interface, ifp);
 		} else
-			add_timeout_tv(&tv, bind_interface, iface);
+			eloop_timeout_add_tv(&tv, bind_interface, ifp);
 	}
 	syslog(LOG_DEBUG,
 	    "%s: sending ARP probe (%d of %d), next in %0.2f seconds",
-	    iface->name, state->probes ? state->probes : PROBE_NUM, PROBE_NUM,
+	    ifp->name, state->probes ? state->probes : PROBE_NUM, PROBE_NUM,
 	    timeval_to_double(&tv));
-	if (send_arp(iface, ARPOP_REQUEST, 0, addr.s_addr) == -1)
+	if (send_arp(ifp, ARPOP_REQUEST, 0, addr.s_addr) == -1)
 		syslog(LOG_ERR, "send_arp: %m");
 }
 
 void
-start_arping(struct interface *iface)
+start_arping(struct interface *ifp)
 {
-	iface->state->probes = 0;
-	iface->state->arping_index = 0;
-	send_arp_probe(iface);
+
+	ifp->state->probes = 0;
+	ifp->state->arping_index = 0;
+	send_arp_probe(ifp);
 }

@@ -35,19 +35,23 @@
   #define ELOOP_QUEUE 0
 #endif
 
-#define add_timeout_tv(a, b, c) add_q_timeout_tv(ELOOP_QUEUE, a, b, c)
-#define add_timeout_sec(a, b, c) add_q_timeout_sec(ELOOP_QUEUE, a, b, c)
-#define delete_timeout(a, b) delete_q_timeout(ELOOP_QUEUE, a, b)
-#define delete_timeouts(a, ...) delete_q_timeouts(ELOOP_QUEUE, a, __VA_ARGS__)
+#define eloop_timeout_add_tv(a, b, c) \
+    eloop_q_timeout_add_tv(ELOOP_QUEUE, a, b, c)
+#define eloop_timeout_add_sec(a, b, c) \
+    eloop_q_timeout_add_sec(ELOOP_QUEUE, a, b, c)
+#define eloop_timeout_delete(a, b) \
+    eloop_q_timeout_delete(ELOOP_QUEUE, a, b)
+#define eloop_timeouts_delete(a, ...) \
+    eloop_q_timeouts_delete(ELOOP_QUEUE, a, __VA_ARGS__)
 
-void add_event(int fd, void (*)(void *), void *);
-void delete_event(int fd);
-void add_q_timeout_sec(int queue, time_t, void (*)(void *), void *);
-void add_q_timeout_tv(int queue, const struct timeval *, void (*)(void *),
+void eloop_event_add(int fd, void (*)(void *), void *);
+void eloop_event_delete(int fd);
+void eloop_q_timeout_add_sec(int queue, time_t, void (*)(void *), void *);
+void eloop_q_timeout_add_tv(int queue, const struct timeval *, void (*)(void *),
     void *);
-void delete_q_timeout(int, void (*)(void *), void *);
-void delete_q_timeouts(int, void *, void (*)(void *), ...);
+void eloop_q_timeout_delete(int, void (*)(void *), void *);
+void eloop_q_timeouts_delete(int, void *, void (*)(void *), ...);
 void eloop_init(void);
-void start_eloop(const sigset_t *);
+void eloop_start(const sigset_t *);
 
 #endif

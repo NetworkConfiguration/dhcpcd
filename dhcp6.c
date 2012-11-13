@@ -653,9 +653,10 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 	state->RTC++;
 	if (callback) {
 		if (state->MRC == 0 || state->RTC < state->MRC)
-			add_timeout_tv(&state->RT, callback, ifp);
+			eloop_timeout_add_tv(&state->RT, callback, ifp);
 		else if (state->MRC != 0 && state->MRCcallback)
-			add_timeout_tv(&state->RT, state->MRCcallback, ifp);
+			eloop_timeout_add_tv(&state->RT, state->MRCcallback,
+			    ifp);
 		else
 			syslog(LOG_WARNING, "%s: sent %d times with no reply",
 			    ifp->name, state->RTC);
@@ -732,7 +733,7 @@ dhcp6_startrebind(void *arg)
 	struct dhcp6_state *state;
 
 	ifp = arg;
-	delete_timeout(dhcp6_sendrenew, ifp);
+	eloop_timeout_delete(dhcp6_sendrenew, ifp);
 	state = D6_STATE(ifp);
 	state->state = DH6S_REBIND;
 	state->RTC = 0;
@@ -761,7 +762,7 @@ dhcp6_startdiscover(void *arg)
 	state->MRT = SOL_MAX_RT;
 	state->MRC = 0;
 
-	delete_timeout(NULL, ifp);
+	eloop_timeout_delete(NULL, ifp);
 	free(state->new);
 	state->new = NULL;
 	state->new_len = 0;
@@ -804,7 +805,7 @@ dhcp6_startrequest(struct interface *ifp)
 {
 	struct dhcp6_state *state;
 
-	delete_timeout(dhcp6_senddiscover, ifp);
+	eloop_timeout_delete(dhcp6_senddiscover, ifp);
 	state = D6_STATE(ifp);
 	state->state = DH6S_REQUEST;
 	state->RTC = 0;
@@ -838,7 +839,7 @@ dhcp6_startconfirm(struct interface *ifp)
 		return;
 	}
 	dhcp6_sendconfirm(ifp);
-	add_timeout_sec(CNF_MAX_RD, dhcp6_failconfirm, ifp);
+	eloop_timeout_add_sec(CNF_MAX_RD, dhcp6_failconfirm, ifp);
 }
 
 static void
@@ -867,7 +868,7 @@ dhcp6_startexpire(void *arg)
 	const struct dhcp6_state *state;
 
 	ifp = arg;
-	delete_timeout(dhcp6_sendrebind, ifp);
+	eloop_timeout_delete(dhcp6_sendrebind, ifp);
 
 	syslog(LOG_ERR, "%s: DHCPv6 lease expired", ifp->name);
 	dhcp6_freedrop_addrs(ifp, 1);
@@ -1313,7 +1314,7 @@ recv:
 	syslog(LOG_INFO, "%s: %s received from %s", ifp->name, op, sfrom);
 
 	reason = NULL; 
-	delete_timeout(NULL, ifp);
+	eloop_timeout_delete(NULL, ifp);
 	switch(state->state) {
 	case DH6S_INFORM:
 		state->renew = 0;
@@ -1367,11 +1368,14 @@ recv:
 	if (!(options & DHCPCD_TEST)) {
 		state->state = DH6S_BOUND;
 		if (state->renew)
-			add_timeout_sec(state->renew, dhcp6_startrenew, ifp);
+			eloop_timeout_add_sec(state->renew,
+			    dhcp6_startrenew, ifp);
 		if (state->rebind)
-			add_timeout_sec(state->rebind, dhcp6_startrebind, ifp);
+			eloop_timeout_add_sec(state->rebind,
+			    dhcp6_startrebind, ifp);
 		if (state->expire != ~0U)
-			add_timeout_sec(state->expire, dhcp6_startexpire, ifp);
+			eloop_timeout_add_sec(state->expire,
+			    dhcp6_startexpire, ifp);
 		ipv6_addaddrs(ifp, &state->addrs);
 		if (state->renew || state->rebind)
 			syslog(LOG_INFO,
@@ -1442,7 +1446,7 @@ dhcp6_open(void)
 	if (set_cloexec(sock) == -1 || set_nonblock(sock) == -1)
 		goto errexit;
 
-	add_event(sock, dhcp6_handledata, NULL);
+	eloop_event_add(sock, dhcp6_handledata, NULL);
 
 	return 0;
 
@@ -1511,7 +1515,7 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 {
 	struct dhcp6_state *state;
 
-	delete_timeout(NULL, ifp);
+	eloop_timeout_delete(NULL, ifp);
 	state = D6_STATE(ifp);
 	if (state) {
 		dhcp6_freedrop_addrs(ifp, drop);
@@ -1535,7 +1539,7 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 			break;
 	if (ifp == NULL && sock != -1) {
 		close(sock);
-		delete_event(sock);
+		eloop_event_delete(sock);
 		sock = -1;
 	}
 }

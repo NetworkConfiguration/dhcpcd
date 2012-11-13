@@ -251,7 +251,7 @@ ipv6rs_sendprobe(void *arg)
 		syslog(LOG_ERR, "%s: sendmsg: %m", ifp->name);
 
 	if (state->rsprobes++ < MAX_RTR_SOLICITATIONS)
-		add_timeout_sec(RTR_SOLICITATION_INTERVAL,
+		eloop_timeout_add_sec(RTR_SOLICITATION_INTERVAL,
 		    ipv6rs_sendprobe, ifp);
 	else
 		syslog(LOG_INFO, "%s: no IPv6 Routers available", ifp->name);
@@ -309,8 +309,8 @@ ipv6rs_freedrop_addrs(struct ra *rap, int drop)
 void ipv6rs_freedrop_ra(struct ra *rap, int drop)
 {
 
-	delete_timeout(NULL, rap->iface);
-	delete_timeout(NULL, rap);
+	eloop_timeout_delete(NULL, rap->iface);
+	eloop_timeout_delete(NULL, rap);
 	TAILQ_REMOVE(&ipv6_routers, rap, next);
 	ipv6rs_freedrop_addrs(rap, drop);
 	ipv6rs_free_opts(rap);
@@ -748,8 +748,8 @@ ipv6rs_handledata(_unused void *arg)
 	if (!(ifp->state->options->options & DHCPCD_IPV6RA_REQRDNSS))
 		has_dns = 1;
 
-	delete_timeout(NULL, ifp);
-	delete_timeout(NULL, rap); /* reachable timer */
+	eloop_timeout_delete(NULL, ifp);
+	eloop_timeout_delete(NULL, rap); /* reachable timer */
 	if (has_dns)
 		daemonise();
 	else if (options & DHCPCD_DAEMONISE &&
@@ -1047,7 +1047,7 @@ ipv6rs_expire(void *arg)
 	}
 
 	if (timerisset(&next))
-		add_timeout_tv(&next, ipv6rs_expire, ifp);
+		eloop_timeout_add_tv(&next, ipv6rs_expire, ifp);
 	if (expired) {
 		ipv6_buildroutes();
 		run_script_reason(ifp, "ROUTERADVERT");
@@ -1059,7 +1059,7 @@ ipv6rs_start(struct interface *ifp)
 {
 	struct rs_state *state;
 
-	delete_timeout(NULL, ifp);
+	eloop_timeout_delete(NULL, ifp);
 
 	state = RS_STATE(ifp);
 	if (state == NULL) {

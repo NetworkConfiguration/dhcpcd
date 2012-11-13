@@ -73,7 +73,7 @@ control_remove(void *arg)
 		n = l->next;
 		if (l == arg) {
 			close(l->fd);
-			delete_event(l->fd);
+			eloop_event_delete(l->fd);
 			if (last == NULL)
 				control_fds = l->next;
 			else
@@ -132,7 +132,7 @@ control_handle(_unused void *arg)
 		l->listener = 0;
 		l->next = control_fds;
 		control_fds = l;
-		add_event(l->fd, control_handle_data, l);
+		eloop_event_add(l->fd, control_handle_data, l);
 	}
 }
 
@@ -165,7 +165,7 @@ control_start(void)
 		close(fd);
 		return -1;
 	}
-	add_event(fd, control_handle, NULL);
+	eloop_event_add(fd, control_handle, NULL);
 	return fd;
 }
 
@@ -175,7 +175,7 @@ control_stop(void)
 	int retval = 0;
 	struct fd_list *l;
 
-	delete_event(fd);
+	eloop_event_delete(fd);
 	if (shutdown(fd, SHUT_RDWR) == -1)
 		retval = 1;
 	fd = -1;
@@ -185,7 +185,7 @@ control_stop(void)
 	l = control_fds;
 	while (l != NULL) {
 		control_fds = l->next;
-		delete_event(l->fd);
+		eloop_event_delete(l->fd);
 		shutdown(l->fd, SHUT_RDWR);
 		free(l);
 		l = control_fds;

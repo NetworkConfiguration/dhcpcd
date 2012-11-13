@@ -232,7 +232,7 @@ handle_exit_timeout(_unused void *arg)
 	options &= ~DHCPCD_TIMEOUT_IPV4LL;
 	timeout = (PROBE_NUM * PROBE_MAX) + (PROBE_WAIT * 2);
 	syslog(LOG_WARNING, "allowing %d seconds for IPv4LL timeout", timeout);
-	add_timeout_sec(timeout, handle_exit_timeout, NULL);
+	eloop_timeout_add_sec(timeout, handle_exit_timeout, NULL);
 }
 
 void
@@ -282,7 +282,7 @@ stop_interface(struct interface *iface)
 	if (strcmp(iface->state->reason, "RELEASE") != 0)
 		drop_dhcp(iface, "STOP");
 	close_sockets(iface);
-	delete_timeout(NULL, iface);
+	eloop_timeout_delete(NULL, iface);
 	free_interface(ifp);
 	if (!(options & (DHCPCD_MASTER | DHCPCD_TEST)))
 		exit(EXIT_FAILURE);
@@ -381,7 +381,7 @@ send_message(struct interface *iface, int type,
 			if (!(options & DHCPCD_TEST))
 				drop_dhcp(iface, "FAIL");
 			close_sockets(iface);
-			delete_timeout(NULL, iface);
+			eloop_timeout_delete(NULL, iface);
 			callback = NULL;
 		}
 	}
@@ -390,7 +390,7 @@ send_message(struct interface *iface, int type,
 	/* Even if we fail to send a packet we should continue as we are
 	 * as our failure timeouts will change out codepath when needed. */
 	if (callback)
-		add_timeout_tv(&tv, callback, iface);
+		eloop_timeout_add_tv(&tv, callback, iface);
 }
 
 static void
@@ -437,7 +437,7 @@ start_expire(void *arg)
 	}
 
 	syslog(LOG_ERR, "%s: lease expired", iface->name);
-	delete_timeout(NULL, iface);
+	eloop_timeout_delete(NULL, iface);
 	drop_dhcp(iface, "EXPIRE");
 	unlink(iface->leasefile);
 	if (iface->carrier != LINK_DOWN)
@@ -540,7 +540,7 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp, const struct i
 		}
 		close_sockets(iface);
 		/* If we constantly get NAKS then we should slowly back off */
-		add_timeout_sec(state->nakoff, start_interface, iface);
+		eloop_timeout_add_sec(state->nakoff, start_interface, iface);
 		if (state->nakoff == 0)
 			state->nakoff = 1;
 		else {
@@ -600,7 +600,7 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp, const struct i
 			run_script(iface);
 			exit(EXIT_SUCCESS);
 		}
-		delete_timeout(send_discover, iface);
+		eloop_timeout_delete(send_discover, iface);
 		/* We don't request BOOTP addresses */
 		if (type) {
 			/* We used to ARP check here, but that seems to be in
@@ -641,7 +641,7 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp, const struct i
 	}
 
 	lease->frominfo = 0;
-	delete_timeout(NULL, iface);
+	eloop_timeout_delete(NULL, iface);
 
 	/* We now have an offer, so close the DHCP sockets.
 	 * This allows us to safely ARP when broken DHCP servers send an ACK
@@ -954,7 +954,7 @@ handle_carrier(int action, int flags, const char *ifname)
 			iface->carrier = LINK_DOWN;
 			syslog(LOG_INFO, "%s: carrier lost", iface->name);
 			close_sockets(iface);
-			delete_timeouts(iface, start_expire, NULL);
+			eloop_timeouts_delete(iface, start_expire, NULL);
 			dhcp6_drop(iface, "EXPIRE6");
 			ipv6rs_drop(iface);
 			drop_dhcp(iface, "NOCARRIER");
@@ -994,16 +994,17 @@ start_discover(void *arg)
 
 	iface->state->state = DHS_DISCOVER;
 	iface->state->xid = dhcp_xid(iface);
-	delete_timeout(NULL, iface);
+	eloop_timeout_delete(NULL, iface);
 	if (ifo->fallback)
-		add_timeout_sec(timeout, start_fallback, iface);
+		eloop_timeout_add_sec(timeout, start_fallback, iface);
 	else if (ifo->options & DHCPCD_IPV4LL &&
 	    !IN_LINKLOCAL(htonl(iface->addr.s_addr)))
 	{
 		if (IN_LINKLOCAL(htonl(iface->state->fail.s_addr)))
-			add_timeout_sec(RATE_LIMIT_INTERVAL, start_ipv4ll, iface);
+			eloop_timeout_add_sec(RATE_LIMIT_INTERVAL,
+			    start_ipv4ll, iface);
 		else
-			add_timeout_sec(timeout, start_ipv4ll, iface);
+			eloop_timeout_add_sec(timeout, start_ipv4ll, iface);
 	}
 	if (ifo->options & DHCPCD_REQUEST)
 		syslog(LOG_INFO, "%s: broadcasting for a lease (requesting %s)",
@@ -1049,7 +1050,7 @@ start_rebind(void *arg)
 	syslog(LOG_DEBUG, "%s: expire in %u seconds",
 	    iface->name, lease->leasetime - lease->rebindtime);
 	iface->state->state = DHS_REBIND;
-	delete_timeout(send_renew, iface);
+	eloop_timeout_delete(send_renew, iface);
 	iface->state->lease.server.s_addr = 0;
 	send_rebind(iface);
 }
@@ -1115,7 +1116,7 @@ start_static(struct interface *iface)
 	ifo = iface->state->options;
 	iface->state->offer =
 	    dhcp_message_new(&ifo->req_addr, &ifo->req_mask);
-	delete_timeout(NULL, iface);
+	eloop_timeout_delete(NULL, iface);
 	bind_interface(iface);
 }
 
@@ -1172,15 +1173,15 @@ start_reboot(struct interface *iface)
 	iface->state->state = DHS_REBOOT;
 	iface->state->xid = dhcp_xid(iface);
 	iface->state->lease.server.s_addr = 0;
-	delete_timeout(NULL, iface);
+	eloop_timeout_delete(NULL, iface);
 	if (ifo->fallback)
-		add_timeout_sec(ifo->reboot, start_fallback, iface);
+		eloop_timeout_add_sec(ifo->reboot, start_fallback, iface);
 	else if (ifo->options & DHCPCD_LASTLEASE &&
 	    iface->state->lease.frominfo)
-		add_timeout_sec(ifo->reboot, start_timeout, iface);
+		eloop_timeout_add_sec(ifo->reboot, start_timeout, iface);
 	else if (!(ifo->options & DHCPCD_INFORM &&
-		options & (DHCPCD_MASTER | DHCPCD_DAEMONISED)))
-		add_timeout_sec(ifo->reboot, start_expire, iface);
+	    options & (DHCPCD_MASTER | DHCPCD_DAEMONISED)))
+		eloop_timeout_add_sec(ifo->reboot, start_expire, iface);
 	/* Don't bother ARP checking as the server could NAK us first. */
 	if (ifo->options & DHCPCD_INFORM)
 		send_inform(iface);
@@ -1240,7 +1241,7 @@ start_interface(void *arg)
 		    iface->name);
 		drop_dhcp(iface, "FAIL");
 		close_sockets(iface);
-		delete_timeout(NULL, iface);
+		eloop_timeout_delete(NULL, iface);
 		return;
 	}
 	/* We don't want to read the old lease if we NAK an old test */
@@ -1768,7 +1769,7 @@ open_sockets(struct interface *iface)
 		if ((r = open_socket(iface, ETHERTYPE_IP)) == -1)
 			syslog(LOG_ERR, "%s: open_socket: %m", iface->name);
 		else
-			add_event(iface->raw_fd, handle_dhcp_packet, iface);
+			eloop_event_add(iface->raw_fd, handle_dhcp_packet, iface);
 	}
 	if (iface->udp_fd == -1 &&
 	    iface->addr.s_addr != 0 &&
@@ -1788,12 +1789,12 @@ void
 close_sockets(struct interface *iface)
 {
 	if (iface->arp_fd != -1) {
-		delete_event(iface->arp_fd);
+		eloop_event_delete(iface->arp_fd);
 		close(iface->arp_fd);
 		iface->arp_fd = -1;
 	}
 	if (iface->raw_fd != -1) {
-		delete_event(iface->raw_fd);
+		eloop_event_delete(iface->raw_fd);
 		close(iface->raw_fd);
 		iface->raw_fd = -1;
 	}
@@ -2083,7 +2084,7 @@ main(int argc, char **argv)
 		if (linkfd == -1)
 			syslog(LOG_ERR, "open_link_socket: %m");
 		else
-			add_event(linkfd, handle_link, NULL);
+			eloop_event_add(linkfd, handle_link, NULL);
 	}
 
 #if 0
@@ -2105,7 +2106,7 @@ main(int argc, char **argv)
 			syslog(LOG_ERR, "ipv6rs: %m");
 			options &= ~DHCPCD_IPV6RS;
 		} else {
-			add_event(ipv6rsfd, ipv6rs_handledata, NULL);
+			eloop_event_add(ipv6rsfd, ipv6rs_handledata, NULL);
 //			atexit(restore_rtadv);
 		}
 		if (options & DHCPCD_IPV6RA_OWN ||
@@ -2115,7 +2116,7 @@ main(int argc, char **argv)
 			if (ipv6nsfd == -1)
 				syslog(LOG_ERR, "ipv6nd: %m");
 			else
-				add_event(ipv6nsfd, ipv6ns_handledata, NULL);
+				eloop_event_add(ipv6nsfd, ipv6ns_handledata, NULL);
 		}
 	}
 
@@ -2190,7 +2191,7 @@ main(int argc, char **argv)
 		} else if (i > 0) {
 			if (options & DHCPCD_IPV4LL)
 				options |= DHCPCD_TIMEOUT_IPV4LL;
-			add_timeout_sec(i, handle_exit_timeout, NULL);
+			eloop_timeout_add_sec(i, handle_exit_timeout, NULL);
 		}
 	}
 	free_options(if_options);
@@ -2198,8 +2199,8 @@ main(int argc, char **argv)
 
 	sort_interfaces();
 	for (iface = ifaces; iface; iface = iface->next)
-		add_timeout_sec(0, start_interface, iface);
+		eloop_timeout_add_sec(0, start_interface, iface);
 
-	start_eloop(&dhcpcd_sigset);
+	eloop_start(&dhcpcd_sigset);
 	exit(EXIT_SUCCESS);
 }

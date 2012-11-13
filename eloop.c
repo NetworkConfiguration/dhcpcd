@@ -59,7 +59,7 @@ static struct timeout {
 static struct timeout *free_timeouts;
 
 void
-add_event(int fd, void (*callback)(void *), void *arg)
+eloop_event_add(int fd, void (*callback)(void *), void *arg)
 {
 	struct event *e, *last = NULL;
 
@@ -90,7 +90,7 @@ add_event(int fd, void (*callback)(void *), void *arg)
 }
 
 void
-delete_event(int fd)
+eloop_event_delete(int fd)
 {
 	struct event *e, *last = NULL;
 
@@ -109,7 +109,7 @@ delete_event(int fd)
 }
 
 void
-add_q_timeout_tv(int queue,
+eloop_q_timeout_add_tv(int queue,
     const struct timeval *when, void (*callback)(void *), void *arg)
 {
 	struct timeval w;
@@ -170,20 +170,22 @@ add_q_timeout_tv(int queue,
 }
 
 void
-add_q_timeout_sec(int queue, time_t when, void (*callback)(void *), void *arg)
+eloop_q_timeout_add_sec(int queue, time_t when,
+    void (*callback)(void *), void *arg)
 {
 	struct timeval tv;
 
 	tv.tv_sec = when;
 	tv.tv_usec = 0;
-	add_q_timeout_tv(queue, &tv, callback, arg);
+	eloop_q_timeout_add_tv(queue, &tv, callback, arg);
 }
 
 /* This deletes all timeouts for the interface EXCEPT for ones with the
  * callbacks given. Handy for deleting everything apart from the expire
  * timeout. */
 static void
-v_delete_q_timeouts(int queue, void *arg, void (*callback)(void *), va_list v)
+eloop_q_timeouts_delete_v(int queue, void *arg,
+    void (*callback)(void *), va_list v)
 {
 	struct timeout *t, *tt, *last = NULL;
 	va_list va;
@@ -213,17 +215,17 @@ v_delete_q_timeouts(int queue, void *arg, void (*callback)(void *), va_list v)
 }
 
 void
-delete_q_timeouts(int queue, void *arg, void (*callback)(void *), ...)
+eloop_q_timeouts_delete(int queue, void *arg, void (*callback)(void *), ...)
 {
 	va_list va;
 
 	va_start(va, callback);
-	v_delete_q_timeouts(queue, arg, callback, va);
+	eloop_q_timeouts_delete_v(queue, arg, callback, va);
 	va_end(va);
 }
 
 void
-delete_q_timeout(int queue, void (*callback)(void *), void *arg)
+eloop_q_timeout_delete(int queue, void (*callback)(void *), void *arg)
 {
 	struct timeout *t, *tt, *last = NULL;
 
@@ -248,7 +250,7 @@ delete_q_timeout(int queue, void (*callback)(void *), void *arg)
  * Normally we don't do this as the OS will do it for us at exit,
  * but it's handy for debugging other leaks in valgrind. */
 static void
-cleanup(void)
+eloop_cleanup(void)
 {
 	struct event *e;
 	struct timeout *t;
@@ -279,12 +281,12 @@ void
 eloop_init(void)
 {
 
-	atexit(cleanup);
+	atexit(eloop_cleanup);
 }
 #endif
 
 _noreturn void
-start_eloop(const sigset_t *cursigs)
+eloop_start(const sigset_t *cursigs)
 {
 	int n, max_fd;
 	fd_set read_fds;

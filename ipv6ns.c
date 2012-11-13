@@ -229,10 +229,10 @@ ipv6ns_sendprobe(void *arg)
 	rtv.tv_sec = 0;
 	rtv.tv_usec = arc4random() % (MAX_RANDOM_FACTOR - MIN_RANDOM_FACTOR);
 	timeradd(&tv, &rtv, &tv);
-	add_timeout_tv(&tv, ipv6ns_sendprobe, rap);
+	eloop_timeout_add_tv(&tv, ipv6ns_sendprobe, rap);
 
 	if (rap->nsprobes++ == 0)
-		add_timeout_sec(DELAY_FIRST_PROBE_TIME,
+		eloop_timeout_add_sec(DELAY_FIRST_PROBE_TIME,
 		    ipv6ns_unreachable, rap);
 }
 
@@ -354,7 +354,7 @@ ipv6ns_handledata(_unused void *arg)
 			tv.tv_sec = REACHABLE_TIME;
 			tv.tv_usec = 0;
 		}
-		add_timeout_tv(&tv, ipv6ns_sendprobe, rap);
-		delete_timeout(ipv6ns_unreachable, rap);
+		eloop_timeout_add_tv(&tv, ipv6ns_sendprobe, rap);
+		eloop_timeout_delete(ipv6ns_unreachable, rap);
 	}
 }

@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2011 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2012 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -88,7 +88,7 @@ start_ipv4ll(void *arg)
 	struct interface *iface = arg;
 	uint32_t addr;
 
-	delete_timeout(NULL, iface);
+	eloop_timeout_delete(NULL, iface);
 	iface->state->probes = 0;
 	iface->state->claims = 0;
 	if (iface->addr.s_addr) {
@@ -144,13 +144,13 @@ handle_ipv4ll_failure(void *arg)
 	close_sockets(iface);
 	free(iface->state->offer);
 	iface->state->offer = NULL;
-	delete_timeout(NULL, iface);
+	eloop_timeout_delete(NULL, iface);
 	if (++iface->state->conflicts > MAX_CONFLICTS) {
 		syslog(LOG_ERR, "%s: failed to acquire an IPv4LL address",
 		    iface->name);
 		iface->state->interval = RATE_LIMIT_INTERVAL / 2;
 		start_discover(iface);
 	} else {
-		add_timeout_sec(PROBE_WAIT, start_ipv4ll, iface);
+		eloop_timeout_add_sec(PROBE_WAIT, start_ipv4ll, iface);
 	}
 }

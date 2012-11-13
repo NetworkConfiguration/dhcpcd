@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2010 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2012 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -62,7 +62,7 @@ daemonise(void)
 	char buf = '\0';
 	int sidpipe[2], fd;
 
-	delete_timeout(handle_exit_timeout, NULL);
+	eloop_timeout_delete(handle_exit_timeout, NULL);
 	if (options & DHCPCD_DAEMONISED || !(options & DHCPCD_DAEMONISE))
 		return 0;
 	/* Setup a signal pipe so parent knows when to exit. */
@@ -213,9 +213,9 @@ bind_interface(void *arg)
 	if (lease->leasetime == ~0U)
 		lease->renewaltime = lease->rebindtime = lease->leasetime;
 	else {
-		add_timeout_sec(lease->renewaltime, start_renew, iface);
-		add_timeout_sec(lease->rebindtime, start_rebind, iface);
-		add_timeout_sec(lease->leasetime, start_expire, iface);
+		eloop_timeout_add_sec(lease->renewaltime, start_renew, iface);
+		eloop_timeout_add_sec(lease->rebindtime, start_rebind, iface);
+		eloop_timeout_add_sec(lease->leasetime, start_expire, iface);
 		syslog(LOG_DEBUG,
 		    "%s: renew in %u seconds, rebind in %u seconds",
 		    iface->name, lease->renewaltime, lease->rebindtime);
