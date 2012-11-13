@@ -64,7 +64,7 @@ cleanup(void)
 #endif
 
 static void
-remove_control_data(void *arg)
+control_remove(void *arg)
 {
 	struct fd_list *l, *n, *last = NULL;
 
@@ -87,7 +87,7 @@ remove_control_data(void *arg)
 }
 
 static void
-handle_control_data(void *arg)
+control_handle_data(void *arg)
 {
 	struct fd_list *l = arg;
 	ssize_t bytes;
@@ -97,7 +97,7 @@ handle_control_data(void *arg)
 
 	bytes = read(l->fd, buffer, sizeof(buffer) - 1);
 	if (bytes == -1 || bytes == 0) {
-		remove_control_data(l);
+		control_remove(l);
 		return;
 	}
 	buffer[bytes] = '\0';
@@ -115,7 +115,7 @@ handle_control_data(void *arg)
 
 /* ARGSUSED */
 static void
-handle_control(_unused void *arg)
+control_handle(_unused void *arg)
 {
 	struct sockaddr_un run;
 	socklen_t len;
@@ -132,7 +132,7 @@ handle_control(_unused void *arg)
 		l->listener = 0;
 		l->next = control_fds;
 		control_fds = l;
-		add_event(l->fd, handle_control_data, l);
+		add_event(l->fd, control_handle_data, l);
 	}
 }
 
@@ -148,7 +148,7 @@ make_sock(void)
 }
 
 int
-start_control(void)
+control_start(void)
 {
 	int len;
 
@@ -165,12 +165,12 @@ start_control(void)
 		close(fd);
 		return -1;
 	}
-	add_event(fd, handle_control, NULL);
+	add_event(fd, control_handle, NULL);
 	return fd;
 }
 
 int
-stop_control(void)
+control_stop(void)
 {
 	int retval = 0;
 	struct fd_list *l;
@@ -195,7 +195,7 @@ stop_control(void)
 }
 
 int
-open_control(void)
+control_open(void)
 {
 	int len;
 
@@ -208,7 +208,7 @@ open_control(void)
 }
 
 int
-send_control(int argc, char * const *argv)
+control_send(int argc, char * const *argv)
 {
 	char *p = buffer;
 	int i;

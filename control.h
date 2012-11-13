@@ -37,9 +37,9 @@ struct fd_list {
 };
 extern struct fd_list *control_fds;
 
-int start_control(void);
-int stop_control(void);
-int open_control(void);
-int send_control(int, char * const *);
+int control_start(void);
+int control_stop(void);
+int control_open(void);
+int control_send(int, char * const *);
 
 #endif

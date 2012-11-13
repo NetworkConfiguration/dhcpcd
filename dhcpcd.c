@@ -201,8 +201,8 @@ cleanup(void)
 		close(linkfd);
 	if (pidfd > -1) {
 		if (options & DHCPCD_MASTER) {
-			if (stop_control() == -1)
-				syslog(LOG_ERR, "stop_control: %m");
+			if (control_stop() == -1)
+				syslog(LOG_ERR, "control_stop: %m");
 		}
 		close(pidfd);
 		unlink(pidfile);
@@ -1966,11 +1966,11 @@ main(int argc, char **argv)
 	}
 
 	if (!(options & (DHCPCD_MASTER | DHCPCD_TEST))) {
-		control_fd = open_control();
+		control_fd = control_open();
 		if (control_fd != -1) {
 			syslog(LOG_INFO,
 			    "sending commands to master dhcpcd process");
-			i = send_control(argc, argv);
+			i = control_send(argc, argv);
 			if (i > 0) {
 				syslog(LOG_DEBUG, "send OK");
 				exit(EXIT_SUCCESS);
@@ -1980,7 +1980,7 @@ main(int argc, char **argv)
 			}
 		} else {
 			if (errno != ENOENT)
-				syslog(LOG_ERR, "open_control: %m");
+				syslog(LOG_ERR, "control_open: %m");
 		}
 	}
 
@@ -2070,8 +2070,8 @@ main(int argc, char **argv)
 	}
 
 	if (options & DHCPCD_MASTER) {
-		if (start_control() == -1)
-			syslog(LOG_ERR, "start_control: %m");
+		if (control_start() == -1)
+			syslog(LOG_ERR, "control_start: %m");
 	}
 
 	if (init_sockets() == -1) {
