@@ -30,6 +30,8 @@
 
 #include "dhcpcd.h"
 
+#define ALLDHCP "ff02::1:2"
+
 /* UDP port numbers for DHCP */
 #define DHCP6_CLIENT_PORT	546
 #define DHCP6_SERVER_PORT	547

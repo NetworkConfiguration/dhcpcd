@@ -66,7 +66,7 @@
 //#define VENDOR_SPLIT
 
 static int sock = -1;
-static struct sockaddr_in6 allrouters, from;
+static struct sockaddr_in6 alldhcp, from;
 static struct msghdr sndhdr;
 static struct iovec sndiov[2];
 static unsigned char *sndbuf;
@@ -149,13 +149,13 @@ dhcp6_init(void)
 	atexit(dhcp6_cleanup);
 #endif
 
-	memset(&allrouters, 0, sizeof(allrouters));
-	allrouters.sin6_family = AF_INET6;
-	allrouters.sin6_port = htons(DHCP6_SERVER_PORT);
+	memset(&alldhcp, 0, sizeof(alldhcp));
+	alldhcp.sin6_family = AF_INET6;
+	alldhcp.sin6_port = htons(DHCP6_SERVER_PORT);
 #ifdef SIN6_LEN
-	allrouters.sin6_len = sizeof(allrouters);
+	alldhcp.sin6_len = sizeof(alldhcp);
 #endif
-	if (inet_pton(AF_INET6, ALLROUTERS, &allrouters.sin6_addr.s6_addr) != 1)
+	if (inet_pton(AF_INET6, ALLDHCP, &alldhcp.sin6_addr.s6_addr) != 1)
 		return -1;
 
 	len = CMSG_SPACE(sizeof(struct in6_pktinfo));
@@ -633,7 +633,7 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 	/* Update the elapsed time */
 	dhcp6_updateelapsed(ifp, state->send, state->send_len);
 
-	to = allrouters;
+	to = alldhcp;
 	sndhdr.msg_name = (caddr_t)&to;
 	sndhdr.msg_iov[0].iov_base = (caddr_t)state->send;
 	sndhdr.msg_iov[0].iov_len = state->send_len;
