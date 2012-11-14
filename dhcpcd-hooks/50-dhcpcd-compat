@@ -23,13 +23,13 @@ for x in $new_domain_name_servers; do
 	DNS="$DNS${DNS:+,}$x"
 done
 
-x="down"
+r="down"
 case "$reason" in
-RENEW) x="up";;
-BOUND|INFORM|REBIND|REBOOT|TEST|TIMEOUT|IPV4LL) x="new";;
+RENEW) r="up";;
+BOUND|INFORM|REBIND|REBOOT|TEST|TIMEOUT|IPV4LL) r="new";;
 esac
 
-if [ "$reason" != "down" ]; then
+if [ "$r" != "down" ]; then
 	rm -f /var/lib/dhcpcd-"$INTERFACE".info
 	for x in IPADDR INTERFACE NETMASK BROADCAST NETWORK DHCPSID GATEWAYS \
 		DNSSERVERS DNSDOMAIN DNSSEARCH NISDOMAIN NISSERVERS \
@@ -38,4 +38,4 @@ if [ "$reason" != "down" ]; then
 	done
 fi
 
-set -- /var/lib/dhcpcd-"$INTERFACE".info "$x"
+set -- /var/lib/dhcpcd-"$INTERFACE".info "$r"
