@@ -480,9 +480,11 @@ ipv6rs_handledata(_unused void *arg)
 			rap->ns = NULL;
 			rap->nslen = 0;
 		}
+		new_data = 1;
 		syslog(LOG_INFO, "%s: Router Advertisement from %s",
 		    ifp->name, sfrom);
-	}
+	} else
+		new_data = 0;
 
 	if (rap == NULL) {
 		rap = xzalloc(sizeof(*rap));
@@ -512,7 +514,8 @@ ipv6rs_handledata(_unused void *arg)
 	}
 	if (nd_ra->nd_ra_retransmit)
 		rap->retrans = ntohl(nd_ra->nd_ra_retransmit);
-	rap->expired = (rap->lifetime == 0);
+	if (rap->lifetime)
+		rap->expired = 0;
 
 	len -= sizeof(struct nd_router_advert);
 	p = ((uint8_t *)icp) + sizeof(struct nd_router_advert);
@@ -720,11 +723,14 @@ ipv6rs_handledata(_unused void *arg)
 				    ap->prefix_pltime);
 		}
 	}
-	if (!(options & DHCPCD_TEST))
-		ipv6_build_routes();
-	run_script_reason(ifp, options & DHCPCD_TEST ? "TEST" : "ROUTERADVERT");
-	if (options & DHCPCD_TEST)
-		exit(EXIT_SUCCESS);
+	if (options & DHCPCD_TEST) {
+		run_script_reason(ifp, "TEST");
+		goto handle_flag;
+	}
+	ipv6_build_routes();
+        /* We will get run by the expire function */
+	if (rap->lifetime)
+		run_script_reason(ifp, "ROUTERADVERT");
 
 	/* If we don't require RDNSS then set has_dns = 1 so we fork */
 	if (!(ifp->state->options->options & DHCPCD_IPV6RA_REQRDNSS))
@@ -751,17 +757,12 @@ ipv6rs_handledata(_unused void *arg)
 	}
 
 handle_flag:
-	if (rap->flags & ND_RA_FLAG_MANAGED) {
+	if (rap->flags & (ND_RA_FLAG_MANAGED | ND_RA_FLAG_OTHER)) {
 		if (new_data)
 			syslog(LOG_WARNING, "%s: no support for DHCPv6 management",
 			    ifp->name);
 		if (options & DHCPCD_TEST)
 			exit(EXIT_SUCCESS);
-//		if (dhcp6_start(ifp, 1) == -1)
-//			syslog(LOG_ERR, "dhcp6_start: %s: %m", ifp->name);
-	} else if (rap->flags & ND_RA_FLAG_OTHER) {
-		if (dhcp6_start(ifp, 0) == -1)
-			syslog(LOG_ERR, "dhcp6_start: %s: %m", ifp->name);
 	} else {
 		if (new_data)
 			syslog(LOG_DEBUG, "%s: No DHCPv6 instruction in RA",
