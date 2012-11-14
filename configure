@@ -213,6 +213,7 @@ if [ -n "$DEBUG" -a "$DEBUG" != no -a "$DEBUG" != false ]; then
 elif [ -z "$DEBUG" -a -d .git ]; then
 	printf "Found git ... "
 	DEBUG=yes
+	echo "CFLAGS+=		-ggdb" >>$CONFIG_MK
 else
 	DEBUG=no
 fi
@@ -404,6 +405,10 @@ if [ "$TAILQ_FOREACH_SAFE" = no ]; then
 	for ((var) = TAILQ_FIRST((head));				\
 	    (var) && ((next) = TAILQ_NEXT((var), field), 1);		\
 	    (var) = (next))
+#define TAILQ_FOREACH_REVERSE_SAFE(var, head, headname, field, prev)	\
+        for ((var) = TAILQ_LAST((head), headname);			\
+                (var) && ((prev) = TAILQ_PREV((var), headname, field), 1);\
+                (var) = (prev))
 EOF
 fi
 
