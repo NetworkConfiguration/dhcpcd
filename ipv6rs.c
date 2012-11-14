@@ -401,7 +401,7 @@ ipv6rs_handledata(_unused void *arg)
 	struct ipv6_addr *ap;
 	char *opt;
 	struct timeval expire;
-	int has_dns, new_rap;
+	uint8_t has_prefix, has_dns, new_rap, new_data;
 
 	len = recvmsg(sock, &rcvhdr, 0);
 	if (len == -1) {
@@ -467,21 +467,10 @@ ipv6rs_handledata(_unused void *arg)
 			break;
 	}
 
-	nd_ra = (struct nd_router_advert *)icp;
-	/* If the lifetime of the router is zero, just expire it
-	 * if we already have it and move on. */
-	if (nd_ra->nd_ra_router_lifetime == 0) {
-		if (rap) {
-			rap->lifetime = 0;
-			ipv6rs_expire(ifp);
-		}
-		return;
-	}
-
 	/* We don't want to spam the log with the fact we got an RA every
 	 * 30 seconds or so, so only spam the log if it's different. */
 	if (options & DHCPCD_DEBUG || rap == NULL ||
-	    (rap->expired || rap->data_len != len ||
+	    (rap->data_len != len ||
 	     memcmp(rap->data, (unsigned char *)icp, rap->data_len) != 0))
 	{
 		if (rap) {
@@ -513,6 +502,7 @@ ipv6rs_handledata(_unused void *arg)
 	}
 
 	get_monotonic(&rap->received);
+	nd_ra = (struct nd_router_advert *)icp;
 	rap->flags = nd_ra->nd_ra_flags_reserved;
 	rap->lifetime = ntohs(nd_ra->nd_ra_router_lifetime);
 	if (nd_ra->nd_ra_reachable) {
@@ -522,13 +512,13 @@ ipv6rs_handledata(_unused void *arg)
 	}
 	if (nd_ra->nd_ra_retransmit)
 		rap->retrans = ntohl(nd_ra->nd_ra_retransmit);
-	rap->expired = 0;
+	rap->expired = (rap->lifetime == 0);
 
 	len -= sizeof(struct nd_router_advert);
 	p = ((uint8_t *)icp) + sizeof(struct nd_router_advert);
 	olen = 0;
 	lifetime = ~0U;
-	has_dns = 0;
+	has_prefix = has_dns = 0;
 	for (olen = 0; len > 0; p += olen, len -= olen) {
 		if ((size_t)len < sizeof(struct nd_opt_hdr)) {
 			syslog(LOG_ERR, "%s: Short option", ifp->name);
@@ -611,6 +601,8 @@ ipv6rs_handledata(_unused void *arg)
 			} else
 				opt = xstrdup(ap->saddr);
 			lifetime = ap->prefix_vltime;
+			if (lifetime > 0)
+				has_prefix = 1;
 			break;
 
 		case ND_OPT_MTU:
@@ -713,6 +705,8 @@ ipv6rs_handledata(_unused void *arg)
 		add_router(rap);
 	if (options & DHCPCD_IPV6RA_OWN && !(options & DHCPCD_TEST)) {
 		TAILQ_FOREACH(ap, &rap->addrs, next) {
+			if (ap->prefix_vltime == 0)
+				continue;
 			syslog(ap->new ? LOG_INFO : LOG_DEBUG,
 			    "%s: adding address %s",
 			    ifp->name, ap->saddr);
@@ -737,12 +731,11 @@ ipv6rs_handledata(_unused void *arg)
 	if (!(ifp->state->options->options & DHCPCD_IPV6RA_REQRDNSS))
 		has_dns = 1;
 
-	if (has_dns)
+	if (has_prefix && has_dns)
 		delete_q_timeout(0, handle_exit_timeout, NULL);
 	delete_timeout(NULL, ifp);
 	delete_timeout(NULL, rap); /* reachable timer */
-	ipv6rs_expire(ifp);
-	if (has_dns)
+	if (has_prefix && has_dns)
 		daemonise();
 	else if (options & DHCPCD_DAEMONISE && !(options & DHCPCD_DAEMONISED))
 		syslog(LOG_WARNING,
@@ -757,6 +750,26 @@ ipv6rs_handledata(_unused void *arg)
 		rap->nsprobes = 0;
 		ipv6ns_sendprobe(rap);
 	}
+
+handle_flag:
+	if (rap->flags & ND_RA_FLAG_MANAGED) {
+		if (new_data)
+			syslog(LOG_WARNING, "%s: no support for DHCPv6 management",
+			    ifp->name);
+//		if (dhcp6_start(ifp, 1) == -1)
+//			syslog(LOG_ERR, "dhcp6_start: %s: %m", ifp->name);
+	} else if (rap->flags & ND_RA_FLAG_OTHER) {
+		if (dhcp6_start(ifp, 0) == -1)
+			syslog(LOG_ERR, "dhcp6_start: %s: %m", ifp->name);
+	} else {
+		if (new_data)
+			syslog(LOG_DEBUG, "%s: No DHCPv6 instruction in RA",
+			    ifp->name);
+	}
+
+	/* Expire should be called last as the rap object could be destroyed */
+	if (!(options & DHCPCD_TEST))
+		ipv6rs_expire(ifp);
 }
 
 int
@@ -828,11 +841,28 @@ ipv6rs_env(char **env, const char *prefix, const struct interface *ifp)
 	return l;
 }
 
+static const struct ipv6_addr *
+ipv6rs_findsameaddr(const struct ipv6_addr *ap)
+{
+	const struct ra *rap;
+	const struct ipv6_addr *a;
+
+	TAILQ_FOREACH(rap, &ipv6_routers, next) {
+		TAILQ_FOREACH(a, &rap->addrs, next) {
+			if (ap != a &&
+			    memcmp(&a->addr, &ap->addr, sizeof(ap->addr) == 0))
+				return a;
+		}
+	}
+	return NULL;
+}
+
 void
 ipv6rs_expire(void *arg)
 {
 	struct interface *ifp;
 	struct ra *rap, *ran;
+	struct ipv6_addr *ap, *apn;
 	struct ra_opt *rao, *raon;
 	struct timeval now, lt, expire, next;
 	int expired;
@@ -849,22 +879,46 @@ ipv6rs_expire(void *arg)
 		lt.tv_usec = 0;
 		timeradd(&rap->received, &lt, &expire);
 		if (timercmp(&now, &expire, >)) {
-			syslog(LOG_INFO, "%s: %s: expired Router Advertisement",
-			    ifp->name, rap->sfrom);
-			rap->expired = expired = 1;
-			continue;
+			if (!rap->expired) {
+				syslog(LOG_INFO,
+				    "%s: %s: expired default Router",
+				    ifp->name, rap->sfrom);
+				rap->expired = expired = 1;
+			}
+		} else {
+			timersub(&expire, &now, &lt);
+			if (!timerisset(&next) || timercmp(&next, &lt, >))
+				next = lt;
 		}
-		timersub(&expire, &now, &lt);
-		if (!timerisset(&next) || timercmp(&next, &lt, >))
-			next = lt;
+
+		if (options & DHCPCD_IPV6RA_OWN) {
+			TAILQ_FOREACH_SAFE(ap, &rap->addrs, next, apn) {
+				lt.tv_sec = ap->prefix_vltime;
+				lt.tv_usec = 0;
+				timeradd(&rap->received, &lt, &expire);
+				if (timercmp(&now, &expire, >) &&
+				    ipv6rs_findsameaddr(ap) == NULL)
+				{
+					syslog(LOG_INFO,
+					    "%s: %s: expired address",
+					    ifp->name, ap->saddr);
+					TAILQ_REMOVE(&rap->addrs, ap, next);
+					free(ap);
+					/* No need to delete it as the kernel
+					 * should have done this. */
+				}
+			}
+		}
 	
 		TAILQ_FOREACH_SAFE(rao, &rap->options, next, raon) {
 			if (!timerisset(&rao->expire))
 				continue;
 			if (timercmp(&now, &rao->expire, >)) {
-				syslog(LOG_INFO,
-				    "%s: %s: expired option %d",
-				    ifp->name, rap->sfrom, rao->type);
+				/* Expired prefixes are logged above */
+				if (rao->type != ND_OPT_PREFIX_INFORMATION)
+					syslog(LOG_INFO,
+					    "%s: %s: expired option %d",
+					    ifp->name, rap->sfrom, rao->type);
 				TAILQ_REMOVE(&rap->options, rao, next);
 				expired = 1;
 				free(rao->option);
@@ -912,14 +966,29 @@ ipv6rs_start(struct interface *ifp)
 void
 ipv6rs_drop(struct interface *ifp)
 {
-	struct ra *rap;
+	struct ra *rap, *ran;
 	int expired = 0;
+	TAILQ_HEAD(, ipv6_addr) addrs;
 
-	TAILQ_FOREACH(rap, &ipv6_routers, next)
-		if (rap->iface == ifp)
+	/* We need to drop routes before addresses
+	 * We do this by moving addresses to a local list, then building
+	 * the routes and finally adding the addresses back to a RA before
+	 * dropping it. Which RA the addresses end up on does not matter. */
+	TAILQ_INIT(&addrs);
+	TAILQ_FOREACH(rap, &ipv6_routers, next) {
+		if (rap->iface == ifp) {
 			rap->expired = expired = 1;
+			TAILQ_CONCAT(&addrs, &rap->addrs, next);
+		}
+	}
 	if (expired) {
 		ipv6_build_routes();
+		TAILQ_FOREACH_SAFE(rap, &ipv6_routers, next, ran) {
+			if (rap->iface == ifp) {
+				TAILQ_CONCAT(&rap->addrs, &addrs, next);
+				ipv6rs_drop_ra(rap);
+			}
+		}
 		run_script_reason(ifp, "ROUTERADVERT");
 	}
 }
