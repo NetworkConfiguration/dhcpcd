@@ -1049,6 +1049,7 @@ ipv6rs_drop(struct interface *ifp)
 	int expired = 0;
 	TAILQ_HEAD(, ipv6_addr) addrs;
 
+	eloop_timeout_delete(NULL, ifp);
 	/* We need to drop routes before addresses
 	 * We do this by moving addresses to a local list, then building
 	 * the routes and finally adding the addresses back to a RA before
