@@ -1185,7 +1185,7 @@ read_lease(const struct interface *iface)
 	return dhcp;
 }
 
-static ssize_t
+ssize_t
 print_string(char *s, ssize_t len, int dl, const uint8_t *data)
 {
 	uint8_t c;

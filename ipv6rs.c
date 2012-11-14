@@ -399,7 +399,7 @@ ipv6rs_handledata(_unused void *arg)
 	struct nd_opt_hdr *ndo;
 	struct ra_opt *rao;
 	struct ipv6_addr *ap;
-	char *opt;
+	char *opt, *tmp;
 	struct timeval expire;
 	uint8_t has_prefix, has_dns, new_rap, new_data;
 
@@ -665,8 +665,14 @@ ipv6rs_handledata(_unused void *arg)
 				syslog(LOG_ERR, "%s: invalid DNSSL option",
 				    ifp->name);
 			} else {
-				opt = xmalloc(l);
-				decode_rfc3397(opt, l, n, op);
+				tmp = xmalloc(l);
+				decode_rfc3397(tmp, l, n, op);
+				n = print_string(NULL, 0,
+				    l - 1, (const uint8_t *)tmp);
+				opt = xmalloc(n);
+				print_string(opt, n,
+				    l - 1, (const uint8_t *)tmp);
+				free(tmp);
 			}
 			break;
 		}
