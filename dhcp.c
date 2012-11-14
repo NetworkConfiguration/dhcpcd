@@ -272,8 +272,11 @@ validate_length(uint8_t option, int dl, int *type)
 		    opt->type & (STRING | RFC3442 | RFC5969))
 			return dl;
 
-		if (opt->type & IPV4 && opt->type & ARRAY)
-			return (dl % sizeof(uint32_t) == 0 ? 0 : -1);
+		if (opt->type & IPV4 && opt->type & ARRAY) {
+			if (dl < (int)sizeof(uint32_t))
+				return -1;
+			return dl - (dl % sizeof(uint32_t));
+		}
 
 		sz = 0;
 		if (opt->type & (UINT32 | IPV4))
@@ -285,7 +288,7 @@ validate_length(uint8_t option, int dl, int *type)
 		/* If we don't know the size, assume it's valid */
 		if (sz == 0)
 			return dl;
-		return sz;
+		return (sz < dl ? -1 : sz);
 	}
 
 	/* unknown option, so let it pass */
