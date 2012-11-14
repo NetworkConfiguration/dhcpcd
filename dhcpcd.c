@@ -530,9 +530,13 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp, const struct i
 		close_sockets(iface);
 		/* If we constantly get NAKS then we should slowly back off */
 		add_timeout_sec(state->nakoff, start_interface, iface);
-		state->nakoff *= 2;
-		if (state->nakoff > NAKOFF_MAX)
-			state->nakoff = NAKOFF_MAX;
+		if (state->nakoff == 0)
+			state->nakoff = 1;
+		else {
+			state->nakoff *= 2;
+			if (state->nakoff > NAKOFF_MAX)
+				state->nakoff = NAKOFF_MAX;
+		}
 		return;
 	}
 
@@ -561,7 +565,7 @@ handle_dhcp(struct interface *iface, struct dhcp_message **dhcpp, const struct i
 	}
 
 	/* No NAK, so reset the backoff */
-	state->nakoff = 1;
+	state->nakoff = 0;
 
 	if ((type == 0 || type == DHCP_OFFER) &&
 	    state->state == DHS_DISCOVER)
@@ -1257,7 +1261,7 @@ init_state(struct interface *iface, int argc, char **argv)
 
 	ifs->state = DHS_INIT;
 	ifs->reason = "PREINIT";
-	ifs->nakoff = 1;
+	ifs->nakoff = 0;
 	configure_interface(iface, argc, argv);
 	if (!(options & DHCPCD_TEST))
 		run_script(iface);
@@ -1365,7 +1369,7 @@ handle_hwaddr(const char *ifname, unsigned char *hwaddr, size_t hwlen)
 				    ifp->name,
 		    		    hwaddr_ntoa(ifp->hwaddr, ifp->hwlen));
 				ifp->state->interval = 0;
-				ifp->state->nakoff = 1;
+				ifp->state->nakoff = 0;
 				start_interface(ifp);
 			}
 		}
