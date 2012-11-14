@@ -825,7 +825,8 @@ configure_interface1(struct interface *iface)
 			duid = xmalloc(DUID_LEN);
 			if ((len = get_duid(duid, iface)) == 0)
 				syslog(LOG_ERR, "get_duid: %m");
-		}
+		} else
+			duid = NULL;
 		if (len > 0) {
 			iface->clientid = xmalloc(len + 6);
 			iface->clientid[0] = len + 5;
@@ -849,6 +850,7 @@ configure_interface1(struct interface *iface)
 			memcpy(iface->clientid + 2, iface->hwaddr,
 			    iface->hwlen);
 		}
+		free(duid);
 	}
 	if (ifo->options & DHCPCD_CLIENTID)
 		syslog(LOG_DEBUG, "%s: using ClientID %s", iface->name,
@@ -1993,6 +1995,10 @@ main(int argc, char **argv)
 	}
 
 	syslog(LOG_INFO, "version " VERSION " starting");
+
+#ifdef DEBUG_MEMORY
+	eloop_init();
+#endif
 
 	if ((signal_fd = signal_init()) == -1)
 		exit(EXIT_FAILURE);
