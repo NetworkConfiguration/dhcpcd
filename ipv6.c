@@ -429,7 +429,7 @@ ipv6_build_routes(void)
 	/* Remove old routes we used to manage
 	 * If we own the default route, but not RA management itself
 	 * then we need to preserve the last best default route we had */
-	TAILQ_FOREACH_REVERSE_SAFE(rt, routes, rt6head, next, rtn) {
+	while ((rt = TAILQ_LAST(routes, rt6head))) {
 		TAILQ_REMOVE(routes, rt, next);
 		if (find_route6(nrs, rt) == NULL) {
 			if (!have_default &&
