@@ -1311,7 +1311,9 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data,
 			while (data < e) {
 				if (l)
 					l++; /* space */
-				l += ipv6_printaddr(NULL, 0, data, ifname);
+				dl = ipv6_printaddr(NULL, 0, data, ifname);
+				if (dl != -1)
+					l += dl;
 				data += 16;
 			}
 			return l + 1;
@@ -1360,7 +1362,11 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data,
 			l = snprintf(s, len, "%s", inet_ntoa(addr));
 			data += sizeof(addr.s_addr);
 		} else if (type & IPV6) {
-			l = ipv6_printaddr(s, len, data, ifname);
+			dl = ipv6_printaddr(s, len, data, ifname);
+			if (dl != -1)
+				l = dl;
+			else
+				l = 0;	
 			data += 16;
 		} else if (type & BINHEX) {
 			l = snprintf(s, len, "%.2x", data[0]);
