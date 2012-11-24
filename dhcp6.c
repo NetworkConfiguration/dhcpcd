@@ -767,6 +767,9 @@ dhcp6_startdiscover(void *arg)
 	state->new = NULL;
 	state->new_len = 0;
 
+	/* XXX remove this line when we fix discover stamping on assigned */
+	dhcp6_freedrop_addrs(ifp, 0);
+
 	if (dhcp6_makemessage(ifp) == -1)
 		syslog(LOG_ERR, "%s: dhcp6_makemessage: %m", ifp->name);
 	else
@@ -1591,14 +1594,14 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 		}
 		ol = ntohs(o->len);
 		od = D6_COPTION_DATA(o);
-		len = print_option(NULL, 0, opt->type, ol, od);
+		len = print_option(NULL, 0, opt->type, ol, od, ifp->name);
 		if (len < 0)
 			return -1;
 		e = strlen(prefix) + 6 + strlen(opt->var) + len + 4;
 		v = val = *ep++ = xmalloc(e);
 		v += snprintf(val, e, "%s_dhcp6_%s=", prefix, opt->var);
 		if (len != 0)
-			print_option(v, len, opt->type, ol, od);
+			print_option(v, len, opt->type, ol, od, ifp->name);
 
 	}
 

@@ -78,6 +78,38 @@ int ipv6_init(void)
 	return 0;
 }
 
+ssize_t
+ipv6_printaddr(char *s, ssize_t sl, const uint8_t *d, const char *ifname)
+{
+	char buf[INET6_ADDRSTRLEN];
+	const char *p;
+	ssize_t l;
+
+	p = inet_ntop(AF_INET6, d, buf, sizeof(buf));
+	if (p == NULL)
+		return -1;
+
+	l = strlen(p);
+	if (d[0] == 0xfe && (d[1] & 0xc0) == 0x80)
+		l += 1 + strlen(ifname);
+
+	if (s == NULL)
+		return l;
+
+	if (sl < l) {
+		errno = ENOMEM;
+		return -1;
+	}
+		
+	s += strlcpy(s, p, sl);
+	if (d[0] == 0xfe && (d[1] & 0xc0) == 0x80) {
+		*s++ = '%';
+		s += strlcpy(s, ifname, sl);
+	}
+	*s = '\0';
+	return l;
+}
+
 struct in6_addr *
 ipv6_linklocal(const char *ifname)
 {

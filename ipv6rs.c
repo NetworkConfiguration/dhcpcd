@@ -651,28 +651,25 @@ ipv6rs_handledata(_unused void *arg)
 			    nd_opt_rdnss_lifetime);
 			op += sizeof(rdnss->nd_opt_rdnss_lifetime);
 			l = 0;
-			for (n = ndo->nd_opt_len - 1; n > 1; n -= 2) {
-				memcpy(&addr.s6_addr, op, sizeof(addr.s6_addr));
-				cbp = inet_ntop(AF_INET6, &addr,
-				    ntopbuf, INET6_ADDRSTRLEN);
-				if (cbp == NULL) {
-					syslog(LOG_ERR,
-					    "%s: invalid RDNSS address",
-					    ifp->name);
-				} else {
-					if (opt) {
-						l = strlen(opt);
-						opt = xrealloc(opt,
-							l + strlen(cbp) + 2);
-						opt[l] = ' ';
-						strcpy(opt + l + 1, cbp);
-					} else
-						opt = xstrdup(cbp);
-					if (lifetime > 0)
-						has_dns = 1;
-				}
-		        	op += sizeof(addr.s6_addr);
+			for (n = ndo->nd_opt_len - 1; n > 1; n -= 2,
+			    op += sizeof(addr.s6_addr))
+			{
+				l += ipv6_printaddr(NULL, 0, op, ifp->name) + 1;
 			}
+			op = (uint8_t *)ndo;
+			op += offsetof(struct nd_opt_rdnss,
+			    nd_opt_rdnss_lifetime);
+			op += sizeof(rdnss->nd_opt_rdnss_lifetime);
+			tmp = opt = malloc(l);
+			for (n = ndo->nd_opt_len - 1; n > 1; n -= 2,
+			    op += sizeof(addr.s6_addr))
+			{
+				tmp += ipv6_printaddr(tmp, l, op, ifp->name);
+				*tmp++ = ' ';
+				if (lifetime > 0)
+					has_dns = 1;
+			}
+			(*--tmp) = '\0';
 			break;
 			
 		case ND_OPT_DNSSL:

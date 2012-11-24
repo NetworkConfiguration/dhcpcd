@@ -282,11 +282,11 @@ make_env(const struct interface *iface, const char *reason, char ***argv)
 		}
 	}
 	if (dhcp && iface->state->old) {
-		e = configure_env(NULL, NULL, iface->state->old, ifo);
+		e = configure_env(NULL, NULL, iface->state->old, iface);
 		if (e > 0) {
 			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
 			elen += configure_env(env + elen, "old",
-			    iface->state->old, ifo);
+			    iface->state->old, iface);
 		}
 		append_config(&env, &elen, "old",
 		    (const char *const *)ifo->config);
@@ -303,11 +303,11 @@ make_env(const struct interface *iface, const char *reason, char ***argv)
 
 dumplease:
 	if (dhcp && iface->state->new) {
-		e = configure_env(NULL, NULL, iface->state->new, ifo);
+		e = configure_env(NULL, NULL, iface->state->new, iface);
 		if (e > 0) {
 			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
 			elen += configure_env(env + elen, "new",
-			    iface->state->new, ifo);
+			    iface->state->new, iface);
 		}
 		append_config(&env, &elen, "new",
 		    (const char *const *)ifo->config);

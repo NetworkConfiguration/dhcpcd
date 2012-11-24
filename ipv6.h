@@ -62,6 +62,7 @@ struct rt6 {
 TAILQ_HEAD(rt6head, rt6);
 
 int ipv6_init(void);
+ssize_t ipv6_printaddr(char *, ssize_t, const uint8_t *, const char *);
 struct in6_addr *ipv6_linklocal(const char *);
 int ipv6_makeaddr(struct in6_addr *, const char *, const struct in6_addr *, int);
 int ipv6_makeprefix(struct in6_addr *, const struct in6_addr *, int);

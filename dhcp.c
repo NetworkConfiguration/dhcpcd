@@ -1222,7 +1222,8 @@ print_string(char *s, ssize_t len, int dl, const uint8_t *data)
 }
 
 ssize_t
-print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data)
+print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data,
+    const char *ifname)
 {
 	const uint8_t *e, *t;
 	uint16_t u16;
@@ -1232,8 +1233,7 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data)
 	struct in_addr addr;
 	ssize_t bytes = 0;
 	ssize_t l;
-	char *tmp, ntopbuf[INET6_ADDRSTRLEN];
-	const char *addr6;
+	char *tmp;
 
 	if (type & RFC3397) {
 		l = decode_rfc3397(NULL, 0, dl, data);
@@ -1280,8 +1280,11 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data)
 		data += sizeof(u16);
 		dl -= sizeof(u16);
 		if (dl)
-			l += print_option(s, len, STRING, dl, data);
+			l += print_option(s, len, STRING, dl, data, ifname);
 		return l;
+	}
+
+	if (type & IPV6) {
 	}
 
 	if (!s) {
@@ -1303,8 +1306,15 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data)
 			l = 16;
 			dl /= 4;
 		} else if (type & IPV6) {
-			l = INET6_ADDRSTRLEN;
-			dl /= 16;
+			e = data + dl;
+			l = 0;
+			while (data < e) {
+				if (l)
+					l++; /* space */
+				l += ipv6_printaddr(NULL, 0, data, ifname);
+				data += 16;
+			}
+			return l + 1;
 		} else if (type & BINHEX) {
 			l = 2;
 		} else {
@@ -1350,9 +1360,7 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data)
 			l = snprintf(s, len, "%s", inet_ntoa(addr));
 			data += sizeof(addr.s_addr);
 		} else if (type & IPV6) {
-			addr6 = inet_ntop(AF_INET6, data,
-			    ntopbuf, sizeof(ntopbuf));
-			l = snprintf(s, len, "%s", addr6);
+			l = ipv6_printaddr(s, len, data, ifname);
 			data += 16;
 		} else if (type & BINHEX) {
 			l = snprintf(s, len, "%.2x", data[0]);
@@ -1369,8 +1377,9 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data)
 
 ssize_t
 configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
-    const struct if_options *ifo)
+    const struct interface *ifp)
 {
+	const struct if_options *ifo;
 	const uint8_t *p;
 	int pl;
 	struct in_addr addr;
@@ -1383,6 +1392,7 @@ configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 	char cidr[4];
 	uint8_t overl = 0;
 
+	ifo = ifp->state->options;
 	get_option_uint8(&overl, dhcp, DHO_OPTIONSOVERLOADED);
 
 	if (!env) {
@@ -1442,14 +1452,14 @@ configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 			p += 3;
 			pl -= 3;
 		}
-		len = print_option(NULL, 0, opt->type, pl, p);
+		len = print_option(NULL, 0, opt->type, pl, p, ifp->name);
 		if (len < 0)
 			return -1;
 		e = strlen(prefix) + strlen(opt->var) + len + 4;
 		v = val = *ep++ = xmalloc(e);
 		v += snprintf(val, e, "%s_%s=", prefix, opt->var);
 		if (len != 0)
-			print_option(v, len, opt->type, pl, p);
+			print_option(v, len, opt->type, pl, p, ifp->name);
 	}
 
 	return ep - env;

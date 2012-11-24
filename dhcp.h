@@ -217,11 +217,10 @@ int get_option_uint8(uint8_t *, const struct dhcp_message *, uint8_t);
 struct rt *get_option_routes(const struct dhcp_message *, const char *,
     unsigned long long *);
 ssize_t decode_rfc3397(char *, ssize_t, int, const uint8_t *);
-ssize_t print_string(char *s, ssize_t len, int dl, const uint8_t *data);
-ssize_t print_option(char *s, ssize_t len, int type, int dl,
-    const uint8_t *data);
+ssize_t print_string(char *, ssize_t, int, const uint8_t *);
+ssize_t print_option(char *, ssize_t, int, int, const uint8_t *, const char *);
 ssize_t configure_env(char **, const char *, const struct dhcp_message *,
-    const struct if_options *);
+    const struct interface *);
 
 int dhcp_message_add_addr(struct dhcp_message *, uint8_t, struct in_addr);
 ssize_t make_message(struct dhcp_message **, const struct interface *,
