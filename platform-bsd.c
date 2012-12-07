@@ -31,6 +31,7 @@
 #include <sys/utsname.h>
 #include <netinet/in.h>
 
+#include <errno.h>
 #include <stdlib.h>
 #include <syslog.h>
 
