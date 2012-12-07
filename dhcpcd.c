@@ -1225,9 +1225,13 @@ start_interface(void *arg)
 
 	if (ifo->options & DHCPCD_IPV6) {
 		if (ifo->options & DHCPCD_INFORM)
-			dhcp6_start(iface, 0);
+			nolease = dhcp6_start(iface, 0);
 		else if (!(ifo->options & DHCPCD_IPV6RS))
-			dhcp6_start(iface, 1);
+			nolease = dhcp6_start(iface, 1);
+		else
+			nolease = 0;
+		if (nolease == -1)
+			syslog(LOG_ERR, "%s: dhcp6_start: %m", iface->name);
 	}
 
 	if (!(ifo->options & DHCPCD_IPV4))
