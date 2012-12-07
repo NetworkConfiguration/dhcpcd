@@ -2105,7 +2105,8 @@ main(int argc, char **argv)
 		ipv6rsfd = ipv6rs_open();
 		if (ipv6rsfd == -1) {
 			syslog(LOG_ERR, "ipv6rs: %m");
-			options &= ~DHCPCD_IPV6RS;
+			options &= ~(DHCPCD_IPV6RS |
+			    DHCPCD_IPV6RA_OWN | DHCPCD_IPV6RA_OWN_DEFAULT);
 		} else {
 			eloop_event_add(ipv6rsfd, ipv6rs_handledata, NULL);
 //			atexit(restore_rtadv);

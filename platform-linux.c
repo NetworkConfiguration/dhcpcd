@@ -185,7 +185,12 @@ check_ipv6(const char *ifname)
 
 	snprintf(path, sizeof(path), "%s/%s/accept_ra", prefix, ifname);
 	r = check_proc_int(path);
-	if (r == 0)
+	if (r == -1)
+		/* The sysctl probably doesn't exist, but this isn't an
+		 * error as such so just log it and continue */
+		syslog(errno == ENOENT ? LOG_DEBUG : LOG_WARNING,
+		    "%s: %m", path);
+	else if (r == 0)
 		options |= DHCPCD_IPV6RA_OWN;
 	else if (options & DHCPCD_IPV6RA_OWN) {
 		syslog(LOG_INFO, "%s: disabling Kernel IPv6 RA support",
@@ -213,7 +218,13 @@ check_ipv6(const char *ifname)
 	if (r != 2) {
 		snprintf(path, sizeof(path), "%s/%s/forwarding",
 		    prefix, ifname);
-		if (check_proc_int(path) != 0) {
+		r = check_proc_int(path);
+		if (r == -1) {
+			/* The sysctl probably doesn't exist, but this isn't an
+			 * error as such so just log it and continue */
+			syslog(errno == ENOENT ? LOG_DEBUG : LOG_WARNING,
+			    "%s: %m", path);
+		} else if (r != 0) {
 			syslog(LOG_WARNING,
 			    "%s: configured as a router, not a host", ifname);
 			return 0;

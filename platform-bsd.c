@@ -90,14 +90,19 @@ restore_kernel_ra(void)
 int
 check_ipv6(const char *ifname)
 {
-	int val;
+	int r;
 
 	/* BSD doesn't support these values per iface, so just return 1 */
 	if (ifname)
 		return 1;
 
-	val = get_inet6_sysctl(IPV6CTL_ACCEPT_RTADV);
-	if (val == 0)
+	r = get_inet6_sysctl(IPV6CTL_ACCEPT_RTADV);
+	if (r == -1)
+		/* The sysctl probably doesn't exist, but this isn't an
+		 * error as such so just log it and continue */
+		syslog(errno == ENOENT ? LOG_DEBUG : LOG_WARNING,
+		    "IPV6CTL_ACCEPT_RTADV: %m");
+	else if (r == 0)
 		options |= DHCPCD_IPV6RA_OWN;
 	else if (options & DHCPCD_IPV6RA_OWN) {
 		syslog(LOG_INFO, "disabling Kernel IPv6 RA support");
@@ -107,8 +112,14 @@ check_ipv6(const char *ifname)
 		}
 		atexit(restore_kernel_ra);
 	}
-return 1;
-	if (get_inet6_sysctl(IPV6CTL_FORWARDING) != 0) {
+
+	r = get_inet6_sysctl(IPV6CTL_FORWARDING);
+	if (r == -1)
+		/* The sysctl probably doesn't exist, but this isn't an
+		 * error as such so just log it and continue */
+		syslog(errno == ENOENT ? LOG_DEBUG : LOG_WARNING,
+		    "IPV6CTL_FORWARDING: %m");
+	else if (r != 0) {
 		syslog(LOG_WARNING,
 		    "Kernel is configured as a router, not a host");
 		return 0;
