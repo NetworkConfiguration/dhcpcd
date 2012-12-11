@@ -948,6 +948,7 @@ dhcp6_findia(struct interface *ifp, const uint8_t *d, size_t l)
 		a = malloc(sizeof(*a));
 		if (a) {
 			a->new = 1;
+			a->onlink = 1; /* XXX: suprised no DHCP opt for this */
 			p = D6_COPTION_DATA(o);
 			memcpy(&a->addr.s6_addr, p,
 			    sizeof(a->addr.s6_addr));

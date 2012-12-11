@@ -439,9 +439,6 @@ ipv6_removesubnet(const struct interface *ifp, struct ipv6_addr *addr)
 #endif
 		{
 			r = del_route6(rt);
-			/* If the subnet route didn't exist, don't
-			 * moan about it.
-			 * We currently do this to silence FreeBSD-7 */
 			if (r == -1 && errno == ESRCH)
 				r = 0;
 		}
@@ -473,6 +470,8 @@ ipv6_buildroutes(void)
 		d6_state = D6_CSTATE(ifp);
 		if (d6_state && d6_state->state == DH6S_BOUND) {
 			TAILQ_FOREACH(addr, &d6_state->addrs, next) {
+				if (!addr->onlink)
+					continue;
 				rt = make_prefix(ifp, NULL, addr);
 				if (rt)
 					TAILQ_INSERT_TAIL(&dnr, rt, next);
@@ -482,6 +481,8 @@ ipv6_buildroutes(void)
 	TAILQ_FOREACH(rap, &ipv6_routers, next) {
 		if (options & DHCPCD_IPV6RA_OWN) {
 			TAILQ_FOREACH(addr, &rap->addrs, next) {
+				if (!addr->onlink)
+					continue;
 				rt = make_prefix(rap->iface, rap, addr);
 				if (rt)
 					TAILQ_INSERT_TAIL(&dnr, rt, next);

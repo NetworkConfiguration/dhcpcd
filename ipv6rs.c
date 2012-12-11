@@ -295,6 +295,7 @@ ipv6rs_freedrop_addrs(struct ra *rap, int drop)
 		 * This is safe because the RA is removed from the list
 		 * before we are called. */
 		if (drop && (options & DHCPCD_IPV6RA_OWN) &&
+		    !IN6_IS_ADDR_UNSPECIFIED(&ap->addr) &&
 		    !ipv6rs_addrexists(ap) && !dhcp6_addrexists(ap))
 		{
 			syslog(LOG_INFO, "%s: deleting address %s",
@@ -581,6 +582,11 @@ ipv6rs_handledata(_unused void *arg)
 				    sizeof(ap->prefix.s6_addr)) == 0)
 					break;
 			if (ap == NULL) {
+				if (!(pi->nd_opt_pi_flags_reserved &
+				    ND_OPT_PI_FLAG_AUTO) &&
+				    !(pi->nd_opt_pi_flags_reserved &
+				    ND_OPT_PI_FLAG_ONLINK))
+					break;
 				ap = xmalloc(sizeof(*ap));
 				ap->new = 1;
 				ap->prefix_len = pi->nd_opt_pi_prefix_len;
@@ -615,6 +621,9 @@ ipv6rs_handledata(_unused void *arg)
 				ap->new = 1;
 			else
 				ap->new = 0;
+			if (pi->nd_opt_pi_flags_reserved &
+			    ND_OPT_PI_FLAG_ONLINK)
+				ap->onlink = 1;
 			ap->prefix_vltime =
 			    ntohl(pi->nd_opt_pi_valid_time);
 			ap->prefix_pltime =
