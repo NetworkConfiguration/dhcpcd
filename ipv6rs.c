@@ -589,6 +589,7 @@ ipv6rs_handledata(_unused void *arg)
 					break;
 				ap = xmalloc(sizeof(*ap));
 				ap->new = 1;
+				ap->onlink = 0;
 				ap->prefix_len = pi->nd_opt_pi_prefix_len;
 				memcpy(ap->prefix.s6_addr,
 				   pi->nd_opt_pi_prefix.s6_addr,
