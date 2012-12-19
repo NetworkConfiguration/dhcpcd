@@ -800,7 +800,8 @@ ipv6rs_handledata(_unused void *arg)
 handle_flag:
 	if (rap->flags & (ND_RA_FLAG_MANAGED | ND_RA_FLAG_OTHER)) {
 		if (new_data)
-			syslog(LOG_WARNING, "%s: no support for DHCPv6 management",
+			syslog(LOG_WARNING,
+			    "%s: no support for DHCPv6 management",
 			    ifp->name);
 		if (options & DHCPCD_TEST)
 			exit(EXIT_SUCCESS);
