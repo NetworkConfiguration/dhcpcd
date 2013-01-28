@@ -822,6 +822,8 @@ get_option_routes(struct interface *ifp, const struct dhcp_message *dhcp)
 	/* OK, get our static routes first. */
 	if (!has_option_mask(ifo->nomask, DHO_STATICROUTE))
 		p = get_option(dhcp, DHO_STATICROUTE, &len, NULL);
+	else
+		p = NULL;
 	if (p) {
 		e = p + len;
 		while (p < e) {
