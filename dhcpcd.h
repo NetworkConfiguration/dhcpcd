@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2012 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -128,27 +128,16 @@ extern int ifdc;
 extern char **ifdv;
 extern struct interface *ifaces;
 
+pid_t daemonise(void);
 struct interface *find_interface(const char *);
 int handle_args(struct fd_list *, int, char **);
 void handle_carrier(int, int, const char *);
 void handle_interface(int, const char *);
 void handle_hwaddr(const char *, unsigned char *, size_t);
-void handle_ifa(int, const char *,
-    struct in_addr *, struct in_addr *, struct in_addr *);
-void handle_exit_timeout(void *);
 void handle_signal(int);
-void start_interface(void *);
-void start_discover(void *);
-void start_request(void *);
-void start_renew(void *);
-void start_rebind(void *);
-void start_reboot(struct interface *);
-void start_expire(void *);
-void send_decline(struct interface *);
-int open_sockets(struct interface *);
-void close_sockets(struct interface *);
-void drop_dhcp(struct interface *, const char *);
 void drop_interface(struct interface *, const char *);
 int select_profile(struct interface *, const char *);
+
+void start_interface(void *);
 
 #endif

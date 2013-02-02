@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2012 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -34,10 +34,7 @@
 #include <stdint.h>
 
 #include "common.h"
-
-/* Max MTU - defines dhcp option length */
-#define MTU_MAX             1500
-#define MTU_MIN             576
+#include "dhcp-common.h"
 
 /* UDP port numbers for DHCP */
 #define DHCP_SERVER_PORT    67
@@ -114,26 +111,6 @@ enum DHO {
 	DHO_END                    = 255
 };
 
-#define REQUEST	(1 << 0)
-#define UINT8	(1 << 1)
-#define UINT16	(1 << 2)
-#define SINT16	(1 << 3)
-#define UINT32	(1 << 4)
-#define SINT32	(1 << 5)
-#define IPV4	(1 << 6)
-#define STRING	(1 << 7)
-#define PAIR	(1 << 8)
-#define ARRAY	(1 << 9)
-#define RFC3361	(1 << 10)
-#define RFC3397	(1 << 11)
-#define RFC3442 (1 << 12)
-#define RFC5969 (1 << 13)
-#define IPV6	(1 << 14)
-#define BINHEX	(1 << 15)
-#define SCODE	(1 << 16)
-
-#define IPV4R	IPV4 | REQUEST
-
 /* FQDN values - lsnybble used in flags
  * hsnybble to create order
  * and to allow 0x00 to mean disable
@@ -193,18 +170,12 @@ struct dhcp_lease {
 #include "if-options.h"
 #include "net.h"
 
-struct dhcp_opt {
-	uint16_t option;
-	int type;
-	const char *var;
-};
-
 extern const struct dhcp_opt const dhcp_opts[];
 
-#define add_option_mask(var, val) (var[val >> 3] |= 1 << (val & 7))
-#define del_option_mask(var, val) (var[val >> 3] &= ~(1 << (val & 7)))
-#define has_option_mask(var, val) (var[val >> 3] & (1 << (val & 7)))
-int make_option_mask(const struct dhcp_opt *,uint8_t *, const char *, int);
+char *decode_rfc3361(int dl, const uint8_t *data);
+ssize_t decode_rfc3442(char *out, ssize_t len, int pl, const uint8_t *p);
+ssize_t decode_rfc5969(char *out, ssize_t len, int pl, const uint8_t *p);
+
 void print_options(void);
 char *get_option_string(const struct dhcp_message *, uint8_t);
 int get_option_addr(struct in_addr *, const struct dhcp_message *, uint8_t);
@@ -215,12 +186,12 @@ int get_option_uint8(uint8_t *, const struct dhcp_message *, uint8_t);
 	    !IN_LINKLOCAL(htonl((m)->yiaddr)) &&			\
 	    get_option_uint8(NULL, m, DHO_MESSAGETYPE) == -1)
 struct rt *get_option_routes(struct interface *, const struct dhcp_message *);
-ssize_t decode_rfc3397(char *, ssize_t, int, const uint8_t *);
-ssize_t print_string(char *, ssize_t, int, const uint8_t *);
-ssize_t print_option(char *, ssize_t, int, int, const uint8_t *, const char *);
 ssize_t configure_env(char **, const char *, const struct dhcp_message *,
     const struct interface *);
 
+uint32_t dhcp_xid(const struct interface *);
+struct dhcp_message *dhcp_message_new(struct in_addr *addr,
+    struct in_addr *mask);
 int dhcp_message_add_addr(struct dhcp_message *, uint8_t, struct in_addr);
 ssize_t make_message(struct dhcp_message **, const struct interface *,
     uint8_t);
@@ -229,5 +200,15 @@ int valid_dhcp_packet(unsigned char *);
 ssize_t write_lease(const struct interface *, const struct dhcp_message *);
 struct dhcp_message *read_lease(const struct interface *);
 void get_lease(struct dhcp_lease *, const struct dhcp_message *);
+
+void dhcp_drop(struct interface *, const char *);
+void dhcp_start(struct interface *);
+void dhcp_stop(struct interface *);
+void dhcp_decline(struct interface *);
+void dhcp_discover(void *);
+void dhcp_inform(struct interface *);
+void dhcp_release(struct interface *);
+void dhcp_bind(void *);
+void dhcp_close(struct interface *);
 
 #endif

@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2012 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -47,11 +47,11 @@
 
 #define ELOOP_QUEUE 1
 #include "common.h"
-#include "configure.h"
 #include "dhcpcd.h"
 #include "eloop.h"
 #include "ipv6.h"
 #include "ipv6ns.h"
+#include "script.h"
 
 #define MIN_RANDOM_FACTOR	(500 * 1000)	/* milliseconds in usecs */
 #define MAX_RANDOM_FACTOR	(1500 * 1000)	/* milliseconds in usecs */
@@ -169,7 +169,7 @@ ipv6ns_unreachable(void *arg)
 	    rap->iface->name, rap->sfrom);
 	rap->expired = 1;
 	ipv6_buildroutes();
-	run_script_reason(rap->iface, "ROUTERADVERT"); /* XXX not RA */
+	script_runreason(rap->iface, "ROUTERADVERT"); /* XXX not RA */
 }
 
 void
@@ -342,7 +342,7 @@ ipv6ns_handledata(_unused void *arg)
 		    ifp->name, sfrom);
 		rap->expired = 1;
 		ipv6_buildroutes();
-		run_script_reason(ifp, "ROUTERADVERT");
+		script_runreason(ifp, "ROUTERADVERT");
 		return;
 	}
 

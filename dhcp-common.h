@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2008 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2012 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -25,15 +25,50 @@
  * SUCH DAMAGE.
  */
 
-#ifndef BIND_H
-#define BIND_H
+#ifndef DHCPCOMMON_H
+#define DHCPCOMMON_H
 
-#include "config.h"
-#ifdef THERE_IS_NO_FORK
-# define daemonise() {}
-#else
-pid_t daemonise(void);
-#endif
+#include <arpa/inet.h>
+#include <netinet/in.h>
 
-void bind_interface(void *);
+#include <stdint.h>
+
+#include "common.h"
+
+/* Max MTU - defines dhcp option length */
+#define MTU_MAX             1500
+#define MTU_MIN             576
+
+#define REQUEST		(1 << 0)
+#define UINT8		(1 << 1)
+#define UINT16		(1 << 2)
+#define SINT16		(1 << 3)
+#define UINT32		(1 << 4)
+#define SINT32		(1 << 5)
+#define ADDRIPV4	(1 << 6)
+#define STRING		(1 << 7)
+#define PAIR		(1 << 8)
+#define ARRAY		(1 << 9)
+#define RFC3361		(1 << 10)
+#define RFC3397		(1 << 11)
+#define RFC3442		(1 << 12)
+#define RFC5969		(1 << 13)
+#define ADDRIPV6	(1 << 14)
+#define BINHEX		(1 << 15)
+#define SCODE		(1 << 16)
+
+struct dhcp_opt {
+	uint16_t option;
+	int type;
+	const char *var;
+};
+
+#define add_option_mask(var, val) (var[val >> 3] |= 1 << (val & 7))
+#define del_option_mask(var, val) (var[val >> 3] &= ~(1 << (val & 7)))
+#define has_option_mask(var, val) (var[val >> 3] & (1 << (val & 7)))
+int make_option_mask(const struct dhcp_opt *,uint8_t *, const char *, int);
+ssize_t decode_rfc3397(char *, ssize_t, int, const uint8_t *);
+ssize_t print_string(char *, ssize_t, int, const uint8_t *);
+ssize_t print_option(char *, ssize_t, int, int, const uint8_t *, const char *);
+
 #endif

@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2012 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -45,15 +45,14 @@
 #include <syslog.h>
 
 #define ELOOP_QUEUE 1
-#include "bind.h"
 #include "common.h"
-#include "configure.h"
 #include "dhcpcd.h"
 #include "dhcp6.h"
 #include "eloop.h"
 #include "ipv6.h"
 #include "ipv6ns.h"
 #include "ipv6rs.h"
+#include "script.h"
 
 /* Debugging Router Solicitations is a lot of spam, so disable it */
 //#define DEBUG_RS
@@ -756,13 +755,13 @@ ipv6rs_handledata(_unused void *arg)
 	if (options & DHCPCD_IPV6RA_OWN && !(options & DHCPCD_TEST))
 		ipv6_addaddrs(ifp, &rap->addrs);
 	if (options & DHCPCD_TEST) {
-		run_script_reason(ifp, "TEST");
+		script_runreason(ifp, "TEST");
 		goto handle_flag;
 	}
 	ipv6_buildroutes();
 	/* We will get run by the expire function */
 	if (rap->lifetime)
-		run_script_reason(ifp, "ROUTERADVERT");
+		script_runreason(ifp, "ROUTERADVERT");
 
 	/* If we don't require RDNSS then set has_dns = 1 so we fork */
 	if (!(ifp->state->options->options & DHCPCD_IPV6RA_REQRDNSS))
@@ -1070,7 +1069,7 @@ ipv6rs_expire(void *arg)
 		eloop_timeout_add_tv(&next, ipv6rs_expire, ifp);
 	if (expired) {
 		ipv6_buildroutes();
-		run_script_reason(ifp, "ROUTERADVERT");
+		script_runreason(ifp, "ROUTERADVERT");
 	}
 }
 
@@ -1125,6 +1124,6 @@ ipv6rs_drop(struct interface *ifp)
 				ipv6rs_drop_ra(rap);
 			}
 		}
-		run_script_reason(ifp, "ROUTERADVERT");
+		script_runreason(ifp, "ROUTERADVERT");
 	}
 }

@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2011 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -57,8 +57,8 @@
 
 #include "config.h"
 #include "common.h"
-#include "configure.h"
 #include "dhcp.h"
+#include "ipv4.h"
 #include "ipv6.h"
 #include "net.h"
 
@@ -294,7 +294,7 @@ link_route(struct nlmsghdr *nlm)
 	if (rt.iface != NULL) {
 		if (metric == rt.iface->metric) {
 			inet_cidrtoaddr(rtm->rtm_dst_len, &rt.net);
-			route_deleted(&rt);
+			ipv4_routedeleted(&rt);
 		}
 	}
 	return 1;
@@ -346,7 +346,7 @@ link_addr(struct nlmsghdr *nlm)
 		}
 		rta = RTA_NEXT(rta, len);
 	}
-	handle_ifa(nlm->nlmsg_type, ifn, &addr, &net, &dest);
+	ipv4_handleifa(nlm->nlmsg_type, ifn, &addr, &net, &dest);
 	return 1;
 }
 

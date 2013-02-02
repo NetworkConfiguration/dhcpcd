@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2012 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -44,16 +44,15 @@
 
 #define ELOOP_QUEUE 2
 
-#include "bind.h"
 #include "config.h"
 #include "common.h"
-#include "configure.h"
 #include "dhcp.h"
 #include "dhcp6.h"
 #include "duid.h"
 #include "eloop.h"
 #include "ipv6rs.h"
 #include "platform.h"
+#include "script.h"
 
 #ifndef __UNCONST
 #define __UNCONST(a) ((void *)(unsigned long)(const void *)(a))
@@ -95,26 +94,27 @@ static const struct dhcp6_op dhcp6_ops[] = {
 	{ 0, NULL }
 };
 
+#define IPV6A	ADDRIPV6 | ARRAY
 const struct dhcp_opt const dhcp6_opts[] = {
 	{ D6_OPTION_CLIENTID,		BINHEX,		"client_id" },
 	{ D6_OPTION_SERVERID,		BINHEX,		"server_id" },
-	{ D6_OPTION_IA_ADDR,		IPV6 | ARRAY,	"ia_addr" },
+	{ D6_OPTION_IA_ADDR,		IPV6A,		"ia_addr" },
 	{ D6_OPTION_PREFERENCE,		UINT8,		"preference" },
 	{ D6_OPTION_RAPID_COMMIT,	0,		"rapid_commit" },
-	{ D6_OPTION_UNICAST,		IPV6,		"unicast" },
+	{ D6_OPTION_UNICAST,		ADDRIPV6,	"unicast" },
 	{ D6_OPTION_STATUS_CODE,	SCODE,		"status_code" },
 	{ D6_OPTION_SIP_SERVERS_NAME,	RFC3397,	"sip_servers_names" },
-	{ D6_OPTION_SIP_SERVERS_ADDRESS,IPV6 | ARRAY,	"sip_servers_addresses" },
-	{ D6_OPTION_DNS_SERVERS,	IPV6 | ARRAY,	"name_servers" },
+	{ D6_OPTION_SIP_SERVERS_ADDRESS,IPV6A,	"sip_servers_addresses" },
+	{ D6_OPTION_DNS_SERVERS,	IPV6A,		"name_servers" },
 	{ D6_OPTION_DOMAIN_LIST,	RFC3397,	"domain_search" },
-	{ D6_OPTION_NIS_SERVERS,	IPV6 | ARRAY,	"nis_servers" },
-	{ D6_OPTION_NISP_SERVERS,	IPV6 | ARRAY,	"nisp_servers" },
+	{ D6_OPTION_NIS_SERVERS,	IPV6A,		"nis_servers" },
+	{ D6_OPTION_NISP_SERVERS,	IPV6A,		"nisp_servers" },
 	{ D6_OPTION_NIS_DOMAIN_NAME,	RFC3397,	"nis_domain_name" },
 	{ D6_OPTION_NISP_DOMAIN_NAME,	RFC3397,	"nisp_domain_name" },
-	{ D6_OPTION_SNTP_SERVERS,	IPV6 | ARRAY,	"sntp_servers" },
+	{ D6_OPTION_SNTP_SERVERS,	IPV6A,		"sntp_servers" },
 	{ D6_OPTION_INFO_REFRESH_TIME,	UINT32,		"info_refresh_time" },
 	{ D6_OPTION_BCMS_SERVER_D,	RFC3397,	"bcms_server_d" },
-	{ D6_OPTION_BCMS_SERVER_A,	IPV6 | ARRAY,	"bcms_server_a" },
+	{ D6_OPTION_BCMS_SERVER_A,	IPV6A,		"bcms_server_a" },
 	{ 0, 0, NULL }
 };
 
@@ -875,7 +875,7 @@ dhcp6_startexpire(void *arg)
 
 	syslog(LOG_ERR, "%s: DHCPv6 lease expired", ifp->name);
 	dhcp6_freedrop_addrs(ifp, 1);
-	run_script_reason(ifp, "EXPIRE6");
+	script_runreason(ifp, "EXPIRE6");
 	state = D6_CSTATE(ifp);
 	unlink(state->leasefile);
 	dhcp6_startdiscover(ifp);
@@ -1390,7 +1390,7 @@ recv:
 		dhcp6_writelease(ifp);
 	}
 
-	run_script_reason(ifp, options & DHCPCD_TEST ? "TEST" : reason);
+	script_runreason(ifp, options & DHCPCD_TEST ? "TEST" : reason);
 	if (options & DHCPCD_TEST ||
 	    (ifp->state->options->options & DHCPCD_INFORM &&
 	    !(options & DHCPCD_MASTER)))
@@ -1527,7 +1527,7 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 		if (drop && state->new) {
 			if (reason == NULL)
 				reason = "STOP6";
-			run_script_reason(ifp, reason);
+			script_runreason(ifp, reason);
 		}
 		free(state->send);
 		free(state->recv);

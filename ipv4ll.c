@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2012 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -94,7 +94,7 @@ ipv4ll_start(void *arg)
 	if (ifp->addr.s_addr) {
 		ifp->state->conflicts = 0;
 		if (IN_LINKLOCAL(htonl(ifp->addr.s_addr))) {
-			send_arp_announce(ifp);
+			arp_announce(ifp);
 			return;
 		}
 	}
@@ -116,7 +116,7 @@ ipv4ll_start(void *arg)
 	else
 		ifp->state->offer = ipv4ll_make_lease(addr);
 	ifp->state->lease.frominfo = 0;
-	send_arp_probe(ifp);
+	arp_probe(ifp);
 }
 
 void
@@ -131,7 +131,7 @@ ipv4ll_handle_failure(void *arg)
 			syslog(LOG_DEBUG,
 			    "%s: IPv4LL %d second defence failed",
 			    ifp->name, DEFEND_INTERVAL);
-			drop_dhcp(ifp, "EXPIRE");
+			dhcp_drop(ifp, "EXPIRE");
 			ifp->state->conflicts = -1;
 		} else {
 			syslog(LOG_DEBUG, "%s: defended IPv4LL address",
@@ -141,7 +141,7 @@ ipv4ll_handle_failure(void *arg)
 		}
 	}
 
-	close_sockets(ifp);
+	dhcp_close(ifp);
 	free(ifp->state->offer);
 	ifp->state->offer = NULL;
 	eloop_timeout_delete(NULL, ifp);
@@ -149,7 +149,7 @@ ipv4ll_handle_failure(void *arg)
 		syslog(LOG_ERR, "%s: failed to acquire an IPv4LL address",
 		    ifp->name);
 		ifp->state->interval = RATE_LIMIT_INTERVAL / 2;
-		start_discover(ifp);
+		dhcp_discover(ifp);
 	} else {
 		eloop_timeout_add_sec(PROBE_WAIT, ipv4ll_start, ifp);
 	}

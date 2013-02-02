@@ -25,18 +25,16 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/stat.h>
-#include <sys/uio.h>
-#include <sys/wait.h>
-
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+#ifdef __linux__
+#  include <asm/types.h> /* for systems with broken headers */
+#  include <linux/rtnetlink.h>
+#endif
+
 #include <ctype.h>
 #include <errno.h>
-#include <signal.h>
-/* We can't include spawn.h here because it may not exist.
- * config.h will pull it in, or our compat one. */
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
@@ -44,432 +42,14 @@
 
 #include "config.h"
 #include "common.h"
-#include "configure.h"
 #include "dhcp.h"
-#include "dhcp6.h"
 #include "if-options.h"
 #include "if-pref.h"
-#include "ipv6rs.h"
+#include "ipv4.h"
 #include "net.h"
-#include "signals.h"
-
-#define DEFAULT_PATH	"PATH=/usr/bin:/usr/sbin:/bin:/sbin"
+#include "script.h"
 
 static struct rt *routes;
-
-static const char *if_params[] = {
-	"interface",
-	"reason",
-	"pid",
-	"ifmetric",
-	"ifwireless",
-	"ifflags",
-	"ssid",
-	"profile",
-	"interface_order",
-	NULL
-};
-
-void
-if_printoptions(void)
-{
-	const char **p;
-
-	for (p = if_params; *p; p++)
-		printf(" -  %s\n", *p);
-}
-
-static int
-exec_script(char *const *argv, char *const *env)
-{
-	pid_t pid;
-	posix_spawnattr_t attr;
-	short flags;
-	sigset_t defsigs;
-	int i;
-
-	/* posix_spawn is a safe way of executing another image
-	 * and changing signals back to how they should be. */
-	if (posix_spawnattr_init(&attr) == -1)
-		return -1;
-	flags = POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF;
-	posix_spawnattr_setflags(&attr, flags);
-	sigemptyset(&defsigs);
-	for (i = 0; i < handle_sigs[i]; i++)
-		sigaddset(&defsigs, handle_sigs[i]);
-	posix_spawnattr_setsigdefault(&attr, &defsigs);
-	posix_spawnattr_setsigmask(&attr, &dhcpcd_sigset);
-	errno = 0;
-	i = posix_spawn(&pid, argv[0], NULL, &attr, argv, env);
-	if (i) {
-		errno = i;
-		return -1;
-	}
-	return pid;
-}
-
-static char *
-make_var(const char *prefix, const char *var)
-{
-	size_t len;
-	char *v;
-
-	len = strlen(prefix) + strlen(var) + 2;
-	v = xmalloc(len);
-	snprintf(v, len, "%s_%s", prefix, var);
-	return v;
-}
-
-
-static void
-append_config(char ***env, ssize_t *len,
-    const char *prefix, const char *const *config)
-{
-	ssize_t i, j, e1;
-	char **ne, *eq;
-
-	if (config == NULL)
-		return;
-
-	ne = *env;
-	for (i = 0; config[i] != NULL; i++) {
-		eq = strchr(config[i], '=');
-		e1 = eq - config[i] + 1;
-		for (j = 0; j < *len; j++) {
-			if (strncmp(ne[j] + strlen(prefix) + 1,
-				config[i], e1) == 0)
-			{
-				free(ne[j]);
-				ne[j] = make_var(prefix, config[i]);
-				break;
-			}
-		}
-		if (j == *len) {
-			j++;
-			ne = xrealloc(ne, sizeof(char *) * (j + 1));
-			ne[j - 1] = make_var(prefix, config[i]);
-			*len = j;
-		}
-	}
-	*env = ne;
-}
-
-static size_t
-arraytostr(const char *const *argv, char **s)
-{
-	const char *const *ap;
-	char *p;
-	size_t len, l;
-
-	len = 0;
-	ap = argv;
-	while (*ap)
-		len += strlen(*ap++) + 1;
-	*s = p = xmalloc(len);
-	ap = argv;
-	while (*ap) {
-		l = strlen(*ap) + 1;
-		memcpy(p, *ap, l);
-		p += l;
-		ap++;
-	}
-	return len;
-}
-
-static ssize_t
-make_env(const struct interface *iface, const char *reason, char ***argv)
-{
-	char **env, *p;
-	ssize_t e, elen, l;
-	const struct if_options *ifo = iface->state->options;
-	const struct interface *ifp;
-	int dhcp, dhcp6, ra;
-	const struct dhcp6_state *d6_state;
-
-	dhcp = dhcp6 = ra = 0;
-	d6_state = D6_STATE(iface);
-	if (strcmp(reason, "TEST") == 0) {
-		if (d6_state && d6_state->new)
-			dhcp6 = 1;
-		else if (ipv6rs_has_ra(iface))
-			ra = 1;
-		else
-			dhcp = 1;
-	} else if (reason[strlen(reason) - 1] == '6')
-		dhcp6 = 1;
-	else if (strcmp(reason, "ROUTERADVERT") == 0)
-		ra = 1;
-	else
-		dhcp = 1;
-
-	/* When dumping the lease, we only want to report interface and
-	   reason - the other interface variables are meaningless */
-	if (options & DHCPCD_DUMPLEASE)
-		elen = 2;
-	else
-		elen = 10;
-
-	/* Make our env */
-	env = xmalloc(sizeof(char *) * (elen + 1));
-	e = strlen("interface") + strlen(iface->name) + 2;
-	env[0] = xmalloc(e);
-	snprintf(env[0], e, "interface=%s", iface->name);
-	e = strlen("reason") + strlen(reason) + 2;
-	env[1] = xmalloc(e);
-	snprintf(env[1], e, "reason=%s", reason);
-	if (options & DHCPCD_DUMPLEASE)
-		goto dumplease;
-
- 	e = 20;
-	env[2] = xmalloc(e);
-	snprintf(env[2], e, "pid=%d", getpid());
-	env[3] = xmalloc(e);
-	snprintf(env[3], e, "ifmetric=%d", iface->metric);
-	env[4] = xmalloc(e);
-	snprintf(env[4], e, "ifwireless=%d", iface->wireless);
-	env[5] = xmalloc(e);
-	snprintf(env[5], e, "ifflags=%u", iface->flags);
-	env[6] = xmalloc(e);
-	snprintf(env[6], e, "ifmtu=%d", get_mtu(iface->name));
-	l = e = strlen("interface_order=");
-	for (ifp = ifaces; ifp; ifp = ifp->next)
-		e += strlen(ifp->name) + 1;
-	p = env[7] = xmalloc(e);
-	strlcpy(p, "interface_order=", e);
-	e -= l;
-	p += l;
-	for (ifp = ifaces; ifp; ifp = ifp->next) {
-		l = strlcpy(p, ifp->name, e);
-		p += l;
-		e -= l;
-		*p++ = ' ';
-		e--;
-	}
-	*--p = '\0';
-	if (strcmp(reason, "TEST") == 0) {
-		env[8] = strdup("if_up=false");
-		env[9] = strdup("if_down=false");
-	} else if ((dhcp && iface->state->new) ||
-	    (dhcp6 && d6_state->new) ||
-	    (ra && ipv6rs_has_ra(iface)))
-	{
-		env[8] = strdup("if_up=true");
-		env[9] = strdup("if_down=false");
-	} else {
-		env[8] = strdup("if_up=false");
-		env[9] = strdup("if_down=true");
-	}
-	if (*iface->state->profile) {
-		e = strlen("profile=") + strlen(iface->state->profile) + 2;
-		env[elen] = xmalloc(e);
-		snprintf(env[elen++], e, "profile=%s", iface->state->profile);
-	}
-	if (iface->wireless) {
-		e = strlen("new_ssid=") + strlen(iface->ssid) + 2;
-		if (iface->state->new != NULL ||
-		    strcmp(iface->state->reason, "CARRIER") == 0)
-		{
-			env = xrealloc(env, sizeof(char *) * (elen + 2));
-			env[elen] = xmalloc(e);
-			snprintf(env[elen++], e, "new_ssid=%s", iface->ssid);
-		}
-		if (iface->state->old != NULL ||
-		    strcmp(iface->state->reason, "NOCARRIER") == 0)
-		{
-			env = xrealloc(env, sizeof(char *) * (elen + 2));
-			env[elen] = xmalloc(e);
-			snprintf(env[elen++], e, "old_ssid=%s", iface->ssid);
-		}
-	}
-	if (dhcp && iface->state->old) {
-		e = configure_env(NULL, NULL, iface->state->old, iface);
-		if (e > 0) {
-			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
-			elen += configure_env(env + elen, "old",
-			    iface->state->old, iface);
-		}
-		append_config(&env, &elen, "old",
-		    (const char *const *)ifo->config);
-	}
-	if (dhcp6 && d6_state->old) {
-		e = dhcp6_env(NULL, NULL, iface,
-		    d6_state->old, d6_state->old_len);
-		if (e > 0) {
-			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
-			elen += dhcp6_env(env + elen, "old", iface,
-			    d6_state->old, d6_state->old_len);
-		}
-	}
-
-dumplease:
-	if (dhcp && iface->state->new) {
-		e = configure_env(NULL, NULL, iface->state->new, iface);
-		if (e > 0) {
-			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
-			elen += configure_env(env + elen, "new",
-			    iface->state->new, iface);
-		}
-		append_config(&env, &elen, "new",
-		    (const char *const *)ifo->config);
-	}
-	if (dhcp6 && d6_state->new) {
-		e = dhcp6_env(NULL, NULL, iface,
-		    d6_state->new, d6_state->new_len);
-		if (e > 0) {
-			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
-			elen += dhcp6_env(env + elen, "new", iface,
-			    d6_state->new, d6_state->new_len);
-		}
-	}
-	if (ra) {
-		e = ipv6rs_env(NULL, NULL, iface);
-		if (e > 0) {
-			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
-			elen += ipv6rs_env(env + elen, NULL, iface);
-		}
-	}
-
-	/* Add our base environment */
-	if (ifo->environ) {
-		e = 0;
-		while (ifo->environ[e++])
-			;
-		env = xrealloc(env, sizeof(char *) * (elen + e + 1));
-		e = 0;
-		while (ifo->environ[e]) {
-			env[elen + e] = xstrdup(ifo->environ[e]);
-			e++;
-		}
-		elen += e;
-	}
-	env[elen] = '\0';
-
-	*argv = env;
-	return elen;
-}
-
-static int
-send_interface1(int fd, const struct interface *iface, const char *reason)
-{
-	char **env, **ep, *s;
-	ssize_t elen;
-	struct iovec iov[2];
-	int retval;
-
-	make_env(iface, reason, &env);
-	elen = arraytostr((const char *const *)env, &s);
-	iov[0].iov_base = &elen;
-	iov[0].iov_len = sizeof(ssize_t);
-	iov[1].iov_base = s;
-	iov[1].iov_len = elen;
-	retval = writev(fd, iov, 2);
-	ep = env;
-	while (*ep)
-		free(*ep++);
-	free(env);
-	free(s);
-	return retval;
-}
-
-int
-send_interface(int fd, const struct interface *iface)
-{
-	int retval = 0;
-	if (send_interface1(fd, iface, iface->state->reason) == -1)
-		retval = -1;
-	if (ipv6rs_has_ra(iface)) {
-		if (send_interface1(fd, iface, "ROUTERADVERT") == -1)
-			retval = -1;
-	}
-	if (D6_STATE_RUNNING(iface)) {
-		if (send_interface1(fd, iface, "INFORM6") == -1)
-			retval = -1;
-	}
-	return retval;
-}
-
-int
-run_script_reason(const struct interface *iface, const char *reason)
-{
-	char *const argv[2] = { UNCONST(iface->state->options->script), NULL };
-	char **env = NULL, **ep;
-	char *path, *bigenv;
-	ssize_t e, elen = 0;
-	pid_t pid;
-	int status = 0;
-	const struct fd_list *fd;
-	struct iovec iov[2];
-
-	if (iface->state->options->script == NULL ||
-	    iface->state->options->script[0] == '\0' ||
-	    strcmp(iface->state->options->script, "/dev/null") == 0)
-		return 0;
-
-	if (reason == NULL)
-		reason = iface->state->reason;
-	syslog(LOG_DEBUG, "%s: executing `%s', reason %s",
-	    iface->name, argv[0], reason);
-
-	/* Make our env */
-	elen = make_env(iface, reason, &env);
-	env = xrealloc(env, sizeof(char *) * (elen + 2));
-	/* Add path to it */
-	path = getenv("PATH");
-	if (path) {
-		e = strlen("PATH") + strlen(path) + 2;
-		env[elen] = xmalloc(e);
-		snprintf(env[elen], e, "PATH=%s", path);
-	} else
-		env[elen] = xstrdup(DEFAULT_PATH);
-	env[++elen] = '\0';
-
-	pid = exec_script(argv, env);
-	if (pid == -1)
-		syslog(LOG_ERR, "exec_script: %s: %m", argv[0]);
-	else if (pid != 0) {
-		/* Wait for the script to finish */
-		while (waitpid(pid, &status, 0) == -1) {
-			if (errno != EINTR) {
-				syslog(LOG_ERR, "waitpid: %m");
-				status = 0;
-				break;
-			}
-		}
-		if (WIFEXITED(status)) {
-			if (WEXITSTATUS(status))
-				syslog(LOG_ERR,
-				    "exec_script: %s: WEXITSTATUS %d",
-				    argv[0], WEXITSTATUS(status));
-		} else if (WIFSIGNALED(status))
-			syslog(LOG_ERR, "exec_sript: %s: %s",
-			    argv[0], strsignal(WTERMSIG(status)));
-	}
-
-	/* Send to our listeners */
-	bigenv = NULL;
-	for (fd = control_fds; fd != NULL; fd = fd->next) {
-		if (fd->listener) {
-			if (bigenv == NULL) {
-				elen = arraytostr((const char *const *)env,
-				    &bigenv);
-				iov[0].iov_base = &elen;
-				iov[0].iov_len = sizeof(ssize_t);
-				iov[1].iov_base = bigenv;
-				iov[1].iov_len = elen;
-			}
-			if (writev(fd->fd, iov, 2) == -1)
-				syslog(LOG_ERR, "writev: %m");
-		}
-	}
-	free(bigenv);
-
-	/* Cleanup */
-	ep = env;
-	while (*ep)
-		free(*ep++);
-	free(env);
-	return WEXITSTATUS(status);
-}
 
 static struct rt *
 find_route(struct rt *rts, const struct rt *r, struct rt **lrt,
@@ -519,7 +99,7 @@ desc_route(const char *cmd, const struct rt *rt)
 /* If something other than dhcpcd removes a route,
  * we need to remove it from our internal table. */
 int
-route_deleted(const struct rt *rt)
+ipv4_routedeleted(const struct rt *rt)
 {
 	struct rt *f, *l;
 
@@ -636,12 +216,12 @@ add_subnet_route(struct rt *rt, const struct interface *iface)
 }
 
 static struct rt *
-get_routes(struct interface *iface)
+get_routes(struct interface *ifp)
 {
 	struct rt *rt, *nrt = NULL, *r = NULL;
 
-	if (iface->state->options->routes != NULL) {
-		for (rt = iface->state->options->routes;
+	if (ifp->state->options->routes != NULL) {
+		for (rt = ifp->state->options->routes;
 		     rt != NULL;
 		     rt = rt->next)
 		{
@@ -659,7 +239,7 @@ get_routes(struct interface *iface)
 		return nrt;
 	}
 
-	return get_option_routes(iface, iface->state->new);
+	return get_option_routes(ifp, ifp->state->new);
 }
 
 /* Some DHCP servers add set host routes by setting the gateway
@@ -746,7 +326,7 @@ add_router_host_route(struct rt *rt, const struct interface *ifp)
 }
 
 void
-build_routes(void)
+ipv4_buildroutes(void)
 {
 	struct rt *nrs = NULL, *dnr, *or, *rt, *rtn, *rtl, *lrt = NULL;
 	struct interface *ifp;
@@ -830,9 +410,10 @@ delete_address(struct interface *iface)
 	return retval;
 }
 
-int
-configure(struct interface *iface)
+void
+ipv4_applyaddr(void *arg)
 {
+	struct interface *iface = arg;
 	struct dhcp_message *dhcp = iface->state->new;
 	struct dhcp_lease *lease = &iface->state->lease;
 	struct if_options *ifo = iface->state->options;
@@ -844,12 +425,12 @@ configure(struct interface *iface)
 
 	if (dhcp == NULL) {
 		if (!(ifo->options & DHCPCD_PERSISTENT)) {
-			build_routes();
+			ipv4_buildroutes();
 			if (iface->addr.s_addr != 0)
 				delete_address(iface);
-			run_script(iface);
+			script_run(iface);
 		}
-		return 0;
+		return;
 	}
 
 	/* This also changes netmask */
@@ -863,8 +444,8 @@ configure(struct interface *iface)
 			&lease->addr, &lease->net, &lease->brd) == -1 &&
 		    errno != EEXIST)
 		{
-			syslog(LOG_ERR, "add_address: %m");
-			return -1;
+			syslog(LOG_ERR, "%s: add_address: %m", __func__);
+			return;
 		}
 	}
 
@@ -887,11 +468,66 @@ configure(struct interface *iface)
 		free(rt);
 	}
 
-	build_routes();
+	ipv4_buildroutes();
 	if (!iface->state->lease.frominfo &&
 	    !(ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC)))
 		if (write_lease(iface, dhcp) == -1)
-			syslog(LOG_ERR, "write_lease: %m");
-	run_script(iface);
-	return 0;
+			syslog(LOG_ERR, "%s: write_lease: %m", __func__);
+	script_run(iface);
+}
+
+void
+ipv4_handleifa(int type, const char *ifname,
+    struct in_addr *addr, struct in_addr *net, struct in_addr *dst)
+{
+	struct interface *ifp;
+	struct if_options *ifo;
+	int i;
+
+	if (addr->s_addr == INADDR_ANY)
+		return;
+	for (ifp = ifaces; ifp; ifp = ifp->next)
+		if (strcmp(ifp->name, ifname) == 0)
+			break;
+	if (ifp == NULL)
+		return;
+
+	if (type == RTM_DELADDR) {
+		if (ifp->state->new &&
+		    ifp->state->new->yiaddr == addr->s_addr)
+			syslog(LOG_INFO, "%s: removing IP address %s/%d",
+			    ifp->name, inet_ntoa(ifp->state->lease.addr),
+			    inet_ntocidr(ifp->state->lease.net));
+		return;
+	}
+
+	if (type != RTM_NEWADDR)
+		return;
+
+	ifo = ifp->state->options;
+	if ((ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC)) == 0 ||
+	    ifo->req_addr.s_addr != INADDR_ANY)
+		return;
+
+	free(ifp->state->old);
+	ifp->state->old = ifp->state->new;
+	ifp->state->new = dhcp_message_new(addr, net);
+	ifp->dst.s_addr = dst ? dst->s_addr : INADDR_ANY;
+	if (dst) {
+		for (i = 1; i < 255; i++)
+			if (i != DHO_ROUTER && has_option_mask(ifo->dstmask,i))
+				dhcp_message_add_addr(ifp->state->new, i, *dst);
+	}
+	ifp->state->reason = "STATIC";
+	ipv4_buildroutes();
+	script_run(ifp);
+	if (ifo->options & DHCPCD_INFORM) {
+		ifp->state->state = DHS_INFORM;
+		ifp->state->xid = dhcp_xid(ifp);
+		ifp->state->lease.server.s_addr =
+		    dst ? dst->s_addr : INADDR_ANY;
+		ifp->addr = *addr;
+		ifp->net = *net;
+		dhcp_inform(ifp);
+	}
 }
