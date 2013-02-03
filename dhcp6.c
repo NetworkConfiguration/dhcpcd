@@ -360,7 +360,7 @@ dhcp6_makemessage(struct interface *ifp)
 	}
 
 	/* Work out option size first */
-	ifo = ifp->state->options;
+	ifo = ifp->options;
 	len = 0;
 	si = NULL;
 	for (opt = dhcp6_opts; opt->option; opt++) {
@@ -1234,7 +1234,7 @@ dhcp6_handledata(_unused void *arg)
 		return;
 	}
 
-	ifo = ifp->state->options;
+	ifo = ifp->options;
 	for (opt = dhcp6_opts; opt->option; opt++) {
 		if (has_option_mask(ifo->requiremask6, opt->option) &&
 		    dhcp6_getoption(opt->option, r, len) == NULL)
@@ -1392,7 +1392,7 @@ recv:
 
 	script_runreason(ifp, options & DHCPCD_TEST ? "TEST" : reason);
 	if (options & DHCPCD_TEST ||
-	    (ifp->state->options->options & DHCPCD_INFORM &&
+	    (ifp->options->options & DHCPCD_INFORM &&
 	    !(options & DHCPCD_MASTER)))
 	{
 #ifdef DEBUG_MEMORY
@@ -1580,7 +1580,7 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 	state = D6_CSTATE(ifp);
 	e = 0;
 	ep = env;
-	ifo = ifp->state->options;
+	ifo = ifp->options;
 	for (opt = dhcp6_opts; opt->option; opt++) {
 		if (!opt->var)
 			continue;

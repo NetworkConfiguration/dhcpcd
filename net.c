@@ -184,22 +184,23 @@ hwaddr_aton(unsigned char *buffer, const char *addr)
 }
 
 void
-free_interface(struct interface *iface)
+free_interface(struct interface *ifp)
 {
-	if (!iface)
+
+	if (ifp == NULL)
 		return;
-	dhcp6_free(iface);
-	ipv6rs_free(iface);
-	if (iface->state) {
-		free_options(iface->state->options);
-		free(iface->state->old);
-		free(iface->state->new);
-		free(iface->state->offer);
-		free(iface->state);
+	dhcp6_free(ifp);
+	ipv6rs_free(ifp);
+	free_options(ifp->options);
+	if (ifp->state) {
+		free(ifp->state->old);
+		free(ifp->state->new);
+		free(ifp->state->offer);
+		free(ifp->state);
 	}
-	free(iface->buffer);
-	free(iface->clientid);
-	free(iface);
+	free(ifp->buffer);
+	free(ifp->clientid);
+	free(ifp);
 }
 
 int

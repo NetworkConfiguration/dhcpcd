@@ -175,21 +175,21 @@ arraytostr(const char *const *argv, char **s)
 }
 
 static ssize_t
-make_env(const struct interface *iface, const char *reason, char ***argv)
+make_env(const struct interface *ifp, const char *reason, char ***argv)
 {
 	char **env, *p;
 	ssize_t e, elen, l;
-	const struct if_options *ifo = iface->state->options;
-	const struct interface *ifp;
+	const struct if_options *ifo = ifp->options;
+	const struct interface *ifp2;
 	int dhcp, dhcp6, ra;
 	const struct dhcp6_state *d6_state;
 
 	dhcp = dhcp6 = ra = 0;
-	d6_state = D6_STATE(iface);
+	d6_state = D6_STATE(ifp);
 	if (strcmp(reason, "TEST") == 0) {
 		if (d6_state && d6_state->new)
 			dhcp6 = 1;
-		else if (ipv6rs_has_ra(iface))
+		else if (ipv6rs_has_ra(ifp))
 			ra = 1;
 		else
 			dhcp = 1;
@@ -209,9 +209,9 @@ make_env(const struct interface *iface, const char *reason, char ***argv)
 
 	/* Make our env */
 	env = xmalloc(sizeof(char *) * (elen + 1));
-	e = strlen("interface") + strlen(iface->name) + 2;
+	e = strlen("interface") + strlen(ifp->name) + 2;
 	env[0] = xmalloc(e);
-	snprintf(env[0], e, "interface=%s", iface->name);
+	snprintf(env[0], e, "interface=%s", ifp->name);
 	e = strlen("reason") + strlen(reason) + 2;
 	env[1] = xmalloc(e);
 	snprintf(env[1], e, "reason=%s", reason);
@@ -222,22 +222,22 @@ make_env(const struct interface *iface, const char *reason, char ***argv)
 	env[2] = xmalloc(e);
 	snprintf(env[2], e, "pid=%d", getpid());
 	env[3] = xmalloc(e);
-	snprintf(env[3], e, "ifmetric=%d", iface->metric);
+	snprintf(env[3], e, "ifmetric=%d", ifp->metric);
 	env[4] = xmalloc(e);
-	snprintf(env[4], e, "ifwireless=%d", iface->wireless);
+	snprintf(env[4], e, "ifwireless=%d", ifp->wireless);
 	env[5] = xmalloc(e);
-	snprintf(env[5], e, "ifflags=%u", iface->flags);
+	snprintf(env[5], e, "ifflags=%u", ifp->flags);
 	env[6] = xmalloc(e);
-	snprintf(env[6], e, "ifmtu=%d", get_mtu(iface->name));
+	snprintf(env[6], e, "ifmtu=%d", get_mtu(ifp->name));
 	l = e = strlen("interface_order=");
-	for (ifp = ifaces; ifp; ifp = ifp->next)
-		e += strlen(ifp->name) + 1;
+	for (ifp2 = ifaces; ifp2; ifp2 = ifp2->next)
+		e += strlen(ifp2->name) + 1;
 	p = env[7] = xmalloc(e);
 	strlcpy(p, "interface_order=", e);
 	e -= l;
 	p += l;
-	for (ifp = ifaces; ifp; ifp = ifp->next) {
-		l = strlcpy(p, ifp->name, e);
+	for (ifp2 = ifaces; ifp2; ifp2 = ifp2->next) {
+		l = strlcpy(p, ifp2->name, e);
 		p += l;
 		e -= l;
 		*p++ = ' ';
@@ -247,9 +247,9 @@ make_env(const struct interface *iface, const char *reason, char ***argv)
 	if (strcmp(reason, "TEST") == 0) {
 		env[8] = strdup("if_up=false");
 		env[9] = strdup("if_down=false");
-	} else if ((dhcp && iface->state->new) ||
+	} else if ((dhcp && ifp->state->new) ||
 	    (dhcp6 && d6_state->new) ||
-	    (ra && ipv6rs_has_ra(iface)))
+	    (ra && ipv6rs_has_ra(ifp)))
 	{
 		env[8] = strdup("if_up=true");
 		env[9] = strdup("if_down=false");
@@ -257,73 +257,73 @@ make_env(const struct interface *iface, const char *reason, char ***argv)
 		env[8] = strdup("if_up=false");
 		env[9] = strdup("if_down=true");
 	}
-	if (*iface->state->profile) {
-		e = strlen("profile=") + strlen(iface->state->profile) + 2;
+	if (*ifp->state->profile) {
+		e = strlen("profile=") + strlen(ifp->state->profile) + 2;
 		env[elen] = xmalloc(e);
-		snprintf(env[elen++], e, "profile=%s", iface->state->profile);
+		snprintf(env[elen++], e, "profile=%s", ifp->state->profile);
 	}
-	if (iface->wireless) {
-		e = strlen("new_ssid=") + strlen(iface->ssid) + 2;
-		if (iface->state->new != NULL ||
-		    strcmp(iface->state->reason, "CARRIER") == 0)
+	if (ifp->wireless) {
+		e = strlen("new_ssid=") + strlen(ifp->ssid) + 2;
+		if (ifp->state->new != NULL ||
+		    strcmp(ifp->state->reason, "CARRIER") == 0)
 		{
 			env = xrealloc(env, sizeof(char *) * (elen + 2));
 			env[elen] = xmalloc(e);
-			snprintf(env[elen++], e, "new_ssid=%s", iface->ssid);
+			snprintf(env[elen++], e, "new_ssid=%s", ifp->ssid);
 		}
-		if (iface->state->old != NULL ||
-		    strcmp(iface->state->reason, "NOCARRIER") == 0)
+		if (ifp->state->old != NULL ||
+		    strcmp(ifp->state->reason, "NOCARRIER") == 0)
 		{
 			env = xrealloc(env, sizeof(char *) * (elen + 2));
 			env[elen] = xmalloc(e);
-			snprintf(env[elen++], e, "old_ssid=%s", iface->ssid);
+			snprintf(env[elen++], e, "old_ssid=%s", ifp->ssid);
 		}
 	}
-	if (dhcp && iface->state->old) {
-		e = configure_env(NULL, NULL, iface->state->old, iface);
+	if (dhcp && ifp->state->old) {
+		e = configure_env(NULL, NULL, ifp->state->old, ifp);
 		if (e > 0) {
 			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
 			elen += configure_env(env + elen, "old",
-			    iface->state->old, iface);
+			    ifp->state->old, ifp);
 		}
 		append_config(&env, &elen, "old",
 		    (const char *const *)ifo->config);
 	}
 	if (dhcp6 && d6_state->old) {
-		e = dhcp6_env(NULL, NULL, iface,
+		e = dhcp6_env(NULL, NULL, ifp,
 		    d6_state->old, d6_state->old_len);
 		if (e > 0) {
 			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
-			elen += dhcp6_env(env + elen, "old", iface,
+			elen += dhcp6_env(env + elen, "old", ifp,
 			    d6_state->old, d6_state->old_len);
 		}
 	}
 
 dumplease:
-	if (dhcp && iface->state->new) {
-		e = configure_env(NULL, NULL, iface->state->new, iface);
+	if (dhcp && ifp->state->new) {
+		e = configure_env(NULL, NULL, ifp->state->new, ifp);
 		if (e > 0) {
 			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
 			elen += configure_env(env + elen, "new",
-			    iface->state->new, iface);
+			    ifp->state->new, ifp);
 		}
 		append_config(&env, &elen, "new",
 		    (const char *const *)ifo->config);
 	}
 	if (dhcp6 && d6_state->new) {
-		e = dhcp6_env(NULL, NULL, iface,
+		e = dhcp6_env(NULL, NULL, ifp,
 		    d6_state->new, d6_state->new_len);
 		if (e > 0) {
 			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
-			elen += dhcp6_env(env + elen, "new", iface,
+			elen += dhcp6_env(env + elen, "new", ifp,
 			    d6_state->new, d6_state->new_len);
 		}
 	}
 	if (ra) {
-		e = ipv6rs_env(NULL, NULL, iface);
+		e = ipv6rs_env(NULL, NULL, ifp);
 		if (e > 0) {
 			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
-			elen += ipv6rs_env(env + elen, NULL, iface);
+			elen += ipv6rs_env(env + elen, NULL, ifp);
 		}
 	}
 
@@ -387,9 +387,9 @@ send_interface(int fd, const struct interface *iface)
 }
 
 int
-script_runreason(const struct interface *iface, const char *reason)
+script_runreason(const struct interface *ifp, const char *reason)
 {
-	char *const argv[2] = { UNCONST(iface->state->options->script), NULL };
+	char *const argv[2] = { UNCONST(ifp->options->script), NULL };
 	char **env = NULL, **ep;
 	char *path, *bigenv;
 	ssize_t e, elen = 0;
@@ -398,18 +398,18 @@ script_runreason(const struct interface *iface, const char *reason)
 	const struct fd_list *fd;
 	struct iovec iov[2];
 
-	if (iface->state->options->script == NULL ||
-	    iface->state->options->script[0] == '\0' ||
-	    strcmp(iface->state->options->script, "/dev/null") == 0)
+	if (ifp->options->script == NULL ||
+	    ifp->options->script[0] == '\0' ||
+	    strcmp(ifp->options->script, "/dev/null") == 0)
 		return 0;
 
 	if (reason == NULL)
-		reason = iface->state->reason;
+		reason = ifp->state->reason;
 	syslog(LOG_DEBUG, "%s: executing `%s', reason %s",
-	    iface->name, argv[0], reason);
+	    ifp->name, argv[0], reason);
 
 	/* Make our env */
-	elen = make_env(iface, reason, &env);
+	elen = make_env(ifp, reason, &env);
 	env = xrealloc(env, sizeof(char *) * (elen + 2));
 	/* Add path to it */
 	path = getenv("PATH");

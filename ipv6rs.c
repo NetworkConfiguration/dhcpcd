@@ -764,7 +764,7 @@ ipv6rs_handledata(_unused void *arg)
 		script_runreason(ifp, "ROUTERADVERT");
 
 	/* If we don't require RDNSS then set has_dns = 1 so we fork */
-	if (!(ifp->state->options->options & DHCPCD_IPV6RA_REQRDNSS))
+	if (!(ifp->options->options & DHCPCD_IPV6RA_REQRDNSS))
 		has_dns = 1;
 
 	eloop_timeout_delete(NULL, ifp);

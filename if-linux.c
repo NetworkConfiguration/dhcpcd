@@ -106,7 +106,7 @@ if_conf(struct interface *iface)
 	if (fp == NULL)
 		return errno == ENOENT ? 0 : -1;
 	if (fgets(buf, sizeof(buf), fp) != NULL && buf[0] == '0')
-		iface->state->options->options |= DHCPCD_BROADCAST;
+		iface->options->options |= DHCPCD_BROADCAST;
 	fclose(fp);
 	return 0;
 }

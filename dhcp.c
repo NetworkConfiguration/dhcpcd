@@ -681,7 +681,7 @@ route_netmask(uint32_t ip_in)
 struct rt *
 get_option_routes(struct interface *ifp, const struct dhcp_message *dhcp)
 {
-	struct if_options *ifo = ifp->state->options;
+	struct if_options *ifo = ifp->options;
 	const uint8_t *p;
 	const uint8_t *e;
 	struct rt *routes = NULL;
@@ -825,7 +825,7 @@ make_message(struct dhcp_message **message,
 	size_t len;
 	const char *hp;
 	const struct dhcp_opt *opt;
-	const struct if_options *ifo = iface->state->options;
+	const struct if_options *ifo = iface->options;
 	const struct dhcp_lease *lease = &iface->state->lease;
 
 	dhcp = xzalloc(sizeof (*dhcp));
@@ -1109,7 +1109,7 @@ configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 	char cidr[4];
 	uint8_t overl = 0;
 
-	ifo = ifp->state->options;
+	ifo = ifp->options;
 	get_option_uint8(&overl, dhcp, DHO_OPTIONSOVERLOADED);
 
 	if (!env) {
@@ -1229,7 +1229,7 @@ dhcp_fallback(void *arg)
 	struct interface *iface;
 
 	iface = (struct interface *)arg;
-	select_profile(iface, iface->state->options->fallback);
+	select_profile(iface, iface->options->fallback);
 	start_interface(iface);
 }
 
@@ -1238,7 +1238,7 @@ dhcp_xid(const struct interface *ifp)
 {
 	uint32_t xid;
 
-	if (ifp->state->options->options & DHCPCD_XID_HWADDR &&
+	if (ifp->options->options & DHCPCD_XID_HWADDR &&
 	    ifp->hwlen >= sizeof(xid)) 
 		/* The lower bits are probably more unique on the network */
 		memcpy(&xid, (ifp->hwaddr + ifp->hwlen) - sizeof(xid),
@@ -1275,7 +1275,7 @@ send_message(struct interface *iface, int type,
     void (*callback)(void *))
 {
 	struct if_state *state = iface->state;
-	struct if_options *ifo = state->options;
+	struct if_options *ifo = iface->options;
 	struct dhcp_message *dhcp;
 	uint8_t *udp;
 	ssize_t len, r;
@@ -1399,7 +1399,7 @@ void
 dhcp_discover(void *arg)
 {
 	struct interface *iface = arg;
-	struct if_options *ifo = iface->state->options;
+	struct if_options *ifo = iface->options;
 	int timeout = ifo->timeout;
 
 	/* If we're rebooting and we're not daemonised then we need
@@ -1530,7 +1530,7 @@ dhcp_bind(void *arg)
 {
 	struct interface *iface = arg;
 	struct if_state *state = iface->state;
-	struct if_options *ifo = state->options;
+	struct if_options *ifo = iface->options;
 	struct dhcp_lease *lease = &state->lease;
 	struct timeval tv;
 
@@ -1679,7 +1679,7 @@ handle_3rdparty(struct interface *iface)
 	struct if_options *ifo;
 	struct in_addr addr, net, dst;
 	
-	ifo = iface->state->options;
+	ifo = iface->options;
 	if (ifo->req_addr.s_addr != INADDR_ANY)
 		return 0;
 
@@ -1702,7 +1702,7 @@ dhcp_static(struct interface *iface)
 
 	if (handle_3rdparty(iface))
 		return;
-	ifo = iface->state->options;
+	ifo = iface->options;
 	iface->state->offer =
 	    dhcp_message_new(&ifo->req_addr, &ifo->req_mask);
 	eloop_timeout_delete(NULL, iface);
@@ -1717,10 +1717,10 @@ dhcp_inform(struct interface *iface)
 		return;
 
 	if (options & DHCPCD_TEST) {
-		iface->addr.s_addr = iface->state->options->req_addr.s_addr;
-		iface->net.s_addr = iface->state->options->req_mask.s_addr;
+		iface->addr.s_addr = iface->options->req_addr.s_addr;
+		iface->net.s_addr = iface->options->req_mask.s_addr;
 	} else {
-		iface->state->options->options |= DHCPCD_STATIC;
+		iface->options->options |= DHCPCD_STATIC;
 		dhcp_static(iface);
 	}
 
@@ -1732,7 +1732,7 @@ dhcp_inform(struct interface *iface)
 static void
 dhcp_reboot(struct interface *iface)
 {
-	struct if_options *ifo = iface->state->options;
+	struct if_options *ifo = iface->options;
 
 	if (ifo->options & DHCPCD_LINK && iface->carrier == LINK_DOWN) {
 		syslog(LOG_INFO, "%s: waiting for carrier", iface->name);
@@ -1862,7 +1862,7 @@ dhcp_handle(struct interface *iface, struct dhcp_message **dhcpp,
     const struct in_addr *from)
 {
 	struct if_state *state = iface->state;
-	struct if_options *ifo = state->options;
+	struct if_options *ifo = iface->options;
 	struct dhcp_message *dhcp = *dhcpp;
 	struct dhcp_lease *lease = &state->lease;
 	uint8_t type, tmp;
@@ -2044,14 +2044,14 @@ dhcp_handlepacket(void *arg)
 			    iface->name, inet_ntoa(from));
 			continue;
 		}
-		i = whitelisted_ip(iface->state->options, from.s_addr);
+		i = whitelisted_ip(iface->options, from.s_addr);
 		if (i == 0) {
 			syslog(LOG_WARNING,
 			    "%s: non whitelisted DHCP packet from %s",
 			    iface->name, inet_ntoa(from));
 			continue;
 		} else if (i != 1 &&
-		    blacklisted_ip(iface->state->options, from.s_addr) == 1)
+		    blacklisted_ip(iface->options, from.s_addr) == 1)
 		{
 			syslog(LOG_WARNING,
 			    "%s: blacklisted DHCP packet from %s",
@@ -2121,7 +2121,7 @@ dhcp_open(struct interface *ifp)
 	    ifp->addr.s_addr != 0 &&
 	    ifp->state->new != NULL &&
 	    (ifp->state->new->cookie == htonl(MAGIC_COOKIE) ||
-	    ifp->state->options->options & DHCPCD_INFORM))
+	    ifp->options->options & DHCPCD_INFORM))
 	{
 		if (open_udp_socket(ifp) == -1 && errno != EADDRINUSE) {
 			syslog(LOG_ERR, "%s: open_udp_socket: %m", ifp->name);
@@ -2134,7 +2134,7 @@ dhcp_open(struct interface *ifp)
 void
 dhcp_start(struct interface *ifp)
 {
-	struct if_options *ifo = ifp->state->options;
+	struct if_options *ifo = ifp->options;
 	struct stat st;
 	struct timeval now;
 	uint32_t l;
@@ -2202,7 +2202,7 @@ dhcp_start(struct interface *ifp)
 	if (ifp->state->offer == NULL)
 		dhcp_discover(ifp);
 	else if (ifp->state->offer->cookie == 0 &&
-	    ifp->state->options->options & DHCPCD_IPV4LL)
+	    ifp->options->options & DHCPCD_IPV4LL)
 		ipv4ll_start(ifp);
 	else
 		dhcp_reboot(ifp);

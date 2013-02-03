@@ -67,7 +67,6 @@ enum DHS {
 struct if_state {
 	enum DHS state;
 	char profile[PROFILE_LEN];
-	struct if_options *options;
 	struct dhcp_message *sent;
 	struct dhcp_message *offer;
 	struct dhcp_message *new;
@@ -114,6 +113,7 @@ struct interface {
 	char leasefile[PATH_MAX];
 	time_t start_uptime;
 
+	struct if_options *options;
 	unsigned char *clientid;
 
 	struct interface *next;

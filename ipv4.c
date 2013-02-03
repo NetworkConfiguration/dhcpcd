@@ -121,7 +121,7 @@ n_route(struct rt *rt)
 	/* Don't set default routes if not asked to */
 	if (rt->dest.s_addr == 0 &&
 	    rt->net.s_addr == 0 &&
-	    !(rt->iface->state->options->options & DHCPCD_GATEWAY))
+	    !(rt->iface->options->options & DHCPCD_GATEWAY))
 		return -1;
 
 	desc_route("adding", rt);
@@ -147,7 +147,7 @@ c_route(struct rt *ort, struct rt *nrt)
 	/* Don't set default routes if not asked to */
 	if (nrt->dest.s_addr == 0 &&
 	    nrt->net.s_addr == 0 &&
-	    !(nrt->iface->state->options->options & DHCPCD_GATEWAY))
+	    !(nrt->iface->options->options & DHCPCD_GATEWAY))
 		return -1;
 
 	desc_route("changing", nrt);
@@ -202,9 +202,9 @@ add_subnet_route(struct rt *rt, const struct interface *iface)
 
 	if (iface->net.s_addr == INADDR_BROADCAST ||
 	    iface->net.s_addr == INADDR_ANY ||
-	    (iface->state->options->options &
+	    (iface->options->options &
 	     (DHCPCD_INFORM | DHCPCD_STATIC) &&
-	     iface->state->options->req_addr.s_addr == INADDR_ANY))
+	     iface->options->req_addr.s_addr == INADDR_ANY))
 		return rt;
 
 	r = xmalloc(sizeof(*r));
@@ -220,8 +220,8 @@ get_routes(struct interface *ifp)
 {
 	struct rt *rt, *nrt = NULL, *r = NULL;
 
-	if (ifp->state->options->routes != NULL) {
-		for (rt = ifp->state->options->routes;
+	if (ifp->options->routes != NULL) {
+		for (rt = ifp->options->routes;
 		     rt != NULL;
 		     rt = rt->next)
 		{
@@ -263,7 +263,7 @@ add_destination_route(struct rt *rt, const struct interface *iface)
 	struct rt *r;
 
 	if (!(iface->flags & IFF_POINTOPOINT) ||
-	    !has_option_mask(iface->state->options->dstmask, DHO_ROUTER))
+	    !has_option_mask(iface->options->dstmask, DHO_ROUTER))
 		return rt;
 	r = xmalloc(sizeof(*r));
 	r->dest.s_addr = INADDR_ANY;
@@ -337,7 +337,7 @@ ipv4_buildroutes(void)
 		dnr = get_routes(ifp);
 		dnr = massage_host_routes(dnr, ifp);
 		dnr = add_subnet_route(dnr, ifp);
-		if (ifp->state->options->options & DHCPCD_GATEWAY) {
+		if (ifp->options->options & DHCPCD_GATEWAY) {
 			dnr = add_router_host_route(dnr, ifp);
 			dnr = add_destination_route(dnr, ifp);
 		}
@@ -394,7 +394,7 @@ delete_address(struct interface *iface)
 	int retval;
 	struct if_options *ifo;
 
-	ifo = iface->state->options;
+	ifo = iface->options;
 	if (ifo->options & DHCPCD_INFORM ||
 	    (ifo->options & DHCPCD_STATIC && ifo->req_addr.s_addr == 0))
 		return 0;
@@ -416,7 +416,7 @@ ipv4_applyaddr(void *arg)
 	struct interface *iface = arg;
 	struct dhcp_message *dhcp = iface->state->new;
 	struct dhcp_lease *lease = &iface->state->lease;
-	struct if_options *ifo = iface->state->options;
+	struct if_options *ifo = iface->options;
 	struct rt *rt;
 
 	/* As we are now adjusting an interface, we need to ensure
@@ -504,7 +504,7 @@ ipv4_handleifa(int type, const char *ifname,
 	if (type != RTM_NEWADDR)
 		return;
 
-	ifo = ifp->state->options;
+	ifo = ifp->options;
 	if ((ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC)) == 0 ||
 	    ifo->req_addr.s_addr != INADDR_ANY)
 		return;

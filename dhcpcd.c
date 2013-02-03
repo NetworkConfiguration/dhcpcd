@@ -297,183 +297,183 @@ stop_interface(struct interface *iface)
 }
 
 static void
-configure_interface1(struct interface *iface)
+configure_interface1(struct interface *ifp)
 {
-	struct if_state *ifs = iface->state;
-	struct if_options *ifo = ifs->options;
+	struct if_options *ifo = ifp->options;
 	uint8_t *duid;
 	size_t len, ifl;
 
 	/* Do any platform specific configuration */
-	if_conf(iface);
+	if_conf(ifp);
 
-	if (iface->flags & IFF_POINTOPOINT && !(ifo->options & DHCPCD_INFORM))
+	if (ifp->flags & IFF_POINTOPOINT && !(ifo->options & DHCPCD_INFORM))
 		ifo->options |= DHCPCD_STATIC;
-	if (iface->flags & IFF_NOARP ||
+	if (ifp->flags & IFF_NOARP ||
 	    ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC))
 		ifo->options &= ~(DHCPCD_ARP | DHCPCD_IPV4LL);
-	if (!(iface->flags & (IFF_POINTOPOINT | IFF_LOOPBACK | IFF_MULTICAST)))
+	if (!(ifp->flags & (IFF_POINTOPOINT | IFF_LOOPBACK | IFF_MULTICAST)))
 		ifo->options &= ~DHCPCD_IPV6RS;
-	if (ifo->options & DHCPCD_LINK && carrier_status(iface) == -1)
+	if (ifo->options & DHCPCD_LINK && carrier_status(ifp) == -1)
 		ifo->options &= ~DHCPCD_LINK;
 	
 	if (ifo->metric != -1)
-		iface->metric = ifo->metric;
+		ifp->metric = ifo->metric;
 
 	/* We want to disable kernel interface RA as early as possible. */
 	if (options & DHCPCD_IPV6RS && ifo->options & DHCPCD_IPV6RS) {
-		if (check_ipv6(iface->name) != 1)
+		if (check_ipv6(ifp->name) != 1)
 			ifo->options &= ~DHCPCD_IPV6RS;
 	}
 
 	/* If we haven't specified a ClientID and our hardware address
 	 * length is greater than DHCP_CHADDR_LEN then we enforce a ClientID
 	 * of the hardware address family and the hardware address. */
-	if (iface->hwlen > DHCP_CHADDR_LEN)
+	if (ifp->hwlen > DHCP_CHADDR_LEN)
 		ifo->options |= DHCPCD_CLIENTID;
 
 	/* Firewire and InfiniBand interfaces require ClientID and
 	 * the broadcast option being set. */
-	switch (iface->family) {
+	switch (ifp->family) {
 	case ARPHRD_IEEE1394:	/* FALLTHROUGH */
 	case ARPHRD_INFINIBAND:
 		ifo->options |= DHCPCD_CLIENTID | DHCPCD_BROADCAST;
 		break;
 	}
 
-	free(iface->clientid);
-	iface->clientid = NULL;
+	free(ifp->clientid);
+	ifp->clientid = NULL;
 	if (!(ifo->options & DHCPCD_IPV4))
 		return;
 
 	if (*ifo->clientid) {
-		iface->clientid = xmalloc(ifo->clientid[0] + 1);
-		memcpy(iface->clientid, ifo->clientid, ifo->clientid[0] + 1);
+		ifp->clientid = xmalloc(ifo->clientid[0] + 1);
+		memcpy(ifp->clientid, ifo->clientid, ifo->clientid[0] + 1);
 	} else if (ifo->options & DHCPCD_CLIENTID) {
 		len = 0;
 		if (ifo->options & DHCPCD_DUID) {
 			duid = xmalloc(DUID_LEN);
-			if ((len = get_duid(duid, iface)) == 0)
+			if ((len = get_duid(duid, ifp)) == 0)
 				syslog(LOG_ERR, "get_duid: %m");
 		} else
 			duid = NULL;
 		if (len > 0) {
-			iface->clientid = xmalloc(len + 6);
-			iface->clientid[0] = len + 5;
-			iface->clientid[1] = 255; /* RFC 4361 */
-			ifl = strlen(iface->name);
+			ifp->clientid = xmalloc(len + 6);
+			ifp->clientid[0] = len + 5;
+			ifp->clientid[1] = 255; /* RFC 4361 */
+			ifl = strlen(ifp->name);
 			if (ifl < 5) {
-				memcpy(iface->clientid + 2, iface->name, ifl);
+				memcpy(ifp->clientid + 2, ifp->name, ifl);
 				if (ifl < 4)
-					memset(iface->clientid + 2 + ifl,
+					memset(ifp->clientid + 2 + ifl,
 					    0, 4 - ifl);
 			} else {
-				ifl = htonl(iface->index);
-				memcpy(iface->clientid + 2, &ifl, 4);
+				ifl = htonl(ifp->index);
+				memcpy(ifp->clientid + 2, &ifl, 4);
 			}
-			memcpy(iface->clientid + 6, duid, len);
+			memcpy(ifp->clientid + 6, duid, len);
 		} else if (len == 0) {
-			len = iface->hwlen + 1;
-			iface->clientid = xmalloc(len + 1);
-			iface->clientid[0] = len;
-			iface->clientid[1] = iface->family;
-			memcpy(iface->clientid + 2, iface->hwaddr,
-			    iface->hwlen);
+			len = ifp->hwlen + 1;
+			ifp->clientid = xmalloc(len + 1);
+			ifp->clientid[0] = len;
+			ifp->clientid[1] = ifp->family;
+			memcpy(ifp->clientid + 2, ifp->hwaddr,
+			    ifp->hwlen);
 		}
 		free(duid);
 	}
 	if (ifo->options & DHCPCD_CLIENTID)
-		syslog(LOG_DEBUG, "%s: using ClientID %s", iface->name,
-		    hwaddr_ntoa(iface->clientid + 1, *iface->clientid));
-	else if (iface->hwlen)
-		syslog(LOG_DEBUG, "%s: using hwaddr %s", iface->name,
-		    hwaddr_ntoa(iface->hwaddr, iface->hwlen));
+		syslog(LOG_DEBUG, "%s: using ClientID %s", ifp->name,
+		    hwaddr_ntoa(ifp->clientid + 1, *ifp->clientid));
+	else if (ifp->hwlen)
+		syslog(LOG_DEBUG, "%s: using hwaddr %s", ifp->name,
+		    hwaddr_ntoa(ifp->hwaddr, ifp->hwlen));
 }
 
 int
-select_profile(struct interface *iface, const char *profile)
+select_profile(struct interface *ifp, const char *profile)
 {
 	struct if_options *ifo;
 	int ret;
 
 	ret = 0;
-	ifo = read_config(cffile, iface->name, iface->ssid, profile);
+	ifo = read_config(cffile, ifp->name, ifp->ssid, profile);
 	if (ifo == NULL) {
-		syslog(LOG_DEBUG, "%s: no profile %s", iface->name, profile);
+		syslog(LOG_DEBUG, "%s: no profile %s", ifp->name, profile);
 		ret = -1;
 		goto exit;
 	}
 	if (profile != NULL) {
-		strlcpy(iface->state->profile, profile,
-		    sizeof(iface->state->profile));
+		strlcpy(ifp->state->profile, profile,
+		    sizeof(ifp->state->profile));
 		syslog(LOG_INFO, "%s: selected profile %s",
-		    iface->name, profile);
+		    ifp->name, profile);
 	} else
-		*iface->state->profile = '\0';
-	free_options(iface->state->options);
-	iface->state->options = ifo;
+		*ifp->state->profile = '\0';
+	free_options(ifp->options);
+	ifp->options = ifo;
 
 exit:
 	if (profile)
-		configure_interface1(iface);
+		configure_interface1(ifp);
 	return ret;
 }
 
 static void
-configure_interface(struct interface *iface, int argc, char **argv)
+configure_interface(struct interface *ifp, int argc, char **argv)
 {
-	select_profile(iface, NULL);
-	add_options(iface->state->options, argc, argv);
-	configure_interface1(iface);
+
+	select_profile(ifp, NULL);
+	add_options(ifp->options, argc, argv);
+	configure_interface1(ifp);
 }
 
 void
 handle_carrier(int action, int flags, const char *ifname)
 {
-	struct interface *iface;
+	struct interface *ifp;
 	int carrier;
 
 	if (!(options & DHCPCD_LINK))
 		return;
-	for (iface = ifaces; iface; iface = iface->next)
-		if (strcmp(iface->name, ifname) == 0)
+	for (ifp = ifaces; ifp; ifp = ifp->next)
+		if (strcmp(ifp->name, ifname) == 0)
 			break;
-	if (!iface) {
+	if (!ifp) {
 		if (options & DHCPCD_LINK)
 			handle_interface(1, ifname);
 		return;
 	}
-	if (!(iface->state->options->options & DHCPCD_LINK))
+	if (!(ifp->options->options & DHCPCD_LINK))
 		return;
 
 	if (action) {
 		carrier = action == 1 ? 1 : 0;
-		iface->flags = flags;
+		ifp->flags = flags;
 	} else
-		carrier = carrier_status(iface);
+		carrier = carrier_status(ifp);
 
 	if (carrier == -1)
 		syslog(LOG_ERR, "%s: carrier_status: %m", ifname);
-	else if (carrier == 0 || ~iface->flags & IFF_UP) {
-		if (iface->carrier != LINK_DOWN) {
-			iface->carrier = LINK_DOWN;
-			syslog(LOG_INFO, "%s: carrier lost", iface->name);
-			dhcp_close(iface);
-			dhcp6_drop(iface, "EXPIRE6");
-			ipv6rs_drop(iface);
-			dhcp_drop(iface, "NOCARRIER");
+	else if (carrier == 0 || ~ifp->flags & IFF_UP) {
+		if (ifp->carrier != LINK_DOWN) {
+			ifp->carrier = LINK_DOWN;
+			syslog(LOG_INFO, "%s: carrier lost", ifp->name);
+			dhcp_close(ifp);
+			dhcp6_drop(ifp, "EXPIRE6");
+			ipv6rs_drop(ifp);
+			dhcp_drop(ifp, "NOCARRIER");
 		}
-	} else if (carrier == 1 && !(~iface->flags & IFF_UP)) {
-		if (iface->carrier != LINK_UP) {
-			iface->carrier = LINK_UP;
-			syslog(LOG_INFO, "%s: carrier acquired", iface->name);
-			if (iface->wireless)
-				getifssid(iface->name, iface->ssid);
-			configure_interface(iface, margc, margv);
-			iface->state->interval = 0;
-			iface->state->reason = "CARRIER";
-			script_run(iface);
-			start_interface(iface);
+	} else if (carrier == 1 && !(~ifp->flags & IFF_UP)) {
+		if (ifp->carrier != LINK_UP) {
+			ifp->carrier = LINK_UP;
+			syslog(LOG_INFO, "%s: carrier acquired", ifp->name);
+			if (ifp->wireless)
+				getifssid(ifp->name, ifp->ssid);
+			configure_interface(ifp, margc, margv);
+			ifp->state->interval = 0;
+			ifp->state->reason = "CARRIER";
+			script_run(ifp);
+			start_interface(ifp);
 		}
 	}
 }
@@ -481,83 +481,83 @@ handle_carrier(int action, int flags, const char *ifname)
 void
 start_interface(void *arg)
 {
-	struct interface *iface = arg;
-	struct if_options *ifo = iface->state->options;
+	struct interface *ifp = arg;
+	struct if_options *ifo = ifp->options;
 	int nolease;
 
-	handle_carrier(0, 0, iface->name);
-	if (iface->carrier == LINK_DOWN) {
-		syslog(LOG_INFO, "%s: waiting for carrier", iface->name);
+	handle_carrier(0, 0, ifp->name);
+	if (ifp->carrier == LINK_DOWN) {
+		syslog(LOG_INFO, "%s: waiting for carrier", ifp->name);
 		return;
 	}
 
-	iface->start_uptime = uptime();
-	free(iface->state->offer);
-	iface->state->offer = NULL;
+	ifp->start_uptime = uptime();
+	free(ifp->state->offer);
+	ifp->state->offer = NULL;
 
 	if (options & DHCPCD_IPV6RS && ifo->options & DHCPCD_IPV6RS &&
 	    !(ifo->options & DHCPCD_INFORM))
-		ipv6rs_start(iface);
+		ipv6rs_start(ifp);
 
-	if (iface->state->arping_index < ifo->arping_len) {
-		arp_start(iface);
+	if (ifp->state->arping_index < ifo->arping_len) {
+		arp_start(ifp);
 		return;
 	}
 
 	if (ifo->options & DHCPCD_IPV6) {
 		if (ifo->options & DHCPCD_INFORM)
-			nolease = dhcp6_start(iface, 0);
+			nolease = dhcp6_start(ifp, 0);
 		else if (!(ifo->options & DHCPCD_IPV6RS))
-			nolease = dhcp6_start(iface, 1);
+			nolease = dhcp6_start(ifp, 1);
 		else
 			nolease = 0;
 		if (nolease == -1)
-			syslog(LOG_ERR, "%s: dhcp6_start: %m", iface->name);
+			syslog(LOG_ERR, "%s: dhcp6_start: %m", ifp->name);
 	}
 
 	if (ifo->options & DHCPCD_IPV4)
-		dhcp_start(iface);
+		dhcp_start(ifp);
 }
 
 static void
-init_state(struct interface *iface, int argc, char **argv)
+init_state(struct interface *ifp, int argc, char **argv)
 {
 	struct if_state *ifs;
 
-	if (iface->state)
-		ifs = iface->state;
+	if (ifp->state)
+		ifs = ifp->state;
 	else
-		ifs = iface->state = xzalloc(sizeof(*ifs));
+		ifs = ifp->state = xzalloc(sizeof(*ifs));
 
 	ifs->state = DHS_INIT;
 	ifs->reason = "PREINIT";
 	ifs->nakoff = 0;
-	configure_interface(iface, argc, argv);
+	configure_interface(ifp, argc, argv);
 	if (!(options & DHCPCD_TEST))
-		script_run(iface);
+		script_run(ifp);
 	/* We need to drop the leasefile so that start_interface
 	 * doesn't load it. */	
-	if (ifs->options->options & DHCPCD_REQUEST)
-		unlink(iface->leasefile);
+	if (ifp->options->options & DHCPCD_REQUEST)
+		unlink(ifp->leasefile);
 
-	if (ifs->options->options & DHCPCD_LINK) {
-		switch (carrier_status(iface)) {
+	if (ifp->options->options & DHCPCD_LINK) {
+		switch (carrier_status(ifp)) {
 		case 0:
-			iface->carrier = LINK_DOWN;
+			ifp->carrier = LINK_DOWN;
 			ifs->reason = "NOCARRIER";
 			break;
 		case 1:
-			iface->carrier = LINK_UP;
+			ifp->carrier = LINK_UP;
 			ifs->reason = "CARRIER";
 			break;
 		default:
-			iface->carrier = LINK_UNKNOWN;
+			ifp->carrier = LINK_UNKNOWN;
 			return;
 		}
 		if (!(options & DHCPCD_TEST))
-			script_run(iface);
+			script_run(ifp);
 	} else
-		iface->carrier = LINK_UNKNOWN;
+		ifp->carrier = LINK_UNKNOWN;
 }
 
 void
@@ -657,27 +657,27 @@ handle_link(_unused void *arg)
 }
 
 static void
-if_reboot(struct interface *iface, int argc, char **argv)
+if_reboot(struct interface *ifp, int argc, char **argv)
 {
 	const struct if_options *ifo;
 	int opt;
 	
-	ifo = iface->state->options;
+	ifo = ifp->options;
 	opt = ifo->options;
-	configure_interface(iface, argc, argv);
-	ifo = iface->state->options;
-	iface->state->interval = 0;
+	configure_interface(ifp, argc, argv);
+	ifo = ifp->options;
+	ifp->state->interval = 0;
 	if ((ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC) &&
-		iface->addr.s_addr != ifo->req_addr.s_addr) ||
+		ifp->addr.s_addr != ifo->req_addr.s_addr) ||
 	    (opt & (DHCPCD_INFORM | DHCPCD_STATIC) &&
 		!(ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC))))
 	{
-		dhcp_drop(iface, "EXPIRE");
+		dhcp_drop(ifp, "EXPIRE");
 	} else {
-		free(iface->state->offer);
-		iface->state->offer = NULL;
+		free(ifp->state->offer);
+		ifp->state->offer = NULL;
 	}
-	start_interface(iface);
+	start_interface(ifp);
 }
 
 static void
@@ -788,7 +788,7 @@ handle_signal(int sig)
 			break;
 		if (ifp->carrier != LINK_DOWN &&
 		    (do_release ||
-			ifp->state->options->options & DHCPCD_RELEASE))
+			ifp->options->options & DHCPCD_RELEASE))
 			dhcp_release(ifp);
 		stop_interface(ifp);
 	}
@@ -922,8 +922,8 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 			if (!ifp)
 				continue;
 			if (do_release)
-				ifp->state->options->options |= DHCPCD_RELEASE;
-			if (ifp->state->options->options & DHCPCD_RELEASE &&
+				ifp->options->options |= DHCPCD_RELEASE;
+			if (ifp->options->options & DHCPCD_RELEASE &&
 			    ifp->carrier != LINK_DOWN)
 				dhcp_release(ifp);
 			stop_interface(ifp);
@@ -1076,9 +1076,9 @@ main(int argc, char **argv)
 		snprintf(iface->leasefile, sizeof(iface->leasefile),
 		    LEASEFILE, iface->name);
 		iface->state = xzalloc(sizeof(*iface->state));
-		iface->state->options = xzalloc(sizeof(*iface->state->options));
-		strlcpy(iface->state->options->script, if_options->script,
-		    sizeof(iface->state->options->script));
+		iface->options = xzalloc(sizeof(*iface->options));
+		strlcpy(iface->options->script, if_options->script,
+		    sizeof(iface->options->script));
 		iface->state->new = read_lease(iface);
 		if (iface->state->new == NULL && errno == ENOENT) {
 			strlcpy(iface->leasefile, argv[optind],
@@ -1311,8 +1311,10 @@ main(int argc, char **argv)
 		}
 		if (options & DHCPCD_MASTER)
 			i = if_options->timeout;
+		else if (ifaces)
+			i = ifaces->options->timeout;
 		else
-			i = ifaces->state->options->timeout;
+			i = 0;
 		if (opt == 0 &&
 		    options & DHCPCD_LINK &&
 		    !(options & DHCPCD_WAITIP))

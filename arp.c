@@ -113,7 +113,7 @@ arp_packet(void *arg)
 	uint8_t *hw_s, *hw_t;
 	ssize_t bytes;
 	struct if_state *state = ifp->state;
-	struct if_options *opts = state->options;
+	struct if_options *opts = ifp->options;
 	const char *hwaddr;
 	struct in_addr ina;
 
@@ -254,8 +254,8 @@ arp_probe(void *arg)
 	struct timeval tv;
 	int arping = 0;
 
-	if (state->arping_index < state->options->arping_len) {
-		addr.s_addr = state->options->arping[state->arping_index];
+	if (state->arping_index < ifp->options->arping_len) {
+		addr.s_addr = ifp->options->arping[state->arping_index];
 		arping = 1;
 	} else if (state->offer) {
 		if (state->offer->yiaddr)
@@ -287,7 +287,7 @@ arp_probe(void *arg)
 		tv.tv_usec = 0;
 		if (arping) {
 			state->probes = 0;
-			if (++state->arping_index < state->options->arping_len)
+			if (++state->arping_index < ifp->options->arping_len)
 				eloop_timeout_add_tv(&tv, arp_probe, ifp);
 			else
 				eloop_timeout_add_tv(&tv, start_interface, ifp);

@@ -316,7 +316,7 @@ n_route(struct rt6 *rt)
 	/* Don't set default routes if not asked to */
 	if (IN6_IS_ADDR_UNSPECIFIED(&rt->dest) &&
 	    IN6_IS_ADDR_UNSPECIFIED(&rt->net) &&
-	    !(rt->iface->state->options->options & DHCPCD_GATEWAY))
+	    !(rt->iface->options->options & DHCPCD_GATEWAY))
 		return -1;
 
 	/* Delete the route first as it could exist prior to dhcpcd running
@@ -337,7 +337,7 @@ c_route(struct rt6 *ort, struct rt6 *nrt)
 	/* Don't set default routes if not asked to */
 	if (IN6_IS_ADDR_UNSPECIFIED(&nrt->dest) &&
 	    IN6_IS_ADDR_UNSPECIFIED(&nrt->net) &&
-	    !(nrt->iface->state->options->options & DHCPCD_GATEWAY))
+	    !(nrt->iface->options->options & DHCPCD_GATEWAY))
 		return -1;
 
 	desc_route("changing", nrt);
