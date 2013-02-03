@@ -83,6 +83,21 @@ struct if_state {
 	time_t defend;
 	struct in_addr fail;
 	size_t arping_index;
+
+	int raw_fd;
+	int udp_fd;
+	int arp_fd;
+	size_t buffer_size, buffer_len, buffer_pos;
+	unsigned char *buffer;
+
+	struct in_addr addr;
+	struct in_addr net;
+	struct in_addr dst;
+
+	char leasefile[PATH_MAX];
+	time_t start_uptime;
+
+	unsigned char *clientid;
 };
 
 struct interface {
@@ -100,21 +115,7 @@ struct interface {
 	int wireless;
 	char ssid[IF_SSIDSIZE];
 
-	int raw_fd;
-	int udp_fd;
-	int arp_fd;
-	size_t buffer_size, buffer_len, buffer_pos;
-	unsigned char *buffer;
-
-	struct in_addr addr;
-	struct in_addr net;
-	struct in_addr dst;
-
-	char leasefile[PATH_MAX];
-	time_t start_uptime;
-
 	struct if_options *options;
-	unsigned char *clientid;
 
 	struct interface *next;
 };

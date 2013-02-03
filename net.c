@@ -196,10 +196,10 @@ free_interface(struct interface *ifp)
 		free(ifp->state->old);
 		free(ifp->state->new);
 		free(ifp->state->offer);
+		free(ifp->state->buffer);
+		free(ifp->state->clientid);
 		free(ifp->state);
 	}
-	free(ifp->buffer);
-	free(ifp->clientid);
 	free(ifp);
 }
 
@@ -476,10 +476,6 @@ discover_interfaces(int argc, char * const *argv)
 			ifp->wireless = 1;
 			ifp->metric += 100;
 		}
-		snprintf(ifp->leasefile, sizeof(ifp->leasefile),
-		    LEASEFILE, ifp->name);
-		/* 0 is a valid fd, so init to -1 */
-		ifp->raw_fd = ifp->udp_fd = ifp->arp_fd = -1;
 
 		if (ifl)
 			ifl->next = ifp; 
@@ -606,11 +602,11 @@ open_udp_socket(struct interface *iface)
 	memset(&sin, 0, sizeof(sin));
 	sin.sin_family = AF_INET;
 	sin.sin_port = htons(DHCP_CLIENT_PORT);
-	sin.sin_addr.s_addr = iface->addr.s_addr;
+	sin.sin_addr.s_addr = iface->state->addr.s_addr;
 	if (bind(s, (struct sockaddr *)&sin, sizeof(sin)) == -1)
 		goto eexit;
 
-	iface->udp_fd = s;
+	iface->state->udp_fd = s;
 	set_cloexec(s);
 	return 0;
 
@@ -629,7 +625,7 @@ send_packet(const struct interface *iface, struct in_addr to,
 	sin.sin_family = AF_INET;
 	sin.sin_addr.s_addr = to.s_addr;
 	sin.sin_port = htons(DHCP_SERVER_PORT);
-	return sendto(iface->udp_fd, data, len, 0,
+	return sendto(iface->state->udp_fd, data, len, 0,
 	    (struct sockaddr *)&sin, sizeof(sin));
 }
 

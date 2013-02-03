@@ -91,7 +91,7 @@ arp_failure(struct interface *ifp)
 		return;
 	}
 
-	unlink(ifp->leasefile);
+	unlink(ifp->state->leasefile);
 	if (!ifp->state->lease.frominfo)
 		dhcp_decline(ifp);
 	dhcp_close(ifp);
@@ -180,10 +180,10 @@ arp_packet(void *arg)
 			state->fail.s_addr = state->offer->yiaddr;
 
 		/* Handle IPv4LL conflicts */
-		if (IN_LINKLOCAL(htonl(ifp->addr.s_addr)) &&
-		    (reply_s == ifp->addr.s_addr ||
-			(reply_s == 0 && reply_t == ifp->addr.s_addr)))
-			state->fail.s_addr = ifp->addr.s_addr;
+		if (IN_LINKLOCAL(htonl(state->addr.s_addr)) &&
+		    (reply_s == state->addr.s_addr ||
+			(reply_s == 0 && reply_t == state->addr.s_addr)))
+			state->fail.s_addr = state->addr.s_addr;
 
 		if (state->fail.s_addr) {
 			syslog(LOG_ERR, "%s: hardware address %s claims %s",
@@ -207,9 +207,9 @@ arp_announce(void *arg)
 
 	if (state->new == NULL)
 		return;
-	if (ifp->arp_fd == -1) {
+	if (state->arp_fd == -1) {
 		open_socket(ifp, ETHERTYPE_ARP);
-		eloop_event_add(ifp->arp_fd, arp_packet, ifp);
+		eloop_event_add(state->arp_fd, arp_packet, ifp);
 	}
 	if (++state->claims < ANNOUNCE_NUM)	
 		syslog(LOG_DEBUG,
@@ -239,9 +239,9 @@ arp_announce(void *arg)
 		timernorm(&tv);
 		eloop_timeout_add_tv(&tv, dhcp_discover, ifp);
 	} else {
-		eloop_event_delete(ifp->arp_fd);
-		close(ifp->arp_fd);
-		ifp->arp_fd = -1;
+		eloop_event_delete(state->arp_fd);
+		close(state->arp_fd);
+		state->arp_fd = -1;
 	}
 }
 
@@ -263,11 +263,11 @@ arp_probe(void *arg)
 		else
 			addr.s_addr = state->offer->ciaddr;
 	} else
-		addr.s_addr = ifp->addr.s_addr;
+		addr.s_addr = state->addr.s_addr;
 
-	if (ifp->arp_fd == -1) {
+	if (state->arp_fd == -1) {
 		open_socket(ifp, ETHERTYPE_ARP);
-		eloop_event_add(ifp->arp_fd, arp_packet, ifp);
+		eloop_event_add(state->arp_fd, arp_packet, ifp);
 	}
 	if (state->probes == 0) {
 		if (arping)

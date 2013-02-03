@@ -91,9 +91,9 @@ ipv4ll_start(void *arg)
 	eloop_timeout_delete(NULL, ifp);
 	ifp->state->probes = 0;
 	ifp->state->claims = 0;
-	if (ifp->addr.s_addr) {
+	if (ifp->state->addr.s_addr) {
 		ifp->state->conflicts = 0;
-		if (IN_LINKLOCAL(htonl(ifp->addr.s_addr))) {
+		if (IN_LINKLOCAL(htonl(ifp->state->addr.s_addr))) {
 			arp_announce(ifp);
 			return;
 		}
@@ -125,7 +125,7 @@ ipv4ll_handle_failure(void *arg)
 	struct interface *ifp = arg;
 	time_t up;
 
-	if (ifp->state->fail.s_addr == ifp->addr.s_addr) {
+	if (ifp->state->fail.s_addr == ifp->state->addr.s_addr) {
 		up = uptime();
 		if (ifp->state->defend + DEFEND_INTERVAL > up) {
 			syslog(LOG_DEBUG,

@@ -299,6 +299,7 @@ stop_interface(struct interface *iface)
 static void
 configure_interface1(struct interface *ifp)
 {
+	struct if_state *ifs = ifp->state;
 	struct if_options *ifo = ifp->options;
 	uint8_t *duid;
 	size_t len, ifl;
@@ -340,14 +341,14 @@ configure_interface1(struct interface *ifp)
 		break;
 	}
 
-	free(ifp->clientid);
-	ifp->clientid = NULL;
+	free(ifs->clientid);
+	ifs->clientid = NULL;
 	if (!(ifo->options & DHCPCD_IPV4))
 		return;
 
 	if (*ifo->clientid) {
-		ifp->clientid = xmalloc(ifo->clientid[0] + 1);
-		memcpy(ifp->clientid, ifo->clientid, ifo->clientid[0] + 1);
+		ifs->clientid = xmalloc(ifo->clientid[0] + 1);
+		memcpy(ifs->clientid, ifo->clientid, ifo->clientid[0] + 1);
 	} else if (ifo->options & DHCPCD_CLIENTID) {
 		len = 0;
 		if (ifo->options & DHCPCD_DUID) {
@@ -357,33 +358,33 @@ configure_interface1(struct interface *ifp)
 		} else
 			duid = NULL;
 		if (len > 0) {
-			ifp->clientid = xmalloc(len + 6);
-			ifp->clientid[0] = len + 5;
-			ifp->clientid[1] = 255; /* RFC 4361 */
+			ifs->clientid = xmalloc(len + 6);
+			ifs->clientid[0] = len + 5;
+			ifs->clientid[1] = 255; /* RFC 4361 */
 			ifl = strlen(ifp->name);
 			if (ifl < 5) {
-				memcpy(ifp->clientid + 2, ifp->name, ifl);
+				memcpy(ifs->clientid + 2, ifp->name, ifl);
 				if (ifl < 4)
-					memset(ifp->clientid + 2 + ifl,
+					memset(ifs->clientid + 2 + ifl,
 					    0, 4 - ifl);
 			} else {
 				ifl = htonl(ifp->index);
-				memcpy(ifp->clientid + 2, &ifl, 4);
+				memcpy(ifs->clientid + 2, &ifl, 4);
 			}
-			memcpy(ifp->clientid + 6, duid, len);
+			memcpy(ifs->clientid + 6, duid, len);
 		} else if (len == 0) {
 			len = ifp->hwlen + 1;
-			ifp->clientid = xmalloc(len + 1);
-			ifp->clientid[0] = len;
-			ifp->clientid[1] = ifp->family;
-			memcpy(ifp->clientid + 2, ifp->hwaddr,
+			ifs->clientid = xmalloc(len + 1);
+			ifs->clientid[0] = len;
+			ifs->clientid[1] = ifp->family;
+			memcpy(ifs->clientid + 2, ifp->hwaddr,
 			    ifp->hwlen);
 		}
 		free(duid);
 	}
 	if (ifo->options & DHCPCD_CLIENTID)
 		syslog(LOG_DEBUG, "%s: using ClientID %s", ifp->name,
-		    hwaddr_ntoa(ifp->clientid + 1, *ifp->clientid));
+		    hwaddr_ntoa(ifs->clientid + 1, ifs->clientid[0]));
 	else if (ifp->hwlen)
 		syslog(LOG_DEBUG, "%s: using hwaddr %s", ifp->name,
 		    hwaddr_ntoa(ifp->hwaddr, ifp->hwlen));
@@ -491,7 +492,7 @@ start_interface(void *arg)
 		return;
 	}
 
-	ifp->start_uptime = uptime();
+	ifp->state->start_uptime = uptime();
 	free(ifp->state->offer);
 	ifp->state->offer = NULL;
 
@@ -532,13 +533,19 @@ init_state(struct interface *ifp, int argc, char **argv)
 	ifs->state = DHS_INIT;
 	ifs->reason = "PREINIT";
 	ifs->nakoff = 0;
+	snprintf(ifs->leasefile, sizeof(ifs->leasefile),
+	    LEASEFILE, ifp->name);
+	/* 0 is a valid fd, so init to -1 */
+	ifs->raw_fd = ifs->udp_fd = ifs->arp_fd = -1;
+
 	configure_interface(ifp, argc, argv);
 	if (!(options & DHCPCD_TEST))
 		script_run(ifp);
+
 	/* We need to drop the leasefile so that start_interface
 	 * doesn't load it. */	
 	if (ifp->options->options & DHCPCD_REQUEST)
-		unlink(ifp->leasefile);
+		unlink(ifs->leasefile);
 
 	if (ifp->options->options & DHCPCD_LINK) {
 		switch (carrier_status(ifp)) {
@@ -668,7 +675,7 @@ if_reboot(struct interface *ifp, int argc, char **argv)
 	ifo = ifp->options;
 	ifp->state->interval = 0;
 	if ((ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC) &&
-		ifp->addr.s_addr != ifo->req_addr.s_addr) ||
+		ifp->state->addr.s_addr != ifo->req_addr.s_addr) ||
 	    (opt & (DHCPCD_INFORM | DHCPCD_STATIC) &&
 		!(ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC))))
 	{
@@ -939,6 +946,7 @@ int
 main(int argc, char **argv)
 {
 	struct interface *iface;
+	struct if_state *ifs;
 	uint16_t family = 0;
 	int opt, oi = 0, sig = 0, i, control_fd;
 	size_t len;
@@ -1072,17 +1080,17 @@ main(int argc, char **argv)
 			exit(EXIT_FAILURE);
 		}
 		ifaces = iface = xzalloc(sizeof(*iface));
-		strlcpy(iface->name, argv[optind], sizeof(iface->name));
-		snprintf(iface->leasefile, sizeof(iface->leasefile),
-		    LEASEFILE, iface->name);
-		iface->state = xzalloc(sizeof(*iface->state));
+		iface->state = ifs = xzalloc(sizeof(*iface->state));
 		iface->options = xzalloc(sizeof(*iface->options));
+		strlcpy(iface->name, argv[optind], sizeof(iface->name));
+		snprintf(ifs->leasefile, sizeof(ifs->leasefile),
+		    LEASEFILE, iface->name);
 		strlcpy(iface->options->script, if_options->script,
 		    sizeof(iface->options->script));
 		iface->state->new = read_lease(iface);
 		if (iface->state->new == NULL && errno == ENOENT) {
-			strlcpy(iface->leasefile, argv[optind],
-			    sizeof(iface->leasefile));
+			strlcpy(ifs->leasefile, argv[optind],
+			    sizeof(ifs->leasefile));
 			iface->state->new = read_lease(iface);
 		}
 		if (iface->state->new == NULL) {

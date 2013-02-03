@@ -819,14 +819,15 @@ make_message(struct dhcp_message **message,
 	struct dhcp_message *dhcp;
 	uint8_t *m, *lp, *p;
 	uint8_t *n_params = NULL;
-	time_t up = uptime() - iface->start_uptime;
 	uint32_t ul;
 	uint16_t sz;
 	size_t len;
 	const char *hp;
 	const struct dhcp_opt *opt;
 	const struct if_options *ifo = iface->options;
-	const struct dhcp_lease *lease = &iface->state->lease;
+	const struct if_state *ifs = iface->state;
+	const struct dhcp_lease *lease = &ifs->lease;
+	time_t up = uptime() - ifs->start_uptime;
 
 	dhcp = xzalloc(sizeof (*dhcp));
 	m = (uint8_t *)dhcp;
@@ -834,13 +835,13 @@ make_message(struct dhcp_message **message,
 
 	if ((type == DHCP_INFORM || type == DHCP_RELEASE ||
 		(type == DHCP_REQUEST &&
-		    iface->net.s_addr == lease->net.s_addr &&
-		    (iface->state->new == NULL ||
-			iface->state->new->cookie == htonl(MAGIC_COOKIE)))))
+		    ifs->net.s_addr == lease->net.s_addr &&
+		    (ifs->new == NULL ||
+			ifs->new->cookie == htonl(MAGIC_COOKIE)))))
 	{
-		dhcp->ciaddr = iface->addr.s_addr;
+		dhcp->ciaddr = ifs->addr.s_addr;
 		/* In-case we haven't actually configured the address yet */
-		if (type == DHCP_INFORM && iface->addr.s_addr == 0)
+		if (type == DHCP_INFORM && ifs->addr.s_addr == 0)
 			dhcp->ciaddr = lease->addr.s_addr;
 	}
 
@@ -866,23 +867,23 @@ make_message(struct dhcp_message **message,
 		else
 			dhcp->secs = htons(up);
 	}
-	dhcp->xid = htonl(iface->state->xid);
+	dhcp->xid = htonl(ifs->xid);
 	dhcp->cookie = htonl(MAGIC_COOKIE);
 
 	*p++ = DHO_MESSAGETYPE; 
 	*p++ = 1;
 	*p++ = type;
 
-	if (iface->clientid) {
+	if (ifs->clientid) {
 		*p++ = DHO_CLIENTID;
-		memcpy(p, iface->clientid, iface->clientid[0] + 1);
-		p += iface->clientid[0] + 1;
+		memcpy(p, ifs->clientid, ifs->clientid[0] + 1);
+		p += ifs->clientid[0] + 1;
 	}
 
 	if (lease->addr.s_addr && lease->cookie == htonl(MAGIC_COOKIE)) {
 		if (type == DHCP_DECLINE ||
 		    (type == DHCP_REQUEST &&
-			lease->addr.s_addr != iface->addr.s_addr))
+			lease->addr.s_addr != ifs->addr.s_addr))
 		{
 			PUTADDR(DHO_IPADDRESS, lease->addr);
 			if (lease->server.s_addr)
@@ -1036,14 +1037,14 @@ write_lease(const struct interface *iface, const struct dhcp_message *dhcp)
 
 	/* We don't write BOOTP leases */
 	if (is_bootp(dhcp)) {
-		unlink(iface->leasefile);
+		unlink(iface->state->leasefile);
 		return 0;
 	}
 
 	syslog(LOG_DEBUG, "%s: writing lease `%s'",
-	    iface->name, iface->leasefile);
+	    iface->name, iface->state->leasefile);
 
-	fd = open(iface->leasefile, O_WRONLY | O_CREAT | O_TRUNC, 0444);
+	fd = open(iface->state->leasefile, O_WRONLY | O_CREAT | O_TRUNC, 0444);
 	if (fd == -1)
 		return -1;
 
@@ -1072,15 +1073,15 @@ read_lease(const struct interface *iface)
 	struct dhcp_message *dhcp;
 	ssize_t bytes;
 
-	fd = open(iface->leasefile, O_RDONLY);
+	fd = open(iface->state->leasefile, O_RDONLY);
 	if (fd == -1) {
 		if (errno != ENOENT)
 			syslog(LOG_ERR, "%s: open `%s': %m",
-			    iface->name, iface->leasefile);
+			    iface->name, iface->state->leasefile);
 		return NULL;
 	}
 	syslog(LOG_DEBUG, "%s: reading lease `%s'",
-	    iface->name, iface->leasefile);
+	    iface->name, iface->state->leasefile);
 	dhcp = xmalloc(sizeof(*dhcp));
 	memset(dhcp, 0, sizeof(*dhcp));
 	bytes = read(fd, dhcp, sizeof(*dhcp));
@@ -1250,23 +1251,24 @@ dhcp_xid(const struct interface *ifp)
 }
 
 void
-dhcp_close(struct interface *iface)
+dhcp_close(struct interface *ifp)
 {
+	struct if_state *ifs = ifp->state;
 
-	if (iface->arp_fd != -1) {
-		eloop_event_delete(iface->arp_fd);
-		close(iface->arp_fd);
-		iface->arp_fd = -1;
+	if (ifs->arp_fd != -1) {
+		eloop_event_delete(ifs->arp_fd);
+		close(ifs->arp_fd);
+		ifs->arp_fd = -1;
 	}
-	if (iface->raw_fd != -1) {
-		eloop_event_delete(iface->raw_fd);
-		close(iface->raw_fd);
-		iface->raw_fd = -1;
+	if (ifs->raw_fd != -1) {
+		eloop_event_delete(ifs->raw_fd);
+		close(ifs->raw_fd);
+		ifs->raw_fd = -1;
 	}
-	if (iface->udp_fd != -1) {
+	if (ifs->udp_fd != -1) {
 		/* we don't listen to events on the udp */
-		close(iface->udp_fd);
-		iface->udp_fd = -1;
+		close(ifs->udp_fd);
+		ifs->udp_fd = -1;
 	}
 }
 
@@ -1314,15 +1316,15 @@ send_message(struct interface *iface, int type,
 	 * then we cannot renew.
 	 * This could happen if our IP was pulled out from underneath us.
 	 * Also, we should not unicast from a BOOTP lease. */
-	if (iface->udp_fd == -1 ||
-	    (!(ifo->options & DHCPCD_INFORM) && is_bootp(iface->state->new)))
+	if (state->udp_fd == -1 ||
+	    (!(ifo->options & DHCPCD_INFORM) && is_bootp(state->new)))
 	{
-		a = iface->addr.s_addr;
-		iface->addr.s_addr = 0;
+		a = state->addr.s_addr;
+		state->addr.s_addr = 0;
 	}
 	len = make_message(&dhcp, iface, type);
 	if (a)
-		iface->addr.s_addr = a;
+		state->addr.s_addr = a;
 	from.s_addr = dhcp->ciaddr;
 	if (from.s_addr)
 		to.s_addr = state->lease.server.s_addr;
@@ -1419,7 +1421,7 @@ dhcp_discover(void *arg)
 	if (ifo->fallback)
 		eloop_timeout_add_sec(timeout, dhcp_fallback, iface);
 	else if (ifo->options & DHCPCD_IPV4LL &&
-	    !IN_LINKLOCAL(htonl(iface->addr.s_addr)))
+	    !IN_LINKLOCAL(htonl(iface->state->addr.s_addr)))
 	{
 		if (IN_LINKLOCAL(htonl(iface->state->fail.s_addr)))
 			eloop_timeout_add_sec(RATE_LIMIT_INTERVAL,
@@ -1450,7 +1452,7 @@ dhcp_expire(void *arg)
 	struct interface *iface = arg;
 
 	iface->state->interval = 0;
-	if (iface->addr.s_addr == 0) {
+	if (iface->state->addr.s_addr == 0) {
 		/* We failed to reboot, so enter discovery. */
 		iface->state->lease.addr.s_addr = 0;
 		dhcp_discover(iface);
@@ -1460,7 +1462,7 @@ dhcp_expire(void *arg)
 	syslog(LOG_ERR, "%s: lease expired", iface->name);
 	eloop_timeout_delete(NULL, iface);
 	dhcp_drop(iface, "EXPIRE");
-	unlink(iface->leasefile);
+	unlink(iface->state->leasefile);
 	if (iface->carrier != LINK_DOWN)
 		start_interface(iface);
 }
@@ -1483,7 +1485,7 @@ dhcp_release(struct interface *iface)
 		nanosleep(&ts, NULL);
 		dhcp_drop(iface, "RELEASE");
 	}
-	unlink(iface->leasefile);
+	unlink(iface->state->leasefile);
 }
 
 void
@@ -1560,7 +1562,7 @@ dhcp_bind(void *arg)
 		if (ifo->req_addr.s_addr != 0)
 			lease->addr.s_addr = ifo->req_addr.s_addr;
 		else
-			lease->addr.s_addr = iface->addr.s_addr;
+			lease->addr.s_addr = state->addr.s_addr;
 		syslog(LOG_INFO, "%s: received approval for %s", iface->name,
 		    inet_ntoa(lease->addr));
 		lease->leasetime = ~0U;
@@ -1717,8 +1719,8 @@ dhcp_inform(struct interface *iface)
 		return;
 
 	if (options & DHCPCD_TEST) {
-		iface->addr.s_addr = iface->options->req_addr.s_addr;
-		iface->net.s_addr = iface->options->req_mask.s_addr;
+		iface->state->addr.s_addr = iface->options->req_addr.s_addr;
+		iface->state->net.s_addr = iface->options->req_mask.s_addr;
 	} else {
 		iface->options->options |= DHCPCD_STATIC;
 		dhcp_static(iface);
@@ -1888,7 +1890,7 @@ dhcp_handle(struct interface *iface, struct dhcp_message **dhcpp,
 		log_dhcp(LOG_WARNING, "NAK:", iface, dhcp, from);
 		if (!(options & DHCPCD_TEST)) {
 			dhcp_drop(iface, "NAK");
-			unlink(iface->leasefile);
+			unlink(iface->state->leasefile);
 		}
 		dhcp_close(iface);
 		/* If we constantly get NAKS then we should slowly back off */
@@ -2001,7 +2003,7 @@ dhcp_handle(struct interface *iface, struct dhcp_message **dhcpp,
 	dhcp_close(iface);
 
 	if (ifo->options & DHCPCD_ARP &&
-	    iface->addr.s_addr != state->offer->yiaddr)
+	    state->addr.s_addr != state->offer->yiaddr)
 	{
 		/* If the interface already has the address configured
 		 * then we can't ARP for duplicate detection. */
@@ -2059,7 +2061,7 @@ dhcp_handlepacket(void *arg)
 			continue;
 		}
 		if (iface->flags & IFF_POINTOPOINT &&
-		    iface->dst.s_addr != from.s_addr)
+		    iface->state->dst.s_addr != from.s_addr)
 		{
 			syslog(LOG_WARNING,
 			    "%s: server %s is not destination",
@@ -2098,7 +2100,7 @@ dhcp_handlepacket(void *arg)
 			continue;
 		}
 		dhcp_handle(iface, &dhcp, &from);
-		if (iface->raw_fd == -1)
+		if (iface->state->raw_fd == -1)
 			break;
 	}
 	free(packet);
@@ -2110,17 +2112,19 @@ static int
 dhcp_open(struct interface *ifp)
 {
 	int r = 0;
+	struct if_state *ifs;
 
-	if (ifp->raw_fd == -1) {
+	ifs = ifp->state;
+	if (ifs->raw_fd == -1) {
 		if ((r = open_socket(ifp, ETHERTYPE_IP)) == -1)
 			syslog(LOG_ERR, "%s: %s: %m", __func__, ifp->name);
 		else
-			eloop_event_add(ifp->raw_fd, dhcp_handlepacket, ifp);
+			eloop_event_add(ifs->raw_fd, dhcp_handlepacket, ifp);
 	}
-	if (ifp->udp_fd == -1 &&
-	    ifp->addr.s_addr != 0 &&
-	    ifp->state->new != NULL &&
-	    (ifp->state->new->cookie == htonl(MAGIC_COOKIE) ||
+	if (ifs->udp_fd == -1 &&
+	    ifs->addr.s_addr != 0 &&
+	    ifs->new != NULL &&
+	    (ifs->new->cookie == htonl(MAGIC_COOKIE) ||
 	    ifp->options->options & DHCPCD_INFORM))
 	{
 		if (open_udp_socket(ifp) == -1 && errno != EADDRINUSE) {
@@ -2172,13 +2176,13 @@ dhcp_start(struct interface *ifp)
 		ifp->state->lease.frominfo = 1;
 		if (ifp->state->offer->cookie == 0) {
 			if (ifp->state->offer->yiaddr ==
-			    ifp->addr.s_addr)
+			    ifp->state->addr.s_addr)
 			{
 				free(ifp->state->offer);
 				ifp->state->offer = NULL;
 			}
 		} else if (ifp->state->lease.leasetime != ~0U &&
-		    stat(ifp->leasefile, &st) == 0)
+		    stat(ifp->state->leasefile, &st) == 0)
 		{
 			/* Offset lease times and check expiry */
 			gettimeofday(&now, NULL);

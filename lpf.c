@@ -112,9 +112,9 @@ open_socket(struct interface *iface, int protocol)
 	if (bind(s, &su.sa, sizeof(su)) == -1)
 		goto eexit;
 	if (protocol == ETHERTYPE_ARP)
-		fd = &iface->arp_fd;
+		fd = &iface->state->arp_fd;
 	else
-		fd = &iface->raw_fd;
+		fd = &iface->state->raw_fd;
 	if (*fd != -1)
 		close(*fd);
 	*fd = s;
@@ -148,9 +148,9 @@ send_raw_packet(const struct interface *iface, int protocol,
 	else
 		memset(&su.sll.sll_addr, 0xff, iface->hwlen);
 	if (protocol == ETHERTYPE_ARP)
-		fd = iface->arp_fd;
+		fd = iface->state->arp_fd;
 	else
-		fd = iface->raw_fd;
+		fd = iface->state->raw_fd;
 
 	return sendto(fd, data, len, 0, &su.sa, sizeof(su));
 }
@@ -182,9 +182,9 @@ get_raw_packet(struct interface *iface, int protocol,
 #endif
 
 	if (protocol == ETHERTYPE_ARP)
-		fd = iface->arp_fd;
+		fd = iface->state->arp_fd;
 	else
-		fd = iface->raw_fd;
+		fd = iface->state->raw_fd;
 	bytes = recvmsg(fd, &msg, 0);
 	if (bytes == -1)
 		return errno == EAGAIN ? 0 : -1;
