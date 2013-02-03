@@ -41,20 +41,6 @@
 #define IF_SSIDSIZE 33
 #define PROFILE_LEN 64
 
-enum DHS {
-	DHS_INIT,
-	DHS_DISCOVER,
-	DHS_REQUEST,
-	DHS_BOUND,
-	DHS_RENEW,
-	DHS_REBIND,
-	DHS_REBOOT,
-	DHS_INFORM,
-	DHS_RENEW_REQUESTED,
-	DHS_INIT_IPV4LL,
-	DHS_PROBE
-};
-
 #define LINK_UP 	1
 #define LINK_UNKNOWN	0
 #define LINK_DOWN 	-1
@@ -64,47 +50,8 @@ enum DHS {
 #define IF_DATA_DHCP6	2
 #define IF_DATA_MAX	3
 
-struct if_state {
-	enum DHS state;
-	char profile[PROFILE_LEN];
-	struct dhcp_message *sent;
-	struct dhcp_message *offer;
-	struct dhcp_message *new;
-	struct dhcp_message *old;
-	struct dhcp_lease lease;
-	const char *reason;
-	time_t interval;
-	time_t nakoff;
-	uint32_t xid;
-	int socket;
-	int probes;
-	int claims;
-	int conflicts;
-	time_t defend;
-	struct in_addr fail;
-	size_t arping_index;
-
-	int raw_fd;
-	int udp_fd;
-	int arp_fd;
-	size_t buffer_size, buffer_len, buffer_pos;
-	unsigned char *buffer;
-
-	struct in_addr addr;
-	struct in_addr net;
-	struct in_addr dst;
-
-	char leasefile[PATH_MAX];
-	time_t start_uptime;
-
-	unsigned char *clientid;
-};
-
 struct interface {
 	char name[IF_NAMESIZE];
-	struct if_state *state;
-	void *if_data[IF_DATA_MAX];
-
 	unsigned int index;
 	int flags;
 	sa_family_t family;
@@ -115,8 +62,9 @@ struct interface {
 	int wireless;
 	char ssid[IF_SSIDSIZE];
 
+	char profile[PROFILE_LEN];
 	struct if_options *options;
-
+	void *if_data[IF_DATA_MAX];
 	struct interface *next;
 };
 
@@ -127,6 +75,7 @@ extern int ifac;
 extern char **ifav;
 extern int ifdc;
 extern char **ifdv;
+extern struct if_options *if_options;
 extern struct interface *ifaces;
 
 pid_t daemonise(void);

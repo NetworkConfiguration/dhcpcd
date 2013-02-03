@@ -31,6 +31,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
+#include <limits.h>
 #include <stdint.h>
 
 #include "common.h"
@@ -166,6 +167,60 @@ struct dhcp_lease {
 	uint32_t cookie;
 };
 
+enum DHS {
+	DHS_INIT,
+	DHS_DISCOVER,
+	DHS_REQUEST,
+	DHS_BOUND,
+	DHS_RENEW,
+	DHS_REBIND,
+	DHS_REBOOT,
+	DHS_INFORM,
+	DHS_RENEW_REQUESTED,
+	DHS_INIT_IPV4LL,
+	DHS_PROBE
+};
+
+struct dhcp_state {
+	enum DHS state;
+	struct dhcp_message *sent;
+	struct dhcp_message *offer;
+	struct dhcp_message *new;
+	struct dhcp_message *old;
+	struct dhcp_lease lease;
+	const char *reason;
+	time_t interval;
+	time_t nakoff;
+	uint32_t xid;
+	int socket;
+	int probes;
+	int claims;
+	int conflicts;
+	time_t defend;
+	struct in_addr fail;
+	size_t arping_index;
+
+	int raw_fd;
+	int udp_fd;
+	int arp_fd;
+	size_t buffer_size, buffer_len, buffer_pos;
+	unsigned char *buffer;
+
+	struct in_addr addr;
+	struct in_addr net;
+	struct in_addr dst;
+
+	char leasefile[PATH_MAX];
+	time_t start_uptime;
+
+	unsigned char *clientid;
+};
+
+#define D_STATE(ifp)							       \
+	((struct dhcp_state *)(ifp)->if_data[IF_DATA_DHCP])
+#define D_CSTATE(ifp)							       \
+	((const struct dhcp_state *)(ifp)->if_data[IF_DATA_DHCP])
+
 #include "dhcpcd.h"
 #include "if-options.h"
 #include "net.h"
@@ -209,6 +264,9 @@ void dhcp_discover(void *);
 void dhcp_inform(struct interface *);
 void dhcp_release(struct interface *);
 void dhcp_bind(void *);
+void dhcp_reboot(struct interface *, int);
 void dhcp_close(struct interface *);
+void dhcp_free(struct interface *);
+int dhcp_dump(const char *);
 
 #endif

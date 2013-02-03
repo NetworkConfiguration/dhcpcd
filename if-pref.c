@@ -28,32 +28,35 @@
 #include <sys/types.h>
 
 #include "config.h"
-#include "dhcpcd.h"
+#include "dhcp.h"
 #include "if-pref.h"
 #include "net.h"
 
 /* Interface comparer for working out ordering. */
 static int
-ifcmp(struct interface *si, struct interface *ti)
+ifcmp(const struct interface *si, const struct interface *ti)
 {
 	int sill, till;
+	const struct dhcp_state *sis, *tis;
 
-	if (si->state && !ti->state)
+	sis = D_CSTATE(si);
+	tis = D_CSTATE(ti);
+	if (sis && !tis)
 		return -1;
-	if (!si->state && ti->state)
+	if (!sis && tis)
 		return 1;
-	if (!si->state && !ti->state)
+	if (!sis && !tis)
 		return 0;
 	/* If one has a lease and the other not, it takes precedence. */
-	if (si->state->new && !ti->state->new)
+	if (sis->new && !tis->new)
 		return -1;
-	if (!si->state->new && ti->state->new)
+	if (!sis->new && tis->new)
 		return 1;
 	/* If we are either, they neither have a lease, or they both have.
 	 * We need to check for IPv4LL and make it non-preferred. */
-	if (si->state->new && ti->state->new) {
-		sill = (si->state->new->cookie == htonl(MAGIC_COOKIE));
-		till = (ti->state->new->cookie == htonl(MAGIC_COOKIE));
+	if (sis->new && tis->new) {
+		sill = (sis->new->cookie == htonl(MAGIC_COOKIE));
+		till = (tis->new->cookie == htonl(MAGIC_COOKIE));
 		if (!sill && till)
 			return 1;
 		if (sill && !till)

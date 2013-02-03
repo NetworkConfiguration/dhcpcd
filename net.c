@@ -189,17 +189,10 @@ free_interface(struct interface *ifp)
 
 	if (ifp == NULL)
 		return;
+	dhcp_free(ifp);
 	dhcp6_free(ifp);
 	ipv6rs_free(ifp);
 	free_options(ifp->options);
-	if (ifp->state) {
-		free(ifp->state->old);
-		free(ifp->state->new);
-		free(ifp->state->offer);
-		free(ifp->state->buffer);
-		free(ifp->state->clientid);
-		free(ifp->state);
-	}
 	free(ifp);
 }
 
@@ -572,6 +565,7 @@ open_udp_socket(struct interface *iface)
 	int s;
 	struct sockaddr_in sin;
 	int n;
+	struct dhcp_state *state;
 #ifdef SO_BINDTODEVICE
 	struct ifreq ifr;
 	char *p;
@@ -599,14 +593,15 @@ open_udp_socket(struct interface *iface)
 	n = 1;
 	if (setsockopt(s, SOL_SOCKET, SO_RCVBUF, &n, sizeof(n)) == -1)
 		goto eexit;
+	state = D_STATE(iface);
 	memset(&sin, 0, sizeof(sin));
 	sin.sin_family = AF_INET;
 	sin.sin_port = htons(DHCP_CLIENT_PORT);
-	sin.sin_addr.s_addr = iface->state->addr.s_addr;
+	sin.sin_addr.s_addr = state->addr.s_addr;
 	if (bind(s, (struct sockaddr *)&sin, sizeof(sin)) == -1)
 		goto eexit;
 
-	iface->state->udp_fd = s;
+	state->udp_fd = s;
 	set_cloexec(s);
 	return 0;
 
@@ -625,7 +620,7 @@ send_packet(const struct interface *iface, struct in_addr to,
 	sin.sin_family = AF_INET;
 	sin.sin_addr.s_addr = to.s_addr;
 	sin.sin_port = htons(DHCP_SERVER_PORT);
-	return sendto(iface->state->udp_fd, data, len, 0,
+	return sendto(D_CSTATE(iface)->udp_fd, data, len, 0,
 	    (struct sockaddr *)&sin, sizeof(sin));
 }
 

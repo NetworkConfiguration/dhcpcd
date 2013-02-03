@@ -65,7 +65,7 @@ static const uint8_t ipv4_bcast_addr[] = {
 };
 
 int
-open_socket(struct interface *iface, int protocol)
+open_socket(struct interface *ifp, int protocol)
 {
 	int s;
 	union sockunion {
@@ -76,6 +76,7 @@ open_socket(struct interface *iface, int protocol)
 	} su;
 	struct sock_fprog pf;
 	int *fd;
+	struct dhcp_state *state;
 #ifdef PACKET_AUXDATA
 	int n;
 #endif
@@ -86,7 +87,7 @@ open_socket(struct interface *iface, int protocol)
 	memset(&su, 0, sizeof(su));
 	su.sll.sll_family = PF_PACKET;
 	su.sll.sll_protocol = htons(protocol);
-	su.sll.sll_ifindex = iface->index;
+	su.sll.sll_ifindex = ifp->index;
 	/* Install the DHCP filter */
 	memset(&pf, 0, sizeof(pf));
 	if (protocol == ETHERTYPE_ARP) {
@@ -111,10 +112,11 @@ open_socket(struct interface *iface, int protocol)
 		goto eexit;
 	if (bind(s, &su.sa, sizeof(su)) == -1)
 		goto eexit;
+	state = D_STATE(ifp);
 	if (protocol == ETHERTYPE_ARP)
-		fd = &iface->state->arp_fd;
+		fd = &state->arp_fd;
 	else
-		fd = &iface->state->raw_fd;
+		fd = &state->raw_fd;
 	if (*fd != -1)
 		close(*fd);
 	*fd = s;
@@ -126,9 +128,10 @@ eexit:
 }
 
 ssize_t
-send_raw_packet(const struct interface *iface, int protocol,
+send_raw_packet(const struct interface *ifp, int protocol,
     const void *data, ssize_t len)
 {
+	const struct dhcp_state *state;
 	union sockunion {
 		struct sockaddr sa;
 		struct sockaddr_ll sll;
@@ -139,24 +142,25 @@ send_raw_packet(const struct interface *iface, int protocol,
 	memset(&su, 0, sizeof(su));
 	su.sll.sll_family = AF_PACKET;
 	su.sll.sll_protocol = htons(protocol);
-	su.sll.sll_ifindex = iface->index;
-	su.sll.sll_hatype = htons(iface->family);
-	su.sll.sll_halen = iface->hwlen;
-	if (iface->family == ARPHRD_INFINIBAND)
+	su.sll.sll_ifindex = ifp->index;
+	su.sll.sll_hatype = htons(ifp->family);
+	su.sll.sll_halen = ifp->hwlen;
+	if (ifp->family == ARPHRD_INFINIBAND)
 		memcpy(&su.sll.sll_addr,
 		    &ipv4_bcast_addr, sizeof(ipv4_bcast_addr));
 	else
-		memset(&su.sll.sll_addr, 0xff, iface->hwlen);
+		memset(&su.sll.sll_addr, 0xff, ifp->hwlen);
+	state = D_CSTATE(ifp);
 	if (protocol == ETHERTYPE_ARP)
-		fd = iface->state->arp_fd;
+		fd = state->arp_fd;
 	else
-		fd = iface->state->raw_fd;
+		fd = state->raw_fd;
 
 	return sendto(fd, data, len, 0, &su.sa, sizeof(su));
 }
 
 ssize_t
-get_raw_packet(struct interface *iface, int protocol,
+get_raw_packet(struct interface *ifp, int protocol,
     void *data, ssize_t len, int *partialcsum)
 {
 	struct iovec iov = {
@@ -167,6 +171,7 @@ get_raw_packet(struct interface *iface, int protocol,
 		.msg_iov = &iov,
 		.msg_iovlen = 1,
 	};
+	struct dhcp_state *state;
 #ifdef PACKET_AUXDATA
 	unsigned char cmsgbuf[CMSG_LEN(sizeof(struct tpacket_auxdata))];
 	struct cmsghdr *cmsg;
@@ -181,10 +186,11 @@ get_raw_packet(struct interface *iface, int protocol,
 	msg.msg_controllen = sizeof(cmsgbuf);
 #endif
 
+	state = D_STATE(ifp);
 	if (protocol == ETHERTYPE_ARP)
-		fd = iface->state->arp_fd;
+		fd = state->arp_fd;
 	else
-		fd = iface->state->raw_fd;
+		fd = state->raw_fd;
 	bytes = recvmsg(fd, &msg, 0);
 	if (bytes == -1)
 		return errno == EAGAIN ? 0 : -1;

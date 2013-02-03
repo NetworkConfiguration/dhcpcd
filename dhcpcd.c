@@ -54,12 +54,10 @@ const char copyright[] = "Copyright (c) 2006-2013 Roy Marples";
 #include "control.h"
 #include "dhcpcd.h"
 #include "dhcp6.h"
-#include "duid.h"
 #include "eloop.h"
 #include "if-options.h"
 #include "if-pref.h"
 #include "ipv4.h"
-#include "ipv4ll.h"
 #include "ipv6.h"
 #include "ipv6ns.h"
 #include "ipv6rs.h"
@@ -67,9 +65,6 @@ const char copyright[] = "Copyright (c) 2006-2013 Roy Marples";
 #include "platform.h"
 #include "script.h"
 #include "signals.h"
-
-/* We should define a maximum for the NAK exponential backoff */ 
-#define NAKOFF_MAX              60
 
 /* Wait N nanoseconds between sending a RELEASE and dropping the address.
  * This gives the kernel enough time to actually send it. */
@@ -79,6 +74,7 @@ const char copyright[] = "Copyright (c) 2006-2013 Roy Marples";
 char vendor[VENDORCLASSID_MAX_LEN];
 int pidfd = -1;
 struct interface *ifaces = NULL;
+struct if_options *if_options = NULL;
 int ifac = 0;
 char **ifav = NULL;
 int ifdc = 0;
@@ -87,7 +83,6 @@ char **ifdv = NULL;
 sigset_t dhcpcd_sigset;
 
 static char *cffile;
-static struct if_options *if_options;
 static char *pidfile;
 static int linkfd = -1, ipv6rsfd = -1, ipv6nsfd = -1;
 static char **ifv;
@@ -155,7 +150,6 @@ cleanup(void)
 	for (i = 0; i < ifdc; i++)
 		free(ifdv[i]);
 	free(ifdv);
-	free(packet);
 #endif
 
 	if (linkfd != -1)
@@ -299,10 +293,7 @@ stop_interface(struct interface *iface)
 static void
 configure_interface1(struct interface *ifp)
 {
-	struct if_state *ifs = ifp->state;
 	struct if_options *ifo = ifp->options;
-	uint8_t *duid;
-	size_t len, ifl;
 
 	/* Do any platform specific configuration */
 	if_conf(ifp);
@@ -340,54 +331,6 @@ configure_interface1(struct interface *ifp)
 		ifo->options |= DHCPCD_CLIENTID | DHCPCD_BROADCAST;
 		break;
 	}
-
-	free(ifs->clientid);
-	ifs->clientid = NULL;
-	if (!(ifo->options & DHCPCD_IPV4))
-		return;
-
-	if (*ifo->clientid) {
-		ifs->clientid = xmalloc(ifo->clientid[0] + 1);
-		memcpy(ifs->clientid, ifo->clientid, ifo->clientid[0] + 1);
-	} else if (ifo->options & DHCPCD_CLIENTID) {
-		len = 0;
-		if (ifo->options & DHCPCD_DUID) {
-			duid = xmalloc(DUID_LEN);
-			if ((len = get_duid(duid, ifp)) == 0)
-				syslog(LOG_ERR, "get_duid: %m");
-		} else
-			duid = NULL;
-		if (len > 0) {
-			ifs->clientid = xmalloc(len + 6);
-			ifs->clientid[0] = len + 5;
-			ifs->clientid[1] = 255; /* RFC 4361 */
-			ifl = strlen(ifp->name);
-			if (ifl < 5) {
-				memcpy(ifs->clientid + 2, ifp->name, ifl);
-				if (ifl < 4)
-					memset(ifs->clientid + 2 + ifl,
-					    0, 4 - ifl);
-			} else {
-				ifl = htonl(ifp->index);
-				memcpy(ifs->clientid + 2, &ifl, 4);
-			}
-			memcpy(ifs->clientid + 6, duid, len);
-		} else if (len == 0) {
-			len = ifp->hwlen + 1;
-			ifs->clientid = xmalloc(len + 1);
-			ifs->clientid[0] = len;
-			ifs->clientid[1] = ifp->family;
-			memcpy(ifs->clientid + 2, ifp->hwaddr,
-			    ifp->hwlen);
-		}
-		free(duid);
-	}
-	if (ifo->options & DHCPCD_CLIENTID)
-		syslog(LOG_DEBUG, "%s: using ClientID %s", ifp->name,
-		    hwaddr_ntoa(ifs->clientid + 1, ifs->clientid[0]));
-	else if (ifp->hwlen)
-		syslog(LOG_DEBUG, "%s: using hwaddr %s", ifp->name,
-		    hwaddr_ntoa(ifp->hwaddr, ifp->hwlen));
 }
 
 int
@@ -404,12 +347,11 @@ select_profile(struct interface *ifp, const char *profile)
 		goto exit;
 	}
 	if (profile != NULL) {
-		strlcpy(ifp->state->profile, profile,
-		    sizeof(ifp->state->profile));
+		strlcpy(ifp->profile, profile, sizeof(ifp->profile));
 		syslog(LOG_INFO, "%s: selected profile %s",
 		    ifp->name, profile);
 	} else
-		*ifp->state->profile = '\0';
+		*ifp->profile = '\0';
 	free_options(ifp->options);
 	ifp->options = ifo;
 
@@ -471,9 +413,7 @@ handle_carrier(int action, int flags, const char *ifname)
 			if (ifp->wireless)
 				getifssid(ifp->name, ifp->ssid);
 			configure_interface(ifp, margc, margv);
-			ifp->state->interval = 0;
-			ifp->state->reason = "CARRIER";
-			script_run(ifp);
+			script_runreason(ifp, "CARRIER");
 			start_interface(ifp);
 		}
 	}
@@ -492,18 +432,9 @@ start_interface(void *arg)
 		return;
 	}
 
-	ifp->state->start_uptime = uptime();
-	free(ifp->state->offer);
-	ifp->state->offer = NULL;
-
 	if (options & DHCPCD_IPV6RS && ifo->options & DHCPCD_IPV6RS &&
 	    !(ifo->options & DHCPCD_INFORM))
 		ipv6rs_start(ifp);
-
-	if (ifp->state->arping_index < ifo->arping_len) {
-		arp_start(ifp);
-		return;
-	}
 
 	if (ifo->options & DHCPCD_IPV6) {
 		if (ifo->options & DHCPCD_INFORM)
@@ -523,46 +454,28 @@ start_interface(void *arg)
 static void
 init_state(struct interface *ifp, int argc, char **argv)
 {
-	struct if_state *ifs;
-
-	if (ifp->state)
-		ifs = ifp->state;
-	else
-		ifs = ifp->state = xzalloc(sizeof(*ifs));
-
-	ifs->state = DHS_INIT;
-	ifs->reason = "PREINIT";
-	ifs->nakoff = 0;
-	snprintf(ifs->leasefile, sizeof(ifs->leasefile),
-	    LEASEFILE, ifp->name);
-	/* 0 is a valid fd, so init to -1 */
-	ifs->raw_fd = ifs->udp_fd = ifs->arp_fd = -1;
+	const char *reason = NULL;
 
 	configure_interface(ifp, argc, argv);
 	if (!(options & DHCPCD_TEST))
-		script_run(ifp);
-
-	/* We need to drop the leasefile so that start_interface
-	 * doesn't load it. */	
-	if (ifp->options->options & DHCPCD_REQUEST)
-		unlink(ifs->leasefile);
+		script_runreason(ifp, "PREINIT");
 
 	if (ifp->options->options & DHCPCD_LINK) {
 		switch (carrier_status(ifp)) {
 		case 0:
 			ifp->carrier = LINK_DOWN;
-			ifs->reason = "NOCARRIER";
+			reason = "NOCARRIER";
 			break;
 		case 1:
 			ifp->carrier = LINK_UP;
-			ifs->reason = "CARRIER";
+			reason = "CARRIER";
 			break;
 		default:
 			ifp->carrier = LINK_UNKNOWN;
 			return;
 		}
-		if (!(options & DHCPCD_TEST))
-			script_run(ifp);
+		if (reason && !(options & DHCPCD_TEST))
+			script_runreason(ifp, reason);
 	} else
 		ifp->carrier = LINK_UNKNOWN;
 }
@@ -666,24 +579,11 @@ handle_link(_unused void *arg)
 static void
 if_reboot(struct interface *ifp, int argc, char **argv)
 {
-	const struct if_options *ifo;
-	int opt;
-	
-	ifo = ifp->options;
-	opt = ifo->options;
+	int oldopts;
+
+	oldopts = ifp->options->options;
 	configure_interface(ifp, argc, argv);
-	ifo = ifp->options;
-	ifp->state->interval = 0;
-	if ((ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC) &&
-		ifp->state->addr.s_addr != ifo->req_addr.s_addr) ||
-	    (opt & (DHCPCD_INFORM | DHCPCD_STATIC) &&
-		!(ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC))))
-	{
-		dhcp_drop(ifp, "EXPIRE");
-	} else {
-		free(ifp->state->offer);
-		ifp->state->offer = NULL;
-	}
+	dhcp_reboot(ifp, oldopts);
 	start_interface(ifp);
 }
 
@@ -706,7 +606,7 @@ reconf_reboot(int action, int argc, char **argv, int oi)
 		if (ifn) {
 			if (action)
 				if_reboot(ifn, argc, argv);
-			else if (ifn->state->new)
+			else
 				ipv4_applyaddr(ifn);
 			free_interface(ifp);
 		} else {
@@ -768,8 +668,7 @@ handle_signal(int sig)
 	case SIGUSR1:
 		syslog(LOG_INFO, "received SIGUSR, reconfiguring");
 		for (ifp = ifaces; ifp; ifp = ifp->next)
-			if (ifp->state->new)
-				ipv4_applyaddr(ifp);
+			ipv4_applyaddr(ifp);
 		return;
 	case SIGPIPE:
 		syslog(LOG_WARNING, "received SIGPIPE");
@@ -946,7 +845,6 @@ int
 main(int argc, char **argv)
 {
 	struct interface *iface;
-	struct if_state *ifs;
 	uint16_t family = 0;
 	int opt, oi = 0, sig = 0, i, control_fd;
 	size_t len;
@@ -1079,28 +977,8 @@ main(int argc, char **argv)
 			syslog(LOG_ERR, "dumplease requires an interface");
 			exit(EXIT_FAILURE);
 		}
-		ifaces = iface = xzalloc(sizeof(*iface));
-		iface->state = ifs = xzalloc(sizeof(*iface->state));
-		iface->options = xzalloc(sizeof(*iface->options));
-		strlcpy(iface->name, argv[optind], sizeof(iface->name));
-		snprintf(ifs->leasefile, sizeof(ifs->leasefile),
-		    LEASEFILE, iface->name);
-		strlcpy(iface->options->script, if_options->script,
-		    sizeof(iface->options->script));
-		iface->state->new = read_lease(iface);
-		if (iface->state->new == NULL && errno == ENOENT) {
-			strlcpy(ifs->leasefile, argv[optind],
-			    sizeof(ifs->leasefile));
-			iface->state->new = read_lease(iface);
-		}
-		if (iface->state->new == NULL) {
-			if (errno == ENOENT)
-				syslog(LOG_ERR, "%s: no lease to dump",
-				    iface->name);
+		if (dhcp_dump(argv[optind]) == -1)
 			exit(EXIT_FAILURE);
-		}
-		iface->state->reason = "DUMP";
-		script_run(iface);
 		exit(EXIT_SUCCESS);
 	}
 

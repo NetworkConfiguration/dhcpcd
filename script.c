@@ -182,10 +182,12 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	const struct if_options *ifo = ifp->options;
 	const struct interface *ifp2;
 	int dhcp, dhcp6, ra;
+	const struct dhcp_state *state;
 	const struct dhcp6_state *d6_state;
 
 	dhcp = dhcp6 = ra = 0;
-	d6_state = D6_STATE(ifp);
+	state = D_STATE(ifp);
+	d6_state = D6_CSTATE(ifp);
 	if (strcmp(reason, "TEST") == 0) {
 		if (d6_state && d6_state->new)
 			dhcp6 = 1;
@@ -247,8 +249,8 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	if (strcmp(reason, "TEST") == 0) {
 		env[8] = strdup("if_up=false");
 		env[9] = strdup("if_down=false");
-	} else if ((dhcp && ifp->state->new) ||
-	    (dhcp6 && d6_state->new) ||
+	} else if ((dhcp && state && state->new) ||
+	    (dhcp6 && d6_state && d6_state->new) ||
 	    (ra && ipv6rs_has_ra(ifp)))
 	{
 		env[8] = strdup("if_up=true");
@@ -257,39 +259,35 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 		env[8] = strdup("if_up=false");
 		env[9] = strdup("if_down=true");
 	}
-	if (*ifp->state->profile) {
-		e = strlen("profile=") + strlen(ifp->state->profile) + 2;
+	if (*ifp->profile) {
+		e = strlen("profile=") + strlen(ifp->profile) + 2;
 		env[elen] = xmalloc(e);
-		snprintf(env[elen++], e, "profile=%s", ifp->state->profile);
+		snprintf(env[elen++], e, "profile=%s", ifp->profile);
 	}
 	if (ifp->wireless) {
 		e = strlen("new_ssid=") + strlen(ifp->ssid) + 2;
-		if (ifp->state->new != NULL ||
-		    strcmp(ifp->state->reason, "CARRIER") == 0)
-		{
+		if (strcmp(reason, "CARRIER") == 0) {
 			env = xrealloc(env, sizeof(char *) * (elen + 2));
 			env[elen] = xmalloc(e);
 			snprintf(env[elen++], e, "new_ssid=%s", ifp->ssid);
 		}
-		if (ifp->state->old != NULL ||
-		    strcmp(ifp->state->reason, "NOCARRIER") == 0)
-		{
+		else if (strcmp(reason, "NOCARRIER") == 0) {
 			env = xrealloc(env, sizeof(char *) * (elen + 2));
 			env[elen] = xmalloc(e);
 			snprintf(env[elen++], e, "old_ssid=%s", ifp->ssid);
 		}
 	}
-	if (dhcp && ifp->state->old) {
-		e = configure_env(NULL, NULL, ifp->state->old, ifp);
+	if (dhcp && state && state->old) {
+		e = configure_env(NULL, NULL, state->old, ifp);
 		if (e > 0) {
 			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
 			elen += configure_env(env + elen, "old",
-			    ifp->state->old, ifp);
+			    state->old, ifp);
 		}
 		append_config(&env, &elen, "old",
 		    (const char *const *)ifo->config);
 	}
-	if (dhcp6 && d6_state->old) {
+	if (dhcp6 && d6_state && d6_state->old) {
 		e = dhcp6_env(NULL, NULL, ifp,
 		    d6_state->old, d6_state->old_len);
 		if (e > 0) {
@@ -300,17 +298,17 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	}
 
 dumplease:
-	if (dhcp && ifp->state->new) {
-		e = configure_env(NULL, NULL, ifp->state->new, ifp);
+	if (dhcp && state && state->new) {
+		e = configure_env(NULL, NULL, state->new, ifp);
 		if (e > 0) {
 			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
 			elen += configure_env(env + elen, "new",
-			    ifp->state->new, ifp);
+			    state->new, ifp);
 		}
 		append_config(&env, &elen, "new",
 		    (const char *const *)ifo->config);
 	}
-	if (dhcp6 && d6_state->new) {
+	if (dhcp6 && d6_state && d6_state->new) {
 		e = dhcp6_env(NULL, NULL, ifp,
 		    d6_state->new, d6_state->new_len);
 		if (e > 0) {
@@ -373,7 +371,9 @@ int
 send_interface(int fd, const struct interface *iface)
 {
 	int retval = 0;
-	if (send_interface1(fd, iface, iface->state->reason) == -1)
+	const struct dhcp_state *state = D_CSTATE(iface);
+
+	if (state && send_interface1(fd, iface, state->reason) == -1)
 		retval = -1;
 	if (ipv6rs_has_ra(iface)) {
 		if (send_interface1(fd, iface, "ROUTERADVERT") == -1)
@@ -403,8 +403,11 @@ script_runreason(const struct interface *ifp, const char *reason)
 	    strcmp(ifp->options->script, "/dev/null") == 0)
 		return 0;
 
-	if (reason == NULL)
-		reason = ifp->state->reason;
+	if (reason == NULL) {
+		const struct dhcp_state *state = D_CSTATE(ifp);
+		if (state)
+			reason = state->reason;
+	}
 	syslog(LOG_DEBUG, "%s: executing `%s', reason %s",
 	    ifp->name, argv[0], reason);
 

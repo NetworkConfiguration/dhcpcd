@@ -34,5 +34,4 @@ void if_printoptions(void);
 int send_interface(int, const struct interface *);
 int script_runreason(const struct interface *, const char *);
 
-#define script_run(ifp) script_runreason(ifp, (ifp)->state->reason);
 #endif

@@ -118,7 +118,7 @@ ipv4_routedeleted(const struct rt *rt)
 static int
 n_route(struct rt *rt)
 {
-	struct if_state *s;
+	const struct dhcp_state *s;
 
 	/* Don't set default routes if not asked to */
 	if (rt->dest.s_addr == 0 &&
@@ -130,7 +130,7 @@ n_route(struct rt *rt)
 	if (!add_route(rt))
 		return 0;
 	if (errno == EEXIST) {
-		s = rt->iface->state;
+		s = D_CSTATE(rt->iface);
 		/* Pretend we added the subnet route */
 		if (rt->dest.s_addr == (s->addr.s_addr & s->net.s_addr) &&
 		    rt->net.s_addr == s->net.s_addr &&
@@ -201,9 +201,9 @@ static struct rt *
 add_subnet_route(struct rt *rt, const struct interface *iface)
 {
 	struct rt *r;
-	struct if_state *s;
+	const struct dhcp_state *s;
 
-	s = iface->state;
+	s = D_CSTATE(iface);
 	if (s->net.s_addr == INADDR_BROADCAST ||
 	    s->net.s_addr == INADDR_ANY ||
 	    (iface->options->options &
@@ -243,7 +243,7 @@ get_routes(struct interface *ifp)
 		return nrt;
 	}
 
-	return get_option_routes(ifp, ifp->state->new);
+	return get_option_routes(ifp, D_STATE(ifp)->new);
 }
 
 /* Some DHCP servers add set host routes by setting the gateway
@@ -255,7 +255,7 @@ massage_host_routes(struct rt *rt, const struct interface *ifp)
 	struct rt *r;
 
 	for (r = rt; r; r = r->next) {
-		if (r->gate.s_addr == ifp->state->addr.s_addr &&
+		if (r->gate.s_addr == D_CSTATE(ifp)->addr.s_addr &&
 		    r->net.s_addr == INADDR_BROADCAST)
 			r->gate.s_addr = r->dest.s_addr;
 	}
@@ -273,7 +273,7 @@ add_destination_route(struct rt *rt, const struct interface *iface)
 	r = xmalloc(sizeof(*r));
 	r->dest.s_addr = INADDR_ANY;
 	r->net.s_addr = INADDR_ANY;
-	r->gate.s_addr = iface->state->dst.s_addr;
+	r->gate.s_addr = D_CSTATE(iface)->dst.s_addr;
 	r->next = rt;
 	return r;
 }
@@ -335,9 +335,11 @@ ipv4_buildroutes(void)
 {
 	struct rt *nrs = NULL, *dnr, *or, *rt, *rtn, *rtl, *lrt = NULL;
 	struct interface *ifp;
+	const struct dhcp_state *state;
 
 	for (ifp = ifaces; ifp; ifp = ifp->next) {
-		if (ifp->state->new == NULL)
+		state = D_CSTATE(ifp);
+		if (state == NULL || state->new == NULL)
 			continue;
 		dnr = get_routes(ifp);
 		dnr = massage_host_routes(dnr, ifp);
@@ -352,11 +354,11 @@ ipv4_buildroutes(void)
 			/* Is this route already in our table? */
 			if ((find_route(nrs, rt, NULL, NULL)) != NULL)
 				continue;
-			rt->src.s_addr = ifp->state->addr.s_addr;
+			rt->src.s_addr = state->addr.s_addr;
 			/* Do we already manage it? */
 			if ((or = find_route(routes, rt, &rtl, NULL))) {
 				if (or->iface != ifp ||
-				    or->src.s_addr != ifp->state->addr.s_addr ||
+				    or->src.s_addr != state->addr.s_addr ||
 				    rt->gate.s_addr != or->gate.s_addr ||
 				    rt->metric != or->metric)
 				{
@@ -398,54 +400,60 @@ delete_address(struct interface *iface)
 {
 	int retval;
 	struct if_options *ifo;
+	struct dhcp_state *state;
 
+	state = D_STATE(iface);
 	ifo = iface->options;
 	if (ifo->options & DHCPCD_INFORM ||
 	    (ifo->options & DHCPCD_STATIC && ifo->req_addr.s_addr == 0))
 		return 0;
 	syslog(LOG_DEBUG, "%s: deleting IP address %s/%d",
-	    iface->name,
-	    inet_ntoa(iface->state->addr),
-	    inet_ntocidr(iface->state->net));
-	retval = del_address(iface, &iface->state->addr, &iface->state->net);
+	    iface->name, inet_ntoa(state->addr), inet_ntocidr(state->net));
+	retval = del_address(iface, &state->addr, &state->net);
 	if (retval == -1 && errno != EADDRNOTAVAIL) 
 		syslog(LOG_ERR, "del_address: %m");
-	iface->state->addr.s_addr = 0;
-	iface->state->net.s_addr = 0;
+	state->addr.s_addr = 0;
+	state->net.s_addr = 0;
 	return retval;
 }
 
 void
 ipv4_applyaddr(void *arg)
 {
-	struct interface *iface = arg;
-	struct dhcp_message *dhcp = iface->state->new;
-	struct dhcp_lease *lease = &iface->state->lease;
-	struct if_options *ifo = iface->options;
+	struct interface *ifp = arg;
+	struct dhcp_state *state = D_STATE(ifp);
+	struct dhcp_message *dhcp;
+	struct dhcp_lease *lease;
+	struct if_options *ifo = ifp->options;
 	struct rt *rt;
 
 	/* As we are now adjusting an interface, we need to ensure
 	 * we have them in the right order for routing and configuration. */
 	sort_interfaces();
 
+	if (state == NULL)
+		return;
+	dhcp = state->new;
+	lease = &state->lease;
+
 	if (dhcp == NULL) {
 		if (!(ifo->options & DHCPCD_PERSISTENT)) {
 			ipv4_buildroutes();
-			if (iface->state->addr.s_addr != 0)
-				delete_address(iface);
-			script_run(iface);
+			if (state->addr.s_addr != 0)
+				delete_address(ifp);
+			script_runreason(ifp, state->reason);
 		}
 		return;
 	}
 
 	/* This also changes netmask */
 	if (!(ifo->options & DHCPCD_INFORM) ||
-	    !has_address(iface->name, &lease->addr, &lease->net))
+	    !has_address(ifp->name, &lease->addr, &lease->net))
 	{
 		syslog(LOG_DEBUG, "%s: adding IP address %s/%d",
-		    iface->name, inet_ntoa(lease->addr),
+		    ifp->name, inet_ntoa(lease->addr),
 		    inet_ntocidr(lease->net));
-		if (add_address(iface,
+		if (add_address(ifp,
 			&lease->addr, &lease->net, &lease->brd) == -1 &&
 		    errno != EEXIST)
 		{
@@ -455,18 +463,18 @@ ipv4_applyaddr(void *arg)
 	}
 
 	/* Now delete the old address if different */
-	if (iface->state->addr.s_addr != lease->addr.s_addr &&
-	    iface->state->addr.s_addr != 0)
-		delete_address(iface);
+	if (state->addr.s_addr != lease->addr.s_addr &&
+	    state->addr.s_addr != 0)
+		delete_address(ifp);
 
-	iface->state->addr.s_addr = lease->addr.s_addr;
-	iface->state->net.s_addr = lease->net.s_addr;
+	state->addr.s_addr = lease->addr.s_addr;
+	state->net.s_addr = lease->net.s_addr;
 
 	/* We need to delete the subnet route to have our metric or
 	 * prefer the interface. */
 	rt = get_subnet_route(dhcp);
 	if (rt != NULL) {
-		rt->iface = iface;
+		rt->iface = ifp;
 		rt->metric = 0;
 		if (!find_route(routes, rt, NULL, NULL))
 			del_route(rt);
@@ -474,11 +482,11 @@ ipv4_applyaddr(void *arg)
 	}
 
 	ipv4_buildroutes();
-	if (!iface->state->lease.frominfo &&
+	if (!state->lease.frominfo &&
 	    !(ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC)))
-		if (write_lease(iface, dhcp) == -1)
+		if (write_lease(ifp, dhcp) == -1)
 			syslog(LOG_ERR, "%s: write_lease: %m", __func__);
-	script_run(iface);
+	script_runreason(ifp, state->reason);
 }
 
 void
@@ -487,6 +495,7 @@ ipv4_handleifa(int type, const char *ifname,
 {
 	struct interface *ifp;
 	struct if_options *ifo;
+	struct dhcp_state *state;
 	int i;
 
 	if (addr->s_addr == INADDR_ANY)
@@ -497,12 +506,13 @@ ipv4_handleifa(int type, const char *ifname,
 	if (ifp == NULL)
 		return;
 
+	state = D_STATE(ifp);
 	if (type == RTM_DELADDR) {
-		if (ifp->state->new &&
-		    ifp->state->new->yiaddr == addr->s_addr)
+		if (state->new &&
+		    state->new->yiaddr == addr->s_addr)
 			syslog(LOG_INFO, "%s: removing IP address %s/%d",
-			    ifp->name, inet_ntoa(ifp->state->lease.addr),
-			    inet_ntocidr(ifp->state->lease.net));
+			    ifp->name, inet_ntoa(state->lease.addr),
+			    inet_ntocidr(state->lease.net));
 		return;
 	}
 
@@ -514,25 +524,24 @@ ipv4_handleifa(int type, const char *ifname,
 	    ifo->req_addr.s_addr != INADDR_ANY)
 		return;
 
-	free(ifp->state->old);
-	ifp->state->old = ifp->state->new;
-	ifp->state->new = dhcp_message_new(addr, net);
-	ifp->state->dst.s_addr = dst ? dst->s_addr : INADDR_ANY;
+	free(state->old);
+	state->old = state->new;
+	state->new = dhcp_message_new(addr, net);
+	state->dst.s_addr = dst ? dst->s_addr : INADDR_ANY;
 	if (dst) {
 		for (i = 1; i < 255; i++)
 			if (i != DHO_ROUTER && has_option_mask(ifo->dstmask,i))
-				dhcp_message_add_addr(ifp->state->new, i, *dst);
+				dhcp_message_add_addr(state->new, i, *dst);
 	}
-	ifp->state->reason = "STATIC";
+	state->reason = "STATIC";
 	ipv4_buildroutes();
-	script_run(ifp);
+	script_runreason(ifp, state->reason);
 	if (ifo->options & DHCPCD_INFORM) {
-		ifp->state->state = DHS_INFORM;
-		ifp->state->xid = dhcp_xid(ifp);
-		ifp->state->lease.server.s_addr =
-		    dst ? dst->s_addr : INADDR_ANY;
-		ifp->state->addr = *addr;
-		ifp->state->net = *net;
+		state->state = DHS_INFORM;
+		state->xid = dhcp_xid(ifp);
+		state->lease.server.s_addr = dst ? dst->s_addr : INADDR_ANY;
+		state->addr = *addr;
+		state->net = *net;
 		dhcp_inform(ifp);
 	}
 }

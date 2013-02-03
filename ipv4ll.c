@@ -34,7 +34,7 @@
 
 #include "arp.h"
 #include "common.h"
-#include "dhcpcd.h"
+#include "dhcp.h"
 #include "eloop.h"
 #include "if-options.h"
 #include "ipv4ll.h"
@@ -86,24 +86,25 @@ void
 ipv4ll_start(void *arg)
 {
 	struct interface *ifp = arg;
+	struct dhcp_state *state = D_STATE(ifp);
 	uint32_t addr;
 
 	eloop_timeout_delete(NULL, ifp);
-	ifp->state->probes = 0;
-	ifp->state->claims = 0;
-	if (ifp->state->addr.s_addr) {
-		ifp->state->conflicts = 0;
-		if (IN_LINKLOCAL(htonl(ifp->state->addr.s_addr))) {
+	state->probes = 0;
+	state->claims = 0;
+	if (state->addr.s_addr) {
+		state->conflicts = 0;
+		if (IN_LINKLOCAL(htonl(state->addr.s_addr))) {
 			arp_announce(ifp);
 			return;
 		}
 	}
 
-	if (ifp->state->offer == NULL)
+	if (state->offer == NULL)
 		addr = 0;
 	else {
-		addr = ifp->state->offer->yiaddr;
-		free(ifp->state->offer);
+		addr = state->offer->yiaddr;
+		free(state->offer);
 	}
 	/* We maybe rebooting an IPv4LL address. */
 	if (!IN_LINKLOCAL(htonl(addr))) {
@@ -112,10 +113,10 @@ ipv4ll_start(void *arg)
 		addr = 0;
 	}
 	if (addr == 0)
-		ifp->state->offer = ipv4ll_find_lease(addr);
+		state->offer = ipv4ll_find_lease(addr);
 	else
-		ifp->state->offer = ipv4ll_make_lease(addr);
-	ifp->state->lease.frominfo = 0;
+		state->offer = ipv4ll_make_lease(addr);
+	state->lease.frominfo = 0;
 	arp_probe(ifp);
 }
 
@@ -123,32 +124,33 @@ void
 ipv4ll_handle_failure(void *arg)
 {
 	struct interface *ifp = arg;
+	struct dhcp_state *state = D_STATE(ifp);
 	time_t up;
 
-	if (ifp->state->fail.s_addr == ifp->state->addr.s_addr) {
+	if (state->fail.s_addr == state->addr.s_addr) {
 		up = uptime();
-		if (ifp->state->defend + DEFEND_INTERVAL > up) {
+		if (state->defend + DEFEND_INTERVAL > up) {
 			syslog(LOG_DEBUG,
 			    "%s: IPv4LL %d second defence failed",
 			    ifp->name, DEFEND_INTERVAL);
 			dhcp_drop(ifp, "EXPIRE");
-			ifp->state->conflicts = -1;
+			state->conflicts = -1;
 		} else {
 			syslog(LOG_DEBUG, "%s: defended IPv4LL address",
 			    ifp->name);
-			ifp->state->defend = up;
+			state->defend = up;
 			return;
 		}
 	}
 
 	dhcp_close(ifp);
-	free(ifp->state->offer);
-	ifp->state->offer = NULL;
+	free(state->offer);
+	state->offer = NULL;
 	eloop_timeout_delete(NULL, ifp);
-	if (++ifp->state->conflicts > MAX_CONFLICTS) {
+	if (++state->conflicts > MAX_CONFLICTS) {
 		syslog(LOG_ERR, "%s: failed to acquire an IPv4LL address",
 		    ifp->name);
-		ifp->state->interval = RATE_LIMIT_INTERVAL / 2;
+		state->interval = RATE_LIMIT_INTERVAL / 2;
 		dhcp_discover(ifp);
 	} else {
 		eloop_timeout_add_sec(PROBE_WAIT, ipv4ll_start, ifp);

@@ -79,24 +79,25 @@ arp_send(const struct interface *ifp, int op, in_addr_t sip, in_addr_t tip)
 static void
 arp_failure(struct interface *ifp)
 {
+	const struct dhcp_state *state = D_CSTATE(ifp);
 
 	/* If we failed without a magic cookie then we need to try
 	 * and defend our IPv4LL address. */
-	if ((ifp->state->offer != NULL &&
-		ifp->state->offer->cookie != htonl(MAGIC_COOKIE)) ||
-	    (ifp->state->new != NULL &&
-		ifp->state->new->cookie != htonl(MAGIC_COOKIE)))
+	if ((state->offer != NULL &&
+		state->offer->cookie != htonl(MAGIC_COOKIE)) ||
+	    (state->new != NULL &&
+		state->new->cookie != htonl(MAGIC_COOKIE)))
 	{
 		ipv4ll_handle_failure(ifp);
 		return;
 	}
 
-	unlink(ifp->state->leasefile);
-	if (!ifp->state->lease.frominfo)
+	unlink(state->leasefile);
+	if (!state->lease.frominfo)
 		dhcp_decline(ifp);
 	dhcp_close(ifp);
 	eloop_timeout_delete(NULL, ifp);
-	if (ifp->state->lease.frominfo)
+	if (state->lease.frominfo)
 		start_interface(ifp);
 	else
 		eloop_timeout_add_sec(DHCP_ARP_FAIL, start_interface, ifp);
@@ -112,11 +113,12 @@ arp_packet(void *arg)
 	uint32_t reply_t;
 	uint8_t *hw_s, *hw_t;
 	ssize_t bytes;
-	struct if_state *state = ifp->state;
+	struct dhcp_state *state;
 	struct if_options *opts = ifp->options;
 	const char *hwaddr;
 	struct in_addr ina;
 
+	state = D_STATE(ifp);
 	state->fail.s_addr = 0;
 	for(;;) {
 		bytes = get_raw_packet(ifp, ETHERTYPE_ARP,
@@ -202,7 +204,7 @@ void
 arp_announce(void *arg)
 {
 	struct interface *ifp = arg;
-	struct if_state *state = ifp->state;
+	struct dhcp_state *state = D_STATE(ifp);
 	struct timeval tv;
 
 	if (state->new == NULL)
@@ -249,7 +251,7 @@ void
 arp_probe(void *arg)
 {
 	struct interface *ifp = arg;
-	struct if_state *state = ifp->state;
+	struct dhcp_state *state = D_STATE(ifp);
 	struct in_addr addr;
 	struct timeval tv;
 	int arping = 0;
@@ -305,8 +307,9 @@ arp_probe(void *arg)
 void
 arp_start(struct interface *ifp)
 {
+	struct dhcp_state *state = D_STATE(ifp);
 
-	ifp->state->probes = 0;
-	ifp->state->arping_index = 0;
+	state->probes = 0;
+	state->arping_index = 0;
 	arp_probe(ifp);
 }
