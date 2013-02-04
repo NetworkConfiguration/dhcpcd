@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2011 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -75,8 +75,8 @@ struct rs_state {
 
 #define RS_STATE(a) ((struct rs_state *)(ifp)->if_data[IF_DATA_IPV6RS])
 
-int ipv6rs_open(void);
-void ipv6rs_handledata(void *);
+#ifdef INET6
+int ipv6rs_init(void);
 int ipv6rs_start(struct interface *);
 ssize_t ipv6rs_env(char **, const char *, const struct interface *);
 const struct ipv6_addr * ipv6rs_findprefix(const struct ipv6_addr *);
@@ -88,4 +88,12 @@ ssize_t ipv6rs_free(struct interface *);
 void ipv6rs_expire(void *arg);
 int ipv6rs_has_ra(const struct interface *);
 void ipv6rs_drop(struct interface *);
+#else
+#define ipv6rs_init() {}
+#define ipv6rs_start(a) {}
+#define ipv6rs_free(a)
+#define ipv6rs_has_ra(a) 0
+#define ipv6rs_drop(a)
+#endif
+
 #endif

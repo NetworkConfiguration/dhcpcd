@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2012 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -249,6 +249,7 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data,
 		return l;
 	}
 
+#ifdef INET
 	if (type & RFC3361) {
 		if ((tmp = decode_rfc3361(dl, data)) == NULL)
 			return -1;
@@ -263,6 +264,7 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data,
 
 	if (type & RFC5969)
 		return decode_rfc5969(s, len, dl, data);
+#endif
 
 	if (type & STRING) {
 		/* Some DHCP servers return NULL strings */
@@ -305,7 +307,9 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data,
 		} else if (type & ADDRIPV4) {
 			l = 16;
 			dl /= 4;
-		} else if (type & ADDRIPV6) {
+		}
+#ifdef INET6
+		else if (type & ADDRIPV6) {
 			e = data + dl;
 			l = 0;
 			while (data < e) {
@@ -317,7 +321,9 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data,
 				data += 16;
 			}
 			return l + 1;
-		} else if (type & BINHEX) {
+		}
+#endif
+		else if (type & BINHEX) {
 			l = 2;
 		} else {
 			errno = EINVAL;
@@ -361,14 +367,18 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data,
 			memcpy(&addr.s_addr, data, sizeof(addr.s_addr));
 			l = snprintf(s, len, "%s", inet_ntoa(addr));
 			data += sizeof(addr.s_addr);
-		} else if (type & ADDRIPV6) {
+		}
+#ifdef INET6
+		else if (type & ADDRIPV6) {
 			dl = ipv6_printaddr(s, len, data, ifname);
 			if (dl != -1)
 				l = dl;
 			else
 				l = 0;	
 			data += 16;
-		} else if (type & BINHEX) {
+		}
+#endif
+		else if (type & BINHEX) {
 			l = snprintf(s, len, "%.2x", data[0]);
 			data++; 
 		} else

@@ -125,7 +125,7 @@ ipv6rs_cleanup(void)
 }
 #endif
 
-int
+static int
 ipv6rs_open(void)
 {
 	int on;
@@ -379,7 +379,7 @@ add_router(struct ra *router)
 }
 
 /* ARGSUSED */
-void
+static void
 ipv6rs_handledata(_unused void *arg)
 {
 	ssize_t len, l, m, n, olen;
@@ -1126,4 +1126,27 @@ ipv6rs_drop(struct interface *ifp)
 		}
 		script_runreason(ifp, "ROUTERADVERT");
 	}
+}
+
+int
+ipv6rs_init(void)
+{
+	int fd;
+
+	fd = ipv6rs_open();
+	if (fd == -1) {
+		syslog(LOG_ERR, "ipv6rs: %m");
+		options &= ~(DHCPCD_IPV6RS |
+			DHCPCD_IPV6RA_OWN | DHCPCD_IPV6RA_OWN_DEFAULT);
+		return -1;
+	}
+
+	eloop_event_add(fd, ipv6rs_handledata, NULL);
+	// atexit(restore_rtadv);
+
+	if (options & DHCPCD_IPV6RA_OWN ||
+	    options & DHCPCD_IPV6RA_OWN_DEFAULT)
+		return ipv6ns_init();
+
+	return 0;
 }

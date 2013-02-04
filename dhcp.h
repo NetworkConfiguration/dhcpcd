@@ -225,13 +225,14 @@ struct dhcp_state {
 #include "if-options.h"
 #include "net.h"
 
+#ifdef INET
 extern const struct dhcp_opt const dhcp_opts[];
 
 char *decode_rfc3361(int dl, const uint8_t *data);
 ssize_t decode_rfc3442(char *out, ssize_t len, int pl, const uint8_t *p);
 ssize_t decode_rfc5969(char *out, ssize_t len, int pl, const uint8_t *p);
 
-void print_options(void);
+void dhcp_printoptions(void);
 char *get_option_string(const struct dhcp_message *, uint8_t);
 int get_option_addr(struct in_addr *, const struct dhcp_message *, uint8_t);
 int get_option_uint32(uint32_t *, const struct dhcp_message *, uint8_t);
@@ -241,7 +242,7 @@ int get_option_uint8(uint8_t *, const struct dhcp_message *, uint8_t);
 	    !IN_LINKLOCAL(htonl((m)->yiaddr)) &&			\
 	    get_option_uint8(NULL, m, DHO_MESSAGETYPE) == -1)
 struct rt *get_option_routes(struct interface *, const struct dhcp_message *);
-ssize_t configure_env(char **, const char *, const struct dhcp_message *,
+ssize_t dhcp_env(char **, const char *, const struct dhcp_message *,
     const struct interface *);
 
 uint32_t dhcp_xid(const struct interface *);
@@ -268,5 +269,15 @@ void dhcp_reboot(struct interface *, int);
 void dhcp_close(struct interface *);
 void dhcp_free(struct interface *);
 int dhcp_dump(const char *);
+#else
+#define dhcp_printoptions
+#define dhcp_drop(a, b)
+#define dhcp_start(a) {}
+#define dhcp_release(a) {}
+#define dhcp_reboot(a, b) b = b
+#define dhcp_close(a)
+#define dhcp_free(a)
+#define dhcp_dump(a) -1
+#endif
 
 #endif

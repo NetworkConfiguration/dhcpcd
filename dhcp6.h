@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2012 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -198,6 +198,7 @@ struct dhcp6_state {
 #define D6_COPTION_DATA(o)						       \
     ((const uint8_t *)(o) + sizeof(struct dhcp6_option))
 
+#ifdef INET6
 void dhcp6_printoptions(void);
 int dhcp6_addrexists(const struct ipv6_addr *);
 int dhcp6_start(struct interface *, int);
@@ -205,5 +206,13 @@ ssize_t dhcp6_env(char **, const char *, const struct interface *,
     const struct dhcp6_message *, ssize_t);
 void dhcp6_free(struct interface *);
 void dhcp6_drop(struct interface *, const char *);
+#else
+#define dhcp6_printoptions()
+#define dhcp6_addrexists(a)
+#define dhcp6_start(a, b) 0
+#define dhcp6_env(a, b, c, d, e)
+#define dhcp6_free(a)
+#define dhcp6_drop(a, b)
+#endif
 
 #endif

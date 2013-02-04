@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2011 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -64,6 +64,7 @@ static const uint8_t ipv4_bcast_addr[] = {
 	0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff
 };
 
+#ifdef INET
 int
 ipv4_opensocket(struct interface *ifp, int protocol)
 {
@@ -212,3 +213,4 @@ ipv4_getrawpacket(struct interface *ifp, int protocol,
 	}
 	return bytes;
 }
+#endif

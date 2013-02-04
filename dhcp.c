@@ -217,7 +217,7 @@ static const size_t udp_dhcp_len = sizeof(struct udp_dhcp_packet);
 static int dhcp_open(struct interface *);
 
 void
-print_options(void)
+dhcp_printoptions(void)
 {
 	const struct dhcp_opt *opt;
 	const char **p;
@@ -1114,7 +1114,7 @@ read_lease(const struct interface *ifp)
 }
 
 ssize_t
-configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
+dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
     const struct interface *ifp)
 {
 	const struct if_options *ifo;

@@ -80,7 +80,7 @@ ipv6ns_cleanup(void)
 }
 #endif
 
-int
+static int
 ipv6ns_open(void)
 {
 	int on;
@@ -237,7 +237,7 @@ ipv6ns_sendprobe(void *arg)
 }
 
 /* ARGSUSED */
-void
+static void
 ipv6ns_handledata(_unused void *arg)
 {
 	ssize_t len;
@@ -357,4 +357,18 @@ ipv6ns_handledata(_unused void *arg)
 		eloop_timeout_add_tv(&tv, ipv6ns_sendprobe, rap);
 		eloop_timeout_delete(ipv6ns_unreachable, rap);
 	}
+}
+
+int
+ipv6ns_init(void)
+{
+	int fd;
+
+	fd = ipv6ns_open();
+	if (fd == -1) {
+		syslog(LOG_ERR, "ipv6ns_open: %m");
+		return -1;
+	}
+	eloop_event_add(fd, ipv6ns_handledata, NULL);
+	return 0;
 }

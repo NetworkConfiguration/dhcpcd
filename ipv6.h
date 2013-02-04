@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2012 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -62,6 +62,7 @@ struct rt6 {
 };
 TAILQ_HEAD(rt6head, rt6);
 
+#ifdef INET6
 int ipv6_init(void);
 ssize_t ipv6_printaddr(char *, ssize_t, const uint8_t *, const char *);
 struct in6_addr *ipv6_linklocal(const char *);
@@ -73,5 +74,8 @@ ssize_t ipv6_addaddrs(const struct interface *, struct ipv6_addrhead *);
 int ipv6_removesubnet(const struct interface *, struct ipv6_addr *);
 void ipv6_buildroutes(void);
 void ipv6_drop(struct interface *);
+#else
+#define ipv6_init() -1
+#endif
 
 #endif

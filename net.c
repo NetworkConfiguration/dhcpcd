@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2011 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -60,6 +60,8 @@
 #include "if-options.h"
 #include "ipv6rs.h"
 #include "net.h"
+
+int socket_afnet = -1;
 
 static char hwaddr_buffer[(HWADDR_LEN * 3) + 1 + 1024];
 

@@ -293,8 +293,10 @@ link_route(struct nlmsghdr *nlm)
 	}
 	if (rt.iface != NULL) {
 		if (metric == rt.iface->metric) {
+#ifdef INET
 			inet_cidrtoaddr(rtm->rtm_dst_len, &rt.net);
 			ipv4_routedeleted(&rt);
+#endif
 		}
 	}
 	return 1;
@@ -303,6 +305,7 @@ link_route(struct nlmsghdr *nlm)
 static int
 link_addr(struct nlmsghdr *nlm)
 {
+#ifdef INET
 	int len;
 	struct rtattr *rta;
 	struct ifaddrmsg *ifa;
@@ -347,6 +350,7 @@ link_addr(struct nlmsghdr *nlm)
 		rta = RTA_NEXT(rta, len);
 	}
 	ipv4_handleifa(nlm->nlmsg_type, ifn, &addr, &net, &dest);
+#endif
 	return 1;
 }
 
@@ -503,6 +507,7 @@ struct nlmr
 	char buffer[256];
 };
 
+#ifdef INET
 int
 if_address(const struct interface *iface,
     const struct in_addr *address, const struct in_addr *netmask,
@@ -599,7 +604,9 @@ if_route(const struct rt *rt, int action)
 	free(nlm);
 	return retval;
 }
+#endif
 
+#ifdef INET6
 int
 if_address6(const struct interface *ifp, const struct ipv6_addr *ap, int action)
 {
@@ -720,3 +727,4 @@ if_route6(const struct rt6 *rt, int action)
 	errno = ENOTSUP;
 	return -1;
 }
+#endif

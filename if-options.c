@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2012 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -306,6 +306,7 @@ splitv(int *argc, char **argv, const char *arg)
 static int
 parse_addr(struct in_addr *addr, struct in_addr *net, const char *arg)
 {
+#ifdef INET
 	char *p;
 	int i;
 
@@ -336,6 +337,10 @@ parse_addr(struct in_addr *addr, struct in_addr *net, const char *arg)
 	else if (net != NULL)
 		net->s_addr = ipv4_getnetmask(addr->s_addr);
 	return 0;
+#else
+	syslog(LOG_ERR, "No IPv4 support");
+	return -1;
+#endif
 }
 
 static const char * 
@@ -344,6 +349,7 @@ set_option_space(const char *arg, const struct dhcp_opt **d,
     uint8_t *request[], uint8_t *require[], uint8_t *no[])
 {
 
+#ifdef INET6
 	if (strncmp(arg, "dhcp6_", strlen("dhcp6_")) == 0) {
 		*d = dhcp6_opts;
 		*request = ifo->requestmask6;
@@ -351,7 +357,13 @@ set_option_space(const char *arg, const struct dhcp_opt **d,
 		*no = ifo->nomask6;
 		return arg + strlen("dhcp6_");
 	}
+#endif
+
+#ifdef INET
 	*d = dhcp_opts;
+#else
+	*d = NULL;
+#endif
 	*request = ifo->requestmask;
 	*require = ifo->requiremask;
 	*no = ifo->nomask;
@@ -777,6 +789,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		ifo->options &= ~DHCPCD_IPV4;
 		ifo->options |= DHCPCD_IPV6 | DHCPCD_IPV6RS;
 		break;
+#ifdef INET
 	case O_ARPING:
 		if (parse_addr(&addr, NULL, arg) != 0)
 			return -1;
@@ -798,6 +811,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		free(ifo->fallback);
 		ifo->fallback = xstrdup(arg);
 		break;
+#endif
 	case O_IPV6RS:
 		ifo->options |= DHCPCD_IPV6RS;
 		break;
@@ -855,10 +869,14 @@ read_config(const char *file,
 
 	/* Seed our default options */
 	ifo = xzalloc(sizeof(*ifo));
+	ifo->options |= DHCPCD_DAEMONISE | DHCPCD_LINK;
+#ifdef INET
 	ifo->options |= DHCPCD_IPV4 | DHCPCD_IPV4LL;
-	ifo->options |= DHCPCD_GATEWAY | DHCPCD_DAEMONISE | DHCPCD_LINK;
-	ifo->options |= DHCPCD_ARP;
+	ifo->options |= DHCPCD_GATEWAY | DHCPCD_ARP; 
+#endif
+#ifdef INET6
 	ifo->options |= DHCPCD_IPV6 | DHCPCD_IPV6RS | DHCPCD_IPV6RA_REQRDNSS;
+#endif
 	ifo->timeout = DEFAULT_TIMEOUT;
 	ifo->reboot = DEFAULT_REBOOT;
 	ifo->metric = -1;

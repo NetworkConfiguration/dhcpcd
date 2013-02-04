@@ -84,7 +84,7 @@ sigset_t dhcpcd_sigset;
 
 static char *cffile;
 static char *pidfile;
-static int linkfd = -1, ipv6rsfd = -1, ipv6nsfd = -1;
+static int linkfd = -1;
 static char **ifv;
 static int ifc;
 static char **margv;
@@ -912,14 +912,18 @@ main(int argc, char **argv)
 		case 'V':
 			printf("Interface options:\n");
 			if_printoptions();
+#ifdef INET
 			if (family == 0 || family == AF_INET) {
 				printf("\nDHCPv4 options:\n");
-				print_options();
+				dhcp_printoptions();
 			}
+#endif
+#ifdef INET6
 			if (family == 0 || family == AF_INET6) {
 				printf("\nDHCPv6 options:\n");
 				dhcp6_printoptions();
 			}
+#endif
 			exit(EXIT_SUCCESS);
 		case '?':
 			usage();
@@ -1116,26 +1120,8 @@ main(int argc, char **argv)
 	}
 	if (options & DHCPCD_IPV6RS && !check_ipv6(NULL))
 		options &= ~DHCPCD_IPV6RS;
-	if (options & DHCPCD_IPV6RS) {
-		ipv6rsfd = ipv6rs_open();
-		if (ipv6rsfd == -1) {
-			syslog(LOG_ERR, "ipv6rs: %m");
-			options &= ~(DHCPCD_IPV6RS |
-			    DHCPCD_IPV6RA_OWN | DHCPCD_IPV6RA_OWN_DEFAULT);
-		} else {
-			eloop_event_add(ipv6rsfd, ipv6rs_handledata, NULL);
-//			atexit(restore_rtadv);
-		}
-		if (options & DHCPCD_IPV6RA_OWN ||
-		    options & DHCPCD_IPV6RA_OWN_DEFAULT)
-		{
-			ipv6nsfd = ipv6ns_open();
-			if (ipv6nsfd == -1)
-				syslog(LOG_ERR, "ipv6nd: %m");
-			else
-				eloop_event_add(ipv6nsfd, ipv6ns_handledata, NULL);
-		}
-	}
+	if (options & DHCPCD_IPV6RS)
+		ipv6rs_init();
 
 	ifc = argc - optind;
 	ifv = argv + optind;

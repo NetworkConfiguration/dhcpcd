@@ -40,6 +40,7 @@ struct rt {
 	struct rt *next;
 };
 
+#ifdef INET
 int inet_ntocidr(struct in_addr);
 int inet_cidrtoaddr(int, struct in_addr *);
 uint32_t ipv4_getnetmask(uint32_t);
@@ -76,5 +77,9 @@ int ipv4_opensocket(struct interface *, int);
 ssize_t ipv4_sendrawpacket(const struct interface *,
     int, const void *, ssize_t);
 ssize_t ipv4_getrawpacket(struct interface *, int, void *, ssize_t, int *);
+#else
+#define ipv4_applyaddr(a) {}
+#define ipv4_freeroutes(a) {}
+#endif
 
 #endif

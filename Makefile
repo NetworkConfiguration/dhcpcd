@@ -1,11 +1,9 @@
 # dhcpcd Makefile
 
 PROG=		dhcpcd
-SRCS=		arp.c common.c control.c dhcpcd.c duid.c eloop.c
+SRCS=		common.c control.c dhcpcd.c duid.c eloop.c
 SRCS+=		if-options.c if-pref.c net.c script.c signals.c
 SRCS+=		dhcp-common.c
-SRCS+=		ipv4.c dhcp.c ipv4ll.c
-SRCS+=		ipv6.c ipv6rs.c ipv6ns.c dhcp6.c
 
 CFLAGS?=	-O2
 CSTD?=		c99

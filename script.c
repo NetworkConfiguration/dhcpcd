@@ -106,6 +106,7 @@ exec_script(char *const *argv, char *const *env)
 	return pid;
 }
 
+#ifdef INET
 static char *
 make_var(const char *prefix, const char *var)
 {
@@ -151,6 +152,7 @@ append_config(char ***env, ssize_t *len,
 	}
 	*env = ne;
 }
+#endif
 
 static size_t
 arraytostr(const char *const *argv, char **s)
@@ -183,17 +185,23 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	const struct interface *ifp2;
 	int dhcp, dhcp6, ra;
 	const struct dhcp_state *state;
+#ifdef INET6
 	const struct dhcp6_state *d6_state;
+#endif
 
 	dhcp = dhcp6 = ra = 0;
 	state = D_STATE(ifp);
+#ifdef INET6
 	d6_state = D6_CSTATE(ifp);
+#endif
 	if (strcmp(reason, "TEST") == 0) {
+#ifdef INET6
 		if (d6_state && d6_state->new)
 			dhcp6 = 1;
 		else if (ipv6rs_has_ra(ifp))
 			ra = 1;
 		else
+#endif
 			dhcp = 1;
 	} else if (reason[strlen(reason) - 1] == '6')
 		dhcp6 = 1;
@@ -249,9 +257,12 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	if (strcmp(reason, "TEST") == 0) {
 		env[8] = strdup("if_up=false");
 		env[9] = strdup("if_down=false");
-	} else if ((dhcp && state && state->new) ||
-	    (dhcp6 && d6_state && d6_state->new) ||
-	    (ra && ipv6rs_has_ra(ifp)))
+	} else if ((dhcp && state && state->new)
+#ifdef INET6
+	    || (dhcp6 && d6_state && d6_state->new)
+	    || (ra && ipv6rs_has_ra(ifp))
+#endif
+	    )
 	{
 		env[8] = strdup("if_up=true");
 		env[9] = strdup("if_down=false");
@@ -277,16 +288,19 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 			snprintf(env[elen++], e, "old_ssid=%s", ifp->ssid);
 		}
 	}
+#ifdef INET
 	if (dhcp && state && state->old) {
-		e = configure_env(NULL, NULL, state->old, ifp);
+		e = dhcp_env(NULL, NULL, state->old, ifp);
 		if (e > 0) {
 			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
-			elen += configure_env(env + elen, "old",
+			elen += dhcp_env(env + elen, "old",
 			    state->old, ifp);
 		}
 		append_config(&env, &elen, "old",
 		    (const char *const *)ifo->config);
 	}
+#endif
+#ifdef INET6
 	if (dhcp6 && d6_state && d6_state->old) {
 		e = dhcp6_env(NULL, NULL, ifp,
 		    d6_state->old, d6_state->old_len);
@@ -296,18 +310,22 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 			    d6_state->old, d6_state->old_len);
 		}
 	}
+#endif
 
 dumplease:
+#ifdef INET
 	if (dhcp && state && state->new) {
-		e = configure_env(NULL, NULL, state->new, ifp);
+		e = dhcp_env(NULL, NULL, state->new, ifp);
 		if (e > 0) {
 			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
-			elen += configure_env(env + elen, "new",
+			elen += dhcp_env(env + elen, "new",
 			    state->new, ifp);
 		}
 		append_config(&env, &elen, "new",
 		    (const char *const *)ifo->config);
 	}
+#endif
+#ifdef INET6
 	if (dhcp6 && d6_state && d6_state->new) {
 		e = dhcp6_env(NULL, NULL, ifp,
 		    d6_state->new, d6_state->new_len);
@@ -324,6 +342,7 @@ dumplease:
 			elen += ipv6rs_env(env + elen, NULL, ifp);
 		}
 	}
+#endif
 
 	/* Add our base environment */
 	if (ifo->environ) {
@@ -371,10 +390,14 @@ int
 send_interface(int fd, const struct interface *iface)
 {
 	int retval = 0;
+#ifdef INET
 	const struct dhcp_state *state = D_CSTATE(iface);
 
 	if (state && send_interface1(fd, iface, state->reason) == -1)
 		retval = -1;
+#endif
+
+#ifdef INET6
 	if (ipv6rs_has_ra(iface)) {
 		if (send_interface1(fd, iface, "ROUTERADVERT") == -1)
 			retval = -1;
@@ -383,6 +406,7 @@ send_interface(int fd, const struct interface *iface)
 		if (send_interface1(fd, iface, "INFORM6") == -1)
 			retval = -1;
 	}
+#endif
 	return retval;
 }
 
@@ -402,12 +426,7 @@ script_runreason(const struct interface *ifp, const char *reason)
 	    ifp->options->script[0] == '\0' ||
 	    strcmp(ifp->options->script, "/dev/null") == 0)
 		return 0;
-
-	if (reason == NULL) {
-		const struct dhcp_state *state = D_CSTATE(ifp);
-		if (state)
-			reason = state->reason;
-	}
+	
 	syslog(LOG_DEBUG, "%s: executing `%s', reason %s",
 	    ifp->name, argv[0], reason);
 
