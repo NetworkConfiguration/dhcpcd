@@ -27,6 +27,7 @@
 
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <net/route.h>
 
 #ifdef __linux__
 #  include <asm/types.h> /* for systems with broken headers */

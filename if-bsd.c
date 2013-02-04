@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2012 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -60,11 +60,10 @@
 
 #include "config.h"
 #include "common.h"
-#include "configure.h"
 #include "dhcp.h"
 #include "if-options.h"
+#include "ipv4.h"
 #include "ipv6.h"
-#include "net.h"
 
 #ifndef RT_ROUNDUP
 #define RT_ROUNDUP(a)							      \
@@ -105,7 +104,7 @@ cleanup(void)
 #endif
 
 int
-init_sockets(void)
+open_sockets(void)
 {
 	if ((socket_afnet = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
 		return -1;
@@ -114,6 +113,24 @@ init_sockets(void)
 		return -1;
 	set_cloexec(r_fd);
 	return 0;
+}
+
+int
+open_link_socket(void)
+{
+	int fd;
+
+#ifdef DEBUG_MEMORY
+	if (link_buf == NULL)
+		atexit(cleanup);
+#endif
+
+	fd = socket(PF_ROUTE, SOCK_RAW, 0);
+	if (fd != -1) {
+		set_cloexec(fd);
+		set_nonblock(fd);
+	}
+	return fd;
 }
 
 int
@@ -154,6 +171,7 @@ getifssid(const char *ifname, char *ssid)
 	return retval;
 }
 
+#ifdef INET
 int
 if_address(const struct interface *iface, const struct in_addr *address,
     const struct in_addr *netmask, const struct in_addr *broadcast,
@@ -189,6 +207,7 @@ if_address(const struct interface *iface, const struct in_addr *address,
 int
 if_route(const struct rt *rt, int action)
 {
+	const struct dhcp_state *state;
 	union sockunion {
 		struct sockaddr sa;
 		struct sockaddr_in sin;
@@ -217,6 +236,7 @@ if_route(const struct rt *rt, int action)
 		ADDSU;							      \
 	}
 
+	state = D_CSTATE(rt->iface);
 	memset(&rtm, 0, sizeof(rtm));
 	rtm.hdr.rtm_version = RTM_VERSION;
 	rtm.hdr.rtm_seq = 1;
@@ -229,8 +249,8 @@ if_route(const struct rt *rt, int action)
 	rtm.hdr.rtm_flags = RTF_UP;
 	/* None interface subnet routes are static. */
 	if (rt->gate.s_addr != INADDR_ANY ||
-	    rt->net.s_addr != rt->iface->net.s_addr ||
-	    rt->dest.s_addr != (rt->iface->addr.s_addr & rt->iface->net.s_addr))
+	    rt->net.s_addr != state->net.s_addr ||
+	    rt->dest.s_addr != (state->addr.s_addr & state->net.s_addr))
 		rtm.hdr.rtm_flags |= RTF_STATIC;
 	rtm.hdr.rtm_addrs = RTA_DST | RTA_GATEWAY;
 	if (rt->dest.s_addr == rt->gate.s_addr &&
@@ -262,7 +282,7 @@ if_route(const struct rt *rt, int action)
 	/* IFP here if we need it */
 
 	if (rtm.hdr.rtm_addrs & RTA_IFA)
-		ADDADDR(&rt->iface->addr);
+		ADDADDR(&state->addr);
 
 #undef ADDADDR
 #undef ADDSU
@@ -272,7 +292,9 @@ if_route(const struct rt *rt, int action)
 		retval = -1;
 	return retval;
 }
+#endif
 
+#ifdef INET6
 int
 if_address6(const struct interface *ifp, const struct ipv6_addr *a, int action)
 {
@@ -412,24 +434,7 @@ if_route6(const struct rt6 *rt, int action)
 		retval = -1;
 	return retval;
 }
-
-int
-open_link_socket(void)
-{
-	int fd;
-
-#ifdef DEBUG_MEMORY
-	if (link_buf == NULL)
-		atexit(cleanup);
 #endif
-
-	fd = socket(PF_ROUTE, SOCK_RAW, 0);
-	if (fd != -1) {
-		set_cloexec(fd);
-		set_nonblock(fd);
-	}
-	return fd;
-}
 
 static void
 get_addrs(int type, char *cp, struct sockaddr **sa)
@@ -538,13 +543,15 @@ manage_link(int fd)
 				sa = (struct sockaddr *)(void *)cp;
 				if (sa->sa_family != AF_INET)
 					break;
+#ifdef INET
 				get_addrs(rtm->rtm_addrs, cp, rti_info);
 				rt.iface = NULL;
 				rt.next = NULL;
 				COPYOUT(rt.dest, rti_info[RTAX_DST]);
 				COPYOUT(rt.net, rti_info[RTAX_NETMASK]);
 				COPYOUT(rt.gate, rti_info[RTAX_GATEWAY]);
-				route_deleted(&rt);
+				ipv4_routedeleted(&rt);
+#endif
 				break;
 #ifdef RTM_CHGADDR
 			case RTM_CHGADDR:	/* FALLTHROUGH */
@@ -572,14 +579,16 @@ manage_link(int fd)
 					    sdl.sdl_alen);
 					break;
 #endif
+#ifdef INET
 				case AF_INET:
 				case 255: /* FIXME: Why 255? */
 					COPYOUT(rt.dest, rti_info[RTAX_IFA]);
 					COPYOUT(rt.net, rti_info[RTAX_NETMASK]);
 					COPYOUT(rt.gate, rti_info[RTAX_BRD]);
-					handle_ifa(rtm->rtm_type, ifname,
+					ipv4_handleifa(rtm->rtm_type, ifname,
 					    &rt.dest, &rt.net, &rt.gate);
 					break;
+#endif
 				}
 				break;
 			}

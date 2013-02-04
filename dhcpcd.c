@@ -35,6 +35,8 @@ const char copyright[] = "Copyright (c) 2006-2013 Roy Marples";
 #include <sys/uio.h>
 #include <sys/utsname.h>
 
+#include <net/route.h> /* For RTM_CHGADDR */
+
 #include <ctype.h>
 #include <errno.h>
 #include <getopt.h>
@@ -536,19 +538,23 @@ handle_hwaddr(const char *ifname, unsigned char *hwaddr, size_t hwlen)
 {
 	struct interface *ifp;
 	struct if_options *ifo;
+	struct dhcp_state *state;
 
 	for (ifp = ifaces; ifp; ifp = ifp->next)
 		if (strcmp(ifp->name, ifname) == 0 && ifp->hwlen <= hwlen) {
-			ifo = ifp->state->options;
+			state = D_STATE(ifp);
+			if (state == NULL)
+				continue;
+			ifo = ifp->options;
 			if (!(ifo->options &
 			    (DHCPCD_INFORM | DHCPCD_STATIC | DHCPCD_CLIENTID))
-	    		    && ifp->state->new != NULL &&
-			    ifp->state->new->cookie == htonl(MAGIC_COOKIE))
+	    		    && state->new != NULL &&
+			    state->new->cookie == htonl(MAGIC_COOKIE))
 			{
 				syslog(LOG_INFO,
 				    "%s: expiring for new hardware address",
 				    ifp->name);
-				drop_dhcp(ifp, "EXPIRE");
+				dhcp_drop(ifp, "EXPIRE");
 			}
 			memcpy(ifp->hwaddr, hwaddr, hwlen);
 			ifp->hwlen = hwlen;
@@ -558,8 +564,8 @@ handle_hwaddr(const char *ifname, unsigned char *hwaddr, size_t hwlen)
 				syslog(LOG_DEBUG, "%s: using hwaddr %s",
 				    ifp->name,
 		    		    hwaddr_ntoa(ifp->hwaddr, ifp->hwlen));
-				ifp->state->interval = 0;
-				ifp->state->nakoff = 0;
+				state->interval = 0;
+				state->nakoff = 0;
 				start_interface(ifp);
 			}
 		}

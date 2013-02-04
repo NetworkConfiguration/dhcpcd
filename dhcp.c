@@ -34,6 +34,7 @@
 #  include <linux/rtnetlink.h>
 #endif
 
+#include <netinet/in_systm.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #define __FAVOR_BSD /* Nasty glibc hack so we can use BSD semantics for UDP */
