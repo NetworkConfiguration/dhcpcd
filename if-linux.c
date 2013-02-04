@@ -126,7 +126,7 @@ _open_link_socket(struct sockaddr_nl *nl)
 }
 
 int
-init_sockets(void)
+open_sockets(void)
 {
 	if ((socket_afnet = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
 		return -1;

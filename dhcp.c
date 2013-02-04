@@ -34,9 +34,16 @@
 #  include <linux/rtnetlink.h>
 #endif
 
+#include <netinet/in.h>
+#include <netinet/ip.h>
+#define __FAVOR_BSD /* Nasty glibc hack so we can use BSD semantics for UDP */
+#include <netinet/udp.h>
+#undef __FAVOR_BSD
+
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
@@ -198,6 +205,14 @@ static const char *dhcp_params[] = {
 	"server_name",
 	NULL
 };
+
+struct udp_dhcp_packet
+{
+	struct ip ip;
+	struct udphdr udp;
+	struct dhcp_message dhcp;
+};
+static const size_t udp_dhcp_len = sizeof(struct udp_dhcp_packet);
 
 static int dhcp_open(struct interface *);
 
@@ -474,7 +489,7 @@ decode_rfc3442_rt(int dl, const uint8_t *data)
 	while (p < e) {
 		cidr = *p++;
 		if (cidr > 32) {
-			free_routes(routes);
+			ipv4_freeroutes(routes);
 			errno = EINVAL;
 			return NULL;
 		}
@@ -1143,7 +1158,7 @@ configure_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 		addr.s_addr = dhcp->yiaddr ? dhcp->yiaddr : dhcp->ciaddr;
 		setvar(&ep, prefix, "ip_address", inet_ntoa(addr));
 		if (get_option_addr(&net, dhcp, DHO_SUBNETMASK) == -1) {
-			net.s_addr = get_netmask(addr.s_addr);
+			net.s_addr = ipv4_getnetmask(addr.s_addr);
 			setvar(&ep, prefix, "subnet_mask", inet_ntoa(net));
 		}
 		snprintf(cidr, sizeof(cidr), "%d", inet_ntocidr(net));
@@ -1200,7 +1215,7 @@ get_lease(struct dhcp_lease *lease, const struct dhcp_message *dhcp)
 	else
 		lease->addr.s_addr = dhcp->ciaddr;
 	if (get_option_addr(&lease->net, dhcp, DHO_SUBNETMASK) == -1)
-		lease->net.s_addr = get_netmask(lease->addr.s_addr);
+		lease->net.s_addr = ipv4_getnetmask(lease->addr.s_addr);
 	if (get_option_addr(&lease->brd, dhcp, DHO_BROADCAST) == -1)
 		lease->brd.s_addr = lease->addr.s_addr | ~lease->net.s_addr;
 	if (get_option_uint32(&lease->leasetime, dhcp, DHO_LEASETIME) == 0) {
@@ -1282,6 +1297,141 @@ dhcp_close(struct interface *ifp)
 	state->interval = 0;
 }
 
+static int
+dhcp_openudp(struct interface *iface)
+{
+	int s;
+	struct sockaddr_in sin;
+	int n;
+	struct dhcp_state *state;
+#ifdef SO_BINDTODEVICE
+	struct ifreq ifr;
+	char *p;
+#endif
+
+	if ((s = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
+	    return -1;
+
+	n = 1;
+	if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &n, sizeof(n)) == -1)
+	    goto eexit;
+#ifdef SO_BINDTODEVICE
+	memset(&ifr, 0, sizeof(ifr));
+	strlcpy(ifr.ifr_name, iface->name, sizeof(ifr.ifr_name));
+	/* We can only bind to the real device */
+	p = strchr(ifr.ifr_name, ':');
+	if (p)
+	    *p = '\0';
+	if (setsockopt(s, SOL_SOCKET, SO_BINDTODEVICE, &ifr,
+		    sizeof(ifr)) == -1)
+	    goto eexit;
+#endif
+	/* As we don't use this socket for receiving, set the
+	 * 	 * receive buffer to 1 */
+	n = 1;
+	if (setsockopt(s, SOL_SOCKET, SO_RCVBUF, &n, sizeof(n)) == -1)
+	    goto eexit;
+	state = D_STATE(iface);
+	memset(&sin, 0, sizeof(sin));
+	sin.sin_family = AF_INET;
+	sin.sin_port = htons(DHCP_CLIENT_PORT);
+	sin.sin_addr.s_addr = state->addr.s_addr;
+	if (bind(s, (struct sockaddr *)&sin, sizeof(sin)) == -1)
+	    goto eexit;
+
+	state->udp_fd = s;
+	set_cloexec(s);
+	return 0;
+
+eexit:
+	close(s);
+	return -1;
+}
+
+static ssize_t
+dhcp_sendpacket(const struct interface *iface, struct in_addr to,
+    const uint8_t *data, ssize_t len)
+{
+	struct sockaddr_in sin;
+
+	memset(&sin, 0, sizeof(sin));
+	sin.sin_family = AF_INET;
+	sin.sin_addr.s_addr = to.s_addr;
+	sin.sin_port = htons(DHCP_SERVER_PORT);
+	return sendto(D_CSTATE(iface)->udp_fd, data, len, 0,
+	    (struct sockaddr *)&sin, sizeof(sin));
+}
+
+static uint16_t
+checksum(const void *data, uint16_t len)
+{
+	const uint8_t *addr = data;
+	uint32_t sum = 0;
+
+	while (len > 1) {
+		sum += addr[0] * 256 + addr[1];
+		addr += 2;
+		len -= 2;
+	}
+
+	if (len == 1)
+		sum += *addr * 256;
+
+	sum = (sum >> 16) + (sum & 0xffff);
+	sum += (sum >> 16);
+
+	sum = htons(sum);
+
+	return ~sum;
+}
+
+static ssize_t
+dhcp_makeudppacket(uint8_t **p, const uint8_t *data, size_t length,
+	struct in_addr source, struct in_addr dest)
+{
+	struct udp_dhcp_packet *udpp;
+	struct ip *ip;
+	struct udphdr *udp;
+
+	udpp = xzalloc(sizeof(*udpp));
+	ip = &udpp->ip;
+	udp = &udpp->udp;
+
+	/* OK, this is important :)
+	 * We copy the data to our packet and then create a small part of the
+	 * ip structure and an invalid ip_len (basically udp length).
+	 * We then fill the udp structure and put the checksum
+	 * of the whole packet into the udp checksum.
+	 * Finally we complete the ip structure and ip checksum.
+	 * If we don't do the ordering like so then the udp checksum will be
+	 * broken, so find another way of doing it! */
+
+	memcpy(&udpp->dhcp, data, length);
+
+	ip->ip_p = IPPROTO_UDP;
+	ip->ip_src.s_addr = source.s_addr;
+	if (dest.s_addr == 0)
+	    ip->ip_dst.s_addr = INADDR_BROADCAST;
+	else
+	    ip->ip_dst.s_addr = dest.s_addr;
+
+	udp->uh_sport = htons(DHCP_CLIENT_PORT);
+	udp->uh_dport = htons(DHCP_SERVER_PORT);
+	udp->uh_ulen = htons(sizeof(*udp) + length);
+	ip->ip_len = udp->uh_ulen;
+	udp->uh_sum = checksum(udpp, sizeof(*udpp));
+
+	ip->ip_v = IPVERSION;
+	ip->ip_hl = sizeof(*ip) >> 2;
+	ip->ip_id = arc4random() & UINT16_MAX;
+	ip->ip_ttl = IPDEFTTL;
+	ip->ip_len = htons(sizeof(*ip) + sizeof(*udp) + length);
+	ip->ip_sum = checksum(ip, sizeof(*ip));
+
+	*p = (uint8_t *)udpp;
+	return sizeof(*ip) + sizeof(*udp) + length;
+}
+
 static void
 send_message(struct interface *iface, int type,
     void (*callback)(void *))
@@ -1341,14 +1491,14 @@ send_message(struct interface *iface, int type,
 	else
 		to.s_addr = 0;
 	if (to.s_addr && to.s_addr != INADDR_BROADCAST) {
-		r = send_packet(iface, to, (uint8_t *)dhcp, len);
+		r = dhcp_sendpacket(iface, to, (uint8_t *)dhcp, len);
 		if (r == -1) {
-			syslog(LOG_ERR, "%s: send_packet: %m", iface->name);
+			syslog(LOG_ERR, "%s: dhcp_sendpacket: %m", iface->name);
 			dhcp_close(iface);
 		}
 	} else {
-		len = make_udp_packet(&udp, (uint8_t *)dhcp, len, from, to);
-		r = send_raw_packet(iface, ETHERTYPE_IP, udp, len);
+		len = dhcp_makeudppacket(&udp, (uint8_t *)dhcp, len, from, to);
+		r = ipv4_sendrawpacket(iface, ETHERTYPE_IP, udp, len);
 		free(udp);
 		/* If we failed to send a raw packet this normally means
 		 * we don't have the ability to work beneath the IP layer
@@ -1657,7 +1807,6 @@ dhcp_bind(void *arg)
 	}
 }
 
-
 static void
 dhcp_timeout(void *arg)
 {
@@ -1699,7 +1848,7 @@ handle_3rdparty(struct interface *ifp)
 	if (ifo->req_addr.s_addr != INADDR_ANY)
 		return 0;
 
-	if (get_address(ifp->name, &addr, &net, &dst) == 1)
+	if (ipv4_getaddress(ifp->name, &addr, &net, &dst) == 1)
 		ipv4_handleifa(RTM_NEWADDR, ifp->name, &addr, &net, &dst);
 	else {
 		syslog(LOG_INFO,
@@ -1811,7 +1960,6 @@ dhcp_reboot(struct interface *ifp, int oldopts)
 	else
 		dhcp_request(ifp);
 }
-
 
 void
 dhcp_drop(struct interface *iface, const char *reason)
@@ -2042,7 +2190,7 @@ dhcp_handle(struct interface *iface, struct dhcp_message **dhcpp,
 		/* If the interface already has the address configured
 		 * then we can't ARP for duplicate detection. */
 		addr.s_addr = state->offer->yiaddr;
-		if (has_address(iface->name, &addr, NULL) != 1) {
+		if (ipv4_hasaddress(iface->name, &addr, NULL) != 1) {
 			state->claims = 0;
 			state->probes = 0;
 			state->conflicts = 0;
@@ -2053,6 +2201,67 @@ dhcp_handle(struct interface *iface, struct dhcp_message **dhcpp,
 	}
 
 	dhcp_bind(iface);
+}
+
+static ssize_t
+get_udp_data(const uint8_t **data, const uint8_t *udp)
+{
+    struct udp_dhcp_packet p;
+
+    memcpy(&p, udp, sizeof(p));
+    *data = udp + offsetof(struct udp_dhcp_packet, dhcp);
+    return ntohs(p.ip.ip_len) - sizeof(p.ip) - sizeof(p.udp);
+}
+
+static int
+valid_udp_packet(const uint8_t *data, size_t data_len, struct in_addr *from,
+    int noudpcsum)
+{
+	struct udp_dhcp_packet p;
+	uint16_t bytes, udpsum;
+
+	if (data_len < sizeof(p.ip)) {
+		if (from)
+			from->s_addr = INADDR_ANY;
+		errno = EINVAL;
+		return -1;
+	}
+	memcpy(&p, data, MIN(data_len, sizeof(p)));
+	if (from)
+		from->s_addr = p.ip.ip_src.s_addr;
+	if (data_len > sizeof(p)) {
+		errno = EINVAL;
+		return -1;
+	}
+	if (checksum(&p.ip, sizeof(p.ip)) != 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	bytes = ntohs(p.ip.ip_len);
+	if (data_len < bytes) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (noudpcsum == 0) {
+		udpsum = p.udp.uh_sum;
+		p.udp.uh_sum = 0;
+		p.ip.ip_hl = 0;
+		p.ip.ip_v = 0;
+		p.ip.ip_tos = 0;
+		p.ip.ip_len = p.udp.uh_ulen;
+		p.ip.ip_id = 0;
+		p.ip.ip_off = 0;
+		p.ip.ip_ttl = 0;
+		p.ip.ip_sum = 0;
+		if (udpsum && checksum(&p, bytes) != udpsum) {
+			errno = EINVAL;
+			return -1;
+		}
+	}
+
+	return 0;
 }
 
 static void
@@ -2072,7 +2281,7 @@ dhcp_handlepacket(void *arg)
 	if (packet == NULL)
 		packet = xmalloc(udp_dhcp_len);
 	for(;;) {
-		bytes = get_raw_packet(iface, ETHERTYPE_IP,
+		bytes = ipv4_getrawpacket(iface, ETHERTYPE_IP,
 		    packet, udp_dhcp_len, &partialcsum);
 		if (bytes == 0 || bytes == -1)
 			break;
@@ -2151,7 +2360,7 @@ dhcp_open(struct interface *ifp)
 
 	state = D_STATE(ifp);
 	if (state->raw_fd == -1) {
-		if ((r = open_socket(ifp, ETHERTYPE_IP)) == -1)
+		if ((r = ipv4_opensocket(ifp, ETHERTYPE_IP)) == -1)
 			syslog(LOG_ERR, "%s: %s: %m", __func__, ifp->name);
 		else
 			eloop_event_add(state->raw_fd, dhcp_handlepacket, ifp);
@@ -2162,8 +2371,8 @@ dhcp_open(struct interface *ifp)
 	    (state->new->cookie == htonl(MAGIC_COOKIE) ||
 	    ifp->options->options & DHCPCD_INFORM))
 	{
-		if (open_udp_socket(ifp) == -1 && errno != EADDRINUSE) {
-			syslog(LOG_ERR, "%s: open_udp_socket: %m", ifp->name);
+		if (dhcp_openudp(ifp) == -1 && errno != EADDRINUSE) {
+			syslog(LOG_ERR, "%s: dhcp_openudp: %m", ifp->name);
 			r = -1;
 		}
 	}

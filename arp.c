@@ -72,7 +72,7 @@ arp_send(const struct interface *ifp, int op, in_addr_t sip, in_addr_t tip)
 	memcpy(p, &tip, sizeof(tip));
 	p += sizeof(tip);
 	len = p - arp_buffer;
-	retval = send_raw_packet(ifp, ETHERTYPE_ARP, arp_buffer, len);
+	retval = ipv4_sendrawpacket(ifp, ETHERTYPE_ARP, arp_buffer, len);
 	return retval;
 }
 
@@ -121,7 +121,7 @@ arp_packet(void *arg)
 	state = D_STATE(ifp);
 	state->fail.s_addr = 0;
 	for(;;) {
-		bytes = get_raw_packet(ifp, ETHERTYPE_ARP,
+		bytes = ipv4_getrawpacket(ifp, ETHERTYPE_ARP,
 		    arp_buffer, sizeof(arp_buffer), NULL);
 		if (bytes == 0 || bytes == -1)
 			return;
@@ -210,7 +210,7 @@ arp_announce(void *arg)
 	if (state->new == NULL)
 		return;
 	if (state->arp_fd == -1) {
-		open_socket(ifp, ETHERTYPE_ARP);
+		ipv4_opensocket(ifp, ETHERTYPE_ARP);
 		eloop_event_add(state->arp_fd, arp_packet, ifp);
 	}
 	if (++state->claims < ANNOUNCE_NUM)	
@@ -268,7 +268,7 @@ arp_probe(void *arg)
 		addr.s_addr = state->addr.s_addr;
 
 	if (state->arp_fd == -1) {
-		open_socket(ifp, ETHERTYPE_ARP);
+		ipv4_opensocket(ifp, ETHERTYPE_ARP);
 		eloop_event_add(state->arp_fd, arp_packet, ifp);
 	}
 	if (state->probes == 0) {

@@ -1091,8 +1091,8 @@ main(int argc, char **argv)
 			syslog(LOG_ERR, "control_start: %m");
 	}
 
-	if (init_sockets() == -1) {
-		syslog(LOG_ERR, "init_socket: %m");
+	if (open_sockets() == -1) {
+		syslog(LOG_ERR, "open_sockets: %m");
 		exit(EXIT_FAILURE);
 	}
 	if (if_options->options & DHCPCD_LINK) {

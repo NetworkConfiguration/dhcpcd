@@ -28,7 +28,21 @@
 #ifndef IPV4_H
 #define IPV4_H
 
-#include "net.h"
+#include "dhcpcd.h"
+
+struct rt {
+	struct in_addr dest;
+	struct in_addr net;
+	struct in_addr gate;
+	const struct interface *iface;
+	int metric;
+	struct in_addr src;
+	struct rt *next;
+};
+
+int inet_ntocidr(struct in_addr);
+int inet_cidrtoaddr(int, struct in_addr *);
+uint32_t ipv4_getnetmask(uint32_t);
 
 void ipv4_buildroutes(void);
 void ipv4_applyaddr(void *);
@@ -36,4 +50,31 @@ int ipv4_routedeleted(const struct rt *);
 
 void ipv4_handleifa(int, const char *,
     struct in_addr *, struct in_addr *, struct in_addr *);
+
+int ipv4_doaddress(const char *,
+    struct in_addr *, struct in_addr *, struct in_addr *, int);
+int if_address(const struct interface *,
+    const struct in_addr *, const struct in_addr *,
+    const struct in_addr *, int);
+#define ipv4_addaddress(iface, addr, net, brd)				      \
+	if_address(iface, addr, net, brd, 1)
+#define ipv4_deleteaddress(iface, addr, net)				      \
+	if_address(iface, addr, net, NULL, -1)
+#define ipv4_hasaddress(iface, addr, net)				      \
+	ipv4_doaddress(iface, addr, net, NULL, 0)
+#define ipv4_getaddress(iface, addr, net, dst)				      \
+	ipv4_doaddress(iface, addr, net, dst, 1)
+
+int if_route(const struct rt *rt, int);
+#define ipv4_addroute(rt) if_route(rt, 1)
+#define ipv4_changeroute(rt) if_route(rt, 0)
+#define ipv4_deleteroute(rt) if_route(rt, -1)
+#define del_src_route(rt) i_route(rt, -2);
+void ipv4_freeroutes(struct rt *);
+
+int ipv4_opensocket(struct interface *, int);
+ssize_t ipv4_sendrawpacket(const struct interface *,
+    int, const void *, ssize_t);
+ssize_t ipv4_getrawpacket(struct interface *, int, void *, ssize_t, int *);
+
 #endif

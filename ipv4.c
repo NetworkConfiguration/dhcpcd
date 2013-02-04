@@ -35,6 +35,7 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <ifaddrs.h>
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
@@ -49,7 +50,121 @@
 #include "net.h"
 #include "script.h"
 
+int socket_afnet = -1;
+
 static struct rt *routes;
+
+int
+inet_ntocidr(struct in_addr address)
+{
+	int cidr = 0;
+	uint32_t mask = htonl(address.s_addr);
+
+	while (mask) {
+		cidr++;
+		mask <<= 1;
+	}
+	return cidr;
+}
+
+int
+inet_cidrtoaddr(int cidr, struct in_addr *addr)
+{
+	int ocets;
+
+	if (cidr < 1 || cidr > 32) {
+		errno = EINVAL;
+		return -1;
+	}
+	ocets = (cidr + 7) / 8;
+
+	addr->s_addr = 0;
+	if (ocets > 0) {
+		memset(&addr->s_addr, 255, (size_t)ocets - 1);
+		memset((unsigned char *)&addr->s_addr + (ocets - 1),
+		    (256 - (1 << (32 - cidr) % 8)), 1);
+	}
+
+	return 0;
+}
+
+uint32_t
+ipv4_getnetmask(uint32_t addr)
+{
+	uint32_t dst;
+
+	if (addr == 0)
+		return 0;
+
+	dst = htonl(addr);
+	if (IN_CLASSA(dst))
+		return ntohl(IN_CLASSA_NET);
+	if (IN_CLASSB(dst))
+		return ntohl(IN_CLASSB_NET);
+	if (IN_CLASSC(dst))
+		return ntohl(IN_CLASSC_NET);
+
+	return 0;
+}
+
+int
+ipv4_doaddress(const char *ifname,
+    struct in_addr *addr, struct in_addr *net, struct in_addr *dst, int act)
+{
+	struct ifaddrs *ifaddrs, *ifa;
+	const struct sockaddr_in *a, *n, *d;
+	int retval;
+
+	if (getifaddrs(&ifaddrs) == -1)
+		return -1;
+
+	retval = 0;
+	for (ifa = ifaddrs; ifa; ifa = ifa->ifa_next) {
+		if (ifa->ifa_addr == NULL ||
+		    ifa->ifa_addr->sa_family != AF_INET ||
+		    strcmp(ifa->ifa_name, ifname) != 0)
+			continue;
+		a = (const struct sockaddr_in *)(void *)ifa->ifa_addr;
+		n = (const struct sockaddr_in *)(void *)ifa->ifa_netmask;
+		if (ifa->ifa_flags & IFF_POINTOPOINT)
+			d = (const struct sockaddr_in *)(void *)
+			    ifa->ifa_dstaddr;
+		else
+			d = NULL;
+		if (act == 1) {
+			addr->s_addr = a->sin_addr.s_addr;
+			net->s_addr = n->sin_addr.s_addr;
+			if (dst) {
+				if (ifa->ifa_flags & IFF_POINTOPOINT)
+					dst->s_addr = d->sin_addr.s_addr;
+				else
+					dst->s_addr = INADDR_ANY;
+			}
+			retval = 1;
+			break;
+		}
+		if (addr->s_addr == a->sin_addr.s_addr &&
+		    (net == NULL || net->s_addr == n->sin_addr.s_addr))
+		{
+			retval = 1;
+			break;
+		}
+	}
+	freeifaddrs(ifaddrs);
+	return retval;
+}
+
+void
+ipv4_freeroutes(struct rt *rts)
+{
+	struct rt *r;
+
+	while (rts) {
+		r = rts->next;
+		free(rts);
+		rts = r;
+	}
+}
 
 static struct rt *
 find_route(struct rt *rts, const struct rt *r, struct rt **lrt,
@@ -127,7 +242,7 @@ n_route(struct rt *rt)
 		return -1;
 
 	desc_route("adding", rt);
-	if (!add_route(rt))
+	if (!ipv4_addroute(rt))
 		return 0;
 	if (errno == EEXIST) {
 		s = D_CSTATE(rt->iface);
@@ -139,7 +254,7 @@ n_route(struct rt *rt)
 		else
 			return -1;
 	}
-	syslog(LOG_ERR, "%s: add_route: %m", rt->iface->name);
+	syslog(LOG_ERR, "%s: ipv4_addroute: %m", rt->iface->name);
 	return -1;
 }
 
@@ -156,10 +271,10 @@ c_route(struct rt *ort, struct rt *nrt)
 	/* We delete and add the route so that we can change metric.
 	 * This also has the nice side effect of flushing ARP entries so
 	 * we don't have to do that manually. */
-	del_route(ort);
-	if (!add_route(nrt))
+	ipv4_deleteroute(ort);
+	if (!ipv4_addroute(nrt))
 		return 0;
-	syslog(LOG_ERR, "%s: add_route: %m", nrt->iface->name);
+	syslog(LOG_ERR, "%s: ipv4_addroute: %m", nrt->iface->name);
 	return -1;
 }
 
@@ -169,9 +284,9 @@ d_route(struct rt *rt)
 	int retval;
 
 	desc_route("deleting", rt);
-	retval = del_route(rt);
+	retval = ipv4_deleteroute(rt);
 	if (retval != 0 && errno != ENOENT && errno != ESRCH)
-		syslog(LOG_ERR,"%s: del_route: %m", rt->iface->name);
+		syslog(LOG_ERR,"%s: ipv4_deleteroute: %m", rt->iface->name);
 	return retval;
 }
 
@@ -187,7 +302,7 @@ get_subnet_route(struct dhcp_message *dhcp)
 		addr = dhcp->ciaddr;
 	/* Ensure we have all the needed values */
 	if (get_option_addr(&net, dhcp, DHO_SUBNETMASK) == -1)
-		net.s_addr = get_netmask(addr);
+		net.s_addr = ipv4_getnetmask(addr);
 	if (net.s_addr == INADDR_BROADCAST || net.s_addr == INADDR_ANY)
 		return NULL;
 	rt = malloc(sizeof(*rt));
@@ -382,7 +497,7 @@ ipv4_buildroutes(void)
 			nrs = rt;
 			rt = lrt; /* When we loop this makes lrt correct */
 		}
-		free_routes(dnr);
+		ipv4_freeroutes(dnr);
 	}
 
 	/* Remove old routes we used to manage */
@@ -391,7 +506,7 @@ ipv4_buildroutes(void)
 			d_route(rt);
 	}
 
-	free_routes(routes);
+	ipv4_freeroutes(routes);
 	routes = nrs;
 }
 
@@ -409,7 +524,7 @@ delete_address(struct interface *iface)
 		return 0;
 	syslog(LOG_DEBUG, "%s: deleting IP address %s/%d",
 	    iface->name, inet_ntoa(state->addr), inet_ntocidr(state->net));
-	retval = del_address(iface, &state->addr, &state->net);
+	retval = ipv4_deleteaddress(iface, &state->addr, &state->net);
 	if (retval == -1 && errno != EADDRNOTAVAIL) 
 		syslog(LOG_ERR, "del_address: %m");
 	state->addr.s_addr = 0;
@@ -448,16 +563,16 @@ ipv4_applyaddr(void *arg)
 
 	/* This also changes netmask */
 	if (!(ifo->options & DHCPCD_INFORM) ||
-	    !has_address(ifp->name, &lease->addr, &lease->net))
+	    !ipv4_hasaddress(ifp->name, &lease->addr, &lease->net))
 	{
 		syslog(LOG_DEBUG, "%s: adding IP address %s/%d",
 		    ifp->name, inet_ntoa(lease->addr),
 		    inet_ntocidr(lease->net));
-		if (add_address(ifp,
+		if (ipv4_addaddress(ifp,
 			&lease->addr, &lease->net, &lease->brd) == -1 &&
 		    errno != EEXIST)
 		{
-			syslog(LOG_ERR, "%s: add_address: %m", __func__);
+			syslog(LOG_ERR, "%s: ipv4_addaddress: %m", __func__);
 			return;
 		}
 	}
@@ -477,7 +592,7 @@ ipv4_applyaddr(void *arg)
 		rt->iface = ifp;
 		rt->metric = 0;
 		if (!find_route(routes, rt, NULL, NULL))
-			del_route(rt);
+			ipv4_deleteroute(rt);
 		free(rt);
 	}
 

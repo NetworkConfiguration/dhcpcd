@@ -54,7 +54,7 @@
 #include "config.h"
 #include "common.h"
 #include "dhcp.h"
-#include "net.h"
+#include "ipv4.h"
 #include "bpf-filter.h"
 
 /* Broadcast address for IPoIB */
@@ -65,7 +65,7 @@ static const uint8_t ipv4_bcast_addr[] = {
 };
 
 int
-open_socket(struct interface *ifp, int protocol)
+ipv4_opensocket(struct interface *ifp, int protocol)
 {
 	int s;
 	union sockunion {
@@ -128,7 +128,7 @@ eexit:
 }
 
 ssize_t
-send_raw_packet(const struct interface *ifp, int protocol,
+ipv4_sendrawpacket(const struct interface *ifp, int protocol,
     const void *data, ssize_t len)
 {
 	const struct dhcp_state *state;
@@ -160,7 +160,7 @@ send_raw_packet(const struct interface *ifp, int protocol,
 }
 
 ssize_t
-get_raw_packet(struct interface *ifp, int protocol,
+ipv4_getrawpacket(struct interface *ifp, int protocol,
     void *data, ssize_t len, int *partialcsum)
 {
 	struct iovec iov = {

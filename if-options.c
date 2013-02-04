@@ -45,7 +45,7 @@
 #include "dhcp.h"
 #include "dhcp6.h"
 #include "if-options.h"
-#include "net.h"
+#include "ipv4.h"
 #include "platform.h"
 
 unsigned long long options = 0;
@@ -334,7 +334,7 @@ parse_addr(struct in_addr *addr, struct in_addr *net, const char *arg)
 	if (p != NULL)
 		*--p = '/';
 	else if (net != NULL)
-		net->s_addr = get_netmask(addr->s_addr);
+		net->s_addr = ipv4_getnetmask(addr->s_addr);
 	return 0;
 }
 
@@ -974,7 +974,7 @@ free_options(struct if_options *ifo)
 				free(ifo->config[i++]);
 			free(ifo->config);
 		}
-		free_routes(ifo->routes);
+		ipv4_freeroutes(ifo->routes);
 		free(ifo->arping);
 		free(ifo->blacklist);
 		free(ifo->fallback);
