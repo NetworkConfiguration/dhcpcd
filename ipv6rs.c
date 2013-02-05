@@ -467,6 +467,13 @@ ipv6rs_handledata(_unused void *arg)
 #endif
 		return;
 	}
+	if (!(ifp->options->options & DHCPCD_IPV6RS)) {
+#ifdef DEBUG_RS
+		syslog(LOG_DEBUG, "%s: unexpected RA from %s",
+		    ifp->name, sfrom);
+#endif
+		return;
+	}
 	TAILQ_FOREACH(rap, &ipv6_routers, next) {
 		if (ifp == rap->iface &&
 		    memcmp(rap->from.s6_addr, from.sin6_addr.s6_addr,
