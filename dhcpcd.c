@@ -1293,18 +1293,19 @@ init_state(struct interface *iface, int argc, char **argv)
 	configure_interface(iface, argc, argv);
 	ifo = ifs->options;
 
-	if (if_options->options & DHCPCD_LINK && linkfd == -1) {
+	if (ifo->options & DHCPCD_LINK && linkfd == -1) {
 		linkfd = open_link_socket();
-		if (linkfd == -1)
+		if (linkfd == -1) {
 			syslog(LOG_ERR, "open_link_socket: %m");
-		else
+			ifo->options &= ~DHCPCD_LINK;
+		} else
 			add_event(linkfd, handle_link, NULL);
 	}
 
 	if (ifo->options & DHCPCD_IPV6RS && !check_ipv6(NULL))
-		options &= ~DHCPCD_IPV6RS;
+		ifo->options &= ~DHCPCD_IPV6RS;
 	if (ifo->options & DHCPCD_IPV6RS && ipv6_open() == -1) {
-		options &= ~DHCPCD_IPV6RS;
+		ifo->options &= ~DHCPCD_IPV6RS;
 		syslog(LOG_ERR, "ipv6_open: %m");
 	}
 
