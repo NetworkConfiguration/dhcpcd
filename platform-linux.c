@@ -175,7 +175,7 @@ int
 check_ipv6(const char *ifname)
 {
 	int r, ex, i;
-	char path[256];
+	char path[256], *p, **nrest;
 
 	if (ifname == NULL) {
 		ifname = "all";
@@ -203,18 +203,26 @@ check_ipv6(const char *ifname)
 			if (strcmp(restore[i], ifname) == 0)
 				break;
 		if (i == nrestore) {
-			restore = realloc(restore,
-			    (nrestore + 1) * sizeof(char *));
-			if (restore == NULL) {
-				syslog(LOG_ERR, "realloc: %m");
-				exit(EXIT_FAILURE);
+			p = strdup(ifname);
+			if (p == NULL) {
+				syslog(LOG_ERR, "%s: %m", __func__);
+				goto forward;
 			}
-			restore[nrestore++] = xstrdup(ifname);
+			nrest = realloc(restore,
+			    (nrestore + 1) * sizeof(char *));
+			if (nrest == NULL) {
+				syslog(LOG_ERR, "%s: %m", __func__);
+				goto forward;
+			}
+			restore = nrest;
+			restore[nrestore++] = p;
+
 		}
 		if (ex)
 			atexit(restore_kernel_ra);
 	}
 
+forward:
 	if (r != 2) {
 		snprintf(path, sizeof(path), "%s/%s/forwarding",
 		    prefix, ifname);

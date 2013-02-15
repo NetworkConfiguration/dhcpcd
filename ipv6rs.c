@@ -661,7 +661,7 @@ ipv6rs_handledata(_unused void *arg)
 					strcpy(opt + l + 1, ap->saddr);
 				}
 			} else
-				opt = xstrdup(ap->saddr);
+				opt = strdup(ap->saddr);
 			lifetime = ap->prefix_vltime;
 			break;
 
@@ -675,7 +675,7 @@ ipv6rs_handledata(_unused void *arg)
 			}
 			rap->mtu = mtuv;
 			snprintf(buf, sizeof(buf), "%d", mtuv);
-			opt = xstrdup(buf);
+			opt = strdup(buf);
 			break;
 
 		case ND_OPT_RDNSS:
@@ -731,20 +731,26 @@ ipv6rs_handledata(_unused void *arg)
 				syslog(LOG_ERR, "%s: invalid DNSSL option",
 				    ifp->name);
 			} else {
-				tmp = xmalloc(l);
-				decode_rfc3397(tmp, l, n, op);
-				n = print_string(NULL, 0,
-				    l - 1, (const uint8_t *)tmp);
-				opt = xmalloc(n);
-				print_string(opt, n,
-				    l - 1, (const uint8_t *)tmp);
-				free(tmp);
+				tmp = malloc(l);
+				if (tmp) {
+					decode_rfc3397(tmp, l, n, op);
+					n = print_string(NULL, 0,
+					    l - 1, (const uint8_t *)tmp);
+					opt = malloc(n);
+					if (opt)
+						print_string(opt, n,
+						    l - 1,
+						    (const uint8_t *)tmp);
+					free(tmp);
+				}
 			}
 			break;
 		}
 
-		if (opt == NULL)
+		if (opt == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
 			continue;
+		}
 		TAILQ_FOREACH(rao, &rap->options, next) {
 			if (rao->type == ndo->nd_opt_type &&
 			    strcmp(rao->option, opt) == 0)

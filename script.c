@@ -382,7 +382,9 @@ dumplease:
 		env = nenv;
 		e = 0;
 		while (ifo->environ[e]) {
-			env[elen + e] = xstrdup(ifo->environ[e]);
+			env[elen + e] = strdup(ifo->environ[e]);
+			if (env[elen + e] == NULL)
+				goto eexit;
 			e++;
 		}
 		elen += e;
@@ -482,8 +484,13 @@ script_runreason(const struct interface *ifp, const char *reason)
 		e = strlen("PATH") + strlen(path) + 2;
 		env[elen] = xmalloc(e);
 		snprintf(env[elen], e, "PATH=%s", path);
-	} else
-		env[elen] = xstrdup(DEFAULT_PATH);
+	} else {
+		env[elen] = strdup(DEFAULT_PATH);
+		if (env[elen] == NULL) {
+			elen = -1;
+			goto out;
+		}
+	}
 	env[++elen] = '\0';
 
 	pid = exec_script(argv, env);

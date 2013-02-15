@@ -2015,7 +2015,11 @@ log_dhcp(int lvl, const char *msg,
 		a = get_option_string(dhcp, DHO_MESSAGE);
 	else if (dhcp->yiaddr != 0) {
 		addr.s_addr = dhcp->yiaddr;
-		a = xstrdup(inet_ntoa(addr));
+		a = strdup(inet_ntoa(addr));
+		if (a == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			return;
+		}
 	} else
 		a = NULL;
 

@@ -264,21 +264,3 @@ xmalloc(size_t s)
 	/* NOTREACHED */
 }
 #endif
-
-#ifndef xstrdup
-char *
-xstrdup(const char *str)
-{
-	char *value;
-
-	if (str == NULL)
-		return NULL;
-
-	if ((value = strdup(str)) != NULL)
-		return value;
-
-	syslog(LOG_ERR, "memory exhausted (xstrdup)");
-	exit(EXIT_FAILURE);
-	/* NOTREACHED */
-}
-#endif

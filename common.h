@@ -91,6 +91,5 @@ ssize_t setvard(char ***, const char *, const char *, int);
 time_t uptime(void);
 int writepid(int, pid_t);
 void *xmalloc(size_t);
-char *xstrdup(const char *);
 
 #endif

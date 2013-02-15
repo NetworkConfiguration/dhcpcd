@@ -147,7 +147,11 @@ add_environ(struct if_options *ifo, const char *value, int uniq)
 	size_t i = 0, l, lv;
 	char *match = NULL, *p, *n;
 
-	match = xstrdup(value);
+	match = strdup(value);
+	if (match == NULL) {
+		syslog(LOG_ERR, "%s: %m", __func__);
+		return NULL;
+	}
 	p = strchr(match, '=');
 	if (p)
 		*p++ = '\0';
@@ -156,8 +160,13 @@ add_environ(struct if_options *ifo, const char *value, int uniq)
 	while (lst && lst[i]) {
 		if (match && strncmp(lst[i], match, l) == 0) {
 			if (uniq) {
+				n = strdup(value);
+				if (n == NULL) {
+					syslog(LOG_ERR, "%s: %m", __func__);
+					return NULL;
+				}
 				free(lst[i]);
-				lst[i] = xstrdup(value);
+				lst[i] = n;
 			} else {
 				/* Append a space and the value to it */
 				l = strlen(lst[i]);
@@ -178,12 +187,17 @@ add_environ(struct if_options *ifo, const char *value, int uniq)
 		i++;
 	}
 
+	n = strdup(value);
+	if (n == NULL) {
+		syslog(LOG_ERR, "%s: %m", __func__);
+		return NULL;
+	}
 	newlist = realloc(lst, sizeof(char *) * (i + 2));
 	if (newlist == NULL) {
 		syslog(LOG_ERR, "%s: %m", __func__);
 		return NULL;
 	}
-	newlist[i] = xstrdup(value);
+	newlist[i] = n;
 	newlist[i + 1] = NULL;
 	ifo->environ = newlist;
 	free(match);
@@ -300,8 +314,12 @@ static char **
 splitv(int *argc, char **argv, const char *arg)
 {
 	char **n, **v = argv;
-	char *o = xstrdup(arg), *p, *t, *nt;
+	char *o = strdup(arg), *p, *t, *nt;
 
+	if (o == NULL) {
+		syslog(LOG_ERR, "%s: %m", __func__);
+		return v;
+	}
 	p = o;
 	while ((t = strsep(&p, ", "))) {
 		nt = strdup(t);
@@ -774,20 +792,31 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 					if (strncmp(ifo->config[s], arg,
 						p - arg) == 0)
 					{
+						p = strdup(arg);
+						if (p == NULL) {
+							syslog(LOG_ERR,
+							    "%s: %m", __func__);
+							return -1;
+						}
 						free(ifo->config[s]);
-						ifo->config[s] = xstrdup(arg);
+						ifo->config[s] = p;
 						return 1;
 					}
 					s++;
 				}
 			}
-			nconf = realloc(ifo->config, sizeof(char *) * (s + 2));
+			p = strdup(arg);
 			if (p == NULL) {
 				syslog(LOG_ERR, "%s: %m", __func__);
 				return -1;
 			}
+			nconf = realloc(ifo->config, sizeof(char *) * (s + 2));
+			if (nconf == NULL) {
+				syslog(LOG_ERR, "%s: %m", __func__);
+				return -1;
+			}
 			ifo->config = nconf;
-			ifo->config[s] = xstrdup(arg);
+			ifo->config[s] = p;
 			ifo->config[s + 1] = NULL;
 		}
 		break;
@@ -857,7 +886,11 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		break;
 	case O_FALLBACK:
 		free(ifo->fallback);
-		ifo->fallback = xstrdup(arg);
+		ifo->fallback = strdup(arg);
+		if (ifo->fallback == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+		    	return -1;
+		}
 		break;
 #endif
 	case O_IPV6RS:

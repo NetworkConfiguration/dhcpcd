@@ -45,7 +45,9 @@ int make_option_mask(const struct dhcp_opt *dopts,
 	const struct dhcp_opt *opt;
 	int match, n;
 
-	o = p = xstrdup(opts);
+	o = p = strdup(opts);
+	if (opts == NULL)
+		return -1;
 	while ((token = strsep(&p, ", "))) {
 		if (*token == '\0')
 			continue;
