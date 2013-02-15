@@ -453,16 +453,45 @@ start_interface(void *arg)
 		dhcp_start(ifp);
 }
 
+/* ARGSUSED */
+static void
+handle_link(_unused void *arg)
+{
+
+	if (manage_link(linkfd) == -1)
+		syslog(LOG_ERR, "manage_link: %m");
+}
+
 static void
 init_state(struct interface *ifp, int argc, char **argv)
 {
+	struct if_options *ifo;
 	const char *reason = NULL;
 
 	configure_interface(ifp, argc, argv);
+	ifo = ifp->options;
+
+	if (if_options->options & DHCPCD_LINK && linkfd == -1) {
+		linkfd = open_link_socket();
+		if (linkfd == -1) {
+			syslog(LOG_ERR, "open_link_socket: %m");
+			ifo->options &= ~DHCPCD_LINK;
+		} else
+			eloop_event_add(linkfd, handle_link, NULL);
+	}
+
+	if (ifo->options & DHCPCD_IPV6RS && !check_ipv6(NULL))
+		ifo->options &= ~DHCPCD_IPV6RS;
+	if (ifo->options & DHCPCD_IPV6RS && ipv6_init() == -1) {
+		ifo->options &= ~DHCPCD_IPV6RS;
+		syslog(LOG_ERR, "ipv6_init: %m");
+	}
+
+
 	if (!(options & DHCPCD_TEST))
 		script_runreason(ifp, "PREINIT");
 
-	if (ifp->options->options & DHCPCD_LINK) {
+	if (ifo->options & DHCPCD_LINK) {
 		switch (carrier_status(ifp)) {
 		case 0:
 			ifp->carrier = LINK_DOWN;
@@ -572,15 +601,6 @@ handle_hwaddr(const char *ifname, unsigned char *hwaddr, size_t hwlen)
 	free(hwaddr);
 }
 #endif
-
-/* ARGSUSED */
-static void
-handle_link(_unused void *arg)
-{
-
-	if (manage_link(linkfd) == -1)
-		syslog(LOG_ERR, "manage_link: %m");
-}
 
 static void
 if_reboot(struct interface *ifp, int argc, char **argv)
@@ -1105,13 +1125,6 @@ main(int argc, char **argv)
 		syslog(LOG_ERR, "open_sockets: %m");
 		exit(EXIT_FAILURE);
 	}
-	if (if_options->options & DHCPCD_LINK) {
-		linkfd = open_link_socket();
-		if (linkfd == -1)
-			syslog(LOG_ERR, "open_link_socket: %m");
-		else
-			eloop_event_add(linkfd, handle_link, NULL);
-	}
 
 #if 0
 	if (options & DHCPCD_IPV6RS && disable_rtadv() == -1) {
@@ -1119,15 +1132,6 @@ main(int argc, char **argv)
 		options &= ~DHCPCD_IPV6RS;
 	}
 #endif
-
-	if (options & DHCPCD_IPV6 && ipv6_init() == -1) {
-		options &= ~DHCPCD_IPV6;
-		syslog(LOG_ERR, "ipv6_init: %m");
-	}
-	if (options & DHCPCD_IPV6RS && !check_ipv6(NULL))
-		options &= ~DHCPCD_IPV6RS;
-	if (options & DHCPCD_IPV6RS)
-		ipv6rs_init();
 
 	ifc = argc - optind;
 	ifv = argv + optind;

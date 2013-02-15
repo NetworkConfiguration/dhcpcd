@@ -35,6 +35,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <unistd.h>
 
 #include "common.h"
 #include "dhcpcd.h"
@@ -66,14 +67,15 @@ ipv6_cleanup()
 int ipv6_init(void)
 {
 
-	routes = malloc(sizeof(*routes));
-	if (routes == NULL)
-		return -1;
-
-	TAILQ_INIT(routes);
+	if (routes == NULL) {
+		routes = malloc(sizeof(*routes));
+		if (routes == NULL) 
+			return -1;
+		TAILQ_INIT(routes);
 #ifdef DEBUG_MEMORY
-	atexit(ipv6_cleanup);
+		atexit(ipv6_cleanup);
 #endif
+	}
 	return 0;
 }
 

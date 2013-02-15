@@ -43,6 +43,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <unistd.h>
 
 #define ELOOP_QUEUE 1
 #include "common.h"
@@ -104,7 +105,7 @@ struct nd_opt_dnssl {		/* DNSSL option RFC 6106 */
 
 struct rahead ipv6_routers = TAILQ_HEAD_INITIALIZER(ipv6_routers);
 
-static int sock;
+static int sock = -1;
 static struct sockaddr_in6 allrouters, from;
 static struct msghdr sndhdr;
 static struct iovec sndiov[2];
@@ -132,31 +133,32 @@ ipv6rs_open(void)
 	int len;
 	struct icmp6_filter filt;
 
+	sock = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
+	if (sock == -1)
+		return -1;
+
 	memset(&allrouters, 0, sizeof(allrouters));
 	allrouters.sin6_family = AF_INET6;
 #ifdef SIN6_LEN
 	allrouters.sin6_len = sizeof(allrouters);
 #endif
 	if (inet_pton(AF_INET6, ALLROUTERS, &allrouters.sin6_addr.s6_addr) != 1)
-		return -1;
-	sock = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
-	if (sock == -1)
-		return -1;
+		goto eexit;
 	on = 1;
 	if (setsockopt(sock, IPPROTO_IPV6, IPV6_RECVPKTINFO,
 		&on, sizeof(on)) == -1)
-		return -1;
+		goto eexit;
 
 	on = 1;
 	if (setsockopt(sock, IPPROTO_IPV6, IPV6_RECVHOPLIMIT,
 		&on, sizeof(on)) == -1)
-		return -1;
+		goto eexit;
 
 	ICMP6_FILTER_SETBLOCKALL(&filt);
 	ICMP6_FILTER_SETPASS(ND_ROUTER_ADVERT, &filt);
 	if (setsockopt(sock, IPPROTO_ICMPV6, ICMP6_FILTER,
 		&filt, sizeof(filt)) == -1)
-		return -1;
+		goto eexit;
 
 	set_cloexec(sock);
 #if DEBUG_MEMORY
@@ -164,17 +166,17 @@ ipv6rs_open(void)
 #endif
 
 	len = CMSG_SPACE(sizeof(struct in6_pktinfo)) + CMSG_SPACE(sizeof(int));
-	sndbuf = xzalloc(len);
+	sndbuf = calloc(1, len);
 	if (sndbuf == NULL)
-		return -1;
+		goto eexit;
 	sndhdr.msg_namelen = sizeof(struct sockaddr_in6);
 	sndhdr.msg_iov = sndiov;
 	sndhdr.msg_iovlen = 1;
 	sndhdr.msg_control = sndbuf;
 	sndhdr.msg_controllen = len;
-	rcvbuf = xzalloc(len);
+	rcvbuf = calloc(1, len);
 	if (rcvbuf == NULL)
-		return -1;
+		goto eexit;
 	rcvhdr.msg_name = &from;
 	rcvhdr.msg_namelen = sizeof(from);
 	rcvhdr.msg_iov = rcviov;
@@ -184,6 +186,15 @@ ipv6rs_open(void)
 	rcviov[0].iov_base = ansbuf;
 	rcviov[0].iov_len = sizeof(ansbuf);
 	return sock;
+
+eexit:
+	close(sock);
+	sock = -1;
+	free(sndbuf);
+	sndbuf = NULL;
+	free(rcvbuf);
+	rcvbuf = NULL;
+	return -1;
 }
 
 static int
@@ -786,8 +797,8 @@ ipv6rs_handledata(_unused void *arg)
 
 	/* If we're owning the RA then we need to try and ensure the
 	 * router is actually reachable */
-	if (options & DHCPCD_IPV6RA_OWN ||
-	    options & DHCPCD_IPV6RA_OWN_DEFAULT)
+	if (ifp->options->options & DHCPCD_IPV6RA_OWN ||
+	    ifp->options->options & DHCPCD_IPV6RA_OWN_DEFAULT)
 	{
 		rap->nsprobes = 0;
 		ipv6ns_sendprobe(rap);
@@ -1085,19 +1096,33 @@ ipv6rs_start(struct interface *ifp)
 {
 	struct rs_state *state;
 
-	eloop_timeout_delete(NULL, ifp);
-
-	state = RS_STATE(ifp);
-	if (state == NULL) {
-		ifp->if_data[IF_DATA_IPV6RS] = xzalloc(sizeof(*state));
-		state = RS_STATE(ifp);
+	if (sock == -1) {
+		if (ipv6rs_open() == -1) {
+			syslog(LOG_ERR, "%s: ipv6rs_open: %m", __func__);
+			return -1;
+		}
+		eloop_event_add(sock, ipv6rs_handledata, NULL);
 	}
 
-	/* Always make a new probe as the underlying hardware
-	 * address could have changed. */
-	ipv6rs_makeprobe(ifp);
-	if (state->rs == NULL)
-		return -1;
+ 	eloop_timeout_delete(NULL, ifp);
+ 
+ 	state = RS_STATE(ifp);
+ 	if (state == NULL) {
+		ifp->if_data[IF_DATA_IPV6RS] = calloc(1, sizeof(*state));
+ 		state = RS_STATE(ifp);
+		if (state == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			return -1;
+		}
+ 	}
+ 
+ 	/* Always make a new probe as the underlying hardware
+ 	 * address could have changed. */
+ 	ipv6rs_makeprobe(ifp);
+	if (state->rs == NULL) {
+		syslog(LOG_ERR, "%s: ipv6rs_makeprobe: %m", __func__);
+ 		return -1;
+	}
 
 	state->rsprobes = 0;
 	ipv6rs_sendprobe(ifp);

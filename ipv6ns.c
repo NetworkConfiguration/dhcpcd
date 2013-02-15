@@ -39,6 +39,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <unistd.h>
 
 #ifdef __linux__
 #  define _LINUX_IN6_H
@@ -59,7 +60,7 @@
 /* Debugging Neighbor Solicitations is a lot of spam, so disable it */
 //#define DEBUG_NS
 
-static int sock;
+static int sock = -1;
 static struct sockaddr_in6 from;
 static struct msghdr sndhdr;
 static struct iovec sndiov[2];
@@ -69,6 +70,8 @@ static struct iovec rcviov[2];
 static unsigned char *rcvbuf;
 static unsigned char ansbuf[1500];
 static char ntopbuf[INET6_ADDRSTRLEN];
+
+static void ipv6ns_handledata(_unused void *arg);
 
 #if DEBUG_MEMORY
 static void
@@ -92,19 +95,19 @@ ipv6ns_open(void)
 		return -1;
 	on = 1;
 	if (setsockopt(sock, IPPROTO_IPV6, IPV6_RECVPKTINFO,
-		&on, sizeof(on)) == -1)
-		return -1;
+	    &on, sizeof(on)) == -1)
+		goto eexit;
 
 	on = 1;
 	if (setsockopt(sock, IPPROTO_IPV6, IPV6_RECVHOPLIMIT,
-		&on, sizeof(on)) == -1)
-		return -1;
+	    &on, sizeof(on)) == -1)
+		goto eexit;
 
 	ICMP6_FILTER_SETBLOCKALL(&filt);
 	ICMP6_FILTER_SETPASS(ND_NEIGHBOR_ADVERT, &filt);
 	if (setsockopt(sock, IPPROTO_ICMPV6, ICMP6_FILTER,
-		&filt, sizeof(filt)) == -1)
-		return -1;
+	    &filt, sizeof(filt)) == -1)
+		goto eexit;
 
 	set_cloexec(sock);
 #if DEBUG_MEMORY
@@ -112,17 +115,17 @@ ipv6ns_open(void)
 #endif
 
 	len = CMSG_SPACE(sizeof(struct in6_pktinfo)) + CMSG_SPACE(sizeof(int));
-	sndbuf = xzalloc(len);
+	sndbuf = calloc(1, len);
 	if (sndbuf == NULL)
-		return -1;
+		goto eexit;
 	sndhdr.msg_namelen = sizeof(struct sockaddr_in6);
 	sndhdr.msg_iov = sndiov;
 	sndhdr.msg_iovlen = 1;
 	sndhdr.msg_control = sndbuf;
 	sndhdr.msg_controllen = len;
-	rcvbuf = xzalloc(len);
+	rcvbuf = calloc(1, len);
 	if (rcvbuf == NULL)
-		return -1;
+		goto eexit;
 	rcvhdr.msg_name = &from;
 	rcvhdr.msg_namelen = sizeof(from);
 	rcvhdr.msg_iov = rcviov;
@@ -132,6 +135,15 @@ ipv6ns_open(void)
 	rcviov[0].iov_base = ansbuf;
 	rcviov[0].iov_len = sizeof(ansbuf);
 	return sock;
+
+eexit:
+	close(sock);
+	sock = -1;
+	free(sndbuf);
+	sndbuf = NULL;
+	free(rcvbuf);
+	rcvbuf = NULL;
+	return -1;
 }
 
 static int
@@ -142,7 +154,7 @@ ipv6ns_makeprobe(struct ra *rap)
 
 	free(rap->ns);
 	rap->nslen = sizeof(*ns) + ROUNDUP8(rap->iface->hwlen + 2);
-	rap->ns = xzalloc(rap->nslen);
+	rap->ns = calloc(1, rap->nslen);
 	if (rap->ns == NULL)
 		return -1;
 	ns = (struct nd_neighbor_solicit *)(void *)rap->ns;
@@ -182,9 +194,17 @@ ipv6ns_sendprobe(void *arg)
 	int hoplimit = HOPLIMIT;
 	struct timeval tv, rtv;
 
-	if (!rap->ns) {
-		if (ipv6ns_makeprobe(rap) == -1)
+	if (sock == -1) {
+		if (ipv6ns_open() == -1) {
+			syslog(LOG_ERR, "%s: ipv6ns_open: %m", __func__);
 			return;
+		}
+		eloop_event_add(sock, ipv6ns_handledata, NULL);
+	}
+
+	if (!rap->ns && ipv6ns_makeprobe(rap) == -1) {
+		syslog(LOG_ERR, "%s: ipv6ns_makeprobe: %m", __func__);
+		return;
 	}
 
 	memset(&dst, 0, sizeof(dst));
@@ -220,7 +240,8 @@ ipv6ns_sendprobe(void *arg)
 	    rap->iface->name, rap->sfrom);
 #endif
 	if (sendmsg(sock, &sndhdr, 0) == -1)
-		syslog(LOG_ERR, "%s: sendmsg: %m", rap->iface->name);
+		syslog(LOG_ERR, "%s: %s: sendmsg: %m",
+		    __func__, rap->iface->name);
 
 
 	ms_to_tv(&tv, rap->retrans == 0 ? RETRANS_TIMER : rap->retrans);
