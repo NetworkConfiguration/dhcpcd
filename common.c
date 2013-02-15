@@ -265,20 +265,6 @@ xmalloc(size_t s)
 }
 #endif
 
-#ifndef xrealloc
-void *
-xrealloc(void *ptr, size_t s)
-{
-	void *value = realloc(ptr, s);
-
-	if (value != NULL)
-		return value;
-	syslog(LOG_ERR, "memory exhausted (xrealloc %zu bytes)", s);
-	exit(EXIT_FAILURE);
-	/* NOTREACHED */
-}
-#endif
-
 #ifndef xstrdup
 char *
 xstrdup(const char *str)

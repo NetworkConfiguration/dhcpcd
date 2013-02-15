@@ -125,7 +125,7 @@ append_config(char ***env, ssize_t *len,
     const char *prefix, const char *const *config)
 {
 	ssize_t i, j, e1;
-	char **ne, *eq;
+	char **ne, *eq, **nep;
 
 	if (config == NULL)
 		return;
@@ -145,7 +145,12 @@ append_config(char ***env, ssize_t *len,
 		}
 		if (j == *len) {
 			j++;
-			ne = xrealloc(ne, sizeof(char *) * (j + 1));
+			nep = realloc(ne, sizeof(char *) * (j + 1));
+			if (nep == NULL) {
+				syslog(LOG_ERR, "%s: %m", __func__);
+				break;
+			}
+			ne = nep;
 			ne[j - 1] = make_var(prefix, config[i]);
 			*len = j;
 		}
@@ -179,7 +184,7 @@ arraytostr(const char *const *argv, char **s)
 static ssize_t
 make_env(const struct interface *ifp, const char *reason, char ***argv)
 {
-	char **env, *p;
+	char **env, **nenv, *p;
 	ssize_t e, elen, l;
 	const struct if_options *ifo = ifp->options;
 	const struct interface *ifp2;
@@ -218,7 +223,9 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 		elen = 10;
 
 	/* Make our env */
-	env = xmalloc(sizeof(char *) * (elen + 1));
+	env = calloc(1, sizeof(char *) * (elen + 1));
+	if (env == NULL)
+		goto eexit;
 	e = strlen("interface") + strlen(ifp->name) + 2;
 	env[0] = xmalloc(e);
 	snprintf(env[0], e, "interface=%s", ifp->name);
@@ -278,12 +285,18 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	if (ifp->wireless) {
 		e = strlen("new_ssid=") + strlen(ifp->ssid) + 2;
 		if (strcmp(reason, "CARRIER") == 0) {
-			env = xrealloc(env, sizeof(char *) * (elen + 2));
+			nenv = realloc(env, sizeof(char *) * (elen + 2));
+			if (nenv == NULL)
+				goto eexit;
+			env = nenv;
 			env[elen] = xmalloc(e);
 			snprintf(env[elen++], e, "new_ssid=%s", ifp->ssid);
 		}
 		else if (strcmp(reason, "NOCARRIER") == 0) {
-			env = xrealloc(env, sizeof(char *) * (elen + 2));
+			nenv = realloc(env, sizeof(char *) * (elen + 2));
+			if (nenv == NULL)
+				goto eexit;
+			env = nenv;
 			env[elen] = xmalloc(e);
 			snprintf(env[elen++], e, "old_ssid=%s", ifp->ssid);
 		}
@@ -292,9 +305,11 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	if (dhcp && state && state->old) {
 		e = dhcp_env(NULL, NULL, state->old, ifp);
 		if (e > 0) {
-			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
-			elen += dhcp_env(env + elen, "old",
-			    state->old, ifp);
+			nenv = realloc(env, sizeof(char *) * (elen + e + 1));
+			if (nenv == NULL)
+				goto eexit;
+			env = nenv;
+			elen += dhcp_env(env + elen, "old", state->old, ifp);
 		}
 		append_config(&env, &elen, "old",
 		    (const char *const *)ifo->config);
@@ -305,7 +320,10 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 		e = dhcp6_env(NULL, NULL, ifp,
 		    d6_state->old, d6_state->old_len);
 		if (e > 0) {
-			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
+			nenv = realloc(env, sizeof(char *) * (elen + e + 1));
+			if (nenv == NULL)
+				goto eexit;
+			env = nenv;
 			elen += dhcp6_env(env + elen, "old", ifp,
 			    d6_state->old, d6_state->old_len);
 		}
@@ -317,7 +335,10 @@ dumplease:
 	if (dhcp && state && state->new) {
 		e = dhcp_env(NULL, NULL, state->new, ifp);
 		if (e > 0) {
-			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
+			nenv = realloc(env, sizeof(char *) * (elen + e + 1));
+			if (nenv == NULL)
+				goto eexit;
+			env = nenv;
 			elen += dhcp_env(env + elen, "new",
 			    state->new, ifp);
 		}
@@ -330,7 +351,10 @@ dumplease:
 		e = dhcp6_env(NULL, NULL, ifp,
 		    d6_state->new, d6_state->new_len);
 		if (e > 0) {
-			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
+			nenv = realloc(env, sizeof(char *) * (elen + e + 1));
+			if (nenv == NULL)
+				goto eexit;
+			env = nenv;
 			elen += dhcp6_env(env + elen, "new", ifp,
 			    d6_state->new, d6_state->new_len);
 		}
@@ -338,7 +362,10 @@ dumplease:
 	if (ra) {
 		e = ipv6rs_env(NULL, NULL, ifp);
 		if (e > 0) {
-			env = xrealloc(env, sizeof(char *) * (elen + e + 1));
+			nenv = realloc(env, sizeof(char *) * (elen + e + 1));
+			if (nenv == NULL)
+				goto eexit;
+			env = nenv;
 			elen += ipv6rs_env(env + elen, NULL, ifp);
 		}
 	}
@@ -349,7 +376,10 @@ dumplease:
 		e = 0;
 		while (ifo->environ[e++])
 			;
-		env = xrealloc(env, sizeof(char *) * (elen + e + 1));
+		nenv = realloc(env, sizeof(char *) * (elen + e + 1));
+		if (nenv == NULL)
+			goto eexit;
+		env = nenv;
 		e = 0;
 		while (ifo->environ[e]) {
 			env[elen + e] = xstrdup(ifo->environ[e]);
@@ -361,6 +391,14 @@ dumplease:
 
 	*argv = env;
 	return elen;
+
+eexit:
+	syslog(LOG_ERR, "%s: %m", __func__);
+	nenv = env;
+	while (*nenv)
+		free(*nenv++);
+	free(env);
+	return -1;
 }
 
 static int
@@ -432,7 +470,12 @@ script_runreason(const struct interface *ifp, const char *reason)
 
 	/* Make our env */
 	elen = make_env(ifp, reason, &env);
-	env = xrealloc(env, sizeof(char *) * (elen + 2));
+	ep = realloc(env, sizeof(char *) * (elen + 2));
+	if (ep == NULL) {
+		elen = -1;
+		goto out;
+	}
+	env = ep;
 	/* Add path to it */
 	path = getenv("PATH");
 	if (path) {
@@ -483,10 +526,13 @@ script_runreason(const struct interface *ifp, const char *reason)
 	}
 	free(bigenv);
 
+out:
 	/* Cleanup */
 	ep = env;
 	while (*ep)
 		free(*ep++);
 	free(env);
+	if (elen == -1)
+		return -1;
 	return WEXITSTATUS(status);
 }

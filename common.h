@@ -90,7 +90,6 @@ ssize_t setvar(char ***, const char *, const char *, const char *);
 ssize_t setvard(char ***, const char *, const char *, int);
 time_t uptime(void);
 int writepid(int, pid_t);
-void *xrealloc(void *, size_t);
 void *xmalloc(size_t);
 char *xstrdup(const char *);
 

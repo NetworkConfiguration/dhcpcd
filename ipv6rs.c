@@ -653,10 +653,13 @@ ipv6rs_handledata(_unused void *arg)
 			    ntohl(pi->nd_opt_pi_preferred_time);
 			if (opt) {
 				l = strlen(opt);
-				opt = xrealloc(opt,
+				tmp = realloc(opt,
 					l + strlen(ap->saddr) + 2);
-				opt[l] = ' ';
-				strcpy(opt + l + 1, ap->saddr);
+				if (tmp) {
+					opt = tmp;
+					opt[l] = ' ';
+					strcpy(opt + l + 1, ap->saddr);
+				}
 			} else
 				opt = xstrdup(ap->saddr);
 			lifetime = ap->prefix_vltime;

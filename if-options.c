@@ -145,7 +145,7 @@ add_environ(struct if_options *ifo, const char *value, int uniq)
 	char **newlist;
 	char **lst = ifo->environ;
 	size_t i = 0, l, lv;
-	char *match = NULL, *p;
+	char *match = NULL, *p, *n;
 
 	match = xstrdup(value);
 	p = strchr(match, '=');
@@ -162,7 +162,12 @@ add_environ(struct if_options *ifo, const char *value, int uniq)
 				/* Append a space and the value to it */
 				l = strlen(lst[i]);
 				lv = strlen(p);
-				lst[i] = xrealloc(lst[i], l + lv + 2);
+				n = realloc(lst[i], l + lv + 2);
+				if (n == NULL) {
+					syslog(LOG_ERR, "%s: %m", __func__);
+					return NULL;
+				}
+				lst[i] = n;
 				lst[i][l] = ' ';
 				memcpy(lst[i] + l + 1, p, lv);
 				lst[i][l + lv + 1] = '\0';
@@ -173,7 +178,11 @@ add_environ(struct if_options *ifo, const char *value, int uniq)
 		i++;
 	}
 
-	newlist = xrealloc(lst, sizeof(char *) * (i + 2));
+	newlist = realloc(lst, sizeof(char *) * (i + 2));
+	if (newlist == NULL) {
+		syslog(LOG_ERR, "%s: %m", __func__);
+		return NULL;
+	}
 	newlist[i] = xstrdup(value);
 	newlist[i + 1] = NULL;
 	ifo->environ = newlist;
@@ -290,14 +299,24 @@ parse_string_hwaddr(char *sbuf, ssize_t slen, const char *str, int clid)
 static char **
 splitv(int *argc, char **argv, const char *arg)
 {
-	char **v = argv;
-	char *o = xstrdup(arg), *p, *t;
+	char **n, **v = argv;
+	char *o = xstrdup(arg), *p, *t, *nt;
 
 	p = o;
 	while ((t = strsep(&p, ", "))) {
+		nt = strdup(t);
+		if (nt == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			return NULL;
+		}
 		(*argc)++;
-		v = xrealloc(v, sizeof(char *) * ((*argc)));
-		v[(*argc) - 1] = xstrdup(t);
+		n = realloc(v, sizeof(char *) * ((*argc)));
+		if (n == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			return NULL;
+		}
+		v = n;
+		v[(*argc) - 1] = nt;
 	}
 	free(o);
 	return v;	
@@ -374,9 +393,10 @@ static int
 parse_option(struct if_options *ifo, int opt, const char *arg)
 {
 	int i;
-	char *p = NULL, *fp, *np;
+	char *p = NULL, *fp, *np, **nconf;
 	ssize_t s;
 	struct in_addr addr, addr2;
+	in_addr_t *naddr;
 	struct rt *rt;
 	const struct dhcp_opt const *d;
 	uint8_t *request, *require, *no;
@@ -761,8 +781,12 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 					s++;
 				}
 			}
-			ifo->config = xrealloc(ifo->config,
-			    sizeof(char *) * (s + 2));
+			nconf = realloc(ifo->config, sizeof(char *) * (s + 2));
+			if (p == NULL) {
+				syslog(LOG_ERR, "%s: %m", __func__);
+				return -1;
+			}
+			ifo->config = nconf;
 			ifo->config[s] = xstrdup(arg);
 			ifo->config[s + 1] = NULL;
 		}
@@ -772,8 +796,13 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			return -1;
 		if (strchr(arg, '/') == NULL)
 			addr2.s_addr = INADDR_BROADCAST;
-		ifo->whitelist = xrealloc(ifo->whitelist,
+		naddr = realloc(ifo->whitelist,
 		    sizeof(in_addr_t) * (ifo->whitelist_len + 2));
+		if (naddr == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			return -1;
+		}
+		ifo->whitelist = naddr;
 		ifo->whitelist[ifo->whitelist_len++] = addr.s_addr;
 		ifo->whitelist[ifo->whitelist_len++] = addr2.s_addr;
 		break;
@@ -782,8 +811,13 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			return -1;
 		if (strchr(arg, '/') == NULL)
 			addr2.s_addr = INADDR_BROADCAST;
-		ifo->blacklist = xrealloc(ifo->blacklist,
+		naddr = realloc(ifo->blacklist,
 		    sizeof(in_addr_t) * (ifo->blacklist_len + 2));
+		if (naddr == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			return -1;
+		}
+		ifo->blacklist = naddr;
 		ifo->blacklist[ifo->blacklist_len++] = addr.s_addr;
 		ifo->blacklist[ifo->blacklist_len++] = addr2.s_addr;
 		break;
@@ -802,8 +836,13 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	case O_ARPING:
 		if (parse_addr(&addr, NULL, arg) != 0)
 			return -1;
-		ifo->arping = xrealloc(ifo->arping,
+		naddr = realloc(ifo->arping,
 		    sizeof(in_addr_t) * (ifo->arping_len + 1));
+		if (naddr == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			return -1;
+		}
+		ifo->arping = naddr;
 		ifo->arping[ifo->arping_len++] = addr.s_addr;
 		break;
 	case O_DESTINATION:
