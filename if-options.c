@@ -707,7 +707,12 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			while (*np == ' ')
 				np++;
 			if (ifo->routes == NULL) {
-				rt = ifo->routes = xmalloc(sizeof(*rt));
+				rt = ifo->routes = calloc(1, sizeof(*rt));
+				if (rt == NULL) {
+					syslog(LOG_ERR, "%s: %m", __func__);
+					*fp = ' ';
+					return -1;
+				}
 			} else {
 				rt = ifo->routes;
 				while (rt->next)
@@ -725,7 +730,11 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			*fp = ' ';
 		} else if (strncmp(arg, "routers=", strlen("routers=")) == 0) {
 			if (ifo->routes == NULL) {
-				rt = ifo->routes = xzalloc(sizeof(*rt));
+				rt = ifo->routes = calloc(1, sizeof(*rt));
+				if (rt == NULL) {
+					syslog(LOG_ERR, "%s: %m", __func__);
+					return -1;
+				}
 			} else {
 				rt = ifo->routes;
 				while (rt->next)
@@ -868,7 +877,11 @@ read_config(const char *file,
 	int skip = 0, have_profile = 0;
 
 	/* Seed our default options */
-	ifo = xzalloc(sizeof(*ifo));
+	ifo = calloc(1, sizeof(*ifo));
+	if (ifo == NULL) {
+		syslog(LOG_ERR, "%s: %m", __func__);
+		return NULL;
+	}
 	ifo->options |= DHCPCD_DAEMONISE | DHCPCD_LINK;
 #ifdef INET
 	ifo->options |= DHCPCD_IPV4 | DHCPCD_IPV4LL;

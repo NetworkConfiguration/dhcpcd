@@ -370,7 +370,11 @@ make_route(const struct interface *ifp, struct ra *rap)
 {
 	struct rt6 *r;
 
-	r = xzalloc(sizeof(*r));
+	r = calloc(1, sizeof(*r));
+	if (r == NULL) {
+		syslog(LOG_ERR, "%s: %m", __func__);
+		return NULL;
+	}
 	r->ra = rap;
 	r->iface = ifp;
 	r->metric = ifp->metric;
@@ -390,6 +394,8 @@ make_prefix(const struct interface * ifp,struct ra *rap, struct ipv6_addr *addr)
 		return NULL;
 
 	r = make_route(ifp, rap);
+	if (r == NULL)
+		return r;
 	r->dest = addr->prefix;
 	ipv6_mask(&r->net, addr->prefix_len);
 	r->gate = in6addr_any;
@@ -403,6 +409,8 @@ make_router(struct ra *rap)
 	struct rt6 *r;
 
 	r = make_route(rap->iface, rap);
+	if (r == NULL)
+		return NULL;
 	r->dest = in6addr_any;
 	r->net = in6addr_any;
 	r->gate = rap->from;

@@ -496,10 +496,15 @@ decode_rfc3442_rt(int dl, const uint8_t *data)
 		}
 
 		if (rt) {
-			rt->next = xzalloc(sizeof(*rt));
+			rt->next = calloc(1, sizeof(*rt));
 			rt = rt->next;
 		} else {
-			routes = rt = xzalloc(sizeof(*routes));
+			routes = rt = calloc(1, sizeof(*routes));
+		}
+		if (rt == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			ipv4_freeroutes(routes);
+			return NULL;
 		}
 		rt->next = NULL;
 
@@ -737,10 +742,14 @@ get_option_routes(struct interface *ifp, const struct dhcp_message *dhcp)
 		e = p + len;
 		while (p < e) {
 			if (route) {
-				route->next = xmalloc(sizeof(*route));
+				route->next = calloc(1, sizeof(*route));
 				route = route->next;
 			} else
-				routes = route = xmalloc(sizeof(*routes));
+				routes = route = calloc(1, sizeof(*routes));
+			if (route == NULL) {
+				syslog(LOG_ERR, "%s: %m", __func__);
+				break;
+			}
 			route->next = NULL;
 			memcpy(&route->dest.s_addr, p, 4);
 			p += 4;
@@ -759,10 +768,14 @@ get_option_routes(struct interface *ifp, const struct dhcp_message *dhcp)
 		e = p + len;
 		while (p < e) {
 			if (route) {
-				route->next = xzalloc(sizeof(*route));
+				route->next = calloc(1, sizeof(*route));
 				route = route->next;
 			} else
-				routes = route = xzalloc(sizeof(*route));
+				routes = route = calloc(1, sizeof(*route));
+			if (route == NULL) {
+				syslog(LOG_ERR, "%s: %m", __func__);
+				break;
+			}
 			memcpy(&route->gate.s_addr, p, 4);
 			p += 4;
 		}
@@ -848,7 +861,9 @@ make_message(struct dhcp_message **message,
 	const struct dhcp_lease *lease = &state->lease;
 	time_t up = uptime() - state->start_uptime;
 
-	dhcp = xzalloc(sizeof (*dhcp));
+	dhcp = calloc(1, sizeof (*dhcp));
+	if (dhcp == NULL)
+		return -1;
 	m = (uint8_t *)dhcp;
 	p = dhcp->options;
 
@@ -1394,7 +1409,9 @@ dhcp_makeudppacket(uint8_t **p, const uint8_t *data, size_t length,
 	struct ip *ip;
 	struct udphdr *udp;
 
-	udpp = xzalloc(sizeof(*udpp));
+	udpp = calloc(1, sizeof(*udpp));
+	if (udpp == NULL)
+		return -1;
 	ip = &udpp->ip;
 	udp = &udpp->udp;
 
@@ -1499,6 +1516,8 @@ send_message(struct interface *iface, int type,
 		}
 	} else {
 		len = dhcp_makeudppacket(&udp, (uint8_t *)dhcp, len, from, to);
+		if (len == -1)
+			return;
 		r = ipv4_sendrawpacket(iface, ETHERTYPE_IP, udp, len);
 		free(udp);
 		/* If we failed to send a raw packet this normally means
@@ -1825,7 +1844,9 @@ dhcp_message_new(struct in_addr *addr, struct in_addr *mask)
 	struct dhcp_message *dhcp;
 	uint8_t *p;
 
-	dhcp = xzalloc(sizeof(*dhcp));
+	dhcp = calloc(1, sizeof(*dhcp));
+	if (dhcp == NULL)
+		return NULL;
 	dhcp->yiaddr = addr->s_addr;
 	p = dhcp->options;
 	if (mask && mask->s_addr != INADDR_ANY) {
@@ -2319,8 +2340,13 @@ dhcp_handlepacket(void *arg)
 			    iface->name, inet_ntoa(from));
 			continue;
 		}
-		if (!dhcp)
-			dhcp = xzalloc(sizeof(*dhcp));
+		if (dhcp == NULL) {
+		        dhcp = calloc(1, sizeof(*dhcp));
+			if (dhcp == NULL) {
+				syslog(LOG_ERR, "%s: calloc: %m", __func__);
+				break;
+			}
+		}
 		memcpy(dhcp, pp, bytes);
 		if (dhcp->cookie != htonl(MAGIC_COOKIE)) {
 			syslog(LOG_DEBUG, "%s: bogus cookie from %s",
@@ -2386,9 +2412,15 @@ dhcp_dump(const char *ifname)
 	struct interface *ifp;
 	struct dhcp_state *state;
 
-	ifaces = ifp = xzalloc(sizeof(*ifp));
-	ifp->if_data[IF_DATA_DHCP] = state = xzalloc(sizeof(*state));
-	ifp->options = xzalloc(sizeof(*ifp->options));
+	ifaces = ifp = calloc(1, sizeof(*ifp));
+	if (ifp == NULL)
+		goto eexit;
+	ifp->if_data[IF_DATA_DHCP] = state = calloc(1, sizeof(*state));
+	if (state == NULL)
+		goto eexit;
+	ifp->options = calloc(1, sizeof(*ifp->options));
+	if (ifp->options == NULL)
+		goto eexit;
 	strlcpy(ifp->name, ifname, sizeof(ifp->name));
 	snprintf(state->leasefile, sizeof(state->leasefile),
 	    LEASEFILE, ifp->name);
@@ -2406,6 +2438,10 @@ dhcp_dump(const char *ifname)
 	}
 	state->reason = "DUMP";
 	return script_runreason(ifp, state->reason);
+
+eexit:
+	syslog(LOG_ERR, "%s: %m", __func__);
+	return -1;
 }
 
 void

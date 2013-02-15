@@ -207,7 +207,7 @@ ipv6rs_makeprobe(struct interface *ifp)
 	state = RS_STATE(ifp);
 	free(state->rs);
 	state->rslen = sizeof(*rs) + ROUNDUP8(ifp->hwlen + 2);
-	state->rs = xzalloc(state->rslen);
+	state->rs = calloc(1, state->rslen);
 	if (state->rs == NULL)
 		return -1;
 	rs = (struct nd_router_solicit *)(void *)state->rs;
@@ -512,7 +512,11 @@ ipv6rs_handledata(_unused void *arg)
 		new_data = 0;
 
 	if (rap == NULL) {
-		rap = xzalloc(sizeof(*rap));
+		rap = calloc(1, sizeof(*rap));
+		if (rap == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			return;
+		}
 		rap->iface = ifp;
 		memcpy(rap->from.s6_addr, from.sin6_addr.s6_addr,
 		    sizeof(rap->from.s6_addr));

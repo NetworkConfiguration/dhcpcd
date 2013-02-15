@@ -516,7 +516,9 @@ if_address(const struct interface *iface,
 	struct nlma *nlm;
 	int retval = 0;
 
-	nlm = xzalloc(sizeof(*nlm));
+	nlm = calloc(1, sizeof(*nlm));
+	if (nlm == NULL)
+		return -1;
 	nlm->hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifaddrmsg));
 	nlm->hdr.nlmsg_flags = NLM_F_REQUEST;
 	if (action >= 0) {
@@ -549,7 +551,9 @@ if_route(const struct rt *rt, int action)
 	int retval = 0;
 	struct dhcp_state *state;
 
-	nlm = xzalloc(sizeof(*nlm));
+	nlm = calloc(1, sizeof(*nlm));
+	if (nlm == NULL)
+		return -1;
 	nlm->hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
 	nlm->hdr.nlmsg_type = RTM_NEWROUTE;
 	if (action == 0)
@@ -614,7 +618,9 @@ if_address6(const struct interface *ifp, const struct ipv6_addr *ap, int action)
 	struct ifa_cacheinfo cinfo;
 	int retval = 0;
 
-	nlm = xzalloc(sizeof(*nlm));
+	nlm = calloc(1, sizeof(*nlm));
+	if (nlm == NULL)
+		return -1;
 	nlm->hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifaddrmsg));
 	nlm->hdr.nlmsg_flags = NLM_F_REQUEST;
 	if (action >= 0) {
@@ -673,7 +679,9 @@ if_route6(const struct rt6 *rt, int action)
 	struct rtattr *metrics = (void *)metricsbuf;
 	int retval = 0;
 
-	nlm = xzalloc(sizeof(*nlm));
+	nlm = calloc(1, sizeof(*nlm));
+	if (nlm == NULL)
+		return -1;
 	nlm->hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
 	nlm->hdr.nlmsg_type = RTM_NEWROUTE;
 	nlm->hdr.nlmsg_flags = NLM_F_REQUEST;

@@ -92,7 +92,6 @@ time_t uptime(void);
 int writepid(int, pid_t);
 void *xrealloc(void *, size_t);
 void *xmalloc(size_t);
-void *xzalloc(size_t);
 char *xstrdup(const char *);
 
 #endif

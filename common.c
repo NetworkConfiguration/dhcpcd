@@ -296,12 +296,3 @@ xstrdup(const char *str)
 	/* NOTREACHED */
 }
 #endif
-
-void *
-xzalloc(size_t s)
-{
-	void *value = xmalloc(s);
-
-	memset(value, 0, s);
-	return value;
-}

@@ -471,7 +471,7 @@ init_state(struct interface *ifp, int argc, char **argv)
 	configure_interface(ifp, argc, argv);
 	ifo = ifp->options;
 
-	if (if_options->options & DHCPCD_LINK && linkfd == -1) {
+	if (ifo->options & DHCPCD_LINK && linkfd == -1) {
 		linkfd = open_link_socket();
 		if (linkfd == -1) {
 			syslog(LOG_ERR, "open_link_socket: %m");

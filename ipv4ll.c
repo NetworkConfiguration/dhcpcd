@@ -47,7 +47,9 @@ ipv4ll_make_lease(uint32_t addr)
 	struct dhcp_message *dhcp;
 	uint8_t *p;
 
-	dhcp = xzalloc(sizeof(*dhcp));
+	dhcp = calloc(1, sizeof(*dhcp));
+	if (dhcp == NULL)
+		return NULL;
 	/* Put some LL options in */
 	dhcp->yiaddr = addr;
 	p = dhcp->options;
@@ -116,8 +118,12 @@ ipv4ll_start(void *arg)
 		state->offer = ipv4ll_find_lease(addr);
 	else
 		state->offer = ipv4ll_make_lease(addr);
-	state->lease.frominfo = 0;
-	arp_probe(ifp);
+	if (state->offer == NULL)
+		syslog(LOG_ERR, "%s: %m", __func__);
+	else {
+		state->lease.frominfo = 0;
+		arp_probe(ifp);
+	}
 }
 
 void

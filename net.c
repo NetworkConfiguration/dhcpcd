@@ -283,7 +283,9 @@ discover_interfaces(int argc, char * const *argv)
 			p = ifa->ifa_name;
 		}
 
-		ifp = xzalloc(sizeof(*ifp));
+		ifp = calloc(1, sizeof(*ifp));
+		if (ifp == NULL)
+			return NULL;
 		strlcpy(ifp->name, p, sizeof(ifp->name));
 		ifp->flags = ifa->ifa_flags;
 
