@@ -745,6 +745,9 @@ ipv6rs_handledata(_unused void *arg)
 				}
 			}
 			break;
+
+		default:
+			continue;
 		}
 
 		if (opt == NULL) {
