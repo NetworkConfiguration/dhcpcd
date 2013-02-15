@@ -56,7 +56,69 @@ for x do
 	--includedir) eval INCLUDEDIR="$INCLUDEDIR${INCLUDEDIR:+ }$var";;
 	--datadir|--infodir) ;; # ignore autotools
 	--disable-maintainer-mode|--disable-dependency-tracking) ;;
-	--help) echo "See the README file for available options"; exit 0;;
+	-V|--version)
+		v=$(sed -ne 's/.*VERSION[[:space:]]*"\([^"]*\).*/\1/p' defs.h);
+		c=$(sed -ne 's/^.*copyright\[\] = "\([^"]*\).*/\1/p' dhcpcd.c);
+		echo "dhcpcd-$v $c";
+		exit 0;;
+	-h|--help) cat <<EOF
+\`configure' configures this package to adapt to many kinds of systems.
+
+Usage: configure [OPTION]... [VAR=VALUE]...
+
+To assign environment variables (e.g., CC, CFLAGS...), specify them as
+VAR=VALUE.  See below for descriptions of some of the useful variables.
+
+Defaults for the options are specified in brackets.
+
+Configuration:
+  -h, --help              display this help and exit
+      --help=short        display options specific to this package
+  -V, --version           display version information and exit
+
+Installation directories:
+  --prefix=PREFIX         install architecture-independent files in PREFIX [/]
+
+By default, \`make install' will install all the files in \'/sbin',
+\`/libexec', etc. You can specify
+an installation prefix other than \`/' using \`--prefix',
+for instance \`--prefix=$HOME'.
+
+For better control, use the options below.
+
+Fine tuning of the installation directories:
+  --bindir=DIR            user executables [PREFIX/bin]
+  --sbindir=DIR           system admin executables [PREFIX/sbin]
+  --libexecdir=DIR        program executables [PREFIX/libexec]
+  --sysconfdir=DIR        read-only single-machine data [PREFIX/etc]
+  --localstatedir=DIR     modifiable single-machine data [PREFIX/var]
+  --libdir=DIR            object code libraries [PREFIX/lib]
+  --includedir=DIR        C header files [PREFIX/include]
+  --mandir=DIR            man documentation [PREFIX/man]
+
+System types:
+  --build=BUILD           configure for building on BUILD [guessed]
+  --host=HOST       build programs to run on HOST [BUILD]
+  --target=TARGET   configure for building compilers for TARGET [HOST]
+
+Optional Features:
+  --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
+  --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
+
+Some influential environment variables:
+  CC          C compiler command
+  CFLAGS      C compiler flags
+  LDFLAGS     linker flags, e.g. -L<lib dir> if you have libraries in a
+              nonstandard directory <lib dir>
+  CPPFLAGS    C/C++ preprocessor flags, e.g. -I<include dir> if you have
+              headers in a nonstandard directory <include dir>
+  CPP         C preprocessor
+
+Use these variables to override the choices made by \`configure' or to help
+it to find libraries and programs with nonstandard names/locations.
+EOF
+exit 0
+;;
 	*) echo "$0: WARNING: unknown option $opt" >&2;;
 	esac
 done
