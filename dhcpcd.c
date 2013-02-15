@@ -96,7 +96,7 @@ static char **ifv;
 static int ifc;
 static char *cffile;
 static char *pidfile;
-static int linkfd = -1, ipv6rsfd = -1, ipv6nsfd = -1;
+static int linkfd = -1;
 static uint8_t *packet;
 
 struct dhcp_op {
@@ -1268,10 +1268,19 @@ start_interface(void *arg)
 		start_reboot(iface);
 }
 
+/* ARGSUSED */
+static void
+handle_link(_unused void *arg)
+{
+	if (manage_link(linkfd) == -1)
+		syslog(LOG_ERR, "manage_link: %m");
+}
+
 static void
 init_state(struct interface *iface, int argc, char **argv)
 {
 	struct if_state *ifs;
+	struct if_options *ifo;
 
 	if (iface->state)
 		ifs = iface->state;
@@ -1282,6 +1291,23 @@ init_state(struct interface *iface, int argc, char **argv)
 	ifs->reason = "PREINIT";
 	ifs->nakoff = 0;
 	configure_interface(iface, argc, argv);
+	ifo = ifs->options;
+
+	if (if_options->options & DHCPCD_LINK && linkfd == -1) {
+		linkfd = open_link_socket();
+		if (linkfd == -1)
+			syslog(LOG_ERR, "open_link_socket: %m");
+		else
+			add_event(linkfd, handle_link, NULL);
+	}
+
+	if (ifo->options & DHCPCD_IPV6RS && !check_ipv6(NULL))
+		options &= ~DHCPCD_IPV6RS;
+	if (ifo->options & DHCPCD_IPV6RS && ipv6_open() == -1) {
+		options &= ~DHCPCD_IPV6RS;
+		syslog(LOG_ERR, "ipv6_open: %m");
+	}
+
 	if (!(options & DHCPCD_TEST))
 		run_script(iface);
 	/* We need to drop the leasefile so that start_interface
@@ -1450,14 +1476,6 @@ handle_ifa(int type, const char *ifname,
 		ifp->net = *net;
 		send_inform(ifp);
 	}
-}
-
-/* ARGSUSED */
-static void
-handle_link(_unused void *arg)
-{
-	if (manage_link(linkfd) == -1)
-		syslog(LOG_ERR, "manage_link: %m");
 }
 
 static void
@@ -2023,13 +2041,6 @@ main(int argc, char **argv)
 		syslog(LOG_ERR, "init_socket: %m");
 		exit(EXIT_FAILURE);
 	}
-	if (if_options->options & DHCPCD_LINK) {
-		linkfd = open_link_socket();
-		if (linkfd == -1)
-			syslog(LOG_ERR, "open_link_socket: %m");
-		else
-			add_event(linkfd, handle_link, NULL);
-	}
 
 #if 0
 	if (options & DHCPCD_IPV6RS && disable_rtadv() == -1) {
@@ -2037,32 +2048,6 @@ main(int argc, char **argv)
 		options &= ~DHCPCD_IPV6RS;
 	}
 #endif
-
-	if (options & DHCPCD_IPV6RS && !check_ipv6(NULL))
-		options &= ~DHCPCD_IPV6RS;
-	if (options & DHCPCD_IPV6RS && ipv6_open() == -1) {
-		options &= ~DHCPCD_IPV6RS;
-		syslog(LOG_ERR, "ipv6_open: %m");
-	}
-	if (options & DHCPCD_IPV6RS) {
-		ipv6rsfd = ipv6rs_open();
-		if (ipv6rsfd == -1) {
-			syslog(LOG_ERR, "ipv6rs: %m");
-			options &= ~DHCPCD_IPV6RS;
-		} else {
-			add_event(ipv6rsfd, ipv6rs_handledata, NULL);
-//			atexit(restore_rtadv);
-		}
-		if (options & DHCPCD_IPV6RA_OWN ||
-		    options & DHCPCD_IPV6RA_OWN_DEFAULT)
-		{
-			ipv6nsfd = ipv6ns_open();
-			if (ipv6nsfd == -1)
-				syslog(LOG_ERR, "ipv6nd: %m");
-			else
-				add_event(ipv6nsfd, ipv6ns_handledata, NULL);
-		}
-	}
 
 	ifc = argc - optind;
 	ifv = argv + optind;

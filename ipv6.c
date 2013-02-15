@@ -35,6 +35,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <unistd.h>
 
 #include "common.h"
 #include "configure.h"
@@ -47,7 +48,7 @@
 #  define s6_addr32 __u6_addr.__u6_addr32
 #endif
 
-int socket_afnet6;
+int socket_afnet6 = -1;
 static struct rt6head *routes;
 
 #ifdef DEBUG_MEMORY
@@ -67,11 +68,21 @@ ipv6_cleanup()
 int
 ipv6_open(void)
 {
+
+	if (socket_afnet6 != -1)
+		return socket_afnet6;
+
 	socket_afnet6 = socket(AF_INET6, SOCK_DGRAM, 0);
 	if (socket_afnet6 == -1)
 		return -1;
 	set_cloexec(socket_afnet6);
-	routes = xmalloc(sizeof(*routes));
+	routes = malloc(sizeof(*routes));
+	if (routes == NULL) {
+		close(socket_afnet6);
+		socket_afnet6 = -1;
+		return -1;
+	}
+
 	TAILQ_INIT(routes);
 #ifdef DEBUG_MEMORY
 	atexit(ipv6_cleanup);
