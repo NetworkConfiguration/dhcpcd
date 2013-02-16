@@ -464,24 +464,47 @@ send_interface1(int fd, const struct interface *iface, const char *reason)
 int
 send_interface(int fd, const struct interface *iface)
 {
+	const char *reason;
 	int retval = 0;
+	int onestate = 0;
 #ifdef INET
 	const struct dhcp_state *state = D_CSTATE(iface);
 
-	if (state && send_interface1(fd, iface, state->reason) == -1)
-		retval = -1;
+	if (state) {
+		onestate = 1;
+		if (send_interface1(fd, iface, state->reason) == -1)
+			retval = -1;
+	}
 #endif
 
 #ifdef INET6
 	if (ipv6rs_has_ra(iface)) {
+		onestate = 1;
 		if (send_interface1(fd, iface, "ROUTERADVERT") == -1)
 			retval = -1;
 	}
 	if (D6_STATE_RUNNING(iface)) {
+		onestate = 1;
 		if (send_interface1(fd, iface, "INFORM6") == -1)
 			retval = -1;
 	}
 #endif
+
+	if (!onestate) {
+		switch (iface->carrier) {
+		case LINK_UP:
+			reason = "CARRIER";
+			break;
+		case LINK_DOWN:
+			reason = "NOCARRIER";
+			break;
+		default:
+			reason = "UNKNOWN";
+			break;
+		}
+		if (send_interface1(fd, iface, reason) == -1)
+			retval = -1;
+	}
 	return retval;
 }
 
