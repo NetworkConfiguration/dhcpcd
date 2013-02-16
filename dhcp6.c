@@ -1599,7 +1599,11 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 		if (len < 0)
 			return -1;
 		e = strlen(prefix) + 6 + strlen(opt->var) + len + 4;
-		v = val = *ep++ = xmalloc(e);
+		v = val = *ep++ = malloc(e);
+		if (v == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			return -1;
+		}
 		v += snprintf(val, e, "%s_dhcp6_%s=", prefix, opt->var);
 		if (len != 0)
 			print_option(v, len, opt->type, ol, od, ifp->name);
@@ -1614,7 +1618,11 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 			TAILQ_FOREACH(ap, &state->addrs, next) {
 				e += strlen(ap->saddr) + 1;
 			}
-			v = val = *ep++ = xmalloc(e);
+			v = val = *ep++ = malloc(e);
+			if (v == NULL) {
+				syslog(LOG_ERR, "%s: %m", __func__);
+				return -1;
+			}
 			v += snprintf(val, e, "%s_dhcp6_ip_address=", prefix);
 			TAILQ_FOREACH(ap, &state->addrs, next) {
 				strcpy(v, ap->saddr);

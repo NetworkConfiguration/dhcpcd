@@ -207,7 +207,11 @@ setvar(char ***e, const char *prefix, const char *var, const char *value)
 
 	if (prefix)
 		len += strlen(prefix) + 1;
-	**e = xmalloc(len);
+	**e = malloc(len);
+	if (**e == NULL) {
+		syslog(LOG_ERR, "%s: %m", __func__);
+		return -1;
+	}
 	if (prefix)
 		snprintf(**e, len, "%s_%s=%s", prefix, var, value);
 	else
@@ -250,17 +254,3 @@ writepid(int fd, pid_t pid)
 		return -1;
 	return 0;
 }
-
-#ifndef xmalloc
-void *
-xmalloc(size_t s)
-{
-	void *value = malloc(s);
-
-	if (value != NULL)
-		return value;
-	syslog(LOG_ERR, "memory exhausted (xalloc %zu bytes)", s);
-	exit (EXIT_FAILURE);
-	/* NOTREACHED */
-}
-#endif

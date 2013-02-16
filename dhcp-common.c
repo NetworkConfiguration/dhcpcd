@@ -244,7 +244,9 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data,
 		l = decode_rfc3397(NULL, 0, dl, data);
 		if (l < 1)
 			return l;
-		tmp = xmalloc(l);
+		tmp = malloc(l);
+		if (tmp == NULL)
+			return -1;
 		decode_rfc3397(tmp, l, dl, data);
 		l = print_string(s, len, l - 1, (uint8_t *)tmp);
 		free(tmp);

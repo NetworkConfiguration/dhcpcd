@@ -133,7 +133,11 @@ ipv6_linklocal(const char *ifname)
 	}
 
 	if (ifa) {
-		in6 = xmalloc(sizeof(*in6));
+		in6 = malloc(sizeof(*in6));
+		if (in6 == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			return NULL;
+		}
 		memcpy(in6, &sa6->sin6_addr, sizeof(*in6));
 	} else
 		in6 = NULL;
@@ -504,7 +508,11 @@ ipv6_buildroutes(void)
 		}
 	}
 
-	nrs = xmalloc(sizeof(*nrs));
+	nrs = malloc(sizeof(*nrs));
+	if (nrs == NULL) {
+		syslog(LOG_ERR, "%s: %m", __func__);
+		return;
+	}
 	TAILQ_INIT(nrs);
 	have_default = 0;
 	TAILQ_FOREACH_SAFE(rt, &dnr, next, rtn) {

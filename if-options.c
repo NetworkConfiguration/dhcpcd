@@ -635,7 +635,11 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		while ((p = strchr(arg, ',')))
 			*p = ' ';
 		s = strlen("skip_hooks=") + strlen(arg) + 1;
-		p = xmalloc(sizeof(char) * s);
+		p = malloc(sizeof(char) * s);
+		if (p == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			return -1;
+		}
 		snprintf(p, s, "skip_hooks=%s", arg);
 		add_environ(ifo, p, 0);
 		free(p);
@@ -755,7 +759,11 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 				rt = ifo->routes;
 				while (rt->next)
 					rt = rt->next;
-				rt->next = xmalloc(sizeof(*rt));
+				rt->next = malloc(sizeof(*rt));
+				if (rt->next == NULL) {
+					syslog(LOG_ERR, "%s: %m", __func__);
+					return -1;
+				}
 				rt = rt->next;
 			}
 			rt->next = NULL;
@@ -777,7 +785,11 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 				rt = ifo->routes;
 				while (rt->next)
 					rt = rt->next;
-				rt->next = xmalloc(sizeof(*rt));
+				rt->next = malloc(sizeof(*rt));
+				if (rt->next == NULL) {
+					syslog(LOG_ERR, "%s: %m", __func__);
+					return -1;
+				}
 				rt = rt->next;
 			}
 			rt->dest.s_addr = INADDR_ANY;

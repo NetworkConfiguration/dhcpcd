@@ -325,7 +325,9 @@ add_subnet_route(struct rt *rt, const struct interface *iface)
 	     iface->options->req_addr.s_addr == INADDR_ANY))
 		return rt;
 
-	r = xmalloc(sizeof(*r));
+	r = malloc(sizeof(*r));
+	if (r == NULL)
+		return NULL;
 	r->dest.s_addr = s->addr.s_addr & s->net.s_addr;
 	r->net.s_addr = s->net.s_addr;
 	r->gate.s_addr = 0;
@@ -346,10 +348,15 @@ get_routes(struct interface *ifp)
 			if (rt->gate.s_addr == 0)
 				break;
 			if (r == NULL)
-				r = nrt = xmalloc(sizeof(*r));
+				r = nrt = malloc(sizeof(*r));
 			else {
-				r->next = xmalloc(sizeof(*r));
+				r->next = malloc(sizeof(*r));
 				r = r->next;
+			}
+			if (r == NULL) {
+				syslog(LOG_ERR, "%s: %m", __func__);
+				ipv4_freeroutes(nrt);
+				return NULL;
 			}
 			memcpy(r, rt, sizeof(*r));
 			r->next = NULL;
@@ -384,7 +391,11 @@ add_destination_route(struct rt *rt, const struct interface *iface)
 	if (!(iface->flags & IFF_POINTOPOINT) ||
 	    !has_option_mask(iface->options->dstmask, DHO_ROUTER))
 		return rt;
-	r = xmalloc(sizeof(*r));
+	r = malloc(sizeof(*r));
+	if (r == NULL) {
+		syslog(LOG_ERR, "%s: %m", __func__);
+		return NULL;
+	}
 	r->dest.s_addr = INADDR_ANY;
 	r->net.s_addr = INADDR_ANY;
 	r->gate.s_addr = D_CSTATE(iface)->dst.s_addr;
@@ -431,7 +442,11 @@ add_router_host_route(struct rt *rt, const struct interface *ifp)
 		}
 		syslog(LOG_WARNING, "%s: router %s requires a host route",
 		    ifp->name, inet_ntoa(rtp->gate));
-		rtn = xmalloc(sizeof(*rtn));
+		rtn = malloc(sizeof(*rtn));
+		if (rtn == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			continue;
+		}
 		rtn->dest.s_addr = rtp->gate.s_addr;
 		rtn->net.s_addr = INADDR_BROADCAST;
 		rtn->gate.s_addr = rtp->gate.s_addr;

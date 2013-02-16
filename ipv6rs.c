@@ -527,7 +527,13 @@ ipv6rs_handledata(_unused void *arg)
 	} else
 		new_rap = 0;
 	if (rap->data_len == 0) {
-		rap->data = xmalloc(len);
+		rap->data = malloc(len);
+		if (rap->data == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			if (new_rap)
+				free(rap);
+			return;
+		}
 		memcpy(rap->data, icp, len);
 		rap->data_len = len;
 	}
@@ -609,7 +615,11 @@ ipv6rs_handledata(_unused void *arg)
 				    !(pi->nd_opt_pi_flags_reserved &
 				    ND_OPT_PI_FLAG_ONLINK))
 					break;
-				ap = xmalloc(sizeof(*ap));
+				ap = malloc(sizeof(*ap));
+				if (ap == NULL) {
+					syslog(LOG_ERR, "%s: %m", __func__);
+					break;
+				}
 				ap->new = 1;
 				ap->onlink = 0;
 				ap->prefix_len = pi->nd_opt_pi_prefix_len;
@@ -769,7 +779,11 @@ ipv6rs_handledata(_unused void *arg)
 		}
 
 		if (rao == NULL) {
-			rao = xmalloc(sizeof(*rao));
+			rao = malloc(sizeof(*rao));
+			if (rao == NULL) {
+				syslog(LOG_ERR, "%s: %m", __func__);
+				continue;
+			}
 			rao->type = ndo->nd_opt_type;
 			rao->option = opt;
 			TAILQ_INSERT_TAIL(&rap->options, rao, next);
@@ -873,7 +887,8 @@ ipv6rs_env(char **env, const char *prefix, const struct interface *ifp)
 		if (env) {
 			snprintf(buffer, sizeof(buffer),
 			    "ra%d_from", i);
-			setvar(&env, prefix, buffer, rap->sfrom);
+			if (setvar(&env, prefix, buffer, rap->sfrom) == -1)
+				return -1;
 		}
 		l++;
 
@@ -936,24 +951,28 @@ ipv6rs_env(char **env, const char *prefix, const struct interface *ifp)
 				new = realloc(**var,
 				    strlen(**var) + 1 +
 				    strlen(rao->option) + 1);
-				if (new) {
-					**var = new;
-					new += strlen(new);
-					*new++ = ' ';
-					strcpy(new, rao->option);
-					continue;
-				}
+				if (new == NULL)
+					return -1;
+				**var = new;
+				new += strlen(new);
+				*new++ = ' ';
+				strcpy(new, rao->option);
+				continue;
 			}
 			if (env) {
 				snprintf(buffer, sizeof(buffer),
 				    "ra%d_%s", i, optn);
-				setvar(&env, prefix, buffer, rao->option);
+				if (setvar(&env, prefix, buffer, rao->option)
+				    == -1)
+					return -1;
 			}
 		}
 	}
 
-	if (env)
-		setvard(&env, prefix, "ra_count", i);
+	if (env) {
+		if (setvard(&env, prefix, "ra_count", i) == -1)
+			return -1;
+	}
 	l++;
 	return l;
 }

@@ -810,7 +810,11 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 	len = 0;
 	for (opt = 0; opt < argc; opt++)
 		len += strlen(argv[opt]) + 1;
-	tmp = p = xmalloc(len + 1);
+	tmp = p = malloc(len + 1);
+	if (tmp == NULL) {
+		syslog(LOG_ERR, "%s: %m", __func__);
+		return -1;
+	}
 	for (opt = 0; opt < argc; opt++) {
 		l = strlen(argv[opt]);
 		strlcpy(p, argv[opt], l + 1);
@@ -842,7 +846,7 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 
 	/* We need at least one interface */
 	if (optind == argc) {
-		syslog(LOG_ERR, "handle_args: no interface");
+		syslog(LOG_ERR, "%s: no interface", __func__);
 		return -1;
 	}
 
@@ -989,7 +993,11 @@ main(int argc, char **argv)
 		/* If we have any other args, we should run as a single dhcpcd
 		 *  instance for that interface. */
 		len = strlen(PIDFILE) + IF_NAMESIZE + 2;
-		pidfile = xmalloc(len);
+		pidfile = malloc(len);
+		if (pidfile == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			exit(EXIT_FAILURE);
+		}
 		if (optind == argc - 1)
 			snprintf(pidfile, len, PIDFILE, "-", argv[optind]);
 		else {

@@ -114,21 +114,25 @@ make_var(const char *prefix, const char *var)
 	char *v;
 
 	len = strlen(prefix) + strlen(var) + 2;
-	v = xmalloc(len);
+	v = malloc(len);
+	if (v == NULL) {
+		syslog(LOG_ERR, "%s: %m", __func__);
+		return NULL;
+	}
 	snprintf(v, len, "%s_%s", prefix, var);
 	return v;
 }
 
 
-static void
+static int
 append_config(char ***env, ssize_t *len,
     const char *prefix, const char *const *config)
 {
 	ssize_t i, j, e1;
-	char **ne, *eq, **nep;
+	char **ne, *eq, **nep, *p;
 
 	if (config == NULL)
-		return;
+		return 0;
 
 	ne = *env;
 	for (i = 0; config[i] != NULL; i++) {
@@ -140,22 +144,28 @@ append_config(char ***env, ssize_t *len,
 			{
 				free(ne[j]);
 				ne[j] = make_var(prefix, config[i]);
+				if (ne[j] == NULL)
+					return -1;
 				break;
 			}
 		}
 		if (j == *len) {
 			j++;
+			p = make_var(prefix, config[i]);
+			if (p == NULL)
+				return -1;
 			nep = realloc(ne, sizeof(char *) * (j + 1));
 			if (nep == NULL) {
 				syslog(LOG_ERR, "%s: %m", __func__);
-				break;
+				return -1;
 			}
 			ne = nep;
-			ne[j - 1] = make_var(prefix, config[i]);
+			ne[j - 1] = p;
 			*len = j;
 		}
 	}
 	*env = ne;
+	return 0;
 }
 #endif
 
@@ -170,7 +180,9 @@ arraytostr(const char *const *argv, char **s)
 	ap = argv;
 	while (*ap)
 		len += strlen(*ap++) + 1;
-	*s = p = xmalloc(len);
+	*s = p = malloc(len);
+	if (p == NULL)
+		return -1;
 	ap = argv;
 	while (*ap) {
 		l = strlen(*ap) + 1;
@@ -222,34 +234,35 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	else
 		elen = 10;
 
+#define EMALLOC(i, l) if ((env[(i)] = malloc(l)) == NULL) goto eexit;
 	/* Make our env */
 	env = calloc(1, sizeof(char *) * (elen + 1));
 	if (env == NULL)
 		goto eexit;
 	e = strlen("interface") + strlen(ifp->name) + 2;
-	env[0] = xmalloc(e);
+	EMALLOC(0, e);
 	snprintf(env[0], e, "interface=%s", ifp->name);
 	e = strlen("reason") + strlen(reason) + 2;
-	env[1] = xmalloc(e);
+	EMALLOC(1, e);
 	snprintf(env[1], e, "reason=%s", reason);
 	if (options & DHCPCD_DUMPLEASE)
 		goto dumplease;
-
  	e = 20;
-	env[2] = xmalloc(e);
+	EMALLOC(2, e);
 	snprintf(env[2], e, "pid=%d", getpid());
-	env[3] = xmalloc(e);
+	EMALLOC(3, e);
 	snprintf(env[3], e, "ifmetric=%d", ifp->metric);
-	env[4] = xmalloc(e);
+	EMALLOC(4, e);
 	snprintf(env[4], e, "ifwireless=%d", ifp->wireless);
-	env[5] = xmalloc(e);
+	EMALLOC(5, e);
 	snprintf(env[5], e, "ifflags=%u", ifp->flags);
-	env[6] = xmalloc(e);
+	EMALLOC(6, e);
 	snprintf(env[6], e, "ifmtu=%d", get_mtu(ifp->name));
 	l = e = strlen("interface_order=");
 	for (ifp2 = ifaces; ifp2; ifp2 = ifp2->next)
 		e += strlen(ifp2->name) + 1;
-	p = env[7] = xmalloc(e);
+	EMALLOC(7, e);
+	p = env[7];
 	strlcpy(p, "interface_order=", e);
 	e -= l;
 	p += l;
@@ -277,9 +290,11 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 		env[8] = strdup("if_up=false");
 		env[9] = strdup("if_down=true");
 	}
+	if (env[8] == NULL || env[9] == NULL)
+		goto eexit;
 	if (*ifp->profile) {
 		e = strlen("profile=") + strlen(ifp->profile) + 2;
-		env[elen] = xmalloc(e);
+		EMALLOC(elen, e);
 		snprintf(env[elen++], e, "profile=%s", ifp->profile);
 	}
 	if (ifp->wireless) {
@@ -289,7 +304,7 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 			if (nenv == NULL)
 				goto eexit;
 			env = nenv;
-			env[elen] = xmalloc(e);
+			EMALLOC(elen, e);
 			snprintf(env[elen++], e, "new_ssid=%s", ifp->ssid);
 		}
 		else if (strcmp(reason, "NOCARRIER") == 0) {
@@ -297,7 +312,7 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 			if (nenv == NULL)
 				goto eexit;
 			env = nenv;
-			env[elen] = xmalloc(e);
+			EMALLOC(elen, e);
 			snprintf(env[elen++], e, "old_ssid=%s", ifp->ssid);
 		}
 	}
@@ -309,10 +324,14 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 			if (nenv == NULL)
 				goto eexit;
 			env = nenv;
-			elen += dhcp_env(env + elen, "old", state->old, ifp);
+			l = dhcp_env(env + elen, "old", state->old, ifp);
+			if (l == -1)
+				goto eexit;
+			elen += l;
 		}
-		append_config(&env, &elen, "old",
-		    (const char *const *)ifo->config);
+		if (append_config(&env, &elen, "old",
+		    (const char *const *)ifo->config) == -1)
+			goto eexit;
 	}
 #endif
 #ifdef INET6
@@ -324,8 +343,11 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 			if (nenv == NULL)
 				goto eexit;
 			env = nenv;
-			elen += dhcp6_env(env + elen, "old", ifp,
+			l = dhcp6_env(env + elen, "old", ifp,
 			    d6_state->old, d6_state->old_len);
+			if (l == -1)
+				goto eexit;
+			elen += l;
 		}
 	}
 #endif
@@ -339,11 +361,15 @@ dumplease:
 			if (nenv == NULL)
 				goto eexit;
 			env = nenv;
-			elen += dhcp_env(env + elen, "new",
+			l = dhcp_env(env + elen, "new",
 			    state->new, ifp);
+			if (l == -1)
+				goto eexit;
+			elen += l;
 		}
-		append_config(&env, &elen, "new",
-		    (const char *const *)ifo->config);
+		if (append_config(&env, &elen, "new",
+		    (const char *const *)ifo->config) == -1)
+			goto eexit;
 	}
 #endif
 #ifdef INET6
@@ -355,8 +381,11 @@ dumplease:
 			if (nenv == NULL)
 				goto eexit;
 			env = nenv;
-			elen += dhcp6_env(env + elen, "new", ifp,
+			l = dhcp6_env(env + elen, "new", ifp,
 			    d6_state->new, d6_state->new_len);
+			if (l == -1)
+				goto eexit;
+			elen += l;
 		}
 	}
 	if (ra) {
@@ -366,7 +395,10 @@ dumplease:
 			if (nenv == NULL)
 				goto eexit;
 			env = nenv;
-			elen += ipv6rs_env(env + elen, NULL, ifp);
+			l = ipv6rs_env(env + elen, NULL, ifp);
+			if (l == -1)
+				goto eexit;
+			elen += l;
 		}
 	}
 #endif
@@ -411,8 +443,11 @@ send_interface1(int fd, const struct interface *iface, const char *reason)
 	struct iovec iov[2];
 	int retval;
 
-	make_env(iface, reason, &env);
+	if (make_env(iface, reason, &env) == -1)
+		return -1;
 	elen = arraytostr((const char *const *)env, &s);
+	if (elen == -1)
+		return -1;
 	iov[0].iov_base = &elen;
 	iov[0].iov_len = sizeof(ssize_t);
 	iov[1].iov_base = s;
@@ -482,7 +517,11 @@ script_runreason(const struct interface *ifp, const char *reason)
 	path = getenv("PATH");
 	if (path) {
 		e = strlen("PATH") + strlen(path) + 2;
-		env[elen] = xmalloc(e);
+		env[elen] = malloc(e);
+		if (env[elen] == NULL) {
+			elen = -1;
+			goto out;
+		}
 		snprintf(env[elen], e, "PATH=%s", path);
 	} else {
 		env[elen] = strdup(DEFAULT_PATH);

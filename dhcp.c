@@ -302,7 +302,9 @@ get_option(const struct dhcp_message *dhcp, uint8_t opt, int *len, int *type)
 		if (o == opt) {
 			if (op) {
 				if (!opt_buffer) {
-					opt_buffer = xmalloc(sizeof(*dhcp));
+					opt_buffer = malloc(sizeof(*dhcp));
+					if (opt_buffer == NULL)
+						return NULL;
 #ifdef DEBUG_MEMORY
 					atexit(free_option_buffer);
 #endif
@@ -542,7 +544,9 @@ decode_rfc3361(int dl, const uint8_t *data)
 	switch (enc) {
 	case 0:
 		if ((l = decode_rfc3397(NULL, 0, dl, data)) > 0) {
-			sip = xmalloc(l);
+			sip = malloc(l);
+			if (sip == NULL)
+				return 0;
 			decode_rfc3397(sip, l, dl, data);
 		}
 		break;
@@ -553,7 +557,9 @@ decode_rfc3361(int dl, const uint8_t *data)
 		}
 		addr.s_addr = INADDR_BROADCAST;
 		l = ((dl / sizeof(addr.s_addr)) * ((4 * 4) + 1)) + 1;
-		sip = p = xmalloc(l);
+		sip = p = malloc(l);
+		if (sip == NULL)
+			return 0;
 		while (dl != 0) {
 			memcpy(&addr.s_addr, data, sizeof(addr.s_addr));
 			data += sizeof(addr.s_addr);
@@ -656,17 +662,20 @@ get_option_string(const struct dhcp_message *dhcp, uint8_t option)
 			errno = EINVAL;
 			return NULL;
 		}
-		s = xmalloc(sizeof(char) * type);
-		decode_rfc3397(s, type, len, p);
+		s = malloc(sizeof(char) * type);
+		if (s)
+			decode_rfc3397(s, type, len, p);
 		return s;
 	}
 
 	if (type & RFC3361)
 		return decode_rfc3361(len, p);
 
-	s = xmalloc(sizeof(char) * (len + 1));
-	memcpy(s, p, len);
-	s[len] = '\0';
+	s = malloc(sizeof(char) * (len + 1));
+	if (s) {
+		memcpy(s, p, len);
+		s[len] = '\0';
+	}
 	return s;
 }
 
@@ -1118,8 +1127,11 @@ read_lease(const struct interface *ifp)
 	}
 	syslog(LOG_DEBUG, "%s: reading lease `%s'",
 	    ifp->name, state->leasefile);
-	dhcp = xmalloc(sizeof(*dhcp));
-	memset(dhcp, 0, sizeof(*dhcp));
+	dhcp = calloc(1, sizeof(*dhcp));
+	if (dhcp == NULL) {
+		close(fd);
+		return NULL;
+	}
 	bytes = read(fd, dhcp, sizeof(*dhcp));
 	close(fd);
 	if (bytes < 0) {
@@ -1210,7 +1222,9 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 		if (len < 0)
 			return -1;
 		e = strlen(prefix) + strlen(opt->var) + len + 4;
-		v = val = *ep++ = xmalloc(e);
+		v = val = *ep++ = malloc(e);
+		if (v == NULL)
+			return -1;
 		v += snprintf(val, e, "%s_%s=", prefix, opt->var);
 		if (len != 0)
 			print_option(v, len, opt->type, pl, p, ifp->name);
@@ -2304,8 +2318,14 @@ dhcp_handlepacket(void *arg)
 	/* We loop through until our buffer is empty.
 	 * The benefit is that if we get >1 DHCP packet in our buffer and
 	 * the first one fails for any reason, we can use the next. */
-	if (packet == NULL)
-		packet = xmalloc(udp_dhcp_len);
+	if (packet == NULL) {
+		packet = malloc(udp_dhcp_len);
+		if (packet == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			return;
+		}
+	}
+
 	for(;;) {
 		bytes = ipv4_getrawpacket(iface, ETHERTYPE_IP,
 		    packet, udp_dhcp_len, &partialcsum);
@@ -2498,18 +2518,24 @@ dhcp_init(struct interface *ifp)
 	state->clientid = NULL;
 
 	if (*ifo->clientid) {
-		state->clientid = xmalloc(ifo->clientid[0] + 1);
+		state->clientid = malloc(ifo->clientid[0] + 1);
+		if (state->clientid == NULL)
+			goto eexit;
 		memcpy(state->clientid, ifo->clientid, ifo->clientid[0] + 1);
 	} else if (ifo->options & DHCPCD_CLIENTID) {
 		len = 0;
 		if (ifo->options & DHCPCD_DUID) {
-			duid = xmalloc(DUID_LEN);
+			duid = malloc(DUID_LEN);
+			if (duid == NULL)
+				goto eexit;
 			if ((len = get_duid(duid, ifp)) == 0)
 				syslog(LOG_ERR, "get_duid: %m");
 		} else
 			duid = NULL;
 		if (len > 0) {
-			state->clientid = xmalloc(len + 6);
+			state->clientid = malloc(len + 6);
+			if (state->clientid == NULL)
+				goto eexit;
 			state->clientid[0] = len + 5;
 			state->clientid[1] = 255; /* RFC 4361 */
 			ifl = strlen(ifp->name);
@@ -2525,7 +2551,9 @@ dhcp_init(struct interface *ifp)
 			memcpy(state->clientid + 6, duid, len);
 		} else if (len == 0) {
 			len = ifp->hwlen + 1;
-			state->clientid = xmalloc(len + 1);
+			state->clientid = malloc(len + 1);
+			if (state->clientid == NULL)
+				goto eexit;
 			state->clientid[0] = len;
 			state->clientid[1] = ifp->family;
 			memcpy(state->clientid + 2, ifp->hwaddr,
@@ -2539,8 +2567,11 @@ dhcp_init(struct interface *ifp)
 	else if (ifp->hwlen)
 		syslog(LOG_DEBUG, "%s: using hwaddr %s", ifp->name,
 		    hwaddr_ntoa(ifp->hwaddr, ifp->hwlen));
-
 	return 0;
+
+eexit:
+	syslog(LOG_ERR, "%s: Error making ClientID: %m", __func__);
+	return -1;
 }
 
 void

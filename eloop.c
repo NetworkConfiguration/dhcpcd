@@ -77,8 +77,14 @@ eloop_event_add(int fd, void (*callback)(void *), void *arg)
 	if (free_events) {
 		e = free_events;
 		free_events = e->next;
-	} else
-		e = xmalloc(sizeof(*e));
+	} else {
+		e = malloc(sizeof(*e));
+		if (e == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			return;
+		}
+	}
+    
 	e->fd = fd;
 	e->callback = callback;
 	e->arg = arg;
@@ -140,8 +146,13 @@ eloop_q_timeout_add_tv(int queue,
 		if (free_timeouts) {
 			t = free_timeouts;
 			free_timeouts = t->next;
-		} else
-			t = xmalloc(sizeof(*t));
+		} else {
+			t = malloc(sizeof(*t));
+			if (t == NULL) {
+				syslog(LOG_ERR, "%s: %m", __func__);
+				return;
+			}
+		}
 	}
 
 	t->when.tv_sec = w.tv_sec;
