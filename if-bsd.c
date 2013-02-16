@@ -572,11 +572,15 @@ manage_link(int fd)
 						break;
 					memcpy(&sdl, rti_info[RTAX_IFA],
 					    rti_info[RTAX_IFA]->sa_len);
-					hwaddr = xmalloc(sdl.sdl_alen);
-					memcpy(hwaddr, LLADDR(&sdl),
-					    sdl.sdl_alen);
-					handle_hwaddr(ifname, hwaddr,
-					    sdl.sdl_alen);
+					hwaddr = malloc(sdl.sdl_alen);
+					if (hwaddr) {
+						memcpy(hwaddr, LLADDR(&sdl),
+						    sdl.sdl_alen);
+						handle_hwaddr(ifname, hwaddr,
+						    sdl.sdl_alen);
+					} else
+						syslog(LOG_ERR, "%s: %m",
+						    __func__);
 					break;
 #endif
 #ifdef INET
