@@ -759,7 +759,6 @@ dhcp6_startdiscover(void *arg)
 	struct dhcp6_state *state;
 
 	ifp = arg;
-	printf ("%s: HERE!!!!\n", ifp->name);
 	state = D6_STATE(ifp);
 	state->state = DH6S_DISCOVER;
 	state->start_uptime = uptime();
