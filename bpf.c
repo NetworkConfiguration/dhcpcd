@@ -67,7 +67,9 @@ ipv4_opensocket(struct interface *ifp, int protocol)
 	char *device;
 	int n = 0;
 
-	device = xmalloc(sizeof(char) * PATH_MAX);
+	device = malloc(sizeof(char) * PATH_MAX);
+	if (device == NULL)
+		return -1;
 	do {
 		snprintf(device, PATH_MAX, "/dev/bpf%d", n++);
 		fd = open(device, O_RDWR | O_NONBLOCK);

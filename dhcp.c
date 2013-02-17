@@ -25,14 +25,16 @@
  * SUCH DAMAGE.
  */
 
-#include <arpa/inet.h>
-#include <net/route.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 
 #ifdef __linux__
 #  include <asm/types.h> /* for systems with broken headers */
 #  include <linux/rtnetlink.h>
 #endif
+
+#include <arpa/inet.h>
+#include <net/route.h>
 
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
