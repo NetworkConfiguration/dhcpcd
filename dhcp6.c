@@ -562,7 +562,7 @@ dhcp6_freedrop_addrs(struct interface *ifp, int drop)
 		ipv6_buildroutes();
 }
 
-static void
+static int
 dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 {
 	struct dhcp6_state *state;
@@ -647,8 +647,12 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 	pi.ipi6_ifindex = ifp->index;
 	memcpy(CMSG_DATA(cm), &pi, sizeof(pi));
 	
-	if (sendmsg(sock, &sndhdr, 0) == -1)
+	if (sendmsg(sock, &sndhdr, 0) == -1) {
 		syslog(LOG_ERR, "%s: sendmsg: %m", ifp->name);
+		ifp->options->options &= ~DHCPCD_IPV6;
+		dhcp6_drop(ifp, "EXPIRE6");
+		return -1;
+	}
 
 	state->RTC++;
 	if (callback) {
@@ -661,6 +665,7 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 			syslog(LOG_WARNING, "%s: sent %d times with no reply",
 			    ifp->name, state->RTC);
 	}
+	return 0;
 }
 
 static void
@@ -754,6 +759,7 @@ dhcp6_startdiscover(void *arg)
 	struct dhcp6_state *state;
 
 	ifp = arg;
+	printf ("%s: HERE!!!!\n", ifp->name);
 	state = D6_STATE(ifp);
 	state->state = DH6S_DISCOVER;
 	state->start_uptime = uptime();
@@ -786,7 +792,8 @@ dhcp6_failconfirm(void *arg)
 	/* Section 18.1.2 says that we SHOULD use the last known
 	 * IP address(s) and lifetimes if we didn't get a reply.
 	 * I disagree with this. */
-	dhcp6_startdiscover(ifp);
+	if (ifp->options->options & DHCPCD_IPV6)
+		dhcp6_startdiscover(ifp);
 }
 
 static void

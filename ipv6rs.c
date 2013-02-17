@@ -257,8 +257,12 @@ ipv6rs_sendprobe(void *arg)
 	memcpy(CMSG_DATA(cm), &hoplimit, sizeof(hoplimit));
 
 	syslog(LOG_INFO, "%s: sending IPv6 Router Solicitation", ifp->name);
-	if (sendmsg(sock, &sndhdr, 0) == -1)
+	if (sendmsg(sock, &sndhdr, 0) == -1) {
 		syslog(LOG_ERR, "%s: sendmsg: %m", ifp->name);
+		ipv6rs_drop(ifp);
+		ifp->options->options &= ~DHCPCD_IPV6RS;
+		return;
+	}
 
 	if (state->rsprobes++ < MAX_RTR_SOLICITATIONS)
 		eloop_timeout_add_sec(RTR_SOLICITATION_INTERVAL,

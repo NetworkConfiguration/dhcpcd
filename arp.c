@@ -256,6 +256,12 @@ arp_probe(void *arg)
 	struct timeval tv;
 	int arping = 0;
 
+	if (state->arp_fd == -1) {
+		if (ipv4_opensocket(ifp, ETHERTYPE_ARP) == -1)
+			return;
+		eloop_event_add(state->arp_fd, arp_packet, ifp);
+	}
+
 	if (state->arping_index < ifp->options->arping_len) {
 		addr.s_addr = ifp->options->arping[state->arping_index];
 		arping = 1;
@@ -267,10 +273,6 @@ arp_probe(void *arg)
 	} else
 		addr.s_addr = state->addr.s_addr;
 
-	if (state->arp_fd == -1) {
-		ipv4_opensocket(ifp, ETHERTYPE_ARP);
-		eloop_event_add(state->arp_fd, arp_packet, ifp);
-	}
 	if (state->probes == 0) {
 		if (arping)
 			syslog(LOG_INFO, "%s: searching for %s",

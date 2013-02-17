@@ -1342,11 +1342,11 @@ dhcp_openudp(struct interface *iface)
 #endif
 
 	if ((s = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
-	    return -1;
+		return -1;
 
 	n = 1;
 	if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &n, sizeof(n)) == -1)
-	    goto eexit;
+		goto eexit;
 #ifdef SO_BINDTODEVICE
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, iface->name, sizeof(ifr.ifr_name));
@@ -1356,20 +1356,20 @@ dhcp_openudp(struct interface *iface)
 	    *p = '\0';
 	if (setsockopt(s, SOL_SOCKET, SO_BINDTODEVICE, &ifr,
 		    sizeof(ifr)) == -1)
-	    goto eexit;
+		goto eexit;
 #endif
 	/* As we don't use this socket for receiving, set the
 	 * 	 * receive buffer to 1 */
 	n = 1;
 	if (setsockopt(s, SOL_SOCKET, SO_RCVBUF, &n, sizeof(n)) == -1)
-	    goto eexit;
+		goto eexit;
 	state = D_STATE(iface);
 	memset(&sin, 0, sizeof(sin));
 	sin.sin_family = AF_INET;
 	sin.sin_port = htons(DHCP_CLIENT_PORT);
 	sin.sin_addr.s_addr = state->addr.s_addr;
 	if (bind(s, (struct sockaddr *)&sin, sizeof(sin)) == -1)
-	    goto eexit;
+		goto eexit;
 
 	state->udp_fd = s;
 	set_cloexec(s);
@@ -1445,9 +1445,9 @@ dhcp_makeudppacket(uint8_t **p, const uint8_t *data, size_t length,
 	ip->ip_p = IPPROTO_UDP;
 	ip->ip_src.s_addr = source.s_addr;
 	if (dest.s_addr == 0)
-	    ip->ip_dst.s_addr = INADDR_BROADCAST;
+		ip->ip_dst.s_addr = INADDR_BROADCAST;
 	else
-	    ip->ip_dst.s_addr = dest.s_addr;
+		ip->ip_dst.s_addr = dest.s_addr;
 
 	udp->uh_sport = htons(DHCP_CLIENT_PORT);
 	udp->uh_dport = htons(DHCP_SERVER_PORT);
@@ -2413,10 +2413,11 @@ dhcp_open(struct interface *ifp)
 
 	state = D_STATE(ifp);
 	if (state->raw_fd == -1) {
-		if ((r = ipv4_opensocket(ifp, ETHERTYPE_IP)) == -1)
+		if ((r = ipv4_opensocket(ifp, ETHERTYPE_IP)) == -1) {
 			syslog(LOG_ERR, "%s: %s: %m", __func__, ifp->name);
-		else
-			eloop_event_add(state->raw_fd, dhcp_handlepacket, ifp);
+			return -1;
+		}
+		eloop_event_add(state->raw_fd, dhcp_handlepacket, ifp);
 	}
 	if (state->udp_fd == -1 &&
 	    state->addr.s_addr != 0 &&
@@ -2426,10 +2427,10 @@ dhcp_open(struct interface *ifp)
 	{
 		if (dhcp_openudp(ifp) == -1 && errno != EADDRINUSE) {
 			syslog(LOG_ERR, "%s: dhcp_openudp: %m", ifp->name);
-			r = -1;
+			return -1;
 		}
 	}
-	return r;
+	return 0;
 }
 
 int
@@ -2609,7 +2610,7 @@ dhcp_start(struct interface *ifp)
 		return;
 	}
 
-	if (!dhcp_open(ifp))
+	if (dhcp_open(ifp) == -1)
 		return;
 
 	if (ifo->options & DHCPCD_INFORM) {
