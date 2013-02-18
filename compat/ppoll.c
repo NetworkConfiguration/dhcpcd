@@ -35,31 +35,29 @@
 
 #include "ppoll.h"
 
+#warning "This ppoll(2) implementation is not entirely race condition safe."
+#warning "Only operating system support for ppoll(2) can correct this."
+
 int
 ppoll(struct pollfd *restrict fds, nfds_t nfds,
     const struct timespec *restrict ts, const sigset_t *restrict sigmask)
 {
-	fd_set read_fds;
-	nfds_t n;
-	int maxfd, r;
+	int r, timeout;
+	sigset_t oldset;
 
-	FD_ZERO(&read_fds);
-	maxfd = 0;
-	for (n = 0; n < nfds; n++) {
-		if (fds[n].events & POLLIN) {
-			FD_SET(fds[n].fd, &read_fds);
-			if (fds[n].fd > maxfd)
-				maxfd = fds[n].fd;
-		}
-	}
-
-	r = pselect(maxfd + 1, &read_fds, NULL, NULL, ts, sigmask);
-	if (r > 0) {
-		for (n = 0; n < nfds; n++) {
-			fds[n].revents =
-			    FD_ISSET(fds[n].fd, &read_fds) ? POLLIN : 0;
-		}
-	}
+	if (ts == NULL)
+		timeout = -1;
+	else if (ts->tv_sec > INT_MAX / 1000 ||
+	    (ts->tv_sec == INT_MAX / 1000 &&
+	    (ts->tv_nsec + 999999) / 1000000 > INT_MAX % 1000000))
+		timeout = INT_MAX;
+	else
+		timeout = ts->tv_sec * 1000 + (ts->tv_nsec + 999999) / 1000000;
+	if (sigmask && sigprocmask(SIG_SETMASK, sigmask, &oldset) == -1)
+		return -1;
+	r = poll(fds, nfds, timeout);
+	if (sigmask && sigprocmask(SIG_SETMASK, &oldset, NULL) == -1)
+		return -1;
 
 	return r;
 }

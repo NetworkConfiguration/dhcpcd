@@ -57,7 +57,7 @@ for x do
 	--without-getline) GETLINE=no;;
 	--without-strlcpy) STRLCPY=no;;
         --without-posix_spawn) POSIX_SPAWN=no;;
-        --without-pselect) PSELECT=no;;
+        --without-ppoll) PPOLL=no;;
 	--serviceexists) SERVICEEXISTS=$var;;
 	--servicecmd) SERVICECMD=$var;;
 	--servicestatus) SERVICESTATUS=$var;;
@@ -283,7 +283,7 @@ if [ -n "$DEBUG" -a "$DEBUG" != no -a "$DEBUG" != false ]; then
 elif [ -z "$DEBUG" -a -d .git ]; then
 	printf "Found git ... "
 	DEBUG=yes
-	echo "CFLAGS+=		-ggdb" >>$CONFIG_MK
+	echo "CFLAGS+=	-ggdb" >>$CONFIG_MK
 else
 	DEBUG=no
 fi
@@ -525,7 +525,46 @@ else
 	echo "#include <spawn.h>" >>$CONFIG_H
 fi
 
-if [ -z "$PSELECT" ]; then
+if [ -z "$PPOLL" ]; then
+	printf "Testing for ppoll ... "
+	cat <<EOF >_ppoll.c
+#include <poll.h>
+#include <stdlib.h>
+int main(void) {
+	ppoll(NULL, 0, NULL, NULL);
+	return 0;
+}
+EOF
+	if $XCC _ppoll.c -o _ppoll 2>/dev/null; then
+		PPOLL=yes
+	else
+		PPOLL=no
+	fi
+	echo "$PPOLL"
+	rm -f _ppoll.c _ppoll
+fi
+if [ "$PPOLL" = no ]; then
+	printf "Testing for pollts ... "
+	cat <<EOF >_pollts.c
+#include <poll.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <time.h>
+int main(void) {
+	pollts(NULL, 0, NULL, NULL);
+	return 0;
+}
+EOF
+	if $XCC _pollts.c -o _pollts 2>/dev/null; then
+		PPOLL=pollts
+		echo "yes"
+	else
+		PPOLL=no
+		echo "no"
+	fi
+	rm -f _pollts.c _pollts
+fi
+if [ "$PPOLL" = no ]; then
 	printf "Testing for pselect ... "
 	cat <<EOF >_pselect.c
 #include <sys/select.h>
@@ -536,17 +575,27 @@ int main(void) {
 }
 EOF
 	if $XCC _pselect.c -o _pselect 2>/dev/null; then
-		PSELECT=yes
+		PPOLL=pselect
+		echo "yes"
 	else
-		PSELECT=no
+		PPOLL=no
+		echo "no"
 	fi
-	echo "$PSELECT"
 	rm -f _pselect.c _pselect
 fi
-if [ "$PSELECT" = no ]; then
+case "$PPOLL" in
+pollts)
+	echo "#define ppoll pollts" >>$CONFIG_H
+	;;
+pselect)
 	echo "COMPAT_SRCS+=	compat/pselect.c" >>$CONFIG_MK
-	echo "#include \"compat/pselect.h\"" >>$CONFIG_H
-fi
+	echo "#include \"compat/ppoll.h\"" >>$CONFIG_H
+	;;
+*)
+	echo "COMPAT_SRCS+=	compat/ppoll.c" >>$CONFIG_MK
+	echo "#include \"compat/ppoll.h\"" >>$CONFIG_H
+	;;
+esac
 
 if [ -z "$SERVICECMD" ]; then
 	printf "Checking for OpenRC ... "

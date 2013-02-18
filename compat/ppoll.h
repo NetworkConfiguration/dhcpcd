@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2012 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -25,16 +25,15 @@
  * SUCH DAMAGE.
  */
 
-#ifndef PSELECT_H
-#define PSELECT_H
+#ifndef PPOLL_H
+#define PPOLL_H
 
-#include <sys/select.h>
-#include <sys/time.h>
-
+#include <poll.h>
 #include <signal.h>
+#include <time.h>
 
-int pselect(int, fd_set *restrict, fd_set *restrict, fd_set *restrict,
-	const struct timespec *restrict,
-	const sigset_t *restrict);
+int
+ppoll(struct pollfd *restrict, nfds_t, const struct timespec *restrict,
+    const sigset_t *restrict);
 
 #endif

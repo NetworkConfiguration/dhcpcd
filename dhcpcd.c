@@ -1125,11 +1125,7 @@ main(int argc, char **argv)
 	eloop_init();
 #endif
 
-	/* This blocks all signals we're interested in.
-	 * eloop uses pselect(2) so that the signals are unblocked
-	 * when we're testing fd's.
-	 * This allows us to ensure a consistent state is maintained
-	 * regardless of when we are interrupted .*/
+	/* Save signal mask, block and redirect signals to our handler */
 	if (signal_init(handle_signal, &dhcpcd_sigset) == -1) {
 		syslog(LOG_ERR, "signal_setup: %m");
 		exit(EXIT_FAILURE);

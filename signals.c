@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2012 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -74,33 +74,40 @@ signal_read(_unused void *arg)
 }
 
 static int
-signal_handle(void (*func)(int), sigset_t *oldset)
+signal_handle(void (*func)(int))
 {
 	unsigned int i;
 	struct sigaction sa;
-	sigset_t newset;
 
 	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = func;
 	sigemptyset(&sa.sa_mask);
 
-	if (oldset)
-		sigemptyset(&newset);
-
 	for (i = 0; handle_sigs[i]; i++) {
 		if (sigaction(handle_sigs[i], &sa, NULL) == -1)
 			return -1;
-		if (oldset)
-			sigaddset(&newset, handle_sigs[i]);
 	}
-	if (oldset)
-		return sigprocmask(SIG_BLOCK, &newset, oldset);
 	return 0;
+}
+
+int
+signal_setup(void)
+{
+
+	return signal_handle(signal_handler);
+}
+
+int
+signal_reset(void)
+{
+
+	return signal_handle(SIG_DFL);
 }
 
 int
 signal_init(void (*func)(int), sigset_t *oldset)
 {
+	sigset_t newset;
 
 	if (pipe(signal_pipe) == -1)
 		return -1;
@@ -110,10 +117,14 @@ signal_init(void (*func)(int), sigset_t *oldset)
 	    set_cloexec(signal_pipe[1] == -1))
 		return -1;
 
+	sigfillset(&newset);
+	if (sigprocmask(SIG_SETMASK, &newset, oldset) == -1)
+		return -1;
+
 	/* Because functions we need to reboot/reconf out interfaces
 	 * are not async signal safe, we need to setup a signal pipe
 	 * so that the actual handler is executed in our event loop. */
 	signal_callback = func;
 	eloop_event_add(signal_pipe[0], signal_read, NULL);
-	return signal_handle(signal_handler, oldset);
+	return signal_setup();
 }

@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2012 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -45,8 +45,10 @@ static struct event {
 	int fd;
 	void (*callback)(void *);
 	void *arg;
+	struct pollfd *pollfd;
 	struct event *next;
 } *events;
+static size_t events_len;
 static struct event *free_events;
 
 static struct timeout {
@@ -58,7 +60,24 @@ static struct timeout {
 } *timeouts;
 static struct timeout *free_timeouts;
 
-void
+static struct pollfd *fds;
+static size_t fds_len;
+
+static void
+eloop_event_setup_fds(void)
+{
+	struct event *e;
+	size_t i;
+
+	for (e = events, i = 0; e; e = e->next, i++) {
+		fds[i].fd = e->fd;
+		fds[i].events = POLLIN;
+		fds[i].revents = 0;
+		e->pollfd = &fds[i];
+	}
+}
+
+int
 eloop_event_add(int fd, void (*callback)(void *), void *arg)
 {
 	struct event *e, *last = NULL;
@@ -68,7 +87,7 @@ eloop_event_add(int fd, void (*callback)(void *), void *arg)
 		if (e->fd == fd) {
 			e->callback = callback;
 			e->arg = arg;
-			return;
+			return 0;
 		}
 		last = e;
 	}
@@ -81,10 +100,23 @@ eloop_event_add(int fd, void (*callback)(void *), void *arg)
 		e = malloc(sizeof(*e));
 		if (e == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);
-			return;
+			return -1;
+		}
+	}
+
+	/* Ensure we can actually listen to it */
+	events_len++;
+	if (events_len > fds_len) {
+		fds_len += 5;
+		free(fds);
+		fds = malloc(sizeof(*fds) * fds_len);
+		if (fds == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			return -1;
 		}
 	}
     
+	/* Now populate the structure and add it to the list */
 	e->fd = fd;
 	e->callback = callback;
 	e->arg = arg;
@@ -93,6 +125,9 @@ eloop_event_add(int fd, void (*callback)(void *), void *arg)
 		last->next = e;
 	else
 		events = e;
+
+	eloop_event_setup_fds();
+	return 0;
 }
 
 void
@@ -108,13 +143,15 @@ eloop_event_delete(int fd)
 				events = e->next;
 			e->next = free_events;
 			free_events = e;
+			events_len--;
+			eloop_event_setup_fds();
 			break;
 		}
 		last = e;
 	}
 }
 
-void
+int
 eloop_q_timeout_add_tv(int queue,
     const struct timeval *when, void (*callback)(void *), void *arg)
 {
@@ -126,7 +163,7 @@ eloop_q_timeout_add_tv(int queue,
 	/* Check for time_t overflow. */
 	if (timercmp(&w, &now, <)) {
 		errno = ERANGE;
-		return;
+		return -1;
 	}
 
 	/* Remove existing timeout if present */
@@ -150,7 +187,7 @@ eloop_q_timeout_add_tv(int queue,
 			t = malloc(sizeof(*t));
 			if (t == NULL) {
 				syslog(LOG_ERR, "%s: %m", __func__);
-				return;
+				return -1;
 			}
 		}
 	}
@@ -168,19 +205,20 @@ eloop_q_timeout_add_tv(int queue,
 	if (!timeouts || timercmp(&t->when, &timeouts->when, <)) {
 		t->next = timeouts;
 		timeouts = t;
-		return;
+		return 0;
 	} 
 	for (tt = timeouts; tt->next; tt = tt->next)
 		if (timercmp(&t->when, &tt->next->when, <)) {
 			t->next = tt->next;
 			tt->next = t;
-			return;
+			return 0;
 		}
 	tt->next = t;
 	t->next = NULL;
+	return 0;
 }
 
-void
+int
 eloop_q_timeout_add_sec(int queue, time_t when,
     void (*callback)(void *), void *arg)
 {
@@ -188,7 +226,7 @@ eloop_q_timeout_add_sec(int queue, time_t when,
 
 	tv.tv_sec = when;
 	tv.tv_usec = 0;
-	eloop_q_timeout_add_tv(queue, &tv, callback, arg);
+	return eloop_q_timeout_add_tv(queue, &tv, callback, arg);
 }
 
 /* This deletes all timeouts for the interface EXCEPT for ones with the
@@ -297,15 +335,13 @@ eloop_init(void)
 #endif
 
 _noreturn void
-eloop_start(const sigset_t *cursigs)
+eloop_start(const sigset_t *sigmask)
 {
-	int n, max_fd;
-	fd_set read_fds;
+	int n;
 	struct event *e;
 	struct timeout *t;
 	struct timeval tv;
-	struct timespec ts;
-	const struct timespec *tsp;
+	struct timespec ts, *tsp;
 
 	for (;;) {
 		/* Run all timeouts first */
@@ -326,30 +362,23 @@ eloop_start(const sigset_t *cursigs)
 			/* No timeouts, so wait forever */
 			tsp = NULL;
 
-		max_fd = -1;
-		FD_ZERO(&read_fds);
-		for (e = events; e; e = e->next) {
-			FD_SET(e->fd, &read_fds);
-			if (e->fd > max_fd)
-				max_fd = e->fd;
-		}
-		if (tsp == NULL && max_fd == -1) {
+		if (tsp == NULL && events_len == 0) {
 			syslog(LOG_ERR, "nothing to do");
 			exit(EXIT_FAILURE);
 		}
 
-		n = pselect(max_fd + 1, &read_fds, NULL, NULL, tsp, cursigs);
+		n = ppoll(fds, events_len, tsp, sigmask);
 		if (n == -1) {
-			if (errno == EINTR)
+			if (errno == EAGAIN || errno == EINTR)
 				continue;
-			syslog(LOG_ERR, "pselect: %m");
+			syslog(LOG_ERR, "poll: %m");
 			exit(EXIT_FAILURE);
 		}
 		
 		/* Process any triggered events. */
 		if (n) {
 			for (e = events; e; e = e->next) {
-				if (FD_ISSET(e->fd, &read_fds)) {
+				if (e->pollfd->revents & (POLLIN || POLLHUP)) {
 					e->callback(e->arg);
 					/* We need to break here as the
 					 * callback could destroy the next

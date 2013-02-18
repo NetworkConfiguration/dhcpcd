@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2012 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -44,10 +44,10 @@
 #define eloop_timeouts_delete(a, ...) \
     eloop_q_timeouts_delete(ELOOP_QUEUE, a, __VA_ARGS__)
 
-void eloop_event_add(int fd, void (*)(void *), void *);
+int eloop_event_add(int fd, void (*)(void *), void *);
 void eloop_event_delete(int fd);
-void eloop_q_timeout_add_sec(int queue, time_t, void (*)(void *), void *);
-void eloop_q_timeout_add_tv(int queue, const struct timeval *, void (*)(void *),
+int eloop_q_timeout_add_sec(int queue, time_t, void (*)(void *), void *);
+int eloop_q_timeout_add_tv(int queue, const struct timeval *, void (*)(void *),
     void *);
 void eloop_q_timeout_delete(int, void (*)(void *), void *);
 void eloop_q_timeouts_delete(int, void *, void (*)(void *), ...);
