@@ -563,7 +563,6 @@ EOF
 		POLLTS=no
 		echo "no"
 	fi
-	echo "$POLLTS"
 	rm -f _ppoll.c _ppoll
 fi
 if [ "$POLLTS" = no ]; then
@@ -589,16 +588,16 @@ case "$POLLTS" in
 yes)
 	;;
 ppoll)
-	echo "#include \"compat/ppoll.h\"" >>$CONFIG_H
+	echo "#include \"compat/pollts.h\"" >>$CONFIG_H
 	echo "#define pollts ppoll" >>$CONFIG_H
 	;;
 pselect)
 	echo "COMPAT_SRCS+=	compat/pselect.c" >>$CONFIG_MK
-	echo "#include \"compat/ppoll.h\"" >>$CONFIG_H
+	echo "#include \"compat/pollts.h\"" >>$CONFIG_H
 	;;
 *)
-	echo "COMPAT_SRCS+=	compat/ppoll.c" >>$CONFIG_MK
-	echo "#include \"compat/ppoll.h\"" >>$CONFIG_H
+	echo "COMPAT_SRCS+=	compat/pollts.c" >>$CONFIG_MK
+	echo "#include \"compat/pollts.h\"" >>$CONFIG_H
 	;;
 esac
 

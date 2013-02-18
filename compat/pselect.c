@@ -33,10 +33,10 @@
 #include <signal.h>
 #include <unistd.h>
 
-#include "ppoll.h"
+#include "pollts.h"
 
 int
-ppoll(struct pollfd *restrict fds, nfds_t nfds,
+pollts(struct pollfd *restrict fds, nfds_t nfds,
     const struct timespec *restrict ts, const sigset_t *restrict sigmask)
 {
 	fd_set read_fds;

@@ -35,11 +35,11 @@
 
 #include "ppoll.h"
 
-#warning "This ppoll(2) implementation is not entirely race condition safe."
-#warning "Only operating system support for ppoll(2) can correct this."
+#warning "This pollts(2) implementation is not entirely race condition safe."
+#warning "Only operating system support for pollts(2) can correct this."
 
 int
-ppoll(struct pollfd *restrict fds, nfds_t nfds,
+pollts(struct pollfd *restrict fds, nfds_t nfds,
     const struct timespec *restrict ts, const sigset_t *restrict sigmask)
 {
 	int r, timeout;
