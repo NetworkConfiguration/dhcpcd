@@ -32,7 +32,11 @@
 #include <unistd.h>
 
 #include "common.h"
+#include "eloop.h"
 #include "signals.h"
+
+static int signal_pipe[2];
+static void (*signal_callback)(int);
 
 const int handle_sigs[] = {
 	SIGALRM,
@@ -43,6 +47,31 @@ const int handle_sigs[] = {
 	SIGUSR1,
 	0
 };
+
+static void
+signal_handler(int sig)
+{
+	int serrno = errno;
+
+	if (write(signal_pipe[1], &sig, sizeof(sig)) != sizeof(sig))
+		syslog(LOG_ERR, "%s: write: %m", __func__);
+	errno = serrno;
+}
+
+static void
+signal_read(_unused void *arg)
+{
+	int sig = -1;
+	char buf[16];
+	ssize_t bytes;
+
+	memset(buf, 0, sizeof(buf));
+	bytes = read(signal_pipe[0], buf, sizeof(buf));
+	if (signal_callback && bytes >= 0 && (size_t)bytes >= sizeof(sig)) {
+		memcpy(&sig, buf, sizeof(sig));
+		signal_callback(sig);
+	}
+}
 
 static int
 signal_handle(void (*func)(int), sigset_t *oldset)
@@ -70,15 +99,21 @@ signal_handle(void (*func)(int), sigset_t *oldset)
 }
 
 int
-signal_setup(void (*func)(int), sigset_t *oldset)
+signal_init(void (*func)(int), sigset_t *oldset)
 {
 
-	return signal_handle(func, oldset);
-}
+	if (pipe(signal_pipe) == -1)
+		return -1;
+	if (set_nonblock(signal_pipe[0]) == -1)
+		return -1;
+	if (set_cloexec(signal_pipe[0]) == -1 ||
+	    set_cloexec(signal_pipe[1] == -1))
+		return -1;
 
-int
-signal_reset(void)
-{
-
-	return signal_handle(SIG_DFL, NULL);
+	/* Because functions we need to reboot/reconf out interfaces
+	 * are not async signal safe, we need to setup a signal pipe
+	 * so that the actual handler is executed in our event loop. */
+	signal_callback = func;
+	eloop_event_add(signal_pipe[0], signal_read, NULL);
+	return signal_handle(signal_handler, oldset);
 }

@@ -1130,7 +1130,7 @@ main(int argc, char **argv)
 	 * when we're testing fd's.
 	 * This allows us to ensure a consistent state is maintained
 	 * regardless of when we are interrupted .*/
-	if (signal_setup(handle_signal, &dhcpcd_sigset) == -1) {
+	if (signal_init(handle_signal, &dhcpcd_sigset) == -1) {
 		syslog(LOG_ERR, "signal_setup: %m");
 		exit(EXIT_FAILURE);
 	}

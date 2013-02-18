@@ -30,10 +30,6 @@
 
 extern const int handle_sigs[];
 
-int signal_init(void);
-int signal_setup(void (*)(int), sigset_t *);
-int signal_reset(void);
-int signal_read(void);
-int signal_block(int);
+int signal_init(void (*)(int), sigset_t *);
 
 #endif
