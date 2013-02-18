@@ -649,12 +649,39 @@ reconf_reboot(int action, int argc, char **argv, int oi)
 	sort_interfaces();
 }
 
+static void
+sig_reboot(_unused void *arg)
+{
+	struct if_options *ifo;
+	int i;
+
+	for (i = 0; i < ifac; i++)
+		free(ifav[i]);
+	free(ifav);
+	ifav = NULL;
+	ifac = 0;
+	for (i = 0; i < ifdc; i++)
+		free(ifdv[i]);
+	free(ifdv);
+	ifdc = 0;
+	ifdv = NULL;
+	ifo = read_config(cffile, NULL, NULL, NULL);
+	add_options(ifo, margc, margv);
+	/* We need to preserve these two options. */
+	if (options & DHCPCD_MASTER)
+		ifo->options |= DHCPCD_MASTER;
+	if (options & DHCPCD_DAEMONISED)
+		ifo->options |= DHCPCD_DAEMONISED;
+	options = ifo->options;
+	free_options(ifo);
+	reconf_reboot(1, ifc, ifv, 0);
+}
+
 void
 handle_signal(int sig)
 {
 	struct interface *ifp;
-	struct if_options *ifo;
-	int do_release, i;
+	int do_release;
 
 	do_release = 0;
 	switch (sig) {
@@ -666,26 +693,10 @@ handle_signal(int sig)
 		break;
 	case SIGALRM:
 		syslog(LOG_INFO, "received SIGALRM, rebinding");
-		for (i = 0; i < ifac; i++)
-			free(ifav[i]);
-		free(ifav);
-		ifav = NULL;
-		ifac = 0;
-		for (i = 0; i < ifdc; i++)
-			free(ifdv[i]);
-		free(ifdv);
-		ifdc = 0;
-		ifdv = NULL;
-		ifo = read_config(cffile, NULL, NULL, NULL);
-		add_options(ifo, margc, margv);
-		/* We need to preserve these two options. */
-		if (options & DHCPCD_MASTER)
-			ifo->options |= DHCPCD_MASTER;
-		if (options & DHCPCD_DAEMONISED)
-			ifo->options |= DHCPCD_DAEMONISED;
-		options = ifo->options;
-		free_options(ifo);
-		reconf_reboot(1, ifc, ifv, 0);
+		/* We shouldn't modify any variables in the signal
+		 * handler, so simply add reboot function to the queue
+		 * for an immediate callout. */
+		eloop_timeout_add_sec(0, sig_reboot, NULL);
 		return;
 	case SIGHUP:
 		syslog(LOG_INFO, "received SIGHUP, releasing");
