@@ -1942,6 +1942,8 @@ dhcp_reboot(struct interface *ifp, int oldopts)
 	struct if_options *ifo = ifp->options;
 	struct dhcp_state *state = D_STATE(ifp);
 
+	if (state == NULL)
+		return;
 	ifo = ifp->options;
 	state->interval = 0;
 	if ((ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC) &&
