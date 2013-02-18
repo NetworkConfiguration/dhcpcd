@@ -588,7 +588,6 @@ case "$POLLTS" in
 yes)
 	;;
 ppoll)
-	echo "#include \"compat/pollts.h\"" >>$CONFIG_H
 	echo "#define pollts ppoll" >>$CONFIG_H
 	;;
 pselect)
