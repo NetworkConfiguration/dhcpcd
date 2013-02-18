@@ -367,7 +367,7 @@ eloop_start(const sigset_t *sigmask)
 			exit(EXIT_FAILURE);
 		}
 
-		n = ppoll(fds, events_len, tsp, sigmask);
+		n = pollts(fds, events_len, tsp, sigmask);
 		if (n == -1) {
 			if (errno == EAGAIN || errno == EINTR)
 				continue;

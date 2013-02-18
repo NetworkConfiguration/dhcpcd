@@ -57,7 +57,8 @@ for x do
 	--without-getline) GETLINE=no;;
 	--without-strlcpy) STRLCPY=no;;
         --without-posix_spawn) POSIX_SPAWN=no;;
-        --without-ppoll) PPOLL=no;;
+        --without-pollts) POLLTS=no;;
+	--with-pollts) POLLTS=$var;;
 	--serviceexists) SERVICEEXISTS=$var;;
 	--servicecmd) SERVICECMD=$var;;
 	--servicestatus) SERVICESTATUS=$var;;
@@ -525,25 +526,7 @@ else
 	echo "#include <spawn.h>" >>$CONFIG_H
 fi
 
-if [ -z "$PPOLL" ]; then
-	printf "Testing for ppoll ... "
-	cat <<EOF >_ppoll.c
-#include <poll.h>
-#include <stdlib.h>
-int main(void) {
-	ppoll(NULL, 0, NULL, NULL);
-	return 0;
-}
-EOF
-	if $XCC _ppoll.c -o _ppoll 2>/dev/null; then
-		PPOLL=yes
-	else
-		PPOLL=no
-	fi
-	echo "$PPOLL"
-	rm -f _ppoll.c _ppoll
-fi
-if [ "$PPOLL" = no ]; then
+if [ -z "$POLLTS" ]; then
 	printf "Testing for pollts ... "
 	cat <<EOF >_pollts.c
 #include <poll.h>
@@ -556,15 +539,34 @@ int main(void) {
 }
 EOF
 	if $XCC _pollts.c -o _pollts 2>/dev/null; then
-		PPOLL=pollts
-		echo "yes"
+		POLLTS=yes
 	else
-		PPOLL=no
-		echo "no"
+		POLLTS=no
 	fi
+	echo "$POLLTS"
 	rm -f _pollts.c _pollts
 fi
-if [ "$PPOLL" = no ]; then
+if [ "$POLLTS" = no ]; then
+	printf "Testing for ppoll ... "
+	cat <<EOF >_ppoll.c
+#include <poll.h>
+#include <stdlib.h>
+int main(void) {
+	ppoll(NULL, 0, NULL, NULL);
+	return 0;
+}
+EOF
+	if $XCC _ppoll.c -o _ppoll 2>/dev/null; then
+		POLLTS=ppoll
+		echo "yes"
+	else
+		POLLTS=no
+		echo "no"
+	fi
+	echo "$POLLTS"
+	rm -f _ppoll.c _ppoll
+fi
+if [ "$POLLTS" = no ]; then
 	printf "Testing for pselect ... "
 	cat <<EOF >_pselect.c
 #include <sys/select.h>
@@ -575,17 +577,20 @@ int main(void) {
 }
 EOF
 	if $XCC _pselect.c -o _pselect 2>/dev/null; then
-		PPOLL=pselect
+		POLLTS=pselect
 		echo "yes"
 	else
-		PPOLL=no
+		POLLTS=no
 		echo "no"
 	fi
 	rm -f _pselect.c _pselect
 fi
-case "$PPOLL" in
-pollts)
-	echo "#define ppoll pollts" >>$CONFIG_H
+case "$POLLTS" in
+yes)
+	;;
+ppoll)
+	echo "#include \"compat/ppoll.h\"" >>$CONFIG_H
+	echo "#define pollts ppoll" >>$CONFIG_H
 	;;
 pselect)
 	echo "COMPAT_SRCS+=	compat/pselect.c" >>$CONFIG_MK

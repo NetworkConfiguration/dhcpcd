@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2011 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -31,7 +31,6 @@
 #include <sys/time.h>
 #include <stdio.h>
 
-#include "config.h"
 #include "defs.h"
 
 #define UNCONST(a)		((void *)(unsigned long)(const void *)(a))

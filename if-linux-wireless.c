@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2009-2010 Roy Marples <roy@marples.name>
+ * Copyright (c) 2009-2013 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -55,6 +55,7 @@
 #include <unistd.h>
 
 #include "common.h"
+#include "config.h"
 
 /* We can't include net.h or dhcpcd.h because
  * they would pull in net/if.h, which defeats the purpose of this hack. */
