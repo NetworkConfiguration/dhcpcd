@@ -749,54 +749,49 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			while (*np == ' ')
 				np++;
 			if (ifo->routes == NULL) {
-				rt = ifo->routes = calloc(1, sizeof(*rt));
-				if (rt == NULL) {
-					syslog(LOG_ERR, "%s: %m", __func__);
-					*fp = ' ';
-					return -1;
-				}
-			} else {
-				rt = ifo->routes;
-				while (rt->next)
-					rt = rt->next;
-				rt->next = malloc(sizeof(*rt));
-				if (rt->next == NULL) {
+				ifo->routes = malloc(sizeof(*ifo->routes));
+				if (ifo->routes == NULL) {
 					syslog(LOG_ERR, "%s: %m", __func__);
 					return -1;
 				}
-				rt = rt->next;
+ 				TAILQ_INIT(ifo->routes);
 			}
-			rt->next = NULL;
-			if (parse_addr(&rt->dest, &rt->net, p) == -1 ||
-			    parse_addr(&rt->gate, NULL, np) == -1)
-			{
+			rt = malloc(sizeof(*rt));
+			if (rt == NULL) {
+				syslog(LOG_ERR, "%s: %m", __func__);
 				*fp = ' ';
 				return -1;
 			}
+			if (parse_addr(&rt->dest, &rt->net, p) == -1 ||
+			    parse_addr(&rt->gate, NULL, np) == -1)
+			{
+				free(rt);
+				*fp = ' ';
+				return -1;
+			}
+			TAILQ_INSERT_TAIL(ifo->routes, rt, next);
 			*fp = ' ';
 		} else if (strncmp(arg, "routers=", strlen("routers=")) == 0) {
 			if (ifo->routes == NULL) {
-				rt = ifo->routes = calloc(1, sizeof(*rt));
-				if (rt == NULL) {
+				ifo->routes = malloc(sizeof(*ifo->routes));
+				if (ifo->routes == NULL) {
 					syslog(LOG_ERR, "%s: %m", __func__);
 					return -1;
 				}
-			} else {
-				rt = ifo->routes;
-				while (rt->next)
-					rt = rt->next;
-				rt->next = malloc(sizeof(*rt));
-				if (rt->next == NULL) {
-					syslog(LOG_ERR, "%s: %m", __func__);
-					return -1;
-				}
-				rt = rt->next;
+ 				TAILQ_INIT(ifo->routes);
+			}
+			rt = malloc(sizeof(*rt));
+			if (rt == NULL) {
+				syslog(LOG_ERR, "%s: %m", __func__);
+				return -1;
 			}
 			rt->dest.s_addr = INADDR_ANY;
 			rt->net.s_addr = INADDR_ANY;
-			rt->next = NULL;
-			if (parse_addr(&rt->gate, NULL, p) == -1)
+			if (parse_addr(&rt->gate, NULL, p) == -1) {
+				free(rt);
 				return -1;
+			}
+			TAILQ_INSERT_TAIL(ifo->routes, rt, next);
 		} else {
 			s = 0;
 			if (ifo->config != NULL) {

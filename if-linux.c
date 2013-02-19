@@ -264,11 +264,10 @@ link_route(struct nlmsghdr *nlm)
 		return 1;
 	rta = (struct rtattr *)(void *)((char *)rtm +NLMSG_ALIGN(sizeof(*rtm)));
 	len = NLMSG_PAYLOAD(nlm, sizeof(*rtm));
-	rt.iface = NULL;
+	memset(&rt, 0, sizeof(rt));
 	rt.dest.s_addr = INADDR_ANY;
 	rt.net.s_addr = INADDR_ANY;
 	rt.gate.s_addr = INADDR_ANY;
-	rt.next = NULL;
 	metric = 0;
 	while (RTA_OK(rta, len)) {
 		switch (rta->rta_type) {

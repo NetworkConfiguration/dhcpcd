@@ -54,7 +54,7 @@
 #include "net.h"
 #include "script.h"
 
-static struct rt *routes;
+static struct rt_head *routes;
 
 int
 inet_ntocidr(struct in_addr address)
@@ -157,26 +157,52 @@ ipv4_doaddress(const char *ifname,
 }
 
 void
-ipv4_freeroutes(struct rt *rts)
+ipv4_freeroutes(struct rt_head *rts)
 {
 	struct rt *r;
 
-	while (rts) {
-		r = rts->next;
+	if (rts) {
+		while ((r = TAILQ_FIRST(rts))) {
+			TAILQ_REMOVE(rts, r, next);
+			free(r);
+		}
 		free(rts);
-		rts = r;
 	}
 }
 
+#ifdef DEBUG_MEMORY
+static void
+ipv4_cleanup()
+{
+
+	ipv4_freeroutes(routes);
+}
+#endif
+
+int
+ipv4_init(void)
+{
+
+	if (routes == NULL) {
+		routes = malloc(sizeof(*routes));
+		if (routes == NULL) 
+			return -1;
+		TAILQ_INIT(routes);
+#ifdef DEBUG_MEMORY
+		atexit(ipv4_cleanup);
+#endif
+	}
+	return 0;
+}
+
 static struct rt *
-find_route(struct rt *rts, const struct rt *r, struct rt **lrt,
-    const struct rt *srt)
+find_route(struct rt_head *rts, const struct rt *r, const struct rt *srt)
 {
 	struct rt *rt;
 
-	if (lrt)
-		*lrt = NULL;
-	for (rt = rts; rt; rt = rt->next) {
+	if (rts == NULL)
+		return NULL;
+	TAILQ_FOREACH(rt, rts, next) {
 		if (rt->dest.s_addr == r->dest.s_addr &&
 #if HAVE_ROUTE_METRIC
 		    (srt || (!rt->iface ||
@@ -185,8 +211,6 @@ find_route(struct rt *rts, const struct rt *r, struct rt **lrt,
                     (!srt || srt != rt) &&
 		    rt->net.s_addr == r->net.s_addr)
 			return rt;
-		if (lrt)
-			*lrt = rt;
 	}
 	return NULL;
 }
@@ -218,16 +242,13 @@ desc_route(const char *cmd, const struct rt *rt)
 int
 ipv4_routedeleted(const struct rt *rt)
 {
-	struct rt *f, *l;
+	struct rt *f;
 
-	f = find_route(routes, rt, &l, NULL);
+	f = find_route(routes, rt, NULL);
 	if (f == NULL)
 		return 0;
 	desc_route("removing", f);
-	if (l)
-		l->next = f->next;
-	else
-		routes = f->next;
+	TAILQ_REMOVE(routes, f, next);
 	free(f);
 	return 1;
 }
@@ -314,18 +335,18 @@ get_subnet_route(struct dhcp_message *dhcp)
 	return rt;
 }
 
-static struct rt *
-add_subnet_route(struct rt *rt, const struct interface *iface)
+static struct rt_head *
+add_subnet_route(struct rt_head *rt, const struct interface *ifp)
 {
 	struct rt *r;
 	const struct dhcp_state *s;
 
-	s = D_CSTATE(iface);
+	s = D_CSTATE(ifp);
 	if (s->net.s_addr == INADDR_BROADCAST ||
 	    s->net.s_addr == INADDR_ANY ||
-	    (iface->options->options &
+	    (ifp->options->options &
 	     (DHCPCD_INFORM | DHCPCD_STATIC) &&
-	     iface->options->req_addr.s_addr == INADDR_ANY))
+	     ifp->options->req_addr.s_addr == INADDR_ANY))
 		return rt;
 
 	r = malloc(sizeof(*r));
@@ -334,35 +355,30 @@ add_subnet_route(struct rt *rt, const struct interface *iface)
 	r->dest.s_addr = s->addr.s_addr & s->net.s_addr;
 	r->net.s_addr = s->net.s_addr;
 	r->gate.s_addr = 0;
-	r->next = rt;
-	return r;
+	TAILQ_INSERT_HEAD(rt, r, next);
+	return rt;
 }
 
-static struct rt *
+static struct rt_head *
 get_routes(struct interface *ifp)
 {
-	struct rt *rt, *nrt = NULL, *r = NULL;
+	struct rt_head *nrt;
+	struct rt *rt, *r = NULL;
 
-	if (ifp->options->routes != NULL) {
-		for (rt = ifp->options->routes;
-		     rt != NULL;
-		     rt = rt->next)
-		{
+	if (ifp->options->routes && TAILQ_FIRST(ifp->options->routes)) {
+		nrt = malloc(sizeof(*nrt));
+		TAILQ_INIT(nrt);
+		TAILQ_FOREACH(rt, ifp->options->routes, next) {
 			if (rt->gate.s_addr == 0)
 				break;
-			if (r == NULL)
-				r = nrt = malloc(sizeof(*r));
-			else {
-				r->next = malloc(sizeof(*r));
-				r = r->next;
-			}
+			r = malloc(sizeof(*r));
 			if (r == NULL) {
 				syslog(LOG_ERR, "%s: %m", __func__);
 				ipv4_freeroutes(nrt);
 				return NULL;
 			}
 			memcpy(r, rt, sizeof(*r));
-			r->next = NULL;
+			TAILQ_INSERT_TAIL(nrt, rt, next);
 		}
 		return nrt;
 	}
@@ -373,12 +389,12 @@ get_routes(struct interface *ifp)
 /* Some DHCP servers add set host routes by setting the gateway
  * to the assinged IP address. This differs from our notion of a host route
  * where the gateway is the destination address, so we fix it. */
-static struct rt *
-massage_host_routes(struct rt *rt, const struct interface *ifp)
+static struct rt_head *
+massage_host_routes(struct rt_head *rt, const struct interface *ifp)
 {
 	struct rt *r;
 
-	for (r = rt; r; r = r->next) {
+	TAILQ_FOREACH(r, rt, next) {
 		if (r->gate.s_addr == D_CSTATE(ifp)->addr.s_addr &&
 		    r->net.s_addr == INADDR_BROADCAST)
 			r->gate.s_addr = r->dest.s_addr;
@@ -386,8 +402,8 @@ massage_host_routes(struct rt *rt, const struct interface *ifp)
 	return rt;
 }
 
-static struct rt *
-add_destination_route(struct rt *rt, const struct interface *iface)
+static struct rt_head *
+add_destination_route(struct rt_head *rt, const struct interface *iface)
 {
 	struct rt *r;
 
@@ -402,23 +418,25 @@ add_destination_route(struct rt *rt, const struct interface *iface)
 	r->dest.s_addr = INADDR_ANY;
 	r->net.s_addr = INADDR_ANY;
 	r->gate.s_addr = D_CSTATE(iface)->dst.s_addr;
-	r->next = rt;
-	return r;
+	TAILQ_INSERT_HEAD(rt, r, next);
+	return rt;
 }
 
 /* We should check to ensure the routers are on the same subnet
  * OR supply a host route. If not, warn and add a host route. */
-static struct rt *
-add_router_host_route(struct rt *rt, const struct interface *ifp)
+static struct rt_head *
+add_router_host_route(struct rt_head *rt, const struct interface *ifp)
 {
-	struct rt *rtp, *rtl, *rtn;
+	struct rt *rtp, *rtn;
 	const char *cp, *cp2, *cp3, *cplim;
 
-	for (rtp = rt, rtl = NULL; rtp; rtl = rtp, rtp = rtp->next) {
+	TAILQ_FOREACH(rtp, rt, next) {
 		if (rtp->dest.s_addr != INADDR_ANY)
 			continue;
 		/* Scan for a route to match */
-		for (rtn = rt; rtn != rtp; rtn = rtn->next) {
+		TAILQ_FOREACH(rtn, rt, next) {
+			if (rtn == rtp)
+				break;
 			/* match host */
 			if (rtn->dest.s_addr == rtp->gate.s_addr)
 				break;
@@ -453,11 +471,7 @@ add_router_host_route(struct rt *rt, const struct interface *ifp)
 		rtn->dest.s_addr = rtp->gate.s_addr;
 		rtn->net.s_addr = INADDR_BROADCAST;
 		rtn->gate.s_addr = rtp->gate.s_addr;
-		rtn->next = rtp;
-		if (rtl == NULL)
-			rt = rtn;
-		else
-			rtl->next = rtn;
+		TAILQ_INSERT_BEFORE(rtp, rtn, next);
 	}
 	return rt;
 }
@@ -465,10 +479,17 @@ add_router_host_route(struct rt *rt, const struct interface *ifp)
 void
 ipv4_buildroutes(void)
 {
-	struct rt *nrs = NULL, *dnr, *or, *rt, *rtn, *rtl, *lrt = NULL;
+	struct rt_head *nrs, *dnr;
+	struct rt *or, *rt, *rtn;
 	struct interface *ifp;
 	const struct dhcp_state *state;
 
+	nrs = malloc(sizeof(*nrs));
+	if (nrs == NULL) {
+		syslog(LOG_ERR, "%s: %m", __func__);
+		return;
+	}
+	TAILQ_INIT(nrs);
 	TAILQ_FOREACH(ifp, ifaces, next) {
 		state = D_CSTATE(ifp);
 		if (state == NULL || state->new == NULL)
@@ -480,15 +501,15 @@ ipv4_buildroutes(void)
 			dnr = add_router_host_route(dnr, ifp);
 			dnr = add_destination_route(dnr, ifp);
 		}
-		for (rt = dnr; rt && (rtn = rt->next, 1); lrt = rt, rt = rtn) {
+		TAILQ_FOREACH_SAFE(rt, dnr, next, rtn) {
 			rt->iface = ifp;
 			rt->metric = ifp->metric;
 			/* Is this route already in our table? */
-			if ((find_route(nrs, rt, NULL, NULL)) != NULL)
+			if ((find_route(nrs, rt, NULL)) != NULL)
 				continue;
 			rt->src.s_addr = state->addr.s_addr;
 			/* Do we already manage it? */
-			if ((or = find_route(routes, rt, &rtl, NULL))) {
+			if ((or = find_route(routes, rt, NULL))) {
 				if (or->iface != ifp ||
 				    or->src.s_addr != state->addr.s_addr ||
 				    rt->gate.s_addr != or->gate.s_addr ||
@@ -497,33 +518,25 @@ ipv4_buildroutes(void)
 					if (c_route(or, rt) != 0)
 						continue;
 				}
-				if (rtl != NULL)
-					rtl->next = or->next;
-				else
-					routes = or->next;
+				TAILQ_REMOVE(routes, or, next);
 				free(or);
 			} else {
 				if (n_route(rt) != 0)
 					continue;
 			}
-			if (dnr == rt)
-				dnr = rtn;
-			else if (lrt)
-				lrt->next = rtn;
-			rt->next = nrs;
-			nrs = rt;
-			rt = lrt; /* When we loop this makes lrt correct */
+			TAILQ_REMOVE(dnr, rt, next);
+			TAILQ_INSERT_TAIL(nrs, rt, next);
 		}
 		ipv4_freeroutes(dnr);
 	}
 
 	/* Remove old routes we used to manage */
-	for (rt = routes; rt; rt = rt->next) {
-		if (find_route(nrs, rt, NULL, NULL) == NULL)
+	TAILQ_FOREACH(rt, routes, next) {
+		if (find_route(nrs, rt, NULL) == NULL)
 			d_route(rt);
 	}
-
 	ipv4_freeroutes(routes);
+
 	routes = nrs;
 }
 
@@ -608,7 +621,7 @@ ipv4_applyaddr(void *arg)
 	if (rt != NULL) {
 		rt->iface = ifp;
 		rt->metric = 0;
-		if (!find_route(routes, rt, NULL, NULL))
+		if (!find_route(routes, rt, NULL))
 			ipv4_deleteroute(rt);
 		free(rt);
 	}

@@ -64,7 +64,8 @@ ipv6_cleanup()
 }
 #endif
 
-int ipv6_init(void)
+int
+ipv6_init(void)
 {
 
 	if (routes == NULL) {

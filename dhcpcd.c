@@ -469,11 +469,16 @@ init_state(struct interface *ifp, int argc, char **argv)
 			eloop_event_add(linkfd, handle_link, NULL);
 	}
 
+	if (ifo->options & DHCPCD_IPV4 && ipv4_init() == -1) {
+		syslog(LOG_ERR, "ipv4_init: %m");
+		ifo->options &= ~DHCPCD_IPV4;
+	}
+
 	if (ifo->options & DHCPCD_IPV6RS && !check_ipv6(NULL))
 		ifo->options &= ~DHCPCD_IPV6RS;
 	if (ifo->options & DHCPCD_IPV6RS && ipv6_init() == -1) {
-		ifo->options &= ~DHCPCD_IPV6RS;
 		syslog(LOG_ERR, "ipv6_init: %m");
+		ifo->options &= ~DHCPCD_IPV6RS;
 	}
 
 	if (!(options & DHCPCD_TEST))

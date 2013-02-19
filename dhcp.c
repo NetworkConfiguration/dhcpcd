@@ -476,41 +476,40 @@ decode_rfc3442(char *out, ssize_t len, int pl, const uint8_t *p)
 	return bytes;
 }
 
-static struct rt *
+static struct rt_head *
 decode_rfc3442_rt(int dl, const uint8_t *data)
 {
 	const uint8_t *p = data;
 	const uint8_t *e;
 	uint8_t cidr;
 	size_t ocets;
-	struct rt *routes = NULL;
+	struct rt_head *routes;
 	struct rt *rt = NULL;
 
 	/* Minimum is 5 -first is CIDR and a router length of 4 */
 	if (dl < 5)
 		return NULL;
 
+	routes = malloc(sizeof(*routes));
+	TAILQ_INIT(routes);
 	e = p + dl;
 	while (p < e) {
 		cidr = *p++;
 		if (cidr > 32) {
 			ipv4_freeroutes(routes);
+			free(routes);
 			errno = EINVAL;
 			return NULL;
 		}
 
-		if (rt) {
-			rt->next = calloc(1, sizeof(*rt));
-			rt = rt->next;
-		} else {
-			routes = rt = calloc(1, sizeof(*routes));
-		}
+		rt = calloc(1, sizeof(*rt));
 		if (rt == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);
 			ipv4_freeroutes(routes);
+			free(routes);
 			return NULL;
 		}
-		rt->next = NULL;
+		TAILQ_INSERT_TAIL(routes, rt, next);
 
 		ocets = (cidr + 7) / 8;
 		/* If we have ocets then we have a destination and netmask */
@@ -713,13 +712,13 @@ route_netmask(uint32_t ip_in)
 /* We need to obey routing options.
  * If we have a CSR then we only use that.
  * Otherwise we add static routes and then routers. */
-struct rt *
+struct rt_head *
 get_option_routes(struct interface *ifp, const struct dhcp_message *dhcp)
 {
 	struct if_options *ifo = ifp->options;
 	const uint8_t *p;
 	const uint8_t *e;
-	struct rt *routes = NULL;
+	struct rt_head *routes = NULL;
 	struct rt *route = NULL;
 	int len;
 
@@ -745,6 +744,11 @@ get_option_routes(struct interface *ifp, const struct dhcp_message *dhcp)
 	}
 
 	/* OK, get our static routes first. */
+	routes = malloc(sizeof(*routes));
+	if (routes == NULL) {
+		syslog(LOG_ERR, "%s: %m", __func__);
+		return NULL;
+	}
 	if (!has_option_mask(ifo->nomask, DHO_STATICROUTE))
 		p = get_option(dhcp, DHO_STATICROUTE, &len, NULL);
 	else
@@ -752,21 +756,17 @@ get_option_routes(struct interface *ifp, const struct dhcp_message *dhcp)
 	if (p) {
 		e = p + len;
 		while (p < e) {
-			if (route) {
-				route->next = calloc(1, sizeof(*route));
-				route = route->next;
-			} else
-				routes = route = calloc(1, sizeof(*routes));
+			route = calloc(1, sizeof(*route));
 			if (route == NULL) {
 				syslog(LOG_ERR, "%s: %m", __func__);
 				break;
 			}
-			route->next = NULL;
 			memcpy(&route->dest.s_addr, p, 4);
 			p += 4;
 			memcpy(&route->gate.s_addr, p, 4);
 			p += 4;
 			route->net.s_addr = route_netmask(route->dest.s_addr);
+			TAILQ_INSERT_TAIL(routes, route, next);
 		}
 	}
 
@@ -778,17 +778,14 @@ get_option_routes(struct interface *ifp, const struct dhcp_message *dhcp)
 	if (p) {
 		e = p + len;
 		while (p < e) {
-			if (route) {
-				route->next = calloc(1, sizeof(*route));
-				route = route->next;
-			} else
-				routes = route = calloc(1, sizeof(*route));
+			route = calloc(1, sizeof(*route));
 			if (route == NULL) {
 				syslog(LOG_ERR, "%s: %m", __func__);
 				break;
 			}
 			memcpy(&route->gate.s_addr, p, 4);
 			p += 4;
+			TAILQ_INSERT_TAIL(routes, route, next);
 		}
 	}
 

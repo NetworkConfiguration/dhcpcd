@@ -31,16 +31,18 @@
 #include "dhcpcd.h"
 
 struct rt {
+	TAILQ_ENTRY(rt) next;
 	struct in_addr dest;
 	struct in_addr net;
 	struct in_addr gate;
 	const struct interface *iface;
 	int metric;
 	struct in_addr src;
-	struct rt *next;
 };
+TAILQ_HEAD(rt_head, rt);
 
 #ifdef INET
+int ipv4_init(void);
 int inet_ntocidr(struct in_addr);
 int inet_cidrtoaddr(int, struct in_addr *);
 uint32_t ipv4_getnetmask(uint32_t);
@@ -71,13 +73,14 @@ int if_route(const struct rt *rt, int);
 #define ipv4_changeroute(rt) if_route(rt, 0)
 #define ipv4_deleteroute(rt) if_route(rt, -1)
 #define del_src_route(rt) i_route(rt, -2);
-void ipv4_freeroutes(struct rt *);
+void ipv4_freeroutes(struct rt_head *);
 
 int ipv4_opensocket(struct interface *, int);
 ssize_t ipv4_sendrawpacket(const struct interface *,
     int, const void *, ssize_t);
 ssize_t ipv4_getrawpacket(struct interface *, int, void *, ssize_t, int *);
 #else
+#define ipv4_init() -1
 #define ipv4_applyaddr(a) {}
 #define ipv4_freeroutes(a) {}
 #endif
