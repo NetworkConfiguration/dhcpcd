@@ -77,6 +77,7 @@ send_arp(const struct interface *ifp, int op, in_addr_t sip, in_addr_t tip)
 	APPEND(&sip, sizeof(sip));
 	ZERO(ifp->hwlen);
 	APPEND(&tip, sizeof(tip));
+	len = p - arp_buffer;
 	return send_raw_packet(ifp, ETHERTYPE_ARP, arp_buffer, len);
 
 eexit:
