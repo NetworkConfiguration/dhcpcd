@@ -479,7 +479,7 @@ ipv6_buildroutes(void)
 		return;
 
 	TAILQ_INIT(&dnr);
-	for (ifp = ifaces; ifp; ifp = ifp->next) {
+	TAILQ_FOREACH(ifp, ifaces, next) {
 		d6_state = D6_CSTATE(ifp);
 		if (d6_state && d6_state->state == DH6S_BOUND) {
 			TAILQ_FOREACH(addr, &d6_state->addrs, next) {

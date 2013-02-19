@@ -199,13 +199,14 @@ up_interface(struct interface *iface)
 	return retval;
 }
 
-struct interface *
+struct if_head *
 discover_interfaces(int argc, char * const *argv)
 {
 	struct ifaddrs *ifaddrs, *ifa;
 	char *p;
 	int i, sdl_type;
-	struct interface *ifp, *ifs, *ifl;
+	struct if_head *ifs;
+	struct interface *ifp;
 #ifdef __linux__
 	char ifn[IF_NAMESIZE];
 #endif
@@ -227,7 +228,11 @@ discover_interfaces(int argc, char * const *argv)
 	if (getifaddrs(&ifaddrs) == -1)
 		return NULL;
 
-	ifs = ifl = NULL;
+	ifs = malloc(sizeof(*ifs));
+	if (ifs == NULL)
+		return NULL;
+	TAILQ_INIT(ifs);
+
 	for (ifa = ifaddrs; ifa; ifa = ifa->ifa_next) {
 		if (ifa->ifa_addr != NULL) {
 #ifdef AF_LINK
@@ -241,9 +246,10 @@ discover_interfaces(int argc, char * const *argv)
 
 		/* It's possible for an interface to have >1 AF_LINK.
 		 * For our purposes, we use the first one. */
-		for (ifp = ifs; ifp; ifp = ifp->next)
+		TAILQ_FOREACH(ifp, ifs, next) {
 			if (strcmp(ifp->name, ifa->ifa_name) == 0)
 				break;
+		}
 		if (ifp)
 			continue;
 		if (argc > 0) {
@@ -409,11 +415,7 @@ discover_interfaces(int argc, char * const *argv)
 			ifp->metric += 100;
 		}
 
-		if (ifl)
-			ifl->next = ifp; 
-		else
-			ifs = ifp;
-		ifl = ifp;
+		TAILQ_INSERT_TAIL(ifs, ifp, next);
 	}
 	freeifaddrs(ifaddrs);
 

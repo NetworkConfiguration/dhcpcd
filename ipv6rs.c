@@ -473,9 +473,10 @@ ipv6rs_handledata(_unused void *arg)
 		return;
 	}
 
-	for (ifp = ifaces; ifp; ifp = ifp->next)
+	TAILQ_FOREACH(ifp, ifaces, next) {
 		if (ifp->index == (unsigned int)pkt.ipi6_ifindex)
 			break;
+	}
 	if (ifp == NULL) {
 #ifdef DEBUG_RS
 		syslog(LOG_DEBUG, "RA for unexpected interface from %s", sfrom);

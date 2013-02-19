@@ -28,6 +28,7 @@
 #ifndef DHCPCD_H
 #define DHCPCD_H
 
+#include <sys/queue.h>
 #include <sys/socket.h>
 #include <net/if.h>
 
@@ -51,6 +52,7 @@
 #define IF_DATA_MAX	3
 
 struct interface {
+	TAILQ_ENTRY(interface) next;
 	char name[IF_NAMESIZE];
 	unsigned int index;
 	int flags;
@@ -65,8 +67,8 @@ struct interface {
 	char profile[PROFILE_LEN];
 	struct if_options *options;
 	void *if_data[IF_DATA_MAX];
-	struct interface *next;
 };
+extern TAILQ_HEAD(if_head, interface) *ifaces;
 
 extern char vendor[VENDORCLASSID_MAX_LEN];
 extern sigset_t dhcpcd_sigset;
@@ -76,7 +78,6 @@ extern char **ifav;
 extern int ifdc;
 extern char **ifdv;
 extern struct if_options *if_options;
-extern struct interface *ifaces;
 
 pid_t daemonise(void);
 struct interface *find_interface(const char *);

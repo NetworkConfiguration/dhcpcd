@@ -259,14 +259,15 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	EMALLOC(6, e);
 	snprintf(env[6], e, "ifmtu=%d", get_mtu(ifp->name));
 	l = e = strlen("interface_order=");
-	for (ifp2 = ifaces; ifp2; ifp2 = ifp2->next)
+	TAILQ_FOREACH(ifp2, ifaces, next) {
 		e += strlen(ifp2->name) + 1;
+	}
 	EMALLOC(7, e);
 	p = env[7];
 	strlcpy(p, "interface_order=", e);
 	e -= l;
 	p += l;
-	for (ifp2 = ifaces; ifp2; ifp2 = ifp2->next) {
+	TAILQ_FOREACH(ifp2, ifaces, next) {
 		l = strlcpy(p, ifp2->name, e);
 		p += l;
 		e -= l;

@@ -79,33 +79,27 @@ ifcmp(const struct interface *si, const struct interface *ti)
 void
 sort_interfaces(void)
 {
-	struct interface *sorted, *ifp, *ifn, *ift;
+	struct if_head sorted;
+	struct interface *ifp, *ift;
 
-	if (!ifaces || !ifaces->next)
+	if (ifaces == NULL ||
+	    (ifp = TAILQ_FIRST(ifaces)) == NULL ||
+	    TAILQ_NEXT(ifp, next) == NULL)
 		return;
-	sorted = ifaces;
-	ifaces = ifaces->next;
-	sorted->next = NULL;
-	for (ifp = ifaces; ifp && (ifn = ifp->next, 1); ifp = ifn) {
-		/* Are we the new head? */
-		if (ifcmp(ifp, sorted) == -1) {
-			ifp->next = sorted;
-			sorted = ifp;
-			continue;
-		}
-		/* Do we fit in the middle? */
-		for (ift = sorted; ift->next; ift = ift->next) {
-			if (ifcmp(ifp, ift->next) == -1) {
-				ifp->next = ift->next;
-				ift->next = ifp;
+
+	TAILQ_INIT(&sorted);
+	TAILQ_REMOVE(ifaces, ifp, next);
+	TAILQ_INSERT_HEAD(&sorted, ifp, next);
+	while ((ifp = TAILQ_FIRST(ifaces))) {
+		TAILQ_REMOVE(ifaces, ifp, next);
+		TAILQ_FOREACH(ift, &sorted, next) {
+			if (ifcmp(ifp, ift) == -1) {
+				TAILQ_INSERT_BEFORE(ift, ifp, next);
 				break;
 			}
 		}
-		/* We must be at the end */
-		if (!ift->next) {
-			ift->next = ifp;
-			ifp->next = NULL;
-		}
+		if (ift == NULL)
+			TAILQ_INSERT_TAIL(&sorted, ifp, next);
 	}
-	ifaces = sorted;
+	TAILQ_CONCAT(ifaces, &sorted, next);
 }

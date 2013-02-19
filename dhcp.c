@@ -2441,9 +2441,14 @@ dhcp_dump(const char *ifname)
 	struct interface *ifp;
 	struct dhcp_state *state;
 
-	ifaces = ifp = calloc(1, sizeof(*ifp));
+	ifaces = malloc(sizeof(*ifaces));
+	if (ifaces == NULL)
+		goto eexit;
+	TAILQ_INIT(ifaces);
+	ifp = calloc(1, sizeof(*ifp));
 	if (ifp == NULL)
 		goto eexit;
+	TAILQ_INSERT_HEAD(ifaces, ifp, next);
 	ifp->if_data[IF_DATA_DHCP] = state = calloc(1, sizeof(*state));
 	if (state == NULL)
 		goto eexit;

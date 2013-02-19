@@ -469,7 +469,7 @@ ipv4_buildroutes(void)
 	struct interface *ifp;
 	const struct dhcp_state *state;
 
-	for (ifp = ifaces; ifp; ifp = ifp->next) {
+	TAILQ_FOREACH(ifp, ifaces, next) {
 		state = D_CSTATE(ifp);
 		if (state == NULL || state->new == NULL)
 			continue;
@@ -632,9 +632,10 @@ ipv4_handleifa(int type, const char *ifname,
 
 	if (addr->s_addr == INADDR_ANY)
 		return;
-	for (ifp = ifaces; ifp; ifp = ifp->next)
+	TAILQ_FOREACH(ifp, ifaces, next) {
 		if (strcmp(ifp->name, ifname) == 0)
 			break;
+	}
 	if (ifp == NULL)
 		return;
 

@@ -319,9 +319,10 @@ ipv6ns_handledata(_unused void *arg)
 		return;
 	}
 
-	for (ifp = ifaces; ifp; ifp = ifp->next)
+	TAILQ_FOREACH(ifp, ifaces, next) {
 		if (ifp->index == (unsigned int)pkt.ipi6_ifindex)
 			break;
+	}
 	if (ifp == NULL) {
 #ifdef DEBUG_NS
 		syslog(LOG_DEBUG, "NA for unexpected interface from %s", sfrom);

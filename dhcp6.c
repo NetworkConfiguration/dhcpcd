@@ -920,7 +920,7 @@ dhcp6_addrexists(const struct ipv6_addr *a)
 	const struct dhcp6_state *state;
 	const struct ipv6_addr *ap;
 
-	for (ifp = ifaces; ifp; ifp = ifp->next) {
+	TAILQ_FOREACH(ifp, ifaces, next) {
 		state = D6_CSTATE(ifp);
 		if (state == NULL)
 			continue;
@@ -1195,9 +1195,10 @@ dhcp6_handledata(_unused void *arg)
 		return;
 	}
 
-	for (ifp = ifaces; ifp; ifp = ifp->next)
+	TAILQ_FOREACH(ifp, ifaces, next) {
 		if (ifp->index == (unsigned int)pkt.ipi6_ifindex)
 			break;
+	}
 	if (ifp == NULL) {
 		syslog(LOG_ERR, "DHCPv6 reply for unexpected interface from %s",
 		    sfrom);
@@ -1545,9 +1546,12 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 
 	/* If we don't have any more DHCP6 enabled interfaces,
 	 * close the global socket */
-	for (ifp = ifaces; ifp; ifp = ifp->next)
-		if (D6_STATE(ifp))
-			break;
+	if (ifaces) {
+		TAILQ_FOREACH(ifp, ifaces, next) {
+			if (D6_STATE(ifp))
+				break;
+		}
+	}
 	if (ifp == NULL && sock != -1) {
 		close(sock);
 		eloop_event_delete(sock);

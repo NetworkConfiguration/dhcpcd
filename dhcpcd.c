@@ -73,9 +73,9 @@ const char copyright[] = "Copyright (c) 2006-2013 Roy Marples";
 #define RELEASE_DELAY_S		0
 #define RELEASE_DELAY_NS	10000000
 
+struct if_head *ifaces;
 char vendor[VENDORCLASSID_MAX_LEN];
 int pidfd = -1;
-struct interface *ifaces = NULL;
 struct if_options *if_options = NULL;
 int ifac = 0;
 char **ifav = NULL;
@@ -135,16 +135,16 @@ static void
 cleanup(void)
 {
 #ifdef DEBUG_MEMORY
-	struct interface *iface;
+	struct interface *ifp;
 	int i;
 
 	free_options(if_options);
 
-	while (ifaces) {
-		iface = ifaces;
-		ifaces = iface->next;
-		free_interface(iface);
+	while ((ifp = TAILQ_FIRST(ifaces))) {
+		TAILQ_REMOVE(ifaces, ifp, next);
+		free_interface(ifp);
 	}
+	free(ifaces);
 
 	for (i = 0; i < ifac; i++)
 		free(ifav[i]);
@@ -256,37 +256,28 @@ struct interface *
 find_interface(const char *ifname)
 {
 	struct interface *ifp;
-	
-	for (ifp = ifaces; ifp; ifp = ifp->next)
+
+	TAILQ_FOREACH(ifp, ifaces, next) {
 		if (strcmp(ifp->name, ifname) == 0)
 			return ifp;
+	}
 	return NULL;
 }
 
 static void
-stop_interface(struct interface *iface)
+stop_interface(struct interface *ifp)
 {
-	struct interface *ifp, *ifl = NULL;
 
-	syslog(LOG_INFO, "%s: removing interface", iface->name);
+	syslog(LOG_INFO, "%s: removing interface", ifp->name);
 
 	// Remove the interface from our list
-	for (ifp = ifaces; ifp; ifp = ifp->next) {
-		if (ifp == iface)
-			break;
-		ifl = ifp;
-	}
-	if (ifl)
-		ifl->next = ifp->next;
-	else
-		ifaces = ifp->next;
-
-	dhcp6_drop(iface, NULL);
-	ipv6rs_drop(iface);
-//	if (strcmp(iface->state->reason, "RELEASE") != 0)
-		dhcp_drop(iface, "STOP");
-	dhcp_close(iface);
-	eloop_timeout_delete(NULL, iface);
+	TAILQ_REMOVE(ifaces, ifp, next);
+	dhcp6_drop(ifp, NULL);
+	ipv6rs_drop(ifp);
+//	if (strcmp(ifp->state->reason, "RELEASE") != 0)
+		dhcp_drop(ifp, "STOP");
+	dhcp_close(ifp);
+	eloop_timeout_delete(NULL, ifp);
 	free_interface(ifp);
 	if (!(options & (DHCPCD_MASTER | DHCPCD_TEST)))
 		exit(EXIT_FAILURE);
@@ -380,10 +371,8 @@ handle_carrier(int action, int flags, const char *ifname)
 
 	if (!(options & DHCPCD_LINK))
 		return;
-	for (ifp = ifaces; ifp; ifp = ifp->next)
-		if (strcmp(ifp->name, ifname) == 0)
-			break;
-	if (!ifp) {
+	ifp = find_interface(ifname);
+	if (ifp == NULL) {
 		if (options & DHCPCD_LINK)
 			handle_interface(1, ifname);
 		return;
@@ -487,7 +476,6 @@ init_state(struct interface *ifp, int argc, char **argv)
 		syslog(LOG_ERR, "ipv6_init: %m");
 	}
 
-
 	if (!(options & DHCPCD_TEST))
 		script_runreason(ifp, "PREINIT");
 
@@ -514,7 +502,8 @@ init_state(struct interface *ifp, int argc, char **argv)
 void
 handle_interface(int action, const char *ifname)
 {
-	struct interface *ifs, *ifp, *ifn, *ifl = NULL;
+	struct if_head *ifs;
+	struct interface *ifp, *ifn, *ifl = NULL;
 	const char * const argv[] = { ifname }; 
 	int i;
 
@@ -535,30 +524,31 @@ handle_interface(int action, const char *ifname)
 	}
 
 	ifs = discover_interfaces(-1, UNCONST(argv));
-	for (ifp = ifs; ifp; ifp = ifp->next) {
+	TAILQ_FOREACH_SAFE(ifp, ifs, next, ifn) {
 		if (strcmp(ifp->name, ifname) != 0)
 			continue;
 		/* Check if we already have the interface */
-		for (ifn = ifaces; ifn; ifn = ifn->next) {
-			if (strcmp(ifn->name, ifp->name) == 0)
-				break;
-			ifl = ifn;
-		}
-		if (ifn) {
+		ifl = find_interface(ifp->name);
+		if (ifl) {
 			/* The flags and hwaddr could have changed */
-			ifn->flags = ifp->flags;
-			ifn->hwlen = ifp->hwlen;
+			ifl->flags = ifp->flags;
+			ifl->hwlen = ifp->hwlen;
 			if (ifp->hwlen != 0)
-				memcpy(ifn->hwaddr, ifp->hwaddr, ifn->hwlen);
+				memcpy(ifl->hwaddr, ifp->hwaddr, ifl->hwlen);
 		} else {
-			if (ifl)
-				ifl->next = ifp;
-			else
-				ifaces = ifp;
+			TAILQ_REMOVE(ifs, ifp, next);
+			TAILQ_INSERT_TAIL(ifaces, ifp, next);
 		}
 		init_state(ifp, 0, NULL);
 		start_interface(ifp);
 	}
+
+	/* Free our discovered list */
+	while ((ifp = TAILQ_FIRST(ifs))) {
+		TAILQ_REMOVE(ifs, ifp, next);
+		free_interface(ifp);
+	}
+	free(ifs);
 }
 
 #ifdef RTM_CHGADDR
@@ -569,7 +559,7 @@ handle_hwaddr(const char *ifname, unsigned char *hwaddr, size_t hwlen)
 	struct if_options *ifo;
 	struct dhcp_state *state;
 
-	for (ifp = ifaces; ifp; ifp = ifp->next)
+	TAILQ_FOREACH(ifp, ifaces, next) {
 		if (strcmp(ifp->name, ifname) == 0 && ifp->hwlen <= hwlen) {
 			state = D_STATE(ifp);
 			if (state == NULL)
@@ -598,6 +588,7 @@ handle_hwaddr(const char *ifname, unsigned char *hwaddr, size_t hwlen)
 				start_interface(ifp);
 			}
 		}
+	}
 	free(hwaddr);
 }
 #endif
@@ -616,19 +607,16 @@ if_reboot(struct interface *ifp, int argc, char **argv)
 static void
 reconf_reboot(int action, int argc, char **argv, int oi)
 {
-	struct interface *ifl, *ifn, *ifp, *ifs, *ift;
+	struct if_head *ifs;
+	struct interface *ifn, *ifp;
 	
 	ifs = discover_interfaces(argc - oi, argv + oi);
 	if (ifs == NULL)
 		return;
 
-	for (ifp = ifs; ifp && (ift = ifp->next, 1); ifp = ift) {
-		ifl = NULL;
-		for (ifn = ifaces; ifn; ifn = ifn->next) {
-			if (strcmp(ifn->name, ifp->name) == 0)
-				break;
-			ifl = ifn;
-		}
+	while ((ifp = TAILQ_FIRST(ifs))) {
+		TAILQ_REMOVE(ifs, ifp, next);
+		ifn = find_interface(ifp->name);
 		if (ifn) {
 			if (action)
 				if_reboot(ifn, argc, argv);
@@ -636,15 +624,12 @@ reconf_reboot(int action, int argc, char **argv, int oi)
 				ipv4_applyaddr(ifn);
 			free_interface(ifp);
 		} else {
-			ifp->next = NULL;
+			TAILQ_INSERT_TAIL(ifaces, ifp, next);
 			init_state(ifp, argc, argv);
 			start_interface(ifp);
-			if (ifl)
-				ifl->next = ifp;
-			else
-				ifaces = ifp;
 		}
 	}
+	free(ifs);
 
 	sort_interfaces();
 }
@@ -704,8 +689,9 @@ handle_signal(int sig)
 		break;
 	case SIGUSR1:
 		syslog(LOG_INFO, "received SIGUSR, reconfiguring");
-		for (ifp = ifaces; ifp; ifp = ifp->next)
+		TAILQ_FOREACH(ifp, ifaces, next) {
 			ipv4_applyaddr(ifp);
+		}
 		return;
 	case SIGPIPE:
 		syslog(LOG_WARNING, "received SIGPIPE");
@@ -723,10 +709,7 @@ handle_signal(int sig)
 	/* As drop_dhcp could re-arrange the order, we do it like this. */
 	for (;;) {
 		/* Be sane and drop the last config first */
-		for (ifp = ifaces; ifp; ifp = ifp->next) {
-			if (ifp->next == NULL)
-				break;
-		}
+		ifp = TAILQ_LAST(ifaces, if_head);
 		if (ifp == NULL)
 			break;
 		if (ifp->carrier != LINK_DOWN &&
@@ -776,7 +759,7 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 		} else if (strcmp(*argv, "--getinterfaces") == 0) {
 			len = 0;
 			if (argc == 1) {
-				for (ifp = ifaces; ifp; ifp = ifp->next) {
+				TAILQ_FOREACH(ifp, ifaces, next) {
 					len++;
 					if (D6_STATE_RUNNING(ifp))
 						len++;
@@ -786,13 +769,14 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 				len = write(fd->fd, &len, sizeof(len));
 				if (len != sizeof(len))
 					return -1;
-				for (ifp = ifaces; ifp; ifp = ifp->next)
+				TAILQ_FOREACH(ifp, ifaces, next) {
 					send_interface(fd->fd, ifp);
+				}
 				return 0;
 			}
 			opt = 0;
 			while (argv[++opt] != NULL) {
-				for (ifp = ifaces; ifp; ifp = ifp->next)
+				TAILQ_FOREACH(ifp, ifaces, next) {
 					if (strcmp(argv[opt], ifp->name) == 0) {
 						len++;
 						if (D6_STATE_RUNNING(ifp))
@@ -800,15 +784,17 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 						if (ipv6rs_has_ra(ifp))
 							len++;
 					}
+				}
 			}
 			len = write(fd->fd, &len, sizeof(len));
 			if (len != sizeof(len))
 				return -1;
 			opt = 0;
 			while (argv[++opt] != NULL) {
-				for (ifp = ifaces; ifp; ifp = ifp->next)
+				TAILQ_FOREACH(ifp, ifaces, next) {
 					if (strcmp(argv[opt], ifp->name) == 0)
 						send_interface(fd->fd, ifp);
+				}
 			}
 			return 0;
 		} else if (strcmp(*argv, "--listen") == 0) {
@@ -863,10 +849,7 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 
 	if (do_release || do_exit) {
 		for (oi = optind; oi < argc; oi++) {
-			for (ifp = ifaces; ifp; ifp = ifp->next)
-				if (strcmp(ifp->name, argv[oi]) == 0)
-					break;
-			if (!ifp)
+			if ((ifp = find_interface(argv[oi])) == NULL)
 				continue;
 			if (do_release)
 				ifp->options->options |= DHCPCD_RELEASE;
@@ -885,7 +868,7 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 int
 main(int argc, char **argv)
 {
-	struct interface *iface;
+	struct interface *ifp;
 	uint16_t family = 0;
 	int opt, oi = 0, sig = 0, i, control_fd;
 	size_t len;
@@ -1158,14 +1141,11 @@ main(int argc, char **argv)
 
 	ifaces = discover_interfaces(ifc, ifv);
 	for (i = 0; i < ifc; i++) {
-		for (iface = ifaces; iface; iface = iface->next)
-			if (strcmp(iface->name, ifv[i]) == 0)
-				break;
-		if (!iface)
+		if (find_interface(ifv[i]) == NULL)
 			syslog(LOG_ERR, "%s: interface not found or invalid",
 			    ifv[i]);
 	}
-	if (!ifaces) {
+	if (ifaces == NULL) {
 		if (ifc == 0)
 			syslog(LOG_ERR, "no valid interfaces found");
 		else
@@ -1181,9 +1161,9 @@ main(int argc, char **argv)
 		daemonise();
 
 	opt = 0;
-	for (iface = ifaces; iface; iface = iface->next) {
-		init_state(iface, argc, argv);
-		if (iface->carrier != LINK_DOWN)
+	TAILQ_FOREACH(ifp, ifaces, next) {
+		init_state(ifp, argc, argv);
+		if (ifp->carrier != LINK_DOWN)
 			opt = 1;
 	}
 
@@ -1198,9 +1178,9 @@ main(int argc, char **argv)
 			ts.tv_sec = 1;
 			ts.tv_nsec = 0;
 			nanosleep(&ts, NULL);
-			for (iface = ifaces; iface; iface = iface->next) {
-				handle_carrier(0, 0, iface->name);
-				if (iface->carrier != LINK_DOWN) {
+			TAILQ_FOREACH(ifp, ifaces, next) {
+				handle_carrier(0, 0, ifp->name);
+				if (ifp->carrier != LINK_DOWN) {
 					opt = 1;
 					break;
 				}
@@ -1208,8 +1188,8 @@ main(int argc, char **argv)
 		}
 		if (options & DHCPCD_MASTER)
 			i = if_options->timeout;
-		else if (ifaces)
-			i = ifaces->options->timeout;
+		else if ((ifp = TAILQ_FIRST(ifaces)))
+			i = ifp->options->timeout;
 		else
 			i = 0;
 		if (opt == 0 &&
@@ -1228,8 +1208,9 @@ main(int argc, char **argv)
 	if_options = NULL;
 
 	sort_interfaces();
-	for (iface = ifaces; iface; iface = iface->next)
-		eloop_timeout_add_sec(0, start_interface, iface);
+	TAILQ_FOREACH(ifp, ifaces, next) {
+		eloop_timeout_add_sec(0, start_interface, ifp);
+	}
 
 	eloop_start(&dhcpcd_sigset);
 	exit(EXIT_SUCCESS);
