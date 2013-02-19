@@ -307,8 +307,8 @@ configure_interface1(struct interface *ifp)
 		ifp->metric = ifo->metric;
 
 	/* We want to disable kernel interface RA as early as possible. */
-	if (options & DHCPCD_IPV6RS && ifo->options & DHCPCD_IPV6RS) {
-		if (check_ipv6(ifp->name) != 1)
+	if (ifo->options & DHCPCD_IPV6RS) {
+		if (check_ipv6(NULL) != 1 || check_ipv6(ifp->name) != 1)
 			ifo->options &= ~DHCPCD_IPV6RS;
 	}
 
@@ -475,9 +475,6 @@ init_state(struct interface *ifp, int argc, char **argv)
 		syslog(LOG_ERR, "ipv4_init: %m");
 		ifo->options &= ~DHCPCD_IPV4;
 	}
-
-	if (ifo->options & DHCPCD_IPV6RS && !check_ipv6(NULL))
-		ifo->options &= ~DHCPCD_IPV6RS;
 	if (ifo->options & DHCPCD_IPV6RS && ipv6_init() == -1) {
 		syslog(LOG_ERR, "ipv6_init: %m");
 		ifo->options &= ~DHCPCD_IPV6RS;

@@ -175,10 +175,14 @@ restore_kernel_ra(void)
 int
 check_ipv6(const char *ifname)
 {
+	static int ipv6_checked = 0;
 	int r, ex, i;
 	char path[256], *p, **nrest;
 
 	if (ifname == NULL) {
+		if (ipv6_checked)
+			return 1;
+		ipv6_checked = 1;
 		ifname = "all";
 		ex = 1;
 	} else

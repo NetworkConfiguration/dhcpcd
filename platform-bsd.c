@@ -92,11 +92,16 @@ restore_kernel_ra(void)
 int
 check_ipv6(const char *ifname)
 {
+	static int ipv6_checked = 0;
 	int r;
 
 	/* BSD doesn't support these values per iface, so just return 1 */
 	if (ifname)
 		return 1;
+
+	if (ipv6_checked)
+		return 1;
+	ipv6_checked = 1;
 
 	r = get_inet6_sysctl(IPV6CTL_ACCEPT_RTADV);
 	if (r == -1)
