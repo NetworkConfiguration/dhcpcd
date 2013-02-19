@@ -82,7 +82,7 @@ arp_send(const struct interface *ifp, int op, in_addr_t sip, in_addr_t tip)
 	return ipv4_sendrawpacket(ifp, ETHERTYPE_ARP, arp_buffer, len);
 
 eexit:
-	errno = ENOSPC;
+	errno = ENOBUFS;
 	return -1;
 }
 
