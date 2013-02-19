@@ -327,6 +327,7 @@ eloop_cleanup(void)
 		free(free_timeouts);
 		free_timeouts = t;
 	}
+	free(fds);
 }
 
 void
