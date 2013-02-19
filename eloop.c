@@ -28,6 +28,7 @@
 /* Needed for ppoll(2) */
 #define _GNU_SOURCE
 
+#include <sys/queue.h>
 #include <sys/time.h>
 
 #include <errno.h>
@@ -44,24 +45,28 @@
 
 static struct timeval now;
 
-static struct event {
+struct event {
+	TAILQ_ENTRY(event) next;
 	int fd;
 	void (*callback)(void *);
 	void *arg;
 	struct pollfd *pollfd;
-	struct event *next;
-} *events;
+};
 static size_t events_len;
-static struct event *free_events;
+static TAILQ_HEAD (event_head, event) events = TAILQ_HEAD_INITIALIZER(events);
+static struct event_head free_events = TAILQ_HEAD_INITIALIZER(free_events);
 
-static struct timeout {
+struct timeout {
+	TAILQ_ENTRY(timeout) next;
 	struct timeval when;
 	void (*callback)(void *);
 	void *arg;
 	int queue;
-	struct timeout *next;
-} *timeouts;
-static struct timeout *free_timeouts;
+};
+static TAILQ_HEAD (timeout_head, timeout) timeouts
+    = TAILQ_HEAD_INITIALIZER(timeouts);
+static struct timeout_head free_timeouts
+    = TAILQ_HEAD_INITIALIZER(free_timeouts);
 
 static struct pollfd *fds;
 static size_t fds_len;
@@ -72,33 +77,33 @@ eloop_event_setup_fds(void)
 	struct event *e;
 	size_t i;
 
-	for (e = events, i = 0; e; e = e->next, i++) {
+	i = 0;
+	TAILQ_FOREACH(e, &events, next) {
 		fds[i].fd = e->fd;
 		fds[i].events = POLLIN;
 		fds[i].revents = 0;
 		e->pollfd = &fds[i];
+		i++;
 	}
 }
 
 int
 eloop_event_add(int fd, void (*callback)(void *), void *arg)
 {
-	struct event *e, *last = NULL;
+	struct event *e;
 
 	/* We should only have one callback monitoring the fd */
-	for (e = events; e; e = e->next) {
+	TAILQ_FOREACH(e, &events, next) {
 		if (e->fd == fd) {
 			e->callback = callback;
 			e->arg = arg;
 			return 0;
 		}
-		last = e;
 	}
 
 	/* Allocate a new event if no free ones already allocated */
-	if (free_events) {
-		e = free_events;
-		free_events = e->next;
+	if ((e = TAILQ_FIRST(&free_events))) {
+		TAILQ_REMOVE(&free_events, e, next);
 	} else {
 		e = malloc(sizeof(*e));
 		if (e == NULL) {
@@ -115,6 +120,7 @@ eloop_event_add(int fd, void (*callback)(void *), void *arg)
 		fds = malloc(sizeof(*fds) * fds_len);
 		if (fds == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);
+			free(e);
 			return -1;
 		}
 	}
@@ -123,12 +129,7 @@ eloop_event_add(int fd, void (*callback)(void *), void *arg)
 	e->fd = fd;
 	e->callback = callback;
 	e->arg = arg;
-	e->next = NULL;
-	if (last)
-		last->next = e;
-	else
-		events = e;
-
+	TAILQ_INSERT_TAIL(&events, e, next);
 	eloop_event_setup_fds();
 	return 0;
 }
@@ -136,21 +137,16 @@ eloop_event_add(int fd, void (*callback)(void *), void *arg)
 void
 eloop_event_delete(int fd)
 {
-	struct event *e, *last = NULL;
+	struct event *e;
 
-	for (e = events; e; e = e->next) {
+	TAILQ_FOREACH(e, &events, next) {
 		if (e->fd == fd) {
-			if (last)
-				last->next = e->next;
-			else
-				events = e->next;
-			e->next = free_events;
-			free_events = e;
+			TAILQ_REMOVE(&events, e, next);
+			TAILQ_INSERT_TAIL(&free_events, e, next);
 			events_len--;
 			eloop_event_setup_fds();
 			break;
 		}
-		last = e;
 	}
 }
 
@@ -170,22 +166,17 @@ eloop_q_timeout_add_tv(int queue,
 	}
 
 	/* Remove existing timeout if present */
-	for (t = timeouts; t; t = t->next) {
+	TAILQ_FOREACH(t, &timeouts, next) {
 		if (t->callback == callback && t->arg == arg) {
-			if (tt)
-				tt->next = t->next;
-			else
-				timeouts = t->next;
+			TAILQ_REMOVE(&timeouts, t, next);
 			break;
 		}
-		tt = t;
 	}
 
-	if (!t) {
+	if (t == NULL) {
 		/* No existing, so allocate or grab one from the free pool */
-		if (free_timeouts) {
-			t = free_timeouts;
-			free_timeouts = t->next;
+		if ((t = TAILQ_FIRST(&free_timeouts))) {
+			TAILQ_REMOVE(&free_timeouts, t, next);
 		} else {
 			t = malloc(sizeof(*t));
 			if (t == NULL) {
@@ -202,22 +193,14 @@ eloop_q_timeout_add_tv(int queue,
 	t->queue = queue;
 
 	/* The timeout list should be in chronological order,
-	 * soonest first.
-	 * This is the easiest algorithm - check the head, then middle
-	 * and finally the end. */
-	if (!timeouts || timercmp(&t->when, &timeouts->when, <)) {
-		t->next = timeouts;
-		timeouts = t;
-		return 0;
-	} 
-	for (tt = timeouts; tt->next; tt = tt->next)
-		if (timercmp(&t->when, &tt->next->when, <)) {
-			t->next = tt->next;
-			tt->next = t;
+	 * soonest first. */
+	TAILQ_FOREACH(tt, &timeouts, next) {
+		if (timercmp(&t->when, &tt->when, <)) {
+			TAILQ_INSERT_BEFORE(tt, t, next);
 			return 0;
 		}
-	tt->next = t;
-	t->next = NULL;
+	}
+	TAILQ_INSERT_TAIL(&timeouts, t, next);
 	return 0;
 }
 
@@ -239,30 +222,25 @@ static void
 eloop_q_timeouts_delete_v(int queue, void *arg,
     void (*callback)(void *), va_list v)
 {
-	struct timeout *t, *tt, *last = NULL;
+	struct timeout *t, *tt;
 	va_list va;
 	void (*f)(void *);
 
-	for (t = timeouts; t && (tt = t->next, 1); t = tt) {
+	TAILQ_FOREACH_SAFE(t, &timeouts, next, tt) {
 		if (t->queue == queue && t->arg == arg &&
 		    t->callback != callback)
 		{
 			va_copy(va, v);
-			while ((f = va_arg(va, void (*)(void *))))
+			while ((f = va_arg(va, void (*)(void *)))) {
 				if (f == t->callback)
 					break;
+			}
 			va_end(va);
-			if (!f) {
-				if (last)
-					last->next = t->next;
-				else
-					timeouts = t->next;
-				t->next = free_timeouts;
-				free_timeouts = t;
-				continue;
+			if (f == NULL) {
+				TAILQ_REMOVE(&timeouts, t, next);
+				TAILQ_INSERT_TAIL(&free_timeouts, t, next);
 			}
 		}
-		last = t;
 	}
 }
 
@@ -279,21 +257,15 @@ eloop_q_timeouts_delete(int queue, void *arg, void (*callback)(void *), ...)
 void
 eloop_q_timeout_delete(int queue, void (*callback)(void *), void *arg)
 {
-	struct timeout *t, *tt, *last = NULL;
+	struct timeout *t, *tt;
 
-	for (t = timeouts; t && (tt = t->next, 1); t = tt) {
+	TAILQ_FOREACH_SAFE(t, &timeouts, next, tt) {
 		if (t->queue == queue && t->arg == arg &&
 		    (!callback || t->callback == callback))
 		{
-			if (last)
-				last->next = t->next;
-			else
-				timeouts = t->next;
-			t->next = free_timeouts;
-			free_timeouts = t;
-			continue;
+			TAILQ_REMOVE(&timeouts, t, next);
+			TAILQ_INSERT_TAIL(&free_timeouts, t, next);
 		}
-		last = t;
 	}
 }
 
@@ -307,25 +279,21 @@ eloop_cleanup(void)
 	struct event *e;
 	struct timeout *t;
 
-	while (events) {
-		e = events->next;
-		free(events);
-		events = e;
+	while ((e = TAILQ_FIRST(&events))) {
+		TAILQ_REMOVE(&events, e, next);
+		free(e);
 	}
-	while (free_events) {
-		e = free_events->next;
-		free(free_events);
-		free_events = e;
+	while ((e = TAILQ_FIRST(&free_events))) {
+		TAILQ_REMOVE(&free_events, e, next);
+		free(e);
 	}
-	while (timeouts) {
-		t = timeouts->next;
-		free(timeouts);
-		timeouts = t;
+	while ((t = TAILQ_FIRST(&timeouts))) {
+		TAILQ_REMOVE(&timeouts, t, next);
+		free(t);
 	}
-	while (free_timeouts) {
-		t = free_timeouts->next;
-		free(free_timeouts);
-		free_timeouts = t;
+	while ((t = TAILQ_FIRST(&free_timeouts))) {
+		TAILQ_REMOVE(&free_timeouts, t, next);
+		free(t);
 	}
 	free(fds);
 }
@@ -349,17 +317,15 @@ eloop_start(const sigset_t *sigmask)
 
 	for (;;) {
 		/* Run all timeouts first */
-		if (timeouts) {
+		if ((t = TAILQ_FIRST(&timeouts))) {
 			get_monotonic(&now);
-			if (timercmp(&now, &timeouts->when, >)) {
-				t = timeouts;
-				timeouts = timeouts->next;
+			if (timercmp(&now, &t->when, >)) {
+				TAILQ_REMOVE(&timeouts, t, next);
 				t->callback(t->arg);
-				t->next = free_timeouts;
-				free_timeouts = t;
+				TAILQ_INSERT_TAIL(&free_timeouts, t, next);
 				continue;
 			}
-			timersub(&timeouts->when, &now, &tv);
+			timersub(&t->when, &now, &tv);
 			TIMEVAL_TO_TIMESPEC(&tv, &ts);
 			tsp = &ts;
 		} else
@@ -380,8 +346,8 @@ eloop_start(const sigset_t *sigmask)
 		}
 		
 		/* Process any triggered events. */
-		if (n) {
-			for (e = events; e; e = e->next) {
+		if (n > 0) {
+			TAILQ_FOREACH(e, &events, next) {
 				if (e->pollfd->revents & (POLLIN || POLLHUP)) {
 					e->callback(e->arg);
 					/* We need to break here as the
