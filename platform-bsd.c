@@ -35,6 +35,7 @@
 #include <stdlib.h>
 #include <syslog.h>
 
+#include "dhcpcd.h"
 #include "if-options.h"
 #include "platform.h"
 

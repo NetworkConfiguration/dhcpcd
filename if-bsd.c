@@ -545,8 +545,8 @@ manage_link(int fd)
 					break;
 #ifdef INET
 				get_addrs(rtm->rtm_addrs, cp, rti_info);
+				memset(&rt, 0, sizeof(rt));
 				rt.iface = NULL;
-				rt.next = NULL;
 				COPYOUT(rt.dest, rti_info[RTAX_DST]);
 				COPYOUT(rt.net, rti_info[RTAX_NETMASK]);
 				COPYOUT(rt.gate, rti_info[RTAX_GATEWAY]);
