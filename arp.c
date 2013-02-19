@@ -45,34 +45,43 @@
 	(sizeof(struct arphdr) + (2 * sizeof(uint32_t)) + (2 * HWADDR_LEN))
 
 static int
-send_arp(const struct interface *iface, int op, in_addr_t sip, in_addr_t tip)
+send_arp(const struct interface *ifp, int op, in_addr_t sip, in_addr_t tip)
 {
 	uint8_t arp_buffer[ARP_LEN];
 	struct arphdr ar;
 	size_t len;
 	uint8_t *p;
-	int retval;
 
-	ar.ar_hrd = htons(iface->family);
+	ar.ar_hrd = htons(ifp->family);
 	ar.ar_pro = htons(ETHERTYPE_IP);
-	ar.ar_hln = iface->hwlen;
+	ar.ar_hln = ifp->hwlen;
 	ar.ar_pln = sizeof(sip);
 	ar.ar_op = htons(op);
-	memcpy(arp_buffer, &ar, sizeof(ar));
-	p = arp_buffer + sizeof(ar);
-	memcpy(p, iface->hwaddr, iface->hwlen);
-	p += iface->hwlen;
-	memcpy(p, &sip, sizeof(sip));
-	p += sizeof(sip);
-	/* ARP requests should ignore this */
-	retval = iface->hwlen;
-	while (retval--)
-		*p++ = '\0';
-	memcpy(p, &tip, sizeof(tip));
-	p += sizeof(tip);
-	len = p - arp_buffer;
-	retval = send_raw_packet(iface, ETHERTYPE_ARP, arp_buffer, len);
-	return retval;
+
+	p = arp_buffer;
+	len = sizeof(arp_buffer);
+
+#define CHECK(fun, b, l)						\
+	do {								\
+		if (len < (l))						\
+			goto eexit;					\
+		fun(p, (b), (l));					\
+		p += (l);						\
+		len -= (l);						\
+	} while (/* CONSTCOND */ 0)
+#define APPEND(b, l)	CHECK(memcpy, b, l)
+#define ZERO(l)		CHECK(memset, 0, l)
+
+	APPEND(&ar, sizeof(ar));
+	APPEND(ifp->hwaddr, ifp->hwlen);
+	APPEND(&sip, sizeof(sip));
+	ZERO(ifp->hwlen);
+	APPEND(&tip, sizeof(tip));
+	return send_raw_packet(ifp, ETHERTYPE_ARP, arp_buffer, len);
+
+eexit:
+	errno = ENOSPC;
+	return -1;
 }
 
 static void
