@@ -73,7 +73,7 @@ const char copyright[] = "Copyright (c) 2006-2013 Roy Marples";
 #define RELEASE_DELAY_S		0
 #define RELEASE_DELAY_NS	10000000
 
-struct if_head *ifaces;
+struct if_head *ifaces = NULL;
 char vendor[VENDORCLASSID_MAX_LEN];
 int pidfd = -1;
 struct if_options *if_options = NULL;
@@ -140,11 +140,13 @@ cleanup(void)
 
 	free_options(if_options);
 
-	while ((ifp = TAILQ_FIRST(ifaces))) {
-		TAILQ_REMOVE(ifaces, ifp, next);
-		free_interface(ifp);
+	if (ifaces) {
+		while ((ifp = TAILQ_FIRST(ifaces))) {
+			TAILQ_REMOVE(ifaces, ifp, next);
+			free_interface(ifp);
+		}
+		free(ifaces);
 	}
-	free(ifaces);
 
 	for (i = 0; i < ifac; i++)
 		free(ifav[i]);
