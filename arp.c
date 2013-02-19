@@ -52,28 +52,37 @@ arp_send(const struct interface *ifp, int op, in_addr_t sip, in_addr_t tip)
 	struct arphdr ar;
 	size_t len;
 	uint8_t *p;
-	int retval;
 
 	ar.ar_hrd = htons(ifp->family);
 	ar.ar_pro = htons(ETHERTYPE_IP);
 	ar.ar_hln = ifp->hwlen;
 	ar.ar_pln = sizeof(sip);
 	ar.ar_op = htons(op);
-	memcpy(arp_buffer, &ar, sizeof(ar));
-	p = arp_buffer + sizeof(ar);
-	memcpy(p, ifp->hwaddr, ifp->hwlen);
-	p += ifp->hwlen;
-	memcpy(p, &sip, sizeof(sip));
-	p += sizeof(sip);
-	/* ARP requests should ignore this */
-	retval = ifp->hwlen;
-	while (retval--)
-		*p++ = '\0';
-	memcpy(p, &tip, sizeof(tip));
-	p += sizeof(tip);
-	len = p - arp_buffer;
-	retval = ipv4_sendrawpacket(ifp, ETHERTYPE_ARP, arp_buffer, len);
-	return retval;
+
+	p = arp_buffer;
+	len = sizeof(arp_buffer);
+
+#define CHECK(fun, b, l)						\
+	do {								\
+		if (len < (l))						\
+			goto eexit;					\
+		fun(p, (b), (l));					\
+		p += (l);						\
+		len -= (l);						\
+	} while (/* CONSTCOND */ 0)
+#define APPEND(b, l)	CHECK(memcpy, b, l)
+#define ZERO(l)		CHECK(memset, 0, l)
+
+	APPEND(&ar, sizeof(ar));
+	APPEND(ifp->hwaddr, ifp->hwlen);
+	APPEND(&sip, sizeof(sip));
+	ZERO(ifp->hwlen);
+	APPEND(&tip, sizeof(tip));
+	return ipv4_sendrawpacket(ifp, ETHERTYPE_ARP, arp_buffer, len);
+
+eexit:
+	errno = ENOSPC;
+	return -1;
 }
 
 static void
