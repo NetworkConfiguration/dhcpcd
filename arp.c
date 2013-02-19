@@ -78,6 +78,7 @@ arp_send(const struct interface *ifp, int op, in_addr_t sip, in_addr_t tip)
 	APPEND(&sip, sizeof(sip));
 	ZERO(ifp->hwlen);
 	APPEND(&tip, sizeof(tip));
+	len = p - arp_buffer;
 	return ipv4_sendrawpacket(ifp, ETHERTYPE_ARP, arp_buffer, len);
 
 eexit:
