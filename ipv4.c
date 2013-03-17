@@ -341,6 +341,9 @@ add_subnet_route(struct rt_head *rt, const struct interface *ifp)
 	struct rt *r;
 	const struct dhcp_state *s;
 
+	if (rt == NULL) /* earlier malloc failed */
+		return NULL;
+
 	s = D_CSTATE(ifp);
 	if (s->net.s_addr == INADDR_BROADCAST ||
 	    s->net.s_addr == INADDR_ANY ||
@@ -350,8 +353,11 @@ add_subnet_route(struct rt_head *rt, const struct interface *ifp)
 		return rt;
 
 	r = malloc(sizeof(*r));
-	if (r == NULL)
+	if (r == NULL) {
+		syslog(LOG_ERR, "%s: %m", __func__);
+		ipv4_freeroutes(rt);
 		return NULL;
+	}
 	r->dest.s_addr = s->addr.s_addr & s->net.s_addr;
 	r->net.s_addr = s->net.s_addr;
 	r->gate.s_addr = 0;
@@ -394,10 +400,12 @@ massage_host_routes(struct rt_head *rt, const struct interface *ifp)
 {
 	struct rt *r;
 
-	TAILQ_FOREACH(r, rt, next) {
-		if (r->gate.s_addr == D_CSTATE(ifp)->addr.s_addr &&
-		    r->net.s_addr == INADDR_BROADCAST)
-			r->gate.s_addr = r->dest.s_addr;
+	if (rt) {
+		TAILQ_FOREACH(r, rt, next) {
+			if (r->gate.s_addr == D_CSTATE(ifp)->addr.s_addr &&
+			    r->net.s_addr == INADDR_BROADCAST)
+				r->gate.s_addr = r->dest.s_addr;
+		}
 	}
 	return rt;
 }
@@ -407,12 +415,15 @@ add_destination_route(struct rt_head *rt, const struct interface *iface)
 {
 	struct rt *r;
 
-	if (!(iface->flags & IFF_POINTOPOINT) ||
+	if (rt == NULL || /* failed a malloc earlier probably */
+	    !(iface->flags & IFF_POINTOPOINT) ||
 	    !has_option_mask(iface->options->dstmask, DHO_ROUTER))
 		return rt;
+
 	r = malloc(sizeof(*r));
 	if (r == NULL) {
 		syslog(LOG_ERR, "%s: %m", __func__);
+		ipv4_freeroutes(rt);
 		return NULL;
 	}
 	r->dest.s_addr = INADDR_ANY;
@@ -429,6 +440,9 @@ add_router_host_route(struct rt_head *rt, const struct interface *ifp)
 {
 	struct rt *rtp, *rtn;
 	const char *cp, *cp2, *cp3, *cplim;
+
+	if (rt == NULL) /* earlier malloc failed */
+		return NULL;
 
 	TAILQ_FOREACH(rtp, rt, next) {
 		if (rtp->dest.s_addr != INADDR_ANY)
@@ -466,7 +480,8 @@ add_router_host_route(struct rt_head *rt, const struct interface *ifp)
 		rtn = malloc(sizeof(*rtn));
 		if (rtn == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);
-			continue;
+			ipv4_freeroutes(rt);
+			return NULL;
 		}
 		rtn->dest.s_addr = rtp->gate.s_addr;
 		rtn->net.s_addr = INADDR_BROADCAST;
@@ -501,6 +516,8 @@ ipv4_buildroutes(void)
 			dnr = add_router_host_route(dnr, ifp);
 			dnr = add_destination_route(dnr, ifp);
 		}
+		if (dnr == NULL) /* failed to malloc all new routes */
+			continue;
 		TAILQ_FOREACH_SAFE(rt, dnr, next, rtn) {
 			rt->iface = ifp;
 			rt->metric = ifp->metric;

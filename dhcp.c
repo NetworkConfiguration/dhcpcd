@@ -497,7 +497,6 @@ decode_rfc3442_rt(int dl, const uint8_t *data)
 		cidr = *p++;
 		if (cidr > 32) {
 			ipv4_freeroutes(routes);
-			free(routes);
 			errno = EINVAL;
 			return NULL;
 		}
@@ -506,7 +505,6 @@ decode_rfc3442_rt(int dl, const uint8_t *data)
 		if (rt == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);
 			ipv4_freeroutes(routes);
-			free(routes);
 			return NULL;
 		}
 		TAILQ_INSERT_TAIL(routes, rt, next);
@@ -749,6 +747,7 @@ get_option_routes(struct interface *ifp, const struct dhcp_message *dhcp)
 		syslog(LOG_ERR, "%s: %m", __func__);
 		return NULL;
 	}
+	TAILQ_INIT(routes);
 	if (!has_option_mask(ifo->nomask, DHO_STATICROUTE))
 		p = get_option(dhcp, DHO_STATICROUTE, &len, NULL);
 	else
@@ -759,7 +758,8 @@ get_option_routes(struct interface *ifp, const struct dhcp_message *dhcp)
 			route = calloc(1, sizeof(*route));
 			if (route == NULL) {
 				syslog(LOG_ERR, "%s: %m", __func__);
-				break;
+				ipv4_freeroutes(routes);
+				return NULL;
 			}
 			memcpy(&route->dest.s_addr, p, 4);
 			p += 4;
@@ -781,7 +781,8 @@ get_option_routes(struct interface *ifp, const struct dhcp_message *dhcp)
 			route = calloc(1, sizeof(*route));
 			if (route == NULL) {
 				syslog(LOG_ERR, "%s: %m", __func__);
-				break;
+				ipv4_freeroutes(routes);
+				return NULL;
 			}
 			memcpy(&route->gate.s_addr, p, 4);
 			p += 4;
