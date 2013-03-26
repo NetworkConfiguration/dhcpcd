@@ -57,7 +57,7 @@ for x do
 	--without-getline) GETLINE=no;;
 	--without-strlcpy) STRLCPY=no;;
         --without-posix_spawn) POSIX_SPAWN=no;;
-        --without-pollts) POLLTS=no;;
+	--without-pollts) POLLTS=xno;;
 	--with-pollts) POLLTS=$var;;
 	--serviceexists) SERVICEEXISTS=$var;;
 	--servicecmd) SERVICECMD=$var;;
