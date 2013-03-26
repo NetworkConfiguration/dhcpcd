@@ -266,7 +266,7 @@ void dhcp_discover(void *);
 void dhcp_inform(struct interface *);
 void dhcp_release(struct interface *);
 void dhcp_bind(void *);
-void dhcp_reboot(struct interface *, int);
+void dhcp_reboot_newopts(struct interface *, int);
 void dhcp_close(struct interface *);
 void dhcp_free(struct interface *);
 int dhcp_dump(const char *);

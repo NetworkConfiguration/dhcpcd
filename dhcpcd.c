@@ -604,7 +604,7 @@ if_reboot(struct interface *ifp, int argc, char **argv)
 
 	oldopts = ifp->options->options;
 	configure_interface(ifp, argc, argv);
-	dhcp_reboot(ifp, oldopts);
+	dhcp_reboot_newopts(ifp, oldopts);
 	start_interface(ifp);
 }
 
@@ -692,9 +692,6 @@ handle_signal(int sig)
 		break;
 	case SIGALRM:
 		syslog(LOG_INFO, "received SIGALRM, rebinding");
-		/* We shouldn't modify any variables in the signal
-		 * handler, so simply add reboot function to the queue
-		 * for an immediate callout. */
 		eloop_timeout_add_now(sig_reboot, NULL);
 		return;
 	case SIGHUP:

@@ -1935,7 +1935,25 @@ dhcp_inform(struct interface *ifp)
 }
 
 void
-dhcp_reboot(struct interface *ifp, int oldopts)
+dhcp_reboot_newopts(struct interface *ifp, int oldopts)
+{
+	struct if_options *ifo = ifp->options;
+	struct dhcp_state *state = D_STATE(ifp);
+
+	if (state == NULL)
+		return;
+	ifo = ifp->options;
+	if ((ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC) &&
+		state->addr.s_addr != ifo->req_addr.s_addr) ||
+	    (oldopts & (DHCPCD_INFORM | DHCPCD_STATIC) &&
+		!(ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC))))
+	{
+		dhcp_drop(ifp, "EXPIRE");
+	}
+}
+
+static void
+dhcp_reboot(struct interface *ifp)
 {
 	struct if_options *ifo = ifp->options;
 	struct dhcp_state *state = D_STATE(ifp);
@@ -1944,16 +1962,6 @@ dhcp_reboot(struct interface *ifp, int oldopts)
 		return;
 	ifo = ifp->options;
 	state->interval = 0;
-	if ((ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC) &&
-		state->addr.s_addr != ifo->req_addr.s_addr) ||
-	    (oldopts & (DHCPCD_INFORM | DHCPCD_STATIC) &&
-		!(ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC))))
-	{
-		dhcp_drop(ifp, "EXPIRE");
-	} else {
-		free(state->offer);
-		state->offer = NULL;
-	}
 
 	if (ifo->options & DHCPCD_LINK && ifp->carrier == LINK_DOWN) {
 		syslog(LOG_INFO, "%s: waiting for carrier", ifp->name);
@@ -2670,6 +2678,6 @@ dhcp_start(struct interface *ifp)
 	    ifp->options->options & DHCPCD_IPV4LL)
 		ipv4ll_start(ifp);
 	else
-		dhcp_reboot(ifp, ifp->options->options);
+		dhcp_reboot(ifp);
 }
 
