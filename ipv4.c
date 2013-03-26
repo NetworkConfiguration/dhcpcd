@@ -274,8 +274,12 @@ n_route(struct rt *rt)
 		    rt->net.s_addr == s->net.s_addr &&
 		    rt->gate.s_addr == 0)
 			return 0;
-		else
+		else {
+			syslog(LOG_DEBUG,
+			    "%s: route exists but not in dhcpcd control",
+			    rt->iface->name);
 			return -1;
+		}
 	}
 	syslog(LOG_ERR, "%s: ipv4_addroute: %m", rt->iface->name);
 	return -1;
