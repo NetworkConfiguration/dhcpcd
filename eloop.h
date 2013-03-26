@@ -49,6 +49,7 @@ void eloop_event_delete(int fd);
 int eloop_q_timeout_add_sec(int queue, time_t, void (*)(void *), void *);
 int eloop_q_timeout_add_tv(int queue, const struct timeval *, void (*)(void *),
     void *);
+int eloop_timeout_add_now(void (*)(void *), void *);
 void eloop_q_timeout_delete(int, void (*)(void *), void *);
 void eloop_q_timeouts_delete(int, void *, void (*)(void *), ...);
 void eloop_init(void);

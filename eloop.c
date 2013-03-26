@@ -68,6 +68,9 @@ static TAILQ_HEAD (timeout_head, timeout) timeouts
 static struct timeout_head free_timeouts
     = TAILQ_HEAD_INITIALIZER(free_timeouts);
 
+static void (*volatile timeout0)(void *);
+static void *volatile timeout0_arg;
+
 static struct pollfd *fds;
 static size_t fds_len;
 
@@ -215,6 +218,20 @@ eloop_q_timeout_add_sec(int queue, time_t when,
 	return eloop_q_timeout_add_tv(queue, &tv, callback, arg);
 }
 
+int
+eloop_timeout_add_now(void (*callback)(void *), void *arg)
+{
+
+	if (timeout0 != NULL) {
+		syslog(LOG_WARNING, "%s: timeout0 already set", __func__);
+		return eloop_q_timeout_add_sec(0, 0, callback, arg);
+	}
+
+	timeout0 = callback;
+	timeout0_arg = arg;
+	return 0;
+}
+
 /* This deletes all timeouts for the interface EXCEPT for ones with the
  * callbacks given. Handy for deleting everything apart from the expire
  * timeout. */
@@ -314,9 +331,16 @@ eloop_start(const sigset_t *sigmask)
 	struct timeout *t;
 	struct timeval tv;
 	struct timespec ts, *tsp;
+	void (*t0)(void *);
 
 	for (;;) {
 		/* Run all timeouts first */
+		if (timeout0) {
+			t0 = timeout0;
+			timeout0 = NULL;
+			t0(timeout0_arg);
+			continue;
+		}
 		if ((t = TAILQ_FIRST(&timeouts))) {
 			get_monotonic(&now);
 			if (timercmp(&now, &t->when, >)) {

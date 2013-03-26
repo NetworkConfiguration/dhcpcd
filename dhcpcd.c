@@ -666,6 +666,16 @@ sig_reboot(_unused void *arg)
 	reconf_reboot(1, ifc, ifv, 0);
 }
 
+static void
+sig_reconf(_unused void *arg)
+{
+	struct interface *ifp;
+
+	TAILQ_FOREACH(ifp, ifaces, next) {
+		ipv4_applyaddr(ifp);
+	}
+}
+
 void
 handle_signal(int sig)
 {
@@ -685,7 +695,7 @@ handle_signal(int sig)
 		/* We shouldn't modify any variables in the signal
 		 * handler, so simply add reboot function to the queue
 		 * for an immediate callout. */
-		eloop_timeout_add_sec(0, sig_reboot, NULL);
+		eloop_timeout_add_now(sig_reboot, NULL);
 		return;
 	case SIGHUP:
 		syslog(LOG_INFO, "received SIGHUP, releasing");
@@ -693,9 +703,7 @@ handle_signal(int sig)
 		break;
 	case SIGUSR1:
 		syslog(LOG_INFO, "received SIGUSR, reconfiguring");
-		TAILQ_FOREACH(ifp, ifaces, next) {
-			ipv4_applyaddr(ifp);
-		}
+		eloop_timeout_add_now(sig_reconf, NULL);
 		return;
 	case SIGPIPE:
 		syslog(LOG_WARNING, "received SIGPIPE");
