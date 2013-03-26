@@ -33,7 +33,7 @@
 #include <signal.h>
 #include <unistd.h>
 
-#include "ppoll.h"
+#include "pollts.h"
 
 #warning "This pollts(2) implementation is not entirely race condition safe."
 #warning "Only operating system support for pollts(2) can correct this."
