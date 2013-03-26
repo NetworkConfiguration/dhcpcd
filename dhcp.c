@@ -1720,6 +1720,7 @@ dhcp_rebind(void *arg)
 	state->state = DHS_REBIND;
 	eloop_timeout_delete(send_renew, ifp);
 	state->lease.server.s_addr = 0;
+	ifp->options->options &= ~ DHCPCD_CSR_WARNED;
 	send_rebind(ifp);
 }
 
@@ -1831,7 +1832,6 @@ dhcp_bind(void *arg)
 		    "%s: renew in %u seconds, rebind in %u seconds",
 		    iface->name, lease->renewaltime, lease->rebindtime);
 	}
-	ifo->options &= ~ DHCPCD_CSR_WARNED;
 	ipv4_applyaddr(iface);
 	daemonise();
 	state->state = DHS_BOUND;
@@ -2023,6 +2023,7 @@ dhcp_drop(struct interface *iface, const char *reason)
 	free(state->old);
 	state->old = NULL;
 	state->lease.addr.s_addr = 0;
+	iface->options->options &= ~ DHCPCD_CSR_WARNED;
 }
 
 static void
