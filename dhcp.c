@@ -1937,7 +1937,7 @@ dhcp_inform(struct interface *ifp)
 void
 dhcp_reboot_newopts(struct interface *ifp, int oldopts)
 {
-	struct if_options *ifo = ifp->options;
+	struct if_options *ifo;
 	struct dhcp_state *state = D_STATE(ifp);
 
 	if (state == NULL)
@@ -1955,7 +1955,7 @@ dhcp_reboot_newopts(struct interface *ifp, int oldopts)
 static void
 dhcp_reboot(struct interface *ifp)
 {
-	struct if_options *ifo = ifp->options;
+	struct if_options *ifo;
 	struct dhcp_state *state = D_STATE(ifp);
 
 	if (state == NULL)
