@@ -201,7 +201,8 @@ if_address(const struct interface *iface, const struct in_addr *address,
 #undef ADDADDR
 
 	return ioctl(socket_afnet,
-	    action < 0 ? SIOCDIFADDR : SIOCAIFADDR, &ifa);
+	    action < 0 ? SIOCDIFADDR :
+	    action == 2 ? SIOCSIFADDR :  SIOCAIFADDR, &ifa);
 }
 
 int

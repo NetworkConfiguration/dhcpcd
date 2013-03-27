@@ -61,6 +61,7 @@ unsigned long long options = 0;
 #define O_IPV6RA_FORK		O_BASE + 6 
 #define O_IPV6RA_OWN		O_BASE + 7
 #define O_IPV6RA_OWN_D		O_BASE + 8
+#define O_NOALIAS		O_BASE + 9
 
 const struct option cf_options[] = {
 	{"background",      no_argument,       NULL, 'b'},
@@ -118,6 +119,7 @@ const struct option cf_options[] = {
 	{"ipv6ra_own_default", no_argument,    NULL, O_IPV6RA_OWN_D},
 	{"ipv4only",        no_argument,       NULL, '4'},
 	{"ipv6only",        no_argument,       NULL, '6'},
+	{"noalias",         no_argument,       NULL, O_NOALIAS},
 	{NULL,              0,                 NULL, '\0'}
 };
 
@@ -914,6 +916,9 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		break;
 	case O_IPV6RA_OWN_D:
 		ifo->options |= DHCPCD_IPV6RA_OWN_DEFAULT;
+		break;
+	case O_NOALIAS:
+		ifo->options |= DHCPCD_NOALIAS;
 		break;
 	default:
 		return 0;

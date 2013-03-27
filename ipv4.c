@@ -592,6 +592,7 @@ ipv4_applyaddr(void *arg)
 	struct dhcp_lease *lease;
 	struct if_options *ifo = ifp->options;
 	struct rt *rt;
+	int r;
 
 	/* As we are now adjusting an interface, we need to ensure
 	 * we have them in the right order for routing and configuration. */
@@ -619,10 +620,13 @@ ipv4_applyaddr(void *arg)
 		syslog(LOG_DEBUG, "%s: adding IP address %s/%d",
 		    ifp->name, inet_ntoa(lease->addr),
 		    inet_ntocidr(lease->net));
-		if (ipv4_addaddress(ifp,
-			&lease->addr, &lease->net, &lease->brd) == -1 &&
-		    errno != EEXIST)
-		{
+		if (ifo->options & DHCPCD_NOALIAS)
+			r = ipv4_setaddress(ifp,
+			    &lease->addr, &lease->net, &lease->brd);
+		else
+			r = ipv4_addaddress(ifp,
+			    &lease->addr, &lease->net, &lease->brd);
+		if (r == -1 && errno != EEXIST) {
 			syslog(LOG_ERR, "%s: ipv4_addaddress: %m", __func__);
 			return;
 		}

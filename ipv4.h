@@ -61,6 +61,8 @@ int if_address(const struct interface *,
     const struct in_addr *, int);
 #define ipv4_addaddress(iface, addr, net, brd)				      \
 	if_address(iface, addr, net, brd, 1)
+#define ipv4_setaddress(iface, addr, net, brd)				      \
+	if_address(iface, addr, net, brd, 2)
 #define ipv4_deleteaddress(iface, addr, net)				      \
 	if_address(iface, addr, net, NULL, -1)
 #define ipv4_hasaddress(iface, addr, net)				      \
