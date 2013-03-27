@@ -1063,7 +1063,7 @@ dhcp6_writelease(const struct interface *ifp)
 	syslog(LOG_DEBUG, "%s: writing lease `%s'",
 	    ifp->name, state->leasefile);
 
-	fd = open(state->leasefile, O_WRONLY | O_CREAT | O_TRUNC, 0444);
+	fd = open(state->leasefile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 	if (fd == -1) {
 		syslog(LOG_ERR, "%s: dhcp6_writelease: %m", ifp->name);
 		return -1;
