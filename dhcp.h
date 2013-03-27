@@ -65,7 +65,7 @@
 #define DHCP_MAX		64
 #define DHCP_RAND_MIN		-1
 #define DHCP_RAND_MAX		1
-#define DHCP_ARP_FAIL		10
+#define DHCP_ARP_FAIL		2
 
 /* number of usecs in a second. */
 #define USECS_SECOND		1000000
