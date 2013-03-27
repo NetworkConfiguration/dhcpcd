@@ -1153,7 +1153,7 @@ write_lease(const struct interface *iface, const struct dhcp_message *dhcp)
 	syslog(LOG_DEBUG, "%s: writing lease `%s'",
 	    iface->name, iface->leasefile);
 
-	fd = open(iface->leasefile, O_WRONLY | O_CREAT | O_TRUNC, 0444);
+	fd = open(iface->leasefile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 	if (fd == -1)
 		return -1;
 
