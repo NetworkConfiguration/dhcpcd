@@ -328,11 +328,18 @@ dhcp6_updateelapsed(struct interface *ifp, struct dhcp6_message *m, ssize_t len)
 }
 
 static void
-dhcp6_newxid(struct dhcp6_message *m)
+dhcp6_newxid(const struct interface *ifp, struct dhcp6_message *m)
 {
 	uint32_t xid;
 
-	xid = arc4random();
+	if (ifp->options->options & DHCPCD_XID_HWADDR &&
+	    ifp->hwlen >= sizeof(xid)) 
+		/* The lower bits are probably more unique on the network */
+		memcpy(&xid, (ifp->hwaddr + ifp->hwlen) - sizeof(xid),
+		    sizeof(xid));
+	else
+		xid = arc4random();
+
 	m->xid[0] = (xid >> 16) & 0xff;
 	m->xid[1] = (xid >> 8) & 0xff;
 	m->xid[2] = xid & 0xff;
@@ -451,7 +458,7 @@ dhcp6_makemessage(struct interface *ifp)
 		return -1;
 	}
 
-	dhcp6_newxid(state->send);
+	dhcp6_newxid(ifp, state->send);
 
 	o = D6_FIRST_OPTION(state->send);
 	o->code = htons(D6_OPTION_CLIENTID);
