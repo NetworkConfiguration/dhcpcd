@@ -1131,7 +1131,7 @@ dhcp6_findia(struct interface *ifp, const uint8_t *d, size_t l,
 		memcpy(iaid, p, sizeof(iaid));
 		p += sizeof(iaid);
 		ol -= sizeof(iaid);
-		if (ifo->ia_type == D6_OPTION_IA_NA) {
+		if (ifo->ia_type != D6_OPTION_IA_TA) {
 			memcpy(&u32, p, sizeof(u32));
 			renew = ntohl(u32);
 			p += sizeof(u32);
