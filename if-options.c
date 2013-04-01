@@ -57,11 +57,14 @@ unsigned long long options = 0;
 #define O_FALLBACK		O_BASE + 2
 #define O_DESTINATION		O_BASE + 3
 #define O_IPV6RS		O_BASE + 4
-#define O_NOIPV6RS		O_BASE + 5 
-#define O_IPV6RA_FORK		O_BASE + 6 
+#define O_NOIPV6RS		O_BASE + 5
+#define O_IPV6RA_FORK		O_BASE + 6
 #define O_IPV6RA_OWN		O_BASE + 7
 #define O_IPV6RA_OWN_D		O_BASE + 8
 #define O_NOALIAS		O_BASE + 9
+#define O_IA_NA			O_BASE + 10
+#define O_IA_TA			O_BASE + 11
+#define O_IA_PD			O_BASE + 12
 
 const struct option cf_options[] = {
 	{"background",      no_argument,       NULL, 'b'},
@@ -95,7 +98,7 @@ const struct option cf_options[] = {
 	{"lastlease",       no_argument,       NULL, 'E'},
 	{"fqdn",            optional_argument, NULL, 'F'},
 	{"nogateway",       no_argument,       NULL, 'G'},
-	{"xidhwaddr",       no_argument,       NULL, 'H'}, 
+	{"xidhwaddr",       no_argument,       NULL, 'H'},
 	{"clientid",        optional_argument, NULL, 'I'},
 	{"broadcast",       no_argument,       NULL, 'J'},
 	{"nolink",          no_argument,       NULL, 'K'},
@@ -120,6 +123,9 @@ const struct option cf_options[] = {
 	{"ipv4only",        no_argument,       NULL, '4'},
 	{"ipv6only",        no_argument,       NULL, '6'},
 	{"noalias",         no_argument,       NULL, O_NOALIAS},
+	{"ia_na",           no_argument,       NULL, O_IA_NA},
+	{"ia_ta",           no_argument,       NULL, O_IA_TA},
+	{"ia_pd",           no_argument,       NULL, O_IA_PD},
 	{NULL,              0,                 NULL, '\0'}
 };
 
@@ -141,7 +147,7 @@ atoint(const char *s)
 	return (int)n;
 }
 
-static char * 
+static char *
 add_environ(struct if_options *ifo, const char *value, int uniq)
 {
 	char **newlist;
@@ -339,7 +345,7 @@ splitv(int *argc, char **argv, const char *arg)
 		v[(*argc) - 1] = nt;
 	}
 	free(o);
-	return v;	
+	return v;
 }
 
 static int
@@ -365,7 +371,7 @@ parse_addr(struct in_addr *addr, struct in_addr *net, const char *arg)
 			syslog(LOG_ERR, "`%s' is not a valid CIDR", p);
 			return -1;
 		}
-	} 
+	}
 
 	if (addr != NULL && inet_aton(arg, addr) == 0) {
 		syslog(LOG_ERR, "`%s' is not a valid IP address", arg);
@@ -382,7 +388,7 @@ parse_addr(struct in_addr *addr, struct in_addr *net, const char *arg)
 #endif
 }
 
-static const char * 
+static const char *
 set_option_space(const char *arg, const struct dhcp_opt **d,
     struct if_options *ifo,
     uint8_t *request[], uint8_t *require[], uint8_t *no[])
@@ -415,12 +421,17 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	int i;
 	char *p = NULL, *fp, *np, **nconf;
 	ssize_t s;
+	size_t sl;
 	struct in_addr addr, addr2;
 	in_addr_t *naddr;
 	struct rt *rt;
 	const struct dhcp_opt const *d;
 	uint8_t *request, *require, *no;
+	struct if_iaid *iaid;
+	uint8_t _iaid[4];
+	struct if_sla *sla;
 
+	i = 0;
 	switch(opt) {
 	case 'f': /* FALLTHROUGH */
 	case 'g': /* FALLTHROUGH */
@@ -780,7 +791,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 					syslog(LOG_ERR, "%s: %m", __func__);
 					return -1;
 				}
- 				TAILQ_INIT(ifo->routes);
+				TAILQ_INIT(ifo->routes);
 			}
 			rt = malloc(sizeof(*rt));
 			if (rt == NULL) {
@@ -898,7 +909,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		ifo->fallback = strdup(arg);
 		if (ifo->fallback == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);
-		    	return -1;
+			return -1;
 		}
 		break;
 #endif
@@ -920,6 +931,116 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	case O_NOALIAS:
 		ifo->options |= DHCPCD_NOALIAS;
 		break;
+#ifdef INET6
+	case O_IA_NA:
+		i = D6_OPTION_IA_NA;
+		/* FALLTHROUGH */
+	case O_IA_TA:
+		if (i == 0)
+			i = D6_OPTION_IA_TA;
+		/* FALLTHROUGH */
+	case O_IA_PD:
+		if (i == 0)
+			i = D6_OPTION_IA_PD;
+		ifo->options |= DHCPCD_IA_FORCED;
+		if (ifo->ia_type != 0 && ifo->ia_type != i) {
+			syslog(LOG_ERR, "cannot specify a different IA type");
+			return -1;
+		}
+		ifo->ia_type = i;
+		if (arg == NULL)
+			break;
+		fp = strchr(arg, ' ');
+		if (fp == NULL) {
+			syslog(LOG_ERR, "%s: invalid syntax", arg);
+			return -1;
+		}
+		*fp++ = '\0';
+		if ((s = parse_string((char *)_iaid, sizeof(_iaid), arg)) < 1) {
+			syslog(LOG_ERR, "%s: invalid IAID", arg);
+			return -1;
+		}
+		if (s < 4)
+			_iaid[3] = '\0';
+		if (s < 3)
+			_iaid[2] = '\0';
+		if (s < 2)
+			_iaid[1] = '\0';
+		iaid = NULL;
+		for (sl = 0; sl < ifo->iaid_len; sl++) {
+			if (ifo->iaid[sl].iaid[0] == _iaid[0] &&
+			    ifo->iaid[sl].iaid[1] == _iaid[1] &&
+			    ifo->iaid[sl].iaid[2] == _iaid[2] &&
+			    ifo->iaid[sl].iaid[3] == _iaid[3])
+			{
+			        iaid = &ifo->iaid[sl];
+				break;
+			}
+		}
+		if (iaid == NULL) {
+			iaid = realloc(ifo->iaid,
+			    sizeof(*ifo->iaid) * (ifo->iaid_len + 1));
+			if (iaid == NULL) {
+				syslog(LOG_ERR, "%s: %m", __func__);
+				return -1;
+			}
+			ifo->iaid = iaid;
+			iaid = &ifo->iaid[ifo->iaid_len++];
+			iaid->iaid[0] = _iaid[0];
+			iaid->iaid[1] = _iaid[1];
+			iaid->iaid[2] = _iaid[2];
+			iaid->iaid[3] = _iaid[3];
+			iaid->sla = NULL;
+			iaid->sla_len = 0;
+		}
+		for (p = fp; p; p = fp) {
+			fp = strchr(p, ' ');
+			if (fp)
+				*fp++ = '\0';
+			sla = realloc(iaid->sla,
+			    sizeof(*iaid->sla) * (iaid->sla_len + 1));
+			if (sla == NULL) {
+				syslog(LOG_ERR, "%s: %m", __func__);
+				return -1;
+			}
+			iaid->sla = sla;
+			sla = &iaid->sla[iaid->sla_len++];
+			np = strchr(p, '/');
+			if (np)
+				*np++ = '\0';
+			else {
+				syslog(LOG_ERR, "%s: missing sla", arg);
+				return -1;
+			}
+			if (strlcpy(sla->ifname, p,
+			    sizeof(sla->ifname)) >= sizeof(sla->ifname))
+			{
+				syslog(LOG_ERR, "%s: interface name too long",
+				    arg);
+				return -1;
+			}
+			p = np;
+			np = strchr(p, '/');
+			if (np)
+				*np++ = '\0';
+			if (parse_string((char *)sla->sla,
+			    sizeof(sla->sla), p) == -1)
+			{
+				syslog(LOG_ERR, "%s: sla: %m", arg);
+				return -1;
+			}
+			if (np) {
+				sla->sla_len = atoint(np);
+				if (sla->sla_len < 0 || sla->sla_len > 128) {
+					syslog(LOG_ERR, "%s: sla len: range",
+					    arg);
+					return -1;
+				}
+			} else
+				sla->sla_len = 8;
+		}
+		break;
+#endif
 	default:
 		return 0;
 	}
@@ -969,7 +1090,7 @@ read_config(const char *file,
 	ifo->options |= DHCPCD_DAEMONISE | DHCPCD_LINK;
 #ifdef INET
 	ifo->options |= DHCPCD_IPV4 | DHCPCD_IPV4LL;
-	ifo->options |= DHCPCD_GATEWAY | DHCPCD_ARP; 
+	ifo->options |= DHCPCD_GATEWAY | DHCPCD_ARP;
 #endif
 #ifdef INET6
 	ifo->options |= DHCPCD_IPV6 | DHCPCD_IPV6RS | DHCPCD_IPV6RA_REQRDNSS;
@@ -1048,6 +1169,33 @@ read_config(const char *file,
 		ifo->vendor[0]++;
 		ifo->vendor[ifo->vendor[0]] = DHO_END;
 	}
+
+#ifdef INET6
+	if (ifname && ifo->iaid_len == 0 && ifo->options & DHCPCD_IPV6) {
+		ifo->iaid = malloc(sizeof(*ifo->iaid));
+		if (ifo->iaid == NULL)
+			syslog(LOG_ERR, "%s: %m", __func__);
+		else {
+			if (ifo->ia_type == 0)
+				ifo->ia_type = D6_OPTION_IA_NA;
+			ifo->iaid_len = strlen(ifname);
+			if (ifo->iaid_len <= sizeof(ifo->iaid->iaid)) {
+				strncpy((char *)ifo->iaid->iaid, ifname,
+					sizeof(ifo->iaid->iaid));
+				memset(ifo->iaid->iaid + ifo->iaid_len, 0,
+					sizeof(ifo->iaid->iaid) -ifo->iaid_len);
+			} else {
+				uint32_t idx = if_nametoindex(ifname);
+				memcpy(ifo->iaid->iaid, &idx, sizeof(idx));
+			}
+			ifo->iaid_len = 1;
+			ifo->iaid->sla = NULL;
+			ifo->iaid->sla_len = 0;
+		}
+	} else
+		ifo->options |= DHCPCD_IA_FORCED;
+#endif
+
 	return ifo;
 }
 
@@ -1093,6 +1241,11 @@ free_options(struct if_options *ifo)
 		free(ifo->arping);
 		free(ifo->blacklist);
 		free(ifo->fallback);
+#ifdef INET6
+		for (i = 0; i < ifo->iaid_len; i++)
+			free(ifo->iaid[i].sla);
+		free(ifo->iaid);
+#endif
 		free(ifo);
 	}
 }

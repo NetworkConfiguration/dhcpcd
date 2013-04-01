@@ -302,7 +302,7 @@ configure_interface1(struct interface *ifp)
 		ifo->options &= ~DHCPCD_IPV6RS;
 	if (ifo->options & DHCPCD_LINK && carrier_status(ifp) == -1)
 		ifo->options &= ~DHCPCD_LINK;
-	
+
 	if (ifo->metric != -1)
 		ifp->metric = ifo->metric;
 
@@ -430,12 +430,13 @@ start_interface(void *arg)
 		ipv6rs_start(ifp);
 
 	if (ifo->options & DHCPCD_IPV6) {
-		if (ifo->options & DHCPCD_INFORM)
+		if (ifo->options & DHCPCD_IPV6RS)
 			nolease = dhcp6_start(ifp, 0);
-		else if (!(ifo->options & DHCPCD_IPV6RS))
+		else if (ifo->options & DHCPCD_IA_FORCED)
 			nolease = dhcp6_start(ifp, 1);
-		else
-			nolease = 0;
+		else {
+			nolease = dhcp6_find_delegates(ifp);;
+		}
 		if (nolease == -1)
 			syslog(LOG_ERR, "%s: dhcp6_start: %m", ifp->name);
 	}
@@ -475,7 +476,7 @@ init_state(struct interface *ifp, int argc, char **argv)
 		syslog(LOG_ERR, "ipv4_init: %m");
 		ifo->options &= ~DHCPCD_IPV4;
 	}
-	if (ifo->options & DHCPCD_IPV6RS && ipv6_init() == -1) {
+	if (ifo->options & DHCPCD_IPV6 && ipv6_init() == -1) {
 		syslog(LOG_ERR, "ipv6_init: %m");
 		ifo->options &= ~DHCPCD_IPV6RS;
 	}
@@ -508,7 +509,7 @@ handle_interface(int action, const char *ifname)
 {
 	struct if_head *ifs;
 	struct interface *ifp, *ifn, *ifl = NULL;
-	const char * const argv[] = { ifname }; 
+	const char * const argv[] = { ifname };
 	int i;
 
 	if (action == -1) {
@@ -571,7 +572,7 @@ handle_hwaddr(const char *ifname, unsigned char *hwaddr, size_t hwlen)
 			ifo = ifp->options;
 			if (!(ifo->options &
 			    (DHCPCD_INFORM | DHCPCD_STATIC | DHCPCD_CLIENTID))
-	    		    && state->new != NULL &&
+			    && state->new != NULL &&
 			    state->new->cookie == htonl(MAGIC_COOKIE))
 			{
 				syslog(LOG_INFO,
@@ -586,7 +587,7 @@ handle_hwaddr(const char *ifname, unsigned char *hwaddr, size_t hwlen)
 			{
 				syslog(LOG_DEBUG, "%s: using hwaddr %s",
 				    ifp->name,
-		    		    hwaddr_ntoa(ifp->hwaddr, ifp->hwlen));
+				    hwaddr_ntoa(ifp->hwaddr, ifp->hwlen));
 				state->interval = 0;
 				state->nakoff = 0;
 				start_interface(ifp);
@@ -613,7 +614,7 @@ reconf_reboot(int action, int argc, char **argv, int oi)
 {
 	struct if_head *ifs;
 	struct interface *ifn, *ifp;
-	
+
 	ifs = discover_interfaces(argc - oi, argv + oi);
 	if (ifs == NULL)
 		return;
@@ -982,7 +983,7 @@ main(int argc, char **argv)
 		options |= DHCPCD_PERSISTENT;
 		options &= ~DHCPCD_DAEMONISE;
 	}
-	
+
 #ifdef THERE_IS_NO_FORK
 	options &= ~DHCPCD_DAEMONISE;
 #endif

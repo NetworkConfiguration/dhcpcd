@@ -1,6 +1,6 @@
 /* 
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2012 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -70,7 +70,7 @@
 #define DHCPCD_HOSTNAME			(1ULL << 18)
 #define DHCPCD_CLIENTID			(1ULL << 19)
 #define DHCPCD_LINK			(1ULL << 20)
-#define DHCPCD_QUIET			(1ULL << 21) 
+#define DHCPCD_QUIET			(1ULL << 21)
 #define DHCPCD_BACKGROUND		(1ULL << 22)
 #define DHCPCD_VENDORRAW		(1ULL << 23)
 #define DHCPCD_TIMEOUT_IPV4LL		(1ULL << 24)
@@ -89,8 +89,21 @@
 #define DHCPCD_IPV6			(1ULL << 37)
 #define DHCPCD_STARTED			(1ULL << 38)
 #define DHCPCD_NOALIAS			(1ULL << 39)
+#define DHCPCD_IA_FORCED		(1ULL << 40)
 
 extern const struct option cf_options[];
+
+struct if_sla {
+	char ifname[IF_NAMESIZE];
+	uint8_t sla[16];
+	short sla_len;
+};
+
+struct if_iaid {
+	uint8_t iaid[4];
+	size_t sla_len;
+	struct if_sla *sla;
+};
 
 struct if_options {
 	int metric;
@@ -113,7 +126,7 @@ struct if_options {
 
 	char **environ;
 	char script[PATH_MAX];
-	
+
 	char hostname[HOSTNAME_MAX_LEN + 1]; /* We don't store the length */
 	int fqdn;
 	uint8_t vendorclassid[VENDORCLASSID_MAX_LEN + 2];
@@ -128,6 +141,12 @@ struct if_options {
 	size_t arping_len;
 	in_addr_t *arping;
 	char *fallback;
+
+#ifdef INET6
+	uint16_t ia_type;
+	size_t iaid_len;
+	struct if_iaid *iaid;
+#endif
 };
 
 extern unsigned long long options;

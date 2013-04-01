@@ -47,6 +47,8 @@ struct ipv6_addr {
 	uint8_t onlink;
 	uint8_t new;
 	char saddr[INET6_ADDRSTRLEN];
+	uint8_t iaid[4];
+	struct interface *delegating_iface;
 };
 TAILQ_HEAD(ipv6_addrhead, ipv6_addr);
 

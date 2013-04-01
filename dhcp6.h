@@ -54,6 +54,7 @@
 #define D6_OPTION_CLIENTID		1
 #define D6_OPTION_SERVERID		2
 #define D6_OPTION_IA_NA			3
+#define D6_OPTION_IA_TA			4
 #define D6_OPTION_ORO			6
 #define D6_OPTION_IA_ADDR		5
 #define D6_OPTION_PREFERENCE		7
@@ -66,6 +67,8 @@
 #define D6_OPTION_SIP_SERVERS_ADDRESS	22
 #define D6_OPTION_DNS_SERVERS		23
 #define D6_OPTION_DOMAIN_LIST		24
+#define D6_OPTION_IA_PD			25
+#define D6_OPTION_IAPREFIX		26
 #define D6_OPTION_NIS_SERVERS		27
 #define D6_OPTION_NISP_SERVERS		28
 #define D6_OPTION_NIS_DOMAIN_NAME	29
@@ -140,15 +143,15 @@ enum DH6S {
 	DH6S_BOUND,
 	DH6S_RENEW,
 	DH6S_REBIND,
-	DH6S_REBOOT,
+	DH6S_CONFIRM,
 	DH6S_INFORM,
 	DH6S_RENEW_REQUESTED,
-	DH6S_PROBE
+	DH6S_PROBE,
+	DH6S_DELEGATED
 };
 
 struct dhcp6_state {
 	enum DH6S state;
-	uint8_t iaid[4];
 	time_t start_uptime;
 
 	/* Message retransmission timings */
@@ -201,6 +204,7 @@ struct dhcp6_state {
 #ifdef INET6
 void dhcp6_printoptions(void);
 int dhcp6_addrexists(const struct ipv6_addr *);
+int dhcp6_find_delegates(struct interface *);
 int dhcp6_start(struct interface *, int);
 ssize_t dhcp6_env(char **, const char *, const struct interface *,
     const struct dhcp6_message *, ssize_t);
@@ -209,6 +213,7 @@ void dhcp6_drop(struct interface *, const char *);
 #else
 #define dhcp6_printoptions()
 #define dhcp6_addrexists(a)
+#define dhcp6_find_delegates(a);
 #define dhcp6_start(a, b) 0
 #define dhcp6_env(a, b, c, d, e)
 #define dhcp6_free(a)

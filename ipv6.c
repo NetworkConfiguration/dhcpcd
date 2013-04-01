@@ -482,7 +482,10 @@ ipv6_buildroutes(void)
 	TAILQ_INIT(&dnr);
 	TAILQ_FOREACH(ifp, ifaces, next) {
 		d6_state = D6_CSTATE(ifp);
-		if (d6_state && d6_state->state == DH6S_BOUND) {
+		if (d6_state &&
+		    (d6_state->state == DH6S_BOUND ||
+		     d6_state->state == DH6S_DELEGATED))
+		{
 			TAILQ_FOREACH(addr, &d6_state->addrs, next) {
 				if (!addr->onlink)
 					continue;
