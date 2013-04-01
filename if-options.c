@@ -1037,7 +1037,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 					return -1;
 				}
 			} else
-				sla->sla_len = 8;
+				sla->sla_len = 16;
 		}
 		break;
 #endif
