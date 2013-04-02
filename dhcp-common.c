@@ -157,7 +157,7 @@ decode_rfc3397(char *out, ssize_t len, int pl, const uint8_t *p)
 			*out = '\0';
 	}
 
-	return count;  
+	return count;
 }
 
 ssize_t
@@ -378,13 +378,13 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data,
 			if (dl != -1)
 				l = dl;
 			else
-				l = 0;	
+				l = 0;
 			data += 16;
 		}
 #endif
 		else if (type & BINHEX) {
 			l = snprintf(s, len, "%.2x", data[0]);
-			data++; 
+			data++;
 		} else
 			l = 0;
 		len -= l;

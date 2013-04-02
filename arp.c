@@ -223,7 +223,7 @@ arp_announce(void *arg)
 		ipv4_opensocket(ifp, ETHERTYPE_ARP);
 		eloop_event_add(state->arp_fd, arp_packet, ifp);
 	}
-	if (++state->claims < ANNOUNCE_NUM)	
+	if (++state->claims < ANNOUNCE_NUM)
 		syslog(LOG_DEBUG,
 		    "%s: sending ARP announce (%d of %d), "
 		    "next in %d.00 seconds",

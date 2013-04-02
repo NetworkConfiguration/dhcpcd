@@ -1,4 +1,4 @@
-/* 
+/*
  * dhcpcd - DHCP client daemon
  * Copyright (c) 2006-2012 Roy Marples <roy@marples.name>
  * All rights reserved
@@ -36,7 +36,7 @@
 #include "if-options.h"
 #include "platform.h"
 
-static const char *mproc = 
+static const char *mproc =
 #if defined(__alpha__)
 	"system type"
 #elif defined(__arm__)

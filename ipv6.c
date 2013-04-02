@@ -70,7 +70,7 @@ ipv6_init(void)
 
 	if (routes == NULL) {
 		routes = malloc(sizeof(*routes));
-		if (routes == NULL) 
+		if (routes == NULL)
 			return -1;
 		TAILQ_INIT(routes);
 #ifdef DEBUG_MEMORY
@@ -102,7 +102,7 @@ ipv6_printaddr(char *s, ssize_t sl, const uint8_t *d, const char *ifname)
 		errno = ENOMEM;
 		return -1;
 	}
-		
+
 	s += strlcpy(s, p, sl);
 	if (d[0] == 0xfe && (d[1] & 0xc0) == 0x80) {
 		*s++ = '%';
@@ -209,7 +209,7 @@ ipv6_mask(struct in6_addr *mask, int len)
 	for (i = 0; i < bytes; i++)
 		mask->s6_addr[i] = 0xff;
 	if (bits)
-		mask->s6_addr[bytes] = masks[bits - 1]; 
+		mask->s6_addr[bytes] = masks[bits - 1];
 	return 0;
 }
 
@@ -438,7 +438,7 @@ ipv6_removesubnet(const struct interface *ifp, struct ipv6_addr *addr)
 	if (rt) {
 		rt->iface = ifp;
 #ifdef __linux__
-		rt->metric = 256;
+		rt->metric = 1024;
 #else
 		rt->metric = 0;
 #endif

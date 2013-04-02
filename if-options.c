@@ -767,7 +767,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 					syslog(LOG_ERR, "%s: %m", __func__);
 					return -1;
 				}
- 				TAILQ_INIT(ifo->routes);
+				TAILQ_INIT(ifo->routes);
 			}
 			rt = malloc(sizeof(*rt));
 			if (rt == NULL) {

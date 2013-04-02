@@ -185,7 +185,7 @@ ipv4_init(void)
 
 	if (routes == NULL) {
 		routes = malloc(sizeof(*routes));
-		if (routes == NULL) 
+		if (routes == NULL)
 			return -1;
 		TAILQ_INIT(routes);
 #ifdef DEBUG_MEMORY
@@ -576,7 +576,7 @@ delete_address(struct interface *iface)
 	syslog(LOG_DEBUG, "%s: deleting IP address %s/%d",
 	    iface->name, inet_ntoa(state->addr), inet_ntocidr(state->net));
 	retval = ipv4_deleteaddress(iface, &state->addr, &state->net);
-	if (retval == -1 && errno != EADDRNOTAVAIL) 
+	if (retval == -1 && errno != EADDRNOTAVAIL)
 		syslog(LOG_ERR, "del_address: %m");
 	state->addr.s_addr = 0;
 	state->net.s_addr = 0;

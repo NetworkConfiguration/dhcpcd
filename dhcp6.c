@@ -416,7 +416,7 @@ dhcp6_makemessage(struct interface *ifp)
 		TAILQ_FOREACH(ap, &state->addrs, next) {
 			if (ifo->ia_type == D6_OPTION_IA_PD)
 				len += sizeof(*o) + sizeof(u8) +
-				    sizeof(u32) + sizeof(u32) + 
+				    sizeof(u32) + sizeof(u32) +
 				    sizeof(ap->prefix.s6_addr);
 			else
 				len += sizeof(*o) + sizeof(ap->addr.s6_addr) +
@@ -1858,8 +1858,6 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 		free(state->recv);
 		free(state->new);
 		free(state->old);
-//		if (state->state == DH6S_DELEGATED)
-//			return;
 		free(state);
 		ifp->if_data[IF_DATA_DHCP6] = NULL;
 	}

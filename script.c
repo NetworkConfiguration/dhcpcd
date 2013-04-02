@@ -247,7 +247,7 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	snprintf(env[1], e, "reason=%s", reason);
 	if (options & DHCPCD_DUMPLEASE)
 		goto dumplease;
- 	e = 20;
+	e = 20;
 	EMALLOC(2, e);
 	snprintf(env[2], e, "pid=%d", getpid());
 	EMALLOC(3, e);
@@ -525,7 +525,7 @@ script_runreason(const struct interface *ifp, const char *reason)
 	    ifp->options->script[0] == '\0' ||
 	    strcmp(ifp->options->script, "/dev/null") == 0)
 		return 0;
-	
+
 	syslog(LOG_DEBUG, "%s: executing `%s', reason %s",
 	    ifp->name, argv[0], reason);
 

@@ -127,7 +127,7 @@ eloop_event_add(int fd, void (*callback)(void *), void *arg)
 			return -1;
 		}
 	}
-    
+
 	/* Now populate the structure and add it to the list */
 	e->fd = fd;
 	e->callback = callback;
@@ -368,7 +368,7 @@ eloop_start(const sigset_t *sigmask)
 			syslog(LOG_ERR, "poll: %m");
 			exit(EXIT_FAILURE);
 		}
-		
+
 		/* Process any triggered events. */
 		if (n > 0) {
 			TAILQ_FOREACH(e, &events, next) {

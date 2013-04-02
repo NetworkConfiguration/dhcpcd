@@ -430,15 +430,15 @@ start_interface(void *arg)
 		ipv6rs_start(ifp);
 
 	if (ifo->options & DHCPCD_IPV6) {
-		if (ifo->options & DHCPCD_IPV6RS)
-			nolease = dhcp6_start(ifp, 0);
-		else if (ifo->options & DHCPCD_IA_FORCED)
-			nolease = dhcp6_start(ifp, 1);
-		else {
-			nolease = dhcp6_find_delegates(ifp);;
+		if (!(ifo->options & DHCPCD_IPV6RS)) {
+			if (ifo->options & DHCPCD_IA_FORCED)
+				nolease = dhcp6_start(ifp, 1);
+			else
+				nolease = dhcp6_find_delegates(ifp);;
+			if (nolease == -1)
+			        syslog(LOG_ERR,
+				    "%s: dhcp6_start: %m", ifp->name);
 		}
-		if (nolease == -1)
-			syslog(LOG_ERR, "%s: dhcp6_start: %m", ifp->name);
 	}
 
 	if (ifo->options & DHCPCD_IPV4)

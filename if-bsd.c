@@ -215,7 +215,7 @@ if_route(const struct rt *rt, int action)
 		struct sockaddr_dl sdl;
 		struct sockaddr_storage ss;
 	} su;
-	struct rtm 
+	struct rtm
 	{
 		struct rt_msghdr hdr;
 		char buffer[sizeof(su) * 4];
@@ -336,7 +336,7 @@ if_route6(const struct rt6 *rt, int action)
 		struct sockaddr_dl sdl;
 		struct sockaddr_storage ss;
 	} su;
-	struct rtm 
+	struct rtm
 	{
 		struct rt_msghdr hdr;
 		char buffer[sizeof(su) * 4];
@@ -349,17 +349,17 @@ if_route6(const struct rt6 *rt, int action)
  * for link local addreses */
 #ifdef __KAME__
 #define SCOPE {								      \
-		if (IN6_IS_ADDR_LINKLOCAL(&su.sin.sin6_addr)) { 	      \
+		if (IN6_IS_ADDR_LINKLOCAL(&su.sin.sin6_addr)) {		      \
 			*(uint16_t *)(void *)&su.sin.sin6_addr.s6_addr[2] =   \
-			    htons(su.sin.sin6_scope_id); 		      \
-			su.sin.sin6_scope_id = 0; 			      \
-		} 							      \
+			    htons(su.sin.sin6_scope_id);		      \
+			su.sin.sin6_scope_id = 0;			      \
+		}							      \
 	}
 #else
 #define SCOPE
 #endif
 
-#define ADDSU {							     	      \
+#define ADDSU {								      \
 		l = RT_ROUNDUP(su.sa.sa_len);				      \
 		memcpy(bp, &su, l);					      \
 		bp += l;						      \

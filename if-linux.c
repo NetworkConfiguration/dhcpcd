@@ -495,7 +495,7 @@ add_attr_32(struct nlmsghdr *n, unsigned int maxlen, int type, uint32_t data)
 struct nlma
 {
 	struct nlmsghdr hdr;
-	struct ifaddrmsg ifa; 
+	struct ifaddrmsg ifa;
 	char buffer[64];
 };
 

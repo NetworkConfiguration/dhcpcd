@@ -221,7 +221,7 @@ ipv6rs_makeprobe(struct interface *ifp)
 	memcpy(nd + 1, ifp->hwaddr, ifp->hwlen);
 	return 0;
 }
-	
+
 static void
 ipv6rs_sendprobe(void *arg)
 {
@@ -733,7 +733,7 @@ ipv6rs_handledata(_unused void *arg)
 					*opt = '\0';
 			}
 			break;
-			
+
 		case ND_OPT_DNSSL:
 			dnssl = (struct nd_opt_dnssl *)p;
 			lifetime = ntohl(dnssl->nd_opt_dnssl_lifetime);
@@ -913,7 +913,7 @@ ipv6rs_env(char **env, const char *prefix, const struct interface *ifp)
 				break;
 			case ND_OPT_RDNSS:
 				optn = "rdnss";
-				var = &rdnss;	
+				var = &rdnss;
 				break;
 			case ND_OPT_DNSSL:
 				optn = "dnssl";
@@ -1007,7 +1007,7 @@ ipv6rs_findprefix(const struct ipv6_addr *a)
 			return ap;
 		}
 	}
-	return NULL;	
+	return NULL;
 }
 
 static const struct ipv6_addr *
@@ -1080,7 +1080,7 @@ ipv6rs_expire(void *arg)
 				}
 			}
 		}
-	
+
 		TAILQ_FOREACH_SAFE(rao, &rap->options, next, raon) {
 			if (rap->expired) {
 				switch(rao->type) {
@@ -1144,24 +1144,24 @@ ipv6rs_start(struct interface *ifp)
 		eloop_event_add(sock, ipv6rs_handledata, NULL);
 	}
 
- 	eloop_timeout_delete(NULL, ifp);
- 
- 	state = RS_STATE(ifp);
- 	if (state == NULL) {
+	eloop_timeout_delete(NULL, ifp);
+
+	state = RS_STATE(ifp);
+	if (state == NULL) {
 		ifp->if_data[IF_DATA_IPV6RS] = calloc(1, sizeof(*state));
- 		state = RS_STATE(ifp);
+		state = RS_STATE(ifp);
 		if (state == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);
 			return -1;
 		}
- 	}
- 
- 	/* Always make a new probe as the underlying hardware
- 	 * address could have changed. */
- 	ipv6rs_makeprobe(ifp);
+	}
+
+	/* Always make a new probe as the underlying hardware
+	 * address could have changed. */
+	ipv6rs_makeprobe(ifp);
 	if (state->rs == NULL) {
 		syslog(LOG_ERR, "%s: ipv6rs_makeprobe: %m", __func__);
- 		return -1;
+		return -1;
 	}
 
 	state->rsprobes = 0;
