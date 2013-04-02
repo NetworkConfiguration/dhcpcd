@@ -951,11 +951,8 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		if (arg == NULL)
 			break;
 		fp = strchr(arg, ' ');
-		if (fp == NULL) {
-			syslog(LOG_ERR, "%s: invalid syntax", arg);
-			return -1;
-		}
-		*fp++ = '\0';
+		if (fp)
+			*fp++ = '\0';
 		if ((s = parse_string((char *)_iaid, sizeof(_iaid), arg)) < 1) {
 			syslog(LOG_ERR, "%s: invalid IAID", arg);
 			return -1;
