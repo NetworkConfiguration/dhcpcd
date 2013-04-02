@@ -438,7 +438,7 @@ ipv6_removesubnet(const struct interface *ifp, struct ipv6_addr *addr)
 	if (rt) {
 		rt->iface = ifp;
 #ifdef __linux__
-		rt->metric = 1024;
+		rt->metric = 256;
 #else
 		rt->metric = 0;
 #endif
