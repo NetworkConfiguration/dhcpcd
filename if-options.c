@@ -874,12 +874,12 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		ifdv = splitv(&ifdc, ifdv, arg);
 		break;
 	case '4':
-		ifo->options &= ~(DHCPCD_IPV6 | DHCPCD_IPV6RS);
+		ifo->options &= ~DHCPCD_IPV6;
 		ifo->options |= DHCPCD_IPV4;
 		break;
 	case '6':
 		ifo->options &= ~DHCPCD_IPV4;
-		ifo->options |= DHCPCD_IPV6 | DHCPCD_IPV6RS;
+		ifo->options |= DHCPCD_IPV6;
 		break;
 #ifdef INET
 	case O_ARPING:
@@ -1165,12 +1165,15 @@ read_config(const char *file,
 	}
 
 	/* Terminate the encapsulated options */
-	if (ifo && ifo->vendor[0] && !(ifo->options & DHCPCD_VENDORRAW)) {
+	if (ifo->vendor[0] && !(ifo->options & DHCPCD_VENDORRAW)) {
 		ifo->vendor[0]++;
 		ifo->vendor[ifo->vendor[0]] = DHO_END;
 	}
 
 #ifdef INET6
+	if (!(ifo->options & DHCPCD_IPV6))
+		ifo->options &= ~DHCPCD_IPV6RS;
+
 	if (ifname && ifo->iaid_len == 0 && ifo->options & DHCPCD_IPV6) {
 		ifo->iaid = malloc(sizeof(*ifo->iaid));
 		if (ifo->iaid == NULL)
