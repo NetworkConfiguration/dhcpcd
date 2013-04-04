@@ -425,11 +425,11 @@ start_interface(void *arg)
 		return;
 	}
 
-	if (options & DHCPCD_IPV6RS && ifo->options & DHCPCD_IPV6RS &&
-	    !(ifo->options & DHCPCD_INFORM))
-		ipv6rs_start(ifp);
-
 	if (ifo->options & DHCPCD_IPV6) {
+		if (ifo->options & DHCPCD_IPV6RS &&
+		    !(ifo->options & DHCPCD_INFORM))
+			ipv6rs_start(ifp);
+
 		if (!(ifo->options & DHCPCD_IPV6RS)) {
 			if (ifo->options & DHCPCD_IA_FORCED)
 				nolease = dhcp6_start(ifp, 1);
