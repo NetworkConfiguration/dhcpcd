@@ -1665,8 +1665,12 @@ dhcp_expire(void *arg)
 void
 dhcp_release(struct interface *ifp)
 {
-	struct dhcp_state *state = D_STATE(ifp);
+	struct dhcp_state *state;
 	struct timespec ts;
+
+	state = D_STATE(ifp);
+	if (state == NULL)
+		return;
 
 	if (state->new != NULL && state->new->cookie == htonl(MAGIC_COOKIE)) {
 		syslog(LOG_INFO, "%s: releasing lease of %s",
