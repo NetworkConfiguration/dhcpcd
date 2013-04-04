@@ -1333,7 +1333,7 @@ dhcp6_delegate_addr(struct interface *ifp, const struct ipv6_addr *prefix,
 {
 	struct dhcp6_state *state;
 	struct ipv6_addr *a, *ap;
-	int b, i, l;
+	int b, i, l, pl, hl;
 	const uint8_t *p;
 	char iabuf[INET6_ADDRSTRLEN];
 	const char *ia;
@@ -1341,9 +1341,11 @@ dhcp6_delegate_addr(struct interface *ifp, const struct ipv6_addr *prefix,
 	state = D6_STATE(ifp);
 
 	l = prefix->prefix_len + sla->sla_len;
-	if (l < 0 || l > 128) {
-		syslog(LOG_ERR, "%s: invalid prefix length (%d + %d = %d)",
-		    ifs->name, prefix->prefix_len, sla->sla_len, l);
+	hl= (ifp->hwlen * 8) + (2 * 8); /* 2 magic bytes for ethernet */
+	pl = l + hl;
+	if (pl < 0 || pl > 128) {
+		syslog(LOG_ERR, "%s: invalid prefix length (%d + %d + %d = %d)",
+		    ifs->name, prefix->prefix_len, sla->sla_len, hl, pl);
 		return NULL;
 	}
 
@@ -1377,7 +1379,7 @@ dhcp6_delegate_addr(struct interface *ifp, const struct ipv6_addr *prefix,
 	for (i = 0, b = prefix->prefix_len; b > 0; b -= 8, i++)
 		a->prefix.s6_addr[i] = prefix->prefix.s6_addr[i];
 	p = &sla->sla[3];
-	i = (128 - 64) / 8;
+	i = (128 - hl) / 8;
 	for (b = sla->sla_len; b > 7; b -= 8, p--)
 		a->prefix.s6_addr[--i] = *p;
 	if (b)
