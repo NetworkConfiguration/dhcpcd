@@ -743,6 +743,7 @@ ipv6rs_handledata(_unused void *arg)
 				free(rao->option);
 				free(rao);
 			}
+			free(opt);
 			continue;
 		}
 
