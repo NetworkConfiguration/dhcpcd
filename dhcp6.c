@@ -1921,7 +1921,8 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 	state = D6_STATE(ifp);
 	if (state) {
 		if (ifp->options->options & DHCPCD_RELEASE) {
-			dhcp6_startrelease(ifp);
+			if (ifp->carrier != LINK_DOWN)
+				dhcp6_startrelease(ifp);
 			unlink(state->leasefile);
 		}
 		dhcp6_freedrop_addrs(ifp, drop);
