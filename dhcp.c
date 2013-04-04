@@ -1,4 +1,4 @@
-/* 
+/*
  * dhcpcd - DHCP client daemon
  * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  * All rights reserved
@@ -77,7 +77,7 @@ static uint8_t *opt_buffer;
 #define IPV4A		ADDRIPV4 | ARRAY
 #define IPV4R		ADDRIPV4 | REQUEST
 
-/* We should define a maximum for the NAK exponential backoff */ 
+/* We should define a maximum for the NAK exponential backoff */
 #define NAKOFF_MAX              60
 
 /* Wait N nanoseconds between sending a RELEASE and dropping the address.
@@ -106,7 +106,7 @@ const struct dhcp_opt const dhcp_opts[] = {
 	{ 1,	ADDRIPV4 | REQUEST,	"subnet_mask" },
 		/* RFC 3442 states that the CSR has to come before all other
 		 * routes. For completeness, we also specify static routes,
-	 	 * then routers. */
+		 * then routers. */
 	{ 121,  RFC3442,	"classless_static_routes" },
 	{ 249,  RFC3442,	"ms_classless_static_routes" },
 	{ 33,	IPV4A | REQUEST,	"static_routes" },
@@ -117,7 +117,7 @@ const struct dhcp_opt const dhcp_opts[] = {
 	{ 6,	IPV4A,		"domain_name_servers" },
 	{ 7,	IPV4A,		"log_servers" },
 	{ 8,	IPV4A,		"cookie_servers" },
-	{ 9, 	IPV4A,		"lpr_servers" },
+	{ 9,	IPV4A,		"lpr_servers" },
 	{ 10,	IPV4A,		"impress_servers" },
 	{ 11,	IPV4A,		"resource_location_servers" },
 	{ 12,	STRING,		"host_name" },
@@ -142,7 +142,7 @@ const struct dhcp_opt const dhcp_opts[] = {
 	{ 31,	UINT8,		"router_discovery" },
 	{ 32,	ADDRIPV4,	"router_solicitation_address" },
 	{ 34,	UINT8,		"trailer_encapsulation" },
-	{ 35, 	UINT32,		"arp_cache_timeout" },
+	{ 35,	UINT32,		"arp_cache_timeout" },
 	{ 36,	UINT16,		"ieee802_3_encapsulation" },
 	{ 37,	UINT8,		"default_tcp_ttl" },
 	{ 38,	UINT32,		"tcp_keepalive_interval" },
@@ -157,7 +157,7 @@ const struct dhcp_opt const dhcp_opts[] = {
 	{ 47,	STRING,		"netbios_scope" },
 	{ 48,	IPV4A,		"font_servers" },
 	{ 49,	IPV4A,		"x_display_manager" },
-	{ 50, 	ADDRIPV4,	"dhcp_requested_address" },
+	{ 50,	ADDRIPV4,	"dhcp_requested_address" },
 	{ 51,	UINT32 | REQUEST,	"dhcp_lease_time" },
 	{ 52,	UINT8,		"dhcp_option_overload" },
 	{ 53,	UINT8,		"dhcp_message_type" },
@@ -311,7 +311,7 @@ get_option(const struct dhcp_message *dhcp, uint8_t opt, int *len, int *type)
 					atexit(free_option_buffer);
 #endif
 				}
-				if (!bp) 
+				if (!bp)
 					bp = opt_buffer;
 				memcpy(bp, op, ol);
 				bp += ol;
@@ -591,12 +591,12 @@ decode_rfc5969(char *out, ssize_t len, int pl, const uint8_t *p)
 		errno = EINVAL;
 		return 0;
 	}
-	
+
 	ipv4masklen = *p++;
 	pl--;
 	ipv6prefixlen = *p++;
 	pl--;
-	
+
 	for (i = 0; i < 16; i++) {
 		ipv6prefix[i] = *p++;
 		pl--;
@@ -614,7 +614,7 @@ decode_rfc5969(char *out, ssize_t len, int pl, const uint8_t *p)
 		    ipv6prefix[8], ipv6prefix[9], ipv6prefix[10],ipv6prefix[11],
 		    ipv6prefix[12],ipv6prefix[13],ipv6prefix[14], ipv6prefix[15]
 		);
-		    
+
 		len -= b;
 		out += b;
 		bytes += b;
@@ -628,7 +628,7 @@ decode_rfc5969(char *out, ssize_t len, int pl, const uint8_t *p)
 		br[2] = *p++;
 		br[3] = *p++;
 		pl -= 4;
-		
+
 		if (out) {
 			b= snprintf(out, len, " %d.%d.%d.%d",
 			    br[0], br[1], br[2], br[3]);
@@ -639,7 +639,7 @@ decode_rfc5969(char *out, ssize_t len, int pl, const uint8_t *p)
 			bytes += (4 * 4);
 		}
 	}
-	
+
 	return bytes;
 }
 
@@ -913,7 +913,7 @@ make_message(struct dhcp_message **message,
 	dhcp->xid = htonl(state->xid);
 	dhcp->cookie = htonl(MAGIC_COOKIE);
 
-	*p++ = DHO_MESSAGETYPE; 
+	*p++ = DHO_MESSAGETYPE;
 	*p++ = 1;
 	*p++ = type;
 
@@ -1043,7 +1043,7 @@ make_message(struct dhcp_message **message,
 		n_params = p;
 		*p++ = 0;
 		for (opt = dhcp_opts; opt->option; opt++) {
-			if (!(opt->type & REQUEST || 
+			if (!(opt->type & REQUEST ||
 				has_option_mask(ifo->requestmask, opt->option)))
 				continue;
 			if (type == DHCP_INFORM &&
@@ -1290,7 +1290,7 @@ dhcp_xid(const struct interface *ifp)
 	uint32_t xid;
 
 	if (ifp->options->options & DHCPCD_XID_HWADDR &&
-	    ifp->hwlen >= sizeof(xid)) 
+	    ifp->hwlen >= sizeof(xid))
 		/* The lower bits are probably more unique on the network */
 		memcpy(&xid, (ifp->hwaddr + ifp->hwlen) - sizeof(xid),
 		    sizeof(xid));
@@ -1357,7 +1357,7 @@ dhcp_openudp(struct interface *iface)
 		goto eexit;
 #endif
 	/* As we don't use this socket for receiving, set the
-	 * 	 * receive buffer to 1 */
+	 * receive buffer to 1 */
 	n = 1;
 	if (setsockopt(s, SOL_SOCKET, SO_RCVBUF, &n, sizeof(n)) == -1)
 		goto eexit;
@@ -1879,7 +1879,7 @@ handle_3rdparty(struct interface *ifp)
 	struct if_options *ifo;
 	struct dhcp_state *state;
 	struct in_addr addr, net, dst;
-	
+
 	ifo = ifp->options;
 	if (ifo->req_addr.s_addr != INADDR_ANY)
 		return 0;
@@ -2072,7 +2072,7 @@ static int
 blacklisted_ip(const struct if_options *ifo, in_addr_t addr)
 {
 	size_t i;
-	
+
 	for (i = 0; i < ifo->blacklist_len; i += 2)
 		if (ifo->blacklist[i] == (addr & ifo->blacklist[i + 1]))
 			return 1;
@@ -2108,7 +2108,7 @@ dhcp_handle(struct interface *iface, struct dhcp_message **dhcpp,
 	state->interval = 0;
 
 	/* We may have found a BOOTP server */
-	if (get_option_uint8(&type, dhcp, DHO_MESSAGETYPE) == -1) 
+	if (get_option_uint8(&type, dhcp, DHO_MESSAGETYPE) == -1)
 		type = 0;
 
 	if (type == DHCP_NAK) {
@@ -2527,7 +2527,7 @@ dhcp_init(struct interface *ifp)
 
 	ifo = ifp->options;
 	/* We need to drop the leasefile so that start_interface
-	 * doesn't load it. */	
+	 * doesn't load it. */
 	if (ifo->options & DHCPCD_REQUEST)
 		unlink(state->leasefile);
 
@@ -2681,4 +2681,3 @@ dhcp_start(struct interface *ifp)
 	else
 		dhcp_reboot(ifp);
 }
-

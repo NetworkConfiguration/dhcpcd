@@ -1,4 +1,4 @@
-/* 
+/*
  * dhcpcd - DHCP client daemon
  * Copyright (c) 2009-2013 Roy Marples <roy@marples.name>
  * All rights reserved

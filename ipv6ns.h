@@ -1,4 +1,4 @@
-/* 
+/*
  * dhcpcd - DHCP client daemon
  * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  * All rights reserved
@@ -32,8 +32,8 @@
 #include "ipv6rs.h"
 
 #define MAX_REACHABLE_TIME	3600	/* seconds */
-#define REACHABLE_TIME		30 	/* seconds */
-#define RETRANS_TIMER		1  	/* second */
+#define REACHABLE_TIME		30	/* seconds */
+#define RETRANS_TIMER		1	/* second */
 #define DELAY_FIRST_PROBE_TIME	5	/* seconds */
 
 int ipv6ns_init(void);

@@ -1,4 +1,4 @@
-/* 
+/*
  * dhcpcd - DHCP client daemon
  * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  * All rights reserved
@@ -42,9 +42,9 @@
 #define IF_SSIDSIZE 33
 #define PROFILE_LEN 64
 
-#define LINK_UP 	1
+#define LINK_UP		1
 #define LINK_UNKNOWN	0
-#define LINK_DOWN 	-1
+#define LINK_DOWN	-1
 
 #define IF_DATA_DHCP	0
 #define IF_DATA_IPV6RS	1

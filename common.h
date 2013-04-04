@@ -1,4 +1,4 @@
-/* 
+/*
  * dhcpcd - DHCP client daemon
  * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  * All rights reserved
@@ -46,7 +46,7 @@
 	ms = (tv)->tv_sec * 1000;					\
 	ms += (tv)->tv_usec / 1000;					\
 } while (0 /* CONSTCOND */);
-#define ms_to_tv(tv, ms) do { 						\
+#define ms_to_tv(tv, ms) do {						\
 	(tv)->tv_sec = ms / 1000;					\
 	(tv)->tv_usec = (ms - ((tv)->tv_sec * 1000)) * 1000;		\
 } while (0 /* CONSTCOND */);

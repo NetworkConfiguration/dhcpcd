@@ -1,4 +1,4 @@
-/* 
+/*
  * dhcpcd - DHCP client daemon
  * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  * All rights reserved
@@ -198,7 +198,7 @@ print_string(char *s, ssize_t len, int dl, const uint8_t *data)
 		case '\'': /* FALLTHROUGH */
 		case '$':  /* FALLTHROUGH */
 		case '`':  /* FALLTHROUGH */
- 		case '\\': /* FALLTHROUGH */
+		case '\\': /* FALLTHROUGH */
 		case '|':  /* FALLTHROUGH */
 		case '&':
 			if (s) {
