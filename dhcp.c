@@ -2019,6 +2019,8 @@ dhcp_drop(struct interface *iface, const char *reason)
 	if (state == NULL)
 		return;
 	eloop_timeouts_delete(iface, dhcp_expire, NULL);
+	if (iface->options->options & DHCPCD_RELEASE)
+		unlink(state->leasefile);
 	free(state->old);
 	state->old = state->new;
 	state->new = NULL;
