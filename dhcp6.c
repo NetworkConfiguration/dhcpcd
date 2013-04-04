@@ -1,4 +1,4 @@
-/* 
+/*
  * dhcpcd - DHCP client daemon
  * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  * All rights reserved
@@ -1004,8 +1004,17 @@ dhcp6_findna(struct interface *ifp, const uint8_t *iaid,
 	i = 0;
 	state = D6_STATE(ifp);
 	while ((o = dhcp6_findoption(D6_OPTION_IA_ADDR, d, l))) {
-		d += ntohs(o->len);
-		l -= ntohs(o->len);
+		l -= ((const uint8_t *)o - d);
+		d += ((const uint8_t *)o - d);
+		u32 = htons(o->len);
+		l -= sizeof(*o) + u32;
+		d += sizeof(*o) + u32;
+		if (u32 < 24) {
+			errno = EINVAL;
+			syslog(LOG_ERR, "%s: IA Address option truncated",
+			    ifp->name);
+			continue;
+		}
 		a = malloc(sizeof(*a));
 		if (a == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);
@@ -1067,9 +1076,17 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 	i = 0;
 	state = D6_STATE(ifp);
 	while ((o = dhcp6_findoption(D6_OPTION_IAPREFIX, d, l))) {
-		u32 = ntohs(o->len);
-		d += u32;
-		l -= u32;
+		l -= ((const uint8_t *)o - d);
+		d += ((const uint8_t *)o - d);
+		u32 = htons(o->len);
+		l -= sizeof(*o) + u32;
+		d += sizeof(*o) + u32;
+		if (u32 < 25) {
+			errno = EINVAL;
+			syslog(LOG_ERR, "%s: IA Prefix option truncated",
+			    ifp->name);
+			continue;
+		}
 		a = malloc(sizeof(*a));
 		if (a == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);
@@ -1123,9 +1140,17 @@ dhcp6_findia(struct interface *ifp, const uint8_t *d, size_t l,
 	dhcp6_freedrop_addrs(ifp, 0);
 	state = D6_STATE(ifp);
 	while ((o = dhcp6_findoption(ifo->ia_type, d, l))) {
-		ol = sizeof(*o) + ntohs(o->len);
-		d += ol;
-		l -= ol;
+		l -= ((const uint8_t *)o - d);
+		d += ((const uint8_t *)o - d);
+		ol = htons(o->len);
+		l -= sizeof(*o) + ol;
+		d += sizeof(*o) + ol;
+		u32 = ifo->ia_type == D6_OPTION_IA_TA ? 4 : 12;
+		if (ol < u32) {
+			errno = EINVAL;
+			syslog(LOG_ERR, "%s: IA option truncated", ifp->name);
+			continue;
+		}
 
 		p = D6_COPTION_DATA(o);
 		memcpy(iaid, p, sizeof(iaid));
@@ -1360,7 +1385,9 @@ dhcp6_delegate_addr(struct interface *ifp, const struct ipv6_addr *prefix,
 
 	if (ipv6_makeaddr(&a->addr, ifp->name, &a->prefix, a->prefix_len) == -1)
 	{
-		syslog(LOG_ERR, "%s: %m", __func__);
+		ia = inet_ntop(AF_INET6, &a->addr.s6_addr,
+		    iabuf, sizeof(iabuf));
+		syslog(LOG_ERR, "%s: %m (%s/%d)", __func__, ia, a->prefix_len);
 		free(a);
 		return NULL;
 	}
