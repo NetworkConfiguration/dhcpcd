@@ -68,11 +68,6 @@ const char copyright[] = "Copyright (c) 2006-2013 Roy Marples";
 #include "script.h"
 #include "signals.h"
 
-/* Wait N nanoseconds between sending a RELEASE and dropping the address.
- * This gives the kernel enough time to actually send it. */
-#define RELEASE_DELAY_S		0
-#define RELEASE_DELAY_NS	10000000
-
 struct if_head *ifaces = NULL;
 char vendor[VENDORCLASSID_MAX_LEN];
 int pidfd = -1;
@@ -276,8 +271,7 @@ stop_interface(struct interface *ifp)
 	TAILQ_REMOVE(ifaces, ifp, next);
 	dhcp6_drop(ifp, NULL);
 	ipv6rs_drop(ifp);
-//	if (strcmp(ifp->state->reason, "RELEASE") != 0)
-		dhcp_drop(ifp, "STOP");
+	dhcp_drop(ifp, "STOP");
 	dhcp_close(ifp);
 	eloop_timeout_delete(NULL, ifp);
 	free_interface(ifp);
@@ -722,10 +716,8 @@ handle_signal(int sig)
 		ifp = TAILQ_LAST(ifaces, if_head);
 		if (ifp == NULL)
 			break;
-		if (ifp->carrier != LINK_DOWN &&
-		    (do_release ||
-			ifp->options->options & DHCPCD_RELEASE))
-			dhcp_release(ifp);
+		if (do_release)
+			ifp->options->options |= DHCPCD_RELEASE;
 		stop_interface(ifp);
 	}
 	exit(EXIT_FAILURE);
@@ -863,9 +855,6 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 				continue;
 			if (do_release)
 				ifp->options->options |= DHCPCD_RELEASE;
-			if (ifp->options->options & DHCPCD_RELEASE &&
-			    ifp->carrier != LINK_DOWN)
-				dhcp_release(ifp);
 			stop_interface(ifp);
 		}
 		return 0;

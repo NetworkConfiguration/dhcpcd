@@ -264,7 +264,6 @@ void dhcp_stop(struct interface *);
 void dhcp_decline(struct interface *);
 void dhcp_discover(void *);
 void dhcp_inform(struct interface *);
-void dhcp_release(struct interface *);
 void dhcp_bind(void *);
 void dhcp_reboot_newopts(struct interface *, int);
 void dhcp_close(struct interface *);
@@ -274,7 +273,6 @@ int dhcp_dump(const char *);
 #define dhcp_printoptions
 #define dhcp_drop(a, b)
 #define dhcp_start(a) {}
-#define dhcp_release(a) {}
 #define dhcp_reboot(a, b) b = b
 #define dhcp_close(a)
 #define dhcp_free(a)

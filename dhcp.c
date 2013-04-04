@@ -1663,30 +1663,6 @@ dhcp_expire(void *arg)
 }
 
 void
-dhcp_release(struct interface *ifp)
-{
-	struct dhcp_state *state;
-	struct timespec ts;
-
-	state = D_STATE(ifp);
-	if (state == NULL)
-		return;
-
-	if (state->new != NULL && state->new->cookie == htonl(MAGIC_COOKIE)) {
-		syslog(LOG_INFO, "%s: releasing lease of %s",
-		    ifp->name, inet_ntoa(state->lease.addr));
-		state->xid = dhcp_xid(ifp);
-		send_message(ifp, DHCP_RELEASE, NULL);
-		/* Give the packet a chance to go before dropping the ip */
-		ts.tv_sec = RELEASE_DELAY_S;
-		ts.tv_nsec = RELEASE_DELAY_NS;
-		nanosleep(&ts, NULL);
-		dhcp_drop(ifp, "RELEASE");
-	}
-	unlink(state->leasefile);
-}
-
-void
 dhcp_decline(struct interface *ifp)
 {
 
@@ -2012,24 +1988,44 @@ dhcp_reboot(struct interface *ifp)
 }
 
 void
-dhcp_drop(struct interface *iface, const char *reason)
+dhcp_drop(struct interface *ifp, const char *reason)
 {
-	struct dhcp_state *state = D_STATE(iface);
+	struct dhcp_state *state;
+#ifdef RELEASE_SLOW
+	struct timespec ts;
+#endif
 
+	state = D_STATE(ifp);
 	if (state == NULL)
 		return;
-	eloop_timeouts_delete(iface, dhcp_expire, NULL);
-	if (iface->options->options & DHCPCD_RELEASE)
+	eloop_timeouts_delete(ifp, dhcp_expire, NULL);
+	if (ifp->options->options & DHCPCD_RELEASE) {
 		unlink(state->leasefile);
+		if (ifp->carrier != LINK_DOWN &&
+		    state->new != NULL &&
+		    state->new->cookie == htonl(MAGIC_COOKIE))
+		{
+			syslog(LOG_INFO, "%s: releasing lease of %s",
+			    ifp->name, inet_ntoa(state->lease.addr));
+			state->xid = dhcp_xid(ifp);
+			send_message(ifp, DHCP_RELEASE, NULL);
+#ifdef RELEASE_SLOW
+			/* Give the packet a chance to go */
+			ts.tv_sec = RELEASE_DELAY_S;
+			ts.tv_nsec = RELEASE_DELAY_NS;
+			nanosleep(&ts, NULL);
+#endif
+		}
+	}
 	free(state->old);
 	state->old = state->new;
 	state->new = NULL;
 	state->reason = reason;
-	ipv4_applyaddr(iface);
+	ipv4_applyaddr(ifp);
 	free(state->old);
 	state->old = NULL;
 	state->lease.addr.s_addr = 0;
-	iface->options->options &= ~ DHCPCD_CSR_WARNED;
+	ifp->options->options &= ~ DHCPCD_CSR_WARNED;
 }
 
 static void
