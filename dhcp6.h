@@ -135,7 +135,7 @@ struct dhcp6_status {
 
 #define DHCP6_RAND_MIN		-100
 #define DHCP6_RAND_MAX		100
- 
+
 enum DH6S {
 	DH6S_INIT,
 	DH6S_DISCOVER,
@@ -147,7 +147,8 @@ enum DH6S {
 	DH6S_INFORM,
 	DH6S_RENEW_REQUESTED,
 	DH6S_PROBE,
-	DH6S_DELEGATED
+	DH6S_DELEGATED,
+	DH6S_RELEASE
 };
 
 struct dhcp6_state {

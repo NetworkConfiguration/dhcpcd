@@ -92,6 +92,7 @@ static const struct dhcp6_op dhcp6_ops[] = {
 	{ DHCP6_REBIND, "REBIND6" },
 	{ DHCP6_CONFIRM, "CONFIRM6" },
 	{ DHCP6_INFORMATION_REQ, "INFORM6" },
+	{ DHCP6_RELEASE, "RELEASE6" },
 	{ 0, NULL }
 };
 
@@ -373,15 +374,17 @@ dhcp6_makemessage(struct interface *ifp)
 	ifo = ifp->options;
 	len = 0;
 	si = NULL;
-	for (opt = dhcp6_opts; opt->option; opt++) {
-		if (!(opt->type & REQUEST ||
-		    has_option_mask(ifo->requestmask6, opt->option)))
-			continue;
-		len += sizeof(*u16);
+	if (state->state != DH6S_RELEASE) {
+		for (opt = dhcp6_opts; opt->option; opt++) {
+			if (!(opt->type & REQUEST ||
+			    has_option_mask(ifo->requestmask6, opt->option)))
+				continue;
+			len += sizeof(*u16);
+		}
+		if (len == 0)
+			len = sizeof(*u16) * 2;
+		len += sizeof(*o);
 	}
-	if (len == 0)
-		len = sizeof(*u16) * 2;
-	len += sizeof(*o);
 
 	len += sizeof(*state->send);
 	len += sizeof(*o) + 14; /* clientid */
@@ -397,6 +400,8 @@ dhcp6_makemessage(struct interface *ifp)
 	case DH6S_REQUEST:
 		m = state->recv;
 		ml = state->recv_len;
+		/* FALLTHROUGH */
+	case DH6S_RELEASE:
 		/* FALLTHROUGH */
 	case DH6S_RENEW:
 		if (m == NULL) {
@@ -462,6 +467,9 @@ dhcp6_makemessage(struct interface *ifp)
 		break;
 	case DH6S_INFORM:
 		state->send->type = DHCP6_INFORMATION_REQ;
+		break;
+	case DH6S_RELEASE:
+		state->send->type = DHCP6_RELEASE;
 		break;
 	default:
 		errno = EINVAL;
@@ -550,23 +558,25 @@ dhcp6_makemessage(struct interface *ifp)
 		}
 	}
 
-	o = D6_NEXT_OPTION(o);
-	o->code = htons(D6_OPTION_ORO);
-	o->len = 0;
-	u16 = (uint16_t *)(void *)D6_OPTION_DATA(o);
-	for (opt = dhcp6_opts; opt->option; opt++) {
-		if (!(opt->type & REQUEST ||
-		    has_option_mask(ifo->requestmask6, opt->option)))
-			continue;
-		*u16++ = htons(opt->option);
-		o->len += sizeof(*u16);
+	if (state->send->type !=  DHCP6_RELEASE) {
+		o = D6_NEXT_OPTION(o);
+		o->code = htons(D6_OPTION_ORO);
+		o->len = 0;
+		u16 = (uint16_t *)(void *)D6_OPTION_DATA(o);
+		for (opt = dhcp6_opts; opt->option; opt++) {
+			if (!(opt->type & REQUEST ||
+			    has_option_mask(ifo->requestmask6, opt->option)))
+				continue;
+			*u16++ = htons(opt->option);
+			o->len += sizeof(*u16);
+		}
+		if (o->len == 0) {
+			*u16++ = htons(D6_OPTION_DNS_SERVERS);
+			*u16++ = htons(D6_OPTION_DOMAIN_LIST);
+			o->len = sizeof(*u16) * 2;
+		}
+		o->len = htons(o->len);
 	}
-	if (o->len == 0) {
-		*u16++ = htons(D6_OPTION_DNS_SERVERS);
-		*u16++ = htons(D6_OPTION_DOMAIN_LIST);
-		o->len = sizeof(*u16) * 2;
-	}
-	o->len = htons(o->len);
 
 	return 0;
 }
@@ -758,6 +768,15 @@ dhcp6_sendconfirm(void *arg)
 	dhcp6_sendmessage(arg, dhcp6_sendconfirm);
 }
 
+/*
+static void
+dhcp6_sendrelease(void *arg)
+{
+
+	dhcp6_sendmessage(arg, dhcp6_sendrelease);
+}
+*/
+
 static void
 dhcp6_startrenew(void *arg)
 {
@@ -940,6 +959,30 @@ dhcp6_startexpire(void *arg)
 	state = D6_CSTATE(ifp);
 	unlink(state->leasefile);
 	dhcp6_startdiscover(ifp);
+}
+
+static void
+dhcp6_startrelease(struct interface *ifp)
+{
+	struct dhcp6_state *state;
+
+	state = D6_STATE(ifp);
+	state->state = DH6S_RELEASE;
+	state->start_uptime = uptime();
+	state->RTC = 0;
+	state->IRT = REL_TIMEOUT;
+	state->MRT = 0;
+	state->MRC = REL_MAX_RC;
+	//state->MRCcallback = dhcp6_failrelease;
+	state->MRCcallback = NULL;
+
+	if (dhcp6_makemessage(ifp) == -1)
+		syslog(LOG_ERR, "%s: dhcp6_makemessage: %m", ifp->name);
+	else
+		/* XXX: We should loop a few times
+		 * Luckily RFC3315 section 18.1.6 says this is optional */
+		//dhcp6_sendrelease(ifp);
+		dhcp6_sendmessage(ifp, NULL);
 }
 
 static int dhcp6_getstatus(const struct dhcp6_option *o)
@@ -1877,6 +1920,10 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 	eloop_timeout_delete(NULL, ifp);
 	state = D6_STATE(ifp);
 	if (state) {
+		if (ifp->options->options & DHCPCD_RELEASE) {
+			dhcp6_startrelease(ifp);
+			unlink(state->leasefile);
+		}
 		dhcp6_freedrop_addrs(ifp, drop);
 		if (drop && state->new) {
 			if (reason == NULL)
