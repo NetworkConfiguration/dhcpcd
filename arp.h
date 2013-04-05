@@ -28,8 +28,7 @@
 #ifndef ARP_H
 #define ARP_H
 
-/* These are for IPV4LL, RFC 3927.
- * We put them here as we use the timings for all ARP foo. */
+/* ARP timings from RFC5227 */
 #define PROBE_WAIT		 1
 #define PROBE_NUM		 3
 #define PROBE_MIN		 1
