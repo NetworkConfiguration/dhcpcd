@@ -1352,7 +1352,8 @@ dhcp6_startinit(struct interface *ifp)
 	state->expire = ~0U;
 	state->lowpl = ~0U;
 	if (!(options & DHCPCD_TEST) &&
-	    ifp->options->ia_type != D6_OPTION_IA_TA)
+	    ifp->options->ia_type != D6_OPTION_IA_TA &&
+	    ifp->options->reboot != 0)
 	{
 		r = dhcp6_readlease(ifp);
 		if (r == -1)
