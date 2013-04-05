@@ -1,4 +1,4 @@
-.\" Copyright (c) 2006-2012 Roy Marples
+.\" Copyright (c) 2006-2013 Roy Marples
 .\" All rights reserved
 .\"
 .\" Redistribution and use in source and binary forms, with or without
@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd November 11, 2012
+.Dd April 5, 2013
 .Dt DHCPCD-RUN-HOOKS 8
 .Os
 .Sh NAME
@@ -97,8 +97,6 @@ dhcpcd is monitoring the interface for a 3rd party to give it an IP address.
 dhcpcd failed to contact any DHCP servers but was able to use an old lease.
 .It Dv EXPIRE | EXPIRE6
 dhcpcd's lease or state expired and it failed to obtain a new one.
-.It Dv RELEASE
-dhcpcd's lease was released back to the DHCP server for re-use.
 .It Dv NAK
 dhcpcd received a NAK from the DHCP server.
 This should be treated as EXPIRE.
