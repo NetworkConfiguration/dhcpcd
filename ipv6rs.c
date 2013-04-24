@@ -66,7 +66,7 @@ struct nd_opt_rdnss {           /* RDNSS option RFC 6106 */
 	uint16_t	nd_opt_rdnss_reserved;
 	uint32_t	nd_opt_rdnss_lifetime;
         /* followed by list of IP prefixes */
-} _packed;
+} __packed;
 #endif
 
 #ifndef ND_OPT_DNSSL
@@ -77,7 +77,7 @@ struct nd_opt_dnssl {		/* DNSSL option RFC 6106 */
 	uint16_t	nd_opt_dnssl_reserved;
 	uint32_t	nd_opt_dnssl_lifetime;
 	/* followed by list of DNS servers */
-} _packed;
+} __packed;
 #endif
 
 /* Minimal IPv6 MTU */
@@ -388,7 +388,7 @@ add_router(struct ra *router)
 
 /* ARGSUSED */
 void
-ipv6rs_handledata(_unused void *arg)
+ipv6rs_handledata(__unused void *arg)
 {
 	ssize_t len, l, m, n, olen;
 	struct cmsghdr *cm;

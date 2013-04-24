@@ -257,7 +257,7 @@ ipv6ns_sendprobe(void *arg)
 
 /* ARGSUSED */
 void
-ipv6ns_handledata(_unused void *arg)
+ipv6ns_handledata(__unused void *arg)
 {
 	ssize_t len;
 	struct cmsghdr *cm;

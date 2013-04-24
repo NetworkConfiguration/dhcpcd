@@ -285,7 +285,7 @@ eloop_init(void)
 }
 #endif
 
-_noreturn void
+__dead void
 start_eloop(void)
 {
 	int msecs, n;

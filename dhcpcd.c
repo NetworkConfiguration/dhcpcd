@@ -209,7 +209,7 @@ cleanup(void)
 
 /* ARGSUSED */
 void
-handle_exit_timeout(_unused void *arg)
+handle_exit_timeout(__unused void *arg)
 {
 	int timeout;
 
@@ -1270,7 +1270,7 @@ start_interface(void *arg)
 
 /* ARGSUSED */
 static void
-handle_link(_unused void *arg)
+handle_link(__unused void *arg)
 {
 	if (manage_link(linkfd) == -1)
 		syslog(LOG_ERR, "manage_link: %m");
@@ -1541,7 +1541,7 @@ reconf_reboot(int action, int argc, char **argv, int oi)
 
 /* ARGSUSED */
 static void
-handle_signal(_unused void *arg)
+handle_signal(__unused void *arg)
 {
 	struct interface *ifp;
 	struct if_options *ifo;
