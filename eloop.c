@@ -323,7 +323,7 @@ eloop_init(void)
 }
 #endif
 
-_noreturn void
+__dead void
 eloop_start(const sigset_t *sigmask)
 {
 	int n;

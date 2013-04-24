@@ -86,20 +86,20 @@ struct dhcp6_message {
 	uint8_t type;
 	uint8_t xid[3];
 	/* followed by options */
-} _packed;
+} __packed;
 
 struct dhcp6_option {
 	uint16_t code;
 	uint16_t len;
 	/* followed by data */
-} _packed;
+} __packed;
 
 struct dhcp6_status {
 	uint16_t code;
 	uint16_t len;
 	uint16_t status;
 	/* followed by message */
-} _packed;
+} __packed;
 
 #define D6_STATUS_OK		0
 #define D6_STATUS_FAIL		1

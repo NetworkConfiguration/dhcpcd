@@ -171,7 +171,7 @@ cleanup(void)
 
 /* ARGSUSED */
 static void
-handle_exit_timeout(_unused void *arg)
+handle_exit_timeout(__unused void *arg)
 {
 	int timeout;
 
@@ -441,7 +441,7 @@ start_interface(void *arg)
 
 /* ARGSUSED */
 static void
-handle_link(_unused void *arg)
+handle_link(__unused void *arg)
 {
 
 	if (manage_link(linkfd) == -1)
@@ -633,8 +633,9 @@ reconf_reboot(int action, int argc, char **argv, int oi)
 	sort_interfaces();
 }
 
+/* ARGSUSED */
 static void
-sig_reboot(_unused void *arg)
+sig_reboot(__unused void *arg)
 {
 	struct if_options *ifo;
 	int i;
@@ -662,7 +663,7 @@ sig_reboot(_unused void *arg)
 }
 
 static void
-sig_reconf(_unused void *arg)
+sig_reconf(__unused void *arg)
 {
 	struct interface *ifp;
 

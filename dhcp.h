@@ -151,7 +151,7 @@ struct dhcp_message {
 	uint8_t bootfile[BOOTFILE_LEN];    /* boot file name */
 	uint32_t cookie;
 	uint8_t options[DHCP_OPTION_LEN]; /* message options - cookie */
-} _packed;
+} __packed;
 
 struct dhcp_lease {
 	struct in_addr addr;

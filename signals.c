@@ -58,8 +58,9 @@ signal_handler(int sig)
 	errno = serrno;
 }
 
+/* ARGSUSED */
 static void
-signal_read(_unused void *arg)
+signal_read(__unused void *arg)
 {
 	int sig = -1;
 	char buf[16];

@@ -71,7 +71,7 @@ static unsigned char *rcvbuf;
 static unsigned char ansbuf[1500];
 static char ntopbuf[INET6_ADDRSTRLEN];
 
-static void ipv6ns_handledata(_unused void *arg);
+static void ipv6ns_handledata(__unused void *arg);
 
 #if DEBUG_MEMORY
 static void
@@ -259,7 +259,7 @@ ipv6ns_sendprobe(void *arg)
 
 /* ARGSUSED */
 static void
-ipv6ns_handledata(_unused void *arg)
+ipv6ns_handledata(__unused void *arg)
 {
 	ssize_t len;
 	struct cmsghdr *cm;

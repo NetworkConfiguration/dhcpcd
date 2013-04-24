@@ -1539,7 +1539,7 @@ dhcp6_find_delegates(struct interface *ifp)
 
 /* ARGSUSED */
 static void
-dhcp6_handledata(_unused void *arg)
+dhcp6_handledata(__unused void *arg)
 {
 	ssize_t len;
 	struct cmsghdr *cm;

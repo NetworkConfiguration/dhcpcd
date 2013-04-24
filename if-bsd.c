@@ -81,14 +81,14 @@ static char *link_buf;
 static ssize_t link_buflen;
 
 int
-if_init(_unused struct interface *iface)
+if_init(__unused struct interface *iface)
 {
 	/* BSD promotes secondary address by default */
 	return 0;
 }
 
 int
-if_conf(_unused struct interface *iface)
+if_conf(__unused struct interface *iface)
 {
 	/* No extra checks needed on BSD */
 	return 0;

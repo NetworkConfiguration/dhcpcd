@@ -115,7 +115,7 @@ control_handle_data(void *arg)
 
 /* ARGSUSED */
 static void
-control_handle(_unused void *arg)
+control_handle(__unused void *arg)
 {
 	struct sockaddr_un run;
 	socklen_t len;
