@@ -34,7 +34,6 @@
 #include <limits.h>
 #include <stdint.h>
 
-#include "common.h"
 #include "dhcp-common.h"
 
 /* UDP port numbers for DHCP */
@@ -133,6 +132,18 @@ enum FQDN {
 
 /* Some crappy DHCP servers require the BOOTP minimum length */
 #define BOOTP_MESSAGE_LENTH_MIN 300
+
+/* Don't import common.h as that defines __unused which causes problems
+ * on some Linux systems which define it as part of a structure */
+#if __GNUC__ > 2 || defined(__INTEL_COMPILER)
+# ifndef __packed
+#  define __packed   __attribute__((__packed__))
+# endif
+#else
+# ifndef __packed
+#  define __packed
+# endif
+#endif
 
 struct dhcp_message {
 	uint8_t op;           /* message type */
