@@ -21,18 +21,17 @@ set_zoneinfo()
 	done
 
 	if [ -z "$zoneinfo_dir" ]; then
-		syslog warning "$interface: timezone directory not found"
+		syslog warning "timezone directory not found"
 		return 1
 	fi
 
 	zone_file="$zoneinfo_dir/$new_tzdb_timezone"
 	if [ ! -e "$zone_file" ]; then
-		syslog warning \
-		    "$interface: no timezone definition for $new_tzdb_timezone"
+		syslog warning "no timezone definition for $new_tzdb_timezone"
 		return 1
 	fi
 
-	syslog info "$interface: timezone changed to $new_tzdb_timezone"
+	syslog info "timezone changed to $new_tzdb_timezone"
 	if [ -h "$localtime" ]; then
 		ln -sf "$zone_file" "$localtime"
 	else
