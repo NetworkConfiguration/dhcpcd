@@ -31,6 +31,7 @@
 #include <sys/time.h>
 #include <stdio.h>
 
+#include "config.h"
 #include "defs.h"
 
 #define UNCONST(a)		((void *)(unsigned long)(const void *)(a))
