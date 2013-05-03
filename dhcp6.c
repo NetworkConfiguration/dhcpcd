@@ -120,6 +120,8 @@ const struct dhcp_opt const dhcp6_opts[] = {
 	{ D6_OPTION_INFO_REFRESH_TIME,	UINT32,		"info_refresh_time" },
 	{ D6_OPTION_BCMS_SERVER_D,	RFC3397,	"bcms_server_d" },
 	{ D6_OPTION_BCMS_SERVER_A,	IPV6A,		"bcms_server_a" },
+	{ D6_OPTION_POSIX_TIMEZONE,	STRING,		"posix_timezone" },
+	{ D6_OPTION_TZDB_TIMEZONE,	STRING,		"tzdb_timezone" },
 	{ 0, 0, NULL }
 };
 
@@ -379,10 +381,9 @@ dhcp6_makemessage(struct interface *ifp)
 	si = NULL;
 	if (state->state != DH6S_RELEASE) {
 		for (opt = dhcp6_opts; opt->option; opt++) {
-			if (!(opt->type & REQUEST ||
-			    has_option_mask(ifo->requestmask6, opt->option)))
-				continue;
-			len += sizeof(*u16);
+			if (opt->type & REQUEST ||
+			    has_option_mask(ifo->requestmask6, opt->option))
+				len += sizeof(*u16);
 		}
 		if (len == 0)
 			len = sizeof(*u16) * 2;
@@ -567,11 +568,12 @@ dhcp6_makemessage(struct interface *ifp)
 		o->len = 0;
 		u16 = (uint16_t *)(void *)D6_OPTION_DATA(o);
 		for (opt = dhcp6_opts; opt->option; opt++) {
-			if (!(opt->type & REQUEST ||
-			    has_option_mask(ifo->requestmask6, opt->option)))
-				continue;
-			*u16++ = htons(opt->option);
-			o->len += sizeof(*u16);
+			if (opt->type & REQUEST ||
+			    has_option_mask(ifo->requestmask6, opt->option))
+			{
+				*u16++ = htons(opt->option);
+				o->len += sizeof(*u16);
+			}
 		}
 		if (o->len == 0) {
 			*u16++ = htons(D6_OPTION_DNS_SERVERS);

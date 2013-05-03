@@ -190,6 +190,8 @@ const struct dhcp_opt const dhcp_opts[] = {
 	{ 91,	UINT32,		"client_last_transaction_time" },
 	{ 92,	IPV4A,		"associated_ip" },
 	{ 98,	STRING,		"uap_servers" },
+	{ 100,	STRING,		"posix_timezone" },
+	{ 101,	STRING,		"tzdb_timezone" },
 	{ 112,	IPV4A,		"netinfo_server_address" },
 	{ 113,	STRING,		"netinfo_server_tag" },
 	{ 114,	STRING,		"default_url" },
