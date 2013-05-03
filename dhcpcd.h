@@ -29,13 +29,9 @@
 #define DHCPCD_H
 
 #include <sys/queue.h>
-#include <sys/socket.h>
 #include <net/if.h>
 
-#include <limits.h>
-
 #include "control.h"
-#include "dhcp.h"
 #include "if-options.h"
 
 #define HWADDR_LEN 20
