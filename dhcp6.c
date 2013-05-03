@@ -1081,7 +1081,7 @@ dhcp6_findna(struct interface *ifp, const uint8_t *iaid,
 			    ifp->name);
 			continue;
 		}
-		a = malloc(sizeof(*a));
+		a = calloc(1, sizeof(*a));
 		if (a == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);
 			break;
@@ -1155,7 +1155,7 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			    ifp->name);
 			continue;
 		}
-		a = malloc(sizeof(*a));
+		a = calloc(1, sizeof(*a));
 		if (a == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);
 			break;
@@ -1432,7 +1432,7 @@ dhcp6_delegate_addr(struct interface *ifp, const struct ipv6_addr *prefix,
 		state->state = DH6S_DELEGATED;
 	}
 
-	a = malloc(sizeof(*a));
+	a = calloc(1, sizeof(*a));
 	if (a == NULL) {
 		syslog(LOG_ERR, "%s: %m", __func__);
 		return NULL;
