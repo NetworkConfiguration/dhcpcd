@@ -146,6 +146,7 @@ struct if_options {
 	uint16_t ia_type;
 	size_t iaid_len;
 	struct if_iaid *iaid;
+	int dadtransmits;
 #endif
 };
 

@@ -247,8 +247,28 @@ ipv6_prefixlen(const struct in6_addr *mask)
 	return x * NBBY + y;
 }
 
+int
+ipv6_addaddr(struct ipv6_addr *ap)
+{
+
+	syslog(ap->new ? LOG_INFO : LOG_DEBUG,
+	    "%s: adding address %s", ap->iface->name, ap->saddr);
+	if (add_address6(ap->iface, ap) == -1) {
+		syslog(LOG_ERR, "add_address6 %m");
+		return -1;
+	}
+	ap->new = 0;
+	ap->added = 1;
+	if (ipv6_removesubnet(ap->iface, ap) == -1)
+		syslog(LOG_ERR,"ipv6_removesubnet %m");
+	syslog(LOG_DEBUG,
+	    "%s: pltime %d seconds, vltime %d seconds",
+	    ap->iface->name, ap->prefix_pltime, ap->prefix_vltime);
+	return 0;
+}
+
 ssize_t
-ipv6_addaddrs(const struct interface *ifp, struct ipv6_addrhead *addrs)
+ipv6_addaddrs(struct ipv6_addrhead *addrs)
 {
 	struct ipv6_addr *ap;
 	ssize_t i;
@@ -258,20 +278,8 @@ ipv6_addaddrs(const struct interface *ifp, struct ipv6_addrhead *addrs)
 		if (ap->prefix_vltime == 0 ||
 		    IN6_IS_ADDR_UNSPECIFIED(&ap->addr))
 			continue;
-		syslog(ap->new ? LOG_INFO : LOG_DEBUG,
-		    "%s: adding address %s",
-		    ifp->name, ap->saddr);
-		if (add_address6(ifp, ap) == -1)
-			syslog(LOG_ERR, "add_address6 %m");
-		else {
+		if (ipv6_addaddr(ap) == 0)
 			i++;
-			if (ipv6_removesubnet(ifp, ap) == -1)
-				syslog(LOG_ERR,"ipv6_removesubnet %m");
-			syslog(LOG_DEBUG,
-			    "%s: pltime %d seconds, vltime %d seconds",
-			    ifp->name, ap->prefix_pltime,
-			    ap->prefix_vltime);
-		}
 	}
 
 	return i;

@@ -308,6 +308,11 @@ if_address6(const struct interface *ifp, const struct ipv6_addr *a, int action)
 		return -1;
 	memset(&ifa, 0, sizeof(ifa));
 	strlcpy(ifa.ifra_name, ifp->name, sizeof(ifa.ifra_name));
+	ifa.ifra_flags = IN6_IFF_TENTATIVE;
+#if 0
+	if (a->autoconf)
+		ifa.ifra_flags |= IN6_IFF_AUTOCONF;
+#endif
 
 #define ADDADDR(v, addr) {						      \
 		(v)->sin6_family = AF_INET6;				      \

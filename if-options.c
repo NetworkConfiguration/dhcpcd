@@ -1091,6 +1091,7 @@ read_config(const char *file,
 #endif
 #ifdef INET6
 	ifo->options |= DHCPCD_IPV6 | DHCPCD_IPV6RS | DHCPCD_IPV6RA_REQRDNSS;
+	ifo->dadtransmits = ipv6_dadtransmits(ifname);
 #endif
 	ifo->timeout = DEFAULT_TIMEOUT;
 	ifo->reboot = DEFAULT_REBOOT;

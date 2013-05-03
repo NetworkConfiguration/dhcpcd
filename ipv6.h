@@ -39,6 +39,7 @@
 
 struct ipv6_addr {
 	TAILQ_ENTRY(ipv6_addr) next;
+	struct interface *iface;
 	struct in6_addr prefix;
 	int prefix_len;
 	uint32_t prefix_vltime;
@@ -47,8 +48,17 @@ struct ipv6_addr {
 	uint8_t onlink;
 	uint8_t new;
 	char saddr[INET6_ADDRSTRLEN];
+	uint8_t added;
+	uint8_t autoconf;
 	uint8_t iaid[4];
 	struct interface *delegating_iface;
+
+	void (*dadcallback)(void *);
+	uint8_t dad;
+	uint8_t dadcompleted;
+	uint8_t *ns;
+	size_t nslen;
+	int nsprobes;
 };
 TAILQ_HEAD(ipv6_addrhead, ipv6_addr);
 
@@ -72,7 +82,8 @@ int ipv6_makeaddr(struct in6_addr *, const char *, const struct in6_addr *, int)
 int ipv6_makeprefix(struct in6_addr *, const struct in6_addr *, int);
 int ipv6_mask(struct in6_addr *, int);
 int ipv6_prefixlen(const struct in6_addr *);
-ssize_t ipv6_addaddrs(const struct interface *, struct ipv6_addrhead *);
+int ipv6_addaddr(struct ipv6_addr *);
+ssize_t ipv6_addaddrs(struct ipv6_addrhead *);
 int ipv6_removesubnet(const struct interface *, struct ipv6_addr *);
 void ipv6_buildroutes(void);
 void ipv6_drop(struct interface *);

@@ -134,3 +134,12 @@ check_ipv6(const char *ifname)
 
 	return 1;
 }
+
+int
+ipv6_dadtransmits(__unused const char *ifname)
+{
+	int r;
+
+	r = get_inet6_sysctl(IPV6CTL_DAD_COUNT);
+	return r < 0 ? 0 : r;
+}

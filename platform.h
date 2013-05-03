@@ -30,5 +30,6 @@
 
 char *hardware_platform(void);
 int check_ipv6(const char *);
+int ipv6_dadtransmits(const char *);
 
 #endif

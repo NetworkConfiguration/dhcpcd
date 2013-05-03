@@ -308,7 +308,7 @@ ipv6rs_freedrop_addrs(struct ra *rap, int drop)
 		/* Only drop the address if no other RAs have assigned it.
 		 * This is safe because the RA is removed from the list
 		 * before we are called. */
-		if (drop && (options & DHCPCD_IPV6RA_OWN) &&
+		if (drop && ap->added &&
 		    !IN6_IS_ADDR_UNSPECIFIED(&ap->addr) &&
 		    !ipv6rs_addrexists(ap) && !dhcp6_addrexists(ap))
 		{
@@ -391,6 +391,23 @@ add_router(struct ra *router)
 		}
 	}
 	TAILQ_INSERT_HEAD(&ipv6_routers, router, next);
+}
+
+static void
+ipv6rs_dadcallback(void *arg)
+{
+	struct ipv6_addr *ap = arg;
+
+	ipv6ns_cancelprobeaddr(ap);
+	ap->dadcompleted = 1;
+	if (ap->dad)
+		/* No idea what how to try and make another address :( */
+		syslog(LOG_WARNING, "%s: DAD detected %s",
+		    ap->iface->name, ap->saddr);
+#ifdef IPV6_SEND_DAD
+	else
+		ipv6_addaddr(ap);
+#endif
 }
 
 /* ARGSUSED */
@@ -620,13 +637,15 @@ ipv6rs_handledata(__unused void *arg)
 				    !(pi->nd_opt_pi_flags_reserved &
 				    ND_OPT_PI_FLAG_ONLINK))
 					break;
-				ap = malloc(sizeof(*ap));
+				ap = calloc(1, sizeof(*ap));
 				if (ap == NULL) {
 					syslog(LOG_ERR, "%s: %m", __func__);
 					break;
 				}
+				ap->iface = rap->iface;
 				ap->new = 1;
 				ap->onlink = 0;
+				ap->autoconf = 1;
 				ap->prefix_len = pi->nd_opt_pi_prefix_len;
 				memcpy(ap->prefix.s6_addr,
 				   pi->nd_opt_pi_prefix.s6_addr,
@@ -651,14 +670,16 @@ ipv6rs_handledata(__unused void *arg)
 					memset(&ap->addr, 0, sizeof(ap->addr));
 					ap->saddr[0] = '\0';
 				}
+				ap->dadcallback = ipv6rs_dadcallback;
 				TAILQ_INSERT_TAIL(&rap->addrs, ap, next);
 			} else if (ap->prefix_vltime !=
 			    ntohl(pi->nd_opt_pi_valid_time) ||
 			    ap->prefix_pltime !=
-			    ntohl(pi->nd_opt_pi_preferred_time))
+			    ntohl(pi->nd_opt_pi_preferred_time) ||
+			    ap->dad)
+			{
 				ap->new = 1;
-			else
-				ap->new = 0;
+			}
 			if (pi->nd_opt_pi_flags_reserved &
 			    ND_OPT_PI_FLAG_ONLINK)
 				ap->onlink = 1;
@@ -666,6 +687,8 @@ ipv6rs_handledata(__unused void *arg)
 			    ntohl(pi->nd_opt_pi_valid_time);
 			ap->prefix_pltime =
 			    ntohl(pi->nd_opt_pi_preferred_time);
+			ap->nsprobes = 0;
+			ap->dad = 0;
 			if (opt) {
 				l = strlen(opt);
 				tmp = realloc(opt,
@@ -806,12 +829,12 @@ ipv6rs_handledata(__unused void *arg)
 
 	if (new_rap)
 		add_router(rap);
-	if (options & DHCPCD_IPV6RA_OWN && !(options & DHCPCD_TEST))
-		ipv6_addaddrs(ifp, &rap->addrs);
 	if (options & DHCPCD_TEST) {
 		script_runreason(ifp, "TEST");
 		goto handle_flag;
 	}
+	if (options & DHCPCD_IPV6RA_OWN)
+		ipv6ns_probeaddrs(&rap->addrs);
 	ipv6_buildroutes();
 	/* We will get run by the expire function */
 	if (rap->lifetime)
@@ -837,7 +860,7 @@ ipv6rs_handledata(__unused void *arg)
 	    ifp->options->options & DHCPCD_IPV6RA_OWN_DEFAULT)
 	{
 		rap->nsprobes = 0;
-		ipv6ns_sendprobe(rap);
+		ipv6ns_proberouter(rap);
 	}
 
 handle_flag:
@@ -1074,6 +1097,7 @@ ipv6rs_expire(void *arg)
 					syslog(LOG_INFO,
 					    "%s: %s: expired address",
 					    ifp->name, ap->saddr);
+					eloop_timeout_delete(NULL, ap);
 					TAILQ_REMOVE(&rap->addrs, ap, next);
 					free(ap);
 					/* No need to delete it as the kernel
@@ -1199,27 +1223,4 @@ ipv6rs_drop(struct interface *ifp)
 		}
 		script_runreason(ifp, "ROUTERADVERT");
 	}
-}
-
-int
-ipv6rs_init(void)
-{
-	int fd;
-
-	fd = ipv6rs_open();
-	if (fd == -1) {
-		syslog(LOG_ERR, "ipv6rs: %m");
-		options &= ~(DHCPCD_IPV6RS |
-			DHCPCD_IPV6RA_OWN | DHCPCD_IPV6RA_OWN_DEFAULT);
-		return -1;
-	}
-
-	eloop_event_add(fd, ipv6rs_handledata, NULL);
-	// atexit(restore_rtadv);
-
-	if (options & DHCPCD_IPV6RA_OWN ||
-	    options & DHCPCD_IPV6RA_OWN_DEFAULT)
-		return ipv6ns_init();
-
-	return 0;
 }

@@ -57,7 +57,7 @@ struct ra {
 	uint32_t mtu;
 	struct ipv6_addrhead addrs;
 	TAILQ_HEAD(, ra_opt) options;
-	
+
 	unsigned char *ns;
 	size_t nslen;
 	int nsprobes;
@@ -76,7 +76,6 @@ struct rs_state {
 #define RS_STATE(a) ((struct rs_state *)(ifp)->if_data[IF_DATA_IPV6RS])
 
 #ifdef INET6
-int ipv6rs_init(void);
 int ipv6rs_start(struct interface *);
 ssize_t ipv6rs_env(char **, const char *, const struct interface *);
 const struct ipv6_addr * ipv6rs_findprefix(const struct ipv6_addr *);
@@ -89,7 +88,6 @@ void ipv6rs_expire(void *arg);
 int ipv6rs_has_ra(const struct interface *);
 void ipv6rs_drop(struct interface *);
 #else
-#define ipv6rs_init() {}
 #define ipv6rs_start(a) {}
 #define ipv6rs_free(a)
 #define ipv6rs_has_ra(a) 0

@@ -33,9 +33,11 @@
 
 #define MAX_REACHABLE_TIME	3600	/* seconds */
 #define REACHABLE_TIME		30	/* seconds */
-#define RETRANS_TIMER		1	/* second */
+#define RETRANS_TIMER		1000	/* milliseconds */
 #define DELAY_FIRST_PROBE_TIME	5	/* seconds */
 
-int ipv6ns_init(void);
-void ipv6ns_sendprobe(void *);
+void ipv6ns_probeaddr(void *);
+ssize_t ipv6ns_probeaddrs(struct ipv6_addrhead *);
+void ipv6ns_cancelprobeaddr(struct ipv6_addr *);
+void ipv6ns_proberouter(void *);
 #endif

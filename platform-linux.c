@@ -245,3 +245,17 @@ forward:
 	}
 	return 1;
 }
+
+int
+ipv6_dadtransmits(const char *ifname)
+{
+	char path[256];
+	int r;
+
+	if (ifname == NULL)
+		ifname = "default";
+
+	snprintf(path, sizeof(path), "%s/%s/dad_transmits", prefix, ifname);
+	r = check_proc_int(path);
+	return r < 0 ? 0 : r;
+}

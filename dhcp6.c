@@ -25,6 +25,8 @@
  * SUCH DAMAGE.
  */
 
+/* TODO: We should decline dupliate addresses detected */
+
 #include <sys/stat.h>
 #include <sys/utsname.h>
 
@@ -50,6 +52,7 @@
 #include "dhcp6.h"
 #include "duid.h"
 #include "eloop.h"
+#include "ipv6ns.h"
 #include "ipv6rs.h"
 #include "platform.h"
 #include "script.h"
@@ -1030,6 +1033,24 @@ dhcp6_addrexists(const struct ipv6_addr *a)
 	return 0;
 }
 
+static void
+dhcp6_dadcallback(void *arg)
+{
+	struct ipv6_addr *ap = arg;
+
+	ipv6ns_cancelprobeaddr(ap);
+	ap->dadcompleted = 1;
+	if (ap->dad)
+		/* XXX FIXME
+		 * We should decline the address */
+		syslog(LOG_WARNING, "%s: DAD detected %s",
+		    ap->iface->name, ap->saddr);
+#ifdef IPV6_SEND_DAD
+	else
+		ipv6_addaddr(ap);
+#endif
+}
+
 static int
 dhcp6_findna(struct interface *ifp, const uint8_t *iaid,
     const uint8_t *d, size_t l)
@@ -1063,8 +1084,10 @@ dhcp6_findna(struct interface *ifp, const uint8_t *iaid,
 			syslog(LOG_ERR, "%s: %m", __func__);
 			break;
 		}
+		a->iface = ifp;
 		a->new = 1;
 		a->onlink = 1; /* XXX: suprised no DHCP opt for this */
+		a->dadcallback = dhcp6_dadcallback;
 		memcpy(a->iaid, iaid, sizeof(a->iaid));
 		p = D6_COPTION_DATA(o);
 		memcpy(&a->addr.s6_addr, p,
@@ -1135,8 +1158,10 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			syslog(LOG_ERR, "%s: %m", __func__);
 			break;
 		}
+		a->iface = ifp;
 		a->new = 1;
 		a->onlink = 0;
+		a->dadcallback = dhcp6_dadcallback;
 		memcpy(a->iaid, iaid, sizeof(a->iaid));
 		p = D6_COPTION_DATA(o);
 		memcpy(&u32, p, sizeof(u32));
@@ -1410,9 +1435,10 @@ dhcp6_delegate_addr(struct interface *ifp, const struct ipv6_addr *prefix,
 		syslog(LOG_ERR, "%s: %m", __func__);
 		return NULL;
 	}
-
+	a->iface = ifp;
 	a->new = 1;
 	a->onlink = 1;
+	a->dadcallback = dhcp6_dadcallback;
 	a->delegating_iface = ifs;
 	memcpy(&a->iaid, &prefix->iaid, sizeof(a->iaid));
 	a->prefix_pltime = prefix->prefix_pltime;
@@ -1486,7 +1512,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 		}
 		if (k) {
 			ifd_state = D6_STATE(ifd);
-			ipv6_addaddrs(ifd, &ifd_state->addrs);
+			ipv6ns_probeaddrs(&ifd_state->addrs);
 		}
 	}
 }
@@ -1531,7 +1557,7 @@ dhcp6_find_delegates(struct interface *ifp)
 	if (k) {
 		syslog(LOG_INFO, "%s: adding delegated prefixes", ifp->name);
 		state = D6_STATE(ifp);
-		ipv6_addaddrs(ifp, &state->addrs);
+		ipv6ns_probeaddrs(&state->addrs);
 		ipv6_buildroutes();
 	}
 	return k;
@@ -1783,7 +1809,7 @@ recv:
 			    dhcp6_startexpire, ifp);
 		if (ifp->options->ia_type == D6_OPTION_IA_PD)
 			dhcp6_delegate_prefix(ifp);
-		ipv6_addaddrs(ifp, &state->addrs);
+		ipv6ns_probeaddrs(&state->addrs);
 		if (state->renew || state->rebind)
 			syslog(LOG_INFO,
 			    "%s: renew in %u seconds, rebind in %u seconds",
