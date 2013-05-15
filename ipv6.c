@@ -28,7 +28,13 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
+#include <net/route.h>
 #include <netinet/in.h>
+
+#ifdef __linux__
+#  include <asm/types.h> /* for systems with broken headers */
+#  include <linux/rtnetlink.h>
+#endif
 
 #include <errno.h>
 #include <ifaddrs.h>
@@ -283,6 +289,49 @@ ipv6_addaddrs(struct ipv6_addrhead *addrs)
 	}
 
 	return i;
+}
+
+void
+ipv6_handleifa(int cmd, const char *ifname, const struct in6_addr *addr)
+{
+
+	ipv6rs_handleifa(cmd, ifname, addr);
+	dhcp6_handleifa(cmd, ifname, addr);
+}
+
+int
+ipv6_handleifa_addrs(int cmd,
+    struct ipv6_addrhead *addrs, const struct in6_addr *addr)
+{
+	struct ipv6_addr *ap, *apn;
+	uint8_t found, alldadcompleted;
+
+	alldadcompleted = 1;
+	found = 0;
+	TAILQ_FOREACH_SAFE(ap, addrs, next, apn) {
+		if (memcmp(addr->s6_addr, ap->addr.s6_addr,
+		    sizeof(addr->s6_addr)))
+		{
+			if (ap->dadcompleted == 0)
+				alldadcompleted = 0;
+			continue;
+		}
+		switch (cmd) {
+		case RTM_DELADDR:
+			syslog(LOG_INFO, "%s: deleted address %s",
+			    ap->iface->name, ap->saddr);
+			TAILQ_REMOVE(addrs, ap, next);
+			free(ap);
+			break;
+		case RTM_NEWADDR:
+			if (!ap->dadcompleted) {
+				found++;
+				ap->dadcompleted = 1;
+			}
+		}
+	}
+
+	return alldadcompleted ? found : 0;
 }
 
 static struct rt6 *

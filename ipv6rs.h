@@ -86,6 +86,7 @@ void ipv6rs_freedrop_ra(struct ra *, int);
 ssize_t ipv6rs_free(struct interface *);
 void ipv6rs_expire(void *arg);
 int ipv6rs_has_ra(const struct interface *);
+void ipv6rs_handleifa(int, const char *, const struct in6_addr *);
 void ipv6rs_drop(struct interface *);
 #else
 #define ipv6rs_start(a) {}

@@ -410,6 +410,50 @@ ipv6rs_dadcallback(void *arg)
 #endif
 }
 
+static void
+ipv6rs_scriptrun(const struct ra *rap)
+{
+	int alldadcomplete, hasdns;
+	const struct ipv6_addr *ap;
+	const struct ra_opt *rao;
+
+	/* If all addresses have completed DAD run the script */
+	alldadcomplete = 1;
+	TAILQ_FOREACH(ap, &rap->addrs, next) {
+		if (ap->dadcompleted == 0)
+			return;
+	}
+
+	/* If we don't require RDNSS then set hasdns = 1 so we fork */
+	if (!(rap->iface->options->options & DHCPCD_IPV6RA_REQRDNSS))
+		hasdns = 1;
+	else {
+		hasdns = 0;
+		TAILQ_FOREACH(rao, &rap->options, next) {
+			if (rao->type == ND_OPT_RDNSS &&
+			    rao->option &&
+			    timerisset(&rao->expire))
+			{
+				hasdns = 1;
+				break;
+			}
+		}
+	}
+
+	script_runreason(rap->iface, "ROUTERADVERT");
+	if (hasdns)
+		daemonise();
+#if 0
+	else if (options & DHCPCD_DAEMONISE &&
+	    !(options & DHCPCD_DAEMONISED) && new_data)
+		syslog(LOG_WARNING,
+		    "%s: did not fork due to an absent"
+		    " RDNSS option in the RA",
+		    ifp->name);
+}
+#endif
+}
+
 /* ARGSUSED */
 static void
 ipv6rs_handledata(__unused void *arg)
@@ -437,7 +481,7 @@ ipv6rs_handledata(__unused void *arg)
 	struct ipv6_addr *ap;
 	char *opt, *tmp;
 	struct timeval expire;
-	uint8_t has_dns, new_rap, new_data;
+	uint8_t new_rap, new_data;
 
 	len = recvmsg(sock, &rcvhdr, 0);
 	if (len == -1) {
@@ -578,7 +622,6 @@ ipv6rs_handledata(__unused void *arg)
 	p = ((uint8_t *)icp) + sizeof(struct nd_router_advert);
 	olen = 0;
 	lifetime = ~0U;
-	has_dns = 0;
 	for (olen = 0; len > 0; p += olen, len -= olen) {
 		if ((size_t)len < sizeof(struct nd_opt_hdr)) {
 			syslog(LOG_ERR, "%s: Short option", ifp->name);
@@ -746,8 +789,6 @@ ipv6rs_handledata(__unused void *arg)
 						l -= (m + 1);
 						tmp += m;
 						*tmp++ = ' ';
-						if (lifetime > 0)
-							has_dns = 1;
 					}
 				}
 				if (tmp != opt)
@@ -836,23 +877,13 @@ ipv6rs_handledata(__unused void *arg)
 	if (options & DHCPCD_IPV6RA_OWN)
 		ipv6ns_probeaddrs(&rap->addrs);
 	ipv6_buildroutes();
+
 	/* We will get run by the expire function */
 	if (rap->lifetime)
-		script_runreason(ifp, "ROUTERADVERT");
-
-	/* If we don't require RDNSS then set has_dns = 1 so we fork */
-	if (!(ifp->options->options & DHCPCD_IPV6RA_REQRDNSS))
-		has_dns = 1;
+		ipv6rs_scriptrun(rap);
 
 	eloop_timeout_delete(NULL, ifp);
 	eloop_timeout_delete(NULL, rap); /* reachable timer */
-	if (has_dns)
-		daemonise();
-	else if (options & DHCPCD_DAEMONISE &&
-	    !(options & DHCPCD_DAEMONISED) && new_data)
-		syslog(LOG_WARNING,
-		    "%s: did not fork due to an absent RDNSS option in the RA",
-		    ifp->name);
 
 	/* If we're owning the RA then we need to try and ensure the
 	 * router is actually reachable */
@@ -1048,6 +1079,25 @@ ipv6rs_findsameaddr(const struct ipv6_addr *ap)
 		}
 	}
 	return NULL;
+}
+
+void
+ipv6rs_handleifa(int cmd, const char *ifname, const struct in6_addr *addr)
+{
+	struct ra *rap;
+	int found;
+
+	TAILQ_FOREACH(rap, &ipv6_routers, next) {
+		if (strcmp(rap->iface->name, ifname))
+			continue;
+		found = ipv6_handleifa_addrs(cmd, &rap->addrs, addr);
+		if (found && rap->lifetime) {
+			syslog(LOG_DEBUG,
+			    "%s: IPv6 Router Advertisement DAD completed",
+			    rap->iface->name);
+			ipv6rs_scriptrun(rap);
+		}
+	}
 }
 
 void

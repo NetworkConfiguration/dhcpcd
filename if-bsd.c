@@ -71,10 +71,13 @@
 #define RT_ADVANCE(x, n) (x += RT_ROUNDUP((n)->sa_len))
 #endif
 
-/* FIXME: Why do we need to check for sa_family 255 */
 #define COPYOUT(sin, sa)						      \
 	sin.s_addr = ((sa) != NULL) ?					      \
 	    (((struct sockaddr_in *)(void *)sa)->sin_addr).s_addr : 0
+
+#define COPYOUT6(sin, sa)						      \
+	sin.s6_addr = ((sa) != NULL) ?					      \
+	    (((struct sockaddr_in6 *)(void *)sa)->sin6_addr).s6_addr : 0
 
 static int r_fd = -1;
 static char *link_buf;
@@ -478,6 +481,10 @@ manage_link(int fd)
 	struct sockaddr_dl sdl;
 	unsigned char *hwaddr;
 #endif
+#ifdef INET6
+	struct in6_addr ia6;
+	struct sockaddr_in6 *sin6;
+#endif
 
 	for (;;) {
 		if (ioctl(fd, FIONREAD, &len) == -1)
@@ -597,6 +604,17 @@ manage_link(int fd)
 					COPYOUT(rt.gate, rti_info[RTAX_BRD]);
 					ipv4_handleifa(rtm->rtm_type, ifname,
 					    &rt.dest, &rt.net, &rt.gate);
+					break;
+#endif
+#ifdef INET6
+				case AF_INET6:
+					sin6 = (struct sockaddr_in6*)
+					    rti_info[RTAX_IFA];
+					memcpy(ia6.s6_addr,
+					    sin6->sin6_addr.s6_addr,
+					    sizeof(ia6.s6_addr));
+					ipv6_handleifa(rtm->rtm_type, ifname,
+					    &ia6);
 					break;
 #endif
 				}

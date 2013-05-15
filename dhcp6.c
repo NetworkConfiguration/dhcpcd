@@ -1559,6 +1559,7 @@ dhcp6_find_delegates(struct interface *ifp)
 	if (k) {
 		syslog(LOG_INFO, "%s: adding delegated prefixes", ifp->name);
 		state = D6_STATE(ifp);
+		state->state = DH6S_DELEGATED;
 		ipv6ns_probeaddrs(&state->addrs);
 		ipv6_buildroutes();
 	}
@@ -1577,7 +1578,6 @@ dhcp6_handledata(__unused void *arg)
 	struct dhcp6_message *r;
 	struct dhcp6_state *state;
 	const struct dhcp6_option *o;
-	const char *reason;
 	const struct dhcp_opt *opt;
 	const struct if_options *ifo;
 	const struct ipv6_addr *ap;
@@ -1638,7 +1638,8 @@ dhcp6_handledata(__unused void *arg)
 	    r->xid[2] != state->send->xid[2])
 	{
 		syslog(LOG_ERR,
-		    "%s: wrong xid 0x%02x%02x%02x (expecting 0x%02x%02x%02x) from %s",
+		    "%s: wrong xid 0x%02x%02x%02x"
+		    " (expecting 0x%02x%02x%02x) from %s",
 		    ifp->name,
 		    r->xid[0], r->xid[1], r->xid[2],
 		    state->send->xid[0], state->send->xid[1],
@@ -1746,7 +1747,7 @@ replyok:
 recv:
 	syslog(LOG_INFO, "%s: %s received from %s", ifp->name, op, sfrom);
 
-	reason = NULL;
+	state->reason = NULL;
 	eloop_timeout_delete(NULL, ifp);
 	switch(state->state) {
 	case DH6S_INFORM:
@@ -1754,22 +1755,22 @@ recv:
 		state->rebind = 0;
 		state->expire = ~0U;
 		state->lowpl = ~0U;
-		reason = "INFORM6";
+		state->reason = "INFORM6";
 		break;
 	case DH6S_REQUEST:
-		if (reason == NULL)
-			reason = "BOUND6";
+		if (state->reason == NULL)
+			state->reason = "BOUND6";
 		/* FALLTHROUGH */
 	case DH6S_RENEW:
-		if (reason == NULL)
-			reason = "RENEW6";
+		if (state->reason == NULL)
+			state->reason = "RENEW6";
 		/* FALLTHROUGH */
 	case DH6S_REBIND:
-		if (reason == NULL)
-			reason = "REBIND6";
+		if (state->reason == NULL)
+			state->reason = "REBIND6";
 	case DH6S_CONFIRM:
-		if (reason == NULL)
-			reason = "REBOOT6";
+		if (state->reason == NULL)
+			state->reason = "REBOOT6";
 		if (state->renew == 0) {
 			if (state->expire == ~0U)
 				state->renew = ~0U;
@@ -1784,7 +1785,7 @@ recv:
 		}
 		break;
 	default:
-		reason = "UNKNOWN6";
+		state->reason = "UNKNOWN6";
 		break;
 	}
 
@@ -1798,7 +1799,11 @@ recv:
 		state->recv_len = 0;
 	}
 
-	if (!(options & DHCPCD_TEST)) {
+	if (options & DHCPCD_TEST)
+		script_runreason(ifp, "TEST");
+	else {
+		if (state->state == DH6S_INFORM)
+			script_runreason(ifp, state->reason);
 		state->state = DH6S_BOUND;
 		if (state->renew)
 			eloop_timeout_add_sec(state->renew,
@@ -1818,9 +1823,23 @@ recv:
 			    ifp->name, state->renew, state->rebind);
 		ipv6_buildroutes();
 		dhcp6_writelease(ifp);
+
+		len = 1;
+		/* If all addresses have completed DAD run the script */
+		TAILQ_FOREACH(ap, &state->addrs, next) {
+			if (ap->dadcompleted == 0) {
+				len = 0;
+				break;
+			}
+		}
+		if (len) {
+			script_runreason(ifp, state->reason);
+			daemonise();
+		} else
+			syslog(LOG_DEBUG, "%s: waiting for RA DAD to complete",
+			    ifp->name);
 	}
 
-	script_runreason(ifp, options & DHCPCD_TEST ? "TEST" : reason);
 	if (options & DHCPCD_TEST ||
 	    (ifp->options->options & DHCPCD_INFORM &&
 	    !(options & DHCPCD_MASTER)))
@@ -1830,7 +1849,6 @@ recv:
 #endif
 		exit(EXIT_SUCCESS);
 	}
-	daemonise();
 }
 
 static int
@@ -1920,10 +1938,8 @@ dhcp6_start(struct interface *ifp, int manage)
 		return -1;
 
 	TAILQ_INIT(&state->addrs);
-	if (dhcp6_find_delegates(ifp)) {
-		state->state = DH6S_DELEGATED;
+	if (dhcp6_find_delegates(ifp))
 		return 0;
-	}
 
 	syslog(LOG_INFO, "%s: %s", ifp->name,
 	    manage ? "soliciting DHCPv6 address" :
@@ -1995,6 +2011,27 @@ dhcp6_free(struct interface *ifp)
 {
 
 	dhcp6_freedrop(ifp, 0, NULL);
+}
+
+void
+dhcp6_handleifa(int cmd, const char *ifname, const struct in6_addr *addr)
+{
+	struct interface *ifp;
+	struct dhcp6_state *state;
+	int found;
+
+	TAILQ_FOREACH(ifp, ifaces, next) {
+		state = D6_STATE(ifp);
+		if (state == NULL || strcmp(ifp->name, ifname))
+			continue;
+		found = ipv6_handleifa_addrs(cmd, &state->addrs, addr);
+		if (found && state->state == DH6S_BOUND) {
+			syslog(LOG_DEBUG, "%s: DHCPv6 DAD completed",
+			    ifp->name);
+			script_runreason(ifp, state->reason);
+			daemonise();
+		}
+	}
 }
 
 ssize_t

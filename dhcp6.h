@@ -1,4 +1,4 @@
-/* 
+/*
  * dhcpcd - DHCP client daemon
  * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
  * All rights reserved
@@ -180,6 +180,7 @@ struct dhcp6_state {
 	struct ipv6_addrhead addrs;
 	uint32_t lowpl;
 	char leasefile[PATH_MAX];
+	const char *reason;
 };
 
 #define D6_STATE(ifp)							       \
@@ -212,6 +213,7 @@ int dhcp6_start(struct interface *, int);
 ssize_t dhcp6_env(char **, const char *, const struct interface *,
     const struct dhcp6_message *, ssize_t);
 void dhcp6_free(struct interface *);
+void dhcp6_handleifa(int, const char *, const struct in6_addr *addr);
 void dhcp6_drop(struct interface *, const char *);
 #else
 #define dhcp6_printoptions()

@@ -55,8 +55,8 @@
 #include "ipv6ns.h"
 #include "script.h"
 
-#define MIN_RANDOM_FACTOR	500				/* milliseconds */
-#define MAX_RANDOM_FACTOR	1500				/* milliseconds */
+#define MIN_RANDOM_FACTOR	500				/* millisecs */
+#define MAX_RANDOM_FACTOR	1500				/* millisecs */
 #define MIN_RANDOM_FACTOR_U	MIN_RANDOM_FACTOR * 1000	/* usecs */
 #define MAX_RANDOM_FACTOR_U	MAX_RANDOM_FACTOR * 1000	/* usecs */
 

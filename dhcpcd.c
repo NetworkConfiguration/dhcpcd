@@ -457,7 +457,10 @@ init_state(struct interface *ifp, int argc, char **argv)
 	configure_interface(ifp, argc, argv);
 	ifo = ifp->options;
 
-	if (ifo->options & DHCPCD_LINK && linkfd == -1) {
+	/* RTM_NEWADDR goes through the link socket as well which we
+	 * need for IPv6 DAD, so we check for DHCPCD_LINK in handle_carrier
+	 * instead */
+	if (linkfd == -1) {
 		linkfd = open_link_socket();
 		if (linkfd == -1) {
 			syslog(LOG_ERR, "open_link_socket: %m");
