@@ -29,6 +29,7 @@
 #define DHCPCD_H
 
 #include <sys/queue.h>
+#include <sys/socket.h>
 #include <net/if.h>
 
 #include "control.h"
