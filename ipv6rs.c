@@ -413,12 +413,11 @@ ipv6rs_dadcallback(void *arg)
 static void
 ipv6rs_scriptrun(const struct ra *rap)
 {
-	int alldadcomplete, hasdns;
+	int hasdns;
 	const struct ipv6_addr *ap;
 	const struct ra_opt *rao;
 
 	/* If all addresses have completed DAD run the script */
-	alldadcomplete = 1;
 	TAILQ_FOREACH(ap, &rap->addrs, next) {
 		if (ap->dadcompleted == 0)
 			return;
