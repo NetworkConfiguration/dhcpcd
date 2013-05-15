@@ -142,7 +142,15 @@ open_link_socket(void)
 	struct sockaddr_nl snl;
 
 	memset(&snl, 0, sizeof(snl));
-	snl.nl_groups = RTMGRP_LINK | RTMGRP_IPV4_ROUTE | RTMGRP_IPV4_IFADDR;
+	snl.nl_groups = RTMGRP_LINK;
+
+#ifdef INET
+	snl.nl_groups |= RTMGRP_IPV4_ROUTE | RTMGRP_IPV4_IFADDR;
+#endif
+#ifdef INET6
+	snl.nl_groups |= RTMGRP_IPV6_ROUTE | RTMGRP_IPV6_IFADDR;
+#endif
+
 	return _open_link_socket(&snl);
 }
 
@@ -304,13 +312,17 @@ link_route(struct nlmsghdr *nlm)
 static int
 link_addr(struct nlmsghdr *nlm)
 {
-#ifdef INET
 	int len;
 	struct rtattr *rta;
 	struct ifaddrmsg *ifa;
-	struct in_addr addr, net, dest;
 	char ifn[IF_NAMESIZE + 1];
 	struct interface *iface;
+#ifdef INET
+	struct in_addr addr, net, dest;
+#endif
+#ifdef INET6
+	struct in6_addr addr6;
+#endif
 
 	if (nlm->nlmsg_type != RTM_DELADDR && nlm->nlmsg_type != RTM_NEWADDR)
 		return 0;
@@ -330,26 +342,46 @@ link_addr(struct nlmsghdr *nlm)
 		return 1;
 	rta = (struct rtattr *) IFA_RTA(ifa);
 	len = NLMSG_PAYLOAD(nlm, sizeof(*ifa));
-	addr.s_addr = dest.s_addr = INADDR_ANY;
-	dest.s_addr = INADDR_ANY;
-	inet_cidrtoaddr(ifa->ifa_prefixlen, &net);
-	while (RTA_OK(rta, len)) {
-		switch (rta->rta_type) {
-		case IFA_ADDRESS:
-			if (iface->flags & IFF_POINTOPOINT) {
-				memcpy(&dest.s_addr, RTA_DATA(rta),
-				    sizeof(addr.s_addr));
+	switch (ifa->ifa_family) {
+#ifdef INET
+	case AF_INET:
+		addr.s_addr = dest.s_addr = INADDR_ANY;
+		dest.s_addr = INADDR_ANY;
+		inet_cidrtoaddr(ifa->ifa_prefixlen, &net);
+		while (RTA_OK(rta, len)) {
+			switch (rta->rta_type) {
+			case IFA_ADDRESS:
+				if (iface->flags & IFF_POINTOPOINT) {
+					memcpy(&dest.s_addr, RTA_DATA(rta),
+					       sizeof(addr.s_addr));
+				}
+				break;
+			case IFA_LOCAL:
+				memcpy(&addr.s_addr, RTA_DATA(rta),
+				       sizeof(addr.s_addr));
+				break;
 			}
-			break;
-		case IFA_LOCAL:
-			memcpy(&addr.s_addr, RTA_DATA(rta),
-			    sizeof(addr.s_addr));
-			break;
+			rta = RTA_NEXT(rta, len);
 		}
-		rta = RTA_NEXT(rta, len);
-	}
-	ipv4_handleifa(nlm->nlmsg_type, ifn, &addr, &net, &dest);
+		ipv4_handleifa(nlm->nlmsg_type, ifn, &addr, &net, &dest);
+		break;
 #endif
+#ifdef INET6
+	case AF_INET6:
+		memset(&addr6, 0, sizeof(addr6));
+		while (RTA_OK(rta, len)) {
+			switch (rta->rta_type) {
+			case IFA_ADDRESS:
+				memcpy(&addr6.s6_addr, RTA_DATA(rta),
+				       sizeof(addr6.s6_addr));
+				break;
+			}
+			rta = RTA_NEXT(rta, len);
+		}
+		ipv6_handleifa(nlm->nlmsg_type, ifn, &addr6);
+		break;
+#endif
+	}
 	return 1;
 }
 
