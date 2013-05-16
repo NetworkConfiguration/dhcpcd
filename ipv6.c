@@ -34,6 +34,11 @@
 #ifdef __linux__
 #  include <asm/types.h> /* for systems with broken headers */
 #  include <linux/rtnetlink.h>
+   /* Match Linux defines to BSD */
+#  define IN6_IFF_TENTATIVE	IFA_F_TENTATIVE | IFA_F_OPTIMISTIC
+#  define IN6_IFF_DUPLICATED	IFA_F_DADFAILED
+#else
+#  include <netinet6/in6_var.h>
 #endif
 
 #include <errno.h>
@@ -292,16 +297,17 @@ ipv6_addaddrs(struct ipv6_addrhead *addrs)
 }
 
 void
-ipv6_handleifa(int cmd, const char *ifname, const struct in6_addr *addr)
+ipv6_handleifa(int cmd, const char *ifname,
+    const struct in6_addr *addr, int flags)
 {
 
-	ipv6rs_handleifa(cmd, ifname, addr);
-	dhcp6_handleifa(cmd, ifname, addr);
+	ipv6rs_handleifa(cmd, ifname, addr, flags);
+	dhcp6_handleifa(cmd, ifname, addr, flags);
 }
 
 int
 ipv6_handleifa_addrs(int cmd,
-    struct ipv6_addrhead *addrs, const struct in6_addr *addr)
+    struct ipv6_addrhead *addrs, const struct in6_addr *addr, int flags)
 {
 	struct ipv6_addr *ap, *apn;
 	uint8_t found, alldadcompleted;
@@ -324,8 +330,17 @@ ipv6_handleifa_addrs(int cmd,
 			free(ap);
 			break;
 		case RTM_NEWADDR:
+			/* Safety - ignore tentative announcements */
+			if (flags & IN6_IFF_TENTATIVE)
+				break;
 			if (!ap->dadcompleted) {
 				found++;
+				if (flags & IN6_IFF_DUPLICATED && ap->dad == 0)
+					ap->dad = 1;
+				if (ap->dadcallback)
+					ap->dadcallback(ap);
+				/* We need to set this here in-case the
+				 * dadcallback function checks it */
 				ap->dadcompleted = 1;
 			}
 		}

@@ -38,6 +38,11 @@
 
 void ipv6ns_probeaddr(void *);
 ssize_t ipv6ns_probeaddrs(struct ipv6_addrhead *);
-void ipv6ns_cancelprobeaddr(struct ipv6_addr *);
 void ipv6ns_proberouter(void *);
+
+#ifdef LISTEN_DAD
+void ipv6ns_cancelprobeaddr(struct ipv6_addr *);
+#else
+#define ipv6ns_cancelprobeaddr(a)
+#endif
 #endif

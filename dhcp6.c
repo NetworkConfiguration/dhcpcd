@@ -1039,7 +1039,11 @@ static void
 dhcp6_dadcallback(void *arg)
 {
 	struct ipv6_addr *ap = arg;
+	struct interface *ifp;
+	struct dhcp6_state *state;
+	int wascompleted;
 
+	wascompleted = ap->dadcompleted;
 	ipv6ns_cancelprobeaddr(ap);
 	ap->dadcompleted = 1;
 	if (ap->dad)
@@ -1047,10 +1051,29 @@ dhcp6_dadcallback(void *arg)
 		 * We should decline the address */
 		syslog(LOG_WARNING, "%s: DAD detected %s",
 		    ap->iface->name, ap->saddr);
-#ifdef IPV6_SEND_DAD
 	else
+#ifdef IPV6_SEND_DAD
 		ipv6_addaddr(ap);
 #endif
+
+	if (!wascompleted) {
+		ifp = ap->iface;
+		state = D6_STATE(ifp);
+		if (state->state == DH6S_BOUND) {
+			TAILQ_FOREACH(ap, &state->addrs, next) {
+				if (!ap->dadcompleted) {
+					wascompleted = 1;
+					break;
+				}
+			}
+			if (!wascompleted) {
+				syslog(LOG_DEBUG, "%s: DHCPv6 DAD completed",
+				    ifp->name);
+				script_runreason(ifp, state->reason);
+				daemonise();
+			}
+		}
+	}
 }
 
 static int
@@ -1836,7 +1859,8 @@ recv:
 			script_runreason(ifp, state->reason);
 			daemonise();
 		} else
-			syslog(LOG_DEBUG, "%s: waiting for RA DAD to complete",
+			syslog(LOG_DEBUG, "%s: waiting for DHCPv6 DAD"
+			    " to complete",
 			    ifp->name);
 	}
 
@@ -2014,23 +2038,17 @@ dhcp6_free(struct interface *ifp)
 }
 
 void
-dhcp6_handleifa(int cmd, const char *ifname, const struct in6_addr *addr)
+dhcp6_handleifa(int cmd, const char *ifname,
+    const struct in6_addr *addr, int flags)
 {
 	struct interface *ifp;
 	struct dhcp6_state *state;
-	int found;
 
 	TAILQ_FOREACH(ifp, ifaces, next) {
 		state = D6_STATE(ifp);
 		if (state == NULL || strcmp(ifp->name, ifname))
 			continue;
-		found = ipv6_handleifa_addrs(cmd, &state->addrs, addr);
-		if (found && state->state == DH6S_BOUND) {
-			syslog(LOG_DEBUG, "%s: DHCPv6 DAD completed",
-			    ifp->name);
-			script_runreason(ifp, state->reason);
-			daemonise();
-		}
+		ipv6_handleifa_addrs(cmd, &state->addrs, addr, flags);
 	}
 }
 

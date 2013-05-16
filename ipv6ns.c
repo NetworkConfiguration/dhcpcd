@@ -213,6 +213,7 @@ ipv6ns_unreachable(void *arg)
 	script_runreason(rap->iface, "ROUTERADVERT"); /* XXX not RA */
 }
 
+#ifdef LISTEN_DAD
 void
 ipv6ns_cancelprobeaddr(struct ipv6_addr *ap)
 {
@@ -221,6 +222,7 @@ ipv6ns_cancelprobeaddr(struct ipv6_addr *ap)
 	if (ap->dadcallback)
 		eloop_timeout_delete(ap->dadcallback, ap);
 }
+#endif
 
 void
 ipv6ns_probeaddr(void *arg)
@@ -234,10 +236,12 @@ ipv6ns_probeaddr(void *arg)
 	struct in6_pktinfo pi;
 	int hoplimit = HOPLIMIT;
 #else
+#ifdef LISTEN_DAD
+	struct timeval tv, rtv;
 	struct timeval mtv;
 	int i;
 #endif
-	struct timeval tv, rtv;
+#endif
 
 	if (ap->dadcallback &&
 	    (ap->new == 0 || ap->nsprobes >= ap->iface->options->dadtransmits))
@@ -335,9 +339,10 @@ ipv6ns_probeaddr(void *arg)
 		    ap);
 	}
 #else /* IPV6_SEND_DAD */
+	ipv6_addaddr(ap);
+#ifdef LISTEN_DAD
 	/* Let the kernel handle DAD.
 	 * We don't know the timings, so just wait for the max */
-	ipv6_addaddr(ap);
 	if (ap->dadcallback) {
 		mtv.tv_sec = 0;
 		mtv.tv_usec = 0;
@@ -349,6 +354,7 @@ ipv6ns_probeaddr(void *arg)
 		}
 		eloop_timeout_add_tv(&mtv, ap->dadcallback, ap);
 	}
+#endif
 #endif /* IPV6_SEND_DAD */
 }
 
@@ -472,8 +478,11 @@ ipv6ns_handledata(__unused void *arg)
 	int found;
 #endif
 	struct timeval tv;
+
+#ifdef LISTEN_DAD
 	struct dhcp6_state *d6state;
 	struct ipv6_addr *ap;
+#endif
 
 	len = recvmsg(sock, &rcvhdr, 0);
 	if (len == -1) {
@@ -551,6 +560,7 @@ ipv6ns_handledata(__unused void *arg)
 		if (memcmp(rap->from.s6_addr, nd_na->nd_na_target.s6_addr,
 		    sizeof(rap->from.s6_addr)) == 0)
 			break;
+#ifdef LISTEN_DAD
 		TAILQ_FOREACH(ap, &rap->addrs, next) {
 			if (memcmp(ap->addr.s6_addr,
 			    nd_na->nd_na_target.s6_addr,
@@ -564,8 +574,10 @@ ipv6ns_handledata(__unused void *arg)
 #endif
 			}
 		}
+#endif
 	}
 	if (rap == NULL) {
+#ifdef LISTEN_DAD
 		d6state = D6_STATE(ifp);
 		if (d6state) {
 			TAILQ_FOREACH(ap, &d6state->addrs, next) {
@@ -582,6 +594,7 @@ ipv6ns_handledata(__unused void *arg)
 				}
 			}
 		}
+#endif
 
 #ifdef DEBUG_NS
 		if (found == 0)

@@ -256,7 +256,7 @@ ipv6rs_sendprobe(void *arg)
 	cm->cmsg_len = CMSG_LEN(sizeof(hoplimit));
 	memcpy(CMSG_DATA(cm), &hoplimit, sizeof(hoplimit));
 
-	syslog(LOG_INFO, "%s: sending IPv6 Router Solicitation", ifp->name);
+	syslog(LOG_INFO, "%s: sending Router Solicitation", ifp->name);
 	if (sendmsg(sock, &sndhdr, 0) == -1) {
 		syslog(LOG_ERR, "%s: sendmsg: %m", ifp->name);
 		ipv6rs_drop(ifp);
@@ -394,23 +394,6 @@ add_router(struct ra *router)
 }
 
 static void
-ipv6rs_dadcallback(void *arg)
-{
-	struct ipv6_addr *ap = arg;
-
-	ipv6ns_cancelprobeaddr(ap);
-	ap->dadcompleted = 1;
-	if (ap->dad)
-		/* No idea what how to try and make another address :( */
-		syslog(LOG_WARNING, "%s: DAD detected %s",
-		    ap->iface->name, ap->saddr);
-#ifdef IPV6_SEND_DAD
-	else
-		ipv6_addaddr(ap);
-#endif
-}
-
-static void
 ipv6rs_scriptrun(const struct ra *rap)
 {
 	int hasdns;
@@ -419,8 +402,12 @@ ipv6rs_scriptrun(const struct ra *rap)
 
 	/* If all addresses have completed DAD run the script */
 	TAILQ_FOREACH(ap, &rap->addrs, next) {
-		if (ap->dadcompleted == 0)
+		if (ap->dadcompleted == 0) {
+			syslog(LOG_DEBUG, "%s: waiting for Router Advertisement"
+			    " DAD to complete",
+			    rap->iface->name);
 			return;
+		}
 	}
 
 	/* If we don't require RDNSS then set hasdns = 1 so we fork */
@@ -451,6 +438,52 @@ ipv6rs_scriptrun(const struct ra *rap)
 		    ifp->name);
 }
 #endif
+}
+
+static void
+ipv6rs_dadcallback(void *arg)
+{
+	struct ipv6_addr *ap = arg, *rapap;
+	struct interface *ifp;
+	struct ra *rap;
+	int wascompleted, found;
+
+	wascompleted = ap->dadcompleted;
+	ipv6ns_cancelprobeaddr(ap);
+	ap->dadcompleted = 1;
+	if (ap->dad)
+		/* No idea what how to try and make another address :( */
+		syslog(LOG_WARNING, "%s: DAD detected %s",
+		    ap->iface->name, ap->saddr);
+#ifdef IPV6_SEND_DAD
+	else
+		ipv6_addaddr(ap);
+#endif
+
+	if (!wascompleted) {
+		ifp = ap->iface;
+
+		TAILQ_FOREACH(rap, &ipv6_routers, next) {
+			if (rap->iface != ifp)
+				continue;
+			wascompleted = 1;
+			TAILQ_FOREACH(rapap, &rap->addrs, next) {
+				if (!rapap->dadcompleted) {
+					wascompleted = 0;
+					break;
+				}
+				if (rapap == ap)
+					found = 1;
+			}
+
+			if (wascompleted && found && rap->lifetime) {
+				syslog(LOG_DEBUG,
+				    "%s: Router Advertisement DAD completed",
+				    rap->iface->name);
+				ipv6rs_scriptrun(rap);
+			}
+		}
+	}
 }
 
 /* ARGSUSED */
@@ -1081,21 +1114,15 @@ ipv6rs_findsameaddr(const struct ipv6_addr *ap)
 }
 
 void
-ipv6rs_handleifa(int cmd, const char *ifname, const struct in6_addr *addr)
+ipv6rs_handleifa(int cmd, const char *ifname,
+    const struct in6_addr *addr, int flags)
 {
 	struct ra *rap;
-	int found;
 
 	TAILQ_FOREACH(rap, &ipv6_routers, next) {
 		if (strcmp(rap->iface->name, ifname))
 			continue;
-		found = ipv6_handleifa_addrs(cmd, &rap->addrs, addr);
-		if (found && rap->lifetime) {
-			syslog(LOG_DEBUG,
-			    "%s: IPv6 Router Advertisement DAD completed",
-			    rap->iface->name);
-			ipv6rs_scriptrun(rap);
-		}
+		ipv6_handleifa_addrs(cmd, &rap->addrs, addr, flags);
 	}
 }
 

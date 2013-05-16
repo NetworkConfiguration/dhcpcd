@@ -78,14 +78,16 @@ TAILQ_HEAD(rt6head, rt6);
 int ipv6_init(void);
 ssize_t ipv6_printaddr(char *, ssize_t, const uint8_t *, const char *);
 struct in6_addr *ipv6_linklocal(const char *);
-int ipv6_makeaddr(struct in6_addr *, const char *, const struct in6_addr *, int);
+int ipv6_makeaddr(struct in6_addr *, const char *,
+    const struct in6_addr *, int);
 int ipv6_makeprefix(struct in6_addr *, const struct in6_addr *, int);
 int ipv6_mask(struct in6_addr *, int);
 int ipv6_prefixlen(const struct in6_addr *);
 int ipv6_addaddr(struct ipv6_addr *);
 ssize_t ipv6_addaddrs(struct ipv6_addrhead *);
-void ipv6_handleifa(int, const char *, const struct in6_addr *);
-int ipv6_handleifa_addrs(int, struct ipv6_addrhead *, const struct in6_addr *);
+void ipv6_handleifa(int, const char *, const struct in6_addr *, int);
+int ipv6_handleifa_addrs(int, struct ipv6_addrhead *,
+    const struct in6_addr *, int);
 int ipv6_removesubnet(const struct interface *, struct ipv6_addr *);
 void ipv6_buildroutes(void);
 void ipv6_drop(struct interface *);

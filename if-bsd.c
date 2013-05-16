@@ -614,7 +614,7 @@ manage_link(int fd)
 					    sin6->sin6_addr.s6_addr,
 					    sizeof(ia6.s6_addr));
 					ipv6_handleifa(rtm->rtm_type, ifname,
-					    &ia6);
+					    &ia6, ifam->ifam_flags);
 					break;
 #endif
 				}
