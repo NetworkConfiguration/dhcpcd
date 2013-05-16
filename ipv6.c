@@ -35,7 +35,7 @@
 #  include <asm/types.h> /* for systems with broken headers */
 #  include <linux/rtnetlink.h>
    /* Match Linux defines to BSD */
-#  define IN6_IFF_TENTATIVE	IFA_F_TENTATIVE | IFA_F_OPTIMISTIC
+#  define IN6_IFF_TENTATIVE	(IFA_F_TENTATIVE | IFA_F_OPTIMISTIC)
 #  define IN6_IFF_DUPLICATED	IFA_F_DADFAILED
 #else
 #ifdef __FreeBSD__ /* Needed so that including netinet6/in6_var.h works */
