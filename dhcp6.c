@@ -699,6 +699,7 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 	dhcp6_updateelapsed(ifp, state->send, state->send_len);
 
 	to = alldhcp;
+	to.sin6_scope_id = ifp->index;
 	sndhdr.msg_name = (caddr_t)&to;
 	sndhdr.msg_iov[0].iov_base = (caddr_t)state->send;
 	sndhdr.msg_iov[0].iov_len = state->send_len;
