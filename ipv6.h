@@ -37,6 +37,32 @@
 
 #define ROUNDUP8(a) (1 + (((a) - 1) | 7))
 
+/*
+ * BSD kernels don't inform userland of DAD results.
+ * Also, for RTM_NEWADDR messages the address flags could be
+ * undefined leading to false positive duplicate address errors.
+ * As such we listen for duplicate addresses on the wire and
+ * wait the maxium possible length of time as dictated by the DAD transmission
+ * counter and RFC timings.
+ * See the discussion here:
+ *    http://mail-index.netbsd.org/tech-net/2013/03/15/msg004019.html
+ */
+#ifdef BSD
+#  define LISTEN_DAD
+#endif
+
+/* This was fixed in NetBSD */
+#ifdef __NetBSD_Prereq__
+#  if __NetBSD_Prereq__(6, 99, 20)
+#    undef LISTEN_DAD
+#  endif
+#endif
+
+#ifdef LISTEN_DAD
+#  warning kernel does not report DAD results to userland
+#  warning listening to duplicated addresses on the wire
+#endif
+
 struct ipv6_addr {
 	TAILQ_ENTRY(ipv6_addr) next;
 	struct interface *iface;

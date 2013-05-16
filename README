@@ -38,16 +38,6 @@ routes. You can find discussion here:
 BSD systems where this has been fixed are:
     NetBSD-5.0
 
-Some BSD systems announce IPv6 addresses to userland when the address has
-been added, not when it's actually ready to use. This is important because
-no kernel allows to send from the unspecified address which means userland
-cannot be RFC conformation when creating DAD messages so we need to rely on
-the kernel implementation.
-You can find the discussion here:
-    http://mail-index.netbsd.org/tech-net/2013/03/15/msg004019.html
-BSD systems where this will be fixed are:
-    NetBSD-7.0
-
 We try and detect how dhcpcd should interact with system services during the
 configure stage. If we cannot auto-detect how do to this, or it is wrong then
 you can change this by passing shell commands to --service-exists,

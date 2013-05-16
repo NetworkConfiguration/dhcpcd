@@ -164,6 +164,12 @@ ipv6ns_open(void)
 	atexit(ipv6ns_cleanup);
 #endif
 
+#ifdef LISTEN_DAD
+	syslog(LOG_WARNING, "kernel does not report DAD results to userland");
+	syslog(LOG_WARNING,
+	    "warning listening to duplicated addresses on the wire");
+#endif
+
 	len = CMSG_SPACE(sizeof(struct in6_pktinfo)) + CMSG_SPACE(sizeof(int));
 	sndbuf = calloc(1, len);
 	if (sndbuf == NULL)

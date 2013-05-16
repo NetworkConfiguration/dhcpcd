@@ -481,7 +481,7 @@ manage_link(int fd)
 	struct sockaddr_dl sdl;
 	unsigned char *hwaddr;
 #endif
-#ifdef INET6
+#if defined(INET6) && !defined(LISTEN_DAD)
 	struct in6_addr ia6;
 	struct sockaddr_in6 *sin6;
 #endif
@@ -606,7 +606,7 @@ manage_link(int fd)
 					    &rt.dest, &rt.net, &rt.gate);
 					break;
 #endif
-#ifdef INET6
+#if defined(INET6) && !defined(LISTEN_DAD)
 				case AF_INET6:
 					sin6 = (struct sockaddr_in6*)
 					    rti_info[RTAX_IFA];
