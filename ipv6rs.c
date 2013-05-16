@@ -392,7 +392,7 @@ add_router(struct ra *router)
 			return;
 		}
 	}
-	TAILQ_INSERT_HEAD(&ipv6_routers, router, next);
+	TAILQ_INSERT_TAIL(&ipv6_routers, router, next);
 }
 
 static void
