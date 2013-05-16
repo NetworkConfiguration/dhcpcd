@@ -244,7 +244,7 @@ eloop_q_timeouts_delete_v(int queue, void *arg,
 	void (*f)(void *);
 
 	TAILQ_FOREACH_SAFE(t, &timeouts, next, tt) {
-		if (t->queue == queue && t->arg == arg &&
+		if ((queue == 0 || t->queue == queue) && t->arg == arg &&
 		    t->callback != callback)
 		{
 			va_copy(va, v);

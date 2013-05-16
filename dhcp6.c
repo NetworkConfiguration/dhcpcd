@@ -44,7 +44,7 @@
 #include <syslog.h>
 #include <unistd.h>
 
-#define ELOOP_QUEUE 2
+#define ELOOP_QUEUE 3
 
 #include "config.h"
 #include "common.h"
@@ -608,7 +608,7 @@ dhcp6_freedrop_addrs(struct interface *ifp, int drop)
 	while ((ap = TAILQ_FIRST(&state->addrs))) {
 		TAILQ_REMOVE(&state->addrs, ap, next);
 		if (ap->dadcallback)
-			eloop_timeout_delete(NULL, ap->dadcallback);
+			eloop_q_timeout_delete(0, NULL, ap->dadcallback);
 		/* Only drop the address if no other RAs have assigned it.
 		 * This is safe because the RA is removed from the list
 		 * before we are called. */

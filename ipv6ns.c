@@ -46,7 +46,7 @@
 #  include <linux/ipv6.h>
 #endif
 
-#define ELOOP_QUEUE 1
+#define ELOOP_QUEUE 2
 #include "common.h"
 #include "dhcpcd.h"
 #include "dhcp6.h"

@@ -32,7 +32,7 @@
 #include <time.h>
 
 #ifndef ELOOP_QUEUE
-  #define ELOOP_QUEUE 0
+  #define ELOOP_QUEUE 1
 #endif
 
 #define eloop_timeout_add_tv(a, b, c) \
