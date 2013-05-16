@@ -233,7 +233,7 @@ ipv6rs_sendprobe(void *arg)
 	int hoplimit = HOPLIMIT;
 
 	dst = allrouters;
-	//dst.sin6_scope_id = ifp->linkid;
+	dst.sin6_scope_id = ifp->index;
 
 	state = RS_STATE(ifp);
 	sndhdr.msg_name = (caddr_t)&dst;

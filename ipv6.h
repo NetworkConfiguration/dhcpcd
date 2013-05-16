@@ -28,6 +28,7 @@
 #ifndef IPV6_H
 #define IPV6_H
 
+#include <sys/param.h>
 #include <sys/queue.h>
 
 #include <netinet/in.h>

@@ -298,7 +298,7 @@ ipv6ns_probeaddr(void *arg)
 	dst.sin6_addr.s6_addr[12] = 0xff;
 
 	//memcpy(&dst.sin6_addr, &ap->addr, sizeof(dst.sin6_addr));
-	//dst.sin6_scope_id = ap->iface->index;
+	dst.sin6_scope_id = ap->iface->index;
 
 	sndhdr.msg_name = (caddr_t)&dst;
 	sndhdr.msg_iov[0].iov_base = ap->ns;
@@ -422,7 +422,7 @@ ipv6ns_proberouter(void *arg)
 	dst.sin6_len = sizeof(dst);
 #endif
 	memcpy(&dst.sin6_addr, &rap->from, sizeof(dst.sin6_addr));
-	//dst.sin6_scope_id = rap->iface->index;
+	dst.sin6_scope_id = rap->iface->index;
 
 	sndhdr.msg_name = (caddr_t)&dst;
 	sndhdr.msg_iov[0].iov_base = rap->ns;
