@@ -1067,7 +1067,7 @@ dhcp6_dadcallback(void *arg)
 				}
 			}
 			if (!wascompleted) {
-				syslog(LOG_DEBUG, "%s: DHCPv6 DAD completed",
+				syslog(LOG_INFO, "%s: DHCPv6 DAD completed",
 				    ifp->name);
 				script_runreason(ifp, state->reason);
 				daemonise();
@@ -1859,7 +1859,7 @@ recv:
 			script_runreason(ifp, state->reason);
 			daemonise();
 		} else
-			syslog(LOG_DEBUG, "%s: waiting for DHCPv6 DAD"
+			syslog(LOG_INFO, "%s: waiting for DHCPv6 DAD"
 			    " to complete",
 			    ifp->name);
 	}

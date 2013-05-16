@@ -403,7 +403,7 @@ ipv6rs_scriptrun(const struct ra *rap)
 	/* If all addresses have completed DAD run the script */
 	TAILQ_FOREACH(ap, &rap->addrs, next) {
 		if (ap->dadcompleted == 0) {
-			syslog(LOG_DEBUG, "%s: waiting for Router Advertisement"
+			syslog(LOG_INFO, "%s: waiting for Router Advertisement"
 			    " DAD to complete",
 			    rap->iface->name);
 			return;
@@ -477,7 +477,7 @@ ipv6rs_dadcallback(void *arg)
 			}
 
 			if (wascompleted && found && rap->lifetime) {
-				syslog(LOG_DEBUG,
+				syslog(LOG_INFO,
 				    "%s: Router Advertisement DAD completed",
 				    rap->iface->name);
 				ipv6rs_scriptrun(rap);
