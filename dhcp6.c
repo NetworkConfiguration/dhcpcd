@@ -618,7 +618,8 @@ dhcp6_freedrop_addrs(struct interface *ifp, int drop)
 		{
 			syslog(LOG_INFO, "%s: deleting address %s",
 			    ifp->name, ap->saddr);
-			if (del_address6(ifp, ap) == -1)
+			if (del_address6(ifp, ap) == -1 &&
+			    errno != EADDRNOTAVAIL)
 				syslog(LOG_ERR, "del_address6 %m");
 		}
 		free(ap);

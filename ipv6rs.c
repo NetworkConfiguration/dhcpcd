@@ -324,7 +324,8 @@ ipv6rs_freedrop_addrs(struct ra *rap, int drop)
 		{
 			syslog(LOG_INFO, "%s: deleting address %s",
 			    rap->iface->name, ap->saddr);
-			if (del_address6(rap->iface, ap) == -1)
+			if (del_address6(rap->iface, ap) == -1 &&
+			    errno != EADDRNOTAVAIL)
 				syslog(LOG_ERR, "del_address6 %m");
 		}
 		free(ap);
