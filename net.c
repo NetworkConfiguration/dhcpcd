@@ -434,7 +434,8 @@ discover_interfaces(int argc, char * const *argv)
 		if (ifa->ifa_addr != NULL &&
 		    ifa->ifa_addr->sa_family == AF_INET6)
 		{
-			sin6 = (const struct sockaddr_in6 *)ifa->ifa_addr;
+			sin6 = (const struct sockaddr_in6 *)
+			    (void *)ifa->ifa_addr;
 			if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr))
 				/* XXX: Check tentative, etc? */
 				ipv6_handleifa(RTM_NEWADDR, ifs, ifa->ifa_name,
