@@ -372,7 +372,7 @@ eloop_start(const sigset_t *sigmask)
 		/* Process any triggered events. */
 		if (n > 0) {
 			TAILQ_FOREACH(e, &events, next) {
-				if (e->pollfd->revents & (POLLIN || POLLHUP)) {
+				if (e->pollfd->revents & (POLLIN | POLLHUP)) {
 					e->callback(e->arg);
 					/* We need to break here as the
 					 * callback could destroy the next
