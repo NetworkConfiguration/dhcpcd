@@ -526,7 +526,7 @@ script_runreason(const struct interface *ifp, const char *reason)
 	    strcmp(ifp->options->script, "/dev/null") == 0)
 		return 0;
 
-	syslog(LOG_DEBUG, "%s: executing `%s', reason %s",
+	syslog(LOG_DEBUG, "%s: executing `%s' %s",
 	    ifp->name, argv[0], reason);
 
 	/* Make our env */
