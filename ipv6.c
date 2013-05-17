@@ -55,6 +55,7 @@
 #include "common.h"
 #include "dhcpcd.h"
 #include "dhcp6.h"
+#include "eloop.h"
 #include "ipv6.h"
 #include "ipv6rs.h"
 
@@ -127,62 +128,28 @@ ipv6_printaddr(char *s, ssize_t sl, const uint8_t *d, const char *ifname)
 	return l;
 }
 
-struct in6_addr *
-ipv6_linklocal(const char *ifname)
-{
-	struct ifaddrs *ifaddrs, *ifa;
-	struct sockaddr_in6 *sa6;
-	struct in6_addr *in6;
-
-	if (getifaddrs(&ifaddrs) == -1)
-		return NULL;
-
-	for (ifa = ifaddrs; ifa; ifa = ifa->ifa_next) {
-		if (ifa->ifa_addr == NULL ||
-		    ifa->ifa_addr->sa_family != AF_INET6)
-			continue;
-		if (strcmp(ifa->ifa_name, ifname))
-			continue;
-		sa6 = (struct sockaddr_in6 *)(void *)ifa->ifa_addr;
-		if (IN6_IS_ADDR_LINKLOCAL(&sa6->sin6_addr))
-			break;
-	}
-
-	if (ifa) {
-		in6 = malloc(sizeof(*in6));
-		if (in6 == NULL) {
-			syslog(LOG_ERR, "%s: %m", __func__);
-			return NULL;
-		}
-		memcpy(in6, &sa6->sin6_addr, sizeof(*in6));
-	} else
-		in6 = NULL;
-
-	freeifaddrs(ifaddrs);
-	return in6;
-}
-
 int
-ipv6_makeaddr(struct in6_addr *addr, const char *ifname,
+ipv6_makeaddr(struct in6_addr *addr, const struct interface *ifp,
     const struct in6_addr *prefix, int prefix_len)
 {
-	struct in6_addr *lla;
+	const struct ipv6_state *state;
+	const struct ll_addr *ap;
 
 	if (prefix_len < 0 || prefix_len > 64) {
 		errno = EINVAL;
 		return -1;
 	}
 
-	lla = ipv6_linklocal(ifname);
-	if (lla == NULL) {
+	state = IPV6_CSTATE(ifp);
+	ap = TAILQ_FIRST(&state->ll_addrs);
+	if (ap == NULL) {
 		errno = ENOENT;
 		return -1;
 	}
 
 	memcpy(addr, prefix, sizeof(*prefix));
-	addr->s6_addr32[2] = lla->s6_addr32[2];
-	addr->s6_addr32[3] = lla->s6_addr32[3];
-	free(lla);
+	addr->s6_addr32[2] = ap->addr.s6_addr32[2];
+	addr->s6_addr32[3] = ap->addr.s6_addr32[3];
 	return 0;
 }
 
@@ -300,13 +267,150 @@ ipv6_addaddrs(struct ipv6_addrhead *addrs)
 	return i;
 }
 
+static struct ipv6_state *
+ipv6_getstate(struct interface *ifp)
+{
+	struct ipv6_state *state;
+
+	state = IPV6_STATE(ifp);
+	if (state == NULL) {
+	        ifp->if_data[IF_DATA_IPV6] = malloc(sizeof(*state));
+		state = IPV6_STATE(ifp);
+		if (state == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			return NULL;
+		}
+		TAILQ_INIT(&state->ll_addrs);
+		TAILQ_INIT(&state->ll_callbacks);
+	}
+	return state;
+}
+
 void
-ipv6_handleifa(int cmd, const char *ifname,
+ipv6_handleifa(int cmd, struct if_head *ifs, const char *ifname,
     const struct in6_addr *addr, int flags)
 {
+	struct interface *ifp;
+	struct ipv6_state *state;
+	struct ll_addr *ap;
+	struct ll_callback *cb;
+
+	/* Safety - ignore tentative announcements */
+	if (cmd == RTM_NEWADDR && flags & IN6_IFF_TENTATIVE)
+		return;
+
+	if (ifs == NULL)
+		ifs = ifaces;
+	if (ifs == NULL) {
+		errno = ESRCH;
+		return;
+	}
+	TAILQ_FOREACH(ifp, ifs, next) {
+		if (strcmp(ifp->name, ifname) == 0)
+			break;
+	}
+	if (ifp == NULL) {
+		errno = ESRCH;
+		return;
+	}
+
+	if (IN6_IS_ADDR_LINKLOCAL(addr)) {
+		state = ipv6_getstate(ifp);
+		if (state == NULL)
+			return;
+		TAILQ_FOREACH(ap, &state->ll_addrs, next) {
+			if (memcmp(ap->addr.s6_addr,
+			    addr->s6_addr,
+			    sizeof(ap->addr.s6_addr)) == 0)
+			break;
+		}
+		switch (cmd) {
+		case RTM_DELADDR:
+			if (ap) {
+				TAILQ_REMOVE(&state->ll_addrs, ap, next);
+				free(ap);
+			}
+			return;
+		case RTM_NEWADDR:
+			if (ap == NULL) {
+				ap = calloc(1, sizeof(*ap));
+				memcpy(ap->addr.s6_addr, addr->s6_addr,
+				    sizeof(ap->addr.s6_addr));
+				TAILQ_INSERT_TAIL(&state->ll_addrs,
+				    ap, next);
+
+				/* Now run any callbacks.
+				 * Typically IPv6RS or DHCPv6 */
+				while ((cb = TAILQ_FIRST(&state->ll_callbacks)))
+				{
+					TAILQ_REMOVE(&state->ll_callbacks,
+					    cb, next);
+					cb->callback(cb->arg);
+					free(cb);
+				}
+			}
+			return;
+		default:
+			return;
+		}
+	}
 
 	ipv6rs_handleifa(cmd, ifname, addr, flags);
 	dhcp6_handleifa(cmd, ifname, addr, flags);
+}
+
+int
+ipv6_interfacehaslinklocal(const struct interface *ifp)
+{
+	const struct ipv6_state *state;
+
+	state = IPV6_CSTATE(ifp);
+	return state && TAILQ_FIRST(&state->ll_addrs) ? 1 : 0;
+}
+
+int ipv6_addlinklocalcallback(struct interface *ifp,
+    void (*callback)(void *), void *arg)
+{
+	struct ipv6_state *state;
+	struct ll_callback *cb;
+
+	state = ipv6_getstate(ifp);
+	TAILQ_FOREACH(cb, &state->ll_callbacks, next) {
+		if (cb->callback == callback && cb->arg == arg)
+			break;
+	}
+	if (cb == NULL) {
+		cb = malloc(sizeof(*cb));
+		if (cb == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			return -1;
+		}
+		cb->callback = callback;
+		cb->arg = arg;
+		TAILQ_INSERT_TAIL(&state->ll_callbacks, cb, next);
+	}
+	return 0;
+}
+
+void
+ipv6_free(struct interface *ifp)
+{
+	struct ipv6_state *state;
+	struct ll_addr *ap;
+	struct ll_callback *cb;
+
+	state = IPV6_STATE(ifp);
+	if (state) {
+		while ((ap = TAILQ_FIRST(&state->ll_addrs))) {
+			TAILQ_REMOVE(&state->ll_addrs, ap, next);
+			free(ap);
+		}
+		while ((cb = TAILQ_FIRST(&state->ll_callbacks))) {
+			TAILQ_REMOVE(&state->ll_callbacks, cb, next);
+			free(cb);
+		}
+		free(state);
+	}
 }
 
 int

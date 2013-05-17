@@ -38,6 +38,7 @@
 
 #define ROUNDUP8(a) (1 + (((a) - 1) | 7))
 
+#ifdef INET6
 /*
  * BSD kernels don't inform userland of DAD results.
  * Also, for RTM_NEWADDR messages the address flags could be
@@ -101,25 +102,52 @@ struct rt6 {
 };
 TAILQ_HEAD(rt6head, rt6);
 
-#ifdef INET6
+struct ll_addr {
+	TAILQ_ENTRY(ll_addr) next;
+	struct in6_addr addr;
+};
+
+TAILQ_HEAD(ll_addr_head, ll_addr);
+
+struct ll_callback {
+	TAILQ_ENTRY(ll_callback) next;
+	void (*callback)(void *);
+	void *arg;
+};
+TAILQ_HEAD(ll_callback_head, ll_callback);
+
+struct ipv6_state {
+	struct ll_addr_head ll_addrs;
+	struct ll_callback_head ll_callbacks;
+};
+
+#define IPV6_STATE(ifp)							       \
+	((struct ipv6_state *)(ifp)->if_data[IF_DATA_IPV6])
+#define IPV6_CSTATE(ifp)						       \
+	((const struct ipv6_state *)(ifp)->if_data[IF_DATA_IPV6])
+
 int ipv6_init(void);
 ssize_t ipv6_printaddr(char *, ssize_t, const uint8_t *, const char *);
-struct in6_addr *ipv6_linklocal(const char *);
-int ipv6_makeaddr(struct in6_addr *, const char *,
+int ipv6_makeaddr(struct in6_addr *, const struct interface *,
     const struct in6_addr *, int);
 int ipv6_makeprefix(struct in6_addr *, const struct in6_addr *, int);
 int ipv6_mask(struct in6_addr *, int);
 int ipv6_prefixlen(const struct in6_addr *);
 int ipv6_addaddr(struct ipv6_addr *);
 ssize_t ipv6_addaddrs(struct ipv6_addrhead *);
-void ipv6_handleifa(int, const char *, const struct in6_addr *, int);
+void ipv6_handleifa(int, struct if_head *,
+    const char *, const struct in6_addr *, int);
 int ipv6_handleifa_addrs(int, struct ipv6_addrhead *,
     const struct in6_addr *, int);
+int ipv6_interfacehaslinklocal(const struct interface *);
+int ipv6_addlinklocalcallback(struct interface *, void (*)(void *), void *);
+void ipv6_free(struct interface *);
 int ipv6_removesubnet(const struct interface *, struct ipv6_addr *);
 void ipv6_buildroutes(void);
 void ipv6_drop(struct interface *);
 #else
 #define ipv6_init() -1
+#define ipv6_free(a)
 #endif
 
 #endif

@@ -42,6 +42,12 @@
 #  include <net/if_media.h>
 #endif
 
+#include <net/route.h>
+#ifdef __linux__
+#  include <asm/types.h> /* for systems with broken headers */
+#  include <linux/rtnetlink.h>
+#endif
+
 #include <ctype.h>
 #include <errno.h>
 #include <ifaddrs.h>
@@ -127,6 +133,7 @@ free_interface(struct interface *ifp)
 	if (ifp == NULL)
 		return;
 	dhcp_free(ifp);
+	ipv6_free(ifp);
 	dhcp6_free(ifp);
 	ipv6rs_free(ifp);
 	free_options(ifp->options);
@@ -223,6 +230,9 @@ discover_interfaces(int argc, char * const *argv)
 #endif
 #elif AF_PACKET
 	const struct sockaddr_ll *sll;
+#endif
+#ifdef INET6
+	const struct sockaddr_in6 *sin6;
 #endif
 
 	if (getifaddrs(&ifaddrs) == -1)
@@ -417,6 +427,22 @@ discover_interfaces(int argc, char * const *argv)
 
 		TAILQ_INSERT_TAIL(ifs, ifp, next);
 	}
+
+#ifdef INET6
+	/* Capture local link addresses */
+	for (ifa = ifaddrs; ifa; ifa = ifa->ifa_next) {
+		if (ifa->ifa_addr != NULL &&
+		    ifa->ifa_addr->sa_family == AF_INET6)
+		{
+			sin6 = (const struct sockaddr_in6 *)ifa->ifa_addr;
+			if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr))
+				/* XXX: Check tentative, etc? */
+				ipv6_handleifa(RTM_NEWADDR, ifs, ifa->ifa_name,
+				    &sin6->sin6_addr, 0);
+		}
+	}
+#endif
+
 	freeifaddrs(ifaddrs);
 
 #ifdef IFLR_ACTIVE

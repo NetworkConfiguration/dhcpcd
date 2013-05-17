@@ -44,9 +44,10 @@
 #define LINK_DOWN	-1
 
 #define IF_DATA_DHCP	0
-#define IF_DATA_IPV6RS	1
-#define IF_DATA_DHCP6	2
-#define IF_DATA_MAX	3
+#define IF_DATA_IPV6	1
+#define IF_DATA_IPV6RS	2
+#define IF_DATA_DHCP6	3
+#define IF_DATA_MAX	4
 
 struct interface {
 	TAILQ_ENTRY(interface) next;

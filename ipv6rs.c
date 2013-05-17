@@ -232,6 +232,14 @@ ipv6rs_sendprobe(void *arg)
 	struct in6_pktinfo pi;
 	int hoplimit = HOPLIMIT;
 
+	if (!ipv6_interfacehaslinklocal(ifp)) {
+		syslog(LOG_DEBUG,
+		    "%s: delaying Router Soliciation for LL address",
+		    ifp->name);
+		ipv6_addlinklocalcallback(ifp, ipv6rs_sendprobe, ifp);
+		return;
+	}
+
 	dst = allrouters;
 	dst.sin6_scope_id = ifp->index;
 
@@ -730,7 +738,7 @@ ipv6rs_handledata(__unused void *arg)
 				if (pi->nd_opt_pi_flags_reserved &
 				    ND_OPT_PI_FLAG_AUTO)
 				{
-					ipv6_makeaddr(&ap->addr, ifp->name,
+					ipv6_makeaddr(&ap->addr, ifp,
 					    &ap->prefix,
 					    pi->nd_opt_pi_prefix_len);
 					cbp = inet_ntop(AF_INET6,

@@ -1483,7 +1483,7 @@ dhcp6_delegate_addr(struct interface *ifp, const struct ipv6_addr *prefix,
 	if (b)
 		a->prefix.s6_addr[--i] |= *p;
 
-	if (ipv6_makeaddr(&a->addr, ifp->name, &a->prefix, a->prefix_len) == -1)
+	if (ipv6_makeaddr(&a->addr, ifp, &a->prefix, a->prefix_len) == -1)
 	{
 		ia = inet_ntop(AF_INET6, &a->addr.s6_addr,
 		    iabuf, sizeof(iabuf));

@@ -378,7 +378,8 @@ link_addr(struct nlmsghdr *nlm)
 			}
 			rta = RTA_NEXT(rta, len);
 		}
-		ipv6_handleifa(nlm->nlmsg_type, ifn, &addr6, ifa->ifa_flags);
+		ipv6_handleifa(nlm->nlmsg_type, NULL, ifn,
+		    &addr6, ifa->ifa_flags);
 		break;
 #endif
 	}

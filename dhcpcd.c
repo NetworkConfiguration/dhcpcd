@@ -369,8 +369,7 @@ handle_carrier(int action, int flags, const char *ifname)
 		return;
 	ifp = find_interface(ifname);
 	if (ifp == NULL) {
-		if (options & DHCPCD_LINK)
-			handle_interface(1, ifname);
+		handle_interface(1, ifname);
 		return;
 	}
 	if (!(ifp->options->options & DHCPCD_LINK))
@@ -456,18 +455,6 @@ init_state(struct interface *ifp, int argc, char **argv)
 
 	configure_interface(ifp, argc, argv);
 	ifo = ifp->options;
-
-	/* RTM_NEWADDR goes through the link socket as well which we
-	 * need for IPv6 DAD, so we check for DHCPCD_LINK in handle_carrier
-	 * instead */
-	if (linkfd == -1) {
-		linkfd = open_link_socket();
-		if (linkfd == -1) {
-			syslog(LOG_ERR, "open_link_socket: %m");
-			ifo->options &= ~DHCPCD_LINK;
-		} else
-			eloop_event_add(linkfd, handle_link, NULL);
-	}
 
 	if (ifo->options & DHCPCD_IPV4 && ipv4_init() == -1) {
 		syslog(LOG_ERR, "ipv4_init: %m");
@@ -1141,6 +1128,19 @@ main(int argc, char **argv)
 	 * the old behaviour of waiting for an IP address */
 	if (ifc == 1)
 		options |= DHCPCD_WAITIP;
+
+	/* RTM_NEWADDR goes through the link socket as well which we
+	 * need for IPv6 DAD, so we check for DHCPCD_LINK in handle_carrier
+	 * instead.
+	 * We also need to open this before checking for interfaces below
+	 * so that we pickup any new addresses during the discover phase. */
+	if (linkfd == -1) {
+		linkfd = open_link_socket();
+		if (linkfd == -1)
+			syslog(LOG_ERR, "open_link_socket: %m");
+		else
+			eloop_event_add(linkfd, handle_link, NULL);
+	}
 
 	ifaces = discover_interfaces(ifc, ifv);
 	for (i = 0; i < ifc; i++) {
