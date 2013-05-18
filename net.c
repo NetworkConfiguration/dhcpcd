@@ -31,9 +31,11 @@
 
 #include <net/if.h>
 #include <net/if_arp.h>
+#include <netinet/in.h>
 #ifdef AF_LINK
 #  include <net/if_dl.h>
 #  include <net/if_types.h>
+#  include <netinet/in_var.h>
 #endif
 #ifdef AF_PACKET
 #  include <netpacket/packet.h>
@@ -217,6 +219,14 @@ discover_interfaces(int argc, char * const *argv)
 #ifdef __linux__
 	char ifn[IF_NAMESIZE];
 #endif
+#ifdef INET6
+	const struct sockaddr_in6 *sin6;
+	int ifa_flags;
+#ifdef SIOCGIFAFLAG_IN6
+	struct in6_ifreq ifr6;
+	int s6;
+#endif
+#endif
 #ifdef AF_LINK
 	const struct sockaddr_dl *sdl;
 #ifdef IFLR_ACTIVE
@@ -231,9 +241,8 @@ discover_interfaces(int argc, char * const *argv)
 #elif AF_PACKET
 	const struct sockaddr_ll *sll;
 #endif
-#ifdef INET6
-	const struct sockaddr_in6 *sin6;
-#endif
+
+
 
 	if (getifaddrs(&ifaddrs) == -1)
 		return NULL;
@@ -315,7 +324,8 @@ discover_interfaces(int argc, char * const *argv)
 			if (up_interface(ifp) == 0)
 				options |= DHCPCD_WAITUP;
 			else
-				syslog(LOG_ERR, "%s: up_interface: %m", ifp->name);
+				syslog(LOG_ERR, "%s: up_interface: %m",
+				    ifp->name);
 		}
 
 		sdl_type = 0;
@@ -430,18 +440,47 @@ discover_interfaces(int argc, char * const *argv)
 
 #ifdef INET6
 	/* Capture local link addresses */
+#ifdef SIOCGIFAFLAG_IN6
+	s6 = socket(AF_INET6, SOCK_DGRAM, 0);
+	if (s6 == -1)
+		syslog(LOG_ERR, "%s: socket: %m", __func__);
+#endif
+
 	for (ifa = ifaddrs; ifa; ifa = ifa->ifa_next) {
 		if (ifa->ifa_addr != NULL &&
 		    ifa->ifa_addr->sa_family == AF_INET6)
 		{
 			sin6 = (const struct sockaddr_in6 *)
 			    (void *)ifa->ifa_addr;
-			if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr))
-				/* XXX: Check tentative, etc? */
+			if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
+#ifdef SIOCGIFAFLAG_IN6
+				memset(&ifr6, 0, sizeof(ifr6));
+				strncpy(ifr6.ifr_name, ifa->ifa_name,
+				    sizeof(ifr6.ifr_name));
+				ifr6.ifr_addr = *sin6;
+				if (ioctl(s6, SIOCGIFAFLAG_IN6, &ifr6) == -1) {
+					syslog(LOG_ERR,
+					    "%s: SIOCGIFAFLAG_IN6: %m",
+					    ifa->ifa_name);
+					continue;
+				}
+				ifa_flags = ifr6.ifr_ifru.ifru_flags6;
+#else
+				/* We have no way of getting the address flags
+				 * such as tentative on Linux at this point.
+				 * We have to hope that getifaddrs only returns
+				 * useable addresses. */
+				ifa_flags = 0;
+#endif
 				ipv6_handleifa(RTM_NEWADDR, ifs, ifa->ifa_name,
-				    &sin6->sin6_addr, 0);
+				    &sin6->sin6_addr, ifa_flags);
+			}
 		}
 	}
+#ifdef SIOCGIFAFLAG_IN6
+	if (s6 != -1)
+		close(s6);
+#endif
 #endif
 
 	freeifaddrs(ifaddrs);
