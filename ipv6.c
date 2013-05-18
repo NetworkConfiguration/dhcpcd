@@ -319,10 +319,8 @@ ipv6_handleifa(int cmd, struct if_head *ifs, const char *ifname,
 		if (state == NULL)
 			return;
 		TAILQ_FOREACH(ap, &state->ll_addrs, next) {
-			if (memcmp(ap->addr.s6_addr,
-			    addr->s6_addr,
-			    sizeof(ap->addr.s6_addr)) == 0)
-			break;
+			if (IN6_ARE_ADDR_EQUAL(&ap->addr, addr))
+				break;
 		}
 		switch (cmd) {
 		case RTM_DELADDR:
@@ -423,9 +421,7 @@ ipv6_handleifa_addrs(int cmd,
 	alldadcompleted = 1;
 	found = 0;
 	TAILQ_FOREACH_SAFE(ap, addrs, next, apn) {
-		if (memcmp(addr->s6_addr, ap->addr.s6_addr,
-		    sizeof(addr->s6_addr)))
-		{
+		if (!IN6_ARE_ADDR_EQUAL(addr, &ap->addr)) {
 			if (ap->dadcompleted == 0)
 				alldadcompleted = 0;
 			continue;
