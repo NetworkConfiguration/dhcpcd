@@ -641,12 +641,36 @@ ipv6_removesubnet(const struct interface *ifp, struct ipv6_addr *addr)
 	(IN6_ARE_ADDR_EQUAL(&((rtp)->dest), &in6addr_any) &&		      \
 	    IN6_ARE_ADDR_EQUAL(&((rtp)->net), &in6addr_any))
 
+static void
+ipv6_buildroutes1(struct rt6head *dnr, int expired)
+{
+	struct rt6 *rt;
+	struct ra *rap;
+	struct ipv6_addr *addr;
+
+	TAILQ_FOREACH(rap, &ipv6_routers, next) {
+		if (rap->expired != expired)
+			continue;
+		if (options & DHCPCD_IPV6RA_OWN) {
+			TAILQ_FOREACH(addr, &rap->addrs, next) {
+				if (!addr->onlink)
+					continue;
+				rt = make_prefix(rap->iface, rap, addr);
+				if (rt)
+					TAILQ_INSERT_TAIL(dnr, rt, next);
+			}
+		}
+		rt = make_router(rap);
+		if (rt)
+			TAILQ_INSERT_TAIL(dnr, rt, next);
+	}
+}
+
 void
 ipv6_buildroutes(void)
 {
 	struct rt6head dnr, *nrs;
 	struct rt6 *rt, *rtn, *or;
-	struct ra *rap;
 	struct ipv6_addr *addr;
 	const struct interface *ifp;
 	const struct dhcp6_state *d6_state;
@@ -656,6 +680,12 @@ ipv6_buildroutes(void)
 		return;
 
 	TAILQ_INIT(&dnr);
+
+	/* First add reachable routers and their prefixes */
+	ipv6_buildroutes1(&dnr, 0);
+
+	/* We have no way of knowing if prefixes added by DHCP are reachable
+	 * or not, so we have to assume they are */
 	TAILQ_FOREACH(ifp, ifaces, next) {
 		d6_state = D6_CSTATE(ifp);
 		if (d6_state &&
@@ -671,22 +701,11 @@ ipv6_buildroutes(void)
 			}
 		}
 	}
-	TAILQ_FOREACH(rap, &ipv6_routers, next) {
-		if (options & DHCPCD_IPV6RA_OWN) {
-			TAILQ_FOREACH(addr, &rap->addrs, next) {
-				if (!addr->onlink)
-					continue;
-				rt = make_prefix(rap->iface, rap, addr);
-				if (rt)
-					TAILQ_INSERT_TAIL(&dnr, rt, next);
-			}
-		}
-		if (!rap->expired) {
-			rt = make_router(rap);
-			if (rt)
-				TAILQ_INSERT_TAIL(&dnr, rt, next);
-		}
-	}
+
+	/* Add our non-reachable routers and prefixes
+	 * Unsure if this is needed, but it's a close match to kernel
+	 * behaviour */
+	ipv6_buildroutes1(&dnr, 1);
 
 	nrs = malloc(sizeof(*nrs));
 	if (nrs == NULL) {

@@ -209,6 +209,7 @@ static void
 ipv6ns_unreachable(void *arg)
 {
 	struct ra *rap = arg;
+	struct timeval tv;
 
 	/* We could add an unreachable flag and persist the information,
 	 * but that is more effort than it's probably worth. */
@@ -217,6 +218,16 @@ ipv6ns_unreachable(void *arg)
 	rap->expired = 1;
 	ipv6_buildroutes();
 	script_runreason(rap->iface, "ROUTERADVERT"); /* XXX not RA */
+
+	/* We should still test if it's reachable or not so
+	 * incase it comes back to life and it's preferable. */
+	if (rap->reachable) {
+		ms_to_tv(&tv, rap->reachable);
+	} else {
+		tv.tv_sec = REACHABLE_TIME;
+		tv.tv_usec = 0;
+	}
+	eloop_timeout_add_tv(&tv, ipv6ns_proberouter, rap);
 }
 
 #ifdef LISTEN_DAD
@@ -626,6 +637,13 @@ ipv6ns_handledata(__unused void *arg)
 	}
 
 	if (is_solicited) {
+		if (rap->expired) {
+			rap->expired = 0;
+			syslog(LOG_INFO, "%s: %s is reachable again",
+				ifp->name, sfrom);
+			ipv6_buildroutes();
+			script_runreason(rap->iface, "ROUTERADVERT"); /* XXX */
+		}
 		rap->nsprobes = 0;
 		if (rap->reachable) {
 			ms_to_tv(&tv, rap->reachable);
