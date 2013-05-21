@@ -28,7 +28,6 @@
 #ifndef IPV6_H
 #define IPV6_H
 
-#include <sys/param.h>
 #include <sys/queue.h>
 
 #include <netinet/in.h>
@@ -49,6 +48,10 @@
  * See the discussion here:
  *    http://mail-index.netbsd.org/tech-net/2013/03/15/msg004019.html
  */
+#ifndef __linux__
+/* We guard here to avoid breaking a compile on linux ppc-64 headers */
+#  include <sys/param.h>
+#endif
 #ifdef BSD
 #  define LISTEN_DAD
 #endif
