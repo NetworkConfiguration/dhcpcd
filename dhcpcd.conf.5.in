@@ -323,6 +323,11 @@ into the value.
 .It Ic timeout Ar seconds
 The default timeout for waiting for a DHCP response is 30 seconds which may
 be too long or too short and can be changed here.
+A setting of 0
+.Ar seconds
+causes
+.Nm dhcpcd
+to wait forever to get a lease.
 .It Ic userclass Ar string
 Tag the DHCP messages with the userclass.
 You can specify more than one.
