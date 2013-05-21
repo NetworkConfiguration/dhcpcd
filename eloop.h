@@ -28,7 +28,6 @@
 #ifndef ELOOP_H
 #define ELOOP_H
 
-#include <signal.h>
 #include <time.h>
 
 #ifndef ELOOP_QUEUE
