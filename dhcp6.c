@@ -1658,6 +1658,9 @@ dhcp6_handledata(__unused void *arg)
 		    ifp->name);
 		return;
 	}
+	/* We're already bound and this message is for another machine */
+	if (state->state == DH6S_BOUND)
+		return;
 
 	r = (struct dhcp6_message *)rcvhdr.msg_iov[0].iov_base;
 	if (r->xid[0] != state->send->xid[0] ||
