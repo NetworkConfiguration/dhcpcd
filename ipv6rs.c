@@ -337,7 +337,8 @@ void ipv6rs_freedrop_ra(struct ra *rap, int drop)
 
 	eloop_timeout_delete(NULL, rap->iface);
 	eloop_timeout_delete(NULL, rap);
-	TAILQ_REMOVE(&ipv6_routers, rap, next);
+	if (!drop)
+		TAILQ_REMOVE(&ipv6_routers, rap, next);
 	ipv6rs_freedrop_addrs(rap, drop);
 	ipv6rs_free_opts(rap);
 	free(rap->data);

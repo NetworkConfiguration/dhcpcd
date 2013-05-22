@@ -652,7 +652,7 @@ ipv6_buildroutes1(struct rt6head *dnr, int expired)
 	TAILQ_FOREACH(rap, &ipv6_routers, next) {
 		if (rap->expired != expired)
 			continue;
-		if (options & DHCPCD_IPV6RA_OWN) {
+		if (rap->iface->options->options & DHCPCD_IPV6RA_OWN) {
 			TAILQ_FOREACH(addr, &rap->addrs, next) {
 				if (!addr->onlink)
 					continue;
@@ -661,9 +661,13 @@ ipv6_buildroutes1(struct rt6head *dnr, int expired)
 					TAILQ_INSERT_TAIL(dnr, rt, next);
 			}
 		}
-		rt = make_router(rap);
-		if (rt)
-			TAILQ_INSERT_TAIL(dnr, rt, next);
+		if (rap->iface->options->options &
+		    (DHCPCD_IPV6RA_OWN | DHCPCD_IPV6RA_OWN_DEFAULT))
+		{
+			rt = make_router(rap);
+			if (rt)
+				TAILQ_INSERT_TAIL(dnr, rt, next);
+		}
 	}
 }
 
