@@ -1284,29 +1284,24 @@ ipv6rs_start(struct interface *ifp)
 void
 ipv6rs_drop(struct interface *ifp)
 {
-	struct ra *rap, *ran;
+	struct ra *rap;
 	int expired = 0;
-	TAILQ_HEAD(, ipv6_addr) addrs;
+	TAILQ_HEAD(rahead, ra) rtrs;
 
 	eloop_timeout_delete(NULL, ifp);
-	/* We need to drop routes before addresses
-	 * We do this by moving addresses to a local list, then building
-	 * the routes and finally adding the addresses back to a RA before
-	 * dropping it. Which RA the addresses end up on does not matter. */
-	TAILQ_INIT(&addrs);
+	TAILQ_INIT(&rtrs);
 	TAILQ_FOREACH(rap, &ipv6_routers, next) {
 		if (rap->iface == ifp) {
 			rap->expired = expired = 1;
-			TAILQ_CONCAT(&addrs, &rap->addrs, next);
+			TAILQ_REMOVE(&ipv6_routers, rap, next);
+			TAILQ_INSERT_TAIL(&rtrs, rap, next);
 		}
 	}
 	if (expired) {
 		ipv6_buildroutes();
-		TAILQ_FOREACH_SAFE(rap, &ipv6_routers, next, ran) {
-			if (rap->iface == ifp) {
-				TAILQ_CONCAT(&rap->addrs, &addrs, next);
-				ipv6rs_drop_ra(rap);
-			}
+		while ((rap = TAILQ_FIRST(&rtrs))) {
+			TAILQ_REMOVE(&rtrs, rap, next);
+			ipv6rs_drop_ra(rap);
 		}
 		script_runreason(ifp, "ROUTERADVERT");
 	}
