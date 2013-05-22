@@ -237,7 +237,7 @@ struct dhcp_state {
 #include "net.h"
 
 #ifdef INET
-extern const struct dhcp_opt const dhcp_opts[];
+extern const struct dhcp_opt dhcp_opts[];
 
 char *decode_rfc3361(int dl, const uint8_t *data);
 ssize_t decode_rfc3442(char *out, ssize_t len, int pl, const uint8_t *p);

@@ -427,7 +427,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	struct in_addr addr, addr2;
 	in_addr_t *naddr;
 	struct rt *rt;
-	const struct dhcp_opt const *d;
+	const struct dhcp_opt *d;
 	uint8_t *request, *require, *no;
 	struct if_iaid *iaid;
 	uint8_t _iaid[4];

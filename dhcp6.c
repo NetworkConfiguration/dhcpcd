@@ -100,7 +100,7 @@ static const struct dhcp6_op dhcp6_ops[] = {
 };
 
 #define IPV6A	ADDRIPV6 | ARRAY
-const struct dhcp_opt const dhcp6_opts[] = {
+const struct dhcp_opt dhcp6_opts[] = {
 	{ D6_OPTION_CLIENTID,		BINHEX,		"client_id" },
 	{ D6_OPTION_SERVERID,		BINHEX,		"server_id" },
 	{ D6_OPTION_IA_ADDR,		IPV6A,		"ia_addr" },

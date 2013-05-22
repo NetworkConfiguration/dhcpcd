@@ -103,7 +103,7 @@ static const struct dhcp_op dhcp_ops[] = {
 	{ 0, NULL }
 };
 
-const struct dhcp_opt const dhcp_opts[] = {
+const struct dhcp_opt dhcp_opts[] = {
 	{ 1,	ADDRIPV4 | REQUEST,	"subnet_mask" },
 		/* RFC 3442 states that the CSR has to come before all other
 		 * routes. For completeness, we also specify static routes,

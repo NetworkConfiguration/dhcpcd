@@ -82,7 +82,7 @@
 
 #include "dhcp.h"
 #include "ipv6.h"
-extern const struct dhcp_opt const dhcp6_opts[];
+extern const struct dhcp_opt dhcp6_opts[];
 
 struct dhcp6_message {
 	uint8_t type;
