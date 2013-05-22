@@ -684,6 +684,9 @@ ipv6_buildroutes(void)
 
 	/* First add reachable routers and their prefixes */
 	ipv6_buildroutes1(&dnr, 0);
+#ifdef HAVE_ROUTE_METRIC
+	have_default = (TAILQ_FIRST(&dnr) != NULL);
+#endif
 
 	/* We have no way of knowing if prefixes added by DHCP are reachable
 	 * or not, so we have to assume they are */
@@ -703,6 +706,13 @@ ipv6_buildroutes(void)
 		}
 	}
 
+#ifdef HAVE_ROUTE_METRIC
+	/* If we have an unreachable router, we really do need to remove the
+	 * route to it beause it could be a lower metric than a reachable
+	 * router. Of course, we should at least have some routers if all
+	 * are unreachable. */
+	if (!have_default)
+#endif
 	/* Add our non-reachable routers and prefixes
 	 * Unsure if this is needed, but it's a close match to kernel
 	 * behaviour */
