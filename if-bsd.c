@@ -311,7 +311,15 @@ if_address6(const struct interface *ifp, const struct ipv6_addr *a, int action)
 		return -1;
 	memset(&ifa, 0, sizeof(ifa));
 	strlcpy(ifa.ifra_name, ifp->name, sizeof(ifa.ifra_name));
-	ifa.ifra_flags = IN6_IFF_TENTATIVE;
+	/*
+	 * We should not set IN6_IFF_TENTATIVE as the kernel should be
+	 * able to work out if it's a new address or not and set it accordingly
+	 * although FreeBSD seems to be buggy here.
+	 *
+	 * We should set IN6_IFF_AUTOCONF, but the kernel won't let us.
+	 * This is probably a safety measure, but still it's not entirely right
+	 * either.
+	 */
 #if 0
 	if (a->autoconf)
 		ifa.ifra_flags |= IN6_IFF_AUTOCONF;

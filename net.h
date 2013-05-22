@@ -28,6 +28,8 @@
 #ifndef INTERFACE_H
 #define INTERFACE_H
 
+#include <sys/socket.h>
+
 #include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/if_ether.h>

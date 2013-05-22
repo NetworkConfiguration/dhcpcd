@@ -34,6 +34,7 @@
 #include <netinet/in.h>
 #ifdef AF_LINK
 #  include <net/if_dl.h>
+#  include <net/if_var.h>
 #  include <net/if_types.h>
 #  include <netinet/in_var.h>
 #endif
