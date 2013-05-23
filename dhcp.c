@@ -722,6 +722,7 @@ get_option_routes(struct interface *ifp, const struct dhcp_message *dhcp)
 	struct rt_head *routes = NULL;
 	struct rt *route = NULL;
 	int len;
+	const char *csr = "";
 
 	/* If we have CSR's then we MUST use these only */
 	if (!has_option_mask(ifo->nomask, DHO_CSR))
@@ -729,15 +730,18 @@ get_option_routes(struct interface *ifp, const struct dhcp_message *dhcp)
 	else
 		p = NULL;
 	/* Check for crappy MS option */
-	if (!p && !has_option_mask(ifo->nomask, DHO_MSCSR))
+	if (!p && !has_option_mask(ifo->nomask, DHO_MSCSR)) {
 		p = get_option(dhcp, DHO_MSCSR, &len, NULL);
+		if (p)
+			csr = "MS ";
+	}
 	if (p) {
 		routes = decode_rfc3442_rt(len, p);
 		if (routes) {
 			if (!(ifo->options & DHCPCD_CSR_WARNED)) {
 				syslog(LOG_DEBUG,
-				    "%s: using Classless Static Routes",
-				    ifp->name);
+				    "%s: using %sClassless Static Routes",
+				    ifp->name, csr);
 				ifo->options |= DHCPCD_CSR_WARNED;
 			}
 			return routes;
