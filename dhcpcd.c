@@ -970,8 +970,15 @@ main(int argc, char **argv)
 
 	if (options & DHCPCD_DEBUG)
 		setlogmask(LOG_UPTO(LOG_DEBUG));
-	if (options & DHCPCD_QUIET)
-		close(STDERR_FILENO);
+	if (options & DHCPCD_QUIET) {
+		i = open(_PATH_DEVNULL, O_RDWR);
+		if (i == -1)
+			syslog(LOG_ERR, "%s: open: %m", __func__);
+		else {
+			dup2(i, STDERR_FILENO);
+			close(i);
+		}
+	}
 
 	if (!(options & (DHCPCD_TEST | DHCPCD_DUMPLEASE))) {
 		/* If we have any other args, we should run as a single dhcpcd
