@@ -32,9 +32,11 @@
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <netinet/in.h>
+#ifdef __FreeBSD__ /* Needed so that including netinet6/in6_var.h works */
+#  include <net/if_var.h>
+#endif
 #ifdef AF_LINK
 #  include <net/if_dl.h>
-#  include <net/if_var.h>
 #  include <net/if_types.h>
 #  include <netinet/in_var.h>
 #endif
