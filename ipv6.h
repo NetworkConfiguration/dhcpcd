@@ -78,6 +78,7 @@ struct ipv6_addr {
 	struct in6_addr addr;
 	uint8_t onlink;
 	uint8_t new;
+	uint8_t stale;
 	char saddr[INET6_ADDRSTRLEN];
 	uint8_t added;
 	uint8_t autoconf;

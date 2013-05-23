@@ -264,7 +264,7 @@ ipv6rs_sendprobe(void *arg)
 	cm->cmsg_len = CMSG_LEN(sizeof(hoplimit));
 	memcpy(CMSG_DATA(cm), &hoplimit, sizeof(hoplimit));
 
-	syslog(LOG_INFO, "%s: sending Router Solicitation", ifp->name);
+	syslog(LOG_DEBUG, "%s: sending Router Solicitation", ifp->name);
 	if (sendmsg(sock, &sndhdr, 0) == -1) {
 		syslog(LOG_ERR, "%s: sendmsg: %m", ifp->name);
 		ipv6rs_drop(ifp);
@@ -276,7 +276,7 @@ ipv6rs_sendprobe(void *arg)
 		eloop_timeout_add_sec(RTR_SOLICITATION_INTERVAL,
 		    ipv6rs_sendprobe, ifp);
 	else
-		syslog(LOG_INFO, "%s: no IPv6 Routers available", ifp->name);
+		syslog(LOG_WARNING, "%s: no IPv6 Routers available", ifp->name);
 }
 
 static void
@@ -415,7 +415,8 @@ ipv6rs_scriptrun(const struct ra *rap)
 	/* If all addresses have completed DAD run the script */
 	TAILQ_FOREACH(ap, &rap->addrs, next) {
 		if (ap->dadcompleted == 0) {
-			syslog(LOG_INFO, "%s: waiting for Router Advertisement"
+			syslog(LOG_DEBUG,
+			    "%s: waiting for Router Advertisement"
 			    " DAD to complete",
 			    rap->iface->name);
 			return;
@@ -489,7 +490,7 @@ ipv6rs_dadcallback(void *arg)
 			}
 
 			if (wascompleted && found && rap->lifetime) {
-				syslog(LOG_INFO,
+				syslog(LOG_DEBUG,
 				    "%s: Router Advertisement DAD completed",
 				    rap->iface->name);
 				ipv6rs_scriptrun(rap);
@@ -1162,7 +1163,7 @@ ipv6rs_expire(void *arg)
 		if (timercmp(&now, &expire, >)) {
 			valid = 0;
 			if (!rap->expired) {
-				syslog(LOG_INFO,
+				syslog(LOG_WARNING,
 				    "%s: %s: expired default Router",
 				    ifp->name, rap->sfrom);
 				rap->expired = expired = 1;
@@ -1182,7 +1183,7 @@ ipv6rs_expire(void *arg)
 				if (timercmp(&now, &expire, >) &&
 				    ipv6rs_findsameaddr(ap) == NULL)
 				{
-					syslog(LOG_INFO,
+					syslog(LOG_WARNING,
 					    "%s: %s: expired address",
 					    ifp->name, ap->saddr);
 					eloop_timeout_delete(NULL, ap);
@@ -1215,7 +1216,7 @@ ipv6rs_expire(void *arg)
 			if (timercmp(&now, &rao->expire, >)) {
 				/* Expired prefixes are logged above */
 				if (rao->type != ND_OPT_PREFIX_INFORMATION)
-					syslog(LOG_INFO,
+					syslog(LOG_WARNING,
 					    "%s: %s: expired option %d",
 					    ifp->name, rap->sfrom, rao->type);
 				TAILQ_REMOVE(&rap->options, rao, next);
@@ -1249,6 +1250,7 @@ ipv6rs_start(struct interface *ifp)
 {
 	struct rs_state *state;
 
+	syslog(LOG_INFO, "%s: soliciting an IPv6 Router", ifp->name);
 	if (sock == -1) {
 		if (ipv6rs_open() == -1) {
 			syslog(LOG_ERR, "%s: ipv6rs_open: %m", __func__);

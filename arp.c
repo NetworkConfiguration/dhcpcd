@@ -285,10 +285,10 @@ arp_probe(void *arg)
 
 	if (state->probes == 0) {
 		if (arping)
-			syslog(LOG_INFO, "%s: searching for %s",
+			syslog(LOG_DEBUG, "%s: searching for %s",
 			    ifp->name, inet_ntoa(addr));
 		else
-			syslog(LOG_INFO, "%s: checking for %s",
+			syslog(LOG_DEBUG, "%s: checking for %s",
 			    ifp->name, inet_ntoa(addr));
 	}
 	if (++state->probes < PROBE_NUM) {

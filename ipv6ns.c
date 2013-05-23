@@ -387,7 +387,8 @@ ipv6ns_probeaddrs(struct ipv6_addrhead *addrs)
 		    IN6_IS_ADDR_UNSPECIFIED(&ap->addr))
 			continue;
 		ipv6ns_probeaddr(ap);
-		i++;
+		if (ap->new)
+			i++;
 	}
 
 	return i;

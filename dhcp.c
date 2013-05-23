@@ -1683,7 +1683,7 @@ dhcp_renew(void *arg)
 	struct dhcp_state *state = D_STATE(ifp);
 	struct dhcp_lease *lease = &state->lease;
 
-	syslog(LOG_INFO, "%s: renewing lease of %s",
+	syslog(LOG_DEBUG, "%s: renewing lease of %s",
 	    ifp->name, inet_ntoa(lease->addr));
 	syslog(LOG_DEBUG, "%s: rebind in %u seconds, expire in %u seconds",
 	    ifp->name, lease->rebindtime - lease->renewaltime,
@@ -1700,7 +1700,7 @@ dhcp_rebind(void *arg)
 	struct dhcp_state *state = D_STATE(ifp);
 	struct dhcp_lease *lease = &state->lease;
 
-	syslog(LOG_ERR, "%s: failed to renew, attempting to rebind",
+	syslog(LOG_WARNING, "%s: failed to renew, attempting to rebind",
 	    ifp->name);
 	syslog(LOG_DEBUG, "%s: expire in %u seconds",
 	    ifp->name, lease->leasetime - lease->rebindtime);
@@ -1773,7 +1773,7 @@ dhcp_bind(void *arg)
 				lease->rebindtime = lease->leasetime * T2;
 			else if (lease->rebindtime >= lease->leasetime) {
 				lease->rebindtime = lease->leasetime * T2;
-				syslog(LOG_ERR,
+				syslog(LOG_WARNING,
 				    "%s: rebind time greater than lease "
 				    "time, forcing to %u seconds",
 				    iface->name, lease->rebindtime);
@@ -1782,12 +1782,13 @@ dhcp_bind(void *arg)
 				lease->renewaltime = lease->leasetime * T1;
 			else if (lease->renewaltime > lease->rebindtime) {
 				lease->renewaltime = lease->leasetime * T1;
-				syslog(LOG_ERR,
+				syslog(LOG_WARNING,
 				    "%s: renewal time greater than rebind "
 				    "time, forcing to %u seconds",
 				    iface->name, lease->renewaltime);
 			}
-			syslog(LOG_INFO,
+			syslog(lease->addr.s_addr == state->addr.s_addr ?
+			    LOG_DEBUG : LOG_INFO,
 			    "%s: leased %s for %u seconds", iface->name,
 			    inet_ntoa(lease->addr), lease->leasetime);
 		}
@@ -2212,7 +2213,7 @@ dhcp_handle(struct interface *iface, struct dhcp_message **dhcpp,
 
 	if (type) {
 		if (type == DHCP_OFFER) {
-			log_dhcp(LOG_INFO, "ignoring offer of",
+			log_dhcp(LOG_WARNING, "ignoring offer of",
 			    iface, dhcp, from);
 			return;
 		}
@@ -2225,7 +2226,7 @@ dhcp_handle(struct interface *iface, struct dhcp_message **dhcpp,
 		}
 
 		if (!(ifo->options & DHCPCD_INFORM))
-			log_dhcp(LOG_INFO, "acknowledged", iface, dhcp, from);
+			log_dhcp(LOG_DEBUG, "acknowledged", iface, dhcp, from);
 	}
 
 	/* BOOTP could have already assigned this above, so check we still
@@ -2266,11 +2267,11 @@ dhcp_handle(struct interface *iface, struct dhcp_message **dhcpp,
 static ssize_t
 get_udp_data(const uint8_t **data, const uint8_t *udp)
 {
-    struct udp_dhcp_packet p;
+	struct udp_dhcp_packet p;
 
-    memcpy(&p, udp, sizeof(p));
-    *data = udp + offsetof(struct udp_dhcp_packet, dhcp);
-    return ntohs(p.ip.ip_len) - sizeof(p.ip) - sizeof(p.udp);
+	memcpy(&p, udp, sizeof(p));
+	*data = udp + offsetof(struct udp_dhcp_packet, dhcp);
+	return ntohs(p.ip.ip_len) - sizeof(p.ip) - sizeof(p.udp);
 }
 
 static int

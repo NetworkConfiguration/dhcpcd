@@ -701,7 +701,8 @@ ipv6_buildroutes(void)
 		     d6_state->state == DH6S_DELEGATED))
 		{
 			TAILQ_FOREACH(addr, &d6_state->addrs, next) {
-				if (!addr->onlink)
+				if (!addr->onlink ||
+				    IN6_IS_ADDR_UNSPECIFIED(&addr->addr))
 					continue;
 				rt = make_prefix(ifp, NULL, addr);
 				if (rt)

@@ -223,17 +223,17 @@ desc_route(const char *cmd, const struct rt *rt)
 
 	strlcpy(addr, inet_ntoa(rt->dest), sizeof(addr));
 	if (rt->gate.s_addr == INADDR_ANY)
-		syslog(LOG_DEBUG, "%s: %s route to %s/%d", ifname, cmd,
+		syslog(LOG_INFO, "%s: %s route to %s/%d", ifname, cmd,
 		    addr, inet_ntocidr(rt->net));
 	else if (rt->gate.s_addr == rt->dest.s_addr &&
 	    rt->net.s_addr == INADDR_BROADCAST)
-		syslog(LOG_DEBUG, "%s: %s host route to %s", ifname, cmd,
+		syslog(LOG_INFO, "%s: %s host route to %s", ifname, cmd,
 		    addr);
 	else if (rt->dest.s_addr == INADDR_ANY && rt->net.s_addr == INADDR_ANY)
-		syslog(LOG_DEBUG, "%s: %s default route via %s", ifname, cmd,
+		syslog(LOG_INFO, "%s: %s default route via %s", ifname, cmd,
 		    inet_ntoa(rt->gate));
 	else
-		syslog(LOG_DEBUG, "%s: %s route to %s/%d via %s", ifname, cmd,
+		syslog(LOG_INFO, "%s: %s route to %s/%d via %s", ifname, cmd,
 		    addr, inet_ntocidr(rt->net), inet_ntoa(rt->gate));
 }
 

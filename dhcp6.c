@@ -597,7 +597,6 @@ dhcp6_get_op(uint16_t type)
 	return NULL;
 }
 
-
 static void
 dhcp6_freedrop_addrs(struct interface *ifp, int drop)
 {
@@ -816,6 +815,9 @@ dhcp6_startrebind(void *arg)
 	ifp = arg;
 	eloop_timeout_delete(dhcp6_sendrenew, ifp);
 	state = D6_STATE(ifp);
+	if (state->state == DH6S_RENEW)
+		syslog(LOG_WARNING, "%s: failed to renew, rebinding",
+		    ifp->name);
 	state->state = DH6S_REBIND;
 	state->RTC = 0;
 	state->MRC = 0;
@@ -843,6 +845,9 @@ dhcp6_startdiscover(void *arg)
 
 	ifp = arg;
 	state = D6_STATE(ifp);
+	if (state->state == DH6S_REBIND)
+		syslog(LOG_ERR, "%s: failed to renew, soliciting",
+		    ifp->name);
 	state->state = DH6S_DISCOVER;
 	state->start_uptime = uptime();
 	state->RTC = 0;
@@ -1020,21 +1025,30 @@ static int dhcp6_getstatus(const struct dhcp6_option *o)
 	return ntohs(s->status);
 }
 
+static struct ipv6_addr *
+dhcp6_findaddr(const struct in6_addr *a, struct interface *ifp)
+{
+	const struct dhcp6_state *state;
+	struct ipv6_addr *ap;
+
+	state = D6_CSTATE(ifp);
+	if (state) {
+		TAILQ_FOREACH(ap, &state->addrs, next) {
+			if (IN6_ARE_ADDR_EQUAL(&ap->addr, a))
+				return ap;
+		}
+	}
+	return NULL;
+}
+
 int
 dhcp6_addrexists(const struct ipv6_addr *a)
 {
-	const struct interface *ifp;
-	const struct dhcp6_state *state;
-	const struct ipv6_addr *ap;
+	struct interface *ifp;
 
 	TAILQ_FOREACH(ifp, ifaces, next) {
-		state = D6_CSTATE(ifp);
-		if (state == NULL)
-			continue;
-		TAILQ_FOREACH(ap, &state->addrs, next) {
-			if (memcmp(&ap->addr, &a->addr, sizeof(a->addr)) == 0)
-				return 1;
-		}
+		if (dhcp6_findaddr(&a->addr, ifp))
+			return 1;
 	}
 	return 0;
 }
@@ -1071,7 +1085,7 @@ dhcp6_dadcallback(void *arg)
 				}
 			}
 			if (!wascompleted) {
-				syslog(LOG_INFO, "%s: DHCPv6 DAD completed",
+				syslog(LOG_DEBUG, "%s: DHCPv6 DAD completed",
 				    ifp->name);
 				script_runreason(ifp, state->reason);
 				daemonise();
@@ -1087,6 +1101,7 @@ dhcp6_findna(struct interface *ifp, const uint8_t *iaid,
 	struct dhcp6_state *state;
 	const struct dhcp6_option *o;
 	const uint8_t *p;
+	struct in6_addr in6;
 	struct ipv6_addr *a;
 	const struct ipv6_addr *pa;
 	char iabuf[INET6_ADDRSTRLEN];
@@ -1108,20 +1123,24 @@ dhcp6_findna(struct interface *ifp, const uint8_t *iaid,
 			    ifp->name);
 			continue;
 		}
-		a = calloc(1, sizeof(*a));
-		if (a == NULL) {
-			syslog(LOG_ERR, "%s: %m", __func__);
-			break;
-		}
-		a->iface = ifp;
-		a->new = 1;
-		a->onlink = 1; /* XXX: suprised no DHCP opt for this */
-		a->dadcallback = dhcp6_dadcallback;
-		memcpy(a->iaid, iaid, sizeof(a->iaid));
 		p = D6_COPTION_DATA(o);
-		memcpy(&a->addr.s6_addr, p,
-		    sizeof(a->addr.s6_addr));
-		p += sizeof(a->addr.s6_addr);
+		memcpy(&in6.s6_addr, p, sizeof(in6.s6_addr));
+		p += sizeof(in6.s6_addr);
+		a = dhcp6_findaddr(&in6, ifp);
+		if (a == NULL) {
+			a = calloc(1, sizeof(*a));
+			if (a == NULL) {
+				syslog(LOG_ERR, "%s: %m", __func__);
+				break;
+			}
+			a->iface = ifp;
+			a->new = 1;
+			a->onlink = 1; /* XXX: suprised no DHCP opt for this */
+			a->dadcallback = dhcp6_dadcallback;
+			memcpy(a->iaid, iaid, sizeof(a->iaid));
+			memcpy(&a->addr.s6_addr, &in6.s6_addr,
+			    sizeof(in6.s6_addr));
+		}
 		pa = ipv6rs_findprefix(a);
 		if (pa) {
 			memcpy(&a->prefix, &pa->prefix,
@@ -1148,7 +1167,10 @@ dhcp6_findna(struct interface *ifp, const uint8_t *iaid,
 		    iabuf, sizeof(iabuf));
 		snprintf(a->saddr, sizeof(a->saddr),
 		    "%s/%d", ia, a->prefix_len);
-		TAILQ_INSERT_TAIL(&state->addrs, a, next);
+		if (a->stale)
+			a->stale = 0;
+		else
+			TAILQ_INSERT_TAIL(&state->addrs, a, next);
 		i++;
 	}
 	return i;
@@ -1231,10 +1253,10 @@ dhcp6_findia(struct interface *ifp, const uint8_t *d, size_t l,
 	uint32_t u32, renew, rebind;
 	uint8_t iaid[4];
 	size_t ol;
+	struct ipv6_addr *ap, *nap;
 
 	ifo = ifp->options;
 	i = 0;
-	dhcp6_freedrop_addrs(ifp, 0);
 	state = D6_STATE(ifp);
 	while ((o = dhcp6_findoption(ifo->ia_type, d, l))) {
 		l -= ((const uint8_t *)o - d);
@@ -1284,6 +1306,7 @@ dhcp6_findia(struct interface *ifp, const uint8_t *d, size_t l,
 			return -1;
 		}
 		if (ifo->ia_type == D6_OPTION_IA_PD) {
+			dhcp6_freedrop_addrs(ifp, 0);
 			if (dhcp6_findpd(ifp, iaid, p, ol) == 0) {
 				syslog(LOG_ERR,
 				    "%s: %s: DHCPv6 REPLY missing Prefix",
@@ -1291,11 +1314,23 @@ dhcp6_findia(struct interface *ifp, const uint8_t *d, size_t l,
 				return -1;
 			}
 		} else {
+			TAILQ_FOREACH(ap, &state->addrs, next) {
+				ap->stale = 1;
+			}
 			if (dhcp6_findna(ifp, iaid, p, ol) == 0) {
 				syslog(LOG_ERR,
 				    "%s: %s: DHCPv6 REPLY missing IA Address",
 				    ifp->name, sfrom);
 				return -1;
+			}
+			TAILQ_FOREACH_SAFE(ap, &state->addrs, next, nap) {
+				if (ap->stale) {
+					TAILQ_REMOVE(&state->addrs, ap, next);
+					if (ap->dadcallback)
+						eloop_q_timeout_delete(0, NULL,
+						    ap->dadcallback);
+					free(ap);
+				}
 			}
 		}
 		i++;
@@ -1495,7 +1530,7 @@ dhcp6_delegate_addr(struct interface *ifp, const struct ipv6_addr *prefix,
 
 	/* Remove any exiting address */
 	TAILQ_FOREACH(ap, &state->addrs, next) {
-		if (memcmp(&ap->addr, &a->addr, sizeof(ap->addr)) == 0) {
+		if (IN6_ARE_ADDR_EQUAL(&ap->addr, &a->addr)) {
 			TAILQ_REMOVE(&state->addrs, ap, next);
 			free(ap);
 			break;
@@ -1608,6 +1643,7 @@ dhcp6_handledata(__unused void *arg)
 	const struct dhcp_opt *opt;
 	const struct if_options *ifo;
 	const struct ipv6_addr *ap;
+	uint8_t stale;
 
 	len = recvmsg(sock, &rcvhdr, 0);
 	if (len == -1) {
@@ -1775,7 +1811,15 @@ replyok:
 	}
 
 recv:
-	syslog(LOG_INFO, "%s: %s received from %s", ifp->name, op, sfrom);
+	stale = 1;
+	TAILQ_FOREACH(ap, &state->addrs, next) {
+		if (ap->new) {
+			stale = 0;
+			break;
+		}
+	}
+	syslog(stale ? LOG_DEBUG : LOG_INFO,
+	    "%s: %s received from %s", ifp->name, op, sfrom);
 
 	state->reason = NULL;
 	eloop_timeout_delete(NULL, ifp);
@@ -1848,7 +1892,7 @@ recv:
 			dhcp6_delegate_prefix(ifp);
 		ipv6ns_probeaddrs(&state->addrs);
 		if (state->renew || state->rebind)
-			syslog(LOG_INFO,
+			syslog(stale ? LOG_DEBUG : LOG_INFO,
 			    "%s: renew in %u seconds, rebind in %u seconds",
 			    ifp->name, state->renew, state->rebind);
 		ipv6_buildroutes();
@@ -1866,8 +1910,8 @@ recv:
 			script_runreason(ifp, state->reason);
 			daemonise();
 		} else
-			syslog(LOG_INFO, "%s: waiting for DHCPv6 DAD"
-			    " to complete",
+			syslog(LOG_DEBUG,
+			    "%s: waiting for DHCPv6 DAD to complete",
 			    ifp->name);
 	}
 
@@ -1973,7 +2017,7 @@ dhcp6_start(struct interface *ifp, int manage)
 		return 0;
 
 	syslog(LOG_INFO, "%s: %s", ifp->name,
-	    manage ? "soliciting DHCPv6 address" :
+	    manage ? "soliciting a DHCPv6 address" :
 	    "requesting DHCPv6 information");
 
 	state->state = manage ? DH6S_INIT : DH6S_INFORM;
