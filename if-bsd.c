@@ -313,8 +313,7 @@ if_address6(const struct interface *ifp, const struct ipv6_addr *a, int action)
 	strlcpy(ifa.ifra_name, ifp->name, sizeof(ifa.ifra_name));
 	/*
 	 * We should not set IN6_IFF_TENTATIVE as the kernel should be
-	 * able to work out if it's a new address or not and set it accordingly
-	 * although FreeBSD seems to be buggy here.
+	 * able to work out if it's a new address or not.
 	 *
 	 * We should set IN6_IFF_AUTOCONF, but the kernel won't let us.
 	 * This is probably a safety measure, but still it's not entirely right
