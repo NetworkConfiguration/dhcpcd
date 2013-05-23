@@ -253,36 +253,19 @@ ipv4_routedeleted(const struct rt *rt)
 	return 1;
 }
 
+#define n_route(a)	 nc_route(1, a, a)
+#define c_route(a, b)	 nc_route(0, a, b)
 static int
-n_route(struct rt *rt)
+nc_route(int add, struct rt *ort, struct rt *nrt)
 {
-	const struct dhcp_state *s;
 
-	/* Don't set default routes if not asked to */
-	if (rt->dest.s_addr == 0 &&
-	    rt->net.s_addr == 0 &&
-	    !(rt->iface->options->options & DHCPCD_GATEWAY))
-		return -1;
-
-	/* Delete the route first as it could exist prior to dhcpcd running
-	 * and we need to ensure it leaves via our preffered interface */
-	ipv4_deleteroute(rt);
-	if (ipv4_addroute(rt) == 0)
-		return 0;
-	syslog(LOG_ERR, "%s: ipv4_addroute: %m", rt->iface->name);
-	return -1;
-}
-
-static int
-c_route(struct rt *ort, struct rt *nrt)
-{
 	/* Don't set default routes if not asked to */
 	if (nrt->dest.s_addr == 0 &&
 	    nrt->net.s_addr == 0 &&
 	    !(nrt->iface->options->options & DHCPCD_GATEWAY))
 		return -1;
 
-	desc_route("changing", nrt);
+	desc_route(add ? "adding" : "changing", nrt);
 	/* We delete and add the route so that we can change metric.
 	 * This also has the nice side effect of flushing ARP entries so
 	 * we don't have to do that manually. */
