@@ -264,23 +264,11 @@ n_route(struct rt *rt)
 	    !(rt->iface->options->options & DHCPCD_GATEWAY))
 		return -1;
 
-	desc_route("adding", rt);
-	if (!ipv4_addroute(rt))
+	/* Delete the route first as it could exist prior to dhcpcd running
+	 * and we need to ensure it leaves via our preffered interface */
+	ipv4_deleteroute(rt);
+	if (ipv4_addroute(rt) == 0)
 		return 0;
-	if (errno == EEXIST) {
-		s = D_CSTATE(rt->iface);
-		/* Pretend we added the subnet route */
-		if (rt->dest.s_addr == (s->addr.s_addr & s->net.s_addr) &&
-		    rt->net.s_addr == s->net.s_addr &&
-		    rt->gate.s_addr == 0)
-			return 0;
-		else {
-			syslog(LOG_DEBUG,
-			    "%s: route exists but not in dhcpcd control",
-			    rt->iface->name);
-			return -1;
-		}
-	}
 	syslog(LOG_ERR, "%s: ipv4_addroute: %m", rt->iface->name);
 	return -1;
 }
