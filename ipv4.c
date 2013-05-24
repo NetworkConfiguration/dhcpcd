@@ -266,7 +266,8 @@ nc_route(int add, struct rt *ort, struct rt *nrt)
 		return -1;
 
 	desc_route(add ? "adding" : "changing", nrt);
-	/* We delete and add the route so that we can change metric.
+	/* We delete and add the route so that we can change metric and
+	 * prefer the interface.
 	 * This also has the nice side effect of flushing ARP entries so
 	 * we don't have to do that manually. */
 	ipv4_deleteroute(ort);

@@ -493,29 +493,10 @@ desc_route(const char *cmd, const struct rt6 *rt)
 		    dest, ipv6_prefixlen(&rt->net), gate);
 }
 
+#define n_route(a)	 nc_route(1, a, a)
+#define c_route(a, b)	 nc_route(0, a, b)
 static int
-n_route(struct rt6 *rt)
-{
-
-	/* Don't set default routes if not asked to */
-	if (IN6_IS_ADDR_UNSPECIFIED(&rt->dest) &&
-	    IN6_IS_ADDR_UNSPECIFIED(&rt->net) &&
-	    !(rt->iface->options->options & DHCPCD_GATEWAY))
-		return -1;
-
-	/* Delete the route first as it could exist prior to dhcpcd running
-	 * and we need to ensure it leaves via our preffered interface */
-	del_route6(rt);
-	desc_route("adding", rt);
-	if (!add_route6(rt))
-		return 0;
-
-	syslog(LOG_ERR, "%s: add_route: %m", rt->iface->name);
-	return -1;
-}
-
-static int
-c_route(struct rt6 *ort, struct rt6 *nrt)
+nc_route(int add, struct rt6 *ort, struct rt6 *nrt)
 {
 
 	/* Don't set default routes if not asked to */
@@ -524,14 +505,13 @@ c_route(struct rt6 *ort, struct rt6 *nrt)
 	    !(nrt->iface->options->options & DHCPCD_GATEWAY))
 		return -1;
 
-	desc_route("changing", nrt);
-	/* We delete and add the route so that we can change metric.
-	 * This also has the nice side effect of flushing ARP entries so
-	 * we don't have to do that manually. */
+	desc_route(add ? "adding" : "changing", nrt);
+	/* We delete and add the route so that we can change metric and
+	 * prefer the interface. */
 	del_route6(ort);
 	if (!add_route6(nrt))
 		return 0;
-	syslog(LOG_ERR, "%s: add_route: %m", nrt->iface->name);
+	syslog(LOG_ERR, "%s: add_route6: %m", nrt->iface->name);
 	return -1;
 }
 
@@ -543,7 +523,7 @@ d_route(struct rt6 *rt)
 	desc_route("deleting", rt);
 	retval = del_route6(rt);
 	if (retval != 0 && errno != ENOENT && errno != ESRCH)
-		syslog(LOG_ERR,"%s: del_route: %m", rt->iface->name);
+		syslog(LOG_ERR,"%s: del_route6: %m", rt->iface->name);
 	return retval;
 }
 
