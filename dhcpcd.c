@@ -426,8 +426,22 @@ start_interface(void *arg)
 		if (!(ifo->options & DHCPCD_IPV6RS)) {
 			if (ifo->options & DHCPCD_IA_FORCED)
 				nolease = dhcp6_start(ifp, 1);
-			else
-				nolease = dhcp6_find_delegates(ifp);;
+			else {
+				nolease = dhcp6_find_delegates(ifp);
+				/* Enabling the below doesn't really make
+				 * sense as there is currently no standard
+				 * to push routes via DHCPv6.
+				 * (There is an expired working draft,
+				 * maybe abandoned?)
+				 * You can also get it to work by forcing
+				 * an IA as shown above. */
+#if 0
+				/* With no RS or delegates we might
+				 * as well try and solicit a DHCPv6 address */
+				if (nolease == 0)
+					nolease = dhcp6_start(ifp, 1);
+#endif
+			}
 			if (nolease == -1)
 			        syslog(LOG_ERR,
 				    "%s: dhcp6_start: %m", ifp->name);
