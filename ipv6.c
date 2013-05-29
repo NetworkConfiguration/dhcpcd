@@ -296,6 +296,14 @@ ipv6_handleifa(int cmd, struct if_head *ifs, const char *ifname,
 	struct ll_addr *ap;
 	struct ll_callback *cb;
 
+#if 0
+	char buf[INET6_ADDRSTRLEN];
+	inet_ntop(AF_INET6, &addr->s6_addr,
+	    buf, INET6_ADDRSTRLEN);
+	syslog(LOG_DEBUG, "%s: cmd %d addr %s flags %d",
+	    ifname, cmd, buf, flags);
+#endif
+
 	/* Safety - ignore tentative announcements */
 	if (cmd == RTM_NEWADDR && flags & IN6_IFF_TENTATIVE)
 		return;
@@ -448,6 +456,7 @@ ipv6_handleifa_addrs(int cmd,
 				 * dadcallback function checks it */
 				ap->dadcompleted = 1;
 			}
+			break;
 		}
 	}
 

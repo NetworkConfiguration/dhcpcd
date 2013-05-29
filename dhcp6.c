@@ -1069,15 +1069,17 @@ dhcp6_dadcallback(void *arg)
 		 * We should decline the address */
 		syslog(LOG_WARNING, "%s: DAD detected %s",
 		    ap->iface->name, ap->saddr);
-	else
 #ifdef IPV6_SEND_DAD
+	else
 		ipv6_addaddr(ap);
 #endif
 
 	if (!wascompleted) {
 		ifp = ap->iface;
 		state = D6_STATE(ifp);
-		if (state->state == DH6S_BOUND) {
+		if (state->state == DH6S_BOUND ||
+		    state->state == DH6S_DELEGATED)
+		{
 			TAILQ_FOREACH(ap, &state->addrs, next) {
 				if (!ap->dadcompleted) {
 					wascompleted = 1;
@@ -1492,6 +1494,7 @@ dhcp6_delegate_addr(struct interface *ifp, const struct ipv6_addr *prefix,
 
 		TAILQ_INIT(&state->addrs);
 		state->state = DH6S_DELEGATED;
+		state->reason = "DELEGATED6";
 	}
 
 	a = calloc(1, sizeof(*a));
@@ -1901,7 +1904,7 @@ recv:
 		len = 1;
 		/* If all addresses have completed DAD run the script */
 		TAILQ_FOREACH(ap, &state->addrs, next) {
-			if (ap->dadcompleted == 0) {
+			if (ap->onlink && ap->dadcompleted == 0) {
 				len = 0;
 				break;
 			}
