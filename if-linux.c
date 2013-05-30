@@ -769,7 +769,8 @@ if_route6(const struct rt6 *rt, int action)
 }
 
 int
-in6_addr_flags(const char *ifname, const struct in6_addr *addr)
+in6_addr_flags(__unused const char *ifname,
+    __unused const struct in6_addr *addr)
 {
 
 	/* How do I get IPv6 address flags on Linux? */
