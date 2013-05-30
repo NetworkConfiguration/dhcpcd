@@ -951,10 +951,10 @@ ipv6rs_handledata(__unused void *arg)
 
 handle_flag:
 	if (rap->flags & ND_RA_FLAG_MANAGED) {
-		if (dhcp6_start(ifp, 1) == -1)
+		if (dhcp6_start(ifp, DH6S_INIT) == -1)
 			syslog(LOG_ERR, "dhcp6_start: %s: %m", ifp->name);
 	} else if (rap->flags & ND_RA_FLAG_OTHER) {
-		if (dhcp6_start(ifp, 0) == -1)
+		if (dhcp6_start(ifp, DH6S_INFORM) == -1)
 			syslog(LOG_ERR, "dhcp6_start: %s: %m", ifp->name);
 	} else {
 		if (new_data)

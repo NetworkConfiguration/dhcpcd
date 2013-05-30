@@ -1989,8 +1989,25 @@ errexit:
 	return -1;
 }
 
+static void
+dhcp6_start1(void *arg)
+{
+	struct interface *ifp = arg;
+	struct dhcp6_state *state;
+
+	state = D6_STATE(ifp);
+	syslog(LOG_INFO, "%s: %s", ifp->name,
+	    state->state == DH6S_INFORM ?
+	    "requesting DHCPv6 information" :
+	    "soliciting a DHCPv6 address");
+	if (state->state == DH6S_INFORM)
+		dhcp6_startinform(ifp);
+	else
+		dhcp6_startinit(ifp);
+}
+
 int
-dhcp6_start(struct interface *ifp, int manage)
+dhcp6_start(struct interface *ifp, int init_state)
 {
 	struct dhcp6_state *state;
 
@@ -2022,20 +2039,20 @@ dhcp6_start(struct interface *ifp, int manage)
 	if (dhcp6_find_delegates(ifp))
 		return 0;
 
-	syslog(LOG_INFO, "%s: %s", ifp->name,
-	    manage ? "soliciting a DHCPv6 address" :
-	    "requesting DHCPv6 information");
-
-	state->state = manage ? DH6S_INIT : DH6S_INFORM;
+	state->state = init_state;
 	snprintf(state->leasefile, sizeof(state->leasefile),
 	    LEASEFILE6, ifp->name);
 
-	if (state->state == DH6S_INFORM)
-		dhcp6_startinform(ifp);
-	else
-		dhcp6_startinit(ifp);
+	if (ipv6_linklocal(ifp) == NULL) {
+		syslog(LOG_DEBUG,
+		    "%s: delaying DHCPv6 soliciation for LL address",
+		    ifp->name);
+		ipv6_addlinklocalcallback(ifp, dhcp6_start1, ifp);
+		return 0;
+	}
 
-	return 1;
+	dhcp6_start1(ifp);
+	return 0;
 }
 
 static void

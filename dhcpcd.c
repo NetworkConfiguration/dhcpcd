@@ -425,7 +425,7 @@ start_interface(void *arg)
 
 		if (!(ifo->options & DHCPCD_IPV6RS)) {
 			if (ifo->options & DHCPCD_IA_FORCED)
-				nolease = dhcp6_start(ifp, 1);
+				nolease = dhcp6_start(ifp, DH6S_INIT);
 			else {
 				nolease = dhcp6_find_delegates(ifp);
 				/* Enabling the below doesn't really make
@@ -439,7 +439,7 @@ start_interface(void *arg)
 				/* With no RS or delegates we might
 				 * as well try and solicit a DHCPv6 address */
 				if (nolease == 0)
-					nolease = dhcp6_start(ifp, 1);
+					nolease = dhcp6_start(ifp, DH6S_INIT);
 #endif
 			}
 			if (nolease == -1)
