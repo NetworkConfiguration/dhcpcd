@@ -981,6 +981,9 @@ dhcp6_startrelease(struct interface *ifp)
 	struct dhcp6_state *state;
 
 	state = D6_STATE(ifp);
+	if (state->state != DH6S_BOUND)
+		return;
+
 	state->state = DH6S_RELEASE;
 	state->start_uptime = uptime();
 	state->RTC = 0;
