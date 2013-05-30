@@ -337,9 +337,11 @@ ipv6ns_probeaddr(void *arg)
 	if (ap->dadcallback == NULL)
 		syslog(LOG_WARNING, "%s: no callback!", ap->iface->name);
 #endif
-	if (sendmsg(unspec_sock, &sndhdr, 0) == -1)
+	if (sendmsg(unspec_sock, &sndhdr, 0) == -1) {
 		syslog(LOG_ERR, "%s: %s: sendmsg: %m",
 		    ap->iface->name, __func__);
+		return;
+	}
 
 	if (ap->dadcallback) {
 		ms_to_tv(&tv, RETRANS_TIMER);
@@ -460,15 +462,17 @@ ipv6ns_proberouter(void *arg)
 	syslog(LOG_INFO, "%s: sending IPv6 NS for %s",
 	    rap->iface->name, rap->sfrom);
 #endif
-	if (sendmsg(sock, &sndhdr, 0) == -1)
+	if (sendmsg(sock, &sndhdr, 0) == -1) {
 		syslog(LOG_ERR, "%s: %s: sendmsg: %m",
 		    rap->iface->name, __func__);
+		return;
+	}
 
 	ms_to_tv(&tv, rap->retrans == 0 ? RETRANS_TIMER : rap->retrans);
 	ms_to_tv(&rtv, MIN_RANDOM_FACTOR);
 	timeradd(&tv, &rtv, &tv);
 	rtv.tv_sec = 0;
-	rtv.tv_usec = arc4random() % (MAX_RANDOM_FACTOR_U - MIN_RANDOM_FACTOR_U);
+	rtv.tv_usec = arc4random() % (MAX_RANDOM_FACTOR_U -MIN_RANDOM_FACTOR_U);
 	timeradd(&tv, &rtv, &tv);
 	eloop_timeout_add_tv(&tv, ipv6ns_proberouter, rap);
 

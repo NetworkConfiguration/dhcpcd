@@ -232,7 +232,7 @@ ipv6rs_sendprobe(void *arg)
 	struct in6_pktinfo pi;
 	int hoplimit = HOPLIMIT;
 
-	if (!ipv6_interfacehaslinklocal(ifp)) {
+	if (ipv6_linklocal(ifp) == NULL) {
 		syslog(LOG_DEBUG,
 		    "%s: delaying Router Soliciation for LL address",
 		    ifp->name);
@@ -596,6 +596,16 @@ ipv6rs_handledata(__unused void *arg)
 #endif
 		return;
 	}
+
+	/* We could recieve a RA before we sent a RS*/
+	if (ipv6_linklocal(ifp) == NULL) {
+#ifdef DEBUG_RS
+		syslog(LOG_DEBUG, "%s: received RA from %s (no link-local)",
+		    ifp->name, sfrom);
+#endif
+		return;
+	}
+
 	TAILQ_FOREACH(rap, &ipv6_routers, next) {
 		if (ifp == rap->iface &&
 		    memcmp(rap->from.s6_addr, from.sin6_addr.s6_addr,

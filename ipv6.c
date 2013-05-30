@@ -373,13 +373,15 @@ ipv6_handleifa(int cmd, struct if_head *ifs, const char *ifname,
 	dhcp6_handleifa(cmd, ifname, addr, flags);
 }
 
-int
-ipv6_interfacehaslinklocal(const struct interface *ifp)
+const struct ll_addr *
+ipv6_linklocal(const struct interface *ifp)
 {
 	const struct ipv6_state *state;
 
 	state = IPV6_CSTATE(ifp);
-	return (state && TAILQ_FIRST(&state->ll_addrs)) ? 1 : 0;
+	if (state)
+		return TAILQ_FIRST(&state->ll_addrs);
+	return NULL;
 }
 
 int ipv6_addlinklocalcallback(struct interface *ifp,
