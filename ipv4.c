@@ -650,6 +650,9 @@ ipv4_handleifa(int type, const char *ifname,
 		return;
 
 	state = D_STATE(ifp);
+	if (state == NULL)
+		return;
+
 	if (type == RTM_DELADDR) {
 		if (state->new &&
 		    state->new->yiaddr == addr->s_addr)
