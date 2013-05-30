@@ -391,7 +391,7 @@ dhcp6_makemessage(struct interface *ifp)
 	}
 
 	len += sizeof(*state->send);
-	len += sizeof(*o) + 14; /* clientid */
+	len += sizeof(*o) + duid_len;
 	len += sizeof(*o) + sizeof(uint16_t); /* elapsed */
 #ifdef DHCPCD_IANA_PEN
 	len += sizeof(*o) + dhcp6_makevendor(NULL);
