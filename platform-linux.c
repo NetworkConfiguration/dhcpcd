@@ -160,7 +160,7 @@ restore_kernel_ra(void)
 		       restore[nrestore]);
 		snprintf(path, sizeof(path), "%s/%s/accept_ra",
 			 prefix, restore[nrestore]);
-		if (write_path(path, "1") == -1)
+		if (write_path(path, "1") == -1 && errno != ENOENT)
 			syslog(LOG_ERR, "write_path: %s: %m", path);
 #ifdef DEBUG_MEMORY
 		}

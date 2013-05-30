@@ -386,6 +386,11 @@ discover_interfaces(int argc, char * const *argv)
 				memcpy(ifp->hwaddr, sll->sll_addr, ifp->hwlen);
 #endif
 		}
+#ifdef __linux__
+		/* PPP addresses on Linux don't have hardware addresses */
+		else
+			ifp->index = if_nametoindex(ifp->name);
+#endif
 
 		/* We only work on ethernet by default */
 		if (!(ifp->flags & IFF_POINTOPOINT) &&
