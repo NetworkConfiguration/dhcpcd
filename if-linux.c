@@ -443,7 +443,7 @@ link_netlink(struct nlmsghdr *nlm)
 		return 1;
 	}
 
-	handle_carrier(ifi->ifi_flags & IFF_RUNNING ? 1 : -1,
+	handle_carrier(ifi->ifi_flags & IFF_RUNNING ? LINK_UP : LINK_DOWN,
 	    ifi->ifi_flags, ifn);
 	return 1;
 }

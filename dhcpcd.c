@@ -294,7 +294,7 @@ configure_interface1(struct interface *ifp)
 		ifo->options &= ~(DHCPCD_ARP | DHCPCD_IPV4LL);
 	if (!(ifp->flags & (IFF_POINTOPOINT | IFF_LOOPBACK | IFF_MULTICAST)))
 		ifo->options &= ~DHCPCD_IPV6RS;
-	if (ifo->options & DHCPCD_LINK && carrier_status(ifp) == -1)
+	if (ifo->options & DHCPCD_LINK && carrier_status(ifp) == LINK_UNKNOWN)
 		ifo->options &= ~DHCPCD_LINK;
 
 	if (ifo->metric != -1)
@@ -360,10 +360,9 @@ configure_interface(struct interface *ifp, int argc, char **argv)
 }
 
 void
-handle_carrier(int action, int flags, const char *ifname)
+handle_carrier(int carrier, int flags, const char *ifname)
 {
 	struct interface *ifp;
-	int carrier;
 
 	if (!(options & DHCPCD_LINK))
 		return;
@@ -375,17 +374,15 @@ handle_carrier(int action, int flags, const char *ifname)
 	if (!(ifp->options->options & DHCPCD_LINK))
 		return;
 
-	if (action) {
-		carrier = action == 1 ? 1 : 0;
+	if (carrier == LINK_UNKNOWN)
+		carrier = carrier_status(ifp); /* will set ifp->flags */
+	else
 		ifp->flags = flags;
-	} else
-		carrier = carrier_status(ifp);
 
-	if (carrier == -1)
+	if (carrier == LINK_UNKNOWN)
 		syslog(LOG_ERR, "%s: carrier_status: %m", ifname);
-	else if (carrier == 0 ||
-	    (ifp->flags & (IFF_UP | IFF_RUNNING)) != (IFF_UP | IFF_RUNNING))
-	{
+	/* IFF_RUNNING is checked, if needed, earlier and is OS dependant */
+	else if (carrier == LINK_DOWN || (ifp->flags & IFF_UP) == 0) {
 		if (ifp->carrier != LINK_DOWN) {
 			ifp->carrier = LINK_DOWN;
 			syslog(LOG_INFO, "%s: carrier lost", ifp->name);
@@ -395,9 +392,7 @@ handle_carrier(int action, int flags, const char *ifname)
 			ipv6_free(ifp);
 			dhcp_drop(ifp, "NOCARRIER");
 		}
-	} else if (carrier == 1 &&
-	    (ifp->flags & (IFF_UP | IFF_RUNNING)) == (IFF_UP | IFF_RUNNING))
-	{
+	} else if (carrier == LINK_UP && ifp->flags & IFF_UP) {
 		if (ifp->carrier != LINK_UP) {
 			ifp->carrier = LINK_UP;
 			syslog(LOG_INFO, "%s: carrier acquired", ifp->name);
@@ -417,7 +412,7 @@ start_interface(void *arg)
 	struct if_options *ifo = ifp->options;
 	int nolease;
 
-	handle_carrier(0, 0, ifp->name);
+	handle_carrier(LINK_UNKNOWN, 0, ifp->name);
 	if (ifp->carrier == LINK_DOWN) {
 		syslog(LOG_INFO, "%s: waiting for carrier", ifp->name);
 		return;
@@ -1208,7 +1203,7 @@ main(int argc, char **argv)
 			ts.tv_nsec = 0;
 			nanosleep(&ts, NULL);
 			TAILQ_FOREACH(ifp, ifaces, next) {
-				handle_carrier(0, 0, ifp->name);
+				handle_carrier(LINK_UNKNOWN, 0, ifp->name);
 				if (ifp->carrier != LINK_DOWN) {
 					opt = 1;
 					break;

@@ -570,10 +570,10 @@ manage_link(int fd)
 					break;
 				switch (ifm->ifm_data.ifi_link_state) {
 				case LINK_STATE_DOWN:
-					len = -1;
+					len = LINK_DOWN;
 					break;
 				case LINK_STATE_UP:
-					len = 1;
+					len = LINK_UP;
 					break;
 				default:
 					/* handle_carrier will re-load
@@ -583,7 +583,7 @@ manage_link(int fd)
 					 * set IFF_RUNNING when this routing
 					 * message is generated.
 					 * As such, it is a race ...*/
-					len = 0;
+					len = LINK_UNKNOWN;
 					break;
 				}
 				handle_carrier(len, ifm->ifm_flags, ifname);

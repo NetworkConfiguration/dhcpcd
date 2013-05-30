@@ -169,16 +169,16 @@ carrier_status(struct interface *iface)
 		return -1;
 	iface->flags = ifr.ifr_flags;
 
-	ret = -1;
+	ret = LINK_UNKNOWN;
 #ifdef SIOCGIFMEDIA
 	memset(&ifmr, 0, sizeof(ifmr));
 	strlcpy(ifmr.ifm_name, iface->name, sizeof(ifmr.ifm_name));
 	if (ioctl(socket_afnet, SIOCGIFMEDIA, &ifmr) != -1 &&
 	    ifmr.ifm_status & IFM_AVALID)
-		ret = (ifmr.ifm_status & IFM_ACTIVE) ? 1 : 0;
+		ret = (ifmr.ifm_status & IFM_ACTIVE) ? LINK_UP : LINK_DOWN;
 #endif
-	if (ret == -1)
-		ret = (ifr.ifr_flags & IFF_RUNNING) ? 1 : 0;
+	if (ret == LINK_UNKNOWN)
+		ret = (ifr.ifr_flags & IFF_RUNNING) ? LINK_UP : LINK_DOWN;
 	return ret;
 }
 
