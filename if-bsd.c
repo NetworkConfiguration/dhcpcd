@@ -450,6 +450,20 @@ if_route6(const struct rt6 *rt, int action)
 		retval = -1;
 	return retval;
 }
+
+int
+pfx_flush(void)
+{
+	int s;
+	char dummy[IFNAMSIZ + 1];
+
+	s = socket(AF_INET6, SOCK_DGRAM, 0);
+	if (s != -1) {
+		strcpy(dummy, "lo0");
+		s = ioctl(s, SIOCSPFXFLUSH_IN6, (caddr_t)&dummy);
+	}
+	return s;
+}
 #endif
 
 static void
@@ -472,6 +486,26 @@ get_addrs(int type, char *cp, struct sockaddr **sa)
 }
 
 int
+in6_addr_flags(const char *ifname, const struct in6_addr *addr)
+{
+	int s, flags;
+	struct in6_ifreq ifr6;
+
+	s = socket(AF_INET6, SOCK_DGRAM, 0);
+	flags = -1;
+	if (s != -1) {
+		memset(&ifr6, 0, sizeof(ifr6));
+		strncpy(ifr6.ifr_name, ifname, sizeof(ifr6.ifr_name));
+		ifr6.ifr_addr.sin6_family = AF_INET6;
+		ifr6.ifr_addr.sin6_addr = *addr;
+		if (ioctl(s, SIOCGIFAFLAG_IN6, &ifr6) != -1)
+			flags = ifr6.ifr_flags;
+		close(s);
+	}
+	return flags;
+}
+
+int
 manage_link(int fd)
 {
 	char *p, *e, *cp;
@@ -491,6 +525,7 @@ manage_link(int fd)
 #if defined(INET6) && !defined(LISTEN_DAD)
 	struct in6_addr ia6;
 	struct sockaddr_in6 *sin6;
+	int ifa_flags;
 #endif
 
 	for (;;) {
@@ -620,8 +655,16 @@ manage_link(int fd)
 					memcpy(ia6.s6_addr,
 					    sin6->sin6_addr.s6_addr,
 					    sizeof(ia6.s6_addr));
+					if (rtm->rtm_type == RTM_NEWADDR) {
+						ifa_flags = in6_addr_flags(
+								ifname,
+								&ia6);
+						if (ifa_flags == -1)
+							break;
+					} else
+						ifa_flags = 0;
 					ipv6_handleifa(rtm->rtm_type, NULL,
-					    ifname, &ia6, ifam->ifam_flags);
+					    ifname, &ia6, ifa_flags);
 					break;
 #endif
 				}

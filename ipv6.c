@@ -66,6 +66,7 @@
 #endif
 
 static struct rt6head *routes;
+static uint8_t do_pfx_flush;
 
 #ifdef DEBUG_MEMORY
 static void
@@ -305,8 +306,14 @@ ipv6_handleifa(int cmd, struct if_head *ifs, const char *ifname,
 #endif
 
 	/* Safety - ignore tentative announcements */
-	if (cmd == RTM_NEWADDR && flags & IN6_IFF_TENTATIVE)
-		return;
+	if (cmd == RTM_NEWADDR) {
+		if (flags & (IN6_IFF_TENTATIVE || IN6_IFF_DUPLICATED))
+			cmd = RTM_DELADDR;
+#ifdef IN6_IFF_DETACHED
+		if (flags & IN6_IFF_DETACHED)
+			cmd = RTM_DELADDR;
+#endif
+	}
 
 	if (ifs == NULL)
 		ifs = ifaces;
@@ -372,7 +379,7 @@ ipv6_interfacehaslinklocal(const struct interface *ifp)
 	const struct ipv6_state *state;
 
 	state = IPV6_CSTATE(ifp);
-	return state && TAILQ_FIRST(&state->ll_addrs) ? 1 : 0;
+	return (state && TAILQ_FIRST(&state->ll_addrs)) ? 1 : 0;
 }
 
 int ipv6_addlinklocalcallback(struct interface *ifp,
@@ -417,6 +424,7 @@ ipv6_free(struct interface *ifp)
 			free(cb);
 		}
 		free(state);
+		ifp->if_data[IF_DATA_IPV6] = NULL;
 	}
 }
 
@@ -517,8 +525,9 @@ nc_route(int add, struct rt6 *ort, struct rt6 *nrt)
 	desc_route(add ? "adding" : "changing", nrt);
 	/* We delete and add the route so that we can change metric and
 	 * prefer the interface. */
-	del_route6(ort);
-	if (!add_route6(nrt))
+	if (del_route6(ort) == 0 && add)
+		do_pfx_flush = 1;
+	if (add_route6(nrt) == 0)
 		return 0;
 	syslog(LOG_ERR, "%s: add_route6: %m", nrt->iface->name);
 	return -1;
@@ -668,7 +677,7 @@ ipv6_buildroutes(void)
 	struct ipv6_addr *addr;
 	const struct interface *ifp;
 	const struct dhcp6_state *d6_state;
-	int have_default;
+	uint8_t have_default;
 
 	if (!(options & (DHCPCD_IPV6RA_OWN | DHCPCD_IPV6RA_OWN_DEFAULT)))
 		return;
@@ -718,7 +727,7 @@ ipv6_buildroutes(void)
 		return;
 	}
 	TAILQ_INIT(nrs);
-	have_default = 0;
+	have_default = do_pfx_flush = 0;
 	TAILQ_FOREACH_SAFE(rt, &dnr, next, rtn) {
 		/* Is this route already in our table? */
 		if (find_route6(nrs, rt) != NULL)
@@ -733,6 +742,7 @@ ipv6_buildroutes(void)
 			{
 				if (c_route(or, rt) != 0)
 					continue;
+				do_pfx_flush = 1;
 			}
 			TAILQ_REMOVE(routes, or, next);
 			free(or);
@@ -770,6 +780,22 @@ ipv6_buildroutes(void)
 				d_route(rt);
 		}
 		free(rt);
+	}
+
+	if (do_pfx_flush) {
+		/* We need to flush all entries in our prefix list
+		 * if we changed a route so that we leave via the
+		 * correct interface */
+		if (pfx_flush() == -1)
+			syslog(LOG_ERR, "pfx_flush: %m");
+
+		/* XXX FIXME
+		 * On multi-homed systems on the same network
+		 * (ie wired and wireless) swapping the active routes
+		 * between interfaces (ie, bringing down the wired and
+		 * back up again while wireless is active) causes the
+		 * ping6 command to emit bogus Network is down errors.
+		 * This could be a kernel bug though */
 	}
 
 	free(routes);

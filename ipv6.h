@@ -148,7 +148,6 @@ int ipv6_addlinklocalcallback(struct interface *, void (*)(void *), void *);
 void ipv6_free(struct interface *);
 int ipv6_removesubnet(const struct interface *, struct ipv6_addr *);
 void ipv6_buildroutes(void);
-void ipv6_drop(struct interface *);
 #else
 #define ipv6_init() -1
 #define ipv6_free(a)

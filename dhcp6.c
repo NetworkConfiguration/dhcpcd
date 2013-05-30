@@ -714,7 +714,7 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 	memcpy(CMSG_DATA(cm), &pi, sizeof(pi));
 
 	if (sendmsg(sock, &sndhdr, 0) == -1) {
-		syslog(LOG_ERR, "%s: sendmsg: %m", ifp->name);
+		syslog(LOG_ERR, "%s: %s: sendmsg: %m", ifp->name, __func__);
 		ifp->options->options &= ~DHCPCD_IPV6;
 		dhcp6_drop(ifp, "EXPIRE6");
 		return -1;

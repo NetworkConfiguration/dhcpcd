@@ -339,7 +339,7 @@ ipv6ns_probeaddr(void *arg)
 #endif
 	if (sendmsg(unspec_sock, &sndhdr, 0) == -1)
 		syslog(LOG_ERR, "%s: %s: sendmsg: %m",
-		    __func__, ap->iface->name);
+		    ap->iface->name, __func__);
 
 	if (ap->dadcallback) {
 		ms_to_tv(&tv, RETRANS_TIMER);
@@ -462,8 +462,7 @@ ipv6ns_proberouter(void *arg)
 #endif
 	if (sendmsg(sock, &sndhdr, 0) == -1)
 		syslog(LOG_ERR, "%s: %s: sendmsg: %m",
-		    __func__, rap->iface->name);
-
+		    rap->iface->name, __func__);
 
 	ms_to_tv(&tv, rap->retrans == 0 ? RETRANS_TIMER : rap->retrans);
 	ms_to_tv(&rtv, MIN_RANDOM_FACTOR);

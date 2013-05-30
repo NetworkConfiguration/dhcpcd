@@ -266,7 +266,7 @@ ipv6rs_sendprobe(void *arg)
 
 	syslog(LOG_DEBUG, "%s: sending Router Solicitation", ifp->name);
 	if (sendmsg(sock, &sndhdr, 0) == -1) {
-		syslog(LOG_ERR, "%s: sendmsg: %m", ifp->name);
+		syslog(LOG_ERR, "%s: %s: sendmsg: %m", ifp->name, __func__);
 		ipv6rs_drop(ifp);
 		ifp->options->options &= ~(DHCPCD_IPV6 | DHCPCD_IPV6RS);
 		return;
@@ -1301,11 +1301,11 @@ ipv6rs_drop(struct interface *ifp)
 		}
 	}
 	if (expired) {
-		ipv6_buildroutes();
 		while ((rap = TAILQ_FIRST(&rtrs))) {
 			TAILQ_REMOVE(&rtrs, rap, next);
 			ipv6rs_drop_ra(rap);
 		}
+		ipv6_buildroutes();
 		script_runreason(ifp, "ROUTERADVERT");
 	}
 }

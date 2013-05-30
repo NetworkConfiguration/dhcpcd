@@ -383,16 +383,21 @@ handle_carrier(int action, int flags, const char *ifname)
 
 	if (carrier == -1)
 		syslog(LOG_ERR, "%s: carrier_status: %m", ifname);
-	else if (carrier == 0 || ~ifp->flags & IFF_UP) {
+	else if (carrier == 0 ||
+	    (ifp->flags & (IFF_UP | IFF_RUNNING)) != (IFF_UP | IFF_RUNNING))
+	{
 		if (ifp->carrier != LINK_DOWN) {
 			ifp->carrier = LINK_DOWN;
 			syslog(LOG_INFO, "%s: carrier lost", ifp->name);
 			dhcp_close(ifp);
 			dhcp6_drop(ifp, "EXPIRE6");
 			ipv6rs_drop(ifp);
+			ipv6_free(ifp);
 			dhcp_drop(ifp, "NOCARRIER");
 		}
-	} else if (carrier == 1 && !(~ifp->flags & IFF_UP)) {
+	} else if (carrier == 1 &&
+	    (ifp->flags & (IFF_UP | IFF_RUNNING)) == (IFF_UP | IFF_RUNNING))
+	{
 		if (ifp->carrier != LINK_UP) {
 			ifp->carrier = LINK_UP;
 			syslog(LOG_INFO, "%s: carrier acquired", ifp->name);
