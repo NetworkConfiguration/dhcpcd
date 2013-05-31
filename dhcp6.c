@@ -1240,7 +1240,7 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			break;
 		}
 		a->iface = ifp;
-		a->flags = IPV6_AF_NEW;
+		a->flags = IPV6_AF_NEW | IPV6_AF_ONLINK;
 		a->dadcallback = dhcp6_dadcallback;
 		memcpy(a->iaid, iaid, sizeof(a->iaid));
 		p = D6_COPTION_DATA(o);
