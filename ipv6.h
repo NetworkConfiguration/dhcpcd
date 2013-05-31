@@ -38,6 +38,10 @@
 #define ROUNDUP8(a) (1 + (((a) - 1) | 7))
 
 #ifdef INET6
+#ifndef ND6_INFINITE_LIFETIME
+#  define ND6_INFINITE_LIFETIME		((uint32_t)~0)
+#endif
+
 /*
  * BSD kernels don't inform userland of DAD results.
  * Also, for RTM_NEWADDR messages the address flags could be

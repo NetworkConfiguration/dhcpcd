@@ -1379,7 +1379,7 @@ dhcp6_validatelease(struct interface *ifp,
 	}
 
 	state->renew = state->rebind = state->expire = 0;
-	state->lowpl = ~0U;
+	state->lowpl = ND6_INFINITE_LIFETIME;
 	len -= (const char *)o - (const char *)m;
 	return dhcp6_findia(ifp, (const uint8_t *)o, len, sfrom);
 }
@@ -1436,10 +1436,13 @@ dhcp6_readlease(struct interface *ifp)
 	if (dhcp6_validatelease(ifp, state->new, state->new_len, NULL) == -1)
 		goto ex;
 
-	gettimeofday(&now, NULL);
-	if ((time_t)state->expire < now.tv_sec - st.st_mtime) {
-		syslog(LOG_DEBUG, "%s: discarding expired lease", ifp->name);
-		goto ex;
+	if (state->expire != ND6_INFINITE_LIFETIME) {
+		gettimeofday(&now, NULL);
+		if ((time_t)state->expire < now.tv_sec - st.st_mtime) {
+			syslog(LOG_DEBUG,"%s: discarding expired lease",
+			    ifp->name);
+			goto ex;
+		}
 	}
 
 	return bytes;
@@ -1461,8 +1464,8 @@ dhcp6_startinit(struct interface *ifp)
 
 	state = D6_STATE(ifp);
 	state->state = DH6S_INIT;
-	state->expire = ~0U;
-	state->lowpl = ~0U;
+	state->expire = ND6_INFINITE_LIFETIME;
+	state->lowpl = ND6_INFINITE_LIFETIME;
 	if (!(options & DHCPCD_TEST) &&
 	    ifp->options->ia_type != D6_OPTION_IA_TA &&
 	    ifp->options->reboot != 0)
@@ -1841,8 +1844,8 @@ recv:
 	case DH6S_INFORM:
 		state->renew = 0;
 		state->rebind = 0;
-		state->expire = ~0U;
-		state->lowpl = ~0U;
+		state->expire = ND6_INFINITE_LIFETIME;
+		state->lowpl = ND6_INFINITE_LIFETIME;
 		state->reason = "INFORM6";
 		break;
 	case DH6S_REQUEST:
@@ -1860,14 +1863,14 @@ recv:
 		if (state->reason == NULL)
 			state->reason = "REBOOT6";
 		if (state->renew == 0) {
-			if (state->expire == ~0U)
-				state->renew = ~0U;
+			if (state->expire == ND6_INFINITE_LIFETIME)
+				state->renew = ND6_INFINITE_LIFETIME;
 			else
 				state->renew = state->lowpl * 0.5;
 		}
 		if (state->rebind == 0) {
-			if (state->expire == ~0U)
-				state->rebind = ~0U;
+			if (state->expire == ND6_INFINITE_LIFETIME)
+				state->rebind = ND6_INFINITE_LIFETIME;
 			else
 				state->rebind = state->lowpl * 0.8;
 		}
@@ -1893,13 +1896,13 @@ recv:
 		if (state->state == DH6S_INFORM)
 			script_runreason(ifp, state->reason);
 		state->state = DH6S_BOUND;
-		if (state->renew)
+		if (state->renew && state->renew != ND6_INFINITE_LIFETIME)
 			eloop_timeout_add_sec(state->renew,
 			    dhcp6_startrenew, ifp);
-		if (state->rebind)
+		if (state->rebind && state->rebind != ND6_INFINITE_LIFETIME)
 			eloop_timeout_add_sec(state->rebind,
 			    dhcp6_startrebind, ifp);
-		if (state->expire != ~0U)
+		if (state->expire && state->expire != ND6_INFINITE_LIFETIME)
 			eloop_timeout_add_sec(state->expire,
 			    dhcp6_startexpire, ifp);
 		if (ifp->options->ia_type == D6_OPTION_IA_PD)
