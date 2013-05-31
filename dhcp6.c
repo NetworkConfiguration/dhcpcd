@@ -610,7 +610,7 @@ dhcp6_freedrop_addrs(struct interface *ifp, int drop)
 		/* Only drop the address if no other RAs have assigned it.
 		 * This is safe because the RA is removed from the list
 		 * before we are called. */
-		if (drop && ap->onlink &&
+		if (drop && ap->flags & IPV6_AF_ONLINK &&
 		    !dhcp6_addrexists(ap) &&
 		    !ipv6rs_addrexists(ap))
 		{
@@ -1088,10 +1088,10 @@ dhcp6_dadcallback(void *arg)
 	struct dhcp6_state *state;
 	int wascompleted;
 
-	wascompleted = ap->dadcompleted;
+	wascompleted = (ap->flags & IPV6_AF_DADCOMPLETED);
 	ipv6ns_cancelprobeaddr(ap);
-	ap->dadcompleted = 1;
-	if (ap->dad)
+	ap->flags |= IPV6_AF_DADCOMPLETED;
+	if (ap->flags & IPV6_AF_DUPLICATED)
 		/* XXX FIXME
 		 * We should decline the address */
 		syslog(LOG_WARNING, "%s: DAD detected %s",
@@ -1108,7 +1108,7 @@ dhcp6_dadcallback(void *arg)
 		    state->state == DH6S_DELEGATED)
 		{
 			TAILQ_FOREACH(ap, &state->addrs, next) {
-				if (!ap->dadcompleted) {
+				if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0) {
 					wascompleted = 1;
 					break;
 				}
@@ -1163,8 +1163,7 @@ dhcp6_findna(struct interface *ifp, const uint8_t *iaid,
 				break;
 			}
 			a->iface = ifp;
-			a->new = 1;
-			a->onlink = 1; /* XXX: suprised no DHCP opt for this */
+			a->flags = IPV6_AF_NEW | IPV6_AF_ONLINK;
 			a->dadcallback = dhcp6_dadcallback;
 			memcpy(a->iaid, iaid, sizeof(a->iaid));
 			memcpy(&a->addr.s6_addr, &in6.s6_addr,
@@ -1196,8 +1195,8 @@ dhcp6_findna(struct interface *ifp, const uint8_t *iaid,
 		    iabuf, sizeof(iabuf));
 		snprintf(a->saddr, sizeof(a->saddr),
 		    "%s/%d", ia, a->prefix_len);
-		if (a->stale)
-			a->stale = 0;
+		if (a->flags & IPV6_AF_STALE)
+			a->flags &= ~IPV6_AF_STALE;
 		else
 			TAILQ_INSERT_TAIL(&state->addrs, a, next);
 		i++;
@@ -1239,8 +1238,7 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			break;
 		}
 		a->iface = ifp;
-		a->new = 1;
-		a->onlink = 0;
+		a->flags = IPV6_AF_NEW;
 		a->dadcallback = dhcp6_dadcallback;
 		memcpy(a->iaid, iaid, sizeof(a->iaid));
 		p = D6_COPTION_DATA(o);
@@ -1340,7 +1338,7 @@ dhcp6_findia(struct interface *ifp, const uint8_t *d, size_t l,
 			}
 		} else {
 			TAILQ_FOREACH(ap, &state->addrs, next) {
-				ap->stale = 1;
+				ap->flags |= IPV6_AF_STALE;
 			}
 			if (dhcp6_findna(ifp, iaid, p, ol) == 0) {
 				syslog(LOG_ERR,
@@ -1349,7 +1347,7 @@ dhcp6_findia(struct interface *ifp, const uint8_t *d, size_t l,
 				return -1;
 			}
 			TAILQ_FOREACH_SAFE(ap, &state->addrs, next, nap) {
-				if (ap->stale) {
+				if (ap->flags & IPV6_AF_STALE) {
 					TAILQ_REMOVE(&state->addrs, ap, next);
 					if (ap->dadcallback)
 						eloop_q_timeout_delete(0, NULL,
@@ -1526,8 +1524,7 @@ dhcp6_delegate_addr(struct interface *ifp, const struct ipv6_addr *prefix,
 		return NULL;
 	}
 	a->iface = ifp;
-	a->new = 1;
-	a->onlink = 1;
+	a->flags = IPV6_AF_NEW | IPV6_AF_ONLINK;
 	a->dadcallback = dhcp6_dadcallback;
 	a->delegating_iface = ifs;
 	memcpy(&a->iaid, &prefix->iaid, sizeof(a->iaid));
@@ -1830,7 +1827,7 @@ replyok:
 recv:
 	stale = 1;
 	TAILQ_FOREACH(ap, &state->addrs, next) {
-		if (ap->new) {
+		if (ap->flags & IPV6_AF_NEW) {
 			stale = 0;
 			break;
 		}
@@ -1918,7 +1915,9 @@ recv:
 		len = 1;
 		/* If all addresses have completed DAD run the script */
 		TAILQ_FOREACH(ap, &state->addrs, next) {
-			if (ap->onlink && ap->dadcompleted == 0) {
+			if (ap->flags & IPV6_AF_ONLINK &&
+			    (ap->flags & IPV6_AF_DADCOMPLETED) == 0)
+			{
 				len = 0;
 				break;
 			}

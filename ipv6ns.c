@@ -261,7 +261,8 @@ ipv6ns_probeaddr(void *arg)
 #endif
 
 	if (ap->dadcallback &&
-	    (ap->new == 0 || ap->nsprobes >= ap->iface->options->dadtransmits))
+	    ((ap->flags & IPV6_AF_NEW) == 0 ||
+	    ap->nsprobes >= ap->iface->options->dadtransmits))
 	{
 #ifdef IPV6_SEND_DAD
 		ap->dadcallback(ap);
@@ -274,7 +275,7 @@ ipv6ns_probeaddr(void *arg)
 	if (ipv6ns_open() == -1)
 		return;
 
-	ap->dadcompleted = 0;
+	ap->flags &= ~IPV6_AF_DADCOMPLETED;
 
 #ifdef IPV6_SEND_DAD
 	if (!ap->ns) {
@@ -386,10 +387,11 @@ ipv6ns_probeaddrs(struct ipv6_addrhead *addrs)
 	i = 0;
 	TAILQ_FOREACH(ap, addrs, next) {
 		if (ap->prefix_vltime == 0 ||
-		    IN6_IS_ADDR_UNSPECIFIED(&ap->addr))
+		    IN6_IS_ADDR_UNSPECIFIED(&ap->addr) ||
+		    ap->flags & IPV6_AF_DELEGATED)
 			continue;
 		ipv6ns_probeaddr(ap);
-		if (ap->new)
+		if (ap->flags & IPV6_AF_NEW)
 			i++;
 	}
 

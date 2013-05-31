@@ -76,23 +76,26 @@ struct ipv6_addr {
 	uint32_t prefix_vltime;
 	uint32_t prefix_pltime;
 	struct in6_addr addr;
-	uint8_t onlink;
-	uint8_t new;
-	uint8_t stale;
+	short flags;
 	char saddr[INET6_ADDRSTRLEN];
-	uint8_t added;
-	uint8_t autoconf;
 	uint8_t iaid[4];
 	struct interface *delegating_iface;
 
 	void (*dadcallback)(void *);
-	uint8_t dad;
-	uint8_t dadcompleted;
 	uint8_t *ns;
 	size_t nslen;
 	int nsprobes;
 };
 TAILQ_HEAD(ipv6_addrhead, ipv6_addr);
+
+#define IPV6_AF_ONLINK		0x0001
+#define	IPV6_AF_NEW		0x0002
+#define IPV6_AF_STALE		0x0004
+#define IPV6_AF_ADDED		0x0008
+#define IPV6_AF_AUTOCONF	0x0010
+#define IPV6_AF_DUPLICATED	0x0020
+#define IPV6_AF_DADCOMPLETED	0x0040
+#define IPV6_AF_DELEGATED	0x0080
 
 struct rt6 {
 	TAILQ_ENTRY(rt6) next;

@@ -318,7 +318,7 @@ ipv6rs_freedrop_addrs(struct ra *rap, int drop)
 		/* Only drop the address if no other RAs have assigned it.
 		 * This is safe because the RA is removed from the list
 		 * before we are called. */
-		if (drop && ap->added &&
+		if (drop && ap->flags & IPV6_AF_ADDED &&
 		    !IN6_IS_ADDR_UNSPECIFIED(&ap->addr) &&
 		    !ipv6rs_addrexists(ap) && !dhcp6_addrexists(ap))
 		{
@@ -414,7 +414,7 @@ ipv6rs_scriptrun(const struct ra *rap)
 
 	/* If all addresses have completed DAD run the script */
 	TAILQ_FOREACH(ap, &rap->addrs, next) {
-		if (ap->dadcompleted == 0) {
+		if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0) {
 			syslog(LOG_DEBUG,
 			    "%s: waiting for Router Advertisement"
 			    " DAD to complete",
@@ -461,10 +461,10 @@ ipv6rs_dadcallback(void *arg)
 	struct ra *rap;
 	int wascompleted, found;
 
-	wascompleted = ap->dadcompleted;
+	wascompleted = (ap->flags & IPV6_AF_DADCOMPLETED);
 	ipv6ns_cancelprobeaddr(ap);
-	ap->dadcompleted = 1;
-	if (ap->dad)
+	ap->flags |= IPV6_AF_DADCOMPLETED;
+	if (ap->flags & IPV6_AF_DUPLICATED)
 		/* No idea what how to try and make another address :( */
 		syslog(LOG_WARNING, "%s: DAD detected %s",
 		    ap->iface->name, ap->saddr);
@@ -481,7 +481,7 @@ ipv6rs_dadcallback(void *arg)
 				continue;
 			wascompleted = 1;
 			TAILQ_FOREACH(rapap, &rap->addrs, next) {
-				if (!rapap->dadcompleted) {
+				if ((rapap->flags & IPV6_AF_DADCOMPLETED) == 0){
 					wascompleted = 0;
 					break;
 				}
@@ -741,9 +741,7 @@ ipv6rs_handledata(__unused void *arg)
 					break;
 				}
 				ap->iface = rap->iface;
-				ap->new = 1;
-				ap->onlink = 0;
-				ap->autoconf = 1;
+				ap->flags = IPV6_AF_NEW | IPV6_AF_AUTOCONF;
 				ap->prefix_len = pi->nd_opt_pi_prefix_len;
 				memcpy(ap->prefix.s6_addr,
 				   pi->nd_opt_pi_prefix.s6_addr,
@@ -774,19 +772,19 @@ ipv6rs_handledata(__unused void *arg)
 			    ntohl(pi->nd_opt_pi_valid_time) ||
 			    ap->prefix_pltime !=
 			    ntohl(pi->nd_opt_pi_preferred_time) ||
-			    ap->dad)
+			    ap->flags & IPV6_AF_DUPLICATED)
 			{
-				ap->new = 1;
+				ap->flags |= IPV6_AF_NEW;
 			}
 			if (pi->nd_opt_pi_flags_reserved &
 			    ND_OPT_PI_FLAG_ONLINK)
-				ap->onlink = 1;
+				ap->flags |= IPV6_AF_ONLINK;
 			ap->prefix_vltime =
 			    ntohl(pi->nd_opt_pi_valid_time);
 			ap->prefix_pltime =
 			    ntohl(pi->nd_opt_pi_preferred_time);
 			ap->nsprobes = 0;
-			ap->dad = 0;
+			ap->flags &= ~IPV6_AF_DUPLICATED;
 			if (opt) {
 				l = strlen(opt);
 				tmp = realloc(opt,

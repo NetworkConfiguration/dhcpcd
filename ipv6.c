@@ -235,14 +235,16 @@ int
 ipv6_addaddr(struct ipv6_addr *ap)
 {
 
-	syslog(ap->new ? LOG_INFO : LOG_DEBUG,
+	syslog(ap->flags & IPV6_AF_NEW ? LOG_INFO : LOG_DEBUG,
 	    "%s: adding address %s", ap->iface->name, ap->saddr);
 	if (add_address6(ap->iface, ap) == -1) {
 		syslog(LOG_ERR, "add_address6 %m");
 		return -1;
 	}
-	ap->new = 0;
-	ap->added = 1;
+	ap->flags &= ~IPV6_AF_NEW;
+	ap->flags |= IPV6_AF_ADDED;
+	if (ap->delegating_iface)
+		ap->flags |= IPV6_AF_DELEGATED;
 	if (ipv6_removesubnet(ap->iface, ap) == -1)
 		syslog(LOG_ERR,"ipv6_removesubnet %m");
 	syslog(LOG_DEBUG,
@@ -260,7 +262,8 @@ ipv6_addaddrs(struct ipv6_addrhead *addrs)
 	i = 0;
 	TAILQ_FOREACH(ap, addrs, next) {
 		if (ap->prefix_vltime == 0 ||
-		    IN6_IS_ADDR_UNSPECIFIED(&ap->addr))
+		    IN6_IS_ADDR_UNSPECIFIED(&ap->addr) ||
+		    ap->flags & IPV6_AF_DELEGATED)
 			continue;
 		if (ipv6_addaddr(ap) == 0)
 			i++;
@@ -441,7 +444,7 @@ ipv6_handleifa_addrs(int cmd,
 	found = 0;
 	TAILQ_FOREACH_SAFE(ap, addrs, next, apn) {
 		if (!IN6_ARE_ADDR_EQUAL(addr, &ap->addr)) {
-			if (ap->dadcompleted == 0)
+			if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0)
 				alldadcompleted = 0;
 			continue;
 		}
@@ -456,15 +459,15 @@ ipv6_handleifa_addrs(int cmd,
 			/* Safety - ignore tentative announcements */
 			if (flags & IN6_IFF_TENTATIVE)
 				break;
-			if (!ap->dadcompleted) {
+			if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0) {
 				found++;
-				if (flags & IN6_IFF_DUPLICATED && ap->dad == 0)
-					ap->dad = 1;
+				if (flags & IN6_IFF_DUPLICATED)
+					ap->flags |= IPV6_AF_DUPLICATED;
 				if (ap->dadcallback)
 					ap->dadcallback(ap);
 				/* We need to set this here in-case the
 				 * dadcallback function checks it */
-				ap->dadcompleted = 1;
+				ap->flags |= IPV6_AF_DADCOMPLETED;
 			}
 			break;
 		}
@@ -654,7 +657,7 @@ ipv6_buildroutes1(struct rt6head *dnr, int expired)
 			continue;
 		if (rap->iface->options->options & DHCPCD_IPV6RA_OWN) {
 			TAILQ_FOREACH(addr, &rap->addrs, next) {
-				if (!addr->onlink)
+				if ((addr->flags & IPV6_AF_ONLINK) == 0)
 					continue;
 				rt = make_prefix(rap->iface, rap, addr);
 				if (rt)
@@ -701,7 +704,7 @@ ipv6_buildroutes(void)
 		     d6_state->state == DH6S_DELEGATED))
 		{
 			TAILQ_FOREACH(addr, &d6_state->addrs, next) {
-				if (!addr->onlink ||
+				if ((addr->flags & IPV6_AF_ONLINK) == 0 ||
 				    IN6_IS_ADDR_UNSPECIFIED(&addr->addr))
 					continue;
 				rt = make_prefix(ifp, NULL, addr);
