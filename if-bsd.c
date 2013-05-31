@@ -650,7 +650,7 @@ manage_link(int fd)
 #endif
 #if defined(INET6) && !defined(LISTEN_DAD)
 				case AF_INET6:
-					sin6 = (struct sockaddr_in6*)
+					sin6 = (struct sockaddr_in6*)(void *)
 					    rti_info[RTAX_IFA];
 					memcpy(ia6.s6_addr,
 					    sin6->sin6_addr.s6_addr,
