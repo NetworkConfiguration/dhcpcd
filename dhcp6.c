@@ -80,6 +80,7 @@ static unsigned char *duid;
 static uint16_t duid_len;
 static char ntopbuf[INET6_ADDRSTRLEN];
 static char *status;
+static size_t status_len;
 
 struct dhcp6_op {
 	uint16_t type;
@@ -287,8 +288,6 @@ dhcp6_findoption(int code, const uint8_t *d, ssize_t len)
 	    len > (ssize_t)sizeof(*o);
 	    o = D6_CNEXT_OPTION(o))
 	{
-		if (o->len == 0)
-			break;
 		len -= sizeof(*o) + ntohs(o->len);
 		if (len < 0) {
 			errno = EINVAL;
@@ -1004,6 +1003,7 @@ dhcp6_startrelease(struct interface *ifp)
 
 static int dhcp6_getstatus(const struct dhcp6_option *o)
 {
+	char *nstatus;
 	const struct dhcp6_status *s;
 	size_t len;
 
@@ -1019,13 +1019,37 @@ static int dhcp6_getstatus(const struct dhcp6_option *o)
 	}
 	s = (const struct dhcp6_status *)o;
 	len = ntohs(s->len) - sizeof(s->len);
-	if (status == NULL || len > strlen(status)) {
-		free(status);
-		status = malloc(len + 1);
+	if (status == NULL || len + 1 > status_len) {
+		status_len = len;
+		nstatus = realloc(status, status_len + 1);
+		if (nstatus == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			free(status);
+		}
+		status = nstatus;
 	}
-	memcpy(status, (const char *)s + sizeof(*s), len);
-	status[len] = '\0';
+	if (status) {
+		memcpy(status, (const char *)s + sizeof(*s), len);
+		status[len] = '\0';
+	}
 	return ntohs(s->status);
+}
+
+static int
+dhcp6_checkstatusok(const struct interface *ifp,
+    const struct dhcp6_message *m, const uint8_t *p, size_t len)
+{
+	const struct dhcp6_option *o;
+
+	if (p)
+		o = dhcp6_findoption(D6_OPTION_STATUS_CODE, p, len);
+	else
+		o = dhcp6_getoption(D6_OPTION_STATUS_CODE, m, len);
+	if (o && dhcp6_getstatus(o) != D6_STATUS_OK) {
+		syslog(LOG_ERR, "%s: DHCPv6 REPLY: %s", ifp->name, status);
+		return -1;
+	}
+	return 0;
 }
 
 static struct ipv6_addr *
@@ -1304,12 +1328,8 @@ dhcp6_findia(struct interface *ifp, const uint8_t *d, size_t l,
 			    (rebind < state->rebind || state->rebind == 0))
 				state->rebind = rebind;
 		}
-		o = dhcp6_findoption(D6_OPTION_STATUS_CODE, p, ol);
-		if (o && dhcp6_getstatus(o) != D6_STATUS_OK) {
-			syslog(LOG_ERR, "%s: DHCPv6 REPLY: %s",
-			    ifp->name, status);
+		if (dhcp6_checkstatusok(ifp, NULL, p, ol) == -1)
 			return -1;
-		}
 		if (ifo->ia_type == D6_OPTION_IA_PD) {
 			dhcp6_freedrop_addrs(ifp, 0);
 			if (dhcp6_findpd(ifp, iaid, p, ol) == 0) {
@@ -1754,16 +1774,7 @@ dhcp6_handledata(__unused void *arg)
 			break;
 		switch(state->state) {
 		case DH6S_CONFIRM:
-			o = dhcp6_getoption(D6_OPTION_STATUS_CODE, r, len);
-			if (o == NULL) {
-				syslog(LOG_ERR,
-				    "%s: no status code in reply from %s",
-				    ifp->name, sfrom);
-				return;
-			}
-			if (dhcp6_getstatus(o) != D6_STATUS_OK) {
-				syslog(LOG_ERR, "%s: DHCPv6 REPLY: %s",
-				    ifp->name, status);
+			if (dhcp6_checkstatusok(ifp, r, NULL, len) == -1) {
 				dhcp6_startdiscover(ifp);
 				return;
 			}
