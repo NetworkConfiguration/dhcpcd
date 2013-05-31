@@ -566,7 +566,7 @@ d_route(struct rt6 *rt)
 }
 
 static struct rt6 *
-make_route(const struct interface *ifp, struct ra *rap)
+make_route(const struct interface *ifp, const struct ra *rap)
 {
 	struct rt6 *r;
 
@@ -586,7 +586,8 @@ make_route(const struct interface *ifp, struct ra *rap)
 }
 
 static struct rt6 *
-make_prefix(const struct interface * ifp,struct ra *rap, struct ipv6_addr *addr)
+make_prefix(const struct interface * ifp, const struct ra *rap,
+    const struct ipv6_addr *addr)
 {
 	struct rt6 *r;
 
@@ -604,7 +605,7 @@ make_prefix(const struct interface * ifp,struct ra *rap, struct ipv6_addr *addr)
 
 
 static struct rt6 *
-make_router(struct ra *rap)
+make_router(const struct ra *rap)
 {
 	struct rt6 *r;
 
@@ -661,11 +662,11 @@ ipv6_removesubnet(const struct interface *ifp, struct ipv6_addr *addr)
 	    IN6_ARE_ADDR_EQUAL(&((rtp)->net), &in6addr_any))
 
 static void
-ipv6_buildroutes1(struct rt6head *dnr, int expired)
+ipv6_build_ra_routes(struct rt6head *dnr, int expired)
 {
 	struct rt6 *rt;
-	struct ra *rap;
-	struct ipv6_addr *addr;
+	const struct ra *rap;
+	const struct ipv6_addr *addr;
 
 	TAILQ_FOREACH(rap, &ipv6_routers, next) {
 		if (rap->expired != expired)
@@ -689,14 +690,34 @@ ipv6_buildroutes1(struct rt6head *dnr, int expired)
 	}
 }
 
+static void
+ipv6_build_dhcp_routes(struct rt6head *dnr, enum DH6S dstate)
+{
+	const struct interface *ifp;
+	const struct dhcp6_state *d6_state;
+	const struct ipv6_addr *addr;
+	struct rt6 *rt;
+
+	TAILQ_FOREACH(ifp, ifaces, next) {
+		d6_state = D6_CSTATE(ifp);
+		if (d6_state && d6_state->state == dstate) {
+			TAILQ_FOREACH(addr, &d6_state->addrs, next) {
+				if ((addr->flags & IPV6_AF_ONLINK) == 0 ||
+				    IN6_IS_ADDR_UNSPECIFIED(&addr->addr))
+					continue;
+				rt = make_prefix(ifp, NULL, addr);
+				if (rt)
+					TAILQ_INSERT_TAIL(dnr, rt, next);
+			}
+		}
+	}
+}
+
 void
 ipv6_buildroutes(void)
 {
 	struct rt6head dnr, *nrs;
 	struct rt6 *rt, *rtn, *or;
-	struct ipv6_addr *addr;
-	const struct interface *ifp;
-	const struct dhcp6_state *d6_state;
 	uint8_t have_default;
 
 	if (!(options & (DHCPCD_IPV6RA_OWN | DHCPCD_IPV6RA_OWN_DEFAULT)))
@@ -705,29 +726,16 @@ ipv6_buildroutes(void)
 	TAILQ_INIT(&dnr);
 
 	/* First add reachable routers and their prefixes */
-	ipv6_buildroutes1(&dnr, 0);
+	ipv6_build_ra_routes(&dnr, 0);
 #ifdef HAVE_ROUTE_METRIC
 	have_default = (TAILQ_FIRST(&dnr) != NULL);
 #endif
 
 	/* We have no way of knowing if prefixes added by DHCP are reachable
-	 * or not, so we have to assume they are */
-	TAILQ_FOREACH(ifp, ifaces, next) {
-		d6_state = D6_CSTATE(ifp);
-		if (d6_state &&
-		    (d6_state->state == DH6S_BOUND ||
-		     d6_state->state == DH6S_DELEGATED))
-		{
-			TAILQ_FOREACH(addr, &d6_state->addrs, next) {
-				if ((addr->flags & IPV6_AF_ONLINK) == 0 ||
-				    IN6_IS_ADDR_UNSPECIFIED(&addr->addr))
-					continue;
-				rt = make_prefix(ifp, NULL, addr);
-				if (rt)
-					TAILQ_INSERT_TAIL(&dnr, rt, next);
-			}
-		}
-	}
+	 * or not, so we have to assume they are.
+	 * Add bound before delegated so we can prefer interfaces better */
+	ipv6_build_dhcp_routes(&dnr, DH6S_BOUND);
+	ipv6_build_dhcp_routes(&dnr, DH6S_DELEGATED);
 
 #ifdef HAVE_ROUTE_METRIC
 	/* If we have an unreachable router, we really do need to remove the
@@ -739,7 +747,7 @@ ipv6_buildroutes(void)
 	/* Add our non-reachable routers and prefixes
 	 * Unsure if this is needed, but it's a close match to kernel
 	 * behaviour */
-	ipv6_buildroutes1(&dnr, 1);
+	ipv6_build_ra_routes(&dnr, 1);
 
 	nrs = malloc(sizeof(*nrs));
 	if (nrs == NULL) {

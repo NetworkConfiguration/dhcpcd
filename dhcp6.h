@@ -209,7 +209,7 @@ struct dhcp6_state {
 void dhcp6_printoptions(void);
 int dhcp6_addrexists(const struct ipv6_addr *);
 int dhcp6_find_delegates(struct interface *);
-int dhcp6_start(struct interface *, int);
+int dhcp6_start(struct interface *, enum DH6S);
 ssize_t dhcp6_env(char **, const char *, const struct interface *,
     const struct dhcp6_message *, ssize_t);
 void dhcp6_free(struct interface *);

@@ -2023,7 +2023,7 @@ dhcp6_start1(void *arg)
 }
 
 int
-dhcp6_start(struct interface *ifp, int init_state)
+dhcp6_start(struct interface *ifp, enum DH6S init_state)
 {
 	struct dhcp6_state *state;
 
