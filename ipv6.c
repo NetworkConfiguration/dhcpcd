@@ -250,20 +250,20 @@ ipv6_addaddr(struct ipv6_addr *ap)
 	if (ap->prefix_pltime == ND6_INFINITE_LIFETIME &&
 	    ap->prefix_vltime == ND6_INFINITE_LIFETIME)
 		syslog(LOG_DEBUG,
-		    "%s: pltime infinity, vltime infinity",
+		    "%s: vltime infinity, pltime infinity",
 		    ap->iface->name);
 	else if (ap->prefix_pltime == ND6_INFINITE_LIFETIME)
 		syslog(LOG_DEBUG,
-		    "%s: pltime infinity, vltime %d seconds",
+		    "%s: vltime %"PRIu32" seconds, pltime infinity",
 		    ap->iface->name, ap->prefix_vltime);
 	else if (ap->prefix_vltime == ND6_INFINITE_LIFETIME)
 		syslog(LOG_DEBUG,
-		    "%s: pltime %d seconds, vltime infinity",
+		    "%s: vltime infinity, pltime %"PRIu32"seconds",
 		    ap->iface->name, ap->prefix_pltime);
 	else
 		syslog(LOG_DEBUG,
-		    "%s: pltime %d seconds, vltime %d seconds",
-		    ap->iface->name, ap->prefix_pltime, ap->prefix_vltime);
+		    "%s: vltime %"PRIu32" seconds, pltime %"PRIu32" seconds",
+		    ap->iface->name, ap->prefix_vltime, ap->prefix_pltime);
 	return 0;
 }
 

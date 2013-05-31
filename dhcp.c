@@ -1685,7 +1685,8 @@ dhcp_renew(void *arg)
 
 	syslog(LOG_DEBUG, "%s: renewing lease of %s",
 	    ifp->name, inet_ntoa(lease->addr));
-	syslog(LOG_DEBUG, "%s: rebind in %u seconds, expire in %u seconds",
+	syslog(LOG_DEBUG, "%s: rebind in %"PRIu32" seconds,"
+	    " expire in %"PRIu32" seconds",
 	    ifp->name, lease->rebindtime - lease->renewaltime,
 	    lease->leasetime - lease->renewaltime);
 	state->state = DHS_RENEW;
@@ -1702,7 +1703,7 @@ dhcp_rebind(void *arg)
 
 	syslog(LOG_WARNING, "%s: failed to renew, attempting to rebind",
 	    ifp->name);
-	syslog(LOG_DEBUG, "%s: expire in %u seconds",
+	syslog(LOG_DEBUG, "%s: expire in %"PRIu32" seconds",
 	    ifp->name, lease->leasetime - lease->rebindtime);
 	state->state = DHS_REBIND;
 	eloop_timeout_delete(send_renew, ifp);
@@ -1710,6 +1711,7 @@ dhcp_rebind(void *arg)
 	ifp->options->options &= ~ DHCPCD_CSR_WARNED;
 	send_rebind(ifp);
 }
+
 
 void
 dhcp_bind(void *arg)
@@ -1775,7 +1777,7 @@ dhcp_bind(void *arg)
 				lease->rebindtime = lease->leasetime * T2;
 				syslog(LOG_WARNING,
 				    "%s: rebind time greater than lease "
-				    "time, forcing to %u seconds",
+				    "time, forcing to %"PRIu32" seconds",
 				    iface->name, lease->rebindtime);
 			}
 			if (lease->renewaltime == 0)
@@ -1784,12 +1786,12 @@ dhcp_bind(void *arg)
 				lease->renewaltime = lease->leasetime * T1;
 				syslog(LOG_WARNING,
 				    "%s: renewal time greater than rebind "
-				    "time, forcing to %u seconds",
+				    "time, forcing to %"PRIu32" seconds",
 				    iface->name, lease->renewaltime);
 			}
 			syslog(lease->addr.s_addr == state->addr.s_addr ?
 			    LOG_DEBUG : LOG_INFO,
-			    "%s: leased %s for %u seconds", iface->name,
+			    "%s: leased %s for %"PRIu32" seconds", iface->name,
 			    inet_ntoa(lease->addr), lease->leasetime);
 		}
 	}
@@ -1817,7 +1819,8 @@ dhcp_bind(void *arg)
 		eloop_timeout_add_sec(lease->rebindtime, dhcp_rebind, iface);
 		eloop_timeout_add_sec(lease->leasetime, dhcp_expire, iface);
 		syslog(LOG_DEBUG,
-		    "%s: renew in %u seconds, rebind in %u seconds",
+		    "%s: renew in %"PRIu32" seconds, rebind in %"PRIu32
+		    " seconds",
 		    iface->name, lease->renewaltime, lease->rebindtime);
 	}
 	ipv4_applyaddr(iface);

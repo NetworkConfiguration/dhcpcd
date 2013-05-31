@@ -686,7 +686,8 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 		}
 
 		syslog(LOG_DEBUG,
-		    "%s: sending %s (xid 0x%02x%02x%02x), next in %0.2f seconds",
+		    "%s: sending %s (xid 0x%02x%02x%02x),"
+		    " next in %0.2f seconds",
 		    ifp->name, dhcp6_get_op(state->send->type),
 		    state->send->xid[0],
 		    state->send->xid[1],
@@ -1910,7 +1911,8 @@ recv:
 		ipv6ns_probeaddrs(&state->addrs);
 		if (state->renew || state->rebind)
 			syslog(stale ? LOG_DEBUG : LOG_INFO,
-			    "%s: renew in %u seconds, rebind in %u seconds",
+			    "%s: renew in %"PRIu32" seconds,"
+			    " rebind in %"PRIu32" seconds",
 			    ifp->name, state->renew, state->rebind);
 		ipv6_buildroutes();
 		dhcp6_writelease(ifp);
