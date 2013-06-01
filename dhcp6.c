@@ -1240,7 +1240,7 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			break;
 		}
 		a->iface = ifp;
-		a->flags = IPV6_AF_NEW | IPV6_AF_ONLINK;
+		a->flags = IPV6_AF_NEW;
 		a->dadcallback = dhcp6_dadcallback;
 		memcpy(a->iaid, iaid, sizeof(a->iaid));
 		p = D6_COPTION_DATA(o);
@@ -1492,24 +1492,20 @@ static struct ipv6_addr *
 dhcp6_delegate_addr(struct interface *ifp, const struct ipv6_addr *prefix,
     const struct if_sla *sla, struct interface *ifs)
 {
+	struct in6_addr addr;
 	struct dhcp6_state *state;
 	struct ipv6_addr *a, *ap;
-	int b, i, l, pl, hl;
-	const uint8_t *p;
 	char iabuf[INET6_ADDRSTRLEN];
 	const char *ia;
 
-	state = D6_STATE(ifp);
-
-	l = prefix->prefix_len + sla->sla_len;
-	hl= (ifp->hwlen * 8) + (2 * 8); /* 2 magic bytes for ethernet */
-	pl = l + hl;
-	if (pl < 0 || pl > 128) {
-		syslog(LOG_ERR, "%s: invalid prefix length (%d + %d + %d = %d)",
-		    ifs->name, prefix->prefix_len, sla->sla_len, hl, pl);
+	if (ipv6_userprefix(&prefix->prefix, prefix->prefix_len,
+		sla->sla, &addr, sla->prefix_len) == -1)
+	{
+		syslog(LOG_ERR, "%s: invalid prefix", ifp->name);
 		return NULL;
 	}
 
+	state = D6_STATE(ifp);
 	if (state == NULL) {
 		ifp->if_data[IF_DATA_DHCP6] = calloc(1, sizeof(*state));
 		state = D6_STATE(ifp);
@@ -1535,17 +1531,8 @@ dhcp6_delegate_addr(struct interface *ifp, const struct ipv6_addr *prefix,
 	memcpy(&a->iaid, &prefix->iaid, sizeof(a->iaid));
 	a->prefix_pltime = prefix->prefix_pltime;
 	a->prefix_vltime = prefix->prefix_vltime;
-	a->prefix_len = l;
-
-	memset(&a->prefix.s6_addr, 0, sizeof(a->prefix.s6_addr));
-	for (i = 0, b = prefix->prefix_len; b > 0; b -= 8, i++)
-		a->prefix.s6_addr[i] = prefix->prefix.s6_addr[i];
-	p = &sla->sla[3];
-	i = (128 - hl) / 8;
-	for (b = sla->sla_len; b > 7; b -= 8, p--)
-		a->prefix.s6_addr[--i] = *p;
-	if (b)
-		a->prefix.s6_addr[--i] |= *p;
+	memcpy(&a->prefix.s6_addr, &addr.s6_addr, sizeof(a->prefix.s6_addr));
+	a->prefix_len = sla->prefix_len;
 
 	if (ipv6_makeaddr(&a->addr, ifp, &a->prefix, a->prefix_len) == -1)
 	{
@@ -1581,12 +1568,19 @@ dhcp6_delegate_prefix(struct interface *ifp)
 	struct if_iaid *iaid;
 	struct if_sla *sla;
 	struct interface *ifd;
+	uint8_t carrier_warned;
 
 	ifo = ifp->options;
 	state = D6_STATE(ifp);
 	TAILQ_FOREACH(ifd, ifaces, next) {
 		k = 0;
+		carrier_warned = 0;
 		TAILQ_FOREACH(ap, &state->addrs, next) {
+			if (ap->flags & IPV6_AF_NEW) {
+				ap->flags &= ~IPV6_AF_NEW;
+				syslog(LOG_DEBUG, "%s: delegated prefix %s",
+				    ifp->name, ap->saddr);
+			}
 			for (i = 0; i < ifo->iaid_len; i++) {
 				iaid = &ifo->iaid[i];
 				if (memcmp(iaid->iaid, ap->iaid,
@@ -1596,17 +1590,36 @@ dhcp6_delegate_prefix(struct interface *ifp)
 					sla = &iaid->sla[j];
 					if (strcmp(ifd->name, sla->ifname))
 						continue;
+					if (ifd->carrier == LINK_DOWN) {
+						syslog(LOG_DEBUG,
+						    "%s: has no carrier, cannot"
+						    " delegate addresses",
+						    ifd->name);
+						carrier_warned = 1;
+						break;
+					}
 					if (dhcp6_delegate_addr(ifd, ap,
 					    sla, ifp))
 						k++;
 				}
+				if (carrier_warned)
+					break;
 			}
+			if (carrier_warned)
+				break;
 		}
-		if (k) {
+		if (k && !carrier_warned) {
 			ifd_state = D6_STATE(ifd);
 			ipv6ns_probeaddrs(&ifd_state->addrs);
 		}
 	}
+}
+
+static void
+dhcp6_find_delegates1(void *arg)
+{
+
+	dhcp6_find_delegates(arg);
 }
 
 int
@@ -1638,6 +1651,16 @@ dhcp6_find_delegates(struct interface *ifp)
 					sla = &iaid->sla[j];
 					if (strcmp(ifp->name, sla->ifname))
 						continue;
+					if (ipv6_linklocal(ifp) == NULL) {
+						syslog(LOG_DEBUG,
+						    "%s: delaying adding"
+						    " delegated addresses for"
+						    " LL address",
+						    ifp->name);
+						ipv6_addlinklocalcallback(ifp,
+						    dhcp6_find_delegates1, ifp);
+						return 1;
+					}
 					if (dhcp6_delegate_addr(ifp, ap,
 					    sla, ifd))
 					    k++;
@@ -2029,8 +2052,10 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 
 	state = D6_STATE(ifp);
 	if (state) {
-		if (state->state == DH6S_DELEGATED)
-			return dhcp6_find_delegates(ifp);
+		if (state->state == DH6S_DELEGATED) {
+			dhcp6_find_delegates(ifp);
+			return 0;
+		}
 		/* We're already running DHCP6 */
 		/* XXX: What if the managed flag changes? */
 		return 0;

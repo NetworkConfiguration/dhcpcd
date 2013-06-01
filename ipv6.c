@@ -66,6 +66,12 @@
 #  define s6_addr32 __u6_addr.__u6_addr32
 #endif
 
+#define EUI64_GBIT	0x01
+#define EUI64_UBIT	0x02
+#define EUI64_TO_IFID(in6)	do {(in6)->s6_addr[8] ^= EUI64_UBIT; } \
+				    while (/*CONSTCOND*/ 0)
+#define EUI64_GROUP(in6)	((in6)->s6_addr[8] & EUI64_GBIT)
+
 static struct rt6head *routes;
 static uint8_t do_pfx_flush;
 
@@ -137,23 +143,93 @@ ipv6_makeaddr(struct in6_addr *addr, const struct interface *ifp,
 {
 	const struct ipv6_state *state;
 	const struct ll_addr *ap;
+#if 0
+	static u_int8_t allzero[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+	static u_int8_t allone[8] =
+	    { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+#endif
 
 	if (prefix_len < 0 || prefix_len > 64) {
 		errno = EINVAL;
 		return -1;
 	}
 
+	memcpy(addr, prefix, sizeof(*prefix));
+
+	/* Try and make the address from the first local-link address */
 	state = IPV6_CSTATE(ifp);
-	ap = TAILQ_FIRST(&state->ll_addrs);
-	if (ap == NULL) {
-		errno = ENOENT;
+	if (state) {
+		ap = TAILQ_FIRST(&state->ll_addrs);
+		if (ap) {
+			addr->s6_addr32[2] = ap->addr.s6_addr32[2];
+			addr->s6_addr32[3] = ap->addr.s6_addr32[3];
+			return 0;
+		}
+	}
+
+	/* Because we delay a few functions until we get a local-link address
+	 * there is little point in the below code.
+	 * It exists in-case we need to create local-link addresses
+	 * ourselves, but then we would need to be able to send RFC
+	 * conformant DAD requests.
+	 * See ipv6ns.c for why we need the kernel to do this. */
+	errno = ENOENT;
+	return -1;
+
+#if 0
+	/* Make an EUI64 based off our hardware address */
+	switch (ifp->family) {
+	case ARPHRD_ETHER:
+		/* Check for a valid hardware address */
+		if (ifp->hwlen != 8 && ifp->hwlen != 6) {
+			errno = ENOTSUP;
+			return -1;
+		}
+		if (memcmp(ifp->hwaddr, allzero, ifp->hwlen) == 0 ||
+		    memcmp(ifp->hwaddr, allone, ifp->hwlen) == 0)
+		{
+			errno = EINVAL;
+			return -1;
+		}
+
+		/* make a EUI64 address */
+		if (ifp->hwlen == 8)
+			memcpy(&addr->s6_addr[8], ifp->hwaddr, 8);
+		else if (ifp->hwlen == 6) {
+			addr->s6_addr[8] = ifp->hwaddr[0];
+			addr->s6_addr[9] = ifp->hwaddr[1];
+			addr->s6_addr[10] = ifp->hwaddr[2];
+			addr->s6_addr[11] = 0xff;
+			addr->s6_addr[12] = 0xfe;
+			addr->s6_addr[13] = ifp->hwaddr[3];
+			addr->s6_addr[14] = ifp->hwaddr[4];
+			addr->s6_addr[15] = ifp->hwaddr[5];
+		}
+		break;
+	default:
+		errno = ENOTSUP;
 		return -1;
 	}
 
-	memcpy(addr, prefix, sizeof(*prefix));
-	addr->s6_addr32[2] = ap->addr.s6_addr32[2];
-	addr->s6_addr32[3] = ap->addr.s6_addr32[3];
+	/* sanity check: g bit must not indicate "group" */
+	if (EUI64_GROUP(addr)) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	EUI64_TO_IFID(addr);
+
+	/* sanity check: ifid must not be all zero, avoid conflict with
+	 * subnet router anycast */
+	if ((addr->s6_addr[8] & ~(EUI64_GBIT | EUI64_UBIT)) == 0x00 &&
+		memcmp(&addr->s6_addr[9], allzero, 7) == 0)
+	{
+		errno = EINVAL;
+		return -1;
+	}
+
 	return 0;
+#endif
 }
 
 int
@@ -230,6 +306,104 @@ ipv6_prefixlen(const struct in6_addr *mask)
 	}
 
 	return x * NBBY + y;
+}
+
+static void
+in6_to_h64(const struct in6_addr *add, uint64_t *vhigh, uint64_t *vlow)
+{
+	uint64_t l, h;
+	const uint8_t *p = (const uint8_t *)&add->s6_addr;
+
+	h = ((uint64_t)p[0] << 56) |
+	    ((uint64_t)p[1] << 48) |
+	    ((uint64_t)p[2] << 40) |
+	    ((uint64_t)p[3] << 32) |
+	    ((uint64_t)p[4] << 24) |
+	    ((uint64_t)p[5] << 16) |
+	    ((uint64_t)p[6] << 8) |
+	    (uint64_t)p[7];
+	p += 8;
+	l = ((uint64_t)p[0] << 56) |
+	    ((uint64_t)p[1] << 48) |
+	    ((uint64_t)p[2] << 40) |
+	    ((uint64_t)p[3] << 32) |
+	    ((uint64_t)p[4] << 24) |
+	    ((uint64_t)p[5] << 16) |
+	    ((uint64_t)p[6] << 8) |
+	    (uint64_t)p[7];
+
+	*vhigh = h;
+	*vlow = l;
+}
+
+static void
+h64_to_in6(uint64_t vhigh, uint64_t vlow, struct in6_addr *add)
+{
+	uint8_t *p = (uint8_t *)&add->s6_addr;
+
+	p[0] = vhigh >> 56;
+	p[1] = vhigh >> 48;
+	p[2] = vhigh >> 40;
+	p[3] = vhigh >> 32;
+	p[4] = vhigh >> 24;
+	p[5] = vhigh >> 16;
+	p[6] = vhigh >> 8;
+	p[7] = vhigh;
+	p += 8;
+	p[0] = vlow >> 56;
+	p[1] = vlow >> 48;
+	p[2] = vlow >> 40;
+	p[3] = vlow >> 32;
+	p[4] = vlow >> 24;
+	p[5] = vlow >> 16;
+	p[6] = vlow >> 8;
+	p[7] = vlow;
+}
+
+int
+ipv6_userprefix(
+	const struct in6_addr *prefix,	// prefix from router
+	int prefix_len,			// length of prefix received
+	uint64_t user_number,		// "random" number from user
+	struct in6_addr *result,	// resultant prefix
+	int result_len)			// desired prefix length
+{
+	uint64_t vh, vl, user_low, user_high;
+
+	if (prefix_len < 0 || prefix_len > 64 ||
+	    result_len < 0 || result_len > 64)
+	{
+		errno = EINVAL;
+		return -1;
+	}
+
+	/* Check that the user_number fits inside result_len less prefix_len */
+	if (result_len < prefix_len || user_number > INT_MAX ||
+	    ffs((int)user_number) > result_len - prefix_len)
+	{
+	       errno = ERANGE;
+	       return -1;
+	}
+
+	/* virtually shift user number by dest_len, then split at 64 */
+	if (result_len >= 64) {
+		user_high = user_number << (result_len - 64);
+		user_low = 0;
+	} else {
+		user_high = user_number >> (64 - result_len);
+		user_low = user_number << result_len;
+	}
+
+	/* convert to two 64bit host order values */
+	in6_to_h64(prefix, &vh, &vl);
+
+	vh |= user_high;
+	vl |= user_low;
+
+	/* copy back result */
+	h64_to_in6(vh, vl, result);
+
+	return 0;
 }
 
 int

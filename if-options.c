@@ -142,6 +142,8 @@ atoint(const char *s)
 	if ((errno != 0 && n == 0) || s == t ||
 	    (errno == ERANGE && (n == LONG_MAX || n == LONG_MIN)))
 	{
+		if (errno == 0)
+			errno = EINVAL;
 		syslog(LOG_ERR, "`%s' out of range", s);
 		return -1;
 	}
@@ -421,6 +423,7 @@ static int
 parse_option(struct if_options *ifo, int opt, const char *arg)
 {
 	int i;
+	long l;
 	char *p = NULL, *fp, *np, **nconf;
 	ssize_t s;
 	size_t sl;
@@ -429,6 +432,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	struct rt *rt;
 	const struct dhcp_opt *d;
 	uint8_t *request, *require, *no;
+	uint32_t u32;
 	struct if_iaid *iaid;
 	uint8_t _iaid[4];
 	struct if_sla *sla;
@@ -955,6 +959,13 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		fp = strchr(arg, ' ');
 		if (fp)
 			*fp++ = '\0';
+		errno = 0;
+		l = strtol(arg, &np, 0);
+		if (l >= 0 && l <= UINT32_MAX && errno == 0 && *np == '\0') {
+			u32 = htonl(l);
+			memcpy(&_iaid, &u32, sizeof(_iaid));
+			goto got_iaid;
+		}
 		if ((s = parse_string((char *)_iaid, sizeof(_iaid), arg)) < 1) {
 			syslog(LOG_ERR, "%s: invalid IAID", arg);
 			return -1;
@@ -965,6 +976,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			_iaid[2] = '\0';
 		if (s < 2)
 			_iaid[1] = '\0';
+got_iaid:
 		iaid = NULL;
 		for (sl = 0; sl < ifo->iaid_len; sl++) {
 			if (ifo->iaid[sl].iaid[0] == _iaid[0] &&
@@ -1007,10 +1019,6 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			np = strchr(p, '/');
 			if (np)
 				*np++ = '\0';
-			else {
-				syslog(LOG_ERR, "%s: missing sla", arg);
-				return -1;
-			}
 			if (strlcpy(sla->ifname, p,
 			    sizeof(sla->ifname)) >= sizeof(sla->ifname))
 			{
@@ -1019,24 +1027,22 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 				return -1;
 			}
 			p = np;
-			np = strchr(p, '/');
-			if (np)
-				*np++ = '\0';
-			if (parse_string((char *)sla->sla,
-			    sizeof(sla->sla), p) == -1)
-			{
-				syslog(LOG_ERR, "%s: sla: %m", arg);
-				return -1;
-			}
-			if (np) {
-				sla->sla_len = atoint(np);
-				if (sla->sla_len < 0 || sla->sla_len > 128) {
-					syslog(LOG_ERR, "%s: sla len: range",
-					    arg);
+			if (p) {
+				np = strchr(p, '/');
+				if (np)
+					*np++ = '\0';
+				errno = 0;
+				sla->sla = atoint(p);
+				if (errno)
 					return -1;
-				}
-			} else
-				sla->sla_len = 16;
+				if (np) {
+					sla->prefix_len = atoint(np);
+					if (sla->prefix_len < 0 ||
+					    sla->prefix_len > 128)
+						return -1;
+				} else
+					sla->prefix_len = 64;
+			}
 		}
 		break;
 #endif

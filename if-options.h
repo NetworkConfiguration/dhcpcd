@@ -95,8 +95,8 @@ extern const struct option cf_options[];
 
 struct if_sla {
 	char ifname[IF_NAMESIZE];
-	uint8_t sla[16];
-	short sla_len;
+	uint32_t sla;
+	short prefix_len;
 };
 
 struct if_iaid {
