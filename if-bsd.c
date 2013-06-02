@@ -499,7 +499,7 @@ in6_addr_flags(const char *ifname, const struct in6_addr *addr)
 		ifr6.ifr_addr.sin6_family = AF_INET6;
 		ifr6.ifr_addr.sin6_addr = *addr;
 		if (ioctl(s, SIOCGIFAFLAG_IN6, &ifr6) != -1)
-			flags = ifr6.ifr_flags;
+			flags = ifr6.ifr_ifru.ifru_flags6;
 		close(s);
 	}
 	return flags;

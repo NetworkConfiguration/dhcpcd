@@ -589,7 +589,7 @@ ipv6ns_handledata(__unused void *arg)
 			    nd_na->nd_na_target.s6_addr,
 			    sizeof(ap->addr.s6_addr)) == 0)
 			{
-				ap->dad = 1;
+				ap->flags |= IPV6_AF_DUPLICATED;
 				if (ap->dadcallback)
 					ap->dadcallback(ap);
 #ifdef DEBUG_NS
@@ -608,7 +608,7 @@ ipv6ns_handledata(__unused void *arg)
 				    nd_na->nd_na_target.s6_addr,
 				    sizeof(ap->addr.s6_addr)) == 0)
 				{
-					ap->dad = 1;
+					ap->flags |= IPV6_AF_DUPLICATED;
 					if (ap->dadcallback)
 						ap->dadcallback(ap);
 #ifdef DEBUG_NS

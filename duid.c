@@ -29,6 +29,8 @@
 #define DUID_LLT	1
 #define DUID_LL		3
 
+#include <sys/socket.h>
+
 #include <net/if.h>
 #include <net/if_arp.h>
 
