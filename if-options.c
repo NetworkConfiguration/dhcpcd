@@ -961,7 +961,9 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			*fp++ = '\0';
 		errno = 0;
 		l = strtol(arg, &np, 0);
-		if (l >= 0 && l <= UINT32_MAX && errno == 0 && *np == '\0') {
+		if (l >= 0 && l <= (long)UINT32_MAX &&
+		    errno == 0 && *np == '\0')
+		{
 			u32 = htonl(l);
 			memcpy(&_iaid, &u32, sizeof(_iaid));
 			goto got_iaid;
