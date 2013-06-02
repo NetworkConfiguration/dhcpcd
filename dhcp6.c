@@ -861,7 +861,6 @@ dhcp6_startdiscover(void *arg)
 	state->new = NULL;
 	state->new_len = 0;
 
-	/* XXX remove this line when we fix discover stamping on assigned */
 	dhcp6_freedrop_addrs(ifp, 0);
 
 	if (dhcp6_makemessage(ifp) == -1)
@@ -1047,11 +1046,16 @@ dhcp6_checkstatusok(const struct interface *ifp,
 		o = dhcp6_findoption(D6_OPTION_STATUS_CODE, p, len);
 	else
 		o = dhcp6_getoption(D6_OPTION_STATUS_CODE, m, len);
-	if (o && dhcp6_getstatus(o) != D6_STATUS_OK) {
+	if (o == NULL) {
+		//syslog(LOG_DEBUG, "%s: no status", ifp->name);
+		return 0;
+	}
+	if (dhcp6_getstatus(o) != D6_STATUS_OK) {
 		syslog(LOG_ERR, "%s: DHCPv6 REPLY: %s", ifp->name, status);
 		return -1;
 	}
-	return 0;
+	//syslog(LOG_DEBUG, "%s: status: %s", ifp->name, status);
+	return 1;
 }
 
 static struct ipv6_addr *
@@ -1380,6 +1384,9 @@ dhcp6_validatelease(struct interface *ifp,
 		return -1;
 	}
 
+	if (dhcp6_checkstatusok(ifp, m, NULL, len) == -1)
+		return -1;
+
 	state->renew = state->rebind = state->expire = 0;
 	state->lowpl = ND6_INFINITE_LIFETIME;
 	len -= (const char *)o - (const char *)m;
@@ -1694,7 +1701,8 @@ dhcp6_handledata(__unused void *arg)
 	const struct dhcp_opt *opt;
 	const struct if_options *ifo;
 	const struct ipv6_addr *ap;
-	uint8_t stale;
+	uint8_t has_new;
+	int error;
 
 	len = recvmsg(sock, &rcvhdr, 0);
 	if (len == -1) {
@@ -1799,15 +1807,24 @@ dhcp6_handledata(__unused void *arg)
 			break;
 		switch(state->state) {
 		case DH6S_CONFIRM:
-			if (dhcp6_checkstatusok(ifp, r, NULL, len) == -1) {
+			error = dhcp6_checkstatusok(ifp, r, NULL, len);
+			/* If we got an OK status the chances are that we
+			 * didn't get the IA's returned, so preserve them
+			 * from our saved response */
+			if (error == 1)
+				goto recv;
+			if (error == -1 ||
+			    dhcp6_validatelease(ifp, r, len, sfrom) == -1) {
 				dhcp6_startdiscover(ifp);
 				return;
 			}
-			goto recv;
+			break;
 		case DH6S_REQUEST: /* FALLTHROUGH */
 		case DH6S_RENEW: /* FALLTHROUGH */
 		case DH6S_REBIND:
-			goto replyok;
+			if (dhcp6_validatelease(ifp, r, len, sfrom) == -1)
+				return;
+			break;
 		default:
 			op = NULL;
 		}
@@ -1817,7 +1834,6 @@ dhcp6_handledata(__unused void *arg)
 			op = NULL;
 			break;
 		}
-replyok:
 		if (dhcp6_validatelease(ifp, r, len, sfrom) == -1)
 			return;
 		break;
@@ -1853,14 +1869,14 @@ replyok:
 	}
 
 recv:
-	stale = 1;
+	has_new = 0;
 	TAILQ_FOREACH(ap, &state->addrs, next) {
 		if (ap->flags & IPV6_AF_NEW) {
-			stale = 0;
+			has_new = 1;
 			break;
 		}
 	}
-	syslog(stale ? LOG_DEBUG : LOG_INFO,
+	syslog(has_new ? LOG_INFO : LOG_DEBUG,
 	    "%s: %s received from %s", ifp->name, op, sfrom);
 
 	state->reason = NULL;
@@ -1934,7 +1950,7 @@ recv:
 			dhcp6_delegate_prefix(ifp);
 		ipv6ns_probeaddrs(&state->addrs);
 		if (state->renew || state->rebind)
-			syslog(stale ? LOG_DEBUG : LOG_INFO,
+			syslog(has_new ? LOG_INFO : LOG_DEBUG,
 			    "%s: renew in %"PRIu32" seconds,"
 			    " rebind in %"PRIu32" seconds",
 			    ifp->name, state->renew, state->rebind);
