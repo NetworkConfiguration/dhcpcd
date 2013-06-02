@@ -133,7 +133,7 @@ is an empty string then the current system hostname is sent.
 If
 .Ar hostname
 is a FQDN (ie, contains a .) then it will be encoded as such.
-.It Ic ia_na Ar iaid
+.It Ic ia_na Op Ar iaid
 Request a DHCPv6 Normal Address for
 .Ar iaid .
 If none is specified, a default
@@ -141,26 +141,35 @@ If none is specified, a default
 is used.
 If the interface name is 4 characters or less then that is used,
 otherwise the interface index is used.
-.It Ic ia_ta Ar iaid
+.It Ic ia_ta Op Ar iaid
 Request a DHCPv6 Temporary Address for
 .Ar iaid .
-.It Ic ia_pd Ar iaid Op Ar interface / Ar sla_id Op / Ar prefix_len
+.It Ic ia_pd Op Ar iaid Op Ar interface / Ar sla_id Op / Ar prefix_len
 Request a DHCPv6 Delegated Prefix for
 .Ar iaid .
-If an
+If no
+.Ar interface
+is given then we will assign a prefix to every other interface with a unique
+.Ar sla_id
+for each, starting from 0.
+Otherwise addresses are only assigned for each
 .Ar interface
 and
 .Ar sla_id
-is given,
-then an address is also assigned to that
-.Ar interface .
 A default
 .Ar prefix_len
-of 64 is assumed if not given.
+of 64 is assumed.
 .Ar sla_id
 is an integer and is added to the prefix which must fit inside
 .Ar prefix_len
 less the length of the delegated prefix.
+You can specify multiple
+.Ar interface /
+.Ar sla_id /
+.Ar prefix_len
+per
+.Ic ia_pd ,
+space separated.
 IPv6RS should be disabled globally when requesting a Prefix Delegation like so:
 .Pp
 .D1 noipv6rs

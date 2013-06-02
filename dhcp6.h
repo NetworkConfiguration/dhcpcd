@@ -179,6 +179,8 @@ struct dhcp6_state {
 	uint32_t expire;
 	struct ipv6_addrhead addrs;
 	uint32_t lowpl;
+	uint32_t sla;
+	uint8_t sla_set;
 	char leasefile[PATH_MAX];
 	const char *reason;
 };

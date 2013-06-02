@@ -144,8 +144,8 @@ int ipv6_makeaddr(struct in6_addr *, const struct interface *,
 int ipv6_makeprefix(struct in6_addr *, const struct in6_addr *, int);
 int ipv6_mask(struct in6_addr *, int);
 int ipv6_prefixlen(const struct in6_addr *);
-int ipv6_userprefix( const struct in6_addr *, int prefix_len,
-    uint64_t user_number, struct in6_addr *result, int result_len);
+int ipv6_userprefix( const struct in6_addr *, short prefix_len,
+    uint64_t user_number, struct in6_addr *result, short result_len);
 int ipv6_addaddr(struct ipv6_addr *);
 ssize_t ipv6_addaddrs(struct ipv6_addrhead *);
 void ipv6_handleifa(int, struct if_head *,

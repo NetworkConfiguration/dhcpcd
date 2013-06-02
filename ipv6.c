@@ -363,10 +363,10 @@ h64_to_in6(uint64_t vhigh, uint64_t vlow, struct in6_addr *add)
 int
 ipv6_userprefix(
 	const struct in6_addr *prefix,	// prefix from router
-	int prefix_len,			// length of prefix received
+	short prefix_len,		// length of prefix received
 	uint64_t user_number,		// "random" number from user
 	struct in6_addr *result,	// resultant prefix
-	int result_len)			// desired prefix length
+	short result_len)		// desired prefix length
 {
 	uint64_t vh, vl, user_low, user_high;
 
