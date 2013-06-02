@@ -30,6 +30,7 @@
 #define DUID_LL		3
 
 #include <sys/socket.h>
+#include <sys/types.h>
 
 #include <net/if.h>
 #include <net/if_arp.h>
