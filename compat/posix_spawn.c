@@ -1,4 +1,4 @@
-/* 
+/*
  * dhcpcd - DHCP client daemon
  * Copyright (c) 2006-2012 Roy Marples <roy@marples.name>
  * All rights reserved
@@ -73,10 +73,10 @@ posix_spawnattr_handle(const posix_spawnattr_t *attrp)
 
 	return 0;
 }
-    
+
 int
 posix_spawn(pid_t *pid, const char * path,
-	_unused void *arg,
+	__unused void *arg,
 	const posix_spawnattr_t *attrp,
 	char *const argv[], char *const envp[])
 {
