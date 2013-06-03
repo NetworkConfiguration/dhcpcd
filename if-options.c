@@ -435,7 +435,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	uint32_t u32;
 	struct if_iaid *iaid;
 	uint8_t _iaid[4];
-	struct if_sla *sla;
+	struct if_sla *sla, *slap;
 
 	i = 0;
 	switch(opt) {
@@ -1035,6 +1035,7 @@ got_iaid:
 					*np++ = '\0';
 				errno = 0;
 				sla->sla = atoint(p);
+				sla->sla_set = 1;
 				if (errno)
 					return -1;
 				if (np) {
@@ -1044,6 +1045,25 @@ got_iaid:
 						return -1;
 				} else
 					sla->prefix_len = 64;
+			} else {
+				sla->sla_set = 0;
+				/* Sanity - check there are no more
+				 * unspecified SLA's */
+				for (sl = 0; sl < iaid->sla_len - 1; sl++) {
+					slap = &iaid->sla[sl];
+					if (slap->sla_set == 0 &&
+					    strcmp(slap->ifname, sla->ifname)
+					    == 0)
+					{
+						syslog(LOG_WARNING,
+						    "%s: cannot specify the "
+						    "same interface twice with "
+						    "an automatic SLA",
+						    sla->ifname);
+						iaid->sla_len--;
+						break;
+					}
+				}
 			}
 		}
 		break;

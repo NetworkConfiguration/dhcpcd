@@ -1495,10 +1495,39 @@ dhcp6_startinit(struct interface *ifp)
 	dhcp6_startdiscover(ifp);
 }
 
-static struct dhcp6_state *
-dhcp6_getstate(struct interface *ifp)
+static uint32_t
+dhcp6_findsla(void)
+{
+	uint32_t sla;
+	const struct interface *ifp;
+	const struct dhcp6_state *state;
+
+	/* Slow, but finding the lowest free SLA is needed if we get a
+	 * /62 or /63 prefix from upstream */
+	for (sla = 0; sla < UINT32_MAX; sla++) {
+		TAILQ_FOREACH(ifp, ifaces, next) {
+			state = D6_CSTATE(ifp);
+			if (state && state->sla_set && state->sla == sla)
+				break;
+		}
+		if (ifp == NULL)
+			return sla;
+	}
+
+	errno = E2BIG;
+	return 0;
+}
+
+static struct ipv6_addr *
+dhcp6_delegate_addr(struct interface *ifp, const struct ipv6_addr *prefix,
+    const struct if_sla *sla, struct interface *ifs)
 {
 	struct dhcp6_state *state;
+	struct if_sla asla;
+	struct in6_addr addr;
+	struct ipv6_addr *a, *ap;
+	char iabuf[INET6_ADDRSTRLEN];
+	const char *ia;
 
 	state = D6_STATE(ifp);
 	if (state == NULL) {
@@ -1513,18 +1542,24 @@ dhcp6_getstate(struct interface *ifp)
 		state->state = DH6S_DELEGATED;
 		state->reason = "DELEGATED6";
 	}
-	return state;
-}
 
-static struct ipv6_addr *
-dhcp6_delegate_addr(struct interface *ifp, const struct ipv6_addr *prefix,
-    const struct if_sla *sla, struct interface *ifs)
-{
-	struct in6_addr addr;
-	struct dhcp6_state *state;
-	struct ipv6_addr *a, *ap;
-	char iabuf[INET6_ADDRSTRLEN];
-	const char *ia;
+	if (sla == NULL || sla->sla_set == 0) {
+		if (!state->sla_set) {
+			errno = 0;
+			state->sla = dhcp6_findsla();
+			if (errno) {
+				syslog(LOG_ERR, "%s: dhcp6_find_sla: %m",
+				    ifp->name);
+				return NULL;
+			}
+			syslog(LOG_DEBUG, "%s: set SLA %d",
+			    ifp->name, state->sla);
+			state->sla_set = 1;
+		}
+		asla.sla = state->sla;
+		asla.prefix_len = 64;
+		sla = &asla;
+	}
 
 	if (ipv6_userprefix(&prefix->prefix, prefix->prefix_len,
 		sla->sla, &addr, sla->prefix_len) == -1)
@@ -1536,10 +1571,6 @@ dhcp6_delegate_addr(struct interface *ifp, const struct ipv6_addr *prefix,
 			sla->sla, sla->prefix_len);
 		return NULL;
 	}
-
-	state = dhcp6_getstate(ifp);
-	if (state == NULL)
-		return NULL;
 
 	a = calloc(1, sizeof(*a));
 	if (a == NULL) {
@@ -1580,29 +1611,6 @@ dhcp6_delegate_addr(struct interface *ifp, const struct ipv6_addr *prefix,
 	return a;
 }
 
-static uint32_t
-dhcp6_findsla(void)
-{
-	uint32_t sla;
-	const struct interface *ifp;
-	const struct dhcp6_state *state;
-
-	/* Slow, but finding the lowest free SLA is needed if we get a
-	 * /62 or /63 prefix from upstream */
-	for (sla = 0; sla < UINT32_MAX; sla++) {
-		TAILQ_FOREACH(ifp, ifaces, next) {
-			state = D6_CSTATE(ifp);
-			if (state && state->sla_set && state->sla == sla)
-				break;
-		}
-		if (ifp == NULL)
-			return sla;
-	}
-
-	errno = E2BIG;
-	return 0;
-}
-
 static void
 dhcp6_delegate_prefix(struct interface *ifp)
 {
@@ -1611,11 +1619,10 @@ dhcp6_delegate_prefix(struct interface *ifp)
 	struct ipv6_addr *ap;
 	size_t i, j, k;
 	struct if_iaid *iaid;
-	struct if_sla *sla, asla;
+	struct if_sla *sla;
 	struct interface *ifd;
 	uint8_t carrier_warned;
 
-	asla.prefix_len = 64;
 	ifo = ifp->options;
 	state = D6_STATE(ifp);
 	TAILQ_FOREACH(ifd, ifaces, next) {
@@ -1637,25 +1644,6 @@ dhcp6_delegate_prefix(struct interface *ifp)
 					 * automate it */
 					if (ifp == ifd)
 						continue;
-					ifd_state = dhcp6_getstate(ifd);
-					if (ifd_state == NULL)
-						return;
-					if (!ifd_state->sla_set) {
-						errno = 0;
-						ifd_state->sla =
-						    dhcp6_findsla();
-						if (errno) {
-							syslog(LOG_ERR,
-							"%s: dhcp6_find_sla:"
-							" %m", ifd->name);
-							continue;
-						}
-						syslog(LOG_DEBUG,
-						    "%s: set SLA %d",
-						    ifd->name, ifd_state->sla);
-						ifd_state->sla_set = 1;
-					}
-					asla.sla = ifd_state->sla;
 					if (ifd->carrier == LINK_DOWN) {
 						syslog(LOG_DEBUG,
 						    "%s: has no carrier, cannot"
@@ -1665,7 +1653,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 						break;
 					}
 					if (dhcp6_delegate_addr(ifd, ap,
-					    &asla, ifp))
+					    NULL, ifp))
 						k++;
 				}
 				for (j = 0; j < iaid->sla_len; j++) {

@@ -97,6 +97,7 @@ struct if_sla {
 	char ifname[IF_NAMESIZE];
 	uint32_t sla;
 	short prefix_len;
+	int8_t sla_set;
 };
 
 struct if_iaid {
