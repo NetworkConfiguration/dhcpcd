@@ -154,11 +154,13 @@ int ipv6_handleifa_addrs(int, struct ipv6_addrhead *,
     const struct in6_addr *, int);
 const struct ll_addr *ipv6_linklocal(const struct interface *);
 int ipv6_addlinklocalcallback(struct interface *, void (*)(void *), void *);
+void ipv6_free_ll_callbacks(struct interface *);
 void ipv6_free(struct interface *);
 int ipv6_removesubnet(const struct interface *, struct ipv6_addr *);
 void ipv6_buildroutes(void);
 #else
 #define ipv6_init() -1
+#define ipv6_free_ll_callbacks(a)
 #define ipv6_free(a)
 #endif
 

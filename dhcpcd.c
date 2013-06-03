@@ -389,7 +389,11 @@ handle_carrier(int carrier, int flags, const char *ifname)
 			dhcp_close(ifp);
 			dhcp6_drop(ifp, "EXPIRE6");
 			ipv6rs_drop(ifp);
-			ipv6_free(ifp);
+			/* Don't blindly delete our knowledge of LL addresses.
+			 * We need to listen to what the kernel does with
+			 * them as some OS's will remove, mark tentative or
+			 * do nothing. */
+			ipv6_free_ll_callbacks(ifp);
 			dhcp_drop(ifp, "NOCARRIER");
 		}
 	} else if (carrier == LINK_UP && ifp->flags & IFF_UP) {

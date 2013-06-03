@@ -601,21 +601,31 @@ int ipv6_addlinklocalcallback(struct interface *ifp,
 }
 
 void
+ipv6_free_ll_callbacks(struct interface *ifp)
+{
+	struct ipv6_state *state;
+	struct ll_callback *cb;
+
+	state = IPV6_STATE(ifp);
+	if (state) {
+		while ((cb = TAILQ_FIRST(&state->ll_callbacks))) {
+			TAILQ_REMOVE(&state->ll_callbacks, cb, next);
+			free(cb);
+		}
+	}
+}
+void
 ipv6_free(struct interface *ifp)
 {
 	struct ipv6_state *state;
 	struct ll_addr *ap;
-	struct ll_callback *cb;
 
+	ipv6_free_ll_callbacks(ifp);
 	state = IPV6_STATE(ifp);
 	if (state) {
 		while ((ap = TAILQ_FIRST(&state->ll_addrs))) {
 			TAILQ_REMOVE(&state->ll_addrs, ap, next);
 			free(ap);
-		}
-		while ((cb = TAILQ_FIRST(&state->ll_callbacks))) {
-			TAILQ_REMOVE(&state->ll_callbacks, cb, next);
-			free(cb);
 		}
 		free(state);
 		ifp->if_data[IF_DATA_IPV6] = NULL;
