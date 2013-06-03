@@ -817,7 +817,7 @@ dhcp6_startrebind(void *arg)
 	eloop_timeout_delete(dhcp6_sendrenew, ifp);
 	state = D6_STATE(ifp);
 	if (state->state == DH6S_RENEW)
-		syslog(LOG_WARNING, "%s: failed to renew, rebinding",
+		syslog(LOG_WARNING, "%s: failed to renew DHCPv6, rebinding",
 		    ifp->name);
 	state->state = DH6S_REBIND;
 	state->RTC = 0;

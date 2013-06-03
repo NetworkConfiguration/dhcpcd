@@ -1631,10 +1631,10 @@ dhcp_discover(void *arg)
 			eloop_timeout_add_sec(timeout, ipv4ll_start, iface);
 	}
 	if (ifo->options & DHCPCD_REQUEST)
-		syslog(LOG_INFO, "%s: broadcasting for a lease (requesting %s)",
+		syslog(LOG_INFO, "%s: soliciting a DHCP lease (requesting %s)",
 		    iface->name, inet_ntoa(ifo->req_addr));
 	else
-		syslog(LOG_INFO, "%s: broadcasting for a lease", iface->name);
+		syslog(LOG_INFO, "%s: soliciting a DHCP lease", iface->name);
 	send_discover(iface);
 }
 
@@ -1662,7 +1662,7 @@ dhcp_expire(void *arg)
 		return;
 	}
 
-	syslog(LOG_ERR, "%s: lease expired", ifp->name);
+	syslog(LOG_ERR, "%s: DHCP lease expired", ifp->name);
 	eloop_timeout_delete(NULL, ifp);
 	dhcp_drop(ifp, "EXPIRE");
 	unlink(state->leasefile);
@@ -1702,7 +1702,7 @@ dhcp_rebind(void *arg)
 	struct dhcp_state *state = D_STATE(ifp);
 	struct dhcp_lease *lease = &state->lease;
 
-	syslog(LOG_WARNING, "%s: failed to renew, attempting to rebind",
+	syslog(LOG_WARNING, "%s: failed to renew DHCP, rebinding",
 	    ifp->name);
 	syslog(LOG_DEBUG, "%s: expire in %"PRIu32" seconds",
 	    ifp->name, lease->leasetime - lease->rebindtime);
