@@ -388,9 +388,11 @@ ipv6ns_probeaddrs(struct ipv6_addrhead *addrs)
 	TAILQ_FOREACH_SAFE(ap, addrs, next, apn) {
 		if (ap->prefix_vltime == 0) {
 			TAILQ_REMOVE(addrs, ap, next);
-			if (ap->flags & IPV6_AF_ADDED)
+			if (ap->flags & IPV6_AF_ADDED) {
 				syslog(LOG_INFO, "%s: deleting address %s",
 				    ap->iface->name, ap->saddr);
+				i++;
+			}
 			if (del_address6(ap) == -1 &&
 			    errno != EADDRNOTAVAIL)
 				syslog(LOG_ERR, "del_address6 %m");
@@ -493,6 +495,14 @@ ipv6ns_proberouter(void *arg)
 	if (rap->nsprobes++ == 0)
 		eloop_timeout_add_sec(DELAY_FIRST_PROBE_TIME,
 		    ipv6ns_unreachable, rap);
+}
+
+void
+ipv6ns_cancelproberouter(struct ra *rap)
+{
+
+	eloop_timeout_delete(ipv6ns_proberouter, rap);
+	eloop_timeout_delete(ipv6ns_unreachable, rap);
 }
 
 /* ARGSUSED */

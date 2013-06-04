@@ -1110,22 +1110,6 @@ ipv6rs_findprefix(const struct ipv6_addr *a)
 	return NULL;
 }
 
-static const struct ipv6_addr *
-ipv6rs_findsameaddr(const struct ipv6_addr *ap)
-{
-	const struct ra *rap;
-	const struct ipv6_addr *a;
-
-	TAILQ_FOREACH(rap, &ipv6_routers, next) {
-		TAILQ_FOREACH(a, &rap->addrs, next) {
-			if (ap != a &&
-			    memcmp(&a->addr, &ap->addr, sizeof(ap->addr) == 0))
-				return a;
-		}
-	}
-	return NULL;
-}
-
 void
 ipv6rs_handleifa(int cmd, const char *ifname,
     const struct in6_addr *addr, int flags)
@@ -1144,7 +1128,6 @@ ipv6rs_expire(void *arg)
 {
 	struct interface *ifp;
 	struct ra *rap, *ran;
-	struct ipv6_addr *ap, *apn;
 	struct ra_opt *rao, *raon;
 	struct timeval now, lt, expire, next;
 	int expired, valid;
@@ -1167,6 +1150,7 @@ ipv6rs_expire(void *arg)
 				    "%s: %s: expired default Router",
 				    ifp->name, rap->sfrom);
 				rap->expired = expired = 1;
+				ipv6ns_cancelproberouter(rap);
 			}
 		} else {
 			valid = 1;
@@ -1175,25 +1159,8 @@ ipv6rs_expire(void *arg)
 				next = lt;
 		}
 
-		if (options & DHCPCD_IPV6RA_OWN) {
-			TAILQ_FOREACH_SAFE(ap, &rap->addrs, next, apn) {
-				lt.tv_sec = ap->prefix_vltime;
-				lt.tv_usec = 0;
-				timeradd(&rap->received, &lt, &expire);
-				if (timercmp(&now, &expire, >) &&
-				    ipv6rs_findsameaddr(ap) == NULL)
-				{
-					syslog(LOG_WARNING,
-					    "%s: %s: expired address",
-					    ifp->name, ap->saddr);
-					eloop_timeout_delete(NULL, ap);
-					TAILQ_REMOVE(&rap->addrs, ap, next);
-					free(ap);
-					/* No need to delete it as the kernel
-					 * should have done this. */
-				}
-			}
-		}
+		/* Addresses are expired in ipv6ns_probeaddrs
+		 * so that DHCPv6 addresses can be removed also. */
 
 		TAILQ_FOREACH_SAFE(rao, &rap->options, next, raon) {
 			if (rap->expired) {

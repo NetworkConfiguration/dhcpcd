@@ -39,6 +39,7 @@
 void ipv6ns_probeaddr(void *);
 ssize_t ipv6ns_probeaddrs(struct ipv6_addrhead *);
 void ipv6ns_proberouter(void *);
+void ipv6ns_cancelproberouter(struct ra *);
 
 #ifdef LISTEN_DAD
 void ipv6ns_cancelprobeaddr(struct ipv6_addr *);
