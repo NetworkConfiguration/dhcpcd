@@ -175,7 +175,7 @@ IPv6RS should be disabled globally when requesting a Prefix Delegation like so:
 .D1 noipv6rs
 .Pp
 .D1 interface eth0
-.D1 ia_pd 1 eth1/0 eth2/0
+.D1 ia_pd 1 eth1/0 eth2/1
 .It Ic ipv4only
 Only configure IPv4.
 .It Ic ipv6only
