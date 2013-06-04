@@ -659,12 +659,13 @@ ipv6ns_handledata(__unused void *arg)
 		syslog(LOG_INFO, "%s: %s is no longer a router",
 		    ifp->name, sfrom);
 		rap->expired = 1;
+		ipv6ns_cancelproberouter(rap);
 		ipv6_buildroutes();
 		script_runreason(ifp, "ROUTERADVERT");
 		return;
 	}
 
-	if (is_solicited) {
+	if (is_solicited && is_router && rap->lifetime) {
 		if (rap->expired) {
 			rap->expired = 0;
 			syslog(LOG_INFO, "%s: %s is reachable again",

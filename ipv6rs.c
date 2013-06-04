@@ -613,6 +613,13 @@ ipv6rs_handledata(__unused void *arg)
 			break;
 	}
 
+	nd_ra = (struct nd_router_advert *)icp;
+	/* Don't bother doing anything if we don't know about a router
+	 * expiring */
+	if ((rap == NULL || rap->lifetime == 0)
+	    && nd_ra->nd_ra_router_lifetime == 0)
+		return;
+
 	/* We don't want to spam the log with the fact we got an RA every
 	 * 30 seconds or so, so only spam the log if it's different. */
 	if (options & DHCPCD_DEBUG || rap == NULL ||
@@ -660,8 +667,10 @@ ipv6rs_handledata(__unused void *arg)
 	}
 
 	get_monotonic(&rap->received);
-	nd_ra = (struct nd_router_advert *)icp;
 	rap->flags = nd_ra->nd_ra_flags_reserved;
+	if (new_rap == 0 && rap->lifetime == 0)
+		syslog(LOG_WARNING, "%s: %s router available",
+		   ifp->name, rap->sfrom);
 	rap->lifetime = ntohs(nd_ra->nd_ra_router_lifetime);
 	if (nd_ra->nd_ra_reachable) {
 		rap->reachable = ntohl(nd_ra->nd_ra_reachable);
@@ -936,7 +945,8 @@ ipv6rs_handledata(__unused void *arg)
 	    ifp->options->options & DHCPCD_IPV6RA_OWN_DEFAULT)
 	{
 		rap->nsprobes = 0;
-		ipv6ns_proberouter(rap);
+		if (rap->lifetime)
+			ipv6ns_proberouter(rap);
 	}
 
 handle_flag:
@@ -1143,11 +1153,11 @@ ipv6rs_expire(void *arg)
 		lt.tv_sec = rap->lifetime;
 		lt.tv_usec = 0;
 		timeradd(&rap->received, &lt, &expire);
-		if (timercmp(&now, &expire, >)) {
+		if (rap->lifetime == 0 || timercmp(&now, &expire, >)) {
 			valid = 0;
 			if (!rap->expired) {
 				syslog(LOG_WARNING,
-				    "%s: %s: expired default Router",
+				    "%s: %s: router expired",
 				    ifp->name, rap->sfrom);
 				rap->expired = expired = 1;
 				ipv6ns_cancelproberouter(rap);
@@ -1200,7 +1210,7 @@ ipv6rs_expire(void *arg)
 
 		/* No valid lifetimes are left on the RA, so we might
 		 * as well punt it. */
-		if (!valid)
+		if (!valid && TAILQ_FIRST(&rap->addrs) == NULL)
 			ipv6rs_free_ra(rap);
 	}
 
@@ -1217,7 +1227,7 @@ ipv6rs_start(struct interface *ifp)
 {
 	struct rs_state *state;
 
-	syslog(LOG_INFO, "%s: soliciting an IPv6 Router", ifp->name);
+	syslog(LOG_INFO, "%s: soliciting an IPv6 router", ifp->name);
 	if (sock == -1) {
 		if (ipv6rs_open() == -1) {
 			syslog(LOG_ERR, "%s: ipv6rs_open: %m", __func__);
