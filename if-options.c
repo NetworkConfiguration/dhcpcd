@@ -1033,11 +1033,15 @@ got_iaid:
 				np = strchr(p, '/');
 				if (np)
 					*np++ = '\0';
-				errno = 0;
-				sla->sla = atoint(p);
-				sla->sla_set = 1;
-				if (errno)
-					return -1;
+				if (*p == '\0')
+					sla->sla_set = 0;
+				else {
+					errno = 0;
+					sla->sla = atoint(p);
+					sla->sla_set = 1;
+					if (errno)
+						return -1;
+				}
 				if (np) {
 					sla->prefix_len = atoint(np);
 					if (sla->prefix_len < 0 ||
