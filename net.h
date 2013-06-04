@@ -103,9 +103,9 @@ int up_interface(struct interface *);
 int if_conf(struct interface *);
 int if_init(struct interface *);
 
-int if_address6(const struct interface *, const struct ipv6_addr *, int);
-#define add_address6(ifp, a) if_address6(ifp, a, 1)
-#define del_address6(ifp, a) if_address6(ifp, a, -1)
+int if_address6(const struct ipv6_addr *, int);
+#define add_address6(a) if_address6(a, 1)
+#define del_address6(a) if_address6(a, -1)
 int in6_addr_flags(const char *, const struct in6_addr *);
 
 int if_route6(const struct rt6 *rt, int);

@@ -324,7 +324,7 @@ ipv6rs_freedrop_addrs(struct ra *rap, int drop)
 		{
 			syslog(LOG_INFO, "%s: deleting address %s",
 			    rap->iface->name, ap->saddr);
-			if (del_address6(rap->iface, ap) == -1 &&
+			if (del_address6(ap) == -1 &&
 			    errno != EADDRNOTAVAIL)
 				syslog(LOG_ERR, "del_address6 %m");
 		}
@@ -768,13 +768,6 @@ ipv6rs_handledata(__unused void *arg)
 				}
 				ap->dadcallback = ipv6rs_dadcallback;
 				TAILQ_INSERT_TAIL(&rap->addrs, ap, next);
-			} else if (ap->prefix_vltime !=
-			    ntohl(pi->nd_opt_pi_valid_time) ||
-			    ap->prefix_pltime !=
-			    ntohl(pi->nd_opt_pi_preferred_time) ||
-			    ap->flags & IPV6_AF_DUPLICATED)
-			{
-				ap->flags |= IPV6_AF_NEW;
 			}
 			if (pi->nd_opt_pi_flags_reserved &
 			    ND_OPT_PI_FLAG_ONLINK)
@@ -784,7 +777,6 @@ ipv6rs_handledata(__unused void *arg)
 			ap->prefix_pltime =
 			    ntohl(pi->nd_opt_pi_preferred_time);
 			ap->nsprobes = 0;
-			ap->flags &= ~IPV6_AF_DUPLICATED;
 			if (opt) {
 				l = strlen(opt);
 				tmp = realloc(opt,

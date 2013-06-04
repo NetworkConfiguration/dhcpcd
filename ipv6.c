@@ -412,7 +412,7 @@ ipv6_addaddr(struct ipv6_addr *ap)
 
 	syslog(ap->flags & IPV6_AF_NEW ? LOG_INFO : LOG_DEBUG,
 	    "%s: adding address %s", ap->iface->name, ap->saddr);
-	if (add_address6(ap->iface, ap) == -1) {
+	if (add_address6(ap) == -1) {
 		syslog(LOG_ERR, "add_address6 %m");
 		return -1;
 	}
@@ -440,25 +440,6 @@ ipv6_addaddr(struct ipv6_addr *ap)
 		    "%s: vltime %"PRIu32" seconds, pltime %"PRIu32" seconds",
 		    ap->iface->name, ap->prefix_vltime, ap->prefix_pltime);
 	return 0;
-}
-
-ssize_t
-ipv6_addaddrs(struct ipv6_addrhead *addrs)
-{
-	struct ipv6_addr *ap;
-	ssize_t i;
-
-	i = 0;
-	TAILQ_FOREACH(ap, addrs, next) {
-		if (ap->prefix_vltime == 0 ||
-		    IN6_IS_ADDR_UNSPECIFIED(&ap->addr) ||
-		    ap->flags & IPV6_AF_DELEGATED)
-			continue;
-		if (ipv6_addaddr(ap) == 0)
-			i++;
-	}
-
-	return i;
 }
 
 static struct ipv6_state *
@@ -497,9 +478,9 @@ ipv6_handleifa(int cmd, struct if_head *ifs, const char *ifname,
 	    ifname, cmd, buf, flags);
 #endif
 
-	/* Safety - ignore tentative announcements */
+	/* Safety, remove tentative addresses */
 	if (cmd == RTM_NEWADDR) {
-		if (flags & (IN6_IFF_TENTATIVE | IN6_IFF_DUPLICATED))
+		if (flags & IN6_IFF_TENTATIVE)
 			cmd = RTM_DELADDR;
 #ifdef IN6_IFF_DETACHED
 		if (flags & IN6_IFF_DETACHED)
@@ -522,47 +503,52 @@ ipv6_handleifa(int cmd, struct if_head *ifs, const char *ifname,
 		return;
 	}
 
-	if (IN6_IS_ADDR_LINKLOCAL(addr)) {
-		state = ipv6_getstate(ifp);
-		if (state == NULL)
-			return;
-		TAILQ_FOREACH(ap, &state->ll_addrs, next) {
-			if (IN6_ARE_ADDR_EQUAL(&ap->addr, addr))
-				break;
-		}
-		switch (cmd) {
-		case RTM_DELADDR:
-			if (ap) {
-				TAILQ_REMOVE(&state->ll_addrs, ap, next);
-				free(ap);
-			}
-			return;
-		case RTM_NEWADDR:
-			if (ap == NULL) {
-				ap = calloc(1, sizeof(*ap));
-				memcpy(ap->addr.s6_addr, addr->s6_addr,
-				    sizeof(ap->addr.s6_addr));
-				TAILQ_INSERT_TAIL(&state->ll_addrs,
-				    ap, next);
-
-				/* Now run any callbacks.
-				 * Typically IPv6RS or DHCPv6 */
-				while ((cb = TAILQ_FIRST(&state->ll_callbacks)))
-				{
-					TAILQ_REMOVE(&state->ll_callbacks,
-					    cb, next);
-					cb->callback(cb->arg);
-					free(cb);
-				}
-			}
-			return;
-		default:
-			return;
-		}
+	if (!IN6_IS_ADDR_LINKLOCAL(addr)) {
+		ipv6rs_handleifa(cmd, ifname, addr, flags);
+		dhcp6_handleifa(cmd, ifname, addr, flags);
+		return;
 	}
 
-	ipv6rs_handleifa(cmd, ifname, addr, flags);
-	dhcp6_handleifa(cmd, ifname, addr, flags);
+	state = ipv6_getstate(ifp);
+	if (state == NULL)
+		return;
+
+	/* We don't care about duplicated LL addresses, so remove them */
+	if (flags & IN6_IFF_DUPLICATED)
+		cmd = RTM_DELADDR;
+
+	TAILQ_FOREACH(ap, &state->ll_addrs, next) {
+		if (IN6_ARE_ADDR_EQUAL(&ap->addr, addr))
+			break;
+	}
+
+	switch (cmd) {
+	case RTM_DELADDR:
+		if (ap) {
+			TAILQ_REMOVE(&state->ll_addrs, ap, next);
+			free(ap);
+		}
+		break;
+	case RTM_NEWADDR:
+		if (ap == NULL) {
+			ap = calloc(1, sizeof(*ap));
+			memcpy(ap->addr.s6_addr, addr->s6_addr,
+			    sizeof(ap->addr.s6_addr));
+			TAILQ_INSERT_TAIL(&state->ll_addrs,
+			    ap, next);
+
+			/* Now run any callbacks.
+			 * Typically IPv6RS or DHCPv6 */
+			while ((cb = TAILQ_FIRST(&state->ll_callbacks)))
+			{
+				TAILQ_REMOVE(&state->ll_callbacks,
+				    cb, next);
+				cb->callback(cb->arg);
+				free(cb);
+			}
+		}
+		break;
+	}
 }
 
 const struct ll_addr *
@@ -662,6 +648,8 @@ ipv6_handleifa_addrs(int cmd,
 				found++;
 				if (flags & IN6_IFF_DUPLICATED)
 					ap->flags |= IPV6_AF_DUPLICATED;
+				else
+					ap->flags &= ~IPV6_AF_DUPLICATED;
 				if (ap->dadcallback)
 					ap->dadcallback(ap);
 				/* We need to set this here in-case the

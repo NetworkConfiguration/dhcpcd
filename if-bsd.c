@@ -300,7 +300,7 @@ if_route(const struct rt *rt, int action)
 
 #ifdef INET6
 int
-if_address6(const struct interface *ifp, const struct ipv6_addr *a, int action)
+if_address6(const struct ipv6_addr *a, int action)
 {
 	int s, r;
 	struct in6_aliasreq ifa;
@@ -310,7 +310,7 @@ if_address6(const struct interface *ifp, const struct ipv6_addr *a, int action)
 	if (s == -1)
 		return -1;
 	memset(&ifa, 0, sizeof(ifa));
-	strlcpy(ifa.ifra_name, ifp->name, sizeof(ifa.ifra_name));
+	strlcpy(ifa.ifra_name, a->iface->name, sizeof(ifa.ifra_name));
 	/*
 	 * We should not set IN6_IFF_TENTATIVE as the kernel should be
 	 * able to work out if it's a new address or not.

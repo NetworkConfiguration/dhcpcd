@@ -616,8 +616,8 @@ dhcp6_freedrop_addrs(struct interface *ifp, int drop)
 		    !ipv6rs_addrexists(ap))
 		{
 			syslog(LOG_INFO, "%s: deleting address %s",
-			    ifp->name, ap->saddr);
-			if (del_address6(ifp, ap) == -1 &&
+			    ap->iface->name, ap->saddr);
+			if (del_address6(ap) == -1 &&
 			    errno != EADDRNOTAVAIL)
 				syslog(LOG_ERR, "del_address6 %m");
 		}
@@ -1193,9 +1193,9 @@ dhcp6_findna(struct interface *ifp, const uint8_t *iaid,
 		p += sizeof(u32);
 		memcpy(&u32, p, sizeof(u32));
 		a->prefix_vltime = ntohl(u32);
-		if (a->prefix_pltime < state->lowpl)
+		if (a->prefix_pltime && a->prefix_pltime < state->lowpl)
 		    state->lowpl = a->prefix_pltime;
-		if (a->prefix_vltime > state->expire)
+		if (a->prefix_vltime && a->prefix_vltime > state->expire)
 		    state->expire = a->prefix_vltime;
 		ia = inet_ntop(AF_INET6, &a->addr.s6_addr,
 		    iabuf, sizeof(iabuf));
@@ -1254,9 +1254,9 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 		memcpy(&u32, p, sizeof(u32));
 		p += sizeof(u32);
 		a->prefix_vltime = ntohl(u32);
-		if (a->prefix_pltime < state->lowpl)
+		if (a->prefix_pltime && a->prefix_pltime < state->lowpl)
 			state->lowpl = a->prefix_pltime;
-		if (a->prefix_vltime > state->expire)
+		if (a->prefix_vltime && a->prefix_vltime > state->expire)
 			state->expire = a->prefix_vltime;
 		memcpy(&u8, p, sizeof(u8));
 		p += sizeof(u8);
@@ -1600,8 +1600,9 @@ dhcp6_delegate_addr(struct interface *ifp, const struct ipv6_addr *prefix,
 	TAILQ_FOREACH(ap, &state->addrs, next) {
 		if (IN6_ARE_ADDR_EQUAL(&ap->addr, &a->addr)) {
 			TAILQ_REMOVE(&state->addrs, ap, next);
+			/* Keep our flags */
+			a->flags |= ap->flags;
 			free(ap);
-			break;
 		}
 	}
 

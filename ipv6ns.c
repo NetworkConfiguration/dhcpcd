@@ -381,18 +381,30 @@ ipv6ns_probeaddr(void *arg)
 ssize_t
 ipv6ns_probeaddrs(struct ipv6_addrhead *addrs)
 {
-	struct ipv6_addr *ap;
+	struct ipv6_addr *ap, *apn;
 	ssize_t i;
 
 	i = 0;
-	TAILQ_FOREACH(ap, addrs, next) {
-		if (ap->prefix_vltime == 0 ||
-		    IN6_IS_ADDR_UNSPECIFIED(&ap->addr) ||
-		    ap->flags & IPV6_AF_DELEGATED)
-			continue;
-		ipv6ns_probeaddr(ap);
-		if (ap->flags & IPV6_AF_NEW)
-			i++;
+	TAILQ_FOREACH_SAFE(ap, addrs, next, apn) {
+		if (ap->prefix_vltime == 0) {
+			TAILQ_REMOVE(addrs, ap, next);
+			if (ap->flags & IPV6_AF_ADDED)
+				syslog(LOG_INFO, "%s: deleting address %s",
+				    ap->iface->name, ap->saddr);
+			if (del_address6(ap) == -1 &&
+			    errno != EADDRNOTAVAIL)
+				syslog(LOG_ERR, "del_address6 %m");
+			if (ap->dadcallback)
+				eloop_q_timeout_delete(0, NULL,
+				    ap->dadcallback);
+			free(ap);
+		} else if (!IN6_IS_ADDR_UNSPECIFIED(&ap->addr) &&
+		    !(ap->flags & IPV6_AF_DELEGATED))
+		{
+			ipv6ns_probeaddr(ap);
+			if (ap->flags & IPV6_AF_NEW)
+				i++;
+		}
 	}
 
 	return i;

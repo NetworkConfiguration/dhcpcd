@@ -644,7 +644,7 @@ if_route(const struct rt *rt, int action)
 
 #ifdef INET6
 int
-if_address6(const struct interface *ifp, const struct ipv6_addr *ap, int action)
+if_address6(const struct ipv6_addr *ap, int action)
 {
 	struct nlma *nlm;
 	struct ifa_cacheinfo cinfo;
@@ -660,7 +660,7 @@ if_address6(const struct interface *ifp, const struct ipv6_addr *ap, int action)
 		nlm->hdr.nlmsg_type = RTM_NEWADDR;
 	} else
 		nlm->hdr.nlmsg_type = RTM_DELADDR;
-	nlm->ifa.ifa_index = ifp->index;
+	nlm->ifa.ifa_index = ap->iface->index;
 	nlm->ifa.ifa_family = AF_INET6;
 	nlm->ifa.ifa_prefixlen = ap->prefix_len;
 	/* This creates the aliased interface */
