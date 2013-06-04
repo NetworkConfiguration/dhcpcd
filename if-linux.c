@@ -665,7 +665,7 @@ if_address6(const struct ipv6_addr *ap, int action)
 	nlm->ifa.ifa_prefixlen = ap->prefix_len;
 	/* This creates the aliased interface */
 	add_attr_l(&nlm->hdr, sizeof(*nlm), IFA_LABEL,
-	    ifp->name, strlen(ifp->name) + 1);
+	    ap->iface->name, strlen(ap->iface->name) + 1);
 	add_attr_l(&nlm->hdr, sizeof(*nlm), IFA_LOCAL,
 	    &ap->addr.s6_addr, sizeof(ap->addr.s6_addr));
 
