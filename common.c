@@ -60,7 +60,7 @@
 #  define _PATH_DEVNULL "/dev/null"
 #endif
 
-static char hostname_buffer[HOSTNAME_MAX_LEN];
+static char hostname_buffer[HOSTNAME_MAX_LEN + 1];
 int clock_monotonic;
 static char *lbuf;
 static size_t lbuf_len;
@@ -140,6 +140,7 @@ get_hostname(void)
 {
 
 	gethostname(hostname_buffer, sizeof(hostname_buffer));
+	hostname_buffer[sizeof(hostname_buffer) - 1] = '\0';
 	if (strcmp(hostname_buffer, "(none)") == 0 ||
 	    strcmp(hostname_buffer, "localhost") == 0 ||
 	    strncmp(hostname_buffer, "localhost.", strlen("localhost.")) == 0 ||
