@@ -99,10 +99,15 @@ encode_rfc1035(const char *src, uint8_t *dst)
 
 	if (src == NULL || *src == '\0')
 		return 0;
+
 	if (dst) {
 		p = dst;
 		lp = p++;
 	}
+	/* Silence bogus GCC warnings */
+	else
+		p = lp = NULL;
+
 	len = 1;
 	has_dot = 0;
 	for (; *src; src++) {
@@ -123,13 +128,16 @@ encode_rfc1035(const char *src, uint8_t *dst)
 			*p++ = (uint8_t)*src;
 		len++;
 	}
+
 	if (dst) {
 		*lp = p - lp - 1;
 		if (has_dot)
 			*p++ = '\0';
 	}
+
 	if (has_dot)
 		len++;
+
 	return len;
 }
 

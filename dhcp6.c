@@ -362,7 +362,7 @@ dhcp6_makemessage(struct interface *ifp)
 	uint8_t IA, *p;
 	uint32_t u32;
 	const struct ipv6_addr *ap;
-	const char *hostname;
+	const char *hostname = NULL; /* assignment just to appease GCC*/
 
 	state = D6_STATE(ifp);
 	if (state->send) {
