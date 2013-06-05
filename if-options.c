@@ -459,20 +459,20 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		add_environ(ifo, arg, 1);
 		break;
 	case 'h':
-		if (arg) {
-			s = parse_string(ifo->hostname,
-			    HOSTNAME_MAX_LEN, arg);
-			if (s == -1) {
-				syslog(LOG_ERR, "hostname: %m");
-				return -1;
-			}
-			if (s != 0 && ifo->hostname[0] == '.') {
-				syslog(LOG_ERR,
-				    "hostname cannot begin with .");
-				return -1;
-			}
-			ifo->hostname[s] = '\0';
+		if (!arg) {
+			ifo->options |= DHCPCD_HOSTNAME;
+			break;
 		}
+		s = parse_string(ifo->hostname, HOSTNAME_MAX_LEN, arg);
+		if (s == -1) {
+			syslog(LOG_ERR, "hostname: %m");
+			return -1;
+		}
+		if (s != 0 && ifo->hostname[0] == '.') {
+			syslog(LOG_ERR, "hostname cannot begin with .");
+			return -1;
+		}
+		ifo->hostname[s] = '\0';
 		if (ifo->hostname[0] == '\0')
 			ifo->options &= ~DHCPCD_HOSTNAME;
 		else
@@ -1131,12 +1131,6 @@ read_config(const char *file,
 	ifo->reboot = DEFAULT_REBOOT;
 	ifo->metric = -1;
 	strlcpy(ifo->script, SCRIPT, sizeof(ifo->script));
-	gethostname(ifo->hostname, HOSTNAME_MAX_LEN);
-	/* Ensure that the hostname is NULL terminated */
-	ifo->hostname[HOSTNAME_MAX_LEN] = '\0';
-	if (strcmp(ifo->hostname, "(none)") == 0 ||
-	    strcmp(ifo->hostname, "localhost") == 0)
-		ifo->hostname[0] = '\0';
 
 	ifo->vendorclassid[0] = strlen(vendor);
 	memcpy(ifo->vendorclassid + 1, vendor, ifo->vendorclassid[0]);

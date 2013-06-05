@@ -65,14 +65,26 @@ try_hostname()
 
 set_hostname()
 {
-	if need_hostname; then
-		if [ -n "$new_host_name" ]; then
+
+	need_hostname || return
+
+	if [ -n "$new_fqdn_name" ]; then
+		try_hostname "$new_fqdn_name"
+	elif [ -n "$new_host_name" ]; then
+		if [ -n "$new_domain_name" ]; then
+			try_hostname "$new_host_name.$new_domain_name"
+		else
 			try_hostname "$new_host_name"
-		elif [ -n "$new_fqdn_name" ]; then
-			try_hostname "$new_fqdn_name"
 		fi
 	fi
 }
+
+# For ease of use, map DHCP6 names onto our DHCP4 names
+case "$reason" in
+BOUND6|RENEW6|REBIND6|REBOOT6|INFORM6)
+	new_fqdn_name="$new_dhcp6_fqdn"
+	;;
+esac
 
 if $if_up; then
 	set_hostname

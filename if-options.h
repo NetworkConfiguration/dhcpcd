@@ -45,7 +45,9 @@
 #define DEFAULT_TIMEOUT		30
 #define DEFAULT_REBOOT		5
 
+#ifndef HOSTNAME_MAX_LEN
 #define HOSTNAME_MAX_LEN	250	/* 255 - 3 (FQDN) - 2 (DNS enc) */
+#endif
 #define VENDORCLASSID_MAX_LEN	255
 #define CLIENTID_MAX_LEN	48
 #define USERCLASS_MAX_LEN	255

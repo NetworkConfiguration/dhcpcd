@@ -126,6 +126,7 @@ const struct dhcp_opt dhcp6_opts[] = {
 	{ D6_OPTION_BCMS_SERVER_A,	IPV6A,		"bcms_server_a" },
 	{ D6_OPTION_POSIX_TIMEZONE,	STRING,		"posix_timezone" },
 	{ D6_OPTION_TZDB_TIMEZONE,	STRING,		"tzdb_timezone" },
+	{ D6_OPTION_FQDN,		RFC3397,	"fqdn" },
 	{ 0, 0, NULL }
 };
 
@@ -361,6 +362,7 @@ dhcp6_makemessage(struct interface *ifp)
 	uint8_t IA, *p;
 	uint32_t u32;
 	const struct ipv6_addr *ap;
+	const char *hostname;
 
 	state = D6_STATE(ifp);
 	if (state->send) {
@@ -379,8 +381,16 @@ dhcp6_makemessage(struct interface *ifp)
 				len += sizeof(*u16);
 		}
 		if (len == 0)
-			len = sizeof(*u16) * 3;
+			len = sizeof(*u16) * 4;
 		len += sizeof(*o);
+
+		if (ifo->fqdn != FQDN_DISABLE) {
+			if (ifo->hostname[0] == '\0')
+				hostname = get_hostname();
+			else
+				hostname = ifo->hostname;
+			len += sizeof(*o) + 1 + encode_rfc1035(hostname, NULL);
+		}
 	}
 
 	len += sizeof(*state->send);
@@ -568,6 +578,26 @@ dhcp6_makemessage(struct interface *ifp)
 	}
 
 	if (state->send->type !=  DHCP6_RELEASE) {
+		if (ifo->fqdn != FQDN_DISABLE) {
+			o = D6_NEXT_OPTION(o);
+			o->code = htons(D6_OPTION_FQDN);
+			p = D6_OPTION_DATA(o);
+			switch (ifo->fqdn) {
+			case FQDN_BOTH:
+				*p = 0x01;
+				break;
+			case FQDN_PTR:
+				*p = 0x00;
+				break;
+			default:
+				*p = 0x04;
+				break;
+			}
+			o->len = encode_rfc1035(hostname, p + 1);
+			if (o->len == 0)
+				*p = 0x04;
+			o->len = htons(++o->len);
+		}
 		o = D6_NEXT_OPTION(o);
 		o->code = htons(D6_OPTION_ORO);
 		o->len = 0;
@@ -581,10 +611,11 @@ dhcp6_makemessage(struct interface *ifp)
 			}
 		}
 		if (o->len == 0) {
+			*u16++ = htons(D6_OPTION_UNICAST);
 			*u16++ = htons(D6_OPTION_DNS_SERVERS);
 			*u16++ = htons(D6_OPTION_DOMAIN_LIST);
-			*u16++ = htons(D6_OPTION_UNICAST);
-			o->len = sizeof(*u16) * 3;
+			*u16++ = htons(D6_OPTION_FQDN);
+			o->len = sizeof(*u16) * 4;
 		}
 		o->len = htons(o->len);
 	}

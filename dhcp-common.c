@@ -89,6 +89,50 @@ int make_option_mask(const struct dhcp_opt *dopts,
 	return 0;
 }
 
+size_t
+encode_rfc1035(const char *src, uint8_t *dst)
+{
+	uint8_t *p;
+	uint8_t *lp;
+	size_t len;
+	uint8_t has_dot;
+
+	if (src == NULL || *src == '\0')
+		return 0;
+	if (dst) {
+		p = dst;
+		lp = p++;
+	}
+	len = 1;
+	has_dot = 0;
+	for (; *src; src++) {
+		if (*src == '\0')
+			break;
+		if (*src == '.') {
+			/* Skip the trailing . */
+			if (src[1] == '\0')
+				break;
+			has_dot = 1;
+			if (dst) {
+				*lp = p - lp - 1;
+				if (*lp == '\0')
+					return len;
+				lp = p++;
+			}
+		} else if (dst)
+			*p++ = (uint8_t)*src;
+		len++;
+	}
+	if (dst) {
+		*lp = p - lp - 1;
+		if (has_dot)
+			*p++ = '\0';
+	}
+	if (has_dot)
+		len++;
+	return len;
+}
+
 /* Decode an RFC3397 DNS search order option into a space
  * separated string. Returns length of string (including
  * terminating zero) or zero on error. out may be NULL

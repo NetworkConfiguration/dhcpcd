@@ -60,6 +60,7 @@
 #  define _PATH_DEVNULL "/dev/null"
 #endif
 
+static char hostname_buffer[HOSTNAME_MAX_LEN];
 int clock_monotonic;
 static char *lbuf;
 static size_t lbuf_len;
@@ -132,6 +133,19 @@ set_nonblock(int fd)
 		return -1;
 	}
 	return 0;
+}
+
+const char *
+get_hostname(void)
+{
+
+	gethostname(hostname_buffer, sizeof(hostname_buffer));
+	if (strcmp(hostname_buffer, "(none)") == 0 ||
+	    strcmp(hostname_buffer, "localhost") == 0 ||
+	    strncmp(hostname_buffer, "localhost.", strlen("localhost.")) == 0 ||
+	    hostname_buffer[0] == '.')
+		return NULL;
+	return hostname_buffer;
 }
 
 /* Handy function to get the time.

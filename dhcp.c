@@ -801,33 +801,6 @@ get_option_routes(struct interface *ifp, const struct dhcp_message *dhcp)
 	return routes;
 }
 
-static size_t
-encode_rfc1035(const char *src, uint8_t *dst)
-{
-	uint8_t *p = dst;
-	uint8_t *lp = p++;
-
-	if (*src == '\0')
-		return 0;
-	for (; *src; src++) {
-		if (*src == '\0')
-			break;
-		if (*src == '.') {
-			/* Skip the trailing . */
-			if (src[1] == '\0')
-				break;
-			*lp = p - lp - 1;
-			if (*lp == '\0')
-				return p - dst;
-			lp = p++;
-		} else
-			*p++ = (uint8_t)*src;
-	}
-	*lp = p - lp - 1;
-	*p++ = '\0';
-	return p - dst;
-}
-
 #define PUTADDR(_type, _val)						      \
 	{								      \
 		*p++ = _type;						      \
@@ -877,6 +850,7 @@ make_message(struct dhcp_message **message,
 	const struct dhcp_state *state = D_CSTATE(iface);
 	const struct dhcp_lease *lease = &state->lease;
 	time_t up = uptime() - state->start_uptime;
+	const char *hostname;
 
 	dhcp = calloc(1, sizeof (*dhcp));
 	if (dhcp == NULL)
@@ -1006,18 +980,22 @@ make_message(struct dhcp_message **message,
 		 * upto the first dot (the short hostname) as otherwise
 		 * confuses some DHCP servers when updating DNS.
 		 * The FQDN option should be used if a FQDN is required. */
-		if (ifo->options & DHCPCD_HOSTNAME && ifo->hostname[0]) {
+		if (ifo->hostname[0] == '\0')
+			hostname = get_hostname();
+		else
+			hostname = ifo->hostname;
+		if (ifo->options & DHCPCD_HOSTNAME && hostname) {
 			*p++ = DHO_HOSTNAME;
-			hp = strchr(ifo->hostname, '.');
+			hp = strchr(hostname, '.');
 			if (hp)
-				len = hp - ifo->hostname;
+				len = hp - hostname;
 			else
-				len = strlen(ifo->hostname);
+				len = strlen(hostname);
 			*p++ = len;
-			memcpy(p, ifo->hostname, len);
+			memcpy(p, hostname, len);
 			p += len;
 		}
-		if (ifo->fqdn != FQDN_DISABLE && ifo->hostname[0]) {
+		if (ifo->fqdn != FQDN_DISABLE) {
 			/* IETF DHC-FQDN option (81), RFC4702 */
 			*p++ = DHO_FQDN;
 			lp = p;
@@ -1032,12 +1010,17 @@ make_message(struct dhcp_message **message,
 			 * N: 1 => Client requests Server to not
 			 *         update DNS
 			 */
-			*p++ = (ifo->fqdn & 0x09) | 0x04;
+			if (hostname)
+				*p++ = (ifo->fqdn & 0x09) | 0x04;
+			else
+				*p++ = (FQDN_NONE & 0x09) | 0x04;
 			*p++ = 0; /* from server for PTR RR */
 			*p++ = 0; /* from server for A RR if S=1 */
-			ul = encode_rfc1035(ifo->hostname, p);
-			*lp += ul;
-			p += ul;
+			if (hostname) {
+				ul = encode_rfc1035(hostname, p);
+				*lp += ul;
+				p += ul;
+			}
 		}
 
 		/* vendor is already encoded correctly, so just add it */

@@ -67,6 +67,7 @@ struct dhcp_opt {
 #define del_option_mask(var, val) (var[val >> 3] &= ~(1 << (val & 7)))
 #define has_option_mask(var, val) (var[val >> 3] & (1 << (val & 7)))
 int make_option_mask(const struct dhcp_opt *,uint8_t *, const char *, int);
+size_t encode_rfc1035(const char *src, uint8_t *dst);
 ssize_t decode_rfc3397(char *, ssize_t, int, const uint8_t *);
 ssize_t print_string(char *, ssize_t, int, const uint8_t *);
 ssize_t print_option(char *, ssize_t, int, int, const uint8_t *, const char *);

@@ -180,9 +180,11 @@ IPv6RS should be disabled globally when requesting a Prefix Delegation like so:
 Only configure IPv4.
 .It Ic ipv6only
 Only confgiure IPv6.
-.It Ic fqdn Op none | ptr | both
-none disables FQDN encoding, ptr just asks the DHCP server to update the PTR
+.It Ic fqdn Op disable | ptr | both
+ptr just asks the DHCP server to update the PTR
 record of the host in DNS whereas both also updates the A record.
+disable will disable the FQDN option.
+The default is both.
 .Nm dhcpcd
 itself never does any DNS updates.
 .Nm dhcpcd

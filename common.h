@@ -34,6 +34,10 @@
 #include "config.h"
 #include "defs.h"
 
+#ifndef HOSTNAME_MAX_LEN
+#define HOSTNAME_MAX_LEN	250	/* 255 - 3 (FQDN) - 2 (DNS enc) */
+#endif
+
 #define UNCONST(a)		((void *)(unsigned long)(const void *)(a))
 
 #define timeval_to_double(tv) ((tv)->tv_sec * 1.0 + (tv)->tv_usec * 1.0e-6)
@@ -96,6 +100,7 @@
 int set_cloexec(int);
 int set_nonblock(int);
 char *get_line(FILE * __restrict);
+const char *get_hostname(void);
 extern int clock_monotonic;
 int get_monotonic(struct timeval *);
 ssize_t setvar(char ***, const char *, const char *, const char *);
