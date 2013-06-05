@@ -259,7 +259,15 @@ from the server.
 It can be a variable to be used in
 .Xr dhcpcd-run-hooks 8
 or the numerical value.
-You can specify more options separated by commas, spaces or more option lines.
+You can specify more
+.Ar option Ns s
+separated by commas, spaces or more
+.Ic option
+lines.
+Prepend dhcp6_ to
+.Ar option
+to request a DHCPv6 option.
+DHCPv4 options are mapped to DHCPv6 where applicable.
 .It Ic nooption Ar option
 Remove the option from the DHCP message.
 This should only be used when a DHCP server sends a non requested option

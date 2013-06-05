@@ -130,6 +130,21 @@ const struct dhcp_opt dhcp6_opts[] = {
 	{ 0, 0, NULL }
 };
 
+struct dhcp_compat {
+	uint8_t dhcp_opt;
+	uint16_t dhcp6_opt;
+};
+
+const struct dhcp_compat dhcp_compats[] = {
+	{ DHO_DNSSERVER,	D6_OPTION_DNS_SERVERS },
+	{ DHO_HOSTNAME,		D6_OPTION_FQDN },
+	{ DHO_DNSDOMAIN,	D6_OPTION_FQDN },
+	{ DHO_NISSERVER,	D6_OPTION_NIS_SERVERS },
+	{ DHO_FQDN,		D6_OPTION_FQDN },
+	{ DHO_DNSSEARCH,	D6_OPTION_DOMAIN_LIST },
+	{ 0, 0 }
+};
+
 #if DEBUG_MEMORY
 static void
 dhcp6_cleanup(void)
@@ -356,7 +371,7 @@ dhcp6_makemessage(struct interface *ifp)
 	ssize_t len, ml;
 	size_t l;
 	uint8_t u8;
-	uint16_t *u16;
+	uint16_t *u16, n_options;
 	const struct if_options *ifo;
 	const struct dhcp_opt *opt;
 	uint8_t IA, *p;
@@ -372,20 +387,20 @@ dhcp6_makemessage(struct interface *ifp)
 
 	/* Work out option size first */
 	ifo = ifp->options;
+	n_options = 0;
 	len = 0;
 	si = NULL;
 	if (state->state != DH6S_RELEASE) {
 		for (opt = dhcp6_opts; opt->option; opt++) {
 			if (opt->type & REQUEST ||
 			    has_option_mask(ifo->requestmask6, opt->option))
+			{
+				n_options++;
 				len += sizeof(*u16);
+			}
 		}
-		if (len == 0) {
-			len = sizeof(*u16) * 3;
-			if (ifo->fqdn != FQDN_DISABLE)
-				len += sizeof(*u16);
-		}
-		len += sizeof(*o);
+		if (len)
+			len += sizeof(*o);
 
 		if (ifo->fqdn != FQDN_DISABLE) {
 			if (ifo->hostname[0] == '\0')
@@ -601,29 +616,23 @@ dhcp6_makemessage(struct interface *ifp)
 				*p = 0x04;
 			o->len = htons(++o->len);
 		}
-		o = D6_NEXT_OPTION(o);
-		o->code = htons(D6_OPTION_ORO);
-		o->len = 0;
-		u16 = (uint16_t *)(void *)D6_OPTION_DATA(o);
-		for (opt = dhcp6_opts; opt->option; opt++) {
-			if (opt->type & REQUEST ||
-			    has_option_mask(ifo->requestmask6, opt->option))
-			{
-				*u16++ = htons(opt->option);
-				o->len += sizeof(*u16);
+
+		if (n_options) {
+			o = D6_NEXT_OPTION(o);
+			o->code = htons(D6_OPTION_ORO);
+			o->len = 0;
+			u16 = (uint16_t *)(void *)D6_OPTION_DATA(o);
+			for (opt = dhcp6_opts; opt->option; opt++) {
+				if (opt->type & REQUEST ||
+				    has_option_mask(ifo->requestmask6,
+				        opt->option))
+				{
+					*u16++ = htons(opt->option);
+					o->len += sizeof(*u16);
+				}
 			}
+			o->len = htons(o->len);
 		}
-		if (o->len == 0) {
-			*u16++ = htons(D6_OPTION_UNICAST);
-			*u16++ = htons(D6_OPTION_DNS_SERVERS);
-			*u16++ = htons(D6_OPTION_DOMAIN_LIST);
-			o->len = sizeof(*u16) * 3;
-			if (ifo->fqdn != FQDN_DISABLE) {
-				*u16++ = htons(D6_OPTION_FQDN);
-				o->len += sizeof(*u16);
-			}
-		}
-		o->len = htons(o->len);
 	}
 
 	return 0;
@@ -2181,9 +2190,28 @@ static void
 dhcp6_start1(void *arg)
 {
 	struct interface *ifp = arg;
+	struct if_options *ifo = ifp->options;
 	struct dhcp6_state *state;
+	size_t i;
+	const struct dhcp_compat *dhc;
 
 	state = D6_STATE(ifp);
+	/* Match any DHCPv4 opton to DHCPv6 options if given for easy
+	 * configuration */
+	for (i = 0; i < sizeof(ifo->requestmask6); i++) {
+		if (ifo->requestmask6[i] != '\0')
+			break;
+	}
+	if (i == sizeof(ifo->requestmask6)) {
+		for (dhc = dhcp_compats; dhc->dhcp_opt; dhc++) {
+			if (has_option_mask(ifo->requestmask, dhc->dhcp_opt))
+				add_option_mask(ifo->requestmask6,
+				    dhc->dhcp6_opt);
+		}
+		if (ifo->fqdn != FQDN_DISABLE)
+			add_option_mask(ifo->requestmask6, D6_OPTION_FQDN);
+	}
+
 	syslog(LOG_INFO, "%s: %s", ifp->name,
 	    state->state == DH6S_INFORM ?
 	    "requesting DHCPv6 information" :
