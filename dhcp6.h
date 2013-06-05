@@ -30,7 +30,9 @@
 
 #include "dhcpcd.h"
 
-#define ALLDHCP "ff02::1:2"
+#define IN6ADDR_LINKLOCAL_ALLDHCP_INIT \
+	{{{ 0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, \
+	    0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x02 }}}
 
 /* UDP port numbers for DHCP */
 #define DHCP6_CLIENT_PORT	546
@@ -177,6 +179,7 @@ struct dhcp6_state {
 	uint32_t renew;
 	uint32_t rebind;
 	uint32_t expire;
+	struct in6_addr unicast;
 	struct ipv6_addrhead addrs;
 	uint32_t lowpl;
 	uint32_t sla;

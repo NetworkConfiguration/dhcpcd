@@ -69,7 +69,9 @@
 //#define VENDOR_SPLIT
 
 static int sock = -1;
-static struct sockaddr_in6 alldhcp, from;
+static struct in6_addr in6addr_linklocal_alldhcp =
+    IN6ADDR_LINKLOCAL_ALLDHCP_INIT;
+static struct sockaddr_in6 from;
 static struct msghdr sndhdr;
 static struct iovec sndiov[2];
 static unsigned char *sndbuf;
@@ -157,15 +159,6 @@ dhcp6_init(void)
 #if DEBUG_MEMORY
 	atexit(dhcp6_cleanup);
 #endif
-
-	memset(&alldhcp, 0, sizeof(alldhcp));
-	alldhcp.sin6_family = AF_INET6;
-	alldhcp.sin6_port = htons(DHCP6_SERVER_PORT);
-#ifdef SIN6_LEN
-	alldhcp.sin6_len = sizeof(alldhcp);
-#endif
-	if (inet_pton(AF_INET6, ALLDHCP, &alldhcp.sin6_addr.s6_addr) != 1)
-		return -1;
 
 	len = CMSG_SPACE(sizeof(struct in6_pktinfo));
 	sndbuf = calloc(1, len);
@@ -358,7 +351,7 @@ dhcp6_makemessage(struct interface *ifp)
 	struct dhcp6_state *state;
 	struct dhcp6_message *m;
 	struct dhcp6_option *o, *so;
-	const struct dhcp6_option *si;
+	const struct dhcp6_option *si, *unicast;
 	ssize_t len, ml;
 	size_t l;
 	uint8_t u8;
@@ -386,7 +379,7 @@ dhcp6_makemessage(struct interface *ifp)
 				len += sizeof(*u16);
 		}
 		if (len == 0)
-			len = sizeof(*u16) * 2;
+			len = sizeof(*u16) * 3;
 		len += sizeof(*o);
 	}
 
@@ -451,6 +444,8 @@ dhcp6_makemessage(struct interface *ifp)
 		return -1;
 
 	state->send_len = len;
+	unicast = NULL;
+	/* Depending on state, get the unicast address */
 	switch(state->state) {
 		break;
 	case DH6S_INIT: /* FALLTHROUGH */
@@ -459,6 +454,7 @@ dhcp6_makemessage(struct interface *ifp)
 		break;
 	case DH6S_REQUEST:
 		state->send->type = DHCP6_REQUEST;
+		unicast = dhcp6_getoption(D6_OPTION_UNICAST, m, ml);
 		break;
 	case DH6S_CONFIRM:
 		state->send->type = DHCP6_CONFIRM;
@@ -468,12 +464,14 @@ dhcp6_makemessage(struct interface *ifp)
 		break;
 	case DH6S_RENEW:
 		state->send->type = DHCP6_RENEW;
+		unicast = dhcp6_getoption(D6_OPTION_UNICAST, m, ml);
 		break;
 	case DH6S_INFORM:
 		state->send->type = DHCP6_INFORMATION_REQ;
 		break;
 	case DH6S_RELEASE:
 		state->send->type = DHCP6_RELEASE;
+		unicast = dhcp6_getoption(D6_OPTION_UNICAST, m, ml);
 		break;
 	default:
 		errno = EINVAL;
@@ -481,6 +479,13 @@ dhcp6_makemessage(struct interface *ifp)
 		state->send = NULL;
 		return -1;
 	}
+
+	/* If we found a unicast option, copy it to our state for sending */
+	if (unicast && ntohs(unicast->len) == sizeof(state->unicast.s6_addr))
+		memcpy(&state->unicast.s6_addr, D6_COPTION_DATA(unicast),
+		    sizeof(state->unicast.s6_addr));
+	else
+		state->unicast = in6addr_any;
 
 	dhcp6_newxid(ifp, state->send);
 
@@ -578,7 +583,8 @@ dhcp6_makemessage(struct interface *ifp)
 		if (o->len == 0) {
 			*u16++ = htons(D6_OPTION_DNS_SERVERS);
 			*u16++ = htons(D6_OPTION_DOMAIN_LIST);
-			o->len = sizeof(*u16) * 2;
+			*u16++ = htons(D6_OPTION_UNICAST);
+			o->len = sizeof(*u16) * 3;
 		}
 		o->len = htons(o->len);
 	}
@@ -638,11 +644,36 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 	double rnd;
 	suseconds_t ms;
 	uint8_t neg;
+	const char *broad_uni;
+
+	memset(&to, 0, sizeof(to));
+	to.sin6_family = AF_INET6;
+	to.sin6_port = htons(DHCP6_SERVER_PORT);
+#ifdef SIN6_LEN
+	to.sin6_len = sizeof(to);
+#endif
 
 	state = D6_STATE(ifp);
+	/* We need to ensure we have sufficient scope to unicast the address */
+	/* XXX FIXME: We should check any added addresses we have like from
+	 * a Router Advertisement */
+	if (!IN6_IS_ADDR_UNSPECIFIED(&state->unicast) &&
+	    state->state == DH6S_REQUEST &&
+	    (!IN6_IS_ADDR_LINKLOCAL(&state->unicast) || !ipv6_linklocal(ifp)))
+		state->unicast = in6addr_any;
+
+	if (IN6_IS_ADDR_UNSPECIFIED(&state->unicast)) {
+		to.sin6_addr = in6addr_linklocal_alldhcp;
+		broad_uni = "broadcasting";
+	} else {
+		to.sin6_addr = state->unicast;
+		broad_uni = "unicasting";
+	}
+
 	if (!callback)
-		syslog(LOG_DEBUG, "%s: sending %s with xid 0x%02x%02x%02x",
+		syslog(LOG_DEBUG, "%s: %s %s with xid 0x%02x%02x%02x",
 		    ifp->name,
+		    broad_uni,
 		    dhcp6_get_op(state->send->type),
 		    state->send->xid[0],
 		    state->send->xid[1],
@@ -687,9 +718,11 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 		}
 
 		syslog(LOG_DEBUG,
-		    "%s: sending %s (xid 0x%02x%02x%02x),"
+		    "%s: %s %s (xid 0x%02x%02x%02x),"
 		    " next in %0.2f seconds",
-		    ifp->name, dhcp6_get_op(state->send->type),
+		    ifp->name,
+		    broad_uni,
+		    dhcp6_get_op(state->send->type),
 		    state->send->xid[0],
 		    state->send->xid[1],
 		    state->send->xid[2],
@@ -699,7 +732,6 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 	/* Update the elapsed time */
 	dhcp6_updateelapsed(ifp, state->send, state->send_len);
 
-	to = alldhcp;
 	to.sin6_scope_id = ifp->index;
 	sndhdr.msg_name = (caddr_t)&to;
 	sndhdr.msg_iov[0].iov_base = (caddr_t)state->send;
