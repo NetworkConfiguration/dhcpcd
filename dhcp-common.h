@@ -56,6 +56,8 @@
 #define ADDRIPV6	(1 << 14)
 #define BINHEX		(1 << 15)
 #define SCODE		(1 << 16)
+#define FLAG		(1 << 17)
+#define NOREQ		(1 << 18)
 
 struct dhcp_opt {
 	uint16_t option;

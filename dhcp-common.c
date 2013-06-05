@@ -329,6 +329,14 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data,
 		return print_string(s, len, dl, data);
 	}
 
+	if (type & FLAG) {
+		if (s) {
+			*s++ = '1';
+			*s = '\0';
+		}
+		return 2;
+	}
+
 	/* DHCPv6 status code */
 	if (type & SCODE && dl >= (int)sizeof(u16)) {
 		if (s) {

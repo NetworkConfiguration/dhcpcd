@@ -103,6 +103,7 @@ enum DHO {
 	DHO_VENDORCLASSID          = 60,
 	DHO_CLIENTID               = 61,
 	DHO_USERCLASS              = 77,  /* RFC 3004 */
+	DHO_RAPIDCOMMIT            = 80,  /* RFC 4039 */
 	DHO_FQDN                   = 81,
 	DHO_DNSSEARCH              = 119, /* RFC 3397 */
 	DHO_CSR                    = 121, /* RFC 3442 */

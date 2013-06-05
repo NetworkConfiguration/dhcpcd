@@ -109,8 +109,8 @@ const struct dhcp_opt dhcp6_opts[] = {
 	{ D6_OPTION_SERVERID,		BINHEX,		"server_id" },
 	{ D6_OPTION_IA_ADDR,		IPV6A,		"ia_addr" },
 	{ D6_OPTION_PREFERENCE,		UINT8,		"preference" },
-	{ D6_OPTION_RAPID_COMMIT,	0,		"rapid_commit" },
 	{ D6_OPTION_UNICAST,		ADDRIPV6,	"unicast" },
+	{ D6_OPTION_RAPID_COMMIT,	FLAG | NOREQ,	"rapid_commit" },
 	{ D6_OPTION_STATUS_CODE,	SCODE,		"status_code" },
 	{ D6_OPTION_SIP_SERVERS_NAME,	RFC3397,	"sip_servers_names" },
 	{ D6_OPTION_SIP_SERVERS_ADDRESS,IPV6A,	"sip_servers_addresses" },
@@ -141,6 +141,7 @@ const struct dhcp_compat dhcp_compats[] = {
 	{ DHO_DNSDOMAIN,	D6_OPTION_FQDN },
 	{ DHO_NISSERVER,	D6_OPTION_NIS_SERVERS },
 	{ DHO_NTPSERVER,	D6_OPTION_SNTP_SERVERS },
+	{ DHO_RAPIDCOMMIT,	D6_OPTION_RAPID_COMMIT },
 	{ DHO_FQDN,		D6_OPTION_FQDN },
 	{ DHO_DNSSEARCH,	D6_OPTION_DOMAIN_LIST },
 	{ 0, 0 }
@@ -393,8 +394,9 @@ dhcp6_makemessage(struct interface *ifp)
 	si = NULL;
 	if (state->state != DH6S_RELEASE) {
 		for (opt = dhcp6_opts; opt->option; opt++) {
-			if (opt->type & REQUEST ||
-			    has_option_mask(ifo->requestmask6, opt->option))
+			if (!(opt->type & NOREQ) &&
+			    (opt->type & REQUEST ||
+			    has_option_mask(ifo->requestmask6, opt->option)))
 			{
 				n_options++;
 				len += sizeof(*u16);
@@ -462,6 +464,11 @@ dhcp6_makemessage(struct interface *ifp)
 	default:
 		IA = 0;
 	}
+
+	if (state->state == DH6S_DISCOVER &&
+	    !(options & DHCPCD_TEST) &&
+	    has_option_mask(ifo->requestmask6, D6_OPTION_RAPID_COMMIT))
+		len += sizeof(*o);
 
 	if (m == NULL) {
 		m = state->new;
@@ -538,6 +545,15 @@ dhcp6_makemessage(struct interface *ifp)
 	o = D6_NEXT_OPTION(o);
 	dhcp6_makevendor(o);
 #endif
+
+	if (state->state == DH6S_DISCOVER &&
+	    !(options & DHCPCD_TEST) &&
+	    has_option_mask(ifo->requestmask6, D6_OPTION_RAPID_COMMIT))
+	{
+		o = D6_NEXT_OPTION(o);
+		o->code = htons(D6_OPTION_RAPID_COMMIT);
+		o->len = 0;
+	}
 
 	for (l = 0; IA && l < ifo->iaid_len; l++) {
 		o = D6_NEXT_OPTION(o);
@@ -624,9 +640,10 @@ dhcp6_makemessage(struct interface *ifp)
 			o->len = 0;
 			u16 = (uint16_t *)(void *)D6_OPTION_DATA(o);
 			for (opt = dhcp6_opts; opt->option; opt++) {
-				if (opt->type & REQUEST ||
+				if (!(opt->type & NOREQ) &&
+				    (opt->type & REQUEST ||
 				    has_option_mask(ifo->requestmask6,
-				        opt->option))
+				        opt->option)))
 				{
 					*u16++ = htons(opt->option);
 					o->len += sizeof(*u16);
@@ -1962,6 +1979,13 @@ dhcp6_handledata(__unused void *arg)
 				return;
 			}
 			break;
+		case DH6S_DISCOVER:
+			if (has_option_mask(ifo->requestmask6,
+			    D6_OPTION_RAPID_COMMIT)  &&
+			    dhcp6_getoption(D6_OPTION_RAPID_COMMIT, r, len))
+				state->state = DH6S_REQUEST;
+			else
+				op = NULL;
 		case DH6S_REQUEST: /* FALLTHROUGH */
 		case DH6S_RENEW: /* FALLTHROUGH */
 		case DH6S_REBIND:
@@ -2004,6 +2028,8 @@ dhcp6_handledata(__unused void *arg)
 
 	switch(r->type) {
 	case DHCP6_ADVERTISE:
+		if (state->state == DH6S_REQUEST) /* rapid commit */
+			break;
 		ap = TAILQ_FIRST(&state->addrs);
 		syslog(LOG_INFO, "%s: ADV %s from %s",
 		    ifp->name, ap->saddr, sfrom);

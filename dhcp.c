@@ -183,6 +183,7 @@ const struct dhcp_opt dhcp_opts[] = {
 	{ 75,	IPV4A,		"streettalk_server" },
 	{ 76,	IPV4A,		"streettalk_directory_assistance_server" },
 	{ 77,	STRING,		"user_class" },
+	{ 80,	FLAG | NOREQ,	"rapid_commit" },
 	{ 81,	STRING | RFC3397,	"fqdn_name" },
 	{ 85,	IPV4A,		"nds_servers" },
 	{ 86,	STRING,		"nds_tree_name" },
@@ -929,6 +930,15 @@ make_message(struct dhcp_message **message,
 		p += len;
 	}
 
+	if (type == DHCP_DISCOVER &&
+	    !(options & DHCPCD_TEST) &&
+	    has_option_mask(ifo->requestmask, DHO_RAPIDCOMMIT))
+	{
+		/* RFC 4039 Section 3 */
+		*p++ = DHO_RAPIDCOMMIT;
+		*p++ = 0;
+	}
+
 	if (type == DHCP_DISCOVER && ifo->options & DHCPCD_REQUEST)
 		PUTADDR(DHO_IPADDRESS, ifo->req_addr);
 
@@ -1036,6 +1046,8 @@ make_message(struct dhcp_message **message,
 		for (opt = dhcp_opts; opt->option; opt++) {
 			if (!(opt->type & REQUEST ||
 				has_option_mask(ifo->requestmask, opt->option)))
+				continue;
+			if (opt->type & NOREQ)
 				continue;
 			if (type == DHCP_INFORM &&
 			    (opt->option == DHO_RENEWALTIME ||
@@ -2141,7 +2153,7 @@ dhcp_handle(struct interface *iface, struct dhcp_message **dhcpp,
 		    get_option_uint8(&tmp, dhcp, i) != 0)
 		{
 			/* If we are bootp, then ignore the need for serverid.
-			 * To ignore bootp, require dhcp_message_type instead. */
+			 * To ignore bootp, require dhcp_message_type. */
 			if (type == 0 && i == DHO_SERVERID)
 				continue;
 			log_dhcp(LOG_WARNING, "reject DHCP", iface, dhcp, from);
