@@ -380,8 +380,11 @@ dhcp6_makemessage(struct interface *ifp)
 			    has_option_mask(ifo->requestmask6, opt->option))
 				len += sizeof(*u16);
 		}
-		if (len == 0)
-			len = sizeof(*u16) * 4;
+		if (len == 0) {
+			len = sizeof(*u16) * 3;
+			if (ifo->fqdn != FQDN_DISABLE)
+				len += sizeof(*u16);
+		}
 		len += sizeof(*o);
 
 		if (ifo->fqdn != FQDN_DISABLE) {
@@ -614,8 +617,11 @@ dhcp6_makemessage(struct interface *ifp)
 			*u16++ = htons(D6_OPTION_UNICAST);
 			*u16++ = htons(D6_OPTION_DNS_SERVERS);
 			*u16++ = htons(D6_OPTION_DOMAIN_LIST);
-			*u16++ = htons(D6_OPTION_FQDN);
-			o->len = sizeof(*u16) * 4;
+			o->len = sizeof(*u16) * 3;
+			if (ifo->fqdn != FQDN_DISABLE) {
+				*u16++ = htons(D6_OPTION_FQDN);
+				o->len += sizeof(*u16);
+			}
 		}
 		o->len = htons(o->len);
 	}
