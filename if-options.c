@@ -1231,9 +1231,13 @@ read_config(const char *file,
 int
 add_options(struct if_options *ifo, int argc, char **argv)
 {
-	int oi, opt, r = 1;
+	int oi, opt, r;
+
+	if (argc == 0)
+		return 1;
 
 	optind = 0;
+	r = 1;
 	while ((opt = getopt_long(argc, argv, IF_OPTS, cf_options, &oi)) != -1)
 	{
 		r = parse_option(ifo, opt, optarg);
