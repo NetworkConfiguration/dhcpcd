@@ -36,7 +36,7 @@ for x do
 	--enable-ipv4) INET=yes;;
 	--disable-ipv6) INET6=no;;
 	--enable-ipv6) INET6=yes;;
-	--prefix) prefix=$var;;
+	--prefix) PREFIX=$var;;
 	--sysconfdir) SYSCONFDIR=$var;;
 	--bindir|--sbindir) SBINDIR=$var;;
 	--libexecdir) LIBEXECDIR=$var;;
@@ -135,7 +135,6 @@ done
 : ${SED:=sed}
 
 : ${FORK:=yes}
-: ${PREFIX:=$prefix}
 : ${SYSCONFDIR:=$PREFIX/etc}
 : ${SBINDIR:=$PREFIX/sbin}
 : ${LIBDIR:=$PREFIX/lib}
