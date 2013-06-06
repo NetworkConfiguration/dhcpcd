@@ -548,7 +548,7 @@ delete_address(struct interface *iface)
 	syslog(LOG_DEBUG, "%s: deleting IP address %s/%d",
 	    iface->name, inet_ntoa(state->addr), inet_ntocidr(state->net));
 	retval = ipv4_deleteaddress(iface, &state->addr, &state->net);
-	if (retval == -1 && errno != EADDRNOTAVAIL)
+	if (retval == -1 && errno != EADDRNOTAVAIL && errno != ENXIO)
 		syslog(LOG_ERR, "del_address: %m");
 	state->addr.s_addr = 0;
 	state->net.s_addr = 0;
