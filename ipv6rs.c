@@ -325,7 +325,7 @@ ipv6rs_freedrop_addrs(struct ra *rap, int drop)
 			syslog(LOG_INFO, "%s: deleting address %s",
 			    rap->iface->name, ap->saddr);
 			if (del_address6(ap) == -1 &&
-			    errno != EADDRNOTAVAIL)
+			    errno != EADDRNOTAVAIL && errno != ENXIO)
 				syslog(LOG_ERR, "del_address6 %m");
 		}
 		free(ap);

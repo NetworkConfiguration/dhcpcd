@@ -688,7 +688,7 @@ dhcp6_freedrop_addrs(struct interface *ifp, int drop)
 			syslog(LOG_INFO, "%s: deleting address %s",
 			    ap->iface->name, ap->saddr);
 			if (del_address6(ap) == -1 &&
-			    errno != EADDRNOTAVAIL)
+			    errno != EADDRNOTAVAIL && errno != ENXIO)
 				syslog(LOG_ERR, "del_address6 %m");
 		}
 		free(ap);

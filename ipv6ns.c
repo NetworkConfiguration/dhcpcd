@@ -394,7 +394,7 @@ ipv6ns_probeaddrs(struct ipv6_addrhead *addrs)
 				i++;
 			}
 			if (del_address6(ap) == -1 &&
-			    errno != EADDRNOTAVAIL)
+			    errno != EADDRNOTAVAIL && errno != ENXIO)
 				syslog(LOG_ERR, "del_address6 %m");
 			if (ap->dadcallback)
 				eloop_q_timeout_delete(0, NULL,
