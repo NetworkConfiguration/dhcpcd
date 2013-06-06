@@ -384,8 +384,9 @@ handle_carrier(int carrier, int flags, const char *ifname)
 	/* IFF_RUNNING is checked, if needed, earlier and is OS dependant */
 	else if (carrier == LINK_DOWN || (ifp->flags & IFF_UP) == 0) {
 		if (ifp->carrier != LINK_DOWN) {
+			if (ifp->carrier == LINK_UP)
+				syslog(LOG_INFO, "%s: carrier lost", ifp->name);
 			ifp->carrier = LINK_DOWN;
-			syslog(LOG_INFO, "%s: carrier lost", ifp->name);
 			dhcp_close(ifp);
 			dhcp6_drop(ifp, "EXPIRE6");
 			ipv6rs_drop(ifp);
@@ -398,8 +399,8 @@ handle_carrier(int carrier, int flags, const char *ifname)
 		}
 	} else if (carrier == LINK_UP && ifp->flags & IFF_UP) {
 		if (ifp->carrier != LINK_UP) {
-			ifp->carrier = LINK_UP;
 			syslog(LOG_INFO, "%s: carrier acquired", ifp->name);
+			ifp->carrier = LINK_UP;
 			if (ifp->wireless)
 				getifssid(ifp->name, ifp->ssid);
 			configure_interface(ifp, margc, margv);
