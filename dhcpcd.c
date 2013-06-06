@@ -516,8 +516,10 @@ handle_interface(int action, const char *ifname)
 
 	if (action == -1) {
 		ifp = find_interface(ifname);
-		if (ifp != NULL)
+		if (ifp != NULL) {
 			stop_interface(ifp);
+			script_runreason(ifp, "DEPARTED");
+		}
 		return;
 	}
 
