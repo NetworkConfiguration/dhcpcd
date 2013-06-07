@@ -617,6 +617,7 @@ if_reboot(struct interface *ifp, int argc, char **argv)
 	int oldopts;
 
 	oldopts = ifp->options->options;
+	script_runreason(ifp, "RECONFIGURE");
 	configure_interface(ifp, argc, argv);
 	dhcp_reboot_newopts(ifp, oldopts);
 	dhcp6_reboot(ifp);

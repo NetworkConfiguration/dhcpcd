@@ -54,8 +54,8 @@ the binary has to run on older versions which lack support, such as getline.
 Hooks
 -----
 Not all the hooks in dhcpcd-hooks are installed by default.
-By default we install 01-test, 10-mtu, 20-resolv.conf,
-29-lookup-hostname and 30-hostname.
+By default we install 01-test, 02-dump, 10-mtu, 10-wpa_supplicant,
+15-timezone, 20-resolv.conf, 29-lookup-hostname and 30-hostname.
 The default dhcpcd.conf disables the lookup-hostname hook by default.
 The configure program attempts to find hooks for systems you have installed.
 To add more simply

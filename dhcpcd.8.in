@@ -171,7 +171,7 @@ changes the routes to use the interface with the same route and the lowest
 metric.
 See options below for controlling which interfaces we allow and deny through
 the use of patterns.
-.Ss Hooking into DHCP events
+.Ss Hooking into events
 .Nm
 runs
 .Pa @SCRIPT@ ,
@@ -184,6 +184,8 @@ in a lexical order.
 The default installation supplies the scripts
 .Pa 01-test ,
 .Pa 10-mtu ,
+.Pa 10-wpa_supplicant ,
+.Pa 15-timezone ,
 .Pa 20-resolv.conf
 and
 .Pa 30-hostname .
