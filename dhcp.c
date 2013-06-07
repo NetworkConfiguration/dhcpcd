@@ -2522,17 +2522,17 @@ dhcp_init(struct interface *ifp)
 	if (state == NULL) {
 		ifp->if_data[IF_DATA_DHCP] = calloc(1, sizeof(*state));
 		state = D_STATE(ifp);
+		if (state == NULL)
+			return -1;
+		/* 0 is a valid fd, so init to -1 */
+		state->raw_fd = state->udp_fd = state->arp_fd = -1;
 	}
-	if (state == NULL)
-		return -1;
 
 	state->state = DHS_INIT;
 	state->reason = "PREINIT";
 	state->nakoff = 0;
 	snprintf(state->leasefile, sizeof(state->leasefile),
 	    LEASEFILE, ifp->name);
-	/* 0 is a valid fd, so init to -1 */
-	state->raw_fd = state->udp_fd = state->arp_fd = -1;
 
 	ifo = ifp->options;
 	/* We need to drop the leasefile so that start_interface
@@ -2617,6 +2617,9 @@ dhcp_start(struct interface *ifp)
 		syslog(LOG_ERR, "%s: dhcp_init: %m", ifp->name);
 		return;
 	}
+
+	/* Close any pre-existing sockets as we're starting over */
+	dhcp_close(ifp);
 
 	state = D_STATE(ifp);
 	state->start_uptime = uptime();

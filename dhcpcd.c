@@ -66,7 +66,6 @@ const char copyright[] = "Copyright (c) 2006-2013 Roy Marples";
 #include "net.h"
 #include "platform.h"
 #include "script.h"
-#include "signals.h"
 
 struct if_head *ifaces = NULL;
 char vendor[VENDORCLASSID_MAX_LEN];
@@ -78,6 +77,15 @@ int ifdc = 0;
 char **ifdv = NULL;
 
 sigset_t dhcpcd_sigset;
+const int handle_sigs[] = {
+	SIGALRM,
+	SIGHUP,
+	SIGINT,
+	SIGPIPE,
+	SIGTERM,
+	SIGUSR1,
+	0
+};
 
 static char *cffile;
 static char *pidfile;
@@ -611,6 +619,7 @@ if_reboot(struct interface *ifp, int argc, char **argv)
 	oldopts = ifp->options->options;
 	configure_interface(ifp, argc, argv);
 	dhcp_reboot_newopts(ifp, oldopts);
+	dhcp6_reboot(ifp);
 	start_interface(ifp);
 }
 
@@ -634,8 +643,8 @@ reconf_reboot(int action, int argc, char **argv, int oi)
 				ipv4_applyaddr(ifn);
 			free_interface(ifp);
 		} else {
-			TAILQ_INSERT_TAIL(ifaces, ifp, next);
 			init_state(ifp, argc, argv);
+			TAILQ_INSERT_TAIL(ifaces, ifp, next);
 			start_interface(ifp);
 		}
 	}
@@ -646,10 +655,14 @@ reconf_reboot(int action, int argc, char **argv, int oi)
 
 /* ARGSUSED */
 static void
-sig_reboot(__unused void *arg)
+sig_reboot(void *arg)
 {
+	siginfo_t *siginfo = arg;
 	struct if_options *ifo;
 	int i;
+
+	syslog(LOG_INFO, "received SIGALRM from PID %d, rebinding",
+	    (int)siginfo->si_pid);
 
 	for (i = 0; i < ifac; i++)
 		free(ifav[i]);
@@ -674,17 +687,20 @@ sig_reboot(__unused void *arg)
 }
 
 static void
-sig_reconf(__unused void *arg)
+sig_reconf(void *arg)
 {
+	siginfo_t *siginfo = arg;
 	struct interface *ifp;
 
+	syslog(LOG_INFO, "received SIGUSR from PID %d, reconfiguring",
+	    (int)siginfo->si_pid);
 	TAILQ_FOREACH(ifp, ifaces, next) {
 		ipv4_applyaddr(ifp);
 	}
 }
 
-void
-handle_signal(int sig)
+static void
+handle_signal(int sig, siginfo_t *siginfo, __unused void *context)
 {
 	struct interface *ifp;
 	int do_release;
@@ -692,30 +708,32 @@ handle_signal(int sig)
 	do_release = 0;
 	switch (sig) {
 	case SIGINT:
-		syslog(LOG_INFO, "received SIGINT, stopping");
+		syslog(LOG_INFO, "received SIGINT from PID %d, stopping",
+		    (int)siginfo->si_pid);
 		break;
 	case SIGTERM:
-		syslog(LOG_INFO, "received SIGTERM, stopping");
+		syslog(LOG_INFO, "received SIGTERM from PID %d, stopping",
+		    (int)siginfo->si_pid);
 		break;
 	case SIGALRM:
-		syslog(LOG_INFO, "received SIGALRM, rebinding");
-		eloop_timeout_add_now(sig_reboot, NULL);
+		eloop_timeout_add_now(sig_reboot, siginfo);
 		return;
 	case SIGHUP:
-		syslog(LOG_INFO, "received SIGHUP, releasing");
+		syslog(LOG_INFO, "received SIGHUP from PID %d, releasing",
+		    (int)siginfo->si_pid);
 		do_release = 1;
 		break;
 	case SIGUSR1:
-		syslog(LOG_INFO, "received SIGUSR, reconfiguring");
-		eloop_timeout_add_now(sig_reconf, NULL);
+		eloop_timeout_add_now(sig_reconf, siginfo);
 		return;
 	case SIGPIPE:
 		syslog(LOG_WARNING, "received SIGPIPE");
 		return;
 	default:
 		syslog(LOG_ERR,
-		    "received signal %d, but don't know what to do with it",
-		    sig);
+		    "received signal %d from PID %d, "
+		    "but don't know what to do with it",
+		    sig, (int)siginfo->si_pid);
 		return;
 	}
 
@@ -873,6 +891,29 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 	}
 
 	reconf_reboot(do_reboot, argc, argv, optind);
+	return 0;
+}
+
+static int
+signal_init(void (*func)(int, siginfo_t *, void *), sigset_t *oldset)
+{
+	unsigned int i;
+	struct sigaction sa;
+	sigset_t newset;
+
+	sigfillset(&newset);
+	if (sigprocmask(SIG_SETMASK, &newset, oldset) == -1)
+		return -1;
+
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_sigaction = func;
+	sa.sa_flags = SA_SIGINFO;
+	sigemptyset(&sa.sa_mask);
+
+	for (i = 0; handle_sigs[i]; i++) {
+		if (sigaction(handle_sigs[i], &sa, NULL) == -1)
+			return -1;
+	}
 	return 0;
 }
 

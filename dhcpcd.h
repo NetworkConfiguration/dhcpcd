@@ -77,13 +77,14 @@ extern int ifdc;
 extern char **ifdv;
 extern struct if_options *if_options;
 
+extern const int handle_sigs[];
+
 pid_t daemonise(void);
 struct interface *find_interface(const char *);
 int handle_args(struct fd_list *, int, char **);
 void handle_carrier(int, int, const char *);
 void handle_interface(int, const char *);
 void handle_hwaddr(const char *, unsigned char *, size_t);
-void handle_signal(int);
 void drop_interface(struct interface *, const char *);
 int select_profile(struct interface *, const char *);
 

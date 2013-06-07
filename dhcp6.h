@@ -216,6 +216,7 @@ void dhcp6_printoptions(void);
 int dhcp6_addrexists(const struct ipv6_addr *);
 int dhcp6_find_delegates(struct interface *);
 int dhcp6_start(struct interface *, enum DH6S);
+void dhcp6_reboot(struct interface *);
 ssize_t dhcp6_env(char **, const char *, const struct interface *,
     const struct dhcp6_message *, ssize_t);
 void dhcp6_free(struct interface *);
@@ -226,6 +227,7 @@ void dhcp6_drop(struct interface *, const char *);
 #define dhcp6_addrexists(a)
 #define dhcp6_find_delegates(a);
 #define dhcp6_start(a, b) 0
+#define dhcp6_reboot(a)
 #define dhcp6_env(a, b, c, d, e)
 #define dhcp6_free(a)
 #define dhcp6_drop(a, b)

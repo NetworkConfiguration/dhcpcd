@@ -2300,6 +2300,16 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 	return 0;
 }
 
+void
+dhcp6_reboot(struct interface *ifp)
+{
+	struct dhcp6_state *state;
+
+	state = D6_STATE(ifp);
+	if (state && state->state == DH6S_BOUND)
+		dhcp6_startrebind(ifp);
+}
+
 static void
 dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 {

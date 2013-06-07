@@ -241,8 +241,6 @@ discover_interfaces(int argc, char * const *argv)
 	const struct sockaddr_ll *sll;
 #endif
 
-
-
 	if (getifaddrs(&ifaddrs) == -1)
 		return NULL;
 
@@ -289,23 +287,23 @@ discover_interfaces(int argc, char * const *argv)
 				continue;
 			p = argv[i];
 		} else {
+			p = ifa->ifa_name;
 			/* -1 means we're discovering against a specific
 			 * interface, but we still need the below rules
 			 * to apply. */
 			if (argc == -1 && strcmp(argv[0], ifa->ifa_name) != 0)
 				continue;
-			for (i = 0; i < ifdc; i++)
-				if (!fnmatch(ifdv[i], ifa->ifa_name, 0))
-					break;
-			if (i < ifdc)
-				continue;
-			for (i = 0; i < ifac; i++)
-				if (!fnmatch(ifav[i], ifa->ifa_name, 0))
-					break;
-			if (ifac && i == ifac)
-				continue;
-			p = ifa->ifa_name;
 		}
+		for (i = 0; i < ifdc; i++)
+			if (!fnmatch(ifdv[i], p, 0))
+				break;
+		if (i < ifdc)
+			continue;
+		for (i = 0; i < ifac; i++)
+			if (!fnmatch(ifav[i], p, 0))
+				break;
+		if (ifac && i == ifac)
+			continue;
 
 		ifp = calloc(1, sizeof(*ifp));
 		if (ifp == NULL)

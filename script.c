@@ -51,7 +51,6 @@
 #include "ipv6rs.h"
 #include "net.h"
 #include "script.h"
-#include "signals.h"
 
 #define DEFAULT_PATH	"PATH=/usr/bin:/usr/sbin:/bin:/sbin"
 
