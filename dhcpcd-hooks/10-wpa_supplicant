@@ -1,4 +1,4 @@
-# Start and stop wpa_supplicant per wireless interface.
+# Start, reconfigure and stop wpa_supplicant per wireless interface.
 # This is needed because wpa_supplicant lacks hotplugging of any kind
 # and the user should not be expected to have to wire it into their system
 # if the base system doesn't do this itself.
@@ -24,7 +24,10 @@ wpa_supplicant_reconfigure()
 {
 	local err errn
 
-	wpa_cli -i "$interface" status >/dev/null 2>&1 || return 0
+	if ! wpa_cli -i "$interface" status >/dev/null 2>&1; then
+		wpa_supplicant_start
+		return $?
+	fi
 	syslog info "reconfiguring wpa_supplicant"
 	err=$(wpa_cli -i"$interface" reconfigure 2>&1)
 	errn=$?

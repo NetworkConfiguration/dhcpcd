@@ -329,6 +329,9 @@ to reload its configuration and rebind its interfaces.
 If
 .Nm
 is not running, then it starts up as normal.
+This may also cause
+.Xr wpa_supplicant 8
+to reload its configuration for each interface as well.
 .It Fl o , Fl Fl option Ar option
 Request the DHCP
 .Ar option
