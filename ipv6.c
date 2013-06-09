@@ -419,7 +419,8 @@ ipv6_addaddr(struct ipv6_addr *ap)
 	ap->flags |= IPV6_AF_ADDED;
 	if (ap->delegating_iface)
 		ap->flags |= IPV6_AF_DELEGATED;
-	if (ipv6_removesubnet(ap->iface, ap) == -1)
+	if (ap->iface->options->options & DHCPCD_IPV6RA_OWN &&
+	    ipv6_removesubnet(ap->iface, ap) == -1)
 		syslog(LOG_ERR,"ipv6_removesubnet %m");
 	if (ap->prefix_pltime == ND6_INFINITE_LIFETIME &&
 	    ap->prefix_vltime == ND6_INFINITE_LIFETIME)
