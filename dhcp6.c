@@ -1860,7 +1860,7 @@ dhcp6_handledata(__unused void *arg)
 	const struct dhcp6_option *o;
 	const struct dhcp_opt *opt;
 	const struct if_options *ifo;
-	const struct ipv6_addr *ap;
+	struct ipv6_addr *ap;
 	uint8_t has_new;
 	int error;
 
@@ -2129,11 +2129,14 @@ recv:
 		len = 1;
 		/* If all addresses have completed DAD run the script */
 		TAILQ_FOREACH(ap, &state->addrs, next) {
-			if (ap->flags & IPV6_AF_ONLINK &&
-			    (ap->flags & IPV6_AF_DADCOMPLETED) == 0)
-			{
-				len = 0;
-				break;
+			if (ap->flags & IPV6_AF_ONLINK) {
+				if (!(ap->flags & IPV6_AF_DADCOMPLETED) &&
+				    ipv6_findaddr(ap->iface, &ap->addr))
+					ap->flags |= IPV6_AF_DADCOMPLETED;
+				if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0) {
+					len = 0;
+					break;
+				}
 			}
 		}
 		if (len) {
@@ -2372,6 +2375,9 @@ dhcp6_handleifa(int cmd, const char *ifname,
 {
 	struct interface *ifp;
 	struct dhcp6_state *state;
+
+	if (ifaces == NULL)
+		return;
 
 	TAILQ_FOREACH(ifp, ifaces, next) {
 		state = D6_STATE(ifp);

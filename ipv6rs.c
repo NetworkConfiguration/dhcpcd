@@ -406,20 +406,25 @@ add_router(struct ra *router)
 }
 
 static void
-ipv6rs_scriptrun(const struct ra *rap)
+ipv6rs_scriptrun(struct ra *rap)
 {
 	int hasdns;
-	const struct ipv6_addr *ap;
+	struct ipv6_addr *ap;
 	const struct ra_opt *rao;
 
 	/* If all addresses have completed DAD run the script */
 	TAILQ_FOREACH(ap, &rap->addrs, next) {
-		if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0) {
-			syslog(LOG_DEBUG,
-			    "%s: waiting for Router Advertisement"
-			    " DAD to complete",
-			    rap->iface->name);
-			return;
+		if (ap->flags & IPV6_AF_ONLINK) {
+			if (!(ap->flags & IPV6_AF_DADCOMPLETED) &&
+			    ipv6_findaddr(ap->iface, &ap->addr))
+				ap->flags |= IPV6_AF_DADCOMPLETED;
+			if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0) {
+				syslog(LOG_DEBUG,
+				    "%s: waiting for Router Advertisement"
+				    " DAD to complete",
+				    rap->iface->name);
+				return;
+			}
 		}
 	}
 

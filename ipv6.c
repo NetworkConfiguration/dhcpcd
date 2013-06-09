@@ -141,8 +141,7 @@ int
 ipv6_makeaddr(struct in6_addr *addr, const struct interface *ifp,
     const struct in6_addr *prefix, int prefix_len)
 {
-	const struct ipv6_state *state;
-	const struct ll_addr *ap;
+	const struct ipv6_addr_l *ap;
 #if 0
 	static u_int8_t allzero[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 	static u_int8_t allone[8] =
@@ -157,14 +156,11 @@ ipv6_makeaddr(struct in6_addr *addr, const struct interface *ifp,
 	memcpy(addr, prefix, sizeof(*prefix));
 
 	/* Try and make the address from the first local-link address */
-	state = IPV6_CSTATE(ifp);
-	if (state) {
-		ap = TAILQ_FIRST(&state->ll_addrs);
-		if (ap) {
-			addr->s6_addr32[2] = ap->addr.s6_addr32[2];
-			addr->s6_addr32[3] = ap->addr.s6_addr32[3];
-			return 0;
-		}
+	ap = ipv6_linklocal(ifp);
+	if (ap) {
+		addr->s6_addr32[2] = ap->addr.s6_addr32[2];
+		addr->s6_addr32[3] = ap->addr.s6_addr32[3];
+		return 0;
 	}
 
 	/* Because we delay a few functions until we get a local-link address
@@ -412,6 +408,9 @@ ipv6_addaddr(struct ipv6_addr *ap)
 
 	syslog(ap->flags & IPV6_AF_NEW ? LOG_INFO : LOG_DEBUG,
 	    "%s: adding address %s", ap->iface->name, ap->saddr);
+	if (!(ap->flags & IPV6_AF_DADCOMPLETED) &&
+	    ipv6_findaddr(ap->iface, &ap->addr))
+		ap->flags |= IPV6_AF_DADCOMPLETED;
 	if (add_address6(ap) == -1) {
 		syslog(LOG_ERR, "add_address6 %m");
 		return -1;
@@ -455,7 +454,7 @@ ipv6_getstate(struct interface *ifp)
 			syslog(LOG_ERR, "%s: %m", __func__);
 			return NULL;
 		}
-		TAILQ_INIT(&state->ll_addrs);
+		TAILQ_INIT(&state->addrs);
 		TAILQ_INIT(&state->ll_callbacks);
 	}
 	return state;
@@ -467,7 +466,7 @@ ipv6_handleifa(int cmd, struct if_head *ifs, const char *ifname,
 {
 	struct interface *ifp;
 	struct ipv6_state *state;
-	struct ll_addr *ap;
+	struct ipv6_addr_l *ap;
 	struct ll_callback *cb;
 
 #if 0
@@ -503,21 +502,20 @@ ipv6_handleifa(int cmd, struct if_head *ifs, const char *ifname,
 		return;
 	}
 
-	if (!IN6_IS_ADDR_LINKLOCAL(addr)) {
-		ipv6rs_handleifa(cmd, ifname, addr, flags);
-		dhcp6_handleifa(cmd, ifname, addr, flags);
-		return;
-	}
-
 	state = ipv6_getstate(ifp);
 	if (state == NULL)
 		return;
 
-	/* We don't care about duplicated LL addresses, so remove them */
+	if (!IN6_IS_ADDR_LINKLOCAL(addr)) {
+		ipv6rs_handleifa(cmd, ifname, addr, flags);
+		dhcp6_handleifa(cmd, ifname, addr, flags);
+	}
+
+	/* We don't care about duplicated addresses, so remove them */
 	if (flags & IN6_IFF_DUPLICATED)
 		cmd = RTM_DELADDR;
 
-	TAILQ_FOREACH(ap, &state->ll_addrs, next) {
+	TAILQ_FOREACH(ap, &state->addrs, next) {
 		if (IN6_ARE_ADDR_EQUAL(&ap->addr, addr))
 			break;
 	}
@@ -525,7 +523,7 @@ ipv6_handleifa(int cmd, struct if_head *ifs, const char *ifname,
 	switch (cmd) {
 	case RTM_DELADDR:
 		if (ap) {
-			TAILQ_REMOVE(&state->ll_addrs, ap, next);
+			TAILQ_REMOVE(&state->addrs, ap, next);
 			free(ap);
 		}
 		break;
@@ -534,7 +532,7 @@ ipv6_handleifa(int cmd, struct if_head *ifs, const char *ifname,
 			ap = calloc(1, sizeof(*ap));
 			memcpy(ap->addr.s6_addr, addr->s6_addr,
 			    sizeof(ap->addr.s6_addr));
-			TAILQ_INSERT_TAIL(&state->ll_addrs,
+			TAILQ_INSERT_TAIL(&state->addrs,
 			    ap, next);
 
 			/* Now run any callbacks.
@@ -551,14 +549,35 @@ ipv6_handleifa(int cmd, struct if_head *ifs, const char *ifname,
 	}
 }
 
-const struct ll_addr *
+const struct ipv6_addr_l *
 ipv6_linklocal(const struct interface *ifp)
 {
 	const struct ipv6_state *state;
+	const struct ipv6_addr_l *ap;
 
 	state = IPV6_CSTATE(ifp);
-	if (state)
-		return TAILQ_FIRST(&state->ll_addrs);
+	if (state) {
+		TAILQ_FOREACH(ap, &state->addrs, next) {
+			if (IN6_IS_ADDR_LINKLOCAL(&ap->addr))
+				return ap;
+		}
+	}
+	return NULL;
+}
+
+const struct ipv6_addr_l *
+ipv6_findaddr(const struct interface *ifp, const struct in6_addr *addr)
+{
+	const struct ipv6_state *state;
+	const struct ipv6_addr_l *ap;
+
+	state = IPV6_CSTATE(ifp);
+	if (state) {
+		TAILQ_FOREACH(ap, &state->addrs, next) {
+			if (IN6_ARE_ADDR_EQUAL(&ap->addr, addr))
+				return ap;
+		}
+	}
 	return NULL;
 }
 
@@ -600,17 +619,18 @@ ipv6_free_ll_callbacks(struct interface *ifp)
 		}
 	}
 }
+
 void
 ipv6_free(struct interface *ifp)
 {
 	struct ipv6_state *state;
-	struct ll_addr *ap;
+	struct ipv6_addr_l *ap;
 
 	ipv6_free_ll_callbacks(ifp);
 	state = IPV6_STATE(ifp);
 	if (state) {
-		while ((ap = TAILQ_FIRST(&state->ll_addrs))) {
-			TAILQ_REMOVE(&state->ll_addrs, ap, next);
+		while ((ap = TAILQ_FIRST(&state->addrs))) {
+			TAILQ_REMOVE(&state->addrs, ap, next);
 			free(ap);
 		}
 		free(state);

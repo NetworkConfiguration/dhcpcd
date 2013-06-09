@@ -113,12 +113,12 @@ struct rt6 {
 };
 TAILQ_HEAD(rt6head, rt6);
 
-struct ll_addr {
-	TAILQ_ENTRY(ll_addr) next;
+struct ipv6_addr_l {
+	TAILQ_ENTRY(ipv6_addr_l) next;
 	struct in6_addr addr;
 };
 
-TAILQ_HEAD(ll_addr_head, ll_addr);
+TAILQ_HEAD(ipv6_addr_l_head, ipv6_addr_l);
 
 struct ll_callback {
 	TAILQ_ENTRY(ll_callback) next;
@@ -128,7 +128,7 @@ struct ll_callback {
 TAILQ_HEAD(ll_callback_head, ll_callback);
 
 struct ipv6_state {
-	struct ll_addr_head ll_addrs;
+	struct ipv6_addr_l_head addrs;
 	struct ll_callback_head ll_callbacks;
 };
 
@@ -151,7 +151,9 @@ void ipv6_handleifa(int, struct if_head *,
     const char *, const struct in6_addr *, int);
 int ipv6_handleifa_addrs(int, struct ipv6_addrhead *,
     const struct in6_addr *, int);
-const struct ll_addr *ipv6_linklocal(const struct interface *);
+const struct ipv6_addr_l *ipv6_linklocal(const struct interface *);
+const struct ipv6_addr_l *ipv6_findaddr(const struct interface *,
+    const struct in6_addr *);
 int ipv6_addlinklocalcallback(struct interface *, void (*)(void *), void *);
 void ipv6_free_ll_callbacks(struct interface *);
 void ipv6_free(struct interface *);

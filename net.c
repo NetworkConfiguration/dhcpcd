@@ -441,21 +441,18 @@ discover_interfaces(int argc, char * const *argv)
 	}
 
 #ifdef INET6
-	/* Capture local link addresses */
 	for (ifa = ifaddrs; ifa; ifa = ifa->ifa_next) {
 		if (ifa->ifa_addr != NULL &&
 		    ifa->ifa_addr->sa_family == AF_INET6)
 		{
 			sin6 = (const struct sockaddr_in6 *)
 			    (void *)ifa->ifa_addr;
-			if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
-				ifa_flags = in6_addr_flags(ifa->ifa_name,
-						&sin6->sin6_addr);
-				if (ifa_flags != -1)
-					ipv6_handleifa(RTM_NEWADDR, ifs,
-					    ifa->ifa_name,
-					    &sin6->sin6_addr, ifa_flags);
-			}
+			ifa_flags = in6_addr_flags(ifa->ifa_name,
+			    &sin6->sin6_addr);
+			if (ifa_flags != -1)
+				ipv6_handleifa(RTM_NEWADDR, ifs,
+				    ifa->ifa_name,
+				    &sin6->sin6_addr, ifa_flags);
 		}
 	}
 #endif

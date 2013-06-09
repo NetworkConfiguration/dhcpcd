@@ -332,8 +332,8 @@ link_addr(struct nlmsghdr *nlm)
 		errno = EBADMSG;
 		return -1;
 	}
-	if (nlm->nlmsg_pid == (uint32_t)getpid())
-		return 1;
+//	if (nlm->nlmsg_pid == (uint32_t)getpid())
+//		return 1;
 	ifa = NLMSG_DATA(nlm);
 	if (if_indextoname(ifa->ifa_index, ifn) == NULL)
 		return -1;
