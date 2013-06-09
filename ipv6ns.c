@@ -393,7 +393,8 @@ ipv6ns_probeaddrs(struct ipv6_addrhead *addrs)
 				    ap->iface->name, ap->saddr);
 				i++;
 			}
-			if (del_address6(ap) == -1 &&
+			if (!IN6_IS_ADDR_UNSPECIFIED(&ap->addr) &&
+			    del_address6(ap) == -1 &&
 			    errno != EADDRNOTAVAIL && errno != ENXIO)
 				syslog(LOG_ERR, "del_address6 %m");
 			if (ap->dadcallback)
