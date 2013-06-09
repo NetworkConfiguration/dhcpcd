@@ -904,37 +904,6 @@ dhcp6_startrenew(void *arg)
 }
 
 static void
-dhcp6_startrebind(void *arg)
-{
-	struct interface *ifp;
-	struct dhcp6_state *state;
-
-	ifp = arg;
-	eloop_timeout_delete(dhcp6_sendrenew, ifp);
-	state = D6_STATE(ifp);
-	if (state->state == DH6S_RENEW)
-		syslog(LOG_WARNING, "%s: failed to renew DHCPv6, rebinding",
-		    ifp->name);
-	state->state = DH6S_REBIND;
-	state->RTC = 0;
-	state->MRC = 0;
-
-	/* RFC 3633 section 12.1 */
-	if (ifp->options->ia_type == D6_OPTION_IA_PD) {
-	    state->IRT = CNF_TIMEOUT;
-	    state->MRT = CNF_MAX_RT;
-	} else {
-	    state->IRT = REB_TIMEOUT;
-	    state->MRT = REB_MAX_RT;
-	}
-
-	if (dhcp6_makemessage(ifp) == -1)
-		syslog(LOG_ERR, "%s: dhcp6_makemessage: %m", ifp->name);
-	else
-		dhcp6_sendrebind(ifp);
-}
-
-static void
 dhcp6_startdiscover(void *arg)
 {
 	struct interface *ifp;
@@ -971,7 +940,11 @@ dhcp6_failconfirm(void *arg)
 	struct interface *ifp;
 
 	ifp = arg;
-	syslog(LOG_ERR, "%s: failed to confirm prior address", ifp->name);
+	syslog(LOG_ERR,
+	    ifp->options->ia_type == D6_OPTION_IA_PD ?
+	    "%s: failed to rebind delegated prefix" :
+	    "%s: failed to confirm prior address",
+	    ifp->name);
 	/* Section 18.1.2 says that we SHOULD use the last known
 	 * IP address(s) and lifetimes if we didn't get a reply.
 	 * I disagree with this. */
@@ -992,6 +965,42 @@ dhcp6_failrequest(void *arg)
 	 * DISCOVER phase makes more sense for us. */
 	dhcp6_startdiscover(ifp);
 }
+
+static void
+dhcp6_startrebind(void *arg)
+{
+	struct interface *ifp;
+	struct dhcp6_state *state;
+
+	ifp = arg;
+	eloop_timeout_delete(dhcp6_sendrenew, ifp);
+	state = D6_STATE(ifp);
+	if (state->state == DH6S_RENEW)
+		syslog(LOG_WARNING, "%s: failed to renew DHCPv6, rebinding",
+		    ifp->name);
+	state->state = DH6S_REBIND;
+	state->RTC = 0;
+	state->MRC = 0;
+
+	/* RFC 3633 section 12.1 */
+	if (ifp->options->ia_type == D6_OPTION_IA_PD) {
+	    state->IRT = CNF_TIMEOUT;
+	    state->MRT = CNF_MAX_RT;
+	} else {
+	    state->IRT = REB_TIMEOUT;
+	    state->MRT = REB_MAX_RT;
+	}
+
+	if (dhcp6_makemessage(ifp) == -1)
+		syslog(LOG_ERR, "%s: dhcp6_makemessage: %m", ifp->name);
+	else
+		dhcp6_sendrebind(ifp);
+
+	/* RFC 3633 section 12.1 */
+	if (ifp->options->ia_type == D6_OPTION_IA_PD)
+		eloop_timeout_add_sec(CNF_MAX_RD, dhcp6_failconfirm, ifp);
+}
+
 
 static void
 dhcp6_startrequest(struct interface *ifp)
