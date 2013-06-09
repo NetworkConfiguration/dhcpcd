@@ -535,14 +535,17 @@ ipv6_handleifa(int cmd, struct if_head *ifs, const char *ifname,
 			TAILQ_INSERT_TAIL(&state->addrs,
 			    ap, next);
 
-			/* Now run any callbacks.
-			 * Typically IPv6RS or DHCPv6 */
-			while ((cb = TAILQ_FIRST(&state->ll_callbacks)))
-			{
-				TAILQ_REMOVE(&state->ll_callbacks,
-				    cb, next);
-				cb->callback(cb->arg);
-				free(cb);
+			if (IN6_IS_ADDR_LINKLOCAL(&ap->addr)) {
+				/* Now run any callbacks.
+				 * Typically IPv6RS or DHCPv6 */
+				while ((cb =
+				    TAILQ_FIRST(&state->ll_callbacks)))
+				{
+					TAILQ_REMOVE(&state->ll_callbacks,
+					    cb, next);
+					cb->callback(cb->arg);
+					free(cb);
+				}
 			}
 		}
 		break;
