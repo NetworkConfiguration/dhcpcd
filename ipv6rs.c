@@ -414,7 +414,9 @@ ipv6rs_scriptrun(struct ra *rap)
 
 	/* If all addresses have completed DAD run the script */
 	TAILQ_FOREACH(ap, &rap->addrs, next) {
-		if (ap->flags & IPV6_AF_ONLINK) {
+		if ((ap->flags & (IPV6_AF_ONLINK | IPV6_AF_AUTOCONF)) ==
+		    (IPV6_AF_ONLINK | IPV6_AF_AUTOCONF))
+		{
 			if (!(ap->flags & IPV6_AF_DADCOMPLETED) &&
 			    ipv6_findaddr(ap->iface, &ap->addr))
 				ap->flags |= IPV6_AF_DADCOMPLETED;
@@ -486,7 +488,9 @@ ipv6rs_dadcallback(void *arg)
 				continue;
 			wascompleted = 1;
 			TAILQ_FOREACH(rapap, &rap->addrs, next) {
-				if ((rapap->flags & IPV6_AF_DADCOMPLETED) == 0){
+				if (rapap->flags & IPV6_AF_AUTOCONF &&
+				    (rapap->flags & IPV6_AF_DADCOMPLETED) == 0)
+				{
 					wascompleted = 0;
 					break;
 				}
@@ -755,7 +759,7 @@ ipv6rs_handledata(__unused void *arg)
 					break;
 				}
 				ap->iface = rap->iface;
-				ap->flags = IPV6_AF_NEW | IPV6_AF_AUTOCONF;
+				ap->flags = IPV6_AF_NEW;
 				ap->prefix_len = pi->nd_opt_pi_prefix_len;
 				memcpy(ap->prefix.s6_addr,
 				   pi->nd_opt_pi_prefix.s6_addr,
@@ -763,6 +767,7 @@ ipv6rs_handledata(__unused void *arg)
 				if (pi->nd_opt_pi_flags_reserved &
 				    ND_OPT_PI_FLAG_AUTO)
 				{
+					ap->flags |= IPV6_AF_AUTOCONF;
 					ipv6_makeaddr(&ap->addr, ifp,
 					    &ap->prefix,
 					    pi->nd_opt_pi_prefix_len);
