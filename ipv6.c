@@ -925,7 +925,7 @@ ipv6_buildroutes(void)
 
 	/* First add reachable routers and their prefixes */
 	ipv6_build_ra_routes(&dnr, 0);
-#ifdef HAVE_ROUTE_METRIC
+#if HAVE_ROUTE_METRIC
 	have_default = (TAILQ_FIRST(&dnr) != NULL);
 #endif
 
@@ -935,7 +935,7 @@ ipv6_buildroutes(void)
 	ipv6_build_dhcp_routes(&dnr, DH6S_BOUND);
 	ipv6_build_dhcp_routes(&dnr, DH6S_DELEGATED);
 
-#ifdef HAVE_ROUTE_METRIC
+#if HAVE_ROUTE_METRIC
 	/* If we have an unreachable router, we really do need to remove the
 	 * route to it beause it could be a lower metric than a reachable
 	 * router. Of course, we should at least have some routers if all
