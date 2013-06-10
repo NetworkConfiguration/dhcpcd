@@ -352,10 +352,10 @@ splitv(int *argc, char **argv, const char *arg)
 	return v;
 }
 
+#ifdef INET
 static int
 parse_addr(struct in_addr *addr, struct in_addr *net, const char *arg)
 {
-#ifdef INET
 	char *p;
 	int i;
 
@@ -386,11 +386,17 @@ parse_addr(struct in_addr *addr, struct in_addr *net, const char *arg)
 	else if (net != NULL)
 		net->s_addr = ipv4_getnetmask(addr->s_addr);
 	return 0;
+}
 #else
+static int
+parse_addr(__unused struct in_addr *addr, __unused struct in_addr *net,
+    __unused const char *arg)
+{
+
 	syslog(LOG_ERR, "No IPv4 support");
 	return -1;
-#endif
 }
+#endif
 
 static const char *
 set_option_space(const char *arg, const struct dhcp_opt **d,
@@ -423,19 +429,21 @@ static int
 parse_option(struct if_options *ifo, int opt, const char *arg)
 {
 	int i;
-	long l;
 	char *p = NULL, *fp, *np, **nconf;
 	ssize_t s;
-	size_t sl;
 	struct in_addr addr, addr2;
 	in_addr_t *naddr;
 	struct rt *rt;
 	const struct dhcp_opt *d;
 	uint8_t *request, *require, *no;
+#ifdef INET6
+	long l;
 	uint32_t u32;
+	size_t sl;
 	struct if_iaid *iaid;
 	uint8_t _iaid[4];
 	struct if_sla *sla, *slap;
+#endif
 
 	i = 0;
 	switch(opt) {

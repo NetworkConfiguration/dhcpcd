@@ -286,6 +286,7 @@ int dhcp_dump(const char *);
 #define dhcp_drop(a, b)
 #define dhcp_start(a) {}
 #define dhcp_reboot(a, b) b = b
+#define dhcp_reboot_newopts(a, b)
 #define dhcp_close(a)
 #define dhcp_free(a)
 #define dhcp_dump(a) -1

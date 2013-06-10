@@ -29,7 +29,11 @@
 #define PLATFORM_H
 
 char *hardware_platform(void);
+#ifdef INET6
 int check_ipv6(const char *);
 int ipv6_dadtransmits(const char *);
+#else
+#define check_ipv6(a) 0
+#endif
 
 #endif

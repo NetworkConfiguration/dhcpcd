@@ -74,8 +74,10 @@ static const char *mproc =
 #endif
 	;
 
-char **restore;
-ssize_t nrestore;
+#ifdef INET6
+static char **restore;
+static ssize_t nrestore;
+#endif
 
 char *
 hardware_platform(void)
@@ -110,6 +112,7 @@ hardware_platform(void)
 	return p;
 }
 
+#ifdef INET6
 static int
 check_proc_int(const char *path)
 {
@@ -259,3 +262,4 @@ ipv6_dadtransmits(const char *ifname)
 	r = check_proc_int(path);
 	return r < 0 ? 0 : r;
 }
+#endif

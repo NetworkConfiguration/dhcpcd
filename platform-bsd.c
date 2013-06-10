@@ -25,14 +25,19 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/ioctl.h>
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/sysctl.h>
 #include <sys/utsname.h>
+
+#include <net/if.h>
 #include <netinet/in.h>
+#include <netinet6/in6_var.h>
 
 #include <errno.h>
 #include <stdlib.h>
+#include <string.h>
 #include <syslog.h>
 
 #include "dhcpcd.h"
@@ -57,6 +62,7 @@ hardware_platform(void)
 	return march;
 }
 
+#ifdef INET6
 #define get_inet6_sysctl(code) inet6_sysctl(code, 0, 0)
 #define set_inet6_sysctl(code, val) inet6_sysctl(code, val, 1)
 static int
@@ -87,6 +93,24 @@ restore_kernel_ra(void)
 	syslog(LOG_INFO, "restoring Kernel IPv6 RA support");
 	if (set_inet6_sysctl(IPV6CTL_ACCEPT_RTADV, 1) == -1)
 		syslog(LOG_ERR, "IPV6CTL_ACCEPT_RTADV: %m");
+}
+
+static int
+ipv6_ra_flush(void)
+{
+	int s;
+	char dummy[IFNAMSIZ + 8];
+
+	s = socket(AF_INET6, SOCK_DGRAM, 0);
+	if (s == -1)
+		return -1;
+	strcpy(dummy, "lo0");
+	if (ioctl(s, SIOCSRTRFLUSH_IN6, (caddr_t)&dummy) == -1)
+		syslog(LOG_ERR, "SIOSRTRFLUSH_IN6: %m");
+	if (ioctl(s, SIOCSPFXFLUSH_IN6, (caddr_t)&dummy) == -1)
+		syslog(LOG_ERR, "SIOSPFXFLUSH_IN6: %m");
+	close(s);
+	return 0;
 }
 
 int
@@ -132,6 +156,8 @@ check_ipv6(const char *ifname)
 		return 0;
 	}
 
+	ipv6_ra_flush();
+
 	return 1;
 }
 
@@ -143,3 +169,4 @@ ipv6_dadtransmits(__unused const char *ifname)
 	r = get_inet6_sysctl(IPV6CTL_DAD_COUNT);
 	return r < 0 ? 0 : r;
 }
+#endif

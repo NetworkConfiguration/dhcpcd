@@ -359,6 +359,7 @@ if_route6(const struct rt6 *rt, int action)
 	char *bp = rtm.buffer;
 	size_t l;
 	int retval = 0;
+	const struct ipv6_addr_l *lla;
 
 /* KAME based systems want to store the scope inside the sin6_addr
  * for link local addreses */
@@ -416,11 +417,10 @@ if_route6(const struct rt6 *rt, int action)
 
 	ADDADDR(&rt->dest);
 	if (!(rtm.hdr.rtm_flags & RTF_GATEWAY)) {
-		/* Make us a link layer socket for the host gateway */
-		memset(&su, 0, sizeof(su));
-		su.sdl.sdl_len = sizeof(struct sockaddr_dl);
-		link_addr(rt->iface->name, &su.sdl);
-		ADDSU;
+		lla = ipv6_linklocal(rt->iface);
+		if (lla == NULL) /* unlikely as we need a LL to get here */
+			return -1;
+		ADDADDRS(&lla->addr, rt->iface->index);
 	} else
 		ADDADDRS(&rt->gate, rt->iface->index);
 
@@ -450,20 +450,6 @@ if_route6(const struct rt6 *rt, int action)
 		retval = -1;
 	return retval;
 }
-
-int
-pfx_flush(void)
-{
-	int s;
-	char dummy[IFNAMSIZ + 1];
-
-	s = socket(AF_INET6, SOCK_DGRAM, 0);
-	if (s != -1) {
-		strcpy(dummy, "lo0");
-		s = ioctl(s, SIOCSPFXFLUSH_IN6, (caddr_t)&dummy);
-	}
-	return s;
-}
 #endif
 
 static void
@@ -485,6 +471,7 @@ get_addrs(int type, char *cp, struct sockaddr **sa)
 	}
 }
 
+#ifdef INET6
 int
 in6_addr_flags(const char *ifname, const struct in6_addr *addr)
 {
@@ -504,6 +491,7 @@ in6_addr_flags(const char *ifname, const struct in6_addr *addr)
 	}
 	return flags;
 }
+#endif
 
 int
 manage_link(int fd)
@@ -515,12 +503,14 @@ manage_link(int fd)
 	struct if_announcemsghdr *ifan;
 	struct if_msghdr *ifm;
 	struct ifa_msghdr *ifam;
-	struct rt rt;
 	struct sockaddr *sa, *rti_info[RTAX_MAX];
 	int len;
 #ifdef RTM_CHGADDR
 	struct sockaddr_dl sdl;
 	unsigned char *hwaddr;
+#endif
+#ifdef INET
+	struct rt rt;
 #endif
 #if defined(INET6) && !defined(LISTEN_DAD)
 	struct in6_addr ia6;

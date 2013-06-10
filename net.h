@@ -103,18 +103,6 @@ int up_interface(struct interface *);
 int if_conf(struct interface *);
 int if_init(struct interface *);
 
-int if_address6(const struct ipv6_addr *, int);
-#define add_address6(a) if_address6(a, 1)
-#define del_address6(a) if_address6(a, -1)
-int in6_addr_flags(const char *, const struct in6_addr *);
-
-int if_route6(const struct rt6 *rt, int);
-#define add_route6(rt) if_route6(rt, 1)
-#define change_route6(rt) if_route6(rt, 0)
-#define del_route6(rt) if_route6(rt, -1)
-#define del_src_route6(rt) if_route6(rt, -2);
-int pfx_flush(void);
-
 int open_link_socket(void);
 int manage_link(int);
 int carrier_status(struct interface *);

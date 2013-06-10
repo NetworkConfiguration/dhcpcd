@@ -776,14 +776,4 @@ in6_addr_flags(__unused const char *ifname,
 	/* How do I get IPv6 address flags on Linux? */
 	return 0;
 }
-
-int
-pfx_flush(void)
-{
-
-	/* Flush prefixes, ip -6 neigh flush equivalent */
-	/* There seems to be no need for this on Linux right now though,
-	 * probably due to route metrics */
-	return 0;
-}
 #endif

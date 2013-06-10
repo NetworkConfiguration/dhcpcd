@@ -37,7 +37,6 @@
 
 #define ROUNDUP8(a) (1 + (((a) - 1) | 7))
 
-#ifdef INET6
 #ifndef ND6_INFINITE_LIFETIME
 #  define ND6_INFINITE_LIFETIME		((uint32_t)~0)
 #endif
@@ -137,6 +136,7 @@ struct ipv6_state {
 #define IPV6_CSTATE(ifp)						       \
 	((const struct ipv6_state *)(ifp)->if_data[IF_DATA_IPV6])
 
+#ifdef INET6
 int ipv6_init(void);
 ssize_t ipv6_printaddr(char *, ssize_t, const uint8_t *, const char *);
 int ipv6_makeaddr(struct in6_addr *, const struct interface *,
@@ -159,6 +159,18 @@ void ipv6_free_ll_callbacks(struct interface *);
 void ipv6_free(struct interface *);
 int ipv6_removesubnet(const struct interface *, struct ipv6_addr *);
 void ipv6_buildroutes(void);
+
+int if_address6(const struct ipv6_addr *, int);
+#define add_address6(a) if_address6(a, 1)
+#define del_address6(a) if_address6(a, -1)
+int in6_addr_flags(const char *, const struct in6_addr *);
+
+int if_route6(const struct rt6 *rt, int);
+#define add_route6(rt) if_route6(rt, 1)
+#define change_route6(rt) if_route6(rt, 0)
+#define del_route6(rt) if_route6(rt, -1)
+#define del_src_route6(rt) if_route6(rt, -2);
+
 #else
 #define ipv6_init() -1
 #define ipv6_free_ll_callbacks(a)
