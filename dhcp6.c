@@ -912,7 +912,7 @@ dhcp6_startdiscover(void *arg)
 	ifp = arg;
 	state = D6_STATE(ifp);
 	if (state->state == DH6S_REBIND)
-		syslog(LOG_ERR, "%s: failed to renew, soliciting",
+		syslog(LOG_ERR, "%s: failed to rebind DHCPv6, soliciting",
 		    ifp->name);
 	state->state = DH6S_DISCOVER;
 	state->start_uptime = uptime();
@@ -940,16 +940,14 @@ dhcp6_failconfirm(void *arg)
 	struct interface *ifp;
 
 	ifp = arg;
-	syslog(LOG_ERR,
-	    ifp->options->ia_type == D6_OPTION_IA_PD ?
-	    "%s: failed to rebind delegated prefix" :
-	    "%s: failed to confirm prior address",
-	    ifp->name);
+	if (ifp->options->ia_type != D6_OPTION_IA_PD)
+		syslog(LOG_ERR,
+		    "%s: failed to confirm prior address",
+		    ifp->name);
 	/* Section 18.1.2 says that we SHOULD use the last known
 	 * IP address(s) and lifetimes if we didn't get a reply.
 	 * I disagree with this. */
-	if (ifp->options->options & DHCPCD_IPV6)
-		dhcp6_startdiscover(ifp);
+	dhcp6_startdiscover(ifp);
 }
 
 static void
