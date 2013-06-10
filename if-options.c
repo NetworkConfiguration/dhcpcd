@@ -1146,8 +1146,7 @@ finish_config(struct if_options *ifo, const char *ifname)
 			ifo->iaid->sla = NULL;
 			ifo->iaid->sla_len = 0;
 		}
-	} else
-		ifo->options |= DHCPCD_IA_FORCED;
+	}
 #endif
 }
 
