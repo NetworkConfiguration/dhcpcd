@@ -2138,8 +2138,6 @@ recv:
 	if (options & DHCPCD_TEST)
 		script_runreason(ifp, "TEST");
 	else {
-		if (state->state == DH6S_INFORM)
-			script_runreason(ifp, state->reason);
 		state->state = DH6S_BOUND;
 		if (state->renew && state->renew != ND6_INFINITE_LIFETIME)
 			eloop_timeout_add_sec(state->renew,
