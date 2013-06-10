@@ -32,6 +32,9 @@
 #include <sys/utsname.h>
 
 #include <net/if.h>
+#ifdef __FreeBSD__ /* Needed so that including netinet6/in6_var.h works */
+#  include <net/if_var.h>
+#endif
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
 
@@ -39,6 +42,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <unistd.h>
 
 #include "dhcpcd.h"
 #include "if-options.h"
