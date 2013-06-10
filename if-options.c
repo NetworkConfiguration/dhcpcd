@@ -1111,6 +1111,46 @@ parse_config_line(struct if_options *ifo, const char *opt, char *line)
 	return -1;
 }
 
+static void
+finish_config(struct if_options *ifo, const char *ifname)
+{
+
+	/* Terminate the encapsulated options */
+	if (ifo->vendor[0] && !(ifo->options & DHCPCD_VENDORRAW)) {
+		ifo->vendor[0]++;
+		ifo->vendor[ifo->vendor[0]] = DHO_END;
+	}
+
+#ifdef INET6
+	if (!(ifo->options & DHCPCD_IPV6))
+		ifo->options &= ~DHCPCD_IPV6RS;
+
+	if (ifname && ifo->iaid_len == 0 && ifo->options & DHCPCD_IPV6) {
+		ifo->iaid = malloc(sizeof(*ifo->iaid));
+		if (ifo->iaid == NULL)
+			syslog(LOG_ERR, "%s: %m", __func__);
+		else {
+			if (ifo->ia_type == 0)
+				ifo->ia_type = D6_OPTION_IA_NA;
+			ifo->iaid_len = strlen(ifname);
+			if (ifo->iaid_len <= sizeof(ifo->iaid->iaid)) {
+				strncpy((char *)ifo->iaid->iaid, ifname,
+					sizeof(ifo->iaid->iaid));
+				memset(ifo->iaid->iaid + ifo->iaid_len, 0,
+					sizeof(ifo->iaid->iaid) -ifo->iaid_len);
+			} else {
+				uint32_t idx = if_nametoindex(ifname);
+				memcpy(ifo->iaid->iaid, &idx, sizeof(idx));
+			}
+			ifo->iaid_len = 1;
+			ifo->iaid->sla = NULL;
+			ifo->iaid->sla_len = 0;
+		}
+	} else
+		ifo->options |= DHCPCD_IA_FORCED;
+#endif
+}
+
 struct if_options *
 read_config(const char *file,
     const char *ifname, const char *ssid, const char *profile)
@@ -1198,41 +1238,7 @@ read_config(const char *file,
 		ifo = NULL;
 	}
 
-	/* Terminate the encapsulated options */
-	if (ifo->vendor[0] && !(ifo->options & DHCPCD_VENDORRAW)) {
-		ifo->vendor[0]++;
-		ifo->vendor[ifo->vendor[0]] = DHO_END;
-	}
-
-#ifdef INET6
-	if (!(ifo->options & DHCPCD_IPV6))
-		ifo->options &= ~DHCPCD_IPV6RS;
-
-	if (ifname && ifo->iaid_len == 0 && ifo->options & DHCPCD_IPV6) {
-		ifo->iaid = malloc(sizeof(*ifo->iaid));
-		if (ifo->iaid == NULL)
-			syslog(LOG_ERR, "%s: %m", __func__);
-		else {
-			if (ifo->ia_type == 0)
-				ifo->ia_type = D6_OPTION_IA_NA;
-			ifo->iaid_len = strlen(ifname);
-			if (ifo->iaid_len <= sizeof(ifo->iaid->iaid)) {
-				strncpy((char *)ifo->iaid->iaid, ifname,
-					sizeof(ifo->iaid->iaid));
-				memset(ifo->iaid->iaid + ifo->iaid_len, 0,
-					sizeof(ifo->iaid->iaid) -ifo->iaid_len);
-			} else {
-				uint32_t idx = if_nametoindex(ifname);
-				memcpy(ifo->iaid->iaid, &idx, sizeof(idx));
-			}
-			ifo->iaid_len = 1;
-			ifo->iaid->sla = NULL;
-			ifo->iaid->sla_len = 0;
-		}
-	} else
-		ifo->options |= DHCPCD_IA_FORCED;
-#endif
-
+	finish_config(ifo, ifname);
 	return ifo;
 }
 
@@ -1252,11 +1258,8 @@ add_options(struct if_options *ifo, int argc, char **argv)
 		if (r != 1)
 			break;
 	}
-	/* Terminate the encapsulated options */
-	if (r == 1 && ifo->vendor[0] && !(ifo->options & DHCPCD_VENDORRAW)) {
-		ifo->vendor[0]++;
-		ifo->vendor[ifo->vendor[0]] = DHO_END;
-	}
+
+	finish_config(ifo, NULL);
 	return r;
 }
 
