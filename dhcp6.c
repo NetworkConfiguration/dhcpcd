@@ -668,13 +668,18 @@ dhcp6_get_op(uint16_t type)
 }
 
 static void
-dhcp6_freedrop_addrs(struct interface *ifp, int drop)
+dhcp6_freedrop_addrs(struct interface *ifp, int drop,
+    const struct interface *ifd)
 {
 	struct dhcp6_state *state;
-	struct ipv6_addr *ap;
+	struct ipv6_addr *ap, *apn;
 
 	state = D6_STATE(ifp);
-	while ((ap = TAILQ_FIRST(&state->addrs))) {
+	if (state == NULL)
+		return;
+	TAILQ_FOREACH_SAFE(ap, &state->addrs, next, apn) {
+		if (ifd && ap->delegating_iface != ifd)
+			continue;
 		TAILQ_REMOVE(&state->addrs, ap, next);
 		if (ap->dadcallback)
 			eloop_q_timeout_delete(0, NULL, ap->dadcallback);
@@ -695,6 +700,16 @@ dhcp6_freedrop_addrs(struct interface *ifp, int drop)
 	}
 	if (drop)
 		ipv6_buildroutes();
+}
+
+static void dhcp6_delete_delegates(struct interface *ifp)
+{
+	struct interface *ifp0;
+
+	TAILQ_FOREACH(ifp0, ifaces, next) {
+		if (ifp0 != ifp)
+			dhcp6_freedrop_addrs(ifp0, 1, ifp);
+	}
 }
 
 static int
@@ -909,11 +924,10 @@ dhcp6_startdiscover(void *arg)
 	struct interface *ifp;
 	struct dhcp6_state *state;
 
+	syslog(LOG_INFO, "%s: soliciting a DHCPv6 lease", ifp->name);
+
 	ifp = arg;
 	state = D6_STATE(ifp);
-	if (state->state == DH6S_REBIND)
-		syslog(LOG_ERR, "%s: failed to rebind DHCPv6, soliciting",
-		    ifp->name);
 	state->state = DH6S_DISCOVER;
 	state->start_uptime = uptime();
 	state->RTC = 0;
@@ -926,7 +940,7 @@ dhcp6_startdiscover(void *arg)
 	state->new = NULL;
 	state->new_len = 0;
 
-	dhcp6_freedrop_addrs(ifp, 0);
+	dhcp6_freedrop_addrs(ifp, 0, NULL);
 
 	if (dhcp6_makemessage(ifp) == -1)
 		syslog(LOG_ERR, "%s: dhcp6_makemessage: %m", ifp->name);
@@ -940,10 +954,7 @@ dhcp6_failconfirm(void *arg)
 	struct interface *ifp;
 
 	ifp = arg;
-	if (ifp->options->ia_type != D6_OPTION_IA_PD)
-		syslog(LOG_ERR,
-		    "%s: failed to confirm prior address",
-		    ifp->name);
+	syslog(LOG_ERR, "%s: failed to confirm prior address", ifp->name);
 	/* Section 18.1.2 says that we SHOULD use the last known
 	 * IP address(s) and lifetimes if we didn't get a reply.
 	 * I disagree with this. */
@@ -961,6 +972,20 @@ dhcp6_failrequest(void *arg)
 	 * what happens if a REQUEST fails.
 	 * Of the possible scenarios listed, moving back to the
 	 * DISCOVER phase makes more sense for us. */
+	dhcp6_startdiscover(ifp);
+}
+
+static void
+dhcp6_failrebind(void *arg)
+{
+	struct interface *ifp;
+
+	ifp = arg;
+	syslog(LOG_ERR, "%s: failed to rebind prior delegation", ifp->name);
+	dhcp6_delete_delegates(ifp);
+	/* Section 18.1.2 says that we SHOULD use the last known
+	 * IP address(s) and lifetimes if we didn't get a reply.
+	 * I disagree with this. */
 	dhcp6_startdiscover(ifp);
 }
 
@@ -996,7 +1021,7 @@ dhcp6_startrebind(void *arg)
 
 	/* RFC 3633 section 12.1 */
 	if (ifp->options->ia_type == D6_OPTION_IA_PD)
-		eloop_timeout_add_sec(CNF_MAX_RD, dhcp6_failconfirm, ifp);
+		eloop_timeout_add_sec(CNF_MAX_RD, dhcp6_failrebind, ifp);
 }
 
 
@@ -1047,6 +1072,8 @@ dhcp6_startinform(struct interface *ifp)
 {
 	struct dhcp6_state *state;
 
+	syslog(LOG_INFO, "%s: requesting DHCPv6 information", ifp->name);
+
 	state = D6_STATE(ifp);
 	state->state = DH6S_INFORM;
 	state->start_uptime = uptime();
@@ -1071,7 +1098,8 @@ dhcp6_startexpire(void *arg)
 	eloop_timeout_delete(dhcp6_sendrebind, ifp);
 
 	syslog(LOG_ERR, "%s: DHCPv6 lease expired", ifp->name);
-	dhcp6_freedrop_addrs(ifp, 1);
+	dhcp6_freedrop_addrs(ifp, 1, NULL);
+	dhcp6_delete_delegates(ifp);
 	script_runreason(ifp, "EXPIRE6");
 	state = D6_CSTATE(ifp);
 	unlink(state->leasefile);
@@ -1438,7 +1466,7 @@ dhcp6_findia(struct interface *ifp, const uint8_t *d, size_t l,
 		if (dhcp6_checkstatusok(ifp, NULL, p, ol) == -1)
 			return -1;
 		if (ifo->ia_type == D6_OPTION_IA_PD) {
-			dhcp6_freedrop_addrs(ifp, 0);
+			dhcp6_freedrop_addrs(ifp, 0, NULL);
 			if (dhcp6_findpd(ifp, iaid, p, ol) == 0) {
 				syslog(LOG_ERR,
 				    "%s: %s: DHCPv6 REPLY missing Prefix",
@@ -1560,7 +1588,7 @@ dhcp6_readlease(struct interface *ifp)
 	return bytes;
 
 ex:
-	dhcp6_freedrop_addrs(ifp, 0);
+	dhcp6_freedrop_addrs(ifp, 0, NULL);
 	free(state->new);
 	state->new = NULL;
 	state->new_len = 0;
@@ -2249,10 +2277,6 @@ dhcp6_start1(void *arg)
 			add_option_mask(ifo->requestmask6, D6_OPTION_FQDN);
 	}
 
-	syslog(LOG_INFO, "%s: %s", ifp->name,
-	    state->state == DH6S_INFORM ?
-	    "requesting DHCPv6 information" :
-	    "soliciting a DHCPv6 address");
 	if (state->state == DH6S_INFORM)
 		dhcp6_startinform(ifp);
 	else
@@ -2333,7 +2357,7 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 				dhcp6_startrelease(ifp);
 			unlink(state->leasefile);
 		}
-		dhcp6_freedrop_addrs(ifp, drop);
+		dhcp6_freedrop_addrs(ifp, drop, NULL);
 		if (drop && state->new) {
 			if (reason == NULL)
 				reason = "STOP6";
