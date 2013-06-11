@@ -940,6 +940,7 @@ dhcp6_startdiscover(void *arg)
 	state->new_len = 0;
 
 	dhcp6_freedrop_addrs(ifp, 0, NULL);
+	unlink(state->leasefile);
 
 	if (dhcp6_makemessage(ifp) == -1)
 		syslog(LOG_ERR, "%s: dhcp6_makemessage: %m", ifp->name);
@@ -1101,7 +1102,6 @@ dhcp6_startexpire(void *arg)
 	dhcp6_delete_delegates(ifp);
 	script_runreason(ifp, "EXPIRE6");
 	state = D6_CSTATE(ifp);
-	unlink(state->leasefile);
 	dhcp6_startdiscover(ifp);
 }
 
@@ -2023,8 +2023,14 @@ dhcp6_handledata(__unused void *arg)
 		case DH6S_REQUEST: /* FALLTHROUGH */
 		case DH6S_RENEW: /* FALLTHROUGH */
 		case DH6S_REBIND:
-			if (dhcp6_validatelease(ifp, r, len, sfrom) == -1)
+			if (dhcp6_validatelease(ifp, r, len, sfrom) == -1) {
+				/* PD doesn't use CONFIRM, so REBIND could
+				 * throw up an invalid prefix if we
+				 * changed link */
+				if (ifp->options->ia_type == D6_OPTION_IA_PD)
+					dhcp6_startdiscover(ifp);
 				return;
+			}
 			break;
 		default:
 			op = NULL;
