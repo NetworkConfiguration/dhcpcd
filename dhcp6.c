@@ -447,6 +447,8 @@ dhcp6_makemessage(struct interface *ifp)
 			ml = state->new_len;
 		}
 		TAILQ_FOREACH(ap, &state->addrs, next) {
+			if (ap->prefix_vltime == 0)
+				continue;
 			if (ifo->ia_type == D6_OPTION_IA_PD)
 				len += sizeof(*o) + sizeof(u8) +
 				    sizeof(u32) + sizeof(u32) +
@@ -564,6 +566,8 @@ dhcp6_makemessage(struct interface *ifp)
 		p += sizeof(u32);
 		memset(p, 0, sizeof(u32) + sizeof(u32));
 		TAILQ_FOREACH(ap, &state->addrs, next) {
+			if (ap->prefix_vltime == 0)
+				continue;
 			if (memcmp(ifo->iaid[l].iaid, ap->iaid, sizeof(u32)))
 				continue;
 			so = D6_NEXT_OPTION(o);
@@ -925,6 +929,7 @@ dhcp6_startdiscover(void *arg)
 	struct dhcp6_state *state;
 
 	ifp = arg;
+	dhcp6_delete_delegates(ifp);
 	syslog(LOG_INFO, "%s: soliciting a DHCPv6 lease", ifp->name);
 	state = D6_STATE(ifp);
 	state->state = DH6S_DISCOVER;
@@ -1092,7 +1097,6 @@ static void
 dhcp6_startexpire(void *arg)
 {
 	struct interface *ifp;
-	const struct dhcp6_state *state;
 
 	ifp = arg;
 	eloop_timeout_delete(dhcp6_sendrebind, ifp);
@@ -1101,7 +1105,6 @@ dhcp6_startexpire(void *arg)
 	dhcp6_freedrop_addrs(ifp, 1, NULL);
 	dhcp6_delete_delegates(ifp);
 	script_runreason(ifp, "EXPIRE6");
-	state = D6_CSTATE(ifp);
 	dhcp6_startdiscover(ifp);
 }
 
