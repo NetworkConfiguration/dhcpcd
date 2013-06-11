@@ -924,9 +924,8 @@ dhcp6_startdiscover(void *arg)
 	struct interface *ifp;
 	struct dhcp6_state *state;
 
-	syslog(LOG_INFO, "%s: soliciting a DHCPv6 lease", ifp->name);
-
 	ifp = arg;
+	syslog(LOG_INFO, "%s: soliciting a DHCPv6 lease", ifp->name);
 	state = D6_STATE(ifp);
 	state->state = DH6S_DISCOVER;
 	state->start_uptime = uptime();
