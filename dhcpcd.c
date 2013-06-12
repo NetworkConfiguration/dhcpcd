@@ -282,6 +282,8 @@ stop_interface(struct interface *ifp)
 	dhcp_drop(ifp, "STOP");
 	dhcp_close(ifp);
 	eloop_timeout_delete(NULL, ifp);
+	if (ifp->options->options & DHCPCD_DEPARTED)
+		script_runreason(ifp, "DEPARTED");
 	free_interface(ifp);
 	if (!(options & (DHCPCD_MASTER | DHCPCD_TEST)))
 		exit(EXIT_FAILURE);
@@ -470,7 +472,7 @@ static void
 handle_link(__unused void *arg)
 {
 
-	if (manage_link(linkfd) == -1)
+	if (manage_link(linkfd) == -1 && errno != ENXIO && errno != ENODEV)
 		syslog(LOG_ERR, "manage_link: %m");
 }
 
@@ -526,8 +528,8 @@ handle_interface(int action, const char *ifname)
 	if (action == -1) {
 		ifp = find_interface(ifname);
 		if (ifp != NULL) {
+			ifp->options->options |= DHCPCD_DEPARTED;
 			stop_interface(ifp);
-			script_runreason(ifp, "DEPARTED");
 		}
 		return;
 	}
