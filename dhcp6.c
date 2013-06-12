@@ -1572,6 +1572,10 @@ dhcp6_readlease(struct interface *ifp)
 		return -1;
 	bytes = read(fd, state->new, state->new_len);
 	close(fd);
+	if (bytes < (ssize_t)state->new_len) {
+		syslog(LOG_ERR, "%s: read: %m", __func__);
+		goto ex;
+	}
 
 	/* Check to see if the lease is still valid */
 	fd = dhcp6_validatelease(ifp, state->new, state->new_len, NULL);
