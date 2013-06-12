@@ -150,6 +150,7 @@ enum DH6S {
 	DH6S_REBIND,
 	DH6S_CONFIRM,
 	DH6S_INFORM,
+	DH6S_INFORMED,
 	DH6S_RENEW_REQUESTED,
 	DH6S_PROBE,
 	DH6S_DELEGATED,
@@ -162,6 +163,7 @@ struct dhcp6_state {
 
 	/* Message retransmission timings */
 	struct timeval RT;
+	int IMD;
 	int RTC;
 	int IRT;
 	int MRC;

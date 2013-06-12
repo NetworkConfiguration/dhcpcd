@@ -741,10 +741,18 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 		    state->send->xid[1],
 		    state->send->xid[2]);
 	else {
+		if (state->IMD) {
+			state->RT.tv_sec = 0;
+			state->RT.tv_usec = arc4random() %
+			    (state->IMD * 1000000);
+			timernorm(&state->RT);
+			broad_uni = "delaying";
+			goto logsend;
+		}
 		if (state->RTC == 0) {
 			RTprev.tv_sec = state->IRT;
 			RTprev.tv_usec = 0;
-			state->RT.tv_sec = state->IRT;
+			state->RT.tv_sec = RTprev.tv_sec;
 			state->RT.tv_usec = 0;
 		} else {
 			RTprev = state->RT;
@@ -779,6 +787,7 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 				timeradd(&state->RT, &RTprev, &state->RT);
 		}
 
+logsend:
 		syslog(LOG_DEBUG,
 		    "%s: %s %s (xid 0x%02x%02x%02x),"
 		    " next in %0.2f seconds",
@@ -789,6 +798,13 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 		    state->send->xid[1],
 		    state->send->xid[2],
 		    timeval_to_double(&state->RT));
+
+		/* Wait the initial delay */
+		if (state->IMD) {
+			state->IMD = 0;
+			eloop_timeout_add_tv(&state->RT, callback, ifp);
+			return 0;
+		}
 	}
 
 	/* Update the elapsed time */
@@ -914,6 +930,7 @@ dhcp6_startdiscover(void *arg)
 	state->state = DH6S_DISCOVER;
 	state->start_uptime = uptime();
 	state->RTC = 0;
+	state->IMD = SOL_MAX_DELAY;
 	state->IRT = SOL_TIMEOUT;
 	state->MRT = SOL_MAX_RT;
 	state->MRC = 0;
@@ -1039,6 +1056,7 @@ dhcp6_startconfirm(struct interface *ifp)
 	state->state = DH6S_CONFIRM;
 	state->start_uptime = uptime();
 	state->RTC = 0;
+	state->IMD = CNF_MAX_DELAY;
 	state->IRT = CNF_TIMEOUT;
 	state->MRT = CNF_MAX_RT;
 	state->MRC = 0;
@@ -1063,6 +1081,7 @@ dhcp6_startinform(struct interface *ifp)
 	state->state = DH6S_INFORM;
 	state->start_uptime = uptime();
 	state->RTC = 0;
+	state->IMD = INF_MAX_DELAY;
 	state->IRT = INF_TIMEOUT;
 	state->MRT = INF_MAX_RT;
 	state->MRC = 0;
@@ -1937,7 +1956,9 @@ dhcp6_handledata(__unused void *arg)
 		return;
 	}
 	/* We're already bound and this message is for another machine */
-	if (state->state == DH6S_BOUND)
+	/* XXX DELEGATED? */
+	if (state->state == DH6S_BOUND ||
+	    state->state == DH6S_INFORMED)
 		return;
 
 	r = (struct dhcp6_message *)rcvhdr.msg_iov[0].iov_base;
@@ -2132,7 +2153,9 @@ recv:
 	if (options & DHCPCD_TEST)
 		script_runreason(ifp, "TEST");
 	else {
-		if (state->state != DH6S_INFORM)
+		if (state->state == DH6S_INFORM)
+			state->state = DH6S_INFORMED;
+		else
 			state->state = DH6S_BOUND;
 		if (state->renew && state->renew != ND6_INFINITE_LIFETIME)
 			eloop_timeout_add_sec(state->renew,
@@ -2287,7 +2310,9 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 			dhcp6_find_delegates(ifp);
 			return 0;
 		}
-		if (state->state == DH6S_INFORM && init_state == DH6S_INFORM) {
+		if (state->state == DH6S_INFORMED &&
+		    init_state == DH6S_INFORM)
+		{
 			dhcp6_startinform(ifp);
 			return 0;
 		}
@@ -2337,8 +2362,19 @@ dhcp6_reboot(struct interface *ifp)
 	struct dhcp6_state *state;
 
 	state = D6_STATE(ifp);
-	if (state && state->state == DH6S_BOUND)
-		dhcp6_startrebind(ifp);
+	if (state) {
+		switch (state->state) {
+		case DH6S_BOUND:
+			dhcp6_startrebind(ifp);
+			break;
+		case DH6S_INFORMED:
+			dhcp6_startinform(ifp);
+			break;
+		default:
+			dhcp6_startdiscover(ifp);
+			break;
+		}
+	}
 }
 
 static void
