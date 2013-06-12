@@ -676,34 +676,13 @@ dhcp6_freedrop_addrs(struct interface *ifp, int drop,
     const struct interface *ifd)
 {
 	struct dhcp6_state *state;
-	struct ipv6_addr *ap, *apn;
 
 	state = D6_STATE(ifp);
-	if (state == NULL)
-		return;
-	TAILQ_FOREACH_SAFE(ap, &state->addrs, next, apn) {
-		if (ifd && ap->delegating_iface != ifd)
-			continue;
-		TAILQ_REMOVE(&state->addrs, ap, next);
-		if (ap->dadcallback)
-			eloop_q_timeout_delete(0, NULL, ap->dadcallback);
-		/* Only drop the address if no other RAs have assigned it.
-		 * This is safe because the RA is removed from the list
-		 * before we are called. */
-		if (drop && ap->flags & IPV6_AF_ONLINK &&
-		    !dhcp6_addrexists(ap) &&
-		    !ipv6rs_addrexists(ap))
-		{
-			syslog(LOG_INFO, "%s: deleting address %s",
-			    ap->iface->name, ap->saddr);
-			if (del_address6(ap) == -1 &&
-			    errno != EADDRNOTAVAIL && errno != ENXIO)
-				syslog(LOG_ERR, "del_address6 %m");
-		}
-		free(ap);
+	if (state) {
+		ipv6_freedrop_addrs(&state->addrs, drop, ifd);
+		if (drop)
+			ipv6_buildroutes();
 	}
-	if (drop)
-		ipv6_buildroutes();
 }
 
 static void dhcp6_delete_delegates(struct interface *ifp)
@@ -1077,9 +1056,10 @@ dhcp6_startinform(struct interface *ifp)
 {
 	struct dhcp6_state *state;
 
-	syslog(LOG_INFO, "%s: requesting DHCPv6 information", ifp->name);
-
 	state = D6_STATE(ifp);
+	if (state->new == NULL || ifp->options->options & DHCPCD_DEBUG)
+		syslog(LOG_INFO, "%s: requesting DHCPv6 information",
+		    ifp->name);
 	state->state = DH6S_INFORM;
 	state->start_uptime = uptime();
 	state->RTC = 0;
@@ -1547,7 +1527,7 @@ dhcp6_writelease(const struct interface *ifp)
 	return bytes;
 }
 
-static ssize_t
+static int
 dhcp6_readlease(struct interface *ifp)
 {
 	struct dhcp6_state *state;
@@ -1575,8 +1555,14 @@ dhcp6_readlease(struct interface *ifp)
 	close(fd);
 
 	/* Check to see if the lease is still valid */
-	if (dhcp6_validatelease(ifp, state->new, state->new_len, NULL) == -1)
+	fd = dhcp6_validatelease(ifp, state->new, state->new_len, NULL);
+	if (fd == -1)
 		goto ex;
+	if (fd == 0) {
+		syslog(LOG_INFO, "%s: lease was for different IA type",
+		    ifp->name);
+		goto ex;
+	}
 
 	if (state->expire != ND6_INFINITE_LIFETIME) {
 		gettimeofday(&now, NULL);
@@ -1587,7 +1573,7 @@ dhcp6_readlease(struct interface *ifp)
 		}
 	}
 
-	return bytes;
+	return fd;
 
 ex:
 	dhcp6_freedrop_addrs(ifp, 0, NULL);
@@ -2146,7 +2132,8 @@ recv:
 	if (options & DHCPCD_TEST)
 		script_runreason(ifp, "TEST");
 	else {
-		state->state = DH6S_BOUND;
+		if (state->state != DH6S_INFORM)
+			state->state = DH6S_BOUND;
 		if (state->renew && state->renew != ND6_INFINITE_LIFETIME)
 			eloop_timeout_add_sec(state->renew,
 			    dhcp6_startrenew, ifp);
@@ -2298,6 +2285,10 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 	if (state) {
 		if (state->state == DH6S_DELEGATED) {
 			dhcp6_find_delegates(ifp);
+			return 0;
+		}
+		if (state->state == DH6S_INFORM && init_state == DH6S_INFORM) {
+			dhcp6_startinform(ifp);
 			return 0;
 		}
 		/* We're already running DHCP6 */

@@ -443,6 +443,34 @@ ipv6_addaddr(struct ipv6_addr *ap)
 	return 0;
 }
 
+void
+ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
+    const struct interface *ifd)
+{
+	struct ipv6_addr *ap, *apn;
+
+	TAILQ_FOREACH_SAFE(ap, addrs, next, apn) {
+		if (ifd && ap->delegating_iface != ifd)
+			continue;
+		TAILQ_REMOVE(addrs, ap, next);
+		if (ap->dadcallback)
+			eloop_q_timeout_delete(0, NULL, ap->dadcallback);
+		/* Only drop the address if no other RAs have assigned it.
+		 * This is safe because the RA is removed from the list
+		 * before we are called. */
+		if (drop && ap->flags & IPV6_AF_ADDED &&
+		    !ipv6rs_addrexists(ap) && !dhcp6_addrexists(ap))
+		{
+			syslog(LOG_INFO, "%s: deleting address %s",
+			    ap->iface->name, ap->saddr);
+			if (del_address6(ap) == -1 &&
+			    errno != EADDRNOTAVAIL && errno != ENXIO)
+				syslog(LOG_ERR, "del_address6 %m");
+		}
+		free(ap);
+	}
+}
+
 static struct ipv6_state *
 ipv6_getstate(struct interface *ifp)
 {

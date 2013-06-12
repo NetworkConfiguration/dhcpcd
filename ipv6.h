@@ -147,6 +147,8 @@ int ipv6_prefixlen(const struct in6_addr *);
 int ipv6_userprefix( const struct in6_addr *, short prefix_len,
     uint64_t user_number, struct in6_addr *result, short result_len);
 int ipv6_addaddr(struct ipv6_addr *);
+void ipv6_freedrop_addrs(struct ipv6_addrhead *, int,
+    const struct interface *);
 void ipv6_handleifa(int, struct if_head *,
     const char *, const struct in6_addr *, int);
 int ipv6_handleifa_addrs(int, struct ipv6_addrhead *,

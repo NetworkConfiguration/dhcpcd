@@ -306,32 +306,6 @@ ipv6rs_addrexists(const struct ipv6_addr *a)
 	return 0;
 }
 
-static void
-ipv6rs_freedrop_addrs(struct ra *rap, int drop)
-{
-	struct ipv6_addr *ap;
-
-	while ((ap = TAILQ_FIRST(&rap->addrs))) {
-		TAILQ_REMOVE(&rap->addrs, ap, next);
-		if (ap->dadcallback)
-			eloop_q_timeout_delete(0, NULL, ap->dadcallback);
-		/* Only drop the address if no other RAs have assigned it.
-		 * This is safe because the RA is removed from the list
-		 * before we are called. */
-		if (drop && ap->flags & IPV6_AF_ADDED &&
-		    !IN6_IS_ADDR_UNSPECIFIED(&ap->addr) &&
-		    !ipv6rs_addrexists(ap) && !dhcp6_addrexists(ap))
-		{
-			syslog(LOG_INFO, "%s: deleting address %s",
-			    rap->iface->name, ap->saddr);
-			if (del_address6(ap) == -1 &&
-			    errno != EADDRNOTAVAIL && errno != ENXIO)
-				syslog(LOG_ERR, "del_address6 %m");
-		}
-		free(ap);
-	}
-}
-
 void ipv6rs_freedrop_ra(struct ra *rap, int drop)
 {
 
@@ -339,7 +313,7 @@ void ipv6rs_freedrop_ra(struct ra *rap, int drop)
 	eloop_timeout_delete(NULL, rap);
 	if (!drop)
 		TAILQ_REMOVE(&ipv6_routers, rap, next);
-	ipv6rs_freedrop_addrs(rap, drop);
+	ipv6_freedrop_addrs(&rap->addrs, drop, NULL);
 	ipv6rs_free_opts(rap);
 	free(rap->data);
 	free(rap->ns);
@@ -961,13 +935,13 @@ ipv6rs_handledata(__unused void *arg)
 
 handle_flag:
 	if (rap->flags & ND_RA_FLAG_MANAGED) {
-		if (dhcp6_start(ifp, DH6S_INIT) == -1)
+		if (rap->lifetime && dhcp6_start(ifp, DH6S_INIT) == -1)
 			syslog(LOG_ERR, "dhcp6_start: %s: %m", ifp->name);
 	} else if (rap->flags & ND_RA_FLAG_OTHER) {
-		if (dhcp6_start(ifp, DH6S_INFORM) == -1)
+		if (rap->lifetime && dhcp6_start(ifp, DH6S_INFORM) == -1)
 			syslog(LOG_ERR, "dhcp6_start: %s: %m", ifp->name);
 	} else {
-		if (new_data)
+		if (rap->lifetime && new_data)
 			syslog(LOG_DEBUG, "%s: No DHCPv6 instruction in RA",
 			    ifp->name);
 		if (options & DHCPCD_TEST)
