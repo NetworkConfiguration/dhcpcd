@@ -274,6 +274,7 @@ stop_interface(struct interface *ifp)
 {
 
 	syslog(LOG_INFO, "%s: removing interface", ifp->name);
+	ifp->options->options |= DHCPCD_STOPPING;
 
 	// Remove the interface from our list
 	TAILQ_REMOVE(ifaces, ifp, next);

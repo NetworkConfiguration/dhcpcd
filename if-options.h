@@ -92,7 +92,8 @@
 #define DHCPCD_STARTED			(1ULL << 38)
 #define DHCPCD_NOALIAS			(1ULL << 39)
 #define DHCPCD_IA_FORCED		(1ULL << 40)
-#define DHCPCD_DEPARTED			(1ULL << 41)
+#define DHCPCD_STOPPING			(1ULL << 41)
+#define DHCPCD_DEPARTED			(1ULL << 42)
 
 extern const struct option cf_options[];
 

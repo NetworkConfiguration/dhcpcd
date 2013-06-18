@@ -742,7 +742,14 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 		    state->send->xid[2]);
 	else {
 		if (state->IMD) {
-			state->RT.tv_sec = 0;
+			/* Some buggy PPP servers close the link too early
+			 * after sending an invalid status in their reply
+			 * which means this host won't see it.
+			 * 2 seconds grace seems to be the sweet spot. */
+			if (ifp->flags & IFF_POINTOPOINT)
+				state->RT.tv_sec = 2;
+			else
+				state->RT.tv_sec = 0;
 			state->RT.tv_usec = arc4random() %
 			    (state->IMD * 1000000);
 			timernorm(&state->RT);
@@ -1008,11 +1015,12 @@ dhcp6_startrebind(void *arg)
 
 	/* RFC 3633 section 12.1 */
 	if (ifp->options->ia_type == D6_OPTION_IA_PD) {
-	    state->IRT = CNF_TIMEOUT;
-	    state->MRT = CNF_MAX_RT;
+		state->IMD = CNF_MAX_DELAY;
+		state->IRT = CNF_TIMEOUT;
+		state->MRT = CNF_MAX_RT;
 	} else {
-	    state->IRT = REB_TIMEOUT;
-	    state->MRT = REB_MAX_RT;
+		state->IRT = REB_TIMEOUT;
+		state->MRT = REB_MAX_RT;
 	}
 
 	if (dhcp6_makemessage(ifp) == -1)
@@ -2392,10 +2400,20 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 		if (ifp->options->options & DHCPCD_RELEASE) {
 			if (ifp->carrier != LINK_DOWN)
 				dhcp6_startrelease(ifp);
-			dhcp6_delete_delegates(ifp);
 			unlink(state->leasefile);
 		}
 		dhcp6_freedrop_addrs(ifp, drop, NULL);
+		/* As the interface is going away from dhcpcd we need to
+		 * remove the delegated addresses, otherwise we lose track
+		 * of which interface is delegating as we remeber it by pointer.
+		 * So if we need to change this behaviour, we need to change
+		 * how we remember which interface delegated.
+		 * To make it more interesting, on some OS's with PPP links
+		 * there is no guarantee the delegating interface will have
+		 * the same name or index so think very hard before changing
+		 * this. */
+		if (ifp->options->options & (DHCPCD_STOPPING | DHCPCD_RELEASE))
+			dhcp6_delete_delegates(ifp);
 		if (drop && state->new) {
 			if (reason == NULL)
 				reason = "STOP6";
