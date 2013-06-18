@@ -2395,6 +2395,21 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 	struct dhcp6_state *state;
 
 	eloop_timeout_delete(NULL, ifp);
+
+	/*
+	 * As the interface is going away from dhcpcd we need to
+	 * remove the delegated addresses, otherwise we lose track
+	 * of which interface is delegating as we remeber it by pointer.
+	 * So if we need to change this behaviour, we need to change
+	 * how we remember which interface delegated.
+	 * To make it more interesting, on some OS's with PPP links
+	 * there is no guarantee the delegating interface will have
+	 * the same name or index so think very hard before changing
+	 * this.
+	 */
+	if (ifp->options->options & (DHCPCD_STOPPING | DHCPCD_RELEASE))
+		dhcp6_delete_delegates(ifp);
+
 	state = D6_STATE(ifp);
 	if (state) {
 		if (ifp->options->options & DHCPCD_RELEASE) {
@@ -2403,17 +2418,6 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 			unlink(state->leasefile);
 		}
 		dhcp6_freedrop_addrs(ifp, drop, NULL);
-		/* As the interface is going away from dhcpcd we need to
-		 * remove the delegated addresses, otherwise we lose track
-		 * of which interface is delegating as we remeber it by pointer.
-		 * So if we need to change this behaviour, we need to change
-		 * how we remember which interface delegated.
-		 * To make it more interesting, on some OS's with PPP links
-		 * there is no guarantee the delegating interface will have
-		 * the same name or index so think very hard before changing
-		 * this. */
-		if (ifp->options->options & (DHCPCD_STOPPING | DHCPCD_RELEASE))
-			dhcp6_delete_delegates(ifp);
 		if (drop && state->new) {
 			if (reason == NULL)
 				reason = "STOP6";
