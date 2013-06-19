@@ -260,6 +260,9 @@ if_route(const struct rt *rt, int action)
 	if (rt->dest.s_addr == rt->gate.s_addr &&
 	    rt->net.s_addr == INADDR_BROADCAST)
 		rtm.hdr.rtm_flags |= RTF_HOST;
+	else if (rt->gate.s_addr == htonl(INADDR_LOOPBACK) &&
+	    rt->net.s_addr == INADDR_BROADCAST)
+		rtm.hdr.rtm_flags |= RTF_HOST | RTF_GATEWAY;
 	else {
 		rtm.hdr.rtm_addrs |= RTA_NETMASK;
 		if (rtm.hdr.rtm_flags & RTF_STATIC)
@@ -269,7 +272,8 @@ if_route(const struct rt *rt, int action)
 	}
 
 	ADDADDR(&rt->dest);
-	if (rtm.hdr.rtm_flags & RTF_HOST ||
+	if ((rtm.hdr.rtm_flags & RTF_HOST &&
+	    rt->gate.s_addr != htonl(INADDR_LOOPBACK)) ||
 	    !(rtm.hdr.rtm_flags & RTF_STATIC))
 	{
 		/* Make us a link layer socket for the host gateway */

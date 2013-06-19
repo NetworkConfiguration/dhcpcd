@@ -229,6 +229,10 @@ desc_route(const char *cmd, const struct rt *rt)
 	    rt->net.s_addr == INADDR_BROADCAST)
 		syslog(LOG_INFO, "%s: %s host route to %s", ifname, cmd,
 		    addr);
+	else if (rt->gate.s_addr == htonl(INADDR_LOOPBACK) &&
+	    rt->net.s_addr == INADDR_BROADCAST)
+		syslog(LOG_INFO, "%s: %s host route to %s via %s", ifname, cmd,
+		    addr, inet_ntoa(rt->gate));
 	else if (rt->dest.s_addr == INADDR_ANY && rt->net.s_addr == INADDR_ANY)
 		syslog(LOG_INFO, "%s: %s default route via %s", ifname, cmd,
 		    inet_ntoa(rt->gate));
@@ -337,6 +341,32 @@ add_subnet_route(struct rt_head *rt, const struct interface *ifp)
 	r->dest.s_addr = s->addr.s_addr & s->net.s_addr;
 	r->net.s_addr = s->net.s_addr;
 	r->gate.s_addr = 0;
+	TAILQ_INSERT_HEAD(rt, r, next);
+	return rt;
+}
+
+static struct rt_head *
+add_loopback_route(struct rt_head *rt, const struct interface *ifp)
+{
+	struct rt *r;
+	const struct dhcp_state *s;
+
+	if (rt == NULL) /* earlier malloc failed */
+		return NULL;
+
+	s = D_CSTATE(ifp);
+	if (s->addr.s_addr == INADDR_ANY)
+		return rt;
+
+	r = malloc(sizeof(*r));
+	if (r == NULL) {
+		syslog(LOG_ERR, "%s: %m", __func__);
+		ipv4_freeroutes(rt);
+		return NULL;
+	}
+	r->dest.s_addr = s->addr.s_addr;
+	r->net.s_addr = INADDR_BROADCAST;
+	r->gate.s_addr = htonl(INADDR_LOOPBACK);
 	TAILQ_INSERT_HEAD(rt, r, next);
 	return rt;
 }
@@ -488,6 +518,7 @@ ipv4_buildroutes(void)
 		dnr = get_routes(ifp);
 		dnr = massage_host_routes(dnr, ifp);
 		dnr = add_subnet_route(dnr, ifp);
+		dnr = add_loopback_route(dnr, ifp);
 		if (ifp->options->options & DHCPCD_GATEWAY) {
 			dnr = add_router_host_route(dnr, ifp);
 			dnr = add_destination_route(dnr, ifp);
