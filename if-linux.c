@@ -632,10 +632,9 @@ if_route(const struct rt *rt, int action)
 		add_attr_l(&nlm->hdr, sizeof(*nlm), RTA_GATEWAY,
 		    &rt->gate.s_addr, sizeof(rt->gate.s_addr));
 
-	if (rt->gate.s_addr != htonl(INADDR_LOOPBACK)) {
+	if (rt->gate.s_addr != htonl(INADDR_LOOPBACK))
 		add_attr_32(&nlm->hdr, sizeof(*nlm), RTA_OIF, rt->iface->index);
-		add_attr_32(&nlm->hdr, sizeof(*nlm), RTA_PRIORITY, rt->metric);
-	}
+	add_attr_32(&nlm->hdr, sizeof(*nlm), RTA_PRIORITY, rt->metric);
 
 	if (send_netlink(&nlm->hdr) == -1)
 		retval = -1;
