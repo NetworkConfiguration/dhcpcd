@@ -689,9 +689,11 @@ static void dhcp6_delete_delegates(struct interface *ifp)
 {
 	struct interface *ifp0;
 
-	TAILQ_FOREACH(ifp0, ifaces, next) {
-		if (ifp0 != ifp)
-			dhcp6_freedrop_addrs(ifp0, 1, ifp);
+	if (ifaces) {
+		TAILQ_FOREACH(ifp0, ifaces, next) {
+			if (ifp0 != ifp)
+				dhcp6_freedrop_addrs(ifp0, 1, ifp);
+		}
 	}
 }
 
@@ -2407,7 +2409,8 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 	 * the same name or index so think very hard before changing
 	 * this.
 	 */
-	if (ifp->options->options & (DHCPCD_STOPPING | DHCPCD_RELEASE))
+	if (ifp->options &&
+	    ifp->options->options & (DHCPCD_STOPPING | DHCPCD_RELEASE))
 		dhcp6_delete_delegates(ifp);
 
 	state = D6_STATE(ifp);
