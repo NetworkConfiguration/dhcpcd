@@ -747,9 +747,9 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 			/* Some buggy PPP servers close the link too early
 			 * after sending an invalid status in their reply
 			 * which means this host won't see it.
-			 * 2 seconds grace seems to be the sweet spot. */
+			 * 1 second grace seems to be the sweet spot. */
 			if (ifp->flags & IFF_POINTOPOINT)
-				state->RT.tv_sec = 2;
+				state->RT.tv_sec = 1;
 			else
 				state->RT.tv_sec = 0;
 			state->RT.tv_usec = arc4random() %
