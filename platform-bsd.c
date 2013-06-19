@@ -99,7 +99,6 @@ restore_kernel_ra(void)
 		syslog(LOG_ERR, "IPV6CTL_ACCEPT_RTADV: %m");
 }
 
-#if 0
 static int
 ipv6_ra_flush(void)
 {
@@ -112,12 +111,11 @@ ipv6_ra_flush(void)
 	strcpy(dummy, "lo0");
 	if (ioctl(s, SIOCSRTRFLUSH_IN6, (caddr_t)&dummy) == -1)
 		syslog(LOG_ERR, "SIOSRTRFLUSH_IN6: %m");
-	if (ioctl(s, SIOCSPFXFLUSH_IN6, (caddr_t)&dummy) == -1)
-		syslog(LOG_ERR, "SIOSPFXFLUSH_IN6: %m");
+//	if (ioctl(s, SIOCSPFXFLUSH_IN6, (caddr_t)&dummy) == -1)
+//		syslog(LOG_ERR, "SIOSPFXFLUSH_IN6: %m");
 	close(s);
 	return 0;
 }
-#endif
 
 int
 check_ipv6(const char *ifname)
@@ -162,11 +160,8 @@ check_ipv6(const char *ifname)
 		return 0;
 	}
 
-#if 0
-	/* I am not convinced this is right as it sometimes makes our own
-	 * added routes disappear. */
+	/* Flush the kernel knowledge of advertised routers */
 	ipv6_ra_flush();
-#endif
 
 	return 1;
 }

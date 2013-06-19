@@ -283,7 +283,13 @@ if_route(const struct rt *rt, int action)
 	if (rtm.hdr.rtm_addrs & RTA_NETMASK)
 		ADDADDR(&rt->net);
 
-	/* IFP here if we need it */
+	if (rtm.hdr.rtm_addrs & RTA_IFP) {
+		/* Make us a link layer socket for the host gateway */
+		memset(&su, 0, sizeof(su));
+		su.sdl.sdl_len = sizeof(struct sockaddr_dl);
+		link_addr(rt->iface->name, &su.sdl);
+		ADDSU;
+	}
 
 	if (rtm.hdr.rtm_addrs & RTA_IFA)
 		ADDADDR(&state->addr);
@@ -412,8 +418,8 @@ if_route6(const struct rt6 *rt, int action)
 #endif
 
 	rtm.hdr.rtm_addrs = RTA_DST | RTA_GATEWAY | RTA_NETMASK;
-//	if (action >= 0)
-//		rtm.hdr.rtm_addrs |= RTA_IFA;
+	if (action >= 0)
+		rtm.hdr.rtm_addrs |= RTA_IFP | RTA_IFA;
 
 	ADDADDR(&rt->dest);
 	if (!(rtm.hdr.rtm_flags & RTF_GATEWAY)) {
@@ -421,8 +427,10 @@ if_route6(const struct rt6 *rt, int action)
 		if (lla == NULL) /* unlikely as we need a LL to get here */
 			return -1;
 		ADDADDRS(&lla->addr, rt->iface->index);
-	} else
+	} else {
+		lla = NULL;
 		ADDADDRS(&rt->gate, rt->iface->index);
+	}
 
 	if (rtm.hdr.rtm_addrs & RTA_NETMASK) {
 		if (rtm.hdr.rtm_flags & RTF_GATEWAY) {
@@ -433,8 +441,22 @@ if_route6(const struct rt6 *rt, int action)
 			ADDADDR(&rt->net);
 	}
 
-	/* IFP here if we need it */
-	/* IFA here if we need it */
+	if (rtm.hdr.rtm_addrs & RTA_IFP) {
+		/* Make us a link layer socket for the host gateway */
+		memset(&su, 0, sizeof(su));
+		su.sdl.sdl_len = sizeof(struct sockaddr_dl);
+		link_addr(rt->iface->name, &su.sdl);
+		ADDSU;
+	}
+
+	if (rtm.hdr.rtm_addrs & RTA_IFA) {
+		if (lla == NULL) {
+			lla = ipv6_linklocal(rt->iface);
+			if (lla == NULL) /* unlikely */
+				return -1;
+		}
+		ADDADDRS(&lla->addr, rt->iface->index);
+	}
 
 #undef ADDADDR
 #undef ADDSU

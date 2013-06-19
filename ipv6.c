@@ -418,11 +418,9 @@ ipv6_addaddr(struct ipv6_addr *ap)
 	ap->flags |= IPV6_AF_ADDED;
 	if (ap->delegating_iface)
 		ap->flags |= IPV6_AF_DELEGATED;
-#if HAVE_ROUTE_METRIC
 	if (ap->iface->options->options & DHCPCD_IPV6RA_OWN &&
 	    ipv6_removesubnet(ap->iface, ap) == -1)
 		syslog(LOG_ERR,"ipv6_removesubnet %m");
-#endif
 	if (ap->prefix_pltime == ND6_INFINITE_LIFETIME &&
 	    ap->prefix_vltime == ND6_INFINITE_LIFETIME)
 		syslog(LOG_DEBUG,
@@ -842,7 +840,6 @@ make_router(const struct ra *rap)
 	return r;
 }
 
-#if HAVE_ROUTE_METRIC
 int
 ipv6_removesubnet(const struct interface *ifp, struct ipv6_addr *addr)
 {
@@ -881,7 +878,6 @@ ipv6_removesubnet(const struct interface *ifp, struct ipv6_addr *addr)
 	}
 	return r;
 }
-#endif
 
 #define RT_IS_DEFAULT(rtp) \
 	(IN6_ARE_ADDR_EQUAL(&((rtp)->dest), &in6addr_any) &&		      \
