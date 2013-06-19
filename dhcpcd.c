@@ -560,7 +560,7 @@ handle_interface(int action, const char *ifname)
 			TAILQ_REMOVE(ifs, ifp, next);
 			TAILQ_INSERT_TAIL(ifaces, ifp, next);
 		}
-		init_state(ifp, 0, NULL);
+		init_state(ifp, margc, margv);
 		start_interface(ifp);
 	}
 
