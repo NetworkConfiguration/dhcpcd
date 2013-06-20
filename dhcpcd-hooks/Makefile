@@ -16,5 +16,16 @@ install:
 
 import:
 	${INSTALL} -d /tmp/${DISTPREFIX}/dhcpcd-hooks
-	${INSTALL} -m ${NONBINMODE} ${SCRIPTS} /tmp/${DISTPREFIX}/dhcpcd-hooks
-
+	for x in ${SCRIPTS}; do \
+		t="/tmp/${DISTPREFIX}/dhcpcd-hooks/$$x"; \
+		if test "$$(sed -ne 1p $$x)" = "#!/bin/sh"; then \
+			echo "#!/bin/sh" >"$$t"; \
+			printf "${IMPORT_SHID}\n" >>"$$t"; \
+			echo "" >>"$$t"; \
+			sed 1d "$$x" >>"$$t"; \
+		else \
+			printf "${IMPORT_SHID}\n" >"$$t"; \
+			echo "" >>"$$t"; \
+			cat "$$x" >>"$$t"; \
+		fi; \
+	done;
