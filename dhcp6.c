@@ -2513,6 +2513,11 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 		}
 		ol = ntohs(o->len);
 		od = D6_COPTION_DATA(o);
+		/* We only want the FQDN name */
+		if (opt->option == D6_OPTION_FQDN) {
+			ol--;
+			od++;
+		}
 		len = print_option(NULL, 0, opt->type, ol, od, ifp->name);
 		if (len < 0)
 			return -1;
