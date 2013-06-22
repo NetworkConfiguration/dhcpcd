@@ -83,6 +83,10 @@
 #define D6_OPTION_POSIX_TIMEZONE	41
 #define D6_OPTION_TZDB_TIMEZONE		42
 
+#define D6_FQDN_PTR	0x00
+#define D6_FQDN_BOTH	0x01
+#define D6_FQDN_NONE	0x04
+
 #include "dhcp.h"
 #include "ipv6.h"
 extern const struct dhcp_opt dhcp6_opts[];
