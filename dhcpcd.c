@@ -412,6 +412,12 @@ handle_carrier(int carrier, int flags, const char *ifname)
 		if (ifp->carrier != LINK_UP) {
 			syslog(LOG_INFO, "%s: carrier acquired", ifp->name);
 			ifp->carrier = LINK_UP;
+#if !defined(__linux__) && !defined(__NetBSD__)
+			/* BSD does not emit RTM_NEWADDR or RTM_CHGADDR when the
+			 * hardware address changes so we have to go
+			 * through the disovery process to work it out. */
+			handle_interface(0, ifp->name);
+#endif
 			if (ifp->wireless)
 				getifssid(ifp->name, ifp->ssid);
 			configure_interface(ifp, margc, margv);
@@ -560,8 +566,10 @@ handle_interface(int action, const char *ifname)
 			TAILQ_REMOVE(ifs, ifp, next);
 			TAILQ_INSERT_TAIL(ifaces, ifp, next);
 		}
-		init_state(ifp, margc, margv);
-		start_interface(ifp);
+		if (action == 1) {
+			init_state(ifp, margc, margv);
+			start_interface(ifp);
+		}
 	}
 
 	/* Free our discovered list */
@@ -572,47 +580,29 @@ handle_interface(int action, const char *ifname)
 	free(ifs);
 }
 
-#ifdef RTM_CHGADDR
 void
-handle_hwaddr(const char *ifname, unsigned char *hwaddr, size_t hwlen)
+handle_hwaddr(const char *ifname, const uint8_t *hwaddr, size_t hwlen)
 {
 	struct interface *ifp;
-	struct if_options *ifo;
-	struct dhcp_state *state;
 
-	TAILQ_FOREACH(ifp, ifaces, next) {
-		if (strcmp(ifp->name, ifname) == 0 && ifp->hwlen <= hwlen) {
-			state = D_STATE(ifp);
-			if (state == NULL)
-				continue;
-			ifo = ifp->options;
-			if (!(ifo->options &
-			    (DHCPCD_INFORM | DHCPCD_STATIC | DHCPCD_CLIENTID))
-			    && state->new != NULL &&
-			    state->new->cookie == htonl(MAGIC_COOKIE))
-			{
-				syslog(LOG_INFO,
-				    "%s: expiring for new hardware address",
-				    ifp->name);
-				dhcp_drop(ifp, "EXPIRE");
-			}
-			memcpy(ifp->hwaddr, hwaddr, hwlen);
-			ifp->hwlen = hwlen;
-			if (!(ifo->options &
-			    (DHCPCD_INFORM | DHCPCD_STATIC | DHCPCD_CLIENTID)))
-			{
-				syslog(LOG_DEBUG, "%s: using hwaddr %s",
-				    ifp->name,
-				    hwaddr_ntoa(ifp->hwaddr, ifp->hwlen));
-				state->interval = 0;
-				state->nakoff = 0;
-				start_interface(ifp);
-			}
-		}
+	ifp = find_interface(ifname);
+	if (ifp == NULL)
+		return;
+
+	if (hwlen > sizeof(ifp->hwaddr)) {
+		errno = ENOBUFS;
+		syslog(LOG_ERR, "%s: %s: %m", ifp->name, __func__);
+		return;
 	}
-	free(hwaddr);
+
+	if (ifp->hwlen == hwlen && memcmp(ifp->hwaddr, hwaddr, hwlen) == 0)
+		return;
+
+	syslog(LOG_INFO, "%s: new hardware address: %s", ifp->name,
+	    hwaddr_ntoa(hwaddr, hwlen));
+	ifp->hwlen = hwlen;
+	memcpy(ifp->hwaddr, hwaddr, hwlen);
 }
-#endif
 
 static void
 if_reboot(struct interface *ifp, int argc, char **argv)

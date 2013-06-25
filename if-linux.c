@@ -386,11 +386,28 @@ link_addr(struct nlmsghdr *nlm)
 	return 1;
 }
 
+static short l2addr_len(unsigned short if_type)
+{
+
+	switch (if_type) {
+	case ARPHRD_ETHER: /* FALLTHROUGH */
+	case ARPHRD_IEEE802: /*FALLTHROUGH */
+	case ARPHRD_IEEE80211:
+		return 6;
+	case ARPHRD_IEEE1394:
+		return 8;
+	case ARPHRD_INFINIBAND:
+		return 20;
+	default:
+		return -1;
+	}
+}
+
 static int
 link_netlink(struct nlmsghdr *nlm)
 {
 	int len;
-	struct rtattr *rta;
+	struct rtattr *rta, *hwaddr;
 	struct ifinfomsg *ifi;
 	char ifn[IF_NAMESIZE + 1];
 
@@ -414,6 +431,7 @@ link_netlink(struct nlmsghdr *nlm)
 	rta = (struct rtattr *)(void *)((char *)ifi +NLMSG_ALIGN(sizeof(*ifi)));
 	len = NLMSG_PAYLOAD(nlm, sizeof(*ifi));
 	*ifn = '\0';
+	hwaddr = NULL;
 	while (RTA_OK(rta, len)) {
 		switch (rta->rta_type) {
 		case IFLA_WIRELESS:
@@ -424,6 +442,9 @@ link_netlink(struct nlmsghdr *nlm)
 			break;
 		case IFLA_IFNAME:
 			strlcpy(ifn, RTA_DATA(rta), sizeof(ifn));
+			break;
+		case IFLA_ADDRESS:
+			hwaddr = rta;
 			break;
 		}
 		rta = RTA_NEXT(rta, len);
@@ -441,6 +462,13 @@ link_netlink(struct nlmsghdr *nlm)
 	if (ifi->ifi_flags & IFF_MASTER && !(ifi->ifi_flags & IFF_LOWER_UP)) {
 		handle_interface(-1, ifn);
 		return 1;
+	}
+
+	/* Re-read hardware address and friends */
+	if (!(ifi->ifi_flags & IFF_UP) && hwaddr) {
+		len = l2addr_len(ifi->ifi_type);
+		if (hwaddr->rta_len == RTA_LENGTH(len))
+			handle_hwaddr(ifn, RTA_DATA(hwaddr), len);
 	}
 
 	handle_carrier(ifi->ifi_flags & IFF_RUNNING ? LINK_UP : LINK_DOWN,
