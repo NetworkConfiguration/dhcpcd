@@ -7,8 +7,8 @@ SRCS+=		dhcp-common.c
 
 CFLAGS?=	-O2
 CSTD?=		c99
-CFLAGS+=	-std=${CSTD}
 include config.mk
+CFLAGS+=	-std=${CSTD}
 
 OBJS+=		${SRCS:.c=.o} ${COMPAT_SRCS:.c=.o}
 

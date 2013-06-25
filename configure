@@ -264,8 +264,8 @@ echo "CC=		$CC" >>$CONFIG_MK
 if [ -n "$CFLAGS" ]; then
 	echo "CFLAGS=		$CFLAGS" >>$CONFIG_MK
 fi
-if [ -n "$CPPLAGS" ]; then
-	echo "CPPLAGS=		$CPPLAGS" >>$CONFIG_MK
+if [ -n "$CPPFLAGS" ]; then
+	echo "CPPFLAGS=		$CPPFLAGS" >>$CONFIG_MK
 fi
 if [ -n "$LDFLAGS" ]; then
 	echo "LDFLAGS=		$LDFLAGS" >>$CONFIG_MK
