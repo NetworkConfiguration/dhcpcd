@@ -71,7 +71,11 @@ set_hostname()
 	if [ -n "$new_fqdn_name" ]; then
 		try_hostname "$new_fqdn_name"
 	elif [ -n "$new_host_name" ]; then
-		if [ -n "$new_domain_name" ]; then
+		# Could be non RFC conformant domain in the
+		# hostname field
+		if [ -n "$new_domain_name" -a \
+		    "$new_host_name" = "${new_host_name#*.}" ]
+		then
 			try_hostname "$new_host_name.$new_domain_name"
 		else
 			try_hostname "$new_host_name"
