@@ -921,6 +921,8 @@ ipv6_build_dhcp_routes(struct rt6head *dnr, enum DH6S dstate)
 	struct rt6 *rt;
 
 	TAILQ_FOREACH(ifp, ifaces, next) {
+		if (!(ifp->options->options & DHCPCD_IPV6RA_OWN))
+			continue;
 		d6_state = D6_CSTATE(ifp);
 		if (d6_state && d6_state->state == dstate) {
 			TAILQ_FOREACH(addr, &d6_state->addrs, next) {
@@ -941,9 +943,7 @@ ipv6_buildroutes(void)
 	struct rt6head dnr, *nrs;
 	struct rt6 *rt, *rtn, *or;
 	uint8_t have_default;
-
-	if (!(options & (DHCPCD_IPV6RA_OWN | DHCPCD_IPV6RA_OWN_DEFAULT)))
-		return;
+	unsigned long long o;
 
 	TAILQ_INIT(&dnr);
 
@@ -1017,9 +1017,10 @@ ipv6_buildroutes(void)
 	while ((rt = TAILQ_LAST(routes, rt6head))) {
 		TAILQ_REMOVE(routes, rt, next);
 		if (find_route6(nrs, rt) == NULL) {
+			o = rt->iface->options->options;
 			if (!have_default &&
-			    (options & DHCPCD_IPV6RA_OWN_DEFAULT) &&
-			    !(options & DHCPCD_IPV6RA_OWN) &&
+			    (o & DHCPCD_IPV6RA_OWN_DEFAULT) &&
+			    !(o & DHCPCD_IPV6RA_OWN) &&
 			    RT_IS_DEFAULT(rt))
 				have_default = 1;
 				/* no need to add it back to our routing table

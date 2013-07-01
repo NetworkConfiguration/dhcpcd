@@ -294,6 +294,7 @@ static void
 configure_interface1(struct interface *ifp)
 {
 	struct if_options *ifo = ifp->options;
+	int ra_global, ra_iface;
 
 	/* Do any platform specific configuration */
 	if_conf(ifp);
@@ -313,8 +314,13 @@ configure_interface1(struct interface *ifp)
 
 	/* We want to disable kernel interface RA as early as possible. */
 	if (ifo->options & DHCPCD_IPV6RS) {
-		if (check_ipv6(NULL) != 1 || check_ipv6(ifp->name) != 1)
+		ra_global = check_ipv6(NULL, options & DHCPCD_IPV6RA_OWN);
+		ra_iface = check_ipv6(ifp->name,
+		    ifp->options->options & DHCPCD_IPV6RA_OWN);
+		if (ra_global == -1 || ra_iface == -1)
 			ifo->options &= ~DHCPCD_IPV6RS;
+		else if (ra_iface == 0)
+			ifo->options |= DHCPCD_IPV6RA_OWN;
 	}
 
 	/* If we haven't specified a ClientID and our hardware address

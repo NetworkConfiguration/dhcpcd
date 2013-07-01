@@ -912,7 +912,7 @@ ipv6rs_handledata(__unused void *arg)
 		script_runreason(ifp, "TEST");
 		goto handle_flag;
 	}
-	if (options & DHCPCD_IPV6RA_OWN)
+	if (ifp->options->options & DHCPCD_IPV6RA_OWN)
 		ipv6ns_probeaddrs(&rap->addrs);
 	ipv6_buildroutes();
 
