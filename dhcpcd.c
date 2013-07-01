@@ -314,9 +314,9 @@ configure_interface1(struct interface *ifp)
 
 	/* We want to disable kernel interface RA as early as possible. */
 	if (ifo->options & DHCPCD_IPV6RS) {
-		ra_global = check_ipv6(NULL, options & DHCPCD_IPV6RA_OWN);
+		ra_global = check_ipv6(NULL, options & DHCPCD_IPV6RA_OWN ? 1:0);
 		ra_iface = check_ipv6(ifp->name,
-		    ifp->options->options & DHCPCD_IPV6RA_OWN);
+		    ifp->options->options & DHCPCD_IPV6RA_OWN ? 1 : 0);
 		if (ra_global == -1 || ra_iface == -1)
 			ifo->options &= ~DHCPCD_IPV6RS;
 		else if (ra_iface == 0)
