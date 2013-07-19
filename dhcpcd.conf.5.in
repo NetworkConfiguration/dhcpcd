@@ -115,9 +115,9 @@ Generate an
 .%T "RFC 4361"
 .Re
 compliant clientid.
-This requires persistent storage and not all DHCP servers work with it so it's
-not enabled by default.
-The duid generated will be held in
+If persistent storage is available then a DUID-LLT (link local address + time)
+is generated, otherwise DUID-LL is generated (link local address).
+The DUID-LLT generated will be held in
 .Pa @SYSCONFDIR@/dhcpcd.duid
 and should not be copied to other hosts.
 .It Ic fallback Ar profile
