@@ -57,11 +57,11 @@ need_hostname()
 	*)					hfqdn=false;;
 	esac
 
-	if [ -n "$old_fqdn_name" ]; then
+	if [ -n "$old_fqdn" ]; then
 		if ${hfqdn}; then
-			[ "$hostname" = "$old_fqdn_name" ]
+			[ "$hostname" = "$old_fqdn" ]
 		else	
-			[ "$hostname" = "${old_fqdn_name%%.*}" ]
+			[ "$hostname" = "${old_fqdn%%.*}" ]
 		fi
 	elif [ -n "$old_host_name" ]; then
 		if ${hfqdn}; then
@@ -100,11 +100,11 @@ set_hostname()
 	*)					hfqdn=false;;
 	esac
 
-	if [ -n "$new_fqdn_name" ]; then
+	if [ -n "$new_fqdn" ]; then
 		if ${hfqdn}; then
-			try_hostname "$new_fqdn_name"
+			try_hostname "$new_fqdn"
 		else
-			try_hostname "${new_fqdn_name%%.*}"
+			try_hostname "${new_fqdn%%.*}"
 		fi
 	elif [ -n "$new_host_name" ]; then
 		if ${hfqdn}; then

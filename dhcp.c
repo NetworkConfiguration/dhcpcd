@@ -184,7 +184,7 @@ const struct dhcp_opt dhcp_opts[] = {
 	{ 76,	IPV4A,		"streettalk_directory_assistance_server" },
 	{ 77,	STRING,		"user_class" },
 	{ 80,	FLAG | NOREQ,	"rapid_commit" },
-	{ 81,	STRING | RFC3397,	"fqdn_name" },
+	{ 81,	STRING | RFC3397,	"fqdn" },
 	{ 85,	IPV4A,		"nds_servers" },
 	{ 86,	STRING,		"nds_tree_name" },
 	{ 87,	STRING,		"nds_context" },
