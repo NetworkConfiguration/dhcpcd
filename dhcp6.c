@@ -124,9 +124,9 @@ const struct dhcp_opt dhcp6_opts[] = {
 	{ D6_OPTION_INFO_REFRESH_TIME,	UINT32,		"info_refresh_time" },
 	{ D6_OPTION_BCMS_SERVER_D,	RFC3397,	"bcms_server_d" },
 	{ D6_OPTION_BCMS_SERVER_A,	IPV6A,		"bcms_server_a" },
+	{ D6_OPTION_FQDN,		RFC3397,	"fqdn" },
 	{ D6_OPTION_POSIX_TIMEZONE,	STRING,		"posix_timezone" },
 	{ D6_OPTION_TZDB_TIMEZONE,	STRING,		"tzdb_timezone" },
-	{ D6_OPTION_FQDN,		RFC3397,	"fqdn" },
 	{ 0, 0, NULL }
 };
 
