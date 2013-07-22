@@ -380,6 +380,7 @@ dhcp6_makemessage(struct interface *ifp)
 	uint32_t u32;
 	const struct ipv6_addr *ap;
 	const char *hostname = NULL; /* assignment just to appease GCC*/
+	int fqdn;
 
 	state = D6_STATE(ifp);
 	if (state->send) {
@@ -387,8 +388,22 @@ dhcp6_makemessage(struct interface *ifp)
 		state->send = NULL;
 	}
 
-	/* Work out option size first */
 	ifo = ifp->options;
+	fqdn = ifo->fqdn;
+
+	if (fqdn == FQDN_DISABLE || ifo->options & DHCPCD_HOSTNAME) {
+		/* We're sending the DHCPv4 hostname option, so send FQDN as
+		 * DHCPv6 has no FQDN option and DHCPv4 must not send
+		 * hostname and FQDN according to RFC4702 */
+		if (fqdn == FQDN_DISABLE)
+			fqdn = FQDN_BOTH;
+		if (ifo->hostname[0] == '\0')
+			hostname = get_hostname();
+		else
+			hostname = ifo->hostname;
+	}
+
+	/* Work out option size first */
 	n_options = 0;
 	len = 0;
 	si = NULL;
@@ -405,13 +420,8 @@ dhcp6_makemessage(struct interface *ifp)
 		if (len)
 			len += sizeof(*o);
 
-		if (ifo->fqdn != FQDN_DISABLE) {
-			if (ifo->hostname[0] == '\0')
-				hostname = get_hostname();
-			else
-				hostname = ifo->hostname;
+		if (fqdn != FQDN_DISABLE)
 			len += sizeof(*o) + 1 + encode_rfc1035(hostname, NULL);
-		}
 	}
 
 	len += sizeof(*state->send);
@@ -617,11 +627,11 @@ dhcp6_makemessage(struct interface *ifp)
 	}
 
 	if (state->send->type !=  DHCP6_RELEASE) {
-		if (ifo->fqdn != FQDN_DISABLE) {
+		if (fqdn != FQDN_DISABLE) {
 			o = D6_NEXT_OPTION(o);
 			o->code = htons(D6_OPTION_FQDN);
 			p = D6_OPTION_DATA(o);
-			switch (ifo->fqdn) {
+			switch (fqdn) {
 			case FQDN_BOTH:
 				*p = D6_FQDN_BOTH;
 				break;
@@ -2303,7 +2313,8 @@ dhcp6_start1(void *arg)
 				add_option_mask(ifo->requestmask6,
 				    dhc->dhcp6_opt);
 		}
-		if (ifo->fqdn != FQDN_DISABLE)
+		if (ifo->fqdn != FQDN_DISABLE ||
+		    ifo->options & DHCPCD_HOSTNAME)
 			add_option_mask(ifo->requestmask6, D6_OPTION_FQDN);
 	}
 

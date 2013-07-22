@@ -986,25 +986,10 @@ make_message(struct dhcp_message **message,
 			}
 		}
 
-		/* Regardless of RFC2132, we should always send a hostname
-		 * upto the first dot (the short hostname) as otherwise
-		 * confuses some DHCP servers when updating DNS.
-		 * The FQDN option should be used if a FQDN is required. */
 		if (ifo->hostname[0] == '\0')
 			hostname = get_hostname();
 		else
 			hostname = ifo->hostname;
-		if (ifo->options & DHCPCD_HOSTNAME && hostname) {
-			*p++ = DHO_HOSTNAME;
-			hp = strchr(hostname, '.');
-			if (hp)
-				len = hp - hostname;
-			else
-				len = strlen(hostname);
-			*p++ = len;
-			memcpy(p, hostname, len);
-			p += len;
-		}
 		if (ifo->fqdn != FQDN_DISABLE) {
 			/* IETF DHC-FQDN option (81), RFC4702 */
 			*p++ = DHO_FQDN;
@@ -1031,6 +1016,22 @@ make_message(struct dhcp_message **message,
 				*lp += ul;
 				p += ul;
 			}
+		} else if (ifo->options & DHCPCD_HOSTNAME && hostname) {
+			*p++ = DHO_HOSTNAME;
+			/*
+			 * Regardless of RFC2132, we should always send a
+			 * hostname upto the first dot (the short hostname) as
+			 * a FQDN confuses some DHCP servers when updating DNS.
+			 * The FQDN option should be used if a FQDN is wanted.
+			 */
+			hp = strchr(hostname, '.');
+			if (hp)
+				len = hp - hostname;
+			else
+				len = strlen(hostname);
+			*p++ = len;
+			memcpy(p, hostname, len);
+			p += len;
 		}
 
 		/* vendor is already encoded correctly, so just add it */
