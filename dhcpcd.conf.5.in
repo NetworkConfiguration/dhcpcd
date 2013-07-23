@@ -393,7 +393,7 @@ of a randomly generated number.
 .Xr if_nametoindex 3 ,
 .Xr fnmatch 3
 .Sh AUTHORS
-.An Roy Marples Aq roy@marples.name
+.An Roy Marples Aq Mt roy@marples.name
 .Sh BUGS
 Please report them to
 .Lk http://roy.marples.name/projects/dhcpcd

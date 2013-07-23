@@ -136,7 +136,7 @@ in a lexical order and then finally
 .Sh SEE ALSO
 .Xr dhcpcd 8
 .Sh AUTHORS
-.An Roy Marples Aq roy@marples.name
+.An Roy Marples Aq Mt roy@marples.name
 .Sh BUGS
 Please report them to
 .Lk http://roy.marples.name/projects/dhcpcd
