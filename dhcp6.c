@@ -398,7 +398,8 @@ dhcp6_makemessage(struct interface *ifp)
 		if (fqdn == FQDN_DISABLE)
 			fqdn = FQDN_BOTH;
 		if (ifo->hostname[0] == '\0')
-			hostname = get_hostname();
+			hostname = get_hostname(ifo->options &
+			    DHCPCD_HOSTNAME_SHORT ? 1 : 0);
 		else
 			hostname = ifo->hostname;
 	}

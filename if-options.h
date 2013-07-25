@@ -94,6 +94,7 @@
 #define DHCPCD_IA_FORCED		(1ULL << 40)
 #define DHCPCD_STOPPING			(1ULL << 41)
 #define DHCPCD_DEPARTED			(1ULL << 42)
+#define DHCPCD_HOSTNAME_SHORT		(1ULL << 43)
 
 extern const struct option cf_options[];
 

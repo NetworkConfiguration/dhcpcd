@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd June 19, 2013
+.Dd July 25, 2013
 .Dt DHCPCD.CONF 5 SMM
 .Os
 .Sh NAME
@@ -133,6 +133,10 @@ is an empty string then the current system hostname is sent.
 If
 .Ar hostname
 is a FQDN (ie, contains a .) then it will be encoded as such.
+.It Ic hostname_short
+Sends the short hostname to the DHCP server instead of the FQDN.
+This is useful because DHCP servers will not register the FQDN in their
+DNS if the domain part does not match theirs.
 .It Ic ia_na Op Ar iaid
 Request a DHCPv6 Normal Address for
 .Ar iaid .

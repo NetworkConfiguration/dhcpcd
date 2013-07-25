@@ -100,7 +100,7 @@
 int set_cloexec(int);
 int set_nonblock(int);
 char *get_line(FILE * __restrict);
-const char *get_hostname(void);
+const char *get_hostname(int);
 extern int clock_monotonic;
 int get_monotonic(struct timeval *);
 ssize_t setvar(char ***, const char *, const char *, const char *);
