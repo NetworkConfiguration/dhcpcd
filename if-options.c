@@ -1082,7 +1082,7 @@ got_iaid:
 		}
 		break;
 	case O_HOSTNAME_SHORT:
-		ifo->options |= DHCPCD_HOSTNAME_SHORT;
+		ifo->options |= DHCPCD_HOSTNAME | DHCPCD_HOSTNAME_SHORT;
 		break;
 #endif
 	default:

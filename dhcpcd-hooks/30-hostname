@@ -96,17 +96,18 @@ try_hostname()
 
 set_hostname()
 {
-	local hfqdn
+	local hfqdn=false hshort=false
 
 	need_hostname || return
 
 	case "$hostname_fqdn" in
 	[Yy][Ee][Ss]|[Tt][Rr][Uu][Ee]|1)	hfqdn=true;;
-	*)					hfqdn=false;;
+	"")					;;
+	*)					hshort=true;;
 	esac
 
 	if [ -n "$new_fqdn" ]; then
-		if ${hfqdn} || ! ${hsort}; then
+		if ${hfqdn} || ! ${hshort}; then
 			try_hostname "$new_fqdn"
 		else
 			try_hostname "${new_fqdn%%.*}"
