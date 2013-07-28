@@ -91,6 +91,9 @@ need_hostname()
 		else
 			[ "$hostname" = "$old_host_name" ]
 		fi
+	else
+		# No old hostname
+		false
 	fi
 }
 
