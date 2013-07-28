@@ -1,9 +1,19 @@
 # Set the hostname from DHCP data if required
 
-# Set one of the below to override the DHCP supplied hostname information
-# to be either a short hostname or a FQDN.
-#hostname_fqdn=false
-#hostname_fqdn=true
+# A hostname can either be a short hostname or a FQDN.
+# hostname_fqdn=true
+# hostname_fqdn=false
+# hostname_fqdn=server
+
+# A value of server means just what the server says, don't manipulate it.
+# This could lead to an inconsistent hostname on a DHCPv4 and DHCPv6 network
+# where the DHCPv4 hostname is short and the DHCPv6 has an FQDN.
+# DHCPv6 has no hostname option.
+# RFC4702 section 3.1 says FQDN should be prefered over hostname.
+#
+# As such, the default is hostname_fqdn=true so that a consistent hostname
+# is always assigned.
+: ${hostname_fqdn:=true}
 
 # Some systems don't have hostname(1)
 _hostname()
@@ -56,7 +66,7 @@ need_hostname()
 	
 	case "$hostname_fqdn" in
 	[Yy][Ee][Ss]|[Tt][Rr][Uu][Ee]|1)	hfqdn=true;;
-	"")					;;
+	[Ss][Ee][Rr][Vv][Ee][Rr])		;;
 	*)					hshort=true;;
 	esac
 
