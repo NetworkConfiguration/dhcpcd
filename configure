@@ -629,6 +629,17 @@ if [ -z "$SERVICECMD" ]; then
 		echo "no"
 	fi
 fi
+if [ -z "$SERVICECMD"  ]; then
+	printf "Checking for Slackware ... "
+	if [ -e /etc/slackware-version -a -d /etc/rc.d ]; then
+		SERVICEEXISTS="[ -x /etc/rc.d/rc.\$1 ]"
+		SERVICECMD="/etc/rc.d/rc.\$1 \$2"
+		SERVICESTATUS="/etc/rc.d/rc.\$1 status 1>/dev/null 2>&1"
+		echo "yes"
+	else
+		echo "no"
+	fi
+fi
 if [ -z "$SERVICECMD" ]; then
 	for x in /etc/init.d/rc.d /etc/rc.d /etc/init.d; do
 		printf "Checking for $x ... "
