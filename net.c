@@ -167,7 +167,7 @@ carrier_status(struct interface *iface)
 #endif
 
 	if (ioctl(socket_afnet, SIOCGIFFLAGS, &ifr) == -1)
-		return -1;
+		return LINK_UNKNOWN;
 	iface->flags = ifr.ifr_flags;
 
 	ret = LINK_UNKNOWN;
@@ -315,7 +315,7 @@ discover_interfaces(int argc, char * const *argv)
 		/* Bring the interface up if not already */
 		if (!(ifp->flags & IFF_UP)
 #ifdef SIOCGIFMEDIA
-		    && carrier_status(ifp) != -1
+		    && carrier_status(ifp) != LINK_UNKNOWN
 #endif
 		   )
 		{
