@@ -1117,7 +1117,7 @@ parse_config_line(struct if_options *ifo, const char *opt, char *line)
 }
 
 static void
-finish_config(struct if_options *ifo, const char *ifname)
+finish_config(struct if_options *ifo)
 {
 
 	/* Terminate the encapsulated options */
@@ -1125,8 +1125,13 @@ finish_config(struct if_options *ifo, const char *ifname)
 		ifo->vendor[0]++;
 		ifo->vendor[ifo->vendor[0]] = DHO_END;
 	}
+}
 
 #ifdef INET6
+static void
+finish_config6(struct if_options *ifo, const char *ifname)
+{
+
 	if (!(ifo->options & DHCPCD_IPV6))
 		ifo->options &= ~DHCPCD_IPV6RS;
 
@@ -1152,8 +1157,8 @@ finish_config(struct if_options *ifo, const char *ifname)
 			ifo->iaid->sla_len = 0;
 		}
 	}
-#endif
 }
+#endif
 
 struct if_options *
 read_config(const char *file,
@@ -1242,7 +1247,10 @@ read_config(const char *file,
 		ifo = NULL;
 	}
 
-	finish_config(ifo, ifname);
+	finish_config(ifo);
+#ifdef INET6
+	finish_config6(ifo, ifname);
+#endif
 	return ifo;
 }
 
@@ -1263,7 +1271,10 @@ add_options(struct if_options *ifo, int argc, char **argv)
 			break;
 	}
 
-	finish_config(ifo, NULL);
+	finish_config(ifo);
+#ifdef INET6
+	finish_config6(ifo, NULL);
+#endif
 	return r;
 }
 
