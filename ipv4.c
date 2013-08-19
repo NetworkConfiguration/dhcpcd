@@ -390,7 +390,7 @@ get_routes(struct interface *ifp)
 				return NULL;
 			}
 			memcpy(r, rt, sizeof(*r));
-			TAILQ_INSERT_TAIL(nrt, rt, next);
+			TAILQ_INSERT_TAIL(nrt, r, next);
 		}
 		return nrt;
 	}
