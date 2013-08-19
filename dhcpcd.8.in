@@ -299,13 +299,18 @@ For example
 If not set then none is sent.
 Some badly configured DHCP servers reject unknown vendorclassids.
 To work around it, try and impersonate Windows by using the MSFT vendorclassid.
-.It Fl k , Fl Fl release
+.It Fl k , Fl Fl release Op Ar interface
 This causes an existing
 .Nm
 process running on the
 .Ar interface
-to release its lease, de-configure the
+to release its lease and de-configure the
+.Ar interface .
+If no 
 .Ar interface
+is specified, the existing 
+.Nm
+process will be instructed to release and de-configure all interfaces
 and then exit.
 .Nm
 then waits until this process has exited.
@@ -322,10 +327,14 @@ Metrics are used to prefer an interface over another one, lowest wins.
 will supply a default metic of 200 +
 .Xr if_nametoindex 3 .
 An extra 100 will be added for wireless interfaces.
-.It Fl n , Fl Fl rebind
+.It Fl n , Fl Fl rebind Op Ar interface
 Notifies
 .Nm
-to reload its configuration and rebind its interfaces.
+to reload its configuration and rebind the specified
+.Ar interface . 
+If no interface is specified, notifies
+.Nm
+to reload its configuration and rebind all its interfaces.
 If
 .Nm
 is not running, then it starts up as normal.
