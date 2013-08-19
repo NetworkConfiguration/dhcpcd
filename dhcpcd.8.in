@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd June 6, 2013
+.Dd August 19, 2013
 .Dt DHCPCD 8
 .Os
 .Sh NAME
@@ -30,7 +30,7 @@
 .Nd a DHCP client
 .Sh SYNOPSIS
 .Nm
-.Op Fl 46ABbDdEGgHJKkLnpqTVw
+.Op Fl 46ABbDdEGgHJKLpqTVw
 .Op Fl C , Fl Fl nohook Ar hook
 .Op Fl c , Fl Fl script Ar script
 .Op Fl e , Fl Fl env Ar value
@@ -57,6 +57,9 @@
 .Op Fl z , Fl Fl allowinterfaces Ar pattern
 .Op interface
 .Op ...
+.Nm
+.Fl n , Fl Fl rebind
+.Op interface
 .Nm
 .Fl k , Fl Fl release
 .Op interface
@@ -308,12 +311,10 @@ to release its lease and de-configure the
 .Ar interface .
 If no 
 .Ar interface
-is specified, the existing 
+is specified then this applies to all interfaces.
+If no interfaces are left running,
 .Nm
-process will be instructed to release and de-configure all interfaces
-and then exit.
-.Nm
-then waits until this process has exited.
+will exit.
 .It Fl l , Fl Fl leasetime Ar seconds
 Request a specific lease time in
 .Ar seconds .
@@ -332,9 +333,7 @@ Notifies
 .Nm
 to reload its configuration and rebind the specified
 .Ar interface . 
-If no interface is specified, notifies
-.Nm
-to reload its configuration and rebind all its interfaces.
+If no interface is specified then this applies to all interfaces.
 If
 .Nm
 is not running, then it starts up as normal.
@@ -419,7 +418,7 @@ Display both program version and copyright information.
 then exits before doing any configuration.
 .It Fl w , Fl Fl waitip
 Wait for an address to be assigned before forking to the background.
-.It Fl x , Fl Fl exit
+.It Fl x , Fl Fl exit Op Ar interface
 This will signal an existing
 .Nm
 process running on the
@@ -427,6 +426,7 @@ process running on the
 to de-configure the
 .Ar interface
 and exit.
+If no interface is specified, then the above is applied to all interfaces.
 .Nm
 then waits until this process has exited.
 .It Fl y , Fl Fl reboot Ar seconds
