@@ -59,7 +59,7 @@
 #include "dhcp6.h"
 #include "eloop.h"
 #include "ipv6.h"
-#include "ipv6rs.h"
+#include "ipv6nd.h"
 
 /* Hackery at it's finest. */
 #ifndef s6_addr32
@@ -457,7 +457,7 @@ ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
 		 * This is safe because the RA is removed from the list
 		 * before we are called. */
 		if (drop && ap->flags & IPV6_AF_ADDED &&
-		    !ipv6rs_addrexists(ap) && !dhcp6_addrexists(ap))
+		    !ipv6nd_addrexists(ap) && !dhcp6_addrexists(ap))
 		{
 			syslog(LOG_INFO, "%s: deleting address %s",
 			    ap->iface->name, ap->saddr);
@@ -535,7 +535,7 @@ ipv6_handleifa(int cmd, struct if_head *ifs, const char *ifname,
 		return;
 
 	if (!IN6_IS_ADDR_LINKLOCAL(addr)) {
-		ipv6rs_handleifa(cmd, ifname, addr, flags);
+		ipv6nd_handleifa(cmd, ifname, addr, flags);
 		dhcp6_handleifa(cmd, ifname, addr, flags);
 	}
 

@@ -45,7 +45,7 @@
 
 #define IF_DATA_DHCP	0
 #define IF_DATA_IPV6	1
-#define IF_DATA_IPV6RS	2
+#define IF_DATA_IPV6ND	2
 #define IF_DATA_DHCP6	3
 #define IF_DATA_MAX	4
 

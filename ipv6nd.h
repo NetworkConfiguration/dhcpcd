@@ -25,8 +25,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef IPV6RS_H
-#define IPV6RS_H
+#ifndef IPV6ND_H
+#define IPV6ND_H
 
 #include <sys/queue.h>
 
@@ -73,26 +73,43 @@ struct rs_state {
 	int rsprobes;
 };
 
-#define RS_STATE(a) ((struct rs_state *)(ifp)->if_data[IF_DATA_IPV6RS])
+#define RS_STATE(a) ((struct rs_state *)(ifp)->if_data[IF_DATA_IPV6ND])
+
+#define MAX_REACHABLE_TIME	3600	/* seconds */
+#define REACHABLE_TIME		30	/* seconds */
+#define RETRANS_TIMER		1000	/* milliseconds */
+#define DELAY_FIRST_PROBE_TIME	5	/* seconds */
 
 #ifdef INET6
-int ipv6rs_start(struct interface *);
-ssize_t ipv6rs_env(char **, const char *, const struct interface *);
-const struct ipv6_addr * ipv6rs_findprefix(const struct ipv6_addr *);
-int ipv6rs_addrexists(const struct ipv6_addr *);
-void ipv6rs_freedrop_ra(struct ra *, int);
-#define ipv6rs_free_ra(ra) ipv6rs_freedrop_ra((ra),  0)
-#define ipv6rs_drop_ra(ra) ipv6rs_freedrop_ra((ra),  1)
-ssize_t ipv6rs_free(struct interface *);
-void ipv6rs_expire(void *arg);
-int ipv6rs_has_ra(const struct interface *);
-void ipv6rs_handleifa(int, const char *, const struct in6_addr *, int);
-void ipv6rs_drop(struct interface *);
+int ipv6nd_startrs(struct interface *);
+ssize_t ipv6nd_env(char **, const char *, const struct interface *);
+const struct ipv6_addr * ipv6nd_findprefix(const struct ipv6_addr *);
+int ipv6nd_addrexists(const struct ipv6_addr *);
+void ipv6nd_freedrop_ra(struct ra *, int);
+#define ipv6nd_free_ra(ra) ipv6nd_freedrop_ra((ra),  0)
+#define ipv6nd_drop_ra(ra) ipv6nd_freedrop_ra((ra),  1)
+ssize_t ipv6nd_free(struct interface *);
+void ipv6nd_expirera(void *arg);
+int ipv6nd_has_ra(const struct interface *);
+void ipv6nd_handleifa(int, const char *, const struct in6_addr *, int);
+void ipv6nd_drop(struct interface *);
+
+void ipv6nd_probeaddr(void *);
+ssize_t ipv6nd_probeaddrs(struct ipv6_addrhead *);
+void ipv6nd_proberouter(void *);
+void ipv6nd_cancelproberouter(struct ra *);
+
+#ifdef LISTEN_DAD
+void ipv6nd_cancelprobeaddr(struct ipv6_addr *);
 #else
-#define ipv6rs_start(a) {}
-#define ipv6rs_free(a)
-#define ipv6rs_has_ra(a) 0
-#define ipv6rs_drop(a)
+#define ipv6nd_cancelprobeaddr(a)
+#endif
+
+#else
+#define ipv6nd_startrs(a) {}
+#define ipv6nd_free(a)
+#define ipv6nd_has_ra(a) 0
+#define ipv6nd_drop(a)
 #endif
 
 #endif

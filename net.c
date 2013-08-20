@@ -70,7 +70,7 @@
 #include "dhcp.h"
 #include "dhcp6.h"
 #include "if-options.h"
-#include "ipv6rs.h"
+#include "ipv6nd.h"
 #include "net.h"
 
 int socket_afnet = -1;
@@ -141,7 +141,7 @@ free_interface(struct interface *ifp)
 	dhcp_free(ifp);
 	ipv6_free(ifp);
 	dhcp6_free(ifp);
-	ipv6rs_free(ifp);
+	ipv6nd_free(ifp);
 	free_options(ifp->options);
 	free(ifp);
 }

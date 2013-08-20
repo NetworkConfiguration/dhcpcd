@@ -339,7 +339,7 @@ if [ -z "$INET" -o "$INET" = yes ]; then
 fi
 if [ -z "$INET6" -o "$INET6" = yes ]; then
 	echo "CPPFLAGS+=	-DINET6" >>$CONFIG_MK
-	echo "SRCS+=		ipv6.c ipv6rs.c ipv6ns.c dhcp6.c" >>$CONFIG_MK
+	echo "SRCS+=		ipv6.c ipv6nd.c dhcp6.c" >>$CONFIG_MK
 fi
 
 # NetBSD: Even if we build for $PREFIX, the clueless user might move us to /

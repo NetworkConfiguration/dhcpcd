@@ -53,8 +53,7 @@
 #include "dhcp6.h"
 #include "duid.h"
 #include "eloop.h"
-#include "ipv6ns.h"
-#include "ipv6rs.h"
+#include "ipv6nd.h"
 #include "platform.h"
 #include "script.h"
 
@@ -1248,7 +1247,7 @@ dhcp6_dadcallback(void *arg)
 	int wascompleted;
 
 	wascompleted = (ap->flags & IPV6_AF_DADCOMPLETED);
-	ipv6ns_cancelprobeaddr(ap);
+	ipv6nd_cancelprobeaddr(ap);
 	ap->flags |= IPV6_AF_DADCOMPLETED;
 	if (ap->flags & IPV6_AF_DUPLICATED)
 		/* XXX FIXME
@@ -1328,7 +1327,7 @@ dhcp6_findna(struct interface *ifp, const uint8_t *iaid,
 			memcpy(&a->addr.s6_addr, &in6.s6_addr,
 			    sizeof(in6.s6_addr));
 		}
-		pa = ipv6rs_findprefix(a);
+		pa = ipv6nd_findprefix(a);
 		if (pa) {
 			memcpy(&a->prefix, &pa->prefix,
 			    sizeof(a->prefix));
@@ -1844,7 +1843,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 		}
 		if (k && !carrier_warned) {
 			ifd_state = D6_STATE(ifd);
-			ipv6ns_probeaddrs(&ifd_state->addrs);
+			ipv6nd_probeaddrs(&ifd_state->addrs);
 		}
 	}
 }
@@ -1907,7 +1906,7 @@ dhcp6_find_delegates(struct interface *ifp)
 		syslog(LOG_INFO, "%s: adding delegated prefixes", ifp->name);
 		state = D6_STATE(ifp);
 		state->state = DH6S_DELEGATED;
-		ipv6ns_probeaddrs(&state->addrs);
+		ipv6nd_probeaddrs(&state->addrs);
 		ipv6_buildroutes();
 	}
 	return k;
@@ -2193,7 +2192,7 @@ recv:
 			    dhcp6_startexpire, ifp);
 		if (ifp->options->ia_type == D6_OPTION_IA_PD)
 			dhcp6_delegate_prefix(ifp);
-		ipv6ns_probeaddrs(&state->addrs);
+		ipv6nd_probeaddrs(&state->addrs);
 		if (state->renew || state->rebind)
 			syslog(has_new ? LOG_INFO : LOG_DEBUG,
 			    "%s: renew in %"PRIu32" seconds,"

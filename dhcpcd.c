@@ -61,8 +61,7 @@ const char copyright[] = "Copyright (c) 2006-2013 Roy Marples";
 #include "if-pref.h"
 #include "ipv4.h"
 #include "ipv6.h"
-#include "ipv6ns.h"
-#include "ipv6rs.h"
+#include "ipv6nd.h"
 #include "net.h"
 #include "platform.h"
 #include "script.h"
@@ -279,7 +278,7 @@ stop_interface(struct interface *ifp)
 	// Remove the interface from our list
 	TAILQ_REMOVE(ifaces, ifp, next);
 	dhcp6_drop(ifp, NULL);
-	ipv6rs_drop(ifp);
+	ipv6nd_drop(ifp);
 	dhcp_drop(ifp, "STOP");
 	dhcp_close(ifp);
 	eloop_timeout_delete(NULL, ifp);
@@ -406,7 +405,7 @@ handle_carrier(int carrier, int flags, const char *ifname)
 			ifp->carrier = LINK_DOWN;
 			dhcp_close(ifp);
 			dhcp6_drop(ifp, "EXPIRE6");
-			ipv6rs_drop(ifp);
+			ipv6nd_drop(ifp);
 			/* Don't blindly delete our knowledge of LL addresses.
 			 * We need to listen to what the kernel does with
 			 * them as some OS's will remove, mark tentative or
@@ -449,7 +448,7 @@ start_interface(void *arg)
 	if (ifo->options & DHCPCD_IPV6) {
 		if (ifo->options & DHCPCD_IPV6RS &&
 		    !(ifo->options & DHCPCD_INFORM))
-			ipv6rs_start(ifp);
+			ipv6nd_startrs(ifp);
 
 		if (!(ifo->options & DHCPCD_IPV6RS)) {
 			if (ifo->options & DHCPCD_IA_FORCED)
@@ -795,7 +794,7 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 					len++;
 					if (D6_STATE_RUNNING(ifp))
 						len++;
-					if (ipv6rs_has_ra(ifp))
+					if (ipv6nd_has_ra(ifp))
 						len++;
 				}
 				len = write(fd->fd, &len, sizeof(len));
@@ -813,7 +812,7 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 						len++;
 						if (D6_STATE_RUNNING(ifp))
 							len++;
-						if (ipv6rs_has_ra(ifp))
+						if (ipv6nd_has_ra(ifp))
 							len++;
 					}
 				}
@@ -1185,7 +1184,7 @@ main(int argc, char **argv)
 
 #if 0
 	if (options & DHCPCD_IPV6RS && disable_rtadv() == -1) {
-		syslog(LOG_ERR, "ipv6rs: %m");
+		syslog(LOG_ERR, "disable_rtadvd: %m");
 		options &= ~DHCPCD_IPV6RS;
 	}
 #endif
