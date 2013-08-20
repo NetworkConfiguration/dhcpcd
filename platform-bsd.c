@@ -44,6 +44,7 @@
 #include <syslog.h>
 #include <unistd.h>
 
+#include "common.h"
 #include "dhcpcd.h"
 #include "if-options.h"
 #include "platform.h"
