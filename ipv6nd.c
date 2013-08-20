@@ -280,7 +280,7 @@ ipv6nd_naopen(void)
 	return sock;
 
 eexit:
-#ifdef LISTEN_DAD
+#ifdef IPV6_SEND_DAD
 	close(unspec_sock);
 	unspec_sock = -1;
 #endif
