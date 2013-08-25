@@ -457,7 +457,10 @@ ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
 		 * This is safe because the RA is removed from the list
 		 * before we are called. */
 		if (drop && ap->flags & IPV6_AF_ADDED &&
-		    !ipv6nd_addrexists(ap) && !dhcp6_addrexists(ap))
+		    !ipv6nd_addrexists(ap) && !dhcp6_addrexists(ap) &&
+		    (ap->iface->options->options &
+		    (DHCPCD_EXITING | DHCPCD_PERSISTENT)) !=
+		    (DHCPCD_EXITING | DHCPCD_PERSISTENT))
 		{
 			syslog(LOG_INFO, "%s: deleting address %s",
 			    ap->iface->name, ap->saddr);
@@ -1026,7 +1029,9 @@ ipv6_buildroutes(void)
 				/* no need to add it back to our routing table
 				 * as we delete an exiting route when we add
 				 * a new one */
-			else
+			else if ((rt->iface->options->options &
+				(DHCPCD_EXITING | DHCPCD_PERSISTENT)) !=
+				(DHCPCD_EXITING | DHCPCD_PERSISTENT))
 				d_route(rt);
 		}
 		free(rt);

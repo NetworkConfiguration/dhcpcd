@@ -747,6 +747,7 @@ handle_signal(int sig, siginfo_t *siginfo, __unused void *context)
 			break;
 		if (do_release)
 			ifp->options->options |= DHCPCD_RELEASE;
+		ifp->options->options |= DHCPCD_EXITING;
 		stop_interface(ifp);
 	}
 	exit(EXIT_FAILURE);
@@ -884,6 +885,7 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 				continue;
 			if (do_release)
 				ifp->options->options |= DHCPCD_RELEASE;
+			ifp->options->options |= DHCPCD_EXITING;
 			stop_interface(ifp);
 		}
 		return 0;

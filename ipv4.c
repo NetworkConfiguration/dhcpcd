@@ -608,7 +608,9 @@ ipv4_applyaddr(void *arg)
 	lease = &state->lease;
 
 	if (dhcp == NULL) {
-		if (!(ifo->options & DHCPCD_PERSISTENT)) {
+		if ((ifo->options & (DHCPCD_EXITING | DHCPCD_PERSISTENT)) !=
+		    (DHCPCD_EXITING | DHCPCD_PERSISTENT))
+		{
 			ipv4_buildroutes();
 			if (state->addr.s_addr != 0)
 				delete_address(ifp);

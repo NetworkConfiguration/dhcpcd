@@ -2421,7 +2421,9 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 	 * this.
 	 */
 	if (ifp->options &&
-	    ifp->options->options & (DHCPCD_STOPPING | DHCPCD_RELEASE))
+	    ifp->options->options & (DHCPCD_STOPPING | DHCPCD_RELEASE) &&
+	    (ifp->options->options & (DHCPCD_EXITING | DHCPCD_PERSISTENT)) !=
+	    (DHCPCD_EXITING | DHCPCD_PERSISTENT))
 		dhcp6_delete_delegates(ifp);
 
 	state = D6_STATE(ifp);
@@ -2432,7 +2434,11 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 			unlink(state->leasefile);
 		}
 		dhcp6_freedrop_addrs(ifp, drop, NULL);
-		if (drop && state->new) {
+		if (drop && state->new &&
+		    (ifp->options->options &
+		    (DHCPCD_EXITING | DHCPCD_PERSISTENT)) !=
+		    (DHCPCD_EXITING | DHCPCD_PERSISTENT))
+		{
 			if (reason == NULL)
 				reason = "STOP6";
 			script_runreason(ifp, reason);

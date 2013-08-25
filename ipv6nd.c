@@ -1268,7 +1268,10 @@ ipv6nd_drop(struct interface *ifp)
 			ipv6nd_drop_ra(rap);
 		}
 		ipv6_buildroutes();
-		script_runreason(ifp, "ROUTERADVERT");
+		if ((ifp->options->options &
+		    (DHCPCD_EXITING | DHCPCD_PERSISTENT)) !=
+		    (DHCPCD_EXITING | DHCPCD_PERSISTENT))
+			script_runreason(ifp, "ROUTERADVERT");
 	}
 }
 static void
