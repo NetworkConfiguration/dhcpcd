@@ -382,14 +382,19 @@ ipv6nd_free_opts(struct ra *rap)
 }
 
 int
-ipv6nd_addrexists(const struct ipv6_addr *a)
+ipv6nd_addrexists(const struct ipv6_addr *addr)
 {
 	struct ra *rap;
 	struct ipv6_addr *ap;
 
 	TAILQ_FOREACH(rap, &ipv6_routers, next) {
 		TAILQ_FOREACH(ap, &rap->addrs, next) {
-			if (memcmp(&ap->addr, &a->addr, sizeof(a->addr)) == 0)
+			if (addr == NULL) {
+				if ((ap->flags &
+				    (IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED)) ==
+				    (IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED))
+					return 1;
+			} else if (IN6_ARE_ADDR_EQUAL(&ap->addr, addr))
 				return 1;
 		}
 	}

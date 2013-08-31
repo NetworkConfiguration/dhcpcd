@@ -110,6 +110,27 @@ ipv4_getnetmask(uint32_t addr)
 }
 
 int
+ipv4_addrexists(const struct in_addr *addr)
+{
+	const struct interface *ifp;
+	const struct dhcp_state *state;
+
+	TAILQ_FOREACH(ifp, ifaces, next) {
+		state = D_CSTATE(ifp);
+		if (state) {
+			if (addr == NULL) {
+				if (state->addr.s_addr)
+					return 1;
+			} else if (memcmp(&addr->s_addr,
+			    &state->addr.s_addr,
+			    sizeof(state->addr.s_addr)) == 0)
+				return 1;
+		}
+	}
+	return 0;
+}
+
+int
 ipv4_doaddress(const char *ifname,
     struct in_addr *addr, struct in_addr *net, struct in_addr *dst, int act)
 {

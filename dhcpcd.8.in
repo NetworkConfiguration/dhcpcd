@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd August 26, 2013
+.Dd August 31, 2013
 .Dt DHCPCD 8
 .Os
 .Sh NAME
@@ -30,7 +30,7 @@
 .Nd a DHCP client
 .Sh SYNOPSIS
 .Nm
-.Op Fl 46ABbDdEGgHJKLpqTVw
+.Op Fl 46ABbDdEGgHJKLpqTV
 .Op Fl C , Fl Fl nohook Ar hook
 .Op Fl c , Fl Fl script Ar script
 .Op Fl e , Fl Fl env Ar value
@@ -51,6 +51,7 @@
 .Op Fl u , Fl Fl userclass Ar class
 .Op Fl v , Fl Fl vendor Ar code , Ar value
 .Op Fl W , Fl Fl whitelist Ar address Ns Op Ar /cidr
+.Op Fl w , Fl Fl waitip Op 4 | 6
 .Op Fl y , Fl Fl reboot Ar seconds
 .Op Fl X , Fl Fl blacklist Ar address Ns Op Ar /cidr
 .Op Fl Z , Fl Fl denyinterfaces Ar pattern
@@ -417,8 +418,10 @@ Set un-encapsulated vendor option to hello world.
 Display both program version and copyright information.
 .Nm
 then exits before doing any configuration.
-.It Fl w , Fl Fl waitip
+.It Fl w , Fl Fl waitip Op 4 | 6
 Wait for an address to be assigned before forking to the background.
+4 means wait for an IPv4 address to be assigned.
+6 means wait for an IPv6 address to be assigned.
 .It Fl x , Fl Fl exit Op Ar interface
 This will signal an existing
 .Nm

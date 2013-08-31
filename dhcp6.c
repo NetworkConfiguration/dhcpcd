@@ -1211,7 +1211,7 @@ dhcp6_checkstatusok(const struct interface *ifp,
 }
 
 static struct ipv6_addr *
-dhcp6_findaddr(const struct in6_addr *a, struct interface *ifp)
+dhcp6_findaddr(struct interface *ifp, const struct in6_addr *addr)
 {
 	const struct dhcp6_state *state;
 	struct ipv6_addr *ap;
@@ -1219,7 +1219,12 @@ dhcp6_findaddr(const struct in6_addr *a, struct interface *ifp)
 	state = D6_CSTATE(ifp);
 	if (state) {
 		TAILQ_FOREACH(ap, &state->addrs, next) {
-			if (IN6_ARE_ADDR_EQUAL(&ap->addr, a))
+			if (addr == NULL) {
+				if ((ap->flags &
+				    (IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED)) ==
+				    (IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED))
+					return ap;
+			} else if (IN6_ARE_ADDR_EQUAL(&ap->addr, addr))
 				return ap;
 		}
 	}
@@ -1227,12 +1232,12 @@ dhcp6_findaddr(const struct in6_addr *a, struct interface *ifp)
 }
 
 int
-dhcp6_addrexists(const struct ipv6_addr *a)
+dhcp6_addrexists(const struct ipv6_addr *addr)
 {
 	struct interface *ifp;
 
 	TAILQ_FOREACH(ifp, ifaces, next) {
-		if (dhcp6_findaddr(&a->addr, ifp))
+		if (dhcp6_findaddr(ifp, addr == NULL ? NULL : &addr->addr))
 			return 1;
 	}
 	return 0;
@@ -1313,7 +1318,7 @@ dhcp6_findna(struct interface *ifp, const uint8_t *iaid,
 		p = D6_COPTION_DATA(o);
 		memcpy(&in6.s6_addr, p, sizeof(in6.s6_addr));
 		p += sizeof(in6.s6_addr);
-		a = dhcp6_findaddr(&in6, ifp);
+		a = dhcp6_findaddr(ifp, &in6);
 		if (a == NULL) {
 			a = calloc(1, sizeof(*a));
 			if (a == NULL) {

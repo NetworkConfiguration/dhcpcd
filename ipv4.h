@@ -46,6 +46,7 @@ int ipv4_init(void);
 int inet_ntocidr(struct in_addr);
 int inet_cidrtoaddr(int, struct in_addr *);
 uint32_t ipv4_getnetmask(uint32_t);
+int ipv4_addrexists(const struct in_addr *);
 
 void ipv4_buildroutes(void);
 void ipv4_applyaddr(void *);

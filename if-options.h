@@ -96,6 +96,8 @@
 #define DHCPCD_DEPARTED			(1ULL << 42)
 #define DHCPCD_HOSTNAME_SHORT		(1ULL << 43)
 #define DHCPCD_EXITING			(1ULL << 44)
+#define DHCPCD_WAITIP4			(1ULL << 45)
+#define DHCPCD_WAITIP6			(1ULL << 46)
 
 extern const struct option cf_options[];
 

@@ -206,6 +206,23 @@ daemonise(void)
 	char buf = '\0';
 	int sidpipe[2], fd;
 
+	if (options & DHCPCD_DAEMONISE && !(options & DHCPCD_DAEMONISED)) {
+		if (options & DHCPCD_WAITIP4 &&
+		    !ipv4_addrexists(NULL))
+			return -1;
+		if (options & DHCPCD_WAITIP6 &&
+		    !ipv6nd_addrexists(NULL) &&
+		    !dhcp6_addrexists(NULL))
+			return -1;
+		if ((options &
+		    (DHCPCD_WAITIP | DHCPCD_WAITIP4 | DHCPCD_WAITIP6)) ==
+		    DHCPCD_WAITIP &&
+		    !ipv4_addrexists(NULL) &&
+		    !ipv6nd_addrexists(NULL) &&
+		    !dhcp6_addrexists(NULL))
+			return -1;
+	}
+
 	eloop_timeout_delete(handle_exit_timeout, NULL);
 	if (options & DHCPCD_DAEMONISED || !(options & DHCPCD_DAEMONISE))
 		return 0;
