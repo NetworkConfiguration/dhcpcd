@@ -191,6 +191,14 @@ check_ipv6(const char *ifname, int own)
 	} else
 		ex = 0;
 
+	snprintf(path, sizeof(path), "%s/%s/autoconf", prefix, ifname);
+	i = check_proc_int(path);
+	if (i != 1) {
+		syslog(LOG_WARNING, "%s: IPv6 kernel autoconf disabled",
+		    ifname);
+		return -1;
+	}
+
 	snprintf(path, sizeof(path), "%s/%s/accept_ra", prefix, ifname);
 	ra = check_proc_int(path);
 	if (ra == -1)
