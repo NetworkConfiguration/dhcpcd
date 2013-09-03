@@ -800,7 +800,6 @@ make_route(const struct interface *ifp, const struct ra *rap)
 		syslog(LOG_ERR, "%s: %m", __func__);
 		return NULL;
 	}
-	r->ra = rap;
 	r->iface = ifp;
 	r->metric = ifp->metric;
 	if (rap)

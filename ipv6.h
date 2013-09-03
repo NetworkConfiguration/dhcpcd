@@ -106,7 +106,6 @@ struct rt6 {
 	struct in6_addr net;
 	struct in6_addr gate;
 	const struct interface *iface;
-	const struct ra *ra;
 	int metric;
 	unsigned int mtu;
 };
