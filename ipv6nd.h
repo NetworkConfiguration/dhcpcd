@@ -83,7 +83,6 @@ struct rs_state {
 #ifdef INET6
 int ipv6nd_startrs(struct interface *);
 ssize_t ipv6nd_env(char **, const char *, const struct interface *);
-const struct ipv6_addr * ipv6nd_findprefix(const struct ipv6_addr *);
 int ipv6nd_addrexists(const struct ipv6_addr *);
 void ipv6nd_freedrop_ra(struct ra *, int);
 #define ipv6nd_free_ra(ra) ipv6nd_freedrop_ra((ra),  0)

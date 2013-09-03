@@ -1121,34 +1121,6 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 	return l;
 }
 
-const struct ipv6_addr *
-ipv6nd_findprefix(const struct ipv6_addr *a)
-{
-	const struct ra *rap;
-	const struct ipv6_addr *ap;
-	const struct in6_addr *p1, *p2;
-	int bytelen, bitlen;
-
-	p1 = &a->addr;
-	TAILQ_FOREACH(rap, &ipv6_routers, next) {
-		TAILQ_FOREACH(ap, &rap->addrs, next) {
-			p2 = & ap->prefix;
-			bytelen = ap->prefix_len / NBBY;
-			bitlen = ap->prefix_len % NBBY;
-			if (memcmp(&p1->s6_addr, &p2->s6_addr, bytelen))
-				continue;
-			if (bitlen != 0) {
-				bitlen = NBBY - bitlen;
-				if (p1->s6_addr[bytelen] >> bitlen !=
-				    p2->s6_addr[bytelen] >> bitlen)
-				continue;
-			}
-			return ap;
-		}
-	}
-	return NULL;
-}
-
 void
 ipv6nd_handleifa(int cmd, const char *ifname,
     const struct in6_addr *addr, int flags)

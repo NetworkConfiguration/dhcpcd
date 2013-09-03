@@ -1295,7 +1295,6 @@ dhcp6_findna(struct interface *ifp, const uint8_t *iaid,
 	const uint8_t *p;
 	struct in6_addr in6;
 	struct ipv6_addr *a;
-	const struct ipv6_addr *pa;
 	char iabuf[INET6_ADDRSTRLEN];
 	const char *ia;
 	int i;
@@ -1332,18 +1331,18 @@ dhcp6_findna(struct interface *ifp, const uint8_t *iaid,
 			memcpy(&a->addr.s6_addr, &in6.s6_addr,
 			    sizeof(in6.s6_addr));
 		}
-		pa = ipv6nd_findprefix(a);
-		if (pa) {
-			memcpy(&a->prefix, &pa->prefix,
-			    sizeof(a->prefix));
-			a->prefix_len = pa->prefix_len;
-		} else {
-			a->prefix_len = 64;
-			if (ipv6_makeprefix(&a->prefix, &a->addr, 64) == -1) {
-				syslog(LOG_ERR, "%s: %m", __func__);
-				free(a);
-				continue;
-			}
+		/*
+		 * RFC 5942 Section 5
+		 * We cannot assume any prefix length, nor tie the address
+		 * to an existing one as it could expire before the address.
+		 * As such we just give it a 128 prefix.
+		 */
+		a->prefix_len = 128;
+		if (ipv6_makeprefix(&a->prefix, &a->addr, a->prefix_len) == -1)
+		{
+			syslog(LOG_ERR, "%s: %m", __func__);
+			free(a);
+			continue;
 		}
 		memcpy(&u32, p, sizeof(u32));
 		a->prefix_pltime = ntohl(u32);
