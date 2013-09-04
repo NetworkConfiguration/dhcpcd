@@ -394,7 +394,7 @@ ipv6nd_addrexists(const struct ipv6_addr *addr)
 				    (IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED)) ==
 				    (IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED))
 					return 1;
-			} else if (IN6_ARE_ADDR_EQUAL(&ap->addr, addr))
+			} else if (IN6_ARE_ADDR_EQUAL(&ap->addr, &addr->addr))
 				return 1;
 		}
 	}
