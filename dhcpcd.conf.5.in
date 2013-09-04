@@ -414,6 +414,12 @@ To work around it, try and impersonate Windows by using the MSFT vendorclassid.
 Wait for an address to be assigned before forking to the background.
 4 means wait for an IPv4 address to be assigned.
 6 means wait for an IPv6 address to be assigned.
+If no argument is given,
+.Nm
+will wait for any address protocol to be assigned.
+It is possible to wait for more than one address protocol and
+.Nm
+will only fork to the background when all waiting conditions are satisfied.
 .It Ic xidhwaddr
 Use the last four bytes of the hardware address as the DHCP xid instead
 of a randomly generated number.
