@@ -528,11 +528,11 @@ init_state(struct interface *ifp, int argc, char **argv)
 
 	if (ifo->options & DHCPCD_LINK) {
 		switch (carrier_status(ifp)) {
-		case 0:
+		case LINK_DOWN:
 			ifp->carrier = LINK_DOWN;
 			reason = "NOCARRIER";
 			break;
-		case 1:
+		case LINK_UP:
 			ifp->carrier = LINK_UP;
 			reason = "CARRIER";
 			break;
