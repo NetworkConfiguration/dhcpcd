@@ -106,6 +106,7 @@ void ipv6nd_cancelprobeaddr(struct ipv6_addr *);
 
 #else
 #define ipv6nd_startrs(a) {}
+#define ipv6nd_addrexists(a) (0)
 #define ipv6nd_free(a)
 #define ipv6nd_has_ra(a) 0
 #define ipv6nd_drop(a)

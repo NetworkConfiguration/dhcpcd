@@ -230,7 +230,7 @@ void dhcp6_handleifa(int, const char *, const struct in6_addr *addr, int);
 void dhcp6_drop(struct interface *, const char *);
 #else
 #define dhcp6_printoptions()
-#define dhcp6_addrexists(a)
+#define dhcp6_addrexists(a) 0
 #define dhcp6_find_delegates(a) 0
 #define dhcp6_start(a, b) 0
 #define dhcp6_reboot(a)
