@@ -320,10 +320,7 @@ add_subnet_route(struct rt_head *rt, const struct interface *ifp)
 
 	s = D_CSTATE(ifp);
 	if (s->net.s_addr == INADDR_BROADCAST ||
-	    s->net.s_addr == INADDR_ANY ||
-	    (ifp->options->options &
-	     (DHCPCD_INFORM | DHCPCD_STATIC) &&
-	     ifp->options->req_addr.s_addr == INADDR_ANY))
+	    s->net.s_addr == INADDR_ANY)
 		return rt;
 
 	r = malloc(sizeof(*r));
@@ -585,7 +582,7 @@ delete_address1(struct interface *ifp,
 	}
 	return r;
 }
-    
+
 static int
 delete_address(struct interface *ifp)
 {
@@ -604,6 +601,24 @@ delete_address(struct interface *ifp)
 	return r;
 }
 
+static struct ipv4_state *
+ipv4_getstate(struct interface *ifp)
+{
+	struct ipv4_state *state;
+
+	state = IPV4_STATE(ifp);
+	if (state == NULL) {
+	        ifp->if_data[IF_DATA_IPV4] = malloc(sizeof(*state));
+		state = IPV4_STATE(ifp);
+		if (state == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			return NULL;
+		}
+		TAILQ_INIT(&state->addrs);
+	}
+	return state;
+}
+
 void
 ipv4_applyaddr(void *arg)
 {
@@ -613,6 +628,7 @@ ipv4_applyaddr(void *arg)
 	struct dhcp_lease *lease;
 	struct if_options *ifo = ifp->options;
 	struct ipv4_addr *ap;
+	struct ipv4_state *istate;
 	struct rt *rt;
 	int r;
 
@@ -660,6 +676,12 @@ ipv4_applyaddr(void *arg)
 			syslog(LOG_ERR, "%s: ipv4_addaddress: %m", __func__);
 			return;
 		}
+		istate = ipv4_getstate(ifp);
+		ap = malloc(sizeof(*ap));
+		ap->addr = lease->addr;
+		ap->net = lease->net;
+		ap->dst.s_addr = INADDR_ANY;
+		TAILQ_INSERT_TAIL(&istate->addrs, ap, next);
 	}
 
 	/* Now delete the old address if different */
@@ -712,18 +734,10 @@ ipv4_handleifa(int type, struct if_head *ifs, const char *ifname,
 	if (ifp == NULL)
 		return;
 
-	state = IPV4_STATE(ifp);
-	if (state == NULL) {
-	        ifp->if_data[IF_DATA_IPV4] = malloc(sizeof(*state));
-		state = IPV4_STATE(ifp);
-		if (state == NULL) {
-			syslog(LOG_ERR, "%s: %m", __func__);
-			return;
-		}
-		TAILQ_INIT(&state->addrs);
-		ap = NULL;
-	} else
-		ap = ipv4_findaddr(ifp, addr, net);
+	state = ipv4_getstate(ifp);
+	if (state == NULL)
+		return;
+	ap = ipv4_findaddr(ifp, addr, net);
 	if (type == RTM_NEWADDR && ap == NULL) {
 		ap = malloc(sizeof(*ap));
 		if (ap == NULL) {

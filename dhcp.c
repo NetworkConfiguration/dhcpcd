@@ -1901,7 +1901,7 @@ dhcp_inform(struct interface *ifp)
 			}
 			state->offer =
 			    dhcp_message_new(&ap->addr, &ap->net);
-		} else 
+		} else
 			state->offer =
 			    dhcp_message_new(&ifo->req_addr, &ifo->req_mask);
 		if (state->offer) {
@@ -2707,10 +2707,15 @@ dhcp_handleifa(int type, struct interface *ifp,
 
 	if (type == RTM_DELADDR) {
 		if (state->new &&
-		    state->new->yiaddr == addr->s_addr)
+		    (state->new->yiaddr == addr->s_addr ||
+		    (state->new->yiaddr == INADDR_ANY &&
+		     state->new->ciaddr == addr->s_addr)))
+		{
 			syslog(LOG_INFO, "%s: removing IP address %s/%d",
 			    ifp->name, inet_ntoa(state->lease.addr),
 			    inet_ntocidr(state->lease.net));
+			dhcp_drop(ifp, "EXPIRE");
+		}
 		return;
 	}
 
