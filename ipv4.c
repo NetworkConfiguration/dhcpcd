@@ -772,5 +772,6 @@ ipv4_free(struct interface *ifp)
 			TAILQ_REMOVE(&state->addrs, addr, next);
 			free(addr);
 		}
+		free(state);
 	}
 }
