@@ -363,7 +363,7 @@ link_addr(struct nlmsghdr *nlm)
 			}
 			rta = RTA_NEXT(rta, len);
 		}
-		ipv4_handleifa(nlm->nlmsg_type, ifn, &addr, &net, &dest);
+		ipv4_handleifa(nlm->nlmsg_type, NULL, ifn, &addr, &net, &dest);
 		break;
 #endif
 #ifdef INET6
