@@ -40,7 +40,6 @@
 
 #include <ctype.h>
 #include <errno.h>
-#include <ifaddrs.h>
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
