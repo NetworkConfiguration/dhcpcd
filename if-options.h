@@ -36,8 +36,6 @@
 #include <limits.h>
 #include <stdint.h>
 
-#include "ipv4.h"
-
 /* Don't set any optional arguments here so we retain POSIX
  * compatibility with getopt */
 #define IF_OPTS "46bc:de:f:gh:i:kl:m:no:pqr:s:t:u:v:wxy:z:ABC:DEF:GHI:JKLO:Q:S:TUVW:X:Z:"

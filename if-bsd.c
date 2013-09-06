@@ -659,7 +659,8 @@ manage_link(int fd)
 					COPYOUT(rt.dest, rti_info[RTAX_IFA]);
 					COPYOUT(rt.net, rti_info[RTAX_NETMASK]);
 					COPYOUT(rt.gate, rti_info[RTAX_BRD]);
-					ipv4_handleifa(rtm->rtm_type, ifname,
+					ipv4_handleifa(rtm->rtm_type,
+					    NULL, ifname,
 					    &rt.dest, &rt.net, &rt.gate);
 					break;
 #endif

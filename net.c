@@ -70,6 +70,7 @@
 #include "dhcp.h"
 #include "dhcp6.h"
 #include "if-options.h"
+#include "ipv4.h"
 #include "ipv6nd.h"
 #include "net.h"
 
@@ -138,6 +139,7 @@ free_interface(struct interface *ifp)
 
 	if (ifp == NULL)
 		return;
+	ipv4_free(ifp);
 	dhcp_free(ifp);
 	ipv6_free(ifp);
 	dhcp6_free(ifp);
@@ -223,6 +225,10 @@ discover_interfaces(int argc, char * const *argv)
 #ifdef __linux__
 	char ifn[IF_NAMESIZE];
 #endif
+#ifdef INET
+	const struct sockaddr_in *addr;
+	const struct sockaddr_in *net;
+	const struct sockaddr_in *dst;
 #ifdef INET6
 	const struct sockaddr_in6 *sin6;
 	int ifa_flags;
@@ -441,11 +447,29 @@ discover_interfaces(int argc, char * const *argv)
 		TAILQ_INSERT_TAIL(ifs, ifp, next);
 	}
 
-#ifdef INET6
 	for (ifa = ifaddrs; ifa; ifa = ifa->ifa_next) {
-		if (ifa->ifa_addr != NULL &&
-		    ifa->ifa_addr->sa_family == AF_INET6)
-		{
+		if (ifa->ifa_addr == NULL)
+			continue;
+		switch(ifa->ifa_addr->sa_family) {
+#ifdef INET
+		case AF_INET:
+			addr = (const struct sockaddr_in *)
+			    (void *)ifa->ifa_addr;
+			net = (const struct sockaddr_in *)
+			    (void *)ifa->ifa_netmask;
+			if (ifa->ifa_flags & IFF_POINTOPOINT)
+				dst = (const struct sockaddr_in *)
+				    (void *)ifa->ifa_dstaddr;
+			else
+				dst = NULL;
+			ipv4_handleifa(RTM_NEWADDR, ifs, ifa->ifa_name,
+				&addr->sin_addr,
+				&net->sin_addr,
+				dst ? &dst->sin_addr : NULL);
+			break;
+#endif
+#ifdef INET6
+		case AF_INET6:
 			sin6 = (const struct sockaddr_in6 *)
 			    (void *)ifa->ifa_addr;
 			ifa_flags = in6_addr_flags(ifa->ifa_name,
@@ -454,6 +478,8 @@ discover_interfaces(int argc, char * const *argv)
 				ipv6_handleifa(RTM_NEWADDR, ifs,
 				    ifa->ifa_name,
 				    &sin6->sin6_addr, ifa_flags);
+			break;
+#endif
 		}
 	}
 #endif

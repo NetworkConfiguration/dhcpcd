@@ -259,8 +259,8 @@ ssize_t dhcp_env(char **, const char *, const struct dhcp_message *,
     const struct interface *);
 
 uint32_t dhcp_xid(const struct interface *);
-struct dhcp_message *dhcp_message_new(struct in_addr *addr,
-    struct in_addr *mask);
+struct dhcp_message *dhcp_message_new(const struct in_addr *addr,
+    const struct in_addr *mask);
 int dhcp_message_add_addr(struct dhcp_message *, uint8_t, struct in_addr);
 ssize_t make_message(struct dhcp_message **, const struct interface *,
     uint8_t);
@@ -269,6 +269,9 @@ int valid_dhcp_packet(unsigned char *);
 ssize_t write_lease(const struct interface *, const struct dhcp_message *);
 struct dhcp_message *read_lease(const struct interface *);
 void get_lease(struct dhcp_lease *, const struct dhcp_message *);
+
+void dhcp_handleifa(int, struct interface *,
+    const struct in_addr *, const struct in_addr *, const struct in_addr *);
 
 void dhcp_drop(struct interface *, const char *);
 void dhcp_start(struct interface *);
