@@ -955,8 +955,7 @@ ipv6nd_handlera(struct interface *ifp, struct icmp6_hdr *icp, ssize_t len)
 		script_runreason(ifp, "TEST");
 		goto handle_flag;
 	}
-	if (ifp->options->options & DHCPCD_IPV6RA_OWN)
-		ipv6nd_probeaddrs(&rap->addrs);
+	ipv6nd_probeaddrs(&rap->addrs);
 	ipv6_buildroutes();
 
 	/* We will get run by the expire function */
@@ -1172,7 +1171,6 @@ ipv6nd_expirera(void *arg)
 
 		/* Addresses are expired in ipv6ns_probeaddrs
 		 * so that DHCPv6 addresses can be removed also. */
-
 		TAILQ_FOREACH_SAFE(rao, &rap->options, next, raon) {
 			if (rap->expired) {
 				switch(rao->type) {
@@ -1313,7 +1311,9 @@ ipv6nd_probeaddr(void *arg)
 #ifdef IPV6_SEND_DAD
 		ap->dadcallback(ap);
 #else
-		ipv6_addaddr(ap);
+		if (!(ap->flags & IPV6_AF_AUTOCONF) ||
+		    ap->iface->options->options & DHCPCD_IPV6RA_OWN)
+			ipv6_addaddr(ap);
 #endif
 		return;
 	}
@@ -1405,7 +1405,11 @@ ipv6nd_probeaddr(void *arg)
 		    ap);
 	}
 #else /* IPV6_SEND_DAD */
-	ipv6_addaddr(ap);
+
+	if (!(ap->flags & IPV6_AF_AUTOCONF) ||
+	    ap->iface->options->options & DHCPCD_IPV6RA_OWN)
+		ipv6_addaddr(ap);
+
 #ifdef LISTEN_DAD
 	/* Let the kernel handle DAD.
 	 * We don't know the timings, so just wait for the max */
@@ -1438,11 +1442,11 @@ ipv6nd_probeaddrs(struct ipv6_addrhead *addrs)
 				syslog(LOG_INFO, "%s: deleting address %s",
 				    ap->iface->name, ap->saddr);
 				i++;
+				if (!IN6_IS_ADDR_UNSPECIFIED(&ap->addr) &&
+				    del_address6(ap) == -1 &&
+				    errno != EADDRNOTAVAIL && errno != ENXIO)
+					syslog(LOG_ERR, "del_address6 %m");
 			}
-			if (!IN6_IS_ADDR_UNSPECIFIED(&ap->addr) &&
-			    del_address6(ap) == -1 &&
-			    errno != EADDRNOTAVAIL && errno != ENXIO)
-				syslog(LOG_ERR, "del_address6 %m");
 			if (ap->dadcallback)
 				eloop_q_timeout_delete(0, NULL,
 				    ap->dadcallback);
