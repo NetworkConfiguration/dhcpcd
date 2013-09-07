@@ -815,7 +815,13 @@ make_prefix(const struct interface * ifp, const struct ra *rap,
 {
 	struct rt6 *r;
 
-	if (addr == NULL || addr->prefix_len > 128)
+	if (addr == NULL || addr->prefix_len > 128) {
+		errno = EINVAL;
+		return NULL;
+	}
+
+	/* There is no point in trying to manage a /128 prefix. */
+	if (addr->prefix_len == 128)
 		return NULL;
 
 	r = make_route(ifp, rap);
