@@ -1447,6 +1447,11 @@ dhcp6_findia(struct interface *ifp, const uint8_t *d, size_t l,
 	ifo = ifp->options;
 	i = 0;
 	state = D6_STATE(ifp);
+	if (ifo->ia_type != D6_OPTION_IA_PD) {
+		TAILQ_FOREACH(ap, &state->addrs, next) {
+			ap->flags |= IPV6_AF_STALE;
+		}
+	}
 	while ((o = dhcp6_findoption(ifo->ia_type, d, l))) {
 		l -= ((const uint8_t *)o - d);
 		d += ((const uint8_t *)o - d);
@@ -1499,26 +1504,25 @@ dhcp6_findia(struct interface *ifp, const uint8_t *d, size_t l,
 				return -1;
 			}
 		} else {
-			TAILQ_FOREACH(ap, &state->addrs, next) {
-				ap->flags |= IPV6_AF_STALE;
-			}
 			if (dhcp6_findna(ifp, iaid, p, ol) == 0) {
 				syslog(LOG_ERR,
 				    "%s: %s: DHCPv6 REPLY missing IA Address",
 				    ifp->name, sfrom);
 				return -1;
 			}
-			TAILQ_FOREACH_SAFE(ap, &state->addrs, next, nap) {
-				if (ap->flags & IPV6_AF_STALE) {
-					TAILQ_REMOVE(&state->addrs, ap, next);
-					if (ap->dadcallback)
-						eloop_q_timeout_delete(0, NULL,
-						    ap->dadcallback);
-					free(ap);
-				}
-			}
 		}
 		i++;
+	}
+	if (ifo->ia_type != D6_OPTION_IA_PD) {
+		TAILQ_FOREACH_SAFE(ap, &state->addrs, next, nap) {
+			if (ap->flags & IPV6_AF_STALE) {
+				TAILQ_REMOVE(&state->addrs, ap, next);
+				if (ap->dadcallback)
+					eloop_q_timeout_delete(0, NULL,
+					    ap->dadcallback);
+				free(ap);
+			}
+		}
 	}
 	return i;
 }

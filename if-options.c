@@ -1022,6 +1022,8 @@ got_iaid:
 			iaid->sla = NULL;
 			iaid->sla_len = 0;
 		}
+		if (ifo->ia_type != D6_OPTION_IA_PD)
+			break;
 		for (p = fp; p; p = fp) {
 			fp = strchr(p, ' ');
 			if (fp)

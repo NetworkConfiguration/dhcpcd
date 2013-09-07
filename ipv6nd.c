@@ -145,6 +145,8 @@ static struct icmp6_filter filt;
 
 struct rahead ipv6_routers = TAILQ_HEAD_INITIALIZER(ipv6_routers);
 
+static void ipv6nd_handledata(void *arg);
+
 #if DEBUG_MEMORY
 static void
 ipv6nd_cleanup(void)
@@ -265,6 +267,12 @@ ipv6nd_naopen(void)
 		goto eexit;
 #endif
 
+	if (sock == -1) {
+		if (ipv6nd_open() == -1)
+			goto eexit;
+		eloop_event_add(sock, ipv6nd_handledata, NULL);
+	}
+
 	ICMP6_FILTER_SETPASS(ND_NEIGHBOR_ADVERT, &filt);
 	if (setsockopt(sock, IPPROTO_ICMPV6, ICMP6_FILTER,
 	    &filt, sizeof(filt)) == -1)
@@ -280,6 +288,7 @@ ipv6nd_naopen(void)
 	return sock;
 
 eexit:
+	syslog(LOG_ERR, "%s: %m", __func__);
 #ifdef IPV6_SEND_DAD
 	close(unspec_sock);
 	unspec_sock = -1;
@@ -1749,7 +1758,7 @@ ipv6nd_handledata(__unused void *arg)
 				return;
 		}
 	}
-	
+
 	syslog(LOG_ERR, "invalid IPv6 type %d or code %d from %s",
 	    icp->icmp6_type, icp->icmp6_code, sfrom);
 }
@@ -1792,5 +1801,3 @@ ipv6nd_startrs(struct interface *ifp)
 	ipv6nd_sendrsprobe(ifp);
 	return 0;
 }
-
-
