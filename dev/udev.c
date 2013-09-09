@@ -43,16 +43,19 @@ int
 libudev_settled(const char *ifname)
 {
 	struct udev_device *device;
+	int r;
 
 	device = udev_device_new_from_subsystem_sysname(udev, "net", ifname);
-	return device ? 1 : 0;
+	r = device ? 1 : 0;
+	udev_device_unref(device);
+	return r;
 }
 
 static void
 libudev_handledata(__unused void *arg)
 {
 	struct udev_device *device;
-	const char *ifname, *action;
+	const char *subsystem, *ifname, *action;
 
 	device = udev_monitor_receive_device(monitor);
 	if (device == NULL) {
@@ -60,24 +63,25 @@ libudev_handledata(__unused void *arg)
 		return;
 	}
 
-	/* udev filter documentation says "usually" so double check */
-	action = udev_device_get_subsystem(device);
-	if (strcmp(action, "net"))
-		return;
-
+	subsystem = udev_device_get_subsystem(device);
 	ifname = udev_device_get_sysname(device);
 	action = udev_device_get_action(device);
-	if (strcmp(action, "add") == 0)
-		handle_interface(1, ifname);
-	else if (strcmp(action, "remove") == 0)
-		handle_interface(-1, ifname);
+	udev_device_unref(device);
+
+	/* udev filter documentation says "usually" so double check */
+	if (strcmp(subsystem, "net") == 0) {
+		if (strcmp(action, "add") == 0)
+			handle_interface(1, ifname);
+		else if (strcmp(action, "remove") == 0)
+			handle_interface(-1, ifname);
+	}
 }
 
 int
 libudev_listening(void)
 {
 
-	return monitor == NULL ? 0 : 1;
+	return monitor ? 1 : 0;
 }
 
 void
