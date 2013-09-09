@@ -393,13 +393,14 @@ configure_interface(struct interface *ifp, int argc, char **argv)
 }
 
 int
-handle_rename(unsigned int index, const char *ifname)
+handle_rename(unsigned int ifindex, const char *ifname)
 {
 	struct interface *ifp;
 
 	TAILQ_FOREACH(ifp, ifaces, next) {
-		if (ifp->index == index && strcmp(ifp->name, ifname)) {
-			syslog(LOG_INFO, "%s: rename to %s", ifp->name, ifname);
+		if (ifp->index == ifindex && strcmp(ifp->name, ifname)) {
+			syslog(LOG_INFO, "%s: renamed to %s",
+			    ifp->name, ifname);
 			strlcpy(ifp->name, ifname, sizeof(ifp->name));
 			return 1;
 		}
