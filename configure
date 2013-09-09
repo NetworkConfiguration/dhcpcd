@@ -9,6 +9,7 @@ ARC4RANDOM=
 CLOSEFROM=
 GETLINE=
 STRLCPY=
+UDEV=
 OS=
 BUILD=
 HOST=
@@ -57,8 +58,9 @@ for x do
 	--without-getline) GETLINE=no;;
 	--without-strlcpy) STRLCPY=no;;
         --without-posix_spawn) POSIX_SPAWN=no;;
-	--without-pollts) POLLTS=xno;;
+	--without-pollts) POLLTS=no;;
 	--with-pollts) POLLTS=$var;;
+	--without-udev) UDEV=no;;
 	--serviceexists) SERVICEEXISTS=$var;;
 	--servicecmd) SERVICECMD=$var;;
 	--servicestatus) SERVICESTATUS=$var;;
@@ -598,6 +600,42 @@ pselect)
 	echo "#include \"compat/pollts.h\"" >>$CONFIG_H
 	;;
 esac
+
+if [ "$UDEV" != no ]; then
+	printf "Checking for libudev ... "
+	LIBUDEV_CFLAGS=$(pkg-config --cflags libudev 2>/dev/null)
+	LIBUDEV_LIBS=$(pkg-config --libs libudev 2>/dev/null)
+fi
+if [ "$UDEV" != no -a -n "$LIBUDEV_LIBS" ]; then
+	echo "yes"
+	echo "SRCS+=	dev/udev.c" >>$CONFIG_MK
+	if [ -n "$LIBUDEV_CFLAGS" ]; then
+		echo "CFLAGS+=		$LIBUDEV_CFLAGS" >>$CONFIG_MK
+	fi
+	echo "CPPFLAGS+=	-DLIBUDEV" >>$CONFIG_MK
+	echo "LDADD+=		$LIBUDEV_LIBS" >>$CONFIG_MK
+
+	printf "Checking udev_monitor_filter_add_match_subsystem_devtype ..."
+	cat <<EOF >_udev.c
+#define LIBUDEV_I_KNOW_THE_API_IS_SUBJECT_TO_CHANGE
+#include <libudev.h>
+#include <stdlib.h>
+int main(void) {
+	udev_monitor_filter_add_match_subsystem_devtype(NULL, NULL, NULL);
+	return 0;
+}
+EOF
+	if $XCC $LIBUDEV_CFLAGS _udev.c -o _udev $LIBUDEV_LIBS2 2>/dev/null
+	then
+		echo "CPPFLAGS+=		-DLIBUDEV_FILTER" >>$CONFIG_MK
+		echo " yes"
+	else
+		echo " no"
+	fi
+	rm -f _udev.c _udev
+elif [ "$UDEV" != no ]; then
+	echo "no"
+fi
 
 if [ -z "$SERVICECMD" ]; then
 	printf "Checking for OpenRC ... "

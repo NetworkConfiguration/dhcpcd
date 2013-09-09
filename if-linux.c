@@ -61,6 +61,9 @@
 #include "ipv4.h"
 #include "ipv6.h"
 #include "net.h"
+#ifdef LIBUDEV
+#include "dev/udev.h"
+#endif
 
 static int sock_fd;
 static struct sockaddr_nl sock_nl;
@@ -122,6 +125,7 @@ _open_link_socket(struct sockaddr_nl *nl)
 	if (bind(fd, (struct sockaddr *)nl, sizeof(*nl)) == -1)
 		return -1;
 	set_cloexec(fd);
+
 	return fd;
 }
 
@@ -140,6 +144,14 @@ int
 open_link_socket(void)
 {
 	struct sockaddr_nl snl;
+
+#ifdef LIBUDEV
+	/* If we have libudev, we need to listen to it for interface
+	 * arrivals and departures so we get the interface name udev wants
+	 * to give it.
+	 * If we fail to work, we fall back to listening to the kernel. */
+	libudev_start();
+#endif
 
 	memset(&snl, 0, sizeof(snl));
 	snl.nl_groups = RTMGRP_LINK;
@@ -410,6 +422,13 @@ link_netlink(struct nlmsghdr *nlm)
 	struct rtattr *rta, *hwaddr;
 	struct ifinfomsg *ifi;
 	char ifn[IF_NAMESIZE + 1];
+
+#ifdef LIBUDEV
+	if (nlm->nlmsg_type == RTM_NEWLINK || nlm->nlmsg_type == RTM_DELLINK) {
+		if (libudev_listening())
+			return 1;
+	}
+#endif
 
 	len = link_route(nlm);
 	if (len != 0)
