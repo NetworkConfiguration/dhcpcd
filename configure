@@ -625,7 +625,7 @@ int main(void) {
 	return 0;
 }
 EOF
-	if $XCC $LIBUDEV_CFLAGS _udev.c -o _udev $LIBUDEV_LIBS2 2>/dev/null
+	if $XCC $LIBUDEV_CFLAGS _udev.c -o _udev $LIBUDEV_LIBS 2>/dev/null
 	then
 		echo "CPPFLAGS+=		-DLIBUDEV_FILTER" >>$CONFIG_MK
 		echo " yes"
