@@ -85,6 +85,7 @@ struct interface *find_interface(const char *);
 int handle_args(struct fd_list *, int, char **);
 void handle_carrier(int, int, const char *);
 void handle_interface(int, const char *);
+int handle_rename(unsigned int, const char *);
 void handle_hwaddr(const char *, const unsigned char *, size_t);
 void drop_interface(struct interface *, const char *);
 int select_profile(struct interface *, const char *);

@@ -422,13 +422,7 @@ link_netlink(struct nlmsghdr *nlm)
 	struct rtattr *rta, *hwaddr;
 	struct ifinfomsg *ifi;
 	char ifn[IF_NAMESIZE + 1];
-
-#ifdef LIBUDEV
-	if (nlm->nlmsg_type == RTM_NEWLINK || nlm->nlmsg_type == RTM_DELLINK) {
-		if (libudev_listening())
-			return 1;
-	}
-#endif
+	struct interface *ifp;
 
 	len = link_route(nlm);
 	if (len != 0)
@@ -451,6 +445,7 @@ link_netlink(struct nlmsghdr *nlm)
 	len = NLMSG_PAYLOAD(nlm, sizeof(*ifi));
 	*ifn = '\0';
 	hwaddr = NULL;
+
 	while (RTA_OK(rta, len)) {
 		switch (rta->rta_type) {
 		case IFLA_WIRELESS:
@@ -480,6 +475,22 @@ link_netlink(struct nlmsghdr *nlm)
 	 * IFF_LOWER_UP set. */
 	if (ifi->ifi_flags & IFF_MASTER && !(ifi->ifi_flags & IFF_LOWER_UP)) {
 		handle_interface(-1, ifn);
+		return 1;
+	}
+
+	/* Check for interface name change */
+	if (handle_rename(ifi->ifi_index, ifn))
+		    return 1;
+
+	/* Check for a new interface */
+	ifp = find_interface(ifn);
+	if (ifp == NULL) {
+#ifdef LIBUDEV
+		/* Let udev announce the interface for renaming */
+		if (libudev_listening())
+			return 1;
+#endif
+		handle_interface(1, ifn);
 		return 1;
 	}
 
