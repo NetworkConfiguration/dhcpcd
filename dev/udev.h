@@ -27,6 +27,7 @@
 #ifndef LIBUDEV_H
 #define LIBUDEV_H
 
+int libudev_settled(const char *);
 int libudev_listening(void);
 int libudev_start(void);
 void libudev_stop(void);

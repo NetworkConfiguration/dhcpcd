@@ -36,7 +36,17 @@
 #include "../eloop.h"
 #include "udev.h"
 
+static struct udev *udev;
 static struct udev_monitor *monitor;
+
+int
+libudev_settled(const char *ifname)
+{
+	struct udev_device *device;
+
+	device = udev_device_new_from_subsystem_sysname(udev, "net", ifname);
+	return device ? 1 : 0;
+}
 
 static void
 libudev_handledata(__unused void *arg)
@@ -73,21 +83,27 @@ libudev_listening(void)
 void
 libudev_stop(void)
 {
-	struct udev *udev;
 
 	if (monitor) {
-		udev = udev_monitor_get_udev(monitor);
-		udev_unref(udev);
 		udev_monitor_unref(monitor);
 		monitor = NULL;
+	}
+
+	if (udev) {
+		udev_unref(udev);
+		udev = NULL;
 	}
 }
 
 int
 libudev_start(void)
 {
-	struct udev *udev;
 	int fd;
+
+	if (udev) {
+		syslog(LOG_ERR, "libudev: already started");
+		return -1;
+	}
 
 	syslog(LOG_DEBUG, "libudev: starting");
 	udev = udev_new();
