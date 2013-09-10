@@ -46,8 +46,11 @@ libudev_settled(const char *ifname)
 	int r;
 
 	device = udev_device_new_from_subsystem_sysname(udev, "net", ifname);
-	r = device ? 1 : 0;
-	udev_device_unref(device);
+	if (device) {
+		r = udev_device_get_is_initialized(device);
+		udev_device_unref(device);
+	} else
+		r = 0;
 	return r;
 }
 
