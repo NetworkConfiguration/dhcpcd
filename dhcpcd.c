@@ -392,22 +392,6 @@ configure_interface(struct interface *ifp, int argc, char **argv)
 	configure_interface1(ifp);
 }
 
-int
-handle_rename(unsigned int ifindex, const char *ifname)
-{
-	struct interface *ifp;
-
-	TAILQ_FOREACH(ifp, ifaces, next) {
-		if (ifp->index == ifindex && strcmp(ifp->name, ifname)) {
-			syslog(LOG_INFO, "%s: renamed to %s",
-			    ifp->name, ifname);
-			strlcpy(ifp->name, ifname, sizeof(ifp->name));
-			return 1;
-		}
-	}
-	return 0;
-}
-
 void
 handle_carrier(int carrier, int flags, const char *ifname)
 {

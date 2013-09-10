@@ -69,15 +69,17 @@ libudev_handledata(__unused void *arg)
 	subsystem = udev_device_get_subsystem(device);
 	ifname = udev_device_get_sysname(device);
 	action = udev_device_get_action(device);
-	udev_device_unref(device);
 
 	/* udev filter documentation says "usually" so double check */
 	if (strcmp(subsystem, "net") == 0) {
-		if (strcmp(action, "add") == 0)
+		syslog(LOG_DEBUG, "%s: libudev: %s", ifname, action);
+		if (strcmp(action, "add") == 0 || strcmp(action, "move") == 0)
 			handle_interface(1, ifname);
 		else if (strcmp(action, "remove") == 0)
 			handle_interface(-1, ifname);
 	}
+
+	udev_device_unref(device);
 }
 
 int

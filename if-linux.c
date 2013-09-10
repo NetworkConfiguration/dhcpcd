@@ -416,6 +416,26 @@ static short l2addr_len(unsigned short if_type)
 }
 
 static int
+handle_rename(unsigned int ifindex, const char *ifname)
+{
+	struct interface *ifp;
+
+	TAILQ_FOREACH(ifp, ifaces, next) {
+		if (ifp->index == ifindex && strcmp(ifp->name, ifname)) {
+			handle_interface(-1, ifp->name);
+#ifdef LIBUDEV
+			/* Let udev announce the interface for renaming */
+			if (libudev_listening())
+				return 1;
+#endif
+			handle_interface(1, ifname);
+			return 1;
+		}
+	}
+	return 0;
+}
+
+static int
 link_netlink(struct nlmsghdr *nlm)
 {
 	int len;
