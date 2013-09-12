@@ -24,11 +24,10 @@
  * SUCH DAMAGE.
  */
 
-#ifdef LIBUDEV_NOFILTER
+#ifdef LIBUDEV_NOINIT
 #  define LIBUDEV_I_KNOW_THE_API_IS_SUBJECT_TO_CHANGE
 #  warning This version of udev is too old does not support
-#  warning monitor filtering or per device initialization
-#  warning checks.
+#  warning per device initialization checks.
 #  warning As such, dhcpcd will need to depend on the
 #  warning udev-settle service or similar if starting
 #  warning in master mode.
