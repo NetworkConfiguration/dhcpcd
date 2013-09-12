@@ -634,6 +634,24 @@ EOF
 		echo "no"
 	fi
 	rm -f _udev.c _udev
+
+	printf "Checking udev_device_get_is_initialized ... "
+	cat <<EOF >_udev.c
+#include <libudev.h>
+#include <stdlib.h>
+int main(void) {
+	udev_device_get_is_initialized(NULL);
+	return 0;
+}
+EOF
+	if $XCC $LIBUDEV_CFLAGS _udev.c -o _udev $LIBUDEV_LIBS 2>/dev/null
+	then
+		echo "yes"
+	else
+		echo "LIBUDEV_CPPFLAGS+=	-DLIBUDEV_NOINIT" >>$CONFIG_MK
+		echo "no"
+	fi
+	rm -f _udev.c _udev
 elif [ "$DEV" != no -a "$UDEV" != no ]; then
 	echo "no"
 fi

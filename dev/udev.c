@@ -62,7 +62,7 @@ udev_initialized(const char *ifname)
 
 	device = udev_device_new_from_subsystem_sysname(udev, "net", ifname);
 	if (device) {
-#ifndef LIBUDEV_NOFILTER
+#ifndef LIBUDEV_NOINIT
 		r = udev_device_get_is_initialized(device);
 #else
 		r = 1;
