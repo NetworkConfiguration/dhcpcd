@@ -1212,11 +1212,6 @@ main(int argc, char **argv)
 	if (ifc == 1)
 		options |= DHCPCD_WAITIP;
 
-	/* Start any dev listening plugin which may want to
-	 * change the interface name provided by the kernel */
-	if (options & DHCPCD_DEV)
-		dev_start(dev_load);
-
 	/* RTM_NEWADDR goes through the link socket as well which we
 	 * need for IPv6 DAD, so we check for DHCPCD_LINK in handle_carrier
 	 * instead.
@@ -1229,6 +1224,12 @@ main(int argc, char **argv)
 		else
 			eloop_event_add(linkfd, handle_link, NULL);
 	}
+
+	/* Start any dev listening plugin which may want to
+	 * change the interface name provided by the kernel */
+	if ((options & (DHCPCD_MASTER | DHCPCD_DEV)) ==
+	    (DHCPCD_MASTER | DHCPCD_DEV))
+		dev_start(dev_load);
 
 	ifaces = discover_interfaces(ifc, ifv);
 	for (i = 0; i < ifc; i++) {
