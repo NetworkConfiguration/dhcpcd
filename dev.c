@@ -33,9 +33,16 @@
 
 #include "common.h"
 #include "dev.h"
+#include "eloop.h"
+#include "dhcpcd.h"
 
 static struct dev *dev;
 static void *handle;
+static int fd = -1;
+
+static struct dev_dhcpcd dev_dhcpcd = {
+	.handle_interface = &handle_interface
+};
 
 int
 dev_initialized(const char *ifname)
@@ -71,11 +78,12 @@ dev_stop(void)
 }
 
 static int
-dev_start1(const char *name)
+dev_start2(const char *name)
 {
 	char file[PATH_MAX];
 	void *h;
-	void (*fptr)(struct dev *);
+	void (*fptr)(struct dev *, const struct dev_dhcpcd *);
+	int r;
 
 	snprintf(file, sizeof(file), DEVDIR "/%s", name);
 	h = dlopen(file, RTLD_LAZY);
@@ -83,15 +91,15 @@ dev_start1(const char *name)
 		syslog(LOG_ERR, "dlopen: %s", dlerror());
 		return -1;
 	}
-	fptr = (void (*)(struct dev *))dlsym(h, "dev_init");
+	fptr = (void (*)(struct dev *, const struct dev_dhcpcd *))dlsym(h, "dev_init");
 	if (fptr == NULL) {
 		syslog(LOG_ERR, "dlsym: %s", dlerror());
 		dlclose(h);
 		return -1;
 	}
 	dev = calloc(1, sizeof(*dev));
-	fptr(dev);
-	if (dev->start  == NULL || dev->start() == -1) {
+	fptr(dev, &dev_dhcpcd);
+	if (dev->start  == NULL || (r = dev->start()) == -1) {
 		free(dev);
 		dev = NULL;
 		dlclose(h);
@@ -99,11 +107,11 @@ dev_start1(const char *name)
 	}
 	syslog(LOG_INFO, "dev: loaded %s", dev->name);
 	handle = h;
-	return 0;
+	return r;
 }
 
-int
-dev_start(const char *plugin)
+static int
+dev_start1(const char *plugin)
 {
 	DIR *dp;
 	struct dirent *d;
@@ -115,7 +123,7 @@ dev_start(const char *plugin)
 	}
 
 	if (plugin)
-		return dev_start1(plugin);
+		return dev_start2(plugin);
 
 	dp = opendir(DEVDIR);
 	if (dp == NULL) {
@@ -128,9 +136,25 @@ dev_start(const char *plugin)
 		if (d->d_name[0] == '.')
 			continue;
 
-		r = dev_start1(d->d_name);
+		r = dev_start2(d->d_name);
 		if (r != -1)
 			break;
 	}
 	return r;
+}
+
+int
+dev_start(const char *plugin)
+{
+
+	fd = dev_start1(plugin);
+	if (fd != -1) {
+		if (eloop_event_add(fd, dev->handle_data, NULL) == -1) {
+			syslog(LOG_ERR, "%s: eloop_event_add: %m", __func__);
+			dev_stop();
+			return -1;
+		}
+	}
+
+	return fd;
 }

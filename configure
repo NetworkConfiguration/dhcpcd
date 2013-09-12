@@ -641,7 +641,6 @@ fi
 if [ "$DEV" = yes ]; then
 	echo "SRCS+=		dev.c" >>$CONFIG_MK
 	echo "CPPFLAGS+=	-DPLUGIN_DEV" >>$CONFIG_MK
-	echo "LDFLAGS+=	-Wl,--export-dynamic" >>$CONFIG_MK
 	echo "MKDIRS+=		dev" >>$CONFIG_MK
 fi
 

@@ -43,8 +43,8 @@
 #define eloop_timeouts_delete(a, ...) \
     eloop_q_timeouts_delete(ELOOP_QUEUE, a, __VA_ARGS__)
 
-int eloop_event_add(int fd, void (*)(void *), void *);
-void eloop_event_delete(int fd);
+int eloop_event_add(int, void (*)(void *), void *);
+void eloop_event_delete(int);
 int eloop_q_timeout_add_sec(int queue, time_t, void (*)(void *), void *);
 int eloop_q_timeout_add_tv(int queue, const struct timeval *, void (*)(void *),
     void *);

@@ -39,14 +39,20 @@
 #include <syslog.h>
 
 #include "../common.h"
-#include "../dhcpcd.h"
-#include "../eloop.h"
 #include "../dev.h"
 
 static const char udev_name[]="udev";
 static struct udev *udev;
 static struct udev_monitor *monitor;
-static int monitor_fd = -1;
+
+static const struct dev_dhcpcd *dhcpcd;
+
+static int
+udev_listening(void)
+{
+
+	return monitor ? 1 : 0;
+}
 
 static int
 udev_initialized(const char *ifname)
@@ -68,7 +74,7 @@ udev_initialized(const char *ifname)
 }
 
 static void
-udev_handledata(__unused void *arg)
+udev_handle_data(__unused void *arg)
 {
 	struct udev_device *device;
 	const char *subsystem, *ifname, *action;
@@ -87,29 +93,17 @@ udev_handledata(__unused void *arg)
 	if (strcmp(subsystem, "net") == 0) {
 		syslog(LOG_DEBUG, "%s: libudev: %s", ifname, action);
 		if (strcmp(action, "add") == 0 || strcmp(action, "move") == 0)
-			handle_interface(1, ifname);
+			dhcpcd->handle_interface(1, ifname);
 		else if (strcmp(action, "remove") == 0)
-			handle_interface(-1, ifname);
+			dhcpcd->handle_interface(-1, ifname);
 	}
 
 	udev_device_unref(device);
 }
 
-static int
-udev_listening(void)
-{
-
-	return monitor ? 1 : 0;
-}
-
 static void
 udev_stop(void)
 {
-
-	if (monitor_fd != -1) {
-		eloop_event_delete(monitor_fd);
-		monitor_fd = -1;
-	}
 
 	if (monitor) {
 		udev_monitor_unref(monitor);
@@ -125,6 +119,7 @@ udev_stop(void)
 static int
 udev_start(void)
 {
+	int fd;
 
 	if (udev) {
 		syslog(LOG_ERR, "udev: already started");
@@ -155,31 +150,30 @@ udev_start(void)
 		syslog(LOG_ERR, "udev_monitor_enable_receiving: %m");
 		goto bad;
 	}
-	monitor_fd = udev_monitor_get_fd(monitor);
-	if (monitor_fd == -1) {
+	fd = udev_monitor_get_fd(monitor);
+	if (fd == -1) {
 		syslog(LOG_ERR, "udev_monitor_get_fd: %m");
 		goto bad;
 	}
-	if (eloop_event_add(monitor_fd, udev_handledata, NULL) == -1) {
-		syslog(LOG_ERR, "%s: eloop_event_add: %m", __func__);
-		goto bad;
-	}
+	return fd;
 
-	return monitor_fd;
 bad:
-
 	udev_stop();
 	return -1;
 }
 
 int
-dev_init(struct dev *dev)
+dev_init(struct dev *dev, const struct dev_dhcpcd *dev_dhcpcd)
 {
 
 	dev->name = udev_name;
 	dev->initialized = udev_initialized;
 	dev->listening = udev_listening;
-	dev->start = udev_start;
+	dev->handle_data = udev_handle_data;
 	dev->stop = udev_stop;
+	dev->start = udev_start;
+
+	dhcpcd =  dev_dhcpcd;
+
 	return 0;
 }

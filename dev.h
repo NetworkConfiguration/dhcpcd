@@ -32,10 +32,16 @@ struct dev {
 	const char *name;
 	int (*initialized)(const char *);
 	int (*listening)(void);
+	void (*handle_data)(void *);
 	int (*start)(void);
 	void (*stop)(void);
 };
-int dev_init(struct dev *);
+
+struct dev_dhcpcd {
+	void (*handle_interface)(int, const char *);
+};
+
+int dev_init(struct dev *, const struct dev_dhcpcd *);
 
 // hooks for dhcpcd
 #ifdef PLUGIN_DEV
