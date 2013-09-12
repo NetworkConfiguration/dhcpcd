@@ -18,6 +18,7 @@ DEBUG=
 FORK=
 STATIC=
 INCLUDEDIR=
+DEVS=
 
 for x do
 	opt=${x%%=*}
@@ -60,6 +61,7 @@ for x do
         --without-posix_spawn) POSIX_SPAWN=no;;
 	--without-pollts) POLLTS=no;;
 	--with-pollts) POLLTS=$var;;
+	--without-dev) DEV=no;;
 	--without-udev) UDEV=no;;
 	--serviceexists) SERVICEEXISTS=$var;;
 	--servicecmd) SERVICECMD=$var;;
@@ -226,7 +228,7 @@ rm -f $CONFIG_H $CONFIG_MK
 echo "# $OS" >$CONFIG_MK
 echo "/* $OS */" >$CONFIG_H
 
-for x in SYSCONFDIR SBINDIR LIBEXECDIR DBDIR RUNDIR; do
+for x in SYSCONFDIR SBINDIR LIBDIR LIBEXECDIR DBDIR RUNDIR; do
 	eval v=\$$x
 	# Make files look nice for import
 	l=$((10 - ${#x}))
@@ -316,7 +318,7 @@ linux)
 	fi
 	echo "SRCS+=		if-linux.c if-linux-wireless.c" >>$CONFIG_MK
 	echo "SRCS+=		platform-linux.c" >>$CONFIG_MK
-	echo "LDADD+=		-lrt" >>$CONFIG_MK
+	echo "LDADD+=		-lrt -ldl" >>$CONFIG_MK
 	;;
 kfreebsd)
 	echo "CPPFLAGS+=	-D_GNU_SOURCE" >>$CONFIG_MK
@@ -325,7 +327,7 @@ kfreebsd)
 	fi
 	echo "SRCS+=		if-bsd.c platform-bsd.c" >>$CONFIG_MK
 	echo "COMPAT_SRCS+=	compat/linkaddr.c" >>$CONFIG_MK
-	echo "LDADD+=		-lrt" >>$CONFIG_MK
+	echo "LDADD+=		-lrt -ldl" >>$CONFIG_MK
 	;;
 *)
 	if [ -z "$INET" -o "$INET" = yes ]; then
@@ -601,19 +603,19 @@ pselect)
 	;;
 esac
 
-if [ "$UDEV" != no ]; then
+if [ "$DEV" != no -a "$UDEV" != no ]; then
 	printf "Checking for libudev ... "
 	LIBUDEV_CFLAGS=$(pkg-config --cflags libudev 2>/dev/null)
 	LIBUDEV_LIBS=$(pkg-config --libs libudev 2>/dev/null)
+	[ -z "$DEV" ] && DEV=yes
 fi
-if [ "$UDEV" != no -a -n "$LIBUDEV_LIBS" ]; then
+if [ "$DEV" != no -a "$UDEV" != no -a -n "$LIBUDEV_LIBS" ]; then
 	echo "yes"
-	echo "SRCS+=	dev/udev.c" >>$CONFIG_MK
+	echo "DEV_PLUGINS+=	udev" >>$CONFIG_MK
 	if [ -n "$LIBUDEV_CFLAGS" ]; then
-		echo "CFLAGS+=		$LIBUDEV_CFLAGS" >>$CONFIG_MK
+		echo "LIBUDEV_CFLAGS=		$LIBUDEV_CFLAGS" >>$CONFIG_MK
 	fi
-	echo "CPPFLAGS+=	-DLIBUDEV" >>$CONFIG_MK
-	echo "LDADD+=		$LIBUDEV_LIBS" >>$CONFIG_MK
+	echo "LIBUDEV_LIBS=		$LIBUDEV_LIBS" >>$CONFIG_MK
 
 	printf "Checking udev_monitor_filter_add_match_subsystem_devtype ..."
 	cat <<EOF >_udev.c
@@ -627,14 +629,20 @@ int main(void) {
 EOF
 	if $XCC $LIBUDEV_CFLAGS _udev.c -o _udev $LIBUDEV_LIBS 2>/dev/null
 	then
-		echo "CPPFLAGS+=		-DLIBUDEV_FILTER" >>$CONFIG_MK
+		echo "LIBUDEV_CPPFLAGS+=	-DLIBUDEV_FILTER" >>$CONFIG_MK
 		echo " yes"
 	else
 		echo " no"
 	fi
 	rm -f _udev.c _udev
-elif [ "$UDEV" != no ]; then
+elif [ "$DEV" != no -a "$UDEV" != no ]; then
 	echo "no"
+fi
+
+if [ "$DEV" = yes ]; then
+	echo "SRCS+=		dev.c" >>$CONFIG_MK
+	echo "CPPFLAGS+=	-DPLUGIN_DEV" >>$CONFIG_MK
+	echo "LDFLAGS+=		-Wl,--export-dynamic" >>$CONFIG_MK
 fi
 
 if [ -z "$SERVICECMD" ]; then

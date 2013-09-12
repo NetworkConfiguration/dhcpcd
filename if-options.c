@@ -68,6 +68,10 @@ unsigned long long options = 0;
 #define O_IA_TA			O_BASE + 11
 #define O_IA_PD			O_BASE + 12
 #define O_HOSTNAME_SHORT	O_BASE + 13
+#define O_DEV			O_BASE + 14
+#define O_NODEV			O_BASE + 15
+
+char *dev_load;
 
 const struct option cf_options[] = {
 	{"background",      no_argument,       NULL, 'b'},
@@ -130,6 +134,8 @@ const struct option cf_options[] = {
 	{"ia_ta",           no_argument,       NULL, O_IA_TA},
 	{"ia_pd",           no_argument,       NULL, O_IA_PD},
 	{"hostname_short",  no_argument,       NULL, O_HOSTNAME_SHORT},
+	{"dev",             required_argument, NULL, O_DEV},
+	{"nodev",           no_argument,       NULL, O_NODEV},
 	{NULL,              0,                 NULL, '\0'}
 };
 
@@ -1089,10 +1095,18 @@ got_iaid:
 			}
 		}
 		break;
+#endif
 	case O_HOSTNAME_SHORT:
 		ifo->options |= DHCPCD_HOSTNAME | DHCPCD_HOSTNAME_SHORT;
 		break;
-#endif
+	case O_DEV:
+		if (dev_load)
+			free(dev_load);
+		dev_load = strdup(arg);
+		break;
+	case O_NODEV:
+		ifo->options &= ~DHCPCD_DEV;
+		break;
 	default:
 		return 0;
 	}
@@ -1184,6 +1198,9 @@ read_config(const char *file,
 		return NULL;
 	}
 	ifo->options |= DHCPCD_DAEMONISE | DHCPCD_LINK;
+#ifdef PLUGIN_DEV
+	ifo->options |= DHCPCD_DEV;
+#endif
 #ifdef INET
 	ifo->options |= DHCPCD_IPV4 | DHCPCD_IPV4LL;
 	ifo->options |= DHCPCD_GATEWAY | DHCPCD_ARP;

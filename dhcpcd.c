@@ -54,6 +54,7 @@ const char copyright[] = "Copyright (c) 2006-2013 Roy Marples";
 #include "config.h"
 #include "common.h"
 #include "control.h"
+#include "dev.h"
 #include "dhcpcd.h"
 #include "dhcp6.h"
 #include "eloop.h"
@@ -158,6 +159,7 @@ cleanup(void)
 	free(ifdv);
 #endif
 
+	dev_stop();
 	if (linkfd != -1)
 		close(linkfd);
 	if (pidfd > -1) {
@@ -1209,6 +1211,11 @@ main(int argc, char **argv)
 	 * the old behaviour of waiting for an IP address */
 	if (ifc == 1)
 		options |= DHCPCD_WAITIP;
+
+	/* Start any dev listening plugin which may want to
+	 * change the interface name provided by the kernel */
+	if (options & DHCPCD_DEV)
+		dev_start(dev_load);
 
 	/* RTM_NEWADDR goes through the link socket as well which we
 	 * need for IPv6 DAD, so we check for DHCPCD_LINK in handle_carrier

@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd August 31, 2013
+.Dd September 12, 2013
 .Dt DHCPCD 8
 .Os
 .Sh NAME
@@ -383,6 +383,21 @@ If
 .Nm
 fails to contact a DHCP server then it returns a failure instead of falling
 back on IPv4LL.
+.It Fl S, Fl Fl static Ar value
+Configures a static
+.Ar value .
+If you set
+.Ic ip_address
+then
+.Nm
+will not attempt to obtain a lease and just use the value for the address with
+an infinite lease time.
+.Pp
+Here is an example which configures a static address, routes and dns.
+.D1 dhcpcd -S ip_address=192.168.0.10/24 \e
+.D1 -S routers=192.168.0.1 \e
+.D1 -S domain_name_servers=192.168.0.1 \e
+.D1 eth0
 .It Fl t , Fl Fl timeout Ar seconds
 Timeout after
 .Ar seconds ,
@@ -512,21 +527,6 @@ Quiet
 .Nm
 on the command line, only warnings and errors will be displayed.
 The messages are still logged though.
-.It Fl S, Fl Fl static Ar value
-Configures a static
-.Ar value .
-If you set
-.Ic ip_address
-then
-.Nm
-will not attempt to obtain a lease and just use the value for the address with
-an infinite lease time.
-.Pp
-Here is an example which configures a static address, routes and dns.
-.D1 dhcpcd -S ip_address=192.168.0.10/24 \e
-.D1 -S routers=192.168.0.1 \e
-.D1 -S domain_name_servers=192.168.0.1 \e
-.D1 eth0
 .It Fl T, Fl Fl test
 On receipt of DHCP messages just call
 .Pa @SCRIPT@
@@ -572,6 +572,10 @@ which is a space or comma separated list of patterns passed to
 If the same interface is matched in
 .Fl Z , Fl Fl denyinterfaces
 then it is still denied.
+.It Fl Fl nodev
+Don't load any
+.Pa /dev
+management modules.
 .El
 .Sh 3RDPARTY LINK MANAGEMENT
 Some interfaces require configuration by 3rd parties, such as PPP or VPN.
@@ -600,6 +604,9 @@ If you always use the same options, put them here.
 Text file that holds the DUID used to identify the host.
 .It Pa @SCRIPT@
 Bourne shell script that is run to configure or de-configure an interface.
+.It Pa @LIBDIR@/dhcpcd/dev
+.Pa /dev
+management modules.
 .It Pa @HOOKDIR@
 A directory containing bourne shell scripts that are run by the above script.
 Each script can be disabled by using the

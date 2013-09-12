@@ -24,12 +24,30 @@
  * SUCH DAMAGE.
  */
 
-#ifndef LIBUDEV_H
-#define LIBUDEV_H
+#ifndef DEV_H
+#define DEV_H
 
-int libudev_settled(const char *);
-int libudev_listening(void);
-int libudev_start(void);
-void libudev_stop(void);
+// dev plugin setup
+struct dev {
+	const char *name;
+	int (*settled)(const char *);
+	int (*listening)(void);
+	int (*start)(void);
+	void (*stop)(void);
+};
+int dev_init(struct dev *);
+
+// hooks for dhcpcd
+#ifdef PLUGIN_DEV
+int dev_settled(const char *);
+int dev_listening(void);
+int dev_start(const char *);
+void dev_stop(void);
+#else
+#define dev_settled(a) 1
+#define dev_listening() 0
+#define dev_start(a)
+#define dev_stop()
+#endif
 
 #endif

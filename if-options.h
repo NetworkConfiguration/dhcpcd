@@ -96,6 +96,7 @@
 #define DHCPCD_EXITING			(1ULL << 44)
 #define DHCPCD_WAITIP4			(1ULL << 45)
 #define DHCPCD_WAITIP6			(1ULL << 46)
+#define DHCPCD_DEV			(1ULL << 47)
 
 extern const struct option cf_options[];
 
@@ -158,6 +159,7 @@ struct if_options {
 };
 
 extern unsigned long long options;
+extern char *dev_load;
 
 struct if_options *read_config(const char *,
     const char *, const char *, const char *);

@@ -1,5 +1,7 @@
 .depend
 *.o
+*.So
+*.so
 *.bz2
 config.h
 config.mk

@@ -57,13 +57,11 @@
 
 #include "config.h"
 #include "common.h"
+#include "dev.h"
 #include "dhcp.h"
 #include "ipv4.h"
 #include "ipv6.h"
 #include "net.h"
-#ifdef LIBUDEV
-#include "dev/udev.h"
-#endif
 
 static int sock_fd;
 static struct sockaddr_nl sock_nl;
@@ -144,14 +142,6 @@ int
 open_link_socket(void)
 {
 	struct sockaddr_nl snl;
-
-#ifdef LIBUDEV
-	/* If we have libudev, we need to listen to it for interface
-	 * arrivals and departures so we get the interface name udev wants
-	 * to give it.
-	 * If we fail to work, we fall back to listening to the kernel. */
-	libudev_start();
-#endif
 
 	memset(&snl, 0, sizeof(snl));
 	snl.nl_groups = RTMGRP_LINK;
@@ -423,12 +413,9 @@ handle_rename(unsigned int ifindex, const char *ifname)
 	TAILQ_FOREACH(ifp, ifaces, next) {
 		if (ifp->index == ifindex && strcmp(ifp->name, ifname)) {
 			handle_interface(-1, ifp->name);
-#ifdef LIBUDEV
-			/* Let udev announce the interface for renaming */
-			if (libudev_listening())
-				return 1;
-#endif
-			handle_interface(1, ifname);
+			/* Let dev announce the interface for renaming */
+			if (!dev_listening())
+				handle_interface(1, ifname);
 			return 1;
 		}
 	}
@@ -505,12 +492,10 @@ link_netlink(struct nlmsghdr *nlm)
 	/* Check for a new interface */
 	ifp = find_interface(ifn);
 	if (ifp == NULL) {
-#ifdef LIBUDEV
-		/* Let udev announce the interface for renaming */
-		if (libudev_listening())
-			return 1;
-#endif
-		handle_interface(1, ifn);
+		/* If are listening to a dev manager, let that announce
+		 * the interface rather than the kernel. */
+		if (dev_listening() < 1)
+			handle_interface(1, ifn);
 		return 1;
 	}
 

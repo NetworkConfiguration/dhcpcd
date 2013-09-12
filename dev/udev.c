@@ -27,20 +27,21 @@
 #define LIBUDEV_I_KNOW_THE_API_IS_SUBJECT_TO_CHANGE
 
 #include <libudev.h>
-#include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
 
 #include "../common.h"
 #include "../dhcpcd.h"
 #include "../eloop.h"
-#include "udev.h"
+#include "../dev.h"
 
+static const char udev_name[]="udev";
 static struct udev *udev;
 static struct udev_monitor *monitor;
+static int monitor_fd = -1;
 
-int
-libudev_settled(const char *ifname)
+static int
+udev_settled(const char *ifname)
 {
 	struct udev_device *device;
 	int r;
@@ -55,7 +56,7 @@ libudev_settled(const char *ifname)
 }
 
 static void
-libudev_handledata(__unused void *arg)
+udev_handledata(__unused void *arg)
 {
 	struct udev_device *device;
 	const char *subsystem, *ifname, *action;
@@ -82,16 +83,21 @@ libudev_handledata(__unused void *arg)
 	udev_device_unref(device);
 }
 
-int
-libudev_listening(void)
+static int
+udev_listening(void)
 {
 
 	return monitor ? 1 : 0;
 }
 
-void
-libudev_stop(void)
+static void
+udev_stop(void)
 {
+
+	if (monitor_fd != -1) {
+		eloop_event_delete(monitor_fd);
+		monitor_fd = -1;
+	}
 
 	if (monitor) {
 		udev_monitor_unref(monitor);
@@ -104,17 +110,16 @@ libudev_stop(void)
 	}
 }
 
-int
-libudev_start(void)
+static int
+udev_start(void)
 {
-	int fd;
 
 	if (udev) {
-		syslog(LOG_ERR, "libudev: already started");
+		syslog(LOG_ERR, "udev: already started");
 		return -1;
 	}
 
-	syslog(LOG_DEBUG, "libudev: starting");
+	syslog(LOG_DEBUG, "udev: starting");
 	udev = udev_new();
 	if (udev == NULL) {
 		syslog(LOG_ERR, "udev_new: %m");
@@ -138,21 +143,31 @@ libudev_start(void)
 		syslog(LOG_ERR, "udev_monitor_enable_receiving: %m");
 		goto bad;
 	}
-	fd = udev_monitor_get_fd(monitor);
-	if (fd == -1) {
+	monitor_fd = udev_monitor_get_fd(monitor);
+	if (monitor_fd == -1) {
 		syslog(LOG_ERR, "udev_monitor_get_fd: %m");
 		goto bad;
 	}
-	if (eloop_event_add(fd, libudev_handledata, NULL) == -1) {
+	if (eloop_event_add(monitor_fd, udev_handledata, NULL) == -1) {
 		syslog(LOG_ERR, "%s: eloop_event_add: %m", __func__);
 		goto bad;
 	}
 
-	atexit(libudev_stop);
-
-	return fd;
+	return monitor_fd;
 bad:
 
-	libudev_stop();
+	udev_stop();
 	return -1;
+}
+
+int
+dev_init(struct dev *dev)
+{
+
+	dev->name = udev_name;
+	dev->settled = udev_settled;
+	dev->listening = udev_listening;
+	dev->start = udev_start;
+	dev->stop = udev_stop;
+	return 0;
 }

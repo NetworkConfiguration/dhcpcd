@@ -43,6 +43,15 @@ configure stage. If we cannot auto-detect how do to this, or it is wrong then
 you can change this by passing shell commands to --service-exists,
 --servicecmd and optionally --servicestatus.
 
+Some systems have /dev management systems and some of these like to rename
+interfaces. As this system would listen in the same way as dhcpcd to new
+interface arrivals, dhcpcd needs to listen to the /dev management sytem
+instead of the kernel. However, if the /dev management system breaks, stops
+working, or changes to a new one, dhcpcd should still try and continue to work.
+To facilitate this, dhcpcd allows a plugin to load to instruct dhcpcd when it
+can use an interface. As of the time of writing only udev support is included.
+You can disable this with --without-dev, or without-udev
+
 To prepare dhcpcd for import into a platform source tree (like NetBSD)
 you can use the make import target to create /tmp/dhcpcd-$version and
 populate it with all the source files and hooks needed.

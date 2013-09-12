@@ -35,6 +35,9 @@
 #endif
 #ifndef SCRIPT
 # define SCRIPT			LIBEXECDIR "/" PACKAGE "-run-hooks"
+#ifndef DEVDIR
+# define DEVDIR			LIBDIR "/" PACKAGE "/dev"
+#endif
 #endif
 #ifndef DUID
 # define DUID			SYSCONFDIR "/" PACKAGE ".duid"

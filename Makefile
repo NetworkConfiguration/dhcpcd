@@ -27,9 +27,10 @@ CLEANFILES+=	.depend
 FILES=		dhcpcd.conf
 FILESDIR=	${SYSCONFDIR}
 
-SUBDIRS=	dhcpcd-hooks
+SUBDIRS=	dhcpcd-hooks dev
 
 SED_DBDIR=		-e 's:@DBDIR@:${DBDIR}:g'
+SED_LIBDIR=		-e 's:@LIBDIR@:${LIBDIR}:g'
 SED_HOOKDIR=		-e 's:@HOOKDIR@:${HOOKDIR}:g'
 SED_SERVICEEXISTS=	-e 's:@SERVICEEXISTS@:${SERVICEEXISTS}:g'
 SED_SERVICECMD=		-e 's:@SERVICECMD@:${SERVICECMD}:g'
@@ -51,16 +52,21 @@ DISTFILE?=	${DISTPREFIX}.tar.bz2
 
 CLEANFILES+=	*.tar.bz2
 
-.PHONY:		import import-bsd
+.PHONY:		import import-bsd dev
 
 .SUFFIXES:	.in
 
 .in:
-	${SED} ${SED_DBDIR} ${SED_HOOKDIR} ${SED_SCRIPT} ${SED_SYS} \
+	${SED} ${SED_DBDIR} ${SED_LIBDIR} ${SED_HOOKDIR} ${SED_SCRIPT} \
+		${SED_SYS} \
 		${SED_SERVICEEXISTS} ${SED_SERVICECMD} ${SED_SERVICESTATUS} \
 		$< > $@
 
 all: config.h ${PROG} ${SCRIPTS} ${MAN5} ${MAN8}
+	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@; cd ..; done
+
+dev:
+	cd dev && ${MAKE}
 
 .c.o:
 	${CC} ${CFLAGS} ${CPPFLAGS} -c $< -o $@
@@ -77,6 +83,9 @@ _proginstall: ${PROG}
 	${INSTALL} -d ${DESTDIR}${SBINDIR}
 	${INSTALL} -m ${BINMODE} ${PROG} ${DESTDIR}${SBINDIR}
 	${INSTALL} -d ${DESTDIR}${DBDIR}
+
+proginstall: _proginstall
+	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@; cd ..; done
 
 _scriptsinstall: ${SCRIPTS}
 	${INSTALL} -d ${DESTDIR}${SCRIPTSDIR}
@@ -98,6 +107,7 @@ install: _proginstall _scriptsinstall _maninstall _confinstall
 
 clean:
 	rm -f ${OBJS} ${PROG} ${PROG}.core ${CLEANFILES}
+	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@; cd ..; done
 
 distclean: clean
 	rm -f .depend config.h config.mk

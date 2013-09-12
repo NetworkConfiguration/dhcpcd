@@ -10,9 +10,13 @@ SCRIPTS+=	${HOOKSCRIPTS}
 
 all:
 
-install:
+clean:
+
+proginstall:
 	${INSTALL} -d ${DESTDIR}${SCRIPTSDIR}
 	${INSTALL} -m ${NONBINMODE} ${SCRIPTS} ${DESTDIR}${SCRIPTSDIR}
+
+install: proginstall
 
 import:
 	${INSTALL} -d /tmp/${DISTPREFIX}/dhcpcd-hooks

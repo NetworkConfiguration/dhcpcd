@@ -1,5 +1,7 @@
 # System definitions
 
+PICFLAG?=	-fPIC
+
 BINMODE?=	0555
 NONBINMODE?=	0444
 MANMODE?=	${NONBINMODE}
