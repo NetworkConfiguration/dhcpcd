@@ -617,9 +617,8 @@ if [ "$DEV" != no -a "$UDEV" != no -a -n "$LIBUDEV_LIBS" ]; then
 	fi
 	echo "LIBUDEV_LIBS=		$LIBUDEV_LIBS" >>$CONFIG_MK
 
-	printf "Checking udev_monitor_filter_add_match_subsystem_devtype ..."
+	printf "Checking udev_monitor_filter_add_match_subsystem_devtype ... "
 	cat <<EOF >_udev.c
-#define LIBUDEV_I_KNOW_THE_API_IS_SUBJECT_TO_CHANGE
 #include <libudev.h>
 #include <stdlib.h>
 int main(void) {
@@ -629,10 +628,10 @@ int main(void) {
 EOF
 	if $XCC $LIBUDEV_CFLAGS _udev.c -o _udev $LIBUDEV_LIBS 2>/dev/null
 	then
-		echo "LIBUDEV_CPPFLAGS+=	-DLIBUDEV_FILTER" >>$CONFIG_MK
-		echo " yes"
+		echo "yes"
 	else
-		echo " no"
+		echo "LIBUDEV_CPPFLAGS+=	-DLIBUDEV_NOFILTER" >>$CONFIG_MK
+		echo "no"
 	fi
 	rm -f _udev.c _udev
 elif [ "$DEV" != no -a "$UDEV" != no ]; then

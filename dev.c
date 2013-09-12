@@ -38,12 +38,12 @@ static struct dev *dev;
 static void *handle;
 
 int
-dev_settled(const char *ifname)
+dev_initialized(const char *ifname)
 {
 
 	if (dev == NULL)
 		return 1;
-	return dev->settled(ifname);
+	return dev->initialized(ifname);
 }
 
 int

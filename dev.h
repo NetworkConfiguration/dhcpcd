@@ -30,7 +30,7 @@
 // dev plugin setup
 struct dev {
 	const char *name;
-	int (*settled)(const char *);
+	int (*initialized)(const char *);
 	int (*listening)(void);
 	int (*start)(void);
 	void (*stop)(void);
@@ -39,12 +39,12 @@ int dev_init(struct dev *);
 
 // hooks for dhcpcd
 #ifdef PLUGIN_DEV
-int dev_settled(const char *);
+int dev_initialized(const char *);
 int dev_listening(void);
 int dev_start(const char *);
 void dev_stop(void);
 #else
-#define dev_settled(a) 1
+#define dev_initialized(a) 1
 #define dev_listening() 0
 #define dev_start(a)
 #define dev_stop()

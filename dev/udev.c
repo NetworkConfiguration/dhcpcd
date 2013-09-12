@@ -24,7 +24,15 @@
  * SUCH DAMAGE.
  */
 
-#define LIBUDEV_I_KNOW_THE_API_IS_SUBJECT_TO_CHANGE
+#ifdef LIBUDEV_NOFILTER
+#  define LIBUDEV_I_KNOW_THE_API_IS_SUBJECT_TO_CHANGE
+#  warning This version of udev is too old does not support
+#  warning monitor filtering or per device initialization
+#  warning checks.
+#  warning As such, dhcpcd will need to depend on the
+#  warning udev-settle service or similar if starting
+#  warning in master mode.
+#endif
 
 #include <libudev.h>
 #include <string.h>
@@ -41,14 +49,18 @@ static struct udev_monitor *monitor;
 static int monitor_fd = -1;
 
 static int
-udev_settled(const char *ifname)
+udev_initialized(const char *ifname)
 {
 	struct udev_device *device;
 	int r;
 
 	device = udev_device_new_from_subsystem_sysname(udev, "net", ifname);
 	if (device) {
+#ifndef LIBUDEV_NOFILTER
 		r = udev_device_get_is_initialized(device);
+#else
+		r = 1;
+#endif
 		udev_device_unref(device);
 	} else
 		r = 0;
@@ -130,7 +142,7 @@ udev_start(void)
 		syslog(LOG_ERR, "udev_monitor_new_from_netlink: %m");
 		goto bad;
 	}
-#ifdef LIBUDEV_FILTER
+#ifndef LIBUDEV_NOFILTER
 	if (udev_monitor_filter_add_match_subsystem_devtype(monitor,
 	    "net", NULL) != 0)
 	{
@@ -165,7 +177,7 @@ dev_init(struct dev *dev)
 {
 
 	dev->name = udev_name;
-	dev->settled = udev_settled;
+	dev->initialized = udev_initialized;
 	dev->listening = udev_listening;
 	dev->start = udev_start;
 	dev->stop = udev_stop;

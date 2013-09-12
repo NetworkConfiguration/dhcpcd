@@ -269,7 +269,7 @@ discover_interfaces(int argc, char * const *argv)
 		}
 
 		/* Ensure that the interface name has settled */
-		if (!dev_settled(ifa->ifa_name))
+		if (!dev_initialized(ifa->ifa_name))
 			continue;
 
 		/* It's possible for an interface to have >1 AF_LINK.
