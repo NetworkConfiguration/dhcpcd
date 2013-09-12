@@ -7,6 +7,7 @@ SRCS+=		dhcp-common.c
 
 CFLAGS?=	-O2
 CSTD?=		c99
+MKDIRS=
 include config.mk
 CFLAGS+=	-std=${CSTD}
 
@@ -27,7 +28,7 @@ CLEANFILES+=	.depend
 FILES=		dhcpcd.conf
 FILESDIR=	${SYSCONFDIR}
 
-SUBDIRS=	dhcpcd-hooks dev
+SUBDIRS=	dhcpcd-hooks ${MKDIRS}
 
 SED_DBDIR=		-e 's:@DBDIR@:${DBDIR}:g'
 SED_LIBDIR=		-e 's:@LIBDIR@:${LIBDIR}:g'

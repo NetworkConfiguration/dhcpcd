@@ -607,10 +607,9 @@ if [ "$DEV" != no -a "$UDEV" != no ]; then
 	printf "Checking for libudev ... "
 	LIBUDEV_CFLAGS=$(pkg-config --cflags libudev 2>/dev/null)
 	LIBUDEV_LIBS=$(pkg-config --libs libudev 2>/dev/null)
-	[ -z "$DEV" ] && DEV=yes
 fi
 if [ "$DEV" != no -a "$UDEV" != no -a -n "$LIBUDEV_LIBS" ]; then
-	echo "yes"
+	[ -z "$DEV" ] && DEV=yes
 	echo "DEV_PLUGINS+=	udev" >>$CONFIG_MK
 	if [ -n "$LIBUDEV_CFLAGS" ]; then
 		echo "LIBUDEV_CFLAGS=		$LIBUDEV_CFLAGS" >>$CONFIG_MK
@@ -641,7 +640,8 @@ fi
 if [ "$DEV" = yes ]; then
 	echo "SRCS+=		dev.c" >>$CONFIG_MK
 	echo "CPPFLAGS+=	-DPLUGIN_DEV" >>$CONFIG_MK
-	echo "LDFLAGS+=		-Wl,--export-dynamic" >>$CONFIG_MK
+	echo "LDFLAGS+=	-Wl,--export-dynamic" >>$CONFIG_MK
+	echo "MKDIRS+=		dev"
 fi
 
 if [ -z "$SERVICECMD" ]; then

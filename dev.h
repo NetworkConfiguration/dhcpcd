@@ -46,8 +46,8 @@ void dev_stop(void);
 #else
 #define dev_initialized(a) 1
 #define dev_listening() 0
-#define dev_start(a)
-#define dev_stop()
+#define dev_start(a) {}
+#define dev_stop() {}
 #endif
 
 #endif
