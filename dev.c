@@ -143,13 +143,22 @@ dev_start1(const char *plugin)
 	return r;
 }
 
+static void
+dev_handle_data(__unused void *arg)
+{
+
+	if (dev->handle_device() == -1) {
+		/* XXX: an error occured. should we restart dev? */
+	}
+}
+
 int
 dev_start(const char *plugin)
 {
 
 	fd = dev_start1(plugin);
 	if (fd != -1) {
-		if (eloop_event_add(fd, dev->handle_data, NULL) == -1) {
+		if (eloop_event_add(fd, dev_handle_data, NULL) == -1) {
 			syslog(LOG_ERR, "%s: eloop_event_add: %m", __func__);
 			dev_stop();
 			return -1;

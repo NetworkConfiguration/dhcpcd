@@ -32,7 +32,7 @@ struct dev {
 	const char *name;
 	int (*initialized)(const char *);
 	int (*listening)(void);
-	void (*handle_data)(void *);
+	int (*handle_device)(void);
 	int (*start)(void);
 	void (*stop)(void);
 };

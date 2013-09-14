@@ -72,16 +72,16 @@ udev_initialized(const char *ifname)
 	return r;
 }
 
-static void
-udev_handle_data(__unused void *arg)
+static int
+udev_handle_device(void)
 {
 	struct udev_device *device;
 	const char *subsystem, *ifname, *action;
 
 	device = udev_monitor_receive_device(monitor);
 	if (device == NULL) {
-		syslog(LOG_DEBUG, "libudev: received NULL device");
-		return;
+		syslog(LOG_ERR, "libudev: received NULL device");
+		return -1;
 	}
 
 	subsystem = udev_device_get_subsystem(device);
@@ -98,6 +98,7 @@ udev_handle_data(__unused void *arg)
 	}
 
 	udev_device_unref(device);
+	return 1;
 }
 
 static void
@@ -168,7 +169,7 @@ dev_init(struct dev *dev, const struct dev_dhcpcd *dev_dhcpcd)
 	dev->name = udev_name;
 	dev->initialized = udev_initialized;
 	dev->listening = udev_listening;
-	dev->handle_data = udev_handle_data;
+	dev->handle_device = udev_handle_device;
 	dev->stop = udev_stop;
 	dev->start = udev_start;
 
