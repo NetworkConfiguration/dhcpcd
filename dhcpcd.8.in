@@ -407,6 +407,17 @@ A setting of 0
 causes
 .Nm
 to wait forever to get a lease.
+If
+.Nm
+is working on a single interface then
+.Nm
+will exit when a timeout occurs, otherwise
+.Nm
+will fork into the background.
+If using IPv4LL then
+.Nm
+start the IPv4LL process after the timeout and then wait a little longer
+before really timing out.
 .It Fl u , Fl Fl userclass Ar class
 Tags the DHCP message with the userclass
 .Ar class .

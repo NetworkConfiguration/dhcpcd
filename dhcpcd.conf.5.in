@@ -388,13 +388,25 @@ into the value.
 .D1 static ip_address=
 .D1 destination routers
 .It Ic timeout Ar seconds
-The default timeout for waiting for a DHCP response is 30 seconds which may
-be too long or too short and can be changed here.
+Timeout after
+.Ar seconds ,
+instead of the default 30.
 A setting of 0
 .Ar seconds
 causes
 .Nm dhcpcd
 to wait forever to get a lease.
+If
+.Nm dhcpcd
+is working on a single interface then
+.Nm dhcpcd
+will exit when a timeout occurs, otherwise
+.Nm dhcpcd
+will fork into the background.
+If using IPv4LL then
+.Nm dhcpcd
+start the IPv4LL process after the timeout and then wait a little longer
+before really timing out.
 .It Ic userclass Ar string
 Tag the DHCP messages with the userclass.
 You can specify more than one.
