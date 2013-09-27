@@ -159,7 +159,8 @@ cleanup(void)
 	free(ifdv);
 #endif
 
-	dev_stop();
+	if (!(options & DHCPCD_FORKED))
+		dev_stop();
 	if (linkfd != -1)
 		close(linkfd);
 	if (pidfd > -1) {
