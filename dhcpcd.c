@@ -1238,7 +1238,7 @@ main(int argc, char **argv)
 			syslog(LOG_ERR, "%s: interface not found or invalid",
 			    ifv[i]);
 	}
-	if (ifaces == NULL) {
+	if (ifaces == NULL || TAILQ_FIRST(ifaces) == NULL) {
 		if (ifc == 0)
 			syslog(LOG_ERR, "no valid interfaces found");
 		else
