@@ -69,6 +69,7 @@ dev_stop(void)
 	if (dev) {
 		syslog(LOG_DEBUG, "dev: unloaded %s", dev->name);
 		dev->stop();
+		free(dev);
 		dev = NULL;
 	}
 	if (handle) {
@@ -91,7 +92,8 @@ dev_start2(const char *name)
 		syslog(LOG_ERR, "dlopen: %s", dlerror());
 		return -1;
 	}
-	fptr = (void (*)(struct dev *, const struct dev_dhcpcd *))dlsym(h, "dev_init");
+	fptr = (void (*)(struct dev *, const struct dev_dhcpcd *))
+	    dlsym(h, "dev_init");
 	if (fptr == NULL) {
 		syslog(LOG_ERR, "dlsym: %s", dlerror());
 		dlclose(h);
@@ -140,6 +142,7 @@ dev_start1(const char *plugin)
 		if (r != -1)
 			break;
 	}
+	closedir(dp);
 	return r;
 }
 
