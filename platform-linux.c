@@ -179,7 +179,7 @@ int
 check_ipv6(const char *ifname, int own)
 {
 	static int ipv6_checked = 0;
-	int ra, forward, ex, i;
+	int ra, ex, i;
 	char path[256], *p, **nrest;
 
 	if (ifname == NULL) {
@@ -220,13 +220,13 @@ check_ipv6(const char *ifname, int own)
 			p = strdup(ifname);
 			if (p == NULL) {
 				syslog(LOG_ERR, "%s: %m", __func__);
-				goto forward;
+				return ra;
 			}
 			nrest = realloc(restore,
 			    (nrestore + 1) * sizeof(char *));
 			if (nrest == NULL) {
 				syslog(LOG_ERR, "%s: %m", __func__);
-				goto forward;
+				return ra;
 			}
 			restore = nrest;
 			restore[nrestore++] = p;
@@ -236,22 +236,6 @@ check_ipv6(const char *ifname, int own)
 			atexit(restore_kernel_ra);
 	}
 
-forward:
-	if (ra != 2) {
-		snprintf(path, sizeof(path), "%s/%s/forwarding",
-		    prefix, ifname);
-		forward = check_proc_int(path);
-		if (forward == -1) {
-			/* The sysctl probably doesn't exist, but this isn't an
-			 * error as such so just log it and continue */
-			syslog(errno == ENOENT ? LOG_DEBUG : LOG_WARNING,
-			    "%s: %m", path);
-		} else if (forward != 0) {
-			syslog(LOG_WARNING,
-			    "%s: configured as a router, not a host", ifname);
-			return 0;
-		}
-	}
 	return ra;
 }
 
