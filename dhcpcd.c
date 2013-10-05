@@ -188,6 +188,11 @@ handle_exit_timeout(__unused void *arg)
 	syslog(LOG_ERR, "timed out");
 	if (!(options & DHCPCD_IPV4) || !(options & DHCPCD_TIMEOUT_IPV4LL)) {
 		if (options & DHCPCD_MASTER) {
+			/* We've timed out, so remove the waitip requirements.
+			 * If the user doesn't like this they can always set
+			 * an infinite timeout. */
+			options &=
+			    ~(DHCPCD_WAITIP | DHCPCD_WAITIP4 | DHCPCD_WAITIP6);
 			daemonise();
 			return;
 		} else
