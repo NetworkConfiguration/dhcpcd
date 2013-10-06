@@ -1538,7 +1538,8 @@ dhcp6_validatelease(struct interface *ifp,
 	state = D6_STATE(ifp);
 	o = dhcp6_getoption(ifp->options->ia_type, m, len);
 	if (o == NULL) {
-		if (sfrom)
+		if (sfrom &&
+		    dhcp6_checkstatusok(ifp, m, NULL, len) != -1)
 			syslog(LOG_ERR, "%s: no IA in REPLY from %s",
 			    ifp->name, sfrom);
 		return -1;
@@ -1852,6 +1853,22 @@ dhcp6_delegate_prefix(struct interface *ifp)
 		if (k && !carrier_warned) {
 			ifd_state = D6_STATE(ifd);
 			ipv6nd_probeaddrs(&ifd_state->addrs);
+		}
+	}
+
+	/* Warn about configured interfaces for delegation that do not exist */
+	for (i = 0; i < ifo->iaid_len; i++) {
+		iaid = &ifo->iaid[i];
+		for (j = 0; j < iaid->sla_len; j++) {
+			sla = &iaid->sla[j];
+			for (k = 0; k < i; j++)
+				if (strcmp(sla->ifname, iaid->sla[j].ifname) == 0)
+					break;
+			if (j >= i && find_interface(sla->ifname) == NULL)
+				syslog(LOG_ERR,
+				    "%s: interface does not exist"
+				    " for delegation",
+				    sla->ifname);
 		}
 	}
 }
