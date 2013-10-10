@@ -70,6 +70,8 @@ unsigned long long options = 0;
 #define O_HOSTNAME_SHORT	O_BASE + 13
 #define O_DEV			O_BASE + 14
 #define O_NODEV			O_BASE + 15
+#define O_NOIPV4		O_BASE + 16
+#define O_NOIPV6		O_BASE + 17
 
 char *dev_load;
 
@@ -129,6 +131,8 @@ const struct option cf_options[] = {
 	{"ipv6ra_own_default", no_argument,    NULL, O_IPV6RA_OWN_D},
 	{"ipv4only",        no_argument,       NULL, '4'},
 	{"ipv6only",        no_argument,       NULL, '6'},
+	{"noipv4",          no_argument,       NULL, O_NOIPV4},
+	{"noipv6",          no_argument,       NULL, O_NOIPV6},
 	{"noalias",         no_argument,       NULL, O_NOALIAS},
 	{"ia_na",           no_argument,       NULL, O_IA_NA},
 	{"ia_ta",           no_argument,       NULL, O_IA_TA},
@@ -908,6 +912,12 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	case '6':
 		ifo->options &= ~DHCPCD_IPV4;
 		ifo->options |= DHCPCD_IPV6;
+		break;
+	case O_NOIPV4:
+		ifo->options &= ~DHCPCD_IPV4;
+		break;
+	case O_NOIPV6:
+		ifo->options &= ~DHCPCD_IPV6;
 		break;
 #ifdef INET
 	case O_ARPING:
