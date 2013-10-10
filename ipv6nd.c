@@ -1460,9 +1460,7 @@ ipv6nd_probeaddrs(struct ipv6_addrhead *addrs)
 				eloop_q_timeout_delete(0, NULL,
 				    ap->dadcallback);
 			free(ap);
-		} else if (!IN6_IS_ADDR_UNSPECIFIED(&ap->addr) &&
-		    !(ap->flags & IPV6_AF_DELEGATED))
-		{
+		} else if (!IN6_IS_ADDR_UNSPECIFIED(&ap->addr)) {
 			ipv6nd_probeaddr(ap);
 			if (ap->flags & IPV6_AF_NEW)
 				i++;

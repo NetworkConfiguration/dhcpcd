@@ -1027,6 +1027,7 @@ dhcp6_startrebind(void *arg)
 
 	/* RFC 3633 section 12.1 */
 	if (ifp->options->ia_type == D6_OPTION_IA_PD) {
+		syslog(LOG_INFO, "%s: confirming Prefix Delegation", ifp->name);
 		state->IMD = CNF_MAX_DELAY;
 		state->IRT = CNF_TIMEOUT;
 		state->MRT = CNF_MAX_RT;
@@ -1330,33 +1331,40 @@ dhcp6_findna(struct interface *ifp, const uint8_t *iaid,
 			memcpy(a->iaid, iaid, sizeof(a->iaid));
 			memcpy(&a->addr.s6_addr, &in6.s6_addr,
 			    sizeof(in6.s6_addr));
-		}
-		/*
-		 * RFC 5942 Section 5
-		 * We cannot assume any prefix length, nor tie the address
-		 * to an existing one as it could expire before the address.
-		 * As such we just give it a 128 prefix.
-		 */
-		a->prefix_len = 128;
-		if (ipv6_makeprefix(&a->prefix, &a->addr, a->prefix_len) == -1)
-		{
-			syslog(LOG_ERR, "%s: %m", __func__);
-			free(a);
-			continue;
+
+			/*
+			 * RFC 5942 Section 5
+			 * We cannot assume any prefix length, nor tie the
+			 * address to an existing one as it could expire
+			 * before the address.
+			 * As such we just give it a 128 prefix.
+			 */
+			a->prefix_len = 128;
+			if (ipv6_makeprefix(&a->prefix, &a->addr,
+			    a->prefix_len) == -1)
+			{
+				syslog(LOG_ERR, "%s: %m", __func__);
+				free(a);
+				continue;
+			}
+			ia = inet_ntop(AF_INET6, &a->addr.s6_addr,
+			    iabuf, sizeof(iabuf));
+			snprintf(a->saddr, sizeof(a->saddr),
+			    "%s/%d", ia, a->prefix_len);
 		}
 		memcpy(&u32, p, sizeof(u32));
 		a->prefix_pltime = ntohl(u32);
 		p += sizeof(u32);
 		memcpy(&u32, p, sizeof(u32));
-		a->prefix_vltime = ntohl(u32);
+		u32 = ntohl(u32);
+		if (a->prefix_vltime != u32) {
+			a->flags |= IPV6_AF_NEW;
+			a->prefix_vltime = u32;
+		}
 		if (a->prefix_pltime && a->prefix_pltime < state->lowpl)
 		    state->lowpl = a->prefix_pltime;
 		if (a->prefix_vltime && a->prefix_vltime > state->expire)
 		    state->expire = a->prefix_vltime;
-		ia = inet_ntop(AF_INET6, &a->addr.s6_addr,
-		    iabuf, sizeof(iabuf));
-		snprintf(a->saddr, sizeof(a->saddr),
-		    "%s/%d", ia, a->prefix_len);
 		if (a->flags & IPV6_AF_STALE)
 			a->flags &= ~IPV6_AF_STALE;
 		else
@@ -1377,8 +1385,9 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 	char iabuf[INET6_ADDRSTRLEN];
 	const char *ia;
 	int i;
-	uint8_t u8;
-	uint32_t u32;
+	uint8_t u8, len;
+	uint32_t u32, pltime, vltime;
+	struct in6_addr prefix;
 
 	i = 0;
 	state = D6_STATE(ifp);
@@ -1394,37 +1403,53 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			    ifp->name);
 			continue;
 		}
-		a = calloc(1, sizeof(*a));
-		if (a == NULL) {
-			syslog(LOG_ERR, "%s: %m", __func__);
-			break;
-		}
-		a->iface = ifp;
-		a->flags = IPV6_AF_NEW;
-		a->dadcallback = dhcp6_dadcallback;
-		memcpy(a->iaid, iaid, sizeof(a->iaid));
 		p = D6_COPTION_DATA(o);
 		memcpy(&u32, p, sizeof(u32));
-		a->prefix_pltime = ntohl(u32);
+		pltime = ntohl(u32);
 		p += sizeof(u32);
 		memcpy(&u32, p, sizeof(u32));
 		p += sizeof(u32);
-		a->prefix_vltime = ntohl(u32);
+		vltime = ntohl(u32);
+		memcpy(&u8, p, sizeof(u8));
+		p += sizeof(u8);
+		len = u8;
+		memcpy(&prefix.s6_addr, p, sizeof(prefix.s6_addr));
+		p += sizeof(prefix.s6_addr);
+
+		TAILQ_FOREACH(a, &state->addrs, next) {
+			if (IN6_ARE_ADDR_EQUAL(&a->prefix, &prefix))
+				break;
+		}
+		if (a == NULL) {
+			a = calloc(1, sizeof(*a));
+			if (a == NULL) {
+				syslog(LOG_ERR, "%s: %m", __func__);
+				break;
+			}
+			a->iface = ifp;
+			a->flags = IPV6_AF_NEW;
+			a->dadcallback = dhcp6_dadcallback;
+			memcpy(a->iaid, iaid, sizeof(a->iaid));
+			memcpy(&a->prefix.s6_addr,
+			    &prefix.s6_addr, sizeof(a->prefix.s6_addr));
+			a->prefix_len = len;
+			ia = inet_ntop(AF_INET6, &a->prefix.s6_addr,
+			    iabuf, sizeof(iabuf));
+			snprintf(a->saddr, sizeof(a->saddr),
+			    "%s/%d", ia, a->prefix_len);
+		} else if (a->prefix_vltime != vltime)
+			a->flags |= IPV6_AF_NEW;
+
+		a->prefix_pltime = pltime;
+		a->prefix_vltime = vltime;
 		if (a->prefix_pltime && a->prefix_pltime < state->lowpl)
 			state->lowpl = a->prefix_pltime;
 		if (a->prefix_vltime && a->prefix_vltime > state->expire)
 			state->expire = a->prefix_vltime;
-		memcpy(&u8, p, sizeof(u8));
-		p += sizeof(u8);
-		a->prefix_len = u8;
-		memcpy(&a->prefix.s6_addr, p, sizeof(a->prefix.s6_addr));
-		p += sizeof(a->prefix.s6_addr);
-		ia = inet_ntop(AF_INET6, &a->prefix.s6_addr,
-		    iabuf, sizeof(iabuf));
-		snprintf(a->saddr, sizeof(a->saddr),
-		    "%s/%d", ia, a->prefix_len);
-		memset(a->addr.s6_addr, 0, sizeof(a->addr.s6_addr));
-		TAILQ_INSERT_TAIL(&state->addrs, a, next);
+		if (a->flags & IPV6_AF_STALE)
+			a->flags &= ~IPV6_AF_STALE;
+		else
+			TAILQ_INSERT_TAIL(&state->addrs, a, next);
 		i++;
 	}
 	return i;
@@ -1447,10 +1472,8 @@ dhcp6_findia(struct interface *ifp, const uint8_t *d, size_t l,
 	ifo = ifp->options;
 	i = 0;
 	state = D6_STATE(ifp);
-	if (ifo->ia_type != D6_OPTION_IA_PD) {
-		TAILQ_FOREACH(ap, &state->addrs, next) {
-			ap->flags |= IPV6_AF_STALE;
-		}
+	TAILQ_FOREACH(ap, &state->addrs, next) {
+		ap->flags |= IPV6_AF_STALE;
 	}
 	while ((o = dhcp6_findoption(ifo->ia_type, d, l))) {
 		l -= ((const uint8_t *)o - d);
@@ -1496,7 +1519,6 @@ dhcp6_findia(struct interface *ifp, const uint8_t *d, size_t l,
 		if (dhcp6_checkstatusok(ifp, NULL, p, ol) == -1)
 			return -1;
 		if (ifo->ia_type == D6_OPTION_IA_PD) {
-			dhcp6_freedrop_addrs(ifp, 0, NULL);
 			if (dhcp6_findpd(ifp, iaid, p, ol) == 0) {
 				syslog(LOG_ERR,
 				    "%s: %s: DHCPv6 REPLY missing Prefix",
@@ -1513,15 +1535,13 @@ dhcp6_findia(struct interface *ifp, const uint8_t *d, size_t l,
 		}
 		i++;
 	}
-	if (ifo->ia_type != D6_OPTION_IA_PD) {
-		TAILQ_FOREACH_SAFE(ap, &state->addrs, next, nap) {
-			if (ap->flags & IPV6_AF_STALE) {
-				TAILQ_REMOVE(&state->addrs, ap, next);
-				if (ap->dadcallback)
-					eloop_q_timeout_delete(0, NULL,
-					    ap->dadcallback);
-				free(ap);
-			}
+	TAILQ_FOREACH_SAFE(ap, &state->addrs, next, nap) {
+		if (ap->flags & IPV6_AF_STALE) {
+			TAILQ_REMOVE(&state->addrs, ap, next);
+			if (ap->dadcallback)
+				eloop_q_timeout_delete(0, NULL,
+				    ap->dadcallback);
+			free(ap);
 		}
 	}
 	return i;
@@ -1696,7 +1716,7 @@ dhcp6_delegate_addr(struct interface *ifp, const struct ipv6_addr *prefix,
 	struct dhcp6_state *state;
 	struct if_sla asla;
 	struct in6_addr addr;
-	struct ipv6_addr *a, *ap;
+	struct ipv6_addr *a, *ap, *apn;
 	char iabuf[INET6_ADDRSTRLEN];
 	const char *ia;
 
@@ -1768,11 +1788,12 @@ dhcp6_delegate_addr(struct interface *ifp, const struct ipv6_addr *prefix,
 	}
 
 	/* Remove any exiting address */
-	TAILQ_FOREACH(ap, &state->addrs, next) {
+	TAILQ_FOREACH_SAFE(ap, &state->addrs, next, apn) {
 		if (IN6_ARE_ADDR_EQUAL(&ap->addr, &a->addr)) {
 			TAILQ_REMOVE(&state->addrs, ap, next);
 			/* Keep our flags */
 			a->flags |= ap->flags;
+			a->flags &= ~IPV6_AF_NEW;
 			free(ap);
 		}
 	}
