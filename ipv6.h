@@ -66,11 +66,6 @@
 #  endif
 #endif
 
-#if defined(LISTEN_DAD) && defined(INET6)
-#  warning kernel does not report DAD results to userland
-#  warning listening to duplicated addresses on the wire
-#endif
-
 struct ipv6_addr {
 	TAILQ_ENTRY(ipv6_addr) next;
 	struct interface *iface;

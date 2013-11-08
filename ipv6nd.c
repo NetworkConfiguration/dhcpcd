@@ -54,6 +54,11 @@
 #include "ipv6nd.h"
 #include "script.h"
 
+#if defined(LISTEN_DAD) && defined(INET6)
+#  warning kernel does not report DAD results to userland
+#  warning listening to duplicated addresses on the wire
+#endif
+
 /* Debugging Router Solicitations is a lot of spam, so disable it */
 //#define DEBUG_RS
 
