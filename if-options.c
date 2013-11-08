@@ -594,7 +594,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	case 'v':
 		p = strchr(arg, ',');
 		if (!p || !p[1]) {
-			syslog(LOG_ERR, "invalid vendor format");
+			syslog(LOG_ERR, "invalid vendor format: %s", arg);
 			return -1;
 		}
 
@@ -618,14 +618,15 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			ifo->vendor[0] = 0;
 		}
 
-		*p = '\0';
+		/* No need to strip the comma */
 		i = atoint(arg);
-		arg = p + 1;
 		if (i < 1 || i > 254) {
 			syslog(LOG_ERR, "vendor option should be between"
 			    " 1 and 254 inclusive");
 			return -1;
 		}
+
+		arg = p + 1;
 		s = VENDOR_MAX_LEN - ifo->vendor[0] - 2;
 		if (inet_aton(arg, &addr) == 1) {
 			if (s < 6) {
