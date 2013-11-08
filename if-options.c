@@ -632,9 +632,11 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			if (s < 6) {
 				s = -1;
 				errno = ENOBUFS;
-			} else
+			} else {
 				memcpy(ifo->vendor + ifo->vendor[0] + 3,
 				    &addr.s_addr, sizeof(addr.s_addr));
+				s = sizeof(addr.s_addr);
+			}
 		} else {
 			s = parse_string((char *)ifo->vendor +
 			    ifo->vendor[0] + 3, s, arg);
@@ -1157,6 +1159,10 @@ finish_config(struct if_options *ifo)
 	if (ifo->vendor[0] && !(ifo->options & DHCPCD_VENDORRAW)) {
 		ifo->vendor[0]++;
 		ifo->vendor[ifo->vendor[0]] = DHO_END;
+		/* We are called twice.
+		 * This should be fixed, but in the meantime, this
+		 * guard should suffice */
+		ifo->options |= DHCPCD_VENDORRAW;
 	}
 }
 
