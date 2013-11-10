@@ -355,7 +355,7 @@ if [ -e "$LDELF" ]; then
 fi
 
 # Add CPPFLAGS and CFLAGS to CC for testing features
-XCC="$CC `$SED -n -e 's/CPPLAGS+=*\(.*\)/\1/p' $CONFIG_MK`"
+XCC="$CC `$SED -n -e 's/CPPFLAGS+=*\(.*\)/\1/p' $CONFIG_MK`"
 XCC="$XCC `$SED -n -e 's/CFLAGS+=*\(.*\)/\1/p' $CONFIG_MK`"
 
 abort=false
