@@ -265,15 +265,21 @@ fi
 $CC --version | $SED -e '1!d'
 echo "CC=		$CC" >>$CONFIG_MK
 
+# Set to blank, then append user config
+# We do this so our SED call to append to XCC remains portable
+echo "CFLAGS=" >>$CONFIG_MK
+echo "CPPFLAGS=" >>$CONFIG_MK
+echo "LDFLAGS=" >>$CONFIG_MK
 if [ -n "$CFLAGS" ]; then
-	echo "CFLAGS=		$CFLAGS" >>$CONFIG_MK
+	echo "CFLAGS+=	$CFLAGS" >>$CONFIG_MK
 fi
 if [ -n "$CPPFLAGS" ]; then
-	echo "CPPFLAGS=		$CPPFLAGS" >>$CONFIG_MK
+	echo "CPPFLAGS+=	$CPPFLAGS" >>$CONFIG_MK
 fi
 if [ -n "$LDFLAGS" ]; then
-	echo "LDFLAGS=		$LDFLAGS" >>$CONFIG_MK
+	echo "LDFLAGS+=	$LDFLAGS" >>$CONFIG_MK
 fi
+
 if [ "$STATIC" = yes ]; then
 	echo "LDFLAGS+=	-static" >>$CONFIG_MK
 fi
