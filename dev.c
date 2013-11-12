@@ -159,6 +159,11 @@ int
 dev_start(const char *plugin)
 {
 
+	if (fd != -1) {
+		syslog(LOG_ERR, "%s: already started on fd %d", __func__, fd);
+		return fd;
+	}
+
 	fd = dev_start1(plugin);
 	if (fd != -1) {
 		if (eloop_event_add(fd, dev_handle_data, NULL) == -1) {
