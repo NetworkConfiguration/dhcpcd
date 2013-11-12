@@ -53,7 +53,6 @@ ipv4_opensocket(struct interface *ifp, int protocol)
 {
 	struct dhcp_state *state;
 	int fd = -1;
-	int *fdp = NULL;
 	struct ifreq ifr;
 	int buf_len = 0;
 	struct bpf_version pv;
@@ -117,21 +116,14 @@ ipv4_opensocket(struct interface *ifp, int protocol)
 	if (protocol == ETHERTYPE_ARP) {
 		pf.bf_insns = UNCONST(arp_bpf_filter);
 		pf.bf_len = arp_bpf_filter_len;
-		fdp = &state->arp_fd;
 	} else {
 		pf.bf_insns = UNCONST(dhcp_bpf_filter);
 		pf.bf_len = dhcp_bpf_filter_len;
-		fdp = &state->raw_fd;
 	}
 	if (ioctl(fd, BIOCSETF, &pf) == -1)
 		goto eexit;
 	if (set_cloexec(fd) == -1)
 		goto eexit;
-	if (fdp) {
-		if (*fdp != -1)
-			close(*fdp);
-		*fdp = fd;
-	}
 	return fd;
 
 eexit:

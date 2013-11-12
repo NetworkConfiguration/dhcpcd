@@ -2423,12 +2423,12 @@ dhcp_handlepacket(void *arg)
 static int
 dhcp_open(struct interface *ifp)
 {
-	int r = 0;
 	struct dhcp_state *state;
 
 	state = D_STATE(ifp);
 	if (state->raw_fd == -1) {
-		if ((r = ipv4_opensocket(ifp, ETHERTYPE_IP)) == -1) {
+		state->raw_fd = ipv4_opensocket(ifp, ETHERTYPE_IP);
+		if (state->raw_fd == -1) {
 			syslog(LOG_ERR, "%s: %s: %m", __func__, ifp->name);
 			return -1;
 		}

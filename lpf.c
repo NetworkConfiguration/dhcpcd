@@ -76,8 +76,6 @@ ipv4_opensocket(struct interface *ifp, int protocol)
 		struct sockaddr_storage ss;
 	} su;
 	struct sock_fprog pf;
-	int *fd;
-	struct dhcp_state *state;
 #ifdef PACKET_AUXDATA
 	int n;
 #endif
@@ -113,14 +111,6 @@ ipv4_opensocket(struct interface *ifp, int protocol)
 		goto eexit;
 	if (bind(s, &su.sa, sizeof(su)) == -1)
 		goto eexit;
-	state = D_STATE(ifp);
-	if (protocol == ETHERTYPE_ARP)
-		fd = &state->arp_fd;
-	else
-		fd = &state->raw_fd;
-	if (*fd != -1)
-		close(*fd);
-	*fd = s;
 	return s;
 
 eexit:

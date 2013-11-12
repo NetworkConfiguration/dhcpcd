@@ -220,7 +220,11 @@ arp_announce(void *arg)
 	if (state->new == NULL)
 		return;
 	if (state->arp_fd == -1) {
-		ipv4_opensocket(ifp, ETHERTYPE_ARP);
+		state->arp_fd = ipv4_opensocket(ifp, ETHERTYPE_ARP);
+		if (state->arp_fd == -1) {
+			syslog(LOG_ERR, "%s: %s: %m", __func__, ifp->name);
+			return;
+		}
 		eloop_event_add(state->arp_fd, arp_packet, ifp);
 	}
 	if (++state->claims < ANNOUNCE_NUM)
@@ -267,8 +271,11 @@ arp_probe(void *arg)
 	int arping = 0;
 
 	if (state->arp_fd == -1) {
-		if (ipv4_opensocket(ifp, ETHERTYPE_ARP) == -1)
+		state->arp_fd = ipv4_opensocket(ifp, ETHERTYPE_ARP);
+		if (state->arp_fd == -1) {
+			syslog(LOG_ERR, "%s: %s: %m", __func__, ifp->name);
 			return;
+		}
 		eloop_event_add(state->arp_fd, arp_packet, ifp);
 	}
 
