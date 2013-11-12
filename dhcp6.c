@@ -1091,10 +1091,12 @@ dhcp6_startconfirm(struct interface *ifp)
 }
 
 static void
-dhcp6_startinform(struct interface *ifp)
+dhcp6_startinform(void *arg)
 {
+	struct interface *ifp;
 	struct dhcp6_state *state;
 
+	ifp = arg;
 	state = D6_STATE(ifp);
 	if (state->new == NULL || ifp->options->options & DHCPCD_DEBUG)
 		syslog(LOG_INFO, "%s: requesting DHCPv6 information",
@@ -1975,6 +1977,7 @@ dhcp6_handledata(__unused void *arg)
 	struct ipv6_addr *ap;
 	uint8_t has_new;
 	int error;
+	uint32_t u32;
 
 	len = recvmsg(sock, &rcvhdr, 0);
 	if (len == -1) {
@@ -2077,9 +2080,20 @@ dhcp6_handledata(__unused void *arg)
 	op = dhcp6_get_op(r->type);
 	switch(r->type) {
 	case DHCP6_REPLY:
-		if (state->state == DH6S_INFORM)
-			break;
 		switch(state->state) {
+		case DH6S_INFORM:
+			/* RFC4242 */
+			o = dhcp6_getoption(D6_OPTION_INFO_REFRESH_TIME,
+			    r, len);
+			if (o == NULL || ntohs(o->len) != sizeof(u32))
+				state->renew = IRT_DEFAULT;
+			else {
+				memcpy(&u32, D6_COPTION_DATA(o), sizeof(u32));
+				state->renew = ntohl(u32);
+				if (state->renew < IRT_MINIMUM)
+					state->renew = IRT_MINIMUM;
+			}
+			break;
 		case DH6S_CONFIRM:
 			error = dhcp6_checkstatusok(ifp, r, NULL, len);
 			/* If we got an OK status the chances are that we
@@ -2095,7 +2109,7 @@ dhcp6_handledata(__unused void *arg)
 			break;
 		case DH6S_DISCOVER:
 			if (has_option_mask(ifo->requestmask6,
-			    D6_OPTION_RAPID_COMMIT)  &&
+			    D6_OPTION_RAPID_COMMIT) &&
 			    dhcp6_getoption(D6_OPTION_RAPID_COMMIT, r, len))
 				state->state = DH6S_REQUEST;
 			else
@@ -2172,7 +2186,6 @@ recv:
 	eloop_timeout_delete(NULL, ifp);
 	switch(state->state) {
 	case DH6S_INFORM:
-		state->renew = 0;
 		state->rebind = 0;
 		state->expire = ND6_INFINITE_LIFETIME;
 		state->lowpl = ND6_INFINITE_LIFETIME;
@@ -2189,6 +2202,7 @@ recv:
 	case DH6S_REBIND:
 		if (state->reason == NULL)
 			state->reason = "REBIND6";
+		/* FALLTHROUGH */
 	case DH6S_CONFIRM:
 		if (state->reason == NULL)
 			state->reason = "REBOOT6";
@@ -2229,7 +2243,8 @@ recv:
 			state->state = DH6S_BOUND;
 		if (state->renew && state->renew != ND6_INFINITE_LIFETIME)
 			eloop_timeout_add_sec(state->renew,
-			    dhcp6_startrenew, ifp);
+			    state->state == DH6S_INFORMED ?
+			    dhcp6_startinform : dhcp6_startrenew, ifp);
 		if (state->rebind && state->rebind != ND6_INFINITE_LIFETIME)
 			eloop_timeout_add_sec(state->rebind,
 			    dhcp6_startrebind, ifp);
@@ -2239,7 +2254,11 @@ recv:
 		if (ifp->options->ia_type == D6_OPTION_IA_PD)
 			dhcp6_delegate_prefix(ifp);
 		ipv6nd_probeaddrs(&state->addrs);
-		if (state->renew || state->rebind)
+		if (state->state == DH6S_INFORMED)
+			syslog(has_new ? LOG_INFO : LOG_DEBUG,
+			    "%s: refresh in %"PRIu32" seconds",
+			    ifp->name, state->renew);
+		else if (state->renew || state->rebind)
 			syslog(has_new ? LOG_INFO : LOG_DEBUG,
 			    "%s: renew in %"PRIu32" seconds,"
 			    " rebind in %"PRIu32" seconds",
@@ -2364,10 +2383,13 @@ dhcp6_start1(void *arg)
 			add_option_mask(ifo->requestmask6, D6_OPTION_FQDN);
 	}
 
-	if (state->state == DH6S_INFORM)
+	if (state->state == DH6S_INFORM) {
+		add_option_mask(ifo->requestmask6, D6_OPTION_INFO_REFRESH_TIME);
 		dhcp6_startinform(ifp);
-	else
+	} else {
+		del_option_mask(ifo->requestmask6, D6_OPTION_INFO_REFRESH_TIME);
 		dhcp6_startinit(ifp);
+	}
 }
 
 int

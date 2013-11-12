@@ -142,6 +142,10 @@ struct dhcp6_status {
 #define REC_MAX_RC		8
 #define HOP_COUNT_LIMIT		32
 
+/* RFC4242 3.1 */
+#define IRT_DEFAULT		86400
+#define IRT_MINIMUM		600
+
 #define DHCP6_RAND_MIN		-100
 #define DHCP6_RAND_MAX		100
 
