@@ -570,6 +570,7 @@ ipv6nd_dadcallback(void *arg)
 			if (rap->iface != ifp)
 				continue;
 			wascompleted = 1;
+			found = 0;
 			TAILQ_FOREACH(rapap, &rap->addrs, next) {
 				if (rapap->flags & IPV6_AF_AUTOCONF &&
 				    (rapap->flags & IPV6_AF_DADCOMPLETED) == 0)
