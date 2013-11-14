@@ -310,7 +310,7 @@ process running on the
 .Ar interface
 to release its lease and de-configure the
 .Ar interface .
-If no 
+If no
 .Ar interface
 is specified then this applies to all interfaces.
 If no interfaces are left running,
@@ -333,7 +333,7 @@ An extra 100 will be added for wireless interfaces.
 Notifies
 .Nm
 to reload its configuration and rebind the specified
-.Ar interface . 
+.Ar interface .
 If no interface is specified then this applies to all interfaces.
 If
 .Nm
