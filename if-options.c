@@ -72,6 +72,7 @@ unsigned long long options = 0;
 #define O_NODEV			O_BASE + 15
 #define O_NOIPV4		O_BASE + 16
 #define O_NOIPV6		O_BASE + 17
+#define O_IAID			O_BASE + 18
 
 char *dev_load;
 
@@ -134,6 +135,7 @@ const struct option cf_options[] = {
 	{"noipv4",          no_argument,       NULL, O_NOIPV4},
 	{"noipv6",          no_argument,       NULL, O_NOIPV6},
 	{"noalias",         no_argument,       NULL, O_NOALIAS},
+	{"iaid",            no_argument,       NULL, O_IAID},
 	{"ia_na",           no_argument,       NULL, O_IA_NA},
 	{"ia_ta",           no_argument,       NULL, O_IA_TA},
 	{"ia_pd",           no_argument,       NULL, O_IA_PD},
@@ -334,6 +336,35 @@ parse_string_hwaddr(char *sbuf, ssize_t slen, const char *str, int clid)
 	return l;
 }
 
+static int
+parse_iaid(uint8_t *iaid, const char *arg, size_t len)
+{
+	unsigned long l;
+	size_t s;
+	uint32_t u32;
+	char *np;
+
+	errno = 0;
+	l = strtoul(arg, &np, 0);
+	if (l <= (unsigned long)UINT32_MAX && errno == 0 && *np == '\0') {
+		u32 = htonl(l);
+		memcpy(iaid, &u32, sizeof(u32));
+		return 0;
+	}
+
+	if ((s = parse_string((char *)iaid, len, arg)) < 1) {
+		syslog(LOG_ERR, "%s: invalid IAID", arg);
+		return -1;
+	}
+	if (s < 4)
+		iaid[3] = '\0';
+	if (s < 3)
+		iaid[2] = '\0';
+	if (s < 2)
+		iaid[1] = '\0';
+	return 0;
+}
+
 static char **
 splitv(int *argc, char **argv, const char *arg)
 {
@@ -449,11 +480,9 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	const struct dhcp_opt *d;
 	uint8_t *request, *require, *no;
 #ifdef INET6
-	long l;
-	uint32_t u32;
 	size_t sl;
-	struct if_iaid *iaid;
-	uint8_t _iaid[4];
+	struct if_ia *ia;
+	uint8_t iaid[4];
 	struct if_sla *sla, *slap;
 #endif
 
@@ -520,7 +549,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			return -1;
 		}
 		errno = 0;
-		ifo->leasetime = (uint32_t)strtol(arg, NULL, 0);
+		ifo->leasetime = (uint32_t)strtoul(arg, NULL, 0);
 		if (errno == EINVAL || errno == ERANGE) {
 			syslog(LOG_ERR, "`%s' out of range", arg);
 			return -1;
@@ -954,6 +983,10 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		}
 		break;
 #endif
+	case O_IAID:
+		if (parse_iaid(ifo->iaid, arg, sizeof(ifo->iaid)) == -1)
+			return -1;
+		ifo->options |= DHCPCD_IAID;
 	case O_IPV6RS:
 		ifo->options |= DHCPCD_IPV6RS;
 		break;
@@ -994,52 +1027,34 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		fp = strchr(arg, ' ');
 		if (fp)
 			*fp++ = '\0';
-		errno = 0;
-		l = strtol(arg, &np, 0);
-		if (l >= 0 && l <= (long)UINT32_MAX &&
-		    errno == 0 && *np == '\0')
-		{
-			u32 = htonl(l);
-			memcpy(&_iaid, &u32, sizeof(_iaid));
-			goto got_iaid;
-		}
-		if ((s = parse_string((char *)_iaid, sizeof(_iaid), arg)) < 1) {
-			syslog(LOG_ERR, "%s: invalid IAID", arg);
+		if (parse_iaid(iaid, arg, sizeof(iaid)) == -1)
 			return -1;
-		}
-		if (s < 4)
-			_iaid[3] = '\0';
-		if (s < 3)
-			_iaid[2] = '\0';
-		if (s < 2)
-			_iaid[1] = '\0';
-got_iaid:
-		iaid = NULL;
-		for (sl = 0; sl < ifo->iaid_len; sl++) {
-			if (ifo->iaid[sl].iaid[0] == _iaid[0] &&
-			    ifo->iaid[sl].iaid[1] == _iaid[1] &&
-			    ifo->iaid[sl].iaid[2] == _iaid[2] &&
-			    ifo->iaid[sl].iaid[3] == _iaid[3])
+		ia = NULL;
+		for (sl = 0; sl < ifo->ia_len; sl++) {
+			if (ifo->ia[sl].iaid[0] == iaid[0] &&
+			    ifo->ia[sl].iaid[1] == iaid[1] &&
+			    ifo->ia[sl].iaid[2] == iaid[2] &&
+			    ifo->ia[sl].iaid[3] == iaid[3])
 			{
-			        iaid = &ifo->iaid[sl];
+			        ia = &ifo->ia[sl];
 				break;
 			}
 		}
-		if (iaid == NULL) {
-			iaid = realloc(ifo->iaid,
-			    sizeof(*ifo->iaid) * (ifo->iaid_len + 1));
-			if (iaid == NULL) {
+		if (ia == NULL) {
+			ia = realloc(ifo->ia,
+			    sizeof(*ifo->ia) * (ifo->ia_len + 1));
+			if (ia == NULL) {
 				syslog(LOG_ERR, "%s: %m", __func__);
 				return -1;
 			}
-			ifo->iaid = iaid;
-			iaid = &ifo->iaid[ifo->iaid_len++];
-			iaid->iaid[0] = _iaid[0];
-			iaid->iaid[1] = _iaid[1];
-			iaid->iaid[2] = _iaid[2];
-			iaid->iaid[3] = _iaid[3];
-			iaid->sla = NULL;
-			iaid->sla_len = 0;
+			ifo->ia = ia;
+			ia = &ifo->ia[ifo->ia_len++];
+			ia->iaid[0] = iaid[0];
+			ia->iaid[1] = iaid[1];
+			ia->iaid[2] = iaid[2];
+			ia->iaid[3] = iaid[3];
+			ia->sla = NULL;
+			ia->sla_len = 0;
 		}
 		if (ifo->ia_type != D6_OPTION_IA_PD)
 			break;
@@ -1047,14 +1062,14 @@ got_iaid:
 			fp = strchr(p, ' ');
 			if (fp)
 				*fp++ = '\0';
-			sla = realloc(iaid->sla,
-			    sizeof(*iaid->sla) * (iaid->sla_len + 1));
+			sla = realloc(ia->sla,
+			    sizeof(*ia->sla) * (ia->sla_len + 1));
 			if (sla == NULL) {
 				syslog(LOG_ERR, "%s: %m", __func__);
 				return -1;
 			}
-			iaid->sla = sla;
-			sla = &iaid->sla[iaid->sla_len++];
+			ia->sla = sla;
+			sla = &ia->sla[ia->sla_len++];
 			np = strchr(p, '/');
 			if (np)
 				*np++ = '\0';
@@ -1090,8 +1105,8 @@ got_iaid:
 				sla->sla_set = 0;
 				/* Sanity - check there are no more
 				 * unspecified SLA's */
-				for (sl = 0; sl < iaid->sla_len - 1; sl++) {
-					slap = &iaid->sla[sl];
+				for (sl = 0; sl < ia->sla_len - 1; sl++) {
+					slap = &ia->sla[sl];
 					if (slap->sla_set == 0 &&
 					    strcmp(slap->ifname, sla->ifname)
 					    == 0)
@@ -1101,14 +1116,14 @@ got_iaid:
 						    "same interface twice with "
 						    "an automatic SLA",
 						    sla->ifname);
-						iaid->sla_len--;
+						ia->sla_len--;
 						break;
 					}
 				}
 			}
 		}
-		break;
 #endif
+		break;
 	case O_HOSTNAME_SHORT:
 		ifo->options |= DHCPCD_HOSTNAME | DHCPCD_HOSTNAME_SHORT;
 		break;
@@ -1165,39 +1180,6 @@ finish_config(struct if_options *ifo)
 		ifo->options |= DHCPCD_VENDORRAW;
 	}
 }
-
-#ifdef INET6
-static void
-finish_config6(struct if_options *ifo, const char *ifname)
-{
-
-	if (!(ifo->options & DHCPCD_IPV6))
-		ifo->options &= ~DHCPCD_IPV6RS;
-
-	if (ifname && ifo->iaid_len == 0 && ifo->options & DHCPCD_IPV6) {
-		ifo->iaid = malloc(sizeof(*ifo->iaid));
-		if (ifo->iaid == NULL)
-			syslog(LOG_ERR, "%s: %m", __func__);
-		else {
-			if (ifo->ia_type == 0)
-				ifo->ia_type = D6_OPTION_IA_NA;
-			ifo->iaid_len = strlen(ifname);
-			if (ifo->iaid_len <= sizeof(ifo->iaid->iaid)) {
-				strncpy((char *)ifo->iaid->iaid, ifname,
-					sizeof(ifo->iaid->iaid));
-				memset(ifo->iaid->iaid + ifo->iaid_len, 0,
-					sizeof(ifo->iaid->iaid) -ifo->iaid_len);
-			} else {
-				uint32_t idx = if_nametoindex(ifname);
-				memcpy(ifo->iaid->iaid, &idx, sizeof(idx));
-			}
-			ifo->iaid_len = 1;
-			ifo->iaid->sla = NULL;
-			ifo->iaid->sla_len = 0;
-		}
-	}
-}
-#endif
 
 struct if_options *
 read_config(const char *file,
@@ -1290,9 +1272,6 @@ read_config(const char *file,
 	}
 
 	finish_config(ifo);
-#ifdef INET6
-	finish_config6(ifo, ifname);
-#endif
 	return ifo;
 }
 
@@ -1314,9 +1293,6 @@ add_options(struct if_options *ifo, int argc, char **argv)
 	}
 
 	finish_config(ifo);
-#ifdef INET6
-	finish_config6(ifo, NULL);
-#endif
 	return r;
 }
 
@@ -1343,10 +1319,11 @@ free_options(struct if_options *ifo)
 		free(ifo->blacklist);
 		free(ifo->fallback);
 #ifdef INET6
-		for (i = 0; i < ifo->iaid_len; i++)
-			free(ifo->iaid[i].sla);
-		free(ifo->iaid);
+		for (i = 0; i < ifo->ia_len; i++)
+			free(ifo->ia[i].sla);
 #endif
+		free(ifo->ia);
+
 		free(ifo);
 	}
 }

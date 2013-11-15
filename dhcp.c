@@ -2512,8 +2512,7 @@ dhcp_init(struct interface *ifp)
 {
 	struct dhcp_state *state;
 	const struct if_options *ifo;
-	unsigned char *duid;
-	size_t len, ifl;
+	size_t len;
 
 	state = D_STATE(ifp);
 	if (state == NULL) {
@@ -2546,33 +2545,15 @@ dhcp_init(struct interface *ifp)
 			goto eexit;
 		memcpy(state->clientid, ifo->clientid, ifo->clientid[0] + 1);
 	} else if (ifo->options & DHCPCD_CLIENTID) {
-		len = 0;
 		if (ifo->options & DHCPCD_DUID) {
-			duid = malloc(DUID_LEN);
-			if (duid == NULL)
-				goto eexit;
-			if ((len = get_duid(duid, ifp)) == 0)
-				syslog(LOG_ERR, "get_duid: %m");
-		} else
-			duid = NULL;
-		if (len > 0) {
-			state->clientid = malloc(len + 6);
+			state->clientid = malloc(duid_len + 6);
 			if (state->clientid == NULL)
 				goto eexit;
-			state->clientid[0] = len + 5;
+			state->clientid[0] = duid_len + 5;
 			state->clientid[1] = 255; /* RFC 4361 */
-			ifl = strlen(ifp->name);
-			if (ifl < 5) {
-				memcpy(state->clientid + 2, ifp->name, ifl);
-				if (ifl < 4)
-					memset(state->clientid + 2 + ifl,
-					    0, 4 - ifl);
-			} else {
-				ifl = htonl(ifp->index);
-				memcpy(state->clientid + 2, &ifl, 4);
-			}
-			memcpy(state->clientid + 6, duid, len);
-		} else if (len == 0) {
+			memcpy(state->clientid + 2, ifo->iaid, 4);
+			memcpy(state->clientid + 6, duid, duid_len);
+		} else {
 			len = ifp->hwlen + 1;
 			state->clientid = malloc(len + 1);
 			if (state->clientid == NULL)
@@ -2582,7 +2563,6 @@ dhcp_init(struct interface *ifp)
 			memcpy(state->clientid + 2, ifp->hwaddr,
 			    ifp->hwlen);
 		}
-		free(duid);
 	}
 	if (ifo->options & DHCPCD_CLIENTID)
 		syslog(LOG_DEBUG, "%s: using ClientID %s", ifp->name,

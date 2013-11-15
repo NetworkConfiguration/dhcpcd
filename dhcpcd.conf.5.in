@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd October 10, 2013
+.Dd November 15, 2013
 .Dt DHCPCD.CONF 5
 .Os
 .Sh NAME
@@ -135,12 +135,19 @@ Generate an
 .Rs
 .%T "RFC 4361"
 .Re
-compliant clientid.
+compliant DHCP Unique Identifier.
 If persistent storage is available then a DUID-LLT (link local address + time)
 is generated, otherwise DUID-LL is generated (link local address).
+This, plus the IAID will be used as the
+.Ic clientid .
 The DUID-LLT generated will be held in
 .Pa @SYSCONFDIR@/dhcpcd.duid
 and should not be copied to other hosts.
+.It Ic iaid Ar iaid
+Set the Interface Association Identifier to
+.Ar iaid .
+This defaults to the interface name if 4 or less characters.
+If more then it defaults to the interface index.
 .It Ic persistent
 .Nm dhcpcd
 normally de-configures the interface and configuration when it exits.
@@ -172,16 +179,19 @@ option above to control how the hostname is set on the host.
 .It Ic ia_na Op Ar iaid
 Request a DHCPv6 Normal Address for
 .Ar iaid .
-If none is specified, a default
 .Ar iaid
-is used.
-If the interface name is 4 characters or less then that is used,
-otherwise the interface index is used.
-You can request more than one ia_na by specifying a unique iaid for each one.
+defaults to the
+.Ic iaid
+option as described above.
+You can request more than one ia_na by specifying a unique
+.Ar iaid
+for each one.
 .It Ic ia_ta Op Ar iaid
 Request a DHCPv6 Temporary Address for
 .Ar iaid .
-You can request more than one ia_ta by specifying a unique iaid for each one.
+You can request more than one ia_ta by specifying a unique
+.Ar iaid
+for each one.
 .It Ic ia_pd Op Ar iaid Op Ar interface Op / Ar sla_id Op / Ar prefix_len
 Request a DHCPv6 Delegated Prefix for
 .Ar iaid .
@@ -461,5 +471,7 @@ of a randomly generated number.
 .Sh AUTHORS
 .An Roy Marples Aq Mt roy@marples.name
 .Sh BUGS
+When configuring DHCPv6 you can only select one IA type.
+.Pp
 Please report them to
 .Lk http://roy.marples.name/projects/dhcpcd

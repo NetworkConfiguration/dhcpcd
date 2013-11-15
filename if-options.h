@@ -97,6 +97,7 @@
 #define DHCPCD_WAITIP4			(1ULL << 45)
 #define DHCPCD_WAITIP6			(1ULL << 46)
 #define DHCPCD_DEV			(1ULL << 47)
+#define DHCPCD_IAID			(1ULL << 48)
 
 extern const struct option cf_options[];
 
@@ -107,13 +108,16 @@ struct if_sla {
 	int8_t sla_set;
 };
 
-struct if_iaid {
+struct if_ia {
 	uint8_t iaid[4];
+#ifdef INET6
 	size_t sla_len;
 	struct if_sla *sla;
+#endif
 };
 
 struct if_options {
+	uint8_t iaid[4];
 	int metric;
 	uint8_t requestmask[256 / 8];
 	uint8_t requiremask[256 / 8];
@@ -150,10 +154,10 @@ struct if_options {
 	in_addr_t *arping;
 	char *fallback;
 
-#ifdef INET6
 	uint16_t ia_type;
-	size_t iaid_len;
-	struct if_iaid *iaid;
+	struct if_ia *ia;
+	size_t ia_len;
+#ifdef INET6
 	int dadtransmits;
 #endif
 };

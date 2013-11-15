@@ -78,8 +78,6 @@ static struct msghdr rcvhdr;
 static struct iovec rcviov[2];
 static unsigned char *rcvbuf;
 static unsigned char ansbuf[1500];
-static unsigned char *duid;
-static uint16_t duid_len;
 static char ntopbuf[INET6_ADDRSTRLEN];
 static char *status;
 static size_t status_len;
@@ -153,7 +151,6 @@ dhcp6_cleanup(void)
 
 	free(sndbuf);
 	free(rcvbuf);
-	free(duid);
 	free(status);
 }
 #endif
@@ -470,7 +467,7 @@ dhcp6_makemessage(struct interface *ifp)
 		/* FALLTHROUGH */
 	case DH6S_INIT: /* FALLTHROUGH */
 	case DH6S_DISCOVER:
-		len += ifo->iaid_len * (sizeof(*o) + (sizeof(u32) * 3));
+		len += ifo->ia_len * (sizeof(*o) + (sizeof(u32) * 3));
 		IA = 1;
 		break;
 	default:
@@ -567,18 +564,18 @@ dhcp6_makemessage(struct interface *ifp)
 		o->len = 0;
 	}
 
-	for (l = 0; IA && l < ifo->iaid_len; l++) {
+	for (l = 0; IA && l < ifo->ia_len; l++) {
 		o = D6_NEXT_OPTION(o);
 		o->code = htons(ifo->ia_type);
 		o->len = htons(sizeof(u32) + sizeof(u32) + sizeof(u32));
 		p = D6_OPTION_DATA(o);
-		memcpy(p, ifo->iaid[l].iaid, sizeof(u32));
+		memcpy(p, ifo->ia[l].iaid, sizeof(u32));
 		p += sizeof(u32);
 		memset(p, 0, sizeof(u32) + sizeof(u32));
 		TAILQ_FOREACH(ap, &state->addrs, next) {
 			if (ap->prefix_vltime == 0)
 				continue;
-			if (memcmp(ifo->iaid[l].iaid, ap->iaid, sizeof(u32)))
+			if (memcmp(ifo->ia[l].iaid, ap->iaid, sizeof(u32)))
 				continue;
 			so = D6_NEXT_OPTION(o);
 			if (ifo->ia_type == D6_OPTION_IA_PD) {
@@ -1813,7 +1810,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 	struct dhcp6_state *state, *ifd_state;
 	struct ipv6_addr *ap;
 	size_t i, j, k;
-	struct if_iaid *iaid;
+	struct if_ia *ia;
 	struct if_sla *sla;
 	struct interface *ifd;
 	uint8_t carrier_warned;
@@ -1829,12 +1826,12 @@ dhcp6_delegate_prefix(struct interface *ifp)
 				syslog(LOG_DEBUG, "%s: delegated prefix %s",
 				    ifp->name, ap->saddr);
 			}
-			for (i = 0; i < ifo->iaid_len; i++) {
-				iaid = &ifo->iaid[i];
-				if (memcmp(iaid->iaid, ap->iaid,
-				    sizeof(iaid->iaid)))
+			for (i = 0; i < ifo->ia_len; i++) {
+				ia = &ifo->ia[i];
+				if (memcmp(ia->iaid, ap->iaid,
+				    sizeof(ia->iaid)))
 					continue;
-				if (iaid->sla_len == 0) {
+				if (ia->sla_len == 0) {
 					/* no SLA configured, so lets
 					 * automate it */
 					if (ifp == ifd)
@@ -1851,8 +1848,8 @@ dhcp6_delegate_prefix(struct interface *ifp)
 					    NULL, ifp))
 						k++;
 				}
-				for (j = 0; j < iaid->sla_len; j++) {
-					sla = &iaid->sla[j];
+				for (j = 0; j < ia->sla_len; j++) {
+					sla = &ia->sla[j];
 					if (strcmp(ifd->name, sla->ifname))
 						continue;
 					if (ifd->carrier == LINK_DOWN) {
@@ -1880,12 +1877,12 @@ dhcp6_delegate_prefix(struct interface *ifp)
 	}
 
 	/* Warn about configured interfaces for delegation that do not exist */
-	for (i = 0; i < ifo->iaid_len; i++) {
-		iaid = &ifo->iaid[i];
-		for (j = 0; j < iaid->sla_len; j++) {
-			sla = &iaid->sla[j];
+	for (i = 0; i < ifo->ia_len; i++) {
+		ia = &ifo->ia[i];
+		for (j = 0; j < ia->sla_len; j++) {
+			sla = &ia->sla[j];
 			for (k = 0; k < i; j++)
-				if (strcmp(sla->ifname, iaid->sla[j].ifname) == 0)
+				if (strcmp(sla->ifname, ia->sla[j].ifname) == 0)
 					break;
 			if (j >= i && find_interface(sla->ifname) == NULL)
 				syslog(LOG_ERR,
@@ -1910,7 +1907,7 @@ dhcp6_find_delegates(struct interface *ifp)
 	struct dhcp6_state *state;
 	struct ipv6_addr *ap;
 	size_t i, j, k;
-	struct if_iaid *iaid;
+	struct if_ia *ia;
 	struct if_sla *sla;
 	struct interface *ifd;
 
@@ -1923,13 +1920,13 @@ dhcp6_find_delegates(struct interface *ifp)
 		if (state == NULL || state->state != DH6S_BOUND)
 			continue;
 		TAILQ_FOREACH(ap, &state->addrs, next) {
-			for (i = 0; i < ifo->iaid_len; i++) {
-				iaid = &ifo->iaid[i];
-				if (memcmp(iaid->iaid, ap->iaid,
-				    sizeof(iaid->iaid)))
+			for (i = 0; i < ifo->ia_len; i++) {
+				ia = &ifo->ia[i];
+				if (memcmp(ia->iaid, ap->iaid,
+				    sizeof(ia->iaid)))
 					continue;
-				for (j = 0; j < iaid->sla_len; j++) {
-					sla = &iaid->sla[j];
+				for (j = 0; j < ia->sla_len; j++) {
+					sla = &ia->sla[j];
 					if (strcmp(ifp->name, sla->ifname))
 						continue;
 					if (ipv6_linklocal(ifp) == NULL) {
@@ -2416,13 +2413,6 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 
 	if (sock == -1 && dhcp6_open() == -1)
 		return -1;
-
-	if (duid == NULL) {
-		duid = malloc(DUID_LEN);
-		if (duid == NULL)
-			return -1;
-		duid_len = get_duid(duid, ifp);
-	}
 
 	ifp->if_data[IF_DATA_DHCP6] = calloc(1, sizeof(*state));
 	state = D6_STATE(ifp);

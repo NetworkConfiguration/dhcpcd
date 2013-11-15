@@ -57,6 +57,7 @@ const char copyright[] = "Copyright (c) 2006-2013 Roy Marples";
 #include "dev.h"
 #include "dhcpcd.h"
 #include "dhcp6.h"
+#include "duid.h"
 #include "eloop.h"
 #include "if-options.h"
 #include "if-pref.h"
@@ -141,6 +142,7 @@ cleanup(void)
 	struct interface *ifp;
 	int i;
 
+	free(duid);
 	free_options(if_options);
 
 	if (ifaces) {
@@ -319,7 +321,7 @@ configure_interface1(struct interface *ifp)
 {
 	struct if_options *ifo = ifp->options;
 	int ra_global, ra_iface;
-
+	uint32_t len;
 	/* Do any platform specific configuration */
 	if_conf(ifp);
 
@@ -335,6 +337,9 @@ configure_interface1(struct interface *ifp)
 
 	if (ifo->metric != -1)
 		ifp->metric = ifo->metric;
+
+	if (!(ifo->options & DHCPCD_IPV6))
+		ifo->options &= ~DHCPCD_IPV6RS;
 
 	/* We want to disable kernel interface RA as early as possible. */
 	if (ifo->options & DHCPCD_IPV6RS) {
@@ -361,6 +366,35 @@ configure_interface1(struct interface *ifp)
 		ifo->options |= DHCPCD_CLIENTID | DHCPCD_BROADCAST;
 		break;
 	}
+
+	if (!(ifo->options & DHCPCD_IAID)) {
+		len = strlen(ifp->name);
+		if (len <= sizeof(ifo->iaid)) {
+			memcpy(ifo->iaid, ifp->name, len);
+			memset(ifo->iaid + len, 0, sizeof(ifo->iaid) - len);
+		} else {
+			/* IAID is the same size as a uint32_t */
+			len = htonl(ifp->index);
+			memcpy(ifo->iaid, &len, sizeof(len));
+		}
+		ifo->options |= DHCPCD_IAID;
+	}
+
+#ifdef INET6
+	if (ifo->ia == NULL && ifo->options & DHCPCD_IPV6) {
+		ifo->ia = malloc(sizeof(*ifo->ia));
+		if (ifo->ia == NULL)
+			syslog(LOG_ERR, "%s: %m", __func__);
+		else {
+			if (ifo->ia_type == 0)
+				ifo->ia_type = D6_OPTION_IA_NA;
+			memcpy(ifo->ia->iaid, ifo->iaid, sizeof(ifo->iaid));
+			ifo->ia_len = 1;
+			ifo->ia->sla = NULL;
+			ifo->ia->sla_len = 0;
+		}
+	}
+#endif
 }
 
 int
@@ -457,11 +491,33 @@ start_interface(void *arg)
 	struct interface *ifp = arg;
 	struct if_options *ifo = ifp->options;
 	int nolease;
+	size_t i;
 
 	handle_carrier(LINK_UNKNOWN, 0, ifp->name);
 	if (ifp->carrier == LINK_DOWN) {
 		syslog(LOG_INFO, "%s: waiting for carrier", ifp->name);
 		return;
+	}
+
+	if (ifo->options & (DHCPCD_DUID | DHCPCD_IPV6)) {
+		/* Report client DUID */
+		if (duid == NULL) {
+			if (duid_init(ifp) == 0)
+				return;
+			syslog(LOG_INFO, "DUID %s",
+			    hwaddr_ntoa(duid, duid_len));
+		}
+
+		/* Report IAIDs */
+		syslog(LOG_INFO, "%s: IAID %s", ifp->name,
+		    hwaddr_ntoa(ifo->iaid, sizeof(ifo->iaid)));
+		for (i = 0; i < ifo->ia_len; i++) {
+			if (memcmp(ifo->iaid, ifo->ia[i].iaid,
+			    sizeof(ifo->iaid)))
+				syslog(LOG_INFO, "%s: IAID %s", ifp->name,
+				    hwaddr_ntoa(ifo->ia[i].iaid,
+				    sizeof(ifo->ia[i].iaid)));
+		}
 	}
 
 	if (ifo->options & DHCPCD_IPV6) {
