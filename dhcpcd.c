@@ -321,7 +321,7 @@ configure_interface1(struct interface *ifp)
 {
 	struct if_options *ifo = ifp->options;
 	int ra_global, ra_iface;
-	uint32_t len;
+
 	/* Do any platform specific configuration */
 	if_conf(ifp);
 
@@ -368,6 +368,44 @@ configure_interface1(struct interface *ifp)
 	}
 
 	if (!(ifo->options & DHCPCD_IAID)) {
+		/*
+		 * An IAID is for identifying a unqiue interface within
+		 * the client. It is 4 bytes long. Working out a default
+		 * value is problematic.
+		 *
+		 * Interface name and number are not stable
+		 * between different OS's. Some OS's also cannot make
+		 * up their mind what the interface should be called
+		 * (yes, udev, I'm looking at you).
+		 * Also, the name could be longer than 4 bytes.
+		 * Also, with pluggable interfaces the name and index
+		 * could easily get swapped per actual interface.
+		 *
+		 * The MAC address is 6 bytes long, the final 3
+		 * being unique to the manufacturer and the initial 3
+		 * being unique to the organisation which makes it.
+		 * We could use the last 4 bytes of the MAC address
+		 * as the IAID as it's the most stable part given the
+		 * above, but equally it's not guaranteed to be
+		 * unique.
+		 *
+		 * Given the above, and our need to reliably work
+		 * between reboots without persitent storage,
+		 * generating the IAID from the MAC address is the only
+		 * logical default.
+		 *
+		 * dhclient uses the last 4 bytes of the MAC address.
+		 * dibbler uses an increamenting counter.
+		 * wide-dhcpv6 uses 0 or a configured value.
+		 * odhcp6c uses 1.
+		 * Windows 7 uses the first 3 bytes of the MAC address
+		 * and an unknown byte.
+		 * dhcpcd-6.1.0 and earlier used the interface name,
+		 * falling back to interface index if name > 4.
+		 */
+		memcpy(ifo->iaid, ifp->hwaddr + ifp->hwlen - sizeof(ifo->iaid),
+		    sizeof(ifo->iaid));
+#if 0
 		len = strlen(ifp->name);
 		if (len <= sizeof(ifo->iaid)) {
 			memcpy(ifo->iaid, ifp->name, len);
@@ -377,6 +415,7 @@ configure_interface1(struct interface *ifp)
 			len = htonl(ifp->index);
 			memcpy(ifo->iaid, &len, sizeof(len));
 		}
+#endif
 		ifo->options |= DHCPCD_IAID;
 	}
 
@@ -485,6 +524,32 @@ handle_carrier(int carrier, int flags, const char *ifname)
 	}
 }
 
+static void
+warn_iaid_conflict(struct interface *ifp, uint8_t *iaid)
+{
+	struct interface *ifn;
+	size_t i;
+
+	TAILQ_FOREACH(ifn, ifaces, next) {
+		if (ifn == ifp)
+			continue;
+		if (memcmp(ifn->options->iaid, iaid,
+		    sizeof(ifn->options->iaid)) == 0)
+			break;
+		for (i = 0; i < ifn->options->ia_len; i++) {
+			if (memcmp(&ifn->options->ia[i].iaid, iaid,
+			    sizeof(ifn->options->ia[i].iaid)) == 0)
+				break;
+		}
+	}
+
+	/* This is only a problem if the interfaces are on the same network. */
+	if (ifn)
+		syslog(LOG_ERR,
+		    "%s: IAID conflicts with one assigned to %s",
+		    ifp->name, ifn->name);
+}
+
 void
 start_interface(void *arg)
 {
@@ -511,12 +576,16 @@ start_interface(void *arg)
 		/* Report IAIDs */
 		syslog(LOG_INFO, "%s: IAID %s", ifp->name,
 		    hwaddr_ntoa(ifo->iaid, sizeof(ifo->iaid)));
+		warn_iaid_conflict(ifp, ifo->iaid);
 		for (i = 0; i < ifo->ia_len; i++) {
 			if (memcmp(ifo->iaid, ifo->ia[i].iaid,
 			    sizeof(ifo->iaid)))
+			{
 				syslog(LOG_INFO, "%s: IAID %s", ifp->name,
 				    hwaddr_ntoa(ifo->ia[i].iaid,
 				    sizeof(ifo->ia[i].iaid)));
+				warn_iaid_conflict(ifp, ifo->ia[i].iaid);
+			}
 		}
 	}
 

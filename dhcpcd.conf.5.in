@@ -146,8 +146,13 @@ and should not be copied to other hosts.
 .It Ic iaid Ar iaid
 Set the Interface Association Identifier to
 .Ar iaid .
-This defaults to the interface name if 4 or less characters.
-If more then it defaults to the interface index.
+This defaults to the last 4 bytes of the hardware address assigned to the
+interface.
+Each instance of this should be unique within the scope of the client and
+.Nm dhcpcd
+warns if a conflict is detected.
+If there is a conflict, it is only a problem if the conflicted IAIDs are
+used on the same network.
 .It Ic persistent
 .Nm dhcpcd
 normally de-configures the interface and configuration when it exits.
