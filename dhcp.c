@@ -2564,6 +2564,12 @@ dhcp_init(struct interface *ifp)
 			    ifp->hwlen);
 		}
 	}
+
+	if (ifo->options & DHCPCD_DUID)
+		/* Don't bother logging as DUID and IAID are reported
+		 * at device start. */
+		return 0;
+
 	if (ifo->options & DHCPCD_CLIENTID)
 		syslog(LOG_DEBUG, "%s: using ClientID %s", ifp->name,
 		    hwaddr_ntoa(state->clientid + 1, state->clientid[0]));
