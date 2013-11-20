@@ -1349,7 +1349,7 @@ main(int argc, char **argv)
 
 	/* When running dhcpcd against a single interface, we need to retain
 	 * the old behaviour of waiting for an IP address */
-	if (ifc == 1)
+	if (ifc == 1 && !(options & DHCPCD_BACKGROUND))
 		options |= DHCPCD_WAITIP;
 
 	/* RTM_NEWADDR goes through the link socket as well which we
