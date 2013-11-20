@@ -325,6 +325,11 @@ configure_interface1(struct interface *ifp)
 	/* Do any platform specific configuration */
 	if_conf(ifp);
 
+	/* If we want to release a lease, we can't really persist the
+	 * address either. */
+	if (ifo->options & DHCPCD_RELEASE)
+		ifo->options &= ~DHCPCD_PERSISTENT;
+
 	if (ifp->flags & IFF_POINTOPOINT && !(ifo->options & DHCPCD_INFORM))
 		ifo->options |= DHCPCD_STATIC;
 	if (ifp->flags & IFF_NOARP ||
@@ -889,8 +894,10 @@ handle_signal(int sig, siginfo_t *siginfo, __unused void *context)
 		ifp = TAILQ_LAST(ifaces, if_head);
 		if (ifp == NULL)
 			break;
-		if (do_release)
+		if (do_release) {
 			ifp->options->options |= DHCPCD_RELEASE;
+			ifp->options->options &= ~DHCPCD_PERSISTENT;
+		}
 		ifp->options->options |= DHCPCD_EXITING;
 		stop_interface(ifp);
 	}
@@ -1027,8 +1034,10 @@ handle_args(struct fd_list *fd, int argc, char **argv)
 		for (oi = optind; oi < argc; oi++) {
 			if ((ifp = find_interface(argv[oi])) == NULL)
 				continue;
-			if (do_release)
+			if (do_release) {
 				ifp->options->options |= DHCPCD_RELEASE;
+				ifp->options->options &= ~DHCPCD_PERSISTENT;
+			}
 			ifp->options->options |= DHCPCD_EXITING;
 			stop_interface(ifp);
 		}
