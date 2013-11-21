@@ -477,6 +477,10 @@ of a randomly generated number.
 .An Roy Marples Aq Mt roy@marples.name
 .Sh BUGS
 When configuring DHCPv6 you can only select one IA type.
+I can't think of a use case where you would want different types,
+so if you have one then please bring it up for discussion on the
+.Aq Mt  dhcpcd-discuss@marples.name
+mailing list.
 .Pp
 Please report them to
 .Lk http://roy.marples.name/projects/dhcpcd
