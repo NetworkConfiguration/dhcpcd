@@ -476,11 +476,11 @@ link_netlink(struct nlmsghdr *nlm)
 		return 1;
 	}
 
-	/* Bridge interfaces set IFF_LOWER_UP when they have a valid
-	 * hardware address. To trigger a valid hardware address pickup
-	 * we need to pretend that that don't exist until they have
-	 * IFF_LOWER_UP set. */
-	if (ifi->ifi_flags & IFF_MASTER && !(ifi->ifi_flags & IFF_LOWER_UP)) {
+	/* Virtual interfaces may not get a valid hardware address
+	 * at this point.
+	 * To trigger a valid hardware address pickup we need to pretend
+	 * that that don't exist until they have one. */
+	if (ifi->ifi_flags & IFF_MASTER && !hwaddr) {
 		handle_interface(-1, ifn);
 		return 1;
 	}
