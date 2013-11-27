@@ -160,6 +160,11 @@ struct if_options {
 #ifdef INET6
 	int dadtransmits;
 #endif
+
+	struct dhcp_opt *dhcp_override;
+	size_t dhcp_override_len;
+	struct dhcp_opt *dhcp6_override;
+	size_t dhcp6_override_len;
 };
 
 extern unsigned long long options;

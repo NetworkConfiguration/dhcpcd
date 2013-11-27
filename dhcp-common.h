@@ -58,20 +58,49 @@
 #define SCODE		(1 << 16)
 #define FLAG		(1 << 17)
 #define NOREQ		(1 << 18)
+#define EMBED		(1 << 19)
+#define ENCAP		(1 << 20)
 
 struct dhcp_opt {
 	uint16_t option;
 	int type;
-	const char *var;
+
+	/* This union allows us to define a global static list of
+	 * variable names which we don't free and a list of user defined
+	 * options which we do free. */
+	union {
+		char *dvar;
+		const char *var;
+	} v;
+
+	/* Embedded options.
+	 * The option code is irrelevant here. */
+	struct dhcp_opt *embopts;
+	size_t embopts_len;
+
+	/* Encapsulated options */
+	struct dhcp_opt *encopts;
+	size_t encopts_len;
 };
 
 #define add_option_mask(var, val) (var[val >> 3] |= 1 << (val & 7))
 #define del_option_mask(var, val) (var[val >> 3] &= ~(1 << (val & 7)))
-#define has_option_mask(var, val) (var[val >> 3] & (1 << (val & 7)))
-int make_option_mask(const struct dhcp_opt *,uint8_t *, const char *, int);
+#define has_option_mask(var, val) (var[val >>3] & (1 << (val & 7)))
+int make_option_mask(const struct dhcp_opt *, uint8_t *, const char *, int);
+
+int dhcp_getaddr(struct in_addr *, const uint8_t *, size_t);
+int dhcp_getuint32(uint32_t *, const uint8_t *, size_t);
+int dhcp_getuint16(uint16_t *, const uint8_t *, size_t);
+int dhcp_getuint8(uint8_t *, const uint8_t *, size_t);
+
 size_t encode_rfc1035(const char *src, uint8_t *dst);
 ssize_t decode_rfc3397(char *, ssize_t, int, const uint8_t *);
 ssize_t print_string(char *, ssize_t, int, const uint8_t *);
 ssize_t print_option(char *, ssize_t, int, int, const uint8_t *, const char *);
+
+ssize_t dhcp_envoption(char **, const char *, const char *, const char *,
+    const struct dhcp_opt *,
+    const uint8_t *(*)(int *, int, const uint8_t *, int),
+    const uint8_t *, int);
 
 #endif

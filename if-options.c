@@ -73,6 +73,10 @@ unsigned long long options = 0;
 #define O_NOIPV4		O_BASE + 16
 #define O_NOIPV6		O_BASE + 17
 #define O_IAID			O_BASE + 18
+#define O_DEFINE		O_BASE + 19
+#define O_DEFINE6		O_BASE + 20
+#define O_EMBED			O_BASE + 21
+#define O_ENCAP			O_BASE + 22
 
 char *dev_load;
 
@@ -142,6 +146,10 @@ const struct option cf_options[] = {
 	{"hostname_short",  no_argument,       NULL, O_HOSTNAME_SHORT},
 	{"dev",             required_argument, NULL, O_DEV},
 	{"nodev",           no_argument,       NULL, O_NODEV},
+	{"define",          no_argument,       NULL, O_DEFINE},
+	{"define6",         no_argument,       NULL, O_DEFINE6},
+	{"embed",           no_argument,       NULL, O_EMBED},
+	{"encap",           no_argument,       NULL, O_ENCAP},
 	{NULL,              0,                 NULL, '\0'}
 };
 
@@ -468,10 +476,33 @@ set_option_space(const char *arg, const struct dhcp_opt **d,
 	return arg;
 }
 
+/* Pointer to last defined option */
+static struct dhcp_opt *ldop;
+
+static void
+free_dhcp_opt_embenc(struct dhcp_opt *opt)
+{
+	size_t i;
+
+	free(opt->v.dvar);
+
+	for (i = 0; i < opt->embopts_len; i++)
+		free(opt->embopts[i].v.dvar);
+	free(opt->embopts);
+	opt->embopts_len = 0;
+	opt->embopts = NULL;
+
+	for (i = 0; i < opt->encopts_len; i++)
+		free(opt->encopts[i].v.dvar);
+	free(opt->encopts);
+	opt->encopts_len = 0;
+	opt->encopts = NULL;
+}
+
 static int
 parse_option(struct if_options *ifo, int opt, const char *arg)
 {
-	int i;
+	int i, t;
 	char *p = NULL, *fp, *np, **nconf;
 	ssize_t s;
 	struct in_addr addr, addr2;
@@ -479,6 +510,8 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	struct rt *rt;
 	const struct dhcp_opt *d;
 	uint8_t *request, *require, *no;
+	struct dhcp_opt **dop, *ndop;
+	size_t *dop_len, dl;
 #ifdef INET6
 	size_t sl;
 	struct if_ia *ia;
@@ -486,6 +519,8 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	struct if_sla *sla, *slap;
 #endif
 
+	dop = NULL;
+	dop_len = NULL;
 	i = 0;
 	switch(opt) {
 	case 'f': /* FALLTHROUGH */
@@ -1135,6 +1170,134 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	case O_NODEV:
 		ifo->options &= ~DHCPCD_DEV;
 		break;
+	case O_DEFINE:
+		dop = &ifo->dhcp_override;
+		dop_len = &ifo->dhcp_override_len;
+		/* FALLTHROUGH */
+	case O_DEFINE6:
+		if (dop == NULL) {
+			dop = &ifo->dhcp6_override;
+			dop_len = &ifo->dhcp6_override_len;
+		}
+		ldop = NULL;
+		/* FALLTHROUGH */
+	case O_EMBED:
+		if (dop == NULL) {
+			if (ldop == NULL) {
+				syslog(LOG_ERR, "embed must be after a define");
+				return -1;
+			}
+			dop = &ldop->embopts;
+			dop_len = &ldop->embopts_len;
+		}
+	case O_ENCAP:
+		if (dop == NULL) {
+			if (ldop == NULL) {
+				syslog(LOG_ERR, "encap must be after a define");
+				return -1;
+			}
+			dop = &ldop->encopts;
+			dop_len = &ldop->encopts_len;
+		}
+
+		/* Shared code for define, define6, embed and encap */
+
+		/* code */
+		if (opt == O_EMBED) /* Embedded options don't have codes */
+			i = 0;
+		else {
+			fp = strchr(arg, ' ');
+			if (!fp) {
+				syslog(LOG_ERR, "invalid syntax: %s", arg);
+				return -1;
+			}
+			*fp++ = '\0';
+			if ((i = atoint(arg)) == -1)
+				return -1;
+			arg = fp;
+		}
+		/* type */
+		fp = strchr(arg, ' ');
+		if (fp)
+			*fp++ = '\0';
+		if (strcasecmp(arg, "ipaddress") == 0)
+			t = ADDRIPV4;
+		else if (strcasecmp(arg, "ip6address") == 0)
+			t = ADDRIPV6;
+		else if (strcasecmp(arg, "string") == 0)
+			t = STRING;
+		else if (strcasecmp(arg, "byte") == 0)
+			t = UINT8;
+		else if (strcasecmp(arg, "uint16") == 0)
+			t = UINT16;
+		else if (strcasecmp(arg, "int16") == 0)
+			t = SINT16;
+		else if (strcasecmp(arg, "uint32") == 0)
+			t = UINT32;
+		else if (strcasecmp(arg, "int32") == 0)
+			t = SINT32;
+		else if (strcasecmp(arg, "domain") == 0)
+			t = STRING | RFC3397;
+		else if (strcasecmp(arg, "binhex") == 0)
+			t = BINHEX;
+		else if (strcasecmp(arg, "embed") == 0)
+			t = EMBED;
+		else if (strcasecmp(arg, "encap") == 0)
+			t = ENCAP;
+		else {
+			syslog(LOG_ERR, "unknown type: %s", arg);
+			return -1;
+		}
+		/* variable */
+		if (fp) {
+			arg = fp;
+			fp = strchr(arg, ' ');
+			if (fp)
+				*fp++ = '\0';
+			np = strdup(arg);
+			if (np == NULL) {
+				syslog(LOG_ERR, "%s: %m", __func__);
+				return -1;
+			}
+		} else {
+			if (t != EMBED && t != ENCAP) {
+				syslog(LOG_ERR,
+				    "type %s requires a variable name",
+				    arg);
+				return -1;
+			}
+			np = NULL;
+		}
+		if (opt == O_EMBED)
+			dl = 0;
+		else {
+			for (dl = 0; dl < *dop_len; dl++) {
+				ndop = &(*dop)[dl];
+				if (ndop->option == i)
+					break;
+			}
+		}
+		if (dl <= *dop_len) {
+			if ((ndop = realloc(*dop,
+			    sizeof(**dop) * ((*dop_len) + 1))) == NULL) {
+				syslog(LOG_ERR, "%s: %m", __func__);
+				return -1;
+			}
+			*dop = ndop;
+			ndop = &(*dop)[(*dop_len)++];
+			ndop->option = i;
+			ndop->embopts = NULL;
+			ndop->embopts_len = 0;
+			ndop->encopts = NULL;
+			ndop->encopts_len = 0;
+		} else
+			free_dhcp_opt_embenc(ndop);
+		ndop->type = t;
+		ndop->v.dvar = np;
+		/* Save the define for embed and encap options */
+		if (opt == O_DEFINE || opt == O_DEFINE6)
+			ldop = ndop;
+		break;
 	default:
 		return 0;
 	}
@@ -1215,6 +1378,27 @@ read_config(const char *file,
 
 	ifo->vendorclassid[0] = strlen(vendor);
 	memcpy(ifo->vendorclassid + 1, vendor, ifo->vendorclassid[0]);
+
+	/* Parse our embedded options file */
+	f = fopen(EMBEDDED_CONFIG, "r");
+	if (f == NULL) {
+		if (errno != ENOENT)
+			syslog(LOG_ERR, "fopen `%s': %m", file);
+	} else {
+		while ((line = get_line(f))) {
+			option = strsep(&line, " \t");
+			/* Trim trailing whitespace */
+			if (line && *line) {
+				p = line + strlen(line) - 1;
+				while (p != line &&
+				    (*p == ' ' || *p == '\t') &&
+				    *(p - 1) != '\\')
+					*p-- = '\0';
+			}
+			parse_config_line(ifo, option, line);
+		}
+		fclose(f);
+	}
 
 	/* Parse our options file */
 	f = fopen(file ? file : CONFIG, "r");
@@ -1318,6 +1502,14 @@ free_options(struct if_options *ifo)
 		free(ifo->arping);
 		free(ifo->blacklist);
 		free(ifo->fallback);
+
+		for (i = 0; i < ifo->dhcp_override_len; i++)
+			free_dhcp_opt_embenc(&ifo->dhcp_override[i]);
+		free(ifo->dhcp_override);
+		for (i = 0; i < ifo->dhcp6_override_len; i++)
+			free_dhcp_opt_embenc(&ifo->dhcp6_override[i]);
+		free(ifo->dhcp6_override);
+
 #ifdef INET6
 		for (i = 0; i < ifo->ia_len; i++)
 			free(ifo->ia[i].sla);

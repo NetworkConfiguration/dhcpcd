@@ -86,12 +86,13 @@ _proginstall: ${PROG}
 	${INSTALL} -m ${BINMODE} ${PROG} ${DESTDIR}${SBINDIR}
 	${INSTALL} -d ${DESTDIR}${DBDIR}
 
-proginstall: _proginstall
-	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@; cd ..; done
-
 _scriptsinstall: ${SCRIPTS}
 	${INSTALL} -d ${DESTDIR}${SCRIPTSDIR}
 	${INSTALL} -m ${BINMODE} ${SCRIPTS} ${DESTDIR}${SCRIPTSDIR}
+	${INSTALL} -m ${CONFMODE} dhcpcd-embedded.conf ${DESTDIR}${SCRIPTSDIR}
+
+proginstall: _proginstall _scriptsinstall
+	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@; cd ..; done
 
 _maninstall: ${MAN5} ${MAN8}
 	${INSTALL} -d ${DESTDIR}${MANDIR}/man5

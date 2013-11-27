@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd November 15, 2013
+.Dd November 27, 2013
 .Dt DHCPCD.CONF 5
 .Os
 .Sh NAME
@@ -468,6 +468,94 @@ will only fork to the background when all waiting conditions are satisfied.
 Use the last four bytes of the hardware address as the DHCP xid instead
 of a randomly generated number.
 .El
+.Ss Defining new options
+DHCP allows for the use of custom options.
+Each option needs to be started with the
+.Ic define
+or
+.Ic define6
+directive.
+This can optionally be followed by both
+.Ic embed
+or
+.Ic encap
+options.
+Both can be specified more than once and
+.Ic embed
+must come before
+.Ic encap .
+.Bl -tag -width indent
+.It Ic define Ar code Ar type Ar variable
+Defines the DHCP option
+.Ar code
+of
+.Ar type
+with a name of
+.Ar variable
+exported to
+.Xr dhcpcd-run-hooks 8 .
+.It Ic define6 Ar code Ar type Ar variable
+Defines the DHCPv6 option
+.Ar code
+of
+.Ar type
+with a name of
+.Ar variable
+exported to
+.Xr dhcpcd-run-hooks 8 ,
+with a prefix of
+.Va _dhcp6 .
+.It Ic embed Ar type Ar variable
+Defines an embedded variable within the defined option.
+The length is determined by the
+.Ar type .
+.It Ic encap Ar code Ar type Ar variable
+Defines an encapsulated variable within the defined option.
+The length is determined by the
+.Ar type .
+.El
+.Ss Types to define
+If a length is unspecified by the type, it consumes the rest of the option
+data.
+.Bl -tag -width indent
+.It Ic ipaddress
+An IPv4 address, 4 bytes
+.It Ic ip6address
+An IPv6 address, 16 bytes
+.It Ic string
+A shell escaped string (binary data escaped as octal)
+.It Ic byte
+A byte
+.It Ic int16
+A signed 16bit integer, 2 bytes
+.It Ic uint16
+An unsigned 16bit integer, 2 bytes
+.It Ic int32
+A signed 32bit integer, 4 bytes
+.It Ic uint32
+An unsigned 32bit integer, 4 bytes
+.It Ic domain
+A RFC 3397 encoded string
+.It Ic binhex
+Binary data expressed as hexadecimal
+.It Ic embed
+Contains embedded options (implies encap as well)
+.It Ic encap
+Contains encapsulated options (implies embed as well)
+.El
+.Ss Example definition
+.D1 # DHCP option 81, Fully Qualified Domain Name, RFC4702
+.D1 define 81 embed
+.D1 embed byte fqdn_flags
+.D1 embed byte fqdn_rcode1
+.D1 embed byte fqdn_rcode2
+.D1 embed domain fqdn
+.Pp
+.D1 # DHCP option 125, Vendor Specific Information Option, RFC3925
+.D1 define 125 encap
+.D1 embed uint32 vsio_enterprise_number
+.D1 # Options defined for the enterprise number
+.D1 encap 1 ipaddress vsio_ipaddress
 .Sh SEE ALSO
 .Xr fnmatch 3 ,
 .Xr if_nametoindex 3 ,

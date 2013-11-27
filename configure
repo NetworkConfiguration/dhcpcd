@@ -300,7 +300,7 @@ fi
 if [ "$DEBUG" != no -a "$DEBUG" != false ]; then
 	echo "Adding debugging CFLAGS"
 	cat <<EOF >>$CONFIG_MK
-CFLAGS+=	-Wall -Wextra -Wimplicit -Wshadow -Wformat=2
+CFLAGS+=	-ggdb -Wall -Wextra -Wimplicit -Wshadow -Wformat=2
 CFLAGS+=	-Wmissing-prototypes -Wmissing-declarations
 CFLAGS+=	-Wmissing-noreturn -Wmissing-format-attribute
 CFLAGS+=	-Wredundant-decls  -Wnested-externs

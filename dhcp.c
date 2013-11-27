@@ -104,106 +104,108 @@ static const struct dhcp_op dhcp_ops[] = {
 	{ 0, NULL }
 };
 
+#define O(a, b, c) {.option = (a), .type = (b), .v.var = (c) }
 const struct dhcp_opt dhcp_opts[] = {
-	{ 1,	ADDRIPV4 | REQUEST,	"subnet_mask" },
+	O(1,	ADDRIPV4 | REQUEST,	"subnet_mask"),
 		/* RFC 3442 states that the CSR has to come before all other
 		 * routes. For completeness, we also specify static routes,
 		 * then routers. */
-	{ 121,  RFC3442,	"classless_static_routes" },
-	{ 249,  RFC3442,	"ms_classless_static_routes" },
-	{ 33,	IPV4A | REQUEST,	"static_routes" },
-	{ 3,	IPV4A | REQUEST,	"routers" },
-	{ 2,	UINT32,		"time_offset" },
-	{ 4,	IPV4A,		"time_servers" },
-	{ 5,	IPV4A,		"ien116_name_servers" },
-	{ 6,	IPV4A,		"domain_name_servers" },
-	{ 7,	IPV4A,		"log_servers" },
-	{ 8,	IPV4A,		"cookie_servers" },
-	{ 9,	IPV4A,		"lpr_servers" },
-	{ 10,	IPV4A,		"impress_servers" },
-	{ 11,	IPV4A,		"resource_location_servers" },
-	{ 12,	STRING,		"host_name" },
-	{ 13,	UINT16,		"boot_size" },
-	{ 14,	STRING,		"merit_dump" },
-	{ 15,	STRING,		"domain_name" },
-	{ 16,	ADDRIPV4,	"swap_server" },
-	{ 17,	STRING,		"root_path" },
-	{ 18,	STRING,		"extensions_path" },
-	{ 19,	UINT8,		"ip_forwarding" },
-	{ 20,	UINT8,		"non_local_source_routing" },
-	{ 21,	IPV4A,	"policy_filter" },
-	{ 22,	SINT16,		"max_dgram_reassembly" },
-	{ 23,	UINT16,		"default_ip_ttl" },
-	{ 24,	UINT32,		"path_mtu_aging_timeout" },
-	{ 25,	UINT16 | ARRAY,	"path_mtu_plateau_table" },
-	{ 26,	UINT16,		"interface_mtu" },
-	{ 27,	UINT8,		"all_subnets_local" },
-	{ 28,	ADDRIPV4 | REQUEST,	"broadcast_address" },
-	{ 29,	UINT8,		"perform_mask_discovery" },
-	{ 30,	UINT8,		"mask_supplier" },
-	{ 31,	UINT8,		"router_discovery" },
-	{ 32,	ADDRIPV4,	"router_solicitation_address" },
-	{ 34,	UINT8,		"trailer_encapsulation" },
-	{ 35,	UINT32,		"arp_cache_timeout" },
-	{ 36,	UINT16,		"ieee802_3_encapsulation" },
-	{ 37,	UINT8,		"default_tcp_ttl" },
-	{ 38,	UINT32,		"tcp_keepalive_interval" },
-	{ 39,	UINT8,		"tcp_keepalive_garbage" },
-	{ 40,	STRING,		"nis_domain" },
-	{ 41,	IPV4A,		"nis_servers" },
-	{ 42,	IPV4A,		"ntp_servers" },
-	{ 43,	STRING,		"vendor_encapsulated_options" },
-	{ 44,	IPV4A,		"netbios_name_servers" },
-	{ 45,	ADDRIPV4,	"netbios_dd_server" },
-	{ 46,	UINT8,		"netbios_node_type" },
-	{ 47,	STRING,		"netbios_scope" },
-	{ 48,	IPV4A,		"font_servers" },
-	{ 49,	IPV4A,		"x_display_manager" },
-	{ 50,	ADDRIPV4,	"dhcp_requested_address" },
-	{ 51,	UINT32 | REQUEST,	"dhcp_lease_time" },
-	{ 52,	UINT8,		"dhcp_option_overload" },
-	{ 53,	UINT8,		"dhcp_message_type" },
-	{ 54,	ADDRIPV4,	"dhcp_server_identifier" },
-	{ 55,	UINT8 | ARRAY,	"dhcp_parameter_request_list" },
-	{ 56,	STRING,		"dhcp_message" },
-	{ 57,	UINT16,		"dhcp_max_message_size" },
-	{ 58,	UINT32 | REQUEST,	"dhcp_renewal_time" },
-	{ 59,	UINT32 | REQUEST,	"dhcp_rebinding_time" },
-	{ 64,	STRING,		"nisplus_domain" },
-	{ 65,	IPV4A,		"nisplus_servers" },
-	{ 66,	STRING,		"tftp_server_name" },
-	{ 67,	STRING,		"bootfile_name" },
-	{ 68,	IPV4A,		"mobile_ip_home_agent" },
-	{ 69,	IPV4A,		"smtp_server" },
-	{ 70,	IPV4A,		"pop_server" },
-	{ 71,	IPV4A,		"nntp_server" },
-	{ 72,	IPV4A,		"www_server" },
-	{ 73,	IPV4A,		"finger_server" },
-	{ 74,	IPV4A,		"irc_server" },
-	{ 75,	IPV4A,		"streettalk_server" },
-	{ 76,	IPV4A,		"streettalk_directory_assistance_server" },
-	{ 77,	STRING,		"user_class" },
-	{ 80,	FLAG | NOREQ,	"rapid_commit" },
-	{ 81,	STRING | RFC3397,	"fqdn" },
-	{ 85,	IPV4A,		"nds_servers" },
-	{ 86,	STRING,		"nds_tree_name" },
-	{ 87,	STRING,		"nds_context" },
-	{ 88,	STRING | RFC3397,	"bcms_controller_names" },
-	{ 89,	IPV4A,		"bcms_controller_address" },
-	{ 91,	UINT32,		"client_last_transaction_time" },
-	{ 92,	IPV4A,		"associated_ip" },
-	{ 98,	STRING,		"uap_servers" },
-	{ 100,	STRING,		"posix_timezone" },
-	{ 101,	STRING,		"tzdb_timezone" },
-	{ 112,	IPV4A,		"netinfo_server_address" },
-	{ 113,	STRING,		"netinfo_server_tag" },
-	{ 114,	STRING,		"default_url" },
-	{ 118,	ADDRIPV4,	"subnet_selection" },
-	{ 119,	STRING | RFC3397,	"domain_search" },
-	{ 120,	STRING | RFC3361,	"sip_server" },
-	{ 212,  RFC5969,	"sixrd" },
-	{ 0, 0, NULL }
+	O(121,  RFC3442,	"classless_static_routes"),
+	O(249,  RFC3442,	"ms_classless_static_routes"),
+	O(33,	IPV4A | REQUEST,	"static_routes"),
+	O(3,	IPV4A | REQUEST,	"routers"),
+	O(2,	UINT32,		"time_offset"),
+	O(4,	IPV4A,		"time_servers"),
+	O(5,	IPV4A,		"ien116_name_servers"),
+	O(6,	IPV4A,		"domain_name_servers"),
+	O(7,	IPV4A,		"log_servers"),
+	O(8,	IPV4A,		"cookie_servers"),
+	O(9,	IPV4A,		"lpr_servers"),
+	O(10,	IPV4A,		"impress_servers"),
+	O(11,	IPV4A,		"resource_location_servers"),
+	O(12,	STRING,		"host_name"),
+	O(13,	UINT16,		"boot_size"),
+	O(14,	STRING,		"merit_dump"),
+	O(15,	STRING,		"domain_name"),
+	O(16,	ADDRIPV4,	"swap_server"),
+	O(17,	STRING,		"root_path"),
+	O(18,	STRING,		"extensions_path"),
+	O(19,	UINT8,		"ip_forwarding"),
+	O(20,	UINT8,		"non_local_source_routing"),
+	O(21,	IPV4A,	"policy_filter"),
+	O(22,	SINT16,		"max_dgram_reassembly"),
+	O(23,	UINT16,		"default_ip_ttl"),
+	O(24,	UINT32,		"path_mtu_aging_timeout"),
+	O(25,	UINT16 | ARRAY,	"path_mtu_plateau_table"),
+	O(26,	UINT16,		"interface_mtu"),
+	O(27,	UINT8,		"all_subnets_local"),
+	O(28,	ADDRIPV4 | REQUEST,	"broadcast_address"),
+	O(29,	UINT8,		"perform_mask_discovery"),
+	O(30,	UINT8,		"mask_supplier"),
+	O(31,	UINT8,		"router_discovery"),
+	O(32,	ADDRIPV4,	"router_solicitation_address"),
+	O(34,	UINT8,		"trailer_encapsulation"),
+	O(35,	UINT32,		"arp_cache_timeout"),
+	O(36,	UINT16,		"ieee802_3_encapsulation"),
+	O(37,	UINT8,		"default_tcp_ttl"),
+	O(38,	UINT32,		"tcp_keepalive_interval"),
+	O(39,	UINT8,		"tcp_keepalive_garbage"),
+	O(40,	STRING,		"nis_domain"),
+	O(41,	IPV4A,		"nis_servers"),
+	O(42,	IPV4A,		"ntp_servers"),
+	O(43,	STRING,		"vendor_encapsulated_options"),
+	O(44,	IPV4A,		"netbios_name_servers"),
+	O(45,	ADDRIPV4,	"netbios_dd_server"),
+	O(46,	UINT8,		"netbios_node_type"),
+	O(47,	STRING,		"netbios_scope"),
+	O(48,	IPV4A,		"font_servers"),
+	O(49,	IPV4A,		"x_display_manager"),
+	O(50,	ADDRIPV4,	"dhcp_requested_address"),
+	O(51,	UINT32 | REQUEST,	"dhcp_lease_time"),
+	O(52,	UINT8,		"dhcp_option_overload"),
+	O(53,	UINT8,		"dhcp_message_type"),
+	O(54,	ADDRIPV4,	"dhcp_server_identifier"),
+	O(55,	UINT8 | ARRAY,	"dhcp_parameter_request_list"),
+	O(56,	STRING,		"dhcp_message"),
+	O(57,	UINT16,		"dhcp_max_message_size"),
+	O(58,	UINT32 | REQUEST,	"dhcp_renewal_time"),
+	O(59,	UINT32 | REQUEST,	"dhcp_rebinding_time"),
+	O(64,	STRING,		"nisplus_domain"),
+	O(65,	IPV4A,		"nisplus_servers"),
+	O(66,	STRING,		"tftp_server_name"),
+	O(67,	STRING,		"bootfile_name"),
+	O(68,	IPV4A,		"mobile_ip_home_agent"),
+	O(69,	IPV4A,		"smtp_server"),
+	O(70,	IPV4A,		"pop_server"),
+	O(71,	IPV4A,		"nntp_server"),
+	O(72,	IPV4A,		"www_server"),
+	O(73,	IPV4A,		"finger_server"),
+	O(74,	IPV4A,		"irc_server"),
+	O(75,	IPV4A,		"streettalk_server"),
+	O(76,	IPV4A,		"streettalk_directory_assistance_server"),
+	O(77,	STRING,		"user_class"),
+	O(80,	FLAG | NOREQ,	"rapid_commit"),
+	O(81,	STRING | RFC3397,	"fqdn"),
+	O(85,	IPV4A,		"nds_servers"),
+	O(86,	STRING,		"nds_tree_name"),
+	O(87,	STRING,		"nds_context"),
+	O(88,	STRING | RFC3397,	"bcms_controller_names"),
+	O(89,	IPV4A,		"bcms_controller_address"),
+	O(91,	UINT32,		"client_last_transaction_time"),
+	O(92,	IPV4A,		"associated_ip"),
+	O(98,	STRING,		"uap_servers"),
+	O(100,	STRING,		"posix_timezone"),
+	O(101,	STRING,		"tzdb_timezone"),
+	O(112,	IPV4A,		"netinfo_server_address"),
+	O(113,	STRING,		"netinfo_server_tag"),
+	O(114,	STRING,		"default_url"),
+	O(118,	ADDRIPV4,	"subnet_selection"),
+	O(119,	STRING | RFC3397,	"domain_search"),
+	O(120,	STRING | RFC3361,	"sip_server"),
+	O(212,  RFC5969,	"sixrd"),
+	O(0, 0, NULL)
 };
+#undef O
 
 static const char *dhcp_params[] = {
 	"ip_address",
@@ -234,8 +236,8 @@ dhcp_printoptions(void)
 		printf("    %s\n", *p);
 
 	for (opt = dhcp_opts; opt->option; opt++)
-		if (opt->var)
-			printf("%03d %s\n", opt->option, opt->var);
+		if (opt->v.var)
+			printf("%03d %s\n", opt->option, opt->v.var);
 }
 
 static int
@@ -283,7 +285,7 @@ validate_length(uint8_t option, int dl, int *type)
 
 #ifdef DEBUG_MEMORY
 static void
-free_option_buffer(void)
+dhcp_cleanup(void)
 {
 
 	free(packet);
@@ -312,9 +314,6 @@ get_option(const struct dhcp_message *dhcp, uint8_t opt, int *len, int *type)
 					opt_buffer = malloc(sizeof(*dhcp));
 					if (opt_buffer == NULL)
 						return NULL;
-#ifdef DEBUG_MEMORY
-					atexit(free_option_buffer);
-#endif
 				}
 				if (!bp)
 					bp = opt_buffer;
@@ -375,50 +374,41 @@ int
 get_option_addr(struct in_addr *a, const struct dhcp_message *dhcp,
     uint8_t option)
 {
-	const uint8_t *p = get_option_raw(dhcp, option);
+	const uint8_t *p;
+	int len;
 
-	if (!p)
-		return -1;
-	memcpy(&a->s_addr, p, sizeof(a->s_addr));
-	return 0;
+	p = get_option(dhcp, option, &len, NULL);
+	return dhcp_getaddr(a, p, len);
 }
 
 int
 get_option_uint32(uint32_t *i, const struct dhcp_message *dhcp, uint8_t option)
 {
-	const uint8_t *p = get_option_raw(dhcp, option);
-	uint32_t d;
+	const uint8_t *p;
+	int len;
 
-	if (!p)
-		return -1;
-	memcpy(&d, p, sizeof(d));
-	*i = ntohl(d);
-	return 0;
+	p = get_option(dhcp, option, &len, NULL);
+	return dhcp_getuint32(i, p, len);
 }
 
 int
 get_option_uint16(uint16_t *i, const struct dhcp_message *dhcp, uint8_t option)
 {
-	const uint8_t *p = get_option_raw(dhcp, option);
-	uint16_t d;
+	const uint8_t *p;
+	int len;
 
-	if (!p)
-		return -1;
-	memcpy(&d, p, sizeof(d));
-	*i = ntohs(d);
-	return 0;
+	p = get_option(dhcp, option, &len, NULL);
+	return dhcp_getuint16(i, p, len);
 }
 
 int
 get_option_uint8(uint8_t *i, const struct dhcp_message *dhcp, uint8_t option)
 {
-	const uint8_t *p = get_option_raw(dhcp, option);
+	const uint8_t *p;
+	int len;
 
-	if (!p)
-		return -1;
-	if (i)
-		*i = *(p);
-	return 0;
+	p = get_option(dhcp, option, &len, NULL);
+	return dhcp_getuint8(i, p, len);
 }
 
 ssize_t
@@ -1135,6 +1125,43 @@ read_lease(const struct interface *ifp)
 	return dhcp;
 }
 
+static const struct dhcp_opt *
+dhcp_getoverride(const struct if_options *ifo, uint16_t o)
+{
+	size_t i;
+	const struct dhcp_opt *opt;
+
+	for (i = 0, opt = ifo->dhcp_override;
+	    i < ifo->dhcp_override_len;
+	    i++, opt++)
+	{
+		if (opt->option == o)
+			return opt;
+	}
+	return NULL;
+}
+
+
+static const uint8_t *
+dhcp_getoption(int *len, int option, const uint8_t *od, int ol)
+{
+	const uint8_t *o;
+	uint8_t l;
+
+	while (ol > 0) {
+		o = od++;
+		l = *od++;
+		if (l > ol)
+			/* Report malformed data? */
+			return NULL;
+		if (*o == option) {
+			*len = l;
+			return od;
+		}
+	}
+	return NULL;
+}
+
 ssize_t
 dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
     const struct interface *ifp)
@@ -1145,24 +1172,29 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 	struct in_addr addr;
 	struct in_addr net;
 	struct in_addr brd;
-	char *val, *v;
 	const struct dhcp_opt *opt;
-	ssize_t len, e = 0;
+	ssize_t e = 0;
 	char **ep;
 	char cidr[4];
 	uint8_t overl = 0;
+	size_t oi;
 
 	ifo = ifp->options;
 	get_option_uint8(&overl, dhcp, DHO_OPTIONSOVERLOADED);
 
 	if (!env) {
 		for (opt = dhcp_opts; opt->option; opt++) {
-			if (!opt->var)
+			if (!opt->v.var)
 				continue;
 			if (has_option_mask(ifo->nomask, opt->option))
 				continue;
-			if (get_option_raw(dhcp, opt->option))
-				e++;
+			if (dhcp_getoverride(ifo, opt->option))
+				continue;
+			p = get_option(dhcp, opt->option, &pl, NULL);
+			if (!p)
+				continue;
+			e += dhcp_envoption(NULL, prefix, "", ifp->name,
+			    opt, dhcp_getoption, p, pl);
 		}
 		if (dhcp->yiaddr || dhcp->ciaddr)
 			e += 5;
@@ -1170,6 +1202,16 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 			e++;
 		if (*dhcp->servername && !(overl & 2))
 			e++;
+		for (oi = 0, opt = ifo->dhcp_override;
+		    oi < ifo->dhcp_override_len;
+		    oi++, opt++)
+		{
+			p = get_option(dhcp, opt->option, &pl, NULL);
+			if (!p)
+				continue;
+			e += dhcp_envoption(NULL, prefix, "", ifp->name,
+			    opt, dhcp_getoption, p, pl);
+		}
 		return e;
 	}
 
@@ -1199,29 +1241,34 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 		setvar(&ep, prefix, "server_name", (const char *)dhcp->servername);
 
 	for (opt = dhcp_opts; opt->option; opt++) {
-		if (!opt->var)
+		if (!opt->v.var)
 			continue;
 		if (has_option_mask(ifo->nomask, opt->option))
 			continue;
-		val = NULL;
+		if (dhcp_getoverride(ifo, opt->option))
+			continue;
 		p = get_option(dhcp, opt->option, &pl, NULL);
 		if (!p)
 			continue;
-		/* We only want the FQDN name */
+		/* No override, which means it's not embedded, so just
+		 * grab the FQDN itself */
 		if (opt->option == DHO_FQDN) {
 			p += 3;
 			pl -= 3;
 		}
-		len = print_option(NULL, 0, opt->type, pl, p, ifp->name);
-		if (len < 0)
-			return -1;
-		e = strlen(prefix) + strlen(opt->var) + len + 4;
-		v = val = *ep++ = malloc(e);
-		if (v == NULL)
-			return -1;
-		v += snprintf(val, e, "%s_%s=", prefix, opt->var);
-		if (len != 0)
-			print_option(v, len, opt->type, pl, p, ifp->name);
+		ep += dhcp_envoption(ep, prefix, "", ifp->name,
+		    opt, dhcp_getoption, p, pl);
+	}
+
+	for (oi = 0, opt = ifo->dhcp_override;
+	    oi < ifo->dhcp_override_len;
+	    oi++, opt++)
+	{
+		if (has_option_mask(ifo->nomask, opt->option))
+			continue;
+		if ((p = get_option(dhcp, opt->option, &pl, NULL)))
+			ep += dhcp_envoption(ep, prefix, "", ifp->name,
+			    opt, dhcp_getoption, p, pl);
 	}
 
 	return ep - env;
@@ -2335,14 +2382,6 @@ dhcp_handlepacket(void *arg)
 	/* We loop through until our buffer is empty.
 	 * The benefit is that if we get >1 DHCP packet in our buffer and
 	 * the first one fails for any reason, we can use the next. */
-	if (packet == NULL) {
-		packet = malloc(udp_dhcp_len);
-		if (packet == NULL) {
-			syslog(LOG_ERR, "%s: %m", __func__);
-			return;
-		}
-	}
-
 	for(;;) {
 		bytes = ipv4_getrawpacket(iface, ETHERTYPE_IP,
 		    packet, udp_dhcp_len, &partialcsum);
@@ -2415,8 +2454,6 @@ dhcp_handlepacket(void *arg)
 		if (state->raw_fd == -1)
 			break;
 	}
-	free(packet);
-	packet = NULL;
 	free(dhcp);
 }
 
@@ -2424,6 +2461,17 @@ static int
 dhcp_open(struct interface *ifp)
 {
 	struct dhcp_state *state;
+
+	if (packet == NULL) {
+		packet = malloc(udp_dhcp_len);
+		if (packet == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			return -1;
+		}
+#ifdef DEBUG_MEMORY
+		atexit(dhcp_cleanup);
+#endif
+	}
 
 	state = D_STATE(ifp);
 	if (state->raw_fd == -1) {

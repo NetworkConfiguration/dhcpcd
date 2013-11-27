@@ -101,31 +101,33 @@ static const struct dhcp6_op dhcp6_ops[] = {
 };
 
 #define IPV6A	ADDRIPV6 | ARRAY
+#define O(a, b, c) {.option = (a), .type = (b), .v.var = (c) }
 const struct dhcp_opt dhcp6_opts[] = {
-	{ D6_OPTION_CLIENTID,		BINHEX,		"client_id" },
-	{ D6_OPTION_SERVERID,		BINHEX,		"server_id" },
-	{ D6_OPTION_IA_ADDR,		IPV6A,		"ia_addr" },
-	{ D6_OPTION_PREFERENCE,		UINT8,		"preference" },
-	{ D6_OPTION_UNICAST,		ADDRIPV6,	"unicast" },
-	{ D6_OPTION_RAPID_COMMIT,	FLAG | NOREQ,	"rapid_commit" },
-	{ D6_OPTION_STATUS_CODE,	SCODE,		"status_code" },
-	{ D6_OPTION_SIP_SERVERS_NAME,	RFC3397,	"sip_servers_names" },
-	{ D6_OPTION_SIP_SERVERS_ADDRESS,IPV6A,	"sip_servers_addresses" },
-	{ D6_OPTION_DNS_SERVERS,	IPV6A,		"name_servers" },
-	{ D6_OPTION_DOMAIN_LIST,	RFC3397,	"domain_search" },
-	{ D6_OPTION_NIS_SERVERS,	IPV6A,		"nis_servers" },
-	{ D6_OPTION_NISP_SERVERS,	IPV6A,		"nisp_servers" },
-	{ D6_OPTION_NIS_DOMAIN_NAME,	RFC3397,	"nis_domain_name" },
-	{ D6_OPTION_NISP_DOMAIN_NAME,	RFC3397,	"nisp_domain_name" },
-	{ D6_OPTION_SNTP_SERVERS,	IPV6A,		"sntp_servers" },
-	{ D6_OPTION_INFO_REFRESH_TIME,	UINT32,		"info_refresh_time" },
-	{ D6_OPTION_BCMS_SERVER_D,	RFC3397,	"bcms_server_d" },
-	{ D6_OPTION_BCMS_SERVER_A,	IPV6A,		"bcms_server_a" },
-	{ D6_OPTION_FQDN,		RFC3397,	"fqdn" },
-	{ D6_OPTION_POSIX_TIMEZONE,	STRING,		"posix_timezone" },
-	{ D6_OPTION_TZDB_TIMEZONE,	STRING,		"tzdb_timezone" },
-	{ 0, 0, NULL }
+	O(D6_OPTION_CLIENTID,		BINHEX,		"client_id"),
+	O(D6_OPTION_SERVERID,		BINHEX,		"server_id"),
+	O(D6_OPTION_IA_ADDR,		IPV6A,		"ia_addr"),
+	O(D6_OPTION_PREFERENCE,		UINT8,		"preference"),
+	O(D6_OPTION_UNICAST,		ADDRIPV6,	"unicast"),
+	O(D6_OPTION_RAPID_COMMIT,	FLAG | NOREQ,	"rapid_commit"),
+	O(D6_OPTION_STATUS_CODE,	SCODE,		"status_code"),
+	O(D6_OPTION_SIP_SERVERS_NAME,	RFC3397,	"sip_servers_names"),
+	O(D6_OPTION_SIP_SERVERS_ADDRESS,IPV6A,	"sip_servers_addresses"),
+	O(D6_OPTION_DNS_SERVERS,	IPV6A,		"name_servers"),
+	O(D6_OPTION_DOMAIN_LIST,	RFC3397,	"domain_search"),
+	O(D6_OPTION_NIS_SERVERS,	IPV6A,		"nis_servers"),
+	O(D6_OPTION_NISP_SERVERS,	IPV6A,		"nisp_servers"),
+	O(D6_OPTION_NIS_DOMAIN_NAME,	RFC3397,	"nis_domain_name"),
+	O(D6_OPTION_NISP_DOMAIN_NAME,	RFC3397,	"nisp_domain_name"),
+	O(D6_OPTION_SNTP_SERVERS,	IPV6A,		"sntp_servers"),
+	O(D6_OPTION_INFO_REFRESH_TIME,	UINT32,		"info_refresh_time"),
+	O(D6_OPTION_BCMS_SERVER_D,	RFC3397,	"bcms_server_d"),
+	O(D6_OPTION_BCMS_SERVER_A,	IPV6A,		"bcms_server_a"),
+	O(D6_OPTION_FQDN,		RFC3397,	"fqdn"),
+	O(D6_OPTION_POSIX_TIMEZONE,	STRING,		"posix_timezone"),
+	O(D6_OPTION_TZDB_TIMEZONE,	STRING,		"tzdb_timezone"),
+	O(0, 0, NULL)
 };
+#undef O
 
 struct dhcp_compat {
 	uint8_t dhcp_opt;
@@ -161,8 +163,8 @@ dhcp6_printoptions(void)
 	const struct dhcp_opt *opt;
 
 	for (opt = dhcp6_opts; opt->option; opt++)
-		if (opt->var)
-			printf("%05d %s\n", opt->option, opt->var);
+		if (opt->v.var)
+			printf("%05d %s\n", opt->option, opt->v.var);
 }
 
 static int
@@ -309,8 +311,20 @@ dhcp6_findoption(int code, const uint8_t *d, ssize_t len)
 	return NULL;
 }
 
+static const uint8_t *
+dhcp6_getoption(int *len, int option, const uint8_t *od, int ol)
+{
+	const struct dhcp6_option *o;
+
+	o = dhcp6_findoption(option, od, ol);
+	if (o == NULL)
+		return NULL;
+	*len = ntohs(o->len);
+	return D6_COPTION_DATA(o);
+}
+
 static const struct dhcp6_option *
-dhcp6_getoption(int code, const struct dhcp6_message *m, ssize_t len)
+dhcp6_getmoption(int code, const struct dhcp6_message *m, ssize_t len)
 {
 
 	len -= sizeof(*m);
@@ -327,7 +341,7 @@ dhcp6_updateelapsed(struct interface *ifp, struct dhcp6_message *m, ssize_t len)
 	time_t up;
 	uint16_t u16;
 
-	co = dhcp6_getoption(D6_OPTION_ELAPSED, m, len);
+	co = dhcp6_getmoption(D6_OPTION_ELAPSED, m, len);
 	if (co == NULL)
 		return -1;
 
@@ -443,7 +457,7 @@ dhcp6_makemessage(struct interface *ifp)
 			m = state->new;
 			ml = state->new_len;
 		}
-		si = dhcp6_getoption(D6_OPTION_SERVERID, m, ml);
+		si = dhcp6_getmoption(D6_OPTION_SERVERID, m, ml);
 		len += sizeof(*si) + ntohs(si->len);
 		/* FALLTHROUGH */
 	case DH6S_REBIND:
@@ -499,7 +513,7 @@ dhcp6_makemessage(struct interface *ifp)
 		break;
 	case DH6S_REQUEST:
 		state->send->type = DHCP6_REQUEST;
-		unicast = dhcp6_getoption(D6_OPTION_UNICAST, m, ml);
+		unicast = dhcp6_getmoption(D6_OPTION_UNICAST, m, ml);
 		break;
 	case DH6S_CONFIRM:
 		state->send->type = DHCP6_CONFIRM;
@@ -509,14 +523,14 @@ dhcp6_makemessage(struct interface *ifp)
 		break;
 	case DH6S_RENEW:
 		state->send->type = DHCP6_RENEW;
-		unicast = dhcp6_getoption(D6_OPTION_UNICAST, m, ml);
+		unicast = dhcp6_getmoption(D6_OPTION_UNICAST, m, ml);
 		break;
 	case DH6S_INFORM:
 		state->send->type = DHCP6_INFORMATION_REQ;
 		break;
 	case DH6S_RELEASE:
 		state->send->type = DHCP6_RELEASE;
-		unicast = dhcp6_getoption(D6_OPTION_UNICAST, m, ml);
+		unicast = dhcp6_getmoption(D6_OPTION_UNICAST, m, ml);
 		break;
 	default:
 		errno = EINVAL;
@@ -1197,7 +1211,7 @@ dhcp6_checkstatusok(const struct interface *ifp,
 	if (p)
 		o = dhcp6_findoption(D6_OPTION_STATUS_CODE, p, len);
 	else
-		o = dhcp6_getoption(D6_OPTION_STATUS_CODE, m, len);
+		o = dhcp6_getmoption(D6_OPTION_STATUS_CODE, m, len);
 	if (o == NULL) {
 		//syslog(LOG_DEBUG, "%s: no status", ifp->name);
 		return 0;
@@ -1555,7 +1569,7 @@ dhcp6_validatelease(struct interface *ifp,
 	const struct dhcp6_option *o;
 
 	state = D6_STATE(ifp);
-	o = dhcp6_getoption(ifp->options->ia_type, m, len);
+	o = dhcp6_getmoption(ifp->options->ia_type, m, len);
 	if (o == NULL) {
 		if (sfrom &&
 		    dhcp6_checkstatusok(ifp, m, NULL, len) != -1)
@@ -2047,13 +2061,13 @@ dhcp6_handledata(__unused void *arg)
 		return;
 	}
 
-	if (dhcp6_getoption(D6_OPTION_SERVERID, r, len) == NULL) {
+	if (dhcp6_getmoption(D6_OPTION_SERVERID, r, len) == NULL) {
 		syslog(LOG_ERR, "%s: no DHCPv6 server ID from %s",
 		    ifp->name, sfrom);
 		return;
 	}
 
-	o = dhcp6_getoption(D6_OPTION_CLIENTID, r, len);
+	o = dhcp6_getmoption(D6_OPTION_CLIENTID, r, len);
 	if (o == NULL || ntohs(o->len) != duid_len ||
 	    memcmp(D6_COPTION_DATA(o), duid, duid_len) != 0)
 	{
@@ -2065,11 +2079,11 @@ dhcp6_handledata(__unused void *arg)
 	ifo = ifp->options;
 	for (opt = dhcp6_opts; opt->option; opt++) {
 		if (has_option_mask(ifo->requiremask6, opt->option) &&
-		    dhcp6_getoption(opt->option, r, len) == NULL)
+		    dhcp6_getmoption(opt->option, r, len) == NULL)
 		{
 			syslog(LOG_WARNING,
 			    "%s: reject DHCPv6 (no option %s) from %s",
-			    ifp->name, opt->var, sfrom);
+			    ifp->name, opt->v.var, sfrom);
 			return;
 		}
 	}
@@ -2080,7 +2094,7 @@ dhcp6_handledata(__unused void *arg)
 		switch(state->state) {
 		case DH6S_INFORM:
 			/* RFC4242 */
-			o = dhcp6_getoption(D6_OPTION_INFO_REFRESH_TIME,
+			o = dhcp6_getmoption(D6_OPTION_INFO_REFRESH_TIME,
 			    r, len);
 			if (o == NULL || ntohs(o->len) != sizeof(u32))
 				state->renew = IRT_DEFAULT;
@@ -2107,7 +2121,7 @@ dhcp6_handledata(__unused void *arg)
 		case DH6S_DISCOVER:
 			if (has_option_mask(ifo->requestmask6,
 			    D6_OPTION_RAPID_COMMIT) &&
-			    dhcp6_getoption(D6_OPTION_RAPID_COMMIT, r, len))
+			    dhcp6_getmoption(D6_OPTION_RAPID_COMMIT, r, len))
 				state->state = DH6S_REQUEST;
 			else
 				op = NULL;
@@ -2556,6 +2570,22 @@ dhcp6_handleifa(int cmd, const char *ifname,
 	}
 }
 
+static const struct dhcp_opt *
+dhcp6_getoverride(const struct if_options *ifo, uint16_t o)
+{
+	size_t i;
+	const struct dhcp_opt *opt;
+
+	for (i = 0, opt = ifo->dhcp6_override;
+	    i < ifo->dhcp6_override_len;
+	    i++, opt++)
+	{
+		if (opt->option == o)
+			return opt;
+	}
+	return NULL;
+}
+
 ssize_t
 dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
     const struct dhcp6_message *m, ssize_t mlen)
@@ -2564,53 +2594,41 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 	const struct if_options *ifo;
 	const struct dhcp_opt *opt;
 	const struct dhcp6_option *o;
-	ssize_t len, e;
+	size_t e, n, oi;
 	uint16_t ol;
 	const uint8_t *od;
 	char **ep, *v, *val;
 	const struct ipv6_addr *ap;
 
 	state = D6_CSTATE(ifp);
-	e = 0;
+	n = 0;
 	ep = env;
 	ifo = ifp->options;
 	for (opt = dhcp6_opts; opt->option; opt++) {
-		if (!opt->var)
+		if (!opt->v.var)
 			continue;
 		if (has_option_mask(ifo->nomask6, opt->option))
 			continue;
-		o = dhcp6_getoption(opt->option, m, mlen);
+		if (dhcp6_getoverride(ifo, opt->option))
+			continue;
+		o = dhcp6_getmoption(opt->option, m, mlen);
 		if (o == NULL)
 			continue;
-		if (env == NULL) {
-			e++;
-			continue;
-		}
 		ol = ntohs(o->len);
 		od = D6_COPTION_DATA(o);
-		/* We only want the FQDN name */
+		/* No override, which means it's not embedded, so just
+		 * grab the FQDN itself */
 		if (opt->option == D6_OPTION_FQDN) {
 			ol--;
 			od++;
 		}
-		len = print_option(NULL, 0, opt->type, ol, od, ifp->name);
-		if (len < 0)
-			return -1;
-		e = strlen(prefix) + 6 + strlen(opt->var) + len + 4;
-		v = val = *ep++ = malloc(e);
-		if (v == NULL) {
-			syslog(LOG_ERR, "%s: %m", __func__);
-			return -1;
-		}
-		v += snprintf(val, e, "%s_dhcp6_%s=", prefix, opt->var);
-		if (len != 0)
-			print_option(v, len, opt->type, ol, od, ifp->name);
-
+		n += dhcp_envoption(env == NULL ? NULL : &env[n],
+		    prefix, "_dhcp6", ifp->name, opt, dhcp6_getoption, od, ol);
 	}
 
 	if (TAILQ_FIRST(&state->addrs)) {
 		if (env == NULL)
-			e++;
+			n++;
 		else {
 			if (ifo->ia_type == D6_OPTION_IA_PD) {
 				e = strlen(prefix) +
@@ -2654,7 +2672,20 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 		}
 	}
 
-	if (env == NULL)
-		return e;
-	return ep - env;
+	for (oi = 0, opt = ifo->dhcp6_override;
+	    oi < ifo->dhcp6_override_len;
+	    oi++, opt++)
+	{
+		if (has_option_mask(ifo->nomask, opt->option))
+			continue;
+		o = dhcp6_getmoption(opt->option, m, mlen);
+		if (o == NULL)
+			continue;
+		ol = ntohs(o->len);
+		od = D6_COPTION_DATA(o);
+		n += dhcp_envoption(env == NULL ? NULL : &env[n],
+		    prefix, "_dhcp6", ifp->name, opt, dhcp6_getoption, od, ol);
+	}
+
+	return n;
 }

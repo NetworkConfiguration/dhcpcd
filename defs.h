@@ -33,11 +33,14 @@
 #ifndef CONFIG
 # define CONFIG			SYSCONFDIR "/" PACKAGE ".conf"
 #endif
+#ifndef EMBEDDED_CONFIG
+# define EMBEDDED_CONFIG	LIBEXECDIR "/" PACKAGE "-embedded.conf"
+#endif
 #ifndef SCRIPT
 # define SCRIPT			LIBEXECDIR "/" PACKAGE "-run-hooks"
+#endif
 #ifndef DEVDIR
 # define DEVDIR			LIBDIR "/" PACKAGE "/dev"
-#endif
 #endif
 #ifndef DUID
 # define DUID			SYSCONFDIR "/" PACKAGE ".duid"

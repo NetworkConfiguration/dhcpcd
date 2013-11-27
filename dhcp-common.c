@@ -38,6 +38,15 @@
 #include "dhcp-common.h"
 #include "dhcp.h"
 
+#ifdef INET
+struct dhcp_opt *dhcp_override = NULL;
+size_t dhcp_override_len = 0;
+#endif
+#ifdef INET6
+struct dhcp_opt *dhcp6_override = NULL;
+size_t dhcp6_override_len = 0;
+#endif
+
 int make_option_mask(const struct dhcp_opt *dopts,
     uint8_t *mask, const char *opts, int add)
 {
@@ -52,10 +61,10 @@ int make_option_mask(const struct dhcp_opt *dopts,
 		if (*token == '\0')
 			continue;
 		for (opt = dopts; opt->option; opt++) {
-			if (!opt->var)
+			if (!opt->v.var)
 				continue;
 			match = 0;
-			if (strcmp(opt->var, token) == 0)
+			if (strcmp(opt->v.var, token) == 0)
 				match = 1;
 			else {
 				errno = 0;
@@ -86,6 +95,50 @@ int make_option_mask(const struct dhcp_opt *dopts,
 		}
 	}
 	free(o);
+	return 0;
+}
+
+int
+dhcp_getaddr(struct in_addr *a, const uint8_t *p, size_t pl)
+{
+
+	if (!p || pl < sizeof(a->s_addr))
+		return -1;
+	memcpy(&a->s_addr, p, sizeof(a->s_addr));
+	return 0;
+}
+
+int
+dhcp_getuint32(uint32_t *i, const uint8_t *p, size_t pl)
+{
+	uint32_t d;
+
+	if (!p || pl < sizeof(d))
+		return -1;
+	memcpy(&d, p, sizeof(d));
+	*i = ntohl(d);
+	return 0;
+}
+
+int
+dhcp_getuint16(uint16_t *i, const uint8_t *p, size_t pl)
+{
+	uint16_t d;
+
+	if (!p || pl < sizeof(d))
+		return -1;
+	memcpy(&d, p, sizeof(d));
+	*i = ntohs(d);
+	return 0;
+}
+
+int
+dhcp_getuint8(uint8_t *i, const uint8_t *p, __unused size_t pl)
+{
+
+	if (!p)
+		return -1;
+	*i = *(p);
 	return 0;
 }
 
@@ -278,6 +331,36 @@ print_string(char *s, ssize_t len, int dl, const uint8_t *data)
 	return bytes;
 }
 
+static size_t
+dhcp_optlen(int type, size_t dl)
+{
+	size_t sz;
+
+	if (dl == 0)
+		return 0;
+
+	if (type == 0 || type & (STRING | RFC3442 | RFC5969))
+		return dl;
+
+	if ((type & (ADDRIPV4 | ARRAY)) == (ADDRIPV4 | ARRAY)) {
+		if (dl < sizeof(uint32_t))
+			return 0;
+		return dl - (dl % sizeof(uint32_t));
+	}
+
+	sz = 0;
+	if (type & (UINT32 | ADDRIPV4))
+		sz = sizeof(uint32_t);
+	else if (type & UINT16)
+		sz = sizeof(uint16_t);
+	else if (type & UINT8)
+		sz = sizeof(uint8_t);
+	else
+		/* If we don't know the size, assume it's valid */
+		return dl;
+	return (dl < sz ? 0 : sz);
+}
+
 ssize_t
 print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data,
     const char *ifname)
@@ -453,4 +536,80 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data,
 	}
 
 	return bytes;
+}
+
+static ssize_t
+dhcp_envoption1(char **env, const char *prefix, const char *famprefix,
+    const char *ifname, const struct dhcp_opt *opt,
+    const uint8_t *od, int ol)
+{
+	ssize_t len;
+	size_t e;
+	char *v, *val;
+
+	len = print_option(NULL, 0, opt->type, ol, od, ifname);
+	if (len < 0)
+		return 0;
+	e = strlen(prefix) + strlen(famprefix) + strlen(opt->v.var) + len + 4;
+	v = val = *env = malloc(e);
+	if (v == NULL) {
+		syslog(LOG_ERR, "%s: %m", __func__);
+		return 0;
+	}
+	v += snprintf(val, e, "%s%s_%s=", prefix, famprefix, opt->v.var);
+	if (len != 0)
+		print_option(v, len, opt->type, ol, od, ifname);
+	return len;
+}
+
+ssize_t
+dhcp_envoption(char **env, const char *prefix, const char *famprefix,
+    const char *ifname, const struct dhcp_opt *opt,
+    const uint8_t *(*dgetopt)(int *, int, const uint8_t *, int),
+    const uint8_t *od, int ol)
+{
+	ssize_t e, n;
+	size_t i;
+	const uint8_t *ed;
+	int el;
+	const struct dhcp_opt *eopt;
+
+	/* If no embedded or encapsulated options, it's easy */
+	if (opt->embopts_len == 0 && opt->encopts_len == 0) {
+		if (env)
+			dhcp_envoption1(&env[0], prefix, famprefix, ifname,
+			    opt, od, ol);
+		return 1;
+	}
+
+	/* Embedded options are always processed first as that
+	 * is a fixed layout */
+	n = 0;
+	for (i = 0; i < opt->embopts_len; i++) {
+		eopt = &opt->embopts[i];
+		e = dhcp_optlen(eopt->type, ol);
+		if (e == 0)
+			/* Report error? */
+			return 0;
+		if (env)
+			dhcp_envoption1(&env[n], prefix, famprefix, ifname,
+			    eopt, od, e);
+		n++;
+		od += e;
+		ol -= e;
+	}
+
+	/* Now find our encapsulated option in what's left */
+	for (i = 0; i < opt->encopts_len; i++) {
+		eopt = &opt->encopts[i];
+		if ((ed = dgetopt(&el, eopt->option, od, ol))) {
+			if (env)
+				dhcp_envoption1(&env[n], prefix,
+				    famprefix, ifname, eopt, ed, el);
+			n++;
+		}
+	}
+
+	/* Return number of options found */
+	return n;
 }
