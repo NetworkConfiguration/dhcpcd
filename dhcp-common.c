@@ -116,7 +116,8 @@ dhcp_getuint32(uint32_t *i, const uint8_t *p, size_t pl)
 	if (!p || pl < sizeof(d))
 		return -1;
 	memcpy(&d, p, sizeof(d));
-	*i = ntohl(d);
+	if (i)
+		*i = ntohl(d);
 	return 0;
 }
 
@@ -128,7 +129,8 @@ dhcp_getuint16(uint16_t *i, const uint8_t *p, size_t pl)
 	if (!p || pl < sizeof(d))
 		return -1;
 	memcpy(&d, p, sizeof(d));
-	*i = ntohs(d);
+	if (i)
+		*i = ntohs(d);
 	return 0;
 }
 
@@ -138,7 +140,8 @@ dhcp_getuint8(uint8_t *i, const uint8_t *p, __unused size_t pl)
 
 	if (!p)
 		return -1;
-	*i = *(p);
+	if (i)
+		*i = *(p);
 	return 0;
 }
 
