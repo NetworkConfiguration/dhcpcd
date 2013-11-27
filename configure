@@ -267,16 +267,16 @@ echo "CC=		$CC" >>$CONFIG_MK
 
 # Set to blank, then append user config
 # We do this so our SED call to append to XCC remains portable
-echo "CFLAGS=" >>$CONFIG_MK
-echo "CPPFLAGS=" >>$CONFIG_MK
-echo "LDFLAGS=" >>$CONFIG_MK
 if [ -n "$CFLAGS" ]; then
+	echo "CFLAGS=" >>$CONFIG_MK
 	echo "CFLAGS+=	$CFLAGS" >>$CONFIG_MK
 fi
 if [ -n "$CPPFLAGS" ]; then
+	echo "CPPFLAGS=" >>$CONFIG_MK
 	echo "CPPFLAGS+=	$CPPFLAGS" >>$CONFIG_MK
 fi
 if [ -n "$LDFLAGS" ]; then
+	echo "LDFLAGS=" >>$CONFIG_MK
 	echo "LDFLAGS+=	$LDFLAGS" >>$CONFIG_MK
 fi
 
@@ -290,6 +290,7 @@ done
 if [ -n "$DEBUG" -a "$DEBUG" != no -a "$DEBUG" != false ]; then
 	echo "Enabling memory debugging"
 	echo "CPPFLAGS+=	-DDEBUG_MEMORY" >>$CONFIG_MK
+	echo "CFLAGS+=	-ggdb" >>$CONFIG_MK
 elif [ -z "$DEBUG" -a -d .git ]; then
 	printf "Found git ... "
 	DEBUG=yes
@@ -300,7 +301,7 @@ fi
 if [ "$DEBUG" != no -a "$DEBUG" != false ]; then
 	echo "Adding debugging CFLAGS"
 	cat <<EOF >>$CONFIG_MK
-CFLAGS+=	-ggdb -Wall -Wextra -Wimplicit -Wshadow -Wformat=2
+CFLAGS+=	-Wall -Wextra -Wimplicit -Wshadow -Wformat=2
 CFLAGS+=	-Wmissing-prototypes -Wmissing-declarations
 CFLAGS+=	-Wmissing-noreturn -Wmissing-format-attribute
 CFLAGS+=	-Wredundant-decls  -Wnested-externs
