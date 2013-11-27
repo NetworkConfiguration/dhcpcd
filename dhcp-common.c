@@ -217,7 +217,7 @@ decode_rfc3397(char *out, ssize_t len, int pl, const uint8_t *p)
 		hops = 0;
 		/* We check we are inside our length again incase
 		 * the data is NOT terminated correctly. */
-		while ((l = *q++) && q - p < pl) {
+		while (q - p < pl && (l = *q++)) {
 			ltype = l & 0xc0;
 			if (ltype == 0x80 || ltype == 0x40)
 				return 0;
