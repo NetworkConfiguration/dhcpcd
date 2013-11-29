@@ -1244,7 +1244,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		}
 		/* type */
 		fp = strwhite(arg);
-		if (fp) 
+		if (fp)
 			*fp++ = '\0';
 		t = 0;
 		if (strcasecmp(arg, "request") == 0) {
@@ -1498,6 +1498,8 @@ read_config(const char *file,
 			memcpy(line, *e, ol);
 #endif
 			option = strsep(&line, " \t");
+			if (line)
+				line = strskipwhite(line);
 			/* Trim trailing whitespace */
 			if (line && *line) {
 				p = line + strlen(line) - 1;
@@ -1549,6 +1551,8 @@ read_config(const char *file,
 
 	while ((line = get_line(f))) {
 		option = strsep(&line, " \t");
+		if (line)
+			line = strskipwhite(line);
 		/* Trim trailing whitespace */
 		if (line && *line) {
 			p = line + strlen(line) - 1;
