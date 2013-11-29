@@ -636,7 +636,7 @@ if [ "$DEV" != no -a "$UDEV" != no -a -n "$LIBUDEV_LIBS" ]; then
 	if [ -n "$LIBUDEV_CFLAGS" ]; then
 		echo "LIBUDEV_CFLAGS=		$LIBUDEV_CFLAGS" >>$CONFIG_MK
 	fi
-	echo "LIBUDEV_LIBS=		$LIBUDEV_LIBS" >>$CONFIG_MK
+	echo "LIBUDEV_LIBS=	$LIBUDEV_LIBS" >>$CONFIG_MK
 
 	printf "Checking udev_monitor_filter_add_match_subsystem_devtype ... "
 	cat <<EOF >_udev.c
@@ -680,7 +680,7 @@ fi
 if [ "$DEV" = yes ]; then
 	echo "SRCS+=		dev.c" >>$CONFIG_MK
 	echo "CPPFLAGS+=	-DPLUGIN_DEV" >>$CONFIG_MK
-	echo "MKDIRS+=		dev" >>$CONFIG_MK
+	echo "MKDIRS+=	dev" >>$CONFIG_MK
 fi
 
 if [ -z "$SERVICECMD" ]; then
