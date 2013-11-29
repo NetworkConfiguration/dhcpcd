@@ -1416,11 +1416,11 @@ read_config(const char *file,
 {
 	struct if_options *ifo;
 	FILE *f;
-	char *line, *option, *p;
+	char *buf, *line, *option, *p;
 	int skip = 0, have_profile = 0;
 #ifndef EMBEDDED_CONFIG
 	const char **e;
-	size_t linel, ol;
+	size_t buflen, ol;
 #endif
 
 	/* Seed our default options */
@@ -1478,24 +1478,25 @@ read_config(const char *file,
 
 		while (f && (line = get_line(f))) {
 #else
-		linel = 80;
-		line = malloc(linel);
-		if (line == NULL) {
+		buflen = 80;
+		buf = malloc(buflen);
+		if (buf == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);
 			return NULL;
 		}
 		for (e = dhcpcd_embedded_conf; *e; e++) {
 			ol = strlen(*e) + 1;
-			if (ol > linel) {
-				free(line);
-				linel = ol;
-				line = malloc(linel);
-				if (line == NULL) {
+			if (ol > buflen) {
+				free(buf);
+				buflen = ol;
+				buf = malloc(buflen);
+				if (buf == NULL) {
 					syslog(LOG_ERR, "%s: %m", __func__);
 					return NULL;
 				}
 			}
-			memcpy(line, *e, ol);
+			memcpy(buf, *e, ol);
+			line = buf;
 #endif
 			option = strsep(&line, " \t");
 			if (line)
@@ -1516,7 +1517,7 @@ read_config(const char *file,
 		if (f)
 			fclose(f);
 #else
-		free(line);
+		free(buf);
 #endif
 #ifdef INET
 		dhcp_eopts = ifo->dhcp_override;
