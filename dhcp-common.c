@@ -168,8 +168,8 @@ decode_rfc3397(char *out, ssize_t len, int pl, const uint8_t *p)
 	while (q - p < pl) {
 		r = NULL;
 		hops = 0;
-		/* We check we are inside our length again incase
-		 * the data is NOT terminated correctly. */
+		/* Check we are inside our length again in-case
+		 * the name isn't fully qualified (ie, not terminated) */
 		while (q - p < pl && (l = *q++)) {
 			ltype = l & 0xc0;
 			if (ltype == 0x80 || ltype == 0x40)
