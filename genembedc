@@ -43,5 +43,12 @@ cat <<EOF
 const char *dhcpcd_embedded_conf[] = {
 EOF
 
-$TOOL_SED -e 's/#.*$//' -e '/^$/d' -e 's/^/"/g' -e 's/$/\",/g' $CONF
+$TOOL_SED \
+	-e 's/#.*$//' \
+	-e '/^$/d' \
+	-e 's/^/"/g' \
+	-e 's/$/\",/g' \
+	-e 's/ [ ]*/ /g' \
+	-e 's/	[	]*/ /g' \
+	$CONF
 printf "%s\n%s\n" "NULL" "};"
