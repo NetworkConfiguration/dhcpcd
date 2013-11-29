@@ -244,49 +244,6 @@ dhcp_printoptions(void)
 			printf("%03d %s\n", opt->option, opt->v.var);
 }
 
-static int
-validate_length(uint8_t option, int dl, int *type)
-{
-	const struct dhcp_opt *opt;
-	ssize_t sz;
-
-	if (dl == 0)
-		return -1;
-
-	for (opt = dhcp_opts; opt->option; opt++) {
-		if (opt->option != option)
-			continue;
-
-		if (type)
-			*type = opt->type;
-
-		if (opt->type == 0 ||
-		    opt->type & (STRING | RFC3442 | RFC5969))
-			return dl;
-
-		if (opt->type & ADDRIPV4 && opt->type & ARRAY) {
-			if (dl < (int)sizeof(uint32_t))
-				return -1;
-			return dl - (dl % sizeof(uint32_t));
-		}
-
-		sz = 0;
-		if (opt->type & (UINT32 | ADDRIPV4))
-			sz = sizeof(uint32_t);
-		if (opt->type & UINT16)
-			sz = sizeof(uint16_t);
-		if (opt->type & UINT8)
-			sz = sizeof(uint8_t);
-		/* If we don't know the size, assume it's valid */
-		if (sz == 0)
-			return dl;
-		return (dl < sz ? -1 : sz);
-	}
-
-	/* unknown option, so let it pass */
-	return dl;
-}
-
 #ifdef DEBUG_MEMORY
 static void
 dhcp_cleanup(void)
@@ -297,9 +254,9 @@ dhcp_cleanup(void)
 }
 #endif
 
-#define get_option_raw(dhcp, opt) get_option(dhcp, opt, NULL, NULL)
+#define get_option_raw(dhcp, opt) get_option(dhcp, opt, NULL)
 static const uint8_t *
-get_option(const struct dhcp_message *dhcp, uint8_t opt, int *len, int *type)
+get_option(const struct dhcp_message *dhcp, uint8_t opt, int *len)
 {
 	const uint8_t *p = dhcp->options;
 	const uint8_t *e = p + sizeof(dhcp->options);
@@ -325,6 +282,10 @@ get_option(const struct dhcp_message *dhcp, uint8_t opt, int *len, int *type)
 				bp += ol;
 			}
 			ol = *p;
+			if (p + ol > e) {
+				errno = EINVAL;
+				return NULL;
+			}
 			op = p + 1;
 			bl += ol;
 		}
@@ -356,12 +317,6 @@ get_option(const struct dhcp_message *dhcp, uint8_t opt, int *len, int *type)
 	}
 
 exit:
-
-	bl = validate_length(opt, bl, type);
-	if (bl == -1) {
-		errno = EINVAL;
-		return NULL;
-	}
 	if (len)
 		*len = bl;
 	if (bp) {
