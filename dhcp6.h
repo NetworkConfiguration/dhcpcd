@@ -222,6 +222,9 @@ struct dhcp6_state {
     ((const uint8_t *)(o) + sizeof(struct dhcp6_option))
 
 #ifdef INET6
+extern struct dhcp_opt *dhcp6_eopts;
+extern size_t dhcp6_eopts_len;
+
 void dhcp6_printoptions(void);
 int dhcp6_addrexists(const struct ipv6_addr *);
 int dhcp6_find_delegates(struct interface *);

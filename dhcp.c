@@ -222,6 +222,10 @@ struct udp_dhcp_packet
 	struct udphdr udp;
 	struct dhcp_message dhcp;
 };
+
+struct dhcp_opt *dhcp_eopts = NULL;
+size_t dhcp_eopts_len = 0;
+
 static const size_t udp_dhcp_len = sizeof(struct udp_dhcp_packet);
 
 static int dhcp_open(struct interface *);
@@ -1126,7 +1130,7 @@ read_lease(const struct interface *ifp)
 }
 
 static const struct dhcp_opt *
-dhcp_getoverride(const struct if_options *ifo, uint16_t o)
+dhcp_getoverride(const struct if_options *ifo, uint16_t o, int e)
 {
 	size_t i;
 	const struct dhcp_opt *opt;
@@ -1138,9 +1142,17 @@ dhcp_getoverride(const struct if_options *ifo, uint16_t o)
 		if (opt->option == o)
 			return opt;
 	}
+	if (e) {
+		for (i = 0, opt = dhcp_eopts;
+		    i < dhcp_eopts_len;
+		    i++, opt++)
+		{
+			if (opt->option == o)
+				return opt;
+		}
+	}
 	return NULL;
 }
-
 
 static const uint8_t *
 dhcp_getoption(int *len, int option, const uint8_t *od, int ol)
@@ -1188,7 +1200,7 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 				continue;
 			if (has_option_mask(ifo->nomask, opt->option))
 				continue;
-			if (dhcp_getoverride(ifo, opt->option))
+			if (dhcp_getoverride(ifo, opt->option, 1))
 				continue;
 			p = get_option(dhcp, opt->option, &pl, NULL);
 			if (!p)
@@ -1202,10 +1214,26 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 			e++;
 		if (*dhcp->servername && !(overl & 2))
 			e++;
+		for (oi = 0, opt = dhcp_eopts;
+		    oi < dhcp_eopts_len;
+		    oi++, opt++)
+		{
+			if (has_option_mask(ifo->nomask, opt->option))
+				continue;
+			if (dhcp_getoverride(ifo, opt->option, 0))
+				continue;
+			p = get_option(dhcp, opt->option, &pl, NULL);
+			if (!p)
+				continue;
+			e += dhcp_envoption(NULL, prefix, "", ifp->name,
+			    opt, dhcp_getoption, p, pl);
+		}
 		for (oi = 0, opt = ifo->dhcp_override;
 		    oi < ifo->dhcp_override_len;
 		    oi++, opt++)
 		{
+			if (has_option_mask(ifo->nomask, opt->option))
+				continue;
 			p = get_option(dhcp, opt->option, &pl, NULL);
 			if (!p)
 				continue;
@@ -1245,7 +1273,7 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 			continue;
 		if (has_option_mask(ifo->nomask, opt->option))
 			continue;
-		if (dhcp_getoverride(ifo, opt->option))
+		if (dhcp_getoverride(ifo, opt->option, 1))
 			continue;
 		p = get_option(dhcp, opt->option, &pl, NULL);
 		if (!p)
@@ -1258,6 +1286,19 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 		}
 		ep += dhcp_envoption(ep, prefix, "", ifp->name,
 		    opt, dhcp_getoption, p, pl);
+	}
+
+	for (oi = 0, opt = dhcp_eopts;
+	    oi < dhcp_eopts_len;
+	    oi++, opt++)
+	{
+		if (has_option_mask(ifo->nomask, opt->option))
+			continue;
+		if (dhcp_getoverride(ifo, opt->option, 0))
+			continue;
+		if ((p = get_option(dhcp, opt->option, &pl, NULL)))
+			ep += dhcp_envoption(ep, prefix, "", ifp->name,
+			    opt, dhcp_getoption, p, pl);
 	}
 
 	for (oi = 0, opt = ifo->dhcp_override;

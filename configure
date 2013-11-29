@@ -19,6 +19,7 @@ FORK=
 STATIC=
 INCLUDEDIR=
 DEVS=
+EMBEDDED=
 
 for x do
 	opt=${x%%=*}
@@ -38,6 +39,8 @@ for x do
 	--enable-ipv4) INET=yes;;
 	--disable-ipv6) INET6=no;;
 	--enable-ipv6) INET6=yes;;
+	--disable-embedded) EMBEDDED=no;;
+	--enable-embedded) EMBEDDED=no;;
 	--prefix) PREFIX=$var;;
 	--sysconfdir) SYSCONFDIR=$var;;
 	--bindir|--sbindir) SBINDIR=$var;;
@@ -137,6 +140,8 @@ exit 0
 done
 
 : ${SED:=sed}
+: ${GREP:=grep}
+: ${WC:=wc}
 
 : ${FORK:=yes}
 : ${SYSCONFDIR:=$PREFIX/etc}
@@ -311,6 +316,23 @@ CFLAGS+=	-Wdeclaration-after-statement -Wsequence-point
 CFLAGS+=	-fno-common
 EOF
 fi
+
+if [ -z "$EMBEDDED" -o "$EMBEDDED" = yes ]; then
+	echo "dhcpcd-embedded.conf will be embedded in dhcpcd itself"
+	echo "SRCS+=		dhcpcd-embedded.c" >>$CONFIG_MK
+else
+	echo "dhcpcd-embedded.conf will be installed to $LIBEXECDIR"
+	echo "CFLAGS+= -DEMBEDDED_CONFIG=\\\"$LIBEXECDIR/dhcpcd-embedded.conf\\\"" >>$CONFIG_MK
+	echo "EMBEDDEDINSTALL=	_embeddedinstall" >>$CONFIG_MK
+fi
+printf %s "Estimating initial embedded defines ... "
+INITDEFINES=$($GREP "^define " dhcpcd-embedded.conf | $WC -l)
+echo $INITDEFINES
+echo "#define INITDEFINES $INITDEFINES" >>$CONFIG_H
+printf %s "Estimating initial embedded define6s ... "
+INITDEFINE6S=$($GREP "^define6 " dhcpcd-embedded.conf | $WC -l)
+echo $INITDEFINE6S
+echo "#define INITDEFINE6S $INITDEFINE6S" >>$CONFIG_H
 
 if [ -n "$FORK" -a "$FORK" != yes -a "$FORK" != true ]; then
 	echo "There is no fork"
@@ -770,7 +792,7 @@ if ! $HOOKSET; then
 	printf "Checking for ypind ... "
 	YPBIND=$(_which ypbind)
 	if [ -n "$YPBIND" ]; then
-		if strings "$YPBIND" | grep -q yp.conf; then
+		if strings "$YPBIND" | $GREP -q yp.conf; then
 			YPHOOK="50-yp.conf"
 		else
 			YPHOOK="50-ypbind"

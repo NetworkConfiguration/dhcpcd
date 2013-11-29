@@ -52,6 +52,8 @@ GITREF?=	HEAD
 DISTPREFIX?=	${PROG}-${VERSION}
 DISTFILE?=	${DISTPREFIX}.tar.bz2
 
+HOST_SH?=	/bin/sh
+
 CLEANFILES+=	*.tar.bz2
 
 .PHONY:		import import-bsd dev
@@ -73,6 +75,16 @@ dev:
 .c.o:
 	${CC} ${CFLAGS} ${CPPFLAGS} -c $< -o $@
 
+CLEANFILES+=	dhcpcd-embedded.h dhcpcd-embedded.c
+
+dhcpcd-embedded.h: genembedh dhcpcd-embedded.conf dhcpcd-embedded.h.in
+	${HOST_SH} ${.ALLSRC} $^ > $@
+
+dhcpcd-embedded.c: genembedc dhcpcd-embedded.conf
+	${HOST_SH} ${.ALLSRC} $^ > $@
+
+if-options.c: dhcpcd-embedded.h
+
 .depend: ${SRCS} ${COMPAT_SRCS}
 	${CC} ${CPPFLAGS} -MM ${SRCS} ${COMPAT_SRCS} > .depend
 
@@ -80,6 +92,10 @@ depend: .depend
 
 ${PROG}: ${DEPEND} ${OBJS}
 	${CC} ${LDFLAGS} -o $@ ${OBJS} ${LDADD}
+
+_embeddedinstall: dhcpcd-embedded.conf
+	${INSTALL} -d ${DESTDIR}${SCRIPTSDIR}
+	${INSTALL} -m ${CONFMODE} dhcpcd-embedded.conf ${DESTDIR}${SCRIPTSDIR}
 
 _proginstall: ${PROG}
 	${INSTALL} -d ${DESTDIR}${SBINDIR}
@@ -89,9 +105,8 @@ _proginstall: ${PROG}
 _scriptsinstall: ${SCRIPTS}
 	${INSTALL} -d ${DESTDIR}${SCRIPTSDIR}
 	${INSTALL} -m ${BINMODE} ${SCRIPTS} ${DESTDIR}${SCRIPTSDIR}
-	${INSTALL} -m ${CONFMODE} dhcpcd-embedded.conf ${DESTDIR}${SCRIPTSDIR}
 
-proginstall: _proginstall _scriptsinstall
+proginstall: _proginstall _scriptsinstall ${EMBEDDEDINSTALL}
 	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@; cd ..; done
 
 _maninstall: ${MAN5} ${MAN8}
@@ -105,8 +120,7 @@ _confinstall:
 	test -e ${DESTDIR}${SYSCONFDIR}/dhcpcd.conf || \
 		${INSTALL} -m ${CONFMODE} dhcpcd.conf ${DESTDIR}${SYSCONFDIR}
 
-install: _proginstall _scriptsinstall _maninstall _confinstall
-	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@; cd ..; done
+install: proginstall _maninstall _confinstall
 
 clean:
 	rm -f ${OBJS} ${PROG} ${PROG}.core ${CLEANFILES}
@@ -118,10 +132,10 @@ distclean: clean
 dist:
 	git archive --prefix=${DISTPREFIX}/ ${GITREF} | bzip2 > ${DISTFILE}
 
-import:
+import: ${SRCS}
 	rm -rf /tmp/${DISTPREFIX}
 	${INSTALL} -d /tmp/${DISTPREFIX}
-	cp ${SRCS} dhcpcd.conf *.in /tmp/${DISTPREFIX}
+	cp ${SRCS} dhcpcd.conf dhcpcd-embedded.conf *.in /tmp/${DISTPREFIX}
 	cp $$(${CC} ${CPPFLAGS} -MM ${SRCS} | \
 		sed -e 's/^.*\.c //g' -e 's/.*\.c$$//g' -e 's/\\//g' | \
 		tr ' ' '\n' | \
@@ -176,6 +190,7 @@ import:
 		for x in \
 		    /tmp/${DISTPREFIX}/dhcpcd-run-hooks.in \
 		    /tmp/${DISTPREFIX}/dhcpcd.conf \
+		    /tmp/${DISTPREFIX}/dhcpcd-embedded.conf \
 		; do \
 			if test -e "$$x"; then \
 				if test "$$(sed -ne 1p $$x)" = "#!/bin/sh" \

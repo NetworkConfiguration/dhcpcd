@@ -9,5 +9,7 @@ dhcpcd
 dhcpcd.conf.5
 dhcpcd.core
 dhcpcd.8
+dhcpcd-embedded.c
+dhcpcd-embedded.h
 dhcpcd-run-hooks
 dhcpcd-run-hooks.8

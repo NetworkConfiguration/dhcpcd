@@ -129,6 +129,9 @@ const struct dhcp_opt dhcp6_opts[] = {
 };
 #undef O
 
+struct dhcp_opt *dhcp6_eopts = NULL;
+size_t dhcp6_eopts_len = 0;
+
 struct dhcp_compat {
 	uint8_t dhcp_opt;
 	uint16_t dhcp6_opt;
@@ -2571,7 +2574,7 @@ dhcp6_handleifa(int cmd, const char *ifname,
 }
 
 static const struct dhcp_opt *
-dhcp6_getoverride(const struct if_options *ifo, uint16_t o)
+dhcp6_getoverride(const struct if_options *ifo, uint16_t o, int e)
 {
 	size_t i;
 	const struct dhcp_opt *opt;
@@ -2582,6 +2585,15 @@ dhcp6_getoverride(const struct if_options *ifo, uint16_t o)
 	{
 		if (opt->option == o)
 			return opt;
+	}
+	if (e != 0) {
+		for (i = 0, opt = dhcp6_eopts;
+		    i < dhcp6_eopts_len;
+		    i++, opt++)
+		{
+			if (opt->option == o)
+				return opt;
+		}
 	}
 	return NULL;
 }
@@ -2609,7 +2621,7 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 			continue;
 		if (has_option_mask(ifo->nomask6, opt->option))
 			continue;
-		if (dhcp6_getoverride(ifo, opt->option))
+		if (dhcp6_getoverride(ifo, opt->option, 1))
 			continue;
 		o = dhcp6_getmoption(opt->option, m, mlen);
 		if (o == NULL)
@@ -2670,6 +2682,24 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 				*--v = '\0';
 			}
 		}
+	}
+
+	for (oi = 0, opt = dhcp6_eopts;
+	    oi < dhcp6_eopts_len;
+	    oi++, opt++)
+	{
+		if (has_option_mask(ifo->nomask, opt->option))
+			continue;
+		if (dhcp6_getoverride(ifo, opt->option, 0))
+			continue;
+
+		o = dhcp6_getmoption(opt->option, m, mlen);
+		if (o == NULL)
+			continue;
+		ol = ntohs(o->len);
+		od = D6_COPTION_DATA(o);
+		n += dhcp_envoption(env == NULL ? NULL : &env[n],
+		    prefix, "_dhcp6", ifp->name, opt, dhcp6_getoption, od, ol);
 	}
 
 	for (oi = 0, opt = ifo->dhcp6_override;

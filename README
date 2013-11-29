@@ -52,6 +52,16 @@ To facilitate this, dhcpcd allows a plugin to load to instruct dhcpcd when it
 can use an interface. As of the time of writing only udev support is included.
 You can disable this with --without-dev, or without-udev
 
+To shrink dhcpcd you can disable IPv4 or IPv6:
+	--disable-inet
+	--disable-inet6
+
+You can also move the embedded extended configuration from the dhcpcd binary
+to an external file (LIBEXECDIR/dhcpcd-embedded.conf)
+	--disable-embedded
+If dhcpcd cannot load this file at runtime, dhcpcd will work but will not be
+able to decode any DHCP/DHCPv6 options present within the file.
+
 To prepare dhcpcd for import into a platform source tree (like NetBSD)
 you can use the make import target to create /tmp/dhcpcd-$version and
 populate it with all the source files and hooks needed.

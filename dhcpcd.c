@@ -136,11 +136,35 @@ printf("usage: "PACKAGE"\t[-46ABbDdEGgHJKkLnpqTVw]\n"
 }
 
 static void
+free_globals(void)
+{
+	int i;
+	size_t n;
+
+	for (i = 0; i < ifac; i++)
+		free(ifav[i]);
+	free(ifav);
+	for (i = 0; i < ifdc; i++)
+		free(ifdv[i]);
+	free(ifdv);
+
+#ifdef INET
+	for (n = 0; n < dhcp_eopts_len; n++)
+		free_dhcp_opt_embenc(&dhcp_eopts[n]);
+	free(dhcp_eopts);
+#endif
+#ifdef INET6
+	for (n = 0; n < dhcp6_eopts_len; n++)
+		free_dhcp_opt_embenc(&dhcp6_eopts[n]);
+	free(dhcp6_eopts);
+#endif
+}
+
+static void
 cleanup(void)
 {
 #ifdef DEBUG_MEMORY
 	struct interface *ifp;
-	int i;
 
 	free(duid);
 	free_options(if_options);
@@ -153,12 +177,7 @@ cleanup(void)
 		free(ifaces);
 	}
 
-	for (i = 0; i < ifac; i++)
-		free(ifav[i]);
-	free(ifav);
-	for (i = 0; i < ifdc; i++)
-		free(ifdv[i]);
-	free(ifdv);
+	free_globals();
 #endif
 
 	if (!(options & DHCPCD_FORKED))
@@ -807,21 +826,16 @@ sig_reboot(void *arg)
 {
 	siginfo_t *siginfo = arg;
 	struct if_options *ifo;
-	int i;
 
 	syslog(LOG_INFO, "received SIGALRM from PID %d, rebinding",
 	    (int)siginfo->si_pid);
 
-	for (i = 0; i < ifac; i++)
-		free(ifav[i]);
-	free(ifav);
+	free_globals();
 	ifav = NULL;
 	ifac = 0;
-	for (i = 0; i < ifdc; i++)
-		free(ifdv[i]);
-	free(ifdv);
 	ifdc = 0;
 	ifdv = NULL;
+
 	ifo = read_config(cffile, NULL, NULL, NULL);
 	add_options(ifo, margc, margv);
 	/* We need to preserve these two options. */

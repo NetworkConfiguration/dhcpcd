@@ -534,6 +534,8 @@ An unsigned 16bit integer, 2 bytes
 A signed 32bit integer, 4 bytes
 .It Ic uint32
 An unsigned 32bit integer, 4 bytes
+.It Ic flag 
+A fixed value (1) to indicate that the option is present, 0 bytes
 .It Ic domain
 A RFC 3397 encoded string
 .It Ic binhex
