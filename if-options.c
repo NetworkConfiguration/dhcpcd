@@ -1304,6 +1304,8 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			t = ENCAP;
 		else if (strcasecmp(arg, "rfc3361") ==0)
 			t = STRING | RFC3361;
+		else if (strcasecmp(arg, "rfc3442") ==0)
+			t = RFC3442;
 		else if (strcasecmp(arg, "rfc5969") == 0)
 			t = RFC5969;
 		else {
