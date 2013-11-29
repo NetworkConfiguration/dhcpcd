@@ -250,9 +250,6 @@ ssize_t decode_rfc5969(char *out, ssize_t len, int pl, const uint8_t *p);
 void dhcp_printoptions(void);
 char *get_option_string(const struct dhcp_message *, uint8_t);
 int get_option_addr(struct in_addr *, const struct dhcp_message *, uint8_t);
-int get_option_uint32(uint32_t *, const struct dhcp_message *, uint8_t);
-int get_option_uint16(uint16_t *, const struct dhcp_message *, uint8_t);
-int get_option_uint8(uint8_t *, const struct dhcp_message *, uint8_t);
 #define is_bootp(m) (m &&						\
 	    !IN_LINKLOCAL(htonl((m)->yiaddr)) &&			\
 	    get_option_uint8(NULL, m, DHO_MESSAGETYPE) == -1)

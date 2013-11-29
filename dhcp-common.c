@@ -98,53 +98,6 @@ int make_option_mask(const struct dhcp_opt *dopts,
 	return 0;
 }
 
-int
-dhcp_getaddr(struct in_addr *a, const uint8_t *p, size_t pl)
-{
-
-	if (!p || pl < sizeof(a->s_addr))
-		return -1;
-	memcpy(&a->s_addr, p, sizeof(a->s_addr));
-	return 0;
-}
-
-int
-dhcp_getuint32(uint32_t *i, const uint8_t *p, size_t pl)
-{
-	uint32_t d;
-
-	if (!p || pl < sizeof(d))
-		return -1;
-	memcpy(&d, p, sizeof(d));
-	if (i)
-		*i = ntohl(d);
-	return 0;
-}
-
-int
-dhcp_getuint16(uint16_t *i, const uint8_t *p, size_t pl)
-{
-	uint16_t d;
-
-	if (!p || pl < sizeof(d))
-		return -1;
-	memcpy(&d, p, sizeof(d));
-	if (i)
-		*i = ntohs(d);
-	return 0;
-}
-
-int
-dhcp_getuint8(uint8_t *i, const uint8_t *p, __unused size_t pl)
-{
-
-	if (!p)
-		return -1;
-	if (i)
-		*i = *(p);
-	return 0;
-}
-
 size_t
 encode_rfc1035(const char *src, uint8_t *dst)
 {

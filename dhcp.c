@@ -265,7 +265,7 @@ get_option(const struct dhcp_message *dhcp, uint8_t opt, int *len)
 	uint8_t overl = 0;
 	uint8_t *bp = NULL;
 	const uint8_t *op = NULL;
-	ssize_t bl = 0;
+	int bl = 0;
 
 	while (p < e) {
 		o = *p++;
@@ -336,38 +336,41 @@ get_option_addr(struct in_addr *a, const struct dhcp_message *dhcp,
 	const uint8_t *p;
 	int len;
 
-	p = get_option(dhcp, option, &len, NULL);
-	return dhcp_getaddr(a, p, len);
+	p = get_option(dhcp, option, &len);
+	if (!p || len < (ssize_t)sizeof(a->s_addr))
+		return -1;
+	memcpy(&a->s_addr, p, sizeof(a->s_addr));
+	return 0;
 }
 
-int
+static int
 get_option_uint32(uint32_t *i, const struct dhcp_message *dhcp, uint8_t option)
 {
 	const uint8_t *p;
 	int len;
+	uint32_t d;
 
-	p = get_option(dhcp, option, &len, NULL);
-	return dhcp_getuint32(i, p, len);
+	p = get_option(dhcp, option, &len);
+	if (!p || len < (ssize_t)sizeof(d))
+		return -1;
+	memcpy(&d, p, sizeof(d));
+	if (i)
+		*i = ntohl(d);
+	return 0;
 }
 
-int
-get_option_uint16(uint16_t *i, const struct dhcp_message *dhcp, uint8_t option)
-{
-	const uint8_t *p;
-	int len;
-
-	p = get_option(dhcp, option, &len, NULL);
-	return dhcp_getuint16(i, p, len);
-}
-
-int
+static int
 get_option_uint8(uint8_t *i, const struct dhcp_message *dhcp, uint8_t option)
 {
 	const uint8_t *p;
 	int len;
 
-	p = get_option(dhcp, option, &len, NULL);
-	return dhcp_getuint8(i, p, len);
+	p = get_option(dhcp, option, &len);
+	if (!p || len < (ssize_t)sizeof(*p))
+		return -1;
+	if (i)
+		*i = *(p);
+	return 0;
 }
 
 ssize_t
@@ -600,29 +603,13 @@ decode_rfc5969(char *out, ssize_t len, int pl, const uint8_t *p)
 char *
 get_option_string(const struct dhcp_message *dhcp, uint8_t option)
 {
-	int type = 0;
 	int len;
 	const uint8_t *p;
 	char *s;
 
-	p = get_option(dhcp, option, &len, &type);
-	if (!p || *p == '\0')
+	p = get_option(dhcp, option, &len);
+	if (!p || len == 0 || *p == '\0')
 		return NULL;
-
-	if (type & RFC3397) {
-		type = decode_rfc3397(NULL, 0, len, p);
-		if (!type) {
-			errno = EINVAL;
-			return NULL;
-		}
-		s = malloc(sizeof(char) * type);
-		if (s)
-			decode_rfc3397(s, type, len, p);
-		return s;
-	}
-
-	if (type & RFC3361)
-		return decode_rfc3361(len, p);
 
 	s = malloc(sizeof(char) * (len + 1));
 	if (s) {
@@ -677,12 +664,12 @@ get_option_routes(struct interface *ifp, const struct dhcp_message *dhcp)
 
 	/* If we have CSR's then we MUST use these only */
 	if (!has_option_mask(ifo->nomask, DHO_CSR))
-		p = get_option(dhcp, DHO_CSR, &len, NULL);
+		p = get_option(dhcp, DHO_CSR, &len);
 	else
 		p = NULL;
 	/* Check for crappy MS option */
 	if (!p && !has_option_mask(ifo->nomask, DHO_MSCSR)) {
-		p = get_option(dhcp, DHO_MSCSR, &len, NULL);
+		p = get_option(dhcp, DHO_MSCSR, &len);
 		if (p)
 			csr = "MS ";
 	}
@@ -707,7 +694,7 @@ get_option_routes(struct interface *ifp, const struct dhcp_message *dhcp)
 	}
 	TAILQ_INIT(routes);
 	if (!has_option_mask(ifo->nomask, DHO_STATICROUTE))
-		p = get_option(dhcp, DHO_STATICROUTE, &len, NULL);
+		p = get_option(dhcp, DHO_STATICROUTE, &len);
 	else
 		p = NULL;
 	if (p) {
@@ -730,7 +717,7 @@ get_option_routes(struct interface *ifp, const struct dhcp_message *dhcp)
 
 	/* Now grab our routers */
 	if (!has_option_mask(ifo->nomask, DHO_ROUTER))
-		p = get_option(dhcp, DHO_ROUTER, &len, NULL);
+		p = get_option(dhcp, DHO_ROUTER, &len);
 	else
 		p = NULL;
 	if (p) {
@@ -1157,7 +1144,7 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 				continue;
 			if (dhcp_getoverride(ifo, opt->option, 1))
 				continue;
-			p = get_option(dhcp, opt->option, &pl, NULL);
+			p = get_option(dhcp, opt->option, &pl);
 			if (!p)
 				continue;
 			e += dhcp_envoption(NULL, prefix, "", ifp->name,
@@ -1177,7 +1164,7 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 				continue;
 			if (dhcp_getoverride(ifo, opt->option, 0))
 				continue;
-			p = get_option(dhcp, opt->option, &pl, NULL);
+			p = get_option(dhcp, opt->option, &pl);
 			if (!p)
 				continue;
 			e += dhcp_envoption(NULL, prefix, "", ifp->name,
@@ -1189,7 +1176,7 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 		{
 			if (has_option_mask(ifo->nomask, opt->option))
 				continue;
-			p = get_option(dhcp, opt->option, &pl, NULL);
+			p = get_option(dhcp, opt->option, &pl);
 			if (!p)
 				continue;
 			e += dhcp_envoption(NULL, prefix, "", ifp->name,
@@ -1230,7 +1217,7 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 			continue;
 		if (dhcp_getoverride(ifo, opt->option, 1))
 			continue;
-		p = get_option(dhcp, opt->option, &pl, NULL);
+		p = get_option(dhcp, opt->option, &pl);
 		if (!p)
 			continue;
 		/* No override, which means it's not embedded, so just
@@ -1251,7 +1238,7 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 			continue;
 		if (dhcp_getoverride(ifo, opt->option, 0))
 			continue;
-		if ((p = get_option(dhcp, opt->option, &pl, NULL)))
+		if ((p = get_option(dhcp, opt->option, &pl)))
 			ep += dhcp_envoption(ep, prefix, "", ifp->name,
 			    opt, dhcp_getoption, p, pl);
 	}
@@ -1262,7 +1249,7 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 	{
 		if (has_option_mask(ifo->nomask, opt->option))
 			continue;
-		if ((p = get_option(dhcp, opt->option, &pl, NULL)))
+		if ((p = get_option(dhcp, opt->option, &pl)))
 			ep += dhcp_envoption(ep, prefix, "", ifp->name,
 			    opt, dhcp_getoption, p, pl);
 	}
