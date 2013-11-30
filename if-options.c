@@ -1416,9 +1416,10 @@ read_config(const char *file,
 {
 	struct if_options *ifo;
 	FILE *f;
-	char *buf, *line, *option, *p;
+	char *line, *option, *p;
 	int skip = 0, have_profile = 0;
 #ifndef EMBEDDED_CONFIG
+	char *buf;
 	const char **e;
 	size_t buflen, ol;
 #endif
