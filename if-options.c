@@ -527,7 +527,7 @@ strskipwhite(const char *s)
 static int
 parse_option(struct if_options *ifo, int opt, const char *arg)
 {
-	int i, t;
+	int i, l, t;
 	char *p = NULL, *fp, *np, **nconf;
 	ssize_t s;
 	struct in_addr addr, addr2;
@@ -1246,6 +1246,14 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		fp = strwhite(arg);
 		if (fp)
 			*fp++ = '\0';
+		np = strchr(arg, ':');
+		/* length */
+		if (np) {
+			*np++ = '\0';
+			if ((l = atoint(np)) == -1)
+				return -1;
+		} else
+			l = 0;
 		t = 0;
 		if (strcasecmp(arg, "request") == 0) {
 			t |= REQUEST;
@@ -1312,6 +1320,11 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			syslog(LOG_ERR, "unknown type: %s", arg);
 			return -1;
 		}
+		if (l && !(t & (STRING | BINHEX))) {
+			syslog(LOG_WARNING,
+			    "ignoring length for type `%s'", arg);
+			l = 0;
+		}
 		/* variable */
 		if (fp) {
 			arg = strskipwhite(fp);
@@ -1359,6 +1372,10 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			free_dhcp_opt_embenc(ndop);
 		ndop->option = i; /* could have been 0 */
 		ndop->type = t;
+		if (t & (STRING | BINHEX))
+			ndop->len = l;
+		else
+			ndop->len = 0;
 		ndop->v.dvar = np;
 		/* Save the define for embed and encap options */
 		if (opt == O_DEFINE || opt == O_DEFINE6)

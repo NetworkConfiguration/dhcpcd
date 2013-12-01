@@ -288,28 +288,36 @@ print_string(char *s, ssize_t len, int dl, const uint8_t *data)
 }
 
 static size_t
-dhcp_optlen(int type, size_t dl)
+dhcp_optlen(const struct dhcp_opt *opt, size_t dl)
 {
 	size_t sz;
 
 	if (dl == 0)
 		return 0;
 
-	if (type == 0 || type & (STRING | RFC3442 | RFC5969))
+	if (opt->type == 0 ||
+	    opt->type & (STRING | BINHEX | RFC3442 | RFC5969))
+	{
+		if (opt->len) {
+			if ((size_t)opt->len > dl)
+				return 0;
+			return opt->len;
+		}
 		return dl;
+	}
 
-	if ((type & (ADDRIPV4 | ARRAY)) == (ADDRIPV4 | ARRAY)) {
+	if ((opt->type & (ADDRIPV4 | ARRAY)) == (ADDRIPV4 | ARRAY)) {
 		if (dl < sizeof(uint32_t))
 			return 0;
 		return dl - (dl % sizeof(uint32_t));
 	}
 
 	sz = 0;
-	if (type & (UINT32 | ADDRIPV4))
+	if (opt->type & (UINT32 | ADDRIPV4))
 		sz = sizeof(uint32_t);
-	else if (type & UINT16)
+	else if (opt->type & UINT16)
 		sz = sizeof(uint16_t);
-	else if (type & UINT8)
+	else if (opt->type & UINT8)
 		sz = sizeof(uint8_t);
 	else
 		/* If we don't know the size, assume it's valid */
@@ -503,6 +511,8 @@ dhcp_envoption1(char **env, const char *prefix, const char *famprefix,
 	size_t e;
 	char *v, *val;
 
+	if (opt->len && opt->len < ol)
+		ol = opt->len;
 	len = print_option(NULL, 0, opt->type, ol, od, ifname);
 	if (len < 0)
 		return 0;
@@ -543,7 +553,7 @@ dhcp_envoption(char **env, const char *prefix, const char *famprefix,
 	n = 0;
 	for (i = 0; i < opt->embopts_len; i++) {
 		eopt = &opt->embopts[i];
-		e = dhcp_optlen(eopt->type, ol);
+		e = dhcp_optlen(eopt, ol);
 		if (e == 0)
 			/* Report error? */
 			return 0;
