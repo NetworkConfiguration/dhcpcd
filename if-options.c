@@ -1372,10 +1372,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			free_dhcp_opt_embenc(ndop);
 		ndop->option = i; /* could have been 0 */
 		ndop->type = t;
-		if (t & (STRING | BINHEX))
-			ndop->len = l;
-		else
-			ndop->len = 0;
+		ndop->len = l;
 		ndop->v.dvar = np;
 		/* Save the define for embed and encap options */
 		if (opt == O_DEFINE || opt == O_DEFINE6)
