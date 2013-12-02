@@ -1337,24 +1337,19 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			t &= ~ARRAY;
 		}
 		/* variable */
-		if (fp) {
-			arg = strskipwhite(fp);
-			fp = strwhite(arg);
-			if (fp)
-				*fp++ = '\0';
-			np = strdup(arg);
-			if (np == NULL) {
-				syslog(LOG_ERR, "%s: %m", __func__);
-				return -1;
-			}
-		} else {
-			if (t != EMBED && t != ENCAP) {
-				syslog(LOG_ERR,
-				    "type %s requires a variable name",
-				    arg);
-				return -1;
-			}
-			np = NULL;
+		if (!fp) {
+		        syslog(LOG_ERR,
+			    "type %s requires a variable name", arg);
+			return -1;
+		}
+		arg = strskipwhite(fp);
+		fp = strwhite(arg);
+		if (fp)
+			*fp++ = '\0';
+		np = strdup(arg);
+		if (np == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			return -1;
 		}
 		if (opt == O_EMBED)
 			dl = *dop_len;
@@ -1448,6 +1443,9 @@ read_config(const char *file,
 	const char **e;
 	size_t buflen, ol;
 #endif
+#if !defined(INET) || !defined(INET6)
+	struct dhcp_opt *opt;
+#endif
 
 	/* Seed our default options */
 	ifo = calloc(1, sizeof(*ifo));
@@ -1493,7 +1491,7 @@ read_config(const char *file,
 		if (ifo->dhcp6_override == NULL)
 			syslog(LOG_ERR, "%s: %m", __func__);
 		else
-			ifo->dhcp6_override_len = INITDEFINES;
+			ifo->dhcp6_override_len = INITDEFINE6S;
 #endif
 
 		/* Now load our embedded config */
@@ -1549,8 +1547,10 @@ read_config(const char *file,
 		dhcp_opts = ifo->dhcp_override;
 		dhcp_opts_len = ifo->dhcp_override_len;
 #else
-		for (i = 0; i < ifo->dhcp_override_len; i++)
-			free_dhcp_opt_embenc(&ifo->dhcp_override[i]);
+		for (i = 0, opt = ifo->dhcp_override;
+		    i < ifo->dhcp_override_len;
+		    i++, opt++)
+			free_dhcp_opt_embenc(opt);
 		free(ifo->dhcp_override);
 #endif
 		ifo->dhcp_override = NULL;
@@ -1560,8 +1560,10 @@ read_config(const char *file,
 		dhcp6_opts = ifo->dhcp6_override;
 		dhcp6_opts_len = ifo->dhcp6_override_len;
 #else
-		for (i = 0; i < ifo->dhcp6_override_len; i++)
-			free_dhcp_opt_embenc(&ifo->dhcp6_override[i]);
+		for (i = 0, opt = ifo->dhcp6_override;
+		    i < ifo->dhcp_override6_len;
+		    i++, opt++)
+			free_dhcp_opt_embenc(opt);
 		free(ifo->dhcp6_override);
 #endif
 		ifo->dhcp6_override = NULL;
@@ -1654,6 +1656,7 @@ void
 free_options(struct if_options *ifo)
 {
 	size_t i;
+	struct dhcp_opt *opt;
 
 	if (ifo) {
 		if (ifo->environ) {
@@ -1673,11 +1676,14 @@ free_options(struct if_options *ifo)
 		free(ifo->blacklist);
 		free(ifo->fallback);
 
-		for (i = 0; i < ifo->dhcp_override_len; i++)
-			free_dhcp_opt_embenc(&ifo->dhcp_override[i]);
+		for (i = 0, opt = ifo->dhcp_override;
+		    i < ifo->dhcp_override_len;
+		    i++, opt++)
+			free_dhcp_opt_embenc(opt);
 		free(ifo->dhcp_override);
-		for (i = 0; i < ifo->dhcp6_override_len; i++)
-			free_dhcp_opt_embenc(&ifo->dhcp6_override[i]);
+		for (i = 0, opt = ifo->dhcp6_override;
+		    i < ifo->dhcp6_override_len;
+		    i++, opt++)
 		free(ifo->dhcp6_override);
 
 #ifdef INET6

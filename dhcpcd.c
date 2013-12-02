@@ -140,6 +140,7 @@ free_globals(void)
 {
 	int i;
 	size_t n;
+	struct dhcp_opt *opt;
 
 	for (i = 0; i < ifac; i++)
 		free(ifav[i]);
@@ -149,13 +150,13 @@ free_globals(void)
 	free(ifdv);
 
 #ifdef INET
-	for (n = 0; n < dhcp_opts_len; n++)
-		free_dhcp_opt_embenc(&dhcp_opts[n]);
+	for (n = 0, opt = dhcp_opts; n < dhcp_opts_len; n++, opt++)
+		free_dhcp_opt_embenc(opt);
 	free(dhcp_opts);
 #endif
 #ifdef INET6
-	for (n = 0; n < dhcp6_opts_len; n++)
-		free_dhcp_opt_embenc(&dhcp6_opts[n]);
+	for (n = 0, opt = dhcp6_opts; n < dhcp6_opts_len; n++, opt++)
+		free_dhcp_opt_embenc(opt);
 	free(dhcp6_opts);
 #endif
 }
