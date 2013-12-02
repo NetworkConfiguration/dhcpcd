@@ -89,7 +89,6 @@
 
 #include "dhcp.h"
 #include "ipv6.h"
-extern const struct dhcp_opt dhcp6_opts[];
 
 struct dhcp6_message {
 	uint8_t type;
@@ -222,8 +221,8 @@ struct dhcp6_state {
     ((const uint8_t *)(o) + sizeof(struct dhcp6_option))
 
 #ifdef INET6
-extern struct dhcp_opt *dhcp6_eopts;
-extern size_t dhcp6_eopts_len;
+extern struct dhcp_opt *dhcp6_opts;
+extern size_t dhcp6_opts_len;
 
 void dhcp6_printoptions(void);
 int dhcp6_addrexists(const struct ipv6_addr *);

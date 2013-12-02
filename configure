@@ -318,11 +318,11 @@ EOF
 fi
 
 if [ -z "$EMBEDDED" -o "$EMBEDDED" = yes ]; then
-	echo "dhcpcd-embedded.conf will be embedded in dhcpcd itself"
+	echo "dhcpcd-definitions.conf will be embedded in dhcpcd itself"
 	echo "SRCS+=		dhcpcd-embedded.c" >>$CONFIG_MK
 else
-	echo "dhcpcd-embedded.conf will be installed to $LIBEXECDIR"
-	echo "CFLAGS+= -DEMBEDDED_CONFIG=\\\"$LIBEXECDIR/dhcpcd-embedded.conf\\\"" >>$CONFIG_MK
+	echo "dhcpcd-definitions.conf will be installed to $LIBEXECDIR"
+	echo "CFLAGS+= -DEMBEDDED_CONFIG=\\\"$LIBEXECDIR/dhcpcd-definitions.conf\\\"" >>$CONFIG_MK
 	echo "EMBEDDEDINSTALL=	_embeddedinstall" >>$CONFIG_MK
 fi
 

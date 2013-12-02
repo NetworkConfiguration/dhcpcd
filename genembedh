@@ -4,7 +4,7 @@ set -e
 : ${TOOL_SED:=sed}
 : ${TOOL_GREP:=grep}
 : ${TOOL_WC:=wc}
-CONF=${1:-dhcpcd-embedded.conf}
+CONF=${1:-dhcpcd-definitions.conf}
 H=${2:-dhcpcd-embedded.h.in}
 
 INITDEFINES=$($TOOL_GREP "^define " $CONF | $TOOL_WC -l)

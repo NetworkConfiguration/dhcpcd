@@ -77,10 +77,10 @@ dev:
 
 CLEANFILES+=	dhcpcd-embedded.h dhcpcd-embedded.c
 
-dhcpcd-embedded.h: genembedh dhcpcd-embedded.conf dhcpcd-embedded.h.in
+dhcpcd-embedded.h: genembedh dhcpcd-definitions.conf dhcpcd-embedded.h.in
 	${HOST_SH} ${.ALLSRC} $^ > $@
 
-dhcpcd-embedded.c: genembedc dhcpcd-embedded.conf
+dhcpcd-embedded.c: genembedc dhcpcd-definitions.conf
 	${HOST_SH} ${.ALLSRC} $^ > $@
 
 if-options.c: dhcpcd-embedded.h
@@ -93,9 +93,9 @@ depend: .depend
 ${PROG}: ${DEPEND} ${OBJS}
 	${CC} ${LDFLAGS} -o $@ ${OBJS} ${LDADD}
 
-_embeddedinstall: dhcpcd-embedded.conf
+_embeddedinstall: dhcpcd-definitions.conf
 	${INSTALL} -d ${DESTDIR}${SCRIPTSDIR}
-	${INSTALL} -m ${CONFMODE} dhcpcd-embedded.conf ${DESTDIR}${SCRIPTSDIR}
+	${INSTALL} -m ${CONFMODE} dhcpcd-definitions.conf ${DESTDIR}${SCRIPTSDIR}
 
 _proginstall: ${PROG}
 	${INSTALL} -d ${DESTDIR}${SBINDIR}
@@ -135,7 +135,7 @@ dist:
 import: ${SRCS}
 	rm -rf /tmp/${DISTPREFIX}
 	${INSTALL} -d /tmp/${DISTPREFIX}
-	cp ${SRCS} dhcpcd.conf dhcpcd-embedded.conf *.in /tmp/${DISTPREFIX}
+	cp ${SRCS} dhcpcd.conf dhcpcd-definitions.conf *.in /tmp/${DISTPREFIX}
 	cp $$(${CC} ${CPPFLAGS} -MM ${SRCS} | \
 		sed -e 's/^.*\.c //g' -e 's/.*\.c$$//g' -e 's/\\//g' | \
 		tr ' ' '\n' | \
@@ -190,7 +190,7 @@ import: ${SRCS}
 		for x in \
 		    /tmp/${DISTPREFIX}/dhcpcd-run-hooks.in \
 		    /tmp/${DISTPREFIX}/dhcpcd.conf \
-		    /tmp/${DISTPREFIX}/dhcpcd-embedded.conf \
+		    /tmp/${DISTPREFIX}/dhcpcd-definitions.conf \
 		; do \
 			if test -e "$$x"; then \
 				if test "$$(sed -ne 1p $$x)" = "#!/bin/sh" \

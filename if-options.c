@@ -451,7 +451,7 @@ parse_addr(__unused struct in_addr *addr, __unused struct in_addr *net,
 #endif
 
 static const char *
-set_option_space(const char *arg, const struct dhcp_opt **d,
+set_option_space(const char *arg, const struct dhcp_opt **d, size_t *dl,
     struct if_options *ifo,
     uint8_t *request[], uint8_t *require[], uint8_t *no[])
 {
@@ -459,6 +459,7 @@ set_option_space(const char *arg, const struct dhcp_opt **d,
 #ifdef INET6
 	if (strncmp(arg, "dhcp6_", strlen("dhcp6_")) == 0) {
 		*d = dhcp6_opts;
+		*dl = dhcp6_opts_len;
 		*request = ifo->requestmask6;
 		*require = ifo->requiremask6;
 		*no = ifo->nomask6;
@@ -468,8 +469,10 @@ set_option_space(const char *arg, const struct dhcp_opt **d,
 
 #ifdef INET
 	*d = dhcp_opts;
+	*dl = dhcp_opts_len;
 #else
 	*d = NULL;
+	*dl = 0;
 #endif
 	*request = ifo->requestmask;
 	*require = ifo->requiremask;
@@ -623,8 +626,9 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		}
 		break;
 	case 'o':
-		arg = set_option_space(arg, &d, ifo, &request, &require, &no);
-		if (make_option_mask(d, request, arg, 1) != 0) {
+		arg = set_option_space(arg, &d, &dl, ifo,
+		    &request, &require, &no);
+		if (make_option_mask(d, dl, request, arg, 1) != 0) {
 			syslog(LOG_ERR, "unknown option `%s'", arg);
 			return -1;
 		}
@@ -836,19 +840,21 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		ifo->options &= ~DHCPCD_IPV4LL;
 		break;
 	case 'O':
-		arg = set_option_space(arg, &d, ifo, &request, &require, &no);
-		if (make_option_mask(d, request, arg, -1) != 0 ||
-		    make_option_mask(d, require, arg, -1) != 0 ||
-		    make_option_mask(d, no, arg, 1) != 0)
+		arg = set_option_space(arg, &d, &dl, ifo,
+		    &request, &require, &no);
+		if (make_option_mask(d, dl, request, arg, -1) != 0 ||
+		    make_option_mask(d, dl, require, arg, -1) != 0 ||
+		    make_option_mask(d, dl, no, arg, 1) != 0)
 		{
 			syslog(LOG_ERR, "unknown option `%s'", arg);
 			return -1;
 		}
 		break;
 	case 'Q':
-		arg = set_option_space(arg, &d, ifo, &request, &require, &no);
-		if (make_option_mask(d, require, arg, 1) != 0 ||
-		    make_option_mask(d, request, arg, 1) != 0)
+		arg = set_option_space(arg, &d, &dl, ifo,
+		    &request, &require, &no);
+		if (make_option_mask(d, dl, require, arg, 1) != 0 ||
+		    make_option_mask(d, dl, request, arg, 1) != 0)
 		{
 			syslog(LOG_ERR, "unknown option `%s'", arg);
 			return -1;
@@ -1024,7 +1030,8 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		ifo->arping[ifo->arping_len++] = addr.s_addr;
 		break;
 	case O_DESTINATION:
-		if (make_option_mask(dhcp_opts, ifo->dstmask, arg, 2) != 0) {
+		if (make_option_mask(dhcp_opts, dhcp_opts_len,
+		    ifo->dstmask, arg, 2) != 0) {
 			if (errno == EINVAL)
 				syslog(LOG_ERR, "option `%s' does not take"
 				    " an IPv4 address", arg);
@@ -1539,8 +1546,8 @@ read_config(const char *file,
 		free(buf);
 #endif
 #ifdef INET
-		dhcp_eopts = ifo->dhcp_override;
-		dhcp_eopts_len = ifo->dhcp_override_len;
+		dhcp_opts = ifo->dhcp_override;
+		dhcp_opts_len = ifo->dhcp_override_len;
 #else
 		for (i = 0; i < ifo->dhcp_override_len; i++)
 			free_dhcp_opt_embenc(&ifo->dhcp_override[i]);
@@ -1550,8 +1557,8 @@ read_config(const char *file,
 		ifo->dhcp_override_len = 0;
 
 #ifdef INET6
-		dhcp6_eopts = ifo->dhcp6_override;
-		dhcp6_eopts_len = ifo->dhcp6_override_len;
+		dhcp6_opts = ifo->dhcp6_override;
+		dhcp6_opts_len = ifo->dhcp6_override_len;
 #else
 		for (i = 0; i < ifo->dhcp6_override_len; i++)
 			free_dhcp_opt_embenc(&ifo->dhcp6_override[i]);

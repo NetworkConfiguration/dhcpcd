@@ -47,12 +47,13 @@ struct dhcp_opt *dhcp6_override = NULL;
 size_t dhcp6_override_len = 0;
 #endif
 
-int make_option_mask(const struct dhcp_opt *dopts,
+int make_option_mask(const struct dhcp_opt *dopts, size_t dopts_len,
     uint8_t *mask, const char *opts, int add)
 {
 	char *token, *o, *p, *t;
 	const struct dhcp_opt *opt;
 	int match, n;
+	size_t i;
 
 	o = p = strdup(opts);
 	if (opts == NULL)
@@ -60,9 +61,7 @@ int make_option_mask(const struct dhcp_opt *dopts,
 	while ((token = strsep(&p, ", "))) {
 		if (*token == '\0')
 			continue;
-		for (opt = dopts; opt->option; opt++) {
-			if (!opt->v.var)
-				continue;
+		for (i = 0, opt = dopts; i < dopts_len; i++, opt++) {
 			match = 0;
 			if (strcmp(opt->v.var, token) == 0)
 				match = 1;

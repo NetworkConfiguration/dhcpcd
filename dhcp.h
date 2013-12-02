@@ -238,10 +238,8 @@ struct dhcp_state {
 #include "net.h"
 
 #ifdef INET
-extern const struct dhcp_opt dhcp_opts[];
-
-extern struct dhcp_opt *dhcp_eopts;
-extern size_t dhcp_eopts_len;
+extern struct dhcp_opt *dhcp_opts;
+extern size_t dhcp_opts_len;
 
 char *decode_rfc3361(int dl, const uint8_t *data);
 ssize_t decode_rfc3442(char *out, ssize_t len, int pl, const uint8_t *p);

@@ -104,109 +104,6 @@ static const struct dhcp_op dhcp_ops[] = {
 	{ 0, NULL }
 };
 
-#define O(a, b, c) {.option = (a), .type = (b), .v.var = (c) }
-const struct dhcp_opt dhcp_opts[] = {
-	O(1,	ADDRIPV4 | REQUEST,	"subnet_mask"),
-		/* RFC 3442 states that the CSR has to come before all other
-		 * routes. For completeness, we also specify static routes,
-		 * then routers. */
-	O(121,  RFC3442,	"classless_static_routes"),
-	O(249,  RFC3442,	"ms_classless_static_routes"),
-	O(33,	IPV4A | REQUEST,	"static_routes"),
-	O(3,	IPV4A | REQUEST,	"routers"),
-	O(2,	UINT32,		"time_offset"),
-	O(4,	IPV4A,		"time_servers"),
-	O(5,	IPV4A,		"ien116_name_servers"),
-	O(6,	IPV4A,		"domain_name_servers"),
-	O(7,	IPV4A,		"log_servers"),
-	O(8,	IPV4A,		"cookie_servers"),
-	O(9,	IPV4A,		"lpr_servers"),
-	O(10,	IPV4A,		"impress_servers"),
-	O(11,	IPV4A,		"resource_location_servers"),
-	O(12,	STRING,		"host_name"),
-	O(13,	UINT16,		"boot_size"),
-	O(14,	STRING,		"merit_dump"),
-	O(15,	STRING,		"domain_name"),
-	O(16,	ADDRIPV4,	"swap_server"),
-	O(17,	STRING,		"root_path"),
-	O(18,	STRING,		"extensions_path"),
-	O(19,	UINT8,		"ip_forwarding"),
-	O(20,	UINT8,		"non_local_source_routing"),
-	O(21,	IPV4A,	"policy_filter"),
-	O(22,	SINT16,		"max_dgram_reassembly"),
-	O(23,	UINT16,		"default_ip_ttl"),
-	O(24,	UINT32,		"path_mtu_aging_timeout"),
-	O(25,	UINT16 | ARRAY,	"path_mtu_plateau_table"),
-	O(26,	UINT16,		"interface_mtu"),
-	O(27,	UINT8,		"all_subnets_local"),
-	O(28,	ADDRIPV4 | REQUEST,	"broadcast_address"),
-	O(29,	UINT8,		"perform_mask_discovery"),
-	O(30,	UINT8,		"mask_supplier"),
-	O(31,	UINT8,		"router_discovery"),
-	O(32,	ADDRIPV4,	"router_solicitation_address"),
-	O(34,	UINT8,		"trailer_encapsulation"),
-	O(35,	UINT32,		"arp_cache_timeout"),
-	O(36,	UINT16,		"ieee802_3_encapsulation"),
-	O(37,	UINT8,		"default_tcp_ttl"),
-	O(38,	UINT32,		"tcp_keepalive_interval"),
-	O(39,	UINT8,		"tcp_keepalive_garbage"),
-	O(40,	STRING,		"nis_domain"),
-	O(41,	IPV4A,		"nis_servers"),
-	O(42,	IPV4A,		"ntp_servers"),
-	O(43,	STRING,		"vendor_encapsulated_options"),
-	O(44,	IPV4A,		"netbios_name_servers"),
-	O(45,	ADDRIPV4,	"netbios_dd_server"),
-	O(46,	UINT8,		"netbios_node_type"),
-	O(47,	STRING,		"netbios_scope"),
-	O(48,	IPV4A,		"font_servers"),
-	O(49,	IPV4A,		"x_display_manager"),
-	O(50,	ADDRIPV4,	"dhcp_requested_address"),
-	O(51,	UINT32 | REQUEST,	"dhcp_lease_time"),
-	O(52,	UINT8,		"dhcp_option_overload"),
-	O(53,	UINT8,		"dhcp_message_type"),
-	O(54,	ADDRIPV4,	"dhcp_server_identifier"),
-	O(55,	UINT8 | ARRAY,	"dhcp_parameter_request_list"),
-	O(56,	STRING,		"dhcp_message"),
-	O(57,	UINT16,		"dhcp_max_message_size"),
-	O(58,	UINT32 | REQUEST,	"dhcp_renewal_time"),
-	O(59,	UINT32 | REQUEST,	"dhcp_rebinding_time"),
-	O(64,	STRING,		"nisplus_domain"),
-	O(65,	IPV4A,		"nisplus_servers"),
-	O(66,	STRING,		"tftp_server_name"),
-	O(67,	STRING,		"bootfile_name"),
-	O(68,	IPV4A,		"mobile_ip_home_agent"),
-	O(69,	IPV4A,		"smtp_server"),
-	O(70,	IPV4A,		"pop_server"),
-	O(71,	IPV4A,		"nntp_server"),
-	O(72,	IPV4A,		"www_server"),
-	O(73,	IPV4A,		"finger_server"),
-	O(74,	IPV4A,		"irc_server"),
-	O(75,	IPV4A,		"streettalk_server"),
-	O(76,	IPV4A,		"streettalk_directory_assistance_server"),
-	O(77,	STRING,		"user_class"),
-	O(80,	FLAG | NOREQ,	"rapid_commit"),
-	O(81,	STRING | RFC3397,	"fqdn"),
-	O(85,	IPV4A,		"nds_servers"),
-	O(86,	STRING,		"nds_tree_name"),
-	O(87,	STRING,		"nds_context"),
-	O(88,	STRING | RFC3397,	"bcms_controller_names"),
-	O(89,	IPV4A,		"bcms_controller_address"),
-	O(91,	UINT32,		"client_last_transaction_time"),
-	O(92,	IPV4A,		"associated_ip"),
-	O(98,	STRING,		"uap_servers"),
-	O(100,	STRING,		"posix_timezone"),
-	O(101,	STRING,		"tzdb_timezone"),
-	O(112,	IPV4A,		"netinfo_server_address"),
-	O(113,	STRING,		"netinfo_server_tag"),
-	O(114,	STRING,		"default_url"),
-	O(118,	ADDRIPV4,	"subnet_selection"),
-	O(119,	STRING | RFC3397,	"domain_search"),
-	O(120,	STRING | RFC3361,	"sip_server"),
-	O(212,  RFC5969,	"sixrd"),
-	O(0, 0, NULL)
-};
-#undef O
-
 static const char *dhcp_params[] = {
 	"ip_address",
 	"subnet_cidr",
@@ -223,8 +120,8 @@ struct udp_dhcp_packet
 	struct dhcp_message dhcp;
 };
 
-struct dhcp_opt *dhcp_eopts = NULL;
-size_t dhcp_eopts_len = 0;
+struct dhcp_opt *dhcp_opts = NULL;
+size_t dhcp_opts_len = 0;
 
 static const size_t udp_dhcp_len = sizeof(struct udp_dhcp_packet);
 
@@ -233,15 +130,15 @@ static int dhcp_open(struct interface *);
 void
 dhcp_printoptions(void)
 {
-	const struct dhcp_opt *opt;
 	const char **p;
+	size_t i;
+	const struct dhcp_opt *opt;
 
 	for (p = dhcp_params; *p; p++)
 		printf("    %s\n", *p);
 
-	for (opt = dhcp_opts; opt->option; opt++)
-		if (opt->v.var)
-			printf("%03d %s\n", opt->option, opt->v.var);
+	for (i = 0, opt = dhcp_opts; i < dhcp_opts_len; i++, opt++)
+		printf("%03d %s\n", opt->option, opt->v.var);
 }
 
 #ifdef DEBUG_MEMORY
@@ -780,7 +677,7 @@ make_message(struct dhcp_message **message,
 	uint8_t *n_params = NULL;
 	uint32_t ul;
 	uint16_t sz;
-	size_t len;
+	size_t len, i;
 	const struct dhcp_opt *opt;
 	const struct if_options *ifo = iface->options;
 	const struct dhcp_state *state = D_CSTATE(iface);
@@ -970,7 +867,7 @@ make_message(struct dhcp_message **message,
 		*p++ = DHO_PARAMETERREQUESTLIST;
 		n_params = p;
 		*p++ = 0;
-		for (opt = dhcp_opts; opt->option; opt++) {
+		for (i = 0, opt = dhcp_opts; i < dhcp_opts_len; i++, opt++) {
 			if (!(opt->type & REQUEST ||
 				has_option_mask(ifo->requestmask, opt->option)))
 				continue;
@@ -1072,7 +969,7 @@ read_lease(const struct interface *ifp)
 }
 
 static const struct dhcp_opt *
-dhcp_getoverride(const struct if_options *ifo, uint16_t o, int e)
+dhcp_getoverride(const struct if_options *ifo, uint16_t o)
 {
 	size_t i;
 	const struct dhcp_opt *opt;
@@ -1083,15 +980,6 @@ dhcp_getoverride(const struct if_options *ifo, uint16_t o, int e)
 	{
 		if (opt->option == o)
 			return opt;
-	}
-	if (e) {
-		for (i = 0, opt = dhcp_eopts;
-		    i < dhcp_eopts_len;
-		    i++, opt++)
-		{
-			if (opt->option == o)
-				return opt;
-		}
 	}
 	return NULL;
 }
@@ -1137,32 +1025,19 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 	get_option_uint8(&overl, dhcp, DHO_OPTIONSOVERLOADED);
 
 	if (!env) {
-		for (opt = dhcp_opts; opt->option; opt++) {
-			if (!opt->v.var)
-				continue;
-			if (has_option_mask(ifo->nomask, opt->option))
-				continue;
-			if (dhcp_getoverride(ifo, opt->option, 1))
-				continue;
-			p = get_option(dhcp, opt->option, &pl);
-			if (!p)
-				continue;
-			e += dhcp_envoption(NULL, prefix, "", ifp->name,
-			    opt, dhcp_getoption, p, pl);
-		}
 		if (dhcp->yiaddr || dhcp->ciaddr)
 			e += 5;
 		if (*dhcp->bootfile && !(overl & 1))
 			e++;
 		if (*dhcp->servername && !(overl & 2))
 			e++;
-		for (oi = 0, opt = dhcp_eopts;
-		    oi < dhcp_eopts_len;
+		for (oi = 0, opt = dhcp_opts;
+		    oi < dhcp_opts_len;
 		    oi++, opt++)
 		{
 			if (has_option_mask(ifo->nomask, opt->option))
 				continue;
-			if (dhcp_getoverride(ifo, opt->option, 0))
+			if (dhcp_getoverride(ifo, opt->option))
 				continue;
 			p = get_option(dhcp, opt->option, &pl);
 			if (!p)
@@ -1199,7 +1074,8 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 		setvar(&ep, prefix, "subnet_cidr", cidr);
 		if (get_option_addr(&brd, dhcp, DHO_BROADCAST) == -1) {
 			brd.s_addr = addr.s_addr | ~net.s_addr;
-			setvar(&ep, prefix, "broadcast_address", inet_ntoa(brd));
+			setvar(&ep, prefix, "broadcast_address",
+			    inet_ntoa(brd));
 		}
 		addr.s_addr = dhcp->yiaddr & net.s_addr;
 		setvar(&ep, prefix, "network_number", inet_ntoa(addr));
@@ -1208,35 +1084,16 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 	if (*dhcp->bootfile && !(overl & 1))
 		setvar(&ep, prefix, "filename", (const char *)dhcp->bootfile);
 	if (*dhcp->servername && !(overl & 2))
-		setvar(&ep, prefix, "server_name", (const char *)dhcp->servername);
+		setvar(&ep, prefix, "server_name",
+		    (const char *)dhcp->servername);
 
-	for (opt = dhcp_opts; opt->option; opt++) {
-		if (!opt->v.var)
-			continue;
-		if (has_option_mask(ifo->nomask, opt->option))
-			continue;
-		if (dhcp_getoverride(ifo, opt->option, 1))
-			continue;
-		p = get_option(dhcp, opt->option, &pl);
-		if (!p)
-			continue;
-		/* No override, which means it's not embedded, so just
-		 * grab the FQDN itself */
-		if (opt->option == DHO_FQDN) {
-			p += 3;
-			pl -= 3;
-		}
-		ep += dhcp_envoption(ep, prefix, "", ifp->name,
-		    opt, dhcp_getoption, p, pl);
-	}
-
-	for (oi = 0, opt = dhcp_eopts;
-	    oi < dhcp_eopts_len;
+	for (oi = 0, opt = dhcp_opts;
+	    oi < dhcp_opts_len;
 	    oi++, opt++)
 	{
 		if (has_option_mask(ifo->nomask, opt->option))
 			continue;
-		if (dhcp_getoverride(ifo, opt->option, 0))
+		if (dhcp_getoverride(ifo, opt->option))
 			continue;
 		if ((p = get_option(dhcp, opt->option, &pl)))
 			ep += dhcp_envoption(ep, prefix, "", ifp->name,

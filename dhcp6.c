@@ -100,37 +100,8 @@ static const struct dhcp6_op dhcp6_ops[] = {
 	{ 0, NULL }
 };
 
-#define IPV6A	ADDRIPV6 | ARRAY
-#define O(a, b, c) {.option = (a), .type = (b), .v.var = (c) }
-const struct dhcp_opt dhcp6_opts[] = {
-	O(D6_OPTION_CLIENTID,		BINHEX,		"client_id"),
-	O(D6_OPTION_SERVERID,		BINHEX,		"server_id"),
-	O(D6_OPTION_IA_ADDR,		IPV6A,		"ia_addr"),
-	O(D6_OPTION_PREFERENCE,		UINT8,		"preference"),
-	O(D6_OPTION_UNICAST,		ADDRIPV6,	"unicast"),
-	O(D6_OPTION_RAPID_COMMIT,	FLAG | NOREQ,	"rapid_commit"),
-	O(D6_OPTION_STATUS_CODE,	SCODE,		"status_code"),
-	O(D6_OPTION_SIP_SERVERS_NAME,	RFC3397,	"sip_servers_names"),
-	O(D6_OPTION_SIP_SERVERS_ADDRESS,IPV6A,	"sip_servers_addresses"),
-	O(D6_OPTION_DNS_SERVERS,	IPV6A,		"name_servers"),
-	O(D6_OPTION_DOMAIN_LIST,	RFC3397,	"domain_search"),
-	O(D6_OPTION_NIS_SERVERS,	IPV6A,		"nis_servers"),
-	O(D6_OPTION_NISP_SERVERS,	IPV6A,		"nisp_servers"),
-	O(D6_OPTION_NIS_DOMAIN_NAME,	RFC3397,	"nis_domain_name"),
-	O(D6_OPTION_NISP_DOMAIN_NAME,	RFC3397,	"nisp_domain_name"),
-	O(D6_OPTION_SNTP_SERVERS,	IPV6A,		"sntp_servers"),
-	O(D6_OPTION_INFO_REFRESH_TIME,	UINT32,		"info_refresh_time"),
-	O(D6_OPTION_BCMS_SERVER_D,	RFC3397,	"bcms_server_d"),
-	O(D6_OPTION_BCMS_SERVER_A,	IPV6A,		"bcms_server_a"),
-	O(D6_OPTION_FQDN,		RFC3397,	"fqdn"),
-	O(D6_OPTION_POSIX_TIMEZONE,	STRING,		"posix_timezone"),
-	O(D6_OPTION_TZDB_TIMEZONE,	STRING,		"tzdb_timezone"),
-	O(0, 0, NULL)
-};
-#undef O
-
-struct dhcp_opt *dhcp6_eopts = NULL;
-size_t dhcp6_eopts_len = 0;
+struct dhcp_opt *dhcp6_opts = NULL;
+size_t dhcp6_opts_len = 0;
 
 struct dhcp_compat {
 	uint8_t dhcp_opt;
@@ -2574,7 +2545,7 @@ dhcp6_handleifa(int cmd, const char *ifname,
 }
 
 static const struct dhcp_opt *
-dhcp6_getoverride(const struct if_options *ifo, uint16_t o, int e)
+dhcp6_getoverride(const struct if_options *ifo, uint16_t o)
 {
 	size_t i;
 	const struct dhcp_opt *opt;
@@ -2585,15 +2556,6 @@ dhcp6_getoverride(const struct if_options *ifo, uint16_t o, int e)
 	{
 		if (opt->option == o)
 			return opt;
-	}
-	if (e != 0) {
-		for (i = 0, opt = dhcp6_eopts;
-		    i < dhcp6_eopts_len;
-		    i++, opt++)
-		{
-			if (opt->option == o)
-				return opt;
-		}
 	}
 	return NULL;
 }
@@ -2616,24 +2578,21 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 	n = 0;
 	ep = env;
 	ifo = ifp->options;
-	for (opt = dhcp6_opts; opt->option; opt++) {
-		if (!opt->v.var)
+
+	for (oi = 0, opt = dhcp6_opts;
+	    oi < dhcp6_opts_len;
+	    oi++, opt++)
+	{
+		if (has_option_mask(ifo->nomask, opt->option))
 			continue;
-		if (has_option_mask(ifo->nomask6, opt->option))
+		if (dhcp6_getoverride(ifo, opt->option))
 			continue;
-		if (dhcp6_getoverride(ifo, opt->option, 1))
-			continue;
+
 		o = dhcp6_getmoption(opt->option, m, mlen);
 		if (o == NULL)
 			continue;
 		ol = ntohs(o->len);
 		od = D6_COPTION_DATA(o);
-		/* No override, which means it's not embedded, so just
-		 * grab the FQDN itself */
-		if (opt->option == D6_OPTION_FQDN) {
-			ol--;
-			od++;
-		}
 		n += dhcp_envoption(env == NULL ? NULL : &env[n],
 		    prefix, "_dhcp6", ifp->name, opt, dhcp6_getoption, od, ol);
 	}
@@ -2682,24 +2641,6 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 				*--v = '\0';
 			}
 		}
-	}
-
-	for (oi = 0, opt = dhcp6_eopts;
-	    oi < dhcp6_eopts_len;
-	    oi++, opt++)
-	{
-		if (has_option_mask(ifo->nomask, opt->option))
-			continue;
-		if (dhcp6_getoverride(ifo, opt->option, 0))
-			continue;
-
-		o = dhcp6_getmoption(opt->option, m, mlen);
-		if (o == NULL)
-			continue;
-		ol = ntohs(o->len);
-		od = D6_COPTION_DATA(o);
-		n += dhcp_envoption(env == NULL ? NULL : &env[n],
-		    prefix, "_dhcp6", ifp->name, opt, dhcp6_getoption, od, ol);
 	}
 
 	for (oi = 0, opt = ifo->dhcp6_override;

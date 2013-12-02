@@ -149,14 +149,14 @@ free_globals(void)
 	free(ifdv);
 
 #ifdef INET
-	for (n = 0; n < dhcp_eopts_len; n++)
-		free_dhcp_opt_embenc(&dhcp_eopts[n]);
-	free(dhcp_eopts);
+	for (n = 0; n < dhcp_opts_len; n++)
+		free_dhcp_opt_embenc(&dhcp_opts[n]);
+	free(dhcp_opts);
 #endif
 #ifdef INET6
-	for (n = 0; n < dhcp6_eopts_len; n++)
-		free_dhcp_opt_embenc(&dhcp6_eopts[n]);
-	free(dhcp6_eopts);
+	for (n = 0; n < dhcp6_opts_len; n++)
+		free_dhcp_opt_embenc(&dhcp6_opts[n]);
+	free(dhcp6_opts);
 #endif
 }
 

@@ -2,7 +2,7 @@
 set -e
 
 : ${TOOL_SED:=sed}
-CONF=${1:-dhcpcd-embedded.conf}
+CONF=${1:-dhcpcd-definitions.conf}
 
 cat <<EOF
 /*
