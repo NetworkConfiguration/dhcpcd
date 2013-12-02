@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd December 1, 2013
+.Dd December 2, 2013
 .Dt DHCPCD.CONF 5
 .Os
 .Sh NAME
@@ -509,10 +509,35 @@ with a prefix of
 Defines an embedded variable within the defined option.
 The length is determined by the
 .Ar type .
+If the
+.Ar variable
+is not the same as defined in the parent option,
+it is prefixed with the parent
+.Ar variable
+first with an underscore.
 .It Ic encap Ar code Ar type Ar variable
 Defines an encapsulated variable within the defined option.
 The length is determined by the
 .Ar type .
+If the
+.Ar variable
+is not the same as defined in the parent option,
+it is prefixed with the parent
+.Ar variable
+first with an underscore.
+.El
+.Ss Type prefix
+These keywords come before the type itself, to describe it more fully.
+You can use more than one, but they must appear in the order listed below.
+.Bl -tag -width -indent
+.It Ic request
+Requests the option by default without having to be specified in user
+configuration
+.It Ic norequest
+This option cannot be requested, regardless of user configuration
+.It Ic array
+The option data is split into a space seperated array, each element being
+the same type.
 .El
 .Ss Types to define
 The type directly affects the length of data consumed inside the option.
@@ -549,17 +574,17 @@ Contains encapsulated options (implies embed as well)
 .El
 .Ss Example definition
 .D1 # DHCP option 81, Fully Qualified Domain Name, RFC4702
-.D1 define 81 embed
-.D1 embed byte fqdn_flags
-.D1 embed byte fqdn_rcode1
-.D1 embed byte fqdn_rcode2
+.D1 define 81 embed fqdn
+.D1 embed byte flags
+.D1 embed byte rcode1
+.D1 embed byte rcode2
 .D1 embed domain fqdn
 .Pp
 .D1 # DHCP option 125, Vendor Specific Information Option, RFC3925
-.D1 define 125 encap
-.D1 embed uint32 vsio_enterprise_number
+.D1 define 125 encap vsio
+.D1 embed uint32 enterprise_number
 .D1 # Options defined for the enterprise number
-.D1 encap 1 ipaddress vsio_ipaddress
+.D1 encap 1 ipaddress ipaddress
 .Sh SEE ALSO
 .Xr fnmatch 3 ,
 .Xr if_nametoindex 3 ,

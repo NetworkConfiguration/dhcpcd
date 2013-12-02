@@ -1325,6 +1325,10 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			    "ignoring length for type `%s'", arg);
 			l = 0;
 		}
+		if (t & ARRAY && t & (STRING | BINHEX)) {
+			syslog(LOG_WARNING, "ignoring array for strings");
+			t &= ~ARRAY;
+		}
 		/* variable */
 		if (fp) {
 			arg = strskipwhite(fp);
