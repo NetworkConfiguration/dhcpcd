@@ -557,7 +557,8 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	case 'n': /* FALLTHROUGH */
 	case 'x': /* FALLTHROUGH */
 	case 'T': /* FALLTHROUGH */
-	case 'U': /* We need to handle non interface options */
+	case 'U': /* FALLTHROUGH */
+	case 'V': /* We need to handle non interface options */
 		break;
 	case 'b':
 		ifo->options |= DHCPCD_BACKGROUND;

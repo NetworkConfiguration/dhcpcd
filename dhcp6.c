@@ -134,11 +134,11 @@ dhcp6_cleanup(void)
 void
 dhcp6_printoptions(void)
 {
+	size_t i;
 	const struct dhcp_opt *opt;
 
-	for (opt = dhcp6_opts; opt->option; opt++)
-		if (opt->v.var)
-			printf("%05d %s\n", opt->option, opt->v.var);
+	for (i = 0, opt = dhcp6_opts; i < dhcp6_opts_len; i++, opt++)
+		printf("%05d %s\n", opt->option, opt->v.var);
 }
 
 static int
@@ -417,7 +417,7 @@ dhcp6_makemessage(struct interface *ifp)
 	len = 0;
 	si = NULL;
 	if (state->state != DH6S_RELEASE) {
-		for (opt = dhcp6_opts; opt->option; opt++) {
+		for (l = 0, opt = dhcp6_opts; l < dhcp6_opts_len ; l++, opt++) {
 			if (!(opt->type & NOREQ) &&
 			    (opt->type & REQUEST ||
 			    has_option_mask(ifo->requestmask6, opt->option)))
@@ -662,7 +662,10 @@ dhcp6_makemessage(struct interface *ifp)
 			o->code = htons(D6_OPTION_ORO);
 			o->len = 0;
 			u16 = (uint16_t *)(void *)D6_OPTION_DATA(o);
-			for (opt = dhcp6_opts; opt->option; opt++) {
+			for (l = 0, opt = dhcp6_opts;
+			    l < dhcp6_opts_len;
+			    l++, opt++)
+			{
 				if (!(opt->type & NOREQ) &&
 				    (opt->type & REQUEST ||
 				    has_option_mask(ifo->requestmask6,
@@ -1974,6 +1977,7 @@ static void
 dhcp6_handledata(__unused void *arg)
 {
 	ssize_t len;
+	size_t i;
 	struct cmsghdr *cm;
 	struct in6_pktinfo pkt;
 	struct interface *ifp;
@@ -2075,7 +2079,7 @@ dhcp6_handledata(__unused void *arg)
 	}
 
 	ifo = ifp->options;
-	for (opt = dhcp6_opts; opt->option; opt++) {
+	for (i = 0, opt = dhcp6_opts; i < dhcp6_opts_len; i++, opt++) {
 		if (has_option_mask(ifo->requiremask6, opt->option) &&
 		    dhcp6_getmoption(opt->option, r, len) == NULL)
 		{

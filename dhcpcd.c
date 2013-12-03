@@ -1155,21 +1155,8 @@ main(int argc, char **argv)
 			i = 2;
 			break;
 		case 'V':
-			printf("Interface options:\n");
-			if_printoptions();
-#ifdef INET
-			if (family == 0 || family == AF_INET) {
-				printf("\nDHCPv4 options:\n");
-				dhcp_printoptions();
-			}
-#endif
-#ifdef INET6
-			if (family == 0 || family == AF_INET6) {
-				printf("\nDHCPv6 options:\n");
-				dhcp6_printoptions();
-			}
-#endif
-			exit(EXIT_SUCCESS);
+			i = 3;
+			break;
 		case '?':
 			usage();
 			exit(EXIT_FAILURE);
@@ -1184,6 +1171,26 @@ main(int argc, char **argv)
 		if (opt == 0)
 			usage();
 		exit(EXIT_FAILURE);
+	}
+	if (i == 3) {
+		printf("Interface options:\n");
+		if_printoptions();
+#ifdef INET
+		if (family == 0 || family == AF_INET) {
+			printf("\nDHCPv4 options:\n");
+			dhcp_printoptions();
+		}
+#endif
+#ifdef INET6
+		if (family == 0 || family == AF_INET6) {
+			printf("\nDHCPv6 options:\n");
+			dhcp6_printoptions();
+		}
+#endif
+#ifdef DEBUG_MEMORY
+		cleanup();
+#endif
+		exit(EXIT_SUCCESS);
 	}
 	options = if_options->options;
 	if (i != 0) {
