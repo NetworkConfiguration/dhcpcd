@@ -393,22 +393,6 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data,
 		return 2;
 	}
 
-	/* DHCPv6 status code */
-	if (type & SCODE && dl >= (int)sizeof(u16)) {
-		if (s) {
-			memcpy(&u16, data, sizeof(u16));
-			u16 = ntohs(u16);
-			l = snprintf(s, len, "%d ", u16);
-			len -= l;
-		} else
-			l = 7;
-		data += sizeof(u16);
-		dl -= sizeof(u16);
-		if (dl)
-			l += print_option(s, len, STRING, dl, data, ifname);
-		return l;
-	}
-
 	if (!s) {
 		if (type & UINT8)
 			l = 3;
