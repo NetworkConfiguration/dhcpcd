@@ -286,15 +286,39 @@ dhcp6_findoption(int code, const uint8_t *d, ssize_t len)
 }
 
 static const uint8_t *
-dhcp6_getoption(int *len, int option, const uint8_t *od, int ol)
+dhcp6_getoption(int *os, int *code, int *len, const uint8_t *od, int ol,
+    struct dhcp_opt **oopt)
 {
 	const struct dhcp6_option *o;
+	size_t i;
+	struct dhcp_opt *opt;
 
-	o = dhcp6_findoption(option, od, ol);
-	if (o == NULL)
-		return NULL;
-	*len = ntohs(o->len);
-	return D6_COPTION_DATA(o);
+	if (od) {
+		*os = sizeof(*o);
+		if (ol < *os) {
+			errno = EINVAL;
+			return NULL;
+		}
+		o = (const struct dhcp6_option *)od;
+		*len = ntohs(o->len);
+		if (*len < 0 || *len > ol) {
+			errno = EINVAL;
+			return NULL;
+		}
+		*code = ntohs(o->code);
+	} else
+		o = NULL;
+
+	for (i = 0, opt = dhcp6_opts; i < dhcp6_opts_len; i++, opt++) {
+		if (opt->option == *code) {
+			*oopt = opt;
+			break;
+		}
+	}
+
+	if (o)
+		return D6_COPTION_DATA(o);
+	return NULL;
 }
 
 static const struct dhcp6_option *
@@ -2542,36 +2566,20 @@ dhcp6_handleifa(int cmd, const char *ifname,
 			continue;
 		ipv6_handleifa_addrs(cmd, &state->addrs, addr, flags);
 	}
-}
 
-static const struct dhcp_opt *
-dhcp6_getoverride(const struct if_options *ifo, uint16_t o)
-{
-	size_t i;
-	const struct dhcp_opt *opt;
-
-	for (i = 0, opt = ifo->dhcp6_override;
-	    i < ifo->dhcp6_override_len;
-	    i++, opt++)
-	{
-		if (opt->option == o)
-			return opt;
-	}
-	return NULL;
 }
 
 ssize_t
 dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
-    const struct dhcp6_message *m, ssize_t mlen)
+    const struct dhcp6_message *m, ssize_t len)
 {
 	const struct dhcp6_state *state;
 	const struct if_options *ifo;
-	const struct dhcp_opt *opt;
+	struct dhcp_opt *opt;
 	const struct dhcp6_option *o;
-	size_t e, n, oi;
-	uint16_t ol;
-	const uint8_t *od;
-	char **ep, *v, *val;
+	size_t i, n;
+	uint16_t ol, oc;
+	char **ep, *v, *val, *pfx;
 	const struct ipv6_addr *ap;
 
 	state = D6_CSTATE(ifp);
@@ -2579,40 +2587,80 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 	ep = env;
 	ifo = ifp->options;
 
-	for (oi = 0, opt = dhcp6_opts;
-	    oi < dhcp6_opts_len;
-	    oi++, opt++)
+	/* Zero our indexes */
+	if (env) {
+		for (i = 0, opt = dhcp6_opts; i < dhcp6_opts_len; i++, opt++)
+			dhcp_zero_index(opt);
+		for (i = 0, opt = ifp->options->dhcp6_override;
+		    i < ifp->options->dhcp6_override_len;
+		    i++, opt++)
+			dhcp_zero_index(opt);
+		i = strlen(prefix) + strlen("_dhcp6") + 1;
+		pfx = malloc(i);
+		if (pfx == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			return 0;
+		}
+		snprintf(pfx, i, "%s_dhcp6", prefix);
+	} else
+		pfx = NULL;
+
+	/* Unlike DHCP, DHCPv6 options *may* occur more than once.
+	 * There is also no provision for option concatenation unlike DHCP. */
+	for (o = D6_CFIRST_OPTION(m);
+	    len > (ssize_t)sizeof(*o);
+	    o = D6_CNEXT_OPTION(o))
 	{
-		if (has_option_mask(ifo->nomask, opt->option))
-			continue;
-		if (dhcp6_getoverride(ifo, opt->option))
-			continue;
-
-		o = dhcp6_getmoption(opt->option, m, mlen);
-		if (o == NULL)
-			continue;
 		ol = ntohs(o->len);
-		od = D6_COPTION_DATA(o);
-		n += dhcp_envoption(env == NULL ? NULL : &env[n],
-		    prefix, "_dhcp6", ifp->name, opt, dhcp6_getoption, od, ol);
+		len -= sizeof(*o) + ol;
+		if (len < 0) {
+			errno = EINVAL;
+			break;
+		}
+		oc = ntohs(o->code);
+		if (has_option_mask(ifo->nomask6, oc))
+			continue;
+		for (i = 0, opt = ifo->dhcp6_override;
+		    i < ifo->dhcp6_override_len;
+		    i++, opt++)
+			if (opt->option == oc)
+				break;
+		if (opt == NULL) {
+			for (i = 0, opt = dhcp6_opts;
+			    i < dhcp6_opts_len;
+			    i++, opt++)
+				if (opt->option == oc)
+					break;
+		}
+		if (opt) {
+			n += dhcp_envoption(env == NULL ? NULL : &env[n],
+			    pfx, ifp->name,
+			    opt, dhcp6_getoption, D6_COPTION_DATA(o), ol);
+		}
 	}
+	free(pfx);
 
+	/* It is tempting to remove this section.
+	 * However, we need it at least for Delegated Prefixes
+	 * (they don't have a DHCPv6 message to parse to get the addressses)
+	 * and it's easier for shell scripts to see which addresses have
+	 * been added */
 	if (TAILQ_FIRST(&state->addrs)) {
 		if (env == NULL)
 			n++;
 		else {
 			if (ifo->ia_type == D6_OPTION_IA_PD) {
-				e = strlen(prefix) +
+				i = strlen(prefix) +
 				    strlen("_dhcp6_prefix=");
 				TAILQ_FOREACH(ap, &state->addrs, next) {
-					e += strlen(ap->saddr) + 1;
+					i += strlen(ap->saddr) + 1;
 				}
-				v = val = *ep++ = malloc(e);
+				v = val = *ep++ = malloc(i);
 				if (v == NULL) {
 					syslog(LOG_ERR, "%s: %m", __func__);
 					return -1;
 				}
-				v += snprintf(val, e, "%s_dhcp6_prefix=",
+				v += snprintf(val, i, "%s_dhcp6_prefix=",
 					prefix);
 				TAILQ_FOREACH(ap, &state->addrs, next) {
 					strcpy(v, ap->saddr);
@@ -2621,17 +2669,17 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 				}
 				*--v = '\0';
 			} else {
-				e = strlen(prefix) +
+				i = strlen(prefix) +
 				    strlen("_dhcp6_ip_address=");
 				TAILQ_FOREACH(ap, &state->addrs, next) {
-					e += strlen(ap->saddr) + 1;
+					i += strlen(ap->saddr) + 1;
 				}
-				v = val = *ep++ = malloc(e);
+				v = val = *ep++ = malloc(i);
 				if (v == NULL) {
 					syslog(LOG_ERR, "%s: %m", __func__);
 					return -1;
 				}
-				v += snprintf(val, e, "%s_dhcp6_ip_address=",
+				v += snprintf(val, i, "%s_dhcp6_ip_address=",
 					prefix);
 				TAILQ_FOREACH(ap, &state->addrs, next) {
 					strcpy(v, ap->saddr);
@@ -2641,21 +2689,6 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 				*--v = '\0';
 			}
 		}
-	}
-
-	for (oi = 0, opt = ifo->dhcp6_override;
-	    oi < ifo->dhcp6_override_len;
-	    oi++, opt++)
-	{
-		if (has_option_mask(ifo->nomask, opt->option))
-			continue;
-		o = dhcp6_getmoption(opt->option, m, mlen);
-		if (o == NULL)
-			continue;
-		ol = ntohs(o->len);
-		od = D6_COPTION_DATA(o);
-		n += dhcp_envoption(env == NULL ? NULL : &env[n],
-		    prefix, "_dhcp6", ifp->name, opt, dhcp6_getoption, od, ol);
 	}
 
 	return n;

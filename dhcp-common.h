@@ -60,6 +60,8 @@
 #define NOREQ		(1 << 18)
 #define EMBED		(1 << 19)
 #define ENCAP		(1 << 20)
+#define INDEX		(1 << 21)
+#define OPTION		(1 << 22)
 
 struct dhcp_opt {
 	uint16_t option;
@@ -73,6 +75,8 @@ struct dhcp_opt {
 		char *dvar;
 		const char *var;
 	} v;
+
+	int index; /* Index counter for many instances of the same option */
 
 	/* Embedded options.
 	 * The option code is irrelevant here. */
@@ -95,9 +99,10 @@ ssize_t decode_rfc3397(char *, ssize_t, int, const uint8_t *);
 ssize_t print_string(char *, ssize_t, int, const uint8_t *);
 ssize_t print_option(char *, ssize_t, int, int, const uint8_t *, const char *);
 
-ssize_t dhcp_envoption(char **, const char *, const char *, const char *,
-    const struct dhcp_opt *,
-    const uint8_t *(*)(int *, int, const uint8_t *, int),
-    const uint8_t *, int);
+ssize_t dhcp_envoption(char **, const char *, const char *, struct dhcp_opt *,
+    const uint8_t *(*dgetopt)(int *, int *, int *, const uint8_t *, int,
+        struct dhcp_opt **),
+    const uint8_t *od, int ol);
+void dhcp_zero_index(struct dhcp_opt *);
 
 #endif

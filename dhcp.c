@@ -985,23 +985,34 @@ dhcp_getoverride(const struct if_options *ifo, uint16_t o)
 }
 
 static const uint8_t *
-dhcp_getoption(int *len, int option, const uint8_t *od, int ol)
+dhcp_getoption(int *os, int *code, int *len, const uint8_t *od, int ol,
+   struct dhcp_opt **oopt)
 {
-	const uint8_t *o;
-	uint8_t l;
+	size_t i;
+	struct dhcp_opt *opt;
 
-	while (ol > 0) {
-		o = od++;
-		l = *od++;
-		if (l > ol)
-			/* Report malformed data? */
+	if (od) {
+		if (ol < 0) {
+			errno = EINVAL;
 			return NULL;
-		if (*o == option) {
-			*len = l;
-			return od;
+		}
+		*os = 2; /* code + len */
+		*code = (int)*od++;
+		*len = (int)*od++;
+		if (*len < 0 || *len > ol) {
+			errno = EINVAL;
+			return NULL;
 		}
 	}
-	return NULL;
+
+	for (i = 0, opt = dhcp_opts; i < dhcp_opts_len; i++, opt++) {
+		if (opt->option == *code) {
+			*oopt = opt;
+			break;
+		}
+	}
+
+	return od;
 }
 
 ssize_t
@@ -1014,12 +1025,12 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 	struct in_addr addr;
 	struct in_addr net;
 	struct in_addr brd;
-	const struct dhcp_opt *opt;
+	struct dhcp_opt *opt;
 	ssize_t e = 0;
 	char **ep;
 	char cidr[4];
 	uint8_t overl = 0;
-	size_t oi;
+	size_t i;
 
 	ifo = ifp->options;
 	get_option_uint8(&overl, dhcp, DHO_OPTIONSOVERLOADED);
@@ -1031,9 +1042,9 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 			e++;
 		if (*dhcp->servername && !(overl & 2))
 			e++;
-		for (oi = 0, opt = dhcp_opts;
-		    oi < dhcp_opts_len;
-		    oi++, opt++)
+		for (i = 0, opt = dhcp_opts;
+		    i < dhcp_opts_len;
+		    i++, opt++)
 		{
 			if (has_option_mask(ifo->nomask, opt->option))
 				continue;
@@ -1042,19 +1053,19 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 			p = get_option(dhcp, opt->option, &pl);
 			if (!p)
 				continue;
-			e += dhcp_envoption(NULL, prefix, "", ifp->name,
+			e += dhcp_envoption(NULL, NULL, ifp->name,
 			    opt, dhcp_getoption, p, pl);
 		}
-		for (oi = 0, opt = ifo->dhcp_override;
-		    oi < ifo->dhcp_override_len;
-		    oi++, opt++)
+		for (i = 0, opt = ifo->dhcp_override;
+		    i < ifo->dhcp_override_len;
+		    i++, opt++)
 		{
 			if (has_option_mask(ifo->nomask, opt->option))
 				continue;
 			p = get_option(dhcp, opt->option, &pl);
 			if (!p)
 				continue;
-			e += dhcp_envoption(NULL, prefix, "", ifp->name,
+			e += dhcp_envoption(NULL, NULL, ifp->name,
 			    opt, dhcp_getoption, p, pl);
 		}
 		return e;
@@ -1087,27 +1098,37 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 		setvar(&ep, prefix, "server_name",
 		    (const char *)dhcp->servername);
 
-	for (oi = 0, opt = dhcp_opts;
-	    oi < dhcp_opts_len;
-	    oi++, opt++)
+	/* Zero our indexes */
+	if (env) {
+		for (i = 0, opt = dhcp_opts; i < dhcp_opts_len; i++, opt++)
+			dhcp_zero_index(opt);
+		for (i = 0, opt = ifp->options->dhcp_override;
+		    i < ifp->options->dhcp_override_len;
+		    i++, opt++)
+			dhcp_zero_index(opt);
+	}
+
+	for (i = 0, opt = dhcp_opts;
+	    i < dhcp_opts_len;
+	    i++, opt++)
 	{
 		if (has_option_mask(ifo->nomask, opt->option))
 			continue;
 		if (dhcp_getoverride(ifo, opt->option))
 			continue;
 		if ((p = get_option(dhcp, opt->option, &pl)))
-			ep += dhcp_envoption(ep, prefix, "", ifp->name,
+			ep += dhcp_envoption(ep, prefix, ifp->name,
 			    opt, dhcp_getoption, p, pl);
 	}
 
-	for (oi = 0, opt = ifo->dhcp_override;
-	    oi < ifo->dhcp_override_len;
-	    oi++, opt++)
+	for (i = 0, opt = ifo->dhcp_override;
+	    i < ifo->dhcp_override_len;
+	    i++, opt++)
 	{
 		if (has_option_mask(ifo->nomask, opt->option))
 			continue;
 		if ((p = get_option(dhcp, opt->option, &pl)))
-			ep += dhcp_envoption(ep, prefix, "", ifp->name,
+			ep += dhcp_envoption(ep, prefix, ifp->name,
 			    opt, dhcp_getoption, p, pl);
 	}
 

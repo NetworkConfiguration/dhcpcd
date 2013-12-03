@@ -482,6 +482,7 @@ set_option_space(const char *arg, const struct dhcp_opt **d, size_t *dl,
 
 /* Pointer to last defined option */
 static struct dhcp_opt *ldop;
+static struct dhcp_opt *edop;
 
 void
 free_dhcp_opt_embenc(struct dhcp_opt *opt)
@@ -1212,17 +1213,23 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			dop = &ifo->dhcp6_override;
 			dop_len = &ifo->dhcp6_override_len;
 		}
-		ldop = NULL;
+		edop = ldop = NULL;
 		/* FALLTHROUGH */
 	case O_EMBED:
 		if (dop == NULL) {
-			if (ldop == NULL) {
-				syslog(LOG_ERR, "embed must be after a define");
+			if (edop) {
+				dop = &edop->embopts;
+				dop_len = &edop->embopts_len;
+			} else if (ldop) {
+				dop = &ldop->embopts;
+				dop_len = &ldop->embopts_len;
+			} else {
+				syslog(LOG_ERR,
+				    "embed must be after a define or encap");
 				return -1;
 			}
-			dop = &ldop->embopts;
-			dop_len = &ldop->embopts_len;
 		}
+		/* FALLTHROUGH */
 	case O_ENCAP:
 		if (dop == NULL) {
 			if (ldop == NULL) {
@@ -1281,6 +1288,16 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			}
 			*fp++ = '\0';
 		}
+		if (strcasecmp(arg, "index") == 0) {
+			t |= INDEX;
+			arg = strskipwhite(fp);
+			fp = strwhite(arg);
+			if (fp == NULL) {
+				syslog(LOG_ERR, "incomplete index type");
+				return -1;
+			}
+			*fp++ = '\0';
+		}
 		if (strcasecmp(arg, "array") == 0) {
 			t |= ARRAY;
 			arg = strskipwhite(fp);
@@ -1314,15 +1331,17 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		else if (strcasecmp(arg, "binhex") == 0)
 			t |= BINHEX;
 		else if (strcasecmp(arg, "embed") == 0)
-			t = EMBED;
+			t |= EMBED;
 		else if (strcasecmp(arg, "encap") == 0)
-			t = ENCAP;
+			t |= ENCAP;
 		else if (strcasecmp(arg, "rfc3361") ==0)
-			t = STRING | RFC3361;
+			t |= STRING | RFC3361;
 		else if (strcasecmp(arg, "rfc3442") ==0)
-			t = RFC3442;
+			t |= STRING | RFC3442;
 		else if (strcasecmp(arg, "rfc5969") == 0)
-			t = RFC5969;
+			t |= STRING | RFC5969;
+		else if (strcasecmp(arg, "option") == 0)
+			t |= OPTION;
 		else {
 			syslog(LOG_ERR, "unknown type: %s", arg);
 			return -1;
@@ -1338,18 +1357,22 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		}
 		/* variable */
 		if (!fp) {
-		        syslog(LOG_ERR,
-			    "type %s requires a variable name", arg);
-			return -1;
-		}
-		arg = strskipwhite(fp);
-		fp = strwhite(arg);
-		if (fp)
-			*fp++ = '\0';
-		np = strdup(arg);
-		if (np == NULL) {
-			syslog(LOG_ERR, "%s: %m", __func__);
-			return -1;
+			if (!(t & OPTION)) {
+			        syslog(LOG_ERR,
+				    "type %s requires a variable name", arg);
+				return -1;
+			}
+			np = NULL;
+		} else {
+			arg = strskipwhite(fp);
+			fp = strwhite(arg);
+			if (fp)
+				*fp++ = '\0';
+			np = strdup(arg);
+			if (np == NULL) {
+				syslog(LOG_ERR, "%s: %m", __func__);
+				return -1;
+			}
 		}
 		if (opt == O_EMBED)
 			dl = *dop_len;
@@ -1383,6 +1406,8 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		/* Save the define for embed and encap options */
 		if (opt == O_DEFINE || opt == O_DEFINE6)
 			ldop = ndop;
+		else if (opt == O_ENCAP)
+			edop = ndop;
 		break;
 	default:
 		return 0;
