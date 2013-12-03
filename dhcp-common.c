@@ -669,8 +669,8 @@ dhcp_zero_index(struct dhcp_opt *opt)
 	struct dhcp_opt *o;
 
 	opt->index = 0;
-	for (i = 0, o = opt->embopts; i < opt->embopts_len; i++, opt++)
+	for (i = 0, o = opt->embopts; i < opt->embopts_len; i++, o++)
 		dhcp_zero_index(o);
-	for (i = 0, o = opt->encopts; i < opt->encopts_len; i++, opt++)
+	for (i = 0, o = opt->encopts; i < opt->encopts_len; i++, o++)
 		dhcp_zero_index(o);
 }
