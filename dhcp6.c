@@ -2583,12 +2583,11 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 	const struct dhcp6_option *o;
 	size_t i, n;
 	uint16_t ol, oc;
-	char **ep, *v, *val, *pfx;
+	char *v, *val, *pfx;
 	const struct ipv6_addr *ap;
 
 	state = D6_CSTATE(ifp);
 	n = 0;
-	ep = env;
 	ifo = ifp->options;
 
 	/* Zero our indexes */
@@ -2629,12 +2628,14 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 		    i++, opt++)
 			if (opt->option == oc)
 				break;
-		if (opt == NULL) {
+		if (i == ifo->dhcp6_override_len) {
 			for (i = 0, opt = dhcp6_opts;
 			    i < dhcp6_opts_len;
 			    i++, opt++)
 				if (opt->option == oc)
 					break;
+			if (i == dhcp6_opts_len)
+				opt = NULL;
 		}
 		if (opt) {
 			n += dhcp_envoption(env == NULL ? NULL : &env[n],
@@ -2650,16 +2651,14 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 	 * and it's easier for shell scripts to see which addresses have
 	 * been added */
 	if (TAILQ_FIRST(&state->addrs)) {
-		if (env == NULL)
-			n++;
-		else {
+		if (env) {
 			if (ifo->ia_type == D6_OPTION_IA_PD) {
 				i = strlen(prefix) +
 				    strlen("_dhcp6_prefix=");
 				TAILQ_FOREACH(ap, &state->addrs, next) {
 					i += strlen(ap->saddr) + 1;
 				}
-				v = val = *ep++ = malloc(i);
+				v = val = env[n] = malloc(i);
 				if (v == NULL) {
 					syslog(LOG_ERR, "%s: %m", __func__);
 					return -1;
@@ -2678,7 +2677,7 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 				TAILQ_FOREACH(ap, &state->addrs, next) {
 					i += strlen(ap->saddr) + 1;
 				}
-				v = val = *ep++ = malloc(i);
+				v = val = env[n] = malloc(i);
 				if (v == NULL) {
 					syslog(LOG_ERR, "%s: %m", __func__);
 					return -1;
@@ -2693,6 +2692,7 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 				*--v = '\0';
 			}
 		}
+		n++;
 	}
 
 	return n;

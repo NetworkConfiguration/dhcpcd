@@ -495,7 +495,7 @@ print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data,
 	return bytes;
 }
 
-static ssize_t
+static size_t
 dhcp_envoption1(char **env, const char *prefix,
     const struct dhcp_opt *opt, int vname, const uint8_t *od, int ol,
     const char *ifname)
@@ -510,10 +510,14 @@ dhcp_envoption1(char **env, const char *prefix,
 	if (len < 0)
 		return 0;
 	if (vname)
-		e = strlen(opt->v.var);
+		e = strlen(opt->v.var) + 1;
 	else
 		e = 0;
-	e += strlen(prefix) + len + 4;
+	if (prefix)
+		e += strlen(prefix);
+	e += len + 4;
+	if (env == NULL)
+		return e;
 	v = val = *env = malloc(e);
 	if (v == NULL) {
 		syslog(LOG_ERR, "%s: %m", __func__);
@@ -525,7 +529,7 @@ dhcp_envoption1(char **env, const char *prefix,
 		v += snprintf(val, e, "%s=", prefix);
 	if (len != 0)
 		print_option(v, len, opt->type, ol, od, ifname);
-	return len;
+	return e;
 }
 
 ssize_t
@@ -542,14 +546,13 @@ dhcp_envoption(char **env, const char *prefix,
 	int eos, eol, ov;
 	struct dhcp_opt *eopt, *oopt;
 	char *pfx;
-	const char *p;
 
 	/* If no embedded or encapsulated options, it's easy */
 	if (opt->embopts_len == 0 && opt->encopts_len == 0) {
-		if (env)
-			dhcp_envoption1(&env[0], prefix, opt, 1, od, ol,
-			    ifname);
-		return 1;
+		if (dhcp_envoption1(env == NULL ? NULL : &env[0],
+		    prefix, opt, 1, od, ol, ifname))
+			return 1;
+		return 0;
 	}
 
 	/* Create a new prefix based on the option */
@@ -573,27 +576,24 @@ dhcp_envoption(char **env, const char *prefix,
 			    opt->v.var, ++opt->index);
 		else
 			snprintf(pfx, e, "%s_%s", prefix, opt->v.var);
-		p = pfx;
 	} else
-		p = pfx = NULL;
+		pfx = NULL;
 
 	/* Embedded options are always processed first as that
 	 * is a fixed layout */
 	n = 0;
-
 	for (i = 0, eopt = opt->embopts; i < opt->embopts_len; i++, eopt++) {
 		e = dhcp_optlen(eopt, ol);
 		if (e == 0)
 			/* Report error? */
 			return 0;
-		if (env) {
-			/* Use the option prefix if the embedded option
-			 * name is different.
-			 * This avoids new_fqdn_fqdn which would be silly. */
-			ov = strcmp(opt->v.var, eopt->v.var);
-			dhcp_envoption1(&env[n], p, eopt, ov, od, e, ifname);
-		}
-		n++;
+		/* Use the option prefix if the embedded option
+		 * name is different.
+		 * This avoids new_fqdn_fqdn which would be silly. */
+		ov = strcmp(opt->v.var, eopt->v.var);
+		if (dhcp_envoption1(env == NULL ? NULL : &env[n],
+		    pfx, eopt, ov, od, e, ifname))
+			n++;
 		od += e;
 		ol -= e;
 	}
@@ -628,7 +628,7 @@ dhcp_envoption(char **env, const char *prefix,
 						eopt = oopt;
 					}
 					n += dhcp_envoption(
-					    env == NULL ? NULL : &env[n], p,
+					    env == NULL ? NULL : &env[n], pfx,
 					    ifname, eopt,
 					    dgetopt, eod, eol);
 					break;
