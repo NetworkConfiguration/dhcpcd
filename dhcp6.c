@@ -1320,7 +1320,7 @@ dhcp6_findna(struct interface *ifp, const uint8_t *iaid,
 	while ((o = dhcp6_findoption(D6_OPTION_IA_ADDR, d, l))) {
 		l -= ((const uint8_t *)o - d);
 		d += ((const uint8_t *)o - d);
-		u32 = htons(o->len);
+		u32 = ntohs(o->len);
 		l -= sizeof(*o) + u32;
 		d += sizeof(*o) + u32;
 		if (u32 < 24) {
@@ -1408,7 +1408,7 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 	while ((o = dhcp6_findoption(D6_OPTION_IAPREFIX, d, l))) {
 		l -= ((const uint8_t *)o - d);
 		d += ((const uint8_t *)o - d);
-		u32 = htons(o->len);
+		u32 = ntohs(o->len);
 		l -= sizeof(*o) + u32;
 		d += sizeof(*o) + u32;
 		if (u32 < 25) {
@@ -1492,7 +1492,7 @@ dhcp6_findia(struct interface *ifp, const uint8_t *d, size_t l,
 	while ((o = dhcp6_findoption(ifo->ia_type, d, l))) {
 		l -= ((const uint8_t *)o - d);
 		d += ((const uint8_t *)o - d);
-		ol = htons(o->len);
+		ol = ntohs(o->len);
 		l -= sizeof(*o) + ol;
 		d += sizeof(*o) + ol;
 		u32 = ifo->ia_type == D6_OPTION_IA_TA ? 4 : 12;
