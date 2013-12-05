@@ -1375,9 +1375,8 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 				return -1;
 			}
 		}
-		if (opt == O_EMBED)
-			dl = *dop_len;
-		else {
+		ndop = NULL;
+		if (opt != O_EMBED) {
 			for (dl = 0; dl < *dop_len; dl++) {
 				ndop = &(*dop)[dl];
 				/* type 0 seems freshly malloced struct
@@ -1386,7 +1385,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 					break;
 			}
 		}
-		if (dl >= *dop_len) {
+		if (ndop == NULL) {
 			if ((ndop = realloc(*dop,
 			    sizeof(**dop) * ((*dop_len) + 1))) == NULL) {
 				syslog(LOG_ERR, "%s: %m", __func__);
