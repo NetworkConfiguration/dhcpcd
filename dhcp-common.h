@@ -62,7 +62,7 @@
 #define OPTION		(1 << 20)
 
 struct dhcp_opt {
-	uint16_t option;
+	uint32_t option; /* Also used for IANA Enterpise Number */
 	int type;
 	int len;
 	char *var;
@@ -79,6 +79,12 @@ struct dhcp_opt {
 	size_t encopts_len;
 };
 
+/* DHCP Vendor-Identifying Vendor Options, RFC3925 */
+extern struct dhcp_opt *vivso;
+extern size_t vivso_len;
+
+struct dhcp_opt *vivso_find(uint16_t, const void *);
+
 #define add_option_mask(var, val) (var[val >> 3] |= 1 << (val & 7))
 #define del_option_mask(var, val) (var[val >> 3] &= ~(1 << (val & 7)))
 #define has_option_mask(var, val) (var[val >>3] & (1 << (val & 7)))
@@ -91,8 +97,8 @@ ssize_t print_string(char *, ssize_t, int, const uint8_t *);
 ssize_t print_option(char *, ssize_t, int, int, const uint8_t *, const char *);
 
 ssize_t dhcp_envoption(char **, const char *, const char *, struct dhcp_opt *,
-    const uint8_t *(*dgetopt)(int *, int *, int *, const uint8_t *, int,
-        struct dhcp_opt **),
+    const uint8_t *(*dgetopt)(unsigned int *, unsigned int *, unsigned int *,
+    const uint8_t *, unsigned int, struct dhcp_opt **),
     const uint8_t *od, int ol);
 void dhcp_zero_index(struct dhcp_opt *);
 

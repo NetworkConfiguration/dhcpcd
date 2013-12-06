@@ -159,6 +159,9 @@ free_globals(void)
 		free_dhcp_opt_embenc(opt);
 	free(dhcp6_opts);
 #endif
+	for (n = 0, opt = vivso; n < vivso_len; n++, opt++)
+		free_dhcp_opt_embenc(opt);
+	free(vivso);
 }
 
 static void

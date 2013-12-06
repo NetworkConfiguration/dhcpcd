@@ -116,6 +116,11 @@ struct if_ia {
 #endif
 };
 
+struct vivco {
+	uint16_t len;
+	uint8_t *data;
+};
+
 struct if_options {
 	uint8_t iaid[4];
 	int metric;
@@ -165,6 +170,11 @@ struct if_options {
 	size_t dhcp_override_len;
 	struct dhcp_opt *dhcp6_override;
 	size_t dhcp6_override_len;
+	uint32_t vivco_en;
+	struct vivco *vivco;
+	size_t vivco_len;
+	struct dhcp_opt *vivso_override;
+	size_t vivso_override_len;
 };
 
 extern unsigned long long options;

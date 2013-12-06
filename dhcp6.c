@@ -116,6 +116,8 @@ const struct dhcp_compat dhcp_compats[] = {
 	{ DHO_NTPSERVER,	D6_OPTION_SNTP_SERVERS },
 	{ DHO_RAPIDCOMMIT,	D6_OPTION_RAPID_COMMIT },
 	{ DHO_FQDN,		D6_OPTION_FQDN },
+	{ DHO_VIVCO,		D6_OPTION_VENDOR_CLASS },
+	{ DHO_VIVSO,		D6_OPTION_VENDOR_OPTS },
 	{ DHO_DNSSEARCH,	D6_OPTION_DOMAIN_LIST },
 	{ 0, 0 }
 };
@@ -178,89 +180,63 @@ dhcp6_init(void)
 	return 0;
 }
 
-#ifdef DHCPCD_IANA_PEN
 static size_t
-dhcp6_makevendor(struct dhcp6_option *o)
+dhcp6_makevendor(struct dhcp6_option *o, const struct interface *ifp)
 {
+	const struct if_options *ifo;
 	size_t len;
 	uint8_t *p;
 	uint16_t u16;
 	uint32_t u32;
-	size_t vlen;
-#ifdef VENDOR_SPLIT
-	const char *platform;
-	size_t plen, unl, url, uml, pl;
-	struct utsname utn;
-#endif
+	size_t vlen, i;
+	const struct vivco *vivco;
 
+	ifo = ifp->options;
 	len = sizeof(uint32_t); /* IANA PEN */
+	if (ifo->vivco_en) {
+		for (i = 0, vivco = ifo->vivco;
+		    i < ifo->vivco_len;
+		    i++, vivco++)
+			len += sizeof(uint16_t) + vivco->len;
+		vlen = 0; /* silence bogus gcc warning */
+	} else {
+		vlen = strlen(vendor);
+		len += sizeof(uint16_t) + vlen;
+	}
 
-#ifdef VENDOR_SPLIT
-	plen = strlen(PACKAGE);
-	vlen = strlen(VERSION);
-	len += sizeof(uint16_t) + plen + 1 + vlen;
-	if (uname(&utn) == 0) {
-		unl = strlen(utn.sysname);
-		url = strlen(utn.release);
-		uml = strlen(utn.machine);
-		platform = hardware_platform();
-		pl = strlen(platform);
-		len += sizeof(uint16_t) + unl + 1 + url;
-		len += sizeof(uint16_t) + uml;
-		len += sizeof(uint16_t) + pl;
-	} else
-		unl = 0;
-#else
-	vlen = strlen(vendor);
-	len += sizeof(uint16_t) + vlen;
-#endif
+	if (len > UINT16_MAX) {
+		syslog(LOG_ERR, "%s: DHCPv6 Vendor Class too big", ifp->name);
+		return 0;
+	}
 
 	if (o) {
-		o->code = htons(D6_OPTION_VENDOR);
+		o->code = htons(D6_OPTION_VENDOR_CLASS);
 		o->len = htons(len);
 		p = D6_OPTION_DATA(o);
-		u32 = htonl(DHCPCD_IANA_PEN);
+		u32 = htonl(ifo->vivco_en ? ifo->vivco_en : DHCPCD_IANA_PEN);
 		memcpy(p, &u32, sizeof(u32));
 		p += sizeof(u32);
-#ifdef VENDOR_SPLIT
-		u16 = htons(plen + 1 + vlen);
-		memcpy(p, &u16, sizeof(u16));
-		p += sizeof(u16);
-		memcpy(p, PACKAGE, plen);
-		p += plen;
-		*p++ = '-';
-		memcpy(p, VERSION, vlen);
-		p += vlen;
-		if (unl > 0) {
-			u16 = htons(unl + 1 + url);
+		if (ifo->vivco_en) {
+			for (i = 0, vivco = ifo->vivco;
+			    i < ifo->vivco_len;
+			    i++, vivco++)
+			{
+				u16 = htons(vivco->len);
+				memcpy(p, &u16, sizeof(u16));
+				p += sizeof(u16);
+				memcpy(p, vivco->data, vivco->len);
+				p += vivco->len;
+			}
+		} else {
+			u16 = htons(vlen);
 			memcpy(p, &u16, sizeof(u16));
 			p += sizeof(u16);
-			memcpy(p, utn.sysname, unl);
-			p += unl;
-			*p++ = '-';
-			memcpy(p, utn.release, url);
-			p += url;
-			u16 = htons(uml);
-			memcpy(p, &u16, sizeof(u16));
-			p += sizeof(u16);
-			memcpy(p, utn.machine, uml);
-			p += uml;
-			u16 = htons(pl);
-			memcpy(p, &u16, sizeof(u16));
-			p += sizeof(u16);
-			memcpy(p, platform, pl);
+			memcpy(p, vendor, vlen);
 		}
-#else
-		u16 = htons(vlen);
-		memcpy(p, &u16, sizeof(u16));
-		p += sizeof(u16);
-		memcpy(p, vendor, vlen);
-#endif
 	}
 
 	return len;
 }
-#endif
 
 static const struct dhcp6_option *
 dhcp6_findoption(int code, const uint8_t *d, ssize_t len)
@@ -286,8 +262,8 @@ dhcp6_findoption(int code, const uint8_t *d, ssize_t len)
 }
 
 static const uint8_t *
-dhcp6_getoption(int *os, int *code, int *len, const uint8_t *od, int ol,
-    struct dhcp_opt **oopt)
+dhcp6_getoption(unsigned int *os, unsigned int *code, unsigned int *len,
+    const uint8_t *od, unsigned int ol, struct dhcp_opt **oopt)
 {
 	const struct dhcp6_option *o;
 	size_t i;
@@ -301,7 +277,7 @@ dhcp6_getoption(int *os, int *code, int *len, const uint8_t *od, int ol,
 		}
 		o = (const struct dhcp6_option *)od;
 		*len = ntohs(o->len);
-		if (*len < 0 || *len > ol) {
+		if (*len > ol) {
 			errno = EINVAL;
 			return NULL;
 		}
@@ -436,9 +412,7 @@ dhcp6_makemessage(struct interface *ifp)
 	len += sizeof(*state->send);
 	len += sizeof(*o) + duid_len;
 	len += sizeof(*o) + sizeof(uint16_t); /* elapsed */
-#ifdef DHCPCD_IANA_PEN
-	len += sizeof(*o) + dhcp6_makevendor(NULL);
-#endif
+	len += sizeof(*o) + dhcp6_makevendor(NULL, ifp);
 
 	/* IA */
 	m = NULL;
@@ -562,10 +536,8 @@ dhcp6_makemessage(struct interface *ifp)
 	p = D6_OPTION_DATA(o);
 	memset(p, 0, sizeof(u16));
 
-#ifdef DHCPCD_IANA_PEN
 	o = D6_NEXT_OPTION(o);
-	dhcp6_makevendor(o);
-#endif
+	dhcp6_makevendor(o, ifp);
 
 	if (state->state == DH6S_DISCOVER &&
 	    !(options & DHCPCD_TEST) &&
@@ -2579,12 +2551,13 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 {
 	const struct dhcp6_state *state;
 	const struct if_options *ifo;
-	struct dhcp_opt *opt;
+	struct dhcp_opt *opt, *vo;
 	const struct dhcp6_option *o;
 	size_t i, n;
 	uint16_t ol, oc;
 	char *v, *val, *pfx;
 	const struct ipv6_addr *ap;
+	uint32_t en;
 
 	state = D6_CSTATE(ifp);
 	n = 0;
@@ -2597,6 +2570,8 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 		for (i = 0, opt = ifp->options->dhcp6_override;
 		    i < ifp->options->dhcp6_override_len;
 		    i++, opt++)
+			dhcp_zero_index(opt);
+		for (i = 0, opt = vivso; i < vivso_len; i++, opt++)
 			dhcp_zero_index(opt);
 		i = strlen(prefix) + strlen("_dhcp6") + 1;
 		pfx = malloc(i);
@@ -2628,6 +2603,15 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 		    i++, opt++)
 			if (opt->option == oc)
 				break;
+		if (i == ifo->dhcp6_override_len &&
+		    oc == D6_OPTION_VENDOR_OPTS &&
+		    ol > sizeof(en))
+		{
+			memcpy(&en, D6_COPTION_DATA(o), sizeof(en));
+			en = ntohl(en);
+			vo = vivso_find(en, ifp);
+		} else
+			vo = NULL;
 		if (i == ifo->dhcp6_override_len) {
 			for (i = 0, opt = dhcp6_opts;
 			    i < dhcp6_opts_len;
@@ -2641,6 +2625,13 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 			n += dhcp_envoption(env == NULL ? NULL : &env[n],
 			    pfx, ifp->name,
 			    opt, dhcp6_getoption, D6_COPTION_DATA(o), ol);
+		}
+		if (vo) {
+			n += dhcp_envoption(env == NULL ? NULL : &env[n],
+			    pfx, ifp->name,
+			    vo, dhcp6_getoption,
+			    D6_COPTION_DATA(o) + sizeof(en),
+			    ol - sizeof(en));
 		}
 	}
 	free(pfx);

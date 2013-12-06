@@ -78,6 +78,8 @@ unsigned long long options = 0;
 #define O_DEFINE6		O_BASE + 20
 #define O_EMBED			O_BASE + 21
 #define O_ENCAP			O_BASE + 22
+#define O_VENDOPT		O_BASE + 23
+#define O_VENDCLASS		O_BASE + 24
 
 char *dev_load;
 
@@ -140,17 +142,19 @@ const struct option cf_options[] = {
 	{"noipv4",          no_argument,       NULL, O_NOIPV4},
 	{"noipv6",          no_argument,       NULL, O_NOIPV6},
 	{"noalias",         no_argument,       NULL, O_NOALIAS},
-	{"iaid",            no_argument,       NULL, O_IAID},
+	{"iaid",            required_argument, NULL, O_IAID},
 	{"ia_na",           no_argument,       NULL, O_IA_NA},
 	{"ia_ta",           no_argument,       NULL, O_IA_TA},
 	{"ia_pd",           no_argument,       NULL, O_IA_PD},
 	{"hostname_short",  no_argument,       NULL, O_HOSTNAME_SHORT},
 	{"dev",             required_argument, NULL, O_DEV},
 	{"nodev",           no_argument,       NULL, O_NODEV},
-	{"define",          no_argument,       NULL, O_DEFINE},
-	{"define6",         no_argument,       NULL, O_DEFINE6},
-	{"embed",           no_argument,       NULL, O_EMBED},
-	{"encap",           no_argument,       NULL, O_ENCAP},
+	{"define",          required_argument, NULL, O_DEFINE},
+	{"define6",         required_argument, NULL, O_DEFINE6},
+	{"embed",           required_argument, NULL, O_EMBED},
+	{"encap",           required_argument, NULL, O_ENCAP},
+	{"vendopt",         required_argument, NULL, O_VENDOPT},
+	{"vendclass",       required_argument, NULL, O_VENDCLASS},
 	{NULL,              0,                 NULL, '\0'}
 };
 
@@ -272,12 +276,13 @@ parse_string_hwaddr(char *sbuf, ssize_t slen, const char *str, int clid)
 	/* If processing a string on the clientid, first byte should be
 	 * 0 to indicate a non hardware type */
 	if (clid && *str) {
-		*sbuf++ = 0;
+		if (sbuf)
+			*sbuf++ = 0;
 		l++;
 	}
 	c[3] = '\0';
 	while (*str) {
-		if (++l > slen) {
+		if (++l > slen && sbuf) {
 			errno = ENOBUFS;
 			return -1;
 		}
@@ -287,19 +292,23 @@ parse_string_hwaddr(char *sbuf, ssize_t slen, const char *str, int clid)
 			case '\0':
 				break;
 			case 'b':
-				*sbuf++ = '\b';
+				if (sbuf)
+					*sbuf++ = '\b';
 				str++;
 				break;
 			case 'n':
-				*sbuf++ = '\n';
+				if (sbuf)
+					*sbuf++ = '\n';
 				str++;
 				break;
 			case 'r':
-				*sbuf++ = '\r';
+				if (sbuf)
+					*sbuf++ = '\r';
 				str++;
 				break;
 			case 't':
-				*sbuf++ = '\t';
+				if (sbuf)
+					*sbuf++ = '\t';
 				str++;
 				break;
 			case 'x':
@@ -310,7 +319,7 @@ parse_string_hwaddr(char *sbuf, ssize_t slen, const char *str, int clid)
 						break;
 					c[i] = *str++;
 				}
-				if (c[1] != '\0') {
+				if (c[1] != '\0' && sbuf) {
 					c[2] = '\0';
 					*sbuf++ = strtol(c, NULL, 16);
 				} else
@@ -324,7 +333,7 @@ parse_string_hwaddr(char *sbuf, ssize_t slen, const char *str, int clid)
 						break;
 					c[i] = *str++;
 				}
-				if (c[2] != '\0') {
+				if (c[2] != '\0' && sbuf) {
 					i = strtol(c, NULL, 8);
 					if (i > 255)
 						i = 255;
@@ -333,13 +342,20 @@ parse_string_hwaddr(char *sbuf, ssize_t slen, const char *str, int clid)
 					l--;
 				break;
 			default:
-				*sbuf++ = *str++;
+				if (sbuf)
+					*sbuf++ = *str;
+				str++;
+				break;
 			}
-		} else
-			*sbuf++ = *str++;
+		} else {
+			if (sbuf)
+				*sbuf++ = *str;
+			str++;
+		}
 	}
 	if (punt_last) {
-		*--sbuf = '\0';
+		if (sbuf)
+			*--sbuf = '\0';
 		l--;
 	}
 	return l;
@@ -533,6 +549,7 @@ static int
 parse_option(struct if_options *ifo, int opt, const char *arg)
 {
 	int i, l, t;
+	unsigned int u;
 	char *p = NULL, *fp, *np, **nconf;
 	ssize_t s;
 	struct in_addr addr, addr2;
@@ -542,6 +559,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 	uint8_t *request, *require, *no;
 	struct dhcp_opt **dop, *ndop;
 	size_t *dop_len, dl;
+	struct vivco *vivco;
 #ifdef INET6
 	size_t sl;
 	struct if_ia *ia;
@@ -1215,6 +1233,12 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			dop = &ifo->dhcp6_override;
 			dop_len = &ifo->dhcp6_override_len;
 		}
+		/* FALLTHROUGH */
+	case O_VENDOPT:
+		if (dop == NULL) {
+			dop = &ifo->vivso_override;
+			dop_len = &ifo->vivso_override_len;
+		}
 		edop = ldop = NULL;
 		/* FALLTHROUGH */
 	case O_EMBED:
@@ -1246,7 +1270,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 
 		/* code */
 		if (opt == O_EMBED) /* Embedded options don't have codes */
-			i = 0;
+			u = 0;
 		else {
 			fp = strwhite(arg);
 			if (!fp) {
@@ -1254,8 +1278,12 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 				return -1;
 			}
 			*fp++ = '\0';
-			if ((i = atoint(arg)) == -1)
+			errno = 0;
+			u = strtoul(arg, &np, 0);
+			if (u > UINT32_MAX || errno != 0 || *np != '\0') {
+				syslog(LOG_ERR, "invalid code: %s", arg);
 				return -1;
+			}
 			arg = strskipwhite(fp);
 		}
 		/* type */
@@ -1382,7 +1410,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 				ndop = &(*dop)[dl];
 				/* type 0 seems freshly malloced struct
 				 * for us to use */
-				if (ndop->option == i || ndop->type == 0)
+				if (ndop->option == u || ndop->type == 0)
 					break;
 			}
 		}
@@ -1400,15 +1428,56 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			ndop->encopts_len = 0;
 		} else
 			free_dhcp_opt_embenc(ndop);
-		ndop->option = i; /* could have been 0 */
+		ndop->option = u; /* could have been 0 */
 		ndop->type = t;
 		ndop->len = l;
 		ndop->var = np;
 		/* Save the define for embed and encap options */
-		if (opt == O_DEFINE || opt == O_DEFINE6)
+		if (opt == O_DEFINE || opt == O_DEFINE6 || opt == O_VENDOPT)
 			ldop = ndop;
 		else if (opt == O_ENCAP)
 			edop = ndop;
+		break;
+	case O_VENDCLASS:
+		fp = strwhite(arg);
+		if (fp)
+			*fp++ = '\0';
+		errno = 0;
+		u = strtoul(arg, &np, 0);
+		if (u > UINT32_MAX || errno != 0 || *np != '\0') {
+			syslog(LOG_ERR, "invalid code: %s", arg);
+			return -1;
+		}
+		if (fp) {
+			s = parse_string(NULL, 0, fp);
+			if (s == -1) {
+				syslog(LOG_ERR, "%s: %m", __func__);
+				return -1;
+			}
+			if (s + (sizeof(uint16_t) * 2) > UINT16_MAX) {
+				syslog(LOG_ERR, "vendor class is too big");
+				return -1;
+			}
+			np = malloc(s);
+			if (np == NULL) {
+				syslog(LOG_ERR, "%s: %m", __func__);
+				return -1;
+			}
+			parse_string(np, s, fp);
+		} else {
+			s = 0;
+			np = NULL;
+		}
+		vivco = realloc(ifo->vivco, ifo->vivco_len + 1);
+		if (vivco == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			return -1;
+		}
+		ifo->vivco = vivco;
+		ifo->vivco_en = u;
+		vivco = &ifo->vivco[ifo->vivco_len++];
+		vivco->len = s;
+		vivco->data = (uint8_t *)np;
 		break;
 	default:
 		return 0;
@@ -1594,6 +1663,11 @@ read_config(const char *file,
 #endif
 		ifo->dhcp6_override = NULL;
 		ifo->dhcp6_override_len = 0;
+
+		vivso = ifo->vivso_override;
+		vivso_len = ifo->vivso_override_len;
+		ifo->vivso_override = NULL;
+		ifo->vivso_override_len = 0;
 	}
 
 	/* Parse our options file */
@@ -1710,6 +1784,12 @@ free_options(struct if_options *ifo)
 		for (i = 0, opt = ifo->dhcp6_override;
 		    i < ifo->dhcp6_override_len;
 		    i++, opt++)
+			free_dhcp_opt_embenc(opt);
+		free(ifo->dhcp6_override);
+		for (i = 0, opt = ifo->vivso_override;
+		    i < ifo->vivso_override_len;
+		    i++, opt++)
+			free_dhcp_opt_embenc(opt);
 		free(ifo->dhcp6_override);
 
 #ifdef INET6

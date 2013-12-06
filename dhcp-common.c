@@ -38,21 +38,39 @@
 #include "dhcp-common.h"
 #include "dhcp.h"
 
-#ifdef INET
-struct dhcp_opt *dhcp_override = NULL;
-size_t dhcp_override_len = 0;
-#endif
-#ifdef INET6
-struct dhcp_opt *dhcp6_override = NULL;
-size_t dhcp6_override_len = 0;
-#endif
+/* DHCP Enterprise options, RFC3925 */
+struct dhcp_opt *vivso = NULL;
+size_t vivso_len = 0;
 
-int make_option_mask(const struct dhcp_opt *dopts, size_t dopts_len,
+struct dhcp_opt *
+vivso_find(uint16_t iana_en, const void *arg)
+{
+	const struct interface *ifp = arg;
+	size_t i;
+	struct dhcp_opt *opt;
+
+	if (arg) {
+		ifp = arg;
+		for (i = 0, opt = ifp->options->vivso_override;
+		    i < ifp->options->vivso_override_len;
+		    i++, opt++)
+			if (opt->option == iana_en)
+				return opt;
+	}
+	for (i = 0, opt = vivso; i < vivso_len; i++, opt++)
+		if (opt->option == iana_en)
+			return opt;
+	return NULL;
+}
+
+int
+make_option_mask(const struct dhcp_opt *dopts, size_t dopts_len,
     uint8_t *mask, const char *opts, int add)
 {
 	char *token, *o, *p, *t;
 	const struct dhcp_opt *opt;
-	int match, n;
+	int match;
+	unsigned int n;
 	size_t i;
 
 	o = p = strdup(opts);
@@ -535,15 +553,15 @@ dhcp_envoption1(char **env, const char *prefix,
 ssize_t
 dhcp_envoption(char **env, const char *prefix,
     const char *ifname, struct dhcp_opt *opt,
-    const uint8_t *(*dgetopt)(int *, int *, int *, const uint8_t *, int,
-        struct dhcp_opt **),
+    const uint8_t *(*dgetopt)(unsigned int *, unsigned int *, unsigned int *,
+    const uint8_t *, unsigned int, struct dhcp_opt **),
     const uint8_t *od, int ol)
 {
 	ssize_t e, n;
 	size_t i;
-	int eoc;
+	unsigned int eoc, eos, eol;
 	const uint8_t *eod;
-	int eos, eol, ov;
+	int ov;
 	struct dhcp_opt *eopt, *oopt;
 	char *pfx;
 

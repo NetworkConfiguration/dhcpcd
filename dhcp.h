@@ -105,6 +105,8 @@ enum DHO {
 	DHO_USERCLASS              = 77,  /* RFC 3004 */
 	DHO_RAPIDCOMMIT            = 80,  /* RFC 4039 */
 	DHO_FQDN                   = 81,
+	DHO_VIVCO                  = 124, /* RFC 3925 */
+	DHO_VIVSO                  = 125, /* RFC 3925 */
 	DHO_DNSSEARCH              = 119, /* RFC 3397 */
 	DHO_CSR                    = 121, /* RFC 3442 */
 	DHO_SIXRD                  = 212, /* RFC 5969 */

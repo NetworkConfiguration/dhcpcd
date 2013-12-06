@@ -684,6 +684,7 @@ make_message(struct dhcp_message **message,
 	const struct dhcp_lease *lease = &state->lease;
 	time_t up = uptime() - state->start_uptime;
 	const char *hostname;
+	const struct vivco *vivco;
 
 	dhcp = calloc(1, sizeof (*dhcp));
 	if (dhcp == NULL)
@@ -864,6 +865,37 @@ make_message(struct dhcp_message **message,
 			p += ifo->vendor[0] + 1;
 		}
 
+		if (ifo->vivco_len) {
+			*p++ = DHO_VIVCO;
+			lp = p++;
+			*lp = sizeof(ul);
+			ul = htonl(ifo->vivco_en);
+			memcpy(p, &ul, sizeof(ul));
+			p += sizeof(ul);
+			for (i = 0, vivco = ifo->vivco;
+			    i < ifo->vivco_len;
+			    i++, vivco++)
+			{
+				len = (p - m) + vivco->len + 1;
+				if (len > sizeof(*dhcp))
+					goto toobig;
+				if (vivco->len + 2 + *lp > 255) {
+					syslog(LOG_ERR,
+					    "%s: VIVCO option too big",
+					    iface->name);
+					free(dhcp);
+					return -1;
+				}
+				*p++ = (uint8_t)vivco->len;
+				memcpy(p, vivco->data, vivco->len);
+				p += vivco->len;
+				*lp += (uint8_t)vivco->len + 1;
+			}
+		}
+
+		len = (p - m) + 3;
+		if (len > sizeof(*dhcp))
+			goto toobig;
 		*p++ = DHO_PARAMETERREQUESTLIST;
 		n_params = p;
 		*p++ = 0;
@@ -877,6 +909,9 @@ make_message(struct dhcp_message **message,
 			    (opt->option == DHO_RENEWALTIME ||
 				opt->option == DHO_REBINDTIME))
 				continue;
+			len = (p - m) + 2;
+			if (len > sizeof(*dhcp))
+				goto toobig;
 			*p++ = opt->option;
 		}
 		*n_params = p - n_params - 1;
@@ -893,6 +928,11 @@ make_message(struct dhcp_message **message,
 
 	*message = dhcp;
 	return p - m;
+
+toobig:
+	syslog(LOG_ERR, "%s: DHCP messge too big", iface->name);
+	free(dhcp);
+	return -1;
 }
 
 ssize_t
@@ -985,21 +1025,21 @@ dhcp_getoverride(const struct if_options *ifo, uint16_t o)
 }
 
 static const uint8_t *
-dhcp_getoption(int *os, int *code, int *len, const uint8_t *od, int ol,
-   struct dhcp_opt **oopt)
+dhcp_getoption(unsigned int *os, unsigned int *code, unsigned int *len,
+    const uint8_t *od, unsigned int ol, struct dhcp_opt **oopt)
 {
 	size_t i;
 	struct dhcp_opt *opt;
 
 	if (od) {
-		if (ol < 0) {
+		if (ol < 2) {
 			errno = EINVAL;
 			return NULL;
 		}
 		*os = 2; /* code + len */
 		*code = (int)*od++;
 		*len = (int)*od++;
-		if (*len < 0 || *len > ol) {
+		if (*len > ol) {
 			errno = EINVAL;
 			return NULL;
 		}
@@ -1025,12 +1065,13 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 	struct in_addr addr;
 	struct in_addr net;
 	struct in_addr brd;
-	struct dhcp_opt *opt;
+	struct dhcp_opt *opt, *vo;
 	ssize_t e = 0;
 	char **ep;
 	char cidr[4];
 	uint8_t overl = 0;
 	size_t i;
+	uint32_t en;
 
 	ifo = ifp->options;
 	get_option_uint8(&overl, dhcp, DHO_OPTIONSOVERLOADED);
@@ -1106,6 +1147,8 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 		    i < ifp->options->dhcp_override_len;
 		    i++, opt++)
 			dhcp_zero_index(opt);
+		for (i = 0, opt = vivso; i < vivso_len; i++, opt++)
+			dhcp_zero_index(opt);
 	}
 
 	for (i = 0, opt = dhcp_opts;
@@ -1119,6 +1162,20 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 		if ((p = get_option(dhcp, opt->option, &pl)))
 			ep += dhcp_envoption(ep, prefix, ifp->name,
 			    opt, dhcp_getoption, p, pl);
+		/* Grab the Vendor-Identifying Vendor Options, RFC 3925 */
+		if (opt->option == DHO_VIVSO && pl > (int)sizeof(uint32_t)) {
+			memcpy(&en, p, sizeof(en));
+			en = ntohl(en);
+			vo = vivso_find(en, ifp);
+			if (vo) {
+				/* Skip over en + total size */
+				p += sizeof(en) + 1;
+				pl -= sizeof(en) + 1;
+				ep += dhcp_envoption(ep, prefix, ifp->name,
+				    vo, dhcp_getoption, p, pl);
+				printf ("%p\n", ep);
+			}
+		}
 	}
 
 	for (i = 0, opt = ifo->dhcp_override;
