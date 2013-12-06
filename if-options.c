@@ -488,17 +488,18 @@ void
 free_dhcp_opt_embenc(struct dhcp_opt *opt)
 {
 	size_t i;
+	struct dhcp_opt *o;
 
-	free(opt->v.dvar);
+	free(opt->var);
 
-	for (i = 0; i < opt->embopts_len; i++)
-		free(opt->embopts[i].v.dvar);
+	for (i = 0, o = opt->embopts; i < opt->embopts_len; i++, o++)
+		free(o->var);
 	free(opt->embopts);
 	opt->embopts_len = 0;
 	opt->embopts = NULL;
 
-	for (i = 0; i < opt->encopts_len; i++)
-		free(opt->encopts[i].v.dvar);
+	for (i = 0, o = opt->encopts; i < opt->encopts_len; i++, o++)
+		free(o->var);
 	free(opt->encopts);
 	opt->encopts_len = 0;
 	opt->encopts = NULL;
@@ -1402,7 +1403,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		ndop->option = i; /* could have been 0 */
 		ndop->type = t;
 		ndop->len = l;
-		ndop->v.dvar = np;
+		ndop->var = np;
 		/* Save the define for embed and encap options */
 		if (opt == O_DEFINE || opt == O_DEFINE6)
 			ldop = ndop;

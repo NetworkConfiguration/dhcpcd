@@ -63,7 +63,7 @@ int make_option_mask(const struct dhcp_opt *dopts, size_t dopts_len,
 			continue;
 		for (i = 0, opt = dopts; i < dopts_len; i++, opt++) {
 			match = 0;
-			if (strcmp(opt->v.var, token) == 0)
+			if (strcmp(opt->var, token) == 0)
 				match = 1;
 			else {
 				errno = 0;
@@ -510,7 +510,7 @@ dhcp_envoption1(char **env, const char *prefix,
 	if (len < 0)
 		return 0;
 	if (vname)
-		e = strlen(opt->v.var) + 1;
+		e = strlen(opt->var) + 1;
 	else
 		e = 0;
 	if (prefix)
@@ -524,7 +524,7 @@ dhcp_envoption1(char **env, const char *prefix,
 		return 0;
 	}
 	if (vname)
-		v += snprintf(val, e, "%s_%s=", prefix, opt->v.var);
+		v += snprintf(val, e, "%s_%s=", prefix, opt->var);
 	else
 		v += snprintf(val, e, "%s=", prefix);
 	if (len != 0)
@@ -564,7 +564,7 @@ dhcp_envoption(char **env, const char *prefix,
 				return 0;
 			}
 		}
-		e = strlen(prefix) + strlen(opt->v.var) + 2 +
+		e = strlen(prefix) + strlen(opt->var) + 2 +
 		    (opt->type & INDEX ? 3 : 0);
 		pfx = malloc(e);
 		if (pfx == NULL) {
@@ -573,9 +573,9 @@ dhcp_envoption(char **env, const char *prefix,
 		}
 		if (opt->type & INDEX)
 			snprintf(pfx, e, "%s_%s%d", prefix,
-			    opt->v.var, ++opt->index);
+			    opt->var, ++opt->index);
 		else
-			snprintf(pfx, e, "%s_%s", prefix, opt->v.var);
+			snprintf(pfx, e, "%s_%s", prefix, opt->var);
 	} else
 		pfx = NULL;
 
@@ -590,7 +590,7 @@ dhcp_envoption(char **env, const char *prefix,
 		/* Use the option prefix if the embedded option
 		 * name is different.
 		 * This avoids new_fqdn_fqdn which would be silly. */
-		ov = strcmp(opt->v.var, eopt->v.var);
+		ov = strcmp(opt->var, eopt->var);
 		if (dhcp_envoption1(env == NULL ? NULL : &env[n],
 		    pfx, eopt, ov, od, e, ifname))
 			n++;

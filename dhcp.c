@@ -138,7 +138,7 @@ dhcp_printoptions(void)
 		printf("    %s\n", *p);
 
 	for (i = 0, opt = dhcp_opts; i < dhcp_opts_len; i++, opt++)
-		printf("%03d %s\n", opt->option, opt->v.var);
+		printf("%03d %s\n", opt->option, opt->var);
 }
 
 #ifdef DEBUG_MEMORY

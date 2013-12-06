@@ -65,14 +65,7 @@ struct dhcp_opt {
 	uint16_t option;
 	int type;
 	int len;
-
-	/* This union allows us to define a global static list of
-	 * variable names which we don't free and a list of user defined
-	 * options which we do free. */
-	union {
-		char *dvar;
-		const char *var;
-	} v;
+	char *var;
 
 	int index; /* Index counter for many instances of the same option */
 

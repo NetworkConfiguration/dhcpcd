@@ -138,7 +138,7 @@ dhcp6_printoptions(void)
 	const struct dhcp_opt *opt;
 
 	for (i = 0, opt = dhcp6_opts; i < dhcp6_opts_len; i++, opt++)
-		printf("%05d %s\n", opt->option, opt->v.var);
+		printf("%05d %s\n", opt->option, opt->var);
 }
 
 static int
@@ -2085,7 +2085,7 @@ dhcp6_handledata(__unused void *arg)
 		{
 			syslog(LOG_WARNING,
 			    "%s: reject DHCPv6 (no option %s) from %s",
-			    ifp->name, opt->v.var, sfrom);
+			    ifp->name, opt->var, sfrom);
 			return;
 		}
 	}
