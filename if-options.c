@@ -1471,7 +1471,8 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			s = 0;
 			np = NULL;
 		}
-		vivco = realloc(ifo->vivco, ifo->vivco_len + 1);
+		vivco = realloc(ifo->vivco, sizeof(*ifo->vivco) *
+		    (ifo->vivco_len + 1));
 		if (vivco == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);
 			return -1;
@@ -1760,6 +1761,7 @@ free_options(struct if_options *ifo)
 {
 	size_t i;
 	struct dhcp_opt *opt;
+	struct vivco *vo;
 
 	if (ifo) {
 		if (ifo->environ) {
@@ -1789,11 +1791,16 @@ free_options(struct if_options *ifo)
 		    i++, opt++)
 			free_dhcp_opt_embenc(opt);
 		free(ifo->dhcp6_override);
+		for (i = 0, vo = ifo->vivco;
+		    i < ifo->vivco_len;
+		    i++, vo++)
+			free(vo->data);
+		free(ifo->vivco);
 		for (i = 0, opt = ifo->vivso_override;
 		    i < ifo->vivso_override_len;
 		    i++, opt++)
 			free_dhcp_opt_embenc(opt);
-		free(ifo->dhcp6_override);
+		free(ifo->vivso_override);
 
 #ifdef INET6
 		for (i = 0; i < ifo->ia_len; i++)
