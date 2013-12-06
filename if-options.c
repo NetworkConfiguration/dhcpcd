@@ -1404,19 +1404,22 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 				return -1;
 			}
 		}
-		ndop = NULL;
 		if (opt != O_EMBED) {
-			for (dl = 0; dl < *dop_len; dl++) {
-				ndop = &(*dop)[dl];
+			for (dl = 0, ndop = *dop; dl < *dop_len; dl++, ndop++)
+			{
 				/* type 0 seems freshly malloced struct
 				 * for us to use */
 				if (ndop->option == u || ndop->type == 0)
 					break;
 			}
-		}
+			if (dl == *dop_len)
+				ndop = NULL;
+		} else
+			ndop = NULL;
 		if (ndop == NULL) {
 			if ((ndop = realloc(*dop,
-			    sizeof(**dop) * ((*dop_len) + 1))) == NULL) {
+			    sizeof(**dop) * ((*dop_len) + 1))) == NULL)
+			{
 				syslog(LOG_ERR, "%s: %m", __func__);
 				return -1;
 			}

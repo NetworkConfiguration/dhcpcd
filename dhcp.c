@@ -1159,21 +1159,23 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 			continue;
 		if (dhcp_getoverride(ifo, opt->option))
 			continue;
-		if ((p = get_option(dhcp, opt->option, &pl)))
+		if ((p = get_option(dhcp, opt->option, &pl))) {
 			ep += dhcp_envoption(ep, prefix, ifp->name,
 			    opt, dhcp_getoption, p, pl);
-		/* Grab the Vendor-Identifying Vendor Options, RFC 3925 */
-		if (opt->option == DHO_VIVSO && pl > (int)sizeof(uint32_t)) {
-			memcpy(&en, p, sizeof(en));
-			en = ntohl(en);
-			vo = vivso_find(en, ifp);
-			if (vo) {
-				/* Skip over en + total size */
-				p += sizeof(en) + 1;
-				pl -= sizeof(en) + 1;
-				ep += dhcp_envoption(ep, prefix, ifp->name,
-				    vo, dhcp_getoption, p, pl);
-				printf ("%p\n", ep);
+			if (opt->option == DHO_VIVSO &&
+			    pl > (int)sizeof(uint32_t))
+			{
+			        memcpy(&en, p, sizeof(en));
+				en = ntohl(en);
+				vo = vivso_find(en, ifp);
+				if (vo) {
+					/* Skip over en + total size */
+					p += sizeof(en) + 1;
+					pl -= sizeof(en) + 1;
+					ep += dhcp_envoption(ep, prefix,
+					    ifp->name,
+					    vo, dhcp_getoption, p, pl);
+				}
 			}
 		}
 	}

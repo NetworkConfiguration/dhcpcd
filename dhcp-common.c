@@ -643,11 +643,11 @@ dhcp_envoption(char **env, const char *prefix,
 						if (oopt == NULL)
 							/* Report error? */
 							continue;
-						eopt = oopt;
 					}
 					n += dhcp_envoption(
 					    env == NULL ? NULL : &env[n], pfx,
-					    ifname, eopt,
+					    ifname,
+					    eopt->type & OPTION ? oopt : eopt,
 					    dgetopt, eod, eol);
 					break;
 				}
