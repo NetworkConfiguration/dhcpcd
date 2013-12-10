@@ -375,12 +375,13 @@ dhcp6_makemessage(struct interface *ifp)
 	ifo = ifp->options;
 	fqdn = ifo->fqdn;
 
-	if (fqdn == FQDN_DISABLE || ifo->options & DHCPCD_HOSTNAME) {
+	if (fqdn == FQDN_DISABLE && ifo->options & DHCPCD_HOSTNAME) {
 		/* We're sending the DHCPv4 hostname option, so send FQDN as
 		 * DHCPv6 has no FQDN option and DHCPv4 must not send
 		 * hostname and FQDN according to RFC4702 */
-		if (fqdn == FQDN_DISABLE)
-			fqdn = FQDN_BOTH;
+		fqdn = FQDN_BOTH;
+	}
+	if (fqdn != FQDN_DISABLE) {
 		if (ifo->hostname[0] == '\0')
 			hostname = get_hostname(ifo->options &
 			    DHCPCD_HOSTNAME_SHORT ? 1 : 0);
