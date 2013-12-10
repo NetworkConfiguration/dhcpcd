@@ -2152,6 +2152,8 @@ dhcp6_handledata(__unused void *arg)
 		ap = TAILQ_FIRST(&state->addrs);
 		syslog(LOG_INFO, "%s: ADV %s from %s",
 		    ifp->name, ap->saddr, sfrom);
+		if (options & DHCPCD_TEST)
+			break;
 		dhcp6_startrequest(ifp);
 		return;
 	}
