@@ -1607,20 +1607,13 @@ dhcp_expire(void *arg)
 	struct interface *ifp = arg;
 	struct dhcp_state *state = D_STATE(ifp);
 
-	state->interval = 0;
-	if (state->addr.s_addr == 0) {
-		/* We failed to reboot, so enter discovery. */
-		state->lease.addr.s_addr = 0;
-		dhcp_discover(ifp);
-		return;
-	}
-
 	syslog(LOG_ERR, "%s: DHCP lease expired", ifp->name);
 	eloop_timeout_delete(NULL, ifp);
 	dhcp_drop(ifp, "EXPIRE");
 	unlink(state->leasefile);
-	if (ifp->carrier != LINK_DOWN)
-		start_interface(ifp);
+
+	state->interval = 0;
+	dhcp_discover(ifp);
 }
 
 void
@@ -2064,7 +2057,7 @@ whitelisted_ip(const struct if_options *ifo, in_addr_t addr)
 }
 
 static void
-dhcp_handle(struct interface *iface, struct dhcp_message **dhcpp,
+dhcp_handledhcp(struct interface *iface, struct dhcp_message **dhcpp,
     const struct in_addr *from)
 {
 	struct dhcp_state *state = D_STATE(iface);
@@ -2098,7 +2091,7 @@ dhcp_handle(struct interface *iface, struct dhcp_message **dhcpp,
 		}
 		dhcp_close(iface);
 		/* If we constantly get NAKS then we should slowly back off */
-		eloop_timeout_add_sec(state->nakoff, start_interface, iface);
+		eloop_timeout_add_sec(state->nakoff, dhcp_discover, iface);
 		if (state->nakoff == 0)
 			state->nakoff = 1;
 		else {
@@ -2370,7 +2363,7 @@ dhcp_handlepacket(void *arg)
 			    hwaddr_ntoa(dhcp->chaddr, sizeof(dhcp->chaddr)));
 			continue;
 		}
-		dhcp_handle(iface, &dhcp, &from);
+		dhcp_handledhcp(iface, &dhcp, &from);
 		if (state->raw_fd == -1)
 			break;
 	}
