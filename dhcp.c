@@ -2126,9 +2126,6 @@ dhcp_handledhcp(struct interface *iface, struct dhcp_message **dhcpp,
 		return;
 	}
 
-	/* No NAK, so reset the backoff */
-	state->nakoff = 0;
-
 	if ((type == 0 || type == DHCP_OFFER) &&
 	    state->state == DHS_DISCOVER)
 	{
@@ -2184,6 +2181,12 @@ dhcp_handledhcp(struct interface *iface, struct dhcp_message **dhcpp,
 		else
 		    ifo->options &= ~DHCPCD_STATIC;
 	}
+
+
+	/* No NAK, so reset the backoff
+	 * We don't reset on an OFFER message because the server could
+	 * potentially NAK the REQUEST. */
+	state->nakoff = 0;
 
 	/* BOOTP could have already assigned this above, so check we still
 	 * have a pointer. */
