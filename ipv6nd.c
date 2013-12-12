@@ -152,6 +152,34 @@ struct rahead ipv6_routers = TAILQ_HEAD_INITIALIZER(ipv6_routers);
 
 static void ipv6nd_handledata(void *arg);
 
+/*
+ * Android ships buggy ICMP6 filter headers.
+ * Supply our own until they fix their shit.
+ * References:
+ *     https://android-review.googlesource.com/#/c/58438/
+ *     http://code.google.com/p/android/issues/original?id=32621&seq=24
+ */
+#ifdef __ANDROID__
+#undef ICMP6_FILTER_WILLPASS
+#undef ICMP6_FILTER_WILLBLOCK
+#undef ICMP6_FILTER_SETPASS
+#undef ICMP6_FILTER_SETBLOCK
+#undef ICMP6_FILTER_SETPASSALL
+#undef ICMP6_FILTER_SETBLOCKALL
+#define ICMP6_FILTER_WILLPASS(type, filterp) \
+	((((filterp)->icmp6_filt[(type) >> 5]) & (1 << ((type) & 31))) == 0)
+#define ICMP6_FILTER_WILLBLOCK(type, filterp) \
+	((((filterp)->icmp6_filt[(type) >> 5]) & (1 << ((type) & 31))) != 0)
+#define ICMP6_FILTER_SETPASS(type, filterp) \
+	((((filterp)->icmp6_filt[(type) >> 5]) &= ~(1 << ((type) & 31))))
+#define ICMP6_FILTER_SETBLOCK(type, filterp) \
+	((((filterp)->icmp6_filt[(type) >> 5]) |=  (1 << ((type) & 31))))
+#define ICMP6_FILTER_SETPASSALL(filterp) \
+	memset(filterp, 0, sizeof(struct icmp6_filter));
+#define ICMP6_FILTER_SETBLOCKALL(filterp) \
+	memset(filterp, 0xff, sizeof(struct icmp6_filter));
+#endif
+
 #if DEBUG_MEMORY
 static void
 ipv6nd_cleanup(void)
