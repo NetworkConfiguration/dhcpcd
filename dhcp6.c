@@ -2004,13 +2004,13 @@ dhcp6_handledata(__unused void *arg)
 			break;
 	}
 	if (ifp == NULL) {
-		syslog(LOG_ERR, "DHCPv6 reply for unexpected interface from %s",
-		    sfrom);
+		syslog(LOG_DEBUG,
+		    "DHCPv6 reply for unexpected interface from %s", sfrom);
 		return;
 	}
 	state = D6_STATE(ifp);
 	if (state == NULL || state->send == NULL) {
-		syslog(LOG_ERR, "%s: DHCPv6 reply received but not running",
+		syslog(LOG_DEBUG, "%s: DHCPv6 reply received but not running",
 		    ifp->name);
 		return;
 	}
@@ -2025,7 +2025,7 @@ dhcp6_handledata(__unused void *arg)
 	    r->xid[1] != state->send->xid[1] ||
 	    r->xid[2] != state->send->xid[2])
 	{
-		syslog(LOG_ERR,
+		syslog(LOG_DEBUG,
 		    "%s: wrong xid 0x%02x%02x%02x"
 		    " (expecting 0x%02x%02x%02x) from %s",
 		    ifp->name,
@@ -2037,7 +2037,7 @@ dhcp6_handledata(__unused void *arg)
 	}
 
 	if (dhcp6_getmoption(D6_OPTION_SERVERID, r, len) == NULL) {
-		syslog(LOG_ERR, "%s: no DHCPv6 server ID from %s",
+		syslog(LOG_DEBUG, "%s: no DHCPv6 server ID from %s",
 		    ifp->name, sfrom);
 		return;
 	}
@@ -2046,7 +2046,7 @@ dhcp6_handledata(__unused void *arg)
 	if (o == NULL || ntohs(o->len) != duid_len ||
 	    memcmp(D6_COPTION_DATA(o), duid, duid_len) != 0)
 	{
-		syslog(LOG_ERR, "%s: incorrect client ID from %s",
+		syslog(LOG_DEBUG, "%s: incorrect client ID from %s",
 		    ifp->name, sfrom);
 		return;
 	}
