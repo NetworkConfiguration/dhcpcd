@@ -716,12 +716,10 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 	/* We need to ensure we have sufficient scope to unicast the address */
 	/* XXX FIXME: We should check any added addresses we have like from
 	 * a Router Advertisement */
-	if (!IN6_IS_ADDR_UNSPECIFIED(&state->unicast) &&
-	    state->state == DH6S_REQUEST &&
-	    (!IN6_IS_ADDR_LINKLOCAL(&state->unicast) || !ipv6_linklocal(ifp)))
-		state->unicast = in6addr_any;
-
-	if (IN6_IS_ADDR_UNSPECIFIED(&state->unicast)) {
+	if (IN6_IS_ADDR_UNSPECIFIED(&state->unicast) ||
+	    (state->state == DH6S_REQUEST &&
+	    (!IN6_IS_ADDR_LINKLOCAL(&state->unicast) || !ipv6_linklocal(ifp))))
+	{
 		to.sin6_addr = in6addr_linklocal_alldhcp;
 		broad_uni = "broadcasting";
 	} else {
