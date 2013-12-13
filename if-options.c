@@ -1039,16 +1039,25 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		break;
 #ifdef INET
 	case O_ARPING:
-		if (parse_addr(&addr, NULL, arg) != 0)
-			return -1;
-		naddr = realloc(ifo->arping,
-		    sizeof(in_addr_t) * (ifo->arping_len + 1));
-		if (naddr == NULL) {
-			syslog(LOG_ERR, "%s: %m", __func__);
-			return -1;
+		while (arg && *arg != '\0') {
+			fp = strwhite(arg);
+			if (fp)
+				*fp++ = '\0';
+			if (parse_addr(&addr, NULL, arg) != 0)
+				return -1;
+			naddr = realloc(ifo->arping,
+			    sizeof(in_addr_t) * (ifo->arping_len + 1));
+			if (naddr == NULL) {
+				syslog(LOG_ERR, "%s: %m", __func__);
+				return -1;
+			}
+			ifo->arping = naddr;
+			ifo->arping[ifo->arping_len++] = addr.s_addr;
+			if (fp)
+				arg = strskipwhite(fp);
+			else
+				arg = NULL;
 		}
-		ifo->arping = naddr;
-		ifo->arping[ifo->arping_len++] = addr.s_addr;
 		break;
 	case O_DESTINATION:
 		if (make_option_mask(dhcp_opts, dhcp_opts_len,
