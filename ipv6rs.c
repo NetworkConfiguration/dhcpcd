@@ -684,12 +684,10 @@ ipv6rs_expire(void *arg)
 	struct ra_opt *rao, *raol, *raon;
 	struct timeval now, lt, expire, next;
 	int expired;
-	uint32_t expire_secs;
 
 	ifp = arg;
 	get_monotonic(&now);
 	expired = 0;
-	expire_secs = ~0U;
 	timerclear(&next);
 
 	for (rap = ifp->ras, ral = NULL;
