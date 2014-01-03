@@ -48,8 +48,10 @@ _VERSION_SH=	sed -n 's/\#define VERSION[[:space:]]*"\(.*\)".*/\1/p' defs.h
 _VERSION!=	${_VERSION_SH}
 VERSION=	${_VERSION}$(shell ${_VERSION_SH})
 
-GITREF?=	HEAD
+FOSSILID?=	current
+
 DISTPREFIX?=	${PROG}-${VERSION}
+DISTFILEGZ?=	${DISTPREFIX}.tar.gz
 DISTFILE?=	${DISTPREFIX}.tar.bz2
 
 HOST_SH?=	/bin/sh
@@ -130,7 +132,9 @@ distclean: clean
 	rm -f .depend config.h config.mk
 
 dist:
-	git archive --prefix=${DISTPREFIX}/ ${GITREF} | bzip2 > ${DISTFILE}
+	fossil tarball --name ${DISTPREFIX} ${FOSSILID} ${DISTFILEGZ}
+	gunzip -c ${DISTFILEGZ} | bzip2 >${DISTFILE}
+	rm ${DISTFILEGZ}
 
 import: ${SRCS}
 	rm -rf /tmp/${DISTPREFIX}

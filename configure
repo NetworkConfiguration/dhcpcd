@@ -296,8 +296,8 @@ if [ -n "$DEBUG" -a "$DEBUG" != no -a "$DEBUG" != false ]; then
 	echo "Enabling memory debugging"
 	echo "CPPFLAGS+=	-DDEBUG_MEMORY" >>$CONFIG_MK
 	echo "CFLAGS+=	-g" >>$CONFIG_MK
-elif [ -z "$DEBUG" -a -d .git ]; then
-	printf "Found git ... "
+elif [ -z "$DEBUG" -a -f .fslckout ]; then
+	printf "Found fossil checkout ... "
 	DEBUG=yes
 	echo "CFLAGS+=	-g" >>$CONFIG_MK
 else
