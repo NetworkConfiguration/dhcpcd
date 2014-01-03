@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2014 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * SUCH DAMAGE.
  */
 
-const char copyright[] = "Copyright (c) 2006-2013 Roy Marples";
+const char copyright[] = "Copyright (c) 2006-2014 Roy Marples";
 
 #include <sys/file.h>
 #include <sys/socket.h>
@@ -34,8 +34,6 @@ const char copyright[] = "Copyright (c) 2006-2013 Roy Marples";
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <sys/utsname.h>
-
-#include <net/route.h> /* For RTM_CHGADDR */
 
 #include <ctype.h>
 #include <errno.h>
