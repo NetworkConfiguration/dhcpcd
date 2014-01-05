@@ -352,9 +352,15 @@ dhcp_optlen(const struct dhcp_opt *opt, size_t dl)
 	return (dl < sz ? 0 : sz);
 }
 
+#ifdef INET6
+#define PO_IFNAME
+#else
+#define PO_IFNAME __unused
+#endif
+
 ssize_t
 print_option(char *s, ssize_t len, int type, int dl, const uint8_t *data,
-    const char *ifname)
+    PO_IFNAME const char *ifname)
 {
 	const uint8_t *e, *t;
 	uint16_t u16;

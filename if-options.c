@@ -1552,6 +1552,7 @@ read_config(const char *file,
 	size_t buflen, ol;
 #endif
 #if !defined(INET) || !defined(INET6)
+	size_t i;
 	struct dhcp_opt *opt;
 #endif
 
@@ -1669,7 +1670,7 @@ read_config(const char *file,
 		dhcp6_opts_len = ifo->dhcp6_override_len;
 #else
 		for (i = 0, opt = ifo->dhcp6_override;
-		    i < ifo->dhcp_override6_len;
+		    i < ifo->dhcp6_override_len;
 		    i++, opt++)
 			free_dhcp_opt_embenc(opt);
 		free(ifo->dhcp6_override);
