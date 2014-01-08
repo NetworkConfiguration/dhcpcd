@@ -683,90 +683,23 @@ if [ "$DEV" = yes ]; then
 	echo "MKDIRS+=	dev" >>$CONFIG_MK
 fi
 
-if [ -z "$SERVICECMD" ]; then
-	printf "Checking for OpenRC ... "
-	if [ -x /sbin/rc-service ]; then
-		SERVICEEXISTS="/sbin/rc-service -e \$1"
-		SERVICECMD="/sbin/rc-service \$1 -- -D \$2"
-		echo "yes"
-	else
-		echo "no"
-	fi
-fi
-if [ -z "$SERVICECMD" ]; then
-	printf "Checking for invoke-rc.d ... "
-	if [ -x /usr/sbin/invoke-rc.d ]; then
-		SERVICEEXISTS="/usr/sbin/invoke-rc.d --query --quiet \$1 start >/dev/null 2>&1 || [ \$? = 104 ]"
-		SERVICECMD="/usr/sbin/invoke-rc.d \$1 \$2"
-		echo "yes"
-	else
-		echo "no"
-	fi
-fi
-if [ -z "$SERVICECMD" ]; then
-	printf "Checking for service ... "
-	if [ -x /sbin/service ]; then
-		SERVICEEXISTS="/sbin/service \$1 >/dev/null 2>&1"
-		SERVICECMD="/sbin/service \$1 \$2"
-		echo "yes"
-	else
-		echo "no"
-	fi
-fi
-if [ -z "$SERVICECMD"  ]; then
-	printf "Checking for Slackware ... "
-	if [ -e /etc/slackware-version -a -d /etc/rc.d ]; then
-		SERVICEEXISTS="[ -x /etc/rc.d/rc.\$1 ]"
-		SERVICECMD="/etc/rc.d/rc.\$1 \$2"
-		SERVICESTATUS="/etc/rc.d/rc.\$1 status 1>/dev/null 2>&1"
-		echo "yes"
-	else
-		echo "no"
-	fi
-fi
-if [ -z "$SERVICECMD" ]; then
-	for x in /etc/init.d/rc.d /etc/rc.d /etc/init.d; do
-		printf "Checking for $x ... "
-		if [ -d $x ]; then
-			SERVICEEXISTS="[ -x $x/\$1 ]"
-			SERVICECMD="$x/\$1 \$2"
-			echo "yes"
-			break
-		else
-			echo "no"
-		fi
-	done
-fi
-if [ -e /etc/arch-release ]; then
-	echo "Overriding service status check for Arch Linux"
-	SERVICESTATUS="[ -e /var/run/daemons/\$1 ]"
-fi
-
-if [ -z "$SERVICEEXISTS" -o -z "$SERVICECMD" ]; then
-	echo "$0: WARNING: No means of interacting with system services detected!"
-	SERVICEEXISTS="return 1"
-	SERVICECMD="return 1"
-fi
-if [ -z "$SERVICESTATUS" ]; then
-	SERVICESTATUS="service_command \$1 status >/dev/null 2>&1"
-fi
 # Transform for a make file
 SERVICEEXISTS=$(echo "$SERVICEEXISTS" | $SED \
 	-e 's:\\:\\\\:g' \
 	-e 's:\&:\\\&:g' \
-	-e 's:\$:\$\$:g' \
+	-e 's:\$:\\\\\$\$:g' \
 )
 echo "SERVICEEXISTS=	$SERVICEEXISTS" >>config.mk
 SERVICECMD=$(echo "$SERVICECMD" | $SED \
 	-e 's:\\:\\\\:g' \
 	-e 's:\&:\\\&:g' \
-	-e 's:\$:\$\$:g' \
+	-e 's:\$:\\\\\$\$:g' \
 )
 echo "SERVICECMD=	$SERVICECMD" >>config.mk
 SERVICESTATUS=$(echo "$SERVICESTATUS" | $SED \
 	-e 's:\\:\\\\:g' \
 	-e 's:\&:\\\&:g' \
-	-e 's:\$:\$\$:g' \
+	-e 's:\$:\\\\\$\$:g' \
 )
 echo "SERVICESTATUS=	$SERVICESTATUS" >>config.mk
 
