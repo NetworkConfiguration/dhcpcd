@@ -38,10 +38,20 @@ routes. You can find discussion here:
 BSD systems where this has been fixed are:
     NetBSD-5.0
 
-We try and detect how dhcpcd should interact with system services during the
-configure stage. If we cannot auto-detect how do to this, or it is wrong then
-you can change this by passing shell commands to --service-exists,
---servicecmd and optionally --servicestatus.
+Some BSD systems protect against IPv6 NS/NA messages by ensuring that the
+source address matches an address/prefix on the interface.
+This is an error as the correct check is for on-link prefixes.
+As such, on these systems stateful addressing via DHCPv6 may cause issues
+trying to reach other neighbours.
+BSD systems where this is known to be a problem
+    Occured in NetBSD-5.0, fixed in NetBSD-6.99.29
+    Occured in OpenBSD-4.2, fixed in OpenBSD-5.0
+
+We try and detect how dhcpcd should interact with system services at runtime.
+If we cannot auto-detect how do to this, or it is wrong then
+you can change this by passing shell commands to --serviceexists,
+--servicecmd and optionally --servicestatus to ./configure or overriding
+the service variables in a hook.
 
 Some systems have /dev management systems and some of these like to rename
 interfaces. As this system would listen in the same way as dhcpcd to new
@@ -92,4 +102,4 @@ ChangeLog
 ---------
 We no longer supply a ChangeLog.
 However, you're more than welcome to read the commit log at
-http://roy.marples.name/projects/dhcpcd/log/
+http://roy.marples.name/projects/dhcpcd/timeline/
