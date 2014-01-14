@@ -1554,7 +1554,7 @@ read_config(const char *file,
 	int skip = 0, have_profile = 0;
 #ifndef EMBEDDED_CONFIG
 	char *buf;
-	const char **e;
+	const char * const *e;
 	size_t buflen, ol;
 #endif
 #if !defined(INET) || !defined(INET6)

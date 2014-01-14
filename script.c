@@ -54,7 +54,7 @@
 
 #define DEFAULT_PATH	"PATH=/usr/bin:/usr/sbin:/bin:/sbin"
 
-static const char *if_params[] = {
+static const char * const if_params[] = {
 	"interface",
 	"reason",
 	"pid",
@@ -70,7 +70,7 @@ static const char *if_params[] = {
 void
 if_printoptions(void)
 {
-	const char **p;
+	const char * const *p;
 
 	for (p = if_params; *p; p++)
 		printf(" -  %s\n", *p);

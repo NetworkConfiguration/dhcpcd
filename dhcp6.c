@@ -68,7 +68,7 @@
 //#define VENDOR_SPLIT
 
 static int sock = -1;
-static struct in6_addr in6addr_linklocal_alldhcp =
+static const struct in6_addr in6addr_linklocal_alldhcp =
     IN6ADDR_LINKLOCAL_ALLDHCP_INIT;
 static struct sockaddr_in6 from;
 static struct msghdr sndhdr;
