@@ -1083,6 +1083,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		if (parse_iaid(ifo->iaid, arg, sizeof(ifo->iaid)) == -1)
 			return -1;
 		ifo->options |= DHCPCD_IAID;
+		break;
 	case O_IPV6RS:
 		ifo->options |= DHCPCD_IPV6RS;
 		break;

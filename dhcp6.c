@@ -431,6 +431,10 @@ dhcp6_makemessage(struct interface *ifp)
 			ml = state->new_len;
 		}
 		si = dhcp6_getmoption(D6_OPTION_SERVERID, m, ml);
+		if (si == NULL) {
+			errno = ESRCH;
+			return -1;
+		}
 		len += sizeof(*si) + ntohs(si->len);
 		/* FALLTHROUGH */
 	case DH6S_REBIND:
