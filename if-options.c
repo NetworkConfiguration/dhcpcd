@@ -509,13 +509,13 @@ free_dhcp_opt_embenc(struct dhcp_opt *opt)
 	free(opt->var);
 
 	for (i = 0, o = opt->embopts; i < opt->embopts_len; i++, o++)
-		free(o->var);
+		free_dhcp_opt_embenc(o);
 	free(opt->embopts);
 	opt->embopts_len = 0;
 	opt->embopts = NULL;
 
 	for (i = 0, o = opt->encopts; i < opt->encopts_len; i++, o++)
-		free(o->var);
+		free_dhcp_opt_embenc(o);
 	free(opt->encopts);
 	opt->encopts_len = 0;
 	opt->encopts = NULL;
