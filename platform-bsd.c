@@ -112,8 +112,8 @@ ipv6_ra_flush(void)
 	strcpy(dummy, "lo0");
 	if (ioctl(s, SIOCSRTRFLUSH_IN6, (caddr_t)&dummy) == -1)
 		syslog(LOG_ERR, "SIOSRTRFLUSH_IN6: %m");
-//	if (ioctl(s, SIOCSPFXFLUSH_IN6, (caddr_t)&dummy) == -1)
-//		syslog(LOG_ERR, "SIOSPFXFLUSH_IN6: %m");
+	if (ioctl(s, SIOCSPFXFLUSH_IN6, (caddr_t)&dummy) == -1)
+		syslog(LOG_ERR, "SIOSPFXFLUSH_IN6: %m");
 	close(s);
 	return 0;
 }
@@ -146,12 +146,14 @@ check_ipv6(const char *ifname, int own)
 			atexit(restore_kernel_ra);
 		}
 		ra = 0;
+
+		/* Flush the kernel knowledge of advertised routers
+		 * and prefixes so the kernel does not expire prefixes
+		 * and default routes we are trying to own. */
+		ipv6_ra_flush();
 	}
 	if (ifname == NULL)
 		global_ra = ra;
-
-	/* Flush the kernel knowledge of advertised routers */
-	ipv6_ra_flush();
 
 	return ra;
 }
