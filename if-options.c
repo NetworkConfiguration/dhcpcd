@@ -525,6 +525,8 @@ static char *
 strwhite(const char *s)
 {
 
+	if (s == NULL)
+		return NULL;
 	while (*s != ' ' && *s != '\t') {
 		if (*s == '\0')
 			return NULL;
@@ -537,6 +539,8 @@ static char *
 strskipwhite(const char *s)
 {
 
+	if (s == NULL)
+		return NULL;
 	while (*s == ' ' || *s == '\t') {
 		if (*s == '\0')
 			return NULL;
@@ -1053,10 +1057,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			}
 			ifo->arping = naddr;
 			ifo->arping[ifo->arping_len++] = addr.s_addr;
-			if (fp)
-				arg = strskipwhite(fp);
-			else
-				arg = NULL;
+			arg = strskipwhite(fp);
 		}
 		break;
 	case O_DESTINATION:
@@ -1283,7 +1284,7 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			u = 0;
 		else {
 			fp = strwhite(arg);
-			if (!fp) {
+			if (fp == NULL) {
 				syslog(LOG_ERR, "invalid syntax: %s", arg);
 				return -1;
 			}
@@ -1295,6 +1296,10 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 				return -1;
 			}
 			arg = strskipwhite(fp);
+			if (arg == NULL) {
+				syslog(LOG_ERR, "invalid syntax");
+				return -1;
+			}
 		}
 		/* type */
 		fp = strwhite(arg);
