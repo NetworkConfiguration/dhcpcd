@@ -366,7 +366,7 @@ ipv6nd_sendrsprobe(void *arg)
 
 	if (ipv6_linklocal(ifp) == NULL) {
 		syslog(LOG_DEBUG,
-		    "%s: delaying Router Soliciation for LL address",
+		    "%s: delaying Router Solicitation for LL address",
 		    ifp->name);
 		ipv6_addlinklocalcallback(ifp, ipv6nd_sendrsprobe, ifp);
 		return;
