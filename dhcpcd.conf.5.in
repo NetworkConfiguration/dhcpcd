@@ -434,7 +434,7 @@ If using IPv4LL then
 start the IPv4LL process after the timeout and then wait a little longer
 before really timing out.
 .It Ic userclass Ar string
-Tag the DHCP messages with the userclass.
+Tag the DHCPv4 messages with the userclass.
 You can specify more than one.
 .It Ic vendor Ar code , Ns Ar value
 Add an encapsulated vendor option.
@@ -454,6 +454,8 @@ Set the vendor option 03 with an IP address as a string.
 Set un-encapsulated vendor option to hello world.
 .D1 vendor ,"hello world"
 .It Ic vendorclassid Ar string
+Set the DHCP Vendor Class.
+DHCPv6 has it's own option as shown below.
 The default is
 dhcpcd-<version>:<os>:<machine>:<platform>.
 For example
@@ -462,7 +464,7 @@ If not set then none is sent.
 Some badly configured DHCP servers reject unknown vendorclassids.
 To work around it, try and impersonate Windows by using the MSFT vendorclassid.
 .It Ic vendclass Ar en Ar data
-Add the Vendor Indetifying Vendor Class with the IANA assigned Enterprise
+Add the DHCPv6 Vendor Indetifying Vendor Class with the IANA assigned Enterprise
 Number
 .Ar en
 with the

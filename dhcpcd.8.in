@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd January 8, 2014
+.Dd January 18, 2014
 .Dt DHCPCD 8
 .Os
 .Sh NAME
@@ -295,7 +295,7 @@ sends a default
 .Ar clientid
 of the hardware family and the hardware address.
 .It Fl i , Fl Fl vendorclassid Ar vendorclassid
-Override the
+Override the DHCPv4
 .Ar vendorclassid
 field sent.
 The default is
@@ -421,7 +421,7 @@ If using IPv4LL then
 start the IPv4LL process after the timeout and then wait a little longer
 before really timing out.
 .It Fl u , Fl Fl userclass Ar class
-Tags the DHCP message with the userclass
+Tags the DHCPv4 message with the userclass
 .Ar class .
 DHCP servers use this to give members of the class DHCP options other than the
 default, without having to know things like hardware address or hostname.
