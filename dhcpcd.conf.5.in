@@ -216,6 +216,8 @@ Otherwise addresses are only assigned for each
 and
 .Ar sla_id .
 You cannot assign a prefix to the requesting interface.
+.Nm dhcpcd
+has to be running for all the interfaces it is delegating to.
 A default
 .Ar prefix_len
 of 64 is assumed.
@@ -233,9 +235,17 @@ space separated.
 IPv6RS should be disabled globally when requesting a Prefix Delegation like so:
 .Pp
 .D1 noipv6rs
+.D1 # Don't touch eth3 at all
+.D1 denyinterfaces eth3 
 .Pp
 .D1 interface eth0
 .D1 ia_pd 1 eth1/0 eth2/1
+.Pp
+.D1 # Disable automatic address configuration for eth1
+.D1 # eth1 still gets a delegated prefix
+.D1 interface eth1
+.D1 noipv4
+.D1 noipv6
 .It Ic ipv4only
 Only configure IPv4.
 .It Ic ipv6only
