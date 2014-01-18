@@ -495,7 +495,7 @@ configure_interface(struct interface *ifp, int argc, char **argv)
 {
 
 	select_profile(ifp, NULL);
-	add_options(ifp->options, argc, argv);
+	add_options(ifp->name, ifp->options, argc, argv);
 	configure_interface1(ifp);
 }
 
@@ -839,7 +839,7 @@ sig_reboot(void *arg)
 	ifdv = NULL;
 
 	ifo = read_config(cffile, NULL, NULL, NULL);
-	add_options(ifo, margc, margv);
+	add_options(NULL, ifo, margc, margv);
 	/* We need to preserve these two options. */
 	if (options & DHCPCD_MASTER)
 		ifo->options |= DHCPCD_MASTER;
@@ -1167,7 +1167,7 @@ main(int argc, char **argv)
 	margv = argv;
 	margc = argc;
 	if_options = read_config(cffile, NULL, NULL, NULL);
-	opt = add_options(if_options, argc, argv);
+	opt = add_options(NULL, if_options, argc, argv);
 	if (opt != 1) {
 		if (opt == 0)
 			usage();

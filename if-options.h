@@ -182,7 +182,7 @@ extern char *dev_load;
 
 struct if_options *read_config(const char *,
     const char *, const char *, const char *);
-int add_options(struct if_options *, int, char **);
+int add_options(const char *, struct if_options *, int, char **);
 void free_dhcp_opt_embenc(struct dhcp_opt *);
 void free_options(struct if_options *);
 

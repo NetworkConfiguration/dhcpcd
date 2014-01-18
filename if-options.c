@@ -550,7 +550,8 @@ strskipwhite(const char *s)
 }
 
 static int
-parse_option(struct if_options *ifo, int opt, const char *arg)
+parse_option(const char *ifname, struct if_options *ifo,
+    int opt, const char *arg)
 {
 	int i, l, t;
 	unsigned int u;
@@ -1081,6 +1082,11 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 		break;
 #endif
 	case O_IAID:
+		if (ifname == NULL) {
+			syslog(LOG_ERR,
+			    "IAID must belong in an interface block");
+			return -1;
+		}
 		if (parse_iaid(ifo->iaid, arg, sizeof(ifo->iaid)) == -1)
 			return -1;
 		ifo->options |= DHCPCD_IAID;
@@ -1112,8 +1118,19 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			i = D6_OPTION_IA_TA;
 		/* FALLTHROUGH */
 	case O_IA_PD:
-		if (i == 0)
+		if (i == 0) {
+			if (ifname == NULL) {
+				syslog(LOG_ERR,
+				    "IA PD must belong in an interface block");
+				return -1;
+			}
 			i = D6_OPTION_IA_PD;
+		}
+		if (arg != NULL && ifname == NULL) {
+			syslog(LOG_ERR,
+			    "IA with IAID must belong in an interface block");
+			return -1;
+		}
 		ifo->options |= DHCPCD_IA_FORCED;
 		if (ifo->ia_type != 0 && ifo->ia_type != i) {
 			syslog(LOG_ERR, "cannot specify a different IA type");
@@ -1173,6 +1190,12 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 			np = strchr(p, '/');
 			if (np)
 				*np++ = '\0';
+			if (strcmp(ifname, p) == 0) {
+				syslog(LOG_ERR,
+				    "%s: cannot assign IA_PD to itself",
+				    ifname);
+				return -1;
+			}
 			if (strlcpy(sla->ifname, p,
 			    sizeof(sla->ifname)) >= sizeof(sla->ifname))
 			{
@@ -1506,7 +1529,8 @@ parse_option(struct if_options *ifo, int opt, const char *arg)
 }
 
 static int
-parse_config_line(struct if_options *ifo, const char *opt, char *line)
+parse_config_line(const char *ifname, struct if_options *ifo,
+    const char *opt, char *line)
 {
 	unsigned int i;
 
@@ -1522,7 +1546,7 @@ parse_config_line(struct if_options *ifo, const char *opt, char *line)
 			return -1;
 		}
 
-		return parse_option(ifo, cf_options[i].val, line);
+		return parse_option(ifname, ifo, cf_options[i].val, line);
 	}
 
 	fprintf(stderr, PACKAGE ": unknown option -- %s\n", opt);
@@ -1648,7 +1672,7 @@ read_config(const char *file,
 				    *(p - 1) != '\\')
 					*p-- = '\0';
 			}
-			parse_config_line(ifo, option, line);
+			parse_config_line(NULL, ifo, option, line);
 
 		}
 
@@ -1737,7 +1761,7 @@ read_config(const char *file,
 		}
 		if (skip)
 			continue;
-		parse_config_line(ifo, option, line);
+		parse_config_line(ifname, ifo, option, line);
 	}
 	fclose(f);
 
@@ -1752,7 +1776,7 @@ read_config(const char *file,
 }
 
 int
-add_options(struct if_options *ifo, int argc, char **argv)
+add_options(const char *ifname, struct if_options *ifo, int argc, char **argv)
 {
 	int oi, opt, r;
 
@@ -1763,7 +1787,7 @@ add_options(struct if_options *ifo, int argc, char **argv)
 	r = 1;
 	while ((opt = getopt_long(argc, argv, IF_OPTS, cf_options, &oi)) != -1)
 	{
-		r = parse_option(ifo, opt, optarg);
+		r = parse_option(ifname, ifo, opt, optarg);
 		if (r != 1)
 			break;
 	}
