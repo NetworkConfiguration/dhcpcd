@@ -510,7 +510,7 @@ ipv6_handleifa(int cmd, struct if_head *ifs, const char *ifname,
 
 	/* Safety, remove tentative addresses */
 	if (cmd == RTM_NEWADDR) {
-		if (flags & IN6_IFF_TENTATIVE)
+		if (flags & (IN6_IFF_TENTATIVE | IN6_IFF_DUPLICATED))
 			cmd = RTM_DELADDR;
 #ifdef IN6_IFF_DETACHED
 		if (flags & IN6_IFF_DETACHED)

@@ -833,11 +833,40 @@ if_route6(const struct rt6 *rt, int action)
 }
 
 int
-in6_addr_flags(__unused const char *ifname,
-    __unused const struct in6_addr *addr)
+in6_addr_flags(const char *ifname, const struct in6_addr *addr)
 {
+	FILE *fp;
+	char *ent, address[33], name[IF_NAMESIZE + 1];
+	unsigned int ifindex;
+	int prefix, scope, flags, i, ret;
+	struct in6_addr addr6;
+	static const char *hex = "0123456789abcdef";
 
-	/* How do I get IPv6 address flags on Linux? */
-	return 0;
+	fp = fopen("/proc/net/if_inet6", "r");
+	if (fp == NULL)
+		return -1;
+	while ((ent = get_line(fp))) {
+		i = sscanf(ent, "%32[a-f0-9] %x %x %x %x %16s\n",
+		    address, &ifindex, &prefix, &scope, &flags, name);
+		if (i != 6 || strlen(address) != 32) {
+			fclose(fp);
+			errno = ENOTSUP;
+			return -1;
+		}
+		if (strcmp(ifname, name))
+			continue;
+		for (i = 0; i < 16; i++) {
+			addr6.s6_addr[i] =
+			    ((strchr(hex, address[i * 2]) - hex) << 4) |
+			    (strchr(hex, address[i * 2 + 1]) - hex);
+		}
+		if (IN6_ARE_ADDR_EQUAL(addr, &addr6)) {
+			fclose(fp);
+			return flags;
+		}
+	}
+	fclose(fp);
+	errno = ESRCH;
+	return -1;
 }
 #endif
