@@ -69,7 +69,7 @@ trim()
 	if [ -z "$var" ]; then
 		# So it seems our shell doesn't support wctype(3) patterns
 		# Fall back to sed
-		var=$(echo "$var" | sed -e 's/^[ \t]*//;s/[ \t]*$//')
+		var=$(echo "$*" | sed -e 's/^[[:space:]]*//;s/[[:space:]]*$//')
 	fi
 	printf %s "$var"
 }
