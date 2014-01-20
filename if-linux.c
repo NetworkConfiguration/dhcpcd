@@ -838,7 +838,7 @@ in6_addr_flags(const char *ifname, const struct in6_addr *addr)
 	FILE *fp;
 	char *ent, address[33], name[IF_NAMESIZE + 1];
 	unsigned int ifindex;
-	int prefix, scope, flags, i, ret;
+	int prefix, scope, flags, i;
 	struct in6_addr addr6;
 	static const char *hex = "0123456789abcdef";
 
