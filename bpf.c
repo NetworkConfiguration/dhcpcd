@@ -197,7 +197,8 @@ ipv4_getrawpacket(struct interface *ifp, int protocol,
 		if (state->buffer_pos + packet.bh_caplen + packet.bh_hdrlen >
 		    state->buffer_len)
 			goto next; /* Packet beyond buffer, drop. */
-		payload = state->buffer + packet.bh_hdrlen + ETHER_HDR_LEN;
+		payload = state->buffer + state->buffer_pos +
+		    packet.bh_hdrlen + ETHER_HDR_LEN;
 		bytes = packet.bh_caplen - ETHER_HDR_LEN;
 		if (bytes > len)
 			bytes = len;
