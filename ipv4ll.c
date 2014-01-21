@@ -134,9 +134,10 @@ ipv4ll_handle_failure(void *arg)
 	time_t up;
 
 	if (state->fail.s_addr == state->addr.s_addr) {
+		/* RFC 3927 Section 2.5 */
 		up = uptime();
 		if (state->defend + DEFEND_INTERVAL > up) {
-			syslog(LOG_DEBUG,
+			syslog(LOG_WARNING,
 			    "%s: IPv4LL %d second defence failed",
 			    ifp->name, DEFEND_INTERVAL);
 			dhcp_drop(ifp, "EXPIRE");
