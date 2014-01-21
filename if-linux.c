@@ -114,7 +114,7 @@ if_conf(struct interface *iface)
 
 /* XXX work out Virtal Interface Masters */
 int
-if_vimaster(_unused const char *ifname)
+if_vimaster(__unused const char *ifname)
 {
 
 	return 0;
