@@ -1501,7 +1501,8 @@ send_message(struct interface *iface, int type,
 		 * As such we remove it from consideration without actually
 		 * stopping the interface. */
 		if (r == -1) {
-			syslog(LOG_ERR, "%s: send_raw_packet: %m", iface->name);
+			syslog(LOG_ERR, "%s: ipv4_sendrawpacket: %m",
+			    iface->name);
 			if (!(options & DHCPCD_TEST))
 				dhcp_drop(iface, "FAIL");
 			dhcp_close(iface);
