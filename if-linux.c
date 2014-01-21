@@ -112,6 +112,14 @@ if_conf(struct interface *iface)
 	return 0;
 }
 
+/* XXX work out Virtal Interface Masters */
+int
+if_vimaster(_unused const char *ifname)
+{
+
+	return 0;
+}
+
 static int
 _open_link_socket(struct sockaddr_nl *nl)
 {

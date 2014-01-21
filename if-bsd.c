@@ -38,6 +38,7 @@
 #ifdef __FreeBSD__ /* Needed so that including netinet6/in6_var.h works */
 #  include <net/if_var.h>
 #endif
+#include <net/if_media.h>
 #include <net/route.h>
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
@@ -159,8 +160,10 @@ getifssid(const char *ifname, char *ssid)
 	ifr.ifr_data = (void *)&nwid;
 	if (ioctl(socket_afnet, SIOCG80211NWID, &ifr) == 0) {
 		retval = nwid.i_len;
-		memcpy(ssid, nwid.i_nwid, nwid.i_len);
-		ssid[nwid.i_len] = '\0';
+		if (ssid) {
+			memcpy(ssid, nwid.i_nwid, nwid.i_len);
+			ssid[nwid.i_len] = '\0';
+		}
 	}
 #elif defined(IEEE80211_IOC_SSID) /* FreeBSD */
 	memset(&ireq, 0, sizeof(ireq));
@@ -171,11 +174,38 @@ getifssid(const char *ifname, char *ssid)
 	ireq.i_data = &nwid;
 	if (ioctl(socket_afnet, SIOCG80211, &ireq) == 0) {
 		retval = ireq.i_len;
-		memcpy(ssid, nwid, ireq.i_len);
-		ssid[ireq.i_len] = '\0';
+		if (ssid) {
+			memcpy(ssid, nwid, ireq.i_len);
+			ssid[ireq.i_len] = '\0';
+		}
 	}
 #endif
 	return retval;
+}
+
+/*
+ * FreeBSD allows for Virtual Access Points
+ * We need to check if the interface is a Virtual Interface Master
+ * and if so, don't use it.
+ * This check is made by virtue of being a IEEE80211 device but
+ * returning the SSID gives an error.
+ */
+int
+if_vimaster(const char *ifname)
+{
+	struct ifmediareq ifmr;
+
+	memset(&ifmr, 0, sizeof(ifmr));
+	strlcpy(ifmr.ifm_name, ifname, sizeof(ifmr.ifm_name));
+	if (ioctl(socket_afnet, SIOCGIFMEDIA, &ifmr) == -1)
+		return -1;
+	if (ifmr.ifm_status & IFM_AVALID &&
+	    IFM_TYPE(ifmr.ifm_active) == IFM_IEEE80211)
+	{
+		if (getifssid(ifname, NULL) == -1)
+			return 1;
+	}
+	return 0;
 }
 
 #ifdef INET
