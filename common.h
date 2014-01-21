@@ -39,6 +39,8 @@
 #endif
 
 #define UNCONST(a)		((void *)(unsigned long)(const void *)(a))
+#define STRINGIFY(a)		#a
+#define TOSTRING(a)		STRINGIFY(a)
 
 #define timeval_to_double(tv) ((tv)->tv_sec * 1.0 + (tv)->tv_usec * 1.0e-6)
 #define timernorm(tv) do {						\
