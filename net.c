@@ -186,6 +186,33 @@ carrier_status(struct interface *iface)
 	return ret;
 }
 
+/*
+ * FreeBSD allows for Virtual Access Points
+ * We need to check if the interface is a Virtual Interface Master
+ * and if so, don't use it.
+ */
+static int
+vi_master(const char *ifname)
+{
+#ifdef SIOCGIFMEDIA
+	struct ifmediareq ifmr;
+	char ssid[IF_SSIDSIZE];
+
+	memset(&ifmr, 0, sizeof(ifmr));
+	strlcpy(ifmr.ifm_name, ifname, sizeof(ifmr.ifm_name));
+	if (ioctl(socket_afnet, SIOCGIFMEDIA, &ifmr) == -1)
+		return -1;
+	if (ifmr.ifm_status & IFM_AVALID &&
+	    IFM_TYPE(ifmr.ifm_active) == IFM_IEEE80211)
+	{
+		if (getifssid(ifname, ssid) == -1)
+			return 1;
+	}
+#endif
+
+	return 0;
+}
+
 int
 up_interface(struct interface *iface)
 {
@@ -317,6 +344,13 @@ discover_interfaces(int argc, char * const *argv)
 				break;
 		if (ifac && i == ifac)
 			continue;
+
+		if (vi_master(ifa->ifa_name) == 1) {
+			syslog(LOG_DEBUG,
+				"%s: is a Virtual Interface Master, skipping",
+				ifa->ifa_name);
+			continue;
+		}
 
 		ifp = calloc(1, sizeof(*ifp));
 		if (ifp == NULL)
