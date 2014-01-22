@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2014 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -94,9 +94,9 @@ arp_failure(struct interface *ifp)
 	/* If we failed without a magic cookie then we need to try
 	 * and defend our IPv4LL address. */
 	if ((state->offer != NULL &&
-		state->offer->cookie != htonl(MAGIC_COOKIE)) ||
+	    state->offer->cookie != htonl(MAGIC_COOKIE)) ||
 	    (state->new != NULL &&
-		state->new->cookie != htonl(MAGIC_COOKIE)))
+	    state->new->cookie != htonl(MAGIC_COOKIE)))
 	{
 		ipv4ll_handle_failure(ifp);
 		return;
@@ -167,8 +167,8 @@ arp_packet(void *arg)
 		if (state->arping_index &&
 		    state->arping_index <= opts->arping_len &&
 		    (reply_s == opts->arping[state->arping_index - 1] ||
-			(reply_s == 0 &&
-			    reply_t == opts->arping[state->arping_index - 1])))
+		    (reply_s == 0 &&
+		    reply_t == opts->arping[state->arping_index - 1])))
 		{
 			ina.s_addr = reply_s;
 			hwaddr = hwaddr_ntoa((unsigned char *)hw_s,
@@ -185,16 +185,16 @@ arp_packet(void *arg)
 			return;
 		}
 
-		/* Check for conflict */
+		/* RFC 2131 3.1.5, Client-server interaction
+		 * RFC 3927 2.2.1, Probe Conflict Detection */
 		if (state->offer &&
 		    (reply_s == state->offer->yiaddr ||
-			(reply_s == 0 && reply_t == state->offer->yiaddr)))
+		    (reply_s == 0 && reply_t == state->offer->yiaddr)))
 			state->fail.s_addr = state->offer->yiaddr;
 
-		/* Handle IPv4LL conflicts */
+		/* RFC 3927 2.5, Conflict Defense */
 		if (IN_LINKLOCAL(htonl(state->addr.s_addr)) &&
-		    (reply_s == state->addr.s_addr ||
-			(reply_s == 0 && reply_t == state->addr.s_addr)))
+		    reply_s == state->addr.s_addr)
 			state->fail.s_addr = state->addr.s_addr;
 
 		if (state->fail.s_addr) {
