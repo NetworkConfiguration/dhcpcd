@@ -48,8 +48,8 @@ const char dhcpcd_copyright[] = "Copyright (c) 2006-2014 Roy Marples";
 #include <unistd.h>
 #include <time.h>
 
-#include "arp.h"
 #include "config.h"
+#include "arp.h"
 #include "common.h"
 #include "control.h"
 #include "dev.h"

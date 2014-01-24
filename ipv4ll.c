@@ -32,6 +32,7 @@
 #include <syslog.h>
 #include <unistd.h>
 
+#include "config.h"
 #include "arp.h"
 #include "common.h"
 #include "dhcp.h"

@@ -54,8 +54,8 @@
 #include <syslog.h>
 #include <unistd.h>
 
-#include "arp.h"
 #include "config.h"
+#include "arp.h"
 #include "common.h"
 #include "dhcp.h"
 #include "dhcpcd.h"
