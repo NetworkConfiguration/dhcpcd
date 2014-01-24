@@ -25,7 +25,7 @@
  * SUCH DAMAGE.
  */
 
-const char copyright[] = "Copyright (c) 2006-2014 Roy Marples";
+const char dhcpcd_copyright[] = "Copyright (c) 2006-2014 Roy Marples";
 
 #include <sys/file.h>
 #include <sys/socket.h>
@@ -1109,7 +1109,7 @@ main(int argc, char **argv)
 			usage();
 			exit(EXIT_SUCCESS);
 		} else if (strcmp(argv[1], "--version") == 0) {
-			printf(""PACKAGE" "VERSION"\n%s\n", copyright);
+			printf(""PACKAGE" "VERSION"\n%s\n", dhcpcd_copyright);
 			exit(EXIT_SUCCESS);
 		}
 	}
