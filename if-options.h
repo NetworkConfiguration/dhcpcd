@@ -36,6 +36,8 @@
 #include <limits.h>
 #include <stdint.h>
 
+#include "auth.h"
+
 /* Don't set any optional arguments here so we retain POSIX
  * compatibility with getopt */
 #define IF_OPTS "46bc:de:f:gh:i:kl:m:no:pqr:s:t:u:v:wxy:z:ABC:DEF:GHI:JKLO:Q:S:TUVW:X:Z:"
@@ -175,6 +177,8 @@ struct if_options {
 	size_t vivco_len;
 	struct dhcp_opt *vivso_override;
 	size_t vivso_override_len;
+
+	struct auth auth;
 };
 
 extern unsigned long long options;

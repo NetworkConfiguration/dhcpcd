@@ -356,8 +356,9 @@ dhcp6_makemessage(struct interface *ifp)
 	const struct dhcp6_option *si, *unicast;
 	ssize_t len, ml;
 	size_t l;
+	int auth_len;
 	uint8_t u8;
-	uint16_t *u16, n_options;
+	uint16_t *u16, n_options, type;
 	const struct if_options *ifo;
 	const struct dhcp_opt *opt;
 	uint8_t IA, *p;
@@ -474,47 +475,54 @@ dhcp6_makemessage(struct interface *ifp)
 		m = state->new;
 		ml = state->new_len;
 	}
-
-	state->send = malloc(len);
-	if (state->send == NULL)
-		return -1;
-
-	state->send_len = len;
 	unicast = NULL;
 	/* Depending on state, get the unicast address */
 	switch(state->state) {
 		break;
 	case DH6S_INIT: /* FALLTHROUGH */
 	case DH6S_DISCOVER:
-		state->send->type = DHCP6_SOLICIT;
+		type = DHCP6_SOLICIT;
 		break;
 	case DH6S_REQUEST:
-		state->send->type = DHCP6_REQUEST;
+		type = DHCP6_REQUEST;
 		unicast = dhcp6_getmoption(D6_OPTION_UNICAST, m, ml);
 		break;
 	case DH6S_CONFIRM:
-		state->send->type = DHCP6_CONFIRM;
+		type = DHCP6_CONFIRM;
 		break;
 	case DH6S_REBIND:
-		state->send->type = DHCP6_REBIND;
+		type = DHCP6_REBIND;
 		break;
 	case DH6S_RENEW:
-		state->send->type = DHCP6_RENEW;
+		type = DHCP6_RENEW;
 		unicast = dhcp6_getmoption(D6_OPTION_UNICAST, m, ml);
 		break;
 	case DH6S_INFORM:
-		state->send->type = DHCP6_INFORMATION_REQ;
+		type = DHCP6_INFORMATION_REQ;
 		break;
 	case DH6S_RELEASE:
-		state->send->type = DHCP6_RELEASE;
+		type = DHCP6_RELEASE;
 		unicast = dhcp6_getmoption(D6_OPTION_UNICAST, m, ml);
 		break;
 	default:
 		errno = EINVAL;
-		free(state->send);
-		state->send = NULL;
 		return -1;
 	}
+
+	if (ifo->auth.options & DHCPCD_AUTH_SEND) {
+		auth_len = dhcp_auth_encode(&ifo->auth, state->auth.token,
+		    NULL, 0, 6, type, NULL, 0);
+		if (auth_len > 0)
+			len += sizeof(*o) + auth_len;
+	} else
+		auth_len = 0; /* appease GCC */
+
+	state->send = malloc(len);
+	if (state->send == NULL)
+		return -1;
+
+	state->send_len = len;
+	state->send->type = type;
 
 	/* If we found a unicast option, copy it to our state for sending */
 	if (unicast && ntohs(unicast->len) == sizeof(state->unicast.s6_addr))
@@ -653,6 +661,23 @@ dhcp6_makemessage(struct interface *ifp)
 				}
 			}
 			o->len = htons(o->len);
+		}
+	}
+
+	/* This has to be the last option */
+	if (ifo->auth.options & DHCPCD_AUTH_SEND && auth_len > 0) {
+		o = D6_NEXT_OPTION(o);
+		o->code = htons(D6_OPTION_AUTH);
+		o->len = htons(auth_len);
+		if (dhcp_auth_encode(&ifo->auth, state->auth.token,
+		    (uint8_t *)state->send, state->send_len,
+		    6, state->send->type,
+		    D6_OPTION_DATA(o), auth_len) == -1) 
+		{
+			printf ("oh dear\n");
+			free(state->send);
+			state->send = NULL;
+			return -1;
 		}
 	}
 
@@ -796,7 +821,7 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 logsend:
 		syslog(LOG_DEBUG,
 		    "%s: %s %s (xid 0x%02x%02x%02x),"
-		    " next in %0.2f seconds",
+		    " next in %0.1f seconds",
 		    ifp->name,
 		    broad_uni,
 		    dhcp6_get_op(state->send->type),
@@ -1052,6 +1077,7 @@ dhcp6_startrequest(struct interface *ifp)
 		syslog(LOG_ERR, "%s: dhcp6_makemessage: %m", ifp->name);
 		return;
 	}
+
 	dhcp6_sendrequest(ifp);
 }
 
@@ -1069,6 +1095,7 @@ dhcp6_startconfirm(struct interface *ifp)
 	state->MRT = CNF_MAX_RT;
 	state->MRC = 0;
 
+	syslog(LOG_INFO, "%s: confirming prior DHCPv6 lease", ifp->name);
 	if (dhcp6_makemessage(ifp) == -1) {
 		syslog(LOG_ERR, "%s: dhcp6_makemessage: %m", ifp->name);
 		return;
@@ -1592,6 +1619,7 @@ dhcp6_readlease(struct interface *ifp)
 	int fd;
 	ssize_t bytes;
 	struct timeval now;
+	const struct dhcp6_option *o;
 
 	state = D6_STATE(ifp);
 	if (stat(state->leasefile, &st) == -1) {
@@ -1633,6 +1661,27 @@ dhcp6_readlease(struct interface *ifp)
 			goto ex;
 		}
 	}
+
+	/* Authenticate the message */
+	o = dhcp6_getmoption(D6_OPTION_AUTH, state->new, state->new_len);
+	if (o) {
+		if (dhcp_auth_validate(&state->auth, &ifp->options->auth,
+		    (uint8_t *)state->new, state->new_len, 6, state->new->type,
+		    D6_COPTION_DATA(o), ntohs(o->len)) == NULL)
+		{
+			syslog(LOG_DEBUG, "%s: dhcp_auth_validate: %m",
+			    ifp->name);
+			syslog(LOG_ERR, "%s: authentication failed",
+			    ifp->name);
+			goto ex;
+		}
+		syslog(LOG_DEBUG, "%s: validated using 0x%08" PRIu32,
+		    ifp->name, state->auth.token->secretid);
+	} else if (ifp->options->auth.options & DHCPCD_AUTH_REQUIRE) {
+		syslog(LOG_ERR, "%s: authentication now required", ifp->name);
+		goto ex;
+	} else
+		syslog(LOG_ERR, "eg");
 
 	return fd;
 
@@ -2063,6 +2112,26 @@ dhcp6_handledata(__unused void *arg)
 			    ifp->name, opt->var, sfrom);
 			return;
 		}
+	}
+
+	/* Authenticate the message */
+	o = dhcp6_getmoption(D6_OPTION_AUTH, r, len);
+	if (o) {
+		if (dhcp_auth_validate(&state->auth, &ifo->auth,
+		    (uint8_t *)r, len, 6, r->type,
+		    D6_COPTION_DATA(o), ntohs(o->len)) == NULL)
+		{
+			syslog(LOG_DEBUG, "dhcp_auth_validate: %m");
+			syslog(LOG_ERR, "%s: authentication failed from %s",
+			    ifp->name, sfrom);
+			return;
+		}
+		syslog(LOG_DEBUG, "%s: validated using 0x%08" PRIu32,
+		    ifp->name, state->auth.token->secretid);
+	} else if (ifo->auth.options & DHCPCD_AUTH_REQUIRE) {
+		syslog(LOG_ERR, "%s: missing authentiation from %s",
+		    ifp->name, sfrom);
+		return;
 	}
 
 	op = dhcp6_get_op(r->type);
@@ -2498,6 +2567,7 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 		free(state->recv);
 		free(state->new);
 		free(state->old);
+		free(state->auth.reconf);
 		free(state);
 		ifp->if_data[IF_DATA_DHCP6] = NULL;
 	}

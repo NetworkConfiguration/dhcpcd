@@ -1,7 +1,8 @@
 /*
  * dhcpcd - DHCP client daemon
  * Copyright (c) 2006-2014 Roy Marples <roy@marples.name>
- *
+ * All rights reserved
+
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -24,38 +25,55 @@
  * SUCH DAMAGE.
  */
 
-#ifndef CONFIG_H
-#define CONFIG_H
+#ifndef AUTH_H
+#define AUTH_H
 
-#define PACKAGE			"dhcpcd"
-#define VERSION			"6.2.1"
+#include <sys/queue.h>
 
-#ifndef CONFIG
-# define CONFIG			SYSCONFDIR "/" PACKAGE ".conf"
-#endif
-#ifndef SCRIPT
-# define SCRIPT			LIBEXECDIR "/" PACKAGE "-run-hooks"
-#endif
-#ifndef DEVDIR
-# define DEVDIR			LIBDIR "/" PACKAGE "/dev"
-#endif
-#ifndef DUID
-# define DUID			SYSCONFDIR "/" PACKAGE ".duid"
-#endif
-#ifndef LEASEFILE
-# define LEASEFILE		DBDIR "/" PACKAGE "-%s.lease"
-#endif
-#ifndef LEASEFILE6
-# define LEASEFILE6		DBDIR "/" PACKAGE "-%s.lease6"
-#endif
-#ifndef PIDFILE
-# define PIDFILE		RUNDIR "/" PACKAGE "%s%s.pid"
-#endif
-#ifndef CONTROLSOCKET
-# define CONTROLSOCKET		RUNDIR "/" PACKAGE ".sock"
-#endif
-#ifndef RDM_MONOFILE
-# define RDM_MONOFILE		DBDIR "/" PACKAGE "-rdm.monotonic"
-#endif
+#define DHCPCD_AUTH_SEND	(1 << 0)
+#define DHCPCD_AUTH_REQUIRE	(1 << 1)
 
+#define AUTH_PROTO_TOKEN	0
+#define AUTH_PROTO_DELAYED	1
+#define AUTH_PROTO_DELAYEDREALM	2
+#define AUTH_PROTO_RECONFKEY	3
+
+#define AUTH_ALG_HMAC_MD5	1
+
+#define AUTH_RDM_MONOTONIC	0
+
+struct token {
+	TAILQ_ENTRY(token) next;
+	uint32_t secretid;
+	unsigned int realm_len;
+	unsigned char *realm;
+	unsigned int key_len;
+	unsigned char *key;
+	time_t expire;
+};
+
+TAILQ_HEAD(token_head, token);
+
+struct auth {
+	int options;
+	uint8_t protocol;
+	uint8_t algorithm;
+	uint8_t rdm;
+	struct token_head tokens;
+};
+
+struct authstate {
+	uint64_t replay;
+	const struct token *token;
+	struct token *reconf;
+};
+
+const struct token * dhcp_auth_validate(struct authstate *,
+    const struct auth *,
+    const uint8_t *, unsigned int, int, int,
+    const uint8_t *, unsigned int);
+
+int dhcp_auth_encode(const struct auth *, const struct token *,
+    uint8_t *, unsigned int, int, int,
+    uint8_t *, unsigned int);
 #endif

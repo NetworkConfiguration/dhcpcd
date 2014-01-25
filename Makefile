@@ -11,6 +11,15 @@ MKDIRS=
 include config.mk
 CFLAGS+=	-std=${CSTD}
 
+SRCS+=		${DHCPCD_SRCS}
+
+.PATH: ./crypt
+
+VPATH=	. ./crypt
+
+CPPFLAGS+=	-I./crypt
+SRCS+=		auth.c hmac_md5.c ${MD5_SRC}
+
 OBJS+=		${SRCS:.c=.o} ${COMPAT_SRCS:.c=.o}
 
 SCRIPT=		${LIBEXECDIR}/dhcpcd-run-hooks
@@ -58,7 +67,7 @@ HOST_SH?=	/bin/sh
 
 CLEANFILES+=	*.tar.bz2
 
-.PHONY:		import import-bsd dev
+.PHONY:		import import-bsd dev test
 
 .SUFFIXES:	.in
 
@@ -95,6 +104,9 @@ depend: .depend
 ${PROG}: ${DEPEND} ${OBJS}
 	${CC} ${LDFLAGS} -o $@ ${OBJS} ${LDADD}
 
+test:
+	cd $@; ${MAKE} $@; ./$@
+
 _embeddedinstall: dhcpcd-definitions.conf
 	${INSTALL} -d ${DESTDIR}${SCRIPTSDIR}
 	${INSTALL} -m ${CONFMODE} dhcpcd-definitions.conf ${DESTDIR}${SCRIPTSDIR}
@@ -126,7 +138,7 @@ install: proginstall _maninstall _confinstall
 
 clean:
 	rm -f ${OBJS} ${PROG} ${PROG}.core ${CLEANFILES}
-	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@; cd ..; done
+	for x in ${SUBDIRS} test; do cd $$x; ${MAKE} $@; cd ..; done
 
 distclean: clean
 	rm -f .depend config.h config.mk

@@ -673,11 +673,12 @@ make_message(struct dhcp_message **message,
     uint8_t type)
 {
 	struct dhcp_message *dhcp;
-	uint8_t *m, *lp, *p;
+	uint8_t *m, *lp, *p, *auth;
 	uint8_t *n_params = NULL;
 	uint32_t ul;
 	uint16_t sz;
 	size_t len, i;
+	int auth_len;
 	const struct dhcp_opt *opt;
 	const struct if_options *ifo = iface->options;
 	const struct dhcp_state *state = D_CSTATE(iface);
@@ -916,6 +917,27 @@ make_message(struct dhcp_message **message,
 		}
 		*n_params = p - n_params - 1;
 	}
+
+	/* silence GCC */
+	auth_len = 0;
+	auth = NULL;
+
+	if (ifo->auth.options & DHCPCD_AUTH_SEND) {
+		auth_len = dhcp_auth_encode(&ifo->auth, state->auth.token,
+		    NULL, 0, 4, type, NULL, 0);
+		if (auth_len > 0) {
+			len = (p + auth_len) - m;
+			if (auth_len > 255 || len > sizeof(*dhcp))
+				goto toobig;
+			*p++ = DHO_AUTHENTICATION;
+			*p++ = (uint8_t)auth_len;
+			auth = p;
+			p += auth_len;
+		} else if (auth_len == -1)
+			syslog(LOG_ERR, "%s: dhcp_auth_encode: %m",
+			    iface->name);
+	}
+
 	*p++ = DHO_END;
 
 #ifdef BOOTP_MESSAGE_LENTH_MIN
@@ -926,8 +948,13 @@ make_message(struct dhcp_message **message,
 		*p++ = DHO_PAD;
 #endif
 
+	len = p - m;
+	if (ifo->auth.options & DHCPCD_AUTH_SEND && auth_len > 0)
+		dhcp_auth_encode(&ifo->auth, state->auth.token,
+		    m, len, 4, type, auth, auth_len);
+
 	*message = dhcp;
-	return p - m;
+	return len;
 
 toobig:
 	syslog(LOG_ERR, "%s: DHCP messge too big", iface->name);
@@ -978,12 +1005,15 @@ write_lease(const struct interface *ifp, const struct dhcp_message *dhcp)
 }
 
 struct dhcp_message *
-read_lease(const struct interface *ifp)
+read_lease(struct interface *ifp)
 {
 	int fd;
 	struct dhcp_message *dhcp;
-	const struct dhcp_state *state = D_CSTATE(ifp);
+	struct dhcp_state *state = D_STATE(ifp);
 	ssize_t bytes;
+	const uint8_t *auth;
+	uint8_t type;
+	int auth_len;
 
 	fd = open(state->leasefile, O_RDONLY);
 	if (fd == -1) {
@@ -1003,8 +1033,28 @@ read_lease(const struct interface *ifp)
 	close(fd);
 	if (bytes < 0) {
 		free(dhcp);
-		dhcp = NULL;
+		return NULL;
 	}
+
+	/* We may have found a BOOTP server */
+	if (get_option_uint8(&type, dhcp, DHO_MESSAGETYPE) == -1)
+		type = 0;
+	/* Authenticate the message */
+	auth = get_option(dhcp, DHO_AUTHENTICATION, &auth_len);
+	if (auth) {
+		if (dhcp_auth_validate(&state->auth, &ifp->options->auth,
+		    (uint8_t *)dhcp, sizeof(*dhcp), 4, type,
+		    auth, auth_len) == NULL)
+		{
+			syslog(LOG_DEBUG, "%s: dhcp_auth_validate: %m",
+			    ifp->name);
+			free(dhcp);
+			return NULL;
+		}
+		syslog(LOG_DEBUG, "%s: validated using 0x%08" PRIu32,
+		    ifp->name, state->auth.token->secretid);
+	}
+
 	return dhcp;
 }
 
@@ -1453,7 +1503,7 @@ send_message(struct interface *iface, int type,
 		tv.tv_usec = arc4random() % (DHCP_RAND_MAX_U - DHCP_RAND_MIN_U);
 		timernorm(&tv);
 		syslog(LOG_DEBUG,
-		    "%s: sending %s (xid 0x%x), next in %0.2f seconds",
+		    "%s: sending %s (xid 0x%x), next in %0.1f seconds",
 		    iface->name, get_dhcp_op(type), state->xid,
 		    timeval_to_double(&tv));
 	}
@@ -1989,6 +2039,10 @@ dhcp_drop(struct interface *ifp, const char *reason)
 	state->old = NULL;
 	state->lease.addr.s_addr = 0;
 	ifp->options->options &= ~ DHCPCD_CSR_WARNED;
+	state->auth.token = NULL;
+	state->auth.replay = 0;
+	free(state->auth.reconf);
+	state->auth.reconf = NULL;
 }
 
 static void
@@ -2066,15 +2120,37 @@ dhcp_handledhcp(struct interface *iface, struct dhcp_message **dhcpp,
 	struct dhcp_message *dhcp = *dhcpp;
 	struct dhcp_lease *lease = &state->lease;
 	uint8_t type, tmp;
+	const uint8_t *auth;
 	struct in_addr addr;
 	size_t i;
-
-	/* reset the message counter */
-	state->interval = 0;
+	int auth_len;
 
 	/* We may have found a BOOTP server */
 	if (get_option_uint8(&type, dhcp, DHO_MESSAGETYPE) == -1)
 		type = 0;
+
+	/* Authenticate the message */
+	auth = get_option(dhcp, DHO_AUTHENTICATION, &auth_len);
+	if (auth) {
+		if (dhcp_auth_validate(&state->auth, &ifo->auth,
+		    (uint8_t *)*dhcpp, sizeof(**dhcpp), 4, type,
+		    auth, auth_len) == NULL)
+		{
+			syslog(LOG_DEBUG, "%s: dhcp_auth_validate: %m",
+			    iface->name);
+			log_dhcp(LOG_ERR, "authentication failed",
+			    iface, dhcp, from);
+			return;
+		}
+		syslog(LOG_DEBUG, "%s: validated using 0x%08" PRIu32,
+		    iface->name, state->auth.token->secretid);
+	} else if (ifo->auth.options & DHCPCD_AUTH_REQUIRE) {
+		log_dhcp(LOG_ERR, "missing authentiation", iface, dhcp, from);
+		return;
+	}
+
+	/* reset the message counter */
+	state->interval = 0;
 
 	if (type == DHCP_NAK) {
 		/* For NAK, only check if we require the ServerID */

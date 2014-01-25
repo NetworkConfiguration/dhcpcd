@@ -460,6 +460,11 @@ configure_interface1(struct interface *ifp)
 		}
 	}
 #endif
+
+	/* If we are not sending an authentication option, don't require it */
+	if (!(ifo->auth.options & DHCPCD_AUTH_SEND))
+		ifo->auth.options &= ~DHCPCD_AUTH_REQUIRE;
+
 }
 
 int

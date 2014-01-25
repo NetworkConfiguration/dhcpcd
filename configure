@@ -64,6 +64,7 @@ for x do
         --without-posix_spawn) POSIX_SPAWN=no;;
 	--without-pollts) POLLTS=no;;
 	--with-pollts) POLLTS=$var;;
+	--without-md5) MD5=no;;
 	--without-dev) DEV=no;;
 	--without-udev) UDEV=no;;
 	--serviceexists) SERVICEEXISTS=$var;;
@@ -319,7 +320,7 @@ fi
 
 if [ -z "$EMBEDDED" -o "$EMBEDDED" = yes ]; then
 	echo "dhcpcd-definitions.conf will be embedded in dhcpcd itself"
-	echo "SRCS+=		dhcpcd-embedded.c" >>$CONFIG_MK
+	echo "DHCPCD_SRCS+=	dhcpcd-embedded.c" >>$CONFIG_MK
 else
 	echo "dhcpcd-definitions.conf will be installed to $LIBEXECDIR"
 	echo "CFLAGS+= -DEMBEDDED_CONFIG=\\\"$LIBEXECDIR/dhcpcd-definitions.conf\\\"" >>$CONFIG_MK
@@ -335,36 +336,36 @@ case "$OS" in
 linux)
 	echo "CPPFLAGS+=	-D_BSD_SOURCE -D_XOPEN_SOURCE=700" >>$CONFIG_MK
 	if [ -z "$INET" -o "$INET" = yes ]; then
-		echo "SRCS+=		lpf.c" >>$CONFIG_MK
+		echo "DHCPCD_SRCS+=	lpf.c" >>$CONFIG_MK
 	fi
-	echo "SRCS+=		if-linux.c if-linux-wireless.c" >>$CONFIG_MK
-	echo "SRCS+=		platform-linux.c" >>$CONFIG_MK
+	echo "DHCPCD_SRCS+=	if-linux.c if-linux-wireless.c" >>$CONFIG_MK
+	echo "DHCPCD_SRCS+=	platform-linux.c" >>$CONFIG_MK
 	echo "LDADD+=		-lrt -ldl" >>$CONFIG_MK
 	;;
 kfreebsd)
 	echo "CPPFLAGS+=	-D_GNU_SOURCE" >>$CONFIG_MK
 	if [ -z "$INET" -o "$INET" = yes ]; then
-		echo "SRCS+=		bpf.c" >>$CONFIG_MK
+		echo "DHCPCD_SRCS+=		bpf.c" >>$CONFIG_MK
 	fi
-	echo "SRCS+=		if-bsd.c platform-bsd.c" >>$CONFIG_MK
+	echo "DHCPCD_SRCS+=	if-bsd.c platform-bsd.c" >>$CONFIG_MK
 	echo "COMPAT_SRCS+=	compat/linkaddr.c" >>$CONFIG_MK
 	echo "LDADD+=		-lrt -ldl" >>$CONFIG_MK
 	;;
 *)
 	if [ -z "$INET" -o "$INET" = yes ]; then
-		echo "SRCS+=		bpf.c" >>$CONFIG_MK
+		echo "DHCPCD_SRCS+=		bpf.c" >>$CONFIG_MK
 	fi
-	echo "SRCS+=		if-bsd.c platform-bsd.c" >>$CONFIG_MK
+	echo "DHCPCD_SRCS+=	if-bsd.c platform-bsd.c" >>$CONFIG_MK
 	;;
 esac
 
 if [ -z "$INET" -o "$INET" = yes ]; then
 	echo "CPPFLAGS+=	-DINET" >>$CONFIG_MK
-	echo "SRCS+=		arp.c dhcp.c ipv4.c ipv4ll.c" >>$CONFIG_MK
+	echo "DHCPCD_SRCS+=	arp.c dhcp.c ipv4.c ipv4ll.c" >>$CONFIG_MK
 fi
 if [ -z "$INET6" -o "$INET6" = yes ]; then
 	echo "CPPFLAGS+=	-DINET6" >>$CONFIG_MK
-	echo "SRCS+=		ipv6.c ipv6nd.c dhcp6.c" >>$CONFIG_MK
+	echo "DHCPCD_SRCS+=	ipv6.c ipv6nd.c dhcp6.c" >>$CONFIG_MK
 fi
 
 # NetBSD: Even if we build for $PREFIX, the clueless user might move us to /
@@ -624,6 +625,32 @@ pselect)
 	;;
 esac
 
+if [ -z "$MD5" ]; then
+	printf "Testing for MD5Init ... "
+	cat <<EOF >_md5.c
+#include <md5.h>
+#include <stdlib.h>
+int main(void) {
+	MD5_CTX context;
+	MD5Init(&context);
+	return 0;
+}
+EOF
+	if $XCC _md5.c -o _md5 2>/dev/null; then
+		MD5=yes
+	else
+		MD5=no
+	fi
+	echo "$MD5"
+	rm -f _md5.c _md5
+fi
+if [ "$MD5" = no ]; then
+	echo "MD5_SRC=	md5.c" >>$CONFIG_MK
+else
+	echo "MD5_SRC=" >>$CONFIG_MK
+	echo "CPPFLAGS+=	-DHAVE_MD5H" >>$CONFIG_H
+fi
+
 if [ "$DEV" != no -a "$UDEV" != no ]; then
 	printf "Checking for libudev ... "
 	LIBUDEV_CFLAGS=$(pkg-config --cflags libudev 2>/dev/null)
@@ -678,7 +705,7 @@ elif [ "$DEV" != no -a "$UDEV" != no ]; then
 fi
 
 if [ "$DEV" = yes ]; then
-	echo "SRCS+=		dev.c" >>$CONFIG_MK
+	echo "DHCPCD_SRCS+=	dev.c" >>$CONFIG_MK
 	echo "CPPFLAGS+=	-DPLUGIN_DEV" >>$CONFIG_MK
 	echo "MKDIRS+=	dev" >>$CONFIG_MK
 fi
@@ -772,3 +799,5 @@ echo "   RUNDIR =		$RUNDIR"
 echo "   MANDIR =		$MANDIR"
 echo "   HOOKSCRIPTS =	$HOOKS"
 echo
+
+rm -f dhcpcd tests/test

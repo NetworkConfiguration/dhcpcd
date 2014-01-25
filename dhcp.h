@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2014 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -34,6 +34,7 @@
 #include <limits.h>
 #include <stdint.h>
 
+#include "auth.h"
 #include "dhcp-common.h"
 
 /* UDP port numbers for DHCP */
@@ -105,6 +106,7 @@ enum DHO {
 	DHO_USERCLASS              = 77,  /* RFC 3004 */
 	DHO_RAPIDCOMMIT            = 80,  /* RFC 4039 */
 	DHO_FQDN                   = 81,
+	DHO_AUTHENTICATION         = 90,  /* RFC 3118 */
 	DHO_VIVCO                  = 124, /* RFC 3925 */
 	DHO_VIVSO                  = 125, /* RFC 3925 */
 	DHO_DNSSEARCH              = 119, /* RFC 3397 */
@@ -228,6 +230,8 @@ struct dhcp_state {
 	time_t start_uptime;
 
 	unsigned char *clientid;
+
+	struct authstate auth;
 };
 
 #define D_STATE(ifp)							       \
@@ -267,7 +271,7 @@ ssize_t make_message(struct dhcp_message **, const struct interface *,
 int valid_dhcp_packet(unsigned char *);
 
 ssize_t write_lease(const struct interface *, const struct dhcp_message *);
-struct dhcp_message *read_lease(const struct interface *);
+struct dhcp_message *read_lease(struct interface *);
 void get_lease(struct dhcp_lease *, const struct dhcp_message *);
 
 void dhcp_handleifa(int, struct interface *,

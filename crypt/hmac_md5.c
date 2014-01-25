@@ -1,7 +1,8 @@
 /*
  * dhcpcd - DHCP client daemon
  * Copyright (c) 2006-2014 Roy Marples <roy@marples.name>
- *
+ * All rights reserved
+
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -24,38 +25,62 @@
  * SUCH DAMAGE.
  */
 
-#ifndef CONFIG_H
-#define CONFIG_H
+#include <inttypes.h>
+#include <string.h>
 
-#define PACKAGE			"dhcpcd"
-#define VERSION			"6.2.1"
+#include "crypt.h"
 
-#ifndef CONFIG
-# define CONFIG			SYSCONFDIR "/" PACKAGE ".conf"
-#endif
-#ifndef SCRIPT
-# define SCRIPT			LIBEXECDIR "/" PACKAGE "-run-hooks"
-#endif
-#ifndef DEVDIR
-# define DEVDIR			LIBDIR "/" PACKAGE "/dev"
-#endif
-#ifndef DUID
-# define DUID			SYSCONFDIR "/" PACKAGE ".duid"
-#endif
-#ifndef LEASEFILE
-# define LEASEFILE		DBDIR "/" PACKAGE "-%s.lease"
-#endif
-#ifndef LEASEFILE6
-# define LEASEFILE6		DBDIR "/" PACKAGE "-%s.lease6"
-#endif
-#ifndef PIDFILE
-# define PIDFILE		RUNDIR "/" PACKAGE "%s%s.pid"
-#endif
-#ifndef CONTROLSOCKET
-# define CONTROLSOCKET		RUNDIR "/" PACKAGE ".sock"
-#endif
-#ifndef RDM_MONOFILE
-# define RDM_MONOFILE		DBDIR "/" PACKAGE "-rdm.monotonic"
+#ifdef HAVE_MD5_H
+#include <md5.h>
+#else
+#include "md5.h"
 #endif
 
-#endif
+#define HMAC_PAD_LEN	64
+#define IPAD		0x36
+#define OPAD		0x5C
+
+/* hmac_md5 as per RFC3118 */
+void
+hmac_md5(const uint8_t *text, int text_len,
+    const uint8_t *key, int key_len,
+    uint8_t *digest)
+{
+	uint8_t k_ipad[HMAC_PAD_LEN], k_opad[HMAC_PAD_LEN];
+	uint8_t tk[MD5_DIGEST_LENGTH];
+	int i;
+	MD5_CTX context;
+
+	/* Ensure key is no bigger than HMAC_PAD_LEN */
+	if (key_len > HMAC_PAD_LEN) {
+		MD5Init(&context);
+		MD5Update(&context, key, key_len);
+		MD5Final(tk, &context);
+		key = tk;
+		key_len = MD5_DIGEST_LENGTH;
+	}
+
+	/* store key in pads */
+	memcpy(k_ipad, key, key_len);
+	memcpy(k_opad, key, key_len);
+	memset(k_ipad + key_len, 0, sizeof(k_ipad) - key_len);
+	memset(k_opad + key_len, 0, sizeof(k_opad) - key_len);
+
+	/* XOR key with ipad and opad values */
+	for (i = 0; i < HMAC_PAD_LEN; i++) {
+		k_ipad[i] ^= IPAD;
+		k_opad[i] ^= OPAD;
+	}
+
+	/* inner MD5 */
+	MD5Init(&context);
+	MD5Update(&context, k_ipad, HMAC_PAD_LEN);
+	MD5Update(&context, text, text_len);
+	MD5Final(digest, &context);
+
+	/* outer MD5 */
+	MD5Init(&context);
+	MD5Update(&context, k_opad, HMAC_PAD_LEN);
+	MD5Update(&context, digest, MD5_DIGEST_LENGTH);
+	MD5Final(digest, &context);
+}

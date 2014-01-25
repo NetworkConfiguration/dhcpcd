@@ -27,6 +27,7 @@
 
 #include <sys/param.h>
 #include <sys/types.h>
+#include <sys/queue.h>
 
 #include <arpa/inet.h>
 
@@ -80,6 +81,9 @@ unsigned long long options = 0;
 #define O_ENCAP			O_BASE + 22
 #define O_VENDOPT		O_BASE + 23
 #define O_VENDCLASS		O_BASE + 24
+#define O_AUTHPROTOCOL		O_BASE + 25
+#define O_AUTHTOKEN		O_BASE + 26
+#define O_AUTHNOTREQUIRED	O_BASE + 27
 
 char *dev_load;
 
@@ -155,6 +159,9 @@ const struct option cf_options[] = {
 	{"encap",           required_argument, NULL, O_ENCAP},
 	{"vendopt",         required_argument, NULL, O_VENDOPT},
 	{"vendclass",       required_argument, NULL, O_VENDCLASS},
+	{"authprotocol",    required_argument, NULL, O_AUTHPROTOCOL},
+	{"authtoken",       required_argument, NULL, O_AUTHTOKEN},
+	{"noauthrequired",  no_argument,       NULL, O_AUTHNOTREQUIRED},
 	{NULL,              0,                 NULL, '\0'}
 };
 
@@ -362,7 +369,7 @@ parse_string_hwaddr(char *sbuf, ssize_t slen, const char *str, int clid)
 }
 
 static int
-parse_iaid(uint8_t *iaid, const char *arg, size_t len)
+parse_iaid1(uint8_t *iaid, const char *arg, size_t len, int n)
 {
 	unsigned long l;
 	size_t s;
@@ -372,7 +379,10 @@ parse_iaid(uint8_t *iaid, const char *arg, size_t len)
 	errno = 0;
 	l = strtoul(arg, &np, 0);
 	if (l <= (unsigned long)UINT32_MAX && errno == 0 && *np == '\0') {
-		u32 = htonl(l);
+		if (n)
+			u32 = htonl(l);
+		else
+			u32 = l;
 		memcpy(iaid, &u32, sizeof(u32));
 		return 0;
 	}
@@ -388,6 +398,20 @@ parse_iaid(uint8_t *iaid, const char *arg, size_t len)
 	if (s < 2)
 		iaid[1] = '\0';
 	return 0;
+}
+
+static int
+parse_iaid(uint8_t *iaid, const char *arg, size_t len)
+{
+
+	return parse_iaid1(iaid, arg, len, 1);
+}
+
+static int
+parse_uint32(uint32_t *i, const char *arg)
+{
+
+	return parse_iaid1((uint8_t *)i, arg, sizeof(uint32_t), 0);
 }
 
 static char **
@@ -549,6 +573,28 @@ strskipwhite(const char *s)
 	return UNCONST(s);
 }
 
+/* Find the end pointer of a string. */
+static char *
+strend(const char *s)
+{
+
+	s = strskipwhite(s);
+	if (s == NULL)
+		return NULL;
+	if (*s != '"')
+		return strchr(s, ' ');
+	s++;
+	for (; *s != '"' ; s++) {
+		if (*s == '\0')
+			return NULL;
+		if (*s == '\\') {
+			if (*(++s) == '\0')
+				return NULL;
+		}
+	}
+	return UNCONST(++s);
+}
+
 static int
 parse_option(const char *ifname, struct if_options *ifo,
     int opt, const char *arg)
@@ -565,6 +611,7 @@ parse_option(const char *ifname, struct if_options *ifo,
 	struct dhcp_opt **dop, *ndop;
 	size_t *dop_len, dl;
 	struct vivco *vivco;
+	struct token *token;
 #ifdef INET6
 	size_t sl;
 	struct if_ia *ia;
@@ -1521,6 +1568,135 @@ parse_option(const char *ifname, struct if_options *ifo,
 		vivco->len = s;
 		vivco->data = (uint8_t *)np;
 		break;
+	case O_AUTHPROTOCOL:
+		fp = strwhite(arg);
+		if (fp)
+			*fp++ = '\0';
+		if (strcasecmp(arg, "token") == 0)
+			ifo->auth.protocol = AUTH_PROTO_TOKEN;
+		else if (strcasecmp(arg, "delayed") == 0)
+			ifo->auth.protocol = AUTH_PROTO_DELAYED;
+		else if (strcasecmp(arg, "delayedrealm") == 0)
+			ifo->auth.protocol = AUTH_PROTO_DELAYEDREALM;
+		else {
+			syslog(LOG_ERR, "%s: unsupported protocol", arg);
+			return -1;
+		}
+		arg = strskipwhite(fp);
+		fp = strwhite(arg);
+		if (arg == NULL) {
+			ifo->auth.options |= DHCPCD_AUTH_SEND;
+			ifo->auth.algorithm = AUTH_ALG_HMAC_MD5;
+			ifo->auth.rdm = AUTH_RDM_MONOTONIC;
+			break;
+		}
+		if (fp)
+			*fp++ = '\0';
+		if (strcasecmp(arg, "hmacmd5") == 0 ||
+		    strcasecmp(arg, "hmac-md5") == 0)
+			ifo->auth.algorithm = AUTH_ALG_HMAC_MD5;
+		else {
+			syslog(LOG_ERR, "%s: unsupported algorithm", arg);
+			return 1;
+		}
+		arg = fp;
+		if (arg == NULL) {
+			ifo->auth.options |= DHCPCD_AUTH_SEND;
+			ifo->auth.rdm = AUTH_RDM_MONOTONIC;
+			break;
+		}
+		if (strcasecmp(arg, "monotonic") == 0)
+			ifo->auth.rdm = AUTH_RDM_MONOTONIC;
+		else {
+			syslog(LOG_ERR, "%s: unsupported RDM", arg);
+			return -1;
+		}
+		break;
+	case O_AUTHTOKEN:
+		fp = strwhite(arg);
+		if (fp == NULL) {
+			syslog(LOG_ERR, "authtoken requires a realm");
+			return -1;
+		}
+		*fp++ = '\0';
+		token = malloc(sizeof(*token));
+		if (token == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			return -1;
+		}
+		if (parse_uint32(&token->secretid, arg) == -1) {
+			syslog(LOG_ERR, "%s: not a number", arg);
+			free(token);
+			return -1;
+		}
+		arg = fp;
+		fp = strend(arg);
+		if (fp == NULL) {
+			syslog(LOG_ERR, "authtoken requies an a key");
+			free(token);
+			return -1;
+		}
+		*fp++ = '\0';
+		token->realm_len = parse_string(NULL, 0, arg);
+		if (token->realm_len) {
+			token->realm = malloc(token->realm_len);
+			if (token->realm == NULL) {
+				free(token);
+				syslog(LOG_ERR, "%s: %m", __func__);
+				return -1;
+			}
+			parse_string((char *)token->realm, token->realm_len,
+			    arg);
+		}
+		arg = fp;
+		fp = strend(arg);
+		if (fp == NULL) {
+			syslog(LOG_ERR, "authtoken requies an an expiry date");
+			free(token->realm);
+			free(token);
+			return -1;
+		}
+		*fp++ = '\0';
+		if (*arg == '"') {
+			arg++;
+			np = strchr(arg, '"');
+			if (np)
+				*np = '\0';
+		}
+		if (strcmp(arg, "0") == 0 || strcasecmp(arg, "forever") == 0)
+			token->expire =0;
+		else {
+			struct tm tm;
+
+			memset(&tm, 0, sizeof(tm));
+			if (strptime(arg, "%Y-%m-%d %H:%M", &tm) == NULL) {
+				syslog(LOG_ERR, "%s: invalid date time", arg);
+				free(token->realm);
+				free(token);
+				return -1;
+			}
+			if ((token->expire = mktime(&tm)) == (time_t)-1) {
+				syslog(LOG_ERR, "%s: mktime: %m", __func__);
+				free(token->realm);
+				free(token);
+				return -1;
+			}
+		}
+		arg = fp;
+		token->key_len = parse_string(NULL, 0, arg);
+		if (token->key_len == 0) {
+			syslog(LOG_ERR, "authtoken needs a key");
+			free(token->realm);
+			free(token);
+			return -1;
+		}
+		token->key = malloc(token->key_len);
+		parse_string((char *)token->key, token->key_len, arg);
+		TAILQ_INSERT_TAIL(&ifo->auth.tokens, token, next);
+		break;
+	case O_AUTHNOTREQUIRED:
+		ifo->auth.options &= ~DHCPCD_AUTH_REQUIRE;
+		break;
 	default:
 		return 0;
 	}
@@ -1607,6 +1783,8 @@ read_config(const char *file,
 	ifo->timeout = DEFAULT_TIMEOUT;
 	ifo->reboot = DEFAULT_REBOOT;
 	ifo->metric = -1;
+	ifo->auth.options |= DHCPCD_AUTH_REQUIRE;
+	TAILQ_INIT(&ifo->auth.tokens);
 	strlcpy(ifo->script, SCRIPT, sizeof(ifo->script));
 
 	ifo->vendorclassid[0] = strlen(vendor);
@@ -1802,6 +1980,7 @@ free_options(struct if_options *ifo)
 	size_t i;
 	struct dhcp_opt *opt;
 	struct vivco *vo;
+	struct token *token;
 
 	if (ifo) {
 		if (ifo->environ) {
@@ -1848,6 +2027,13 @@ free_options(struct if_options *ifo)
 #endif
 		free(ifo->ia);
 
+		while ((token = TAILQ_FIRST(&ifo->auth.tokens))) {
+			TAILQ_REMOVE(&ifo->auth.tokens, token, next);
+			if (token->realm_len)
+				free(token->realm);
+			free(token->key);
+			free(token);
+		}
 		free(ifo);
 	}
 }

@@ -61,6 +61,7 @@
 #define D6_OPTION_IA_ADDR		5
 #define D6_OPTION_PREFERENCE		7
 #define D6_OPTION_ELAPSED		8
+#define D6_OPTION_AUTH			11
 #define D6_OPTION_UNICAST		12
 #define D6_OPTION_STATUS_CODE		13
 #define D6_OPTION_RAPID_COMMIT		14
@@ -197,6 +198,8 @@ struct dhcp6_state {
 	uint8_t sla_set;
 	char leasefile[PATH_MAX];
 	const char *reason;
+
+	struct authstate auth;
 };
 
 #define D6_STATE(ifp)							       \

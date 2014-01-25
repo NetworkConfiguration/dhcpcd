@@ -231,7 +231,7 @@ arp_announce(void *arg)
 	if (++state->claims < ANNOUNCE_NUM)
 		syslog(LOG_DEBUG,
 		    "%s: sending ARP announce (%d of %d), "
-		    "next in %d.00 seconds",
+		    "next in %d.0 seconds",
 		    ifp->name, state->claims, ANNOUNCE_NUM, ANNOUNCE_WAIT);
 	else
 		syslog(LOG_DEBUG,
@@ -317,7 +317,7 @@ arp_probe(void *arg)
 			eloop_timeout_add_tv(&tv, dhcp_bind, ifp);
 	}
 	syslog(LOG_DEBUG,
-	    "%s: sending ARP probe (%d of %d), next in %0.2f seconds",
+	    "%s: sending ARP probe (%d of %d), next in %0.1f seconds",
 	    ifp->name, state->probes ? state->probes : PROBE_NUM, PROBE_NUM,
 	    timeval_to_double(&tv));
 	if (arp_send(ifp, ARPOP_REQUEST, 0, addr.s_addr) == -1)
