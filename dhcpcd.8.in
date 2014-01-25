@@ -670,7 +670,3 @@ of the last replay value
 sent reset.
 We could change this to use a NTP time stamp instead, but it's
 more likely the RTC on this host is broken which would cause the same result.
-.Pp
-WIDE DHCPv6 server sometimes fails to authenticate a
-.Nm
-message.

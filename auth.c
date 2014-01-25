@@ -328,7 +328,9 @@ get_next_rdm_monotonic(void)
 
 	rdm++;
 	fseek(fp, 0, SEEK_SET);
-	if (fprintf(fp, "0x%016" PRIu64 "\n", rdm) != 19) {
+	if (ftruncate(fileno(fp)) == -1 ||
+	    fprintf(fp, "0x%016" PRIu64 "\n", rdm) != 19)
+	{
 		if (!last_rdm_set) {
 			last_rdm = rdm;
 			last_rdm_set = 1;

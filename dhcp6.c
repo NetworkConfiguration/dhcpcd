@@ -669,16 +669,7 @@ dhcp6_makemessage(struct interface *ifp)
 		o = D6_NEXT_OPTION(o);
 		o->code = htons(D6_OPTION_AUTH);
 		o->len = htons(auth_len);
-		if (dhcp_auth_encode(&ifo->auth, state->auth.token,
-		    (uint8_t *)state->send, state->send_len,
-		    6, state->send->type,
-		    D6_OPTION_DATA(o), auth_len) == -1) 
-		{
-			printf ("oh dear\n");
-			free(state->send);
-			state->send = NULL;
-			return -1;
-		}
+		/* data will be filled at send message time */
 	}
 
 	return 0;
@@ -719,6 +710,27 @@ static void dhcp6_delete_delegates(struct interface *ifp)
 				dhcp6_freedrop_addrs(ifp0, 1, ifp);
 		}
 	}
+}
+
+
+static int
+dhcp6_update_auth(struct interface *ifp, struct dhcp6_message *m, ssize_t len)
+{
+	struct dhcp6_state *state;
+	const struct dhcp6_option *co;
+	struct dhcp6_option *o;
+
+	co = dhcp6_getmoption(D6_OPTION_AUTH, m, len);
+	if (co == NULL)
+		return -1;
+
+	o = __UNCONST(co);
+	state = D6_STATE(ifp);
+
+	return dhcp_auth_encode(&ifp->options->auth, state->auth.token,
+	    (uint8_t *)state->send, state->send_len,
+	    6, state->send->type,
+	    D6_OPTION_DATA(o), ntohs(o->len));
 }
 
 static int
@@ -840,6 +852,10 @@ logsend:
 
 	/* Update the elapsed time */
 	dhcp6_updateelapsed(ifp, state->send, state->send_len);
+	if (dhcp6_update_auth(ifp, state->send, state->send_len) == -1) {
+		syslog(LOG_ERR, "%s: dhcp6_updateauth: %m", ifp->name);
+		return -1;
+	}
 
 	to.sin6_scope_id = ifp->index;
 	sndhdr.msg_name = (caddr_t)&to;
