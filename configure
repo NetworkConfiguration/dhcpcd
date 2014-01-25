@@ -648,7 +648,7 @@ if [ "$MD5" = no ]; then
 	echo "MD5_SRC=	md5.c" >>$CONFIG_MK
 else
 	echo "MD5_SRC=" >>$CONFIG_MK
-	echo "CPPFLAGS+=	-DHAVE_MD5H" >>$CONFIG_H
+	echo "#define HAVE_MD5H" >>$CONFIG_H
 fi
 
 if [ "$DEV" != no -a "$UDEV" != no ]; then
