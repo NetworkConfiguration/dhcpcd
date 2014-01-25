@@ -1696,8 +1696,7 @@ dhcp6_readlease(struct interface *ifp)
 	} else if (ifp->options->auth.options & DHCPCD_AUTH_REQUIRE) {
 		syslog(LOG_ERR, "%s: authentication now required", ifp->name);
 		goto ex;
-	} else
-		syslog(LOG_ERR, "eg");
+	}
 
 	return fd;
 
@@ -2148,7 +2147,10 @@ dhcp6_handledata(__unused void *arg)
 		syslog(LOG_ERR, "%s: missing authentiation from %s",
 		    ifp->name, sfrom);
 		return;
-	}
+	} else if (ifo->auth.options & DHCPCD_AUTH_SEND)
+		syslog(LOG_WARNING,
+		    "%s: missing authentiation from %s",
+		    ifp->name, sfrom);
 
 	op = dhcp6_get_op(r->type);
 	switch(r->type) {
