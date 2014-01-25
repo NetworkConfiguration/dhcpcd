@@ -35,6 +35,7 @@
 #include <string.h>
 #include <syslog.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "config.h"
 #include "auth.h"
@@ -327,8 +328,8 @@ get_next_rdm_monotonic(void)
 	}
 
 	rdm++;
-	fseek(fp, 0, SEEK_SET);
-	if (ftruncate(fileno(fp)) == -1 ||
+	if (fseek(fp, 0, SEEK_SET) == -1 ||
+	    ftruncate(fileno(fp), 0) == -1 ||
 	    fprintf(fp, "0x%016" PRIu64 "\n", rdm) != 19)
 	{
 		if (!last_rdm_set) {
