@@ -666,7 +666,7 @@ ipv6nd_handlera(struct interface *ifp, struct icmp6_hdr *icp, ssize_t len)
 		return;
 	}
 
-	/* We could recieve a RA before we sent a RS*/
+	/* We could receive a RA before we sent a RS*/
 	if (ipv6_linklocal(ifp) == NULL) {
 #ifdef DEBUG_RS
 		syslog(LOG_DEBUG, "%s: received RA from %s (no link-local)",
