@@ -365,7 +365,7 @@ dhcp_auth_encode(const struct auth *auth, const struct token *t,
 	uint64_t rdm;
 	uint8_t hmac[HMAC_LENGTH];
 	time_t now;
-	uint8_t hops, *p;
+	uint8_t hops, *p, info;
 	uint32_t giaddr, secretid;
 
 	if (auth->protocol == 0 && t == NULL) {
@@ -415,6 +415,13 @@ dhcp_auth_encode(const struct auth *auth, const struct token *t,
 		return -1;
 	}
 
+	/* DISCOVER or INFORM messages don't write auth info */
+	if ((mp == 4 && (mt == DHCP_DISCOVER || mt == DHCP_INFORM)) ||
+	    (mp == 6 && (mt == DHCP6_SOLICIT || mt == DHCP6_INFORMATION_REQ)))
+		info = 0;
+	else
+		info = 1;
+
 	/* Work out the auth area size.
 	 * We only need to do this for DISCOVER messages */
 	if (data == NULL) {
@@ -424,11 +431,11 @@ dhcp_auth_encode(const struct auth *auth, const struct token *t,
 			dlen += t->key_len;
 			break;
 		case AUTH_PROTO_DELAYEDREALM:
-			if (t)
+			if (info && t)
 				dlen += t->realm_len;
 			/* FALLTHROUGH */
 		case AUTH_PROTO_DELAYED:
-			if (t)
+			if (info && t)
 				dlen += sizeof(t->secretid) + sizeof(hmac);
 			break;
 		}
@@ -480,8 +487,7 @@ dhcp_auth_encode(const struct auth *auth, const struct token *t,
 	}
 
 	/* DISCOVER or INFORM messages don't write auth info */
-	if ((mp == 4 && (mt == DHCP_DISCOVER || mt == DHCP_INFORM)) ||
-	    (mp == 6 && (mt == DHCP6_SOLICIT || mt == DHCP6_INFORMATION_REQ)))
+	if (!info)
 		return dlen;
 
 	/* Loading a saved lease without an authentication option */
