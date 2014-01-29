@@ -852,7 +852,9 @@ logsend:
 
 	/* Update the elapsed time */
 	dhcp6_updateelapsed(ifp, state->send, state->send_len);
-	if (dhcp6_update_auth(ifp, state->send, state->send_len) == -1) {
+	if (ifp->options->auth.options & DHCPCD_AUTH_SEND &&
+	    dhcp6_update_auth(ifp, state->send, state->send_len) == -1)
+	{
 		syslog(LOG_ERR, "%s: dhcp6_updateauth: %m", ifp->name);
 		return -1;
 	}
