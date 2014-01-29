@@ -122,6 +122,15 @@ const struct dhcp_compat dhcp_compats[] = {
 	{ 0, 0 }
 };
 
+static const char * const dhcp6_statuses[] = {
+	"Success",
+	"Unspecified Failure",
+	"No Addresses Available",
+	"No Binding",
+	"Not On Link",
+	"Use Multicast"
+};
+
 #if DEBUG_MEMORY
 static void
 dhcp6_cleanup(void)
@@ -1191,12 +1200,13 @@ dhcp6_startrelease(struct interface *ifp)
 
 static int dhcp6_getstatus(const struct dhcp6_option *o)
 {
+	uint16_t code;
 	char *nstatus;
-	const struct dhcp6_status *s;
 	size_t len;
+	const uint8_t *p;
 
 	len = ntohs(o->len);
-	if (len < sizeof(uint16_t)) {
+	if (len < sizeof(code)) {
 		syslog(LOG_ERR, "status truncated");
 		return -1;
 	}
@@ -1205,8 +1215,21 @@ static int dhcp6_getstatus(const struct dhcp6_option *o)
 		syslog(LOG_ERR, "not a status");
 		return -1;
 	}
-	s = (const struct dhcp6_status *)o;
-	len = ntohs(s->len) - sizeof(s->len);
+	p = D6_COPTION_DATA(o);
+	len = ntohs(o->len);
+	memcpy(&code, p, sizeof(code));
+	code = ntohs(code);
+	len -= sizeof(code);
+
+	if (len == 0) {
+		if (code < sizeof(dhcp6_statuses) / sizeof(char *)) {
+			p = (const uint8_t *)dhcp6_statuses[code];
+			len = strlen((const char *)p);
+		} else
+			p = NULL;
+	} else {
+		p = D6_COPTION_DATA(o) + sizeof(uint16_t);
+	}
 	if (status == NULL || len + 1 > status_len) {
 		status_len = len;
 		nstatus = realloc(status, status_len + 1);
@@ -1217,10 +1240,10 @@ static int dhcp6_getstatus(const struct dhcp6_option *o)
 		status = nstatus;
 	}
 	if (status) {
-		memcpy(status, (const char *)s + sizeof(*s), len);
+		memcpy(status, p, len);
 		status[len] = '\0';
 	}
-	return ntohs(s->status);
+	return code;
 }
 
 static int

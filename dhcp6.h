@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2014 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -102,13 +102,6 @@ struct dhcp6_option {
 	uint16_t code;
 	uint16_t len;
 	/* followed by data */
-} __packed;
-
-struct dhcp6_status {
-	uint16_t code;
-	uint16_t len;
-	uint16_t status;
-	/* followed by message */
 } __packed;
 
 #define D6_STATUS_OK		0
