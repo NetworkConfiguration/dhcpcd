@@ -162,7 +162,7 @@ ipv4ll_handle_failure(void *arg)
 			state->interval = RATE_LIMIT_INTERVAL / 2;
 			dhcp_discover(ifp);
 		} else
-			eloop_add_timeout_sec(RATE_LIMIT_INTERVAL,
+			eloop_timeout_add_sec(RATE_LIMIT_INTERVAL,
 			    ipv4ll_start, ifp);
 	} else {
 		eloop_timeout_add_sec(PROBE_WAIT, ipv4ll_start, ifp);
