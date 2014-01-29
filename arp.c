@@ -245,6 +245,9 @@ arp_announce(void *arg)
 		return;
 	}
 	if (state->new->cookie != htonl(MAGIC_COOKIE)) {
+		/* Check if doing DHCP */
+		if (!(ifp->options->options & DHCPCD_DHCP))
+			return;
 		/* We should pretend to be at the end
 		 * of the DHCP negotation cycle unless we rebooted */
 		if (state->interval != 0)

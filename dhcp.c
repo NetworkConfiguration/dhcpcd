@@ -2660,7 +2660,7 @@ dhcp_start(struct interface *ifp)
 		return;
 	}
 
-	if (dhcp_open(ifp) == -1)
+	if (ifo->options & DHCPCD_DHCP && dhcp_open(ifp) == -1)
 		return;
 
 	if (ifo->options & DHCPCD_INFORM) {
@@ -2709,10 +2709,21 @@ dhcp_start(struct interface *ifp)
 			}
 		}
 	}
+
+	if (!(ifo->options & DHCPCD_DHCP)) {
+		if (ifo->options & DHCPCD_IPV4LL) {
+			if (state->offer && state->offer->cookie != 0) {
+				free(state->offer);
+				state->offer = NULL;
+			}
+			ipv4ll_start(ifp);
+		}
+		return;
+	}
+
 	if (state->offer == NULL)
 		dhcp_discover(ifp);
-	else if (state->offer->cookie == 0 &&
-	    ifp->options->options & DHCPCD_IPV4LL)
+	else if (state->offer->cookie == 0 && ifo->options & DHCPCD_IPV4LL)
 		ipv4ll_start(ifp);
 	else
 		dhcp_reboot(ifp);

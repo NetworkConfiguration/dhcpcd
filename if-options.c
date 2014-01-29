@@ -84,6 +84,8 @@ unsigned long long options = 0;
 #define O_AUTHPROTOCOL		O_BASE + 25
 #define O_AUTHTOKEN		O_BASE + 26
 #define O_AUTHNOTREQUIRED	O_BASE + 27
+#define O_NODHCP		O_BASE + 28
+#define O_NODHCP6		O_BASE + 29
 
 char *dev_load;
 
@@ -162,6 +164,8 @@ const struct option cf_options[] = {
 	{"authprotocol",    required_argument, NULL, O_AUTHPROTOCOL},
 	{"authtoken",       required_argument, NULL, O_AUTHTOKEN},
 	{"noauthrequired",  no_argument,       NULL, O_AUTHNOTREQUIRED},
+	{"nodhcp",          no_argument,       NULL, O_NODHCP},
+	{"nodhcp6",         no_argument,       NULL, O_NODHCP6},
 	{NULL,              0,                 NULL, '\0'}
 };
 
@@ -1697,6 +1701,12 @@ parse_option(const char *ifname, struct if_options *ifo,
 	case O_AUTHNOTREQUIRED:
 		ifo->auth.options &= ~DHCPCD_AUTH_REQUIRE;
 		break;
+	case O_NODHCP:
+		ifo->options &= ~DHCPCD_DHCP;
+		break;
+	case O_NODHCP6:
+		ifo->options &= ~DHCPCD_DHCP6;
+		break;
 	default:
 		return 0;
 	}
@@ -1773,11 +1783,12 @@ read_config(const char *file,
 	ifo->options |= DHCPCD_DEV;
 #endif
 #ifdef INET
-	ifo->options |= DHCPCD_IPV4 | DHCPCD_IPV4LL;
+	ifo->options |= DHCPCD_IPV4 | DHCPCD_DHCP | DHCPCD_IPV4LL;
 	ifo->options |= DHCPCD_GATEWAY | DHCPCD_ARP;
 #endif
 #ifdef INET6
 	ifo->options |= DHCPCD_IPV6 | DHCPCD_IPV6RS | DHCPCD_IPV6RA_REQRDNSS;
+	ifo->options |= DHCPCD_DHCP6;
 	ifo->dadtransmits = ipv6_dadtransmits(ifname);
 #endif
 	ifo->timeout = DEFAULT_TIMEOUT;

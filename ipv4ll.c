@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2014 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -158,8 +158,12 @@ ipv4ll_handle_failure(void *arg)
 	if (++state->conflicts > MAX_CONFLICTS) {
 		syslog(LOG_ERR, "%s: failed to acquire an IPv4LL address",
 		    ifp->name);
-		state->interval = RATE_LIMIT_INTERVAL / 2;
-		dhcp_discover(ifp);
+		if (ifp->options->options & DHCPCD_DHCP) {
+			state->interval = RATE_LIMIT_INTERVAL / 2;
+			dhcp_discover(ifp);
+		} else
+			eloop_add_timeout_sec(RATE_LIMIT_INTERVAL,
+			    ipv4ll_start, ifp);
 	} else {
 		eloop_timeout_add_sec(PROBE_WAIT, ipv4ll_start, ifp);
 	}

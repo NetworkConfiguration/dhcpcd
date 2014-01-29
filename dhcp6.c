@@ -2491,6 +2491,9 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 		return 0;
 	}
 
+	if (!(ifp->options->options & DHCPCD_DHCP6))
+		return 0;
+
 	if (sock == -1 && dhcp6_open() == -1)
 		return -1;
 

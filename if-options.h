@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2014 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -100,6 +100,8 @@
 #define DHCPCD_WAITIP6			(1ULL << 46)
 #define DHCPCD_DEV			(1ULL << 47)
 #define DHCPCD_IAID			(1ULL << 48)
+#define DHCPCD_DHCP			(1ULL << 49)
+#define DHCPCD_DHCP6			(1ULL << 50)
 
 extern const struct option cf_options[];
 
