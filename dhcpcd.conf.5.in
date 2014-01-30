@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd January 29, 2014
+.Dd January 30, 2014
 .Dt DHCPCD.CONF 5
 .Os
 .Sh NAME
@@ -683,8 +683,20 @@ is the default.
 If none specified,
 .Ic monotonic
 is the default.
+If this is changed from what was previously used,
+or the means of calculating or storing it is broken then the DHCP server
+will probably have to have its notion of the clients Replay Detection Value
+reset.
 .Bl -tag -width -indent
+.It Ic monocounter
+Read the number in the file
+.Pa @DBDIR@/dhcpcd-rdm.monotonic
+and add one to it.
+.It Ic monotime
+Create a NTP timestamp from the system time.
 .It Ic monotonic
+Same as
+.Ic monotime .
 .El
 .Sh SEE ALSO
 .Xr fnmatch 3 ,

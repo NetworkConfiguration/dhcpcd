@@ -32,6 +32,7 @@
 
 #define DHCPCD_AUTH_SEND	(1 << 0)
 #define DHCPCD_AUTH_REQUIRE	(1 << 1)
+#define DHCPCD_AUTH_RDM_COUNTER	(1 << 2)
 
 #define AUTH_PROTO_TOKEN	0
 #define AUTH_PROTO_DELAYED	1

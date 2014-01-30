@@ -1609,7 +1609,11 @@ parse_option(const char *ifname, struct if_options *ifo,
 			ifo->auth.rdm = AUTH_RDM_MONOTONIC;
 			break;
 		}
-		if (strcasecmp(arg, "monotonic") == 0)
+		if (strcasecmp(arg, "monocounter") == 0) {
+			ifo->auth.rdm = AUTH_RDM_MONOTONIC;
+			ifo->auth.options |= DHCPCD_AUTH_RDM_COUNTER;
+		} else if (strcasecmp(arg, "monotonic") ==0 ||
+		    strcasecmp(arg, "monotime") == 0)
 			ifo->auth.rdm = AUTH_RDM_MONOTONIC;
 		else {
 			syslog(LOG_ERR, "%s: unsupported RDM", arg);

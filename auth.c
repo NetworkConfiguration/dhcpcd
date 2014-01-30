@@ -123,18 +123,25 @@ dhcp_auth_validate(struct authstate *state, const struct auth *auth,
 		errno = EPERM;
 		return NULL;
 	}
-
 	dlen -= 3;
+
 	memcpy(&replay, d, sizeof(replay));
 	replay = ntohll(replay);
+	if (state->token) {
+		if (state->replay == (replay ^ 0x8000000000000000ULL)) {
+			/* We don't know if the singular point is increasing
+			 * or decreasing. */
+			errno = EPERM;
+			return NULL;
+		}
+		if ((uint64_t)(replay - state->replay) <= 0) {
+			/* Replay attack detected */
+			errno = EPERM;
+			return NULL;
+		}
+	}
 	d+= sizeof(replay);
 	dlen -= sizeof(replay);
-
-	if (state->token && replay - state->replay <= 0) {
-		/* Replay attack detected */
-		errno = EPERM;
-		return NULL;
-	}
 
 	realm = NULL;
 	realm_len = 0;
@@ -302,7 +309,7 @@ finish:
 static uint64_t last_rdm;
 static uint8_t last_rdm_set;
 static uint64_t
-get_next_rdm_monotonic(void)
+get_next_rdm_monotonic_counter(void)
 {
 	FILE *fp;
 	char *line, *ep;
@@ -346,6 +353,33 @@ get_next_rdm_monotonic(void)
 	return rdm;
 }
 
+#define JAN_1970	2208988800UL	/* 1970 - 1900 in seconds */
+static uint64_t
+get_next_rdm_monotonic_clock(void)
+{
+	struct timespec ts;
+	uint32_t pack[2];
+	double frac;
+	uint64_t rdm;
+
+	if (clock_gettime(CLOCK_REALTIME, &ts) != 0)
+		return ++last_rdm; /* report error? */
+	pack[0] = htonl((uint32_t)ts.tv_sec + JAN_1970);
+	frac = (ts.tv_nsec / 1e9 * 0x100000000ULL);
+	pack[1] = htonl((uint32_t)frac);
+
+	memcpy(&rdm, &pack, sizeof(rdm));
+	return rdm;
+}
+
+static uint64_t
+get_next_rdm_monotonic(const struct auth *auth)
+{
+
+	if (auth->options & DHCPCD_AUTH_RDM_COUNTER)
+		return get_next_rdm_monotonic_counter();
+	return get_next_rdm_monotonic_clock();
+}
 
 /*
  * Encode a DHCP message.
@@ -459,11 +493,11 @@ dhcp_auth_encode(const struct auth *auth, const struct token *t,
 	*data++ = auth->rdm;
 	switch (auth->rdm) {
 	case AUTH_RDM_MONOTONIC:
-		rdm = get_next_rdm_monotonic();
+		rdm = get_next_rdm_monotonic(auth);
 		break;
 	default:
 		/* This block appeases gcc, clang doesn't need it */
-		rdm = get_next_rdm_monotonic();
+		rdm = get_next_rdm_monotonic(auth);
 		break;
 	}
 	rdm = htonll(rdm);
