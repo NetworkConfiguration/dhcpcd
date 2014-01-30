@@ -1615,6 +1615,7 @@ parse_option(const char *ifname, struct if_options *ifo,
 			syslog(LOG_ERR, "%s: unsupported RDM", arg);
 			return -1;
 		}
+		ifo->auth.options |= DHCPCD_AUTH_SEND;
 		break;
 	case O_AUTHTOKEN:
 		fp = strwhite(arg);
