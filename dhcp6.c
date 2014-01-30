@@ -2169,12 +2169,12 @@ dhcp6_handledata(__unused void *arg)
 		syslog(LOG_DEBUG, "%s: validated using 0x%08" PRIu32,
 		    ifp->name, state->auth.token->secretid);
 	} else if (ifo->auth.options & DHCPCD_AUTH_REQUIRE) {
-		syslog(LOG_ERR, "%s: missing authentiation from %s",
+		syslog(LOG_ERR, "%s: no authentication from %s",
 		    ifp->name, sfrom);
 		return;
 	} else if (ifo->auth.options & DHCPCD_AUTH_SEND)
 		syslog(LOG_WARNING,
-		    "%s: missing authentiation from %s",
+		    "%s: no authentication from %s",
 		    ifp->name, sfrom);
 
 	op = dhcp6_get_op(r->type);

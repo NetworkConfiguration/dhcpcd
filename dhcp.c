@@ -2046,9 +2046,9 @@ dhcp_drop(struct interface *ifp, const char *reason)
 }
 
 static void
-log_dhcp(int lvl, const char *msg,
+log_dhcp1(int lvl, const char *msg,
     const struct interface *iface, const struct dhcp_message *dhcp,
-    const struct in_addr *from)
+    const struct in_addr *from, int ad)
 {
 	const char *tfrom;
 	char *a;
@@ -2057,7 +2057,7 @@ log_dhcp(int lvl, const char *msg,
 
 	if (strcmp(msg, "NAK:") == 0)
 		a = get_option_string(dhcp, DHO_MESSAGE);
-	else if (dhcp->yiaddr != 0) {
+	else if (ad && dhcp->yiaddr != 0) {
 		addr.s_addr = dhcp->yiaddr;
 		a = strdup(inet_ntoa(addr));
 		if (a == NULL) {
@@ -2069,10 +2069,14 @@ log_dhcp(int lvl, const char *msg,
 
 	tfrom = "from";
 	r = get_option_addr(&addr, dhcp, DHO_SERVERID);
-	if (dhcp->servername[0] && r == 0)
-		syslog(lvl, "%s: %s %s %s %s `%s'", iface->name, msg, a,
-		    tfrom, inet_ntoa(addr), dhcp->servername);
-	else {
+	if (dhcp->servername[0] && r == 0) {
+		if (a == NULL)
+			syslog(lvl, "%s: %s %s %s `%s'", iface->name, msg,
+			    tfrom, inet_ntoa(addr), dhcp->servername);
+		else
+			syslog(lvl, "%s: %s %s %s %s `%s'", iface->name, msg, a,
+			    tfrom, inet_ntoa(addr), dhcp->servername);
+	} else {
 		if (r != 0) {
 			tfrom = "via";
 			addr = *from;
@@ -2085,6 +2089,15 @@ log_dhcp(int lvl, const char *msg,
 			    iface->name, msg, a, tfrom, inet_ntoa(addr));
 	}
 	free(a);
+}
+
+static void
+log_dhcp(int lvl, const char *msg,
+    const struct interface *iface, const struct dhcp_message *dhcp,
+    const struct in_addr *from)
+{
+
+	log_dhcp1(lvl, msg, iface, dhcp, from, 1);
 }
 
 static int
@@ -2138,18 +2151,18 @@ dhcp_handledhcp(struct interface *iface, struct dhcp_message **dhcpp,
 		{
 			syslog(LOG_DEBUG, "%s: dhcp_auth_validate: %m",
 			    iface->name);
-			log_dhcp(LOG_ERR, "authentication failed",
-			    iface, dhcp, from);
+			log_dhcp1(LOG_ERR, "authentication failed",
+			    iface, dhcp, from, 0);
 			return;
 		}
 		syslog(LOG_DEBUG, "%s: validated using 0x%08" PRIu32,
 		    iface->name, state->auth.token->secretid);
 	} else if (ifo->auth.options & DHCPCD_AUTH_REQUIRE) {
-		log_dhcp(LOG_ERR, "missing authentiation", iface, dhcp, from);
+		log_dhcp1(LOG_ERR, "no authentication", iface, dhcp, from, 0);
 		return;
 	} else if (ifo->auth.options & DHCPCD_AUTH_SEND)
-		log_dhcp(LOG_WARNING, "missing authentiation",
-		    iface, dhcp, from);
+		log_dhcp1(LOG_WARNING, "no authentication",
+		    iface, dhcp, from, 0);
 
 	/* reset the message counter */
 	state->interval = 0;
