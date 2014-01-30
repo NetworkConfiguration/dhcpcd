@@ -2147,7 +2147,9 @@ dhcp_handledhcp(struct interface *iface, struct dhcp_message **dhcpp,
 	} else if (ifo->auth.options & DHCPCD_AUTH_REQUIRE) {
 		log_dhcp(LOG_ERR, "missing authentiation", iface, dhcp, from);
 		return;
-	}
+	} else if (ifo->auth.options & DHCPCD_AUTH_SEND)
+		log_dhcp(LOG_WARNING, "missing authentiation",
+		    iface, dhcp, from);
 
 	/* reset the message counter */
 	state->interval = 0;
