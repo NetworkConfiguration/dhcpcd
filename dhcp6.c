@@ -419,7 +419,9 @@ dhcp6_makemessage(struct interface *ifp)
 		if (fqdn != FQDN_DISABLE)
 			len += sizeof(*o) + 1 + encode_rfc1035(hostname, NULL);
 
-		len += sizeof(*o); /* Reconfigure Accept */
+		if ((ifo->auth.options & DHCPCD_AUTH_SENDREQUIRE) !=
+		    DHCPCD_AUTH_SENDREQUIRE)
+			len += sizeof(*o); /* Reconfigure Accept */
 	}
 
 	len += sizeof(*state->send);
@@ -653,9 +655,13 @@ dhcp6_makemessage(struct interface *ifp)
 			o->len = htons(l + 1);
 		}
 
-		o = D6_NEXT_OPTION(o);
-		o->code = htons(D6_OPTION_RECONF_ACCEPT);
-		o->len = 0;
+		if ((ifo->auth.options & DHCPCD_AUTH_SENDREQUIRE) !=
+		    DHCPCD_AUTH_SENDREQUIRE)
+		{
+			o = D6_NEXT_OPTION(o);
+			o->code = htons(D6_OPTION_RECONF_ACCEPT);
+			o->len = 0;
+		}
 
 		if (n_options) {
 			o = D6_NEXT_OPTION(o);
@@ -2637,6 +2643,10 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 	 * of which interface is delegating as we remeber it by pointer.
 	 * So if we need to change this behaviour, we need to change
 	 * how we remember which interface delegated.
+	 *
+	 * XXX The below is no longer true due to the change of the
+	 * default IAID, but do PPP links have stable ethernet addresses?
+	 *
 	 * To make it more interesting, on some OS's with PPP links
 	 * there is no guarantee the delegating interface will have
 	 * the same name or index so think very hard before changing
@@ -2650,6 +2660,7 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 
 	state = D6_STATE(ifp);
 	if (state) {
+		dhcp_auth_reset(&state->auth);
 		if (ifp->options->options & DHCPCD_RELEASE) {
 			if (ifp->carrier != LINK_DOWN)
 				dhcp6_startrelease(ifp);

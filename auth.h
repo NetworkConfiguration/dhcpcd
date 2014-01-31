@@ -34,6 +34,8 @@
 #define DHCPCD_AUTH_REQUIRE	(1 << 1)
 #define DHCPCD_AUTH_RDM_COUNTER	(1 << 2)
 
+#define DHCPCD_AUTH_SENDREQUIRE	(DHCPCD_AUTH_SEND | DHCPCD_AUTH_REQUIRE)
+
 #define AUTH_PROTO_TOKEN	0
 #define AUTH_PROTO_DELAYED	1
 #define AUTH_PROTO_DELAYEDREALM	2
@@ -68,6 +70,8 @@ struct authstate {
 	const struct token *token;
 	struct token *reconf;
 };
+
+void dhcp_auth_reset(struct authstate *);
 
 const struct token * dhcp_auth_validate(struct authstate *,
     const struct auth *,

@@ -867,10 +867,14 @@ make_message(struct dhcp_message **message,
 			p += ifo->vendor[0] + 1;
 		}
 
-		/* We support HMAC-MD5 */
-		*p++ = DHO_FORCERENEW_NONCE;
-		*p++ = 1;
-		*p++ = AUTH_ALG_HMAC_MD5;
+		if ((ifo->auth.options & DHCPCD_AUTH_SENDREQUIRE) !=
+		    DHCPCD_AUTH_SENDREQUIRE)
+		{
+			/* We support HMAC-MD5 */
+			*p++ = DHO_FORCERENEW_NONCE;
+			*p++ = 1;
+			*p++ = AUTH_ALG_HMAC_MD5;
+		}
 
 		if (ifo->vivco_len) {
 			*p++ = DHO_VIVCO;
@@ -2014,6 +2018,7 @@ dhcp_drop(struct interface *ifp, const char *reason)
 	state = D_STATE(ifp);
 	if (state == NULL)
 		return;
+	dhcp_auth_reset(&state->auth);
 	dhcp_close(ifp);
 	arp_close(ifp);
 	eloop_timeouts_delete(ifp, dhcp_expire, NULL);

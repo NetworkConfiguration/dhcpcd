@@ -74,6 +74,16 @@ ntohll(uint64_t x)
 
 #define HMAC_LENGTH	16
 
+void
+dhcp_auth_reset(struct authstate *state)
+{
+
+	if (state->reconf) {
+		free(state->reconf);
+		state->reconf = NULL;
+	}
+}
+
 /*
  * Authenticate a DHCP message.
  * m and mlen refer to the whole message.
@@ -215,6 +225,12 @@ dhcp_auth_validate(struct authstate *state, const struct auth *auth,
 			/* Nothing to validate, just accepting the key */
 			return state->reconf;
 		case 2:
+			if (!((mp == 4 && mt == DHCP_FORCERENEW) ||
+			    (mp == 6 && mt == DHCP6_RECONFIGURE)))
+			{
+				errno = EINVAL;
+				return NULL;
+			}
 			if (state->reconf == NULL) {
 				errno = ENOENT;
 				return NULL;
