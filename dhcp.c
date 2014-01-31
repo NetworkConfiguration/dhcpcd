@@ -866,6 +866,11 @@ make_message(struct dhcp_message **message,
 			p += ifo->vendor[0] + 1;
 		}
 
+		/* We support HMAC-MD5 */
+		*p++ = DHO_FORCERENEW_NONCE;
+		*p++ = 1;
+		*p++ = AUTH_ALG_HMAC_MD5;
+
 		if (ifo->vivco_len) {
 			*p++ = DHO_VIVCO;
 			lp = p++;
