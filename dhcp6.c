@@ -2252,14 +2252,6 @@ dhcp6_handledata(__unused void *arg)
 			    ifp->name, sfrom);
 			return;
 		}
-		if (state->state != DH6S_BOUND &&
-		    state->state != DH6S_INFORMED)
-		{
-			syslog(LOG_DEBUG,
-			    "%s: not bound, ignoring Force Renew from %s",
-			    ifp->name, sfrom);
-			return;
-		}
 		syslog(LOG_INFO, "%s: Force Renew from %s", ifp->name, sfrom);
 		o = dhcp6_getmoption(D6_OPTION_RECONF_MSG, r, len);
 		if (o == NULL) {
