@@ -93,14 +93,15 @@ struct dhcp_op {
 };
 
 static const struct dhcp_op dhcp_ops[] = {
-	{ DHCP_DISCOVER, "DISCOVER" },
-	{ DHCP_OFFER,    "OFFER" },
-	{ DHCP_REQUEST,  "REQUEST" },
-	{ DHCP_DECLINE,  "DECLINE" },
-	{ DHCP_ACK,      "ACK" },
-	{ DHCP_NAK,      "NAK" },
-	{ DHCP_RELEASE,  "RELEASE" },
-	{ DHCP_INFORM,   "INFORM" },
+	{ DHCP_DISCOVER,   "DISCOVER" },
+	{ DHCP_OFFER,      "OFFER" },
+	{ DHCP_REQUEST,    "REQUEST" },
+	{ DHCP_DECLINE,    "DECLINE" },
+	{ DHCP_ACK,        "ACK" },
+	{ DHCP_NAK,        "NAK" },
+	{ DHCP_RELEASE,    "RELEASE" },
+	{ DHCP_INFORM,     "INFORM" },
+	{ DHCP_FORCERENEW, "DHCP_FORCERENEW"},
 	{ 0, NULL }
 };
 
