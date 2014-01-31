@@ -2182,7 +2182,7 @@ dhcp_handledhcp(struct interface *iface, struct dhcp_message **dhcpp,
 			    iface, dhcp, from);
 			return;
 		}
-		if (state->state != DHS_BOUND) {
+		if (state->state != DHS_BOUND && state->state != DHS_INFORM) {
 			log_dhcp(LOG_DEBUG, "not bound, ignoring Force Renew",
 			    iface, dhcp, from);
 			return;
@@ -2190,8 +2190,13 @@ dhcp_handledhcp(struct interface *iface, struct dhcp_message **dhcpp,
 		log_dhcp(LOG_ERR, "Force Renew from", iface, dhcp, from);
 		/* The rebind and expire timings are still the same, we just
 		 * enter the renew state early */
-		eloop_timeout_delete(dhcp_renew, iface);
-		dhcp_renew(iface);
+		if (state->state == DHS_BOUND) {
+			eloop_timeout_delete(dhcp_renew, iface);
+			dhcp_renew(iface);
+		} else {
+			eloop_timeout_delete(send_inform, iface);
+			dhcp_inform(iface);
+		}
 		return;
 	}
 
