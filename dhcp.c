@@ -2274,7 +2274,9 @@ dhcp_handledhcp(struct interface *iface, struct dhcp_message **dhcpp,
 			    iface->name, msg);
 			free(msg);
 		}
-		if (get_option_uint8(&tmp, dhcp, DHO_AUTOCONFIGURE) != 0) {
+		if (state->state == DHS_DISCOVER &&
+		    get_option_uint8(&tmp, dhcp, DHO_AUTOCONFIGURE) != 0)
+		{
 			switch (tmp) {
 			case 0:
 				log_dhcp(LOG_WARNING, "IPv4LL disabled from",
