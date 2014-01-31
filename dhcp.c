@@ -1367,11 +1367,6 @@ dhcp_openudp(struct interface *iface)
 		    sizeof(ifr)) == -1)
 		goto eexit;
 #endif
-	/* As we don't use this socket for receiving, set the
-	 * receive buffer to 1 */
-	n = 1;
-	if (setsockopt(s, SOL_SOCKET, SO_RCVBUF, &n, sizeof(n)) == -1)
-		goto eexit;
 	state = D_STATE(iface);
 	memset(&sin, 0, sizeof(sin));
 	sin.sin_family = AF_INET;
@@ -2510,9 +2505,9 @@ dhcp_handleudp(void *arg)
 
 	ifp = arg;
 	state = D_CSTATE(ifp);
-	bytes = read(state->udp_fd, buffer, sizeof(buffer));
 	/* Just read what's in the UDP fd and discard it as we always read
 	 * from the raw fd */
+	bytes = read(state->udp_fd, buffer, sizeof(buffer));
 }
 
 static int
