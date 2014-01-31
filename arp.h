@@ -45,4 +45,5 @@
 void arp_announce(void *);
 void arp_probe(void *);
 void arp_start(struct interface *);
+void arp_close(struct interface *);
 #endif

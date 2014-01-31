@@ -106,7 +106,6 @@ arp_failure(struct interface *ifp)
 	unlink(state->leasefile);
 	if (!state->lease.frominfo)
 		dhcp_decline(ifp);
-	dhcp_close(ifp);
 	eloop_timeout_delete(NULL, ifp);
 	if (state->lease.frominfo)
 		start_interface(ifp);
@@ -336,3 +335,19 @@ arp_start(struct interface *ifp)
 	state->arping_index = 0;
 	arp_probe(ifp);
 }
+
+void
+arp_close(struct interface *ifp)
+{
+	struct dhcp_state *state = D_STATE(ifp);
+
+	if (state == NULL)
+		return;
+
+	if (state->arp_fd != -1) {
+		eloop_event_delete(state->arp_fd);
+		close(state->arp_fd);
+		state->arp_fd = -1;
+	}
+}
+

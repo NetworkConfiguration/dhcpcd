@@ -1718,9 +1718,8 @@ dhcp_bind(void *arg)
 	struct if_options *ifo = iface->options;
 	struct dhcp_lease *lease = &state->lease;
 	struct timeval tv;
+	uint8_t ipv4ll = 0;
 
-	/* We're binding an address now - ensure that sockets are closed */
-	dhcp_close(iface);
 	state->reason = NULL;
 	if (clock_monotonic)
 		get_monotonic(&lease->boundtime);
@@ -1741,6 +1740,7 @@ dhcp_bind(void *arg)
 		    iface->name, inet_ntoa(lease->addr));
 		lease->leasetime = ~0U;
 		state->reason = "IPV4LL";
+		ipv4ll = 1;
 	} else if (ifo->options & DHCPCD_INFORM) {
 		if (ifo->req_addr.s_addr != 0)
 			lease->addr.s_addr = ifo->req_addr.s_addr;
@@ -1822,6 +1822,8 @@ dhcp_bind(void *arg)
 	}
 	ipv4_applyaddr(iface);
 	daemonise();
+	if (!ipv4ll)
+		arp_close(iface);
 	state->state = DHS_BOUND;
 	if (ifo->options & DHCPCD_ARP) {
 		state->claims = 0;
@@ -2011,6 +2013,8 @@ dhcp_drop(struct interface *ifp, const char *reason)
 	state = D_STATE(ifp);
 	if (state == NULL)
 		return;
+	dhcp_close(ifp);
+	arp_close(ifp);
 	eloop_timeouts_delete(ifp, dhcp_expire, NULL);
 	if (ifp->options->options & DHCPCD_RELEASE) {
 		unlink(state->leasefile);
@@ -2164,6 +2168,49 @@ dhcp_handledhcp(struct interface *iface, struct dhcp_message **dhcpp,
 		log_dhcp1(LOG_WARNING, "no authentication",
 		    iface, dhcp, from, 0);
 
+	/* RFC 3203 */
+	if (type == DHCP_FORCERENEW) {
+		if (from->s_addr == INADDR_ANY ||
+		    from->s_addr == INADDR_BROADCAST)
+		{
+			log_dhcp(LOG_ERR, "discarding Force Renew",
+			    iface, dhcp, from);
+			return;
+		}
+		if (auth == NULL) {
+			log_dhcp(LOG_ERR, "unauthenticated Force Renew",
+			    iface, dhcp, from);
+			return;
+		}
+		if (state->state != DHS_BOUND) {
+			log_dhcp(LOG_DEBUG, "not bound, ignoring Force Renew",
+			    iface, dhcp, from);
+			return;
+		}
+		log_dhcp(LOG_ERR, "Force Renew from", iface, dhcp, from);
+		/* The rebind and expire timings are still the same, we just
+		 * enter the renew state early */
+		eloop_timeout_delete(dhcp_renew, iface);
+		dhcp_renew(iface);
+		return;
+	}
+
+	if (state->state == DHS_BOUND) {
+		/* Before we supported FORCERENEW we closed off the raw
+		 * port so we effectively ignored all messages.
+		 * As such we'll not log by default here. */
+		//log_dhcp(LOG_DEBUG, "bound, ignoring", iface, dhcp, from);
+		return;
+	}
+
+	/* Ensure it's the right transaction */
+	if (state->xid != ntohl(dhcp->xid)) {
+		syslog(LOG_DEBUG,
+		    "%s: wrong xid 0x%x (expecting 0x%x) from %s",
+		    iface->name, ntohl(dhcp->xid), state->xid,
+		    inet_ntoa(*from));
+		return;
+	}
 	/* reset the message counter */
 	state->interval = 0;
 
@@ -2175,13 +2222,14 @@ dhcp_handledhcp(struct interface *iface, struct dhcp_message **dhcpp,
 			log_dhcp(LOG_WARNING, "reject NAK", iface, dhcp, from);
 			return;
 		}
+
 		/* We should restart on a NAK */
 		log_dhcp(LOG_WARNING, "NAK:", iface, dhcp, from);
 		if (!(options & DHCPCD_TEST)) {
 			dhcp_drop(iface, "NAK");
 			unlink(state->leasefile);
 		}
-		dhcp_close(iface);
+
 		/* If we constantly get NAKS then we should slowly back off */
 		eloop_timeout_add_sec(state->nakoff, dhcp_discover, iface);
 		if (state->nakoff == 0)
@@ -2290,11 +2338,6 @@ dhcp_handledhcp(struct interface *iface, struct dhcp_message **dhcpp,
 
 	lease->frominfo = 0;
 	eloop_timeout_delete(NULL, iface);
-
-	/* We now have an offer, so close the DHCP sockets.
-	 * This allows us to safely ARP when broken DHCP servers send an ACK
-	 * follows by an invalid NAK. */
-	dhcp_close(iface);
 
 	if (ifo->options & DHCPCD_ARP &&
 	    state->addr.s_addr != state->offer->yiaddr)
@@ -2441,14 +2484,6 @@ dhcp_handlepacket(void *arg)
 			    iface->name, inet_ntoa(from));
 			continue;
 		}
-		/* Ensure it's the right transaction */
-		if (state->xid != ntohl(dhcp->xid)) {
-			syslog(LOG_DEBUG,
-			    "%s: wrong xid 0x%x (expecting 0x%x) from %s",
-			    iface->name, ntohl(dhcp->xid), state->xid,
-			    inet_ntoa(from));
-			continue;
-		}
 		/* Ensure packet is for us */
 		if (iface->hwlen <= sizeof(dhcp->chaddr) &&
 		    memcmp(dhcp->chaddr, iface->hwaddr, iface->hwlen))
@@ -2463,6 +2498,21 @@ dhcp_handlepacket(void *arg)
 			break;
 	}
 	free(dhcp);
+}
+
+static void
+dhcp_handleudp(void *arg)
+{
+	const struct interface *ifp;
+	const struct dhcp_state *state;
+	ssize_t bytes;
+	uint8_t buffer[sizeof(struct dhcp_message)];
+
+	ifp = arg;
+	state = D_CSTATE(ifp);
+	bytes = read(state->udp_fd, buffer, sizeof(buffer));
+	/* Just read what's in the UDP fd and discard it as we always read
+	 * from the raw fd */
 }
 
 static int
@@ -2491,15 +2541,13 @@ dhcp_open(struct interface *ifp)
 		eloop_event_add(state->raw_fd, dhcp_handlepacket, ifp);
 	}
 	if (state->udp_fd == -1 &&
-	    state->addr.s_addr != 0 &&
-	    state->new != NULL &&
-	    (state->new->cookie == htonl(MAGIC_COOKIE) ||
-	    ifp->options->options & DHCPCD_INFORM))
+	    ifp->options->options & DHCPCD_DHCP)
 	{
 		if (dhcp_openudp(ifp) == -1 && errno != EADDRINUSE) {
 			syslog(LOG_ERR, "%s: dhcp_openudp: %m", ifp->name);
 			return -1;
 		}
+		eloop_event_add(state->udp_fd, dhcp_handleudp, ifp);
 	}
 	return 0;
 }
@@ -2686,7 +2734,6 @@ dhcp_start(struct interface *ifp)
 		syslog(LOG_WARNING, "%s: needs a clientid to configure",
 		    ifp->name);
 		dhcp_drop(ifp, "FAIL");
-		dhcp_close(ifp);
 		eloop_timeout_delete(NULL, ifp);
 		return;
 	}

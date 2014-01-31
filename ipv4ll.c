@@ -151,7 +151,6 @@ ipv4ll_handle_failure(void *arg)
 		}
 	}
 
-	dhcp_close(ifp);
 	free(state->offer);
 	state->offer = NULL;
 	eloop_timeout_delete(NULL, ifp);

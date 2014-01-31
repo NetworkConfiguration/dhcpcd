@@ -328,7 +328,6 @@ stop_interface(struct interface *ifp)
 	dhcp6_drop(ifp, NULL);
 	ipv6nd_drop(ifp);
 	dhcp_drop(ifp, "STOP");
-	dhcp_close(ifp);
 	eloop_timeout_delete(NULL, ifp);
 	if (ifp->options->options & DHCPCD_DEPARTED)
 		script_runreason(ifp, "DEPARTED");
@@ -526,7 +525,6 @@ handle_carrier(int carrier, int flags, const char *ifname)
 			if (ifp->carrier == LINK_UP)
 				syslog(LOG_INFO, "%s: carrier lost", ifp->name);
 			ifp->carrier = LINK_DOWN;
-			dhcp_close(ifp);
 			dhcp6_drop(ifp, "EXPIRE6");
 			ipv6nd_drop(ifp);
 			/* Don't blindly delete our knowledge of LL addresses.

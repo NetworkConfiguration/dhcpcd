@@ -57,6 +57,7 @@
 #define DHCP_NAK            6
 #define DHCP_RELEASE        7
 #define DHCP_INFORM         8
+#define DHCP_FORCERENEW     9
 
 /* Constants taken from RFC 2131. */
 #define T1			0.5
