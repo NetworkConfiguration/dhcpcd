@@ -17,10 +17,11 @@ SRCS+=		${DHCPCD_SRCS}
 
 VPATH=	. ./crypt
 
+SRCS+=		auth.c
 CPPFLAGS+=	-I./crypt
-SRCS+=		auth.c hmac_md5.c ${MD5_SRC}
+CRYPT_SRCS=	hmac_md5.c ${MD5_SRC}
 
-OBJS+=		${SRCS:.c=.o} ${COMPAT_SRCS:.c=.o}
+OBJS+=		${SRCS:.c=.o} ${COMPAT_SRCS:.c=.o} ${CRYPT_SRCS:.c=.o}
 
 SCRIPT=		${LIBEXECDIR}/dhcpcd-run-hooks
 HOOKDIR=	${LIBEXECDIR}/dhcpcd-hooks
@@ -156,18 +157,28 @@ import: ${SRCS}
 		sed -e 's/^.*\.c //g' -e 's/.*\.c$$//g' -e 's/\\//g' | \
 		tr ' ' '\n' | \
 		sed -e '/^compat\//d' | \
-		sort -u) /tmp/${DISTPREFIX}
+		sed -e '/^crypt\//d' | \
+		sort -u) /tmp/${DISTPREFIX}; \
+	if test -n "${CRYPT_SRCS}"; then \
+		${INSTALL} -d /tmp/${DISTPREFIX}/crypt; \
+		cp crypt/${CRYPT_SRCS} /tmp/${DISTPREFIX}/crypt; \
+		cp $$(cd crypt && ${CC} ${CPPFLAGS} -MM ${CRYPT_SRCS} | \
+			sed -e 's/^.*c //g' -e 's/.*\.c$$//g' -e 's/\\//g' | \
+			tr ' ' '\n' | sed -e 's:^:crypt/:g' | \
+			sort -u) /tmp/${DISTPREFIX}/crypt; \
+	fi;
 	if test -n "${COMPAT_SRCS}"; then \
 		${INSTALL} -d /tmp/${DISTPREFIX}/compat; \
-		cp ${COMPAT_SRCS} /tmp/${DISTPREFIX}/compat; \
-		cp $$(${CC} ${CPPFLAGS} -MM ${COMPAT_SRCS} | \
+		cp compat/${COMPAT_SRCS} /tmp/${DISTPREFIX}/compat; \
+		cp $$(cd compat && ${CC} ${CPPFLAGS} -MM ${COMPAT_SRCS} | \
 			sed -e 's/^.*c //g' -e 's/.*\.c$$//g' -e 's/\\//g' | \
-			tr ' ' '\n' | \
+			tr ' ' '\n' | sed -e 's:^:compat/:g' | \
 			sort -u) /tmp/${DISTPREFIX}/compat; \
 	fi;
 	if test -n "${IMPORT_RCSID}"; then \
 		for x in \
 		    /tmp/${DISTPREFIX}/*.c \
+		    /tmp/${DISTPREFIX}/crypt/*.c \
 		    /tmp/${DISTPREFIX}/compat/*.c \
 		; do \
 			if test -e "$$x"; then \
@@ -180,6 +191,7 @@ import: ${SRCS}
 	if test -n "${IMPORT_HID}"; then \
 		for x in \
 		    /tmp/${DISTPREFIX}/*.h \
+		    /tmp/${DISTPREFIX}/crypt/*.h \
 		    /tmp/${DISTPREFIX}/compat/*.h \
 		; do \
 			if test -e "$$x"; then \
