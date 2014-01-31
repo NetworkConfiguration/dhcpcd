@@ -777,6 +777,13 @@ make_message(struct dhcp_message **message,
 	if (type == DHCP_DISCOVER && ifo->options & DHCPCD_REQUEST)
 		PUTADDR(DHO_IPADDRESS, ifo->req_addr);
 
+	/* RFC 2563 Auto Configure */
+	if (type == DHCP_DISCOVER && ifo->options & DHCPCD_IPV4LL) {
+		*p++ = DHO_AUTOCONFIGURE;
+		*p++ = 1;
+		*p++ = 1;
+	}
+
 	if (type == DHCP_DISCOVER ||
 	    type == DHCP_INFORM ||
 	    type == DHCP_REQUEST)
@@ -2147,6 +2154,7 @@ dhcp_handledhcp(struct interface *iface, struct dhcp_message **dhcpp,
 	struct in_addr addr;
 	size_t i;
 	int auth_len;
+	char *msg;
 
 	/* We may have found a BOOTP server */
 	if (get_option_uint8(&type, dhcp, DHO_MESSAGETYPE) == -1)
@@ -2236,6 +2244,11 @@ dhcp_handledhcp(struct interface *iface, struct dhcp_message **dhcpp,
 
 		/* We should restart on a NAK */
 		log_dhcp(LOG_WARNING, "NAK:", iface, dhcp, from);
+		if ((msg = get_option_string(dhcp, DHO_MESSAGE))) {
+			syslog(LOG_WARNING, "%s: message: %s",
+			    iface->name, msg);
+			free(msg);
+		}
 		if (!(options & DHCPCD_TEST)) {
 			dhcp_drop(iface, "NAK");
 			unlink(state->leasefile);
@@ -2249,6 +2262,40 @@ dhcp_handledhcp(struct interface *iface, struct dhcp_message **dhcpp,
 			state->nakoff *= 2;
 			if (state->nakoff > NAKOFF_MAX)
 				state->nakoff = NAKOFF_MAX;
+		}
+		return;
+	}
+
+	/* DHCP Auto-Configure, RFC 2563 */
+	if (type == DHCP_OFFER && dhcp->yiaddr == 0) {
+		log_dhcp(LOG_WARNING, "no address given", iface, dhcp, from);
+		if ((msg = get_option_string(dhcp, DHO_MESSAGE))) {
+			syslog(LOG_WARNING, "%s: message: %s",
+			    iface->name, msg);
+			free(msg);
+		}
+		if (get_option_uint8(&tmp, dhcp, DHO_AUTOCONFIGURE) != 0) {
+			switch (tmp) {
+			case 0:
+				log_dhcp(LOG_WARNING, "IPv4LL disabled from",
+				    iface, dhcp, from);
+				dhcp_close(iface);
+				eloop_timeout_delete(NULL, iface);
+				eloop_timeout_add_sec(DHCP_MAX, dhcp_discover,
+				    iface);
+				break;
+			case 1:
+				log_dhcp(LOG_WARNING, "IPv4LL enabled from",
+				    iface, dhcp, from);
+				eloop_timeout_delete(NULL, iface);
+				ipv4ll_start(iface);
+				break;
+			default:
+				syslog(LOG_ERR,
+				    "%s: unknown auto configuration option %d",
+				    iface->name, tmp);
+				break;
+			}
 		}
 		return;
 	}
