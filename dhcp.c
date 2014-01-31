@@ -2511,14 +2511,13 @@ dhcp_handleudp(void *arg)
 {
 	const struct interface *ifp;
 	const struct dhcp_state *state;
-	ssize_t bytes;
 	uint8_t buffer[sizeof(struct dhcp_message)];
 
 	ifp = arg;
 	state = D_CSTATE(ifp);
 	/* Just read what's in the UDP fd and discard it as we always read
 	 * from the raw fd */
-	bytes = read(state->udp_fd, buffer, sizeof(buffer));
+	read(state->udp_fd, buffer, sizeof(buffer));
 }
 
 static int
