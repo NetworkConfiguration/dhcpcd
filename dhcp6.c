@@ -418,6 +418,8 @@ dhcp6_makemessage(struct interface *ifp)
 
 		if (fqdn != FQDN_DISABLE)
 			len += sizeof(*o) + 1 + encode_rfc1035(hostname, NULL);
+
+		len += sizeof(*o); /* Reconfigure Accept */
 	}
 
 	len += sizeof(*state->send);
@@ -629,7 +631,7 @@ dhcp6_makemessage(struct interface *ifp)
 		}
 	}
 
-	if (state->send->type !=  DHCP6_RELEASE) {
+	if (state->send->type != DHCP6_RELEASE) {
 		if (fqdn != FQDN_DISABLE) {
 			o = D6_NEXT_OPTION(o);
 			o->code = htons(D6_OPTION_FQDN);
@@ -650,6 +652,10 @@ dhcp6_makemessage(struct interface *ifp)
 				*p = D6_FQDN_NONE;
 			o->len = htons(l + 1);
 		}
+
+		o = D6_NEXT_OPTION(o);
+		o->code = htons(D6_OPTION_RECONF_ACCEPT);
+		o->len = 0;
 
 		if (n_options) {
 			o = D6_NEXT_OPTION(o);
@@ -2048,7 +2054,7 @@ dhcp6_handledata(__unused void *arg)
 	const char *sfrom, *op;
 	struct dhcp6_message *r;
 	struct dhcp6_state *state;
-	const struct dhcp6_option *o;
+	const struct dhcp6_option *o, *auth;
 	const struct dhcp_opt *opt;
 	const struct if_options *ifo;
 	struct ipv6_addr *ap;
@@ -2112,9 +2118,10 @@ dhcp6_handledata(__unused void *arg)
 		return;
 
 	r = (struct dhcp6_message *)rcvhdr.msg_iov[0].iov_base;
-	if (r->xid[0] != state->send->xid[0] ||
+	if (r->type != DHCP6_RECONFIGURE &&
+	    (r->xid[0] != state->send->xid[0] ||
 	    r->xid[1] != state->send->xid[1] ||
-	    r->xid[2] != state->send->xid[2])
+	    r->xid[2] != state->send->xid[2]))
 	{
 		syslog(LOG_DEBUG,
 		    "%s: wrong xid 0x%02x%02x%02x"
@@ -2155,11 +2162,11 @@ dhcp6_handledata(__unused void *arg)
 	}
 
 	/* Authenticate the message */
-	o = dhcp6_getmoption(D6_OPTION_AUTH, r, len);
-	if (o) {
+	auth = dhcp6_getmoption(D6_OPTION_AUTH, r, len);
+	if (auth) {
 		if (dhcp_auth_validate(&state->auth, &ifo->auth,
 		    (uint8_t *)r, len, 6, r->type,
-		    D6_COPTION_DATA(o), ntohs(o->len)) == NULL)
+		    D6_COPTION_DATA(auth), ntohs(auth->len)) == NULL)
 		{
 			syslog(LOG_DEBUG, "dhcp_auth_validate: %m");
 			syslog(LOG_ERR, "%s: authentication failed from %s",
@@ -2237,6 +2244,63 @@ dhcp6_handledata(__unused void *arg)
 		}
 		if (dhcp6_validatelease(ifp, r, len, sfrom) == -1)
 			return;
+		break;
+	case DHCP6_RECONFIGURE:
+		if (auth == NULL) {
+			syslog(LOG_ERR,
+			    "%s: unauthenticated Force Renew from %s",
+			    ifp->name, sfrom);
+			return;
+		}
+		if (state->state != DH6S_BOUND &&
+		    state->state != DH6S_INFORMED)
+		{
+			syslog(LOG_DEBUG,
+			    "%s: not bound, ignoring Force Renew from %s",
+			    ifp->name, sfrom);
+			return;
+		}
+		syslog(LOG_INFO, "%s: Force Renew from %s", ifp->name, sfrom);
+		o = dhcp6_getmoption(D6_OPTION_RECONF_MSG, r, len);
+		if (o == NULL) {
+			syslog(LOG_ERR,
+			    "%s: missing Reconfigure Message option",
+			    ifp->name);
+			return;
+		}
+		if (ntohs(o->len) != 1) {
+			syslog(LOG_ERR,
+			    "%s: missing Reconfigure Message type",
+			    ifp->name);
+			return;
+		}
+		switch(*D6_COPTION_DATA(o)) {
+		case DHCP6_RENEW:
+			if (state->state != DH6S_BOUND) {
+				syslog(LOG_ERR,
+				    "%s: not bound, ignoring Force Renew",
+				    ifp->name);
+				return;
+			}
+			eloop_timeout_delete(dhcp6_startrenew, ifp);
+			dhcp6_startrenew(ifp);
+			break;
+		case DHCP6_INFORMATION_REQ:
+			if (state->state != DH6S_INFORMED) {
+				syslog(LOG_ERR,
+				    "%s: not informed, ignoring Force Renew",
+				    ifp->name);
+				return;
+			}
+			eloop_timeout_delete(dhcp6_sendinform, ifp);
+			dhcp6_startinform(ifp);
+			break;
+		default:
+			syslog(LOG_ERR,
+			    "%s: unsupported Reconfigure Message type",
+			    ifp->name);
+			return;
+		}
 		break;
 	default:
 		syslog(LOG_ERR, "%s: invalid DHCP6 type %s (%d)",
