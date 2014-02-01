@@ -2275,7 +2275,7 @@ dhcp_handledhcp(struct interface *iface, struct dhcp_message **dhcpp,
 			free(msg);
 		}
 		if (state->state == DHS_DISCOVER &&
-		    get_option_uint8(&tmp, dhcp, DHO_AUTOCONFIGURE) != 0)
+		    get_option_uint8(&tmp, dhcp, DHO_AUTOCONFIGURE) == 0)
 		{
 			switch (tmp) {
 			case 0:
@@ -2290,7 +2290,11 @@ dhcp_handledhcp(struct interface *iface, struct dhcp_message **dhcpp,
 				log_dhcp(LOG_WARNING, "IPv4LL enabled from",
 				    iface, dhcp, from);
 				eloop_timeout_delete(NULL, iface);
-				ipv4ll_start(iface);
+				if (IN_LINKLOCAL(htonl(state->addr.s_addr)))
+					eloop_timeout_add_sec(DHCP_MAX,
+					    dhcp_discover, iface);
+				else
+					ipv4ll_start(iface);
 				break;
 			default:
 				syslog(LOG_ERR,
