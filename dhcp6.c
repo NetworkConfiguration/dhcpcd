@@ -1002,7 +1002,7 @@ dhcp6_startdiscover(void *arg)
 	state->RTC = 0;
 	state->IMD = SOL_MAX_DELAY;
 	state->IRT = SOL_TIMEOUT;
-	state->MRT = SOL_MAX_RT;
+	state->MRT = state->sol_max_rt;
 	state->MRC = 0;
 
 	eloop_timeout_delete(NULL, ifp);
@@ -1159,7 +1159,7 @@ dhcp6_startinform(void *arg)
 	state->RTC = 0;
 	state->IMD = INF_MAX_DELAY;
 	state->IRT = INF_TIMEOUT;
-	state->MRT = INF_MAX_RT;
+	state->MRT = state->inf_max_rt;
 	state->MRC = 0;
 
 	if (dhcp6_makemessage(ifp) == -1)
@@ -2248,6 +2248,31 @@ dhcp6_handledata(__unused void *arg)
 			op = NULL;
 			break;
 		}
+		/* RFC7083 */
+		o = dhcp6_getmoption(D6_OPTION_SOL_MAX_RT, r, len);
+		if (o && ntohs(o->len) >= sizeof(u32)) {
+			memcpy(&u32, D6_COPTION_DATA(o), sizeof(u32));
+			u32 = ntohl(u32);
+			if (u32 >= 60 && u32 <= 86400) {
+				syslog(LOG_DEBUG, "%s: SOL_MAX_RT %d -> %d",
+				    ifp->name, state->sol_max_rt, u32);
+				state->sol_max_rt = u32;
+			} else
+				syslog(LOG_ERR, "%s: invalid SOL_MAX_RT %d",
+				    ifp->name, u32);
+		}
+		o = dhcp6_getmoption(D6_OPTION_INF_MAX_RT, r, len);
+		if (o && ntohs(o->len) >= sizeof(u32)) {
+			memcpy(&u32, D6_COPTION_DATA(o), sizeof(u32));
+			u32 = ntohl(u32);
+			if (u32 >= 60 && u32 <= 86400) {
+				syslog(LOG_DEBUG, "%s: INF_MAX_RT %d -> %d",
+				    ifp->name, state->inf_max_rt, u32);
+				state->inf_max_rt = u32;
+			} else
+				syslog(LOG_ERR, "%s: invalid INF_MAX_RT %d",
+				    ifp->name, u32);
+		}
 		if (dhcp6_validatelease(ifp, r, len, sfrom) == -1)
 			return;
 		break;
@@ -2588,6 +2613,9 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 	state = D6_STATE(ifp);
 	if (state == NULL)
 		return -1;
+
+	state->sol_max_rt = SOL_MAX_RT;
+	state->inf_max_rt = INF_MAX_RT;
 
 	TAILQ_INIT(&state->addrs);
 	if (dhcp6_find_delegates(ifp))

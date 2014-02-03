@@ -52,6 +52,8 @@
 #define DHCP6_INFORMATION_REQ	11
 #define DHCP6_RELAY_FLOW	12
 #define DHCP6_RELAY_REPL	13
+#define DHCP6_RECONFIGURE_REQ	18
+#define DHCP6_RECONFIGURE_REPLY	19
 
 #define D6_OPTION_CLIENTID		1
 #define D6_OPTION_SERVERID		2
@@ -87,6 +89,8 @@
 #define D6_OPTION_FQDN			39
 #define D6_OPTION_POSIX_TIMEZONE	41
 #define D6_OPTION_TZDB_TIMEZONE		42
+#define D6_OPTION_SOL_MAX_RT		82
+#define D6_OPTION_INF_MAX_RT		83
 
 #define D6_FQDN_PTR	0x00
 #define D6_FQDN_BOTH	0x01
@@ -174,6 +178,8 @@ struct dhcp6_state {
 	int MRC;
 	int MRT;
 	void (*MRCcallback)(void *);
+	int sol_max_rt;
+	int inf_max_rt;
 
 	struct dhcp6_message *send;
 	size_t send_len;
