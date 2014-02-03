@@ -124,6 +124,7 @@ struct udp_dhcp_packet
 struct dhcp_opt *dhcp_opts = NULL;
 size_t dhcp_opts_len = 0;
 
+static int udp_fd = -1;
 static const size_t udp_dhcp_len = sizeof(struct udp_dhcp_packet);
 
 static int dhcp_open(struct interface *);
@@ -1356,7 +1357,7 @@ dhcp_close(struct interface *ifp)
 }
 
 static int
-dhcp_openudp(struct interface *iface)
+dhcp_openudp(struct interface *ifp)
 {
 	int s;
 	struct sockaddr_in sin;
@@ -1374,26 +1375,34 @@ dhcp_openudp(struct interface *iface)
 	if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &n, sizeof(n)) == -1)
 		goto eexit;
 #ifdef SO_BINDTODEVICE
-	memset(&ifr, 0, sizeof(ifr));
-	strlcpy(ifr.ifr_name, iface->name, sizeof(ifr.ifr_name));
-	/* We can only bind to the real device */
-	p = strchr(ifr.ifr_name, ':');
-	if (p)
-	    *p = '\0';
-	if (setsockopt(s, SOL_SOCKET, SO_BINDTODEVICE, &ifr,
+	if (ifp) {
+		memset(&ifr, 0, sizeof(ifr));
+		strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
+		/* We can only bind to the real device */
+		p = strchr(ifr.ifr_name, ':');
+		if (p)
+			*p = '\0';
+		if (setsockopt(s, SOL_SOCKET, SO_BINDTODEVICE, &ifr,
 		    sizeof(ifr)) == -1)
-		goto eexit;
+		        goto eexit;
+	}
 #endif
-	state = D_STATE(iface);
 	memset(&sin, 0, sizeof(sin));
 	sin.sin_family = AF_INET;
 	sin.sin_port = htons(DHCP_CLIENT_PORT);
-	sin.sin_addr.s_addr = state->addr.s_addr;
+	if (ifp) {
+		state = D_STATE(ifp);
+		sin.sin_addr.s_addr = state->addr.s_addr;
+	} else
+		state = NULL; /* appease gcc */
 	if (bind(s, (struct sockaddr *)&sin, sizeof(sin)) == -1)
 		goto eexit;
 
-	state->udp_fd = s;
 	set_cloexec(s);
+	if (ifp)
+		state->udp_fd = s;
+	else
+		udp_fd = s;
 	return 0;
 
 eexit:
@@ -2060,6 +2069,20 @@ dhcp_drop(struct interface *ifp, const char *reason)
 	state->auth.replay = 0;
 	free(state->auth.reconf);
 	state->auth.reconf = NULL;
+
+	/* If we don't have any more DHCP enabled interfaces,
+	 * close the global socket */
+	if (ifaces) {
+		TAILQ_FOREACH(ifp, ifaces, next) {
+			if (D_STATE(ifp))
+				break;
+		}
+	}
+	if (ifp == NULL && udp_fd != -1) {
+		close(udp_fd);
+		eloop_event_delete(udp_fd);
+		udp_fd = -1;
+	}
 }
 
 static void
@@ -2604,7 +2627,10 @@ dhcp_open(struct interface *ifp)
 		eloop_event_add(state->raw_fd, dhcp_handlepacket, ifp);
 	}
 	if (state->udp_fd == -1 &&
-	    ifp->options->options & DHCPCD_DHCP)
+	    state->addr.s_addr != 0 &&
+	    state->new != NULL &&
+	    (state->new->cookie == htonl(MAGIC_COOKIE) ||
+	    ifp->options->options & DHCPCD_INFORM))
 	{
 		if (dhcp_openudp(ifp) == -1 && errno != EADDRINUSE) {
 			syslog(LOG_ERR, "%s: dhcp_openudp: %m", ifp->name);
@@ -2681,6 +2707,11 @@ dhcp_init(struct interface *ifp)
 	struct dhcp_state *state;
 	const struct if_options *ifo;
 	size_t len;
+
+	/* Listen on *.*.*.*:bootpc so that the kernel never sends an
+	 * ICMP port unreachable message back to the DHCP server */
+	if (udp_fd == -1 && dhcp_openudp(NULL) != -1)
+		eloop_event_add(udp_fd, dhcp_handleudp, NULL);
 
 	state = D_STATE(ifp);
 	if (state == NULL) {
