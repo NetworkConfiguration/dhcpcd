@@ -2610,7 +2610,8 @@ dhcp_open(struct interface *ifp)
 			syslog(LOG_ERR, "%s: dhcp_openudp: %m", ifp->name);
 			return -1;
 		}
-		eloop_event_add(state->udp_fd, dhcp_handleudp, ifp);
+		if (state->udp_fd != -1)
+			eloop_event_add(state->udp_fd, dhcp_handleudp, ifp);
 	}
 	return 0;
 }
