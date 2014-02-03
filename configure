@@ -639,7 +639,7 @@ int main(void) {
 }
 EOF
 	# We only want to link to libmd if it exists in /lib
-	set -- $(ls /lib/libmd.so.*)
+	set -- $(ls /lib/libmd.so.* 2>/dev/null)
 	if $XCC _md5.c -o _md5 2>/dev/null; then
 		MD5=yes
 	elif [ -e "$1" ] && $XCC _md5.c -lmd -o _md5 2>/dev/null; then
