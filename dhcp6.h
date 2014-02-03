@@ -120,7 +120,7 @@ struct dhcp6_option {
 
 #define SOL_MAX_DELAY		1
 #define SOL_TIMEOUT		1
-#define SOL_MAX_RT		120
+#define SOL_MAX_RT		3600 /* RFC7083 */
 #define REQ_TIMEOUT		1
 #define REQ_MAX_RT		30
 #define REQ_MAX_RC		10
@@ -134,7 +134,7 @@ struct dhcp6_option {
 #define REB_MAX_RT		600
 #define INF_MAX_DELAY		1
 #define INF_TIMEOUT		1
-#define INF_MAX_RT		120
+#define INF_MAX_RT		3600 /* RFC7083 */
 #define REL_TIMEOUT		1
 #define REL_MAX_RC		5
 #define DEC_TIMEOUT		1
