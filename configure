@@ -626,8 +626,10 @@ pselect)
 esac
 
 if [ -z "$MD5" ]; then
+	MD5_LIB=
 	printf "Testing for MD5Init ... "
 	cat <<EOF >_md5.c
+#include <sys/types.h>
 #include <md5.h>
 #include <stdlib.h>
 int main(void) {
@@ -638,6 +640,9 @@ int main(void) {
 EOF
 	if $XCC _md5.c -o _md5 2>/dev/null; then
 		MD5=yes
+	elif $XCC _md5.c -lmd -o _md5; then
+		MD5="yes (-lmd)"
+		MD5_LIB=-lmd
 	else
 		MD5=no
 	fi
@@ -649,6 +654,7 @@ if [ "$MD5" = no ]; then
 else
 	echo "MD5_SRC=" >>$CONFIG_MK
 	echo "CPPFLAGS+=	-DHAVE_MD5_H" >>$CONFIG_MK
+	[ -n "$MD5_LIB" ] && echo "LDADD+=	$MD5_LIB" >>$CONFIG_MK
 fi
 
 if [ "$DEV" != no -a "$UDEV" != no ]; then

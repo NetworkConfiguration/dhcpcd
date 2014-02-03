@@ -161,7 +161,9 @@ import: ${SRCS}
 		sort -u) /tmp/${DISTPREFIX}; \
 	if test -n "${CRYPT_SRCS}"; then \
 		${INSTALL} -d /tmp/${DISTPREFIX}/crypt; \
-		cp crypt/${CRYPT_SRCS} /tmp/${DISTPREFIX}/crypt; \
+		cp $$(echo ${CRYPT_SRCS} | tr ' ' '\n' | \
+			sed -e 's:^:crypt/:g') \
+			/tmp/${DISTPREFIX}/crypt; \
 		cp $$(cd crypt && ${CC} ${CPPFLAGS} -MM ${CRYPT_SRCS} | \
 			sed -e 's/^.*c //g' -e 's/.*\.c$$//g' -e 's/\\//g' | \
 			tr ' ' '\n' | sed -e 's:^:crypt/:g' | \
@@ -169,10 +171,10 @@ import: ${SRCS}
 	fi;
 	if test -n "${COMPAT_SRCS}"; then \
 		${INSTALL} -d /tmp/${DISTPREFIX}/compat; \
-		cp compat/${COMPAT_SRCS} /tmp/${DISTPREFIX}/compat; \
-		cp $$(cd compat && ${CC} ${CPPFLAGS} -MM ${COMPAT_SRCS} | \
+		cp ${COMPAT_SRCS} /tmp/${DISTPREFIX}/compat; \
+		cp $$(${CC} ${CPPFLAGS} -MM ${COMPAT_SRCS} | \
 			sed -e 's/^.*c //g' -e 's/.*\.c$$//g' -e 's/\\//g' | \
-			tr ' ' '\n' | sed -e 's:^:compat/:g' | \
+			tr ' ' '\n' | \
 			sort -u) /tmp/${DISTPREFIX}/compat; \
 	fi;
 	if test -n "${IMPORT_RCSID}"; then \
