@@ -2590,15 +2590,21 @@ dhcp_handlepacket(void *arg)
 static void
 dhcp_handleudp(void *arg)
 {
+	int fd;
 	const struct interface *ifp;
 	const struct dhcp_state *state;
 	uint8_t buffer[sizeof(struct dhcp_message)];
 
-	ifp = arg;
-	state = D_CSTATE(ifp);
+	if (arg) {
+		ifp = arg;
+		state = D_CSTATE(ifp);
+		fd = state->udp_fd;
+	} else
+		fd = udp_fd;
+
 	/* Just read what's in the UDP fd and discard it as we always read
 	 * from the raw fd */
-	read(state->udp_fd, buffer, sizeof(buffer));
+	read(fd, buffer, sizeof(buffer));
 }
 
 static int
@@ -2708,11 +2714,6 @@ dhcp_init(struct interface *ifp)
 	const struct if_options *ifo;
 	size_t len;
 
-	/* Listen on *.*.*.*:bootpc so that the kernel never sends an
-	 * ICMP port unreachable message back to the DHCP server */
-	if (udp_fd == -1 && dhcp_openudp(NULL) != -1)
-		eloop_event_add(udp_fd, dhcp_handleudp, NULL);
-
 	state = D_STATE(ifp);
 	if (state == NULL) {
 		ifp->if_data[IF_DATA_DHCP] = calloc(1, sizeof(*state));
@@ -2794,6 +2795,11 @@ dhcp_start(struct interface *ifp)
 
 	if (!(ifo->options & DHCPCD_IPV4))
 		return;
+
+	/* Listen on *.*.*.*:bootpc so that the kernel never sends an
+	 * ICMP port unreachable message back to the DHCP server */
+	if (udp_fd == -1 && dhcp_openudp(NULL) != -1)
+		eloop_event_add(udp_fd, dhcp_handleudp, NULL);
 
 	if (dhcp_init(ifp) == -1) {
 		syslog(LOG_ERR, "%s: dhcp_init: %m", ifp->name);
