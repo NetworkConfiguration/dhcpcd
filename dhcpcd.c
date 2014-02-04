@@ -186,12 +186,13 @@ handle_exit_timeout(__unused void *arg)
 	eloop_timeout_add_sec(timeout, handle_exit_timeout, NULL);
 }
 
+/* Returns the pid of the child, otherwise 0. */
 pid_t
 daemonise(void)
 {
 #ifdef THERE_IS_NO_FORK
 	errno = ENOSYS;
-	return -1;
+	return 0;
 #else
 	pid_t pid;
 	char buf = '\0';
@@ -200,18 +201,18 @@ daemonise(void)
 	if (options & DHCPCD_DAEMONISE && !(options & DHCPCD_DAEMONISED)) {
 		if (options & DHCPCD_WAITIP4 &&
 		    !ipv4_addrexists(NULL))
-			return -1;
+			return 0;
 		if (options & DHCPCD_WAITIP6 &&
 		    !ipv6nd_addrexists(NULL) &&
 		    !dhcp6_addrexists(NULL))
-			return -1;
+			return 0;
 		if ((options &
 		    (DHCPCD_WAITIP | DHCPCD_WAITIP4 | DHCPCD_WAITIP6)) ==
 		    DHCPCD_WAITIP &&
 		    !ipv4_addrexists(NULL) &&
 		    !ipv6nd_addrexists(NULL) &&
 		    !dhcp6_addrexists(NULL))
-			return -1;
+			return 0;
 	}
 
 	eloop_timeout_delete(handle_exit_timeout, NULL);
@@ -220,14 +221,13 @@ daemonise(void)
 	/* Setup a signal pipe so parent knows when to exit. */
 	if (pipe(sidpipe) == -1) {
 		syslog(LOG_ERR, "pipe: %m");
-		return -1;
+		return 0;
 	}
 	syslog(LOG_DEBUG, "forking to background");
 	switch (pid = fork()) {
 	case -1:
 		syslog(LOG_ERR, "fork: %m");
-		exit(EXIT_FAILURE);
-		/* NOTREACHED */
+		return 0;
 	case 0:
 		setsid();
 		/* Notify parent it's safe to exit as we've detached. */
