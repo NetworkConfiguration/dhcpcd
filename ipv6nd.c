@@ -523,7 +523,7 @@ add_router(struct ra *router)
 	TAILQ_INSERT_TAIL(&ipv6_routers, router, next);
 }
 
-static void
+static int
 ipv6nd_scriptrun(struct ra *rap)
 {
 	int hasdns;
@@ -543,7 +543,7 @@ ipv6nd_scriptrun(struct ra *rap)
 				    "%s: waiting for Router Advertisement"
 				    " DAD to complete",
 				    rap->iface->name);
-				return;
+				return 0;
 			}
 		}
 	}
@@ -566,7 +566,7 @@ ipv6nd_scriptrun(struct ra *rap)
 
 	script_runreason(rap->iface, "ROUTERADVERT");
 	if (hasdns)
-		daemonise();
+		hasdns = daemonise();
 #if 0
 	else if (options & DHCPCD_DAEMONISE &&
 	    !(options & DHCPCD_DAEMONISED) && new_data)
@@ -576,6 +576,7 @@ ipv6nd_scriptrun(struct ra *rap)
 		    ifp->name);
 }
 #endif
+	return hasdns;
 }
 
 static void
@@ -621,7 +622,8 @@ ipv6nd_dadcallback(void *arg)
 				syslog(LOG_DEBUG,
 				    "%s: Router Advertisement DAD completed",
 				    rap->iface->name);
-				ipv6nd_scriptrun(rap);
+				if (ipv6nd_scriptrun(rap))
+					return;
 			}
 		}
 	}
@@ -1009,8 +1011,10 @@ ipv6nd_handlera(struct interface *ifp, struct icmp6_hdr *icp, ssize_t len)
 	ipv6_buildroutes();
 
 	/* We will get run by the expire function */
-	if (rap->lifetime)
-		ipv6nd_scriptrun(rap);
+	if (rap->lifetime) {
+		if (ipv6nd_scriptrun(rap))
+			return;
+	}
 
 	eloop_timeout_delete(NULL, ifp);
 	eloop_timeout_delete(NULL, rap); /* reachable timer */

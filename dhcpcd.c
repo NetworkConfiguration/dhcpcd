@@ -252,7 +252,7 @@ daemonise(void)
 	}
 	/* Done with the fd now */
 	if (pid != 0) {
-		syslog(LOG_INFO, "forked to background, child pid %d",pid);
+		syslog(LOG_INFO, "forked to background, child pid %d", pid);
 		writepid(pidfd, pid);
 		close(pidfd);
 		pidfd = -1;
@@ -1435,7 +1435,6 @@ exit_failure:
 	i = EXIT_FAILURE;
 
 exit1:
-
 	if (ifaces) {
 		while ((ifp = TAILQ_FIRST(ifaces))) {
 			TAILQ_REMOVE(ifaces, ifp, next);
