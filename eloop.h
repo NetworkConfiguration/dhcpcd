@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2014 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -34,6 +34,10 @@
   #define ELOOP_QUEUE 1
 #endif
 
+/* EXIT_FAILURE is a non zero value and EXIT_SUCCESS is zero.
+ * To add a CONTINUE definition, simply do the opposite of EXIT_FAILURE. */
+#define ELOOP_CONTINUE	-EXIT_FAILURE
+
 #define eloop_timeout_add_tv(a, b, c) \
     eloop_q_timeout_add_tv(ELOOP_QUEUE, a, b, c)
 #define eloop_timeout_add_sec(a, b, c) \
@@ -52,6 +56,7 @@ int eloop_timeout_add_now(void (*)(void *), void *);
 void eloop_q_timeout_delete(int, void (*)(void *), void *);
 void eloop_q_timeouts_delete(int, void *, void (*)(void *), ...);
 void eloop_init(void);
-void eloop_start(const sigset_t *);
+void eloop_exit(int);
+int eloop_start(const sigset_t *);
 
 #endif

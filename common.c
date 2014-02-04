@@ -64,18 +64,6 @@ static char hostname_buffer[HOSTNAME_MAX_LEN + 1];
 int clock_monotonic;
 static char *lbuf;
 static size_t lbuf_len;
-#ifdef DEBUG_MEMORY
-static char lbuf_set;
-#endif
-
-#ifdef DEBUG_MEMORY
-static void
-free_lbuf(void)
-{
-	free(lbuf);
-	lbuf = NULL;
-}
-#endif
 
 /* Handy routine to read very long lines in text files.
  * This means we read the whole line and avoid any nasty buffer overflows.
@@ -88,13 +76,6 @@ get_line(FILE * __restrict fp)
 	char *p;
 	ssize_t bytes;
 
-#ifdef DEBUG_MEMORY
-	if (lbuf_set == 0) {
-		atexit(free_lbuf);
-		lbuf_set = 1;
-	}
-#endif
-
 	do {
 		bytes = getline(&lbuf, &lbuf_len, fp);
 		if (bytes == -1)
@@ -105,6 +86,14 @@ get_line(FILE * __restrict fp)
 	if (lbuf[--bytes] == '\n')
 		lbuf[bytes] = '\0';
 	return p;
+}
+
+void
+get_line_free(void)
+{
+
+	free(lbuf);
+	lbuf_len = 0;
 }
 
 int

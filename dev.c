@@ -63,11 +63,12 @@ dev_listening(void)
 }
 
 void
-dev_stop(void)
+dev_stop(int stop)
 {
 
 	if (dev) {
-		syslog(LOG_DEBUG, "dev: unloaded %s", dev->name);
+		if (stop)
+			syslog(LOG_DEBUG, "dev: unloaded %s", dev->name);
 		dev->stop();
 		free(dev);
 		dev = NULL;
@@ -168,7 +169,7 @@ dev_start(const char *plugin)
 	if (fd != -1) {
 		if (eloop_event_add(fd, dev_handle_data, NULL) == -1) {
 			syslog(LOG_ERR, "%s: eloop_event_add: %m", __func__);
-			dev_stop();
+			dev_stop(1);
 			return -1;
 		}
 	}

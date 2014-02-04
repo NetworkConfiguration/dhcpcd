@@ -32,8 +32,10 @@ char *hardware_platform(void);
 #ifdef INET6
 int check_ipv6(const char *, int);
 int ipv6_dadtransmits(const char *);
+void restore_kernel_ra(void);
 #else
 #define check_ipv6(a, b) -1
+#define restore_kernel_ra(a)
 #endif
 
 #endif

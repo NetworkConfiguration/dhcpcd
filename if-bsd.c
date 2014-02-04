@@ -102,14 +102,19 @@ if_conf(__unused struct interface *iface)
 	return 0;
 }
 
-#ifdef DEBUG_MEMORY
-static void
-cleanup(void)
+void
+if_free(void)
 {
 
-	free(link_buf);
+	if (r_fd != -1) {
+		close(r_fd);
+		r_fd = -1;
+	}
+	if (link_buflen) {
+		free(link_buf);
+		link_buflen = 0;
+	}
 }
-#endif
 
 int
 open_sockets(void)
@@ -127,11 +132,6 @@ int
 open_link_socket(void)
 {
 	int fd;
-
-#ifdef DEBUG_MEMORY
-	if (link_buf == NULL)
-		atexit(cleanup);
-#endif
 
 	fd = socket(PF_ROUTE, SOCK_RAW, 0);
 	if (fd != -1) {

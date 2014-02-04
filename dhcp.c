@@ -143,16 +143,6 @@ dhcp_printoptions(void)
 		printf("%03d %s\n", opt->option, opt->var);
 }
 
-#ifdef DEBUG_MEMORY
-static void
-dhcp_cleanup(void)
-{
-
-	free(packet);
-	free(opt_buffer);
-}
-#endif
-
 #define get_option_raw(dhcp, opt) get_option(dhcp, opt, NULL)
 static const uint8_t *
 get_option(const struct dhcp_message *dhcp, uint8_t opt, int *len)
@@ -1816,7 +1806,8 @@ dhcp_bind(void *arg)
 	if (options & DHCPCD_TEST) {
 		state->reason = "TEST";
 		script_runreason(iface, state->reason);
-		exit(EXIT_SUCCESS);
+		eloop_exit(EXIT_SUCCESS);
+		return;
 	}
 	if (state->reason == NULL) {
 		if (state->old) {
@@ -1842,13 +1833,14 @@ dhcp_bind(void *arg)
 		    iface->name, lease->renewaltime, lease->rebindtime);
 	}
 	ipv4_applyaddr(iface);
-	daemonise();
-	if (!ipv4ll)
-		arp_close(iface);
-	state->state = DHS_BOUND;
-	if (ifo->options & DHCPCD_ARP) {
-		state->claims = 0;
-		arp_announce(iface);
+	if (daemonise() == 0) {
+		if (!ipv4ll)
+			arp_close(iface);
+		state->state = DHS_BOUND;
+		if (ifo->options & DHCPCD_ARP) {
+		        state->claims = 0;
+			arp_announce(iface);
+		}
 	}
 }
 
@@ -2065,24 +2057,6 @@ dhcp_drop(struct interface *ifp, const char *reason)
 	state->old = NULL;
 	state->lease.addr.s_addr = 0;
 	ifp->options->options &= ~ DHCPCD_CSR_WARNED;
-	state->auth.token = NULL;
-	state->auth.replay = 0;
-	free(state->auth.reconf);
-	state->auth.reconf = NULL;
-
-	/* If we don't have any more DHCP enabled interfaces,
-	 * close the global socket */
-	if (ifaces) {
-		TAILQ_FOREACH(ifp, ifaces, next) {
-			if (D_STATE(ifp))
-				break;
-		}
-	}
-	if (ifp == NULL && udp_fd != -1) {
-		close(udp_fd);
-		eloop_event_delete(udp_fd);
-		udp_fd = -1;
-	}
 }
 
 static void
@@ -2373,7 +2347,8 @@ dhcp_handledhcp(struct interface *iface, struct dhcp_message **dhcpp,
 			state->offer = NULL;
 			state->reason = "TEST";
 			script_runreason(iface, state->reason);
-			exit(EXIT_SUCCESS);
+			eloop_exit(EXIT_SUCCESS);
+			return;
 		}
 		eloop_timeout_delete(send_discover, iface);
 		/* We don't request BOOTP addresses */
@@ -2618,9 +2593,6 @@ dhcp_open(struct interface *ifp)
 			syslog(LOG_ERR, "%s: %m", __func__);
 			return -1;
 		}
-#ifdef DEBUG_MEMORY
-		atexit(dhcp_cleanup);
-#endif
 	}
 
 	state = D_STATE(ifp);
@@ -2704,6 +2676,27 @@ dhcp_free(struct interface *ifp)
 		free(state->clientid);
 		free(state);
 		ifp->if_data[IF_DATA_DHCP] = NULL;
+	}
+
+	/* If we don't have any more DHCP enabled interfaces,
+	 * close the global socket and release resources */
+	if (ifaces) {
+		TAILQ_FOREACH(ifp, ifaces, next) {
+			if (D_STATE(ifp))
+				break;
+		}
+	}
+	if (ifp == NULL) {
+		if (udp_fd != -1) {
+			close(udp_fd);
+			eloop_event_delete(udp_fd);
+			udp_fd = -1;
+		}
+
+		free(packet);
+		free(opt_buffer);
+		packet = NULL;
+		opt_buffer = NULL;
 	}
 }
 

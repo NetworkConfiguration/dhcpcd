@@ -67,7 +67,7 @@ struct auth {
 
 struct authstate {
 	uint64_t replay;
-	const struct token *token;
+	struct token *token;
 	struct token *reconf;
 };
 

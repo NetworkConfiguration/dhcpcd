@@ -293,21 +293,16 @@ for x in $INCLUDEDIR; do
 	echo "CPPFLAGS+=	-I$x" >>$CONFIG_MK
 done
 
-if [ -n "$DEBUG" -a "$DEBUG" != no -a "$DEBUG" != false ]; then
-	echo "Enabling memory debugging"
-	echo "CPPFLAGS+=	-DDEBUG_MEMORY" >>$CONFIG_MK
-	echo "CFLAGS+=	-g" >>$CONFIG_MK
-elif [ -z "$DEBUG" -a -f .fslckout ]; then
+if [ -z "$DEBUG" -a -f .fslckout ]; then
 	printf "Found fossil checkout ... "
 	DEBUG=yes
-	echo "CFLAGS+=	-g" >>$CONFIG_MK
 else
 	DEBUG=no
 fi
 if [ "$DEBUG" != no -a "$DEBUG" != false ]; then
 	echo "Adding debugging CFLAGS"
 	cat <<EOF >>$CONFIG_MK
-CFLAGS+=	-Wall -Wextra -Wimplicit -Wshadow -Wformat=2
+CFLAGS+=	-g -Wall -Wextra -Wimplicit -Wshadow -Wformat=2
 CFLAGS+=	-Wmissing-prototypes -Wmissing-declarations
 CFLAGS+=	-Wmissing-noreturn -Wmissing-format-attribute
 CFLAGS+=	-Wredundant-decls  -Wnested-externs

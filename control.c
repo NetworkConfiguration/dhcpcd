@@ -48,21 +48,6 @@ static char *argvp[255];
 static struct sockaddr_un sun;
 struct fd_list *control_fds = NULL;
 
-#ifdef DEBUG_MEMORY
-static void
-cleanup(void)
-{
-	struct fd_list *f;
-
-	f = control_fds;
-	while (f) {
-		control_fds = f->next;
-		free(f);
-		f = control_fds;
-	}
-}
-#endif
-
 static void
 control_remove(void *arg)
 {
@@ -201,9 +186,6 @@ control_open(void)
 
 	if ((len = make_sock()) == -1)
 		return -1;
-#ifdef DEBUG_MEMORY
-	atexit(cleanup);
-#endif
 	return connect(fd, (struct sockaddr *)&sun, len);
 }
 

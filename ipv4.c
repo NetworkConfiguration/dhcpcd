@@ -169,15 +169,6 @@ ipv4_freeroutes(struct rt_head *rts)
 	}
 }
 
-#ifdef DEBUG_MEMORY
-static void
-ipv4_cleanup()
-{
-
-	ipv4_freeroutes(routes);
-}
-#endif
-
 int
 ipv4_init(void)
 {
@@ -187,9 +178,6 @@ ipv4_init(void)
 		if (routes == NULL)
 			return -1;
 		TAILQ_INIT(routes);
-#ifdef DEBUG_MEMORY
-		atexit(ipv4_cleanup);
-#endif
 	}
 	return 0;
 }
@@ -776,12 +764,17 @@ ipv4_free(struct interface *ifp)
 	struct ipv4_state *state;
 	struct ipv4_addr *addr;
 
-	state = IPV4_STATE(ifp);
-	if (state) {
-		while ((addr = TAILQ_FIRST(&state->addrs))) {
-			TAILQ_REMOVE(&state->addrs, addr, next);
-			free(addr);
+	if (ifp) {
+		state = IPV4_STATE(ifp);
+		if (state) {
+		        while ((addr = TAILQ_FIRST(&state->addrs))) {
+				TAILQ_REMOVE(&state->addrs, addr, next);
+				free(addr);
+			}
+			free(state);
 		}
-		free(state);
+	} else {
+		ipv4_freeroutes(routes);
+		routes = NULL;
 	}
 }

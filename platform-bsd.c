@@ -89,7 +89,7 @@ inet6_sysctl(int code, int val, int action)
 	return val;
 }
 
-static void
+void
 restore_kernel_ra(void)
 {
 
@@ -121,7 +121,7 @@ ipv6_ra_flush(void)
 int
 check_ipv6(const char *ifname, int own)
 {
-	static int set_restore = 0, global_ra = 0;
+	static int global_ra = 0;
 	int ra;
 
 	/* BSD doesn't support these values per iface, so just return
@@ -140,10 +140,6 @@ check_ipv6(const char *ifname, int own)
 		if (set_inet6_sysctl(IPV6CTL_ACCEPT_RTADV, 0) == -1) {
 			syslog(LOG_ERR, "IPV6CTL_ACCEPT_RTADV: %m");
 			return ra;
-		}
-		if (!set_restore) {
-			set_restore = 1;
-			atexit(restore_kernel_ra);
 		}
 		ra = 0;
 

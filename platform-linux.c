@@ -145,51 +145,36 @@ write_path(const char *path, const char *val)
 
 static const char *prefix = "/proc/sys/net/ipv6/conf";
 
-static void
+void
 restore_kernel_ra(void)
 {
 	char path[256];
 
-#ifndef DEBUG_MEMORY
 	if (options & DHCPCD_FORKED)
 		return;
-#endif
 
 	for (nrestore--; nrestore >= 0; nrestore--) {
-#ifdef DEBUG_MEMORY
 		if (!(options & DHCPCD_FORKED)) {
-#endif
-		syslog(LOG_INFO, "%s: restoring Kernel IPv6 RA support",
-		       restore[nrestore]);
-		snprintf(path, sizeof(path), "%s/%s/accept_ra",
-			 prefix, restore[nrestore]);
-		if (write_path(path, "1") == -1 && errno != ENOENT)
-			syslog(LOG_ERR, "write_path: %s: %m", path);
-#ifdef DEBUG_MEMORY
+			syslog(LOG_INFO, "%s: restoring Kernel IPv6 RA support",
+			    restore[nrestore]);
+			snprintf(path, sizeof(path), "%s/%s/accept_ra",
+			    prefix, restore[nrestore]);
+			if (write_path(path, "1") == -1 && errno != ENOENT)
+			    syslog(LOG_ERR, "write_path: %s: %m", path);
 		}
 		free(restore[nrestore]);
-#endif
 	}
-#ifdef DEBUG_MEMORY
 	free(restore);
-#endif
 }
 
 int
 check_ipv6(const char *ifname, int own)
 {
-	static int ipv6_checked = 0;
-	int ra, ex, i;
+	int ra, i;
 	char path[256], *p, **nrest;
 
-	if (ifname == NULL) {
-		if (ipv6_checked)
-			return 1;
-		ipv6_checked = 1;
+	if (ifname == NULL)
 		ifname = "all";
-		ex = 1;
-	} else
-		ex = 0;
 
 	snprintf(path, sizeof(path), "%s/%s/autoconf", prefix, ifname);
 	i = check_proc_int(path);
@@ -232,8 +217,6 @@ check_ipv6(const char *ifname, int own)
 			restore[nrestore++] = p;
 
 		}
-		if (ex)
-			atexit(restore_kernel_ra);
 	}
 
 	return ra;

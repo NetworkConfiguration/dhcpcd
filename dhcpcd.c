@@ -87,7 +87,6 @@ const int handle_sigs[] = {
 };
 
 static char *cffile;
-static char *pidfile;
 static int linkfd = -1;
 static char **ifv;
 static int ifc;
@@ -95,7 +94,7 @@ static char **margv;
 static int margc;
 
 static pid_t
-read_pid(void)
+read_pid(const char *pidfile)
 {
 	FILE *fp;
 	pid_t pid;
@@ -162,46 +161,6 @@ free_globals(void)
 	free(vivso);
 }
 
-static void
-cleanup(void)
-{
-#ifdef DEBUG_MEMORY
-	struct interface *ifp;
-
-	free(duid);
-	free_options(if_options);
-
-	if (ifaces) {
-		while ((ifp = TAILQ_FIRST(ifaces))) {
-			TAILQ_REMOVE(ifaces, ifp, next);
-			free_interface(ifp);
-		}
-		free(ifaces);
-	}
-
-	free_globals();
-#endif
-
-	if (!(options & DHCPCD_FORKED))
-		dev_stop();
-	if (linkfd != -1)
-		close(linkfd);
-	if (pidfd > -1) {
-		if (options & DHCPCD_MASTER) {
-			if (control_stop() == -1)
-				syslog(LOG_ERR, "control_stop: %m");
-		}
-		close(pidfd);
-		unlink(pidfile);
-	}
-#ifdef DEBUG_MEMORY
-	free(pidfile);
-#endif
-
-	if (options & DHCPCD_STARTED && !(options & DHCPCD_FORKED))
-		syslog(LOG_INFO, "exited");
-}
-
 /* ARGSUSED */
 static void
 handle_exit_timeout(__unused void *arg)
@@ -217,9 +176,9 @@ handle_exit_timeout(__unused void *arg)
 			options &=
 			    ~(DHCPCD_WAITIP | DHCPCD_WAITIP4 | DHCPCD_WAITIP6);
 			daemonise();
-			return;
 		} else
-			exit(EXIT_FAILURE);
+			eloop_exit(EXIT_FAILURE);
+		return;
 	}
 	options &= ~DHCPCD_TIMEOUT_IPV4LL;
 	timeout = (PROBE_NUM * PROBE_MAX) + (PROBE_WAIT * 2);
@@ -231,6 +190,7 @@ pid_t
 daemonise(void)
 {
 #ifdef THERE_IS_NO_FORK
+	errno = ENOSYS;
 	return -1;
 #else
 	pid_t pid;
@@ -297,7 +257,8 @@ daemonise(void)
 		close(pidfd);
 		pidfd = -1;
 		options |= DHCPCD_FORKED;
-		exit(EXIT_SUCCESS);
+		eloop_exit(EXIT_SUCCESS);
+		return pid;
 	}
 	options |= DHCPCD_DAEMONISED;
 	return pid;
@@ -333,7 +294,7 @@ stop_interface(struct interface *ifp)
 		script_runreason(ifp, "DEPARTED");
 	free_interface(ifp);
 	if (!(options & (DHCPCD_MASTER | DHCPCD_TEST)))
-		exit(EXIT_FAILURE);
+		eloop_exit(EXIT_FAILURE);
 }
 
 static void
@@ -904,23 +865,22 @@ handle_signal(int sig, siginfo_t *siginfo, __unused void *context)
 		return;
 	}
 
-	if (options & DHCPCD_TEST)
-		exit(EXIT_FAILURE);
-
-	/* As drop_dhcp could re-arrange the order, we do it like this. */
-	for (;;) {
-		/* Be sane and drop the last config first */
-		ifp = TAILQ_LAST(ifaces, if_head);
-		if (ifp == NULL)
-			break;
-		if (do_release) {
-			ifp->options->options |= DHCPCD_RELEASE;
-			ifp->options->options &= ~DHCPCD_PERSISTENT;
+	if (!(options & DHCPCD_TEST)) {
+		/* drop_dhcp could change the order, so we do it like this. */
+		for (;;) {
+			/* Be sane and drop the last config first */
+			ifp = TAILQ_LAST(ifaces, if_head);
+			if (ifp == NULL)
+				break;
+			if (do_release) {
+				ifp->options->options |= DHCPCD_RELEASE;
+				ifp->options->options &= ~DHCPCD_PERSISTENT;
+			}
+			ifp->options->options |= DHCPCD_EXITING;
+			stop_interface(ifp);
 		}
-		ifp->options->options |= DHCPCD_EXITING;
-		stop_interface(ifp);
 	}
-	exit(EXIT_FAILURE);
+	eloop_exit(EXIT_FAILURE);
 }
 
 int
@@ -1093,15 +1053,17 @@ signal_init(void (*func)(int, siginfo_t *, void *), sigset_t *oldset)
 int
 main(int argc, char **argv)
 {
+	char *pidfile;
 	struct interface *ifp;
 	uint16_t family = 0;
-	int opt, oi = 0, sig = 0, i, control_fd;
+	int opt, oi = 0, sig = 0, i;
 	size_t len;
 	pid_t pid;
 	struct timespec ts;
 	struct utsname utn;
 	const char *platform;
 
+	pidfile = NULL;
 	closefrom(3);
 	openlog(PACKAGE, LOG_PERROR | LOG_PID, LOG_DAEMON);
 	setlogmask(LOG_UPTO(LOG_INFO));
@@ -1110,10 +1072,10 @@ main(int argc, char **argv)
 	if (argc > 1) {
 		if (strcmp(argv[1], "--help") == 0) {
 			usage();
-			exit(EXIT_SUCCESS);
+			return EXIT_SUCCESS;
 		} else if (strcmp(argv[1], "--version") == 0) {
 			printf(""PACKAGE" "VERSION"\n%s\n", dhcpcd_copyright);
-			exit(EXIT_SUCCESS);
+			return EXIT_SUCCESS;
 		}
 	}
 
@@ -1163,7 +1125,7 @@ main(int argc, char **argv)
 			break;
 		case '?':
 			usage();
-			exit(EXIT_FAILURE);
+			goto exit_failure;
 		}
 	}
 
@@ -1174,7 +1136,7 @@ main(int argc, char **argv)
 	if (opt != 1) {
 		if (opt == 0)
 			usage();
-		exit(EXIT_FAILURE);
+		goto exit_failure;
 	}
 	if (i == 3) {
 		printf("Interface options:\n");
@@ -1191,10 +1153,7 @@ main(int argc, char **argv)
 			dhcp6_printoptions();
 		}
 #endif
-#ifdef DEBUG_MEMORY
-		cleanup();
-#endif
-		exit(EXIT_SUCCESS);
+		goto exit_success;
 	}
 	options = if_options->options;
 	if (i != 0) {
@@ -1229,7 +1188,7 @@ main(int argc, char **argv)
 		pidfile = malloc(len);
 		if (pidfile == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);
-			exit(EXIT_FAILURE);
+			goto exit_failure;
 		}
 		if (optind == argc - 1)
 			snprintf(pidfile, len, PIDFILE, "-", argv[optind]);
@@ -1241,30 +1200,29 @@ main(int argc, char **argv)
 
 	if (chdir("/") == -1)
 		syslog(LOG_ERR, "chdir `/': %m");
-	atexit(cleanup);
 
 	if (options & DHCPCD_DUMPLEASE) {
 		if (optind != argc - 1) {
 			syslog(LOG_ERR, "dumplease requires an interface");
-			exit(EXIT_FAILURE);
+			goto exit_failure;
 		}
 		if (dhcp_dump(argv[optind]) == -1)
-			exit(EXIT_FAILURE);
-		exit(EXIT_SUCCESS);
+			goto exit_failure;
+		goto exit_success;
 	}
 
 	if (!(options & (DHCPCD_MASTER | DHCPCD_TEST))) {
-		control_fd = control_open();
-		if (control_fd != -1) {
+		if ((i = control_open()) != -1) {
 			syslog(LOG_INFO,
 			    "sending commands to master dhcpcd process");
-			i = control_send(argc, argv);
-			if (i > 0) {
+			len = control_send(argc, argv);
+			close(i);
+			if (len > 0) {
 				syslog(LOG_DEBUG, "send OK");
-				exit(EXIT_SUCCESS);
+				goto exit_success;
 			} else {
 				syslog(LOG_ERR, "failed to send commands");
-				exit(EXIT_FAILURE);
+				goto exit_failure;
 			}
 		} else {
 			if (errno != ENOENT)
@@ -1277,7 +1235,7 @@ main(int argc, char **argv)
 		    PACKAGE " will not work correctly unless run as root");
 
 	if (sig != 0) {
-		pid = read_pid();
+		pid = read_pid(pidfile);
 		if (pid != 0)
 			syslog(LOG_INFO, "sending signal %d to pid %d",
 			    sig, pid);
@@ -1286,36 +1244,36 @@ main(int argc, char **argv)
 				syslog(LOG_ERR, ""PACKAGE" not running");
 			if (pid != 0 && errno != ESRCH) {
 				syslog(LOG_ERR, "kill: %m");
-				exit(EXIT_FAILURE);
+				goto exit_failure;
 			}
 			unlink(pidfile);
 			if (sig != SIGALRM)
-				exit(EXIT_FAILURE);
+				goto exit_failure;
 		} else {
 			if (sig == SIGALRM || sig == SIGUSR1)
-				exit(EXIT_SUCCESS);
+				goto exit_success;
 			/* Spin until it exits */
 			syslog(LOG_INFO, "waiting for pid %d to exit", pid);
 			ts.tv_sec = 0;
 			ts.tv_nsec = 100000000; /* 10th of a second */
 			for(i = 0; i < 100; i++) {
 				nanosleep(&ts, NULL);
-				if (read_pid() == 0)
-					exit(EXIT_SUCCESS);
+				if (read_pid(pidfile) == 0)
+					goto exit_success;
 			}
 			syslog(LOG_ERR, "pid %d failed to exit", pid);
-			exit(EXIT_FAILURE);
+			goto exit_failure;
 		}
 	}
 
 	if (!(options & DHCPCD_TEST)) {
-		if ((pid = read_pid()) > 0 &&
+		if ((pid = read_pid(pidfile)) > 0 &&
 		    kill(pid, 0) == 0)
 		{
 			syslog(LOG_ERR, ""PACKAGE
 			    " already running on pid %d (%s)",
 			    pid, pidfile);
-			exit(EXIT_FAILURE);
+			goto exit_failure;
 		}
 
 		/* Ensure we have the needed directories */
@@ -1332,10 +1290,10 @@ main(int argc, char **argv)
 			 * runs on an interface */
 			if (flock(pidfd, LOCK_EX | LOCK_NB) == -1) {
 				syslog(LOG_ERR, "flock `%s': %m", pidfile);
-				exit(EXIT_FAILURE);
+				goto exit_failure;
 			}
 			if (set_cloexec(pidfd) == -1)
-				exit(EXIT_FAILURE);
+				goto exit_failure;
 			writepid(pidfd, getpid());
 		}
 	}
@@ -1343,14 +1301,10 @@ main(int argc, char **argv)
 	syslog(LOG_INFO, "version " VERSION " starting");
 	options |= DHCPCD_STARTED;
 
-#ifdef DEBUG_MEMORY
-	eloop_init();
-#endif
-
 	/* Save signal mask, block and redirect signals to our handler */
 	if (signal_init(handle_signal, &dhcpcd_sigset) == -1) {
 		syslog(LOG_ERR, "signal_setup: %m");
-		exit(EXIT_FAILURE);
+		goto exit_failure;
 	}
 
 	if (options & DHCPCD_MASTER) {
@@ -1360,7 +1314,7 @@ main(int argc, char **argv)
 
 	if (open_sockets() == -1) {
 		syslog(LOG_ERR, "open_sockets: %m");
-		exit(EXIT_FAILURE);
+		goto exit_failure;
 	}
 
 #if 0
@@ -1407,11 +1361,11 @@ main(int argc, char **argv)
 		if (ifc == 0)
 			syslog(LOG_ERR, "no valid interfaces found");
 		else
-			exit(EXIT_FAILURE);
+			goto exit_failure;
 		if (!(options & DHCPCD_LINK)) {
 			syslog(LOG_ERR,
 			    "aborting as link detection is disabled");
-			exit(EXIT_FAILURE);
+			goto exit_failure;
 		}
 	}
 
@@ -1470,6 +1424,51 @@ main(int argc, char **argv)
 		eloop_timeout_add_sec(0, start_interface, ifp);
 	}
 
-	eloop_start(&dhcpcd_sigset);
-	exit(EXIT_SUCCESS);
+	i = eloop_start(&dhcpcd_sigset);
+	goto exit1;
+
+exit_success:
+	i = EXIT_SUCCESS;
+	goto exit1;
+
+exit_failure:
+	i = EXIT_FAILURE;
+
+exit1:
+
+	if (ifaces) {
+		while ((ifp = TAILQ_FIRST(ifaces))) {
+			TAILQ_REMOVE(ifaces, ifp, next);
+			free_interface(ifp);
+		}
+		free(ifaces);
+	}
+
+	free(duid);
+	free_options(if_options);
+	free_globals();
+	restore_kernel_ra();
+	ipv4_free(NULL);
+	ipv6_free(NULL);
+	if_free();
+	get_line_free();
+	dev_stop(options & DHCPCD_DAEMONISED);
+	if (linkfd != -1) {
+		close(linkfd);
+		linkfd = -1;
+	}
+	if (pidfd > -1) {
+		if (options & DHCPCD_MASTER) {
+			if (control_stop() == -1)
+				syslog(LOG_ERR, "control_stop: %m");
+		}
+		close(pidfd);
+		unlink(pidfile);
+		pidfd = -1;
+	}
+	free(pidfile);
+
+	if (options & DHCPCD_STARTED && !(options & DHCPCD_FORKED))
+		syslog(LOG_INFO, "exited");
+	return i;
 }

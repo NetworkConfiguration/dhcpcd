@@ -103,6 +103,7 @@ int do_mtu(const char *, short int);
 int up_interface(struct interface *);
 int if_conf(struct interface *);
 int if_init(struct interface *);
+void if_free(void);
 
 int open_link_socket(void);
 int manage_link(int);

@@ -112,6 +112,16 @@ if_conf(struct interface *iface)
 	return 0;
 }
 
+void
+if_free(void)
+{
+
+	if (sock_fd != -1) {
+		close(sock_fd);
+		sock_fd = -1;
+	}
+}
+
 /* XXX work out Virtal Interface Masters */
 int
 if_vimaster(__unused const char *ifname)

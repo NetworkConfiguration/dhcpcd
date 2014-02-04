@@ -78,7 +78,16 @@ void
 dhcp_auth_reset(struct authstate *state)
 {
 
+	state->replay = 0;
+	if (state->token) {
+		free(state->token->key);
+		free(state->token->realm);
+		free(state->token);
+		state->token = NULL;
+	}
 	if (state->reconf) {
+		free(state->reconf->key);
+		free(state->reconf->realm);
 		free(state->reconf);
 		state->reconf = NULL;
 	}
@@ -270,7 +279,11 @@ dhcp_auth_validate(struct authstate *state, const struct auth *auth,
 
 gottoken:
 	/* First message from the server */
-	if (state->token && state->token != t) {
+	if (state->token &&
+	    (state->token->secretid != t->secretid ||
+	    state->token->realm_len != t->realm_len ||
+	    memcmp(state->token->realm, t->realm, t->realm_len)))
+	{
 		errno = EPERM;
 		return NULL;
 	}
@@ -317,7 +330,40 @@ gottoken:
 finish:
 	/* If we got here then authentication passed */
 	state->replay = replay;
-	state->token = t;
+	if (state->token == NULL) {
+		/* We cannot just save a pointer because a reconfigure will
+		 * recreate the token list. So we duplicate it. */
+		state->token = malloc(sizeof(*state->token));
+		if (state->token) {
+			state->token->secretid = t->secretid;
+			state->token->key = malloc(t->key_len);
+			if (state->token->key) {
+				state->token->key_len = t->key_len;
+				memcpy(state->token->key, t->key, t->key_len);
+			} else {
+				free(state->token);
+				state->token = NULL;
+			}
+			if (t->realm) {
+				state->token->realm = malloc(t->realm_len);
+				if (state->token->realm) {
+					state->token->realm_len = t->realm_len;
+					memcpy(state->token->realm, t->realm,
+					    t->realm_len);
+			    } else {
+					free(state->token->key);
+					free(state->token);
+					state->token = NULL;
+			    }
+			} else {
+				state->token->realm = NULL;
+				state->token->realm_len = 0;
+			}
+		}
+		/* If we cannot save the token, we must invalidate */
+		if (state->token == NULL)
+			return NULL;
+	}
 
 	return t;
 }

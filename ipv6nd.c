@@ -180,16 +180,6 @@ static void ipv6nd_handledata(void *arg);
 	memset(filterp, 0xff, sizeof(struct icmp6_filter));
 #endif
 
-#if DEBUG_MEMORY
-static void
-ipv6nd_cleanup(void)
-{
-
-	free(sndbuf);
-	free(rcvbuf);
-}
-#endif
-
 static int
 ipv6nd_open(void)
 {
@@ -230,9 +220,6 @@ ipv6nd_open(void)
 		goto eexit;
 
 	set_cloexec(sock);
-#if DEBUG_MEMORY
-	atexit(ipv6nd_cleanup);
-#endif
 
 	len = CMSG_SPACE(sizeof(struct in6_pktinfo)) + CMSG_SPACE(sizeof(int));
 	sndbuf = calloc(1, len);
@@ -465,11 +452,12 @@ ipv6nd_free(struct interface *ifp)
 	ssize_t n;
 
 	state = RS_STATE(ifp);
-	if (state) {
-		free(state->rs);
-		free(state);
-		ifp->if_data[IF_DATA_IPV6ND] = NULL;
-	}
+	if (state == NULL)
+		return 0;
+
+	free(state->rs);
+	free(state);
+	ifp->if_data[IF_DATA_IPV6ND] = NULL;
 	n = 0;
 	TAILQ_FOREACH_SAFE(rap, &ipv6_routers, next, ran) {
 		if (rap->iface == ifp) {
@@ -477,6 +465,25 @@ ipv6nd_free(struct interface *ifp)
 			n++;
 		}
 	}
+
+	/* If we don't have any more IPv6 enabled interfaces,
+	 * close the global socket and release resources */
+	TAILQ_FOREACH(ifp, ifaces, next) {
+		if (RS_STATE(ifp))
+			break;
+	}
+	if (ifp == NULL) {
+		if (sock != -1) {
+			    close(sock);
+			    eloop_event_delete(sock);
+			    sock = -1;
+		}
+		free(sndbuf);
+		free(rcvbuf);
+		sndbuf = NULL;
+		rcvbuf = NULL;
+	}
+
 	return n;
 }
 
@@ -1031,8 +1038,10 @@ handle_flag:
 		if (rap->lifetime && new_data)
 			syslog(LOG_DEBUG, "%s: No DHCPv6 instruction in RA",
 			    ifp->name);
-		if (options & DHCPCD_TEST)
-			exit(EXIT_SUCCESS);
+		if (options & DHCPCD_TEST) {
+			eloop_exit(EXIT_SUCCESS);
+			return;
+		}
 	}
 
 	/* Expire should be called last as the rap object could be destroyed */
@@ -1292,6 +1301,7 @@ ipv6nd_drop(struct interface *ifp)
 			script_runreason(ifp, "ROUTERADVERT");
 	}
 }
+
 static void
 ipv6nd_unreachable(void *arg)
 {

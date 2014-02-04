@@ -48,7 +48,7 @@ int dev_init(struct dev *, const struct dev_dhcpcd *);
 int dev_initialized(const char *);
 int dev_listening(void);
 int dev_start(const char *);
-void dev_stop(void);
+void dev_stop(int);
 #else
 #define dev_initialized(a) 1
 #define dev_listening() 0

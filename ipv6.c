@@ -74,20 +74,6 @@
 
 static struct rt6head *routes;
 
-#ifdef DEBUG_MEMORY
-static void
-ipv6_cleanup()
-{
-	struct rt6 *rt;
-
-	while ((rt = TAILQ_FIRST(routes))) {
-		TAILQ_REMOVE(routes, rt, next);
-		free(rt);
-	}
-	free(routes);
-}
-#endif
-
 int
 ipv6_init(void)
 {
@@ -97,9 +83,6 @@ ipv6_init(void)
 		if (routes == NULL)
 			return -1;
 		TAILQ_INIT(routes);
-#ifdef DEBUG_MEMORY
-		atexit(ipv6_cleanup);
-#endif
 	}
 	return 0;
 }
@@ -659,16 +642,28 @@ ipv6_free(struct interface *ifp)
 {
 	struct ipv6_state *state;
 	struct ipv6_addr_l *ap;
+	struct rt6 *rt;
 
-	ipv6_free_ll_callbacks(ifp);
-	state = IPV6_STATE(ifp);
-	if (state) {
-		while ((ap = TAILQ_FIRST(&state->addrs))) {
-			TAILQ_REMOVE(&state->addrs, ap, next);
-			free(ap);
+	if (ifp) {
+		ipv6_free_ll_callbacks(ifp);
+		state = IPV6_STATE(ifp);
+		if (state) {
+			while ((ap = TAILQ_FIRST(&state->addrs))) {
+				TAILQ_REMOVE(&state->addrs, ap, next);
+				free(ap);
+			}
+			free(state);
+			ifp->if_data[IF_DATA_IPV6] = NULL;
 		}
-		free(state);
-		ifp->if_data[IF_DATA_IPV6] = NULL;
+	} else {
+		if (routes) {
+			while ((rt = TAILQ_FIRST(routes))) {
+				TAILQ_REMOVE(routes, rt, next);
+				free(rt);
+			}
+			free(routes);
+			routes = NULL;
+		}
 	}
 }
 

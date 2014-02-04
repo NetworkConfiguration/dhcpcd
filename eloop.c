@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2014 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -74,6 +74,9 @@ static void *volatile timeout0_arg;
 static struct pollfd *fds;
 static size_t fds_len;
 
+static int eloop_exitnow;
+static int eloop_exitcode;
+
 static void
 eloop_event_setup_fds(void)
 {
@@ -94,6 +97,7 @@ int
 eloop_event_add(int fd, void (*callback)(void *), void *arg)
 {
 	struct event *e;
+	struct pollfd *nfds;
 
 	/* We should only have one callback monitoring the fd */
 	TAILQ_FOREACH(e, &events, next) {
@@ -119,13 +123,16 @@ eloop_event_add(int fd, void (*callback)(void *), void *arg)
 	events_len++;
 	if (events_len > fds_len) {
 		fds_len += 5;
-		free(fds);
-		fds = malloc(sizeof(*fds) * fds_len);
-		if (fds == NULL) {
+		nfds = malloc(sizeof(*fds) * (fds_len + 5));
+		if (nfds == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);
-			free(e);
+			events_len--;
+			TAILQ_INSERT_TAIL(&free_events, e, next);
 			return -1;
 		}
+		fds_len += 5;
+		free(fds);
+		fds = nfds;
 	}
 
 	/* Now populate the structure and add it to the list */
@@ -292,44 +299,15 @@ eloop_q_timeout_delete(int queue, void (*callback)(void *), void *arg)
 	}
 }
 
-#ifdef DEBUG_MEMORY
-/* Define this to free all malloced memory.
- * Normally we don't do this as the OS will do it for us at exit,
- * but it's handy for debugging other leaks in valgrind. */
-static void
-eloop_cleanup(void)
-{
-	struct event *e;
-	struct timeout *t;
-
-	while ((e = TAILQ_FIRST(&events))) {
-		TAILQ_REMOVE(&events, e, next);
-		free(e);
-	}
-	while ((e = TAILQ_FIRST(&free_events))) {
-		TAILQ_REMOVE(&free_events, e, next);
-		free(e);
-	}
-	while ((t = TAILQ_FIRST(&timeouts))) {
-		TAILQ_REMOVE(&timeouts, t, next);
-		free(t);
-	}
-	while ((t = TAILQ_FIRST(&free_timeouts))) {
-		TAILQ_REMOVE(&free_timeouts, t, next);
-		free(t);
-	}
-	free(fds);
-}
-
 void
-eloop_init(void)
+eloop_exit(int code)
 {
 
-	atexit(eloop_cleanup);
+	eloop_exitcode = code;
+	eloop_exitnow = 1;
 }
-#endif
 
-__dead void
+int
 eloop_start(const sigset_t *sigmask)
 {
 	int n;
@@ -339,7 +317,11 @@ eloop_start(const sigset_t *sigmask)
 	struct timespec ts, *tsp;
 	void (*t0)(void *);
 
+	eloop_exitcode = EXIT_FAILURE;
 	for (;;) {
+		if (eloop_exitnow)
+			break;
+
 		/* Run all timeouts first */
 		if (timeout0) {
 			t0 = timeout0;
@@ -364,7 +346,7 @@ eloop_start(const sigset_t *sigmask)
 
 		if (tsp == NULL && events_len == 0) {
 			syslog(LOG_ERR, "nothing to do");
-			exit(EXIT_FAILURE);
+			break;
 		}
 
 		n = pollts(fds, events_len, tsp, sigmask);
@@ -372,7 +354,7 @@ eloop_start(const sigset_t *sigmask)
 			if (errno == EAGAIN || errno == EINTR)
 				continue;
 			syslog(LOG_ERR, "poll: %m");
-			exit(EXIT_FAILURE);
+			break;
 		}
 
 		/* Process any triggered events. */
@@ -388,4 +370,26 @@ eloop_start(const sigset_t *sigmask)
 			}
 		}
 	}
+
+	/* Release our malloced resources */
+	while ((e = TAILQ_FIRST(&events))) {
+		TAILQ_REMOVE(&events, e, next);
+		free(e);
+	}
+	while ((e = TAILQ_FIRST(&free_events))) {
+		TAILQ_REMOVE(&free_events, e, next);
+		free(e);
+	}
+	while ((t = TAILQ_FIRST(&timeouts))) {
+		TAILQ_REMOVE(&timeouts, t, next);
+		free(t);
+	}
+	while ((t = TAILQ_FIRST(&free_timeouts))) {
+		TAILQ_REMOVE(&free_timeouts, t, next);
+		free(t);
+	}
+	free(fds);
+	fds_len = 0;
+
+	return eloop_exitcode;
 }

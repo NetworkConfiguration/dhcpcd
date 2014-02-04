@@ -131,17 +131,6 @@ static const char * const dhcp6_statuses[] = {
 	"Use Multicast"
 };
 
-#if DEBUG_MEMORY
-static void
-dhcp6_cleanup(void)
-{
-
-	free(sndbuf);
-	free(rcvbuf);
-	free(status);
-}
-#endif
-
 void
 dhcp6_printoptions(void)
 {
@@ -156,10 +145,6 @@ static int
 dhcp6_init(void)
 {
 	int len;
-
-#if DEBUG_MEMORY
-	atexit(dhcp6_cleanup);
-#endif
 
 	len = CMSG_SPACE(sizeof(struct in6_pktinfo));
 	sndbuf = calloc(1, len);
@@ -2481,10 +2466,7 @@ recv:
 	    (ifp->options->options & DHCPCD_INFORM &&
 	    !(options & DHCPCD_MASTER)))
 	{
-#ifdef DEBUG_MEMORY
-		dhcp6_free(ifp);
-#endif
-		exit(EXIT_SUCCESS);
+		eloop_exit(EXIT_SUCCESS);
 	}
 }
 
@@ -2708,23 +2690,30 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 		free(state->recv);
 		free(state->new);
 		free(state->old);
-		free(state->auth.reconf);
 		free(state);
 		ifp->if_data[IF_DATA_DHCP6] = NULL;
 	}
 
 	/* If we don't have any more DHCP6 enabled interfaces,
-	 * close the global socket */
+	 * close the global socketo and release resources */
 	if (ifaces) {
 		TAILQ_FOREACH(ifp, ifaces, next) {
 			if (D6_STATE(ifp))
 				break;
 		}
 	}
-	if (ifp == NULL && sock != -1) {
-		close(sock);
-		eloop_event_delete(sock);
-		sock = -1;
+	if (ifp == NULL) {
+		if (sock != -1) {
+			close(sock);
+			eloop_event_delete(sock);
+			sock = -1;
+		}
+		free(sndbuf);
+		free(rcvbuf);
+		free(status);
+		sndbuf = NULL;
+		rcvbuf = NULL;
+		status = NULL;
 	}
 }
 
