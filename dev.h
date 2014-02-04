@@ -53,7 +53,7 @@ void dev_stop(int);
 #define dev_initialized(a) 1
 #define dev_listening() 0
 #define dev_start(a) {}
-#define dev_stop() {}
+#define dev_stop(a) {}
 #endif
 
 #endif
