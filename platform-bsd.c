@@ -89,11 +89,12 @@ inet6_sysctl(int code, int val, int action)
 	return val;
 }
 
+static int kernel_ra_set;
 void
 restore_kernel_ra(void)
 {
 
-	if (options & DHCPCD_FORKED)
+	if (kernel_ra_set == 0 || options & DHCPCD_FORKED)
 		return;
 	syslog(LOG_INFO, "restoring Kernel IPv6 RA support");
 	if (set_inet6_sysctl(IPV6CTL_ACCEPT_RTADV, 1) == -1)
@@ -142,6 +143,7 @@ check_ipv6(const char *ifname, int own)
 			return ra;
 		}
 		ra = 0;
+		kernel_ra_set = 1;
 
 		/* Flush the kernel knowledge of advertised routers
 		 * and prefixes so the kernel does not expire prefixes
