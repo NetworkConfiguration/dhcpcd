@@ -41,6 +41,12 @@
 #include "control.h"
 #include "eloop.h"
 
+#ifndef SUN_LEN
+#define SUN_LEN(su) \
+            (sizeof(*(su)) - sizeof((su)->sun_path) + strlen((su)->sun_path))
+#endif
+
+
 struct fd_list *control_fds = NULL;
 
 static void
@@ -126,7 +132,7 @@ make_sock(struct control_ctx *ctx, struct sockaddr_un *sun)
 	memset(sun, 0, sizeof(*sun));
 	sun->sun_family = AF_UNIX;
 	strlcpy(sun->sun_path, CONTROLSOCKET, sizeof(sun->sun_path));
-	return sizeof(sun->sun_family) + sizeof(sun->sun_path) + 1;
+	return SUN_LEN(sun);
 }
 
 int
@@ -146,6 +152,7 @@ control_start(struct control_ctx *ctx)
 	    listen(ctx->fd, sizeof(control_fds)) == -1)
 	{
 		close(ctx->fd);
+		ctx->fd = -1;
 		return -1;
 	}
 	eloop_event_add(ctx->fd, control_handle, ctx);
