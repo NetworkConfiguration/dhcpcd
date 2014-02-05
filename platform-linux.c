@@ -117,16 +117,15 @@ static int
 check_proc_int(const char *path)
 {
 	FILE *fp;
-	char *buf;
+	int i;
 
 	fp = fopen(path, "r");
 	if (fp == NULL)
 		return -1;
-	buf = get_line(fp);
+	if (fscanf(fp, "%d", &i) != 1)
+		i = -1;
 	fclose(fp);
-	if (buf == NULL)
-		return -1;
-	return atoi(buf);
+	return i;
 }
 
 static ssize_t
