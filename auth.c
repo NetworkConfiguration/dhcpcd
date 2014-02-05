@@ -374,7 +374,6 @@ static uint64_t
 get_next_rdm_monotonic_counter(void)
 {
 	FILE *fp;
-	char *line, *ep;
 	uint64_t rdm;
 	int flocked;
 
@@ -389,13 +388,8 @@ get_next_rdm_monotonic_counter(void)
 		rdm = 0;
 	} else {
 		flocked = flock(fileno(fp), LOCK_EX);
-		line = get_line(fp);
-		if (line == NULL)
+		if (fscanf(fp, "0x%016" PRIu64, &rdm) != 1)
 			rdm = 0; /* truncated? report error? */
-		else {
-			rdm = strtoull(line, &ep, 0);
-			free(line);
-		}
 	}
 
 	rdm++;
