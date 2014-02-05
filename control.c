@@ -41,11 +41,6 @@
 #include "control.h"
 #include "eloop.h"
 
-static int fd = -1;
-static char buffer[1024];
-static char *argvp[255];
-
-static struct sockaddr_un sun;
 struct fd_list *control_fds = NULL;
 
 static void
@@ -75,10 +70,9 @@ static void
 control_handle_data(void *arg)
 {
 	struct fd_list *l = arg;
+	char buffer[1024], *e, *p, *argvp[255], **ap;
 	ssize_t bytes;
 	int argc;
-	char *e, *p;
-	char **ap;
 
 	bytes = read(l->fd, buffer, sizeof(buffer) - 1);
 	if (bytes == -1 || bytes == 0) {
@@ -100,15 +94,17 @@ control_handle_data(void *arg)
 
 /* ARGSUSED */
 static void
-control_handle(__unused void *arg)
+control_handle(void *arg)
 {
+	struct control_ctx *ctx;
 	struct sockaddr_un run;
 	socklen_t len;
 	struct fd_list *l;
 	int f;
 
+	ctx = arg;
 	len = sizeof(run);
-	if ((f = accept(fd, (struct sockaddr *)&run, &len)) == -1)
+	if ((f = accept(ctx->fd, (struct sockaddr *)&run, &len)) == -1)
 		return;
 	set_cloexec(f);
 	l = malloc(sizeof(*l));
@@ -122,48 +118,50 @@ control_handle(__unused void *arg)
 }
 
 static int
-make_sock(void)
+make_sock(struct control_ctx *ctx, struct sockaddr_un *sun)
 {
-	if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
+
+	if ((ctx->fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
 		return -1;
-	memset(&sun, 0, sizeof(sun));
-	sun.sun_family = AF_UNIX;
-	strlcpy(sun.sun_path, CONTROLSOCKET, sizeof(sun.sun_path));
-	return sizeof(sun.sun_family) + strlen(sun.sun_path) + 1;
+	memset(sun, 0, sizeof(*sun));
+	sun->sun_family = AF_UNIX;
+	strlcpy(sun->sun_path, CONTROLSOCKET, sizeof(sun->sun_path));
+	return sizeof(sun->sun_family) + sizeof(sun->sun_path) + 1;
 }
 
 int
-control_start(void)
+control_start(struct control_ctx *ctx)
 {
+	struct sockaddr_un sun;
 	int len;
 
-	if ((len = make_sock()) == -1)
+	if ((len = make_sock(ctx, &sun)) == -1)
 		return -1;
 	unlink(CONTROLSOCKET);
-	if (bind(fd, (struct sockaddr *)&sun, len) == -1 ||
+	if (bind(ctx->fd, (struct sockaddr *)&sun, len) == -1 ||
 	    chmod(CONTROLSOCKET,
 		S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP) == -1 ||
-	    set_cloexec(fd) == -1 ||
-	    set_nonblock(fd) == -1 ||
-	    listen(fd, sizeof(control_fds)) == -1)
+	    set_cloexec(ctx->fd) == -1 ||
+	    set_nonblock(ctx->fd) == -1 ||
+	    listen(ctx->fd, sizeof(control_fds)) == -1)
 	{
-		close(fd);
+		close(ctx->fd);
 		return -1;
 	}
-	eloop_event_add(fd, control_handle, NULL);
-	return fd;
+	eloop_event_add(ctx->fd, control_handle, ctx);
+	return ctx->fd;
 }
 
 int
-control_stop(void)
+control_stop(struct control_ctx *ctx)
 {
 	int retval = 0;
 	struct fd_list *l;
 
-	eloop_event_delete(fd);
-	if (shutdown(fd, SHUT_RDWR) == -1)
+	eloop_event_delete(ctx->fd);
+	if (shutdown(ctx->fd, SHUT_RDWR) == -1)
 		retval = 1;
-	fd = -1;
+	ctx->fd = -1;
 	if (unlink(CONTROLSOCKET) == -1)
 		retval = -1;
 
@@ -180,19 +178,20 @@ control_stop(void)
 }
 
 int
-control_open(void)
+control_open(struct control_ctx *ctx)
 {
+	struct sockaddr_un sun;
 	int len;
 
-	if ((len = make_sock()) == -1)
+	if ((len = make_sock(ctx, &sun)) == -1)
 		return -1;
-	return connect(fd, (struct sockaddr *)&sun, len);
+	return connect(ctx->fd, (struct sockaddr *)&sun, len);
 }
 
 int
-control_send(int argc, char * const *argv)
+control_send(struct control_ctx *ctx, int argc, char * const *argv)
 {
-	char *p = buffer;
+	char buffer[1024], *p;
 	int i;
 	size_t len;
 
@@ -200,6 +199,7 @@ control_send(int argc, char * const *argv)
 		errno = ENOBUFS;
 		return -1;
 	}
+	p = buffer;
 	for (i = 0; i < argc; i++) {
 		len = strlen(argv[i]) + 1;
 		if ((p - buffer) + len > sizeof(buffer)) {
@@ -209,5 +209,5 @@ control_send(int argc, char * const *argv)
 		memcpy(p, argv[i], len);
 		p += len;
 	}
-	return write(fd, buffer, p - buffer);
+	return write(ctx->fd, buffer, p - buffer);
 }

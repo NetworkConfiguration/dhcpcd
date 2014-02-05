@@ -1062,6 +1062,7 @@ main(int argc, char **argv)
 	struct timespec ts;
 	struct utsname utn;
 	const char *platform;
+	struct control_ctx control_ctx;
 
 	pidfile = NULL;
 	closefrom(3);
@@ -1212,10 +1213,10 @@ main(int argc, char **argv)
 	}
 
 	if (!(options & (DHCPCD_MASTER | DHCPCD_TEST))) {
-		if ((i = control_open()) != -1) {
+		if ((i = control_open(&control_ctx)) != -1) {
 			syslog(LOG_INFO,
 			    "sending commands to master dhcpcd process");
-			len = control_send(argc, argv);
+			len = control_send(&control_ctx, argc, argv);
 			close(i);
 			if (len > 0) {
 				syslog(LOG_DEBUG, "send OK");
@@ -1308,7 +1309,7 @@ main(int argc, char **argv)
 	}
 
 	if (options & DHCPCD_MASTER) {
-		if (control_start() == -1)
+		if (control_start(&control_ctx) == -1)
 			syslog(LOG_ERR, "control_start: %m");
 	}
 
@@ -1458,7 +1459,7 @@ exit1:
 	}
 	if (pidfd > -1) {
 		if (options & DHCPCD_MASTER) {
-			if (control_stop() == -1)
+			if (control_stop(&control_ctx) == -1)
 				syslog(LOG_ERR, "control_stop: %m");
 		}
 		close(pidfd);
