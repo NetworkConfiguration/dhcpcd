@@ -392,8 +392,10 @@ get_next_rdm_monotonic_counter(void)
 		line = get_line(fp);
 		if (line == NULL)
 			rdm = 0; /* truncated? report error? */
-		else
+		else {
 			rdm = strtoull(line, &ep, 0);
+			free(line);
+		}
 	}
 
 	rdm++;

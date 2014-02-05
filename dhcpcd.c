@@ -68,7 +68,6 @@ const char dhcpcd_copyright[] = "Copyright (c) 2006-2014 Roy Marples";
 
 struct if_head *ifaces = NULL;
 char vendor[VENDORCLASSID_MAX_LEN];
-int pidfd = -1;
 struct if_options *if_options = NULL;
 int ifac = 0;
 char **ifav = NULL;
@@ -86,6 +85,7 @@ const int handle_sigs[] = {
 	0
 };
 
+static int pidfd = -1;
 static char *cffile;
 static int linkfd = -1;
 static char **ifv;
