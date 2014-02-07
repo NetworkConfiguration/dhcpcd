@@ -86,16 +86,16 @@ duid_make(unsigned char *d, const struct interface *ifp, uint16_t type)
 static size_t
 duid_get(unsigned char *d, const struct interface *ifp)
 {
-	FILE *f;
+	FILE *fp;
 	int x = 0;
 	size_t len = 0;
-	char *line;
+	char line[513];
 	const struct interface *ifp2;
 
 	/* If we already have a DUID then use it as it's never supposed
 	 * to change once we have one even if the interfaces do */
-	if ((f = fopen(DUID, "r"))) {
-		while ((line = get_line(f))) {
+	if ((fp = fopen(DUID, "r"))) {
+		while (fscanf(fp, "%512s\n", line) != EOF) {
 			len = hwaddr_aton(NULL, line);
 			if (len && len <= DUID_LEN) {
 				hwaddr_aton(d, line);
@@ -103,7 +103,7 @@ duid_get(unsigned char *d, const struct interface *ifp)
 			}
 			len = 0;
 		}
-		fclose(f);
+		fclose(fp);
 		if (len)
 			return len;
 	} else {
@@ -131,13 +131,13 @@ duid_get(unsigned char *d, const struct interface *ifp)
 		}
 	}
 
-	if (!(f = fopen(DUID, "w"))) {
+	if (!(fp = fopen(DUID, "w"))) {
 		syslog(LOG_ERR, "error writing DUID: %s: %m", DUID);
 		return duid_make(d, ifp, DUID_LL);
 	}
 	len = duid_make(d, ifp, DUID_LLT);
-	x = fprintf(f, "%s\n", hwaddr_ntoa(d, len));
-	fclose(f);
+	x = fprintf(fp, "%s\n", hwaddr_ntoa(d, len));
+	fclose(fp);
 	/* Failed to write the duid? scrub it, we cannot use it */
 	if (x < 1) {
 		syslog(LOG_ERR, "error writing DUID: %s: %m", DUID);
