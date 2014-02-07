@@ -83,19 +83,25 @@ duid_make(unsigned char *d, const struct interface *ifp, uint16_t type)
 	return p - d;
 }
 
+#define DUID_STRLEN DUID_LEN * 3
 static size_t
 duid_get(unsigned char *d, const struct interface *ifp)
 {
 	FILE *fp;
 	int x = 0;
 	size_t len = 0;
-	char line[513];
+	char line[DUID_STRLEN + 1];
 	const struct interface *ifp2;
 
 	/* If we already have a DUID then use it as it's never supposed
 	 * to change once we have one even if the interfaces do */
 	if ((fp = fopen(DUID, "r"))) {
-		while (fscanf(fp, "%512s\n", line) != EOF) {
+		while (fgets(line, DUID_STRLEN, fp)) {
+			len = strlen(line);
+			if (len) {
+				if (line[len - 1] == '\n')
+					line[len - 1] = '\0';
+			}
 			len = hwaddr_aton(NULL, line);
 			if (len && len <= DUID_LEN) {
 				hwaddr_aton(d, line);
