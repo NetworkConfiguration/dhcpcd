@@ -58,10 +58,10 @@ hardware_platform(char *str, size_t len)
 {
 	int mib[2] = { CTL_HW, HW_MACHINE_ARCH };
 	char march[SYS_NMLN];
-	size_t len = sizeof(march);
+	size_t marchlen = sizeof(march);
 
 	if (sysctl(mib, sizeof(mib) / sizeof(mib[0]),
-	    march, &len, NULL, 0) != 0)
+	    march, &marchlen, NULL, 0) != 0)
 		return -1;
 	return snprintf(str, len, ":%s", march);
 }
