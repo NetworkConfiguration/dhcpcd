@@ -84,10 +84,6 @@
 #  define CLLADDR(s) ((const char *)((s)->sdl_data + (s)->sdl_nlen))
 #endif
 
-static int r_fd = -1;
-static char *link_buf;
-static ssize_t link_buflen;
-
 int
 if_init(__unused struct interface *iface)
 {
@@ -99,32 +95,6 @@ int
 if_conf(__unused struct interface *iface)
 {
 	/* No extra checks needed on BSD */
-	return 0;
-}
-
-void
-if_free(void)
-{
-
-	if (r_fd != -1) {
-		close(r_fd);
-		r_fd = -1;
-	}
-	if (link_buflen) {
-		free(link_buf);
-		link_buflen = 0;
-	}
-}
-
-int
-open_sockets(void)
-{
-	if ((socket_afnet = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
-		return -1;
-	set_cloexec(socket_afnet);
-	if ((r_fd = socket(PF_ROUTE, SOCK_RAW, 0)) == -1)
-		return -1;
-	set_cloexec(r_fd);
 	return 0;
 }
 
@@ -144,7 +114,7 @@ open_link_socket(void)
 int
 getifssid(const char *ifname, char *ssid)
 {
-	int retval = -1;
+	int s, retval = -1;
 #if defined(SIOCG80211NWID)
 	struct ifreq ifr;
 	struct ieee80211_nwid nwid;
@@ -153,12 +123,15 @@ getifssid(const char *ifname, char *ssid)
 	char nwid[IEEE80211_NWID_LEN + 1];
 #endif
 
+	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+		return -1;
+
 #if defined(SIOCG80211NWID) /* NetBSD */
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
 	memset(&nwid, 0, sizeof(nwid));
 	ifr.ifr_data = (void *)&nwid;
-	if (ioctl(socket_afnet, SIOCG80211NWID, &ifr) == 0) {
+	if (ioctl(s, SIOCG80211NWID, &ifr) == 0) {
 		retval = nwid.i_len;
 		if (ssid) {
 			memcpy(ssid, nwid.i_nwid, nwid.i_len);
@@ -172,7 +145,7 @@ getifssid(const char *ifname, char *ssid)
 	ireq.i_val = -1;
 	memset(nwid, 0, sizeof(nwid));
 	ireq.i_data = &nwid;
-	if (ioctl(socket_afnet, SIOCG80211, &ireq) == 0) {
+	if (ioctl(s, SIOCG80211, &ireq) == 0) {
 		retval = ireq.i_len;
 		if (ssid) {
 			memcpy(ssid, nwid, ireq.i_len);
@@ -180,6 +153,8 @@ getifssid(const char *ifname, char *ssid)
 		}
 	}
 #endif
+
+	close(s);
 	return retval;
 }
 
@@ -193,11 +168,16 @@ getifssid(const char *ifname, char *ssid)
 int
 if_vimaster(const char *ifname)
 {
+	int s, r;
 	struct ifmediareq ifmr;
 
+	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+		return -1;
 	memset(&ifmr, 0, sizeof(ifmr));
 	strlcpy(ifmr.ifm_name, ifname, sizeof(ifmr.ifm_name));
-	if (ioctl(socket_afnet, SIOCGIFMEDIA, &ifmr) == -1)
+	r = ioctl(s, SIOCGIFMEDIA, &ifmr);
+	close(s);
+	if (r == -1)
 		return -1;
 	if (ifmr.ifm_status & IFM_AVALID &&
 	    IFM_TYPE(ifmr.ifm_active) == IFM_IEEE80211)
@@ -214,11 +194,15 @@ if_address(const struct interface *iface, const struct in_addr *address,
     const struct in_addr *netmask, const struct in_addr *broadcast,
     int action)
 {
+	int s, r;
 	struct ifaliasreq ifa;
 	union {
 		struct sockaddr *sa;
 		struct sockaddr_in *sin;
 	} _s;
+
+	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+		return -1;
 
 	memset(&ifa, 0, sizeof(ifa));
 	strlcpy(ifa.ifra_name, iface->name, sizeof(ifa.ifra_name));
@@ -237,9 +221,11 @@ if_address(const struct interface *iface, const struct in_addr *address,
 	}
 #undef ADDADDR
 
-	return ioctl(socket_afnet,
+	r = ioctl(s,
 	    action < 0 ? SIOCDIFADDR :
 	    action == 2 ? SIOCSIFADDR :  SIOCAIFADDR, &ifa);
+	close(s);
+	return r;
 }
 
 int
@@ -259,7 +245,10 @@ if_route(const struct rt *rt, int action)
 	} rtm;
 	char *bp = rtm.buffer;
 	size_t l;
-	int retval = 0;
+	int s, retval;
+
+	if ((s = socket(PF_ROUTE, SOCK_RAW, 0)) == -1)
+		return -1;
 
 #define ADDSU {								      \
 		l = RT_ROUNDUP(su.sa.sa_len);				      \
@@ -336,8 +325,9 @@ if_route(const struct rt *rt, int action)
 #undef ADDSU
 
 	rtm.hdr.rtm_msglen = l = bp - (char *)&rtm;
-	if (write(r_fd, &rtm, l) == -1)
-		retval = -1;
+
+	retval = write(s, &rtm, l) == -1 ? -1 : 0;
+	close(s);
 	return retval;
 }
 #endif
@@ -350,9 +340,9 @@ if_address6(const struct ipv6_addr *a, int action)
 	struct in6_aliasreq ifa;
 	struct in6_addr mask;
 
-	s = socket(AF_INET6, SOCK_DGRAM, 0);
-	if (s == -1)
+	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) == -1)
 		return -1;
+
 	memset(&ifa, 0, sizeof(ifa));
 	strlcpy(ifa.ifra_name, a->iface->name, sizeof(ifa.ifra_name));
 	/*
@@ -402,8 +392,11 @@ if_route6(const struct rt6 *rt, int action)
 	} rtm;
 	char *bp = rtm.buffer;
 	size_t l;
-	int retval = 0;
+	int s, retval;
 	const struct ipv6_addr_l *lla;
+
+	if ((s = socket(PF_ROUTE, SOCK_RAW, 0)) == -1)
+		return -1;
 
 /* KAME based systems want to store the scope inside the sin6_addr
  * for link local addreses */
@@ -507,8 +500,9 @@ if_route6(const struct rt6 *rt, int action)
 	}
 
 	rtm.hdr.rtm_msglen = l = bp - (char *)&rtm;
-	if (write(r_fd, &rtm, l) == -1)
-		retval = -1;
+
+	retval = write(s, &rtm, l) == -1 ? -1 : 0;
+	close(s);
 	return retval;
 }
 #endif
@@ -557,8 +551,8 @@ in6_addr_flags(const char *ifname, const struct in6_addr *addr)
 int
 manage_link(int fd)
 {
-	char *p, *e, *cp;
-	char ifname[IF_NAMESIZE];
+	/* route and ifwatchd like a msg buf size of 2048 */
+	char msg[2048], *p, *e, *cp, ifname[IF_NAMESIZE];
 	ssize_t bytes;
 	struct rt_msghdr *rtm;
 	struct if_announcemsghdr *ifan;
@@ -577,16 +571,7 @@ manage_link(int fd)
 #endif
 
 	for (;;) {
-		if (ioctl(fd, FIONREAD, &len) == -1)
-			return -1;
-		if (link_buflen < len) {
-			p = realloc(link_buf, len);
-			if (p == NULL)
-				return -1;
-			link_buf = p;
-			link_buflen = len;
-		}
-		bytes = read(fd, link_buf, link_buflen);
+		bytes = read(fd, msg, sizeof(msg));
 		if (bytes == -1) {
 			if (errno == EAGAIN)
 				return 0;
@@ -594,8 +579,8 @@ manage_link(int fd)
 				continue;
 			return -1;
 		}
-		e = link_buf + bytes;
-		for (p = link_buf; p < e; p += rtm->rtm_msglen) {
+		e = msg + bytes;
+		for (p = msg; p < e; p += rtm->rtm_msglen) {
 			rtm = (struct rt_msghdr *)(void *)p;
 			// Ignore messages generated by us
 			if (rtm->rtm_pid == getpid())

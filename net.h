@@ -85,10 +85,6 @@
 # define IN_LINKLOCAL(addr) ((addr & IN_CLASSB_NET) == LINKLOCAL_ADDR)
 #endif
 
-extern int socket_afnet;
-
-int open_sockets(void);
-
 char *hwaddr_ntoa(const unsigned char *, size_t);
 size_t hwaddr_aton(unsigned char *, const char *);
 
@@ -100,10 +96,8 @@ int do_mtu(const char *, short int);
 #define get_mtu(iface) do_mtu(iface, 0)
 #define set_mtu(iface, mtu) do_mtu(iface, mtu)
 
-int up_interface(struct interface *);
 int if_conf(struct interface *);
 int if_init(struct interface *);
-void if_free(void);
 
 int open_link_socket(void);
 int manage_link(int);

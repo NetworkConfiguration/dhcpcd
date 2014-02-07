@@ -1313,11 +1313,6 @@ main(int argc, char **argv)
 			syslog(LOG_ERR, "control_start: %m");
 	}
 
-	if (open_sockets() == -1) {
-		syslog(LOG_ERR, "open_sockets: %m");
-		goto exit_failure;
-	}
-
 #if 0
 	if (options & DHCPCD_IPV6RS && disable_rtadv() == -1) {
 		syslog(LOG_ERR, "disable_rtadvd: %m");
@@ -1451,7 +1446,6 @@ exit1:
 	restore_kernel_ra();
 	ipv4_free(NULL);
 	ipv6_free(NULL);
-	if_free();
 	get_line_free();
 	dev_stop(options & DHCPCD_DAEMONISED);
 	if (linkfd != -1) {

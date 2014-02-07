@@ -63,9 +63,6 @@
 #include "ipv6.h"
 #include "net.h"
 
-static int sock_fd;
-static struct sockaddr_nl sock_nl;
-
 int
 if_init(struct interface *iface)
 {
@@ -112,16 +109,6 @@ if_conf(struct interface *iface)
 	return 0;
 }
 
-void
-if_free(void)
-{
-
-	if (sock_fd != -1) {
-		close(sock_fd);
-		sock_fd = -1;
-	}
-}
-
 /* XXX work out Virtal Interface Masters */
 int
 if_vimaster(__unused const char *ifname)
@@ -143,17 +130,6 @@ _open_link_socket(struct sockaddr_nl *nl)
 	set_cloexec(fd);
 
 	return fd;
-}
-
-int
-open_sockets(void)
-{
-	if ((socket_afnet = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
-		return -1;
-	set_cloexec(socket_afnet);
-	sock_fd = _open_link_socket(&sock_nl);
-	set_cloexec(sock_fd);
-	return sock_fd;
 }
 
 int
@@ -538,11 +514,14 @@ manage_link(int fd)
 static int
 send_netlink(struct nlmsghdr *hdr)
 {
-	int r;
+	int s, r;
+	struct sockaddr_nl sock_nl;
 	struct iovec iov;
 	struct msghdr msg;
 	static unsigned int seq;
 
+	if ((s = _open_link_socket(&sock_nl)) == -1)
+		return -1;
 	memset(&iov, 0, sizeof(iov));
 	iov.iov_base = hdr;
 	iov.iov_len = hdr->nlmsg_len;
@@ -555,10 +534,11 @@ send_netlink(struct nlmsghdr *hdr)
 	hdr->nlmsg_flags |= NLM_F_ACK;
 	hdr->nlmsg_seq = ++seq;
 
-	if (sendmsg(sock_fd, &msg, 0) != -1)
-		r = get_netlink(sock_fd, 0, &err_netlink);
+	if (sendmsg(s, &msg, 0) != -1)
+		r = get_netlink(s, 0, &err_netlink);
 	else
 		r = -1;
+	close(s);
 	return r;
 }
 

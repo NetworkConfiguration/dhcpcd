@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2014 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -74,8 +74,6 @@
 #include "ipv4.h"
 #include "ipv6nd.h"
 #include "net.h"
-
-int socket_afnet = -1;
 
 static char hwaddr_buffer[(HWADDR_LEN * 3) + 1 + 1024];
 
@@ -152,7 +150,7 @@ free_interface(struct interface *ifp)
 int
 carrier_status(struct interface *iface)
 {
-	int ret;
+	int s, r;
 	struct ifreq ifr;
 #ifdef SIOCGIFMEDIA
 	struct ifmediareq ifmr;
@@ -161,6 +159,8 @@ carrier_status(struct interface *iface)
 	char *p;
 #endif
 
+	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+		return LINK_UNKNOWN;
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, iface->name, sizeof(ifr.ifr_name));
 #ifdef __linux__
@@ -169,32 +169,37 @@ carrier_status(struct interface *iface)
 		*p = '\0';
 #endif
 
-	if (ioctl(socket_afnet, SIOCGIFFLAGS, &ifr) == -1)
+	if (ioctl(s, SIOCGIFFLAGS, &ifr) == -1) {
+		close(s);
 		return LINK_UNKNOWN;
+	}
 	iface->flags = ifr.ifr_flags;
 
-	ret = LINK_UNKNOWN;
+	r = LINK_UNKNOWN;
 #ifdef SIOCGIFMEDIA
 	memset(&ifmr, 0, sizeof(ifmr));
 	strlcpy(ifmr.ifm_name, iface->name, sizeof(ifmr.ifm_name));
-	if (ioctl(socket_afnet, SIOCGIFMEDIA, &ifmr) != -1 &&
+	if (ioctl(s, SIOCGIFMEDIA, &ifmr) != -1 &&
 	    ifmr.ifm_status & IFM_AVALID)
-		ret = (ifmr.ifm_status & IFM_ACTIVE) ? LINK_UP : LINK_DOWN;
+		r = (ifmr.ifm_status & IFM_ACTIVE) ? LINK_UP : LINK_DOWN;
 #endif
-	if (ret == LINK_UNKNOWN)
-		ret = (ifr.ifr_flags & IFF_RUNNING) ? LINK_UP : LINK_DOWN;
-	return ret;
+	if (r == LINK_UNKNOWN)
+		r = (ifr.ifr_flags & IFF_RUNNING) ? LINK_UP : LINK_DOWN;
+	close(s);
+	return r;
 }
 
-int
+static int
 up_interface(struct interface *iface)
 {
 	struct ifreq ifr;
-	int retval = -1;
+	int s, r;
 #ifdef __linux__
 	char *p;
 #endif
 
+	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+		return -1;
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, iface->name, sizeof(ifr.ifr_name));
 #ifdef __linux__
@@ -202,17 +207,19 @@ up_interface(struct interface *iface)
 	if ((p = strchr(ifr.ifr_name, ':')))
 		*p = '\0';
 #endif
-	if (ioctl(socket_afnet, SIOCGIFFLAGS, &ifr) == 0) {
+	r = -1;
+	if (ioctl(s, SIOCGIFFLAGS, &ifr) == 0) {
 		if ((ifr.ifr_flags & IFF_UP))
-			retval = 0;
+			r = 0;
 		else {
 			ifr.ifr_flags |= IFF_UP;
-			if (ioctl(socket_afnet, SIOCSIFFLAGS, &ifr) == 0)
-				retval = 0;
+			if (ioctl(s, SIOCSIFFLAGS, &ifr) == 0)
+				r = 0;
 		}
 		iface->flags = ifr.ifr_flags;
 	}
-	return retval;
+	close(s);
+	return r;
 }
 
 struct if_head *
@@ -508,13 +515,16 @@ discover_interfaces(int argc, char * const *argv)
 int
 do_mtu(const char *ifname, short int mtu)
 {
+	int s, r;
 	struct ifreq ifr;
-	int r;
 
+	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+		return -1;
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
 	ifr.ifr_mtu = mtu;
-	r = ioctl(socket_afnet, mtu ? SIOCSIFMTU : SIOCGIFMTU, &ifr);
+	r = ioctl(s, mtu ? SIOCSIFMTU : SIOCGIFMTU, &ifr);
+	close(s);
 	if (r == -1)
 		return -1;
 	return ifr.ifr_mtu;
