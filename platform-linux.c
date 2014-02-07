@@ -83,7 +83,7 @@ int
 hardware_platform(char *str, size_t len)
 {
 	FILE *fp;
-	char buf[255];
+	char buf[256];
 
 	if (mproc == NULL) {
 		errno = EINVAL;
@@ -94,9 +94,9 @@ hardware_platform(char *str, size_t len)
 	if (fp == NULL)
 		return -1;
 
-	while (fscanf(fp, "%s : ", buf) != EOF) {
+	while (fscanf(fp, "%255s : ", buf) != EOF) {
 		if (strncmp(buf, mproc, strlen(mproc)) == 0) {
-			fscanf(fp, "%s", buf);
+			fscanf(fp, "%255s", buf);
 			fclose(fp);
 			return snprintf(str, len, ":%s", buf);
 		}
