@@ -786,73 +786,57 @@ reconf_reboot(int action, int argc, char **argv, int oi)
 	sort_interfaces();
 }
 
-/* ARGSUSED */
 static void
-sig_reboot(void *arg)
+handle_signal1(void *arg)
 {
-	siginfo_t *siginfo = arg;
+	siginfo_t *si;
+	struct interface *ifp;
 	struct if_options *ifo;
-
-	syslog(LOG_INFO, "received SIGALRM from PID %d, rebinding",
-	    (int)siginfo->si_pid);
-
-	free_globals();
-	ifav = NULL;
-	ifac = 0;
-	ifdc = 0;
-	ifdv = NULL;
-
-	ifo = read_config(cffile, NULL, NULL, NULL);
-	add_options(NULL, ifo, margc, margv);
-	/* We need to preserve these two options. */
-	if (options & DHCPCD_MASTER)
-		ifo->options |= DHCPCD_MASTER;
-	if (options & DHCPCD_DAEMONISED)
-		ifo->options |= DHCPCD_DAEMONISED;
-	options = ifo->options;
-	free_options(ifo);
-	reconf_reboot(1, ifc, ifv, 0);
-}
-
-static void
-sig_reconf(void *arg)
-{
-	siginfo_t *siginfo = arg;
-	struct interface *ifp;
-
-	syslog(LOG_INFO, "received SIGUSR from PID %d, reconfiguring",
-	    (int)siginfo->si_pid);
-	TAILQ_FOREACH(ifp, ifaces, next) {
-		ipv4_applyaddr(ifp);
-	}
-}
-
-static void
-handle_signal(int sig, siginfo_t *siginfo, __unused void *context)
-{
-	struct interface *ifp;
 	int do_release;
 
+	si = arg;
 	do_release = 0;
-	switch (sig) {
+	switch (si->si_signo) {
 	case SIGINT:
 		syslog(LOG_INFO, "received SIGINT from PID %d, stopping",
-		    (int)siginfo->si_pid);
+		    (int)si->si_pid);
 		break;
 	case SIGTERM:
 		syslog(LOG_INFO, "received SIGTERM from PID %d, stopping",
-		    (int)siginfo->si_pid);
+		    (int)si->si_pid);
 		break;
 	case SIGALRM:
-		eloop_timeout_add_now(sig_reboot, siginfo);
+		syslog(LOG_INFO, "received SIGALRM from PID %d, rebinding",
+		    (int)si->si_pid);
+
+		free_globals();
+		ifav = NULL;
+		ifac = 0;
+		ifdc = 0;
+		ifdv = NULL;
+
+		ifo = read_config(cffile, NULL, NULL, NULL);
+		add_options(NULL, ifo, margc, margv);
+		/* We need to preserve these two options. */
+		if (options & DHCPCD_MASTER)
+		    ifo->options |= DHCPCD_MASTER;
+		if (options & DHCPCD_DAEMONISED)
+		    ifo->options |= DHCPCD_DAEMONISED;
+		options = ifo->options;
+		free_options(ifo);
+		reconf_reboot(1, ifc, ifv, 0);
 		return;
 	case SIGHUP:
 		syslog(LOG_INFO, "received SIGHUP from PID %d, releasing",
-		    (int)siginfo->si_pid);
+		    (int)si->si_pid);
 		do_release = 1;
 		break;
 	case SIGUSR1:
-		eloop_timeout_add_now(sig_reconf, siginfo);
+		syslog(LOG_INFO, "received SIGUSR from PID %d, reconfiguring",
+		    (int)si->si_pid);
+		TAILQ_FOREACH(ifp, ifaces, next) {
+		    ipv4_applyaddr(ifp);
+		}
 		return;
 	case SIGPIPE:
 		syslog(LOG_WARNING, "received SIGPIPE");
@@ -861,7 +845,7 @@ handle_signal(int sig, siginfo_t *siginfo, __unused void *context)
 		syslog(LOG_ERR,
 		    "received signal %d from PID %d, "
 		    "but don't know what to do with it",
-		    sig, (int)siginfo->si_pid);
+		    si->si_signo, (int)si->si_pid);
 		return;
 	}
 
@@ -881,6 +865,18 @@ handle_signal(int sig, siginfo_t *siginfo, __unused void *context)
 		}
 	}
 	eloop_exit(EXIT_FAILURE);
+}
+
+static siginfo_t dhcpcd_siginfo;
+static void
+handle_signal(__unused int sig, siginfo_t *siginfo, __unused void *context)
+{
+
+	/* So that we can operate safely under a signal we instruct
+	 * eloop to pass a copy of the siginfo structure to handle_signal1
+	 * as the very first thing to do. */
+	memcpy(&dhcpcd_siginfo, siginfo, sizeof(dhcpcd_siginfo));
+	eloop_timeout_add_now(handle_signal1, &dhcpcd_siginfo);
 }
 
 int
