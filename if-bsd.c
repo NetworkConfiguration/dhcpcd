@@ -101,14 +101,8 @@ if_conf(__unused struct interface *iface)
 int
 open_link_socket(void)
 {
-	int fd;
 
-	fd = socket(PF_ROUTE, SOCK_RAW, 0);
-	if (fd != -1) {
-		set_cloexec(fd);
-		set_nonblock(fd);
-	}
-	return fd;
+	return socket(PF_ROUTE, SOCK_RAW | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
 }
 
 int

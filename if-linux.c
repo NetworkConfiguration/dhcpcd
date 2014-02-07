@@ -122,13 +122,12 @@ _open_link_socket(struct sockaddr_nl *nl)
 {
 	int fd;
 
-	if ((fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE)) == -1)
+	fd = socket(AF_NETLINK, SOCK_RAW | SOCK_CLOEXEC, NETLINK_ROUTE);
+	if (fd == -1)
 		return -1;
 	nl->nl_family = AF_NETLINK;
 	if (bind(fd, (struct sockaddr *)nl, sizeof(*nl)) == -1)
 		return -1;
-	set_cloexec(fd);
-
 	return fd;
 }
 

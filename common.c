@@ -96,34 +96,6 @@ get_line_free(void)
 	lbuf_len = 0;
 }
 
-int
-set_cloexec(int fd)
-{
-	int flags;
-
-	if ((flags = fcntl(fd, F_GETFD, 0)) == -1 ||
-	    fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == -1)
-	{
-		syslog(LOG_ERR, "fcntl: %m");
-		return -1;
-	}
-	return 0;
-}
-
-int
-set_nonblock(int fd)
-{
-	int flags;
-
-	if ((flags = fcntl(fd, F_GETFL, 0)) == -1 ||
-	    fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
-	{
-		syslog(LOG_ERR, "fcntl: %m");
-		return -1;
-	}
-	return 0;
-}
-
 const char *
 get_hostname(int short_hostname)
 {

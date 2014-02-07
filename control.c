@@ -29,6 +29,7 @@
 #include <sys/un.h>
 
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -106,28 +107,35 @@ control_handle(void *arg)
 	struct sockaddr_un run;
 	socklen_t len;
 	struct fd_list *l;
-	int f;
+	int fd, flags;
 
 	ctx = arg;
 	len = sizeof(run);
-	if ((f = accept(ctx->fd, (struct sockaddr *)&run, &len)) == -1)
+	if ((fd = accept(ctx->fd, (struct sockaddr *)&run, &len)) == -1)
 		return;
-	set_cloexec(f);
+	if ((flags = fcntl(fd, F_GETFD, 0)) == -1 ||
+	    fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == -1)
+	{
+		close(fd);
+	        return;
+	}
 	l = malloc(sizeof(*l));
 	if (l) {
-		l->fd = f;
+		l->fd = fd;
 		l->listener = 0;
 		l->next = control_fds;
 		control_fds = l;
 		eloop_event_add(l->fd, control_handle_data, l);
-	}
+	} else
+		close(fd);
 }
 
 static int
 make_sock(struct control_ctx *ctx, struct sockaddr_un *sun)
 {
 
-	if ((ctx->fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
+	if ((ctx->fd = socket(AF_UNIX,
+	    SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0)) == -1)
 		return -1;
 	memset(sun, 0, sizeof(*sun));
 	sun->sun_family = AF_UNIX;
@@ -147,8 +155,6 @@ control_start(struct control_ctx *ctx)
 	if (bind(ctx->fd, (struct sockaddr *)&sun, len) == -1 ||
 	    chmod(CONTROLSOCKET,
 		S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP) == -1 ||
-	    set_cloexec(ctx->fd) == -1 ||
-	    set_nonblock(ctx->fd) == -1 ||
 	    listen(ctx->fd, sizeof(control_fds)) == -1)
 	{
 		close(ctx->fd);

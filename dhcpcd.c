@@ -1284,7 +1284,9 @@ main(int argc, char **argv)
 		if (mkdir(DBDIR, 0755) == -1 && errno != EEXIST)
 			syslog(LOG_ERR, "mkdir `%s': %m", DBDIR);
 
-		pidfd = open(pidfile, O_WRONLY | O_CREAT | O_NONBLOCK, 0664);
+		pidfd = open(pidfile,
+		    O_WRONLY | O_CREAT | O_NONBLOCK | O_CLOEXEC,
+		    0664);
 		if (pidfd == -1)
 			syslog(LOG_ERR, "open `%s': %m", pidfile);
 		else {
@@ -1294,8 +1296,6 @@ main(int argc, char **argv)
 				syslog(LOG_ERR, "flock `%s': %m", pidfile);
 				goto exit_failure;
 			}
-			if (set_cloexec(pidfd) == -1)
-				goto exit_failure;
 			writepid(pidfd, getpid());
 		}
 	}

@@ -1358,7 +1358,7 @@ dhcp_openudp(struct interface *ifp)
 	char *p;
 #endif
 
-	if ((s = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
+	if ((s = socket(PF_INET, SOCK_DGRAM | SOCK_CLOEXEC, IPPROTO_UDP)) == -1)
 		return -1;
 
 	n = 1;
@@ -1388,7 +1388,6 @@ dhcp_openudp(struct interface *ifp)
 	if (bind(s, (struct sockaddr *)&sin, sizeof(sin)) == -1)
 		goto eexit;
 
-	set_cloexec(s);
 	if (ifp)
 		state->udp_fd = s;
 	else

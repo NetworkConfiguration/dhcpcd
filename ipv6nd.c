@@ -192,7 +192,8 @@ ipv6nd_open(void)
 	} su;
 #endif
 
-	sock = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
+	sock = socket(AF_INET6, SOCK_RAW | SOCK_CLOEXEC | SOCK_NONBLOCK,
+	    IPPROTO_ICMPV6);
 	if (sock == -1)
 		return -1;
 
@@ -218,8 +219,6 @@ ipv6nd_open(void)
 	if (setsockopt(sock, IPPROTO_ICMPV6, ICMP6_FILTER,
 		&filt, sizeof(filt)) == -1)
 		goto eexit;
-
-	set_cloexec(sock);
 
 	len = CMSG_SPACE(sizeof(struct in6_pktinfo)) + CMSG_SPACE(sizeof(int));
 	sndbuf = calloc(1, len);

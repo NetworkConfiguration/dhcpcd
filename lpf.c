@@ -80,7 +80,8 @@ ipv4_opensocket(struct interface *ifp, int protocol)
 	int n;
 #endif
 
-	if ((s = socket(PF_PACKET, SOCK_DGRAM, htons(protocol))) == -1)
+	if ((s = socket(PF_PACKET, SOCK_DGRAM | SOCK_CLOEXEC | SOCK_NONBLOCK,
+	    htons(protocol))) == -1)
 		return -1;
 
 	memset(&su, 0, sizeof(su));
@@ -105,10 +106,6 @@ ipv4_opensocket(struct interface *ifp, int protocol)
 			goto eexit;
 	}
 #endif
-	if (set_cloexec(s) == -1)
-		goto eexit;
-	if (set_nonblock(s) == -1)
-		goto eexit;
 	if (bind(s, &su.sa, sizeof(su)) == -1)
 		goto eexit;
 	return s;

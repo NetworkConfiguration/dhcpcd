@@ -62,7 +62,7 @@ ipv4_opensocket(struct interface *ifp, int protocol)
 	int flags;
 #endif
 #ifdef _PATH_BPF
-	fd = open(_PATH_BPF, O_RDWR | O_NONBLOCK);
+	fd = open(_PATH_BPF, O_RDWR | O_CLOEXEC | O_NONBLOCK);
 #else
 	char *device;
 	int n = 0;
@@ -72,7 +72,7 @@ ipv4_opensocket(struct interface *ifp, int protocol)
 		return -1;
 	do {
 		snprintf(device, PATH_MAX, "/dev/bpf%d", n++);
-		fd = open(device, O_RDWR | O_NONBLOCK);
+		fd = open(device, O_RDWR | O_CLOEXEC | O_NONBLOCK);
 	} while (fd == -1 && errno == EBUSY);
 	free(device);
 #endif
@@ -122,8 +122,6 @@ ipv4_opensocket(struct interface *ifp, int protocol)
 		pf.bf_len = dhcp_bpf_filter_len;
 	}
 	if (ioctl(fd, BIOCSETF, &pf) == -1)
-		goto eexit;
-	if (set_cloexec(fd) == -1)
 		goto eexit;
 	return fd;
 

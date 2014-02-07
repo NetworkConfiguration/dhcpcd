@@ -2486,7 +2486,8 @@ dhcp6_open(void)
 	sa.sin6_len = sizeof(sa);
 #endif
 
-	sock = socket(PF_INET6, SOCK_DGRAM, IPPROTO_UDP);
+	sock = socket(PF_INET6, SOCK_DGRAM | SOCK_CLOEXEC | SOCK_NONBLOCK,
+	    IPPROTO_UDP);
 	if (sock == -1)
 		return -1;
 
@@ -2513,9 +2514,6 @@ dhcp6_open(void)
 	n = 1;
 	if (setsockopt(sock, IPPROTO_IPV6, IPV6_RECVPKTINFO,
 	    &n, sizeof(n)) == -1)
-		goto errexit;
-
-	if (set_cloexec(sock) == -1 || set_nonblock(sock) == -1)
 		goto errexit;
 
 	eloop_event_add(sock, dhcp6_handledata, NULL);
