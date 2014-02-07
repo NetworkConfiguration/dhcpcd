@@ -49,10 +49,6 @@
 # endif
 #endif
 
-#ifndef DUID_LEN
-#  define DUID_LEN			128 + 2
-#endif
-
 #define EUI64_ADDR_LEN			8
 #define INFINIBAND_ADDR_LEN		20
 

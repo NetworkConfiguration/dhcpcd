@@ -30,6 +30,10 @@
 
 #include "net.h"
 
+#ifndef DUID_LEN
+#  define DUID_LEN	128 + 2
+#endif
+
 extern unsigned char *duid;
 extern size_t duid_len;
 
