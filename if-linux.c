@@ -515,19 +515,20 @@ static int
 send_netlink(struct nlmsghdr *hdr)
 {
 	int s, r;
-	struct sockaddr_nl sock_nl;
+	struct sockaddr_nl snl;
 	struct iovec iov;
 	struct msghdr msg;
 	static unsigned int seq;
 
-	if ((s = _open_link_socket(&sock_nl)) == -1)
+	memset(&snl, 0, sizeof(snl));
+	if ((s = _open_link_socket(&snl)) == -1)
 		return -1;
 	memset(&iov, 0, sizeof(iov));
 	iov.iov_base = hdr;
 	iov.iov_len = hdr->nlmsg_len;
 	memset(&msg, 0, sizeof(msg));
-	msg.msg_name = &sock_nl;
-	msg.msg_namelen = sizeof(sock_nl);
+	msg.msg_name = &snl;
+	msg.msg_namelen = sizeof(snl);
 	msg.msg_iov = &iov;
 	msg.msg_iovlen = 1;
 	/* Request a reply */
