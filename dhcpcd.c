@@ -1410,7 +1410,8 @@ main(int argc, char **argv)
 		    !(options & DHCPCD_WAITIP))
 		{
 			syslog(LOG_WARNING, "no interfaces have a carrier");
-			daemonise();
+			if (daemonise())
+				goto exit_success;
 		} else if (i > 0) {
 			if (options & DHCPCD_IPV4LL)
 				options |= DHCPCD_TIMEOUT_IPV4LL;
