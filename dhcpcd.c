@@ -786,28 +786,33 @@ reconf_reboot(int action, int argc, char **argv, int oi)
 	sort_interfaces();
 }
 
+struct dhcpcd_siginfo {
+	int signo;
+	pid_t pid;
+} dhcpcd_siginfo;
+
 static void
 handle_signal1(void *arg)
 {
-	siginfo_t *si;
+	struct dhcpcd_siginfo *si;
 	struct interface *ifp;
 	struct if_options *ifo;
 	int do_release;
 
 	si = arg;
 	do_release = 0;
-	switch (si->si_signo) {
+	switch (si->signo) {
 	case SIGINT:
 		syslog(LOG_INFO, "received SIGINT from PID %d, stopping",
-		    (int)si->si_pid);
+		    (int)si->pid);
 		break;
 	case SIGTERM:
 		syslog(LOG_INFO, "received SIGTERM from PID %d, stopping",
-		    (int)si->si_pid);
+		    (int)si->pid);
 		break;
 	case SIGALRM:
 		syslog(LOG_INFO, "received SIGALRM from PID %d, rebinding",
-		    (int)si->si_pid);
+		    (int)si->pid);
 
 		free_globals();
 		ifav = NULL;
@@ -828,12 +833,12 @@ handle_signal1(void *arg)
 		return;
 	case SIGHUP:
 		syslog(LOG_INFO, "received SIGHUP from PID %d, releasing",
-		    (int)si->si_pid);
+		    (int)si->pid);
 		do_release = 1;
 		break;
 	case SIGUSR1:
 		syslog(LOG_INFO, "received SIGUSR from PID %d, reconfiguring",
-		    (int)si->si_pid);
+		    (int)si->pid);
 		TAILQ_FOREACH(ifp, ifaces, next) {
 		    ipv4_applyaddr(ifp);
 		}
@@ -845,7 +850,7 @@ handle_signal1(void *arg)
 		syslog(LOG_ERR,
 		    "received signal %d from PID %d, "
 		    "but don't know what to do with it",
-		    si->si_signo, (int)si->si_pid);
+		    si->signo, (int)si->pid);
 		return;
 	}
 
@@ -867,7 +872,6 @@ handle_signal1(void *arg)
 	eloop_exit(EXIT_FAILURE);
 }
 
-static siginfo_t dhcpcd_siginfo;
 static void
 handle_signal(__unused int sig, siginfo_t *siginfo, __unused void *context)
 {
@@ -875,7 +879,8 @@ handle_signal(__unused int sig, siginfo_t *siginfo, __unused void *context)
 	/* So that we can operate safely under a signal we instruct
 	 * eloop to pass a copy of the siginfo structure to handle_signal1
 	 * as the very first thing to do. */
-	memcpy(&dhcpcd_siginfo, siginfo, sizeof(dhcpcd_siginfo));
+	dhcpcd_siginfo.signo = siginfo->si_signo;
+	dhcpcd_siginfo.pid = siginfo->si_pid;
 	eloop_timeout_add_now(handle_signal1, &dhcpcd_siginfo);
 }
 
