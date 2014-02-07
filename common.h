@@ -107,6 +107,5 @@ int get_monotonic(struct timeval *);
 ssize_t setvar(char ***, const char *, const char *, const char *);
 ssize_t setvard(char ***, const char *, const char *, int);
 time_t uptime(void);
-int writepid(int, pid_t);
 
 #endif

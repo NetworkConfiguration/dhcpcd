@@ -186,6 +186,15 @@ handle_exit_timeout(__unused void *arg)
 	eloop_timeout_add_sec(timeout, handle_exit_timeout, NULL);
 }
 
+static inline int
+writepid(int fd, pid_t pid)
+{
+
+	if (ftruncate(fd, (off_t)0) == -1)
+		return -1;
+	return dprintf(fd, "%d\n", pid);
+}
+
 /* Returns the pid of the child, otherwise 0. */
 pid_t
 daemonise(void)
