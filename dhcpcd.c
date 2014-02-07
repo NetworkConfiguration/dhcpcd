@@ -1455,7 +1455,6 @@ exit1:
 	restore_kernel_ra();
 	ipv4_free(NULL);
 	ipv6_free(NULL);
-	get_line_free();
 	dev_stop(options & DHCPCD_DAEMONISED);
 	if (linkfd != -1) {
 		close(linkfd);

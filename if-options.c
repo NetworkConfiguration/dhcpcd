@@ -1759,18 +1759,40 @@ finish_config(struct if_options *ifo)
 	}
 }
 
+/* Handy routine to read very long lines in text files.
+ * This means we read the whole line and avoid any nasty buffer overflows.
+ * We strip leading space and avoid comment lines, making the code that calls
+ * us smaller. */
+static char *
+get_line(char ** __restrict buf, size_t * __restrict buflen, FILE * __restrict fp)
+{
+	char *p;
+	ssize_t bytes;
+
+	do {
+		bytes = getline(buf, buflen, fp);
+		if (bytes == -1)
+			return NULL;
+		for (p = *buf; *p == ' ' || *p == '\t'; p++)
+			;
+	} while (*p == '\0' || *p == '\n' || *p == '#' || *p == ';');
+	if ((*buf)[--bytes] == '\n')
+		(*buf)[bytes] = '\0';
+	return p;
+}
+
 struct if_options *
 read_config(const char *file,
     const char *ifname, const char *ssid, const char *profile)
 {
 	struct if_options *ifo;
-	FILE *f;
-	char *line, *option, *p;
+	FILE *fp;
+	char *line, *buf, *option, *p;
+	size_t buflen;
 	int skip = 0, have_profile = 0;
 #ifndef EMBEDDED_CONFIG
-	char *buf;
 	const char * const *e;
-	size_t buflen, ol;
+	size_t ol;
 #endif
 #if !defined(INET) || !defined(INET6)
 	size_t i;
@@ -1806,6 +1828,9 @@ read_config(const char *file,
 	ifo->vendorclassid[0] = strlen(vendor);
 	memcpy(ifo->vendorclassid + 1, vendor, ifo->vendorclassid[0]);
 
+	buf = NULL;
+	buflen = 0;
+
 	/* Parse our embedded options file */
 	if (ifname == NULL) {
 		/* Space for initial estimates */
@@ -1829,11 +1854,11 @@ read_config(const char *file,
 
 		/* Now load our embedded config */
 #ifdef EMBEDDED_CONFIG
-		f = fopen(EMBEDDED_CONFIG, "r");
-		if (f == NULL)
+		fp = fopen(EMBEDDED_CONFIG, "r");
+		if (fp == NULL)
 			syslog(LOG_ERR, "fopen `%s': %m", EMBEDDED_CONFIG);
 
-		while (f && (line = get_line(f))) {
+		while (fp && (line = get_line(&buf, &buflen, fp))) {
 #else
 		buflen = 80;
 		buf = malloc(buflen);
@@ -1871,10 +1896,8 @@ read_config(const char *file,
 		}
 
 #ifdef EMBEDDED_CONFIG
-		if (f)
-			fclose(f);
-#else
-		free(buf);
+		if (fp)
+			fclose(fp);
 #endif
 #ifdef INET
 		dhcp_opts = ifo->dhcp_override;
@@ -1909,14 +1932,15 @@ read_config(const char *file,
 	}
 
 	/* Parse our options file */
-	f = fopen(file ? file : CONFIG, "r");
-	if (f == NULL) {
+	fp = fopen(file ? file : CONFIG, "r");
+	if (fp == NULL) {
 		if (file != NULL)
 			syslog(LOG_ERR, "fopen `%s': %m", file);
+		free(buf);
 		return ifo;
 	}
 
-	while ((line = get_line(f))) {
+	while ((line = get_line(&buf, &buflen, fp))) {
 		option = strsep(&line, " \t");
 		if (line)
 			line = strskipwhite(line);
@@ -1957,7 +1981,8 @@ read_config(const char *file,
 			continue;
 		parse_config_line(ifname, ifo, option, line);
 	}
-	fclose(f);
+	fclose(fp);
+	free(buf);
 
 	if (profile && !have_profile) {
 		free_options(ifo);

@@ -62,39 +62,6 @@
 
 static char hostname_buffer[HOSTNAME_MAX_LEN + 1];
 int clock_monotonic;
-static char *lbuf;
-static size_t lbuf_len;
-
-/* Handy routine to read very long lines in text files.
- * This means we read the whole line and avoid any nasty buffer overflows.
- * We strip leading space and avoid comment lines, making the code that calls
- * us smaller.
- * As we don't use threads, this API is clean too. */
-char *
-get_line(FILE * __restrict fp)
-{
-	char *p;
-	ssize_t bytes;
-
-	do {
-		bytes = getline(&lbuf, &lbuf_len, fp);
-		if (bytes == -1)
-			return NULL;
-		for (p = lbuf; *p == ' ' || *p == '\t'; p++)
-			;
-	} while (*p == '\0' || *p == '\n' || *p == '#' || *p == ';');
-	if (lbuf[--bytes] == '\n')
-		lbuf[bytes] = '\0';
-	return p;
-}
-
-void
-get_line_free(void)
-{
-
-	free(lbuf);
-	lbuf_len = 0;
-}
 
 const char *
 get_hostname(int short_hostname)

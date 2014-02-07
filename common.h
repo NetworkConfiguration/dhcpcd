@@ -99,7 +99,6 @@
 # endif
 #endif
 
-char *get_line(FILE * __restrict);
 void get_line_free(void);
 const char *get_hostname(int);
 extern int clock_monotonic;
