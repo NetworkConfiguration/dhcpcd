@@ -1255,7 +1255,6 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 void
 get_lease(struct dhcp_lease *lease, const struct dhcp_message *dhcp)
 {
-	struct timeval now;
 
 	lease->cookie = dhcp->cookie;
 	/* BOOTP does not set yiaddr for replies when ciaddr is set. */
@@ -1267,12 +1266,7 @@ get_lease(struct dhcp_lease *lease, const struct dhcp_message *dhcp)
 		lease->net.s_addr = ipv4_getnetmask(lease->addr.s_addr);
 	if (get_option_addr(&lease->brd, dhcp, DHO_BROADCAST) == -1)
 		lease->brd.s_addr = lease->addr.s_addr | ~lease->net.s_addr;
-	if (get_option_uint32(&lease->leasetime, dhcp, DHO_LEASETIME) == 0) {
-		/* Ensure that we can use the lease */
-		get_monotonic(&now);
-		if (now.tv_sec + (time_t)lease->leasetime < now.tv_sec)
-			lease->leasetime = ~0U; /* Infinite lease */
-	} else
+	if (get_option_uint32(&lease->leasetime, dhcp, DHO_LEASETIME) != 0)
 		lease->leasetime = ~0U; /* Default to infinite lease */
 	if (get_option_uint32(&lease->renewaltime, dhcp, DHO_RENEWALTIME) != 0)
 		lease->renewaltime = 0;
@@ -1731,8 +1725,6 @@ dhcp_bind(void *arg)
 	uint8_t ipv4ll = 0;
 
 	state->reason = NULL;
-	if (clock_monotonic)
-		get_monotonic(&lease->boundtime);
 	state->xid = 0;
 	free(state->old);
 	state->old = state->new;

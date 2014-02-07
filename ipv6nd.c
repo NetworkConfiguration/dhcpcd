@@ -1067,7 +1067,6 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 {
 	ssize_t l;
 	size_t len;
-	struct timeval now;
 	const struct ra *rap;
 	const struct ra_opt *rao;
 	int i;
@@ -1077,7 +1076,6 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 
 	i = 0;
 	l = 0;
-	get_monotonic(&now);
 	TAILQ_FOREACH(rap, &ipv6_routers, next) {
 		i++;
 		if (rap->iface != ifp)
