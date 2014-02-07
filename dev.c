@@ -72,6 +72,7 @@ dev_stop(int stop)
 		dev->stop();
 		free(dev);
 		dev = NULL;
+		fd = -1;
 	}
 	if (handle) {
 		dlclose(handle);
