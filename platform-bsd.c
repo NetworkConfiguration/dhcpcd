@@ -53,18 +53,17 @@
 #  define SYS_NMLN 256
 #endif
 
-static char march[SYS_NMLN];
-
-char *
-hardware_platform(void)
+int
+hardware_platform(char *str, size_t len)
 {
 	int mib[2] = { CTL_HW, HW_MACHINE_ARCH };
+	char march[SYS_NMLN];
 	size_t len = sizeof(march);
 
 	if (sysctl(mib, sizeof(mib) / sizeof(mib[0]),
-		march, &len, NULL, 0) != 0)
-		return NULL;
-	return march;
+	    march, &len, NULL, 0) != 0)
+		return -1;
+	return snprintf(str, len, ":%s", march);
 }
 
 #ifdef INET6

@@ -1063,7 +1063,7 @@ signal_init(void (*func)(int, siginfo_t *, void *), sigset_t *oldset)
 int
 main(int argc, char **argv)
 {
-	char *pidfile;
+	char *pidfile, *p;
 	struct interface *ifp;
 	uint16_t family = 0;
 	int opt, oi = 0, sig = 0, i;
@@ -1071,7 +1071,6 @@ main(int argc, char **argv)
 	pid_t pid;
 	struct timespec ts;
 	struct utsname utn;
-	const char *platform;
 	struct control_ctx control_ctx;
 
 	pidfile = NULL;
@@ -1090,13 +1089,13 @@ main(int argc, char **argv)
 		}
 	}
 
-	platform = hardware_platform();
-	if (uname(&utn) == 0)
-		snprintf(vendor, VENDORCLASSID_MAX_LEN,
-		    "%s-%s:%s-%s:%s%s%s", PACKAGE, VERSION,
-		    utn.sysname, utn.release, utn.machine,
-		    platform ? ":" : "", platform ? platform : "");
-	else
+	if (uname(&utn) == 0) {
+		p = vendor;
+		p += snprintf(vendor, VENDORCLASSID_MAX_LEN,
+		    "%s-%s:%s-%s:%s", PACKAGE, VERSION,
+		    utn.sysname, utn.release, utn.machine);
+		hardware_platform(p, VENDORCLASSID_MAX_LEN - (p - vendor));
+	} else
 		snprintf(vendor, VENDORCLASSID_MAX_LEN,
 		    "%s-%s", PACKAGE, VERSION);
 

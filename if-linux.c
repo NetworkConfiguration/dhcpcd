@@ -865,11 +865,10 @@ in6_addr_flags(const char *ifname, const struct in6_addr *addr)
 	}
 	*p = '\0';
 
-	while ((p = get_line(fp))) {
-		i = sscanf(p, "%32[a-f0-9] %x %x %x %x"
-		    " %"TOSTRING(IF_NAMESIZE)"s\n",
-		    address, &ifindex, &prefix, &scope, &flags, name);
-		if (i != 6 || strlen(address) != 32) {
+	while (fscanf(fp, "%32[a-f0-9] %x %x %x %x %"TOSTRING(IF_NAMESIZE)"s\n",
+	    address, &ifindex, &prefix, &scope, &flags, name) == 6)
+	{
+		if (strlen(address) != 32) {
 			fclose(fp);
 			errno = ENOTSUP;
 			return -1;

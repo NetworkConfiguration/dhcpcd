@@ -79,37 +79,31 @@ static char **restore;
 static ssize_t nrestore;
 #endif
 
-char *
-hardware_platform(void)
+int
+hardware_platform(char *str, size_t len)
 {
 	FILE *fp;
-	char *buf, *p;
+	char buf[255];
 
 	if (mproc == NULL) {
 		errno = EINVAL;
-		return NULL;
+		return -1;
 	}
 
 	fp = fopen("/proc/cpuinfo", "r");
 	if (fp == NULL)
-		return NULL;
+		return -1;
 
-	p = NULL;
-	while ((buf = get_line(fp))) {
+	while (fscanf(fp, "%s : ", buf) != EOF) {
 		if (strncmp(buf, mproc, strlen(mproc)) == 0) {
-			p = strchr(buf, ':');
-			if (p != NULL && ++p != NULL) {
-				while (*p == ' ')
-					p++;
-				break;
-			}
+			fscanf(fp, "%s", buf);
+			fclose(fp);
+			return snprintf(str, len, ":%s", buf);
 		}
 	}
 	fclose(fp);
-
-	if (p == NULL)
-		errno = ESRCH;
-	return p;
+	errno = ESRCH;
+	return -1;
 }
 
 #ifdef INET6
