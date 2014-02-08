@@ -184,6 +184,7 @@ dhcp6_makevendor(struct dhcp6_option *o, const struct interface *ifp)
 	uint32_t u32;
 	size_t vlen, i;
 	const struct vivco *vivco;
+	char vendor[VENDORCLASSID_MAX_LEN];
 
 	ifo = ifp->options;
 	len = sizeof(uint32_t); /* IANA PEN */
@@ -194,7 +195,7 @@ dhcp6_makevendor(struct dhcp6_option *o, const struct interface *ifp)
 			len += sizeof(uint16_t) + vivco->len;
 		vlen = 0; /* silence bogus gcc warning */
 	} else {
-		vlen = strlen(vendor);
+		vlen = dhcp_vendor(vendor, sizeof(vendor));
 		len += sizeof(uint16_t) + vlen;
 	}
 

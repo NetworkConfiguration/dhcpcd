@@ -1825,8 +1825,8 @@ read_config(const char *file,
 	TAILQ_INIT(&ifo->auth.tokens);
 	strlcpy(ifo->script, SCRIPT, sizeof(ifo->script));
 
-	ifo->vendorclassid[0] = strlen(vendor);
-	memcpy(ifo->vendorclassid + 1, vendor, ifo->vendorclassid[0]);
+	ifo->vendorclassid[0] = dhcp_vendor((char *)ifo->vendorclassid + 1,
+	    sizeof(ifo->vendorclassid) - 1);
 
 	buf = NULL;
 	buflen = 0;

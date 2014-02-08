@@ -69,7 +69,6 @@ struct interface {
 };
 extern TAILQ_HEAD(if_head, interface) *ifaces;
 
-extern char vendor[VENDORCLASSID_MAX_LEN];
 extern sigset_t dhcpcd_sigset;
 extern int ifac;
 extern char **ifav;

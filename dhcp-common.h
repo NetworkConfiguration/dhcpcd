@@ -85,6 +85,8 @@ extern size_t vivso_len;
 
 struct dhcp_opt *vivso_find(uint16_t, const void *);
 
+size_t dhcp_vendor(char *, size_t);
+
 #define add_option_mask(var, val) (var[val >> 3] |= 1 << (val & 7))
 #define del_option_mask(var, val) (var[val >> 3] &= ~(1 << (val & 7)))
 #define has_option_mask(var, val) (var[val >>3] & (1 << (val & 7)))

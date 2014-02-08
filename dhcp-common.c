@@ -25,6 +25,8 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/utsname.h>
+
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -37,6 +39,7 @@
 #include "common.h"
 #include "dhcp-common.h"
 #include "dhcp.h"
+#include "platform.h"
 
 /* DHCP Enterprise options, RFC3925 */
 struct dhcp_opt *vivso = NULL;
@@ -61,6 +64,22 @@ vivso_find(uint16_t iana_en, const void *arg)
 		if (opt->option == iana_en)
 			return opt;
 	return NULL;
+}
+
+size_t
+dhcp_vendor(char *str, size_t strlen)
+{
+	struct utsname utn;
+	char *p;
+
+	if (uname(&utn) != 0)
+		return snprintf(str, strlen, "%s-%s", PACKAGE, VERSION);
+	p = str;
+	p += snprintf(str, strlen,
+	    "%s-%s:%s-%s:%s", PACKAGE, VERSION,
+	    utn.sysname, utn.release, utn.machine);
+	p += hardware_platform(p, strlen - (p - str));
+	return p - str;
 }
 
 int

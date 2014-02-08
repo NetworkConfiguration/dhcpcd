@@ -33,7 +33,6 @@ const char dhcpcd_copyright[] = "Copyright (c) 2006-2014 Roy Marples";
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/uio.h>
-#include <sys/utsname.h>
 
 #include <ctype.h>
 #include <errno.h>
@@ -67,7 +66,6 @@ const char dhcpcd_copyright[] = "Copyright (c) 2006-2014 Roy Marples";
 #include "script.h"
 
 struct if_head *ifaces = NULL;
-char vendor[VENDORCLASSID_MAX_LEN];
 struct if_options *if_options = NULL;
 int ifac = 0;
 char **ifav = NULL;
@@ -1063,14 +1061,13 @@ signal_init(void (*func)(int, siginfo_t *, void *), sigset_t *oldset)
 int
 main(int argc, char **argv)
 {
-	char *pidfile, *p;
+	char *pidfile;
 	struct interface *ifp;
 	uint16_t family = 0;
 	int opt, oi = 0, sig = 0, i;
 	size_t len;
 	pid_t pid;
 	struct timespec ts;
-	struct utsname utn;
 	struct control_ctx control_ctx;
 
 	pidfile = NULL;
@@ -1088,16 +1085,6 @@ main(int argc, char **argv)
 			return EXIT_SUCCESS;
 		}
 	}
-
-	if (uname(&utn) == 0) {
-		p = vendor;
-		p += snprintf(vendor, VENDORCLASSID_MAX_LEN,
-		    "%s-%s:%s-%s:%s", PACKAGE, VERSION,
-		    utn.sysname, utn.release, utn.machine);
-		hardware_platform(p, VENDORCLASSID_MAX_LEN - (p - vendor));
-	} else
-		snprintf(vendor, VENDORCLASSID_MAX_LEN,
-		    "%s-%s", PACKAGE, VERSION);
 
 	i = 0;
 	while ((opt = getopt_long(argc, argv, IF_OPTS, cf_options, &oi)) != -1)
