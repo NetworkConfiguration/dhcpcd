@@ -2041,30 +2041,30 @@ free_options(struct if_options *ifo)
 		free(ifo->blacklist);
 		free(ifo->fallback);
 
-		for (i = 0, opt = ifo->dhcp_override;
-		    i < ifo->dhcp_override_len;
-		    i++, opt++)
+		for (opt = ifo->dhcp_override;
+		    ifo->dhcp_override_len > 0;
+		    opt++, ifo->dhcp_override_len--)
 			free_dhcp_opt_embenc(opt);
 		free(ifo->dhcp_override);
-		for (i = 0, opt = ifo->dhcp6_override;
-		    i < ifo->dhcp6_override_len;
-		    i++, opt++)
+		for (opt = ifo->dhcp6_override;
+		    ifo->dhcp6_override_len > 0;
+		    opt++, ifo->dhcp6_override_len--)
 			free_dhcp_opt_embenc(opt);
 		free(ifo->dhcp6_override);
-		for (i = 0, vo = ifo->vivco;
-		    i < ifo->vivco_len;
-		    i++, vo++)
+		for (vo = ifo->vivco;
+		    ifo->vivco_len > 0;
+		    vo++, ifo->vivco_len--)
 			free(vo->data);
 		free(ifo->vivco);
-		for (i = 0, opt = ifo->vivso_override;
-		    i < ifo->vivso_override_len;
-		    i++, opt++)
+		for (opt = ifo->vivso_override;
+		    ifo->vivso_override_len > 0;
+		    opt++, ifo->vivso_override_len--)
 			free_dhcp_opt_embenc(opt);
 		free(ifo->vivso_override);
 
 #ifdef INET6
-		for (i = 0; i < ifo->ia_len; i++)
-			free(ifo->ia[i].sla);
+		for (; ifo->ia_len > 0; ifo->ia_len--)
+			free(ifo->ia[ifo->ia_len - 1].sla);
 #endif
 		free(ifo->ia);
 

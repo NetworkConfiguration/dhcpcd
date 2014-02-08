@@ -146,18 +146,19 @@ restore_kernel_ra(void)
 	if (options & DHCPCD_FORKED)
 		return;
 
-	for (nrestore--; nrestore >= 0; nrestore--) {
+	for (; nrestore > 0; nrestore--) {
 		if (!(options & DHCPCD_FORKED)) {
 			syslog(LOG_INFO, "%s: restoring Kernel IPv6 RA support",
-			    restore[nrestore]);
+			    restore[nrestore - 1]);
 			snprintf(path, sizeof(path), "%s/%s/accept_ra",
-			    prefix, restore[nrestore]);
+			    prefix, restore[nrestore - 1]);
 			if (write_path(path, "1") == -1 && errno != ENOENT)
 			    syslog(LOG_ERR, "write_path: %s: %m", path);
 		}
-		free(restore[nrestore]);
+		free(restore[nrestore - 1]);
 	}
 	free(restore);
+	restore = NULL;
 }
 
 int

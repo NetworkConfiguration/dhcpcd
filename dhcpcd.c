@@ -133,30 +133,45 @@ printf("usage: "PACKAGE"\t[-46ABbDdEGgHJKkLnpqTVw]\n"
 static void
 free_globals(void)
 {
-	int i;
-	size_t n;
 	struct dhcp_opt *opt;
 
-	for (i = 0; i < ifac; i++)
-		free(ifav[i]);
-	free(ifav);
-	for (i = 0; i < ifdc; i++)
-		free(ifdv[i]);
-	free(ifdv);
+	if (ifac) {
+		for (ifac--; ifac >= 0; ifac--)
+			free(ifav[ifac]);
+		free(ifav);
+		ifav = NULL;
+	}
+	if (ifdc) {
+		for (ifdc--; ifdc >= 0; ifdc--)
+			free(ifdv[ifac]);
+		free(ifdv);
+		ifdv = NULL;
+	}
 
 #ifdef INET
-	for (n = 0, opt = dhcp_opts; n < dhcp_opts_len; n++, opt++)
-		free_dhcp_opt_embenc(opt);
-	free(dhcp_opts);
+	if (dhcp_opts) {
+		for (opt = dhcp_opts; dhcp_opts_len > 0;
+		    opt++, dhcp_opts_len--)
+			free_dhcp_opt_embenc(opt);
+		free(dhcp_opts);
+		dhcp_opts = NULL;
+	}
 #endif
 #ifdef INET6
-	for (n = 0, opt = dhcp6_opts; n < dhcp6_opts_len; n++, opt++)
-		free_dhcp_opt_embenc(opt);
-	free(dhcp6_opts);
+	if (dhcp6_opts) {
+		for (opt = dhcp6_opts; dhcp6_opts_len > 0;
+		    opt++, dhcp6_opts_len--)
+			free_dhcp_opt_embenc(opt);
+		free(dhcp6_opts);
+		dhcp6_opts = NULL;
+	}
 #endif
-	for (n = 0, opt = vivso; n < vivso_len; n++, opt++)
-		free_dhcp_opt_embenc(opt);
-	free(vivso);
+	if (vivso) {
+		for (opt = vivso; vivso_len > 0; opt++, vivso_len--)
+			free_dhcp_opt_embenc(opt);
+		free(vivso);
+		vivso = NULL;
+	}
 }
 
 /* ARGSUSED */
@@ -185,12 +200,13 @@ handle_exit_timeout(__unused void *arg)
 }
 
 static inline int
-writepid(int fd, pid_t pid)
+write_pid(int fd, pid_t pid)
 {
 
 	if (ftruncate(fd, (off_t)0) == -1)
 		return -1;
-	return dprintf(fd, "%d\n", pid);
+	lseek(fd, (off_t)0, SEEK_SET);
+	return dprintf(fd, "%d\n", (int)pid);
 }
 
 /* Returns the pid of the child, otherwise 0. */
@@ -260,7 +276,7 @@ daemonise(void)
 	/* Done with the fd now */
 	if (pid != 0) {
 		syslog(LOG_INFO, "forked to background, child pid %d", pid);
-		writepid(pidfd, pid);
+		write_pid(pidfd, pid);
 		close(pidfd);
 		pidfd = -1;
 		options |= DHCPCD_FORKED;
@@ -1086,6 +1102,7 @@ main(int argc, char **argv)
 		}
 	}
 
+	control_ctx.fd = -1;
 	i = 0;
 	while ((opt = getopt_long(argc, argv, IF_OPTS, cf_options, &oi)) != -1)
 	{
@@ -1280,7 +1297,7 @@ main(int argc, char **argv)
 			syslog(LOG_ERR, "mkdir `%s': %m", DBDIR);
 
 		pidfd = open(pidfile,
-		    O_WRONLY | O_CREAT | O_NONBLOCK | O_CLOEXEC,
+		    O_WRONLY | O_CREAT | O_CLOEXEC | O_NONBLOCK,
 		    0664);
 		if (pidfd == -1)
 			syslog(LOG_ERR, "open `%s': %m", pidfile);
@@ -1289,9 +1306,11 @@ main(int argc, char **argv)
 			 * runs on an interface */
 			if (flock(pidfd, LOCK_EX | LOCK_NB) == -1) {
 				syslog(LOG_ERR, "flock `%s': %m", pidfile);
+				close(pidfd);
+				pidfd = -1;
 				goto exit_failure;
 			}
-			writepid(pidfd, getpid());
+			write_pid(pidfd, getpid());
 		}
 	}
 
@@ -1361,8 +1380,8 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (options & DHCPCD_BACKGROUND)
-		daemonise();
+	if (options & DHCPCD_BACKGROUND && daemonise())
+		goto exit_success;
 
 	opt = 0;
 	TAILQ_FOREACH(ifp, ifaces, next) {
@@ -1428,16 +1447,27 @@ exit_failure:
 	i = EXIT_FAILURE;
 
 exit1:
+	/* Free memory and close fd's.
+	 * We also set global variables back to their initial variables
+	 * so we work nicely in a threads based environment as opposed to
+	 * the normal process one. */
 	if (ifaces) {
 		while ((ifp = TAILQ_FIRST(ifaces))) {
 			TAILQ_REMOVE(ifaces, ifp, next);
 			free_interface(ifp);
 		}
 		free(ifaces);
+		ifaces = NULL;
 	}
 
-	free(duid);
-	free_options(if_options);
+	if (duid) {
+		free(duid);
+		duid = NULL;
+	}
+	if (if_options) {
+		free_options(if_options);
+		if_options = NULL;
+	}
 	free_globals();
 	restore_kernel_ra();
 	ipv4_free(NULL);
@@ -1450,13 +1480,16 @@ exit1:
 	if (pidfd > -1) {
 		if (options & DHCPCD_MASTER) {
 			if (control_stop(&control_ctx) == -1)
-				syslog(LOG_ERR, "control_stop: %m");
+				syslog(LOG_ERR, "control_stop: %m:");
 		}
 		close(pidfd);
 		unlink(pidfile);
 		pidfd = -1;
 	}
-	free(pidfile);
+	if (pidfile) {
+		free(pidfile);
+		pidfile = NULL;
+	}
 
 	if (options & DHCPCD_STARTED && !(options & DHCPCD_FORKED))
 		syslog(LOG_INFO, "exited");
