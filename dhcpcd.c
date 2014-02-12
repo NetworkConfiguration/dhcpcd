@@ -1086,7 +1086,7 @@ int
 main(int argc, char **argv)
 {
 	struct dhcpcd_ctx ctx;
-	char *pidfile;
+	char pidfile[sizeof(PIDFILE) + IF_NAMESIZE];
 	struct if_options *ifo;
 	struct interface *ifp;
 	uint16_t family = 0;
@@ -1112,7 +1112,6 @@ main(int argc, char **argv)
 		}
 	}
 
-	pidfile = NULL;
 	ifo = NULL;
 	ctx.cffile = CONFIG;
 	ctx.pid_fd = ctx.control_fd = ctx.link_fd = -1;
@@ -1217,16 +1216,17 @@ main(int argc, char **argv)
 	if (!(ctx.options & (DHCPCD_TEST | DHCPCD_DUMPLEASE))) {
 		/* If we have any other args, we should run as a single dhcpcd
 		 *  instance for that interface. */
-		len = strlen(PIDFILE) + IF_NAMESIZE + 2;
-		pidfile = malloc(len);
-		if (pidfile == NULL) {
-			syslog(LOG_ERR, "%s: %m", __func__);
-			goto exit_failure;
+		if (optind == argc - 1) {
+			if (strlen(argv[optind]) > IF_NAMESIZE) {
+				syslog(LOG_ERR, "%s: interface name too long",
+				    argv[optind]);
+				goto exit_failure;
+			}
+			snprintf(pidfile, sizeof(pidfile),
+			    PIDFILE, "-", argv[optind]);
 		}
-		if (optind == argc - 1)
-			snprintf(pidfile, len, PIDFILE, "-", argv[optind]);
 		else {
-			snprintf(pidfile, len, PIDFILE, "", "");
+			snprintf(pidfile, sizeof(pidfile), PIDFILE, "", "");
 			ctx.options |= DHCPCD_MASTER;
 		}
 	}
@@ -1499,7 +1499,6 @@ exit1:
 		close(ctx.pid_fd);
 		unlink(pidfile);
 	}
-	free(pidfile);
 	eloop_free(ctx.eloop);
 
 	if (ctx.options & DHCPCD_STARTED && !(ctx.options & DHCPCD_FORKED))
