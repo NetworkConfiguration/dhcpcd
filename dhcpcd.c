@@ -1503,5 +1503,6 @@ exit1:
 
 	if (ctx.options & DHCPCD_STARTED && !(ctx.options & DHCPCD_FORKED))
 		syslog(LOG_INFO, "exited");
+	closelog();
 	return i;
 }

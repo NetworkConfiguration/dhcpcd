@@ -2670,7 +2670,7 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 				break;
 		}
 	}
-	if (ifp == NULL) {
+	if (ifp == NULL && ctx->ipv6) {
 		if (ctx->ipv6->dhcp_fd != -1) {
 			eloop_event_delete(ctx->eloop, ctx->ipv6->dhcp_fd);
 			close(ctx->ipv6->dhcp_fd);

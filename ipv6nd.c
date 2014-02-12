@@ -999,9 +999,11 @@ ipv6nd_has_ra(const struct interface *ifp)
 {
 	const struct ra *rap;
 
-	TAILQ_FOREACH(rap, ifp->ctx->ipv6->ra_routers, next)
-		if (rap->iface == ifp)
-			return 1;
+	if (ifp->ctx->ipv6) {
+		TAILQ_FOREACH(rap, ifp->ctx->ipv6->ra_routers, next)
+			if (rap->iface == ifp)
+				return 1;
+	}
 	return 0;
 }
 
@@ -1226,6 +1228,9 @@ ipv6nd_drop(struct interface *ifp)
 	struct ra *rap;
 	int expired = 0;
 	TAILQ_HEAD(rahead, ra) rtrs;
+
+	if (ifp->ctx->ipv6 == NULL)
+		return;
 
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	TAILQ_INIT(&rtrs);

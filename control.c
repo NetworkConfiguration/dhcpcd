@@ -197,7 +197,12 @@ control_open(struct dhcpcd_ctx *ctx)
 
 	if ((len = make_sock(ctx, &sun)) == -1)
 		return -1;
-	return connect(ctx->control_fd, (struct sockaddr *)&sun, len);
+	if (connect(ctx->control_fd, (struct sockaddr *)&sun, len) == -1) {
+		close(ctx->control_fd);
+		ctx->control_fd = -1;
+		return -1;
+	}
+	return 0;
 }
 
 int
