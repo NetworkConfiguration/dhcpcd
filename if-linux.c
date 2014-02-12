@@ -63,10 +63,14 @@
 #include "ipv6.h"
 #include "net.h"
 
+#define PROC_INET6	"/proc/net/if_inet6"
+#define PROC_PROMOTE	"/proc/sys/net/ipv4/conf/%s/promote_secondaries"
+#define SYS_LAYER2	"/sys/class/net/%s/device/layer2"
+
 int
-if_init(struct interface *iface)
+if_init(struct interface *ifp)
 {
-	char path[PATH_MAX];
+	char path[sizeof(PROC_PROMOTE) + IF_NAMESIZE];
 	FILE *fp;
 	int n;
 
@@ -77,9 +81,7 @@ if_init(struct interface *iface)
 	 * and the subnet mask moves onto 192.168.1.3/24
 	 * This matches the behaviour of BSD which makes coding dhcpcd
 	 * a little easier as there's just one behaviour. */
-	snprintf(path, sizeof(path),
-	    "/proc/sys/net/ipv4/conf/%s/promote_secondaries",
-	    iface->name);
+	snprintf(path, sizeof(path), PROC_PROMOTE, ifp->name);
 
 	fp = fopen(path, "w");
 	if (fp == NULL)
@@ -90,21 +92,18 @@ if_init(struct interface *iface)
 }
 
 int
-if_conf(struct interface *iface)
+if_conf(struct interface *ifp)
 {
-	char path[PATH_MAX], buf[1];
+	char path[sizeof(SYS_LAYER2) + IF_NAMESIZE], buf[1];
 	FILE *fp;
 
 	/* Some qeth setups require the use of the broadcast flag. */
-	snprintf(path, sizeof(path),
-	    "/sys/class/net/%s/device/layer2",
-	    iface->name);
-
+	snprintf(path, sizeof(path), SYS_LAYER2, ifp->name);
 	fp = fopen(path, "r");
 	if (fp == NULL)
 		return errno == ENOENT ? 0 : -1;
 	if (fgets(buf, sizeof(buf), fp) != NULL && buf[0] == '0')
-		iface->options->options |= DHCPCD_BROADCAST;
+		ifp->options->options |= DHCPCD_BROADCAST;
 	fclose(fp);
 	return 0;
 }
@@ -842,7 +841,7 @@ in6_addr_flags(const char *ifname, const struct in6_addr *addr)
 	unsigned int ifindex;
 	int prefix, scope, flags, i;
 
-	fp = fopen("/proc/net/if_inet6", "r");
+	fp = fopen(PROC_INET6, "r");
 	if (fp == NULL)
 		return -1;
 
