@@ -41,10 +41,6 @@
 #include "dhcp.h"
 #include "platform.h"
 
-/* DHCP Enterprise options, RFC3925 */
-struct dhcp_opt *vivso = NULL;
-size_t vivso_len = 0;
-
 struct dhcp_opt *
 vivso_find(uint16_t iana_en, const void *arg)
 {
@@ -60,7 +56,7 @@ vivso_find(uint16_t iana_en, const void *arg)
 			if (opt->option == iana_en)
 				return opt;
 	}
-	for (i = 0, opt = vivso; i < vivso_len; i++, opt++)
+	for (i = 0, opt = ifp->ctx->vivso; i < ifp->ctx->vivso_len; i++, opt++)
 		if (opt->option == iana_en)
 			return opt;
 	return NULL;
@@ -576,9 +572,10 @@ dhcp_envoption1(char **env, const char *prefix,
 }
 
 ssize_t
-dhcp_envoption(char **env, const char *prefix,
+dhcp_envoption(struct dhcpcd_ctx *ctx, char **env, const char *prefix,
     const char *ifname, struct dhcp_opt *opt,
-    const uint8_t *(*dgetopt)(unsigned int *, unsigned int *, unsigned int *,
+    const uint8_t *(*dgetopt)(struct dhcpcd_ctx *,
+    unsigned int *, unsigned int *, unsigned int *,
     const uint8_t *, unsigned int, struct dhcp_opt **),
     const uint8_t *od, int ol)
 {
@@ -652,13 +649,13 @@ dhcp_envoption(char **env, const char *prefix,
 		{
 			eoc = opt->option;
 			if (eopt->type & OPTION) {
-				dgetopt(NULL, &eoc, NULL, NULL, 0, &oopt);
+				dgetopt(ctx, NULL, &eoc, NULL, NULL, 0, &oopt);
 				if (oopt)
 					oopt->index = 0;
 			}
 		}
 
-		while ((eod = dgetopt(&eos, &eoc, &eol, od, ol, &oopt))) {
+		while ((eod = dgetopt(ctx, &eos, &eoc, &eol, od, ol, &oopt))) {
 			for (i = 0, eopt = opt->encopts;
 			    i < opt->encopts_len;
 			    i++, eopt++)
@@ -669,7 +666,7 @@ dhcp_envoption(char **env, const char *prefix,
 							/* Report error? */
 							continue;
 					}
-					n += dhcp_envoption(
+					n += dhcp_envoption(ctx,
 					    env == NULL ? NULL : &env[n], pfx,
 					    ifname,
 					    eopt->type & OPTION ? oopt : eopt,

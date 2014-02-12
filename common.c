@@ -60,29 +60,27 @@
 #  define _PATH_DEVNULL "/dev/null"
 #endif
 
-static char hostname_buffer[HOSTNAME_MAX_LEN + 1];
-int clock_monotonic;
-
 const char *
-get_hostname(int short_hostname)
+get_hostname(char *buf, size_t buflen, int short_hostname)
 {
 	char *p;
 
-	gethostname(hostname_buffer, sizeof(hostname_buffer));
-	hostname_buffer[sizeof(hostname_buffer) - 1] = '\0';
-	if (strcmp(hostname_buffer, "(none)") == 0 ||
-	    strcmp(hostname_buffer, "localhost") == 0 ||
-	    strncmp(hostname_buffer, "localhost.", strlen("localhost.")) == 0 ||
-	    hostname_buffer[0] == '.')
+	if (gethostname(buf, buflen) != 0)
+		return NULL;
+	buf[buflen - 1] = '\0';
+	if (strcmp(buf, "(none)") == 0 ||
+	    strcmp(buf, "localhost") == 0 ||
+	    strncmp(buf, "localhost.", strlen("localhost.")) == 0 ||
+	    buf[0] == '.')
 		return NULL;
 
 	if (short_hostname) {
-		p = strchr(hostname_buffer, '.');
+		p = strchr(buf, '.');
 		if (p)
 			*p = '\0';
 	}
 
-	return hostname_buffer;
+	return buf;
 }
 
 /* Handy function to get the time.
@@ -94,24 +92,13 @@ get_hostname(int short_hostname)
 int
 get_monotonic(struct timeval *tp)
 {
-	static int posix_clock_set = 0;
 #if defined(_POSIX_MONOTONIC_CLOCK) && defined(CLOCK_MONOTONIC)
 	struct timespec ts;
-	static clockid_t posix_clock;
 
-	if (!posix_clock_set) {
-		if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0) {
-			posix_clock = CLOCK_MONOTONIC;
-			clock_monotonic = posix_clock_set = 1;
-		}
-	}
-
-	if (clock_monotonic) {
-		if (clock_gettime(posix_clock, &ts) == 0) {
-			tp->tv_sec = ts.tv_sec;
-			tp->tv_usec = ts.tv_nsec / 1000;
-			return 0;
-		}
+	if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0) {
+		tp->tv_sec = ts.tv_sec;
+		tp->tv_usec = ts.tv_nsec / 1000;
+		return 0;
 	}
 #elif defined(__APPLE__)
 #define NSEC_PER_SEC 1000000000
@@ -143,11 +130,13 @@ get_monotonic(struct timeval *tp)
 	}
 #endif
 
+#if 0
 	/* Something above failed, so fall back to gettimeofday */
 	if (!posix_clock_set) {
 		syslog(LOG_WARNING, NO_MONOTONIC);
 		posix_clock_set = 1;
 	}
+#endif
 	return gettimeofday(tp, NULL);
 }
 

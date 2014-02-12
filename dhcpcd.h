@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2013 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2014 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -51,6 +51,7 @@
 #define IF_DATA_MAX	5
 
 struct interface {
+	struct dhcpcd_ctx *ctx;
 	TAILQ_ENTRY(interface) next;
 	char name[IF_NAMESIZE];
 	unsigned int index;
@@ -67,23 +68,77 @@ struct interface {
 	struct if_options *options;
 	void *if_data[IF_DATA_MAX];
 };
-extern TAILQ_HEAD(if_head, interface) *ifaces;
+TAILQ_HEAD(if_head, interface);
 
-extern sigset_t dhcpcd_sigset;
-extern int ifac;
-extern char **ifav;
-extern int ifdc;
-extern char **ifdv;
-extern struct if_options *if_options;
+struct dhcpcd_ctx {
+	sigset_t sigset;
+	const char *cffile;
+	unsigned long long options;
+	int argc;
+	char **argv;
+	int ifac;	/* allowed interfaces */
+	char **ifav;	/* allowed interfaces */
+	int ifdc;	/* denied interfaces */
+	char **ifdv;	/* denied interfaces */
+	int ifc;	/* listed interfaces */
+	char **ifv;	/* listed interfaces */
+	unsigned char *duid;
+	size_t duid_len;
+	int pid_fd;
+	int link_fd;
+	struct if_head *ifaces;
+
+	struct eloop_ctx *eloop;
+
+	int control_fd;
+	struct fd_list *control_fds;
+
+	/* DHCP Enterprise options, RFC3925 */
+	struct dhcp_opt *vivso;
+	size_t vivso_len;
+
+#ifdef INET
+	struct dhcp_opt *dhcp_opts;
+	size_t dhcp_opts_len;
+	struct rt_head *ipv4_routes;
+
+	int udp_fd;
+	uint8_t *packet;
+
+	/* Our aggregate option buffer.
+	 * We ONLY use this when options are split, which for most purposes is
+	 * practically never. See RFC3396 for details. */
+	uint8_t *opt_buffer;
+#endif
+#ifdef INET6
+	struct dhcp_opt *dhcp6_opts;
+	size_t dhcp6_opts_len;
+	struct ipv6_ctx *ipv6;
+#ifdef __linux__
+	char **ra_restore;
+	ssize_t ra_restore_len;
+#endif /* __linux__ */
+#endif /* INET6 */
+
+#ifdef PLUGIN_DEV
+	char *dev_load;
+	int dev_fd;
+	struct dev *dev;
+	void *dev_handle;
+#endif
+
+
+};
 
 extern const int handle_sigs[];
 
-pid_t daemonise(void);
-struct interface *find_interface(const char *);
-int handle_args(struct fd_list *, int, char **);
-void handle_carrier(int, int, const char *);
-void handle_interface(int, const char *);
-void handle_hwaddr(const char *, const unsigned char *, size_t);
+pid_t daemonise(struct dhcpcd_ctx *);
+struct interface *find_interface(struct dhcpcd_ctx *, const char *);
+int handle_args(struct dhcpcd_ctx *, struct fd_list *, int, char **);
+void handle_carrier(struct dhcpcd_ctx *, int, int, const char *);
+void handle_interface(void *, int, const char *);
+void handle_hwaddr(struct dhcpcd_ctx *, const char *,
+    const unsigned char *, size_t);
 void drop_interface(struct interface *, const char *);
 int select_profile(struct interface *, const char *);
 

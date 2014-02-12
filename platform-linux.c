@@ -74,11 +74,6 @@ static const char *mproc =
 #endif
 	;
 
-#ifdef INET6
-static char **restore;
-static ssize_t nrestore;
-#endif
-
 int
 hardware_platform(char *str, size_t len)
 {
@@ -139,30 +134,27 @@ write_path(const char *path, const char *val)
 static const char *prefix = "/proc/sys/net/ipv6/conf";
 
 void
-restore_kernel_ra(void)
+restore_kernel_ra(struct dhcpcd_ctx *ctx)
 {
 	char path[256];
 
-	if (options & DHCPCD_FORKED)
-		return;
-
-	for (; nrestore > 0; nrestore--) {
-		if (!(options & DHCPCD_FORKED)) {
+	for (; ctx->ra_restore_len > 0; ctx->ra_restore_len--) {
+		if (!(ctx->options & DHCPCD_FORKED)) {
 			syslog(LOG_INFO, "%s: restoring Kernel IPv6 RA support",
-			    restore[nrestore - 1]);
+			    ctx->ra_restore[ctx->ra_restore_len - 1]);
 			snprintf(path, sizeof(path), "%s/%s/accept_ra",
-			    prefix, restore[nrestore - 1]);
+			    prefix, ctx->ra_restore[ctx->ra_restore_len - 1]);
 			if (write_path(path, "1") == -1 && errno != ENOENT)
 			    syslog(LOG_ERR, "write_path: %s: %m", path);
 		}
-		free(restore[nrestore - 1]);
+		free(ctx->ra_restore[ctx->ra_restore_len - 1]);
 	}
-	free(restore);
-	restore = NULL;
+	free(ctx->ra_restore);
+	ctx->ra_restore = NULL;
 }
 
 int
-check_ipv6(const char *ifname, int own)
+check_ipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 {
 	int ra, i;
 	char path[256], *p, **nrest;
@@ -192,24 +184,23 @@ check_ipv6(const char *ifname, int own)
 			syslog(LOG_ERR, "write_path: %s: %m", path);
 			return ra;
 		}
-		for (i = 0; i < nrestore; i++)
-			if (strcmp(restore[i], ifname) == 0)
+		for (i = 0; i < ctx->ra_restore_len; i++)
+			if (strcmp(ctx->ra_restore[i], ifname) == 0)
 				break;
-		if (i == nrestore) {
+		if (i == ctx->ra_restore_len) {
 			p = strdup(ifname);
 			if (p == NULL) {
 				syslog(LOG_ERR, "%s: %m", __func__);
 				return ra;
 			}
-			nrest = realloc(restore,
-			    (nrestore + 1) * sizeof(char *));
+			nrest = realloc(ctx->ra_restore,
+			    (ctx->ra_restore_len + 1) * sizeof(char *));
 			if (nrest == NULL) {
 				syslog(LOG_ERR, "%s: %m", __func__);
 				return ra;
 			}
-			restore = nrest;
-			restore[nrestore++] = p;
-
+			ctx->ra_restore = nrest;
+			ctx->ra_restore[ctx->ra_restore_len++] = p;
 		}
 	}
 

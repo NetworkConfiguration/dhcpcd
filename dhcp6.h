@@ -227,18 +227,16 @@ struct dhcp6_state {
     ((const uint8_t *)(o) + sizeof(struct dhcp6_option))
 
 #ifdef INET6
-extern struct dhcp_opt *dhcp6_opts;
-extern size_t dhcp6_opts_len;
-
-void dhcp6_printoptions(void);
-int dhcp6_addrexists(const struct ipv6_addr *);
+void dhcp6_printoptions(const struct dhcpcd_ctx *);
+int dhcp6_addrexists(struct dhcpcd_ctx *, const struct ipv6_addr *);
 int dhcp6_find_delegates(struct interface *);
 int dhcp6_start(struct interface *, enum DH6S);
 void dhcp6_reboot(struct interface *);
 ssize_t dhcp6_env(char **, const char *, const struct interface *,
     const struct dhcp6_message *, ssize_t);
 void dhcp6_free(struct interface *);
-void dhcp6_handleifa(int, const char *, const struct in6_addr *addr, int);
+void dhcp6_handleifa(struct dhcpcd_ctx *, int, const char *,
+    const struct in6_addr *addr, int);
 void dhcp6_drop(struct interface *, const char *);
 #else
 #define dhcp6_printoptions()

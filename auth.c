@@ -368,10 +368,8 @@ finish:
 	return t;
 }
 
-static uint64_t last_rdm;
-static uint8_t last_rdm_set;
 static uint64_t
-get_next_rdm_monotonic_counter(void)
+get_next_rdm_monotonic_counter(struct auth *auth)
 {
 	FILE *fp;
 	uint64_t rdm;
@@ -380,10 +378,10 @@ get_next_rdm_monotonic_counter(void)
 	fp = fopen(RDM_MONOFILE, "r+");
 	if (fp == NULL) {
 		if (errno != ENOENT)
-			return ++last_rdm; /* report error? */
+			return ++auth->last_replay; /* report error? */
 		fp = fopen(RDM_MONOFILE, "w");
 		if (fp == NULL)
-			return ++last_rdm; /* report error? */
+			return ++auth->last_replay; /* report error? */
 		flocked = flock(fileno(fp), LOCK_EX);
 		rdm = 0;
 	} else {
@@ -397,11 +395,11 @@ get_next_rdm_monotonic_counter(void)
 	    ftruncate(fileno(fp), 0) == -1 ||
 	    fprintf(fp, "0x%016" PRIu64 "\n", rdm) != 19)
 	{
-		if (!last_rdm_set) {
-			last_rdm = rdm;
-			last_rdm_set = 1;
+		if (!auth->last_replay_set) {
+			auth->last_replay = rdm;
+			auth->last_replay_set = 1;
 		} else
-			rdm = ++last_rdm;
+			rdm = ++auth->last_replay;
 		/* report error? */
 	}
 	fflush(fp);
@@ -413,7 +411,7 @@ get_next_rdm_monotonic_counter(void)
 
 #define JAN_1970	2208988800UL	/* 1970 - 1900 in seconds */
 static uint64_t
-get_next_rdm_monotonic_clock(void)
+get_next_rdm_monotonic_clock(struct auth *auth)
 {
 	struct timespec ts;
 	uint32_t pack[2];
@@ -421,7 +419,7 @@ get_next_rdm_monotonic_clock(void)
 	uint64_t rdm;
 
 	if (clock_gettime(CLOCK_REALTIME, &ts) != 0)
-		return ++last_rdm; /* report error? */
+		return ++auth->last_replay; /* report error? */
 	pack[0] = htonl((uint32_t)ts.tv_sec + JAN_1970);
 	frac = (ts.tv_nsec / 1e9 * 0x100000000ULL);
 	pack[1] = htonl((uint32_t)frac);
@@ -431,12 +429,12 @@ get_next_rdm_monotonic_clock(void)
 }
 
 static uint64_t
-get_next_rdm_monotonic(const struct auth *auth)
+get_next_rdm_monotonic(struct auth *auth)
 {
 
 	if (auth->options & DHCPCD_AUTH_RDM_COUNTER)
-		return get_next_rdm_monotonic_counter();
-	return get_next_rdm_monotonic_clock();
+		return get_next_rdm_monotonic_counter(auth);
+	return get_next_rdm_monotonic_clock(auth);
 }
 
 /*
@@ -450,7 +448,7 @@ get_next_rdm_monotonic(const struct auth *auth)
  * data and dlen refer to the authentication option within the message.
  */
 int
-dhcp_auth_encode(const struct auth *auth, const struct token *t,
+dhcp_auth_encode(struct auth *auth, const struct token *t,
     uint8_t *m, unsigned int mlen, int mp, int mt,
     uint8_t *data, unsigned int dlen)
 {

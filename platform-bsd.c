@@ -90,10 +90,10 @@ inet6_sysctl(int code, int val, int action)
 
 static int kernel_ra_set;
 void
-restore_kernel_ra(void)
+restore_kernel_ra(struct dhcpcd_ctx *ctx)
 {
 
-	if (kernel_ra_set == 0 || options & DHCPCD_FORKED)
+	if (kernel_ra_set == 0 || ctx->options & DHCPCD_FORKED)
 		return;
 	syslog(LOG_INFO, "restoring Kernel IPv6 RA support");
 	if (set_inet6_sysctl(IPV6CTL_ACCEPT_RTADV, 1) == -1)

@@ -62,6 +62,8 @@ struct auth {
 	uint8_t protocol;
 	uint8_t algorithm;
 	uint8_t rdm;
+	uint64_t last_replay;
+	uint8_t last_replay_set;
 	struct token_head tokens;
 };
 
@@ -78,7 +80,7 @@ const struct token * dhcp_auth_validate(struct authstate *,
     const uint8_t *, unsigned int, int, int,
     const uint8_t *, unsigned int);
 
-int dhcp_auth_encode(const struct auth *, const struct token *,
+int dhcp_auth_encode(struct auth *, const struct token *,
     uint8_t *, unsigned int, int, int,
     uint8_t *, unsigned int);
 #endif

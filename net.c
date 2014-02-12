@@ -75,23 +75,29 @@
 #include "ipv6nd.h"
 #include "net.h"
 
-static char hwaddr_buffer[(HWADDR_LEN * 3) + 1 + 1024];
-
 char *
-hwaddr_ntoa(const unsigned char *hwaddr, size_t hwlen)
+hwaddr_ntoa(const unsigned char *hwaddr, size_t hwlen, char *buf, size_t buflen)
 {
-	char *p = hwaddr_buffer;
+	char *p;
 	size_t i;
 
+	if (buf == NULL) {
+		return NULL;
+	}
+
+	if (hwlen * 3 > buflen) {
+		errno = ENOBUFS;
+		return 0;
+	}
+
+	p = buf;
 	for (i = 0; i < hwlen; i++) {
 		if (i > 0)
 			*p ++= ':';
 		p += snprintf(p, 3, "%.2x", hwaddr[i]);
 	}
-
 	*p ++= '\0';
-
-	return hwaddr_buffer;
+	return buf;
 }
 
 size_t
@@ -223,7 +229,7 @@ up_interface(struct interface *iface)
 }
 
 struct if_head *
-discover_interfaces(int argc, char * const *argv)
+discover_interfaces(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 {
 	struct ifaddrs *ifaddrs, *ifa;
 	char *p;
@@ -277,7 +283,7 @@ discover_interfaces(int argc, char * const *argv)
 		}
 
 		/* Ensure that the interface name has settled */
-		if (!dev_initialized(ifa->ifa_name))
+		if (!dev_initialized(ctx, ifa->ifa_name))
 			continue;
 
 		/* It's possible for an interface to have >1 AF_LINK.
@@ -314,15 +320,15 @@ discover_interfaces(int argc, char * const *argv)
 			if (argc == -1 && strcmp(argv[0], ifa->ifa_name) != 0)
 				continue;
 		}
-		for (i = 0; i < ifdc; i++)
-			if (!fnmatch(ifdv[i], p, 0))
+		for (i = 0; i < ctx->ifdc; i++)
+			if (!fnmatch(ctx->ifdv[i], p, 0))
 				break;
-		if (i < ifdc)
+		if (i < ctx->ifdc)
 			continue;
-		for (i = 0; i < ifac; i++)
-			if (!fnmatch(ifav[i], p, 0))
+		for (i = 0; i < ctx->ifac; i++)
+			if (!fnmatch(ctx->ifav[i], p, 0))
 				break;
-		if (ifac && i == ifac)
+		if (ctx->ifac && i == ctx->ifac)
 			continue;
 
 		if (if_vimaster(ifa->ifa_name) == 1) {
@@ -335,6 +341,7 @@ discover_interfaces(int argc, char * const *argv)
 		ifp = calloc(1, sizeof(*ifp));
 		if (ifp == NULL)
 			return NULL;
+		ifp->ctx = ctx;
 		strlcpy(ifp->name, p, sizeof(ifp->name));
 		ifp->flags = ifa->ifa_flags;
 
@@ -346,7 +353,7 @@ discover_interfaces(int argc, char * const *argv)
 		   )
 		{
 			if (up_interface(ifp) == 0)
-				options |= DHCPCD_WAITUP;
+				ctx->options |= DHCPCD_WAITUP;
 			else
 				syslog(LOG_ERR, "%s: up_interface: %m",
 				    ifp->name);
@@ -355,7 +362,7 @@ discover_interfaces(int argc, char * const *argv)
 		sdl_type = 0;
 		/* Don't allow loopback unless explicit */
 		if (ifp->flags & IFF_LOOPBACK) {
-			if (argc == 0 && ifac == 0) {
+			if (argc == 0 && ctx->ifac == 0) {
 				free_interface(ifp);
 				continue;
 			}
@@ -421,7 +428,7 @@ discover_interfaces(int argc, char * const *argv)
 		if (!(ifp->flags & IFF_POINTOPOINT) &&
 		    ifp->family != ARPHRD_ETHER)
 		{
-			if (argc == 0 && ifac == 0) {
+			if (argc == 0 && ctx->ifac == 0) {
 				free_interface(ifp);
 				continue;
 			}
@@ -482,7 +489,7 @@ discover_interfaces(int argc, char * const *argv)
 				    (void *)ifa->ifa_dstaddr;
 			else
 				dst = NULL;
-			ipv4_handleifa(RTM_NEWADDR, ifs, ifa->ifa_name,
+			ipv4_handleifa(ctx, RTM_NEWADDR, ifs, ifa->ifa_name,
 				&addr->sin_addr,
 				&net->sin_addr,
 				dst ? &dst->sin_addr : NULL);
@@ -495,7 +502,7 @@ discover_interfaces(int argc, char * const *argv)
 			ifa_flags = in6_addr_flags(ifa->ifa_name,
 			    &sin6->sin6_addr);
 			if (ifa_flags != -1)
-				ipv6_handleifa(RTM_NEWADDR, ifs,
+				ipv6_handleifa(ctx, RTM_NEWADDR, ifs,
 				    ifa->ifa_name,
 				    &sin6->sin6_addr, ifa_flags);
 			break;

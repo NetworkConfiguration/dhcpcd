@@ -47,22 +47,21 @@
             (sizeof(*(su)) - sizeof((su)->sun_path) + strlen((su)->sun_path))
 #endif
 
-
-struct fd_list *control_fds = NULL;
-
 static void
 control_remove(void *arg)
 {
+	struct dhcpcd_ctx *ctx;
 	struct fd_list *l, *n, *last = NULL;
 
-	l = control_fds;
+	ctx = arg;
+	l = ctx->control_fds;
 	while (l) {
 		n = l->next;
 		if (l == arg) {
 			close(l->fd);
-			eloop_event_delete(l->fd);
+			eloop_event_delete(ctx->eloop, l->fd);
 			if (last == NULL)
-				control_fds = l->next;
+				ctx->control_fds = l->next;
 			else
 				last->next = l->next;
 			free(l);
@@ -96,14 +95,13 @@ control_handle_data(void *arg)
 		*ap++ = p;
 		p += strlen(p) + 1;
 	}
-	handle_args(l, argc, argvp);
+	handle_args(l->ctx, l, argc, argvp);
 }
 
-/* ARGSUSED */
 static void
 control_handle(void *arg)
 {
-	struct control_ctx *ctx;
+	struct dhcpcd_ctx *ctx;
 	struct sockaddr_un run;
 	socklen_t len;
 	struct fd_list *l;
@@ -111,7 +109,7 @@ control_handle(void *arg)
 
 	ctx = arg;
 	len = sizeof(run);
-	if ((fd = accept(ctx->fd, (struct sockaddr *)&run, &len)) == -1)
+	if ((fd = accept(ctx->control_fd, (struct sockaddr *)&run, &len)) == -1)
 		return;
 	if ((flags = fcntl(fd, F_GETFD, 0)) == -1 ||
 	    fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == -1)
@@ -121,20 +119,21 @@ control_handle(void *arg)
 	}
 	l = malloc(sizeof(*l));
 	if (l) {
+		l->ctx = ctx;
 		l->fd = fd;
 		l->listener = 0;
-		l->next = control_fds;
-		control_fds = l;
-		eloop_event_add(l->fd, control_handle_data, l);
+		l->next = ctx->control_fds;
+		ctx->control_fds = l;
+		eloop_event_add(ctx->eloop, l->fd, control_handle_data, l);
 	} else
 		close(fd);
 }
 
 static int
-make_sock(struct control_ctx *ctx, struct sockaddr_un *sun)
+make_sock(struct dhcpcd_ctx *ctx, struct sockaddr_un *sun)
 {
 
-	if ((ctx->fd = socket(AF_UNIX,
+	if ((ctx->control_fd = socket(AF_UNIX,
 	    SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0)) == -1)
 		return -1;
 	memset(sun, 0, sizeof(*sun));
@@ -144,7 +143,7 @@ make_sock(struct control_ctx *ctx, struct sockaddr_un *sun)
 }
 
 int
-control_start(struct control_ctx *ctx)
+control_start(struct dhcpcd_ctx *ctx)
 {
 	struct sockaddr_un sun;
 	int len;
@@ -152,57 +151,57 @@ control_start(struct control_ctx *ctx)
 	if ((len = make_sock(ctx, &sun)) == -1)
 		return -1;
 	unlink(CONTROLSOCKET);
-	if (bind(ctx->fd, (struct sockaddr *)&sun, len) == -1 ||
+	if (bind(ctx->control_fd, (struct sockaddr *)&sun, len) == -1 ||
 	    chmod(CONTROLSOCKET,
 		S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP) == -1 ||
-	    listen(ctx->fd, sizeof(control_fds)) == -1)
+	    listen(ctx->control_fd, sizeof(ctx->control_fds)) == -1)
 	{
-		close(ctx->fd);
-		ctx->fd = -1;
+		close(ctx->control_fd);
+		ctx->control_fd = -1;
 		return -1;
 	}
-	eloop_event_add(ctx->fd, control_handle, ctx);
-	return ctx->fd;
+	eloop_event_add(ctx->eloop, ctx->control_fd, control_handle, ctx);
+	return ctx->control_fd;
 }
 
 int
-control_stop(struct control_ctx *ctx)
+control_stop(struct dhcpcd_ctx *ctx)
 {
 	int retval = 0;
 	struct fd_list *l;
 
-	eloop_event_delete(ctx->fd);
-	if (shutdown(ctx->fd, SHUT_RDWR) == -1)
+	eloop_event_delete(ctx->eloop, ctx->control_fd);
+	if (shutdown(ctx->control_fd, SHUT_RDWR) == -1)
 		retval = 1;
-	ctx->fd = -1;
+	ctx->control_fd = -1;
 	if (unlink(CONTROLSOCKET) == -1)
 		retval = -1;
 
-	l = control_fds;
+	l = ctx->control_fds;
 	while (l != NULL) {
-		control_fds = l->next;
-		eloop_event_delete(l->fd);
+		ctx->control_fds = l->next;
+		eloop_event_delete(ctx->eloop, l->fd);
 		shutdown(l->fd, SHUT_RDWR);
 		free(l);
-		l = control_fds;
+		l = ctx->control_fds;
 	}
 
 	return retval;
 }
 
 int
-control_open(struct control_ctx *ctx)
+control_open(struct dhcpcd_ctx *ctx)
 {
 	struct sockaddr_un sun;
 	int len;
 
 	if ((len = make_sock(ctx, &sun)) == -1)
 		return -1;
-	return connect(ctx->fd, (struct sockaddr *)&sun, len);
+	return connect(ctx->control_fd, (struct sockaddr *)&sun, len);
 }
 
 int
-control_send(struct control_ctx *ctx, int argc, char * const *argv)
+control_send(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 {
 	char buffer[1024], *p;
 	int i;
@@ -222,5 +221,5 @@ control_send(struct control_ctx *ctx, int argc, char * const *argv)
 		memcpy(p, argv[i], len);
 		p += len;
 	}
-	return write(ctx->fd, buffer, p - buffer);
+	return write(ctx->control_fd, buffer, p - buffer);
 }

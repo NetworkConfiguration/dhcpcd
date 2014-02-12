@@ -543,7 +543,7 @@ in6_addr_flags(const char *ifname, const struct in6_addr *addr)
 #endif
 
 int
-manage_link(int fd)
+manage_link(struct dhcpcd_ctx *ctx)
 {
 	/* route and ifwatchd like a msg buf size of 2048 */
 	char msg[2048], *p, *e, *cp, ifname[IF_NAMESIZE];
@@ -565,7 +565,7 @@ manage_link(int fd)
 #endif
 
 	for (;;) {
-		bytes = read(fd, msg, sizeof(msg));
+		bytes = read(ctx->link_fd, msg, sizeof(msg));
 		if (bytes == -1) {
 			if (errno == EAGAIN)
 				return 0;
@@ -585,10 +585,12 @@ manage_link(int fd)
 				ifan = (struct if_announcemsghdr *)(void *)p;
 				switch(ifan->ifan_what) {
 				case IFAN_ARRIVAL:
-					handle_interface(1, ifan->ifan_name);
+					handle_interface(ctx, 1,
+					    ifan->ifan_name);
 					break;
 				case IFAN_DEPARTURE:
-					handle_interface(-1, ifan->ifan_name);
+					handle_interface(ctx, -1,
+					    ifan->ifan_name);
 					break;
 				}
 				break;
@@ -616,7 +618,8 @@ manage_link(int fd)
 					len = LINK_UNKNOWN;
 					break;
 				}
-				handle_carrier(len, ifm->ifm_flags, ifname);
+				handle_carrier(ctx, len,
+				    ifm->ifm_flags, ifname);
 				break;
 			case RTM_DELETE:
 				if (~rtm->rtm_addrs &
@@ -633,7 +636,7 @@ manage_link(int fd)
 				COPYOUT(rt.dest, rti_info[RTAX_DST]);
 				COPYOUT(rt.net, rti_info[RTAX_NETMASK]);
 				COPYOUT(rt.gate, rti_info[RTAX_GATEWAY]);
-				ipv4_routedeleted(&rt);
+				ipv4_routedeleted(ctx, &rt);
 #endif
 				break;
 #ifdef RTM_CHGADDR
@@ -659,7 +662,7 @@ manage_link(int fd)
 #endif
 					memcpy(&sdl, rti_info[RTAX_IFA],
 					    rti_info[RTAX_IFA]->sa_len);
-					handle_hwaddr(ifname,
+					handle_hwaddr(ctx, ifname,
 					    (const unsigned char*)CLLADDR(&sdl),
 					    sdl.sdl_alen);
 					break;
@@ -669,7 +672,7 @@ manage_link(int fd)
 					COPYOUT(rt.dest, rti_info[RTAX_IFA]);
 					COPYOUT(rt.net, rti_info[RTAX_NETMASK]);
 					COPYOUT(rt.gate, rti_info[RTAX_BRD]);
-					ipv4_handleifa(rtm->rtm_type,
+					ipv4_handleifa(ctx, rtm->rtm_type,
 					    NULL, ifname,
 					    &rt.dest, &rt.net, &rt.gate);
 					break;
@@ -689,7 +692,7 @@ manage_link(int fd)
 							break;
 					} else
 						ifa_flags = 0;
-					ipv6_handleifa(rtm->rtm_type, NULL,
+					ipv6_handleifa(ctx, rtm->rtm_type, NULL,
 					    ifname, &ia6, ifa_flags);
 					break;
 #endif

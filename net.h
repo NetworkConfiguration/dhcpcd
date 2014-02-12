@@ -81,12 +81,12 @@
 # define IN_LINKLOCAL(addr) ((addr & IN_CLASSB_NET) == LINKLOCAL_ADDR)
 #endif
 
-char *hwaddr_ntoa(const unsigned char *, size_t);
+char *hwaddr_ntoa(const unsigned char *, size_t, char *, size_t);
 size_t hwaddr_aton(unsigned char *, const char *);
 
 int getifssid(const char *, char *);
 int if_vimaster(const char *);
-struct if_head *discover_interfaces(int, char * const *);
+struct if_head *discover_interfaces(struct dhcpcd_ctx *, int, char * const *);
 void free_interface(struct interface *);
 int do_mtu(const char *, short int);
 #define get_mtu(iface) do_mtu(iface, 0)
@@ -96,6 +96,6 @@ int if_conf(struct interface *);
 int if_init(struct interface *);
 
 int open_link_socket(void);
-int manage_link(int);
+int manage_link(struct dhcpcd_ctx *);
 int carrier_status(struct interface *);
 #endif

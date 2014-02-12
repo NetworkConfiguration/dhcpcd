@@ -30,11 +30,11 @@
 
 int hardware_platform(char *, size_t);
 #ifdef INET6
-int check_ipv6(const char *, int);
+int check_ipv6(struct dhcpcd_ctx *ctx, const char *, int);
 int ipv6_dadtransmits(const char *);
-void restore_kernel_ra(void);
+void restore_kernel_ra(struct dhcpcd_ctx *);
 #else
-#define check_ipv6(a, b) -1
+#define check_ipv6(a, b,c ) -1
 #define restore_kernel_ra(a)
 #endif
 

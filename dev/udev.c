@@ -73,7 +73,7 @@ udev_initialized(const char *ifname)
 }
 
 static int
-udev_handle_device(void)
+udev_handle_device(void *ctx)
 {
 	struct udev_device *device;
 	const char *subsystem, *ifname, *action;
@@ -92,9 +92,9 @@ udev_handle_device(void)
 	if (strcmp(subsystem, "net") == 0) {
 		syslog(LOG_DEBUG, "%s: libudev: %s", ifname, action);
 		if (strcmp(action, "add") == 0 || strcmp(action, "move") == 0)
-			dhcpcd->handle_interface(1, ifname);
+			dhcpcd->handle_interface(ctx, 1, ifname);
 		else if (strcmp(action, "remove") == 0)
-			dhcpcd->handle_interface(-1, ifname);
+			dhcpcd->handle_interface(ctx, -1, ifname);
 	}
 
 	udev_device_unref(device);

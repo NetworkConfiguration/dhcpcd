@@ -34,9 +34,6 @@
 #  define DUID_LEN	128 + 2
 #endif
 
-extern unsigned char *duid;
-extern size_t duid_len;
-
 size_t duid_init(const struct interface *);
 
 #endif

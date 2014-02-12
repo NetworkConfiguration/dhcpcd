@@ -43,64 +43,31 @@
 #include "dhcpcd.h"
 #include "eloop.h"
 
-static struct timeval now;
-
-struct event {
-	TAILQ_ENTRY(event) next;
-	int fd;
-	void (*callback)(void *);
-	void *arg;
-	struct pollfd *pollfd;
-};
-static size_t events_len;
-static TAILQ_HEAD (event_head, event) events = TAILQ_HEAD_INITIALIZER(events);
-static struct event_head free_events = TAILQ_HEAD_INITIALIZER(free_events);
-
-struct timeout {
-	TAILQ_ENTRY(timeout) next;
-	struct timeval when;
-	void (*callback)(void *);
-	void *arg;
-	int queue;
-};
-static TAILQ_HEAD (timeout_head, timeout) timeouts
-    = TAILQ_HEAD_INITIALIZER(timeouts);
-static struct timeout_head free_timeouts
-    = TAILQ_HEAD_INITIALIZER(free_timeouts);
-
-static void (*volatile timeout0)(void *);
-static void *volatile timeout0_arg;
-
-static struct pollfd *fds;
-static size_t fds_len;
-
-static int eloop_exitnow;
-static int eloop_exitcode;
-
 static void
-eloop_event_setup_fds(void)
+eloop_event_setup_fds(struct eloop_ctx *ctx)
 {
-	struct event *e;
+	struct eloop_event *e;
 	size_t i;
 
 	i = 0;
-	TAILQ_FOREACH(e, &events, next) {
-		fds[i].fd = e->fd;
-		fds[i].events = POLLIN;
-		fds[i].revents = 0;
-		e->pollfd = &fds[i];
+	TAILQ_FOREACH(e, &ctx->events, next) {
+		ctx->fds[i].fd = e->fd;
+		ctx->fds[i].events = POLLIN;
+		ctx->fds[i].revents = 0;
+		e->pollfd = &ctx->fds[i];
 		i++;
 	}
 }
 
 int
-eloop_event_add(int fd, void (*callback)(void *), void *arg)
+eloop_event_add(struct eloop_ctx *ctx,
+    int fd, void (*callback)(void *), void *arg)
 {
-	struct event *e;
+	struct eloop_event *e;
 	struct pollfd *nfds;
 
 	/* We should only have one callback monitoring the fd */
-	TAILQ_FOREACH(e, &events, next) {
+	TAILQ_FOREACH(e, &ctx->events, next) {
 		if (e->fd == fd) {
 			e->callback = callback;
 			e->arg = arg;
@@ -109,8 +76,8 @@ eloop_event_add(int fd, void (*callback)(void *), void *arg)
 	}
 
 	/* Allocate a new event if no free ones already allocated */
-	if ((e = TAILQ_FIRST(&free_events))) {
-		TAILQ_REMOVE(&free_events, e, next);
+	if ((e = TAILQ_FIRST(&ctx->free_events))) {
+		TAILQ_REMOVE(&ctx->free_events, e, next);
 	} else {
 		e = malloc(sizeof(*e));
 		if (e == NULL) {
@@ -120,19 +87,19 @@ eloop_event_add(int fd, void (*callback)(void *), void *arg)
 	}
 
 	/* Ensure we can actually listen to it */
-	events_len++;
-	if (events_len > fds_len) {
-		fds_len += 5;
-		nfds = malloc(sizeof(*fds) * (fds_len + 5));
+	ctx->events_len++;
+	if (ctx->events_len > ctx->fds_len) {
+		ctx->fds_len += 5;
+		nfds = malloc(sizeof(*ctx->fds) * (ctx->fds_len + 5));
 		if (nfds == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);
-			events_len--;
-			TAILQ_INSERT_TAIL(&free_events, e, next);
+			ctx->events_len--;
+			TAILQ_INSERT_TAIL(&ctx->free_events, e, next);
 			return -1;
 		}
-		fds_len += 5;
-		free(fds);
-		fds = nfds;
+		ctx->fds_len += 5;
+		free(ctx->fds);
+		ctx->fds = nfds;
 	}
 
 	/* Now populate the structure and add it to the list */
@@ -145,33 +112,34 @@ eloop_event_add(int fd, void (*callback)(void *), void *arg)
 	 * message (which is likely to be that the DHCP addresses are wrong)
 	 * we insert new events at the queue head as the link fd will be
 	 * the first event added. */
-	TAILQ_INSERT_HEAD(&events, e, next);
-	eloop_event_setup_fds();
+	TAILQ_INSERT_HEAD(&ctx->events, e, next);
+	eloop_event_setup_fds(ctx);
 	return 0;
 }
 
 void
-eloop_event_delete(int fd)
+eloop_event_delete(struct eloop_ctx *ctx, int fd)
 {
-	struct event *e;
+	struct eloop_event *e;
 
-	TAILQ_FOREACH(e, &events, next) {
+	TAILQ_FOREACH(e, &ctx->events, next) {
 		if (e->fd == fd) {
-			TAILQ_REMOVE(&events, e, next);
-			TAILQ_INSERT_TAIL(&free_events, e, next);
-			events_len--;
-			eloop_event_setup_fds();
+			TAILQ_REMOVE(&ctx->events, e, next);
+			TAILQ_INSERT_TAIL(&ctx->free_events, e, next);
+			ctx->events_len--;
+			eloop_event_setup_fds(ctx);
 			break;
 		}
 	}
 }
 
 int
-eloop_q_timeout_add_tv(int queue,
+eloop_q_timeout_add_tv(struct eloop_ctx *ctx, int queue,
     const struct timeval *when, void (*callback)(void *), void *arg)
 {
+	struct timeval now;
 	struct timeval w;
-	struct timeout *t, *tt = NULL;
+	struct eloop_timeout *t, *tt = NULL;
 
 	get_monotonic(&now);
 	timeradd(&now, when, &w);
@@ -182,17 +150,17 @@ eloop_q_timeout_add_tv(int queue,
 	}
 
 	/* Remove existing timeout if present */
-	TAILQ_FOREACH(t, &timeouts, next) {
+	TAILQ_FOREACH(t, &ctx->timeouts, next) {
 		if (t->callback == callback && t->arg == arg) {
-			TAILQ_REMOVE(&timeouts, t, next);
+			TAILQ_REMOVE(&ctx->timeouts, t, next);
 			break;
 		}
 	}
 
 	if (t == NULL) {
 		/* No existing, so allocate or grab one from the free pool */
-		if ((t = TAILQ_FIRST(&free_timeouts))) {
-			TAILQ_REMOVE(&free_timeouts, t, next);
+		if ((t = TAILQ_FIRST(&ctx->free_timeouts))) {
+			TAILQ_REMOVE(&ctx->free_timeouts, t, next);
 		} else {
 			t = malloc(sizeof(*t));
 			if (t == NULL) {
@@ -210,38 +178,39 @@ eloop_q_timeout_add_tv(int queue,
 
 	/* The timeout list should be in chronological order,
 	 * soonest first. */
-	TAILQ_FOREACH(tt, &timeouts, next) {
+	TAILQ_FOREACH(tt, &ctx->timeouts, next) {
 		if (timercmp(&t->when, &tt->when, <)) {
 			TAILQ_INSERT_BEFORE(tt, t, next);
 			return 0;
 		}
 	}
-	TAILQ_INSERT_TAIL(&timeouts, t, next);
+	TAILQ_INSERT_TAIL(&ctx->timeouts, t, next);
 	return 0;
 }
 
 int
-eloop_q_timeout_add_sec(int queue, time_t when,
+eloop_q_timeout_add_sec(struct eloop_ctx *ctx, int queue, time_t when,
     void (*callback)(void *), void *arg)
 {
 	struct timeval tv;
 
 	tv.tv_sec = when;
 	tv.tv_usec = 0;
-	return eloop_q_timeout_add_tv(queue, &tv, callback, arg);
+	return eloop_q_timeout_add_tv(ctx, queue, &tv, callback, arg);
 }
 
 int
-eloop_timeout_add_now(void (*callback)(void *), void *arg)
+eloop_timeout_add_now(struct eloop_ctx *ctx,
+    void (*callback)(void *), void *arg)
 {
 
-	if (timeout0 != NULL) {
+	if (ctx->timeout0 != NULL) {
 		syslog(LOG_WARNING, "%s: timeout0 already set", __func__);
-		return eloop_q_timeout_add_sec(0, 0, callback, arg);
+		return eloop_q_timeout_add_sec(ctx, 0, 0, callback, arg);
 	}
 
-	timeout0 = callback;
-	timeout0_arg = arg;
+	ctx->timeout0 = callback;
+	ctx->timeout0_arg = arg;
 	return 0;
 }
 
@@ -249,14 +218,14 @@ eloop_timeout_add_now(void (*callback)(void *), void *arg)
  * callbacks given. Handy for deleting everything apart from the expire
  * timeout. */
 static void
-eloop_q_timeouts_delete_v(int queue, void *arg,
+eloop_q_timeouts_delete_v(struct eloop_ctx *ctx, int queue, void *arg,
     void (*callback)(void *), va_list v)
 {
-	struct timeout *t, *tt;
+	struct eloop_timeout *t, *tt;
 	va_list va;
 	void (*f)(void *);
 
-	TAILQ_FOREACH_SAFE(t, &timeouts, next, tt) {
+	TAILQ_FOREACH_SAFE(t, &ctx->timeouts, next, tt) {
 		if ((queue == 0 || t->queue == queue) && t->arg == arg &&
 		    t->callback != callback)
 		{
@@ -267,74 +236,121 @@ eloop_q_timeouts_delete_v(int queue, void *arg,
 			}
 			va_end(va);
 			if (f == NULL) {
-				TAILQ_REMOVE(&timeouts, t, next);
-				TAILQ_INSERT_TAIL(&free_timeouts, t, next);
+				TAILQ_REMOVE(&ctx->timeouts, t, next);
+				TAILQ_INSERT_TAIL(&ctx->free_timeouts, t, next);
 			}
 		}
 	}
 }
 
 void
-eloop_q_timeouts_delete(int queue, void *arg, void (*callback)(void *), ...)
+eloop_q_timeouts_delete(struct eloop_ctx *ctx, int queue,
+    void *arg, void (*callback)(void *), ...)
 {
 	va_list va;
 
 	va_start(va, callback);
-	eloop_q_timeouts_delete_v(queue, arg, callback, va);
+	eloop_q_timeouts_delete_v(ctx, queue, arg, callback, va);
 	va_end(va);
 }
 
 void
-eloop_q_timeout_delete(int queue, void (*callback)(void *), void *arg)
+eloop_q_timeout_delete(struct eloop_ctx *ctx, int queue,
+    void (*callback)(void *), void *arg)
 {
-	struct timeout *t, *tt;
+	struct eloop_timeout *t, *tt;
 
-	TAILQ_FOREACH_SAFE(t, &timeouts, next, tt) {
+	TAILQ_FOREACH_SAFE(t, &ctx->timeouts, next, tt) {
 		if (t->queue == queue && t->arg == arg &&
 		    (!callback || t->callback == callback))
 		{
-			TAILQ_REMOVE(&timeouts, t, next);
-			TAILQ_INSERT_TAIL(&free_timeouts, t, next);
+			TAILQ_REMOVE(&ctx->timeouts, t, next);
+			TAILQ_INSERT_TAIL(&ctx->free_timeouts, t, next);
 		}
 	}
 }
 
 void
-eloop_exit(int code)
+eloop_exit(struct eloop_ctx *ctx, int code)
 {
 
-	eloop_exitcode = code;
-	eloop_exitnow = 1;
+	ctx->exitcode = code;
+	ctx->exitnow = 1;
+}
+
+struct eloop_ctx *
+eloop_init(void)
+{
+	struct eloop_ctx *ctx;
+
+	ctx = calloc(1, sizeof(*ctx));
+	if (ctx) {
+		TAILQ_INIT(&ctx->events);
+		TAILQ_INIT(&ctx->free_events);
+		TAILQ_INIT(&ctx->timeouts);
+		TAILQ_INIT(&ctx->free_timeouts);
+		ctx->exitcode = EXIT_FAILURE;
+	}
+	return ctx;
+}
+
+
+void eloop_free(struct eloop_ctx *ctx)
+{
+	struct eloop_event *e;
+	struct eloop_timeout *t;
+
+	if (ctx == NULL)
+		return;
+
+	while ((e = TAILQ_FIRST(&ctx->events))) {
+		TAILQ_REMOVE(&ctx->events, e, next);
+		free(e);
+	}
+	while ((e = TAILQ_FIRST(&ctx->free_events))) {
+		TAILQ_REMOVE(&ctx->free_events, e, next);
+		free(e);
+	}
+	while ((t = TAILQ_FIRST(&ctx->timeouts))) {
+		TAILQ_REMOVE(&ctx->timeouts, t, next);
+		free(t);
+	}
+	while ((t = TAILQ_FIRST(&ctx->free_timeouts))) {
+		TAILQ_REMOVE(&ctx->free_timeouts, t, next);
+		free(t);
+	}
+	free(ctx->fds);
+	free(ctx);
 }
 
 int
-eloop_start(const sigset_t *sigmask)
+eloop_start(struct eloop_ctx *ctx, const sigset_t *sigmask)
 {
+	struct timeval now;
 	int n;
-	struct event *e;
-	struct timeout *t;
+	struct eloop_event *e;
+	struct eloop_timeout *t;
 	struct timeval tv;
 	struct timespec ts, *tsp;
 	void (*t0)(void *);
 
-	eloop_exitcode = EXIT_FAILURE;
 	for (;;) {
-		if (eloop_exitnow)
+		if (ctx->exitnow)
 			break;
 
 		/* Run all timeouts first */
-		if (timeout0) {
-			t0 = timeout0;
-			timeout0 = NULL;
-			t0(timeout0_arg);
+		if (ctx->timeout0) {
+			t0 = ctx->timeout0;
+			ctx->timeout0 = NULL;
+			t0(ctx->timeout0_arg);
 			continue;
 		}
-		if ((t = TAILQ_FIRST(&timeouts))) {
+		if ((t = TAILQ_FIRST(&ctx->timeouts))) {
 			get_monotonic(&now);
 			if (timercmp(&now, &t->when, >)) {
-				TAILQ_REMOVE(&timeouts, t, next);
+				TAILQ_REMOVE(&ctx->timeouts, t, next);
 				t->callback(t->arg);
-				TAILQ_INSERT_TAIL(&free_timeouts, t, next);
+				TAILQ_INSERT_TAIL(&ctx->free_timeouts, t, next);
 				continue;
 			}
 			timersub(&t->when, &now, &tv);
@@ -344,12 +360,12 @@ eloop_start(const sigset_t *sigmask)
 			/* No timeouts, so wait forever */
 			tsp = NULL;
 
-		if (tsp == NULL && events_len == 0) {
+		if (tsp == NULL && ctx->events_len == 0) {
 			syslog(LOG_ERR, "nothing to do");
 			break;
 		}
 
-		n = pollts(fds, events_len, tsp, sigmask);
+		n = pollts(ctx->fds, ctx->events_len, tsp, sigmask);
 		if (n == -1) {
 			if (errno == EAGAIN || errno == EINTR)
 				continue;
@@ -359,7 +375,7 @@ eloop_start(const sigset_t *sigmask)
 
 		/* Process any triggered events. */
 		if (n > 0) {
-			TAILQ_FOREACH(e, &events, next) {
+			TAILQ_FOREACH(e, &ctx->events, next) {
 				if (e->pollfd->revents & (POLLIN | POLLHUP)) {
 					e->callback(e->arg);
 					/* We need to break here as the
@@ -371,25 +387,5 @@ eloop_start(const sigset_t *sigmask)
 		}
 	}
 
-	/* Release our malloced resources */
-	while ((e = TAILQ_FIRST(&events))) {
-		TAILQ_REMOVE(&events, e, next);
-		free(e);
-	}
-	while ((e = TAILQ_FIRST(&free_events))) {
-		TAILQ_REMOVE(&free_events, e, next);
-		free(e);
-	}
-	while ((t = TAILQ_FIRST(&timeouts))) {
-		TAILQ_REMOVE(&timeouts, t, next);
-		free(t);
-	}
-	while ((t = TAILQ_FIRST(&free_timeouts))) {
-		TAILQ_REMOVE(&free_timeouts, t, next);
-		free(t);
-	}
-	free(fds);
-	fds_len = 0;
-
-	return eloop_exitcode;
+	return ctx->exitcode;
 }

@@ -100,7 +100,7 @@
 #endif
 
 void get_line_free(void);
-const char *get_hostname(int);
+const char *get_hostname(char *, size_t, int);
 extern int clock_monotonic;
 int get_monotonic(struct timeval *);
 ssize_t setvar(char ***, const char *, const char *, const char *);

@@ -77,7 +77,7 @@ if_printoptions(void)
 }
 
 static int
-exec_script(char *const *argv, char *const *env)
+exec_script(const sigset_t *sigs, char *const *argv, char *const *env)
 {
 	pid_t pid;
 	posix_spawnattr_t attr;
@@ -95,7 +95,7 @@ exec_script(char *const *argv, char *const *env)
 	for (i = 0; i < handle_sigs[i]; i++)
 		sigaddset(&defsigs, handle_sigs[i]);
 	posix_spawnattr_setsigdefault(&attr, &defsigs);
-	posix_spawnattr_setsigmask(&attr, &dhcpcd_sigset);
+	posix_spawnattr_setsigmask(&attr, sigs);
 	errno = 0;
 	i = posix_spawn(&pid, argv[0], NULL, &attr, argv, env);
 	if (i) {
@@ -228,7 +228,7 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 
 	/* When dumping the lease, we only want to report interface and
 	   reason - the other interface variables are meaningless */
-	if (options & DHCPCD_DUMPLEASE)
+	if (ifp->ctx->options & DHCPCD_DUMPLEASE)
 		elen = 2;
 	else
 		elen = 10;
@@ -244,7 +244,7 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	e = strlen("reason") + strlen(reason) + 2;
 	EMALLOC(1, e);
 	snprintf(env[1], e, "reason=%s", reason);
-	if (options & DHCPCD_DUMPLEASE)
+	if (ifp->ctx->options & DHCPCD_DUMPLEASE)
 		goto dumplease;
 	e = 20;
 	EMALLOC(2, e);
@@ -258,7 +258,7 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	EMALLOC(6, e);
 	snprintf(env[6], e, "ifmtu=%d", get_mtu(ifp->name));
 	l = e = strlen("interface_order=");
-	TAILQ_FOREACH(ifp2, ifaces, next) {
+	TAILQ_FOREACH(ifp2, ifp->ctx->ifaces, next) {
 		e += strlen(ifp2->name) + 1;
 	}
 	EMALLOC(7, e);
@@ -266,7 +266,7 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	strlcpy(p, "interface_order=", e);
 	e -= l;
 	p += l;
-	TAILQ_FOREACH(ifp2, ifaces, next) {
+	TAILQ_FOREACH(ifp2, ifp->ctx->ifaces, next) {
 		l = strlcpy(p, ifp2->name, e);
 		p += l;
 		e -= l;
@@ -555,7 +555,7 @@ script_runreason(const struct interface *ifp, const char *reason)
 	}
 	env[++elen] = NULL;
 
-	pid = exec_script(argv, env);
+	pid = exec_script(&ifp->ctx->sigset, argv, env);
 	if (pid == -1)
 		syslog(LOG_ERR, "%s: %s: %m", __func__, argv[0]);
 	else if (pid != 0) {
@@ -579,7 +579,7 @@ script_runreason(const struct interface *ifp, const char *reason)
 
 	/* Send to our listeners */
 	bigenv = NULL;
-	for (fd = control_fds; fd != NULL; fd = fd->next) {
+	for (fd = ifp->ctx->control_fds; fd != NULL; fd = fd->next) {
 		if (fd->listener) {
 			if (bigenv == NULL) {
 				elen = arraytostr((const char *const *)env,

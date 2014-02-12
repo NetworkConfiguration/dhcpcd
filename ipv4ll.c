@@ -92,7 +92,7 @@ ipv4ll_start(void *arg)
 	struct dhcp_state *state = D_STATE(ifp);
 	uint32_t addr;
 
-	eloop_timeout_delete(NULL, ifp);
+	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	state->probes = 0;
 	state->claims = 0;
 	if (state->addr.s_addr) {
@@ -153,7 +153,7 @@ ipv4ll_handle_failure(void *arg)
 
 	free(state->offer);
 	state->offer = NULL;
-	eloop_timeout_delete(NULL, ifp);
+	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	if (++state->conflicts > MAX_CONFLICTS) {
 		syslog(LOG_ERR, "%s: failed to acquire an IPv4LL address",
 		    ifp->name);
@@ -161,9 +161,10 @@ ipv4ll_handle_failure(void *arg)
 			state->interval = RATE_LIMIT_INTERVAL / 2;
 			dhcp_discover(ifp);
 		} else
-			eloop_timeout_add_sec(RATE_LIMIT_INTERVAL,
-			    ipv4ll_start, ifp);
+			eloop_timeout_add_sec(ifp->ctx->eloop,
+			    RATE_LIMIT_INTERVAL, ipv4ll_start, ifp);
 	} else {
-		eloop_timeout_add_sec(PROBE_WAIT, ipv4ll_start, ifp);
+		eloop_timeout_add_sec(ifp->ctx->eloop,
+		    PROBE_WAIT, ipv4ll_start, ifp);
 	}
 }

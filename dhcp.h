@@ -246,19 +246,16 @@ struct dhcp_state {
 #include "net.h"
 
 #ifdef INET
-extern struct dhcp_opt *dhcp_opts;
-extern size_t dhcp_opts_len;
-
 char *decode_rfc3361(int dl, const uint8_t *data);
 ssize_t decode_rfc3442(char *out, ssize_t len, int pl, const uint8_t *p);
 ssize_t decode_rfc5969(char *out, ssize_t len, int pl, const uint8_t *p);
 
-void dhcp_printoptions(void);
-char *get_option_string(const struct dhcp_message *, uint8_t);
-int get_option_addr(struct in_addr *, const struct dhcp_message *, uint8_t);
-#define is_bootp(m) (m &&						\
+void dhcp_printoptions(const struct dhcpcd_ctx *);
+int get_option_addr(struct dhcpcd_ctx *,struct in_addr *,
+    const struct dhcp_message *, uint8_t);
+#define is_bootp(i, m) ((m) &&						\
 	    !IN_LINKLOCAL(htonl((m)->yiaddr)) &&			\
-	    get_option_uint8(NULL, m, DHO_MESSAGETYPE) == -1)
+	    get_option_uint8((i)->ctx, NULL, (m), DHO_MESSAGETYPE) == -1)
 struct rt_head *get_option_routes(struct interface *,
     const struct dhcp_message *);
 ssize_t dhcp_env(char **, const char *, const struct dhcp_message *,
@@ -274,7 +271,6 @@ int valid_dhcp_packet(unsigned char *);
 
 ssize_t write_lease(const struct interface *, const struct dhcp_message *);
 struct dhcp_message *read_lease(struct interface *);
-void get_lease(struct dhcp_lease *, const struct dhcp_message *);
 
 void dhcp_handleifa(int, struct interface *,
     const struct in_addr *, const struct in_addr *, const struct in_addr *);

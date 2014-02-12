@@ -31,62 +31,57 @@
 #include <string.h>
 #include <syslog.h>
 
+#define _INDEV
 #include "common.h"
 #include "dev.h"
 #include "eloop.h"
 #include "dhcpcd.h"
 
-static struct dev *dev;
-static void *handle;
-static int fd = -1;
-
-static struct dev_dhcpcd dev_dhcpcd = {
-	.handle_interface = &handle_interface
-};
-
 int
-dev_initialized(const char *ifname)
+dev_initialized(struct dhcpcd_ctx *ctx, const char *ifname)
 {
 
-	if (dev == NULL)
+	if (ctx->dev == NULL)
 		return 1;
-	return dev->initialized(ifname);
+	return ctx->dev->initialized(ifname);
 }
 
 int
-dev_listening(void)
+dev_listening(struct dhcpcd_ctx *ctx)
 {
 
-	if (dev == NULL)
+	if (ctx->dev == NULL)
 		return 0;
-	return dev->listening();
+	return ctx->dev->listening();
 }
 
 void
-dev_stop(int stop)
+dev_stop(struct dhcpcd_ctx *ctx, int stop)
 {
 
-	if (dev) {
+	if (ctx->dev) {
 		if (stop)
-			syslog(LOG_DEBUG, "dev: unloaded %s", dev->name);
-		dev->stop();
-		free(dev);
-		dev = NULL;
-		fd = -1;
+			syslog(LOG_DEBUG, "dev: unloaded %s", ctx->dev->name);
+		ctx->dev->stop();
+		eloop_event_delete(ctx->eloop, ctx->dev_fd);
+		free(ctx->dev);
+		ctx->dev = NULL;
+		ctx->dev_fd = -1;
 	}
-	if (handle) {
-		dlclose(handle);
-		handle = NULL;
+	if (ctx->dev_handle) {
+		dlclose(ctx->dev_handle);
+		ctx->dev_handle = NULL;
 	}
 }
 
 static int
-dev_start2(const char *name)
+dev_start2(struct dhcpcd_ctx *ctx, const char *name)
 {
 	char file[PATH_MAX];
 	void *h;
 	void (*fptr)(struct dev *, const struct dev_dhcpcd *);
 	int r;
+	struct dev_dhcpcd dev_dhcpcd;
 
 	snprintf(file, sizeof(file), DEVDIR "/%s", name);
 	h = dlopen(file, RTLD_LAZY);
@@ -101,33 +96,34 @@ dev_start2(const char *name)
 		dlclose(h);
 		return -1;
 	}
-	dev = calloc(1, sizeof(*dev));
-	fptr(dev, &dev_dhcpcd);
-	if (dev->start  == NULL || (r = dev->start()) == -1) {
-		free(dev);
-		dev = NULL;
+	ctx->dev = calloc(1, sizeof(*ctx->dev));
+	dev_dhcpcd.handle_interface = &handle_interface;
+	fptr(ctx->dev, &dev_dhcpcd);
+	if (ctx->dev->start  == NULL || (r = ctx->dev->start()) == -1) {
+		free(ctx->dev);
+		ctx->dev = NULL;
 		dlclose(h);
 		return -1;
 	}
-	syslog(LOG_INFO, "dev: loaded %s", dev->name);
-	handle = h;
+	syslog(LOG_INFO, "dev: loaded %s", ctx->dev->name);
+	ctx->dev_handle = h;
 	return r;
 }
 
 static int
-dev_start1(const char *plugin)
+dev_start1(struct dhcpcd_ctx *ctx)
 {
 	DIR *dp;
 	struct dirent *d;
 	int r;
 
-	if (dev) {
-		syslog(LOG_ERR, "dev: already started %s", dev->name);
+	if (ctx->dev) {
+		syslog(LOG_ERR, "dev: already started %s", ctx->dev->name);
 		return -1;
 	}
 
-	if (plugin)
-		return dev_start2(plugin);
+	if (ctx->dev_load)
+		return dev_start2(ctx, ctx->dev_load);
 
 	dp = opendir(DEVDIR);
 	if (dp == NULL) {
@@ -140,7 +136,7 @@ dev_start1(const char *plugin)
 		if (d->d_name[0] == '.')
 			continue;
 
-		r = dev_start2(d->d_name);
+		r = dev_start2(ctx, d->d_name);
 		if (r != -1)
 			break;
 	}
@@ -149,31 +145,36 @@ dev_start1(const char *plugin)
 }
 
 static void
-dev_handle_data(__unused void *arg)
+dev_handle_data(void *arg)
 {
+	struct dhcpcd_ctx *ctx;
 
-	if (dev->handle_device() == -1) {
+	ctx = arg;
+	if (ctx->dev->handle_device(arg) == -1) {
 		/* XXX: an error occured. should we restart dev? */
 	}
 }
 
 int
-dev_start(const char *plugin)
+dev_start(struct dhcpcd_ctx *ctx)
 {
 
-	if (fd != -1) {
-		syslog(LOG_ERR, "%s: already started on fd %d", __func__, fd);
-		return fd;
+	if (ctx->dev_fd != -1) {
+		syslog(LOG_ERR, "%s: already started on fd %d", __func__,
+		    ctx->dev_fd);
+		return ctx->dev_fd;
 	}
 
-	fd = dev_start1(plugin);
-	if (fd != -1) {
-		if (eloop_event_add(fd, dev_handle_data, NULL) == -1) {
+	ctx->dev_fd = dev_start1(ctx);
+	if (ctx->dev_fd != -1) {
+		if (eloop_event_add(ctx->eloop,
+			ctx->dev_fd, dev_handle_data, ctx) == -1)
+		{
 			syslog(LOG_ERR, "%s: eloop_event_add: %m", __func__);
-			dev_stop(1);
+			dev_stop(ctx, 1);
 			return -1;
 		}
 	}
 
-	return fd;
+	return ctx->dev_fd;
 }

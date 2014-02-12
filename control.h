@@ -28,20 +28,18 @@
 #ifndef CONTROL_H
 #define CONTROL_H
 
+#include "dhcpcd.h"
+
 struct fd_list {
+	struct fd_list *next;
+	struct dhcpcd_ctx *ctx;
 	int fd;
 	int listener;
-	struct fd_list *next;
-};
-extern struct fd_list *control_fds;
-
-struct control_ctx {
-	int fd;
 };
 
-int control_start(struct control_ctx *);
-int control_stop(struct control_ctx *);
-int control_open(struct control_ctx *);
-int control_send(struct control_ctx *, int, char * const *);
+int control_start(struct dhcpcd_ctx *);
+int control_stop(struct dhcpcd_ctx *);
+int control_open(struct dhcpcd_ctx *);
+int control_send(struct dhcpcd_ctx *, int, char * const *);
 
 #endif

@@ -51,9 +51,6 @@
 #include "duid.h"
 #include "net.h"
 
-unsigned char *duid = NULL;
-size_t duid_len = 0;
-
 static size_t
 duid_make(unsigned char *d, const struct interface *ifp, uint16_t type)
 {
@@ -90,7 +87,7 @@ duid_get(unsigned char *d, const struct interface *ifp)
 	FILE *fp;
 	int x = 0;
 	size_t len = 0;
-	char line[DUID_STRLEN + 1];
+	char line[DUID_STRLEN];
 	const struct interface *ifp2;
 
 	/* If we already have a DUID then use it as it's never supposed
@@ -121,7 +118,7 @@ duid_get(unsigned char *d, const struct interface *ifp)
 	if (ifp->family == ARPHRD_NETROM) {
 		syslog(LOG_WARNING, "%s: is a NET/ROM psuedo interface",
 		    ifp->name);
-		TAILQ_FOREACH(ifp2, ifaces, next) {
+		TAILQ_FOREACH(ifp2, ifp->ctx->ifaces, next) {
 			if (ifp2->family != ARPHRD_NETROM)
 				break;
 		}
@@ -142,7 +139,7 @@ duid_get(unsigned char *d, const struct interface *ifp)
 		return duid_make(d, ifp, DUID_LL);
 	}
 	len = duid_make(d, ifp, DUID_LLT);
-	x = fprintf(fp, "%s\n", hwaddr_ntoa(d, len));
+	x = fprintf(fp, "%s\n", hwaddr_ntoa(d, len, line, sizeof(line)));
 	fclose(fp);
 	/* Failed to write the duid? scrub it, we cannot use it */
 	if (x < 1) {
@@ -156,13 +153,13 @@ duid_get(unsigned char *d, const struct interface *ifp)
 size_t duid_init(const struct interface *ifp)
 {
 
-	if (duid == NULL) {
-		duid = malloc(DUID_LEN);
-		if (duid == NULL) {
+	if (ifp->ctx->duid == NULL) {
+		ifp->ctx->duid = malloc(DUID_LEN);
+		if (ifp->ctx->duid == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);
 			return 0;
 		}
-		duid_len = duid_get(duid, ifp);
+		ifp->ctx->duid_len = duid_get(ifp->ctx->duid, ifp);
 	}
-	return duid_len;
+	return ifp->ctx->duid_len;
 }
