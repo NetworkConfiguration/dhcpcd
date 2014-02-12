@@ -64,11 +64,11 @@ ipv4_opensocket(struct interface *ifp, int protocol)
 #ifdef _PATH_BPF
 	fd = open(_PATH_BPF, O_RDWR | O_CLOEXEC | O_NONBLOCK);
 #else
-	char device[PATH_MAX];
+	char device[32];
 	int n = 0;
 
 	do {
-		snprintf(device, PATH_MAX, "/dev/bpf%d", n++);
+		snprintf(device, sizeof(device), "/dev/bpf%d", n++);
 		fd = open(device, O_RDWR | O_CLOEXEC | O_NONBLOCK);
 	} while (fd == -1 && errno == EBUSY);
 #endif

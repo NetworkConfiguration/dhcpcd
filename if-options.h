@@ -146,7 +146,7 @@ struct if_options {
 	char **config;
 
 	char **environ;
-	char script[PATH_MAX];
+	char *script;
 
 	char hostname[HOSTNAME_MAX_LEN + 1]; /* We don't store the length */
 	int fqdn;

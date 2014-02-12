@@ -632,7 +632,10 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		ifo->options |= DHCPCD_BACKGROUND;
 		break;
 	case 'c':
-		strlcpy(ifo->script, arg, sizeof(ifo->script));
+		free(ifo->script);
+		ifo->script = strdup(arg);
+		if (ifo->script == NULL)
+			syslog(LOG_ERR, "%s: %m", __func__);
 		break;
 	case 'd':
 		ifo->options |= DHCPCD_DEBUG;
@@ -1824,7 +1827,6 @@ read_config(struct dhcpcd_ctx *ctx,
 	ifo->metric = -1;
 	ifo->auth.options |= DHCPCD_AUTH_REQUIRE;
 	TAILQ_INIT(&ifo->auth.tokens);
-	strlcpy(ifo->script, SCRIPT, sizeof(ifo->script));
 
 	ifo->vendorclassid[0] = dhcp_vendor((char *)ifo->vendorclassid + 1,
 	    sizeof(ifo->vendorclassid) - 1);
@@ -2042,6 +2044,7 @@ free_options(struct if_options *ifo)
 			free(ifo->config);
 		}
 		ipv4_freeroutes(ifo->routes);
+		free(ifo->script);
 		free(ifo->arping);
 		free(ifo->blacklist);
 		free(ifo->fallback);

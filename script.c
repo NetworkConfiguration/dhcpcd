@@ -511,7 +511,7 @@ send_interface(int fd, const struct interface *iface)
 int
 script_runreason(const struct interface *ifp, const char *reason)
 {
-	char *const argv[2] = { UNCONST(ifp->options->script), NULL };
+	char *argv[2];
 	char **env = NULL, **ep;
 	char *path, *bigenv;
 	ssize_t e, elen = 0;
@@ -520,11 +520,13 @@ script_runreason(const struct interface *ifp, const char *reason)
 	const struct fd_list *fd;
 	struct iovec iov[2];
 
-	if (ifp->options->script == NULL ||
-	    ifp->options->script[0] == '\0' ||
-	    strcmp(ifp->options->script, "/dev/null") == 0)
+	if (ifp->options->script &&
+	    (ifp->options->script[0] == '\0' ||
+	    strcmp(ifp->options->script, "/dev/null") == 0))
 		return 0;
 
+	argv[0] = ifp->options->script ? ifp->options->script : UNCONST(SCRIPT);
+	argv[1] = NULL;
 	syslog(LOG_DEBUG, "%s: executing `%s' %s",
 	    ifp->name, argv[0], reason);
 
