@@ -1480,8 +1480,10 @@ exit1:
 		free(ctx.ifaces);
 	}
 	free(ctx.duid);
-	if (ctx.link_fd != -1)
+	if (ctx.link_fd != -1) {
+		eloop_event_delete(ctx.eloop, ctx.link_fd);
 		close(ctx.link_fd);
+	}
 
 	free_options(ifo);
 	free_globals(&ctx);

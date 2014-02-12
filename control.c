@@ -58,8 +58,8 @@ control_remove(void *arg)
 	while (l) {
 		n = l->next;
 		if (l == arg) {
-			close(l->fd);
 			eloop_event_delete(ctx->eloop, l->fd);
+			close(l->fd);
 			if (last == NULL)
 				ctx->control_fds = l->next;
 			else

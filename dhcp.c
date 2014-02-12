@@ -2739,8 +2739,8 @@ dhcp_free(struct interface *ifp)
 	}
 	if (ifp == NULL) {
 		if (ctx->udp_fd != -1) {
-			close(ctx->udp_fd);
 			eloop_event_delete(ctx->eloop, ctx->udp_fd);
+			close(ctx->udp_fd);
 			ctx->udp_fd = -1;
 		}
 

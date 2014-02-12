@@ -62,8 +62,8 @@ dev_stop(struct dhcpcd_ctx *ctx, int stop)
 	if (ctx->dev) {
 		if (stop)
 			syslog(LOG_DEBUG, "dev: unloaded %s", ctx->dev->name);
-		ctx->dev->stop();
 		eloop_event_delete(ctx->eloop, ctx->dev_fd);
+		ctx->dev->stop();
 		free(ctx->dev);
 		ctx->dev = NULL;
 		ctx->dev_fd = -1;

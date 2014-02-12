@@ -2672,8 +2672,8 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 	}
 	if (ifp == NULL) {
 		if (ctx->ipv6->dhcp_fd != -1) {
-			close(ctx->ipv6->dhcp_fd);
 			eloop_event_delete(ctx->eloop, ctx->ipv6->dhcp_fd);
+			close(ctx->ipv6->dhcp_fd);
 			ctx->ipv6->dhcp_fd = -1;
 		}
 	}

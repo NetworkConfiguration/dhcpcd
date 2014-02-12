@@ -235,8 +235,8 @@ unspec:
 
 eexit:
 	if (ctx->nd_fd != -1) {
-		close(ctx->nd_fd);
 		eloop_event_delete(dctx->eloop, ctx->nd_fd);
+		close(ctx->nd_fd);
 		ctx->nd_fd = -1;
 	}
 #ifdef IPV6_SEND_DAD
@@ -418,8 +418,8 @@ ipv6nd_free(struct interface *ifp)
 	}
 	if (ifp == NULL) {
 		if (ctx->ipv6->nd_fd != -1) {
-			close(ctx->ipv6->nd_fd);
 			eloop_event_delete(ctx->eloop, ctx->ipv6->nd_fd);
+			close(ctx->ipv6->nd_fd);
 			ctx->ipv6->nd_fd = -1;
 		}
 	}
