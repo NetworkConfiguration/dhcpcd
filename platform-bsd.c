@@ -88,12 +88,11 @@ inet6_sysctl(int code, int val, int action)
 	return val;
 }
 
-static int kernel_ra_set;
 void
 restore_kernel_ra(struct dhcpcd_ctx *ctx)
 {
 
-	if (kernel_ra_set == 0 || ctx->options & DHCPCD_FORKED)
+	if (ctx->ra_kernel_set == 0 || ctx->options & DHCPCD_FORKED)
 		return;
 	syslog(LOG_INFO, "restoring Kernel IPv6 RA support");
 	if (set_inet6_sysctl(IPV6CTL_ACCEPT_RTADV, 1) == -1)
@@ -119,15 +118,14 @@ ipv6_ra_flush(void)
 }
 
 int
-check_ipv6(const char *ifname, int own)
+check_ipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 {
-	static int global_ra = 0;
 	int ra;
 
 	/* BSD doesn't support these values per iface, so just return
 	 * the global ra setting */
 	if (ifname)
-		return global_ra;
+		return ctx->ra_global;
 
 	ra = get_inet6_sysctl(IPV6CTL_ACCEPT_RTADV);
 	if (ra == -1)
@@ -142,7 +140,7 @@ check_ipv6(const char *ifname, int own)
 			return ra;
 		}
 		ra = 0;
-		kernel_ra_set = 1;
+		ctx->ra_kernel_set = 1;
 
 		/* Flush the kernel knowledge of advertised routers
 		 * and prefixes so the kernel does not expire prefixes
@@ -150,7 +148,7 @@ check_ipv6(const char *ifname, int own)
 		ipv6_ra_flush();
 	}
 	if (ifname == NULL)
-		global_ra = ra;
+		ctx->ra_global = ra;
 
 	return ra;
 }

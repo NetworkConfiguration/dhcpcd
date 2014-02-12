@@ -1115,11 +1115,13 @@ main(int argc, char **argv)
 	pidfile = NULL;
 	ifo = NULL;
 	ctx.cffile = CONFIG;
-	ctx.pid_fd = -1;
-	ctx.control_fd = -1;
+	ctx.pid_fd = ctx.control_fd = ctx.link_fd = -1;
+#ifdef PLUGIN_DEV
 	ctx.dev_fd = -1;
-	ctx.link_fd = -1;
+#endif
+#ifdef INET
 	ctx.udp_fd = -1;
+#endif
 	i = 0;
 	while ((opt = getopt_long(argc, argv, IF_OPTS, cf_options, &oi)) != -1)
 	{

@@ -117,7 +117,10 @@ struct dhcpcd_ctx {
 #ifdef __linux__
 	char **ra_restore;
 	ssize_t ra_restore_len;
-#endif /* __linux__ */
+#else /* __linux__ */
+	int ra_global;
+	int ra_kernel_set;
+#endif
 #endif /* INET6 */
 
 #ifdef PLUGIN_DEV
@@ -126,8 +129,6 @@ struct dhcpcd_ctx {
 	struct dev *dev;
 	void *dev_handle;
 #endif
-
-
 };
 
 extern const int handle_sigs[];
