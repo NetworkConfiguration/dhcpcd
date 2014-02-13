@@ -805,7 +805,8 @@ nc_route(int add, struct rt6 *ort, struct rt6 *nrt)
 	desc_route(add ? "adding" : "changing", nrt);
 	/* We delete and add the route so that we can change metric and
 	 * prefer the interface. */
-	del_route6(ort);
+	if (del_route6(ort) == -1 && errno != ESRCH)
+		syslog(LOG_ERR, "%s: del_route6: %m", ort->iface->name);
 	if (add_route6(nrt) == 0)
 		return 0;
 	syslog(LOG_ERR, "%s: add_route6: %m", nrt->iface->name);

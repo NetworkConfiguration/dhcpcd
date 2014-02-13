@@ -259,7 +259,8 @@ nc_route(int add, struct rt *ort, struct rt *nrt)
 	 * prefer the interface.
 	 * This also has the nice side effect of flushing ARP entries so
 	 * we don't have to do that manually. */
-	ipv4_deleteroute(ort);
+	if (ipv4_deleteroute(ort) == -1 && errno != ESRCH)
+		syslog(LOG_ERR, "%s: ipv4_deleteroute: %m", ort->iface->name);
 	if (!ipv4_addroute(nrt))
 		return 0;
 	syslog(LOG_ERR, "%s: ipv4_addroute: %m", nrt->iface->name);
