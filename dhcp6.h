@@ -240,9 +240,9 @@ void dhcp6_handleifa(struct dhcpcd_ctx *, int, const char *,
 void dhcp6_drop(struct interface *, const char *);
 #else
 #define dhcp6_printoptions()
-#define dhcp6_addrexists(a) 0
-#define dhcp6_find_delegates(a) 0
-#define dhcp6_start(a, b) 0
+#define dhcp6_addrexists(a, b) (0)
+#define dhcp6_find_delegates(a) (0)
+#define dhcp6_start(a, b) (0)
 #define dhcp6_reboot(a)
 #define dhcp6_env(a, b, c, d, e)
 #define dhcp6_free(a)

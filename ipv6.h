@@ -201,7 +201,7 @@ int if_route6(const struct rt6 *rt, int);
 #define del_src_route6(rt) if_route6(rt, -2);
 
 #else
-#define ipv6_init() -1
+#define ipv6_init(a) NULL
 #define ipv6_free_ll_callbacks(a)
 #define ipv6_free(a)
 #define ipv6_ctxfree(a)

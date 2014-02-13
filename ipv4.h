@@ -98,12 +98,12 @@ ssize_t ipv4_getrawpacket(struct interface *, int, void *, ssize_t, int *);
 void ipv4_free(struct interface *);
 void ipv4_ctxfree(struct dhcpcd_ctx *);
 #else
-#define ipv4_init() (-1)
+#define ipv4_init(a) (-1)
 #define ipv4_applyaddr(a) {}
 #define ipv4_freeroutes(a) {}
 #define ipv4_free(a) {}
 #define ipv4_ctxfree(a) {}
-#define ipv4_addrexists(a) (0)
+#define ipv4_addrexists(a, b) (0)
 #endif
 
 #endif
