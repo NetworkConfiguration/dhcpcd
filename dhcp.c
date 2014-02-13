@@ -1364,7 +1364,7 @@ dhcp_openudp(struct dhcpcd_ctx *ctx, struct interface *ifp)
 	if ((s = socket(PF_INET, SOCK_DGRAM | SOCK_CLOEXEC, IPPROTO_UDP)) == -1)
 		return -1;
 #else
-	if ((s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_UDP)) == -1)
+	if ((s = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
 		return -1;
 	if ((n = fcntl(s, F_GETFD, 0)) == -1 ||
 	    fcntl(s, F_SETFD, n | FD_CLOEXEC) == -1)
