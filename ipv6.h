@@ -154,7 +154,10 @@ struct ipv6_ctx {
 
 	int nd_fd;
 #ifdef IPV6_SEND_DAD
-	int unspec_fd = -1;
+	int unspec_fd;
+#endif
+#ifdef LISTEN_DAD
+	uint8_t dad_warned;
 #endif
 	struct ra_head *ra_routers;
 	struct rt6_head *routes;

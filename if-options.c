@@ -25,6 +25,8 @@
  * SUCH DAMAGE.
  */
 
+#define _WITH_GETLINE /* Stop FreeBSD bitching */
+
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/queue.h>

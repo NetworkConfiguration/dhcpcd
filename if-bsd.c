@@ -122,6 +122,7 @@ open_link_socket(void)
 		close(s);
 	        return -1;
 	}
+	return s;
 #endif
 }
 

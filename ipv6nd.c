@@ -268,9 +268,13 @@ unspec:
 #endif
 
 #ifdef LISTEN_DAD
-	syslog(LOG_WARNING, "kernel does not report DAD results to userland");
-	syslog(LOG_WARNING,
-	    "warning listening to duplicated addresses on the wire");
+	if (!ctx->dad_warned) {
+		syslog(LOG_WARNING, 
+		    "kernel does not report DAD results to userland");
+		syslog(LOG_WARNING,
+		    "warning listening to duplicated addresses on the wire");
+		ctx->dad_warned = 1;
+	}
 #endif
 
 	return ctx->nd_fd;
