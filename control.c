@@ -133,9 +133,30 @@ static int
 make_sock(struct dhcpcd_ctx *ctx, struct sockaddr_un *sun)
 {
 
+#ifdef SOCK_CLOEXEC
 	if ((ctx->control_fd = socket(AF_UNIX,
 	    SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0)) == -1)
 		return -1;
+#else
+	int flags;
+
+	if ((ctx->control_fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
+		return -1;
+	if ((flags = fcntl(ctx->control_fd, F_GETFD, 0)) == -1 ||
+	    fcntl(ctx->control_fd, F_SETFD, flags | FD_CLOEXEC) == -1)
+	{
+		close(ctx->control_fd);
+		ctx->control_fd = -1;
+	        return -1;
+	}
+	if ((flags = fcntl(ctx->control_fd, F_GETFL, 0)) == -1 ||
+	    fcntl(ctx->control_fd, F_SETFL, flags | O_NONBLOCK) == -1)
+	{
+		close(ctx->control_fd);
+		ctx->control_fd = -1;
+	        return -1;
+	}
+#endif
 	memset(sun, 0, sizeof(*sun));
 	sun->sun_family = AF_UNIX;
 	strlcpy(sun->sun_path, CONTROLSOCKET, sizeof(sun->sun_path));

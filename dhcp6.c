@@ -2447,11 +2447,30 @@ dhcp6_open(struct dhcpcd_ctx *dctx)
 #endif
 
 	ctx = dctx->ipv6;
+#ifdef SOCK_CLOEXEC
 	ctx->dhcp_fd = socket(PF_INET6,
 	    SOCK_DGRAM | SOCK_CLOEXEC | SOCK_NONBLOCK,
 	    IPPROTO_UDP);
 	if (ctx->dhcp_fd == -1)
 		return -1;
+#else
+	if ((ctx->dhcp_fd = socket(PF_INET6, SOCK_DGRAM, IPPROTO_UDP)) == -1)
+		return -1;
+	if ((n = fcntl(ctx->dhcp_fd, F_GETFD, 0)) == -1 ||
+	    fcntl(ctx->dhcp_fd, F_SETFD, n | FD_CLOEXEC) == -1)
+	{
+		close(ctx->dhcp_fd);
+		ctx->dhcp_fd = -1;
+	        return -1;
+	}
+	if ((n = fcntl(ctx->dhcp_fd, F_GETFL, 0)) == -1 ||
+	    fcntl(ctx->dhcp_fd, F_SETFL, n | O_NONBLOCK) == -1)
+	{
+		close(ctx->dhcp_fd);
+		ctx->dhcp_fd = -1;
+	        return -1;
+	}
+#endif
 
 	n = 1;
 	if (setsockopt(ctx->dhcp_fd, SOL_SOCKET, SO_REUSEADDR,

@@ -51,6 +51,7 @@
 #endif
 
 #include <errno.h>
+#include <fcntl.h>
 #include <fnmatch.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -102,7 +103,26 @@ int
 open_link_socket(void)
 {
 
+#ifdef SOCK_CLOEXEC
 	return socket(PF_ROUTE, SOCK_RAW | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
+#else
+	int s, flags;
+
+	if ((s = socket(PF_ROUTE, SOCK_RAW, 0)) == -1)
+		return -1;
+	if ((flags = fcntl(s, F_GETFD, 0)) == -1 ||
+	    fcntl(s, F_SETFD, flags | FD_CLOEXEC) == -1)
+	{
+		close(s);
+	        return -1;
+	}
+	if ((flags = fcntl(s, F_GETFL, 0)) == -1 ||
+	    fcntl(s, F_SETFL, flags | O_NONBLOCK) == -1)
+	{
+		close(s);
+	        return -1;
+	}
+#endif
 }
 
 int

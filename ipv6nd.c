@@ -39,6 +39,7 @@
 #endif
 
 #include <errno.h>
+#include <fcntl.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -178,10 +179,29 @@ ipv6nd_open(struct dhcpcd_ctx *dctx)
 	ctx = dctx->ipv6;
 	if (ctx->nd_fd != -1)
 		goto unspec;
+#ifdef SOCK_CLOEXEC
 	ctx->nd_fd = socket(AF_INET6, SOCK_RAW | SOCK_CLOEXEC | SOCK_NONBLOCK,
 	    IPPROTO_ICMPV6);
 	if (ctx->nd_fd == -1)
 		return -1;
+#else
+	if ((ctx->nd_fd = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6)) == -1)
+		return -1;
+	if ((on = fcntl(ctx->nd_fd, F_GETFD, 0)) == -1 ||
+	    fcntl(ctx->nd_fd, F_SETFD, on | FD_CLOEXEC) == -1)
+	{
+		close(ctx->nd_fd);
+		ctx->nd_fd = -1;
+	        return -1;
+	}
+	if ((on = fcntl(ctx->nd_fd, F_GETFL, 0)) == -1 ||
+	    fcntl(ctx->nd_fd, F_SETFL, on | O_NONBLOCK) == -1)
+	{
+		close(ctx->nd_fd);
+		ctx->nd_fd = -1;
+	        return -1;
+	}
+#endif
 
 	on = 1;
 	if (setsockopt(ctx->nd_fd, IPPROTO_IPV6, IPV6_RECVPKTINFO,
@@ -210,9 +230,31 @@ unspec:
 	ICMP6_FILTER_SETBLOCKALL(&filt);
 
 	/* We send DAD requests from the unspecified address. */
-	ctx->unspec_fd = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
+#ifdef SOCK_CLOEXEC
+	ctx->unspec_fd = socket(AF_INET6,
+	    SOCK_RAW | SOCK_CLOEXEC | SOCK_NONBLOCK,
+	    IPPROTO_ICMPV6);
 	if (ctx->unspec_fd == -1)
-		goto eexit;
+		return -1;
+#else
+	if ((ctx->unspec_fd = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6)) == -1)
+		return -1;
+	if ((on = fcntl(ctx->unspec_fd, F_GETFD, 0)) == -1 ||
+	    fcntl(ctx->unspec_fd, F_SETFD, on | FD_CLOEXEC) == -1)
+	{
+		close(ctx->unspec_fd);
+		ctx->unspec_fd = -1;
+	        return -1;
+	}
+	if ((on = fcntl(ctx->unspec_fd, F_GETFL, 0)) == -1 ||
+	    fcntl(ctx->unspec_fd, F_SETFL, on | O_NONBLOCK) == -1)
+	{
+		close(ctx->unspec_fd);
+		ctx->unspec_fd = -1;
+	        return -1;
+	}
+#endif
+	
 	if (setsockopt(ctx->unspec_fd, IPPROTO_ICMPV6, ICMP6_FILTER,
 	    &filt, sizeof(filt)) == -1)
 		goto eexit;

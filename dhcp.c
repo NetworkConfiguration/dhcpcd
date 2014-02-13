@@ -1360,8 +1360,19 @@ dhcp_openudp(struct dhcpcd_ctx *ctx, struct interface *ifp)
 	char *p;
 #endif
 
+#ifdef SOCK_CLOEXEC
 	if ((s = socket(PF_INET, SOCK_DGRAM | SOCK_CLOEXEC, IPPROTO_UDP)) == -1)
 		return -1;
+#else
+	if ((s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_UDP)) == -1)
+		return -1;
+	if ((n = fcntl(s, F_GETFD, 0)) == -1 ||
+	    fcntl(s, F_SETFD, n | FD_CLOEXEC) == -1)
+	{
+		close(s);
+	        return -1;
+	}
+#endif
 
 	n = 1;
 	if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &n, sizeof(n)) == -1)
