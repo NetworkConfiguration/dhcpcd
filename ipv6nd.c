@@ -809,7 +809,7 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 				    ND_OPT_PI_FLAG_AUTO) &&
 				    !(pi->nd_opt_pi_flags_reserved &
 				    ND_OPT_PI_FLAG_ONLINK))
-					break;
+					continue;
 				ap = calloc(1, sizeof(*ap));
 				if (ap == NULL) {
 					syslog(LOG_ERR, "%s: %m", __func__);
