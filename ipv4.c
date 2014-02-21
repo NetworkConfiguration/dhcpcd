@@ -543,7 +543,10 @@ ipv4_buildroutes(struct dhcpcd_ctx *ctx)
 
 	/* Remove old routes we used to manage */
 	TAILQ_FOREACH(rt, ctx->ipv4_routes, next) {
-		if (find_route(nrs, rt, NULL) == NULL)
+		if (find_route(nrs, rt, NULL) == NULL &&
+		    (rt->iface->options->options &
+		    (DHCPCD_EXITING | DHCPCD_PERSISTENT)) !=
+		    (DHCPCD_EXITING | DHCPCD_PERSISTENT))
 			d_route(rt);
 	}
 	ipv4_freeroutes(ctx->ipv4_routes);
@@ -638,10 +641,10 @@ ipv4_applyaddr(void *arg)
 	lease = &state->lease;
 
 	if (dhcp == NULL) {
+		ipv4_buildroutes(ifp->ctx);
 		if ((ifo->options & (DHCPCD_EXITING | DHCPCD_PERSISTENT)) !=
 		    (DHCPCD_EXITING | DHCPCD_PERSISTENT))
 		{
-			ipv4_buildroutes(ifp->ctx);
 			if (state->addr.s_addr != 0)
 				delete_address(ifp);
 			script_runreason(ifp, state->reason);
