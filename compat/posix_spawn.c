@@ -74,21 +74,31 @@ posix_spawnattr_handle(const posix_spawnattr_t *attrp)
 	return 0;
 }
 
+inline static int
+is_vfork_safe(short int flags)
+{
+	return !(flags & (POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK));
+}
+
 int
-posix_spawn(pid_t *pid, const char * path,
-	__unused void *arg,
+posix_spawn(pid_t *pid, const char *path,
+	const posix_spawn_file_actions_t *file_actions,
 	const posix_spawnattr_t *attrp,
 	char *const argv[], char *const envp[])
 {
+	short int flags;
 	pid_t p;
 	volatile int error;
 
 	error = 0;
+	flags = attrp ? attrp->posix_attr_flags : 0;
+	if (file_actions == NULL && is_vfork_safe(flags))
+		p = vfork();
+	else
 #ifdef THERE_IS_NO_FORK
-	/* Pray we can sanely modify signal foo */
-	p = vfork();
+		return ENOSYS;
 #else
-	p = fork();
+		p = fork();
 #endif
 	switch (p) {
 	case -1:

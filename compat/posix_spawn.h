@@ -38,8 +38,13 @@ typedef struct {
 	sigset_t posix_attr_sigdefault;
 } posix_spawnattr_t;
 
-int posix_spawn(pid_t *, const char *, void *, const posix_spawnattr_t *,
-	char *const [], char *const []);
+typedef struct {
+//	int unused;
+} posix_spawn_file_actions_t;
+
+int posix_spawn(pid_t *, const char *,
+    const posix_spawn_file_actions_t *, const posix_spawnattr_t *,
+    char *const [], char *const []);
 int posix_spawnattr_init(posix_spawnattr_t *);
 int posix_spawnattr_setflags(posix_spawnattr_t *, short);
 int posix_spawnattr_setsigmask(posix_spawnattr_t *, const sigset_t *);
