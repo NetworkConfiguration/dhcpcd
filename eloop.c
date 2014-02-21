@@ -324,8 +324,9 @@ void eloop_free(struct eloop_ctx *ctx)
 }
 
 int
-eloop_start(struct eloop_ctx *ctx, const sigset_t *sigmask)
+eloop_start(struct dhcpcd_ctx *dctx)
 {
+	struct eloop_ctx *ctx;
 	struct timeval now;
 	int n;
 	struct eloop_event *e;
@@ -333,7 +334,11 @@ eloop_start(struct eloop_ctx *ctx, const sigset_t *sigmask)
 	struct timeval tv;
 	struct timespec ts, *tsp;
 	void (*t0)(void *);
+#ifndef USE_SIGNALS
+	int timeout;
+#endif
 
+	ctx = dctx->eloop;
 	for (;;) {
 		if (ctx->exitnow)
 			break;
@@ -365,7 +370,20 @@ eloop_start(struct eloop_ctx *ctx, const sigset_t *sigmask)
 			break;
 		}
 
-		n = pollts(ctx->fds, ctx->events_len, tsp, sigmask);
+#ifdef USE_SIGNALS
+		n = pollts(ctx->fds, ctx->events_len, tsp, &dctx->sigset);
+#else
+		if (tsp == NULL)
+			timeout = -1;
+		else if (tsp->tv_sec > INT_MAX / 1000 ||
+		    (tsp->tv_sec == INT_MAX / 1000 &&
+		    (tsp->tv_nsec + 999999) / 1000000 > INT_MAX % 1000000))
+			timeout = INT_MAX;
+		else
+			timeout = tsp->tv_sec * 1000 +
+			    (tsp->tv_nsec + 999999) / 1000000;
+		n = poll(ctx->fds, ctx->events_len, timeout);
+#endif
 		if (n == -1) {
 			if (errno == EAGAIN || errno == EINTR)
 				continue;

@@ -67,6 +67,7 @@ const char dhcpcd_copyright[] = "Copyright (c) 2006-2014 Roy Marples";
 #include "platform.h"
 #include "script.h"
 
+#ifdef USE_SIGNALS
 const int handle_sigs[] = {
 	SIGALRM,
 	SIGHUP,
@@ -79,7 +80,9 @@ const int handle_sigs[] = {
 
 /* Handling signals needs *some* context */
 static struct dhcpcd_ctx *dhcpcd_ctx;
+#endif
 
+#if defined(USE_SIGNALS) || !defined(THERE_IS_NO_FORK)
 static pid_t
 read_pid(const char *pidfile)
 {
@@ -95,6 +98,17 @@ read_pid(const char *pidfile)
 	fclose(fp);
 	return pid;
 }
+
+static inline int
+write_pid(int fd, pid_t pid)
+{
+
+	if (ftruncate(fd, (off_t)0) == -1)
+		return -1;
+	lseek(fd, (off_t)0, SEEK_SET);
+	return dprintf(fd, "%d\n", (int)pid);
+}
+#endif
 
 static void
 usage(void)
@@ -195,21 +209,12 @@ handle_exit_timeout(void *arg)
 	eloop_timeout_add_sec(ctx->eloop, timeout, handle_exit_timeout, ctx);
 }
 
-static inline int
-write_pid(int fd, pid_t pid)
-{
-
-	if (ftruncate(fd, (off_t)0) == -1)
-		return -1;
-	lseek(fd, (off_t)0, SEEK_SET);
-	return dprintf(fd, "%d\n", (int)pid);
-}
-
 /* Returns the pid of the child, otherwise 0. */
 pid_t
 daemonise(struct dhcpcd_ctx *ctx)
 {
 #ifdef THERE_IS_NO_FORK
+	eloop_timeout_delete(ctx->eloop, handle_exit_timeout, ctx);
 	errno = ENOSYS;
 	return 0;
 #else
@@ -821,6 +826,27 @@ reconf_reboot(struct dhcpcd_ctx *ctx, int action, int argc, char **argv, int oi)
 	sort_interfaces(ctx);
 }
 
+static void
+stop_all_interfaces(struct dhcpcd_ctx *ctx, int do_release)
+{
+	struct interface *ifp;
+
+	/* drop_dhcp could change the order, so we do it like this. */
+	for (;;) {
+		/* Be sane and drop the last config first */
+		ifp = TAILQ_LAST(ctx->ifaces, if_head);
+		if (ifp == NULL)
+			break;
+		if (do_release) {
+			ifp->options->options |= DHCPCD_RELEASE;
+			ifp->options->options &= ~DHCPCD_PERSISTENT;
+		}
+		ifp->options->options |= DHCPCD_EXITING;
+		stop_interface(ifp);
+	}
+}
+
+#ifdef USE_SIGNALS
 struct dhcpcd_siginfo {
 	int signo;
 	pid_t pid;
@@ -886,21 +912,8 @@ handle_signal1(void *arg)
 		return;
 	}
 
-	if (!(ctx->options & DHCPCD_TEST)) {
-		/* drop_dhcp could change the order, so we do it like this. */
-		for (;;) {
-			/* Be sane and drop the last config first */
-			ifp = TAILQ_LAST(ctx->ifaces, if_head);
-			if (ifp == NULL)
-				break;
-			if (do_release) {
-				ifp->options->options |= DHCPCD_RELEASE;
-				ifp->options->options &= ~DHCPCD_PERSISTENT;
-			}
-			ifp->options->options |= DHCPCD_EXITING;
-			stop_interface(ifp);
-		}
-	}
+	if (!(ctx->options & DHCPCD_TEST))
+		stop_all_interfaces(ctx, do_release);
 	eloop_exit(ctx->eloop, EXIT_FAILURE);
 }
 
@@ -916,6 +929,30 @@ handle_signal(__unused int sig, siginfo_t *siginfo, __unused void *context)
 	eloop_timeout_add_now(dhcpcd_ctx->eloop,
 	    handle_signal1, &dhcpcd_siginfo);
 }
+
+static int
+signal_init(void (*func)(int, siginfo_t *, void *), sigset_t *oldset)
+{
+	unsigned int i;
+	struct sigaction sa;
+	sigset_t newset;
+
+	sigfillset(&newset);
+	if (sigprocmask(SIG_SETMASK, &newset, oldset) == -1)
+		return -1;
+
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_sigaction = func;
+	sa.sa_flags = SA_SIGINFO;
+	sigemptyset(&sa.sa_mask);
+
+	for (i = 0; handle_sigs[i]; i++) {
+		if (sigaction(handle_sigs[i], &sa, NULL) == -1)
+			return -1;
+	}
+	return 0;
+}
+#endif
 
 int
 handle_args(struct dhcpcd_ctx *ctx, struct fd_list *fd, int argc, char **argv)
@@ -1000,17 +1037,19 @@ handle_args(struct dhcpcd_ctx *ctx, struct fd_list *fd, int argc, char **argv)
 	}
 
 	/* Log the command */
-	len = 0;
+	len = 1;
 	for (opt = 0; opt < argc; opt++)
 		len += strlen(argv[opt]) + 1;
-	tmp = p = malloc(len + 1);
+	tmp = malloc(len);
 	if (tmp == NULL) {
 		syslog(LOG_ERR, "%s: %m", __func__);
 		return -1;
 	}
+	p = tmp;
 	for (opt = 0; opt < argc; opt++) {
 		l = strlen(argv[opt]);
-		strlcpy(p, argv[opt], l + 1);
+		strlcpy(p, argv[opt], len);
+		len -= l + 1;
 		p += l;
 		*p++ = ' ';
 	}
@@ -1037,13 +1076,12 @@ handle_args(struct dhcpcd_ctx *ctx, struct fd_list *fd, int argc, char **argv)
 		}
 	}
 
-	/* We need at least one interface */
-	if (optind == argc) {
-		syslog(LOG_ERR, "%s: no interface", __func__);
-		return -1;
-	}
-
 	if (do_release || do_exit) {
+		if (optind == argc) {
+			stop_all_interfaces(ctx, do_release);
+			eloop_exit(ctx->eloop, EXIT_SUCCESS);
+			return 0;
+		}
 		for (oi = optind; oi < argc; oi++) {
 			if ((ifp = find_interface(ctx, argv[oi])) == NULL)
 				continue;
@@ -1061,29 +1099,6 @@ handle_args(struct dhcpcd_ctx *ctx, struct fd_list *fd, int argc, char **argv)
 	return 0;
 }
 
-static int
-signal_init(void (*func)(int, siginfo_t *, void *), sigset_t *oldset)
-{
-	unsigned int i;
-	struct sigaction sa;
-	sigset_t newset;
-
-	sigfillset(&newset);
-	if (sigprocmask(SIG_SETMASK, &newset, oldset) == -1)
-		return -1;
-
-	memset(&sa, 0, sizeof(sa));
-	sa.sa_sigaction = func;
-	sa.sa_flags = SA_SIGINFO;
-	sigemptyset(&sa.sa_mask);
-
-	for (i = 0; handle_sigs[i]; i++) {
-		if (sigaction(handle_sigs[i], &sa, NULL) == -1)
-			return -1;
-	}
-	return 0;
-}
-
 int
 main(int argc, char **argv)
 {
@@ -1092,13 +1107,21 @@ main(int argc, char **argv)
 	struct if_options *ifo;
 	struct interface *ifp;
 	uint16_t family = 0;
-	int opt, oi = 0, sig = 0, i;
+	int opt, oi = 0, i;
 	size_t len;
+#if defined(USE_SIGNALS) || !defined(THERE_IS_NO_FORK)
 	pid_t pid;
+#endif
+#ifdef USE_SIGNALS
+	int sig;
+#endif
 	struct timespec ts;
 
 	memset(&ctx, 0, sizeof(ctx));
-	dhcpcd_ctx = &ctx; /* for our signal handler */
+#ifdef USE_SIGNALS
+	dhcpcd_ctx = &ctx;
+	sig = 0;
+#endif
 	closefrom(3);
 	openlog(PACKAGE, LOG_PERROR | LOG_PID, LOG_DAEMON);
 	setlogmask(LOG_UPTO(LOG_INFO));
@@ -1136,6 +1159,7 @@ main(int argc, char **argv)
 		case 'f':
 			ctx.cffile = optarg;
 			break;
+#ifdef USE_SIGNALS
 		case 'g':
 			sig = SIGUSR1;
 			break;
@@ -1148,6 +1172,7 @@ main(int argc, char **argv)
 		case 'x':
 			sig = SIGTERM;
 			break;
+#endif
 		case 'T':
 			i = 1;
 			break;
@@ -1246,12 +1271,20 @@ main(int argc, char **argv)
 		goto exit_success;
 	}
 
+#ifdef USE_SIGNALS
 	if (!(ctx.options & (DHCPCD_MASTER | DHCPCD_TEST))) {
-		if ((i = control_open(&ctx)) != -1) {
+#endif
+		if (ctx.options & DHCPCD_MASTER)
+			i = -1;
+		else
+			i = control_open(&ctx, argv[optind]);
+		if (i == -1)
+			i = control_open(&ctx, NULL);
+		if (i != -1) {
 			syslog(LOG_INFO,
 			    "sending commands to master dhcpcd process");
 			len = control_send(&ctx, argc, argv);
-			close(i);
+			control_close(&ctx);
 			if (len > 0) {
 				syslog(LOG_DEBUG, "send OK");
 				goto exit_success;
@@ -1263,12 +1296,21 @@ main(int argc, char **argv)
 			if (errno != ENOENT)
 				syslog(LOG_ERR, "control_open: %m");
 		}
+#ifdef USE_SIGNALS
 	}
+#endif
 
 	if (geteuid())
 		syslog(LOG_WARNING,
 		    PACKAGE " will not work correctly unless run as root");
 
+	ctx.eloop = eloop_init();
+	if (ctx.eloop == NULL) {
+		syslog(LOG_ERR, "%s: %m", __func__);
+		goto exit_failure;
+	}
+
+#ifdef USE_SIGNALS
 	if (sig != 0) {
 		pid = read_pid(pidfile);
 		if (pid != 0)
@@ -1335,29 +1377,27 @@ main(int argc, char **argv)
 		}
 	}
 
-	syslog(LOG_INFO, "version " VERSION " starting");
-	ctx.options |= DHCPCD_STARTED;
-	ctx.eloop = eloop_init();
-	if (ctx.eloop == NULL) {
-		syslog(LOG_ERR, "%s: %m", __func__);
+
+	if (ctx.options & DHCPCD_MASTER) {
+		if (control_start(&ctx, NULL) == -1)
+			syslog(LOG_ERR, "control_start: %m");
+	}
+#else
+	if (control_start(&ctx,
+	    ctx.options & DHCPCD_MASTER ? NULL : argv[optind]) == -1)
+	{
+		syslog(LOG_ERR, "control_start: %m");
 		goto exit_failure;
 	}
+#endif
 
+	syslog(LOG_INFO, "version " VERSION " starting");
+	ctx.options |= DHCPCD_STARTED;
+#ifdef USE_SIGNALS
 	/* Save signal mask, block and redirect signals to our handler */
 	if (signal_init(handle_signal, &ctx.sigset) == -1) {
 		syslog(LOG_ERR, "signal_setup: %m");
 		goto exit_failure;
-	}
-
-	if (ctx.options & DHCPCD_MASTER) {
-		if (control_start(&ctx) == -1)
-			syslog(LOG_ERR, "control_start: %m");
-	}
-
-#if 0
-	if (options & DHCPCD_IPV6RS && disable_rtadv() == -1) {
-		syslog(LOG_ERR, "disable_rtadvd: %m");
-		options &= ~DHCPCD_IPV6RS;
 	}
 #endif
 
@@ -1462,7 +1502,7 @@ main(int argc, char **argv)
 		eloop_timeout_add_sec(ctx.eloop, 0, start_interface, ifp);
 	}
 
-	i = eloop_start(ctx.eloop, &ctx.sigset);
+	i = eloop_start(&ctx);
 	goto exit1;
 
 exit_success:
@@ -1493,11 +1533,9 @@ exit1:
 	ipv4_ctxfree(&ctx);
 	ipv6_ctxfree(&ctx);
 	dev_stop(&ctx, !(ctx.options & DHCPCD_FORKED));
+	if (!(ctx.options & DHCPCD_FORKED) && control_stop(&ctx) == -1)
+		syslog(LOG_ERR, "control_stop: %m:");
 	if (ctx.pid_fd != -1) {
-		if (ctx.options & DHCPCD_MASTER) {
-			if (control_stop(&ctx) == -1)
-				syslog(LOG_ERR, "control_stop: %m:");
-		}
 		close(ctx.pid_fd);
 		unlink(pidfile);
 	}

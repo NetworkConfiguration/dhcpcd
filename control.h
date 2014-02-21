@@ -37,9 +37,10 @@ struct fd_list {
 	int listener;
 };
 
-int control_start(struct dhcpcd_ctx *);
+int control_start(struct dhcpcd_ctx *, const char *);
 int control_stop(struct dhcpcd_ctx *);
-int control_open(struct dhcpcd_ctx *);
+int control_open(struct dhcpcd_ctx *, const char *);
 int control_send(struct dhcpcd_ctx *, int, char * const *);
+void control_close(struct dhcpcd_ctx *ctx);
 
 #endif

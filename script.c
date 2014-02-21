@@ -76,26 +76,36 @@ if_printoptions(void)
 		printf(" -  %s\n", *p);
 }
 
+#ifdef USE_SIGNALS
+#define U
+#else
+#define U __unused
+#endif
 static int
-exec_script(const sigset_t *sigs, char *const *argv, char *const *env)
+exec_script(U const struct dhcpcd_ctx *ctx, char *const *argv, char *const *env)
+#undef U
 {
 	pid_t pid;
 	posix_spawnattr_t attr;
+	int i;
+#ifdef USE_SIGNALS
 	short flags;
 	sigset_t defsigs;
-	int i;
+#endif
 
 	/* posix_spawn is a safe way of executing another image
 	 * and changing signals back to how they should be. */
 	if (posix_spawnattr_init(&attr) == -1)
 		return -1;
+#ifdef USE_SIGNALS
 	flags = POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF;
 	posix_spawnattr_setflags(&attr, flags);
 	sigemptyset(&defsigs);
 	for (i = 0; i < handle_sigs[i]; i++)
 		sigaddset(&defsigs, handle_sigs[i]);
 	posix_spawnattr_setsigdefault(&attr, &defsigs);
-	posix_spawnattr_setsigmask(&attr, sigs);
+	posix_spawnattr_setsigmask(&attr, &ctx->sigset);
+#endif
 	errno = 0;
 	i = posix_spawn(&pid, argv[0], NULL, &attr, argv, env);
 	if (i) {
@@ -557,7 +567,7 @@ script_runreason(const struct interface *ifp, const char *reason)
 	}
 	env[++elen] = NULL;
 
-	pid = exec_script(&ifp->ctx->sigset, argv, env);
+	pid = exec_script(ifp->ctx, argv, env);
 	if (pid == -1)
 		syslog(LOG_ERR, "%s: %s: %m", __func__, argv[0]);
 	else if (pid != 0) {

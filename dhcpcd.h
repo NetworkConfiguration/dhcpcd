@@ -32,6 +32,7 @@
 #include <sys/socket.h>
 #include <net/if.h>
 
+#include "defs.h"
 #include "control.h"
 #include "if-options.h"
 
@@ -71,7 +72,9 @@ struct interface {
 TAILQ_HEAD(if_head, interface);
 
 struct dhcpcd_ctx {
+#ifdef USE_SIGNALS
 	sigset_t sigset;
+#endif
 	const char *cffile;
 	unsigned long long options;
 	int argc;
@@ -92,6 +95,7 @@ struct dhcpcd_ctx {
 
 	int control_fd;
 	struct fd_list *control_fds;
+	char control_sock[sizeof(CONTROLSOCKET) + IF_NAMESIZE];
 
 	/* DHCP Enterprise options, RFC3925 */
 	struct dhcp_opt *vivso;
@@ -131,9 +135,12 @@ struct dhcpcd_ctx {
 #endif
 };
 
+#ifdef USE_SIGNALS
 extern const int handle_sigs[];
+#endif
 
 pid_t daemonise(struct dhcpcd_ctx *);
+
 struct interface *find_interface(struct dhcpcd_ctx *, const char *);
 int handle_args(struct dhcpcd_ctx *, struct fd_list *, int, char **);
 void handle_carrier(struct dhcpcd_ctx *, int, int, const char *);

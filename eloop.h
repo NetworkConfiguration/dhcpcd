@@ -94,6 +94,6 @@ void eloop_q_timeouts_delete(struct eloop_ctx *, int, void *,
 struct eloop_ctx * eloop_init(void);
 void eloop_free(struct eloop_ctx *);
 void eloop_exit(struct eloop_ctx *, int);
-int eloop_start(struct eloop_ctx *, const sigset_t *);
+int eloop_start(struct dhcpcd_ctx *);
 
 #endif

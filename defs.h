@@ -52,10 +52,19 @@
 # define PIDFILE		RUNDIR "/" PACKAGE "%s%s.pid"
 #endif
 #ifndef CONTROLSOCKET
-# define CONTROLSOCKET		RUNDIR "/" PACKAGE ".sock"
+# define CONTROLSOCKET		RUNDIR "/" PACKAGE "%s%s.sock"
 #endif
 #ifndef RDM_MONOFILE
 # define RDM_MONOFILE		DBDIR "/" PACKAGE "-rdm.monotonic"
+#endif
+
+#ifndef NO_SIGNALS
+#  define USE_SIGNALS
+#endif
+#ifndef USE_SIGNALS
+#  ifndef THERE_IS_NO_FORK
+#    define THERE_IS_NO_FORK
+#  endif
 #endif
 
 #endif
