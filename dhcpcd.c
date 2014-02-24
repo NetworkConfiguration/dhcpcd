@@ -461,14 +461,11 @@ int
 select_profile(struct interface *ifp, const char *profile)
 {
 	struct if_options *ifo;
-	int ret;
 
-	ret = 0;
 	ifo = read_config(ifp->ctx, ifp->name, ifp->ssid, profile);
 	if (ifo == NULL) {
 		syslog(LOG_DEBUG, "%s: no profile %s", ifp->name, profile);
-		ret = -1;
-		goto exit;
+		return -1;
 	}
 	if (profile != NULL) {
 		strlcpy(ifp->profile, profile, sizeof(ifp->profile));
@@ -478,11 +475,9 @@ select_profile(struct interface *ifp, const char *profile)
 		*ifp->profile = '\0';
 	free_options(ifp->options);
 	ifp->options = ifo;
-
-exit:
 	if (profile)
 		configure_interface1(ifp);
-	return ret;
+	return 1;
 }
 
 static void

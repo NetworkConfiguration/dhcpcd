@@ -179,8 +179,19 @@ arp_packet(void *arg)
 			    "%s: found %s on hardware address %s",
 			    ifp->name, inet_ntoa(ina), hwaddr);
 			if (select_profile(ifp, hwaddr) == -1 &&
-			    errno == ENOENT)
-				select_profile(ifp, inet_ntoa(ina));
+			    select_profile(ifp, inet_ntoa(ina)) == -1)
+			{
+				state->probes = 0;
+				/* We didn't find a profile for this
+				 * address or hwaddr, so move to the next
+				 * arping profile */
+				if (state->arping_index <
+				    ifp->options->arping_len)
+				{
+					arp_probe(ifp);
+					return;
+				}
+			}
 			dhcp_close(ifp);
 			eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 			start_interface(ifp);

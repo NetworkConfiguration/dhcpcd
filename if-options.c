@@ -1995,7 +1995,7 @@ read_config(struct dhcpcd_ctx *ctx,
 	if (profile && !have_profile) {
 		free_options(ifo);
 		errno = ENOENT;
-		ifo = NULL;
+		return NULL;
 	}
 
 	finish_config(ifo);
