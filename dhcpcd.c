@@ -757,7 +757,7 @@ handle_hwaddr(struct dhcpcd_ctx *ctx, const char *ifname,
     const uint8_t *hwaddr, size_t hwlen)
 {
 	struct interface *ifp;
-	char buf[hwlen * 3];
+	char buf[sizeof(ifp->hwaddr) * 3];
 
 	ifp = find_interface(ctx, ifname);
 	if (ifp == NULL)
