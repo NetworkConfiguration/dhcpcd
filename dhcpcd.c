@@ -882,7 +882,10 @@ handle_signal1(void *arg)
 		    ifo->options |= DHCPCD_DAEMONISED;
 		ctx->options = ifo->options;
 		free_options(ifo);
-		reconf_reboot(ctx, 1, ctx->ifc, ctx->ifv, 0);
+		/* Preserve any options passed on the commandline
+		 * when we were started. */
+		reconf_reboot(ctx, 1, ctx->argc, ctx->argv,
+		    ctx->argc - ctx->ifc);
 		return;
 	case SIGHUP:
 		syslog(LOG_INFO, "received SIGHUP from PID %d, releasing",
@@ -1090,6 +1093,7 @@ handle_args(struct dhcpcd_ctx *ctx, struct fd_list *fd, int argc, char **argv)
 		return 0;
 	}
 
+	/* XXX: Respect initial commandline options? */
 	reconf_reboot(ctx, do_reboot, argc, argv, optind);
 	return 0;
 }
