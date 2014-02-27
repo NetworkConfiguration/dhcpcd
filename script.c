@@ -58,6 +58,7 @@ static const char * const if_params[] = {
 	"interface",
 	"reason",
 	"pid",
+	"ifcarrier",
 	"ifmetric",
 	"ifwireless",
 	"ifflags",
@@ -241,7 +242,7 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	if (ifp->ctx->options & DHCPCD_DUMPLEASE)
 		elen = 2;
 	else
-		elen = 10;
+		elen = 11;
 
 #define EMALLOC(i, l) if ((env[(i)] = malloc(l)) == NULL) goto eexit;
 	/* Make our env */
@@ -260,19 +261,23 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	EMALLOC(2, e);
 	snprintf(env[2], e, "pid=%d", getpid());
 	EMALLOC(3, e);
-	snprintf(env[3], e, "ifmetric=%d", ifp->metric);
+	snprintf(env[3], e, "ifcarrier=%s",
+	    ifp->carrier == LINK_UNKNOWN ? "unknown" :
+	    ifp->carrier == LINK_UP ? "up" : "down");
 	EMALLOC(4, e);
-	snprintf(env[4], e, "ifwireless=%d", ifp->wireless);
+	snprintf(env[4], e, "ifmetric=%d", ifp->metric);
 	EMALLOC(5, e);
-	snprintf(env[5], e, "ifflags=%u", ifp->flags);
+	snprintf(env[5], e, "ifwireless=%d", ifp->wireless);
 	EMALLOC(6, e);
-	snprintf(env[6], e, "ifmtu=%d", get_mtu(ifp->name));
+	snprintf(env[6], e, "ifflags=%u", ifp->flags);
+	EMALLOC(7, e);
+	snprintf(env[7], e, "ifmtu=%d", get_mtu(ifp->name));
 	l = e = strlen("interface_order=");
 	TAILQ_FOREACH(ifp2, ifp->ctx->ifaces, next) {
 		e += strlen(ifp2->name) + 1;
 	}
-	EMALLOC(7, e);
-	p = env[7];
+	EMALLOC(8, e);
+	p = env[8];
 	strlcpy(p, "interface_order=", e);
 	e -= l;
 	p += l;
@@ -285,8 +290,8 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	}
 	*--p = '\0';
 	if (strcmp(reason, "TEST") == 0) {
-		env[8] = strdup("if_up=false");
-		env[9] = strdup("if_down=false");
+		env[9] = strdup("if_up=false");
+		env[10] = strdup("if_down=false");
 	} else if ((dhcp && state && state->new)
 #ifdef INET6
 	    || (dhcp6 && d6_state && d6_state->new)
@@ -294,13 +299,13 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 #endif
 	    )
 	{
-		env[8] = strdup("if_up=true");
-		env[9] = strdup("if_down=false");
+		env[9] = strdup("if_up=true");
+		env[10] = strdup("if_down=false");
 	} else {
-		env[8] = strdup("if_up=false");
-		env[9] = strdup("if_down=true");
+		env[9] = strdup("if_up=false");
+		env[10] = strdup("if_down=true");
 	}
-	if (env[8] == NULL || env[9] == NULL)
+	if (env[9] == NULL || env[10] == NULL)
 		goto eexit;
 	if (*ifp->profile) {
 		e = strlen("profile=") + strlen(ifp->profile) + 2;
@@ -316,8 +321,7 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 			env = nenv;
 			EMALLOC(elen, e);
 			snprintf(env[elen++], e, "new_ssid=%s", ifp->ssid);
-		}
-		else if (strcmp(reason, "NOCARRIER") == 0) {
+		} else if (strcmp(reason, "NOCARRIER") == 0) {
 			nenv = realloc(env, sizeof(char *) * (elen + 2));
 			if (nenv == NULL)
 				goto eexit;

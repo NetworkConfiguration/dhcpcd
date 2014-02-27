@@ -38,6 +38,9 @@ wpa_supplicant_start()
 {
 	local dir err errn
 
+	# If the carrier is up, don't bother checking anything
+	[ "$ifcarrier" = "up" ] && return 0
+
 	# Pre flight checks
 	if [ ! -s "$wpa_supplicant_conf" ]; then
 		syslog warn \
