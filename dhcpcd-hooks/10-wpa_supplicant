@@ -18,7 +18,8 @@ if [ -z "$wpa_supplicant_conf" ]; then
 fi
 : ${wpa_supplicant_conf:=/etc/wpa_supplicant.conf}
 
-wpa_supplcant_ctrldir() {
+wpa_supplicant_ctrldir()
+{
 	local dir
 
 	dir=$(key_get_value "[[:space:]]*ctrl_interface=" \
@@ -48,7 +49,7 @@ wpa_supplicant_start()
 		syslog warn "not interacting with wpa_supplicant(8)"
 		return 1
 	fi
-	dir=$(wpa_supplcant_ctrldir)
+	dir=$(wpa_supplicant_ctrldir)
 	if [ -z "$dir" ]; then
 		syslog warn \
 			"ctrl_interface not defined in $wpa_supplicant_conf"
@@ -71,7 +72,7 @@ wpa_supplicant_reconfigure()
 {
 	local dir err errn
 
-	dir=$(wpa_supplcant_ctrldir)
+	dir=$(wpa_supplicant_ctrldir)
 	[ -z "$dir" ] && return 1
 	if ! wpa_cli -p "$dir" -i "$interface" status >/dev/null 2>&1; then
 		wpa_supplicant_start
@@ -91,7 +92,7 @@ wpa_supplicant_stop()
 {
 	local dir err errn
 
-	dir=$(wpa_supplcant_ctrldir)
+	dir=$(wpa_supplicant_ctrldir)
 	[ -z "$dir" ] && return 1
 	wpa_cli -p "$dir" -i "$interface" status >/dev/null 2>&1 || return 0
 	syslog info "stopping wpa_supplicant"
