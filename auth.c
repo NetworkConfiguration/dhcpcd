@@ -343,18 +343,20 @@ finish:
 			} else {
 				free(state->token);
 				state->token = NULL;
+				return NULL;
 			}
-			if (t->realm) {
+			if (t->realm_len) {
 				state->token->realm = malloc(t->realm_len);
 				if (state->token->realm) {
 					state->token->realm_len = t->realm_len;
 					memcpy(state->token->realm, t->realm,
 					    t->realm_len);
-			    } else {
+				} else {
 					free(state->token->key);
 					free(state->token);
 					state->token = NULL;
-			    }
+					return NULL;
+				}
 			} else {
 				state->token->realm = NULL;
 				state->token->realm_len = 0;

@@ -146,7 +146,7 @@ free_globals(struct dhcpcd_ctx *ctx)
 	}
 	if (ctx->ifdc) {
 		for (ctx->ifdc--; ctx->ifdc >= 0; ctx->ifdc--)
-			free(ctx->ifdv[ctx->ifac]);
+			free(ctx->ifdv[ctx->ifdc]);
 		free(ctx->ifdv);
 		ctx->ifdv = NULL;
 	}

@@ -151,7 +151,9 @@ get_option(struct dhcpcd_ctx *ctx,
 		if (o == opt) {
 			if (op) {
 				if (!ctx->opt_buffer) {
-					ctx->opt_buffer = malloc(sizeof(*dhcp));
+					ctx->opt_buffer =
+					    malloc(DHCP_OPTION_LEN +
+					    BOOTFILE_LEN + SERVERNAME_LEN);
 					if (ctx->opt_buffer == NULL)
 						return NULL;
 				}
@@ -972,9 +974,8 @@ ssize_t
 write_lease(const struct interface *ifp, const struct dhcp_message *dhcp)
 {
 	int fd;
-	ssize_t bytes = sizeof(*dhcp);
-	const uint8_t *p = dhcp->options;
-	const uint8_t *e = p + sizeof(dhcp->options);
+	ssize_t bytes;
+	const uint8_t *e, *p;
 	uint8_t l;
 	uint8_t o = 0;
 	const struct dhcp_state *state = D_CSTATE(ifp);
@@ -993,6 +994,9 @@ write_lease(const struct interface *ifp, const struct dhcp_message *dhcp)
 		return -1;
 
 	/* Only write as much as we need */
+	p = dhcp->options;
+	e = p + sizeof(dhcp->options);
+	bytes = sizeof(*dhcp);
 	while (p < e) {
 		o = *p;
 		if (o == DHO_END) {

@@ -352,7 +352,6 @@ dhcp_optlen(const struct dhcp_opt *opt, size_t dl)
 		return dl - (dl % ADDR6SZ);
 	}
 
-	sz = 0;
 	if (opt->type & (UINT32 | ADDRIPV4))
 		sz = sizeof(uint32_t);
 	else if (opt->type & UINT16)

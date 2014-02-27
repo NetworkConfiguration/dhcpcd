@@ -835,6 +835,8 @@ logsend:
 
 	/* Set the outbound interface */
 	cm = CMSG_FIRSTHDR(&ctx->sndhdr);
+	if (cm == NULL) /* unlikely */
+		return -1;
 	cm->cmsg_level = IPPROTO_IPV6;
 	cm->cmsg_type = IPV6_PKTINFO;
 	cm->cmsg_len = CMSG_LEN(sizeof(pi));
@@ -1416,7 +1418,6 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 		p += sizeof(u8);
 		len = u8;
 		memcpy(&prefix.s6_addr, p, sizeof(prefix.s6_addr));
-		p += sizeof(prefix.s6_addr);
 
 		TAILQ_FOREACH(a, &state->addrs, next) {
 			if (IN6_ARE_ADDR_EQUAL(&a->prefix, &prefix))
@@ -2630,9 +2631,14 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 {
 	struct dhcp6_state *state;
 	struct dhcpcd_ctx *ctx;
+	int options;
 
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 
+	if (ifp->options)
+		options = ifp->options->options;
+	else
+		options = 0;
 	/*
 	 * As the interface is going away from dhcpcd we need to
 	 * remove the delegated addresses, otherwise we lose track
@@ -2641,30 +2647,31 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 	 * how we remember which interface delegated.
 	 *
 	 * XXX The below is no longer true due to the change of the
-	 * default IAID, but do PPP links have stable ethernet addresses?
+	 * default IAID, but do PPP links have stable ethernet
+	 * addresses?
 	 *
 	 * To make it more interesting, on some OS's with PPP links
 	 * there is no guarantee the delegating interface will have
 	 * the same name or index so think very hard before changing
 	 * this.
 	 */
-	if (ifp->options &&
-	    ifp->options->options & (DHCPCD_STOPPING | DHCPCD_RELEASE) &&
-	    (ifp->options->options & (DHCPCD_EXITING | DHCPCD_PERSISTENT)) !=
+	if (options & (DHCPCD_STOPPING | DHCPCD_RELEASE) &&
+	    (options &
+	    (DHCPCD_EXITING | DHCPCD_PERSISTENT)) !=
 	    (DHCPCD_EXITING | DHCPCD_PERSISTENT))
 		dhcp6_delete_delegates(ifp);
 
 	state = D6_STATE(ifp);
 	if (state) {
 		dhcp_auth_reset(&state->auth);
-		if (ifp->options->options & DHCPCD_RELEASE) {
+		if (options & DHCPCD_RELEASE) {
 			if (ifp->carrier != LINK_DOWN)
 				dhcp6_startrelease(ifp);
 			unlink(state->leasefile);
 		}
 		dhcp6_freedrop_addrs(ifp, drop, NULL);
 		if (drop && state->new &&
-		    (ifp->options->options &
+		    (options &
 		    (DHCPCD_EXITING | DHCPCD_PERSISTENT)) !=
 		    (DHCPCD_EXITING | DHCPCD_PERSISTENT))
 		{
@@ -2681,7 +2688,7 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 	}
 
 	/* If we don't have any more DHCP6 enabled interfaces,
-	 * close the global socketo and release resources */
+	 * close the global socket and release resources */
 	ctx = ifp->ctx;
 	if (ctx->ifaces) {
 		TAILQ_FOREACH(ifp, ctx->ifaces, next) {

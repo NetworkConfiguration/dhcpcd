@@ -211,6 +211,7 @@ add_environ(struct if_options *ifo, const char *value, int uniq)
 				n = strdup(value);
 				if (n == NULL) {
 					syslog(LOG_ERR, "%s: %m", __func__);
+					free(match);
 					return NULL;
 				}
 				free(lst[i]);
@@ -218,10 +219,11 @@ add_environ(struct if_options *ifo, const char *value, int uniq)
 			} else {
 				/* Append a space and the value to it */
 				l = strlen(lst[i]);
-				lv = strlen(p);
+				lv = p ? strlen(p) : 0;
 				n = realloc(lst[i], l + lv + 2);
 				if (n == NULL) {
 					syslog(LOG_ERR, "%s: %m", __func__);
+					free(match);
 					return NULL;
 				}
 				lst[i] = n;
@@ -235,6 +237,7 @@ add_environ(struct if_options *ifo, const char *value, int uniq)
 		i++;
 	}
 
+	free(match);
 	n = strdup(value);
 	if (n == NULL) {
 		syslog(LOG_ERR, "%s: %m", __func__);
@@ -243,12 +246,12 @@ add_environ(struct if_options *ifo, const char *value, int uniq)
 	newlist = realloc(lst, sizeof(char *) * (i + 2));
 	if (newlist == NULL) {
 		syslog(LOG_ERR, "%s: %m", __func__);
+		free(n);
 		return NULL;
 	}
 	newlist[i] = n;
 	newlist[i + 1] = NULL;
 	ifo->environ = newlist;
-	free(match);
 	return newlist[i];
 }
 
@@ -431,16 +434,18 @@ splitv(int *argc, char **argv, const char *arg)
 		nt = strdup(t);
 		if (nt == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);
-			return NULL;
+			free(o);
+			return v;
 		}
-		(*argc)++;
-		n = realloc(v, sizeof(char *) * ((*argc)));
+		n = realloc(v, sizeof(char *) * ((*argc) + 1));
 		if (n == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);
-			return NULL;
+			free(o);
+			free(nt);
+			return v;
 		}
 		v = n;
-		v[(*argc) - 1] = nt;
+		v[(*argc)++] = nt;
 	}
 	free(o);
 	return v;
@@ -477,7 +482,7 @@ parse_addr(struct in_addr *addr, struct in_addr *net, const char *arg)
 	}
 	if (p != NULL)
 		*--p = '/';
-	else if (net != NULL)
+	else if (net != NULL && addr != NULL)
 		net->s_addr = ipv4_getnetmask(addr->s_addr);
 	return 0;
 }
@@ -620,7 +625,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 
 	dop = NULL;
 	dop_len = NULL;
-	i = 0;
+	//i = 0;
 	switch(opt) {
 	case 'f': /* FALLTHROUGH */
 	case 'g': /* FALLTHROUGH */
@@ -1512,6 +1517,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			    sizeof(**dop) * ((*dop_len) + 1))) == NULL)
 			{
 				syslog(LOG_ERR, "%s: %m", __func__);
+				free(np);
 				return -1;
 			}
 			*dop = ndop;
