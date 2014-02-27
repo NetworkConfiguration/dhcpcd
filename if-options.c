@@ -201,8 +201,12 @@ add_environ(struct if_options *ifo, const char *value, int uniq)
 		return NULL;
 	}
 	p = strchr(match, '=');
-	if (p)
-		*p++ = '\0';
+	if (p == NULL) {
+		syslog(LOG_ERR, "%s: no assignment: %s", __func__, value);
+		free(match);
+		return NULL;
+	}
+	*p++ = '\0';
 	l = strlen(match);
 
 	while (lst && lst[i]) {
@@ -219,7 +223,7 @@ add_environ(struct if_options *ifo, const char *value, int uniq)
 			} else {
 				/* Append a space and the value to it */
 				l = strlen(lst[i]);
-				lv = p ? strlen(p) : 0;
+				lv = strlen(p);
 				n = realloc(lst[i], l + lv + 2);
 				if (n == NULL) {
 					syslog(LOG_ERR, "%s: %m", __func__);

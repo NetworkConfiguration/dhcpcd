@@ -140,11 +140,13 @@ append_config(char ***env, ssize_t *len,
 {
 	ssize_t i, j, e1;
 	char **ne, *eq, **nep, *p;
+	int ret;
 
 	if (config == NULL)
 		return 0;
 
 	ne = *env;
+	ret = 0;
 	for (i = 0; config[i] != NULL; i++) {
 		eq = strchr(config[i], '=');
 		e1 = eq - config[i] + 1;
@@ -152,22 +154,29 @@ append_config(char ***env, ssize_t *len,
 			if (strncmp(ne[j] + strlen(prefix) + 1,
 				config[i], e1) == 0)
 			{
+				p = make_var(prefix, config[i]);
+				if (p == NULL) {
+					ret = -1;
+					break;
+				}
 				free(ne[j]);
-				ne[j] = make_var(prefix, config[i]);
-				if (ne[j] == NULL)
-					return -1;
+				ne[j] = p;
 				break;
 			}
 		}
 		if (j == *len) {
 			j++;
 			p = make_var(prefix, config[i]);
-			if (p == NULL)
-				return -1;
+			if (p == NULL) {
+				ret = -1;
+				break;
+			}
 			nep = realloc(ne, sizeof(char *) * (j + 1));
 			if (nep == NULL) {
 				syslog(LOG_ERR, "%s: %m", __func__);
-				return -1;
+				free(p);
+				ret = -1;
+				break;
 			}
 			ne = nep;
 			ne[j - 1] = p;
@@ -175,7 +184,7 @@ append_config(char ***env, ssize_t *len,
 		}
 	}
 	*env = ne;
-	return 0;
+	return ret;
 }
 #endif
 

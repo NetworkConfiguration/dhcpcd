@@ -207,7 +207,7 @@ get_netlink(struct dhcpcd_ctx *ctx, int fd, int flags,
 			continue;
 
 		for (nlm = (struct nlmsghdr *)(void *)buf;
-		     NLMSG_OK(nlm, (size_t)bytes);
+		     nlm && NLMSG_OK(nlm, (size_t)bytes);
 		     nlm = NLMSG_NEXT(nlm, bytes))
 		{
 			r = callback(ctx, nlm);

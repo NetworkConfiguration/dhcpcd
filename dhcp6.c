@@ -1208,7 +1208,8 @@ dhcp6_checkstatusok(const struct interface *ifp,
 		syslog(LOG_ERR, "%s: %m", __func__);
 		return -1;
 	}
-	memcpy(status, p, len);
+	if (p)
+		memcpy(status, p, len);
 	status[len] = '\0';
 	syslog(LOG_ERR, "%s: DHCPv6 REPLY: %s", ifp->name, status);
 	free(status);

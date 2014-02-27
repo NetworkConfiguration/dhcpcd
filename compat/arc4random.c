@@ -109,7 +109,7 @@ arc4_stir(struct arc4_stream *as)
 	gettimeofday(&rdat.tv, NULL);
 	fd = open("/dev/urandom", O_RDONLY);
 	if (fd != -1) {
-		n = read(fd, rdat.rnd, sizeof(rdat.rnd));
+		(void)read(fd, rdat.rnd, sizeof(rdat.rnd));
 		close(fd);
 	}
 
