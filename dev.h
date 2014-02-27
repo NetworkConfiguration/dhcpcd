@@ -51,8 +51,8 @@ int dev_listening(struct dhcpcd_ctx *);
 int dev_start(struct dhcpcd_ctx *);
 void dev_stop(struct dhcpcd_ctx *, int);
 #else
-#define dev_initialized(a, b) 1
-#define dev_listening(a) 0
+#define dev_initialized(a, b) (1)
+#define dev_listening(a) (0)
 #define dev_start(a) {}
 #define dev_stop(a, b) {}
 #endif

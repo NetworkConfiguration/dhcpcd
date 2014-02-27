@@ -186,6 +186,8 @@ arraytostr(const char *const *argv, char **s)
 	char *p;
 	size_t len, l;
 
+	if (*argv == NULL)
+		return 0;
 	len = 0;
 	ap = argv;
 	while (*ap)
@@ -442,10 +444,12 @@ dumplease:
 
 eexit:
 	syslog(LOG_ERR, "%s: %m", __func__);
-	nenv = env;
-	while (*nenv)
-		free(*nenv++);
-	free(env);
+	if (env) {
+		nenv = env;
+		while (*nenv)
+			free(*nenv++);
+		free(env);
+	}
 	return -1;
 }
 

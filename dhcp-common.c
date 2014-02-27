@@ -44,19 +44,19 @@
 struct dhcp_opt *
 vivso_find(uint16_t iana_en, const void *arg)
 {
-	const struct interface *ifp = arg;
+	const struct interface *ifp;
 	size_t i;
 	struct dhcp_opt *opt;
 
-	if (arg) {
-		ifp = arg;
-		for (i = 0, opt = ifp->options->vivso_override;
-		    i < ifp->options->vivso_override_len;
-		    i++, opt++)
-			if (opt->option == iana_en)
-				return opt;
-	}
-	for (i = 0, opt = ifp->ctx->vivso; i < ifp->ctx->vivso_len; i++, opt++)
+	ifp = arg;
+	for (i = 0, opt = ifp->options->vivso_override;
+	    i < ifp->options->vivso_override_len;
+	    i++, opt++)
+		if (opt->option == iana_en)
+			return opt;
+	for (i = 0, opt = ifp->ctx->vivso;
+	    i < ifp->ctx->vivso_len;
+	    i++, opt++)
 		if (opt->option == iana_en)
 			return opt;
 	return NULL;
