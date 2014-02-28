@@ -7,5 +7,6 @@ NONBINMODE?=	0444
 MANMODE?=	${NONBINMODE}
 CONFMODE?=	0644
 
+CC?=		cc
 INSTALL?=	install
 SED?=		sed
