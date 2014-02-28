@@ -197,6 +197,7 @@ check_ipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 			    (ctx->ra_restore_len + 1) * sizeof(char *));
 			if (nrest == NULL) {
 				syslog(LOG_ERR, "%s: %m", __func__);
+				free(p);
 				return ra;
 			}
 			ctx->ra_restore = nrest;
