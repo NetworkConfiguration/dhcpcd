@@ -1356,7 +1356,9 @@ dhcp6_findna(struct interface *ifp, const uint8_t *iaid,
 			    iabuf, sizeof(iabuf));
 			snprintf(a->saddr, sizeof(a->saddr),
 			    "%s/%d", ia, a->prefix_len);
-		}
+			TAILQ_INSERT_TAIL(&state->addrs, a, next);
+		} else
+			a->flags &= ~IPV6_AF_STALE;
 		memcpy(&u32, p, sizeof(u32));
 		a->prefix_pltime = ntohl(u32);
 		p += sizeof(u32);
@@ -1370,10 +1372,6 @@ dhcp6_findna(struct interface *ifp, const uint8_t *iaid,
 		    state->lowpl = a->prefix_pltime;
 		if (a->prefix_vltime && a->prefix_vltime > state->expire)
 		    state->expire = a->prefix_vltime;
-		if (a->flags & IPV6_AF_STALE)
-			a->flags &= ~IPV6_AF_STALE;
-		else
-			TAILQ_INSERT_TAIL(&state->addrs, a, next);
 		i++;
 	}
 	return i;
@@ -1441,8 +1439,12 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			    iabuf, sizeof(iabuf));
 			snprintf(a->saddr, sizeof(a->saddr),
 			    "%s/%d", ia, a->prefix_len);
-		} else if (a->prefix_vltime != vltime)
-			a->flags |= IPV6_AF_NEW;
+			TAILQ_INSERT_TAIL(&state->addrs, a, next);
+		} else {
+			a->flags &= ~IPV6_AF_STALE;
+			if (a->prefix_vltime != vltime)
+				a->flags |= IPV6_AF_NEW;
+		}
 
 		a->prefix_pltime = pltime;
 		a->prefix_vltime = vltime;
@@ -1450,10 +1452,6 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			state->lowpl = a->prefix_pltime;
 		if (a->prefix_vltime && a->prefix_vltime > state->expire)
 			state->expire = a->prefix_vltime;
-		if (a->flags & IPV6_AF_STALE)
-			a->flags &= ~IPV6_AF_STALE;
-		else
-			TAILQ_INSERT_TAIL(&state->addrs, a, next);
 		i++;
 	}
 	return i;
@@ -1505,6 +1503,25 @@ dhcp6_findia(struct interface *ifp, const uint8_t *d, size_t l,
 			rebind = ntohl(u32);
 			p += sizeof(u32);
 			ol -= sizeof(u32);
+		}
+		if (dhcp6_checkstatusok(ifp, NULL, p, ol) == -1)
+			continue;
+		if (ifo->ia_type == D6_OPTION_IA_PD) {
+			if (dhcp6_findpd(ifp, iaid, p, ol) == 0) {
+				syslog(LOG_WARNING,
+				    "%s: %s: DHCPv6 REPLY missing Prefix",
+				    ifp->name, sfrom);
+				continue;
+			}
+		} else {
+			if (dhcp6_findna(ifp, iaid, p, ol) == 0) {
+				syslog(LOG_WARNING,
+				    "%s: %s: DHCPv6 REPLY missing IA Address",
+				    ifp->name, sfrom);
+				continue;
+			}
+		}
+		if (ifo->ia_type != D6_OPTION_IA_TA) {
 			if (renew > rebind && rebind > 0) {
 				if (sfrom)
 				    syslog(LOG_WARNING,
@@ -1519,23 +1536,6 @@ dhcp6_findia(struct interface *ifp, const uint8_t *d, size_t l,
 			if (rebind != 0 &&
 			    (rebind < state->rebind || state->rebind == 0))
 				state->rebind = rebind;
-		}
-		if (dhcp6_checkstatusok(ifp, NULL, p, ol) == -1)
-			return -1;
-		if (ifo->ia_type == D6_OPTION_IA_PD) {
-			if (dhcp6_findpd(ifp, iaid, p, ol) == 0) {
-				syslog(LOG_ERR,
-				    "%s: %s: DHCPv6 REPLY missing Prefix",
-				    ifp->name, sfrom);
-				return -1;
-			}
-		} else {
-			if (dhcp6_findna(ifp, iaid, p, ol) == 0) {
-				syslog(LOG_ERR,
-				    "%s: %s: DHCPv6 REPLY missing IA Address",
-				    ifp->name, sfrom);
-				return -1;
-			}
 		}
 		i++;
 	}

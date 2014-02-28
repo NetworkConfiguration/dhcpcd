@@ -1453,8 +1453,8 @@ checksum(const void *data, uint16_t len)
 	return ~sum;
 }
 
-static ssize_t
-dhcp_makeudppacket(uint8_t **p, const uint8_t *data, size_t length,
+static struct udp_dhcp_packet *
+dhcp_makeudppacket(ssize_t *sz, const uint8_t *data, size_t length,
 	struct in_addr source, struct in_addr dest)
 {
 	struct udp_dhcp_packet *udpp;
@@ -1463,7 +1463,7 @@ dhcp_makeudppacket(uint8_t **p, const uint8_t *data, size_t length,
 
 	udpp = calloc(1, sizeof(*udpp));
 	if (udpp == NULL)
-		return -1;
+		return NULL;
 	ip = &udpp->ip;
 	udp = &udpp->udp;
 
@@ -1498,8 +1498,8 @@ dhcp_makeudppacket(uint8_t **p, const uint8_t *data, size_t length,
 	ip->ip_len = htons(sizeof(*ip) + sizeof(*udp) + length);
 	ip->ip_sum = checksum(ip, sizeof(*ip));
 
-	*p = (uint8_t *)udpp;
-	return sizeof(*ip) + sizeof(*udp) + length;
+	*sz = sizeof(*ip) + sizeof(*udp) + length;
+	return udpp;
 }
 
 static void
@@ -1568,11 +1568,14 @@ send_message(struct interface *iface, int type,
 			dhcp_close(iface);
 		}
 	} else {
-		len = dhcp_makeudppacket(&udp, (uint8_t *)dhcp, len, from, to);
-		if (len == -1)
-			return;
-		r = ipv4_sendrawpacket(iface, ETHERTYPE_IP, udp, len);
-		free(udp);
+		r = 0;
+		udp = dhcp_makeudppacket(&r, (uint8_t *)dhcp, len, from, to);
+		if (udp == NULL) {
+			syslog(LOG_ERR, "dhcp_makeudppacket: %m");
+		} else {
+			r = ipv4_sendrawpacket(iface, ETHERTYPE_IP, udp, r);
+			free(udp);
+		}
 		/* If we failed to send a raw packet this normally means
 		 * we don't have the ability to work beneath the IP layer
 		 * for this interface.
