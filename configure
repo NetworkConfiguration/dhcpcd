@@ -26,7 +26,6 @@ for x do
 	var=${x#*=}
 	case "$opt" in
 	--os|OS) OS=$var;;
-	--with-cc|CC) CC=$var;;
 	--debug) DEBUG=$var;;
 	--disable-debug) DEBUG=no;;
 	--enable-debug) DEBUG=yes;;
@@ -248,28 +247,9 @@ done
 echo "LIBDIR=		$LIBDIR" >>$CONFIG_MK
 echo "MANDIR=		$MANDIR" >>$CONFIG_MK
 
-if [ -z "$CC" ]; then
-	printf "Looking for compiler ... "
-	for b in $TARGET- ""; do
-		for cc in gcc clang pcc icc cc; do
-			if type $b$cc >/dev/null 2>&1; then
-				CC=$b$cc
-				echo "$CC"
-				break
-			fi
-		done
-		[ -n "$CC" ] && break
-	done
-	if [ -z "$CC" ]; then
-		echo
-		echo "no suitable compiler found - aborting" >&2
-		exit 1
-	fi
-else
-	echo "Using compiler $CC"
-fi
+: ${CC:=cc}
+echo "Using compiler .. $(which $CC)"
 $CC --version | $SED -e '1!d'
-echo "CC=		$CC" >>$CONFIG_MK
 
 # Set to blank, then append user config
 # We do this so our SED call to append to XCC remains portable
