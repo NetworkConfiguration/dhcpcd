@@ -629,6 +629,9 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 
 	dop = NULL;
 	dop_len = NULL;
+#ifdef INET6
+	i = 0;
+#endif
 	switch(opt) {
 	case 'f': /* FALLTHROUGH */
 	case 'g': /* FALLTHROUGH */

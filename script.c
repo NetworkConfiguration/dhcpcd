@@ -221,32 +221,46 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	ssize_t e, elen, l;
 	const struct if_options *ifo = ifp->options;
 	const struct interface *ifp2;
-	int dhcp, dhcp6, ra;
+#ifdef INET
+	int dhcp;
 	const struct dhcp_state *state;
+#endif
 #ifdef INET6
 	const struct dhcp6_state *d6_state;
+	int dhcp6, ra;
 #endif
 
-	dhcp = dhcp6 = ra = 0;
+#ifdef INET
+	dhcp = 0;
 	state = D_STATE(ifp);
+#endif
 #ifdef INET6
+	dhcp6 = ra = 0;
 	d6_state = D6_CSTATE(ifp);
 #endif
 	if (strcmp(reason, "TEST") == 0) {
+		if (1 == 2) {}
 #ifdef INET6
-		if (d6_state && d6_state->new)
+		else if (d6_state && d6_state->new)
 			dhcp6 = 1;
 		else if (ipv6nd_has_ra(ifp))
 			ra = 1;
-		else
 #endif
+#ifdef INET
+		else
 			dhcp = 1;
-	} else if (reason[strlen(reason) - 1] == '6')
+#endif
+	}
+#ifdef INET6
+	else if (reason[strlen(reason) - 1] == '6')
 		dhcp6 = 1;
 	else if (strcmp(reason, "ROUTERADVERT") == 0)
 		ra = 1;
+#endif
+#ifdef INET
 	else
 		dhcp = 1;
+#endif
 
 	/* When dumping the lease, we only want to report interface and
 	   reason - the other interface variables are meaningless */
@@ -303,7 +317,10 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	if (strcmp(reason, "TEST") == 0) {
 		env[9] = strdup("if_up=false");
 		env[10] = strdup("if_down=false");
-	} else if ((dhcp && state && state->new)
+	} else if (1 == 2 /* appease ifdefs */
+#ifdef INET
+	    || (dhcp && state && state->new)
+#endif
 #ifdef INET6
 	    || (dhcp6 && d6_state && d6_state->new)
 	    || (ra && ipv6nd_has_ra(ifp))
