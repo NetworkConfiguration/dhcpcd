@@ -1509,7 +1509,7 @@ send_message(struct interface *iface, int type,
 	struct dhcp_state *state = D_STATE(iface);
 	struct if_options *ifo = iface->options;
 	struct dhcp_message *dhcp;
-	uint8_t *udp;
+	struct udp_dhcp_packet *udp;
 	ssize_t len, r;
 	struct in_addr from, to;
 	in_addr_t a = 0;
@@ -1573,7 +1573,8 @@ send_message(struct interface *iface, int type,
 		if (udp == NULL) {
 			syslog(LOG_ERR, "dhcp_makeudppacket: %m");
 		} else {
-			r = ipv4_sendrawpacket(iface, ETHERTYPE_IP, udp, r);
+			r = ipv4_sendrawpacket(iface, ETHERTYPE_IP,
+			    (uint8_t *)udp, r);
 			free(udp);
 		}
 		/* If we failed to send a raw packet this normally means

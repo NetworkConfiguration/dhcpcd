@@ -1503,7 +1503,8 @@ dhcp6_findia(struct interface *ifp, const uint8_t *d, size_t l,
 			rebind = ntohl(u32);
 			p += sizeof(u32);
 			ol -= sizeof(u32);
-		}
+		} else
+			renew = rebind = 0; /* appease gcc */
 		if (dhcp6_checkstatusok(ifp, NULL, p, ol) == -1)
 			continue;
 		if (ifo->ia_type == D6_OPTION_IA_PD) {
