@@ -468,9 +468,7 @@ ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
 		if (ifd && ap->delegating_iface != ifd)
 			continue;
 		TAILQ_REMOVE(addrs, ap, next);
-		if (ap->dadcallback)
-			eloop_q_timeout_delete(ap->iface->ctx->eloop,
-			    0, NULL, ap->dadcallback);
+		eloop_q_timeout_delete(ap->iface->ctx->eloop, 0, NULL, ap);
 		/* Only drop the address if no other RAs have assigned it.
 		 * This is safe because the RA is removed from the list
 		 * before we are called. */

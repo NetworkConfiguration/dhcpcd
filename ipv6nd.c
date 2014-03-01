@@ -1510,9 +1510,8 @@ ipv6nd_probeaddrs(struct ipv6_addrhead *addrs)
 				    errno != EADDRNOTAVAIL && errno != ENXIO)
 					syslog(LOG_ERR, "del_address6 %m");
 			}
-			if (ap->dadcallback)
-				eloop_q_timeout_delete(ap->iface->ctx->eloop,
-				    0, NULL, ap->dadcallback);
+			eloop_q_timeout_delete(ap->iface->ctx->eloop,
+			    0, NULL, ap);
 			free(ap);
 		} else if (!IN6_IS_ADDR_UNSPECIFIED(&ap->addr)) {
 			ipv6nd_probeaddr(ap);
