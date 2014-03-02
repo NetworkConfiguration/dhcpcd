@@ -183,7 +183,8 @@ CONFIG_H=config.h
 CONFIG_MK=config.mk
 
 if [ -z "$BUILD" ]; then
-	BUILD=`uname -m`-`uname -s | tr '[:upper:]' '[:lower:]'`
+	# autoconf target triplet: cpu-vendor-os
+	BUILD=$(uname -m)-unknown-$(uname -s | tr '[:upper:]' '[:lower:]')
 fi
 if [ -z "$HOST" ]; then
 	[ -z "$TARGET" ] && TARGET=$BUILD
@@ -203,27 +204,26 @@ if [ -z "$OS" ]; then
 fi
 
 if [ -z "$OS" ]; then
-	# Derive OS from cpu-manufacturer-os-kernel
+	# Derive OS from cpu-vendor-os-kernel
 	CPU=${TARGET%%-*}
 	REST=${TARGET#*-}
 	if [ "$CPU" != "$REST" ]; then
-		MANU=${REST%%-*}
+		VENDOR=${REST%%-*}
 		REST=${REST#*-}
-		if [ "$MANU" != "$REST" ]; then
+		if [ "$VENDOR" != "$REST" ]; then
 			OS=${REST%%-*}
 			REST=${REST#*-}
 			if [ "$OS" != "$REST" ]; then
+				# 4 tupple
 				KERNEL=${REST%%-*}
 			else
 				# 3 tupple
-				KERNEL=$OS
-				OS=$MANU
-				MANU=
+				KERNEL=
 			fi
 		else
 			# 2 tupple
-			OS=$MANU
-			MANU=
+			OS=$VENDOR
+			VENDOR=
 		fi
 	fi
 fi
