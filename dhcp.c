@@ -1344,7 +1344,7 @@ dhcp_close(struct interface *ifp)
 		state->raw_fd = -1;
 	}
 	if (state->udp_fd != -1) {
-		/* we don't listen to events on the udp */
+		eloop_event_delete(ifp->ctx->eloop, state->udp_fd);
 		close(state->udp_fd);
 		state->udp_fd = -1;
 	}
