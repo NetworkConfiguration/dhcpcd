@@ -2611,7 +2611,7 @@ dhcp_handleudp(void *arg)
 
 	/* Just read what's in the UDP fd and discard it as we always read
 	 * from the raw fd */
-	read(ctx->udp_fd, buffer, sizeof(buffer));
+	(void)read(ctx->udp_fd, buffer, sizeof(buffer));
 }
 
 static void
@@ -2626,7 +2626,7 @@ dhcp_handleifudp(void *arg)
 
 	/* Just read what's in the UDP fd and discard it as we always read
 	 * from the raw fd */
-	read(state->udp_fd, buffer, sizeof(buffer));
+	(void)read(state->udp_fd, buffer, sizeof(buffer));
 }
 
 static int
