@@ -175,6 +175,7 @@ int ipv6_mask(struct in6_addr *, int);
 int ipv6_prefixlen(const struct in6_addr *);
 int ipv6_userprefix( const struct in6_addr *, short prefix_len,
     uint64_t user_number, struct in6_addr *result, short result_len);
+void ipv6_checkaddrflags(void *);
 int ipv6_addaddr(struct ipv6_addr *);
 void ipv6_freedrop_addrs(struct ipv6_addrhead *, int,
     const struct interface *);

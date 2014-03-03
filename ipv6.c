@@ -418,6 +418,31 @@ ipv6_userprefix(
 	return 0;
 }
 
+#ifdef LISTEN_DAD
+void
+ipv6_checkaddrflags(void *arg)
+{
+	struct ipv6_addr *ap;
+	int ifa_flags;
+
+	ap = arg;
+	ifa_flags = in6_addr_flags(ap->iface->name, &ap->addr);
+	if (ifa_flags == -1)
+		syslog(LOG_ERR, "%s: in6_addr_flags: %m", ap->iface->name);
+	else if (!(ifa_flags & IN6_IFF_TENTATIVE)) {
+		ipv6_handleifa(ap->iface->ctx, RTM_NEWADDR,
+		    ap->iface->ctx->ifaces, ap->iface->name,
+		    &ap->addr, ifa_flags);
+	} else {
+		struct timeval tv;
+
+		ms_to_tv(&tv, RETRANS_TIMER / 2);
+		eloop_timeout_add_tv(ap->iface->ctx->eloop, &tv,
+		    ipv6_checkaddrflags, ap);
+	}
+}
+#endif
+
 int
 ipv6_addaddr(struct ipv6_addr *ap)
 {
@@ -865,7 +890,6 @@ make_prefix(const struct interface * ifp, const struct ra *rap,
 	r->gate = in6addr_any;
 	return r;
 }
-
 
 static struct rt6 *
 make_router(const struct ra *rap)

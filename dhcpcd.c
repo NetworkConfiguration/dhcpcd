@@ -519,7 +519,8 @@ handle_carrier(struct dhcpcd_ctx *ctx, int carrier, int flags,
 			 * them as some OS's will remove, mark tentative or
 			 * do nothing. */
 			ipv6_free_ll_callbacks(ifp);
-			dhcp_drop(ifp, "NOCARRIER");
+			dhcp_drop(ifp, "EXPIRE");
+			script_runreason(ifp, "NOCARRIER");
 		}
 	} else if (carrier == LINK_UP && ifp->flags & IFF_UP) {
 		if (ifp->carrier != LINK_UP) {

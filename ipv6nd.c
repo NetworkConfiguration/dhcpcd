@@ -1338,6 +1338,7 @@ ipv6nd_cancelprobeaddr(struct ipv6_addr *ap)
 	if (ap->dadcallback)
 		eloop_timeout_delete(ap->iface->ctx->eloop, ap->dadcallback,ap);
 }
+
 #endif
 
 void
@@ -1351,11 +1352,10 @@ ipv6nd_probeaddr(void *arg)
 	struct cmsghdr *cm;
 	struct in6_pktinfo pi;
 	int hoplimit = HOPLIMIT;
+	struct timeval tv, rtv;
 #else
 #ifdef LISTEN_DAD
-	struct timeval tv, rtv;
-	struct timeval mtv;
-	int i;
+	struct timeval tv;
 #endif
 #endif
 
@@ -1474,18 +1474,11 @@ ipv6nd_probeaddr(void *arg)
 
 #ifdef LISTEN_DAD
 	/* Let the kernel handle DAD.
-	 * We don't know the timings, so just wait for the max */
+	 * We don't know the timings, so just poll the address flags */
 	if (ap->dadcallback) {
-		mtv.tv_sec = 0;
-		mtv.tv_usec = 0;
-		for (i = 0; i < ap->iface->options->dadtransmits; i++) {
-			ms_to_tv(&tv, RETRANS_TIMER);
-			ms_to_tv(&rtv, MAX_RANDOM_FACTOR);
-			timeradd(&tv, &rtv, &tv);
-			timeradd(&mtv, &tv, &mtv);
-		}
+		ms_to_tv(&tv, RETRANS_TIMER / 2);
 		eloop_timeout_add_tv(ap->iface->ctx->eloop,
-		    &mtv, ap->dadcallback, ap);
+		    &tv, ipv6_checkaddrflags, ap);
 	}
 #endif
 #endif /* IPV6_SEND_DAD */

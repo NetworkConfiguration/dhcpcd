@@ -2409,9 +2409,9 @@ recv:
 		/* If all addresses have completed DAD run the script */
 		TAILQ_FOREACH(ap, &state->addrs, next) {
 			if (ap->flags & IPV6_AF_ONLINK) {
-				if (!(ap->flags & IPV6_AF_DADCOMPLETED) &&
-				    ipv6_findaddr(ap->iface, &ap->addr))
-					ap->flags |= IPV6_AF_DADCOMPLETED;
+//				if (!(ap->flags & IPV6_AF_DADCOMPLETED) &&
+//				    ipv6_findaddr(ap->iface, &ap->addr))
+//					ap->flags |= IPV6_AF_DADCOMPLETED;
 				if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0) {
 					len = 0;
 					break;
