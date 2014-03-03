@@ -196,20 +196,21 @@ if [ -z "$TARGET" ]; then
 fi
 
 if [ -z "$OS" ]; then
-	# Derive OS from cpu-vendor-os-kernel
+	# Derive OS from cpu-vendor-[kernel-]os
 	CPU=${TARGET%%-*}
 	REST=${TARGET#*-}
 	if [ "$CPU" != "$REST" ]; then
 		VENDOR=${REST%%-*}
 		REST=${REST#*-}
 		if [ "$VENDOR" != "$REST" ]; then
-			OS=${REST%%-*}
+			KERNEL=${REST%%-*}
 			REST=${REST#*-}
-			if [ "$OS" != "$REST" ]; then
+			if [ "$KERNEL" != "$REST" ]; then
 				# 4 tupple
-				KERNEL=${REST%%-*}
+				OS=${REST%%-*}
 			else
 				# 3 tupple
+				OS=$KERNEL
 				KERNEL=
 			fi
 		else
@@ -217,6 +218,13 @@ if [ -z "$OS" ]; then
 			OS=$VENDOR
 			VENDOR=
 		fi
+	fi
+
+        # Work with cpu-kernel-os, ie Debian
+	if [ "$VENDOR" = linux ]; then
+		KERNEL=$OS
+		OS=linux
+		VENDOR=
 	fi
 fi
 
