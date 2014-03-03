@@ -203,16 +203,8 @@ if [ -z "$OS" ]; then
 		VENDOR=${REST%%-*}
 		REST=${REST#*-}
 		if [ "$VENDOR" != "$REST" ]; then
-			KERNEL=${REST%%-*}
-			REST=${REST#*-}
-			if [ "$KERNEL" != "$REST" ]; then
-				# 4 tupple
-				OS=${REST%%-*}
-			else
-				# 3 tupple
-				OS=$KERNEL
-				KERNEL=
-			fi
+			# Use kernel if given, otherwise os
+			OS=${REST%%-*}
 		else
 			# 2 tupple
 			OS=$VENDOR
@@ -221,11 +213,13 @@ if [ -z "$OS" ]; then
 	fi
 
         # Work with cpu-kernel-os, ie Debian
-	if [ "$VENDOR" = linux ]; then
-		KERNEL=$OS
-		OS=linux
-		VENDOR=
-	fi
+	case "$VENDOR" in
+	linux|kfreebsd) OS=$VENDOR; VENDOR= ;;
+	esac
+	# Special case
+	case "$OS" in
+	gnu) OS=hurd;; # No HURD support as yet
+	esac
 fi
 
 echo "Configuring dhcpcd for ... $OS"
