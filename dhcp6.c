@@ -2634,7 +2634,7 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 {
 	struct dhcp6_state *state;
 	struct dhcpcd_ctx *ctx;
-	int options;
+	unsigned long long options;
 
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 
@@ -2642,6 +2642,7 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 		options = ifp->options->options;
 	else
 		options = 0;
+
 	/*
 	 * As the interface is going away from dhcpcd we need to
 	 * remove the delegated addresses, otherwise we lose track
