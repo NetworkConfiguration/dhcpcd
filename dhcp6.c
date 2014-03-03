@@ -1545,7 +1545,7 @@ dhcp6_findia(struct interface *ifp, const uint8_t *d, size_t l,
 			TAILQ_REMOVE(&state->addrs, ap, next);
 			if (ap->dadcallback)
 				eloop_q_timeout_delete(ap->iface->ctx->eloop,
-				    0, NULL, ap->dadcallback);
+				    0, NULL, ap);
 			free(ap);
 		}
 	}
@@ -2392,6 +2392,7 @@ recv:
 			    dhcp6_startexpire, ifp);
 		if (ifp->options->ia_type == D6_OPTION_IA_PD)
 			dhcp6_delegate_prefix(ifp);
+
 		ipv6nd_probeaddrs(&state->addrs);
 		if (state->state == DH6S_INFORMED)
 			syslog(has_new ? LOG_INFO : LOG_DEBUG,
@@ -2409,9 +2410,9 @@ recv:
 		/* If all addresses have completed DAD run the script */
 		TAILQ_FOREACH(ap, &state->addrs, next) {
 			if (ap->flags & IPV6_AF_ONLINK) {
-//				if (!(ap->flags & IPV6_AF_DADCOMPLETED) &&
-//				    ipv6_findaddr(ap->iface, &ap->addr))
-//					ap->flags |= IPV6_AF_DADCOMPLETED;
+				if (!(ap->flags & IPV6_AF_DADCOMPLETED) &&
+				    ipv6_findaddr(ap->iface, &ap->addr))
+					ap->flags |= IPV6_AF_DADCOMPLETED;
 				if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0) {
 					len = 0;
 					break;

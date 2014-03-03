@@ -488,6 +488,8 @@ ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
     const struct interface *ifd)
 {
 	struct ipv6_addr *ap, *apn;
+	struct ipv6_state *state;
+	struct ipv6_addr_l *lap;
 
 	TAILQ_FOREACH_SAFE(ap, addrs, next, apn) {
 		if (ifd && ap->delegating_iface != ifd)
@@ -509,6 +511,21 @@ ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
 			if (del_address6(ap) == -1 &&
 			    errno != EADDRNOTAVAIL && errno != ENXIO)
 				syslog(LOG_ERR, "del_address6 %m");
+
+			/* Remove it from our internal state */
+			state = IPV6_STATE(ap->iface);
+			if (state) {
+				TAILQ_FOREACH(lap, &state->addrs, next) {
+					if (IN6_ARE_ADDR_EQUAL(&lap->addr,
+					    &ap->addr))
+					{
+						TAILQ_REMOVE(&state->addrs,
+						    lap, next);
+						free(lap);
+						break;
+					}
+				}
+			}
 		}
 		free(ap);
 	}
