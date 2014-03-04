@@ -182,7 +182,9 @@ valid_domainname()
 		[ -z "$label" -o ${#label} -gt 63 ] && return 1
 		case "$label" in
 		-*|_*|*-|*_)		return 1;;
-		*[![:alnum:]-_]*)	return 1;;
+		# sh seems to break with *[![:alnum:]-_]*
+		# but works with *[![:alnum:]_-]*
+		*[![:alnum:]_-]*)	return 1;;
 		esac
 		[ "$name" = "${name#*.}" ] && break
 		name="${name#*.}"
