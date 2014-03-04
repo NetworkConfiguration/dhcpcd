@@ -488,8 +488,10 @@ ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
     const struct interface *ifd)
 {
 	struct ipv6_addr *ap, *apn;
+#ifdef LISTEN_DAD
 	struct ipv6_state *state;
 	struct ipv6_addr_l *lap;
+#endif
 
 	TAILQ_FOREACH_SAFE(ap, addrs, next, apn) {
 		if (ifd && ap->delegating_iface != ifd)
@@ -512,7 +514,9 @@ ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
 			    errno != EADDRNOTAVAIL && errno != ENXIO)
 				syslog(LOG_ERR, "del_address6 %m");
 
-			/* Remove it from our internal state */
+#ifdef LISTEN_DAD
+			/* Remove it from our internal state as we cannot
+			 * reliably listen to RTM messages */
 			state = IPV6_STATE(ap->iface);
 			if (state) {
 				TAILQ_FOREACH(lap, &state->addrs, next) {
@@ -526,6 +530,7 @@ ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
 					}
 				}
 			}
+#endif
 		}
 		free(ap);
 	}
