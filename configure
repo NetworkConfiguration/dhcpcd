@@ -196,6 +196,7 @@ if [ -z "$TARGET" ]; then
 fi
 
 if [ -z "$OS" ]; then
+	echo "Deriving operating system from ... $TARGET"
 	# Derive OS from cpu-vendor-[kernel-]os
 	CPU=${TARGET%%-*}
 	REST=${TARGET#*-}
