@@ -90,9 +90,10 @@ hardware_platform(char *str, size_t len)
 		return -1;
 
 	while (fscanf(fp, "%255s : ", buf) != EOF) {
-		if (strncmp(buf, mproc, strlen(mproc)) == 0) {
-			(void)fscanf(fp, "%255s", buf);
-			fclose(fp);
+		if (strncmp(buf, mproc, strlen(mproc)) == 0 &&
+		    fscanf(fp, "%255s", buf) == 1)
+		{
+		        fclose(fp);
 			return snprintf(str, len, ":%s", buf);
 		}
 	}
