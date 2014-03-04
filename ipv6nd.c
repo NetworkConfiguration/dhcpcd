@@ -254,7 +254,7 @@ unspec:
 	        return -1;
 	}
 #endif
-	
+
 	if (setsockopt(ctx->unspec_fd, IPPROTO_ICMPV6, ICMP6_FILTER,
 	    &filt, sizeof(filt)) == -1)
 		goto eexit;
