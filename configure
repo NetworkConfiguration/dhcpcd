@@ -277,14 +277,13 @@ fi
 if [ "$DEBUG" != no -a "$DEBUG" != false ]; then
 	echo "Adding debugging CFLAGS"
 	cat <<EOF >>$CONFIG_MK
-CFLAGS+=	-g -Wall -Wextra -Wimplicit -Wshadow -Wformat=2
+CFLAGS+=	-g -Wall -Wextra -Wshadow -Wformat=2
 CFLAGS+=	-Wmissing-prototypes -Wmissing-declarations
 CFLAGS+=	-Wmissing-noreturn -Wmissing-format-attribute
 CFLAGS+=	-Wredundant-decls  -Wnested-externs
 CFLAGS+=	-Winline -Wwrite-strings -Wcast-align -Wcast-qual
 CFLAGS+=	-Wpointer-arith -Wstrict-overflow
-CFLAGS+=	-Wdeclaration-after-statement -Wsequence-point
-CFLAGS+=	-fno-common
+CFLAGS+=	-Wdeclaration-after-statement
 EOF
 fi
 
@@ -315,7 +314,7 @@ linux)
 kfreebsd)
 	echo "CPPFLAGS+=	-D_GNU_SOURCE" >>$CONFIG_MK
 	if [ -z "$INET" -o "$INET" = yes ]; then
-		echo "DHCPCD_SRCS+=		bpf.c" >>$CONFIG_MK
+		echo "DHCPCD_SRCS+=	bpf.c" >>$CONFIG_MK
 	fi
 	echo "DHCPCD_SRCS+=	if-bsd.c platform-bsd.c" >>$CONFIG_MK
 	echo "COMPAT_SRCS+=	compat/linkaddr.c" >>$CONFIG_MK
@@ -323,7 +322,7 @@ kfreebsd)
 	;;
 *)
 	if [ -z "$INET" -o "$INET" = yes ]; then
-		echo "DHCPCD_SRCS+=		bpf.c" >>$CONFIG_MK
+		echo "DHCPCD_SRCS+=	bpf.c" >>$CONFIG_MK
 	fi
 	echo "DHCPCD_SRCS+=	if-bsd.c platform-bsd.c" >>$CONFIG_MK
 	;;
@@ -626,7 +625,7 @@ if [ "$MD5" = no ]; then
 else
 	echo "MD5_SRC=" >>$CONFIG_MK
 	echo "CPPFLAGS+=	-DHAVE_MD5_H" >>$CONFIG_MK
-	[ -n "$MD5_LIB" ] && echo "LDADD+=	$MD5_LIB" >>$CONFIG_MK
+	[ -n "$MD5_LIB" ] && echo "LDADD+=		$MD5_LIB" >>$CONFIG_MK
 fi
 
 if [ "$DEV" != no -a "$UDEV" != no ]; then

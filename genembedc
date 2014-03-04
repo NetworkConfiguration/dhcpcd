@@ -40,7 +40,7 @@ cat <<EOF
 
 #include <unistd.h>
 
-const char *dhcpcd_embedded_conf[] = {
+const char * const dhcpcd_embedded_conf[] = {
 EOF
 
 $TOOL_SED \
