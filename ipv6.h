@@ -29,6 +29,7 @@
 #define IPV6_H
 
 #include <sys/queue.h>
+#include <sys/uio.h>
 
 #include <netinet/in.h>
 
@@ -140,6 +141,7 @@ struct ipv6_state {
 #define IP6BUFLEN	(CMSG_SPACE(sizeof(struct in6_pktinfo)) + \
 			CMSG_SPACE(sizeof(int)))
 
+#ifdef INET6
 struct ipv6_ctx {
 	struct sockaddr_in6 from;
 	struct msghdr sndhdr;
@@ -164,6 +166,7 @@ struct ipv6_ctx {
 
 	int dhcp_fd;
 };
+#endif
 
 #ifdef INET6
 struct ipv6_ctx *ipv6_init(struct dhcpcd_ctx *);

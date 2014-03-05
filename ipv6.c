@@ -39,8 +39,8 @@
 #  define IN6_IFF_TENTATIVE	(IFA_F_TENTATIVE | IFA_F_OPTIMISTIC)
 #  define IN6_IFF_DUPLICATED	IFA_F_DADFAILED
 #else
-#ifdef __FreeBSD__ /* Needed so that including netinet6/in6_var.h works */
 #  include <net/if.h>
+#ifdef __FreeBSD__ /* Needed so that including netinet6/in6_var.h works */
 #  include <net/if_var.h>
 #endif
 #  include <netinet6/in6_var.h>

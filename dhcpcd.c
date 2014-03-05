@@ -1403,6 +1403,17 @@ main(int argc, char **argv)
 	}
 #endif
 
+#ifdef __FreeBSD__
+	syslog(LOG_WARNING, "FreeBSD errors that are worked around:");
+	syslog(LOG_WARNING, "IPv4 subnet routes cannot be deleted");
+#endif
+#ifdef __OpenBSD__
+	syslog(LOG_WARNING, "OpenBSD errors that need to be fixed:");
+	syslog(LOG_WARNING,
+	    "IPv4 subnet routes and IPv6 prefixes cannot be deleted");
+	syslog(LOG_WARNING, "duplicate IPv4 subnet routes will be created");
+#endif
+
 	ctx.ifc = argc - optind;
 	ctx.ifv = argv + optind;
 

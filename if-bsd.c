@@ -47,6 +47,7 @@
 #elif __APPLE__
   /* FIXME: Add apple includes so we can work out SSID */
 #else
+#  include <net80211/ieee80211.h>
 #  include <net80211/ieee80211_ioctl.h>
 #endif
 

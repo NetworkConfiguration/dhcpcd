@@ -280,11 +280,15 @@ if [ "$DEBUG" != no -a "$DEBUG" != false ]; then
 CFLAGS+=	-g -Wall -Wextra -Wshadow -Wformat=2
 CFLAGS+=	-Wmissing-prototypes -Wmissing-declarations
 CFLAGS+=	-Wmissing-noreturn -Wmissing-format-attribute
-CFLAGS+=	-Wredundant-decls  -Wnested-externs
+CFLAGS+=	-Wnested-externs
 CFLAGS+=	-Winline -Wwrite-strings -Wcast-align -Wcast-qual
 CFLAGS+=	-Wpointer-arith -Wstrict-overflow
 CFLAGS+=	-Wdeclaration-after-statement
 EOF
+	case "$OS" in
+	openbsd)	;; # OpenBSD has many redundant decs in system headers
+	*)		echo "CFLAGS+=	-Wredundant-decls" >>$CONFIG_MK;;
+	esac
 fi
 
 if [ -z "$EMBEDDED" -o "$EMBEDDED" = yes ]; then
@@ -495,6 +499,38 @@ if [ "$TAILQ_FOREACH_SAFE" = no ]; then
 EOF
 fi
 
+if [ -z "$TAILQ_CONCAT" ]; then
+	printf "Testing for TAILQ_CONCAT ..."
+	cat <<EOF >_queue.c
+#include <sys/queue.h>
+int main(void) {
+#ifndef TAILQ_CONCAT
+#error TAILQ_CONCAT
+#endif
+	return 0;
+}
+EOF
+	if $XCC _queue.c -o _queue 2>/dev/null; then
+		TAILQ_CONCAT=yes
+	else
+		TAILQ_CONCAT=no
+	fi
+	echo "$TAILQ_CONCAT"
+	rm -f _queue.c _queue
+fi
+if [ "$TAILQ_CONCAT" = no ]; then
+	cat <<EOF >>$CONFIG_H
+#define TAILQ_CONCAT(head1, head2, field) do {				\\
+	if (!TAILQ_EMPTY(head2)) {					\\
+		*(head1)->tqh_last = (head2)->tqh_first;		\\
+		(head2)->tqh_first->field.tqe_prev = (head1)->tqh_last;	\\
+		(head1)->tqh_last = (head2)->tqh_last;			\\
+		TAILQ_INIT((head2));					\\
+	}								\\
+} while (/*CONSTCOND*/0)
+EOF
+fi
+
 if [ -z "$POSIX_SPAWN" ]; then
 	printf "Testing for posix_spawn ... "
 	cat <<EOF >_posix_spawn.c
@@ -506,7 +542,10 @@ int main(void) {
 }
 EOF
 	if $XCC _posix_spawn.c -o _posix_spawn 2>/dev/null; then
-		POSIX_SPAWN=yes
+		case "$OS" in
+		openbsd) printf "broken OpenBSD ... "; POSIX_SPAWN=no;;
+		*) POSIX_SPAWN=yes;;
+		esac
 	else
 		POSIX_SPAWN=no
 	fi

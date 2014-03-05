@@ -53,6 +53,12 @@
 #  define SYS_NMLN 256
 #endif
 
+#ifndef HW_MACHINE_ARCH
+#  ifdef HW_MODEL	/* OpenBSD */
+#    define HW_MACHINE_ARCH HW_MODEL
+#  endif
+#endif
+
 int
 hardware_platform(char *str, size_t len)
 {
