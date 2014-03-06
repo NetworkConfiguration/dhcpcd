@@ -921,14 +921,14 @@ handle_signal1(void *arg)
 }
 
 static void
-handle_signal(__unused int sig, siginfo_t *siginfo, __unused void *context)
+handle_signal(int sig, siginfo_t *siginfo, __unused void *context)
 {
 
 	/* So that we can operate safely under a signal we instruct
 	 * eloop to pass a copy of the siginfo structure to handle_signal1
 	 * as the very first thing to do. */
-	dhcpcd_siginfo.signo = siginfo->si_signo;
-	dhcpcd_siginfo.pid = siginfo->si_pid;
+	dhcpcd_siginfo.signo = sig;
+	dhcpcd_siginfo.pid = siginfo ? siginfo->si_pid : 0;
 	eloop_timeout_add_now(dhcpcd_ctx->eloop,
 	    handle_signal1, &dhcpcd_siginfo);
 }
@@ -1408,12 +1408,6 @@ main(int argc, char **argv)
 #ifdef __FreeBSD__
 	syslog(LOG_WARNING, "FreeBSD errors that are worked around:");
 	syslog(LOG_WARNING, "IPv4 subnet routes cannot be deleted");
-#endif
-#ifdef __OpenBSD__
-	syslog(LOG_WARNING, "OpenBSD errors that need to be fixed:");
-	syslog(LOG_WARNING,
-	    "IPv4 subnet routes cannot be deleted");
-	syslog(LOG_WARNING, "IPv6 prefixes cannot be deleted");
 #endif
 
 	ctx.ifc = argc - optind;

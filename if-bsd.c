@@ -283,22 +283,25 @@ if_route(const struct rt *rt, int action)
 	memset(&rtm, 0, sizeof(rtm));
 	rtm.hdr.rtm_version = RTM_VERSION;
 	rtm.hdr.rtm_seq = 1;
+	rtm.hdr.rtm_addrs = RTA_DST;
 	if (action == 0)
 		rtm.hdr.rtm_type = RTM_CHANGE;
-	else if (action > 0)
+	else if (action > 0) {
 		rtm.hdr.rtm_type = RTM_ADD;
-	else
+		rtm.hdr.rtm_addrs |= RTA_GATEWAY;
+	} else
 		rtm.hdr.rtm_type = RTM_DELETE;
 	rtm.hdr.rtm_flags = RTF_UP;
 #ifdef SIOCGIFPRIORITY
 	rtm.hdr.rtm_priority = rt->metric;
 #endif
+	rtm.hdr.rtm_hdrlen = sizeof(rtm.hdr);
+
 	/* None interface subnet routes are static. */
 	if (rt->gate.s_addr != INADDR_ANY ||
 	    rt->net.s_addr != state->net.s_addr ||
 	    rt->dest.s_addr != (state->addr.s_addr & state->net.s_addr))
 		rtm.hdr.rtm_flags |= RTF_STATIC;
-	rtm.hdr.rtm_addrs = RTA_DST | RTA_GATEWAY;
 	if (rt->dest.s_addr == rt->gate.s_addr &&
 	    rt->net.s_addr == INADDR_BROADCAST)
 		rtm.hdr.rtm_flags |= RTF_HOST;
@@ -314,17 +317,19 @@ if_route(const struct rt *rt, int action)
 	}
 
 	ADDADDR(&rt->dest);
-	if ((rtm.hdr.rtm_flags & RTF_HOST &&
-	    rt->gate.s_addr != htonl(INADDR_LOOPBACK)) ||
-	    !(rtm.hdr.rtm_flags & RTF_STATIC))
-	{
-		/* Make us a link layer socket for the host gateway */
-		memset(&su, 0, sizeof(su));
-		su.sdl.sdl_len = sizeof(struct sockaddr_dl);
-		link_addr(rt->iface->name, &su.sdl);
-		ADDSU;
-	} else
-		ADDADDR(&rt->gate);
+	if (rtm.hdr.rtm_addrs & RTA_GATEWAY) {
+		if ((rtm.hdr.rtm_flags & RTF_HOST &&
+		    rt->gate.s_addr != htonl(INADDR_LOOPBACK)) ||
+		    !(rtm.hdr.rtm_flags & RTF_STATIC))
+		{
+			/* Make us a link layer socket for the host gateway */
+			memset(&su, 0, sizeof(su));
+			su.sdl.sdl_len = sizeof(struct sockaddr_dl);
+			link_addr(rt->iface->name, &su.sdl);
+			ADDSU;
+		} else
+			ADDADDR(&rt->gate);
+	}
 
 	if (rtm.hdr.rtm_addrs & RTA_NETMASK)
 		ADDADDR(&rt->net);
@@ -457,8 +462,8 @@ if_route6(const struct rt6 *rt, int action)
 		rtm.hdr.rtm_type = RTM_ADD;
 	else
 		rtm.hdr.rtm_type = RTM_DELETE;
-
 	rtm.hdr.rtm_flags = RTF_UP;
+	rtm.hdr.rtm_addrs = RTA_DST | RTA_NETMASK;
 #ifdef SIOCGIFPRIORITY
 	rtm.hdr.rtm_priority = rt->metric;
 #endif
@@ -471,19 +476,21 @@ if_route6(const struct rt6 *rt, int action)
 		rtm.hdr.rtm_flags |= RTF_CLONING;
 #endif
 
-	rtm.hdr.rtm_addrs = RTA_DST | RTA_GATEWAY | RTA_NETMASK;
 	if (action >= 0)
-		rtm.hdr.rtm_addrs |= RTA_IFP | RTA_IFA;
+		rtm.hdr.rtm_addrs |= RTA_GATEWAY | RTA_IFP | RTA_IFA;
 
 	ADDADDR(&rt->dest);
-	if (!(rtm.hdr.rtm_flags & RTF_GATEWAY)) {
-		lla = ipv6_linklocal(rt->iface);
-		if (lla == NULL) /* unlikely as we need a LL to get here */
-			return -1;
-		ADDADDRS(&lla->addr, rt->iface->index);
-	} else {
-		lla = NULL;
-		ADDADDRS(&rt->gate, rt->iface->index);
+	lla = NULL;
+	if (rtm.hdr.rtm_addrs & RTA_GATEWAY) {
+		if (!(rtm.hdr.rtm_flags & RTF_GATEWAY)) {
+			lla = ipv6_linklocal(rt->iface);
+			if (lla == NULL) /* unlikely */
+				return -1;
+			ADDADDRS(&lla->addr, rt->iface->index);
+		} else {
+			lla = NULL;
+			ADDADDRS(&rt->gate, rt->iface->index);
+		}
 	}
 
 	if (rtm.hdr.rtm_addrs & RTA_NETMASK) {
