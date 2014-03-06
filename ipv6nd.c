@@ -857,13 +857,13 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 			    ntohl(pi->nd_opt_pi_preferred_time);
 			ap->nsprobes = 0;
 			if (opt) {
-				l = strlen(opt);
-				tmp = realloc(opt,
-					l + strlen(ap->saddr) + 2);
+				l = strlen(opt) + 1;
+				m = strlen(ap->saddr) + 1;
+				tmp = realloc(opt, l + m);
 				if (tmp) {
 					opt = tmp;
-					opt[l] = ' ';
-					strcpy(opt + l + 1, ap->saddr);
+					opt[l - 1] = ' ';
+					strlcpy(opt + l, ap->saddr, m);
 				}
 			} else
 				opt = strdup(ap->saddr);
@@ -1129,24 +1129,25 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 					if (new) {
 						**var = new;
 						new = strchr(**var, '=');
-						if (new)
-							strcpy(new + 1,
-							    rao->option);
-						else
+						if (new) {
+							len -= (new - **var);
+							strlcpy(new + 1,
+							    rao->option,
+							    len - 1);
+						} else
 							syslog(LOG_ERR,
 							    "new is null");
 					}
 					continue;
 				}
-				new = realloc(**var,
-				    strlen(**var) + 1 +
-				    strlen(rao->option) + 1);
+				len = strlen(rao->option) + 1;
+				new = realloc(**var, strlen(**var) + 1 + len);
 				if (new == NULL)
 					return -1;
 				**var = new;
 				new += strlen(new);
 				*new++ = ' ';
-				strcpy(new, rao->option);
+				strlcpy(new, rao->option, len);
 				continue;
 			}
 			if (env) {

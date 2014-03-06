@@ -2750,7 +2750,7 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 	const struct if_options *ifo;
 	struct dhcp_opt *opt, *vo;
 	const struct dhcp6_option *o;
-	size_t i, n;
+	size_t i, l, n;
 	uint16_t ol, oc;
 	char *v, *val, *pfx;
 	const struct ipv6_addr *ap;
@@ -2849,40 +2849,46 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 	if (TAILQ_FIRST(&state->addrs)) {
 		if (env) {
 			if (ifo->ia_type == D6_OPTION_IA_PD) {
-				i = strlen(prefix) +
+				l = strlen(prefix) +
 				    strlen("_dhcp6_prefix=");
 				TAILQ_FOREACH(ap, &state->addrs, next) {
-					i += strlen(ap->saddr) + 1;
+					l += strlen(ap->saddr) + 1;
 				}
-				v = val = env[n] = malloc(i);
+				v = val = env[n] = malloc(l);
 				if (v == NULL) {
 					syslog(LOG_ERR, "%s: %m", __func__);
 					return -1;
 				}
-				v += snprintf(val, i, "%s_dhcp6_prefix=",
-					prefix);
+				i = snprintf(val, l, "%s_dhcp6_prefix=",
+				    prefix);
+				v += i;
+				l -= i;
 				TAILQ_FOREACH(ap, &state->addrs, next) {
-					strcpy(v, ap->saddr);
-					v += strlen(ap->saddr);
+					i = strlen(ap->saddr);
+					strlcpy(v, ap->saddr, l);
+					v += i;
+					l -= i;
 					*v++ = ' ';
 				}
 				*--v = '\0';
 			} else {
-				i = strlen(prefix) +
+				l = strlen(prefix) +
 				    strlen("_dhcp6_ip_address=");
 				TAILQ_FOREACH(ap, &state->addrs, next) {
-					i += strlen(ap->saddr) + 1;
+					l += strlen(ap->saddr) + 1;
 				}
-				v = val = env[n] = malloc(i);
+				v = val = env[n] = malloc(l);
 				if (v == NULL) {
 					syslog(LOG_ERR, "%s: %m", __func__);
 					return -1;
 				}
-				v += snprintf(val, i, "%s_dhcp6_ip_address=",
-					prefix);
+				i = snprintf(val, l, "%s_dhcp6_ip_address=",
+				    prefix);
 				TAILQ_FOREACH(ap, &state->addrs, next) {
-					strcpy(v, ap->saddr);
-					v += strlen(ap->saddr);
+					i = strlen(ap->saddr);
+					strlcpy(v, ap->saddr, l);
+					v += i;
+					l -= i;
 					*v++ = ' ';
 				}
 				*--v = '\0';
