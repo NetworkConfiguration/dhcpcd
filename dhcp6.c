@@ -2854,7 +2854,7 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 					syslog(LOG_ERR, "%s: %m", __func__);
 					return -1;
 				}
-				i = snprintf(val, l, "%s_dhcp6_prefix=",
+				i = snprintf(v, l, "%s_dhcp6_prefix=",
 				    prefix);
 				v += i;
 				l -= i;
@@ -2877,8 +2877,10 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 					syslog(LOG_ERR, "%s: %m", __func__);
 					return -1;
 				}
-				i = snprintf(val, l, "%s_dhcp6_ip_address=",
+				i = snprintf(v, l, "%s_dhcp6_ip_address=",
 				    prefix);
+				v += i;
+				l -= i;
 				TAILQ_FOREACH(ap, &state->addrs, next) {
 					i = strlen(ap->saddr);
 					strlcpy(v, ap->saddr, l);
