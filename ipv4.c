@@ -722,21 +722,29 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 
 	if (ifs == NULL)
 		ifs = ctx->ifaces;
-	if (ifs == NULL)
+	if (ifs == NULL) {
+		errno = ESRCH;
 		return;
-	if (addr->s_addr == INADDR_ANY)
+	}
+	if (addr->s_addr == INADDR_ANY) {
+		errno = EINVAL;
 		return;
+	}
 
 	TAILQ_FOREACH(ifp, ifs, next) {
 		if (strcmp(ifp->name, ifname) == 0)
 			break;
 	}
-	if (ifp == NULL)
+	if (ifp == NULL) {
+		errno = ESRCH;
 		return;
-
+	}
 	state = ipv4_getstate(ifp);
-	if (state == NULL)
+	if (state == NULL) {
+		errno = ENOENT;
 		return;
+	}
+
 	ap = ipv4_findaddr(ifp, addr, net);
 	if (type == RTM_NEWADDR && ap == NULL) {
 		ap = malloc(sizeof(*ap));

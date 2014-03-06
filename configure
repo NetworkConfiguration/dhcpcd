@@ -215,11 +215,11 @@ if [ -z "$OS" ]; then
 
         # Work with cpu-kernel-os, ie Debian
 	case "$VENDOR" in
-	linux|kfreebsd) OS=$VENDOR; VENDOR= ;;
+	linux*|kfreebsd*) OS=$VENDOR; VENDOR= ;;
 	esac
 	# Special case
 	case "$OS" in
-	gnu) OS=hurd;; # No HURD support as yet
+	gnu*) OS=hurd;; # No HURD support as yet
 	esac
 fi
 
@@ -286,7 +286,7 @@ CFLAGS+=	-Wpointer-arith -Wstrict-overflow
 CFLAGS+=	-Wdeclaration-after-statement
 EOF
 	case "$OS" in
-	openbsd)	;; # OpenBSD has many redundant decs in system headers
+	openbsd*)	;; # OpenBSD has many redundant decs in system headers
 	*)		echo "CFLAGS+=	-Wredundant-decls" >>$CONFIG_MK;;
 	esac
 fi
@@ -306,7 +306,7 @@ if [ -n "$FORK" -a "$FORK" != yes -a "$FORK" != true ]; then
 fi
 
 case "$OS" in
-linux)
+linux*)
 	echo "CPPFLAGS+=	-D_BSD_SOURCE -D_XOPEN_SOURCE=700" >>$CONFIG_MK
 	if [ -z "$INET" -o "$INET" = yes ]; then
 		echo "DHCPCD_SRCS+=	lpf.c" >>$CONFIG_MK
@@ -315,7 +315,7 @@ linux)
 	echo "DHCPCD_SRCS+=	platform-linux.c" >>$CONFIG_MK
 	echo "LDADD+=		-lrt -ldl" >>$CONFIG_MK
 	;;
-kfreebsd)
+kfreebsd*)
 	echo "CPPFLAGS+=	-D_GNU_SOURCE" >>$CONFIG_MK
 	if [ -z "$INET" -o "$INET" = yes ]; then
 		echo "DHCPCD_SRCS+=	bpf.c" >>$CONFIG_MK
@@ -543,7 +543,7 @@ int main(void) {
 EOF
 	if $XCC _posix_spawn.c -o _posix_spawn 2>/dev/null; then
 		case "$OS" in
-		openbsd) printf "broken OpenBSD ... "; POSIX_SPAWN=no;;
+		openbsd*) printf "broken OpenBSD ... "; POSIX_SPAWN=no;;
 		*) POSIX_SPAWN=yes;;
 		esac
 	else

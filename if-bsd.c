@@ -412,7 +412,7 @@ if_route6(const struct rt6 *rt, int action)
 	char *bp = rtm.buffer;
 	size_t l;
 	int s, retval;
-	const struct ipv6_addr_l *lla;
+	const struct ipv6_addr *lla;
 
 	if ((s = socket(PF_ROUTE, SOCK_RAW, 0)) == -1)
 		return -1;
@@ -586,7 +586,7 @@ manage_link(struct dhcpcd_ctx *ctx)
 #ifdef INET
 	struct rt rt;
 #endif
-#if defined(INET6) && !defined(LISTEN_DAD)
+#ifdef INET6
 	struct in6_addr ia6;
 	struct sockaddr_in6 *sin6;
 	int ifa_flags;
@@ -705,7 +705,7 @@ manage_link(struct dhcpcd_ctx *ctx)
 					    &rt.dest, &rt.net, &rt.gate);
 					break;
 #endif
-#if defined(INET6) && !defined(LISTEN_DAD)
+#ifdef INET6
 				case AF_INET6:
 					sin6 = (struct sockaddr_in6*)(void *)
 					    rti_info[RTAX_IFA];

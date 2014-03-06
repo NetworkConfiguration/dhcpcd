@@ -1258,17 +1258,12 @@ dhcp6_dadcallback(void *arg)
 	int wascompleted;
 
 	wascompleted = (ap->flags & IPV6_AF_DADCOMPLETED);
-	ipv6nd_cancelprobeaddr(ap);
 	ap->flags |= IPV6_AF_DADCOMPLETED;
 	if (ap->flags & IPV6_AF_DUPLICATED)
 		/* XXX FIXME
 		 * We should decline the address */
 		syslog(LOG_WARNING, "%s: DAD detected %s",
 		    ap->iface->name, ap->saddr);
-#ifdef IPV6_SEND_DAD
-	else
-		ipv6_addaddr(ap);
-#endif
 
 	if (!wascompleted) {
 		ifp = ap->iface;
@@ -1899,7 +1894,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 		}
 		if (k && !carrier_warned) {
 			ifd_state = D6_STATE(ifd);
-			ipv6nd_probeaddrs(&ifd_state->addrs);
+			ipv6_addaddrs(&ifd_state->addrs);
 		}
 	}
 
@@ -1979,7 +1974,7 @@ dhcp6_find_delegates(struct interface *ifp)
 		syslog(LOG_INFO, "%s: adding delegated prefixes", ifp->name);
 		state = D6_STATE(ifp);
 		state->state = DH6S_DELEGATED;
-		ipv6nd_probeaddrs(&state->addrs);
+		ipv6_addaddrs(&state->addrs);
 		ipv6_buildroutes(ifp->ctx);
 	}
 	return k;
@@ -2393,7 +2388,7 @@ recv:
 		if (ifp->options->ia_type == D6_OPTION_IA_PD)
 			dhcp6_delegate_prefix(ifp);
 
-		ipv6nd_probeaddrs(&state->addrs);
+		ipv6_addaddrs(&state->addrs);
 		if (state->state == DH6S_INFORMED)
 			syslog(has_new ? LOG_INFO : LOG_DEBUG,
 			    "%s: refresh in %"PRIu32" seconds",

@@ -94,16 +94,8 @@ void ipv6nd_handleifa(struct dhcpcd_ctx *, int,
     const char *, const struct in6_addr *, int);
 void ipv6nd_drop(struct interface *);
 
-void ipv6nd_probeaddr(void *);
-ssize_t ipv6nd_probeaddrs(struct ipv6_addrhead *);
 void ipv6nd_proberouter(void *);
 void ipv6nd_cancelproberouter(struct ra *);
-
-#ifdef LISTEN_DAD
-void ipv6nd_cancelprobeaddr(struct ipv6_addr *);
-#else
-#define ipv6nd_cancelprobeaddr(a)
-#endif
 
 #else
 #define ipv6nd_startrs(a) {}
