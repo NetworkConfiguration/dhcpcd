@@ -44,7 +44,7 @@ static const char udev_name[]="udev";
 static struct udev *udev;
 static struct udev_monitor *monitor;
 
-static const struct dev_dhcpcd *dhcpcd;
+static struct dev_dhcpcd dhcpcd;
 
 static int
 udev_listening(void)
@@ -92,9 +92,9 @@ udev_handle_device(void *ctx)
 	if (strcmp(subsystem, "net") == 0) {
 		syslog(LOG_DEBUG, "%s: libudev: %s", ifname, action);
 		if (strcmp(action, "add") == 0 || strcmp(action, "move") == 0)
-			dhcpcd->handle_interface(ctx, 1, ifname);
+			dhcpcd.handle_interface(ctx, 1, ifname);
 		else if (strcmp(action, "remove") == 0)
-			dhcpcd->handle_interface(ctx, -1, ifname);
+			dhcpcd.handle_interface(ctx, -1, ifname);
 	}
 
 	udev_device_unref(device);
@@ -173,7 +173,7 @@ dev_init(struct dev *dev, const struct dev_dhcpcd *dev_dhcpcd)
 	dev->stop = udev_stop;
 	dev->start = udev_start;
 
-	dhcpcd =  dev_dhcpcd;
+	dhcpcd = *dev_dhcpcd;
 
 	return 0;
 }
