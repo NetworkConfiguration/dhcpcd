@@ -250,13 +250,19 @@ discover_interfaces(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 #endif
 #ifdef AF_LINK
 	const struct sockaddr_dl *sdl;
+#ifdef SIOCGIFPRIORITY
+	struct ifreq ifr;
+#endif
 #ifdef IFLR_ACTIVE
 	struct if_laddrreq iflr;
-	int socket_aflink;
+#endif
+#if defined(IFLR_ACTIVE) || defined(SIOCGIFPRIORITY)
+	int s;
 
-	socket_aflink = socket(AF_LINK, SOCK_DGRAM, 0);
-	if (socket_aflink == -1)
+	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
 		return NULL;
+#endif
+#ifdef IFLR_ACTIVE
 	memset(&iflr, 0, sizeof(iflr));
 #endif
 #elif AF_PACKET
@@ -265,7 +271,6 @@ discover_interfaces(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 
 	if (getifaddrs(&ifaddrs) == -1)
 		return NULL;
-
 	ifs = malloc(sizeof(*ifs));
 	if (ifs == NULL)
 		return NULL;
@@ -339,8 +344,10 @@ discover_interfaces(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		}
 
 		ifp = calloc(1, sizeof(*ifp));
-		if (ifp == NULL)
-			return NULL;
+		if (ifp == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			break;
+		}
 		ifp->ctx = ctx;
 		strlcpy(ifp->name, p, sizeof(ifp->name));
 		ifp->flags = ifa->ifa_flags;
@@ -378,7 +385,7 @@ discover_interfaces(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 			    MIN(ifa->ifa_addr->sa_len, sizeof(iflr.addr)));
 			iflr.flags = IFLR_PREFIX;
 			iflr.prefixlen = sdl->sdl_alen * NBBY;
-			if (ioctl(socket_aflink, SIOCGLIFADDR, &iflr) == -1 ||
+			if (ioctl(s, SIOCGLIFADDR, &iflr) == -1 ||
 			    !(iflr.flags & IFLR_ACTIVE))
 			{
 				free_interface(ifp);
@@ -463,6 +470,13 @@ discover_interfaces(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 			continue;
 		}
 
+#ifdef SIOCGIFPRIORITY
+		/* Respect the interface priority */
+		memset(&ifr, 0, sizeof(ifr));
+		strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
+		if (ioctl(s, SIOCGIFPRIORITY, &ifr) == 0)
+			ifp->metric = ifr.ifr_metric;
+#else
 		/* We reserve the 100 range for virtual interfaces, if and when
 		 * we can work them out. */
 		ifp->metric = 200 + ifp->index;
@@ -470,6 +484,7 @@ discover_interfaces(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 			ifp->wireless = 1;
 			ifp->metric += 100;
 		}
+#endif
 
 		TAILQ_INSERT_TAIL(ifs, ifp, next);
 	}
@@ -512,8 +527,8 @@ discover_interfaces(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 
 	freeifaddrs(ifaddrs);
 
-#ifdef IFLR_ACTIVE
-	close(socket_aflink);
+#if defined(IFLR_ACTIVE) || defined(SIOCGIFPRIORITY)
+	close(s);
 #endif
 
 	return ifs;

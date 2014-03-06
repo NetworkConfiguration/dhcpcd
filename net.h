@@ -41,7 +41,7 @@
 
 /* Some systems have route metrics */
 #ifndef HAVE_ROUTE_METRIC
-# ifdef __linux__
+# if defined(__linux__) || defined(SIOCGIFPRIORITY)
 #  define HAVE_ROUTE_METRIC 1
 # endif
 # ifndef HAVE_ROUTE_METRIC

@@ -297,9 +297,11 @@ find_interface(struct dhcpcd_ctx *ctx, const char *ifname)
 {
 	struct interface *ifp;
 
-	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-		if (strcmp(ifp->name, ifname) == 0)
-			return ifp;
+	if (ctx != NULL && ctx->ifaces != NULL) {
+		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+			if (strcmp(ifp->name, ifname) == 0)
+				return ifp;
+		}
 	}
 	return NULL;
 }
@@ -1410,8 +1412,8 @@ main(int argc, char **argv)
 #ifdef __OpenBSD__
 	syslog(LOG_WARNING, "OpenBSD errors that need to be fixed:");
 	syslog(LOG_WARNING,
-	    "IPv4 subnet routes and IPv6 prefixes cannot be deleted");
-	syslog(LOG_WARNING, "duplicate IPv4 subnet routes will be created");
+	    "IPv4 subnet routes cannot be deleted");
+	syslog(LOG_WARNING, "IPv6 prefixes cannot be deleted");
 #endif
 
 	ctx.ifc = argc - optind;

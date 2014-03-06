@@ -290,6 +290,9 @@ if_route(const struct rt *rt, int action)
 	else
 		rtm.hdr.rtm_type = RTM_DELETE;
 	rtm.hdr.rtm_flags = RTF_UP;
+#ifdef SIOCGIFPRIORITY
+	rtm.hdr.rtm_priority = rt->metric;
+#endif
 	/* None interface subnet routes are static. */
 	if (rt->gate.s_addr != INADDR_ANY ||
 	    rt->net.s_addr != state->net.s_addr ||
@@ -456,6 +459,9 @@ if_route6(const struct rt6 *rt, int action)
 		rtm.hdr.rtm_type = RTM_DELETE;
 
 	rtm.hdr.rtm_flags = RTF_UP;
+#ifdef SIOCGIFPRIORITY
+	rtm.hdr.rtm_priority = rt->metric;
+#endif
 	/* None interface subnet routes are static. */
 	if (IN6_IS_ADDR_UNSPECIFIED(&rt->dest) &&
 	    IN6_IS_ADDR_UNSPECIFIED(&rt->net))
