@@ -252,17 +252,24 @@ discover_interfaces(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 	const struct sockaddr_dl *sdl;
 #ifdef SIOCGIFPRIORITY
 	struct ifreq ifr;
+	int s_inet;
 #endif
 #ifdef IFLR_ACTIVE
 	struct if_laddrreq iflr;
+	int s_link;
 #endif
-#if defined(IFLR_ACTIVE) || defined(SIOCGIFPRIORITY)
-	int s;
 
-	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+#ifdef SIOCGIFPRIORITY
+	if ((s_inet = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
 		return NULL;
 #endif
 #ifdef IFLR_ACTIVE
+	if ((s_link = socket(AF_LINK, SOCK_DGRAM, 0)) == -1) {
+#ifdef SIOCGIFPRIORITY
+		close(s_inet);
+#endif
+		return NULL;
+	}
 	memset(&iflr, 0, sizeof(iflr));
 #endif
 #elif AF_PACKET
@@ -385,7 +392,7 @@ discover_interfaces(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 			    MIN(ifa->ifa_addr->sa_len, sizeof(iflr.addr)));
 			iflr.flags = IFLR_PREFIX;
 			iflr.prefixlen = sdl->sdl_alen * NBBY;
-			if (ioctl(s, SIOCGLIFADDR, &iflr) == -1 ||
+			if (ioctl(s_link, SIOCGLIFADDR, &iflr) == -1 ||
 			    !(iflr.flags & IFLR_ACTIVE))
 			{
 				free_interface(ifp);
@@ -474,7 +481,7 @@ discover_interfaces(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		/* Respect the interface priority */
 		memset(&ifr, 0, sizeof(ifr));
 		strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
-		if (ioctl(s, SIOCGIFPRIORITY, &ifr) == 0)
+		if (ioctl(s_inet, SIOCGIFPRIORITY, &ifr) == 0)
 			ifp->metric = ifr.ifr_metric;
 #else
 		/* We reserve the 100 range for virtual interfaces, if and when
@@ -527,8 +534,11 @@ discover_interfaces(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 
 	freeifaddrs(ifaddrs);
 
-#if defined(IFLR_ACTIVE) || defined(SIOCGIFPRIORITY)
-	close(s);
+#ifdef SIOCGIFPRIORITY
+	close(s_inet);
+#endif
+#ifdef IFLR_ACTIVE
+	close(s_link);
 #endif
 
 	return ifs;
