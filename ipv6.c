@@ -942,14 +942,15 @@ ipv6_build_ra_routes(struct ipv6_ctx *ctx, struct rt6_head *dnr, int expired)
 			continue;
 		if (rap->iface->options->options & DHCPCD_IPV6RA_OWN) {
 			TAILQ_FOREACH(addr, &rap->addrs, next) {
-				if ((addr->flags & IPV6_AF_ONLINK) == 0)
+				if (addr->prefix_vltime == 0 ||
+				    (addr->flags & IPV6_AF_ONLINK) == 0)
 					continue;
 				rt = make_prefix(rap->iface, rap, addr);
 				if (rt)
 					TAILQ_INSERT_TAIL(dnr, rt, next);
 			}
 		}
-		if (rap->iface->options->options &
+		if (rap->lifetime && rap->iface->options->options &
 		    (DHCPCD_IPV6RA_OWN | DHCPCD_IPV6RA_OWN_DEFAULT))
 		{
 			rt = make_router(rap);

@@ -588,7 +588,7 @@ ipv6nd_dadcallback(void *arg)
 					found = 1;
 			}
 
-			if (wascompleted && found && rap->lifetime) {
+			if (wascompleted && found) {
 				syslog(LOG_DEBUG,
 				    "%s: Router Advertisement DAD completed",
 				    rap->iface->name);
@@ -664,11 +664,6 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 	}
 
 	nd_ra = (struct nd_router_advert *)icp;
-	/* Don't bother doing anything if we don't know about a router
-	 * expiring */
-	if ((rap == NULL || rap->lifetime == 0)
-	    && nd_ra->nd_ra_router_lifetime == 0)
-		return;
 
 	/* We don't want to spam the log with the fact we got an RA every
 	 * 30 seconds or so, so only spam the log if it's different. */
@@ -980,12 +975,8 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 	}
 	ipv6_addaddrs(&rap->addrs);
 	ipv6_buildroutes(ifp->ctx);
-
-	/* We will get run by the expire function */
-	if (rap->lifetime) {
-		if (ipv6nd_scriptrun(rap))
-			return;
-	}
+	if (ipv6nd_scriptrun(rap))
+		return;
 
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, rap); /* reachable timer */
@@ -1002,15 +993,13 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 
 handle_flag:
 	if (rap->flags & ND_RA_FLAG_MANAGED) {
-		if (rap->lifetime && new_data &&
-		    dhcp6_start(ifp, DH6S_INIT) == -1)
+		if (new_data && dhcp6_start(ifp, DH6S_INIT) == -1)
 			syslog(LOG_ERR, "dhcp6_start: %s: %m", ifp->name);
 	} else if (rap->flags & ND_RA_FLAG_OTHER) {
-		if (rap->lifetime && new_data &&
-		    dhcp6_start(ifp, DH6S_INFORM) == -1)
+		if (new_data && dhcp6_start(ifp, DH6S_INFORM) == -1)
 			syslog(LOG_ERR, "dhcp6_start: %s: %m", ifp->name);
 	} else {
-		if (rap->lifetime && new_data)
+		if (new_data)
 			syslog(LOG_DEBUG, "%s: No DHCPv6 instruction in RA",
 			    ifp->name);
 		if (ifp->ctx->options & DHCPCD_TEST) {
@@ -1180,23 +1169,26 @@ ipv6nd_expirera(void *arg)
 	TAILQ_FOREACH_SAFE(rap, ifp->ctx->ipv6->ra_routers, next, ran) {
 		if (rap->iface != ifp)
 			continue;
-		lt.tv_sec = rap->lifetime;
-		lt.tv_usec = 0;
-		timeradd(&rap->received, &lt, &expire);
-		if (rap->lifetime == 0 || timercmp(&now, &expire, >)) {
-			valid = 0;
-			if (!rap->expired) {
-				syslog(LOG_WARNING,
-				    "%s: %s: router expired",
-				    ifp->name, rap->sfrom);
-				rap->expired = expired = 1;
-				ipv6nd_cancelproberouter(rap);
+		valid = 0;
+		if (rap->lifetime) {
+			lt.tv_sec = rap->lifetime;
+			lt.tv_usec = 0;
+			timeradd(&rap->received, &lt, &expire);
+			if (rap->lifetime == 0 || timercmp(&now, &expire, >)) {
+				if (!rap->expired) {
+					syslog(LOG_WARNING,
+					    "%s: %s: router expired",
+					    ifp->name, rap->sfrom);
+					rap->expired = expired = 1;
+					ipv6nd_cancelproberouter(rap);
+				}
+			} else {
+				valid = 1;
+				timersub(&expire, &now, &lt);
+				if (!timerisset(&next) ||
+				    timercmp(&next, &lt, >))
+					next = lt;
 			}
-		} else {
-			valid = 1;
-			timersub(&expire, &now, &lt);
-			if (!timerisset(&next) || timercmp(&next, &lt, >))
-				next = lt;
 		}
 
 		/* Addresses are expired in ipv6_addaddrs
