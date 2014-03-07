@@ -264,6 +264,14 @@ if [ -n "$LDFLAGS" ]; then
 	echo "LDFLAGS+=	$LDFLAGS" >>$CONFIG_MK
 fi
 
+case "$OS" in
+openbsd*)
+	if [ "$SBINDIR" = /sbin ]; then
+		echo "Forcing a static build for OpenBSD and SBINDIR of /sbin"
+		STATIC=yes
+	fi
+	;;
+esac
 if [ "$STATIC" = yes ]; then
 	echo "LDFLAGS+=	-static" >>$CONFIG_MK
 fi
