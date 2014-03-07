@@ -1248,7 +1248,7 @@ main(int argc, char **argv)
 	if (!(ctx.options & (DHCPCD_TEST | DHCPCD_DUMPLEASE))) {
 		/* If we have any other args, we should run as a single dhcpcd
 		 *  instance for that interface. */
-		if (optind == argc - 1) {
+		if (optind == argc - 1 && !(ctx.options & DHCPCD_MASTER)) {
 			if (strlen(argv[optind]) > IF_NAMESIZE) {
 				syslog(LOG_ERR, "%s: interface name too long",
 				    argv[optind]);
