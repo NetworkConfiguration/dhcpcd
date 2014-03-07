@@ -578,7 +578,8 @@ start_interface(void *arg)
 	size_t i;
 	char buf[DUID_LEN * 3];
 
-	handle_carrier(ifp->ctx, LINK_UNKNOWN, 0, ifp->name);
+	if (ifp->carrier == LINK_UNKNOWN)
+		handle_carrier(ifp->ctx, LINK_UNKNOWN, 0, ifp->name);
 	if (ifp->carrier == LINK_DOWN) {
 		syslog(LOG_INFO, "%s: waiting for carrier", ifp->name);
 		return;
