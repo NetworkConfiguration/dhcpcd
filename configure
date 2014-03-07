@@ -1,6 +1,8 @@
 #!/bin/sh
 # Try and be like autotools configure, but without autotools
 
+echo "configure args: $*"
+
 # Ensure that we do not inherit these from env
 HOOKSET=false
 INET=
@@ -72,6 +74,7 @@ for x do
 	--includedir) eval INCLUDEDIR="$INCLUDEDIR${INCLUDEDIR:+ }$var";;
 	--datadir|--infodir) ;; # ignore autotools
 	--disable-maintainer-mode|--disable-dependency-tracking) ;;
+	--disable-silent-rules) ;;
 	-V|--version)
 		v=$(sed -ne 's/.*VERSION[[:space:]]*"\([^"]*\).*/\1/p' defs.h);
 		c=$(sed -ne 's/^.*copyright\[\] = "\([^"]*\).*/\1/p' dhcpcd.c);
