@@ -264,6 +264,8 @@ detect_init()
 		done
 		if [ -e /etc/arch-release ]; then
 			_service_status="[ -e /var/run/daemons/\$1 ]"
+		elif [ "$x" = "/etc/rc.d" -a -e /etc/rc.d/rc.subr ]; then
+			_service_status="$x/\$1 check 1>/dev/null 2>&1"
 		fi
 	fi
 
