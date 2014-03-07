@@ -295,7 +295,6 @@ if_route(const struct rt *rt, int action)
 #ifdef SIOCGIFPRIORITY
 	rtm.hdr.rtm_priority = rt->metric;
 #endif
-	rtm.hdr.rtm_hdrlen = sizeof(rtm.hdr);
 
 	/* None interface subnet routes are static. */
 	if (rt->gate.s_addr != INADDR_ANY ||
