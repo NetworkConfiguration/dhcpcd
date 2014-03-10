@@ -1460,14 +1460,14 @@ dhcp6_findia(struct interface *ifp, const uint8_t *d, size_t l,
 	const struct if_options *ifo;
 	const struct dhcp6_option *o;
 	const uint8_t *p;
-	int i;
+	int i, e;
 	uint32_t u32, renew, rebind;
 	uint8_t iaid[4];
 	size_t ol;
 	struct ipv6_addr *ap, *nap;
 
 	ifo = ifp->options;
-	i = 0;
+	i = e = 0;
 	state = D6_STATE(ifp);
 	TAILQ_FOREACH(ap, &state->addrs, next) {
 		ap->flags |= IPV6_AF_STALE;
@@ -1500,8 +1500,10 @@ dhcp6_findia(struct interface *ifp, const uint8_t *d, size_t l,
 			ol -= sizeof(u32);
 		} else
 			renew = rebind = 0; /* appease gcc */
-		if (dhcp6_checkstatusok(ifp, NULL, p, ol) == -1)
+		if (dhcp6_checkstatusok(ifp, NULL, p, ol) == -1) {
+			e = 1;
 			continue;
+		}
 		if (ifo->ia_type == D6_OPTION_IA_PD) {
 			if (dhcp6_findpd(ifp, iaid, p, ol) == 0) {
 				syslog(LOG_WARNING,
@@ -1544,6 +1546,8 @@ dhcp6_findia(struct interface *ifp, const uint8_t *d, size_t l,
 			free(ap);
 		}
 	}
+	if (i == 0 && e)
+		return -1;
 	return i;
 }
 
@@ -1659,8 +1663,12 @@ dhcp6_readlease(struct interface *ifp)
 			    ifp->name);
 			goto ex;
 		}
-		syslog(LOG_DEBUG, "%s: validated using 0x%08" PRIu32,
-		    ifp->name, state->auth.token->secretid);
+		if (state->auth.token)
+			syslog(LOG_DEBUG, "%s: validated using 0x%08" PRIu32,
+			    ifp->name, state->auth.token->secretid);
+		else
+			syslog(LOG_DEBUG, "%s: accepted reconfigure key",
+			    ifp->name);
 	} else if (ifp->options->auth.options & DHCPCD_AUTH_REQUIRE) {
 		syslog(LOG_ERR, "%s: authentication now required", ifp->name);
 		goto ex;
@@ -2055,10 +2063,13 @@ dhcp6_handledata(void *arg)
 		    ifp->name);
 		return;
 	}
+
+	r = (struct dhcp6_message *)ctx->rcvhdr.msg_iov[0].iov_base;
+
 	/* We're already bound and this message is for another machine */
 	/* XXX DELEGATED? */
-	if (state->state == DH6S_BOUND ||
-	    state->state == DH6S_INFORMED)
+	if (r->type != DHCP6_RECONFIGURE &&
+	    (state->state == DH6S_BOUND || state->state == DH6S_INFORMED))
 		return;
 
 	r = (struct dhcp6_message *)ctx->rcvhdr.msg_iov[0].iov_base;
@@ -2121,8 +2132,12 @@ dhcp6_handledata(void *arg)
 			    ifp->name, ctx->sfrom);
 			return;
 		}
-		syslog(LOG_DEBUG, "%s: validated using 0x%08" PRIu32,
-		    ifp->name, state->auth.token->secretid);
+		if (state->auth.token)
+			syslog(LOG_DEBUG, "%s: validated using 0x%08" PRIu32,
+			    ifp->name, state->auth.token->secretid);
+		else
+			syslog(LOG_DEBUG, "%s: accepted reconfigure key",
+			    ifp->name);
 	} else if (ifo->auth.options & DHCPCD_AUTH_REQUIRE) {
 		syslog(LOG_ERR, "%s: no authentication from %s",
 		    ifp->name, ctx->sfrom);
@@ -2157,7 +2172,8 @@ dhcp6_handledata(void *arg)
 			if (error == 1)
 				goto recv;
 			if (error == -1 ||
-			    dhcp6_validatelease(ifp, r, len, ctx->sfrom) == -1){
+			    dhcp6_validatelease(ifp, r, len, ctx->sfrom) == -1)
+			{
 				dhcp6_startdiscover(ifp);
 				return;
 			}

@@ -1061,8 +1061,12 @@ read_lease(struct interface *ifp)
 			free(dhcp);
 			return NULL;
 		}
-		syslog(LOG_DEBUG, "%s: validated using 0x%08" PRIu32,
-		    ifp->name, state->auth.token->secretid);
+		if (state->auth.token)
+			syslog(LOG_DEBUG, "%s: validated using 0x%08" PRIu32,
+			    ifp->name, state->auth.token->secretid);
+		else
+			syslog(LOG_DEBUG, "%s: accepted reconfigure key",
+			    ifp->name);
 	}
 
 	return dhcp;
@@ -2197,8 +2201,12 @@ dhcp_handledhcp(struct interface *iface, struct dhcp_message **dhcpp,
 			    iface, dhcp, from, 0);
 			return;
 		}
-		syslog(LOG_DEBUG, "%s: validated using 0x%08" PRIu32,
-		    iface->name, state->auth.token->secretid);
+		if (state->auth.token)
+			syslog(LOG_DEBUG, "%s: validated using 0x%08" PRIu32,
+			    iface->name, state->auth.token->secretid);
+		else
+			syslog(LOG_DEBUG, "%s: accepted reconfigure key",
+			    iface->name);
 	} else if (ifo->auth.options & DHCPCD_AUTH_REQUIRE) {
 		log_dhcp1(LOG_ERR, "no authentication", iface, dhcp, from, 0);
 		return;
