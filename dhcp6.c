@@ -82,6 +82,7 @@ static const struct dhcp6_op dhcp6_ops[] = {
 	{ DHCP6_CONFIRM, "CONFIRM6" },
 	{ DHCP6_INFORMATION_REQ, "INFORM6" },
 	{ DHCP6_RELEASE, "RELEASE6" },
+	{ DHCP6_RECONFIGURE, "RECONFIURE6" },
 	{ 0, NULL }
 };
 
@@ -2283,9 +2284,9 @@ dhcp6_handledata(void *arg)
 			syslog(LOG_ERR,
 			    "%s: unsupported Reconfigure Message type",
 			    ifp->name);
-			return;
+			break;
 		}
-		break;
+		return;
 	default:
 		syslog(LOG_ERR, "%s: invalid DHCP6 type %s (%d)",
 		    ifp->name, op, r->type);
