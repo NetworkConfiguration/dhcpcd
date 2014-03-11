@@ -2238,12 +2238,12 @@ dhcp6_handledata(void *arg)
 	case DHCP6_RECONFIGURE:
 		if (auth == NULL) {
 			syslog(LOG_ERR,
-			    "%s: unauthenticated Force Renew from %s",
-			    ifp->name, ctx->sfrom);
+			    "%s: unauthenticated %s from %s",
+			    ifp->name, op, ctx->sfrom);
 			return;
 		}
-		syslog(LOG_INFO, "%s: Force Renew from %s",
-		    ifp->name, ctx->sfrom);
+		syslog(LOG_INFO, "%s: %s from %s",
+		    ifp->name, op, ctx->sfrom);
 		o = dhcp6_getmoption(D6_OPTION_RECONF_MSG, r, len);
 		if (o == NULL) {
 			syslog(LOG_ERR,
@@ -2261,8 +2261,8 @@ dhcp6_handledata(void *arg)
 		case DHCP6_RENEW:
 			if (state->state != DH6S_BOUND) {
 				syslog(LOG_ERR,
-				    "%s: not bound, ignoring Force Renew",
-				    ifp->name);
+				    "%s: not bound, ignoring %s",
+				    ifp->name, op);
 				return;
 			}
 			eloop_timeout_delete(ifp->ctx->eloop,
@@ -2272,8 +2272,8 @@ dhcp6_handledata(void *arg)
 		case DHCP6_INFORMATION_REQ:
 			if (state->state != DH6S_INFORMED) {
 				syslog(LOG_ERR,
-				    "%s: not informed, ignoring Force Renew",
-				    ifp->name);
+				    "%s: not informed, ignoring %s",
+				    ifp->name, op);
 				return;
 			}
 			eloop_timeout_delete(ifp->ctx->eloop,
@@ -2282,8 +2282,8 @@ dhcp6_handledata(void *arg)
 			break;
 		default:
 			syslog(LOG_ERR,
-			    "%s: unsupported Reconfigure Message type",
-			    ifp->name);
+			    "%s: unsupported %s type %d",
+			    ifp->name, op, *D6_COPTION_DATA(o));
 			break;
 		}
 		return;
