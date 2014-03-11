@@ -2703,7 +2703,6 @@ dhcp_dump(const char *ifname)
 	ifp->options = calloc(1, sizeof(*ifp->options));
 	if (ifp->options == NULL)
 		goto eexit;
-	strlcpy(ifp->name, ifname, sizeof(ifp->name));
 	snprintf(state->leasefile, sizeof(state->leasefile),
 	    LEASEFILE, ifp->name);
 	strlcpy(ifp->options->script, SCRIPT, sizeof(ifp->options->script));
