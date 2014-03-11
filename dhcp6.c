@@ -2648,7 +2648,8 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 	struct dhcpcd_ctx *ctx;
 	unsigned long long options;
 
-	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
+	if (ifp->ctx->eloop)
+		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 
 	if (ifp->options)
 		options = ifp->options->options;

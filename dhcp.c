@@ -2678,34 +2678,32 @@ dhcp_open(struct interface *ifp)
 }
 
 int
-dhcp_dump(const char *ifname)
+dhcp_dump(struct dhcpcd_ctx *ctx, const char *ifname)
 {
-	struct dhcpcd_ctx ctx;
 	struct interface *ifp;
 	struct dhcp_state *state;
-	int r;
 
-	ifp = NULL;
+	if (ctx->ifaces == NULL) {
+		ctx->ifaces = malloc(sizeof(*ctx->ifaces));
+		if (ctx->ifaces == NULL)
+			return -1;
+		TAILQ_INIT(ctx->ifaces);
+	}
 	state = NULL;
-	memset(&ctx, 0, sizeof(ctx));
-	ctx.ifaces = malloc(sizeof(*ctx.ifaces));
-	if (ctx.ifaces == NULL)
-		goto eexit;
-	TAILQ_INIT(ctx.ifaces);
 	ifp = calloc(1, sizeof(*ifp));
 	if (ifp == NULL)
 		goto eexit;
-	ifp->ctx = &ctx;
-	TAILQ_INSERT_HEAD(ctx.ifaces, ifp, next);
+	ifp->ctx = ctx;
+	TAILQ_INSERT_HEAD(ctx->ifaces, ifp, next);
 	ifp->if_data[IF_DATA_DHCP] = state = calloc(1, sizeof(*state));
 	if (state == NULL)
 		goto eexit;
 	ifp->options = calloc(1, sizeof(*ifp->options));
 	if (ifp->options == NULL)
 		goto eexit;
+	strlcpy(ifp->name, ifname, sizeof(ifp->name));
 	snprintf(state->leasefile, sizeof(state->leasefile),
 	    LEASEFILE, ifp->name);
-	strlcpy(ifp->options->script, SCRIPT, sizeof(ifp->options->script));
 	state->new = read_lease(ifp);
 	if (state->new == NULL && errno == ENOENT) {
 		strlcpy(state->leasefile, ifname, sizeof(state->leasefile));
@@ -2714,28 +2712,14 @@ dhcp_dump(const char *ifname)
 	if (state->new == NULL) {
 		if (errno == ENOENT)
 			syslog(LOG_ERR, "%s: no lease to dump", ifname);
-		r = -1;
-		goto cexit;
+		return -1;
 	}
 	state->reason = "DUMP";
-	r = script_runreason(ifp, state->reason);
-	goto cexit;
+	return script_runreason(ifp, state->reason);
 
 eexit:
 	syslog(LOG_ERR, "%s: %m", __func__);
-	r = -1;
-
-cexit:
-	if (state) {
-		free(state->new);
-		free(state);
-	}
-	if (ifp) {
-		free(ifp->options);
-		free(ifp);
-	}
-	free(ctx.ifaces);
-	return r;
+	return -1;
 }
 
 void

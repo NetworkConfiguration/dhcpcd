@@ -1275,7 +1275,7 @@ main(int argc, char **argv)
 			syslog(LOG_ERR, "dumplease requires an interface");
 			goto exit_failure;
 		}
-		if (dhcp_dump(argv[optind]) == -1)
+		if (dhcp_dump(&ctx, argv[optind]) == -1)
 			goto exit_failure;
 		goto exit_success;
 	}
