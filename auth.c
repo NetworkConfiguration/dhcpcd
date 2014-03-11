@@ -139,8 +139,14 @@ dhcp_auth_validate(struct authstate *state, const struct auth *auth,
 		    algorithm != auth->algorithm ||
 		    rdm != auth->rdm)
 	{
-		errno = EPERM;
-		return NULL;
+		/* As we don't require authentication, we should still
+		 * accept a reconfigure key */
+		if (protocol != AUTH_PROTO_RECONFKEY ||
+		    auth->options & DHCPCD_AUTH_REQUIRE)
+		{
+			errno = EPERM;
+			return NULL;
+		}
 	}
 	dlen -= 3;
 
