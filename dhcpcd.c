@@ -1196,6 +1196,9 @@ main(int argc, char **argv)
 
 	ctx.argv = argv;
 	ctx.argc = argc;
+	ctx.ifc = argc - optind;
+	ctx.ifv = argv + optind;
+
 	ifo = read_config(&ctx, NULL, NULL, NULL);
 	opt = add_options(&ctx, NULL, ifo, argc, argv);
 	if (opt != 1) {
@@ -1278,7 +1281,9 @@ main(int argc, char **argv)
 	}
 
 #ifdef USE_SIGNALS
-	if (!(ctx.options & (DHCPCD_MASTER | DHCPCD_TEST))) {
+	if (!(ctx.options & DHCPCD_TEST) &&
+	    (sig == 0 || ctx.ifc != 0))
+	{
 #endif
 		if (ctx.options & DHCPCD_MASTER)
 			i = -1;
@@ -1411,9 +1416,6 @@ main(int argc, char **argv)
 	syslog(LOG_WARNING, "FreeBSD errors that are worked around:");
 	syslog(LOG_WARNING, "IPv4 subnet routes cannot be deleted");
 #endif
-
-	ctx.ifc = argc - optind;
-	ctx.ifv = argv + optind;
 
 	/* When running dhcpcd against a single interface, we need to retain
 	 * the old behaviour of waiting for an IP address */
