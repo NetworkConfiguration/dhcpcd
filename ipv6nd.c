@@ -46,14 +46,6 @@
 #include <syslog.h>
 #include <unistd.h>
 
-/* Currently, no known kernel allows us to send from the unspecified address
- * which is required for DAD to work. This isn't that much of a problem as
- * the kernel will do DAD for us correctly, however we don't know the exact
- * randomness the kernel applies to the timeouts. So we just follow the same
- * logic and have a little faith.
- * This define is purely for completeness */
-// #define IPV6_SEND_DAD
-
 #define ELOOP_QUEUE 2
 #include "common.h"
 #include "dhcpcd.h"
@@ -164,16 +156,10 @@ ipv6nd_open(struct dhcpcd_ctx *dctx)
 	struct ipv6_ctx *ctx;
 	int on;
 	struct icmp6_filter filt;
-#ifdef IPV6_SEND_DAD
-	union {
-		struct sockaddr sa;
-		struct sockaddr_in6 sin;
-	} su;
-#endif
 
 	ctx = dctx->ipv6;
 	if (ctx->nd_fd != -1)
-		goto unspec;
+		return ctx->nd_fd;
 #ifdef SOCK_CLOEXEC
 	ctx->nd_fd = socket(AF_INET6, SOCK_RAW | SOCK_CLOEXEC | SOCK_NONBLOCK,
 	    IPPROTO_ICMPV6);
@@ -216,52 +202,6 @@ ipv6nd_open(struct dhcpcd_ctx *dctx)
 		goto eexit;
 
 	eloop_event_add(dctx->eloop, ctx->nd_fd, ipv6nd_handledata, dctx);
-
-unspec:
-#ifdef IPV6_SEND_DAD
-	if (ctx->unspec_fd != -1)
-		return ctx->nd_fd;
-
-	ICMP6_FILTER_SETBLOCKALL(&filt);
-
-	/* We send DAD requests from the unspecified address. */
-#ifdef SOCK_CLOEXEC
-	ctx->unspec_fd = socket(AF_INET6,
-	    SOCK_RAW | SOCK_CLOEXEC | SOCK_NONBLOCK,
-	    IPPROTO_ICMPV6);
-	if (ctx->unspec_fd == -1)
-		return -1;
-#else
-	if ((ctx->unspec_fd = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6)) == -1)
-		return -1;
-	if ((on = fcntl(ctx->unspec_fd, F_GETFD, 0)) == -1 ||
-	    fcntl(ctx->unspec_fd, F_SETFD, on | FD_CLOEXEC) == -1)
-	{
-		close(ctx->unspec_fd);
-		ctx->unspec_fd = -1;
-	        return -1;
-	}
-	if ((on = fcntl(ctx->unspec_fd, F_GETFL, 0)) == -1 ||
-	    fcntl(ctx->unspec_fd, F_SETFL, on | O_NONBLOCK) == -1)
-	{
-		close(ctx->unspec_fd);
-		ctx->unspec_fd = -1;
-	        return -1;
-	}
-#endif
-
-	if (setsockopt(ctx->unspec_fd, IPPROTO_ICMPV6, ICMP6_FILTER,
-	    &filt, sizeof(filt)) == -1)
-		goto eexit;
-	memset(&su, 0, sizeof(su));
-	su.sin.sin6_family = AF_INET6;
-#ifdef SIN6_LEN
-	su.sin.sin6_len = sizeof(su.sin);
-#endif
-	if (bind(ctx->unspec_fd, &su.sa, sizeof(su.sin)) == -1)
-		goto eexit;
-#endif
-
 	return ctx->nd_fd;
 
 eexit:
@@ -270,12 +210,6 @@ eexit:
 		close(ctx->nd_fd);
 		ctx->nd_fd = -1;
 	}
-#ifdef IPV6_SEND_DAD
-	if (ctx->unpsec_fd != -1) {
-		close(ctx->unspec_fd);
-		ctx->unspec_fd = -1;
-	}
-#endif
 	return -1;
 }
 
