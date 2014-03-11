@@ -704,7 +704,7 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 {
 	struct dhcp6_state *state;
 	struct ipv6_ctx *ctx;
-	struct sockaddr_in6 to;
+	struct sockaddr_in6 dst;
 	struct cmsghdr *cm;
 	struct in6_pktinfo pi;
 	struct timeval RTprev;
@@ -713,12 +713,13 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 	uint8_t neg;
 	const char *broad_uni;
 	const struct in6_addr alldhcp = IN6ADDR_LINKLOCAL_ALLDHCP_INIT;
+	int hoplimit = HOPLIMIT;
 
-	memset(&to, 0, sizeof(to));
-	to.sin6_family = AF_INET6;
-	to.sin6_port = htons(DHCP6_SERVER_PORT);
+	memset(&dst, 0, sizeof(dst));
+	dst.sin6_family = AF_INET6;
+	dst.sin6_port = htons(DHCP6_SERVER_PORT);
 #ifdef SIN6_LEN
-	to.sin6_len = sizeof(to);
+	dst.sin6_len = sizeof(dst);
 #endif
 
 	state = D6_STATE(ifp);
@@ -729,10 +730,10 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 	    (state->state == DH6S_REQUEST &&
 	    (!IN6_IS_ADDR_LINKLOCAL(&state->unicast) || !ipv6_linklocal(ifp))))
 	{
-		to.sin6_addr = alldhcp;
+		dst.sin6_addr = alldhcp;
 		broad_uni = "broadcasting";
 	} else {
-		to.sin6_addr = state->unicast;
+		dst.sin6_addr = state->unicast;
 		broad_uni = "unicasting";
 	}
 
@@ -829,8 +830,8 @@ logsend:
 	}
 
 	ctx = ifp->ctx->ipv6;
-	to.sin6_scope_id = ifp->index;
-	ctx->sndhdr.msg_name = (caddr_t)&to;
+	dst.sin6_scope_id = ifp->index;
+	ctx->sndhdr.msg_name = (caddr_t)&dst;
 	ctx->sndhdr.msg_iov[0].iov_base = (caddr_t)state->send;
 	ctx->sndhdr.msg_iov[0].iov_len = state->send_len;
 
@@ -844,6 +845,15 @@ logsend:
 	memset(&pi, 0, sizeof(pi));
 	pi.ipi6_ifindex = ifp->index;
 	memcpy(CMSG_DATA(cm), &pi, sizeof(pi));
+
+	/* Hop limit */
+	cm = CMSG_NXTHDR(&ctx->sndhdr, cm);
+	if (cm == NULL) /* unlikely */
+		return -1;
+	cm->cmsg_level = IPPROTO_IPV6;
+	cm->cmsg_type = IPV6_HOPLIMIT;
+	cm->cmsg_len = CMSG_LEN(sizeof(hoplimit));
+	memcpy(CMSG_DATA(cm), &hoplimit, sizeof(hoplimit));
 
 	if (sendmsg(ctx->dhcp_fd, &ctx->sndhdr, 0) == -1) {
 		syslog(LOG_ERR, "%s: %s: sendmsg: %m", ifp->name, __func__);
