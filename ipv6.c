@@ -121,7 +121,7 @@ ipv6_init(struct dhcpcd_ctx *dhcpcd_ctx)
 
 #ifdef IPV6_POLLADDRFLAG
 	if (!ctx->polladdr_warned) {
-		syslog(LOG_WARNING, 
+		syslog(LOG_WARNING,
 		    "kernel does not report IPv6 address flag changes");
 		syslog(LOG_WARNING,
 		    "polling tentative address flags periodically instead");

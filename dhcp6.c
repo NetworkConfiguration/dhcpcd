@@ -2519,7 +2519,6 @@ dhcp6_open(struct dhcpcd_ctx *dctx)
 		goto errexit;
 
 	eloop_event_add(dctx->eloop, ctx->dhcp_fd, dhcp6_handledata, dctx);
-
 	return 0;
 
 errexit:
