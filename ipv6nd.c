@@ -184,6 +184,12 @@ ipv6nd_open(struct dhcpcd_ctx *dctx)
 	}
 #endif
 
+	/* RFC4861 4.1 */
+	on = 255;
+	if (setsockopt(ctx->nd_fd, IPPROTO_IPV6, IPV6_MULTICAST_HOPS,
+	    &on, sizeof(on)) == -1)
+		goto eexit;
+
 	on = 1;
 	if (setsockopt(ctx->nd_fd, IPPROTO_IPV6, IPV6_RECVPKTINFO,
 	    &on, sizeof(on)) == -1)
@@ -247,7 +253,6 @@ ipv6nd_sendrsprobe(void *arg)
 	struct sockaddr_in6 dst;
 	struct cmsghdr *cm;
 	struct in6_pktinfo pi;
-	int hoplimit = 255; /* RFC4861 4.1 */
 
 	if (ipv6_linklocal(ifp) == NULL) {
 		syslog(LOG_DEBUG,
@@ -273,8 +278,6 @@ ipv6nd_sendrsprobe(void *arg)
 	ctx->sndhdr.msg_name = (caddr_t)&dst;
 	ctx->sndhdr.msg_iov[0].iov_base = state->rs;
 	ctx->sndhdr.msg_iov[0].iov_len = state->rslen;
-	ctx->sndhdr.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo)) +
-	    CMSG_SPACE(sizeof(int));
 
 	/* Set the outbound interface */
 	cm = CMSG_FIRSTHDR(&ctx->sndhdr);
@@ -286,15 +289,6 @@ ipv6nd_sendrsprobe(void *arg)
 	memset(&pi, 0, sizeof(pi));
 	pi.ipi6_ifindex = ifp->index;
 	memcpy(CMSG_DATA(cm), &pi, sizeof(pi));
-
-	/* Hop limit */
-	cm = CMSG_NXTHDR(&ctx->sndhdr, cm);
-	if (cm == NULL) /* unlikely */
-		return;
-	cm->cmsg_level = IPPROTO_IPV6;
-	cm->cmsg_type = IPV6_HOPLIMIT;
-	cm->cmsg_len = CMSG_LEN(sizeof(hoplimit));
-	memcpy(CMSG_DATA(cm), &hoplimit, sizeof(hoplimit));
 
 	syslog(LOG_DEBUG, "%s: sending Router Solicitation", ifp->name);
 	if (sendmsg(ctx->nd_fd, &ctx->sndhdr, 0) == -1) {
@@ -1247,7 +1241,6 @@ ipv6nd_proberouter(void *arg)
 	struct sockaddr_in6 dst;
 	struct cmsghdr *cm;
 	struct in6_pktinfo pi;
-	int hoplimit = 255; /* RFC4861 4.1 */
 	struct timeval tv, rtv;
 	struct ipv6_ctx *ctx;
 
@@ -1287,8 +1280,6 @@ ipv6nd_proberouter(void *arg)
 	ctx->sndhdr.msg_name = (caddr_t)&dst;
 	ctx->sndhdr.msg_iov[0].iov_base = rap->ns;
 	ctx->sndhdr.msg_iov[0].iov_len = rap->nslen;
-	ctx->sndhdr.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo)) +
-	    CMSG_SPACE(sizeof(int));
 
 	/* Set the outbound interface */
 	cm = CMSG_FIRSTHDR(&ctx->sndhdr);
@@ -1300,15 +1291,6 @@ ipv6nd_proberouter(void *arg)
 	memset(&pi, 0, sizeof(pi));
 	pi.ipi6_ifindex = rap->iface->index;
 	memcpy(CMSG_DATA(cm), &pi, sizeof(pi));
-
-	/* Hop limit */
-	cm = CMSG_NXTHDR(&ctx->sndhdr, cm);
-	if (cm == NULL) /* unlikely */
-		return;
-	cm->cmsg_level = IPPROTO_IPV6;
-	cm->cmsg_type = IPV6_HOPLIMIT;
-	cm->cmsg_len = CMSG_LEN(sizeof(hoplimit));
-	memcpy(CMSG_DATA(cm), &hoplimit, sizeof(hoplimit));
 
 #ifdef DEBUG_NS
 	syslog(LOG_INFO, "%s: sending IPv6 NS for %s",

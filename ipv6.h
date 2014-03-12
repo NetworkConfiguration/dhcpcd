@@ -134,7 +134,7 @@ struct ipv6_ctx {
 	struct sockaddr_in6 from;
 	struct msghdr sndhdr;
 	struct iovec sndiov[2];
-	unsigned char sndbuf[IP6BUFLEN];
+	unsigned char sndbuf[CMSG_SPACE(sizeof(struct in6_pktinfo))];
 	struct msghdr rcvhdr;
 	struct iovec rcviov[2];
 	unsigned char rcvbuf[IP6BUFLEN];

@@ -833,7 +833,6 @@ logsend:
 	ctx->sndhdr.msg_name = (caddr_t)&dst;
 	ctx->sndhdr.msg_iov[0].iov_base = (caddr_t)state->send;
 	ctx->sndhdr.msg_iov[0].iov_len = state->send_len;
-	ctx->sndhdr.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo));
 
 	/* Set the outbound interface */
 	cm = CMSG_FIRSTHDR(&ctx->sndhdr);
