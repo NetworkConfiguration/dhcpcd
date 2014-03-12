@@ -273,6 +273,8 @@ ipv6nd_sendrsprobe(void *arg)
 	ctx->sndhdr.msg_name = (caddr_t)&dst;
 	ctx->sndhdr.msg_iov[0].iov_base = state->rs;
 	ctx->sndhdr.msg_iov[0].iov_len = state->rslen;
+	ctx->sndhdr.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo)) +
+	    CMSG_SPACE(sizeof(int));
 
 	/* Set the outbound interface */
 	cm = CMSG_FIRSTHDR(&ctx->sndhdr);
@@ -1285,6 +1287,8 @@ ipv6nd_proberouter(void *arg)
 	ctx->sndhdr.msg_name = (caddr_t)&dst;
 	ctx->sndhdr.msg_iov[0].iov_base = rap->ns;
 	ctx->sndhdr.msg_iov[0].iov_len = rap->nslen;
+	ctx->sndhdr.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo)) +
+	    CMSG_SPACE(sizeof(int));
 
 	/* Set the outbound interface */
 	cm = CMSG_FIRSTHDR(&ctx->sndhdr);
@@ -1436,6 +1440,8 @@ ipv6nd_handledata(void *arg)
 
 	dhcpcd_ctx = arg;
 	ctx = dhcpcd_ctx->ipv6;
+	ctx->rcvhdr.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo)) +
+	    CMSG_SPACE(sizeof(int));
 	len = recvmsg(ctx->nd_fd, &ctx->rcvhdr, 0);
 	if (len == -1) {
 		syslog(LOG_ERR, "recvmsg: %m");

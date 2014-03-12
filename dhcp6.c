@@ -713,7 +713,6 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 	uint8_t neg;
 	const char *broad_uni;
 	const struct in6_addr alldhcp = IN6ADDR_LINKLOCAL_ALLDHCP_INIT;
-	int hoplimit = 1; /* Relay agents bump this up */
 
 	memset(&dst, 0, sizeof(dst));
 	dst.sin6_family = AF_INET6;
@@ -834,6 +833,7 @@ logsend:
 	ctx->sndhdr.msg_name = (caddr_t)&dst;
 	ctx->sndhdr.msg_iov[0].iov_base = (caddr_t)state->send;
 	ctx->sndhdr.msg_iov[0].iov_len = state->send_len;
+	ctx->sndhdr.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo));
 
 	/* Set the outbound interface */
 	cm = CMSG_FIRSTHDR(&ctx->sndhdr);
@@ -845,15 +845,6 @@ logsend:
 	memset(&pi, 0, sizeof(pi));
 	pi.ipi6_ifindex = ifp->index;
 	memcpy(CMSG_DATA(cm), &pi, sizeof(pi));
-
-	/* Hop limit */
-	cm = CMSG_NXTHDR(&ctx->sndhdr, cm);
-	if (cm == NULL) /* unlikely */
-		return -1;
-	cm->cmsg_level = IPPROTO_IPV6;
-	cm->cmsg_type = IPV6_HOPLIMIT;
-	cm->cmsg_len = CMSG_LEN(sizeof(hoplimit));
-	memcpy(CMSG_DATA(cm), &hoplimit, sizeof(hoplimit));
 
 	if (sendmsg(ctx->dhcp_fd, &ctx->sndhdr, 0) == -1) {
 		syslog(LOG_ERR, "%s: %s: sendmsg: %m", ifp->name, __func__);
@@ -2023,6 +2014,7 @@ dhcp6_handledata(void *arg)
 
 	dhcpcd_ctx = arg;
 	ctx = dhcpcd_ctx->ipv6;
+	ctx->rcvhdr.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo));
 	len = recvmsg(ctx->dhcp_fd, &ctx->rcvhdr, 0);
 	if (len == -1) {
 		syslog(LOG_ERR, "recvmsg: %m");
@@ -2520,11 +2512,6 @@ dhcp6_open(struct dhcpcd_ctx *dctx)
 
 	n = 1;
 	if (setsockopt(ctx->dhcp_fd, IPPROTO_IPV6, IPV6_RECVPKTINFO,
-	    &n, sizeof(n)) == -1)
-		goto errexit;
-
-	n = 1;
-	if (setsockopt(ctx->dhcp_fd, IPPROTO_IPV6, IPV6_RECVHOPLIMIT,
 	    &n, sizeof(n)) == -1)
 		goto errexit;
 
