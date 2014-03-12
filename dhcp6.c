@@ -713,7 +713,7 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 	uint8_t neg;
 	const char *broad_uni;
 	const struct in6_addr alldhcp = IN6ADDR_LINKLOCAL_ALLDHCP_INIT;
-	int hoplimit = HOPLIMIT;
+	int hoplimit = 1; /* Relay agents bump this up */
 
 	memset(&dst, 0, sizeof(dst));
 	dst.sin6_family = AF_INET6;

@@ -247,7 +247,7 @@ ipv6nd_sendrsprobe(void *arg)
 	struct sockaddr_in6 dst;
 	struct cmsghdr *cm;
 	struct in6_pktinfo pi;
-	int hoplimit = HOPLIMIT;
+	int hoplimit = 255; /* RFC4861 4.1 */
 
 	if (ipv6_linklocal(ifp) == NULL) {
 		syslog(LOG_DEBUG,
@@ -1245,7 +1245,7 @@ ipv6nd_proberouter(void *arg)
 	struct sockaddr_in6 dst;
 	struct cmsghdr *cm;
 	struct in6_pktinfo pi;
-	int hoplimit = HOPLIMIT;
+	int hoplimit = 255; /* RFC4861 4.1 */
 	struct timeval tv, rtv;
 	struct ipv6_ctx *ctx;
 

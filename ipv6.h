@@ -41,7 +41,6 @@
 #include "dhcpcd.h"
 
 #define ALLROUTERS "ff02::2"
-#define HOPLIMIT 255
 
 #define ROUNDUP8(a) (1 + (((a) - 1) | 7))
 
