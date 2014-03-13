@@ -246,7 +246,23 @@ echo "LIBDIR=		$LIBDIR" >>$CONFIG_MK
 echo "MANDIR=		$MANDIR" >>$CONFIG_MK
 
 : ${CC:=cc}
-echo "Using compiler .. $(which $CC)"
+if ! type "$CC" >/dev/null 2>&1; then
+	for _CC in clang gcc pcc icc; do
+		_CC=$(_which "$_CC")
+		if [ -x "$_CC" ]; then
+			CC=$_CC
+			break
+		fi
+	done
+	
+fi
+
+echo "Using compiler .. $CC"
+if ! type "$CC" >/dev/null 2>&1; then
+	echo "$CC is not an executable"
+	exit 1
+fi
+[ "$CC" != cc ] && echo "CC=	$CC" >>$CONFIG_MK
 $CC --version | $SED -e '1!d'
 
 # Set to blank, then append user config
