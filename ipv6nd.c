@@ -431,15 +431,17 @@ add_router(struct ipv6_ctx *ctx, struct ra *router)
 static int
 ipv6nd_scriptrun(struct ra *rap)
 {
-	int hasdns;
+	int hasdns, hasaddress, pid;
 	struct ipv6_addr *ap;
 	const struct ra_opt *rao;
 
+	hasaddress = 0;
 	/* If all addresses have completed DAD run the script */
 	TAILQ_FOREACH(ap, &rap->addrs, next) {
 		if ((ap->flags & (IPV6_AF_ONLINK | IPV6_AF_AUTOCONF)) ==
 		    (IPV6_AF_ONLINK | IPV6_AF_AUTOCONF))
 		{
+			hasaddress = 1;
 			if (!(ap->flags & IPV6_AF_DADCOMPLETED) &&
 			    ipv6_findaddr(ap->iface, &ap->addr))
 				ap->flags |= IPV6_AF_DADCOMPLETED;
@@ -470,8 +472,10 @@ ipv6nd_scriptrun(struct ra *rap)
 	}
 
 	script_runreason(rap->iface, "ROUTERADVERT");
-	if (hasdns)
-		hasdns = daemonise(rap->iface->ctx);
+	pid = 0;
+	if (hasdns && (hasaddress ||
+	    !(rap->flags & (ND_RA_FLAG_MANAGED | ND_RA_FLAG_OTHER))))
+		pid = daemonise(rap->iface->ctx);
 #if 0
 	else if (options & DHCPCD_DAEMONISE &&
 	    !(options & DHCPCD_DAEMONISED) && new_data)
@@ -481,7 +485,7 @@ ipv6nd_scriptrun(struct ra *rap)
 		    ifp->name);
 }
 #endif
-	return hasdns;
+	return pid;
 }
 
 static void
