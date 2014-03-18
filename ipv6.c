@@ -633,7 +633,8 @@ ipv6_findaddr(const struct interface *ifp, const struct in6_addr *addr)
 				    !(ap->addr_flags & IN6_IFF_NOTUSEABLE))
 					return ap;
 			} else {
-				if (IN6_ARE_ADDR_EQUAL(&ap->addr, addr))
+				if (IN6_ARE_ADDR_EQUAL(&ap->addr, addr) &&
+				    !(ap->addr_flags & IN6_IFF_TENTATIVE))
 					return ap;
 			}
 		}
