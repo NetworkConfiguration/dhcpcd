@@ -690,7 +690,7 @@ if [ "$MD5" = no ]; then
 	echo "MD5_SRC=	md5.c" >>$CONFIG_MK
 else
 	echo "MD5_SRC=" >>$CONFIG_MK
-	echo "CPPFLAGS+=	-DHAVE_MD5_H" >>$CONFIG_MK
+	echo "#define HAVE_MD5_H" >>$CONFIG_H
 	[ -n "$MD5_LIB" ] && echo "LDADD+=		$MD5_LIB" >>$CONFIG_MK
 fi
 
@@ -784,48 +784,54 @@ if ! $HOOKSET; then
 		echo "not found"
 	fi
 
-	printf "Checking for ypind ... "
+	printf "Checking for ypbind ... "
 	YPBIND=$(_which ypbind)
 	if [ -n "$YPBIND" ]; then
+		YPHOOK="50-ypbind"
 		if strings "$YPBIND" | $GREP -q yp\\.conf; then
 			YPHOOK="50-yp.conf"
+			YPOS="Linux"
 		elif strings "$YPBIND" | $GREP -q \\.ypservers; then
-			YPHOOK="50-ypbind"
+			YPOS="NetBSD"
 			echo "YPDOMAIN_DIR=	/var/yp" >>$CONFIG_MK
 			echo "YPDOMAIN_SUFFIX=.ypservers" >>$CONFIG_MK
 		elif strings "$YPBIND" | $GREP -q /etc/yp; then
-			YPHOOK="50-ypbind"
+			YPOS="OpenBSD"
 			echo "YPDOMAIN_DIR=	/etc/yp" >>$CONFIG_MK
 			echo "YPDOMAIN_SUFFIX=" >>$CONFIG_MK
-		fi
-		if [ -n "$YPHOOK" ]; then
-			echo "$YPBIND ($YPHOOK)"
-			HOOKS="$HOOKS${HOOKS:+ }$YPHOOK"
 		else
-			echo "unsupported version"
+			YPOS="FreeBSD"
+			echo "YPDOMAIN_DIR=" >>$CONFIG_MK
+			echo "YPDOMAIN_SUFFIX=" >>$CONFIG_MK
 		fi
+		echo "$YPBIND ($YPHOOK${YPOS:+ }$YPOS)"
+		HOOKS="$HOOKS${HOOKS:+ }$YPHOOK"
 	else
 		echo "not found"
 	fi
 fi
 
-cd dhcpcd-hooks
-for x in $HOOKSCRIPTS; do
-	printf "Finding hook $x ... "
-	for h in [0-9][0-9]"-$x" [0-9][0-9]"-$x.sh" [0-9][0-9]"-$x.conf"; do
-		[ -e "$h" ] && break
+if cd dhcpcd-hooks; then
+	for x in $HOOKSCRIPTS; do
+		printf "Finding hook $x ... "
+		for h in [0-9][0-9]"-$x" \
+		    [0-9][0-9]"-$x.sh" \
+		    [0-9][0-9]"-$x.conf"
+		do
+			[ -e "$h" ] && break
+		done
+		if [ ! -e "$h" ]; then
+			echo "no"
+		else
+			echo "$h"
+			case " $HOOKS " in
+			*" $h "*)	;;
+			*)		HOOKS="$HOOKS${HOOKS:+ }$h";;
+			esac
+		fi
 	done
-	if [ ! -e "$h" ]; then
-		echo "no"
-	else
-		echo "$h"
-		case " $HOOKS " in
-		*" $h "*)	;;
-		*)		HOOKS="$HOOKS${HOOKS:+ }$h";;
-		esac
-	fi
-done
-cd ..
+	cd ..
+fi
 echo "HOOKSCRIPTS=	$HOOKS" >>$CONFIG_MK
 
 # Define any RCSIDs for import into 3rd party systems
