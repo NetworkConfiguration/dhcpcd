@@ -787,13 +787,23 @@ if ! $HOOKSET; then
 	printf "Checking for ypind ... "
 	YPBIND=$(_which ypbind)
 	if [ -n "$YPBIND" ]; then
-		if strings "$YPBIND" | $GREP -q yp.conf; then
+		if strings "$YPBIND" | $GREP -q yp\\.conf; then
 			YPHOOK="50-yp.conf"
-		else
+		elif strings "$YPBIND" | $GREP -q \\.ypservers; then
 			YPHOOK="50-ypbind"
+			echo "YPDOMAIN_DIR=	/var/yp" >>$CONFIG_MK
+			echo "YPDOMAIN_SUFFIX=.ypservers" >>$CONFIG_MK
+		elif strings "$YPBIND" | $GREP -q /etc/yp; then
+			YPHOOK="50-ypbind"
+			echo "YPDOMAIN_DIR=	/etc/yp" >>$CONFIG_MK
+			echo "YPDOMAIN_SUFFIX=" >>$CONFIG_MK
 		fi
-		echo "$YPBIND ($YPHOOK)"
-		HOOKS="$HOOKS${HOOKS:+ }$YPHOOK"
+		if [ -n "$YPHOOK" ]; then
+			echo "$YPBIND ($YPHOOK)"
+			HOOKS="$HOOKS${HOOKS:+ }$YPHOOK"
+		else
+			echo "unsupported version"
+		fi
 	else
 		echo "not found"
 	fi

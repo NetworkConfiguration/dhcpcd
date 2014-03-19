@@ -8,9 +8,16 @@ SCRIPTS+=	10-mtu 10-wpa_supplicant 15-timezone 20-resolv.conf
 SCRIPTS+=	29-lookup-hostname 30-hostname
 SCRIPTS+=	${HOOKSCRIPTS}
 
-all:
+50-ypbind: 50-ypbind.in
+	${SED} \
+		-e 's:@YPDOMAIN_DIR@:${YPDOMAIN_DIR}:g' \
+		-e 's:@YPDOMAIN_SUFFIX@:${YPDOMAIN_SUFFIX}:g' \
+		50-ypbind.in > $@
+
+all: ${HOOKSCRIPTS}
 
 clean:
+	rm -f 50-ypbind
 
 proginstall:
 	${INSTALL} -d ${DESTDIR}${SCRIPTSDIR}
