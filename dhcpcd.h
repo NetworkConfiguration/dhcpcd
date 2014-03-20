@@ -118,10 +118,9 @@ struct dhcpcd_ctx {
 	struct dhcp_opt *dhcp6_opts;
 	size_t dhcp6_opts_len;
 	struct ipv6_ctx *ipv6;
-#ifdef __linux__
 	char **ra_restore;
 	ssize_t ra_restore_len;
-#else /* __linux__ */
+#ifndef __linux__
 	int ra_global;
 	int ra_kernel_set;
 #endif

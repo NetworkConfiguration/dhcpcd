@@ -141,7 +141,7 @@ restore_kernel_ra(struct dhcpcd_ctx *ctx)
 
 	for (; ctx->ra_restore_len > 0; ctx->ra_restore_len--) {
 		if (!(ctx->options & DHCPCD_FORKED)) {
-			syslog(LOG_INFO, "%s: restoring Kernel IPv6 RA support",
+			syslog(LOG_INFO, "%s: restoring kernel IPv6 RA support",
 			    ctx->ra_restore[ctx->ra_restore_len - 1]);
 			snprintf(path, sizeof(path), "%s/%s/accept_ra",
 			    prefix, ctx->ra_restore[ctx->ra_restore_len - 1]);
@@ -179,7 +179,7 @@ check_ipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 		syslog(errno == ENOENT ? LOG_DEBUG : LOG_WARNING,
 		    "%s: %m", path);
 	else if (ra != 0 && own) {
-		syslog(LOG_INFO, "%s: disabling Kernel IPv6 RA support",
+		syslog(LOG_INFO, "%s: disabling kernel IPv6 RA support",
 		    ifname);
 		if (write_path(path, "0") == -1) {
 			syslog(LOG_ERR, "write_path: %s: %m", path);
@@ -192,18 +192,19 @@ check_ipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 			p = strdup(ifname);
 			if (p == NULL) {
 				syslog(LOG_ERR, "%s: %m", __func__);
-				return ra;
+				return 0;
 			}
 			nrest = realloc(ctx->ra_restore,
 			    (ctx->ra_restore_len + 1) * sizeof(char *));
 			if (nrest == NULL) {
 				syslog(LOG_ERR, "%s: %m", __func__);
 				free(p);
-				return ra;
+				return 0;
 			}
 			ctx->ra_restore = nrest;
 			ctx->ra_restore[ctx->ra_restore_len++] = p;
 		}
+		return 0;
 	}
 
 	return ra;

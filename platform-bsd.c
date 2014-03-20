@@ -37,6 +37,7 @@
 #endif
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
+#include <netinet6/nd6.h>
 
 #include <errno.h>
 #include <stdlib.h>
@@ -94,15 +95,69 @@ inet6_sysctl(int code, int val, int action)
 	return val;
 }
 
+#define del_if_nd6_flag(ifname, flag) if_nd6_flag(ifname, flag, -1)
+#define get_if_nd6_flag(ifname, flag) if_nd6_flag(ifname, flag,  0)
+#define set_if_nd6_flag(ifname, flag) if_nd6_flag(ifname, flag,  1)
+static int
+if_nd6_flag(const char *ifname, unsigned int flag, int set)
+{
+	int s, error;
+	struct in6_ndireq nd;
+	unsigned int oflags;
+
+	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) == -1)
+		return -1;
+	memset(&nd, 0, sizeof(nd));
+	strlcpy(nd.ifname, ifname, sizeof(nd.ifname));
+	if ((error = ioctl(s, SIOCGIFINFO_IN6, &nd)) == -1)
+		goto eexit;
+	if (set == 0) {
+		close(s);
+		return nd.ndi.flags & flag ? 1 : 0;
+	}
+
+	oflags = nd.ndi.flags;
+	if (set == -1)
+		nd.ndi.flags &= ~flag;
+	else
+		nd.ndi.flags |= flag;
+	if (oflags == nd.ndi.flags)
+		error = 0;
+	else
+		error = ioctl(s, SIOCSIFINFO_FLAGS, &nd);
+
+eexit:
+	close(s);
+	return error;
+}
+
 void
 restore_kernel_ra(struct dhcpcd_ctx *ctx)
 {
 
-	if (ctx->ra_kernel_set == 0 || ctx->options & DHCPCD_FORKED)
+	if (ctx->options & DHCPCD_FORKED)
 		return;
-	syslog(LOG_INFO, "restoring Kernel IPv6 RA support");
-	if (set_inet6_sysctl(IPV6CTL_ACCEPT_RTADV, 1) == -1)
-		syslog(LOG_ERR, "IPV6CTL_ACCEPT_RTADV: %m");
+
+	for (; ctx->ra_restore_len > 0; ctx->ra_restore_len--) {
+		if (!(ctx->options & DHCPCD_FORKED)) {
+			syslog(LOG_INFO, "%s: restoring kernel IPv6 RA support",
+			    ctx->ra_restore[ctx->ra_restore_len - 1]);
+			if (set_if_nd6_flag(
+			    ctx->ra_restore[ctx->ra_restore_len -1],
+			    ND6_IFF_ACCEPT_RTADV) == -1)
+				syslog(LOG_ERR, "%s: del_if_nd6_flag: %m",
+				    ctx->ra_restore[ctx->ra_restore_len - 1]);
+		}
+		free(ctx->ra_restore[ctx->ra_restore_len - 1]);
+	}
+	free(ctx->ra_restore);
+	ctx->ra_restore = NULL;
+
+	if (ctx->ra_kernel_set) {
+		syslog(LOG_INFO, "restoring kernel IPv6 RA support");
+		if (set_inet6_sysctl(IPV6CTL_ACCEPT_RTADV, 1) == -1)
+			syslog(LOG_ERR, "IPV6CTL_ACCEPT_RTADV: %m");
+	}
 }
 
 static int
@@ -128,10 +183,65 @@ check_ipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 {
 	int ra;
 
-	/* BSD doesn't support these values per iface, so just return
-	 * the global ra setting */
-	if (ifname)
+	if (ifname) {
+#ifdef ND6_IFF_ACCEPT_RTADV
+		int i;
+		char *p, **nrest;
+#endif
+
+#ifdef ND_IFF_AUTO_LINKLOCAL
+		if (set_if_nd6_flag(ifname, ND6_IFF_AUTO_LINKLOCAL) == -1) {
+			syslog(LOG_ERR, "%s: set_if_nd6_flag: %m", ifname);
+			return -1;
+		}
+#endif
+
+		if (del_if_nd6_flag(ifname, ND6_IFF_IFDISABLED) == -1) {
+			syslog(LOG_ERR, "%s: del_if_nd6_flag: %m", ifname);
+			return -1;
+		}
+
+#ifdef ND6_IFF_ACCEPT_RTADV
+		ra = get_if_nd6_flag(ifname, ND6_IFF_ACCEPT_RTADV);
+		if (ra == -1)
+			syslog(LOG_ERR, "%s: get_if_nd6_flag: %m", ifname);
+		else if (ra != 0 && own) {
+			syslog(LOG_INFO,
+			    "%s: disabling Kernel IPv6 RA support",
+			    ifname);
+			if (del_if_nd6_flag(ifname, ND6_IFF_ACCEPT_RTADV)
+			    == -1)
+			{
+				syslog(LOG_ERR, "%s: del_if_nd6_flag: %m",
+				    ifname);
+				return ra;
+			}
+			for (i = 0; i < ctx->ra_restore_len; i++)
+				if (strcmp(ctx->ra_restore[i], ifname) == 0)
+					break;
+			if (i == ctx->ra_restore_len) {
+				p = strdup(ifname);
+				if (p == NULL) {
+					syslog(LOG_ERR, "%s: %m", __func__);
+					return 0;
+				}
+				nrest = realloc(ctx->ra_restore,
+				    (ctx->ra_restore_len + 1) * sizeof(char *));
+				if (nrest == NULL) {
+					syslog(LOG_ERR, "%s: %m", __func__);
+					free(p);
+					return 0;
+				}
+				ctx->ra_restore = nrest;
+				ctx->ra_restore[ctx->ra_restore_len++] = p;
+			}
+			return 0;
+		}
+		return ra;
+#else
 		return ctx->ra_global;
+#endif
+	}
 
 	ra = get_inet6_sysctl(IPV6CTL_ACCEPT_RTADV);
 	if (ra == -1)
@@ -153,9 +263,8 @@ check_ipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 		 * and default routes we are trying to own. */
 		ipv6_ra_flush();
 	}
-	if (ifname == NULL)
-		ctx->ra_global = ra;
 
+	ctx->ra_global = ra;
 	return ra;
 }
 
