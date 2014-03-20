@@ -786,8 +786,7 @@ desc_route(const char *cmd, const struct rt6 *rt)
 	gate = inet_ntop(AF_INET6, &rt->gate.s6_addr,
 	    gatebuf, INET6_ADDRSTRLEN);
 	if (IN6_ARE_ADDR_EQUAL(&rt->gate, &in6addr_any))
-		syslog(LOG_INFO, "%s: %s %sroute to %s/%d", ifname, cmd,
-		    rt->flags & RTF_REJECT ? "reject " : "",
+		syslog(LOG_INFO, "%s: %s route to %s/%d", ifname, cmd,
 		    dest, ipv6_prefixlen(&rt->net));
 	else if (IN6_ARE_ADDR_EQUAL(&rt->dest, &in6addr_any) &&
 	    IN6_ARE_ADDR_EQUAL(&rt->net, &in6addr_any))

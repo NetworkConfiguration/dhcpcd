@@ -35,6 +35,8 @@
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 
+#include <net/route.h>
+
 /* Support older kernels */
 #ifndef IFLA_WIRELESS
 # define IFLA_WIRELESS (IFLA_MASTER + 1)
@@ -814,9 +816,7 @@ if_route6(const struct rt6 *rt, int action)
 	add_attr_l(&nlm.hdr, sizeof(nlm), RTA_DST,
 	    &rt->dest.s6_addr, sizeof(rt->dest.s6_addr));
 
-	/* If destination == gateway then don't add the gateway */
-	if (!IN6_IS_ADDR_UNSPECIFIED(&rt->gate) &&
-	    !IN6_ARE_ADDR_EQUAL(&rt->dest, &rt->gate))
+	if (action >= 0 && !IN6_IS_ADDR_UNSPECIFIED(&rt->gate))
 		add_attr_l(&nlm.hdr, sizeof(nlm), RTA_GATEWAY,
 		    &rt->gate.s6_addr, sizeof(rt->gate.s6_addr));
 
