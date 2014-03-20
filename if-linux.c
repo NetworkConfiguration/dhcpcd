@@ -804,7 +804,10 @@ if_route6(const struct rt6 *rt, int action)
 			nlm.rt.rtm_scope = RT_SCOPE_LINK;
 		} else
 			nlm.rt.rtm_protocol = RTPROT_BOOT;
-		nlm.rt.rtm_type = RTN_UNICAST;
+		if (rt->flags & RTF_REJECT)
+			nlm.rt.rtm_type = RTN_UNREACHABLE;
+		else
+			nlm.rt.rtm_type = RTN_UNICAST;
 	}
 
 	nlm.rt.rtm_dst_len = ipv6_prefixlen(&rt->net);
@@ -817,8 +820,10 @@ if_route6(const struct rt6 *rt, int action)
 		add_attr_l(&nlm.hdr, sizeof(nlm), RTA_GATEWAY,
 		    &rt->gate.s6_addr, sizeof(rt->gate.s6_addr));
 
-	add_attr_32(&nlm.hdr, sizeof(nlm), RTA_OIF, rt->iface->index);
-	add_attr_32(&nlm.hdr, sizeof(nlm), RTA_PRIORITY, rt->metric);
+	if (!(rt->flags & RTF_REJECT)) {
+		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_OIF, rt->iface->index);
+		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_PRIORITY, rt->metric);
+	}
 
 	if (rt->mtu) {
 		metrics->rta_type = RTA_METRICS;

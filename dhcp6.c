@@ -1425,7 +1425,7 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 				break;
 			}
 			a->iface = ifp;
-			a->flags = IPV6_AF_NEW;
+			a->flags = IPV6_AF_NEW | IPV6_AF_DELEGATEDPFX;
 			a->dadcallback = dhcp6_dadcallback;
 			memcpy(a->iaid, iaid, sizeof(a->iaid));
 			memcpy(&a->prefix.s6_addr,
@@ -1852,6 +1852,8 @@ dhcp6_delegate_prefix(struct interface *ifp)
 		k = 0;
 		carrier_warned = 0;
 		TAILQ_FOREACH(ap, &state->addrs, next) {
+			if (!(ap->flags & IPV6_AF_DELEGATEDPFX))
+				continue;
 			if (ap->flags & IPV6_AF_NEW) {
 				ap->flags &= ~IPV6_AF_NEW;
 				syslog(LOG_DEBUG, "%s: delegated prefix %s",
@@ -1946,12 +1948,12 @@ dhcp6_find_delegates(struct interface *ifp)
 	k = 0;
 	TAILQ_FOREACH(ifd, ifp->ctx->ifaces, next) {
 		ifo = ifd->options;
-		if (ifo->ia_type != D6_OPTION_IA_PD)
-			continue;
 		state = D6_STATE(ifd);
 		if (state == NULL || state->state != DH6S_BOUND)
 			continue;
 		TAILQ_FOREACH(ap, &state->addrs, next) {
+			if (!(ap->flags & IPV6_AF_DELEGATEDPFX))
+				continue;
 			for (i = 0; i < ifo->ia_len; i++) {
 				ia = &ifo->ia[i];
 				if (memcmp(ia->iaid, ap->iaid,

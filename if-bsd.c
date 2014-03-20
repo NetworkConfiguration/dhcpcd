@@ -461,45 +461,42 @@ if_route6(const struct rt6 *rt, int action)
 		rtm.hdr.rtm_type = RTM_ADD;
 	else
 		rtm.hdr.rtm_type = RTM_DELETE;
-	rtm.hdr.rtm_flags = RTF_UP;
+	rtm.hdr.rtm_flags = RTF_UP | rt->flags;
 	rtm.hdr.rtm_addrs = RTA_DST | RTA_NETMASK;
 #ifdef SIOCGIFPRIORITY
 	rtm.hdr.rtm_priority = rt->metric;
 #endif
 	/* None interface subnet routes are static. */
-	if (IN6_IS_ADDR_UNSPECIFIED(&rt->dest) &&
-	    IN6_IS_ADDR_UNSPECIFIED(&rt->net))
-		rtm.hdr.rtm_flags |= RTF_GATEWAY;
+	if (IN6_IS_ADDR_UNSPECIFIED(&rt->gate)) {
 #ifdef RTF_CLONING
-	else
 		rtm.hdr.rtm_flags |= RTF_CLONING;
 #endif
+	 } else
+		rtm.hdr.rtm_flags |= RTF_GATEWAY | RTF_STATIC;
 
-	if (action >= 0)
-		rtm.hdr.rtm_addrs |= RTA_GATEWAY | RTA_IFP | RTA_IFA;
+	if (action >= 0) {
+		rtm.hdr.rtm_addrs |= RTA_GATEWAY;
+		if (!(rtm.hdr.rtm_flags & RTF_REJECT))
+			rtm.hdr.rtm_addrs |= RTA_IFP | RTA_IFA;
+	}
 
 	ADDADDR(&rt->dest);
 	lla = NULL;
 	if (rtm.hdr.rtm_addrs & RTA_GATEWAY) {
-		if (!(rtm.hdr.rtm_flags & RTF_GATEWAY)) {
+		if (IN6_IS_ADDR_UNSPECIFIED(&rt->gate)) {
 			lla = ipv6_linklocal(rt->iface);
 			if (lla == NULL) /* unlikely */
 				return -1;
 			ADDADDRS(&lla->addr, rt->iface->index);
 		} else {
-			lla = NULL;
-			ADDADDRS(&rt->gate, rt->iface->index);
+			ADDADDRS(&rt->gate,
+			    IN6_ARE_ADDR_EQUAL(&rt->gate, &in6addr_loopback)
+			    ? 0 : rt->iface->index);
 		}
 	}
 
-	if (rtm.hdr.rtm_addrs & RTA_NETMASK) {
-		if (rtm.hdr.rtm_flags & RTF_GATEWAY) {
-			memset(&su, 0, sizeof(su));
-			su.sin.sin6_family = AF_INET6;
-			ADDSU;
-		} else
-			ADDADDR(&rt->net);
-	}
+	if (rtm.hdr.rtm_addrs & RTA_NETMASK)
+		ADDADDR(&rt->net);
 
 	if (rtm.hdr.rtm_addrs & RTA_IFP) {
 		/* Make us a link layer socket for the host gateway */

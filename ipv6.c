@@ -786,7 +786,8 @@ desc_route(const char *cmd, const struct rt6 *rt)
 	gate = inet_ntop(AF_INET6, &rt->gate.s6_addr,
 	    gatebuf, INET6_ADDRSTRLEN);
 	if (IN6_ARE_ADDR_EQUAL(&rt->gate, &in6addr_any))
-		syslog(LOG_INFO, "%s: %s route to %s/%d", ifname, cmd,
+		syslog(LOG_INFO, "%s: %s %sroute to %s/%d", ifname, cmd,
+		    rt->flags & RTF_REJECT ? "reject " : "",
 		    dest, ipv6_prefixlen(&rt->net));
 	else if (IN6_ARE_ADDR_EQUAL(&rt->dest, &in6addr_any) &&
 	    IN6_ARE_ADDR_EQUAL(&rt->net, &in6addr_any))
@@ -862,16 +863,23 @@ make_prefix(const struct interface * ifp, const struct ra *rap,
 		return NULL;
 	}
 
-	/* There is no point in trying to manage a /128 prefix. */
-	if (addr->prefix_len == 128)
+	/* There is no point in trying to manage a /128 prefix,
+	 * ones without a lifetime or ones not on link or delegated */
+	if (addr->prefix_len == 128 ||
+	    addr->prefix_vltime == 0 ||
+	    !(addr->flags & (IPV6_AF_ONLINK | IPV6_AF_DELEGATEDPFX)))
 		return NULL;
 
 	r = make_route(ifp, rap);
 	if (r == NULL)
-		return r;
+		return NULL;
 	r->dest = addr->prefix;
 	ipv6_mask(&r->net, addr->prefix_len);
-	r->gate = in6addr_any;
+	if (addr->flags & IPV6_AF_DELEGATEDPFX) {
+		r->flags |= RTF_REJECT;
+		r->gate = in6addr_loopback;
+	} else
+		r->gate = in6addr_any;
 	return r;
 }
 
@@ -944,9 +952,6 @@ ipv6_build_ra_routes(struct ipv6_ctx *ctx, struct rt6_head *dnr, int expired)
 			continue;
 		if (rap->iface->options->options & DHCPCD_IPV6RA_OWN) {
 			TAILQ_FOREACH(addr, &rap->addrs, next) {
-				if (addr->prefix_vltime == 0 ||
-				    (addr->flags & IPV6_AF_ONLINK) == 0)
-					continue;
 				rt = make_prefix(rap->iface, rap, addr);
 				if (rt)
 					TAILQ_INSERT_TAIL(dnr, rt, next);
@@ -972,14 +977,9 @@ ipv6_build_dhcp_routes(struct dhcpcd_ctx *ctx,
 	struct rt6 *rt;
 
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-		if (!(ifp->options->options & DHCPCD_IPV6RA_OWN))
-			continue;
 		d6_state = D6_CSTATE(ifp);
 		if (d6_state && d6_state->state == dstate) {
 			TAILQ_FOREACH(addr, &d6_state->addrs, next) {
-				if ((addr->flags & IPV6_AF_ONLINK) == 0 ||
-				    IN6_IS_ADDR_UNSPECIFIED(&addr->addr))
-					continue;
 				rt = make_prefix(ifp, NULL, addr);
 				if (rt)
 					TAILQ_INSERT_TAIL(dnr, rt, next);

@@ -97,6 +97,7 @@ TAILQ_HEAD(ipv6_addrhead, ipv6_addr);
 #define IPV6_AF_DUPLICATED	0x0020
 #define IPV6_AF_DADCOMPLETED	0x0040
 #define IPV6_AF_DELEGATED	0x0080
+#define IPV6_AF_DELEGATEDPFX	0x0100
 
 struct rt6 {
 	TAILQ_ENTRY(rt6) next;
@@ -104,6 +105,7 @@ struct rt6 {
 	struct in6_addr net;
 	struct in6_addr gate;
 	const struct interface *iface;
+	unsigned int flags;
 	int metric;
 	unsigned int mtu;
 };
