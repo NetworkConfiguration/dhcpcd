@@ -1756,7 +1756,7 @@ dhcp6_delegate_addr(struct interface *ifp, struct ipv6_addr *prefix,
 
 		/* Make a 64 prefix by default, as this maks SLAAC
 		 * possible.  Otherwise round up to the nearest octet. */
-		if (asla.prefix_len < 64)
+		if (asla.prefix_len <= 64)
 			asla.prefix_len = 64;
 		else
 			asla.prefix_len = ROUNDUP8(asla.prefix_len);
