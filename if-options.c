@@ -1260,14 +1260,14 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 				syslog(LOG_ERR,
 				    "%s: cannot assign IA_PD to itself",
 				    ifname);
-				return -1;
+				goto err_sla;
 			}
 			if (strlcpy(sla->ifname, p,
 			    sizeof(sla->ifname)) >= sizeof(sla->ifname))
 			{
 				syslog(LOG_ERR, "%s: interface name too long",
 				    arg);
-				return -1;
+				goto err_sla;
 			}
 			p = np;
 			if (p) {
@@ -1279,15 +1279,22 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 				else {
 					errno = 0;
 					sla->sla = atoint(p);
+					if (sla->sla == 0 && ia->sla_len > 1) {
+						syslog(LOG_ERR, "%s: cannot"
+						    " assign multiple prefixes"
+						    " with a SLA of 0",
+						    ifname);
+						goto err_sla;
+					}
 					sla->sla_set = 1;
 					if (errno)
-						return -1;
+						goto err_sla;
 				}
 				if (np) {
 					sla->prefix_len = atoint(np);
 					if (sla->prefix_len < 0 ||
 					    sla->prefix_len > 128)
-						return -1;
+						goto err_sla;
 				} else
 					sla->prefix_len = 64;
 			} else {
@@ -1311,8 +1318,11 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 				}
 			}
 		}
-#endif
 		break;
+err_sla:
+		ia->sla_len--;
+		return -1;
+#endif
 	case O_HOSTNAME_SHORT:
 		ifo->options |= DHCPCD_HOSTNAME | DHCPCD_HOSTNAME_SHORT;
 		break;

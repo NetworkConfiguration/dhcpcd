@@ -196,8 +196,6 @@ struct dhcp6_state {
 	struct in6_addr unicast;
 	struct ipv6_addrhead addrs;
 	uint32_t lowpl;
-	uint32_t sla;
-	uint8_t sla_set;
 	char leasefile[sizeof(LEASEFILE6) + IF_NAMESIZE];
 	const char *reason;
 

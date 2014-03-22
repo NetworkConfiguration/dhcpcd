@@ -42,7 +42,8 @@
 
 #define ALLROUTERS "ff02::2"
 
-#define ROUNDUP8(a) (1 + (((a) - 1) | 7))
+#define ROUNDUP8(a)  (1 + (((a) - 1) |  7))
+#define ROUNDUP16(a) (1 + (((a) - 1) | 16))
 
 #ifndef ND6_INFINITE_LIFETIME
 #  define ND6_INFINITE_LIFETIME		((uint32_t)~0)
@@ -98,6 +99,7 @@ TAILQ_HEAD(ipv6_addrhead, ipv6_addr);
 #define IPV6_AF_DADCOMPLETED	0x0040
 #define IPV6_AF_DELEGATED	0x0080
 #define IPV6_AF_DELEGATEDPFX	0x0100
+#define IPV6_AF_DELEGATEDZERO	0X0200
 
 struct rt6 {
 	TAILQ_ENTRY(rt6) next;

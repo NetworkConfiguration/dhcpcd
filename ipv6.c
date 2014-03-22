@@ -328,8 +328,8 @@ ipv6_userprefix(
 {
 	uint64_t vh, vl, user_low, user_high;
 
-	if (prefix_len < 0 || prefix_len > 64 ||
-	    result_len < 0 || result_len > 64)
+	if (prefix_len < 0 || prefix_len > 120 ||
+	    result_len < 0 || result_len > 120)
 	{
 		errno = EINVAL;
 		return -1;
@@ -867,6 +867,10 @@ make_prefix(const struct interface * ifp, const struct ra *rap,
 	if (addr->prefix_len == 128 ||
 	    addr->prefix_vltime == 0 ||
 	    !(addr->flags & (IPV6_AF_ONLINK | IPV6_AF_DELEGATEDPFX)))
+		return NULL;
+
+	/* Don't install a blackhole route when not creating bigger prefixes */
+	if (addr->flags & IPV6_AF_DELEGATEDZERO)
 		return NULL;
 
 	r = make_route(ifp, rap);

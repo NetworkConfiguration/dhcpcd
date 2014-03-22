@@ -1716,31 +1716,8 @@ dhcp6_startinit(struct interface *ifp)
 	dhcp6_startdiscover(ifp);
 }
 
-static uint32_t
-dhcp6_findsla(const struct dhcpcd_ctx *ctx)
-{
-	uint32_t sla;
-	const struct interface *ifp;
-	const struct dhcp6_state *state;
-
-	/* Slow, but finding the lowest free SLA is needed if we get a
-	 * /62 or /63 prefix from upstream */
-	for (sla = 0; sla < UINT32_MAX; sla++) {
-		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-			state = D6_CSTATE(ifp);
-			if (state && state->sla_set && state->sla == sla)
-				break;
-		}
-		if (ifp == NULL)
-			return sla;
-	}
-
-	errno = E2BIG;
-	return 0;
-}
-
 static struct ipv6_addr *
-dhcp6_delegate_addr(struct interface *ifp, const struct ipv6_addr *prefix,
+dhcp6_delegate_addr(struct interface *ifp, struct ipv6_addr *prefix,
     const struct if_sla *sla, struct interface *ifs)
 {
 	struct dhcp6_state *state;
@@ -1764,21 +1741,25 @@ dhcp6_delegate_addr(struct interface *ifp, const struct ipv6_addr *prefix,
 		state->reason = "DELEGATED6";
 	}
 
-	if (sla == NULL || sla->sla_set == 0) {
-		if (!state->sla_set) {
-			errno = 0;
-			state->sla = dhcp6_findsla(ifp->ctx);
-			if (errno) {
-				syslog(LOG_ERR, "%s: dhcp6_find_sla: %m",
-				    ifp->name);
-				return NULL;
-			}
-			syslog(LOG_DEBUG, "%s: set SLA %d",
-			    ifp->name, state->sla);
-			state->sla_set = 1;
+	if (sla == NULL) {
+		struct interface *ifi;
+		unsigned int idx;
+
+		asla.sla = ifp->index;
+		/* Work out our largest index delegating to. */
+		idx = 0;
+		TAILQ_FOREACH(ifi, ifp->ctx->ifaces, next) {
+			if (ifi != ifp && ifi->index > idx)
+				idx = ifi->index;
 		}
-		asla.sla = state->sla;
-		asla.prefix_len = 64;
+		asla.prefix_len = prefix->prefix_len + ffs((int)idx);
+
+		/* Make a 64 prefix by default, as this maks SLAAC
+		 * possible.  Otherwise round up to the nearest octet. */
+		if (asla.prefix_len < 64)
+			asla.prefix_len = 64;
+		else
+			asla.prefix_len = ROUNDUP8(asla.prefix_len);
 		sla = &asla;
 	}
 
@@ -1808,14 +1789,10 @@ dhcp6_delegate_addr(struct interface *ifp, const struct ipv6_addr *prefix,
 	memcpy(&a->prefix.s6_addr, &addr.s6_addr, sizeof(a->prefix.s6_addr));
 	a->prefix_len = sla->prefix_len;
 
-	if (ipv6_makeaddr(&a->addr, ifp, &a->prefix, a->prefix_len) == -1)
-	{
-		ia = inet_ntop(AF_INET6, &a->addr.s6_addr,
-		    iabuf, sizeof(iabuf));
-		syslog(LOG_ERR, "%s: %m (%s/%d)", __func__, ia, a->prefix_len);
-		free(a);
-		return NULL;
-	}
+	/* Wang a 1 at the end as the prefix could be >64
+	 * making SLAAC impossible. */
+	memcpy(&a->addr.s6_addr, &a->prefix.s6_addr, sizeof(a->addr.s6_addr));
+	a->addr.s6_addr[sizeof(a->addr.s6_addr) - 1] += 1;
 
 	/* Remove any exiting address */
 	TAILQ_FOREACH_SAFE(ap, &state->addrs, next, apn) {
@@ -1844,13 +1821,13 @@ dhcp6_delegate_prefix(struct interface *ifp)
 	struct if_ia *ia;
 	struct if_sla *sla;
 	struct interface *ifd;
-	uint8_t carrier_warned;
+	uint8_t carrier_warned, abrt;
 
 	ifo = ifp->options;
 	state = D6_STATE(ifp);
 	TAILQ_FOREACH(ifd, ifp->ctx->ifaces, next) {
 		k = 0;
-		carrier_warned = 0;
+		carrier_warned = abrt = 0;
 		TAILQ_FOREACH(ap, &state->addrs, next) {
 			if (!(ap->flags & IPV6_AF_DELEGATEDPFX))
 				continue;
@@ -1877,12 +1854,23 @@ dhcp6_delegate_prefix(struct interface *ifp)
 						carrier_warned = 1;
 						break;
 					}
+					if (ap->prefix_len >= 64 && k) {
+						syslog(LOG_WARNING,
+						    "%s: cannot automatically"
+						    " assign more prefixes",
+						    ifp->name);
+						    abrt = 1;
+						break;
+					}
 					if (dhcp6_delegate_addr(ifd, ap,
 					    NULL, ifp))
 						k++;
 				}
 				for (j = 0; j < ia->sla_len; j++) {
 					sla = &ia->sla[j];
+					if (sla->sla == 0)
+						ap->flags |=
+						    IPV6_AF_DELEGATEDZERO;
 					if (strcmp(ifd->name, sla->ifname))
 						continue;
 					if (ifd->carrier == LINK_DOWN) {
@@ -1897,10 +1885,10 @@ dhcp6_delegate_prefix(struct interface *ifp)
 					    sla, ifp))
 						k++;
 				}
-				if (carrier_warned)
+				if (carrier_warned ||abrt)
 					break;
 			}
-			if (carrier_warned)
+			if (carrier_warned || abrt)
 				break;
 		}
 		if (k && !carrier_warned) {
