@@ -340,7 +340,6 @@ linux*)
 	fi
 	echo "DHCPCD_SRCS+=	if-linux.c if-linux-wireless.c" >>$CONFIG_MK
 	echo "DHCPCD_SRCS+=	platform-linux.c" >>$CONFIG_MK
-	echo "LDADD+=		-lrt -ldl" >>$CONFIG_MK
 	;;
 kfreebsd*)
 	echo "CPPFLAGS+=	-D_GNU_SOURCE" >>$CONFIG_MK
@@ -349,7 +348,6 @@ kfreebsd*)
 	fi
 	echo "DHCPCD_SRCS+=	if-bsd.c platform-bsd.c" >>$CONFIG_MK
 	echo "COMPAT_SRCS+=	compat/linkaddr.c" >>$CONFIG_MK
-	echo "LDADD+=		-lrt -ldl" >>$CONFIG_MK
 	;;
 *)
 	if [ -z "$INET" -o "$INET" = yes ]; then
@@ -399,6 +397,27 @@ else
 	abort=true
 fi
 rm -f _getifaddrs.c _getifaddrs
+$abort && exit 1
+
+printf "Testing for clock_gettime ... "
+cat <<EOF >_clock_gettime.c
+#include <time.h>
+int main(void) {
+	struct timespec ts;
+	return clock_gettime(CLOCK_MONOTONIC, &ts);
+}
+EOF
+if $XCC _clock_gettime.c -o _clock_gettime 2>/dev/null; then
+	echo "yes"
+elif $XCC _clock_gettime.c -lrt -o _clock_gettime 2>/dev/null; then
+	echo "yes (-lrt)"
+	echo "LDADD+=		-lrt" >>$CONFIG_MK
+else
+	echo "no"
+	echo "libc support for clock_getttime is required - aborting" >&2
+	abort=true
+fi
+rm -f _clock_gettime.c _clockgettime
 $abort && exit 1
 
 if [ -z "$ARC4RANDOM" ]; then
@@ -751,6 +770,27 @@ if [ "$DEV" = yes ]; then
 	echo "DHCPCD_SRCS+=	dev.c" >>$CONFIG_MK
 	echo "CPPFLAGS+=	-DPLUGIN_DEV" >>$CONFIG_MK
 	echo "MKDIRS+=	dev" >>$CONFIG_MK
+
+	printf "Testing for dlopen ... "
+	cat <<EOF >_dlopen.c
+#include <dlfcn.h>
+#include <stdlib.h>
+int main(void) {
+	dlopen(NULL, 0);
+	return 0;
+}
+EOF
+	if $XCC _dlopen.c -o _dlopen 2>/dev/null; then
+		echo "yes"
+	elif $XCC _dlopen.c -ldl -o _dlopen 2>/dev/null; then
+		echo "yes (-ldl)"
+		echo "LDADD+=		-ldl" >>$CONFIG_MK
+	else
+		echo "no"
+		echo "libc for dlopen is required - aborting"
+	fi
+	rm -f _dlopen.c _dlopen
+	$abort && exit 1
 fi
 
 # Transform for a make file
