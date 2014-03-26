@@ -292,10 +292,21 @@ if [ -n "$LDFLAGS" ]; then
 	echo "LDFLAGS+=	$LDFLAGS" >>$CONFIG_MK
 fi
 
+# NetBSD: Even if we build for $PREFIX, the clueless user might move us to /
+LDELF=/libexec/ld.elf_so
+if [ -e "$LDELF" ]; then
+	echo "Linking against $LDELF"
+	echo "LDFLAGS+=	-Wl,-dynamic-linker=$LDELF" >>$CONFIG_MK
+	echo "LDFLAGS+=	-Wl,-rpath=${LIBDIR}" >>$CONFIG_MK
+fi
+
 case "$OS" in
-openbsd*)
-	if [ "$SBINDIR" = /sbin ]; then
-		echo "Forcing a static build for OpenBSD and SBINDIR of /sbin"
+linux*) ;;
+*)
+	if ! [ -x "$LDELF" -o -x /libexec/ld-elf.so.[0-9]* ] && \
+	    [ -z "$PREFIX" -o "$PREFIX" = "/" ]
+	then
+		echo "Forcing a static build for $OS and \$PREFIX of /"
 		STATIC=yes
 	fi
 	;;
@@ -376,14 +387,6 @@ fi
 if [ -z "$INET6" -o "$INET6" = yes ]; then
 	echo "CPPFLAGS+=	-DINET6" >>$CONFIG_MK
 	echo "DHCPCD_SRCS+=	ipv6.c ipv6nd.c dhcp6.c" >>$CONFIG_MK
-fi
-
-# NetBSD: Even if we build for $PREFIX, the clueless user might move us to /
-LDELF=/libexec/ld.elf_so
-if [ -e "$LDELF" ]; then
-	echo "Linking against $LDELF"
-	echo "LDFLAGS+=	-Wl,-dynamic-linker=$LDELF" >>$CONFIG_MK
-	echo "LDFLAGS+=	-Wl,-rpath=${LIBDIR}" >>$CONFIG_MK
 fi
 
 # Add CPPFLAGS and CFLAGS to CC for testing features
