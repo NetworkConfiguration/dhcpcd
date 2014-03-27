@@ -87,15 +87,15 @@ ipv4_opensocket(struct interface *ifp, int protocol)
 	memset(&su, 0, sizeof(su));
 	su.sll.sll_family = PF_PACKET;
 	su.sll.sll_protocol = htons(protocol);
-	su.sll.sll_ifindex = ifp->index;
+	su.sll.sll_ifindex = (int)ifp->index;
 	/* Install the DHCP filter */
 	memset(&pf, 0, sizeof(pf));
 	if (protocol == ETHERTYPE_ARP) {
 		pf.filter = UNCONST(arp_bpf_filter);
-		pf.len = arp_bpf_filter_len;
+		pf.len = (unsigned int)arp_bpf_filter_len;
 	} else {
 		pf.filter = UNCONST(dhcp_bpf_filter);
-		pf.len = dhcp_bpf_filter_len;
+		pf.len = (unsigned int)dhcp_bpf_filter_len;
 	}
 	if (setsockopt(s, SOL_SOCKET, SO_ATTACH_FILTER, &pf, sizeof(pf)) != 0)
 		goto eexit;
@@ -117,7 +117,7 @@ eexit:
 
 ssize_t
 ipv4_sendrawpacket(const struct interface *ifp, int protocol,
-    const void *data, ssize_t len)
+    const void *data, size_t len)
 {
 	const struct dhcp_state *state;
 	union sockunion {
@@ -130,9 +130,9 @@ ipv4_sendrawpacket(const struct interface *ifp, int protocol,
 	memset(&su, 0, sizeof(su));
 	su.sll.sll_family = AF_PACKET;
 	su.sll.sll_protocol = htons(protocol);
-	su.sll.sll_ifindex = ifp->index;
+	su.sll.sll_ifindex = (int)ifp->index;
 	su.sll.sll_hatype = htons(ifp->family);
-	su.sll.sll_halen = ifp->hwlen;
+	su.sll.sll_halen = (unsigned char)ifp->hwlen;
 	if (ifp->family == ARPHRD_INFINIBAND)
 		memcpy(&su.sll.sll_addr,
 		    &ipv4_bcast_addr, sizeof(ipv4_bcast_addr));
@@ -149,7 +149,7 @@ ipv4_sendrawpacket(const struct interface *ifp, int protocol,
 
 ssize_t
 ipv4_getrawpacket(struct interface *ifp, int protocol,
-    void *data, ssize_t len, int *partialcsum)
+    void *data, size_t len, int *partialcsum)
 {
 	struct iovec iov = {
 		.iov_base = data,

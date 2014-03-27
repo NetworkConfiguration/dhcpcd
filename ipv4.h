@@ -36,7 +36,7 @@ struct rt {
 	struct in_addr net;
 	struct in_addr gate;
 	const struct interface *iface;
-	int metric;
+	unsigned int metric;
 	struct in_addr src;
 };
 TAILQ_HEAD(rt_head, rt);
@@ -60,7 +60,7 @@ struct ipv4_state {
 
 #ifdef INET
 int ipv4_init(struct dhcpcd_ctx *);
-int inet_ntocidr(struct in_addr);
+uint8_t inet_ntocidr(struct in_addr);
 int inet_cidrtoaddr(int, struct in_addr *);
 uint32_t ipv4_getnetmask(uint32_t);
 int ipv4_addrexists(struct dhcpcd_ctx *, const struct in_addr *);
@@ -93,8 +93,8 @@ void ipv4_freeroutes(struct rt_head *);
 
 int ipv4_opensocket(struct interface *, int);
 ssize_t ipv4_sendrawpacket(const struct interface *,
-    int, const void *, ssize_t);
-ssize_t ipv4_getrawpacket(struct interface *, int, void *, ssize_t, int *);
+    int, const void *, size_t);
+ssize_t ipv4_getrawpacket(struct interface *, int, void *, size_t, int *);
 void ipv4_free(struct interface *);
 void ipv4_ctxfree(struct dhcpcd_ctx *);
 #else

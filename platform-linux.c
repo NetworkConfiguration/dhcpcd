@@ -157,7 +157,8 @@ restore_kernel_ra(struct dhcpcd_ctx *ctx)
 int
 check_ipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 {
-	int ra, i;
+	int ra;
+	size_t i;
 	char path[256], *p, **nrest;
 
 	if (ifname == NULL)

@@ -246,9 +246,9 @@ struct dhcp_state {
 #include "net.h"
 
 #ifdef INET
-char *decode_rfc3361(int dl, const uint8_t *data);
-ssize_t decode_rfc3442(char *out, ssize_t len, int pl, const uint8_t *p);
-ssize_t decode_rfc5969(char *out, ssize_t len, int pl, const uint8_t *p);
+char *decode_rfc3361(const uint8_t *, size_t);
+ssize_t decode_rfc3442(char *, size_t, const uint8_t *p, size_t);
+ssize_t decode_rfc5969(char *, size_t, const uint8_t *p, size_t);
 
 void dhcp_printoptions(const struct dhcpcd_ctx *);
 int get_option_addr(struct dhcpcd_ctx *,struct in_addr *,
@@ -282,7 +282,7 @@ void dhcp_decline(struct interface *);
 void dhcp_discover(void *);
 void dhcp_inform(struct interface *);
 void dhcp_bind(void *);
-void dhcp_reboot_newopts(struct interface *, int);
+void dhcp_reboot_newopts(struct interface *, unsigned long long);
 void dhcp_close(struct interface *);
 void dhcp_free(struct interface *);
 int dhcp_dump(struct dhcpcd_ctx *, const char *);

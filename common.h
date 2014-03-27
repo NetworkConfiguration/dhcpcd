@@ -42,7 +42,8 @@
 #define STRINGIFY(a)		#a
 #define TOSTRING(a)		STRINGIFY(a)
 
-#define timeval_to_double(tv) ((tv)->tv_sec * 1.0 + (tv)->tv_usec * 1.0e-6)
+#define timeval_to_double(tv)						\
+	((double)(tv)->tv_sec + (double)((tv)->tv_usec) * 1.0e-6)
 #define timernorm(tv) do {						\
 	while ((tv)->tv_usec >= 1000000) {				\
 		(tv)->tv_sec++;						\
@@ -53,9 +54,9 @@
 	ms = (tv)->tv_sec * 1000;					\
 	ms += (tv)->tv_usec / 1000;					\
 } while (0 /* CONSTCOND */);
-#define ms_to_tv(tv, ms) do {						\
-	(tv)->tv_sec = ms / 1000;					\
-	(tv)->tv_usec = (ms - ((tv)->tv_sec * 1000)) * 1000;		\
+#define ms_to_tv(tv, ms) do {						      \
+	(tv)->tv_sec = ms / 1000;					      \
+	(tv)->tv_usec = (suseconds_t)(ms - ((tv)->tv_sec * 1000)) * 1000;     \
 } while (0 /* CONSTCOND */);
 
 #ifndef TIMEVAL_TO_TIMESPEC
@@ -104,7 +105,7 @@ const char *get_hostname(char *, size_t, int);
 extern int clock_monotonic;
 int get_monotonic(struct timeval *);
 ssize_t setvar(char ***, const char *, const char *, const char *);
-ssize_t setvard(char ***, const char *, const char *, int);
+ssize_t setvard(char ***, const char *, const char *, size_t);
 time_t uptime(void);
 
 #endif

@@ -55,7 +55,8 @@ ipv4_opensocket(struct interface *ifp, int protocol)
 	struct dhcp_state *state;
 	int fd = -1;
 	struct ifreq ifr;
-	int buf_len = 0;
+	int ibuf_len = 0;
+	size_t buf_len;
 	struct bpf_version pv;
 	struct bpf_program pf;
 #ifdef BIOCIMMEDIATE
@@ -92,9 +93,10 @@ ipv4_opensocket(struct interface *ifp, int protocol)
 		goto eexit;
 
 	/* Get the required BPF buffer length from the kernel. */
-	if (ioctl(fd, BIOCGBLEN, &buf_len) == -1)
+	if (ioctl(fd, BIOCGBLEN, &ibuf_len) == -1)
 		goto eexit;
-	if (state->buffer_size != (size_t)buf_len) {
+	buf_len = (size_t)ibuf_len;
+	if (state->buffer_size != buf_len) {
 		free(state->buffer);
 		state->buffer = malloc(buf_len);
 		if (state->buffer == NULL)
@@ -138,7 +140,7 @@ eexit:
 
 ssize_t
 ipv4_sendrawpacket(const struct interface *ifp, int protocol,
-    const void *data, ssize_t len)
+    const void *data, size_t len)
 {
 	struct iovec iov[2];
 	struct ether_header hw;
@@ -164,7 +166,7 @@ ipv4_sendrawpacket(const struct interface *ifp, int protocol,
  * So we pass the buffer in the API so we can loop on >1 packet. */
 ssize_t
 ipv4_getrawpacket(struct interface *ifp, int protocol,
-    void *data, ssize_t len, int *partialcsum)
+    void *data, size_t len, int *partialcsum)
 {
 	int fd = -1;
 	struct bpf_hdr packet;
@@ -188,7 +190,7 @@ ipv4_getrawpacket(struct interface *ifp, int protocol,
 				return errno == EAGAIN ? 0 : -1;
 			else if ((size_t)bytes < sizeof(packet))
 				return -1;
-			state->buffer_len = bytes;
+			state->buffer_len = (size_t)bytes;
 			state->buffer_pos = 0;
 		}
 		bytes = -1;
@@ -201,10 +203,10 @@ ipv4_getrawpacket(struct interface *ifp, int protocol,
 			goto next; /* Packet beyond buffer, drop. */
 		payload = state->buffer + state->buffer_pos +
 		    packet.bh_hdrlen + ETHER_HDR_LEN;
-		bytes = packet.bh_caplen - ETHER_HDR_LEN;
-		if (bytes > len)
-			bytes = len;
-		memcpy(data, payload, bytes);
+		bytes = (ssize_t)packet.bh_caplen - ETHER_HDR_LEN;
+		if ((size_t)bytes > len)
+			bytes = (ssize_t)len;
+		memcpy(data, payload, (size_t)bytes);
 next:
 		state->buffer_pos += BPF_WORDALIGN(packet.bh_hdrlen +
 		    packet.bh_caplen);

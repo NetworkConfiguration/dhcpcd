@@ -172,14 +172,14 @@ struct dhcp6_state {
 
 	/* Message retransmission timings */
 	struct timeval RT;
-	int IMD;
-	int RTC;
-	int IRT;
-	int MRC;
-	int MRT;
+	unsigned int IMD;
+	unsigned int RTC;
+	unsigned int IRT;
+	unsigned int MRC;
+	unsigned int MRT;
 	void (*MRCcallback)(void *);
-	int sol_max_rt;
-	int inf_max_rt;
+	unsigned int sol_max_rt;
+	unsigned int inf_max_rt;
 
 	struct dhcp6_message *send;
 	size_t send_len;
@@ -227,11 +227,11 @@ struct dhcp6_state {
 #ifdef INET6
 void dhcp6_printoptions(const struct dhcpcd_ctx *);
 int dhcp6_addrexists(struct dhcpcd_ctx *, const struct ipv6_addr *);
-int dhcp6_find_delegates(struct interface *);
+size_t dhcp6_find_delegates(struct interface *);
 int dhcp6_start(struct interface *, enum DH6S);
 void dhcp6_reboot(struct interface *);
 ssize_t dhcp6_env(char **, const char *, const struct interface *,
-    const struct dhcp6_message *, ssize_t);
+    const struct dhcp6_message *, size_t);
 void dhcp6_free(struct interface *);
 void dhcp6_handleifa(struct dhcpcd_ctx *, int, const char *,
     const struct in6_addr *addr, int);

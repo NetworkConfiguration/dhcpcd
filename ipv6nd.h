@@ -48,7 +48,7 @@ struct ra {
 	struct in6_addr from;
 	char sfrom[INET6_ADDRSTRLEN];
 	unsigned char *data;
-	ssize_t data_len;
+	size_t data_len;
 	struct timeval received;
 	unsigned char flags;
 	uint32_t lifetime;

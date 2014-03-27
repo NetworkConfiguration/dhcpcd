@@ -155,12 +155,15 @@ get_netlink(struct dhcpcd_ctx *ctx, int fd, int flags,
     int (*callback)(struct dhcpcd_ctx *, struct nlmsghdr *))
 {
 	char *buf = NULL, *nbuf;
-	ssize_t buflen = 0, bytes;
+	ssize_t bytes;
+	size_t buflen;
 	struct nlmsghdr *nlm;
 	struct sockaddr_nl nladdr;
 	socklen_t nladdr_len = sizeof(nladdr);
-	int r = -1;
+	int r;
 
+	buflen = 0;
+	r = -1;
 	for (;;) {
 		bytes = recv(fd, NULL, 0,
 		    flags | MSG_PEEK | MSG_DONTWAIT | MSG_TRUNC);
@@ -172,16 +175,16 @@ get_netlink(struct dhcpcd_ctx *ctx, int fd, int flags,
 			if (errno == EINTR)
 				continue;
 			goto eexit;
-		} else if (bytes == buflen) {
+		} else if ((size_t)bytes == buflen) {
 			/* Support kernels older than 2.6.22 */
 			if (bytes == 0)
 				bytes = 512;
 			else
 				bytes *= 2;
 		}
-		if (buflen < bytes) {
+		if (buflen < (size_t)bytes) {
 			/* Alloc 1 more so we work with older kernels */
-			buflen = bytes + 1;
+			buflen = (size_t)bytes + 1;
 			nbuf = realloc(buf, buflen);
 			if (nbuf == NULL)
 				goto eexit;
@@ -227,18 +230,18 @@ static int
 err_netlink(__unused struct dhcpcd_ctx *ctx, struct nlmsghdr *nlm)
 {
 	struct nlmsgerr *err;
-	int l;
+	size_t len;
 
 	if (nlm->nlmsg_type != NLMSG_ERROR)
 		return 0;
-	l = nlm->nlmsg_len - sizeof(*nlm);
-	if ((size_t)l < sizeof(*err)) {
+	len = nlm->nlmsg_len - sizeof(*nlm);
+	if (len < sizeof(*err)) {
 		errno = EBADMSG;
 		return -1;
 	}
 	err = (struct nlmsgerr *)NLMSG_DATA(nlm);
 	if (err->error == 0)
-		return l;
+		return (int)len;
 	errno = -err->error;
 	return -1;
 }
@@ -258,7 +261,8 @@ get_max_pid_t()
 static int
 link_route(struct dhcpcd_ctx *ctx, struct nlmsghdr *nlm)
 {
-	int len, idx, metric;
+	size_t len;
+	unsigned int idx, metric;
 	struct rtattr *rta;
 	struct rtmsg *rtm;
 	struct rt rt;
@@ -268,7 +272,7 @@ link_route(struct dhcpcd_ctx *ctx, struct nlmsghdr *nlm)
 		return 0;
 
 	len = nlm->nlmsg_len - sizeof(*nlm);
-	if ((size_t)len < sizeof(*rtm)) {
+	if (len < sizeof(*rtm)) {
 		errno = EBADMSG;
 		return -1;
 	}
@@ -302,12 +306,12 @@ link_route(struct dhcpcd_ctx *ctx, struct nlmsghdr *nlm)
 			    sizeof(rt.gate.s_addr));
 			break;
 		case RTA_OIF:
-			idx = *(int *)RTA_DATA(rta);
+			idx = *(unsigned int *)RTA_DATA(rta);
 			if (if_indextoname(idx, ifn))
 				rt.iface = find_interface(ctx, ifn);
 			break;
 		case RTA_PRIORITY:
-			metric = *(int *)RTA_DATA(rta);
+			metric = *(unsigned int *)RTA_DATA(rta);
 			break;
 		}
 		rta = RTA_NEXT(rta, len);
@@ -326,7 +330,7 @@ link_route(struct dhcpcd_ctx *ctx, struct nlmsghdr *nlm)
 static int
 link_addr(struct dhcpcd_ctx *ctx, struct nlmsghdr *nlm)
 {
-	int len;
+	size_t len;
 	struct rtattr *rta;
 	struct ifaddrmsg *ifa;
 	char ifn[IF_NAMESIZE + 1];
@@ -342,7 +346,7 @@ link_addr(struct dhcpcd_ctx *ctx, struct nlmsghdr *nlm)
 		return 0;
 
 	len = nlm->nlmsg_len - sizeof(*nlm);
-	if ((size_t)len < sizeof(*ifa)) {
+	if (len < sizeof(*ifa)) {
 		errno = EBADMSG;
 		return -1;
 	}
@@ -436,18 +440,19 @@ handle_rename(struct dhcpcd_ctx *ctx, unsigned int ifindex, const char *ifname)
 static int
 link_netlink(struct dhcpcd_ctx *ctx, struct nlmsghdr *nlm)
 {
-	int len;
+	int r;
+	size_t len;
 	struct rtattr *rta, *hwaddr;
 	struct ifinfomsg *ifi;
 	char ifn[IF_NAMESIZE + 1];
 	struct interface *ifp;
 
-	len = link_route(ctx, nlm);
-	if (len != 0)
-		return len;
-	len = link_addr(ctx, nlm);
-	if (len != 0)
-		return len;
+	r = link_route(ctx, nlm);
+	if (r != 0)
+		return r;
+	r = link_addr(ctx, nlm);
+	if (r != 0)
+		return r;
 
 	if (nlm->nlmsg_type != RTM_NEWLINK && nlm->nlmsg_type != RTM_DELLINK)
 		return 0;
@@ -497,7 +502,7 @@ link_netlink(struct dhcpcd_ctx *ctx, struct nlmsghdr *nlm)
 	}
 
 	/* Check for interface name change */
-	if (handle_rename(ctx, ifi->ifi_index, ifn))
+	if (handle_rename(ctx, (unsigned int)ifi->ifi_index, ifn))
 		    return 1;
 
 	/* Check for a new interface */
@@ -512,9 +517,11 @@ link_netlink(struct dhcpcd_ctx *ctx, struct nlmsghdr *nlm)
 
 	/* Re-read hardware address and friends */
 	if (!(ifi->ifi_flags & IFF_UP) && hwaddr) {
-		len = l2addr_len(ifi->ifi_type);
-		if (hwaddr->rta_len == RTA_LENGTH(len))
-			handle_hwaddr(ctx, ifn, RTA_DATA(hwaddr), len);
+		short l;
+
+		l = l2addr_len(ifi->ifi_type);
+		if (hwaddr->rta_len == RTA_LENGTH(l))
+			handle_hwaddr(ctx, ifn, RTA_DATA(hwaddr), l);
 	}
 
 	handle_carrier(ctx, ifi->ifi_flags & IFF_RUNNING ? LINK_UP : LINK_DOWN,
@@ -565,10 +572,10 @@ send_netlink(struct dhcpcd_ctx *ctx, struct nlmsghdr *hdr)
 	((struct rtattr *)(((ptrdiff_t)(nmsg))+NLMSG_ALIGN((nmsg)->nlmsg_len)))
 
 static int
-add_attr_l(struct nlmsghdr *n, unsigned int maxlen, int type,
-    const void *data, int alen)
+add_attr_l(struct nlmsghdr *n, unsigned short maxlen, unsigned short type,
+    const void *data, unsigned short alen)
 {
-	int len = RTA_LENGTH(alen);
+	unsigned short len = RTA_LENGTH(alen);
 	struct rtattr *rta;
 
 	if (NLMSG_ALIGN(n->nlmsg_len) + RTA_ALIGN(len) > maxlen) {
@@ -586,9 +593,10 @@ add_attr_l(struct nlmsghdr *n, unsigned int maxlen, int type,
 }
 
 static int
-add_attr_32(struct nlmsghdr *n, unsigned int maxlen, int type, uint32_t data)
+add_attr_32(struct nlmsghdr *n, unsigned short maxlen, unsigned short type,
+    uint32_t data)
 {
-	int len = RTA_LENGTH(sizeof(data));
+	unsigned short len = RTA_LENGTH(sizeof(data));
 	struct rtattr *rta;
 
 	if (NLMSG_ALIGN(n->nlmsg_len) + len > maxlen) {
@@ -641,7 +649,7 @@ if_address(const struct interface *iface,
 	nlm.ifa.ifa_prefixlen = inet_ntocidr(*netmask);
 	/* This creates the aliased interface */
 	add_attr_l(&nlm.hdr, sizeof(nlm), IFA_LABEL,
-	    iface->name, strlen(iface->name) + 1);
+	    iface->name, (unsigned short)(strlen(iface->name) + 1));
 	add_attr_l(&nlm.hdr, sizeof(nlm), IFA_LOCAL,
 	    &address->s_addr, sizeof(address->s_addr));
 	if (action >= 0 && broadcast)
@@ -738,7 +746,7 @@ if_address6(const struct ipv6_addr *ap, int action)
 	nlm.ifa.ifa_prefixlen = ap->prefix_len;
 	/* This creates the aliased interface */
 	add_attr_l(&nlm.hdr, sizeof(nlm), IFA_LABEL,
-	    ap->iface->name, strlen(ap->iface->name) + 1);
+	    ap->iface->name, (unsigned short)(strlen(ap->iface->name) + 1));
 	add_attr_l(&nlm.hdr, sizeof(nlm), IFA_LOCAL,
 	    &ap->addr.s6_addr, sizeof(ap->addr.s6_addr));
 
@@ -756,10 +764,10 @@ if_address6(const struct ipv6_addr *ap, int action)
 }
 
 static int
-rta_add_attr_32(struct rtattr *rta, unsigned int maxlen,
-    int type, uint32_t data)
+rta_add_attr_32(struct rtattr *rta, unsigned short maxlen,
+    unsigned short type, uint32_t data)
 {
-	unsigned int len = RTA_LENGTH(sizeof(data));
+	unsigned short len = RTA_LENGTH(sizeof(data));
 	struct rtattr *subrta;
 
 	if (RTA_ALIGN(rta->rta_len) + len > maxlen) {
@@ -771,7 +779,7 @@ rta_add_attr_32(struct rtattr *rta, unsigned int maxlen,
 	subrta->rta_type = type;
 	subrta->rta_len = len;
 	memcpy(RTA_DATA(subrta), &data, sizeof(data));
-	rta->rta_len = NLMSG_ALIGN(rta->rta_len) + len;
+	rta->rta_len = (unsigned short)(NLMSG_ALIGN(rta->rta_len) + len);
 	return 0;
 }
 

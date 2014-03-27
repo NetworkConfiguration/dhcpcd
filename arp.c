@@ -46,7 +46,7 @@
 #define ARP_LEN								      \
 	(sizeof(struct arphdr) + (2 * sizeof(uint32_t)) + (2 * HWADDR_LEN))
 
-static int
+static ssize_t
 arp_send(const struct interface *ifp, int op, in_addr_t sip, in_addr_t tip)
 {
 	uint8_t arp_buffer[ARP_LEN];
@@ -61,15 +61,15 @@ arp_send(const struct interface *ifp, int op, in_addr_t sip, in_addr_t tip)
 	ar.ar_op = htons(op);
 
 	p = arp_buffer;
-	len = sizeof(arp_buffer);
+	len = 0;
 
 #define CHECK(fun, b, l)						\
 	do {								\
-		if (len < (l))						\
+		if (len + (l) > sizeof(arp_buffer))			\
 			goto eexit;					\
 		fun(p, (b), (l));					\
 		p += (l);						\
-		len -= (l);						\
+		len += (l);						\
 	} while (/* CONSTCOND */ 0)
 #define APPEND(b, l)	CHECK(memcpy, b, l)
 #define ZERO(l)		CHECK(memset, 0, l)
@@ -79,7 +79,6 @@ arp_send(const struct interface *ifp, int op, in_addr_t sip, in_addr_t tip)
 	APPEND(&sip, sizeof(sip));
 	ZERO(ifp->hwlen);
 	APPEND(&tip, sizeof(tip));
-	len = p - arp_buffer;
 	return ipv4_sendrawpacket(ifp, ETHERTYPE_ARP, arp_buffer, len);
 
 eexit:

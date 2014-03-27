@@ -108,7 +108,7 @@ extern const struct option cf_options[];
 struct if_sla {
 	char ifname[IF_NAMESIZE];
 	uint32_t sla;
-	short prefix_len;
+	uint8_t prefix_len;
 	int8_t sla_set;
 };
 
@@ -121,7 +121,7 @@ struct if_ia {
 };
 
 struct vivco {
-	uint16_t len;
+	size_t len;
 	uint8_t *data;
 };
 
@@ -151,7 +151,7 @@ struct if_options {
 	char hostname[HOSTNAME_MAX_LEN + 1]; /* We don't store the length */
 	int fqdn;
 	uint8_t vendorclassid[VENDORCLASSID_MAX_LEN + 2];
-	char clientid[CLIENTID_MAX_LEN + 2];
+	uint8_t clientid[CLIENTID_MAX_LEN + 2];
 	uint8_t userclass[USERCLASS_MAX_LEN + 2];
 	uint8_t vendor[VENDOR_MAX_LEN + 2];
 

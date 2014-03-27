@@ -56,11 +56,11 @@ struct interface {
 	TAILQ_ENTRY(interface) next;
 	char name[IF_NAMESIZE];
 	unsigned int index;
-	int flags;
+	unsigned int flags;
 	sa_family_t family;
 	unsigned char hwaddr[HWADDR_LEN];
-	size_t hwlen;
-	int metric;
+	uint8_t hwlen;
+	unsigned int metric;
 	int carrier;
 	int wireless;
 	char ssid[IF_SSIDSIZE];
@@ -119,7 +119,7 @@ struct dhcpcd_ctx {
 	size_t dhcp6_opts_len;
 	struct ipv6_ctx *ipv6;
 	char **ra_restore;
-	ssize_t ra_restore_len;
+	size_t ra_restore_len;
 #ifndef __linux__
 	int ra_global;
 	int ra_kernel_set;
@@ -142,10 +142,10 @@ pid_t daemonise(struct dhcpcd_ctx *);
 
 struct interface *find_interface(struct dhcpcd_ctx *, const char *);
 int handle_args(struct dhcpcd_ctx *, struct fd_list *, int, char **);
-void handle_carrier(struct dhcpcd_ctx *, int, int, const char *);
+void handle_carrier(struct dhcpcd_ctx *, int, unsigned int, const char *);
 void handle_interface(void *, int, const char *);
 void handle_hwaddr(struct dhcpcd_ctx *, const char *,
-    const unsigned char *, size_t);
+    const unsigned char *, uint8_t);
 void drop_interface(struct interface *, const char *);
 int select_profile(struct interface *, const char *);
 

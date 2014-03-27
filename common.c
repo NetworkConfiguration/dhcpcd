@@ -157,15 +157,15 @@ setvar(char ***e, const char *prefix, const char *var, const char *value)
 	else
 		snprintf(**e, len, "%s=%s", var, value);
 	(*e)++;
-	return len;
+	return (ssize_t)len;
 }
 
 ssize_t
-setvard(char ***e, const char *prefix, const char *var, int value)
+setvard(char ***e, const char *prefix, const char *var, size_t value)
 {
 	char buffer[32];
 
-	snprintf(buffer, sizeof(buffer), "%d", value);
+	snprintf(buffer, sizeof(buffer), "%zu", value);
 	return setvar(e, prefix, var, buffer);
 }
 

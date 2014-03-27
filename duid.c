@@ -70,14 +70,14 @@ duid_make(unsigned char *d, const struct interface *ifp, uint16_t type)
 		/* time returns seconds from jan 1 1970, but DUID-LLT is
 		 * seconds from jan 1 2000 modulo 2^32 */
 		t = time(NULL) - DUID_TIME_EPOCH;
-		u32 = htonl(t & 0xffffffff);
+		u32 = htonl((uint32_t)t & 0xffffffff);
 		memcpy(p, &u32, 4);
 		p += 4;
 	}
 	/* Finally, add the MAC address of the interface */
 	memcpy(p, ifp->hwaddr, ifp->hwlen);
 	p += ifp->hwlen;
-	return p - d;
+	return (size_t)(p - d);
 }
 
 #define DUID_STRLEN DUID_LEN * 3

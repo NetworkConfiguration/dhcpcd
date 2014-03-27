@@ -28,6 +28,6 @@
 #ifndef CRYPT_H
 #define CRYPT_H
 
-void hmac_md5(const uint8_t *, int, const uint8_t *, int, uint8_t *);
+void hmac_md5(const uint8_t *, size_t, const uint8_t *, size_t, uint8_t *);
 
 #endif

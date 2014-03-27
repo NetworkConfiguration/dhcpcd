@@ -347,9 +347,9 @@ if_route(const struct rt *rt, int action)
 #undef ADDADDR
 #undef ADDSU
 
-	rtm.hdr.rtm_msglen = l = bp - (char *)&rtm;
+	rtm.hdr.rtm_msglen = (unsigned short)(bp - (char *)&rtm);
 
-	retval = write(s, &rtm, l) == -1 ? -1 : 0;
+	retval = write(s, &rtm, rtm.hdr.rtm_msglen) == -1 ? -1 : 0;
 	close(s);
 	return retval;
 }
@@ -461,7 +461,7 @@ if_route6(const struct rt6 *rt, int action)
 		rtm.hdr.rtm_type = RTM_ADD;
 	else
 		rtm.hdr.rtm_type = RTM_DELETE;
-	rtm.hdr.rtm_flags = RTF_UP | rt->flags;
+	rtm.hdr.rtm_flags = RTF_UP | (int)rt->flags;
 	rtm.hdr.rtm_addrs = RTA_DST | RTA_NETMASK;
 #ifdef SIOCGIFPRIORITY
 	rtm.hdr.rtm_priority = rt->metric;
@@ -524,9 +524,9 @@ if_route6(const struct rt6 *rt, int action)
 		rtm.hdr.rtm_rmx.rmx_mtu = rt->mtu;
 	}
 
-	rtm.hdr.rtm_msglen = l = bp - (char *)&rtm;
+	rtm.hdr.rtm_msglen = (unsigned short)(bp - (char *)&rtm);
 
-	retval = write(s, &rtm, l) == -1 ? -1 : 0;
+	retval = write(s, &rtm, rtm.hdr.rtm_msglen) == -1 ? -1 : 0;
 	close(s);
 	return retval;
 }
@@ -650,7 +650,7 @@ manage_link(struct dhcpcd_ctx *ctx)
 					break;
 				}
 				handle_carrier(ctx, len,
-				    ifm->ifm_flags, ifname);
+				    (unsigned int)ifm->ifm_flags, ifname);
 				break;
 			case RTM_DELETE:
 				if (~rtm->rtm_addrs &

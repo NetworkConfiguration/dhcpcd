@@ -179,7 +179,7 @@ carrier_status(struct interface *iface)
 		close(s);
 		return LINK_UNKNOWN;
 	}
-	iface->flags = ifr.ifr_flags;
+	iface->flags = (unsigned int)ifr.ifr_flags;
 
 	r = LINK_UNKNOWN;
 #ifdef SIOCGIFMEDIA
@@ -222,7 +222,7 @@ up_interface(struct interface *iface)
 			if (ioctl(s, SIOCSIFFLAGS, &ifr) == 0)
 				r = 0;
 		}
-		iface->flags = ifr.ifr_flags;
+		iface->flags = (unsigned int)ifr.ifr_flags;
 	}
 	close(s);
 	return r;
@@ -233,7 +233,8 @@ discover_interfaces(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 {
 	struct ifaddrs *ifaddrs, *ifa;
 	char *p;
-	int i, sdl_type;
+	int i;
+	sa_family_t sdl_type;
 	struct if_head *ifs;
 	struct interface *ifp;
 #ifdef __linux__
@@ -425,7 +426,7 @@ discover_interfaces(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 			memcpy(ifp->hwaddr, CLLADDR(sdl), ifp->hwlen);
 #elif AF_PACKET
 			sll = (const struct sockaddr_ll *)(void *)ifa->ifa_addr;
-			ifp->index = sll->sll_ifindex;
+			ifp->index = (unsigned int)sll->sll_ifindex;
 			ifp->family = sdl_type = sll->sll_hatype;
 			ifp->hwlen = sll->sll_halen;
 			if (ifp->hwlen != 0)

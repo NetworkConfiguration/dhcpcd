@@ -535,9 +535,10 @@ ipv6nd_dadcallback(void *arg)
 
 static void
 ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
-    struct icmp6_hdr *icp, ssize_t len)
+    struct icmp6_hdr *icp, size_t len)
 {
-	ssize_t l, m, n, olen;
+	size_t olen, l, m, n;
+	ssize_t r;
 	struct nd_router_advert *nd_ra;
 	struct nd_opt_prefix_info *pi;
 	struct nd_opt_mtu *mtu;
@@ -556,7 +557,7 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 	struct timeval expire;
 	uint8_t new_rap, new_data;
 
-	if ((size_t)len < sizeof(struct nd_router_advert)) {
+	if (len < sizeof(struct nd_router_advert)) {
 		syslog(LOG_ERR, "IPv6 RA packet too short from %s", ctx->sfrom);
 		return;
 	}
@@ -665,7 +666,7 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 	p = ((uint8_t *)icp) + sizeof(struct nd_router_advert);
 	lifetime = ~0U;
 	for (; len > 0; p += olen, len -= olen) {
-		if ((size_t)len < sizeof(struct nd_opt_hdr)) {
+		if (len < sizeof(struct nd_opt_hdr)) {
 			syslog(LOG_ERR, "%s: short option", ifp->name);
 			break;
 		}
@@ -803,9 +804,9 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 			for (n = ndo->nd_opt_len - 1; n > 1; n -= 2,
 			    op += sizeof(addr.s6_addr))
 			{
-				m = ipv6_printaddr(NULL, 0, op, ifp->name);
-				if (m != -1)
-					l += m + 1;
+				r = ipv6_printaddr(NULL, 0, op, ifp->name);
+				if (r != -1)
+					l += (size_t)r + 1;
 			}
 			op = (uint8_t *)ndo;
 			op += offsetof(struct nd_opt_rdnss,
@@ -816,11 +817,11 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 				for (n = ndo->nd_opt_len - 1; n > 1; n -= 2,
 				    op += sizeof(addr.s6_addr))
 				{
-					m = ipv6_printaddr(tmp, l, op,
+					r = ipv6_printaddr(tmp, l, op,
 					    ifp->name);
-					if (m != -1) {
-						l -= (m + 1);
-						tmp += m;
+					if (r != -1) {
+						l -= ((size_t)r + 1);
+						tmp += (size_t)r;
 						*tmp++ = ' ';
 					}
 				}
@@ -838,21 +839,22 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 			    nd_opt_dnssl_lifetime);
 			op += sizeof(dnssl->nd_opt_dnssl_lifetime);
 			n = (dnssl->nd_opt_dnssl_len - 1) * 8;
-			l = decode_rfc3397(NULL, 0, n, op);
-			if (l < 1) {
+			r = decode_rfc3397(NULL, 0, op, n);
+			if (r < 1) {
 				syslog(LOG_ERR, "%s: invalid DNSSL option",
 				    ifp->name);
 			} else {
+				l = (size_t)r;
 				tmp = malloc(l);
 				if (tmp) {
-					decode_rfc3397(tmp, l, n, op);
-					n = print_string(NULL, 0,
-					    l - 1, (const uint8_t *)tmp);
+					decode_rfc3397(tmp, l, op, n);
+					l -= 1;
+					n = (size_t)print_string(NULL, 0,
+					    (const uint8_t *)tmp, l);
 					opt = malloc(n);
 					if (opt)
 						print_string(opt, n,
-						    l - 1,
-						    (const uint8_t *)tmp);
+						    (const uint8_t *)tmp, l);
 					free(tmp);
 				}
 			}
@@ -962,17 +964,14 @@ ipv6nd_has_ra(const struct interface *ifp)
 ssize_t
 ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 {
-	ssize_t l;
-	size_t len;
+	size_t i, len, l;
 	const struct ra *rap;
 	const struct ra_opt *rao;
-	int i;
 	char buffer[32];
 	const char *optn;
 	char **pref, **mtu, **rdnss, **dnssl, ***var, *new;
 
-	i = 0;
-	l = 0;
+	i = l = 0;
 	TAILQ_FOREACH(rap, ifp->ctx->ipv6->ra_routers, next) {
 		i++;
 		if (rap->iface != ifp)
@@ -980,8 +979,7 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 		if (env) {
 			snprintf(buffer, sizeof(buffer),
 			    "ra%d_from", i);
-			if (setvar(&env, prefix, buffer, rap->sfrom) == -1)
-				return -1;
+			setvar(&env, prefix, buffer, rap->sfrom);
 		}
 		l++;
 
@@ -1023,7 +1021,7 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 						continue;
 					} else
 						new++;
-					len = (new - **var) +
+					len = (size_t)(new - **var) +
 					    strlen(rao->option) + 1;
 					if (len > strlen(**var))
 						new = realloc(**var, len);
@@ -1033,7 +1031,9 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 						**var = new;
 						new = strchr(**var, '=');
 						if (new) {
-							len -= (new - **var);
+							len -=
+							    (size_t)
+							    (new - **var);
 							strlcpy(new + 1,
 							    rao->option,
 							    len - 1);
@@ -1045,30 +1045,27 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 				}
 				len = strlen(rao->option) + 1;
 				new = realloc(**var, strlen(**var) + 1 + len);
-				if (new == NULL)
-					return -1;
-				**var = new;
-				new += strlen(new);
-				*new++ = ' ';
-				strlcpy(new, rao->option, len);
+				if (new) {
+					**var = new;
+					new += strlen(new);
+					*new++ = ' ';
+					strlcpy(new, rao->option, len);
+				} else
+					syslog(LOG_ERR, "%s: %m", __func__);
 				continue;
 			}
 			if (env) {
 				snprintf(buffer, sizeof(buffer),
 				    "ra%d_%s", i, optn);
-				if (setvar(&env, prefix, buffer, rao->option)
-				    == -1)
-					return -1;
+				setvar(&env, prefix, buffer, rao->option);
 			}
 		}
 	}
 
-	if (env) {
-		if (setvard(&env, prefix, "ra_count", i) == -1)
-			return -1;
-	}
+	if (env)
+		setvard(&env, prefix, "ra_count", i);
 	l++;
-	return l;
+	return (ssize_t)l;
 }
 
 void
@@ -1330,7 +1327,7 @@ ipv6nd_cancelproberouter(struct ra *rap)
 
 static void
 ipv6nd_handlena(struct ipv6_ctx *ctx, struct interface *ifp,
-    struct icmp6_hdr *icp, ssize_t len)
+    struct icmp6_hdr *icp, size_t len)
 {
 	struct nd_neighbor_advert *nd_na;
 	struct ra *rap;
@@ -1476,10 +1473,10 @@ ipv6nd_handledata(void *arg)
 	if (icp->icmp6_code == 0) {
 		switch(icp->icmp6_type) {
 			case ND_NEIGHBOR_ADVERT:
-				ipv6nd_handlena(ctx, ifp, icp, len);
+				ipv6nd_handlena(ctx, ifp, icp, (size_t)len);
 				return;
 			case ND_ROUTER_ADVERT:
-				ipv6nd_handlera(ctx, ifp, icp, len);
+				ipv6nd_handlera(ctx, ifp, icp, (size_t)len);
 				return;
 		}
 	}

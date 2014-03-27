@@ -61,10 +61,10 @@
 #undef IPV4_LOOPBACK_ROUTE
 #endif
 
-int
+uint8_t
 inet_ntocidr(struct in_addr address)
 {
-	int cidr = 0;
+	uint8_t cidr = 0;
 	uint32_t mask = htonl(address.s_addr);
 
 	while (mask) {

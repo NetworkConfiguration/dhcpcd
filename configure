@@ -334,9 +334,10 @@ CFLAGS+=	-Wnested-externs
 CFLAGS+=	-Winline -Wwrite-strings -Wcast-align -Wcast-qual
 CFLAGS+=	-Wpointer-arith -Wstrict-overflow
 CFLAGS+=	-Wdeclaration-after-statement
+CFLAGS+=	-Wconversion
 EOF
 	case "$OS" in
-	openbsd*)	;; # OpenBSD has many redundant decs in system headers
+	mirbsd*|openbsd*);; # OpenBSD has many redundant decs in system headers
 	*)		echo "CFLAGS+=	-Wredundant-decls" >>$CONFIG_MK;;
 	esac
 fi

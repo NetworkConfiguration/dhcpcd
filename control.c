@@ -119,32 +119,32 @@ control_handle(void *arg)
 		close(fd);
 }
 
-static int
+static socklen_t
 make_sock(struct dhcpcd_ctx *ctx, struct sockaddr_un *sun, const char *ifname)
 {
 
 #ifdef SOCK_CLOEXEC
 	if ((ctx->control_fd = socket(AF_UNIX,
 	    SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0)) == -1)
-		return -1;
+		return 0;
 #else
 	int flags;
 
 	if ((ctx->control_fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
-		return -1;
+		return 0;
 	if ((flags = fcntl(ctx->control_fd, F_GETFD, 0)) == -1 ||
 	    fcntl(ctx->control_fd, F_SETFD, flags | FD_CLOEXEC) == -1)
 	{
 		close(ctx->control_fd);
 		ctx->control_fd = -1;
-	        return -1;
+	        return 0;
 	}
 	if ((flags = fcntl(ctx->control_fd, F_GETFL, 0)) == -1 ||
 	    fcntl(ctx->control_fd, F_SETFL, flags | O_NONBLOCK) == -1)
 	{
 		close(ctx->control_fd);
 		ctx->control_fd = -1;
-	        return -1;
+	        return 0;
 	}
 #endif
 	memset(sun, 0, sizeof(*sun));
@@ -159,9 +159,9 @@ int
 control_start(struct dhcpcd_ctx *ctx, const char *ifname)
 {
 	struct sockaddr_un sun;
-	int len;
+	socklen_t len;
 
-	if ((len = make_sock(ctx, &sun, ifname)) == -1)
+	if ((len = make_sock(ctx, &sun, ifname)) == 0)
 		return -1;
 	unlink(ctx->control_sock);
 	if (bind(ctx->control_fd, (struct sockaddr *)&sun, len) == -1 ||
@@ -209,9 +209,9 @@ int
 control_open(struct dhcpcd_ctx *ctx, const char *ifname)
 {
 	struct sockaddr_un sun;
-	int len;
+	socklen_t len;
 
-	if ((len = make_sock(ctx, &sun, ifname)) == -1)
+	if ((len = make_sock(ctx, &sun, ifname)) == 0)
 		return -1;
 	if (connect(ctx->control_fd, (struct sockaddr *)&sun, len) == -1) {
 		close(ctx->control_fd);
@@ -221,28 +221,28 @@ control_open(struct dhcpcd_ctx *ctx, const char *ifname)
 	return 0;
 }
 
-int
+ssize_t
 control_send(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 {
-	char buffer[1024], *p;
+	char buffer[1024];
 	int i;
-	size_t len;
+	size_t len, l;
 
 	if (argc > 255) {
 		errno = ENOBUFS;
 		return -1;
 	}
-	p = buffer;
+	len = 0;
 	for (i = 0; i < argc; i++) {
-		len = strlen(argv[i]) + 1;
-		if ((p - buffer) + len > sizeof(buffer)) {
+		l = strlen(argv[i]) + 1;
+		if (len + l > sizeof(buffer)) {
 			errno = ENOBUFS;
 			return -1;
 		}
-		memcpy(p, argv[i], len);
-		p += len;
+		memcpy(buffer + len, argv[i], l);
+		len += l;
 	}
-	return write(ctx->control_fd, buffer, p - buffer);
+	return write(ctx->control_fd, buffer, len);
 }
 
 void

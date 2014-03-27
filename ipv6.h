@@ -73,7 +73,7 @@ struct ipv6_addr {
 	TAILQ_ENTRY(ipv6_addr) next;
 	struct interface *iface;
 	struct in6_addr prefix;
-	int prefix_len;
+	uint8_t prefix_len;
 	uint32_t prefix_vltime;
 	uint32_t prefix_pltime;
 	struct in6_addr addr;
@@ -108,7 +108,7 @@ struct rt6 {
 	struct in6_addr gate;
 	const struct interface *iface;
 	unsigned int flags;
-	int metric;
+	unsigned int metric;
 	unsigned int mtu;
 };
 TAILQ_HEAD(rt6_head, rt6);
@@ -159,12 +159,12 @@ struct ipv6_ctx {
 
 #ifdef INET6
 struct ipv6_ctx *ipv6_init(struct dhcpcd_ctx *);
-ssize_t ipv6_printaddr(char *, ssize_t, const uint8_t *, const char *);
+ssize_t ipv6_printaddr(char *, size_t, const uint8_t *, const char *);
 int ipv6_makeaddr(struct in6_addr *, const struct interface *,
     const struct in6_addr *, int);
 int ipv6_makeprefix(struct in6_addr *, const struct in6_addr *, int);
 int ipv6_mask(struct in6_addr *, int);
-int ipv6_prefixlen(const struct in6_addr *);
+uint8_t ipv6_prefixlen(const struct in6_addr *);
 int ipv6_userprefix( const struct in6_addr *, short prefix_len,
     uint64_t user_number, struct in6_addr *result, short result_len);
 void ipv6_checkaddrflags(void *);

@@ -353,7 +353,7 @@ configure_interface1(struct interface *ifp)
 		ifo->options &= ~DHCPCD_LINK;
 
 	if (ifo->metric != -1)
-		ifp->metric = ifo->metric;
+		ifp->metric = (unsigned int)ifo->metric;
 
 	if (!(ifo->options & DHCPCD_IPV6))
 		ifo->options &= ~DHCPCD_IPV6RS;
@@ -492,7 +492,7 @@ configure_interface(struct interface *ifp, int argc, char **argv)
 }
 
 void
-handle_carrier(struct dhcpcd_ctx *ctx, int carrier, int flags,
+handle_carrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
     const char *ifname)
 {
 	struct interface *ifp;
@@ -574,7 +574,6 @@ start_interface(void *arg)
 {
 	struct interface *ifp = arg;
 	struct if_options *ifo = ifp->options;
-	int nolease;
 	size_t i;
 	char buf[DUID_LEN * 3];
 
@@ -619,10 +618,13 @@ start_interface(void *arg)
 			ipv6nd_startrs(ifp);
 
 		if (!(ifo->options & DHCPCD_IPV6RS)) {
+			ssize_t nolease;
+
 			if (ifo->options & DHCPCD_IA_FORCED)
 				nolease = dhcp6_start(ifp, DH6S_INIT);
 			else {
-				nolease = dhcp6_find_delegates(ifp);
+				dhcp6_find_delegates(ifp);
+				nolease = 0;
 				/* Enabling the below doesn't really make
 				 * sense as there is currently no standard
 				 * to push routes via DHCPv6.
@@ -760,7 +762,7 @@ handle_interface(void *arg, int action, const char *ifname)
 
 void
 handle_hwaddr(struct dhcpcd_ctx *ctx, const char *ifname,
-    const uint8_t *hwaddr, size_t hwlen)
+    const uint8_t *hwaddr, uint8_t hwlen)
 {
 	struct interface *ifp;
 	char buf[sizeof(ifp->hwaddr) * 3];
@@ -787,7 +789,7 @@ handle_hwaddr(struct dhcpcd_ctx *ctx, const char *ifname,
 static void
 if_reboot(struct interface *ifp, int argc, char **argv)
 {
-	int oldopts;
+	unsigned long long oldopts;
 
 	oldopts = ifp->options->options;
 	script_runreason(ifp, "RECONFIGURE");
@@ -959,8 +961,7 @@ handle_args(struct dhcpcd_ctx *ctx, struct fd_list *fd, int argc, char **argv)
 	struct interface *ifp;
 	int do_exit = 0, do_release = 0, do_reboot = 0;
 	int opt, oi = 0;
-	ssize_t len;
-	size_t l;
+	size_t len, l;
 	struct iovec iov[2];
 	char *tmp, *p;
 
@@ -998,8 +999,8 @@ handle_args(struct dhcpcd_ctx *ctx, struct fd_list *fd, int argc, char **argv)
 					if (ipv6nd_has_ra(ifp))
 						len++;
 				}
-				len = write(fd->fd, &len, sizeof(len));
-				if (len != sizeof(len))
+				if (write(fd->fd, &len, sizeof(len) !=
+				    sizeof(len)))
 					return -1;
 				TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 					send_interface(fd->fd, ifp);
@@ -1018,8 +1019,7 @@ handle_args(struct dhcpcd_ctx *ctx, struct fd_list *fd, int argc, char **argv)
 					}
 				}
 			}
-			len = write(fd->fd, &len, sizeof(len));
-			if (len != sizeof(len))
+			if (write(fd->fd, &len, sizeof(len)) != sizeof(len))
 				return -1;
 			opt = 0;
 			while (argv[++opt] != NULL) {
@@ -1108,7 +1108,8 @@ main(int argc, char **argv)
 	struct interface *ifp;
 	uint16_t family = 0;
 	int opt, oi = 0, i;
-	size_t len;
+	time_t t;
+	ssize_t len;
 #if defined(USE_SIGNALS) || !defined(THERE_IS_NO_FORK)
 	pid_t pid;
 #endif
@@ -1488,11 +1489,11 @@ main(int argc, char **argv)
 			}
 		}
 		if (ctx.options & DHCPCD_MASTER)
-			i = ifo->timeout;
+			t = ifo->timeout;
 		else if ((ifp = TAILQ_FIRST(ctx.ifaces)))
-			i = ifp->options->timeout;
+			t = ifp->options->timeout;
 		else
-			i = 0;
+			t = 0;
 		if (opt == 0 &&
 		    ctx.options & DHCPCD_LINK &&
 		    !(ctx.options & DHCPCD_WAITIP))
@@ -1500,10 +1501,10 @@ main(int argc, char **argv)
 			syslog(LOG_WARNING, "no interfaces have a carrier");
 			if (daemonise(&ctx))
 				goto exit_success;
-		} else if (i > 0) {
+		} else if (t > 0) {
 			if (ctx.options & DHCPCD_IPV4LL)
 				ctx.options |= DHCPCD_TIMEOUT_IPV4LL;
-			eloop_timeout_add_sec(ctx.eloop, i,
+			eloop_timeout_add_sec(ctx.eloop, t,
 			    handle_exit_timeout, &ctx);
 		}
 	}

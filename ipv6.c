@@ -135,11 +135,11 @@ ipv6_init(struct dhcpcd_ctx *dhcpcd_ctx)
 }
 
 ssize_t
-ipv6_printaddr(char *s, ssize_t sl, const uint8_t *d, const char *ifname)
+ipv6_printaddr(char *s, size_t sl, const uint8_t *d, const char *ifname)
 {
 	char buf[INET6_ADDRSTRLEN];
 	const char *p;
-	ssize_t l;
+	size_t l;
 
 	p = inet_ntop(AF_INET6, d, buf, sizeof(buf));
 	if (p == NULL)
@@ -150,7 +150,7 @@ ipv6_printaddr(char *s, ssize_t sl, const uint8_t *d, const char *ifname)
 		l += 1 + strlen(ifname);
 
 	if (s == NULL)
-		return l;
+		return (ssize_t)l;
 
 	if (sl < l) {
 		errno = ENOMEM;
@@ -163,7 +163,7 @@ ipv6_printaddr(char *s, ssize_t sl, const uint8_t *d, const char *ifname)
 		s += strlcpy(s, ifname, sl);
 	}
 	*s = '\0';
-	return l;
+	return (ssize_t)l;
 }
 
 int
@@ -202,11 +202,11 @@ ipv6_makeprefix(struct in6_addr *prefix, const struct in6_addr *addr, int len)
 
 	bytelen = len / NBBY;
 	bitlen = len % NBBY;
-	memcpy(&prefix->s6_addr, &addr->s6_addr, bytelen);
+	memcpy(&prefix->s6_addr, &addr->s6_addr, (size_t)bytelen);
 	if (bitlen != 0)
 		prefix->s6_addr[bytelen] >>= NBBY - bitlen;
 	memset((char *)prefix->s6_addr + bytelen, 0,
-	    sizeof(prefix->s6_addr) - bytelen);
+	    sizeof(prefix->s6_addr) - (size_t)bytelen);
 	return 0;
 }
 
@@ -232,7 +232,7 @@ ipv6_mask(struct in6_addr *mask, int len)
 	return 0;
 }
 
-int
+uint8_t
 ipv6_prefixlen(const struct in6_addr *mask)
 {
 	int x = 0, y;
@@ -257,13 +257,13 @@ ipv6_prefixlen(const struct in6_addr *mask)
 	 */
 	if (p < lim) {
 		if (y != 0 && (*p & (0x00ff >> y)) != 0)
-			return -1;
+			return 0;
 		for (p = p + 1; p < lim; p++)
 			if (*p != 0)
-				return -1;
+				return 0;
 	}
 
-	return x * NBBY + y;
+	return (uint8_t)(x * NBBY + y);
 }
 
 static void
@@ -299,23 +299,23 @@ h64_to_in6(uint64_t vhigh, uint64_t vlow, struct in6_addr *add)
 {
 	uint8_t *p = (uint8_t *)&add->s6_addr;
 
-	p[0] = vhigh >> 56;
-	p[1] = vhigh >> 48;
-	p[2] = vhigh >> 40;
-	p[3] = vhigh >> 32;
-	p[4] = vhigh >> 24;
-	p[5] = vhigh >> 16;
-	p[6] = vhigh >> 8;
-	p[7] = vhigh;
+	p[0] = (uint8_t)(vhigh >> 56);
+	p[1] = (uint8_t)(vhigh >> 48);
+	p[2] = (uint8_t)(vhigh >> 40);
+	p[3] = (uint8_t)(vhigh >> 32);
+	p[4] = (uint8_t)(vhigh >> 24);
+	p[5] = (uint8_t)(vhigh >> 16);
+	p[6] = (uint8_t)(vhigh >> 8);
+	p[7] = (uint8_t)vhigh;
 	p += 8;
-	p[0] = vlow >> 56;
-	p[1] = vlow >> 48;
-	p[2] = vlow >> 40;
-	p[3] = vlow >> 32;
-	p[4] = vlow >> 24;
-	p[5] = vlow >> 16;
-	p[6] = vlow >> 8;
-	p[7] = vlow;
+	p[0] = (uint8_t)(vlow >> 56);
+	p[1] = (uint8_t)(vlow >> 48);
+	p[2] = (uint8_t)(vlow >> 40);
+	p[3] = (uint8_t)(vlow >> 32);
+	p[4] = (uint8_t)(vlow >> 24);
+	p[5] = (uint8_t)(vlow >> 16);
+	p[6] = (uint8_t)(vlow >> 8);
+	p[7] = (uint8_t)vlow;
 }
 
 int

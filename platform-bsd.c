@@ -185,7 +185,7 @@ check_ipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 
 	if (ifname) {
 #ifdef ND6_IFF_ACCEPT_RTADV
-		int i;
+		size_t i;
 		char *p, **nrest;
 #endif
 

@@ -51,7 +51,7 @@ htonll(uint64_t x)
 {
 
 	return (uint64_t)htonl((uint32_t)(x >> 32)) |
-	    (int64_t)htonl((uint32_t)(x & 0xffffffff)) << 32;
+	    (uint64_t)htonl((uint32_t)(x & 0xffffffff)) << 32;
 }
 #else	/* (BYTE_ORDER == LITTLE_ENDIAN) */
 #define htonll(x) (x)
@@ -65,7 +65,7 @@ ntohll(uint64_t x)
 {
 
 	return (uint64_t)ntohl((uint32_t)(x >> 32)) |
-	    (int64_t)ntohl((uint32_t)(x & 0xffffffff)) << 32;
+	    (uint64_t)ntohl((uint32_t)(x & 0xffffffff)) << 32;
 }
 #else	/* (BYTE_ORDER == LITTLE_ENDIAN) */
 #define ntohll(x) (x)
@@ -101,14 +101,14 @@ dhcp_auth_reset(struct authstate *state)
  */
 const struct token *
 dhcp_auth_validate(struct authstate *state, const struct auth *auth,
-    const uint8_t *m, unsigned int mlen, int mp,  int mt,
-    const uint8_t *data, unsigned int dlen)
+    const uint8_t *m, size_t mlen, int mp,  int mt,
+    const uint8_t *data, size_t dlen)
 {
 	uint8_t protocol, algorithm, rdm, *mm, type;
 	uint64_t replay;
 	uint32_t secretid;
 	const uint8_t *d, *realm;
-	unsigned int realm_len;
+	size_t realm_len;
 	const struct token *t;
 	time_t now;
 	uint8_t hmac[HMAC_LENGTH];
@@ -422,7 +422,7 @@ get_next_rdm_monotonic_counter(struct auth *auth)
 	return rdm;
 }
 
-#define JAN_1970	2208988800UL	/* 1970 - 1900 in seconds */
+#define JAN_1970       2208988800U    /* 1970 - 1900 in seconds */
 static uint64_t
 get_next_rdm_monotonic_clock(struct auth *auth)
 {
@@ -434,7 +434,7 @@ get_next_rdm_monotonic_clock(struct auth *auth)
 	if (clock_gettime(CLOCK_REALTIME, &ts) != 0)
 		return ++auth->last_replay; /* report error? */
 	pack[0] = htonl((uint32_t)ts.tv_sec + JAN_1970);
-	frac = (ts.tv_nsec / 1e9 * 0x100000000ULL);
+	frac = ((double)ts.tv_nsec / 1e9 * 0x100000000ULL);
 	pack[1] = htonl((uint32_t)frac);
 
 	memcpy(&rdm, &pack, sizeof(rdm));
@@ -460,10 +460,10 @@ get_next_rdm_monotonic(struct auth *auth)
  * mt is the DHCP message type.
  * data and dlen refer to the authentication option within the message.
  */
-int
+ssize_t
 dhcp_auth_encode(struct auth *auth, const struct token *t,
-    uint8_t *m, unsigned int mlen, int mp, int mt,
-    uint8_t *data, unsigned int dlen)
+    uint8_t *m, size_t mlen, int mp, int mt,
+    uint8_t *data, size_t dlen)
 {
 	uint64_t rdm;
 	uint8_t hmac[HMAC_LENGTH];
@@ -542,7 +542,7 @@ dhcp_auth_encode(struct auth *auth, const struct token *t,
 				dlen += sizeof(t->secretid) + sizeof(hmac);
 			break;
 		}
-		return dlen;
+		return (ssize_t)dlen;
 	}
 
 	if (dlen < 1 + 1 + 1 + 8) {
@@ -586,12 +586,12 @@ dhcp_auth_encode(struct auth *auth, const struct token *t,
 			return -1;
 		}
 		memcpy(data, t->key, t->key_len);
-		return dlen - t->key_len;
+		return (ssize_t)(dlen - t->key_len);
 	}
 
 	/* DISCOVER or INFORM messages don't write auth info */
 	if (!info)
-		return dlen;
+		return (ssize_t)dlen;
 
 	/* Loading a saved lease without an authentication option */
 	if (t == NULL)
@@ -656,5 +656,5 @@ dhcp_auth_encode(struct auth *auth, const struct token *t,
 	}
 
 	/* Done! */
-	return dlen - sizeof(hmac); /* should be zero */
+	return (int)(dlen - sizeof(hmac)); /* should be zero */
 }
