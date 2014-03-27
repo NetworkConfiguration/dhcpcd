@@ -505,7 +505,7 @@ dhcp6_makemessage(struct interface *ifp)
 	o->code = htons(D6_OPTION_ELAPSED);
 	o->len = htons(sizeof(uint16_t));
 	p = D6_OPTION_DATA(o);
-	memset(p, 0, sizeof(u16));
+	memset(p, 0, sizeof(uint16_t));
 
 	o = D6_NEXT_OPTION(o);
 	dhcp6_makevendor(o, ifp);
