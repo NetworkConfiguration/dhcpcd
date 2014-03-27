@@ -97,7 +97,7 @@ get_monotonic(struct timeval *tp)
 
 	if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0) {
 		tp->tv_sec = ts.tv_sec;
-		tp->tv_usec = ts.tv_nsec / 1000;
+		tp->tv_usec = (suseconds_t)(ts.tv_nsec / 1000);
 		return 0;
 	}
 #elif defined(__APPLE__)

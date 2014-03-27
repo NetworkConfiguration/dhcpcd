@@ -371,7 +371,8 @@ eloop_start(struct dhcpcd_ctx *dctx)
 		}
 
 #ifdef USE_SIGNALS
-		n = pollts(ctx->fds, ctx->events_len, tsp, &dctx->sigset);
+		n = pollts(ctx->fds, (nfds_t)ctx->events_len,
+		    tsp, &dctx->sigset);
 #else
 		if (tsp == NULL)
 			timeout = -1;

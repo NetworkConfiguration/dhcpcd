@@ -1625,7 +1625,7 @@ dhcp6_readlease(struct interface *ifp)
 	}
 	syslog(LOG_DEBUG, "%s: reading lease `%s'",
 	    ifp->name, state->leasefile);
-	if (st.st_size > SIZE_MAX) {
+	if (st.st_size > UINT32_MAX) {
 		syslog(LOG_ERR, "%s: file too big", ifp->name);
 		return -1;
 	}
