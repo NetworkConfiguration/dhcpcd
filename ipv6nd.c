@@ -978,7 +978,7 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 			continue;
 		if (env) {
 			snprintf(buffer, sizeof(buffer),
-			    "ra%d_from", i);
+			    "ra%zu_from", i);
 			setvar(&env, prefix, buffer, rap->sfrom);
 		}
 		l++;
@@ -1056,7 +1056,7 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 			}
 			if (env) {
 				snprintf(buffer, sizeof(buffer),
-				    "ra%d_%s", i, optn);
+				    "ra%zu_%s", i, optn);
 				setvar(&env, prefix, buffer, rao->option);
 			}
 		}

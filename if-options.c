@@ -390,9 +390,9 @@ parse_iaid1(uint8_t *iaid, const char *arg, size_t len, int n)
 	l = strtoul(arg, &np, 0);
 	if (l <= (unsigned long)UINT32_MAX && errno == 0 && *np == '\0') {
 		if (n)
-			u32 = htonl(l);
+			u32 = htonl((uint32_t)l);
 		else
-			u32 = l;
+			u32 = (uint32_t)l;
 		memcpy(iaid, &u32, sizeof(u32));
 		return 0;
 	}
@@ -609,7 +609,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
     int opt, const char *arg, struct dhcp_opt **ldop, struct dhcp_opt **edop)
 {
 	int i, l, t;
-	unsigned int u;
+	unsigned long u;
 	char *p = NULL, *fp, *np, **nconf;
 	ssize_t s;
 	struct in_addr addr, addr2;
@@ -1550,7 +1550,7 @@ err_sla:
 			ndop->encopts_len = 0;
 		} else
 			free_dhcp_opt_embenc(ndop);
-		ndop->option = u; /* could have been 0 */
+		ndop->option = (uint32_t)u; /* could have been 0 */
 		ndop->type = t;
 		ndop->len = (size_t)l;
 		ndop->var = np;
@@ -1598,7 +1598,7 @@ err_sla:
 			return -1;
 		}
 		ifo->vivco = vivco;
-		ifo->vivco_en = u;
+		ifo->vivco_en = (uint32_t)u;
 		vivco = &ifo->vivco[ifo->vivco_len++];
 		vivco->len = dl;
 		vivco->data = (uint8_t *)np;

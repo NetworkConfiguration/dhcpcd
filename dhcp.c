@@ -698,11 +698,11 @@ make_message(struct dhcp_message **message,
 	}
 
 	dhcp->op = DHCP_BOOTREQUEST;
-	dhcp->hwtype = iface->family;
+	dhcp->hwtype = (uint8_t)iface->family;
 	switch (iface->family) {
 	case ARPHRD_ETHER:
 	case ARPHRD_IEEE802:
-		dhcp->hwlen = iface->hwlen;
+		dhcp->hwlen = (uint8_t)iface->hwlen;
 		memcpy(&dhcp->chaddr, &iface->hwaddr, iface->hwlen);
 		break;
 	}
@@ -848,9 +848,9 @@ make_message(struct dhcp_message **message,
 			*p++ = 0; /* from server for PTR RR */
 			*p++ = 0; /* from server for A RR if S=1 */
 			if (hostname) {
-				ul = encode_rfc1035(hostname, p);
-				*lp += ul;
-				p += ul;
+				i = encode_rfc1035(hostname, p);
+				*lp += i;
+				p += i;
 			}
 		} else if (ifo->options & DHCPCD_HOSTNAME && hostname) {
 			*p++ = DHO_HOSTNAME;

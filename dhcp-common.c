@@ -587,12 +587,12 @@ size_t
 dhcp_envoption(struct dhcpcd_ctx *ctx, char **env, const char *prefix,
     const char *ifname, struct dhcp_opt *opt,
     const uint8_t *(*dgetopt)(struct dhcpcd_ctx *,
-    unsigned int *, unsigned int *, unsigned int *,
-    const uint8_t *, unsigned int, struct dhcp_opt **),
+    size_t *, unsigned int *, size_t *,
+    const uint8_t *, size_t, struct dhcp_opt **),
     const uint8_t *od, size_t ol)
 {
-	size_t e, i, n;
-	unsigned int eoc, eos, eol;
+	size_t e, i, n, eos, eol;
+	unsigned int eoc;
 	const uint8_t *eod;
 	int ov;
 	struct dhcp_opt *eopt, *oopt;

@@ -152,7 +152,7 @@ make_sock(struct dhcpcd_ctx *ctx, struct sockaddr_un *sun, const char *ifname)
 	snprintf(sun->sun_path, sizeof(sun->sun_path), CONTROLSOCKET,
 	    ifname ? "-" : "", ifname ? ifname : "");
 	strlcpy(ctx->control_sock, sun->sun_path, sizeof(ctx->control_sock));
-	return SUN_LEN(sun);
+	return (socklen_t)SUN_LEN(sun);
 }
 
 int

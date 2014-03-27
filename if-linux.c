@@ -403,7 +403,8 @@ link_addr(struct dhcpcd_ctx *ctx, struct nlmsghdr *nlm)
 	return 1;
 }
 
-static short l2addr_len(unsigned short if_type)
+static uint8_t
+l2addr_len(unsigned short if_type)
 {
 
 	switch (if_type) {
@@ -415,9 +416,10 @@ static short l2addr_len(unsigned short if_type)
 		return 8;
 	case ARPHRD_INFINIBAND:
 		return 20;
-	default:
-		return -1;
 	}
+
+	/* Impossible */
+	return 0;
 }
 
 static int
@@ -517,7 +519,7 @@ link_netlink(struct dhcpcd_ctx *ctx, struct nlmsghdr *nlm)
 
 	/* Re-read hardware address and friends */
 	if (!(ifi->ifi_flags & IFF_UP) && hwaddr) {
-		short l;
+		uint8_t l;
 
 		l = l2addr_len(ifi->ifi_type);
 		if (hwaddr->rta_len == RTA_LENGTH(l))

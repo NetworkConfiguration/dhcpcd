@@ -681,7 +681,7 @@ static void dhcp6_delete_delegates(struct interface *ifp)
 }
 
 
-static int
+static ssize_t
 dhcp6_update_auth(struct interface *ifp, struct dhcp6_message *m, size_t len)
 {
 	struct dhcp6_state *state;

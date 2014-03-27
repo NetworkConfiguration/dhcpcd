@@ -165,8 +165,8 @@ check_ipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 		ifname = "all";
 
 	snprintf(path, sizeof(path), "%s/%s/autoconf", prefix, ifname);
-	i = check_proc_int(path);
-	if (i != 1) {
+	ra = check_proc_int(path);
+	if (ra != 1) {
 		syslog(LOG_WARNING, "%s: IPv6 kernel autoconf disabled",
 		    ifname);
 		return -1;
