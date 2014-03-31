@@ -92,10 +92,10 @@ ipv4_opensocket(struct interface *ifp, int protocol)
 	memset(&pf, 0, sizeof(pf));
 	if (protocol == ETHERTYPE_ARP) {
 		pf.filter = UNCONST(arp_bpf_filter);
-		pf.len = (unsigned int)arp_bpf_filter_len;
+		pf.len = arp_bpf_filter_len;
 	} else {
 		pf.filter = UNCONST(dhcp_bpf_filter);
-		pf.len = (unsigned int)dhcp_bpf_filter_len;
+		pf.len = dhcp_bpf_filter_len;
 	}
 	if (setsockopt(s, SOL_SOCKET, SO_ATTACH_FILTER, &pf, sizeof(pf)) != 0)
 		goto eexit;
