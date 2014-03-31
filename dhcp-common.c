@@ -194,11 +194,12 @@ ssize_t
 decode_rfc3397(char *out, size_t len, const uint8_t *p, size_t pl)
 {
 	const char *start;
-	size_t start_len, l;
+	size_t start_len, l, count;
 	const uint8_t *r, *q = p, *e;
-	int count = 0, hops;
+	int hops;
 	uint8_t ltype;
 
+	count = 0;
 	start = out;
 	start_len = len;
 	q = p;
@@ -260,7 +261,7 @@ decode_rfc3397(char *out, size_t len, const uint8_t *p, size_t pl)
 			*out = '\0';
 	}
 
-	return count;
+	return (ssize_t)count;
 }
 
 ssize_t
