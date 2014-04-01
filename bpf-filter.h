@@ -47,8 +47,7 @@ static const struct bpf_insn arp_bpf_filter [] = {
 	/* Otherwise, drop it. */
 	BPF_STMT(BPF_RET + BPF_K, 0),
 };
-static const unsigned int arp_bpf_filter_len =
-    sizeof(arp_bpf_filter) / sizeof(arp_bpf_filter[0]);
+#define arp_bpf_filter_len sizeof(arp_bpf_filter) / sizeof(arp_bpf_filter[0])
 
 
 /* dhcp_bpf_filter taken from bpf.c in dhcp-3.1.0
@@ -97,5 +96,4 @@ static const struct bpf_insn dhcp_bpf_filter [] = {
 	/* Otherwise, drop it. */
 	BPF_STMT(BPF_RET + BPF_K, 0),
 };
-static const unsigned int dhcp_bpf_filter_len =
-    sizeof(dhcp_bpf_filter) / sizeof(dhcp_bpf_filter[0]);
+#define dhcp_bpf_filter_len sizeof(dhcp_bpf_filter) / sizeof(dhcp_bpf_filter[0])
