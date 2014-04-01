@@ -2630,31 +2630,38 @@ dhcp_handlepacket(void *arg)
 }
 
 static void
-dhcp_handleudp(void *arg)
+dhcp_handleudp1(struct dhcpcd_ctx *ctx, int *fd, const char *ifname)
 {
-	struct dhcpcd_ctx *ctx;
 	uint8_t buffer[sizeof(struct dhcp_message)];
-
-	ctx = arg;
 
 	/* Just read what's in the UDP fd and discard it as we always read
 	 * from the raw fd */
-	(void)read(ctx->udp_fd, buffer, sizeof(buffer));
+	if (read(*fd, buffer, sizeof(buffer)) == -1) {
+		syslog(LOG_ERR, "%s: %s: %m", ifname, __func__);
+		eloop_event_delete(ctx->eloop, *fd);
+		close(*fd);
+		*fd = -1;
+	}
+}
+
+static void
+dhcp_handleudp(void *arg)
+{
+	struct dhcpcd_ctx *ctx;
+
+	ctx = arg;
+	dhcp_handleudp1(arg, &ctx->udp_fd, NULL);
 }
 
 static void
 dhcp_handleifudp(void *arg)
 {
 	const struct interface *ifp;
-	const struct dhcp_state *state;
-	uint8_t buffer[sizeof(struct dhcp_message)];
+	struct dhcp_state *state;
 
 	ifp = arg;
-	state = D_CSTATE(ifp);
-
-	/* Just read what's in the UDP fd and discard it as we always read
-	 * from the raw fd */
-	(void)read(state->udp_fd, buffer, sizeof(buffer));
+	state = D_STATE(ifp);
+	dhcp_handleudp1(ifp->ctx, &state->udp_fd, ifp->name);
 }
 
 static int
