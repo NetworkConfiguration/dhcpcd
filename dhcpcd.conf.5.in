@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd March 22, 2014
+.Dd April 6, 2014
 .Dt DHCPCD.CONF 5
 .Os
 .Sh NAME
@@ -105,6 +105,8 @@ such as FireWire and InfiniBand.
 In most cases,
 .Nm dhcpcd
 will set this automatically.
+.It Ic debug
+Echo debug messages to the stderr and syslog.
 .It Ic dev Ar value
 Load the
 .Ar value
