@@ -38,6 +38,7 @@ const char dhcpcd_copyright[] = "Copyright (c) 2006-2014 Roy Marples";
 
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <getopt.h>
 #include <limits.h>
 #include <paths.h>
@@ -1371,9 +1372,11 @@ main(int argc, char **argv)
 		if (mkdir(DBDIR, 0755) == -1 && errno != EEXIST)
 			syslog(LOG_ERR, "mkdir `%s': %m", DBDIR);
 
-		ctx.pid_fd = open(pidfile,
-		    O_WRONLY | O_CREAT | O_CLOEXEC | O_NONBLOCK,
-		    0664);
+		opt = O_WRONLY | O_CREAT | O_NONBLOCK;
+#ifdef O_CLOEXEC
+		opt |= O_CLOEXEC;
+#endif
+		ctx.pid_fd = open(pidfile, opt, 0664);
 		if (ctx.pid_fd == -1)
 			syslog(LOG_ERR, "open `%s': %m", pidfile);
 		else {
@@ -1385,6 +1388,16 @@ main(int argc, char **argv)
 				ctx.pid_fd = -1;
 				goto exit_failure;
 			}
+#ifndef O_CLOEXEC
+			if (fcntl(ctx.pid_fd, F_GETFD, &opt) == -1 ||
+			    fcntl(ctx.pid_fd, F_SETFD, opt | FD_CLOEXEC) == -1)
+			{
+				syslog(LOG_ERR, "fcntl: %m");
+				close(ctx.pid_fd);
+				ctx.pid_fd = -1;
+				goto exit_failure;
+			}
+#endif
 			write_pid(ctx.pid_fd, getpid());
 		}
 	}
