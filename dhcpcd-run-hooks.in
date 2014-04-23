@@ -117,19 +117,29 @@ remove_markers()
 }
 
 # Compare two files.
+comp_file()
+{
+
+	[ -e "$1" ] || return 1
+	[ -e "$2" ] || return 1
+
+	if type cmp >/dev/null 2>&1; then
+		cmp -s "$1" "$2"
+	elif type diff >/dev/null 2>&1; then
+		diff -q "$1" "$2" >/dev/null
+	else
+		# Hopefully we're only working on small text files ...
+		[ "$(cat "$1")" = "$(cat "$2")" ]
+	fi
+}
+
+# Compare two files.
 # If different, replace first with second otherwise remove second.
 change_file()
 {
+
 	if [ -e "$1" ]; then
-		if type cmp >/dev/null 2>&1; then
-			cmp -s "$1" "$2"
-		elif type diff >/dev/null 2>&1; then
-			diff -q "$1" "$2" >/dev/null
-		else
-			# Hopefully we're only working on small text files ...
-			[ "$(cat "$1")" = "$(cat "$2")" ]
-		fi
-		if [ $? -eq 0 ]; then
+		if comp_file "$1" "$2"; then
 			rm -f "$2"
 			return 1
 		fi
@@ -139,9 +149,24 @@ change_file()
 	return 0
 }
 
+# Compare two files.
+# If different, copy or link depending on target type
+copy_file()
+{
+
+	if [ -h "$2" ]; then
+		[ "$(readlink "$2")" = "$1" ] && return 1
+		ln -sf "$1" "$2"
+	else
+		comp_file "$1" "$2" && return 1
+		cat "$2" >"$1"
+	fi
+}
+
 # Save a config file
 save_conf()
 {
+
 	if [ -f "$1" ]; then
 		rm -f "$1-pre.$interface"
 		cat "$1" > "$1-pre.$interface"
@@ -151,6 +176,7 @@ save_conf()
 # Restore a config file
 restore_conf()
 {
+
 	[ -f "$1-pre.$interface" ] || return 1
 	cat "$1-pre.$interface" > "$1"
 	rm -f "$1-pre.$interface"
@@ -205,6 +231,7 @@ valid_domainname_list()
 # Check for a valid path
 valid_path()
 {
+
 	case "$@" in
 	*[![:alnum:]#%+-_:\.,@~\\/\[\]=\ ]*) return 1;;
 	esac

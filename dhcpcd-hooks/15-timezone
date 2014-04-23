@@ -31,11 +31,8 @@ set_zoneinfo()
 		return 1
 	fi
 
-	syslog info "timezone changed to $new_tzdb_timezone"
-	if [ -h "$localtime" ]; then
-		ln -sf "$zone_file" "$localtime"
-	else
-		cp "$zone_file" "$localtime"
+	if copy_file "$zone_file" "$localtime"; then
+		syslog info "timezone changed to $new_tzdb_timezone"
 	fi
 }
 
