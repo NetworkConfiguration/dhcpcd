@@ -367,17 +367,11 @@ linux*)
 	;;
 kfreebsd*)
 	echo "CPPFLAGS+=	-D_GNU_SOURCE" >>$CONFIG_MK
-	if [ -z "$INET" -o "$INET" = yes ]; then
-		echo "DHCPCD_SRCS+=	bpf.c" >>$CONFIG_MK
-	fi
-	echo "DHCPCD_SRCS+=	if-bsd.c platform-bsd.c" >>$CONFIG_MK
+	echo "DHCPCD_SRCS+=	if-bsd.c" >>$CONFIG_MK
 	echo "COMPAT_SRCS+=	compat/linkaddr.c" >>$CONFIG_MK
 	;;
 *)
-	if [ -z "$INET" -o "$INET" = yes ]; then
-		echo "DHCPCD_SRCS+=	bpf.c" >>$CONFIG_MK
-	fi
-	echo "DHCPCD_SRCS+=	if-bsd.c platform-bsd.c" >>$CONFIG_MK
+	echo "DHCPCD_SRCS+=	if-bsd.c" >>$CONFIG_MK
 	;;
 esac
 

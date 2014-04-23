@@ -30,9 +30,13 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/sysctl.h>
+#include <sys/time.h>
 #include <sys/types.h>
+#include <sys/uio.h>
+#include <sys/utsname.h>
 
 #include <arpa/inet.h>
+#include <net/bpf.h>
 #include <net/if.h>
 #include <net/if_dl.h>
 #ifdef __FreeBSD__ /* Needed so that including netinet6/in6_var.h works */
@@ -42,6 +46,7 @@
 #include <net/route.h>
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
+#include <netinet6/nd6.h>
 #ifdef __DragonFly__
 #  include <netproto/802_11/ieee80211_ioctl.h>
 #elif __APPLE__
@@ -67,6 +72,9 @@
 #include "if-options.h"
 #include "ipv4.h"
 #include "ipv6.h"
+#include "platform.h"
+
+#include "bpf-filter.h"
 
 #ifndef RT_ROUNDUP
 #define RT_ROUNDUP(a)							      \
@@ -205,6 +213,173 @@ if_vimaster(const char *ifname)
 }
 
 #ifdef INET
+int
+ipv4_opensocket(struct interface *ifp, int protocol)
+{
+	struct dhcp_state *state;
+	int fd = -1;
+	struct ifreq ifr;
+	int ibuf_len = 0;
+	size_t buf_len;
+	struct bpf_version pv;
+	struct bpf_program pf;
+#ifdef BIOCIMMEDIATE
+	int flags;
+#endif
+#ifdef _PATH_BPF
+	fd = open(_PATH_BPF, O_RDWR | O_CLOEXEC | O_NONBLOCK);
+#else
+	char device[32];
+	int n = 0;
+
+	do {
+		snprintf(device, sizeof(device), "/dev/bpf%d", n++);
+		fd = open(device, O_RDWR | O_CLOEXEC | O_NONBLOCK);
+	} while (fd == -1 && errno == EBUSY);
+#endif
+
+	if (fd == -1)
+		return -1;
+
+	state = D_STATE(ifp);
+
+	if (ioctl(fd, BIOCVERSION, &pv) == -1)
+		goto eexit;
+	if (pv.bv_major != BPF_MAJOR_VERSION ||
+	    pv.bv_minor < BPF_MINOR_VERSION) {
+		syslog(LOG_ERR, "BPF version mismatch - recompile");
+		goto eexit;
+	}
+
+	memset(&ifr, 0, sizeof(ifr));
+	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
+	if (ioctl(fd, BIOCSETIF, &ifr) == -1)
+		goto eexit;
+
+	/* Get the required BPF buffer length from the kernel. */
+	if (ioctl(fd, BIOCGBLEN, &ibuf_len) == -1)
+		goto eexit;
+	buf_len = (size_t)ibuf_len;
+	if (state->buffer_size != buf_len) {
+		free(state->buffer);
+		state->buffer = malloc(buf_len);
+		if (state->buffer == NULL)
+			goto eexit;
+		state->buffer_size = buf_len;
+		state->buffer_len = state->buffer_pos = 0;
+	}
+
+#ifdef BIOCIMMEDIATE
+	flags = 1;
+	if (ioctl(fd, BIOCIMMEDIATE, &flags) == -1)
+		goto eexit;
+#endif
+
+	/* Install the DHCP filter */
+	if (protocol == ETHERTYPE_ARP) {
+		pf.bf_insns = UNCONST(arp_bpf_filter);
+		pf.bf_len = arp_bpf_filter_len;
+	} else {
+		pf.bf_insns = UNCONST(dhcp_bpf_filter);
+		pf.bf_len = dhcp_bpf_filter_len;
+	}
+	if (ioctl(fd, BIOCSETF, &pf) == -1)
+		goto eexit;
+
+#ifdef __OpenBSD__
+	/* For some reason OpenBSD fails to open the fd as non blocking */
+	if ((flags = fcntl(fd, F_GETFL, 0)) == -1 ||
+	    fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
+		goto eexit;
+#endif
+
+	return fd;
+
+eexit:
+	free(state->buffer);
+	state->buffer = NULL;
+	close(fd);
+	return -1;
+}
+
+ssize_t
+ipv4_sendrawpacket(const struct interface *ifp, int protocol,
+    const void *data, size_t len)
+{
+	struct iovec iov[2];
+	struct ether_header hw;
+	int fd;
+	const struct dhcp_state *state;
+
+	memset(&hw, 0, ETHER_HDR_LEN);
+	memset(&hw.ether_dhost, 0xff, ETHER_ADDR_LEN);
+	hw.ether_type = htons(protocol);
+	iov[0].iov_base = &hw;
+	iov[0].iov_len = ETHER_HDR_LEN;
+	iov[1].iov_base = UNCONST(data);
+	iov[1].iov_len = len;
+	state = D_CSTATE(ifp);
+	if (protocol == ETHERTYPE_ARP)
+		fd = state->arp_fd;
+	else
+		fd = state->raw_fd;
+	return writev(fd, iov, 2);
+}
+
+/* BPF requires that we read the entire buffer.
+ * So we pass the buffer in the API so we can loop on >1 packet. */
+ssize_t
+ipv4_getrawpacket(struct interface *ifp, int protocol,
+    void *data, size_t len, int *partialcsum)
+{
+	int fd = -1;
+	struct bpf_hdr packet;
+	ssize_t bytes;
+	const unsigned char *payload;
+	struct dhcp_state *state;
+
+	state = D_STATE(ifp);
+	if (protocol == ETHERTYPE_ARP)
+		fd = state->arp_fd;
+	else
+		fd = state->raw_fd;
+
+	if (partialcsum != NULL)
+		*partialcsum = 0; /* Not supported on BSD */
+
+	for (;;) {
+		if (state->buffer_len == 0) {
+			bytes = read(fd, state->buffer, state->buffer_size);
+			if (bytes == -1)
+				return errno == EAGAIN ? 0 : -1;
+			else if ((size_t)bytes < sizeof(packet))
+				return -1;
+			state->buffer_len = (size_t)bytes;
+			state->buffer_pos = 0;
+		}
+		bytes = -1;
+		memcpy(&packet, state->buffer + state->buffer_pos,
+		    sizeof(packet));
+		if (packet.bh_caplen != packet.bh_datalen)
+			goto next; /* Incomplete packet, drop. */
+		if (state->buffer_pos + packet.bh_caplen + packet.bh_hdrlen >
+		    state->buffer_len)
+			goto next; /* Packet beyond buffer, drop. */
+		payload = state->buffer + state->buffer_pos +
+		    packet.bh_hdrlen + ETHER_HDR_LEN;
+		bytes = (ssize_t)packet.bh_caplen - ETHER_HDR_LEN;
+		if ((size_t)bytes > len)
+			bytes = (ssize_t)len;
+		memcpy(data, payload, (size_t)bytes);
+next:
+		state->buffer_pos += BPF_WORDALIGN(packet.bh_hdrlen +
+		    packet.bh_caplen);
+		if (state->buffer_pos >= state->buffer_len)
+			state->buffer_len = state->buffer_pos = 0;
+		if (bytes != -1)
+			return bytes;
+	}
+}
 int
 if_address(const struct interface *iface, const struct in_addr *address,
     const struct in_addr *netmask, const struct in_addr *broadcast,
@@ -733,3 +908,231 @@ manage_link(struct dhcpcd_ctx *ctx)
 		}
 	}
 }
+
+#ifndef SYS_NMLN	/* OSX */
+#  define SYS_NMLN 256
+#endif
+#ifndef HW_MACHINE_ARCH
+#  ifdef HW_MODEL	/* OpenBSD */
+#    define HW_MACHINE_ARCH HW_MODEL
+#  endif
+#endif
+int
+hardware_platform(char *str, size_t len)
+{
+	int mib[2] = { CTL_HW, HW_MACHINE_ARCH };
+	char march[SYS_NMLN];
+	size_t marchlen = sizeof(march);
+
+	if (sysctl(mib, sizeof(mib) / sizeof(mib[0]),
+	    march, &marchlen, NULL, 0) != 0)
+		return -1;
+	return snprintf(str, len, ":%s", march);
+}
+
+#ifdef INET6
+#define get_inet6_sysctl(code) inet6_sysctl(code, 0, 0)
+#define set_inet6_sysctl(code, val) inet6_sysctl(code, val, 1)
+static int
+inet6_sysctl(int code, int val, int action)
+{
+	int mib[] = { CTL_NET, PF_INET6, IPPROTO_IPV6, 0 };
+	size_t size;
+
+	mib[3] = code;
+	size = sizeof(val);
+	if (action) {
+		if (sysctl(mib, sizeof(mib)/sizeof(mib[0]),
+		    NULL, 0, &val, size) == -1)
+			return -1;
+		return 0;
+	}
+	if (sysctl(mib, sizeof(mib)/sizeof(mib[0]), &val, &size, NULL, 0) == -1)
+		return -1;
+	return val;
+}
+
+#define del_if_nd6_flag(ifname, flag) if_nd6_flag(ifname, flag, -1)
+#define get_if_nd6_flag(ifname, flag) if_nd6_flag(ifname, flag,  0)
+#define set_if_nd6_flag(ifname, flag) if_nd6_flag(ifname, flag,  1)
+static int
+if_nd6_flag(const char *ifname, unsigned int flag, int set)
+{
+	int s, error;
+	struct in6_ndireq nd;
+	unsigned int oflags;
+
+	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) == -1)
+		return -1;
+	memset(&nd, 0, sizeof(nd));
+	strlcpy(nd.ifname, ifname, sizeof(nd.ifname));
+	if ((error = ioctl(s, SIOCGIFINFO_IN6, &nd)) == -1)
+		goto eexit;
+	if (set == 0) {
+		close(s);
+		return nd.ndi.flags & flag ? 1 : 0;
+	}
+
+	oflags = nd.ndi.flags;
+	if (set == -1)
+		nd.ndi.flags &= ~flag;
+	else
+		nd.ndi.flags |= flag;
+	if (oflags == nd.ndi.flags)
+		error = 0;
+	else
+		error = ioctl(s, SIOCSIFINFO_FLAGS, &nd);
+
+eexit:
+	close(s);
+	return error;
+}
+
+void
+restore_kernel_ra(struct dhcpcd_ctx *ctx)
+{
+
+	if (ctx->options & DHCPCD_FORKED)
+		return;
+
+	for (; ctx->ra_restore_len > 0; ctx->ra_restore_len--) {
+		if (!(ctx->options & DHCPCD_FORKED)) {
+			syslog(LOG_INFO, "%s: restoring kernel IPv6 RA support",
+			    ctx->ra_restore[ctx->ra_restore_len - 1]);
+			if (set_if_nd6_flag(
+			    ctx->ra_restore[ctx->ra_restore_len -1],
+			    ND6_IFF_ACCEPT_RTADV) == -1)
+				syslog(LOG_ERR, "%s: del_if_nd6_flag: %m",
+				    ctx->ra_restore[ctx->ra_restore_len - 1]);
+		}
+		free(ctx->ra_restore[ctx->ra_restore_len - 1]);
+	}
+	free(ctx->ra_restore);
+	ctx->ra_restore = NULL;
+
+	if (ctx->ra_kernel_set) {
+		syslog(LOG_INFO, "restoring kernel IPv6 RA support");
+		if (set_inet6_sysctl(IPV6CTL_ACCEPT_RTADV, 1) == -1)
+			syslog(LOG_ERR, "IPV6CTL_ACCEPT_RTADV: %m");
+	}
+}
+
+static int
+ipv6_ra_flush(void)
+{
+	int s;
+	char dummy[IFNAMSIZ + 8];
+
+	s = socket(AF_INET6, SOCK_DGRAM, 0);
+	if (s == -1)
+		return -1;
+	strlcpy(dummy, "lo0", sizeof(dummy));
+	if (ioctl(s, SIOCSRTRFLUSH_IN6, (caddr_t)&dummy) == -1)
+		syslog(LOG_ERR, "SIOSRTRFLUSH_IN6: %m");
+	if (ioctl(s, SIOCSPFXFLUSH_IN6, (caddr_t)&dummy) == -1)
+		syslog(LOG_ERR, "SIOSPFXFLUSH_IN6: %m");
+	close(s);
+	return 0;
+}
+
+int
+check_ipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
+{
+	int ra;
+
+	if (ifname) {
+#ifdef ND6_IFF_ACCEPT_RTADV
+		size_t i;
+		char *p, **nrest;
+#endif
+
+#ifdef ND_IFF_AUTO_LINKLOCAL
+		if (set_if_nd6_flag(ifname, ND6_IFF_AUTO_LINKLOCAL) == -1) {
+			syslog(LOG_ERR, "%s: set_if_nd6_flag: %m", ifname);
+			return -1;
+		}
+#endif
+
+#ifdef ND6_IFF_IFDISABLED
+		if (del_if_nd6_flag(ifname, ND6_IFF_IFDISABLED) == -1) {
+			syslog(LOG_ERR, "%s: del_if_nd6_flag: %m", ifname);
+			return -1;
+		}
+#endif
+
+#ifdef ND6_IFF_ACCEPT_RTADV
+		ra = get_if_nd6_flag(ifname, ND6_IFF_ACCEPT_RTADV);
+		if (ra == -1)
+			syslog(LOG_ERR, "%s: get_if_nd6_flag: %m", ifname);
+		else if (ra != 0 && own) {
+			syslog(LOG_INFO,
+			    "%s: disabling Kernel IPv6 RA support",
+			    ifname);
+			if (del_if_nd6_flag(ifname, ND6_IFF_ACCEPT_RTADV)
+			    == -1)
+			{
+				syslog(LOG_ERR, "%s: del_if_nd6_flag: %m",
+				    ifname);
+				return ra;
+			}
+			for (i = 0; i < ctx->ra_restore_len; i++)
+				if (strcmp(ctx->ra_restore[i], ifname) == 0)
+					break;
+			if (i == ctx->ra_restore_len) {
+				p = strdup(ifname);
+				if (p == NULL) {
+					syslog(LOG_ERR, "%s: %m", __func__);
+					return 0;
+				}
+				nrest = realloc(ctx->ra_restore,
+				    (ctx->ra_restore_len + 1) * sizeof(char *));
+				if (nrest == NULL) {
+					syslog(LOG_ERR, "%s: %m", __func__);
+					free(p);
+					return 0;
+				}
+				ctx->ra_restore = nrest;
+				ctx->ra_restore[ctx->ra_restore_len++] = p;
+			}
+			return 0;
+		}
+		return ra;
+#else
+		return ctx->ra_global;
+#endif
+	}
+
+	ra = get_inet6_sysctl(IPV6CTL_ACCEPT_RTADV);
+	if (ra == -1)
+		/* The sysctl probably doesn't exist, but this isn't an
+		 * error as such so just log it and continue */
+		syslog(errno == ENOENT ? LOG_DEBUG : LOG_WARNING,
+		    "IPV6CTL_ACCEPT_RTADV: %m");
+	else if (ra != 0 && own) {
+		syslog(LOG_INFO, "disabling Kernel IPv6 RA support");
+		if (set_inet6_sysctl(IPV6CTL_ACCEPT_RTADV, 0) == -1) {
+			syslog(LOG_ERR, "IPV6CTL_ACCEPT_RTADV: %m");
+			return ra;
+		}
+		ra = 0;
+		ctx->ra_kernel_set = 1;
+
+		/* Flush the kernel knowledge of advertised routers
+		 * and prefixes so the kernel does not expire prefixes
+		 * and default routes we are trying to own. */
+		ipv6_ra_flush();
+	}
+
+	ctx->ra_global = ra;
+	return ra;
+}
+
+int
+ipv6_dadtransmits(__unused const char *ifname)
+{
+	int r;
+
+	r = get_inet6_sysctl(IPV6CTL_DAD_COUNT);
+	return r < 0 ? 0 : r;
+}
+#endif
