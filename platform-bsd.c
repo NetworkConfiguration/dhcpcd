@@ -196,10 +196,12 @@ check_ipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 		}
 #endif
 
+#ifdef ND6_IFF_IFDISABLED
 		if (del_if_nd6_flag(ifname, ND6_IFF_IFDISABLED) == -1) {
 			syslog(LOG_ERR, "%s: del_if_nd6_flag: %m", ifname);
 			return -1;
 		}
+#endif
 
 #ifdef ND6_IFF_ACCEPT_RTADV
 		ra = get_if_nd6_flag(ifname, ND6_IFF_ACCEPT_RTADV);
