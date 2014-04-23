@@ -9,11 +9,8 @@ CFLAGS?=	-O2
 CSTD?=		c99
 MKDIRS=
 
-# Nasty hack so that make clean works without configure being run
-_CONFIG_MK_SH=	test -e config.mk && echo config.mk || echo config-null.mk
-_CONFIG_MK!=	${_CONFIG_MK_SH}
-CONFIG_MK=	${_CONFIG_MK}$(shell ${_CONFIG_MK_SH})
-include		${CONFIG_MK}
+TOP?=		.
+include ${TOP}/iconfig.mk
 
 CFLAGS+=	-std=${CSTD}
 
@@ -56,13 +53,8 @@ SED_SERVICESTATUS=	-e 's:@SERVICESTATUS@:${SERVICESTATUS}:g'
 SED_SCRIPT=		-e 's:@SCRIPT@:${SCRIPT}:g'
 SED_SYS=		-e 's:@SYSCONFDIR@:${SYSCONFDIR}:g'
 
-_DEPEND_SH=	test -e .depend && echo ".depend" || echo ""
-_DEPEND!=	${_DEPEND_SH}
-DEPEND=		${_DEPEND}$(shell ${_DEPEND_SH})
-
-_VERSION_SH=	sed -n 's/\#define VERSION[[:space:]]*"\(.*\)".*/\1/p' defs.h
-_VERSION!=	${_VERSION_SH}
-VERSION=	${_VERSION}$(shell ${_VERSION_SH})
+DEPEND!=	test -e .depend && echo ".depend" || echo ""
+VERSION!=	sed -n 's/\#define VERSION[[:space:]]*"\(.*\)".*/\1/p' defs.h
 
 FOSSILID?=	current
 

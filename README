@@ -83,6 +83,9 @@ In this instance, you may wish to disable some configured tests when
 the binary has to run on older versions which lack support, such as getline.
 ./configure --without-getline
 
+Building for distribution (ie making a dhcpcd source tarball) now requires
+gmake-4 or any BSD make.
+
 
 Hooks
 -----

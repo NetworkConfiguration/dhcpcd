@@ -1,4 +1,5 @@
-include ../config.mk
+TOP?=	..
+include ${TOP}/iconfig.mk
 
 PROG=		test
 SRCS=		test.c

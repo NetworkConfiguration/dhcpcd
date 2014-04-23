@@ -1,6 +1,6 @@
 TOP?=	../
 include ${TOP}/Makefile.inc
-include ${TOP}/config.mk
+include ${TOP}/iconfig.mk
 
 SCRIPTSDIR=	${LIBEXECDIR}/dhcpcd-hooks
 SCRIPTS=	01-test 02-dump
