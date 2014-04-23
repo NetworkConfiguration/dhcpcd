@@ -548,19 +548,6 @@ EOF
 	echo "$TAILQ_FOREACH_SAFE"
 	rm -f _queue.c _queue
 fi
-if [ "$TAILQ_FOREACH_SAFE" = no ]; then
-	cat <<EOF >>$CONFIG_H
-#define	TAILQ_FOREACH_SAFE(var, head, field, next)			\\
-	for ((var) = TAILQ_FIRST((head));				\\
-	    (var) && ((next) = TAILQ_NEXT((var), field), 1);		\\
-	    (var) = (next))
-#define TAILQ_FOREACH_REVERSE_SAFE(var, head, headname, field, prev)	\\
-	for ((var) = TAILQ_LAST((head), headname);			\\
-	    (var) && ((prev) = TAILQ_PREV((var), headname, field), 1);  \\
-	    (var) = (prev))
-EOF
-fi
-
 if [ -z "$TAILQ_CONCAT" ]; then
 	printf "Testing for TAILQ_CONCAT ..."
 	cat <<EOF >_queue.c
@@ -580,17 +567,8 @@ EOF
 	echo "$TAILQ_CONCAT"
 	rm -f _queue.c _queue
 fi
-if [ "$TAILQ_CONCAT" = no ]; then
-	cat <<EOF >>$CONFIG_H
-#define TAILQ_CONCAT(head1, head2, field) do {				\\
-	if (!TAILQ_EMPTY(head2)) {					\\
-		*(head1)->tqh_last = (head2)->tqh_first;		\\
-		(head2)->tqh_first->field.tqe_prev = (head1)->tqh_last;	\\
-		(head1)->tqh_last = (head2)->tqh_last;			\\
-		TAILQ_INIT((head2));					\\
-	}								\\
-} while (/*CONSTCOND*/0)
-EOF
+if [ "$TAILQ_FOREACH_SAFE" = no -o "$TAILQ_CONCAT" = no ]; then
+	echo "#include		\"compat/queue.h\"">>$CONFIG_H
 fi
 
 if [ -z "$POSIX_SPAWN" ]; then
