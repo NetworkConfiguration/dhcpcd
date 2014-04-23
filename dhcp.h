@@ -294,7 +294,7 @@ int dhcp_dump(struct dhcpcd_ctx *, const char *);
 #define dhcp_reboot_newopts(a, b)
 #define dhcp_close(a)
 #define dhcp_free(a)
-#define dhcp_dump(a) -1
+#define dhcp_dump(a, b) -1
 #endif
 
 #endif
