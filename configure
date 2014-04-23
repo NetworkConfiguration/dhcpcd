@@ -359,11 +359,7 @@ fi
 case "$OS" in
 linux*)
 	echo "CPPFLAGS+=	-D_BSD_SOURCE -D_XOPEN_SOURCE=700" >>$CONFIG_MK
-	if [ -z "$INET" -o "$INET" = yes ]; then
-		echo "DHCPCD_SRCS+=	lpf.c" >>$CONFIG_MK
-	fi
 	echo "DHCPCD_SRCS+=	if-linux.c if-linux-wireless.c" >>$CONFIG_MK
-	echo "DHCPCD_SRCS+=	platform-linux.c" >>$CONFIG_MK
 	;;
 kfreebsd*)
 	echo "CPPFLAGS+=	-D_GNU_SOURCE" >>$CONFIG_MK

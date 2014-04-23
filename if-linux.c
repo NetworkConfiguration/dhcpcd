@@ -32,9 +32,15 @@
 #include <sys/ioctl.h>
 #include <sys/param.h>
 
+#include <linux/filter.h>
+#include <linux/if_packet.h>
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 
+#include <arpa/inet.h>
+#include <net/if.h>
+#include <netinet/in_systm.h>
+#include <netinet/in.h>
 #include <net/route.h>
 
 /* Support older kernels */
@@ -50,11 +56,14 @@
 #endif
 
 #include <errno.h>
+#include <fcntl.h>
 #include <ctype.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "config.h"
@@ -64,10 +73,95 @@
 #include "ipv4.h"
 #include "ipv6.h"
 #include "net.h"
+#include "platform.h"
+
+#define bpf_insn		sock_filter
+#define BPF_SKIPTYPE
+#define BPF_ETHCOOK		-ETH_HLEN
+#define BPF_WHOLEPACKET	0x0fffffff /* work around buggy LPF filters */
+
+#include "config.h"
+#include "common.h"
+#include "dhcp.h"
+#include "ipv4.h"
+#include "bpf-filter.h"
+
+/* Broadcast address for IPoIB */
+static const uint8_t ipv4_bcast_addr[] = {
+	0x00, 0xff, 0xff, 0xff,
+	0xff, 0x12, 0x40, 0x1b, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff
+};
 
 #define PROC_INET6	"/proc/net/if_inet6"
 #define PROC_PROMOTE	"/proc/sys/net/ipv4/conf/%s/promote_secondaries"
 #define SYS_LAYER2	"/sys/class/net/%s/device/layer2"
+
+static const char *mproc =
+#if defined(__alpha__)
+	"system type"
+#elif defined(__arm__)
+	"Hardware"
+#elif defined(__avr32__)
+	"cpu family"
+#elif defined(__bfin__)
+	"BOARD Name"
+#elif defined(__cris__)
+	"cpu model"
+#elif defined(__frv__)
+	"System"
+#elif defined(__i386__) || defined(__x86_64__)
+	"vendor_id"
+#elif defined(__ia64__)
+	"vendor"
+#elif defined(__hppa__)
+	"model"
+#elif defined(__m68k__)
+	"MMU"
+#elif defined(__mips__)
+	"system type"
+#elif defined(__powerpc__) || defined(__powerpc64__)
+	"machine"
+#elif defined(__s390__) || defined(__s390x__)
+	"Manufacturer"
+#elif defined(__sh__)
+	"machine"
+#elif defined(sparc) || defined(__sparc__)
+	"cpu"
+#elif defined(__vax__)
+	"cpu"
+#else
+	NULL
+#endif
+	;
+
+int
+hardware_platform(char *str, size_t len)
+{
+	FILE *fp;
+	char buf[256];
+
+	if (mproc == NULL) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	fp = fopen("/proc/cpuinfo", "r");
+	if (fp == NULL)
+		return -1;
+
+	while (fscanf(fp, "%255s : ", buf) != EOF) {
+		if (strncmp(buf, mproc, strlen(mproc)) == 0 &&
+		    fscanf(fp, "%255s", buf) == 1)
+		{
+		        fclose(fp);
+			return snprintf(str, len, ":%s", buf);
+		}
+	}
+	fclose(fp);
+	errno = ESRCH;
+	return -1;
+}
 
 int
 if_init(struct interface *ifp)
@@ -631,6 +725,142 @@ struct nlmr
 
 #ifdef INET
 int
+ipv4_opensocket(struct interface *ifp, int protocol)
+{
+	int s;
+	union sockunion {
+		struct sockaddr sa;
+		struct sockaddr_in sin;
+		struct sockaddr_ll sll;
+		struct sockaddr_storage ss;
+	} su;
+	struct sock_fprog pf;
+#ifdef PACKET_AUXDATA
+	int n;
+#endif
+
+	if ((s = socket(PF_PACKET, SOCK_DGRAM | SOCK_CLOEXEC | SOCK_NONBLOCK,
+	    htons(protocol))) == -1)
+		return -1;
+
+	memset(&su, 0, sizeof(su));
+	su.sll.sll_family = PF_PACKET;
+	su.sll.sll_protocol = htons(protocol);
+	su.sll.sll_ifindex = (int)ifp->index;
+	/* Install the DHCP filter */
+	memset(&pf, 0, sizeof(pf));
+	if (protocol == ETHERTYPE_ARP) {
+		pf.filter = UNCONST(arp_bpf_filter);
+		pf.len = arp_bpf_filter_len;
+	} else {
+		pf.filter = UNCONST(dhcp_bpf_filter);
+		pf.len = dhcp_bpf_filter_len;
+	}
+	if (setsockopt(s, SOL_SOCKET, SO_ATTACH_FILTER, &pf, sizeof(pf)) != 0)
+		goto eexit;
+#ifdef PACKET_AUXDATA
+	n = 1;
+	if (setsockopt(s, SOL_PACKET, PACKET_AUXDATA, &n, sizeof(n)) != 0) {
+		if (errno != ENOPROTOOPT)
+			goto eexit;
+	}
+#endif
+	if (bind(s, &su.sa, sizeof(su)) == -1)
+		goto eexit;
+	return s;
+
+eexit:
+	close(s);
+	return -1;
+}
+
+ssize_t
+ipv4_sendrawpacket(const struct interface *ifp, int protocol,
+    const void *data, size_t len)
+{
+	const struct dhcp_state *state;
+	union sockunion {
+		struct sockaddr sa;
+		struct sockaddr_ll sll;
+		struct sockaddr_storage ss;
+	} su;
+	int fd;
+
+	memset(&su, 0, sizeof(su));
+	su.sll.sll_family = AF_PACKET;
+	su.sll.sll_protocol = htons(protocol);
+	su.sll.sll_ifindex = (int)ifp->index;
+	su.sll.sll_hatype = htons(ifp->family);
+	su.sll.sll_halen = (unsigned char)ifp->hwlen;
+	if (ifp->family == ARPHRD_INFINIBAND)
+		memcpy(&su.sll.sll_addr,
+		    &ipv4_bcast_addr, sizeof(ipv4_bcast_addr));
+	else
+		memset(&su.sll.sll_addr, 0xff, ifp->hwlen);
+	state = D_CSTATE(ifp);
+	if (protocol == ETHERTYPE_ARP)
+		fd = state->arp_fd;
+	else
+		fd = state->raw_fd;
+
+	return sendto(fd, data, len, 0, &su.sa, sizeof(su));
+}
+
+ssize_t
+ipv4_getrawpacket(struct interface *ifp, int protocol,
+    void *data, size_t len, int *partialcsum)
+{
+	struct iovec iov = {
+		.iov_base = data,
+		.iov_len = len,
+	};
+	struct msghdr msg = {
+		.msg_iov = &iov,
+		.msg_iovlen = 1,
+	};
+	struct dhcp_state *state;
+#ifdef PACKET_AUXDATA
+	unsigned char cmsgbuf[CMSG_LEN(sizeof(struct tpacket_auxdata))];
+	struct cmsghdr *cmsg;
+	struct tpacket_auxdata *aux;
+#endif
+
+	ssize_t bytes;
+	int fd = -1;
+
+#ifdef PACKET_AUXDATA
+	msg.msg_control = cmsgbuf;
+	msg.msg_controllen = sizeof(cmsgbuf);
+#endif
+
+	state = D_STATE(ifp);
+	if (protocol == ETHERTYPE_ARP)
+		fd = state->arp_fd;
+	else
+		fd = state->raw_fd;
+	bytes = recvmsg(fd, &msg, 0);
+	if (bytes == -1)
+		return errno == EAGAIN ? 0 : -1;
+	if (partialcsum != NULL) {
+		*partialcsum = 0;
+#ifdef PACKET_AUXDATA
+		for (cmsg = CMSG_FIRSTHDR(&msg);
+		     cmsg;
+		     cmsg = CMSG_NXTHDR(&msg, cmsg))
+		{
+			if (cmsg->cmsg_level == SOL_PACKET &&
+			    cmsg->cmsg_type == PACKET_AUXDATA) {
+				aux = (void *)CMSG_DATA(cmsg);
+				*partialcsum = aux->tp_status &
+				    TP_STATUS_CSUMNOTREADY;
+			}
+		}
+#endif
+	}
+	return bytes;
+}
+
+int
 if_address(const struct interface *iface,
     const struct in_addr *address, const struct in_addr *netmask,
     const struct in_addr *broadcast, int action)
@@ -885,5 +1115,127 @@ in6_addr_flags(const char *ifname, const struct in6_addr *addr)
 	fclose(fp);
 	errno = ESRCH;
 	return -1;
+}
+
+static int
+check_proc_int(const char *path)
+{
+	FILE *fp;
+	int i;
+
+	fp = fopen(path, "r");
+	if (fp == NULL)
+		return -1;
+	if (fscanf(fp, "%d", &i) != 1)
+		i = -1;
+	fclose(fp);
+	return i;
+}
+
+static ssize_t
+write_path(const char *path, const char *val)
+{
+	FILE *fp;
+	ssize_t r;
+
+	fp = fopen(path, "w");
+	if (fp == NULL)
+		return -1;
+	r = fprintf(fp, "%s\n", val);
+	fclose(fp);
+	return r;
+}
+
+static const char *prefix = "/proc/sys/net/ipv6/conf";
+
+void
+restore_kernel_ra(struct dhcpcd_ctx *ctx)
+{
+	char path[256];
+
+	for (; ctx->ra_restore_len > 0; ctx->ra_restore_len--) {
+		if (!(ctx->options & DHCPCD_FORKED)) {
+			syslog(LOG_INFO, "%s: restoring kernel IPv6 RA support",
+			    ctx->ra_restore[ctx->ra_restore_len - 1]);
+			snprintf(path, sizeof(path), "%s/%s/accept_ra",
+			    prefix, ctx->ra_restore[ctx->ra_restore_len - 1]);
+			if (write_path(path, "1") == -1 && errno != ENOENT)
+			    syslog(LOG_ERR, "write_path: %s: %m", path);
+		}
+		free(ctx->ra_restore[ctx->ra_restore_len - 1]);
+	}
+	free(ctx->ra_restore);
+	ctx->ra_restore = NULL;
+}
+
+int
+check_ipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
+{
+	int ra;
+	size_t i;
+	char path[256], *p, **nrest;
+
+	if (ifname == NULL)
+		ifname = "all";
+
+	snprintf(path, sizeof(path), "%s/%s/autoconf", prefix, ifname);
+	ra = check_proc_int(path);
+	if (ra != 1) {
+		syslog(LOG_WARNING, "%s: IPv6 kernel autoconf disabled",
+		    ifname);
+		return -1;
+	}
+
+	snprintf(path, sizeof(path), "%s/%s/accept_ra", prefix, ifname);
+	ra = check_proc_int(path);
+	if (ra == -1)
+		/* The sysctl probably doesn't exist, but this isn't an
+		 * error as such so just log it and continue */
+		syslog(errno == ENOENT ? LOG_DEBUG : LOG_WARNING,
+		    "%s: %m", path);
+	else if (ra != 0 && own) {
+		syslog(LOG_INFO, "%s: disabling kernel IPv6 RA support",
+		    ifname);
+		if (write_path(path, "0") == -1) {
+			syslog(LOG_ERR, "write_path: %s: %m", path);
+			return ra;
+		}
+		for (i = 0; i < ctx->ra_restore_len; i++)
+			if (strcmp(ctx->ra_restore[i], ifname) == 0)
+				break;
+		if (i == ctx->ra_restore_len) {
+			p = strdup(ifname);
+			if (p == NULL) {
+				syslog(LOG_ERR, "%s: %m", __func__);
+				return 0;
+			}
+			nrest = realloc(ctx->ra_restore,
+			    (ctx->ra_restore_len + 1) * sizeof(char *));
+			if (nrest == NULL) {
+				syslog(LOG_ERR, "%s: %m", __func__);
+				free(p);
+				return 0;
+			}
+			ctx->ra_restore = nrest;
+			ctx->ra_restore[ctx->ra_restore_len++] = p;
+		}
+		return 0;
+	}
+
+	return ra;
+}
+
+int
+ipv6_dadtransmits(const char *ifname)
+{
+	char path[256];
+	int r;
+
+	if (ifname == NULL)
+		ifname = "default";
+
+	snprintf(path, sizeof(path), "%s/%s/dad_transmits", prefix, ifname);
+	r = check_proc_int(path);
+	return r < 0 ? 0 : r;
 }
 #endif
