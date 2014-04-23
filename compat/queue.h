@@ -33,9 +33,15 @@
 
 #ifndef COMPAT_QUEUE_H
 #define COMPAT_QUEUE_H
+
+#include <sys/queue.h>
 /*
  * Tail queue definitions.
  */
+#ifndef TAILQ_END
+#define	TAILQ_END(head)			(NULL)
+#endif
+
 #ifndef TAILQ_HEAD
 #define	_TAILQ_HEAD(name, type, qual)					\
 struct name {								\
@@ -58,7 +64,6 @@ struct {								\
  * Tail queue access methods.
  */
 #define	TAILQ_FIRST(head)		((head)->tqh_first)
-#define	TAILQ_END(head)			(NULL)
 #define	TAILQ_NEXT(elm, field)		((elm)->field.tqe_next)
 #define	TAILQ_LAST(head, headname) \
 	(*(((struct headname *)((head)->tqh_last))->tqh_last))
