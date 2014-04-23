@@ -8,7 +8,13 @@ SRCS+=		dhcp-common.c
 CFLAGS?=	-O2
 CSTD?=		c99
 MKDIRS=
-include config.mk
+
+# Nasty hack so that make clean works without configure being run
+_CONFIG_MK_SH=	test -e config.mk && echo config.mk || echo config-null.mk
+_CONFIG_MK!=	${_CONFIG_MK_SH}
+CONFIG_MK=	${_CONFIG_MK}$(shell ${_CONFIG_MK_SH})
+include		${CONFIG_MK}
+
 CFLAGS+=	-std=${CSTD}
 
 SRCS+=		${DHCPCD_SRCS}
@@ -146,7 +152,7 @@ distclean: clean
 
 dist:
 	fossil tarball --name ${DISTPREFIX} ${FOSSILID} ${DISTFILEGZ}
-	gunzip -c ${DISTFILEGZ} | bzip2 >${DISTFILE}
+	gunzip -c ${DISTFILEGZ} |  bzip2 >${DISTFILE}
 	rm ${DISTFILEGZ}
 
 import: ${SRCS}
