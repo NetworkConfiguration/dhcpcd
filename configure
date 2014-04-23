@@ -526,7 +526,7 @@ EOF
 fi
 if [ "$STRLCPY" = no ]; then
 	echo "COMPAT_SRCS+=	compat/strlcpy.c" >>$CONFIG_MK
-	echo "#include \"compat/strlcpy.h\"" >>$CONFIG_H
+	echo "#include		\"compat/strlcpy.h\"" >>$CONFIG_H
 fi
 
 if [ -z "$TAILQ_FOREACH_SAFE" ]; then
@@ -594,9 +594,8 @@ EOF
 fi
 if [ "$POSIX_SPAWN" = no ]; then
 	echo "COMPAT_SRCS+=	compat/posix_spawn.c" >>$CONFIG_MK
-	echo "#include \"compat/posix_spawn.h\"" >>$CONFIG_H
 else
-	echo "#include <spawn.h>" >>$CONFIG_H
+	echo "#define HAVE_SPAWN_H" >>$CONFIG_H
 fi
 
 if [ -z "$POLLTS" ]; then
@@ -661,15 +660,15 @@ case "$POLLTS" in
 yes)
 	;;
 ppoll)
-	echo "#define pollts ppoll" >>$CONFIG_H
+	echo "#define pollts	ppoll" >>$CONFIG_H
 	;;
 pselect)
 	echo "COMPAT_SRCS+=	compat/pselect.c" >>$CONFIG_MK
-	echo "#include \"compat/pollts.h\"" >>$CONFIG_H
+	echo "#include		\"compat/pollts.h\"" >>$CONFIG_H
 	;;
 *)
 	echo "COMPAT_SRCS+=	compat/pollts.c" >>$CONFIG_MK
-	echo "#include \"compat/pollts.h\"" >>$CONFIG_H
+	echo "#include		\"compat/pollts.h\"" >>$CONFIG_H
 	;;
 esac
 

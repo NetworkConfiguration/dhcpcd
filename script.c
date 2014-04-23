@@ -52,6 +52,12 @@
 #include "net.h"
 #include "script.h"
 
+#ifdef HAVE_SPAWN_H
+#include <spawn.h>
+#else
+#include "compat/posix_spawn.h"
+#endif
+
 #define DEFAULT_PATH	"PATH=/usr/bin:/usr/sbin:/bin:/sbin"
 
 static const char * const if_params[] = {
