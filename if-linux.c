@@ -217,9 +217,23 @@ _open_link_socket(struct sockaddr_nl *nl)
 {
 	int fd;
 
+#ifdef SOCK_CLOEXEC
 	fd = socket(AF_NETLINK, SOCK_RAW | SOCK_CLOEXEC, NETLINK_ROUTE);
 	if (fd == -1)
 		return -1;
+#else
+	int flags;
+
+	fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
+	if (fd == -1)
+		return -1;
+	if ((flags = fcntl(fd, F_GETFD, 0)) == -1 ||
+	    fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == -1)
+	{
+		close(fd);
+	        return -1;
+	}
+#endif
 	nl->nl_family = AF_NETLINK;
 	if (bind(fd, (struct sockaddr *)nl, sizeof(*nl)) == -1)
 		return -1;
@@ -739,11 +753,28 @@ ipv4_opensocket(struct interface *ifp, int protocol)
 	int n;
 #endif
 
+#ifdef SOCK_CLOEXEC
 	if ((s = socket(PF_PACKET, SOCK_DGRAM | SOCK_CLOEXEC | SOCK_NONBLOCK,
 	    htons(protocol))) == -1)
 		return -1;
+#else
+	int flags;
 
-	memset(&su, 0, sizeof(su));
+	if ((s = socket(PF_PACKET, SOCK_DGRAM, htons(protocol))) == -1)
+		return -1;
+	if ((flags = fcntl(s, F_GETFD, 0)) == -1 ||
+	    fcntl(s, F_SETFD, flags | FD_CLOEXEC) == -1)
+	{
+		close(s);
+	        return -1;
+	}
+	if ((flags = fcntl(s, F_GETFL, 0)) == -1 ||
+	    fcntl(s, F_SETFL, flags | O_NONBLOCK) == -1)
+	{
+		close(s);
+	        return -1;
+	}
+#endif
 	su.sll.sll_family = PF_PACKET;
 	su.sll.sll_protocol = htons(protocol);
 	su.sll.sll_ifindex = (int)ifp->index;
