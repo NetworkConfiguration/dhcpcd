@@ -36,7 +36,11 @@
 #  include <asm/types.h> /* for systems with broken headers */
 #  include <linux/rtnetlink.h>
    /* Match Linux defines to BSD */
-#  define IN6_IFF_TENTATIVE	(IFA_F_TENTATIVE | IFA_F_OPTIMISTIC)
+#  ifdef IFA_F_OPTIMISTIC
+#    define IN6_IFF_TENTATIVE	(IFA_F_TENTATIVE | IFA_F_OPTIMISTIC)
+#  else
+#    define IN6_IFF_TENTATIVE   IFA_F_TENTATIVE
+#  endif
 #  define IN6_IFF_DUPLICATED	IFA_F_DADFAILED
 #  define IN6_IFF_DETACHED	0
 #else
