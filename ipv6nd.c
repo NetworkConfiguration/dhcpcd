@@ -150,6 +150,14 @@ static void ipv6nd_handledata(void *arg);
 	memset(filterp, 0xff, sizeof(struct icmp6_filter));
 #endif
 
+/* Support older systems with different defines */
+#if !defined(IPV6_RECVHOPLIMIT) && defined(IPV6_HOPLIMIT)
+#define IPV6_RECVHOPLIMIT IPV6_HOPLIMIT
+#endif
+#if !defined(IPV6_RECVPKTINFO) && defined(IPV6_PKTINFO)
+#define IPV6_RECVPKTINFO IPV6_PKTINFO
+#endif
+
 static int
 ipv6nd_open(struct dhcpcd_ctx *dctx)
 {

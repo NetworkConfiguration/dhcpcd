@@ -67,6 +67,11 @@
 /* Unsure if I want this */
 //#define VENDOR_SPLIT
 
+/* Support older systems with different defines */
+#if !defined(IPV6_RECVPKTINFO) && defined(IPV6_PKTINFO)
+#define IPV6_RECVPKTINFO IPV6_PKTINFO
+#endif
+
 struct dhcp6_op {
 	uint16_t type;
 	const char *name;
