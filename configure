@@ -42,7 +42,7 @@ for x do
 	--disable-ipv6) INET6=no;;
 	--enable-ipv6) INET6=yes;;
 	--disable-embedded) EMBEDDED=no;;
-	--enable-embedded) EMBEDDED=no;;
+	--enable-embedded) EMBEDDED=yes;;
 	--prefix) PREFIX=$var;;
 	--sysconfdir) SYSCONFDIR=$var;;
 	--bindir|--sbindir) SBINDIR=$var;;
