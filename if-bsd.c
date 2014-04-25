@@ -42,9 +42,9 @@
 #ifdef __FreeBSD__ /* Needed so that including netinet6/in6_var.h works */
 #  include <net/if_var.h>
 #endif
-#include <net/if_ether.h>
 #include <net/if_media.h>
 #include <net/route.h>
+#include <netinet/if_ether.h>
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/nd6.h>

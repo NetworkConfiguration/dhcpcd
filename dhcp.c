@@ -35,8 +35,8 @@
 #endif
 
 #include <arpa/inet.h>
+#include <net/if.h>
 #include <net/route.h>
-
 #include <netinet/if_ether.h>
 #include <netinet/in_systm.h>
 #include <netinet/in.h>

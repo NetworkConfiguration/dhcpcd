@@ -381,9 +381,9 @@ ipv6_checkaddrflags(void *arg)
 	int ifa_flags;
 
 	ap = arg;
-	ifa_flags = in6_addr_flags(ap->iface->name, &ap->addr);
+	ifa_flags = if_addrflags6(ap->iface->name, &ap->addr);
 	if (ifa_flags == -1)
-		syslog(LOG_ERR, "%s: in6_addr_flags: %m", ap->iface->name);
+		syslog(LOG_ERR, "%s: if_addrflags6: %m", ap->iface->name);
 	else if (!(ifa_flags & IN6_IFF_TENTATIVE)) {
 		ipv6_handleifa(ap->iface->ctx, RTM_NEWADDR,
 		    ap->iface->ctx->ifaces, ap->iface->name,
