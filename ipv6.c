@@ -39,9 +39,13 @@
 #  ifdef IFA_F_OPTIMISTIC
 #    define IN6_IFF_TENTATIVE	(IFA_F_TENTATIVE | IFA_F_OPTIMISTIC)
 #  else
-#    define IN6_IFF_TENTATIVE   IFA_F_TENTATIVE
+#    define IN6_IFF_TENTATIVE   (IFA_F_TENTATIVE | 0x04)
 #  endif
-#  define IN6_IFF_DUPLICATED	IFA_F_DADFAILED
+#  ifdef IF_F_DADFAILED
+#    define IN6_IFF_DUPLICATED	IFA_F_DADFAILED
+#  else
+#    define IN6_IFF_DUPLICATED	0x08
+#  endif
 #  define IN6_IFF_DETACHED	0
 #else
 #  include <net/if.h>
