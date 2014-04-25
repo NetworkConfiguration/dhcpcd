@@ -70,76 +70,13 @@
 #include "dev.h"
 #include "dhcp.h"
 #include "dhcp6.h"
+#include "if.h"
 #include "if-options.h"
 #include "ipv4.h"
 #include "ipv6nd.h"
-#include "net.h"
-
-char *
-hwaddr_ntoa(const unsigned char *hwaddr, size_t hwlen, char *buf, size_t buflen)
-{
-	char *p;
-	size_t i;
-
-	if (buf == NULL) {
-		return NULL;
-	}
-
-	if (hwlen * 3 > buflen) {
-		errno = ENOBUFS;
-		return 0;
-	}
-
-	p = buf;
-	for (i = 0; i < hwlen; i++) {
-		if (i > 0)
-			*p ++= ':';
-		p += snprintf(p, 3, "%.2x", hwaddr[i]);
-	}
-	*p ++= '\0';
-	return buf;
-}
-
-size_t
-hwaddr_aton(unsigned char *buffer, const char *addr)
-{
-	char c[3];
-	const char *p = addr;
-	unsigned char *bp = buffer;
-	size_t len = 0;
-
-	c[2] = '\0';
-	while (*p) {
-		c[0] = *p++;
-		c[1] = *p++;
-		/* Ensure that digits are hex */
-		if (isxdigit((unsigned char)c[0]) == 0 ||
-		    isxdigit((unsigned char)c[1]) == 0)
-		{
-			errno = EINVAL;
-			return 0;
-		}
-		/* We should have at least two entries 00:01 */
-		if (len == 0 && *p == '\0') {
-			errno = EINVAL;
-			return 0;
-		}
-		/* Ensure that next data is EOL or a seperator with data */
-		if (!(*p == '\0' || (*p == ':' && *(p + 1) != '\0'))) {
-			errno = EINVAL;
-			return 0;
-		}
-		if (*p)
-			p++;
-		if (bp)
-			*bp++ = (unsigned char)strtol(c, NULL, 16);
-		len++;
-	}
-	return len;
-}
 
 void
-free_interface(struct interface *ifp)
+if_free(struct interface *ifp)
 {
 
 	if (ifp == NULL)
@@ -154,7 +91,7 @@ free_interface(struct interface *ifp)
 }
 
 int
-carrier_status(struct interface *iface)
+if_carrier(struct interface *iface)
 {
 	int s, r;
 	struct ifreq ifr;
@@ -229,7 +166,7 @@ up_interface(struct interface *iface)
 }
 
 struct if_head *
-discover_interfaces(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
+if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 {
 	struct ifaddrs *ifaddrs, *ifa;
 	char *p;
@@ -363,7 +300,7 @@ discover_interfaces(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		/* Bring the interface up if not already */
 		if (!(ifp->flags & IFF_UP)
 #ifdef SIOCGIFMEDIA
-		    && carrier_status(ifp) != LINK_UNKNOWN
+		    && if_carrier(ifp) != LINK_UNKNOWN
 #endif
 		   )
 		{
@@ -378,7 +315,7 @@ discover_interfaces(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		/* Don't allow loopback unless explicit */
 		if (ifp->flags & IFF_LOOPBACK) {
 			if (argc == 0 && ctx->ifac == 0) {
-				free_interface(ifp);
+				if_free(ifp);
 				continue;
 			}
 		} else if (ifa->ifa_addr != NULL) {
@@ -396,7 +333,7 @@ discover_interfaces(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 			if (ioctl(s_link, SIOCGLIFADDR, &iflr) == -1 ||
 			    !(iflr.flags & IFLR_ACTIVE))
 			{
-				free_interface(ifp);
+				if_free(ifp);
 				continue;
 			}
 #endif
@@ -444,7 +381,7 @@ discover_interfaces(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		    ifp->family != ARPHRD_ETHER)
 		{
 			if (argc == 0 && ctx->ifac == 0) {
-				free_interface(ifp);
+				if_free(ifp);
 				continue;
 			}
 			switch (ifp->family) {
@@ -465,16 +402,16 @@ discover_interfaces(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		/* Handle any platform init for the interface */
 		if (if_init(ifp) == -1) {
 			syslog(LOG_ERR, "%s: if_init: %m", p);
-			free_interface(ifp);
+			if_free(ifp);
 			continue;
 		}
 
 		/* Ensure that the MTU is big enough for DHCP */
-		if (get_mtu(ifp->name) < MTU_MIN &&
-		    set_mtu(ifp->name, MTU_MIN) == -1)
+		if (if_getmtu(ifp->name) < MTU_MIN &&
+		    if_setmtu(ifp->name, MTU_MIN) == -1)
 		{
 			syslog(LOG_ERR, "%s: set_mtu: %m", p);
-			free_interface(ifp);
+			if_free(ifp);
 			continue;
 		}
 
@@ -488,7 +425,7 @@ discover_interfaces(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		/* We reserve the 100 range for virtual interfaces, if and when
 		 * we can work them out. */
 		ifp->metric = 200 + ifp->index;
-		if (getifssid(ifp->name, ifp->ssid) != -1) {
+		if (if_getssid(ifp->name, ifp->ssid) != -1) {
 			ifp->wireless = 1;
 			ifp->metric += 100;
 		}
@@ -522,7 +459,7 @@ discover_interfaces(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		case AF_INET6:
 			sin6 = (const struct sockaddr_in6 *)
 			    (void *)ifa->ifa_addr;
-			ifa_flags = in6_addr_flags(ifa->ifa_name,
+			ifa_flags = if_addrflags6(ifa->ifa_name,
 			    &sin6->sin6_addr);
 			if (ifa_flags != -1)
 				ipv6_handleifa(ctx, RTM_NEWADDR, ifs,
@@ -546,7 +483,7 @@ discover_interfaces(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 }
 
 int
-do_mtu(const char *ifname, short int mtu)
+if_domtu(const char *ifname, short int mtu)
 {
 	int s, r;
 	struct ifreq ifr;

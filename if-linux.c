@@ -39,6 +39,7 @@
 
 #include <arpa/inet.h>
 #include <net/if.h>
+#include <net/if_ether.h>
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
 #include <net/route.h>
@@ -70,20 +71,15 @@
 #include "common.h"
 #include "dev.h"
 #include "dhcp.h"
+#include "if.h"
 #include "ipv4.h"
 #include "ipv6.h"
-#include "net.h"
-#include "platform.h"
 
 #define bpf_insn		sock_filter
 #define BPF_SKIPTYPE
 #define BPF_ETHCOOK		-ETH_HLEN
 #define BPF_WHOLEPACKET	0x0fffffff /* work around buggy LPF filters */
 
-#include "config.h"
-#include "common.h"
-#include "dhcp.h"
-#include "ipv4.h"
 #include "bpf-filter.h"
 
 /* Broadcast address for IPoIB */
@@ -136,7 +132,7 @@ static const char *mproc =
 	;
 
 int
-hardware_platform(char *str, size_t len)
+if_machinearch(char *str, size_t len)
 {
 	FILE *fp;
 	char buf[256];
@@ -241,7 +237,7 @@ _open_link_socket(struct sockaddr_nl *nl)
 }
 
 int
-open_link_socket(void)
+if_openlinksocket(void)
 {
 	struct sockaddr_nl snl;
 
@@ -640,7 +636,7 @@ link_netlink(struct dhcpcd_ctx *ctx, struct nlmsghdr *nlm)
 }
 
 int
-manage_link(struct dhcpcd_ctx *ctx)
+if_managelink(struct dhcpcd_ctx *ctx)
 {
 
 	return get_netlink(ctx, ctx->link_fd, MSG_DONTWAIT, &link_netlink);
@@ -739,7 +735,7 @@ struct nlmr
 
 #ifdef INET
 int
-ipv4_opensocket(struct interface *ifp, int protocol)
+if_openrawsocket(struct interface *ifp, int protocol)
 {
 	int s;
 	union sockunion {
@@ -806,7 +802,7 @@ eexit:
 }
 
 ssize_t
-ipv4_sendrawpacket(const struct interface *ifp, int protocol,
+if_sendrawpacket(const struct interface *ifp, int protocol,
     const void *data, size_t len)
 {
 	const struct dhcp_state *state;
@@ -838,7 +834,7 @@ ipv4_sendrawpacket(const struct interface *ifp, int protocol,
 }
 
 ssize_t
-ipv4_getrawpacket(struct interface *ifp, int protocol,
+if_readrawpacket(struct interface *ifp, int protocol,
     void *data, size_t len, int *partialcsum)
 {
 	struct iovec iov = {
@@ -1110,7 +1106,7 @@ if_route6(const struct rt6 *rt, int action)
 }
 
 int
-in6_addr_flags(const char *ifname, const struct in6_addr *addr)
+if_addrflags6(const char *ifname, const struct in6_addr *addr)
 {
 	FILE *fp;
 	char *p, ifaddress[33], address[33], name[IF_NAMESIZE + 1];
@@ -1180,7 +1176,7 @@ write_path(const char *path, const char *val)
 static const char *prefix = "/proc/sys/net/ipv6/conf";
 
 void
-restore_kernel_ra(struct dhcpcd_ctx *ctx)
+if_rarestore(struct dhcpcd_ctx *ctx)
 {
 	char path[256];
 
@@ -1200,7 +1196,7 @@ restore_kernel_ra(struct dhcpcd_ctx *ctx)
 }
 
 int
-check_ipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
+if_checkipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 {
 	int ra;
 	size_t i;
@@ -1254,19 +1250,5 @@ check_ipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 	}
 
 	return ra;
-}
-
-int
-ipv6_dadtransmits(const char *ifname)
-{
-	char path[256];
-	int r;
-
-	if (ifname == NULL)
-		ifname = "default";
-
-	snprintf(path, sizeof(path), "%s/%s/dad_transmits", prefix, ifname);
-	r = check_proc_int(path);
-	return r < 0 ? 0 : r;
 }
 #endif

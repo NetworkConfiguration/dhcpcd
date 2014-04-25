@@ -28,11 +28,7 @@
 #ifndef DUID_H
 #define DUID_H
 
-#include "net.h"
-
-#ifndef DUID_LEN
-#  define DUID_LEN	128 + 2
-#endif
+#define DUID_LEN	128 + 2
 
 size_t duid_init(const struct interface *);
 

@@ -108,4 +108,6 @@ ssize_t setvar(char ***, const char *, const char *, const char *);
 ssize_t setvard(char ***, const char *, const char *, size_t);
 time_t uptime(void);
 
+char *hwaddr_ntoa(const unsigned char *, size_t, char *, size_t);
+size_t hwaddr_aton(unsigned char *, const char *);
 #endif

@@ -29,8 +29,8 @@
 
 #include "config.h"
 #include "dhcp.h"
+#include "dhcpcd.h"
 #include "if-pref.h"
-#include "net.h"
 
 /* Interface comparer for working out ordering. */
 static int

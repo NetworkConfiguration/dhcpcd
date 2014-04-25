@@ -37,9 +37,9 @@
 #include "common.h"
 #include "dhcp.h"
 #include "eloop.h"
+#include "if.h"
 #include "if-options.h"
 #include "ipv4ll.h"
-#include "net.h"
 
 static struct dhcp_message *
 ipv4ll_make_lease(uint32_t addr)

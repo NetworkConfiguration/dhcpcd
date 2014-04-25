@@ -39,7 +39,8 @@
 #include "common.h"
 #include "dhcp-common.h"
 #include "dhcp.h"
-#include "platform.h"
+#include "if.h"
+#include "ipv6.h"
 
 struct dhcp_opt *
 vivso_find(uint32_t iana_en, const void *arg)
@@ -78,7 +79,7 @@ dhcp_vendor(char *str, size_t len)
 	    utn.sysname, utn.release, utn.machine);
 	p += l;
 	len -= (size_t)l;
-	l = hardware_platform(p, len);
+	l = if_machinearch(p, len);
 	return (size_t)(p - str);
 }
 

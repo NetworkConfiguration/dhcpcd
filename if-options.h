@@ -166,9 +166,6 @@ struct if_options {
 	uint16_t ia_type;
 	struct if_ia *ia;
 	size_t ia_len;
-#ifdef INET6
-	int dadtransmits;
-#endif
 
 	struct dhcp_opt *dhcp_override;
 	size_t dhcp_override_len;

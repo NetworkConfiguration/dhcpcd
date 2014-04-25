@@ -48,8 +48,8 @@
 #endif
 
 #include "common.h"
+#include "dhcpcd.h"
 #include "duid.h"
-#include "net.h"
 
 static size_t
 duid_make(unsigned char *d, const struct interface *ifp, uint16_t type)

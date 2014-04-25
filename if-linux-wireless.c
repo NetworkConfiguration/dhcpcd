@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2009-2013 Roy Marples <roy@marples.name>
+ * Copyright (c) 2009-2014 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -57,13 +57,13 @@
 #include "common.h"
 #include "config.h"
 
-/* We can't include net.h or dhcpcd.h because
+/* We can't include if.h or dhcpcd.h because
  * they would pull in net/if.h, which defeats the purpose of this hack. */
 #define IF_SSIDSIZE 33
-int getifssid(const char *ifname, char *ssid);
+int if_getssid(const char *ifname, char *ssid);
 
 int
-getifssid(const char *ifname, char *ssid)
+if_getssid(const char *ifname, char *ssid)
 {
 #ifdef SIOCGIWESSID
 	int s, retval;

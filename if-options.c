@@ -52,7 +52,6 @@
 #include "dhcpcd-embedded.h"
 #include "if-options.h"
 #include "ipv4.h"
-#include "platform.h"
 
 /* These options only make sense in the config file, so don't use any
    valid short options for them */
@@ -1861,7 +1860,6 @@ read_config(struct dhcpcd_ctx *ctx,
 #ifdef INET6
 	ifo->options |= DHCPCD_IPV6 | DHCPCD_IPV6RS | DHCPCD_IPV6RA_REQRDNSS;
 	ifo->options |= DHCPCD_DHCP6;
-	ifo->dadtransmits = ipv6_dadtransmits(ifname);
 #endif
 	ifo->timeout = DEFAULT_TIMEOUT;
 	ifo->reboot = DEFAULT_REBOOT;

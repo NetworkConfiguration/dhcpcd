@@ -42,6 +42,7 @@
 #ifdef __FreeBSD__ /* Needed so that including netinet6/in6_var.h works */
 #  include <net/if_var.h>
 #endif
+#include <net/if_ether.h>
 #include <net/if_media.h>
 #include <net/route.h>
 #include <netinet/in.h>
@@ -69,10 +70,10 @@
 #include "config.h"
 #include "common.h"
 #include "dhcp.h"
+#include "if.h"
 #include "if-options.h"
 #include "ipv4.h"
 #include "ipv6.h"
-#include "platform.h"
 
 #include "bpf-filter.h"
 
@@ -109,7 +110,7 @@ if_conf(__unused struct interface *iface)
 }
 
 int
-open_link_socket(void)
+if_openlinksocket(void)
 {
 
 #ifdef SOCK_CLOEXEC
@@ -136,7 +137,7 @@ open_link_socket(void)
 }
 
 int
-getifssid(const char *ifname, char *ssid)
+if_getssid(const char *ifname, char *ssid)
 {
 	int s, retval = -1;
 #if defined(SIOCG80211NWID)
@@ -206,7 +207,7 @@ if_vimaster(const char *ifname)
 	if (ifmr.ifm_status & IFM_AVALID &&
 	    IFM_TYPE(ifmr.ifm_active) == IFM_IEEE80211)
 	{
-		if (getifssid(ifname, NULL) == -1)
+		if (if_getssid(ifname, NULL) == -1)
 			return 1;
 	}
 	return 0;
@@ -214,7 +215,7 @@ if_vimaster(const char *ifname)
 
 #ifdef INET
 int
-ipv4_opensocket(struct interface *ifp, int protocol)
+if_openrawsocket(struct interface *ifp, int protocol)
 {
 	struct dhcp_state *state;
 	int fd = -1;
@@ -303,7 +304,7 @@ eexit:
 }
 
 ssize_t
-ipv4_sendrawpacket(const struct interface *ifp, int protocol,
+if_sendrawpacket(const struct interface *ifp, int protocol,
     const void *data, size_t len)
 {
 	struct iovec iov[2];
@@ -329,7 +330,7 @@ ipv4_sendrawpacket(const struct interface *ifp, int protocol,
 /* BPF requires that we read the entire buffer.
  * So we pass the buffer in the API so we can loop on >1 packet. */
 ssize_t
-ipv4_getrawpacket(struct interface *ifp, int protocol,
+if_readrawpacket(struct interface *ifp, int protocol,
     void *data, size_t len, int *partialcsum)
 {
 	int fd = -1;
@@ -380,6 +381,7 @@ next:
 			return bytes;
 	}
 }
+
 int
 if_address(const struct interface *iface, const struct in_addr *address,
     const struct in_addr *netmask, const struct in_addr *broadcast,
@@ -728,7 +730,7 @@ get_addrs(int type, char *cp, struct sockaddr **sa)
 
 #ifdef INET6
 int
-in6_addr_flags(const char *ifname, const struct in6_addr *addr)
+if_addrflags6(const char *ifname, const struct in6_addr *addr)
 {
 	int s, flags;
 	struct in6_ifreq ifr6;
@@ -749,7 +751,7 @@ in6_addr_flags(const char *ifname, const struct in6_addr *addr)
 #endif
 
 int
-manage_link(struct dhcpcd_ctx *ctx)
+if_managelink(struct dhcpcd_ctx *ctx)
 {
 	/* route and ifwatchd like a msg buf size of 2048 */
 	char msg[2048], *p, *e, *cp, ifname[IF_NAMESIZE];
@@ -891,7 +893,7 @@ manage_link(struct dhcpcd_ctx *ctx)
 					    sin6->sin6_addr.s6_addr,
 					    sizeof(ia6.s6_addr));
 					if (rtm->rtm_type == RTM_NEWADDR) {
-						ifa_flags = in6_addr_flags(
+						ifa_flags = if_addrflags6(
 								ifname,
 								&ia6);
 						if (ifa_flags == -1)
@@ -918,7 +920,7 @@ manage_link(struct dhcpcd_ctx *ctx)
 #  endif
 #endif
 int
-hardware_platform(char *str, size_t len)
+if_machinearch(char *str, size_t len)
 {
 	int mib[2] = { CTL_HW, HW_MACHINE_ARCH };
 	char march[SYS_NMLN];
@@ -989,7 +991,7 @@ eexit:
 }
 
 void
-restore_kernel_ra(struct dhcpcd_ctx *ctx)
+if_rarestore(struct dhcpcd_ctx *ctx)
 {
 
 	if (ctx->options & DHCPCD_FORKED)
@@ -1018,7 +1020,7 @@ restore_kernel_ra(struct dhcpcd_ctx *ctx)
 }
 
 static int
-ipv6_ra_flush(void)
+if_raflush(void)
 {
 	int s;
 	char dummy[IFNAMSIZ + 8];
@@ -1036,7 +1038,7 @@ ipv6_ra_flush(void)
 }
 
 int
-check_ipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
+if_checkipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 {
 	int ra;
 
@@ -1120,19 +1122,10 @@ check_ipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 		/* Flush the kernel knowledge of advertised routers
 		 * and prefixes so the kernel does not expire prefixes
 		 * and default routes we are trying to own. */
-		ipv6_ra_flush();
+		if_raflush();
 	}
 
 	ctx->ra_global = ra;
 	return ra;
-}
-
-int
-ipv6_dadtransmits(__unused const char *ifname)
-{
-	int r;
-
-	r = get_inet6_sysctl(IPV6CTL_DAD_COUNT);
-	return r < 0 ? 0 : r;
 }
 #endif

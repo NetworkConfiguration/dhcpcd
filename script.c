@@ -46,10 +46,10 @@
 #include "common.h"
 #include "dhcp.h"
 #include "dhcp6.h"
+#include "if.h"
 #include "if-options.h"
 #include "if-pref.h"
 #include "ipv6nd.h"
-#include "net.h"
 #include "script.h"
 
 #ifdef HAVE_SPAWN_H
@@ -303,7 +303,7 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	EMALLOC(6, e);
 	snprintf(env[6], e, "ifflags=%u", ifp->flags);
 	EMALLOC(7, e);
-	snprintf(env[7], e, "ifmtu=%d", get_mtu(ifp->name));
+	snprintf(env[7], e, "ifmtu=%d", if_getmtu(ifp->name));
 	l = e = strlen("interface_order=");
 	TAILQ_FOREACH(ifp2, ifp->ctx->ifaces, next) {
 		e += strlen(ifp2->name) + 1;

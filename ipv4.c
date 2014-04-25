@@ -49,10 +49,10 @@
 #include "common.h"
 #include "dhcpcd.h"
 #include "dhcp.h"
+#include "if.h"
 #include "if-options.h"
 #include "if-pref.h"
 #include "ipv4.h"
-#include "net.h"
 #include "script.h"
 
 #define IPV4_LOOPBACK_ROUTE
@@ -259,11 +259,11 @@ nc_route(int add, struct rt *ort, struct rt *nrt)
 	 * prefer the interface.
 	 * This also has the nice side effect of flushing ARP entries so
 	 * we don't have to do that manually. */
-	if (ipv4_deleteroute(ort) == -1 && errno != ESRCH)
-		syslog(LOG_ERR, "%s: ipv4_deleteroute: %m", ort->iface->name);
-	if (!ipv4_addroute(nrt))
+	if (if_delroute(ort) == -1 && errno != ESRCH)
+		syslog(LOG_ERR, "%s: ipv4_delroute: %m", ort->iface->name);
+	if (!if_addroute(nrt))
 		return 0;
-	syslog(LOG_ERR, "%s: ipv4_addroute: %m", nrt->iface->name);
+	syslog(LOG_ERR, "%s: if_addroute: %m", nrt->iface->name);
 	return -1;
 }
 
@@ -273,9 +273,9 @@ d_route(struct rt *rt)
 	int retval;
 
 	desc_route("deleting", rt);
-	retval = ipv4_deleteroute(rt);
+	retval = if_delroute(rt);
 	if (retval != 0 && errno != ENOENT && errno != ESRCH)
-		syslog(LOG_ERR,"%s: ipv4_deleteroute: %m", rt->iface->name);
+		syslog(LOG_ERR,"%s: if_delroute: %m", rt->iface->name);
 	return retval;
 }
 
@@ -564,7 +564,7 @@ delete_address1(struct interface *ifp,
 
 	syslog(LOG_DEBUG, "%s: deleting IP address %s/%d",
 	    ifp->name, inet_ntoa(*addr), inet_ntocidr(*net));
-	r = ipv4_deleteaddress(ifp, addr, net);
+	r = if_deladdress(ifp, addr, net);
 	if (r == -1 && errno != EADDRNOTAVAIL && errno != ENXIO &&
 	    errno != ENODEV)
 		syslog(LOG_ERR, "%s: %s: %m", ifp->name, __func__);
@@ -666,13 +666,13 @@ ipv4_applyaddr(void *arg)
 		    ifp->name, inet_ntoa(lease->addr),
 		    inet_ntocidr(lease->net));
 		if (ifo->options & DHCPCD_NOALIAS)
-			r = ipv4_setaddress(ifp,
+			r = if_setaddress(ifp,
 			    &lease->addr, &lease->net, &lease->brd);
 		else
-			r = ipv4_addaddress(ifp,
+			r = if_addaddress(ifp,
 			    &lease->addr, &lease->net, &lease->brd);
 		if (r == -1 && errno != EEXIST) {
-			syslog(LOG_ERR, "%s: ipv4_addaddress: %m", __func__);
+			syslog(LOG_ERR, "%s: if_addaddress: %m", __func__);
 			return;
 		}
 		istate = ipv4_getstate(ifp);
@@ -698,7 +698,7 @@ ipv4_applyaddr(void *arg)
 		rt->iface = ifp;
 		rt->metric = 0;
 		if (!find_route(ifp->ctx->ipv4_routes, rt, NULL))
-			ipv4_deleteroute(rt);
+			if_delroute(rt);
 		free(rt);
 	}
 

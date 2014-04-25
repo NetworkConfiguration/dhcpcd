@@ -186,17 +186,6 @@ void ipv6_ctxfree(struct dhcpcd_ctx *);
 int ipv6_removesubnet(struct interface *, struct ipv6_addr *);
 void ipv6_buildroutes(struct dhcpcd_ctx *);
 
-int if_address6(const struct ipv6_addr *, int);
-#define add_address6(a) if_address6(a, 1)
-#define del_address6(a) if_address6(a, -1)
-int in6_addr_flags(const char *, const struct in6_addr *);
-
-int if_route6(const struct rt6 *rt, int);
-#define add_route6(rt) if_route6(rt, 1)
-#define change_route6(rt) if_route6(rt, 0)
-#define del_route6(rt) if_route6(rt, -1)
-#define del_src_route6(rt) if_route6(rt, -2);
-
 #else
 #define ipv6_init(a) NULL
 #define ipv6_free_ll_callbacks(a)

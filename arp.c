@@ -25,6 +25,8 @@
  * SUCH DAMAGE.
  */
 
+#include <netinet/if_ether.h>
+
 #include <errno.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -39,9 +41,9 @@
 #include "dhcp.h"
 #include "dhcpcd.h"
 #include "eloop.h"
+#include "if.h"
 #include "if-options.h"
 #include "ipv4ll.h"
-#include "net.h"
 
 #define ARP_LEN								      \
 	(sizeof(struct arphdr) + (2 * sizeof(uint32_t)) + (2 * HWADDR_LEN))
@@ -79,7 +81,7 @@ arp_send(const struct interface *ifp, int op, in_addr_t sip, in_addr_t tip)
 	APPEND(&sip, sizeof(sip));
 	ZERO(ifp->hwlen);
 	APPEND(&tip, sizeof(tip));
-	return ipv4_sendrawpacket(ifp, ETHERTYPE_ARP, arp_buffer, len);
+	return if_sendrawpacket(ifp, ETHERTYPE_ARP, arp_buffer, len);
 
 eexit:
 	errno = ENOBUFS;
@@ -132,7 +134,7 @@ arp_packet(void *arg)
 	state = D_STATE(ifp);
 	state->fail.s_addr = 0;
 	for(;;) {
-		bytes = ipv4_getrawpacket(ifp, ETHERTYPE_ARP,
+		bytes = if_readrawpacket(ifp, ETHERTYPE_ARP,
 		    arp_buffer, sizeof(arp_buffer), NULL);
 		if (bytes == 0 || bytes == -1)
 			return;
@@ -232,7 +234,7 @@ arp_announce(void *arg)
 	if (state->new == NULL)
 		return;
 	if (state->arp_fd == -1) {
-		state->arp_fd = ipv4_opensocket(ifp, ETHERTYPE_ARP);
+		state->arp_fd = if_openrawsocket(ifp, ETHERTYPE_ARP);
 		if (state->arp_fd == -1) {
 			syslog(LOG_ERR, "%s: %s: %m", __func__, ifp->name);
 			return;
@@ -288,7 +290,7 @@ arp_probe(void *arg)
 	int arping = 0;
 
 	if (state->arp_fd == -1) {
-		state->arp_fd = ipv4_opensocket(ifp, ETHERTYPE_ARP);
+		state->arp_fd = if_openrawsocket(ifp, ETHERTYPE_ARP);
 		if (state->arp_fd == -1) {
 			syslog(LOG_ERR, "%s: %s: %m", __func__, ifp->name);
 			return;

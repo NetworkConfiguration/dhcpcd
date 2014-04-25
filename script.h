@@ -28,8 +28,6 @@
 #ifndef SCRIPT_H
 #define SCRIPT_H
 
-#include "net.h"
-
 void if_printoptions(void);
 int send_interface(int, const struct interface *);
 int script_runreason(const struct interface *, const char *);

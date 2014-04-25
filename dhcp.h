@@ -243,7 +243,6 @@ struct dhcp_state {
 
 #include "dhcpcd.h"
 #include "if-options.h"
-#include "net.h"
 
 #ifdef INET
 char *decode_rfc3361(const uint8_t *, size_t);

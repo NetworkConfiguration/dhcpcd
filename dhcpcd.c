@@ -60,13 +60,12 @@ const char dhcpcd_copyright[] = "Copyright (c) 2006-2014 Roy Marples";
 #include "dhcp6.h"
 #include "duid.h"
 #include "eloop.h"
+#include "if.h"
 #include "if-options.h"
 #include "if-pref.h"
 #include "ipv4.h"
 #include "ipv6.h"
 #include "ipv6nd.h"
-#include "net.h"
-#include "platform.h"
 #include "script.h"
 
 #ifdef USE_SIGNALS
@@ -325,7 +324,7 @@ stop_interface(struct interface *ifp)
 	eloop_timeout_delete(ctx->eloop, NULL, ifp);
 	if (ifp->options->options & DHCPCD_DEPARTED)
 		script_runreason(ifp, "DEPARTED");
-	free_interface(ifp);
+	if_free(ifp);
 	if (!(ctx->options & (DHCPCD_MASTER | DHCPCD_TEST)))
 		eloop_exit(ctx->eloop, EXIT_FAILURE);
 }
@@ -351,7 +350,7 @@ configure_interface1(struct interface *ifp)
 		ifo->options &= ~(DHCPCD_ARP | DHCPCD_IPV4LL);
 	if (!(ifp->flags & (IFF_POINTOPOINT | IFF_LOOPBACK | IFF_MULTICAST)))
 		ifo->options &= ~DHCPCD_IPV6RS;
-	if (ifo->options & DHCPCD_LINK && carrier_status(ifp) == LINK_UNKNOWN)
+	if (ifo->options & DHCPCD_LINK && if_carrier(ifp) == LINK_UNKNOWN)
 		ifo->options &= ~DHCPCD_LINK;
 
 	if (ifo->metric != -1)
@@ -362,9 +361,9 @@ configure_interface1(struct interface *ifp)
 
 	/* We want to disable kernel interface RA as early as possible. */
 	if (ifo->options & DHCPCD_IPV6RS) {
-		ra_global = check_ipv6(ifp->ctx, NULL,
+		ra_global = if_checkipv6(ifp->ctx, NULL,
 		    ifp->ctx->options & DHCPCD_IPV6RA_OWN ? 1 : 0);
-		ra_iface = check_ipv6(ifp->ctx, ifp->name,
+		ra_iface = if_checkipv6(ifp->ctx, ifp->name,
 		    ifp->options->options & DHCPCD_IPV6RA_OWN ? 1 : 0);
 		if (ra_global == -1 || ra_iface == -1)
 			ifo->options &= ~DHCPCD_IPV6RS;
@@ -504,7 +503,7 @@ handle_carrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 		return;
 
 	if (carrier == LINK_UNKNOWN)
-		carrier = carrier_status(ifp); /* will set ifp->flags */
+		carrier = if_carrier(ifp); /* will set ifp->flags */
 	else
 		ifp->flags = flags;
 
@@ -537,7 +536,7 @@ handle_carrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 			handle_interface(ctx, 0, ifp->name);
 #endif
 			if (ifp->wireless)
-				getifssid(ifp->name, ifp->ssid);
+				if_getssid(ifp->name, ifp->ssid);
 			configure_interface(ifp, ctx->argc, ctx->argv);
 			script_runreason(ifp, "CARRIER");
 			start_interface(ifp);
@@ -657,8 +656,8 @@ handle_link(void *arg)
 	struct dhcpcd_ctx *ctx;
 
 	ctx = arg;
-	if (manage_link(ctx) == -1 && errno != ENXIO && errno != ENODEV)
-		syslog(LOG_ERR, "manage_link: %m");
+	if (if_managelink(ctx) == -1 && errno != ENXIO && errno != ENODEV)
+		syslog(LOG_ERR, "if_managelink: %m");
 }
 
 static void
@@ -681,7 +680,7 @@ init_state(struct interface *ifp, int argc, char **argv)
 
 	reason = NULL; /* appease gcc */
 	if (ifo->options & DHCPCD_LINK) {
-		switch (carrier_status(ifp)) {
+		switch (if_carrier(ifp)) {
 		case LINK_DOWN:
 			ifp->carrier = LINK_DOWN;
 			reason = "NOCARRIER";
@@ -732,7 +731,7 @@ handle_interface(void *arg, int action, const char *ifname)
 			return;
 	}
 
-	ifs = discover_interfaces(ctx, -1, UNCONST(argv));
+	ifs = if_discover(ctx, -1, UNCONST(argv));
 	TAILQ_FOREACH_SAFE(ifp, ifs, next, ifn) {
 		if (strcmp(ifp->name, ifname) != 0)
 			continue;
@@ -757,7 +756,7 @@ handle_interface(void *arg, int action, const char *ifname)
 	/* Free our discovered list */
 	while ((ifp = TAILQ_FIRST(ifs))) {
 		TAILQ_REMOVE(ifs, ifp, next);
-		free_interface(ifp);
+		if_free(ifp);
 	}
 	free(ifs);
 }
@@ -807,7 +806,7 @@ reconf_reboot(struct dhcpcd_ctx *ctx, int action, int argc, char **argv, int oi)
 	struct if_head *ifs;
 	struct interface *ifn, *ifp;
 
-	ifs = discover_interfaces(ctx, argc - oi, argv + oi);
+	ifs = if_discover(ctx, argc - oi, argv + oi);
 	if (ifs == NULL)
 		return;
 
@@ -819,7 +818,7 @@ reconf_reboot(struct dhcpcd_ctx *ctx, int action, int argc, char **argv, int oi)
 				if_reboot(ifn, argc, argv);
 			else
 				ipv4_applyaddr(ifn);
-			free_interface(ifp);
+			if_free(ifp);
 		} else {
 			init_state(ifp, argc, argv);
 			TAILQ_INSERT_TAIL(ctx->ifaces, ifp, next);
@@ -1442,7 +1441,7 @@ main(int argc, char **argv)
 	 * instead.
 	 * We also need to open this before checking for interfaces below
 	 * so that we pickup any new addresses during the discover phase. */
-	ctx.link_fd = open_link_socket();
+	ctx.link_fd = if_openlinksocket();
 	if (ctx.link_fd == -1)
 		syslog(LOG_ERR, "open_link_socket: %m");
 	else
@@ -1454,7 +1453,7 @@ main(int argc, char **argv)
 	    (DHCPCD_MASTER | DHCPCD_DEV))
 		dev_start(&ctx);
 
-	ctx.ifaces = discover_interfaces(&ctx, ctx.ifc, ctx.ifv);
+	ctx.ifaces = if_discover(&ctx, ctx.ifc, ctx.ifv);
 	for (i = 0; i < ctx.ifc; i++) {
 		if (find_interface(&ctx, ctx.ifv[i]) == NULL)
 			syslog(LOG_ERR, "%s: interface not found or invalid",
@@ -1545,7 +1544,7 @@ exit1:
 	if (ctx.ifaces) {
 		while ((ifp = TAILQ_FIRST(ctx.ifaces))) {
 			TAILQ_REMOVE(ctx.ifaces, ifp, next);
-			free_interface(ifp);
+			if_free(ifp);
 		}
 		free(ctx.ifaces);
 	}
@@ -1557,7 +1556,7 @@ exit1:
 
 	free_options(ifo);
 	free_globals(&ctx);
-	restore_kernel_ra(&ctx);
+	if_rarestore(&ctx);
 	ipv4_ctxfree(&ctx);
 	ipv6_ctxfree(&ctx);
 	dev_stop(&ctx, !(ctx.options & DHCPCD_FORKED));

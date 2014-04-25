@@ -67,6 +67,7 @@
 #include "dhcpcd.h"
 #include "dhcp6.h"
 #include "eloop.h"
+#include "if.h"
 #include "ipv6.h"
 #include "ipv6nd.h"
 
@@ -406,8 +407,8 @@ ipv6_addaddr(struct ipv6_addr *ap)
 	if (!(ap->flags & IPV6_AF_DADCOMPLETED) &&
 	    ipv6_findaddr(ap->iface, &ap->addr))
 		ap->flags |= IPV6_AF_DADCOMPLETED;
-	if (add_address6(ap) == -1) {
-		syslog(LOG_ERR, "add_address6 %m");
+	if (if_addaddress6(ap) == -1) {
+		syslog(LOG_ERR, "if_addaddress6: %m");
 		return -1;
 	}
 	ap->flags &= ~IPV6_AF_NEW;
@@ -416,7 +417,7 @@ ipv6_addaddr(struct ipv6_addr *ap)
 		ap->flags |= IPV6_AF_DELEGATED;
 	if (ap->iface->options->options & DHCPCD_IPV6RA_OWN &&
 	    ipv6_removesubnet(ap->iface, ap) == -1)
-		syslog(LOG_ERR,"ipv6_removesubnet %m");
+		syslog(LOG_ERR,"ipv6_removesubnet: %m");
 	if (ap->prefix_pltime == ND6_INFINITE_LIFETIME &&
 	    ap->prefix_vltime == ND6_INFINITE_LIFETIME)
 		syslog(LOG_DEBUG,
@@ -465,9 +466,9 @@ ipv6_addaddrs(struct ipv6_addrhead *addrs)
 				    ap->iface->name, ap->saddr);
 				i++;
 				if (!IN6_IS_ADDR_UNSPECIFIED(&ap->addr) &&
-				    del_address6(ap) == -1 &&
+				    if_deladdress6(ap) == -1 &&
 				    errno != EADDRNOTAVAIL && errno != ENXIO)
-					syslog(LOG_ERR, "del_address6 %m");
+					syslog(LOG_ERR, "if_deladdress6: %m");
 			}
 			eloop_q_timeout_delete(ap->iface->ctx->eloop,
 			    0, NULL, ap);
@@ -506,9 +507,9 @@ ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
 		{
 			syslog(LOG_INFO, "%s: deleting address %s",
 			    ap->iface->name, ap->saddr);
-			if (del_address6(ap) == -1 &&
+			if (if_deladdress6(ap) == -1 &&
 			    errno != EADDRNOTAVAIL && errno != ENXIO)
-				syslog(LOG_ERR, "del_address6 %m");
+				syslog(LOG_ERR, "if_deladdress6: :%m");
 		}
 		free(ap);
 	}
@@ -820,11 +821,11 @@ nc_route(int add, struct rt6 *ort, struct rt6 *nrt)
 	desc_route(add ? "adding" : "changing", nrt);
 	/* We delete and add the route so that we can change metric and
 	 * prefer the interface. */
-	if (del_route6(ort) == -1 && errno != ESRCH)
-		syslog(LOG_ERR, "%s: del_route6: %m", ort->iface->name);
-	if (add_route6(nrt) == 0)
+	if (if_delroute6(ort) == -1 && errno != ESRCH)
+		syslog(LOG_ERR, "%s: if_delroute6: %m", ort->iface->name);
+	if (if_addroute6(nrt) == 0)
 		return 0;
-	syslog(LOG_ERR, "%s: add_route6: %m", nrt->iface->name);
+	syslog(LOG_ERR, "%s: if_addroute6: %m", nrt->iface->name);
 	return -1;
 }
 
@@ -834,9 +835,9 @@ d_route(struct rt6 *rt)
 	int retval;
 
 	desc_route("deleting", rt);
-	retval = del_route6(rt);
+	retval = if_delroute6(rt);
 	if (retval != 0 && errno != ENOENT && errno != ESRCH)
-		syslog(LOG_ERR,"%s: del_route6: %m", rt->iface->name);
+		syslog(LOG_ERR,"%s: if_delroute6: %m", rt->iface->name);
 	return retval;
 }
 
@@ -938,7 +939,7 @@ ipv6_removesubnet(struct interface *ifp, struct ipv6_addr *addr)
 		if (!find_route6(ifp->ctx->ipv6->routes, rt))
 #endif
 		{
-			r = del_route6(rt);
+			r = if_delroute6(rt);
 			if (r == -1 && errno == ESRCH)
 				r = 0;
 		}

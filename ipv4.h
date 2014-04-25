@@ -74,27 +74,8 @@ struct ipv4_addr *ipv4_findaddr(struct interface *,
 void ipv4_handleifa(struct dhcpcd_ctx *, int, struct if_head *, const char *,
     const struct in_addr *, const struct in_addr *, const struct in_addr *);
 
-int if_address(const struct interface *,
-    const struct in_addr *, const struct in_addr *,
-    const struct in_addr *, int);
-#define ipv4_addaddress(iface, addr, net, brd)				      \
-	if_address(iface, addr, net, brd, 1)
-#define ipv4_setaddress(iface, addr, net, brd)				      \
-	if_address(iface, addr, net, brd, 2)
-#define ipv4_deleteaddress(iface, addr, net)				      \
-	if_address(iface, addr, net, NULL, -1)
-
-int if_route(const struct rt *rt, int);
-#define ipv4_addroute(rt) if_route(rt, 1)
-#define ipv4_changeroute(rt) if_route(rt, 0)
-#define ipv4_deleteroute(rt) if_route(rt, -1)
-#define del_src_route(rt) i_route(rt, -2);
 void ipv4_freeroutes(struct rt_head *);
 
-int ipv4_opensocket(struct interface *, int);
-ssize_t ipv4_sendrawpacket(const struct interface *,
-    int, const void *, size_t);
-ssize_t ipv4_getrawpacket(struct interface *, int, void *, size_t, int *);
 void ipv4_free(struct interface *);
 void ipv4_ctxfree(struct dhcpcd_ctx *);
 #else

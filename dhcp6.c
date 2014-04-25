@@ -54,7 +54,6 @@
 #include "duid.h"
 #include "eloop.h"
 #include "ipv6nd.h"
-#include "platform.h"
 #include "script.h"
 
 #ifndef __UNCONST

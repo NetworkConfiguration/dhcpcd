@@ -40,6 +40,7 @@
 #include <sys/param.h>
 #include <sys/time.h>
 
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -180,3 +181,65 @@ uptime(void)
 	return tv.tv_sec;
 }
 
+char *
+hwaddr_ntoa(const unsigned char *hwaddr, size_t hwlen, char *buf, size_t buflen)
+{
+	char *p;
+	size_t i;
+
+	if (buf == NULL) {
+		return NULL;
+	}
+
+	if (hwlen * 3 > buflen) {
+		errno = ENOBUFS;
+		return 0;
+	}
+
+	p = buf;
+	for (i = 0; i < hwlen; i++) {
+		if (i > 0)
+			*p ++= ':';
+		p += snprintf(p, 3, "%.2x", hwaddr[i]);
+	}
+	*p ++= '\0';
+	return buf;
+}
+
+size_t
+hwaddr_aton(unsigned char *buffer, const char *addr)
+{
+	char c[3];
+	const char *p = addr;
+	unsigned char *bp = buffer;
+	size_t len = 0;
+
+	c[2] = '\0';
+	while (*p) {
+		c[0] = *p++;
+		c[1] = *p++;
+		/* Ensure that digits are hex */
+		if (isxdigit((unsigned char)c[0]) == 0 ||
+		    isxdigit((unsigned char)c[1]) == 0)
+		{
+			errno = EINVAL;
+			return 0;
+		}
+		/* We should have at least two entries 00:01 */
+		if (len == 0 && *p == '\0') {
+			errno = EINVAL;
+			return 0;
+		}
+		/* Ensure that next data is EOL or a seperator with data */
+		if (!(*p == '\0' || (*p == ':' && *(p + 1) != '\0'))) {
+			errno = EINVAL;
+			return 0;
+		}
+		if (*p)
+			p++;
+		if (bp)
+			*bp++ = (unsigned char)strtol(c, NULL, 16);
+		len++;
+	}
+	return len;
+}

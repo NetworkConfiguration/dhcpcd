@@ -37,6 +37,7 @@
 #include <arpa/inet.h>
 #include <net/route.h>
 
+#include <netinet/if_ether.h>
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
@@ -62,6 +63,7 @@
 #include "dhcp-common.h"
 #include "duid.h"
 #include "eloop.h"
+#include "if.h"
 #include "ipv4.h"
 #include "ipv4ll.h"
 #include "script.h"
@@ -783,9 +785,9 @@ make_message(struct dhcp_message **message,
 
 		*p++ = DHO_MAXMESSAGESIZE;
 		*p++ = 2;
-		mtu = get_mtu(iface->name);
+		mtu = if_getmtu(iface->name);
 		if (mtu < MTU_MIN) {
-			if (set_mtu(iface->name, MTU_MIN) == 0)
+			if (if_setmtu(iface->name, MTU_MIN) == 0)
 				sz = MTU_MIN;
 		} else if (mtu > MTU_MAX) {
 			/* Even though our MTU could be greater than
@@ -1590,7 +1592,7 @@ send_message(struct interface *iface, uint8_t type,
 		if (udp == NULL) {
 			syslog(LOG_ERR, "dhcp_makeudppacket: %m");
 		} else {
-			r = ipv4_sendrawpacket(iface, ETHERTYPE_IP,
+			r = if_sendrawpacket(iface, ETHERTYPE_IP,
 			    (uint8_t *)udp, ulen);
 			free(udp);
 		}
@@ -1600,7 +1602,7 @@ send_message(struct interface *iface, uint8_t type,
 		 * As such we remove it from consideration without actually
 		 * stopping the interface. */
 		if (r == -1) {
-			syslog(LOG_ERR, "%s: ipv4_sendrawpacket: %m",
+			syslog(LOG_ERR, "%s: if_sendrawpacket: %m",
 			    iface->name);
 			if (!(iface->ctx->options & DHCPCD_TEST))
 				dhcp_drop(iface, "FAIL");
@@ -2558,7 +2560,7 @@ dhcp_handlepacket(void *arg)
 	 * The benefit is that if we get >1 DHCP packet in our buffer and
 	 * the first one fails for any reason, we can use the next. */
 	for(;;) {
-		bytes = (size_t)ipv4_getrawpacket(iface, ETHERTYPE_IP,
+		bytes = (size_t)if_readrawpacket(iface, ETHERTYPE_IP,
 		    iface->ctx->packet, udp_dhcp_len, &partialcsum);
 		if (bytes == 0 || (ssize_t)bytes == -1)
 			break;
@@ -2679,7 +2681,7 @@ dhcp_open(struct interface *ifp)
 
 	state = D_STATE(ifp);
 	if (state->raw_fd == -1) {
-		state->raw_fd = ipv4_opensocket(ifp, ETHERTYPE_IP);
+		state->raw_fd = if_openrawsocket(ifp, ETHERTYPE_IP);
 		if (state->raw_fd == -1) {
 			syslog(LOG_ERR, "%s: %s: %m", __func__, ifp->name);
 			return -1;
