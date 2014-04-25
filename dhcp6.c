@@ -2226,8 +2226,9 @@ dhcp6_handledata(void *arg)
 			memcpy(&u32, D6_COPTION_DATA(o), sizeof(u32));
 			u32 = ntohl(u32);
 			if (u32 >= 60 && u32 <= 86400) {
-				syslog(LOG_DEBUG, "%s: SOL_MAX_RT %d -> %d",
-				    ifp->name, state->sol_max_rt, u32);
+				syslog(LOG_DEBUG, "%s: SOL_MAX_RT %llu -> %d",
+				    ifp->name,
+				    (unsigned long long)state->sol_max_rt, u32);
 				state->sol_max_rt = (time_t)u32;
 			} else
 				syslog(LOG_ERR, "%s: invalid SOL_MAX_RT %d",
@@ -2238,8 +2239,9 @@ dhcp6_handledata(void *arg)
 			memcpy(&u32, D6_COPTION_DATA(o), sizeof(u32));
 			u32 = ntohl(u32);
 			if (u32 >= 60 && u32 <= 86400) {
-				syslog(LOG_DEBUG, "%s: INF_MAX_RT %d -> %d",
-				    ifp->name, state->inf_max_rt, u32);
+				syslog(LOG_DEBUG, "%s: INF_MAX_RT %llu -> %d",
+				    ifp->name,
+				    (unsigned long long)state->inf_max_rt, u32);
 				state->inf_max_rt = (time_t)u32;
 			} else
 				syslog(LOG_ERR, "%s: invalid INF_MAX_RT %d",
