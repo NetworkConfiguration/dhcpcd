@@ -59,10 +59,12 @@ struct {								\
 	qual type *qual *tqe_prev;	/* address of previous next element */\
 }
 #define TAILQ_ENTRY(type)	_TAILQ_ENTRY(struct type,)
+#endif /* !TAILQ_HEAD */
 
 /*
  * Tail queue access methods.
  */
+#ifndef TAILQ_FIRST
 #define	TAILQ_FIRST(head)		((head)->tqh_first)
 #define	TAILQ_NEXT(elm, field)		((elm)->field.tqe_next)
 #define	TAILQ_LAST(head, headname) \
@@ -70,8 +72,9 @@ struct {								\
 #define	TAILQ_PREV(elm, headname, field) \
 	(*(((struct headname *)((elm)->field.tqe_prev))->tqh_last))
 #define	TAILQ_EMPTY(head)		(TAILQ_FIRST(head) == TAILQ_END(head))
+#endif /* !TAILQ_FIRST */
 
-
+#ifndef TAILQ_FOREACH
 #define	TAILQ_FOREACH(var, head, field)					\
 	for ((var) = ((head)->tqh_first);				\
 	    (var) != TAILQ_END(head);					\
@@ -81,7 +84,9 @@ struct {								\
 	for ((var) = (*(((struct headname *)((head)->tqh_last))->tqh_last));\
 	    (var) != TAILQ_END(head);					\
 	    (var) = (*(((struct headname *)((var)->field.tqe_prev))->tqh_last)))
+#endif /* !TAILQ_FOREACH */
 
+#ifndef TAILQ_INIT
 #define	TAILQ_INIT(head) do {						\
 	(head)->tqh_first = TAILQ_END(head);				\
 	(head)->tqh_last = &(head)->tqh_first;				\
@@ -130,7 +135,9 @@ struct {								\
 		(head)->tqh_last = (elm)->field.tqe_prev;		\
 	*(elm)->field.tqe_prev = (elm)->field.tqe_next;			\
 } while (/*CONSTCOND*/0)
+#endif /* !TAILQ_INIT */
 
+#ifndef TAILQ_REPLACE
 #define TAILQ_REPLACE(head, elm, elm2, field) do {                      \
         if (((elm2)->field.tqe_next = (elm)->field.tqe_next) !=		\
 	    TAILQ_END(head))						\
@@ -141,7 +148,7 @@ struct {								\
         (elm2)->field.tqe_prev = (elm)->field.tqe_prev;                 \
         *(elm2)->field.tqe_prev = (elm2);                               \
 } while (/*CONSTCOND*/0)
-#endif /* !TAILQ_HEAD */
+#endif /* !TAILQ_REPLACE */
 
 #ifndef TAILQ_FOREACH_SAFE
 #define	TAILQ_FOREACH_SAFE(var, head, field, next)			\
