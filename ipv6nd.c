@@ -905,7 +905,7 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 		if (lifetime == ~0U)
 			timerclear(&rao->expire);
 		else {
-			expire.tv_sec = lifetime;
+			expire.tv_sec = (time_t)lifetime;
 			expire.tv_usec = 0;
 			timeradd(&rap->received, &expire, &rao->expire);
 		}
@@ -1110,7 +1110,7 @@ ipv6nd_expirera(void *arg)
 			continue;
 		valid = 0;
 		if (rap->lifetime) {
-			lt.tv_sec = rap->lifetime;
+			lt.tv_sec = (time_t)rap->lifetime;
 			lt.tv_usec = 0;
 			timeradd(&rap->received, &lt, &expire);
 			if (rap->lifetime == 0 || timercmp(&now, &expire, >)) {

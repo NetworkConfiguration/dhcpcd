@@ -2228,7 +2228,7 @@ dhcp6_handledata(void *arg)
 			if (u32 >= 60 && u32 <= 86400) {
 				syslog(LOG_DEBUG, "%s: SOL_MAX_RT %d -> %d",
 				    ifp->name, state->sol_max_rt, u32);
-				state->sol_max_rt = u32;
+				state->sol_max_rt = (time_t)u32;
 			} else
 				syslog(LOG_ERR, "%s: invalid SOL_MAX_RT %d",
 				    ifp->name, u32);
@@ -2240,7 +2240,7 @@ dhcp6_handledata(void *arg)
 			if (u32 >= 60 && u32 <= 86400) {
 				syslog(LOG_DEBUG, "%s: INF_MAX_RT %d -> %d",
 				    ifp->name, state->inf_max_rt, u32);
-				state->inf_max_rt = u32;
+				state->inf_max_rt = (time_t)u32;
 			} else
 				syslog(LOG_ERR, "%s: invalid INF_MAX_RT %d",
 				    ifp->name, u32);
@@ -2406,15 +2406,16 @@ recv:
 		else
 			state->state = DH6S_BOUND;
 		if (state->renew && state->renew != ND6_INFINITE_LIFETIME)
-			eloop_timeout_add_sec(ifp->ctx->eloop, state->renew,
+			eloop_timeout_add_sec(ifp->ctx->eloop,
+			    (time_t)state->renew,
 			    state->state == DH6S_INFORMED ?
 			    dhcp6_startinform : dhcp6_startrenew, ifp);
 		if (state->rebind && state->rebind != ND6_INFINITE_LIFETIME)
-			eloop_timeout_add_sec(ifp->ctx->eloop, state->rebind,
-			    dhcp6_startrebind, ifp);
+			eloop_timeout_add_sec(ifp->ctx->eloop,
+			    (time_t)state->rebind, dhcp6_startrebind, ifp);
 		if (state->expire && state->expire != ND6_INFINITE_LIFETIME)
-			eloop_timeout_add_sec(ifp->ctx->eloop, state->expire,
-			    dhcp6_startexpire, ifp);
+			eloop_timeout_add_sec(ifp->ctx->eloop,
+			    (time_t)state->expire, dhcp6_startexpire, ifp);
 		if (ifp->options->ia_type == D6_OPTION_IA_PD)
 			dhcp6_delegate_prefix(ifp);
 

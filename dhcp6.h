@@ -174,12 +174,12 @@ struct dhcp6_state {
 	struct timeval RT;
 	unsigned int IMD;
 	unsigned int RTC;
-	unsigned int IRT;
+	time_t IRT;
 	unsigned int MRC;
-	unsigned int MRT;
+	time_t MRT;
 	void (*MRCcallback)(void *);
-	unsigned int sol_max_rt;
-	unsigned int inf_max_rt;
+	time_t sol_max_rt;
+	time_t inf_max_rt;
 
 	struct dhcp6_message *send;
 	size_t send_len;

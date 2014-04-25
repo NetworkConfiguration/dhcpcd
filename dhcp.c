@@ -1871,11 +1871,11 @@ dhcp_bind(void *arg)
 		lease->renewaltime = lease->rebindtime = lease->leasetime;
 	else {
 		eloop_timeout_add_sec(iface->ctx->eloop,
-		    lease->renewaltime, dhcp_renew, iface);
+		    (time_t)lease->renewaltime, dhcp_renew, iface);
 		eloop_timeout_add_sec(iface->ctx->eloop,
-		    lease->rebindtime, dhcp_rebind, iface);
+		    (time_t)lease->rebindtime, dhcp_rebind, iface);
 		eloop_timeout_add_sec(iface->ctx->eloop,
-		    lease->leasetime, dhcp_expire, iface);
+		    (time_t)lease->leasetime, dhcp_expire, iface);
 		syslog(LOG_DEBUG,
 		    "%s: renew in %"PRIu32" seconds, rebind in %"PRIu32
 		    " seconds",
