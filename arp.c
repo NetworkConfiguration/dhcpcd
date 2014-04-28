@@ -113,10 +113,10 @@ arp_failure(struct interface *ifp)
 		dhcp_decline(ifp);
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	if (state->lease.frominfo)
-		start_interface(ifp);
+		dhcpcd_startinterface(ifp);
 	else
 		eloop_timeout_add_sec(ifp->ctx->eloop,
-		    DHCP_ARP_FAIL, start_interface, ifp);
+		    DHCP_ARP_FAIL, dhcpcd_startinterface, ifp);
 }
 
 static void
@@ -183,8 +183,8 @@ arp_packet(void *arg)
 			syslog(LOG_INFO,
 			    "%s: found %s on hardware address %s",
 			    ifp->name, inet_ntoa(ina), hwaddr);
-			if (select_profile(ifp, hwaddr) == -1 &&
-			    select_profile(ifp, inet_ntoa(ina)) == -1)
+			if (dhcpcd_selectprofile(ifp, hwaddr) == -1 &&
+			    dhcpcd_selectprofile(ifp, inet_ntoa(ina)) == -1)
 			{
 				state->probes = 0;
 				/* We didn't find a profile for this
@@ -199,7 +199,7 @@ arp_packet(void *arg)
 			}
 			dhcp_close(ifp);
 			eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
-			start_interface(ifp);
+			dhcpcd_startinterface(ifp);
 			return;
 		}
 
@@ -337,7 +337,7 @@ arp_probe(void *arg)
 				    &tv, arp_probe, ifp);
 			else
 				eloop_timeout_add_tv(ifp->ctx->eloop,
-				    &tv, start_interface, ifp);
+				    &tv, dhcpcd_startinterface, ifp);
 		} else
 			eloop_timeout_add_tv(ifp->ctx->eloop,
 			    &tv, dhcp_bind, ifp);

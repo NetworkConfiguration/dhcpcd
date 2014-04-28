@@ -135,20 +135,19 @@ struct dhcpcd_ctx {
 };
 
 #ifdef USE_SIGNALS
-extern const int handle_sigs[];
+extern const int dhcpcd_handlesigs[];
 #endif
 
-pid_t daemonise(struct dhcpcd_ctx *);
+pid_t dhcpcd_daemonise(struct dhcpcd_ctx *);
 
-struct interface *find_interface(struct dhcpcd_ctx *, const char *);
-int handle_args(struct dhcpcd_ctx *, struct fd_list *, int, char **);
-void handle_carrier(struct dhcpcd_ctx *, int, unsigned int, const char *);
-void handle_interface(void *, int, const char *);
-void handle_hwaddr(struct dhcpcd_ctx *, const char *,
+int dhcpcd_handleargs(struct dhcpcd_ctx *, struct fd_list *, int, char **);
+void dhcpcd_handlecarrier(struct dhcpcd_ctx *, int, unsigned int, const char *);
+int dhcpcd_handleinterface(void *, int, const char *);
+void dhcpcd_handlehwaddr(struct dhcpcd_ctx *, const char *,
     const unsigned char *, uint8_t);
-void drop_interface(struct interface *, const char *);
-int select_profile(struct interface *, const char *);
+void dhcpcd_dropinterface(struct interface *, const char *);
+int dhcpcd_selectprofile(struct interface *, const char *);
 
-void start_interface(void *);
+void dhcpcd_startinterface(void *);
 
 #endif

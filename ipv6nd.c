@@ -483,7 +483,7 @@ ipv6nd_scriptrun(struct ra *rap)
 	pid = 0;
 	if (hasdns && (hasaddress ||
 	    !(rap->flags & (ND_RA_FLAG_MANAGED | ND_RA_FLAG_OTHER))))
-		pid = daemonise(rap->iface->ctx);
+		pid = dhcpcd_daemonise(rap->iface->ctx);
 #if 0
 	else if (options & DHCPCD_DAEMONISE &&
 	    !(options & DHCPCD_DAEMONISED) && new_data)

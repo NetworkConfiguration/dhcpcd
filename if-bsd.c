@@ -793,11 +793,11 @@ if_managelink(struct dhcpcd_ctx *ctx)
 				ifan = (struct if_announcemsghdr *)(void *)p;
 				switch(ifan->ifan_what) {
 				case IFAN_ARRIVAL:
-					handle_interface(ctx, 1,
+					dhcpcd_handleinterface(ctx, 1,
 					    ifan->ifan_name);
 					break;
 				case IFAN_DEPARTURE:
-					handle_interface(ctx, -1,
+					dhcpcd_handleinterface(ctx, -1,
 					    ifan->ifan_name);
 					break;
 				}
@@ -826,7 +826,7 @@ if_managelink(struct dhcpcd_ctx *ctx)
 					len = LINK_UNKNOWN;
 					break;
 				}
-				handle_carrier(ctx, len,
+				dhcpcd_handlecarrier(ctx, len,
 				    (unsigned int)ifm->ifm_flags, ifname);
 				break;
 			case RTM_DELETE:
@@ -870,7 +870,7 @@ if_managelink(struct dhcpcd_ctx *ctx)
 #endif
 					memcpy(&sdl, rti_info[RTAX_IFA],
 					    rti_info[RTAX_IFA]->sa_len);
-					handle_hwaddr(ctx, ifname,
+					dhcpcd_handlehwaddr(ctx, ifname,
 					    (const unsigned char*)CLLADDR(&sdl),
 					    sdl.sdl_alen);
 					break;

@@ -412,7 +412,7 @@ link_route(struct dhcpcd_ctx *ctx, struct nlmsghdr *nlm)
 		case RTA_OIF:
 			idx = *(unsigned int *)RTA_DATA(rta);
 			if (if_indextoname(idx, ifn))
-				rt.iface = find_interface(ctx, ifn);
+				rt.iface = if_find(ctx, ifn);
 			break;
 		case RTA_PRIORITY:
 			metric = *(unsigned int *)RTA_DATA(rta);
@@ -457,7 +457,7 @@ link_addr(struct dhcpcd_ctx *ctx, struct nlmsghdr *nlm)
 	ifa = NLMSG_DATA(nlm);
 	if (if_indextoname(ifa->ifa_index, ifn) == NULL)
 		return -1;
-	iface = find_interface(ctx, ifn);
+	iface = if_find(ctx, ifn);
 	if (iface == NULL)
 		return 1;
 	rta = (struct rtattr *) IFA_RTA(ifa);
@@ -533,10 +533,10 @@ handle_rename(struct dhcpcd_ctx *ctx, unsigned int ifindex, const char *ifname)
 
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 		if (ifp->index == ifindex && strcmp(ifp->name, ifname)) {
-			handle_interface(ctx, -1, ifp->name);
+			dhcpcd_handleinterface(ctx, -1, ifp->name);
 			/* Let dev announce the interface for renaming */
 			if (!dev_listening(ctx))
-				handle_interface(ctx, 1, ifname);
+				dhcpcd_handleinterface(ctx, 1, ifname);
 			return 1;
 		}
 	}
@@ -594,7 +594,7 @@ link_netlink(struct dhcpcd_ctx *ctx, struct nlmsghdr *nlm)
 	}
 
 	if (nlm->nlmsg_type == RTM_DELLINK) {
-		handle_interface(ctx, -1, ifn);
+		dhcpcd_handleinterface(ctx, -1, ifn);
 		return 1;
 	}
 
@@ -603,7 +603,7 @@ link_netlink(struct dhcpcd_ctx *ctx, struct nlmsghdr *nlm)
 	 * To trigger a valid hardware address pickup we need to pretend
 	 * that that don't exist until they have one. */
 	if (ifi->ifi_flags & IFF_MASTER && !hwaddr) {
-		handle_interface(ctx, -1, ifn);
+		dhcpcd_handleinterface(ctx, -1, ifn);
 		return 1;
 	}
 
@@ -612,12 +612,12 @@ link_netlink(struct dhcpcd_ctx *ctx, struct nlmsghdr *nlm)
 		    return 1;
 
 	/* Check for a new interface */
-	ifp = find_interface(ctx, ifn);
+	ifp = if_find(ctx, ifn);
 	if (ifp == NULL) {
 		/* If are listening to a dev manager, let that announce
 		 * the interface rather than the kernel. */
 		if (dev_listening(ctx) < 1)
-			handle_interface(ctx, 1, ifn);
+			dhcpcd_handleinterface(ctx, 1, ifn);
 		return 1;
 	}
 
@@ -630,7 +630,8 @@ link_netlink(struct dhcpcd_ctx *ctx, struct nlmsghdr *nlm)
 			handle_hwaddr(ctx, ifn, RTA_DATA(hwaddr), l);
 	}
 
-	handle_carrier(ctx, ifi->ifi_flags & IFF_RUNNING ? LINK_UP : LINK_DOWN,
+	dhcpcd_handlecarrier(ctx,
+	    ifi->ifi_flags & IFF_RUNNING ? LINK_UP : LINK_DOWN,
 	    ifi->ifi_flags, ifn);
 	return 1;
 }

@@ -85,7 +85,7 @@ control_handle_data(void *arg)
 		*ap++ = p;
 		p += strlen(p) + 1;
 	}
-	handle_args(l->ctx, l, argc, argvp);
+	dhcpcd_handleargs(l->ctx, l, argc, argvp);
 }
 
 static void

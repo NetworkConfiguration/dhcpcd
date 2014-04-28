@@ -482,6 +482,20 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 	return ifs;
 }
 
+struct interface *
+if_find(struct dhcpcd_ctx *ctx, const char *ifname)
+{
+	struct interface *ifp;
+
+	if (ctx != NULL && ctx->ifaces != NULL) {
+		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+			if (strcmp(ifp->name, ifname) == 0)
+				return ifp;
+		}
+	}
+	return NULL;
+}
+
 int
 if_domtu(const char *ifname, short int mtu)
 {

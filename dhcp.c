@@ -1317,8 +1317,8 @@ dhcp_fallback(void *arg)
 	struct interface *iface;
 
 	iface = (struct interface *)arg;
-	select_profile(iface, iface->options->fallback);
-	start_interface(iface);
+	dhcpcd_selectprofile(iface, iface->options->fallback);
+	dhcpcd_startinterface(iface);
 }
 
 uint32_t
@@ -1882,7 +1882,7 @@ dhcp_bind(void *arg)
 		    iface->name, lease->renewaltime, lease->rebindtime);
 	}
 	ipv4_applyaddr(iface);
-	if (daemonise(iface->ctx) == 0) {
+	if (dhcpcd_daemonise(iface->ctx) == 0) {
 		if (!ipv4ll)
 			arp_close(iface);
 		state->state = DHS_BOUND;

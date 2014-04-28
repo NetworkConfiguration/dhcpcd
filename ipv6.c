@@ -746,7 +746,7 @@ ipv6_handleifa_addrs(int cmd,
 			break;
 		case RTM_NEWADDR:
 			/* Safety - ignore tentative announcements */
-			if (flags & IN6_IFF_TENTATIVE)
+			if (flags & (IN6_IFF_DETACHED |IN6_IFF_TENTATIVE))
 				break;
 			if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0) {
 				found++;

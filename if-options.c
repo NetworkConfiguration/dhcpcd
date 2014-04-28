@@ -85,6 +85,10 @@
 #define O_AUTHNOTREQUIRED	O_BASE + 27
 #define O_NODHCP		O_BASE + 28
 #define O_NODHCP6		O_BASE + 29
+#define O_DHCP			O_BASE + 30
+#define O_DHCP6			O_BASE + 31
+#define O_IPV4			O_BASE + 32
+#define O_IPV6			O_BASE + 33
 
 const struct option cf_options[] = {
 	{"background",      no_argument,       NULL, 'b'},
@@ -143,7 +147,9 @@ const struct option cf_options[] = {
 	{"ipv6ra_own_default", no_argument,    NULL, O_IPV6RA_OWN_D},
 	{"ipv4only",        no_argument,       NULL, '4'},
 	{"ipv6only",        no_argument,       NULL, '6'},
+	{"ipv4",            no_argument,       NULL, O_IPV4},
 	{"noipv4",          no_argument,       NULL, O_NOIPV4},
+	{"ipv6",            no_argument,       NULL, O_IPV6},
 	{"noipv6",          no_argument,       NULL, O_NOIPV6},
 	{"noalias",         no_argument,       NULL, O_NOALIAS},
 	{"iaid",            required_argument, NULL, O_IAID},
@@ -162,7 +168,9 @@ const struct option cf_options[] = {
 	{"authprotocol",    required_argument, NULL, O_AUTHPROTOCOL},
 	{"authtoken",       required_argument, NULL, O_AUTHTOKEN},
 	{"noauthrequired",  no_argument,       NULL, O_AUTHNOTREQUIRED},
+	{"dhcp",            no_argument,       NULL, O_DHCP},
 	{"nodhcp",          no_argument,       NULL, O_NODHCP},
+	{"dhcp6",           no_argument,       NULL, O_DHCP6},
 	{"nodhcp6",         no_argument,       NULL, O_NODHCP6},
 	{NULL,              0,                 NULL, '\0'}
 };
@@ -1100,8 +1108,14 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		ifo->options &= ~DHCPCD_IPV4;
 		ifo->options |= DHCPCD_IPV6;
 		break;
+	case O_IPV4:
+		ifo->options |= DHCPCD_IPV4;
+		break;
 	case O_NOIPV4:
 		ifo->options &= ~DHCPCD_IPV4;
+		break;
+	case O_IPV6:
+		ifo->options |= DHCPCD_IPV6;
 		break;
 	case O_NOIPV6:
 		ifo->options &= ~DHCPCD_IPV6;
@@ -1746,8 +1760,14 @@ err_sla:
 	case O_AUTHNOTREQUIRED:
 		ifo->auth.options &= ~DHCPCD_AUTH_REQUIRE;
 		break;
+	case O_DHCP:
+		ifo->options |= DHCPCD_DHCP | DHCPCD_IPV4;
+		break;
 	case O_NODHCP:
 		ifo->options &= ~DHCPCD_DHCP;
+		break;
+	case O_DHCP6:
+		ifo->options |= DHCPCD_DHCP6 | DHCPCD_IPV6;
 		break;
 	case O_NODHCP6:
 		ifo->options &= ~DHCPCD_DHCP6;

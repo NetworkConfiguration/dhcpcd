@@ -53,6 +53,8 @@
 #include "dhcp6.h"
 #include "duid.h"
 #include "eloop.h"
+#include "if.h"
+#include "if-options.h"
 #include "ipv6nd.h"
 #include "script.h"
 
@@ -1288,7 +1290,7 @@ dhcp6_dadcallback(void *arg)
 				syslog(LOG_DEBUG, "%s: DHCPv6 DAD completed",
 				    ifp->name);
 				script_runreason(ifp, state->reason);
-				daemonise(ifp->ctx);
+				dhcpcd_daemonise(ifp->ctx);
 			}
 		}
 	}
@@ -1756,7 +1758,7 @@ dhcp6_delegate_addr(struct interface *ifp, struct ipv6_addr *prefix,
 		state->reason = "DELEGATED6";
 	}
 
-	if (sla == NULL) {
+	if (sla == NULL || sla->sla_set == 0) {
 		struct interface *ifi;
 		unsigned int idx;
 		int bits;
@@ -1780,6 +1782,7 @@ dhcp6_delegate_addr(struct interface *ifp, struct ipv6_addr *prefix,
 				asla.prefix_len = 64;
 			else
 				asla.prefix_len = ROUNDUP8(asla.prefix_len);
+
 		}
 		sla = &asla;
 	}
@@ -1846,6 +1849,30 @@ dhcp6_delegate_prefix(struct interface *ifp)
 
 	ifo = ifp->options;
 	state = D6_STATE(ifp);
+
+	/* Try to load configured interfaces for delegation that do not exist */
+	for (i = 0; i < ifo->ia_len; i++) {
+		ia = &ifo->ia[i];
+		for (j = 0; j < ia->sla_len; j++) {
+			sla = &ia->sla[j];
+			for (k = 0; k < i; j++)
+				if (strcmp(sla->ifname, ia->sla[j].ifname) == 0)
+					break;
+			if (j >= i &&
+			    if_find(ifp->ctx, sla->ifname) == NULL)
+			{
+				syslog(LOG_INFO,
+				    "%s: loading for delegation", sla->ifname);
+				if (dhcpcd_handleinterface(ifp->ctx, 2,
+				    sla->ifname) == -1)
+					syslog(LOG_ERR,
+					    "%s: interface does not exist"
+					    " for delegation",
+					    sla->ifname);
+			}
+		}
+	}
+
 	TAILQ_FOREACH(ifd, ifp->ctx->ifaces, next) {
 		k = 0;
 		carrier_warned = abrt = 0;
@@ -1915,23 +1942,6 @@ dhcp6_delegate_prefix(struct interface *ifp)
 		if (k && !carrier_warned) {
 			ifd_state = D6_STATE(ifd);
 			ipv6_addaddrs(&ifd_state->addrs);
-		}
-	}
-
-	/* Warn about configured interfaces for delegation that do not exist */
-	for (i = 0; i < ifo->ia_len; i++) {
-		ia = &ifo->ia[i];
-		for (j = 0; j < ia->sla_len; j++) {
-			sla = &ia->sla[j];
-			for (k = 0; k < i; j++)
-				if (strcmp(sla->ifname, ia->sla[j].ifname) == 0)
-					break;
-			if (j >= i &&
-			    find_interface(ifp->ctx, sla->ifname) == NULL)
-				syslog(LOG_ERR,
-				    "%s: interface does not exist"
-				    " for delegation",
-				    sla->ifname);
 		}
 	}
 }
@@ -2449,7 +2459,7 @@ recv:
 		}
 		if (len) {
 			script_runreason(ifp, state->reason);
-			daemonise(ifp->ctx);
+			dhcpcd_daemonise(ifp->ctx);
 		} else
 			syslog(LOG_DEBUG,
 			    "%s: waiting for DHCPv6 DAD to complete",

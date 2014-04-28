@@ -81,6 +81,7 @@
 #endif
 
 struct if_head *if_discover(struct dhcpcd_ctx *, int, char * const *);
+struct interface *if_find(struct dhcpcd_ctx *, const char *);
 void if_free(struct interface *);
 int if_domtu(const char *, short int);
 #define if_getmtu(iface) if_domtu(iface, 0)
