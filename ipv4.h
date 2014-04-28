@@ -60,6 +60,7 @@ struct ipv4_state {
 
 #ifdef INET
 int ipv4_init(struct dhcpcd_ctx *);
+void ipv4_sortinterfaces(struct dhcpcd_ctx *);
 uint8_t inet_ntocidr(struct in_addr);
 int inet_cidrtoaddr(int, struct in_addr *);
 uint32_t ipv4_getnetmask(uint32_t);
@@ -80,6 +81,7 @@ void ipv4_free(struct interface *);
 void ipv4_ctxfree(struct dhcpcd_ctx *);
 #else
 #define ipv4_init(a) (-1)
+#define ipv4_sortinterfaces(a) {}
 #define ipv4_applyaddr(a) {}
 #define ipv4_freeroutes(a) {}
 #define ipv4_free(a) {}

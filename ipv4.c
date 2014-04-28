@@ -51,7 +51,6 @@
 #include "dhcp.h"
 #include "if.h"
 #include "if-options.h"
-#include "if-pref.h"
 #include "ipv4.h"
 #include "script.h"
 
@@ -178,6 +177,79 @@ ipv4_init(struct dhcpcd_ctx *ctx)
 		TAILQ_INIT(ctx->ipv4_routes);
 	}
 	return 0;
+}
+
+
+/* Interface comparer for working out ordering. */
+static int
+ipv4_ifcmp(const struct interface *si, const struct interface *ti)
+{
+	int sill, till;
+	const struct dhcp_state *sis, *tis;
+
+	sis = D_CSTATE(si);
+	tis = D_CSTATE(ti);
+	if (sis && !tis)
+		return -1;
+	if (!sis && tis)
+		return 1;
+	if (!sis && !tis)
+		return 0;
+	/* If one has a lease and the other not, it takes precedence. */
+	if (sis->new && !tis->new)
+		return -1;
+	if (!sis->new && tis->new)
+		return 1;
+	/* If we are either, they neither have a lease, or they both have.
+	 * We need to check for IPv4LL and make it non-preferred. */
+	if (sis->new && tis->new) {
+		sill = (sis->new->cookie == htonl(MAGIC_COOKIE));
+		till = (tis->new->cookie == htonl(MAGIC_COOKIE));
+		if (!sill && till)
+			return 1;
+		if (sill && !till)
+			return -1;
+	}
+	/* Then carrier status. */
+	if (si->carrier > ti->carrier)
+		return -1;
+	if (si->carrier < ti->carrier)
+		return 1;
+	/* Finally, metric */
+	if (si->metric < ti->metric)
+		return -1;
+	if (si->metric > ti->metric)
+		return 1;
+	return 0;
+}
+
+/* Sort the interfaces into a preferred order - best first, worst last. */
+void
+ipv4_sortinterfaces(struct dhcpcd_ctx *ctx)
+{
+	struct if_head sorted;
+	struct interface *ifp, *ift;
+
+	if (ctx->ifaces == NULL ||
+	    (ifp = TAILQ_FIRST(ctx->ifaces)) == NULL ||
+	    TAILQ_NEXT(ifp, next) == NULL)
+		return;
+
+	TAILQ_INIT(&sorted);
+	TAILQ_REMOVE(ctx->ifaces, ifp, next);
+	TAILQ_INSERT_HEAD(&sorted, ifp, next);
+	while ((ifp = TAILQ_FIRST(ctx->ifaces))) {
+		TAILQ_REMOVE(ctx->ifaces, ifp, next);
+		TAILQ_FOREACH(ift, &sorted, next) {
+			if (ipv4_ifcmp(ifp, ift) == -1) {
+				TAILQ_INSERT_BEFORE(ift, ifp, next);
+				break;
+			}
+		}
+		if (ift == NULL)
+			TAILQ_INSERT_TAIL(&sorted, ifp, next);
+	}
+	TAILQ_CONCAT(ctx->ifaces, &sorted, next);
 }
 
 static struct rt *
@@ -633,7 +705,7 @@ ipv4_applyaddr(void *arg)
 
 	/* As we are now adjusting an interface, we need to ensure
 	 * we have them in the right order for routing and configuration. */
-	sort_interfaces(ifp->ctx);
+	ipv4_sortinterfaces(ifp->ctx);
 
 	if (state == NULL)
 		return;

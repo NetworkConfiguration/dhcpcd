@@ -48,7 +48,6 @@
 #include "dhcp6.h"
 #include "if.h"
 #include "if-options.h"
-#include "if-pref.h"
 #include "ipv6nd.h"
 #include "script.h"
 

@@ -62,7 +62,6 @@ const char dhcpcd_copyright[] = "Copyright (c) 2006-2014 Roy Marples";
 #include "eloop.h"
 #include "if.h"
 #include "if-options.h"
-#include "if-pref.h"
 #include "ipv4.h"
 #include "ipv6.h"
 #include "ipv6nd.h"
@@ -821,7 +820,7 @@ reconf_reboot(struct dhcpcd_ctx *ctx, int action, int argc, char **argv, int oi)
 	}
 	free(ifs);
 
-	sort_interfaces(ctx);
+	ipv4_sortinterfaces(ctx);
 }
 
 static void
@@ -1519,7 +1518,7 @@ main(int argc, char **argv)
 	free_options(ifo);
 	ifo = NULL;
 
-	sort_interfaces(&ctx);
+	ipv4_sortinterfaces(&ctx);
 	TAILQ_FOREACH(ifp, ctx.ifaces, next) {
 		eloop_timeout_add_sec(ctx.eloop, 0, dhcpcd_startinterface, ifp);
 	}

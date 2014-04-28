@@ -2,7 +2,7 @@
 
 PROG=		dhcpcd
 SRCS=		common.c control.c dhcpcd.c duid.c eloop.c
-SRCS+=		if.c if-options.c if-pref.c script.c
+SRCS+=		if.c if-options.c script.c
 SRCS+=		dhcp-common.c
 
 CFLAGS?=	-O2
