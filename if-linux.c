@@ -32,6 +32,7 @@
 #include <sys/ioctl.h>
 #include <sys/param.h>
 
+#include <linux/if_addr.h>
 #include <linux/filter.h>
 #include <linux/if_packet.h>
 #include <linux/netlink.h>
@@ -992,6 +993,9 @@ if_address6(const struct ipv6_addr *ap, int action)
 	struct nlma nlm;
 	struct ifa_cacheinfo cinfo;
 	int retval = 0;
+#ifdef IFA_F_NOPREFIXROUTE
+	uint32_t flags;
+#endif
 
 	memset(&nlm, 0, sizeof(nlm));
 	nlm.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifaddrmsg));
@@ -1017,6 +1021,11 @@ if_address6(const struct ipv6_addr *ap, int action)
 		add_attr_l(&nlm.hdr, sizeof(nlm), IFA_CACHEINFO,
 		    &cinfo, sizeof(cinfo));
 	}
+
+#ifdef IFA_F_NOPREFIXROUTE
+	flags = IFA_F_NOPREFIXROUTE;
+	add_attr_32(&nlm.hdr, sizeof(nlm), IFA_FLAGS, flags);
+#endif
 
 	if (send_netlink(ap->iface->ctx, &nlm.hdr) == -1)
 		retval = -1;
