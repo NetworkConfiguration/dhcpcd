@@ -627,7 +627,7 @@ link_netlink(struct dhcpcd_ctx *ctx, struct nlmsghdr *nlm)
 
 		l = l2addr_len(ifi->ifi_type);
 		if (hwaddr->rta_len == RTA_LENGTH(l))
-			handle_hwaddr(ctx, ifn, RTA_DATA(hwaddr), l);
+			dhcpcd_handlehwaddr(ctx, ifn, RTA_DATA(hwaddr), l);
 	}
 
 	dhcpcd_handlecarrier(ctx,

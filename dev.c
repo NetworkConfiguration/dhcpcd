@@ -97,7 +97,7 @@ dev_start2(struct dhcpcd_ctx *ctx, const char *name)
 		return -1;
 	}
 	ctx->dev = calloc(1, sizeof(*ctx->dev));
-	dev_dhcpcd.handle_interface = &handle_interface;
+	dev_dhcpcd.handle_interface = &dhcpcd_handleinterface;
 	fptr(ctx->dev, &dev_dhcpcd);
 	if (ctx->dev->start  == NULL || (r = ctx->dev->start()) == -1) {
 		free(ctx->dev);
