@@ -1675,6 +1675,7 @@ err_sla:
 		token = malloc(sizeof(*token));
 		if (token == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);
+			free(token);
 			return -1;
 		}
 		if (parse_uint32(&token->secretid, arg) == -1) {
@@ -1693,6 +1694,7 @@ err_sla:
 		s = parse_string(NULL, 0, arg);
 		if (s == -1) {
 			syslog(LOG_ERR, "realm_len: %m");
+			free(token);
 			return -1;
 		}
 		if (s) {

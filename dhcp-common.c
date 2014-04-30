@@ -80,6 +80,7 @@ dhcp_vendor(char *str, size_t len)
 	p += l;
 	len -= (size_t)l;
 	l = if_machinearch(p, len);
+	p += l;
 	return (size_t)(p - str);
 }
 
