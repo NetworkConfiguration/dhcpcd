@@ -1000,15 +1000,24 @@ if_rarestore(struct dhcpcd_ctx *ctx)
 		return;
 
 	for (; ctx->ra_restore_len > 0; ctx->ra_restore_len--) {
+#ifdef ND6_IFF_ACCEPT_RTADV
 		if (!(ctx->options & DHCPCD_FORKED)) {
 			syslog(LOG_INFO, "%s: restoring kernel IPv6 RA support",
 			    ctx->ra_restore[ctx->ra_restore_len - 1]);
 			if (set_if_nd6_flag(
 			    ctx->ra_restore[ctx->ra_restore_len -1],
 			    ND6_IFF_ACCEPT_RTADV) == -1)
+				syslog(LOG_ERR, "%s: set_if_nd6_flag: %m",
+				    ctx->ra_restore[ctx->ra_restore_len - 1]);
+#ifdef ND6_IFF_OVERRIDE_RTADV
+			if (ctx->ra_kernel_set == 0 && del_if_nd6_flag(
+			    ctx->ra_restore[ctx->ra_restore_len -1],
+			    ND6_IFF_OVERRIDE_RTADV) == -1)
 				syslog(LOG_ERR, "%s: del_if_nd6_flag: %m",
 				    ctx->ra_restore[ctx->ra_restore_len - 1]);
+#endif
 		}
+#endif
 		free(ctx->ra_restore[ctx->ra_restore_len - 1]);
 	}
 	free(ctx->ra_restore);
@@ -1045,6 +1054,9 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 	int ra;
 
 	if (ifname) {
+#ifdef ND6_IFF_OVERRIDE_RTADV
+		int override;
+#endif
 #ifdef ND6_IFF_ACCEPT_RTADV
 		size_t i;
 		char *p, **nrest;
@@ -1064,6 +1076,14 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 		}
 #endif
 
+#ifdef ND6_IFF_OVERRIDE_RTADV
+		override = get_if_nd6_flag(ifname, ND6_IFF_OVERRIDE_RTADV);
+		if (override == -1)
+			syslog(LOG_ERR, "%s: get_if_nd6_flag: %m", ifname);
+		else if (override == 0 && !own)
+			return 0;
+#endif
+
 #ifdef ND6_IFF_ACCEPT_RTADV
 		ra = get_if_nd6_flag(ifname, ND6_IFF_ACCEPT_RTADV);
 		if (ra == -1)
@@ -1079,6 +1099,16 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 				    ifname);
 				return ra;
 			}
+#ifdef ND6_IFF_OVERRIDE_RTADV
+			if (override == 0 && ctx->ra_kernel_set == 0 &&
+			    set_if_nd6_flag(ifname, ND6_IFF_OVERRIDE_RTADV)
+			    == -1)
+			{
+				syslog(LOG_ERR, "%s: set_if_nd6_flag: %m",
+				    ifname);
+				return ra;
+			}
+#endif
 			for (i = 0; i < ctx->ra_restore_len; i++)
 				if (strcmp(ctx->ra_restore[i], ifname) == 0)
 					break;
