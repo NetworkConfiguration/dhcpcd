@@ -244,6 +244,7 @@ if_openrawsocket(struct interface *ifp, int protocol)
 
 	state = D_STATE(ifp);
 
+	memset(&pv, 0, sizeof(pv));
 	if (ioctl(fd, BIOCVERSION, &pv) == -1)
 		goto eexit;
 	if (pv.bv_major != BPF_MAJOR_VERSION ||
@@ -277,6 +278,7 @@ if_openrawsocket(struct interface *ifp, int protocol)
 #endif
 
 	/* Install the DHCP filter */
+	memset(&pf, 0, sizeof(pf));
 	if (protocol == ETHERTYPE_ARP) {
 		pf.bf_insns = UNCONST(arp_bpf_filter);
 		pf.bf_len = arp_bpf_filter_len;
@@ -434,7 +436,7 @@ if_route(const struct rt *rt, int action)
 	struct rtm
 	{
 		struct rt_msghdr hdr;
-		char buffer[sizeof(su) * 4];
+		char buffer[sizeof(su) * 5];
 	} rtm;
 	char *bp = rtm.buffer;
 	size_t l;
@@ -588,7 +590,7 @@ if_route6(const struct rt6 *rt, int action)
 	struct rtm
 	{
 		struct rt_msghdr hdr;
-		char buffer[sizeof(su) * 4];
+		char buffer[sizeof(su) * 5];
 	} rtm;
 	char *bp = rtm.buffer;
 	size_t l;
