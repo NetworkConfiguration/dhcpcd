@@ -998,7 +998,10 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 				    sizeof(len)))
 					return -1;
 				TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-					send_interface(fd->fd, ifp);
+					if (send_interface(fd->fd, ifp) == -1)
+						syslog(LOG_ERR,
+						    "send_interface %d: %m",
+						    fd->fd);
 				}
 				return 0;
 			}
@@ -1019,8 +1022,11 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 			opt = 0;
 			while (argv[++opt] != NULL) {
 				TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-					if (strcmp(argv[opt], ifp->name) == 0)
-						send_interface(fd->fd, ifp);
+					if (strcmp(argv[opt], ifp->name)== 0 &&
+					    send_interface(fd->fd, ifp) == -1)
+						syslog(LOG_ERR,
+						    "send_interface %d: %m",
+						    fd->fd);
 				}
 			}
 			return 0;
