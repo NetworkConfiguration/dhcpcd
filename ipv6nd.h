@@ -93,10 +93,6 @@ int ipv6nd_has_ra(const struct interface *);
 void ipv6nd_handleifa(struct dhcpcd_ctx *, int,
     const char *, const struct in6_addr *, int);
 void ipv6nd_drop(struct interface *);
-
-void ipv6nd_proberouter(void *);
-void ipv6nd_cancelproberouter(struct ra *);
-
 #else
 #define ipv6nd_startrs(a) {}
 #define ipv6nd_addrexists(a, b) (0)

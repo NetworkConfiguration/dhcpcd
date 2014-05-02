@@ -121,6 +121,7 @@ struct nd_opt_dnssl {		/* DNSSL option RFC 6106 */
 //
 
 static void ipv6nd_handledata(void *arg);
+static void ipv6nd_proberouter(void *arg);
 
 /*
  * Android ships buggy ICMP6 filter headers.
@@ -1091,6 +1092,133 @@ ipv6nd_handleifa(struct dhcpcd_ctx *ctx, int cmd, const char *ifname,
 	}
 }
 
+static void
+ipv6nd_unreachable(void *arg)
+{
+	struct ra *rap = arg;
+	struct timeval tv;
+
+	/* We could add an unreachable flag and persist the information,
+	 * but that is more effort than it's probably worth. */
+	syslog(LOG_WARNING, "%s: %s is unreachable, expiring it",
+	    rap->iface->name, rap->sfrom);
+	rap->expired = 1;
+	ipv6_buildroutes(rap->iface->ctx);
+	script_runreason(rap->iface, "ROUTERADVERT"); /* XXX not RA */
+
+	/* We should still test if it's reachable or not so
+	 * incase it comes back to life and it's preferable. */
+	if (rap->reachable) {
+		ms_to_tv(&tv, rap->reachable);
+	} else {
+		tv.tv_sec = REACHABLE_TIME;
+		tv.tv_usec = 0;
+	}
+	eloop_timeout_add_tv(rap->iface->ctx->eloop,
+	    &tv, ipv6nd_proberouter, rap);
+}
+
+static void
+ipv6nd_proberouter1(struct ra *rap)
+{
+	struct nd_neighbor_solicit *ns;
+	struct nd_opt_hdr *nd;
+	struct sockaddr_in6 dst;
+	struct cmsghdr *cm;
+	struct in6_pktinfo pi;
+	struct ipv6_ctx *ctx;
+
+	if (ipv6nd_open(rap->iface->ctx) == -1) {
+		syslog(LOG_ERR, "%s: ipv6nd_open: %m", __func__);
+		return;
+	}
+
+	if (!rap->ns) {
+	        rap->nslen = sizeof(*ns) + ROUNDUP8(rap->iface->hwlen + 2);
+		rap->ns = calloc(1, rap->nslen);
+		if (rap->ns == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			return;
+		}
+		ns = (struct nd_neighbor_solicit *)(void *)rap->ns;
+		ns->nd_ns_type = ND_NEIGHBOR_SOLICIT;
+		//ns->nd_ns_cksum = 0;
+		//ns->nd_ns_code = 0;
+		//ns->nd_ns_reserved = 0;
+		ns->nd_ns_target = rap->from;
+		nd = (struct nd_opt_hdr *)(rap->ns + sizeof(*ns));
+		nd->nd_opt_type = ND_OPT_SOURCE_LINKADDR;
+		nd->nd_opt_len = (ROUNDUP8(rap->iface->hwlen + 2)) >> 3;
+		memcpy(nd + 1, rap->iface->hwaddr, rap->iface->hwlen);
+	}
+
+	memset(&dst, 0, sizeof(dst));
+	dst.sin6_family = AF_INET6;
+#ifdef SIN6_LEN
+	dst.sin6_len = sizeof(dst);
+#endif
+	memcpy(&dst.sin6_addr, &rap->from, sizeof(dst.sin6_addr));
+	dst.sin6_scope_id = rap->iface->index;
+
+	ctx = rap->iface->ctx->ipv6;
+	ctx->sndhdr.msg_name = (caddr_t)&dst;
+	ctx->sndhdr.msg_iov[0].iov_base = rap->ns;
+	ctx->sndhdr.msg_iov[0].iov_len = rap->nslen;
+
+	/* Set the outbound interface */
+	cm = CMSG_FIRSTHDR(&ctx->sndhdr);
+	if (cm == NULL) /* unlikely */
+		return;
+	cm->cmsg_level = IPPROTO_IPV6;
+	cm->cmsg_type = IPV6_PKTINFO;
+	cm->cmsg_len = CMSG_LEN(sizeof(pi));
+	memset(&pi, 0, sizeof(pi));
+	pi.ipi6_ifindex = rap->iface->index;
+	memcpy(CMSG_DATA(cm), &pi, sizeof(pi));
+
+#ifdef DEBUG_NS
+	syslog(LOG_INFO, "%s: sending IPv6 NS for %s",
+	    rap->iface->name, rap->sfrom);
+#endif
+	if (sendmsg(ctx->nd_fd, &ctx->sndhdr, 0) == -1) {
+		syslog(LOG_ERR, "%s: %s: sendmsg: %m",
+		    rap->iface->name, __func__);
+		return;
+	}
+
+	ipv6nd_proberouter(rap);
+
+	if (rap->nsprobes++ == 0)
+		eloop_timeout_add_sec(rap->iface->ctx->eloop,
+		    DELAY_FIRST_PROBE_TIME, ipv6nd_unreachable, rap);
+}
+
+static void
+ipv6nd_proberouter(void *arg)
+{
+	struct ra *rap = arg;
+	struct timeval tv, rtv;
+
+	ms_to_tv(&tv, rap->retrans == 0 ? RETRANS_TIMER : rap->retrans);
+	ms_to_tv(&rtv, MIN_RANDOM_FACTOR);
+	timeradd(&tv, &rtv, &tv);
+	rtv.tv_sec = 0;
+	rtv.tv_usec = arc4random() % (MAX_RANDOM_FACTOR_U -MIN_RANDOM_FACTOR_U);
+	timeradd(&tv, &rtv, &tv);
+	eloop_timeout_add_tv(rap->iface->ctx->eloop,
+	    &tv, ipv6nd_proberouter1, rap);
+
+	/* The unreachable timer starts AFTER first probe is actually send */
+}
+
+static void
+ipv6nd_cancelproberouter(struct ra *rap)
+{
+
+	eloop_timeout_delete(rap->iface->ctx->eloop, ipv6nd_proberouter, rap);
+	eloop_timeout_delete(rap->iface->ctx->eloop, ipv6nd_unreachable, rap);
+}
+
 void
 ipv6nd_expirera(void *arg)
 {
@@ -1213,124 +1341,6 @@ ipv6nd_drop(struct interface *ifp)
 		    (DHCPCD_EXITING | DHCPCD_PERSISTENT))
 			script_runreason(ifp, "ROUTERADVERT");
 	}
-}
-
-static void
-ipv6nd_unreachable(void *arg)
-{
-	struct ra *rap = arg;
-	struct timeval tv;
-
-	/* We could add an unreachable flag and persist the information,
-	 * but that is more effort than it's probably worth. */
-	syslog(LOG_WARNING, "%s: %s is unreachable, expiring it",
-	    rap->iface->name, rap->sfrom);
-	rap->expired = 1;
-	ipv6_buildroutes(rap->iface->ctx);
-	script_runreason(rap->iface, "ROUTERADVERT"); /* XXX not RA */
-
-	/* We should still test if it's reachable or not so
-	 * incase it comes back to life and it's preferable. */
-	if (rap->reachable) {
-		ms_to_tv(&tv, rap->reachable);
-	} else {
-		tv.tv_sec = REACHABLE_TIME;
-		tv.tv_usec = 0;
-	}
-	eloop_timeout_add_tv(rap->iface->ctx->eloop,
-	    &tv, ipv6nd_proberouter, rap);
-}
-
-void
-ipv6nd_proberouter(void *arg)
-{
-	struct ra *rap = arg;
-	struct nd_neighbor_solicit *ns;
-	struct nd_opt_hdr *nd;
-	struct sockaddr_in6 dst;
-	struct cmsghdr *cm;
-	struct in6_pktinfo pi;
-	struct timeval tv, rtv;
-	struct ipv6_ctx *ctx;
-
-	if (ipv6nd_open(rap->iface->ctx) == -1) {
-		syslog(LOG_ERR, "%s: ipv6nd_open: %m", __func__);
-		return;
-	}
-
-	if (!rap->ns) {
-	        rap->nslen = sizeof(*ns) + ROUNDUP8(rap->iface->hwlen + 2);
-		rap->ns = calloc(1, rap->nslen);
-		if (rap->ns == NULL) {
-			syslog(LOG_ERR, "%s: %m", __func__);
-			return;
-		}
-		ns = (struct nd_neighbor_solicit *)(void *)rap->ns;
-		ns->nd_ns_type = ND_NEIGHBOR_SOLICIT;
-		//ns->nd_ns_cksum = 0;
-		//ns->nd_ns_code = 0;
-		//ns->nd_ns_reserved = 0;
-		ns->nd_ns_target = rap->from;
-		nd = (struct nd_opt_hdr *)(rap->ns + sizeof(*ns));
-		nd->nd_opt_type = ND_OPT_SOURCE_LINKADDR;
-		nd->nd_opt_len = (ROUNDUP8(rap->iface->hwlen + 2)) >> 3;
-		memcpy(nd + 1, rap->iface->hwaddr, rap->iface->hwlen);
-	}
-
-	memset(&dst, 0, sizeof(dst));
-	dst.sin6_family = AF_INET6;
-#ifdef SIN6_LEN
-	dst.sin6_len = sizeof(dst);
-#endif
-	memcpy(&dst.sin6_addr, &rap->from, sizeof(dst.sin6_addr));
-	dst.sin6_scope_id = rap->iface->index;
-
-	ctx = rap->iface->ctx->ipv6;
-	ctx->sndhdr.msg_name = (caddr_t)&dst;
-	ctx->sndhdr.msg_iov[0].iov_base = rap->ns;
-	ctx->sndhdr.msg_iov[0].iov_len = rap->nslen;
-
-	/* Set the outbound interface */
-	cm = CMSG_FIRSTHDR(&ctx->sndhdr);
-	if (cm == NULL) /* unlikely */
-		return;
-	cm->cmsg_level = IPPROTO_IPV6;
-	cm->cmsg_type = IPV6_PKTINFO;
-	cm->cmsg_len = CMSG_LEN(sizeof(pi));
-	memset(&pi, 0, sizeof(pi));
-	pi.ipi6_ifindex = rap->iface->index;
-	memcpy(CMSG_DATA(cm), &pi, sizeof(pi));
-
-#ifdef DEBUG_NS
-	syslog(LOG_INFO, "%s: sending IPv6 NS for %s",
-	    rap->iface->name, rap->sfrom);
-#endif
-	if (sendmsg(ctx->nd_fd, &ctx->sndhdr, 0) == -1) {
-		syslog(LOG_ERR, "%s: %s: sendmsg: %m",
-		    rap->iface->name, __func__);
-		return;
-	}
-
-	ms_to_tv(&tv, rap->retrans == 0 ? RETRANS_TIMER : rap->retrans);
-	ms_to_tv(&rtv, MIN_RANDOM_FACTOR);
-	timeradd(&tv, &rtv, &tv);
-	rtv.tv_sec = 0;
-	rtv.tv_usec = arc4random() % (MAX_RANDOM_FACTOR_U -MIN_RANDOM_FACTOR_U);
-	timeradd(&tv, &rtv, &tv);
-	eloop_timeout_add_tv(rap->iface->ctx->eloop,
-	    &tv, ipv6nd_proberouter, rap);
-
-	if (rap->nsprobes++ == 0)
-		eloop_timeout_add_sec(rap->iface->ctx->eloop,
-		    DELAY_FIRST_PROBE_TIME, ipv6nd_unreachable, rap);
-}
-
-void
-ipv6nd_cancelproberouter(struct ra *rap)
-{
-
-	eloop_timeout_delete(rap->iface->ctx->eloop, ipv6nd_proberouter, rap);
-	eloop_timeout_delete(rap->iface->ctx->eloop, ipv6nd_unreachable, rap);
 }
 
 static void
