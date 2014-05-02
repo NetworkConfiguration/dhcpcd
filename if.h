@@ -80,6 +80,9 @@
 # define IN_LINKLOCAL(addr) ((addr & IN_CLASSB_NET) == LINKLOCAL_ADDR)
 #endif
 
+#define RAW_EOF			1 << 0
+#define RAW_PARTIALCSUM		2 << 0
+
 struct if_head *if_discover(struct dhcpcd_ctx *, int, char * const *);
 struct interface *if_find(struct dhcpcd_ctx *, const char *);
 void if_free(struct interface *);

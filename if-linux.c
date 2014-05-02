@@ -272,15 +272,9 @@ get_netlink(struct dhcpcd_ctx *ctx, int fd, int flags,
 	for (;;) {
 		bytes = recv(fd, NULL, 0,
 		    flags | MSG_PEEK | MSG_DONTWAIT | MSG_TRUNC);
-		if (bytes == -1) {
-			if (errno == EAGAIN) {
-				r = 0;
-				goto eexit;
-			}
-			if (errno == EINTR)
-				continue;
+		if (bytes == -1 || bytes == 0)
 			goto eexit;
-		} else if ((size_t)bytes == buflen) {
+		if ((size_t)bytes == buflen) {
 			/* Support kernels older than 2.6.22 */
 			if (bytes == 0)
 				bytes = 512;
@@ -297,15 +291,8 @@ get_netlink(struct dhcpcd_ctx *ctx, int fd, int flags,
 		}
 		bytes = recvfrom(fd, buf, buflen, flags,
 		    (struct sockaddr *)&nladdr, &nladdr_len);
-		if (bytes == -1) {
-			if (errno == EAGAIN) {
-				r = 0;
-				goto eexit;
-			}
-			if (errno == EINTR)
-				continue;
+		if (bytes == -1 || bytes == 0)
 			goto eexit;
-		}
 
 		/* Check sender */
 		if (nladdr_len != sizeof(nladdr)) {
@@ -752,7 +739,7 @@ if_openrawsocket(struct interface *ifp, int protocol)
 #endif
 
 #ifdef SOCK_CLOEXEC
-	if ((s = socket(PF_PACKET, SOCK_DGRAM | SOCK_CLOEXEC | SOCK_NONBLOCK,
+	if ((s = socket(PF_PACKET, SOCK_DGRAM | SOCK_CLOEXEC,
 	    htons(protocol))) == -1)
 		return -1;
 #else
@@ -762,12 +749,6 @@ if_openrawsocket(struct interface *ifp, int protocol)
 		return -1;
 	if ((flags = fcntl(s, F_GETFD, 0)) == -1 ||
 	    fcntl(s, F_SETFD, flags | FD_CLOEXEC) == -1)
-	{
-		close(s);
-	        return -1;
-	}
-	if ((flags = fcntl(s, F_GETFL, 0)) == -1 ||
-	    fcntl(s, F_SETFL, flags | O_NONBLOCK) == -1)
 	{
 		close(s);
 	        return -1;
@@ -839,7 +820,7 @@ if_sendrawpacket(const struct interface *ifp, int protocol,
 
 ssize_t
 if_readrawpacket(struct interface *ifp, int protocol,
-    void *data, size_t len, int *partialcsum)
+    void *data, size_t len, int *flags)
 {
 	struct iovec iov = {
 		.iov_base = data,
@@ -871,9 +852,9 @@ if_readrawpacket(struct interface *ifp, int protocol,
 		fd = state->raw_fd;
 	bytes = recvmsg(fd, &msg, 0);
 	if (bytes == -1)
-		return errno == EAGAIN ? 0 : -1;
-	if (partialcsum != NULL) {
-		*partialcsum = 0;
+		return -1;
+	if (bytes) {
+		*flags &= ~RAW_PARTIALCSUM;
 #ifdef PACKET_AUXDATA
 		for (cmsg = CMSG_FIRSTHDR(&msg);
 		     cmsg;
@@ -882,8 +863,8 @@ if_readrawpacket(struct interface *ifp, int protocol,
 			if (cmsg->cmsg_level == SOL_PACKET &&
 			    cmsg->cmsg_type == PACKET_AUXDATA) {
 				aux = (void *)CMSG_DATA(cmsg);
-				*partialcsum = aux->tp_status &
-				    TP_STATUS_CSUMNOTREADY;
+				if (aux->tp_status & TP_STATUS_CSUMNOTREADY)
+					*flags |= RAW_PARTIALCSUM;
 			}
 		}
 #endif

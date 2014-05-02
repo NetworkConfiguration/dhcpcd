@@ -134,14 +134,20 @@ arp_packet(void *arg)
 	const char *hwaddr;
 	struct in_addr ina;
 	char hwbuf[HWADDR_LEN * 3];
+	int flags;
 
 	state = D_STATE(ifp);
 	state->fail.s_addr = 0;
-	for(;;) {
+	flags = 0;
+	while (!(flags & RAW_EOF)) {
 		bytes = if_readrawpacket(ifp, ETHERTYPE_ARP,
-		    arp_buffer, sizeof(arp_buffer), NULL);
-		if (bytes == 0 || bytes == -1)
+		    arp_buffer, sizeof(arp_buffer), &flags);
+		if (bytes == 0 || bytes == -1) {
+			syslog(LOG_ERR, "%s: arp if_readrawpacket: %m",
+			    ifp->name);
+			dhcp_close(ifp);
 			return;
+		}
 		/* We must have a full ARP header */
 		if ((size_t)bytes < sizeof(ar))
 			continue;

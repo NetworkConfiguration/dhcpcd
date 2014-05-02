@@ -2036,8 +2036,11 @@ dhcp6_handledata(void *arg)
 	ctx = dhcpcd_ctx->ipv6;
 	ctx->rcvhdr.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo));
 	bytes = recvmsg(ctx->dhcp_fd, &ctx->rcvhdr, 0);
-	if (bytes == -1) {
+	if (bytes == -1 || bytes == 0) {
 		syslog(LOG_ERR, "recvmsg: %m");
+		close(ctx->dhcp_fd);
+		eloop_event_delete(dhcpcd_ctx->eloop, ctx->dhcp_fd);
+		ctx->dhcp_fd = -1;
 		return;
 	}
 	len = (size_t)bytes;

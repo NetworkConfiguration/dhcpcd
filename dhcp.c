@@ -2557,55 +2557,58 @@ valid_udp_packet(const uint8_t *data, size_t data_len, struct in_addr *from,
 static void
 dhcp_handlepacket(void *arg)
 {
-	struct interface *iface = arg;
+	struct interface *ifp = arg;
 	struct dhcp_message *dhcp = NULL;
 	const uint8_t *pp;
 	size_t bytes;
 	struct in_addr from;
-	int i, partialcsum = 0;
-	const struct dhcp_state *state = D_CSTATE(iface);
+	int i, flags;
+	const struct dhcp_state *state = D_CSTATE(ifp);
 
-	/* We loop through until our buffer is empty.
-	 * The benefit is that if we get >1 DHCP packet in our buffer and
-	 * the first one fails for any reason, we can use the next. */
-	for(;;) {
-		bytes = (size_t)if_readrawpacket(iface, ETHERTYPE_IP,
-		    iface->ctx->packet, udp_dhcp_len, &partialcsum);
-		if (bytes == 0 || (ssize_t)bytes == -1)
+	/* Need this API due to BPF */
+	flags = 0;
+	while (!(flags & RAW_EOF)) {
+		bytes = (size_t)if_readrawpacket(ifp, ETHERTYPE_IP,
+		    ifp->ctx->packet, udp_dhcp_len, &flags);
+		if (bytes == 0 || (ssize_t)bytes == -1) {
+			syslog(LOG_ERR, "%s: dhcp if_readrawpacket: %m",
+			    ifp->name);
+			dhcp_close(ifp);
 			break;
-		if (valid_udp_packet(iface->ctx->packet, bytes,
-			&from, partialcsum) == -1)
+		}
+		if (valid_udp_packet(ifp->ctx->packet, bytes,
+			&from, flags & RAW_PARTIALCSUM) == -1)
 		{
 			syslog(LOG_ERR, "%s: invalid UDP packet from %s",
-			    iface->name, inet_ntoa(from));
+			    ifp->name, inet_ntoa(from));
 			continue;
 		}
-		i = whitelisted_ip(iface->options, from.s_addr);
+		i = whitelisted_ip(ifp->options, from.s_addr);
 		if (i == 0) {
 			syslog(LOG_WARNING,
 			    "%s: non whitelisted DHCP packet from %s",
-			    iface->name, inet_ntoa(from));
+			    ifp->name, inet_ntoa(from));
 			continue;
 		} else if (i != 1 &&
-		    blacklisted_ip(iface->options, from.s_addr) == 1)
+		    blacklisted_ip(ifp->options, from.s_addr) == 1)
 		{
 			syslog(LOG_WARNING,
 			    "%s: blacklisted DHCP packet from %s",
-			    iface->name, inet_ntoa(from));
+			    ifp->name, inet_ntoa(from));
 			continue;
 		}
-		if (iface->flags & IFF_POINTOPOINT &&
+		if (ifp->flags & IFF_POINTOPOINT &&
 		    state->dst.s_addr != from.s_addr)
 		{
 			syslog(LOG_WARNING,
 			    "%s: server %s is not destination",
-			    iface->name, inet_ntoa(from));
+			    ifp->name, inet_ntoa(from));
 		}
-		bytes = get_udp_data(&pp, iface->ctx->packet);
+		bytes = get_udp_data(&pp, ifp->ctx->packet);
 		if (bytes > sizeof(*dhcp)) {
 			syslog(LOG_ERR,
 			    "%s: packet greater than DHCP size from %s",
-			    iface->name, inet_ntoa(from));
+			    ifp->name, inet_ntoa(from));
 			continue;
 		}
 		if (dhcp == NULL) {
@@ -2618,22 +2621,22 @@ dhcp_handlepacket(void *arg)
 		memcpy(dhcp, pp, bytes);
 		if (dhcp->cookie != htonl(MAGIC_COOKIE)) {
 			syslog(LOG_DEBUG, "%s: bogus cookie from %s",
-			    iface->name, inet_ntoa(from));
+			    ifp->name, inet_ntoa(from));
 			continue;
 		}
 		/* Ensure packet is for us */
-		if (iface->hwlen <= sizeof(dhcp->chaddr) &&
-		    memcmp(dhcp->chaddr, iface->hwaddr, iface->hwlen))
+		if (ifp->hwlen <= sizeof(dhcp->chaddr) &&
+		    memcmp(dhcp->chaddr, ifp->hwaddr, ifp->hwlen))
 		{
 			char buf[sizeof(dhcp->chaddr) * 3];
 
 			syslog(LOG_DEBUG, "%s: xid 0x%x is not for hwaddr %s",
-			    iface->name, ntohl(dhcp->xid),
+			    ifp->name, ntohl(dhcp->xid),
 			    hwaddr_ntoa(dhcp->chaddr, sizeof(dhcp->chaddr),
 				buf, sizeof(buf)));
 			continue;
 		}
-		dhcp_handledhcp(iface, &dhcp, &from);
+		dhcp_handledhcp(ifp, &dhcp, &from);
 		if (state->raw_fd == -1)
 			break;
 	}

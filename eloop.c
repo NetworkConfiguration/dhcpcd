@@ -386,7 +386,7 @@ eloop_start(struct dhcpcd_ctx *dctx)
 		n = poll(ctx->fds, ctx->events_len, timeout);
 #endif
 		if (n == -1) {
-			if (errno == EAGAIN || errno == EINTR)
+			if (errno == EINTR)
 				continue;
 			syslog(LOG_ERR, "poll: %m");
 			break;
@@ -395,7 +395,7 @@ eloop_start(struct dhcpcd_ctx *dctx)
 		/* Process any triggered events. */
 		if (n > 0) {
 			TAILQ_FOREACH(e, &ctx->events, next) {
-				if (e->pollfd->revents & (POLLIN | POLLHUP)) {
+				if (e->pollfd->revents & (POLLIN)) {
 					e->callback(e->arg);
 					/* We need to break here as the
 					 * callback could destroy the next

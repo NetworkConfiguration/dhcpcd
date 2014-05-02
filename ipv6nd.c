@@ -1166,10 +1166,10 @@ ipv6nd_proberouter(void *arg)
 	pi.ipi6_ifindex = rap->iface->index;
 	memcpy(CMSG_DATA(cm), &pi, sizeof(pi));
 
-#ifdef DEBUG_NS
+//#ifdef DEBUG_NS
 	syslog(LOG_INFO, "%s: sending IPv6 NS for %s",
 	    rap->iface->name, rap->sfrom);
-#endif
+//#endif
 	if (sendmsg(ctx->nd_fd, &ctx->sndhdr, 0) == -1) {
 		syslog(LOG_ERR, "%s: %s: sendmsg: %m",
 		    rap->iface->name, __func__);
@@ -1432,8 +1432,11 @@ ipv6nd_handledata(void *arg)
 	ctx->rcvhdr.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo)) +
 	    CMSG_SPACE(sizeof(int));
 	len = recvmsg(ctx->nd_fd, &ctx->rcvhdr, 0);
-	if (len == -1) {
+	if (len == -1 || len == 0) {
 		syslog(LOG_ERR, "recvmsg: %m");
+		eloop_event_delete(dhcpcd_ctx->eloop, ctx->nd_fd);
+		close(ctx->nd_fd);
+		ctx->nd_fd = -1;
 		return;
 	}
 	ctx->sfrom = inet_ntop(AF_INET6, &ctx->from.sin6_addr,

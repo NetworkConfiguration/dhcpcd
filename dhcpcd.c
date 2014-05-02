@@ -641,8 +641,12 @@ handle_link(void *arg)
 	struct dhcpcd_ctx *ctx;
 
 	ctx = arg;
-	if (if_managelink(ctx) == -1 && errno != ENXIO && errno != ENODEV)
+	if (if_managelink(ctx) == -1) {
 		syslog(LOG_ERR, "if_managelink: %m");
+		eloop_event_delete(ctx->eloop, ctx->link_fd);
+		close(ctx->link_fd);
+		ctx->link_fd = -1;
+	}
 }
 
 static void
