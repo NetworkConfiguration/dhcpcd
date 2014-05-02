@@ -107,6 +107,12 @@ control_handle(void *arg)
 		close(fd);
 	        return;
 	}
+	if ((flags = fcntl(fd, F_GETFL, 0)) == -1 ||
+	    fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
+	{
+		close(fd);
+	        return;
+	}
 	l = malloc(sizeof(*l));
 	if (l) {
 		l->ctx = ctx;
