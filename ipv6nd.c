@@ -1176,21 +1176,19 @@ ipv6nd_proberouter(void *arg)
 		return;
 	}
 
-	ms_to_tv(&tv, rap->retrans ? rap->retrans :  RETRANS_TIMER);
-	eloop_timeout_add_tv(rap->iface->ctx->eloop, &tv,
-	    ++rap->nsprobes < MAX_UNICAST_SOLICIT ?
-	    ipv6nd_proberouter : ipv6nd_unreachable,
-	    rap);
-}
-
-static void
-ipv6nd_stalerouter(void *arg)
-{
-	struct ra *rap = arg;
-
-	rap->nsprobes = 0;
-	eloop_timeout_add_sec(rap->iface->ctx->eloop, DELAY_FIRST_PROBE_TIME,
-	    ipv6nd_proberouter, rap);
+	if (rap->nsprobes++ == 0)
+		eloop_timeout_add_sec(rap->iface->ctx->eloop,
+		    DELAY_FIRST_PROBE_TIME,
+		    ipv6nd_proberouter, rap);
+	else {
+		/* MAX_UNICAST_PROBES applies to this retrans loop,
+		 * so take one away for the above DELAY probe */
+		ms_to_tv(&tv, rap->retrans ? rap->retrans :  RETRANS_TIMER);
+		eloop_timeout_add_tv(rap->iface->ctx->eloop, &tv,
+		    rap->nsprobes <= MAX_UNICAST_SOLICIT ?
+		    ipv6nd_proberouter : ipv6nd_unreachable,
+		    rap);
+	}
 }
 
 static void
@@ -1198,7 +1196,6 @@ ipv6nd_cancelproberouter(struct ra *rap)
 {
 
 	eloop_timeout_delete(rap->iface->ctx->eloop, ipv6nd_proberouter, rap);
-	eloop_timeout_delete(rap->iface->ctx->eloop, ipv6nd_stalerouter, rap);
 	eloop_timeout_delete(rap->iface->ctx->eloop, ipv6nd_unreachable, rap);
 }
 
@@ -1209,6 +1206,7 @@ ipv6nd_startproberouter(struct ra *rap)
 	struct timeval tv, rtv;
 
 	ipv6nd_cancelproberouter(rap);
+	rap->nsprobes = 0;
 
 	ms_to_tv(&tv, rap->reachable ? rap->reachable : REACHABLE_TIME);
 	ms_to_tv(&rtv, MIN_RANDOM_FACTOR);
@@ -1217,7 +1215,7 @@ ipv6nd_startproberouter(struct ra *rap)
 	rtv.tv_usec = arc4random() % (MAX_RANDOM_FACTOR_U -MIN_RANDOM_FACTOR_U);
 	timeradd(&tv, &rtv, &tv);
 	eloop_timeout_add_tv(rap->iface->ctx->eloop,
-	    &tv, ipv6nd_stalerouter, rap);
+	    &tv, ipv6nd_proberouter, rap);
 }
 
 void
