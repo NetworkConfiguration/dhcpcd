@@ -120,8 +120,8 @@ struct nd_opt_dnssl {		/* DNSSL option RFC 6106 */
 //#define DEBUG_NS
 //
 
-static void ipv6nd_handledata(void *arg);
-static void ipv6nd_proberouter(void *arg);
+static void ipv6nd_handledata(void *);
+static void ipv6nd_proberouter(struct ra *);
 
 /*
  * Android ships buggy ICMP6 filter headers.
@@ -1096,7 +1096,6 @@ static void
 ipv6nd_unreachable(void *arg)
 {
 	struct ra *rap = arg;
-	struct timeval tv;
 
 	/* We could add an unreachable flag and persist the information,
 	 * but that is more effort than it's probably worth. */
@@ -1105,22 +1104,12 @@ ipv6nd_unreachable(void *arg)
 	rap->expired = 1;
 	ipv6_buildroutes(rap->iface->ctx);
 	script_runreason(rap->iface, "ROUTERADVERT"); /* XXX not RA */
-
-	/* We should still test if it's reachable or not so
-	 * incase it comes back to life and it's preferable. */
-	if (rap->reachable) {
-		ms_to_tv(&tv, rap->reachable);
-	} else {
-		tv.tv_sec = REACHABLE_TIME;
-		tv.tv_usec = 0;
-	}
-	eloop_timeout_add_tv(rap->iface->ctx->eloop,
-	    &tv, ipv6nd_proberouter, rap);
 }
 
 static void
-ipv6nd_proberouter1(struct ra *rap)
+ipv6nd_proberouter1(void *arg)
 {
+	struct ra *rap = arg;
 	struct nd_neighbor_solicit *ns;
 	struct nd_opt_hdr *nd;
 	struct sockaddr_in6 dst;
@@ -1186,20 +1175,24 @@ ipv6nd_proberouter1(struct ra *rap)
 		return;
 	}
 
-	ipv6nd_proberouter(rap);
-
 	if (rap->nsprobes++ == 0)
 		eloop_timeout_add_sec(rap->iface->ctx->eloop,
 		    DELAY_FIRST_PROBE_TIME, ipv6nd_unreachable, rap);
+
+	if (rap->nsprobes < MAX_UNICAST_SOLICIT)
+		ipv6nd_proberouter(rap);
 }
 
 static void
-ipv6nd_proberouter(void *arg)
+ipv6nd_proberouter(struct ra *rap)
 {
-	struct ra *rap = arg;
 	struct timeval tv, rtv;
 
-	ms_to_tv(&tv, rap->retrans == 0 ? RETRANS_TIMER : rap->retrans);
+	if (rap->nsprobes == 0) {
+		ms_to_tv(&tv, rap->reachable ? rap->reachable : REACHABLE_TIME);
+	} else {
+		ms_to_tv(&tv, rap->retrans ? rap->retrans :  RETRANS_TIMER);
+	}
 	ms_to_tv(&rtv, MIN_RANDOM_FACTOR);
 	timeradd(&tv, &rtv, &tv);
 	rtv.tv_sec = 0;
@@ -1215,7 +1208,7 @@ static void
 ipv6nd_cancelproberouter(struct ra *rap)
 {
 
-	eloop_timeout_delete(rap->iface->ctx->eloop, ipv6nd_proberouter, rap);
+	eloop_timeout_delete(rap->iface->ctx->eloop, ipv6nd_proberouter1, rap);
 	eloop_timeout_delete(rap->iface->ctx->eloop, ipv6nd_unreachable, rap);
 }
 
@@ -1350,7 +1343,6 @@ ipv6nd_handlena(struct ipv6_ctx *ctx, struct interface *ifp,
 	struct nd_neighbor_advert *nd_na;
 	struct ra *rap;
 	int is_router, is_solicited;
-	struct timeval tv;
 
 	if ((size_t)len < sizeof(struct nd_neighbor_advert)) {
 		syslog(LOG_ERR, "IPv6 NA packet too short from %s", ctx->sfrom);
@@ -1413,17 +1405,10 @@ ipv6nd_handlena(struct ipv6_ctx *ctx, struct interface *ifp,
 			ipv6_buildroutes(ifp->ctx);
 			script_runreason(rap->iface, "ROUTERADVERT"); /* XXX */
 		}
-		rap->nsprobes = 0;
-		if (rap->reachable) {
-			ms_to_tv(&tv, rap->reachable);
-		} else {
-			tv.tv_sec = REACHABLE_TIME;
-			tv.tv_usec = 0;
-		}
-		eloop_timeout_add_tv(rap->iface->ctx->eloop,
-		    &tv, ipv6nd_proberouter, rap);
 		eloop_timeout_delete(rap->iface->ctx->eloop,
 		    ipv6nd_unreachable, rap);
+		rap->nsprobes = 0;
+		ipv6nd_proberouter(rap);
 	}
 }
 

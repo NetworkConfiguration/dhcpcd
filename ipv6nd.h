@@ -75,8 +75,10 @@ struct rs_state {
 
 #define RS_STATE(a) ((struct rs_state *)(ifp)->if_data[IF_DATA_IPV6ND])
 
+#define MAX_UNICAST_SOLICIT	3	/* 3 transmissions */
+
 #define MAX_REACHABLE_TIME	3600	/* seconds */
-#define REACHABLE_TIME		30	/* seconds */
+#define REACHABLE_TIME		30000	/* milliseconds */
 #define RETRANS_TIMER		1000	/* milliseconds */
 #define DELAY_FIRST_PROBE_TIME	5	/* seconds */
 
