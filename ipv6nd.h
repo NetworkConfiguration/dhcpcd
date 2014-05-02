@@ -77,7 +77,7 @@ struct rs_state {
 
 #define MAX_UNICAST_SOLICIT	3	/* 3 transmissions */
 
-#define MAX_REACHABLE_TIME	3600	/* seconds */
+#define MAX_REACHABLE_TIME	3600000	/* milliseconds */
 #define REACHABLE_TIME		30000	/* milliseconds */
 #define RETRANS_TIMER		1000	/* milliseconds */
 #define DELAY_FIRST_PROBE_TIME	5	/* seconds */

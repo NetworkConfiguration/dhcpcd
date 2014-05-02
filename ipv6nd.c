@@ -121,7 +121,7 @@ struct nd_opt_dnssl {		/* DNSSL option RFC 6106 */
 //
 
 static void ipv6nd_handledata(void *);
-static void ipv6nd_proberouter(struct ra *);
+static void ipv6nd_startproberouter(struct ra *);
 
 /*
  * Android ships buggy ICMP6 filter headers.
@@ -933,7 +933,7 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 	{
 		rap->nsprobes = 0;
 		if (rap->lifetime)
-			ipv6nd_proberouter(rap);
+			ipv6nd_startproberouter(rap);
 	}
 
 handle_flag:
@@ -1107,7 +1107,7 @@ ipv6nd_unreachable(void *arg)
 }
 
 static void
-ipv6nd_proberouter1(void *arg)
+ipv6nd_proberouter(void *arg)
 {
 	struct ra *rap = arg;
 	struct nd_neighbor_solicit *ns;
@@ -1116,6 +1116,7 @@ ipv6nd_proberouter1(void *arg)
 	struct cmsghdr *cm;
 	struct in6_pktinfo pi;
 	struct ipv6_ctx *ctx;
+	struct timeval tv;
 
 	if (ipv6nd_open(rap->iface->ctx) == -1) {
 		syslog(LOG_ERR, "%s: ipv6nd_open: %m", __func__);
@@ -1175,41 +1176,48 @@ ipv6nd_proberouter1(void *arg)
 		return;
 	}
 
-	if (rap->nsprobes++ == 0)
-		eloop_timeout_add_sec(rap->iface->ctx->eloop,
-		    DELAY_FIRST_PROBE_TIME, ipv6nd_unreachable, rap);
-
-	if (rap->nsprobes < MAX_UNICAST_SOLICIT)
-		ipv6nd_proberouter(rap);
+	ms_to_tv(&tv, rap->retrans ? rap->retrans :  RETRANS_TIMER);
+	eloop_timeout_add_tv(rap->iface->ctx->eloop, &tv,
+	    ++rap->nsprobes < MAX_UNICAST_SOLICIT ?
+	    ipv6nd_proberouter : ipv6nd_unreachable,
+	    rap);
 }
 
 static void
-ipv6nd_proberouter(struct ra *rap)
+ipv6nd_stalerouter(void *arg)
 {
-	struct timeval tv, rtv;
+	struct ra *rap = arg;
 
-	if (rap->nsprobes == 0) {
-		ms_to_tv(&tv, rap->reachable ? rap->reachable : REACHABLE_TIME);
-	} else {
-		ms_to_tv(&tv, rap->retrans ? rap->retrans :  RETRANS_TIMER);
-	}
-	ms_to_tv(&rtv, MIN_RANDOM_FACTOR);
-	timeradd(&tv, &rtv, &tv);
-	rtv.tv_sec = 0;
-	rtv.tv_usec = arc4random() % (MAX_RANDOM_FACTOR_U -MIN_RANDOM_FACTOR_U);
-	timeradd(&tv, &rtv, &tv);
-	eloop_timeout_add_tv(rap->iface->ctx->eloop,
-	    &tv, ipv6nd_proberouter1, rap);
-
-	/* The unreachable timer starts AFTER first probe is actually send */
+	rap->nsprobes = 0;
+	eloop_timeout_add_sec(rap->iface->ctx->eloop, DELAY_FIRST_PROBE_TIME,
+	    ipv6nd_proberouter, rap);
 }
 
 static void
 ipv6nd_cancelproberouter(struct ra *rap)
 {
 
-	eloop_timeout_delete(rap->iface->ctx->eloop, ipv6nd_proberouter1, rap);
+	eloop_timeout_delete(rap->iface->ctx->eloop, ipv6nd_proberouter, rap);
+	eloop_timeout_delete(rap->iface->ctx->eloop, ipv6nd_stalerouter, rap);
 	eloop_timeout_delete(rap->iface->ctx->eloop, ipv6nd_unreachable, rap);
+}
+
+
+static void
+ipv6nd_startproberouter(struct ra *rap)
+{
+	struct timeval tv, rtv;
+
+	ipv6nd_cancelproberouter(rap);
+
+	ms_to_tv(&tv, rap->reachable ? rap->reachable : REACHABLE_TIME);
+	ms_to_tv(&rtv, MIN_RANDOM_FACTOR);
+	timeradd(&tv, &rtv, &tv);
+	rtv.tv_sec = 0;
+	rtv.tv_usec = arc4random() % (MAX_RANDOM_FACTOR_U -MIN_RANDOM_FACTOR_U);
+	timeradd(&tv, &rtv, &tv);
+	eloop_timeout_add_tv(rap->iface->ctx->eloop,
+	    &tv, ipv6nd_stalerouter, rap);
 }
 
 void
@@ -1405,10 +1413,7 @@ ipv6nd_handlena(struct ipv6_ctx *ctx, struct interface *ifp,
 			ipv6_buildroutes(ifp->ctx);
 			script_runreason(rap->iface, "ROUTERADVERT"); /* XXX */
 		}
-		eloop_timeout_delete(rap->iface->ctx->eloop,
-		    ipv6nd_unreachable, rap);
-		rap->nsprobes = 0;
-		ipv6nd_proberouter(rap);
+		ipv6nd_startproberouter(rap);
 	}
 }
 
