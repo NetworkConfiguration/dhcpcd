@@ -828,6 +828,15 @@ make_message(struct dhcp_message **message,
 			    ifo->options & DHCPCD_HOSTNAME_SHORT ? 1 : 0);
 		else
 			hostname = ifo->hostname;
+
+		/*
+		 * RFC4702 3.1 States that if we send the Client FQDN option
+		 * then we MUST NOT also send the Host Name option.
+		 * Technically we could, but that is not RFC conformant and
+		 * also seems to break some DHCP server implemetations such as
+		 * Windows. On the other hand, ISC dhcpd is just as non RFC
+		 * conformant by not accepting a partially qualified FQDN.
+		 */
 		if (ifo->fqdn != FQDN_DISABLE) {
 			/* IETF DHC-FQDN option (81), RFC4702 */
 			*p++ = DHO_FQDN;
