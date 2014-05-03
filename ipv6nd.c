@@ -1166,10 +1166,10 @@ ipv6nd_proberouter(void *arg)
 	pi.ipi6_ifindex = rap->iface->index;
 	memcpy(CMSG_DATA(cm), &pi, sizeof(pi));
 
-//#ifdef DEBUG_NS
+#ifdef DEBUG_NS
 	syslog(LOG_INFO, "%s: sending IPv6 NS for %s",
 	    rap->iface->name, rap->sfrom);
-//#endif
+#endif
 	if (sendmsg(ctx->nd_fd, &ctx->sndhdr, 0) == -1) {
 		syslog(LOG_ERR, "%s: %s: sendmsg: %m",
 		    rap->iface->name, __func__);
