@@ -160,11 +160,39 @@ if_machinearch(char *str, size_t len)
 	return -1;
 }
 
+static int
+check_proc_int(const char *path)
+{
+	FILE *fp;
+	int i;
+
+	fp = fopen(path, "r");
+	if (fp == NULL)
+		return -1;
+	if (fscanf(fp, "%d", &i) != 1)
+		i = -1;
+	fclose(fp);
+	return i;
+}
+
+static ssize_t
+write_path(const char *path, const char *val)
+{
+	FILE *fp;
+	ssize_t r;
+
+	fp = fopen(path, "w");
+	if (fp == NULL)
+		return -1;
+	r = fprintf(fp, "%s\n", val);
+	fclose(fp);
+	return r;
+}
+
 int
 if_init(struct interface *ifp)
 {
 	char path[sizeof(PROC_PROMOTE) + IF_NAMESIZE];
-	FILE *fp;
 	int n;
 
 	/* We enable promote_secondaries so that we can do this
@@ -175,29 +203,27 @@ if_init(struct interface *ifp)
 	 * This matches the behaviour of BSD which makes coding dhcpcd
 	 * a little easier as there's just one behaviour. */
 	snprintf(path, sizeof(path), PROC_PROMOTE, ifp->name);
-
-	fp = fopen(path, "w");
-	if (fp == NULL)
+	n = check_proc_int(path);
+	if (n == -1)
 		return errno == ENOENT ? 0 : -1;
-	n = fprintf(fp, "1");
-	fclose(fp);
-	return n == -1 ? -1 : 0;
+	if (n == 1)
+		return 0;
+	return write_path(path, "1") == -1 ? -1 : 0;
 }
 
 int
 if_conf(struct interface *ifp)
 {
-	char path[sizeof(SYS_LAYER2) + IF_NAMESIZE], buf[1];
-	FILE *fp;
+	char path[sizeof(SYS_LAYER2) + IF_NAMESIZE];
+	int n;
 
 	/* Some qeth setups require the use of the broadcast flag. */
 	snprintf(path, sizeof(path), SYS_LAYER2, ifp->name);
-	fp = fopen(path, "r");
-	if (fp == NULL)
+	n = check_proc_int(path);
+	if (n == -1)
 		return errno == ENOENT ? 0 : -1;
-	if (fgets(buf, sizeof(buf), fp) != NULL && buf[0] == '0')
+	if (n == 0)
 		ifp->options->options |= DHCPCD_BROADCAST;
-	fclose(fp);
 	return 0;
 }
 
@@ -1135,35 +1161,6 @@ if_addrflags6(const char *ifname, const struct in6_addr *addr)
 	fclose(fp);
 	errno = ESRCH;
 	return -1;
-}
-
-static int
-check_proc_int(const char *path)
-{
-	FILE *fp;
-	int i;
-
-	fp = fopen(path, "r");
-	if (fp == NULL)
-		return -1;
-	if (fscanf(fp, "%d", &i) != 1)
-		i = -1;
-	fclose(fp);
-	return i;
-}
-
-static ssize_t
-write_path(const char *path, const char *val)
-{
-	FILE *fp;
-	ssize_t r;
-
-	fp = fopen(path, "w");
-	if (fp == NULL)
-		return -1;
-	r = fprintf(fp, "%s\n", val);
-	fclose(fp);
-	return r;
 }
 
 static const char *prefix = "/proc/sys/net/ipv6/conf";
