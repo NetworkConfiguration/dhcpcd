@@ -1494,20 +1494,17 @@ ipv6nd_handledata(void *arg)
 	    icp->icmp6_type, icp->icmp6_code, ctx->sfrom);
 }
 
-static int
+static void
 ipv6nd_startrs1(void *arg)
 {
 	struct interface *ifp = arg;
 	struct rs_state *state;
-	struct timeval tv;
 
 	syslog(LOG_INFO, "%s: soliciting an IPv6 router", ifp->name);
 	if (ipv6nd_open(ifp->ctx) == -1) {
 		syslog(LOG_ERR, "%s: ipv6nd_open: %m", __func__);
 		return;
 	}
-
-	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 
 	state = RS_STATE(ifp);
 	if (state == NULL) {
@@ -1536,6 +1533,7 @@ ipv6nd_startrs(struct interface *ifp)
 {
 	struct timeval tv;
 
+	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	tv.tv_sec = 0;
 	tv.tv_usec = (suseconds_t)(arc4random() %
 	    (MAX_RTR_SOLICITATION_DELAY * 1000000));
