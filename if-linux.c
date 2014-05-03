@@ -853,8 +853,8 @@ if_readrawpacket(struct interface *ifp, int protocol,
 	bytes = recvmsg(fd, &msg, 0);
 	if (bytes == -1)
 		return -1;
+	*flags = RAW_EOF; /* We only ever read one packet */
 	if (bytes) {
-		*flags &= ~RAW_PARTIALCSUM;
 #ifdef PACKET_AUXDATA
 		for (cmsg = CMSG_FIRSTHDR(&msg);
 		     cmsg;
@@ -869,7 +869,6 @@ if_readrawpacket(struct interface *ifp, int protocol,
 		}
 #endif
 	}
-	*flags |= RAW_EOF;
 	return bytes;
 }
 
