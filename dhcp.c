@@ -1667,16 +1667,16 @@ send_rebind(void *arg)
 void
 dhcp_discover(void *arg)
 {
-	struct interface *iface = arg;
-	struct dhcp_state *state = D_STATE(iface);
-	struct if_options *ifo = iface->options;
+	struct interface *ifp = arg;
+	struct dhcp_state *state = D_STATE(ifp);
+	struct if_options *ifo = ifp->options;
 	time_t timeout = ifo->timeout;
 
 	/* If we're rebooting and we're not daemonised then we need
 	 * to shorten the normal timeout to ensure we try correctly
 	 * for a fallback or IPv4LL address. */
 	if (state->state == DHS_REBOOT &&
-	    !(iface->ctx->options & DHCPCD_DAEMONISED))
+	    !(ifp->ctx->options & DHCPCD_DAEMONISED))
 	{
 		if (ifo->reboot >= timeout)
 			timeout = 2;
@@ -1685,25 +1685,25 @@ dhcp_discover(void *arg)
 	}
 
 	state->state = DHS_DISCOVER;
-	state->xid = dhcp_xid(iface);
-	eloop_timeout_delete(iface->ctx->eloop, NULL, iface);
+	state->xid = dhcp_xid(ifp);
+	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	if (ifo->fallback)
-		eloop_timeout_add_sec(iface->ctx->eloop,
-		    timeout, dhcp_fallback, iface);
+		eloop_timeout_add_sec(ifp->ctx->eloop,
+		    timeout, dhcp_fallback, ifp);
 	else if (ifo->options & DHCPCD_IPV4LL &&
 	    !IN_LINKLOCAL(htonl(state->addr.s_addr)))
 	{
 		if (IN_LINKLOCAL(htonl(state->fail.s_addr)))
 			timeout = RATE_LIMIT_INTERVAL;
-		eloop_timeout_add_sec(iface->ctx->eloop,
-		    timeout, ipv4ll_start, iface);
+		eloop_timeout_add_sec(ifp->ctx->eloop,
+		    timeout, ipv4ll_start, ifp);
 	}
 	if (ifo->options & DHCPCD_REQUEST)
 		syslog(LOG_INFO, "%s: soliciting a DHCP lease (requesting %s)",
-		    iface->name, inet_ntoa(ifo->req_addr));
+		    ifp->name, inet_ntoa(ifo->req_addr));
 	else
-		syslog(LOG_INFO, "%s: soliciting a DHCP lease", iface->name);
-	send_discover(iface);
+		syslog(LOG_INFO, "%s: soliciting a DHCP lease", ifp->name);
+	send_discover(ifp);
 }
 
 static void
@@ -2827,7 +2827,7 @@ dhcp_init(struct interface *ifp)
 	    LEASEFILE, ifp->name);
 
 	ifo = ifp->options;
-	/* We need to drop the leasefile so that start_interface
+	/* We need to drop the leasefile so that dhcp_start
 	 * doesn't load it. */
 	if (ifo->options & DHCPCD_REQUEST)
 		unlink(state->leasefile);
@@ -2882,9 +2882,10 @@ eexit:
 	return -1;
 }
 
-void
-dhcp_start(struct interface *ifp)
+static void
+dhcp_start1(void *arg)
 {
+	struct interface *ifp = arg;
 	struct if_options *ifo = ifp->options;
 	struct dhcp_state *state;
 	struct stat st;
@@ -2990,6 +2991,24 @@ dhcp_start(struct interface *ifp)
 		ipv4ll_start(ifp);
 	else
 		dhcp_reboot(ifp);
+}
+
+void
+dhcp_start(struct interface *ifp)
+{
+	struct timeval tv;
+
+	if (!(ifp->options->options & DHCPCD_IPV4))
+		return;
+
+	tv.tv_sec = DHCP_MIN_DELAY;
+	tv.tv_usec = (suseconds_t)(arc4random() %
+	    ((DHCP_MAX_DELAY - DHCP_MIN_DELAY) * 1000000));
+	timernorm(&tv);
+	syslog(LOG_DEBUG,
+	    "%s: delaying DHCP for %0.1f seconds",
+	    ifp->name, timeval_to_double(&tv));
+	eloop_timeout_add_tv(ifp->ctx->eloop, &tv, dhcp_start1, ifp);
 }
 
 void

@@ -77,6 +77,16 @@
 #define PROBE_MIN_U		PROBE_MIN * USECS_SECOND
 #define PROBE_MAX_U		PROBE_MAX * USECS_SECOND
 
+#ifdef RFC2131_STRICT
+/* Be strictly conformant for section 4.1.1 */
+#  define DHCP_MIN_DELAY	1
+#  define DHCP_MAX_DELAY	10
+#else
+/* or mirror the more modern IPv6RS and DHCPv6 delays */
+#  define DHCP_MIN_DELAY	0
+#  define DHCP_MAX_DELAY	1
+#endif
+
 /* DHCP options */
 enum DHO {
 	DHO_PAD                    = 0,
