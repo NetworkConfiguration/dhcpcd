@@ -1494,15 +1494,17 @@ ipv6nd_handledata(void *arg)
 	    icp->icmp6_type, icp->icmp6_code, ctx->sfrom);
 }
 
-int
-ipv6nd_startrs(struct interface *ifp)
+static int
+ipv6nd_startrs1(void *arg)
 {
+	struct interface *ifp = arg;
 	struct rs_state *state;
+	struct timeval tv;
 
 	syslog(LOG_INFO, "%s: soliciting an IPv6 router", ifp->name);
 	if (ipv6nd_open(ifp->ctx) == -1) {
 		syslog(LOG_ERR, "%s: ipv6nd_open: %m", __func__);
-		return -1;
+		return;
 	}
 
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
@@ -1513,7 +1515,7 @@ ipv6nd_startrs(struct interface *ifp)
 		state = RS_STATE(ifp);
 		if (state == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);
-			return -1;
+			return;
 		}
 	}
 
@@ -1522,10 +1524,25 @@ ipv6nd_startrs(struct interface *ifp)
 	ipv6nd_makersprobe(ifp);
 	if (state->rs == NULL) {
 		syslog(LOG_ERR, "%s: ipv6ns_makersprobe: %m", __func__);
-		return -1;
+		return;
 	}
 
 	state->rsprobes = 0;
 	ipv6nd_sendrsprobe(ifp);
-	return 0;
+}
+
+void
+ipv6nd_startrs(struct interface *ifp)
+{
+	struct timeval tv;
+
+	tv.tv_sec = 0;
+	tv.tv_usec = (suseconds_t)(arc4random() %
+	    (MAX_RTR_SOLICITATION_DELAY * 1000000));
+	timernorm(&tv);
+	syslog(LOG_DEBUG,
+	    "%s: delaying IPv6 router solictation for %0.1f seconds",
+	    ifp->name, timeval_to_double(&tv));
+	eloop_timeout_add_tv(ifp->ctx->eloop, &tv, ipv6nd_startrs1, ifp);
+	return;
 }

@@ -75,15 +75,16 @@ struct rs_state {
 
 #define RS_STATE(a) ((struct rs_state *)(ifp)->if_data[IF_DATA_IPV6ND])
 
-#define MAX_UNICAST_SOLICIT	3	/* 3 transmissions */
+#define MAX_RTR_SOLICITATION_DELAY	1	/* seconds */
+#define MAX_UNICAST_SOLICIT		3	/* 3 transmissions */
 
-#define MAX_REACHABLE_TIME	3600000	/* milliseconds */
-#define REACHABLE_TIME		30000	/* milliseconds */
-#define RETRANS_TIMER		1000	/* milliseconds */
-#define DELAY_FIRST_PROBE_TIME	5	/* seconds */
+#define MAX_REACHABLE_TIME		3600000	/* milliseconds */
+#define REACHABLE_TIME			30000	/* milliseconds */
+#define RETRANS_TIMER			1000	/* milliseconds */
+#define DELAY_FIRST_PROBE_TIME		5	/* seconds */
 
 #ifdef INET6
-int ipv6nd_startrs(struct interface *);
+void ipv6nd_startrs(struct interface *);
 ssize_t ipv6nd_env(char **, const char *, const struct interface *);
 int ipv6nd_addrexists(struct dhcpcd_ctx *, const struct ipv6_addr *);
 void ipv6nd_freedrop_ra(struct ra *, int);
