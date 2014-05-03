@@ -869,6 +869,7 @@ if_readrawpacket(struct interface *ifp, int protocol,
 		}
 #endif
 	}
+	*flags |= RAW_EOF;
 	return bytes;
 }
 
