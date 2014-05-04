@@ -998,8 +998,8 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 					if (ipv6nd_has_ra(ifp))
 						len++;
 				}
-				if (write(fd->fd, &len, sizeof(len) !=
-				    sizeof(len)))
+				if (write(fd->fd, &len, sizeof(len)) !=
+				    sizeof(len))
 					return -1;
 				TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 					if (send_interface(fd->fd, ifp) == -1)

@@ -506,7 +506,7 @@ send_interface1(int fd, const struct interface *iface, const char *reason)
 	if ((ssize_t)elen == -1)
 		return -1;
 	iov[0].iov_base = &elen;
-	iov[0].iov_len = sizeof(ssize_t);
+	iov[0].iov_len = sizeof(elen);
 	iov[1].iov_base = s;
 	iov[1].iov_len = elen;
 	retval = writev(fd, iov, 2);
