@@ -1158,7 +1158,7 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 	ifo = ifp->options;
 	get_option_uint8(ifp->ctx, &overl, dhcp, DHO_OPTIONSOVERLOADED);
 
-	if (!env) {
+	if (env == NULL) {
 		if (dhcp->yiaddr || dhcp->ciaddr)
 			e += 5;
 		if (*dhcp->bootfile && !(overl & 1))

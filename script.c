@@ -408,7 +408,7 @@ dumplease:
 #ifdef INET
 	if (dhcp && state && state->new) {
 		n = dhcp_env(NULL, NULL, state->new, ifp);
-		if (e > 0) {
+		if (n > 0) {
 			nenv = realloc(env, sizeof(char *) *
 			    (elen + (size_t)n + 1));
 			if (nenv == NULL)
