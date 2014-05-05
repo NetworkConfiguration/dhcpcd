@@ -519,36 +519,41 @@ send_interface1(int fd, const struct interface *iface, const char *reason)
 }
 
 int
-send_interface(int fd, const struct interface *iface)
+send_interface(int fd, const struct interface *ifp)
 {
 	const char *reason;
 	int retval = 0;
 	int onestate = 0;
 #ifdef INET
-	const struct dhcp_state *state = D_CSTATE(iface);
+	const struct dhcp_state *d = D_CSTATE(ifp);
+#endif
+#ifdef INET6
+	const struct dhcp6_state *d6 = D6_CSTATE(ifp);
+#endif
 
-	if (state) {
+#ifdef INET
+	if (d) {
 		onestate = 1;
-		if (send_interface1(fd, iface, state->reason) == -1)
+		if (send_interface1(fd, ifp, d->reason) == -1)
 			retval = -1;
 	}
 #endif
 
 #ifdef INET6
-	if (ipv6nd_has_ra(iface)) {
+	if (ipv6nd_has_ra(ifp)) {
 		onestate = 1;
-		if (send_interface1(fd, iface, "ROUTERADVERT") == -1)
+		if (send_interface1(fd, ifp, "ROUTERADVERT") == -1)
 			retval = -1;
 	}
-	if (D6_STATE_RUNNING(iface)) {
+	if (D6_STATE_RUNNING(ifp)) {
 		onestate = 1;
-		if (send_interface1(fd, iface, "INFORM6") == -1)
+		if (send_interface1(fd, ifp, d6->reason) == -1)
 			retval = -1;
 	}
 #endif
 
 	if (!onestate) {
-		switch (iface->carrier) {
+		switch (ifp->carrier) {
 		case LINK_UP:
 			reason = "CARRIER";
 			break;
@@ -559,7 +564,7 @@ send_interface(int fd, const struct interface *iface)
 			reason = "UNKNOWN";
 			break;
 		}
-		if (send_interface1(fd, iface, reason) == -1)
+		if (send_interface1(fd, ifp, reason) == -1)
 			retval = -1;
 	}
 	return retval;
