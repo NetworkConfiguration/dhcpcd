@@ -263,6 +263,13 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	else if (strcmp(reason, "ROUTERADVERT") == 0)
 		ra = 1;
 #endif
+	else if (strcmp(reason, "PREINIT") == 0 ||
+	    strcmp(reason, "CARRIER") == 0 ||
+	    strcmp(reason, "NOCARRIER") == 0 ||
+	    strcmp(reason, "UNKNOWN") == 0 ||
+	    strcmp(reason, "DEPARTED") == 0 ||
+	    strcmp(reason, "STOPPED") == 0)
+		;
 #ifdef INET
 	else
 		dhcp = 1;
