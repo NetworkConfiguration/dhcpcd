@@ -819,8 +819,8 @@ reconf_reboot(struct dhcpcd_ctx *ctx, int action, int argc, char **argv, int oi)
 				ipv4_applyaddr(ifn);
 			if_free(ifp);
 		} else {
-			init_state(ifp, argc, argv);
 			TAILQ_INSERT_TAIL(ctx->ifaces, ifp, next);
+			init_state(ifp, argc, argv);
 			dhcpcd_startinterface(ifp);
 		}
 	}
