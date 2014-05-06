@@ -2072,8 +2072,10 @@ dhcp_reboot(struct interface *ifp)
 	/* Don't bother ARP checking as the server could NAK us first. */
 	if (ifo->options & DHCPCD_INFORM)
 		dhcp_inform(ifp);
-	else
-		dhcp_request(ifp);
+	else {
+		/* Don't call dhcp_request as that would change the state */
+		send_request(ifp);
+	}
 }
 
 void
