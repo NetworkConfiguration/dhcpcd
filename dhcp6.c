@@ -2710,7 +2710,10 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 			unlink(state->leasefile);
 		}
 		dhcp6_freedrop_addrs(ifp, drop, NULL);
-		if (drop && state->new &&
+		free(state->old);
+		state->old = state->new;
+		state->new = NULL;
+		if (drop && state->old &&
 		    (options &
 		    (DHCPCD_EXITING | DHCPCD_PERSISTENT)) !=
 		    (DHCPCD_EXITING | DHCPCD_PERSISTENT))
@@ -2719,10 +2722,9 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 				reason = "STOP6";
 			script_runreason(ifp, reason);
 		}
+		free(state->old);
 		free(state->send);
 		free(state->recv);
-		free(state->new);
-		free(state->old);
 		free(state);
 		ifp->if_data[IF_DATA_DHCP6] = NULL;
 	}
