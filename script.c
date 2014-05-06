@@ -523,7 +523,6 @@ send_interface(int fd, const struct interface *ifp)
 {
 	const char *reason;
 	int retval = 0;
-	int onestate = 0;
 #ifdef INET
 	const struct dhcp_state *d = D_CSTATE(ifp);
 #endif
@@ -531,42 +530,36 @@ send_interface(int fd, const struct interface *ifp)
 	const struct dhcp6_state *d6 = D6_CSTATE(ifp);
 #endif
 
+	switch (ifp->carrier) {
+	case LINK_UP:
+		reason = "CARRIER";
+		break;
+	case LINK_DOWN:
+		reason = "NOCARRIER";
+		break;
+	default:
+		reason = "UNKNOWN";
+		break;
+	}
+	if (send_interface1(fd, ifp, reason) == -1)
+			retval = -1;
 #ifdef INET
-	if (d) {
-		onestate = 1;
+	if (d)
 		if (send_interface1(fd, ifp, d->reason) == -1)
 			retval = -1;
-	}
 #endif
 
 #ifdef INET6
 	if (ipv6nd_has_ra(ifp)) {
-		onestate = 1;
 		if (send_interface1(fd, ifp, "ROUTERADVERT") == -1)
 			retval = -1;
 	}
 	if (D6_STATE_RUNNING(ifp)) {
-		onestate = 1;
 		if (send_interface1(fd, ifp, d6->reason) == -1)
 			retval = -1;
 	}
 #endif
 
-	if (!onestate) {
-		switch (ifp->carrier) {
-		case LINK_UP:
-			reason = "CARRIER";
-			break;
-		case LINK_DOWN:
-			reason = "NOCARRIER";
-			break;
-		default:
-			reason = "UNKNOWN";
-			break;
-		}
-		if (send_interface1(fd, ifp, reason) == -1)
-			retval = -1;
-	}
 	return retval;
 }
 

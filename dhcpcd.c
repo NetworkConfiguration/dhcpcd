@@ -309,6 +309,8 @@ stop_interface(struct interface *ifp)
 	eloop_timeout_delete(ctx->eloop, NULL, ifp);
 	if (ifp->options->options & DHCPCD_DEPARTED)
 		script_runreason(ifp, "DEPARTED");
+	else
+		script_runreason(ifp, "STOPPED");
 	if_free(ifp);
 	if (!(ctx->options & (DHCPCD_MASTER | DHCPCD_TEST)))
 		eloop_exit(ctx->eloop, EXIT_FAILURE);
@@ -993,6 +995,8 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 			if (argc == 1) {
 				TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 					len++;
+					if (D_STATE(ifp))
+						len++;
 					if (D6_STATE_RUNNING(ifp))
 						len++;
 					if (ipv6nd_has_ra(ifp))
@@ -1014,6 +1018,8 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 				TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 					if (strcmp(argv[opt], ifp->name) == 0) {
 						len++;
+						if (D_STATE(ifp))
+							len++;
 						if (D6_STATE_RUNNING(ifp))
 							len++;
 						if (ipv6nd_has_ra(ifp))
