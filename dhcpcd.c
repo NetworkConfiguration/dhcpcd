@@ -502,6 +502,7 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 			if (ifp->carrier == LINK_UP)
 				syslog(LOG_INFO, "%s: carrier lost", ifp->name);
 			ifp->carrier = LINK_DOWN;
+			script_runreason(ifp, "NOCARRIER");
 			dhcp6_drop(ifp, "EXPIRE6");
 			ipv6nd_drop(ifp);
 			/* Don't blindly delete our knowledge of LL addresses.
@@ -510,7 +511,6 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 			 * do nothing. */
 			ipv6_free_ll_callbacks(ifp);
 			dhcp_drop(ifp, "EXPIRE");
-			script_runreason(ifp, "NOCARRIER");
 		}
 	} else if (carrier == LINK_UP && ifp->flags & IFF_UP) {
 		if (ifp->carrier != LINK_UP) {
