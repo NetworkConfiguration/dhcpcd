@@ -124,6 +124,7 @@ int if_route(const struct rt *rt, int);
 #ifdef INET6
 int if_checkipv6(struct dhcpcd_ctx *ctx, const char *, int);
 void if_rarestore(struct dhcpcd_ctx *);
+int if_nd6reachable(const char *ifname, struct in6_addr *addr);
 
 int if_address6(const struct ipv6_addr *, int);
 #define if_addaddress6(a) if_address6(a, 1)

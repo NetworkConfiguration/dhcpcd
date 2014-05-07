@@ -1163,6 +1163,14 @@ if_addrflags6(const char *ifname, const struct in6_addr *addr)
 	return -1;
 }
 
+int
+if_nd6reachable(__unused const char *ifname, __unused struct in6_addr *addr)
+{
+
+	/* Assume reachable until I work out how to obtain reachability */
+	return 1;
+}
+
 static const char *prefix = "/proc/sys/net/ipv6/conf";
 
 void

@@ -57,11 +57,6 @@ struct ra {
 	uint32_t mtu;
 	struct ipv6_addrhead addrs;
 	TAILQ_HEAD(, ra_opt) options;
-
-	unsigned char *ns;
-	size_t nslen;
-	int nsprobes;
-
 	int expired;
 };
 

@@ -972,6 +972,36 @@ eexit:
 	return error;
 }
 
+int
+if_nd6reachable(const char *ifname, struct in6_addr *addr)
+{
+	int s, r;
+	struct in6_nbrinfo nbi;
+
+	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
+		return -1;
+
+	memset(&nbi, 0, sizeof(nbi));
+	strlcpy(nbi.ifname, ifname, sizeof(nbi.ifname));
+	nbi.addr = *addr;
+	if (ioctl(s, SIOCGNBRINFO_IN6, &nbi) == -1)
+		r = -1;
+	else {
+		switch(nbi.state) {
+		case ND6_LLINFO_REACHABLE:
+		case ND6_LLINFO_STALE:
+		case ND6_LLINFO_DELAY:
+		case ND6_LLINFO_PROBE:
+			r = 1;
+			break;
+		default:
+			r = 0;
+		}
+	}
+	close(s);
+	return r;
+}
+
 void
 if_rarestore(struct dhcpcd_ctx *ctx)
 {
