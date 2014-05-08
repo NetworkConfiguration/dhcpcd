@@ -74,6 +74,7 @@
 #include "if-options.h"
 #include "ipv4.h"
 #include "ipv6.h"
+#include "ipv6nd.h"
 
 #include "bpf-filter.h"
 
@@ -762,8 +763,10 @@ if_managelink(struct dhcpcd_ctx *ctx)
 #endif
 
 	bytes = read(ctx->link_fd, msg, sizeof(msg));
-	if (bytes == -1 || bytes == 0)
-		return bytes;
+	if (bytes == -1)
+		return -1;
+	if (bytes == 0)
+		return 0;
 	e = msg + bytes;
 	for (p = msg; p < e; p += rtm->rtm_msglen) {
 		rtm = (struct rt_msghdr *)(void *)p;
