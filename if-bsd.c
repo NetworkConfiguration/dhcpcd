@@ -975,7 +975,7 @@ eexit:
 int
 if_nd6reachable(const char *ifname, struct in6_addr *addr)
 {
-	int s, r;
+	int s, flags;
 	struct in6_nbrinfo nbi;
 
 	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
@@ -985,21 +985,22 @@ if_nd6reachable(const char *ifname, struct in6_addr *addr)
 	strlcpy(nbi.ifname, ifname, sizeof(nbi.ifname));
 	nbi.addr = *addr;
 	if (ioctl(s, SIOCGNBRINFO_IN6, &nbi) == -1)
-		r = -1;
+		flags = -1;
 	else {
+		flags = 0;
 		switch(nbi.state) {
 		case ND6_LLINFO_REACHABLE:
 		case ND6_LLINFO_STALE:
 		case ND6_LLINFO_DELAY:
 		case ND6_LLINFO_PROBE:
-			r = 1;
+			flags |= IPV6ND_REACHABLE;
 			break;
-		default:
-			r = 0;
 		}
+		if (nbi.isrouter)
+			flags |= IPV6ND_ROUTER;
 	}
 	close(s);
-	return r;
+	return flags;
 }
 
 void

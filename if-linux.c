@@ -75,6 +75,7 @@
 #include "if.h"
 #include "ipv4.h"
 #include "ipv6.h"
+#include "ipv6nd.h"
 
 #define bpf_insn		sock_filter
 #define BPF_SKIPTYPE
@@ -275,7 +276,7 @@ if_openlinksocket(void)
 	snl.nl_groups |= RTMGRP_IPV4_ROUTE | RTMGRP_IPV4_IFADDR;
 #endif
 #ifdef INET6
-	snl.nl_groups |= RTMGRP_IPV6_ROUTE | RTMGRP_IPV6_IFADDR;
+	snl.nl_groups |= RTMGRP_IPV6_ROUTE | RTMGRP_IPV6_IFADDR | RTMGRP_NEIGH;
 #endif
 
 	return _open_link_socket(&snl);
@@ -557,6 +558,50 @@ handle_rename(struct dhcpcd_ctx *ctx, unsigned int ifindex, const char *ifname)
 	return 0;
 }
 
+#ifdef INET6
+static int
+link_neigh(struct dhcpcd_ctx *ctx, struct nlmsghdr *nlm)
+{
+	struct ndmsg *r;
+	struct rtattr *rta;
+	size_t len;
+	struct in6_addr addr6;
+	int flags;
+
+	if (nlm->nlmsg_type != RTM_NEWNEIGH && nlm->nlmsg_type != RTM_DELNEIGH)
+		return 0;
+	if (nlm->nlmsg_len < sizeof(*r))
+		return -1;
+
+	r = NLMSG_DATA(nlm);
+	rta = (struct rtattr *)RTM_RTA(r);
+	len = RTM_PAYLOAD(nlm);
+        if (r->ndm_family == AF_INET6) {
+		flags = 0;
+		if (r->ndm_flags & NTF_ROUTER)
+			flags |= IPV6ND_ROUTER;
+		if (nlm->nlmsg_type == RTM_NEWNEIGH &&
+		    r->ndm_state &
+		    (NUD_REACHABLE | NUD_STALE | NUD_DELAY | NUD_PROBE |
+		     NUD_PERMANENT))
+		        flags |= IPV6ND_REACHABLE;
+		memset(&addr6, 0, sizeof(addr6));
+		while (RTA_OK(rta, len)) {
+			switch (rta->rta_type) {
+			case NDA_DST:
+				memcpy(&addr6.s6_addr, RTA_DATA(rta),
+				       sizeof(addr6.s6_addr));
+				break;
+			}
+			rta = RTA_NEXT(rta, len);
+		}
+		ipv6nd_neighbour(ctx, &addr6, flags);
+	}
+
+	return 1;
+}
+#endif
+
 static int
 link_netlink(struct dhcpcd_ctx *ctx, struct nlmsghdr *nlm)
 {
@@ -573,6 +618,11 @@ link_netlink(struct dhcpcd_ctx *ctx, struct nlmsghdr *nlm)
 	r = link_addr(ctx, nlm);
 	if (r != 0)
 		return r;
+#ifdef INET6
+	r = link_neigh(ctx, nlm);
+	if (r != 0)
+		return r;
+#endif
 
 	if (nlm->nlmsg_type != RTM_NEWLINK && nlm->nlmsg_type != RTM_DELLINK)
 		return 0;
@@ -1161,14 +1211,6 @@ if_addrflags6(const char *ifname, const struct in6_addr *addr)
 	fclose(fp);
 	errno = ESRCH;
 	return -1;
-}
-
-int
-if_nd6reachable(__unused const char *ifname, __unused struct in6_addr *addr)
-{
-
-	/* Assume reachable until I work out how to obtain reachability */
-	return 1;
 }
 
 static const char *prefix = "/proc/sys/net/ipv6/conf";

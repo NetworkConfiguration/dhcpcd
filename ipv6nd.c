@@ -317,39 +317,69 @@ ipv6nd_sendrsprobe(void *arg)
 }
 
 static void
+ipv6nd_reachable(struct ra *rap, int flags)
+{
+
+	if (flags & IPV6ND_REACHABLE) {
+		if (rap->lifetime && rap->expired) {
+			syslog(LOG_INFO, "%s: %s is reachable again",
+			    rap->iface->name, rap->sfrom);
+			rap->expired = 0;
+			ipv6_buildroutes(rap->iface->ctx);
+			/* XXX Not really an RA */
+			script_runreason(rap->iface, "ROUTERADVERT");
+		}
+	} else {
+		/* Any error means it's really gone from the kernel
+		 * neighbour database */
+		if (rap->lifetime && !rap->expired) {
+			syslog(LOG_WARNING,
+			    "%s: %s is unreachable, expiring it",
+			    rap->iface->name, rap->sfrom);
+			rap->expired = 1;
+			ipv6_buildroutes(rap->iface->ctx);
+			/* XXX Not really an RA */
+			script_runreason(rap->iface, "ROUTERADVERT");
+		}
+	}
+}
+
+#ifdef HAVE_RTM_GETNEIGH
+void
+ipv6nd_neighbour(struct dhcpcd_ctx *ctx, struct in6_addr *addr, int flags)
+{
+	struct ra *rap;
+
+	TAILQ_FOREACH(rap, ctx->ipv6->ra_routers, next) {
+		if (IN6_ARE_ADDR_EQUAL(&rap->from, addr)) {
+			ipv6nd_reachable(rap, flags);
+			break;
+		}
+	}
+}
+
+#else
+
+static void
 ipv6nd_checkreachablerouters(void *arg)
 {
 	struct dhcpcd_ctx *ctx = arg;
 	struct ra *rap;
+	int flags;
 
 	TAILQ_FOREACH(rap, ctx->ipv6->ra_routers, next) {
-		if (if_nd6reachable(rap->iface->name, &rap->from) == 1) {
-			if (rap->lifetime && rap->expired) {
-				syslog(LOG_INFO, "%s: %s is reachable again",
-				    rap->iface->name, rap->sfrom);
-				rap->expired = 0;
-				ipv6_buildroutes(ctx);
-				/* XXX Not really an RA */
-				script_runreason(rap->iface, "ROUTERADVERT");
-			}
-		} else {
-			/* Any error means it's really gone from the kernel
-			 * neighbour database */
-			if (rap->lifetime && !rap->expired) {
-				syslog(LOG_WARNING,
-				    "%s: %s is unreachable, expiring it",
-				    rap->iface->name, rap->sfrom);
-				rap->expired = 1;
-				ipv6_buildroutes(ctx);
-				/* XXX Not really an RA */
-				script_runreason(rap->iface, "ROUTERADVERT");
-			}
+		flags = if_nd6reachable(rap->iface->name, &rap->from);
+		if (flags == -1) {
+			/* An error occured, so it's unreachable */
+			flags = 0;
 		}
+		ipv6nd_reachable(rap, flags);
 	}
 
 	eloop_timeout_add_sec(ctx->eloop, ND6REACHABLE_TIMER,
 	    ipv6nd_checkreachablerouters, ctx);
 }
+#endif
 
 static void
 ipv6nd_free_opts(struct ra *rap)
@@ -390,9 +420,11 @@ void ipv6nd_freedrop_ra(struct ra *rap, int drop)
 	eloop_timeout_delete(rap->iface->ctx->eloop, NULL, rap);
 	if (!drop)
 		TAILQ_REMOVE(rap->iface->ctx->ipv6->ra_routers, rap, next);
+#ifndef HAVE_RTM_GETNEIGH
 	if (TAILQ_FIRST(rap->iface->ctx->ipv6->ra_routers) == NULL)
 		eloop_timeout_delete(rap->iface->ctx->eloop,
 		    ipv6nd_checkreachablerouters, rap->iface->ctx);
+#endif
 	ipv6_freedrop_addrs(&rap->addrs, drop, NULL);
 	ipv6nd_free_opts(rap);
 	free(rap->data);
@@ -983,8 +1015,10 @@ handle_flag:
 	/* Expire should be called last as the rap object could be destroyed */
 	ipv6nd_expirera(ifp);
 
+#ifndef HAVE_RTM_GETNEIGH
 	/* Start our reachability tests now */
 	ipv6nd_checkreachablerouters(ifp->ctx);
+#endif
 }
 
 int

@@ -78,6 +78,9 @@ struct rs_state {
 #define RETRANS_TIMER			1000	/* milliseconds */
 #define DELAY_FIRST_PROBE_TIME		5	/* seconds */
 
+#define IPV6ND_REACHABLE		(1 << 0)
+#define IPV6ND_ROUTER			(1 << 1)
+
 #ifdef INET6
 void ipv6nd_startrs(struct interface *);
 ssize_t ipv6nd_env(char **, const char *, const struct interface *);
@@ -91,6 +94,10 @@ int ipv6nd_has_ra(const struct interface *);
 void ipv6nd_handleifa(struct dhcpcd_ctx *, int,
     const char *, const struct in6_addr *, int);
 void ipv6nd_drop(struct interface *);
+
+#ifdef HAVE_RTM_GETNEIGH
+void ipv6nd_neighbour(struct dhcpcd_ctx *, struct in6_addr *, int);
+#endif
 #else
 #define ipv6nd_startrs(a) {}
 #define ipv6nd_addrexists(a, b) (0)
