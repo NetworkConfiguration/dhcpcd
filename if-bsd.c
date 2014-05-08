@@ -1076,16 +1076,29 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 		char *p, **nrest;
 #endif
 
-#ifdef ND_IFF_AUTO_LINKLOCAL
-		if (set_if_nd6_flag(ifname, ND6_IFF_AUTO_LINKLOCAL) == -1) {
-			syslog(LOG_ERR, "%s: set_if_nd6_flag: %m", ifname);
+#ifdef ND6_IFF_IFDISABLED
+		if (del_if_nd6_flag(ifname, ND6_IFF_IFDISABLED) == -1) {
+			syslog(LOG_ERR,
+			    "%s: del_if_nd6_flag: ND6_IFF_IFDISABLED: %m",
+			    ifname);
 			return -1;
 		}
 #endif
 
-#ifdef ND6_IFF_IFDISABLED
-		if (del_if_nd6_flag(ifname, ND6_IFF_IFDISABLED) == -1) {
-			syslog(LOG_ERR, "%s: del_if_nd6_flag: %m", ifname);
+#ifdef ND6_IFF_PERFORMNUD
+		if (set_if_nd6_flag(ifname, ND6_IFF_PERFORMNUD) == -1) {
+			syslog(LOG_ERR,
+			    "%s: set_if_nd6_flag: ND6_IFF_PERFORMNUD: %m",
+			    ifname);
+			return -1;
+		}
+#endif
+
+#ifdef ND_IFF_AUTO_LINKLOCAL
+		if (set_if_nd6_flag(ifname, ND6_IFF_AUTO_LINKLOCAL) == -1) {
+			syslog(LOG_ERR,
+			    "%s: set_if_nd6_flag: ND6_IFF_AUTO_LINKLOCAL: %m",
+			    ifname);
 			return -1;
 		}
 #endif
@@ -1093,7 +1106,9 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 #ifdef ND6_IFF_OVERRIDE_RTADV
 		override = get_if_nd6_flag(ifname, ND6_IFF_OVERRIDE_RTADV);
 		if (override == -1)
-			syslog(LOG_ERR, "%s: get_if_nd6_flag: %m", ifname);
+			syslog(LOG_ERR,
+			    "%s: get_if_nd6_flag: ND6_IFF_OVERRIDE_RTADV: %m",
+			    ifname);
 		else if (override == 0 && !own)
 			return 0;
 #endif
@@ -1101,7 +1116,9 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 #ifdef ND6_IFF_ACCEPT_RTADV
 		ra = get_if_nd6_flag(ifname, ND6_IFF_ACCEPT_RTADV);
 		if (ra == -1)
-			syslog(LOG_ERR, "%s: get_if_nd6_flag: %m", ifname);
+			syslog(LOG_ERR,
+			    "%s: get_if_nd6_flag: ND6_IFF_ACCEPT_RTADV: %m",
+			    ifname);
 		else if (ra != 0 && own) {
 			syslog(LOG_INFO,
 			    "%s: disabling Kernel IPv6 RA support",
@@ -1109,7 +1126,9 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 			if (del_if_nd6_flag(ifname, ND6_IFF_ACCEPT_RTADV)
 			    == -1)
 			{
-				syslog(LOG_ERR, "%s: del_if_nd6_flag: %m",
+				syslog(LOG_ERR,
+				    "%s: del_if_nd6_flag: "
+				    "ND6_IFF_ACCEPT_RTADV: %m",
 				    ifname);
 				return ra;
 			}
@@ -1118,7 +1137,9 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 			    set_if_nd6_flag(ifname, ND6_IFF_OVERRIDE_RTADV)
 			    == -1)
 			{
-				syslog(LOG_ERR, "%s: set_if_nd6_flag: %m",
+				syslog(LOG_ERR,
+				    "%s: set_if_nd6_flag: "
+				    "ND6_IFF_OVERRIDE_RTADV: %m",
 				    ifname);
 				return ra;
 			}
