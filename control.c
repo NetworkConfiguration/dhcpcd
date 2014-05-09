@@ -173,6 +173,9 @@ control_start(struct dhcpcd_ctx *ctx, const char *ifname)
 	if (bind(ctx->control_fd, (struct sockaddr *)&sun, len) == -1 ||
 	    chmod(ctx->control_sock,
 		S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP) == -1 ||
+	    (ctx->control_group &&
+	        chown(ctx->control_sock,
+		geteuid(), ctx->control_group) == -1) ||
 	    listen(ctx->control_fd, sizeof(ctx->control_fds)) == -1)
 	{
 		close(ctx->control_fd);

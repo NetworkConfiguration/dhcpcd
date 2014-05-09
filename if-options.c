@@ -36,6 +36,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <getopt.h>
+#include <grp.h>
 #include <limits.h>
 #include <paths.h>
 #include <stdio.h>
@@ -89,6 +90,7 @@
 #define O_DHCP6			O_BASE + 31
 #define O_IPV4			O_BASE + 32
 #define O_IPV6			O_BASE + 33
+#define O_CONTROLGRP		O_BASE + 34
 
 const struct option cf_options[] = {
 	{"background",      no_argument,       NULL, 'b'},
@@ -172,6 +174,7 @@ const struct option cf_options[] = {
 	{"nodhcp",          no_argument,       NULL, O_NODHCP},
 	{"dhcp6",           no_argument,       NULL, O_DHCP6},
 	{"nodhcp6",         no_argument,       NULL, O_NODHCP6},
+	{"controlgroup",    required_argument, NULL, O_CONTROLGRP},
 	{NULL,              0,                 NULL, '\0'}
 };
 
@@ -615,7 +618,8 @@ static int
 parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
     int opt, const char *arg, struct dhcp_opt **ldop, struct dhcp_opt **edop)
 {
-	int i, l, t;
+	int i, t;
+	long l;
 	unsigned long u;
 	char *p = NULL, *fp, *np, **nconf;
 	ssize_t s;
@@ -628,6 +632,11 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	size_t *dop_len, dl;
 	struct vivco *vivco;
 	struct token *token;
+	struct group *grp;
+#ifdef _REENTRANT
+#error foo
+	struct group grpbuf;
+#endif
 #ifdef INET6
 	size_t sl;
 	struct if_ia *ia;
@@ -1773,6 +1782,58 @@ err_sla:
 		break;
 	case O_NODHCP6:
 		ifo->options &= ~DHCPCD_DHCP6;
+		break;
+	case O_CONTROLGRP:
+#ifdef _REENTRANT
+		l = sysconf(_SC_GETGR_R_SIZE_MAX);
+		if (l == -1)
+			dl = 1024;
+		else
+			dl = (size_t)l;
+		p = malloc(dl);
+		if (p == NULL) {
+			syslog(LOG_ERR, "%s: malloc: %m", __func__);
+			return -1;
+		}
+		while ((i = getgrnam_r(arg, &grpbuf, p, (size_t)l, &grp)) ==
+		    ERANGE)
+		{
+			size_t nl = dl * 2;
+			if (nl < dl) {
+				syslog(LOG_ERR, "control_group: out of buffer");
+				free(p);
+				return -1;
+			}
+			dl = nl;
+			np = realloc(p, dl);
+			if (np == NULL) {
+				syslog(LOG_ERR, "control_group: realloc: %m");
+				free(p);
+				return -1;
+			}
+			p = np;
+		}
+		if (i != 0) {
+			errno = i;
+			syslog(LOG_ERR, "getgrnam_r: %m");
+			free(p);
+			return -1;
+		}
+		if (grp == NULL) {
+			syslog(LOG_ERR, "controlgroup: %s: not found", arg);
+			free(p);
+			return -1;
+		}
+		ctx->control_group = grp->gr_gid;
+		free(p);
+#else
+		grp = getgrnam(arg);
+		if (grp == NULL) {
+			syslog(LOG_ERR, "controlgroup: %s: not found", arg);
+			return -1;
+		}
+		ctx->control_group = grp->gr_gid;
+#endif
 		break;
 	default:
 		return 0;

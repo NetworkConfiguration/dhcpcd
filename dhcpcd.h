@@ -96,6 +96,7 @@ struct dhcpcd_ctx {
 	int control_fd;
 	struct fd_list *control_fds;
 	char control_sock[sizeof(CONTROLSOCKET) + IF_NAMESIZE];
+	gid_t control_group;
 
 	/* DHCP Enterprise options, RFC3925 */
 	struct dhcp_opt *vivso;
