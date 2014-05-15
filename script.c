@@ -551,7 +551,7 @@ send_interface(int fd, const struct interface *ifp)
 	if (send_interface1(fd, ifp, reason) == -1)
 			retval = -1;
 #ifdef INET
-	if (d)
+	if (d && d->reason)
 		if (send_interface1(fd, ifp, d->reason) == -1)
 			retval = -1;
 #endif
@@ -561,7 +561,7 @@ send_interface(int fd, const struct interface *ifp)
 		if (send_interface1(fd, ifp, "ROUTERADVERT") == -1)
 			retval = -1;
 	}
-	if (D6_STATE_RUNNING(ifp)) {
+	if (D6_STATE_RUNNING(ifp) && d6->reason) {
 		if (send_interface1(fd, ifp, d6->reason) == -1)
 			retval = -1;
 	}
