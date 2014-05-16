@@ -301,8 +301,6 @@ stop_interface(struct interface *ifp)
 	syslog(LOG_INFO, "%s: removing interface", ifp->name);
 	ifp->options->options |= DHCPCD_STOPPING;
 
-	// Remove the interface from our list
-	TAILQ_REMOVE(ifp->ctx->ifaces, ifp, next);
 	dhcp6_drop(ifp, NULL);
 	ipv6nd_drop(ifp);
 	dhcp_drop(ifp, "STOP");
@@ -311,7 +309,11 @@ stop_interface(struct interface *ifp)
 		script_runreason(ifp, "DEPARTED");
 	else
 		script_runreason(ifp, "STOPPED");
+
+	// Remove the interface from our list
+	TAILQ_REMOVE(ifp->ctx->ifaces, ifp, next);
 	if_free(ifp);
+
 	if (!(ctx->options & (DHCPCD_MASTER | DHCPCD_TEST)))
 		eloop_exit(ctx->eloop, EXIT_FAILURE);
 }
