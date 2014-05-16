@@ -2486,7 +2486,6 @@ dhcp_handledhcp(struct interface *iface, struct dhcp_message **dhcpp,
 			state->claims = 0;
 			state->probes = 0;
 			state->conflicts = 0;
-			state->state = DHS_PROBE;
 			arp_probe(iface);
 			return;
 		}
