@@ -115,7 +115,7 @@ if_openlinksocket(void)
 {
 
 #ifdef SOCK_CLOEXEC
-	return socket(PF_ROUTE, SOCK_RAW | SOCK_CLOEXEC, 0);
+	return socket(PF_ROUTE, SOCK_RAW | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
 #else
 	int s, flags;
 
@@ -123,6 +123,12 @@ if_openlinksocket(void)
 		return -1;
 	if ((flags = fcntl(s, F_GETFD, 0)) == -1 ||
 	    fcntl(s, F_SETFD, flags | FD_CLOEXEC) == -1)
+	{
+		close(s);
+	        return -1;
+	}
+	if ((flags = fcntl(s, F_GETFL, 0)) == -1 ||
+	    fcntl(s, F_SETFL, flags | O_NONBLOCK) == -1)
 	{
 		close(s);
 	        return -1;
@@ -223,14 +229,14 @@ if_openrawsocket(struct interface *ifp, int protocol)
 	int flags;
 #endif
 #ifdef _PATH_BPF
-	fd = open(_PATH_BPF, O_RDWR | O_CLOEXEC);
+	fd = open(_PATH_BPF, O_RDWR | O_CLOEXEC | O_NONBLOCK);
 #else
 	char device[32];
 	int n = 0;
 
 	do {
 		snprintf(device, sizeof(device), "/dev/bpf%d", n++);
-		fd = open(device, O_RDWR | O_CLOEXEC);
+		fd = open(device, O_RDWR | O_CLOEXEC | O_NONBLOCK);
 	} while (fd == -1 && errno == EBUSY);
 #endif
 
@@ -283,6 +289,13 @@ if_openrawsocket(struct interface *ifp, int protocol)
 	}
 	if (ioctl(fd, BIOCSETF, &pf) == -1)
 		goto eexit;
+
+#ifdef __OpenBSD__
+	/* For some reason OpenBSD fails to open the fd as non blocking */
+	if ((flags = fcntl(fd, F_GETFL, 0)) == -1 ||
+	    fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
+		goto eexit;
+#endif
 
 	return fd;
 

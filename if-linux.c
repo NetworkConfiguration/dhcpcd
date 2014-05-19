@@ -815,7 +815,7 @@ if_openrawsocket(struct interface *ifp, int protocol)
 #endif
 
 #ifdef SOCK_CLOEXEC
-	if ((s = socket(PF_PACKET, SOCK_DGRAM | SOCK_CLOEXEC,
+	if ((s = socket(PF_PACKET, SOCK_DGRAM | SOCK_CLOEXEC | SOCK_NONBLOCK,
 	    htons(protocol))) == -1)
 		return -1;
 #else
@@ -825,6 +825,12 @@ if_openrawsocket(struct interface *ifp, int protocol)
 		return -1;
 	if ((flags = fcntl(s, F_GETFD, 0)) == -1 ||
 	    fcntl(s, F_SETFD, flags | FD_CLOEXEC) == -1)
+	{
+		close(s);
+	        return -1;
+	}
+	if ((flags = fcntl(s, F_GETFL, 0)) == -1 ||
+	    fcntl(s, F_SETFL, flags | O_NONBLOCK) == -1)
 	{
 		close(s);
 	        return -1;
