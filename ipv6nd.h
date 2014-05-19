@@ -90,7 +90,8 @@ void ipv6nd_freedrop_ra(struct ra *, int);
 #define ipv6nd_drop_ra(ra) ipv6nd_freedrop_ra((ra),  1)
 ssize_t ipv6nd_free(struct interface *);
 void ipv6nd_expirera(void *arg);
-int ipv6nd_has_ra(const struct interface *);
+int ipv6nd_hasra(const struct interface *);
+int ipv6nd_hasradhcp(const struct interface *);
 void ipv6nd_handleifa(struct dhcpcd_ctx *, int,
     const char *, const struct in6_addr *, int);
 void ipv6nd_drop(struct interface *);

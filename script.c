@@ -249,7 +249,7 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 #ifdef INET6
 		else if (d6_state && d6_state->new)
 			dhcp6 = 1;
-		else if (ipv6nd_has_ra(ifp))
+		else if (ipv6nd_hasra(ifp))
 			ra = 1;
 #endif
 #ifdef INET
@@ -336,7 +336,7 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 #endif
 #ifdef INET6
 	    || (dhcp6 && d6_state && d6_state->new)
-	    || (ra && ipv6nd_has_ra(ifp))
+	    || (ra && ipv6nd_hasra(ifp))
 #endif
 	    )
 	{
@@ -557,7 +557,7 @@ send_interface(int fd, const struct interface *ifp)
 #endif
 
 #ifdef INET6
-	if (ipv6nd_has_ra(ifp)) {
+	if (ipv6nd_hasra(ifp)) {
 		if (send_interface1(fd, ifp, "ROUTERADVERT") == -1)
 			retval = -1;
 	}

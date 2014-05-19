@@ -1022,14 +1022,30 @@ handle_flag:
 }
 
 int
-ipv6nd_has_ra(const struct interface *ifp)
+ipv6nd_hasra(const struct interface *ifp)
 {
 	const struct ra *rap;
 
 	if (ifp->ctx->ipv6) {
 		TAILQ_FOREACH(rap, ifp->ctx->ipv6->ra_routers, next)
-			if (rap->iface == ifp)
+			if (rap->iface == ifp && !rap->expired)
 				return 1;
+	}
+	return 0;
+}
+
+int
+ipv6nd_hasradhcp(const struct interface *ifp)
+{
+	const struct ra *rap;
+
+	if (ifp->ctx->ipv6) {
+		TAILQ_FOREACH(rap, ifp->ctx->ipv6->ra_routers, next) {
+			if (rap->iface == ifp &&
+			    !rap->expired &&
+			    (rap->flags & (ND_RA_FLAG_MANAGED | ND_RA_FLAG_OTHER)))
+				return 1;
+		}
 	}
 	return 0;
 }

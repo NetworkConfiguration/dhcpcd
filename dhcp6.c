@@ -1142,7 +1142,12 @@ dhcp6_startexpire(void *arg)
 	dhcp6_freedrop_addrs(ifp, 1, NULL);
 	dhcp6_delete_delegates(ifp);
 	script_runreason(ifp, "EXPIRE6");
-	dhcp6_startdiscover(ifp);
+	if (ipv6nd_hasradhcp(ifp))
+		dhcp6_startdiscover(ifp);
+	else
+		syslog(LOG_WARNING,
+		    "%s: no advertising IPv6 router wants DHCP",
+		    ifp->name);
 }
 
 static void

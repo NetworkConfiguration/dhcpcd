@@ -1001,7 +1001,7 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 						len++;
 					if (D6_STATE_RUNNING(ifp))
 						len++;
-					if (ipv6nd_has_ra(ifp))
+					if (ipv6nd_hasra(ifp))
 						len++;
 				}
 				if (write(fd->fd, &len, sizeof(len)) !=
@@ -1024,7 +1024,7 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 							len++;
 						if (D6_STATE_RUNNING(ifp))
 							len++;
-						if (ipv6nd_has_ra(ifp))
+						if (ipv6nd_hasra(ifp))
 							len++;
 					}
 				}
