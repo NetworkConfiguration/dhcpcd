@@ -1613,11 +1613,19 @@ send_message(struct interface *iface, uint8_t type,
 		if (r == -1) {
 			syslog(LOG_ERR, "%s: if_sendrawpacket: %m",
 			    iface->name);
-			if (!(iface->ctx->options & DHCPCD_TEST))
-				dhcp_drop(iface, "FAIL");
-			dhcp_close(iface);
-			eloop_timeout_delete(iface->ctx->eloop, NULL, iface);
-			callback = NULL;
+			switch(errno) {
+			case ENETDOWN:
+			case ENETRESET:
+			case ENETUNREACH:
+				break;
+			default:
+				if (!(iface->ctx->options & DHCPCD_TEST))
+					dhcp_drop(iface, "FAIL");
+				dhcp_close(iface);
+				eloop_timeout_delete(iface->ctx->eloop,
+				    NULL, iface);
+				callback = NULL;
+			}
 		}
 	}
 	free(dhcp);
