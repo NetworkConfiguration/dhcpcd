@@ -149,7 +149,7 @@ if_getssid(const char *ifname, char *ssid)
 	char nwid[IEEE80211_NWID_LEN + 1];
 #endif
 
-	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+	if ((s = socket(PF_INET, SOCK_DGRAM, 0)) == -1)
 		return -1;
 
 #if defined(SIOCG80211NWID) /* NetBSD */
@@ -197,7 +197,7 @@ if_vimaster(const char *ifname)
 	int s, r;
 	struct ifmediareq ifmr;
 
-	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+	if ((s = socket(PF_INET, SOCK_DGRAM, 0)) == -1)
 		return -1;
 	memset(&ifmr, 0, sizeof(ifmr));
 	strlcpy(ifmr.ifm_name, ifname, sizeof(ifmr.ifm_name));
@@ -397,7 +397,7 @@ if_address(const struct interface *iface, const struct in_addr *address,
 		struct sockaddr_in *sin;
 	} _s;
 
-	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+	if ((s = socket(PF_INET, SOCK_DGRAM, 0)) == -1)
 		return -1;
 
 	memset(&ifa, 0, sizeof(ifa));
@@ -543,7 +543,7 @@ if_address6(const struct ipv6_addr *a, int action)
 	struct in6_aliasreq ifa;
 	struct in6_addr mask;
 
-	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) == -1)
+	if ((s = socket(PF_INET6, SOCK_DGRAM, 0)) == -1)
 		return -1;
 
 	memset(&ifa, 0, sizeof(ifa));
@@ -738,7 +738,7 @@ if_addrflags6(const char *ifname, const struct in6_addr *addr)
 	int s, flags;
 	struct in6_ifreq ifr6;
 
-	s = socket(AF_INET6, SOCK_DGRAM, 0);
+	s = socket(PF_INET6, SOCK_DGRAM, 0);
 	flags = -1;
 	if (s != -1) {
 		memset(&ifr6, 0, sizeof(ifr6));
@@ -962,7 +962,7 @@ if_nd6_flag(const char *ifname, unsigned int flag, int set)
 	struct in6_ndireq nd;
 	unsigned int oflags;
 
-	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) == -1)
+	if ((s = socket(PF_INET6, SOCK_DGRAM, 0)) == -1)
 		return -1;
 	memset(&nd, 0, sizeof(nd));
 	strlcpy(nd.ifname, ifname, sizeof(nd.ifname));
@@ -994,7 +994,7 @@ if_nd6reachable(const char *ifname, struct in6_addr *addr)
 	int s, flags;
 	struct in6_nbrinfo nbi;
 
-	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
+	if ((s = socket(PF_INET6, SOCK_DGRAM, 0)) < 0)
 		return -1;
 
 	memset(&nbi, 0, sizeof(nbi));
@@ -1063,7 +1063,7 @@ if_raflush(void)
 	int s;
 	char dummy[IFNAMSIZ + 8];
 
-	s = socket(AF_INET6, SOCK_DGRAM, 0);
+	s = socket(PF_INET6, SOCK_DGRAM, 0);
 	if (s == -1)
 		return -1;
 	strlcpy(dummy, "lo0", sizeof(dummy));

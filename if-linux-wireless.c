@@ -69,7 +69,7 @@ if_getssid(const char *ifname, char *ssid)
 	int s, retval;
 	struct iwreq iwr;
 
-	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+	if ((s = socket(PF_INET, SOCK_DGRAM, 0)) == -1)
 		return -1;
 	memset(&iwr, 0, sizeof(iwr));
 	strlcpy(iwr.ifr_name, ifname, sizeof(iwr.ifr_name));

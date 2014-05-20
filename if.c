@@ -102,7 +102,7 @@ if_carrier(struct interface *iface)
 	char *p;
 #endif
 
-	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+	if ((s = socket(PF_INET, SOCK_DGRAM, 0)) == -1)
 		return LINK_UNKNOWN;
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, iface->name, sizeof(ifr.ifr_name));
@@ -141,7 +141,7 @@ up_interface(struct interface *iface)
 	char *p;
 #endif
 
-	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+	if ((s = socket(PF_INET, SOCK_DGRAM, 0)) == -1)
 		return -1;
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, iface->name, sizeof(ifr.ifr_name));
@@ -198,11 +198,11 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 #endif
 
 #ifdef SIOCGIFPRIORITY
-	if ((s_inet = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+	if ((s_inet = socket(PF_INET, SOCK_DGRAM, 0)) == -1)
 		return NULL;
 #endif
 #ifdef IFLR_ACTIVE
-	if ((s_link = socket(AF_LINK, SOCK_DGRAM, 0)) == -1) {
+	if ((s_link = socket(PF_LINK, SOCK_DGRAM, 0)) == -1) {
 #ifdef SIOCGIFPRIORITY
 		close(s_inet);
 #endif
@@ -502,7 +502,7 @@ if_domtu(const char *ifname, short int mtu)
 	int s, r;
 	struct ifreq ifr;
 
-	if ((s = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+	if ((s = socket(PF_INET, SOCK_DGRAM, 0)) == -1)
 		return -1;
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
