@@ -25,6 +25,7 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
 
@@ -126,7 +127,7 @@ control_handle(void *arg)
 }
 
 static socklen_t
-make_sock(struct dhcpcd_ctx *ctx, struct sockaddr_un *sun, const char *ifname)
+make_sock(struct dhcpcd_ctx *ctx, struct sockaddr_un *sa, const char *ifname)
 {
 
 #ifdef SOCK_CLOEXEC
@@ -153,24 +154,24 @@ make_sock(struct dhcpcd_ctx *ctx, struct sockaddr_un *sun, const char *ifname)
 	        return 0;
 	}
 #endif
-	memset(sun, 0, sizeof(*sun));
-	sun->sun_family = AF_UNIX;
-	snprintf(sun->sun_path, sizeof(sun->sun_path), CONTROLSOCKET,
+	memset(sa, 0, sizeof(*sa));
+	sa->sun_family = AF_UNIX;
+	snprintf(sa->sun_path, sizeof(sa->sun_path), CONTROLSOCKET,
 	    ifname ? "-" : "", ifname ? ifname : "");
-	strlcpy(ctx->control_sock, sun->sun_path, sizeof(ctx->control_sock));
-	return (socklen_t)SUN_LEN(sun);
+	strlcpy(ctx->control_sock, sa->sun_path, sizeof(ctx->control_sock));
+	return (socklen_t)SUN_LEN(sa);
 }
 
 int
 control_start(struct dhcpcd_ctx *ctx, const char *ifname)
 {
-	struct sockaddr_un sun;
+	struct sockaddr_un sa;
 	socklen_t len;
 
-	if ((len = make_sock(ctx, &sun, ifname)) == 0)
+	if ((len = make_sock(ctx, &sa, ifname)) == 0)
 		return -1;
 	unlink(ctx->control_sock);
-	if (bind(ctx->control_fd, (struct sockaddr *)&sun, len) == -1 ||
+	if (bind(ctx->control_fd, (struct sockaddr *)&sa, len) == -1 ||
 	    chmod(ctx->control_sock,
 		S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP) == -1 ||
 	    (ctx->control_group &&
@@ -217,12 +218,12 @@ control_stop(struct dhcpcd_ctx *ctx)
 int
 control_open(struct dhcpcd_ctx *ctx, const char *ifname)
 {
-	struct sockaddr_un sun;
+	struct sockaddr_un sa;
 	socklen_t len;
 
-	if ((len = make_sock(ctx, &sun, ifname)) == 0)
+	if ((len = make_sock(ctx, &sa, ifname)) == 0)
 		return -1;
-	if (connect(ctx->control_fd, (struct sockaddr *)&sun, len) == -1) {
+	if (connect(ctx->control_fd, (struct sockaddr *)&sa, len) == -1) {
 		close(ctx->control_fd);
 		ctx->control_fd = -1;
 		return -1;

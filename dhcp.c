@@ -82,6 +82,10 @@
 #define RELEASE_DELAY_S		0
 #define RELEASE_DELAY_NS	10000000
 
+#ifndef IPDEFTTL
+#define IPDEFTTL 64 /* RFC1340 */
+#endif
+
 struct dhcp_op {
 	uint8_t value;
 	const char *name;

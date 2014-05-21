@@ -44,6 +44,11 @@
 #include "dhcp6.h"
 #include "dhcpcd.h"
 
+#ifdef __sun
+#define htonll
+#define ntohll
+#endif
+
 #ifndef htonll
 #if (BYTE_ORDER == LITTLE_ENDIAN)
 static inline uint64_t
@@ -386,7 +391,9 @@ get_next_rdm_monotonic_counter(struct auth *auth)
 {
 	FILE *fp;
 	uint64_t rdm;
+#ifdef LOCK_EX
 	int flocked;
+#endif
 
 	fp = fopen(RDM_MONOFILE, "r+");
 	if (fp == NULL) {
@@ -395,10 +402,14 @@ get_next_rdm_monotonic_counter(struct auth *auth)
 		fp = fopen(RDM_MONOFILE, "w");
 		if (fp == NULL)
 			return ++auth->last_replay; /* report error? */
+#ifdef LOCK_EX
 		flocked = flock(fileno(fp), LOCK_EX);
+#endif
 		rdm = 0;
 	} else {
+#ifdef LOCK_EX
 		flocked = flock(fileno(fp), LOCK_EX);
+#endif
 		if (fscanf(fp, "0x%016" PRIu64, &rdm) != 1)
 			rdm = 0; /* truncated? report error? */
 	}
@@ -416,8 +427,10 @@ get_next_rdm_monotonic_counter(struct auth *auth)
 		/* report error? */
 	}
 	fflush(fp);
+#ifdef LOCK_EX
 	if (flocked == 0)
 		flock(fileno(fp), LOCK_UN);
+#endif
 	fclose(fp);
 	return rdm;
 }

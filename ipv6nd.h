@@ -103,7 +103,7 @@ void ipv6nd_neighbour(struct dhcpcd_ctx *, struct in6_addr *, int);
 #define ipv6nd_startrs(a) {}
 #define ipv6nd_addrexists(a, b) (0)
 #define ipv6nd_free(a)
-#define ipv6nd_has_ra(a) (0)
+#define ipv6nd_hasra(a) (0)
 #define ipv6nd_drop(a)
 #endif
 

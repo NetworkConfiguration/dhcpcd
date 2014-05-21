@@ -341,15 +341,23 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 			ifp->index = sdl->sdl_index;
 			sdl_type = sdl->sdl_type;
 			switch(sdl->sdl_type) {
+#ifdef IFT_BRIDGE
 			case IFT_BRIDGE: /* FALLTHROUGH */
+#endif
+#ifdef IFT_L2VLAN
 			case IFT_L2VLAN: /* FALLTHOUGH */
+#endif
+#ifdef IFT_L3IPVLAN
 			case IFT_L3IPVLAN: /* FALLTHROUGH */
+#endif
 			case IFT_ETHER:
 				ifp->family = ARPHRD_ETHER;
 				break;
+#ifdef IFT_IEEE1394
 			case IFT_IEEE1394:
 				ifp->family = ARPHRD_IEEE1394;
 				break;
+#endif
 #ifdef IFT_INFINIBAND
 			case IFT_INFINIBAND:
 				ifp->family = ARPHRD_INFINIBAND;

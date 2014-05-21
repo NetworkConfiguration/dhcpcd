@@ -38,6 +38,11 @@
 #define HOSTNAME_MAX_LEN	250	/* 255 - 3 (FQDN) - 2 (DNS enc) */
 #endif
 
+#ifndef MIN
+#define MIN(a,b)		((/*CONSTCOND*/(a)<(b))?(a):(b))
+#define MAX(a,b)		((/*CONSTCOND*/(a)>(b))?(a):(b))
+#endif
+
 #define UNCONST(a)		((void *)(unsigned long)(const void *)(a))
 #define STRINGIFY(a)		#a
 #define TOSTRING(a)		STRINGIFY(a)

@@ -1139,7 +1139,11 @@ main(int argc, char **argv)
 	siga = NULL;
 #endif
 	closefrom(3);
+#ifdef LOG_PERROR
 	openlog(PACKAGE, LOG_PERROR | LOG_PID, LOG_DAEMON);
+#else
+	openlog(PACKAGE, LOG_PID, LOG_DAEMON);
+#endif
 	setlogmask(LOG_UPTO(LOG_INFO));
 
 	/* Test for --help and --version */
@@ -1392,6 +1396,7 @@ main(int argc, char **argv)
 		if (ctx.pid_fd == -1)
 			syslog(LOG_ERR, "open `%s': %m", pidfile);
 		else {
+#ifdef LOCK_EX
 			/* Lock the file so that only one instance of dhcpcd
 			 * runs on an interface */
 			if (flock(ctx.pid_fd, LOCK_EX | LOCK_NB) == -1) {
@@ -1400,6 +1405,7 @@ main(int argc, char **argv)
 				ctx.pid_fd = -1;
 				goto exit_failure;
 			}
+#endif
 #ifndef O_CLOEXEC
 			if (fcntl(ctx.pid_fd, F_GETFD, &opt) == -1 ||
 			    fcntl(ctx.pid_fd, F_SETFD, opt | FD_CLOEXEC) == -1)

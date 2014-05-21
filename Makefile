@@ -6,12 +6,12 @@ SRCS+=		if.c if-options.c script.c
 SRCS+=		dhcp-common.c
 
 CFLAGS?=	-O2
-CSTD?=		c99
 MKDIRS=
 
 TOP?=		.
 include ${TOP}/iconfig.mk
 
+CSTD?=		c99
 CFLAGS+=	-std=${CSTD}
 
 SRCS+=		${DHCPCD_SRCS}
