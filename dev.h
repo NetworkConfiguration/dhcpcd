@@ -38,7 +38,7 @@ struct dev {
 };
 
 struct dev_dhcpcd {
-	void (*handle_interface)(void *, int, const char *);
+	int (*handle_interface)(void *, int, const char *);
 };
 
 int dev_init(struct dev *, const struct dev_dhcpcd *);
