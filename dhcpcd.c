@@ -1145,6 +1145,9 @@ main(int argc, char **argv)
 	openlog(PACKAGE, LOG_PID, LOG_DAEMON);
 #endif
 	setlogmask(LOG_UPTO(LOG_INFO));
+#ifndef LOG_PERROR
+	psyslog_prio = LOG_UPTO(LOG_INFO);
+#endif
 
 	/* Test for --help and --version */
 	if (argc > 1) {
@@ -1255,8 +1258,12 @@ main(int argc, char **argv)
 	ctx.options &= ~DHCPCD_DAEMONISE;
 #endif
 
-	if (ctx.options & DHCPCD_DEBUG)
+	if (ctx.options & DHCPCD_DEBUG) {
 		setlogmask(LOG_UPTO(LOG_DEBUG));
+#ifndef LOG_PERROR
+		psyslog_prio = LOG_UPTO(LOG_DEBUG);
+#endif
+	}
 	if (ctx.options & DHCPCD_QUIET) {
 		i = open(_PATH_DEVNULL, O_RDWR);
 		if (i == -1)

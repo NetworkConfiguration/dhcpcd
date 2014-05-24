@@ -372,9 +372,16 @@ kfreebsd*)
 	echo "COMPAT_SRCS+=	compat/linkaddr.c" >>$CONFIG_MK
 	;;
 sunos*)
-#	echo "CSTD=		gnu99" >>$CONFIG_MK
+	echo "WARNING!!! Solaris support is at early development stage!" >&2
+	echo "so don't expect it to work just yet, patches welcome" >&2
 	echo "CPPFLAGS+=	-D_XPG4_2 -D__EXTENSIONS__ -DBSD_COMP" \
 	    >>$CONFIG_MK
+	echo "DHCPCD_SRCS+=	if-sun.c" >>$CONFIG_MK
+
+	# IPv6 won't work, but it will at least compile.
+	echo "CPPFLAGS+=	-DIN6_IFF_DETACHED=0" >>$CONFIG_MK
+	echo "CPPFLAGS+=	-DIN6_IFF_TENTATIVE=0" >>$CONFIG_MK
+	echo "CPPFLAGS+=	-DIN6_IFF_DUPLICATED=0" >>$CONFIG_MK
 	;;
 *)
 	echo "DHCPCD_SRCS+=	if-bsd.c" >>$CONFIG_MK
@@ -718,6 +725,29 @@ pselect)
 	echo "#include		\"compat/pollts.h\"" >>$CONFIG_H
 	;;
 esac
+
+if [ -z "$LOG_PERROR" ]; then
+	printf "Testing for LOG_PERROR ... "
+	cat <<EOF >_log_perror.c
+#include <syslog.h>
+int main(void) {
+	openlog("test", LOG_PERROR, LOG_DAEMON);
+	return 0;
+}
+EOF
+	if $XCC _log_perror.c -o _log_perror 2>/dev/null; then
+		LOG_PERROR=yes
+	else
+		LOG_PERROR=no
+	fi
+	echo "$LOG_PERROR"
+	rm -f _log_perror.c _log_perror
+fi
+if [ "$LOG_PERROR" = no ]; then
+	echo "COMPAT_SRCS+=	compat/psyslog.c" >>$CONFIG_MK
+	echo "#include		\"compat/psyslog.h\"" >>$CONFIG_H
+	echo "#define syslog	psyslog" >>$CONFIG_H
+fi
 
 if [ -z "$MD5" ]; then
 	MD5_LIB=

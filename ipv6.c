@@ -52,7 +52,9 @@
 #ifdef __FreeBSD__ /* Needed so that including netinet6/in6_var.h works */
 #  include <net/if_var.h>
 #endif
+#ifndef __sun
 #  include <netinet6/in6_var.h>
+#endif
 #endif
 
 #include <errno.h>
@@ -81,7 +83,11 @@
 
 /* Hackery at it's finest. */
 #ifndef s6_addr32
-#  define s6_addr32 __u6_addr.__u6_addr32
+#  ifdef __sun
+#    define s6_addr32	_S6_un._S6_u32
+#  else
+#    define s6_addr32	__u6_addr.__u6_addr32
+#  endif
 #endif
 
 struct ipv6_ctx *
