@@ -76,8 +76,7 @@ ipv4ll_find_lease(uint32_t old_addr)
 
 	for (;;) {
 		addr = htonl(LINKLOCAL_ADDR |
-		    (((uint32_t)abs((int)arc4random())
-			% 0xFD00) + 0x0100));
+		    (uint32_t)abs((int)arc4random_uniform(0xFD00)) + 0x0100);
 		if (addr != old_addr &&
 		    IN_LINKLOCAL(ntohl(addr)))
 			break;

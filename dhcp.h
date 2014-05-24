@@ -68,15 +68,6 @@
 #define DHCP_RAND_MAX		1
 #define DHCP_ARP_FAIL		2
 
-/* number of usecs in a second. */
-#define USECS_SECOND		1000000
-/* As we use timevals, we should use the usec part for
- * greater randomisation. */
-#define DHCP_RAND_MIN_U		DHCP_RAND_MIN * USECS_SECOND
-#define DHCP_RAND_MAX_U		DHCP_RAND_MAX * USECS_SECOND
-#define PROBE_MIN_U		PROBE_MIN * USECS_SECOND
-#define PROBE_MAX_U		PROBE_MAX * USECS_SECOND
-
 #ifdef RFC2131_STRICT
 /* Be strictly conformant for section 4.1.1 */
 #  define DHCP_MIN_DELAY	1

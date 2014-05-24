@@ -1519,7 +1519,7 @@ dhcp_makeudppacket(size_t *sz, const uint8_t *data, size_t length,
 
 	ip->ip_v = IPVERSION;
 	ip->ip_hl = sizeof(*ip) >> 2;
-	ip->ip_id = arc4random() & UINT16_MAX;
+	ip->ip_id = (uint16_t)arc4random_uniform(UINT16_MAX);
 	ip->ip_ttl = IPDEFTTL;
 	ip->ip_len = htons(sizeof(*ip) + sizeof(*udp) + length);
 	ip->ip_sum = checksum(ip, sizeof(*ip));
@@ -1554,7 +1554,8 @@ send_message(struct interface *iface, uint8_t type,
 				state->interval = 64;
 		}
 		tv.tv_sec = state->interval + DHCP_RAND_MIN;
-		tv.tv_usec = arc4random() % (DHCP_RAND_MAX_U - DHCP_RAND_MIN_U);
+		tv.tv_usec = (suseconds_t)arc4random_uniform(
+		    (DHCP_RAND_MAX - DHCP_RAND_MIN) * 1000000);
 		timernorm(&tv);
 		syslog(LOG_DEBUG,
 		    "%s: sending %s (xid 0x%x), next in %0.1f seconds",
@@ -3015,8 +3016,8 @@ dhcp_start(struct interface *ifp)
 		return;
 
 	tv.tv_sec = DHCP_MIN_DELAY;
-	tv.tv_usec = (suseconds_t)(arc4random() %
-	    ((DHCP_MAX_DELAY - DHCP_MIN_DELAY) * 1000000));
+	tv.tv_usec = (suseconds_t)arc4random_uniform(
+	    (DHCP_MAX_DELAY - DHCP_MIN_DELAY) * 1000000);
 	timernorm(&tv);
 	syslog(LOG_DEBUG,
 	    "%s: delaying DHCP for %0.1f seconds",

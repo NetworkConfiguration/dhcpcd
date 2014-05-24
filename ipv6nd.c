@@ -1486,8 +1486,8 @@ ipv6nd_startrs(struct interface *ifp)
 
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	tv.tv_sec = 0;
-	tv.tv_usec = (suseconds_t)(arc4random() %
-	    (MAX_RTR_SOLICITATION_DELAY * 1000000));
+	tv.tv_usec = (suseconds_t)arc4random_uniform(
+	    MAX_RTR_SOLICITATION_DELAY * 1000000);
 	timernorm(&tv);
 	syslog(LOG_DEBUG,
 	    "%s: delaying IPv6 router solictation for %0.1f seconds",

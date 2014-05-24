@@ -762,8 +762,8 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 				state->RT.tv_sec = 1;
 			else
 				state->RT.tv_sec = 0;
-			state->RT.tv_usec = (suseconds_t)(arc4random() %
-			    (state->IMD * 1000000));
+			state->RT.tv_usec = (suseconds_t)arc4random_uniform(
+			    state->IMD * 1000000);
 			timernorm(&state->RT);
 			broad_uni = "delaying";
 			goto logsend;
@@ -779,7 +779,8 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 		}
 
 		rnd = DHCP6_RAND_MIN;
-		rnd += arc4random() % (DHCP6_RAND_MAX - DHCP6_RAND_MIN);
+		rnd += (suseconds_t)arc4random_uniform(
+		    DHCP6_RAND_MAX - DHCP6_RAND_MIN);
 		rnd /= 1000;
 		neg = (rnd < 0.0);
 		if (neg)

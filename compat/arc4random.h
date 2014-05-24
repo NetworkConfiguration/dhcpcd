@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2010 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2014 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -30,7 +30,6 @@
 
 #include <stdint.h>
 
-void arc4random_stir(void);
-void arc4random_addrandom(unsigned char *, int);
 uint32_t arc4random(void);
+uint32_t arc4random_uniform(uint32_t);
 #endif

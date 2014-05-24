@@ -280,7 +280,8 @@ arp_announce(void *arg)
 		state->probes = 0;
 		state->claims = 0;
 		tv.tv_sec = state->interval - DHCP_RAND_MIN;
-		tv.tv_usec = arc4random() % (DHCP_RAND_MAX_U - DHCP_RAND_MIN_U);
+		tv.tv_usec = (suseconds_t)arc4random_uniform(
+		    (DHCP_RAND_MAX - DHCP_RAND_MIN) * 1000000);
 		timernorm(&tv);
 		eloop_timeout_add_tv(ifp->ctx->eloop, &tv, dhcp_discover, ifp);
 	} else {
@@ -330,7 +331,8 @@ arp_probe(void *arg)
 	}
 	if (++state->probes < PROBE_NUM) {
 		tv.tv_sec = PROBE_MIN;
-		tv.tv_usec = arc4random() % (PROBE_MAX_U - PROBE_MIN_U);
+		tv.tv_usec = (suseconds_t)arc4random_uniform(
+		    (PROBE_MAX - PROBE_MIN) * 1000000);
 		timernorm(&tv);
 		eloop_timeout_add_tv(ifp->ctx->eloop, &tv, arp_probe, ifp);
 	} else {
