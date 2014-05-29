@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd March 7, 2014
+.Dd May 29, 2014
 .Dt DHCPCD 8
 .Os
 .Sh NAME
@@ -613,6 +613,16 @@ unicasts INFORM to the destination, otherwise it defaults to STATIC.
 requires a Berkley Packet Filter, or BPF device on BSD based systems and a
 Linux Socket Filter, or LPF device on Linux based systems for all IPv4
 configuration.
+.Pp
+If restricting
+.Nm
+to a single interface and optionally address family via the command-line
+then all futher calls to
+.Nm
+to rebind, reconfigure or exit need to include the same restrictive flags
+so that
+.Nm
+knows which process to signal.
 .Sh FILES
 .Bl -ohang
 .It Pa @SYSCONFDIR@/dhcpcd.conf

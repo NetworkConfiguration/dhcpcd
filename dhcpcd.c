@@ -1116,7 +1116,7 @@ int
 main(int argc, char **argv)
 {
 	struct dhcpcd_ctx ctx;
-	char pidfile[sizeof(PIDFILE) + IF_NAMESIZE];
+	char pidfile[sizeof(PIDFILE) + IF_NAMESIZE + 1];
 	struct if_options *ifo;
 	struct interface *ifp;
 	uint16_t family = 0;
@@ -1174,9 +1174,19 @@ main(int argc, char **argv)
 	{
 		switch (opt) {
 		case '4':
+			if (family) {
+				syslog(LOG_ERR, "cannot specify more than one"
+				    " address family");
+				goto exit_failure;
+			}
 			family = AF_INET;
 			break;
 		case '6':
+			if (family) {
+				syslog(LOG_ERR, "cannot specify more than one"
+				    " address family");
+				goto exit_failure;
+			}
 			family = AF_INET6;
 			break;
 		case 'f':
@@ -1278,16 +1288,29 @@ main(int argc, char **argv)
 		/* If we have any other args, we should run as a single dhcpcd
 		 *  instance for that interface. */
 		if (optind == argc - 1 && !(ctx.options & DHCPCD_MASTER)) {
+			const char *per;
+
 			if (strlen(argv[optind]) > IF_NAMESIZE) {
 				syslog(LOG_ERR, "%s: interface name too long",
 				    argv[optind]);
 				goto exit_failure;
 			}
+			/* Allow a dhcpcd interface per address family */
+			switch(family) {
+			case AF_INET:
+				per = "-4";
+				break;
+			case AF_INET6:
+				per = "-6";
+				break;
+			default:
+				per = "";
+			}
 			snprintf(pidfile, sizeof(pidfile),
-			    PIDFILE, "-", argv[optind]);
+			    PIDFILE, "-", argv[optind], per);
 		}
 		else {
-			snprintf(pidfile, sizeof(pidfile), PIDFILE, "", "");
+			snprintf(pidfile, sizeof(pidfile), PIDFILE, "", "", "");
 			ctx.options |= DHCPCD_MASTER;
 		}
 	}
