@@ -232,10 +232,6 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 #endif
 		}
 
-		/* Ensure that the interface name has settled */
-		if (!dev_initialized(ctx, ifa->ifa_name))
-			continue;
-
 		/* It's possible for an interface to have >1 AF_LINK.
 		 * For our purposes, we use the first one. */
 		TAILQ_FOREACH(ifp, ifs, next) {
@@ -281,10 +277,13 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		if (ctx->ifac && i == ctx->ifac)
 			continue;
 
-		if (if_vimaster(ifa->ifa_name) == 1) {
+		/* Ensure that the interface name has settled */
+		if (!dev_initialized(ctx, p))
+			continue;
+
+		if (if_vimaster(p) == 1) {
 			syslog(argc ? LOG_ERR : LOG_DEBUG,
-				"%s: is a Virtual Interface Master, skipping",
-				ifa->ifa_name);
+			    "%s: is a Virtual Interface Master, skipping", p);
 			continue;
 		}
 
