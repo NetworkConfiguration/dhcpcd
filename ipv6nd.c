@@ -350,10 +350,12 @@ ipv6nd_neighbour(struct dhcpcd_ctx *ctx, struct in6_addr *addr, int flags)
 {
 	struct ra *rap;
 
-	TAILQ_FOREACH(rap, ctx->ipv6->ra_routers, next) {
-		if (IN6_ARE_ADDR_EQUAL(&rap->from, addr)) {
-			ipv6nd_reachable(rap, flags);
-			break;
+	if (ctx->ipv6) {
+	        TAILQ_FOREACH(rap, ctx->ipv6->ra_routers, next) {
+			if (IN6_ARE_ADDR_EQUAL(&rap->from, addr)) {
+				ipv6nd_reachable(rap, flags);
+				break;
+			}
 		}
 	}
 }
