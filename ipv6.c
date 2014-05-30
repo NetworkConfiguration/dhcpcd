@@ -379,6 +379,56 @@ ipv6_userprefix(
 	return 0;
 }
 
+int
+ipv6_makestableprivate(struct in6_addr *addr,
+    const struct in6_addr *prefix, int prefix_len,
+    const unsigned char *netiface, size_t netiface_len,
+    const unsigned char *netid, size_t netid_len,
+    uint32_t dad_counter,
+    const char *secret, size_t secret_len)
+{
+	unsigned char buf[2048], digest[SHA256_DIGEST_STRING_LENGTH];
+	size_t len, l;
+	SHA256_CTX ctx;
+
+	if (prefix_len < 0 || prefix_len > 120) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	l = ROUNDUP8(prefix_len);
+	len = l + netiface_len + netid_len + sizeof(dad_counter) + secret_len;
+	if (len > sizeof(buf)) {
+		errno = ENOBUF;
+		return -1;
+	}
+
+	/* Combine all parameters into one buffer */
+	p = buf;
+	memcpy(p, prefix, l);
+	p += l;
+	memcpy(p, netiface, netiface_len);
+	p += netiface_len;
+	memcpy(p, netid, netid_len);
+	p += netid_len;
+	memcpy(p, dad_counter, sizeof(dad_counter));
+	p += sizeof(dad_counter);
+	memcpy(p, secret, secret_len);
+
+	/* Make an address using the prefix and the digest of the above.
+	 * RFC7212 Section 5.1 states that we shouldn't use MD5.
+	 * Pity as we use that for HMAC-MD5 which is still deemed OK.
+	 * SHA-256 is recommended */
+	SHA256_Init(&ctx);
+	SHA256_Update(&ctx, buf, len);
+	SHA256_Final(digest, &ctx);
+
+	memcpy(addr->s6_addr, prefix, l);
+	l = 128 - l;
+	memcpy(addr->s6_addr + l, hash, 128 - l);
+	return 0;
+}
+
 #ifdef IPV6_POLLADDRFLAG
 void
 ipv6_checkaddrflags(void *arg)

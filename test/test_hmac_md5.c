@@ -97,7 +97,7 @@ hmac_md5_test4(void)
 	uint8_t hmac[16];
 	uint8_t text[50];
 	uint8_t key[25];
-	int i;
+	uint8_t i;
 
 	printf ("HMAC MD5 Test 4:\t\t");
 	for (i = 0; i < 50; i++)
