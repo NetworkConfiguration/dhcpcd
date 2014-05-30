@@ -343,7 +343,7 @@ EOF
 
 	case "$OS" in
 	sunos*);;
-	*)		echo "CFLAGS+=	-Wstrict-overflow" >>$CONFIG_MF;;
+	*)		echo "CFLAGS+=	-Wstrict-overflow" >>$CONFIG_MK;;
 	esac
 fi
 
