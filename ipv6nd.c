@@ -822,27 +822,28 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 		case ND_OPT_PREFIX_INFORMATION:
 			pi = (struct nd_opt_prefix_info *)(void *)ndo;
 			if (pi->nd_opt_pi_len != 4) {
-				syslog(LOG_ERR,
+				syslog(new_data ? LOG_ERR : LOG_DEBUG,
 				    "%s: invalid option len for prefix",
 				    ifp->name);
 				continue;
 			}
 			if (pi->nd_opt_pi_prefix_len > 128) {
-				syslog(LOG_ERR, "%s: invalid prefix len",
+				syslog(new_data ? LOG_ERR : LOG_DEBUG,
+				    "%s: invalid prefix len",
 				    ifp->name);
 				continue;
 			}
 			if (IN6_IS_ADDR_MULTICAST(&pi->nd_opt_pi_prefix) ||
 			    IN6_IS_ADDR_LINKLOCAL(&pi->nd_opt_pi_prefix))
 			{
-				syslog(LOG_ERR,
+				syslog(new_data ? LOG_ERR : LOG_DEBUG,
 				    "%s: invalid prefix in RA", ifp->name);
 				continue;
 			}
 			if (ntohl(pi->nd_opt_pi_preferred_time) >
 			    ntohl(pi->nd_opt_pi_valid_time))
 			{
-				syslog(LOG_ERR,
+				syslog(new_data ? LOG_ERR : LOG_DEBUG,
 				    "%s: pltime > vltime", ifp->name);
 				continue;
 			}
@@ -977,7 +978,8 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 			n = (dnssl->nd_opt_dnssl_len - 1) * 8;
 			r = decode_rfc3397(NULL, 0, op, n);
 			if (r < 1) {
-				syslog(LOG_ERR, "%s: invalid DNSSL option",
+				syslog(new_data ? LOG_ERR : LOG_DEBUG,
+				    "%s: invalid DNSSL option",
 				    ifp->name);
 				continue;
 			} else {
