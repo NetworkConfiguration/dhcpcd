@@ -844,7 +844,7 @@ int main(void) {
 EOF
 		# We only want to link to libmd if it exists in /lib
 		set -- $(ls /lib/libmd.so.* 2>/dev/null)
-		if $XCC	_sha256.c -o _sha256 3>/dev/null; then
+		if $XCC	_sha256.c -o _sha256 2>/dev/null; then
 			SHA2=yes
 			SHA2_RENAMED=yes
 		elif [ -e "$1" ] && $XCC _sha256.c -lmd -o _sha256 2>/dev/null

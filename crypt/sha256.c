@@ -24,8 +24,7 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/endian.h>
-#include <sys/types.h>
+#include <inttypes.h>
 
 #include <string.h>
 
@@ -42,6 +41,38 @@
 	memcpy((void *)dst, (const void *)src, (size_t)len)
 
 #else /* BYTE_ORDER != BIG_ENDIAN */
+
+static inline void
+be32enc(uint8_t *buf, uint32_t u)
+{
+
+	buf[0] = (uint8_t)((u >> 24) & 0xff);
+	buf[1] = (uint8_t)((u >> 16) & 0xff);
+	buf[2] = (uint8_t)((u >> 8) & 0xff);
+	buf[3] = (uint8_t)(u & 0xff);
+}
+
+static inline void
+be64enc(uint8_t *buf, uint64_t u)
+{
+
+	be32enc(buf, (uint32_t)(u >> 32));
+	be32enc(buf + sizeof(uint32_t), (uint32_t)(u & 0xffffffffULL));
+}
+
+static inline uint16_t
+be16dec(const uint8_t *buf)
+{
+
+	return (uint16_t)(buf[0] << 8 | buf[1]);
+}
+
+static inline uint32_t
+be32dec(const uint8_t *buf)
+{
+
+	return (uint32_t)(be16dec(buf) << 16 | be16dec(buf + 2));
+}
 
 /*
  * Encode a length len/4 vector of (uint32_t) into a length len vector of
