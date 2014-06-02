@@ -825,26 +825,26 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 				syslog(LOG_ERR,
 				    "%s: invalid option len for prefix",
 				    ifp->name);
-				break;
+				continue;
 			}
 			if (pi->nd_opt_pi_prefix_len > 128) {
 				syslog(LOG_ERR, "%s: invalid prefix len",
 				    ifp->name);
-				break;
+				continue;
 			}
 			if (IN6_IS_ADDR_MULTICAST(&pi->nd_opt_pi_prefix) ||
 			    IN6_IS_ADDR_LINKLOCAL(&pi->nd_opt_pi_prefix))
 			{
 				syslog(LOG_ERR,
 				    "%s: invalid prefix in RA", ifp->name);
-				break;
+				continue;
 			}
 			if (ntohl(pi->nd_opt_pi_preferred_time) >
 			    ntohl(pi->nd_opt_pi_valid_time))
 			{
 				syslog(LOG_ERR,
 				    "%s: pltime > vltime", ifp->name);
-				break;
+				continue;
 			}
 			TAILQ_FOREACH(ap, &rap->addrs, next)
 				if (ap->prefix_len ==pi->nd_opt_pi_prefix_len &&
@@ -859,10 +859,8 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 				    ND_OPT_PI_FLAG_ONLINK))
 					continue;
 				ap = calloc(1, sizeof(*ap));
-				if (ap == NULL) {
-					syslog(LOG_ERR, "%s: %m", __func__);
+				if (ap == NULL)
 					break;
-				}
 				ap->iface = rap->iface;
 				ap->flags = IPV6_AF_NEW;
 				ap->prefix_len = pi->nd_opt_pi_prefix_len;
@@ -909,13 +907,12 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 					opt = tmp;
 					opt[l - 1] = ' ';
 					strlcpy(opt + l, ap->saddr, m);
-				} else
+				} else {
 					syslog(LOG_ERR, "%s: %m", __func__);
-			} else {
+					continue;
+				}
+			} else
 				opt = strdup(ap->saddr);
-				if (opt == NULL)
-					syslog(LOG_ERR, "%s: %m", __func__);
-			}
 			lifetime = ap->prefix_vltime;
 			break;
 
@@ -930,8 +927,6 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 			rap->mtu = mtuv;
 			snprintf(buf, sizeof(buf), "%d", mtuv);
 			opt = strdup(buf);
-			if (opt == NULL)
-				syslog(LOG_ERR, "%s: %m", __func__);
 			break;
 
 		case ND_OPT_RDNSS:
@@ -954,24 +949,23 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 			    nd_opt_rdnss_lifetime);
 			op += sizeof(rdnss->nd_opt_rdnss_lifetime);
 			tmp = opt = malloc(l);
-			if (opt) {
-				for (n = ndo->nd_opt_len - 1; n > 1; n -= 2,
-				    op += sizeof(addr.s6_addr))
-				{
-					r = ipv6_printaddr(tmp, l, op,
-					    ifp->name);
-					if (r != -1) {
-						l -= ((size_t)r + 1);
-						tmp += (size_t)r;
-						*tmp++ = ' ';
-					}
+			if (opt == NULL)
+				continue;
+			for (n = ndo->nd_opt_len - 1; n > 1; n -= 2,
+			    op += sizeof(addr.s6_addr))
+			{
+				r = ipv6_printaddr(tmp, l, op,
+				    ifp->name);
+				if (r != -1) {
+					l -= ((size_t)r + 1);
+					tmp += (size_t)r;
+					*tmp++ = ' ';
 				}
-				if (tmp != opt)
-					(*--tmp) = '\0';
-				else
-					*opt = '\0';
-			} else
-				syslog(LOG_ERR, "%s: %m", __func__);
+			}
+			if (tmp != opt)
+				(*--tmp) = '\0';
+			else
+				*opt = '\0';
 			break;
 
 		case ND_OPT_DNSSL:
@@ -985,6 +979,7 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 			if (r < 1) {
 				syslog(LOG_ERR, "%s: invalid DNSSL option",
 				    ifp->name);
+				continue;
 			} else {
 				l = (size_t)r;
 				tmp = malloc(l);
@@ -1001,8 +996,7 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 						syslog(LOG_ERR, "%s: %m",
 						    __func__);
 					free(tmp);
-				} else
-					syslog(LOG_ERR, "%s: %m", __func__);
+				}
 			}
 			break;
 
@@ -1010,8 +1004,10 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 			continue;
 		}
 
-		if (opt == NULL)
+		if (opt == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
 			continue;
+		}
 
 		TAILQ_FOREACH(rao, &rap->options, next) {
 			if (rao->type == ndo->nd_opt_type &&
