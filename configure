@@ -801,6 +801,7 @@ fi
 
 if [ -z "$SHA2" ]; then
 	SHA2_LIB=
+	SHA2_RENAMED=
 	printf "Testing for SHA256_Init ... "
 	cat <<EOF >_sha256.c
 #include <sys/types.h>
@@ -826,12 +827,49 @@ EOF
 	fi
 	echo "$SHA2"
 	rm -f _sha256.c _sha256
+	if [ "$SHA2" = no ]; then
+		# Did OpenBSD really change this? grrrr
+		printf "Testing for SHA256Init ... "
+		cat <<EOF >_sha256.c
+#include <sys/types.h>
+EOF
+		[ -n "$SHA2_H" ] && echo "#include <$SHA2_H>">>_sha256.c
+		cat <<EOF >>_sha256.c
+#include <stdlib.h>
+int main(void) {
+	SHA2_CTX context;
+	SHA256Init(&context);
+	return 0;
+}
+EOF
+		# We only want to link to libmd if it exists in /lib
+		set -- $(ls /lib/libmd.so.* 2>/dev/null)
+		if $XCC	_sha256.c -o _sha256 3>/dev/null; then
+			SHA2=yes
+			SHA2_RENAMED=yes
+		elif [ -e "$1" ] && $XCC _sha256.c -lmd -o _sha256 2>/dev/null
+		then
+			SHA2="yes (-lmd)"
+			SHA2_LIB=-lmd
+			SHA2_RENAMED=yes
+		else
+			SHA2=no
+		fi
+		echo "$SHA2"
+		rm -f _sha256.c _sha256
+	fi
 fi
 if [ "$SHA2" = no ]; then
 	echo "SHA256_SRC=	sha256.c" >>$CONFIG_MK
 else
 	echo "SHA256_SRC=" >>$CONFIG_MK
 	echo "#define SHA2_H		<$SHA2_H>" >>$CONFIG_H
+	if [ "$SHA2_RENAMED" = yes ]; then
+		echo "#define SHA256_CTX	SHA2_CTX" >>$CONFIG_H
+		echo "#define SHA256_Init	SHA256Init" >>$CONFIG_H
+		echo "#define SHA256_Update	SHA256Update" >>$CONFIG_H
+		echo "#define SHA256_Final	SHA256Final" >>$CONFIG_H
+	fi
 	[ -n "$SHA2_LIB" ] && echo "LDADD+=		$SHA2_LIB" >>$CONFIG_MK
 fi
 
