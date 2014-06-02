@@ -909,9 +909,13 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 					opt = tmp;
 					opt[l - 1] = ' ';
 					strlcpy(opt + l, ap->saddr, m);
-				}
-			} else
+				} else
+					syslog(LOG_ERR, "%s: %m", __func__);
+			} else {
 				opt = strdup(ap->saddr);
+				if (opt == NULL)
+					syslog(LOG_ERR, "%s: %m", __func__);
+			}
 			lifetime = ap->prefix_vltime;
 			break;
 
@@ -926,6 +930,8 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 			rap->mtu = mtuv;
 			snprintf(buf, sizeof(buf), "%d", mtuv);
 			opt = strdup(buf);
+			if (opt == NULL)
+				syslog(LOG_ERR, "%s: %m", __func__);
 			break;
 
 		case ND_OPT_RDNSS:
@@ -964,7 +970,8 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 					(*--tmp) = '\0';
 				else
 					*opt = '\0';
-			}
+			} else
+				syslog(LOG_ERR, "%s: %m", __func__);
 			break;
 
 		case ND_OPT_DNSSL:
@@ -990,8 +997,12 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 					if (opt)
 						print_string(opt, n,
 						    (const uint8_t *)tmp, l);
+					else
+						syslog(LOG_ERR, "%s: %m",
+						    __func__);
 					free(tmp);
-				}
+				} else
+					syslog(LOG_ERR, "%s: %m", __func__);
 			}
 			break;
 
@@ -999,10 +1010,9 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 			continue;
 		}
 
-		if (opt == NULL) {
-			syslog(LOG_ERR, "%s: %m", __func__);
+		if (opt == NULL)
 			continue;
-		}
+
 		TAILQ_FOREACH(rao, &rap->options, next) {
 			if (rao->type == ndo->nd_opt_type &&
 			    strcmp(rao->option, opt) == 0)
