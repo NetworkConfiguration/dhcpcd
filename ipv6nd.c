@@ -572,23 +572,78 @@ ipv6nd_scriptrun(struct ra *rap)
 }
 
 static void
+ipv6nd_addaddr(void *arg)
+{
+	struct ipv6_addr *ap = arg;
+
+	ipv6_addaddr(ap);
+}
+
+static void
 ipv6nd_dadcallback(void *arg)
 {
 	struct ipv6_addr *ap = arg, *rapap;
 	struct interface *ifp;
 	struct ra *rap;
 	int wascompleted, found;
+	struct timeval tv;
+	char buf[INET6_ADDRSTRLEN];
+	const char *p;
 
+	ifp = ap->iface;
 	wascompleted = (ap->flags & IPV6_AF_DADCOMPLETED);
 	ap->flags |= IPV6_AF_DADCOMPLETED;
-	if (ap->flags & IPV6_AF_DUPLICATED)
-		/* No idea what how to try and make another address :( */
+	if (ap->flags & IPV6_AF_DUPLICATED) {
+		ap->dadcounter++;
 		syslog(LOG_WARNING, "%s: DAD detected %s",
 		    ap->iface->name, ap->saddr);
 
-	if (!wascompleted) {
-		ifp = ap->iface;
+		/* Try and make another stable private address.
+		 * Because ap->dadcounter is always increamented,
+		 * a different address is generated. */
+		/* XXX Cache DAD counter per prefix/id/ssid? */
+		if (ifp->options->options & DHCPCD_STABLEPRIVATE &&
+		    ap->dadcounter < IDGEN_RETRIES)
+		{
+			syslog(LOG_INFO, "%s: deleting address %s",
+				ifp->name, ap->saddr);
+			if (if_deladdress6(ap) == -1 &&
+			    errno != EADDRNOTAVAIL && errno != ENXIO)
+				syslog(LOG_ERR, "if_deladdress6: %m");
+			if (ipv6_makestableprivate(&ap->addr,
+			    &ap->prefix, ap->prefix_len,
+			    ifp->options->iaid, sizeof(ifp->options->iaid),
+			    ifp->ssid, strlen(ifp->ssid),
+			    ap->dadcounter,
+			    ifp->ctx->secret, ifp->ctx->secret_len) == -1)
+			{
+				syslog(LOG_ERR,
+				    "%s: ipv6_makestableprivate: %m",
+				    ifp->name);
+				return;
+			}
+			ap->flags &= ~(IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED);
+			ap->flags |= IPV6_AF_NEW;
+			p = inet_ntop(AF_INET6, ap->addr.s6_addr,
+			    buf, sizeof(buf));
+			if (p)
+				snprintf(ap->saddr,
+				    sizeof(ap->saddr),
+				    "%s/%d",
+				    p, ap->prefix_len);
+			else
+				ap->saddr[0] = '\0';
+			tv.tv_sec = 0;
+			tv.tv_usec = (suseconds_t)arc4random_uniform(
+			    IDGEN_DELAY * USECINSEC);
+			timernorm(&tv);
+			eloop_timeout_add_tv(ifp->ctx->eloop, &tv,
+			    ipv6nd_addaddr, ap);
+			return;
+		}
+	}
 
+	if (!wascompleted) {
 		TAILQ_FOREACH(rap, ifp->ctx->ipv6->ra_routers, next) {
 			if (rap->iface != ifp)
 				continue;

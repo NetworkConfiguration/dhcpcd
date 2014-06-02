@@ -22,7 +22,7 @@ VPATH=	. ./crypt
 
 SRCS+=		auth.c
 CPPFLAGS+=	-I./crypt
-CRYPT_SRCS=	hmac_md5.c ${MD5_SRC}
+CRYPT_SRCS=	hmac_md5.c ${MD5_SRC} ${SHA256_SRC}
 
 OBJS+=		${SRCS:.c=.o} ${COMPAT_SRCS:.c=.o} ${CRYPT_SRCS:.c=.o}
 

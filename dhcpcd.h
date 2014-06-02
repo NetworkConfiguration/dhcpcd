@@ -36,9 +36,10 @@
 #include "control.h"
 #include "if-options.h"
 
-#define HWADDR_LEN 20
-#define IF_SSIDSIZE 33
-#define PROFILE_LEN 64
+#define HWADDR_LEN	20
+#define IF_SSIDSIZE	33
+#define PROFILE_LEN	64
+#define SECRET_LEN	64
 
 #define LINK_UP		1
 #define LINK_UNKNOWN	0
@@ -116,6 +117,9 @@ struct dhcpcd_ctx {
 	uint8_t *opt_buffer;
 #endif
 #ifdef INET6
+	unsigned char secret[SECRET_LEN];
+	size_t secret_len;
+
 	struct dhcp_opt *dhcp6_opts;
 	size_t dhcp6_opts_len;
 	struct ipv6_ctx *ipv6;

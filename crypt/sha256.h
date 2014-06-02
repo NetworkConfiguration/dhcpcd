@@ -1,6 +1,6 @@
-/*
- * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2014 Roy Marples <roy@marples.name>
+/*-
+ * Copyright 2005 Colin Percival
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -22,52 +22,29 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 
-#ifndef CONFIG_H
-#define CONFIG_H
+#ifndef SHA256_H_
+#define SHA256_H_
 
-#define PACKAGE			"dhcpcd"
-#define VERSION			"6.3.2"
+#include <sys/types.h>
 
-#ifndef CONFIG
-# define CONFIG			SYSCONFDIR "/" PACKAGE ".conf"
-#endif
-#ifndef SCRIPT
-# define SCRIPT			LIBEXECDIR "/" PACKAGE "-run-hooks"
-#endif
-#ifndef DEVDIR
-# define DEVDIR			LIBDIR "/" PACKAGE "/dev"
-#endif
-#ifndef DUID
-# define DUID			SYSCONFDIR "/" PACKAGE ".duid"
-#endif
-#ifndef SECRET
-# define SECRET			SYSCONFDIR "/" PACKAGE ".secret"
-#endif
-#ifndef LEASEFILE
-# define LEASEFILE		DBDIR "/" PACKAGE "-%s.lease"
-#endif
-#ifndef LEASEFILE6
-# define LEASEFILE6		DBDIR "/" PACKAGE "-%s.lease6"
-#endif
-#ifndef PIDFILE
-# define PIDFILE		RUNDIR "/" PACKAGE "%s%s%s.pid"
-#endif
-#ifndef CONTROLSOCKET
-# define CONTROLSOCKET		RUNDIR "/" PACKAGE "%s%s.sock"
-#endif
-#ifndef RDM_MONOFILE
-# define RDM_MONOFILE		DBDIR "/" PACKAGE "-rdm.monotonic"
-#endif
+#define SHA256_DIGEST_LENGTH		32
 
-#ifndef NO_SIGNALS
-#  define USE_SIGNALS
-#endif
-#ifndef USE_SIGNALS
-#  ifndef THERE_IS_NO_FORK
-#    define THERE_IS_NO_FORK
-#  endif
-#endif
+typedef struct SHA256Context {
+	uint32_t state[8];
+	uint64_t count;
+	unsigned char buf[64];
+} SHA256_CTX;
+
+void	SHA256_Init(SHA256_CTX *);
+void	SHA256_Update(SHA256_CTX *, const void *, size_t);
+void	SHA256_Final(unsigned char [32], SHA256_CTX *);
+char   *SHA256_End(SHA256_CTX *, char *);
+char   *SHA256_File(const char *, char *);
+char   *SHA256_FileChunk(const char *, char *, off_t, off_t);
+char   *SHA256_Data(const void *, unsigned int, char *);
 
 #endif

@@ -102,6 +102,7 @@
 #define DHCPCD_IAID			(1ULL << 48)
 #define DHCPCD_DHCP			(1ULL << 49)
 #define DHCPCD_DHCP6			(1ULL << 50)
+#define DHCPCD_STABLEPRIVATE		(1ULL << 51)
 
 extern const struct option cf_options[];
 

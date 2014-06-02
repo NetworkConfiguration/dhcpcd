@@ -68,6 +68,8 @@ for x do
 	--without-pollts) POLLTS=no;;
 	--with-pollts) POLLTS=$var;;
 	--without-md5) MD5=no;;
+	--without-sha2) SHA2=no;;
+	--without-sha256) SHA2=no;;
 	--without-dev) DEV=no;;
 	--without-udev) UDEV=no;;
 	--serviceexists) SERVICEEXISTS=$var;;
@@ -781,6 +783,57 @@ else
 	echo "MD5_SRC=" >>$CONFIG_MK
 	echo "#define HAVE_MD5_H" >>$CONFIG_H
 	[ -n "$MD5_LIB" ] && echo "LDADD+=		$MD5_LIB" >>$CONFIG_MK
+fi
+
+if [ -z "$SHA2_H" -a -z "$SHA2" -o "$SHA2" != no ]; then
+	printf "Testing for sha2.h ... "
+	if [ -e /usr/include/sha2.h ]; then
+		SHA2_H=sha2.h
+	elif [ -e /usr/inclde/sha256.h ]; then
+		SHA2_H=sha256.h
+	fi
+	if [ -n "$SHA2_H" ]; then
+		echo "$SHA2_H"
+	else
+		echo "no"
+	fi
+fi
+
+if [ -z "$SHA2" ]; then
+	SHA2_LIB=
+	printf "Testing for SHA256_Init ... "
+	cat <<EOF >_sha256.c
+#include <sys/types.h>
+EOF
+	[ -n "$SHA2_H" ] && echo "#include <$SHA2_H>">>_sha256.c
+	cat <<EOF >>_sha256.c
+#include <sha2.h>
+#include <stdlib.h>
+int main(void) {
+	SHA256_CTX context;
+	SHA256_Init(&context);
+	return 0;
+}
+EOF
+	# We only want to link to libmd if it exists in /lib
+	set -- $(ls /lib/libmd.so.* 2>/dev/null)
+	if $XCC _sha256.c -o _sha256 2>/dev/null; then
+		SHA2=yes
+	elif [ -e "$1" ] && $XCC _sha256.c -lmd -o _sha256 2>/dev/null; then
+		SHA2="yes (-lmd)"
+		SHA2_LIB=-lmd
+	else
+		MD5=no
+	fi
+	echo "$SHA2"
+	rm -f _sha256.c _sha256
+fi
+if [ "$SHA2" = no ]; then
+	echo "SHA256_SRC=	sha256.c" >>$CONFIG_MK
+else
+	echo "SHA256_SRC=" >>$CONFIG_MK
+	echo "#define SHA2_H		<$SHA2_H>" >>$CONFIG_H
+	[ -n "$SHA2_LIB" ] && echo "LDADD+=		$SHA2_LIB" >>$CONFIG_MK
 fi
 
 if [ "$DEV" != no -a "$UDEV" != no ]; then

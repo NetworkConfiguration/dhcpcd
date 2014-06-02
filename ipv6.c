@@ -73,6 +73,16 @@
 #include "ipv6.h"
 #include "ipv6nd.h"
 
+#ifdef SHA2_H
+#  include SHA2_H
+#else
+#  include "sha256.h"
+#endif
+
+#ifndef SHA256_DIGEST_LENGTH
+#  define SHA256_DIGEST_LENGTH		32
+#endif
+
 #ifdef IPV6_POLLADDRFLAG
 #  warning kernel does not report IPv6 address flag changes
 #  warning polling tentative address flags periodically instead
@@ -181,13 +191,149 @@ ipv6_printaddr(char *s, size_t sl, const uint8_t *d, const char *ifname)
 	return (ssize_t)l;
 }
 
+static ssize_t
+ipv6_readsecret(struct dhcpcd_ctx *ctx)
+{
+	FILE *fp;
+	char line[1024];
+	unsigned char *p;
+	size_t len;
+	uint32_t r;
+	int x;
+
+	if ((fp = fopen(SECRET, "r"))) {
+		while (fgets(line, sizeof(line), fp)) {
+			len = strlen(line);
+			if (len) {
+				if (line[len - 1] == '\n')
+					line[len - 1] = '\0';
+			}
+			len = hwaddr_aton(NULL, line);
+			if (len) {
+				ctx->secret_len = hwaddr_aton(ctx->secret,
+				    line);
+				break;
+			}
+			len = 0;
+		}
+		fclose(fp);
+		if (len)
+			return (ssize_t)len;
+	} else {
+		if (errno != ENOENT)
+			syslog(LOG_ERR, "error reading secret: %s: %m", SECRET);
+	}
+
+	/* Chaining arc4random should be good enough.
+	 * RFC7217 section 5.1 states the key SHOULD be at least 128 bits.
+	 * To attempt and future proof ourselves, we'll generate a key of
+	 * 512 bits (64 bytes). */
+	p = ctx->secret;
+	ctx->secret_len = 0;
+	for (len = 0; len < 512 / NBBY; len += sizeof(r)) {
+		r = arc4random();
+		memcpy(p, &r, sizeof(r));
+		p += sizeof(r);
+		ctx->secret_len += sizeof(r);
+
+	}
+
+	if (!(fp = fopen(SECRET, "w")))
+		goto eexit;
+	x = fprintf(fp, "%s\n",
+	    hwaddr_ntoa(ctx->secret, ctx->secret_len, line, sizeof(line)));
+	fclose(fp);
+	if (x > 0)
+		return (ssize_t)ctx->secret_len;
+
+eexit:
+	syslog(LOG_ERR, "error writing secret: %s: %m", SECRET);
+	unlink(SECRET);
+	ctx->secret_len = 0;
+	return -1;
+}
+
+/* RFC7217 */
+int
+ipv6_makestableprivate(struct in6_addr *addr,
+    const struct in6_addr *prefix, int prefix_len,
+    const unsigned char *netiface, size_t netiface_len,
+    const char *netid, size_t netid_len,
+    uint32_t dad_counter,
+    const unsigned char *secret, size_t secret_len)
+{
+	unsigned char buf[2048], *p, digest[SHA256_DIGEST_LENGTH];
+	size_t len, l;
+	SHA256_CTX ctx;
+
+	if (prefix_len < 0 || prefix_len > 120) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	l = (size_t)(ROUNDUP8(prefix_len) / NBBY);
+	len = l + netiface_len + netid_len + sizeof(dad_counter) + secret_len;
+	if (len > sizeof(buf)) {
+		errno = ENOBUFS;
+		return -1;
+	}
+
+	/* Combine all parameters into one buffer */
+	p = buf;
+	memcpy(p, prefix, l);
+	p += l;
+	memcpy(p, netiface, netiface_len);
+	p += netiface_len;
+	memcpy(p, netid, netid_len);
+	p += netid_len;
+	memcpy(p, &dad_counter, sizeof(dad_counter));
+	p += sizeof(dad_counter);
+	memcpy(p, secret, secret_len);
+
+	/* Make an address using the prefix and the digest of the above.
+	 * RFC7217 Section 5.1 states that we shouldn't use MD5.
+	 * Pity as we use that for HMAC-MD5 which is still deemed OK.
+	 * SHA-256 is recommended */
+	SHA256_Init(&ctx);
+	SHA256_Update(&ctx, buf, len);
+	SHA256_Final(digest, &ctx);
+
+	p = addr->s6_addr;
+	memcpy(p, prefix, l);
+	/* RFC7217 section 5.2 says we need to start taking the id from
+	 * the least significant bit */
+	len = sizeof(addr->s6_addr) - l;
+	memcpy(p + l, digest + (sizeof(digest) - len), len);
+
+	return 0;
+}
+
 int
 ipv6_makeaddr(struct in6_addr *addr, const struct interface *ifp,
     const struct in6_addr *prefix, int prefix_len)
 {
 	const struct ipv6_addr *ap;
 
-	if (prefix_len < 0 || prefix_len > 64) {
+	if (prefix_len < 0 || prefix_len > 120) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (ifp->options->options & DHCPCD_STABLEPRIVATE) {
+		if (ifp->ctx->secret_len == 0) {
+			if (ipv6_readsecret(ifp->ctx) == -1)
+				return -1;
+		}
+		if (ipv6_makestableprivate(addr, prefix, prefix_len,
+		    ifp->options->iaid, sizeof(ifp->options->iaid),
+		    ifp->ssid, strlen(ifp->ssid),
+		    0, /* DAD counter starts at 0 */
+		    ifp->ctx->secret, ifp->ctx->secret_len) == -1)
+			return -1;
+		return 0;
+	}
+
+	if (prefix_len > 64) {
 		errno = EINVAL;
 		return -1;
 	}

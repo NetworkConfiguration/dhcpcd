@@ -47,12 +47,13 @@
 #define STRINGIFY(a)		#a
 #define TOSTRING(a)		STRINGIFY(a)
 
+#define USECINSEC		1000000
 #define timeval_to_double(tv)						\
 	((double)(tv)->tv_sec + (double)((tv)->tv_usec) * 1.0e-6)
 #define timernorm(tv) do {						\
-	while ((tv)->tv_usec >= 1000000) {				\
+	while ((tv)->tv_usec >=  USECINSEC) {				\
 		(tv)->tv_sec++;						\
-		(tv)->tv_usec -= 1000000;				\
+		(tv)->tv_usec -= USECINSEC;				\
 	}								\
 } while (0 /* CONSTCOND */);
 #define tv_to_ms(ms, tv) do {						\

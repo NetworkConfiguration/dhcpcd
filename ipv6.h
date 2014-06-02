@@ -49,6 +49,10 @@
 #  define ND6_INFINITE_LIFETIME		((uint32_t)~0)
 #endif
 
+/* RFC7217 constants */
+#define IDGEN_RETRIES	3
+#define IDGEN_DELAY	1 /* second */
+
 /*
  * BSD kernels don't inform userland of DAD results.
  * See the discussion here:
@@ -84,6 +88,7 @@ struct ipv6_addr {
 	struct interface *delegating_iface;
 
 	void (*dadcallback)(void *);
+	uint32_t dadcounter;
 	uint8_t *ns;
 	size_t nslen;
 	int nsprobes;
@@ -160,6 +165,12 @@ struct ipv6_ctx {
 #ifdef INET6
 struct ipv6_ctx *ipv6_init(struct dhcpcd_ctx *);
 ssize_t ipv6_printaddr(char *, size_t, const uint8_t *, const char *);
+int ipv6_makestableprivate(struct in6_addr *addr,
+    const struct in6_addr *prefix, int prefix_len,
+    const unsigned char *netiface, size_t netiface_len,
+    const char *netid, size_t netid_len,
+    uint32_t dad_counter,
+    const unsigned char *secret, size_t secret_len);
 int ipv6_makeaddr(struct in6_addr *, const struct interface *,
     const struct in6_addr *, int);
 int ipv6_makeprefix(struct in6_addr *, const struct in6_addr *, int);
