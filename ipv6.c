@@ -28,6 +28,7 @@
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 
 #include <net/route.h>
 #include <netinet/in.h>
@@ -238,7 +239,11 @@ ipv6_readsecret(struct dhcpcd_ctx *ctx)
 
 	}
 
-	if (!(fp = fopen(SECRET, "w")))
+	/* Ensure that only the dhcpcd user can read the secret.
+	 * Write permission is also denied as chaning it would remove
+	 * it's stability. */
+	if ((fp = fopen(SECRET, "w")) == NULL ||
+	    chmod(SECRET, S_IRUSR) == -1)
 		goto eexit;
 	x = fprintf(fp, "%s\n",
 	    hwaddr_ntoa(ctx->secret, ctx->secret_len, line, sizeof(line)));
@@ -254,8 +259,8 @@ eexit:
 }
 
 /* RFC7217 */
-int
-ipv6_makestableprivate(struct in6_addr *addr,
+static int
+ipv6_makestableprivate1(struct in6_addr *addr,
     const struct in6_addr *prefix, int prefix_len,
     const unsigned char *netiface, size_t netiface_len,
     const char *netid, size_t netid_len,
@@ -309,6 +314,23 @@ ipv6_makestableprivate(struct in6_addr *addr,
 }
 
 int
+ipv6_makestableprivate(struct in6_addr *addr,
+    const struct in6_addr *prefix, int prefix_len,
+    const struct interface *ifp,
+    uint32_t dad_counter)
+{
+
+	/* For our implementation, we shall set the hardware address
+	 * as the interface identifier */
+
+	return ipv6_makestableprivate1(addr, prefix, prefix_len,
+	    ifp->hwaddr, ifp->hwlen,
+	    ifp->ssid, strlen(ifp->ssid),
+	    dad_counter,
+	    ifp->ctx->secret, ifp->ctx->secret_len);
+}
+
+int
 ipv6_makeaddr(struct in6_addr *addr, const struct interface *ifp,
     const struct in6_addr *prefix, int prefix_len)
 {
@@ -324,11 +346,8 @@ ipv6_makeaddr(struct in6_addr *addr, const struct interface *ifp,
 			if (ipv6_readsecret(ifp->ctx) == -1)
 				return -1;
 		}
-		if (ipv6_makestableprivate(addr, prefix, prefix_len,
-		    ifp->options->iaid, sizeof(ifp->options->iaid),
-		    ifp->ssid, strlen(ifp->ssid),
-		    0, /* DAD counter starts at 0 */
-		    ifp->ctx->secret, ifp->ctx->secret_len) == -1)
+		if (ipv6_makestableprivate(addr,
+		    prefix, prefix_len, ifp, 0) == -1)
 			return -1;
 		return 0;
 	}

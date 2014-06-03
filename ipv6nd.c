@@ -612,10 +612,7 @@ ipv6nd_dadcallback(void *arg)
 				syslog(LOG_ERR, "if_deladdress6: %m");
 			if (ipv6_makestableprivate(&ap->addr,
 			    &ap->prefix, ap->prefix_len,
-			    ifp->options->iaid, sizeof(ifp->options->iaid),
-			    ifp->ssid, strlen(ifp->ssid),
-			    ap->dadcounter,
-			    ifp->ctx->secret, ifp->ctx->secret_len) == -1)
+			    ifp, ap->dadcounter) == -1)
 			{
 				syslog(LOG_ERR,
 				    "%s: ipv6_makestableprivate: %m",

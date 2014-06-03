@@ -167,10 +167,7 @@ struct ipv6_ctx *ipv6_init(struct dhcpcd_ctx *);
 ssize_t ipv6_printaddr(char *, size_t, const uint8_t *, const char *);
 int ipv6_makestableprivate(struct in6_addr *addr,
     const struct in6_addr *prefix, int prefix_len,
-    const unsigned char *netiface, size_t netiface_len,
-    const char *netid, size_t netid_len,
-    uint32_t dad_counter,
-    const unsigned char *secret, size_t secret_len);
+    const struct interface *ifp, uint32_t dad_counter);
 int ipv6_makeaddr(struct in6_addr *, const struct interface *,
     const struct in6_addr *, int);
 int ipv6_makeprefix(struct in6_addr *, const struct in6_addr *, int);
