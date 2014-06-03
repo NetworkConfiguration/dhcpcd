@@ -1016,7 +1016,7 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 			    strcmp(rao->option, opt) == 0)
 				break;
 		}
-		if (lifetime == 0) {
+		if (lifetime == 0 || *opt == '\0') {
 			if (rao) {
 				TAILQ_REMOVE(&rap->options, rao, next);
 				free(rao->option);
@@ -1118,7 +1118,7 @@ ipv6nd_hasradhcp(const struct interface *ifp)
 ssize_t
 ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 {
-	size_t i, len, l;
+	size_t i, l, len;
 	const struct ra *rap;
 	const struct ra_opt *rao;
 	char buffer[32];
@@ -1144,7 +1144,7 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 			var = NULL;
 			switch(rao->type) {
 			case ND_OPT_PREFIX_INFORMATION:
-				optn = "prefix";
+				optn = "prefix"; /* really address */
 				var = &pref;
 				break;
 			case ND_OPT_MTU:
