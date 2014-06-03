@@ -258,6 +258,8 @@ eexit:
 	return -1;
 }
 
+/* http://www.iana.org/assignments/ipv6-interface-ids/ipv6-interface-ids.xhtml
+ * RFC5453 */
 static const struct reslowhigh {
 	const uint8_t high[8];
 	const uint8_t low[8];
@@ -343,7 +345,8 @@ ipv6_makestableprivate1(struct in6_addr *addr,
 		len = sizeof(addr->s6_addr) - l;
 		memcpy(p + l, digest + (sizeof(digest) - len), len);
 
-		/* Ensure that the Interface ID does not match a reserved one.
+		/* Ensure that the Interface ID does not match a reserved one,
+		 * if it does then treat it as a DAD failure.
 		 * RFC7217 section 5.2 */
 		if (prefix_len != 64)
 			break;
