@@ -258,13 +258,45 @@ eexit:
 	return -1;
 }
 
+static const struct reslowhigh {
+	const uint8_t high[8];
+	const uint8_t low[8];
+} reslowhigh[] = {
+	/* RFC4291 + RFC6543 */
+	{ { 0x02, 0x00, 0x5e, 0xff, 0xfe, 0x00, 0x00, 0x00 },
+	  { 0x02, 0x00, 0x5e, 0xff, 0xfe, 0xff, 0xff, 0xff } },
+	/* RFC2526 */
+	{ { 0xfd, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x80 },
+	  { 0xfd, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff } }
+};
+
+static int
+ipv6_reserved(const struct in6_addr *addr)
+{
+	uint64_t id, low, high;
+	size_t i;
+	const struct reslowhigh *r;
+
+	id = be64dec(addr->s6_addr + sizeof(id));
+	if (id == 0) /* RFC4291 */
+		return 1;
+	for (i = 0; i < sizeof(reslowhigh) / sizeof(reslowhigh[0]); i++) {
+		r = &reslowhigh[i];
+		low = be64dec(r->low);
+		high = be64dec(r->high);
+		if (id >= low && id <= high)
+			return 1;
+	}
+	return 0;
+}
+
 /* RFC7217 */
 static int
 ipv6_makestableprivate1(struct in6_addr *addr,
     const struct in6_addr *prefix, int prefix_len,
     const unsigned char *netiface, size_t netiface_len,
     const char *netid, size_t netid_len,
-    uint32_t dad_counter,
+    uint32_t *dad_counter,
     const unsigned char *secret, size_t secret_len)
 {
 	unsigned char buf[2048], *p, digest[SHA256_DIGEST_LENGTH];
@@ -277,38 +309,47 @@ ipv6_makestableprivate1(struct in6_addr *addr,
 	}
 
 	l = (size_t)(ROUNDUP8(prefix_len) / NBBY);
-	len = l + netiface_len + netid_len + sizeof(dad_counter) + secret_len;
+	len = l + netiface_len + netid_len + sizeof(*dad_counter) + secret_len;
 	if (len > sizeof(buf)) {
 		errno = ENOBUFS;
 		return -1;
 	}
 
-	/* Combine all parameters into one buffer */
-	p = buf;
-	memcpy(p, prefix, l);
-	p += l;
-	memcpy(p, netiface, netiface_len);
-	p += netiface_len;
-	memcpy(p, netid, netid_len);
-	p += netid_len;
-	memcpy(p, &dad_counter, sizeof(dad_counter));
-	p += sizeof(dad_counter);
-	memcpy(p, secret, secret_len);
+	for (;; (*dad_counter)++) {
+		/* Combine all parameters into one buffer */
+		p = buf;
+		memcpy(p, prefix, l);
+		p += l;
+		memcpy(p, netiface, netiface_len);
+		p += netiface_len;
+		memcpy(p, netid, netid_len);
+		p += netid_len;
+		memcpy(p, dad_counter, sizeof(*dad_counter));
+		p += sizeof(*dad_counter);
+		memcpy(p, secret, secret_len);
 
-	/* Make an address using the prefix and the digest of the above.
-	 * RFC7217 Section 5.1 states that we shouldn't use MD5.
-	 * Pity as we use that for HMAC-MD5 which is still deemed OK.
-	 * SHA-256 is recommended */
-	SHA256_Init(&ctx);
-	SHA256_Update(&ctx, buf, len);
-	SHA256_Final(digest, &ctx);
+		/* Make an address using the digest of the above.
+		 * RFC7217 Section 5.1 states that we shouldn't use MD5.
+		 * Pity as we use that for HMAC-MD5 which is still deemed OK.
+		 * SHA-256 is recommended */
+		SHA256_Init(&ctx);
+		SHA256_Update(&ctx, buf, len);
+		SHA256_Final(digest, &ctx);
 
-	p = addr->s6_addr;
-	memcpy(p, prefix, l);
-	/* RFC7217 section 5.2 says we need to start taking the id from
-	 * the least significant bit */
-	len = sizeof(addr->s6_addr) - l;
-	memcpy(p + l, digest + (sizeof(digest) - len), len);
+		p = addr->s6_addr;
+		memcpy(p, prefix, l);
+		/* RFC7217 section 5.2 says we need to start taking the id from
+		 * the least significant bit */
+		len = sizeof(addr->s6_addr) - l;
+		memcpy(p + l, digest + (sizeof(digest) - len), len);
+
+		/* Ensure that the Interface ID does not match a reserved one.
+		 * RFC7217 section 5.2 */
+		if (prefix_len != 64)
+			break;
+		if (!ipv6_reserved(addr))
+			break;
+	}
 
 	return 0;
 }
@@ -317,17 +358,24 @@ int
 ipv6_makestableprivate(struct in6_addr *addr,
     const struct in6_addr *prefix, int prefix_len,
     const struct interface *ifp,
-    uint32_t dad_counter)
+    int *dad_counter)
 {
+	uint32_t dad;
+	int r;
+
+	dad = (uint32_t)*dad_counter;
 
 	/* For our implementation, we shall set the hardware address
 	 * as the interface identifier */
-
-	return ipv6_makestableprivate1(addr, prefix, prefix_len,
+	r = ipv6_makestableprivate1(addr, prefix, prefix_len,
 	    ifp->hwaddr, ifp->hwlen,
 	    ifp->ssid, strlen(ifp->ssid),
-	    dad_counter,
+	    &dad,
 	    ifp->ctx->secret, ifp->ctx->secret_len);
+
+	if (r == 0)
+		*dad_counter = (int)dad;
+	return r;
 }
 
 int
@@ -335,6 +383,7 @@ ipv6_makeaddr(struct in6_addr *addr, const struct interface *ifp,
     const struct in6_addr *prefix, int prefix_len)
 {
 	const struct ipv6_addr *ap;
+	int dad;
 
 	if (prefix_len < 0 || prefix_len > 120) {
 		errno = EINVAL;
@@ -346,10 +395,11 @@ ipv6_makeaddr(struct in6_addr *addr, const struct interface *ifp,
 			if (ipv6_readsecret(ifp->ctx) == -1)
 				return -1;
 		}
+		dad = 0;
 		if (ipv6_makestableprivate(addr,
-		    prefix, prefix_len, ifp, 0) == -1)
+		    prefix, prefix_len, ifp, &dad) == -1)
 			return -1;
-		return 0;
+		return dad;
 	}
 
 	if (prefix_len > 64) {
@@ -447,55 +497,19 @@ ipv6_prefixlen(const struct in6_addr *mask)
 }
 
 static void
-in6_to_h64(const struct in6_addr *add, uint64_t *vhigh, uint64_t *vlow)
+in6_to_h64(uint64_t *vhigh, uint64_t *vlow, const struct in6_addr *addr)
 {
-	uint64_t l, h;
-	const uint8_t *p = (const uint8_t *)&add->s6_addr;
 
-	h = ((uint64_t)p[0] << 56) |
-	    ((uint64_t)p[1] << 48) |
-	    ((uint64_t)p[2] << 40) |
-	    ((uint64_t)p[3] << 32) |
-	    ((uint64_t)p[4] << 24) |
-	    ((uint64_t)p[5] << 16) |
-	    ((uint64_t)p[6] << 8) |
-	    (uint64_t)p[7];
-	p += 8;
-	l = ((uint64_t)p[0] << 56) |
-	    ((uint64_t)p[1] << 48) |
-	    ((uint64_t)p[2] << 40) |
-	    ((uint64_t)p[3] << 32) |
-	    ((uint64_t)p[4] << 24) |
-	    ((uint64_t)p[5] << 16) |
-	    ((uint64_t)p[6] << 8) |
-	    (uint64_t)p[7];
-
-	*vhigh = h;
-	*vlow = l;
+	*vhigh = be64dec(addr->s6_addr);
+	*vlow = be64dec(addr->s6_addr + 8);
 }
 
 static void
-h64_to_in6(uint64_t vhigh, uint64_t vlow, struct in6_addr *add)
+h64_to_in6(struct in6_addr *addr, uint64_t vhigh, uint64_t vlow)
 {
-	uint8_t *p = (uint8_t *)&add->s6_addr;
 
-	p[0] = (uint8_t)(vhigh >> 56);
-	p[1] = (uint8_t)(vhigh >> 48);
-	p[2] = (uint8_t)(vhigh >> 40);
-	p[3] = (uint8_t)(vhigh >> 32);
-	p[4] = (uint8_t)(vhigh >> 24);
-	p[5] = (uint8_t)(vhigh >> 16);
-	p[6] = (uint8_t)(vhigh >> 8);
-	p[7] = (uint8_t)vhigh;
-	p += 8;
-	p[0] = (uint8_t)(vlow >> 56);
-	p[1] = (uint8_t)(vlow >> 48);
-	p[2] = (uint8_t)(vlow >> 40);
-	p[3] = (uint8_t)(vlow >> 32);
-	p[4] = (uint8_t)(vlow >> 24);
-	p[5] = (uint8_t)(vlow >> 16);
-	p[6] = (uint8_t)(vlow >> 8);
-	p[7] = (uint8_t)vlow;
+	be64enc(addr->s6_addr, vhigh);
+	be64enc(addr->s6_addr + 8, vlow);
 }
 
 int
@@ -533,13 +547,13 @@ ipv6_userprefix(
 	}
 
 	/* convert to two 64bit host order values */
-	in6_to_h64(prefix, &vh, &vl);
+	in6_to_h64(&vh, &vl, prefix);
 
 	vh |= user_high;
 	vl |= user_low;
 
 	/* copy back result */
-	h64_to_in6(vh, vl, result);
+	h64_to_in6(result, vh, vl);
 
 	return 0;
 }

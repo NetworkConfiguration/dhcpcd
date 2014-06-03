@@ -589,6 +589,7 @@ ipv6nd_dadcallback(void *arg)
 	struct timeval tv;
 	char buf[INET6_ADDRSTRLEN];
 	const char *p;
+	int dadcounter;
 
 	ifp = ap->iface;
 	wascompleted = (ap->flags & IPV6_AF_DADCOMPLETED);
@@ -610,15 +611,17 @@ ipv6nd_dadcallback(void *arg)
 			if (if_deladdress6(ap) == -1 &&
 			    errno != EADDRNOTAVAIL && errno != ENXIO)
 				syslog(LOG_ERR, "if_deladdress6: %m");
+			dadcounter = ap->dadcounter;
 			if (ipv6_makestableprivate(&ap->addr,
 			    &ap->prefix, ap->prefix_len,
-			    ifp, ap->dadcounter) == -1)
+			    ifp, &dadcounter) == -1)
 			{
 				syslog(LOG_ERR,
 				    "%s: ipv6_makestableprivate: %m",
 				    ifp->name);
 				return;
 			}
+			ap->dadcounter = dadcounter;
 			ap->flags &= ~(IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED);
 			ap->flags |= IPV6_AF_NEW;
 			p = inet_ntop(AF_INET6, ap->addr.s6_addr,
@@ -869,9 +872,14 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 				    ND_OPT_PI_FLAG_AUTO)
 				{
 					ap->flags |= IPV6_AF_AUTOCONF;
-					ipv6_makeaddr(&ap->addr, ifp,
+					ap->dadcounter =
+					    ipv6_makeaddr(&ap->addr, ifp,
 					    &ap->prefix,
 					    pi->nd_opt_pi_prefix_len);
+					if (ap->dadcounter == -1) {
+						free(ap);
+						break;
+					}
 					cbp = inet_ntop(AF_INET6,
 					    ap->addr.s6_addr,
 					    buf, sizeof(buf));
