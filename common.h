@@ -137,7 +137,14 @@ static inline uint32_t
 be32dec(const uint8_t *buf)
 {
 
-	return (uint32_t)(be16dec(buf) << 16 | be16dec(buf + 2));
+	return (uint32_t)((uint32_t)be16dec(buf) << 16 | be16dec(buf + 2));
+}
+
+static inline uint64_t
+be64dec(const uint8_t *buf)
+{
+
+	return (uint64_t)((uint64_t)be32dec(buf) << 32 | be32dec(buf + 4));
 }
 #endif
 
