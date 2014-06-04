@@ -1088,8 +1088,10 @@ if_address6(const struct ipv6_addr *ap, int action)
 	}
 
 #ifdef IFA_F_NOPREFIXROUTE
-	flags = IFA_F_NOPREFIXROUTE;
-	add_attr_32(&nlm.hdr, sizeof(nlm), IFA_FLAGS, flags);
+	if (!IN6_IS_ADDR_LINKLOCAL(&ap->addr)) {
+		flags = IFA_F_NOPREFIXROUTE;
+		add_attr_32(&nlm.hdr, sizeof(nlm), IFA_FLAGS, flags);
+	}
 #endif
 
 	if (send_netlink(ap->iface->ctx, &nlm.hdr) == -1)
@@ -1254,9 +1256,16 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 	snprintf(path, sizeof(path), "%s/%s/autoconf", prefix, ifname);
 	ra = check_proc_int(path);
 	if (ra != 1) {
-		syslog(LOG_WARNING, "%s: IPv6 kernel autoconf disabled",
-		    ifname);
-		return -1;
+		if (!own) {
+			syslog(LOG_WARNING,
+			    "%s: IPv6 kernel autoconf disabled", ifname);
+			return -1;
+		}
+	} else if (ra != -1 && own) {
+		if (write_path(path, "0") == -1) {
+			syslog(LOG_ERR, "write_path: %s: %m", path);
+			return -1;
+		}
 	}
 
 	snprintf(path, sizeof(path), "%s/%s/accept_ra", prefix, ifname);
