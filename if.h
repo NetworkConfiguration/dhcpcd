@@ -90,6 +90,7 @@
 #define RAW_EOF			1 << 0
 #define RAW_PARTIALCSUM		2 << 0
 
+int if_up(struct interface *ifp);
 struct if_head *if_discover(struct dhcpcd_ctx *, int, char * const *);
 struct interface *if_find(struct dhcpcd_ctx *, const char *);
 void if_free(struct interface *);

@@ -31,6 +31,7 @@
 #include <sys/stat.h>
 
 #include <net/route.h>
+#include <netinet/if_ether.h>
 #include <netinet/in.h>
 
 #ifdef __linux__
@@ -917,7 +918,7 @@ ipv6_addlinklocal(struct interface *ifp)
 		switch (ifp->family) {
 		case ARPHRD_ETHER:
 			/* Check for a valid hardware address */
-			if (ifp->hwlen != 6 & ifp->hwlen != 8) {
+			if (ifp->hwlen != 6 && ifp->hwlen != 8) {
 				errno = ENOTSUP;
 				return -1;
 			}
@@ -988,8 +989,20 @@ ipv6_addlinklocal(struct interface *ifp)
 int
 ipv6_start(struct interface *ifp)
 {
+	const struct ipv6_state *state;
+	const struct ipv6_addr *ap;
 
-	if (ipv6_linklocal(ifp) == NULL && ipv6_addlinklocal(ifp) == -1)
+	state = IPV6_CSTATE(ifp);
+	if (state) {
+		TAILQ_FOREACH(ap, &state->addrs, next) {
+			if (IN6_IS_ADDR_LINKLOCAL(&ap->addr) &&
+			    !(ap->addr_flags & IN6_IFF_DUPLICATED))
+				break;
+		}
+	} else
+		ap = NULL;
+
+	if (ap == NULL && ipv6_addlinklocal(ifp) == -1)
 		return -1;
 	return 0;
 }

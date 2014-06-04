@@ -77,7 +77,7 @@
 #define DHCPCD_VENDORRAW		(1ULL << 23)
 #define DHCPCD_TIMEOUT_IPV4LL		(1ULL << 24)
 #define DHCPCD_WAITIP			(1ULL << 25)
-#define DHCPCD_WAITUP			(1ULL << 26)
+#define DHCPCD_SLAACPRIVATE		(1ULL << 26)
 #define DHCPCD_CSR_WARNED		(1ULL << 27)
 #define DHCPCD_XID_HWADDR		(1ULL << 28)
 #define DHCPCD_BROADCAST		(1ULL << 29)
@@ -102,7 +102,6 @@
 #define DHCPCD_IAID			(1ULL << 48)
 #define DHCPCD_DHCP			(1ULL << 49)
 #define DHCPCD_DHCP6			(1ULL << 50)
-#define DHCPCD_SLAACPRIVATE		(1ULL << 51)
 
 extern const struct option cf_options[];
 

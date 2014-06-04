@@ -132,8 +132,8 @@ if_carrier(struct interface *iface)
 	return r;
 }
 
-static int
-up_interface(struct interface *iface)
+int
+if_up(struct interface *ifp)
 {
 	struct ifreq ifr;
 	int s, r;
@@ -144,7 +144,7 @@ up_interface(struct interface *iface)
 	if ((s = socket(PF_INET, SOCK_DGRAM, 0)) == -1)
 		return -1;
 	memset(&ifr, 0, sizeof(ifr));
-	strlcpy(ifr.ifr_name, iface->name, sizeof(ifr.ifr_name));
+	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
 #ifdef __linux__
 	/* We can only bring the real interface up */
 	if ((p = strchr(ifr.ifr_name, ':')))
@@ -159,7 +159,7 @@ up_interface(struct interface *iface)
 			if (ioctl(s, SIOCSIFFLAGS, &ifr) == 0)
 				r = 0;
 		}
-		iface->flags = (unsigned int)ifr.ifr_flags;
+		ifp->flags = (unsigned int)ifr.ifr_flags;
 	}
 	close(s);
 	return r;
@@ -295,20 +295,6 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		ifp->ctx = ctx;
 		strlcpy(ifp->name, p, sizeof(ifp->name));
 		ifp->flags = ifa->ifa_flags;
-
-		/* Bring the interface up if not already */
-		if (!(ifp->flags & IFF_UP)
-#ifdef SIOCGIFMEDIA
-		    && if_carrier(ifp) != LINK_UNKNOWN
-#endif
-		   )
-		{
-			if (up_interface(ifp) == 0)
-				ctx->options |= DHCPCD_WAITUP;
-			else
-				syslog(LOG_ERR, "%s: up_interface: %m",
-				    ifp->name);
-		}
 
 		sdl_type = 0;
 		/* Don't allow loopback unless explicit */

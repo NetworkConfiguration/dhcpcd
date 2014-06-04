@@ -569,6 +569,19 @@ dhcpcd_startinterface(void *arg)
 	size_t i;
 	char buf[DUID_LEN * 3];
 
+	/* Add our link-local address before upping the interface
+	 * so our RFC7217 address beats the hwaddr based one */
+	if (ifo->options & DHCPCD_IPV6 && ipv6_start(ifp) == -1) {
+		syslog(LOG_ERR, "%s: ipv6_start: %m", ifp->name);
+		ifo->options &= DHCPCD_IPV6;
+	}
+
+	if (!(ifp->flags & IFF_UP) && if_carrier(ifp) != LINK_UNKNOWN) {
+		if (if_up(ifp) == -1)
+			syslog(LOG_ERR, "%s: if_up: %m",
+			    ifp->name);
+	}
+
 	if (ifp->carrier == LINK_UNKNOWN)
 		dhcpcd_handlecarrier(ifp->ctx, LINK_UNKNOWN, 0, ifp->name);
 	if (ifp->carrier == LINK_DOWN) {
@@ -604,10 +617,6 @@ dhcpcd_startinterface(void *arg)
 		}
 	}
 
-	if (ifo->options & DHCPCD_IPV6 && ipv6_start(ifp) == -1) {
-		syslog(LOG_ERR, "%s: ipv6_start: %m", ifp->name);
-		ifo->options &= DHCPCD_IPV6;
-	}
 	if (ifo->options & DHCPCD_IPV6) {
 		if (ifo->options & DHCPCD_IPV6RS &&
 		    !(ifo->options & DHCPCD_INFORM))
@@ -1536,25 +1545,6 @@ main(int argc, char **argv)
 	}
 
 	if (!(ctx.options & DHCPCD_BACKGROUND)) {
-		/* If we don't have a carrier, we may have to wait for a second
-		 * before one becomes available if we brought an interface up */
-		if (opt == 0 &&
-		    ctx.options & DHCPCD_LINK &&
-		    ctx.options & DHCPCD_WAITUP &&
-		    !(ctx.options & DHCPCD_WAITIP))
-		{
-			ts.tv_sec = 1;
-			ts.tv_nsec = 0;
-			nanosleep(&ts, NULL);
-			TAILQ_FOREACH(ifp, ctx.ifaces, next) {
-				dhcpcd_handlecarrier(&ctx, LINK_UNKNOWN, 0,
-				    ifp->name);
-				if (ifp->carrier != LINK_DOWN) {
-					opt = 1;
-					break;
-				}
-			}
-		}
 		if (ctx.options & DHCPCD_MASTER)
 			t = ifo->timeout;
 		else if ((ifp = TAILQ_FIRST(ctx.ifaces)))
