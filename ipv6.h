@@ -45,6 +45,11 @@
 #define ROUNDUP8(a)  (1 + (((a) - 1) |  7))
 #define ROUNDUP16(a) (1 + (((a) - 1) | 16))
 
+#define EUI64_GBIT		0x01
+#define EUI64_UBIT		0x02
+#define EUI64_TO_IFID(in6)	do {(in6)->s6_addr[8] ^= EUI64_UBIT; } while (0)
+#define EUI64_GROUP(in6)	((in6)->s6_addr[8] & EUI64_GBIT)
+
 #ifndef ND6_INFINITE_LIFETIME
 #  define ND6_INFINITE_LIFETIME		((uint32_t)~0)
 #endif
@@ -189,6 +194,7 @@ const struct ipv6_addr *ipv6_findaddr(const struct interface *,
 #define ipv6_linklocal(ifp) (ipv6_findaddr((ifp), NULL))
 int ipv6_addlinklocalcallback(struct interface *, void (*)(void *), void *);
 void ipv6_free_ll_callbacks(struct interface *);
+int ipv6_start(struct interface *);
 void ipv6_free(struct interface *);
 void ipv6_ctxfree(struct dhcpcd_ctx *);
 int ipv6_removesubnet(struct interface *, struct ipv6_addr *);
@@ -196,6 +202,7 @@ void ipv6_buildroutes(struct dhcpcd_ctx *);
 
 #else
 #define ipv6_init(a) NULL
+#define ipv6_start(a) (-1)
 #define ipv6_free_ll_callbacks(a)
 #define ipv6_free(a)
 #define ipv6_ctxfree(a)

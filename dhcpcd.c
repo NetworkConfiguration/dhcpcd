@@ -447,6 +447,8 @@ configure_interface1(struct interface *ifp)
 	if (!(ifo->auth.options & DHCPCD_AUTH_SEND))
 		ifo->auth.options &= ~DHCPCD_AUTH_REQUIRE;
 
+	if (ifo->options & DHCPCD_SLAACPRIVATE)
+		ifo->options |= DHCPCD_IPV6RA_OWN;
 }
 
 int
@@ -602,6 +604,10 @@ dhcpcd_startinterface(void *arg)
 		}
 	}
 
+	if (ifo->options & DHCPCD_IPV6 && ipv6_start(ifp) == -1) {
+		syslog(LOG_ERR, "%s: ipv6_start: %m", ifp->name);
+		ifo->options &= DHCPCD_IPV6;
+	}
 	if (ifo->options & DHCPCD_IPV6) {
 		if (ifo->options & DHCPCD_IPV6RS &&
 		    !(ifo->options & DHCPCD_INFORM))

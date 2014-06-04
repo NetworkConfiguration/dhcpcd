@@ -75,7 +75,7 @@
 .Sh DESCRIPTION
 .Nm
 is an implementation of the DHCP client specified in
-.Li RFC 2131 .
+.%R RFC 2131 .
 .Nm
 gets the host information
 .Po
@@ -103,27 +103,20 @@ to renew early.
 .Pp
 .Nm
 is also an implementation of the BOOTP client specified in
-.Li RFC 951 .
+.%R RFC 951 .
 .Pp
 .Nm
 is also an implementation of the IPv6 Router Solicitor as specified in
-.Li RFC 4861
+.%R RFC 4861
 and
-.Li RFC 6106 .
-.Nm
-can optionally handle address and route management itself,
-and will do so by default if Router Solicitation is disabled in the kernel
-or if stable private addresses are enabled in the configuration.
-If
-.Nm
-is managing routes,
-.Nm
-sends Neighbor Solicitions to each advertising router periodically and will
-expire the ones that do not respond.
+.%R RFC 6106
+and will generate stable private Interface Identifiers for SLAAC
+as specified in
+.%R RFC 7212 .
 .Pp
 .Nm
 is also an implemenation of the DHCPv6 client as specified in
-.Li RFC 3315 .
+.%R RFC 3315 .
 By default,
 .Nm
 only starts DHCPv6 when instructed to do so by an IPV6 Router Advertisement.
@@ -221,7 +214,7 @@ instead of the default
 .Pa @SCRIPT@ .
 .It Fl D , Fl Fl duid
 Generate an
-.Li RFC 4361
+.%R RFC 4361
 compliant clientid.
 This requires persistent storage and not all DHCP servers work with it so it
 is not enabled by default.
@@ -269,7 +262,7 @@ are disable, none, ptr and both.
 itself never does any DNS updates.
 .Nm
 encodes the FQDN hostname as specified in
-.Li RFC1035 .
+.%R RFC1035 .
 .It Fl f , Fl Fl config Ar file
 Specify a config to load instead of
 .Pa @SYSCONFDIR@/dhcpcd.conf .

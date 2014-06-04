@@ -453,9 +453,11 @@ instead of the default
 .It Ic ssid Ar ssid
 Subsequent options are only parsed for this wireless
 .Ar ssid .
-.It Ic stableprivate
-Configure stable private IPv6 addresses as per RFC7217 for SLAAC instead of
-ones generated from hardware addresses for SLAAC.
+.It Ic slaac Op Ar hwaddr | Ar private
+Selects the interface identifier used for SLAAC generated IPv6 addresses.
+.Ar private
+is the default and complies with
+.%R RFC 7217.
 .It Ic static Ar value
 Configures a static
 .Ar value .

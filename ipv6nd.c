@@ -603,7 +603,7 @@ ipv6nd_dadcallback(void *arg)
 		 * Because ap->dadcounter is always increamented,
 		 * a different address is generated. */
 		/* XXX Cache DAD counter per prefix/id/ssid? */
-		if (ifp->options->options & DHCPCD_STABLEPRIVATE &&
+		if (ifp->options->options & DHCPCD_SLAACPRIVATE &&
 		    ap->dadcounter < IDGEN_RETRIES)
 		{
 			syslog(LOG_INFO, "%s: deleting address %s",

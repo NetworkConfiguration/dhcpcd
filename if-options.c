@@ -91,7 +91,7 @@
 #define O_IPV4			O_BASE + 32
 #define O_IPV6			O_BASE + 33
 #define O_CONTROLGRP		O_BASE + 34
-#define O_STABLEPRIVATE		O_BASE + 35
+#define O_SLAAC			O_BASE + 35
 
 const struct option cf_options[] = {
 	{"background",      no_argument,       NULL, 'b'},
@@ -176,7 +176,7 @@ const struct option cf_options[] = {
 	{"dhcp6",           no_argument,       NULL, O_DHCP6},
 	{"nodhcp6",         no_argument,       NULL, O_NODHCP6},
 	{"controlgroup",    required_argument, NULL, O_CONTROLGRP},
-	{"stableprivate",   no_argument,       NULL, O_STABLEPRIVATE},
+	{"slaac",           required_argument, NULL, O_SLAAC},
 	{NULL,              0,                 NULL, '\0'}
 };
 
@@ -1837,10 +1837,13 @@ err_sla:
 		ctx->control_group = grp->gr_gid;
 #endif
 		break;
-	case O_STABLEPRIVATE:
-		ifo->options |= DHCPCD_STABLEPRIVATE;
-		/* This option implies that we steal SLAAC from the kernel */
-		ifo->options |= DHCPCD_IPV6RA_OWN;
+	case O_SLAAC:
+		if (strcmp(arg, "private") == 0 ||
+		    strcmp(arg, "stableprivate") == 0 ||
+		    strcmp(arg, "stable") == 0)
+			ifo->options |= DHCPCD_SLAACPRIVATE;
+		else
+			ifo->options &= ~DHCPCD_SLAACPRIVATE;
 		break;
 	default:
 		return 0;
@@ -1949,6 +1952,7 @@ read_config(struct dhcpcd_ctx *ctx,
 #endif
 #ifdef INET6
 	ifo->options |= DHCPCD_IPV6 | DHCPCD_IPV6RS | DHCPCD_IPV6RA_REQRDNSS;
+	ifo->options |= DHCPCD_SLAACPRIVATE;
 	ifo->options |= DHCPCD_DHCP6;
 #endif
 	ifo->timeout = DEFAULT_TIMEOUT;

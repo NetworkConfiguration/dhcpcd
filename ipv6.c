@@ -393,7 +393,7 @@ ipv6_makeaddr(struct in6_addr *addr, const struct interface *ifp,
 		return -1;
 	}
 
-	if (ifp->options->options & DHCPCD_STABLEPRIVATE) {
+	if (ifp->options->options & DHCPCD_SLAACPRIVATE) {
 		if (ifp->ctx->secret_len == 0) {
 			if (ipv6_readsecret(ifp->ctx) == -1)
 				return -1;
@@ -876,6 +876,122 @@ ipv6_free_ll_callbacks(struct interface *ifp)
 			free(cb);
 		}
 	}
+}
+
+static struct ipv6_addr *
+ipv6_newlinklocal(struct interface *ifp)
+{
+	struct ipv6_addr *ap;
+
+	ap = calloc(1, sizeof(*ap));
+	if (ap != NULL) {
+		ap->iface = ifp;
+		ap->prefix.s6_addr32[0] = htonl(0xfe800000);
+		ap->prefix.s6_addr32[1] = 0;
+		ap->prefix_len = 64;
+		ap->dadcounter = 0;
+		ap->prefix_pltime = ND6_INFINITE_LIFETIME;
+		ap->prefix_vltime = ND6_INFINITE_LIFETIME;
+		ap->flags = IPV6_AF_NEW;
+		ap->addr_flags = IN6_IFF_TENTATIVE;
+	}
+	return ap;
+}
+
+static const uint8_t allzero[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+static const uint8_t allone[8] =
+    { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+
+static int
+ipv6_addlinklocal(struct interface *ifp)
+{
+	struct ipv6_state *state;
+	struct ipv6_addr *ap;
+	int dadcounter;
+
+	if (ipv6_linklocal(ifp))
+		return 0;
+
+	/* Check sanity before malloc */
+	if (!(ifp->options->options & DHCPCD_SLAACPRIVATE)) {
+		switch (ifp->family) {
+		case ARPHRD_ETHER:
+			/* Check for a valid hardware address */
+			if (ifp->hwlen != 6 & ifp->hwlen != 8) {
+				errno = ENOTSUP;
+				return -1;
+			}
+			if (memcmp(ifp->hwaddr, allzero, ifp->hwlen) == 0 ||
+			    memcmp(ifp->hwaddr, allone, ifp->hwlen) == 0)
+			{
+				errno = EINVAL;
+				return -1;
+			}
+			break;
+		default:
+			errno = ENOTSUP;
+			return -1;
+		}
+	}
+
+	state = ipv6_getstate(ifp);
+	if (state == NULL)
+		return -1;
+
+	ap = ipv6_newlinklocal(ifp);
+	if (ap == NULL)
+		return -1;
+
+	if (ifp->options->options & DHCPCD_SLAACPRIVATE) {
+		dadcounter = 0;
+		if (ipv6_makestableprivate(&ap->addr,
+			&ap->prefix, ap->prefix_len, ifp, &dadcounter) == -1)
+		{
+			free(ap);
+			return -1;
+		}
+		ap->dadcounter = dadcounter;
+	} else {
+		memcpy(ap->addr.s6_addr, ap->prefix.s6_addr, ap->prefix_len);
+		switch (ifp->family) {
+		case ARPHRD_ETHER:
+			if (ifp->hwlen == 6) {
+				ap->addr.s6_addr[ 8] = ifp->hwaddr[0];
+				ap->addr.s6_addr[ 9] = ifp->hwaddr[1];
+				ap->addr.s6_addr[10] = ifp->hwaddr[2];
+				ap->addr.s6_addr[11] = 0xff;
+				ap->addr.s6_addr[12] = 0xfe;
+				ap->addr.s6_addr[13] = ifp->hwaddr[3];
+				ap->addr.s6_addr[14] = ifp->hwaddr[4];
+				ap->addr.s6_addr[15] = ifp->hwaddr[5];
+			} else if (ifp->hwlen == 8)
+				memcpy(&ap->addr.s6_addr[8], ifp->hwaddr, 8);
+			break;
+		}
+
+		/* Sanity check: g bit must not indciate "group" */
+		if (EUI64_GROUP(&ap->addr)) {
+			free(ap);
+			errno = EINVAL;
+			return -1;
+		}
+		EUI64_TO_IFID(&ap->addr);
+	}
+
+	inet_ntop(AF_INET6, &ap->addr, ap->saddr, sizeof(ap->saddr));
+	TAILQ_INSERT_TAIL(&state->addrs, ap, next);
+	ipv6_addaddr(ap);
+	return 1;
+}
+
+/* Ensure the interface has a link-local address */
+int
+ipv6_start(struct interface *ifp)
+{
+
+	if (ipv6_linklocal(ifp) == NULL && ipv6_addlinklocal(ifp) == -1)
+		return -1;
+	return 0;
 }
 
 void
