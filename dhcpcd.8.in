@@ -109,10 +109,7 @@ is also an implementation of the BOOTP client specified in
 is also an implementation of the IPv6 Router Solicitor as specified in
 .%R RFC 4861
 and
-.%R RFC 6106
-and will generate stable private Interface Identifiers for SLAAC
-as specified in
-.%R RFC 7212 .
+.%R RFC 6106 .
 .Pp
 .Nm
 is also an implemenation of the DHCPv6 client as specified in

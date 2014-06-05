@@ -1952,7 +1952,6 @@ read_config(struct dhcpcd_ctx *ctx,
 #endif
 #ifdef INET6
 	ifo->options |= DHCPCD_IPV6 | DHCPCD_IPV6RS | DHCPCD_IPV6RA_REQRDNSS;
-	ifo->options |= DHCPCD_SLAACPRIVATE;
 	ifo->options |= DHCPCD_DHCP6;
 #endif
 	ifo->timeout = DEFAULT_TIMEOUT;
