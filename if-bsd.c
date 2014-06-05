@@ -1108,6 +1108,34 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 		}
 #endif
 
+#ifdef ND6_IFF_AUTO_LINKLOCAL
+		if (own) {
+			int all;
+
+			all = get_if_nd6_flag(ifname, ND6_IFF_AUTO_LINKLOCAL);
+			if (all == -1)
+				syslog(LOG_ERR,
+				    "%s: get_if_nd6_flag: "
+				    "ND6_IFF_AUTO_LINKLOCAL: %m",
+				    ifname);
+			else if (all != 0) {
+				syslog(LOG_DEBUG,
+				    "%s: disabling Kernel IPv6 "
+				    "auto link-local support",
+				    ifname);
+				if (del_if_nd6_flag(ifname,
+				    ND6_IFF_AUTO_LINKLOCAL) == -1)
+				{
+					syslog(LOG_ERR,
+					    "%s: del_if_nd6_flag: "
+					    "ND6_IFF_AUTO_LINKLOCAL: %m",
+					    ifname);
+					return -1;
+				}
+			}
+		}
+#endif
+
 #ifdef ND6_IFF_OVERRIDE_RTADV
 		override = get_if_nd6_flag(ifname, ND6_IFF_OVERRIDE_RTADV);
 		if (override == -1)
