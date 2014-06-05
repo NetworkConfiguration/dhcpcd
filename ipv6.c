@@ -38,7 +38,6 @@
 #ifdef __linux__
 #  include <asm/types.h> /* for systems with broken headers */
 #  include <linux/rtnetlink.h>
-#  include <endian.h>
    /* Match Linux defines to BSD */
 #  ifdef IFA_F_OPTIMISTIC
 #    define IN6_IFF_TENTATIVE	(IFA_F_TENTATIVE | IFA_F_OPTIMISTIC)
