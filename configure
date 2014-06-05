@@ -766,7 +766,7 @@ EOF
 	fi
 	echo "$BE64ENC"
 fi
-if [ "$BE64ENC" == no ]; then
+if [ "$BE64ENC" = no ]; then
 	echo "#include		\"compat/endian.h\"" >>$CONFIG_H
 fi
 
