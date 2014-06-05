@@ -30,9 +30,10 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 
+#include <net/if.h>
 #include <net/route.h>
-#include <netinet/if_ether.h>
 #include <netinet/in.h>
+#include <netinet/if_ether.h>
 
 #ifdef __linux__
 #  include <asm/types.h> /* for systems with broken headers */
