@@ -674,7 +674,6 @@ static void
 init_state(struct interface *ifp, int argc, char **argv)
 {
 	struct if_options *ifo;
-	const char *reason;
 
 	configure_interface(ifp, argc, argv);
 	ifo = ifp->options;
@@ -696,9 +695,15 @@ init_state(struct interface *ifp, int argc, char **argv)
 		syslog(LOG_ERR, "%s: ipv6_start: %m", ifp->name);
 		ifo->options &= DHCPCD_IPV6;
 	}
+}
+
+static void
+run_preinit(struct interface *ifp)
+{
+	const char *reason;
 
 	reason = NULL; /* appease gcc */
-	if (ifo->options & DHCPCD_LINK) {
+	if (ifp->options->options & DHCPCD_LINK) {
 		switch (if_carrier(ifp)) {
 		case LINK_DOWN:
 			ifp->carrier = LINK_DOWN;
@@ -772,6 +777,7 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 		}
 		if (action > 0) {
 			init_state(ifp, ctx->argc, ctx->argv);
+			run_preinit(ifp);
 			dhcpcd_startinterface(ifp);
 		}
 	}
@@ -849,6 +855,7 @@ reconf_reboot(struct dhcpcd_ctx *ctx, int action, int argc, char **argv, int oi)
 		} else {
 			TAILQ_INSERT_TAIL(ctx->ifaces, ifp, next);
 			init_state(ifp, argc, argv);
+			run_preinit(ifp);
 			dhcpcd_startinterface(ifp);
 		}
 	}
@@ -1545,12 +1552,16 @@ main(int argc, char **argv)
 		}
 	}
 
+	TAILQ_FOREACH(ifp, ctx.ifaces, next) {
+		init_state(ifp, argc, argv);
+	}
+
 	if (ctx.options & DHCPCD_BACKGROUND && dhcpcd_daemonise(&ctx))
 		goto exit_success;
 
 	opt = 0;
 	TAILQ_FOREACH(ifp, ctx.ifaces, next) {
-		init_state(ifp, argc, argv);
+		run_preinit(ifp);
 		if (ifp->carrier != LINK_DOWN)
 			opt = 1;
 	}
