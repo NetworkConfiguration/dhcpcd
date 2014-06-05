@@ -348,6 +348,9 @@ configure_interface1(struct interface *ifp)
 	if (!(ifo->options & DHCPCD_IPV6))
 		ifo->options &= ~DHCPCD_IPV6RS;
 
+	if (ifo->options & DHCPCD_SLAACPRIVATE)
+		ifo->options |= DHCPCD_IPV6RA_OWN;
+
 	/* We want to disable kernel interface RA as early as possible. */
 	if (ifo->options & DHCPCD_IPV6RS) {
 		ra_global = if_checkipv6(ifp->ctx, NULL,
@@ -446,9 +449,6 @@ configure_interface1(struct interface *ifp)
 	/* If we are not sending an authentication option, don't require it */
 	if (!(ifo->auth.options & DHCPCD_AUTH_SEND))
 		ifo->auth.options &= ~DHCPCD_AUTH_REQUIRE;
-
-	if (ifo->options & DHCPCD_SLAACPRIVATE)
-		ifo->options |= DHCPCD_IPV6RA_OWN;
 }
 
 int
@@ -570,7 +570,9 @@ dhcpcd_startinterface(void *arg)
 	char buf[DUID_LEN * 3];
 
 	/* Add our link-local address before upping the interface
-	 * so our RFC7217 address beats the hwaddr based one */
+	 * so our RFC7217 address beats the hwaddr based one.
+	 * This is also a safety check incase it was ripped out
+	 * from under us. */
 	if (ifo->options & DHCPCD_IPV6 && ipv6_start(ifp) == -1) {
 		syslog(LOG_ERR, "%s: ipv6_start: %m", ifp->name);
 		ifo->options &= DHCPCD_IPV6;
@@ -684,6 +686,15 @@ init_state(struct interface *ifp, int argc, char **argv)
 	if (ifo->options & DHCPCD_IPV6 && ipv6_init(ifp->ctx) == NULL) {
 		syslog(LOG_ERR, "ipv6_init: %m");
 		ifo->options &= ~DHCPCD_IPV6RS;
+	}
+
+	/* Add our link-local address before upping the interface
+	 * so our RFC7217 address beats the hwaddr based one.
+	 * This needs to happen before PREINIT incase a hook script
+	 * inadvertently ups the interface. */
+	if (ifo->options & DHCPCD_IPV6 && ipv6_start(ifp) == -1) {
+		syslog(LOG_ERR, "%s: ipv6_start: %m", ifp->name);
+		ifo->options &= DHCPCD_IPV6;
 	}
 
 	reason = NULL; /* appease gcc */

@@ -1029,7 +1029,8 @@ if_rarestore(struct dhcpcd_ctx *ctx)
 	for (; ctx->ra_restore_len > 0; ctx->ra_restore_len--) {
 #ifdef ND6_IFF_ACCEPT_RTADV
 		if (!(ctx->options & DHCPCD_FORKED)) {
-			syslog(LOG_INFO, "%s: restoring kernel IPv6 RA support",
+			syslog(LOG_DEBUG,
+			    "%s: restoring kernel IPv6 RA support",
 			    ctx->ra_restore[ctx->ra_restore_len - 1]);
 			if (set_if_nd6_flag(
 			    ctx->ra_restore[ctx->ra_restore_len -1],
@@ -1051,7 +1052,7 @@ if_rarestore(struct dhcpcd_ctx *ctx)
 	ctx->ra_restore = NULL;
 
 	if (ctx->ra_kernel_set) {
-		syslog(LOG_INFO, "restoring kernel IPv6 RA support");
+		syslog(LOG_DEBUG, "restoring kernel IPv6 RA support");
 		if (set_inet6_sysctl(IPV6CTL_ACCEPT_RTADV, 1) == -1)
 			syslog(LOG_ERR, "IPV6CTL_ACCEPT_RTADV: %m");
 	}
@@ -1107,15 +1108,6 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 		}
 #endif
 
-#ifdef ND_IFF_AUTO_LINKLOCAL
-		if (set_if_nd6_flag(ifname, ND6_IFF_AUTO_LINKLOCAL) == -1) {
-			syslog(LOG_ERR,
-			    "%s: set_if_nd6_flag: ND6_IFF_AUTO_LINKLOCAL: %m",
-			    ifname);
-			return -1;
-		}
-#endif
-
 #ifdef ND6_IFF_OVERRIDE_RTADV
 		override = get_if_nd6_flag(ifname, ND6_IFF_OVERRIDE_RTADV);
 		if (override == -1)
@@ -1133,7 +1125,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 			    "%s: get_if_nd6_flag: ND6_IFF_ACCEPT_RTADV: %m",
 			    ifname);
 		else if (ra != 0 && own) {
-			syslog(LOG_INFO,
+			syslog(LOG_DEBUG,
 			    "%s: disabling Kernel IPv6 RA support",
 			    ifname);
 			if (del_if_nd6_flag(ifname, ND6_IFF_ACCEPT_RTADV)
@@ -1191,7 +1183,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 		syslog(errno == ENOENT ? LOG_DEBUG : LOG_WARNING,
 		    "IPV6CTL_ACCEPT_RTADV: %m");
 	else if (ra != 0 && own) {
-		syslog(LOG_INFO, "disabling Kernel IPv6 RA support");
+		syslog(LOG_DEBUG, "disabling Kernel IPv6 RA support");
 		if (set_inet6_sysctl(IPV6CTL_ACCEPT_RTADV, 0) == -1) {
 			syslog(LOG_ERR, "IPV6CTL_ACCEPT_RTADV: %m");
 			return ra;

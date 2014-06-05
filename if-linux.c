@@ -1230,7 +1230,8 @@ if_rarestore(struct dhcpcd_ctx *ctx)
 
 	for (; ctx->ra_restore_len > 0; ctx->ra_restore_len--) {
 		if (!(ctx->options & DHCPCD_FORKED)) {
-			syslog(LOG_INFO, "%s: restoring kernel IPv6 RA support",
+			syslog(LOG_DEBUG,
+			    "%s: restoring kernel IPv6 RA support",
 			    ctx->ra_restore[ctx->ra_restore_len - 1]);
 			snprintf(path, sizeof(path), "%s/%s/accept_ra",
 			    prefix, ctx->ra_restore[ctx->ra_restore_len - 1]);
@@ -1276,7 +1277,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 		syslog(errno == ENOENT ? LOG_DEBUG : LOG_WARNING,
 		    "%s: %m", path);
 	else if (ra != 0 && own) {
-		syslog(LOG_INFO, "%s: disabling kernel IPv6 RA support",
+		syslog(LOG_DEBUG, "%s: disabling kernel IPv6 RA support",
 		    ifname);
 		if (write_path(path, "0") == -1) {
 			syslog(LOG_ERR, "write_path: %s: %m", path);
