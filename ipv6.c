@@ -38,6 +38,7 @@
 #ifdef __linux__
 #  include <asm/types.h> /* for systems with broken headers */
 #  include <linux/rtnetlink.h>
+#  include <endian.h>
    /* Match Linux defines to BSD */
 #  ifdef IFA_F_OPTIMISTIC
 #    define IN6_IFF_TENTATIVE	(IFA_F_TENTATIVE | IFA_F_OPTIMISTIC)
@@ -51,6 +52,7 @@
 #  endif
 #  define IN6_IFF_DETACHED	0
 #else
+#  include <sys/endian.h>
 #  include <net/if.h>
 #ifdef __FreeBSD__ /* Needed so that including netinet6/in6_var.h works */
 #  include <net/if_var.h>
