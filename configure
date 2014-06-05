@@ -755,6 +755,7 @@ if [ -z "$BE64ENC" ]; then
 	printf "Testing for be64enc ... "
 	cat <<EOF >_be64enc.c
 #include <sys/endian.h>
+#include <stdlib.h>
 int main(void) {
 	be64enc(NULL, 0);
 }
