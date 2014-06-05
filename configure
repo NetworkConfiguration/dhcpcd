@@ -302,6 +302,11 @@ if [ -e "$LDELF" ]; then
 	echo "LDFLAGS+=	-Wl,-rpath=${LIBDIR}" >>$CONFIG_MK
 fi
 
+if [ -z "$PREFIX" -o "$PREFIX" = / ]; then
+	ALLOW_USR_LIBS=false
+else
+	ALLOW_USR_LIBS=true
+fi
 case "$OS" in
 linux*|sunos*) ;;
 *)
@@ -310,6 +315,7 @@ linux*|sunos*) ;;
 	then
 		echo "Forcing a static build for $OS and \$PREFIX of /"
 		STATIC=yes
+		ALLOW_USR_LIBS=true
 	fi
 	;;
 esac
@@ -786,7 +792,11 @@ int main(void) {
 }
 EOF
 	# We only want to link to libmd if it exists in /lib
-	set -- $(ls /lib/libmd.so.* 2>/dev/null)
+	if $ALLOW_USR_LIBS; then
+		set -- /
+	else
+		set -- $(ls /lib/libmd.so.* 2>/dev/null)
+	fi
 	if $XCC _md5.c -o _md5 2>/dev/null; then
 		MD5=yes
 	elif [ -e "$1" ] && $XCC _md5.c -lmd -o _md5 2>/dev/null; then
@@ -837,7 +847,11 @@ int main(void) {
 }
 EOF
 	# We only want to link to libmd if it exists in /lib
-	set -- $(ls /lib/libmd.so.* 2>/dev/null)
+	if $ALLOW_USR_LIBS; then
+		set -- /
+	else
+		set -- $(ls /lib/libmd.so.* 2>/dev/null)
+	fi
 	if $XCC _sha256.c -o _sha256 2>/dev/null; then
 		SHA2=yes
 	elif [ -e "$1" ] && $XCC _sha256.c -lmd -o _sha256 2>/dev/null; then
@@ -864,7 +878,11 @@ int main(void) {
 }
 EOF
 		# We only want to link to libmd if it exists in /lib
-		set -- $(ls /lib/libmd.so.* 2>/dev/null)
+		if $ALLOW_USR_LIBS; then
+			set -- /
+		else
+			set -- $(ls /lib/libmd.so.* 2>/dev/null)
+		fi
 		if $XCC	_sha256.c -o _sha256 2>/dev/null; then
 			SHA2=yes
 			SHA2_RENAMED=yes
