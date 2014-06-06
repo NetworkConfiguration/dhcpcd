@@ -395,7 +395,7 @@ eloop_start(struct dhcpcd_ctx *dctx)
 		/* Process any triggered events. */
 		if (n > 0) {
 			TAILQ_FOREACH(e, &ctx->events, next) {
-				if (e->pollfd->revents & (POLLIN | POLLHUP)) {
+				if (e->pollfd->revents) {
 					e->callback(e->arg);
 					/* We need to break here as the
 					 * callback could destroy the next
