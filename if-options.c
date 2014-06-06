@@ -178,7 +178,7 @@ const struct option cf_options[] = {
 	{"nodhcp6",         no_argument,       NULL, O_NODHCP6},
 	{"controlgroup",    required_argument, NULL, O_CONTROLGRP},
 	{"slaac",           required_argument, NULL, O_SLAAC},
-	{"gateway",         required_argument, NULL, O_GATEWAY},
+	{"gateway",         no_argument,       NULL, O_GATEWAY},
 	{NULL,              0,                 NULL, '\0'}
 };
 
