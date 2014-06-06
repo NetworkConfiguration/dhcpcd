@@ -92,6 +92,7 @@
 #define O_IPV6			O_BASE + 33
 #define O_CONTROLGRP		O_BASE + 34
 #define O_SLAAC			O_BASE + 35
+#define O_GATEWAY		O_BASE + 36
 
 const struct option cf_options[] = {
 	{"background",      no_argument,       NULL, 'b'},
@@ -177,6 +178,7 @@ const struct option cf_options[] = {
 	{"nodhcp6",         no_argument,       NULL, O_NODHCP6},
 	{"controlgroup",    required_argument, NULL, O_CONTROLGRP},
 	{"slaac",           required_argument, NULL, O_SLAAC},
+	{"gateway",         required_argument, NULL, O_GATEWAY},
 	{NULL,              0,                 NULL, '\0'}
 };
 
@@ -733,7 +735,9 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	case 'o':
 		arg = set_option_space(ctx, arg, &d, &dl, ifo,
 		    &request, &require, &no);
-		if (make_option_mask(d, dl, request, arg, 1) != 0) {
+		if (make_option_mask(d, dl, request, arg, 1) != 0 ||
+		    make_option_mask(d, dl, no, arg, -1) != 0)
+		{
 			syslog(LOG_ERR, "unknown option `%s'", arg);
 			return -1;
 		}
@@ -962,7 +966,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		arg = set_option_space(ctx, arg, &d, &dl, ifo,
 		    &request, &require, &no);
 		if (make_option_mask(d, dl, require, arg, 1) != 0 ||
-		    make_option_mask(d, dl, request, arg, 1) != 0)
+		    make_option_mask(d, dl, request, arg, 1) != 0 ||
+		    make_option_mask(d, dl, no, arg, -1) != 0)
 		{
 			syslog(LOG_ERR, "unknown option `%s'", arg);
 			return -1;
@@ -1836,6 +1841,9 @@ err_sla:
 		}
 		ctx->control_group = grp->gr_gid;
 #endif
+		break;
+	case O_GATEWAY:
+		ifo->options |= DHCPCD_GATEWAY;
 		break;
 	case O_SLAAC:
 		if (strcmp(arg, "private") == 0 ||
