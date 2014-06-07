@@ -206,6 +206,7 @@ ipv6_readsecret(struct dhcpcd_ctx *ctx)
 	int x;
 
 	if ((fp = fopen(SECRET, "r"))) {
+		len = 0;
 		while (fgets(line, sizeof(line), fp)) {
 			len = strlen(line);
 			if (len) {
