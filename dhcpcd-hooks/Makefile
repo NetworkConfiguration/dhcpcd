@@ -25,7 +25,7 @@ proginstall:
 
 install: proginstall
 
-import:
+import: ${HOOKSCRIPTS}
 	${INSTALL} -d /tmp/${DISTPREFIX}/dhcpcd-hooks
 	for x in ${SCRIPTS}; do \
 		t="/tmp/${DISTPREFIX}/dhcpcd-hooks/$$x"; \
