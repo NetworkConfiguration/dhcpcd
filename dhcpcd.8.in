@@ -75,7 +75,7 @@
 .Sh DESCRIPTION
 .Nm
 is an implementation of the DHCP client specified in
-.%R RFC 2131 .
+.Li RFC 2131 .
 .Nm
 gets the host information
 .Po
@@ -103,17 +103,17 @@ to renew early.
 .Pp
 .Nm
 is also an implementation of the BOOTP client specified in
-.%R RFC 951 .
+.Li RFC 951 .
 .Pp
 .Nm
 is also an implementation of the IPv6 Router Solicitor as specified in
-.%R RFC 4861
+.Li RFC 4861
 and
-.%R RFC 6106 .
+.Li RFC 6106 .
 .Pp
 .Nm
 is also an implemenation of the DHCPv6 client as specified in
-.%R RFC 3315 .
+.Li RFC 3315 .
 By default,
 .Nm
 only starts DHCPv6 when instructed to do so by an IPV6 Router Advertisement.
@@ -211,7 +211,7 @@ instead of the default
 .Pa @SCRIPT@ .
 .It Fl D , Fl Fl duid
 Generate an
-.%R RFC 4361
+.Li RFC 4361
 compliant clientid.
 This requires persistent storage and not all DHCP servers work with it so it
 is not enabled by default.
@@ -259,7 +259,7 @@ are disable, none, ptr and both.
 itself never does any DNS updates.
 .Nm
 encodes the FQDN hostname as specified in
-.%R RFC1035 .
+.Li RFC1035 .
 .It Fl f , Fl Fl config Ar file
 Specify a config to load instead of
 .Pa @SYSCONFDIR@/dhcpcd.conf .
