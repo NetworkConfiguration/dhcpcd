@@ -2124,6 +2124,10 @@ read_config(struct dhcpcd_ctx *ctx,
 				skip = 1;
 			continue;
 		}
+		/* Skip arping if we have selected a profile but not parsing
+		 * one. */
+		if (profile && !have_profile && strcmp(option, "arping") == 0)
+			continue;
 		if (skip)
 			continue;
 		parse_config_line(ctx, ifname, ifo, option, line, &ldop, &edop);
