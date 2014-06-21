@@ -115,6 +115,8 @@ struct if_sla {
 struct if_ia {
 	uint8_t iaid[4];
 #ifdef INET6
+	struct in6_addr addr;
+	uint8_t prefix_len;
 	size_t sla_len;
 	struct if_sla *sla;
 #endif

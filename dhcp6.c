@@ -405,12 +405,15 @@ dhcp6_makemessage(struct interface *ifp)
 	case DH6S_REBIND:
 		/* FALLTHROUGH */
 	case DH6S_CONFIRM:
+		/* FALLTHROUGH */
+	case DH6S_DISCOVER:
 		if (m == NULL) {
 			m = state->new;
 			ml = state->new_len;
 		}
 		TAILQ_FOREACH(ap, &state->addrs, next) {
-			if (ap->prefix_vltime == 0)
+			if (ap->prefix_vltime == 0 &&
+			    !(ap->flags & IPV6_AF_REQUEST))
 				continue;
 			if (ifo->ia_type == D6_OPTION_IA_PD)
 				len += sizeof(*o) + sizeof(u8) +
@@ -421,8 +424,7 @@ dhcp6_makemessage(struct interface *ifp)
 				    sizeof(u32) + sizeof(u32);
 		}
 		/* FALLTHROUGH */
-	case DH6S_INIT: /* FALLTHROUGH */
-	case DH6S_DISCOVER:
+	case DH6S_INIT:
 		len += ifo->ia_len * (sizeof(*o) + (sizeof(u32) * 3));
 		IA = 1;
 		break;
@@ -536,7 +538,8 @@ dhcp6_makemessage(struct interface *ifp)
 		p += sizeof(u32);
 		memset(p, 0, sizeof(u32) + sizeof(u32));
 		TAILQ_FOREACH(ap, &state->addrs, next) {
-			if (ap->prefix_vltime == 0)
+			if (ap->prefix_vltime == 0 &&
+			    !(ap->flags & IPV6_AF_REQUEST))
 				continue;
 			if (memcmp(ifo->ia[l].iaid, ap->iaid, sizeof(u32)))
 				continue;
@@ -949,10 +952,51 @@ dhcp6_startrenew(void *arg)
 }
 
 static void
+dhcp6_dadcallback(void *arg)
+{
+	struct ipv6_addr *ap = arg;
+	struct interface *ifp;
+	struct dhcp6_state *state;
+	int wascompleted;
+
+	wascompleted = (ap->flags & IPV6_AF_DADCOMPLETED);
+	ap->flags |= IPV6_AF_DADCOMPLETED;
+	if (ap->flags & IPV6_AF_DUPLICATED)
+		/* XXX FIXME
+		 * We should decline the address */
+		syslog(LOG_WARNING, "%s: DAD detected %s",
+		    ap->iface->name, ap->saddr);
+
+	if (!wascompleted) {
+		ifp = ap->iface;
+		state = D6_STATE(ifp);
+		if (state->state == DH6S_BOUND ||
+		    state->state == DH6S_DELEGATED)
+		{
+			TAILQ_FOREACH(ap, &state->addrs, next) {
+				if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0) {
+					wascompleted = 1;
+					break;
+				}
+			}
+			if (!wascompleted) {
+				syslog(LOG_DEBUG, "%s: DHCPv6 DAD completed",
+				    ifp->name);
+				script_runreason(ifp, state->reason);
+				dhcpcd_daemonise(ifp->ctx);
+			}
+		}
+	}
+}
+
+static void
 dhcp6_startdiscover(void *arg)
 {
 	struct interface *ifp;
 	struct dhcp6_state *state;
+	size_t i;
+	struct if_ia *ia;
+	struct ipv6_addr *a;
 
 	ifp = arg;
 	dhcp6_delete_delegates(ifp);
@@ -973,6 +1017,30 @@ dhcp6_startdiscover(void *arg)
 
 	dhcp6_freedrop_addrs(ifp, 0, NULL);
 	unlink(state->leasefile);
+
+	/* Add any requested prefixes / addresses */
+	for (i = 0; i < ifp->options->ia_len; i++) {
+		ia = &ifp->options->ia[i];
+		if (ia->prefix_len) {
+			a = calloc(1, sizeof(*a));
+			if (a == NULL) {
+				syslog(LOG_ERR, "%s: %m", __func__);
+				return NULL;
+			}
+			a->flags = IPV6_AF_REQUEST;
+			a->iface = ifp;
+			a->dadcallback = dhcp6_dadcallback;
+			memcpy(&a->iaid, &ia->iaid, sizeof(a->iaid));
+			//a->prefix_pltime = 0;
+			//a->prefix_vltime = 0;
+			if (ifp->options->ia_type == D6_OPTION_IA_PD)
+				memcpy(&a->prefix, &ia->addr, sizeof(a->addr));
+			else
+				memcpy(&a->addr, &ia->addr, sizeof(a->addr));
+			a->prefix_len = ia->prefix_len;
+			TAILQ_INSERT_TAIL(&state->addrs, a, next);
+		}
+	}
 
 	if (dhcp6_makemessage(ifp) == -1)
 		syslog(LOG_ERR, "%s: dhcp6_makemessage: %m", ifp->name);
@@ -1264,44 +1332,6 @@ dhcp6_addrexists(struct dhcpcd_ctx *ctx, const struct ipv6_addr *addr)
 	return 0;
 }
 
-static void
-dhcp6_dadcallback(void *arg)
-{
-	struct ipv6_addr *ap = arg;
-	struct interface *ifp;
-	struct dhcp6_state *state;
-	int wascompleted;
-
-	wascompleted = (ap->flags & IPV6_AF_DADCOMPLETED);
-	ap->flags |= IPV6_AF_DADCOMPLETED;
-	if (ap->flags & IPV6_AF_DUPLICATED)
-		/* XXX FIXME
-		 * We should decline the address */
-		syslog(LOG_WARNING, "%s: DAD detected %s",
-		    ap->iface->name, ap->saddr);
-
-	if (!wascompleted) {
-		ifp = ap->iface;
-		state = D6_STATE(ifp);
-		if (state->state == DH6S_BOUND ||
-		    state->state == DH6S_DELEGATED)
-		{
-			TAILQ_FOREACH(ap, &state->addrs, next) {
-				if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0) {
-					wascompleted = 1;
-					break;
-				}
-			}
-			if (!wascompleted) {
-				syslog(LOG_DEBUG, "%s: DHCPv6 DAD completed",
-				    ifp->name);
-				script_runreason(ifp, state->reason);
-				dhcpcd_daemonise(ifp->ctx);
-			}
-		}
-	}
-}
-
 static int
 dhcp6_findna(struct interface *ifp, const uint8_t *iaid,
     const uint8_t *d, size_t l)
@@ -1370,7 +1400,7 @@ dhcp6_findna(struct interface *ifp, const uint8_t *iaid,
 			    "%s/%d", ia, a->prefix_len);
 			TAILQ_INSERT_TAIL(&state->addrs, a, next);
 		} else
-			a->flags &= ~IPV6_AF_STALE;
+			a->flags &= ~(IPV6_AF_STALE | IPV6_AF_REQUEST);
 		memcpy(&u32, p, sizeof(u32));
 		a->prefix_pltime = ntohl(u32);
 		p += sizeof(u32);
@@ -1455,7 +1485,7 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			    "%s/%d", ia, a->prefix_len);
 			TAILQ_INSERT_TAIL(&state->addrs, a, next);
 		} else {
-			a->flags &= ~IPV6_AF_STALE;
+			a->flags &= ~(IPV6_AF_STALE | IPV6_AF_REQUEST);
 			if (a->prefix_vltime != vltime)
 				a->flags |= IPV6_AF_NEW;
 		}

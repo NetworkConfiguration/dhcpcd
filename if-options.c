@@ -1236,6 +1236,9 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		fp = strwhite(arg);
 		if (fp)
 			*fp++ = '\0';
+		p = strchr(arg, '/');
+		if (p)
+			*p++ = '\0';
 		if (parse_iaid(iaid, arg, sizeof(iaid)) == -1)
 			return -1;
 		ia = NULL;
@@ -1262,8 +1265,33 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			ia->iaid[1] = iaid[1];
 			ia->iaid[2] = iaid[2];
 			ia->iaid[3] = iaid[3];
-			ia->sla = NULL;
+			if (p == NULL) {
+				memset(&ia->addr, 0, sizeof(ia->addr));
+				ia->prefix_len = 0;
+			} else {
+				arg = p;
+				p = strchr(arg, '/');
+				if (p)
+					*p++ = '\0';
+				if (inet_pton(AF_INET6, arg, &ia->addr) == -1) {
+					syslog(LOG_ERR, "%s: %m", arg);
+					memset(&ia->addr, 0, sizeof(ia->addr));
+				}
+				if (p) {
+					i = atoint(p);
+					if (i != -1 && (i < 8 || i > 120)) {
+						errno = EINVAL;
+						i = -1;
+					}
+					if (i == -1) {
+						syslog(LOG_ERR, "%s: %m", p);
+						ia->prefix_len = 0;
+					} else
+						ia->prefix_len = (uint8_t)i;
+				}
+			}
 			ia->sla_len = 0;
+			ia->sla = NULL;
 		}
 		if (ifo->ia_type != D6_OPTION_IA_PD)
 			break;
