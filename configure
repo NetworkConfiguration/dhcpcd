@@ -272,8 +272,20 @@ if ! type "$CC" >/dev/null 2>&1; then
 fi
 
 echo "Using compiler .. $CC"
-if ! type "$CC" >/dev/null 2>&1; then
-	echo "$CC is not an executable"
+cat <<EOF >_test.c
+int main(void) {
+	return 0;
+}
+EOF
+_CC=true
+if $CC _test.c -o _test >/dev/null 2>&1; then
+	[ -x _test ] || _CC=false
+else
+	_CC=false
+fi
+rm -f _test.c _test
+if ! $_CC; then
+	echo "$CC does not create executables"
 	exit 1
 fi
 [ "$CC" != cc ] && echo "CC=	$CC" >>$CONFIG_MK
