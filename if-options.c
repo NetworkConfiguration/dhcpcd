@@ -1265,7 +1265,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			ia->iaid[1] = iaid[1];
 			ia->iaid[2] = iaid[2];
 			ia->iaid[3] = iaid[3];
-			if (p == NULL) {
+			if (p == NULL || ifo->ia_type == D6_OPTION_IA_TA) {
 				memset(&ia->addr, 0, sizeof(ia->addr));
 				ia->prefix_len = 0;
 			} else {
@@ -1277,7 +1277,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 					syslog(LOG_ERR, "%s: %m", arg);
 					memset(&ia->addr, 0, sizeof(ia->addr));
 				}
-				if (p) {
+				if (p && ifo->ia_type == D6_OPTION_IA_PD) {
 					i = atoint(p);
 					if (i != -1 && (i < 8 || i > 120)) {
 						errno = EINVAL;

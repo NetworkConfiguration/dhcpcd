@@ -214,7 +214,7 @@ DNS if the domain part does not match theirs.
 Also, see the
 .Ic env
 option above to control how the hostname is set on the host.
-.It Ic ia_na Op Ar iaid Op / address Op / prefix_len
+.It Ic ia_na Op Ar iaid Op / address
 Request a DHCPv6 Normal Address for
 .Ar iaid .
 .Ar iaid

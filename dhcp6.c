@@ -1021,7 +1021,9 @@ dhcp6_startdiscover(void *arg)
 	/* Add any requested prefixes / addresses */
 	for (i = 0; i < ifp->options->ia_len; i++) {
 		ia = &ifp->options->ia[i];
-		if (ia->prefix_len) {
+		if (!IN6_IS_ADDR_UNSPECIFIED(&ia->addr) ||
+		    (ia->prefix_len && ifp->options->ia_type == D6_OPTION_IA_PD))
+		{
 			a = calloc(1, sizeof(*a));
 			if (a == NULL) {
 				syslog(LOG_ERR, "%s: %m", __func__);
@@ -1033,11 +1035,11 @@ dhcp6_startdiscover(void *arg)
 			memcpy(&a->iaid, &ia->iaid, sizeof(a->iaid));
 			//a->prefix_pltime = 0;
 			//a->prefix_vltime = 0;
-			if (ifp->options->ia_type == D6_OPTION_IA_PD)
+			if (ifp->options->ia_type == D6_OPTION_IA_PD) {
 				memcpy(&a->prefix, &ia->addr, sizeof(a->addr));
-			else
+				a->prefix_len = ia->prefix_len;
+			} else
 				memcpy(&a->addr, &ia->addr, sizeof(a->addr));
-			a->prefix_len = ia->prefix_len;
 			TAILQ_INSERT_TAIL(&state->addrs, a, next);
 		}
 	}
