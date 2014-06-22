@@ -1665,6 +1665,7 @@ dhcp6_readlease(struct interface *ifp)
 	if (stat(state->leasefile, &st) == -1) {
 		if (errno == ENOENT)
 			return 0;
+		syslog(LOG_ERR, "%s: %s: %m", ifp->name, __func__);
 		return -1;
 	}
 	syslog(LOG_DEBUG, "%s: reading lease `%s'",
@@ -1674,12 +1675,17 @@ dhcp6_readlease(struct interface *ifp)
 		return -1;
 	}
 	state->new = malloc((size_t)st.st_size);
-	if (state->new == NULL)
+	if (state->new == NULL) {
+		syslog(LOG_ERR, "%s: %m", __func__);
 		return -1;
+	}
 	state->new_len = (size_t)st.st_size;
 	fd = open(state->leasefile, O_RDONLY);
-	if (fd == -1)
+	if (fd == -1) {
+		syslog(LOG_ERR, "%s: %s: %s: %m", ifp->name, __func__,
+		    state->leasefile);
 		return -1;
+	}
 	bytes = read(fd, state->new, state->new_len);
 	close(fd);
 	if (bytes < (ssize_t)state->new_len) {
@@ -2977,4 +2983,36 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 	}
 
 	return (ssize_t)n;
+}
+
+int
+dhcp6_dump(struct interface *ifp)
+{
+	struct dhcp6_state *state;
+	int r;
+
+	ifp->if_data[IF_DATA_DHCP6] = state = calloc(1, sizeof(*state));
+	if (state == NULL)
+		goto eexit;
+	TAILQ_INIT(&state->addrs);
+	snprintf(state->leasefile, sizeof(state->leasefile),
+	    LEASEFILE6, ifp->name);
+	r = dhcp6_readlease(ifp);
+	if (r == -1 && errno == ENOENT) {
+		strlcpy(state->leasefile, ifp->name, sizeof(state->leasefile));
+		r = dhcp6_readlease(ifp);
+	}
+	if (r == -1) {
+		if (errno == ENOENT)
+			syslog(LOG_ERR, "%s: no lease to dump", ifp->name);
+		else
+			syslog(LOG_ERR, "%s: dhcp6_readlease: %m", ifp->name);
+		return -1;
+	}
+	state->reason = "DUMP6";
+	return script_runreason(ifp, state->reason);
+
+eexit:
+	syslog(LOG_ERR, "%s: %m", __func__);
+	return -1;
 }

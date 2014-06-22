@@ -236,6 +236,7 @@ void dhcp6_free(struct interface *);
 void dhcp6_handleifa(struct dhcpcd_ctx *, int, const char *,
     const struct in6_addr *addr, int);
 void dhcp6_drop(struct interface *, const char *);
+int dhcp6_dump(struct interface *);
 #else
 #define dhcp6_printoptions()
 #define dhcp6_addrexists(a, b) (0)
@@ -245,6 +246,7 @@ void dhcp6_drop(struct interface *, const char *);
 #define dhcp6_env(a, b, c, d, e)
 #define dhcp6_free(a)
 #define dhcp6_drop(a, b)
+#define dhcp6_dump(a) -1
 #endif
 
 #endif

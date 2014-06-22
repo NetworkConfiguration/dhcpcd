@@ -1351,12 +1351,44 @@ main(int argc, char **argv)
 	if (chdir("/") == -1)
 		syslog(LOG_ERR, "chdir `/': %m");
 
+	/* Freeing allocated addresses from dumping leases can trigger
+	 * eloop removals as well, so init here. */
+	ctx.eloop = eloop_init();
+	if (ctx.eloop == NULL) {
+		syslog(LOG_ERR, "%s: %m", __func__);
+		goto exit_failure;
+	}
+
 	if (ctx.options & DHCPCD_DUMPLEASE) {
 		if (optind != argc - 1) {
 			syslog(LOG_ERR, "dumplease requires an interface");
 			goto exit_failure;
 		}
-		if (dhcp_dump(&ctx, argv[optind]) == -1)
+		i = 0;
+		if (ctx.ifaces == NULL) {
+			ctx.ifaces = malloc(sizeof(*ctx.ifaces));
+			if (ctx.ifaces == NULL) {
+				syslog(LOG_ERR, "%s: %m", __func__);
+				goto exit_failure;
+			}
+			TAILQ_INIT(ctx.ifaces);
+		}
+		ifp = calloc(1, sizeof(*ifp));
+		if (ifp == NULL)
+			goto exit_failure;
+		strlcpy(ifp->name, argv[optind], sizeof(ifp->name));
+		ifp->ctx = &ctx;
+		TAILQ_INSERT_HEAD(ctx.ifaces, ifp, next);
+		configure_interface(ifp, 0, NULL);
+		if (family == 0 || family == AF_INET) {
+			if (dhcp_dump(ifp) == -1)
+				i = 1;
+		}
+		if (family == 0 || family == AF_INET6) {
+			if (dhcp6_dump(ifp) == -1)
+				i = 1;
+		}
+		if (i == -1)
 			goto exit_failure;
 		goto exit_success;
 	}
@@ -1395,12 +1427,6 @@ main(int argc, char **argv)
 	if (geteuid())
 		syslog(LOG_WARNING,
 		    PACKAGE " will not work correctly unless run as root");
-
-	ctx.eloop = eloop_init();
-	if (ctx.eloop == NULL) {
-		syslog(LOG_ERR, "%s: %m", __func__);
-		goto exit_failure;
-	}
 
 #ifdef USE_SIGNALS
 	if (sig != 0) {

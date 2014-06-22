@@ -2733,40 +2733,23 @@ dhcp_open(struct interface *ifp)
 }
 
 int
-dhcp_dump(struct dhcpcd_ctx *ctx, const char *ifname)
+dhcp_dump(struct interface *ifp)
 {
-	struct interface *ifp;
 	struct dhcp_state *state;
 
-	if (ctx->ifaces == NULL) {
-		ctx->ifaces = malloc(sizeof(*ctx->ifaces));
-		if (ctx->ifaces == NULL)
-			return -1;
-		TAILQ_INIT(ctx->ifaces);
-	}
-	state = NULL;
-	ifp = calloc(1, sizeof(*ifp));
-	if (ifp == NULL)
-		goto eexit;
-	ifp->ctx = ctx;
-	TAILQ_INSERT_HEAD(ctx->ifaces, ifp, next);
 	ifp->if_data[IF_DATA_DHCP] = state = calloc(1, sizeof(*state));
 	if (state == NULL)
 		goto eexit;
-	ifp->options = calloc(1, sizeof(*ifp->options));
-	if (ifp->options == NULL)
-		goto eexit;
-	strlcpy(ifp->name, ifname, sizeof(ifp->name));
 	snprintf(state->leasefile, sizeof(state->leasefile),
 	    LEASEFILE, ifp->name);
 	state->new = read_lease(ifp);
 	if (state->new == NULL && errno == ENOENT) {
-		strlcpy(state->leasefile, ifname, sizeof(state->leasefile));
+		strlcpy(state->leasefile, ifp->name, sizeof(state->leasefile));
 		state->new = read_lease(ifp);
 	}
 	if (state->new == NULL) {
 		if (errno == ENOENT)
-			syslog(LOG_ERR, "%s: no lease to dump", ifname);
+			syslog(LOG_ERR, "%s: no lease to dump", ifp->name);
 		return -1;
 	}
 	state->reason = "DUMP";

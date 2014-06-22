@@ -285,7 +285,7 @@ void dhcp_bind(void *);
 void dhcp_reboot_newopts(struct interface *, unsigned long long);
 void dhcp_close(struct interface *);
 void dhcp_free(struct interface *);
-int dhcp_dump(struct dhcpcd_ctx *, const char *);
+int dhcp_dump(struct interface *);
 #else
 #define dhcp_printoptions
 #define dhcp_drop(a, b)
@@ -294,7 +294,7 @@ int dhcp_dump(struct dhcpcd_ctx *, const char *);
 #define dhcp_reboot_newopts(a, b)
 #define dhcp_close(a)
 #define dhcp_free(a)
-#define dhcp_dump(a, b) -1
+#define dhcp_dump(a) -1
 #endif
 
 #endif
