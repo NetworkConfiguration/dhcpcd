@@ -743,6 +743,7 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 			errno = ESRCH;
 			return -1;
 		}
+		syslog(LOG_DEBUG, "%s: interface departed", ifp->name);
 		ifp->options->options |= DHCPCD_DEPARTED;
 		stop_interface(ifp);
 		return 0;
@@ -766,20 +767,21 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 		/* Check if we already have the interface */
 		ifl = if_find(ctx, ifp->name);
 		if (ifl) {
+			syslog(LOG_DEBUG, "%s: interface updated", ifl->name);
 			/* The flags and hwaddr could have changed */
 			ifl->flags = ifp->flags;
 			ifl->hwlen = ifp->hwlen;
 			if (ifp->hwlen != 0)
 				memcpy(ifl->hwaddr, ifp->hwaddr, ifl->hwlen);
 		} else {
+			syslog(LOG_DEBUG, "%s: interface added", ifp->name);
 			TAILQ_REMOVE(ifs, ifp, next);
 			TAILQ_INSERT_TAIL(ctx->ifaces, ifp, next);
-		}
-		if (action > 0) {
 			init_state(ifp, ctx->argc, ctx->argv);
 			run_preinit(ifp);
-			dhcpcd_startinterface(ifp);
 		}
+		if (action > 0)
+			dhcpcd_startinterface(ifp);
 	}
 
 	/* Free our discovered list */
