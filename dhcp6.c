@@ -1022,12 +1022,13 @@ dhcp6_startdiscover(void *arg)
 	for (i = 0; i < ifp->options->ia_len; i++) {
 		ia = &ifp->options->ia[i];
 		if (!IN6_IS_ADDR_UNSPECIFIED(&ia->addr) ||
-		    (ia->prefix_len && ifp->options->ia_type == D6_OPTION_IA_PD))
+		    (ia->prefix_len &&
+		    ifp->options->ia_type == D6_OPTION_IA_PD))
 		{
 			a = calloc(1, sizeof(*a));
 			if (a == NULL) {
 				syslog(LOG_ERR, "%s: %m", __func__);
-				return NULL;
+				return;
 			}
 			a->flags = IPV6_AF_REQUEST;
 			a->iface = ifp;
