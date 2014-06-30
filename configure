@@ -272,8 +272,17 @@ if ! type "$CC" >/dev/null 2>&1; then
 fi
 
 echo "Using compiler .. $CC"
-if ! echo "int main(void) { return 0; }" | $CC -x c -o /dev/null - 2>/dev/null
-then
+cat <<EOF >_test.c
+int main(void) {
+	return 0;
+}
+EOF
+_CC=false
+if $CC _test.c -o _test >/dev/null 2>&1; then
+	[ -x _test ] && _CC=true
+fi
+rm -f _test.c _test
+if ! $_CC; then
 	echo "$CC does not create executables"
 	exit 1
 fi
