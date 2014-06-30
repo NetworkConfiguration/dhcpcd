@@ -721,7 +721,7 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 {
 	struct dhcpcd_ctx *ctx;
 	struct if_head *ifs;
-	struct interface *ifp, *ifn, *ifl = NULL;
+	struct interface *ifp, *iff, *ifn;
 	const char * const argv[] = { ifname };
 	int i;
 
@@ -754,23 +754,24 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 			continue;
 		i = 0;
 		/* Check if we already have the interface */
-		ifl = if_find(ctx, ifp->name);
-		if (ifl) {
-			syslog(LOG_DEBUG, "%s: interface updated", ifl->name);
+		iff = if_find(ctx, ifp->name);
+		if (iff) {
+			syslog(LOG_DEBUG, "%s: interface updated", iff->name);
 			/* The flags and hwaddr could have changed */
-			ifl->flags = ifp->flags;
-			ifl->hwlen = ifp->hwlen;
+			iff->flags = ifp->flags;
+			iff->hwlen = ifp->hwlen;
 			if (ifp->hwlen != 0)
-				memcpy(ifl->hwaddr, ifp->hwaddr, ifl->hwlen);
+				memcpy(iff->hwaddr, ifp->hwaddr, iff->hwlen);
 		} else {
 			syslog(LOG_DEBUG, "%s: interface added", ifp->name);
 			TAILQ_REMOVE(ifs, ifp, next);
 			TAILQ_INSERT_TAIL(ctx->ifaces, ifp, next);
 			init_state(ifp, ctx->argc, ctx->argv);
 			run_preinit(ifp);
+			iff = ifp;
 		}
 		if (action > 0)
-			dhcpcd_startinterface(ifp);
+			dhcpcd_startinterface(iff);
 	}
 
 	/* Free our discovered list */
