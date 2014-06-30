@@ -1034,13 +1034,15 @@ if_rarestore(struct dhcpcd_ctx *ctx)
 			    ctx->ra_restore[ctx->ra_restore_len - 1]);
 			if (set_if_nd6_flag(
 			    ctx->ra_restore[ctx->ra_restore_len -1],
-			    ND6_IFF_ACCEPT_RTADV) == -1)
+			    ND6_IFF_ACCEPT_RTADV) == -1 &&
+			    errno != ENXIO)
 				syslog(LOG_ERR, "%s: set_if_nd6_flag: %m",
 				    ctx->ra_restore[ctx->ra_restore_len - 1]);
 #ifdef ND6_IFF_OVERRIDE_RTADV
 			if (ctx->ra_kernel_set == 0 && del_if_nd6_flag(
 			    ctx->ra_restore[ctx->ra_restore_len -1],
-			    ND6_IFF_OVERRIDE_RTADV) == -1)
+			    ND6_IFF_OVERRIDE_RTADV) == -1 &&
+			    errno != ENXIO)
 				syslog(LOG_ERR, "%s: del_if_nd6_flag: %m",
 				    ctx->ra_restore[ctx->ra_restore_len - 1]);
 #endif
