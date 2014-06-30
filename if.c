@@ -295,6 +295,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		ifp->ctx = ctx;
 		strlcpy(ifp->name, p, sizeof(ifp->name));
 		ifp->flags = ifa->ifa_flags;
+		ifp->carrier = if_carrier(ifp);
 
 		sdl_type = 0;
 		/* Don't allow loopback unless explicit */

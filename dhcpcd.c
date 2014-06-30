@@ -339,7 +339,7 @@ configure_interface1(struct interface *ifp)
 		ifo->options &= ~(DHCPCD_ARP | DHCPCD_IPV4LL);
 	if (!(ifp->flags & (IFF_POINTOPOINT | IFF_LOOPBACK | IFF_MULTICAST)))
 		ifo->options &= ~DHCPCD_IPV6RS;
-	if (ifo->options & DHCPCD_LINK && if_carrier(ifp) == LINK_UNKNOWN)
+	if (ifo->options & DHCPCD_LINK && ifp->carrier == LINK_UNKNOWN)
 		ifo->options &= ~DHCPCD_LINK;
 
 	if (ifo->metric != -1)
@@ -561,6 +561,24 @@ warn_iaid_conflict(struct interface *ifp, uint8_t *iaid)
 		    ifp->name, ifn->name);
 }
 
+static void
+pre_start(struct interface *ifp)
+{
+
+	/* Add our link-local address before upping the interface
+	 * so our RFC7217 address beats the hwaddr based one.
+	 * This is also a safety check incase it was ripped out
+	 * from under us. */
+	if (ifp->options->options & DHCPCD_IPV6 && ipv6_start(ifp) == -1) {
+		syslog(LOG_ERR, "%s: ipv6_start: %m", ifp->name);
+		ifp->options->options &= DHCPCD_IPV6;
+	}
+
+	if (!(ifp->flags & IFF_UP) && if_up(ifp) == -1)
+		syslog(LOG_ERR, "%s: if_up: %m", ifp->name);
+}
+
+
 void
 dhcpcd_startinterface(void *arg)
 {
@@ -569,24 +587,9 @@ dhcpcd_startinterface(void *arg)
 	size_t i;
 	char buf[DUID_LEN * 3];
 
-	/* Add our link-local address before upping the interface
-	 * so our RFC7217 address beats the hwaddr based one.
-	 * This is also a safety check incase it was ripped out
-	 * from under us. */
-	if (ifo->options & DHCPCD_IPV6 && ipv6_start(ifp) == -1) {
-		syslog(LOG_ERR, "%s: ipv6_start: %m", ifp->name);
-		ifo->options &= DHCPCD_IPV6;
-	}
+	pre_start(ifp);
 
-	if (!(ifp->flags & IFF_UP) && if_carrier(ifp) != LINK_UNKNOWN) {
-		if (if_up(ifp) == -1)
-			syslog(LOG_ERR, "%s: if_up: %m",
-			    ifp->name);
-	}
-
-	if (ifp->carrier == LINK_UNKNOWN)
-		dhcpcd_handlecarrier(ifp->ctx, LINK_UNKNOWN, 0, ifp->name);
-	if (ifp->carrier == LINK_DOWN) {
+	if (ifp->carrier == LINK_DOWN && ifo->options & DHCPCD_LINK) {
 		syslog(LOG_INFO, "%s: waiting for carrier", ifp->name);
 		return;
 	}
@@ -700,31 +703,17 @@ init_state(struct interface *ifp, int argc, char **argv)
 static void
 run_preinit(struct interface *ifp)
 {
-	const char *reason;
 
-	reason = NULL; /* appease gcc */
-	if (ifp->options->options & DHCPCD_LINK) {
-		switch (if_carrier(ifp)) {
-		case LINK_DOWN:
-			ifp->carrier = LINK_DOWN;
-			reason = "NOCARRIER";
-			break;
-		case LINK_UP:
-			ifp->carrier = LINK_UP;
-			reason = "CARRIER";
-			break;
-		default:
-			ifp->carrier = LINK_UNKNOWN;
-			return;
-		}
-	} else
-		ifp->carrier = LINK_UNKNOWN;
+	pre_start(ifp);
+	if (ifp->ctx->options & DHCPCD_TEST)
+		return;
 
-	if (!(ifp->ctx->options & DHCPCD_TEST))
-		script_runreason(ifp, "PREINIT");
+	script_runreason(ifp, "PREINIT");
 
-	if (ifp->carrier != LINK_UNKNOWN && !(ifp->ctx->options & DHCPCD_TEST))
-		script_runreason(ifp, reason);
+	if (ifp->carrier != LINK_UNKNOWN &&
+	    ifp->options->options & DHCPCD_LINK)
+		script_runreason(ifp,
+		    ifp->carrier == LINK_UP ? "CARRIER" : "NOCARRIER");
 }
 
 int
