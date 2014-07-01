@@ -133,7 +133,7 @@ if_carrier(struct interface *iface)
 }
 
 int
-if_up(struct interface *ifp)
+if_setflag(struct interface *ifp, short flag)
 {
 	struct ifreq ifr;
 	int s, r;
@@ -152,10 +152,10 @@ if_up(struct interface *ifp)
 #endif
 	r = -1;
 	if (ioctl(s, SIOCGIFFLAGS, &ifr) == 0) {
-		if ((ifr.ifr_flags & IFF_UP))
+		if (flag == 0 || ifr.ifr_flags & flag)
 			r = 0;
 		else {
-			ifr.ifr_flags |= IFF_UP;
+			ifr.ifr_flags |= flag;
 			if (ioctl(s, SIOCSIFFLAGS, &ifr) == 0)
 				r = 0;
 		}

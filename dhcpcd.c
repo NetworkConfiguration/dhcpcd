@@ -502,10 +502,23 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 	if (ifp == NULL || !(ifp->options->options & DHCPCD_LINK))
 		return;
 
-	if (carrier == LINK_UNKNOWN)
+	switch(carrier) {
+	case LINK_UNKNOWN:
 		carrier = if_carrier(ifp); /* will set ifp->flags */
-	else
+		break;
+	case LINK_UP:
+		/* we have a carrier! however, we need to ignore the flags
+		 * set in the kernel message as sometimes this message is
+		 * reported before IFF_UP is set by the kernel even though
+		 * dhcpcd has already set it.
+		 *
+		 * So we check the flags now. If IFF_UP is still not set
+		 * then we should expect an accompanying link_down message */
+		if_setflag(ifp, 0); /* will set ifp->flags */
+		break;
+	default:
 		ifp->flags = flags;
+	}
 
 	if (carrier == LINK_UNKNOWN)
 		syslog(LOG_ERR, "%s: carrier_status: %m", ifname);
@@ -582,11 +595,7 @@ pre_start(struct interface *ifp)
 		syslog(LOG_ERR, "%s: ipv6_start: %m", ifp->name);
 		ifp->options->options &= DHCPCD_IPV6;
 	}
-
-	if (!(ifp->flags & IFF_UP) && if_up(ifp) == -1)
-		syslog(LOG_ERR, "%s: if_up: %m", ifp->name);
 }
-
 
 void
 dhcpcd_startinterface(void *arg)
@@ -597,6 +606,8 @@ dhcpcd_startinterface(void *arg)
 	char buf[DUID_LEN * 3];
 
 	pre_start(ifp);
+	if (!if_up(ifp) == -1)
+		syslog(LOG_ERR, "%s: if_up: %m", ifp->name);
 
 	if (ifp->carrier == LINK_DOWN && ifo->options & DHCPCD_LINK) {
 		syslog(LOG_INFO, "%s: waiting for carrier", ifp->name);
