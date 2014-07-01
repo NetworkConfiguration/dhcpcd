@@ -442,6 +442,8 @@ configure_interface1(struct interface *ifp)
 				ifo->ia->ia_type = D6_OPTION_IA_NA;
 				memcpy(ifo->ia->iaid, ifo->iaid,
 				    sizeof(ifo->iaid));
+				memset(&ifo->ia->addr, 0,
+				    sizeof(ifo->ia->addr));
 				ifo->ia->sla = NULL;
 				ifo->ia->sla_len = 0;
 			}
