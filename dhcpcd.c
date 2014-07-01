@@ -323,6 +323,7 @@ configure_interface1(struct interface *ifp)
 {
 	struct if_options *ifo = ifp->options;
 	int ra_global, ra_iface;
+	size_t i;
 
 	/* Do any platform specific configuration */
 	if_conf(ifp);
@@ -431,17 +432,25 @@ configure_interface1(struct interface *ifp)
 	}
 
 #ifdef INET6
-	if (ifo->ia == NULL && ifo->options & DHCPCD_IPV6) {
-		ifo->ia = malloc(sizeof(*ifo->ia));
-		if (ifo->ia == NULL)
-			syslog(LOG_ERR, "%s: %m", __func__);
-		else {
-			if (ifo->ia_type == 0)
-				ifo->ia_type = D6_OPTION_IA_NA;
-			memcpy(ifo->ia->iaid, ifo->iaid, sizeof(ifo->iaid));
-			ifo->ia_len = 1;
-			ifo->ia->sla = NULL;
-			ifo->ia->sla_len = 0;
+	if (ifo->options & DHCPCD_IPV6) {
+		if (ifo->ia == NULL) {
+			ifo->ia = malloc(sizeof(*ifo->ia));
+			if (ifo->ia == NULL)
+				syslog(LOG_ERR, "%s: %m", __func__);
+			else {
+				ifo->ia_len = 1;
+				ifo->ia->ia_type = D6_OPTION_IA_NA;
+				memcpy(ifo->ia->iaid, ifo->iaid,
+				    sizeof(ifo->iaid));
+				ifo->ia->sla = NULL;
+				ifo->ia->sla_len = 0;
+			}
+		} else {
+			for (i = 0; i < ifo->ia_len; i++) {
+				if (!ifo->ia[i].iaid_set)
+					memcpy(ifo->ia->iaid, ifo->iaid,
+					    sizeof(ifo->iaid));
+			}
 		}
 	}
 #endif
@@ -627,7 +636,9 @@ dhcpcd_startinterface(void *arg)
 		    !(ifo->options & DHCPCD_INFORM))
 			ipv6nd_startrs(ifp);
 
-		if (!(ifo->options & DHCPCD_IPV6RS)) {
+		if (!(ifo->options & DHCPCD_IPV6RS) ||
+		    ifo->options & DHCPCD_IA_FORCED)
+		{
 			ssize_t nolease;
 
 			if (ifo->options & DHCPCD_IA_FORCED)

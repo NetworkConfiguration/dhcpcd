@@ -652,7 +652,6 @@ ipv6_addaddrs(struct ipv6_addrhead *addrs)
 	i = 0;
 	TAILQ_FOREACH_SAFE(ap, addrs, next, apn) {
 		if (ap->prefix_vltime == 0) {
-			TAILQ_REMOVE(addrs, ap, next);
 			if (ap->flags & IPV6_AF_ADDED) {
 				syslog(LOG_INFO, "%s: deleting address %s",
 				    ap->iface->name, ap->saddr);
@@ -664,7 +663,12 @@ ipv6_addaddrs(struct ipv6_addrhead *addrs)
 			}
 			eloop_q_timeout_delete(ap->iface->ctx->eloop,
 			    0, NULL, ap);
-			free(ap);
+			if (ap->flags & IPV6_AF_REQUEST) {
+				ap->flags &= ~IPV6_AF_ADDED;
+			} else {
+				TAILQ_REMOVE(addrs, ap, next);
+				free(ap);
+			}
 		} else if (!IN6_IS_ADDR_UNSPECIFIED(&ap->addr)) {
 			if (ap->flags & IPV6_AF_NEW)
 				i++;

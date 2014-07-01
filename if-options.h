@@ -115,6 +115,8 @@ struct if_sla {
 struct if_ia {
 	uint8_t iaid[4];
 #ifdef INET6
+	uint16_t ia_type;
+	uint8_t iaid_set;
 	struct in6_addr addr;
 	uint8_t prefix_len;
 	size_t sla_len;
@@ -165,7 +167,6 @@ struct if_options {
 	in_addr_t *arping;
 	char *fallback;
 
-	uint16_t ia_type;
 	struct if_ia *ia;
 	size_t ia_len;
 

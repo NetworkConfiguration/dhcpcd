@@ -1220,37 +1220,39 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			}
 			i = D6_OPTION_IA_PD;
 		}
-		if (arg != NULL && ifname == NULL) {
+		if (ifname == NULL && arg) {
 			syslog(LOG_ERR,
 			    "IA with IAID must belong in an interface block");
 			return -1;
 		}
 		ifo->options |= DHCPCD_IA_FORCED;
-		if (ifo->ia_type != 0 && ifo->ia_type != i) {
-			syslog(LOG_ERR, "cannot specify a different IA type");
-			return -1;
-		}
-		ifo->ia_type = (uint16_t)i;
-		if (arg == NULL)
-			break;
-		fp = strwhite(arg);
-		if (fp)
-			*fp++ = '\0';
-		p = strchr(arg, '/');
-		if (p)
-			*p++ = '\0';
-		if (parse_iaid(iaid, arg, sizeof(iaid)) == -1)
-			return -1;
+		if (arg) {
+			t = 1;
+			fp = strwhite(arg);
+			if (fp)
+				*fp++ = '\0';
+			p = strchr(arg, '/');
+			if (p)
+				*p++ = '\0';
+			if (parse_iaid(iaid, arg, sizeof(iaid)) == -1)
+				return -1;
+		} else
+			t = 0;
 		ia = NULL;
 		for (sl = 0; sl < ifo->ia_len; sl++) {
-			if (ifo->ia[sl].iaid[0] == iaid[0] &&
+			if ((t == 0 && !ifo->ia[sl].iaid_set) ||
+			    (ifo->ia[sl].iaid[0] == iaid[0] &&
 			    ifo->ia[sl].iaid[1] == iaid[1] &&
 			    ifo->ia[sl].iaid[2] == iaid[2] &&
-			    ifo->ia[sl].iaid[3] == iaid[3])
+			    ifo->ia[sl].iaid[3] == iaid[3]))
 			{
 			        ia = &ifo->ia[sl];
 				break;
 			}
+		}
+		if (ia && ia->ia_type != (uint16_t)i) {
+			syslog(LOG_ERR, "Cannot mix IA for the same IAID");
+			break;
 		}
 		if (ia == NULL) {
 			ia = realloc(ifo->ia,
@@ -1261,11 +1263,19 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			}
 			ifo->ia = ia;
 			ia = &ifo->ia[ifo->ia_len++];
-			ia->iaid[0] = iaid[0];
-			ia->iaid[1] = iaid[1];
-			ia->iaid[2] = iaid[2];
-			ia->iaid[3] = iaid[3];
-			if (p == NULL || ifo->ia_type == D6_OPTION_IA_TA) {
+			ia->ia_type = (uint16_t)i;
+			if (t) {
+				ia->iaid[0] = iaid[0];
+				ia->iaid[1] = iaid[1];
+				ia->iaid[2] = iaid[2];
+				ia->iaid[3] = iaid[3];
+				ia->iaid_set = 1;
+			} else
+				ia->iaid_set = 0;
+			if (!ia->iaid_set ||
+			    p == NULL ||
+			    ia->ia_type == D6_OPTION_IA_TA)
+			{
 				memset(&ia->addr, 0, sizeof(ia->addr));
 				ia->prefix_len = 0;
 			} else {
@@ -1277,7 +1287,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 					syslog(LOG_ERR, "%s: %m", arg);
 					memset(&ia->addr, 0, sizeof(ia->addr));
 				}
-				if (p && ifo->ia_type == D6_OPTION_IA_PD) {
+				if (p && ia->ia_type == D6_OPTION_IA_PD) {
 					i = atoint(p);
 					if (i != -1 && (i < 8 || i > 120)) {
 						errno = EINVAL;
@@ -1293,7 +1303,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			ia->sla_len = 0;
 			ia->sla = NULL;
 		}
-		if (ifo->ia_type != D6_OPTION_IA_PD)
+		if (ia->ia_type != D6_OPTION_IA_PD)
 			break;
 		for (p = fp; p; p = fp) {
 			fp = strwhite(p);

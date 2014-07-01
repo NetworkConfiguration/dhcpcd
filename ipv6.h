@@ -90,6 +90,7 @@ struct ipv6_addr {
 	short flags;
 	char saddr[INET6_ADDRSTRLEN];
 	uint8_t iaid[4];
+	uint16_t ia_type;
 	struct interface *delegating_iface;
 
 	void (*dadcallback)(void *);
