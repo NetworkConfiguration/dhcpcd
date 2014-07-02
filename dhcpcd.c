@@ -323,7 +323,9 @@ configure_interface1(struct interface *ifp)
 {
 	struct if_options *ifo = ifp->options;
 	int ra_global, ra_iface;
+#ifdef INET6
 	size_t i;
+#endif
 
 	/* Do any platform specific configuration */
 	if_conf(ifp);
@@ -608,7 +610,7 @@ dhcpcd_startinterface(void *arg)
 	char buf[DUID_LEN * 3];
 
 	pre_start(ifp);
-	if (!if_up(ifp) == -1)
+	if (if_up(ifp) == -1)
 		syslog(LOG_ERR, "%s: if_up: %m", ifp->name);
 
 	if (ifp->carrier == LINK_DOWN && ifo->options & DHCPCD_LINK) {
