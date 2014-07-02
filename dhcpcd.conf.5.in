@@ -457,6 +457,9 @@ Subsequent options are only parsed for this wireless
 .Ar ssid .
 .It Ic slaac Op Ar hwaddr | Ar private
 Selects the interface identifier used for SLAAC generated IPv6 addresses.
+If
+.Ar private
+is used, a RFC7217 address is generated.
 .It Ic static Ar value
 Configures a static
 .Ar value .
