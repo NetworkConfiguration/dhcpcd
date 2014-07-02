@@ -1123,7 +1123,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 				return ra;
 			}
 #ifdef ND6_IFF_OVERRIDE_RTADV
-			if (override == 0 && ctx->ra_kernel_set == 0 &&
+			if (override == 0 &&
 			    set_if_nd6_flag(ifname, ND6_IFF_OVERRIDE_RTADV)
 			    == -1)
 			{
