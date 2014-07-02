@@ -943,6 +943,30 @@ make_message(struct dhcp_message **message,
 				goto toobig;
 			*p++ = (uint8_t)opt->option;
 		}
+		for (i = 0, opt = ifo->dhcp_override;
+		    i < ifo->dhcp_override_len;
+		    i++, opt++)
+		{
+			/* Check if added above */
+			for (lp = n_params + 1; lp < p; lp++)
+				if (*lp == (uint8_t)opt->option)
+					break;
+			if (lp < p)
+				continue;
+			if (!(opt->type & REQUEST ||
+				has_option_mask(ifo->requestmask, opt->option)))
+				continue;
+			if (opt->type & NOREQ)
+				continue;
+			if (type == DHCP_INFORM &&
+			    (opt->option == DHO_RENEWALTIME ||
+				opt->option == DHO_REBINDTIME))
+				continue;
+			len = (size_t)((p - m) + 2);
+			if (len > sizeof(*dhcp))
+				goto toobig;
+			*p++ = (uint8_t)opt->option;
+		}
 		*n_params = (uint8_t)(p - n_params - 1);
 	}
 

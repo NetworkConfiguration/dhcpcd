@@ -311,11 +311,11 @@ dhcp6_makemessage(struct interface *ifp)
 	struct dhcp6_message *m;
 	struct dhcp6_option *o, *so;
 	const struct dhcp6_option *si, *unicast;
-	size_t l, len, ml, auth_len;
+	size_t l, n, len, ml, auth_len;
 	uint8_t u8, type;
 	uint16_t *u16, n_options;
 	struct if_options *ifo;
-	const struct dhcp_opt *opt;
+	const struct dhcp_opt *opt, *opt2;
 	uint8_t IA, *p;
 	uint32_t u32;
 	const struct ipv6_addr *ap;
@@ -354,6 +354,27 @@ dhcp6_makemessage(struct interface *ifp)
 	if (state->state != DH6S_RELEASE) {
 		for (l = 0, opt = ifp->ctx->dhcp6_opts;
 		    l < ifp->ctx->dhcp6_opts_len;
+		    l++, opt++)
+		{
+			for (n = 0, opt2 = ifo->dhcp6_override;
+			    n < ifo->dhcp6_override_len;
+			    n++, opt2++)
+			{
+				if (opt->option == opt2->option)
+					break;
+			}
+			if (n < ifo->dhcp6_override_len)
+			    continue;
+			if (!(opt->type & NOREQ) &&
+			    (opt->type & REQUEST ||
+			    has_option_mask(ifo->requestmask6, opt->option)))
+			{
+				n_options++;
+				len += sizeof(*u16);
+			}
+		}
+		for (l = 0, opt = ifo->dhcp6_override;
+		    l < ifo->dhcp6_override_len;
 		    l++, opt++)
 		{
 			if (!(opt->type & NOREQ) &&
@@ -626,6 +647,28 @@ dhcp6_makemessage(struct interface *ifp)
 			u16 = (uint16_t *)(void *)D6_OPTION_DATA(o);
 			for (l = 0, opt = ifp->ctx->dhcp6_opts;
 			    l < ifp->ctx->dhcp6_opts_len;
+			    l++, opt++)
+			{
+				for (n = 0, opt2 = ifo->dhcp6_override;
+				    n < ifo->dhcp6_override_len;
+				    n++, opt2++)
+				{
+					if (opt->option == opt2->option)
+						break;
+				}
+				if (n < ifo->dhcp6_override_len)
+				    continue;
+				if (!(opt->type & NOREQ) &&
+				    (opt->type & REQUEST ||
+				    has_option_mask(ifo->requestmask6,
+				        opt->option)))
+				{
+					*u16++ = htons(opt->option);
+					o->len += sizeof(*u16);
+				}
+			}
+			for (l = 0, opt = ifo->dhcp6_override;
+			    l < ifo->dhcp6_override_len;
 			    l++, opt++)
 			{
 				if (!(opt->type & NOREQ) &&
