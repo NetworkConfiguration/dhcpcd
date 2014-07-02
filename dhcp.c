@@ -2998,6 +2998,14 @@ dhcp_start(struct interface *ifp)
 	if (!(ifp->options->options & DHCPCD_IPV4))
 		return;
 
+	/* No point in delaying a static configuration */
+	if (ifp->options->options & DHCPCD_STATIC &&
+	    !(ifp->options->options & DHCPCD_INFORM))
+	{
+		dhcp_start1(ifp);
+		return;
+	}
+
 	tv.tv_sec = DHCP_MIN_DELAY;
 	tv.tv_usec = (suseconds_t)arc4random_uniform(
 	    (DHCP_MAX_DELAY - DHCP_MIN_DELAY) * 1000000);
