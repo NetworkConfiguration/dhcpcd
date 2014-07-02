@@ -2925,7 +2925,6 @@ ssize_t
 dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
     const struct dhcp6_message *m, size_t len)
 {
-	const struct dhcp6_state *state;
 	const struct if_options *ifo;
 	struct dhcp_opt *opt, *vo;
 	const struct dhcp6_option *o;
@@ -2941,7 +2940,6 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 		return -1;
 	}
 
-	state = D6_CSTATE(ifp);
 	n = 0;
 	ifo = ifp->options;
 	ctx = ifp->ctx;
