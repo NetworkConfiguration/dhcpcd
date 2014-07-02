@@ -1226,21 +1226,21 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			return -1;
 		}
 		ifo->options |= DHCPCD_IA_FORCED;
+		fp = strwhite(arg);
+		if (fp) {
+			*fp++ = '\0';
+			fp = strskipwhite(fp);
+		}
 		if (arg) {
-			t = 1;
-			fp = strwhite(arg);
-			if (fp)
-				*fp++ = '\0';
 			p = strchr(arg, '/');
 			if (p)
 				*p++ = '\0';
 			if (parse_iaid(iaid, arg, sizeof(iaid)) == -1)
 				return -1;
-		} else
-			t = 0;
+		}
 		ia = NULL;
 		for (sl = 0; sl < ifo->ia_len; sl++) {
-			if ((t == 0 && !ifo->ia[sl].iaid_set) ||
+			if ((arg == NULL && !ifo->ia[sl].iaid_set) ||
 			    (ifo->ia[sl].iaid[0] == iaid[0] &&
 			    ifo->ia[sl].iaid[1] == iaid[1] &&
 			    ifo->ia[sl].iaid[2] == iaid[2] &&
@@ -1264,7 +1264,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			ifo->ia = ia;
 			ia = &ifo->ia[ifo->ia_len++];
 			ia->ia_type = (uint16_t)i;
-			if (t) {
+			if (arg) {
 				ia->iaid[0] = iaid[0];
 				ia->iaid[1] = iaid[1];
 				ia->iaid[2] = iaid[2];
