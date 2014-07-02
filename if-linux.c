@@ -1223,33 +1223,11 @@ if_addrflags6(const char *ifname, const struct in6_addr *addr)
 
 static const char *prefix = "/proc/sys/net/ipv6/conf";
 
-void
-if_rarestore(struct dhcpcd_ctx *ctx)
-{
-	char path[256];
-
-	for (; ctx->ra_restore_len > 0; ctx->ra_restore_len--) {
-		if (!(ctx->options & DHCPCD_FORKED)) {
-			syslog(LOG_DEBUG,
-			    "%s: restoring kernel IPv6 RA support",
-			    ctx->ra_restore[ctx->ra_restore_len - 1]);
-			snprintf(path, sizeof(path), "%s/%s/accept_ra",
-			    prefix, ctx->ra_restore[ctx->ra_restore_len - 1]);
-			if (write_path(path, "1") == -1 && errno != ENOENT)
-			    syslog(LOG_ERR, "write_path: %s: %m", path);
-		}
-		free(ctx->ra_restore[ctx->ra_restore_len - 1]);
-	}
-	free(ctx->ra_restore);
-	ctx->ra_restore = NULL;
-}
-
 int
-if_checkipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
+if_checkipv6(__unused struct dhcpcd_ctx *ctx, const char *ifname, int own)
 {
 	int ra;
-	size_t i;
-	char path[256], *p, **nrest;
+	char path[256];
 
 	if (ifname == NULL)
 		ifname = "all";
@@ -1282,25 +1260,6 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 		if (write_path(path, "0") == -1) {
 			syslog(LOG_ERR, "write_path: %s: %m", path);
 			return ra;
-		}
-		for (i = 0; i < ctx->ra_restore_len; i++)
-			if (strcmp(ctx->ra_restore[i], ifname) == 0)
-				break;
-		if (i == ctx->ra_restore_len) {
-			p = strdup(ifname);
-			if (p == NULL) {
-				syslog(LOG_ERR, "%s: %m", __func__);
-				return 0;
-			}
-			nrest = realloc(ctx->ra_restore,
-			    (ctx->ra_restore_len + 1) * sizeof(char *));
-			if (nrest == NULL) {
-				syslog(LOG_ERR, "%s: %m", __func__);
-				free(p);
-				return 0;
-			}
-			ctx->ra_restore = nrest;
-			ctx->ra_restore[ctx->ra_restore_len++] = p;
 		}
 		return 0;
 	}

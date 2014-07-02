@@ -1666,7 +1666,6 @@ exit1:
 
 	free_options(ifo);
 	free_globals(&ctx);
-	if_rarestore(&ctx);
 	ipv4_ctxfree(&ctx);
 	ipv6_ctxfree(&ctx);
 	dev_stop(&ctx, !(ctx.options & DHCPCD_FORKED));
