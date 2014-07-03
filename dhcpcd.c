@@ -139,14 +139,14 @@ free_globals(struct dhcpcd_ctx *ctx)
 	struct dhcp_opt *opt;
 
 	if (ctx->ifac) {
-		for (ctx->ifac--; ctx->ifac >= 0; ctx->ifac--)
-			free(ctx->ifav[ctx->ifac]);
+		for (; ctx->ifac > 0; ctx->ifac--)
+			free(ctx->ifav[ctx->ifac - 1]);
 		free(ctx->ifav);
 		ctx->ifav = NULL;
 	}
 	if (ctx->ifdc) {
-		for (ctx->ifdc--; ctx->ifdc >= 0; ctx->ifdc--)
-			free(ctx->ifdv[ctx->ifdc]);
+		for (; ctx->ifdc > 0; ctx->ifdc--)
+			free(ctx->ifdv[ctx->ifdc - 1]);
 		free(ctx->ifdv);
 		ctx->ifdv = NULL;
 	}
