@@ -121,13 +121,22 @@ static const char * const dhcp6_statuses[] = {
 };
 
 void
-dhcp6_printoptions(const struct dhcpcd_ctx *ctx)
+dhcp6_printoptions(const struct dhcpcd_ctx *ctx,
+    const struct dhcp_opt *opts, size_t opts_len)
 {
-	size_t i;
-	const struct dhcp_opt *opt;
+	size_t i, j;
+	const struct dhcp_opt *opt, *opt2;
 
 	for (i = 0, opt = ctx->dhcp6_opts;
 	    i < ctx->dhcp6_opts_len; i++, opt++)
+	{
+		for (j = 0, opt2 = opts; j < opts_len; j++, opt2++)
+			if (opt2->option == opt->option)
+				break;
+		if (j == opts_len)
+			printf("%05d %s\n", opt->option, opt->var);
+	}
+	for (i = 0, opt = opts; i < opts_len; i++, opt++)
 		printf("%05d %s\n", opt->option, opt->var);
 }
 

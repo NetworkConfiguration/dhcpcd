@@ -1282,6 +1282,8 @@ main(int argc, char **argv)
 	ctx.ifv = argv + optind;
 
 	ifo = read_config(&ctx, NULL, NULL, NULL);
+	if (ifo == NULL)
+		goto exit_failure;
 	opt = add_options(&ctx, NULL, ifo, argc, argv);
 	if (opt != 1) {
 		if (opt == 0)
@@ -1290,17 +1292,26 @@ main(int argc, char **argv)
 	}
 	if (i == 3) {
 		printf("Interface options:\n");
+		if (optind == argc - 1) {
+			free_options(ifo);
+			ifo = read_config(&ctx, argv[optind], NULL, NULL);
+			if (ifo == NULL)
+				goto exit_failure;
+			add_options(&ctx, NULL, ifo, argc, argv);
+		}
 		if_printoptions();
 #ifdef INET
 		if (family == 0 || family == AF_INET) {
 			printf("\nDHCPv4 options:\n");
-			dhcp_printoptions(&ctx);
+			dhcp_printoptions(&ctx,
+			    ifo->dhcp_override, ifo->dhcp_override_len);
 		}
 #endif
 #ifdef INET6
 		if (family == 0 || family == AF_INET6) {
 			printf("\nDHCPv6 options:\n");
-			dhcp6_printoptions(&ctx);
+			dhcp6_printoptions(&ctx,
+			    ifo->dhcp6_override, ifo->dhcp6_override_len);
 		}
 #endif
 		goto exit_success;
@@ -1399,7 +1410,7 @@ main(int argc, char **argv)
 			ifp->ctx = &ctx;
 			TAILQ_INSERT_HEAD(ctx.ifaces, ifp, next);
 		}
-		configure_interface(ifp, 0, NULL);
+		configure_interface(ifp, ctx.argc, ctx.argv);
 		if (family == 0 || family == AF_INET) {
 			if (dhcp_dump(ifp) == -1)
 				i = 1;

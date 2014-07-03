@@ -125,16 +125,24 @@ static const size_t udp_dhcp_len = sizeof(struct udp_dhcp_packet);
 static int dhcp_open(struct interface *);
 
 void
-dhcp_printoptions(const struct dhcpcd_ctx *ctx)
+dhcp_printoptions(const struct dhcpcd_ctx *ctx,
+    const struct dhcp_opt *opts, size_t opts_len)
 {
 	const char * const *p;
-	size_t i;
-	const struct dhcp_opt *opt;
+	size_t i, j;
+	const struct dhcp_opt *opt, *opt2;
 
 	for (p = dhcp_params; *p; p++)
 		printf("    %s\n", *p);
 
-	for (i = 0, opt = ctx->dhcp_opts; i < ctx->dhcp_opts_len; i++, opt++)
+	for (i = 0, opt = ctx->dhcp_opts; i < ctx->dhcp_opts_len; i++, opt++) {
+		for (j = 0, opt2 = opts; j < opts_len; j++, opt2++)
+			if (opt->option == opt2->option)
+				break;
+		if (j == opts_len)
+			printf("%03d %s\n", opt->option, opt->var);
+	}
+	for (i = 0, opt = opts; i < opts_len; i++, opt++)
 		printf("%03d %s\n", opt->option, opt->var);
 }
 
