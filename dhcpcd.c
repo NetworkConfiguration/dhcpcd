@@ -1383,20 +1383,22 @@ main(int argc, char **argv)
 			goto exit_failure;
 		}
 		i = 0;
-		if (ctx.ifaces == NULL) {
-			ctx.ifaces = malloc(sizeof(*ctx.ifaces));
-			if (ctx.ifaces == NULL) {
+		/* We need to try and find the interface so we can
+		 * load the hardware address to compare automated IAID */
+		ctx.ifaces = if_discover(&ctx, 1, argv + optind);
+		if (ctx.ifaces == NULL)
+			goto exit_failure;
+		ifp = TAILQ_FIRST(ctx.ifaces);
+		if (ifp == NULL) {
+			ifp = calloc(1, sizeof(*ifp));
+			if (ifp == NULL) {
 				syslog(LOG_ERR, "%s: %m", __func__);
 				goto exit_failure;
 			}
-			TAILQ_INIT(ctx.ifaces);
+			strlcpy(ifp->name, argv[optind], sizeof(ifp->name));
+			ifp->ctx = &ctx;
+			TAILQ_INSERT_HEAD(ctx.ifaces, ifp, next);
 		}
-		ifp = calloc(1, sizeof(*ifp));
-		if (ifp == NULL)
-			goto exit_failure;
-		strlcpy(ifp->name, argv[optind], sizeof(ifp->name));
-		ifp->ctx = &ctx;
-		TAILQ_INSERT_HEAD(ctx.ifaces, ifp, next);
 		configure_interface(ifp, 0, NULL);
 		if (family == 0 || family == AF_INET) {
 			if (dhcp_dump(ifp) == -1)

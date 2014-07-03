@@ -1822,7 +1822,7 @@ dhcp6_readlease(struct interface *ifp)
 	if (fd == -1)
 		goto ex;
 	if (fd == 0) {
-		syslog(LOG_INFO, "%s: lease was for different IA type",
+		syslog(LOG_INFO, "%s: no useable IA found in lease",
 		    ifp->name);
 		goto ex;
 	}
@@ -1867,7 +1867,8 @@ ex:
 	free(state->new);
 	state->new = NULL;
 	state->new_len = 0;
-	unlink(state->leasefile);
+	if (!(ifp->ctx->options & DHCPCD_DUMPLEASE))
+		unlink(state->leasefile);
 	return 0;
 }
 
