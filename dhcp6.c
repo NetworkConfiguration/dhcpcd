@@ -703,7 +703,6 @@ dhcp6_makemessage(struct interface *ifp)
 				p += sizeof(u8);
 				memcpy(p, &ap->prefix.s6_addr,
 				    sizeof(ap->prefix.s6_addr));
-				p += sizeof(ap->prefix.s6_addr);
 
 				/* RFC6603 Sectio 4.2 */
 				sla = dhcp6_findselfsla(ifp, ap->iaid);
