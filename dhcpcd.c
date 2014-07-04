@@ -648,7 +648,7 @@ dhcpcd_startinterface(void *arg)
 
 	if (ifo->options & DHCPCD_IPV6) {
 		if (ifo->options & DHCPCD_IPV6RS &&
-		    !(ifo->options & DHCPCD_INFORM))
+		    !(ifo->options & (DHCPCD_INFORM | DHCPCD_PFXDLGONLY)))
 			ipv6nd_startrs(ifp);
 
 		if (!(ifo->options & DHCPCD_IPV6RS) ||
@@ -680,6 +680,8 @@ dhcpcd_startinterface(void *arg)
 				    "%s: dhcp6_start: %m", ifp->name);
 		}
 	}
+	if (ifo->options & DHCPCD_PFXDLGONLY)
+		return;
 
 	if (ifo->options & DHCPCD_IPV4)
 		dhcp_start(ifp);
@@ -1370,9 +1372,10 @@ main(int argc, char **argv)
 			}
 			snprintf(pidfile, sizeof(pidfile),
 			    PIDFILE, "-", argv[optind], per);
-		}
-		else {
-			snprintf(pidfile, sizeof(pidfile), PIDFILE, "", "", "");
+		} else {
+			snprintf(pidfile, sizeof(pidfile), PIDFILE,
+			    ctx.options & DHCPCD_PFXDLGONLY ? ".pd" : "",
+			    "", "");
 			ctx.options |= DHCPCD_MASTER;
 		}
 	}
@@ -1425,7 +1428,7 @@ main(int argc, char **argv)
 	}
 
 #ifdef USE_SIGNALS
-	if (!(ctx.options & DHCPCD_TEST) &&
+	if (!(ctx.options & (DHCPCD_TEST | DHCPCD_PFXDLGONLY)) &&
 	    (sig == 0 || ctx.ifc != 0))
 	{
 #endif
@@ -1541,7 +1544,7 @@ main(int argc, char **argv)
 	}
 
 
-	if (ctx.options & DHCPCD_MASTER) {
+	if (ctx.options & DHCPCD_MASTER && !(ctx.options & DHCPCD_PFXDLGONLY)) {
 		if (control_start(&ctx, NULL) == -1)
 			syslog(LOG_ERR, "control_start: %m");
 	}

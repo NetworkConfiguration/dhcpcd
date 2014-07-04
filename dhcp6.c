@@ -445,17 +445,25 @@ dhcp6_makemessage(struct interface *ifp)
 			if (ap->prefix_vltime == 0 &&
 			    !(ap->flags & IPV6_AF_REQUEST))
 				continue;
-			if (ap->ia_type == D6_OPTION_IA_PD)
-				len += sizeof(*o) + sizeof(u8) +
-				    sizeof(u32) + sizeof(u32) +
-				    sizeof(ap->prefix.s6_addr);
-			else
+			if (ap->ia_type == D6_OPTION_IA_PD) {
+				if (!(ifo->options & DHCPCD_NOPFXDLG))
+					len += sizeof(*o) + sizeof(u8) +
+					    sizeof(u32) + sizeof(u32) +
+					    sizeof(ap->prefix.s6_addr);
+			} else if (!(ifo->options & DHCPCD_PFXDLGONLY))
 				len += sizeof(*o) + sizeof(ap->addr.s6_addr) +
 				    sizeof(u32) + sizeof(u32);
 		}
 		/* FALLTHROUGH */
 	case DH6S_INIT:
-		len += ifo->ia_len * (sizeof(*o) + (sizeof(u32) * 3));
+		for (l = 0; l < ifo->ia_len; l++) {
+			if (ifo->ia[l].ia_type == D6_OPTION_IA_PD) {
+				if (ifo->options & DHCPCD_NOPFXDLG)
+					continue;
+			} else if (ifo->options & DHCPCD_PFXDLGONLY)
+				continue;
+			len += sizeof(*o) + (sizeof(u32) * 3);
+		}
 		IA = 1;
 		break;
 	default:
@@ -560,6 +568,11 @@ dhcp6_makemessage(struct interface *ifp)
 	}
 
 	for (l = 0; IA && l < ifo->ia_len; l++) {
+		if (ifo->ia[l].ia_type == D6_OPTION_IA_PD) {
+			if (ifo->options & DHCPCD_NOPFXDLG)
+				continue;
+		} else if (ifo->options & DHCPCD_PFXDLGONLY)
+			continue;
 		o = D6_NEXT_OPTION(o);
 		o->code = htons(ifo->ia[l].ia_type);
 		o->len = htons(sizeof(u32) + sizeof(u32) + sizeof(u32));
@@ -1697,13 +1710,15 @@ dhcp6_findia(struct interface *ifp, const struct dhcp6_message *m, size_t l,
 			continue;
 		}
 		if (code == D6_OPTION_IA_PD) {
-			if (dhcp6_findpd(ifp, iaid, p, ol) == 0) {
+			if (!(ifo->options & DHCPCD_NOPFXDLG) &&
+			    dhcp6_findpd(ifp, iaid, p, ol) == 0)
+			{
 				syslog(LOG_WARNING,
 				    "%s: %s: DHCPv6 REPLY missing Prefix",
 				    ifp->name, sfrom);
 				continue;
 			}
-		} else {
+		} else if (!(ifo->options & DHCPCD_PFXDLGONLY)) {
 			if (dhcp6_findna(ifp, code, iaid, p, ol) == 0) {
 				syslog(LOG_WARNING,
 				    "%s: %s: DHCPv6 REPLY missing IA Address",
@@ -2823,7 +2838,8 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 
 	state->state = init_state;
 	snprintf(state->leasefile, sizeof(state->leasefile),
-	    LEASEFILE6, ifp->name);
+	    LEASEFILE6, ifp->name,
+	    ifp->options->options & DHCPCD_PFXDLGONLY ? ".pd" : "");
 
 	if (ipv6_linklocal(ifp) == NULL) {
 		syslog(LOG_DEBUG,
@@ -3090,7 +3106,8 @@ dhcp6_dump(struct interface *ifp)
 		goto eexit;
 	TAILQ_INIT(&state->addrs);
 	snprintf(state->leasefile, sizeof(state->leasefile),
-	    LEASEFILE6, ifp->name);
+	    LEASEFILE6, ifp->name,
+	    ifp->options->options & DHCPCD_PFXDLGONLY ? ".pd" : "");
 	r = dhcp6_readlease(ifp);
 	if (r == -1 && errno == ENOENT) {
 		strlcpy(state->leasefile, ifp->name, sizeof(state->leasefile));

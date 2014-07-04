@@ -49,7 +49,7 @@
 # define LEASEFILE		DBDIR "/" PACKAGE "-%s.lease"
 #endif
 #ifndef LEASEFILE6
-# define LEASEFILE6		DBDIR "/" PACKAGE "-%s.lease6"
+# define LEASEFILE6		DBDIR "/" PACKAGE "-%s%s.lease6"
 #endif
 #ifndef PIDFILE
 # define PIDFILE		RUNDIR "/" PACKAGE "%s%s%s.pid"

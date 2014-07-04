@@ -93,6 +93,8 @@
 #define O_CONTROLGRP		O_BASE + 34
 #define O_SLAAC			O_BASE + 35
 #define O_GATEWAY		O_BASE + 36
+#define O_NOPFXDLG		O_BASE + 37
+#define O_PFXDLGONLY		O_BASE + 38
 
 const struct option cf_options[] = {
 	{"background",      no_argument,       NULL, 'b'},
@@ -179,6 +181,8 @@ const struct option cf_options[] = {
 	{"controlgroup",    required_argument, NULL, O_CONTROLGRP},
 	{"slaac",           required_argument, NULL, O_SLAAC},
 	{"gateway",         no_argument,       NULL, O_GATEWAY},
+	{"nopfxdlg",        no_argument,       NULL, O_NOPFXDLG},
+	{"pfxdlgonly",      no_argument,       NULL, O_PFXDLGONLY},
 	{NULL,              0,                 NULL, '\0'}
 };
 
@@ -1908,6 +1912,12 @@ err_sla:
 			ifo->options |= DHCPCD_SLAACPRIVATE;
 		else
 			ifo->options &= ~DHCPCD_SLAACPRIVATE;
+		break;
+	case O_NOPFXDLG:
+		ifo->options |= DHCPCD_NOPFXDLG;
+		break;
+	case O_PFXDLGONLY:
+		ifo->options |= DHCPCD_PFXDLGONLY;
 		break;
 	default:
 		return 0;
