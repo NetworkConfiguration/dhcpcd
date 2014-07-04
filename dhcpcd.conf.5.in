@@ -250,7 +250,10 @@ Otherwise addresses are only assigned for each
 and
 .Ar sla_id .
 Each assigned address will have a suffix of 1.
-You cannot assign a prefix to the requesting interface.
+You cannot assign a prefix to the requesting interface unless the
+DHCPv6 server supports
+.Li RFC6603
+Prefix Exclude Option.
 .Nm dhcpcd
 has to be running for all the interfaces it is delegating to.
 A default

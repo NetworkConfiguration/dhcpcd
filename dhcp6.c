@@ -313,12 +313,98 @@ dhcp6_newxid(const struct interface *ifp, struct dhcp6_message *m)
 	m->xid[2] = xid & 0xff;
 }
 
+static const struct if_sla *
+dhcp6_findselfsla(struct interface *ifp, const uint8_t *iaid)
+{
+	size_t i, j;
+
+	for (i = 0; i < ifp->options->ia_len; i++) {
+		if (iaid == NULL ||
+		    memcmp(&ifp->options->ia[i].iaid, iaid,
+		    sizeof(ifp->options->ia[i].iaid)) == 0)
+		{
+			for (j = 0; j < ifp->options->ia[i].sla_len; j++) {
+				if (strcmp(ifp->options->ia[i].sla[j].ifname,
+				    ifp->name) == 0)
+					return &ifp->options->ia[i].sla[j];
+			}
+		}
+	}
+	return NULL;
+}
+
+static int
+dhcp6_delegateaddr(struct in6_addr *addr, struct interface *ifp,
+    const struct ipv6_addr *prefix, const struct if_sla *sla)
+{
+	struct dhcp6_state *state;
+	struct if_sla asla;
+	char iabuf[INET6_ADDRSTRLEN];
+	const char *ia;
+
+	state = D6_STATE(ifp);
+	if (state == NULL) {
+		ifp->if_data[IF_DATA_DHCP6] = calloc(1, sizeof(*state));
+		state = D6_STATE(ifp);
+		if (state == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			return -1;
+		}
+
+		TAILQ_INIT(&state->addrs);
+		state->state = DH6S_DELEGATED;
+		state->reason = "DELEGATED6";
+	}
+
+	if (sla == NULL || sla->sla_set == 0) {
+		struct interface *ifi;
+		unsigned int idx;
+		int bits;
+
+		asla.sla = ifp->index;
+		/* Work out our largest index delegating to. */
+		idx = 0;
+		TAILQ_FOREACH(ifi, ifp->ctx->ifaces, next) {
+			if (ifi != ifp && ifi->index > idx)
+				idx = ifi->index;
+		}
+		bits = ffs((int)idx);
+		if (prefix->prefix_len + bits > UINT8_MAX)
+			asla.prefix_len = UINT8_MAX;
+		else {
+			asla.prefix_len = prefix->prefix_len + (uint8_t)bits;
+
+			/* Make a 64 prefix by default, as this maks SLAAC
+			 * possible. Otherwise round up to the nearest octet. */
+			if (asla.prefix_len <= 64)
+				asla.prefix_len = 64;
+			else
+				asla.prefix_len = ROUNDUP8(asla.prefix_len);
+
+		}
+		sla = &asla;
+	}
+
+	if (ipv6_userprefix(&prefix->prefix, prefix->prefix_len,
+		sla->sla, addr, sla->prefix_len) == -1)
+	{
+		ia = inet_ntop(AF_INET6, &prefix->prefix.s6_addr,
+		    iabuf, sizeof(iabuf));
+		syslog(LOG_ERR, "%s: invalid prefix %s/%d + %d/%d: %m",
+			ifp->name, ia, prefix->prefix_len,
+			sla->sla, sla->prefix_len);
+		return -1;
+	}
+
+	return 0;
+}
+
 static int
 dhcp6_makemessage(struct interface *ifp)
 {
 	struct dhcp6_state *state;
 	struct dhcp6_message *m;
-	struct dhcp6_option *o, *so;
+	struct dhcp6_option *o, *so, *eo;
 	const struct dhcp6_option *si, *unicast;
 	size_t l, n, len, ml, auth_len;
 	uint8_t u8, type;
@@ -331,6 +417,8 @@ dhcp6_makemessage(struct interface *ifp)
 	char hbuf[HOSTNAME_MAX_LEN + 1];
 	const char *hostname;
 	int fqdn;
+	const struct if_sla *sla;
+	struct in6_addr addr;
 
 	state = D6_STATE(ifp);
 	if (state->send) {
@@ -394,6 +482,10 @@ dhcp6_makemessage(struct interface *ifp)
 				len += sizeof(*u16);
 			}
 		}
+		if (dhcp6_findselfsla(ifp, NULL)) {
+			n_options++;
+			len += sizeof(*u16);
+		}
 		if (len)
 			len += sizeof(*o);
 
@@ -446,10 +538,18 @@ dhcp6_makemessage(struct interface *ifp)
 			    !(ap->flags & IPV6_AF_REQUEST))
 				continue;
 			if (ap->ia_type == D6_OPTION_IA_PD) {
-				if (!(ifo->options & DHCPCD_NOPFXDLG))
+				if (!(ifo->options & DHCPCD_NOPFXDLG)) {
 					len += sizeof(*o) + sizeof(u8) +
 					    sizeof(u32) + sizeof(u32) +
 					    sizeof(ap->prefix.s6_addr);
+					sla = dhcp6_findselfsla(ifp, ap->iaid);
+					if (sla)
+						len += sizeof(*o) + 1 +
+						    ((sla->prefix_len -
+						    ap->prefix_len - 1) / 8) +
+						    1;
+
+				}
 			} else if (!(ifo->options & DHCPCD_PFXDLGONLY))
 				len += sizeof(*o) + sizeof(ap->addr.s6_addr) +
 				    sizeof(u32) + sizeof(u32);
@@ -603,16 +703,46 @@ dhcp6_makemessage(struct interface *ifp)
 				p += sizeof(u8);
 				memcpy(p, &ap->prefix.s6_addr,
 				    sizeof(ap->prefix.s6_addr));
-				/* Avoid a shadowed declaration warning by
-				 * moving our addition outside of the htons
-				 * macro */
+				p += sizeof(ap->prefix.s6_addr);
+
+				/* RFC6603 Sectio 4.2 */
+				sla = dhcp6_findselfsla(ifp, ap->iaid);
+				if (sla &&
+				    dhcp6_delegateaddr(&addr, ifp, ap, sla) ==0)
+				{
+					uint16_t el;
+					uint8_t *pp;
+
+					el = ((sla->prefix_len -
+					    ap->prefix_len - 1) / 8) + 1;
+					eo = D6_NEXT_OPTION(so);
+					eo->code = htons(D6_OPTION_PD_EXCLUDE);
+					eo->len = el + 1;
+					p = D6_OPTION_DATA(eo);
+					*p++ = (uint8_t)sla->prefix_len;
+					pp = addr.s6_addr;
+					pp += (ap->prefix_len - 1) / 8;
+					u8 = ap->prefix_len % 8;
+					if (u8 % 8 == 0)
+						pp++;
+					else {
+						*p = (uint8_t)(*pp++ << u8);
+						el--;
+					}
+					memcpy(p, pp, el);
+					u32 = ntohs(so->len) +
+					    sizeof(*eo) + eo->len;
+					so->len = htons(u32);
+					eo->len = htons(eo->len);
+				}
+
 				u32 = ntohs(o->len) + sizeof(*so)
 				    + ntohs(so->len);
 				o->len = htons(u32);
 			} else {
 				so->code = htons(D6_OPTION_IA_ADDR);
-				so->len = htons(sizeof(ap->addr.s6_addr) +
-				    sizeof(u32) + sizeof(u32));
+				so->len = sizeof(ap->addr.s6_addr) +
+				    sizeof(u32) + sizeof(u32);
 				p = D6_OPTION_DATA(so);
 				memcpy(p, &ap->addr.s6_addr,
 				    sizeof(ap->addr.s6_addr));
@@ -622,11 +752,9 @@ dhcp6_makemessage(struct interface *ifp)
 				p += sizeof(u32);
 				u32 = htonl(ap->prefix_vltime);
 				memcpy(p, &u32, sizeof(u32));
-				/* Avoid a shadowed declaration warning by
-				 * moving our addition outside of the htons
-				 * macro */
 				u32 = ntohs(o->len) + sizeof(*so)
-				    + ntohs(so->len);
+				    + so->len;
+				so->len = htons(so->len);
 				o->len = htons(u32);
 			}
 		}
@@ -701,6 +829,10 @@ dhcp6_makemessage(struct interface *ifp)
 					*u16++ = htons(opt->option);
 					o->len += sizeof(*u16);
 				}
+			}
+			if (dhcp6_findselfsla(ifp, NULL)) {
+				*u16++ = htons(D6_OPTION_PD_EXCLUDE);
+				o->len += sizeof(*u16);
 			}
 			o->len = htons(o->len);
 		}
@@ -1535,8 +1667,8 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
     const uint8_t *d, size_t l)
 {
 	struct dhcp6_state *state;
-	const struct dhcp6_option *o;
-	const uint8_t *p;
+	const struct dhcp6_option *o, *ex;
+	const uint8_t *p, *ps, *pe, *op;
 	struct ipv6_addr *a;
 	char iabuf[INET6_ADDRSTRLEN];
 	const char *ia;
@@ -1561,7 +1693,8 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			    ifp->name);
 			continue;
 		}
-		p = D6_COPTION_DATA(o);
+		ps = p = D6_COPTION_DATA(o);
+		pe = ps + u32;
 		memcpy(&u32, p, sizeof(u32));
 		pltime = ntohl(u32);
 		p += sizeof(u32);
@@ -1572,6 +1705,7 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 		p += sizeof(u8);
 		len = u8;
 		memcpy(&prefix.s6_addr, p, sizeof(prefix.s6_addr));
+		p += sizeof(prefix.s6_addr);
 
 		TAILQ_FOREACH(a, &state->addrs, next) {
 			if (IN6_ARE_ADDR_EQUAL(&a->prefix, &prefix))
@@ -1612,6 +1746,37 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 		if (a->prefix_vltime && a->prefix_vltime > state->expire)
 			state->expire = a->prefix_vltime;
 		i++;
+
+		off = (size_t)(pe - p);
+		ex = dhcp6_findoption(D6_OPTION_PD_EXCLUDE, p, off);
+
+		if (ex) {
+			off = ntohs(ex->len);
+			if (off < 2) {
+				syslog(LOG_ERR, "%s: trunaced PD Exclude",
+				    ifp->name);
+				ex = NULL;
+			}
+		}
+		if (ex) {
+			int bytelen, bitlen;
+
+			op = D6_COPTION_DATA(ex);
+			a->prefix_exclude_len = *op++;
+			memcpy(&a->prefix_exclude, &a->prefix,
+			    sizeof(a->prefix_exclude));
+			bytelen = a->prefix_len / NBBY;
+			bitlen = a->prefix_len % NBBY;
+			if (bitlen != 0)
+				a->prefix_exclude.s6_addr[bytelen] |=
+				    *op++ >> bitlen;
+			memcpy(a->prefix_exclude.s6_addr + bytelen + 1,
+			    op, off - 2);
+		} else {
+			a->prefix_exclude_len = 0;
+			memset(&a->prefix_exclude, 0,
+			    sizeof(a->prefix_exclude));
+		}
 	}
 	return i;
 }
@@ -1943,69 +2108,28 @@ dhcp6_startinit(struct interface *ifp)
 }
 
 static struct ipv6_addr *
-dhcp6_delegate_addr(struct interface *ifp, struct ipv6_addr *prefix,
+dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
     const struct if_sla *sla, struct interface *ifs)
 {
 	struct dhcp6_state *state;
-	struct if_sla asla;
 	struct in6_addr addr;
 	struct ipv6_addr *a, *ap, *apn;
 	char iabuf[INET6_ADDRSTRLEN];
 	const char *ia;
 
-	state = D6_STATE(ifp);
-	if (state == NULL) {
-		ifp->if_data[IF_DATA_DHCP6] = calloc(1, sizeof(*state));
-		state = D6_STATE(ifp);
-		if (state == NULL) {
-			syslog(LOG_ERR, "%s: %m", __func__);
+	/* RFC6603 Section 4.2 */
+	if (ifp == ifs) {
+		if (prefix->prefix_exclude_len == 0) {
+			syslog(LOG_WARNING,
+			    "%s: DHCPv6 server does not support "
+			    "OPTION_PD_EXCLUDE",
+			    ifp->name);
 			return NULL;
 		}
-
-		TAILQ_INIT(&state->addrs);
-		state->state = DH6S_DELEGATED;
-		state->reason = "DELEGATED6";
-	}
-
-	if (sla == NULL || sla->sla_set == 0) {
-		struct interface *ifi;
-		unsigned int idx;
-		int bits;
-
-		asla.sla = ifp->index;
-		/* Work out our largest index delegating to. */
-		idx = 0;
-		TAILQ_FOREACH(ifi, ifp->ctx->ifaces, next) {
-			if (ifi != ifp && ifi->index > idx)
-				idx = ifi->index;
-		}
-		bits = ffs((int)idx);
-		if (prefix->prefix_len + bits > UINT8_MAX)
-			asla.prefix_len = UINT8_MAX;
-		else {
-			asla.prefix_len = prefix->prefix_len + (uint8_t)bits;
-
-			/* Make a 64 prefix by default, as this maks SLAAC
-			 * possible. Otherwise round up to the nearest octet. */
-			if (asla.prefix_len <= 64)
-				asla.prefix_len = 64;
-			else
-				asla.prefix_len = ROUNDUP8(asla.prefix_len);
-
-		}
-		sla = &asla;
-	}
-
-	if (ipv6_userprefix(&prefix->prefix, prefix->prefix_len,
-		sla->sla, &addr, sla->prefix_len) == -1)
-	{
-		ia = inet_ntop(AF_INET6, &prefix->prefix.s6_addr,
-		    iabuf, sizeof(iabuf));
-		syslog(LOG_ERR, "%s: invalid prefix %s/%d + %d/%d: %m",
-			ifp->name, ia, prefix->prefix_len,
-			sla->sla, sla->prefix_len);
+		memcpy(&addr, &prefix->prefix_exclude, sizeof(addr));
+	} else if (dhcp6_delegateaddr(&addr, ifp, prefix, sla) == -1)
 		return NULL;
-	}
+
 
 	a = calloc(1, sizeof(*a));
 	if (a == NULL) {
@@ -2027,6 +2151,7 @@ dhcp6_delegate_addr(struct interface *ifp, struct ipv6_addr *prefix,
 	memcpy(&a->addr.s6_addr, &a->prefix.s6_addr, sizeof(a->addr.s6_addr));
 	a->addr.s6_addr[sizeof(a->addr.s6_addr) - 1] += 1;
 
+	state = D6_STATE(ifp);
 	/* Remove any exiting address */
 	TAILQ_FOREACH_SAFE(ap, &state->addrs, next, apn) {
 		if (IN6_ARE_ADDR_EQUAL(&ap->addr, &a->addr)) {
@@ -2119,7 +2244,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 						    abrt = 1;
 						break;
 					}
-					if (dhcp6_delegate_addr(ifd, ap,
+					if (dhcp6_ifdelegateaddr(ifd, ap,
 					    NULL, ifp))
 						k++;
 				}
@@ -2138,7 +2263,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 						carrier_warned = 1;
 						break;
 					}
-					if (dhcp6_delegate_addr(ifd, ap,
+					if (dhcp6_ifdelegateaddr(ifd, ap,
 					    sla, ifp))
 						k++;
 				}
@@ -2201,7 +2326,7 @@ dhcp6_find_delegates(struct interface *ifp)
 						    dhcp6_find_delegates1, ifp);
 						return 1;
 					}
-					if (dhcp6_delegate_addr(ifp, ap,
+					if (dhcp6_ifdelegateaddr(ifp, ap,
 					    sla, ifd))
 					    k++;
 				}
@@ -2786,6 +2911,10 @@ dhcp6_start1(void *arg)
 		    ifo->options & DHCPCD_HOSTNAME)
 			add_option_mask(ifo->requestmask6, D6_OPTION_FQDN);
 	}
+
+	/* Rapid commit won't wor with Prefix Delegation Exclusion */
+	if (dhcp6_findselfsla(ifp, NULL))
+		del_option_mask(ifo->requestmask6, D6_OPTION_RAPID_COMMIT);
 
 	if (state->state == DH6S_INFORM) {
 		add_option_mask(ifo->requestmask6, D6_OPTION_INFO_REFRESH_TIME);

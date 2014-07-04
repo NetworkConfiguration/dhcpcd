@@ -92,6 +92,8 @@ struct ipv6_addr {
 	uint8_t iaid[4];
 	uint16_t ia_type;
 	struct interface *delegating_iface;
+	uint8_t prefix_exclude_len;
+	struct in6_addr prefix_exclude;
 
 	void (*dadcallback)(void *);
 	int dadcounter;

@@ -1337,19 +1337,6 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			np = strchr(p, '/');
 			if (np)
 				*np++ = '\0';
-			/*
-			 * RFC3633 12.1
-			 * the requesting router MUST NOT assign any delegated
-			 * prefixes or subnets from the delegated prefix(es) to
-			 * the link through which it received the DHCP message
-			 * from the delegating router.
-			 */
-			if (strcmp(ifname, p) == 0) {
-				syslog(LOG_ERR,
-				    "%s: cannot assign IA_PD to itself",
-				    ifname);
-				goto err_sla;
-			}
 			if (strlcpy(sla->ifname, p,
 			    sizeof(sla->ifname)) >= sizeof(sla->ifname))
 			{
