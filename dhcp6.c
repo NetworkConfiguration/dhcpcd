@@ -546,8 +546,8 @@ dhcp6_makemessage(struct interface *ifp)
 					if (sla)
 						len += sizeof(*o) + 1 +
 						    ((sla->prefix_len -
-						    ap->prefix_len - 1) / 8) +
-						    1;
+						    ap->prefix_len - 1) / NBBY)
+						    + 1;
 
 				}
 			} else if (!(ifo->options & DHCPCD_PFXDLGONLY))
@@ -713,16 +713,16 @@ dhcp6_makemessage(struct interface *ifp)
 					uint8_t *pp;
 
 					el = ((sla->prefix_len -
-					    ap->prefix_len - 1) / 8) + 1;
+					    ap->prefix_len - 1) / NBBY) + 1;
 					eo = D6_NEXT_OPTION(so);
 					eo->code = htons(D6_OPTION_PD_EXCLUDE);
 					eo->len = el + 1;
 					p = D6_OPTION_DATA(eo);
 					*p++ = (uint8_t)sla->prefix_len;
 					pp = addr.s6_addr;
-					pp += (ap->prefix_len - 1) / 8;
-					u8 = ap->prefix_len % 8;
-					if (u8 % 8 == 0)
+					pp += (ap->prefix_len - 1) / NBBY;
+					u8 = ap->prefix_len % NBBY;
+					if (u8 % NBBY == 0)
 						pp++;
 					else {
 						*p = (uint8_t)(*pp++ << u8);
@@ -1752,7 +1752,7 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 		if (ex) {
 			off = ntohs(ex->len);
 			if (off < 2) {
-				syslog(LOG_ERR, "%s: trunaced PD Exclude",
+				syslog(LOG_ERR, "%s: truncated PD Exclude",
 				    ifp->name);
 				ex = NULL;
 			}

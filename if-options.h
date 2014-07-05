@@ -28,6 +28,7 @@
 #ifndef IF_OPTIONS_H
 #define IF_OPTIONS_H
 
+#include <sys/param.h>
 #include <sys/socket.h>
 #include <net/if.h>
 #include <netinet/in.h>
@@ -134,13 +135,13 @@ struct vivco {
 struct if_options {
 	uint8_t iaid[4];
 	int metric;
-	uint8_t requestmask[256 / 8];
-	uint8_t requiremask[256 / 8];
-	uint8_t nomask[256 / 8];
-	uint8_t requestmask6[(UINT16_MAX + 1) / 8];
-	uint8_t requiremask6[(UINT16_MAX + 1) / 8];
-	uint8_t nomask6[(UINT16_MAX + 1) / 8];
-	uint8_t dstmask[256 / 8];
+	uint8_t requestmask[256 / NBBY];
+	uint8_t requiremask[256 / NBBY];
+	uint8_t nomask[256 / NBBY];
+	uint8_t requestmask6[(UINT16_MAX + 1) / NBBY];
+	uint8_t requiremask6[(UINT16_MAX + 1) / NBBY];
+	uint8_t nomask6[(UINT16_MAX + 1) / NBBY];
+	uint8_t dstmask[256 / NBBY];
 	uint32_t leasetime;
 	time_t timeout;
 	time_t reboot;

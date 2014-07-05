@@ -294,7 +294,7 @@ decode_rfc3442(char *out, size_t len, const uint8_t *p, size_t pl)
 			errno = EINVAL;
 			return -1;
 		}
-		ocets = (cidr + 7) / 8;
+		ocets = (cidr + 7) / NBBY;
 		if (!out) {
 			p += 4 + ocets;
 			bytes += ((4 * 4) * 2) + 4;
@@ -365,7 +365,7 @@ decode_rfc3442_rt(const uint8_t *data, size_t dl)
 		}
 		TAILQ_INSERT_TAIL(routes, rt, next);
 
-		ocets = (cidr + 7) / 8;
+		ocets = (cidr + 7) / NBBY;
 		/* If we have ocets then we have a destination and netmask */
 		if (ocets > 0) {
 			memcpy(&rt->dest.s_addr, p, ocets);
