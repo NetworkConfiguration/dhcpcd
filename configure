@@ -432,7 +432,7 @@ int main(void) {
 EOF
 if $XCC _getifaddrs.c -o _getifaddrs 2>/dev/null; then
 	echo "yes"
-elif $XCC _getifaddrs.c -o _getifaddrs -lsocket >/dev/null; then
+elif $XCC _getifaddrs.c -o _getifaddrs -lsocket 2>/dev/null; then
 	echo "yes (-lsocket)"
 	echo "LDADD+=		-lsocket" >>$CONFIG_MK
 else
