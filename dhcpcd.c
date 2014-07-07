@@ -581,7 +581,7 @@ warn_iaid_conflict(struct interface *ifp, uint8_t *iaid)
 	}
 
 	/* This is only a problem if the interfaces are on the same network. */
-	if (ifn)
+	if (ifn && strcmp(ifp->name, ifn->name))
 		syslog(LOG_ERR,
 		    "%s: IAID conflicts with one assigned to %s",
 		    ifp->name, ifn->name);
@@ -702,7 +702,7 @@ handle_link(void *arg)
 }
 
 static void
-init_state(struct interface *ifp, int argc, char **argv)
+dhcpcd_initstate1(struct interface *ifp, int argc, char **argv)
 {
 	struct if_options *ifo;
 
@@ -726,6 +726,13 @@ init_state(struct interface *ifp, int argc, char **argv)
 		syslog(LOG_ERR, "%s: ipv6_start: %m", ifp->name);
 		ifo->options &= DHCPCD_IPV6;
 	}
+}
+
+void
+dhcpcd_initstate(struct interface *ifp)
+{
+
+	dhcpcd_initstate1(ifp, ifp->ctx->argc, ifp->ctx->argv);
 }
 
 static void
@@ -794,7 +801,7 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 			syslog(LOG_DEBUG, "%s: interface added", ifp->name);
 			TAILQ_REMOVE(ifs, ifp, next);
 			TAILQ_INSERT_TAIL(ctx->ifaces, ifp, next);
-			init_state(ifp, ctx->argc, ctx->argv);
+			dhcpcd_initstate(ifp);
 			run_preinit(ifp);
 			iff = ifp;
 		}
@@ -874,7 +881,7 @@ reconf_reboot(struct dhcpcd_ctx *ctx, int action, int argc, char **argv, int oi)
 			if_free(ifp);
 		} else {
 			TAILQ_INSERT_TAIL(ctx->ifaces, ifp, next);
-			init_state(ifp, argc, argv);
+			dhcpcd_initstate1(ifp, argc, argv);
 			run_preinit(ifp);
 			dhcpcd_startinterface(ifp);
 		}
@@ -887,7 +894,7 @@ reconf_reboot(struct dhcpcd_ctx *ctx, int action, int argc, char **argv, int oi)
 static void
 stop_all_interfaces(struct dhcpcd_ctx *ctx, int do_release)
 {
-	struct interface *ifp;
+	struct interface *ifp, *ifpm;
 
 	/* drop_dhcp could change the order, so we do it like this. */
 	for (;;) {
@@ -895,6 +902,10 @@ stop_all_interfaces(struct dhcpcd_ctx *ctx, int do_release)
 		ifp = TAILQ_LAST(ctx->ifaces, if_head);
 		if (ifp == NULL)
 			break;
+		/* Stop the master interface only */
+		ifpm = if_find(ifp->ctx, ifp->name);
+		if (ifpm)
+			ifp = ifpm;
 		if (do_release) {
 			ifp->options->options |= DHCPCD_RELEASE;
 			ifp->options->options &= ~DHCPCD_PERSISTENT;
@@ -1267,10 +1278,13 @@ main(int argc, char **argv)
 			i = 1;
 			break;
 		case 'U':
-			i = 2;
+			if (i == 3)
+				i = 4;
+			else if (i != 4)
+				i = 3;
 			break;
 		case 'V':
-			i = 3;
+			i = 2;
 			break;
 		case '?':
 			usage();
@@ -1292,7 +1306,7 @@ main(int argc, char **argv)
 			usage();
 		goto exit_failure;
 	}
-	if (i == 3) {
+	if (i == 2) {
 		printf("Interface options:\n");
 		if (optind == argc - 1) {
 			free_options(ifo);
@@ -1324,6 +1338,8 @@ main(int argc, char **argv)
 			ctx.options |= DHCPCD_TEST;
 		else
 			ctx.options |= DHCPCD_DUMPLEASE;
+		if (i == 4)
+			ctx.options |= DHCPCD_PFXDLGONLY;
 		ctx.options |= DHCPCD_PERSISTENT;
 		ctx.options &= ~DHCPCD_DAEMONISE;
 	}
@@ -1373,9 +1389,7 @@ main(int argc, char **argv)
 			snprintf(pidfile, sizeof(pidfile),
 			    PIDFILE, "-", argv[optind], per);
 		} else {
-			snprintf(pidfile, sizeof(pidfile), PIDFILE,
-			    ctx.options & DHCPCD_PFXDLGONLY ? ".pd" : "",
-			    "", "");
+			snprintf(pidfile, sizeof(pidfile), PIDFILE, "", "", "");
 			ctx.options |= DHCPCD_MASTER;
 		}
 	}
@@ -1414,6 +1428,8 @@ main(int argc, char **argv)
 			TAILQ_INSERT_HEAD(ctx.ifaces, ifp, next);
 		}
 		configure_interface(ifp, ctx.argc, ctx.argv);
+		if (ctx.options & DHCPCD_PFXDLGONLY)
+			ifp->options->options |= DHCPCD_PFXDLGONLY;
 		if (family == 0 || family == AF_INET) {
 			if (dhcp_dump(ifp) == -1)
 				i = 1;
@@ -1428,7 +1444,7 @@ main(int argc, char **argv)
 	}
 
 #ifdef USE_SIGNALS
-	if (!(ctx.options & (DHCPCD_TEST | DHCPCD_PFXDLGONLY)) &&
+	if (!(ctx.options & DHCPCD_TEST) &&
 	    (sig == 0 || ctx.ifc != 0))
 	{
 #endif
@@ -1544,7 +1560,7 @@ main(int argc, char **argv)
 	}
 
 
-	if (ctx.options & DHCPCD_MASTER && !(ctx.options & DHCPCD_PFXDLGONLY)) {
+	if (ctx.options & DHCPCD_MASTER) {
 		if (control_start(&ctx, NULL) == -1)
 			syslog(LOG_ERR, "control_start: %m");
 	}
@@ -1613,7 +1629,7 @@ main(int argc, char **argv)
 	}
 
 	TAILQ_FOREACH(ifp, ctx.ifaces, next) {
-		init_state(ifp, argc, argv);
+		dhcpcd_initstate1(ifp, argc, argv);
 	}
 
 	if (ctx.options & DHCPCD_BACKGROUND && dhcpcd_daemonise(&ctx))

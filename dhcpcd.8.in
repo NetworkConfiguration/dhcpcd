@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd July 4, 2014
+.Dd July 7, 2014
 .Dt DHCPCD 8
 .Os
 .Sh NAME
@@ -67,10 +67,6 @@
 .Nm
 .Fl U, Fl Fl dumplease
 .Ar interface
-.Nm
-.Fl Fl pfxdlgonly
-.Nm
-.Fl Fl nopfxdlg
 .Nm
 .Fl Fl version
 .Nm
@@ -556,6 +552,14 @@ Dumps the last lease for the
 to stdout.
 .Ar interface
 could also be a path to a DHCP wire formatted file.
+Use the
+.Fl 4
+or
+.Fl 6
+flags to specify an address family.
+Pass a 2nd
+.Fl U, Fl Fl dumplease option to dump a secondary lease, such as
+DHCPv6 Prefix Delegation when not being mixed with another IA type.
 .It Fl V, Fl Fl variables
 Display a list of option codes and the associated variable for use in
 .Xr dhcpcd-run-hooks 8 .
@@ -618,30 +622,6 @@ to rebind, reconfigure or exit need to include the same restrictive flags
 so that
 .Nm
 knows which process to signal.
-.Pp
-.Li RFC3633
-DHCPv6 Prefix Delegation does not work in the same state or session as
-Normal or Temporary Addresses.
-.Nm
-is designed for a single state per protocol and as such
-.Li draft-ietf-dhc-dhcpv6-stateful-issues-06
-is supported by default, but that is not a published RFC yet.
-To allow RFC conformance,
-.Nm
-supports the
-.Fl Fl pfxdlgonly
-and
-.Fl Fl nopfxdlg
-options which allow the spawning of two
-.Nm
-instances to separate the Prefix Delegation state from the others.
-You may wish to disable
-.Xr dhcpcd-run-hooks 8
-on the
-.Fl Fl pfxdlgonly
-instance using the
-.Fl Fl script \"\"
-option.
 .Sh FILES
 .Bl -ohang
 .It Pa @SYSCONFDIR@/dhcpcd.conf

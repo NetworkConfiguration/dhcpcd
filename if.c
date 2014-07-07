@@ -240,6 +240,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		}
 		if (ifp)
 			continue;
+
 		if (argc > 0) {
 			for (i = 0; i < argc; i++) {
 #ifdef __linux__
@@ -483,7 +484,9 @@ if_find(struct dhcpcd_ctx *ctx, const char *ifname)
 
 	if (ctx != NULL && ctx->ifaces != NULL) {
 		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-			if (strcmp(ifp->name, ifname) == 0)
+			if ((ifp->options ||
+			    !(ifp->options->options & DHCPCD_PFXDLGONLY)) &&
+			    strcmp(ifp->name, ifname) == 0)
 				return ifp;
 		}
 	}

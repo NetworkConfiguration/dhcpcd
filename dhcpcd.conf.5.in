@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd July 4, 2014
+.Dd July 7, 2014
 .Dt DHCPCD.CONF 5
 .Os
 .Sh NAME
@@ -293,12 +293,18 @@ IPv6RS should be disabled globally when requesting a Prefix Delegation like so:
 .D1 interface eth1
 .D1 ipv4
 .D1 ipv6rs
-.Pp
-Using this option with other IA options in the same interface block is not
-currently RFC conformant.
-Please see the
-.Li BUGS
-section below.
+.It Ic ia_pd_mix
+To be RFC compliant,
+.Nm dhcpcd
+cannot mix Prefix Delegation with other DHCPv6 address types in the same
+session.
+This has a number of issues: additional DHCP traffic and potential collisions
+between options.
+.Ic ia_pd_mix
+enables
+.Li draft-ietf-dhc-dhcpv6-stateful-issues-06
+support so that Prefix Delegation can be mixed with other address types in
+the same session.
 .It Ic ipv4only
 Only configure IPv4.
 .It Ic ipv6only
@@ -751,21 +757,5 @@ Same as
 .Sh AUTHORS
 .An Roy Marples Aq Mt roy@marples.name
 .Sh BUGS
-Combining different DHCPv6 IA options in the same interface block is not
-currently RFC conformant.
-See
-.Lk http://datatracker.ietf.org/doc/draft-ietf-dhc-dhcpv6-stateful-issues
-for details.
-.Nm dhcpcd
-strives to comply with this document and will be updated when finally published.
-To enable RFC conformance, spawn separate
-.Nm dhcpcd
-instances using the
-.Fl Fl pfxdlgonly
-and
-.Fl Fl nopfxdlg
-options as described in
-.Xr dhcpcd 8 .
-.Pp
 Please report them to
 .Lk http://roy.marples.name/projects/dhcpcd

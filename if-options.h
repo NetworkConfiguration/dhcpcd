@@ -105,6 +105,7 @@
 #define DHCPCD_DHCP6			(1ULL << 50)
 #define DHCPCD_NOPFXDLG			(1ULL << 51)
 #define DHCPCD_PFXDLGONLY		(1ULL << 52)
+#define DHCPCD_PFXDLGMIX		(1ULL << 53)
 
 extern const struct option cf_options[];
 

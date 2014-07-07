@@ -2221,6 +2221,8 @@ dhcp6_delegate_prefix(struct interface *ifp)
 	}
 
 	TAILQ_FOREACH(ifd, ifp->ctx->ifaces, next) {
+		if (ifp->options->options & DHCPCD_NOPFXDLG)
+			continue;
 		k = 0;
 		carrier_warned = abrt = 0;
 		TAILQ_FOREACH(ap, &state->addrs, next) {
@@ -2357,6 +2359,24 @@ dhcp6_find_delegates(struct interface *ifp)
 	return k;
 }
 
+static struct interface *
+dhcp6_findpfxdlgif(struct interface *ifp)
+{
+	struct interface *ifn;
+
+	if (ifp->options && ifp->options->options & DHCPCD_PFXDLGONLY)
+		return NULL;
+
+	if (ifp->ctx && ifp->ctx->ifaces) {
+		TAILQ_FOREACH(ifn, ifp->ctx->ifaces, next) {
+			if (strcmp(ifn->name, ifp->name) == 0 &&
+			    ifn->options->options & DHCPCD_PFXDLGONLY)
+				return ifn;
+		}
+	}
+	return NULL;
+}
+
 /* ARGSUSED */
 static void
 dhcp6_handledata(void *arg)
@@ -2367,7 +2387,7 @@ dhcp6_handledata(void *arg)
 	ssize_t bytes;
 	struct cmsghdr *cm;
 	struct in6_pktinfo pkt;
-	struct interface *ifp;
+	struct interface *ifp, *ifpx;
 	const char *op;
 	struct dhcp6_message *r;
 	struct dhcp6_state *state;
@@ -2431,22 +2451,31 @@ dhcp6_handledata(void *arg)
 		    ctx->sfrom);
 		return;
 	}
+
+	r = (struct dhcp6_message *)ctx->rcvhdr.msg_iov[0].iov_base;
+
+	/* Which interface state is the IAID for? */
+	ifpx = dhcp6_findpfxdlgif(ifp);
+	if (ifpx && D6_STATE(ifpx)) {
+		state = D6_STATE(ifpx);
+		if (r->xid[0] == state->send->xid[0] &&
+		    r->xid[1] == state->send->xid[1] &&
+		    r->xid[2] == state->send->xid[2])
+			ifp = ifpx;
+	}
+
 	state = D6_STATE(ifp);
 	if (state == NULL || state->send == NULL) {
 		syslog(LOG_DEBUG, "%s: DHCPv6 reply received but not running",
 		    ifp->name);
 		return;
 	}
-
-	r = (struct dhcp6_message *)ctx->rcvhdr.msg_iov[0].iov_base;
-
 	/* We're already bound and this message is for another machine */
 	/* XXX DELEGATED? */
 	if (r->type != DHCP6_RECONFIGURE &&
 	    (state->state == DH6S_BOUND || state->state == DH6S_INFORMED))
 		return;
 
-	r = (struct dhcp6_message *)ctx->rcvhdr.msg_iov[0].iov_base;
 	if (r->type != DHCP6_RECONFIGURE &&
 	    (r->xid[0] != state->send->xid[0] ||
 	    r->xid[1] != state->send->xid[1] ||
@@ -2929,6 +2958,47 @@ dhcp6_start1(void *arg)
 	if (dhcp6_findselfsla(ifp, NULL))
 		del_option_mask(ifo->requestmask6, D6_OPTION_RAPID_COMMIT);
 
+	/* Create a 2nd interface to handle the PD state */
+	if (!(ifo->options & (DHCPCD_PFXDLGONLY | DHCPCD_PFXDLGMIX)) &&
+	    dhcp6_hasprefixdelegation(ifp))
+	{
+		const char * const argv[] = { ifp->name };
+		struct if_head *ifs;
+		struct interface *ifn;
+
+		ifn = dhcp6_findpfxdlgif(ifp);
+		if (ifn == NULL) {
+			ifs = if_discover(ifp->ctx, -1, UNCONST(argv));
+			if (ifs) {
+				ifn = TAILQ_FIRST(ifs);
+				if (ifn) {
+					syslog(LOG_INFO,
+					    "%s: creating psuedo interface"
+					    " to handle Prefix Delegation",
+					    ifp->name);
+					ifp->options->options |=
+					    DHCPCD_NOPFXDLG;
+					TAILQ_REMOVE(ifs, ifn, next);
+					TAILQ_INSERT_AFTER(ifp->ctx->ifaces,
+					    ifp, ifn, next);
+					dhcpcd_initstate(ifn);
+					ifn->options->options |=
+					    DHCPCD_PFXDLGONLY;
+					ifn->options->options &=
+					    ~(DHCPCD_IPV4 | DHCPCD_IPV6RS |
+					    DHCPCD_NOPFXDLG);
+					eloop_timeout_add_sec(ifp->ctx->eloop,
+					    0, dhcpcd_startinterface, ifn);
+				}
+				while ((ifn = TAILQ_FIRST(ifs))) {
+					TAILQ_REMOVE(ifs, ifn, next);
+					if_free(ifn);
+				}
+				free(ifs);
+			}
+		}
+	}
+
 	if (state->state == DH6S_INFORM) {
 		add_option_mask(ifo->requestmask6, D6_OPTION_INFO_REFRESH_TIME);
 		dhcp6_startinform(ifp);
@@ -3019,9 +3089,17 @@ dhcp6_reboot(struct interface *ifp)
 static void
 dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 {
+	struct interface *ifpx;
 	struct dhcp6_state *state;
 	struct dhcpcd_ctx *ctx;
 	unsigned long long options;
+
+	ifpx = dhcp6_findpfxdlgif(ifp);
+	if (ifpx) {
+		dhcp6_freedrop(ifpx, drop, reason);
+		TAILQ_REMOVE(ifp->ctx->ifaces, ifpx, next);
+		if_free(ifpx);
+	}
 
 	if (ifp->ctx->eloop)
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
