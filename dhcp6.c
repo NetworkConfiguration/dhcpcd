@@ -1820,7 +1820,7 @@ dhcp6_findia(struct interface *ifp, const struct dhcp6_message *m, size_t l,
 		ap->flags |= IPV6_AF_STALE;
 	}
 	l -= sizeof(*m);
-	for (o = D6_FIRST_OPTION(m); l > sizeof(*o); o = D6_NEXT_OPTION(o)) {
+	for (o = D6_CFIRST_OPTION(m); l > sizeof(*o); o = D6_CNEXT_OPTION(o)) {
 		ol = ntohs(o->len);
 		if (sizeof(*o) + ol > l) {
 			errno = EINVAL;
