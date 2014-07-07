@@ -2973,7 +2973,7 @@ dhcp6_start1(void *arg)
 				ifn = TAILQ_FIRST(ifs);
 				if (ifn) {
 					syslog(LOG_INFO,
-					    "%s: creating psuedo interface"
+					    "%s: creating pseudo interface"
 					    " to handle Prefix Delegation",
 					    ifp->name);
 					ifp->options->options |=
