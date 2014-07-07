@@ -1318,6 +1318,9 @@ dhcp6_hasprefixdelegation(struct interface *ifp)
 {
 	size_t i;
 
+	if (ifp->options->options & DHCPCD_NOPFXDLG)
+		return 0;
+
 	for (i = 0; i < ifp->options->ia_len; i++) {
 		if (ifp->options->ia[i].ia_type == D6_OPTION_IA_PD)
 			return 1;
