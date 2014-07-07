@@ -484,7 +484,7 @@ if_find(struct dhcpcd_ctx *ctx, const char *ifname)
 
 	if (ctx != NULL && ctx->ifaces != NULL) {
 		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-			if ((ifp->options ||
+			if ((ifp->options == NULL ||
 			    !(ifp->options->options & DHCPCD_PFXDLGONLY)) &&
 			    strcmp(ifp->name, ifname) == 0)
 				return ifp;
