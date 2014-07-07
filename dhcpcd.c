@@ -570,6 +570,8 @@ warn_iaid_conflict(struct interface *ifp, uint8_t *iaid)
 	TAILQ_FOREACH(ifn, ifp->ctx->ifaces, next) {
 		if (ifn == ifp)
 			continue;
+		if (ifn->options->options & DHCPCD_PFXDLGONLY)
+			continue;
 		if (memcmp(ifn->options->iaid, iaid,
 		    sizeof(ifn->options->iaid)) == 0)
 			break;
@@ -623,11 +625,17 @@ dhcpcd_startinterface(void *arg)
 		if (ifp->ctx->duid == NULL) {
 			if (duid_init(ifp) == 0)
 				return;
-			syslog(LOG_INFO, "DUID %s",
-			    hwaddr_ntoa(ifp->ctx->duid, ifp->ctx->duid_len,
-			    buf, sizeof(buf)));
+			if (!(ifo->options & DHCPCD_PFXDLGONLY))
+				syslog(LOG_INFO, "DUID %s",
+				    hwaddr_ntoa(ifp->ctx->duid,
+				    ifp->ctx->duid_len,
+				    buf, sizeof(buf)));
 		}
+	}
 
+	if (ifo->options & (DHCPCD_DUID | DHCPCD_IPV6) &&
+	    !(ifo->options & DHCPCD_PFXDLGONLY))
+	{
 		/* Report IAIDs */
 		syslog(LOG_INFO, "%s: IAID %s", ifp->name,
 		    hwaddr_ntoa(ifo->iaid, sizeof(ifo->iaid),
