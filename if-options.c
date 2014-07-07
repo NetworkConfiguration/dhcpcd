@@ -648,7 +648,6 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	struct token *token;
 	struct group *grp;
 #ifdef _REENTRANT
-#error foo
 	struct group grpbuf;
 #endif
 #ifdef INET6
