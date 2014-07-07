@@ -411,7 +411,7 @@ dhcp6_makemessage(struct interface *ifp)
 	uint16_t *u16, n_options;
 	struct if_options *ifo;
 	const struct dhcp_opt *opt, *opt2;
-	uint8_t IA, *p;
+	uint8_t IA, *p, *pp;
 	uint32_t u32;
 	const struct ipv6_addr *ap;
 	char hbuf[HOSTNAME_MAX_LEN + 1];
@@ -704,31 +704,28 @@ dhcp6_makemessage(struct interface *ifp)
 				memcpy(p, &ap->prefix.s6_addr,
 				    sizeof(ap->prefix.s6_addr));
 
-				/* RFC6603 Sectio 4.2 */
+				/* RFC6603 Section 4.2 */
 				sla = dhcp6_findselfsla(ifp, ap->iaid);
 				if (sla &&
 				    dhcp6_delegateaddr(&addr, ifp, ap, sla) ==0)
 				{
-					uint16_t el;
-					uint8_t *pp;
-
-					el = ((sla->prefix_len -
+					n = ((sla->prefix_len -
 					    ap->prefix_len - 1) / NBBY) + 1;
 					eo = D6_NEXT_OPTION(so);
 					eo->code = htons(D6_OPTION_PD_EXCLUDE);
-					eo->len = el + 1;
+					eo->len = (uint16_t)n + 1;
 					p = D6_OPTION_DATA(eo);
 					*p++ = (uint8_t)sla->prefix_len;
 					pp = addr.s6_addr;
-					pp += (ap->prefix_len - 1) / NBBY;
+					pp += ((ap->prefix_len - 1) / NBBY)
+					    + (n - 1);
 					u8 = ap->prefix_len % NBBY;
-					if (u8 % NBBY == 0)
-						pp++;
-					else {
-						*p = (uint8_t)(*pp++ << u8);
-						el--;
-					}
-					memcpy(p, pp, el);
+					if (u8)
+						n--;
+					while (n-- > 0)
+						*p++ = *pp--;
+					if (u8)
+						*p = (uint8_t)(*pp << u8);
 					u32 = ntohs(so->len) +
 					    sizeof(*eo) + eo->len;
 					so->len = htons(u32);
@@ -1672,7 +1669,7 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 	char iabuf[INET6_ADDRSTRLEN];
 	const char *ia;
 	int i;
-	uint8_t u8, len;
+	uint8_t u8, len, *pw;
 	uint32_t u32, pltime, vltime;
 	struct in6_addr prefix;
 	size_t off;
@@ -1748,7 +1745,19 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 
 		off = (size_t)(pe - p);
 		ex = dhcp6_findoption(D6_OPTION_PD_EXCLUDE, p, off);
+#if 0
+		if (ex == NULL) {
+			struct dhcp6_option *w;
+			uint8_t *wp;
 
+			w = calloc(1, 128);
+			w->len = htons(2);
+			wp = D6_OPTION_DATA(w);
+			*wp++ = 64;
+			*wp++ = 0x78;
+			ex = w;
+		}
+#endif
 		if (ex) {
 			off = ntohs(ex->len);
 			if (off < 2) {
@@ -1758,19 +1767,21 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			}
 		}
 		if (ex) {
-			int bytelen, bitlen;
-
 			op = D6_COPTION_DATA(ex);
 			a->prefix_exclude_len = *op++;
 			memcpy(&a->prefix_exclude, &a->prefix,
 			    sizeof(a->prefix_exclude));
-			bytelen = a->prefix_len / NBBY;
-			bitlen = a->prefix_len % NBBY;
-			if (bitlen != 0)
-				a->prefix_exclude.s6_addr[bytelen] |=
-				    *op++ >> bitlen;
-			memcpy(a->prefix_exclude.s6_addr + bytelen + 1,
-			    op, off - 2);
+			len = a->prefix_len / NBBY;
+			u8 = a->prefix_len % NBBY;
+			off--;
+			if (u8)
+				off--;
+			pw = a->prefix_exclude.s6_addr +
+			    (a->prefix_exclude_len / NBBY) - 1;
+			while (off-- > 0)
+				*pw-- = *op++;
+			if (u8)
+				*pw |= *op >> u8;
 		} else {
 			a->prefix_exclude_len = 0;
 			memset(&a->prefix_exclude, 0,
