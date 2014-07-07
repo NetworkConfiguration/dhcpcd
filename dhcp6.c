@@ -396,7 +396,7 @@ dhcp6_delegateaddr(struct in6_addr *addr, struct interface *ifp,
 		return -1;
 	}
 
-	return 0;
+	return sla->prefix_len;
 }
 
 static int
@@ -2129,18 +2129,22 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 	struct ipv6_addr *a, *ap, *apn;
 	char iabuf[INET6_ADDRSTRLEN];
 	const char *ia;
+	int pfxlen;
 
 	/* RFC6603 Section 4.2 */
+	pfxlen = 0; /* appease gcc */
 	if (ifp == ifs) {
 		if (prefix->prefix_exclude_len == 0) {
-			syslog(LOG_WARNING,
-			    "%s: DHCPv6 server does not support "
-			    "OPTION_PD_EXCLUDE",
-			    ifp->name);
+			/* Don't spam the log automatically */
+			if (sla)
+				syslog(LOG_WARNING,
+				    "%s: DHCPv6 server does not support "
+				    "OPTION_PD_EXCLUDE",
+				    ifp->name);
 			return NULL;
 		}
 		memcpy(&addr, &prefix->prefix_exclude, sizeof(addr));
-	} else if (dhcp6_delegateaddr(&addr, ifp, prefix, sla) == -1)
+	} else if ((pfxlen = dhcp6_delegateaddr(&addr, ifp, prefix, sla)) == -1)
 		return NULL;
 
 
@@ -2157,7 +2161,8 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 	a->prefix_pltime = prefix->prefix_pltime;
 	a->prefix_vltime = prefix->prefix_vltime;
 	memcpy(&a->prefix.s6_addr, &addr.s6_addr, sizeof(a->prefix.s6_addr));
-	a->prefix_len = sla->prefix_len;
+	a->prefix_len = ifp == ifs ?
+	    prefix->prefix_exclude_len : (uint8_t)pfxlen;
 
 	/* Wang a 1 at the end as the prefix could be >64
 	 * making SLAAC impossible. */
@@ -2221,7 +2226,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 	}
 
 	TAILQ_FOREACH(ifd, ifp->ctx->ifaces, next) {
-		if (ifp->options->options & DHCPCD_NOPFXDLG)
+		if (ifd->options->options & DHCPCD_NOPFXDLG)
 			continue;
 		k = 0;
 		carrier_warned = abrt = 0;
@@ -2241,8 +2246,6 @@ dhcp6_delegate_prefix(struct interface *ifp)
 				if (ia->sla_len == 0) {
 					/* no SLA configured, so lets
 					 * automate it */
-					if (ifp == ifd)
-						continue;
 					if (ifd->carrier == LINK_DOWN) {
 						syslog(LOG_DEBUG,
 						    "%s: has no carrier, cannot"
@@ -2251,21 +2254,13 @@ dhcp6_delegate_prefix(struct interface *ifp)
 						carrier_warned = 1;
 						break;
 					}
-					if (ap->prefix_len >= 64 && k) {
-						syslog(LOG_WARNING,
-						    "%s: cannot automatically"
-						    " assign more prefixes",
-						    ifp->name);
-						    abrt = 1;
-						break;
-					}
 					if (dhcp6_ifdelegateaddr(ifd, ap,
 					    NULL, ifp))
 						k++;
 				}
 				for (j = 0; j < ia->sla_len; j++) {
 					sla = &ia->sla[j];
-					if (sla->sla == 0)
+					if (sla->sla_set && sla->sla == 0)
 						ap->flags |=
 						    IPV6_AF_DELEGATEDZERO;
 					if (strcmp(ifd->name, sla->ifname))
