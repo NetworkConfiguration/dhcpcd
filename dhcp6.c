@@ -1346,7 +1346,7 @@ dhcp6_startrebind(void *arg)
 		syslog(LOG_WARNING, "%s: failed to renew DHCPv6, rebinding",
 		    ifp->name);
 	else
-		syslog(LOG_INFO, "%s: rebinding prior DHCPc6 lease",
+		syslog(LOG_INFO, "%s: rebinding prior DHCPv6 lease",
 		    ifp->name);
 	state->state = DH6S_REBIND;
 	state->RTC = 0;
