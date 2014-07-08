@@ -207,7 +207,7 @@ dhcp6_findoption(unsigned int code, const uint8_t *d, size_t len)
 
 	code = htons(code);
 	for (o = (const struct dhcp6_option *)d;
-	    len > (ssize_t)sizeof(*o);
+	    len >= sizeof(*o);
 	    o = D6_CNEXT_OPTION(o))
 	{
 		ol = sizeof(*o) + ntohs(o->len);
@@ -267,6 +267,10 @@ static const struct dhcp6_option *
 dhcp6_getmoption(unsigned int code, const struct dhcp6_message *m, size_t len)
 {
 
+	if (len < sizeof(*m)) {
+		errno = EINVAL;
+		return NULL;
+	}
 	len -= sizeof(*m);
 	return dhcp6_findoption(code,
 	    (const uint8_t *)D6_CFIRST_OPTION(m), len);
@@ -1947,6 +1951,11 @@ dhcp6_validatelease(struct interface *ifp,
 {
 	struct dhcp6_state *state;
 
+	if (len <= sizeof(*m)) {
+		syslog(LOG_ERR, "%s: DHCPv6 lease truncated", ifp->name);
+		return -1;
+	}
+
 	state = D6_STATE(ifp);
 	if (dhcp6_checkstatusok(ifp, m, NULL, len) == -1)
 		return -1;
@@ -2014,7 +2023,7 @@ dhcp6_readlease(struct interface *ifp)
 	}
 	bytes = read(fd, state->new, state->new_len);
 	close(fd);
-	if (bytes < (ssize_t)state->new_len) {
+	if (bytes != (ssize_t)state->new_len) {
 		syslog(LOG_ERR, "%s: read: %m", __func__);
 		goto ex;
 	}
