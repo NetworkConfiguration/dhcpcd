@@ -1171,7 +1171,9 @@ dhcp6_dadcallback(void *arg)
 		    state->state == DH6S_DELEGATED)
 		{
 			TAILQ_FOREACH(ap, &state->addrs, next) {
-				if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0) {
+				if (ap->flags & IPV6_AF_ADDED &&
+				    !(ap->flags & IPV6_AF_DADCOMPLETED))
+				{
 					wascompleted = 1;
 					break;
 				}
@@ -1815,7 +1817,8 @@ dhcp6_findia(struct interface *ifp, const struct dhcp6_message *m, size_t l,
 	struct ipv6_addr *ap, *nap;
 
 	if (l < sizeof(*m)) {
-		syslog(LOG_ERR, "%s: message truncated", ifp->name);
+		/* Should be impossible with guards at packet in
+		 * and reading leases */
 		errno = EINVAL;
 		return -1;
 	}
@@ -2142,7 +2145,7 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 
 	/* RFC6603 Section 4.2 */
 	pfxlen = 0; /* appease gcc */
-	if (ifp == ifs) {
+	if (strcmp(ifp->name, ifs->name) == 0) {
 		if (prefix->prefix_exclude_len == 0) {
 			/* Don't spam the log automatically */
 			if (sla)
@@ -2152,6 +2155,7 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 				    ifp->name);
 			return NULL;
 		}
+		pfxlen = prefix->prefix_exclude_len;
 		memcpy(&addr, &prefix->prefix_exclude, sizeof(addr));
 	} else if ((pfxlen = dhcp6_delegateaddr(&addr, ifp, prefix, sla)) == -1)
 		return NULL;
@@ -2170,8 +2174,7 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 	a->prefix_pltime = prefix->prefix_pltime;
 	a->prefix_vltime = prefix->prefix_vltime;
 	memcpy(&a->prefix.s6_addr, &addr.s6_addr, sizeof(a->prefix.s6_addr));
-	a->prefix_len = ifp == ifs ?
-	    prefix->prefix_exclude_len : (uint8_t)pfxlen;
+	a->prefix_len = (uint8_t)pfxlen;
 
 	/* Wang a 1 at the end as the prefix could be >64
 	 * making SLAAC impossible. */
@@ -3146,7 +3149,9 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 		dhcp6_freedrop_addrs(ifp, drop, NULL);
 		free(state->old);
 		state->old = state->new;
+		state->old_len = state->new_len;
 		state->new = NULL;
+		state->new_len = 0;
 		if (drop && state->old &&
 		    (options &
 		    (DHCPCD_EXITING | DHCPCD_PERSISTENT)) !=
@@ -3228,7 +3233,8 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 	const struct dhcpcd_ctx *ctx;
 
 	if (len < sizeof(*m)) {
-		syslog(LOG_ERR, "%s: message truncated", ifp->name);
+		/* Should be impossible with guards at packet in
+		 * and reading leases */
 		errno = EINVAL;
 		return -1;
 	}
