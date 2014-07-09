@@ -1253,7 +1253,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		ia = NULL;
 		for (sl = 0; sl < ifo->ia_len; sl++) {
 			if ((arg == NULL && !ifo->ia[sl].iaid_set) ||
-			    (ifo->ia[sl].iaid[0] == iaid[0] &&
+			    (ifo->ia[sl].iaid_set &&
+			    ifo->ia[sl].iaid[0] == iaid[0] &&
 			    ifo->ia[sl].iaid[1] == iaid[1] &&
 			    ifo->ia[sl].iaid[2] == iaid[2] &&
 			    ifo->ia[sl].iaid[3] == iaid[3]))
