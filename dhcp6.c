@@ -400,6 +400,16 @@ dhcp6_delegateaddr(struct in6_addr *addr, struct interface *ifp,
 		return -1;
 	}
 
+	if (prefix->prefix_exclude_len &&
+	    IN6_ARE_ADDR_EQUAL(addr, &prefix->prefix_exclude))
+	{
+		ia = inet_ntop(AF_INET6, &prefix->prefix_exclude.s6_addr,
+		    iabuf, sizeof(iabuf));
+		syslog(LOG_ERR, "%s: cannot delegate excluded prefix %s/%d",
+		    ifp->name, ia, prefix->prefix_exclude_len);
+		return -1;
+	}
+
 	return sla->prefix_len;
 }
 
@@ -415,14 +425,13 @@ dhcp6_makemessage(struct interface *ifp)
 	uint16_t *u16, n_options;
 	struct if_options *ifo;
 	const struct dhcp_opt *opt, *opt2;
-	uint8_t IA, *p, *pp;
+	uint8_t IA, *p;
+	const uint8_t *pp;
 	uint32_t u32;
 	const struct ipv6_addr *ap;
 	char hbuf[HOSTNAME_MAX_LEN + 1];
 	const char *hostname;
 	int fqdn;
-	const struct if_sla *sla;
-	struct in6_addr addr;
 
 	state = D6_STATE(ifp);
 	if (state->send) {
@@ -546,10 +555,9 @@ dhcp6_makemessage(struct interface *ifp)
 					len += sizeof(*o) + sizeof(u8) +
 					    sizeof(u32) + sizeof(u32) +
 					    sizeof(ap->prefix.s6_addr);
-					sla = dhcp6_findselfsla(ifp, ap->iaid);
-					if (sla)
+					if (ap->prefix_exclude_len)
 						len += sizeof(*o) + 1 +
-						    ((sla->prefix_len -
+						    ((ap->prefix_exclude_len -
 						    ap->prefix_len - 1) / NBBY)
 						    + 1;
 
@@ -709,18 +717,15 @@ dhcp6_makemessage(struct interface *ifp)
 				    sizeof(ap->prefix.s6_addr));
 
 				/* RFC6603 Section 4.2 */
-				sla = dhcp6_findselfsla(ifp, ap->iaid);
-				if (sla &&
-				    dhcp6_delegateaddr(&addr, ifp, ap, sla) ==0)
-				{
-					n = ((sla->prefix_len -
+				if (ap->prefix_exclude_len) {
+					n = ((ap->prefix_exclude_len -
 					    ap->prefix_len - 1) / NBBY) + 1;
 					eo = D6_NEXT_OPTION(so);
 					eo->code = htons(D6_OPTION_PD_EXCLUDE);
 					eo->len = (uint16_t)n + 1;
 					p = D6_OPTION_DATA(eo);
-					*p++ = (uint8_t)sla->prefix_len;
-					pp = addr.s6_addr;
+					*p++ = (uint8_t)ap->prefix_exclude_len;
+					pp = ap->prefix_exclude.s6_addr;
 					pp += ((ap->prefix_len - 1) / NBBY)
 					    + (n - 1);
 					u8 = ap->prefix_len % NBBY;
@@ -1323,7 +1328,6 @@ static int
 dhcp6_hasprefixdelegation(struct interface *ifp)
 {
 	size_t i;
-	int r;
 	uint16_t t;
 
 	if (ifp->options->options & DHCPCD_NOPFXDLG)
@@ -1689,6 +1693,7 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 	uint32_t u32, pltime, vltime;
 	struct in6_addr prefix;
 	size_t off;
+	uint16_t ol;
 
 	i = 0;
 	state = D6_STATE(ifp);
@@ -1761,7 +1766,9 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 
 		off = (size_t)(pe - p);
 		ex = dhcp6_findoption(D6_OPTION_PD_EXCLUDE, p, off);
-#if 0
+		a->prefix_exclude_len = 0;
+		memset(&a->prefix_exclude, 0, sizeof(a->prefix_exclude));
+#if 1
 		if (ex == NULL) {
 			struct dhcp6_option *w;
 			uint8_t *wp;
@@ -1774,35 +1781,37 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			ex = w;
 		}
 #endif
-		if (ex) {
-			off = ntohs(ex->len);
-			if (off < 2) {
-				syslog(LOG_ERR, "%s: truncated PD Exclude",
-				    ifp->name);
-				ex = NULL;
-			}
+		if (ex == NULL)
+			continue;
+		ol = ntohs(ex->len);
+		if (ol < 2) {
+			syslog(LOG_ERR, "%s: truncated PD Exclude",
+			    ifp->name);
+			continue;
 		}
-		if (ex) {
-			op = D6_COPTION_DATA(ex);
-			a->prefix_exclude_len = *op++;
-			memcpy(&a->prefix_exclude, &a->prefix,
-			    sizeof(a->prefix_exclude));
-			len = a->prefix_len / NBBY;
-			u8 = a->prefix_len % NBBY;
-			off--;
-			if (u8)
-				off--;
-			pw = a->prefix_exclude.s6_addr +
-			    (a->prefix_exclude_len / NBBY) - 1;
-			while (off-- > 0)
-				*pw-- = *op++;
-			if (u8)
-				*pw |= *op >> u8;
-		} else {
+		op = D6_COPTION_DATA(ex);
+		a->prefix_exclude_len = *op++;
+		ol--;
+		if (((a->prefix_exclude_len - a->prefix_len - 1) / NBBY) + 1
+		    != ol)
+		{
+			syslog(LOG_ERR, "%s: PD Exclude length mismatch",
+			    ifp->name);
 			a->prefix_exclude_len = 0;
-			memset(&a->prefix_exclude, 0,
-			    sizeof(a->prefix_exclude));
+			continue;
 		}
+		len = a->prefix_len / NBBY;
+		u8 = a->prefix_len % NBBY;
+		memcpy(&a->prefix_exclude, &a->prefix,
+		    sizeof(a->prefix_exclude));
+		if (u8)
+			ol--;
+		pw = a->prefix_exclude.s6_addr +
+		    (a->prefix_exclude_len / NBBY) - 1;
+		while (ol-- > 0)
+			*pw-- = *op++;
+		if (u8)
+			*pw |= *op >> u8;
 	}
 	return i;
 }
