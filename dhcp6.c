@@ -1323,15 +1323,22 @@ static int
 dhcp6_hasprefixdelegation(struct interface *ifp)
 {
 	size_t i;
+	int r;
+	uint16_t t;
 
 	if (ifp->options->options & DHCPCD_NOPFXDLG)
 		return 0;
 
+	t = 0;
 	for (i = 0; i < ifp->options->ia_len; i++) {
-		if (ifp->options->ia[i].ia_type == D6_OPTION_IA_PD)
-			return 1;
+		if (t && t != ifp->options->ia[i].ia_type) {
+			if (t == D6_OPTION_IA_PD ||
+			    ifp->options->ia[i].ia_type == D6_OPTION_IA_PD)
+				return 2;
+		}
+		t = ifp->options->ia[i].ia_type;
 	}
-	return 0;
+	return t == D6_OPTION_IA_PD ? 1 : 0;
 }
 
 static void
@@ -2967,7 +2974,7 @@ dhcp6_start1(void *arg)
 
 	/* Create a 2nd interface to handle the PD state */
 	if (!(ifo->options & (DHCPCD_PFXDLGONLY | DHCPCD_PFXDLGMIX)) &&
-	    dhcp6_hasprefixdelegation(ifp))
+	    dhcp6_hasprefixdelegation(ifp) > 1)
 	{
 		const char * const argv[] = { ifp->name };
 		struct if_head *ifs;
