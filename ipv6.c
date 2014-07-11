@@ -783,8 +783,7 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 			if (ap == NULL) {
 				ap = calloc(1, sizeof(*ap));
 				ap->iface = ifp;
-				memcpy(ap->addr.s6_addr, addr->s6_addr,
-				    sizeof(ap->addr.s6_addr));
+				ap->addr = *addr;
 				TAILQ_INSERT_TAIL(&state->addrs,
 				    ap, next);
 			}
@@ -1113,10 +1112,8 @@ desc_route(const char *cmd, const struct rt6 *rt)
 	char gatebuf[INET6_ADDRSTRLEN];
 	const char *ifname = rt->iface->name, *dest, *gate;
 
-	dest = inet_ntop(AF_INET6, &rt->dest.s6_addr,
-	    destbuf, INET6_ADDRSTRLEN);
-	gate = inet_ntop(AF_INET6, &rt->gate.s6_addr,
-	    gatebuf, INET6_ADDRSTRLEN);
+	dest = inet_ntop(AF_INET6, &rt->dest, destbuf, INET6_ADDRSTRLEN);
+	gate = inet_ntop(AF_INET6, &rt->gate, gatebuf, INET6_ADDRSTRLEN);
 	if (IN6_ARE_ADDR_EQUAL(&rt->gate, &in6addr_any))
 		syslog(LOG_INFO, "%s: %s route to %s/%d", ifname, cmd,
 		    dest, ipv6_prefixlen(&rt->net));

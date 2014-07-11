@@ -888,9 +888,7 @@ if_managelink(struct dhcpcd_ctx *ctx)
 			case AF_INET6:
 				sin6 = (struct sockaddr_in6*)(void *)
 				    rti_info[RTAX_IFA];
-				memcpy(ia6.s6_addr,
-				    sin6->sin6_addr.s6_addr,
-				    sizeof(ia6.s6_addr));
+				ia6 = sin6->sin6_addr;
 				if (rtm->rtm_type == RTM_NEWADDR) {
 					ifa_flags = if_addrflags6(ifname, &ia6);
 					if (ifa_flags == -1)
