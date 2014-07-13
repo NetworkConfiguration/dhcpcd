@@ -72,10 +72,8 @@
 #endif
 
 /* This was fixed in NetBSD */
-#ifdef __NetBSD_Prereq__
-#  if __NetBSD_Prereq__(6, 99, 20)
-#    undef IPV6_POLLADDRFLAG
-#  endif
+#if defined(__NetBSD_Version__) && __NetBSD_Version__ >= 699002000
+#  undef IPV6_POLLADDRFLAG
 #endif
 
 struct ipv6_addr {
