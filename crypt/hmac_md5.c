@@ -30,6 +30,7 @@
 
 #include "crypt.h"
 
+#include "../config.h"
 #ifdef HAVE_MD5_H
 #include <md5.h>
 #else

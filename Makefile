@@ -164,7 +164,8 @@ import: ${SRCS}
 			/tmp/${DISTPREFIX}/crypt; \
 		cp $$(cd crypt && ${CC} ${CPPFLAGS} -MM ${CRYPT_SRCS} | \
 			sed -e 's/^.*c //g' -e 's/.*\.c$$//g' -e 's/\\//g' | \
-			tr ' ' '\n' | sed -e 's:^:crypt/:g' | \
+			tr ' ' '\n' | sed -e '/config.h/d' \
+			-e 's:^:crypt/:g' | \
 			sort -u) /tmp/${DISTPREFIX}/crypt; \
 	fi;
 	if test -n "${COMPAT_SRCS}"; then \
