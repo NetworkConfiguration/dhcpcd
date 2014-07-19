@@ -55,6 +55,7 @@
 #include <syslog.h>
 #include <unistd.h>
 
+#define ELOOP_QUEUE 2
 #include "config.h"
 #include "arp.h"
 #include "common.h"

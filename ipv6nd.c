@@ -46,7 +46,7 @@
 #include <syslog.h>
 #include <unistd.h>
 
-#define ELOOP_QUEUE 2
+#define ELOOP_QUEUE 3
 #include "common.h"
 #include "dhcpcd.h"
 #include "dhcp6.h"
