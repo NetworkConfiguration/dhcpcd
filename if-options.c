@@ -2062,11 +2062,11 @@ read_config(struct dhcpcd_ctx *ctx,
 		for (e = dhcpcd_embedded_conf; *e; e++) {
 			ol = strlen(*e) + 1;
 			if (ol > buflen) {
-				free(buf);
 				buflen = ol;
-				buf = malloc(buflen);
+				buf = realloc(buf, buflen);
 				if (buf == NULL) {
 					syslog(LOG_ERR, "%s: %m", __func__);
+					free(buf);
 					return NULL;
 				}
 			}
