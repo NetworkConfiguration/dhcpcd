@@ -55,7 +55,7 @@ getline(char ** __restrict buf, size_t * __restrict buflen,
 	do {
 		if (feof(fp))
 			break;
-		if (*buf == NULL || bytes != 0) {
+		if (*buf == NULL || bytes != 0 || *buflen < BUFSIZ) {
 			newlen = *buflen + BUFSIZ;
 			newbuf = realloc(*buf, newlen);
 			if (newbuf == NULL)
