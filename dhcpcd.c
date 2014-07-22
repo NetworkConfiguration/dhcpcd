@@ -610,14 +610,27 @@ dhcpcd_startinterface(void *arg)
 	struct if_options *ifo = ifp->options;
 	size_t i;
 	char buf[DUID_LEN * 3];
+	struct timeval tv;
 
 	pre_start(ifp);
 	if (if_up(ifp) == -1)
 		syslog(LOG_ERR, "%s: if_up: %m", ifp->name);
 
-	if (ifp->carrier == LINK_DOWN && ifo->options & DHCPCD_LINK) {
-		syslog(LOG_INFO, "%s: waiting for carrier", ifp->name);
-		return;
+	if (ifo->options & DHCPCD_LINK) {
+		switch (ifp->carrier) {
+		case LINK_UP:
+			break;
+		case LINK_DOWN:
+			syslog(LOG_INFO, "%s: waiting for carrier", ifp->name);
+			return;
+		case LINK_UNKNOWN:
+			syslog(LOG_INFO, "%s: unknown carrier", ifp->name);
+			tv.tv_sec = 0;
+			tv.tv_usec = 100;
+			eloop_timeout_add_tv(ifp->ctx->eloop, &tv,
+			    dhcpcd_startinterface, ifp);
+			return;
+		}
 	}
 
 	if (ifo->options & (DHCPCD_DUID | DHCPCD_IPV6)) {
