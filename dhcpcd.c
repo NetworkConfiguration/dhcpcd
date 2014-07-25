@@ -342,8 +342,6 @@ configure_interface1(struct interface *ifp)
 		ifo->options &= ~(DHCPCD_ARP | DHCPCD_IPV4LL);
 	if (!(ifp->flags & (IFF_POINTOPOINT | IFF_LOOPBACK | IFF_MULTICAST)))
 		ifo->options &= ~DHCPCD_IPV6RS;
-	if (ifo->options & DHCPCD_LINK && ifp->carrier == LINK_UNKNOWN)
-		ifo->options &= ~DHCPCD_LINK;
 
 	if (ifo->metric != -1)
 		ifp->metric = (unsigned int)ifo->metric;
@@ -617,6 +615,7 @@ dhcpcd_startinterface(void *arg)
 		syslog(LOG_ERR, "%s: if_up: %m", ifp->name);
 
 	if (ifo->options & DHCPCD_LINK) {
+link_retry:
 		switch (ifp->carrier) {
 		case LINK_UP:
 			break;
@@ -624,6 +623,11 @@ dhcpcd_startinterface(void *arg)
 			syslog(LOG_INFO, "%s: waiting for carrier", ifp->name);
 			return;
 		case LINK_UNKNOWN:
+			/* No media state available, so we loop until
+			 * IFF_UP and IFF_RUNNING are set. */
+			ifp->carrier = if_carrier(ifp);
+			if (ifp->carrier != LINK_UNKNOWN)
+				goto link_retry;
 			syslog(LOG_INFO, "%s: unknown carrier", ifp->name);
 			tv.tv_sec = 0;
 			tv.tv_usec = 100;
