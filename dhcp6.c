@@ -1955,6 +1955,7 @@ dhcp6_validatelease(struct interface *ifp,
     const char *sfrom)
 {
 	struct dhcp6_state *state;
+	int nia;
 
 	if (len <= sizeof(*m)) {
 		syslog(LOG_ERR, "%s: DHCPv6 lease truncated", ifp->name);
@@ -1967,7 +1968,13 @@ dhcp6_validatelease(struct interface *ifp,
 
 	state->renew = state->rebind = state->expire = 0;
 	state->lowpl = ND6_INFINITE_LIFETIME;
-	return dhcp6_findia(ifp, m, len, sfrom);
+	nia = dhcp6_findia(ifp, m, len, sfrom);
+	if (nia == 0) {
+		syslog(LOG_ERR, "%s: no useable IA found in lease",
+		    ifp->name);
+		return -1;
+	}
+	return nia;
 }
 
 static ssize_t
@@ -2037,11 +2044,6 @@ dhcp6_readlease(struct interface *ifp)
 	fd = dhcp6_validatelease(ifp, state->new, state->new_len, NULL);
 	if (fd == -1)
 		goto ex;
-	if (fd == 0) {
-		syslog(LOG_INFO, "%s: no useable IA found in lease",
-		    ifp->name);
-		goto ex;
-	}
 
 	if (state->expire != ND6_INFINITE_LIFETIME) {
 		gettimeofday(&now, NULL);
