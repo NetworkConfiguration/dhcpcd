@@ -26,6 +26,7 @@
  */
 
 #include <sys/socket.h>
+#include <sys/types.h>
 
 #include <net/if.h>
 #include <netinet/in.h>
