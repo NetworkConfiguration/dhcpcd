@@ -32,9 +32,11 @@
 
 #include "../config.h"
 #ifdef HAVE_MD5_H
-#include <md5.h>
+#  ifndef DEPGEN
+#    include <md5.h>
+#  endif
 #else
-#include "md5.h"
+#  include "md5.h"
 #endif
 
 #define HMAC_PAD_LEN	64

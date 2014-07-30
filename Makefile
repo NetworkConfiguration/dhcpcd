@@ -147,7 +147,7 @@ import: ${SRCS}
 	rm -rf /tmp/${DISTPREFIX}
 	${INSTALL} -d /tmp/${DISTPREFIX}
 	cp ${SRCS} dhcpcd.conf dhcpcd-definitions.conf *.in /tmp/${DISTPREFIX}
-	cp $$(${CC} ${CPPFLAGS} -MM ${SRCS} | \
+	cp $$(${CC} ${CPPFLAGS} -DDEPGEN -MM ${SRCS} | \
 		sed -e 's/^.*\.c //g' -e 's/.*\.c$$//g' -e 's/\\//g' | \
 		tr ' ' '\n' | \
 		sed -e '/^compat\//d' | \
@@ -156,7 +156,7 @@ import: ${SRCS}
 	if test -n "${CRYPT_SRCS}"; then \
 		${INSTALL} -d /tmp/${DISTPREFIX}/crypt; \
 		cp ${CRYPT_SRCS} /tmp/${DISTPREFIX}/crypt; \
-		cp $$(${CC} ${CPPFLAGS} -MM ${CRYPT_SRCS} | \
+		cp $$(${CC} ${CPPFLAGS} -DDEPGEN -MM ${CRYPT_SRCS} | \
 			sed -e 's/^.*c //g' -e 's/.*\.c$$//g' -e 's/\\//g' | \
 			tr ' ' '\n' | sed -e '/\/\.\.\//d'  | \
 			sort -u) /tmp/${DISTPREFIX}/crypt; \
@@ -164,7 +164,7 @@ import: ${SRCS}
 	if test -n "${COMPAT_SRCS}"; then \
 		${INSTALL} -d /tmp/${DISTPREFIX}/compat; \
 		cp ${COMPAT_SRCS} /tmp/${DISTPREFIX}/compat; \
-		cp $$(${CC} ${CPPFLAGS} -MM ${COMPAT_SRCS} | \
+		cp $$(${CC} ${CPPFLAGS} -DDEPGEN -MM ${COMPAT_SRCS} | \
 			sed -e 's/^.*c //g' -e 's/.*\.c$$//g' -e 's/\\//g' | \
 			tr ' ' '\n' | \
 			sort -u) /tmp/${DISTPREFIX}/compat; \
