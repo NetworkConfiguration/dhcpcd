@@ -203,9 +203,12 @@ get_option(struct dhcpcd_ctx *ctx,
 				goto exit;
 			break;
 		case DHO_OPTIONSOVERLOADED:
-			/* Ensure we only get this option once */
+			/* Ensure we only get this option once by setting
+			 * the last bit as well as the value.
+			 * This is valid because only the first two bits
+			 * actually mean anything in RFC2132 Section 9.3 */
 			if (!overl)
-				overl = p[1];
+				overl = 0x80 | p[1];
 			break;
 		}
 		l = *p++;
