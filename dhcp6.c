@@ -1601,8 +1601,6 @@ dhcp6_findna(struct interface *ifp, uint16_t ot, const uint8_t *iaid,
 {
 	struct dhcp6_state *state;
 	const struct dhcp6_option *o;
-	const uint8_t *p;
-	struct in6_addr in6;
 	struct ipv6_addr *a;
 	char iabuf[INET6_ADDRSTRLEN];
 	const char *ia;
@@ -1626,9 +1624,7 @@ dhcp6_findna(struct interface *ifp, uint16_t ot, const uint8_t *iaid,
 			    ifp->name);
 			continue;
 		}
-		p = D6_COPTION_DATA(o);
 		iap = (const struct dhcp6_ia_addr *)D6_COPTION_DATA(o);
-		p += sizeof(in6);
 		a = dhcp6_findaddr(ifp, &iap->addr);
 		if (a == NULL) {
 			a = calloc(1, sizeof(*a));
@@ -2148,7 +2144,6 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 	int pfxlen;
 
 	/* RFC6603 Section 4.2 */
-	pfxlen = 0; /* appease gcc */
 	if (strcmp(ifp->name, ifs->name) == 0) {
 		if (prefix->prefix_exclude_len == 0) {
 			/* Don't spam the log automatically */
