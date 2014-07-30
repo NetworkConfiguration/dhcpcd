@@ -819,7 +819,7 @@ EOF
 	rm -f _md5.c _md5
 fi
 if [ "$MD5" = no ]; then
-	echo "MD5_SRC=	md5.c" >>$CONFIG_MK
+	echo "MD5_SRC=	crypt/md5.c" >>$CONFIG_MK
 else
 	echo "MD5_SRC=" >>$CONFIG_MK
 	echo "#define HAVE_MD5_H" >>$CONFIG_H
@@ -909,7 +909,7 @@ EOF
 	fi
 fi
 if [ "$SHA2" = no ]; then
-	echo "SHA256_SRC=	sha256.c" >>$CONFIG_MK
+	echo "SHA256_SRC=	crypt/sha256.c" >>$CONFIG_MK
 else
 	echo "SHA256_SRC=" >>$CONFIG_MK
 	echo "#define SHA2_H		<$SHA2_H>" >>$CONFIG_H

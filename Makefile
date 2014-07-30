@@ -16,13 +16,9 @@ CFLAGS+=	-std=${CSTD}
 
 SRCS+=		${DHCPCD_SRCS}
 
-.PATH: ./crypt
-
-VPATH=	. ./crypt
-
 SRCS+=		auth.c
 CPPFLAGS+=	-I./crypt
-CRYPT_SRCS=	hmac_md5.c ${MD5_SRC} ${SHA256_SRC}
+CRYPT_SRCS=	crypt/hmac_md5.c ${MD5_SRC} ${SHA256_SRC}
 
 OBJS+=		${SRCS:.c=.o} ${COMPAT_SRCS:.c=.o} ${CRYPT_SRCS:.c=.o}
 
@@ -159,13 +155,10 @@ import: ${SRCS}
 		sort -u) /tmp/${DISTPREFIX}; \
 	if test -n "${CRYPT_SRCS}"; then \
 		${INSTALL} -d /tmp/${DISTPREFIX}/crypt; \
-		cp $$(echo ${CRYPT_SRCS} | tr ' ' '\n' | \
-			sed -e 's:^:crypt/:g') \
-			/tmp/${DISTPREFIX}/crypt; \
-		cp $$(cd crypt && ${CC} ${CPPFLAGS} -MM ${CRYPT_SRCS} | \
+		cp ${CRYPT_SRCS} /tmp/${DISTPREFIX}/crypt; \
+		cp $$(${CC} ${CPPFLAGS} -MM ${CRYPT_SRCS} | \
 			sed -e 's/^.*c //g' -e 's/.*\.c$$//g' -e 's/\\//g' | \
-			tr ' ' '\n' | sed -e '/config.h/d' \
-			-e 's:^:crypt/:g' | \
+			tr ' ' '\n' | sed -e '/\/\.\.\//d'  | \
 			sort -u) /tmp/${DISTPREFIX}/crypt; \
 	fi;
 	if test -n "${COMPAT_SRCS}"; then \
