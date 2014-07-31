@@ -7,4 +7,6 @@ CONFIG_MK?=	$(shell test -e ${TOP}/config.mk && \
 		    echo config.mk || echo config-null.mk)
 
 include Makefile
--include .depend
+ifneq ($(wildcard .depend), )
+include .depend
+endif
