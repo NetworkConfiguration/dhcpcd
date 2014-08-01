@@ -259,8 +259,10 @@ _open_link_socket(struct sockaddr_nl *nl)
 	}
 #endif
 	nl->nl_family = AF_NETLINK;
-	if (bind(fd, (struct sockaddr *)nl, sizeof(*nl)) == -1)
+	if (bind(fd, (struct sockaddr *)nl, sizeof(*nl)) == -1) {
+		close(fd);
 		return -1;
+	}
 	return fd;
 }
 
@@ -299,7 +301,7 @@ get_netlink(struct dhcpcd_ctx *ctx, int fd, int flags,
 	for (;;) {
 		bytes = recv(fd, NULL, 0,
 		    flags | MSG_PEEK | MSG_DONTWAIT | MSG_TRUNC);
-		if (bytes == -1 || bytes == 0)
+		if (bytes == -1)
 			goto eexit;
 		if ((size_t)bytes == buflen) {
 			/* Support kernels older than 2.6.22 */
