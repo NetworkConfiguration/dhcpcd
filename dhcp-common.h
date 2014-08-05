@@ -82,7 +82,7 @@ struct dhcp_opt {
 
 struct dhcp_opt *vivso_find(uint32_t, const void *);
 
-size_t dhcp_vendor(char *, size_t);
+ssize_t dhcp_vendor(char *, size_t);
 
 #define add_option_mask(var, val) (var[val >> 3] |= 1 << (val & 7))
 #define del_option_mask(var, val) (var[val >> 3] &= ~(1 << (val & 7)))

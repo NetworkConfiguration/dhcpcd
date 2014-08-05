@@ -828,7 +828,6 @@ make_message(struct dhcp_message **message,
 			p += ifo->vendorclassid[0] + 1;
 		}
 
-
 		if (type != DHCP_INFORM) {
 			if (ifo->leasetime != 0) {
 				*p++ = DHO_LEASETIME;

@@ -63,7 +63,7 @@ vivso_find(uint32_t iana_en, const void *arg)
 	return NULL;
 }
 
-size_t
+ssize_t
 dhcp_vendor(char *str, size_t len)
 {
 	struct utsname utn;
@@ -71,17 +71,21 @@ dhcp_vendor(char *str, size_t len)
 	int l;
 
 	if (uname(&utn) != 0)
-		return (size_t)snprintf(str, len, "%s-%s",
+		return (ssize_t)snprintf(str, len, "%s-%s",
 		    PACKAGE, VERSION);
 	p = str;
 	l = snprintf(p, len,
 	    "%s-%s:%s-%s:%s", PACKAGE, VERSION,
 	    utn.sysname, utn.release, utn.machine);
+	if (l == -1 || (size_t)(l + 1) > len)
+		return -1;
 	p += l;
 	len -= (size_t)l;
 	l = if_machinearch(p, len);
+	if (l == -1 || (size_t)(l + 1) > len)
+		return -1;
 	p += l;
-	return (size_t)(p - str);
+	return p - str;
 }
 
 int

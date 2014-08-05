@@ -156,11 +156,11 @@ static size_t
 dhcp6_makevendor(struct dhcp6_option *o, const struct interface *ifp)
 {
 	const struct if_options *ifo;
-	size_t len;
+	size_t len, i;
 	uint8_t *p;
 	uint16_t u16;
 	uint32_t u32;
-	size_t vlen, i;
+	ssize_t vlen;
 	const struct vivco *vivco;
 	char vendor[VENDORCLASSID_MAX_LEN];
 
@@ -174,7 +174,10 @@ dhcp6_makevendor(struct dhcp6_option *o, const struct interface *ifp)
 		vlen = 0; /* silence bogus gcc warning */
 	} else {
 		vlen = dhcp_vendor(vendor, sizeof(vendor));
-		len += sizeof(uint16_t) + vlen;
+		if (vlen == -1)
+			vlen = 0;
+		else
+			len += sizeof(uint16_t) + (size_t)vlen;
 	}
 
 	if (len > UINT16_MAX) {
@@ -200,11 +203,11 @@ dhcp6_makevendor(struct dhcp6_option *o, const struct interface *ifp)
 				memcpy(p, vivco->data, vivco->len);
 				p += vivco->len;
 			}
-		} else {
+		} else if (vlen) {
 			u16 = htons(vlen);
 			memcpy(p, &u16, sizeof(u16));
 			p += sizeof(u16);
-			memcpy(p, vendor, vlen);
+			memcpy(p, vendor, (size_t)vlen);
 		}
 	}
 
