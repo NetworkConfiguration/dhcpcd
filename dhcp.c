@@ -989,10 +989,11 @@ make_message(struct dhcp_message **message,
 		auth_len = (size_t)dhcp_auth_encode(&ifo->auth,
 		    state->auth.token,
 		    NULL, 0, 4, type, NULL, 0);
-		if ((ssize_t)auth_len == -1)
+		if ((ssize_t)auth_len == -1) {
 			syslog(LOG_ERR, "%s: dhcp_auth_encode: %m",
 			    iface->name);
-		else if (auth_len > 0) {
+			auth_len = 0;
+		} else if (auth_len != 0) {
 			len = (size_t)((p + auth_len) - m);
 			if (auth_len > 255 || len > sizeof(*dhcp))
 				goto toobig;
@@ -1014,7 +1015,7 @@ make_message(struct dhcp_message **message,
 #endif
 
 	len = (size_t)(p - m);
-	if (ifo->auth.options & DHCPCD_AUTH_SEND && auth_len > 0)
+	if (ifo->auth.options & DHCPCD_AUTH_SEND && auth_len != 0)
 		dhcp_auth_encode(&ifo->auth, state->auth.token,
 		    m, len, 4, type, auth, auth_len);
 

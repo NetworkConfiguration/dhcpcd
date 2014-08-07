@@ -649,7 +649,7 @@ dhcp6_makemessage(struct interface *ifp)
 			syslog(LOG_ERR, "%s: dhcp_auth_encode: %m",
 			    ifp->name);
 			auth_len = 0;
-		} else if (auth_len> 0)
+		} else if (auth_len != 0)
 			len += sizeof(*o) + auth_len;
 	} else
 		auth_len = 0; /* appease GCC */
@@ -853,7 +853,7 @@ dhcp6_makemessage(struct interface *ifp)
 	}
 
 	/* This has to be the last option */
-	if (ifo->auth.options & DHCPCD_AUTH_SEND && auth_len > 0) {
+	if (ifo->auth.options & DHCPCD_AUTH_SEND && auth_len != 0) {
 		o = D6_NEXT_OPTION(o);
 		o->code = htons(D6_OPTION_AUTH);
 		o->len = htons(auth_len);
