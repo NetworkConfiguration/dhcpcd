@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd July 14, 2014
+.Dd August 7, 2014
 .Dt DHCPCD.CONF 5
 .Os
 .Sh NAME
@@ -71,7 +71,7 @@ Example:
 .D1 static ip_address=192.168.0.10/24
 .It Ic authprotocol Ar protocol Ar algorithm Ar rdm
 Authenticate DHCP messages.
-See the Supported Protocols section.
+See the Supported Authentication Protocols section.
 .It Ic authtoken Ar secretid Ar realm Ar expire Ar key
 Define a shared key for use in authentication.
 .Ar realm can be "" to for use with the
@@ -84,6 +84,18 @@ You can use the keyword
 or
 .Ar 0
 which means the token never expires.
+For the token protocol,
+.Ar secretid
+needs to be 0 and
+.Ar realm
+needs to be "".
+If
+.Nm dhcpcd
+has the error
+.D1 dhcp_auth_encode: Invalid argument
+then it means that
+.Nm dhcpcd
+could not find the correct authentication token in your configuration.
 .It Ic background
 Background immediately.
 This is useful for startup scripts which don't disable link messages for
@@ -703,10 +715,10 @@ References an option from the global definition
 .D1 embed uint32 enterprise_number
 .D1 # Options defined for the enterprise number
 .D1 encap 1 ipaddress ipaddress
-.Ss Supported protocols
+.Ss Supported Authentication Protocols
 .Bl -tag -width -indent
 .It Ic token
-Sends and expects the token with the secretid 0 in each message.
+Sends and expects the token with the secretid 0 and realm of "" in each message.
 .It Ic delayedrealm
 Delayed Authentication.
 .Nm dhcpcd
@@ -723,7 +735,7 @@ This token is used to authenicate all other messages.
 .It Ic delayed
 Same as above, but without a realm.
 .El
-.Ss Supported algorithms
+.Ss Supported Authentication Algorithms
 If none specified,
 .Ic hmac-md5
 is the default.

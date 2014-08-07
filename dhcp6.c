@@ -645,9 +645,11 @@ dhcp6_makemessage(struct interface *ifp)
 	if (ifo->auth.options & DHCPCD_AUTH_SEND) {
 		auth_len = (size_t)dhcp_auth_encode(&ifo->auth,
 		    state->auth.token, NULL, 0, 6, type, NULL, 0);
-		if ((ssize_t)auth_len == -1)
+		if ((ssize_t)auth_len == -1) {
+			syslog(LOG_ERR, "%s: dhcp_auth_encode: %m",
+			    ifp->name);
 			auth_len = 0;
-		else if (auth_len> 0)
+		} else if (auth_len> 0)
 			len += sizeof(*o) + auth_len;
 	} else
 		auth_len = 0; /* appease GCC */
@@ -1045,7 +1047,8 @@ logsend:
 	    dhcp6_update_auth(ifp, state->send, state->send_len) == -1)
 	{
 		syslog(LOG_ERR, "%s: dhcp6_updateauth: %m", ifp->name);
-		return -1;
+		if (errno != ESRCH)
+			return -1;
 	}
 
 	ctx = ifp->ctx->ipv6;
