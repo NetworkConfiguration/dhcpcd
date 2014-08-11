@@ -33,8 +33,9 @@
 #include <sys/param.h>
 
 #include <linux/if_addr.h>
-#include <linux/filter.h>
+#include <linux/if_link.h>
 #include <linux/if_packet.h>
+#include <linux/filter.h>
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 
@@ -1223,16 +1224,85 @@ if_addrflags6(const char *ifname, const struct in6_addr *addr)
 	return -1;
 }
 
+struct nlml
+{
+	struct nlmsghdr hdr;
+	struct ifinfomsg i;
+	char buffer[32];
+};
+
+#if IFLA_INET6_MAX >= IFLA_INET6_TOKEN - 1
+static int
+add_attr_8(struct nlmsghdr *n, unsigned short maxlen, unsigned short type,
+    uint8_t data)
+{
+
+	return add_attr_l(n, maxlen, type, &data, sizeof(data));
+}
+
+static struct rtattr *
+add_attr_nest(struct nlmsghdr *n, unsigned short maxlen, unsigned short type)
+{
+	struct rtattr *nest;
+	
+	nest = NLMSG_TAIL(n);
+	add_attr_l(n, maxlen, type, NULL, 0);
+	return nest;
+}
+
+static void
+add_attr_nest_end(struct nlmsghdr *n, struct rtattr *nest)
+{
+
+	nest->rta_len = (unsigned short)((char *)NLMSG_TAIL(n) - (char *)nest);
+}
+
+static int
+if_disable_autolinklocal(struct dhcpcd_ctx *ctx, const char *ifname)
+{
+	struct nlml nlm;
+	struct rtattr *afs, *afs6;
+
+	memset(&nlm, 0, sizeof(nlm));
+	nlm.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifinfomsg));
+	nlm.hdr.nlmsg_type = RTM_NEWLINK;
+	nlm.hdr.nlmsg_flags = NLM_F_REQUEST;
+	nlm.i.ifi_family = AF_INET6;
+	nlm.i.ifi_index = (int)if_nametoindex(ifname);
+	afs = add_attr_nest(&nlm.hdr, sizeof(nlm), IFLA_AF_SPEC);
+	afs6 = add_attr_nest(&nlm.hdr, sizeof(nlm), AF_INET6);
+	add_attr_8(&nlm.hdr, sizeof(nlm), IFLA_INET6_ADDR_GEN_MODE,
+	    IN6_ADDR_GEN_MODE_NONE);
+	add_attr_nest_end(&nlm.hdr, afs6);
+	add_attr_nest_end(&nlm.hdr, afs);
+	
+	return send_netlink(ctx, &nlm.hdr);
+}
+#else
+static int
+if_disable_autolinklocal(__unused struct dhcpcd_ctx *ctx,
+    __unused const char *ifname)
+{
+	errno = ENOTSUP;
+	return -1;
+}
+#endif
+
 static const char *prefix = "/proc/sys/net/ipv6/conf";
 
 int
-if_checkipv6(__unused struct dhcpcd_ctx *ctx, const char *ifname, int own)
+if_checkipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 {
 	int ra;
 	char path[256];
 
 	if (ifname == NULL)
 		ifname = "all";
+	else if (own) {
+		if (if_disable_autolinklocal(ctx, ifname) == -1)
+			syslog(LOG_DEBUG, "%s: if_disable_autolinklocal: %m",
+			    ifname);
+	}
 
 	snprintf(path, sizeof(path), "%s/%s/autoconf", prefix, ifname);
 	ra = check_proc_int(path);
