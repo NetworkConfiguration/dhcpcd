@@ -88,18 +88,19 @@ control_handle_data(void *arg)
 		ap = argvp;
 		while (p < e) {
 			argc++;
-			if ((size_t)argc > sizeof(argvp)) {
+			if ((size_t)argc >= sizeof(argvp) / sizeof(argvp[0])) {
 				errno = ENOBUFS;
 				return;
 			}
 			a = *ap++ = p;
 			len = strlen(p);
 			p += len + 1;
-			if (a[len - 1] == '\n') {
+			if (len && a[len - 1] == '\n') {
 				a[len - 1] = '\0';
 				break;
 			}
 		}
+		*ap = NULL;
 		dhcpcd_handleargs(l->ctx, l, argc, argvp);
 	}
 }
