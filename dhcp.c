@@ -299,6 +299,10 @@ decode_rfc3442(char *out, size_t len, const uint8_t *p, size_t pl)
 			return -1;
 		}
 		ocets = (cidr + 7) / NBBY;
+		if (p + 4 + ocets > e) {
+			errno = ERANGE;
+			return -1;
+		}
 		if (!out) {
 			p += 4 + ocets;
 			bytes += ((4 * 4) * 2) + 4;
@@ -361,6 +365,13 @@ decode_rfc3442_rt(const uint8_t *data, size_t dl)
 			return NULL;
 		}
 
+		ocets = (cidr + 7) / NBBY;
+		if (p + 4 + ocets > e) {
+			ipv4_freeroutes(routes);
+			errno = ERANGE;
+			return NULL;
+		}
+
 		rt = calloc(1, sizeof(*rt));
 		if (rt == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);
@@ -369,7 +380,6 @@ decode_rfc3442_rt(const uint8_t *data, size_t dl)
 		}
 		TAILQ_INSERT_TAIL(routes, rt, next);
 
-		ocets = (cidr + 7) / NBBY;
 		/* If we have ocets then we have a destination and netmask */
 		if (ocets > 0) {
 			memcpy(&rt->dest.s_addr, p, ocets);
