@@ -145,11 +145,9 @@ make_option_mask(const struct dhcp_opt *dopts, size_t dopts_len,
 			return -1;
 		}
 		if (add == 1 || add == 2)
-			add_option_mask(mask,
-			    opt->option);
+			add_option_mask(mask, opt->option);
 		else
-			del_option_mask(mask,
-			    opt->option);
+			del_option_mask(mask, opt->option);
 	}
 	free(o);
 	return 0;
