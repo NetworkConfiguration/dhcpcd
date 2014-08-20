@@ -235,6 +235,10 @@ decode_rfc3397(char *out, size_t len, const uint8_t *p, size_t pl)
 			if (ltype == 0x80 || ltype == 0x40)
 				return -1;
 			else if (ltype == 0xc0) { /* pointer */
+				if (q == e) {
+					errno = ERANGE;
+					return -1;
+				}
 				l = (l & 0x3f) << 8;
 				l |= *q++;
 				/* save source of first jump. */
@@ -252,6 +256,10 @@ decode_rfc3397(char *out, size_t len, const uint8_t *p, size_t pl)
 				}
 			} else {
 				/* straightforward name segment, add with '.' */
+				if (q + l > e) {
+					errno = ERANGE;
+					return -1;
+				}
 				count += l + 1;
 				if (out) {
 					if (l + 1 > len) {
