@@ -1563,7 +1563,7 @@ send_message(struct interface *iface, uint8_t type,
 	struct in_addr from, to;
 	in_addr_t a = INADDR_ANY;
 	struct timeval tv;
-	int s = -1;
+	int s;
 
 	if (!callback)
 		syslog(LOG_DEBUG, "%s: sending %s with xid 0x%x",
@@ -1594,7 +1594,8 @@ send_message(struct interface *iface, uint8_t type,
 		s = dhcp_openudp(iface);
 		if (s == -1 && errno != EADDRINUSE)
 			syslog(LOG_ERR, "%s: dhcp_openudp: %m", iface->name);
-	}
+	} else
+		s = -1;
 
 	/* If we couldn't open a UDP port for our IP address
 	 * then we cannot renew.
