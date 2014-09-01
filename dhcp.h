@@ -220,7 +220,6 @@ struct dhcp_state {
 	size_t arping_index;
 
 	int raw_fd;
-	int udp_fd;
 	int arp_fd;
 	size_t buffer_size, buffer_len, buffer_pos;
 	unsigned char *buffer;

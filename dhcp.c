@@ -123,8 +123,6 @@ struct udp_dhcp_packet
 
 static const size_t udp_dhcp_len = sizeof(struct udp_dhcp_packet);
 
-static int dhcp_open(struct interface *);
-
 void
 dhcp_printoptions(const struct dhcpcd_ctx *ctx,
     const struct dhcp_opt *opts, size_t opts_len)
@@ -1415,17 +1413,12 @@ dhcp_close(struct interface *ifp)
 		close(state->raw_fd);
 		state->raw_fd = -1;
 	}
-	if (state->udp_fd != -1) {
-		eloop_event_delete(ifp->ctx->eloop, state->udp_fd);
-		close(state->udp_fd);
-		state->udp_fd = -1;
-	}
 
 	state->interval = 0;
 }
 
 static int
-dhcp_openudp(struct dhcpcd_ctx *ctx, struct interface *ifp)
+dhcp_openudp(struct interface *ifp)
 {
 	int s;
 	struct sockaddr_in sin;
@@ -1477,29 +1470,11 @@ dhcp_openudp(struct dhcpcd_ctx *ctx, struct interface *ifp)
 	if (bind(s, (struct sockaddr *)&sin, sizeof(sin)) == -1)
 		goto eexit;
 
-	if (ifp)
-		state->udp_fd = s;
-	else
-		ctx->udp_fd = s;
-	return 0;
+	return s;
 
 eexit:
 	close(s);
 	return -1;
-}
-
-static ssize_t
-dhcp_sendpacket(const struct interface *iface, struct in_addr to,
-    const uint8_t *data, size_t len)
-{
-	struct sockaddr_in sin;
-
-	memset(&sin, 0, sizeof(sin));
-	sin.sin_family = AF_INET;
-	sin.sin_addr.s_addr = to.s_addr;
-	sin.sin_port = htons(DHCP_SERVER_PORT);
-	return sendto(D_CSTATE(iface)->udp_fd, data, len, 0,
-	    (struct sockaddr *)&sin, sizeof(sin));
 }
 
 static uint16_t
@@ -1586,8 +1561,9 @@ send_message(struct interface *iface, uint8_t type,
 	size_t len;
 	ssize_t r;
 	struct in_addr from, to;
-	in_addr_t a = 0;
+	in_addr_t a = INADDR_ANY;
 	struct timeval tv;
+	int s = -1;
 
 	if (!callback)
 		syslog(LOG_DEBUG, "%s: sending %s with xid 0x%x",
@@ -1610,23 +1586,26 @@ send_message(struct interface *iface, uint8_t type,
 		    timeval_to_double(&tv));
 	}
 
-	/* Ensure sockets are open. */
-	if (dhcp_open(iface) == -1) {
-		if (!(iface->ctx->options & DHCPCD_TEST))
-			dhcp_drop(iface, "FAIL");
-		return;
+	if (state->addr.s_addr != INADDR_ANY &&
+	    state->new != NULL &&
+	    (state->new->cookie == htonl(MAGIC_COOKIE) ||
+	    iface->options->options & DHCPCD_INFORM))
+	{
+		s = dhcp_openudp(iface);
+		if (s == -1 && errno != EADDRINUSE)
+			syslog(LOG_ERR, "%s: dhcp_openudp: %m", iface->name);
 	}
 
 	/* If we couldn't open a UDP port for our IP address
 	 * then we cannot renew.
 	 * This could happen if our IP was pulled out from underneath us.
 	 * Also, we should not unicast from a BOOTP lease. */
-	if (state->udp_fd == -1 ||
+	if (s == -1 ||
 	    (!(ifo->options & DHCPCD_INFORM) &&
 	    is_bootp(iface, state->new)))
 	{
 		a = state->addr.s_addr;
-		state->addr.s_addr = 0;
+		state->addr.s_addr = INADDR_ANY;
 	}
 	r = make_message(&dhcp, iface, type);
 	if (r == -1)
@@ -1638,13 +1617,18 @@ send_message(struct interface *iface, uint8_t type,
 	if (from.s_addr)
 		to.s_addr = state->lease.server.s_addr;
 	else
-		to.s_addr = 0;
+		to.s_addr = INADDR_ANY;
 	if (to.s_addr && to.s_addr != INADDR_BROADCAST) {
-		r = dhcp_sendpacket(iface, to, (uint8_t *)dhcp, len);
-		if (r == -1) {
+		struct sockaddr_in sin;
+
+		memset(&sin, 0, sizeof(sin));
+		sin.sin_family = AF_INET;
+		sin.sin_addr.s_addr = to.s_addr;
+		sin.sin_port = htons(DHCP_SERVER_PORT);
+		r = sendto(s, (uint8_t *)dhcp, len, 0,
+		    (struct sockaddr *)&sin, sizeof(sin));
+		if (r == -1)
 			syslog(LOG_ERR, "%s: dhcp_sendpacket: %m", iface->name);
-			dhcp_close(iface);
-		}
 	} else {
 		size_t ulen;
 
@@ -1683,6 +1667,9 @@ send_message(struct interface *iface, uint8_t type,
 	free(dhcp);
 
 fail:
+	if (s != -1)
+		close(s);
+
 	/* Even if we fail to send a packet we should continue as we are
 	 * as our failure timeouts will change out codepath when needed. */
 	if (callback)
@@ -2705,38 +2692,21 @@ dhcp_handlepacket(void *arg)
 }
 
 static void
-dhcp_handleudp1(struct dhcpcd_ctx *ctx, int *fd, const char *ifname)
-{
-	uint8_t buffer[sizeof(struct dhcp_message)];
-
-	/* Just read what's in the UDP fd and discard it as we always read
-	 * from the raw fd */
-	if (read(*fd, buffer, sizeof(buffer)) == -1) {
-		syslog(LOG_ERR, "%s: %s: %m", ifname, __func__);
-		eloop_event_delete(ctx->eloop, *fd);
-		close(*fd);
-		*fd = -1;
-	}
-}
-
-static void
 dhcp_handleudp(void *arg)
 {
 	struct dhcpcd_ctx *ctx;
+	uint8_t buffer[sizeof(struct dhcp_message)];
 
 	ctx = arg;
-	dhcp_handleudp1(arg, &ctx->udp_fd, NULL);
-}
 
-static void
-dhcp_handleifudp(void *arg)
-{
-	const struct interface *ifp;
-	struct dhcp_state *state;
-
-	ifp = arg;
-	state = D_STATE(ifp);
-	dhcp_handleudp1(ifp->ctx, &state->udp_fd, ifp->name);
+	/* Just read what's in the UDP fd and discard it as we always read
+	 * from the raw fd */
+	if (read(ctx->udp_fd, buffer, sizeof(buffer)) == -1) {
+		syslog(LOG_ERR, "%s: %m", __func__);
+		eloop_event_delete(ctx->eloop, ctx->udp_fd);
+		close(ctx->udp_fd);
+		ctx->udp_fd = -1;
+	}
 }
 
 static int
@@ -2761,20 +2731,6 @@ dhcp_open(struct interface *ifp)
 		}
 		eloop_event_add(ifp->ctx->eloop,
 		    state->raw_fd, dhcp_handlepacket, ifp);
-	}
-	if (state->udp_fd == -1 &&
-	    state->addr.s_addr != 0 &&
-	    state->new != NULL &&
-	    (state->new->cookie == htonl(MAGIC_COOKIE) ||
-	    ifp->options->options & DHCPCD_INFORM))
-	{
-		if (dhcp_openudp(ifp->ctx, ifp) == -1 && errno != EADDRINUSE) {
-			syslog(LOG_ERR, "%s: dhcp_openudp: %m", ifp->name);
-			return -1;
-		}
-		if (state->udp_fd != -1)
-			eloop_event_add(ifp->ctx->eloop,
-			    state->udp_fd, dhcp_handleifudp, ifp);
 	}
 	return 0;
 }
@@ -2861,7 +2817,7 @@ dhcp_init(struct interface *ifp)
 		if (state == NULL)
 			return -1;
 		/* 0 is a valid fd, so init to -1 */
-		state->raw_fd = state->udp_fd = state->arp_fd = -1;
+		state->raw_fd = state->arp_fd = -1;
 	}
 
 	state->state = DHS_INIT;
@@ -2942,9 +2898,15 @@ dhcp_start1(void *arg)
 
 	/* Listen on *.*.*.*:bootpc so that the kernel never sends an
 	 * ICMP port unreachable message back to the DHCP server */
-	if (ifp->ctx->udp_fd == -1 && dhcp_openudp(ifp->ctx, NULL) != -1)
+	if (ifp->ctx->udp_fd == -1) {
+	    	ifp->ctx->udp_fd = dhcp_openudp(NULL);
+		if (ifp->ctx->udp_fd == -1) {
+	    		syslog(LOG_ERR, "%s: dhcp_openudp: %m", ifp->name);
+			return;
+		}
 		eloop_event_add(ifp->ctx->eloop,
 		    ifp->ctx->udp_fd, dhcp_handleudp, ifp->ctx);
+	}
 
 	if (dhcp_init(ifp) == -1) {
 		syslog(LOG_ERR, "%s: dhcp_init: %m", ifp->name);
