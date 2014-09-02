@@ -2900,9 +2900,9 @@ dhcp_start1(void *arg)
 	/* Listen on *.*.*.*:bootpc so that the kernel never sends an
 	 * ICMP port unreachable message back to the DHCP server */
 	if (ifp->ctx->udp_fd == -1) {
-	    	ifp->ctx->udp_fd = dhcp_openudp(NULL);
+		ifp->ctx->udp_fd = dhcp_openudp(NULL);
 		if (ifp->ctx->udp_fd == -1) {
-	    		syslog(LOG_ERR, "%s: dhcp_openudp: %m", ifp->name);
+			syslog(LOG_ERR, "dhcp_openudp: %m");
 			return;
 		}
 		eloop_event_add(ifp->ctx->eloop,
