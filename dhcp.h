@@ -240,6 +240,8 @@ struct dhcp_state {
 	((struct dhcp_state *)(ifp)->if_data[IF_DATA_DHCP])
 #define D_CSTATE(ifp)							       \
 	((const struct dhcp_state *)(ifp)->if_data[IF_DATA_DHCP])
+#define D_STATE_RUNNING(ifp)						       \
+	(D_CSTATE((ifp)) && D_CSTATE((ifp))->new && D_CSTATE((ifp))->reason)
 
 #include "dhcpcd.h"
 #include "if-options.h"

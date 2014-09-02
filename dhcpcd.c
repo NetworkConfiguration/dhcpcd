@@ -1086,7 +1086,7 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 			if (argc == 1) {
 				TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 					len++;
-					if (D_STATE(ifp))
+					if (D_STATE_RUNNING(ifp))
 						len++;
 					if (D6_STATE_RUNNING(ifp))
 						len++;
@@ -1109,7 +1109,7 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 				TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 					if (strcmp(argv[opt], ifp->name) == 0) {
 						len++;
-						if (D_STATE(ifp))
+						if (D_STATE_RUNNING(ifp))
 							len++;
 						if (D6_STATE_RUNNING(ifp))
 							len++;
