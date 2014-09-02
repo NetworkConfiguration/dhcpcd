@@ -215,6 +215,7 @@ control_stop(struct dhcpcd_ctx *ctx)
 	eloop_event_delete(ctx->eloop, ctx->control_fd);
 	if (shutdown(ctx->control_fd, SHUT_RDWR) == -1)
 		retval = 1;
+	close(ctx->control_fd);
 	ctx->control_fd = -1;
 	if (unlink(ctx->control_sock) == -1)
 		retval = -1;
@@ -224,6 +225,7 @@ control_stop(struct dhcpcd_ctx *ctx)
 		ctx->control_fds = l->next;
 		eloop_event_delete(ctx->eloop, l->fd);
 		shutdown(l->fd, SHUT_RDWR);
+		close(l->fd);
 		free(l);
 		l = ctx->control_fds;
 	}
