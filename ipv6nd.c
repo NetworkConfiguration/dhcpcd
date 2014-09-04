@@ -218,12 +218,13 @@ ipv6nd_open(struct dhcpcd_ctx *dctx)
 	    &filt, sizeof(filt)) == -1)
 		goto eexit;
 
-	eloop_event_add(dctx->eloop, ctx->nd_fd, ipv6nd_handledata, dctx);
+	eloop_event_add(dctx->eloop, ctx->nd_fd,
+	    ipv6nd_handledata, dctx, NULL, NULL);
 	return ctx->nd_fd;
 
 eexit:
 	if (ctx->nd_fd != -1) {
-		eloop_event_delete(dctx->eloop, ctx->nd_fd);
+		eloop_event_delete(dctx->eloop, ctx->nd_fd, 0);
 		close(ctx->nd_fd);
 		ctx->nd_fd = -1;
 	}
@@ -466,7 +467,7 @@ ipv6nd_free(struct interface *ifp)
 	}
 	if (ifp == NULL) {
 		if (ctx->ipv6->nd_fd != -1) {
-			eloop_event_delete(ctx->eloop, ctx->ipv6->nd_fd);
+			eloop_event_delete(ctx->eloop, ctx->ipv6->nd_fd, 0);
 			close(ctx->ipv6->nd_fd);
 			ctx->ipv6->nd_fd = -1;
 		}
@@ -1454,7 +1455,7 @@ ipv6nd_handledata(void *arg)
 	len = recvmsg(ctx->nd_fd, &ctx->rcvhdr, 0);
 	if (len == -1 || len == 0) {
 		syslog(LOG_ERR, "recvmsg: %m");
-		eloop_event_delete(dhcpcd_ctx->eloop, ctx->nd_fd);
+		eloop_event_delete(dhcpcd_ctx->eloop, ctx->nd_fd, 0);
 		close(ctx->nd_fd);
 		ctx->nd_fd = -1;
 		return;

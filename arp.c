@@ -250,8 +250,8 @@ arp_announce(void *arg)
 			syslog(LOG_ERR, "%s: %s: %m", __func__, ifp->name);
 			return;
 		}
-		eloop_event_add(ifp->ctx->eloop,
-		    state->arp_fd, arp_packet, ifp);
+		eloop_event_add(ifp->ctx->eloop, state->arp_fd,
+		    arp_packet, ifp, NULL, NULL);
 	}
 	if (++state->claims < ANNOUNCE_NUM)
 		syslog(LOG_DEBUG,
@@ -286,7 +286,7 @@ arp_announce(void *arg)
 		timernorm(&tv);
 		eloop_timeout_add_tv(ifp->ctx->eloop, &tv, dhcp_discover, ifp);
 	} else {
-		eloop_event_delete(ifp->ctx->eloop, state->arp_fd);
+		eloop_event_delete(ifp->ctx->eloop, state->arp_fd, 0);
 		close(state->arp_fd);
 		state->arp_fd = -1;
 	}
@@ -308,7 +308,7 @@ arp_probe(void *arg)
 			return;
 		}
 		eloop_event_add(ifp->ctx->eloop,
-		    state->arp_fd, arp_packet, ifp);
+		    state->arp_fd, arp_packet, ifp, NULL, NULL);
 	}
 
 	if (state->arping_index < ifp->options->arping_len) {
@@ -378,7 +378,7 @@ arp_close(struct interface *ifp)
 		return;
 
 	if (state->arp_fd != -1) {
-		eloop_event_delete(ifp->ctx->eloop, state->arp_fd);
+		eloop_event_delete(ifp->ctx->eloop, state->arp_fd, 0);
 		close(state->arp_fd);
 		state->arp_fd = -1;
 	}

@@ -64,7 +64,7 @@ control_handle_data(void *arg)
 		last = NULL;
 		for (lp = l->ctx->control_fds; lp; lp = lp->next) {
 			if (lp == l) {
-				eloop_event_delete(lp->ctx->eloop, lp->fd);
+				eloop_event_delete(lp->ctx->eloop, lp->fd, 0);
 				close(lp->fd);
 				if (last == NULL)
 					lp->ctx->control_fds = lp->next;
@@ -137,7 +137,8 @@ control_handle(void *arg)
 		l->listener = 0;
 		l->next = ctx->control_fds;
 		ctx->control_fds = l;
-		eloop_event_add(ctx->eloop, l->fd, control_handle_data, l);
+		eloop_event_add(ctx->eloop, l->fd,
+		    control_handle_data, l, NULL, NULL);
 	} else
 		close(fd);
 }
@@ -200,7 +201,8 @@ control_start(struct dhcpcd_ctx *ctx, const char *ifname)
 		unlink(ctx->control_sock);
 		return -1;
 	}
-	eloop_event_add(ctx->eloop, ctx->control_fd, control_handle, ctx);
+	eloop_event_add(ctx->eloop, ctx->control_fd,
+	    control_handle, ctx, NULL, NULL);
 	return ctx->control_fd;
 }
 
@@ -212,7 +214,7 @@ control_stop(struct dhcpcd_ctx *ctx)
 
 	if (ctx->control_fd == -1)
 		return 0;
-	eloop_event_delete(ctx->eloop, ctx->control_fd);
+	eloop_event_delete(ctx->eloop, ctx->control_fd, 0);
 	if (shutdown(ctx->control_fd, SHUT_RDWR) == -1)
 		retval = 1;
 	close(ctx->control_fd);
@@ -223,7 +225,7 @@ control_stop(struct dhcpcd_ctx *ctx)
 	l = ctx->control_fds;
 	while (l != NULL) {
 		ctx->control_fds = l->next;
-		eloop_event_delete(ctx->eloop, l->fd);
+		eloop_event_delete(ctx->eloop, l->fd, 0);
 		shutdown(l->fd, SHUT_RDWR);
 		close(l->fd);
 		free(l);

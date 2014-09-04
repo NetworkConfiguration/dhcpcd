@@ -720,7 +720,7 @@ handle_link(void *arg)
 	ctx = arg;
 	if (if_managelink(ctx) == -1) {
 		syslog(LOG_ERR, "if_managelink: %m");
-		eloop_event_delete(ctx->eloop, ctx->link_fd);
+		eloop_event_delete(ctx->eloop, ctx->link_fd, 0);
 		close(ctx->link_fd);
 		ctx->link_fd = -1;
 	}
@@ -1046,6 +1046,68 @@ signal_init(void (*func)(int, siginfo_t *, void *), sigset_t *oldset)
 }
 #endif
 
+static void
+dhcpcd_version(void *arg)
+{
+	struct fd_list *fd = arg;
+	size_t len;
+	struct iovec iov[2];
+
+	len = strlen(VERSION) + 1;
+	iov[0].iov_base = &len;
+	iov[0].iov_len = sizeof(ssize_t);
+	iov[1].iov_base = UNCONST(VERSION);
+	iov[1].iov_len = len;
+	if (writev(fd->fd, iov, 2) == -1)
+		syslog(LOG_ERR, "%s: writev: %m", __func__);
+	else
+		eloop_event_delete(fd->ctx->eloop, fd->fd, 1);
+}
+
+static void
+dhcpcd_getconfigfile(void *arg)
+{
+	struct fd_list *fd = arg;
+	size_t len;
+	struct iovec iov[2];
+
+	len = strlen(fd->ctx->cffile) + 1;
+	iov[0].iov_base = &len;
+	iov[0].iov_len = sizeof(ssize_t);
+	iov[1].iov_base = UNCONST(fd->ctx->cffile);
+	iov[1].iov_len = len;
+	if (writev(fd->fd, iov, 2) == -1)
+		syslog(LOG_ERR, "%s: writev: %m", __func__);
+	else
+		eloop_event_delete(fd->ctx->eloop, fd->fd, 1);
+}
+
+static void
+dhcpcd_getinterfaces(void *arg)
+{
+	struct fd_list *fd = arg;
+	struct interface *ifp;
+	size_t len;
+
+	len = 0;
+	TAILQ_FOREACH(ifp, fd->ctx->ifaces, next) {
+		len++;
+		if (D_STATE_RUNNING(ifp))
+			len++;
+		if (D6_STATE_RUNNING(ifp))
+			len++;
+		if (ipv6nd_hasra(ifp))
+			len++;
+	}
+	if (write(fd->fd, &len, sizeof(len)) != sizeof(len))
+		return;
+	TAILQ_FOREACH(ifp, fd->ctx->ifaces, next) {
+		if (send_interface(fd->fd, ifp) == -1)
+			syslog(LOG_ERR, "send_interface %d: %m", fd->fd);
+	}
+	eloop_event_delete(fd->ctx->eloop, fd->fd, 1);
+}
+
 int
 dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
     int argc, char **argv)
@@ -1054,53 +1116,24 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 	int do_exit = 0, do_release = 0, do_reboot = 0;
 	int opt, oi = 0;
 	size_t len, l;
-	struct iovec iov[2];
 	char *tmp, *p;
 
 	if (fd != NULL) {
-		/* Special commands for our control socket */
+		/* Special commands for our control socket
+		 * as the other end should be blocking until it gets the
+		 * expected reply we should be safely able just to change the
+		 * write callback on the fd */
 		if (strcmp(*argv, "--version") == 0) {
-			len = strlen(VERSION) + 1;
-			iov[0].iov_base = &len;
-			iov[0].iov_len = sizeof(ssize_t);
-			iov[1].iov_base = UNCONST(VERSION);
-			iov[1].iov_len = len;
-			if (writev(fd->fd, iov, 2) == -1) {
-				syslog(LOG_ERR, "writev: %m");
-				return -1;
-			}
+			eloop_event_add(fd->ctx->eloop, fd->fd, NULL, NULL,
+			    dhcpcd_version, fd);
 			return 0;
 		} else if (strcmp(*argv, "--getconfigfile") == 0) {
-			len = strlen(ctx->cffile) + 1;
-			iov[0].iov_base = &len;
-			iov[0].iov_len = sizeof(ssize_t);
-			iov[1].iov_base = UNCONST(ctx->cffile);
-			iov[1].iov_len = len;
-			if (writev(fd->fd, iov, 2) == -1) {
-				syslog(LOG_ERR, "writev: %m");
-				return -1;
-			}
+			eloop_event_add(fd->ctx->eloop, fd->fd, NULL, NULL,
+			    dhcpcd_getconfigfile, fd);
 			return 0;
 		} else if (strcmp(*argv, "--getinterfaces") == 0) {
-			len = 0;
-			TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-				len++;
-				if (D_STATE_RUNNING(ifp))
-					len++;
-				if (D6_STATE_RUNNING(ifp))
-					len++;
-				if (ipv6nd_hasra(ifp))
-					len++;
-			}
-			if (write(fd->fd, &len, sizeof(len)) !=
-			    sizeof(len))
-				return -1;
-			TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-				if (send_interface(fd->fd, ifp) == -1)
-					syslog(LOG_ERR,
-					    "send_interface %d: %m",
-					    fd->fd);
-			}
+			eloop_event_add(fd->ctx->eloop, fd->fd, NULL, NULL,
+			    dhcpcd_getinterfaces, fd);
 			return 0;
 		} else if (strcmp(*argv, "--listen") == 0) {
 			fd->listener = 1;
@@ -1598,7 +1631,8 @@ main(int argc, char **argv)
 	if (ctx.link_fd == -1)
 		syslog(LOG_ERR, "open_link_socket: %m");
 	else
-		eloop_event_add(ctx.eloop, ctx.link_fd, handle_link, &ctx);
+		eloop_event_add(ctx.eloop, ctx.link_fd,
+		    handle_link, &ctx, NULL, NULL);
 
 	/* Start any dev listening plugin which may want to
 	 * change the interface name provided by the kernel */
@@ -1688,7 +1722,7 @@ exit1:
 	}
 	free(ctx.duid);
 	if (ctx.link_fd != -1) {
-		eloop_event_delete(ctx.eloop, ctx.link_fd);
+		eloop_event_delete(ctx.eloop, ctx.link_fd, 0);
 		close(ctx.link_fd);
 	}
 

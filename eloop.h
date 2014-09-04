@@ -41,8 +41,10 @@
 struct eloop_event {
 	TAILQ_ENTRY(eloop_event) next;
 	int fd;
-	void (*callback)(void *);
-	void *arg;
+	void (*read_cb)(void *);
+	void *read_cb_arg;
+	void (*write_cb)(void *);
+	void *write_cb_arg;
 	struct pollfd *pollfd;
 };
 
@@ -81,8 +83,10 @@ struct eloop_ctx {
 #define eloop_timeouts_delete(a, b, ...) \
     eloop_q_timeouts_delete(a, ELOOP_QUEUE, b, __VA_ARGS__)
 
-int eloop_event_add(struct eloop_ctx *, int, void (*)(void *), void *);
-void eloop_event_delete(struct eloop_ctx *, int);
+int eloop_event_add(struct eloop_ctx *, int,
+    void (*)(void *), void *,
+    void (*)(void *), void *);
+void eloop_event_delete(struct eloop_ctx *, int, int);
 int eloop_q_timeout_add_sec(struct eloop_ctx *, int queue,
     time_t, void (*)(void *), void *);
 int eloop_q_timeout_add_tv(struct eloop_ctx *, int queue,

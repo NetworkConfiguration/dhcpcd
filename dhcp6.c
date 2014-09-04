@@ -2418,7 +2418,7 @@ dhcp6_handledata(void *arg)
 	if (bytes == -1 || bytes == 0) {
 		syslog(LOG_ERR, "recvmsg: %m");
 		close(ctx->dhcp_fd);
-		eloop_event_delete(dhcpcd_ctx->eloop, ctx->dhcp_fd);
+		eloop_event_delete(dhcpcd_ctx->eloop, ctx->dhcp_fd, 0);
 		ctx->dhcp_fd = -1;
 		return;
 	}
@@ -2930,7 +2930,8 @@ dhcp6_open(struct dhcpcd_ctx *dctx)
 	    &n, sizeof(n)) == -1)
 		goto errexit;
 
-	eloop_event_add(dctx->eloop, ctx->dhcp_fd, dhcp6_handledata, dctx);
+	eloop_event_add(dctx->eloop, ctx->dhcp_fd,
+	    dhcp6_handledata, dctx, NULL, NULL);
 	return 0;
 
 errexit:
@@ -3184,7 +3185,7 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 	}
 	if (ifp == NULL && ctx->ipv6) {
 		if (ctx->ipv6->dhcp_fd != -1) {
-			eloop_event_delete(ctx->eloop, ctx->ipv6->dhcp_fd);
+			eloop_event_delete(ctx->eloop, ctx->ipv6->dhcp_fd, 0);
 			close(ctx->ipv6->dhcp_fd);
 			ctx->ipv6->dhcp_fd = -1;
 		}
