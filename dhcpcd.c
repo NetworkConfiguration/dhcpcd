@@ -1094,9 +1094,9 @@ dhcpcd_getinterfaces(void *arg)
 		len++;
 		if (D_STATE_RUNNING(ifp))
 			len++;
-		if (D6_STATE_RUNNING(ifp))
+		if (RS_STATE_RUNNING(ifp))
 			len++;
-		if (ipv6nd_hasra(ifp))
+		if (D6_STATE_RUNNING(ifp))
 			len++;
 	}
 	if (write(fd->fd, &len, sizeof(len)) != sizeof(len))

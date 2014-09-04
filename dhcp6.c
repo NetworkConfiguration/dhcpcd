@@ -1162,6 +1162,21 @@ dhcp6_startrenew(void *arg)
 		dhcp6_sendrenew(ifp);
 }
 
+int
+dhcp6_dadcompleted(const struct interface *ifp)
+{
+	const struct dhcp6_state *state;
+	const struct ipv6_addr *ap;
+
+	state = D6_CSTATE(ifp);
+	TAILQ_FOREACH(ap, &state->addrs, next) {
+		if (ap->flags & IPV6_AF_ADDED &&
+		    !(ap->flags & IPV6_AF_DADCOMPLETED))
+		    	return 0;
+	}
+	return 1;
+}
+
 static void
 dhcp6_dadcallback(void *arg)
 {

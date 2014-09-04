@@ -580,6 +580,24 @@ ipv6nd_addaddr(void *arg)
 	ipv6_addaddr(ap);
 }
 
+int
+ipv6nd_dadcompleted(const struct interface *ifp)
+{
+	const struct ra *rap;
+	const struct ipv6_addr *ap;
+
+	TAILQ_FOREACH(rap, ifp->ctx->ipv6->ra_routers, next) {
+		if (rap->iface != ifp)
+			continue;
+		TAILQ_FOREACH(ap, &rap->addrs, next) {
+			if (ap->flags & IPV6_AF_AUTOCONF &&
+			    !(ap->flags & IPV6_AF_DADCOMPLETED))
+			    	return 0;
+		}
+	}
+	return 1;
+}
+
 static void
 ipv6nd_dadcallback(void *arg)
 {

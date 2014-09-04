@@ -69,6 +69,7 @@ struct rs_state {
 };
 
 #define RS_STATE(a) ((struct rs_state *)(ifp)->if_data[IF_DATA_IPV6ND])
+#define RS_STATE_RUNNING(a) (ipv6nd_hasra((a)) && ipv6nd_dadcompleted((a)))
 
 #define MAX_RTR_SOLICITATION_DELAY	1	/* seconds */
 #define MAX_UNICAST_SOLICIT		3	/* 3 transmissions */
@@ -94,6 +95,7 @@ int ipv6nd_hasra(const struct interface *);
 int ipv6nd_hasradhcp(const struct interface *);
 void ipv6nd_handleifa(struct dhcpcd_ctx *, int,
     const char *, const struct in6_addr *, int);
+int ipv6nd_dadcompleted(const struct interface *);
 void ipv6nd_drop(struct interface *);
 
 #ifdef HAVE_RTM_GETNEIGH

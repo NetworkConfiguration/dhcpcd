@@ -572,7 +572,7 @@ send_interface(int fd, const struct interface *ifp)
 #endif
 
 #ifdef INET6
-	if (ipv6nd_hasra(ifp)) {
+	if (RS_STATE_RUNNING(ifp)) {
 		if (send_interface1(fd, ifp, "ROUTERADVERT") == -1)
 			retval = -1;
 	}
