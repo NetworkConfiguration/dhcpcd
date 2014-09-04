@@ -1083,52 +1083,23 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 			return 0;
 		} else if (strcmp(*argv, "--getinterfaces") == 0) {
 			len = 0;
-			if (argc == 1) {
-				TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+			TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+				len++;
+				if (D_STATE_RUNNING(ifp))
 					len++;
-					if (D_STATE_RUNNING(ifp))
-						len++;
-					if (D6_STATE_RUNNING(ifp))
-						len++;
-					if (ipv6nd_hasra(ifp))
-						len++;
-				}
-				if (write(fd->fd, &len, sizeof(len)) !=
-				    sizeof(len))
-					return -1;
-				TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-					if (send_interface(fd->fd, ifp) == -1)
-						syslog(LOG_ERR,
-						    "send_interface %d: %m",
-						    fd->fd);
-				}
-				return 0;
+				if (D6_STATE_RUNNING(ifp))
+					len++;
+				if (ipv6nd_hasra(ifp))
+					len++;
 			}
-			opt = 0;
-			while (argv[++opt] != NULL) {
-				TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-					if (strcmp(argv[opt], ifp->name) == 0) {
-						len++;
-						if (D_STATE_RUNNING(ifp))
-							len++;
-						if (D6_STATE_RUNNING(ifp))
-							len++;
-						if (ipv6nd_hasra(ifp))
-							len++;
-					}
-				}
-			}
-			if (write(fd->fd, &len, sizeof(len)) != sizeof(len))
+			if (write(fd->fd, &len, sizeof(len)) !=
+			    sizeof(len))
 				return -1;
-			opt = 0;
-			while (argv[++opt] != NULL) {
-				TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-					if (strcmp(argv[opt], ifp->name)== 0 &&
-					    send_interface(fd->fd, ifp) == -1)
-						syslog(LOG_ERR,
-						    "send_interface %d: %m",
-						    fd->fd);
-				}
+			TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+				if (send_interface(fd->fd, ifp) == -1)
+					syslog(LOG_ERR,
+					    "send_interface %d: %m",
+					    fd->fd);
 			}
 			return 0;
 		} else if (strcmp(*argv, "--listen") == 0) {
