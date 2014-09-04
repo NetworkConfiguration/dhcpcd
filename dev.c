@@ -62,7 +62,7 @@ dev_stop(struct dhcpcd_ctx *ctx, int stop)
 	if (ctx->dev) {
 		if (stop)
 			syslog(LOG_DEBUG, "dev: unloaded %s", ctx->dev->name);
-		eloop_event_delete(ctx->eloop, ctx->dev_fd);
+		eloop_event_delete(ctx->eloop, ctx->dev_fd, 0);
 		ctx->dev->stop();
 		free(ctx->dev);
 		ctx->dev = NULL;
@@ -168,7 +168,7 @@ dev_start(struct dhcpcd_ctx *ctx)
 	ctx->dev_fd = dev_start1(ctx);
 	if (ctx->dev_fd != -1) {
 		if (eloop_event_add(ctx->eloop,
-			ctx->dev_fd, dev_handle_data, ctx) == -1)
+			ctx->dev_fd, dev_handle_data, ctx, NULL, NULL) == -1)
 		{
 			syslog(LOG_ERR, "%s: eloop_event_add: %m", __func__);
 			dev_stop(ctx, 1);
