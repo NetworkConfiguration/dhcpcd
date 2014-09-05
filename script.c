@@ -512,34 +512,29 @@ eexit:
 	return -1;
 }
 
-static ssize_t
-send_interface1(int fd, const struct interface *iface, const char *reason)
+static int
+send_interface1(struct fd_list *fd, const struct interface *iface,
+    const char *reason)
 {
 	char **env, **ep, *s;
 	size_t elen;
-	struct iovec iov[2];
-	ssize_t retval;
+	int retval;
 
 	if (make_env(iface, reason, &env) == -1)
 		return -1;
 	elen = (size_t)arraytostr((const char *const *)env, &s);
 	if ((ssize_t)elen == -1)
 		return -1;
-	iov[0].iov_base = &elen;
-	iov[0].iov_len = sizeof(elen);
-	iov[1].iov_base = s;
-	iov[1].iov_len = elen;
-	retval = writev(fd, iov, 2);
+	retval = control_queue(fd, s, elen, 1);
 	ep = env;
 	while (*ep)
 		free(*ep++);
 	free(env);
-	free(s);
 	return retval;
 }
 
 int
-send_interface(int fd, const struct interface *ifp)
+send_interface(struct fd_list *fd, const struct interface *ifp)
 {
 	const char *reason;
 	int retval = 0;
@@ -562,7 +557,7 @@ send_interface(int fd, const struct interface *ifp)
 		break;
 	}
 	if (send_interface1(fd, ifp, reason) == -1)
-			retval = -1;
+		retval = -1;
 #ifdef INET
 	if (D_STATE_RUNNING(ifp)) {
 		d = D_CSTATE(ifp);
@@ -595,8 +590,7 @@ script_runreason(const struct interface *ifp, const char *reason)
 	size_t e, elen = 0;
 	pid_t pid;
 	int status = 0;
-	const struct fd_list *fd;
-	struct iovec iov[2];
+	struct fd_list *fd;
 
 	if (ifp->options->script &&
 	    (ifp->options->script[0] == '\0' ||
@@ -663,26 +657,21 @@ script_runreason(const struct interface *ifp, const char *reason)
 
 	/* Send to our listeners */
 	bigenv = NULL;
-	for (fd = ifp->ctx->control_fds; fd != NULL; fd = fd->next) {
-		if (fd->listener) {
-			if (bigenv == NULL) {
-				elen = (size_t)arraytostr((const char *const *)env,
-				    &bigenv);
-				if ((ssize_t)elen == -1) {
-					syslog(LOG_ERR, "%s: arraytostr: %m",
-					    ifp->name);
-					continue;
-				}
-				iov[0].iov_base = &elen;
-				iov[0].iov_len = sizeof(size_t);
-				iov[1].iov_base = bigenv;
-				iov[1].iov_len = elen;
+	TAILQ_FOREACH(fd, &ifp->ctx->control_fds, next) {
+		if (!fd->listener)
+			continue;
+		if (bigenv == NULL) {
+			elen = (size_t)arraytostr((const char *const *)env,
+			    &bigenv);
+			if ((ssize_t)elen == -1) {
+				syslog(LOG_ERR, "%s: arraytostr: %m",
+				    ifp->name);
+				    break;
 			}
-			if (writev(fd->fd, iov, 2) == -1)
-				syslog(LOG_ERR, "%s: writev: %m", __func__);
 		}
+		if (control_queue(fd, bigenv, elen, 1) == -1)
+			syslog(LOG_ERR, "%s: control_queue: %m", __func__);
 	}
-	free(bigenv);
 
 out:
 	/* Cleanup */

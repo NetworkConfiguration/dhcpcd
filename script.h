@@ -28,8 +28,10 @@
 #ifndef SCRIPT_H
 #define SCRIPT_H
 
+#include "control.h"
+
 void if_printoptions(void);
-int send_interface(int, const struct interface *);
+int send_interface(struct fd_list *, const struct interface *);
 int script_runreason(const struct interface *, const char *);
 
 #endif

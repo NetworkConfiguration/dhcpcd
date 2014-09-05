@@ -34,6 +34,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -49,9 +50,47 @@
 #endif
 
 static void
+control_queue_purge(struct dhcpcd_ctx *ctx, char *data)
+{
+	int found;
+	struct fd_list *fp;
+	struct fd_data *fpd;
+
+	/* If no other fd queue has the same data, free it */
+	found = 0;
+	TAILQ_FOREACH(fp, &ctx->control_fds, next) {
+		TAILQ_FOREACH(fpd, &fp->queue, next) {
+			if (fpd->data == data) {
+				found = 1;
+				break;
+			}
+		}
+	}
+	if (!found)
+		free(data);
+}
+
+static void
+control_queue_free(struct fd_list *fd)
+{
+	struct fd_data *fdp;
+
+	while ((fdp = TAILQ_FIRST(&fd->queue))) {
+		TAILQ_REMOVE(&fd->queue, fdp, next);
+		if (fdp->freeit)
+			control_queue_purge(fd->ctx, fdp->data);
+		free(fdp);
+	}
+	while ((fdp = TAILQ_FIRST(&fd->free_queue))) {
+		TAILQ_REMOVE(&fd->free_queue, fdp, next);
+		free(fdp);
+	}
+}
+
+static void
 control_handle_data(void *arg)
 {
-	struct fd_list *l = arg, *lp, *last;
+	struct fd_list *l = arg;
 	char buffer[1024], *e, *p, *argvp[255], **ap, *a;
 	ssize_t bytes;
 	size_t len;
@@ -61,20 +100,11 @@ control_handle_data(void *arg)
 	if (bytes == -1 || bytes == 0) {
 		/* Control was closed or there was an error.
 		 * Remove it from our list. */
-		last = NULL;
-		for (lp = l->ctx->control_fds; lp; lp = lp->next) {
-			if (lp == l) {
-				eloop_event_delete(lp->ctx->eloop, lp->fd, 0);
-				close(lp->fd);
-				if (last == NULL)
-					lp->ctx->control_fds = lp->next;
-				else
-					last->next = lp->next;
-				free(lp);
-				break;
-			}
-			last = lp;
-		}
+		TAILQ_REMOVE(&l->ctx->control_fds, l, next);
+		eloop_event_delete(l->ctx->eloop, l->fd, 0);
+		close(l->fd);
+		control_queue_free(l);
+		free(l);
 		return;
 	}
 	buffer[bytes] = '\0';
@@ -101,7 +131,8 @@ control_handle_data(void *arg)
 			}
 		}
 		*ap = NULL;
-		dhcpcd_handleargs(l->ctx, l, argc, argvp);
+		if (dhcpcd_handleargs(l->ctx, l, argc, argvp) == -1)
+			syslog(LOG_ERR, "%s: dhcpcd_handleargs: %m", __func__);
 	}
 }
 
@@ -135,8 +166,9 @@ control_handle(void *arg)
 		l->ctx = ctx;
 		l->fd = fd;
 		l->listener = 0;
-		l->next = ctx->control_fds;
-		ctx->control_fds = l;
+		TAILQ_INIT(&l->queue);
+		TAILQ_INIT(&l->free_queue);
+		TAILQ_INSERT_TAIL(&ctx->control_fds, l, next);
 		eloop_event_add(ctx->eloop, l->fd,
 		    control_handle_data, l, NULL, NULL);
 	} else
@@ -215,21 +247,17 @@ control_stop(struct dhcpcd_ctx *ctx)
 	if (ctx->control_fd == -1)
 		return 0;
 	eloop_event_delete(ctx->eloop, ctx->control_fd, 0);
-	if (shutdown(ctx->control_fd, SHUT_RDWR) == -1)
-		retval = 1;
 	close(ctx->control_fd);
 	ctx->control_fd = -1;
 	if (unlink(ctx->control_sock) == -1)
 		retval = -1;
 
-	l = ctx->control_fds;
-	while (l != NULL) {
-		ctx->control_fds = l->next;
+	while ((l = TAILQ_FIRST(&ctx->control_fds))) {
+		TAILQ_REMOVE(&ctx->control_fds, l, next);
 		eloop_event_delete(ctx->eloop, l->fd, 0);
-		shutdown(l->fd, SHUT_RDWR);
 		close(l->fd);
+		control_queue_free(l);
 		free(l);
-		l = ctx->control_fds;
 	}
 
 	return retval;
@@ -273,6 +301,65 @@ control_send(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		len += l;
 	}
 	return write(ctx->control_fd, buffer, len);
+}
+
+static void
+control_writeone(void *arg)
+{
+	struct fd_list *fd;
+	struct iovec iov[2];
+	struct fd_data *data;
+
+	fd = arg;
+	data = TAILQ_FIRST(&fd->queue);
+	iov[0].iov_base = &data->data_len;
+	iov[0].iov_len = sizeof(size_t);
+	iov[1].iov_base = data->data;
+	iov[1].iov_len = data->data_len;
+	if (writev(fd->fd, iov, 2) == -1) {
+		syslog(LOG_ERR, "%s: writev: %m", __func__);
+		return;
+	}
+
+	TAILQ_REMOVE(&fd->queue, data, next);
+	if (data->freeit)
+		control_queue_purge(fd->ctx, data->data);
+	data->data = NULL; /* safety */
+	data->data_len = 0;
+	TAILQ_INSERT_TAIL(&fd->free_queue, data, next);
+
+	if (TAILQ_FIRST(&fd->queue) == NULL)
+		eloop_event_delete(fd->ctx->eloop, fd->fd, 1);
+}
+
+int
+control_queue(struct fd_list *fd, char *data, size_t data_len, uint8_t fit)
+{
+	struct fd_data *d;
+	size_t n;
+
+	d = TAILQ_FIRST(&fd->free_queue);
+	if (d) {
+		TAILQ_REMOVE(&fd->free_queue, d, next);
+	} else {
+		n = 0;
+		TAILQ_FOREACH(d, &fd->queue, next) {
+			if (++n == CONTROL_QUEUE_MAX) {
+				errno = ENOBUFS;
+				return -1;
+			}
+		}
+		d = malloc(sizeof(*d));
+		if (d == NULL)
+			return -1;
+	}
+	d->data = data;
+	d->data_len = data_len;
+	d->freeit = fit;
+	TAILQ_INSERT_TAIL(&fd->queue, d, next);
+	eloop_event_add(fd->ctx->eloop, fd->fd,
+	    NULL, NULL, control_writeone, fd);
+	return 0;
 }
 
 void
