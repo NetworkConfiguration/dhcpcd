@@ -509,6 +509,28 @@ if [ "$ARC4RANDOM" = no ]; then
 	echo "#include \"compat/arc4random.h\"" >>$CONFIG_H
 fi
 
+if [ -z "$ARC4RANDOM_UNIFORM" ]; then
+	printf "Testing for arc4random_uniform ... "
+	cat <<EOF >_arc4random_uniform.c
+#include <stdlib.h>
+int main(void) {
+	arc4random_uniform(100);
+	return 0;
+}
+EOF
+	if $XCC _arc4random_uniform.c -o _arc4random_uniform 2>/dev/null; then
+		ARC4RANDOM_UNIFORM=yes
+	else
+		ARC4RANDOM_UNIFORM=no
+	fi
+	echo "$ARC4RANDOM"
+	rm -f _arc4random.c _arc4random
+fi
+if [ "$ARC4RANDOM_UNIFORM" = no ]; then
+	echo "COMPAT_SRCS+=	compat/arc4random_uniform.c" >>$CONFIG_MK
+	echo "#include \"compat/arc4random_uniform.h\"" >>$CONFIG_H
+fi
+
 if [ -z "$CLOSEFROM" ]; then
 	printf "Testing for closefrom ... "
 	cat <<EOF >_closefrom.c

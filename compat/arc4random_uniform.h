@@ -25,10 +25,10 @@
  * SUCH DAMAGE.
  */
 
-#ifndef ARC4RANDOM_H
-#define ARC4RANDOM_H
+#ifndef ARC4RANDOM_UNIFORM_H
+#define ARC4RANDOM_UNIFORM_H
 
 #include <stdint.h>
 
-uint32_t arc4random(void);
+uint32_t arc4random_uniform(uint32_t);
 #endif
