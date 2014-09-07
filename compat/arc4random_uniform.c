@@ -14,6 +14,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <stdint.h>
+#include <stdlib.h>
+
 /* We need to include config.h so we pickup either the system arc4random
  * or our compat one. */
 #include "../config.h"
