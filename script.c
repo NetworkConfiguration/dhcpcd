@@ -280,7 +280,7 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	if (ifp->ctx->options & DHCPCD_DUMPLEASE)
 		elen = 2;
 	else
-		elen = 11;
+		elen = 13;
 
 #define EMALLOC(i, l) if ((env[(i)] = malloc((l))) == NULL) goto eexit;
 	/* Make our env */
@@ -350,6 +350,18 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 		env[10] = strdup("if_down=true");
 	}
 	if (env[9] == NULL || env[10] == NULL)
+		goto eexit;
+	if (dhcpcd_oneup(ifp->ctx))
+		env[11] = strdup("if_oneup=true");
+	else
+		env[11] = strdup("if_oneup=false");
+	if (env[11] == NULL)
+		goto eexit;
+	if (dhcpcd_ipwaited(ifp->ctx))
+		env[12] = strdup("if_ipwaited=true");
+	else
+		env[12] = strdup("if_ipwaited=false");
+	if (env[12] == NULL)
 		goto eexit;
 	if (*ifp->profile) {
 		e = strlen("profile=") + strlen(ifp->profile) + 2;

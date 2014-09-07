@@ -209,6 +209,41 @@ handle_exit_timeout(void *arg)
 	eloop_timeout_add_sec(ctx->eloop, timeout, handle_exit_timeout, ctx);
 }
 
+int
+dhcpcd_oneup(struct dhcpcd_ctx *ctx)
+{
+	const struct interface *ifp;
+
+	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+		if (D_STATE_RUNNING(ifp) ||
+		    RS_STATE_RUNNING(ifp) ||
+		    D6_STATE_RUNNING(ifp))
+			return 1;
+	}
+	return 0;
+}
+
+int
+dhcpcd_ipwaited(struct dhcpcd_ctx *ctx)
+{
+
+	if (ctx->options & DHCPCD_WAITIP4 &&
+	    !ipv4_addrexists(ctx, NULL))
+		return 0;
+	if (ctx->options & DHCPCD_WAITIP6 &&
+	    !ipv6nd_addrexists(ctx, NULL) &&
+	    !dhcp6_addrexists(ctx, NULL))
+		return 0;
+	if ((ctx->options &
+	    (DHCPCD_WAITIP | DHCPCD_WAITIP4 | DHCPCD_WAITIP6)) ==
+	    (DHCPCD_WAITIP | DHCPCD_WAITIP4 | DHCPCD_WAITIP6) &&
+	    !ipv4_addrexists(ctx, NULL) &&
+	    !ipv6nd_addrexists(ctx, NULL) &&
+	    !dhcp6_addrexists(ctx, NULL))
+		return 0;
+	return 1;
+}
+
 /* Returns the pid of the child, otherwise 0. */
 pid_t
 dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
@@ -225,19 +260,7 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 	if (ctx->options & DHCPCD_DAEMONISE &&
 	    !(ctx->options & DHCPCD_DAEMONISED))
 	{
-		if (ctx->options & DHCPCD_WAITIP4 &&
-		    !ipv4_addrexists(ctx, NULL))
-			return 0;
-		if (ctx->options & DHCPCD_WAITIP6 &&
-		    !ipv6nd_addrexists(ctx, NULL) &&
-		    !dhcp6_addrexists(ctx, NULL))
-			return 0;
-		if ((ctx->options &
-		    (DHCPCD_WAITIP | DHCPCD_WAITIP4 | DHCPCD_WAITIP6)) ==
-		    (DHCPCD_WAITIP | DHCPCD_WAITIP4 | DHCPCD_WAITIP6) &&
-		    !ipv4_addrexists(ctx, NULL) &&
-		    !ipv6nd_addrexists(ctx, NULL) &&
-		    !dhcp6_addrexists(ctx, NULL))
+		if (!dhcpcd_ipwaited(ctx))
 			return 0;
 	}
 
