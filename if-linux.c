@@ -51,6 +51,11 @@
 # define IFLA_WIRELESS (IFLA_MASTER + 1)
 #endif
 
+/* Linux has these in an enum and there is just no way to work
+ * out of they exist at compile time. Silly silly silly. */
+#define IFLA_INET6_ADDR_GEN_MODE	8
+#define IN6_ADDR_GEN_MODE_NONE		1
+
 /* For some reason, glibc doesn't include newer flags from linux/if.h
  * However, we cannot include linux/if.h directly as it conflicts
  * with the glibc version. D'oh! */
@@ -1231,7 +1236,6 @@ struct nlml
 	char buffer[32];
 };
 
-#if IFLA_INET6_MAX >= IFLA_INET6_TOKEN - 1
 static int
 add_attr_8(struct nlmsghdr *n, unsigned short maxlen, unsigned short type,
     uint8_t data)
@@ -1278,15 +1282,6 @@ if_disable_autolinklocal(struct dhcpcd_ctx *ctx, const char *ifname)
 	
 	return send_netlink(ctx, &nlm.hdr);
 }
-#else
-static int
-if_disable_autolinklocal(__unused struct dhcpcd_ctx *ctx,
-    __unused const char *ifname)
-{
-	errno = ENOTSUP;
-	return -1;
-}
-#endif
 
 static const char *prefix = "/proc/sys/net/ipv6/conf";
 
