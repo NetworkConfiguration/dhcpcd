@@ -57,6 +57,11 @@
 #include "compat/posix_spawn.h"
 #endif
 
+/* Allow the OS to define another script env var name */
+#ifndef SVCNAME
+#define SVCNAME "SVCNAME"
+#endif
+
 #define DEFAULT_PATH	"PATH=/usr/bin:/usr/sbin:/bin:/sbin"
 
 static const char * const if_params[] = {
@@ -598,7 +603,7 @@ script_runreason(const struct interface *ifp, const char *reason)
 {
 	char *argv[2];
 	char **env = NULL, **ep;
-	char *path, *bigenv;
+	char *svcname, *path, *bigenv;
 	size_t e, elen = 0;
 	pid_t pid;
 	int status = 0;
@@ -620,7 +625,9 @@ script_runreason(const struct interface *ifp, const char *reason)
 		syslog(LOG_ERR, "%s: make_env: %m", ifp->name);
 		return -1;
 	}
-	ep = realloc(env, sizeof(char *) * (elen + 2));
+	/* Resize for PATH and SVCNAME */
+	svcname = getenv(SVCNAME);
+	ep = realloc(env, sizeof(char *) * (elen + 2 + (svcname ? 1 : 0)));
 	if (ep == NULL) {
 		elen = 0;
 		goto out;
@@ -642,6 +649,16 @@ script_runreason(const struct interface *ifp, const char *reason)
 			elen = 0;
 			goto out;
 		}
+	}
+	ep = env;
+	if (svcname) {
+		e = strlen(SVCNAME) + strlen(svcname) + 2;
+		env[++elen] = malloc(e);
+		if (env[elen] == NULL) {
+			elen = 0;
+			goto out;
+		}
+		snprintf(env[elen], e, "%s=%s", SVCNAME, svcname);
 	}
 	env[++elen] = NULL;
 

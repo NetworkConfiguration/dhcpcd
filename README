@@ -97,6 +97,20 @@ The configure program attempts to find hooks for systems you have installed.
 To add more simply
 ./configure -with-hook=ntp.conf
 
+Some system services expose the name of the service we are in,
+by default dhcpcd will pick SVCNAME from the environment.
+You can override this in CPPFLAGS+= -DSVCNAME="RC_SVCNAME".
+This is important because dhcpcd will scrub the environment aside from $PATH
+before running hooks.
+This variable could be used to facilitate service re-entry so this chain could
+happen in a custom OS hook:
+  dhcpcd service marked inactive && dhcpcd service starts
+  dependant services are not started because dhcpcd is inactive (not stopped)
+  dhcpcd hook tests $if_oneup && $if_ipwaited
+  if true, mark the dhcpcd service as started and then start dependencies
+  if false and the dhcpcd service was previously started, mark as inactive and
+     stop any dependant services.
+
 
 Compatibility
 -------------
