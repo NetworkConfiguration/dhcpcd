@@ -419,6 +419,24 @@ fi
 XCC="$CC `$SED -n -e 's/CPPFLAGS+=*\(.*\)/\1/p' $CONFIG_MK`"
 XCC="$XCC `$SED -n -e 's/CFLAGS+=*\(.*\)/\1/p' $CONFIG_MK`"
 
+if [ "$OS" = linux ]; then
+	printf "Testing for nl80211 ... "
+	cat <<EOF >_nl80211.c
+#include <linux/nl80211.hx>
+int main(void) {
+	return 0;
+}
+EOF
+	if $XCC _nl80211.c -o _nl80211 2>/dev/null; then
+		echo "yes"
+		echo "#define HAVE_NL80211_H" >>$CONFIG_H
+	else
+		echo "no"
+		echo "DHCPCD_SRCS+=	if-linux-wext.c" >>$CONFIG_MK
+	fi
+	rm -f _nl80211.c _nl80211
+fi
+
 abort=false
 # We require the libc to support non standard functions, like getifaddrs
 printf "Testing for getifaddrs ... "
@@ -524,7 +542,7 @@ EOF
 		ARC4RANDOM_UNIFORM=no
 	fi
 	echo "$ARC4RANDOM"
-	rm -f _arc4random.c _arc4random
+	rm -f _arc4random_uniform.c _arc4random_uniform
 fi
 if [ "$ARC4RANDOM_UNIFORM" = no ]; then
 	echo "COMPAT_SRCS+=	compat/arc4random_uniform.c" >>$CONFIG_MK
@@ -1022,24 +1040,6 @@ EOF
 	fi
 	rm -f _dlopen.c _dlopen
 	$abort && exit 1
-fi
-
-if [ "$OS" = linux ]; then
-	printf "Testing for nl80211 ... "
-	cat <<EOF >_nl80211.c
-#include <linux/nl80211.h>
-int main(void) {
-	return 0;
-}
-EOF
-	if $XCC _nl80211.c -o _nl80211 2>/dev/null; then
-		echo "yes"
-		echo "#define HAVE_NL80211_H" >>$CONFIG_H
-	else
-		echo "no"
-		echo "DHCPCD_SRCS+=	if-linux-wireless.c" >>$CONFIG_MK
-	fi
-	rm -f _nl80211.c _nl80211
 fi
 
 # Transform for a make file
