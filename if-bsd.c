@@ -137,8 +137,8 @@ if_openlinksocket(void)
 #endif
 }
 
-int
-if_getssid(struct interface *ifp)
+static int
+if_getssid1(const char *ifname, char *ssid)
 {
 	int s, retval = -1;
 #if defined(SIOCG80211NWID)
@@ -154,18 +154,19 @@ if_getssid(struct interface *ifp)
 
 #if defined(SIOCG80211NWID) /* NetBSD */
 	memset(&ifr, 0, sizeof(ifr));
-	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
+	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
 	memset(&nwid, 0, sizeof(nwid));
 	ifr.ifr_data = (void *)&nwid;
 	if (ioctl(s, SIOCG80211NWID, &ifr) == 0) {
-		if (nwid.i_len > sizeof(ifp->ssid)) {
+		if (ssid == NULL)
+			retval = nwid.i_len;
+		else if (nwid.i_len > IF_SSIDSIZE) {
 			errno = ENOBUFS;
 			retval = -1;
 		} else {
 			retval = nwid.i_len;
-			memcpy(ifp->ssid, nwid.i_nwid, nwid.i_len);
+			memcpy(ssid, nwid.i_nwid, nwid.i_len);
 			ssid[nwid.i_len] = '\0';
-			ifp->ssid_len = nwid.i_len;
 		}
 	}
 #elif defined(IEEE80211_IOC_SSID) /* FreeBSD */
@@ -176,20 +177,32 @@ if_getssid(struct interface *ifp)
 	memset(nwid, 0, sizeof(nwid));
 	ireq.i_data = &nwid;
 	if (ioctl(s, SIOCG80211, &ireq) == 0) {
-		if (ireq.i_len > sizeof(ifp->ssid)) {
+		if (ssid == NULL)
+			retval = ireq.i_len;
+		else if (ireq.i_len > IF_SSIDSIZE) {
 			errno = ENOBUFS;
 			retval = -1;
 		} else  {
 			retval = ireq.i_len;
-			memcpy(ifp->ssid, nwid, ireq.i_len);
-			ifp->ssid[ireq.i_len] = '\0';
-			ifp->ssid_len = ireq.i_len;
+			memcpy(ssid, nwid, ireq.i_len);
+			ssid[ireq.i_len] = '\0';
 		}
 	}
 #endif
 
 	close(s);
 	return retval;
+}
+
+int
+if_getssid(struct interface *ifp)
+{
+	int r;
+
+	r = if_getssid1(ifp->name, ifp->ssid);
+	if (r != -1)
+		ifp->ssid_len = (unsigned int)r;
+	return r;
 }
 
 /*
@@ -216,7 +229,7 @@ if_vimaster(const char *ifname)
 	if (ifmr.ifm_status & IFM_AVALID &&
 	    IFM_TYPE(ifmr.ifm_active) == IFM_IEEE80211)
 	{
-		if (if_getssid(ifname, NULL) == -1)
+		if (if_getssid1(ifname, NULL) == -1)
 			return 1;
 	}
 	return 0;
