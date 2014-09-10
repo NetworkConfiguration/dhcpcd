@@ -422,7 +422,7 @@ XCC="$XCC `$SED -n -e 's/CFLAGS+=*\(.*\)/\1/p' $CONFIG_MK`"
 if [ "$OS" = linux ]; then
 	printf "Testing for nl80211 ... "
 	cat <<EOF >_nl80211.c
-#include <linux/nl80211.hx>
+#include <linux/nl80211.h>
 int main(void) {
 	return 0;
 }
