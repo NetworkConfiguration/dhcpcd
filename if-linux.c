@@ -891,6 +891,7 @@ gnl_parse(struct nlmsghdr *nlm, struct nlattr *tb[], int maxtype)
 	size_t len, rem;
 	int type;
 
+	memset(tb, 0, sizeof(*tb) * (maxtype + 1));
 	ghdr = NLMSG_DATA(nlm);
 	head = (struct nlattr *)((char *) ghdr + GENL_HDRLEN);
 	len = nlm->nlmsg_len - GENL_HDRLEN - NLMSG_HDRLEN;
