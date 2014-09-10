@@ -311,13 +311,6 @@ if_openrawsocket(struct interface *ifp, int protocol)
 	if (ioctl(fd, BIOCSETF, &pf) == -1)
 		goto eexit;
 
-#ifdef __OpenBSD__
-	/* For some reason OpenBSD fails to open the fd as non blocking */
-	if ((flags = fcntl(fd, F_GETFL, 0)) == -1 ||
-	    fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
-		goto eexit;
-#endif
-
 	return fd;
 
 eexit:
