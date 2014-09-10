@@ -64,7 +64,7 @@ struct interface {
 	unsigned int metric;
 	int carrier;
 	int wireless;
-	char ssid[IF_SSIDSIZE];
+	uint8_t ssid[IF_SSIDSIZE];
 	unsigned int ssid_len;
 
 	char profile[PROFILE_LEN];

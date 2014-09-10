@@ -301,7 +301,7 @@ static int
 ipv6_makestableprivate1(struct in6_addr *addr,
     const struct in6_addr *prefix, int prefix_len,
     const unsigned char *netiface, size_t netiface_len,
-    const char *netid, size_t netid_len,
+    const unsigned char *netid, size_t netid_len,
     uint32_t *dad_counter,
     const unsigned char *secret, size_t secret_len)
 {
@@ -376,7 +376,7 @@ ipv6_makestableprivate(struct in6_addr *addr,
 	 * as the interface identifier */
 	r = ipv6_makestableprivate1(addr, prefix, prefix_len,
 	    ifp->hwaddr, ifp->hwlen,
-	    ifp->ssid, strlen(ifp->ssid),
+	    ifp->ssid, ifp->ssid_len,
 	    &dad,
 	    ifp->ctx->secret, ifp->ctx->secret_len);
 

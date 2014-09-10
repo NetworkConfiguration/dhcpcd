@@ -87,7 +87,7 @@
 #include <linux/genetlink.h>
 #include <linux/nl80211.h>
 #else
-int if_getssid_wext(const char *ifname, char *ssid);
+int if_getssid_wext(const char *ifname, uint8_t *ssid);
 #endif
 
 #define bpf_insn		sock_filter
@@ -933,7 +933,7 @@ gnl_getfamily(struct dhcpcd_ctx *ctx, const char *name)
 	nlm.ghdr.version = 1;
 	if (nla_put_string(&nlm.hdr, sizeof(nlm), CTRL_ATTR_FAMILY_NAME, name)
 	    == -1)
-	    	return -1;
+		return -1;
 	return send_netlink(ctx, NULL, NETLINK_GENERIC, &nlm.hdr,
 	    &_gnl_getfamily);
 }
@@ -977,7 +977,7 @@ if_getssid(struct interface *ifp)
 	nlm.hdr.nlmsg_flags = NLM_F_REQUEST;
 	nlm.ghdr.cmd = NL80211_CMD_GET_INTERFACE;
 	nla_put_32(&nlm.hdr, sizeof(nlm), NL80211_ATTR_IFINDEX, ifp->index);
-	
+
 	return send_netlink(ifp->ctx, ifp, NETLINK_GENERIC, &nlm.hdr,
 	    &_if_getssid);
 }
@@ -1453,7 +1453,7 @@ static struct rtattr *
 add_attr_nest(struct nlmsghdr *n, unsigned short maxlen, unsigned short type)
 {
 	struct rtattr *nest;
-	
+
 	nest = NLMSG_TAIL(n);
 	add_attr_l(n, maxlen, type, NULL, 0);
 	return nest;
@@ -1484,7 +1484,7 @@ if_disable_autolinklocal(struct dhcpcd_ctx *ctx, const char *ifname)
 	    IN6_ADDR_GEN_MODE_NONE);
 	add_attr_nest_end(&nlm.hdr, afs6);
 	add_attr_nest_end(&nlm.hdr, afs);
-	
+
 	return send_netlink(ctx, NULL, NETLINK_ROUTE, &nlm.hdr, NULL);
 }
 

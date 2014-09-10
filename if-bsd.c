@@ -138,7 +138,7 @@ if_openlinksocket(void)
 }
 
 static int
-if_getssid1(const char *ifname, char *ssid)
+if_getssid1(const char *ifname, uint8_t *ssid)
 {
 	int s, retval = -1;
 #if defined(SIOCG80211NWID)

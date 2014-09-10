@@ -489,8 +489,18 @@ int
 dhcpcd_selectprofile(struct interface *ifp, const char *profile)
 {
 	struct if_options *ifo;
+	char pssid[PROFILE_LEN];
 
-	ifo = read_config(ifp->ctx, ifp->name, ifp->ssid, profile);
+	if (ifp->ssid_len) {
+		ssize_t r;
+		r =print_string(pssid, sizeof(pssid), ifp->ssid, ifp->ssid_len);
+		if (r == -1) {
+			syslog(LOG_ERR, "%s: %s: %m", ifp->name, __func__);
+			pssid[0] = '\0';
+		}
+	} else
+		pssid[0] = '\0';
+	ifo = read_config(ifp->ctx, ifp->name, pssid, profile);
 	if (ifo == NULL) {
 		syslog(LOG_DEBUG, "%s: no profile %s", ifp->name, profile);
 		return -1;
