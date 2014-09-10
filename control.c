@@ -325,7 +325,7 @@ control_writeone(void *arg)
 	iov[1].iov_base = data->data;
 	iov[1].iov_len = data->data_len;
 	if (writev(fd->fd, iov, 2) == -1) {
-		syslog(LOG_ERR, "%s: writev: %m", __func__);
+		syslog(LOG_ERR, "%s: writev fd %d: %m", __func__, fd->fd);
 		if (errno != EINTR && errno != EAGAIN)
 			control_delete(fd);
 		return;
