@@ -391,11 +391,11 @@ static inline long long
 get_max_pid_t()
 {
 
-    if (sizeof(pid_t) == sizeof(short))		return SHRT_MAX;
-    if (sizeof(pid_t) == sizeof(int))		return INT_MAX;
-    if (sizeof(pid_t) == sizeof(long))		return LONG_MAX;
-    if (sizeof(pid_t) == sizeof(long long))	return LLONG_MAX;
-    abort();
+	if (sizeof(pid_t) == sizeof(short))		return SHRT_MAX;
+	if (sizeof(pid_t) == sizeof(int))		return INT_MAX;
+	if (sizeof(pid_t) == sizeof(long))		return LONG_MAX;
+	if (sizeof(pid_t) == sizeof(long long))		return LLONG_MAX;
+	abort();
 }
 
 static int
@@ -932,8 +932,8 @@ gnl_getfamily(struct dhcpcd_ctx *ctx, const char *name)
 	nlm.hdr.nlmsg_flags = NLM_F_REQUEST;
 	nlm.ghdr.cmd = CTRL_CMD_GETFAMILY;
 	nlm.ghdr.version = 1;
-	if (nla_put_string(&nlm.hdr, sizeof(nlm), CTRL_ATTR_FAMILY_NAME, name)
-	    == -1)
+	if (nla_put_string(&nlm.hdr, sizeof(nlm),
+	    CTRL_ATTR_FAMILY_NAME, name) == -1)
 		return -1;
 	return send_netlink(ctx, NULL, NETLINK_GENERIC, &nlm.hdr,
 	    &_gnl_getfamily);
@@ -947,10 +947,14 @@ _if_getssid(__unused struct dhcpcd_ctx *ctx, struct interface *ifp,
 
 	if (gnl_parse(nlm, tb, NL80211_ATTR_SSID) == -1)
 		return -1;
+
 	if (tb[NL80211_ATTR_SSID] == NULL) {
-		errno = ENOENT;
-		return -1;
+		/* If the SSID is not found then it means that
+		 * we're not associated to an AP. */
+		ifp->ssid_len = 0;
+		goto out;
 	}
+
 	ifp->ssid_len = NLA_LEN(tb[NL80211_ATTR_SSID]);
 	if (ifp->ssid_len > sizeof(ifp->ssid)) {
 		errno = ENOBUFS;
@@ -958,6 +962,8 @@ _if_getssid(__unused struct dhcpcd_ctx *ctx, struct interface *ifp,
 		return -1;
 	}
 	memcpy(ifp->ssid, NLA_DATA(tb[NL80211_ATTR_SSID]), ifp->ssid_len);
+
+out:
 	ifp->ssid[ifp->ssid_len] = '\0';
 	return ifp->ssid_len;
 }
@@ -979,8 +985,8 @@ if_getssid(struct interface *ifp)
 	nlm.ghdr.cmd = NL80211_CMD_GET_INTERFACE;
 	nla_put_32(&nlm.hdr, sizeof(nlm), NL80211_ATTR_IFINDEX, ifp->index);
 
-	return send_netlink(ifp->ctx, ifp, NETLINK_GENERIC, &nlm.hdr,
-	    &_if_getssid);
+	return send_netlink(ifp->ctx, ifp,
+	    NETLINK_GENERIC, &nlm.hdr, &_if_getssid);
 }
 #else
 int
@@ -1256,8 +1262,8 @@ if_route(const struct rt *rt, int action)
 		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_OIF, rt->iface->index);
 	add_attr_32(&nlm.hdr, sizeof(nlm), RTA_PRIORITY, rt->metric);
 
-	if (send_netlink(rt->iface->ctx, NULL, NETLINK_ROUTE, &nlm.hdr, NULL)
-	    == -1)
+	if (send_netlink(rt->iface->ctx, NULL,
+	    NETLINK_ROUTE, &nlm.hdr, NULL) == -1)
 		retval = -1;
 	return retval;
 }
@@ -1306,8 +1312,8 @@ if_address6(const struct ipv6_addr *ap, int action)
 	}
 #endif
 
-	if (send_netlink(ap->iface->ctx, NULL, NETLINK_ROUTE, &nlm.hdr, NULL)
-	    == -1)
+	if (send_netlink(ap->iface->ctx, NULL,
+	    NETLINK_ROUTE, &nlm.hdr, NULL) == -1)
 		retval = -1;
 	return retval;
 }
@@ -1390,8 +1396,8 @@ if_route6(const struct rt6 *rt, int action)
 		    RTA_DATA(metrics), RTA_PAYLOAD(metrics));
 	}
 
-	if (send_netlink(rt->iface->ctx, NULL, NETLINK_ROUTE, &nlm.hdr, NULL)
-	    == -1)
+	if (send_netlink(rt->iface->ctx, NULL,
+	    NETLINK_ROUTE, &nlm.hdr, NULL) == -1)
 		retval = -1;
 	return retval;
 }
