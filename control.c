@@ -89,23 +89,30 @@ control_queue_free(struct fd_list *fd)
 }
 
 static void
+control_delete(struct fd_list *fd)
+{
+
+	TAILQ_REMOVE(&fd->ctx->control_fds, fd, next);
+	eloop_event_delete(fd->ctx->eloop, fd->fd, 0);
+	close(fd->fd);
+	control_queue_free(fd);
+	free(fd);
+}
+
+static void
 control_handle_data(void *arg)
 {
-	struct fd_list *l = arg;
+	struct fd_list *fd = arg;
 	char buffer[1024], *e, *p, *argvp[255], **ap, *a;
 	ssize_t bytes;
 	size_t len;
 	int argc;
 
-	bytes = read(l->fd, buffer, sizeof(buffer) - 1);
+	bytes = read(fd->fd, buffer, sizeof(buffer) - 1);
 	if (bytes == -1 || bytes == 0) {
 		/* Control was closed or there was an error.
 		 * Remove it from our list. */
-		TAILQ_REMOVE(&l->ctx->control_fds, l, next);
-		eloop_event_delete(l->ctx->eloop, l->fd, 0);
-		close(l->fd);
-		control_queue_free(l);
-		free(l);
+		control_delete(fd);
 		return;
 	}
 	buffer[bytes] = '\0';
@@ -132,7 +139,7 @@ control_handle_data(void *arg)
 			}
 		}
 		*ap = NULL;
-		if (dhcpcd_handleargs(l->ctx, l, argc, argvp) == -1)
+		if (dhcpcd_handleargs(fd->ctx, fd, argc, argvp) == -1)
 			syslog(LOG_ERR, "%s: dhcpcd_handleargs: %m", __func__);
 	}
 }
@@ -319,6 +326,8 @@ control_writeone(void *arg)
 	iov[1].iov_len = data->data_len;
 	if (writev(fd->fd, iov, 2) == -1) {
 		syslog(LOG_ERR, "%s: writev: %m", __func__);
+		if (errno != EINTR && errno != EAGAIN)
+			control_delete(fd);
 		return;
 	}
 
