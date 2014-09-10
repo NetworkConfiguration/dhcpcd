@@ -574,7 +574,7 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 			dhcpcd_handleinterface(ctx, 0, ifp->name);
 #endif
 			if (ifp->wireless)
-				if_getssid(ifp->name, ifp->ssid);
+				if_getssid(ifp);
 			configure_interface(ifp, ctx->argc, ctx->argv);
 			script_runreason(ifp, "CARRIER");
 			dhcpcd_startinterface(ifp);

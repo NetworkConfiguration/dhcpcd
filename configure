@@ -382,7 +382,7 @@ fi
 case "$OS" in
 linux*)
 	echo "CPPFLAGS+=	-D_BSD_SOURCE -D_XOPEN_SOURCE=700" >>$CONFIG_MK
-	echo "DHCPCD_SRCS+=	if-linux.c if-linux-wireless.c" >>$CONFIG_MK
+	echo "DHCPCD_SRCS+=	if-linux.c" >>$CONFIG_MK
 	;;
 kfreebsd*)
 	echo "CPPFLAGS+=	-D_GNU_SOURCE" >>$CONFIG_MK
@@ -1022,6 +1022,24 @@ EOF
 	fi
 	rm -f _dlopen.c _dlopen
 	$abort && exit 1
+fi
+
+if [ "$OS" = linux ]; then
+	printf "Testing for nl80211 ... "
+	cat <<EOF >_nl80211.c
+#include <linux/nl80211.h>
+int main(void) {
+	return 0;
+}
+EOF
+	if $XCC _nl80211.c -o _nl80211 2>/dev/null; then
+		echo "yes"
+		echo "#define HAVE_NL80211_H" >>$CONFIG_H
+	else
+		echo "no"
+		echo "DHCPCD_SRCS+=	if-linux-wireless.c" >>$CONFIG_MK
+	fi
+	rm -f _nl80211.c _nl80211
 fi
 
 # Transform for a make file

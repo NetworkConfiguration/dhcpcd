@@ -374,21 +374,28 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 		snprintf(env[elen++], e, "profile=%s", ifp->profile);
 	}
 	if (ifp->wireless) {
-		e = strlen("new_ssid=") + strlen(ifp->ssid) + 2;
-		if (strcmp(reason, "CARRIER") == 0) {
-			nenv = realloc(env, sizeof(char *) * (elen + 2));
-			if (nenv == NULL)
-				goto eexit;
-			env = nenv;
-			EMALLOC(elen, e);
-			snprintf(env[elen++], e, "new_ssid=%s", ifp->ssid);
-		} else if (strcmp(reason, "NOCARRIER") == 0) {
-			nenv = realloc(env, sizeof(char *) * (elen + 2));
-			if (nenv == NULL)
-				goto eexit;
-			env = nenv;
-			EMALLOC(elen, e);
-			snprintf(env[elen++], e, "old_ssid=%s", ifp->ssid);
+		const char *pfx;
+
+		if (strcmp(reason, "CARRIER") == 0)
+			pfx = "new_ssid=";
+		else if (strcmp(reason, "NOCARRIER") == 0)
+			pfx = "old_ssid=";
+		else	
+			pfx = NULL;
+		if (pfx) {
+			int pfx_len;
+			ssize_t psl;
+
+			pfx_len = strlen(pfx);
+			psl = print_string(NULL, 0,
+			    (const uint8_t *)ifp->ssid, ifp->ssid_len);
+			if (psl != -1) {
+				EMALLOC(elen, pfx_len + psl + 1);
+				memcpy(env[elen], pfx, pfx_len);
+				print_string(env[elen] + pfx_len, psl,
+				    (const uint8_t *)ifp->ssid, ifp->ssid_len);
+				elen++;
+			}
 		}
 	}
 #ifdef INET

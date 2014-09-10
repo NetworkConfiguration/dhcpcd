@@ -103,7 +103,7 @@ int if_carrier(struct interface *);
 /* The below functions are provided by if-KERNEL.c */
 int if_conf(struct interface *);
 int if_init(struct interface *);
-int if_getssid(const char *, char *);
+int if_getssid(struct interface *);
 int if_vimaster(const char *);
 int if_openlinksocket(void);
 int if_managelink(struct dhcpcd_ctx *);

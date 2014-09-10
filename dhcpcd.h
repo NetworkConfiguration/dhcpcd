@@ -65,6 +65,7 @@ struct interface {
 	int carrier;
 	int wireless;
 	char ssid[IF_SSIDSIZE];
+	unsigned int ssid_len;
 
 	char profile[PROFILE_LEN];
 	struct if_options *options;
