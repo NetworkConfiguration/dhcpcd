@@ -1,8 +1,8 @@
 # Sample dhcpcd hook for ypbind
 # This script is only suitable for the BSD versions.
 
-: ${ypbind_restart_cmd:=service_command ypbind restart &}
-: ${ypbind_stop_cmd:=service_condcommand ypbind stop &}
+: ${ypbind_restart_cmd:=service_command ypbind restart}
+: ${ypbind_stop_cmd:=service_condcommand ypbind stop}
 ypbind_dir="$state_dir/ypbind"
 : ${ypdomain_dir:=@YPDOMAIN_DIR@}
 : ${ypdomain_suffix:=@YPDOMAIN_SUFFIX@}
