@@ -657,7 +657,6 @@ script_runreason(const struct interface *ifp, const char *reason)
 			goto out;
 		}
 	}
-	ep = env;
 	if (svcname) {
 		e = strlen(SVCNAME) + strlen(svcname) + 2;
 		env[++elen] = malloc(e);
