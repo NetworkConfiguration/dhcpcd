@@ -362,9 +362,7 @@ if_readrawpacket(struct interface *ifp, int protocol,
 	else
 		fd = state->raw_fd;
 
-	if (flags != NULL)
-		*flags = 0; /* Not supported on BSD */
-
+	*flags = 0;
 	for (;;) {
 		if (state->buffer_len == 0) {
 			bytes = read(fd, state->buffer, state->buffer_size);
