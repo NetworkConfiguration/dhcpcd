@@ -692,6 +692,7 @@ script_runreason(const struct interface *ifp, const char *reason)
 
 	/* Send to our listeners */
 	bigenv = NULL;
+	status = 0;
 	TAILQ_FOREACH(fd, &ifp->ctx->control_fds, next) {
 		if (!fd->listener)
 			continue;
@@ -706,7 +707,11 @@ script_runreason(const struct interface *ifp, const char *reason)
 		}
 		if (control_queue(fd, bigenv, elen, 1) == -1)
 			syslog(LOG_ERR, "%s: control_queue: %m", __func__);
+		else
+			status = 1;
 	}
+	if (!status)
+		free(bigenv);
 
 out:
 	/* Cleanup */

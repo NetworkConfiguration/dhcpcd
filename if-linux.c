@@ -375,9 +375,11 @@ get_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp, int fd, int flags,
 				goto eexit;
 			if (r)
 				continue;
-			r = callback(ctx, ifp, nlm);
-			if (r != 0)
-				goto eexit;
+			if (callback) {
+				r = callback(ctx, ifp, nlm);
+				if (r != 0)
+					goto eexit;
+			}
 		}
 	}
 
@@ -784,7 +786,8 @@ add_attr_l(struct nlmsghdr *n, unsigned short maxlen, unsigned short type,
 	rta = NLMSG_TAIL(n);
 	rta->rta_type = type;
 	rta->rta_len = len;
-	memcpy(RTA_DATA(rta), data, alen);
+	if (alen)
+		memcpy(RTA_DATA(rta), data, alen);
 	n->nlmsg_len = NLMSG_ALIGN(n->nlmsg_len) + RTA_ALIGN(len);
 
 	return 0;
