@@ -234,9 +234,8 @@ dhcpcd_ipwaited(struct dhcpcd_ctx *ctx)
 	    !ipv6nd_addrexists(ctx, NULL) &&
 	    !dhcp6_addrexists(ctx, NULL))
 		return 0;
-	if ((ctx->options &
-	    (DHCPCD_WAITIP | DHCPCD_WAITIP4 | DHCPCD_WAITIP6)) ==
-	    (DHCPCD_WAITIP | DHCPCD_WAITIP4 | DHCPCD_WAITIP6) &&
+	if (ctx->options & DHCPCD_WAITIP &&
+	    !(ctx->options & (DHCPCD_WAITIP4 | DHCPCD_WAITIP6)) &&
 	    !ipv4_addrexists(ctx, NULL) &&
 	    !ipv6nd_addrexists(ctx, NULL) &&
 	    !dhcp6_addrexists(ctx, NULL))
