@@ -123,6 +123,8 @@ struct udp_dhcp_packet
 
 static const size_t udp_dhcp_len = sizeof(struct udp_dhcp_packet);
 
+static int dhcp_open(struct interface *ifp);
+
 void
 dhcp_printoptions(const struct dhcpcd_ctx *ctx,
     const struct dhcp_opt *opts, size_t opts_len)
@@ -1586,6 +1588,9 @@ send_message(struct interface *iface, uint8_t type,
 		    timeval_to_double(&tv));
 	}
 
+	if (dhcp_open(iface) == -1)
+		return;
+
 	if (state->addr.s_addr != INADDR_ANY &&
 	    state->new != NULL &&
 	    (state->new->cookie == htonl(MAGIC_COOKIE) ||
@@ -2140,7 +2145,7 @@ dhcp_drop(struct interface *ifp, const char *reason)
 	dhcp_auth_reset(&state->auth);
 	dhcp_close(ifp);
 	arp_close(ifp);
-	eloop_timeouts_delete(ifp->ctx->eloop, ifp, dhcp_expire, NULL);
+	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	if (ifp->options->options & DHCPCD_RELEASE) {
 		unlink(state->leasefile);
 		if (ifp->carrier != LINK_DOWN &&
