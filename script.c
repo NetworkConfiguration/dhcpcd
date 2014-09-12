@@ -58,8 +58,8 @@
 #endif
 
 /* Allow the OS to define another script env var name */
-#ifndef SVCNAME
-#define SVCNAME "SVCNAME"
+#ifndef RC_SVCNAME
+#define RC_SVCNAME "RC_SVCNAME"
 #endif
 
 #define DEFAULT_PATH	"PATH=/usr/bin:/usr/sbin:/bin:/sbin"
@@ -632,8 +632,8 @@ script_runreason(const struct interface *ifp, const char *reason)
 		syslog(LOG_ERR, "%s: make_env: %m", ifp->name);
 		return -1;
 	}
-	/* Resize for PATH and SVCNAME */
-	svcname = getenv(SVCNAME);
+	/* Resize for PATH and RC_SVCNAME */
+	svcname = getenv(RC_SVCNAME);
 	ep = realloc(env, sizeof(char *) * (elen + 2 + (svcname ? 1 : 0)));
 	if (ep == NULL) {
 		elen = 0;
@@ -658,13 +658,13 @@ script_runreason(const struct interface *ifp, const char *reason)
 		}
 	}
 	if (svcname) {
-		e = strlen(SVCNAME) + strlen(svcname) + 2;
+		e = strlen(RC_SVCNAME) + strlen(svcname) + 2;
 		env[++elen] = malloc(e);
 		if (env[elen] == NULL) {
 			elen = 0;
 			goto out;
 		}
-		snprintf(env[elen], e, "%s=%s", SVCNAME, svcname);
+		snprintf(env[elen], e, "%s=%s", RC_SVCNAME, svcname);
 	}
 	env[++elen] = NULL;
 

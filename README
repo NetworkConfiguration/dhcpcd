@@ -98,8 +98,8 @@ To add more simply
 ./configure -with-hook=ntp.conf
 
 Some system services expose the name of the service we are in,
-by default dhcpcd will pick SVCNAME from the environment.
-You can override this in CPPFLAGS+= -DSVCNAME="RC_SVCNAME".
+by default dhcpcd will pick RC_SVCNAME from the environment.
+You can override this in CPPFLAGS+= -DRC_SVCNAME="YOUR_SVCNAME".
 This is important because dhcpcd will scrub the environment aside from $PATH
 before running hooks.
 This variable could be used to facilitate service re-entry so this chain could
