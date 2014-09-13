@@ -59,7 +59,9 @@ wpa_supplicant_start()
 
 	wpa_cli -p "$dir" -i "$interface" status >/dev/null 2>&1 && return 0
 	syslog info "starting wpa_supplicant"
-	err=$(wpa_supplicant -B -c"$wpa_supplicant_conf" -i"$interface" 2>&1)
+	driver=${wpa_supplicant_driver:+-D}$wpa_supplicant_driver
+	err=$(wpa_supplicant -B -c"$wpa_supplicant_conf" -i"$interface" \
+	    "$driver" 2>&1)
 	errn=$?
 	if [ $errn != 0 ]; then
 		syslog err "failed to start wpa_supplicant"

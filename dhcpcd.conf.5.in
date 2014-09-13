@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd August 7, 2014
+.Dd September 14, 2014
 .Dt DHCPCD.CONF 5
 .Os
 .Sh NAME
@@ -139,6 +139,11 @@ to the environment for use in
 For example, you can force the hostname hook to always set the hostname with
 .Ic env
 .Va force_hostname=YES .
+Or set which driver
+.Xr wpa_supplicant 8
+should use with
+.Ic env
+.Va wpa_supplicant_driver=nl80211
 .Pp
 If the hostname is set, will be will set to the FQDN if possible as per
 RFC 4702 section 3.1.
