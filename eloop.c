@@ -35,7 +35,6 @@
 #include <limits.h>
 #include <poll.h>
 #include <signal.h>
-#include <stdarg.h>
 #include <stdlib.h>
 #include <syslog.h>
 
