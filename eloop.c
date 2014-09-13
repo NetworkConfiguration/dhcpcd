@@ -233,46 +233,6 @@ eloop_timeout_add_now(struct eloop_ctx *ctx,
 	return 0;
 }
 
-/* This deletes all timeouts for the interface EXCEPT for ones with the
- * callbacks given. Handy for deleting everything apart from the expire
- * timeout. */
-static void
-eloop_q_timeouts_delete_v(struct eloop_ctx *ctx, int queue, void *arg,
-    void (*callback)(void *), va_list v)
-{
-	struct eloop_timeout *t, *tt;
-	va_list va;
-	void (*f)(void *);
-
-	TAILQ_FOREACH_SAFE(t, &ctx->timeouts, next, tt) {
-		if ((queue == 0 || t->queue == queue) && t->arg == arg &&
-		    t->callback != callback)
-		{
-			va_copy(va, v);
-			while ((f = va_arg(va, void (*)(void *)))) {
-				if (f == t->callback)
-					break;
-			}
-			va_end(va);
-			if (f == NULL) {
-				TAILQ_REMOVE(&ctx->timeouts, t, next);
-				TAILQ_INSERT_TAIL(&ctx->free_timeouts, t, next);
-			}
-		}
-	}
-}
-
-void
-eloop_q_timeouts_delete(struct eloop_ctx *ctx, int queue,
-    void *arg, void (*callback)(void *), ...)
-{
-	va_list va;
-
-	va_start(va, callback);
-	eloop_q_timeouts_delete_v(ctx, queue, arg, callback, va);
-	va_end(va);
-}
-
 void
 eloop_q_timeout_delete(struct eloop_ctx *ctx, int queue,
     void (*callback)(void *), void *arg)
