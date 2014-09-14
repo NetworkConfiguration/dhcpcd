@@ -1114,25 +1114,29 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 	size_t len, l;
 	char *tmp, *p;
 
-	if (fd != NULL) {
-		/* Special commands for our control socket
-		 * as the other end should be blocking until it gets the
-		 * expected reply we should be safely able just to change the
-		 * write callback on the fd */
-		if (strcmp(*argv, "--version") == 0) {
-			return control_queue(fd, UNCONST(VERSION),
-			    strlen(VERSION) + 1, 0);
-		} else if (strcmp(*argv, "--getconfigfile") == 0) {
-			return control_queue(fd, UNCONST(fd->ctx->cffile),
-			    strlen(fd->ctx->cffile) + 1, 0);
-		} else if (strcmp(*argv, "--getinterfaces") == 0) {
-			eloop_event_add(fd->ctx->eloop, fd->fd, NULL, NULL,
-			    dhcpcd_getinterfaces, fd);
-			return 0;
-		} else if (strcmp(*argv, "--listen") == 0) {
-			fd->listener = 1;
-			return 0;
-		}
+	/* Special commands for our control socket
+	 * as the other end should be blocking until it gets the
+	 * expected reply we should be safely able just to change the
+	 * write callback on the fd */
+	if (strcmp(*argv, "--version") == 0) {
+		return control_queue(fd, UNCONST(VERSION),
+		    strlen(VERSION) + 1, 0);
+	} else if (strcmp(*argv, "--getconfigfile") == 0) {
+		return control_queue(fd, UNCONST(fd->ctx->cffile),
+		    strlen(fd->ctx->cffile) + 1, 0);
+	} else if (strcmp(*argv, "--getinterfaces") == 0) {
+		eloop_event_add(fd->ctx->eloop, fd->fd, NULL, NULL,
+		    dhcpcd_getinterfaces, fd);
+		return 0;
+	} else if (strcmp(*argv, "--listen") == 0) {
+		fd->flags |= FD_LISTEN;
+		return 0;
+	}
+
+	/* Only priviledged users can control dhcpcd via the socket. */
+	if (fd->flags & FD_UNPRIV) {
+		errno = EPERM;
+		return -1;
 	}
 
 	/* Log the command */
@@ -1247,7 +1251,7 @@ main(int argc, char **argv)
 
 	ifo = NULL;
 	ctx.cffile = CONFIG;
-	ctx.pid_fd = ctx.control_fd = ctx.link_fd = -1;
+	ctx.pid_fd = ctx.control_fd = ctx.control_unpriv_fd = ctx.link_fd = -1;
 	TAILQ_INIT(&ctx.control_fds);
 #ifdef PLUGIN_DEV
 	ctx.dev_fd = -1;

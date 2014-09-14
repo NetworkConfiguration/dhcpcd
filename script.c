@@ -546,9 +546,12 @@ send_interface1(struct fd_list *fd, const struct interface *iface,
 
 	if (make_env(iface, reason, &env) == -1)
 		return -1;
+	s = NULL;
 	elen = (size_t)arraytostr((const char *const *)env, &s);
-	if ((ssize_t)elen == -1)
+	if ((ssize_t)elen == -1) {
+		free(s);
 		return -1;
+	}
 	retval = control_queue(fd, s, elen, 1);
 	ep = env;
 	while (*ep)
@@ -694,7 +697,7 @@ script_runreason(const struct interface *ifp, const char *reason)
 	bigenv = NULL;
 	status = 0;
 	TAILQ_FOREACH(fd, &ifp->ctx->control_fds, next) {
-		if (!fd->listener)
+		if (!(fd->flags & FD_LISTEN))
 			continue;
 		if (bigenv == NULL) {
 			elen = (size_t)arraytostr((const char *const *)env,

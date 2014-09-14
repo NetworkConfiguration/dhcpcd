@@ -96,6 +96,7 @@ struct dhcpcd_ctx {
 	struct eloop_ctx *eloop;
 
 	int control_fd;
+	int control_unpriv_fd;
 	struct fd_list_head control_fds;
 	char control_sock[sizeof(CONTROLSOCKET) + IF_NAMESIZE];
 	gid_t control_group;

@@ -45,11 +45,14 @@ struct fd_list {
 	TAILQ_ENTRY(fd_list) next;
 	struct dhcpcd_ctx *ctx;
 	int fd;
-	int listener;
+	unsigned int flags;
 	struct fd_data_head queue;
 	struct fd_data_head free_queue;
 };
 TAILQ_HEAD(fd_list_head, fd_list);
+
+#define FD_LISTEN	(0<<1)
+#define FD_UNPRIV	(1<<1)
 
 int control_start(struct dhcpcd_ctx *, const char *);
 int control_stop(struct dhcpcd_ctx *);

@@ -57,6 +57,9 @@
 #ifndef CONTROLSOCKET
 # define CONTROLSOCKET		RUNDIR "/" PACKAGE "%s%s.sock"
 #endif
+#ifndef UNPRIVSOCKET
+# define UNPRIVSOCKET		RUNDIR "/" PACKAGE ".unpriv.sock"
+#endif
 #ifndef RDM_MONOFILE
 # define RDM_MONOFILE		DBDIR "/" PACKAGE "-rdm.monotonic"
 #endif
