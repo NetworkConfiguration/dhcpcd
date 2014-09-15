@@ -3009,25 +3009,19 @@ void
 dhcp_start(struct interface *ifp)
 {
 	struct timeval tv;
+	unsigned long opts = ifp->options->options;
 
 	if (!(ifp->options->options & DHCPCD_IPV4))
 		return;
 
 	/* No point in delaying a static configuration */
-	if (ifp->options->options & DHCPCD_STATIC &&
-	    !(ifp->options->options & DHCPCD_INFORM))
-	{
-		tv.tv_sec = 0;
-		tv.tv_usec = 0;
-	} else {
-		tv.tv_sec = DHCP_MIN_DELAY;
-		tv.tv_usec = (suseconds_t)arc4random_uniform(
-		    (DHCP_MAX_DELAY - DHCP_MIN_DELAY) * 1000000);
-		timernorm(&tv);
-		syslog(LOG_DEBUG,
-		    "%s: delaying DHCP for %0.1f seconds",
-		    ifp->name, timeval_to_double(&tv));
-	}
+	tv.tv_sec = DHCP_MIN_DELAY;
+	tv.tv_usec = (suseconds_t)arc4random_uniform(
+	    (DHCP_MAX_DELAY - DHCP_MIN_DELAY) * 1000000);
+	timernorm(&tv);
+	syslog(LOG_DEBUG,
+	    "%s: delaying IPv4 for %0.1f seconds",
+	    ifp->name, timeval_to_double(&tv));
 
 	eloop_timeout_add_tv(ifp->ctx->eloop, &tv, dhcp_start1, ifp);
 }
