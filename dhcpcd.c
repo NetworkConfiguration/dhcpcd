@@ -1159,6 +1159,10 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 	free(tmp);
 
 	optind = 0;
+	/* Pretend argv[0] is a program - tests show that getopt(3)
+	 * still works even if the pointer is out of bounds */
+	argc++;
+	argv--;
 	while ((opt = getopt_long(argc, argv, IF_OPTS, cf_options, &oi)) != -1)
 	{
 		switch (opt) {
