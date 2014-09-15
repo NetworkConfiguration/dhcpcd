@@ -2668,10 +2668,12 @@ dhcp6_handledata(void *arg)
 		break;
 	case DHCP6_RECONFIGURE:
 		if (auth == NULL) {
-			syslog(LOG_ERR,
+			syslog(ifo->options & DHCPCD_AUTH_REQUIRE ?
+			    LOG_ERR : LOG_WARNING,
 			    "%s: unauthenticated %s from %s",
 			    ifp->name, op, ctx->sfrom);
-			return;
+			if (ifo->options & DHCPCD_AUTH_REQUIRE)
+				return;
 		}
 		syslog(LOG_INFO, "%s: %s from %s",
 		    ifp->name, op, ctx->sfrom);

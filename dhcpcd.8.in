@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd September 14, 2014
+.Dd September 15, 2014
 .Dt DHCPCD 8
 .Os
 .Sh NAME
@@ -143,6 +143,14 @@ If a list of interfaces are given on the command line, then
 only works with those interfaces, otherwise
 .Nm
 discovers available Ethernet interfaces.
+This is called Master mode and this behaviour can be forced with the
+.Fl M , Fl Fl master
+option so that an individual interface can start
+.Nm
+but only one instance is running.
+The
+.Nm dhcpcd-ui
+project expects dhcpcd to be running this way.
 If any interface reports a working carrier then
 .Nm
 will try and obtain a lease before forking to the background,
@@ -321,6 +329,7 @@ DHCP server.
 Start
 .Nm
 in master mode even if only one interface specified on the command line.
+See the Multiple Interfaces section above.
 .It Fl m , Fl Fl metric Ar metric
 Metrics are used to prefer an interface over another one, lowest wins.
 .Nm
