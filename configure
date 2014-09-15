@@ -432,9 +432,14 @@ EOF
 		echo "#define HAVE_NL80211_H" >>$CONFIG_H
 	else
 		echo "no"
-		echo "DHCPCD_SRCS+=	if-linux-wext.c" >>$CONFIG_MK
 	fi
 	rm -f _nl80211.c _nl80211
+
+	# Even though we have nl80211, we only use it as a fallback
+	# because it's currently possible to configure a kernel
+	# where the SSID associated to won't be reported by nl80211
+	# but will be via WEXT.
+	echo "DHCPCD_SRCS+=	if-linux-wext.c" >>$CONFIG_MK
 fi
 
 abort=false

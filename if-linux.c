@@ -970,8 +970,8 @@ out:
 	return ifp->ssid_len;
 }
 
-int
-if_getssid(struct interface *ifp)
+static int
+if_getssid_nl80211(struct interface *ifp)
 {
 	int family;
 	struct nlmg nlm;
@@ -990,7 +990,8 @@ if_getssid(struct interface *ifp)
 	return send_netlink(ifp->ctx, ifp,
 	    NETLINK_GENERIC, &nlm.hdr, &_if_getssid);
 }
-#else
+#endif
+
 int
 if_getssid(struct interface *ifp)
 {
@@ -999,9 +1000,12 @@ if_getssid(struct interface *ifp)
 	r = if_getssid_wext(ifp->name, ifp->ssid);
 	if (r != -1)
 		ifp->ssid_len = r;
+#ifdef HAVE_NL80211_H
+	else if (r == -1)
+		r = if_getssid_nl80211(ifp);
+#endif
 	return r;
 }
-#endif
 
 struct nlma
 {
