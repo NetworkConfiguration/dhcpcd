@@ -3009,7 +3009,6 @@ void
 dhcp_start(struct interface *ifp)
 {
 	struct timeval tv;
-	unsigned long opts = ifp->options->options;
 
 	if (!(ifp->options->options & DHCPCD_IPV4))
 		return;
