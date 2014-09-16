@@ -3124,7 +3124,9 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 
 	ifpx = dhcp6_findpfxdlgif(ifp);
 	if (ifpx) {
-		dhcp6_freedrop(ifpx, drop, reason);
+		/* Read the below comment why we need to force
+		 * a drop here */
+		dhcp6_freedrop(ifpx, 1, reason);
 		TAILQ_REMOVE(ifp->ctx->ifaces, ifpx, next);
 		if_free(ifpx);
 	}
