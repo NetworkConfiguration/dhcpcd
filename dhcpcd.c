@@ -99,7 +99,7 @@ read_pid(const char *pidfile)
 	return pid;
 }
 
-static inline int
+static int
 write_pid(int fd, pid_t pid)
 {
 
