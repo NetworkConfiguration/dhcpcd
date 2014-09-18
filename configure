@@ -382,6 +382,8 @@ fi
 case "$OS" in
 linux*)
 	echo "CPPFLAGS+=	-D_BSD_SOURCE -D_XOPEN_SOURCE=700" >>$CONFIG_MK
+	# glibc-2.20
+	echo "CPPFLAGS+=	-D_DEFAULT_SOURCE" >>$CONFIG_MK
 	echo "DHCPCD_SRCS+=	if-linux.c" >>$CONFIG_MK
 	;;
 kfreebsd*)
