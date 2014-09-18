@@ -1040,9 +1040,9 @@ if_raflush(void)
 	if (s == -1)
 		return -1;
 	strlcpy(dummy, "lo0", sizeof(dummy));
-	if (ioctl(s, SIOCSRTRFLUSH_IN6, (caddr_t)&dummy) == -1)
+	if (ioctl(s, SIOCSRTRFLUSH_IN6, (void *)&dummy) == -1)
 		syslog(LOG_ERR, "SIOSRTRFLUSH_IN6: %m");
-	if (ioctl(s, SIOCSPFXFLUSH_IN6, (caddr_t)&dummy) == -1)
+	if (ioctl(s, SIOCSPFXFLUSH_IN6, (void *)&dummy) == -1)
 		syslog(LOG_ERR, "SIOSPFXFLUSH_IN6: %m");
 	close(s);
 	return 0;
