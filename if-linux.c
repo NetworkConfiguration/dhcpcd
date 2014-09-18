@@ -86,9 +86,8 @@
 #ifdef HAVE_NL80211_H
 #include <linux/genetlink.h>
 #include <linux/nl80211.h>
-#else
-int if_getssid_wext(const char *ifname, uint8_t *ssid);
 #endif
+int if_getssid_wext(const char *ifname, uint8_t *ssid);
 
 #define bpf_insn		sock_filter
 #define BPF_SKIPTYPE
@@ -470,14 +469,11 @@ link_route(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 }
 
 static int
-link_addr(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
-    struct nlmsghdr *nlm)
+link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 {
 	size_t len;
 	struct rtattr *rta;
 	struct ifaddrmsg *ifa;
-	char ifn[IF_NAMESIZE + 1];
-	struct interface *iface;
 #ifdef INET
 	struct in_addr addr, net, dest;
 #endif
@@ -494,7 +490,7 @@ link_addr(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 		return -1;
 	}
 	ifa = NLMSG_DATA(nlm);
-	if (if_findindex(ctx, ifa->ifa_index) == NULL) {
+	if ((ifp = if_findindex(ctx, ifa->ifa_index)) == NULL) {
 		/* We don't know about the interface the address is for
 		 * so it's not really an error */
 		return 1;
@@ -510,7 +506,7 @@ link_addr(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 		while (RTA_OK(rta, len)) {
 			switch (rta->rta_type) {
 			case IFA_ADDRESS:
-				if (iface->flags & IFF_POINTOPOINT) {
+				if (ifp->flags & IFF_POINTOPOINT) {
 					memcpy(&dest.s_addr, RTA_DATA(rta),
 					       sizeof(addr.s_addr));
 				}
@@ -522,7 +518,7 @@ link_addr(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 			}
 			rta = RTA_NEXT(rta, len);
 		}
-		ipv4_handleifa(ctx, nlm->nlmsg_type, NULL, ifn,
+		ipv4_handleifa(ctx, nlm->nlmsg_type, NULL, ifp->name,
 		    &addr, &net, &dest);
 		break;
 #endif
@@ -538,7 +534,7 @@ link_addr(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 			}
 			rta = RTA_NEXT(rta, len);
 		}
-		ipv6_handleifa(ctx, nlm->nlmsg_type, NULL, ifn,
+		ipv6_handleifa(ctx, nlm->nlmsg_type, NULL, ifp->name,
 		    &addr6, ifa->ifa_flags);
 		break;
 #endif
@@ -1514,7 +1510,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 	else if (own) {
 		if (if_disable_autolinklocal(ctx, ifp->index) == -1)
 			syslog(LOG_DEBUG, "%s: if_disable_autolinklocal: %m",
-			    ifname);
+			    ifp->name);
 	}
 	if (ifp)
 		ifname = ifp->name;
