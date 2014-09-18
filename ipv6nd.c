@@ -397,6 +397,9 @@ ipv6nd_addrexists(struct dhcpcd_ctx *ctx, const struct ipv6_addr *addr)
 	struct ra *rap;
 	struct ipv6_addr *ap;
 
+	if (ctx->ipv6 == NULL)
+		return 0;
+
 	TAILQ_FOREACH(rap, ctx->ipv6->ra_routers, next) {
 		TAILQ_FOREACH(ap, &rap->addrs, next) {
 			if (addr == NULL) {
