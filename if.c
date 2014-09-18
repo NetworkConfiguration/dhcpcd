@@ -478,7 +478,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 	return ifs;
 }
 
-struct interface *
+static struct interface *
 if_findindexname(struct dhcpcd_ctx *ctx, unsigned int idx, const char *name)
 {
 	struct interface *ifp;

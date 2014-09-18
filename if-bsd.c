@@ -1062,7 +1062,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 		if (del_if_nd6_flag(ifp->name, ND6_IFF_IFDISABLED) == -1) {
 			syslog(LOG_ERR,
 			    "%s: del_if_nd6_flag: ND6_IFF_IFDISABLED: %m",
-			    ifname);
+			    ifp->name);
 			return -1;
 		}
 #endif
@@ -1071,7 +1071,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 		if (set_if_nd6_flag(ifp->name, ND6_IFF_PERFORMNUD) == -1) {
 			syslog(LOG_ERR,
 			    "%s: set_if_nd6_flag: ND6_IFF_PERFORMNUD: %m",
-			    ifname);
+			    ifp->name);
 			return -1;
 		}
 #endif
