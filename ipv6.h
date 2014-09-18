@@ -33,7 +33,7 @@
 
 #include <netinet/in.h>
 
-#ifdef __linux__
+#if defined(__linux__) && defined(__GLIBC__)
 #  define _LINUX_IN6_H
 #  include <linux/ipv6.h>
 #endif

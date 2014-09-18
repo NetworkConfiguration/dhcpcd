@@ -31,10 +31,6 @@
 #include <sys/utsname.h>
 
 #include <netinet/in.h>
-#ifdef __linux__
-#  define _LINUX_IN6_H
-#  include <linux/ipv6.h>
-#endif
 
 #include <ctype.h>
 #include <errno.h>

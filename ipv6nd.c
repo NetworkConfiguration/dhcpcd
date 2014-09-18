@@ -33,11 +33,6 @@
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 
-#ifdef __linux__
-#  define _LINUX_IN6_H
-#  include <linux/ipv6.h>
-#endif
-
 #include <errno.h>
 #include <fcntl.h>
 #include <stddef.h>
