@@ -769,7 +769,7 @@ int
 if_managelink(struct dhcpcd_ctx *ctx)
 {
 	/* route and ifwatchd like a msg buf size of 2048 */
-	char msg[2048], *p, *e, *cp, ifname[IF_NAMESIZE];
+	char msg[2048], *p, *e, *cp;
 	ssize_t bytes;
 	struct rt_msghdr *rtm;
 	struct if_announcemsghdr *ifan;
@@ -778,6 +778,7 @@ if_managelink(struct dhcpcd_ctx *ctx)
 	struct sockaddr *sa, *rti_info[RTAX_MAX];
 	int len;
 	struct sockaddr_dl sdl;
+	struct interface *ifp;
 #ifdef INET
 	struct rt rt;
 #endif
@@ -816,8 +817,7 @@ if_managelink(struct dhcpcd_ctx *ctx)
 #endif
 		case RTM_IFINFO:
 			ifm = (struct if_msghdr *)(void *)p;
-			memset(ifname, 0, sizeof(ifname));
-			if (!(if_indextoname(ifm->ifm_index, ifname)))
+			if ((ifp = if_findindex(ctx, ifm->ifm_index)) == NULL)
 				break;
 			switch (ifm->ifm_data.ifi_link_state) {
 			case LINK_STATE_DOWN:
@@ -838,7 +838,7 @@ if_managelink(struct dhcpcd_ctx *ctx)
 				break;
 			}
 			dhcpcd_handlecarrier(ctx, len,
-			    (unsigned int)ifm->ifm_flags, ifname);
+			    (unsigned int)ifm->ifm_flags, ifp->name);
 			break;
 		case RTM_DELETE:
 			if (~rtm->rtm_addrs &
@@ -864,7 +864,7 @@ if_managelink(struct dhcpcd_ctx *ctx)
 		case RTM_DELADDR:	/* FALLTHROUGH */
 		case RTM_NEWADDR:
 			ifam = (struct ifa_msghdr *)(void *)p;
-			if (!if_indextoname(ifam->ifam_index, ifname))
+			if ((ifp = if_findindex(ctx, ifam->ifam_index)) == NULL)
 				break;
 			cp = (char *)(void *)(ifam + 1);
 			get_addrs(ifam->ifam_addrs, cp, rti_info);
@@ -881,7 +881,7 @@ if_managelink(struct dhcpcd_ctx *ctx)
 #endif
 				memcpy(&sdl, rti_info[RTAX_IFA],
 				    rti_info[RTAX_IFA]->sa_len);
-				dhcpcd_handlehwaddr(ctx, ifname,
+				dhcpcd_handlehwaddr(ctx, ifp->name,
 				    (const unsigned char*)CLLADDR(&sdl),
 				    sdl.sdl_alen);
 				break;
@@ -892,7 +892,7 @@ if_managelink(struct dhcpcd_ctx *ctx)
 				COPYOUT(rt.net, rti_info[RTAX_NETMASK]);
 				COPYOUT(rt.gate, rti_info[RTAX_BRD]);
 				ipv4_handleifa(ctx, rtm->rtm_type,
-				    NULL, ifname,
+				    NULL, ifp->name,
 				    &rt.dest, &rt.net, &rt.gate);
 				break;
 #endif
@@ -902,13 +902,14 @@ if_managelink(struct dhcpcd_ctx *ctx)
 				    rti_info[RTAX_IFA];
 				ia6 = sin6->sin6_addr;
 				if (rtm->rtm_type == RTM_NEWADDR) {
-					ifa_flags = if_addrflags6(ifname, &ia6);
+					ifa_flags = if_addrflags6(ifp->name,
+					    &ia6);
 					if (ifa_flags == -1)
 						break;
 				} else
 					ifa_flags = 0;
 				ipv6_handleifa(ctx, rtm->rtm_type, NULL,
-				    ifname, &ia6, ifa_flags);
+				    ifp->name, &ia6, ifa_flags);
 				break;
 #endif
 			}
@@ -1048,17 +1049,17 @@ if_raflush(void)
 }
 
 int
-if_checkipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
+if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 {
 	int ra;
 
-	if (ifname) {
+	if (ifp) {
 #ifdef ND6_IFF_OVERRIDE_RTADV
 		int override;
 #endif
 
 #ifdef ND6_IFF_IFDISABLED
-		if (del_if_nd6_flag(ifname, ND6_IFF_IFDISABLED) == -1) {
+		if (del_if_nd6_flag(ifp->name, ND6_IFF_IFDISABLED) == -1) {
 			syslog(LOG_ERR,
 			    "%s: del_if_nd6_flag: ND6_IFF_IFDISABLED: %m",
 			    ifname);
@@ -1067,7 +1068,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 #endif
 
 #ifdef ND6_IFF_PERFORMNUD
-		if (set_if_nd6_flag(ifname, ND6_IFF_PERFORMNUD) == -1) {
+		if (set_if_nd6_flag(ifp->name, ND6_IFF_PERFORMNUD) == -1) {
 			syslog(LOG_ERR,
 			    "%s: set_if_nd6_flag: ND6_IFF_PERFORMNUD: %m",
 			    ifname);
@@ -1079,24 +1080,24 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 		if (own) {
 			int all;
 
-			all = get_if_nd6_flag(ifname, ND6_IFF_AUTO_LINKLOCAL);
+			all = get_if_nd6_flag(ifp->name,ND6_IFF_AUTO_LINKLOCAL);
 			if (all == -1)
 				syslog(LOG_ERR,
 				    "%s: get_if_nd6_flag: "
 				    "ND6_IFF_AUTO_LINKLOCAL: %m",
-				    ifname);
+				    ifp->name);
 			else if (all != 0) {
 				syslog(LOG_DEBUG,
 				    "%s: disabling Kernel IPv6 "
 				    "auto link-local support",
-				    ifname);
-				if (del_if_nd6_flag(ifname,
+				    ifp->name);
+				if (del_if_nd6_flag(ifp->name,
 				    ND6_IFF_AUTO_LINKLOCAL) == -1)
 				{
 					syslog(LOG_ERR,
 					    "%s: del_if_nd6_flag: "
 					    "ND6_IFF_AUTO_LINKLOCAL: %m",
-					    ifname);
+					    ifp->name);
 					return -1;
 				}
 			}
@@ -1104,43 +1105,43 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
 #endif
 
 #ifdef ND6_IFF_OVERRIDE_RTADV
-		override = get_if_nd6_flag(ifname, ND6_IFF_OVERRIDE_RTADV);
+		override = get_if_nd6_flag(ifp->name, ND6_IFF_OVERRIDE_RTADV);
 		if (override == -1)
 			syslog(LOG_ERR,
 			    "%s: get_if_nd6_flag: ND6_IFF_OVERRIDE_RTADV: %m",
-			    ifname);
+			    ifp->name);
 		else if (override == 0 && !own)
 			return 0;
 #endif
 
 #ifdef ND6_IFF_ACCEPT_RTADV
-		ra = get_if_nd6_flag(ifname, ND6_IFF_ACCEPT_RTADV);
+		ra = get_if_nd6_flag(ifp->name, ND6_IFF_ACCEPT_RTADV);
 		if (ra == -1)
 			syslog(LOG_ERR,
 			    "%s: get_if_nd6_flag: ND6_IFF_ACCEPT_RTADV: %m",
-			    ifname);
+			    ifp->name);
 		else if (ra != 0 && own) {
 			syslog(LOG_DEBUG,
 			    "%s: disabling Kernel IPv6 RA support",
-			    ifname);
-			if (del_if_nd6_flag(ifname, ND6_IFF_ACCEPT_RTADV)
+			    ifp->name);
+			if (del_if_nd6_flag(ifp->name, ND6_IFF_ACCEPT_RTADV)
 			    == -1)
 			{
 				syslog(LOG_ERR,
 				    "%s: del_if_nd6_flag: "
 				    "ND6_IFF_ACCEPT_RTADV: %m",
-				    ifname);
+				    ifp->name);
 				return ra;
 			}
 #ifdef ND6_IFF_OVERRIDE_RTADV
 			if (override == 0 &&
-			    set_if_nd6_flag(ifname, ND6_IFF_OVERRIDE_RTADV)
+			    set_if_nd6_flag(ifp->name, ND6_IFF_OVERRIDE_RTADV)
 			    == -1)
 			{
 				syslog(LOG_ERR,
 				    "%s: set_if_nd6_flag: "
 				    "ND6_IFF_OVERRIDE_RTADV: %m",
-				    ifname);
+				    ifp->name);
 				return ra;
 			}
 #endif

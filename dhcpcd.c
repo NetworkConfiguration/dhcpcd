@@ -378,7 +378,7 @@ configure_interface1(struct interface *ifp)
 	if (ifo->options & DHCPCD_IPV6RS) {
 		ra_global = if_checkipv6(ifp->ctx, NULL,
 		    ifp->ctx->options & DHCPCD_IPV6RA_OWN ? 1 : 0);
-		ra_iface = if_checkipv6(ifp->ctx, ifp->name,
+		ra_iface = if_checkipv6(ifp->ctx, ifp,
 		    ifp->options->options & DHCPCD_IPV6RA_OWN ? 1 : 0);
 		if (ra_global == -1 || ra_iface == -1)
 			ifo->options &= ~DHCPCD_IPV6RS;

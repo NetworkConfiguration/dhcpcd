@@ -405,7 +405,7 @@ link_route(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
     struct nlmsghdr *nlm)
 {
 	size_t len;
-	unsigned int idx, metric;
+	unsigned int metric;
 	struct rtattr *rta;
 	struct rtmsg *rtm;
 	struct rt rt;
@@ -449,9 +449,8 @@ link_route(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 			    sizeof(rt.gate.s_addr));
 			break;
 		case RTA_OIF:
-			idx = *(unsigned int *)RTA_DATA(rta);
-			if (if_indextoname(idx, ifn))
-				rt.iface = if_find(ctx, ifn);
+			rt.iface = if_findindex(ctx,
+			    *(unsigned int *)RTA_DATA(rta));
 			break;
 		case RTA_PRIORITY:
 			metric = *(unsigned int *)RTA_DATA(rta);
@@ -495,11 +494,11 @@ link_addr(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 		return -1;
 	}
 	ifa = NLMSG_DATA(nlm);
-	if (if_indextoname(ifa->ifa_index, ifn) == NULL)
-		return -1;
-	iface = if_find(ctx, ifn);
-	if (iface == NULL)
+	if (if_findindex(ctx, ifa->ifa_index) == NULL) {
+		/* We don't know about the interface the address is for
+		 * so it's not really an error */
 		return 1;
+	}
 	rta = (struct rtattr *) IFA_RTA(ifa);
 	len = NLMSG_PAYLOAD(nlm, sizeof(*ifa));
 	switch (ifa->ifa_family) {
@@ -1480,7 +1479,7 @@ add_attr_nest_end(struct nlmsghdr *n, struct rtattr *nest)
 }
 
 static int
-if_disable_autolinklocal(struct dhcpcd_ctx *ctx, const char *ifname)
+if_disable_autolinklocal(struct dhcpcd_ctx *ctx, int ifindex)
 {
 	struct nlml nlm;
 	struct rtattr *afs, *afs6;
@@ -1490,7 +1489,7 @@ if_disable_autolinklocal(struct dhcpcd_ctx *ctx, const char *ifname)
 	nlm.hdr.nlmsg_type = RTM_NEWLINK;
 	nlm.hdr.nlmsg_flags = NLM_F_REQUEST;
 	nlm.i.ifi_family = AF_INET6;
-	nlm.i.ifi_index = (int)if_nametoindex(ifname);
+	nlm.i.ifi_index = ifindex;
 	afs = add_attr_nest(&nlm.hdr, sizeof(nlm), IFLA_AF_SPEC);
 	afs6 = add_attr_nest(&nlm.hdr, sizeof(nlm), AF_INET6);
 	add_attr_8(&nlm.hdr, sizeof(nlm), IFLA_INET6_ADDR_GEN_MODE,
@@ -1504,18 +1503,21 @@ if_disable_autolinklocal(struct dhcpcd_ctx *ctx, const char *ifname)
 static const char *prefix = "/proc/sys/net/ipv6/conf";
 
 int
-if_checkipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
+if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 {
+	const char *ifname;
 	int ra;
 	char path[256];
 
-	if (ifname == NULL)
+	if (ifp == NULL)
 		ifname = "all";
 	else if (own) {
-		if (if_disable_autolinklocal(ctx, ifname) == -1)
+		if (if_disable_autolinklocal(ctx, ifp->index) == -1)
 			syslog(LOG_DEBUG, "%s: if_disable_autolinklocal: %m",
 			    ifname);
 	}
+	if (ifp)
+		ifname = ifp->name;
 
 	snprintf(path, sizeof(path), "%s/%s/autoconf", prefix, ifname);
 	ra = check_proc_int(path);
