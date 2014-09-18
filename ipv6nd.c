@@ -287,7 +287,7 @@ ipv6nd_sendrsprobe(void *arg)
 
 	state = RS_STATE(ifp);
 	ctx = ifp->ctx->ipv6;
-	ctx->sndhdr.msg_name = (caddr_t)&dst;
+	ctx->sndhdr.msg_name = (void *)&dst;
 	ctx->sndhdr.msg_iov[0].iov_base = state->rs;
 	ctx->sndhdr.msg_iov[0].iov_len = state->rslen;
 
