@@ -30,7 +30,7 @@
 
 #include <stdint.h>
 
-static void
+inline static void
 be32enc(uint8_t *buf, uint32_t u)
 {
 
@@ -40,7 +40,7 @@ be32enc(uint8_t *buf, uint32_t u)
 	buf[3] = (uint8_t)(u & 0xff);
 }
 
-static void
+inline static void
 be64enc(uint8_t *buf, uint64_t u)
 {
 
@@ -48,21 +48,21 @@ be64enc(uint8_t *buf, uint64_t u)
 	be32enc(buf + sizeof(uint32_t), (uint32_t)(u & 0xffffffffULL));
 }
 
-static uint16_t
+inline static uint16_t
 be16dec(const uint8_t *buf)
 {
 
 	return (uint16_t)(buf[0] << 8 | buf[1]);
 }
 
-static uint32_t
+inline static uint32_t
 be32dec(const uint8_t *buf)
 {
 
 	return (uint32_t)((uint32_t)be16dec(buf) << 16 | be16dec(buf + 2));
 }
 
-static uint64_t
+inline static uint64_t
 be64dec(const uint8_t *buf)
 {
 
