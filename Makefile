@@ -135,7 +135,7 @@ clean:
 	for x in ${SUBDIRS} test; do cd $$x; ${MAKE} $@; cd ..; done
 
 distclean: clean
-	rm -f .depend config.h config.mk
+	rm -f .depend config.h config.mk config.log
 
 dist:
 	fossil tarball --name ${DISTPREFIX} ${FOSSILID} ${DISTFILEGZ}
