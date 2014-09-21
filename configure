@@ -271,24 +271,6 @@ if ! type "$CC" >/dev/null 2>&1; then
 	done
 fi
 
-echo "Using compiler .. $CC"
-cat <<EOF >_test.c
-int main(void) {
-	return 0;
-}
-EOF
-_CC=false
-if $CC _test.c -o _test >/dev/null 2>&1; then
-	[ -x _test ] && _CC=true
-fi
-rm -f _test.c _test
-if ! $_CC; then
-	echo "$CC does not create executables"
-	exit 1
-fi
-[ "$CC" != cc ] && echo "CC=	$CC" >>$CONFIG_MK
-$CC --version | $SED -e '1!d'
-
 # Set to blank, then append user config
 # We do this so our SED call to append to XCC remains portable
 if [ -n "$CFLAGS" ]; then
@@ -417,9 +399,28 @@ if [ -z "$INET6" -o "$INET6" = yes ]; then
 	echo "DHCPCD_SRCS+=	ipv6.c ipv6nd.c dhcp6.c" >>$CONFIG_MK
 fi
 
+echo "Using compiler .. $CC"
 # Add CPPFLAGS and CFLAGS to CC for testing features
 XCC="$CC `$SED -n -e 's/CPPFLAGS+=*\(.*\)/\1/p' $CONFIG_MK`"
 XCC="$XCC `$SED -n -e 's/CFLAGS+=*\(.*\)/\1/p' $CONFIG_MK`"
+
+# Now test we can use the compiler with our CFLAGS
+cat <<EOF >_test.c
+int main(void) {
+	return 0;
+}
+EOF
+_CC=false
+if $CC _test.c -o _test >/dev/null 2>&1; then
+	[ -x _test ] && _CC=true
+fi
+rm -f _test.c _test
+if ! $_CC; then
+	echo "$CC does not create executables"
+	exit 1
+fi
+[ "$CC" != cc ] && echo "CC=	$CC" >>$CONFIG_MK
+$CC --version | $SED -e '1!d'
 
 if [ "$OS" = linux ]; then
 	printf "Testing for nl80211 ... "
