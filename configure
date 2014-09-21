@@ -15,8 +15,8 @@ STRLCPY=
 UDEV=
 OS=
 BUILD=
+BUILDCC=
 HOST=
-HOSTCC=
 TARGET=
 DEBUG=
 FORK=
@@ -244,14 +244,16 @@ echo "LIBDIR=		$LIBDIR" >>$CONFIG_MK
 echo "MANDIR=		$MANDIR" >>$CONFIG_MK
 
 # Always obey CC.
+# However, if CC is not specified and we are given GNU style
+# --host or --build targets the expectation is we try and match that
+# to a compiler.
 if [ -n "$CC" ]; then
 	HOSTCC=
 else
 	CC=cc
 	_COMPILERS="cc clang gcc pcc icc"
 fi
-# Only look for a cross compiler if --host and --build are not the same
-if [ -n "$HOSTCC" -a "$BUILD" != "$$HOST" ]; then
+if [ -n "$HOSTCC" ]; then
 	for _CC in $_COMPILERS; do
 		_CC=$(_which "$HOSTCC$_CC")
 		if [ -x "$_CC" ]; then
