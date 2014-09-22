@@ -1097,7 +1097,8 @@ find_route6(struct rt6_head *rts, const struct rt6 *r)
 	TAILQ_FOREACH(rt, rts, next) {
 		if (IN6_ARE_ADDR_EQUAL(&rt->dest, &r->dest) &&
 #if HAVE_ROUTE_METRIC
-		    rt->iface->metric == r->iface->metric &&
+		    (r->iface == NULL || rt->iface == NULL ||
+		    rt->iface->metric == r->iface->metric)
 #endif
 		    IN6_ARE_ADDR_EQUAL(&rt->net, &r->net))
 			return rt;
@@ -1110,8 +1111,9 @@ desc_route(const char *cmd, const struct rt6 *rt)
 {
 	char destbuf[INET6_ADDRSTRLEN];
 	char gatebuf[INET6_ADDRSTRLEN];
-	const char *ifname = rt->iface->name, *dest, *gate;
+	const char *ifname, *dest, *gate;
 
+	ifname = rt->iface ? rt->iface->name : "(no iface)";
 	dest = inet_ntop(AF_INET6, &rt->dest, destbuf, INET6_ADDRSTRLEN);
 	gate = inet_ntop(AF_INET6, &rt->gate, gatebuf, INET6_ADDRSTRLEN);
 	if (IN6_ARE_ADDR_EQUAL(&rt->gate, &in6addr_any))
@@ -1125,6 +1127,22 @@ desc_route(const char *cmd, const struct rt6 *rt)
 		syslog(LOG_INFO, "%s: %s%s route to %s/%d via %s", ifname, cmd,
 		    rt->flags & RTF_REJECT ? " reject" : "",
 		    dest, ipv6_prefixlen(&rt->net), gate);
+}
+
+/* If something other than dhcpcd removes a route,
+ * we need to remove it from our internal table. */
+int
+ipv6_routedeleted(struct dhcpcd_ctx *ctx, const struct rt6 *rt)
+{
+	struct rt6 *f;
+
+	f = find_route6(ctx->ipv6->routes, rt);
+	if (f == NULL)
+		return 0;
+	desc_route("removing", f);
+	TAILQ_REMOVE(ctx->ipv6->routes, f, next);
+	free(f);
+	return 1;
 }
 
 #define n_route(a)	 nc_route(1, a, a)
