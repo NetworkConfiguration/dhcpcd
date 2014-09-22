@@ -1103,7 +1103,7 @@ find_route6(struct rt6_head *rts, const struct rt6 *r)
 		if (IN6_ARE_ADDR_EQUAL(&rt->dest, &r->dest) &&
 #if HAVE_ROUTE_METRIC
 		    (r->iface == NULL || rt->iface == NULL ||
-		    rt->iface->metric == r->iface->metric)
+		    rt->iface->metric == r->iface->metric) &&
 #endif
 		    IN6_ARE_ADDR_EQUAL(&rt->net, &r->net))
 			return rt;
