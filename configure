@@ -971,8 +971,10 @@ fi
 
 if [ "$DEV" != no -a "$UDEV" != no ]; then
 	printf "Checking for libudev ... "
-	LIBUDEV_CFLAGS=$(pkg-config --cflags libudev 2>&3)
-	LIBUDEV_LIBS=$(pkg-config --libs libudev 2>&3)
+	if type pkg-config >/dev/null 2>&1; then
+		LIBUDEV_CFLAGS=$(pkg-config --cflags libudev 2>&3)
+		LIBUDEV_LIBS=$(pkg-config --libs libudev 2>&3)
+	fi
 fi
 if [ "$DEV" != no -a "$UDEV" != no -a -n "$LIBUDEV_LIBS" ]; then
 	echo "yes"
