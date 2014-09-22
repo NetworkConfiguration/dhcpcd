@@ -996,6 +996,11 @@ ipv6_start(struct interface *ifp)
 	const struct ipv6_state *state;
 	const struct ipv6_addr *ap;
 
+	/* We can't assign a link-locak address to this,
+	 * the ppp process has to. */
+	if (ifp->flags & IFF_POINTOPOINT)
+		return 0;
+
 	state = IPV6_CSTATE(ifp);
 	if (state) {
 		TAILQ_FOREACH(ap, &state->addrs, next) {
