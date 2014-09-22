@@ -898,9 +898,8 @@ static int
 nla_put_string(struct nlmsghdr *n, unsigned short maxlen,
     unsigned short type, const char *data)
 {
-	unsigned short len;
 	struct nlattr *nla;
-	size_t sl;
+	size_t len, sl;
 
 	sl = strlen(data) + 1;
 	len = NLA_ALIGN(NLA_HDRLEN + sl);
@@ -911,9 +910,9 @@ nla_put_string(struct nlmsghdr *n, unsigned short maxlen,
 
 	nla = (struct nlattr *)NLMSG_TAIL(n);
 	nla->nla_type = type;
-	nla->nla_len = len;
+	nla->nla_len = (unsigned short)len;
 	memcpy(NLA_DATA(nla), data, sl);
-	n->nlmsg_len = NLMSG_ALIGN(n->nlmsg_len) + len;
+	n->nlmsg_len = NLMSG_ALIGN(n->nlmsg_len) + (unsigned short)len;
 	return 0;
 }
 
@@ -925,7 +924,7 @@ gnl_parse(struct nlmsghdr *nlm, struct nlattr *tb[], int maxtype)
 	size_t len, rem;
 	int type;
 
-	memset(tb, 0, sizeof(*tb) * (maxtype + 1));
+	memset(tb, 0, sizeof(*tb) * ((unsigned int)maxtype + 1));
 	ghdr = NLMSG_DATA(nlm);
 	head = (struct nlattr *)((char *) ghdr + GENL_HDRLEN);
 	len = nlm->nlmsg_len - GENL_HDRLEN - NLMSG_HDRLEN;
@@ -999,7 +998,7 @@ _if_getssid(__unused struct dhcpcd_ctx *ctx, struct interface *ifp,
 
 out:
 	ifp->ssid[ifp->ssid_len] = '\0';
-	return ifp->ssid_len;
+	return (int)ifp->ssid_len;
 }
 
 static int
@@ -1014,7 +1013,7 @@ if_getssid_nl80211(struct interface *ifp)
 		return -1;
 	memset(&nlm, 0, sizeof(nlm));
 	nlm.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct genlmsghdr));
-	nlm.hdr.nlmsg_type = family;
+	nlm.hdr.nlmsg_type = (unsigned short)family;
 	nlm.hdr.nlmsg_flags = NLM_F_REQUEST;
 	nlm.ghdr.cmd = NL80211_CMD_GET_INTERFACE;
 	nla_put_32(&nlm.hdr, sizeof(nlm), NL80211_ATTR_IFINDEX, ifp->index);
@@ -1031,7 +1030,7 @@ if_getssid(struct interface *ifp)
 
 	r = if_getssid_wext(ifp->name, ifp->ssid);
 	if (r != -1)
-		ifp->ssid_len = r;
+		ifp->ssid_len = (unsigned int)r;
 #ifdef HAVE_NL80211_H
 	else if (r == -1)
 		r = if_getssid_nl80211(ifp);
@@ -1545,7 +1544,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 	if (ifp == NULL)
 		ifname = "all";
 	else if (own) {
-		if (if_disable_autolinklocal(ctx, ifp->index) == -1)
+		if (if_disable_autolinklocal(ctx, (int)ifp->index) == -1)
 			syslog(LOG_DEBUG, "%s: if_disable_autolinklocal: %m",
 			    ifp->name);
 	}
