@@ -1055,7 +1055,7 @@ handle_signal(int sig, siginfo_t *siginfo, __unused void *context)
 }
 
 static int
-signal_init(void (*func)(int, siginfo_t *, void *), sigset_t *oldset)
+signal_init(sigset_t *oldset)
 {
 	unsigned int i;
 	struct sigaction sa;
@@ -1066,7 +1066,7 @@ signal_init(void (*func)(int, siginfo_t *, void *), sigset_t *oldset)
 		return -1;
 
 	memset(&sa, 0, sizeof(sa));
-	sa.sa_sigaction = func;
+	sa.sa_sigaction = handle_signal;
 	sa.sa_flags = SA_SIGINFO;
 	sigemptyset(&sa.sa_mask);
 
@@ -1603,7 +1603,7 @@ main(int argc, char **argv)
 	ctx.options |= DHCPCD_STARTED;
 #ifdef USE_SIGNALS
 	/* Save signal mask, block and redirect signals to our handler */
-	if (signal_init(handle_signal, &ctx.sigset) == -1) {
+	if (signal_init(&ctx.sigset) == -1) {
 		syslog(LOG_ERR, "signal_setup: %m");
 		goto exit_failure;
 	}
