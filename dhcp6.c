@@ -2058,7 +2058,9 @@ dhcp6_readlease(struct interface *ifp)
 	if (fd == -1)
 		goto ex;
 
-	if (state->expire != ND6_INFINITE_LIFETIME) {
+	if (!(ifp->options->options & DHCPCD_DUMPLEASE) &&
+	    state->expire != ND6_INFINITE_LIFETIME)
+	{
 		gettimeofday(&now, NULL);
 		if ((time_t)state->expire < now.tv_sec - st.st_mtime) {
 			syslog(LOG_DEBUG,"%s: discarding expired lease",
