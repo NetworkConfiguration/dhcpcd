@@ -1491,7 +1491,7 @@ dhcp6_startexpire(void *arg)
 	dhcp6_freedrop_addrs(ifp, 1, NULL);
 	dhcp6_delete_delegates(ifp);
 	script_runreason(ifp, "EXPIRE6");
-	if (ipv6nd_hasradhcp(ifp))
+	if (ipv6nd_hasradhcp(ifp) || dhcp6_hasprefixdelegation(ifp))
 		dhcp6_startdiscover(ifp);
 	else
 		syslog(LOG_WARNING,
@@ -2789,13 +2789,13 @@ recv:
 		if (state->renew == 0) {
 			if (state->expire == ND6_INFINITE_LIFETIME)
 				state->renew = ND6_INFINITE_LIFETIME;
-			else
+			else if (state->lowpl != ND6_INFINITE_LIFETIME)
 				state->renew = (uint32_t)(state->lowpl * 0.5);
 		}
 		if (state->rebind == 0) {
 			if (state->expire == ND6_INFINITE_LIFETIME)
 				state->rebind = ND6_INFINITE_LIFETIME;
-			else
+			else if (state->lowpl != ND6_INFINITE_LIFETIME)
 				state->rebind = (uint32_t)(state->lowpl * 0.8);
 		}
 		break;
@@ -2829,7 +2829,7 @@ recv:
 		if (state->rebind && state->rebind != ND6_INFINITE_LIFETIME)
 			eloop_timeout_add_sec(ifp->ctx->eloop,
 			    (time_t)state->rebind, dhcp6_startrebind, ifp);
-		if (state->expire && state->expire != ND6_INFINITE_LIFETIME)
+		if (state->expire != ND6_INFINITE_LIFETIME)
 			eloop_timeout_add_sec(ifp->ctx->eloop,
 			    (time_t)state->expire, dhcp6_startexpire, ifp);
 
@@ -2845,6 +2845,9 @@ recv:
 			    "%s: renew in %"PRIu32" seconds,"
 			    " rebind in %"PRIu32" seconds",
 			    ifp->name, state->renew, state->rebind);
+		else if (state->expire == 0)
+			syslog(has_new ? LOG_INFO : LOG_DEBUG,
+			    "%s: will expire", ifp->name);
 		ipv6_buildroutes(ifp->ctx);
 		dhcp6_writelease(ifp);
 
