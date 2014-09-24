@@ -2058,7 +2058,7 @@ dhcp6_readlease(struct interface *ifp)
 	if (fd == -1)
 		goto ex;
 
-	if (!(ifp->options->options & DHCPCD_DUMPLEASE) &&
+	if (!(ifp->ctx->options & DHCPCD_DUMPLEASE) &&
 	    state->expire != ND6_INFINITE_LIFETIME)
 	{
 		gettimeofday(&now, NULL);
