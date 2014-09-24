@@ -1168,7 +1168,7 @@ dhcp6_dadcompleted(const struct interface *ifp)
 	TAILQ_FOREACH(ap, &state->addrs, next) {
 		if (ap->flags & IPV6_AF_ADDED &&
 		    !(ap->flags & IPV6_AF_DADCOMPLETED))
-		    	return 0;
+			return 0;
 	}
 	return 1;
 }
