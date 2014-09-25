@@ -1201,7 +1201,7 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 	struct dhcp_opt *opt, *vo;
 	size_t e, i, pl;
 	char **ep;
-	char cidr[4];
+	char cidr[4], safe[(BOOTFILE_LEN * 4) + 1];
 	uint8_t overl = 0;
 	uint32_t en;
 
@@ -1268,11 +1268,16 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 		setvar(&ep, prefix, "network_number", inet_ntoa(addr));
 	}
 
-	if (*dhcp->bootfile && !(overl & 1))
-		setvar(&ep, prefix, "filename", (const char *)dhcp->bootfile);
-	if (*dhcp->servername && !(overl & 2))
-		setvar(&ep, prefix, "server_name",
-		    (const char *)dhcp->servername);
+	if (*dhcp->bootfile && !(overl & 1)) {
+		print_string(safe, sizeof(safe),
+		    dhcp->bootfile, sizeof(dhcp->bootfile));
+		setvar(&ep, prefix, "filename", safe);
+	}
+	if (*dhcp->servername && !(overl & 2)) {
+		print_string(safe, sizeof(safe),
+		    dhcp->servername, sizeof(dhcp->servername));
+		setvar(&ep, prefix, "server_name", safe);
+	}
 
 	/* Zero our indexes */
 	if (env) {
@@ -2181,7 +2186,7 @@ log_dhcp1(int lvl, const char *msg,
     const struct in_addr *from, int ad)
 {
 	const char *tfrom;
-	char *a;
+	char *a,  sname[sizeof(dhcp->servername) * 4];
 	struct in_addr addr;
 	int r;
 
@@ -2200,12 +2205,14 @@ log_dhcp1(int lvl, const char *msg,
 	tfrom = "from";
 	r = get_option_addr(iface->ctx, &addr, dhcp, DHO_SERVERID);
 	if (dhcp->servername[0] && r == 0) {
+		print_string(sname, sizeof(sname),
+		    dhcp->servername, strlen((const char *)dhcp->servername));
 		if (a == NULL)
 			syslog(lvl, "%s: %s %s %s `%s'", iface->name, msg,
-			    tfrom, inet_ntoa(addr), dhcp->servername);
+			    tfrom, inet_ntoa(addr), sname);
 		else
 			syslog(lvl, "%s: %s %s %s %s `%s'", iface->name, msg, a,
-			    tfrom, inet_ntoa(addr), dhcp->servername);
+			    tfrom, inet_ntoa(addr), sname);
 	} else {
 		if (r != 0) {
 			tfrom = "via";
