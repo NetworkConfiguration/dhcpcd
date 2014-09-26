@@ -2218,6 +2218,39 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 }
 
 static void
+dhcp6_script_try_run(struct interface *ifp)
+{
+	struct dhcp6_state *state;
+	struct ipv6_addr *ap;
+	int completed;
+
+	state = D6_STATE(ifp);
+	if (!TAILQ_FIRST(&state->addrs))
+		return;
+
+	completed = 1;
+	/* If all addresses have completed DAD run the script */
+	TAILQ_FOREACH(ap, &state->addrs, next) {
+		if (ap->flags & IPV6_AF_ONLINK) {
+			if (!(ap->flags & IPV6_AF_DADCOMPLETED) &&
+			    ipv6_findaddr(ap->iface, &ap->addr))
+				ap->flags |= IPV6_AF_DADCOMPLETED;
+			if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0) {
+				completed = 0;
+				break;
+			}
+		}
+	}
+	if (completed) {
+		script_runreason(ifp, state->reason);
+		dhcpcd_daemonise(ifp->ctx);
+	} else
+		syslog(LOG_DEBUG,
+		    "%s: waiting for DHCPv6 DAD to complete",
+		    ifp->name);
+}
+
+static void
 dhcp6_delegate_prefix(struct interface *ifp)
 {
 	struct if_options *ifo;
@@ -2316,6 +2349,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 		if (k && !carrier_warned) {
 			ifd_state = D6_STATE(ifd);
 			ipv6_addaddrs(&ifd_state->addrs);
+			dhcp6_script_try_run(ifd);
 		}
 	}
 }
@@ -2380,6 +2414,7 @@ dhcp6_find_delegates(struct interface *ifp)
 		state->state = DH6S_DELEGATED;
 		ipv6_addaddrs(&state->addrs);
 		ipv6_buildroutes(ifp->ctx);
+		dhcp6_script_try_run(ifp);
 	}
 	return k;
 }
@@ -2850,27 +2885,7 @@ recv:
 			    "%s: will expire", ifp->name);
 		ipv6_buildroutes(ifp->ctx);
 		dhcp6_writelease(ifp);
-
-		len = 1;
-		/* If all addresses have completed DAD run the script */
-		TAILQ_FOREACH(ap, &state->addrs, next) {
-			if (ap->flags & IPV6_AF_ONLINK) {
-				if (!(ap->flags & IPV6_AF_DADCOMPLETED) &&
-				    ipv6_findaddr(ap->iface, &ap->addr))
-					ap->flags |= IPV6_AF_DADCOMPLETED;
-				if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0) {
-					len = 0;
-					break;
-				}
-			}
-		}
-		if (len) {
-			script_runreason(ifp, state->reason);
-			dhcpcd_daemonise(ifp->ctx);
-		} else
-			syslog(LOG_DEBUG,
-			    "%s: waiting for DHCPv6 DAD to complete",
-			    ifp->name);
+		dhcp6_script_try_run(ifp);
 	}
 
 	if (ifp->ctx->options & DHCPCD_TEST ||
