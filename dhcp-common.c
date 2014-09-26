@@ -331,7 +331,7 @@ print_string(char *s, size_t len, const uint8_t *data, size_t dl)
 		}
 		ve = svis(v, c, VIS_CSTYLE | VIS_OCTAL,
 		    data <= e ? *data : 0, ESCAPE_CHARS);
-		if (len < (size_t)(ve - v) + 1) {
+		if (s && len < (size_t)(ve - v) + 1) {
 			errno = ENOBUFS;
 			return -1;
 		}
