@@ -36,6 +36,11 @@
 #include <unistd.h>
 
 #include "config.h"
+
+#ifdef HAVE_VIS_H
+#include <vis.h>
+#endif
+
 #include "common.h"
 #include "dhcp-common.h"
 #include "dhcp.h"
@@ -291,14 +296,28 @@ decode_rfc3397(char *out, size_t len, const uint8_t *p, size_t pl)
 	return (ssize_t)count;
 }
 
+/*
+ * Escape these characters to avoid any nastiness passing to a POSIX shell.
+ * See IEEE Std 1003.1, 2004 Shell Command Language, 2.2 Quoting
+ * space is not escaped.
+ */
+#define ESCAPE_CHARS	"|&;<>()$`\\\"'\t\n"
+
+/*
+ * Prints a chunk of data to a string.
+ * Escapes some characters defnined above to try and avoid any loopholes
+ * in the shell we're passing to.
+ * Any non visible characters are escaped as an octal number.
+ */
 ssize_t
 print_string(char *s, size_t len, const uint8_t *data, size_t dl)
 {
 	uint8_t c;
 	const uint8_t *e, *p;
-	ssize_t bytes = 0;
-	ssize_t r;
+	size_t bytes;
+	char v[5], *vp, *ve;
 
+	bytes = 0;
 	e = data + dl;
 	while (data < e) {
 		c = *data++;
@@ -310,51 +329,25 @@ print_string(char *s, size_t len, const uint8_t *data, size_t dl)
 			if (p == e)
 				break;
 		}
-		if (!isascii(c) || !isprint(c)) {
-			if (s) {
-				if (len < 5) {
-					errno = ENOBUFS;
-					return -1;
-				}
-				r = snprintf(s, len, "\\%03o", c);
-				len -= (size_t)r;
-				bytes += r;
-				s += r;
-			} else
-				bytes += 4;
-			continue;
+		ve = svis(v, c, VIS_CSTYLE | VIS_OCTAL,
+		    data <= e ? *data : 0, ESCAPE_CHARS);
+		if (len < (size_t)(ve - v) + 1) {
+			errno = ENOBUFS;
+			return -1;
 		}
-		switch (c) {
-		case '"':  /* FALLTHROUGH */
-		case '\'': /* FALLTHROUGH */
-		case '$':  /* FALLTHROUGH */
-		case '`':  /* FALLTHROUGH */
-		case '\\': /* FALLTHROUGH */
-		case '|':  /* FALLTHROUGH */
-		case '&':
-			if (s) {
-				if (len < 3) {
-					errno = ENOBUFS;
-					return -1;
-				}
-				*s++ = '\\';
-				len--;
-			}
-			bytes++;
-			break;
-		}
+		bytes += (size_t)(ve - v);
 		if (s) {
-			*s++ = (char)c;
-			len--;
+			vp = v;
+			while (vp != ve)
+				*s++ = *vp++;
 		}
-		bytes++;
 	}
 
 	/* NULL */
 	if (s)
 		*s = '\0';
 	bytes++;
-	return bytes;
+	return (ssize_t)bytes;
 }
 
 #define ADDRSZ		4
