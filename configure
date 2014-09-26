@@ -644,7 +644,7 @@ EOF
 		VIS=no
 	fi
 	echo "$VIS"
-	rm -f _svis.c _svis
+	rm -f _vis.c _vis
 fi
 if [ "$VIS" = no ]; then
 	echo "COMPAT_SRCS+=	compat/vis.c" >>$CONFIG_MK
