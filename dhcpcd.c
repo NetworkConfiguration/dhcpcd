@@ -454,27 +454,23 @@ configure_interface1(struct interface *ifp)
 	}
 
 #ifdef INET6
-	if (ifo->options & DHCPCD_IPV6) {
-		if (ifo->ia == NULL) {
-			ifo->ia = malloc(sizeof(*ifo->ia));
-			if (ifo->ia == NULL)
-				syslog(LOG_ERR, "%s: %m", __func__);
-			else {
-				ifo->ia_len = 1;
-				ifo->ia->ia_type = D6_OPTION_IA_NA;
+	if (ifo->ia == NULL && ifo->options & DHCPCD_IPV6) {
+		ifo->ia = malloc(sizeof(*ifo->ia));
+		if (ifo->ia == NULL)
+			syslog(LOG_ERR, "%s: %m", __func__);
+		else {
+			ifo->ia_len = 1;
+			ifo->ia->ia_type = D6_OPTION_IA_NA;
+			memcpy(ifo->ia->iaid, ifo->iaid, sizeof(ifo->iaid));
+			memset(&ifo->ia->addr, 0, sizeof(ifo->ia->addr));
+			ifo->ia->sla = NULL;
+			ifo->ia->sla_len = 0;
+		}
+	} else {
+		for (i = 0; i < ifo->ia_len; i++) {
+			if (!ifo->ia[i].iaid_set)
 				memcpy(ifo->ia->iaid, ifo->iaid,
 				    sizeof(ifo->iaid));
-				memset(&ifo->ia->addr, 0,
-				    sizeof(ifo->ia->addr));
-				ifo->ia->sla = NULL;
-				ifo->ia->sla_len = 0;
-			}
-		} else {
-			for (i = 0; i < ifo->ia_len; i++) {
-				if (!ifo->ia[i].iaid_set)
-					memcpy(ifo->ia->iaid, ifo->iaid,
-					    sizeof(ifo->iaid));
-			}
 		}
 	}
 #endif
