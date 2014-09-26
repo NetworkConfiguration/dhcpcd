@@ -3255,6 +3255,13 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 	char *pfx;
 	uint32_t en;
 	const struct dhcpcd_ctx *ctx;
+	const struct dhcp6_state *state;
+	const struct ipv6_addr *ap;
+	char *v, *val;
+
+	n = 0;
+	if (m == NULL)
+		goto delegated;
 
 	if (len < sizeof(*m)) {
 		/* Should be impossible with guards at packet in
@@ -3263,7 +3270,6 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 		return -1;
 	}
 
-	n = 0;
 	ifo = ifp->options;
 	ctx = ifp->ctx;
 
@@ -3345,6 +3351,35 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 		}
 	}
 	free(pfx);
+
+delegated:
+        /* Needed for Delegated Prefixes */
+	state = D6_CSTATE(ifp);
+	i = 0;
+	TAILQ_FOREACH(ap, &state->addrs, next) {
+		if (ap->delegating_iface) {
+                       	i += strlen(ap->saddr) + 1;
+		}
+	}
+	if (env && i) {
+		i += strlen(prefix) + strlen("_dhcp6_prefix=");
+                v = val = env[n] = malloc(i);
+		if (v == NULL) {
+			syslog(LOG_ERR, "%s: %m", __func__);
+			return -1;
+		}
+		v += snprintf(val, i, "%s_dhcp6_prefix=", prefix);
+		TAILQ_FOREACH(ap, &state->addrs, next) {
+			if (ap->delegating_iface) {
+				strcpy(v, ap->saddr);
+				v += strlen(ap->saddr);
+				*v++ = ' ';
+			}
+		}
+		*--v = '\0';
+        }
+	if (i)
+		n++;
 
 	return (ssize_t)n;
 }
