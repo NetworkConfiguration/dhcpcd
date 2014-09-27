@@ -436,13 +436,18 @@ link_route(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 
 	rta = (struct rtattr *)(void *)((char *)rtm +NLMSG_ALIGN(sizeof(*rtm)));
 	len = NLMSG_PAYLOAD(nlm, sizeof(*rtm));
-	memset(&rt, 0, sizeof(rt));
-	rt.dest.s_addr = INADDR_ANY;
-	rt.net.s_addr = INADDR_ANY;
-	rt.gate.s_addr = INADDR_ANY;
+#ifdef INET
+	if (rtm->rtm_family == AF_INET)
+		memset(&rt, 0, sizeof(rt));
+#endif
+#ifdef INET6
+	if (rtm->rtm_family == AF_INET6)
+		memset(&rt6, 0, sizeof(rt6));
+#endif
 	metric = 0;
 	while (RTA_OK(rta, len)) {
 		switch (rtm->rtm_family) {
+#ifdef INET
 		case AF_INET:
 			switch (rta->rta_type) {
 			case RTA_DST:
@@ -459,6 +464,8 @@ link_route(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 				break;
 			}
 			break;
+#endif
+#ifdef INET6
 		case AF_INET6:
 			switch (rta->rta_type) {
 			case RTA_DST:
@@ -475,6 +482,7 @@ link_route(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 				break;
 			}
 			break;
+#endif
 		}
 		switch (rta->rta_type) {
 		case RTA_PRIORITY:
