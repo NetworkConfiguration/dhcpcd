@@ -66,7 +66,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "vis.h"
+#include "svis.h"
 
 #undef BELL
 #define BELL '\a'

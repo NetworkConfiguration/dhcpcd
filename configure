@@ -71,7 +71,7 @@ for x do
 	--without-md5) MD5=no;;
 	--without-sha2) SHA2=no;;
 	--without-sha256) SHA2=no;;
-	--without-vis) VIS=no;;
+	--without-svis) SVIS=no;;
 	--without-dev) DEV=no;;
 	--without-udev) UDEV=no;;
 	--serviceexists) SERVICEEXISTS=$var;;
@@ -628,9 +628,9 @@ if [ "$STRLCPY" = no ]; then
 	echo "#include		\"compat/strlcpy.h\"" >>$CONFIG_H
 fi
 
-if [ -z "$VIS" ]; then
-	printf "Testing for vis ... "
-	cat <<EOF >_vis.c
+if [ -z "$SVIS" ]; then
+	printf "Testing for svis ... "
+	cat <<EOF >_svis.c
 #include <vis.h>
 int main(void) {
 	char s[10];
@@ -638,17 +638,17 @@ int main(void) {
 	return 0;
 }
 EOF
-	if $XCC _vis.c -o _vis 2>&3; then
-		VIS=yes
+	if $XCC _svis.c -o _svis 2>&3; then
+		SVIS=yes
 	else
-		VIS=no
+		SVIS=no
 	fi
-	echo "$VIS"
-	rm -f _vis.c _vis
+	echo "$SVIS"
+	rm -f _svis.c _svis
 fi
-if [ "$VIS" = no ]; then
-	echo "COMPAT_SRCS+=	compat/vis.c" >>$CONFIG_MK
-	echo "#include		\"compat/vis.h\"" >>$CONFIG_H
+if [ "$SVIS" = no ]; then
+	echo "COMPAT_SRCS+=	compat/svis.c" >>$CONFIG_MK
+	echo "#include		\"compat/svis.h\"" >>$CONFIG_H
 else
 	echo "#define HAVE_VIS_H" >>$CONFIG_H
 fi
