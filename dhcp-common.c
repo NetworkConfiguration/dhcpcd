@@ -302,6 +302,7 @@ decode_rfc3397(char *out, size_t len, const uint8_t *p, size_t pl)
  * space is not escaped.
  */
 #define ESCAPE_CHARS	"|&;<>()$`\\\"'\t\n"
+#define ESCAPE_EXTRA	"*?[#~=%"
 
 /*
  * Prints a chunk of data to a string.
@@ -331,7 +332,7 @@ print_string(char *s, size_t len, int flags, const uint8_t *data, size_t dl)
 		}
 		if (flags)
 			ve = svis(v, c, VIS_CSTYLE | VIS_OCTAL,
-			    data <= e ? *data : 0, ESCAPE_CHARS);
+			    data <= e ? *data : 0, ESCAPE_CHARS ESCAPE_GLOB);
 		else
 			ve = vis(v, c, VIS_CSTYLE | VIS_OCTAL,
 			    data <= e ? *data : 0);
