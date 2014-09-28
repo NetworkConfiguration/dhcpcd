@@ -93,7 +93,7 @@ int make_option_mask(const struct dhcp_opt *, size_t,
 
 size_t encode_rfc1035(const char *src, uint8_t *dst);
 ssize_t decode_rfc3397(char *, size_t, const uint8_t *, size_t);
-ssize_t print_string(char *, size_t, const uint8_t *, size_t);
+ssize_t print_string(char *, size_t, int, const uint8_t *, size_t);
 ssize_t print_option(char *, size_t, int, const uint8_t *, size_t,
     const char *);
 

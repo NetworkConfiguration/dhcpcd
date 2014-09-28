@@ -158,3 +158,10 @@ svis(char *dst, int c, int flag, int nextc, const char *extra)
 	}
 	return dst;
 }
+
+char *
+vis(char *dst, int c, int flag, int nextc)
+{
+
+	return svis(dst, c, flag, nextc, "");
+}

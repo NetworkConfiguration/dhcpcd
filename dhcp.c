@@ -1269,12 +1269,12 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 	}
 
 	if (*dhcp->bootfile && !(overl & 1)) {
-		print_string(safe, sizeof(safe),
+		print_string(safe, sizeof(safe), 1,
 		    dhcp->bootfile, sizeof(dhcp->bootfile));
 		setvar(&ep, prefix, "filename", safe);
 	}
 	if (*dhcp->servername && !(overl & 2)) {
-		print_string(safe, sizeof(safe),
+		print_string(safe, sizeof(safe), 1,
 		    dhcp->servername, sizeof(dhcp->servername));
 		setvar(&ep, prefix, "server_name", safe);
 	}
@@ -2190,9 +2190,25 @@ log_dhcp1(int lvl, const char *msg,
 	struct in_addr addr;
 	int r;
 
-	if (strcmp(msg, "NAK:") == 0)
+	if (strcmp(msg, "NAK:") == 0) {
 		a = get_option_string(iface->ctx, dhcp, DHO_MESSAGE);
-	else if (ad && dhcp->yiaddr != 0) {
+		if (a) {
+			char *tmp;
+			size_t al, tmpl;
+
+			al = strlen(a);
+			tmpl = (al * 4) + 1;
+			tmp = malloc(tmpl);
+			if (tmp == NULL) {
+				syslog(LOG_ERR, "%s: %m", __func__);
+				free(a);
+				return;
+			}
+			print_string(tmp, tmpl, 0, (uint8_t *)a, al);
+			free(a);
+			a = tmp;
+		}
+	} else if (ad && dhcp->yiaddr != 0) {
 		addr.s_addr = dhcp->yiaddr;
 		a = strdup(inet_ntoa(addr));
 		if (a == NULL) {
@@ -2205,7 +2221,7 @@ log_dhcp1(int lvl, const char *msg,
 	tfrom = "from";
 	r = get_option_addr(iface->ctx, &addr, dhcp, DHO_SERVERID);
 	if (dhcp->servername[0] && r == 0) {
-		print_string(sname, sizeof(sname),
+		print_string(sname, sizeof(sname), 0,
 		    dhcp->servername, strlen((const char *)dhcp->servername));
 		if (a == NULL)
 			syslog(lvl, "%s: %s %s %s `%s'", iface->name, msg,

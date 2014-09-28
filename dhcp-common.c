@@ -310,7 +310,7 @@ decode_rfc3397(char *out, size_t len, const uint8_t *p, size_t pl)
  * Any non visible characters are escaped as an octal number.
  */
 ssize_t
-print_string(char *s, size_t len, const uint8_t *data, size_t dl)
+print_string(char *s, size_t len, int flags, const uint8_t *data, size_t dl)
 {
 	uint8_t c;
 	const uint8_t *e, *p;
@@ -329,8 +329,12 @@ print_string(char *s, size_t len, const uint8_t *data, size_t dl)
 			if (p == e)
 				break;
 		}
-		ve = svis(v, c, VIS_CSTYLE | VIS_OCTAL,
-		    data <= e ? *data : 0, ESCAPE_CHARS);
+		if (flags)
+			ve = svis(v, c, VIS_CSTYLE | VIS_OCTAL,
+			    data <= e ? *data : 0, ESCAPE_CHARS);
+		else
+			ve = vis(v, c, VIS_CSTYLE | VIS_OCTAL,
+			    data <= e ? *data : 0);
 		if (s && len < (size_t)(ve - v) + 1) {
 			errno = ENOBUFS;
 			return -1;
@@ -426,7 +430,7 @@ print_option(char *s, size_t len, int type, const uint8_t *data, size_t dl,
 		if (tmp == NULL)
 			return -1;
 		decode_rfc3397(tmp, l, data, dl);
-		sl = print_string(s, len, (uint8_t *)tmp, l - 1);
+		sl = print_string(s, len, 1, (uint8_t *)tmp, l - 1);
 		free(tmp);
 		return sl;
 	}
@@ -436,7 +440,7 @@ print_option(char *s, size_t len, int type, const uint8_t *data, size_t dl,
 		if ((tmp = decode_rfc3361(data, dl)) == NULL)
 			return -1;
 		l = strlen(tmp);
-		sl = print_string(s, len, (uint8_t *)tmp, l);
+		sl = print_string(s, len, 1, (uint8_t *)tmp, l);
 		free(tmp);
 		return sl;
 	}
@@ -452,7 +456,7 @@ print_option(char *s, size_t len, int type, const uint8_t *data, size_t dl,
 		/* Some DHCP servers return NULL strings */
 		if (*data == '\0')
 			return 0;
-		return print_string(s, len, data, dl);
+		return print_string(s, len, 1, data, dl);
 	}
 
 	if (type & FLAG) {

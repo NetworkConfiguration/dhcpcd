@@ -490,7 +490,9 @@ dhcpcd_selectprofile(struct interface *ifp, const char *profile)
 
 	if (ifp->ssid_len) {
 		ssize_t r;
-		r =print_string(pssid, sizeof(pssid), ifp->ssid, ifp->ssid_len);
+
+		r = print_string(pssid, sizeof(pssid), 0,
+		    ifp->ssid, ifp->ssid_len);
 		if (r == -1) {
 			syslog(LOG_ERR, "%s: %s: %m", ifp->name, __func__);
 			pssid[0] = '\0';
