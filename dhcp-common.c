@@ -332,7 +332,7 @@ print_string(char *s, size_t len, int flags, const uint8_t *data, size_t dl)
 		}
 		if (flags)
 			ve = svis(v, c, VIS_CSTYLE | VIS_OCTAL,
-			    data <= e ? *data : 0, ESCAPE_CHARS ESCAPE_GLOB);
+			    data <= e ? *data : 0, ESCAPE_CHARS ESCAPE_EXTRA);
 		else
 			ve = vis(v, c, VIS_CSTYLE | VIS_OCTAL,
 			    data <= e ? *data : 0);
