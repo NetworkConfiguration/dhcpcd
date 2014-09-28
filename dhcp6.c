@@ -433,7 +433,7 @@ dhcp6_makemessage(struct interface *ifp)
 	const struct dhcp6_option *si, *unicast;
 	size_t l, n, len, ml, auth_len;
 	uint8_t u8, type;
-	uint16_t *u16, n_options;
+	uint16_t u16, n_options;
 	struct if_options *ifo;
 	const struct dhcp_opt *opt, *opt2;
 	uint8_t IA, *p;
@@ -493,7 +493,7 @@ dhcp6_makemessage(struct interface *ifp)
 			    has_option_mask(ifo->requestmask6, opt->option)))
 			{
 				n_options++;
-				len += sizeof(*u16);
+				len += sizeof(u16);
 			}
 		}
 		for (l = 0, opt = ifo->dhcp6_override;
@@ -505,12 +505,12 @@ dhcp6_makemessage(struct interface *ifp)
 			    has_option_mask(ifo->requestmask6, opt->option)))
 			{
 				n_options++;
-				len += sizeof(*u16);
+				len += sizeof(u16);
 			}
 		}
 		if (dhcp6_findselfsla(ifp, NULL)) {
 			n_options++;
-			len += sizeof(*u16);
+			len += sizeof(u16);
 		}
 		if (len)
 			len += sizeof(*o);
@@ -804,7 +804,7 @@ dhcp6_makemessage(struct interface *ifp)
 			o = D6_NEXT_OPTION(o);
 			o->code = htons(D6_OPTION_ORO);
 			o->len = 0;
-			u16 = (uint16_t *)(void *)D6_OPTION_DATA(o);
+			p = D6_OPTION_DATA(o);
 			for (l = 0, opt = ifp->ctx->dhcp6_opts;
 			    l < ifp->ctx->dhcp6_opts_len;
 			    l++, opt++)
@@ -823,8 +823,10 @@ dhcp6_makemessage(struct interface *ifp)
 				    has_option_mask(ifo->requestmask6,
 				        opt->option)))
 				{
-					*u16++ = htons(opt->option);
-					o->len += sizeof(*u16);
+					u16 = htons(opt->option);
+					memcpy(p, &u16, sizeof(u16));
+					p += sizeof(u16);
+					o->len += sizeof(u16);
 				}
 			}
 			for (l = 0, opt = ifo->dhcp6_override;
@@ -836,13 +838,17 @@ dhcp6_makemessage(struct interface *ifp)
 				    has_option_mask(ifo->requestmask6,
 				        opt->option)))
 				{
-					*u16++ = htons(opt->option);
-					o->len += sizeof(*u16);
+					u16 = htons(opt->option);
+					memcpy(p, &u16, sizeof(u16));
+					p += sizeof(u16);
+					o->len += sizeof(u16);
 				}
 			}
 			if (dhcp6_findselfsla(ifp, NULL)) {
-				*u16++ = htons(D6_OPTION_PD_EXCLUDE);
-				o->len += sizeof(*u16);
+				u16 = htons(D6_OPTION_PD_EXCLUDE);
+				memcpy(p, &u16, sizeof(u16));
+				p += sizeof(u16);
+				o->len += sizeof(u16);
 			}
 			o->len = htons(o->len);
 		}
