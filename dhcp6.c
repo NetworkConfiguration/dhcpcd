@@ -847,7 +847,6 @@ dhcp6_makemessage(struct interface *ifp)
 			if (dhcp6_findselfsla(ifp, NULL)) {
 				u16 = htons(D6_OPTION_PD_EXCLUDE);
 				memcpy(p, &u16, sizeof(u16));
-				p += sizeof(u16);
 				o->len += sizeof(u16);
 			}
 			o->len = htons(o->len);
