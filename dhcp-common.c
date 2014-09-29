@@ -336,11 +336,11 @@ print_string(char *s, size_t len, int flags, const uint8_t *data, size_t dl)
 		else
 			ve = vis(v, c, VIS_CSTYLE | VIS_OCTAL,
 			    data <= e ? *data : 0);
-		if (s && len < (size_t)(ve - v) + 1) {
+		bytes += (size_t)(ve - v);
+		if (s && len < bytes + 1) {
 			errno = ENOBUFS;
 			return -1;
 		}
-		bytes += (size_t)(ve - v);
 		if (s) {
 			vp = v;
 			while (vp != ve)
