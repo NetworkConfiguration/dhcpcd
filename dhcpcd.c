@@ -554,10 +554,10 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 		ifp->flags = flags;
 	}
 
-	if (carrier == LINK_UNKNOWN)
-		syslog(LOG_ERR, "%s: carrier_status: %m", ifname);
-	/* IFF_RUNNING is checked, if needed, earlier and is OS dependant */
-	else if (carrier == LINK_DOWN || (ifp->flags & IFF_UP) == 0) {
+	if (carrier == LINK_UNKNOWN) {
+		if (errno != ENOTTY) /* For example a PPP link on BSD */
+			syslog(LOG_ERR, "%s: carrier_status: %m", ifname);
+	} else if (carrier == LINK_DOWN || (ifp->flags & IFF_UP) == 0) {
 		if (ifp->carrier != LINK_DOWN) {
 			if (ifp->carrier == LINK_UP)
 				syslog(LOG_INFO, "%s: carrier lost", ifp->name);
@@ -640,7 +640,6 @@ dhcpcd_startinterface(void *arg)
 	struct if_options *ifo = ifp->options;
 	size_t i;
 	char buf[DUID_LEN * 3];
-	struct timeval tv;
 
 	pre_start(ifp);
 	if (if_up(ifp) == -1)
@@ -655,16 +654,15 @@ link_retry:
 			syslog(LOG_INFO, "%s: waiting for carrier", ifp->name);
 			return;
 		case LINK_UNKNOWN:
-			/* No media state available, so we loop until
-			 * IFF_UP and IFF_RUNNING are set. */
+			/* No media state available.
+			 * Any change on state such as IFF_UP and IFF_RUNNING
+			 * should be reported to us via the route socket
+			 * as we've done the best we can to bring the interface
+			 * up at this point. */
 			ifp->carrier = if_carrier(ifp);
 			if (ifp->carrier != LINK_UNKNOWN)
 				goto link_retry;
 			syslog(LOG_INFO, "%s: unknown carrier", ifp->name);
-			tv.tv_sec = 0;
-			tv.tv_usec = 100;
-			eloop_timeout_add_tv(ifp->ctx->eloop, &tv,
-			    dhcpcd_startinterface, ifp);
 			return;
 		}
 	}
