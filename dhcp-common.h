@@ -62,6 +62,9 @@
 #define INDEX		(1 << 19)
 #define OPTION		(1 << 20)
 
+/* Print string flags */
+#define PS_SHELL	(1 << 0)
+
 struct dhcp_opt {
 	uint32_t option; /* Also used for IANA Enterpise Number */
 	int type;

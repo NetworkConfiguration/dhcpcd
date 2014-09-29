@@ -330,7 +330,7 @@ print_string(char *s, size_t len, int flags, const uint8_t *data, size_t dl)
 			if (p == e)
 				break;
 		}
-		if (flags)
+		if (flags & PS_SHELL)
 			ve = svis(v, c, VIS_CSTYLE | VIS_OCTAL,
 			    data <= e ? *data : 0, ESCAPE_CHARS ESCAPE_EXTRA);
 		else
@@ -431,7 +431,7 @@ print_option(char *s, size_t len, int type, const uint8_t *data, size_t dl,
 		if (tmp == NULL)
 			return -1;
 		decode_rfc3397(tmp, l, data, dl);
-		sl = print_string(s, len, 1, (uint8_t *)tmp, l - 1);
+		sl = print_string(s, len, PS_SHELL, (uint8_t *)tmp, l - 1);
 		free(tmp);
 		return sl;
 	}
@@ -441,7 +441,7 @@ print_option(char *s, size_t len, int type, const uint8_t *data, size_t dl,
 		if ((tmp = decode_rfc3361(data, dl)) == NULL)
 			return -1;
 		l = strlen(tmp);
-		sl = print_string(s, len, 1, (uint8_t *)tmp, l);
+		sl = print_string(s, len, PS_SHELL, (uint8_t *)tmp, l);
 		free(tmp);
 		return sl;
 	}
@@ -457,7 +457,7 @@ print_option(char *s, size_t len, int type, const uint8_t *data, size_t dl,
 		/* Some DHCP servers return NULL strings */
 		if (*data == '\0')
 			return 0;
-		return print_string(s, len, 1, data, dl);
+		return print_string(s, len, PS_SHELL, data, dl);
 	}
 
 	if (type & FLAG) {

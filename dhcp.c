@@ -1269,12 +1269,12 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 	}
 
 	if (*dhcp->bootfile && !(overl & 1)) {
-		print_string(safe, sizeof(safe), 1,
+		print_string(safe, sizeof(safe), PS_SHELL,
 		    dhcp->bootfile, sizeof(dhcp->bootfile));
 		setvar(&ep, prefix, "filename", safe);
 	}
 	if (*dhcp->servername && !(overl & 2)) {
-		print_string(safe, sizeof(safe), 1,
+		print_string(safe, sizeof(safe), PS_SHELL,
 		    dhcp->servername, sizeof(dhcp->servername));
 		setvar(&ep, prefix, "server_name", safe);
 	}

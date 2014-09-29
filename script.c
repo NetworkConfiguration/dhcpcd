@@ -375,27 +375,26 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	}
 	if (ifp->wireless) {
 		const char *pfx;
+		size_t pfx_len;
+		ssize_t psl;
 
 		if (strcmp(reason, "CARRIER") == 0)
 			pfx = "new_ssid=";
 		else if (strcmp(reason, "NOCARRIER") == 0)
 			pfx = "old_ssid=";
-		else	
-			pfx = NULL;
-		if (pfx) {
-			size_t pfx_len;
-			ssize_t psl;
+		else
+			pfx = "if_ssid=";
 
-			pfx_len = strlen(pfx);
-			psl = print_string(NULL, 0, 1,
+		pfx_len = strlen(pfx);
+		psl = print_string(NULL, 0, PS_SHELL,
+		    (const uint8_t *)ifp->ssid, ifp->ssid_len);
+		if (psl != -1) {
+			EMALLOC(elen, pfx_len + (size_t)psl + 1);
+			memcpy(env[elen], pfx, pfx_len);
+			print_string(env[elen] + pfx_len, (size_t)psl,
+			    PS_SHELL,
 			    (const uint8_t *)ifp->ssid, ifp->ssid_len);
-			if (psl != -1) {
-				EMALLOC(elen, pfx_len + (size_t)psl + 1);
-				memcpy(env[elen], pfx, pfx_len);
-				print_string(env[elen] + pfx_len, (size_t)psl, 1,
-				    (const uint8_t *)ifp->ssid, ifp->ssid_len);
-				elen++;
-			}
+			elen++;
 		}
 	}
 #ifdef INET
