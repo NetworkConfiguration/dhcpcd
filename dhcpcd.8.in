@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd September 28, 2014
+.Dd September 30, 2014
 .Dt DHCPCD 8
 .Os
 .Sh NAME
@@ -205,10 +205,23 @@ for details on how these scripts work.
 currently ignores the exit code of the script.
 .Pp
 .Nm
-sanitises each variable passed from the DHCP/RA message by encoding non
+converts all binary variables passed from the DHCP/RA message by
+encoding them as hex strings of the format XX:XX.
+This be decoded back into the raw binary form using
+.Xr dhcpcd-decode 8
+like so:
+.D1 dhcpcd-decode -x \*q$variable_name\*q
+or
+.D1 printf \*q%s\*q \*q$variable_name\*q | \e
+.D1 sed -e 's/://g' -e 's/\e([0-9A-F]\e{2\e}\e)/\e\e\e\e\e\ex\e1/gI' | \e
+.D1 xargs printf
+.Pp
+.Nm
+sanitises each string variable passed from the DHCP/RA message by encoding non
 printable characters in escaped octal and escaping the following characters:
 .D1 | \*[Am] \&; \*[Lt] \*[Gt] \&( \&) $ ` \e \*q ' \
 \*[Lt]tab\*[Gt] \*[Lt]newline\*[Gt]
+.D1 * \&? \&[ # ~ = %
 .Pp
 It is possible to reverse this encoding by passing the variable to
 .Xr dhcpcd-decode 8 ,
@@ -218,6 +231,12 @@ or to
 .Xr unvis 1
 like so:
 .D1 printf \*q%s\*q \*q$variable_name\*q | unvis
+.Pp
+To remove the shell escaped character encoding but keep the non printable
+character octal escaped and C style encoding you can do this:
+.D1 dhcpcd-decode -s \*q$variable-name\*q
+or
+.D1 printf \*q%s\*q \*q$variable_name\*q | unvis | vis -c
 .Ss Fine tuning
 You can fine-tune the behaviour of
 .Nm
