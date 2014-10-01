@@ -71,7 +71,6 @@ for x do
 	--without-md5) MD5=no;;
 	--without-sha2) SHA2=no;;
 	--without-sha256) SHA2=no;;
-	--without-svis) SVIS=no;;
 	--without-dev) DEV=no;;
 	--without-udev) UDEV=no;;
 	--serviceexists) SERVICEEXISTS=$var;;
@@ -626,31 +625,6 @@ fi
 if [ "$STRLCPY" = no ]; then
 	echo "COMPAT_SRCS+=	compat/strlcpy.c" >>$CONFIG_MK
 	echo "#include		\"compat/strlcpy.h\"" >>$CONFIG_H
-fi
-
-if [ -z "$SVIS" ]; then
-	printf "Testing for svis ... "
-	cat <<EOF >_svis.c
-#include <vis.h>
-int main(void) {
-	char s[10];
-	svis(s, 1, 2, 3, s);
-	return 0;
-}
-EOF
-	if $XCC _svis.c -o _svis 2>&3; then
-		SVIS=yes
-	else
-		SVIS=no
-	fi
-	echo "$SVIS"
-	rm -f _svis.c _svis
-fi
-if [ "$SVIS" = no ]; then
-	echo "COMPAT_SRCS+=	compat/svis.c" >>$CONFIG_MK
-	echo "#include		\"compat/svis.h\"" >>$CONFIG_H
-else
-	echo "#define HAVE_VIS_H" >>$CONFIG_H
 fi
 
 if [ -z "$DPRINTF" ]; then

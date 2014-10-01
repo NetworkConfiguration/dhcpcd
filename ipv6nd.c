@@ -1011,12 +1011,14 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 					decode_rfc3397(tmp, l, op, n);
 					l -= 1;
 					n = (size_t)print_string(NULL, 0,
-					    PS_SHELL, (const uint8_t *)tmp, l);
+					    STRING | ARRAY | DOMAIN,
+					    (const uint8_t *)tmp, l);
 					opt = malloc(n);
-					if (opt)
-						print_string(opt, n, PS_SHELL,
+					if (opt) {
+						print_string(opt, n,
+						    STRING | ARRAY | DOMAIN,
 						    (const uint8_t *)tmp, l);
-					else
+					} else
 						syslog(LOG_ERR, "%s: %m",
 						    __func__);
 					free(tmp);

@@ -132,6 +132,7 @@ dhcp_printoptions(const struct dhcpcd_ctx *ctx,
 	const char * const *p;
 	size_t i, j;
 	const struct dhcp_opt *opt, *opt2;
+	int cols;
 
 	for (p = dhcp_params; *p; p++)
 		printf("    %s\n", *p);
@@ -140,11 +141,15 @@ dhcp_printoptions(const struct dhcpcd_ctx *ctx,
 		for (j = 0, opt2 = opts; j < opts_len; j++, opt2++)
 			if (opt->option == opt2->option)
 				break;
-		if (j == opts_len)
-			printf("%03d %s\n", opt->option, opt->var);
+		if (j == opts_len) {
+			cols = printf("%03d %s", opt->option, opt->var);
+			dhcp_print_option_encoding(opt, cols);
+		}
 	}
-	for (i = 0, opt = opts; i < opts_len; i++, opt++)
-		printf("%03d %s\n", opt->option, opt->var);
+	for (i = 0, opt = opts; i < opts_len; i++, opt++) {
+		cols = printf("%03d %s", opt->option, opt->var);
+		dhcp_print_option_encoding(opt, cols);
+	}
 }
 
 #define get_option_raw(ctx, dhcp, opt) get_option(ctx, dhcp, opt, NULL)
@@ -1269,12 +1274,12 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 	}
 
 	if (*dhcp->bootfile && !(overl & 1)) {
-		print_string(safe, sizeof(safe), PS_SHELL,
+		print_string(safe, sizeof(safe), STRING,
 		    dhcp->bootfile, sizeof(dhcp->bootfile));
 		setvar(&ep, prefix, "filename", safe);
 	}
 	if (*dhcp->servername && !(overl & 2)) {
-		print_string(safe, sizeof(safe), PS_SHELL,
+		print_string(safe, sizeof(safe), STRING | DOMAIN,
 		    dhcp->servername, sizeof(dhcp->servername));
 		setvar(&ep, prefix, "server_name", safe);
 	}
@@ -2204,7 +2209,7 @@ log_dhcp1(int lvl, const char *msg,
 				free(a);
 				return;
 			}
-			print_string(tmp, tmpl, 0, (uint8_t *)a, al);
+			print_string(tmp, tmpl, STRING, (uint8_t *)a, al);
 			free(a);
 			a = tmp;
 		}
@@ -2221,7 +2226,7 @@ log_dhcp1(int lvl, const char *msg,
 	tfrom = "from";
 	r = get_option_addr(iface->ctx, &addr, dhcp, DHO_SERVERID);
 	if (dhcp->servername[0] && r == 0) {
-		print_string(sname, sizeof(sname), 0,
+		print_string(sname, sizeof(sname), STRING,
 		    dhcp->servername, strlen((const char *)dhcp->servername));
 		if (a == NULL)
 			syslog(lvl, "%s: %s %s %s `%s'", iface->name, msg,

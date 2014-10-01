@@ -2,7 +2,7 @@
 
 if [ "$reason" = "TEST" ]; then
 	set | grep "^\(interface\|pid\|reason\|skip_hooks\)=" | sort
-	set | grep "^if\(carrier\|flags\|mtu\|wireless\)=" | sort
+	set | grep "^if\(carrier\|flags\|mtu\|wireless\|ssid\)=" | sort
 	set | grep "^\(new_\|old_\|ra_count=\|ra[0-9]*_\)" | sort
 	exit 0
 fi

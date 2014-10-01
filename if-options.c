@@ -1548,10 +1548,16 @@ err_sla:
 			t |= SINT32;
 		else if (strcasecmp(arg, "flag") == 0)
 			t |= FLAG;
+		else if (strcasecmp(arg, "raw") == 0)
+			t |= STRING | RAW;
+		else if (strcasecmp(arg, "ascii") == 0)
+			t |= STRING | ASCII;
 		else if (strcasecmp(arg, "domain") == 0)
-			t |= STRING | RFC3397;
+			t |= STRING | DOMAIN | RFC3397;
+		else if (strcasecmp(arg, "dname") == 0)
+			t |= STRING | DOMAIN;
 		else if (strcasecmp(arg, "binhex") == 0)
-			t |= BINHEX;
+			t |= STRING | BINHEX;
 		else if (strcasecmp(arg, "embed") == 0)
 			t |= EMBED;
 		else if (strcasecmp(arg, "encap") == 0)
@@ -1573,7 +1579,9 @@ err_sla:
 			    "ignoring length for type `%s'", arg);
 			l = 0;
 		}
-		if (t & ARRAY && t & (STRING | BINHEX)) {
+		if (t & ARRAY && t & (STRING | BINHEX) &&
+		    !(t & (RFC3397 | DOMAIN)))
+		{
 			syslog(LOG_WARNING, "ignoring array for strings");
 			t &= ~ARRAY;
 		}

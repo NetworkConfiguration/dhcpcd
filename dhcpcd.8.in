@@ -203,50 +203,6 @@ See
 for details on how these scripts work.
 .Nm
 currently ignores the exit code of the script.
-.Pp
-.Nm
-converts all binary variables passed from the DHCP/RA message by
-encoding them as hex strings of the format XX:XX.
-This be decoded back into the raw binary form using
-.Xr dhcpcd-decode 8
-like so:
-.D1 dhcpcd-decode -x \*q$variable_name\*q
-or
-.D1 printf \*q%s\*q \*q$variable_name\*q | \e
-.D1 sed -e 's/://g' -e 's/\e([0-9A-F]\e{2\e}\e)/\e\e\e\e\e\ex\e1/gI' | \e
-.D1 xargs printf
-.Pp
-.Nm
-sanitises each string variable passed from the DHCP/RA message by encoding non
-printable characters in C style where possible, or escaped octal when not.
-The following characters are also escaped in C style (except for $ in octal):
-.D1 | \*[Am] \&; \*[Lt] \*[Gt] \&( \&) $ ` \e \*q ' \
-\*[Lt]tab\*[Gt] \*[Lt]newline\*[Gt]
-.D1 * \&? \&[ # ~ = %
-.Pp
-It is possible to reverse this encoding by passing the variable to
-.Xr dhcpcd-decode 8 ,
-like so:
-.D1 dhcpcd-decode \*q$variable_name\*q
-or to
-.Xr unvis 1
-like so:
-.D1 printf \*q%s\*q \*q$variable_name\*q | unvis
-.Pp
-To remove the shell escaped character encoding but keep the non printable
-character octal escaped and C style encoding you can do this:
-.D1 dhcpcd-decode -s \*q$variable-name\*q
-or
-.D1 printf \*q%s\*q \*q$variable_name\*q | unvis | vis -c
-.Pp
-If you have neither
-.Xr dhcpcd-decode 8
-or a working
-.Xr unvis 1 ,
-then the shell builtin eval could be used:
-.D1 eval \*q$variable_name\*q
-but that does not work well with any non printable characters and the $
-character.
 .Ss Fine tuning
 You can fine-tune the behaviour of
 .Nm
@@ -728,7 +684,6 @@ Control socket to per interface daemon.
 .Xr if_nametoindex 3 ,
 .Xr dhcpcd.conf 5 ,
 .Xr resolv.conf 5 ,
-.Xr dhcpcd-decode 8 ,
 .Xr dhcpcd-run-hooks 8 ,
 .Xr resolvconf 8
 .Sh STANDARDS

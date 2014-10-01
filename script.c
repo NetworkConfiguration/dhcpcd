@@ -374,25 +374,18 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 		snprintf(env[elen++], e, "profile=%s", ifp->profile);
 	}
 	if (ifp->wireless) {
-		const char *pfx;
+		static const char *pfx = "ifssid=";
 		size_t pfx_len;
 		ssize_t psl;
 
-		if (strcmp(reason, "CARRIER") == 0)
-			pfx = "new_ssid=";
-		else if (strcmp(reason, "NOCARRIER") == 0)
-			pfx = "old_ssid=";
-		else
-			pfx = "if_ssid=";
-
 		pfx_len = strlen(pfx);
-		psl = print_string(NULL, 0, PS_SHELL,
+		psl = print_string(NULL, 0, ESCSTRING,
 		    (const uint8_t *)ifp->ssid, ifp->ssid_len);
 		if (psl != -1) {
 			EMALLOC(elen, pfx_len + (size_t)psl + 1);
 			memcpy(env[elen], pfx, pfx_len);
 			print_string(env[elen] + pfx_len, (size_t)psl,
-			    PS_SHELL,
+			    ESCSTRING,
 			    (const uint8_t *)ifp->ssid, ifp->ssid_len);
 			elen++;
 		}

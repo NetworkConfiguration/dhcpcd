@@ -134,6 +134,7 @@ dhcp6_printoptions(const struct dhcpcd_ctx *ctx,
 {
 	size_t i, j;
 	const struct dhcp_opt *opt, *opt2;
+	int cols;
 
 	for (i = 0, opt = ctx->dhcp6_opts;
 	    i < ctx->dhcp6_opts_len; i++, opt++)
@@ -141,11 +142,15 @@ dhcp6_printoptions(const struct dhcpcd_ctx *ctx,
 		for (j = 0, opt2 = opts; j < opts_len; j++, opt2++)
 			if (opt2->option == opt->option)
 				break;
-		if (j == opts_len)
-			printf("%05d %s\n", opt->option, opt->var);
+		if (j == opts_len) {
+			cols = printf("%05d %s", opt->option, opt->var);
+			dhcp_print_option_encoding(opt, cols);
+		}
 	}
-	for (i = 0, opt = opts; i < opts_len; i++, opt++)
-		printf("%05d %s\n", opt->option, opt->var);
+	for (i = 0, opt = opts; i < opts_len; i++, opt++) {
+		cols = printf("%05d %s", opt->option, opt->var);
+		dhcp_print_option_encoding(opt, cols);
+	}
 }
 
 static size_t

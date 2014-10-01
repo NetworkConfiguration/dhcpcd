@@ -61,9 +61,10 @@
 #define ENCAP		(1 << 18)
 #define INDEX		(1 << 19)
 #define OPTION		(1 << 20)
-
-/* Print string flags */
-#define PS_SHELL	(1 << 0)
+#define DOMAIN		(1 << 21)
+#define ASCII		(1 << 22)
+#define RAW		(1 << 23)
+#define ESCSTRING	(1 << 24)
 
 struct dhcp_opt {
 	uint32_t option; /* Also used for IANA Enterpise Number */
@@ -87,6 +88,7 @@ struct dhcp_opt *vivso_find(uint32_t, const void *);
 
 ssize_t dhcp_vendor(char *, size_t);
 
+void dhcp_print_option_encoding(const struct dhcp_opt *opt, int cols);
 #define add_option_mask(var, val) (var[val >> 3] |= 1 << (val & 7))
 #define del_option_mask(var, val) (var[val >> 3] &= ~(1 << (val & 7)))
 #define has_option_mask(var, val) (var[val >> 3] & (1 << (val & 7)))

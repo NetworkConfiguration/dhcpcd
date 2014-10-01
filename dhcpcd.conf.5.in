@@ -683,7 +683,7 @@ An IPv4 address, 4 bytes
 .It Ic ip6address
 An IPv6 address, 16 bytes
 .It Ic string Op : Ic length
-A shell escaped string (binary data escaped as octal)
+A NVT ASCII string of printable characters.
 .It Ic byte
 A byte
 .It Ic int16
@@ -698,6 +698,8 @@ An unsigned 32bit integer, 4 bytes
 A fixed value (1) to indicate that the option is present, 0 bytes
 .It Ic domain
 A RFC 3397 encoded string
+.It Ic dname
+A RFC 1035 validated string
 .It Ic binhex Op : Ic length
 Binary data expressed as hexadecimal
 .It Ic embed
