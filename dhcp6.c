@@ -3383,7 +3383,7 @@ delegated:
 	i = 0;
 	TAILQ_FOREACH(ap, &state->addrs, next) {
 		if (ap->delegating_iface) {
-                       	i += strlen(ap->saddr) + 1;
+			i += strlen(ap->saddr) + 1;
 		}
 	}
 	if (env && i) {
@@ -3396,8 +3396,12 @@ delegated:
 		v += snprintf(val, i, "%s_dhcp6_prefix=", prefix);
 		TAILQ_FOREACH(ap, &state->addrs, next) {
 			if (ap->delegating_iface) {
-				strcpy(v, ap->saddr);
-				v += strlen(ap->saddr);
+				/* Can't use stpcpy(3) due to "security" */
+				const char *sap = ap->saddr;
+
+				do
+					*v++ = *sap;
+				while (*sap++ != '\0');
 				*v++ = ' ';
 			}
 		}
