@@ -570,7 +570,7 @@ Pass a 2nd
 .Fl U, Fl Fl dumplease option to dump a secondary lease, such as
 DHCPv6 Prefix Delegation when not being mixed with another IA type.
 .It Fl V, Fl Fl variables
-Display a list of option codes and the associated variable for use in
+Display a list of option codes, the associated variable and encoding for use in
 .Xr dhcpcd-run-hooks 8 .
 Variables are prefixed with new_ and old_ unless the option number is -.
 Variables without an option are part of the DHCP message and cannot be
