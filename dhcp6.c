@@ -1189,7 +1189,7 @@ dhcp6_dadcallback(void *arg)
 	struct ipv6_addr *ap = arg;
 	struct interface *ifp;
 	struct dhcp6_state *state;
-	int wascompleted;
+	int wascompleted, valid;
 
 	wascompleted = (ap->flags & IPV6_AF_DADCOMPLETED);
 	ap->flags |= IPV6_AF_DADCOMPLETED;
@@ -1205,6 +1205,7 @@ dhcp6_dadcallback(void *arg)
 		if (state->state == DH6S_BOUND ||
 		    state->state == DH6S_DELEGATED)
 		{
+			valid = (ap->delegating_iface == NULL);
 			TAILQ_FOREACH(ap, &state->addrs, next) {
 				if (ap->flags & IPV6_AF_ADDED &&
 				    !(ap->flags & IPV6_AF_DADCOMPLETED))
@@ -1217,7 +1218,7 @@ dhcp6_dadcallback(void *arg)
 				syslog(LOG_DEBUG, "%s: DHCPv6 DAD completed",
 				    ifp->name);
 				script_runreason(ifp, state->reason);
-				if (ap->delegating_iface == NULL)
+				if (valid)
 					dhcpcd_daemonise(ifp->ctx);
 			}
 		}
