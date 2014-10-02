@@ -1217,7 +1217,7 @@ dhcp6_dadcallback(void *arg)
 				syslog(LOG_DEBUG, "%s: DHCPv6 DAD completed",
 				    ifp->name);
 				script_runreason(ifp, state->reason);
-				if (state->state != DH6S_DELEGATED)
+				if (ap->delegating_iface == NULL)
 					dhcpcd_daemonise(ifp->ctx);
 			}
 		}
