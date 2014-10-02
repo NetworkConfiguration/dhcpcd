@@ -1005,7 +1005,7 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 				    ifp->name);
 				continue;
 			} else {
-				l = (size_t)r;
+				l = (size_t)r + 1;
 				tmp = malloc(l);
 				if (tmp) {
 					decode_rfc3397(tmp, l, op, n);
@@ -1013,6 +1013,7 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 					n = (size_t)print_string(NULL, 0,
 					    STRING | ARRAY | DOMAIN,
 					    (const uint8_t *)tmp, l);
+					n++;
 					opt = malloc(n);
 					if (opt) {
 						print_string(opt, n,

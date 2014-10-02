@@ -347,6 +347,9 @@ decode_rfc3397(char *out, size_t len, const uint8_t *p, size_t pl)
 			*out = '\0';
 	}
 
+	if (count)
+		/* Don't count the trailing NUL */
+		count--;
 	return (ssize_t)count;
 }
 
@@ -398,7 +401,7 @@ valid_domainname(char *lbl, int type)
 		{
 			if (++len > 63) {
 				errno = ERANGE;
-		    		errset = 1;
+				errset = 1;
 				break;
 			}
 		} else
@@ -434,7 +437,7 @@ print_string(char *dst, size_t len, int type, const uint8_t *data, size_t dl)
 	odst = dst;
 	bytes = 0;
 	e = data + dl;
-	
+
 	while (data < e) {
 		c = *data++;
 		if (type & BINHEX) {
@@ -516,7 +519,6 @@ print_string(char *dst, size_t len, int type, const uint8_t *data, size_t dl)
 		}
 
 	}
-	bytes++;
 
 	return (ssize_t)bytes;
 }
@@ -592,7 +594,7 @@ print_option(char *s, size_t len, int type, const uint8_t *data, size_t dl,
 		sl = decode_rfc3397(NULL, 0, data, dl);
 		if (sl == 0 || sl == -1)
 			return sl;
-		l = (size_t)sl;
+		l = (size_t)sl + 1;
 		tmp = malloc(l);
 		if (tmp == NULL)
 			return -1;
@@ -627,7 +629,7 @@ print_option(char *s, size_t len, int type, const uint8_t *data, size_t dl,
 			*s++ = '1';
 			*s = '\0';
 		}
-		return 2;
+		return 1;
 	}
 
 	if (!s) {
@@ -661,14 +663,14 @@ print_option(char *s, size_t len, int type, const uint8_t *data, size_t dl,
 					l += (size_t)sl;
 				data += 16;
 			}
-			return (ssize_t)(l + 1);
+			return (ssize_t)l;
 		}
 #endif
 		else {
 			errno = EINVAL;
 			return -1;
 		}
-		return (ssize_t)((l + 1) * dl);
+		return (ssize_t)(l * dl);
 	}
 
 	t = data;
@@ -749,7 +751,7 @@ dhcp_envoption1(char **env, const char *prefix,
 		e = 0;
 	if (prefix)
 		e += strlen(prefix);
-	e += (size_t)len + 4;
+	e += (size_t)len + 2;
 	if (env == NULL)
 		return e;
 	v = val = *env = malloc(e);
@@ -762,7 +764,7 @@ dhcp_envoption1(char **env, const char *prefix,
 	else
 		v += snprintf(val, e, "%s=", prefix);
 	if (len != 0)
-		print_option(v, (size_t)len, opt->type, od, ol, ifname);
+		print_option(v, (size_t)len + 1, opt->type, od, ol, ifname);
 	return e;
 }
 
