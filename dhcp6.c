@@ -2233,12 +2233,13 @@ dhcp6_script_try_run(struct interface *ifp)
 {
 	struct dhcp6_state *state;
 	struct ipv6_addr *ap;
-	int completed;
+	int completed, valid;
 
 	state = D6_STATE(ifp);
 	if (!TAILQ_FIRST(&state->addrs))
 		return;
 
+	valid = 0;
 	completed = 1;
 	/* If all addresses have completed DAD run the script */
 	TAILQ_FOREACH(ap, &state->addrs, next) {
@@ -2251,10 +2252,13 @@ dhcp6_script_try_run(struct interface *ifp)
 				break;
 			}
 		}
+		if (ap->delegating_iface == NULL)
+			valid = 1;
 	}
 	if (completed) {
 		script_runreason(ifp, state->reason);
-		dhcpcd_daemonise(ifp->ctx);
+		if (valid)
+			dhcpcd_daemonise(ifp->ctx);
 	} else
 		syslog(LOG_DEBUG,
 		    "%s: waiting for DHCPv6 DAD to complete",
