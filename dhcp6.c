@@ -3148,23 +3148,7 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 	struct dhcp6_state *state;
 	struct dhcpcd_ctx *ctx;
 	unsigned long long options;
-
-	ifpx = dhcp6_findpfxdlgif(ifp);
-	if (ifpx) {
-		/* Read the below comment why we need to force
-		 * a drop here */
-		dhcp6_freedrop(ifpx, 1, reason);
-		TAILQ_REMOVE(ifp->ctx->ifaces, ifpx, next);
-		if_free(ifpx);
-	}
-
-	if (ifp->ctx->eloop)
-		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
-
-	if (ifp->options)
-		options = ifp->options->options;
-	else
-		options = 0;
+	int dropdele;
 
 	/*
 	 * As the interface is going away from dhcpcd we need to
@@ -3182,10 +3166,26 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 	 * the same name or index so think very hard before changing
 	 * this.
 	 */
-	if (options & (DHCPCD_STOPPING | DHCPCD_RELEASE) &&
+	if (ifp->options)
+		options = ifp->options->options;
+	else
+		options = 0;
+	dropdele = (options & (DHCPCD_STOPPING | DHCPCD_RELEASE) &&
 	    (options &
 	    (DHCPCD_EXITING | DHCPCD_PERSISTENT)) !=
-	    (DHCPCD_EXITING | DHCPCD_PERSISTENT))
+	    (DHCPCD_EXITING | DHCPCD_PERSISTENT));
+
+	ifpx = dhcp6_findpfxdlgif(ifp);
+	if (ifpx) {
+		dhcp6_freedrop(ifpx, dropdele ? 1 : drop, reason);
+		TAILQ_REMOVE(ifp->ctx->ifaces, ifpx, next);
+		if_free(ifpx);
+	}
+
+	if (ifp->ctx->eloop)
+		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
+
+	if (dropdele)
 		dhcp6_delete_delegates(ifp);
 
 	state = D6_STATE(ifp);
