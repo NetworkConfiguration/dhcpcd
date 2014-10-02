@@ -3401,7 +3401,7 @@ delegated:
 
 				do
 					*v++ = *sap;
-				while (*sap++ != '\0');
+				while (*++sap != '\0');
 				*v++ = ' ';
 			}
 		}

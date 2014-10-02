@@ -465,11 +465,11 @@ print_string(char *dst, size_t len, int type, const uint8_t *data, size_t dl)
 		{
 			errno = EINVAL;
 			if (c == '\\') {
-				if (len  == 0 || len == 1) {
-					errno = ENOSPC;
-					return -1;
-				}
 				if (dst) {
+					if (len  == 0 || len == 1) {
+						errno = ENOSPC;
+						return -1;
+					}
 					*dst++ = '\\'; *dst++ = '\\';
 					len -= 2;
 				}
