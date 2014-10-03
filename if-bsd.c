@@ -913,6 +913,10 @@ if_managelink(struct dhcpcd_ctx *ctx)
 				sin6 = (struct sockaddr_in6*)(void *)
 				    rti_info[RTAX_IFA];
 				ia6 = sin6->sin6_addr;
+#ifdef __KAME__
+				if (IN6_IS_ADDR_LINKLOCAL(&ia6))
+					ia6.s6_addr[2] = ia6.s6_addr[3] = '\0';
+#endif
 				if (rtm->rtm_type == RTM_NEWADDR) {
 					ifa_flags = if_addrflags6(ifp->name,
 					    &ia6);
