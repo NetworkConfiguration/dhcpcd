@@ -462,9 +462,7 @@ dumplease:
 	}
 #endif
 #ifdef INET6
-	if (dhcp6 && d6_state &&
-	    (d6_state->new || d6_state->state == DH6S_DELEGATED))
-	{
+	if (dhcp6 && D6_STATE_RUNNING(ifp)) {
 		n = dhcp6_env(NULL, NULL, ifp,
 		    d6_state->new, d6_state->new_len);
 		if (n > 0) {

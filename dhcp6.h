@@ -208,7 +208,7 @@ struct dhcp6_state {
 #define D6_CSTATE(ifp)							       \
 	((const struct dhcp6_state *)(ifp)->if_data[IF_DATA_DHCP6])
 #define D6_STATE_RUNNING(ifp)						       \
-	(D6_CSTATE((ifp)) && D6_CSTATE((ifp))->new &&			       \
+	(D6_CSTATE((ifp)) &&						       \
 	D6_CSTATE((ifp))->reason && dhcp6_dadcompleted((ifp)))
 
 #define D6_FIRST_OPTION(m)						       \

@@ -1175,6 +1175,9 @@ dhcp6_dadcompleted(const struct interface *ifp)
 	const struct ipv6_addr *ap;
 
 	state = D6_CSTATE(ifp);
+	if (!TAILQ_FIRST(&state->addrs))
+		return 0;
+
 	TAILQ_FOREACH(ap, &state->addrs, next) {
 		if (ap->flags & IPV6_AF_ADDED &&
 		    !(ap->flags & IPV6_AF_DADCOMPLETED))
@@ -3393,13 +3396,13 @@ delegated:
 		}
 	}
 	if (env && i) {
-		i += strlen(prefix) + strlen("_dhcp6_prefix=");
+		i += strlen(prefix) + strlen("_delegated_dhcp6_prefix=");
                 v = val = env[n] = malloc(i);
 		if (v == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);
 			return -1;
 		}
-		v += snprintf(val, i, "%s_dhcp6_prefix=", prefix);
+		v += snprintf(val, i, "%s_delegated_dhcp6_prefix=", prefix);
 		TAILQ_FOREACH(ap, &state->addrs, next) {
 			if (ap->delegating_iface) {
 				/* Can't use stpcpy(3) due to "security" */
