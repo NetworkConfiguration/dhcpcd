@@ -1726,7 +1726,7 @@ exit1:
 	ipv4_ctxfree(&ctx);
 	ipv6_ctxfree(&ctx);
 	dev_stop(&ctx, !(ctx.options & DHCPCD_FORKED));
-	if (!(ctx.options & DHCPCD_FORKED) && control_stop(&ctx) == -1)
+	if (control_stop(&ctx) == -1)
 		syslog(LOG_ERR, "control_stop: %m:");
 	if (ctx.pid_fd != -1) {
 		close(ctx.pid_fd);

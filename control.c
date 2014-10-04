@@ -298,6 +298,9 @@ control_stop(struct dhcpcd_ctx *ctx)
 	int retval = 0;
 	struct fd_list *l;
 
+	if (ctx->options & DHCPCD_FORKED)
+		goto freeit;
+
 	if (ctx->control_fd == -1)
 		return 0;
 	eloop_event_delete(ctx->eloop, ctx->control_fd, 0);
@@ -314,6 +317,7 @@ control_stop(struct dhcpcd_ctx *ctx)
 			retval = -1;
 	}
 
+freeit:
 	while ((l = TAILQ_FIRST(&ctx->control_fds))) {
 		TAILQ_REMOVE(&ctx->control_fds, l, next);
 		eloop_event_delete(ctx->eloop, l->fd, 0);
