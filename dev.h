@@ -49,7 +49,7 @@ int dev_init(struct dev *, const struct dev_dhcpcd *);
 int dev_initialized(struct dhcpcd_ctx *, const char *);
 int dev_listening(struct dhcpcd_ctx *);
 int dev_start(struct dhcpcd_ctx *);
-void dev_stop(struct dhcpcd_ctx *, int);
+void dev_stop(struct dhcpcd_ctx *);
 #else
 #define dev_initialized(a, b) (1)
 #define dev_listening(a) (0)

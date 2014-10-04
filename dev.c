@@ -55,8 +55,8 @@ dev_listening(struct dhcpcd_ctx *ctx)
 	return ctx->dev->listening();
 }
 
-void
-dev_stop(struct dhcpcd_ctx *ctx, int stop)
+static void
+dev_stop1(struct dhcpcd_ctx *ctx, int stop)
 {
 
 	if (ctx->dev) {
@@ -72,6 +72,13 @@ dev_stop(struct dhcpcd_ctx *ctx, int stop)
 		dlclose(ctx->dev_handle);
 		ctx->dev_handle = NULL;
 	}
+}
+
+void
+dev_stop(struct dhcpcd_ctx *ctx)
+{
+
+	dev_stop1(ctx,!(ctx->options & DHCPCD_FORKED));
 }
 
 static int
@@ -171,7 +178,7 @@ dev_start(struct dhcpcd_ctx *ctx)
 			ctx->dev_fd, dev_handle_data, ctx, NULL, NULL) == -1)
 		{
 			syslog(LOG_ERR, "%s: eloop_event_add: %m", __func__);
-			dev_stop(ctx, 1);
+			dev_stop1(ctx, 1);
 			return -1;
 		}
 	}
