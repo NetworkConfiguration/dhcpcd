@@ -54,7 +54,7 @@ void dev_stop(struct dhcpcd_ctx *);
 #define dev_initialized(a, b) (1)
 #define dev_listening(a) (0)
 #define dev_start(a) {}
-#define dev_stop(a, b) {}
+#define dev_stop(a) {}
 #endif
 
 #endif
