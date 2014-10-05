@@ -67,6 +67,13 @@
 #include <syslog.h>
 #include <unistd.h>
 
+#if defined(OpenBSD) && OpenBSD >= 201411
+/* OpenBSD dropped the global setting from sysctl but left the #define
+ * which causes a EPERM error when trying to use it.
+ * I think both the error and keeping the define are wrong, so we #undef it. */
+#undef IPV6CTL_ACCEPT_RTADV
+#endif
+
 #include "config.h"
 #include "common.h"
 #include "dhcp.h"
@@ -549,21 +556,21 @@ if_route(const struct rt *rt, int action)
 
 #ifdef INET6
 static void
-ifa_scope(struct sockaddr_in6 *sin, unsigned int index)
+ifa_scope(struct sockaddr_in6 *sin, unsigned int ifindex)
 {
 
 #ifdef __KAME__
 	/* KAME based systems want to store the scope inside the sin6_addr
 	 * for link local addreses */
 	if (IN6_IS_ADDR_LINKLOCAL(&sin->sin6_addr)) {
-		uint16_t scope = htons(index);
+		uint16_t scope = htons(ifindex);
 		memcpy(&sin->sin6_addr.s6_addr[2], &scope,
 		    sizeof(scope));
 	}
 	sin->sin6_scope_id = 0;
 #else
 	if (IN6_IS_ADDR_LINKLOCAL(&sin->sin6_addr))
-		sin->sin6_scope_id = index;
+		sin->sin6_scope_id = ifindex;
 	else
 		sin->sin6_scope_id = 0;
 #endif
@@ -688,7 +695,7 @@ if_route6(const struct rt6 *rt, int action)
 				return -1;
 			ADDADDRS(&lla->addr, rt->iface->index);
 		} else {
-			ADDADDR(&rt->gate);
+			ADDADDRS(&rt->gate, rt->iface->index);
 		}
 	}
 
@@ -962,6 +969,7 @@ if_machinearch(char *str, size_t len)
 }
 
 #ifdef INET6
+#ifdef IPV6CTL_ACCEPT_RTADV
 #define get_inet6_sysctl(code) inet6_sysctl(code, 0, 0)
 #define set_inet6_sysctl(code, val) inet6_sysctl(code, val, 1)
 static int
@@ -982,6 +990,7 @@ inet6_sysctl(int code, int val, int action)
 		return -1;
 	return val;
 }
+#endif
 
 #define del_if_nd6_flag(ifname, flag) if_nd6_flag(ifname, flag, -1)
 #define get_if_nd6_flag(ifname, flag) if_nd6_flag(ifname, flag,  0)
@@ -1068,6 +1077,37 @@ if_raflush(void)
 	return 0;
 }
 
+#ifdef SIOCGIFXFLAGS
+static int
+set_ifxflags(const struct interface *ifp, int own)
+{
+	struct ifreq ifr;
+	int s, flags;
+
+	s = socket(PF_INET6, SOCK_DGRAM, 0);
+	if (s == -1)
+		return -1;
+	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
+	if (ioctl(s, SIOCGIFXFLAGS, (void *)&ifr) == -1) {
+		close(s);
+		return -1;
+	}
+	flags = ifr.ifr_flags;
+	flags &= ~IFXF_NOINET6;
+	if (own)
+		flags &= ~IFXF_AUTOCONF6;
+	if (ifr.ifr_flags != flags) {
+		ifr.ifr_flags = flags;
+		if (ioctl(s, SIOCSIFXFLAGS, (void *)&ifr) == -1) {
+			close(s);
+			return -1;
+		}
+	}
+	close(s);
+	return 0;
+}
+#endif
+
 int
 if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 {
@@ -1124,6 +1164,10 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 		}
 #endif
 
+#ifdef SIOCGIFXFLAGS
+		set_ifxflags(ifp, own);
+#endif
+
 #ifdef ND6_IFF_OVERRIDE_RTADV
 		override = get_if_nd6_flag(ifp->name, ND6_IFF_OVERRIDE_RTADV);
 		if (override == -1)
@@ -1173,6 +1217,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 #endif
 	}
 
+#ifdef IPV6CTL_ACCEPT_RTADV
 	ra = get_inet6_sysctl(IPV6CTL_ACCEPT_RTADV);
 	if (ra == -1)
 		/* The sysctl probably doesn't exist, but this isn't an
@@ -1186,7 +1231,10 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 			return ra;
 		}
 		ra = 0;
-
+#else
+	ra = 0;
+	if (own) {
+#endif
 		/* Flush the kernel knowledge of advertised routers
 		 * and prefixes so the kernel does not expire prefixes
 		 * and default routes we are trying to own. */
