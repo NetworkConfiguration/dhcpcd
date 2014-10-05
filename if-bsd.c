@@ -548,6 +548,27 @@ if_route(const struct rt *rt, int action)
 #endif
 
 #ifdef INET6
+static void
+ifa_scope(struct sockaddr_in6 *sin, unsigned int index)
+{
+
+#ifdef __KAME__
+	/* KAME based systems want to store the scope inside the sin6_addr
+	 * for link local addreses */
+	if (IN6_IS_ADDR_LINKLOCAL(&sin->sin6_addr)) {
+		uint16_t scope = htons(index);
+		memcpy(&sin->sin6_addr.s6_addr[2], &scope,
+		    sizeof(scope));
+	}
+	sin->sin6_scope_id = 0;
+#else
+	if (IN6_IS_ADDR_LINKLOCAL(&sin->sin6_addr))
+		sin->sin6_scope_id = index;
+	else
+		sin->sin6_scope_id = 0;
+#endif
+}
+
 int
 if_address6(const struct ipv6_addr *a, int action)
 {
@@ -580,6 +601,7 @@ if_address6(const struct ipv6_addr *a, int action)
 	}
 
 	ADDADDR(&ifa.ifra_addr, &a->addr);
+	ifa_scope(&ifa.ifra_addr, a->iface->index);
 	ipv6_mask(&mask, a->prefix_len);
 	ADDADDR(&ifa.ifra_prefixmask, &mask);
 	ifa.ifra_lifetime.ia6t_vltime = a->prefix_vltime;
@@ -613,21 +635,6 @@ if_route6(const struct rt6 *rt, int action)
 	if ((s = socket(PF_ROUTE, SOCK_RAW, 0)) == -1)
 		return -1;
 
-/* KAME based systems want to store the scope inside the sin6_addr
- * for link local addreses */
-#ifdef __KAME__
-#define SCOPE {								      \
-		if (IN6_IS_ADDR_LINKLOCAL(&su.sin.sin6_addr)) {		      \
-			uint16_t scope = htons(su.sin.sin6_scope_id);	      \
-			memcpy(&su.sin.sin6_addr.s6_addr[2], &scope,	      \
-			    sizeof(scope));				      \
-			su.sin.sin6_scope_id = 0;			      \
-		}							      \
-	}
-#else
-#define SCOPE
-#endif
-
 #define ADDSU {								      \
 		l = RT_ROUNDUP(su.sa.sa_len);				      \
 		memcpy(bp, &su, l);					      \
@@ -638,8 +645,8 @@ if_route6(const struct rt6 *rt, int action)
 		su.sin.sin6_family = AF_INET6;				      \
 		su.sin.sin6_len = sizeof(su.sin);			      \
 		(&su.sin)->sin6_addr = *addr;				      \
-		su.sin.sin6_scope_id = scope;				      \
-		SCOPE;							      \
+		if (scope)						      \
+			ifa_scope(&su.sin, scope);			      \
 		ADDSU;							      \
 	}
 #define ADDADDR(addr) ADDADDRS(addr, 0)
@@ -681,9 +688,7 @@ if_route6(const struct rt6 *rt, int action)
 				return -1;
 			ADDADDRS(&lla->addr, rt->iface->index);
 		} else {
-			ADDADDRS(&rt->gate,
-			    IN6_ARE_ADDR_EQUAL(&rt->gate, &in6addr_loopback)
-			    ? 0 : rt->iface->index);
+			ADDADDR(&rt->gate);
 		}
 	}
 
@@ -709,7 +714,6 @@ if_route6(const struct rt6 *rt, int action)
 
 #undef ADDADDR
 #undef ADDSU
-#undef SCOPE
 
 	if (action >= 0 && rt->mtu) {
 		rtm.hdr.rtm_inits |= RTV_MTU;
@@ -745,7 +749,7 @@ get_addrs(int type, char *cp, struct sockaddr **sa)
 
 #ifdef INET6
 int
-if_addrflags6(const char *ifname, const struct in6_addr *addr)
+if_addrflags6(const struct in6_addr *addr, const struct interface *ifp)
 {
 	int s, flags;
 	struct in6_ifreq ifr6;
@@ -754,9 +758,10 @@ if_addrflags6(const char *ifname, const struct in6_addr *addr)
 	flags = -1;
 	if (s != -1) {
 		memset(&ifr6, 0, sizeof(ifr6));
-		strncpy(ifr6.ifr_name, ifname, sizeof(ifr6.ifr_name));
+		strncpy(ifr6.ifr_name, ifp->name, sizeof(ifr6.ifr_name));
 		ifr6.ifr_addr.sin6_family = AF_INET6;
 		ifr6.ifr_addr.sin6_addr = *addr;
+		ifa_scope(&ifr6.ifr_addr, ifp->index);
 		if (ioctl(s, SIOCGIFAFLAG_IN6, &ifr6) != -1)
 			flags = ifr6.ifr_ifru.ifru_flags6;
 		close(s);
@@ -918,8 +923,7 @@ if_managelink(struct dhcpcd_ctx *ctx)
 					ia6.s6_addr[2] = ia6.s6_addr[3] = '\0';
 #endif
 				if (rtm->rtm_type == RTM_NEWADDR) {
-					ifa_flags = if_addrflags6(ifp->name,
-					    &ia6);
+					ifa_flags = if_addrflags6(&ia6, ifp);
 					if (ifa_flags == -1)
 						break;
 				} else

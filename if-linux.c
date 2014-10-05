@@ -1448,7 +1448,7 @@ if_route6(const struct rt6 *rt, int action)
 }
 
 int
-if_addrflags6(const char *ifname, const struct in6_addr *addr)
+if_addrflags6(const struct in6_addr *addr, const struct interface *ifp)
 {
 	FILE *fp;
 	char *p, ifaddress[33], address[33], name[IF_NAMESIZE + 1];
@@ -1473,7 +1473,7 @@ if_addrflags6(const char *ifname, const struct in6_addr *addr)
 			errno = ENOTSUP;
 			return -1;
 		}
-		if (strcmp(ifname, name) == 0 &&
+		if (strcmp(ifname, ifp->name) == 0 &&
 		    strcmp(ifaddress, address) == 0)
 		{
 			fclose(fp);

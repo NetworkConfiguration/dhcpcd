@@ -184,7 +184,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 	const struct sockaddr_in *dst;
 #endif
 #ifdef INET6
-	const struct sockaddr_in6 *sin6;
+	struct sockaddr_in6 *sin6;
 	int ifa_flags;
 #endif
 #ifdef AF_LINK
@@ -453,10 +453,20 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 #endif
 #ifdef INET6
 		case AF_INET6:
-			sin6 = (const struct sockaddr_in6 *)
-			    (void *)ifa->ifa_addr;
-			ifa_flags = if_addrflags6(ifa->ifa_name,
-			    &sin6->sin6_addr);
+			TAILQ_FOREACH(ifp, ifs, next) {
+				if (strcmp(ifp->name, ifa->ifa_name) == 0)
+					break;
+			}
+			if (ifp == NULL)
+				break; /* Should be impossible */
+			sin6 = (struct sockaddr_in6 *)(void *)ifa->ifa_addr;
+#ifdef __KAME__
+			if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr))
+				/* Remove the scope from the address */
+				sin6->sin6_addr.s6_addr[2] =
+				    sin6->sin6_addr.s6_addr[3] = '\0';
+#endif
+			ifa_flags = if_addrflags6(&sin6->sin6_addr, ifp);
 			if (ifa_flags != -1)
 				ipv6_handleifa(ctx, RTM_NEWADDR, ifs,
 				    ifa->ifa_name,

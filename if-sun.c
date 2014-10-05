@@ -143,7 +143,7 @@ if_route6(const struct rt6 *rt, int action)
 
 #ifdef INET6
 int
-if_addrflags6(const char *ifname, const struct in6_addr *addr)
+if_addrflags6(const struct in6_addr *addr, const struct interface *ifp)
 {
 
 	errno = ENOTSUP;

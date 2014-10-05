@@ -138,7 +138,7 @@ int if_nd6reachable(const char *ifname, struct in6_addr *addr);
 int if_address6(const struct ipv6_addr *, int);
 #define if_addaddress6(a) if_address6(a, 1)
 #define if_deladdress6(a) if_address6(a, -1)
-int if_addrflags6(const char *, const struct in6_addr *);
+int if_addrflags6(const struct in6_addr *, const struct interface *);
 
 int if_route6(const struct rt6 *rt, int);
 #define if_addroute6(rt) if_route6(rt, 1)
