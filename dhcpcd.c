@@ -646,7 +646,6 @@ dhcpcd_startinterface(void *arg)
 		syslog(LOG_ERR, "%s: if_up: %m", ifp->name);
 
 	if (ifo->options & DHCPCD_LINK) {
-link_retry:
 		switch (ifp->carrier) {
 		case LINK_UP:
 			break;
@@ -660,9 +659,13 @@ link_retry:
 			 * as we've done the best we can to bring the interface
 			 * up at this point. */
 			ifp->carrier = if_carrier(ifp);
-			if (ifp->carrier != LINK_UNKNOWN)
-				goto link_retry;
-			syslog(LOG_INFO, "%s: unknown carrier", ifp->name);
+			if (ifp->carrier == LINK_UNKNOWN) {
+				syslog(LOG_INFO, "%s: unknown carrier",
+				    ifp->name);
+				return;
+			}
+			dhcpcd_handlecarrier(ifp->ctx, ifp->carrier,
+			    ifp->flags, ifp->name);
 			return;
 		}
 	}
@@ -1618,8 +1621,8 @@ main(int argc, char **argv)
 		ctx.options |= DHCPCD_WAITIP;
 
 	/* RTM_NEWADDR goes through the link socket as well which we
-	 * need for IPv6 DAD, so we check for DHCPCD_LINK in handle_carrier
-	 * instead.
+	 * need for IPv6 DAD, so we check for DHCPCD_LINK in
+	 * dhcpcd_handlecarrier instead.
 	 * We also need to open this before checking for interfaces below
 	 * so that we pickup any new addresses during the discover phase. */
 	ctx.link_fd = if_openlinksocket();
