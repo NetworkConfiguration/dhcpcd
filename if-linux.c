@@ -1473,7 +1473,7 @@ if_addrflags6(const struct in6_addr *addr, const struct interface *ifp)
 			errno = ENOTSUP;
 			return -1;
 		}
-		if (strcmp(ifname, ifp->name) == 0 &&
+		if (strcmp(name, ifp->name) == 0 &&
 		    strcmp(ifaddress, address) == 0)
 		{
 			fclose(fp);
