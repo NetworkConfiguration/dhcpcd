@@ -48,7 +48,6 @@ BSD systems where this is known to be a problem
     Occured in OpenBSD-4.2, fixed in OpenBSD-5.0
 
 On FreeBSD-10 dhcpcd cannot delete IPv4 subnet routes.
-On OpenBSD-5.5 dhcpcd cannot delete IPv4 subnet routes or IPv6 prefixes.
 
 We try and detect how dhcpcd should interact with system services at runtime.
 If we cannot auto-detect how do to this, or it is wrong then
