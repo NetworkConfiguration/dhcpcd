@@ -2712,7 +2712,7 @@ dhcp_handlepacket(void *arg)
 		{
 			char buf[sizeof(dhcp->chaddr) * 3];
 
-			syslog(LOG_DEBUG, "%s: xid 0x%x is not for hwaddr %s",
+			syslog(LOG_DEBUG, "%s: xid 0x%x is for hwaddr %s",
 			    ifp->name, ntohl(dhcp->xid),
 			    hwaddr_ntoa(dhcp->chaddr, sizeof(dhcp->chaddr),
 				buf, sizeof(buf)));
