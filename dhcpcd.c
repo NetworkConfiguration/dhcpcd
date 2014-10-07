@@ -1610,11 +1610,6 @@ main(int argc, char **argv)
 	}
 #endif
 
-#ifdef __FreeBSD__
-	syslog(LOG_WARNING, "FreeBSD errors that are worked around:");
-	syslog(LOG_WARNING, "IPv4 subnet routes cannot be deleted");
-#endif
-
 	/* When running dhcpcd against a single interface, we need to retain
 	 * the old behaviour of waiting for an IP address */
 	if (ctx.ifc == 1 && !(ctx.options & DHCPCD_BACKGROUND))
