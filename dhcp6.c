@@ -2328,7 +2328,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 				if (ia->sla_len == 0) {
 					/* no SLA configured, so lets
 					 * automate it */
-					if (ifd->carrier == LINK_DOWN) {
+					if (ifd->carrier != LINK_UP) {
 						syslog(LOG_DEBUG,
 						    "%s: has no carrier, cannot"
 						    " delegate addresses",
@@ -2347,7 +2347,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 						    IPV6_AF_DELEGATEDZERO;
 					if (strcmp(ifd->name, sla->ifname))
 						continue;
-					if (ifd->carrier == LINK_DOWN) {
+					if (ifd->carrier != LINK_UP) {
 						syslog(LOG_DEBUG,
 						    "%s: has no carrier, cannot"
 						    " delegate addresses",
@@ -3200,7 +3200,7 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 	if (state) {
 		dhcp_auth_reset(&state->auth);
 		if (options & DHCPCD_RELEASE) {
-			if (ifp->carrier != LINK_DOWN)
+			if (ifp->carrier == LINK_UP)
 				dhcp6_startrelease(ifp);
 			unlink(state->leasefile);
 		}
