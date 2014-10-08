@@ -52,6 +52,10 @@
 #define IF_DATA_DHCP6	4
 #define IF_DATA_MAX	5
 
+/* If the interface does not support carrier status (ie PPP),
+ * dhcpcd can poll it for the relevant flags periodically */
+#define IF_POLL_UP	100	/* milliseconds */
+
 struct interface {
 	struct dhcpcd_ctx *ctx;
 	TAILQ_ENTRY(interface) next;

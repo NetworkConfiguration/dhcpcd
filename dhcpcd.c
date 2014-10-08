@@ -640,10 +640,8 @@ dhcpcd_startinterface(void *arg)
 	struct if_options *ifo = ifp->options;
 	size_t i;
 	char buf[DUID_LEN * 3];
-
-	pre_start(ifp);
-	if (if_up(ifp) == -1)
-		syslog(LOG_ERR, "%s: if_up: %m", ifp->name);
+	int carrier;
+	struct timeval tv;
 
 	if (ifo->options & DHCPCD_LINK) {
 		switch (ifp->carrier) {
@@ -654,18 +652,15 @@ dhcpcd_startinterface(void *arg)
 			return;
 		case LINK_UNKNOWN:
 			/* No media state available.
-			 * Any change on state such as IFF_UP and IFF_RUNNING
-			 * should be reported to us via the route socket
-			 * as we've done the best we can to bring the interface
-			 * up at this point. */
-			ifp->carrier = if_carrier(ifp);
-			if (ifp->carrier == LINK_UNKNOWN) {
-				syslog(LOG_INFO, "%s: unknown carrier",
-				    ifp->name);
-				return;
-			}
-			dhcpcd_handlecarrier(ifp->ctx, ifp->carrier,
-			    ifp->flags, ifp->name);
+			 * Loop until both IFF_UP and IFF_RUNNING are set */
+			if ((carrier = if_carrier(ifp)) == LINK_UNKNOWN) {
+				tv.tv_sec = 0;
+				tv.tv_usec = IF_POLL_UP * 1000;
+				eloop_timeout_add_tv(ifp->ctx->eloop,
+				    &tv, dhcpcd_startinterface, ifp);
+			} else
+				dhcpcd_handlecarrier(ifp->ctx, carrier,
+				    ifp->flags, ifp->name);
 			return;
 		}
 	}
@@ -746,6 +741,33 @@ dhcpcd_startinterface(void *arg)
 }
 
 static void
+dhcpcd_prestartinterface(void *arg)
+{
+	struct interface *ifp = arg;
+
+	pre_start(ifp);
+	if (if_up(ifp) == -1)
+		syslog(LOG_ERR, "%s: if_up: %m", ifp->name);
+
+	if (ifp->options->options & DHCPCD_LINK &&
+	    ifp->carrier == LINK_UNKNOWN)
+	{
+		int carrier;
+
+		if ((carrier = if_carrier(ifp)) != LINK_UNKNOWN) {
+			dhcpcd_handlecarrier(ifp->ctx, carrier,
+			    ifp->flags, ifp->name);
+			return;
+		}
+		syslog(LOG_INFO,
+		    "%s: unknown carrier, waiting for interface flags",
+		    ifp->name);
+	}
+
+	dhcpcd_startinterface(ifp);
+}
+
+static void
 handle_link(void *arg)
 {
 	struct dhcpcd_ctx *ctx;
@@ -803,8 +825,7 @@ run_preinit(struct interface *ifp)
 
 	script_runreason(ifp, "PREINIT");
 
-	if (ifp->carrier != LINK_UNKNOWN &&
-	    ifp->options->options & DHCPCD_LINK)
+	if (ifp->options->options & DHCPCD_LINK && ifp->carrier != LINK_UNKNOWN)
 		script_runreason(ifp,
 		    ifp->carrier == LINK_UP ? "CARRIER" : "NOCARRIER");
 }
@@ -864,7 +885,7 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 			iff = ifp;
 		}
 		if (action > 0)
-			dhcpcd_startinterface(iff);
+			dhcpcd_prestartinterface(iff);
 	}
 
 	/* Free our discovered list */
@@ -915,7 +936,7 @@ if_reboot(struct interface *ifp, int argc, char **argv)
 	configure_interface(ifp, argc, argv);
 	dhcp_reboot_newopts(ifp, oldopts);
 	dhcp6_reboot(ifp);
-	dhcpcd_startinterface(ifp);
+	dhcpcd_prestartinterface(ifp);
 }
 
 static void
@@ -941,7 +962,7 @@ reconf_reboot(struct dhcpcd_ctx *ctx, int action, int argc, char **argv, int oi)
 			TAILQ_INSERT_TAIL(ctx->ifaces, ifp, next);
 			dhcpcd_initstate1(ifp, argc, argv);
 			run_preinit(ifp);
-			dhcpcd_startinterface(ifp);
+			dhcpcd_prestartinterface(ifp);
 		}
 	}
 	free(ifs);
@@ -1691,7 +1712,8 @@ main(int argc, char **argv)
 
 	ipv4_sortinterfaces(&ctx);
 	TAILQ_FOREACH(ifp, ctx.ifaces, next) {
-		eloop_timeout_add_sec(ctx.eloop, 0, dhcpcd_startinterface, ifp);
+		eloop_timeout_add_sec(ctx.eloop, 0,
+		    dhcpcd_prestartinterface, ifp);
 	}
 
 	i = eloop_start(&ctx);
