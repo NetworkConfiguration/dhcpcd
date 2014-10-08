@@ -3185,6 +3185,8 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 
 	ifpx = dhcp6_findpfxdlgif(ifp);
 	if (ifpx) {
+		if (options & DHCPCD_EXITING)
+			ifpx->options->options |= DHCPCD_EXITING;
 		dhcp6_freedrop(ifpx, dropdele ? 1 : drop, reason);
 		TAILQ_REMOVE(ifp->ctx->ifaces, ifpx, next);
 		if_free(ifpx);
