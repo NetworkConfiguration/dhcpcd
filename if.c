@@ -330,7 +330,13 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 			sdl_type = sdl->sdl_type;
 			switch(sdl->sdl_type) {
 #ifdef IFT_BRIDGE
-			case IFT_BRIDGE: /* FALLTHROUGH */
+			case IFT_BRIDGE:
+				/* Don't allow bridge unless explicit */
+				if (argc == 0 && ctx->ifac == 0) {
+					if_free(ifp);
+					continue;
+				}
+				/* FALLTHOUGH */
 #endif
 #ifdef IFT_L2VLAN
 			case IFT_L2VLAN: /* FALLTHOUGH */
