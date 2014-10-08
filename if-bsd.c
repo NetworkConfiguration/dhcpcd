@@ -491,7 +491,7 @@ if_route(const struct rt *rt, int action)
 	} else
 		rtm.hdr.rtm_type = RTM_DELETE;
 	rtm.hdr.rtm_flags = RTF_UP;
-#ifdef RTM_PINNED
+#ifdef RTF_PINNED
 	if (rtm.hdr.rtm_type != RTM_ADD)
 		rtm.hdr.rtm_flags |= RTF_PINNED;
 #endif
@@ -672,7 +672,7 @@ if_route6(const struct rt6 *rt, int action)
 	else
 		rtm.hdr.rtm_type = RTM_DELETE;
 	rtm.hdr.rtm_flags = RTF_UP | (int)rt->flags;
-#ifdef RTM_PINNED
+#ifdef RTF_PINNED
 	if (rtm.hdr.rtm_type != RTM_ADD)
 		rtm.hdr.rtm_flags |= RTF_PINNED;
 #endif
