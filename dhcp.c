@@ -1960,7 +1960,8 @@ dhcp_bind(void *arg)
 		state->state = DHS_BOUND;
 		if (ifo->options & DHCPCD_ARP) {
 		        state->claims = 0;
-			arp_announce(iface);
+			if (state->added)
+				arp_announce(iface);
 		}
 	}
 }
@@ -2036,7 +2037,7 @@ dhcp_inform(struct interface *ifp)
 	} else {
 		if (ifo->req_addr.s_addr == INADDR_ANY) {
 			state = D_STATE(ifp);
-			ap = ipv4_findaddr(ifp, NULL, NULL);
+			ap = ipv4_iffindaddr(ifp, NULL, NULL);
 			if (ap == NULL) {
 				syslog(LOG_INFO,
 					"%s: waiting for 3rd party to "
@@ -2110,7 +2111,8 @@ dhcp_reboot(struct interface *ifp)
 	} else if (state->offer->cookie == 0) {
 		if (ifo->options & DHCPCD_IPV4LL) {
 			state->claims = 0;
-			arp_announce(ifp);
+			if (state->added)
+				arp_announce(ifp);
 		} else
 			dhcp_discover(ifp);
 		return;
@@ -2563,7 +2565,7 @@ dhcp_handledhcp(struct interface *iface, struct dhcp_message **dhcpp,
 		/* If the interface already has the address configured
 		 * then we can't ARP for duplicate detection. */
 		addr.s_addr = state->offer->yiaddr;
-		if (!ipv4_findaddr(iface, &addr, NULL)) {
+		if (!ipv4_findaddr(iface->ctx, &addr)) {
 			state->claims = 0;
 			state->probes = 0;
 			state->conflicts = 0;

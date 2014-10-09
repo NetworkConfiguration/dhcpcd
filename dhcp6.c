@@ -1595,12 +1595,13 @@ dhcp6_checkstatusok(const struct interface *ifp,
 }
 
 static struct ipv6_addr *
-dhcp6_findaddr(struct interface *ifp, const struct in6_addr *addr)
+dhcp6_iffindaddr(struct interface *ifp, const struct in6_addr *addr,
+    short flags)
 {
-	const struct dhcp6_state *state;
+	struct dhcp6_state *state;
 	struct ipv6_addr *ap;
 
-	state = D6_CSTATE(ifp);
+	state = D6_STATE(ifp);
 	if (state) {
 		TAILQ_FOREACH(ap, &state->addrs, next) {
 			if (addr == NULL) {
@@ -1608,23 +1609,28 @@ dhcp6_findaddr(struct interface *ifp, const struct in6_addr *addr)
 				    (IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED)) ==
 				    (IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED))
 					return ap;
-			} else if (IN6_ARE_ADDR_EQUAL(&ap->addr, addr))
+			} else if (ap->prefix_vltime &&
+			    IN6_ARE_ADDR_EQUAL(&ap->addr, addr) &&
+			    (!flags || ap->flags & flags))
 				return ap;
 		}
 	}
 	return NULL;
 }
 
-int
-dhcp6_addrexists(struct dhcpcd_ctx *ctx, const struct ipv6_addr *addr)
+struct ipv6_addr *
+dhcp6_findaddr(struct dhcpcd_ctx *ctx, const struct in6_addr *addr,
+    short flags)
 {
 	struct interface *ifp;
+	struct ipv6_addr *ap;
 
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-		if (dhcp6_findaddr(ifp, addr == NULL ? NULL : &addr->addr))
-			return 1;
+		ap = dhcp6_iffindaddr(ifp, addr, flags);
+		if (ap)
+			return ap;
 	}
-	return 0;
+	return NULL;
 }
 
 static int
@@ -1657,7 +1663,7 @@ dhcp6_findna(struct interface *ifp, uint16_t ot, const uint8_t *iaid,
 			continue;
 		}
 		iap = (const struct dhcp6_ia_addr *)D6_COPTION_DATA(o);
-		a = dhcp6_findaddr(ifp, &iap->addr);
+		a = dhcp6_iffindaddr(ifp, &iap->addr, 0);
 		if (a == NULL) {
 			a = calloc(1, sizeof(*a));
 			if (a == NULL) {
@@ -2249,7 +2255,7 @@ dhcp6_script_try_run(struct interface *ifp)
 	TAILQ_FOREACH(ap, &state->addrs, next) {
 		if (ap->flags & IPV6_AF_ONLINK) {
 			if (!(ap->flags & IPV6_AF_DADCOMPLETED) &&
-			    ipv6_findaddr(ap->iface, &ap->addr))
+			    ipv6_iffindaddr(ap->iface, &ap->addr))
 				ap->flags |= IPV6_AF_DADCOMPLETED;
 			if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0) {
 				completed = 0;

@@ -85,7 +85,8 @@ struct rs_state {
 #ifdef INET6
 void ipv6nd_startrs(struct interface *);
 ssize_t ipv6nd_env(char **, const char *, const struct interface *);
-int ipv6nd_addrexists(struct dhcpcd_ctx *, const struct ipv6_addr *);
+struct ipv6_addr *ipv6nd_findaddr(struct dhcpcd_ctx *,
+    const struct in6_addr *, short);
 void ipv6nd_freedrop_ra(struct ra *, int);
 #define ipv6nd_free_ra(ra) ipv6nd_freedrop_ra((ra),  0)
 #define ipv6nd_drop_ra(ra) ipv6nd_freedrop_ra((ra),  1)
@@ -103,7 +104,7 @@ void ipv6nd_neighbour(struct dhcpcd_ctx *, struct in6_addr *, int);
 #endif
 #else
 #define ipv6nd_startrs(a) {}
-#define ipv6nd_addrexists(a, b) (0)
+#define ipv6nd_findaddr(a, b, c) (0)
 #define ipv6nd_free(a)
 #define ipv6nd_hasra(a) (0)
 #define ipv6nd_dadcompleted(a) (0)

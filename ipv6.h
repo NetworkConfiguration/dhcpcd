@@ -191,9 +191,11 @@ void ipv6_handleifa(struct dhcpcd_ctx *ctx, int, struct if_head *,
     const char *, const struct in6_addr *, int);
 int ipv6_handleifa_addrs(int, struct ipv6_addrhead *,
     const struct in6_addr *, int);
-const struct ipv6_addr *ipv6_findaddr(const struct interface *,
+const struct ipv6_addr *ipv6_iffindaddr(const struct interface *,
     const struct in6_addr *);
-#define ipv6_linklocal(ifp) (ipv6_findaddr((ifp), NULL))
+struct ipv6_addr *ipv6_findaddr(struct dhcpcd_ctx *,
+    const struct in6_addr *, short);
+#define ipv6_linklocal(ifp) (ipv6_iffindaddr((ifp), NULL))
 int ipv6_addlinklocalcallback(struct interface *, void (*)(void *), void *);
 void ipv6_free_ll_callbacks(struct interface *);
 int ipv6_start(struct interface *);

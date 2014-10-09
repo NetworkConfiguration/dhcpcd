@@ -391,14 +391,15 @@ ipv6nd_free_opts(struct ra *rap)
 	}
 }
 
-int
-ipv6nd_addrexists(struct dhcpcd_ctx *ctx, const struct ipv6_addr *addr)
+struct ipv6_addr *
+ipv6nd_findaddr(struct dhcpcd_ctx *ctx, const struct in6_addr *addr,
+    short flags)
 {
 	struct ra *rap;
 	struct ipv6_addr *ap;
 
 	if (ctx->ipv6 == NULL)
-		return 0;
+		return NULL;
 
 	TAILQ_FOREACH(rap, ctx->ipv6->ra_routers, next) {
 		TAILQ_FOREACH(ap, &rap->addrs, next) {
@@ -406,12 +407,14 @@ ipv6nd_addrexists(struct dhcpcd_ctx *ctx, const struct ipv6_addr *addr)
 				if ((ap->flags &
 				    (IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED)) ==
 				    (IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED))
-					return 1;
-			} else if (IN6_ARE_ADDR_EQUAL(&ap->addr, &addr->addr))
-				return 1;
+					return ap;
+			} else if (ap->prefix_vltime &&
+			    IN6_ARE_ADDR_EQUAL(&ap->addr, addr) &&
+			    (!flags || ap->flags & flags))
+				return ap;
 		}
 	}
-	return 0;
+	return NULL;
 }
 
 void ipv6nd_freedrop_ra(struct ra *rap, int drop)
@@ -525,7 +528,7 @@ ipv6nd_scriptrun(struct ra *rap)
 		{
 			hasaddress = 1;
 			if (!(ap->flags & IPV6_AF_DADCOMPLETED) &&
-			    ipv6_findaddr(ap->iface, &ap->addr))
+			    ipv6_iffindaddr(ap->iface, &ap->addr))
 				ap->flags |= IPV6_AF_DADCOMPLETED;
 			if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0) {
 				syslog(LOG_DEBUG,

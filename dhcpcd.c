@@ -231,14 +231,14 @@ dhcpcd_ipwaited(struct dhcpcd_ctx *ctx)
 	    !ipv4_addrexists(ctx, NULL))
 		return 0;
 	if (ctx->options & DHCPCD_WAITIP6 &&
-	    !ipv6nd_addrexists(ctx, NULL) &&
-	    !dhcp6_addrexists(ctx, NULL))
+	    !ipv6nd_findaddr(ctx, NULL, 0) &&
+	    !dhcp6_findaddr(ctx, NULL, 0))
 		return 0;
 	if (ctx->options & DHCPCD_WAITIP &&
 	    !(ctx->options & (DHCPCD_WAITIP4 | DHCPCD_WAITIP6)) &&
 	    !ipv4_addrexists(ctx, NULL) &&
-	    !ipv6nd_addrexists(ctx, NULL) &&
-	    !dhcp6_addrexists(ctx, NULL))
+	    !ipv6nd_findaddr(ctx, NULL, 0) &&
+	    !dhcp6_findaddr(ctx, NULL, 0))
 		return 0;
 	return 1;
 }
