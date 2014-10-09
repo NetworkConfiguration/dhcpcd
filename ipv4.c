@@ -584,7 +584,7 @@ ipv4_buildroutes(struct dhcpcd_ctx *ctx)
 	TAILQ_INIT(nrs);
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 		state = D_CSTATE(ifp);
-		if (state == NULL || state->new == NULL)
+		if (state == NULL || state->new == NULL || !state->added)
 			continue;
 		dnr = get_routes(ifp);
 		dnr = massage_host_routes(dnr, ifp);
@@ -764,6 +764,7 @@ ipv4_applyaddr(void *arg)
 					{
 						ipv4_addaddr(ifn,
 						    &nstate->lease);
+						nstate->added = 1;
 						break;
 					}
 				}
