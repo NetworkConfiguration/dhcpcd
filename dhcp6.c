@@ -2253,6 +2253,8 @@ dhcp6_script_try_run(struct interface *ifp)
 	completed = 1;
 	/* If all addresses have completed DAD run the script */
 	TAILQ_FOREACH(ap, &state->addrs, next) {
+		if (!(ap->flags & IPV6_AF_ADDED))
+			continue;
 		if (ap->flags & IPV6_AF_ONLINK) {
 			if (!(ap->flags & IPV6_AF_DADCOMPLETED) &&
 			    ipv6_iffindaddr(ap->iface, &ap->addr))
