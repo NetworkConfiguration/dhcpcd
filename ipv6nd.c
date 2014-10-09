@@ -1155,9 +1155,9 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 
 	i = l = 0;
 	TAILQ_FOREACH(rap, ifp->ctx->ipv6->ra_routers, next) {
-		i++;
 		if (rap->iface != ifp)
 			continue;
+		i++;
 		if (env) {
 			snprintf(buffer, sizeof(buffer),
 			    "ra%zu_from", i);
