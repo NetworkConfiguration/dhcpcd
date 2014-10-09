@@ -1141,6 +1141,9 @@ ipv6_routedeleted(struct dhcpcd_ctx *ctx, const struct rt6 *rt)
 {
 	struct rt6 *f;
 
+	if (ctx->ipv6 == NULL)
+		return 0;
+
 	f = find_route6(ctx->ipv6->routes, rt);
 	if (f == NULL)
 		return 0;
