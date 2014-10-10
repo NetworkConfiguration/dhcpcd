@@ -124,6 +124,7 @@ static void
 arp_packet(void *arg)
 {
 	struct interface *ifp = arg;
+	const struct interface *ifn;
 	uint8_t arp_buffer[ARP_LEN];
 	struct arphdr ar;
 	uint32_t reply_s;
@@ -170,8 +171,12 @@ arp_packet(void *arg)
 		if ((hw_t + ar.ar_hln + ar.ar_pln) - arp_buffer > bytes)
 			continue;
 		/* Ignore messages from ourself */
-		if (ar.ar_hln == ifp->hwlen &&
-		    memcmp(hw_s, ifp->hwaddr, ifp->hwlen) == 0)
+		TAILQ_FOREACH(ifn, ifp->ctx->ifaces, next) {
+			if (ar.ar_hln == ifn->hwlen &&
+			    memcmp(hw_s, ifn->hwaddr, ifn->hwlen) == 0)
+				break;
+		}
+		if (ifn)
 			continue;
 		/* Copy out the IP addresses */
 		memcpy(&reply_s, hw_s + ar.ar_hln, ar.ar_pln);
