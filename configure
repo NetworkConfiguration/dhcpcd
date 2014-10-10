@@ -370,7 +370,6 @@ linux*)
 kfreebsd*)
 	echo "CPPFLAGS+=	-D_GNU_SOURCE" >>$CONFIG_MK
 	echo "DHCPCD_SRCS+=	if-bsd.c" >>$CONFIG_MK
-	echo "COMPAT_SRCS+=	compat/linkaddr.c" >>$CONFIG_MK
 	;;
 sunos*)
 	echo "WARNING!!! Solaris support is at early development stage!" >&2

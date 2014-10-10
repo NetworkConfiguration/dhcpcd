@@ -524,10 +524,9 @@ if_route(const struct rt *rt, int action)
 		    rt->gate.s_addr != htonl(INADDR_LOOPBACK)) ||
 		    !(rtm.hdr.rtm_flags & RTF_STATIC))
 		{
-			/* Make us a link layer socket for the host gateway */
-			memset(&su, 0, sizeof(su));
-			su.sdl.sdl_len = sizeof(struct sockaddr_dl);
-			link_addr(rt->iface->name, &su.sdl);
+			memcpy(&su.sdl,
+			    &rt->iface->linkaddr, sizeof(struct sockaddr_dl));
+			su.sdl.sdl_nlen = su.sdl.sdl_alen = su.sdl.sdl_slen = 0;
 			ADDSU;
 		} else
 			ADDADDR(&rt->gate);
@@ -537,10 +536,9 @@ if_route(const struct rt *rt, int action)
 		ADDADDR(&rt->net);
 
 	if (rtm.hdr.rtm_addrs & RTA_IFP) {
-		/* Make us a link layer socket for the host gateway */
-		memset(&su, 0, sizeof(su));
-		su.sdl.sdl_len = sizeof(struct sockaddr_dl);
-		link_addr(rt->iface->name, &su.sdl);
+		memcpy(&su.sdl,
+		    &rt->iface->linkaddr, sizeof(struct sockaddr_dl));
+		su.sdl.sdl_nlen = su.sdl.sdl_alen = su.sdl.sdl_slen = 0;
 		ADDSU;
 	}
 
@@ -698,10 +696,10 @@ if_route6(const struct rt6 *rt, int action)
 	lla = NULL;
 	if (rtm.hdr.rtm_addrs & RTA_GATEWAY) {
 		if (IN6_IS_ADDR_UNSPECIFIED(&rt->gate)) {
-			lla = ipv6_linklocal(rt->iface);
-			if (lla == NULL) /* unlikely */
-				return -1;
-			ADDADDRS(&lla->addr, rt->iface->index);
+			memcpy(&su.sdl,
+			    &rt->iface->linkaddr, sizeof(struct sockaddr_dl));
+			su.sdl.sdl_nlen = su.sdl.sdl_alen = su.sdl.sdl_slen = 0;
+			ADDSU;
 		} else {
 			ADDADDRS(&rt->gate, rt->iface->index);
 		}
@@ -711,10 +709,9 @@ if_route6(const struct rt6 *rt, int action)
 		ADDADDR(&rt->net);
 
 	if (rtm.hdr.rtm_addrs & RTA_IFP) {
-		/* Make us a link layer socket for the host gateway */
-		memset(&su, 0, sizeof(su));
-		su.sdl.sdl_len = sizeof(struct sockaddr_dl);
-		link_addr(rt->iface->name, &su.sdl);
+		memcpy(&su.sdl,
+		    &rt->iface->linkaddr, sizeof(struct sockaddr_dl));
+		su.sdl.sdl_nlen = su.sdl.sdl_alen = su.sdl.sdl_slen = 0;
 		ADDSU;
 	}
 
@@ -1048,9 +1045,14 @@ if_nd6reachable(const char *ifname, struct in6_addr *addr)
 	memset(&nbi, 0, sizeof(nbi));
 	strlcpy(nbi.ifname, ifname, sizeof(nbi.ifname));
 	nbi.addr = *addr;
-	if (ioctl(s, SIOCGNBRINFO_IN6, &nbi) == -1)
+	if (ioctl(s, SIOCGNBRINFO_IN6, &nbi) == -1) {
+#ifdef __FreeBSD__
+		/* FreeBSD doesn't support reachable routers? */
+		if (errno == EINVAL)
+			errno = ENOTSUP;
+#endif
 		flags = -1;
-	else {
+	} else {
 		flags = 0;
 		switch(nbi.state) {
 		case ND6_LLINFO_REACHABLE:

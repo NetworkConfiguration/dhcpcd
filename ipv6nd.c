@@ -368,8 +368,12 @@ ipv6nd_checkreachablerouters(void *arg)
 	TAILQ_FOREACH(rap, ctx->ipv6->ra_routers, next) {
 		flags = if_nd6reachable(rap->iface->name, &rap->from);
 		if (flags == -1) {
-			/* An error occured, so it's unreachable */
-			flags = 0;
+			if (errno == ENOTSUP)
+				/* Unsupported? We have to assume reachable */
+				flags = IPV6ND_REACHABLE;
+			else
+				/* An error occured, so it's unreachable */
+				flags = 0;
 		}
 		ipv6nd_reachable(rap, flags);
 	}
@@ -1110,7 +1114,8 @@ handle_flag:
 
 #ifndef HAVE_RTM_GETNEIGH
 	/* Start our reachability tests now */
-	ipv6nd_checkreachablerouters(ifp->ctx);
+	eloop_timeout_add_sec(ifp->ctx->eloop, ND6REACHABLE_TIMER,
+	    ipv6nd_checkreachablerouters, ifp->ctx);
 #endif
 }
 

@@ -326,6 +326,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 			}
 #endif
 
+			memcpy(&ifp->linkaddr, sdl, sdl->sdl_len);
 			ifp->index = sdl->sdl_index;
 			sdl_type = sdl->sdl_type;
 			switch(sdl->sdl_type) {
