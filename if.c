@@ -302,7 +302,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		sdl_type = 0;
 		/* Don't allow loopback unless explicit */
 		if (ifp->flags & IFF_LOOPBACK) {
-			if (argc == 0 && ctx->ifac == 0) {
+			if ((argc == 0 || argc == -1) && ctx->ifac == 0) {
 				if_free(ifp);
 				continue;
 			}
@@ -332,7 +332,9 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 #ifdef IFT_BRIDGE
 			case IFT_BRIDGE:
 				/* Don't allow bridge unless explicit */
-				if (argc == 0 && ctx->ifac == 0) {
+				if ((argc == 0 || argc == -1)
+				    && ctx->ifac == 0)
+				{
 					if_free(ifp);
 					continue;
 				}
@@ -382,7 +384,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		if (!(ifp->flags & IFF_POINTOPOINT) &&
 		    ifp->family != ARPHRD_ETHER)
 		{
-			if (argc == 0 && ctx->ifac == 0) {
+			if ((argc == 0 || argc == -1) && ctx->ifac == 0) {
 				if_free(ifp);
 				continue;
 			}
