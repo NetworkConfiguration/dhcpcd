@@ -272,9 +272,6 @@ ssize_t make_message(struct dhcp_message **, const struct interface *,
     uint8_t);
 int valid_dhcp_packet(unsigned char *);
 
-ssize_t write_lease(const struct interface *, const struct dhcp_message *);
-struct dhcp_message *read_lease(struct interface *);
-
 void dhcp_handleifa(int, struct interface *,
     const struct in_addr *, const struct in_addr *, const struct in_addr *);
 

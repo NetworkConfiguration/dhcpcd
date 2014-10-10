@@ -46,6 +46,7 @@
 #include <unistd.h>
 
 #include "config.h"
+#include "arp.h"
 #include "common.h"
 #include "dhcpcd.h"
 #include "dhcp.h"
@@ -762,9 +763,18 @@ ipv4_applyaddr(void *arg)
 					if (nstate && !nstate->added &&
 					    nstate->addr.s_addr == addr.s_addr)
 					{
-						ipv4_addaddr(ifn,
-						    &nstate->lease);
-						nstate->added = 1;
+						if (ifn->options->options &
+						    DHCPCD_ARP)
+						{
+							nstate->claims = 0;
+							nstate->probes = 0;
+							nstate->conflicts = 0;
+							arp_probe(ifn);
+						} else {
+							ipv4_addaddr(ifn,
+							    &nstate->lease);
+							nstate->added = 1;
+						}
 						break;
 					}
 				}
@@ -857,10 +867,6 @@ ipv4_applyaddr(void *arg)
 
 routes:
 	ipv4_buildroutes(ifp->ctx);
-	if (!state->lease.frominfo &&
-	    !(ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC)))
-		if (write_lease(ifp, dhcp) == -1)
-			syslog(LOG_ERR, "%s: write_lease: %m", __func__);
 	script_runreason(ifp, state->reason);
 }
 
