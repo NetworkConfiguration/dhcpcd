@@ -63,7 +63,9 @@ struct interface {
 	unsigned int index;
 	unsigned int flags;
 	sa_family_t family;
+#ifdef __FreeBSD
 	struct sockaddr_storage linkaddr;
+#endif
 	unsigned char hwaddr[HWADDR_LEN];
 	uint8_t hwlen;
 	unsigned int metric;

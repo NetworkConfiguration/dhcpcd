@@ -326,7 +326,9 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 			}
 #endif
 
+#ifdef __FreeBSD__
 			memcpy(&ifp->linkaddr, sdl, sdl->sdl_len);
+#endif
 			ifp->index = sdl->sdl_index;
 			sdl_type = sdl->sdl_type;
 			switch(sdl->sdl_type) {

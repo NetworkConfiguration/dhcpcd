@@ -144,6 +144,19 @@ if_openlinksocket(void)
 #endif
 }
 
+static void
+if_linkaddr(struct sockaddr_dl *sdl, const struct interface *ifp)
+{
+
+#ifdef __FreeBSD__
+	memcpy(sdl, &ifp->linkaddr, sizeof(*sdl));
+	sdl->sdl_nlen = sdl->sdl_alen = sdl->sdl_slen = 0;
+#else
+	sdl->sdl_len = sizeof(*sdl);
+	link_addr(ifp->name, sdl);
+#endif
+}
+
 static int
 if_getssid1(const char *ifname, uint8_t *ssid)
 {
@@ -524,9 +537,7 @@ if_route(const struct rt *rt, int action)
 		    rt->gate.s_addr != htonl(INADDR_LOOPBACK)) ||
 		    !(rtm.hdr.rtm_flags & RTF_STATIC))
 		{
-			memcpy(&su.sdl,
-			    &rt->iface->linkaddr, sizeof(struct sockaddr_dl));
-			su.sdl.sdl_nlen = su.sdl.sdl_alen = su.sdl.sdl_slen = 0;
+			if_linkaddr(&su.sdl, rt->iface);
 			ADDSU;
 		} else
 			ADDADDR(&rt->gate);
@@ -536,9 +547,7 @@ if_route(const struct rt *rt, int action)
 		ADDADDR(&rt->net);
 
 	if (rtm.hdr.rtm_addrs & RTA_IFP) {
-		memcpy(&su.sdl,
-		    &rt->iface->linkaddr, sizeof(struct sockaddr_dl));
-		su.sdl.sdl_nlen = su.sdl.sdl_alen = su.sdl.sdl_slen = 0;
+		if_linkaddr(&su.sdl, rt->iface);
 		ADDSU;
 	}
 
@@ -696,9 +705,7 @@ if_route6(const struct rt6 *rt, int action)
 	lla = NULL;
 	if (rtm.hdr.rtm_addrs & RTA_GATEWAY) {
 		if (IN6_IS_ADDR_UNSPECIFIED(&rt->gate)) {
-			memcpy(&su.sdl,
-			    &rt->iface->linkaddr, sizeof(struct sockaddr_dl));
-			su.sdl.sdl_nlen = su.sdl.sdl_alen = su.sdl.sdl_slen = 0;
+			if_linkaddr(&su.sdl, rt->iface);
 			ADDSU;
 		} else {
 			ADDADDRS(&rt->gate, rt->iface->index);
@@ -709,9 +716,7 @@ if_route6(const struct rt6 *rt, int action)
 		ADDADDR(&rt->net);
 
 	if (rtm.hdr.rtm_addrs & RTA_IFP) {
-		memcpy(&su.sdl,
-		    &rt->iface->linkaddr, sizeof(struct sockaddr_dl));
-		su.sdl.sdl_nlen = su.sdl.sdl_alen = su.sdl.sdl_slen = 0;
+		if_linkaddr(&su.sdl, rt->iface);
 		ADDSU;
 	}
 
