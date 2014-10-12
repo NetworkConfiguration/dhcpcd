@@ -1093,6 +1093,8 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, rap); /* reachable timer */
 
 handle_flag:
+	if (!(ifp->options->options & DHCPCD_DHCP6))
+		goto nodhcp6;
 	if (rap->flags & ND_RA_FLAG_MANAGED) {
 		if (new_data && dhcp6_start(ifp, DH6S_INIT) == -1)
 			syslog(LOG_ERR, "dhcp6_start: %s: %m", ifp->name);
@@ -1103,6 +1105,7 @@ handle_flag:
 		if (new_data)
 			syslog(LOG_DEBUG, "%s: No DHCPv6 instruction in RA",
 			    ifp->name);
+nodhcp6:
 		if (ifp->ctx->options & DHCPCD_TEST) {
 			eloop_exit(ifp->ctx->eloop, EXIT_SUCCESS);
 			return;
