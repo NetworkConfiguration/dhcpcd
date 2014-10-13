@@ -1060,6 +1060,7 @@ if_nd6reachable(const char *ifname, struct in6_addr *addr)
 	} else {
 		flags = 0;
 		switch(nbi.state) {
+		case ND6_LLINFO_NOSTATE:	/* just added */
 		case ND6_LLINFO_REACHABLE:
 		case ND6_LLINFO_STALE:
 		case ND6_LLINFO_DELAY:
