@@ -827,6 +827,10 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 	if (rap->lifetime)
 		rap->expired = 0;
 
+	TAILQ_FOREACH(ap, &rap->addrs, next) {
+		ap->flags |= IPV6_AF_STALE;
+	}
+
 	len -= sizeof(struct nd_router_advert);
 	p = ((uint8_t *)icp) + sizeof(struct nd_router_advert);
 	lifetime = ~0U;
@@ -923,7 +927,8 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 				}
 				ap->dadcallback = ipv6nd_dadcallback;
 				TAILQ_INSERT_TAIL(&rap->addrs, ap, next);
-			}
+			} else
+				ap->flags &= ~IPV6_AF_STALE;
 			if (pi->nd_opt_pi_flags_reserved &
 			    ND_OPT_PI_FLAG_ONLINK)
 				ap->flags |= IPV6_AF_ONLINK;

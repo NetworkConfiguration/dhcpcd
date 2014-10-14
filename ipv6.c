@@ -713,7 +713,9 @@ ipv6_addaddrs(struct ipv6_addrhead *addrs)
 				TAILQ_REMOVE(addrs, ap, next);
 				free(ap);
 			}
-		} else if (!IN6_IS_ADDR_UNSPECIFIED(&ap->addr)) {
+		} else if (!(ap->flags & IPV6_AF_STALE) &&
+		    !IN6_IS_ADDR_UNSPECIFIED(&ap->addr))
+		{
 			apf = ipv6_findaddr(ap->iface->ctx,
 			    &ap->addr, IPV6_AF_ADDED);
 			if (apf && apf->iface != ap->iface) {
