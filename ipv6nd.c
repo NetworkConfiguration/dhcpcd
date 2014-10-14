@@ -79,6 +79,9 @@ struct nd_opt_dnssl {		/* DNSSL option RFC 6106 */
 } __packed;
 #endif
 
+/* Impossible options, so we can easily add extras */
+#define _ND_OPT_PREFIX_ADDR	255 + 1
+
 /* Minimal IPv6 MTU */
 #ifndef IPV6_MMTU
 #define IPV6_MMTU 1280
@@ -704,7 +707,7 @@ static void
 ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
     struct icmp6_hdr *icp, size_t len)
 {
-	size_t olen, l, m, n;
+	size_t olen, l, n;
 	ssize_t r;
 	struct nd_router_advert *nd_ra;
 	struct nd_opt_prefix_info *pi;
@@ -720,7 +723,7 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 	struct nd_opt_hdr *ndo;
 	struct ra_opt *rao;
 	struct ipv6_addr *ap;
-	char *opt, *tmp;
+	char *opt, *opt2, *tmp;
 	struct timeval expire;
 	uint8_t new_rap, new_data;
 
@@ -844,7 +847,7 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 			break;
 		}
 
-		opt = NULL;
+		opt = opt2 = NULL;
 		switch (ndo->nd_opt_type) {
 		case ND_OPT_PREFIX_INFORMATION:
 			pi = (struct nd_opt_prefix_info *)(void *)ndo;
@@ -929,20 +932,16 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 			ap->prefix_pltime =
 			    ntohl(pi->nd_opt_pi_preferred_time);
 			ap->nsprobes = 0;
-			if (opt) {
-				l = strlen(opt) + 1;
-				m = strlen(ap->saddr) + 1;
-				tmp = realloc(opt, l + m);
-				if (tmp) {
-					opt = tmp;
-					opt[l - 1] = ' ';
-					strlcpy(opt + l, ap->saddr, m);
-				} else {
-					syslog(LOG_ERR, "%s: %m", __func__);
-					continue;
+			cbp = inet_ntop(AF_INET6, &ap->prefix, buf, sizeof(buf));
+			if (cbp) {
+				l = strlen(cbp);
+				opt = malloc(l + 5);
+				if (opt) {
+					snprintf(opt, l + 5, "%s/%d", cbp,
+					    ap->prefix_len);
+					opt2 = strdup(ap->saddr);
 				}
-			} else
-				opt = strdup(ap->saddr);
+			}
 			lifetime = ap->prefix_vltime;
 			break;
 
@@ -1043,8 +1042,10 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 			continue;
 		}
 
+		n = ndo->nd_opt_type;
+extra_opt:
 		TAILQ_FOREACH(rao, &rap->options, next) {
-			if (rao->type == ndo->nd_opt_type &&
+			if (rao->type == n &&
 			    strcmp(rao->option, opt) == 0)
 				break;
 		}
@@ -1064,7 +1065,7 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 				syslog(LOG_ERR, "%s: %m", __func__);
 				continue;
 			}
-			rao->type = ndo->nd_opt_type;
+			rao->type = (uint16_t)n;
 			rao->option = opt;
 			TAILQ_INSERT_TAIL(&rap->options, rao, next);
 		} else
@@ -1075,6 +1076,11 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 			expire.tv_sec = (time_t)lifetime;
 			expire.tv_usec = 0;
 			timeradd(&rap->received, &expire, &rao->expire);
+		}
+		if (rao && rao->type == ND_OPT_PREFIX_INFORMATION && opt2) {
+			n = _ND_OPT_PREFIX_ADDR;
+			opt = opt2;
+			goto extra_opt;
 		}
 	}
 
@@ -1159,7 +1165,7 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 	const struct ra_opt *rao;
 	char buffer[32];
 	const char *optn;
-	char **pref, **mtu, **rdnss, **dnssl, ***var, *new;
+	char **pref, **addr, **mtu, **rdnss, **dnssl, ***var, *new;
 
 	i = l = 0;
 	TAILQ_FOREACH(rap, ifp->ctx->ipv6->ra_routers, next) {
@@ -1173,15 +1179,19 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 		}
 		l++;
 
-		pref = mtu = rdnss = dnssl = NULL;
+		pref = addr = mtu = rdnss = dnssl = NULL;
 		TAILQ_FOREACH(rao, &rap->options, next) {
 			if (rao->option == NULL)
 				continue;
 			var = NULL;
 			switch(rao->type) {
 			case ND_OPT_PREFIX_INFORMATION:
-				optn = "prefix"; /* really address */
+				optn = "prefix";
 				var = &pref;
+				break;
+			case _ND_OPT_PREFIX_ADDR:
+				optn = "addr";
+				var = &addr;
 				break;
 			case ND_OPT_MTU:
 				optn = "mtu";

@@ -37,7 +37,7 @@
 
 struct ra_opt {
 	TAILQ_ENTRY(ra_opt) next;
-	uint8_t type;
+	uint16_t type;
 	struct timeval expire;
 	char *option;
 };
