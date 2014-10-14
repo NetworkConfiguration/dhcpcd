@@ -40,13 +40,13 @@ BSD systems where this has been fixed or is known to work are:
     FreeBSD-10.0
 
 Some BSD systems protect against IPv6 NS/NA messages by ensuring that the
-source address matches an address/prefix on the interface.
-This is an error as the correct check is for on-link prefixes.
-As such, on these systems stateful addressing via DHCPv6 may cause issues
-trying to reach other neighbours.
-BSD systems where this is known to be a problem
-    Occured in NetBSD-5.0, fixed in NetBSD-6.99.29
-    Occured in OpenBSD-4.2, fixed in OpenBSD-5.0
+source address matches a prefix on the recieved by a RA message.
+This is an error as the correct check is for on-link prefixes as the
+kernel may not be handling RA itself.
+BSD systems where this has been fixed or is known to work are:
+    NetBSD-7.0
+    OpenBSD-5.0
+    patch submitted against FreeBSD-10.0
 
 We try and detect how dhcpcd should interact with system services at runtime.
 If we cannot auto-detect how do to this, or it is wrong then
