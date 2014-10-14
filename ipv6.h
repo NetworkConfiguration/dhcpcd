@@ -159,9 +159,6 @@ struct ipv6_ctx {
 	const char *sfrom;
 
 	int nd_fd;
-#ifdef IPV6_POLLADDRFLAG
-	uint8_t polladdr_warned;
-#endif
 	struct ra_head *ra_routers;
 	struct rt6_head *routes;
 

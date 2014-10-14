@@ -149,16 +149,6 @@ ipv6_init(struct dhcpcd_ctx *dhcpcd_ctx)
 	ctx->nd_fd = -1;
 	ctx->dhcp_fd = -1;
 
-#ifdef IPV6_POLLADDRFLAG
-	if (!ctx->polladdr_warned) {
-		syslog(LOG_WARNING,
-		    "kernel does not report IPv6 address flag changes");
-		syslog(LOG_WARNING,
-		    "polling tentative address flags periodically instead");
-		ctx->polladdr_warned = 1;
-	}
-#endif
-
 	dhcpcd_ctx->ipv6 = ctx;
 	return ctx;
 }
