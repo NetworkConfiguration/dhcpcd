@@ -1061,6 +1061,7 @@ extra_opt:
 				free(rao);
 			}
 			free(opt);
+			free(opt2);
 			continue;
 		}
 
@@ -1085,6 +1086,7 @@ extra_opt:
 		if (rao && rao->type == ND_OPT_PREFIX_INFORMATION && opt2) {
 			n = _ND_OPT_PREFIX_ADDR;
 			opt = opt2;
+			opt2 = NULL;
 			goto extra_opt;
 		}
 	}
