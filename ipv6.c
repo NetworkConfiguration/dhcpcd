@@ -612,7 +612,7 @@ ipv6_addaddr(struct ipv6_addr *ap)
 
 	/* Ensure no other interface has this address */
 	TAILQ_FOREACH(ifp, ap->iface->ctx->ifaces, next) {
-		if (ifp == ap->iface)
+		if (ifp == ap->iface || strcmp(ifp->name, ap->iface->name) == 0)
 			continue;
 		state = IPV6_STATE(ifp);
 		if (state == NULL)
