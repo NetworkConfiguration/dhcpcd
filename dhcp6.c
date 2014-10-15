@@ -458,7 +458,7 @@ dhcp6_delegateaddr(struct in6_addr *addr, struct interface *ifp,
 #define BIT_MASK(len) (BIT(len) - 1)
 		if (ia->sla_max == 0)
 			/* Work out the real sla_max from our bits used */
-			ia->sla_max = BIT_MASK(asla.prefix_len -
+			ia->sla_max = (uint32_t)BIT_MASK(asla.prefix_len -
 			    prefix->prefix_len);
 	}
 
