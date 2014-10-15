@@ -123,6 +123,7 @@ struct if_ia {
 	uint8_t iaid_set;
 	struct in6_addr addr;
 	uint8_t prefix_len;
+	uint32_t sla_max;
 	size_t sla_len;
 	struct if_sla *sla;
 #endif
