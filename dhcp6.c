@@ -2297,7 +2297,7 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 }
 
 static void
-dhcp6_script_try_run(struct interface *ifp)
+dhcp6_script_try_run(struct interface *ifp, const char *reason)
 {
 	struct dhcp6_state *state;
 	struct ipv6_addr *ap;
@@ -2326,7 +2326,7 @@ dhcp6_script_try_run(struct interface *ifp)
 			valid = 1;
 	}
 	if (completed) {
-		script_runreason(ifp, state->reason);
+		script_runreason(ifp, reason ? reason : state->reason);
 		if (valid)
 			dhcpcd_daemonise(ifp->ctx);
 	} else
@@ -2434,7 +2434,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 		if (k && !carrier_warned) {
 			ifd_state = D6_STATE(ifd);
 			ipv6_addaddrs(&ifd_state->addrs);
-			dhcp6_script_try_run(ifd);
+			dhcp6_script_try_run(ifd, "DELEGATED6");
 		}
 	}
 }
@@ -2499,7 +2499,7 @@ dhcp6_find_delegates(struct interface *ifp)
 		state->state = DH6S_DELEGATED;
 		ipv6_addaddrs(&state->addrs);
 		ipv6_buildroutes(ifp->ctx);
-		dhcp6_script_try_run(ifp);
+		dhcp6_script_try_run(ifp, "DELEGATED6");
 	}
 	return k;
 }
@@ -2970,7 +2970,7 @@ recv:
 			    "%s: will expire", ifp->name);
 		ipv6_buildroutes(ifp->ctx);
 		dhcp6_writelease(ifp);
-		dhcp6_script_try_run(ifp);
+		dhcp6_script_try_run(ifp, NULL);
 	}
 
 	if (ifp->ctx->options & DHCPCD_TEST ||
