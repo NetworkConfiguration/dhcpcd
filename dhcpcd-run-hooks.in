@@ -161,7 +161,7 @@ copy_file()
 		ln -sf "$1" "$2"
 	else
 		comp_file "$1" "$2" && return 1
-		cat "$2" >"$1"
+		cat "$1" >"$2"
 	fi
 }
 
