@@ -757,7 +757,8 @@ ipv4_applyaddr(void *arg)
 				addr = state->addr;
 				delete_address(ifp);
 				TAILQ_FOREACH(ifn, ifp->ctx->ifaces, next) {
-					if (ifn == ifp)
+					if (ifn == ifp ||
+					    strcmp(ifn->name, ifp->name) == 0)
 						continue;
 					nstate = D_STATE(ifn);
 					if (nstate && !nstate->added &&
@@ -788,7 +789,7 @@ ipv4_applyaddr(void *arg)
 
 	/* Ensure only one interface has the address */
 	TAILQ_FOREACH(ifn, ifp->ctx->ifaces, next) {
-		if (ifn == ifp)
+		if (ifn == ifp || strcmp(ifn->name, ifp->name) == 0)
 			continue;
 		nstate = D_STATE(ifn);
 		if (nstate && nstate->added &&

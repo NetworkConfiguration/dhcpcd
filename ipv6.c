@@ -718,7 +718,9 @@ ipv6_addaddrs(struct ipv6_addrhead *addrs)
 		{
 			apf = ipv6_findaddr(ap->iface->ctx,
 			    &ap->addr, IPV6_AF_ADDED);
-			if (apf && apf->iface != ap->iface) {
+			if (apf && apf->iface != ap->iface &&
+			    strcmp(apf->iface->name, ap->iface->name))
+			{
 				if (apf->iface->metric <= ap->iface->metric) {
 					syslog(LOG_INFO,
 					    "%s: preferring %s on %s",
@@ -765,7 +767,9 @@ ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
 		{
 			/* Find the same address somewhere else */
 			apf = ipv6_findaddr(ap->iface->ctx, &ap->addr, 0);
-			if (apf == NULL || apf->iface != ap->iface)
+			if (apf == NULL ||
+			    (apf->iface != ap->iface &&
+			    strcmp(apf->iface->name, ap->iface->name)))
 				ipv6_deleteaddr(ap);
 			if (!(ap->iface->options->options &
 			    DHCPCD_EXITING) && apf)
