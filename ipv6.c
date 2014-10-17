@@ -737,7 +737,8 @@ ipv6_addaddrs(struct ipv6_addrhead *addrs)
 				if (if_deladdress6(apf) == -1 &&
 				    errno != EADDRNOTAVAIL && errno != ENXIO)
 					syslog(LOG_ERR, "if_deladdress6: %m");
-				apf->flags &= ~IPV6_AF_ADDED;
+				apf->flags &=
+				    ~(IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED);
 			} else if (apf)
 				apf->flags &= ~IPV6_AF_ADDED;
 			if (ap->flags & IPV6_AF_NEW)
