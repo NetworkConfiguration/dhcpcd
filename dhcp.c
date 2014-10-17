@@ -1601,7 +1601,7 @@ send_message(struct interface *iface, uint8_t type,
 	if (dhcp_open(iface) == -1)
 		return;
 
-	if (state->addr.s_addr != INADDR_ANY &&
+	if (state->added && state->addr.s_addr != INADDR_ANY &&
 	    state->new != NULL &&
 	    (state->new->cookie == htonl(MAGIC_COOKIE) ||
 	    iface->options->options & DHCPCD_INFORM))
