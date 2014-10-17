@@ -704,6 +704,9 @@ dhcpcd_startinterface(void *arg)
 		    !(ifo->options & (DHCPCD_INFORM | DHCPCD_PFXDLGONLY)))
 			ipv6nd_startrs(ifp);
 
+		if (ifo->options & DHCPCD_DHCP6)
+			dhcp6_find_delegates(ifp);
+
 		if (!(ifo->options & DHCPCD_IPV6RS) ||
 		    ifo->options & DHCPCD_IA_FORCED)
 		{
@@ -712,7 +715,6 @@ dhcpcd_startinterface(void *arg)
 			if (ifo->options & DHCPCD_IA_FORCED)
 				nolease = dhcp6_start(ifp, DH6S_INIT);
 			else {
-				dhcp6_find_delegates(ifp);
 				nolease = 0;
 				/* Enabling the below doesn't really make
 				 * sense as there is currently no standard
