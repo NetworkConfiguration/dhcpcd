@@ -1067,7 +1067,6 @@ if_openrawsocket(struct interface *ifp, int protocol)
 	int s;
 	union sockunion {
 		struct sockaddr sa;
-		struct sockaddr_in sin;
 		struct sockaddr_ll sll;
 		struct sockaddr_storage ss;
 	} su;
@@ -1121,7 +1120,7 @@ if_openrawsocket(struct interface *ifp, int protocol)
 	su.sll.sll_family = PF_PACKET;
 	su.sll.sll_protocol = htons(protocol);
 	su.sll.sll_ifindex = (int)ifp->index;
-	if (bind(s, &su.sa, sizeof(su)) == -1)
+	if (bind(s, &su.sa, sizeof(su.sll)) == -1)
 		goto eexit;
 	return s;
 
@@ -1159,7 +1158,7 @@ if_sendrawpacket(const struct interface *ifp, int protocol,
 	else
 		fd = state->raw_fd;
 
-	return sendto(fd, data, len, 0, &su.sa, sizeof(su));
+	return sendto(fd, data, len, 0, &su.sa, sizeof(su.sll));
 }
 
 ssize_t
