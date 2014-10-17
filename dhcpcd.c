@@ -204,7 +204,7 @@ handle_exit_timeout(void *arg)
 		return;
 	}
 	ctx->options &= ~DHCPCD_TIMEOUT_IPV4LL;
-	timeout = (PROBE_NUM * PROBE_MAX) + (PROBE_WAIT * 2);
+	timeout = (PROBE_NUM * PROBE_MAX) + (PROBE_WAIT * 2) + DHCP_MAX_DELAY;
 	syslog(LOG_WARNING, "allowing %d seconds for IPv4LL timeout", timeout);
 	eloop_timeout_add_sec(ctx->eloop, timeout, handle_exit_timeout, ctx);
 }
