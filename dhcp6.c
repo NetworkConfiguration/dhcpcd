@@ -3147,18 +3147,23 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 
 	state = D6_STATE(ifp);
 	if (state) {
-		if (state->state == DH6S_DELEGATED) {
-			dhcp6_find_delegates(ifp);
-			return 0;
-		}
 		if (state->state == DH6S_INFORMED &&
 		    init_state == DH6S_INFORM)
 		{
 			dhcp6_startinform(ifp);
 			return 0;
 		}
+		if (init_state == DH6S_INIT &&
+		    ifp->options->options & DHCPCD_DHCP6 &&
+		    (state->state == DH6S_INFORM ||
+		    state->state == DH6S_INFORMED ||
+		    state->state == DH6S_DELEGATED))
+		{
+			/* Change from stateless to stateful */
+			goto gogogo;
+		}
 		/* We're already running DHCP6 */
-		/* XXX: What if the managed flag changes? */
+		/* XXX: What if the managed flag vanishes from all RA? */
 		return 0;
 	}
 
@@ -3175,16 +3180,13 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 
 	state->sol_max_rt = SOL_MAX_RT;
 	state->inf_max_rt = INF_MAX_RT;
-
 	TAILQ_INIT(&state->addrs);
-	if (dhcp6_find_delegates(ifp))
-		return 0;
 
+gogogo:
 	state->state = init_state;
 	snprintf(state->leasefile, sizeof(state->leasefile),
 	    LEASEFILE6, ifp->name,
 	    ifp->options->options & DHCPCD_PFXDLGONLY ? ".pd" : "");
-
 	if (ipv6_linklocal(ifp) == NULL) {
 		syslog(LOG_DEBUG,
 		    "%s: delaying DHCPv6 soliciation for LL address",
