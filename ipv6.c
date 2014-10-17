@@ -590,7 +590,7 @@ ipv6_deleteaddr(struct ipv6_addr *addr)
 	syslog(LOG_INFO, "%s: deleting address %s",
 	    addr->iface->name, addr->saddr);
 	if (if_deladdress6(addr) == -1 &&
-	    errno != EADDRNOTAVAIL && errno != ENXIO)
+	    errno != EADDRNOTAVAIL && errno != ENXIO && errno != ENODEV)
 		syslog(LOG_ERR, "if_deladdress6: :%m");
 
 	state = IPV6_STATE(addr->iface);
