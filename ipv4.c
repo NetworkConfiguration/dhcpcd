@@ -817,7 +817,7 @@ ipv4_applyaddr(void *arg)
 	/* Does another interface already have the address from a prior boot? */
 	if (ifn == NULL) {
 		TAILQ_FOREACH(ifn, ifp->ctx->ifaces, next) {
-			if (ifn == ifp)
+			if (ifn == ifp || strcmp(ifn->name, ifp->name) == 0)
 				continue;
 			ap = ipv4_iffindaddr(ifn, &lease->addr, NULL);
 			if (ap)
