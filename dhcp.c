@@ -2159,13 +2159,16 @@ dhcp_drop(struct interface *ifp, const char *reason)
 	struct timespec ts;
 #endif
 
+	/* dhcp_start may just have been called and we don't yet have a state
+	 * but we do have a timeout, so punt it. */
+	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
+
 	state = D_STATE(ifp);
 	if (state == NULL)
 		return;
 	dhcp_auth_reset(&state->auth);
 	dhcp_close(ifp);
 	arp_close(ifp);
-	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	if (ifp->options->options & DHCPCD_RELEASE) {
 		unlink(state->leasefile);
 		if (ifp->carrier != LINK_DOWN &&
