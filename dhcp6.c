@@ -1264,10 +1264,12 @@ dhcp6_dadcallback(void *arg)
 		if (state->state == DH6S_BOUND ||
 		    state->state == DH6S_DELEGATED)
 		{
+			struct ipv6_addr *ap2;
+
 			valid = (ap->delegating_iface == NULL);
-			TAILQ_FOREACH(ap, &state->addrs, next) {
-				if (ap->flags & IPV6_AF_ADDED &&
-				    !(ap->flags & IPV6_AF_DADCOMPLETED))
+			TAILQ_FOREACH(ap2, &state->addrs, next) {
+				if (ap2->flags & IPV6_AF_ADDED &&
+				    !(ap2->flags & IPV6_AF_DADCOMPLETED))
 				{
 					wascompleted = 1;
 					break;
@@ -1276,7 +1278,9 @@ dhcp6_dadcallback(void *arg)
 			if (!wascompleted) {
 				syslog(LOG_DEBUG, "%s: DHCPv6 DAD completed",
 				    ifp->name);
-				script_runreason(ifp, state->reason);
+				script_runreason(ifp,
+				    ap->delegating_iface ?
+				    "DELEGATED6" : state->reason);
 				if (valid)
 					dhcpcd_daemonise(ifp->ctx);
 			}
@@ -2296,17 +2300,16 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 }
 
 static void
-dhcp6_script_try_run(struct interface *ifp, const char *reason)
+dhcp6_script_try_run(struct interface *ifp, int delegated)
 {
 	struct dhcp6_state *state;
 	struct ipv6_addr *ap;
-	int completed, valid;
+	int completed;
 
 	state = D6_STATE(ifp);
 	if (!TAILQ_FIRST(&state->addrs))
 		return;
 
-	valid = 0;
 	completed = 1;
 	/* If all addresses have completed DAD run the script */
 	TAILQ_FOREACH(ap, &state->addrs, next) {
@@ -2316,17 +2319,18 @@ dhcp6_script_try_run(struct interface *ifp, const char *reason)
 			if (!(ap->flags & IPV6_AF_DADCOMPLETED) &&
 			    ipv6_iffindaddr(ap->iface, &ap->addr))
 				ap->flags |= IPV6_AF_DADCOMPLETED;
-			if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0) {
+			if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0 &&
+			    ((delegated && ap->delegating_iface) ||
+			    (!delegated && !ap->delegating_iface)))
+			{
 				completed = 0;
 				break;
 			}
 		}
-		if (ap->delegating_iface == NULL)
-			valid = 1;
 	}
 	if (completed) {
-		script_runreason(ifp, reason ? reason : state->reason);
-		if (valid)
+		script_runreason(ifp, delegated ? "DELEGATED6" : state->reason);
+		if (!delegated)
 			dhcpcd_daemonise(ifp->ctx);
 	} else
 		syslog(LOG_DEBUG,
@@ -2433,7 +2437,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 		if (k && !carrier_warned) {
 			ifd_state = D6_STATE(ifd);
 			ipv6_addaddrs(&ifd_state->addrs);
-			dhcp6_script_try_run(ifd, "DELEGATED6");
+			dhcp6_script_try_run(ifd, 1);
 		}
 	}
 }
@@ -2498,7 +2502,7 @@ dhcp6_find_delegates(struct interface *ifp)
 		state->state = DH6S_DELEGATED;
 		ipv6_addaddrs(&state->addrs);
 		ipv6_buildroutes(ifp->ctx);
-		dhcp6_script_try_run(ifp, "DELEGATED6");
+		dhcp6_script_try_run(ifp, 1);
 	}
 	return k;
 }
@@ -2969,7 +2973,7 @@ recv:
 			    "%s: will expire", ifp->name);
 		ipv6_buildroutes(ifp->ctx);
 		dhcp6_writelease(ifp);
-		dhcp6_script_try_run(ifp, NULL);
+		dhcp6_script_try_run(ifp, 0);
 	}
 
 	if (ifp->ctx->options & DHCPCD_TEST ||
