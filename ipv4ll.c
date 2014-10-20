@@ -109,6 +109,8 @@ ipv4ll_start(void *arg)
 		addr = state->offer->yiaddr;
 		free(state->offer);
 	}
+
+	state->state = DHS_INIT_IPV4LL;
 	/* We maybe rebooting an IPv4LL address. */
 	if (!IN_LINKLOCAL(htonl(addr))) {
 		syslog(LOG_INFO, "%s: probing for an IPv4LL address",
