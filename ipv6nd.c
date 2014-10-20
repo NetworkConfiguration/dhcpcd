@@ -1607,7 +1607,7 @@ ipv6nd_startrs(struct interface *ifp)
 	    MAX_RTR_SOLICITATION_DELAY * 1000000);
 	timernorm(&tv);
 	syslog(LOG_DEBUG,
-	    "%s: delaying IPv6 router solictation for %0.1f seconds",
+	    "%s: delaying IPv6 router solicitation for %0.1f seconds",
 	    ifp->name, timeval_to_double(&tv));
 	eloop_timeout_add_tv(ifp->ctx->eloop, &tv, ipv6nd_startrs1, ifp);
 	return;
