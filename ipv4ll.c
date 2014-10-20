@@ -139,13 +139,13 @@ ipv4ll_handle_failure(void *arg)
 		up = uptime();
 		if (state->defend + DEFEND_INTERVAL > up) {
 			syslog(LOG_WARNING,
-			    "%s: IPv4LL %d second defence failed",
-			    ifp->name, DEFEND_INTERVAL);
+			    "%s: IPv4LL %d second defence failed for %s",
+			    ifp->name, DEFEND_INTERVAL, inet_ntoa(state->addr));
 			dhcp_drop(ifp, "EXPIRE");
 			state->conflicts = -1;
 		} else {
-			syslog(LOG_DEBUG, "%s: defended IPv4LL address",
-			    ifp->name);
+			syslog(LOG_DEBUG, "%s: defended IPv4LL address %s",
+			    ifp->name, inet_ntoa(state->addr));
 			state->defend = up;
 			return;
 		}
