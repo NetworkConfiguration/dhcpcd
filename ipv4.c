@@ -852,6 +852,7 @@ ipv4_applyaddr(void *arg)
 		delete_address(ifp);
 
 	state->added = 1;
+	state->defend = 0;
 	state->addr.s_addr = lease->addr.s_addr;
 	state->net.s_addr = lease->net.s_addr;
 
