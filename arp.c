@@ -135,12 +135,11 @@ arp_packet(void *arg)
 	struct dhcp_state *state;
 	struct if_options *opts = ifp->options;
 	const char *hwaddr;
-	struct in_addr ina;
+	struct in_addr ina, fail;
 	char hwbuf[HWADDR_LEN * 3];
 	int flags;
 
 	state = D_STATE(ifp);
-	state->fail.s_addr = 0;
 	flags = 0;
 	while (!(flags & RAW_EOF)) {
 		bytes = if_readrawpacket(ifp, ETHERTYPE_ARP,
@@ -216,19 +215,21 @@ arp_packet(void *arg)
 			return;
 		}
 
+		fail.s_addr = 0;
 		/* RFC 2131 3.1.5, Client-server interaction
 		 * RFC 3927 2.2.1, Probe Conflict Detection */
 		if (state->offer &&
 		    (reply_s == state->offer->yiaddr ||
 		    (reply_s == 0 && reply_t == state->offer->yiaddr)))
-			state->fail.s_addr = state->offer->yiaddr;
+			fail.s_addr = state->offer->yiaddr;
 
 		/* RFC 3927 2.5, Conflict Defense */
 		if (IN_LINKLOCAL(htonl(state->addr.s_addr)) &&
 		    reply_s == state->addr.s_addr)
-			state->fail.s_addr = state->addr.s_addr;
+			fail.s_addr = state->addr.s_addr;
 
-		if (state->fail.s_addr) {
+		if (fail.s_addr) {
+			state->fail = fail;
 			syslog(LOG_ERR, "%s: hardware address %s claims %s",
 			    ifp->name,
 			    hwaddr_ntoa((unsigned char *)hw_s,
