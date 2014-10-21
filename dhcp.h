@@ -212,12 +212,17 @@ struct dhcp_state {
 	time_t nakoff;
 	uint32_t xid;
 	int socket;
+
+	/* ARP */
 	int probes;
 	int claims;
-	int conflicts;
-	time_t defend;
 	struct in_addr fail;
 	size_t arping_index;
+
+	/* IPv4LL */
+	char randomstate[128];
+	int conflicts;
+	time_t defend;
 
 	int raw_fd;
 	int arp_fd;

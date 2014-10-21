@@ -71,29 +71,36 @@ ipv4ll_make_lease(uint32_t addr)
 }
 
 static struct dhcp_message *
-ipv4ll_find_lease(struct dhcpcd_ctx *ctx)
+ipv4ll_find_lease(const struct interface *ifp)
 {
 	uint32_t addr;
-	struct interface *ifp;
+	struct interface *ifp2;
 	const struct dhcp_state *state;
 
 	for (;;) {
-		addr = ntohl(LINKLOCAL_ADDR |
-		    (uint32_t)(abs((int)arc4random_uniform(0xFD00)) + 0x0100));
+		addr = ntohl(LINKLOCAL_ADDR | random() & 0x0000FFFF);
 
-		/* Sanity */
-		if (!IN_LINKLOCAL(htonl(addr)))
+		state = D_CSTATE(ifp);
+		/* No point using a failed address */
+		if (addr == state->fail.s_addr)
+			continue;
+
+		/* RFC 3927 Section 2.1 states that the first 256 and
+		 * last 256 addresses are reserved for future use */
+		if (!IN_LINKLOCAL(htonl(addr)) ||
+		    (htonl(addr) & 0x0000FF00) == 0x0000 ||
+		    (htonl(addr) & 0x0000FF00) == 0xFF00)
 			continue;
 
 		/* Ensure we don't have the address on another interface */
-		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-			state = D_CSTATE(ifp);
+		TAILQ_FOREACH(ifp2, ifp->ctx->ifaces, next) {
+			state = D_CSTATE(ifp2);
 			if (state && state->addr.s_addr == addr)
 				break;
 		}
 
 		/* Yay, this should be a unique and workable IPv4LL address */
-		if (ifp == NULL)
+		if (ifp2 == NULL)
 			break;
 	}
 	return ipv4ll_make_lease(addr);
@@ -115,6 +122,21 @@ ipv4ll_start(void *arg)
 	struct dhcp_state *state = D_STATE(ifp);
 	uint32_t addr;
 
+	/* RFC 3927 Section 2.1 states that the random number generator
+	 * SHOULD be seeded with a value derived from persistent information
+	 * such as the IEEE 802 MAC address. */
+	if (state->conflicts == 0) {
+		unsigned int seed;
+
+		if (sizeof(seed) > ifp->hwlen) {
+			seed = 0;
+			memcpy(&seed, ifp->hwaddr, ifp->hwlen);
+		} else
+			memcpy(&seed, ifp->hwaddr + ifp->hwlen - sizeof(seed),
+			    sizeof(seed));
+		initstate(seed, state->randomstate, sizeof(state->randomstate));
+	}
+
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	state->probes = 0;
 	state->claims = 0;
@@ -133,6 +155,7 @@ ipv4ll_start(void *arg)
 	}
 
 	state->state = DHS_INIT_IPV4LL;
+	setstate(state->randomstate);
 	/* We maybe rebooting an IPv4LL address. */
 	if (!IN_LINKLOCAL(htonl(addr))) {
 		syslog(LOG_INFO, "%s: probing for an IPv4LL address",
@@ -140,15 +163,15 @@ ipv4ll_start(void *arg)
 		addr = 0;
 	}
 	if (addr == 0)
-		state->offer = ipv4ll_find_lease(ifp->ctx);
+		state->offer = ipv4ll_find_lease(ifp);
 	else
 		state->offer = ipv4ll_make_lease(addr);
-	if (state->offer == NULL)
+	if (state->offer == NULL) {
 		syslog(LOG_ERR, "%s: %m", __func__);
-	else {
-		state->lease.frominfo = 0;
-		arp_probe(ifp);
+		return;
 	}
+	state->lease.frominfo = 0;
+	arp_probe(ifp);
 }
 
 void
