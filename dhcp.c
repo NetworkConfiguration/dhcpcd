@@ -1964,8 +1964,12 @@ dhcp_bind(void *arg)
 applyaddr:
 	ipv4_applyaddr(ifp);
 	if (dhcpcd_daemonise(ifp->ctx) == 0) {
-		if (!ipv4ll)
+		if (!ipv4ll) {
+			/* We bound a non IPv4LL address so reset the
+			 * conflict counter */
+			state->conflicts = 0;
 			arp_close(ifp);
+		}
 		if (ifo->options & DHCPCD_ARP) {
 		        state->claims = 0;
 			if (state->added)

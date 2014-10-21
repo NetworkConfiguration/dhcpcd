@@ -277,16 +277,21 @@ arp_announce(void *arg)
 		return;
 	}
 	if (state->new->cookie != htonl(MAGIC_COOKIE)) {
+		/* Reset the conflict counter when we finish announcing. */
+		eloop_timeout_add_sec(ifp->ctx->eloop,
+		    ANNOUNCE_WAIT, ipv4ll_claimed, ifp);
 		/* Check if doing DHCP */
 		if (!(ifp->options->options & DHCPCD_DHCP))
 			return;
 		/* We should pretend to be at the end
 		 * of the DHCP negotation cycle unless we rebooted */
-		if (state->interval != 0)
-			state->interval = 64;
+		if (state->interval)
+			state->interval = 64 + DHCP_RAND_MIN;
+		else
+			state->interval = ANNOUNCE_WAIT;
 		state->probes = 0;
 		state->claims = 0;
-		tv.tv_sec = state->interval - DHCP_RAND_MIN;
+		tv.tv_sec = state->interval;
 		tv.tv_usec = (suseconds_t)arc4random_uniform(
 		    (DHCP_RAND_MAX - DHCP_RAND_MIN) * 1000000);
 		timernorm(&tv);

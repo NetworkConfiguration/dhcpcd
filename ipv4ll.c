@@ -86,6 +86,15 @@ ipv4ll_find_lease(uint32_t old_addr)
 }
 
 void
+ipv4ll_claimed(void *arg)
+{
+	struct interface *ifp = arg;
+	struct dhcp_state *state = D_STATE(ifp);
+
+	state->conflicts = 0;
+}
+
+void
 ipv4ll_start(void *arg)
 {
 	struct interface *ifp = arg;
@@ -96,7 +105,6 @@ ipv4ll_start(void *arg)
 	state->probes = 0;
 	state->claims = 0;
 	if (state->addr.s_addr) {
-		state->conflicts = 0;
 		if (IN_LINKLOCAL(htonl(state->addr.s_addr))) {
 			arp_announce(ifp);
 			return;
@@ -144,7 +152,6 @@ ipv4ll_handle_failure(void *arg)
 			    "%s: IPv4LL %d second defence failed for %s",
 			    ifp->name, DEFEND_INTERVAL, inet_ntoa(state->addr));
 			dhcp_drop(ifp, "EXPIRE");
-			state->conflicts = -1;
 		} else {
 			syslog(LOG_DEBUG, "%s: defended IPv4LL address %s",
 			    ifp->name, inet_ntoa(state->addr));
