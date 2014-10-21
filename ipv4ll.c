@@ -71,15 +71,29 @@ ipv4ll_make_lease(uint32_t addr)
 }
 
 static struct dhcp_message *
-ipv4ll_find_lease(uint32_t old_addr)
+ipv4ll_find_lease(struct dhcpcd_ctx *ctx)
 {
 	uint32_t addr;
+	struct interface *ifp;
+	const struct dhcp_state *state;
 
 	for (;;) {
-		addr = htonl(LINKLOCAL_ADDR |
+		addr = ntohl(LINKLOCAL_ADDR |
 		    (uint32_t)(abs((int)arc4random_uniform(0xFD00)) + 0x0100));
-		if (addr != old_addr &&
-		    IN_LINKLOCAL(ntohl(addr)))
+
+		/* Sanity */
+		if (!IN_LINKLOCAL(htonl(addr)))
+			continue;
+
+		/* Ensure we don't have the address on another interface */
+		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+			state = D_CSTATE(ifp);
+			if (state && state->addr.s_addr == addr)
+				break;
+		}
+
+		/* Yay, this should be a unique and workable IPv4LL address */
+		if (ifp == NULL)
 			break;
 	}
 	return ipv4ll_make_lease(addr);
@@ -126,7 +140,7 @@ ipv4ll_start(void *arg)
 		addr = 0;
 	}
 	if (addr == 0)
-		state->offer = ipv4ll_find_lease(addr);
+		state->offer = ipv4ll_find_lease(ifp->ctx);
 	else
 		state->offer = ipv4ll_make_lease(addr);
 	if (state->offer == NULL)
