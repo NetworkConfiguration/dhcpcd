@@ -177,7 +177,7 @@ ipv4ll_handle_failure(void *arg)
 	free(state->offer);
 	state->offer = NULL;
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
-	if (++state->conflicts > MAX_CONFLICTS) {
+	if (++state->conflicts >= MAX_CONFLICTS) {
 		syslog(LOG_ERR, "%s: failed to acquire an IPv4LL address",
 		    ifp->name);
 		if (ifp->options->options & DHCPCD_DHCP) {
