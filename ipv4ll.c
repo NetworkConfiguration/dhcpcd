@@ -78,18 +78,14 @@ ipv4ll_find_lease(const struct interface *ifp)
 	const struct dhcp_state *state;
 
 	for (;;) {
-		addr = ntohl(LINKLOCAL_ADDR | random() & 0x0000FFFF);
+		/* RFC 3927 Section 2.1 states that the first 256 and
+		 * last 256 addresses are reserved for future use.
+		 * See ipv4ll_start for why we don't use arc4_random. */
+		addr = ntohl(LINKLOCAL_ADDR | ((random() % 0xFD00) + 0x0100));
 
 		state = D_CSTATE(ifp);
 		/* No point using a failed address */
 		if (addr == state->fail.s_addr)
-			continue;
-
-		/* RFC 3927 Section 2.1 states that the first 256 and
-		 * last 256 addresses are reserved for future use */
-		if (!IN_LINKLOCAL(htonl(addr)) ||
-		    (htonl(addr) & 0x0000FF00) == 0x0000 ||
-		    (htonl(addr) & 0x0000FF00) == 0xFF00)
 			continue;
 
 		/* Ensure we don't have the address on another interface */
@@ -124,7 +120,8 @@ ipv4ll_start(void *arg)
 
 	/* RFC 3927 Section 2.1 states that the random number generator
 	 * SHOULD be seeded with a value derived from persistent information
-	 * such as the IEEE 802 MAC address. */
+	 * such as the IEEE 802 MAC address so that it usually picks
+	 * the same address without persistent storage. */
 	if (state->conflicts == 0) {
 		unsigned int seed;
 
