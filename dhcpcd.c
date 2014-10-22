@@ -368,14 +368,20 @@ configure_interface1(struct interface *ifp)
 	if (ifo->metric != -1)
 		ifp->metric = (unsigned int)ifo->metric;
 
+	if (!(ifo->options & DHCPCD_IPV4))
+		ifo->options &= ~(DHCPCD_DHCP | DHCPCD_IPV4LL);
+
 	if (!(ifo->options & DHCPCD_IPV6))
-		ifo->options &= ~DHCPCD_IPV6RS;
+		ifo->options &= ~(DHCPCD_IPV6RS | DHCPCD_DHCP6);
 
 	if (ifo->options & DHCPCD_SLAACPRIVATE)
 		ifo->options |= DHCPCD_IPV6RA_OWN;
 
 	/* We want to disable kernel interface RA as early as possible. */
 	if (ifo->options & DHCPCD_IPV6RS) {
+		/* If not doing any DHCP, disable the RDNSS requirement. */
+		if (!(ifo->options & (DHCPCD_DHCP | DHCPCD_DHCP6)))
+			ifo->options &= ~DHCPCD_IPV6RA_REQRDNSS;
 		ra_global = if_checkipv6(ifp->ctx, NULL,
 		    ifp->ctx->options & DHCPCD_IPV6RA_OWN ? 1 : 0);
 		ra_iface = if_checkipv6(ifp->ctx, ifp,
