@@ -3042,10 +3042,8 @@ dhcp_start1(void *arg)
 		return;
 	}
 
-	if (state->offer == NULL)
+	if (state->offer == NULL || state->offer->cookie == 0)
 		dhcp_discover(ifp);
-	else if (state->offer->cookie == 0 && ifo->options & DHCPCD_IPV4LL)
-		ipv4ll_start(ifp);
 	else
 		dhcp_reboot(ifp);
 }
