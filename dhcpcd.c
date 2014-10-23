@@ -188,7 +188,7 @@ handle_exit_timeout(void *arg)
 
 	ctx = arg;
 	syslog(LOG_ERR, "timed out");
-	if (!ctx->options & DHCPCD_MASTER) {
+	if (!(ctx->options & DHCPCD_MASTER)) {
 		eloop_exit(ctx->eloop, EXIT_FAILURE);
 		return;
 	}
