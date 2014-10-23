@@ -67,7 +67,6 @@
 #define DHCP_MAX		64
 #define DHCP_RAND_MIN		-1
 #define DHCP_RAND_MAX		1
-#define DHCP_ARP_FAIL		2
 
 #ifdef RFC2131_STRICT
 /* Be strictly conformant for section 4.1.1 */
@@ -238,7 +237,6 @@ struct dhcp_state {
 	unsigned int conflicts;
 	time_t defend;
 	char randomstate[128];
-	struct in_addr failed;
 };
 
 #define D_STATE(ifp)							       \

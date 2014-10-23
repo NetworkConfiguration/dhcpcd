@@ -61,9 +61,11 @@ struct arp_state {
 	struct in_addr addr;
 	int probes;
 	int claims;
+	struct in_addr failed;
 };
 TAILQ_HEAD(arp_statehead, arp_state);
 
+void arp_report_conflicted(const struct arp_state *, const struct arp_msg *);
 void arp_announce(struct arp_state *);
 void arp_probe(struct arp_state *);
 struct arp_state *arp_new(struct interface *);

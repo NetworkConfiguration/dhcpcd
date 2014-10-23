@@ -2328,17 +2328,14 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 	    (amsg->sip.s_addr == 0 &&
 	    amsg->tip.s_addr == ifo->arping[state->arping_index - 1])))
 	{
-		struct in_addr addr;
 		char buf[HWADDR_LEN * 3];
 
-		addr.s_addr = ifo->arping[state->arping_index - 1];
-		syslog(LOG_INFO,
-		    "%s: found %s on hardware address %s",
-		    astate->iface->name, inet_ntoa(addr),
-		    hwaddr_ntoa(amsg->sha, astate->iface->hwlen,
-		    buf, sizeof(buf)));
+		astate->failed.s_addr = ifo->arping[state->arping_index - 1];
+		arp_report_conflicted(astate, amsg);
+		hwaddr_ntoa(amsg->sha, astate->iface->hwlen, buf, sizeof(buf));
 		if (dhcpcd_selectprofile(astate->iface, buf) == -1 &&
-		    dhcpcd_selectprofile(astate->iface, inet_ntoa(addr)) == -1)
+		    dhcpcd_selectprofile(astate->iface,
+		        inet_ntoa(astate->failed)) == -1)
 		{
 			/* We didn't find a profile for this
 			 * address or hwaddr, so move to the next
@@ -2359,28 +2356,15 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 	if (amsg->sip.s_addr == state->offer->yiaddr ||
 	    (amsg->sip.s_addr == 0 && amsg->tip.s_addr == state->offer->yiaddr))
 	{
-		struct in_addr fail;
-		char buf[HWADDR_LEN * 3];
-
-		fail.s_addr = state->offer->yiaddr;
-		syslog(LOG_ERR, "%s: hardware address %s claims %s",
-		    astate->iface->name,
-		    hwaddr_ntoa(amsg->sha, astate->iface->hwlen,
-		    buf, sizeof(buf)),
-		    inet_ntoa(fail));
-
-		arp_free(astate);
+		astate->failed.s_addr = state->offer->yiaddr;
+		arp_report_conflicted(astate, amsg);
 		unlink(state->leasefile);
 		if (!state->lease.frominfo)
 			dhcp_decline(astate->iface);
 		eloop_timeout_delete(astate->iface->ctx->eloop, NULL,
 		    astate->iface);
-		if (state->lease.frominfo)
-			dhcpcd_startinterface(astate->iface);
-		else
-			eloop_timeout_add_sec(astate->iface->ctx->eloop,
-			    DHCP_ARP_FAIL,
-			    dhcpcd_startinterface, astate->iface);
+		eloop_timeout_add_sec(astate->iface->ctx->eloop,
+		    DHCP_RAND_MAX, dhcp_discover, astate->iface);
 	}
 }
 

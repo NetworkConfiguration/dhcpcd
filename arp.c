@@ -94,6 +94,17 @@ eexit:
 	return -1;
 }
 
+void
+arp_report_conflicted(const struct arp_state *astate, const struct arp_msg *amsg)
+{
+	char buf[HWADDR_LEN * 3];
+
+	syslog(LOG_ERR, "%s: hardware address %s claims %s",
+	    astate->iface->name,
+	    hwaddr_ntoa(amsg->sha, astate->iface->hwlen, buf, sizeof(buf)),
+	    inet_ntoa(astate->failed));
+}
+
 static void
 arp_packet(void *arg)
 {
@@ -158,7 +169,8 @@ arp_packet(void *arg)
 
 		/* Run the conflicts */
 		TAILQ_FOREACH_SAFE(astate, &state->arp_states, next, astaten) {
-			astate->conflicted_cb(astate, &arm);
+			if (astate->conflicted_cb)
+				astate->conflicted_cb(astate, &arm);
 		}
 	}
 }

@@ -83,11 +83,11 @@ ipv4ll_pick_addr(const struct arp_state *astate)
 		 * See ipv4ll_start for why we don't use arc4_random. */
 		addr = ntohl(LINKLOCAL_ADDR | ((random() % 0xFD00) + 0x0100));
 
-		state = D_CSTATE(astate->iface);
 		/* No point using a failed address */
-		if (addr == state->failed.s_addr)
+		if (addr == astate->failed.s_addr)
 			continue;
 
+		state = D_CSTATE(astate->iface);
 		/* Ensure we don't have the address on another interface */
 		TAILQ_FOREACH(ifp, astate->iface->ctx->ifaces, next) {
 			state = D_CSTATE(ifp);
@@ -136,8 +136,7 @@ static void
 ipv4ll_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 {
 	struct dhcp_state *state = D_STATE(astate->iface);
-	uint32_t fail;
-	char buf[HWADDR_LEN * 3];
+	in_addr_t fail;
 
 	if (state->offer == NULL)
 		return;
@@ -156,13 +155,10 @@ ipv4ll_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 	if (fail == 0)
 		return;
 
-	state->failed.s_addr = fail;
-	syslog(LOG_ERR, "%s: hardware address %s claims %s",
-	    astate->iface->name,
-	    hwaddr_ntoa(amsg->sha, astate->iface->hwlen, buf, sizeof(buf)),
-	    inet_ntoa(state->failed));
+	astate->failed.s_addr = fail;
+	arp_report_conflicted(astate, amsg);
 
-	if (state->failed.s_addr == state->addr.s_addr) {
+	if (astate->failed.s_addr == state->addr.s_addr) {
 		time_t up;
 
 		/* RFC 3927 Section 2.5 */
