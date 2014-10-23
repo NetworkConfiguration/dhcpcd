@@ -34,6 +34,7 @@
 #include <limits.h>
 #include <stdint.h>
 
+#include "arp.h"
 #include "auth.h"
 #include "dhcp-common.h"
 
@@ -213,17 +214,6 @@ struct dhcp_state {
 	uint32_t xid;
 	int socket;
 
-	/* ARP */
-	int probes;
-	int claims;
-	struct in_addr fail;
-	size_t arping_index;
-
-	/* IPv4LL */
-	char randomstate[128];
-	int conflicts;
-	time_t defend;
-
 	int raw_fd;
 	int arp_fd;
 	size_t buffer_size, buffer_len, buffer_pos;
@@ -240,6 +230,15 @@ struct dhcp_state {
 	unsigned char *clientid;
 
 	struct authstate auth;
+	struct arp_statehead arp_states;
+
+	size_t arping_index;
+
+	struct arp_state *arp_ipv4ll;
+	unsigned int conflicts;
+	time_t defend;
+	char randomstate[128];
+	struct in_addr failed;
 };
 
 #define D_STATE(ifp)							       \
@@ -286,7 +285,8 @@ void dhcp_stop(struct interface *);
 void dhcp_decline(struct interface *);
 void dhcp_discover(void *);
 void dhcp_inform(struct interface *);
-void dhcp_bind(void *);
+void dhcp_probe(struct interface *);
+void dhcp_bind(struct interface *, struct arp_state *);
 void dhcp_reboot_newopts(struct interface *, unsigned long long);
 void dhcp_close(struct interface *);
 void dhcp_free(struct interface *);

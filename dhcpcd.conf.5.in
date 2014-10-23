@@ -455,8 +455,9 @@ Suppress any dhcpcd output to the console, except for errors.
 .It Ic reboot Ar seconds
 Allow
 .Ar reboot
-seconds before moving to the DISCOVER phase if we have an old lease to use.
-The default is 5 seconds.
+seconds before moving to the DISCOVER phase if we have an old lease to use
+and moving from DISCOVER to IPv4LL if no reply.
+The default is 10 seconds.
 A setting of 0 seconds causes
 .Nm dhcpcd
 to skip the REBOOT phase and go straight into DISCOVER.

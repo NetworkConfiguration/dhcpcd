@@ -133,6 +133,22 @@ ipv4_iffindaddr(struct interface *ifp,
 }
 
 struct ipv4_addr *
+ipv4_iffindlladdr(struct interface *ifp)
+{
+	struct ipv4_state *state;
+	struct ipv4_addr *ap;
+
+	state = IPV4_STATE(ifp);
+	if (state) {
+		TAILQ_FOREACH(ap, &state->addrs, next) {
+			if (IN_LINKLOCAL(htonl(ap->addr.s_addr)))
+				return ap;
+		}
+	}
+	return NULL;
+}
+
+struct ipv4_addr *
 ipv4_findaddr(struct dhcpcd_ctx *ctx, const struct in_addr *addr)
 {
 	struct interface *ifp;
@@ -767,10 +783,7 @@ ipv4_applyaddr(void *arg)
 						if (ifn->options->options &
 						    DHCPCD_ARP)
 						{
-							nstate->claims = 0;
-							nstate->probes = 0;
-							nstate->conflicts = 0;
-							arp_probe(ifn);
+							dhcp_bind(ifn, NULL);
 						} else {
 							ipv4_addaddr(ifn,
 							    &nstate->lease);

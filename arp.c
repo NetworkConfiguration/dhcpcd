@@ -39,7 +39,7 @@
 #include <syslog.h>
 #include <unistd.h>
 
-#define ELOOP_QUEUE 2
+#define ELOOP_QUEUE 5
 #include "config.h"
 #include "arp.h"
 #include "ipv4.h"
@@ -95,48 +95,17 @@ eexit:
 }
 
 static void
-arp_failure(struct interface *ifp)
-{
-	const struct dhcp_state *state = D_CSTATE(ifp);
-
-	/* If we failed without a magic cookie then we need to try
-	 * and defend our IPv4LL address. */
-	if ((state->offer != NULL &&
-	    state->offer->cookie != htonl(MAGIC_COOKIE)) ||
-	    (state->new != NULL &&
-	    state->new->cookie != htonl(MAGIC_COOKIE)))
-	{
-		ipv4ll_handle_failure(ifp);
-		return;
-	}
-
-	unlink(state->leasefile);
-	if (!state->lease.frominfo)
-		dhcp_decline(ifp);
-	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
-	if (state->lease.frominfo)
-		dhcpcd_startinterface(ifp);
-	else
-		eloop_timeout_add_sec(ifp->ctx->eloop,
-		    DHCP_ARP_FAIL, dhcpcd_startinterface, ifp);
-}
-
-static void
 arp_packet(void *arg)
 {
 	struct interface *ifp = arg;
 	const struct interface *ifn;
 	uint8_t arp_buffer[ARP_LEN];
 	struct arphdr ar;
-	uint32_t reply_s;
-	uint32_t reply_t;
-	uint8_t *hw_s, *hw_t;
+	struct arp_msg arm;
 	ssize_t bytes;
 	struct dhcp_state *state;
-	struct if_options *opts = ifp->options;
-	const char *hwaddr;
-	struct in_addr ina, fail;
-	char hwbuf[HWADDR_LEN * 3];
+	struct arp_state *astate, *astaten;
+	unsigned char *hw_s, *hw_t;
 	int flags;
 
 	state = D_STATE(ifp);
@@ -154,10 +123,13 @@ arp_packet(void *arg)
 		if ((size_t)bytes < sizeof(ar))
 			continue;
 		memcpy(&ar, arp_buffer, sizeof(ar));
+		/* Families must match */
+		if (ar.ar_hrd != htons(ifp->family))
+			continue;
 		/* Protocol must be IP. */
 		if (ar.ar_pro != htons(ETHERTYPE_IP))
 			continue;
-		if (ar.ar_pln != sizeof(reply_s))
+		if (ar.ar_pln != sizeof(arm.sip.s_addr))
 			continue;
 		/* Only these types are recognised */
 		if (ar.ar_op != htons(ARPOP_REPLY) &&
@@ -178,79 +150,25 @@ arp_packet(void *arg)
 		}
 		if (ifn)
 			continue;
-		/* Copy out the IP addresses */
-		memcpy(&reply_s, hw_s + ar.ar_hln, ar.ar_pln);
-		memcpy(&reply_t, hw_t + ar.ar_hln, ar.ar_pln);
+		/* Copy out the HW and IP addresses */
+		memcpy(&arm.sha, hw_s, ar.ar_hln);
+		memcpy(&arm.sip.s_addr, hw_s + ar.ar_hln, ar.ar_pln);
+		memcpy(&arm.tha, hw_t, ar.ar_hln);
+		memcpy(&arm.tip.s_addr, hw_t + ar.ar_hln, ar.ar_pln);
 
-		/* Check for arping */
-		if (state->arping_index &&
-		    state->arping_index <= opts->arping_len &&
-		    (reply_s == opts->arping[state->arping_index - 1] ||
-		    (reply_s == 0 &&
-		    reply_t == opts->arping[state->arping_index - 1])))
-		{
-			ina.s_addr = reply_s;
-			hwaddr = hwaddr_ntoa((unsigned char *)hw_s,
-			    (size_t)ar.ar_hln, hwbuf, sizeof(hwbuf));
-			syslog(LOG_INFO,
-			    "%s: found %s on hardware address %s",
-			    ifp->name, inet_ntoa(ina), hwaddr);
-			if (dhcpcd_selectprofile(ifp, hwaddr) == -1 &&
-			    dhcpcd_selectprofile(ifp, inet_ntoa(ina)) == -1)
-			{
-				state->probes = 0;
-				/* We didn't find a profile for this
-				 * address or hwaddr, so move to the next
-				 * arping profile */
-				if (state->arping_index <
-				    ifp->options->arping_len)
-				{
-					arp_probe(ifp);
-					return;
-				}
-			}
-			dhcp_close(ifp);
-			eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
-			dhcpcd_startinterface(ifp);
-			return;
-		}
-
-		fail.s_addr = 0;
-		/* RFC 2131 3.1.5, Client-server interaction
-		 * RFC 3927 2.2.1, Probe Conflict Detection */
-		if (state->offer &&
-		    (reply_s == state->offer->yiaddr ||
-		    (reply_s == 0 && reply_t == state->offer->yiaddr)))
-			fail.s_addr = state->offer->yiaddr;
-
-		/* RFC 3927 2.5, Conflict Defense */
-		if (IN_LINKLOCAL(htonl(state->addr.s_addr)) &&
-		    reply_s == state->addr.s_addr)
-			fail.s_addr = state->addr.s_addr;
-
-		if (fail.s_addr) {
-			state->fail = fail;
-			syslog(LOG_ERR, "%s: hardware address %s claims %s",
-			    ifp->name,
-			    hwaddr_ntoa((unsigned char *)hw_s,
-				(size_t)ar.ar_hln, hwbuf, sizeof(hwbuf)),
-			    inet_ntoa(state->fail));
-			errno = EEXIST;
-			arp_failure(ifp);
-			return;
+		/* Run the conflicts */
+		TAILQ_FOREACH_SAFE(astate, &state->arp_states, next, astaten) {
+			astate->conflicted_cb(astate, &arm);
 		}
 	}
 }
 
-void
-arp_announce(void *arg)
+static void
+arp_open(struct interface *ifp)
 {
-	struct interface *ifp = arg;
-	struct dhcp_state *state = D_STATE(ifp);
-	struct timeval tv;
+	struct dhcp_state *state;
 
-	if (state->new == NULL)
-		return;
+	state = D_STATE(ifp);
 	if (state->arp_fd == -1) {
 		state->arp_fd = if_openrawsocket(ifp, ETHERTYPE_ARP);
 		if (state->arp_fd == -1) {
@@ -260,131 +178,132 @@ arp_announce(void *arg)
 		eloop_event_add(ifp->ctx->eloop, state->arp_fd,
 		    arp_packet, ifp, NULL, NULL);
 	}
-	if (++state->claims < ANNOUNCE_NUM)
+}
+
+static void
+arp_announced(void *arg)
+{
+	struct arp_state *astate = arg;
+
+	if (astate->announced_cb) {
+		astate->announced_cb(astate);
+		return;
+	}
+
+	/* Nothing more to do, so free us */
+	arp_free(astate);
+}
+
+static void
+arp_announce1(void *arg)
+{
+	struct arp_state *astate = arg;
+	struct interface *ifp = astate->iface;
+
+	if (++astate->claims < ANNOUNCE_NUM)
 		syslog(LOG_DEBUG,
 		    "%s: sending ARP announce (%d of %d), "
 		    "next in %d.0 seconds",
-		    ifp->name, state->claims, ANNOUNCE_NUM, ANNOUNCE_WAIT);
+		    ifp->name, astate->claims, ANNOUNCE_NUM, ANNOUNCE_WAIT);
 	else
 		syslog(LOG_DEBUG,
 		    "%s: sending ARP announce (%d of %d)",
-		    ifp->name, state->claims, ANNOUNCE_NUM);
+		    ifp->name, astate->claims, ANNOUNCE_NUM);
 	if (arp_send(ifp, ARPOP_REQUEST,
-		state->new->yiaddr, state->new->yiaddr) == -1)
+		astate->addr.s_addr, astate->addr.s_addr) == -1)
 		syslog(LOG_ERR, "send_arp: %m");
-	if (state->claims < ANNOUNCE_NUM) {
-		eloop_timeout_add_sec(ifp->ctx->eloop,
-		    ANNOUNCE_WAIT, arp_announce, ifp);
-		return;
-	}
-	if (state->new->cookie != htonl(MAGIC_COOKIE)) {
-		/* Reset the conflict counter when we finish announcing. */
-		eloop_timeout_add_sec(ifp->ctx->eloop,
-		    ANNOUNCE_WAIT, ipv4ll_claimed, ifp);
-		/* Check if doing DHCP */
-		if (!(ifp->options->options & DHCPCD_DHCP))
-			return;
-		/* We should pretend to be at the end
-		 * of the DHCP negotation cycle unless we rebooted */
-		if (state->interval)
-			state->interval = 64 + DHCP_RAND_MIN;
-		else
-			state->interval = ANNOUNCE_WAIT;
-		state->probes = 0;
-		state->claims = 0;
-		tv.tv_sec = state->interval;
-		tv.tv_usec = (suseconds_t)arc4random_uniform(
-		    (DHCP_RAND_MAX - DHCP_RAND_MIN) * 1000000);
-		timernorm(&tv);
-		eloop_timeout_add_tv(ifp->ctx->eloop, &tv, dhcp_discover, ifp);
-	} else {
-		eloop_event_delete(ifp->ctx->eloop, state->arp_fd, 0);
-		close(state->arp_fd);
-		state->arp_fd = -1;
-	}
+	eloop_timeout_add_sec(ifp->ctx->eloop, ANNOUNCE_WAIT,
+	    astate->claims < ANNOUNCE_NUM ? arp_announce1 : arp_announced,
+	    astate);
 }
 
 void
-arp_probe(void *arg)
+arp_announce(struct arp_state *astate)
 {
-	struct interface *ifp = arg;
-	struct dhcp_state *state = D_STATE(ifp);
-	struct in_addr addr;
+
+	arp_open(astate->iface);
+	astate->claims = 0;
+	arp_announce1(astate);
+}
+
+static void
+arp_probed(void *arg)
+{
+	struct arp_state *astate = arg;
+
+	astate->probed_cb(astate);
+}
+
+static void
+arp_probe1(void *arg)
+{
+	struct arp_state *astate = arg;
+	struct interface *ifp = astate->iface;
 	struct timeval tv;
-	int arping = 0;
 
-	if (state->arp_fd == -1) {
-		state->arp_fd = if_openrawsocket(ifp, ETHERTYPE_ARP);
-		if (state->arp_fd == -1) {
-			syslog(LOG_ERR, "%s: %s: %m", __func__, ifp->name);
-			return;
-		}
-		eloop_event_add(ifp->ctx->eloop,
-		    state->arp_fd, arp_packet, ifp, NULL, NULL);
-	}
-
-	if (state->arping_index < ifp->options->arping_len) {
-		addr.s_addr = ifp->options->arping[state->arping_index];
-		arping = 1;
-	} else if (state->offer) {
-		if (state->offer->yiaddr)
-			addr.s_addr = state->offer->yiaddr;
-		else
-			addr.s_addr = state->offer->ciaddr;
-	} else
-		addr.s_addr = state->addr.s_addr;
-
-	if (state->probes == 0) {
-		if (arping)
-			syslog(LOG_DEBUG, "%s: searching for %s",
-			    ifp->name, inet_ntoa(addr));
-		else
-			syslog(LOG_DEBUG, "%s: checking for %s",
-			    ifp->name, inet_ntoa(addr));
-	}
-	if (++state->probes < PROBE_NUM) {
+	if (++astate->probes < PROBE_NUM) {
 		tv.tv_sec = PROBE_MIN;
 		tv.tv_usec = (suseconds_t)arc4random_uniform(
 		    (PROBE_MAX - PROBE_MIN) * 1000000);
 		timernorm(&tv);
-		eloop_timeout_add_tv(ifp->ctx->eloop, &tv, arp_probe, ifp);
+		eloop_timeout_add_tv(ifp->ctx->eloop, &tv, arp_probe1, astate);
 	} else {
 		tv.tv_sec = ANNOUNCE_WAIT;
 		tv.tv_usec = 0;
-		if (arping) {
-			state->probes = 0;
-			if (++state->arping_index < ifp->options->arping_len)
-				eloop_timeout_add_tv(ifp->ctx->eloop,
-				    &tv, arp_probe, ifp);
-			else
-				eloop_timeout_add_tv(ifp->ctx->eloop,
-				    &tv, dhcpcd_startinterface, ifp);
-		} else
-			eloop_timeout_add_tv(ifp->ctx->eloop,
-			    &tv, dhcp_bind, ifp);
+		eloop_timeout_add_tv(ifp->ctx->eloop, &tv, arp_probed, astate);
 	}
 	syslog(LOG_DEBUG,
 	    "%s: sending ARP probe (%d of %d), next in %0.1f seconds",
-	    ifp->name, state->probes ? state->probes : PROBE_NUM, PROBE_NUM,
+	    ifp->name, astate->probes ? astate->probes : PROBE_NUM, PROBE_NUM,
 	    timeval_to_double(&tv));
-	if (arp_send(ifp, ARPOP_REQUEST, 0, addr.s_addr) == -1)
+	if (arp_send(ifp, ARPOP_REQUEST, 0, astate->addr.s_addr) == -1)
 		syslog(LOG_ERR, "send_arp: %m");
 }
 
 void
-arp_start(struct interface *ifp)
+arp_probe(struct arp_state *astate)
 {
-	struct dhcp_state *state = D_STATE(ifp);
 
-	state->probes = 0;
-	state->arping_index = 0;
-	arp_probe(ifp);
+	arp_open(astate->iface);
+	astate->probes = 0;
+	syslog(LOG_DEBUG, "%s: probing for %s",
+	    astate->iface->name, inet_ntoa(astate->addr));
+	arp_probe1(astate);
+}
+
+
+struct arp_state *
+arp_new(struct interface *ifp) {
+	struct arp_state *astate;
+	struct dhcp_state *state;
+
+	astate = calloc(1, sizeof(*astate));
+	if (astate == NULL) {
+		syslog(LOG_ERR, "%s: %s: %m", ifp->name, __func__);
+		return NULL;
+	}
+
+	astate->iface = ifp;
+	state = D_STATE(ifp);
+	TAILQ_INSERT_TAIL(&state->arp_states, astate, next);
+	return astate;
+}
+
+void
+arp_free(struct arp_state *astate)
+{
+	struct dhcp_state *state;
+
+	state = D_STATE(astate->iface);
+	TAILQ_REMOVE(&state->arp_states, astate, next);
+	free(astate);
 }
 
 void
 arp_close(struct interface *ifp)
 {
 	struct dhcp_state *state = D_STATE(ifp);
+	struct arp_state *astate;
 
 	if (state == NULL)
 		return;
@@ -394,5 +313,10 @@ arp_close(struct interface *ifp)
 		close(state->arp_fd);
 		state->arp_fd = -1;
 	}
-}
 
+	while ((astate = TAILQ_FIRST(&state->arp_states))) {
+		TAILQ_REMOVE(&state->arp_states, astate, next);
+		eloop_timeout_delete(ifp->ctx->eloop, NULL, astate);
+		free(astate);
+	}
+}

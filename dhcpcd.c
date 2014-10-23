@@ -185,28 +185,15 @@ static void
 handle_exit_timeout(void *arg)
 {
 	struct dhcpcd_ctx *ctx;
-	int timeout;
 
 	ctx = arg;
 	syslog(LOG_ERR, "timed out");
-	if (!(ctx->options & DHCPCD_IPV4) ||
-	    !(ctx->options & DHCPCD_TIMEOUT_IPV4LL))
-	{
-		if (ctx->options & DHCPCD_MASTER) {
-			/* We've timed out, so remove the waitip requirements.
-			 * If the user doesn't like this they can always set
-			 * an infinite timeout. */
-			ctx->options &=
-			    ~(DHCPCD_WAITIP | DHCPCD_WAITIP4 | DHCPCD_WAITIP6);
-			dhcpcd_daemonise(ctx);
-		} else
-			eloop_exit(ctx->eloop, EXIT_FAILURE);
+	if (!ctx->options & DHCPCD_MASTER) {
+		eloop_exit(ctx->eloop, EXIT_FAILURE);
 		return;
 	}
-	ctx->options &= ~DHCPCD_TIMEOUT_IPV4LL;
-	timeout = (PROBE_NUM * PROBE_MAX) + (PROBE_WAIT * 2) + DHCP_MAX_DELAY;
-	syslog(LOG_WARNING, "allowing %d seconds for IPv4LL timeout", timeout);
-	eloop_timeout_add_sec(ctx->eloop, timeout, handle_exit_timeout, ctx);
+	ctx->options |= DHCPCD_NOWAITIP;
+	dhcpcd_daemonise(ctx);
 }
 
 int
@@ -257,7 +244,7 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 	int sidpipe[2], fd;
 
 	if (ctx->options & DHCPCD_DAEMONISE &&
-	    !(ctx->options & DHCPCD_DAEMONISED))
+	    !(ctx->options & (DHCPCD_DAEMONISED | DHCPCD_NOWAITIP)))
 	{
 		if (!dhcpcd_ipwaited(ctx))
 			return 0;
@@ -1709,8 +1696,6 @@ main(int argc, char **argv)
 			if (dhcpcd_daemonise(&ctx))
 				goto exit_success;
 		} else if (t > 0) {
-			if (ctx.options & DHCPCD_IPV4LL)
-				ctx.options |= DHCPCD_TIMEOUT_IPV4LL;
 			eloop_timeout_add_sec(ctx.eloop, t,
 			    handle_exit_timeout, &ctx);
 		}
