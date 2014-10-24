@@ -313,9 +313,11 @@ arp_free(struct arp_state *astate)
 {
 	struct dhcp_state *state;
 
-	state = D_STATE(astate->iface);
-	TAILQ_REMOVE(&state->arp_states, astate, next);
-	free(astate);
+	if (astate) {
+		state = D_STATE(astate->iface);
+		TAILQ_REMOVE(&state->arp_states, astate, next);
+		free(astate);
+	}
 }
 
 void

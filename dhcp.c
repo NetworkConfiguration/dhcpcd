@@ -1970,8 +1970,13 @@ applyaddr:
 				astate->announced_cb =
 				    dhcp_arp_announced;
 			}
-			if (astate)
+			if (astate) {
 				arp_announce(astate);
+				if (astate != state->arp_ipv4ll) {
+					arp_free(state->arp_ipv4ll);
+					state->arp_ipv4ll = NULL;
+				}
+			}
 		} else if (!ipv4ll)
 			arp_close(ifp);
 	}
