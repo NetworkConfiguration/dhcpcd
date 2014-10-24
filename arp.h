@@ -71,5 +71,6 @@ void arp_probe(struct arp_state *);
 struct arp_state *arp_new(struct interface *);
 void arp_cancel(struct arp_state *);
 void arp_free(struct arp_state *);
+void arp_free_but(struct arp_state *);
 void arp_close(struct interface *);
 #endif

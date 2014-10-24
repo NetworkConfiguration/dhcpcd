@@ -314,9 +314,23 @@ arp_free(struct arp_state *astate)
 	struct dhcp_state *state;
 
 	if (astate) {
+		eloop_timeout_delete(astate->iface->ctx->eloop, NULL, astate);
 		state = D_STATE(astate->iface);
 		TAILQ_REMOVE(&state->arp_states, astate, next);
 		free(astate);
+	}
+}
+
+void
+arp_free_but(struct arp_state *astate)
+{
+	struct arp_state *p, *n;
+	struct dhcp_state *state;
+
+	state = D_STATE(astate->iface);
+	TAILQ_FOREACH_SAFE(p, &state->arp_states, next, n) {
+		if (p != astate)
+			arp_free(p);
 	}
 }
 
@@ -336,8 +350,6 @@ arp_close(struct interface *ifp)
 	}
 
 	while ((astate = TAILQ_FIRST(&state->arp_states))) {
-		TAILQ_REMOVE(&state->arp_states, astate, next);
-		eloop_timeout_delete(ifp->ctx->eloop, NULL, astate);
-		free(astate);
+		arp_free(astate);
 	}
 }

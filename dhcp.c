@@ -1972,10 +1972,7 @@ applyaddr:
 			}
 			if (astate) {
 				arp_announce(astate);
-				if (astate != state->arp_ipv4ll) {
-					arp_free(state->arp_ipv4ll);
-					state->arp_ipv4ll = NULL;
-				}
+				arp_free_but(astate);
 			}
 		} else if (!ipv4ll)
 			arp_close(ifp);
