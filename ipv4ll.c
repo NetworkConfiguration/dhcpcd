@@ -174,12 +174,13 @@ ipv4ll_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 		}
 	}
 
+	arp_cancel(astate);
 	if (++state->conflicts == MAX_CONFLICTS)
 		syslog(LOG_ERR, "%s: failed to acquire an IPv4LL address",
 		    astate->iface->name);
 	astate->addr.s_addr = ipv4ll_pick_addr(astate);
 	eloop_timeout_add_sec(astate->iface->ctx->eloop,
-		state->conflicts > MAX_CONFLICTS ?
+		state->conflicts >= MAX_CONFLICTS ?
 		RATE_LIMIT_INTERVAL : PROBE_WAIT,
 		ipv4ll_probe, astate);
 }

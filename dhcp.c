@@ -1415,7 +1415,6 @@ dhcp_close(struct interface *ifp)
 	if (state == NULL)
 		return;
 
-	arp_close(ifp);
 	if (state->raw_fd != -1) {
 		eloop_event_delete(ifp->ctx->eloop, state->raw_fd, 0);
 		close(state->raw_fd);
@@ -1669,7 +1668,7 @@ send_message(struct interface *iface, uint8_t type,
 			default:
 				if (!(iface->ctx->options & DHCPCD_TEST))
 					dhcp_drop(iface, "FAIL");
-				dhcp_close(iface);
+				dhcp_free(iface);
 				eloop_timeout_delete(iface->ctx->eloop,
 				    NULL, iface);
 				callback = NULL;
@@ -1778,7 +1777,6 @@ dhcp_expire(void *arg)
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	dhcp_drop(ifp, "EXPIRE");
 	unlink(state->leasefile);
-
 	state->interval = 0;
 	dhcp_discover(ifp);
 }
@@ -1924,7 +1922,7 @@ dhcp_bind(struct interface *ifp, struct arp_state *astate)
 		return;
 	}
 	if (state->reason == NULL) {
-		if (state->old) {
+		if (state->old && state->new->cookie != htonl(MAGIC_COOKIE)) {
 			if (state->old->yiaddr == state->new->yiaddr &&
 			    lease->server.s_addr)
 				state->reason = "RENEW";
@@ -2158,15 +2156,18 @@ dhcp_drop(struct interface *ifp, const char *reason)
 	struct timespec ts;
 #endif
 
+	state = D_STATE(ifp);
 	/* dhcp_start may just have been called and we don't yet have a state
 	 * but we do have a timeout, so punt it. */
-	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
-
-	state = D_STATE(ifp);
-	if (state == NULL)
+	if (state == NULL) {
+		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 		return;
-	dhcp_auth_reset(&state->auth);
-	dhcp_close(ifp);
+	}
+	if (state->state != DHS_IPV4LL_BOUND) {
+		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
+		dhcp_auth_reset(&state->auth);
+		dhcp_close(ifp);
+	}
 	if (ifp->options->options & DHCPCD_RELEASE) {
 		unlink(state->leasefile);
 		if (ifp->carrier != LINK_DOWN &&
@@ -2348,6 +2349,7 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 			return;
 		}
 		dhcp_close(astate->iface);
+		arp_close(astate->iface);
 		eloop_timeout_delete(astate->iface->ctx->eloop, NULL,
 		    astate->iface);
 		dhcpcd_startinterface(astate->iface);
@@ -2538,7 +2540,8 @@ dhcp_handledhcp(struct interface *iface, struct dhcp_message **dhcpp,
 			case 0:
 				log_dhcp(LOG_WARNING, "IPv4LL disabled from",
 				    iface, dhcp, from);
-				dhcp_close(iface);
+				dhcp_drop(iface, "EXPIRE");
+				arp_close(iface);
 				eloop_timeout_delete(iface->ctx->eloop,
 				    NULL, iface);
 				eloop_timeout_add_sec(iface->ctx->eloop,
@@ -2769,6 +2772,7 @@ dhcp_handlepacket(void *arg)
 			syslog(LOG_ERR, "%s: dhcp if_readrawpacket: %m",
 			    ifp->name);
 			dhcp_close(ifp);
+			arp_close(ifp);
 			break;
 		}
 		if (valid_udp_packet(ifp->ctx->packet, bytes,
@@ -2919,6 +2923,7 @@ dhcp_free(struct interface *ifp)
 	struct dhcpcd_ctx *ctx;
 
 	dhcp_close(ifp);
+	arp_close(ifp);
 	if (state) {
 		free(state->old);
 		free(state->new);
@@ -3063,9 +3068,6 @@ dhcp_start1(void *arg)
 		syslog(LOG_ERR, "%s: dhcp_init: %m", ifp->name);
 		return;
 	}
-
-	/* Close any pre-existing sockets as we're starting over */
-	dhcp_close(ifp);
 
 	state = D_STATE(ifp);
 	state->start_uptime = uptime();
