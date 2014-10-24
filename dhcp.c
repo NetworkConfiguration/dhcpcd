@@ -2131,6 +2131,13 @@ dhcp_reboot(struct interface *ifp)
 	state->xid = dhcp_xid(ifp);
 	state->lease.server.s_addr = 0;
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
+
+	/* Need to add this before dhcp_expire and friends. */
+	if (!ifo->fallback && ifo->reboot && ifo->options & DHCPCD_IPV4LL &&
+	    !IN_LINKLOCAL(htonl(state->addr.s_addr)))
+		eloop_timeout_add_sec(ifp->ctx->eloop,
+		    ifo->reboot, ipv4ll_start, ifp);
+
 	if (ifo->fallback)
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    ifo->reboot, dhcp_fallback, ifp);
