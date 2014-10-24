@@ -226,9 +226,10 @@ ipv4ll_start(void *arg)
 		return;
 	}
 
-	if (state->offer) {
+	if (state->offer && IN_LINKLOCAL(ntohl(state->offer->yiaddr))) {
 		astate->addr.s_addr = state->offer->yiaddr;
 		free(state->offer);
+		state->offer = NULL;
 		ap = ipv4_iffindaddr(ifp, &astate->addr, NULL);
 	} else
 		ap = ipv4_iffindlladdr(ifp);
