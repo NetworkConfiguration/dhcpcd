@@ -313,6 +313,7 @@ stop_interface(struct interface *ifp)
 	dhcp6_drop(ifp, NULL);
 	ipv6nd_drop(ifp);
 	dhcp_drop(ifp, "STOP");
+	arp_close(ifp);
 	eloop_timeout_delete(ctx->eloop, NULL, ifp);
 	if (ifp->options->options & DHCPCD_DEPARTED)
 		script_runreason(ifp, "DEPARTED");
@@ -564,6 +565,7 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 			 * do nothing. */
 			ipv6_free_ll_callbacks(ifp);
 			dhcp_drop(ifp, "EXPIRE");
+			arp_close(ifp);
 		}
 	} else if (carrier == LINK_UP && ifp->flags & IFF_UP) {
 		if (ifp->carrier != LINK_UP) {
