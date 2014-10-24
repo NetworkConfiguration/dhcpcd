@@ -1949,7 +1949,11 @@ dhcp_bind(struct interface *ifp, struct arp_state *astate)
 		    " seconds",
 		    ifp->name, lease->renewaltime, lease->rebindtime);
 	}
-	state->state = DHS_BOUND;
+	if (!(ifo->options & DHCPCD_STATIC) &&
+	    state->new->cookie != htonl(MAGIC_COOKIE))
+		state->state = DHS_IPV4LL_BOUND;
+	else
+		state->state = DHS_BOUND;
 	if (!state->lease.frominfo &&
 	    !(ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC)))
 		if (write_lease(ifp, state->new) == -1)
@@ -2525,7 +2529,8 @@ dhcp_handledhcp(struct interface *iface, struct dhcp_message **dhcpp,
 			    iface->name, msg);
 			free(msg);
 		}
-		if (state->state == DHS_DISCOVER &&
+		if ((state->state == DHS_DISCOVER ||
+		    state->state == DHS_IPV4LL_BOUND) &&
 		    get_option_uint8(iface->ctx, &tmp, dhcp,
 		    DHO_AUTOCONFIGURE) == 0)
 		{
@@ -2586,7 +2591,7 @@ dhcp_handledhcp(struct interface *iface, struct dhcp_message **dhcpp,
 	}
 
 	if ((type == 0 || type == DHCP_OFFER) &&
-	    state->state == DHS_DISCOVER)
+	    (state->state == DHS_DISCOVER || state->state == DHS_IPV4LL_BOUND))
 	{
 		lease->frominfo = 0;
 		lease->addr.s_addr = dhcp->yiaddr;

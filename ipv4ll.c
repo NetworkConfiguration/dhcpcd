@@ -138,9 +138,6 @@ ipv4ll_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 	struct dhcp_state *state = D_STATE(astate->iface);
 	in_addr_t fail;
 
-	if (state->offer == NULL)
-		return;
-
 	fail = 0;
 	/* RFC 3927 2.2.1, Probe Conflict Detection */
 	if (amsg->sip.s_addr == astate->addr.s_addr ||
