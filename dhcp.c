@@ -2172,7 +2172,8 @@ dhcp_drop(struct interface *ifp, const char *reason)
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 		return;
 	}
-	if (state->state != DHS_IPV4LL_BOUND) {
+	/* Don't reset DHCP state if we have an IPv4LL address and link is up */
+	if (state->state != DHS_IPV4LL_BOUND || ifp->carrier != LINK_UP) {
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 		dhcp_auth_reset(&state->auth);
 		dhcp_close(ifp);
