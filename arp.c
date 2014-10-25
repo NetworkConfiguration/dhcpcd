@@ -317,6 +317,8 @@ arp_free(struct arp_state *astate)
 		eloop_timeout_delete(astate->iface->ctx->eloop, NULL, astate);
 		state = D_STATE(astate->iface);
 		TAILQ_REMOVE(&state->arp_states, astate, next);
+		if (state->arp_ipv4ll == astate)
+			state->arp_ipv4ll = NULL;
 		free(astate);
 	}
 }
