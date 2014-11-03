@@ -624,7 +624,7 @@ pre_start(struct interface *ifp)
 	 * from under us. */
 	if (ifp->options->options & DHCPCD_IPV6 && ipv6_start(ifp) == -1) {
 		syslog(LOG_ERR, "%s: ipv6_start: %m", ifp->name);
-		ifp->options->options &= DHCPCD_IPV6;
+		ifp->options->options &= ~DHCPCD_IPV6;
 	}
 }
 
@@ -801,7 +801,7 @@ dhcpcd_initstate1(struct interface *ifp, int argc, char **argv)
 	 * inadvertently ups the interface. */
 	if (ifo->options & DHCPCD_IPV6 && ipv6_start(ifp) == -1) {
 		syslog(LOG_ERR, "%s: ipv6_start: %m", ifp->name);
-		ifo->options &= DHCPCD_IPV6;
+		ifo->options &= ~DHCPCD_IPV6;
 	}
 }
 
