@@ -970,18 +970,18 @@ reconf_reboot(struct dhcpcd_ctx *ctx, int action, int argc, char **argv, int oi)
 static void
 stop_all_interfaces(struct dhcpcd_ctx *ctx, int do_release)
 {
-	struct interface *ifp, *ifpm;
+	struct interface *ifp;
 
 	/* drop_dhcp could change the order, so we do it like this. */
 	for (;;) {
-		/* Be sane and drop the last config first */
-		ifp = TAILQ_LAST(ctx->ifaces, if_head);
+		/* Be sane and drop the last config first,
+		 * skipping any pseudo interfaces */
+		TAILQ_FOREACH_REVERSE(ifp, ctx->ifaces, if_head, next) {
+			if (!(ifp->options->options & DHCPCD_PFXDLGONLY))
+				break;
+		}
 		if (ifp == NULL)
 			break;
-		/* Stop the master interface only */
-		ifpm = if_find(ifp->ctx, ifp->name);
-		if (ifpm)
-			ifp = ifpm;
 		if (do_release) {
 			ifp->options->options |= DHCPCD_RELEASE;
 			ifp->options->options &= ~DHCPCD_PERSISTENT;
