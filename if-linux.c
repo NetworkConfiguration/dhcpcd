@@ -53,6 +53,7 @@
 
 /* Linux has these in an enum and there is just no way to work
  * out of they exist at compile time. Silly silly silly. */
+#define IFLA_AF_SPEC			26
 #define IFLA_INET6_ADDR_GEN_MODE	8
 #define IN6_ADDR_GEN_MODE_NONE		1
 
