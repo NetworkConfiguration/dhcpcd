@@ -1131,20 +1131,6 @@ if cd dhcpcd-hooks; then
 fi
 echo "HOOKSCRIPTS=	$HOOKS" >>$CONFIG_MK
 
-# Define any RCSIDs for import into 3rd party systems
-case "$OS" in
-netbsd)
-	echo "IMPORT_RCSID=	\#include <sys/cdefs.h>\\n" >>$CONFIG_MK
-	echo "IMPORT_RCSID+=	__RCSID(\\\"\\\$\$NetBSD: \\\$\$\\\");" >> \
-	    $CONFIG_MK
-	echo "IMPORT_HID+=	/* \\\$\$NetBSD: \\\$\$ */" >> \
-	    $CONFIG_MK
-	echo "IMPORT_MANID=	.\\\\\\\\\\\"     \\\$\$NetBSD: \$\$ " >> \
-	    $CONFIG_MK
-	echo "IMPORT_SHID=	\# \\\$\$NetBSD: \$\$ " >>$CONFIG_MK
-	;;
-esac
-
 echo
 echo "   SYSCONFDIR =		$SYSCONFDIR"
 echo "   SBINDIR =		$SBINDIR"
