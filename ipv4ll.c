@@ -87,7 +87,6 @@ ipv4ll_pick_addr(const struct arp_state *astate)
 		if (addr == astate->failed.s_addr)
 			continue;
 
-		state = D_CSTATE(astate->iface);
 		/* Ensure we don't have the address on another interface */
 		TAILQ_FOREACH(ifp, astate->iface->ctx->ifaces, next) {
 			state = D_CSTATE(ifp);
