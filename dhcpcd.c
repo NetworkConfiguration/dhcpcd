@@ -313,13 +313,15 @@ stop_interface(struct interface *ifp)
 	ipv6nd_drop(ifp);
 	dhcp_drop(ifp, "STOP");
 	arp_close(ifp);
-	eloop_timeout_delete(ctx->eloop, NULL, ifp);
 	if (ifp->options->options & DHCPCD_DEPARTED)
 		script_runreason(ifp, "DEPARTED");
 	else
 		script_runreason(ifp, "STOPPED");
 
-	// Remove the interface from our list
+	/* Delete all timeouts for the interfaces */
+	eloop_q_timeout_delete(ctx->eloop, 0, NULL, ifp);
+
+	/* Remove the interface from our list */
 	TAILQ_REMOVE(ifp->ctx->ifaces, ifp, next);
 	if_free(ifp);
 
