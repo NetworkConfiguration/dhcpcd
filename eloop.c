@@ -28,7 +28,6 @@
 /* Needed for ppoll(2) */
 #define _GNU_SOURCE
 
-#include <sys/queue.h>
 #include <sys/time.h>
 
 #include <errno.h>
@@ -38,6 +37,7 @@
 #include <stdlib.h>
 #include <syslog.h>
 
+#include "config.h"
 #include "common.h"
 #include "dhcpcd.h"
 #include "eloop.h"

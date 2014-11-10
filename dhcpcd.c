@@ -30,7 +30,6 @@ const char dhcpcd_copyright[] = "Copyright (c) 2006-2014 Roy Marples";
 #define _WITH_DPRINTF /* Stop FreeBSD bitching */
 
 #include <sys/file.h>
-#include <sys/queue.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>

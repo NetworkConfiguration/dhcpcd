@@ -34,7 +34,6 @@
 #ifndef COMPAT_QUEUE_H
 #define COMPAT_QUEUE_H
 
-#include <sys/queue.h>
 /*
  * Tail queue definitions.
  */

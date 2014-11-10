@@ -31,7 +31,9 @@
 #endif
 
 #ifndef __sun
+# if !defined(__linux__) || (defined(__linux__) && defined(__GLIBC__))
 #  include <sys/cdefs.h>
+# endif
 #endif
 
 #ifdef __APPLE__
