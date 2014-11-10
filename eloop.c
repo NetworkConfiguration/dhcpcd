@@ -239,7 +239,8 @@ eloop_q_timeout_delete(struct eloop_ctx *ctx, int queue,
 	struct eloop_timeout *t, *tt;
 
 	TAILQ_FOREACH_SAFE(t, &ctx->timeouts, next, tt) {
-		if (t->queue == queue && t->arg == arg &&
+		if ((queue == 0 || t->queue == queue) &&
+		    t->arg == arg &&
 		    (!callback || t->callback == callback))
 		{
 			TAILQ_REMOVE(&ctx->timeouts, t, next);
