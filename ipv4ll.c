@@ -249,3 +249,11 @@ ipv4ll_start(void *arg)
 		astate->addr.s_addr = ipv4ll_pick_addr(astate);
 	arp_probe(astate);
 }
+
+void
+ipv4ll_stop(struct interface *ifp)
+{
+	struct dhcp_state *state = D_STATE(ifp);
+
+	eloop_timeout_delete(ifp->ctx->eloop, NULL, state->arp_ipv4ll);
+}
