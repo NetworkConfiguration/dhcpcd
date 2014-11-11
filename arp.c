@@ -354,6 +354,10 @@ arp_close(struct interface *ifp)
 	}
 
 	while ((astate = TAILQ_FIRST(&state->arp_states))) {
+#ifndef __clang_analyzer__
+		/* clang guard needed for a more compex variant on this bug:
+		 * http://llvm.org/bugs/show_bug.cgi?id=18222 */
 		arp_free(astate);
+#endif
 	}
 }
