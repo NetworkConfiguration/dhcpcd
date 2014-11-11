@@ -530,7 +530,7 @@ EOF
 fi
 if [ "$ARC4RANDOM" = no ]; then
 	echo "COMPAT_SRCS+=	compat/arc4random.c" >>$CONFIG_MK
-	echo "#include \"compat/arc4random.h\"" >>$CONFIG_H
+	echo "#include		\"compat/arc4random.h\"" >>$CONFIG_H
 fi
 
 if [ -z "$ARC4RANDOM_UNIFORM" ]; then
@@ -552,7 +552,7 @@ EOF
 fi
 if [ "$ARC4RANDOM_UNIFORM" = no ]; then
 	echo "COMPAT_SRCS+=	compat/arc4random_uniform.c" >>$CONFIG_MK
-	echo "#include \"compat/arc4random_uniform.h\"" >>$CONFIG_H
+	echo "#include		\"compat/arc4random_uniform.h\"" >>$CONFIG_H
 fi
 
 if [ -z "$CLOSEFROM" ]; then
@@ -574,7 +574,7 @@ EOF
 fi
 if [ "$CLOSEFROM" = no ]; then
 	echo "COMPAT_SRCS+=	compat/closefrom.c" >>$CONFIG_MK
-	echo "#include \"compat/closefrom.h\"" >>$CONFIG_H
+	echo "#include		\"compat/closefrom.h\"" >>$CONFIG_H
 fi
 
 if [ -z "$GETLINE" ]; then
@@ -599,7 +599,7 @@ EOF
 fi
 if [ "$GETLINE" = no ]; then
 	echo "COMPAT_SRCS+=	compat/getline.c" >>$CONFIG_MK
-	echo "#include \"compat/getline.h\"" >>$CONFIG_H
+	echo "#include		\"compat/getline.h\"" >>$CONFIG_H
 fi
 
 if [ -z "$STRLCPY" ]; then
