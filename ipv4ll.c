@@ -107,15 +107,17 @@ ipv4ll_probed(struct arp_state *astate)
 	struct dhcp_state *state = D_STATE(astate->iface);
 	struct dhcp_message *offer;
 
-	/* A DHCP lease could have already been offered.
-	 * Backup this lease and replace once the IPv4LL addres is bound */
-	offer = state->offer;
-	state->offer = ipv4ll_make_lease(astate->addr.s_addr);
-	if (state->offer == NULL)
-		syslog(LOG_ERR, "%s: %m", __func__);
-	else
-		dhcp_bind(astate->iface, astate);
-	state->offer = offer;
+	if (state->state != DHS_BOUND) {
+		/* A DHCP lease could have already been offered.
+		 * Backup and replace once the IPv4LL addres is bound */
+		offer = state->offer;
+		state->offer = ipv4ll_make_lease(astate->addr.s_addr);
+		if (state->offer == NULL)
+			syslog(LOG_ERR, "%s: %m", __func__);
+		else
+			dhcp_bind(astate->iface, astate);
+		state->offer = offer;
+	}
 }
 
 static void
