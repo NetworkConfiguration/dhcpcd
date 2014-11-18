@@ -1281,7 +1281,9 @@ if_route(const struct rt *rt, int action)
 			nlm.rt.rtm_protocol = RTPROT_KERNEL;
 		else
 			nlm.rt.rtm_protocol = RTPROT_BOOT;
-		if (rt->gate.s_addr == INADDR_ANY ||
+		if (rt->iface->flags & IFF_LOOPBACK)
+			nlm.rt.rtm_scope = RT_SCOPE_HOST;
+		else if (rt->gate.s_addr == INADDR_ANY ||
 		    (rt->gate.s_addr == rt->dest.s_addr &&
 			rt->net.s_addr == INADDR_BROADCAST))
 			nlm.rt.rtm_scope = RT_SCOPE_LINK;
@@ -1409,7 +1411,9 @@ if_route6(const struct rt6 *rt, int action)
 	else {
 		nlm.hdr.nlmsg_flags |= NLM_F_CREATE | NLM_F_EXCL;
 		/* None interface subnet routes are static. */
-		if (IN6_IS_ADDR_UNSPECIFIED(&rt->gate)) {
+		if (rt->iface->flags & IFF_LOOPBACK)
+			nlm.rt.rtm_scope = RT_SCOPE_HOST;
+		else if (IN6_IS_ADDR_UNSPECIFIED(&rt->gate)) {
 			nlm.rt.rtm_protocol = RTPROT_KERNEL;
 			nlm.rt.rtm_scope = RT_SCOPE_LINK;
 		} else
