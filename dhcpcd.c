@@ -938,6 +938,23 @@ if_reboot(struct interface *ifp, int argc, char **argv)
 }
 
 static void
+reload_config(struct dhcpcd_ctx *ctx)
+{
+	struct if_options *ifo;
+
+	free_globals(ctx);
+	ifo = read_config(ctx, NULL, NULL, NULL);
+	add_options(ctx, NULL, ifo, ctx->argc, ctx->argv);
+	/* We need to preserve these two options. */
+	if (ctx->options & DHCPCD_MASTER)
+		ifo->options |= DHCPCD_MASTER;
+	if (ctx->options & DHCPCD_DAEMONISED)
+		ifo->options |= DHCPCD_DAEMONISED;
+	ctx->options = ifo->options;
+	free_options(ifo);
+}
+
+static void
 reconf_reboot(struct dhcpcd_ctx *ctx, int action, int argc, char **argv, int oi)
 {
 	struct if_head *ifs;
@@ -1005,7 +1022,6 @@ handle_signal1(void *arg)
 	struct dhcpcd_ctx *ctx;
 	struct dhcpcd_siginfo *si;
 	struct interface *ifp;
-	struct if_options *ifo;
 	int do_release;
 
 	ctx = dhcpcd_ctx;
@@ -1024,16 +1040,7 @@ handle_signal1(void *arg)
 		break;
 	case SIGHUP:
 		syslog(LOG_INFO, sigmsg, "HUP", (int)si->pid, "rebinding");
-		free_globals(ctx);
-		ifo = read_config(ctx, NULL, NULL, NULL);
-		add_options(ctx, NULL, ifo, ctx->argc, ctx->argv);
-		/* We need to preserve these two options. */
-		if (ctx->options & DHCPCD_MASTER)
-		    ifo->options |= DHCPCD_MASTER;
-		if (ctx->options & DHCPCD_DAEMONISED)
-		    ifo->options |= DHCPCD_DAEMONISED;
-		ctx->options = ifo->options;
-		free_options(ifo);
+		reload_config(ctx);
 		/* Preserve any options passed on the commandline
 		 * when we were started. */
 		reconf_reboot(ctx, 1, ctx->argc, ctx->argv,
@@ -1216,6 +1223,7 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 		return 0;
 	}
 
+	reload_config(ctx);
 	/* XXX: Respect initial commandline options? */
 	reconf_reboot(ctx, do_reboot, argc, argv, optind);
 	return 0;
