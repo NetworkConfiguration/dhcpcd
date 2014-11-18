@@ -283,6 +283,13 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		if (!dev_initialized(ctx, p))
 			continue;
 
+		/* Don't allow loopback or pointopoint unless explicit */
+		if (ifa->ifa_flags & (IFF_LOOPBACK | IFF_POINTOPOINT)) {
+			if ((argc == 0 || argc == -1) && ctx->ifac == 0)
+				continue;
+		}
+
+
 		if (if_vimaster(p) == 1) {
 			syslog(argc ? LOG_ERR : LOG_DEBUG,
 			    "%s: is a Virtual Interface Master, skipping", p);
@@ -300,13 +307,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		ifp->carrier = if_carrier(ifp);
 
 		sdl_type = 0;
-		/* Don't allow loopback unless explicit */
-		if (ifp->flags & IFF_LOOPBACK) {
-			if ((argc == 0 || argc == -1) && ctx->ifac == 0) {
-				if_free(ifp);
-				continue;
-			}
-		} else if (ifa->ifa_addr != NULL) {
+		if (ifa->ifa_addr != NULL) {
 #ifdef AF_LINK
 			sdl = (const struct sockaddr_dl *)(void *)ifa->ifa_addr;
 
@@ -384,9 +385,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 #endif
 
 		/* We only work on ethernet by default */
-		if (!(ifp->flags & IFF_POINTOPOINT) &&
-		    ifp->family != ARPHRD_ETHER)
-		{
+		if (ifp->family != ARPHRD_ETHER) {
 			if ((argc == 0 || argc == -1) && ctx->ifac == 0) {
 				if_free(ifp);
 				continue;
@@ -394,14 +393,19 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 			switch (ifp->family) {
 			case ARPHRD_IEEE1394: /* FALLTHROUGH */
 			case ARPHRD_INFINIBAND:
+#ifdef ARPHRD_LOOPBACK
+			case ARPHRD_LOOPBACK:
+#endif
+#ifdef ARPHRD_PPP
+			case ARPHRD_PPP:
+#endif
 				/* We don't warn for supported families */
 				break;
 			default:
 				syslog(LOG_WARNING,
 				    "%s: unsupported interface type %.2x"
-				    ", falling back to ethernet",
-				    ifp->name, sdl_type);
-				ifp->family = ARPHRD_ETHER;
+				    ", family %.2x",
+				    ifp->name, sdl_type, ifp->family);
 				break;
 			}
 		}
