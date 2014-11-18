@@ -432,19 +432,24 @@ configure_interface1(struct interface *ifp)
 		 * dhcpcd-6.1.0 and earlier used the interface name,
 		 * falling back to interface index if name > 4.
 		 */
-		memcpy(ifo->iaid, ifp->hwaddr + ifp->hwlen - sizeof(ifo->iaid),
-		    sizeof(ifo->iaid));
-#if 0
-		len = strlen(ifp->name);
-		if (len <= sizeof(ifo->iaid)) {
-			memcpy(ifo->iaid, ifp->name, len);
-			memset(ifo->iaid + len, 0, sizeof(ifo->iaid) - len);
-		} else {
-			/* IAID is the same size as a uint32_t */
-			len = htonl(ifp->index);
-			memcpy(ifo->iaid, &len, sizeof(len));
+		if (ifp->hwlen >= sizeof(ifo->iaid))
+			memcpy(ifo->iaid,
+			    ifp->hwaddr + ifp->hwlen - sizeof(ifo->iaid),
+			    sizeof(ifo->iaid));
+		else {
+			uint32_t len;
+			
+			len = (uint32_t)strlen(ifp->name);
+			if (len <= sizeof(ifo->iaid)) {
+				memcpy(ifo->iaid, ifp->name, len);
+				memset(ifo->iaid + len, 0,
+				    sizeof(ifo->iaid) - len);
+			} else {
+				/* IAID is the same size as a uint32_t */
+				len = htonl(ifp->index);
+				memcpy(ifo->iaid, &len, sizeof(len));
+			}
 		}
-#endif
 		ifo->options |= DHCPCD_IAID;
 	}
 
