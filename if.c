@@ -166,6 +166,18 @@ if_setflag(struct interface *ifp, short flag)
 	return r;
 }
 
+static int
+if_hasconf(struct dhcpcd_ctx *ctx, const char *ifname)
+{
+	int i;
+
+	for (i = 0; i < ctx->ifcc; i++) {
+		if (strcmp(ctx->ifcv[i], ifname) == 0)
+			return 1;
+	}
+	return 0;
+}
+
 struct if_head *
 if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 {
@@ -285,10 +297,10 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 
 		/* Don't allow loopback or pointopoint unless explicit */
 		if (ifa->ifa_flags & (IFF_LOOPBACK | IFF_POINTOPOINT)) {
-			if ((argc == 0 || argc == -1) && ctx->ifac == 0)
+			if ((argc == 0 || argc == -1) &&
+			    ctx->ifac == 0 && !if_hasconf(ctx, p))
 				continue;
 		}
-
 
 		if (if_vimaster(p) == 1) {
 			syslog(argc ? LOG_ERR : LOG_DEBUG,
@@ -336,8 +348,9 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 #ifdef IFT_BRIDGE
 			case IFT_BRIDGE:
 				/* Don't allow bridge unless explicit */
-				if ((argc == 0 || argc == -1)
-				    && ctx->ifac == 0)
+				if ((argc == 0 || argc == -1) &&
+				    ctx->ifac == 0 &&
+				    !if_hasconf(ctx, ifp->name))
 				{
 					if_free(ifp);
 					continue;
@@ -386,7 +399,9 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 
 		/* We only work on ethernet by default */
 		if (ifp->family != ARPHRD_ETHER) {
-			if ((argc == 0 || argc == -1) && ctx->ifac == 0) {
+			if ((argc == 0 || argc == -1) &&
+			    ctx->ifac == 0 && !if_hasconf(ctx, ifp->name))
+			{
 				if_free(ifp);
 				continue;
 			}
@@ -403,8 +418,8 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 				break;
 			default:
 				syslog(LOG_WARNING,
-				    "%s: unsupported interface type %.2x"
-				    ", family %.2x",
+				    "%s: unsupported interface type %.2x, "
+				    "family %.2x",
 				    ifp->name, sdl_type, ifp->family);
 				break;
 			}

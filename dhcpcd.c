@@ -149,6 +149,12 @@ free_globals(struct dhcpcd_ctx *ctx)
 		free(ctx->ifdv);
 		ctx->ifdv = NULL;
 	}
+	if (ctx->ifcc) {
+		for (; ctx->ifcc > 0; ctx->ifcc--)
+			free(ctx->ifcv[ctx->ifcc - 1]);
+		free(ctx->ifcv);
+		ctx->ifcv = NULL;
+	}
 
 #ifdef INET
 	if (ctx->dhcp_opts) {
