@@ -351,7 +351,8 @@ configure_interface1(struct interface *ifp)
 	if (ifp->flags & IFF_NOARP ||
 	    ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC))
 		ifo->options &= ~(DHCPCD_ARP | DHCPCD_IPV4LL);
-	if (!(ifp->flags & (IFF_POINTOPOINT | IFF_LOOPBACK | IFF_MULTICAST)))
+	if (ifp->flags & (IFF_POINTOPOINT | IFF_LOOPBACK) ||
+	    !(ifp->flags & IFF_MULTICAST))
 		ifo->options &= ~DHCPCD_IPV6RS;
 
 	if (ifo->metric != -1)
