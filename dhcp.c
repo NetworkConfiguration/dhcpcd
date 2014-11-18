@@ -1964,9 +1964,8 @@ applyaddr:
 	if (ifo->options & DHCPCD_ARP) {
 		if (state->added) {
 			if (astate == NULL) {
-				/* We don't care about what happens
-				 * to the ARP announcement */
 				astate = arp_new(ifp);
+				astate->addr = state->addr;
 				astate->announced_cb =
 				    dhcp_arp_announced;
 			}
