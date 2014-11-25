@@ -2790,7 +2790,7 @@ dhcp_handlepacket(void *arg)
 			break;
 		}
 		if (valid_udp_packet(ifp->ctx->packet, bytes,
-			&from, flags & RAW_PARTIALCSUM) == -1)
+		    &from, flags & RAW_PARTIALCSUM) == -1)
 		{
 			syslog(LOG_ERR, "%s: invalid UDP packet from %s",
 			    ifp->name, inet_ntoa(from));
