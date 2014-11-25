@@ -124,7 +124,7 @@ arp_packet(void *arg)
 	while (!(flags & RAW_EOF)) {
 		bytes = if_readrawpacket(ifp, ETHERTYPE_ARP,
 		    arp_buffer, sizeof(arp_buffer), &flags);
-		if (bytes == 0 || bytes == -1) {
+		if (bytes == -1) {
 			syslog(LOG_ERR, "%s: arp if_readrawpacket: %m",
 			    ifp->name);
 			dhcp_close(ifp);

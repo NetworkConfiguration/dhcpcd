@@ -2782,7 +2782,7 @@ dhcp_handlepacket(void *arg)
 	while (!(flags & RAW_EOF)) {
 		bytes = (size_t)if_readrawpacket(ifp, ETHERTYPE_IP,
 		    ifp->ctx->packet, udp_dhcp_len, &flags);
-		if (bytes == 0 || (ssize_t)bytes == -1) {
+		if ((ssize_t)bytes == -1) {
 			syslog(LOG_ERR, "%s: dhcp if_readrawpacket: %m",
 			    ifp->name);
 			dhcp_close(ifp);
