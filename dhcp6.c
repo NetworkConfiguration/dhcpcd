@@ -2562,7 +2562,7 @@ dhcp6_handledata(void *arg)
 	ctx->sfrom = inet_ntop(AF_INET6, &ctx->from.sin6_addr,
 	    ctx->ntopbuf, sizeof(ctx->ntopbuf));
 	if (len < sizeof(struct dhcp6_message)) {
-		syslog(LOG_ERR, "DHCPv6 RA packet too short from %s",
+		syslog(LOG_ERR, "DHCPv6 packet too short from %s",
 		    ctx->sfrom);
 		return;
 	}
