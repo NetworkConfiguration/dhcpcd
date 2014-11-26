@@ -590,7 +590,7 @@ ipv4_buildroutes(struct dhcpcd_ctx *ctx)
 	struct rt_head *nrs, *dnr;
 	struct rt *or, *rt, *rtn;
 	struct interface *ifp;
-	const struct dhcp_state *state;
+	const struct dhcp_state *state, *ostate;
 
 	nrs = malloc(sizeof(*nrs));
 	if (nrs == NULL) {
@@ -623,6 +623,11 @@ ipv4_buildroutes(struct dhcpcd_ctx *ctx)
 			rt->src.s_addr = state->addr.s_addr;
 			/* Do we already manage it? */
 			if ((or = find_route(ctx->ipv4_routes, rt, NULL))) {
+				if (state->added & STATE_FAKE)
+					continue;
+				ostate = D_CSTATE(or->iface);
+				if (ostate->added & STATE_FAKE)
+					goto remroute;
 				if (or->iface != ifp ||
 				    or->src.s_addr != state->addr.s_addr ||
 				    rt->gate.s_addr != or->gate.s_addr ||
@@ -631,10 +636,12 @@ ipv4_buildroutes(struct dhcpcd_ctx *ctx)
 					if (c_route(or, rt) != 0)
 						continue;
 				}
+remroute:
 				TAILQ_REMOVE(ctx->ipv4_routes, or, next);
 				free(or);
 			} else {
-				if (n_route(rt) != 0)
+				if (!(state->added & STATE_FAKE) &&
+				    n_route(rt) != 0)
 					continue;
 			}
 			TAILQ_REMOVE(dnr, rt, next);
@@ -786,7 +793,8 @@ ipv4_applyaddr(void *arg)
 						} else {
 							ipv4_addaddr(ifn,
 							    &nstate->lease);
-							nstate->added = 1;
+							nstate->added =
+							    STATE_ADDED;
 						}
 						break;
 					}
@@ -863,7 +871,7 @@ ipv4_applyaddr(void *arg)
 	    state->addr.s_addr != 0)
 		delete_address(ifp);
 
-	state->added = 1;
+	state->added = STATE_ADDED;
 	state->defend = 0;
 	state->addr.s_addr = lease->addr.s_addr;
 	state->net.s_addr = lease->net.s_addr;

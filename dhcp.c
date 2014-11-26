@@ -2182,6 +2182,7 @@ dhcp_drop(struct interface *ifp, const char *reason)
 		dhcp_auth_reset(&state->auth);
 		dhcp_close(ifp);
 	}
+
 	if (ifp->options->options & DHCPCD_RELEASE) {
 		unlink(state->leasefile);
 		if (ifp->carrier != LINK_DOWN &&
@@ -2200,6 +2201,7 @@ dhcp_drop(struct interface *ifp, const char *reason)
 #endif
 		}
 	}
+
 	free(state->old);
 	state->old = state->new;
 	state->new = NULL;
@@ -3126,6 +3128,23 @@ dhcp_start1(void *arg)
 	if (state->offer) {
 		get_lease(ifp->ctx, &state->lease, state->offer);
 		state->lease.frominfo = 1;
+		if (state->new == NULL &&
+		    ipv4_iffindaddr(ifp, &state->lease.addr, &state->lease.net))
+		{
+			/* We still have the IP address from the last lease.
+			 * Fake add the address and routes from it so the lease
+			 * can be cleaned up. */
+			state->new = malloc(sizeof(*state->new));
+			if (state->new) {
+				memcpy(state->new, state->offer,
+				    sizeof(*state->new));
+				state->addr = state->lease.addr;
+				state->net = state->lease.net;
+				state->added |= STATE_ADDED | STATE_FAKE;
+				ipv4_buildroutes(ifp->ctx);
+			} else
+				syslog(LOG_ERR, "%s: %m", __func__);
+		}
 		if (state->offer->cookie == 0) {
 			if (state->offer->yiaddr == state->addr.s_addr) {
 				free(state->offer);
@@ -3145,6 +3164,8 @@ dhcp_start1(void *arg)
 				free(state->offer);
 				state->offer = NULL;
 				state->lease.addr.s_addr = 0;
+				if (state->new)
+					dhcp_drop(ifp, "EXPIRE");
 			} else {
 				l = (uint32_t)(now.tv_sec - st.st_mtime);
 				state->lease.leasetime -= l;

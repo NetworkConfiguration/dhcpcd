@@ -66,6 +66,9 @@ int inet_cidrtoaddr(int, struct in_addr *);
 uint32_t ipv4_getnetmask(uint32_t);
 int ipv4_addrexists(struct dhcpcd_ctx *, const struct in_addr *);
 
+#define STATE_ADDED		0x01
+#define STATE_FAKE		0x02
+
 void ipv4_buildroutes(struct dhcpcd_ctx *);
 void ipv4_applyaddr(void *);
 int ipv4_routedeleted(struct dhcpcd_ctx *, const struct rt *);
