@@ -38,6 +38,7 @@ struct rt {
 	const struct interface *iface;
 	unsigned int metric;
 	struct in_addr src;
+	uint8_t flags;
 };
 TAILQ_HEAD(rt_head, rt);
 

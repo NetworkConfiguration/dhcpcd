@@ -230,6 +230,11 @@ ipv4_ifcmp(const struct interface *si, const struct interface *ti)
 		return -1;
 	if (!sis->new && tis->new)
 		return 1;
+	/* Always prefer proper leases */
+	if (!(sis->added & STATE_FAKE) && (sis->added & STATE_FAKE))
+		return -1;
+	if ((sis->added & STATE_FAKE) && !(sis->added & STATE_FAKE))
+		return 1;
 	/* If we are either, they neither have a lease, or they both have.
 	 * We need to check for IPv4LL and make it non-preferred. */
 	if (sis->new && tis->new) {
@@ -625,10 +630,8 @@ ipv4_buildroutes(struct dhcpcd_ctx *ctx)
 			if ((or = find_route(ctx->ipv4_routes, rt, NULL))) {
 				if (state->added & STATE_FAKE)
 					continue;
-				ostate = D_CSTATE(or->iface);
-				if (ostate->added & STATE_FAKE)
-					goto remroute;
-				if (or->iface != ifp ||
+				if (or->flags & STATE_FAKE ||
+				    or->iface != ifp ||
 				    or->src.s_addr != state->addr.s_addr ||
 				    rt->gate.s_addr != or->gate.s_addr ||
 				    rt->metric != or->metric)
@@ -636,7 +639,6 @@ ipv4_buildroutes(struct dhcpcd_ctx *ctx)
 					if (c_route(or, rt) != 0)
 						continue;
 				}
-remroute:
 				TAILQ_REMOVE(ctx->ipv4_routes, or, next);
 				free(or);
 			} else {
@@ -644,6 +646,9 @@ remroute:
 				    n_route(rt) != 0)
 					continue;
 			}
+			rt->flags = STATE_ADDED;
+			if (state->added & STATE_FAKE)
+				rt->flags |= STATE_FAKE;
 			TAILQ_REMOVE(dnr, rt, next);
 			TAILQ_INSERT_TAIL(nrs, rt, next);
 		}
