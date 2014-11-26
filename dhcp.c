@@ -3190,7 +3190,8 @@ dhcp_start1(void *arg)
 	if (state->offer == NULL || state->offer->cookie == 0) {
 		/* If we don't have an address yet, enter the reboot
 		 * state to ensure at least fallback in short order. */
-		if (state->addr.s_addr == INADDR_ANY)
+		if (state->addr.s_addr == INADDR_ANY ||
+		    state->added & STATE_FAKE)
 			state->state = DHS_REBOOT;
 		dhcp_discover(ifp);
 	} else
