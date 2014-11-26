@@ -3166,8 +3166,22 @@ dhcp_start1(void *arg)
 				free(state->offer);
 				state->offer = NULL;
 				state->lease.addr.s_addr = 0;
+				/* Technically we should discard the lease
+				 * as it's expired, just as DHCPv6 addresses
+				 * would be by the kernel.
+				 * However, this may violate POLA so
+				 * we currently leave it be.
+				 * If we get a totally different lease from
+				 * the DHCP server we'll drop it anyway, as
+				 * we will on any other event which would
+				 * trigger a lease drop.
+				 * This should only happen if dhcpcd stops
+				 * running and the lease expires before
+				 * dhcpcd starts again. */
+#if 0
 				if (state->new)
 					dhcp_drop(ifp, "EXPIRE");
+#endif
 			} else {
 				l = (uint32_t)(now.tv_sec - st.st_mtime);
 				state->lease.leasetime -= l;
