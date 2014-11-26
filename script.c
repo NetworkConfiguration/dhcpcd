@@ -372,6 +372,11 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 		env[12] = strdup("if_ipwaited=false");
 	if (env[12] == NULL)
 		goto eexit;
+	if (ifo->options & DHCPCD_DEBUG) {
+		e = strlen("syslog_debug=true") + 1;
+		EMALLOC(elen, e);
+		snprintf(env[elen++], e, "syslog_debug=true");
+	}
 	if (*ifp->profile) {
 		e = strlen("profile=") + strlen(ifp->profile) + 2;
 		EMALLOC(elen, e);
