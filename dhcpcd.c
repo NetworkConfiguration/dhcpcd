@@ -449,12 +449,13 @@ configure_interface1(struct interface *ifp)
 			    sizeof(ifo->iaid));
 		else {
 			uint32_t len;
-			
+
 			len = (uint32_t)strlen(ifp->name);
 			if (len <= sizeof(ifo->iaid)) {
 				memcpy(ifo->iaid, ifp->name, len);
-				memset(ifo->iaid + len, 0,
-				    sizeof(ifo->iaid) - len);
+				if (len < sizeof(ifo->iaid))
+					memset(ifo->iaid + len, 0,
+					    sizeof(ifo->iaid) - len);
 			} else {
 				/* IAID is the same size as a uint32_t */
 				len = htonl(ifp->index);
