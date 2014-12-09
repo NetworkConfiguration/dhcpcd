@@ -538,6 +538,25 @@ configure_interface(struct interface *ifp, int argc, char **argv)
 	configure_interface1(ifp);
 }
 
+static void
+dhcpcd_pollup(void *arg)
+{
+	struct interface *ifp = arg;
+	int carrier;
+
+	carrier = if_carrier(ifp); /* will set ifp->flags */
+	if (carrier == LINK_UP && !(ifp->flags & IFF_UP)) {
+		struct timeval tv;
+
+		tv.tv_sec = 0;
+		tv.tv_usec = IF_POLL_UP * 1000;
+		eloop_timeout_add_tv(ifp->ctx->eloop, &tv, dhcpcd_pollup, ifp);
+		return;
+	}
+
+	dhcpcd_handlecarrier(ifp->ctx, carrier, ifp->flags, ifp->name);
+}
+
 void
 dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
     const char *ifname)
@@ -553,14 +572,15 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 		carrier = if_carrier(ifp); /* will set ifp->flags */
 		break;
 	case LINK_UP:
-		/* we have a carrier! however, we need to ignore the flags
-		 * set in the kernel message as sometimes this message is
-		 * reported before IFF_UP is set by the kernel even though
-		 * dhcpcd has already set it.
-		 *
-		 * So we check the flags now. If IFF_UP is still not set
-		 * then we should expect an accompanying link_down message */
-		if_setflag(ifp, 0); /* will set ifp->flags */
+		/* we have a carrier! Still need to check for IFF_UP */
+		if (flags & IFF_UP)
+			ifp->flags = flags;
+		else {
+			/* So we need to poll for IFF_UP as there is no
+			 * kernel notification when it's set. */
+			dhcpcd_pollup(ifp);
+			return;
+		}
 		break;
 	default:
 		ifp->flags = flags;
