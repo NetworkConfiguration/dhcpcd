@@ -29,11 +29,6 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 
-#ifdef __linux__
-#  include <asm/types.h> /* for systems with broken headers */
-#  include <linux/rtnetlink.h>
-#endif
-
 #include <arpa/inet.h>
 #include <net/if.h>
 #include <net/route.h>

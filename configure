@@ -366,6 +366,9 @@ linux*)
 	# glibc-2.20
 	echo "CPPFLAGS+=	-D_DEFAULT_SOURCE" >>$CONFIG_MK
 	echo "DHCPCD_SRCS+=	if-linux.c" >>$CONFIG_MK
+	# for RTM_NEWADDR and friends
+	echo "#include <asm/types.h> /* fix broken headers */" >>$CONFIG_H
+	echo "#include <linux/rtnetlink.h>" >>$CONFIG_H
 	;;
 kfreebsd*)
 	echo "CPPFLAGS+=	-D_GNU_SOURCE" >>$CONFIG_MK

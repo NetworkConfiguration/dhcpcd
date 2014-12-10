@@ -98,7 +98,7 @@ void ipv6nd_handleifa(struct dhcpcd_ctx *, int,
 int ipv6nd_dadcompleted(const struct interface *);
 void ipv6nd_drop(struct interface *);
 
-#ifdef HAVE_RTM_GETNEIGH
+#ifdef RTM_NEWNEIGH
 void ipv6nd_neighbour(struct dhcpcd_ctx *, struct in6_addr *, int);
 #endif
 #else

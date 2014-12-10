@@ -343,7 +343,7 @@ ipv6nd_reachable(struct ra *rap, int flags)
 	}
 }
 
-#ifdef HAVE_RTM_GETNEIGH
+#ifdef RTM_NEWNEIGH
 void
 ipv6nd_neighbour(struct dhcpcd_ctx *ctx, struct in6_addr *addr, int flags)
 {
@@ -358,9 +358,7 @@ ipv6nd_neighbour(struct dhcpcd_ctx *ctx, struct in6_addr *addr, int flags)
 		}
 	}
 }
-
 #else
-
 static void
 ipv6nd_checkreachablerouters(void *arg)
 {
@@ -431,7 +429,7 @@ void ipv6nd_freedrop_ra(struct ra *rap, int drop)
 	eloop_timeout_delete(rap->iface->ctx->eloop, NULL, rap);
 	if (!drop)
 		TAILQ_REMOVE(rap->iface->ctx->ipv6->ra_routers, rap, next);
-#ifndef HAVE_RTM_GETNEIGH
+#ifndef RTM_NEWNEIGH
 	if (TAILQ_FIRST(rap->iface->ctx->ipv6->ra_routers) == NULL)
 		eloop_timeout_delete(rap->iface->ctx->eloop,
 		    ipv6nd_checkreachablerouters, rap->iface->ctx);
@@ -1128,7 +1126,7 @@ nodhcp6:
 	/* Expire should be called last as the rap object could be destroyed */
 	ipv6nd_expirera(ifp);
 
-#ifndef HAVE_RTM_GETNEIGH
+#ifndef RTM_NEWNEIGH
 	/* Start our reachability tests now */
 	eloop_timeout_add_sec(ifp->ctx->eloop, ND6REACHABLE_TIMER,
 	    ipv6nd_checkreachablerouters, ifp->ctx);

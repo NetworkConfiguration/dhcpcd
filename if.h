@@ -48,13 +48,6 @@
 # endif
 #endif
 
-/* Neighbour reachability and router updates */
-#ifndef HAVE_RTM_GETNEIGH
-# ifdef __linux__
-#  define HAVE_RTM_GETNEIGH
-# endif
-#endif
-
 #define EUI64_ADDR_LEN			8
 #define INFINIBAND_ADDR_LEN		20
 
