@@ -84,7 +84,7 @@ if_getssid_wext(const char *ifname, uint8_t *ssid)
 	close(s);
 	return retval;
 #else
-	/* Stop gcc warning about unused paramters */
+	/* Stop gcc warning about unused parameters */
 	ifname = ssid;
 	return -1;
 #endif
