@@ -29,6 +29,7 @@
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <net/if.h>
+#include <net/route.h>
 #include <netinet/in.h>
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
