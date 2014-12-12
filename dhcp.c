@@ -2502,6 +2502,8 @@ dhcp_handledhcp(struct interface *iface, struct dhcp_message **dhcpp,
 			    iface->name, msg);
 			free(msg);
 		}
+		if (state->state == DHS_INFORM) /* INFORM should not be NAKed */
+			return;
 		if (!(iface->ctx->options & DHCPCD_TEST)) {
 			dhcp_drop(iface, "NAK");
 			unlink(state->leasefile);
