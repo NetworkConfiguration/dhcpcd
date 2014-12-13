@@ -46,6 +46,7 @@
 #include <net/route.h>
 #include <netinet/if_ether.h>
 #include <netinet/in.h>
+#include <netinet/in_var.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/nd6.h>
 #ifdef __DragonFly__
@@ -418,40 +419,32 @@ next:
 }
 
 int
-if_address(const struct interface *iface, const struct in_addr *address,
+if_address(const struct interface *ifp, const struct in_addr *address,
     const struct in_addr *netmask, const struct in_addr *broadcast,
     int action)
 {
 	int s, r;
-	struct ifaliasreq ifa;
-	union {
-		struct sockaddr *sa;
-		struct sockaddr_in *sin;
-	} _s;
+	struct in_aliasreq ifra;
 
 	if ((s = socket(PF_INET, SOCK_DGRAM, 0)) == -1)
 		return -1;
 
-	memset(&ifa, 0, sizeof(ifa));
-	strlcpy(ifa.ifra_name, iface->name, sizeof(ifa.ifra_name));
+	memset(&ifra, 0, sizeof(ifra));
+	strlcpy(ifra.ifra_name, ifp->name, sizeof(ifra.ifra_name));
 
-#define ADDADDR(_var, _addr) {						      \
-		_s.sa = &_var;						      \
-		_s.sin->sin_family = AF_INET;				      \
-		_s.sin->sin_len = sizeof(*_s.sin);			      \
-		memcpy(&_s.sin->sin_addr, _addr, sizeof(_s.sin->sin_addr));   \
-	}
-
-	ADDADDR(ifa.ifra_addr, address);
-	ADDADDR(ifa.ifra_mask, netmask);
-	if (action >= 0 && broadcast) {
-		ADDADDR(ifa.ifra_broadaddr, broadcast);
-	}
+#define ADDADDR(var, addr) do {						      \
+		(var)->sin_family = AF_INET;				      \
+		(var)->sin_len = sizeof(*(var));			      \
+		(var)->sin_addr = *(addr);				      \
+	} while (/*CONSTCOND*/0)
+	ADDADDR(&ifra.ifra_addr, address);
+	ADDADDR(&ifra.ifra_mask, netmask);
+	if (action >= 0 && broadcast)
+		ADDADDR(&ifra.ifra_broadaddr, broadcast);
 #undef ADDADDR
 
 	r = ioctl(s,
-	    action < 0 ? SIOCDIFADDR :
-	    action == 2 ? SIOCSIFADDR :  SIOCAIFADDR, &ifa);
+	    action < 0 ? SIOCDIFADDR : SIOCAIFADDR, &ifra);
 	close(s);
 	return r;
 }
