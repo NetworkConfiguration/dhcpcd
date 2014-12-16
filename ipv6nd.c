@@ -549,7 +549,7 @@ ipv6nd_addaddr(void *arg)
 {
 	struct ipv6_addr *ap = arg;
 
-	ipv6_addaddr(ap);
+	ipv6_addaddr(ap, NULL);
 }
 
 int
@@ -896,6 +896,7 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 			if (pi->nd_opt_pi_flags_reserved &
 			    ND_OPT_PI_FLAG_ONLINK)
 				ap->flags |= IPV6_AF_ONLINK;
+			ap->acquired = rap->received;
 			ap->prefix_vltime =
 			    ntohl(pi->nd_opt_pi_valid_time);
 			ap->prefix_pltime =
