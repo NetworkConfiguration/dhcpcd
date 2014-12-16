@@ -48,6 +48,13 @@ BSD systems where this has been fixed or is known to work are:
     OpenBSD-5.0
     patch submitted against FreeBSD-10.0
 
+Some BSD systems do not announce IPv6 address flag changes, such as
+IN6_IFF_TENTATIVE, IN6_IFF_DUPLICATED, etc. On these systems,
+dhcpcd will poll a freshly added address until either IN6_IFF_TENTATIVE is
+cleared or IN6_IFF_DUPLICATED is set and take action accordingly.
+BSD systems where this has been fixed or is known to work are:
+    NetBSD-7.0
+
 Some BSD systems do not announce cached neighbour route changes based
 on reachability to userland. For such systems, IPv6 routers will always
 be assumed to be reachable until they either stop being a router or expire.
