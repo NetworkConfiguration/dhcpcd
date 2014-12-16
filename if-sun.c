@@ -167,14 +167,6 @@ if_machinearch(char *str, size_t len)
 }
 
 #ifdef INET6
-int
-if_nd6reachable(const char *ifname, struct in6_addr *addr)
-{
-
-	errno = ENOTSUP;
-	return -1;
-}
-
 void
 if_rarestore(struct dhcpcd_ctx *ctx)
 {

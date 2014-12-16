@@ -580,6 +580,15 @@ ifa_scope(struct sockaddr_in6 *sin, unsigned int ifindex)
 #endif
 }
 
+#ifdef __KAME__
+#define DESCOPE(ia6) do {						      \
+	if (IN6_IS_ADDR_LINKLOCAL((ia6)))				      \
+		(ia6)->s6_addr[2] = (ia6)->s6_addr[3] = '\0';		      \
+	} while (/*CONSTCOND */0)
+#else
+#define DESCOPE(ia6)
+#endif
+
 int
 if_address6(const struct ipv6_addr *a, int action)
 {
@@ -746,11 +755,6 @@ get_addrs(int type, char *cp, struct sockaddr **sa)
 	for (i = 0; i < RTAX_MAX; i++) {
 		if (type & (1 << i)) {
 			sa[i] = (struct sockaddr *)cp;
-#ifdef DEBUG
-			printf ("got %d %d %s\n", i, sa[i]->sa_family,
-			    inet_ntoa(((struct sockaddr_in *)sa[i])->
-				sin_addr));
-#endif
 			RT_ADVANCE(cp, sa[i]);
 		} else
 			sa[i] = NULL;
@@ -856,16 +860,20 @@ if_managelink(struct dhcpcd_ctx *ctx)
 			dhcpcd_handlecarrier(ctx, len,
 			    (unsigned int)ifm->ifm_flags, ifp->name);
 			break;
+		case RTM_ADD:
+		case RTM_CHANGE:
 		case RTM_DELETE:
-			if (~rtm->rtm_addrs &
-			    (RTA_DST | RTA_GATEWAY | RTA_NETMASK))
-				break;
 			cp = (char *)(void *)(rtm + 1);
 			sa = (struct sockaddr *)(void *)cp;
 			get_addrs(rtm->rtm_addrs, cp, rti_info);
 			switch (sa->sa_family) {
 #ifdef INET
 			case AF_INET:
+				if (rtm->rtm_type != RTM_DELETE)
+					break;
+				if (~rtm->rtm_addrs &
+				    (RTA_DST | RTA_GATEWAY | RTA_NETMASK))
+					break;
 				memset(&rt, 0, sizeof(rt));
 				rt.iface = NULL;
 				COPYOUT(rt.dest, rti_info[RTAX_DST]);
@@ -876,6 +884,37 @@ if_managelink(struct dhcpcd_ctx *ctx)
 #endif
 #ifdef INET6
 			case AF_INET6:
+				if (~rtm->rtm_addrs &
+				    (RTA_DST | RTA_GATEWAY))
+					break;
+				/*
+				 * BSD caches host routes in the
+				 * routing table.
+				 * As such, we should be notified of
+				 * reachability by its existance
+				 * with a hardware address
+				 */
+				if (rtm->rtm_flags & (RTF_HOST)) {
+					COPYOUT6(ia6, rti_info[RTAX_DST]);
+					DESCOPE(&ia6);
+					if (rti_info[RTAX_GATEWAY]->sa_family
+					    == AF_LINK)
+						memcpy(&sdl,
+						    rti_info[RTAX_GATEWAY],
+						    sizeof(sdl));
+					else
+						sdl.sdl_alen = 0;
+					ipv6nd_neighbour(ctx, &ia6,
+					    rtm->rtm_type != RTM_DELETE &&
+					    sdl.sdl_alen ?
+					    IPV6ND_REACHABLE : 0);
+					break;
+				}
+
+				if (rtm->rtm_type != RTM_DELETE)
+					break;
+				if (!(rtm->rtm_addrs & RTA_NETMASK))
+					break;
 				memset(&rt6, 0, sizeof(rt6));
 				rt6.iface = NULL;
 				COPYOUT6(rt6.dest, rti_info[RTAX_DST]);
@@ -885,6 +924,7 @@ if_managelink(struct dhcpcd_ctx *ctx)
 				break;
 #endif
 			}
+			break;
 #ifdef RTM_CHGADDR
 		case RTM_CHGADDR:	/* FALLTHROUGH */
 #endif
@@ -928,10 +968,7 @@ if_managelink(struct dhcpcd_ctx *ctx)
 				sin6 = (struct sockaddr_in6*)(void *)
 				    rti_info[RTAX_IFA];
 				ia6 = sin6->sin6_addr;
-#ifdef __KAME__
-				if (IN6_IS_ADDR_LINKLOCAL(&ia6))
-					ia6.s6_addr[2] = ia6.s6_addr[3] = '\0';
-#endif
+				DESCOPE(&ia6);
 				if (rtm->rtm_type == RTM_NEWADDR) {
 					ifa_flags = if_addrflags6(&ia6, ifp);
 					if (ifa_flags == -1)
@@ -1029,43 +1066,6 @@ if_nd6_flag(const char *ifname, unsigned int flag, int set)
 eexit:
 	close(s);
 	return error;
-}
-
-int
-if_nd6reachable(const char *ifname, struct in6_addr *addr)
-{
-	int s, flags;
-	struct in6_nbrinfo nbi;
-
-	if ((s = socket(PF_INET6, SOCK_DGRAM, 0)) < 0)
-		return -1;
-
-	memset(&nbi, 0, sizeof(nbi));
-	strlcpy(nbi.ifname, ifname, sizeof(nbi.ifname));
-	nbi.addr = *addr;
-	if (ioctl(s, SIOCGNBRINFO_IN6, &nbi) == -1) {
-#ifdef __FreeBSD__
-		/* FreeBSD doesn't support reachable routers? */
-		if (errno == EINVAL)
-			errno = ENOTSUP;
-#endif
-		flags = -1;
-	} else {
-		flags = 0;
-		switch(nbi.state) {
-		case ND6_LLINFO_NOSTATE:	/* just added */
-		case ND6_LLINFO_REACHABLE:
-		case ND6_LLINFO_STALE:
-		case ND6_LLINFO_DELAY:
-		case ND6_LLINFO_PROBE:
-			flags |= IPV6ND_REACHABLE;
-			break;
-		}
-		if (nbi.isrouter)
-			flags |= IPV6ND_ROUTER;
-	}
-	close(s);
-	return flags;
 }
 
 static int
