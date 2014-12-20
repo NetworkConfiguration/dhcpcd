@@ -33,7 +33,7 @@
 #include <time.h>
 
 int
-pollts(struct pollfd *restrict, nfds_t, const struct timespec *restrict,
-    const sigset_t *restrict);
+pollts(struct pollfd *__restrict, nfds_t, const struct timespec *__restrict,
+    const sigset_t *__restrict);
 
 #endif

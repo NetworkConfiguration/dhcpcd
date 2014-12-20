@@ -36,8 +36,8 @@
 #include "pollts.h"
 
 int
-pollts(struct pollfd *restrict fds, nfds_t nfds,
-    const struct timespec *restrict ts, const sigset_t *restrict sigmask)
+pollts(struct pollfd *__restrict fds, nfds_t nfds,
+    const struct timespec *__restrict ts, const sigset_t *__restrict sigmask)
 {
 	fd_set read_fds;
 	nfds_t n;
