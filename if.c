@@ -70,6 +70,11 @@
 #include "ipv4.h"
 #include "ipv6nd.h"
 
+#ifdef __QNX__
+/* QNX carries defines for, but does not actually support PF_LINK */
+#undef IFLR_ACTIVE
+#endif
+
 void
 if_free(struct interface *ifp)
 {

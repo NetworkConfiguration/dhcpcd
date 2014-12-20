@@ -48,15 +48,17 @@
 #    define IN6_IFF_DUPLICATED	0x08
 #  endif
 #  define IN6_IFF_DETACHED	0
-#else
-#  include <sys/endian.h>
+#else /* !__linux__ */
+#  ifndef __QNX__
+#    include <sys/endian.h>
+#  endif
 #  include <net/if.h>
-#ifdef __FreeBSD__ /* Needed so that including netinet6/in6_var.h works */
-#  include <net/if_var.h>
-#endif
-#ifndef __sun
-#  include <netinet6/in6_var.h>
-#endif
+#  ifdef __FreeBSD__ /* Needed so that including netinet6/in6_var.h works */
+#    include <net/if_var.h>
+#  endif
+#  ifndef __sun
+#    include <netinet6/in6_var.h>
+#  endif
 #endif
 
 #include <errno.h>

@@ -506,6 +506,9 @@ if $XCC _inet_ntoa.c -o _inet_ntoa 2>&3; then
 elif $XCC _inet_ntoa.c -lnsl -o _inet_ntoa 2>&3; then
 	echo "yes (-lnsl)"
 	echo "LDADD+=		-lnsl" >>$CONFIG_MK
+elif $XCC _inet_ntoa.c -lsocket -o _inet_ntoa 2>&3; then
+	echo "yes (-lsocket)"
+	echo "LDADD+=		-lsocket" >>$CONFIG_MK	
 else
 	echo "no"
 	echo "libc support for inet_ntoa is required - aborting" >&2
