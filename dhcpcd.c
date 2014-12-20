@@ -903,6 +903,10 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 
 	i = -1;
 	ifs = if_discover(ctx, -1, UNCONST(argv));
+	if (ifs == NULL) {
+		syslog(LOG_ERR, "%s: if_discover: %m", __func__);
+		return -1;
+	}
 	TAILQ_FOREACH_SAFE(ifp, ifs, next, ifn) {
 		if (strcmp(ifp->name, ifname) != 0)
 			continue;
@@ -1003,8 +1007,10 @@ reconf_reboot(struct dhcpcd_ctx *ctx, int action, int argc, char **argv, int oi)
 	struct interface *ifn, *ifp;
 
 	ifs = if_discover(ctx, argc - oi, argv + oi);
-	if (ifs == NULL)
+	if (ifs == NULL) {
+		syslog(LOG_ERR, "%s: if_discover: %m", __func__);
 		return;
+	}
 
 	while ((ifp = TAILQ_FIRST(ifs))) {
 		TAILQ_REMOVE(ifs, ifp, next);
@@ -1510,8 +1516,10 @@ main(int argc, char **argv)
 		/* We need to try and find the interface so we can
 		 * load the hardware address to compare automated IAID */
 		ctx.ifaces = if_discover(&ctx, 1, argv + optind);
-		if (ctx.ifaces == NULL)
+		if (ctx.ifaces == NULL) {
+			syslog(LOG_ERR, "if_discover: %m");
 			goto exit_failure;
+		}
 		ifp = TAILQ_FIRST(ctx.ifaces);
 		if (ifp == NULL) {
 			ifp = calloc(1, sizeof(*ifp));
@@ -1703,12 +1711,16 @@ main(int argc, char **argv)
 		dev_start(&ctx);
 
 	ctx.ifaces = if_discover(&ctx, ctx.ifc, ctx.ifv);
+	if (ctx.ifaces == NULL) {
+		syslog(LOG_ERR, "if_discover: %m");
+		goto exit_failure;
+	}
 	for (i = 0; i < ctx.ifc; i++) {
 		if (if_find(&ctx, ctx.ifv[i]) == NULL)
 			syslog(LOG_ERR, "%s: interface not found or invalid",
 			    ctx.ifv[i]);
 	}
-	if (ctx.ifaces == NULL || TAILQ_FIRST(ctx.ifaces) == NULL) {
+	if (TAILQ_FIRST(ctx.ifaces) == NULL) {
 		if (ctx.ifc == 0)
 			syslog(LOG_ERR, "no valid interfaces found");
 		else
