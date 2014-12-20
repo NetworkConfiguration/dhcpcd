@@ -143,6 +143,16 @@ struct ipv6_state {
 #define IPV6_CSTATE(ifp)						       \
 	((const struct ipv6_state *)(ifp)->if_data[IF_DATA_IPV6])
 
+#ifndef ALIGNBYTES
+#define ALIGNBYTES (sizeof(int) - 1)
+#endif
+#ifndef ALIGN
+#define	ALIGN(p) (((unsigned int)(p) + ALIGNBYTES) & ~ALIGNBYTES)
+#endif
+#ifndef CMSG_SPACE
+#define	CMSG_SPACE(len)	(ALIGN(sizeof(struct cmsghdr)) + ALIGN(len))
+#endif
+
 #define IP6BUFLEN	(CMSG_SPACE(sizeof(struct in6_pktinfo)) + \
 			CMSG_SPACE(sizeof(int)))
 
