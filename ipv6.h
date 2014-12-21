@@ -214,11 +214,11 @@ int ipv6_removesubnet(struct interface *, struct ipv6_addr *);
 void ipv6_buildroutes(struct dhcpcd_ctx *);
 
 #else
-#define ipv6_init(a) NULL
+#define ipv6_init(a) (NULL)
 #define ipv6_start(a) (-1)
-#define ipv6_free_ll_callbacks(a)
-#define ipv6_free(a)
-#define ipv6_ctxfree(a)
+#define ipv6_free_ll_callbacks(a) {}
+#define ipv6_free(a) {}
+#define ipv6_ctxfree(a) {}
 #endif
 
 #endif

@@ -75,6 +75,6 @@ void arp_free(struct arp_state *);
 void arp_free_but(struct arp_state *);
 void arp_close(struct interface *);
 #else
-#define arp_close(a)
+#define arp_close(a) {}
 #endif
 #endif

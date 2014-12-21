@@ -101,10 +101,10 @@ void ipv6nd_neighbour(struct dhcpcd_ctx *, struct in6_addr *, int);
 #else
 #define ipv6nd_startrs(a) {}
 #define ipv6nd_findaddr(a, b, c) (0)
-#define ipv6nd_free(a)
+#define ipv6nd_free(a) {}
 #define ipv6nd_hasra(a) (0)
 #define ipv6nd_dadcompleted(a) (0)
-#define ipv6nd_drop(a)
+#define ipv6nd_drop(a) {}
 #endif
 
 #endif

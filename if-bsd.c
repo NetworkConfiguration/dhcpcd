@@ -145,6 +145,7 @@ if_openlinksocket(void)
 #endif
 }
 
+#if defined(INET) || defined(INET6)
 static void
 if_linkaddr(struct sockaddr_dl *sdl, const struct interface *ifp)
 {
@@ -157,6 +158,7 @@ if_linkaddr(struct sockaddr_dl *sdl, const struct interface *ifp)
 	link_addr(ifp->name, sdl);
 #endif
 }
+#endif
 
 static int
 if_getssid1(const char *ifname, uint8_t *ssid)

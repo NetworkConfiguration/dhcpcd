@@ -246,13 +246,13 @@ void dhcp6_drop(struct interface *, const char *);
 int dhcp6_dump(struct interface *);
 #else
 #define dhcp6_findaddr(a, b, c) (0)
-#define dhcp6_find_delegates(a)
+#define dhcp6_find_delegates(a) {}
 #define dhcp6_start(a, b) (0)
-#define dhcp6_reboot(a)
-#define dhcp6_env(a, b, c, d, e)
-#define dhcp6_free(a)
+#define dhcp6_reboot(a) {}
+#define dhcp6_env(a, b, c, d, e) {}
+#define dhcp6_free(a) {}
 #define dhcp6_dadcompleted(a) (0)
-#define dhcp6_drop(a, b)
+#define dhcp6_drop(a, b) {}
 #define dhcp6_dump(a) (-1)
 #endif
 

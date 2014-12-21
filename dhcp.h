@@ -290,13 +290,13 @@ void dhcp_close(struct interface *);
 void dhcp_free(struct interface *);
 int dhcp_dump(struct interface *);
 #else
-#define dhcp_drop(a, b)
+#define dhcp_drop(a, b) {}
 #define dhcp_start(a) {}
-#define dhcp_reboot(a, b) b = b
-#define dhcp_reboot_newopts(a, b)
-#define dhcp_close(a)
-#define dhcp_free(a)
-#define dhcp_dump(a) -1
+#define dhcp_reboot(a, b) (b = b)
+#define dhcp_reboot_newopts(a, b) (b = b)
+#define dhcp_close(a) {}
+#define dhcp_free(a) {}
+#define dhcp_dump(a) (-1)
 #endif
 
 #endif

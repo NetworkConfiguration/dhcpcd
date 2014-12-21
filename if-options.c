@@ -526,6 +526,11 @@ set_option_space(struct dhcpcd_ctx *ctx,
     uint8_t *request[], uint8_t *require[], uint8_t *no[])
 {
 
+#if !defined(INET) && !defined(INET6)
+	/* Satisfy use */
+	ctx = ctx;
+#endif
+
 #ifdef INET6
 	if (strncmp(arg, "dhcp6_", strlen("dhcp6_")) == 0) {
 		*d = ctx->dhcp6_opts;
