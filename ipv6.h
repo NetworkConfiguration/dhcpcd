@@ -143,6 +143,11 @@ struct ipv6_state {
 #define IPV6_CSTATE(ifp)						       \
 	((const struct ipv6_state *)(ifp)->if_data[IF_DATA_IPV6])
 
+/* dhcpcd requires CMSG_SPACE to evaluate to a compile time constant. */
+#ifdef __QNX__
+#undef CMSG_SPACE
+#endif
+
 #ifndef ALIGNBYTES
 #define ALIGNBYTES (sizeof(int) - 1)
 #endif
