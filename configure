@@ -361,6 +361,10 @@ if [ -n "$FORK" -a "$FORK" != yes -a "$FORK" != true ]; then
 fi
 
 case "$OS" in
+kfreebsd*)
+	echo "CPPFLAGS+=	-D_GNU_SOURCE" >>$CONFIG_MK
+	echo "DHCPCD_SRCS+=	if-bsd.c" >>$CONFIG_MK
+	;;
 linux*)
 	echo "CPPFLAGS+=	-D_BSD_SOURCE -D_XOPEN_SOURCE=700" >>$CONFIG_MK
 	# glibc-2.20
@@ -370,8 +374,8 @@ linux*)
 	echo "#include <asm/types.h> /* fix broken headers */" >>$CONFIG_H
 	echo "#include <linux/rtnetlink.h>" >>$CONFIG_H
 	;;
-kfreebsd*)
-	echo "CPPFLAGS+=	-D_GNU_SOURCE" >>$CONFIG_MK
+qnx*)
+	echo "CPPFLAGS+=	-D__EXT" >>$CONFIG_MK
 	echo "DHCPCD_SRCS+=	if-bsd.c" >>$CONFIG_MK
 	;;
 sunos*)
