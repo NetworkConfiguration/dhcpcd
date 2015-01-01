@@ -3289,7 +3289,7 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 	state = D6_STATE(ifp);
 	if (state) {
 		dhcp_auth_reset(&state->auth);
-		if (options & DHCPCD_RELEASE) {
+		if (drop && options & DHCPCD_RELEASE) {
 			if (ifp->carrier == LINK_UP)
 				dhcp6_startrelease(ifp);
 			unlink(state->leasefile);
