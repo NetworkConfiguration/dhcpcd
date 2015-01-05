@@ -738,16 +738,21 @@ if [ -z "$POSIX_SPAWN" ]; then
 	cat <<EOF >_posix_spawn.c
 #include <spawn.h>
 #include <stdlib.h>
+
+#ifdef __OpenBSD__
+#  include <sys/param.h>
+#  if OpenBSD<201505
+#    error posix_spawn was fixed in OpenBSD-5.7
+#  endif
+#endif
+
 int main(void) {
 	posix_spawn(NULL, NULL, NULL, NULL, NULL, NULL);
 	return 0;
 }
 EOF
 	if $XCC _posix_spawn.c -o _posix_spawn 2>&3; then
-		case "$OS" in
-		openbsd*) printf "broken OpenBSD ... "; POSIX_SPAWN=no;;
-		*) POSIX_SPAWN=yes;;
-		esac
+		POSIX_SPAWN=yes
 	else
 		POSIX_SPAWN=no
 	fi
