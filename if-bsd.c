@@ -1209,15 +1209,15 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 			    ifp->name);
 			if (del_if_nd6_flag(ifp->name, ND6_IFF_ACCEPT_RTADV)
 			    == -1)
-			{
 				syslog(LOG_ERR,
 				    "%s: del_if_nd6_flag: "
 				    "ND6_IFF_ACCEPT_RTADV: %m",
 				    ifp->name);
-				return ra;
-			}
-			ra = 0;
-		}
+			else
+				ra = 0;
+		} else if (ra == 0 && !own)
+			syslog(LOG_WARNING,
+			    "%s: IPv6 kernel autoconf disabled", ifp->name);
 #ifdef ND6_IFF_OVERRIDE_RTADV
 		if (override == 0 && ra)
 			return ctx->ra_global;
