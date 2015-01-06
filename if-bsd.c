@@ -1185,8 +1185,16 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 			syslog(LOG_ERR,
 			    "%s: get_if_nd6_flag: ND6_IFF_OVERRIDE_RTADV: %m",
 			    ifp->name);
-		else if (override == 0 && !own)
-			return 0;
+		else if (override == 0 && own) {
+			if (set_if_nd6_flag(ifp->name, ND6_IFF_OVERRIDE_RTADV)
+			    == -1)
+				syslog(LOG_ERR,
+				    "%s: set_if_nd6_flag: "
+				    "ND6_IFF_OVERRIDE_RTADV: %m",
+				    ifp->name);
+			else
+				override = 1;
+		}
 #endif
 
 #ifdef ND6_IFF_ACCEPT_RTADV
@@ -1208,20 +1216,12 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 				    ifp->name);
 				return ra;
 			}
-#ifdef ND6_IFF_OVERRIDE_RTADV
-			if (override == 0 &&
-			    set_if_nd6_flag(ifp->name, ND6_IFF_OVERRIDE_RTADV)
-			    == -1)
-			{
-				syslog(LOG_ERR,
-				    "%s: set_if_nd6_flag: "
-				    "ND6_IFF_OVERRIDE_RTADV: %m",
-				    ifp->name);
-				return ra;
-			}
-#endif
-			return 0;
+			ra = 0;
 		}
+#ifdef ND6_IFF_OVERRIDE_RTADV
+		if (override == 0 && ra)
+			return ctx->ra_global;
+#endif
 		return ra;
 #else
 		return ctx->ra_global;
