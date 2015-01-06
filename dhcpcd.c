@@ -385,7 +385,7 @@ configure_interface1(struct interface *ifp)
 		    ifp->options->options & DHCPCD_IPV6RA_OWN ? 1 : 0);
 		if (ra_global == -1 || ra_iface == -1)
 			ifo->options &= ~DHCPCD_IPV6RS;
-		else if (ra_iface == 0)
+		else if (ra_iface == 0 && !(ifp->ctx->options & DHCPCD_TEST))
 			ifo->options |= DHCPCD_IPV6RA_OWN;
 	}
 
