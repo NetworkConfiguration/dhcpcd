@@ -864,7 +864,9 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 				ap->prefix_len = pi->nd_opt_pi_prefix_len;
 				ap->prefix = pi->nd_opt_pi_prefix;
 				if (pi->nd_opt_pi_flags_reserved &
-				    ND_OPT_PI_FLAG_AUTO)
+				    ND_OPT_PI_FLAG_AUTO &&
+				    ap->iface->options->options &
+				    DHCPCD_IPV6RA_AUTOCONF)
 				{
 					ap->flags |= IPV6_AF_AUTOCONF;
 					ap->dadcounter =
