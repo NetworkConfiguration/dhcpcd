@@ -494,8 +494,8 @@ ipv6nd_scriptrun(struct ra *rap)
 	hasaddress = 0;
 	/* If all addresses have completed DAD run the script */
 	TAILQ_FOREACH(ap, &rap->addrs, next) {
-		if ((ap->flags & (IPV6_AF_ONLINK | IPV6_AF_AUTOCONF)) ==
-		    (IPV6_AF_ONLINK | IPV6_AF_AUTOCONF))
+		if ((ap->flags & (IPV6_AF_AUTOCONF | IPV6_AF_ADDED)) ==
+		    (IPV6_AF_AUTOCONF | IPV6_AF_ADDED))
 		{
 			hasaddress = 1;
 			if (!(ap->flags & IPV6_AF_DADCOMPLETED) &&
@@ -563,8 +563,9 @@ ipv6nd_dadcompleted(const struct interface *ifp)
 			continue;
 		TAILQ_FOREACH(ap, &rap->addrs, next) {
 			if (ap->flags & IPV6_AF_AUTOCONF &&
+			    ap->flags & IPV6_AF_ADDED &&
 			    !(ap->flags & IPV6_AF_DADCOMPLETED))
-			    	return 0;
+				return 0;
 		}
 	}
 	return 1;
@@ -647,6 +648,7 @@ try_script:
 			found = 0;
 			TAILQ_FOREACH(rapap, &rap->addrs, next) {
 				if (rapap->flags & IPV6_AF_AUTOCONF &&
+				    rapap->flags & IPV6_AF_ADDED &&
 				    (rapap->flags & IPV6_AF_DADCOMPLETED) == 0)
 				{
 					wascompleted = 0;
