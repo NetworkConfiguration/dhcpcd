@@ -2876,7 +2876,15 @@ dhcp_open(struct interface *ifp)
 	if (state->raw_fd == -1) {
 		state->raw_fd = if_openrawsocket(ifp, ETHERTYPE_IP);
 		if (state->raw_fd == -1) {
-			syslog(LOG_ERR, "%s: %s: %m", __func__, ifp->name);
+			if (errno == ENOENT) {
+				syslog(LOG_ERR,
+				   "Packet Filter missing from kernel");
+				/* May as well disable IPv4 entirely at
+				 * this point as we really need it. */
+				ifp->options->options &= ~DHCPCD_IPV4;
+			} else
+				syslog(LOG_ERR, "%s: %s: %m",
+				    __func__, ifp->name);
 			return -1;
 		}
 		eloop_event_add(ifp->ctx->eloop,
