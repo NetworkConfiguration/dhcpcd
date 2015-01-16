@@ -640,9 +640,9 @@ ipv6_addaddr(struct ipv6_addr *ap, const struct timeval *now)
 		}
 		timersub(now, &ap->acquired, &n);
 		if (ap->prefix_pltime != ND6_INFINITE_LIFETIME)
-			ap->prefix_pltime -= n.tv_sec;
+			ap->prefix_pltime -= (uint32_t)n.tv_sec;
 		if (ap->prefix_vltime != ND6_INFINITE_LIFETIME)
-			ap->prefix_vltime -= n.tv_sec;
+			ap->prefix_vltime -= (uint32_t)n.tv_sec;
 	}
 
 	syslog(ap->flags & IPV6_AF_NEW ? LOG_INFO : LOG_DEBUG,
