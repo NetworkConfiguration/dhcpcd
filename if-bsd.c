@@ -61,6 +61,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <fnmatch.h>
+#include <paths.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
