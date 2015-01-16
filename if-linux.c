@@ -1062,6 +1062,8 @@ struct nlmr
 };
 
 #ifdef INET
+const char *if_pfname = "Packet Socket";
+
 int
 if_openrawsocket(struct interface *ifp, int protocol)
 {

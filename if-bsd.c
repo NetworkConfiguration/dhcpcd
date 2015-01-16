@@ -260,6 +260,8 @@ if_vimaster(const char *ifname)
 }
 
 #ifdef INET
+const char *if_pfname = "Berkley Packet Filter";
+
 int
 if_openrawsocket(struct interface *ifp, int protocol)
 {

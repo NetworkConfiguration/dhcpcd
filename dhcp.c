@@ -2877,8 +2877,7 @@ dhcp_open(struct interface *ifp)
 		state->raw_fd = if_openrawsocket(ifp, ETHERTYPE_IP);
 		if (state->raw_fd == -1) {
 			if (errno == ENOENT) {
-				syslog(LOG_ERR,
-				   "Packet Filter missing from kernel");
+				syslog(LOG_ERR, "%s not found", if_pfname);
 				/* May as well disable IPv4 entirely at
 				 * this point as we really need it. */
 				ifp->options->options &= ~DHCPCD_IPV4;

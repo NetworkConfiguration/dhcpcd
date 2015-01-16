@@ -103,6 +103,7 @@ int if_openlinksocket(void);
 int if_managelink(struct dhcpcd_ctx *);
 
 #ifdef INET
+extern const char *if_pfname;
 int if_openrawsocket(struct interface *, int);
 ssize_t if_sendrawpacket(const struct interface *,
     int, const void *, size_t);
