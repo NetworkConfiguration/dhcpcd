@@ -601,12 +601,8 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 			ifp->carrier = LINK_DOWN;
 			script_runreason(ifp, "NOCARRIER");
 			dhcp6_drop(ifp, "EXPIRE6");
+			ipv6_drop(ifp);
 			ipv6nd_drop(ifp);
-			/* Don't blindly delete our knowledge of LL addresses.
-			 * We need to listen to what the kernel does with
-			 * them as some OS's will remove, mark tentative or
-			 * do nothing. */
-			ipv6_free_ll_callbacks(ifp);
 			dhcp_drop(ifp, "EXPIRE");
 			arp_close(ifp);
 		}
@@ -622,8 +618,11 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 #endif
 			if (ifp->wireless)
 				if_getssid(ifp);
-			configure_interface(ifp, ctx->argc, ctx->argv);
+			dhcpcd_initstate(ifp);
 			script_runreason(ifp, "CARRIER");
+			/* RFC4941 Section 3.5 */
+			if (ifp->options->options & DHCPCD_IPV6RA_OWN)
+				ipv6_gentempifid(ifp);
 			dhcpcd_startinterface(ifp);
 		}
 	}

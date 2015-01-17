@@ -581,7 +581,7 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 			rta = RTA_NEXT(rta, len);
 		}
 		ipv6_handleifa(ctx, nlm->nlmsg_type, NULL, ifp->name,
-		    &addr6, ifa->ifa_flags);
+		    &addr6, ifa->ifa_prefixlen, ifa->ifa_flags);
 		break;
 #endif
 	}
@@ -1325,8 +1325,10 @@ if_address6(const struct ipv6_addr *ap, int action)
 	struct nlma nlm;
 	struct ifa_cacheinfo cinfo;
 	int retval = 0;
+/* IFA_FLAGS is not a define, but is was added at the same time
+ * IFA_F_NOPREFIXROUTE was do use that. */
 #ifdef IFA_F_NOPREFIXROUTE
-	uint32_t flags;
+	uint32_t flags = 0;
 #endif
 
 	memset(&nlm, 0, sizeof(nlm));
@@ -1339,6 +1341,20 @@ if_address6(const struct ipv6_addr *ap, int action)
 		nlm.hdr.nlmsg_type = RTM_DELADDR;
 	nlm.ifa.ifa_index = ap->iface->index;
 	nlm.ifa.ifa_family = AF_INET6;
+	if (ap->addr_flags & IFA_F_TEMPORARY) {
+#ifdef IFA_F_NOPREFIXROUTE
+		flags |= IFA_F_TEMPORARY;
+#else
+		nlm.ifa.ifa_flags |= IFA_F_TEMPORARY;
+#endif
+	}
+#ifdef IFA_F_MANAGETEMPADDR
+	else if (ap->flags & IPV6_AF_AUTOCONF &&
+	    ip6_use_tempaddr(ap->iface->name))
+		flags |= IFA_F_MANAGETEMPADDR;
+#endif
+
+	/* Add as /128 if no IFA_F_NOPREFIXROUTE ? */
 	nlm.ifa.ifa_prefixlen = ap->prefix_len;
 	/* This creates the aliased interface */
 	add_attr_l(&nlm.hdr, sizeof(nlm), IFA_LABEL,
@@ -1355,10 +1371,12 @@ if_address6(const struct ipv6_addr *ap, int action)
 	}
 
 #ifdef IFA_F_NOPREFIXROUTE
-	if (!IN6_IS_ADDR_LINKLOCAL(&ap->addr)) {
-		flags = IFA_F_NOPREFIXROUTE;
+	if (!IN6_IS_ADDR_LINKLOCAL(&ap->addr))
+		flags |= IFA_F_NOPREFIXROUTE;
+#endif
+#ifdef IFA_F_NOPREFIXROUTE
+	if (flags)
 		add_attr_32(&nlm.hdr, sizeof(nlm), IFA_FLAGS, flags);
-	}
 #endif
 
 	if (send_netlink(ap->iface->ctx, NULL,
@@ -1492,6 +1510,15 @@ if_addrflags6(const struct in6_addr *addr, const struct interface *ifp)
 	return -1;
 }
 
+int
+if_getlifetime6(__unused struct ipv6_addr *ia)
+{
+
+	/* God knows how to work out address lifetimes on Linux */
+	errno = ENOTSUP;
+	return -1;
+}
+
 struct nlml
 {
 	struct nlmsghdr hdr;
@@ -1596,5 +1623,45 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 	}
 
 	return ra;
+}
+
+int
+ip6_use_tempaddr(const char *ifname)
+{
+	char path[256];
+	int val;
+
+	if (ifname == NULL)
+		ifname = "all";
+	snprintf(path, sizeof(path), "%s/%s/use_tempaddr", prefix, ifname);
+	val = check_proc_int(path);
+	return val == -1 ? 0 : val;
+}
+
+int
+ip6_temp_preferred_lifetime(const char *ifname)
+{
+	char path[256];
+	int val;
+
+	if (ifname == NULL)
+		ifname = "all";
+	snprintf(path, sizeof(path), "%s/%s/temp_prefered_lft", prefix,
+	    ifname);
+	val = check_proc_int(path);
+	return val < 0 ? TEMP_PREFERRED_LIFETIME : val;
+}
+
+int
+ip6_temp_valid_lifetime(const char *ifname)
+{
+	char path[256];
+	int val;
+
+	if (ifname == NULL)
+		ifname = "all";
+	snprintf(path, sizeof(path), "%s/%s/temp_valid_lft", prefix, ifname);
+	val = check_proc_int(path);
+	return val < 0 ? TEMP_VALID_LIFETIME : val;
 }
 #endif

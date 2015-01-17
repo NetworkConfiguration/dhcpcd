@@ -618,6 +618,8 @@ if_address6(const struct ipv6_addr *a, int action)
 	if (a->autoconf)
 		ifa.ifra_flags |= IN6_IFF_AUTOCONF;
 #endif
+	if (a->flags & IPV6_AF_TEMPORARY)
+		ifa.ifra_flags |= IN6_IFF_TEMPORARY;
 
 #define ADDADDR(v, addr) {						      \
 		(v)->sin6_family = AF_INET6;				      \
@@ -787,6 +789,51 @@ if_addrflags6(const struct in6_addr *addr, const struct interface *ifp)
 	}
 	return flags;
 }
+
+int
+if_getlifetime6(struct ipv6_addr *ia)
+{
+	int s, r;
+	struct in6_ifreq ifr6;
+
+	s = socket(PF_INET6, SOCK_DGRAM, 0);
+	r = -1;
+	if (s != -1) {
+		memset(&ifr6, 0, sizeof(ifr6));
+		strncpy(ifr6.ifr_name, ia->iface->name, sizeof(ifr6.ifr_name));
+		ifr6.ifr_addr.sin6_family = AF_INET6;
+		ifr6.ifr_addr.sin6_addr = ia->addr;
+		ifa_scope(&ifr6.ifr_addr, ia->iface->index);
+		if (ioctl(s, SIOCGIFALIFETIME_IN6, &ifr6) != -1) {
+			time_t t;
+			struct in6_addrlifetime *lifetime;
+
+			t = time(NULL);
+			lifetime = &ifr6.ifr_ifru.ifru_lifetime;
+
+			if (lifetime->ia6t_preferred)
+				ia->prefix_pltime =
+				    (uint32_t)(lifetime->ia6t_preferred -
+				    MIN(t, lifetime->ia6t_preferred));
+			else
+				ia->prefix_pltime = ND6_INFINITE_LIFETIME;
+			if (lifetime->ia6t_expire) {
+				ia->prefix_vltime =
+				    (uint32_t)(lifetime->ia6t_expire -
+				    MIN(t, lifetime->ia6t_expire));
+				/* Calculate the created time */
+				get_monotonic(&ia->created);
+				ia->created.tv_sec -=
+				    lifetime->ia6t_vltime - ia->prefix_vltime;
+			} else
+				ia->prefix_vltime = ND6_INFINITE_LIFETIME;
+
+			r = 0;
+		}
+		close(s);
+	}
+	return r;
+}
 #endif
 
 int
@@ -808,7 +855,7 @@ if_managelink(struct dhcpcd_ctx *ctx)
 #endif
 #ifdef INET6
 	struct rt6 rt6;
-	struct in6_addr ia6;
+	struct in6_addr ia6, net6;
 	struct sockaddr_in6 *sin6;
 	int ifa_flags;
 #endif
@@ -974,6 +1021,10 @@ if_managelink(struct dhcpcd_ctx *ctx)
 				    rti_info[RTAX_IFA];
 				ia6 = sin6->sin6_addr;
 				DESCOPE(&ia6);
+				sin6 = (struct sockaddr_in6*)(void *)
+				    rti_info[RTAX_NETMASK];
+				net6 = sin6->sin6_addr;
+				DESCOPE(&net6);
 				if (rtm->rtm_type == RTM_NEWADDR) {
 					ifa_flags = if_addrflags6(&ia6, ifp);
 					if (ifa_flags == -1)
@@ -981,7 +1032,8 @@ if_managelink(struct dhcpcd_ctx *ctx)
 				} else
 					ifa_flags = 0;
 				ipv6_handleifa(ctx, rtm->rtm_type, NULL,
-				    ifp->name, &ia6, ifa_flags);
+				    ifp->name, &ia6, ipv6_prefixlen(&net6),
+				    ifa_flags);
 				break;
 #endif
 			}
@@ -1035,7 +1087,64 @@ inet6_sysctl(int code, int val, int action)
 		return -1;
 	return val;
 }
+
+#define get_inet6_sysctlbyname(code) inet6_sysctlbyname(code, 0, 0)
+#define set_inet6_sysctlbyname(code, val) inet6_sysctlbyname(code, val, 1)
+static int
+inet6_sysctlbyname(const char *name, int val, int action)
+{
+	size_t size;
+
+	size = sizeof(val);
+	if (action) {
+		if (sysctlbyname(name, NULL, 0, &val, size) == -1)
+			return -1;
+		return 0;
+	}
+	if (sysctlbyname(name, &val, &size, NULL, 0) == -1)
+		return -1;
+	return val;
+}
 #endif
+
+int
+ip6_use_tempaddr(__unused const char *ifname)
+{
+	int val;
+
+#ifdef IPV6CTL_USETEMPADDR
+	val = get_inet6_sysctl(IPV6CTL_USETEMPADDR);
+#else
+	val = get_inet6_sysctlbyname("net.inet6.ip6.use_tempaddr");
+#endif
+	return val == -1 ? TEMP_PREFERRED_LIFETIME : val;
+}
+
+int
+ip6_temp_preferred_lifetime(__unused const char *ifname)
+{
+	int val;
+
+#ifdef IPV6CTL_TEMPPLTIME
+	val = get_inet6_sysctl(IPV6CTL_TEMPPLTIME);
+#else
+	val = get_inet6_sysctlbyname("net.inet6.ip6.temppltime");
+#endif
+	return val < 0 ? TEMP_PREFERRED_LIFETIME : val;
+}
+
+int
+ip6_temp_valid_lifetime(__unused const char *ifname)
+{
+	int val;
+
+#ifdef IPV6CTL_TEMPVLTIME
+	val = get_inet6_sysctl(IPV6CTL_TEMPVLTIME);
+#else
+	val = get_inet6_sysctlbyname("net.inet6.ip6.tempvltime");
+#endif
+	return val < 0 ? TEMP_VALID_LIFETIME : val;
+}
 
 #define del_if_nd6_flag(ifname, flag) if_nd6_flag(ifname, flag, -1)
 #define get_if_nd6_flag(ifname, flag) if_nd6_flag(ifname, flag,  0)

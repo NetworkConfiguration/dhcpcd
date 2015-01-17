@@ -691,7 +691,7 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 	struct ipv6_addr *ap;
 	char *opt, *opt2, *tmp;
 	struct timeval expire;
-	uint8_t new_rap, new_data;
+	uint8_t new_rap, new_data, new_ap;
 
 	if (len < sizeof(struct nd_router_advert)) {
 		syslog(LOG_ERR, "IPv6 RA packet too short from %s", ctx->sfrom);
@@ -793,6 +793,7 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 	if (rap->lifetime)
 		rap->expired = 0;
 
+	ipv6_settempstale(ifp);
 	TAILQ_FOREACH(ap, &rap->addrs, next) {
 		ap->flags |= IPV6_AF_STALE;
 	}
@@ -894,13 +895,27 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 					ap->saddr[0] = '\0';
 				}
 				ap->dadcallback = ipv6nd_dadcallback;
+				ap->created = ap->acquired = rap->received;
 				TAILQ_INSERT_TAIL(&rap->addrs, ap, next);
-			} else
+
+				/* New address to dhcpcd RA handling.
+				 * If the address already exists and a valid
+				 * temporary address also exists then
+				 * extend the existing one rather than
+				 * create a new one */
+				if (ipv6_iffindaddr(ifp, &ap->addr) &&
+				    ipv6_settemptime(ap, 0))
+					new_ap = 0;
+				else
+					new_ap = 1;
+			} else {
+				new_ap = 0;
 				ap->flags &= ~IPV6_AF_STALE;
+				ap->acquired = rap->received;
+			}
 			if (pi->nd_opt_pi_flags_reserved &
 			    ND_OPT_PI_FLAG_ONLINK)
 				ap->flags |= IPV6_AF_ONLINK;
-			ap->acquired = rap->received;
 			ap->prefix_vltime =
 			    ntohl(pi->nd_opt_pi_valid_time);
 			ap->prefix_pltime =
@@ -916,6 +931,24 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 					opt2 = strdup(ap->saddr);
 				}
 			}
+
+			/* RFC4941 Section 3.3.3 */
+			if (ap->flags & IPV6_AF_AUTOCONF &&
+			    ap->iface->options->options & DHCPCD_IPV6RA_OWN &&
+			    ip6_use_tempaddr(ap->iface->name))
+			{
+				if (!new_ap) {
+					if (ipv6_settemptime(ap, 1) == NULL)
+						new_ap = 1;
+				}
+				if (new_ap && ap->prefix_pltime) {
+					if (ipv6_createtempaddr(ap,
+					    &ap->acquired) == NULL)
+						syslog(LOG_ERR,
+						    "ipv6_createtempaddr: %m");
+				}
+			}
+
 			lifetime = ap->prefix_vltime;
 			break;
 
@@ -1067,6 +1100,7 @@ extra_opt:
 		goto handle_flag;
 	}
 	ipv6_addaddrs(&rap->addrs);
+	ipv6_addtempaddrs(ifp, &rap->received);
 	ipv6_buildroutes(ifp->ctx);
 	if (ipv6nd_scriptrun(rap))
 		return;

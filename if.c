@@ -195,7 +195,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 	const struct sockaddr_in *dst;
 #endif
 #ifdef INET6
-	struct sockaddr_in6 *sin6;
+	struct sockaddr_in6 *sin6, *net6;
 	int ifa_flags;
 #endif
 #ifdef AF_LINK
@@ -505,6 +505,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 			if (ifp == NULL)
 				break; /* Should be impossible */
 			sin6 = (struct sockaddr_in6 *)(void *)ifa->ifa_addr;
+			net6 = (struct sockaddr_in6 *)(void *)ifa->ifa_netmask;
 #ifdef __KAME__
 			if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr))
 				/* Remove the scope from the address */
@@ -515,7 +516,9 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 			if (ifa_flags != -1)
 				ipv6_handleifa(ctx, RTM_NEWADDR, ifs,
 				    ifa->ifa_name,
-				    &sin6->sin6_addr, ifa_flags);
+				    &sin6->sin6_addr,
+				    ipv6_prefixlen(&net6->sin6_addr),
+				    ifa_flags);
 			break;
 #endif
 		}

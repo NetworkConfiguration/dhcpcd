@@ -1736,6 +1736,7 @@ dhcp6_findna(struct interface *ifp, uint16_t ot, const uint8_t *iaid,
 			a->ia_type = ot;
 			memcpy(a->iaid, iaid, sizeof(a->iaid));
 			a->addr = iap->addr;
+			a->created = *acquired;
 
 			/*
 			 * RFC 5942 Section 5
@@ -1818,6 +1819,7 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			}
 			a->iface = ifp;
 			a->flags = IPV6_AF_NEW | IPV6_AF_DELEGATEDPFX;
+			a->created = *acquired;
 			a->dadcallback = dhcp6_dadcallback;
 			a->ia_type = D6_OPTION_IA_PD;
 			memcpy(a->iaid, iaid, sizeof(a->iaid));
@@ -2284,7 +2286,7 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 	a->dadcallback = dhcp6_dadcallback;
 	a->delegating_iface = ifs;
 	memcpy(&a->iaid, &prefix->iaid, sizeof(a->iaid));
-	a->acquired = prefix->acquired;
+	a->created = a->acquired = prefix->acquired;
 	a->prefix_pltime = prefix->prefix_pltime;
 	a->prefix_vltime = prefix->prefix_vltime;
 	a->prefix = addr;
@@ -2303,6 +2305,7 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 			/* Keep our flags */
 			a->flags |= ap->flags;
 			a->flags &= ~IPV6_AF_NEW;
+			a->created = ap->created;
 			free(ap);
 		}
 	}
