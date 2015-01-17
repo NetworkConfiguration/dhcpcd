@@ -2574,7 +2574,10 @@ dhcp_handledhcp(struct interface *iface, struct dhcp_message **dhcpp,
 		    get_option_uint8(iface->ctx, &tmp, dhcp, (uint8_t)i) != 0)
 		{
 			/* If we are bootp, then ignore the need for serverid.
-			 * To ignore bootp, require dhcp_message_type. */
+			 * To ignore bootp, require dhcp_message_type.
+			 * However, nothing really stops bootp from providing
+			 * DHCP style options as well so the above isn't
+			 * always true. */
 			if (type == 0 && i == DHO_SERVERID)
 				continue;
 			log_dhcp(LOG_WARNING, "reject DHCP", iface, dhcp, from);
