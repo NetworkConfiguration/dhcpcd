@@ -711,7 +711,7 @@ ipv6_addaddr(struct ipv6_addr *ap, const struct timeval *now)
 	    ap->prefix_pltime &&
 	    ap->prefix_vltime &&
 	    ap->iface->options->options & DHCPCD_IPV6RA_OWN &&
-	    ip6_use_tempaddr(ifp->name))
+	    ip6_use_tempaddr(ap->iface->name))
 		eloop_timeout_add_sec(ap->iface->ctx->eloop,
 		    (time_t)ap->prefix_pltime - REGEN_ADVANCE,
 		    ipv6_regentempaddr, ap);
