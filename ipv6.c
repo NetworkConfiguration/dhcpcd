@@ -1259,6 +1259,7 @@ ipv6_free(struct interface *ifp)
 			}
 			free(state);
 			ifp->if_data[IF_DATA_IPV6] = NULL;
+			eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 		}
 	}
 }
@@ -1379,9 +1380,6 @@ ipv6_gentempifid(struct interface *ifp)
 	int retry;
 
 	state = IPV6_STATE(ifp);
-	if (state == NULL)
-		return;
-
 	retry = 0;
 	if (memcmp(nullid, state->randomseed0, sizeof(nullid)) == 0) {
 		uint32_t r;
