@@ -87,7 +87,7 @@
 
 /* Linux-3.18 can manage temporary addresses even with RA
  * processing disabled. */
-#undef IFA_F_MANAGETEMPADDR
+//#undef IFA_F_MANAGETEMPADDR
 #ifndef IFA_F_MANAGETEMPADDR
 #define IPV6_MANAGETEMPADDR
 #endif
