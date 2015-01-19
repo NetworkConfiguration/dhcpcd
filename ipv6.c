@@ -117,11 +117,11 @@
 #endif
 
 
-#ifdef KERNEL_MANAGETEMPADDR
-#define ipv6_regentempifid(a) {}
-#else
+#ifdef IPV6_MANAGETEMPADDR
 static void ipv6_regentempifid(void *);
 static void ipv6_regentempaddr(void *);
+#else
+#define ipv6_regentempifid(a) {}
 #endif
 
 struct ipv6_ctx *
@@ -705,7 +705,7 @@ ipv6_addaddr(struct ipv6_addr *ap, const struct timeval *now)
 		return -1;
 	}
 
-#ifndef KERNEL_MANAGETEMPADDR
+#ifdef IPV6_MANAGETEMPADDR
 	/* RFC4941 Section 3.4 */
 	if (ap->flags & IPV6_AF_TEMPORARY &&
 	    ap->prefix_pltime &&
@@ -1323,7 +1323,7 @@ ipv6_handleifa_addrs(int cmd,
 	return alldadcompleted ? found : 0;
 }
 
-#ifndef KERNEL_MANAGETEMPADDR
+#ifdef IPV6_MANAGETEMPADDR
 static const struct ipv6_addr *
 ipv6_findaddrid(struct dhcpcd_ctx *ctx, uint8_t *addr)
 {
@@ -1676,7 +1676,7 @@ ipv6_regentempifid(void *arg)
 
 	ipv6_regen_desync(ifp, 1);
 }
-#endif /* !KERNEL_MANAGETEMPADDR */
+#endif /* IPV6_MANAGETEMPADDR */
 
 static struct rt6 *
 find_route6(struct rt6_head *rts, const struct rt6 *r)

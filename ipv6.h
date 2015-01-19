@@ -87,9 +87,9 @@
 
 /* Linux-3.18 can manage temporary addresses even with RA
  * processing disabled. */
-//#undef IFA_F_MANAGETEMPADDR
-#ifdef IFA_F_MANAGETEMPADDR
-#define KERNEL_MANAGETEMPADDR
+#undef IFA_F_MANAGETEMPADDR
+#ifndef IFA_F_MANAGETEMPADDR
+#define IPV6_MANAGETEMPADDR
 #endif
 
 struct ipv6_addr {
@@ -155,10 +155,12 @@ struct ipv6_state {
 	struct ipv6_addrhead addrs;
 	struct ll_callback_head ll_callbacks;
 
+#ifdef IPV6_MANAGETEMPADDR
 	time_t desync_factor;
 	uint8_t randomseed0[8]; /* upper 64 bits of MD5 digest */
 	uint8_t randomseed1[8]; /* lower 64 bits */
 	uint8_t randomid[8];
+#endif
 };
 
 #define IPV6_STATE(ifp)							       \
@@ -235,19 +237,16 @@ struct ipv6_addr *ipv6_findaddr(struct dhcpcd_ctx *,
 int ipv6_addlinklocalcallback(struct interface *, void (*)(void *), void *);
 void ipv6_drop(struct interface *);
 
-#ifdef KERNEL_MANAGETEMPADDR
-#define ipv6_gentempifid(a) {}
-#define ipv6_settempstale(a) {}
-#define ipv6_createtempaddr(a, b) (NULL)
-#define ipv6_settemptime(a, b) (NULL)
-#define ipv6_addtempaddrs(a, b) {}
-#else
+#ifdef IPV6_MANAGETEMPADDR
 void ipv6_gentempifid(struct interface *);
 void ipv6_settempstale(struct interface *);
 struct ipv6_addr *ipv6_createtempaddr(struct ipv6_addr *,
     const struct timeval *);
 struct ipv6_addr *ipv6_settemptime(struct ipv6_addr *, int);
 void ipv6_addtempaddrs(struct interface *, const struct timeval *);
+#else
+#define ipv6_gentempifid(a) {}
+#define ipv6_settempstale(a) {}
 #endif
 
 int ipv6_start(struct interface *);

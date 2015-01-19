@@ -691,7 +691,10 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 	struct ipv6_addr *ap;
 	char *opt, *opt2, *tmp;
 	struct timeval expire;
-	uint8_t new_rap, new_data, new_ap;
+	uint8_t new_rap, new_data;
+#ifdef IPV6_MANAGETEMPADDR
+	uint8_t new_ap;
+#endif
 
 	if (len < sizeof(struct nd_router_advert)) {
 		syslog(LOG_ERR, "IPv6 RA packet too short from %s", ctx->sfrom);
@@ -898,6 +901,7 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 				ap->created = ap->acquired = rap->received;
 				TAILQ_INSERT_TAIL(&rap->addrs, ap, next);
 
+#ifdef IPV6_MANAGETEMPADDR
 				/* New address to dhcpcd RA handling.
 				 * If the address already exists and a valid
 				 * temporary address also exists then
@@ -908,8 +912,11 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 					new_ap = 0;
 				else
 					new_ap = 1;
+#endif
 			} else {
+#ifdef IPV6_MANAGETEMPADDR
 				new_ap = 0;
+#endif
 				ap->flags &= ~IPV6_AF_STALE;
 				ap->acquired = rap->received;
 			}
@@ -932,6 +939,7 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 				}
 			}
 
+#ifdef IPV6_MANAGETEMPADDR
 			/* RFC4941 Section 3.3.3 */
 			if (ap->flags & IPV6_AF_AUTOCONF &&
 			    ap->iface->options->options & DHCPCD_IPV6RA_OWN &&
@@ -948,6 +956,7 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 						    "ipv6_createtempaddr: %m");
 				}
 			}
+#endif
 
 			lifetime = ap->prefix_vltime;
 			break;
@@ -1100,7 +1109,9 @@ extra_opt:
 		goto handle_flag;
 	}
 	ipv6_addaddrs(&rap->addrs);
+#ifdef IPV6_MANAGETEMPADDR
 	ipv6_addtempaddrs(ifp, &rap->received);
+#endif
 	ipv6_buildroutes(ifp->ctx);
 	if (ipv6nd_scriptrun(rap))
 		return;
