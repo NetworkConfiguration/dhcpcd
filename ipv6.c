@@ -1066,22 +1066,6 @@ ipv6_addlinklocalcallback(struct interface *ifp,
 	return 0;
 }
 
-void
-ipv6_drop(struct interface *ifp)
-{
-	struct ipv6_state *state;
-	struct ll_callback *cb;
-
-	state = IPV6_STATE(ifp);
-	if (state) {
-		while ((cb = TAILQ_FIRST(&state->ll_callbacks))) {
-			TAILQ_REMOVE(&state->ll_callbacks, cb, next);
-			free(cb);
-		}
-		ipv6_freedrop_addrs(&state->addrs, 2, NULL);
-	}
-}
-
 static struct ipv6_addr *
 ipv6_newlinklocal(struct interface *ifp)
 {
@@ -1244,19 +1228,19 @@ ipv6_start(struct interface *ifp)
 }
 
 void
-ipv6_free(struct interface *ifp)
+ipv6_freedrop(struct interface *ifp, int drop)
 {
 	struct ipv6_state *state;
-	struct ipv6_addr *ap;
+	struct ll_callback *cb;
 
 	if (ifp) {
-		ipv6_drop(ifp);
 		state = IPV6_STATE(ifp);
 		if (state) {
-			while ((ap = TAILQ_FIRST(&state->addrs))) {
-				TAILQ_REMOVE(&state->addrs, ap, next);
-				free(ap);
+			while ((cb = TAILQ_FIRST(&state->ll_callbacks))) {
+				TAILQ_REMOVE(&state->ll_callbacks, cb, next);
+				free(cb);
 			}
+			ipv6_freedrop_addrs(&state->addrs, drop ? 2 : 0, NULL);
 			free(state);
 			ifp->if_data[IF_DATA_IPV6] = NULL;
 			eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);

@@ -317,6 +317,7 @@ stop_interface(struct interface *ifp)
 
 	dhcp6_drop(ifp, NULL);
 	ipv6nd_drop(ifp);
+	ipv6_drop(ifp);
 	dhcp_drop(ifp, "STOP");
 	arp_close(ifp);
 	if (ifp->options->options & DHCPCD_DEPARTED)
@@ -601,8 +602,8 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 			ifp->carrier = LINK_DOWN;
 			script_runreason(ifp, "NOCARRIER");
 			dhcp6_drop(ifp, "EXPIRE6");
-			ipv6_drop(ifp);
 			ipv6nd_drop(ifp);
+			ipv6_drop(ifp);
 			dhcp_drop(ifp, "EXPIRE");
 			arp_close(ifp);
 		}

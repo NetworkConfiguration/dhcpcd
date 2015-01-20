@@ -235,7 +235,9 @@ struct ipv6_addr *ipv6_findaddr(struct dhcpcd_ctx *,
     const struct in6_addr *, short);
 #define ipv6_linklocal(ifp) (ipv6_iffindaddr((ifp), NULL))
 int ipv6_addlinklocalcallback(struct interface *, void (*)(void *), void *);
-void ipv6_drop(struct interface *);
+void ipv6_freedrop(struct interface *, int);
+#define ipv6_free(ifp) ipv6_freedrop(ifp, 0)
+#define ipv6_drop(ifp) ipv6_freedrop(ifp, 2)
 
 #ifdef IPV6_MANAGETEMPADDR
 void ipv6_gentempifid(struct interface *);
@@ -250,7 +252,6 @@ void ipv6_addtempaddrs(struct interface *, const struct timeval *);
 #endif
 
 int ipv6_start(struct interface *);
-void ipv6_free(struct interface *);
 void ipv6_ctxfree(struct dhcpcd_ctx *);
 int ipv6_routedeleted(struct dhcpcd_ctx *, const struct rt6 *);
 int ipv6_removesubnet(struct interface *, struct ipv6_addr *);
@@ -261,6 +262,7 @@ void ipv6_buildroutes(struct dhcpcd_ctx *);
 #define ipv6_start(a) (-1)
 #define ipv6_free_ll_callbacks(a) {}
 #define ipv6_free(a) {}
+#define ipv6_drop(a) {}
 #define ipv6_ctxfree(a) {}
 #endif
 
