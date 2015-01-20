@@ -83,9 +83,9 @@ if_free(struct interface *ifp)
 		return;
 	ipv4_free(ifp);
 	dhcp_free(ifp);
-	ipv6_free(ifp);
 	dhcp6_free(ifp);
 	ipv6nd_free(ifp);
+	ipv6_free(ifp);
 	free_options(ifp->options);
 	free(ifp);
 }

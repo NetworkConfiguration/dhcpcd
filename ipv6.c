@@ -835,13 +835,16 @@ ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
 	TAILQ_FOREACH_SAFE(ap, addrs, next, apn) {
 		if (ifd && ap->delegating_iface != ifd)
 			continue;
-		TAILQ_REMOVE(addrs, ap, next);
+		if (drop != 2)
+			TAILQ_REMOVE(addrs, ap, next);
 		eloop_q_timeout_delete(ap->iface->ctx->eloop, 0, NULL, ap);
 		if (drop && ap->flags & IPV6_AF_ADDED &&
 		    (ap->iface->options->options &
 		    (DHCPCD_EXITING | DHCPCD_PERSISTENT)) !=
 		    (DHCPCD_EXITING | DHCPCD_PERSISTENT))
 		{
+			if (drop == 2)
+				TAILQ_REMOVE(addrs, ap, next);
 			/* Find the same address somewhere else */
 			apf = ipv6_findaddr(ap->iface->ctx, &ap->addr, 0);
 			if (apf == NULL ||
@@ -855,8 +858,11 @@ ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
 					get_monotonic(&now);
 				ipv6_addaddr(apf, &now);
 			}
+			if (drop == 2)
+				free(ap);
 		}
-		free(ap);
+		if (drop != 2)
+			free(ap);
 	}
 }
 
@@ -1227,18 +1233,24 @@ ipv6_freedrop(struct interface *ifp, int drop)
 	struct ipv6_state *state;
 	struct ll_callback *cb;
 
-	if (ifp) {
-		state = IPV6_STATE(ifp);
-		if (state) {
-			while ((cb = TAILQ_FIRST(&state->ll_callbacks))) {
-				TAILQ_REMOVE(&state->ll_callbacks, cb, next);
-				free(cb);
-			}
-			ipv6_freedrop_addrs(&state->addrs, drop, NULL);
-			free(state);
-			ifp->if_data[IF_DATA_IPV6] = NULL;
-			eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
+	if (ifp == NULL)
+		return;
+
+	if ((state = IPV6_STATE(ifp)) == NULL)
+		return;
+
+	ipv6_freedrop_addrs(&state->addrs, drop ? 2 : 0, NULL);
+
+	/* Becuase we need to cache the addresses we don't control,
+	 * we only free the state on when NOT dropping addresses. */
+	if (drop == 0) {
+		while ((cb = TAILQ_FIRST(&state->ll_callbacks))) {
+			TAILQ_REMOVE(&state->ll_callbacks, cb, next);
+			free(cb);
 		}
+		free(state);
+		ifp->if_data[IF_DATA_IPV6] = NULL;
+		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	}
 }
 
