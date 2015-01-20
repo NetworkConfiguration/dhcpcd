@@ -2686,6 +2686,14 @@ dhcp6_handledata(void *arg)
 			    ifp->name, opt->var, ctx->sfrom);
 			return;
 		}
+		if (has_option_mask(ifo->rejectmask6, opt->option) &&
+		    dhcp6_getmoption(opt->option, r, len))
+		{
+			syslog(LOG_WARNING,
+			    "%s: reject DHCPv6 (option %s) from %s",
+			    ifp->name, opt->var, ctx->sfrom);
+			return;
+		}
 	}
 
 	/* Authenticate the message */

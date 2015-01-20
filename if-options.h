@@ -141,9 +141,11 @@ struct if_options {
 	uint8_t requestmask[256 / NBBY];
 	uint8_t requiremask[256 / NBBY];
 	uint8_t nomask[256 / NBBY];
+	uint8_t rejectmask[256 / NBBY];
 	uint8_t requestmask6[(UINT16_MAX + 1) / NBBY];
 	uint8_t requiremask6[(UINT16_MAX + 1) / NBBY];
 	uint8_t nomask6[(UINT16_MAX + 1) / NBBY];
+	uint8_t rejectmask6[(UINT16_MAX + 1) / NBBY];
 	uint8_t dstmask[256 / NBBY];
 	uint32_t leasetime;
 	time_t timeout;
