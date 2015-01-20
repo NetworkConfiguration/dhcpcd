@@ -835,16 +835,13 @@ ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
 	TAILQ_FOREACH_SAFE(ap, addrs, next, apn) {
 		if (ifd && ap->delegating_iface != ifd)
 			continue;
-		if (drop != 2)
-			TAILQ_REMOVE(addrs, ap, next);
+		TAILQ_REMOVE(addrs, ap, next);
 		eloop_q_timeout_delete(ap->iface->ctx->eloop, 0, NULL, ap);
 		if (drop && ap->flags & IPV6_AF_ADDED &&
 		    (ap->iface->options->options &
 		    (DHCPCD_EXITING | DHCPCD_PERSISTENT)) !=
 		    (DHCPCD_EXITING | DHCPCD_PERSISTENT))
 		{
-			if (drop == 2)
-				TAILQ_REMOVE(addrs, ap, next);
 			/* Find the same address somewhere else */
 			apf = ipv6_findaddr(ap->iface->ctx, &ap->addr, 0);
 			if (apf == NULL ||
@@ -858,11 +855,8 @@ ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
 					get_monotonic(&now);
 				ipv6_addaddr(apf, &now);
 			}
-			if (drop == 2)
-				free(ap);
 		}
-		if (drop != 2)
-			free(ap);
+		free(ap);
 	}
 }
 
@@ -1240,7 +1234,7 @@ ipv6_freedrop(struct interface *ifp, int drop)
 				TAILQ_REMOVE(&state->ll_callbacks, cb, next);
 				free(cb);
 			}
-			ipv6_freedrop_addrs(&state->addrs, drop ? 2 : 0, NULL);
+			ipv6_freedrop_addrs(&state->addrs, drop, NULL);
 			free(state);
 			ifp->if_data[IF_DATA_IPV6] = NULL;
 			eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
@@ -1251,10 +1245,15 @@ ipv6_freedrop(struct interface *ifp, int drop)
 void
 ipv6_ctxfree(struct dhcpcd_ctx *ctx)
 {
+	struct rt6 *rt;
 
 	if (ctx->ipv6 == NULL)
 		return;
 
+	while ((rt = TAILQ_FIRST(ctx->ipv6->routes))) {
+		TAILQ_REMOVE(ctx->ipv6->routes, rt, next);
+		free(rt);
+	}
 	free(ctx->ipv6->routes);
 	free(ctx->ipv6->ra_routers);
 	free(ctx->ipv6);
