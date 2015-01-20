@@ -1087,7 +1087,9 @@ inet6_sysctl(int code, int val, int action)
 		return -1;
 	return val;
 }
+#endif
 
+#ifndef IPV6CTL_TEMPVLTIME
 #define get_inet6_sysctlbyname(code) inet6_sysctlbyname(code, 0, 0)
 #define set_inet6_sysctlbyname(code, val) inet6_sysctlbyname(code, val, 1)
 static int
