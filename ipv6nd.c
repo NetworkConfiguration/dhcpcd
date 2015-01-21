@@ -730,6 +730,12 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 		return;
 	}
 
+	if (ipv6_iffindaddr(ifp, &ctx->from.sin6_addr)) {
+		syslog(LOG_DEBUG, "%s: ignoring RA from ourself %s",
+		    ifp->name, ctx->sfrom);
+		return;
+	}
+
 	TAILQ_FOREACH(rap, ctx->ra_routers, next) {
 		if (ifp == rap->iface &&
 		    IN6_ARE_ADDR_EQUAL(&rap->from, &ctx->from.sin6_addr))
