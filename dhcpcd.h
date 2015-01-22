@@ -60,6 +60,9 @@ struct interface {
 	struct dhcpcd_ctx *ctx;
 	TAILQ_ENTRY(interface) next;
 	char name[IF_NAMESIZE];
+#ifdef __linux
+	char alias[IF_NAMESIZE];
+#endif
 	unsigned int index;
 	unsigned int flags;
 	sa_family_t family;

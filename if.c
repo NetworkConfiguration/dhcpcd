@@ -98,20 +98,11 @@ if_carrier(struct interface *iface)
 #ifdef SIOCGIFMEDIA
 	struct ifmediareq ifmr;
 #endif
-#ifdef __linux__
-	char *p;
-#endif
 
 	if ((s = socket(PF_INET, SOCK_DGRAM, 0)) == -1)
 		return LINK_UNKNOWN;
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, iface->name, sizeof(ifr.ifr_name));
-#ifdef __linux__
-	/* We can only test the real interface up */
-	if ((p = strchr(ifr.ifr_name, ':')))
-		*p = '\0';
-#endif
-
 	if (ioctl(s, SIOCGIFFLAGS, &ifr) == -1) {
 		close(s);
 		return LINK_UNKNOWN;
@@ -138,19 +129,11 @@ if_setflag(struct interface *ifp, short flag)
 {
 	struct ifreq ifr;
 	int s, r;
-#ifdef __linux__
-	char *p;
-#endif
 
 	if ((s = socket(PF_INET, SOCK_DGRAM, 0)) == -1)
 		return -1;
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
-#ifdef __linux__
-	/* We can only bring the real interface up */
-	if ((p = strchr(ifr.ifr_name, ':')))
-		*p = '\0';
-#endif
 	r = -1;
 	if (ioctl(s, SIOCGIFFLAGS, &ifr) == 0) {
 		if (flag == 0 || (ifr.ifr_flags & flag) == flag)
@@ -273,6 +256,9 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 			p = argv[i];
 		} else {
 			p = ifa->ifa_name;
+#ifdef __linux__
+			strlcpy(ifn, ifa->ifa_name, sizeof(ifn));
+#endif
 			/* -1 means we're discovering against a specific
 			 * interface, but we still need the below rules
 			 * to apply. */
@@ -313,7 +299,12 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 			break;
 		}
 		ifp->ctx = ctx;
+#ifdef __linux__
+		strlcpy(ifp->name, ifn, sizeof(ifp->name));
+		strlcpy(ifp->alias, p, sizeof(ifp->alias));
+#else
 		strlcpy(ifp->name, p, sizeof(ifp->name));
+#endif
 		ifp->flags = ifa->ifa_flags;
 		ifp->carrier = if_carrier(ifp);
 
@@ -546,6 +537,9 @@ if_findindexname(struct dhcpcd_ctx *ctx, unsigned int idx, const char *name)
 			if ((ifp->options == NULL ||
 			    !(ifp->options->options & DHCPCD_PFXDLGONLY)) &&
 			    ((name && strcmp(ifp->name, name) == 0) ||
+#ifdef __linux__
+			    (name && strcmp(ifp->alias, name) == 0) ||
+#endif
 			    (!name && ifp->index == idx)))
 				return ifp;
 		}

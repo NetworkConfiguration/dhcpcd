@@ -1239,7 +1239,7 @@ if_address(const struct interface *iface,
 	nlm.ifa.ifa_prefixlen = inet_ntocidr(*netmask);
 	/* This creates the aliased interface */
 	add_attr_l(&nlm.hdr, sizeof(nlm), IFA_LABEL,
-	    iface->name, (unsigned short)(strlen(iface->name) + 1));
+	    iface->alias, (unsigned short)(strlen(iface->alias) + 1));
 	add_attr_l(&nlm.hdr, sizeof(nlm), IFA_LOCAL,
 	    &address->s_addr, sizeof(address->s_addr));
 	if (action >= 0 && broadcast)
@@ -1358,7 +1358,7 @@ if_address6(const struct ipv6_addr *ap, int action)
 	nlm.ifa.ifa_prefixlen = ap->prefix_len;
 	/* This creates the aliased interface */
 	add_attr_l(&nlm.hdr, sizeof(nlm), IFA_LABEL,
-	    ap->iface->name, (unsigned short)(strlen(ap->iface->name) + 1));
+	    ap->iface->alias, (unsigned short)(strlen(ap->iface->alias) + 1));
 	add_attr_l(&nlm.hdr, sizeof(nlm), IFA_LOCAL,
 	    &ap->addr.s6_addr, sizeof(ap->addr.s6_addr));
 
