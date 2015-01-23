@@ -1567,22 +1567,18 @@ struct ipv6_addr *
 ipv6_settemptime(struct ipv6_addr *ia, int flags)
 {
 	struct ipv6_state *state;
-	struct ipv6_addr *ap;
+	struct ipv6_addr *ap, *first;
 
 	state = IPV6_STATE(ia->iface);
+	first = NULL;
 	TAILQ_FOREACH_REVERSE(ap, &state->addrs, ipv6_addrhead, next) {
 		if (ap->flags & IPV6_AF_TEMPORARY &&
+		    ap->prefix_pltime &&
 		    IN6_ARE_ADDR_EQUAL(&ia->prefix, &ap->prefix))
 		{
 			time_t max, ext;
 
 			if (flags == 0) {
-				/* Don't try and extend an address which is
-				 * deprecated */
-				if (ap->prefix_pltime == 0 ||
-				    ap->prefix_pltime == ND6_INFINITE_LIFETIME)
-					continue;
-
 				if (ap->prefix_pltime -
 				    (uint32_t)(ia->acquired.tv_sec -
 				    ap->acquired.tv_sec)
@@ -1595,6 +1591,13 @@ ipv6_settemptime(struct ipv6_addr *ia, int flags)
 			if (!(ap->flags & IPV6_AF_ADDED))
 				ap->flags |= IPV6_AF_NEW | IPV6_AF_AUTOCONF;
 			ap->flags &= ~IPV6_AF_STALE;
+
+			/* RFC4941 Section 3.4
+			 * Deprecated prefix, deprecate the temporary address */
+			if (ia->prefix_pltime == 0) {
+				ap->prefix_pltime = 0;
+				goto valid;
+			}
 
 			/* Ensure desync is still valid */
 			ipv6_regen_desync(ap->iface, 0);
@@ -1612,6 +1615,7 @@ ipv6_settemptime(struct ipv6_addr *ia, int flags)
 				ap->prefix_pltime =
 				    (uint32_t)(max - ia->acquired.tv_sec);
 
+valid:
 			ext = ia->acquired.tv_sec + (time_t)ia->prefix_vltime;
 			max = ap->created.tv_sec +
 			    ip6_temp_valid_lifetime(ap->iface->name);
@@ -1623,10 +1627,18 @@ ipv6_settemptime(struct ipv6_addr *ia, int flags)
 
 			/* Just extend the latest matching prefix */
 			ap->acquired = ia->acquired;
-			return ap;
+
+			/* If extending return the last match as
+			 * it's the most current.
+			 * If deprecating, deprecate any other addresses we
+			 * may have, although this should not be needed */
+			if (ia->prefix_pltime)
+				return ap;
+			if (first == NULL)
+				first = ap;
 		}
 	}
-	return NULL;
+	return first;
 }
 
 void
