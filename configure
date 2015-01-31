@@ -636,6 +636,30 @@ if [ "$STRLCPY" = no ]; then
 	echo "#include		\"compat/strlcpy.h\"" >>$CONFIG_H
 fi
 
+if [ -z "$STRTOI" ]; then
+	printf "Testing for strtoi ... "
+	cat <<EOF >_strtoi.c
+#include <stdlib.h>
+#include <limits.h>
+#include <inttypes.h>
+int main(void) {
+	int e;
+	return strtoi("1234", NULL, 0, 0, INT32_MAX, &e);
+}
+EOF
+	if $XCC _strtoi.c -o _strtoi 2>&3; then
+		STRTOI=yes
+	else
+		STRTOI=no
+	fi
+	echo "$STRTOI"
+	rm -f _strtoi.c _strtoi
+fi
+if [ "$STRTOI" = no ]; then
+	echo "COMPAT_SRCS+=	compat/strtoi.c" >>$CONFIG_MK
+	echo "#include		\"compat/strtoi.h\"" >>$CONFIG_H
+fi
+
 if [ -z "$DPRINTF" ]; then
 	printf "Testing for dprintf ... "
 	cat <<EOF >_dprintf.c

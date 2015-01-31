@@ -36,6 +36,7 @@
 #include <errno.h>
 #include <getopt.h>
 #include <grp.h>
+#include <inttypes.h>
 #include <limits.h>
 #include <paths.h>
 #include <stdio.h>
@@ -188,26 +189,6 @@ const struct option cf_options[] = {
 	{"reject",          required_argument, NULL, O_REJECT},
 	{NULL,              0,                 NULL, '\0'}
 };
-
-static int
-atoint(const char *s)
-{
-	char *t;
-	long n;
-
-	errno = 0;
-	n = strtol(s, &t, 0);
-	if ((errno != 0 && n == 0) || s == t ||
-	    (errno == ERANGE && (n == LONG_MAX || n == LONG_MIN)))
-	{
-		if (errno == 0)
-			errno = EINVAL;
-		syslog(LOG_ERR, "`%s' out of range", s);
-		return -1;
-	}
-
-	return (int)n;
-}
 
 static char *
 add_environ(struct if_options *ifo, const char *value, int uniq)
@@ -402,19 +383,15 @@ parse_string_hwaddr(char *sbuf, size_t slen, const char *str, int clid)
 static int
 parse_iaid1(uint8_t *iaid, const char *arg, size_t len, int n)
 {
-	unsigned long l;
+	int e;
+	uint32_t narg;
 	ssize_t s;
-	uint32_t u32;
-	char *np;
 
-	errno = 0;
-	l = strtoul(arg, &np, 0);
-	if (l <= (unsigned long)UINT32_MAX && errno == 0 && *np == '\0') {
+	narg = (uint32_t)strtou(arg, NULL, 0, 0, UINT32_MAX, &e);
+	if (e == 0) {
 		if (n)
-			u32 = htonl((uint32_t)l);
-		else
-			u32 = (uint32_t)l;
-		memcpy(iaid, &u32, sizeof(u32));
+			narg = htonl(narg);
+		memcpy(iaid, &narg, sizeof(narg));
 		return 0;
 	}
 
@@ -644,7 +621,7 @@ static int
 parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
     int opt, const char *arg, struct dhcp_opt **ldop, struct dhcp_opt **edop)
 {
-	int i, t;
+	int e, i, t;
 	long l;
 	unsigned long u;
 	char *p = NULL, *fp, *np, **nconf;
@@ -734,22 +711,17 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		ifo->options |= DHCPCD_RELEASE;
 		break;
 	case 'l':
-		if (*arg == '-') {
-			syslog(LOG_ERR,
-			    "leasetime must be a positive value");
-			return -1;
-		}
-		errno = 0;
-		ifo->leasetime = (uint32_t)strtoul(arg, NULL, 0);
-		if (errno == EINVAL || errno == ERANGE) {
-			syslog(LOG_ERR, "`%s' out of range", arg);
+		ifo->leasetime = (uint32_t)strtou(arg, NULL,
+		    0, 0, UINT32_MAX, &e);
+		if (e) {
+			syslog(LOG_ERR, "failed to convert leasetime %s", arg);
 			return -1;
 		}
 		break;
 	case 'm':
-		ifo->metric = atoint(arg);
-		if (ifo->metric < 0) {
-			syslog(LOG_ERR, "metric must be a positive value");
+		ifo->metric = (int)strtoi(arg, NULL, 0, 0, INT32_MAX, &e);
+		if (e) {
+			syslog(LOG_ERR, "failed to convert metric %s", arg);
 			return -1;
 		}
 		break;
@@ -806,9 +778,9 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		ifo->options &= ~(DHCPCD_ARP | DHCPCD_STATIC);
 		break;
 	case 't':
-		ifo->timeout = atoint(arg);
-		if (ifo->timeout < 0) {
-			syslog(LOG_ERR, "timeout must be a positive value");
+		ifo->timeout = (time_t)strtoi(arg, NULL, 0, 0, INT32_MAX, &e);
+		if (e) {
+			syslog(LOG_ERR, "failed to convert timeout");
 			return -1;
 		}
 		break;
@@ -853,8 +825,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		}
 
 		/* No need to strip the comma */
-		i = atoint(arg);
-		if (i < 1 || i > 254) {
+		i = (int)strtoi(arg, NULL, 0, 1, 254, &e);
+		if (e) {
 			syslog(LOG_ERR, "vendor option should be between"
 			    " 1 and 254 inclusive");
 			return -1;
@@ -895,9 +867,9 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		}
 		break;
 	case 'y':
-		ifo->reboot = atoint(arg);
-		if (ifo->reboot < 0) {
-			syslog(LOG_ERR, "reboot must be a positive value");
+		ifo->reboot = (time_t)strtoi(arg, NULL, 0, 0, UINT32_MAX, &e);
+		if (e) {
+			syslog(LOG_ERR, "failed to convert reboot %s", arg);
 			return -1;
 		}
 		break;
@@ -1332,13 +1304,12 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 					memset(&ia->addr, 0, sizeof(ia->addr));
 				}
 				if (p && ia->ia_type == D6_OPTION_IA_PD) {
-					i = atoint(p);
-					if (i != -1 && (i < 8 || i > 120)) {
-						errno = EINVAL;
-						i = -1;
-					}
-					if (i == -1) {
-						syslog(LOG_ERR, "%s: %m", p);
+					i = (int)strtoi(p, NULL, 0, 8, 120, &e);
+					if (e) {
+						syslog(LOG_ERR,
+						    "%s: failed to convert"
+						    " prefix len",
+						    p);
 						ia->prefix_len = 0;
 					} else
 						ia->prefix_len = (uint8_t)i;
@@ -1382,11 +1353,15 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 				if (*p == '\0')
 					sla->sla_set = 0;
 				else {
-					errno = 0;
-					i = atoint(p);
-					if (i == -1)
+					sla->sla = (uint32_t)strtou(p, NULL,
+					    0, 0, UINT32_MAX, &e);
+					sla->sla_set = 1;
+					if (e) {
+						syslog(LOG_ERR,
+						    "%s: failed to convert sla",
+						    ifname);
 						goto err_sla;
-					sla->sla = (uint32_t)i;
+					}
 					if (sla->sla == 0 && ia->sla_len > 1) {
 						syslog(LOG_ERR, "%s: cannot"
 						    " assign multiple prefixes"
@@ -1394,15 +1369,16 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 						    ifname);
 						goto err_sla;
 					}
-					sla->sla_set = 1;
-					if (errno)
-						goto err_sla;
 				}
 				if (np) {
-					i = atoint(np);
-					if (i < 0 || i > 128)
+					sla->prefix_len = (uint8_t)strtoi(np,
+					    NULL, 0, 0, 128, &e);
+					if (e) {
+						syslog(LOG_ERR, "%s: failed to "
+						    "convert prefix len",
+						    ifname);
 						goto err_sla;
-					sla->prefix_len = (uint8_t)i;
+					}
 				} else
 					sla->prefix_len = 0;
 			} else {
@@ -1505,9 +1481,8 @@ err_sla:
 				return -1;
 			}
 			*fp++ = '\0';
-			errno = 0;
-			u = strtoul(arg, &np, 0);
-			if (u > UINT32_MAX || errno != 0 || *np != '\0') {
+			u = strtou(arg, NULL, 0, 0, UINT32_MAX, &e);
+			if (e) {
 				syslog(LOG_ERR, "invalid code: %s", arg);
 				return -1;
 			}
@@ -1525,8 +1500,11 @@ err_sla:
 		/* length */
 		if (np) {
 			*np++ = '\0';
-			if ((l = atoint(np)) == -1)
+			l = (long)strtou(np, NULL, 0, 0, LONG_MAX, &e);
+			if (e) {
+				syslog(LOG_ERR, "failed to convert length");
 				return -1;
+			}
 		} else
 			l = 0;
 		t = 0;
@@ -1685,9 +1663,8 @@ err_sla:
 		fp = strwhite(arg);
 		if (fp)
 			*fp++ = '\0';
-		errno = 0;
-		u = strtoul(arg, &np, 0);
-		if (u > UINT32_MAX || errno != 0 || *np != '\0') {
+		u = (uint32_t)strtou(arg, NULL, 0, 0, UINT32_MAX, &e);
+		if (e) {
 			syslog(LOG_ERR, "invalid code: %s", arg);
 			return -1;
 		}

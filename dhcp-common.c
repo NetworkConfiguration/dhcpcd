@@ -30,6 +30,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
@@ -152,9 +153,9 @@ make_option_mask(const struct dhcp_opt *dopts, size_t dopts_len,
     const struct dhcp_opt *odopts, size_t odopts_len,
     uint8_t *mask, const char *opts, int add)
 {
-	char *token, *o, *p, *t;
+	char *token, *o, *p;
 	const struct dhcp_opt *opt;
-	int match;
+	int match, e;
 	unsigned int n;
 	size_t i;
 
@@ -169,11 +170,10 @@ make_option_mask(const struct dhcp_opt *dopts, size_t dopts_len,
 			if (strcmp(opt->var, token) == 0)
 				match = 1;
 			else {
-				errno = 0;
-				n = (unsigned int)strtol(token, &t, 0);
-				if (errno == 0 && !*t)
-					if (opt->option == n)
-						match = 1;
+				n = (unsigned int)strtou(token, NULL, 0,
+				    0, UINT_MAX, &e);
+				if (e == 0 && opt->option == n)
+					match = 1;
 			}
 			if (match)
 				break;
@@ -183,11 +183,10 @@ make_option_mask(const struct dhcp_opt *dopts, size_t dopts_len,
 				if (strcmp(opt->var, token) == 0)
 				        match = 1;
 				else {
-					errno = 0;
-					n = (unsigned int)strtol(token, &t, 0);
-					if (errno == 0 && !*t)
-						if (opt->option == n)
-							match = 1;
+					n = (unsigned int)strtou(token, NULL, 0,
+					    0, UINT_MAX, &e);
+					if (e == 0 && opt->option == n)
+						match = 1;
 				}
 				if (match)
 					break;
