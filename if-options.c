@@ -1481,7 +1481,7 @@ err_sla:
 				return -1;
 			}
 			*fp++ = '\0';
-			u = strtou(arg, NULL, 0, 0, UINT32_MAX, &e);
+			u = (uint32_t)strtou(arg, NULL, 0, 0, UINT32_MAX, &e);
 			if (e) {
 				syslog(LOG_ERR, "invalid code: %s", arg);
 				return -1;
