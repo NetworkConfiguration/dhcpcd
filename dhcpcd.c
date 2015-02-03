@@ -1760,7 +1760,10 @@ main(int argc, char **argv)
 			syslog(LOG_WARNING, "no interfaces have a carrier");
 			if (dhcpcd_daemonise(&ctx))
 				goto exit_success;
-		} else if (t > 0 && ctx.options & DHCPCD_DAEMONISE) {
+		} else if (t > 0 &&
+		    /* Test mode removes the daeomise bit, so check for both */
+		    ctx.options & (DHCPCD_DAEMONISE | DHCPCD_TEST))
+		{
 			eloop_timeout_add_sec(ctx.eloop, t,
 			    handle_exit_timeout, &ctx);
 		}
