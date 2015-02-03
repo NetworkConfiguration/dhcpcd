@@ -1761,7 +1761,7 @@ main(int argc, char **argv)
 			if (dhcpcd_daemonise(&ctx))
 				goto exit_success;
 		} else if (t > 0 &&
-		    /* Test mode removes the daeomise bit, so check for both */
+		    /* Test mode removes the daemonise bit, so check for both */
 		    ctx.options & (DHCPCD_DAEMONISE | DHCPCD_TEST))
 		{
 			eloop_timeout_add_sec(ctx.eloop, t,
