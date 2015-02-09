@@ -46,10 +46,10 @@
 # define SECRET			SYSCONFDIR "/" PACKAGE ".secret"
 #endif
 #ifndef LEASEFILE
-# define LEASEFILE		DBDIR "/" PACKAGE "-%s.lease"
+# define LEASEFILE		DBDIR "/" PACKAGE "-%s%s%s.lease"
 #endif
 #ifndef LEASEFILE6
-# define LEASEFILE6		DBDIR "/" PACKAGE "-%s%s.lease6"
+# define LEASEFILE6		LEASEFILE "6"
 #endif
 #ifndef PIDFILE
 # define PIDFILE		RUNDIR "/" PACKAGE "%s%s%s.pid"

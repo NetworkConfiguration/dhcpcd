@@ -101,6 +101,8 @@ ssize_t decode_rfc3397(char *, size_t, const uint8_t *, size_t);
 ssize_t print_string(char *, size_t, int, const uint8_t *, size_t);
 ssize_t print_option(char *, size_t, int, const uint8_t *, size_t,
     const char *);
+int dhcp_set_leasefile(char *, size_t, int,
+    const struct interface *, const char *);
 
 size_t dhcp_envoption(struct dhcpcd_ctx *,
     char **, const char *, const char *, struct dhcp_opt *,

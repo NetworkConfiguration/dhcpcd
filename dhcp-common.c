@@ -730,6 +730,33 @@ print_option(char *s, size_t len, int type, const uint8_t *data, size_t dl,
 	return bytes;
 }
 
+int
+dhcp_set_leasefile(char *leasefile, size_t len, int family,
+    const struct interface *ifp, const char *extra)
+{
+	char ssid[len];
+
+	switch (family) {
+	case AF_INET:
+	case AF_INET6:
+		break;
+	default:
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (ifp->wireless) {
+		ssid[0] = '-';
+		print_string(ssid + 1, sizeof(ssid) - 1,
+		    ESCSTRING,
+		    (const uint8_t *)ifp->ssid, ifp->ssid_len);
+	} else
+		ssid[0] = '\0';
+	return snprintf(leasefile, len,
+	    family == AF_INET ? LEASEFILE : LEASEFILE6,
+	    ifp->name, ssid, extra);
+}
+
 static size_t
 dhcp_envoption1(char **env, const char *prefix,
     const struct dhcp_opt *opt, int vname, const uint8_t *od, size_t ol,

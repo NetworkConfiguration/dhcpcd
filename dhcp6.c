@@ -3212,8 +3212,8 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 
 gogogo:
 	state->state = init_state;
-	snprintf(state->leasefile, sizeof(state->leasefile),
-	    LEASEFILE6, ifp->name,
+	dhcp_set_leasefile(state->leasefile, sizeof(state->leasefile),
+	    AF_INET6, ifp,
 	    ifp->options->options & DHCPCD_PFXDLGONLY ? ".pd" : "");
 	if (ipv6_linklocal(ifp) == NULL) {
 		syslog(LOG_DEBUG,
@@ -3533,8 +3533,8 @@ dhcp6_dump(struct interface *ifp)
 	if (state == NULL)
 		goto eexit;
 	TAILQ_INIT(&state->addrs);
-	snprintf(state->leasefile, sizeof(state->leasefile),
-	    LEASEFILE6, ifp->name,
+	dhcp_set_leasefile(state->leasefile, sizeof(state->leasefile),
+	    AF_INET6, ifp,
 	    ifp->options->options & DHCPCD_PFXDLGONLY ? ".pd" : "");
 	r = dhcp6_readlease(ifp);
 	if (r == -1 && errno == ENOENT) {
