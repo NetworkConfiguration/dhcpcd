@@ -456,14 +456,15 @@ print_string(char *dst, size_t len, int type, const uint8_t *data, size_t dl)
 			errno = EINVAL;
 			break;
 		}
-		if (!(type & (ASCII | RAW | ESCSTRING)) /*plain string */ &&
+		if (!(type & (ASCII | RAW | ESCSTRING | ESCFILE)) /* plain */ &&
 		    (!isascii(c) && !isprint(c)))
 		{
 			errno = EINVAL;
 			break;
 		}
-		if (type & ESCSTRING &&
-		    (c == '\\' || !isascii(c) || !isprint(c)))
+		if ((type & (ESCSTRING | ESCFILE) &&
+		    (c == '\\' || !isascii(c) || !isprint(c))) ||
+		    (type & ESCFILE && (c == '/')))
 		{
 			errno = EINVAL;
 			if (c == '\\') {
@@ -748,7 +749,7 @@ dhcp_set_leasefile(char *leasefile, size_t len, int family,
 	if (ifp->wireless) {
 		ssid[0] = '-';
 		print_string(ssid + 1, sizeof(ssid) - 1,
-		    ESCSTRING,
+		    ESCFILE,
 		    (const uint8_t *)ifp->ssid, ifp->ssid_len);
 	} else
 		ssid[0] = '\0';
