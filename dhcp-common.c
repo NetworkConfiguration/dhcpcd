@@ -464,7 +464,7 @@ print_string(char *dst, size_t len, int type, const uint8_t *data, size_t dl)
 		}
 		if ((type & (ESCSTRING | ESCFILE) &&
 		    (c == '\\' || !isascii(c) || !isprint(c))) ||
-		    (type & ESCFILE && (c == '/')))
+		    (type & ESCFILE && (c == '/' || c == ' ')))
 		{
 			errno = EINVAL;
 			if (c == '\\') {
