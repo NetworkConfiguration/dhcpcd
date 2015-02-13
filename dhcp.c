@@ -1895,7 +1895,8 @@ dhcp_bind(struct interface *ifp, struct arp_state *astate)
 				    "time, forcing to %"PRIu32" seconds",
 				    ifp->name, lease->renewaltime);
 			}
-			syslog(lease->addr.s_addr == state->addr.s_addr ?
+			syslog(lease->addr.s_addr == state->addr.s_addr &&
+			    !(state->added & STATE_FAKE) ?
 			    LOG_DEBUG : LOG_INFO,
 			    "%s: leased %s for %"PRIu32" seconds", ifp->name,
 			    inet_ntoa(lease->addr), lease->leasetime);
@@ -1908,7 +1909,7 @@ dhcp_bind(struct interface *ifp, struct arp_state *astate)
 		return;
 	}
 	if (state->reason == NULL) {
-		if (state->old && state->new->cookie != htonl(MAGIC_COOKIE)) {
+		if (state->old && !(state->added | STATE_FAKE)) {
 			if (state->old->yiaddr == state->new->yiaddr &&
 			    lease->server.s_addr)
 				state->reason = "RENEW";
@@ -3207,14 +3208,9 @@ dhcp_start1(void *arg)
 		return;
 	}
 
-	if (state->offer == NULL || state->offer->cookie == 0) {
-		/* If we don't have an address yet, enter the reboot
-		 * state to ensure at least fallback in short order. */
-		if (state->addr.s_addr == INADDR_ANY ||
-		    state->added & STATE_FAKE)
-			state->state = DHS_REBOOT;
+	if (state->offer == NULL || state->offer->cookie == 0)
 		dhcp_discover(ifp);
-	} else
+	else
 		dhcp_reboot(ifp);
 }
 
