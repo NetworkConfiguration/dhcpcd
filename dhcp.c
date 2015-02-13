@@ -1909,7 +1909,7 @@ dhcp_bind(struct interface *ifp, struct arp_state *astate)
 		return;
 	}
 	if (state->reason == NULL) {
-		if (state->old && !(state->added | STATE_FAKE)) {
+		if (state->old && !(state->added & STATE_FAKE)) {
 			if (state->old->yiaddr == state->new->yiaddr &&
 			    lease->server.s_addr)
 				state->reason = "RENEW";
