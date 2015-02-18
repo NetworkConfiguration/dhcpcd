@@ -1371,7 +1371,9 @@ ipv6_gentempifid(struct interface *ifp)
 	uint8_t seed[16], digest[16];
 	int retry;
 
-	state = IPV6_STATE(ifp);
+	if ((state = IPV6_STATE(ifp)) == NULL)
+		return;
+
 	retry = 0;
 	if (memcmp(nullid, state->randomseed0, sizeof(nullid)) == 0) {
 		uint32_t r;
