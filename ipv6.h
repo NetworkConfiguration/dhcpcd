@@ -186,6 +186,14 @@ struct ipv6_state {
 #define IP6BUFLEN	(CMSG_SPACE(sizeof(struct in6_pktinfo)) + \
 			CMSG_SPACE(sizeof(int)))
 
+
+/* ipi6.ifiindex differes between OS's so have a cast function */
+#ifdef __linux__
+#define CAST_IPI6_IFINDEX(idx) (int)(idx)
+#else
+#define CAST_IPI6_IFINDEX(idx) (idx)
+#endif
+
 #ifdef INET6
 struct ipv6_ctx {
 	struct sockaddr_in6 from;
@@ -205,9 +213,7 @@ struct ipv6_ctx {
 
 	int dhcp_fd;
 };
-#endif
 
-#ifdef INET6
 struct ipv6_ctx *ipv6_init(struct dhcpcd_ctx *);
 ssize_t ipv6_printaddr(char *, size_t, const uint8_t *, const char *);
 int ipv6_makestableprivate(struct in6_addr *addr,

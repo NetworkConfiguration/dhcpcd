@@ -1127,7 +1127,7 @@ logsend:
 	cm->cmsg_type = IPV6_PKTINFO;
 	cm->cmsg_len = CMSG_LEN(sizeof(pi));
 	memset(&pi, 0, sizeof(pi));
-	pi.ipi6_ifindex = ifp->index;
+	pi.ipi6_ifindex = CAST_IPI6_IFINDEX(ifp->index);
 	memcpy(CMSG_DATA(cm), &pi, sizeof(pi));
 
 	if (sendmsg(ctx->dhcp_fd, &ctx->sndhdr, 0) == -1) {
