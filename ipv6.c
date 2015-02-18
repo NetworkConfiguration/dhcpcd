@@ -1097,9 +1097,6 @@ ipv6_addlinklocal(struct interface *ifp)
 	struct ipv6_addr *ap, *ap2;
 	int dadcounter;
 
-	if (ipv6_linklocal(ifp))
-		return 0;
-
 	/* Check sanity before malloc */
 	if (!(ifp->options->options & DHCPCD_SLAACPRIVATE)) {
 		switch (ifp->family) {
