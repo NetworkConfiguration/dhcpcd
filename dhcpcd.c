@@ -1070,21 +1070,24 @@ handle_signal1(void *arg)
 	struct dhcpcd_ctx *ctx;
 	struct dhcpcd_siginfo *si;
 	struct interface *ifp;
-	int do_release;
+	int do_release, exit_code;;
 
 	ctx = dhcpcd_ctx;
 	si = arg;
 	do_release = 0;
+	exit_code = EXIT_FAILURE;
 	switch (si->signo) {
 	case SIGINT:
 		syslog(LOG_INFO, sigmsg, "INT", (int)si->pid, "stopping");
 		break;
 	case SIGTERM:
 		syslog(LOG_INFO, sigmsg, "TERM", (int)si->pid, "stopping");
+		exit_code = EXIT_SUCCESS;
 		break;
 	case SIGALRM:
 		syslog(LOG_INFO, sigmsg, "ALRM", (int)si->pid, "releasing");
 		do_release = 1;
+		exit_code = EXIT_SUCCESS;
 		break;
 	case SIGHUP:
 		syslog(LOG_INFO, sigmsg, "HUP", (int)si->pid, "rebinding");
@@ -1113,7 +1116,7 @@ handle_signal1(void *arg)
 
 	if (!(ctx->options & DHCPCD_TEST))
 		stop_all_interfaces(ctx, do_release);
-	eloop_exit(ctx->eloop, EXIT_FAILURE);
+	eloop_exit(ctx->eloop, exit_code);
 }
 
 static void
