@@ -233,11 +233,11 @@ const struct ipv6_addr *ipv6_iffindaddr(const struct interface *,
     const struct in6_addr *);
 struct ipv6_addr *ipv6_findaddr(struct dhcpcd_ctx *,
     const struct in6_addr *, short);
-#define ipv6_linklocal(ifp) (ipv6_iffindaddr((ifp), NULL))
+#define ipv6_linklocal(ifp) ipv6_iffindaddr((ifp), NULL)
 int ipv6_addlinklocalcallback(struct interface *, void (*)(void *), void *);
 void ipv6_freedrop(struct interface *, int);
-#define ipv6_free(ifp) ipv6_freedrop(ifp, 0)
-#define ipv6_drop(ifp) ipv6_freedrop(ifp, 2)
+#define ipv6_free(ifp) ipv6_freedrop((ifp), 0)
+#define ipv6_drop(ifp) ipv6_freedrop((ifp), 2)
 
 #ifdef IPV6_MANAGETEMPADDR
 void ipv6_gentempifid(struct interface *);
