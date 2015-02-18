@@ -28,6 +28,8 @@
 #ifndef STRTOI_H
 #define STRTOI_H
 
+#include <inttypes.h>
+
 intmax_t strtoi(const char * __restrict nptr, char ** __restrict endptr,
     int base, intmax_t lo, intmax_t hi, int *rstatus);
 uintmax_t strtou(const char * __restrict nptr, char ** __restrict endptr,
