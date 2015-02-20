@@ -737,6 +737,11 @@ dhcp_set_leasefile(char *leasefile, size_t len, int family,
 {
 	char ssid[len];
 
+	if (ifp->name[0] == '\0') {
+		strlcpy(leasefile, ifp->ctx->pidfile, len);
+		return 0;
+	}
+
 	switch (family) {
 	case AF_INET:
 	case AF_INET6:

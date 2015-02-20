@@ -1966,13 +1966,15 @@ dhcp6_findia(struct interface *ifp, const struct dhcp6_message *m, size_t l,
 			if (memcmp(&ifo->ia[j].iaid, iaid, sizeof(iaid)) == 0)
 				break;
 		}
-		if (j == ifo->ia_len) {
+		if (j == ifo->ia_len &&
+		    !(ifo->ia_len == 0 && ifp->ctx->options & DHCPCD_DUMPLEASE))
+		{
 			syslog(LOG_DEBUG, "%s: ignoring unrequested IAID %s",
 			    ifp->name,
 			    hwaddr_ntoa(iaid, sizeof(iaid), buf, sizeof(buf)));
 			continue;
 		}
-		if (ifo->ia[j].ia_type != code) {
+		if ( j < ifo->ia_len && ifo->ia[j].ia_type != code) {
 			syslog(LOG_ERR, "%s: IAID %s: option type mismatch",
 			    ifp->name,
 			    hwaddr_ntoa(iaid, sizeof(iaid), buf, sizeof(buf)));
@@ -3530,17 +3532,15 @@ dhcp6_dump(struct interface *ifp)
 	int r;
 
 	ifp->if_data[IF_DATA_DHCP6] = state = calloc(1, sizeof(*state));
-	if (state == NULL)
-		goto eexit;
+	if (state == NULL) {
+		syslog(LOG_ERR, "%s: %m", __func__);
+		return -1;
+	}
 	TAILQ_INIT(&state->addrs);
 	dhcp_set_leasefile(state->leasefile, sizeof(state->leasefile),
 	    AF_INET6, ifp,
 	    ifp->options->options & DHCPCD_PFXDLGONLY ? ".pd" : "");
 	r = dhcp6_readlease(ifp);
-	if (r == -1 && errno == ENOENT) {
-		strlcpy(state->leasefile, ifp->name, sizeof(state->leasefile));
-		r = dhcp6_readlease(ifp);
-	}
 	if (r == -1) {
 		if (errno == ENOENT)
 			syslog(LOG_ERR, "%s: no lease to dump", ifp->name);
@@ -3550,8 +3550,4 @@ dhcp6_dump(struct interface *ifp)
 	}
 	state->reason = "DUMP6";
 	return script_runreason(ifp, state->reason);
-
-eexit:
-	syslog(LOG_ERR, "%s: %m", __func__);
-	return -1;
 }

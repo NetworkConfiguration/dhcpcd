@@ -2919,10 +2919,6 @@ dhcp_dump(struct interface *ifp)
 	dhcp_set_leasefile(state->leasefile, sizeof(state->leasefile),
 	    AF_INET, ifp, "");
 	state->new = read_lease(ifp);
-	if (state->new == NULL && errno == ENOENT) {
-		strlcpy(state->leasefile, ifp->name, sizeof(state->leasefile));
-		state->new = read_lease(ifp);
-	}
 	if (state->new == NULL) {
 		if (errno == ENOENT)
 			syslog(LOG_ERR, "%s: no lease to dump", ifp->name);

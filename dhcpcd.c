@@ -468,7 +468,9 @@ configure_interface1(struct interface *ifp)
 	}
 
 #ifdef INET6
-	if (ifo->ia_len == 0 && ifo->options & DHCPCD_IPV6) {
+	if (ifo->ia_len == 0 && ifo->options & DHCPCD_IPV6 &&
+	    ifp->name[0] != '\0')
+	{
 		ifo->ia = malloc(sizeof(*ifo->ia));
 		if (ifo->ia == NULL)
 			syslog(LOG_ERR, "%s: %m", __func__);
@@ -1284,7 +1286,6 @@ int
 main(int argc, char **argv)
 {
 	struct dhcpcd_ctx ctx;
-	char pidfile[sizeof(PIDFILE) + IF_NAMESIZE + 1];
 	struct if_options *ifo;
 	struct interface *ifp;
 	uint16_t family = 0;
@@ -1491,10 +1492,11 @@ main(int argc, char **argv)
 			default:
 				per = "";
 			}
-			snprintf(pidfile, sizeof(pidfile),
+			snprintf(ctx.pidfile, sizeof(ctx.pidfile),
 			    PIDFILE, "-", argv[optind], per);
 		} else {
-			snprintf(pidfile, sizeof(pidfile), PIDFILE, "", "", "");
+			snprintf(ctx.pidfile, sizeof(ctx.pidfile),
+			    PIDFILE, "", "", "");
 			ctx.options |= DHCPCD_MASTER;
 		}
 	}
@@ -1530,9 +1532,15 @@ main(int argc, char **argv)
 				syslog(LOG_ERR, "%s: %m", __func__);
 				goto exit_failure;
 			}
-			strlcpy(ifp->name, argv[optind], sizeof(ifp->name));
+			strlcpy(ctx.pidfile, argv[optind], sizeof(ctx.pidfile));
 			ifp->ctx = &ctx;
 			TAILQ_INSERT_HEAD(ctx.ifaces, ifp, next);
+			if (family == 0) {
+				if (ctx.pidfile[strlen(ctx.pidfile) - 1] == '6')
+					family = AF_INET6;
+				else
+					family = AF_INET;
+			}
 		}
 		configure_interface(ifp, ctx.argc, ctx.argv);
 		if (ctx.options & DHCPCD_PFXDLGONLY)
@@ -1587,7 +1595,7 @@ main(int argc, char **argv)
 
 #ifdef USE_SIGNALS
 	if (sig != 0) {
-		pid = read_pid(pidfile);
+		pid = read_pid(ctx.pidfile);
 		if (pid != 0)
 			syslog(LOG_INFO, "sending signal %s to pid %d",
 			    siga, pid);
@@ -1598,7 +1606,7 @@ main(int argc, char **argv)
 				syslog(LOG_ERR, "kill: %m");
 				goto exit_failure;
 			}
-			unlink(pidfile);
+			unlink(ctx.pidfile);
 			if (sig != SIGHUP)
 				goto exit_failure;
 		} else {
@@ -1610,7 +1618,7 @@ main(int argc, char **argv)
 			ts.tv_nsec = 100000000; /* 10th of a second */
 			for(i = 0; i < 100; i++) {
 				nanosleep(&ts, NULL);
-				if (read_pid(pidfile) == 0)
+				if (read_pid(ctx.pidfile) == 0)
 					goto exit_success;
 			}
 			syslog(LOG_ERR, "pid %d failed to exit", pid);
@@ -1619,12 +1627,12 @@ main(int argc, char **argv)
 	}
 
 	if (!(ctx.options & DHCPCD_TEST)) {
-		if ((pid = read_pid(pidfile)) > 0 &&
+		if ((pid = read_pid(ctx.pidfile)) > 0 &&
 		    kill(pid, 0) == 0)
 		{
 			syslog(LOG_ERR, ""PACKAGE
 			    " already running on pid %d (%s)",
-			    pid, pidfile);
+			    pid, ctx.pidfile);
 			goto exit_failure;
 		}
 
@@ -1638,15 +1646,15 @@ main(int argc, char **argv)
 #ifdef O_CLOEXEC
 		opt |= O_CLOEXEC;
 #endif
-		ctx.pid_fd = open(pidfile, opt, 0664);
+		ctx.pid_fd = open(ctx.pidfile, opt, 0664);
 		if (ctx.pid_fd == -1)
-			syslog(LOG_ERR, "open `%s': %m", pidfile);
+			syslog(LOG_ERR, "open `%s': %m", ctx.pidfile);
 		else {
 #ifdef LOCK_EX
 			/* Lock the file so that only one instance of dhcpcd
 			 * runs on an interface */
 			if (flock(ctx.pid_fd, LOCK_EX | LOCK_NB) == -1) {
-				syslog(LOG_ERR, "flock `%s': %m", pidfile);
+				syslog(LOG_ERR, "flock `%s': %m", ctx.pidfile);
 				close(ctx.pid_fd);
 				ctx.pid_fd = -1;
 				goto exit_failure;
@@ -1814,7 +1822,7 @@ exit1:
 		syslog(LOG_ERR, "control_stop: %m:");
 	if (ctx.pid_fd != -1) {
 		close(ctx.pid_fd);
-		unlink(pidfile);
+		unlink(ctx.pidfile);
 	}
 	eloop_free(ctx.eloop);
 

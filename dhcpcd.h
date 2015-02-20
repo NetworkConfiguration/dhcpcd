@@ -84,9 +84,8 @@ struct interface {
 TAILQ_HEAD(if_head, interface);
 
 struct dhcpcd_ctx {
-#ifdef USE_SIGNALS
-	sigset_t sigset;
-#endif
+	int pid_fd;
+	char pidfile[sizeof(PIDFILE) + IF_NAMESIZE + 1];
 	const char *cffile;
 	unsigned long long options;
 	int argc;
@@ -101,10 +100,12 @@ struct dhcpcd_ctx {
 	char **ifcv;	/* configured interfaces */
 	unsigned char *duid;
 	size_t duid_len;
-	int pid_fd;
 	int link_fd;
 	struct if_head *ifaces;
 
+#ifdef USE_SIGNALS
+	sigset_t sigset;
+#endif
 	struct eloop_ctx *eloop;
 
 	int control_fd;
