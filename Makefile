@@ -142,6 +142,15 @@ dist:
 	gunzip -c ${DISTFILEGZ} |  bzip2 >${DISTFILE}
 	rm ${DISTFILEGZ}
 
+snapshot:
+	rm -rf /tmp/${DISTPREFIX}
+	${INSTALL} -d /tmp/${DISTPREFIX}
+	cp -RPp * /tmp/${DISTPREFIX}
+	cd /tmp/${DISTPREFIX} && ${MAKE} distclean
+	cd /tmp && tar -cvjpf ${DISTFILE} ${DISTPREFIX}
+	mv /tmp/${DISTFILE} .
+	ls -l ${DISTFILE}
+
 import: ${SRCS}
 	rm -rf /tmp/${DISTPREFIX}
 	${INSTALL} -d /tmp/${DISTPREFIX}
