@@ -192,10 +192,9 @@ syslog()
 		${syslog_debug} || return 0
 	fi
 	[ -n "$lvl" ] && shift
-	if [ -n "$*" ]; then
-		if type logger >/dev/null 2>&1; then
-			logger -t dhcpcd -p daemon."$lvl" -is "$interface: $*"
-		fi
+	[ -n "$*" ] || return 0
+	if type logger >/dev/null 2>&1; then
+		logger -i -p daemon."$lvl" -s -t dhcpcd "$interface: $*"
 	fi
 }
 
