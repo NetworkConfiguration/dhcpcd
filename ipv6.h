@@ -88,7 +88,12 @@
 /* Linux-3.18 can manage temporary addresses even with RA
  * processing disabled. */
 //#undef IFA_F_MANAGETEMPADDR
-#ifndef IFA_F_MANAGETEMPADDR
+#if defined(__linux__) && defined(IFA_F_MANAGETEMPADDR)
+#define IPV6_MANAGETEMPADDR
+#endif
+
+/* Some BSDs do not allow userlan to set temporary addresses. */
+#if defined(BSD) && defined(IN6_IFF_TEMPORARY)
 #define IPV6_MANAGETEMPADDR
 #endif
 
@@ -130,7 +135,9 @@ TAILQ_HEAD(ipv6_addrhead, ipv6_addr);
 #define IPV6_AF_DELEGATEDPFX	0x0100
 #define IPV6_AF_DELEGATEDZERO	0x0200
 #define IPV6_AF_REQUEST		0x0400
+#ifdef IPV6_MANAGETEMPADDR
 #define IPV6_AF_TEMPORARY	0X0800
+#endif
 
 struct rt6 {
 	TAILQ_ENTRY(rt6) next;

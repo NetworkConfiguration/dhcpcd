@@ -125,9 +125,13 @@ int if_route(const struct rt *rt, int);
 
 #ifdef INET6
 int if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *, int);
+#ifdef IPV6_MANAGETEMPADDR
 int ip6_use_tempaddr(const char *ifname);
 int ip6_temp_preferred_lifetime(const char *ifname);
 int ip6_temp_valid_lifetime(const char *ifname);
+#else
+#define ip6_use_tempaddr(a) (0)
+#endif
 
 int if_address6(const struct ipv6_addr *, int);
 #define if_addaddress6(a) if_address6(a, 1)

@@ -618,8 +618,10 @@ if_address6(const struct ipv6_addr *a, int action)
 	if (a->autoconf)
 		ifa.ifra_flags |= IN6_IFF_AUTOCONF;
 #endif
+#ifdef IPV6_MANGETEMPADDR
 	if (a->flags & IPV6_AF_TEMPORARY)
 		ifa.ifra_flags |= IN6_IFF_TEMPORARY;
+#endif
 
 #define ADDADDR(v, addr) {						      \
 		(v)->sin6_family = AF_INET6;				      \
@@ -1089,6 +1091,7 @@ inet6_sysctl(int code, int val, int action)
 }
 #endif
 
+#ifdef IPV6_MANAGETEMPADDR
 #ifndef IPV6CTL_TEMPVLTIME
 #define get_inet6_sysctlbyname(code) inet6_sysctlbyname(code, 0, 0)
 #define set_inet6_sysctlbyname(code, val) inet6_sysctlbyname(code, val, 1)
@@ -1119,7 +1122,7 @@ ip6_use_tempaddr(__unused const char *ifname)
 #else
 	val = get_inet6_sysctlbyname("net.inet6.ip6.use_tempaddr");
 #endif
-	return val == -1 ? TEMP_PREFERRED_LIFETIME : val;
+	return val == -1 ? 0 : val;
 }
 
 int
@@ -1147,6 +1150,7 @@ ip6_temp_valid_lifetime(__unused const char *ifname)
 #endif
 	return val < 0 ? TEMP_VALID_LIFETIME : val;
 }
+#endif
 
 #define del_if_nd6_flag(ifname, flag) if_nd6_flag(ifname, flag, -1)
 #define get_if_nd6_flag(ifname, flag) if_nd6_flag(ifname, flag,  0)

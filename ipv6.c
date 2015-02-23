@@ -984,8 +984,10 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 				    ap, next);
 			}
 			ap->addr_flags = flags;
+#ifdef IPV6_MANAGETEMPADDR
 			if (ap->addr_flags & IN6_IFF_TEMPORARY)
 				ap->flags |= IPV6_AF_TEMPORARY;
+#endif
 			if (IN6_IS_ADDR_LINKLOCAL(&ap->addr)) {
 #ifdef IPV6_POLLADDRFLAG
 				if (ap->addr_flags & IN6_IFF_TENTATIVE) {
