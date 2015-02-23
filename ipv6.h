@@ -92,7 +92,7 @@
 #define IPV6_MANAGETEMPADDR
 #endif
 
-/* Some BSDs do not allow userlan to set temporary addresses. */
+/* Some BSDs do not allow userland to set temporary addresses. */
 #if defined(BSD) && defined(IN6_IFF_TEMPORARY)
 #define IPV6_MANAGETEMPADDR
 #endif
