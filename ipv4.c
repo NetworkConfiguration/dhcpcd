@@ -50,7 +50,7 @@
 #include "script.h"
 
 #define IPV4_LOOPBACK_ROUTE
-#ifdef __linux__
+#if defined(__linux__) || (defined(BSD) && defined(RTF_LOCAL))
 /* Linux has had loopback routes in the local table since 2.2 */
 #undef IPV4_LOOPBACK_ROUTE
 #endif
