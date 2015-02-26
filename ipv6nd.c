@@ -1118,6 +1118,12 @@ extra_opt:
 #ifdef IPV6_MANAGETEMPADDR
 	ipv6_addtempaddrs(ifp, &rap->received);
 #endif
+
+	/* Find any freshly added routes, such as the subnet route.
+	 * We do this because we cannot rely on recieving the kernel
+	 * notification right now via our link socket. */
+	if_initrt6(ifp);
+
 	ipv6_buildroutes(ifp->ctx);
 	if (ipv6nd_scriptrun(rap))
 		return;

@@ -58,10 +58,10 @@
 
 #define ELOOP_QUEUE 7
 #include "common.h"
+#include "if.h"
 #include "dhcpcd.h"
 #include "dhcp6.h"
 #include "eloop.h"
-#include "if.h"
 #include "ipv6.h"
 #include "ipv6nd.h"
 
@@ -150,6 +150,8 @@ ipv6_init(struct dhcpcd_ctx *dhcpcd_ctx)
 		return NULL;
 	}
 	TAILQ_INIT(ctx->ra_routers);
+
+	TAILQ_INIT(&ctx->kroutes);
 
 	ctx->sndhdr.msg_namelen = sizeof(struct sockaddr_in6);
 	ctx->sndhdr.msg_iov = ctx->sndiov;
@@ -725,9 +727,6 @@ ipv6_addaddr(struct ipv6_addr *ap, const struct timeval *now)
 	ap->flags |= IPV6_AF_ADDED;
 	if (ap->delegating_iface)
 		ap->flags |= IPV6_AF_DELEGATED;
-	if (ap->iface->options->options & DHCPCD_IPV6RA_OWN &&
-	    ipv6_removesubnet(ap->iface, ap) == -1)
-		syslog(LOG_ERR,"ipv6_removesubnet: %m");
 
 #ifdef IPV6_POLLADDRFLAG
 	eloop_timeout_delete(ap->iface->ctx->eloop,
@@ -1223,6 +1222,9 @@ ipv6_start(struct interface *ifp)
 
 	if (ap == NULL && ipv6_addlinklocal(ifp) == -1)
 		return -1;
+
+	/* Load existing routes */
+	if_initrt6(ifp);
 	return 0;
 }
 
@@ -1256,17 +1258,14 @@ ipv6_freedrop(struct interface *ifp, int drop)
 void
 ipv6_ctxfree(struct dhcpcd_ctx *ctx)
 {
-	struct rt6 *rt;
 
 	if (ctx->ipv6 == NULL)
 		return;
 
-	while ((rt = TAILQ_FIRST(ctx->ipv6->routes))) {
-		TAILQ_REMOVE(ctx->ipv6->routes, rt, next);
-		free(rt);
-	}
+	ipv6_freerts(ctx->ipv6->routes);
 	free(ctx->ipv6->routes);
 	free(ctx->ipv6->ra_routers);
+	ipv6_freerts(&ctx->ipv6->kroutes);
 	free(ctx->ipv6);
 }
 
@@ -1693,7 +1692,7 @@ find_route6(struct rt6_head *rts, const struct rt6 *r)
 
 	TAILQ_FOREACH(rt, rts, next) {
 		if (IN6_ARE_ADDR_EQUAL(&rt->dest, &r->dest) &&
-#if HAVE_ROUTE_METRIC
+#ifdef HAVE_ROUTE_METRIC
 		    (r->iface == NULL || rt->iface == NULL ||
 		    rt->iface->metric == r->iface->metric) &&
 #endif
@@ -1726,30 +1725,75 @@ desc_route(const char *cmd, const struct rt6 *rt)
 		    dest, ipv6_prefixlen(&rt->net), gate);
 }
 
+static struct rt6*
+ipv6_findrt(struct dhcpcd_ctx *ctx, const struct rt6 *rt, int flags)
+{
+	struct rt6 *r;
+
+	TAILQ_FOREACH(r, &ctx->ipv6->kroutes, next) {
+		if (IN6_ARE_ADDR_EQUAL(&rt->dest, &r->dest) &&
+		    (!flags || rt->iface == r->iface) &&
+#ifdef HAVE_ROUTE_METRIC
+		    (!flags || rt->metric == r->metric) &&
+#endif
+		    IN6_ARE_ADDR_EQUAL(&rt->net, &r->net))
+			return r;
+	}
+	return NULL;
+}
+
+void
+ipv6_freerts(struct rt6_head *routes)
+{
+	struct rt6 *rt;
+
+	while ((rt = TAILQ_FIRST(routes))) {
+		TAILQ_REMOVE(routes, rt, next);
+		free(rt);
+	}
+}
+
 /* If something other than dhcpcd removes a route,
  * we need to remove it from our internal table. */
 int
-ipv6_routedeleted(struct dhcpcd_ctx *ctx, const struct rt6 *rt)
+ipv6_handlert(struct dhcpcd_ctx *ctx, int cmd, struct rt6 *rt)
 {
 	struct rt6 *f;
 
-	if (ctx->ipv6 == NULL)
-		return 0;
-
-	f = find_route6(ctx->ipv6->routes, rt);
-	if (f == NULL)
-		return 0;
-	desc_route("removing", f);
-	TAILQ_REMOVE(ctx->ipv6->routes, f, next);
-	free(f);
-	return 1;
+	f = ipv6_findrt(ctx, rt, 1);
+	switch(cmd) {
+	case RTM_ADD:
+		if (f == NULL) {
+			if ((f = malloc(sizeof(*f))) == NULL)
+				return -1;
+			*f = *rt;
+			TAILQ_INSERT_TAIL(&ctx->ipv6->kroutes, f, next);
+		}
+		break;
+	case RTM_DELETE:
+		if (f) {
+			TAILQ_REMOVE(&ctx->ipv6->kroutes, f, next);
+			free(f);
+		}
+		/* If we manage the route, remove it */
+		if ((f = find_route6(ctx->ipv6->routes, rt))) {
+			desc_route("removing", f);
+			TAILQ_REMOVE(ctx->ipv6->routes, f, next);
+			free(f);
+		}
+		break;
+	}
+	return 0;
 }
 
-#define n_route(a)	 nc_route(1, a, a)
-#define c_route(a, b)	 nc_route(0, a, b)
+#define n_route(a)	 nc_route(NULL, a)
+#define c_route(a, b)	 nc_route(a, b)
 static int
-nc_route(int add, struct rt6 *ort, struct rt6 *nrt)
+nc_route(struct rt6 *ort, struct rt6 *nrt)
 {
+#ifdef HAVE_ROUTE_METRIC
+	int retval;
+#endif
 
 	/* Don't set default routes if not asked to */
 	if (IN6_IS_ADDR_UNSPECIFIED(&nrt->dest) &&
@@ -1757,15 +1801,37 @@ nc_route(int add, struct rt6 *ort, struct rt6 *nrt)
 	    !(nrt->iface->options->options & DHCPCD_GATEWAY))
 		return -1;
 
-	desc_route(add ? "adding" : "changing", nrt);
-	/* We delete and add the route so that we can change metric and
-	 * prefer the interface. */
-	if (if_delroute6(ort) == -1 && errno != ESRCH)
-		syslog(LOG_ERR, "%s: if_delroute6: %m", ort->iface->name);
-	if (if_addroute6(nrt) == 0)
+	desc_route(ort == NULL ? "adding" : "changing", nrt);
+
+	if (ort == NULL) {
+		ort = ipv6_findrt(nrt->iface->ctx, nrt, 0);
+		if (ort && ort->iface == nrt->iface &&
+#ifdef HAVE_ROUTE_METRIC
+		    ort->metric == nrt->metric &&
+#endif
+		    IN6_ARE_ADDR_EQUAL(&ort->gate, &nrt->gate))
+			return 0;
+	}
+
+#ifdef HAVE_ROUTE_METRIC
+	/* With route metrics, we can safely add the new route before
+	 * deleting the old route. */
+	if ((retval = if_route6(RTM_ADD, nrt, NULL)) == -1)
+		syslog(LOG_ERR, "if_route6 (ADD): %m");
+	if (ort && if_route6(RTM_DELETE, ort, NULL) == -1 &&
+	    errno != ESRCH)
+		syslog(LOG_ERR, "if_route6 (DEL): %m");
+	return retval;
+#else
+	/* No route metrics, we need to delete the old route before
+	 * adding the new one. */
+	if (ort && if_route6(RTM_DELETE, ort, NULL) == -1 && errno != ESRCH)
+		syslog(LOG_ERR, "if_route6: %m");
+	if (if_route6(RTM_ADD, nrt, NULL) == 0)
 		return 0;
-	syslog(LOG_ERR, "%s: if_addroute6: %m", nrt->iface->name);
+	syslog(LOG_ERR, "if_route6 (ADD): %m");
 	return -1;
+#endif
 }
 
 static int
@@ -1774,7 +1840,7 @@ d_route(struct rt6 *rt)
 	int retval;
 
 	desc_route("deleting", rt);
-	retval = if_delroute6(rt);
+	retval = if_route6(RTM_DELETE, rt, NULL);
 	if (retval != 0 && errno != ENOENT && errno != ESRCH)
 		syslog(LOG_ERR,"%s: if_delroute6: %m", rt->iface->name);
 	return retval;
@@ -1791,7 +1857,9 @@ make_route(const struct interface *ifp, const struct ra *rap)
 		return NULL;
 	}
 	r->iface = ifp;
+#ifdef HAVE_ROUTE_METRIC
 	r->metric = ifp->metric;
+#endif
 	if (rap)
 		r->mtu = rap->mtu;
 	else
@@ -1845,45 +1913,6 @@ make_router(const struct ra *rap)
 	r->dest = in6addr_any;
 	r->net = in6addr_any;
 	r->gate = rap->from;
-	return r;
-}
-
-int
-ipv6_removesubnet(struct interface *ifp, struct ipv6_addr *addr)
-{
-	struct rt6 *rt;
-#if HAVE_ROUTE_METRIC
-	struct rt6 *ort;
-#endif
-	int r;
-
-	/* We need to delete the subnet route to have our metric or
-	 * prefer the interface. */
-	r = 0;
-	rt = make_prefix(ifp, NULL, addr);
-	if (rt) {
-		rt->iface = ifp;
-#ifdef __linux__
-		rt->metric = 256;
-#else
-		rt->metric = 0;
-#endif
-#if HAVE_ROUTE_METRIC
-		/* For some reason, Linux likes to re-add the subnet
-		   route under the original metric.
-		   I would love to find a way of stopping this! */
-		if ((ort = find_route6(ifp->ctx->ipv6->routes, rt)) == NULL ||
-		    ort->metric != rt->metric)
-#else
-		if (!find_route6(ifp->ctx->ipv6->routes, rt))
-#endif
-		{
-			r = if_delroute6(rt);
-			if (r == -1 && errno == ESRCH)
-				r = 0;
-		}
-		free(rt);
-	}
 	return r;
 }
 
@@ -1951,7 +1980,7 @@ ipv6_buildroutes(struct dhcpcd_ctx *ctx)
 
 	/* First add reachable routers and their prefixes */
 	ipv6_build_ra_routes(ctx->ipv6, &dnr, 0);
-#if HAVE_ROUTE_METRIC
+#ifdef HAVE_ROUTE_METRIC
 	have_default = (TAILQ_FIRST(&dnr) != NULL);
 #endif
 
@@ -1961,7 +1990,7 @@ ipv6_buildroutes(struct dhcpcd_ctx *ctx)
 	ipv6_build_dhcp_routes(ctx, &dnr, DH6S_BOUND);
 	ipv6_build_dhcp_routes(ctx, &dnr, DH6S_DELEGATED);
 
-#if HAVE_ROUTE_METRIC
+#ifdef HAVE_ROUTE_METRIC
 	/* If we have an unreachable router, we really do need to remove the
 	 * route to it beause it could be a lower metric than a reachable
 	 * router. Of course, we should at least have some routers if all
@@ -1980,6 +2009,7 @@ ipv6_buildroutes(struct dhcpcd_ctx *ctx)
 	}
 	TAILQ_INIT(nrs);
 	have_default = 0;
+
 	TAILQ_FOREACH_SAFE(rt, &dnr, next, rtn) {
 		/* Is this route already in our table? */
 		if (find_route6(nrs, rt) != NULL)
@@ -1988,9 +2018,11 @@ ipv6_buildroutes(struct dhcpcd_ctx *ctx)
 		/* Do we already manage it? */
 		if ((or = find_route6(ctx->ipv6->routes, rt))) {
 			if (or->iface != rt->iface ||
+#ifdef HAVE_ROUTE_METRIC
+			    rt->metric != or->metric ||
+#endif
 		//	    or->src.s_addr != ifp->addr.s_addr ||
-			    !IN6_ARE_ADDR_EQUAL(&rt->gate, &or->gate) ||
-			    rt->metric != or->metric)
+			    !IN6_ARE_ADDR_EQUAL(&rt->gate, &or->gate))
 			{
 				if (c_route(or, rt) != 0)
 					continue;

@@ -146,7 +146,9 @@ struct rt6 {
 	struct in6_addr gate;
 	const struct interface *iface;
 	unsigned int flags;
+#ifdef HAVE_ROUTE_METRIC
 	unsigned int metric;
+#endif
 	unsigned int mtu;
 };
 TAILQ_HEAD(rt6_head, rt6);
@@ -218,6 +220,8 @@ struct ipv6_ctx {
 	struct ra_head *ra_routers;
 	struct rt6_head *routes;
 
+	struct rt6_head kroutes;
+
 	int dhcp_fd;
 };
 
@@ -266,8 +270,8 @@ void ipv6_addtempaddrs(struct interface *, const struct timeval *);
 
 int ipv6_start(struct interface *);
 void ipv6_ctxfree(struct dhcpcd_ctx *);
-int ipv6_routedeleted(struct dhcpcd_ctx *, const struct rt6 *);
-int ipv6_removesubnet(struct interface *, struct ipv6_addr *);
+int ipv6_handlert(struct dhcpcd_ctx *, int cmd, struct rt6 *);
+void ipv6_freerts(struct rt6_head *);
 void ipv6_buildroutes(struct dhcpcd_ctx *);
 
 #else

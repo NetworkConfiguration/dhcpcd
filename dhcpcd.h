@@ -122,6 +122,7 @@ struct dhcpcd_ctx {
 	struct dhcp_opt *dhcp_opts;
 	size_t dhcp_opts_len;
 	struct rt_head *ipv4_routes;
+	struct rt_head *ipv4_kroutes;
 
 	int udp_fd;
 	uint8_t *packet;

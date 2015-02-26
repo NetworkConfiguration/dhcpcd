@@ -2990,6 +2990,9 @@ dhcp_init(struct interface *ifp)
 		/* 0 is a valid fd, so init to -1 */
 		state->raw_fd = state->arp_fd = -1;
 		TAILQ_INIT(&state->arp_states);
+
+		/* Now is a good time to find IPv4 routes */
+		if_initrt(ifp);
 	}
 
 	state->state = DHS_INIT;
