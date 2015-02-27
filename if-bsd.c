@@ -153,13 +153,11 @@ static void
 if_linkaddr(struct sockaddr_dl *sdl, const struct interface *ifp)
 {
 
-#ifdef __FreeBSD__
-	memcpy(sdl, &ifp->linkaddr, sizeof(*sdl));
-	sdl->sdl_nlen = sdl->sdl_alen = sdl->sdl_slen = 0;
-#else
+	memset(sdl, 0, sizeof(*sdl));
+	sdl->sdl_family = AF_LINK;
 	sdl->sdl_len = sizeof(*sdl);
-	link_addr(ifp->name, sdl);
-#endif
+	sdl->sdl_nlen = sdl->sdl_alen = sdl->sdl_slen = 0;
+	sdl->sdl_index = (unsigned short)ifp->index;
 }
 #endif
 
