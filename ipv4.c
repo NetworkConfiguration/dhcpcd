@@ -599,6 +599,7 @@ add_router_host_route(struct rt_head *rt, const struct interface *ifp)
 {
 	struct rt *rtp, *rtn;
 	const char *cp, *cp2, *cp3, *cplim;
+	struct if_options *ifo;
 
 	if (rt == NULL) /* earlier malloc failed */
 		return NULL;
@@ -627,15 +628,23 @@ add_router_host_route(struct rt_head *rt, const struct interface *ifp)
 		}
 		if (rtn != rtp)
 			continue;
+		ifo = ifp->options;
 		if (ifp->flags & IFF_NOARP) {
-			syslog(LOG_WARNING,
-			    "%s: forcing router %s through interface",
-			    ifp->name, inet_ntoa(rtp->gate));
+			if (!(ifo->options & DHCPCD_ROUTER_HOST_ROUTE_WARNED)) {
+				ifo->options |= DHCPCD_ROUTER_HOST_ROUTE_WARNED;
+				syslog(LOG_WARNING,
+				    "%s: forcing router %s through interface",
+				    ifp->name, inet_ntoa(rtp->gate));
+			}
 			rtp->gate.s_addr = 0;
 			continue;
 		}
-		syslog(LOG_WARNING, "%s: router %s requires a host route",
-		    ifp->name, inet_ntoa(rtp->gate));
+		if (!(ifo->options & DHCPCD_ROUTER_HOST_ROUTE_WARNED)) {
+			ifo->options |= DHCPCD_ROUTER_HOST_ROUTE_WARNED;
+			syslog(LOG_WARNING,
+			    "%s: router %s requires a host route",
+			    ifp->name, inet_ntoa(rtp->gate));
+		}
 		rtn = malloc(sizeof(*rtn));
 		if (rtn == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);

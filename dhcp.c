@@ -1813,7 +1813,8 @@ dhcp_rebind(void *arg)
 	state->state = DHS_REBIND;
 	eloop_timeout_delete(ifp->ctx->eloop, send_renew, ifp);
 	state->lease.server.s_addr = 0;
-	ifp->options->options &= ~ DHCPCD_CSR_WARNED;
+	ifp->options->options &= ~(DHCPCD_CSR_WARNED |
+	    DHCPCD_ROUTER_HOST_ROUTE_WARNED);
 	send_rebind(ifp);
 }
 
@@ -2192,7 +2193,8 @@ dhcp_drop(struct interface *ifp, const char *reason)
 	free(state->old);
 	state->old = NULL;
 	state->lease.addr.s_addr = 0;
-	ifp->options->options &= ~ DHCPCD_CSR_WARNED;
+	ifp->options->options &= ~(DHCPCD_CSR_WARNED |
+	    DHCPCD_ROUTER_HOST_ROUTE_WARNED);
 }
 
 static void
