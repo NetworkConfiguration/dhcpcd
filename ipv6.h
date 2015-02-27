@@ -252,7 +252,11 @@ struct ipv6_addr *ipv6_findaddr(struct dhcpcd_ctx *,
     const struct in6_addr *, short);
 #define ipv6_linklocal(ifp) ipv6_iffindaddr((ifp), NULL)
 int ipv6_addlinklocalcallback(struct interface *, void (*)(void *), void *);
-void ipv6_freeaddr(struct ipv6_addr *);
+//void ipv6_freeaddr(struct ipv6_addr *);
+#define ipv6_freeaddr(ap) do { \
+	eloop_q_timeout_delete((ap)->iface->ctx->eloop, 0, NULL, (ap)); \
+	free(ap); \
+	} while (0)
 void ipv6_freedrop(struct interface *, int);
 #define ipv6_free(ifp) ipv6_freedrop((ifp), 0)
 #define ipv6_drop(ifp) ipv6_freedrop((ifp), 2)
