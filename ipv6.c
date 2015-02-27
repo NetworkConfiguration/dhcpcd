@@ -620,6 +620,8 @@ ipv6_deleteaddr(struct ipv6_addr *addr)
 	TAILQ_FOREACH(ap, &state->addrs, next) {
 		if (IN6_ARE_ADDR_EQUAL(&ap->addr, &addr->addr)) {
 			TAILQ_REMOVE(&state->addrs, ap, next);
+			eloop_q_timeout_delete(addr->iface->ctx->eloop, 0,
+			    NULL, ap);
 			free(ap);
 			break;
 		}
@@ -936,6 +938,7 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 		case RTM_DELADDR:
 			if (ap) {
 				TAILQ_REMOVE(&state->addrs, ap, next);
+				eloop_q_timeout_delete(ctx->eloop, 0, NULL, ap);
 				free(ap);
 			}
 			break;
