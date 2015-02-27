@@ -824,6 +824,14 @@ ipv6_addaddrs(struct ipv6_addrhead *addrs)
 }
 
 void
+ipv6_freeaddr(struct ipv6_addr *ap)
+{
+
+	eloop_q_timeout_delete(ap->iface->ctx->eloop, 0, NULL, ap);
+	free(ap);
+}
+
+void
 ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
     const struct interface *ifd)
 {
