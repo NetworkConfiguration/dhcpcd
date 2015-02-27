@@ -1072,7 +1072,7 @@ if_addrflags6(const struct in6_addr *addr, const struct interface *ifp)
 	flags = -1;
 	if (s != -1) {
 		memset(&ifr6, 0, sizeof(ifr6));
-		strncpy(ifr6.ifr_name, ifp->name, sizeof(ifr6.ifr_name));
+		strlcpy(ifr6.ifr_name, ifp->name, sizeof(ifr6.ifr_name));
 		ifr6.ifr_addr.sin6_family = AF_INET6;
 		ifr6.ifr_addr.sin6_addr = *addr;
 		ifa_scope(&ifr6.ifr_addr, ifp->index);
@@ -1093,7 +1093,7 @@ if_getlifetime6(struct ipv6_addr *ia)
 	r = -1;
 	if (s != -1) {
 		memset(&ifr6, 0, sizeof(ifr6));
-		strncpy(ifr6.ifr_name, ia->iface->name, sizeof(ifr6.ifr_name));
+		strlcpy(ifr6.ifr_name, ia->iface->name, sizeof(ifr6.ifr_name));
 		ifr6.ifr_addr.sin6_family = AF_INET6;
 		ifr6.ifr_addr.sin6_addr = ia->addr;
 		ifa_scope(&ifr6.ifr_addr, ia->iface->index);
