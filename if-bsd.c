@@ -605,8 +605,20 @@ if_route(unsigned char cmd, const struct rt *rt, struct rt *srt)
 	}
 	if (rt->dest.s_addr == rt->gate.s_addr &&
 	    rt->net.s_addr == INADDR_BROADCAST)
+	{
+#ifdef RTF_CLONING
+		/* We add a cloning network route for a single host.
+		 * Traffic to the host will generate a cloned route and the
+		 * hardware address will resolve correctly.
+		 * It might be more correct to use RTF_HOST instead of
+		 * RTF_CLONING, and that does work, but some OS generate
+		 * an arp warning diagnostic which we don't want to do. */
+		rtm.hdr.rtm_flags |= RTF_CLONING;
+		rtm.hdr.rtm_addrs |= RTA_NETMASK;
+#else
 		rtm.hdr.rtm_flags |= RTF_HOST;
-	else if (rt->gate.s_addr == htonl(INADDR_LOOPBACK) &&
+#endif
+	} else if (rt->gate.s_addr == htonl(INADDR_LOOPBACK) &&
 	    rt->net.s_addr == INADDR_BROADCAST)
 	{
 		rtm.hdr.rtm_flags |= RTF_HOST | RTF_GATEWAY;
@@ -625,7 +637,11 @@ if_route(unsigned char cmd, const struct rt *rt, struct rt *srt)
 
 	ADDADDR(&rt->dest);
 	if (rtm.hdr.rtm_addrs & RTA_GATEWAY) {
+#ifdef RTF_CLONING
+		if ((rtm.hdr.rtm_flags & (RTF_HOST | RTF_CLONING) &&
+#else
 		if ((rtm.hdr.rtm_flags & RTF_HOST &&
+#endif
 		    rt->gate.s_addr != htonl(INADDR_LOOPBACK)) ||
 		    !(rtm.hdr.rtm_flags & RTF_STATIC))
 		{
