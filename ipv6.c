@@ -620,9 +620,7 @@ ipv6_deleteaddr(struct ipv6_addr *addr)
 	TAILQ_FOREACH(ap, &state->addrs, next) {
 		if (IN6_ARE_ADDR_EQUAL(&ap->addr, &addr->addr)) {
 			TAILQ_REMOVE(&state->addrs, ap, next);
-			eloop_q_timeout_delete(addr->iface->ctx->eloop, 0,
-			    NULL, ap);
-			free(ap);
+			ipv6_freeaddr(ap);
 			break;
 		}
 	}
@@ -784,7 +782,7 @@ ipv6_addaddrs(struct ipv6_addrhead *addrs)
 				ap->flags &= ~IPV6_AF_ADDED;
 			} else {
 				TAILQ_REMOVE(addrs, ap, next);
-				free(ap);
+				ipv6_freeaddr(ap);
 			}
 		} else if (!(ap->flags & IPV6_AF_STALE) &&
 		    !IN6_IS_ADDR_UNSPECIFIED(&ap->addr))
@@ -826,6 +824,14 @@ ipv6_addaddrs(struct ipv6_addrhead *addrs)
 }
 
 void
+ipv6_freeaddr(struct ipv6_addr *ap)
+{
+
+	eloop_q_timeout_delete(ap->iface->ctx->eloop, 0, NULL, ap);
+	free(ap);
+}
+
+void
 ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
     const struct interface *ifd)
 {
@@ -838,7 +844,6 @@ ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
 			continue;
 		if (drop != 2)
 			TAILQ_REMOVE(addrs, ap, next);
-		eloop_q_timeout_delete(ap->iface->ctx->eloop, 0, NULL, ap);
 		if (drop && ap->flags & IPV6_AF_ADDED &&
 		    (ap->iface->options->options &
 		    (DHCPCD_EXITING | DHCPCD_PERSISTENT)) !=
@@ -860,10 +865,10 @@ ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
 				ipv6_addaddr(apf, &now);
 			}
 			if (drop == 2)
-				free(ap);
+				ipv6_freeaddr(ap);
 		}
 		if (drop != 2)
-			free(ap);
+			ipv6_freeaddr(ap);
 	}
 }
 
@@ -938,8 +943,7 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 		case RTM_DELADDR:
 			if (ap) {
 				TAILQ_REMOVE(&state->addrs, ap, next);
-				eloop_q_timeout_delete(ctx->eloop, 0, NULL, ap);
-				free(ap);
+				ipv6_freeaddr(ap);
 			}
 			break;
 		case RTM_NEWADDR:

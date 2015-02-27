@@ -2034,9 +2034,7 @@ dhcp6_findia(struct interface *ifp, const struct dhcp6_message *m, size_t l,
 	}
 	TAILQ_FOREACH_SAFE(ap, &state->addrs, next, nap) {
 		if (ap->flags & IPV6_AF_STALE) {
-			if (ap->dadcallback)
-				eloop_q_timeout_delete(ap->iface->ctx->eloop,
-				    0, NULL, ap);
+			eloop_q_timeout_delete(ifp->ctx->eloop, 0, NULL, ap);
 			if (ap->flags & IPV6_AF_REQUEST) {
 				ap->prefix_vltime = ap->prefix_pltime = 0;
 			} else {
@@ -2308,7 +2306,7 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 			a->flags |= ap->flags;
 			a->flags &= ~IPV6_AF_NEW;
 			a->created = ap->created;
-			free(ap);
+			ipv6_freeaddr(ap);
 		}
 	}
 
