@@ -593,7 +593,12 @@ get_option_routes(struct interface *ifp, const struct dhcp_message *dhcp)
 	if (p) {
 		routes = decode_rfc3442_rt(p, len);
 		if (routes) {
-			if (!(ifo->options & DHCPCD_CSR_WARNED)) {
+			const struct dhcp_state *state;
+
+			state = D_CSTATE(ifp);
+			if (!(ifo->options & DHCPCD_CSR_WARNED) &&
+			    !(state->added & STATE_FAKE))
+			{
 				syslog(LOG_DEBUG,
 				    "%s: using %sClassless Static Routes",
 				    ifp->name, csr);
