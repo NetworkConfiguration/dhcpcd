@@ -28,10 +28,10 @@
 #ifndef INTERFACE_H
 #define INTERFACE_H
 
-#include <sys/socket.h>
+#include <sys/ioctl.h>		/* for SIOCGIFPRIORITY */
 
 #include <net/if.h>
-//#include <net/route.h>
+#include <net/route.h>		/* for RTM_ADD et all */
 #include <netinet/in.h>
 
 /* Some systems have route metrics */
@@ -100,6 +100,9 @@ int if_vimaster(const char *);
 int if_openlinksocket(void);
 int if_managelink(struct dhcpcd_ctx *);
 
+/* dhcpcd uses the same routing flags as BSD.
+ * If the platform doesn't use these flags,
+ * map them in the platform interace file. */
 #ifndef RTM_ADD
 #define RTM_ADD		0x1	/* Add Route */
 #define RTM_DELETE	0x2	/* Delete Route */
