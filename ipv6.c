@@ -85,7 +85,7 @@
 
 #ifdef IPV6_POLLADDRFLAG
 #  warning kernel does not report IPv6 address flag changes
-#  warning polling tentative address flags periodically instead
+#  warning polling tentative address flags periodically
 #endif
 
 #ifdef __linux__
@@ -1875,7 +1875,7 @@ make_route(const struct interface *ifp, const struct ra *rap)
 }
 
 static struct rt6 *
-make_prefix(const struct interface * ifp, const struct ra *rap,
+make_prefix(const struct interface *ifp, const struct ra *rap,
     const struct ipv6_addr *addr)
 {
 	struct rt6 *r;
