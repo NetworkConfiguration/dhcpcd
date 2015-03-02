@@ -338,9 +338,11 @@ ipv4_findrt(struct dhcpcd_ctx *ctx, const struct rt *rt, int flags)
 		return NULL;
 	TAILQ_FOREACH(r, ctx->ipv4_kroutes, next) {
 		if (rt->dest.s_addr == r->dest.s_addr &&
-		    (!flags || rt->iface == r->iface) &&
 #ifdef HAVE_ROUTE_METRIC
+		    rt->iface == r->iface &&
 		    (!flags || rt->metric == r->metric) &&
+#else
+		    (!flags || rt->iface == r->iface) &&
 #endif
 		    rt->net.s_addr == r->net.s_addr)
 			return r;

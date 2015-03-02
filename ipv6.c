@@ -1741,7 +1741,10 @@ ipv6_findrt(struct dhcpcd_ctx *ctx, const struct rt6 *rt, int flags)
 		if (IN6_ARE_ADDR_EQUAL(&rt->dest, &r->dest) &&
 		    (!flags || rt->iface == r->iface) &&
 #ifdef HAVE_ROUTE_METRIC
+		    rt->iface == r->iface &&
 		    (!flags || rt->metric == r->metric) &&
+#else
+		    (!flags || rt->iface == r->iface) &&
 #endif
 		    IN6_ARE_ADDR_EQUAL(&rt->net, &r->net))
 			return r;
