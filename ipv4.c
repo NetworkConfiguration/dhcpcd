@@ -366,6 +366,9 @@ ipv4_handlert(struct dhcpcd_ctx *ctx, int cmd, struct rt *rt)
 {
 	struct rt *f;
 
+	if (ctx->ipv4_kroutes == NULL)
+		return 0;
+
 	f = ipv4_findrt(ctx, rt, 1);
 	switch (cmd) {
 	case RTM_ADD:

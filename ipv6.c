@@ -1767,6 +1767,9 @@ ipv6_handlert(struct dhcpcd_ctx *ctx, int cmd, struct rt6 *rt)
 {
 	struct rt6 *f;
 
+	if (ctx->ipv6 == NULL)
+		return 0;
+
 	f = ipv6_findrt(ctx, rt, 1);
 	switch(cmd) {
 	case RTM_ADD:
