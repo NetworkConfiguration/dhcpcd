@@ -28,15 +28,14 @@
 #ifndef INTERFACE_H
 #define INTERFACE_H
 
-#include <sys/ioctl.h>		/* for SIOCGIFPRIORITY */
-
 #include <net/if.h>
 #include <net/route.h>		/* for RTM_ADD et all */
 #include <netinet/in.h>
 
-/* Some systems have route metrics */
+/* Some systems have route metrics.
+ * OpenBSD route priority is not this. */
 #ifndef HAVE_ROUTE_METRIC
-# if defined(__linux__) || defined(SIOCGIFPRIORITY)
+# if defined(__linux__)
 #  define HAVE_ROUTE_METRIC 1
 # endif
 #endif

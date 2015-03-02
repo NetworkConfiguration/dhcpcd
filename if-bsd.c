@@ -514,9 +514,6 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct rt_msghdr *rtm)
 	else
 		rt->net.s_addr = INADDR_BROADCAST;
 	COPYOUT(rt->gate, rti_info[RTAX_GATEWAY]);
-#ifdef SIOCGIFPRIORITY
-	rt->metric = rtm->rtm_priority;
-#endif
 
 	if (rtm->rtm_index)
 		rt->iface = if_findindex(ctx, rtm->rtm_index);
@@ -591,9 +588,6 @@ if_route(unsigned char cmd, const struct rt *rt, struct rt *srt)
 	if (cmd != RTM_ADD)
 		rtm.hdr.rtm_flags |= RTF_PINNED;
 #endif
-#ifdef SIOCGIFPRIORITY
-	rtm.hdr.rtm_priority = rt->metric;
-#endif
 
 	if (cmd != RTM_DELETE) {
 		rtm.hdr.rtm_addrs |= RTA_IFA | RTA_IFP;
@@ -602,6 +596,11 @@ if_route(unsigned char cmd, const struct rt *rt, struct rt *srt)
 		    rt->net.s_addr != state->net.s_addr ||
 		    rt->dest.s_addr != (state->addr.s_addr & state->net.s_addr))
 			rtm.hdr.rtm_flags |= RTF_STATIC;
+		else {
+#ifdef RTF_CLONING
+			rtm.hdr.rtm_flags |= RTF_CLONING;
+#endif
+		}
 	}
 	if (rt->dest.s_addr == rt->gate.s_addr &&
 	    rt->net.s_addr == INADDR_BROADCAST)
@@ -879,9 +878,6 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct rt_msghdr *rtm)
 	} else
 		ipv6_mask(&rt->net, 128);
 	COPYOUT6(rt->gate, rti_info[RTAX_GATEWAY]);
-#ifdef SIOCGIFPRIORITY
-	rt->metric = rtm->rtm_priority;
-#endif
 
 	if (rtm->rtm_index)
 		rt->iface = if_findindex(ctx, rtm->rtm_index);
@@ -952,15 +948,12 @@ if_route6(unsigned char cmd, const struct rt6 *rt, struct rt6 *srt)
 		rtm.hdr.rtm_flags |= RTF_PINNED;
 #endif
 	rtm.hdr.rtm_addrs = RTA_DST | RTA_NETMASK;
-#ifdef SIOCGIFPRIORITY
-	rtm.hdr.rtm_priority = rt->metric;
-#endif
 	/* None interface subnet routes are static. */
 	if (IN6_IS_ADDR_UNSPECIFIED(&rt->gate)) {
 #ifdef RTF_CLONING
 		rtm.hdr.rtm_flags |= RTF_CLONING;
 #endif
-	 } else
+	} else
 		rtm.hdr.rtm_flags |= RTF_GATEWAY | RTF_STATIC;
 
 	if (cmd == RTM_ADD)
