@@ -979,7 +979,7 @@ if_reboot(struct interface *ifp, int argc, char **argv)
 
 	oldopts = ifp->options->options;
 	script_runreason(ifp, "RECONFIGURE");
-	configure_interface(ifp, argc, argv);
+	dhcpcd_initstate1(ifp, argc, argv);
 	dhcp_reboot_newopts(ifp, oldopts);
 	dhcp6_reboot(ifp);
 	dhcpcd_prestartinterface(ifp);
