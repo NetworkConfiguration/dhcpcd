@@ -990,7 +990,7 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 	struct sockaddr_in6 dst;
 	struct cmsghdr *cm;
 	struct in6_pktinfo pi;
-	struct timeval RTprev;
+	struct timespec RTprev;
 	double rnd;
 	time_t ms;
 	uint8_t neg;
@@ -1037,49 +1037,49 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 				state->RT.tv_sec = 1;
 			else
 				state->RT.tv_sec = 0;
-			state->RT.tv_usec = (suseconds_t)arc4random_uniform(
-			    state->IMD * 1000000);
-			timernorm(&state->RT);
+			state->RT.tv_nsec = (suseconds_t)arc4random_uniform(
+			    state->IMD * NSEC_PER_SEC);
+			timespecnorm(&state->RT);
 			broad_uni = "delaying";
 			goto logsend;
 		}
 		if (state->RTC == 0) {
 			RTprev.tv_sec = state->IRT;
-			RTprev.tv_usec = 0;
+			RTprev.tv_nsec = 0;
 			state->RT.tv_sec = RTprev.tv_sec;
-			state->RT.tv_usec = 0;
+			state->RT.tv_nsec = 0;
 		} else {
 			RTprev = state->RT;
-			timeradd(&state->RT, &state->RT, &state->RT);
+			timespecadd(&state->RT, &state->RT, &state->RT);
 		}
 
 		rnd = DHCP6_RAND_MIN;
 		rnd += (suseconds_t)arc4random_uniform(
 		    DHCP6_RAND_MAX - DHCP6_RAND_MIN);
-		rnd /= 1000;
+		rnd /= MSEC_PER_SEC;
 		neg = (rnd < 0.0);
 		if (neg)
 			rnd = -rnd;
-		tv_to_ms(ms, &RTprev);
+		ts_to_ms(ms, &RTprev);
 		ms *= rnd;
-		ms_to_tv(&RTprev, ms);
+		ms_to_ts(&RTprev, ms);
 		if (neg)
-			timersub(&state->RT, &RTprev, &state->RT);
+			timespecsub(&state->RT, &RTprev, &state->RT);
 		else
-			timeradd(&state->RT, &RTprev, &state->RT);
+			timespecadd(&state->RT, &RTprev, &state->RT);
 
 		if (state->RT.tv_sec > state->MRT) {
 			RTprev.tv_sec = state->MRT;
-			RTprev.tv_usec = 0;
+			RTprev.tv_nsec = 0;
 			state->RT.tv_sec = state->MRT;
-			state->RT.tv_usec = 0;
-			tv_to_ms(ms, &RTprev);
+			state->RT.tv_nsec = 0;
+			ts_to_ms(ms, &RTprev);
 			ms *= rnd;
-			ms_to_tv(&RTprev, ms);
+			ms_to_ts(&RTprev, ms);
 			if (neg)
-				timersub(&state->RT, &RTprev, &state->RT);
+				timespecsub(&state->RT, &RTprev, &state->RT);
 			else
-				timeradd(&state->RT, &RTprev, &state->RT);
+				timespecadd(&state->RT, &RTprev, &state->RT);
 		}
 
 logsend:
@@ -1092,7 +1092,7 @@ logsend:
 		    state->send->xid[0],
 		    state->send->xid[1],
 		    state->send->xid[2],
-		    timeval_to_double(&state->RT));
+		    timespec_to_double(&state->RT));
 
 		/* Wait the initial delay */
 		if (state->IMD) {
@@ -1695,7 +1695,7 @@ dhcp6_findaddr(struct dhcpcd_ctx *ctx, const struct in6_addr *addr,
 
 static int
 dhcp6_findna(struct interface *ifp, uint16_t ot, const uint8_t *iaid,
-    const uint8_t *d, size_t l, const struct timeval *acquired)
+    const uint8_t *d, size_t l, const struct timespec *acquired)
 {
 	struct dhcp6_state *state;
 	const struct dhcp6_option *o;
@@ -1776,7 +1776,7 @@ dhcp6_findna(struct interface *ifp, uint16_t ot, const uint8_t *iaid,
 
 static int
 dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
-    const uint8_t *d, size_t l, const struct timeval *acquired)
+    const uint8_t *d, size_t l, const struct timespec *acquired)
 {
 	struct dhcp6_state *state;
 	const struct dhcp6_option *o, *ex;
@@ -1902,7 +1902,7 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 
 static int
 dhcp6_findia(struct interface *ifp, const struct dhcp6_message *m, size_t l,
-    const char *sfrom, const struct timeval *acquired)
+    const char *sfrom, const struct timespec *acquired)
 {
 	struct dhcp6_state *state;
 	const struct if_options *ifo;
@@ -2051,11 +2051,11 @@ dhcp6_findia(struct interface *ifp, const struct dhcp6_message *m, size_t l,
 static int
 dhcp6_validatelease(struct interface *ifp,
     const struct dhcp6_message *m, size_t len,
-    const char *sfrom, const struct timeval *acquired)
+    const char *sfrom, const struct timespec *acquired)
 {
 	struct dhcp6_state *state;
 	int nia;
-	struct timeval aq;
+	struct timespec aq;
 
 	if (len <= sizeof(*m)) {
 		syslog(LOG_ERR, "%s: DHCPv6 lease truncated", ifp->name);
@@ -2109,9 +2109,9 @@ dhcp6_readlease(struct interface *ifp)
 	struct stat st;
 	int fd;
 	ssize_t bytes;
-	struct timeval now;
 	const struct dhcp6_option *o;
-	struct timeval acquired;
+	struct timespec acquired;
+	time_t now;
 
 	state = D6_STATE(ifp);
 	if (stat(state->leasefile, &st) == -1) {
@@ -2145,9 +2145,13 @@ dhcp6_readlease(struct interface *ifp)
 		goto ex;
 	}
 
-	gettimeofday(&now, NULL);
+	if ((now = time(NULL)) == -1) {
+		syslog(LOG_ERR, "%s: time: %m", __func__);
+		goto ex;
+	}
+
 	get_monotonic(&acquired);
-	acquired.tv_sec -= now.tv_sec - st.st_mtime;
+	acquired.tv_sec -= now - st.st_mtime;
 
 	/* Check to see if the lease is still valid */
 	fd = dhcp6_validatelease(ifp, state->new, state->new_len, NULL,
@@ -2158,7 +2162,7 @@ dhcp6_readlease(struct interface *ifp)
 	if (!(ifp->ctx->options & DHCPCD_DUMPLEASE) &&
 	    state->expire != ND6_INFINITE_LIFETIME)
 	{
-		if ((time_t)state->expire < now.tv_sec - st.st_mtime) {
+		if ((time_t)state->expire < now - st.st_mtime) {
 			syslog(LOG_DEBUG,"%s: discarding expired lease",
 			    ifp->name);
 			goto ex;

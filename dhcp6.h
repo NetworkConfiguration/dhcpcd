@@ -172,7 +172,7 @@ struct dhcp6_state {
 	time_t start_uptime;
 
 	/* Message retransmission timings */
-	struct timeval RT;
+	struct timespec RT;
 	unsigned int IMD;
 	unsigned int RTC;
 	time_t IRT;

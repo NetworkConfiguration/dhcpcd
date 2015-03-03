@@ -153,16 +153,15 @@ eloop_event_delete(struct eloop_ctx *ctx, int fd, int write_only)
 
 int
 eloop_q_timeout_add_tv(struct eloop_ctx *ctx, int queue,
-    const struct timeval *when, void (*callback)(void *), void *arg)
+    const struct timespec *when, void (*callback)(void *), void *arg)
 {
-	struct timeval now;
-	struct timeval w;
+	struct timespec now, w;
 	struct eloop_timeout *t, *tt = NULL;
 
 	get_monotonic(&now);
-	timeradd(&now, when, &w);
+	timespecadd(&now, when, &w);
 	/* Check for time_t overflow. */
-	if (timercmp(&w, &now, <)) {
+	if (timespeccmp(&w, &now, <)) {
 		errno = ERANGE;
 		return -1;
 	}
@@ -188,8 +187,7 @@ eloop_q_timeout_add_tv(struct eloop_ctx *ctx, int queue,
 		}
 	}
 
-	t->when.tv_sec = w.tv_sec;
-	t->when.tv_usec = w.tv_usec;
+	t->when = w;
 	t->callback = callback;
 	t->arg = arg;
 	t->queue = queue;
@@ -197,7 +195,7 @@ eloop_q_timeout_add_tv(struct eloop_ctx *ctx, int queue,
 	/* The timeout list should be in chronological order,
 	 * soonest first. */
 	TAILQ_FOREACH(tt, &ctx->timeouts, next) {
-		if (timercmp(&t->when, &tt->when, <)) {
+		if (timespeccmp(&t->when, &tt->when, <)) {
 			TAILQ_INSERT_BEFORE(tt, t, next);
 			return 0;
 		}
@@ -210,10 +208,10 @@ int
 eloop_q_timeout_add_sec(struct eloop_ctx *ctx, int queue, time_t when,
     void (*callback)(void *), void *arg)
 {
-	struct timeval tv;
+	struct timespec tv;
 
 	tv.tv_sec = when;
-	tv.tv_usec = 0;
+	tv.tv_nsec = 0;
 	return eloop_q_timeout_add_tv(ctx, queue, &tv, callback, arg);
 }
 
@@ -261,6 +259,11 @@ struct eloop_ctx *
 eloop_init(void)
 {
 	struct eloop_ctx *ctx;
+	struct timespec now;
+
+	/* Check we have a working monotonic clock. */
+	if (get_monotonic(&now) == -1)
+		return NULL;
 
 	ctx = calloc(1, sizeof(*ctx));
 	if (ctx) {
@@ -306,12 +309,10 @@ int
 eloop_start(struct dhcpcd_ctx *dctx)
 {
 	struct eloop_ctx *ctx;
-	struct timeval now;
 	int n;
 	struct eloop_event *e;
 	struct eloop_timeout *t;
-	struct timeval tv;
-	struct timespec ts, *tsp;
+	struct timespec now, ts, *tsp;
 	void (*t0)(void *);
 #ifndef USE_SIGNALS
 	int timeout;
@@ -331,14 +332,13 @@ eloop_start(struct dhcpcd_ctx *dctx)
 		}
 		if ((t = TAILQ_FIRST(&ctx->timeouts))) {
 			get_monotonic(&now);
-			if (timercmp(&now, &t->when, >)) {
+			if (timespeccmp(&now, &t->when, >)) {
 				TAILQ_REMOVE(&ctx->timeouts, t, next);
 				t->callback(t->arg);
 				TAILQ_INSERT_TAIL(&ctx->free_timeouts, t, next);
 				continue;
 			}
-			timersub(&t->when, &now, &tv);
-			TIMEVAL_TO_TIMESPEC(&tv, &ts);
+			timespecsub(&t->when, &now, &ts);
 			tsp = &ts;
 		} else
 			/* No timeouts, so wait forever */

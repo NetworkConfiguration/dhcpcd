@@ -50,7 +50,7 @@ struct eloop_event {
 
 struct eloop_timeout {
 	TAILQ_ENTRY(eloop_timeout) next;
-	struct timeval when;
+	struct timespec when;
 	void (*callback)(void *);
 	void *arg;
 	int queue;
@@ -88,7 +88,7 @@ void eloop_event_delete(struct eloop_ctx *, int, int);
 int eloop_q_timeout_add_sec(struct eloop_ctx *, int queue,
     time_t, void (*)(void *), void *);
 int eloop_q_timeout_add_tv(struct eloop_ctx *, int queue,
-    const struct timeval *, void (*)(void *), void *);
+    const struct timespec *, void (*)(void *), void *);
 int eloop_timeout_add_now(struct eloop_ctx *, void (*)(void *), void *);
 void eloop_q_timeout_delete(struct eloop_ctx *, int, void (*)(void *), void *);
 struct eloop_ctx * eloop_init(void);

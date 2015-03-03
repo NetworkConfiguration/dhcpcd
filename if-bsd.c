@@ -600,6 +600,9 @@ if_route(unsigned char cmd, const struct rt *rt, struct rt *srt)
 #ifdef RTF_CLONING
 			rtm.hdr.rtm_flags |= RTF_CLONING;
 #endif
+#ifdef RTP_CONNECTED
+			rtm.hdr.rtm_priority = RTP_CONNECTED;
+#endif
 		}
 	}
 	if (rt->dest.s_addr == rt->gate.s_addr &&
@@ -952,6 +955,9 @@ if_route6(unsigned char cmd, const struct rt6 *rt, struct rt6 *srt)
 	if (IN6_IS_ADDR_UNSPECIFIED(&rt->gate)) {
 #ifdef RTF_CLONING
 		rtm.hdr.rtm_flags |= RTF_CLONING;
+#endif
+#ifdef RTP_CONNECTED
+		rtm.hdr.rtm_priority = RTP_CONNECTED;
 #endif
 	} else
 		rtm.hdr.rtm_flags |= RTF_GATEWAY | RTF_STATIC;

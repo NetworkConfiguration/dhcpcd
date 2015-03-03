@@ -89,18 +89,13 @@ get_hostname(char *buf, size_t buflen, int short_hostname)
  */
 #define NO_MONOTONIC "host does not support a monotonic clock - timing can skew"
 int
-get_monotonic(struct timeval *tp)
+get_monotonic(struct timespec *ts)
 {
-#if defined(_POSIX_MONOTONIC_CLOCK) && defined(CLOCK_MONOTONIC)
-	struct timespec ts;
 
-	if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0) {
-		tp->tv_sec = ts.tv_sec;
-		tp->tv_usec = (suseconds_t)(ts.tv_nsec / 1000);
+#if defined(_POSIX_MONOTONIC_CLOCK) && defined(CLOCK_MONOTONIC)
+	return clock_gettime(CLOCK_MONOTONIC, ts);
 		return 0;
-	}
 #elif defined(__APPLE__)
-#define NSEC_PER_SEC 1000000000
 	/* We can use mach kernel functions here.
 	 * This is crap though - why can't they implement clock_gettime?*/
 	static struct mach_timebase_info info = { 0, 0 };
@@ -118,13 +113,12 @@ get_monotonic(struct timeval *tp)
 		nano = mach_absolute_time();
 		if ((info.denom != 1 || info.numer != 1) && factor != 0.0)
 			nano *= factor;
-		tp->tv_sec = nano / NSEC_PER_SEC;
-		rem = nano % NSEC_PER_SEC;
-		if (rem < 0) {
-			tp->tv_sec--;
-			rem += NSEC_PER_SEC;
+		ts->tv_sec = nano / NSEC_PER_SEC;
+		ts->tv_nsec = nano % NSEC_PER_SEC;
+		if (ts->tv_nsec < 0) {
+			ts->tv_sec--;
+			ts->tv_nsec += NSEC_PER_SEC;
 		}
-		tp->tv_usec = rem / 1000;
 		return 0;
 	}
 #endif
@@ -136,7 +130,15 @@ get_monotonic(struct timeval *tp)
 		posix_clock_set = 1;
 	}
 #endif
-	return gettimeofday(tp, NULL);
+	{
+		struct timeval tv;
+		if (gettimeofday(&tv, NULL) == 0) {
+			TIMEVAL_TO_TIMESPEC(&tv, ts);
+			return 0;
+		}
+	}
+
+	return -1;
 }
 
 ssize_t
@@ -172,7 +174,7 @@ setvard(char ***e, const char *prefix, const char *var, size_t value)
 time_t
 uptime(void)
 {
-	struct timeval tv;
+	struct timespec tv;
 
 	if (get_monotonic(&tv) == -1)
 		return -1;

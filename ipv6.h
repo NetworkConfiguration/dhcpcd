@@ -104,8 +104,8 @@ struct ipv6_addr {
 	uint8_t prefix_len;
 	uint32_t prefix_vltime;
 	uint32_t prefix_pltime;
-	struct timeval created;
-	struct timeval acquired;
+	struct timespec created;
+	struct timespec acquired;
 	struct in6_addr addr;
 	int addr_flags;
 	short flags;
@@ -238,7 +238,7 @@ uint8_t ipv6_prefixlen(const struct in6_addr *);
 int ipv6_userprefix( const struct in6_addr *, short prefix_len,
     uint64_t user_number, struct in6_addr *result, short result_len);
 void ipv6_checkaddrflags(void *);
-int ipv6_addaddr(struct ipv6_addr *, const struct timeval *);
+int ipv6_addaddr(struct ipv6_addr *, const struct timespec *);
 ssize_t ipv6_addaddrs(struct ipv6_addrhead *addrs);
 void ipv6_freedrop_addrs(struct ipv6_addrhead *, int,
     const struct interface *);
@@ -261,9 +261,9 @@ void ipv6_freedrop(struct interface *, int);
 void ipv6_gentempifid(struct interface *);
 void ipv6_settempstale(struct interface *);
 struct ipv6_addr *ipv6_createtempaddr(struct ipv6_addr *,
-    const struct timeval *);
+    const struct timespec *);
 struct ipv6_addr *ipv6_settemptime(struct ipv6_addr *, int);
-void ipv6_addtempaddrs(struct interface *, const struct timeval *);
+void ipv6_addtempaddrs(struct interface *, const struct timespec *);
 #else
 #define ipv6_gentempifid(a) {}
 #define ipv6_settempstale(a) {}

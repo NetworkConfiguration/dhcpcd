@@ -550,10 +550,10 @@ dhcpcd_pollup(void *arg)
 
 	carrier = if_carrier(ifp); /* will set ifp->flags */
 	if (carrier == LINK_UP && !(ifp->flags & IFF_UP)) {
-		struct timeval tv;
+		struct timespec tv;
 
 		tv.tv_sec = 0;
-		tv.tv_usec = IF_POLL_UP * 1000;
+		tv.tv_nsec = IF_POLL_UP * MSEC_PER_NSEC;
 		eloop_timeout_add_tv(ifp->ctx->eloop, &tv, dhcpcd_pollup, ifp);
 		return;
 	}
@@ -681,7 +681,7 @@ dhcpcd_startinterface(void *arg)
 	size_t i;
 	char buf[DUID_LEN * 3];
 	int carrier;
-	struct timeval tv;
+	struct timespec tv;
 
 	if (ifo->options & DHCPCD_LINK) {
 		switch (ifp->carrier) {
@@ -695,7 +695,7 @@ dhcpcd_startinterface(void *arg)
 			 * Loop until both IFF_UP and IFF_RUNNING are set */
 			if ((carrier = if_carrier(ifp)) == LINK_UNKNOWN) {
 				tv.tv_sec = 0;
-				tv.tv_usec = IF_POLL_UP * 1000;
+				tv.tv_nsec = IF_POLL_UP * MSEC_PER_NSEC;
 				eloop_timeout_add_tv(ifp->ctx->eloop,
 				    &tv, dhcpcd_startinterface, ifp);
 			} else
@@ -1508,7 +1508,7 @@ main(int argc, char **argv)
 	 * eloop removals as well, so init here. */
 	ctx.eloop = eloop_init();
 	if (ctx.eloop == NULL) {
-		syslog(LOG_ERR, "%s: %m", __func__);
+		syslog(LOG_ERR, "%s: eloop_init: %m", __func__);
 		goto exit_failure;
 	}
 

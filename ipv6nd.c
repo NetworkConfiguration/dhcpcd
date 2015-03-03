@@ -519,7 +519,7 @@ ipv6nd_scriptrun(struct ra *rap)
 		TAILQ_FOREACH(rao, &rap->options, next) {
 			if (rao->type == ND_OPT_RDNSS &&
 			    rao->option &&
-			    timerisset(&rao->expire))
+			    timespecisset(&rao->expire))
 			{
 				hasdns = 1;
 				break;
@@ -578,7 +578,7 @@ ipv6nd_dadcallback(void *arg)
 	struct interface *ifp;
 	struct ra *rap;
 	int wascompleted, found;
-	struct timeval tv;
+	struct timespec tv;
 	char buf[INET6_ADDRSTRLEN];
 	const char *p;
 	int dadcounter;
@@ -630,9 +630,9 @@ ipv6nd_dadcallback(void *arg)
 			else
 				ap->saddr[0] = '\0';
 			tv.tv_sec = 0;
-			tv.tv_usec = (suseconds_t)arc4random_uniform(
-			    IDGEN_DELAY * USECINSEC);
-			timernorm(&tv);
+			tv.tv_nsec = (suseconds_t)
+			    arc4random_uniform(IDGEN_DELAY * NSEC_PER_SEC);
+			timespecnorm(&tv);
 			eloop_timeout_add_tv(ifp->ctx->eloop, &tv,
 			    ipv6nd_addaddr, ap);
 			return;
@@ -690,7 +690,7 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 	struct ra_opt *rao;
 	struct ipv6_addr *ap;
 	char *opt, *opt2, *tmp;
-	struct timeval expire;
+	struct timespec expire;
 	uint8_t new_rap, new_data;
 #ifdef IPV6_MANAGETEMPADDR
 	uint8_t new_ap;
@@ -1094,11 +1094,11 @@ extra_opt:
 		} else
 			free(opt);
 		if (lifetime == ~0U)
-			timerclear(&rao->expire);
+			timespecclear(&rao->expire);
 		else {
 			expire.tv_sec = (time_t)lifetime;
-			expire.tv_usec = 0;
-			timeradd(&rap->received, &expire, &rao->expire);
+			expire.tv_nsec = 0;
+			timespecadd(&rap->received, &expire, &rao->expire);
 		}
 		if (rao && rao->type == ND_OPT_PREFIX_INFORMATION && opt2) {
 			n = _ND_OPT_PREFIX_ADDR;
@@ -1316,13 +1316,13 @@ ipv6nd_expirera(void *arg)
 	struct interface *ifp;
 	struct ra *rap, *ran;
 	struct ra_opt *rao, *raon;
-	struct timeval now, lt, expire, next;
+	struct timespec now, lt, expire, next;
 	int expired, valid;
 
 	ifp = arg;
 	get_monotonic(&now);
 	expired = 0;
-	timerclear(&next);
+	timespecclear(&next);
 
 	TAILQ_FOREACH_SAFE(rap, ifp->ctx->ipv6->ra_routers, next, ran) {
 		if (rap->iface != ifp)
@@ -1330,9 +1330,10 @@ ipv6nd_expirera(void *arg)
 		valid = 0;
 		if (rap->lifetime) {
 			lt.tv_sec = (time_t)rap->lifetime;
-			lt.tv_usec = 0;
-			timeradd(&rap->received, &lt, &expire);
-			if (rap->lifetime == 0 || timercmp(&now, &expire, >)) {
+			lt.tv_nsec = 0;
+			timespecadd(&rap->received, &lt, &expire);
+			if (rap->lifetime == 0 || timespeccmp(&now, &expire, >))
+			{
 				if (!rap->expired) {
 					syslog(LOG_WARNING,
 					    "%s: %s: router expired",
@@ -1341,9 +1342,9 @@ ipv6nd_expirera(void *arg)
 				}
 			} else {
 				valid = 1;
-				timersub(&expire, &now, &lt);
-				if (!timerisset(&next) ||
-				    timercmp(&next, &lt, >))
+				timespecsub(&expire, &now, &lt);
+				if (!timespecisset(&next) ||
+				    timespeccmp(&next, &lt, >))
 					next = lt;
 			}
 		}
@@ -1366,9 +1367,9 @@ ipv6nd_expirera(void *arg)
 					continue;
 				}
 			}
-			if (!timerisset(&rao->expire))
+			if (!timespecisset(&rao->expire))
 				continue;
-			if (timercmp(&now, &rao->expire, >)) {
+			if (timespeccmp(&now, &rao->expire, >)) {
 				/* Expired prefixes are logged above */
 				if (rao->type != ND_OPT_PREFIX_INFORMATION)
 					syslog(LOG_WARNING,
@@ -1381,8 +1382,8 @@ ipv6nd_expirera(void *arg)
 				continue;
 			}
 			valid = 1;
-			timersub(&rao->expire, &now, &lt);
-			if (!timerisset(&next) || timercmp(&next, &lt, >))
+			timespecsub(&rao->expire, &now, &lt);
+			if (!timespecisset(&next) || timespeccmp(&next, &lt, >))
 				next = lt;
 		}
 
@@ -1392,7 +1393,7 @@ ipv6nd_expirera(void *arg)
 			ipv6nd_free_ra(rap);
 	}
 
-	if (timerisset(&next))
+	if (timespecisset(&next))
 		eloop_timeout_add_tv(ifp->ctx->eloop,
 		    &next, ipv6nd_expirera, ifp);
 	if (expired) {
@@ -1624,16 +1625,16 @@ ipv6nd_startrs1(void *arg)
 void
 ipv6nd_startrs(struct interface *ifp)
 {
-	struct timeval tv;
+	struct timespec tv;
 
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	tv.tv_sec = 0;
-	tv.tv_usec = (suseconds_t)arc4random_uniform(
-	    MAX_RTR_SOLICITATION_DELAY * 1000000);
-	timernorm(&tv);
+	tv.tv_nsec = (suseconds_t)arc4random_uniform(
+	    MAX_RTR_SOLICITATION_DELAY * NSEC_PER_SEC);
+	timespecnorm(&tv);
 	syslog(LOG_DEBUG,
 	    "%s: delaying IPv6 router solicitation for %0.1f seconds",
-	    ifp->name, timeval_to_double(&tv));
+	    ifp->name, timespec_to_double(&tv));
 	eloop_timeout_add_tv(ifp->ctx->eloop, &tv, ipv6nd_startrs1, ifp);
 	return;
 }

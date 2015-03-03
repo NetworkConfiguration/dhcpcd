@@ -48,28 +48,34 @@
 #define STRINGIFY(a)		#a
 #define TOSTRING(a)		STRINGIFY(a)
 
-#define USECINSEC		1000000
-#define timeval_to_double(tv)						\
-	((double)(tv)->tv_sec + (double)((tv)->tv_usec) * 1.0e-6)
-#define timernorm(tv) do {						\
-	while ((tv)->tv_usec >=  USECINSEC) {				\
-		(tv)->tv_sec++;						\
-		(tv)->tv_usec -= USECINSEC;				\
-	}								\
+#define USEC_PER_SEC		1000000L
+#define USEC_PER_NSEC		1000L
+#define NSEC_PER_SEC		1000000000L
+#define MSEC_PER_SEC		1000L
+#define MSEC_PER_NSEC		1000000L
+
+#define timespec_to_double(tv)						     \
+	((double)(tv)->tv_sec + (double)((tv)->tv_nsec) / 1000000000.0)
+#define timespecnorm(tv) do {						     \
+	while ((tv)->tv_nsec >=  NSEC_PER_SEC) {			     \
+		(tv)->tv_sec++;						     \
+		(tv)->tv_nsec -= NSEC_PER_SEC;				     \
+	}								     \
 } while (0 /* CONSTCOND */);
-#define tv_to_ms(ms, tv) do {						\
-	ms = (tv)->tv_sec * 1000;					\
-	ms += (tv)->tv_usec / 1000;					\
+#define ts_to_ms(ms, tv) do {						     \
+	ms = (tv)->tv_sec * MSEC_PER_SEC;				     \
+	ms += (tv)->tv_nsec / MSEC_PER_NSEC;				     \
 } while (0 /* CONSTCOND */);
-#define ms_to_tv(tv, ms) do {						      \
-	(tv)->tv_sec = ms / 1000;					      \
-	(tv)->tv_usec = (suseconds_t)(ms - ((tv)->tv_sec * 1000)) * 1000;     \
+#define ms_to_ts(tv, ms) do {						     \
+	(tv)->tv_sec = ms / MSEC_PER_SEC;				     \
+	(tv)->tv_nsec = (suseconds_t)(ms - ((tv)->tv_sec * MSEC_PER_SEC))    \
+	    * MSEC_PER_NSEC;						     \
 } while (0 /* CONSTCOND */);
 
 #ifndef TIMEVAL_TO_TIMESPEC
 #define	TIMEVAL_TO_TIMESPEC(tv, ts) do {				\
 	(ts)->tv_sec = (tv)->tv_sec;					\
-	(ts)->tv_nsec = (tv)->tv_usec * 1000;				\
+	(ts)->tv_nsec = (tv)->tv_usec * USEC_PER_NSEC;			\
 } while (0 /* CONSTCOND */)
 #endif
 
@@ -110,7 +116,7 @@
 void get_line_free(void);
 const char *get_hostname(char *, size_t, int);
 extern int clock_monotonic;
-int get_monotonic(struct timeval *);
+int get_monotonic(struct timespec *);
 ssize_t setvar(char ***, const char *, const char *, const char *);
 ssize_t setvard(char ***, const char *, const char *, size_t);
 time_t uptime(void);

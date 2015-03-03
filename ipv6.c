@@ -594,9 +594,9 @@ ipv6_checkaddrflags(void *arg)
 		    ap->iface->ctx->ifaces, ap->iface->name,
 		    &ap->addr, ap->prefix_len, ifa_flags);
 	} else {
-		struct timeval tv;
+		struct timespec tv;
 
-		ms_to_tv(&tv, RETRANS_TIMER / 2);
+		ms_to_ts(&tv, RETRANS_TIMER / 2);
 		eloop_timeout_add_tv(ap->iface->ctx->eloop, &tv,
 		    ipv6_checkaddrflags, ap);
 	}
@@ -627,7 +627,7 @@ ipv6_deleteaddr(struct ipv6_addr *addr)
 }
 
 int
-ipv6_addaddr(struct ipv6_addr *ap, const struct timeval *now)
+ipv6_addaddr(struct ipv6_addr *ap, const struct timespec *now)
 {
 	struct interface *ifp;
 	struct ipv6_state *state;
@@ -676,17 +676,17 @@ ipv6_addaddr(struct ipv6_addr *ap, const struct timeval *now)
 	/* Adjust plftime and vltime based on acquired time */
 	pltime = ap->prefix_pltime;
 	vltime = ap->prefix_vltime;
-	if (timerisset(&ap->acquired) &&
+	if (timespecisset(&ap->acquired) &&
 	    (ap->prefix_pltime != ND6_INFINITE_LIFETIME ||
 	    ap->prefix_vltime != ND6_INFINITE_LIFETIME))
 	{
-		struct timeval n;
+		struct timespec n;
 
 		if (now == NULL) {
 			get_monotonic(&n);
 			now = &n;
 		}
-		timersub(now, &ap->acquired, &n);
+		timespecsub(now, &ap->acquired, &n);
 		if (ap->prefix_pltime != ND6_INFINITE_LIFETIME)
 			ap->prefix_pltime -= (uint32_t)n.tv_sec;
 		if (ap->prefix_vltime != ND6_INFINITE_LIFETIME)
@@ -732,9 +732,9 @@ ipv6_addaddr(struct ipv6_addr *ap, const struct timeval *now)
 	eloop_timeout_delete(ap->iface->ctx->eloop,
 		ipv6_checkaddrflags, ap);
 	if (!(ap->flags & IPV6_AF_DADCOMPLETED)) {
-		struct timeval tv;
+		struct timespec tv;
 
-		ms_to_tv(&tv, RETRANS_TIMER / 2);
+		ms_to_ts(&tv, RETRANS_TIMER / 2);
 		eloop_timeout_add_tv(ap->iface->ctx->eloop,
 		    &tv, ipv6_checkaddrflags, ap);
 	}
@@ -766,10 +766,10 @@ ipv6_addaddrs(struct ipv6_addrhead *addrs)
 {
 	struct ipv6_addr *ap, *apn, *apf;
 	ssize_t i;
-	struct timeval now;
+	struct timespec now;
 
 	i = 0;
-	timerclear(&now);
+	timespecclear(&now);
 	TAILQ_FOREACH_SAFE(ap, addrs, next, apn) {
 		if (ap->prefix_vltime == 0) {
 			if (ap->flags & IPV6_AF_ADDED) {
@@ -814,7 +814,7 @@ ipv6_addaddrs(struct ipv6_addrhead *addrs)
 				apf->flags &= ~IPV6_AF_ADDED;
 			if (ap->flags & IPV6_AF_NEW)
 				i++;
-			if (!timerisset(&now))
+			if (!timespecisset(&now))
 				get_monotonic(&now);
 			ipv6_addaddr(ap, &now);
 		}
@@ -836,9 +836,9 @@ ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
     const struct interface *ifd)
 {
 	struct ipv6_addr *ap, *apn, *apf;
-	struct timeval now;
+	struct timespec now;
 
-	timerclear(&now);
+	timespecclear(&now);
 	TAILQ_FOREACH_SAFE(ap, addrs, next, apn) {
 		if (ifd && ap->delegating_iface != ifd)
 			continue;
@@ -860,7 +860,7 @@ ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
 			if (!(ap->iface->options->options &
 			    DHCPCD_EXITING) && apf)
 			{
-				if (!timerisset(&now))
+				if (!timespecisset(&now))
 					get_monotonic(&now);
 				ipv6_addaddr(apf, &now);
 			}
@@ -997,9 +997,9 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 			if (IN6_IS_ADDR_LINKLOCAL(&ap->addr)) {
 #ifdef IPV6_POLLADDRFLAG
 				if (ap->addr_flags & IN6_IFF_TENTATIVE) {
-					struct timeval tv;
+					struct timespec tv;
 
-					ms_to_tv(&tv, RETRANS_TIMER / 2);
+					ms_to_ts(&tv, RETRANS_TIMER / 2);
 					eloop_timeout_add_tv(
 					    ap->iface->ctx->eloop,
 					    &tv, ipv6_checkaddrflags, ap);
@@ -1437,7 +1437,7 @@ ipv6_tempdadcallback(void *arg)
 
 	if (ia->flags & IPV6_AF_DUPLICATED) {
 		struct ipv6_addr *ia1;
-		struct timeval tv;
+		struct timespec tv;
 
 		if (++ia->dadcounter == TEMP_IDGEN_RETRIES) {
 			syslog(LOG_ERR,
@@ -1457,7 +1457,7 @@ ipv6_tempdadcallback(void *arg)
 }
 
 struct ipv6_addr *
-ipv6_createtempaddr(struct ipv6_addr *ia0, const struct timeval *now)
+ipv6_createtempaddr(struct ipv6_addr *ia0, const struct timespec *now)
 {
 	struct ipv6_state *state;
 	const struct ipv6_state *cstate;
@@ -1649,7 +1649,7 @@ valid:
 }
 
 void
-ipv6_addtempaddrs(struct interface *ifp, const struct timeval *now)
+ipv6_addtempaddrs(struct interface *ifp, const struct timespec *now)
 {
 	struct ipv6_state *state;
 	struct ipv6_addr *ia;
@@ -1666,7 +1666,7 @@ static void
 ipv6_regentempaddr(void *arg)
 {
 	struct ipv6_addr *ia = arg, *ia1;
-	struct timeval tv;
+	struct timespec tv;
 
 	syslog(LOG_DEBUG, "%s: regen temp addr %s",
 	    ia->iface->name, ia->saddr);

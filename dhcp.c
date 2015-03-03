@@ -1569,7 +1569,7 @@ send_message(struct interface *iface, uint8_t type,
 	ssize_t r;
 	struct in_addr from, to;
 	in_addr_t a = INADDR_ANY;
-	struct timeval tv;
+	struct timespec tv;
 	int s;
 
 	if (!callback)
@@ -1584,13 +1584,13 @@ send_message(struct interface *iface, uint8_t type,
 				state->interval = 64;
 		}
 		tv.tv_sec = state->interval + DHCP_RAND_MIN;
-		tv.tv_usec = (suseconds_t)arc4random_uniform(
-		    (DHCP_RAND_MAX - DHCP_RAND_MIN) * 1000000);
-		timernorm(&tv);
+		tv.tv_nsec = (suseconds_t)arc4random_uniform(
+		    (DHCP_RAND_MAX - DHCP_RAND_MIN) * NSEC_PER_SEC);
+		timespecnorm(&tv);
 		syslog(LOG_DEBUG,
 		    "%s: sending %s (xid 0x%x), next in %0.1f seconds",
 		    iface->name, get_dhcp_op(type), state->xid,
-		    timeval_to_double(&tv));
+		    timespec_to_double(&tv));
 	}
 
 	if (dhcp_open(iface) == -1)
@@ -1829,7 +1829,6 @@ dhcp_bind(struct interface *ifp, struct arp_state *astate)
 	struct dhcp_state *state = D_STATE(ifp);
 	struct if_options *ifo = ifp->options;
 	struct dhcp_lease *lease = &state->lease;
-	struct timeval tv;
 	uint8_t ipv4ll = 0;
 
 	if (state->state == DHS_BOUND)
@@ -1862,9 +1861,7 @@ dhcp_bind(struct interface *ifp, struct arp_state *astate)
 		lease->leasetime = ~0U;
 		state->reason = "INFORM";
 	} else {
-		if (gettimeofday(&tv, NULL) == 0)
-			lease->leasedfrom = tv.tv_sec;
-		else if (lease->frominfo)
+		if (lease->frominfo)
 			state->reason = "TIMEOUT";
 		if (lease->leasetime == ~0U) {
 			lease->renewaltime =
@@ -3071,7 +3068,6 @@ dhcp_start1(void *arg)
 	struct if_options *ifo = ifp->options;
 	struct dhcp_state *state;
 	struct stat st;
-	struct timeval now;
 	uint32_t l;
 	int nolease;
 
@@ -3167,10 +3163,12 @@ dhcp_start1(void *arg)
 		} else if (state->lease.leasetime != ~0U &&
 		    stat(state->leasefile, &st) == 0)
 		{
+			time_t now;
+
 			/* Offset lease times and check expiry */
-			gettimeofday(&now, NULL);
-			if ((time_t)state->lease.leasetime <
-			    now.tv_sec - st.st_mtime)
+			now = time(NULL);
+			if (now == -1 ||
+			    (time_t)state->lease.leasetime < now - st.st_mtime)
 			{
 				syslog(LOG_DEBUG,
 				    "%s: discarding expired lease",
@@ -3195,7 +3193,7 @@ dhcp_start1(void *arg)
 					dhcp_drop(ifp, "EXPIRE");
 #endif
 			} else {
-				l = (uint32_t)(now.tv_sec - st.st_mtime);
+				l = (uint32_t)(now - st.st_mtime);
 				state->lease.leasetime -= l;
 				state->lease.renewaltime -= l;
 				state->lease.rebindtime -= l;
@@ -3223,19 +3221,19 @@ dhcp_start1(void *arg)
 void
 dhcp_start(struct interface *ifp)
 {
-	struct timeval tv;
+	struct timespec tv;
 
 	if (!(ifp->options->options & DHCPCD_IPV4))
 		return;
 
 	/* No point in delaying a static configuration */
 	tv.tv_sec = DHCP_MIN_DELAY;
-	tv.tv_usec = (suseconds_t)arc4random_uniform(
-	    (DHCP_MAX_DELAY - DHCP_MIN_DELAY) * 1000000);
-	timernorm(&tv);
+	tv.tv_nsec = (suseconds_t)arc4random_uniform(
+	    (DHCP_MAX_DELAY - DHCP_MIN_DELAY) * NSEC_PER_SEC);
+	timespecnorm(&tv);
 	syslog(LOG_DEBUG,
 	    "%s: delaying IPv4 for %0.1f seconds",
-	    ifp->name, timeval_to_double(&tv));
+	    ifp->name, timespec_to_double(&tv));
 
 	eloop_timeout_add_tv(ifp->ctx->eloop, &tv, dhcp_start1, ifp);
 }

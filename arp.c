@@ -253,24 +253,24 @@ arp_probe1(void *arg)
 {
 	struct arp_state *astate = arg;
 	struct interface *ifp = astate->iface;
-	struct timeval tv;
+	struct timespec tv;
 
 	if (++astate->probes < PROBE_NUM) {
 		tv.tv_sec = PROBE_MIN;
-		tv.tv_usec = (suseconds_t)arc4random_uniform(
-		    (PROBE_MAX - PROBE_MIN) * 1000000);
-		timernorm(&tv);
+		tv.tv_nsec = (suseconds_t)arc4random_uniform(
+		    (PROBE_MAX - PROBE_MIN) * NSEC_PER_SEC);
+		timespecnorm(&tv);
 		eloop_timeout_add_tv(ifp->ctx->eloop, &tv, arp_probe1, astate);
 	} else {
 		tv.tv_sec = ANNOUNCE_WAIT;
-		tv.tv_usec = 0;
+		tv.tv_nsec = 0;
 		eloop_timeout_add_tv(ifp->ctx->eloop, &tv, arp_probed, astate);
 	}
 	syslog(LOG_DEBUG,
 	    "%s: ARP probing %s (%d of %d), next in %0.1f seconds",
 	    ifp->name, inet_ntoa(astate->addr),
 	    astate->probes ? astate->probes : PROBE_NUM, PROBE_NUM,
-	    timeval_to_double(&tv));
+	    timespec_to_double(&tv));
 	if (arp_send(ifp, ARPOP_REQUEST, 0, astate->addr.s_addr) == -1)
 		syslog(LOG_ERR, "send_arp: %m");
 }

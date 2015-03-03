@@ -181,7 +181,6 @@ struct dhcp_lease {
 	uint32_t renewaltime;
 	uint32_t rebindtime;
 	struct in_addr server;
-	time_t leasedfrom;
 	uint8_t frominfo;
 	uint32_t cookie;
 };
