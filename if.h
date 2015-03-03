@@ -124,7 +124,7 @@ int if_address(const struct interface *,
 #define if_deladdress(ifp, addr, net)		\
 	if_address(ifp, addr, net, NULL, -1)
 
-int if_route(unsigned char, const struct rt *rt, struct rt *);
+int if_route(unsigned char, const struct rt *rt);
 int if_initrt(struct interface *);
 #endif
 
@@ -145,7 +145,7 @@ int if_address6(const struct ipv6_addr *, int);
 int if_addrflags6(const struct in6_addr *, const struct interface *);
 int if_getlifetime6(struct ipv6_addr *);
 
-int if_route6(unsigned char, const struct rt6 *rt, struct rt6 *);
+int if_route6(unsigned char, const struct rt6 *rt);
 int if_initrt6(struct interface *);
 #else
 #define if_checkipv6(a, b, c) (-1)

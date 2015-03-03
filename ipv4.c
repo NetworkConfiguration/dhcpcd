@@ -436,17 +436,17 @@ nc_route(struct rt *ort, struct rt *nrt)
 #ifdef HAVE_ROUTE_METRIC
 	/* With route metrics, we can safely add the new route before
 	 * deleting the old route. */
-	if ((retval = if_route(RTM_ADD, nrt, NULL))  == -1)
+	if ((retval = if_route(RTM_ADD, nrt))  == -1)
 		syslog(LOG_ERR, "if_route (ADD): %m");
-	if (ort && if_route(RTM_DELETE, ort, NULL) == -1 && errno != ESRCH)
+	if (ort && if_route(RTM_DELETE, ort) == -1 && errno != ESRCH)
 		syslog(LOG_ERR, "if_route (DEL): %m");
 	return retval;
 #else
 	/* No route metrics, we need to delete the old route before
 	 * adding the new one. */
-	if (ort && if_route(RTM_DELETE, ort, NULL) == -1 && errno != ESRCH)
+	if (ort && if_route(RTM_DELETE, ort) == -1 && errno != ESRCH)
 		syslog(LOG_ERR, "if_route (DEL): %m");
-	if (if_route(RTM_ADD, nrt, NULL) == 0)
+	if (if_route(RTM_ADD, nrt) == 0)
 		return 0;
 	syslog(LOG_ERR, "if_route (ADD): %m");
 	return -1;
@@ -459,7 +459,7 @@ d_route(struct rt *rt)
 	int retval;
 
 	desc_route("deleting", rt);
-	retval = if_route(RTM_DELETE, rt, NULL);
+	retval = if_route(RTM_DELETE, rt);
 	if (retval != 0 && errno != ENOENT && errno != ESRCH)
 		syslog(LOG_ERR,"%s: if_delroute: %m", rt->iface->name);
 	return retval;

@@ -538,7 +538,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct rt_msghdr *rtm)
 }
 
 int
-if_route(unsigned char cmd, const struct rt *rt, struct rt *srt)
+if_route(unsigned char cmd, const struct rt *rt)
 {
 	const struct dhcp_state *state;
 	union sockunion {
@@ -632,9 +632,8 @@ if_route(unsigned char cmd, const struct rt *rt, struct rt *srt)
 		if (rtm.hdr.rtm_flags & RTF_STATIC)
 			rtm.hdr.rtm_flags |= RTF_GATEWAY;
 	}
-	if (((cmd == RTM_ADD || cmd == RTM_CHANGE) &&
-	    !(rtm.hdr.rtm_flags & RTF_GATEWAY)) ||
-	    cmd == RTM_GET)
+	if ((cmd == RTM_ADD || cmd == RTM_CHANGE) &&
+	    !(rtm.hdr.rtm_flags & RTF_GATEWAY))
 		rtm.hdr.rtm_addrs |= RTA_IFA | RTA_IFP;
 
 	ADDADDR(&rt->dest);
@@ -674,16 +673,6 @@ if_route(unsigned char cmd, const struct rt *rt, struct rt *srt)
 
 	rtm.hdr.rtm_msglen = (unsigned short)(bp - (char *)&rtm);
 	retval = write(s, &rtm, rtm.hdr.rtm_msglen) == -1 ? -1 : 0;
-
-	if (cmd == RTM_GET && retval == 0) {
-		retval = read(s, &rtm, sizeof(rtm));
-		if (retval < (int)sizeof(struct rt_msghdr) ||
-		    retval < rtm.hdr.rtm_msglen)
-			retval = -1;
-		else
-			retval = if_copyrt(rt->iface->ctx, srt, &rtm.hdr);
-	}
-
 	close(s);
 	return retval;
 }
@@ -905,7 +894,7 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct rt_msghdr *rtm)
 }
 
 int
-if_route6(unsigned char cmd, const struct rt6 *rt, struct rt6 *srt)
+if_route6(unsigned char cmd, const struct rt6 *rt)
 {
 	union sockunion {
 		struct sockaddr sa;
@@ -964,8 +953,7 @@ if_route6(unsigned char cmd, const struct rt6 *rt, struct rt6 *srt)
 
 	if (cmd == RTM_ADD)
 		rtm.hdr.rtm_addrs |= RTA_GATEWAY;
-	if (cmd == RTM_GET ||
-	    (cmd == RTM_ADD && !(rtm.hdr.rtm_flags & RTF_REJECT)))
+	if (cmd == RTM_ADD && !(rtm.hdr.rtm_flags & RTF_REJECT))
 		rtm.hdr.rtm_addrs |= RTA_IFP | RTA_IFA;
 
 	ADDADDR(&rt->dest);
@@ -1010,16 +998,6 @@ if_route6(unsigned char cmd, const struct rt6 *rt, struct rt6 *srt)
 
 	rtm.hdr.rtm_msglen = (unsigned short)(bp - (char *)&rtm);
 	retval = write(s, &rtm, rtm.hdr.rtm_msglen) == -1 ? -1 : 0;
-
-	if (cmd == RTM_GET && retval == 0) {
-		retval = read(s, &rtm, sizeof(rtm));
-		if (retval < (int)sizeof(struct rt_msghdr) ||
-		    retval < rtm.hdr.rtm_msglen)
-			retval = -1;
-		else
-			retval = if_copyrt6(rt->iface->ctx, srt, &rtm.hdr);
-	}
-
 	close(s);
 	return retval;
 }
