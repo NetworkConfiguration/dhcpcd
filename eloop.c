@@ -32,9 +32,9 @@
 
 #include <errno.h>
 #include <limits.h>
-#include <poll.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <string.h>
 #include <syslog.h>
 
 #include "config.h"
@@ -42,6 +42,11 @@
 #include "dhcpcd.h"
 #include "eloop.h"
 
+#if defined(HAVE_EPOLL)
+#include <sys/epoll.h>
+#define eloop_event_setup_fds(ctx)
+#else
+#include <poll.h>
 static void
 eloop_event_setup_fds(struct eloop_ctx *ctx)
 {
@@ -61,6 +66,7 @@ eloop_event_setup_fds(struct eloop_ctx *ctx)
 		i++;
 	}
 }
+#endif
 
 int
 eloop_event_add(struct eloop_ctx *ctx, int fd,
@@ -68,7 +74,19 @@ eloop_event_add(struct eloop_ctx *ctx, int fd,
     void (*write_cb)(void *), void *write_cb_arg)
 {
 	struct eloop_event *e;
+#ifdef HAVE_EPOLL
+	struct epoll_event epe, *nfds;
+#else
 	struct pollfd *nfds;
+#endif
+
+#ifdef HAVE_EPOLL
+	memset(&epe, 0, sizeof(epe));
+	epe.data.fd = fd;
+	epe.events = EPOLLIN;
+	if (write_cb)
+		epe.events |= EPOLLOUT;
+#endif
 
 	/* We should only have one callback monitoring the fd */
 	TAILQ_FOREACH(e, &ctx->events, next) {
@@ -81,8 +99,14 @@ eloop_event_add(struct eloop_ctx *ctx, int fd,
 				e->write_cb = write_cb;
 				e->write_cb_arg = write_cb_arg;
 			}
+#ifdef HAVE_EPOLL
+			epe.data.ptr = e;
+			return epoll_ctl(ctx->epoll_fd, EPOLL_CTL_MOD,
+			    fd, &epe);
+#else
 			eloop_event_setup_fds(ctx);
 			return 0;
+#endif
 		}
 	}
 
@@ -91,27 +115,20 @@ eloop_event_add(struct eloop_ctx *ctx, int fd,
 		TAILQ_REMOVE(&ctx->free_events, e, next);
 	} else {
 		e = malloc(sizeof(*e));
-		if (e == NULL) {
-			syslog(LOG_ERR, "%s: %m", __func__);
-			return -1;
-		}
+		if (e == NULL)
+			goto err;
 	}
 
 	/* Ensure we can actually listen to it */
 	ctx->events_len++;
 	if (ctx->events_len > ctx->fds_len) {
+		nfds = realloc(ctx->fds, sizeof(*ctx->fds) * (ctx->fds_len+5));
+		if (nfds == NULL)
+			goto err;
 		ctx->fds_len += 5;
-		nfds = malloc(sizeof(*ctx->fds) * (ctx->fds_len + 5));
-		if (nfds == NULL) {
-			syslog(LOG_ERR, "%s: %m", __func__);
-			ctx->events_len--;
-			TAILQ_INSERT_TAIL(&ctx->free_events, e, next);
-			return -1;
-		}
-		ctx->fds_len += 5;
-		free(ctx->fds);
 		ctx->fds = nfds;
 	}
+
 
 	/* Now populate the structure and add it to the list */
 	e->fd = fd;
@@ -119,6 +136,13 @@ eloop_event_add(struct eloop_ctx *ctx, int fd,
 	e->read_cb_arg = read_cb_arg;
 	e->write_cb = write_cb;
 	e->write_cb_arg = write_cb_arg;
+
+#ifdef HAVE_EPOLL
+	epe.data.ptr = e;
+	if (epoll_ctl(ctx->epoll_fd, EPOLL_CTL_ADD, fd, &epe) == -1)
+		goto err;
+#endif
+
 	/* The order of events should not matter.
 	 * However, some PPP servers love to close the link right after
 	 * sending their final message. So to ensure dhcpcd processes this
@@ -128,6 +152,14 @@ eloop_event_add(struct eloop_ctx *ctx, int fd,
 	TAILQ_INSERT_HEAD(&ctx->events, e, next);
 	eloop_event_setup_fds(ctx);
 	return 0;
+
+err:
+	syslog(LOG_ERR, "%s: %m", __func__);
+	if (e) {
+		ctx->events_len--;
+		TAILQ_INSERT_TAIL(&ctx->free_events, e, next);
+	}
+	return -1;
 }
 
 void
@@ -142,6 +174,13 @@ eloop_event_delete(struct eloop_ctx *ctx, int fd, int write_only)
 				e->write_cb_arg = NULL;
 			} else {
 				TAILQ_REMOVE(&ctx->events, e, next);
+#ifdef HAVE_EPOLL
+				/* NULL event is safe because we
+				 * rely on epoll_pwait which as added
+				 * after the delete without event was fixed. */
+				epoll_ctl(ctx->epoll_fd, EPOLL_CTL_DEL,
+				    fd, NULL);
+#endif
 				TAILQ_INSERT_TAIL(&ctx->free_events, e, next);
 				ctx->events_len--;
 			}
@@ -272,7 +311,15 @@ eloop_init(void)
 		TAILQ_INIT(&ctx->timeouts);
 		TAILQ_INIT(&ctx->free_timeouts);
 		ctx->exitcode = EXIT_FAILURE;
+#ifdef HAVE_EPOLL
+		if ((ctx->epoll_fd = epoll_create1(EPOLL_CLOEXEC)) == -1) {
+			free(ctx);
+			return NULL;
+		}
+#endif
+
 	}
+
 	return ctx;
 }
 
@@ -314,8 +361,11 @@ eloop_start(struct dhcpcd_ctx *dctx)
 	struct eloop_timeout *t;
 	struct timespec now, ts, *tsp;
 	void (*t0)(void *);
-#ifndef USE_SIGNALS
+#if defined(HAVE_EPOLL) || !defined(USE_SIGNALS)
 	int timeout;
+#endif
+#ifdef HAVE_EPOLL
+	int i;
 #endif
 
 	ctx = dctx->eloop;
@@ -349,10 +399,7 @@ eloop_start(struct dhcpcd_ctx *dctx)
 			break;
 		}
 
-#ifdef USE_SIGNALS
-		n = pollts(ctx->fds, (nfds_t)ctx->events_len,
-		    tsp, &dctx->sigset);
-#else
+#if defined(HAVE_EPOLL) || !defined(USE_SIGNALS)
 		if (tsp == NULL)
 			timeout = -1;
 		else if (tsp->tv_sec > INT_MAX / 1000 ||
@@ -360,9 +407,25 @@ eloop_start(struct dhcpcd_ctx *dctx)
 		    (tsp->tv_nsec + 999999) / 1000000 > INT_MAX % 1000000))
 			timeout = INT_MAX;
 		else
-			timeout = tsp->tv_sec * 1000 +
-			    (tsp->tv_nsec + 999999) / 1000000;
-		n = poll(ctx->fds, ctx->events_len, timeout);
+			timeout = (int)(tsp->tv_sec * 1000 +
+			    (tsp->tv_nsec + 999999) / 1000000);
+#endif
+
+#ifdef HAVE_EPOLL
+#ifdef USE_SIGNALS
+		n = epoll_pwait(ctx->epoll_fd, ctx->fds, (int)ctx->events_len,
+		    timeout, &dctx->sigset);
+#else
+		n = epoll_wait(ctx->epoll_fd, ctx->fds, (int)ctx->events_len,
+		    timeout);
+#endif
+#else
+#ifdef USE_SIGNALS
+		n = pollts(ctx->fds, (nfds_t)ctx->events_len,
+		    tsp, &dctx->sigset);
+#else
+		n = poll(ctx->fds, (nfds_t)ctx->events_len, timeout);
+#endif
 #endif
 		if (n == -1) {
 			if (errno == EINTR)
@@ -372,10 +435,34 @@ eloop_start(struct dhcpcd_ctx *dctx)
 		}
 
 		/* Process any triggered events. */
+#ifdef HAVE_EPOLL
+		for (i = 0; i < n; i++) {
+			e = (struct eloop_event *)ctx->fds[i].data.ptr;
+			if (ctx->fds[i].events & EPOLLOUT &&
+			    e->write_cb)
+			{
+				e->write_cb(e->write_cb_arg);
+				/* We need to break here as the
+				 * callback could destroy the next
+				 * fd to process. */
+				break;
+			}
+			if (ctx->fds[i].events &&
+			    ctx->fds[i].events &
+			    (EPOLLIN | EPOLLERR | EPOLLHUP))
+			{
+				e->read_cb(e->read_cb_arg);
+				/* We need to break here as the
+				 * callback could destroy the next
+				 * fd to process. */
+				break;
+			}
+		}
+#else
 		if (n > 0) {
 			TAILQ_FOREACH(e, &ctx->events, next) {
 				if (e->pollfd->revents & POLLOUT &&
-					e->write_cb)
+				    e->write_cb)
 				{
 					e->write_cb(e->write_cb_arg);
 					/* We need to break here as the
@@ -392,6 +479,7 @@ eloop_start(struct dhcpcd_ctx *dctx)
 				}
 			}
 		}
+#endif
 	}
 
 	return ctx->exitcode;

@@ -24,6 +24,7 @@ STATIC=
 INCLUDEDIR=
 DEVS=
 EMBEDDED=
+POLL=
 
 for x do
 	opt=${x%%=*}
@@ -66,13 +67,12 @@ for x do
 	--without-getline) GETLINE=no;;
 	--without-strlcpy) STRLCPY=no;;
         --without-posix_spawn) POSIX_SPAWN=no;;
-	--without-pollts) POLLTS=no;;
-	--with-pollts) POLLTS=$var;;
 	--without-md5) MD5=no;;
 	--without-sha2) SHA2=no;;
 	--without-sha256) SHA2=no;;
 	--without-dev) DEV=no;;
 	--without-udev) UDEV=no;;
+	--with-poll) POLL="$var";;
 	--serviceexists) SERVICEEXISTS=$var;;
 	--servicecmd) SERVICECMD=$var;;
 	--servicestatus) SERVICESTATUS=$var;;
@@ -789,27 +789,34 @@ else
 	echo "#define HAVE_SPAWN_H" >>$CONFIG_H
 fi
 
-if [ -z "$POLLTS" ]; then
-	printf "Testing for pollts ... "
-	cat <<EOF >_pollts.c
-#include <poll.h>
-#include <signal.h>
-#include <stdlib.h>
-#include <time.h>
+if [ -z "$POLL" ]; then
+	printf "Testing for epoll ... "
+	cat <<EOF >_epoll.c
+#ifdef __linux__
+#include <linux/version.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 37)
+#error kernel has buggy epoll_wait timeout
+#endif
+#endif
+
+#include <sys/epoll.h>
+#include <unistd.h>
 int main(void) {
-	pollts(NULL, 0, NULL, NULL);
+	epoll_create1(EPOLL_CLOEXEC);
+	epoll_pwait(-1, NULL, 0, 0, NULL);
 	return 0;
 }
 EOF
-	if $XCC _pollts.c -o _pollts 2>&3; then
-		POLLTS=yes
+	if $XCC _epoll.c -o _epoll 2>&3; then
+		POLL=epoll
+		echo "#define HAVE_EPOLL" >>$CONFIG_MK
+		echo "yes"
 	else
-		POLLTS=no
+		echo "no"
 	fi
-	echo "$POLLTS"
-	rm -f _pollts.c _pollts
+	rm -f _epoll.c _epoll
 fi
-if [ "$POLLTS" = no ]; then
+if [ -z "$POLL" ]; then
 	printf "Testing for ppoll ... "
 	cat <<EOF >_ppoll.c
 #include <poll.h>
@@ -820,15 +827,14 @@ int main(void) {
 }
 EOF
 	if $XCC _ppoll.c -o _ppoll 2>&3; then
-		POLLTS=ppoll
-		echo "yes"
-	else
-		POLLTS=no
-		echo "no"
-	fi
+		POLL=ppoll
+ 		echo "yes"
+ 	else
+ 		echo "no"
+ 	fi
 	rm -f _ppoll.c _ppoll
 fi
-if [ "$POLLTS" = no ]; then
+if [ -z "$POLL" ]; then
 	printf "Testing for pselect ... "
 	cat <<EOF >_pselect.c
 #include <sys/select.h>
@@ -839,16 +845,16 @@ int main(void) {
 }
 EOF
 	if $XCC _pselect.c -o _pselect 2>&3; then
-		POLLTS=pselect
+		POLL=pselect
 		echo "yes"
 	else
-		POLLTS=no
 		echo "no"
 	fi
 	rm -f _pselect.c _pselect
 fi
-case "$POLLTS" in
-yes)
+case "$POLL" in
+epoll)
+	echo "#define HAVE_EPOLL" >>$CONFIG_H
 	;;
 ppoll)
 	echo "#define pollts		ppoll" >>$CONFIG_H

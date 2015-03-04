@@ -30,6 +30,8 @@
 
 #include <time.h>
 
+#include "config.h"
+
 #ifndef ELOOP_QUEUE
   #define ELOOP_QUEUE 1
 #endif
@@ -45,7 +47,9 @@ struct eloop_event {
 	void *read_cb_arg;
 	void (*write_cb)(void *);
 	void *write_cb_arg;
+#if !defined(HAVE_EPOLL)
 	struct pollfd *pollfd;
+#endif
 };
 
 struct eloop_timeout {
@@ -67,7 +71,12 @@ struct eloop_ctx {
 	void (*timeout0)(void *);
 	void *timeout0_arg;
 
+#ifdef HAVE_EPOLL
+	int epoll_fd;
+	struct epoll_event *fds;
+#else
 	struct pollfd *fds;
+#endif
 	size_t fds_len;
 
 	int exitnow;
