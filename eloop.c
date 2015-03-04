@@ -383,7 +383,7 @@ eloop_requeue(struct eloop_ctx *ctx)
 		return -1;
 
 	i = 0;
-	while ((int)i < dhcpcd_handlesigs[i])
+	while (dhcpcd_handlesigs[i])
 		i++;
 	TAILQ_FOREACH(e, &ctx->events, next) {
 		i++;
@@ -394,7 +394,7 @@ eloop_requeue(struct eloop_ctx *ctx)
 	if ((ke = malloc(sizeof(*ke) * i)) == NULL)
 		return -1;
 
-	for (i = 0; (int)i < dhcpcd_handlesigs[i]; i++)
+	for (i = 0; dhcpcd_handlesigs[i]; i++)
 		EV_SET(&ke[i], dhcpcd_handlesigs[i],
 		    EVFILT_SIGNAL, EV_ADD, 0, 0, UPTR(NULL));
 
