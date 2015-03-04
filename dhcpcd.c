@@ -1299,7 +1299,6 @@ main(int argc, char **argv)
 	int sig;
 	const char *siga;
 #endif
-	struct timespec ts;
 
 	memset(&ctx, 0, sizeof(ctx));
 #ifdef USE_SIGNALS
@@ -1610,6 +1609,8 @@ main(int argc, char **argv)
 			if (sig != SIGHUP)
 				goto exit_failure;
 		} else {
+			struct timespec ts;
+
 			if (sig == SIGHUP || sig == SIGUSR1)
 				goto exit_success;
 			/* Spin until it exits */
