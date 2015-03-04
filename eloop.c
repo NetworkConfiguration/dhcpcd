@@ -44,6 +44,7 @@
 
 #if defined(HAVE_KQUEUE)
 #include <sys/event.h>
+#include <fcntl.h>
 #ifdef __NetBSD__
 /* udata is void * except on NetBSD */
 #define UPTR(x) ((intptr_t)(x))
@@ -359,10 +360,24 @@ eloop_init(void)
 		TAILQ_INIT(&ctx->free_timeouts);
 		ctx->exitcode = EXIT_FAILURE;
 #ifdef HAVE_KQUEUE
+#ifdef HAVE_KQUEUE1
+		if ((ctx->kqueue_fd = kqueue1(O_CLOEXEC)) == -1) {
+			free(ctx);
+			return NULL;
+		}
+#else
 		if ((ctx->kqueue_fd = kqueue()) == -1) {
 			free(ctx);
 			return NULL;
 		}
+		if ((i = fcntl(ctx->kqueue_fd, F_GETFD, 0)) == -1 ||
+		    fcntl(ctx->kqueue_fd, F_SETFD, i | FD_CLOEXEC) == -1)
+		{
+			close(ctx->kqueue_fd);
+			free(ctx);
+			return NULL;
+		}
+#endif
 		/* There is no sigmask parameter to kqueue, instead
 		 * we have to use it's filters. */
 		ctx->fds_len = 0;

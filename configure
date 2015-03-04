@@ -790,6 +790,22 @@ else
 fi
 
 if [ -z "$POLL" ]; then
+	printf "Testing for kqueue1 ... "
+	cat <<EOF >_kqueue.c
+#include <sys/event.h>
+int main(void) {
+	return kqueue1(0);
+}
+EOF
+	if $XCC _kqueue.c -o _kqueue 2>&3; then
+		POLL=kqueue1
+ 		echo "yes"
+ 	else
+ 		echo "no"
+ 	fi
+	rm -f _kqueue.c _kqueue
+fi
+if [ -z "$POLL" ]; then
 	printf "Testing for kqueue ... "
 	cat <<EOF >_kqueue.c
 #include <sys/event.h>
@@ -869,6 +885,10 @@ EOF
 	rm -f _pselect.c _pselect
 fi
 case "$POLL" in
+kqueue1)
+	echo "#define HAVE_KQUEUE" >>$CONFIG_H
+	echo "#define HAVE_KQUEUE1" >>$CONFIG_H
+	;;
 kqueue)
 	echo "#define HAVE_KQUEUE" >>$CONFIG_H
 	;;
