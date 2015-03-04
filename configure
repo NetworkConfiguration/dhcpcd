@@ -792,6 +792,7 @@ fi
 if [ -z "$POLL" ]; then
 	printf "Testing for kqueue1 ... "
 	cat <<EOF >_kqueue.c
+#include <sys/types.h>
 #include <sys/event.h>
 int main(void) {
 	return kqueue1(0);
@@ -808,6 +809,7 @@ fi
 if [ -z "$POLL" ]; then
 	printf "Testing for kqueue ... "
 	cat <<EOF >_kqueue.c
+#include <sys/types.h>
 #include <sys/event.h>
 int main(void) {
 	return kqueue();

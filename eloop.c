@@ -36,6 +36,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <unistd.h>
 
 #include "config.h"
 #include "common.h"
@@ -46,10 +47,13 @@
 #include <sys/event.h>
 #include <fcntl.h>
 #ifdef __NetBSD__
-/* udata is void * except on NetBSD */
-#define UPTR(x) ((intptr_t)(x))
+/* udata is void * except on NetBSD
+ * lengths are int except on NetBSD */
+#define UPTR(x)	((intptr_t)(x))
+#define LENC(x)	(x)
 #else
-#define UPTR(x) (x)
+#define UPTR(x)	(x)
+#define LENC(x)	((int)(x))
 #endif
 #define eloop_event_setup_fds(ctx)
 #elif defined(HAVE_EPOLL)
@@ -391,7 +395,7 @@ eloop_init(void)
 		for (i = 0; i < dhcpcd_handlesigs[i]; i++)
 			EV_SET(&ctx->fds[i], dhcpcd_handlesigs[i],
 			    EVFILT_SIGNAL, EV_ADD, 0, 0, UPTR(NULL));
-		if (kevent(ctx->kqueue_fd, ctx->fds, ctx->fds_len,
+		if (kevent(ctx->kqueue_fd, ctx->fds, LENC(ctx->fds_len),
 		    NULL, 0, NULL) == -1)
 		{
 			free(ctx->fds);
@@ -505,8 +509,8 @@ eloop_start(struct dhcpcd_ctx *dctx)
 #endif
 
 #ifdef HAVE_KQUEUE
-		n = kevent(ctx->kqueue_fd, NULL, 0, ctx->fds, ctx->events_len,
-		    tsp);
+		n = kevent(ctx->kqueue_fd, NULL, 0,
+		    ctx->fds, LENC(ctx->events_len), tsp);
 #elif HAVE_EPOLL
 #ifdef USE_SIGNALS
 		n = epoll_pwait(ctx->epoll_fd, ctx->fds, (int)ctx->events_len,
