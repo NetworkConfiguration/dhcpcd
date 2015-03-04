@@ -68,12 +68,12 @@ const char dhcpcd_copyright[] = "Copyright (c) 2006-2015 Roy Marples";
 
 #ifdef USE_SIGNALS
 const int dhcpcd_handlesigs[] = {
+	SIGTERM,
+	SIGINT,
 	SIGALRM,
 	SIGHUP,
-	SIGINT,
-	SIGPIPE,
-	SIGTERM,
 	SIGUSR1,
+	SIGPIPE,
 	0
 };
 
@@ -1060,14 +1060,10 @@ stop_all_interfaces(struct dhcpcd_ctx *ctx, int do_release)
 }
 
 #ifdef USE_SIGNALS
-struct dhcpcd_siginfo {
-	int signo;
-	pid_t pid;
-} dhcpcd_siginfo;
-
-#define sigmsg "received signal %s from PID %d, %s"
-static void
-handle_signal1(void *arg)
+struct dhcpcd_siginfo dhcpcd_siginfo;
+#define sigmsg "received signal %s, %s"
+void
+dhcpcd_handle_signal(void *arg)
 {
 	struct dhcpcd_ctx *ctx;
 	struct dhcpcd_siginfo *si;
@@ -1080,19 +1076,19 @@ handle_signal1(void *arg)
 	exit_code = EXIT_FAILURE;
 	switch (si->signo) {
 	case SIGINT:
-		syslog(LOG_INFO, sigmsg, "INT", (int)si->pid, "stopping");
+		syslog(LOG_INFO, sigmsg, "INT", "stopping");
 		break;
 	case SIGTERM:
-		syslog(LOG_INFO, sigmsg, "TERM", (int)si->pid, "stopping");
+		syslog(LOG_INFO, sigmsg, "TERM", "stopping");
 		exit_code = EXIT_SUCCESS;
 		break;
 	case SIGALRM:
-		syslog(LOG_INFO, sigmsg, "ALRM", (int)si->pid, "releasing");
+		syslog(LOG_INFO, sigmsg, "ALRM", "releasing");
 		do_release = 1;
 		exit_code = EXIT_SUCCESS;
 		break;
 	case SIGHUP:
-		syslog(LOG_INFO, sigmsg, "HUP", (int)si->pid, "rebinding");
+		syslog(LOG_INFO, sigmsg, "HUP", "rebinding");
 		reload_config(ctx);
 		/* Preserve any options passed on the commandline
 		 * when we were started. */
@@ -1100,7 +1096,7 @@ handle_signal1(void *arg)
 		    ctx->argc - ctx->ifc);
 		return;
 	case SIGUSR1:
-		syslog(LOG_INFO, sigmsg, "USR1", (int)si->pid, "reconfiguring");
+		syslog(LOG_INFO, sigmsg, "USR1", "reconfiguring");
 		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 			ipv4_applyaddr(ifp);
 		}
@@ -1110,9 +1106,9 @@ handle_signal1(void *arg)
 		return;
 	default:
 		syslog(LOG_ERR,
-		    "received signal %d from PID %d, "
+		    "received signal %d, "
 		    "but don't know what to do with it",
-		    si->signo, (int)si->pid);
+		    si->signo);
 		return;
 	}
 
@@ -1121,39 +1117,44 @@ handle_signal1(void *arg)
 	eloop_exit(ctx->eloop, exit_code);
 }
 
+#ifndef HAVE_KQUEUE
 static void
-handle_signal(int sig, siginfo_t *siginfo, __unused void *context)
+handle_signal(int sig, __unused siginfo_t *siginfo, __unused void *context)
 {
 
 	/* So that we can operate safely under a signal we instruct
 	 * eloop to pass a copy of the siginfo structure to handle_signal1
 	 * as the very first thing to do. */
 	dhcpcd_siginfo.signo = sig;
-	dhcpcd_siginfo.pid = siginfo ? siginfo->si_pid : 0;
 	eloop_timeout_add_now(dhcpcd_ctx->eloop,
-	    handle_signal1, &dhcpcd_siginfo);
+	    dhcpcd_handle_signal, &dhcpcd_siginfo);
 }
+#endif
 
 static int
 signal_init(sigset_t *oldset)
 {
-	unsigned int i;
-	struct sigaction sa;
 	sigset_t newset;
+#ifndef HAVE_KQUEUE
+	int i;
+	struct sigaction sa;
+#endif
 
 	sigfillset(&newset);
 	if (sigprocmask(SIG_SETMASK, &newset, oldset) == -1)
 		return -1;
 
+#ifndef HAVE_KQUEUE
 	memset(&sa, 0, sizeof(sa));
 	sa.sa_sigaction = handle_signal;
 	sa.sa_flags = SA_SIGINFO;
 	sigemptyset(&sa.sa_mask);
 
-	for (i = 0; dhcpcd_handlesigs[i]; i++) {
+	for (i = 0; i < dhcpcd_handlesigs[i]; i++) {
 		if (sigaction(dhcpcd_handlesigs[i], &sa, NULL) == -1)
 			return -1;
 	}
+#endif
 	return 0;
 }
 #endif

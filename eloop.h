@@ -47,7 +47,7 @@ struct eloop_event {
 	void *read_cb_arg;
 	void (*write_cb)(void *);
 	void *write_cb_arg;
-#if !defined(HAVE_EPOLL)
+#if !defined(HAVE_KQUEUE) && !defined(HAVE_EPOLL)
 	struct pollfd *pollfd;
 #endif
 };
@@ -71,7 +71,10 @@ struct eloop_ctx {
 	void (*timeout0)(void *);
 	void *timeout0_arg;
 
-#ifdef HAVE_EPOLL
+#ifdef HAVE_KQUEUE
+	int kqueue_fd;
+	struct kevent *fds;
+#elif HAVE_EPOLL
 	int epoll_fd;
 	struct epoll_event *fds;
 #else

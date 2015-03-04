@@ -42,7 +42,16 @@
 #include "dhcpcd.h"
 #include "eloop.h"
 
-#if defined(HAVE_EPOLL)
+#if defined(HAVE_KQUEUE)
+#include <sys/event.h>
+#ifdef __NetBSD__
+/* udata is void * except on NetBSD */
+#define UPTR(x) ((intptr_t)(x))
+#else
+#define UPTR(x) (x)
+#endif
+#define eloop_event_setup_fds(ctx)
+#elif defined(HAVE_EPOLL)
 #include <sys/epoll.h>
 #define eloop_event_setup_fds(ctx)
 #else
@@ -74,7 +83,9 @@ eloop_event_add(struct eloop_ctx *ctx, int fd,
     void (*write_cb)(void *), void *write_cb_arg)
 {
 	struct eloop_event *e;
-#ifdef HAVE_EPOLL
+#ifdef HAVE_KQUEUE
+	struct kevent ke[2], *nfds;
+#elif HAVE_EPOLL
 	struct epoll_event epe, *nfds;
 #else
 	struct pollfd *nfds;
@@ -99,7 +110,16 @@ eloop_event_add(struct eloop_ctx *ctx, int fd,
 				e->write_cb = write_cb;
 				e->write_cb_arg = write_cb_arg;
 			}
-#ifdef HAVE_EPOLL
+#ifdef HAVE_KQUEUE
+			EV_SET(&ke[0], fd, EVFILT_READ, EV_ADD, 0, 0, UPTR(e));
+			if (write_cb)
+				EV_SET(&ke[1], fd, EVFILT_WRITE, EV_ADD,
+				    0, 0, UPTR(e));
+			if (kevent(ctx->kqueue_fd, ke, write_cb ? 2 : 1,
+			    NULL, 0, NULL) == -1)
+				goto err;
+			return 0;
+#elif HAVE_EPOLL
 			epe.data.ptr = e;
 			return epoll_ctl(ctx->epoll_fd, EPOLL_CTL_MOD,
 			    fd, &epe);
@@ -129,7 +149,6 @@ eloop_event_add(struct eloop_ctx *ctx, int fd,
 		ctx->fds = nfds;
 	}
 
-
 	/* Now populate the structure and add it to the list */
 	e->fd = fd;
 	e->read_cb = read_cb;
@@ -137,7 +156,13 @@ eloop_event_add(struct eloop_ctx *ctx, int fd,
 	e->write_cb = write_cb;
 	e->write_cb_arg = write_cb_arg;
 
-#ifdef HAVE_EPOLL
+#ifdef HAVE_KQUEUE
+	EV_SET(&ke[0], fd, EVFILT_READ, EV_ADD, 0, 0, UPTR(e));
+	if (write_cb)
+		EV_SET(&ke[1], fd, EVFILT_WRITE, EV_ADD, 0, 0, UPTR(e));
+	if (kevent(ctx->kqueue_fd, ke, write_cb ? 2 : 1, NULL, 0, NULL) == -1)
+		goto err;
+#elif HAVE_EPOLL
 	epe.data.ptr = e;
 	if (epoll_ctl(ctx->epoll_fd, EPOLL_CTL_ADD, fd, &epe) == -1)
 		goto err;
@@ -166,15 +191,34 @@ void
 eloop_event_delete(struct eloop_ctx *ctx, int fd, int write_only)
 {
 	struct eloop_event *e;
+#ifdef HAVE_KQUEUE
+	struct kevent ke;
+#endif
 
 	TAILQ_FOREACH(e, &ctx->events, next) {
 		if (e->fd == fd) {
 			if (write_only) {
-				e->write_cb = NULL;
-				e->write_cb_arg = NULL;
+				if (e->write_cb) {
+					e->write_cb = NULL;
+					e->write_cb_arg = NULL;
+#ifdef HAVE_KQUEUE
+					EV_SET(&ke, fd, EVFILT_WRITE, EV_DELETE,
+					    0, 0, UPTR(NULL));
+					kevent(ctx->kqueue_fd, &ke, 1, NULL, 0,
+					    NULL);
+#endif
+				}
+
 			} else {
 				TAILQ_REMOVE(&ctx->events, e, next);
-#ifdef HAVE_EPOLL
+#ifdef HAVE_KQUEUE
+				EV_SET(&ke, fd, EVFILT_READ, EV_DELETE,
+				    0, 0, UPTR(NULL));
+				kevent(ctx->kqueue_fd, &ke, 1, NULL, 0, NULL);
+				EV_SET(&ke, fd, EVFILT_WRITE, EV_DELETE,
+				    0, 0, UPTR(NULL));
+				kevent(ctx->kqueue_fd, &ke, 1, NULL, 0, NULL);
+#elif HAVE_EPOLL
 				/* NULL event is safe because we
 				 * rely on epoll_pwait which as added
 				 * after the delete without event was fixed. */
@@ -299,6 +343,9 @@ eloop_init(void)
 {
 	struct eloop_ctx *ctx;
 	struct timespec now;
+#ifdef HAVE_KQUEUE
+	int i;
+#endif
 
 	/* Check we have a working monotonic clock. */
 	if (get_monotonic(&now) == -1)
@@ -311,7 +358,32 @@ eloop_init(void)
 		TAILQ_INIT(&ctx->timeouts);
 		TAILQ_INIT(&ctx->free_timeouts);
 		ctx->exitcode = EXIT_FAILURE;
-#ifdef HAVE_EPOLL
+#ifdef HAVE_KQUEUE
+		if ((ctx->kqueue_fd = kqueue()) == -1) {
+			free(ctx);
+			return NULL;
+		}
+		/* There is no sigmask parameter to kqueue, instead
+		 * we have to use it's filters. */
+		ctx->fds_len = 0;
+		while ((int)ctx->fds_len < dhcpcd_handlesigs[ctx->fds_len])
+			ctx->fds_len++;
+		ctx->fds = malloc(ctx->fds_len * sizeof(*ctx->fds));
+		if (ctx->fds == NULL) {
+			free(ctx);
+			return NULL;
+		}
+		for (i = 0; i < dhcpcd_handlesigs[i]; i++)
+			EV_SET(&ctx->fds[i], dhcpcd_handlesigs[i],
+			    EVFILT_SIGNAL, EV_ADD, 0, 0, UPTR(NULL));
+		if (kevent(ctx->kqueue_fd, ctx->fds, ctx->fds_len,
+		    NULL, 0, NULL) == -1)
+		{
+			free(ctx->fds);
+			free(ctx);
+			return NULL;
+		}
+#elif HAVE_EPOLL
 		if ((ctx->epoll_fd = epoll_create1(EPOLL_CLOEXEC)) == -1) {
 			free(ctx);
 			return NULL;
@@ -331,6 +403,12 @@ void eloop_free(struct eloop_ctx *ctx)
 
 	if (ctx == NULL)
 		return;
+
+#ifdef HAVE_KQUEUE
+	close(ctx->kqueue_fd);
+#elif HAVE_EPOLL
+	close(ctx->epoll_fd);
+#endif
 
 	while ((e = TAILQ_FIRST(&ctx->events))) {
 		TAILQ_REMOVE(&ctx->events, e, next);
@@ -364,7 +442,7 @@ eloop_start(struct dhcpcd_ctx *dctx)
 #if defined(HAVE_EPOLL) || !defined(USE_SIGNALS)
 	int timeout;
 #endif
-#ifdef HAVE_EPOLL
+#if defined(HAVE_KQUEUE) || defined(HAVE_EPOLL)
 	int i;
 #endif
 
@@ -411,7 +489,10 @@ eloop_start(struct dhcpcd_ctx *dctx)
 			    (tsp->tv_nsec + 999999) / 1000000);
 #endif
 
-#ifdef HAVE_EPOLL
+#ifdef HAVE_KQUEUE
+		n = kevent(ctx->kqueue_fd, NULL, 0, ctx->fds, ctx->events_len,
+		    tsp);
+#elif HAVE_EPOLL
 #ifdef USE_SIGNALS
 		n = epoll_pwait(ctx->epoll_fd, ctx->fds, (int)ctx->events_len,
 		    timeout, &dctx->sigset);
@@ -434,27 +515,43 @@ eloop_start(struct dhcpcd_ctx *dctx)
 			break;
 		}
 
-		/* Process any triggered events. */
-#ifdef HAVE_EPOLL
+		/* Process any triggered events.
+		 * We break after calling each callback incase
+		 * the current event or next event is removed. */
+#ifdef HAVE_KQUEUE
+		for (i = 0; i < n; i++) {
+			if (ctx->fds[i].filter == EVFILT_SIGNAL) {
+				struct dhcpcd_siginfo si;
+
+				si.signo = (int)ctx->fds[i].ident;
+				dhcpcd_handle_signal(&si);
+				break;
+			}
+			e = (struct eloop_event *)ctx->fds[i].udata;
+			if (ctx->fds[i].filter == EVFILT_WRITE &&
+			    e->write_cb)
+			{
+				e->write_cb(e->write_cb_arg);
+				break;
+			}
+			if (ctx->fds[i].filter == EVFILT_READ) {
+				e->read_cb(e->read_cb_arg);
+				break;
+			}
+		}
+#elif HAVE_EPOLL
 		for (i = 0; i < n; i++) {
 			e = (struct eloop_event *)ctx->fds[i].data.ptr;
 			if (ctx->fds[i].events & EPOLLOUT &&
 			    e->write_cb)
 			{
 				e->write_cb(e->write_cb_arg);
-				/* We need to break here as the
-				 * callback could destroy the next
-				 * fd to process. */
 				break;
 			}
-			if (ctx->fds[i].events &&
-			    ctx->fds[i].events &
+			if (ctx->fds[i].events &
 			    (EPOLLIN | EPOLLERR | EPOLLHUP))
 			{
 				e->read_cb(e->read_cb_arg);
-				/* We need to break here as the
-				 * callback could destroy the next
-				 * fd to process. */
 				break;
 			}
 		}
@@ -465,16 +562,10 @@ eloop_start(struct dhcpcd_ctx *dctx)
 				    e->write_cb)
 				{
 					e->write_cb(e->write_cb_arg);
-					/* We need to break here as the
-					 * callback could destroy the next
-					 * fd to process. */
 					break;
 				}
 				if (e->pollfd->revents) {
 					e->read_cb(e->read_cb_arg);
-					/* We need to break here as the
-					 * callback could destroy the next
-					 * fd to process. */
 					break;
 				}
 			}

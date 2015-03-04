@@ -150,7 +150,12 @@ struct dhcpcd_ctx {
 };
 
 #ifdef USE_SIGNALS
+struct dhcpcd_siginfo {
+	int signo;
+};
+
 extern const int dhcpcd_handlesigs[];
+void dhcpcd_handle_signal(void *);
 #endif
 
 int dhcpcd_oneup(struct dhcpcd_ctx *);
