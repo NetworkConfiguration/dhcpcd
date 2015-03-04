@@ -88,9 +88,9 @@ eloop_event_add(struct eloop_ctx *ctx, int fd,
     void (*write_cb)(void *), void *write_cb_arg)
 {
 	struct eloop_event *e;
-#ifdef HAVE_KQUEUE
+#if defined(HAVE_KQUEUE)
 	struct kevent ke[2];
-#elif HAVE_EPOLL
+#elif defined(HAVE_EPOLL)
 	struct epoll_event epe;
 #else
 	struct pollfd *nfds;
@@ -115,7 +115,7 @@ eloop_event_add(struct eloop_ctx *ctx, int fd,
 				e->write_cb = write_cb;
 				e->write_cb_arg = write_cb_arg;
 			}
-#ifdef HAVE_KQUEUE
+#if defined(HAVE_KQUEUE)
 			EV_SET(&ke[0], fd, EVFILT_READ, EV_ADD, 0, 0, UPTR(e));
 			if (write_cb)
 				EV_SET(&ke[1], fd, EVFILT_WRITE, EV_ADD,
@@ -124,7 +124,7 @@ eloop_event_add(struct eloop_ctx *ctx, int fd,
 			    NULL, 0, NULL) == -1)
 				goto err;
 			return 0;
-#elif HAVE_EPOLL
+#elif defined(HAVE_EPOLL)
 			epe.data.ptr = e;
 			return epoll_ctl(ctx->poll_fd, EPOLL_CTL_MOD,
 			    fd, &epe);
@@ -163,13 +163,13 @@ eloop_event_add(struct eloop_ctx *ctx, int fd,
 	e->write_cb = write_cb;
 	e->write_cb_arg = write_cb_arg;
 
-#ifdef HAVE_KQUEUE
+#if defined(HAVE_KQUEUE)
 	EV_SET(&ke[0], fd, EVFILT_READ, EV_ADD, 0, 0, UPTR(e));
 	if (write_cb)
 		EV_SET(&ke[1], fd, EVFILT_WRITE, EV_ADD, 0, 0, UPTR(e));
 	if (kevent(ctx->poll_fd, ke, write_cb ? 2 : 1, NULL, 0, NULL) == -1)
 		goto err;
-#elif HAVE_EPOLL
+#elif defined(HAVE_EPOLL)
 	epe.data.ptr = e;
 	if (epoll_ctl(ctx->poll_fd, EPOLL_CTL_ADD, fd, &epe) == -1)
 		goto err;
@@ -218,7 +218,7 @@ eloop_event_delete(struct eloop_ctx *ctx, int fd, int write_only)
 
 			} else {
 				TAILQ_REMOVE(&ctx->events, e, next);
-#ifdef HAVE_KQUEUE
+#if defined(HAVE_KQUEUE)
 				EV_SET(&ke[0], fd, EVFILT_READ,
 				    EV_DELETE, 0, 0, UPTR(NULL));
 				if (e->write_cb)
@@ -226,7 +226,7 @@ eloop_event_delete(struct eloop_ctx *ctx, int fd, int write_only)
 					    EV_DELETE, 0, 0, UPTR(NULL));
 				kevent(ctx->poll_fd, ke, e->write_cb ? 2 : 1,
 				    NULL, 0, NULL);
-#elif HAVE_EPOLL
+#elif defined(HAVE_EPOLL)
 				/* NULL event is safe because we
 				 * rely on epoll_pwait which as added
 				 * after the delete without event was fixed. */
@@ -432,7 +432,7 @@ eloop_init(void)
 		TAILQ_INIT(&ctx->timeouts);
 		TAILQ_INIT(&ctx->free_timeouts);
 		ctx->exitcode = EXIT_FAILURE;
-#ifdef HAVE_KQUEUE
+#if defined(HAVE_KQUEUE)
 		/* requeue will put our signals in place */
 		if (eloop_kqueue_open(ctx) == -1 ||
 		    eloop_requeue(ctx) == -1)
@@ -440,7 +440,7 @@ eloop_init(void)
 			free(ctx);
 			return NULL;
 		}
-#elif HAVE_EPOLL
+#elif defined(HAVE_EPOLL)
 		if ((ctx->poll_fd = epoll_create1(EPOLL_CLOEXEC)) == -1) {
 			free(ctx);
 			return NULL;
@@ -496,9 +496,9 @@ eloop_start(struct dhcpcd_ctx *dctx)
 #if defined(HAVE_EPOLL) || !defined(USE_SIGNALS)
 	int timeout;
 #endif
-#ifdef HAVE_KQUEUE
+#if defined(HAVE_KQUEUE)
 	struct kevent ke;
-#elif HAVE_EPOLL
+#elif defined(HAVE_EPOLL)
 	struct epoll_event epe;
 #endif
 
@@ -545,12 +545,11 @@ eloop_start(struct dhcpcd_ctx *dctx)
 			    (tsp->tv_nsec + 999999) / 1000000);
 #endif
 
-#ifdef HAVE_KQUEUE
+#if defined(HAVE_KQUEUE)
 		n = kevent(ctx->poll_fd, NULL, 0, &ke, 1, tsp);
-#elif HAVE_EPOLL
+#elif defined(HAVE_EPOLL)
 #ifdef USE_SIGNALS
 		n = epoll_pwait(ctx->poll_fd, &epe, 1, timeout, &dctx->sigset);
-		    timeout, &dctx->sigset);
 #else
 		n = epoll_wait(ctx->poll_fd, &epe, 1, timeout);
 #endif
@@ -572,7 +571,7 @@ eloop_start(struct dhcpcd_ctx *dctx)
 		/* Process any triggered events.
 		 * We go back to the start after calling each callback incase
 		 * the current event or next event is removed. */
-#ifdef HAVE_KQUEUE
+#if defined(HAVE_KQUEUE)
 		if (n) {
 			if (ke.filter == EVFILT_SIGNAL) {
 				struct dhcpcd_siginfo si;
@@ -590,10 +589,10 @@ eloop_start(struct dhcpcd_ctx *dctx)
 				continue;
 			}
 		}
-#elif HAVE_EPOLL
+#elif defined(HAVE_EPOLL)
 		if (n) {
-			e = (struct eloop_event *)ctx->fds[i].data.ptr;
-			if (epe.events & EPOLLOUT && e->writecb) {
+			e = (struct eloop_event *)epe.data.ptr;
+			if (epe.events & EPOLLOUT && e->write_cb) {
 				e->write_cb(e->write_cb_arg);
 				continue;
 			}
