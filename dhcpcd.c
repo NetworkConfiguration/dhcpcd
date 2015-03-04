@@ -271,6 +271,12 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 		return 0;
 	case 0:
 		setsid();
+		/* Some polling methods don't survive after forking,
+		 * so ensure we can requeue all our events. */
+		if (eloop_requeue(ctx->eloop) == -1) {
+			syslog(LOG_ERR, "eloop_requeue: %m");
+			eloop_exit(ctx->eloop, EXIT_FAILURE);
+		}
 		/* Notify parent it's safe to exit as we've detached. */
 		close(sidpipe[0]);
 		if (write(sidpipe[1], &buf, 1) == -1)

@@ -71,16 +71,12 @@ struct eloop_ctx {
 	void (*timeout0)(void *);
 	void *timeout0_arg;
 
-#ifdef HAVE_KQUEUE
-	int kqueue_fd;
-	struct kevent *fds;
-#elif HAVE_EPOLL
-	int epoll_fd;
-	struct epoll_event *fds;
+#if defined(HAVE_KQUEUE) || defined(HAVE_EPOLL)
+	int poll_fd;
 #else
 	struct pollfd *fds;
-#endif
 	size_t fds_len;
+#endif
 
 	int exitnow;
 	int exitcode;
@@ -104,6 +100,11 @@ int eloop_q_timeout_add_tv(struct eloop_ctx *, int queue,
 int eloop_timeout_add_now(struct eloop_ctx *, void (*)(void *), void *);
 void eloop_q_timeout_delete(struct eloop_ctx *, int, void (*)(void *), void *);
 struct eloop_ctx * eloop_init(void);
+#ifdef HAVE_KQUEUE
+int eloop_requeue(struct eloop_ctx *);
+#else
+#define eloop_requeue(a) (0)
+#endif
 void eloop_free(struct eloop_ctx *);
 void eloop_exit(struct eloop_ctx *, int);
 int eloop_start(struct dhcpcd_ctx *);
