@@ -198,8 +198,10 @@ void
 eloop_event_delete(struct eloop_ctx *ctx, int fd, int write_only)
 {
 	struct eloop_event *e;
-#ifdef HAVE_KQUEUE
+#if defined(HAVE_KQUEUE)
 	struct kevent ke[2];
+#elif defined(HAVE_EPOLL)
+	struct epoll_event epe;
 #endif
 
 	TAILQ_FOREACH(e, &ctx->events, next) {
@@ -208,11 +210,17 @@ eloop_event_delete(struct eloop_ctx *ctx, int fd, int write_only)
 				if (e->write_cb) {
 					e->write_cb = NULL;
 					e->write_cb_arg = NULL;
-#ifdef HAVE_KQUEUE
+#if defined(HAVE_KQUEUE)
 					EV_SET(&ke[0], fd, EVFILT_WRITE,
 					    EV_DELETE, 0, 0, UPTR(NULL));
 					kevent(ctx->poll_fd, ke, 1, NULL, 0,
 					    NULL);
+#elif defined(HAVE_EPOLL)
+					memset(&epe, 0, sizeof(epe));
+					epe.data.fd = e->fd;
+					epe.data.ptr = e;
+					epe.events = EPOLLIN;
+					epoll_ctl(ctx->poll_fd, EPOLL_CTL_MOD, fd, &epe);
 #endif
 				}
 
