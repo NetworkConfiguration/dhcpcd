@@ -331,8 +331,16 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 			ifp->index = sdl->sdl_index;
 			switch(sdl->sdl_type) {
 #ifdef IFT_BRIDGE
-			case IFT_BRIDGE:
-				/* Don't allow bridge unless explicit */
+			case IFT_BRIDGE: /* FALLTHROUGH */
+#endif
+#ifdef IFT_PPP
+			case IFT_PPP: /* FALLTHROUGH */
+#endif
+#ifdef IFT_PROPVIRTUAL
+			case IFT_PROPVIRTUAL: /* FALLTHROUGH */
+#endif
+#if defined(IFT_BRIDGE) || defined(IFT_PPP) || defined(IFT_PROPVIRTUAL)
+				/* Don't allow unless explicit */
 				if ((argc == 0 || argc == -1) &&
 				    ctx->ifac == 0 &&
 				    !if_hasconf(ctx, ifp->name))
@@ -340,10 +348,10 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 					if_free(ifp);
 					continue;
 				}
-				/* FALLTHOUGH */
+				/* FALLTHROUGH */
 #endif
 #ifdef IFT_L2VLAN
-			case IFT_L2VLAN: /* FALLTHOUGH */
+			case IFT_L2VLAN: /* FALLTHROUGH */
 #endif
 #ifdef IFT_L3IPVLAN
 			case IFT_L3IPVLAN: /* FALLTHROUGH */
