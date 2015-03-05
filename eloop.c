@@ -107,6 +107,26 @@ eloop_event_add(struct eloop_ctx *ctx, int fd,
 	/* We should only have one callback monitoring the fd */
 	TAILQ_FOREACH(e, &ctx->events, next) {
 		if (e->fd == fd) {
+			int error;
+
+#if defined(HAVE_KQUEUE)
+			EV_SET(&ke[0], fd, EVFILT_READ, EV_ADD, 0, 0, UPTR(e));
+			if (write_cb)
+				EV_SET(&ke[1], fd, EVFILT_WRITE, EV_ADD,
+				    0, 0, UPTR(e));
+			else if (e->write_cb)
+				EV_SET(&ke[1], fd, EVFILT_WRITE, EV_DELETE,
+				    0, 0, UPTR(e));
+			error = kevent(ctx->poll_fd, ke,
+			    e->write_cb || write_cb ? 2 : 1, NULL, 0, NULL);
+				goto err;
+#elif defined(HAVE_EPOLL)
+			epe.data.ptr = e;
+			error = epoll_ctl(ctx->poll_fd, EPOLL_CTL_MOD,
+			    fd, &epe);
+#else
+			error = 0;
+#endif
 			if (read_cb) {
 				e->read_cb = read_cb;
 				e->read_cb_arg = read_cb_arg;
@@ -115,23 +135,8 @@ eloop_event_add(struct eloop_ctx *ctx, int fd,
 				e->write_cb = write_cb;
 				e->write_cb_arg = write_cb_arg;
 			}
-#if defined(HAVE_KQUEUE)
-			EV_SET(&ke[0], fd, EVFILT_READ, EV_ADD, 0, 0, UPTR(e));
-			if (write_cb)
-				EV_SET(&ke[1], fd, EVFILT_WRITE, EV_ADD,
-				    0, 0, UPTR(e));
-			if (kevent(ctx->poll_fd, ke, write_cb ? 2 : 1,
-			    NULL, 0, NULL) == -1)
-				goto err;
-			return 0;
-#elif defined(HAVE_EPOLL)
-			epe.data.ptr = e;
-			return epoll_ctl(ctx->poll_fd, EPOLL_CTL_MOD,
-			    fd, &epe);
-#else
 			eloop_event_setup_fds(ctx);
-			return 0;
-#endif
+			return error;
 		}
 	}
 
