@@ -119,7 +119,6 @@ eloop_event_add(struct eloop_ctx *ctx, int fd,
 				    0, 0, UPTR(e));
 			error = kevent(ctx->poll_fd, ke,
 			    e->write_cb || write_cb ? 2 : 1, NULL, 0, NULL);
-				goto err;
 #elif defined(HAVE_EPOLL)
 			epe.data.ptr = e;
 			error = epoll_ctl(ctx->poll_fd, EPOLL_CTL_MOD,
