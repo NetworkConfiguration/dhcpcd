@@ -372,7 +372,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 				}
 				syslog(LOG_WARNING,
 				    "%s: unsupported interface type %.2x",
-				    ifp->name, ifp->family);
+				    ifp->name, sdl->sdl_type);
 				/* Pretend it's ethernet */
 				ifp->family = ARPHRD_ETHER;
 				break;
