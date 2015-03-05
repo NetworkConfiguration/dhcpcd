@@ -359,14 +359,13 @@ eloop_exit(struct eloop_ctx *ctx, int code)
 	ctx->exitnow = 1;
 }
 
-#ifdef HAVE_KQUEUE
+#if defined(HAVE_KQUEUE) || defined(HAVE_EPOLL)
 static int
-eloop_kqueue_open(struct eloop_ctx *ctx)
+eloop_open(struct eloop_ctx *ctx)
 {
-#ifdef HAVE_KQUEUE1
-	if ((ctx->poll_fd = kqueue1(O_CLOEXEC)) == -1)
-		return -1;
-#else
+#if defined(HAVE_KQUEUE1)
+	return (ctx->poll_fd = kqueue1(O_CLOEXEC));
+#elif defined(HAVE_KQUEUE)
 	int i;
 
 	if ((ctx->poll_fd = kqueue()) == -1)
@@ -378,23 +377,30 @@ eloop_kqueue_open(struct eloop_ctx *ctx)
 		ctx->poll_fd = -1;
 		return -1;
 	}
-#endif
 
 	return ctx->poll_fd;
+#elif defined (HAVE_EPOLL)
+	return (ctx->poll_fd = epoll_create1(EPOLL_CLOEXEC));
+#endif
 }
 
 int
 eloop_requeue(struct eloop_ctx *ctx)
 {
-	size_t i;
 	struct eloop_event *e;
-	struct kevent *ke;
 	int error;
+#if defined(HAVE_KQUEUE)
+	size_t i;
+	struct kevent *ke;
+#elif defined(HAVE_EPOLL)
+	struct epoll_event epe;
+#endif
 
-	close(ctx->poll_fd);
-	if (eloop_kqueue_open(ctx) == -1)
+	if (ctx->poll_fd != -1)
+		close(ctx->poll_fd);
+	if (eloop_open(ctx) == -1)
 		return -1;
-
+#if defined (HAVE_KQUEUE)
 	i = 0;
 	while (dhcpcd_handlesigs[i])
 		i++;
@@ -424,6 +430,22 @@ eloop_requeue(struct eloop_ctx *ctx)
 
 	error =  kevent(ctx->poll_fd, ke, LENC(i), NULL, 0, NULL);
 	free(ke);
+
+#elif defined(HAVE_EPOLL)
+
+	error = 0;
+	TAILQ_FOREACH(e, &ctx->events, next) {
+		memset(&epe, 0, sizeof(epe));
+		epe.data.fd = e->fd;
+		epe.events = EPOLLIN;
+		if (e->write_cb)
+			epe.events |= EPOLLOUT;
+		epe.data.ptr = e;
+		if (epoll_ctl(ctx->poll_fd, EPOLL_CTL_ADD, e->fd, &epe) == -1)
+			error = -1;
+	}
+#endif
+
 	return error;
 }
 #endif
@@ -445,21 +467,13 @@ eloop_init(void)
 		TAILQ_INIT(&ctx->timeouts);
 		TAILQ_INIT(&ctx->free_timeouts);
 		ctx->exitcode = EXIT_FAILURE;
-#if defined(HAVE_KQUEUE)
-		/* requeue will put our signals in place */
-		if (eloop_kqueue_open(ctx) == -1 ||
-		    eloop_requeue(ctx) == -1)
-		{
-			free(ctx);
-			return NULL;
-		}
-#elif defined(HAVE_EPOLL)
-		if ((ctx->poll_fd = epoll_create1(EPOLL_CLOEXEC)) == -1) {
-			free(ctx);
-			return NULL;
-		}
+#if defined(HAVE_KQUEUE) || defined(HAVE_EPOLL)
+		ctx->poll_fd = -1;
 #endif
-
+		if (eloop_requeue(ctx) == -1) {
+			free(ctx);
+			return NULL;
+		}
 	}
 
 	return ctx;

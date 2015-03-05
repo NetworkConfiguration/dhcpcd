@@ -100,7 +100,7 @@ int eloop_q_timeout_add_tv(struct eloop_ctx *, int queue,
 int eloop_timeout_add_now(struct eloop_ctx *, void (*)(void *), void *);
 void eloop_q_timeout_delete(struct eloop_ctx *, int, void (*)(void *), void *);
 struct eloop_ctx * eloop_init(void);
-#ifdef HAVE_KQUEUE
+#if defined(HAVE_KQUEUE) || defined(HAVE_EPOLL)
 int eloop_requeue(struct eloop_ctx *);
 #else
 #define eloop_requeue(a) (0)
