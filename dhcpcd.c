@@ -1156,7 +1156,7 @@ signal_init(sigset_t *oldset)
 	sa.sa_flags = SA_SIGINFO;
 	sigemptyset(&sa.sa_mask);
 
-	for (i = 0; i < dhcpcd_handlesigs[i]; i++) {
+	for (i = 0; dhcpcd_handlesigs[i]; i++) {
 		if (sigaction(dhcpcd_handlesigs[i], &sa, NULL) == -1)
 			return -1;
 	}
