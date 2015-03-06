@@ -345,6 +345,11 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 				    ctx->ifac == 0 &&
 				    !if_hasconf(ctx, ifp->name))
 				{
+					syslog(LOG_DEBUG,
+					    "%s: ignoring due to"
+					    " interface type and"
+					    " no config",
+					    ifp->name);
 					if_free(ifp);
 					continue;
 				}
