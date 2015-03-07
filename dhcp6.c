@@ -419,7 +419,10 @@ dhcp6_delegateaddr(struct in6_addr *addr, struct interface *ifp,
 		}
 	} else if (sla->prefix_len == 0) {
 		asla.sla = sla->sla;
-		asla.prefix_len = 0;
+		if (asla.sla == 0)
+			asla.prefix_len = prefix->prefix_len;
+		else
+			asla.prefix_len = 0;
 		sla = &asla;
 	}
 	if (sla->prefix_len == 0) {
