@@ -1362,13 +1362,6 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 						    ifname);
 						goto err_sla;
 					}
-					if (sla->sla == 0 && ia->sla_len > 1) {
-						syslog(LOG_ERR, "%s: cannot"
-						    " assign multiple prefixes"
-						    " with a SLA of 0",
-						    ifname);
-						goto err_sla;
-					}
 				}
 				if (np) {
 					sla->prefix_len = (uint8_t)strtoi(np,
@@ -1388,7 +1381,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			/* Sanity check */
 			for (sl = 0; sl < ia->sla_len - 1; sl++) {
 				slap = &ia->sla[sl];
-				if (slap->sla_set && sla->sla_set == 0) {
+				if (slap->sla_set != sla->sla_set) {
 					syslog(LOG_WARNING,
 					    "%s: cannot mix automatic "
 					    "and fixed SLA",
@@ -1403,6 +1396,13 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 					    "same interface twice with "
 					    "an automatic SLA",
 					    sla->ifname);
+					goto err_sla;
+				}
+				if (slap->sla == 0 || sla->sla == 0) {
+					syslog(LOG_ERR, "%s: cannot"
+					    " assign multiple prefixes"
+					    " with a SLA of 0",
+					    ifname);
 					goto err_sla;
 				}
 			}
