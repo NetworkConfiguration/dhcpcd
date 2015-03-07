@@ -511,7 +511,7 @@ set_option_space(struct dhcpcd_ctx *ctx,
 
 #if !defined(INET) && !defined(INET6)
 	/* Satisfy use */
-	ctx = ctx;
+	ctx = NULL;
 #endif
 
 #ifdef INET6

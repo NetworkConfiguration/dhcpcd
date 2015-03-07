@@ -273,6 +273,7 @@ get_addrs(int type, char *cp, struct sockaddr **sa)
 	}
 }
 
+#if defined(INET) || defined(INET6)
 static struct interface *
 if_findsdl(struct dhcpcd_ctx *ctx, struct sockaddr_dl *sdl)
 {
@@ -285,6 +286,7 @@ if_findsdl(struct dhcpcd_ctx *ctx, struct sockaddr_dl *sdl)
 	}
 	return NULL;
 }
+#endif
 
 #ifdef INET
 const char *if_pfname = "Berkley Packet Filter";
