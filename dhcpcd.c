@@ -1037,8 +1037,6 @@ reconf_reboot(struct dhcpcd_ctx *ctx, int action, int argc, char **argv, int oi)
 		}
 	}
 	free(ifs);
-
-	ipv4_sortinterfaces(ctx);
 }
 
 static void
@@ -1790,7 +1788,7 @@ main(int argc, char **argv)
 	free_options(ifo);
 	ifo = NULL;
 
-	ipv4_sortinterfaces(&ctx);
+	if_sortinterfaces(&ctx);
 	TAILQ_FOREACH(ifp, ctx.ifaces, next) {
 		eloop_timeout_add_sec(ctx.eloop, 0,
 		    dhcpcd_prestartinterface, ifp);

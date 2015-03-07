@@ -3150,7 +3150,6 @@ dhcp_start1(void *arg)
 				state->addr = state->lease.addr;
 				state->net = state->lease.net;
 				state->added |= STATE_ADDED | STATE_FAKE;
-				ipv4_sortinterfaces(ifp->ctx);
 				ipv4_buildroutes(ifp->ctx);
 			} else
 				syslog(LOG_ERR, "%s: %m", __func__);

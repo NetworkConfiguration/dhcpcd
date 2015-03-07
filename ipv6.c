@@ -1989,6 +1989,10 @@ ipv6_buildroutes(struct dhcpcd_ctx *ctx)
 	uint8_t have_default;
 	unsigned long long o;
 
+	/* We need to have the interfaces in the correct order to ensure
+	 * our routes are managed correctly. */
+	if_sortinterfaces(ctx);
+
 	TAILQ_INIT(&dnr);
 
 	/* First add reachable routers and their prefixes */
