@@ -367,6 +367,11 @@ kfreebsd*)
 	;;
 linux*)
 	echo "CPPFLAGS+=	-D_BSD_SOURCE -D_XOPEN_SOURCE=700" >>$CONFIG_MK
+	# Large File Support, should be fine for 32-bit systems.
+	# But if this is the case, why is it not set by default?
+	echo "CPPFLAGS+=	-D_FILE_OFFSET_BITS=64" >>$CONFIG_MK
+	echo "CPPFLAGS+=	-D_LARGEFILE_SOURCE" >>$CONFIG_MK
+	echo "CPPFLAGS+=	-D_LARGEFILE64_SOURCE" >>$CONFIG_MK
 	# glibc-2.20
 	echo "CPPFLAGS+=	-D_DEFAULT_SOURCE" >>$CONFIG_MK
 	echo "DHCPCD_SRCS+=	if-linux.c" >>$CONFIG_MK
