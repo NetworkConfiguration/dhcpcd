@@ -110,13 +110,14 @@ eloop_event_add(struct eloop_ctx *ctx, int fd,
 			int error;
 
 #if defined(HAVE_KQUEUE)
-			EV_SET(&ke[0], fd, EVFILT_READ, EV_ADD, 0, 0, UPTR(e));
+			EV_SET(&ke[0], (uintptr_t)fd, EVFILT_READ, EV_ADD,
+			    0, 0, UPTR(e));
 			if (write_cb)
-				EV_SET(&ke[1], fd, EVFILT_WRITE, EV_ADD,
-				    0, 0, UPTR(e));
+				EV_SET(&ke[1], (uintptr_t)fd, EVFILT_WRITE,
+				    EV_ADD, 0, 0, UPTR(e));
 			else if (e->write_cb)
-				EV_SET(&ke[1], fd, EVFILT_WRITE, EV_DELETE,
-				    0, 0, UPTR(e));
+				EV_SET(&ke[1], (uintptr_t)fd, EVFILT_WRITE,
+				    EV_DELETE, 0, 0, UPTR(e));
 			error = kevent(ctx->poll_fd, ke,
 			    e->write_cb || write_cb ? 2 : 1, NULL, 0, NULL);
 #elif defined(HAVE_EPOLL)
@@ -168,9 +169,10 @@ eloop_event_add(struct eloop_ctx *ctx, int fd,
 	e->write_cb_arg = write_cb_arg;
 
 #if defined(HAVE_KQUEUE)
-	EV_SET(&ke[0], fd, EVFILT_READ, EV_ADD, 0, 0, UPTR(e));
+	EV_SET(&ke[0], (uintptr_t)fd, EVFILT_READ, EV_ADD, 0, 0, UPTR(e));
 	if (write_cb)
-		EV_SET(&ke[1], fd, EVFILT_WRITE, EV_ADD, 0, 0, UPTR(e));
+		EV_SET(&ke[1], (uintptr_t)fd, EVFILT_WRITE,
+		    EV_ADD, 0, 0, UPTR(e));
 	if (kevent(ctx->poll_fd, ke, write_cb ? 2 : 1, NULL, 0, NULL) == -1)
 		goto err;
 #elif defined(HAVE_EPOLL)
@@ -215,8 +217,9 @@ eloop_event_delete(struct eloop_ctx *ctx, int fd, int write_only)
 					e->write_cb = NULL;
 					e->write_cb_arg = NULL;
 #if defined(HAVE_KQUEUE)
-					EV_SET(&ke[0], fd, EVFILT_WRITE,
-					    EV_DELETE, 0, 0, UPTR(NULL));
+					EV_SET(&ke[0], (uintptr_t)fd,
+					    EVFILT_WRITE, EV_DELETE,
+					    0, 0, UPTR(NULL));
 					kevent(ctx->poll_fd, ke, 1, NULL, 0,
 					    NULL);
 #elif defined(HAVE_EPOLL)
@@ -224,18 +227,20 @@ eloop_event_delete(struct eloop_ctx *ctx, int fd, int write_only)
 					epe.data.fd = e->fd;
 					epe.data.ptr = e;
 					epe.events = EPOLLIN;
-					epoll_ctl(ctx->poll_fd, EPOLL_CTL_MOD, fd, &epe);
+					epoll_ctl(ctx->poll_fd, EPOLL_CTL_MOD,
+					    fd, &epe);
 #endif
 				}
 
 			} else {
 				TAILQ_REMOVE(&ctx->events, e, next);
 #if defined(HAVE_KQUEUE)
-				EV_SET(&ke[0], fd, EVFILT_READ,
+				EV_SET(&ke[0], (uintptr_t)fd, EVFILT_READ,
 				    EV_DELETE, 0, 0, UPTR(NULL));
 				if (e->write_cb)
-					EV_SET(&ke[1], fd, EVFILT_WRITE,
-					    EV_DELETE, 0, 0, UPTR(NULL));
+					EV_SET(&ke[1], (uintptr_t)fd,
+					    EVFILT_WRITE, EV_DELETE,
+					    0, 0, UPTR(NULL));
 				kevent(ctx->poll_fd, ke, e->write_cb ? 2 : 1,
 				    NULL, 0, NULL);
 #elif defined(HAVE_EPOLL)
@@ -413,15 +418,15 @@ eloop_requeue(struct eloop_ctx *ctx)
 		return -1;
 
 	for (i = 0; dhcpcd_handlesigs[i]; i++)
-		EV_SET(&ke[i], dhcpcd_handlesigs[i],
+		EV_SET(&ke[i], (uintptr_t)dhcpcd_handlesigs[i],
 		    EVFILT_SIGNAL, EV_ADD, 0, 0, UPTR(NULL));
 
 	TAILQ_FOREACH(e, &ctx->events, next) {
-		EV_SET(&ke[i], e->fd, EVFILT_READ,
+		EV_SET(&ke[i], (uintptr_t)e->fd, EVFILT_READ,
 		    EV_ADD, 0, 0, UPTR(e));
 		i++;
 		if (e->write_cb) {
-			EV_SET(&ke[i], e->fd, EVFILT_WRITE,
+			EV_SET(&ke[i], (uintptr_t)e->fd, EVFILT_WRITE,
 			    EV_ADD, 0, 0, UPTR(e));
 			i++;
 		}
