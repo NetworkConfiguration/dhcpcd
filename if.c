@@ -319,7 +319,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 			memcpy(&iflr.addr, ifa->ifa_addr,
 			    MIN(ifa->ifa_addr->sa_len, sizeof(iflr.addr)));
 			iflr.flags = IFLR_PREFIX;
-			iflr.prefixlen = sdl->sdl_alen * NBBY;
+			iflr.prefixlen = (unsigned int)sdl->sdl_alen * NBBY;
 			if (ioctl(s_link, SIOCGLIFADDR, &iflr) == -1 ||
 			    !(iflr.flags & IFLR_ACTIVE))
 			{
