@@ -794,7 +794,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		}
 		if (s != 0) {
 			ifo->userclass[ifo->userclass[0] + 1] = (uint8_t)s;
-			ifo->userclass[0] += (uint8_t)s + 1;
+			ifo->userclass[0] = (uint8_t)(ifo->userclass[0] + s +1);
 		}
 		break;
 	case 'v':
@@ -824,8 +824,10 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			ifo->vendor[0] = 0;
 		}
 
-		/* No need to strip the comma */
+		/* Strip and preserve the comma */
+		*p = '\0';
 		i = (int)strtoi(arg, NULL, 0, 1, 254, &e);
+		*p = ',';
 		if (e) {
 			syslog(LOG_ERR, "vendor option should be between"
 			    " 1 and 254 inclusive");
@@ -854,7 +856,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		if (s != 0) {
 			ifo->vendor[ifo->vendor[0] + 1] = (uint8_t)i;
 			ifo->vendor[ifo->vendor[0] + 2] = (uint8_t)s;
-			ifo->vendor[0] += (uint8_t)s + 2;
+			ifo->vendor[0] = (uint8_t)(ifo->vendor[0] + s + 2);
 		}
 		break;
 	case 'w':
@@ -2044,7 +2046,7 @@ read_config(struct dhcpcd_ctx *ctx,
 
 	vlen = dhcp_vendor((char *)ifo->vendorclassid + 1,
 	            sizeof(ifo->vendorclassid) - 1);
-	ifo->vendorclassid[0] = vlen == -1 ? 0 : (uint8_t)vlen;
+	ifo->vendorclassid[0] = (uint8_t)(vlen == -1 ? 0 : vlen);
 
 	buf = NULL;
 	buflen = 0;
