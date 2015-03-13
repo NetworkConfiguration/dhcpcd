@@ -445,14 +445,14 @@ dhcp6_delegateaddr(struct in6_addr *addr, struct interface *ifp,
 		if (prefix->prefix_len + bits > UINT8_MAX)
 			asla.prefix_len = UINT8_MAX;
 		else {
-			asla.prefix_len = prefix->prefix_len + (uint8_t)bits;
+			asla.prefix_len = (uint8_t)(prefix->prefix_len + bits);
 
 			/* Make a 64 prefix by default, as this maks SLAAC
 			 * possible. Otherwise round up to the nearest octet. */
 			if (asla.prefix_len <= 64)
 				asla.prefix_len = 64;
 			else
-				asla.prefix_len = ROUNDUP8(asla.prefix_len);
+				asla.prefix_len = (uint8_t)ROUNDUP8(asla.prefix_len);
 
 		}
 
@@ -634,7 +634,7 @@ dhcp6_makemessage(struct interface *ifp)
 					    sizeof(ap->prefix);
 					if (ap->prefix_exclude_len)
 						len += sizeof(*o) + 1 +
-						    ((ap->prefix_exclude_len -
+						    (uint8_t)((ap->prefix_exclude_len -
 						    ap->prefix_len - 1) / NBBY)
 						    + 1;
 
@@ -791,15 +791,15 @@ dhcp6_makemessage(struct interface *ifp)
 
 				/* RFC6603 Section 4.2 */
 				if (ap->prefix_exclude_len) {
-					n = ((ap->prefix_exclude_len -
+					n = (size_t)((ap->prefix_exclude_len -
 					    ap->prefix_len - 1) / NBBY) + 1;
 					eo = D6_NEXT_OPTION(so);
 					eo->code = htons(D6_OPTION_PD_EXCLUDE);
-					eo->len = (uint16_t)n + 1;
+					eo->len = (uint16_t)(n + 1);
 					p = D6_OPTION_DATA(eo);
 					*p++ = (uint8_t)ap->prefix_exclude_len;
 					pp = ap->prefix_exclude.s6_addr;
-					pp += ((ap->prefix_len - 1) / NBBY)
+					pp += (size_t)((ap->prefix_len - 1) / NBBY)
 					    + (n - 1);
 					u8 = ap->prefix_len % NBBY;
 					if (u8)
@@ -808,14 +808,14 @@ dhcp6_makemessage(struct interface *ifp)
 						*p++ = *pp--;
 					if (u8)
 						*p = (uint8_t)(*pp << u8);
-					u32 = ntohs(so->len) +
-					    sizeof(*eo) + eo->len;
-					so->len = htons(u32);
+					u16 = (uint16_t)(ntohs(so->len) +
+					    sizeof(*eo) + eo->len);
+					so->len = htons(u16);
 					eo->len = htons(eo->len);
 				}
 
-				u32 = ntohs(o->len) + sizeof(*so)
-				    + ntohs(so->len);
+				u32 = (uint32_t)(ntohs(o->len) + sizeof(*so)
+				    + ntohs(so->len));
 				o->len = htons(u32);
 			} else {
 				so->code = htons(D6_OPTION_IA_ADDR);
@@ -826,10 +826,10 @@ dhcp6_makemessage(struct interface *ifp)
 				iap->addr = ap->addr;
 				iap->pltime = htonl(ap->prefix_pltime);
 				iap->vltime = htonl(ap->prefix_vltime);
-				u32 = ntohs(o->len) + sizeof(*so)
-				    + so->len;
+				u16 = (uint16_t)(ntohs(o->len) + sizeof(*so)
+				    + so->len);
 				so->len = htons(so->len);
-				o->len = htons(u32);
+				o->len = htons(u16);
 			}
 		}
 	}
@@ -890,7 +890,7 @@ dhcp6_makemessage(struct interface *ifp)
 					u16 = htons(opt->option);
 					memcpy(p, &u16, sizeof(u16));
 					p += sizeof(u16);
-					o->len += sizeof(u16);
+					o->len = (uint16_t)(o->len + sizeof(u16));
 				}
 			}
 			for (l = 0, opt = ifo->dhcp6_override;
@@ -905,13 +905,13 @@ dhcp6_makemessage(struct interface *ifp)
 					u16 = htons(opt->option);
 					memcpy(p, &u16, sizeof(u16));
 					p += sizeof(u16);
-					o->len += sizeof(u16);
+					o->len = (uint16_t)(o->len + sizeof(u16));
 				}
 			}
 			if (dhcp6_findselfsla(ifp, NULL)) {
 				u16 = htons(D6_OPTION_PD_EXCLUDE);
 				memcpy(p, &u16, sizeof(u16));
-				o->len += sizeof(u16);
+				o->len = (uint16_t)(o->len + sizeof(u16));
 			}
 			o->len = htons(o->len);
 		}
@@ -1041,7 +1041,7 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 			else
 				state->RT.tv_sec = 0;
 			state->RT.tv_nsec = (suseconds_t)arc4random_uniform(
-			    state->IMD * NSEC_PER_SEC);
+			    (uint32_t)(state->IMD * NSEC_PER_SEC));
 			timespecnorm(&state->RT);
 			broad_uni = "delaying";
 			goto logsend;
@@ -1064,7 +1064,7 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 		if (neg)
 			rnd = -rnd;
 		ts_to_ms(ms, &RTprev);
-		ms *= rnd;
+		ms = (time_t)((double)ms * rnd);
 		ms_to_ts(&RTprev, ms);
 		if (neg)
 			timespecsub(&state->RT, &RTprev, &state->RT);
@@ -1077,7 +1077,7 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 			state->RT.tv_sec = state->MRT;
 			state->RT.tv_nsec = 0;
 			ts_to_ms(ms, &RTprev);
-			ms *= rnd;
+			ms = (time_t)((double)ms * rnd);
 			ms_to_ts(&RTprev, ms);
 			if (neg)
 				timespecsub(&state->RT, &RTprev, &state->RT);
@@ -1852,7 +1852,7 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 		i++;
 
 		p = D6_COPTION_DATA(o) + sizeof(pdp);
-		ol -= sizeof(pdp);
+		ol = (uint16_t)(ol - sizeof(pdp));
 		ex = dhcp6_findoption(D6_OPTION_PD_EXCLUDE, p, ol);
 		a->prefix_exclude_len = 0;
 		memset(&a->prefix_exclude, 0, sizeof(a->prefix_exclude));
@@ -1898,7 +1898,7 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 		while (ol-- > 0)
 			*pw-- = *op++;
 		if (u8)
-			*pw |= *op >> u8;
+			*pw = (uint8_t)(*pw | (*op >> u8));
 	}
 	return i;
 }
@@ -1963,7 +1963,7 @@ dhcp6_findia(struct interface *ifp, const struct dhcp6_message *m, size_t l,
 		p = D6_COPTION_DATA(o);
 		memcpy(iaid, p, sizeof(iaid));
 		p += sizeof(iaid);
-		ol -= sizeof(iaid);
+		ol = (uint16_t)(ol - sizeof(iaid));
 
 		for (j = 0; j < ifo->ia_len; j++) {
 			if (memcmp(&ifo->ia[j].iaid, iaid, sizeof(iaid)) == 0)
@@ -1988,11 +1988,11 @@ dhcp6_findia(struct interface *ifp, const struct dhcp6_message *m, size_t l,
 			memcpy(&u32, p, sizeof(u32));
 			renew = ntohl(u32);
 			p += sizeof(u32);
-			ol -= sizeof(u32);
+			ol = (uint16_t)(ol - sizeof(u32));
 			memcpy(&u32, p, sizeof(u32));
 			rebind = ntohl(u32);
 			p += sizeof(u32);
-			ol -= sizeof(u32);
+			ol = (uint16_t)(ol - sizeof(u32));
 		} else
 			renew = rebind = 0; /* appease gcc */
 		if (dhcp6_checkstatusok(ifp, NULL, p, ol) == -1) {
@@ -2302,7 +2302,8 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 	/* Wang a 1 at the end as the prefix could be >64
 	 * making SLAAC impossible. */
 	a->addr = a->prefix;
-	a->addr.s6_addr[sizeof(a->addr.s6_addr) - 1] += 1;
+	a->addr.s6_addr[sizeof(a->addr.s6_addr) - 1] =
+	    (uint8_t)(a->addr.s6_addr[sizeof(a->addr.s6_addr) - 1] + 1);
 
 	state = D6_STATE(ifp);
 	/* Remove any exiting address */
