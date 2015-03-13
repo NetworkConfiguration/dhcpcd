@@ -414,9 +414,6 @@ dhcp6_delegateaddr(struct in6_addr *addr, struct interface *ifp,
 		asla.sla = ifp->index;
 		asla.prefix_len = 0;
 		sla = &asla;
-
-		if (ia->sla_max == 0) {
-		}
 	} else if (sla->prefix_len == 0) {
 		asla.sla = sla->sla;
 		if (asla.sla == 0)
