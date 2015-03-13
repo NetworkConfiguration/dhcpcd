@@ -248,7 +248,7 @@ ipv6nd_makersprobe(struct interface *ifp)
 	rs->nd_rs_reserved = 0;
 	nd = (struct nd_opt_hdr *)(state->rs + sizeof(*rs));
 	nd->nd_opt_type = ND_OPT_SOURCE_LINKADDR;
-	nd->nd_opt_len = (ROUNDUP8(ifp->hwlen + 2)) >> 3;
+	nd->nd_opt_len = (uint8_t)((ROUNDUP8(ifp->hwlen + 2)) >> 3);
 	memcpy(nd + 1, ifp->hwaddr, ifp->hwlen);
 	return 0;
 }
