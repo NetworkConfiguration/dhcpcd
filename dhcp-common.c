@@ -485,9 +485,9 @@ print_string(char *dst, size_t len, int type, const uint8_t *data, size_t dl)
 					return -1;
 				}
 				*dst++ = '\\';
-		                *dst++ = (((unsigned char)c >> 6) & 03) + '0';
-		                *dst++ = (((unsigned char)c >> 3) & 07) + '0';
-		                *dst++ = ( (unsigned char)c       & 07) + '0';
+		                *dst++ = (char)(((c >> 6) & 03) + '0');
+		                *dst++ = (char)(((c >> 3) & 07) + '0');
+		                *dst++ = (char)(( c       & 07) + '0');
 				len -= 4;
 			}
 			bytes += 4;
