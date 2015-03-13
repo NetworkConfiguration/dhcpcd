@@ -90,9 +90,12 @@ struct dhcp_opt *vivso_find(uint32_t, const void *);
 ssize_t dhcp_vendor(char *, size_t);
 
 void dhcp_print_option_encoding(const struct dhcp_opt *opt, int cols);
-#define add_option_mask(var, val) (var[val >> 3] |= 1 << (val & 7))
-#define del_option_mask(var, val) (var[val >> 3] &= ~(1 << (val & 7)))
-#define has_option_mask(var, val) (var[val >> 3] & (1 << (val & 7)))
+#define add_option_mask(var, val) \
+	((var)[(val) >> 3] = (uint8_t)((var)[(val) >> 3] | 1 << ((val) & 7)))
+#define del_option_mask(var, val) \
+	((var)[(val) >> 3] = (uint8_t)((var)[(val) >> 3] & ~(1 << ((val) & 7))))
+#define has_option_mask(var, val) \
+	((var)[(val) >> 3] & (uint8_t)(1 << ((val) & 7)))
 int make_option_mask(const struct dhcp_opt *, size_t,
     const struct dhcp_opt *, size_t,
     uint8_t *, const char *, int);
