@@ -298,7 +298,7 @@ decode_rfc3442(char *out, size_t len, const uint8_t *p, size_t pl)
 			errno = EINVAL;
 			return -1;
 		}
-		ocets = (cidr + 7) / NBBY;
+		ocets = (size_t)(cidr + 7) / NBBY;
 		if (p + 4 + ocets > e) {
 			errno = ERANGE;
 			return -1;
@@ -365,7 +365,7 @@ decode_rfc3442_rt(const uint8_t *data, size_t dl)
 			return NULL;
 		}
 
-		ocets = (cidr + 7) / NBBY;
+		ocets = (size_t)(cidr + 7) / NBBY;
 		if (p + 4 + ocets > e) {
 			ipv4_freeroutes(routes);
 			errno = ERANGE;
@@ -761,7 +761,7 @@ make_message(struct dhcp_message **message,
 
 	if (state->clientid) {
 		*p++ = DHO_CLIENTID;
-		memcpy(p, state->clientid, state->clientid[0] + 1);
+		memcpy(p, state->clientid, (size_t)state->clientid[0] + 1);
 		p += state->clientid[0] + 1;
 	}
 
@@ -832,14 +832,15 @@ make_message(struct dhcp_message **message,
 
 		if (ifo->userclass[0]) {
 			*p++ = DHO_USERCLASS;
-			memcpy(p, ifo->userclass, ifo->userclass[0] + 1);
+			memcpy(p, ifo->userclass,
+			    (size_t)ifo->userclass[0] + 1);
 			p += ifo->userclass[0] + 1;
 		}
 
 		if (ifo->vendorclassid[0]) {
 			*p++ = DHO_VENDORCLASSID;
 			memcpy(p, ifo->vendorclassid,
-			    ifo->vendorclassid[0] + 1);
+			    (size_t)ifo->vendorclassid[0] + 1);
 			p += ifo->vendorclassid[0] + 1;
 		}
 
@@ -890,7 +891,7 @@ make_message(struct dhcp_message **message,
 			*p++ = 0; /* from server for A RR if S=1 */
 			if (hostname) {
 				i = encode_rfc1035(hostname, p);
-				*lp += i;
+				*lp += (uint8_t)i;
 				p += i;
 			}
 		} else if (ifo->options & DHCPCD_HOSTNAME && hostname) {
@@ -904,7 +905,7 @@ make_message(struct dhcp_message **message,
 		/* vendor is already encoded correctly, so just add it */
 		if (ifo->vendor[0]) {
 			*p++ = DHO_VENDOR;
-			memcpy(p, ifo->vendor, ifo->vendor[0] + 1);
+			memcpy(p, ifo->vendor, (size_t)ifo->vendor[0] + 1);
 			p += ifo->vendor[0] + 1;
 		}
 
@@ -1492,13 +1493,13 @@ checksum(const void *data, uint16_t len)
 	uint16_t res;
 
 	while (len > 1) {
-		sum += addr[0] * 256 + addr[1];
+		sum += (uint32_t)addr[0] * 256 + (uint32_t)addr[1];
 		addr += 2;
 		len -= 2;
 	}
 
 	if (len == 1)
-		sum += *addr * 256;
+		sum += (uint32_t)*addr * 256;
 
 	sum = (sum >> 16) + (sum & 0xffff);
 	sum += (sum >> 16);
