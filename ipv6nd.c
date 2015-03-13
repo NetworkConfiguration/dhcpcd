@@ -237,7 +237,7 @@ ipv6nd_makersprobe(struct interface *ifp)
 
 	state = RS_STATE(ifp);
 	free(state->rs);
-	state->rslen = sizeof(*rs) + ROUNDUP8(ifp->hwlen + 2);
+	state->rslen = sizeof(*rs) + (size_t)ROUNDUP8(ifp->hwlen + 2);
 	state->rs = calloc(1, state->rslen);
 	if (state->rs == NULL)
 		return -1;
@@ -816,7 +816,7 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 			break;
 		}
 		ndo = (struct nd_opt_hdr *)p;
-		olen = ndo->nd_opt_len * 8 ;
+		olen = (size_t)ndo->nd_opt_len * 8;
 		if (olen == 0) {
 			syslog(LOG_ERR, "%s: zero length option", ifp->name);
 			break;
@@ -988,7 +988,7 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 			    nd_opt_rdnss_lifetime);
 			op += sizeof(rdnss->nd_opt_rdnss_lifetime);
 			l = 0;
-			for (n = ndo->nd_opt_len - 1; n > 1; n -= 2,
+			for (n = (size_t)ndo->nd_opt_len - 1; n > 1; n -= 2,
 			    op += sizeof(addr))
 			{
 				r = ipv6_printaddr(NULL, 0, op, ifp->name);
@@ -1002,7 +1002,7 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 			tmp = opt = malloc(l);
 			if (opt == NULL)
 				continue;
-			for (n = ndo->nd_opt_len - 1; n > 1; n -= 2,
+			for (n = (size_t)ndo->nd_opt_len - 1; n > 1; n -= 2,
 			    op += sizeof(addr))
 			{
 				r = ipv6_printaddr(tmp, l, op,
@@ -1025,7 +1025,7 @@ ipv6nd_handlera(struct ipv6_ctx *ctx, struct interface *ifp,
 			op = p + offsetof(struct nd_opt_dnssl,
 			    nd_opt_dnssl_lifetime);
 			op += sizeof(dnssl->nd_opt_dnssl_lifetime);
-			n = (dnssl->nd_opt_dnssl_len - 1) * 8;
+			n = (size_t)(dnssl->nd_opt_dnssl_len - 1) * 8;
 			r = decode_rfc3397(NULL, 0, op, n);
 			if (r < 1) {
 				syslog(new_data ? LOG_ERR : LOG_DEBUG,

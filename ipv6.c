@@ -454,7 +454,8 @@ ipv6_makeprefix(struct in6_addr *prefix, const struct in6_addr *addr, int len)
 	bitlen = len % NBBY;
 	memcpy(&prefix->s6_addr, &addr->s6_addr, (size_t)bytelen);
 	if (bitlen != 0)
-		prefix->s6_addr[bytelen] >>= NBBY - bitlen;
+		prefix->s6_addr[bytelen] =
+		    (uint8_t)(prefix->s6_addr[bytelen] >> (NBBY - bitlen));
 	memset((char *)prefix->s6_addr + bytelen, 0,
 	    sizeof(prefix->s6_addr) - (size_t)bytelen);
 	return 0;
@@ -1406,7 +1407,7 @@ again:
 	/* RFC4941 Section 3.2.1.1
 	 * Take the left-most 64bits and set bit 6 to zero */
 	memcpy(state->randomid, digest, sizeof(state->randomid));
-	state->randomid[0] &= ~EUI64_UBIT;
+	state->randomid[0] = (uint8_t)(state->randomid[0] & ~EUI64_UBIT);
 
 	/* RFC4941 Section 3.2.1.4
 	 * Reject reserved or existing id's */
