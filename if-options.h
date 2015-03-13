@@ -162,7 +162,7 @@ struct if_options {
 	char *script;
 
 	char hostname[HOSTNAME_MAX_LEN + 1]; /* We don't store the length */
-	int fqdn;
+	uint8_t fqdn;
 	uint8_t vendorclassid[VENDORCLASSID_MAX_LEN + 2];
 	uint8_t clientid[CLIENTID_MAX_LEN + 2];
 	uint8_t userclass[USERCLASS_MAX_LEN + 2];

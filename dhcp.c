@@ -191,12 +191,12 @@ get_option(struct dhcpcd_ctx *ctx,
 		case DHO_END:
 			if (overl & 1) {
 				/* bit 1 set means parse boot file */
-				overl &= ~1;
+				overl = (uint8_t)(overl & ~1);
 				p = dhcp->bootfile;
 				e = p + sizeof(dhcp->bootfile);
 			} else if (overl & 2) {
 				/* bit 2 set means parse server name */
-				overl &= ~2;
+				overl = (uint8_t)(overl & ~2);
 				p = dhcp->servername;
 				e = p + sizeof(dhcp->servername);
 			} else
@@ -884,14 +884,14 @@ make_message(struct dhcp_message **message,
 			 *         update DNS
 			 */
 			if (hostname)
-				*p++ = (ifo->fqdn & 0x09) | 0x04;
+				*p++ = (uint8_t)((ifo->fqdn & 0x09) | 0x04);
 			else
 				*p++ = (FQDN_NONE & 0x09) | 0x04;
 			*p++ = 0; /* from server for PTR RR */
 			*p++ = 0; /* from server for A RR if S=1 */
 			if (hostname) {
 				i = encode_rfc1035(hostname, p);
-				*lp += (uint8_t)i;
+				*lp = (uint8_t)(*lp + i);
 				p += i;
 			}
 		} else if (ifo->options & DHCPCD_HOSTNAME && hostname) {
@@ -942,7 +942,7 @@ make_message(struct dhcp_message **message,
 				*p++ = (uint8_t)vivco->len;
 				memcpy(p, vivco->data, vivco->len);
 				p += vivco->len;
-				*lp += (uint8_t)vivco->len + 1;
+				*lp = (uint8_t)(*lp + vivco->len + 1);
 			}
 		}
 
@@ -1486,11 +1486,10 @@ eexit:
 }
 
 static uint16_t
-checksum(const void *data, uint16_t len)
+checksum(const void *data, unsigned int len)
 {
 	const uint8_t *addr = data;
 	uint32_t sum = 0;
-	uint16_t res;
 
 	while (len > 1) {
 		sum += (uint32_t)addr[0] * 256 + (uint32_t)addr[1];
@@ -1504,9 +1503,7 @@ checksum(const void *data, uint16_t len)
 	sum = (sum >> 16) + (sum & 0xffff);
 	sum += (sum >> 16);
 
-	res = htons(sum);
-
-	return ~res;
+	return (uint16_t)~htons(sum);
 }
 
 static struct udp_dhcp_packet *
