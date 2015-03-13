@@ -81,7 +81,8 @@ ipv4ll_pick_addr(const struct arp_state *astate)
 		/* RFC 3927 Section 2.1 states that the first 256 and
 		 * last 256 addresses are reserved for future use.
 		 * See ipv4ll_start for why we don't use arc4_random. */
-		addr = ntohl(LINKLOCAL_ADDR | ((random() % 0xFD00) + 0x0100));
+		addr = ntohl(LINKLOCAL_ADDR |
+		    ((uint32_t)(random() % 0xFD00) + 0x0100));
 
 		/* No point using a failed address */
 		if (addr == astate->failed.s_addr)
