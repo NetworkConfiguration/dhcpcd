@@ -1541,7 +1541,8 @@ ipv6nd_handledata(void *arg)
 		return;
 	}
 
-	pkt.ipi6_ifindex = hoplimit = 0;
+	pkt.ipi6_ifindex = 0;
+	hoplimit = 0;
 	for (cm = (struct cmsghdr *)CMSG_FIRSTHDR(&ctx->rcvhdr);
 	     cm;
 	     cm = (struct cmsghdr *)CMSG_NXTHDR(&ctx->rcvhdr, cm))
