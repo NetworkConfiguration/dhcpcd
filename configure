@@ -326,14 +326,15 @@ fi
 if [ "$DEBUG" != no -a "$DEBUG" != false ]; then
 	echo "Adding debugging CFLAGS"
 	cat <<EOF >>$CONFIG_MK
-CFLAGS+=	-g -Wall -Wextra -Wshadow -Wformat=2
+CFLAGS+=	-g -Wall -Wextra
 CFLAGS+=	-Wmissing-prototypes -Wmissing-declarations
-CFLAGS+=	-Wmissing-noreturn -Wmissing-format-attribute
-CFLAGS+=	-Wnested-externs
-CFLAGS+=	-Winline -Wwrite-strings -Wcast-align -Wcast-qual
-CFLAGS+=	-Wpointer-arith
-CFLAGS+=	-Wdeclaration-after-statement
+CFLAGS+=	-Wmissing-format-attribute -Wnested-externs
+CFLAGS+=	-Winline -Wcast-align -Wcast-qual -Wpointer-arith
+CFLAGS+=	-Wreturn-type -Wswitch -Wshadow
+CFLAGS+=	-Wcast-qual -Wwrite-strings
 CFLAGS+=	-Wconversion
+CFLAGS+=	-Wformat=2
+CFLAGS+=	-Wpointer-sign -Wmissing-noreturn
 EOF
 	case "$OS" in
 	mirbsd*|openbsd*);; # OpenBSD has many redundant decs in system headers
