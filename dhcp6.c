@@ -3146,12 +3146,8 @@ dhcp6_start1(void *arg)
 					TAILQ_REMOVE(ifs, ifn, next);
 					TAILQ_INSERT_AFTER(ifp->ctx->ifaces,
 					    ifp, ifn, next);
-					dhcpcd_initstate(ifn);
-					ifn->options->options |=
-					    DHCPCD_PFXDLGONLY;
-					ifn->options->options &=
-					    ~(DHCPCD_IPV4 | DHCPCD_IPV6RS |
-					    DHCPCD_NOPFXDLG);
+					dhcpcd_initstate(ifn,
+					    DHCPCD_PFXDLGONLY);
 					eloop_timeout_add_sec(ifp->ctx->eloop,
 					    0, dhcpcd_startinterface, ifn);
 				}

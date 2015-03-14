@@ -381,6 +381,10 @@ configure_interface1(struct interface *ifp)
 	    !(ifp->ctx->options & DHCPCD_TEST))
 		ifo->options |= DHCPCD_IPV6RA_OWN;
 
+	/* If we're a psuedo interface, ensure we disable as much as we can */
+	if (ifp->options->options & DHCPCD_PFXDLGONLY)
+		ifp->options->options &= ~(DHCPCD_IPV4 | DHCPCD_IPV6RS);
+
 	/* We want to disable kernel interface RA as early as possible. */
 	if (ifo->options & DHCPCD_IPV6RS) {
 		/* If not doing any DHCP, disable the RDNSS requirement. */
@@ -540,11 +544,13 @@ dhcpcd_selectprofile(struct interface *ifp, const char *profile)
 }
 
 static void
-configure_interface(struct interface *ifp, int argc, char **argv)
+configure_interface(struct interface *ifp, int argc, char **argv,
+    unsigned long long options)
 {
 
 	dhcpcd_selectprofile(ifp, NULL);
 	add_options(ifp->ctx, ifp->name, ifp->options, argc, argv);
+	ifp->options->options |= options;
 	configure_interface1(ifp);
 }
 
@@ -627,7 +633,7 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 #endif
 			if (ifp->wireless)
 				if_getssid(ifp);
-			dhcpcd_initstate(ifp);
+			dhcpcd_initstate(ifp, 0);
 			script_runreason(ifp, "CARRIER");
 			/* RFC4941 Section 3.5 */
 			if (ifp->options->options & DHCPCD_IPV6RA_OWN)
@@ -747,7 +753,7 @@ dhcpcd_startinterface(void *arg)
 
 	if (ifo->options & DHCPCD_IPV6) {
 		if (ifo->options & DHCPCD_IPV6RS &&
-		    !(ifo->options & (DHCPCD_INFORM | DHCPCD_PFXDLGONLY)))
+		    !(ifo->options & DHCPCD_INFORM))
 			ipv6nd_startrs(ifp);
 
 		if (ifo->options & DHCPCD_DHCP6)
@@ -781,8 +787,6 @@ dhcpcd_startinterface(void *arg)
 				    "%s: dhcp6_start: %m", ifp->name);
 		}
 	}
-	if (ifo->options & DHCPCD_PFXDLGONLY)
-		return;
 
 	if (ifo->options & DHCPCD_IPV4)
 		dhcp_start(ifp);
@@ -830,11 +834,12 @@ handle_link(void *arg)
 }
 
 static void
-dhcpcd_initstate1(struct interface *ifp, int argc, char **argv)
+dhcpcd_initstate1(struct interface *ifp, int argc, char **argv,
+    unsigned long long options)
 {
 	struct if_options *ifo;
 
-	configure_interface(ifp, argc, argv);
+	configure_interface(ifp, argc, argv, options);
 	ifo = ifp->options;
 
 	if (ifo->options & DHCPCD_IPV4 && ipv4_init(ifp->ctx) == -1) {
@@ -857,10 +862,10 @@ dhcpcd_initstate1(struct interface *ifp, int argc, char **argv)
 }
 
 void
-dhcpcd_initstate(struct interface *ifp)
+dhcpcd_initstate(struct interface *ifp, unsigned long long options)
 {
 
-	dhcpcd_initstate1(ifp, ifp->ctx->argc, ifp->ctx->argv);
+	dhcpcd_initstate1(ifp, ifp->ctx->argc, ifp->ctx->argv, options);
 }
 
 static void
@@ -932,7 +937,7 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 			syslog(LOG_DEBUG, "%s: interface added", ifp->name);
 			TAILQ_REMOVE(ifs, ifp, next);
 			TAILQ_INSERT_TAIL(ctx->ifaces, ifp, next);
-			dhcpcd_initstate(ifp);
+			dhcpcd_initstate(ifp, 0);
 			run_preinit(ifp);
 			iff = ifp;
 		}
@@ -985,7 +990,7 @@ if_reboot(struct interface *ifp, int argc, char **argv)
 
 	oldopts = ifp->options->options;
 	script_runreason(ifp, "RECONFIGURE");
-	dhcpcd_initstate1(ifp, argc, argv);
+	dhcpcd_initstate1(ifp, argc, argv, 0);
 	dhcp_reboot_newopts(ifp, oldopts);
 	dhcp6_reboot(ifp);
 	dhcpcd_prestartinterface(ifp);
@@ -1031,7 +1036,7 @@ reconf_reboot(struct dhcpcd_ctx *ctx, int action, int argc, char **argv, int oi)
 			if_free(ifp);
 		} else {
 			TAILQ_INSERT_TAIL(ctx->ifaces, ifp, next);
-			dhcpcd_initstate1(ifp, argc, argv);
+			dhcpcd_initstate1(ifp, argc, argv, 0);
 			run_preinit(ifp);
 			dhcpcd_prestartinterface(ifp);
 		}
@@ -1546,7 +1551,7 @@ main(int argc, char **argv)
 					family = AF_INET;
 			}
 		}
-		configure_interface(ifp, ctx.argc, ctx.argv);
+		configure_interface(ifp, ctx.argc, ctx.argv, 0);
 		if (ctx.options & DHCPCD_PFXDLGONLY)
 			ifp->options->options |= DHCPCD_PFXDLGONLY;
 		if (family == 0 || family == AF_INET) {
@@ -1750,7 +1755,7 @@ main(int argc, char **argv)
 	}
 
 	TAILQ_FOREACH(ifp, ctx.ifaces, next) {
-		dhcpcd_initstate1(ifp, argc, argv);
+		dhcpcd_initstate1(ifp, argc, argv, 0);
 	}
 
 	if (ctx.options & DHCPCD_BACKGROUND && dhcpcd_daemonise(&ctx))

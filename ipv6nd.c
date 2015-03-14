@@ -1569,8 +1569,12 @@ ipv6nd_handledata(void *arg)
 	}
 
 	TAILQ_FOREACH(ifp, dhcpcd_ctx->ifaces, next) {
-		if (ifp->index == (unsigned int)pkt.ipi6_ifindex)
+		if (ifp->index == (unsigned int)pkt.ipi6_ifindex) {
+			if (!(ifp->options->options & DHCPCD_IPV6) ||
+			    ifp->options->options & DHCPCD_PFXDLGONLY)
+				return;
 			break;
+		}
 	}
 
 	icp = (struct icmp6_hdr *)ctx->rcvhdr.msg_iov[0].iov_base;
