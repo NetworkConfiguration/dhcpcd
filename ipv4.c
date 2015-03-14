@@ -383,7 +383,7 @@ nc_route(struct rt *ort, struct rt *nrt)
 #ifdef HAVE_ROUTE_METRIC
 		    ort->metric == nrt->metric &&
 #endif
-		    IN6_ARE_ADDR_EQUAL(&ort->gate, &nrt->gate))))
+		    ort->gate.s_addr == nrt->gate.s_addr)))
 			return 0;
 	} else if (ort->flags & STATE_FAKE && !(nrt->flags & STATE_FAKE) &&
 	    ort->iface == nrt->iface &&
