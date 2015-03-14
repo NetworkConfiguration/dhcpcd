@@ -510,6 +510,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct rt_msghdr *rtm)
 
 	get_addrs(rtm->rtm_addrs, cp, rti_info);
 	memset(rt, 0, sizeof(*rt));
+	rt->flags = rtm->rtm_flags;
 	COPYOUT(rt->dest, rti_info[RTAX_DST]);
 	if (rtm->rtm_addrs & RTA_NETMASK)
 		COPYOUT(rt->net, rti_info[RTAX_NETMASK]);
@@ -823,6 +824,7 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct rt_msghdr *rtm)
 
 	get_addrs(rtm->rtm_addrs, cp, rti_info);
 	memset(rt, 0, sizeof(*rt));
+	rt->flags = rtm->rtm_flags;
 	COPYOUT6(rt->dest, rti_info[RTAX_DST]);
 	if (rtm->rtm_addrs & RTA_NETMASK) {
 		/*

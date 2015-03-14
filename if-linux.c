@@ -469,6 +469,10 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct nlmsghdr *nlm)
 		return -1;
 
 	memset(rt, 0, sizeof(*rt));
+	ipv6_mask(&rt->net, rtm->rtm_dst_len);
+	if (rtm->rtm_type == RTN_UNREACHABLE)
+		rt->flags = RTF_REJECT;
+
 	rta = (struct rtattr *)RTM_RTA(rtm);
 	len = RTM_PAYLOAD(nlm);
 	while (RTA_OK(rta, len)) {
@@ -492,7 +496,6 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct nlmsghdr *nlm)
 		rta = RTA_NEXT(rta, len);
 	}
 
-	ipv6_mask(&rt->net, rtm->rtm_dst_len);
 	return 0;
 }
 #endif
@@ -1551,7 +1554,6 @@ if_route6(unsigned char cmd, const struct rt6 *rt)
 			add_attr_32(&nlm.hdr, sizeof(nlm),
 			    RTA_PRIORITY, rt->metric);
 	}
-
 	if (cmd == RTM_ADD && rt->mtu) {
 		char metricsbuf[32];
 		struct rtattr *metrics = (void *)metricsbuf;

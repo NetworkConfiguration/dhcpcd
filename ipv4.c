@@ -377,11 +377,13 @@ nc_route(struct rt *ort, struct rt *nrt)
 
 	if (ort == NULL) {
 		ort = ipv4_findrt(nrt->iface->ctx, nrt, 0);
-		if (ort && ort->iface == nrt->iface &&
+		if (ort &&
+		    ((ort->flags & RTF_REJECT && nrt->flags & RTF_REJECT) ||
+		     (ort->iface == nrt->iface &&
 #ifdef HAVE_ROUTE_METRIC
 		    ort->metric == nrt->metric &&
 #endif
-		    ort->gate.s_addr == nrt->gate.s_addr)
+		    IN6_ARE_ADDR_EQUAL(&ort->gate, &nrt->gate))))
 			return 0;
 	} else if (ort->flags & STATE_FAKE && !(nrt->flags & STATE_FAKE) &&
 	    ort->iface == nrt->iface &&

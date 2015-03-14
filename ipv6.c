@@ -1740,12 +1740,13 @@ ipv6_findrt(struct dhcpcd_ctx *ctx, const struct rt6 *rt, int flags)
 
 	TAILQ_FOREACH(r, &ctx->ipv6->kroutes, next) {
 		if (IN6_ARE_ADDR_EQUAL(&rt->dest, &r->dest) &&
-		    (!flags || rt->iface == r->iface) &&
 #ifdef HAVE_ROUTE_METRIC
-		    rt->iface == r->iface &&
+		    (rt->iface == r->iface ||
+		    (rt->flags & RTF_REJECT && r->flags & RTF_REJECT)) &&
 		    (!flags || rt->metric == r->metric) &&
 #else
-		    (!flags || rt->iface == r->iface) &&
+		    (!flags || rt->iface == r->iface ||
+		    (rt->flags & RTF_REJECT && r->flags & RTF_REJECT)) &&
 #endif
 		    IN6_ARE_ADDR_EQUAL(&rt->net, &r->net))
 			return r;
@@ -1819,11 +1820,13 @@ nc_route(struct rt6 *ort, struct rt6 *nrt)
 
 	if (ort == NULL) {
 		ort = ipv6_findrt(nrt->iface->ctx, nrt, 0);
-		if (ort && ort->iface == nrt->iface &&
+		if (ort &&
+		    ((ort->flags & RTF_REJECT && nrt->flags & RTF_REJECT) ||
+		     (ort->iface == nrt->iface &&
 #ifdef HAVE_ROUTE_METRIC
 		    ort->metric == nrt->metric &&
 #endif
-		    IN6_ARE_ADDR_EQUAL(&ort->gate, &nrt->gate))
+		    IN6_ARE_ADDR_EQUAL(&ort->gate, &nrt->gate))))
 			return 0;
 	}
 
