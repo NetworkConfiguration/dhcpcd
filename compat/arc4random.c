@@ -88,13 +88,13 @@ arc4_getbyte(struct arc4_stream *as)
 static uint32_t
 arc4_getword(struct arc4_stream *as)
 {
-	uint32_t val;
+	int val;
 
 	val = arc4_getbyte(as) << 24;
 	val |= arc4_getbyte(as) << 16;
 	val |= arc4_getbyte(as) << 8;
 	val |= arc4_getbyte(as);
-	return val;
+	return (uint32_t)val;
 }
 
 static void
