@@ -23,20 +23,20 @@
 #include "md5.h"
 
 #define PUT_64BIT_LE(cp, value) do {					\
-	(cp)[7] = (value) >> 56;					\
-	(cp)[6] = (value) >> 48;					\
-	(cp)[5] = (value) >> 40;					\
-	(cp)[4] = (value) >> 32;					\
-	(cp)[3] = (value) >> 24;					\
-	(cp)[2] = (value) >> 16;					\
-	(cp)[1] = (value) >> 8;						\
-	(cp)[0] = (value); } while (0)
+	(cp)[7] = (uint8_t)((value) >> 56);				\
+	(cp)[6] = (uint8_t)((value) >> 48);				\
+	(cp)[5] = (uint8_t)((value) >> 40);				\
+	(cp)[4] = (uint8_t)((value) >> 32);				\
+	(cp)[3] = (uint8_t)((value) >> 24);				\
+	(cp)[2] = (uint8_t)((value) >> 16);				\
+	(cp)[1] = (uint8_t)((value) >> 8);				\
+	(cp)[0] = (uint8_t)(value); } while (0)
 
 #define PUT_32BIT_LE(cp, value) do {					\
-	(cp)[3] = (value) >> 24;					\
-	(cp)[2] = (value) >> 16;					\
-	(cp)[1] = (value) >> 8;						\
-	(cp)[0] = (value); } while (0)
+	(cp)[3] = (uint8_t)((value) >> 24);				\
+	(cp)[2] = (uint8_t)((value) >> 16);				\
+	(cp)[1] = (uint8_t)((value) >> 8);				\
+	(cp)[0] = (uint8_t)(value); } while (0)
 
 static uint8_t PADDING[MD5_BLOCK_LENGTH] = {
 	0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
