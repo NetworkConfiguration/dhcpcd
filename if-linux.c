@@ -1756,6 +1756,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 	return ra;
 }
 
+#ifdef IPV6_MANAGETEMPADDR
 int
 ip6_use_tempaddr(const char *ifname)
 {
@@ -1795,4 +1796,5 @@ ip6_temp_valid_lifetime(const char *ifname)
 	val = check_proc_int(path);
 	return val < 0 ? TEMP_VALID_LIFETIME : val;
 }
-#endif
+#endif /* IPV6_MANAGETEMPADDR */
+#endif /* INET6 */
