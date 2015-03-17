@@ -103,7 +103,7 @@ hmac_md5_test4(void)
 	for (i = 0; i < 50; i++)
 		text[i] = 0xcd;
 	for (i = 0; i < 25; i++)
-		key[i] = i + 1;
+		key[i] = (uint8_t)(i + 1);
 	hmac_md5(text, 50, key, 25, hmac);
 	print_hmac(hmac);
 	printf("\t\texpected result:\t 0x697eaf0aca3a3aea3a75164746ffaa79\n");
