@@ -33,7 +33,7 @@
 #include "dprintf.h"
 
 int
-dprintf(int fd, const char *fmt, ...)
+vdprintf(int fd, const char *fmt, va_list va)
 {
 	int e;
 	FILE *fp;
@@ -47,9 +47,19 @@ dprintf(int fd, const char *fmt, ...)
 		return -1;
 	}
 
-	va_start(va, fmt);
 	e = vfprintf(fp, fmt, va);
-	va_end(va);
 	fclose(fp);
 	return e;
 }
+
+int
+dprintf(int fd, const char *fmt, ...)
+{
+	int e;
+
+	va_start(va, fmt);
+	e = vdprintf(fd, fmt, va);
+	va_end(va);
+	return e;
+}
+

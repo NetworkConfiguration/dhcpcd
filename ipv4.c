@@ -36,7 +36,6 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
 #include <unistd.h>
 
 #include "config.h"
@@ -267,26 +266,28 @@ static void
 desc_route(const char *cmd, const struct rt *rt)
 {
 	char addr[sizeof("000.000.000.000") + 1];
-	const char *ifname = rt->iface->name;
+	struct dhcpcd_ctx *ctx = rt->iface ? rt->iface->ctx : NULL;
+	const char *ifname = rt->iface ? rt->iface->name : NULL;
 
 	strlcpy(addr, inet_ntoa(rt->dest), sizeof(addr));
 	if (rt->gate.s_addr == INADDR_ANY)
-		syslog(LOG_INFO, "%s: %s route to %s/%d", ifname, cmd,
-		    addr, inet_ntocidr(rt->net));
+		logger(ctx, LOG_INFO, "%s: %s route to %s/%d",
+		    ifname, cmd, addr, inet_ntocidr(rt->net));
 	else if (rt->gate.s_addr == rt->dest.s_addr &&
 	    rt->net.s_addr == INADDR_BROADCAST)
-		syslog(LOG_INFO, "%s: %s host route to %s", ifname, cmd,
-		    addr);
+		logger(ctx, LOG_INFO, "%s: %s host route to %s",
+		    ifname, cmd, addr);
 	else if (rt->gate.s_addr == htonl(INADDR_LOOPBACK) &&
 	    rt->net.s_addr == INADDR_BROADCAST)
-		syslog(LOG_INFO, "%s: %s host route to %s via %s", ifname, cmd,
-		    addr, inet_ntoa(rt->gate));
+		logger(ctx, LOG_INFO, "%s: %s host route to %s via %s",
+		    ifname, cmd, addr, inet_ntoa(rt->gate));
 	else if (rt->dest.s_addr == INADDR_ANY && rt->net.s_addr == INADDR_ANY)
-		syslog(LOG_INFO, "%s: %s default route via %s", ifname, cmd,
-		    inet_ntoa(rt->gate));
+		logger(ctx, LOG_INFO, "%s: %s default route via %s",
+		    ifname, cmd, inet_ntoa(rt->gate));
 	else
-		syslog(LOG_INFO, "%s: %s route to %s/%d via %s", ifname, cmd,
-		    addr, inet_ntocidr(rt->net), inet_ntoa(rt->gate));
+		logger(ctx, LOG_INFO, "%s: %s route to %s/%d via %s",
+		    ifname, cmd, addr, inet_ntocidr(rt->net),
+		    inet_ntoa(rt->gate));
 }
 
 static struct rt *
@@ -399,18 +400,18 @@ nc_route(struct rt *ort, struct rt *nrt)
 	/* With route metrics, we can safely add the new route before
 	 * deleting the old route. */
 	if ((retval = if_route(RTM_ADD, nrt))  == -1)
-		syslog(LOG_ERR, "if_route (ADD): %m");
+		logger(nrt->iface->ctx, LOG_ERR, "if_route (ADD): %m");
 	if (ort && if_route(RTM_DELETE, ort) == -1 && errno != ESRCH)
-		syslog(LOG_ERR, "if_route (DEL): %m");
+		logger(nrt->iface->ctx, LOG_ERR, "if_route (DEL): %m");
 	return retval;
 #else
 	/* No route metrics, we need to delete the old route before
 	 * adding the new one. */
 	if (ort && if_route(RTM_DELETE, ort) == -1 && errno != ESRCH)
-		syslog(LOG_ERR, "if_route (DEL): %m");
+		logger(nrt->iface->ctx, LOG_ERR, "if_route (DEL): %m");
 	if (if_route(RTM_ADD, nrt) == 0)
 		return 0;
-	syslog(LOG_ERR, "if_route (ADD): %m");
+	logger(nrt->iface->ctx, LOG_ERR, "if_route (ADD): %m");
 	return -1;
 #endif
 }
@@ -423,7 +424,8 @@ d_route(struct rt *rt)
 	desc_route("deleting", rt);
 	retval = if_route(RTM_DELETE, rt);
 	if (retval != 0 && errno != ENOENT && errno != ESRCH)
-		syslog(LOG_ERR,"%s: if_delroute: %m", rt->iface->name);
+		logger(rt->iface->ctx, LOG_ERR,
+		    "%s: if_delroute: %m", rt->iface->name);
 	return retval;
 }
 
@@ -440,7 +442,7 @@ make_subnet_route(const struct interface *ifp)
 
 	r = malloc(sizeof(*r));
 	if (r == NULL) {
-		syslog(LOG_ERR, "%s: %m", __func__);
+		logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
 		return NULL;
 	}
 	r->dest.s_addr = s->addr.s_addr & s->net.s_addr;
@@ -479,7 +481,7 @@ add_loopback_route(struct rt_head *rt, const struct interface *ifp)
 
 	r = malloc(sizeof(*r));
 	if (r == NULL) {
-		syslog(LOG_ERR, "%s: %m", __func__);
+		logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
 		ipv4_freeroutes(rt);
 		return NULL;
 	}
@@ -505,7 +507,7 @@ get_routes(struct interface *ifp)
 				break;
 			r = malloc(sizeof(*r));
 			if (r == NULL) {
-				syslog(LOG_ERR, "%s: %m", __func__);
+				logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
 				ipv4_freeroutes(nrt);
 				return NULL;
 			}
@@ -537,24 +539,24 @@ massage_host_routes(struct rt_head *rt, const struct interface *ifp)
 }
 
 static struct rt_head *
-add_destination_route(struct rt_head *rt, const struct interface *iface)
+add_destination_route(struct rt_head *rt, const struct interface *ifp)
 {
 	struct rt *r;
 
 	if (rt == NULL || /* failed a malloc earlier probably */
-	    !(iface->flags & IFF_POINTOPOINT) ||
-	    !has_option_mask(iface->options->dstmask, DHO_ROUTER))
+	    !(ifp->flags & IFF_POINTOPOINT) ||
+	    !has_option_mask(ifp->options->dstmask, DHO_ROUTER))
 		return rt;
 
 	r = malloc(sizeof(*r));
 	if (r == NULL) {
-		syslog(LOG_ERR, "%s: %m", __func__);
+		logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
 		ipv4_freeroutes(rt);
 		return NULL;
 	}
 	r->dest.s_addr = INADDR_ANY;
 	r->net.s_addr = INADDR_ANY;
-	r->gate.s_addr = D_CSTATE(iface)->dst.s_addr;
+	r->gate.s_addr = D_CSTATE(ifp)->dst.s_addr;
 	TAILQ_INSERT_HEAD(rt, r, next);
 	return rt;
 }
@@ -603,7 +605,7 @@ add_router_host_route(struct rt_head *rt, const struct interface *ifp)
 			    !(state->added & STATE_FAKE))
 			{
 				ifo->options |= DHCPCD_ROUTER_HOST_ROUTE_WARNED;
-				syslog(LOG_WARNING,
+				logger(ifp->ctx, LOG_WARNING,
 				    "%s: forcing router %s through interface",
 				    ifp->name, inet_ntoa(rtp->gate));
 			}
@@ -614,13 +616,13 @@ add_router_host_route(struct rt_head *rt, const struct interface *ifp)
 		    !(state->added & STATE_FAKE))
 		{
 			ifo->options |= DHCPCD_ROUTER_HOST_ROUTE_WARNED;
-			syslog(LOG_WARNING,
+			logger(ifp->ctx, LOG_WARNING,
 			    "%s: router %s requires a host route",
 			    ifp->name, inet_ntoa(rtp->gate));
 		}
 		rtn = malloc(sizeof(*rtn));
 		if (rtn == NULL) {
-			syslog(LOG_ERR, "%s: %m", __func__);
+			logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
 			ipv4_freeroutes(rt);
 			return NULL;
 		}
@@ -646,7 +648,7 @@ ipv4_buildroutes(struct dhcpcd_ctx *ctx)
 
 	nrs = malloc(sizeof(*nrs));
 	if (nrs == NULL) {
-		syslog(LOG_ERR, "%s: %m", __func__);
+		logger(ctx, LOG_ERR, "%s: %m", __func__);
 		return;
 	}
 	TAILQ_INIT(nrs);
@@ -730,12 +732,12 @@ delete_address1(struct interface *ifp,
 	struct ipv4_state *state;
 	struct ipv4_addr *ap;
 
-	syslog(LOG_DEBUG, "%s: deleting IP address %s/%d",
+	logger(ifp->ctx, LOG_DEBUG, "%s: deleting IP address %s/%d",
 	    ifp->name, inet_ntoa(*addr), inet_ntocidr(*net));
 	r = if_deladdress(ifp, addr, net);
 	if (r == -1 && errno != EADDRNOTAVAIL && errno != ENXIO &&
 	    errno != ENODEV)
-		syslog(LOG_ERR, "%s: %s: %m", ifp->name, __func__);
+		logger(ifp->ctx, LOG_ERR, "%s: %s: %m", ifp->name, __func__);
 
 	state = IPV4_STATE(ifp);
 	TAILQ_FOREACH(ap, &state->addrs, next) {
@@ -779,7 +781,7 @@ ipv4_getstate(struct interface *ifp)
 	        ifp->if_data[IF_DATA_IPV4] = malloc(sizeof(*state));
 		state = IPV4_STATE(ifp);
 		if (state == NULL) {
-			syslog(LOG_ERR, "%s: %m", __func__);
+			logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
 			return NULL;
 		}
 		TAILQ_INIT(&state->addrs);
@@ -804,12 +806,12 @@ ipv4_addaddr(struct interface *ifp, const struct dhcp_lease *lease)
 		}
 	}
 
-	syslog(LOG_DEBUG, "%s: adding IP address %s/%d",
+	logger(ifp->ctx, LOG_DEBUG, "%s: adding IP address %s/%d",
 	    ifp->name, inet_ntoa(lease->addr),
 	    inet_ntocidr(lease->net));
 	r = if_addaddress(ifp, &lease->addr, &lease->net, &lease->brd);
 	if (r == -1 && errno != EEXIST)
-		syslog(LOG_ERR, "%s: if_addaddress: %m", __func__);
+		logger(ifp->ctx, LOG_ERR, "%s: if_addaddress: %m", __func__);
 	return r;
 }
 
@@ -877,7 +879,8 @@ ipv4_applyaddr(void *arg)
 		    nstate->addr.s_addr == lease->addr.s_addr)
 		{
 			if (ifn->metric <= ifp->metric) {
-				syslog(LOG_INFO, "%s: preferring %s on %s",
+				logger(ifp->ctx, LOG_INFO,
+				    "%s: preferring %s on %s",
 				    ifp->name,
 				    inet_ntoa(lease->addr),
 				    ifn->name);
@@ -885,7 +888,7 @@ ipv4_applyaddr(void *arg)
 				state->net.s_addr = lease->net.s_addr;
 				goto routes;
 			}
-			syslog(LOG_INFO, "%s: preferring %s on %s",
+			logger(ifp->ctx, LOG_INFO, "%s: preferring %s on %s",
 			    ifn->name,
 			    inet_ntoa(lease->addr),
 			    ifp->name);
@@ -912,7 +915,8 @@ ipv4_applyaddr(void *arg)
 		delete_address1(ifp, &ap->addr, &ap->net);
 
 	if (ipv4_iffindaddr(ifp, &lease->addr, &lease->net))
-		syslog(LOG_DEBUG, "%s: IP address %s/%d already exists",
+		logger(ifp->ctx, LOG_DEBUG,
+		    "%s: IP address %s/%d already exists",
 		    ifp->name, inet_ntoa(lease->addr),
 		    inet_ntocidr(lease->net));
 	else {
@@ -987,7 +991,7 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 	if (type == RTM_NEWADDR && ap == NULL) {
 		ap = malloc(sizeof(*ap));
 		if (ap == NULL) {
-			syslog(LOG_ERR, "%s: %m", __func__);
+			logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
 			return;
 		}
 		ap->iface = ifp;

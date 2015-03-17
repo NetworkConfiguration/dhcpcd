@@ -57,7 +57,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
 #include <unistd.h>
 
 #include "config.h"
@@ -288,14 +287,14 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		}
 
 		if (if_vimaster(p) == 1) {
-			syslog(argc ? LOG_ERR : LOG_DEBUG,
+			logger(ctx, argc ? LOG_ERR : LOG_DEBUG,
 			    "%s: is a Virtual Interface Master, skipping", p);
 			continue;
 		}
 
 		ifp = calloc(1, sizeof(*ifp));
 		if (ifp == NULL) {
-			syslog(LOG_ERR, "%s: %m", __func__);
+			logger(ctx, LOG_ERR, "%s: %m", __func__);
 			break;
 		}
 		ifp->ctx = ctx;
@@ -345,7 +344,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 				    ctx->ifac == 0 &&
 				    !if_hasconf(ctx, ifp->name))
 				{
-					syslog(LOG_DEBUG,
+					logger(ifp->ctx, LOG_DEBUG,
 					    "%s: ignoring due to"
 					    " interface type and"
 					    " no config",
@@ -383,7 +382,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 					if_free(ifp);
 					continue;
 				}
-				syslog(LOG_WARNING,
+				logger(ifp->ctx, LOG_WARNING,
 				    "%s: unsupported interface type %.2x",
 				    ifp->name, sdl->sdl_type);
 				/* Pretend it's ethernet */
@@ -433,7 +432,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 /* IFT already checked */
 #ifndef AF_LINK
 			default:
-				syslog(LOG_WARNING,
+				logger(ifp->ctx, LOG_WARNING,
 				    "%s: unsupported interface family %.2x",
 				    ifp->name, ifp->family);
 				break;
@@ -443,7 +442,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 
 		/* Handle any platform init for the interface */
 		if (if_init(ifp) == -1) {
-			syslog(LOG_ERR, "%s: if_init: %m", p);
+			logger(ifp->ctx, LOG_ERR, "%s: if_init: %m", p);
 			if_free(ifp);
 			continue;
 		}
@@ -452,7 +451,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		if (if_getmtu(ifp->name) < MTU_MIN &&
 		    if_setmtu(ifp->name, MTU_MIN) == -1)
 		{
-			syslog(LOG_ERR, "%s: set_mtu: %m", p);
+			logger(ifp->ctx, LOG_ERR, "%s: set_mtu: %m", p);
 			if_free(ifp);
 			continue;
 		}

@@ -31,9 +31,11 @@
 #include <sys/param.h>
 #include <sys/time.h>
 #include <stdio.h>
+#include <syslog.h>
 
 #include "config.h"
 #include "defs.h"
+#include "dhcpcd.h"
 
 #ifndef HOSTNAME_MAX_LEN
 #define HOSTNAME_MAX_LEN	250	/* 255 - 3 (FQDN) - 2 (DNS enc) */
@@ -47,6 +49,7 @@
 #define UNCONST(a)		((void *)(unsigned long)(const void *)(a))
 #define STRINGIFY(a)		#a
 #define TOSTRING(a)		STRINGIFY(a)
+#define UNUSED(a)		(void)(a)
 
 #define USEC_PER_SEC		1000000L
 #define USEC_PER_NSEC		1000L
@@ -114,6 +117,9 @@
 # ifndef __packed
 #  define __packed   __attribute__((__packed__))
 # endif
+# ifndef __printflike
+#  define __printflike(a, b) __attribute__((format(printf, a, b)))
+# endif
 # ifndef __unused
 #  define __unused   __attribute__((__unused__))
 # endif
@@ -123,6 +129,9 @@
 # endif
 # ifndef __packed
 #  define __packed
+# endif
+# ifndef __printflike
+#  define __printflike
 # endif
 # ifndef __unused
 #  define __unused
@@ -145,8 +154,35 @@ void get_line_free(void);
 const char *get_hostname(char *, size_t, int);
 extern int clock_monotonic;
 int get_monotonic(struct timespec *);
-ssize_t setvar(char ***, const char *, const char *, const char *);
-ssize_t setvard(char ***, const char *, const char *, size_t);
+
+/* We could shave a few k off the binary size by just using the
+ * syslog(3) interface.
+ * However, this results in a ugly output on the command line
+ * and relies on syslogd(8) starting before dhcpcd which is not
+ * always the case. */
+#ifndef USE_LOGFILE
+# define USE_LOGFILE 1
+#endif
+#if USE_LOGFILE
+void logger_open(struct dhcpcd_ctx *);
+#define logger_mask(ctx, lvl) setlogmask((lvl))
+__printflike(3, 4) void logger(struct dhcpcd_ctx *, int, const char *, ...);
+void logger_close(struct dhcpcd_ctx *);
+#else
+#define logger_open(ctx) openlog(PACKAGE, LOG_PERROR | LOG_PID, LOG_DAEMON)
+#define logger_mask(ctx, lvl) setlogmask((lvl))
+#define logger(ctx, pri, fmt, ...)			\
+	do {						\
+		UNUSED((ctx));				\
+		syslog((pri), (fmt), ##__VA_ARGS__);	\
+	} while (0 /*CONSTCOND */)
+#define logger_close(ctx) closelog()
+#endif
+
+ssize_t setvar(struct dhcpcd_ctx *,
+    char ***, const char *, const char *, const char *);
+ssize_t setvard(struct dhcpcd_ctx *,
+    char ***, const char *, const char *, size_t);
 time_t uptime(void);
 
 char *hwaddr_ntoa(const unsigned char *, size_t, char *, size_t);

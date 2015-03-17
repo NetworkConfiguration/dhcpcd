@@ -28,5 +28,6 @@
 #ifndef DPRINTF_H
 #define DPRINTF_H
 
+int dprintf(int, const char *, va_list);
 int dprintf(int, const char *, ...);
 #endif

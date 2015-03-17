@@ -188,8 +188,12 @@ syslog()
 	fi
 	[ -n "$lvl" ] && shift
 	[ -n "$*" ] || return 0
+	case "$lvl" in
+	err|error)	echo "$interface: $*" >&2;;
+	*)		echo "$interface: $*";;
+	esac
 	if type logger >/dev/null 2>&1; then
-		logger -i -p daemon."$lvl" -s -t dhcpcd "$interface: $*"
+		logger -i -p daemon."$lvl" -t dhcpcd-run-hooks "$interface: $*"
 	fi
 }
 

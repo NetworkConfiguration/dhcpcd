@@ -33,7 +33,6 @@
 #include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
 #include <unistd.h>
 
 #include "config.h"
@@ -764,7 +763,7 @@ dhcp_set_leasefile(char *leasefile, size_t len, int family,
 }
 
 static size_t
-dhcp_envoption1(char **env, const char *prefix,
+dhcp_envoption1(struct dhcpcd_ctx *ctx, char **env, const char *prefix,
     const struct dhcp_opt *opt, int vname, const uint8_t *od, size_t ol,
     const char *ifname)
 {
@@ -788,7 +787,7 @@ dhcp_envoption1(char **env, const char *prefix,
 		return e;
 	v = val = *env = malloc(e);
 	if (v == NULL) {
-		syslog(LOG_ERR, "%s: %m", __func__);
+		logger(ctx, LOG_ERR, "%s: %m", __func__);
 		return 0;
 	}
 	if (vname)
@@ -817,7 +816,7 @@ dhcp_envoption(struct dhcpcd_ctx *ctx, char **env, const char *prefix,
 
 	/* If no embedded or encapsulated options, it's easy */
 	if (opt->embopts_len == 0 && opt->encopts_len == 0) {
-		if (dhcp_envoption1(env == NULL ? NULL : &env[0],
+		if (dhcp_envoption1(ctx, env == NULL ? NULL : &env[0],
 		    prefix, opt, 1, od, ol, ifname))
 			return 1;
 		return 0;
@@ -828,7 +827,7 @@ dhcp_envoption(struct dhcpcd_ctx *ctx, char **env, const char *prefix,
 		if (opt->type & INDEX) {
 			if (opt->index > 999) {
 				errno = ENOBUFS;
-				syslog(LOG_ERR, "%s: %m", __func__);
+				logger(ctx, LOG_ERR, "%s: %m", __func__);
 				return 0;
 			}
 		}
@@ -836,7 +835,7 @@ dhcp_envoption(struct dhcpcd_ctx *ctx, char **env, const char *prefix,
 		    (opt->type & INDEX ? 3 : 0);
 		pfx = malloc(e);
 		if (pfx == NULL) {
-			syslog(LOG_ERR, "%s: %m", __func__);
+			logger(ctx, LOG_ERR, "%s: %m", __func__);
 			return 0;
 		}
 		if (opt->type & INDEX)
@@ -859,7 +858,7 @@ dhcp_envoption(struct dhcpcd_ctx *ctx, char **env, const char *prefix,
 		 * name is different.
 		 * This avoids new_fqdn_fqdn which would be silly. */
 		ov = strcmp(opt->var, eopt->var);
-		if (dhcp_envoption1(env == NULL ? NULL : &env[n],
+		if (dhcp_envoption1(ctx, env == NULL ? NULL : &env[n],
 		    pfx, eopt, ov, od, e, ifname))
 			n++;
 		od += e;

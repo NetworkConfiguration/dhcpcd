@@ -54,7 +54,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "common.h"
 #include "config.h"
 
 /* We can't include if.h or dhcpcd.h because

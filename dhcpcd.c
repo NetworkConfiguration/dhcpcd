@@ -46,7 +46,6 @@ const char dhcpcd_copyright[] = "Copyright (c) 2006-2015 Roy Marples";
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
 #include <unistd.h>
 #include <time.h>
 
@@ -73,6 +72,7 @@ const int dhcpcd_handlesigs[] = {
 	SIGALRM,
 	SIGHUP,
 	SIGUSR1,
+	SIGUSR2,
 	SIGPIPE,
 	0
 };
@@ -192,7 +192,7 @@ handle_exit_timeout(void *arg)
 	struct dhcpcd_ctx *ctx;
 
 	ctx = arg;
-	syslog(LOG_ERR, "timed out");
+	logger(ctx, LOG_ERR, "timed out");
 	if (!(ctx->options & DHCPCD_MASTER)) {
 		eloop_exit(ctx->eloop, EXIT_FAILURE);
 		return;
@@ -261,26 +261,26 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 		return 0;
 	/* Setup a signal pipe so parent knows when to exit. */
 	if (pipe(sidpipe) == -1) {
-		syslog(LOG_ERR, "pipe: %m");
+		logger(ctx, LOG_ERR, "pipe: %m");
 		return 0;
 	}
-	syslog(LOG_DEBUG, "forking to background");
+	logger(ctx, LOG_DEBUG, "forking to background");
 	switch (pid = fork()) {
 	case -1:
-		syslog(LOG_ERR, "fork: %m");
+		logger(ctx, LOG_ERR, "fork: %m");
 		return 0;
 	case 0:
 		setsid();
 		/* Some polling methods don't survive after forking,
 		 * so ensure we can requeue all our events. */
 		if (eloop_requeue(ctx->eloop) == -1) {
-			syslog(LOG_ERR, "eloop_requeue: %m");
+			logger(ctx, LOG_ERR, "eloop_requeue: %m");
 			eloop_exit(ctx->eloop, EXIT_FAILURE);
 		}
 		/* Notify parent it's safe to exit as we've detached. */
 		close(sidpipe[0]);
 		if (write(sidpipe[1], &buf, 1) == -1)
-			syslog(LOG_ERR, "failed to notify parent: %m");
+			logger(ctx, LOG_ERR, "failed to notify parent: %m");
 		close(sidpipe[1]);
 		if ((fd = open(_PATH_DEVNULL, O_RDWR, 0)) != -1) {
 			dup2(fd, STDIN_FILENO);
@@ -293,13 +293,13 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 		/* Wait for child to detach */
 		close(sidpipe[1]);
 		if (read(sidpipe[0], &buf, 1) == -1)
-			syslog(LOG_ERR, "failed to read child: %m");
+			logger(ctx, LOG_ERR, "failed to read child: %m");
 		close(sidpipe[0]);
 		break;
 	}
 	/* Done with the fd now */
 	if (pid != 0) {
-		syslog(LOG_INFO, "forked to background, child pid %d", pid);
+		logger(ctx, LOG_INFO, "forked to background, child pid %d", pid);
 		write_pid(ctx->pid_fd, pid);
 		close(ctx->pid_fd);
 		ctx->pid_fd = -1;
@@ -318,7 +318,7 @@ stop_interface(struct interface *ifp)
 	struct dhcpcd_ctx *ctx;
 
 	ctx = ifp->ctx;
-	syslog(LOG_INFO, "%s: removing interface", ifp->name);
+	logger(ctx, LOG_INFO, "%s: removing interface", ifp->name);
 	ifp->options->options |= DHCPCD_STOPPING;
 
 	dhcp6_drop(ifp, NULL);
@@ -483,7 +483,7 @@ configure_interface1(struct interface *ifp)
 	{
 		ifo->ia = malloc(sizeof(*ifo->ia));
 		if (ifo->ia == NULL)
-			syslog(LOG_ERR, "%s: %m", __func__);
+			logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
 		else {
 			ifo->ia_len = 1;
 			ifo->ia->ia_type = D6_OPTION_IA_NA;
@@ -520,19 +520,21 @@ dhcpcd_selectprofile(struct interface *ifp, const char *profile)
 		r = print_string(pssid, sizeof(pssid), ESCSTRING,
 		    ifp->ssid, ifp->ssid_len);
 		if (r == -1) {
-			syslog(LOG_ERR, "%s: %s: %m", ifp->name, __func__);
+			logger(ifp->ctx, LOG_ERR,
+			    "%s: %s: %m", ifp->name, __func__);
 			pssid[0] = '\0';
 		}
 	} else
 		pssid[0] = '\0';
 	ifo = read_config(ifp->ctx, ifp->name, pssid, profile);
 	if (ifo == NULL) {
-		syslog(LOG_DEBUG, "%s: no profile %s", ifp->name, profile);
+		logger(ifp->ctx, LOG_DEBUG, "%s: no profile %s",
+		    ifp->name, profile);
 		return -1;
 	}
 	if (profile != NULL) {
 		strlcpy(ifp->profile, profile, sizeof(ifp->profile));
-		syslog(LOG_INFO, "%s: selected profile %s",
+		logger(ifp->ctx, LOG_INFO, "%s: selected profile %s",
 		    ifp->name, profile);
 	} else
 		*ifp->profile = '\0';
@@ -608,11 +610,11 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 
 	if (carrier == LINK_UNKNOWN) {
 		if (errno != ENOTTY) /* For example a PPP link on BSD */
-			syslog(LOG_ERR, "%s: carrier_status: %m", ifname);
+			logger(ctx, LOG_ERR, "%s: carrier_status: %m", ifname);
 	} else if (carrier == LINK_DOWN || (ifp->flags & IFF_UP) == 0) {
 		if (ifp->carrier != LINK_DOWN) {
 			if (ifp->carrier == LINK_UP)
-				syslog(LOG_INFO, "%s: carrier lost", ifp->name);
+				logger(ctx, LOG_INFO, "%s: carrier lost", ifp->name);
 			ifp->carrier = LINK_DOWN;
 			script_runreason(ifp, "NOCARRIER");
 			dhcp6_drop(ifp, "EXPIRE6");
@@ -623,7 +625,7 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 		}
 	} else if (carrier == LINK_UP && ifp->flags & IFF_UP) {
 		if (ifp->carrier != LINK_UP) {
-			syslog(LOG_INFO, "%s: carrier acquired", ifp->name);
+			logger(ctx, LOG_INFO, "%s: carrier acquired", ifp->name);
 			ifp->carrier = LINK_UP;
 #if !defined(__linux__) && !defined(__NetBSD__)
 			/* BSD does not emit RTM_NEWADDR or RTM_CHGADDR when the
@@ -666,7 +668,7 @@ warn_iaid_conflict(struct interface *ifp, uint8_t *iaid)
 
 	/* This is only a problem if the interfaces are on the same network. */
 	if (ifn && strcmp(ifp->name, ifn->name))
-		syslog(LOG_ERR,
+		logger(ifp->ctx, LOG_ERR,
 		    "%s: IAID conflicts with one assigned to %s",
 		    ifp->name, ifn->name);
 }
@@ -680,7 +682,7 @@ pre_start(struct interface *ifp)
 	 * This is also a safety check incase it was ripped out
 	 * from under us. */
 	if (ifp->options->options & DHCPCD_IPV6 && ipv6_start(ifp) == -1) {
-		syslog(LOG_ERR, "%s: ipv6_start: %m", ifp->name);
+		logger(ifp->ctx, LOG_ERR, "%s: ipv6_start: %m", ifp->name);
 		ifp->options->options &= ~DHCPCD_IPV6;
 	}
 }
@@ -700,7 +702,8 @@ dhcpcd_startinterface(void *arg)
 		case LINK_UP:
 			break;
 		case LINK_DOWN:
-			syslog(LOG_INFO, "%s: waiting for carrier", ifp->name);
+			logger(ifp->ctx, LOG_INFO, "%s: waiting for carrier",
+			    ifp->name);
 			return;
 		case LINK_UNKNOWN:
 			/* No media state available.
@@ -723,7 +726,7 @@ dhcpcd_startinterface(void *arg)
 			if (duid_init(ifp) == 0)
 				return;
 			if (!(ifo->options & DHCPCD_PFXDLGONLY))
-				syslog(LOG_INFO, "DUID %s",
+				logger(ifp->ctx, LOG_INFO, "DUID %s",
 				    hwaddr_ntoa(ifp->ctx->duid,
 				    ifp->ctx->duid_len,
 				    buf, sizeof(buf)));
@@ -734,7 +737,7 @@ dhcpcd_startinterface(void *arg)
 	    !(ifo->options & DHCPCD_PFXDLGONLY))
 	{
 		/* Report IAIDs */
-		syslog(LOG_INFO, "%s: IAID %s", ifp->name,
+		logger(ifp->ctx, LOG_INFO, "%s: IAID %s", ifp->name,
 		    hwaddr_ntoa(ifo->iaid, sizeof(ifo->iaid),
 		    buf, sizeof(buf)));
 		warn_iaid_conflict(ifp, ifo->iaid);
@@ -742,8 +745,8 @@ dhcpcd_startinterface(void *arg)
 			if (memcmp(ifo->iaid, ifo->ia[i].iaid,
 			    sizeof(ifo->iaid)))
 			{
-				syslog(LOG_INFO, "%s: IAID %s", ifp->name,
-				    hwaddr_ntoa(ifo->ia[i].iaid,
+				logger(ifp->ctx, LOG_INFO, "%s: IAID %s",
+				    ifp->name, hwaddr_ntoa(ifo->ia[i].iaid,
 				    sizeof(ifo->ia[i].iaid),
 				    buf, sizeof(buf)));
 				warn_iaid_conflict(ifp, ifo->ia[i].iaid);
@@ -783,7 +786,7 @@ dhcpcd_startinterface(void *arg)
 #endif
 			}
 			if (nolease == -1)
-			        syslog(LOG_ERR,
+			        logger(ifp->ctx, LOG_ERR,
 				    "%s: dhcp6_start: %m", ifp->name);
 		}
 	}
@@ -799,7 +802,7 @@ dhcpcd_prestartinterface(void *arg)
 
 	pre_start(ifp);
 	if (if_up(ifp) == -1)
-		syslog(LOG_ERR, "%s: if_up: %m", ifp->name);
+		logger(ifp->ctx, LOG_ERR, "%s: if_up: %m", ifp->name);
 
 	if (ifp->options->options & DHCPCD_LINK &&
 	    ifp->carrier == LINK_UNKNOWN)
@@ -811,7 +814,7 @@ dhcpcd_prestartinterface(void *arg)
 			    ifp->flags, ifp->name);
 			return;
 		}
-		syslog(LOG_INFO,
+		logger(ifp->ctx, LOG_INFO,
 		    "%s: unknown carrier, waiting for interface flags",
 		    ifp->name);
 	}
@@ -826,7 +829,7 @@ handle_link(void *arg)
 
 	ctx = arg;
 	if (if_managelink(ctx) == -1) {
-		syslog(LOG_ERR, "if_managelink: %m");
+		logger(ctx, LOG_ERR, "if_managelink: %m");
 		eloop_event_delete(ctx->eloop, ctx->link_fd, 0);
 		close(ctx->link_fd);
 		ctx->link_fd = -1;
@@ -843,11 +846,11 @@ dhcpcd_initstate1(struct interface *ifp, int argc, char **argv,
 	ifo = ifp->options;
 
 	if (ifo->options & DHCPCD_IPV4 && ipv4_init(ifp->ctx) == -1) {
-		syslog(LOG_ERR, "ipv4_init: %m");
+		logger(ifp->ctx, LOG_ERR, "ipv4_init: %m");
 		ifo->options &= ~DHCPCD_IPV4;
 	}
 	if (ifo->options & DHCPCD_IPV6 && ipv6_init(ifp->ctx) == NULL) {
-		syslog(LOG_ERR, "ipv6_init: %m");
+		logger(ifp->ctx, LOG_ERR, "ipv6_init: %m");
 		ifo->options &= ~DHCPCD_IPV6RS;
 	}
 
@@ -856,7 +859,7 @@ dhcpcd_initstate1(struct interface *ifp, int argc, char **argv,
 	 * This needs to happen before PREINIT incase a hook script
 	 * inadvertently ups the interface. */
 	if (ifo->options & DHCPCD_IPV6 && ipv6_start(ifp) == -1) {
-		syslog(LOG_ERR, "%s: ipv6_start: %m", ifp->name);
+		logger(ifp->ctx, LOG_ERR, "%s: ipv6_start: %m", ifp->name);
 		ifo->options &= ~DHCPCD_IPV6;
 	}
 }
@@ -899,7 +902,7 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 			errno = ESRCH;
 			return -1;
 		}
-		syslog(LOG_DEBUG, "%s: interface departed", ifp->name);
+		logger(ctx, LOG_DEBUG, "%s: interface departed", ifp->name);
 		ifp->options->options |= DHCPCD_DEPARTED;
 		stop_interface(ifp);
 		return 0;
@@ -917,7 +920,7 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 	i = -1;
 	ifs = if_discover(ctx, -1, UNCONST(argv));
 	if (ifs == NULL) {
-		syslog(LOG_ERR, "%s: if_discover: %m", __func__);
+		logger(ctx, LOG_ERR, "%s: if_discover: %m", __func__);
 		return -1;
 	}
 	TAILQ_FOREACH_SAFE(ifp, ifs, next, ifn) {
@@ -927,14 +930,14 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 		/* Check if we already have the interface */
 		iff = if_find(ctx, ifp->name);
 		if (iff) {
-			syslog(LOG_DEBUG, "%s: interface updated", iff->name);
+			logger(ctx, LOG_DEBUG, "%s: interface updated", iff->name);
 			/* The flags and hwaddr could have changed */
 			iff->flags = ifp->flags;
 			iff->hwlen = ifp->hwlen;
 			if (ifp->hwlen != 0)
 				memcpy(iff->hwaddr, ifp->hwaddr, iff->hwlen);
 		} else {
-			syslog(LOG_DEBUG, "%s: interface added", ifp->name);
+			logger(ctx, LOG_DEBUG, "%s: interface added", ifp->name);
 			TAILQ_REMOVE(ifs, ifp, next);
 			TAILQ_INSERT_TAIL(ctx->ifaces, ifp, next);
 			dhcpcd_initstate(ifp, 0);
@@ -970,14 +973,14 @@ dhcpcd_handlehwaddr(struct dhcpcd_ctx *ctx, const char *ifname,
 
 	if (hwlen > sizeof(ifp->hwaddr)) {
 		errno = ENOBUFS;
-		syslog(LOG_ERR, "%s: %s: %m", ifp->name, __func__);
+		logger(ctx, LOG_ERR, "%s: %s: %m", ifp->name, __func__);
 		return;
 	}
 
 	if (ifp->hwlen == hwlen && memcmp(ifp->hwaddr, hwaddr, hwlen) == 0)
 		return;
 
-	syslog(LOG_INFO, "%s: new hardware address: %s", ifp->name,
+	logger(ctx, LOG_INFO, "%s: new hardware address: %s", ifp->name,
 	    hwaddr_ntoa(hwaddr, hwlen, buf, sizeof(buf)));
 	ifp->hwlen = hwlen;
 	memcpy(ifp->hwaddr, hwaddr, hwlen);
@@ -1021,7 +1024,7 @@ reconf_reboot(struct dhcpcd_ctx *ctx, int action, int argc, char **argv, int oi)
 
 	ifs = if_discover(ctx, argc - oi, argv + oi);
 	if (ifs == NULL) {
-		syslog(LOG_ERR, "%s: if_discover: %m", __func__);
+		logger(ctx, LOG_ERR, "%s: if_discover: %m", __func__);
 		return;
 	}
 
@@ -1070,7 +1073,7 @@ stop_all_interfaces(struct dhcpcd_ctx *ctx, int do_release)
 
 #ifdef USE_SIGNALS
 struct dhcpcd_siginfo dhcpcd_siginfo;
-#define sigmsg "received signal %s, %s"
+#define sigmsg "received %s, %s"
 void
 dhcpcd_handle_signal(void *arg)
 {
@@ -1085,19 +1088,19 @@ dhcpcd_handle_signal(void *arg)
 	exit_code = EXIT_FAILURE;
 	switch (si->signo) {
 	case SIGINT:
-		syslog(LOG_INFO, sigmsg, "INT", "stopping");
+		logger(ctx, LOG_INFO, sigmsg, "SIGINT", "stopping");
 		break;
 	case SIGTERM:
-		syslog(LOG_INFO, sigmsg, "TERM", "stopping");
+		logger(ctx, LOG_INFO, sigmsg, "SIGTERM", "stopping");
 		exit_code = EXIT_SUCCESS;
 		break;
 	case SIGALRM:
-		syslog(LOG_INFO, sigmsg, "ALRM", "releasing");
+		logger(ctx, LOG_INFO, sigmsg, "SIGALRM", "releasing");
 		do_release = 1;
 		exit_code = EXIT_SUCCESS;
 		break;
 	case SIGHUP:
-		syslog(LOG_INFO, sigmsg, "HUP", "rebinding");
+		logger(ctx, LOG_INFO, sigmsg, "SIGHUP", "rebinding");
 		reload_config(ctx);
 		/* Preserve any options passed on the commandline
 		 * when we were started. */
@@ -1105,16 +1108,21 @@ dhcpcd_handle_signal(void *arg)
 		    ctx->argc - ctx->ifc);
 		return;
 	case SIGUSR1:
-		syslog(LOG_INFO, sigmsg, "USR1", "reconfiguring");
+		logger(ctx, LOG_INFO, sigmsg, "SIGUSR1", "reconfiguring");
 		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 			ipv4_applyaddr(ifp);
 		}
 		return;
+	case SIGUSR2:
+		logger_close(ctx);
+		logger_open(ctx);
+		logger(ctx, LOG_INFO, sigmsg, "SIGUSR2", "reopened logfile");
+		return;
 	case SIGPIPE:
-		syslog(LOG_WARNING, "received signal PIPE");
+		logger(ctx, LOG_WARNING, "received SIGPIPE");
 		return;
 	default:
-		syslog(LOG_ERR,
+		logger(ctx, LOG_ERR,
 		    "received signal %d, "
 		    "but don't know what to do with it",
 		    si->signo);
@@ -1190,7 +1198,8 @@ dhcpcd_getinterfaces(void *arg)
 	eloop_event_delete(fd->ctx->eloop, fd->fd, 1);
 	TAILQ_FOREACH(ifp, fd->ctx->ifaces, next) {
 		if (send_interface(fd, ifp) == -1)
-			syslog(LOG_ERR, "send_interface %d: %m", fd->fd);
+			logger(ifp->ctx, LOG_ERR,
+			    "send_interface %d: %m", fd->fd);
 	}
 }
 
@@ -1245,7 +1254,7 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 		*p++ = ' ';
 	}
 	*--p = '\0';
-	syslog(LOG_INFO, "control command: %s", tmp);
+	logger(ctx, LOG_INFO, "control command: %s", tmp);
 	free(tmp);
 
 	optind = 0;
@@ -1310,23 +1319,6 @@ main(int argc, char **argv)
 	const char *siga;
 #endif
 
-	memset(&ctx, 0, sizeof(ctx));
-#ifdef USE_SIGNALS
-	dhcpcd_ctx = &ctx;
-	sig = 0;
-	siga = NULL;
-#endif
-	closefrom(3);
-#ifdef LOG_PERROR
-	openlog(PACKAGE, LOG_PERROR | LOG_PID, LOG_DAEMON);
-#else
-	openlog(PACKAGE, LOG_PID, LOG_DAEMON);
-#endif
-	setlogmask(LOG_UPTO(LOG_INFO));
-#ifndef LOG_PERROR
-	psyslog_prio = LOG_UPTO(LOG_INFO);
-#endif
-
 	/* Test for --help and --version */
 	if (argc > 1) {
 		if (strcmp(argv[1], "--help") == 0) {
@@ -1337,6 +1329,18 @@ main(int argc, char **argv)
 			return EXIT_SUCCESS;
 		}
 	}
+
+	memset(&ctx, 0, sizeof(ctx));
+#ifdef USE_SIGNALS
+	dhcpcd_ctx = &ctx;
+	sig = 0;
+	siga = NULL;
+#endif
+	closefrom(3);
+
+	ctx.log_fd = -1;
+	logger_open(&ctx);
+	logger_mask(&ctx, LOG_UPTO(LOG_INFO));
 
 	ifo = NULL;
 	ctx.cffile = CONFIG;
@@ -1353,19 +1357,9 @@ main(int argc, char **argv)
 	{
 		switch (opt) {
 		case '4':
-			if (family) {
-				syslog(LOG_ERR, "cannot specify more than one"
-				    " address family");
-				goto exit_failure;
-			}
 			family = AF_INET;
 			break;
 		case '6':
-			if (family) {
-				syslog(LOG_ERR, "cannot specify more than one"
-				    " address family");
-				goto exit_failure;
-			}
 			family = AF_INET6;
 			break;
 		case 'f':
@@ -1375,6 +1369,11 @@ main(int argc, char **argv)
 		case 'g':
 			sig = SIGUSR1;
 			siga = "USR1";
+			break;
+		case 'j':
+			ctx.logfile = strdup(optarg);
+			logger_close(&ctx);
+			logger_open(&ctx);
 			break;
 		case 'k':
 			sig = SIGALRM;
@@ -1463,16 +1462,12 @@ main(int argc, char **argv)
 	ctx.options &= ~DHCPCD_DAEMONISE;
 #endif
 
-	if (ctx.options & DHCPCD_DEBUG) {
-		setlogmask(LOG_UPTO(LOG_DEBUG));
-#ifndef LOG_PERROR
-		psyslog_prio = LOG_UPTO(LOG_DEBUG);
-#endif
-	}
+	if (ctx.options & DHCPCD_DEBUG)
+		logger_mask(&ctx, LOG_UPTO(LOG_DEBUG));
 	if (ctx.options & DHCPCD_QUIET) {
 		i = open(_PATH_DEVNULL, O_RDWR);
 		if (i == -1)
-			syslog(LOG_ERR, "%s: open: %m", __func__);
+			logger(&ctx, LOG_ERR, "%s: open: %m", __func__);
 		else {
 			dup2(i, STDERR_FILENO);
 			close(i);
@@ -1486,7 +1481,8 @@ main(int argc, char **argv)
 			const char *per;
 
 			if (strlen(argv[optind]) > IF_NAMESIZE) {
-				syslog(LOG_ERR, "%s: interface name too long",
+				logger(&ctx, LOG_ERR,
+				    "%s: interface name too long",
 				    argv[optind]);
 				goto exit_failure;
 			}
@@ -1511,19 +1507,20 @@ main(int argc, char **argv)
 	}
 
 	if (chdir("/") == -1)
-		syslog(LOG_ERR, "chdir `/': %m");
+		logger(&ctx, LOG_ERR, "chdir `/': %m");
 
 	/* Freeing allocated addresses from dumping leases can trigger
 	 * eloop removals as well, so init here. */
-	ctx.eloop = eloop_init();
+	ctx.eloop = eloop_init(&ctx);
 	if (ctx.eloop == NULL) {
-		syslog(LOG_ERR, "%s: eloop_init: %m", __func__);
+		logger(&ctx, LOG_ERR, "%s: eloop_init: %m", __func__);
 		goto exit_failure;
 	}
 
 	if (ctx.options & DHCPCD_DUMPLEASE) {
 		if (optind != argc - 1) {
-			syslog(LOG_ERR, "dumplease requires an interface");
+			logger(&ctx, LOG_ERR,
+			    "dumplease requires an interface");
 			goto exit_failure;
 		}
 		i = 0;
@@ -1531,14 +1528,14 @@ main(int argc, char **argv)
 		 * load the hardware address to compare automated IAID */
 		ctx.ifaces = if_discover(&ctx, 1, argv + optind);
 		if (ctx.ifaces == NULL) {
-			syslog(LOG_ERR, "if_discover: %m");
+			logger(&ctx, LOG_ERR, "if_discover: %m");
 			goto exit_failure;
 		}
 		ifp = TAILQ_FIRST(ctx.ifaces);
 		if (ifp == NULL) {
 			ifp = calloc(1, sizeof(*ifp));
 			if (ifp == NULL) {
-				syslog(LOG_ERR, "%s: %m", __func__);
+				logger(&ctx, LOG_ERR, "%s: %m", __func__);
 				goto exit_failure;
 			}
 			strlcpy(ctx.pidfile, argv[optind], sizeof(ctx.pidfile));
@@ -1579,40 +1576,41 @@ main(int argc, char **argv)
 		if (i == -1)
 			i = control_open(&ctx, NULL);
 		if (i != -1) {
-			syslog(LOG_INFO,
+			logger(&ctx, LOG_INFO,
 			    "sending commands to master dhcpcd process");
 			len = control_send(&ctx, argc, argv);
 			control_close(&ctx);
 			if (len > 0) {
-				syslog(LOG_DEBUG, "send OK");
+				logger(&ctx, LOG_DEBUG, "send OK");
 				goto exit_success;
 			} else {
-				syslog(LOG_ERR, "failed to send commands");
+				logger(&ctx, LOG_ERR,
+				    "failed to send commands");
 				goto exit_failure;
 			}
 		} else {
 			if (errno != ENOENT)
-				syslog(LOG_ERR, "control_open: %m");
+				logger(&ctx, LOG_ERR, "control_open: %m");
 		}
 #ifdef USE_SIGNALS
 	}
 #endif
 
 	if (geteuid())
-		syslog(LOG_WARNING,
+		logger(&ctx, LOG_WARNING,
 		    PACKAGE " will not work correctly unless run as root");
 
 #ifdef USE_SIGNALS
 	if (sig != 0) {
 		pid = read_pid(ctx.pidfile);
 		if (pid != 0)
-			syslog(LOG_INFO, "sending signal %s to pid %d",
+			logger(&ctx, LOG_INFO, "sending signal %s to pid %d",
 			    siga, pid);
 		if (pid == 0 || kill(pid, sig) != 0) {
 			if (sig != SIGHUP && errno != EPERM)
-				syslog(LOG_ERR, ""PACKAGE" not running");
+				logger(&ctx, LOG_ERR, ""PACKAGE" not running");
 			if (pid != 0 && errno != ESRCH) {
-				syslog(LOG_ERR, "kill: %m");
+				logger(&ctx, LOG_ERR, "kill: %m");
 				goto exit_failure;
 			}
 			unlink(ctx.pidfile);
@@ -1624,7 +1622,8 @@ main(int argc, char **argv)
 			if (sig == SIGHUP || sig == SIGUSR1)
 				goto exit_success;
 			/* Spin until it exits */
-			syslog(LOG_INFO, "waiting for pid %d to exit", pid);
+			logger(&ctx, LOG_INFO,
+			    "waiting for pid %d to exit", pid);
 			ts.tv_sec = 0;
 			ts.tv_nsec = 100000000; /* 10th of a second */
 			for(i = 0; i < 100; i++) {
@@ -1632,7 +1631,7 @@ main(int argc, char **argv)
 				if (read_pid(ctx.pidfile) == 0)
 					goto exit_success;
 			}
-			syslog(LOG_ERR, "pid %d failed to exit", pid);
+			logger(&ctx, LOG_ERR, "pid %d failed to exit", pid);
 			goto exit_failure;
 		}
 	}
@@ -1641,7 +1640,7 @@ main(int argc, char **argv)
 		if ((pid = read_pid(ctx.pidfile)) > 0 &&
 		    kill(pid, 0) == 0)
 		{
-			syslog(LOG_ERR, ""PACKAGE
+			logger(&ctx, LOG_ERR, ""PACKAGE
 			    " already running on pid %d (%s)",
 			    pid, ctx.pidfile);
 			goto exit_failure;
@@ -1649,9 +1648,9 @@ main(int argc, char **argv)
 
 		/* Ensure we have the needed directories */
 		if (mkdir(RUNDIR, 0755) == -1 && errno != EEXIST)
-			syslog(LOG_ERR, "mkdir `%s': %m", RUNDIR);
+			logger(&ctx, LOG_ERR, "mkdir `%s': %m", RUNDIR);
 		if (mkdir(DBDIR, 0755) == -1 && errno != EEXIST)
-			syslog(LOG_ERR, "mkdir `%s': %m", DBDIR);
+			logger(&ctx, LOG_ERR, "mkdir `%s': %m", DBDIR);
 
 		opt = O_WRONLY | O_CREAT | O_NONBLOCK;
 #ifdef O_CLOEXEC
@@ -1659,13 +1658,13 @@ main(int argc, char **argv)
 #endif
 		ctx.pid_fd = open(ctx.pidfile, opt, 0664);
 		if (ctx.pid_fd == -1)
-			syslog(LOG_ERR, "open `%s': %m", ctx.pidfile);
+			logger(&ctx, LOG_ERR, "open `%s': %m", ctx.pidfile);
 		else {
 #ifdef LOCK_EX
 			/* Lock the file so that only one instance of dhcpcd
 			 * runs on an interface */
 			if (flock(ctx.pid_fd, LOCK_EX | LOCK_NB) == -1) {
-				syslog(LOG_ERR, "flock `%s': %m", ctx.pidfile);
+				logger(&ctx, LOG_ERR, "flock `%s': %m", ctx.pidfile);
 				close(ctx.pid_fd);
 				ctx.pid_fd = -1;
 				goto exit_failure;
@@ -1675,7 +1674,7 @@ main(int argc, char **argv)
 			if (fcntl(ctx.pid_fd, F_GETFD, &opt) == -1 ||
 			    fcntl(ctx.pid_fd, F_SETFD, opt | FD_CLOEXEC) == -1)
 			{
-				syslog(LOG_ERR, "fcntl: %m");
+				logger(&ctx, LOG_ERR, "fcntl: %m");
 				close(ctx.pid_fd);
 				ctx.pid_fd = -1;
 				goto exit_failure;
@@ -1688,23 +1687,23 @@ main(int argc, char **argv)
 
 	if (ctx.options & DHCPCD_MASTER) {
 		if (control_start(&ctx, NULL) == -1)
-			syslog(LOG_ERR, "control_start: %m");
+			logger(&ctx, LOG_ERR, "control_start: %m");
 	}
 #else
 	if (control_start(&ctx,
 	    ctx.options & DHCPCD_MASTER ? NULL : argv[optind]) == -1)
 	{
-		syslog(LOG_ERR, "control_start: %m");
+		logger(&ctx, LOG_ERR, "control_start: %m");
 		goto exit_failure;
 	}
 #endif
 
-	syslog(LOG_INFO, "version " VERSION " starting");
+	logger(&ctx, LOG_DEBUG, PACKAGE "-" VERSION " starting");
 	ctx.options |= DHCPCD_STARTED;
 #ifdef USE_SIGNALS
 	/* Save signal mask, block and redirect signals to our handler */
 	if (signal_init(&ctx.sigset) == -1) {
-		syslog(LOG_ERR, "signal_setup: %m");
+		logger(&ctx, LOG_ERR, "signal_setup: %m");
 		goto exit_failure;
 	}
 #endif
@@ -1721,7 +1720,7 @@ main(int argc, char **argv)
 	 * so that we pickup any new addresses during the discover phase. */
 	ctx.link_fd = if_openlinksocket();
 	if (ctx.link_fd == -1)
-		syslog(LOG_ERR, "open_link_socket: %m");
+		logger(&ctx, LOG_ERR, "open_link_socket: %m");
 	else
 		eloop_event_add(ctx.eloop, ctx.link_fd,
 		    handle_link, &ctx, NULL, NULL);
@@ -1734,21 +1733,22 @@ main(int argc, char **argv)
 
 	ctx.ifaces = if_discover(&ctx, ctx.ifc, ctx.ifv);
 	if (ctx.ifaces == NULL) {
-		syslog(LOG_ERR, "if_discover: %m");
+		logger(&ctx, LOG_ERR, "if_discover: %m");
 		goto exit_failure;
 	}
 	for (i = 0; i < ctx.ifc; i++) {
 		if (if_find(&ctx, ctx.ifv[i]) == NULL)
-			syslog(LOG_ERR, "%s: interface not found or invalid",
+			logger(&ctx, LOG_ERR,
+			    "%s: interface not found or invalid",
 			    ctx.ifv[i]);
 	}
 	if (TAILQ_FIRST(ctx.ifaces) == NULL) {
 		if (ctx.ifc == 0)
-			syslog(LOG_ERR, "no valid interfaces found");
+			logger(&ctx, LOG_ERR, "no valid interfaces found");
 		else
 			goto exit_failure;
 		if (!(ctx.options & DHCPCD_LINK)) {
-			syslog(LOG_ERR,
+			logger(&ctx, LOG_ERR,
 			    "aborting as link detection is disabled");
 			goto exit_failure;
 		}
@@ -1779,7 +1779,8 @@ main(int argc, char **argv)
 		    ctx.options & DHCPCD_LINK &&
 		    !(ctx.options & DHCPCD_WAITIP))
 		{
-			syslog(LOG_WARNING, "no interfaces have a carrier");
+			logger(&ctx, LOG_WARNING,
+			    "no interfaces have a carrier");
 			if (dhcpcd_daemonise(&ctx))
 				goto exit_success;
 		} else if (t > 0 &&
@@ -1799,7 +1800,7 @@ main(int argc, char **argv)
 		    dhcpcd_prestartinterface, ifp);
 	}
 
-	i = eloop_start(&ctx);
+	i = eloop_start(ctx.eloop);
 	goto exit1;
 
 exit_success:
@@ -1830,7 +1831,7 @@ exit1:
 	ipv6_ctxfree(&ctx);
 	dev_stop(&ctx);
 	if (control_stop(&ctx) == -1)
-		syslog(LOG_ERR, "control_stop: %m:");
+		logger(&ctx, LOG_ERR, "control_stop: %m:");
 	if (ctx.pid_fd != -1) {
 		close(ctx.pid_fd);
 		unlink(ctx.pidfile);
@@ -1838,7 +1839,8 @@ exit1:
 	eloop_free(ctx.eloop);
 
 	if (ctx.options & DHCPCD_STARTED && !(ctx.options & DHCPCD_FORKED))
-		syslog(LOG_INFO, "exited");
-	closelog();
+		logger(&ctx, LOG_INFO, PACKAGE " exited");
+	logger_close(&ctx);
+	free(ctx.logfile);
 	return i;
 }

@@ -66,7 +66,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
 #include <unistd.h>
 
 #if defined(OpenBSD) && OpenBSD >= 201411
@@ -326,7 +325,7 @@ if_openrawsocket(struct interface *ifp, int protocol)
 		goto eexit;
 	if (pv.bv_major != BPF_MAJOR_VERSION ||
 	    pv.bv_minor < BPF_MINOR_VERSION) {
-		syslog(LOG_ERR, "BPF version mismatch - recompile");
+		logger(ifp->ctx, LOG_ERR, "BPF version mismatch - recompile");
 		goto eexit;
 	}
 
@@ -1438,7 +1437,7 @@ eexit:
 }
 
 static int
-if_raflush(void)
+if_raflush(struct dhcpcd_ctx *ctx)
 {
 	int s;
 	char dummy[IFNAMSIZ + 8];
@@ -1448,9 +1447,9 @@ if_raflush(void)
 		return -1;
 	strlcpy(dummy, "lo0", sizeof(dummy));
 	if (ioctl(s, SIOCSRTRFLUSH_IN6, (void *)&dummy) == -1)
-		syslog(LOG_ERR, "SIOSRTRFLUSH_IN6: %m");
+		logger(ctx, LOG_ERR, "SIOSRTRFLUSH_IN6: %m");
 	if (ioctl(s, SIOCSPFXFLUSH_IN6, (void *)&dummy) == -1)
-		syslog(LOG_ERR, "SIOSPFXFLUSH_IN6: %m");
+		logger(ctx, LOG_ERR, "SIOSPFXFLUSH_IN6: %m");
 	close(s);
 	return 0;
 }
@@ -1498,7 +1497,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 
 #ifdef ND6_IFF_IFDISABLED
 		if (del_if_nd6_flag(ifp->name, ND6_IFF_IFDISABLED) == -1) {
-			syslog(LOG_ERR,
+			logger(ifp->ctx, LOG_ERR,
 			    "%s: del_if_nd6_flag: ND6_IFF_IFDISABLED: %m",
 			    ifp->name);
 			return -1;
@@ -1507,7 +1506,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 
 #ifdef ND6_IFF_PERFORMNUD
 		if (set_if_nd6_flag(ifp->name, ND6_IFF_PERFORMNUD) == -1) {
-			syslog(LOG_ERR,
+			logger(ifp->ctx, LOG_ERR,
 			    "%s: set_if_nd6_flag: ND6_IFF_PERFORMNUD: %m",
 			    ifp->name);
 			return -1;
@@ -1520,19 +1519,19 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 
 			all = get_if_nd6_flag(ifp->name,ND6_IFF_AUTO_LINKLOCAL);
 			if (all == -1)
-				syslog(LOG_ERR,
+				logger(ifp->ctx, LOG_ERR,
 				    "%s: get_if_nd6_flag: "
 				    "ND6_IFF_AUTO_LINKLOCAL: %m",
 				    ifp->name);
 			else if (all != 0) {
-				syslog(LOG_DEBUG,
+				logger(ifp->ctx, LOG_DEBUG,
 				    "%s: disabling Kernel IPv6 "
 				    "auto link-local support",
 				    ifp->name);
 				if (del_if_nd6_flag(ifp->name,
 				    ND6_IFF_AUTO_LINKLOCAL) == -1)
 				{
-					syslog(LOG_ERR,
+					logger(ifp->ctx, LOG_ERR,
 					    "%s: del_if_nd6_flag: "
 					    "ND6_IFF_AUTO_LINKLOCAL: %m",
 					    ifp->name);
@@ -1549,13 +1548,13 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 #ifdef ND6_IFF_OVERRIDE_RTADV
 		override = get_if_nd6_flag(ifp->name, ND6_IFF_OVERRIDE_RTADV);
 		if (override == -1)
-			syslog(LOG_ERR,
+			logger(ifp->ctx, LOG_ERR,
 			    "%s: get_if_nd6_flag: ND6_IFF_OVERRIDE_RTADV: %m",
 			    ifp->name);
 		else if (override == 0 && own) {
 			if (set_if_nd6_flag(ifp->name, ND6_IFF_OVERRIDE_RTADV)
 			    == -1)
-				syslog(LOG_ERR,
+				logger(ifp->ctx, LOG_ERR,
 				    "%s: set_if_nd6_flag: "
 				    "ND6_IFF_OVERRIDE_RTADV: %m",
 				    ifp->name);
@@ -1567,23 +1566,23 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 #ifdef ND6_IFF_ACCEPT_RTADV
 		ra = get_if_nd6_flag(ifp->name, ND6_IFF_ACCEPT_RTADV);
 		if (ra == -1)
-			syslog(LOG_ERR,
+			logger(ifp->ctx, LOG_ERR,
 			    "%s: get_if_nd6_flag: ND6_IFF_ACCEPT_RTADV: %m",
 			    ifp->name);
 		else if (ra != 0 && own) {
-			syslog(LOG_DEBUG,
+			logger(ifp->ctx, LOG_DEBUG,
 			    "%s: disabling Kernel IPv6 RA support",
 			    ifp->name);
 			if (del_if_nd6_flag(ifp->name, ND6_IFF_ACCEPT_RTADV)
 			    == -1)
-				syslog(LOG_ERR,
+				logger(ifp->ctx, LOG_ERR,
 				    "%s: del_if_nd6_flag: "
 				    "ND6_IFF_ACCEPT_RTADV: %m",
 				    ifp->name);
 			else
 				ra = 0;
 		} else if (ra == 0 && !own)
-			syslog(LOG_WARNING,
+			logger(ifp->ctx, LOG_WARNING,
 			    "%s: IPv6 kernel autoconf disabled", ifp->name);
 #ifdef ND6_IFF_OVERRIDE_RTADV
 		if (override == 0 && ra)
@@ -1600,12 +1599,12 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 	if (ra == -1)
 		/* The sysctl probably doesn't exist, but this isn't an
 		 * error as such so just log it and continue */
-		syslog(errno == ENOENT ? LOG_DEBUG : LOG_WARNING,
+		logger(ifp->ctx, errno == ENOENT ? LOG_DEBUG : LOG_WARNING,
 		    "IPV6CTL_ACCEPT_RTADV: %m");
 	else if (ra != 0 && own) {
-		syslog(LOG_DEBUG, "disabling Kernel IPv6 RA support");
+		logger(ifp->ctx, LOG_DEBUG, "disabling Kernel IPv6 RA support");
 		if (set_inet6_sysctl(IPV6CTL_ACCEPT_RTADV, 0) == -1) {
-			syslog(LOG_ERR, "IPV6CTL_ACCEPT_RTADV: %m");
+			logger(ifp->ctx, LOG_ERR, "IPV6CTL_ACCEPT_RTADV: %m");
 			return ra;
 		}
 		ra = 0;
@@ -1616,7 +1615,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 		/* Flush the kernel knowledge of advertised routers
 		 * and prefixes so the kernel does not expire prefixes
 		 * and default routes we are trying to own. */
-		if_raflush();
+		if_raflush(ctx);
 	}
 
 	ctx->ra_global = ra;
