@@ -1586,9 +1586,10 @@ ipv6nd_handledata(void *arg)
 	}
 
 	TAILQ_FOREACH(ifp, dctx->ifaces, next) {
-		if (ifp->index == (unsigned int)pkt.ipi6_ifindex) {
-			if (!(ifp->options->options & DHCPCD_IPV6) ||
-			    ifp->options->options & DHCPCD_PFXDLGONLY)
+		if (ifp->index == (unsigned int)pkt.ipi6_ifindex &&
+		    !(ifp->options->options & DHCPCD_PFXDLGONLY))
+		{
+			if (!(ifp->options->options & DHCPCD_IPV6))
 				return;
 			break;
 		}

@@ -2627,7 +2627,6 @@ dhcp6_handledata(void *arg)
 			break;
 		}
 	}
-
 	if (pkt.ipi6_ifindex == 0) {
 		logger(dctx, LOG_ERR,
 		    "DHCPv6 reply did not contain index from %s", ctx->sfrom);
@@ -2635,7 +2634,9 @@ dhcp6_handledata(void *arg)
 	}
 
 	TAILQ_FOREACH(ifp, dctx->ifaces, next) {
-		if (ifp->index == (unsigned int)pkt.ipi6_ifindex)
+		/* Ensure we work on the master interface */
+		if (ifp->index == (unsigned int)pkt.ipi6_ifindex &&
+		    !(ifp->options->options & DHCPCD_PFXDLGONLY))
 			break;
 	}
 	if (ifp == NULL) {
@@ -2663,11 +2664,16 @@ dhcp6_handledata(void *arg)
 		    "%s: DHCPv6 reply received but not running", ifp->name);
 		return;
 	}
+
 	/* We're already bound and this message is for another machine */
 	/* XXX DELEGATED? */
 	if (r->type != DHCP6_RECONFIGURE &&
-	    (state->state == DH6S_BOUND || state->state == DH6S_INFORMED))
+	    (state->state == DH6S_BOUND || state->state == DH6S_INFORMED)) 
+	{
+		logger(ifp->ctx, LOG_DEBUG,
+		    "%s: DHCPv6 reply received but already bound", ifp->name);
 		return;
+	}
 
 	if (r->type != DHCP6_RECONFIGURE &&
 	    (r->xid[0] != state->send->xid[0] ||
