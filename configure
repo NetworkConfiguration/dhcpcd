@@ -320,10 +320,8 @@ done
 if [ -z "$DEBUG" -a -f .fslckout ]; then
 	printf "Found fossil checkout ... "
 	DEBUG=yes
-else
-	DEBUG=no
 fi
-if [ "$DEBUG" != no -a "$DEBUG" != false ]; then
+if [ -n "$DEBUG" -a "$DEBUG" != no -a "$DEBUG" != false ]; then
 	echo "Adding debugging CFLAGS"
 	cat <<EOF >>$CONFIG_MK
 CFLAGS+=	-g -Wall -Wextra
