@@ -1149,7 +1149,7 @@ nextslaacprivate:
 		}
 		ap->dadcounter = dadcounter;
 	} else {
-		memcpy(ap->addr.s6_addr, ap->prefix.s6_addr, ap->prefix_len);
+		memcpy(ap->addr.s6_addr, ap->prefix.s6_addr, 8);
 		switch (ifp->family) {
 		case ARPHRD_ETHER:
 			if (ifp->hwlen == 6) {
@@ -1163,6 +1163,11 @@ nextslaacprivate:
 				ap->addr.s6_addr[15] = ifp->hwaddr[5];
 			} else if (ifp->hwlen == 8)
 				memcpy(&ap->addr.s6_addr[8], ifp->hwaddr, 8);
+			else {
+				free(ap);
+				errno = ENOTSUP;
+				return -1;
+			}
 			break;
 		}
 
