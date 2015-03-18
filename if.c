@@ -596,6 +596,14 @@ if_cmp(const struct interface *si, const struct interface *ti)
 	int r;
 #endif
 
+	/* Always prefer master interfaces */
+	if (!(si->options->options & DHCPCD_PFXDLGONLY) &&
+	    ti->options->options & DHCPCD_PFXDLGONLY)
+		return -1;
+	if (si->options->options & DHCPCD_PFXDLGONLY &&
+	    !(ti->options->options & DHCPCD_PFXDLGONLY))
+		return 1;
+
 	if (D_STATE_RUNNING(si) && !D_STATE_RUNNING(ti))
 		return -1;
 	if (!D_STATE_RUNNING(si) && D_STATE_RUNNING(ti))
