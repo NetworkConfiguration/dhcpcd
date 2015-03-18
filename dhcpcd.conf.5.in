@@ -382,7 +382,7 @@ rather than
 .Xr syslog 3 .
 The
 .Ar logfile
-is reopened when
+is truncated when opened and is reopened when
 .Nm dhcpcd
 receives the
 .Dv SIGUSR2

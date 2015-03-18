@@ -150,7 +150,7 @@ logger_open(struct dhcpcd_ctx *ctx)
 {
 
 	if (ctx->logfile) {
-		int f = O_CREAT | O_APPEND;
+		int f = O_CREAT | O_APPEND | O_TRUNC;
 
 #ifdef O_CLOEXEC
 		f |= O_CLOEXEC;
