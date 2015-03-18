@@ -28,6 +28,16 @@
 #ifndef DPRINTF_H
 #define DPRINTF_H
 
-int dprintf(int, const char *, va_list);
-int dprintf(int, const char *, ...);
+#include <stdarg.h>
+
+#ifndef __printflike
+# if __GNUC__ > 2 || defined(__INTEL_COMPILER)
+#  define __printflike(a, b) __attribute__((format(printf, a, b)))
+# else
+#  define __printflike(a, b)
+# endif
+#endif
+
+__printflike(2, 0) int vdprintf(int, const char * __restrict, va_list);
+__printflike(2, 3) int dprintf(int, const char * __restrict, ...);
 #endif

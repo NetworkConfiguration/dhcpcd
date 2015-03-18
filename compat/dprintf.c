@@ -33,11 +33,10 @@
 #include "dprintf.h"
 
 int
-vdprintf(int fd, const char *fmt, va_list va)
+vdprintf(int fd, const char * __restrict fmt, va_list va)
 {
 	int e;
 	FILE *fp;
-	va_list va;
 
 	if ((e = dup(fd)) == -1)
 		return -1;
@@ -53,9 +52,10 @@ vdprintf(int fd, const char *fmt, va_list va)
 }
 
 int
-dprintf(int fd, const char *fmt, ...)
+dprintf(int fd, const char * __restrict fmt, ...)
 {
 	int e;
+	va_list va;
 
 	va_start(va, fmt);
 	e = vdprintf(fd, fmt, va);
