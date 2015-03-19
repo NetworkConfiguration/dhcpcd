@@ -1446,7 +1446,7 @@ af_attach(int s, const struct interface *ifp, int af)
 
 	strlcpy(ifar.ifar_name, ifp->name, sizeof(ifar.ifar_name));
 	ifar.ifar_af = af;
-	return ioctl(s, SIOCIFAFATTACH, (caddr_t)&ifar);
+	return ioctl(s, SIOCIFAFATTACH, (void *)&ifar);
 }
 #endif
 
