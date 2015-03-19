@@ -1461,6 +1461,13 @@ set_ifxflags(const struct interface *ifp, int own)
 	struct ifreq ifr;
 	int s, flags;
 
+#ifndef IFXF_NOINET6
+	/* No point in removing the no inet6 flag if it doesn't
+	 * exist and we're not owning inet6. */
+	if (! own)
+		return 0;
+#endif
+
 	s = socket(PF_INET6, SOCK_DGRAM, 0);
 	if (s == -1)
 		return -1;
@@ -1470,7 +1477,9 @@ set_ifxflags(const struct interface *ifp, int own)
 		return -1;
 	}
 	flags = ifr.ifr_flags;
+#ifdef IFXF_NOINET6
 	flags &= ~IFXF_NOINET6;
+#endif
 	if (own)
 		flags &= ~IFXF_AUTOCONF6;
 	if (ifr.ifr_flags != flags) {
