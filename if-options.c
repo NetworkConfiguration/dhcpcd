@@ -1038,7 +1038,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 				}
 				TAILQ_INIT(ifo->routes);
 			}
-			rt = malloc(sizeof(*rt));
+			rt = calloc(1, sizeof(*rt));
 			if (rt == NULL) {
 				logger(ctx, LOG_ERR, "%s: %m", __func__);
 				*fp = ' ';
@@ -1063,7 +1063,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 				}
 				TAILQ_INIT(ifo->routes);
 			}
-			rt = malloc(sizeof(*rt));
+			rt = calloc(1, sizeof(*rt));
 			if (rt == NULL) {
 				logger(ctx, LOG_ERR, "%s: %m", __func__);
 				return -1;
