@@ -370,9 +370,6 @@ ipv4_handlert(struct dhcpcd_ctx *ctx, int cmd, struct rt *rt)
 static int
 nc_route(struct rt *ort, struct rt *nrt)
 {
-#ifdef HAVE_ROUTE_METRIC
-	int retval;
-#endif
 
 	/* Don't set default routes if not asked to */
 	if (nrt->dest.s_addr == 0 &&
@@ -405,21 +402,29 @@ nc_route(struct rt *ort, struct rt *nrt)
 #ifdef HAVE_ROUTE_METRIC
 	/* With route metrics, we can safely add the new route before
 	 * deleting the old route. */
-	if ((retval = if_route(RTM_ADD, nrt))  == -1)
-		logger(nrt->iface->ctx, LOG_ERR, "if_route (ADD): %m");
-	if (ort && if_route(RTM_DELETE, ort) == -1 && errno != ESRCH)
-		logger(nrt->iface->ctx, LOG_ERR, "if_route (DEL): %m");
-	return retval;
-#else
+	if (if_route(RTM_ADD, nrt)  == 0) {
+		if (ort && if_route(RTM_DELETE, ort) == -1 && errno != ESRCH)
+			logger(nrt->iface->ctx, LOG_ERR, "if_route (DEL): %m");
+		return 0;
+	}
+
+	/* If the kernel claims the route exists we need to rip out the
+	 * old one first. */
+	if (errno != EEXIST || ort == NULL)
+		goto logerr;
+#endif
+
 	/* No route metrics, we need to delete the old route before
 	 * adding the new one. */
 	if (ort && if_route(RTM_DELETE, ort) == -1 && errno != ESRCH)
 		logger(nrt->iface->ctx, LOG_ERR, "if_route (DEL): %m");
 	if (if_route(RTM_ADD, nrt) == 0)
 		return 0;
+#ifdef HAVE_ROUTE_METRIC
+logerr:
+#endif
 	logger(nrt->iface->ctx, LOG_ERR, "if_route (ADD): %m");
 	return -1;
-#endif
 }
 
 static int
