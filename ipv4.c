@@ -332,6 +332,12 @@ ipv4_handlert(struct dhcpcd_ctx *ctx, int cmd, struct rt *rt)
 	if (ctx->ipv4_kroutes == NULL)
 		return 0;
 
+	/* DHCP host routes have a gateway of the destination.
+	 * We need to emulate that */
+	if (rt->gate.s_addr == INADDR_ANY &&
+	    rt->net.s_addr == INADDR_BROADCAST)
+	    	rt->gate = rt->dest;
+
 	f = ipv4_findrt(ctx, rt, 1);
 	switch (cmd) {
 	case RTM_ADD:
