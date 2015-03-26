@@ -50,6 +50,7 @@
 #include "dhcp.h"
 #include "dhcp6.h"
 #include "dhcpcd-embedded.h"
+#include "if.h"
 #include "if-options.h"
 #include "ipv4.h"
 
