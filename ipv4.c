@@ -704,8 +704,10 @@ ipv4_buildroutes(struct dhcpcd_ctx *ctx)
 				free(or);
 			} else {
 				if (state->added & STATE_FAKE) {
-					if (!ipv4_findrt(ctx, rt, 1))
-						continue;
+					or = ipv4_findrt(ctx, rt, 1);
+					if (or == NULL ||
+					    or->gate.s_addr != rt->gate.s_addr)
+ 						continue;
 				} else {
 					if (n_route(rt) != 0)
 						continue;
