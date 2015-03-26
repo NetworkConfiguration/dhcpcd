@@ -336,7 +336,7 @@ ipv4_handlert(struct dhcpcd_ctx *ctx, int cmd, struct rt *rt)
 	 * We need to emulate that */
 	if (rt->gate.s_addr == INADDR_ANY &&
 	    rt->net.s_addr == INADDR_BROADCAST)
-	    	rt->gate = rt->dest;
+		rt->gate = rt->dest;
 
 	f = ipv4_findrt(ctx, rt, 1);
 	switch (cmd) {
