@@ -54,7 +54,7 @@
 	(sizeof(struct arphdr) + (2 * sizeof(uint32_t)) + (2 * HWADDR_LEN))
 
 static ssize_t
-arp_send(const struct interface *ifp, int op, in_addr_t sip, in_addr_t tip)
+arp_request(const struct interface *ifp, in_addr_t sip, in_addr_t tip)
 {
 	uint8_t arp_buffer[ARP_LEN];
 	struct arphdr ar;
@@ -65,7 +65,7 @@ arp_send(const struct interface *ifp, int op, in_addr_t sip, in_addr_t tip)
 	ar.ar_pro = htons(ETHERTYPE_IP);
 	ar.ar_hln = ifp->hwlen;
 	ar.ar_pln = sizeof(sip);
-	ar.ar_op = htons(op);
+	ar.ar_op = htons(ARPOP_REQUEST);
 
 	p = arp_buffer;
 	len = 0;
@@ -223,8 +223,7 @@ arp_announce1(void *arg)
 		    "%s: ARP announcing %s (%d of %d)",
 		    ifp->name, inet_ntoa(astate->addr),
 		    astate->claims, ANNOUNCE_NUM);
-	if (arp_send(ifp, ARPOP_REQUEST,
-		astate->addr.s_addr, astate->addr.s_addr) == -1)
+	if (arp_request(ifp, astate->addr.s_addr, astate->addr.s_addr) == -1)
 		logger(ifp->ctx, LOG_ERR, "send_arp: %m");
 	eloop_timeout_add_sec(ifp->ctx->eloop, ANNOUNCE_WAIT,
 	    astate->claims < ANNOUNCE_NUM ? arp_announce1 : arp_announced,
@@ -271,7 +270,7 @@ arp_probe1(void *arg)
 	    ifp->name, inet_ntoa(astate->addr),
 	    astate->probes ? astate->probes : PROBE_NUM, PROBE_NUM,
 	    timespec_to_double(&tv));
-	if (arp_send(ifp, ARPOP_REQUEST, 0, astate->addr.s_addr) == -1)
+	if (arp_request(ifp, 0, astate->addr.s_addr) == -1)
 		logger(ifp->ctx, LOG_ERR, "send_arp: %m");
 }
 

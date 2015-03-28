@@ -114,8 +114,8 @@ int if_managelink(struct dhcpcd_ctx *);
 extern const char *if_pfname;
 int if_openrawsocket(struct interface *, int);
 ssize_t if_sendrawpacket(const struct interface *,
-    int, const void *, size_t);
-ssize_t if_readrawpacket(struct interface *, int, void *, size_t, int *);
+    uint16_t, const void *, size_t);
+ssize_t if_readrawpacket(struct interface *, uint16_t, void *, size_t, int *);
 
 int if_address(const struct interface *,
     const struct in_addr *, const struct in_addr *,

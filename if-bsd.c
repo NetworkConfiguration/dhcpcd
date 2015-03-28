@@ -375,7 +375,7 @@ eexit:
 }
 
 ssize_t
-if_sendrawpacket(const struct interface *ifp, int protocol,
+if_sendrawpacket(const struct interface *ifp, uint16_t protocol,
     const void *data, size_t len)
 {
 	struct iovec iov[2];
@@ -401,7 +401,7 @@ if_sendrawpacket(const struct interface *ifp, int protocol,
 /* BPF requires that we read the entire buffer.
  * So we pass the buffer in the API so we can loop on >1 packet. */
 ssize_t
-if_readrawpacket(struct interface *ifp, int protocol,
+if_readrawpacket(struct interface *ifp, uint16_t protocol,
     void *data, size_t len, int *flags)
 {
 	int fd;
@@ -725,7 +725,7 @@ ifa_scope(struct sockaddr_in6 *sin, unsigned int ifindex)
 	/* KAME based systems want to store the scope inside the sin6_addr
 	 * for link local addreses */
 	if (IN6_IS_ADDR_LINKLOCAL(&sin->sin6_addr)) {
-		uint16_t scope = htons(ifindex);
+		uint16_t scope = htons((uint16_t)ifindex);
 		memcpy(&sin->sin6_addr.s6_addr[2], &scope,
 		    sizeof(scope));
 	}
