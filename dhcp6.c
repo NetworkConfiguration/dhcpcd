@@ -198,14 +198,14 @@ dhcp6_makevendor(struct dhcp6_option *o, const struct interface *ifp)
 			    i < ifo->vivco_len;
 			    i++, vivco++)
 			{
-				u16 = htons(vivco->len);
+				u16 = htons((uint16_t)vivco->len);
 				memcpy(p, &u16, sizeof(u16));
 				p += sizeof(u16);
 				memcpy(p, vivco->data, vivco->len);
 				p += vivco->len;
 			}
 		} else if (vlen) {
-			u16 = htons(vlen);
+			u16 = htons((uint16_t)vlen);
 			memcpy(p, &u16, sizeof(u16));
 			p += sizeof(u16);
 			memcpy(p, vendor, (size_t)vlen);
@@ -494,9 +494,9 @@ dhcp6_makemessage(struct interface *ifp)
 	struct dhcp6_message *m;
 	struct dhcp6_option *o, *so, *eo;
 	const struct dhcp6_option *si, *unicast;
-	size_t l, n, len, ml, auth_len;
+	size_t l, n, len, ml;
 	uint8_t u8, type;
-	uint16_t u16, n_options;
+	uint16_t u16, n_options, auth_len;
 	struct if_options *ifo;
 	const struct dhcp_opt *opt, *opt2;
 	uint8_t IA, *p;
@@ -701,17 +701,22 @@ dhcp6_makemessage(struct interface *ifp)
 		return -1;
 	}
 
+	auth_len = 0;
 	if (ifo->auth.options & DHCPCD_AUTH_SEND) {
-		auth_len = (size_t)dhcp_auth_encode(&ifo->auth,
+		ssize_t alen = dhcp_auth_encode(&ifo->auth,
 		    state->auth.token, NULL, 0, 6, type, NULL, 0);
-		if ((ssize_t)auth_len == -1) {
+		if (alen != -1 && alen > UINT16_MAX) {
+			errno = ERANGE;
+			alen = -1;
+		}
+		if (alen == -1)
 			logger(ifp->ctx, LOG_ERR,
 			    "%s: dhcp_auth_encode: %m", ifp->name);
-			auth_len = 0;
-		} else if (auth_len != 0)
+		else if (alen != 0) {
+			auth_len = (uint16_t)alen;
 			len += sizeof(*o) + auth_len;
-	} else
-		auth_len = 0; /* appease GCC */
+		}
+	}
 
 	state->send = malloc(len);
 	if (state->send == NULL)
@@ -731,7 +736,7 @@ dhcp6_makemessage(struct interface *ifp)
 
 	o = D6_FIRST_OPTION(state->send);
 	o->code = htons(D6_OPTION_CLIENTID);
-	o->len = htons(ifp->ctx->duid_len);
+	o->len = htons((uint16_t)ifp->ctx->duid_len);
 	memcpy(D6_OPTION_DATA(o), ifp->ctx->duid, ifp->ctx->duid_len);
 
 	if (si) {
@@ -813,9 +818,9 @@ dhcp6_makemessage(struct interface *ifp)
 					eo->len = htons(eo->len);
 				}
 
-				u32 = (uint32_t)(ntohs(o->len) + sizeof(*so)
+				u16 = (uint16_t)(ntohs(o->len) + sizeof(*so)
 				    + ntohs(so->len));
-				o->len = htons(u32);
+				o->len = htons(u16);
 			} else {
 				so->code = htons(D6_OPTION_IA_ADDR);
 				so->len = sizeof(ap->addr) +
@@ -852,7 +857,7 @@ dhcp6_makemessage(struct interface *ifp)
 			l = encode_rfc1035(hostname, p + 1);
 			if (l == 0)
 				*p = D6_FQDN_NONE;
-			o->len = htons(l + 1);
+			o->len = htons((uint16_t)(l + 1));
 		}
 
 		if ((ifo->auth.options & DHCPCD_AUTH_SENDREQUIRE) !=
@@ -886,7 +891,7 @@ dhcp6_makemessage(struct interface *ifp)
 				    has_option_mask(ifo->requestmask6,
 				        opt->option)))
 				{
-					u16 = htons(opt->option);
+					u16 = htons((uint16_t)opt->option);
 					memcpy(p, &u16, sizeof(u16));
 					p += sizeof(u16);
 					o->len = (uint16_t)(o->len + sizeof(u16));
@@ -901,7 +906,7 @@ dhcp6_makemessage(struct interface *ifp)
 				    has_option_mask(ifo->requestmask6,
 				        opt->option)))
 				{
-					u16 = htons(opt->option);
+					u16 = htons((uint16_t)opt->option);
 					memcpy(p, &u16, sizeof(u16));
 					p += sizeof(u16);
 					o->len = (uint16_t)(o->len + sizeof(u16));
@@ -920,7 +925,7 @@ dhcp6_makemessage(struct interface *ifp)
 	if (ifo->auth.options & DHCPCD_AUTH_SEND && auth_len != 0) {
 		o = D6_NEXT_OPTION(o);
 		o->code = htons(D6_OPTION_AUTH);
-		o->len = htons(auth_len);
+		o->len = htons((uint16_t)auth_len);
 		/* data will be filled at send message time */
 	}
 

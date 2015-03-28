@@ -698,10 +698,10 @@ make_message(struct dhcp_message **message,
 {
 	struct dhcp_message *dhcp;
 	uint8_t *m, *lp, *p, *auth;
-	uint8_t *n_params = NULL;
+	uint8_t *n_params = NULL, auth_len;
 	uint32_t ul;
 	uint16_t sz;
-	size_t len, i, auth_len;
+	size_t len, i;
 	const struct dhcp_opt *opt;
 	struct if_options *ifo = ifp->options;
 	const struct dhcp_state *state = D_CSTATE(ifp);
@@ -749,7 +749,7 @@ make_message(struct dhcp_message **message,
 		if (up < 0 || up > (time_t)UINT16_MAX)
 			dhcp->secs = htons((uint16_t)UINT16_MAX);
 		else
-			dhcp->secs = htons(up);
+			dhcp->secs = htons((uint16_t)up);
 	}
 	dhcp->xid = htonl(state->xid);
 	dhcp->cookie = htonl(MAGIC_COOKIE);
@@ -825,7 +825,7 @@ make_message(struct dhcp_message **message,
 			 * handle DHCP packets any bigger. */
 			mtu = MTU_MAX;
 		}
-		sz = htons(mtu);
+		sz = htons((uint16_t)mtu);
 		memcpy(p, &sz, 2);
 		p += 2;
 
@@ -1001,19 +1001,23 @@ make_message(struct dhcp_message **message,
 	auth = NULL;
 
 	if (ifo->auth.options & DHCPCD_AUTH_SEND) {
-		auth_len = (size_t)dhcp_auth_encode(&ifo->auth,
+		ssize_t alen = dhcp_auth_encode(&ifo->auth,
 		    state->auth.token,
 		    NULL, 0, 4, type, NULL, 0);
-		if ((ssize_t)auth_len == -1) {
+		if (alen != -1 && alen > UINT8_MAX) {
+			errno = ERANGE;
+			alen = -1;
+		}
+		if (alen == -1)
 			logger(ifp->ctx, LOG_ERR,
 			    "%s: dhcp_auth_encode: %m", ifp->name);
-			auth_len = 0;
-		} else if (auth_len != 0) {
-			len = (size_t)((p + auth_len) - m);
-			if (auth_len > 255 || len > sizeof(*dhcp))
+		else if (alen != 0) {
+			auth_len = (uint8_t)alen;
+			len = (size_t)((p + alen) - m);
+			if (len > sizeof(*dhcp))
 				goto toobig;
 			*p++ = DHO_AUTHENTICATION;
-			*p++ = (uint8_t)auth_len;
+			*p++ = auth_len;
 			auth = p;
 			p += auth_len;
 		}
@@ -1550,7 +1554,7 @@ dhcp_makeudppacket(size_t *sz, const uint8_t *data, size_t length,
 	ip->ip_hl = sizeof(*ip) >> 2;
 	ip->ip_id = (uint16_t)arc4random_uniform(UINT16_MAX);
 	ip->ip_ttl = IPDEFTTL;
-	ip->ip_len = htons(sizeof(*ip) + sizeof(*udp) + length);
+	ip->ip_len = htons((uint16_t)(sizeof(*ip) + sizeof(*udp) + length));
 	ip->ip_sum = checksum(ip, sizeof(*ip));
 
 	*sz = sizeof(*ip) + sizeof(*udp) + length;

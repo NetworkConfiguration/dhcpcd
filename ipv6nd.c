@@ -1457,7 +1457,7 @@ ipv6nd_handlena(struct dhcpcd_ctx *dctx, struct interface *ifp,
 	struct ipv6_ctx *ctx = dctx->ipv6;
 	struct nd_neighbor_advert *nd_na;
 	struct ra *rap;
-	int is_router, is_solicited;
+	uint32_t is_router, is_solicited;
 	char buf[INET6_ADDRSTRLEN];
 	const char *taddr;
 
