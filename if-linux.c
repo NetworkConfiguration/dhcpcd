@@ -1186,7 +1186,7 @@ eexit:
 }
 
 ssize_t
-if_sendrawpacket(const struct interface *ifp, int protocol,
+if_sendrawpacket(const struct interface *ifp, uint16_t protocol,
     const void *data, size_t len)
 {
 	const struct dhcp_state *state;
@@ -1218,7 +1218,7 @@ if_sendrawpacket(const struct interface *ifp, int protocol,
 }
 
 ssize_t
-if_readrawpacket(struct interface *ifp, int protocol,
+if_readrawpacket(struct interface *ifp, uint16_t protocol,
     void *data, size_t len, int *flags)
 {
 	struct iovec iov = {
