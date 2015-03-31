@@ -189,11 +189,11 @@ logger(struct dhcpcd_ctx *ctx, int pri, const char *fmt, ...)
 	char fmt_cpy[1024];
 #endif
 
-	serrno = errno;
-	va_start(va, fmt);
-
 	if (pri >= LOG_DEBUG && ctx && !(ctx->options & DHCPCD_DEBUG))
 		return;
+
+	serrno = errno;
+	va_start(va, fmt);
 
 #ifndef HAVE_PRINTF_M
 	/* Print strerrno(errno) in place of %m */
