@@ -2940,9 +2940,8 @@ dhcp_dump(struct interface *ifp)
 	    AF_INET, ifp, "");
 	state->new = read_lease(ifp);
 	if (state->new == NULL) {
-		if (errno == ENOENT)
-			logger(ifp->ctx, LOG_ERR,
-			    "%s: no lease to dump", ifp->name);
+		logger(ifp->ctx, LOG_ERR,
+		    "%s: %s: %m", state->leasefile, __func__);
 		return -1;
 	}
 	state->reason = "DUMP";

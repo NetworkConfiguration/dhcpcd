@@ -1243,9 +1243,6 @@ dhcp6_dadcompleted(const struct interface *ifp)
 	const struct ipv6_addr *ap;
 
 	state = D6_CSTATE(ifp);
-	if (!TAILQ_FIRST(&state->addrs))
-		return 0;
-
 	TAILQ_FOREACH(ap, &state->addrs, next) {
 		if (ap->flags & IPV6_AF_ADDED &&
 		    !(ap->flags & IPV6_AF_DADCOMPLETED))
@@ -2128,7 +2125,7 @@ dhcp6_writelease(const struct interface *ifp)
 }
 
 static int
-dhcp6_readlease(struct interface *ifp)
+dhcp6_readlease(struct interface *ifp, int validate)
 {
 	struct dhcp6_state *state;
 	struct stat st;
@@ -2140,9 +2137,9 @@ dhcp6_readlease(struct interface *ifp)
 
 	state = D6_STATE(ifp);
 	if (stat(state->leasefile, &st) == -1) {
-		if (errno == ENOENT)
-			return 0;
-		logger(ifp->ctx, LOG_ERR, "%s: %s: %m", ifp->name, __func__);
+		if (errno != ENOENT)
+			logger(ifp->ctx, LOG_ERR, "%s: %s: %m",
+			    ifp->name, __func__);
 		return -1;
 	}
 	logger(ifp->ctx, LOG_DEBUG, "%s: reading lease `%s'",
@@ -2170,6 +2167,13 @@ dhcp6_readlease(struct interface *ifp)
 		goto ex;
 	}
 
+	/* If not validating IA's and if they have expired,
+	 * skip to the auth check. */
+	if (!validate) {
+		fd = 0;
+		goto auth;
+	}
+
 	if ((now = time(NULL)) == -1) {
 		logger(ifp->ctx, LOG_ERR, "%s: time: %m", __func__);
 		goto ex;
@@ -2195,6 +2199,7 @@ dhcp6_readlease(struct interface *ifp)
 		}
 	}
 
+auth:
 	/* Authenticate the message */
 	o = dhcp6_getmoption(D6_OPTION_AUTH, state->new, state->new_len);
 	if (o) {
@@ -2263,7 +2268,7 @@ dhcp6_startinit(struct interface *ifp)
 	    !(has_ta && !has_non_ta) &&
 	    ifp->options->reboot != 0)
 	{
-		r = dhcp6_readlease(ifp);
+		r = dhcp6_readlease(ifp, 1);
 		if (r == -1)
 			logger(ifp->ctx, LOG_ERR, "%s: dhcp6_readlease: %s: %m",
 			    ifp->name, state->leasefile);
@@ -2357,9 +2362,6 @@ dhcp6_script_try_run(struct interface *ifp, int delegated)
 	int completed;
 
 	state = D6_STATE(ifp);
-	if (!TAILQ_FIRST(&state->addrs))
-		return;
-
 	completed = 1;
 	/* If all addresses have completed DAD run the script */
 	TAILQ_FOREACH(ap, &state->addrs, next) {
@@ -2769,6 +2771,8 @@ dhcp6_handledata(void *arg)
 	case DHCP6_REPLY:
 		switch(state->state) {
 		case DH6S_INFORM:
+			if (dhcp6_checkstatusok(ifp, r, NULL, len) == -1)
+				return;
 			/* RFC4242 */
 			o = dhcp6_getmoption(D6_OPTION_INFO_REFRESH_TIME,
 			    r, len);
@@ -3569,7 +3573,6 @@ int
 dhcp6_dump(struct interface *ifp)
 {
 	struct dhcp6_state *state;
-	int r;
 
 	ifp->if_data[IF_DATA_DHCP6] = state = calloc(1, sizeof(*state));
 	if (state == NULL) {
@@ -3580,14 +3583,9 @@ dhcp6_dump(struct interface *ifp)
 	dhcp_set_leasefile(state->leasefile, sizeof(state->leasefile),
 	    AF_INET6, ifp,
 	    ifp->options->options & DHCPCD_PFXDLGONLY ? ".pd" : "");
-	r = dhcp6_readlease(ifp);
-	if (r == -1) {
-		if (errno == ENOENT)
-			logger(ifp->ctx, LOG_ERR,
-			    "%s: no lease to dump", ifp->name);
-		else
-			logger(ifp->ctx, LOG_ERR,
-			    "%s: dhcp6_readlease: %m", ifp->name);
+	if (dhcp6_readlease(ifp, 0) == -1) {
+		logger(ifp->ctx, LOG_ERR,
+		    "%s: %s: %m", state->leasefile, __func__);
 		return -1;
 	}
 	state->reason = "DUMP6";
