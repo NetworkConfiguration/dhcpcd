@@ -387,7 +387,7 @@ configure_interface1(struct interface *ifp)
 
 	/* We want to disable kernel interface RA as early as possible. */
 	if (ifo->options & DHCPCD_IPV6RS &&
-	    !(ifo->options & DHCPCD_DUMPLEASE))
+	    !(ifp->ctx->options & DHCPCD_DUMPLEASE))
 	{
 		/* If not doing any DHCP, disable the RDNSS requirement. */
 		if (!(ifo->options & (DHCPCD_DHCP | DHCPCD_DHCP6)))
