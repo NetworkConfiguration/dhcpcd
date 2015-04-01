@@ -2940,8 +2940,8 @@ dhcp_dump(struct interface *ifp)
 	    AF_INET, ifp, "");
 	state->new = read_lease(ifp);
 	if (state->new == NULL) {
-		logger(ifp->ctx, LOG_ERR,
-		    "%s: %s: %m", state->leasefile, __func__);
+		logger(ifp->ctx, LOG_ERR, "%s: %s: %m",
+		    *ifp->name ? ifp->name : state->leasefile, __func__);
 		return -1;
 	}
 	state->reason = "DUMP";
