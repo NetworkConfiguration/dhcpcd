@@ -197,7 +197,7 @@ struct ipv6_state {
 
 
 /* ipi6.ifiindex differes between OS's so have a cast function */
-#ifdef __linux__
+#ifdef __GLIBC__
 #define CAST_IPI6_IFINDEX(idx) (int)(idx)
 #else
 #define CAST_IPI6_IFINDEX(idx) (idx)

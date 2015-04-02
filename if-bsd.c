@@ -291,7 +291,7 @@ if_findsdl(struct dhcpcd_ctx *ctx, struct sockaddr_dl *sdl)
 const char *if_pfname = "Berkley Packet Filter";
 
 int
-if_openrawsocket(struct interface *ifp, int protocol)
+if_openrawsocket(struct interface *ifp, uint16_t protocol)
 {
 	struct dhcp_state *state;
 	int fd = -1;

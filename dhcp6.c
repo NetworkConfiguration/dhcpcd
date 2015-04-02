@@ -188,7 +188,7 @@ dhcp6_makevendor(struct dhcp6_option *o, const struct interface *ifp)
 
 	if (o) {
 		o->code = htons(D6_OPTION_VENDOR_CLASS);
-		o->len = htons(len);
+		o->len = htons((uint16_t)len);
 		p = D6_OPTION_DATA(o);
 		u32 = htonl(ifo->vivco_en ? ifo->vivco_en : DHCPCD_IANA_PEN);
 		memcpy(p, &u32, sizeof(u32));
@@ -216,7 +216,7 @@ dhcp6_makevendor(struct dhcp6_option *o, const struct interface *ifp)
 }
 
 static const struct dhcp6_option *
-dhcp6_findoption(unsigned int code, const uint8_t *d, size_t len)
+dhcp6_findoption(uint16_t code, const uint8_t *d, size_t len)
 {
 	const struct dhcp6_option *o;
 	size_t ol;
@@ -280,7 +280,7 @@ dhcp6_getoption(struct dhcpcd_ctx *ctx,
 }
 
 static const struct dhcp6_option *
-dhcp6_getmoption(unsigned int code, const struct dhcp6_message *m, size_t len)
+dhcp6_getmoption(uint16_t code, const struct dhcp6_message *m, size_t len)
 {
 
 	if (len < sizeof(*m)) {
@@ -310,7 +310,7 @@ dhcp6_updateelapsed(struct interface *ifp, struct dhcp6_message *m, size_t len)
 	up = uptime() - state->start_uptime;
 	if (up < 0 || up > (time_t)UINT16_MAX)
 		up = (time_t)UINT16_MAX;
-	u16 = htons(up);
+	u16 = htons((uint16_t)up);
 	memcpy(D6_OPTION_DATA(o), &u16, sizeof(u16));
 	return 0;
 }
@@ -2721,7 +2721,7 @@ dhcp6_handledata(void *arg)
 	    i++, opt++)
 	{
 		if (has_option_mask(ifo->requiremask6, opt->option) &&
-		    dhcp6_getmoption(opt->option, r, len) == NULL)
+		    dhcp6_getmoption((uint16_t)opt->option, r, len) == NULL)
 		{
 			logger(ifp->ctx, LOG_WARNING,
 			    "%s: reject DHCPv6 (no option %s) from %s",
@@ -2729,7 +2729,7 @@ dhcp6_handledata(void *arg)
 			return;
 		}
 		if (has_option_mask(ifo->rejectmask6, opt->option) &&
-		    dhcp6_getmoption(opt->option, r, len))
+		    dhcp6_getmoption((uint16_t)opt->option, r, len))
 		{
 			logger(ifp->ctx, LOG_WARNING,
 			    "%s: reject DHCPv6 (option %s) from %s",

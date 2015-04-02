@@ -1498,18 +1498,18 @@ checksum(const void *data, unsigned int len)
 	uint32_t sum = 0;
 
 	while (len > 1) {
-		sum += (uint32_t)addr[0] * 256 + (uint32_t)addr[1];
+		sum += (uint32_t)(addr[0] * 256 + addr[1]);
 		addr += 2;
 		len -= 2;
 	}
 
 	if (len == 1)
-		sum += (uint32_t)*addr * 256;
+		sum += (uint32_t)(*addr * 256);
 
 	sum = (sum >> 16) + (sum & 0xffff);
 	sum += (sum >> 16);
 
-	return (uint16_t)~htons(sum);
+	return (uint16_t)~htons((uint16_t)sum);
 }
 
 static struct udp_dhcp_packet *
@@ -1546,7 +1546,7 @@ dhcp_makeudppacket(size_t *sz, const uint8_t *data, size_t length,
 
 	udp->uh_sport = htons(DHCP_CLIENT_PORT);
 	udp->uh_dport = htons(DHCP_SERVER_PORT);
-	udp->uh_ulen = htons(sizeof(*udp) + length);
+	udp->uh_ulen = htons((uint16_t)(sizeof(*udp) + length));
 	ip->ip_len = udp->uh_ulen;
 	udp->uh_sum = checksum(udpp, sizeof(*udpp));
 

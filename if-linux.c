@@ -869,7 +869,7 @@ static int
 add_attr_l(struct nlmsghdr *n, unsigned short maxlen, unsigned short type,
     const void *data, unsigned short alen)
 {
-	unsigned short len = RTA_LENGTH(alen);
+	unsigned short len = (unsigned short)RTA_LENGTH(alen);
 	struct rtattr *rta;
 
 	if (NLMSG_ALIGN(n->nlmsg_len) + RTA_ALIGN(len) > maxlen) {
@@ -918,7 +918,7 @@ nla_next(struct nlattr *nla, size_t *rem)
 }
 
 #define NLA_TYPE(nla) ((nla)->nla_type & NLA_TYPE_MASK)
-#define NLA_LEN(nla) ((nla)->nla_len - NLA_HDRLEN)
+#define NLA_LEN(nla) (unsigned int)((nla)->nla_len - NLA_HDRLEN)
 #define NLA_OK(nla, rem) \
 	((rem) >= sizeof(struct nlattr) && \
 	(nla)->nla_len >= sizeof(struct nlattr) && \
@@ -1118,7 +1118,7 @@ struct nlmr
 const char *if_pfname = "Packet Socket";
 
 int
-if_openrawsocket(struct interface *ifp, int protocol)
+if_openrawsocket(struct interface *ifp, uint16_t protocol)
 {
 	int s;
 	union sockunion {
