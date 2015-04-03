@@ -56,7 +56,8 @@ struct ra {
 	uint32_t mtu;
 	struct ipv6_addrhead addrs;
 	TAILQ_HEAD(, ra_opt) options;
-	int expired;
+	uint8_t expired;
+	uint8_t no_default_warned;
 };
 
 TAILQ_HEAD(ra_head, ra);

@@ -1956,11 +1956,23 @@ make_router(const struct ra *rap)
 	(IN6_ARE_ADDR_EQUAL(&((rtp)->dest), &in6addr_any) &&		      \
 	    IN6_ARE_ADDR_EQUAL(&((rtp)->net), &in6addr_any))
 
+static int
+ra_has_public_addr(const struct ra *rap)
+{
+	const struct ipv6_addr *ia;
+
+	TAILQ_FOREACH(ia, &rap->addrs, next) {
+		if (ia->prefix_pltime && (ia->addr.s6_addr[0] & 0xfe) != 0xfc)
+			return 1;
+	}
+	return 0;
+}
+
 static void
 ipv6_build_ra_routes(struct ipv6_ctx *ctx, struct rt6_head *dnr, int expired)
 {
 	struct rt6 *rt;
-	const struct ra *rap;
+	struct ra *rap;
 	const struct ipv6_addr *addr;
 
 	TAILQ_FOREACH(rap, ctx->ra_routers, next) {
@@ -1976,9 +1988,19 @@ ipv6_build_ra_routes(struct ipv6_ctx *ctx, struct rt6_head *dnr, int expired)
 		if (rap->lifetime && rap->iface->options->options &
 		    (DHCPCD_IPV6RA_OWN | DHCPCD_IPV6RA_OWN_DEFAULT))
 		{
-			rt = make_router(rap);
-			if (rt)
-				TAILQ_INSERT_TAIL(dnr, rt, next);
+			if (!ra_has_public_addr(rap)) {
+				logger(rap->iface->ctx,
+				    rap->no_default_warned ?
+				    LOG_DEBUG : LOG_WARNING,
+				    "%s: ignoring default route from %s"
+				    " (no public prefix)",
+				    rap->iface->name, rap->sfrom);
+				rap->no_default_warned = 1;
+			} else {
+				rt = make_router(rap);
+				if (rt)
+					TAILQ_INSERT_TAIL(dnr, rt, next);
+			}
 		}
 	}
 }
