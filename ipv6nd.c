@@ -760,6 +760,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 		if (rap) {
 			free(rap->data);
 			rap->data_len = 0;
+			rap->no_default_warned = 0;
 		}
 		new_data = 1;
 	} else
