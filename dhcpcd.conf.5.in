@@ -368,12 +368,12 @@ Each time dhcpcd receives an IPv6 Router Adveristment, dhcpcd will manage
 the default route only.
 This allows dhcpcd to prefer an interface for outbound traffic based on metric
 and/or user selection rather than the kernel.
-.It Ic ipv6ra_always_default
+.It Ic ipv6ra_accept_nopublic
 Some IPv6 routers advertise themselves as a default router without any
-public prefixes.
+public prefixes or managed addresses.
 Generally, this is incorrect behaviour and
 .Nm dhcpcd
-will not install a default route for them unless this option is turned on.
+will ignore the advertisement unless this option is turned on.
 .It Ic ipv6rs
 Enables IPv6 Router Advertisment solicitation.
 This is on by default, but is documented here in the case where it is disabled

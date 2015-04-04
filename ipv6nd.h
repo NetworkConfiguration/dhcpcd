@@ -57,7 +57,7 @@ struct ra {
 	struct ipv6_addrhead addrs;
 	TAILQ_HEAD(, ra_opt) options;
 	uint8_t expired;
-	uint8_t no_default_warned;
+	uint8_t no_public_warned;
 };
 
 TAILQ_HEAD(ra_head, ra);

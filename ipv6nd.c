@@ -673,6 +673,18 @@ try_script:
 	}
 }
 
+static int
+ipv6nd_ra_has_public_addr(const struct ra *rap)
+{
+	const struct ipv6_addr *ia;
+
+	TAILQ_FOREACH(ia, &rap->addrs, next) {
+		if (ia->prefix_pltime && (ia->addr.s6_addr[0] & 0xfe) != 0xfc)
+			return 1;
+	}
+	return 0;
+}
+
 static void
 ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
     struct icmp6_hdr *icp, size_t len)
@@ -760,7 +772,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 		if (rap) {
 			free(rap->data);
 			rap->data_len = 0;
-			rap->no_default_warned = 0;
+			rap->no_public_warned = 0;
 		}
 		new_data = 1;
 	} else
@@ -834,7 +846,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 		}
 		if (olen > len) {
 			logger(ifp->ctx, LOG_ERR,
-			    "%s: Option length exceeds message", ifp->name);
+			    "%s: option length exceeds message", ifp->name);
 			break;
 		}
 
@@ -1059,8 +1071,8 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 						    STRING | ARRAY | DOMAIN,
 						    (const uint8_t *)tmp, l);
 					} else
-						logger(ifp->ctx, LOG_ERR, "%s: %m",
-						    __func__);
+						logger(ifp->ctx, LOG_ERR,
+						    "%s: %m", __func__);
 					free(tmp);
 				}
 			}
@@ -1121,6 +1133,18 @@ extra_opt:
 
 	if (new_rap)
 		add_router(ifp->ctx->ipv6, rap);
+	if (!ipv6nd_ra_has_public_addr(rap) &&
+	    !(rap->flags & ND_RA_FLAG_MANAGED) &&
+	    !(rap->iface->options->options & DHCPCD_IPV6RA_ACCEPT_NOPUBLIC))
+	{
+		logger(rap->iface->ctx,
+		    rap->no_public_warned ? LOG_DEBUG : LOG_WARNING,
+		    "%s: ignoring RA from %s"
+		    " (no public prefix, no managed address)",
+		    rap->iface->name, rap->sfrom);
+		rap->no_public_warned = 1;
+		return;
+	}
 	if (ifp->ctx->options & DHCPCD_TEST) {
 		script_runreason(ifp, "TEST");
 		goto handle_flag;
