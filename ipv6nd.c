@@ -679,7 +679,9 @@ ipv6nd_ra_has_public_addr(const struct ra *rap)
 	const struct ipv6_addr *ia;
 
 	TAILQ_FOREACH(ia, &rap->addrs, next) {
-		if (ia->prefix_pltime && (ia->addr.s6_addr[0] & 0xfe) != 0xfc)
+		if (ia->prefix_pltime &&
+		    (ia->addr.s6_addr[0] & 0xfe) != 0xfc &&
+		    ia->flags & IPV6_AF_AUTOCONF)
 			return 1;
 	}
 	return 0;
