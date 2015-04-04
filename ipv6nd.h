@@ -94,6 +94,7 @@ ssize_t ipv6nd_free(struct interface *);
 void ipv6nd_expirera(void *arg);
 int ipv6nd_hasra(const struct interface *);
 int ipv6nd_hasradhcp(const struct interface *);
+void ipv6nd_runignoredra(struct interface *);
 void ipv6nd_handleifa(struct dhcpcd_ctx *, int,
     const char *, const struct in6_addr *, int);
 int ipv6nd_dadcompleted(const struct interface *);
