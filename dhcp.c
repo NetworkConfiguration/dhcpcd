@@ -160,6 +160,12 @@ get_option(struct dhcpcd_ctx *ctx,
 	const uint8_t *op = NULL;
 	size_t bl = 0;
 
+	/* Check we have the magic cookie */
+	if (dhcp->cookie != htonl(MAGIC_COOKIE)) {
+		errno = ENOTSUP;
+		return NULL;
+	}
+
 	while (p < e) {
 		o = *p++;
 		if (o == opt) {
@@ -1059,7 +1065,7 @@ write_lease(const struct interface *ifp, const struct dhcp_message *dhcp)
 	const struct dhcp_state *state = D_CSTATE(ifp);
 
 	/* We don't write BOOTP leases */
-	if (is_bootp(ifp, dhcp)) {
+	if (IS_BOOTP(ifp, dhcp)) {
 		unlink(state->leasefile);
 		return 0;
 	}
@@ -1126,7 +1132,8 @@ read_lease(struct interface *ifp)
 
 	/* We may have found a BOOTP server */
 	if (get_option_uint8(ifp->ctx, &type, dhcp, DHO_MESSAGETYPE) == -1)
-		type = 0;
+		return dhcp;
+
 	/* Authenticate the message */
 	auth = get_option(ifp->ctx, dhcp, DHO_AUTHENTICATION, &auth_len);
 	if (auth) {
@@ -1619,7 +1626,7 @@ send_message(struct interface *ifp, uint8_t type,
 	 * Also, we should not unicast from a BOOTP lease. */
 	if (s == -1 ||
 	    (!(ifo->options & DHCPCD_INFORM) &&
-	    is_bootp(ifp, state->new)))
+	    IS_BOOTP(ifp, state->new)))
 	{
 		a = state->addr.s_addr;
 		state->addr.s_addr = INADDR_ANY;
@@ -2554,9 +2561,9 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 		if (has_option_mask(ifo->requiremask, i) &&
 		    get_option_uint8(ifp->ctx, &tmp, dhcp, (uint8_t)i) != 0)
 		{
-			/* If we are bootp, then ignore the need for serverid.
-			 * To ignore bootp, require dhcp_message_type.
-			 * However, nothing really stops bootp from providing
+			/* If we are BOOTP, then ignore the need for serverid.
+			 * To ignore BOOTP, require dhcp_message_type.
+			 * However, nothing really stops BOOTP from providing
 			 * DHCP style options as well so the above isn't
 			 * always true. */
 			if (type == 0 && i == DHO_SERVERID)
