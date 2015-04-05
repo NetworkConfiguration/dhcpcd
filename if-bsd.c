@@ -546,7 +546,6 @@ if_route(unsigned char cmd, const struct rt *rt)
 		struct sockaddr sa;
 		struct sockaddr_in sin;
 		struct sockaddr_dl sdl;
-		struct sockaddr_storage ss;
 	} su;
 	struct rtm
 	{
@@ -902,7 +901,6 @@ if_route6(unsigned char cmd, const struct rt6 *rt)
 		struct sockaddr sa;
 		struct sockaddr_in6 sin;
 		struct sockaddr_dl sdl;
-		struct sockaddr_storage ss;
 	} su;
 	struct rtm
 	{
