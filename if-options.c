@@ -98,6 +98,7 @@
 #define O_IPV6RA_NOAUTOCONF	O_BASE + 39
 #define O_REJECT		O_BASE + 40
 #define O_IPV6RA_ACCEPT_NOPUBLIC	O_BASE + 41
+#define O_BOOTP			O_BASE + 42
 
 const struct option cf_options[] = {
 	{"background",      no_argument,       NULL, 'b'},
@@ -190,6 +191,7 @@ const struct option cf_options[] = {
 	{"gateway",         no_argument,       NULL, O_GATEWAY},
 	{"ia_pd_mix",       no_argument,       NULL, O_PFXDLGMIX},
 	{"reject",          required_argument, NULL, O_REJECT},
+	{"bootp",           no_argument,       NULL, O_BOOTP},
 	{NULL,              0,                 NULL, '\0'}
 };
 
@@ -1956,6 +1958,9 @@ err_sla:
 		break;
 	case O_PFXDLGMIX:
 		ifo->options |= DHCPCD_PFXDLGMIX;
+		break;
+	case O_BOOTP:
+		ifo->options |= DHCPCD_BOOTP;
 		break;
 	default:
 		return 0;

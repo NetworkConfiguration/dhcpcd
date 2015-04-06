@@ -760,9 +760,11 @@ make_message(struct dhcp_message **message,
 	dhcp->xid = htonl(state->xid);
 	dhcp->cookie = htonl(MAGIC_COOKIE);
 
-	*p++ = DHO_MESSAGETYPE;
-	*p++ = 1;
-	*p++ = type;
+	if (!(ifo->options & DHCPCD_BOOTP)) {
+		*p++ = DHO_MESSAGETYPE;
+		*p++ = 1;
+		*p++ = type;
+	}
 
 	if (state->clientid) {
 		*p++ = DHO_CLIENTID;
@@ -1031,13 +1033,10 @@ make_message(struct dhcp_message **message,
 
 	*p++ = DHO_END;
 
-#ifdef BOOTP_MESSAGE_LENTH_MIN
-	/* Some crappy DHCP servers think they have to obey the BOOTP minimum
-	 * message length.
-	 * They are wrong, but we should still cater for them. */
+	/* Pad out to the BOOTP minimum message length.
+	 * Some DHCP servers incorrectly require this. */
 	while (p - m < BOOTP_MESSAGE_LENTH_MIN)
 		*p++ = DHO_PAD;
-#endif
 
 	len = (size_t)(p - m);
 	if (ifo->auth.options & DHCPCD_AUTH_SEND && auth_len != 0)
@@ -1132,7 +1131,7 @@ read_lease(struct interface *ifp)
 
 	/* We may have found a BOOTP server */
 	if (get_option_uint8(ifp->ctx, &type, dhcp, DHO_MESSAGETYPE) == -1)
-		return dhcp;
+		type = 0;
 
 	/* Authenticate the message */
 	auth = get_option(ifp->ctx, dhcp, DHO_AUTHENTICATION, &auth_len);
@@ -1585,7 +1584,9 @@ send_message(struct interface *ifp, uint8_t type,
 
 	if (!callback)
 		logger(ifp->ctx, LOG_DEBUG, "%s: sending %s with xid 0x%x",
-		    ifp->name, get_dhcp_op(type), state->xid);
+		    ifp->name,
+		    ifo->options & DHCPCD_BOOTP ? "BOOTP" : get_dhcp_op(type),
+		    state->xid);
 	else {
 		if (state->interval == 0)
 			state->interval = 4;
@@ -1600,7 +1601,9 @@ send_message(struct interface *ifp, uint8_t type,
 		timespecnorm(&tv);
 		logger(ifp->ctx, LOG_DEBUG,
 		    "%s: sending %s (xid 0x%x), next in %0.1f seconds",
-		    ifp->name, get_dhcp_op(type), state->xid,
+		    ifp->name,
+		    ifo->options & DHCPCD_BOOTP ? "BOOTP" : get_dhcp_op(type),
+		    state->xid,
 		    timespec_to_double(&tv));
 	}
 
@@ -1759,7 +1762,8 @@ dhcp_discover(void *arg)
 		    ifp->name, inet_ntoa(ifo->req_addr));
 	else
 		logger(ifp->ctx, LOG_INFO,
-		    "%s: soliciting a DHCP lease", ifp->name);
+		    "%s: soliciting a %s lease",
+		    ifp->name, ifo->options & DHCPCD_BOOTP ? "BOOTP" : "DHCP");
 	send_discover(ifp);
 }
 
@@ -2429,6 +2433,12 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 	/* We may have found a BOOTP server */
 	if (get_option_uint8(ifp->ctx, &type, dhcp, DHO_MESSAGETYPE) == -1)
 		type = 0;
+	else if (ifo->options & DHCPCD_BOOTP) {
+		logger(ifp->ctx, LOG_DEBUG,
+		    "%s: ignoring DHCP reply (excpecting BOOTP)",
+		    ifp->name);
+		return;
+	}
 
 	/* Authenticate the message */
 	auth = get_option(ifp->ctx, dhcp, DHO_AUTHENTICATION, &auth_len);
@@ -3155,8 +3165,20 @@ dhcp_start1(void *arg)
 	}
 	/* We don't want to read the old lease if we NAK an old test */
 	nolease = state->offer && ifp->ctx->options & DHCPCD_TEST;
-	if (!nolease)
+	if (!nolease) {
 		state->offer = read_lease(ifp);
+		/* Check the saved lease matches the type we want */
+		if (state->offer) {
+			if ((IS_BOOTP(ifp, state->offer) &&
+			    !(ifo->options & DHCPCD_BOOTP)) ||
+			    (!IS_BOOTP(ifp, state->offer) &&
+			    ifo->options & DHCPCD_BOOTP))
+			{
+				free(state->offer);
+				state->offer = NULL;
+			}
+		}
+	}
 	if (state->offer) {
 		get_lease(ifp->ctx, &state->lease, state->offer);
 		state->lease.frominfo = 1;

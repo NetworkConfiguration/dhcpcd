@@ -110,6 +110,7 @@
 #define DHCPCD_IPV6RA_AUTOCONF		(1ULL << 54)
 #define DHCPCD_ROUTER_HOST_ROUTE_WARNED	(1ULL << 55)
 #define DHCPCD_IPV6RA_ACCEPT_NOPUBLIC	(1ULL << 56)
+#define DHCPCD_BOOTP			(1ULL << 57)
 
 extern const struct option cf_options[];
 
