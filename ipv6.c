@@ -745,6 +745,14 @@ ipv6_addaddr(struct ipv6_addr *ap, const struct timespec *now)
 	return 0;
 }
 
+int
+ipv6_publicaddr(const struct ipv6_addr *ia)
+{
+	return (ia->prefix_pltime &&
+	    (ia->addr.s6_addr[0] & 0xfe) != 0xc &&
+	    !(ia->addr_flags & IN6_IFF_NOTUSEABLE));
+}
+
 struct ipv6_addr *
 ipv6_findaddr(struct dhcpcd_ctx *ctx, const struct in6_addr *addr, short flags)
 {

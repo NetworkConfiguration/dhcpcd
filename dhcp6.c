@@ -496,8 +496,7 @@ dhcp6_has_public_addr(const struct interface *ifp)
 	if (state == NULL)
 		return 0;
 	TAILQ_FOREACH(ia, &state->addrs, next) {
-		if (ia->prefix_pltime &&
-		    (ia->addr.s6_addr[0] & 0xfe) != 0xc)
+		if (ipv6_publicaddr(ia))
 			return 1;
 	}
 	return 0;
