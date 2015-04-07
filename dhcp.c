@@ -819,23 +819,25 @@ make_message(struct dhcp_message **message,
 	    type == DHCP_INFORM ||
 	    type == DHCP_REQUEST)
 	{
-		int mtu;
+		if (!(ifo->options & DHCPCD_BOOTP)) {
+			int mtu;
 
-		*p++ = DHO_MAXMESSAGESIZE;
-		*p++ = 2;
-		mtu = if_getmtu(ifp->name);
-		if (mtu < MTU_MIN) {
-			if (if_setmtu(ifp->name, MTU_MIN) == 0)
-				sz = MTU_MIN;
-		} else if (mtu > MTU_MAX) {
-			/* Even though our MTU could be greater than
-			 * MTU_MAX (1500) dhcpcd does not presently
-			 * handle DHCP packets any bigger. */
-			mtu = MTU_MAX;
+			*p++ = DHO_MAXMESSAGESIZE;
+			*p++ = 2;
+			mtu = if_getmtu(ifp->name);
+			if (mtu < MTU_MIN) {
+				if (if_setmtu(ifp->name, MTU_MIN) == 0)
+					sz = MTU_MIN;
+			} else if (mtu > MTU_MAX) {
+				/* Even though our MTU could be greater than
+				 * MTU_MAX (1500) dhcpcd does not presently
+				 * handle DHCP packets any bigger. */
+				mtu = MTU_MAX;
+			}
+			sz = htons((uint16_t)mtu);
+			memcpy(p, &sz, 2);
+			p += 2;
 		}
-		sz = htons((uint16_t)mtu);
-		memcpy(p, &sz, 2);
-		p += 2;
 
 		if (ifo->userclass[0]) {
 			*p++ = DHO_USERCLASS;
