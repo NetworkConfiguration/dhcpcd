@@ -252,8 +252,8 @@ find_route(struct rt_head *rts, const struct rt *r, const struct rt *srt)
 	TAILQ_FOREACH(rt, rts, next) {
 		if (rt->dest.s_addr == r->dest.s_addr &&
 #ifdef HAVE_ROUTE_METRIC
-		    (srt || (!rt->iface ||
-			rt->iface->metric == r->iface->metric)) &&
+		    (srt || (r->iface == NULL || rt->iface == NULL ||
+		    rt->iface->metric == r->iface->metric)) &&
 #endif
                     (!srt || srt != rt) &&
 		    rt->net.s_addr == r->net.s_addr)
