@@ -605,8 +605,8 @@ if_route(unsigned char cmd, const struct rt *rt)
 #endif
 		}
 	}
-	if (rt->dest.s_addr == rt->gate.s_addr &&
-	    rt->net.s_addr == INADDR_BROADCAST)
+	if (rt->net.s_addr == htonl(INADDR_BROADCAST) &&
+	    rt->gate.s_addr == htonl(INADDR_ANY))
 	{
 #ifdef RTF_CLONING
 		/* We add a cloning network route for a single host.
@@ -621,7 +621,7 @@ if_route(unsigned char cmd, const struct rt *rt)
 		rtm.hdr.rtm_flags |= RTF_HOST;
 #endif
 	} else if (rt->gate.s_addr == htonl(INADDR_LOOPBACK) &&
-	    rt->net.s_addr == INADDR_BROADCAST)
+	    rt->net.s_addr == htonl(INADDR_BROADCAST))
 	{
 		rtm.hdr.rtm_flags |= RTF_HOST | RTF_GATEWAY;
 		/* Going via lo0 so remove the interface flags */

@@ -270,18 +270,18 @@ desc_route(const char *cmd, const struct rt *rt)
 	const char *ifname = rt->iface ? rt->iface->name : NULL;
 
 	strlcpy(addr, inet_ntoa(rt->dest), sizeof(addr));
-	if (rt->gate.s_addr == INADDR_ANY)
-		logger(ctx, LOG_INFO, "%s: %s route to %s/%d",
-		    ifname, cmd, addr, inet_ntocidr(rt->net));
-	else if (rt->gate.s_addr == rt->dest.s_addr &&
-	    rt->net.s_addr == INADDR_BROADCAST)
+	if (rt->net.s_addr == htonl(INADDR_BROADCAST) &&
+	    rt->gate.s_addr == htonl(INADDR_ANY))
 		logger(ctx, LOG_INFO, "%s: %s host route to %s",
 		    ifname, cmd, addr);
-	else if (rt->gate.s_addr == htonl(INADDR_LOOPBACK) &&
-	    rt->net.s_addr == INADDR_BROADCAST)
+	else if (rt->net.s_addr == htonl(INADDR_BROADCAST))
 		logger(ctx, LOG_INFO, "%s: %s host route to %s via %s",
 		    ifname, cmd, addr, inet_ntoa(rt->gate));
-	else if (rt->dest.s_addr == INADDR_ANY && rt->net.s_addr == INADDR_ANY)
+	else if (rt->gate.s_addr == htonl(INADDR_ANY))
+		logger(ctx, LOG_INFO, "%s: %s route to %s/%d",
+		    ifname, cmd, addr, inet_ntocidr(rt->net));
+	else if (rt->dest.s_addr == htonl(INADDR_ANY) &&
+	    rt->net.s_addr == htonl(INADDR_ANY))
 		logger(ctx, LOG_INFO, "%s: %s default route via %s",
 		    ifname, cmd, inet_ntoa(rt->gate));
 	else
@@ -331,12 +331,6 @@ ipv4_handlert(struct dhcpcd_ctx *ctx, int cmd, struct rt *rt)
 
 	if (ctx->ipv4_kroutes == NULL)
 		return 0;
-
-	/* DHCP host routes have a gateway of the destination.
-	 * We need to emulate that */
-	if (rt->gate.s_addr == INADDR_ANY &&
-	    rt->net.s_addr == INADDR_BROADCAST)
-		rt->gate = rt->dest;
 
 	f = ipv4_findrt(ctx, rt, 1);
 	switch (cmd) {
@@ -524,8 +518,8 @@ get_routes(struct interface *ifp)
 }
 
 /* Some DHCP servers add set host routes by setting the gateway
- * to the assinged IP address. This differs from our notion of a host route
- * where the gateway is the destination address, so we fix it. */
+ * to the assigned IP address or the destination address.
+ * We need to change this. */
 static struct rt_head *
 massage_host_routes(struct rt_head *rt, const struct interface *ifp)
 {
@@ -533,13 +527,17 @@ massage_host_routes(struct rt_head *rt, const struct interface *ifp)
 
 	if (rt) {
 		TAILQ_FOREACH(r, rt, next) {
-			if (r->gate.s_addr == D_CSTATE(ifp)->addr.s_addr &&
-			    r->net.s_addr == INADDR_BROADCAST)
-				r->gate.s_addr = r->dest.s_addr;
+			if (r->gate.s_addr == D_CSTATE(ifp)->addr.s_addr ||
+			    r->gate.s_addr == r->dest.s_addr)
+			{
+				r->gate.s_addr = htonl(INADDR_ANY);
+				r->net.s_addr = htonl(INADDR_BROADCAST);
+			}
 		}
 	}
 	return rt;
 }
+
 
 static struct rt_head *
 add_destination_route(struct rt_head *rt, const struct interface *ifp)
@@ -630,8 +628,8 @@ add_router_host_route(struct rt_head *rt, const struct interface *ifp)
 			return NULL;
 		}
 		rtn->dest.s_addr = rtp->gate.s_addr;
-		rtn->net.s_addr = INADDR_BROADCAST;
-		rtn->gate.s_addr = rtp->gate.s_addr;
+		rtn->net.s_addr = htonl(INADDR_BROADCAST);
+		rtn->gate.s_addr = htonl(INADDR_ANY);
 		TAILQ_INSERT_BEFORE(rtp, rtn, next);
 	}
 	return rt;

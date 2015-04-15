@@ -1359,10 +1359,9 @@ if_route(unsigned char cmd, const struct rt *rt)
 		add_attr_l(&nlm.hdr, sizeof(nlm), RTA_PREFSRC,
 		    &state->addr.s_addr, sizeof(state->addr.s_addr));
 	}
-	/* If destination == gateway then don't add the gateway */
+	/* If a host route then don't add the gateway */
 	if ((cmd == RTM_ADD || cmd == RTM_CHANGE) &&
-	    (rt->dest.s_addr != rt->gate.s_addr ||
-	    rt->net.s_addr != INADDR_BROADCAST))
+	    rt->net.s_addr != INADDR_BROADCAST)
 		add_attr_l(&nlm.hdr, sizeof(nlm), RTA_GATEWAY,
 		    &rt->gate.s_addr, sizeof(rt->gate.s_addr));
 
