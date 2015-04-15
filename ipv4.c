@@ -440,38 +440,30 @@ d_route(struct rt *rt)
 	return retval;
 }
 
-static struct rt *
-make_subnet_route(const struct interface *ifp)
-{
-	const struct dhcp_state *s;
-	struct rt *r;
-
-	s = D_CSTATE(ifp);
-	if (s->net.s_addr == INADDR_BROADCAST ||
-	    s->net.s_addr == INADDR_ANY)
-		return NULL;
-
-	r = malloc(sizeof(*r));
-	if (r == NULL) {
-		logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
-		return NULL;
-	}
-	r->dest.s_addr = s->addr.s_addr & s->net.s_addr;
-	r->net.s_addr = s->net.s_addr;
-	r->gate.s_addr = INADDR_ANY;
-	return r;
-}
-
 static struct rt_head *
 add_subnet_route(struct rt_head *rt, const struct interface *ifp)
 {
+	const struct dhcp_state *s;
 	struct rt *r;
 
 	if (rt == NULL) /* earlier malloc failed */
 		return NULL;
 
-	if ((r = make_subnet_route(ifp)) == NULL)
+	s = D_CSTATE(ifp);
+	/* Don't create a subnet route for these addresses */
+	if (s->net.s_addr == INADDR_BROADCAST ||
+	    s->net.s_addr == INADDR_ANY)
+		return rt;
+
+	if ((r = malloc(sizeof(*r))) == NULL) {
+		logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
+		ipv4_freeroutes(rt);
 		return NULL;
+	}
+	r->dest.s_addr = s->addr.s_addr & s->net.s_addr;
+	r->net.s_addr = s->net.s_addr;
+	r->gate.s_addr = INADDR_ANY;
+
 	TAILQ_INSERT_HEAD(rt, r, next);
 	return rt;
 }
