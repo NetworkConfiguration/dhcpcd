@@ -408,6 +408,11 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 		return -1;
 
 	memset(rt, 0, sizeof(*rt));
+	if (rtm->rtm_type == RTN_UNREACHABLE)
+		rt->flags = RTF_REJECT;
+	if (rtm->rtm_scope == RT_SCOPE_HOST)
+		rt->flags |= RTF_HOST;
+
 	prefsrc.s_addr = INADDR_ANY;
 	rta = (struct rtattr *)RTM_RTA(rtm);
 	len = RTM_PAYLOAD(nlm);
@@ -468,9 +473,11 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct nlmsghdr *nlm)
 		return -1;
 
 	memset(rt, 0, sizeof(*rt));
-	ipv6_mask(&rt->net, rtm->rtm_dst_len);
 	if (rtm->rtm_type == RTN_UNREACHABLE)
 		rt->flags = RTF_REJECT;
+	if (rtm->rtm_scope == RT_SCOPE_HOST)
+		rt->flags |= RTF_HOST;
+	ipv6_mask(&rt->net, rtm->rtm_dst_len);
 
 	rta = (struct rtattr *)RTM_RTA(rtm);
 	len = RTM_PAYLOAD(nlm);
