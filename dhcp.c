@@ -624,11 +624,11 @@ get_option_routes(struct interface *ifp, const struct dhcp_message *dhcp)
 		p = get_option(ifp->ctx, dhcp, DHO_STATICROUTE, &len);
 	else
 		p = NULL;
-	if (p) {
+	/* RFC 2131 Section 5.8 states length MUST be in multiples of 8 */
+	if (p && len % 8 == 0) {
 		e = p + len;
 		while (p < e) {
-			route = calloc(1, sizeof(*route));
-			if (route == NULL) {
+			if ((route = calloc(1, sizeof(*route))) == NULL) {
 				logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
 				ipv4_freeroutes(routes);
 				return NULL;
@@ -637,6 +637,13 @@ get_option_routes(struct interface *ifp, const struct dhcp_message *dhcp)
 			p += 4;
 			memcpy(&route->gate.s_addr, p, 4);
 			p += 4;
+			/* RFC 2131 Section 5.8 states default route is
+			 * illegal */
+			if (route->dest.s_addr == htonl(INADDR_ANY)) {
+				errno = EINVAL;
+				free(route);
+				continue;
+			}
 			route->net.s_addr = route_netmask(route->dest.s_addr);
 			TAILQ_INSERT_TAIL(routes, route, next);
 		}
@@ -650,8 +657,7 @@ get_option_routes(struct interface *ifp, const struct dhcp_message *dhcp)
 	if (p) {
 		e = p + len;
 		while (p < e) {
-			route = calloc(1, sizeof(*route));
-			if (route == NULL) {
+			if ((route = calloc(1, sizeof(*route))) == NULL) {
 				logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
 				ipv4_freeroutes(routes);
 				return NULL;
