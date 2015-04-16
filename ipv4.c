@@ -445,9 +445,13 @@ add_subnet_route(struct rt_head *rt, const struct interface *ifp)
 
 	s = D_CSTATE(ifp);
 	/* Don't create a subnet route for these addresses */
-	if (s->net.s_addr == INADDR_BROADCAST ||
-	    s->net.s_addr == INADDR_ANY)
+	if (s->net.s_addr == INADDR_ANY)
 		return rt;
+#ifndef BSD
+	/* BSD adds a route in this instance */
+	if (s->net.s_addr == INADDR_BROADCAST)
+		return rt;
+#endif
 
 	if ((r = malloc(sizeof(*r))) == NULL) {
 		logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
