@@ -295,7 +295,7 @@ ipv6nd_sendrsprobe(void *arg)
 	cm->cmsg_type = IPV6_PKTINFO;
 	cm->cmsg_len = CMSG_LEN(sizeof(pi));
 	memset(&pi, 0, sizeof(pi));
-	pi.ipi6_ifindex = CAST_IPI6_IFINDEX(ifp->index);
+	pi.ipi6_ifindex = ifp->index;
 	memcpy(CMSG_DATA(cm), &pi, sizeof(pi));
 
 	logger(ifp->ctx, LOG_DEBUG,

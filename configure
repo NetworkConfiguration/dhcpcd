@@ -360,23 +360,21 @@ if [ -n "$FORK" -a "$FORK" != yes -a "$FORK" != true ]; then
 fi
 
 case "$OS" in
-kfreebsd*)
+freebsd*|kfreebsd*)
 	echo "CPPFLAGS+=	-D_GNU_SOURCE" >>$CONFIG_MK
 	echo "DHCPCD_SRCS+=	if-bsd.c" >>$CONFIG_MK
 	;;
 linux*)
-	echo "CPPFLAGS+=	-D_BSD_SOURCE -D_XOPEN_SOURCE=700" >>$CONFIG_MK
+	echo "CPPFLAGS+=	-D_GNU_SOURCE" >>$CONFIG_MK
 	# Large File Support, should be fine for 32-bit systems.
 	# But if this is the case, why is it not set by default?
 	echo "CPPFLAGS+=	-D_FILE_OFFSET_BITS=64" >>$CONFIG_MK
 	echo "CPPFLAGS+=	-D_LARGEFILE_SOURCE" >>$CONFIG_MK
 	echo "CPPFLAGS+=	-D_LARGEFILE64_SOURCE" >>$CONFIG_MK
-	# glibc-2.20
-	echo "CPPFLAGS+=	-D_DEFAULT_SOURCE" >>$CONFIG_MK
 	echo "DHCPCD_SRCS+=	if-linux.c" >>$CONFIG_MK
 	# for RTM_NEWADDR and friends
-	echo "#include <asm/types.h> /* fix broken headers */" >>$CONFIG_H
-	echo "#include <linux/rtnetlink.h>" >>$CONFIG_H
+	echo "#include		<asm/types.h> /* fix broken headers */" >>$CONFIG_H
+	echo "#include		<linux/rtnetlink.h>" >>$CONFIG_H
 	;;
 qnx*)
 	echo "CPPFLAGS+=	-D__EXT" >>$CONFIG_MK
@@ -594,7 +592,6 @@ fi
 if [ -z "$GETLINE" ]; then
 	printf "Testing for getline ... "
 	cat <<EOF >_getline.c
-#define _GNU_SOURCE
 #include <stdio.h>
 int main(void) {
 	char *buf = NULL;

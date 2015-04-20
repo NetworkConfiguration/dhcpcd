@@ -25,11 +25,6 @@
  * SUCH DAMAGE.
  */
 
-/* Needed define to get at getline for glibc and FreeBSD */
-#ifndef _GNU_SOURCE
-#  define _GNU_SOURCE
-#endif
-
 #ifdef __APPLE__
 #  include <mach/mach_time.h>
 #  include <mach/kern_return.h>

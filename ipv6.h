@@ -29,13 +29,7 @@
 #define IPV6_H
 
 #include <sys/uio.h>
-
 #include <netinet/in.h>
-
-#if defined(__linux__) && defined(__GLIBC__)
-#  define _LINUX_IN6_H
-#  include <linux/ipv6.h>
-#endif
 
 #include "config.h"
 #include "dhcpcd.h"
@@ -195,13 +189,6 @@ struct ipv6_state {
 #define IP6BUFLEN	(CMSG_SPACE(sizeof(struct in6_pktinfo)) + \
 			CMSG_SPACE(sizeof(int)))
 
-
-/* ipi6.ifiindex differes between OS's so have a cast function */
-#ifdef __GLIBC__
-#define CAST_IPI6_IFINDEX(idx) (int)(idx)
-#else
-#define CAST_IPI6_IFINDEX(idx) (idx)
-#endif
 
 #ifdef INET6
 struct ipv6_ctx {
