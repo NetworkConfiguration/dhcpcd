@@ -40,7 +40,7 @@ struct rt {
 	unsigned int metric;
 #endif
 	struct in_addr src;
-	uint8_t flags;
+	unsigned int flags;
 };
 TAILQ_HEAD(rt_head, rt);
 

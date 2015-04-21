@@ -1388,7 +1388,7 @@ ipv6nd_expirera(void *arg)
 	struct ra *rap, *ran;
 	struct ra_opt *rao, *raon;
 	struct timespec now, lt, expire, next;
-	int expired, valid;
+	uint8_t expired, valid;
 
 	ifp = arg;
 	get_monotonic(&now);
@@ -1477,7 +1477,7 @@ void
 ipv6nd_drop(struct interface *ifp)
 {
 	struct ra *rap;
-	int expired = 0;
+	uint8_t expired = 0;
 	TAILQ_HEAD(rahead, ra) rtrs;
 
 	if (ifp->ctx->ipv6 == NULL)
