@@ -604,6 +604,12 @@ if_cmp(const struct interface *si, const struct interface *ti)
 	    !(ti->options->options & DHCPCD_PFXDLGONLY))
 		return 1;
 
+	/* Check carrier status first */
+	if (si->carrier > ti->carrier)
+		return -1;
+	if (si->carrier < ti->carrier)
+		return 1;
+
 	if (D_STATE_RUNNING(si) && !D_STATE_RUNNING(ti))
 		return -1;
 	if (!D_STATE_RUNNING(si) && D_STATE_RUNNING(ti))
@@ -618,16 +624,11 @@ if_cmp(const struct interface *si, const struct interface *ti)
 		return 1;
 
 #ifdef INET
-	/* Special attention needed hereto due take states and IPv4LL. */
+	/* Special attention needed here due to states and IPv4LL. */
 	if ((r = ipv4_ifcmp(si, ti)) != 0)
 		return r;
 #endif
 
-	/* Then carrier status. */
-	if (si->carrier > ti->carrier)
-		return -1;
-	if (si->carrier < ti->carrier)
-		return 1;
 	/* Finally, metric */
 	if (si->metric < ti->metric)
 		return -1;
