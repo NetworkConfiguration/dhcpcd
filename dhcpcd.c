@@ -313,6 +313,17 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 }
 
 static void
+dhcpcd_drop(struct interface *ifp, int stop)
+{
+
+	dhcp6_drop(ifp, stop ? NULL : "EXPIRE6");
+	ipv6nd_drop(ifp);
+	ipv6_drop(ifp);
+	dhcp_drop(ifp, stop ? "STOP" : "EXPIRE");
+	arp_close(ifp);
+}
+
+static void
 stop_interface(struct interface *ifp)
 {
 	struct dhcpcd_ctx *ctx;
@@ -321,11 +332,7 @@ stop_interface(struct interface *ifp)
 	logger(ctx, LOG_INFO, "%s: removing interface", ifp->name);
 	ifp->options->options |= DHCPCD_STOPPING;
 
-	dhcp6_drop(ifp, NULL);
-	ipv6nd_drop(ifp);
-	ipv6_drop(ifp);
-	dhcp_drop(ifp, "STOP");
-	arp_close(ifp);
+	dhcpcd_drop(ifp, 1);
 	if (ifp->options->options & DHCPCD_DEPARTED)
 		script_runreason(ifp, "DEPARTED");
 	else
@@ -620,11 +627,7 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 				logger(ctx, LOG_INFO, "%s: carrier lost", ifp->name);
 			ifp->carrier = LINK_DOWN;
 			script_runreason(ifp, "NOCARRIER");
-			dhcp6_drop(ifp, "EXPIRE6");
-			ipv6nd_drop(ifp);
-			ipv6_drop(ifp);
-			dhcp_drop(ifp, "EXPIRE");
-			arp_close(ifp);
+			dhcpcd_drop(ifp, 0);
 		}
 	} else if (carrier == LINK_UP && ifp->flags & IFF_UP) {
 		if (ifp->carrier != LINK_UP) {
