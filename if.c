@@ -539,9 +539,10 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 static struct interface *
 if_findindexname(struct if_head *ifaces, unsigned int idx, const char *name)
 {
-	struct interface *ifp;
 
 	if (ifaces != NULL) {
+		struct interface *ifp;
+
 		TAILQ_FOREACH(ifp, ifaces, next) {
 			if ((ifp->options == NULL ||
 			    !(ifp->options->options & DHCPCD_PFXDLGONLY)) &&
@@ -553,6 +554,8 @@ if_findindexname(struct if_head *ifaces, unsigned int idx, const char *name)
 				return ifp;
 		}
 	}
+
+	errno = ESRCH;
 	return NULL;
 }
 
