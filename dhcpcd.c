@@ -591,7 +591,7 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 {
 	struct interface *ifp;
 
-	ifp = if_find(ctx, ifname);
+	ifp = if_find(ctx->ifaces, ifname);
 	if (ifp == NULL || !(ifp->options->options & DHCPCD_LINK))
 		return;
 
@@ -903,7 +903,7 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 
 	ctx = arg;
 	if (action == -1) {
-		ifp = if_find(ctx, ifname);
+		ifp = if_find(ctx->ifaces, ifname);
 		if (ifp == NULL) {
 			errno = ESRCH;
 			return -1;
@@ -934,7 +934,7 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 			continue;
 		i = 0;
 		/* Check if we already have the interface */
-		iff = if_find(ctx, ifp->name);
+		iff = if_find(ctx->ifaces, ifp->name);
 		if (iff) {
 			logger(ctx, LOG_DEBUG, "%s: interface updated", iff->name);
 			/* The flags and hwaddr could have changed */
@@ -973,7 +973,7 @@ dhcpcd_handlehwaddr(struct dhcpcd_ctx *ctx, const char *ifname,
 	struct interface *ifp;
 	char buf[sizeof(ifp->hwaddr) * 3];
 
-	ifp = if_find(ctx, ifname);
+	ifp = if_find(ctx->ifaces, ifname);
 	if (ifp == NULL)
 		return;
 
@@ -1036,7 +1036,7 @@ reconf_reboot(struct dhcpcd_ctx *ctx, int action, int argc, char **argv, int oi)
 
 	while ((ifp = TAILQ_FIRST(ifs))) {
 		TAILQ_REMOVE(ifs, ifp, next);
-		ifn = if_find(ctx, ifp->name);
+		ifn = if_find(ctx->ifaces, ifp->name);
 		if (ifn) {
 			if (action)
 				if_reboot(ifn, argc, argv);
@@ -1289,7 +1289,7 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 			return 0;
 		}
 		for (oi = optind; oi < argc; oi++) {
-			if ((ifp = if_find(ctx, argv[oi])) == NULL)
+			if ((ifp = if_find(ctx->ifaces, argv[oi])) == NULL)
 				continue;
 			if (do_release) {
 				ifp->options->options |= DHCPCD_RELEASE;
@@ -1743,7 +1743,7 @@ main(int argc, char **argv)
 		goto exit_failure;
 	}
 	for (i = 0; i < ctx.ifc; i++) {
-		if (if_find(&ctx, ctx.ifv[i]) == NULL)
+		if (if_find(ctx.ifaces, ctx.ifv[i]) == NULL)
 			logger(&ctx, LOG_ERR,
 			    "%s: interface not found or invalid",
 			    ctx.ifv[i]);

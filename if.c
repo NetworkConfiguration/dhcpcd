@@ -537,12 +537,12 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 }
 
 static struct interface *
-if_findindexname(struct dhcpcd_ctx *ctx, unsigned int idx, const char *name)
+if_findindexname(struct if_head *ifaces, unsigned int idx, const char *name)
 {
 	struct interface *ifp;
 
-	if (ctx != NULL && ctx->ifaces != NULL) {
-		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+	if (ifaces != NULL) {
+		TAILQ_FOREACH(ifp, ifaces, next) {
 			if ((ifp->options == NULL ||
 			    !(ifp->options->options & DHCPCD_PFXDLGONLY)) &&
 			    ((name && strcmp(ifp->name, name) == 0) ||
@@ -557,17 +557,17 @@ if_findindexname(struct dhcpcd_ctx *ctx, unsigned int idx, const char *name)
 }
 
 struct interface *
-if_find(struct dhcpcd_ctx *ctx, const char *name)
+if_find(struct if_head *ifaces, const char *name)
 {
 
-	return if_findindexname(ctx, 0, name);
+	return if_findindexname(ifaces, 0, name);
 }
 
 struct interface *
-if_findindex(struct dhcpcd_ctx *ctx, unsigned int idx)
+if_findindex(struct if_head *ifaces, unsigned int idx)
 {
 
-	return if_findindexname(ctx, idx, NULL);
+	return if_findindexname(ifaces, idx, NULL);
 }
 
 int

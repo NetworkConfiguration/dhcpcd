@@ -83,8 +83,8 @@
 int if_setflag(struct interface *ifp, short flag);
 #define if_up(ifp) if_setflag((ifp), (IFF_UP | IFF_RUNNING))
 struct if_head *if_discover(struct dhcpcd_ctx *, int, char * const *);
-struct interface *if_find(struct dhcpcd_ctx *, const char *);
-struct interface *if_findindex(struct dhcpcd_ctx *, unsigned int);
+struct interface *if_find(struct if_head *, const char *);
+struct interface *if_findindex(struct if_head *, unsigned int);
 void if_sortinterfaces(struct dhcpcd_ctx *);
 void if_free(struct interface *);
 int if_domtu(const char *, short int);

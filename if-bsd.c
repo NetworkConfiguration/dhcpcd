@@ -281,7 +281,7 @@ if_findsdl(struct dhcpcd_ctx *ctx, struct sockaddr_dl *sdl)
 		char ifname[IF_NAMESIZE];
 		memcpy(ifname, sdl->sdl_data, sdl->sdl_nlen);
 		ifname[sdl->sdl_nlen] = '\0';
-		return if_find(ctx, ifname);
+		return if_find(ctx->ifaces, ifname);
 	}
 	return NULL;
 }
@@ -517,7 +517,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct rt_msghdr *rtm)
 	COPYOUT(rt->gate, rti_info[RTAX_GATEWAY]);
 
 	if (rtm->rtm_index)
-		rt->iface = if_findindex(ctx, rtm->rtm_index);
+		rt->iface = if_findindex(ctx->ifaces, rtm->rtm_index);
 	else if (rtm->rtm_addrs & RTA_IFP) {
 		struct sockaddr_dl *sdl;
 
@@ -873,7 +873,7 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct rt_msghdr *rtm)
 	COPYOUT6(rt->gate, rti_info[RTAX_GATEWAY]);
 
 	if (rtm->rtm_index)
-		rt->iface = if_findindex(ctx, rtm->rtm_index);
+		rt->iface = if_findindex(ctx->ifaces, rtm->rtm_index);
 	else if (rtm->rtm_addrs & RTA_IFP) {
 		struct sockaddr_dl *sdl;
 
@@ -1156,7 +1156,8 @@ if_managelink(struct dhcpcd_ctx *ctx)
 #endif
 		case RTM_IFINFO:
 			ifm = (struct if_msghdr *)(void *)p;
-			if ((ifp = if_findindex(ctx, ifm->ifm_index)) == NULL)
+			ifp = if_findindex(ctx->ifaces, ifm->ifm_index);
+			if (ifp == NULL)
 				break;
 			switch (ifm->ifm_data.ifi_link_state) {
 			case LINK_STATE_DOWN:
@@ -1232,7 +1233,8 @@ if_managelink(struct dhcpcd_ctx *ctx)
 		case RTM_DELADDR:	/* FALLTHROUGH */
 		case RTM_NEWADDR:
 			ifam = (struct ifa_msghdr *)(void *)p;
-			if ((ifp = if_findindex(ctx, ifam->ifam_index)) == NULL)
+			ifp = if_findindex(ctx->ifaces, ifam->ifam_index);
+			if (ifp == NULL)
 				break;
 			cp = (char *)(void *)(ifam + 1);
 			get_addrs(ifam->ifam_addrs, cp, rti_info);

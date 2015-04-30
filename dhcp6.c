@@ -2428,7 +2428,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 				if (strcmp(sla->ifname, ia->sla[j].ifname) == 0)
 					break;
 			if (j >= i &&
-			    if_find(ifp->ctx, sla->ifname) == NULL)
+			    if_find(ifp->ctx->ifaces, sla->ifname) == NULL)
 			{
 				logger(ifp->ctx, LOG_INFO,
 				    "%s: loading for delegation", sla->ifname);

@@ -431,7 +431,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 			    sizeof(prefsrc.s_addr));
 			break;
 		case RTA_OIF:
-			rt->iface = if_findindex(ctx,
+			rt->iface = if_findindex(ctx->ifaces,
 			    *(unsigned int *)RTA_DATA(rta));
 			break;
 		case RTA_PRIORITY:
@@ -492,7 +492,7 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct nlmsghdr *nlm)
 			    sizeof(rt->gate.s6_addr));
 			break;
 		case RTA_OIF:
-			rt->iface = if_findindex(ctx,
+			rt->iface = if_findindex(ctx->ifaces,
 			    *(unsigned int *)RTA_DATA(rta));
 			break;
 		case RTA_PRIORITY:
@@ -596,7 +596,7 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 		return -1;
 	}
 	ifa = NLMSG_DATA(nlm);
-	if ((ifp = if_findindex(ctx, ifa->ifa_index)) == NULL) {
+	if ((ifp = if_findindex(ctx->ifaces, ifa->ifa_index)) == NULL) {
 		/* We don't know about the interface the address is for
 		 * so it's not really an error */
 		return 1;
@@ -803,8 +803,7 @@ link_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp,
 		return 0;
 
 	/* Check for a new interface */
-	ifp = if_find(ctx, ifn);
-	if (ifp == NULL) {
+	if ((ifp = if_find(ctx->ifaces, ifn)) == NULL) {
 		/* If are listening to a dev manager, let that announce
 		 * the interface rather than the kernel. */
 		if (dev_listening(ctx) < 1)
