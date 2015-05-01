@@ -326,7 +326,7 @@ get_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp, int fd, int flags,
 	size_t buflen;
 	struct nlmsghdr *nlm;
 	struct sockaddr_nl nladdr;
-	socklen_t nladdr_len = sizeof(nladdr);
+	socklen_t nladdr_len;
 	int r;
 
 	buflen = 0;
@@ -351,6 +351,7 @@ get_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp, int fd, int flags,
 				goto eexit;
 			buf = nbuf;
 		}
+		nladdr_len = sizeof(nladdr);
 		bytes = recvfrom(fd, buf, buflen, flags,
 		    (struct sockaddr *)&nladdr, &nladdr_len);
 		if (bytes == -1 || bytes == 0)

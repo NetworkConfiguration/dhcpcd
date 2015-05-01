@@ -658,10 +658,12 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 			dhcpcd_handleinterface(ctx, 0, ifp->name);
 #endif
 			if (ifp->wireless) {
-				size_t olen;
 				uint8_t ossid[IF_SSIDSIZE];
+#ifdef NOCARRIER_PRESERVE_IP
+				size_t olen;
 
 				olen = ifp->ssid_len;
+#endif
 				memcpy(ossid, ifp->ssid, ifp->ssid_len);
 				if_getssid(ifp);
 #ifdef NOCARRIER_PRESERVE_IP

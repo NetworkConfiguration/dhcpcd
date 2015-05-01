@@ -2203,8 +2203,9 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	}
 
 auth:
-	/* Authenticate the message */
+
 	retval = 0;
+	/* Authenticate the message */
 	o = dhcp6_getmoption(D6_OPTION_AUTH, state->new, state->new_len);
 	if (o) {
 		if (dhcp_auth_validate(&state->auth, &ifp->options->auth,
@@ -2239,7 +2240,7 @@ ex:
 	state->new_len = 0;
 	if (!(ifp->ctx->options & DHCPCD_DUMPLEASE))
 		unlink(state->leasefile);
-	return 0;
+	return retval;
 }
 
 static void
