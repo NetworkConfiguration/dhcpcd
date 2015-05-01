@@ -2149,38 +2149,27 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	const struct dhcp6_option *o;
 	struct timespec acquired;
 	time_t now;
+	int retval;
 
 	state = D6_STATE(ifp);
-	if (stat(state->leasefile, &st) == -1) {
-		if (errno != ENOENT)
-			logger(ifp->ctx, LOG_ERR, "%s: %s: %m",
-			    ifp->name, __func__);
+	if (stat(state->leasefile, &st) == -1)
 		return -1;
-	}
 	logger(ifp->ctx, LOG_DEBUG, "%s: reading lease `%s'",
 	    ifp->name, state->leasefile);
 	if (st.st_size > UINT32_MAX) {
-		logger(ifp->ctx, LOG_ERR, "%s: file too big", ifp->name);
+		errno = E2BIG;
 		return -1;
 	}
-	state->new = malloc((size_t)st.st_size);
-	if (state->new == NULL) {
-		logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
+	if ((fd = open(state->leasefile, O_RDONLY)) == -1)
 		return -1;
-	}
+	if ((state->new = malloc((size_t)st.st_size)) == NULL)
+		return -1;
+	retval = -1;
 	state->new_len = (size_t)st.st_size;
-	fd = open(state->leasefile, O_RDONLY);
-	if (fd == -1) {
-		logger(ifp->ctx, LOG_ERR, "%s: %s: %s: %m",
-		    ifp->name, __func__, state->leasefile);
-		return -1;
-	}
 	bytes = read(fd, state->new, state->new_len);
 	close(fd);
-	if (bytes != (ssize_t)state->new_len) {
-		logger(ifp->ctx, LOG_ERR, "%s: read: %m", __func__);
+	if (bytes != (ssize_t)state->new_len)
 		goto ex;
-	}
 
 	/* If not validating IA's and if they have expired,
 	 * skip to the auth check. */
@@ -2189,10 +2178,8 @@ dhcp6_readlease(struct interface *ifp, int validate)
 		goto auth;
 	}
 
-	if ((now = time(NULL)) == -1) {
-		logger(ifp->ctx, LOG_ERR, "%s: time: %m", __func__);
+	if ((now = time(NULL)) == -1)
 		goto ex;
-	}
 
 	get_monotonic(&acquired);
 	acquired.tv_sec -= now - st.st_mtime;
@@ -2210,12 +2197,14 @@ dhcp6_readlease(struct interface *ifp, int validate)
 			logger(ifp->ctx,
 			    LOG_DEBUG,"%s: discarding expired lease",
 			    ifp->name);
+			retval = 0;
 			goto ex;
 		}
 	}
 
 auth:
 	/* Authenticate the message */
+	retval = 0;
 	o = dhcp6_getmoption(D6_OPTION_AUTH, state->new, state->new_len);
 	if (o) {
 		if (dhcp_auth_validate(&state->auth, &ifp->options->auth,
@@ -2253,7 +2242,6 @@ ex:
 	return 0;
 }
 
-
 static void
 dhcp6_startinit(struct interface *ifp)
 {
@@ -2284,10 +2272,12 @@ dhcp6_startinit(struct interface *ifp)
 	    ifp->options->reboot != 0)
 	{
 		r = dhcp6_readlease(ifp, 1);
-		if (r == -1)
-			logger(ifp->ctx, LOG_ERR, "%s: dhcp6_readlease: %s: %m",
-			    ifp->name, state->leasefile);
-		else if (r != 0) {
+		if (r == -1) {
+			if (errno != ENOENT)
+				logger(ifp->ctx, LOG_ERR,
+				    "%s: dhcp6_readlease: %s: %m",
+				    ifp->name, state->leasefile);
+		} else if (r != 0) {
 			/* RFC 3633 section 12.1 */
 			if (dhcp6_hasprefixdelegation(ifp))
 				dhcp6_startrebind(ifp);
