@@ -41,6 +41,7 @@
 #define ELOOP_QUEUE 5
 #include "config.h"
 #include "arp.h"
+#include "if.h"
 #include "ipv4.h"
 #include "common.h"
 #include "dhcp.h"
@@ -406,7 +407,7 @@ arp_handleifa(int cmd, struct interface *ifp, const struct in_addr *addr,
 			if (flags & IN_IFF_DUPLICATED) {
 				if (astate->conflicted_cb)
 					astate->conflicted_cb(astate, NULL);
-			} else if (!(flags & IN_IFF_TENTATIVE)) {
+			} else if (!(flags & IN_IFF_NOTUSEABLE)) {
 				if (astate->probed_cb)
 					astate->probed_cb(astate);
 			}

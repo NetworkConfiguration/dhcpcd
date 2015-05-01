@@ -144,6 +144,7 @@ struct vivco {
 };
 
 struct if_options {
+	time_t mtime;
 	uint8_t iaid[4];
 	int metric;
 	uint8_t requestmask[256 / NBBY];

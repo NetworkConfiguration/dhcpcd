@@ -1589,6 +1589,9 @@ send_message(struct interface *ifp, uint8_t type,
 	in_addr_t a = INADDR_ANY;
 	struct timespec tv;
 	int s;
+#ifdef IN_IFF_NOTUSEABLE
+	struct ipv4_addr *ia;
+#endif
 
 	if (!callback)
 		logger(ifp->ctx, LOG_DEBUG, "%s: sending %s with xid 0x%x",
@@ -1621,6 +1624,10 @@ send_message(struct interface *ifp, uint8_t type,
 	if (state->added && !(state->added & STATE_FAKE) &&
 	    state->addr.s_addr != INADDR_ANY &&
 	    state->new != NULL &&
+#ifdef IN_IFF_NOTUSEABLE
+	    ((ia = ipv4_iffindaddr(ifp, &state->addr, NULL)) &&
+	    !(ia->addr_flags & IN_IFF_NOTUSEABLE)) &&
+#endif
 	    (state->new->cookie == htonl(MAGIC_COOKIE) ||
 	    ifp->options->options & DHCPCD_INFORM))
 	{
@@ -2438,6 +2445,9 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 	size_t auth_len;
 	char *msg;
 	struct arp_state *astate;
+#ifdef IN_IFF_DUPLICATED
+	struct ipv4_addr *ia;
+#endif
 
 	/* We may have found a BOOTP server */
 	if (get_option_uint8(ifp->ctx, &type, dhcp, DHO_MESSAGETYPE) == -1)
@@ -2648,13 +2658,23 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 		return;
 	}
 
+#ifdef IN_IFF_DUPLICATED
+	ia = ipv4_iffindaddr(ifp, &lease->addr, NULL);
+	if (ia && ia->addr_flags & IN_IFF_DUPLICATED) {
+		log_dhcp(LOG_WARNING, "declined duplicate address",
+		    ifp, dhcp, from);
+		if (type)
+			dhcp_decline(ifp);
+		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
+		eloop_timeout_add_sec(ifp->ctx->eloop,
+		    DHCP_RAND_MAX, dhcp_discover, ifp);
+		return;
+	}
+#endif
+
 	if ((type == 0 || type == DHCP_OFFER) &&
 	    (state->state == DHS_DISCOVER || state->state == DHS_IPV4LL_BOUND))
 	{
-#ifdef IN_IFF_DUPLICATED
-		struct ipv4_addr *ia;
-#endif
-
 		lease->frominfo = 0;
 		lease->addr.s_addr = dhcp->yiaddr;
 		lease->cookie = dhcp->cookie;
@@ -2663,18 +2683,6 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 		    &lease->server, dhcp, DHO_SERVERID) != 0)
 			lease->server.s_addr = INADDR_ANY;
 		log_dhcp(LOG_INFO, "offered", ifp, dhcp, from);
-#ifdef IN_IFF_DUPLICATED
-		ia = ipv4_iffindaddr(ifp, &lease->addr, NULL);
-		if (ia && ia->addr_flags & IN_IFF_DUPLICATED) {
-			log_dhcp(LOG_WARNING, "declined duplicate address",
-			    ifp, dhcp, from);
-			dhcp_decline(ifp);
-			eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
-			eloop_timeout_add_sec(ifp->ctx->eloop,
-			    DHCP_RAND_MAX, dhcp_discover, ifp);
-			return;
-		}
-#endif
 		free(state->offer);
 		state->offer = dhcp;
 		*dhcpp = NULL;
@@ -2739,13 +2747,19 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 	lease->frominfo = 0;
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	astate = NULL;
-	if (ifo->options & DHCPCD_ARP &&
-	    state->addr.s_addr != state->offer->yiaddr)
+
+#ifndef IN_IFF_TENTATIVE
+	if (ifo->options & DHCPCD_ARP
+	    && state->addr.s_addr != state->offer->yiaddr)
+#endif
 	{
+		addr.s_addr = state->offer->yiaddr;
+#ifndef IN_IFF_TENTATIVE
 		/* If the interface already has the address configured
 		 * then we can't ARP for duplicate detection. */
-		addr.s_addr = state->offer->yiaddr;
-		if (!ipv4_iffindaddr(ifp, &addr, NULL)) {
+		ia = ipv4_findaddr(ifp->ctx, &addr);
+		if (ia) {
+#endif
 			astate = arp_new(ifp, &addr);
 			if (astate) {
 				astate->probed_cb = dhcp_arp_probed;
@@ -2756,8 +2770,8 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 			}
 #ifndef IN_IFF_TENTATIVE
 			return;
-#endif
 		}
+#endif
 	}
 
 	dhcp_bind(ifp, astate);
@@ -3141,7 +3155,8 @@ dhcp_start1(void *arg)
 			/* Don't log an error if some other process
 			 * is handling this. */
 			if (errno != EADDRINUSE)
-				logger(ifp->ctx, LOG_ERR, "dhcp_openudp: %m");
+				logger(ifp->ctx, LOG_ERR,
+				    "%s: dhcp_openudp: %m", __func__);
 		} else
 			eloop_event_add(ifp->ctx->eloop,
 			    ifp->ctx->udp_fd, dhcp_handleudp,

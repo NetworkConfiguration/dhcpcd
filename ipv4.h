@@ -30,6 +30,11 @@
 
 #include "dhcpcd.h"
 
+#ifdef IN_IFF_TENTATIVE
+#define IN_IFF_NOTUSEABLE \
+        (IN_IFF_TENTATIVE | IN_IFF_DUPLICATED | IN_IFF_DETACHED)
+#endif
+
 struct rt {
 	TAILQ_ENTRY(rt) next;
 	struct in_addr dest;

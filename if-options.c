@@ -28,6 +28,7 @@
 #define _WITH_GETLINE /* Stop FreeBSD bitching */
 
 #include <sys/param.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 
 #include <arpa/inet.h>
@@ -2040,6 +2041,7 @@ read_config(struct dhcpcd_ctx *ctx,
 {
 	struct if_options *ifo;
 	FILE *fp;
+	struct stat sb;
 	char *line, *buf, *option, *p;
 	size_t buflen;
 	ssize_t vlen;
@@ -2196,6 +2198,8 @@ read_config(struct dhcpcd_ctx *ctx,
 		free(buf);
 		return ifo;
 	}
+	if (stat(ctx->cffile, &sb) == 0)
+		ifo->mtime = sb.st_mtime;
 
 	ldop = edop = NULL;
 	while ((line = get_line(&buf, &buflen, fp))) {

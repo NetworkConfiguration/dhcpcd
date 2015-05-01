@@ -350,7 +350,7 @@ stop_interface(struct interface *ifp)
 }
 
 static void
-configure_interface1(struct interface *ifp, struct if_options *old)
+configure_interface1(struct interface *ifp)
 {
 	struct if_options *ifo = ifp->options;
 	int ra_global, ra_iface;
@@ -516,16 +516,6 @@ configure_interface1(struct interface *ifp, struct if_options *old)
 	/* If we are not sending an authentication option, don't require it */
 	if (!(ifo->auth.options & DHCPCD_AUTH_SEND))
 		ifo->auth.options &= ~DHCPCD_AUTH_REQUIRE;
-
-	/* If we ARPing something or options have changed,
-	 * drop leases and restart */
-	if (old) {
-		/* Remove warning options for a fair comparison */
-		old->options &= ~(DHCPCD_WARNINGS | DHCPCD_CONF);
-		if (ifo->arping_len || memcmp(ifo, old, sizeof(*old)))
-			dhcpcd_drop(ifp, 0);
-		free(old);
-	}
 }
 
 int
@@ -559,16 +549,10 @@ dhcpcd_selectprofile(struct interface *ifp, const char *profile)
 	} else
 		*ifp->profile = '\0';
 
-	if (profile) {
-		struct if_options *old;
-
-		old = ifp->options;
-		ifp->options = ifo;
-		configure_interface1(ifp, old);
-	} else {
-		free_options(ifp->options);
-		ifp->options = ifo;
-	}
+	free_options(ifp->options);
+	ifp->options = ifo;
+	if (profile)
+		configure_interface1(ifp);
 	return 1;
 }
 
@@ -576,13 +560,20 @@ static void
 configure_interface(struct interface *ifp, int argc, char **argv,
     unsigned long long options)
 {
-	struct if_options *old;
+	time_t old;
 
-	old = ifp->options;
+	old = ifp->options ? ifp->options->mtime : 0;
 	dhcpcd_selectprofile(ifp, NULL);
 	add_options(ifp->ctx, ifp->name, ifp->options, argc, argv);
 	ifp->options->options |= options;
-	configure_interface1(ifp, old);
+	configure_interface1(ifp);
+
+	/* If the mtime has changed drop any old lease */
+	if (ifp->options && old != 0 && ifp->options->mtime != old) {
+		logger(ifp->ctx, LOG_WARNING,
+		    "%s: confile file changed, expiring leases", ifp->name);
+		dhcpcd_drop(ifp, 0);
+	}
 }
 
 static void

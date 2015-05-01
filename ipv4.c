@@ -987,13 +987,13 @@ ipv4_applyaddr(void *arg)
 			return;
 	}
 
-#ifdef IN_IFF_TENTATIVE
+#ifdef IN_IFF_NOTUSEABLE
 	ap = ipv4_iffindaddr(ifp, &lease->addr, NULL);
 	if (ap == NULL) {
 		logger(ifp->ctx, LOG_ERR, "%s: added address vanished",
 		    ifp->name);
 		return;
-	} else if (ap->addr_flags & IN_IFF_TENTATIVE)
+	} else if (ap->addr_flags & IN_IFF_NOTUSEABLE)
 		return;
 #endif
 
