@@ -3193,11 +3193,14 @@ dhcp_start1(void *arg)
 		state->offer = read_lease(ifp);
 		/* Check the saved lease matches the type we want */
 		if (state->offer) {
-			struct ipv4_addr *ia;
+#ifdef IN_IFF_DUPLICATED
 			struct in_addr addr;
+			struct ipv4_addr *ia;
 
 			addr.s_addr = state->offer->yiaddr;
 			ia = ipv4_iffindaddr(ifp, &addr, NULL);
+#endif
+
 			if ((IS_BOOTP(ifp, state->offer) &&
 			    !(ifo->options & DHCPCD_BOOTP)) ||
 #ifdef IN_IFF_DUPLICATED

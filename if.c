@@ -478,6 +478,8 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 	for (ifa = ifaddrs; ifa; ifa = ifa->ifa_next) {
 		if (ifa->ifa_addr == NULL)
 			continue;
+		if ((ifp = if_find(ifs, ifa->ifa_name)) == NULL)
+			continue;
 		switch(ifa->ifa_addr->sa_family) {
 #ifdef INET
 		case AF_INET:
@@ -499,12 +501,6 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 #endif
 #ifdef INET6
 		case AF_INET6:
-			TAILQ_FOREACH(ifp, ifs, next) {
-				if (strcmp(ifp->name, ifa->ifa_name) == 0)
-					break;
-			}
-			if (ifp == NULL)
-				break; /* Should be impossible */
 			sin6 = (struct sockaddr_in6 *)(void *)ifa->ifa_addr;
 			net6 = (struct sockaddr_in6 *)(void *)ifa->ifa_netmask;
 #ifdef __KAME__

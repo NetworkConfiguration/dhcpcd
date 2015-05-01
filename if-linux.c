@@ -625,7 +625,7 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 			rta = RTA_NEXT(rta, len);
 		}
 		ipv4_handleifa(ctx, nlm->nlmsg_type, NULL, ifp->name,
-		    &addr, &net, &dest);
+		    &addr, &net, &dest, ifa->ifa_flags);
 		break;
 #endif
 #ifdef INET6

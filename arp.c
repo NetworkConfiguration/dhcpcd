@@ -412,5 +412,10 @@ arp_handleifa(int cmd, struct interface *ifp, const struct in_addr *addr,
 			}
 		}
 	}
+#else
+	UNUSED(cmd);
+	UNUSED(ifp);
+	UNUSED(addr);
+	UNUSED(flags);
 #endif
 }
