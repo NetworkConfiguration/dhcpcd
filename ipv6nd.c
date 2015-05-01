@@ -54,9 +54,6 @@
 /* Debugging Router Solicitations is a lot of spam, so disable it */
 //#define DEBUG_RS
 
-#define RTR_SOLICITATION_INTERVAL       4 /* seconds */
-#define MAX_RTR_SOLICITATIONS           3 /* times */
-
 #ifndef ND_OPT_RDNSS
 #define ND_OPT_RDNSS			25
 struct nd_opt_rdnss {           /* RDNSS option RFC 6106 */
@@ -311,9 +308,48 @@ ipv6nd_sendrsprobe(void *arg)
 	if (state->rsprobes++ < MAX_RTR_SOLICITATIONS)
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    RTR_SOLICITATION_INTERVAL, ipv6nd_sendrsprobe, ifp);
-	else
+	else {
 		logger(ifp->ctx, LOG_WARNING,
 		    "%s: no IPv6 Routers available", ifp->name);
+		ipv6nd_drop(ifp);
+		dhcp6_drop(ifp, "EXPIRE6");
+	}
+}
+
+void
+ipv6nd_expire(struct interface *ifp, uint32_t seconds)
+{
+	struct ra *rap;
+	struct timespec now;
+
+	get_monotonic(&now);
+
+	TAILQ_FOREACH(rap, ifp->ctx->ipv6->ra_routers, next) {
+		if (rap->iface == ifp) {
+			rap->received = now;
+			rap->expired = seconds ? 0 : 1;
+			if (seconds) {
+				struct ra_opt *rao;
+				struct ipv6_addr *ap;
+
+				rap->lifetime = seconds;
+				TAILQ_FOREACH(ap, &rap->addrs, next) {
+					if (ap->prefix_vltime) {
+						ap->prefix_vltime = seconds;
+						ap->prefix_pltime = seconds / 2;
+					}
+				}
+				ipv6_addaddrs(&rap->addrs);
+				TAILQ_FOREACH(rao, &rap->options, next) {
+					timespecclear(&rao->expire);
+				}
+			}
+		}
+	}
+	if (seconds)
+		ipv6nd_expirera(ifp);
+	else
+		ipv6_buildroutes(ifp->ctx);
 }
 
 static void
@@ -407,7 +443,6 @@ void ipv6nd_freedrop_ra(struct ra *rap, int drop)
 	ipv6nd_free_opts(rap);
 	free(rap->data);
 	free(rap);
-
 }
 
 ssize_t
@@ -1388,13 +1423,14 @@ ipv6nd_expirera(void *arg)
 	struct ra *rap, *ran;
 	struct ra_opt *rao, *raon;
 	struct timespec now, lt, expire, next;
-	uint8_t expired, valid;
+	uint8_t expired, valid, validone;
 
 	ifp = arg;
 	get_monotonic(&now);
 	expired = 0;
 	timespecclear(&next);
 
+	validone = 0;
 	TAILQ_FOREACH_SAFE(rap, ifp->ctx->ipv6->ra_routers, next, ran) {
 		if (rap->iface != ifp)
 			continue;
@@ -1410,6 +1446,7 @@ ipv6nd_expirera(void *arg)
 					    "%s: %s: router expired",
 					    ifp->name, rap->sfrom);
 					rap->expired = expired = 1;
+					rap->lifetime = 0;
 				}
 			} else {
 				valid = 1;
@@ -1462,6 +1499,8 @@ ipv6nd_expirera(void *arg)
 		 * as well punt it. */
 		if (!valid && TAILQ_FIRST(&rap->addrs) == NULL)
 			ipv6nd_free_ra(rap);
+		else
+			validone = 1;
 	}
 
 	if (timespecisset(&next))
@@ -1471,6 +1510,10 @@ ipv6nd_expirera(void *arg)
 		ipv6_buildroutes(ifp->ctx);
 		script_runreason(ifp, "ROUTERADVERT");
 	}
+
+	/* No valid routers? Kill any DHCPv6. */
+	if (!validone)
+		dhcp6_drop(ifp, "EXPIRE6");
 }
 
 void

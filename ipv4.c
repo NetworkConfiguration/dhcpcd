@@ -720,12 +720,14 @@ ipv4_buildroutes(struct dhcpcd_ctx *ctx)
 	}
 
 	/* Remove old routes we used to manage */
-	TAILQ_FOREACH(rt, ctx->ipv4_routes, next) {
-		if (find_route(nrs, rt, NULL) == NULL &&
-		    (rt->iface->options->options &
-		    (DHCPCD_EXITING | DHCPCD_PERSISTENT)) !=
-		    (DHCPCD_EXITING | DHCPCD_PERSISTENT))
-			d_route(rt);
+	if (ctx->ipv4_routes) {
+		TAILQ_FOREACH(rt, ctx->ipv4_routes, next) {
+			if (find_route(nrs, rt, NULL) == NULL &&
+			    (rt->iface->options->options &
+			    (DHCPCD_EXITING | DHCPCD_PERSISTENT)) !=
+			    (DHCPCD_EXITING | DHCPCD_PERSISTENT))
+				d_route(rt);
+		}
 	}
 	ipv4_freeroutes(ctx->ipv4_routes);
 	ctx->ipv4_routes = nrs;

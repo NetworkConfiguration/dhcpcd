@@ -640,6 +640,8 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 			script_runreason(ifp, "NOCARRIER");
 #ifdef NOCARRIER_PRESERVE_IP
 			arp_close(ifp);
+			ipv4_buildroutes(ifp->ctx);
+			ipv6nd_expire(ifp, 0);
 #else
 			dhcpcd_drop(ifp, 0);
 #endif
@@ -671,6 +673,12 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 			}
 			dhcpcd_initstate(ifp, 0);
 			script_runreason(ifp, "CARRIER");
+#ifdef NOCARRIER_PRESERVE_IP
+			/* Set any IPv6 Routers we remembered to expire
+			 * faster than they would normally as we
+			 * maybe on a new network. */
+			ipv6nd_expire(ifp, RTR_CARRIER_EXPIRE);
+#endif
 			/* RFC4941 Section 3.5 */
 			if (ifp->options->options & DHCPCD_IPV6RA_OWN)
 				ipv6_gentempifid(ifp);
