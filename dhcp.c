@@ -2445,9 +2445,7 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 	size_t auth_len;
 	char *msg;
 	struct arp_state *astate;
-#ifdef IN_IFF_DUPLICATED
 	struct ipv4_addr *ia;
-#endif
 
 	/* We may have found a BOOTP server */
 	if (get_option_uint8(ifp->ctx, &type, dhcp, DHO_MESSAGETYPE) == -1)
