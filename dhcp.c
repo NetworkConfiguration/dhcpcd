@@ -1799,7 +1799,7 @@ dhcp_expire(void *arg)
 	dhcp_discover(ifp);
 }
 
-void
+static void
 dhcp_decline(struct interface *ifp)
 {
 
@@ -1824,12 +1824,14 @@ dhcp_renew(void *arg)
 	send_renew(ifp);
 }
 
+#ifndef IN_IFF_TENTATIVE
 static void
 dhcp_arp_announced(struct arp_state *astate)
 {
 
 	arp_close(astate->iface);
 }
+#endif
 
 static void
 dhcp_rebind(void *arg)
@@ -1978,9 +1980,13 @@ dhcp_bind(struct interface *ifp, struct arp_state *astate)
 
 applyaddr:
 	ipv4_applyaddr(ifp);
-	if (dhcpcd_daemonise(ifp->ctx))
-		return;
-	if (ifo->options & DHCPCD_ARP) {
+	if (ifo->options & DHCPCD_ARP &&
+	    !(ifp->ctx->options & DHCPCD_FORKED))
+	{
+#ifdef IN_IFF_TENTATIVE
+		if (astate)
+			arp_free_but(astate);
+#else
 		if (state->added) {
 			if (astate == NULL) {
 				astate = arp_new(ifp, &state->addr);
@@ -1994,6 +2000,7 @@ applyaddr:
 			}
 		} else if (!ipv4ll)
 			arp_close(ifp);
+#endif
 	}
 }
 
@@ -2347,7 +2354,12 @@ dhcp_arp_probed(struct arp_state *astate)
 	}
 	dhcp_close(astate->iface);
 	eloop_timeout_delete(astate->iface->ctx->eloop, NULL, astate->iface);
+#ifdef IN_IFF_TENTATIVE
+	ipv4_finaliseaddr(astate->iface);
+	arp_close(astate->iface);
+#else
 	dhcp_bind(astate->iface, astate);
+#endif
 }
 
 static void
@@ -2360,6 +2372,7 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 	ifo = astate->iface->options;
 	if (state->arping_index &&
 	    state->arping_index <= ifo->arping_len &&
+	    amsg &&
 	    (amsg->sip.s_addr == ifo->arping[state->arping_index - 1] ||
 	    (amsg->sip.s_addr == 0 &&
 	    amsg->tip.s_addr == ifo->arping[state->arping_index - 1])))
@@ -2386,14 +2399,17 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 		dhcpcd_startinterface(astate->iface);
 	}
 
-	if (state->offer == NULL)
-		return;
-
-	/* RFC 2131 3.1.5, Client-server interaction */
-	if (amsg->sip.s_addr == state->offer->yiaddr ||
-	    (amsg->sip.s_addr == 0 && amsg->tip.s_addr == state->offer->yiaddr))
+	/* RFC 2131 3.1.5, Client-server interaction
+	 * NULL amsg means IN_IFF_DUPLICATED */
+	if (amsg == NULL || (state->offer &&
+	    (amsg->sip.s_addr == state->offer->yiaddr ||
+	    (amsg->sip.s_addr == 0 &&
+	    amsg->tip.s_addr == state->offer->yiaddr))))
 	{
-		astate->failed.s_addr = state->offer->yiaddr;
+		if (amsg)
+			astate->failed.s_addr = state->offer->yiaddr;
+		else
+			astate->failed = astate->addr;
 		arp_report_conflicted(astate, amsg);
 		unlink(state->leasefile);
 		if (!state->lease.frominfo)
@@ -2419,6 +2435,7 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 	unsigned int i;
 	size_t auth_len;
 	char *msg;
+	struct arp_state *astate;
 
 	/* We may have found a BOOTP server */
 	if (get_option_uint8(ifp->ctx, &type, dhcp, DHO_MESSAGETYPE) == -1)
@@ -2632,6 +2649,10 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 	if ((type == 0 || type == DHCP_OFFER) &&
 	    (state->state == DHS_DISCOVER || state->state == DHS_IPV4LL_BOUND))
 	{
+#ifdef IN_IFF_DUPLICATED
+		struct ipv4_addr *ia;
+#endif
+
 		lease->frominfo = 0;
 		lease->addr.s_addr = dhcp->yiaddr;
 		lease->cookie = dhcp->cookie;
@@ -2640,6 +2661,18 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 		    &lease->server, dhcp, DHO_SERVERID) != 0)
 			lease->server.s_addr = INADDR_ANY;
 		log_dhcp(LOG_INFO, "offered", ifp, dhcp, from);
+#ifdef IN_IFF_DUPLICATED
+		ia = ipv4_iffindaddr(ifp, &lease->addr, NULL);
+		if (ia && ia->addr_flags & IN_IFF_DUPLICATED) {
+			log_dhcp(LOG_WARNING, "declined duplicate address",
+			    ifp, dhcp, from);
+			dhcp_decline(ifp);
+			eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
+			eloop_timeout_add_sec(ifp->ctx->eloop,
+			    DHCP_RAND_MAX, dhcp_discover, ifp);
+			return;
+		}
+#endif
 		free(state->offer);
 		state->offer = dhcp;
 		*dhcpp = NULL;
@@ -2703,7 +2736,7 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 
 	lease->frominfo = 0;
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
-
+	astate = NULL;
 	if (ifo->options & DHCPCD_ARP &&
 	    state->addr.s_addr != state->offer->yiaddr)
 	{
@@ -2711,19 +2744,21 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 		 * then we can't ARP for duplicate detection. */
 		addr.s_addr = state->offer->yiaddr;
 		if (!ipv4_iffindaddr(ifp, &addr, NULL)) {
-			struct arp_state *astate;
-
 			astate = arp_new(ifp, &addr);
 			if (astate) {
 				astate->probed_cb = dhcp_arp_probed;
 				astate->conflicted_cb = dhcp_arp_conflicted;
+#ifndef IN_IFF_TENTATIVE
 				arp_probe(astate);
+#endif
 			}
+#ifndef IN_IFF_TENTATIVE
 			return;
+#endif
 		}
 	}
 
-	dhcp_bind(ifp, NULL);
+	dhcp_bind(ifp, astate);
 }
 
 static size_t
@@ -3158,8 +3193,16 @@ dhcp_start1(void *arg)
 		state->offer = read_lease(ifp);
 		/* Check the saved lease matches the type we want */
 		if (state->offer) {
+			struct ipv4_addr *ia;
+			struct in_addr addr;
+
+			addr.s_addr = state->offer->yiaddr;
+			ia = ipv4_iffindaddr(ifp, &addr, NULL);
 			if ((IS_BOOTP(ifp, state->offer) &&
 			    !(ifo->options & DHCPCD_BOOTP)) ||
+#ifdef IN_IFF_DUPLICATED
+			    (ia && ia->addr_flags & IN_IFF_DUPLICATED) ||
+#endif
 			    (!IS_BOOTP(ifp, state->offer) &&
 			    ifo->options & DHCPCD_BOOTP))
 			{
@@ -3271,10 +3314,11 @@ dhcp_start(struct interface *ifp)
 }
 
 void
-dhcp_handleifa(int type, struct interface *ifp,
+dhcp_handleifa(int cmd, struct interface *ifp,
 	const struct in_addr *addr,
 	const struct in_addr *net,
-	const struct in_addr *dst)
+	const struct in_addr *dst,
+	__unused int flags)
 {
 	struct dhcp_state *state;
 	struct if_options *ifo;
@@ -3284,7 +3328,7 @@ dhcp_handleifa(int type, struct interface *ifp,
 	if (state == NULL)
 		return;
 
-	if (type == RTM_DELADDR) {
+	if (cmd == RTM_DELADDR) {
 		if (state->new &&
 		    (state->new->yiaddr == addr->s_addr ||
 		    (state->new->yiaddr == INADDR_ANY &&
@@ -3299,7 +3343,7 @@ dhcp_handleifa(int type, struct interface *ifp,
 		return;
 	}
 
-	if (type != RTM_NEWADDR)
+	if (cmd != RTM_NEWADDR)
 		return;
 
 	ifo = ifp->options;

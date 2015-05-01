@@ -713,6 +713,33 @@ if_initrt(struct interface *ifp)
 	free(buf);
 	return 0;
 }
+
+int
+if_addrflags(const struct in_addr *addr, const struct interface *ifp)
+{
+#ifdef SIOCGIFAFLAG_IN
+	int s, flags;
+	struct ifreq ifr;
+	struct sockaddr_in *sin;
+
+	s = socket(PF_INET, SOCK_DGRAM, 0);
+	flags = -1;
+	if (s != -1) {
+		memset(&ifr, 0, sizeof(ifr));
+		strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
+		sin = (struct sockaddr_in *)(void *)&ifr.ifr_addr;
+		sin->sin_family = AF_INET;
+		sin->sin_addr = *addr;
+		if (ioctl(s, SIOCGIFAFLAG_IN, &ifr) != -1)
+			flags = ifr.ifr_addrflags;
+		close(s);
+	}
+	return flags;
+#else
+	errno = ENOTSUP;
+	return 0;
+#endif
+}
 #endif
 
 #ifdef INET6
@@ -1127,6 +1154,8 @@ if_managelink(struct dhcpcd_ctx *ctx)
 	struct rt6 rt6;
 	struct in6_addr ia6, net6;
 	struct sockaddr_in6 *sin6;
+#endif
+#if (defined(INET) && defined(IN_IFF_TENTATIVE)) || defined(INET6)
 	int ifa_flags;
 #endif
 
@@ -1261,9 +1290,15 @@ if_managelink(struct dhcpcd_ctx *ctx)
 				COPYOUT(rt.dest, rti_info[RTAX_IFA]);
 				COPYOUT(rt.net, rti_info[RTAX_NETMASK]);
 				COPYOUT(rt.gate, rti_info[RTAX_BRD]);
+				if (rtm->rtm_type == RTM_NEWADDR) {
+					ifa_flags = if_addrflags(&rt.dest, ifp);
+					if (ifa_flags == -1)
+						break;
+				} else
+					ifa_flags = 0;
 				ipv4_handleifa(ctx, rtm->rtm_type,
 				    NULL, ifp->name,
-				    &rt.dest, &rt.net, &rt.gate);
+				    &rt.dest, &rt.net, &rt.gate, ifa_flags);
 				break;
 #endif
 #ifdef INET6

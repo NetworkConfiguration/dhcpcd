@@ -490,10 +490,11 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 				    (void *)ifa->ifa_dstaddr;
 			else
 				dst = NULL;
+			ifa_flags = if_addrflags(&addr->sin_addr, ifp);
 			ipv4_handleifa(ctx, RTM_NEWADDR, ifs, ifa->ifa_name,
 				&addr->sin_addr,
 				&net->sin_addr,
-				dst ? &dst->sin_addr : NULL);
+				dst ? &dst->sin_addr : NULL, ifa_flags);
 			break;
 #endif
 #ifdef INET6

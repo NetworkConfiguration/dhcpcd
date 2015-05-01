@@ -50,6 +50,7 @@ struct ipv4_addr {
 	struct in_addr net;
 	struct in_addr dst;
 	struct interface *iface;
+	int addr_flags;
 };
 TAILQ_HEAD(ipv4_addrhead, ipv4_addr);
 
@@ -75,6 +76,7 @@ int ipv4_addrexists(struct dhcpcd_ctx *, const struct in_addr *);
 #define STATE_FAKE		0x02
 
 void ipv4_buildroutes(struct dhcpcd_ctx *);
+void ipv4_finaliseaddr(struct interface *);
 void ipv4_applyaddr(void *);
 int ipv4_handlert(struct dhcpcd_ctx *, int, struct rt *);
 void ipv4_freerts(struct rt_head *);
@@ -84,7 +86,8 @@ struct ipv4_addr *ipv4_iffindaddr(struct interface *,
 struct ipv4_addr *ipv4_iffindlladdr(struct interface *);
 struct ipv4_addr *ipv4_findaddr(struct dhcpcd_ctx *, const struct in_addr *);
 void ipv4_handleifa(struct dhcpcd_ctx *, int, struct if_head *, const char *,
-    const struct in_addr *, const struct in_addr *, const struct in_addr *);
+    const struct in_addr *, const struct in_addr *, const struct in_addr *,
+    int);
 
 void ipv4_freeroutes(struct rt_head *);
 

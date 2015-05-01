@@ -1412,6 +1412,15 @@ if_initrt(struct interface *ifp)
 	return send_netlink(ifp->ctx, ifp,
 	    NETLINK_ROUTE, &nlm.hdr, &_if_initrt);
 }
+
+int
+if_addrflags(__unused const struct in_addr *addr,
+    __unused const struct interface *ifp)
+{
+
+	/* Linux has no support for IPv4 address flags */
+	return 0;
+}
 #endif
 
 #ifdef INET6

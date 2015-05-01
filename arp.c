@@ -96,12 +96,20 @@ eexit:
 void
 arp_report_conflicted(const struct arp_state *astate, const struct arp_msg *amsg)
 {
-	char buf[HWADDR_LEN * 3];
 
-	logger(astate->iface->ctx, LOG_ERR, "%s: hardware address %s claims %s",
-	    astate->iface->name,
-	    hwaddr_ntoa(amsg->sha, astate->iface->hwlen, buf, sizeof(buf)),
-	    inet_ntoa(astate->failed));
+	if (amsg) {
+		char buf[HWADDR_LEN * 3];
+
+		logger(astate->iface->ctx, LOG_ERR,
+		    "%s: hardware address %s claims %s",
+		    astate->iface->name,
+		    hwaddr_ntoa(amsg->sha, astate->iface->hwlen,
+		    buf, sizeof(buf)),
+		    inet_ntoa(astate->failed));
+	} else
+		logger(astate->iface->ctx, LOG_ERR,
+		    "%s: DAD detected %s",
+		    astate->iface->name, inet_ntoa(astate->failed));
 }
 
 static void
@@ -315,7 +323,8 @@ arp_new(struct interface *ifp, const struct in_addr *addr)
 	}
 	state = D_STATE(ifp);
 	astate->iface = ifp;
-	astate->addr = *addr;
+	if (addr)
+		astate->addr = *addr;
 	TAILQ_INSERT_TAIL(&state->arp_states, astate, next);
 	return astate;
 }
@@ -379,4 +388,29 @@ arp_close(struct interface *ifp)
 		arp_free(astate);
 #endif
 	}
+}
+
+void
+arp_handleifa(int cmd, struct interface *ifp, const struct in_addr *addr,
+    int flags)
+{
+#ifdef IN_IFF_DUPLICATED
+	struct dhcp_state *state = D_STATE(ifp);
+	struct arp_state *astate, *asn;
+
+	if (cmd != RTM_NEWADDR || (state = D_STATE(ifp)) == NULL)
+		return;
+
+	TAILQ_FOREACH_SAFE(astate, &state->arp_states, next, asn) {
+		if (astate->addr.s_addr == addr->s_addr) {
+			if (flags & IN_IFF_DUPLICATED) {
+				if (astate->conflicted_cb)
+					astate->conflicted_cb(astate, NULL);
+			} else if (!(flags & IN_IFF_TENTATIVE)) {
+				if (astate->probed_cb)
+					astate->probed_cb(astate);
+			}
+		}
+	}
+#endif
 }

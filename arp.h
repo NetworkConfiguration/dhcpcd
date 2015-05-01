@@ -74,6 +74,8 @@ void arp_cancel(struct arp_state *);
 void arp_free(struct arp_state *);
 void arp_free_but(struct arp_state *);
 void arp_close(struct interface *);
+
+void arp_handleifa(int, struct interface *, const struct in_addr *, int);
 #else
 #define arp_close(a) {}
 #endif

@@ -800,26 +800,82 @@ ipv4_getstate(struct interface *ifp)
 static int
 ipv4_addaddr(struct interface *ifp, const struct dhcp_lease *lease)
 {
-	int r;
+	struct ipv4_state *state;
+	struct ipv4_addr *ia;
 
+	if ((state = ipv4_getstate(ifp)) == NULL) {
+		logger(ifp->ctx, LOG_ERR, "%s: ipv4_getstate: %m", __func__);
+		return -1;
+	}
 	if (ifp->options->options & DHCPCD_NOALIAS) {
-		struct ipv4_state *state;
-		struct ipv4_addr *ap, *apn;
+		struct ipv4_addr *ian;
 
-		state = IPV4_STATE(ifp);
-		TAILQ_FOREACH_SAFE(ap, &state->addrs, next, apn) {
-			if (ap->addr.s_addr != lease->addr.s_addr)
-				delete_address1(ifp, &ap->addr, &ap->net);
+		TAILQ_FOREACH_SAFE(ia, &state->addrs, next, ian) {
+			if (ia->addr.s_addr != lease->addr.s_addr)
+				delete_address1(ifp, &ia->addr, &ia->net);
 		}
+	}
+
+	if ((ia = malloc(sizeof(*ia))) == NULL) {
+		logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
+		return -1;
 	}
 
 	logger(ifp->ctx, LOG_DEBUG, "%s: adding IP address %s/%d",
 	    ifp->name, inet_ntoa(lease->addr),
 	    inet_ntocidr(lease->net));
-	r = if_addaddress(ifp, &lease->addr, &lease->net, &lease->brd);
-	if (r == -1 && errno != EEXIST)
-		logger(ifp->ctx, LOG_ERR, "%s: if_addaddress: %m", __func__);
-	return r;
+	if (if_addaddress(ifp, &lease->addr, &lease->net, &lease->brd) == -1) {
+		if (errno != EEXIST)
+			logger(ifp->ctx, LOG_ERR, "%s: if_addaddress: %m",
+			    __func__);
+		free(ia);
+		return -1;
+	}
+
+	ia->iface = ifp;
+	ia->addr = lease->addr;
+	ia->net = lease->net;
+#ifdef IN_IFF_TENTATIVE
+	ia->addr_flags = IN_IFF_TENTATIVE;
+#endif
+	TAILQ_INSERT_TAIL(&state->addrs, ia, next);
+	return 0;
+}
+
+static void
+ipv4_finalisert(struct interface *ifp)
+{
+	const struct dhcp_state *state = D_CSTATE(ifp);
+
+	/* Find any freshly added routes, such as the subnet route.
+	 * We do this because we cannot rely on recieving the kernel
+	 * notification right now via our link socket. */
+	if_initrt(ifp);
+	ipv4_buildroutes(ifp->ctx);
+	script_runreason(ifp, state->reason);
+
+	dhcpcd_daemonise(ifp->ctx);
+}
+
+void
+ipv4_finaliseaddr(struct interface *ifp)
+{
+	struct dhcp_state *state = D_STATE(ifp);
+	struct dhcp_lease *lease;
+
+	lease = &state->lease;
+
+	/* Delete the old address if different */
+	if (state->addr.s_addr != lease->addr.s_addr &&
+	    state->addr.s_addr != 0 &&
+	    ipv4_iffindaddr(ifp, &lease->addr, NULL))
+		delete_address(ifp);
+
+	state->added = STATE_ADDED;
+	state->defend = 0;
+	state->addr.s_addr = lease->addr.s_addr;
+	state->net.s_addr = lease->net.s_addr;
+	ipv4_finalisert(ifp);
 }
 
 void
@@ -831,7 +887,6 @@ ipv4_applyaddr(void *arg)
 	struct dhcp_lease *lease;
 	struct if_options *ifo = ifp->options;
 	struct ipv4_addr *ap;
-	struct ipv4_state *istate = NULL;
 	int r;
 
 	if (state == NULL)
@@ -893,7 +948,7 @@ ipv4_applyaddr(void *arg)
 				    ifn->name);
 				state->addr.s_addr = lease->addr.s_addr;
 				state->net.s_addr = lease->net.s_addr;
-				goto routes;
+				ipv4_finalisert(ifp);
 			}
 			logger(ifp->ctx, LOG_INFO, "%s: preferring %s on %s",
 			    ifn->name,
@@ -930,40 +985,26 @@ ipv4_applyaddr(void *arg)
 		r = ipv4_addaddr(ifp, lease);
 		if (r == -1 && errno != EEXIST)
 			return;
-		istate = ipv4_getstate(ifp);
-		ap = malloc(sizeof(*ap));
-		ap->iface = ifp;
-		ap->addr = lease->addr;
-		ap->net = lease->net;
-		ap->dst.s_addr = INADDR_ANY;
-		TAILQ_INSERT_TAIL(&istate->addrs, ap, next);
 	}
 
-	/* Now delete the old address if different */
-	if (state->addr.s_addr != lease->addr.s_addr &&
-	    state->addr.s_addr != 0 &&
-	    ipv4_iffindaddr(ifp, &lease->addr, NULL))
-		delete_address(ifp);
+#ifdef IN_IFF_TENTATIVE
+	ap = ipv4_iffindaddr(ifp, &lease->addr, NULL);
+	if (ap == NULL) {
+		logger(ifp->ctx, LOG_ERR, "%s: added address vanished",
+		    ifp->name);
+		return;
+	} else if (ap->addr_flags & IN_IFF_TENTATIVE)
+		return;
+#endif
 
-	state->added = STATE_ADDED;
-	state->defend = 0;
-	state->addr.s_addr = lease->addr.s_addr;
-	state->net.s_addr = lease->net.s_addr;
-
-routes:
-	/* Find any freshly added routes, such as the subnet route.
-	 * We do this because we cannot rely on recieving the kernel
-	 * notification right now via our link socket. */
-	if_initrt(ifp);
-	ipv4_buildroutes(ifp->ctx);
-	script_runreason(ifp, state->reason);
+	ipv4_finaliseaddr(ifp);
 }
 
 void
 ipv4_handleifa(struct dhcpcd_ctx *ctx,
-    int type, struct if_head *ifs, const char *ifname,
+    int cmd, struct if_head *ifs, const char *ifname,
     const struct in_addr *addr, const struct in_addr *net,
-    const struct in_addr *dst)
+    const struct in_addr *dst, int flags)
 {
 	struct interface *ifp;
 	struct ipv4_state *state;
@@ -979,44 +1020,39 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 		errno = EINVAL;
 		return;
 	}
-
-	TAILQ_FOREACH(ifp, ifs, next) {
-		if (strcmp(ifp->name, ifname) == 0)
-			break;
-	}
-	if (ifp == NULL) {
-		errno = ESRCH;
+	if ((ifp = if_find(ifs, ifname)) == NULL)
 		return;
-	}
-	state = ipv4_getstate(ifp);
-	if (state == NULL) {
+	if ((state = ipv4_getstate(ifp)) == NULL) {
 		errno = ENOENT;
 		return;
 	}
 
 	ap = ipv4_iffindaddr(ifp, addr, net);
-	if (type == RTM_NEWADDR && ap == NULL) {
-		ap = malloc(sizeof(*ap));
+	if (cmd == RTM_NEWADDR) {
 		if (ap == NULL) {
-			logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
-			return;
+			if ((ap = malloc(sizeof(*ap))) == NULL) {
+				logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
+				return;
+			}
+			ap->iface = ifp;
+			ap->addr = *addr;
+			ap->net = *net;
+			if (dst)
+				ap->dst.s_addr = dst->s_addr;
+			else
+				ap->dst.s_addr = INADDR_ANY;
+			TAILQ_INSERT_TAIL(&state->addrs, ap, next);
 		}
-		ap->iface = ifp;
-		ap->addr.s_addr = addr->s_addr;
-		ap->net.s_addr = net->s_addr;
-		if (dst)
-			ap->dst.s_addr = dst->s_addr;
-		else
-			ap->dst.s_addr = INADDR_ANY;
-		TAILQ_INSERT_TAIL(&state->addrs, ap, next);
-	} else if (type == RTM_DELADDR) {
-		if (ap == NULL)
-			return;
-		TAILQ_REMOVE(&state->addrs, ap, next);
-		free(ap);
+		ap->addr_flags = flags;
+	} else if (cmd == RTM_DELADDR) {
+		if (ap) {
+			TAILQ_REMOVE(&state->addrs, ap, next);
+			free(ap);
+		}
 	}
 
-	dhcp_handleifa(type, ifp, addr, net, dst);
+	dhcp_handleifa(cmd, ifp, addr, net, dst, flags);
+	arp_handleifa(cmd, ifp, addr, flags);
 }
 
 void

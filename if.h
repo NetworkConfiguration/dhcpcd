@@ -31,6 +31,9 @@
 #include <net/if.h>
 #include <net/route.h>		/* for RTM_ADD et all */
 #include <netinet/in.h>
+#ifdef BSD
+#include <netinet/in_var.h>	/* for IN_IFF_TENTATIVE et all */
+#endif
 
 /* Some systems have route metrics.
  * OpenBSD route priority is not this. */
@@ -124,6 +127,8 @@ int if_address(const struct interface *,
 	if_address(ifp, addr, net, brd, 1)
 #define if_deladdress(ifp, addr, net)		\
 	if_address(ifp, addr, net, NULL, -1)
+
+int if_addrflags(const struct in_addr *, const struct interface *);
 
 int if_route(unsigned char, const struct rt *rt);
 int if_initrt(struct interface *);
