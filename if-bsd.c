@@ -741,6 +741,7 @@ int
 if_addrflags(__unused const struct in_addr *addr,
     __unused const struct interface *ifp)
 {
+
 	errno = ENOTSUP;
 	return 0;
 }
