@@ -2415,6 +2415,10 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 	    (amsg->sip.s_addr == 0 &&
 	    amsg->tip.s_addr == state->offer->yiaddr))))
 	{
+#ifdef IN_IFF_DUPLICATED
+		struct ipv4_addr *ia;
+#endif
+
 		if (amsg)
 			astate->failed.s_addr = state->offer->yiaddr;
 		else
@@ -2423,6 +2427,11 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 		unlink(state->leasefile);
 		if (!state->lease.frominfo)
 			dhcp_decline(astate->iface);
+#ifdef IN_IFF_DUPLICATED
+		ia = ipv4_iffindaddr(astate->iface, &astate->addr, NULL);
+		if (ia)
+			ipv4_deladdr(astate->iface, &ia->addr, &ia->net);
+#endif
 		eloop_timeout_delete(astate->iface->ctx->eloop, NULL,
 		    astate->iface);
 		eloop_timeout_add_sec(astate->iface->ctx->eloop,
@@ -2663,6 +2672,7 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 		    ifp, dhcp, from);
 		if (type)
 			dhcp_decline(ifp);
+		ipv4_deladdr(ifp, &ia->addr, &ia->net);
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    DHCP_RAND_MAX, dhcp_discover, ifp);
@@ -3347,15 +3357,13 @@ dhcp_handleifa(int cmd, struct interface *ifp,
 		return;
 
 	if (cmd == RTM_DELADDR) {
-		if (state->new &&
-		    (state->new->yiaddr == addr->s_addr ||
-		    (state->new->yiaddr == INADDR_ANY &&
-		     state->new->ciaddr == addr->s_addr)))
+		if (state->addr.s_addr == addr->s_addr &&
+		    state->net.s_addr == net->s_addr)
 		{
 			logger(ifp->ctx, LOG_INFO,
 			    "%s: removing IP address %s/%d",
-			    ifp->name, inet_ntoa(state->lease.addr),
-			    inet_ntocidr(state->lease.net));
+			    ifp->name, inet_ntoa(state->addr),
+			    inet_ntocidr(state->net));
 			dhcp_drop(ifp, "EXPIRE");
 		}
 		return;

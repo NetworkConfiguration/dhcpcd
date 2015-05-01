@@ -731,20 +731,31 @@ ipv4_buildroutes(struct dhcpcd_ctx *ctx)
 	ctx->ipv4_routes = nrs;
 }
 
-static int
-delete_address1(struct interface *ifp,
+int
+ipv4_deladdr(struct interface *ifp,
     const struct in_addr *addr, const struct in_addr *net)
 {
+	struct dhcp_state *dstate;
 	int r;
 	struct ipv4_state *state;
 	struct ipv4_addr *ap;
 
 	logger(ifp->ctx, LOG_DEBUG, "%s: deleting IP address %s/%d",
 	    ifp->name, inet_ntoa(*addr), inet_ntocidr(*net));
+
 	r = if_deladdress(ifp, addr, net);
 	if (r == -1 && errno != EADDRNOTAVAIL && errno != ENXIO &&
 	    errno != ENODEV)
 		logger(ifp->ctx, LOG_ERR, "%s: %s: %m", ifp->name, __func__);
+
+	dstate = D_STATE(ifp);
+	if (dstate->addr.s_addr == addr->s_addr &&
+	    dstate->net.s_addr == net->s_addr)
+	{
+		dstate->added = 0;
+		dstate->addr.s_addr = 0;
+		dstate->net.s_addr = 0;
+	}
 
 	state = IPV4_STATE(ifp);
 	TAILQ_FOREACH(ap, &state->addrs, next) {
@@ -771,10 +782,7 @@ delete_address(struct interface *ifp)
 	if (ifo->options & DHCPCD_INFORM ||
 	    (ifo->options & DHCPCD_STATIC && ifo->req_addr.s_addr == 0))
 		return 0;
-	r = delete_address1(ifp, &state->addr, &state->net);
-	state->added = 0;
-	state->addr.s_addr = 0;
-	state->net.s_addr = 0;
+	r = ipv4_deladdr(ifp, &state->addr, &state->net);
 	return r;
 }
 
@@ -812,7 +820,7 @@ ipv4_addaddr(struct interface *ifp, const struct dhcp_lease *lease)
 
 		TAILQ_FOREACH_SAFE(ia, &state->addrs, next, ian) {
 			if (ia->addr.s_addr != lease->addr.s_addr)
-				delete_address1(ifp, &ia->addr, &ia->net);
+				ipv4_deladdr(ifp, &ia->addr, &ia->net);
 		}
 	}
 
@@ -954,7 +962,7 @@ ipv4_applyaddr(void *arg)
 			    ifn->name,
 			    inet_ntoa(lease->addr),
 			    ifp->name);
-			delete_address1(ifn, &nstate->addr, &nstate->net);
+			ipv4_deladdr(ifn, &nstate->addr, &nstate->net);
 			nstate->added = 0;
 			break;
 		}
@@ -967,14 +975,14 @@ ipv4_applyaddr(void *arg)
 				continue;
 			ap = ipv4_iffindaddr(ifn, &lease->addr, NULL);
 			if (ap)
-				delete_address1(ifn, &ap->addr, &ap->net);
+				ipv4_deladdr(ifn, &ap->addr, &ap->net);
 		}
 	}
 
 	/* If the netmask is different, delete the addresss */
 	ap = ipv4_iffindaddr(ifp, &lease->addr, NULL);
 	if (ap && ap->net.s_addr != lease->net.s_addr)
-		delete_address1(ifp, &ap->addr, &ap->net);
+		ipv4_deladdr(ifp, &ap->addr, &ap->net);
 
 	if (ipv4_iffindaddr(ifp, &lease->addr, &lease->net))
 		logger(ifp->ctx, LOG_DEBUG,

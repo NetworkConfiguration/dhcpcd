@@ -638,7 +638,9 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 				    ifp->name);
 			ifp->carrier = LINK_DOWN;
 			script_runreason(ifp, "NOCARRIER");
-#ifndef NOCARRIER_PRESERVE_IP
+#ifdef NOCARRIER_PRESERVE_IP
+			arp_close(ifp);
+#else
 			dhcpcd_drop(ifp, 0);
 #endif
 		}
@@ -1715,7 +1717,6 @@ main(int argc, char **argv)
 			write_pid(ctx.pid_fd, getpid());
 		}
 	}
-
 
 	if (ctx.options & DHCPCD_MASTER) {
 		if (control_start(&ctx, NULL) == -1)

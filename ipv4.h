@@ -82,6 +82,8 @@ int ipv4_addrexists(struct dhcpcd_ctx *, const struct in_addr *);
 
 void ipv4_buildroutes(struct dhcpcd_ctx *);
 void ipv4_finaliseaddr(struct interface *);
+int ipv4_deladdr(struct interface *ifp, const struct in_addr *,
+    const struct in_addr *);
 void ipv4_applyaddr(void *);
 int ipv4_handlert(struct dhcpcd_ctx *, int, struct rt *);
 void ipv4_freerts(struct rt_head *);
