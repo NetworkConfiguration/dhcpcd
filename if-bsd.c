@@ -714,10 +714,10 @@ if_initrt(struct interface *ifp)
 	return 0;
 }
 
+#ifdef SIOCGIFAFLAG_IN
 int
 if_addrflags(const struct in_addr *addr, const struct interface *ifp)
 {
-#ifdef SIOCGIFAFLAG_IN
 	int s, flags;
 	struct ifreq ifr;
 	struct sockaddr_in *sin;
@@ -735,12 +735,17 @@ if_addrflags(const struct in_addr *addr, const struct interface *ifp)
 		close(s);
 	}
 	return flags;
+}
 #else
+int
+if_addrflags(__unused const struct in_addr *addr,
+    __unused const struct interface *ifp)
+{
 	errno = ENOTSUP;
 	return 0;
-#endif
 }
 #endif
+#endif /* INET */
 
 #ifdef INET6
 static void
