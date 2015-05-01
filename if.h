@@ -43,6 +43,14 @@
 # endif
 #endif
 
+/* Some systems have in-built IPv4 DAD.
+ * However, we need them to do DAD at carrier up as well. */
+#ifdef IN_IFF_TENTATIVE
+#  ifdef __NetBSD__
+#    define NOCARRIER_PRESERVE_IP
+#  endif
+#endif
+
 #include "config.h"
 #include "dhcpcd.h"
 #include "ipv4.h"

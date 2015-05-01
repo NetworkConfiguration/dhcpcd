@@ -1986,6 +1986,8 @@ applyaddr:
 #ifdef IN_IFF_TENTATIVE
 		if (astate)
 			arp_free_but(astate);
+		else if (!ipv4ll)
+			arp_close(ifp);
 #else
 		if (state->added) {
 			if (astate == NULL) {

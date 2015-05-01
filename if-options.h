@@ -112,6 +112,10 @@
 #define DHCPCD_IPV6RA_ACCEPT_NOPUBLIC	(1ULL << 56)
 #define DHCPCD_BOOTP			(1ULL << 57)
 
+#define DHCPCD_WARNINGS (DHCPCD_CSR_WARNED | \
+		DHCPCD_ROUTER_HOST_ROUTE_WARNED)
+#define DHCPCD_CONF (DHCPCD_NOPFXDLG | DHCPCD_PFXDLGONLY)
+
 extern const struct option cf_options[];
 
 struct if_sla {

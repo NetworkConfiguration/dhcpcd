@@ -350,7 +350,7 @@ stop_interface(struct interface *ifp)
 }
 
 static void
-configure_interface1(struct interface *ifp)
+configure_interface1(struct interface *ifp, struct if_options *old)
 {
 	struct if_options *ifo = ifp->options;
 	int ra_global, ra_iface;
@@ -516,6 +516,16 @@ configure_interface1(struct interface *ifp)
 	/* If we are not sending an authentication option, don't require it */
 	if (!(ifo->auth.options & DHCPCD_AUTH_SEND))
 		ifo->auth.options &= ~DHCPCD_AUTH_REQUIRE;
+
+	/* If we ARPing something or options have changed,
+	 * drop leases and restart */
+	if (old) {
+		/* Remove warning options for a fair comparison */
+		old->options &= ~(DHCPCD_WARNINGS | DHCPCD_CONF);
+		if (ifo->arping_len || memcmp(ifo, old, sizeof(*old)))
+			dhcpcd_drop(ifp, 0);
+		free(old);
+	}
 }
 
 int
@@ -548,10 +558,17 @@ dhcpcd_selectprofile(struct interface *ifp, const char *profile)
 		    ifp->name, profile);
 	} else
 		*ifp->profile = '\0';
-	free_options(ifp->options);
-	ifp->options = ifo;
-	if (profile)
-		configure_interface1(ifp);
+
+	if (profile) {
+		struct if_options *old;
+
+		old = ifp->options;
+		ifp->options = ifo;
+		configure_interface1(ifp, old);
+	} else {
+		free_options(ifp->options);
+		ifp->options = ifo;
+	}
 	return 1;
 }
 
@@ -559,11 +576,13 @@ static void
 configure_interface(struct interface *ifp, int argc, char **argv,
     unsigned long long options)
 {
+	struct if_options *old;
 
+	old = ifp->options;
 	dhcpcd_selectprofile(ifp, NULL);
 	add_options(ifp->ctx, ifp->name, ifp->options, argc, argv);
 	ifp->options->options |= options;
-	configure_interface1(ifp);
+	configure_interface1(ifp, old);
 }
 
 static void
@@ -624,14 +643,18 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 	} else if (carrier == LINK_DOWN || (ifp->flags & IFF_UP) == 0) {
 		if (ifp->carrier != LINK_DOWN) {
 			if (ifp->carrier == LINK_UP)
-				logger(ctx, LOG_INFO, "%s: carrier lost", ifp->name);
+				logger(ctx, LOG_INFO, "%s: carrier lost",
+				    ifp->name);
 			ifp->carrier = LINK_DOWN;
 			script_runreason(ifp, "NOCARRIER");
+#ifndef NOCARRIER_PRESERVE_IP
 			dhcpcd_drop(ifp, 0);
+#endif
 		}
 	} else if (carrier == LINK_UP && ifp->flags & IFF_UP) {
 		if (ifp->carrier != LINK_UP) {
-			logger(ctx, LOG_INFO, "%s: carrier acquired", ifp->name);
+			logger(ctx, LOG_INFO, "%s: carrier acquired",
+			    ifp->name);
 			ifp->carrier = LINK_UP;
 #if !defined(__linux__) && !defined(__NetBSD__)
 			/* BSD does not emit RTM_NEWADDR or RTM_CHGADDR when the
@@ -639,8 +662,20 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 			 * through the disovery process to work it out. */
 			dhcpcd_handleinterface(ctx, 0, ifp->name);
 #endif
-			if (ifp->wireless)
+			if (ifp->wireless) {
+				size_t olen;
+				uint8_t ossid[IF_SSIDSIZE];
+
+				olen = ifp->ssid_len;
+				memcpy(ossid, ifp->ssid, ifp->ssid_len);
 				if_getssid(ifp);
+#ifdef NOCARRIER_PRESERVE_IP
+				/* If we changed SSID network, drop leases */
+				if (ifp->ssid_len != olen ||
+				    memcmp(ifp->ssid, ossid, ifp->ssid_len))
+					dhcpcd_drop(ifp, 0);
+#endif
+			}
 			dhcpcd_initstate(ifp, 0);
 			script_runreason(ifp, "CARRIER");
 			/* RFC4941 Section 3.5 */
