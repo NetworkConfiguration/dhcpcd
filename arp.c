@@ -285,19 +285,37 @@ arp_probe(struct arp_state *astate)
 	arp_probe1(astate);
 }
 
-struct arp_state *
-arp_new(struct interface *ifp) {
+static struct arp_state *
+arp_find(struct interface *ifp, const struct in_addr *addr)
+{
 	struct arp_state *astate;
 	struct dhcp_state *state;
 
-	astate = calloc(1, sizeof(*astate));
-	if (astate == NULL) {
+	state = D_STATE(ifp);
+	TAILQ_FOREACH(astate, &state->arp_states, next) {
+		if (astate->addr.s_addr == addr->s_addr && astate->iface == ifp)
+			return astate;
+	}
+	errno = ESRCH;
+	return NULL;
+}
+
+struct arp_state *
+arp_new(struct interface *ifp, const struct in_addr *addr)
+{
+	struct arp_state *astate;
+	struct dhcp_state *state;
+
+	if (addr && (astate = arp_find(ifp, addr)))
+		return astate;
+
+	if ((astate = calloc(1, sizeof(*astate))) == NULL) {
 		logger(ifp->ctx, LOG_ERR, "%s: %s: %m", ifp->name, __func__);
 		return NULL;
 	}
-
-	astate->iface = ifp;
 	state = D_STATE(ifp);
+	astate->iface = ifp;
+	astate->addr = *addr;
 	TAILQ_INSERT_TAIL(&state->arp_states, astate, next);
 	return astate;
 }

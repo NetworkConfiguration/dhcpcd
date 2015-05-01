@@ -69,7 +69,7 @@ TAILQ_HEAD(arp_statehead, arp_state);
 void arp_report_conflicted(const struct arp_state *, const struct arp_msg *);
 void arp_announce(struct arp_state *);
 void arp_probe(struct arp_state *);
-struct arp_state *arp_new(struct interface *);
+struct arp_state *arp_new(struct interface *, const struct in_addr *);
 void arp_cancel(struct arp_state *);
 void arp_free(struct arp_state *);
 void arp_free_but(struct arp_state *);

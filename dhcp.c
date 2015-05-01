@@ -1983,8 +1983,7 @@ applyaddr:
 	if (ifo->options & DHCPCD_ARP) {
 		if (state->added) {
 			if (astate == NULL) {
-				astate = arp_new(ifp);
-				astate->addr = state->addr;
+				astate = arp_new(ifp, &state->addr);
 				astate->announced_cb =
 				    dhcp_arp_announced;
 			}
@@ -2412,10 +2411,8 @@ dhcp_probe(struct interface *ifp)
 	const struct dhcp_state *state;
 	struct arp_state *astate;
 
-	astate = arp_new(ifp);
-	if (astate) {
-		state = D_CSTATE(ifp);
-		astate->addr = state->addr;
+	state = D_CSTATE(ifp);
+	if ((astate = arp_new(ifp, &state->addr))) {
 		astate->probed_cb = dhcp_arp_probed;
 		astate->conflicted_cb = dhcp_arp_conflicted;
 		astate->announced_cb = dhcp_arp_announced;
@@ -2731,9 +2728,8 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 		if (!ipv4_iffindaddr(ifp, &addr, NULL)) {
 			struct arp_state *astate;
 
-			astate = arp_new(ifp);
+			astate = arp_new(ifp, &addr);
 			if (astate) {
-				astate->addr = addr;
 				astate->probed_cb = dhcp_arp_probed;
 				astate->conflicted_cb = dhcp_arp_conflicted;
 				arp_probe(astate);
@@ -3143,7 +3139,7 @@ dhcp_start1(void *arg)
 	if (state->arping_index < ifo->arping_len) {
 		struct arp_state *astate;
 
-		astate = arp_new(ifp);
+		astate = arp_new(ifp, NULL);
 		if (astate) {
 			astate->probed_cb = dhcp_arp_probed;
 			astate->conflicted_cb = dhcp_arp_conflicted;

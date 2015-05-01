@@ -218,7 +218,7 @@ ipv4ll_start(void *arg)
 		initstate(seed, state->randomstate, sizeof(state->randomstate));
 	}
 
-	if ((astate = arp_new(ifp)) == NULL)
+	if ((astate = arp_new(ifp, NULL)) == NULL)
 		return;
 
 	state->arp_ipv4ll = astate;
