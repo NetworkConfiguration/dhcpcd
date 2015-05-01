@@ -2405,21 +2405,6 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 	}
 }
 
-void
-dhcp_probe(struct interface *ifp)
-{
-	const struct dhcp_state *state;
-	struct arp_state *astate;
-
-	state = D_CSTATE(ifp);
-	if ((astate = arp_new(ifp, &state->addr))) {
-		astate->probed_cb = dhcp_arp_probed;
-		astate->conflicted_cb = dhcp_arp_conflicted;
-		astate->announced_cb = dhcp_arp_announced;
-		arp_probe(astate);
-	}
-}
-
 static void
 dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
     const struct in_addr *from)
