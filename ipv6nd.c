@@ -322,6 +322,9 @@ ipv6nd_expire(struct interface *ifp, uint32_t seconds)
 	struct ra *rap;
 	struct timespec now;
 
+	if (ifp->ctx->ipv6 == NULL)
+		return;
+
 	get_monotonic(&now);
 
 	TAILQ_FOREACH(rap, ifp->ctx->ipv6->ra_routers, next) {
