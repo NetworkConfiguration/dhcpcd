@@ -66,7 +66,7 @@ const char dhcpcd_copyright[] = "Copyright (c) 2006-2015 Roy Marples";
 #include "script.h"
 
 #ifdef USE_SIGNALS
-const int dhcpcd_handlesigs[] = {
+const int dhcpcd_signals[] = {
 	SIGTERM,
 	SIGINT,
 	SIGALRM,
@@ -77,8 +77,15 @@ const int dhcpcd_handlesigs[] = {
 	0
 };
 
+#ifndef HAVE_KQUEUE
+struct dhcpcd_siginfo {
+	struct dhcpcd_ctx *ctx;
+	int sig;
+} dhcpcd_siginfo;
+
 /* Handling signals needs *some* context */
 static struct dhcpcd_ctx *dhcpcd_ctx;
+#endif
 #endif
 
 #if defined(USE_SIGNALS) || !defined(THERE_IS_NO_FORK)
@@ -1116,21 +1123,18 @@ stop_all_interfaces(struct dhcpcd_ctx *ctx, int do_release)
 }
 
 #ifdef USE_SIGNALS
-struct dhcpcd_siginfo dhcpcd_siginfo;
 #define sigmsg "received %s, %s"
-void
-dhcpcd_handle_signal(void *arg)
+static void
+handle_signal2(void *arg, int sig)
 {
-	struct dhcpcd_ctx *ctx;
-	struct dhcpcd_siginfo *si;
+	struct dhcpcd_ctx *ctx = arg;
 	struct interface *ifp;
-	int do_release, exit_code;;
+	int do_release, exit_code;
 
 	ctx = dhcpcd_ctx;
-	si = arg;
 	do_release = 0;
 	exit_code = EXIT_FAILURE;
-	switch (si->signo) {
+	switch (sig) {
 	case SIGINT:
 		logger(ctx, LOG_INFO, sigmsg, "SIGINT", "stopping");
 		break;
@@ -1169,7 +1173,7 @@ dhcpcd_handle_signal(void *arg)
 		logger(ctx, LOG_ERR,
 		    "received signal %d, "
 		    "but don't know what to do with it",
-		    si->signo);
+		    sig);
 		return;
 	}
 
@@ -1180,15 +1184,24 @@ dhcpcd_handle_signal(void *arg)
 
 #ifndef HAVE_KQUEUE
 static void
+handle_signal1(void *arg)
+{
+	struct dhcpcd_siginfo *si = arg;
+
+	handle_signal2(si->ctx, si->sig);
+}
+
+static void
 handle_signal(int sig, __unused siginfo_t *siginfo, __unused void *context)
 {
 
 	/* So that we can operate safely under a signal we instruct
 	 * eloop to pass a copy of the siginfo structure to handle_signal1
 	 * as the very first thing to do. */
-	dhcpcd_siginfo.signo = sig;
+	dhcpcd_siginfo.ctx = dhcpcd_ctx;
+	dhcpcd_siginfo.sig = sig;
 	eloop_timeout_add_now(dhcpcd_ctx->eloop,
-	    dhcpcd_handle_signal, &dhcpcd_siginfo);
+	    handle_signal1, &dhcpcd_siginfo);
 }
 #endif
 
@@ -1211,8 +1224,8 @@ signal_init(sigset_t *oldset)
 	sa.sa_flags = SA_SIGINFO;
 	sigemptyset(&sa.sa_mask);
 
-	for (i = 0; dhcpcd_handlesigs[i]; i++) {
-		if (sigaction(dhcpcd_handlesigs[i], &sa, NULL) == -1)
+	for (i = 0; dhcpcd_signals[i]; i++) {
+		if (sigaction(dhcpcd_signals[i], &sa, NULL) == -1)
 			return -1;
 	}
 #endif
@@ -1555,7 +1568,7 @@ main(int argc, char **argv)
 
 	/* Freeing allocated addresses from dumping leases can trigger
 	 * eloop removals as well, so init here. */
-	ctx.eloop = eloop_init(&ctx);
+	ctx.eloop = eloop_init(&ctx, handle_signal2, dhcpcd_signals);
 	if (ctx.eloop == NULL) {
 		logger(&ctx, LOG_ERR, "%s: eloop_init: %m", __func__);
 		goto exit_failure;
@@ -1843,7 +1856,7 @@ main(int argc, char **argv)
 		    dhcpcd_prestartinterface, ifp);
 	}
 
-	i = eloop_start(ctx.eloop);
+	i = eloop_start(ctx.eloop, &ctx.sigset);
 	goto exit1;
 
 exit_success:

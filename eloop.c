@@ -32,12 +32,18 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <unistd.h>
 
+/* config.h should define HAVE_KQUEUE, HAVE_EPOLL, etc */
 #include "config.h"
+#include "eloop.h"
+
+/* custom syslog wrapper for dhcpcd */
 #include "common.h"
 #include "dhcpcd.h"
-#include "eloop.h"
+#define syslog(PRIO, FMT, ...) \
+	logger((struct dhcpcd_ctx *)ctx->cb_ctx, PRIO, FMT, __VA_ARGS__)
 
 #if defined(HAVE_KQUEUE)
 #include <sys/event.h>
@@ -188,7 +194,7 @@ eloop_event_add(struct eloop_ctx *ctx, int fd,
 	return 0;
 
 err:
-	logger(ctx->ctx, LOG_ERR, "%s: %m", __func__);
+	syslog(LOG_ERR, "%s: %m", __func__);
 	if (e) {
 		ctx->events_len--;
 		TAILQ_INSERT_TAIL(&ctx->free_events, e, next);
@@ -285,7 +291,7 @@ eloop_q_timeout_add_tv(struct eloop_ctx *ctx, int queue,
 		} else {
 			t = malloc(sizeof(*t));
 			if (t == NULL) {
-				logger(ctx->ctx, LOG_ERR, "%s: %m", __func__);
+				syslog(LOG_ERR, "%s: %m", __func__);
 				return -1;
 			}
 		}
@@ -326,8 +332,7 @@ eloop_timeout_add_now(struct eloop_ctx *ctx,
 {
 
 	if (ctx->timeout0 != NULL) {
-		logger(ctx->ctx, LOG_WARNING,
-		    "%s: timeout0 already set", __func__);
+		syslog(LOG_WARNING, "%s: timeout0 already set", __func__);
 		return eloop_q_timeout_add_sec(ctx, 0, 0, callback, arg);
 	}
 
@@ -405,7 +410,7 @@ eloop_requeue(struct eloop_ctx *ctx)
 		return -1;
 #if defined (HAVE_KQUEUE)
 	i = 0;
-	while (dhcpcd_handlesigs[i])
+	while (ctx->signals[i] != 0)
 		i++;
 	TAILQ_FOREACH(e, &ctx->events, next) {
 		i++;
@@ -416,8 +421,8 @@ eloop_requeue(struct eloop_ctx *ctx)
 	if ((ke = malloc(sizeof(*ke) * i)) == NULL)
 		return -1;
 
-	for (i = 0; dhcpcd_handlesigs[i]; i++)
-		EV_SET(&ke[i], (uintptr_t)dhcpcd_handlesigs[i],
+	for (i = 0; ctx->signal[i] != 0; i++)
+		EV_SET(&ke[i], (uintptr_t)ctx->signals[i],
 		    EVFILT_SIGNAL, EV_ADD, 0, 0, UPTR(NULL));
 
 	TAILQ_FOREACH(e, &ctx->events, next) {
@@ -454,7 +459,7 @@ eloop_requeue(struct eloop_ctx *ctx)
 #endif
 
 struct eloop_ctx *
-eloop_init(struct dhcpcd_ctx *dctx)
+eloop_init(void *ectx, void (*signal_cb)(void *, int), const int *signals)
 {
 	struct eloop_ctx *ctx;
 	struct timespec now;
@@ -465,7 +470,8 @@ eloop_init(struct dhcpcd_ctx *dctx)
 
 	ctx = calloc(1, sizeof(*ctx));
 	if (ctx) {
-		ctx->ctx = dctx;
+		ctx->cb_ctx = ectx;
+		ctx->signal_cb = signal_cb;
 		TAILQ_INIT(&ctx->events);
 		TAILQ_INIT(&ctx->free_events);
 		TAILQ_INIT(&ctx->timeouts);
@@ -474,6 +480,7 @@ eloop_init(struct dhcpcd_ctx *dctx)
 #if defined(HAVE_KQUEUE) || defined(HAVE_EPOLL)
 		ctx->poll_fd = -1;
 #endif
+		ctx->signals = signals;
 		if (eloop_requeue(ctx) == -1) {
 			free(ctx);
 			return NULL;
@@ -516,7 +523,7 @@ void eloop_free(struct eloop_ctx *ctx)
 }
 
 int
-eloop_start(struct eloop_ctx *ctx)
+eloop_start(struct eloop_ctx *ctx, sigset_t *signals)
 {
 	int n;
 	struct eloop_event *e;
@@ -528,6 +535,7 @@ eloop_start(struct eloop_ctx *ctx)
 #endif
 #if defined(HAVE_KQUEUE)
 	struct kevent ke;
+	UNUSED(signals);
 #elif defined(HAVE_EPOLL)
 	struct epoll_event epe;
 #endif
@@ -544,7 +552,7 @@ eloop_start(struct eloop_ctx *ctx)
 			continue;
 		}
 		if ((t = TAILQ_FIRST(&ctx->timeouts))) {
-			get_monotonic(&now);
+			clock_gettime(CLOCK_MONOTONIC, &now);
 			if (timespeccmp(&now, &t->when, >)) {
 				TAILQ_REMOVE(&ctx->timeouts, t, next);
 				t->callback(t->arg);
@@ -558,7 +566,7 @@ eloop_start(struct eloop_ctx *ctx)
 			tsp = NULL;
 
 		if (tsp == NULL && ctx->events_len == 0) {
-			logger(ctx->ctx, LOG_ERR, "nothing to do");
+			syslog(LOG_ERR, "%s: nothing to do", __func__);
 			break;
 		}
 
@@ -578,15 +586,13 @@ eloop_start(struct eloop_ctx *ctx)
 		n = kevent(ctx->poll_fd, NULL, 0, &ke, 1, tsp);
 #elif defined(HAVE_EPOLL)
 #ifdef USE_SIGNALS
-		n = epoll_pwait(ctx->poll_fd, &epe, 1, timeout,
-		    &ctx->ctx->sigset);
+		n = epoll_pwait(ctx->poll_fd, &epe, 1, timeout, signals);
 #else
 		n = epoll_wait(ctx->poll_fd, &epe, 1, timeout);
 #endif
 #else
 #ifdef USE_SIGNALS
-		n = pollts(ctx->fds, (nfds_t)ctx->events_len, tsp,
-		    &ctx->ctx->sigset);
+		n = pollts(ctx->fds, (nfds_t)ctx->events_len, tsp, signals);
 #else
 		n = poll(ctx->fds, (nfds_t)ctx->events_len, timeout);
 #endif
@@ -594,7 +600,7 @@ eloop_start(struct eloop_ctx *ctx)
 		if (n == -1) {
 			if (errno == EINTR)
 				continue;
-			logger(ctx->ctx, LOG_ERR, "poll: %m");
+			syslog(LOG_ERR, "%s: poll: %m", __func__);
 			break;
 		}
 
@@ -604,10 +610,7 @@ eloop_start(struct eloop_ctx *ctx)
 #if defined(HAVE_KQUEUE)
 		if (n) {
 			if (ke.filter == EVFILT_SIGNAL) {
-				struct dhcpcd_siginfo si;
-
-				si.signo = (int)ke.ident;
-				dhcpcd_handle_signal(&si);
+				ctx->signal_cb(ctx->cb_ctx, (int)ke.ident);
 				continue;
 			}
 			e = (struct eloop_event *)ke.udata;

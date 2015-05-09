@@ -61,7 +61,7 @@ struct eloop_timeout {
 };
 
 struct eloop_ctx {
-	struct dhcpcd_ctx *ctx;
+	void *cb_ctx;
 
 	size_t events_len;
 	TAILQ_HEAD (event_head, eloop_event) events;
@@ -72,6 +72,8 @@ struct eloop_ctx {
 
 	void (*timeout0)(void *);
 	void *timeout0_arg;
+	const int *signals;
+	void (*signal_cb)(void *, int);
 
 #if defined(HAVE_KQUEUE) || defined(HAVE_EPOLL)
 	int poll_fd;
@@ -103,14 +105,14 @@ int eloop_q_timeout_add_tv(struct eloop_ctx *, int queue,
 int eloop_timeout_add_now(struct eloop_ctx *, void (*)(void *), void *);
 #endif
 void eloop_q_timeout_delete(struct eloop_ctx *, int, void (*)(void *), void *);
-struct eloop_ctx * eloop_init(struct dhcpcd_ctx *);
+struct eloop_ctx * eloop_init(void *, void (*)(void *, int), const int *);
 #if defined(HAVE_KQUEUE) || defined(HAVE_EPOLL)
 int eloop_requeue(struct eloop_ctx *);
 #else
-#define eloop_requeue(a) (0)
+#define eloop_requeue(a, b) (0)
 #endif
 void eloop_free(struct eloop_ctx *);
 void eloop_exit(struct eloop_ctx *, int);
-int eloop_start(struct eloop_ctx *);
+int eloop_start(struct eloop_ctx *, sigset_t *);
 
 #endif
