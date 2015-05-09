@@ -421,7 +421,7 @@ eloop_requeue(struct eloop_ctx *ctx)
 	if ((ke = malloc(sizeof(*ke) * i)) == NULL)
 		return -1;
 
-	for (i = 0; ctx->signal[i] != 0; i++)
+	for (i = 0; ctx->signals[i] != 0; i++)
 		EV_SET(&ke[i], (uintptr_t)ctx->signals[i],
 		    EVFILT_SIGNAL, EV_ADD, 0, 0, UPTR(NULL));
 

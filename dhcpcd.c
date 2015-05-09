@@ -1131,7 +1131,6 @@ handle_signal2(void *arg, int sig)
 	struct interface *ifp;
 	int do_release, exit_code;
 
-	ctx = dhcpcd_ctx;
 	do_release = 0;
 	exit_code = EXIT_FAILURE;
 	switch (sig) {
@@ -1389,7 +1388,9 @@ main(int argc, char **argv)
 
 	memset(&ctx, 0, sizeof(ctx));
 #ifdef USE_SIGNALS
+#ifndef HAVE_KQUEUE
 	dhcpcd_ctx = &ctx;
+#endif
 	sig = 0;
 	siga = NULL;
 #endif
