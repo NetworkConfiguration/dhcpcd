@@ -27,6 +27,7 @@
 
 #include <sys/time.h>
 
+#include <assert.h>
 #include <errno.h>
 #include <limits.h>
 #include <signal.h>
@@ -43,7 +44,7 @@
 #include "common.h"
 #include "dhcpcd.h"
 #define syslog(PRIO, FMT, ...) \
-	logger((struct dhcpcd_ctx *)ctx->cb_ctx, PRIO, FMT, __VA_ARGS__)
+	logger((struct dhcpcd_ctx *)ctx->signal_cb_ctx, PRIO, FMT, __VA_ARGS__)
 
 #if defined(HAVE_KQUEUE)
 #include <sys/event.h>
@@ -326,7 +327,7 @@ eloop_q_timeout_add_sec(struct eloop_ctx *ctx, int queue, time_t when,
 }
 
 #if !defined(HAVE_KQUEUE)
-int
+static int
 eloop_timeout_add_now(struct eloop_ctx *ctx,
     void (*callback)(void *), void *arg)
 {
@@ -458,8 +459,78 @@ eloop_requeue(struct eloop_ctx *ctx)
 }
 #endif
 
+int
+eloop_signal_set_cb(struct eloop_ctx *ctx,
+    const int *signals, void (*signal_cb)(int, void *), void *signal_cb_ctx)
+{
+
+	assert(ctx);
+	ctx->signals = signals;
+	ctx->signal_cb = signal_cb;
+	ctx->signal_cb_ctx = signal_cb_ctx;
+	return eloop_requeue(ctx);
+}
+
+#ifndef HAVE_KQUEUE
+struct eloop_siginfo {
+	int sig;
+	struct eloop_ctx *ctx;
+};
+static struct eloop_siginfo eloop_siginfo;
+static struct eloop_ctx *eloop_ctx;
+
+static void
+eloop_signal1(void *arg)
+{
+	struct eloop_siginfo *si = arg;
+
+	si->ctx->signal_cb(si->cig, si->ctx->signal_cb_arg);
+}
+
+static void
+eloop_signal3(int sig, __unused siginfo_t *siginfo, __unused void *arg)
+{
+
+	/* So that we can operate safely under a signal we instruct
+	 * eloop to pass a copy of the siginfo structure to handle_signal1
+	 * as the very first thing to do. */
+	eloop_siginfo.sig = sig;
+	eloop_siginfo.ctx = eloop_ctx;
+	eloop_timeout_add_now(eloop_ctx, eloop_signal1, &eloop_siginfo);
+}
+#endif
+
+int
+eloop_signal_mask(struct eloop_ctx *ctx, sigset_t *oldset)
+{
+	sigset_t newset;
+#ifndef HAVE_KQUEUE
+	int i;
+	struct sigaction sa;
+#endif
+
+	sigfillset(&newset);
+	if (sigprocmask(SIG_SETMASK, &newset, oldset) == -1)
+		return -1;
+
+#ifdef HAVE_KQUEUE
+	UNUSED(ctx);
+#else
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_sigaction = eloop_signal3;
+	sa.sa_flags = SA_SIGINFO;
+	sigemptyset(&sa.sa_mask);
+
+	for (i = 0; ctx->signals[i]; i++) {
+		if (sigaction(ctx->signals[i], &sa, NULL) == -1)
+			return -1;
+	}
+#endif
+	return 0;
+}
+
 struct eloop_ctx *
-eloop_init(void *ectx, void (*signal_cb)(void *, int), const int *signals)
+eloop_new(void)
 {
 	struct eloop_ctx *ctx;
 	struct timespec now;
@@ -470,8 +541,6 @@ eloop_init(void *ectx, void (*signal_cb)(void *, int), const int *signals)
 
 	ctx = calloc(1, sizeof(*ctx));
 	if (ctx) {
-		ctx->cb_ctx = ectx;
-		ctx->signal_cb = signal_cb;
 		TAILQ_INIT(&ctx->events);
 		TAILQ_INIT(&ctx->free_events);
 		TAILQ_INIT(&ctx->timeouts);
@@ -480,11 +549,6 @@ eloop_init(void *ectx, void (*signal_cb)(void *, int), const int *signals)
 #if defined(HAVE_KQUEUE) || defined(HAVE_EPOLL)
 		ctx->poll_fd = -1;
 #endif
-		ctx->signals = signals;
-		if (eloop_requeue(ctx) == -1) {
-			free(ctx);
-			return NULL;
-		}
 	}
 
 	return ctx;
@@ -610,7 +674,8 @@ eloop_start(struct eloop_ctx *ctx, sigset_t *signals)
 #if defined(HAVE_KQUEUE)
 		if (n) {
 			if (ke.filter == EVFILT_SIGNAL) {
-				ctx->signal_cb(ctx->cb_ctx, (int)ke.ident);
+				ctx->signal_cb((int)ke.ident,
+				    ctx->signal_cb_ctx);
 				continue;
 			}
 			e = (struct eloop_event *)ke.udata;

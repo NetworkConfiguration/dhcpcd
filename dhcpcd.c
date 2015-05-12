@@ -76,16 +76,6 @@ const int dhcpcd_signals[] = {
 	SIGPIPE,
 	0
 };
-
-#ifndef HAVE_KQUEUE
-struct dhcpcd_siginfo {
-	struct dhcpcd_ctx *ctx;
-	int sig;
-} dhcpcd_siginfo;
-
-/* Handling signals needs *some* context */
-static struct dhcpcd_ctx *dhcpcd_ctx;
-#endif
 #endif
 
 #if defined(USE_SIGNALS) || !defined(THERE_IS_NO_FORK)
@@ -1125,7 +1115,7 @@ stop_all_interfaces(struct dhcpcd_ctx *ctx, int do_release)
 #ifdef USE_SIGNALS
 #define sigmsg "received %s, %s"
 static void
-handle_signal2(void *arg, int sig)
+signal_cb(int sig, void *arg)
 {
 	struct dhcpcd_ctx *ctx = arg;
 	struct interface *ifp;
@@ -1179,56 +1169,6 @@ handle_signal2(void *arg, int sig)
 	if (!(ctx->options & DHCPCD_TEST))
 		stop_all_interfaces(ctx, do_release);
 	eloop_exit(ctx->eloop, exit_code);
-}
-
-#ifndef HAVE_KQUEUE
-static void
-handle_signal1(void *arg)
-{
-	struct dhcpcd_siginfo *si = arg;
-
-	handle_signal2(si->ctx, si->sig);
-}
-
-static void
-handle_signal(int sig, __unused siginfo_t *siginfo, __unused void *context)
-{
-
-	/* So that we can operate safely under a signal we instruct
-	 * eloop to pass a copy of the siginfo structure to handle_signal1
-	 * as the very first thing to do. */
-	dhcpcd_siginfo.ctx = dhcpcd_ctx;
-	dhcpcd_siginfo.sig = sig;
-	eloop_timeout_add_now(dhcpcd_ctx->eloop,
-	    handle_signal1, &dhcpcd_siginfo);
-}
-#endif
-
-static int
-signal_init(sigset_t *oldset)
-{
-	sigset_t newset;
-#ifndef HAVE_KQUEUE
-	int i;
-	struct sigaction sa;
-#endif
-
-	sigfillset(&newset);
-	if (sigprocmask(SIG_SETMASK, &newset, oldset) == -1)
-		return -1;
-
-#ifndef HAVE_KQUEUE
-	memset(&sa, 0, sizeof(sa));
-	sa.sa_sigaction = handle_signal;
-	sa.sa_flags = SA_SIGINFO;
-	sigemptyset(&sa.sa_mask);
-
-	for (i = 0; dhcpcd_signals[i]; i++) {
-		if (sigaction(dhcpcd_signals[i], &sa, NULL) == -1)
-			return -1;
-	}
-#endif
-	return 0;
 }
 #endif
 
@@ -1569,8 +1509,7 @@ main(int argc, char **argv)
 
 	/* Freeing allocated addresses from dumping leases can trigger
 	 * eloop removals as well, so init here. */
-	ctx.eloop = eloop_init(&ctx, handle_signal2, dhcpcd_signals);
-	if (ctx.eloop == NULL) {
+	if ((ctx.eloop = eloop_new()) == NULL) {
 		logger(&ctx, LOG_ERR, "%s: eloop_init: %m", __func__);
 		goto exit_failure;
 	}
@@ -1758,9 +1697,15 @@ main(int argc, char **argv)
 	logger(&ctx, LOG_DEBUG, PACKAGE "-" VERSION " starting");
 	ctx.options |= DHCPCD_STARTED;
 #ifdef USE_SIGNALS
+	if (eloop_signal_set_cb(ctx.eloop, dhcpcd_signals,
+	    signal_cb, &ctx) == -1)
+	{
+		logger(&ctx, LOG_ERR, "eloop_signal_mask: %m");
+		goto exit_failure;
+	}
 	/* Save signal mask, block and redirect signals to our handler */
-	if (signal_init(&ctx.sigset) == -1) {
-		logger(&ctx, LOG_ERR, "signal_setup: %m");
+	if (eloop_signal_mask(ctx.eloop, &ctx.sigset) == -1) {
+		logger(&ctx, LOG_ERR, "eloop_signal_mask: %m");
 		goto exit_failure;
 	}
 #endif

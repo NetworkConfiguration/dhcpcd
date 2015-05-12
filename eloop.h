@@ -61,8 +61,6 @@ struct eloop_timeout {
 };
 
 struct eloop_ctx {
-	void *cb_ctx;
-
 	size_t events_len;
 	TAILQ_HEAD (event_head, eloop_event) events;
 	struct event_head free_events;
@@ -73,7 +71,8 @@ struct eloop_ctx {
 	void (*timeout0)(void *);
 	void *timeout0_arg;
 	const int *signals;
-	void (*signal_cb)(void *, int);
+	void (*signal_cb)(int, void *);
+	void *signal_cb_ctx;
 
 #if defined(HAVE_KQUEUE) || defined(HAVE_EPOLL)
 	int poll_fd;
@@ -86,26 +85,29 @@ struct eloop_ctx {
 	int exitcode;
 };
 
+int eloop_event_add(struct eloop_ctx *, int,
+    void (*)(void *), void *,
+    void (*)(void *), void *);
+void eloop_event_delete(struct eloop_ctx *, int, int);
+
+
 #define eloop_timeout_add_tv(a, b, c, d) \
     eloop_q_timeout_add_tv(a, ELOOP_QUEUE, b, c, d)
 #define eloop_timeout_add_sec(a, b, c, d) \
     eloop_q_timeout_add_sec(a, ELOOP_QUEUE, b, c, d)
 #define eloop_timeout_delete(a, b, c) \
     eloop_q_timeout_delete(a, ELOOP_QUEUE, b, c)
-
-int eloop_event_add(struct eloop_ctx *, int,
-    void (*)(void *), void *,
-    void (*)(void *), void *);
-void eloop_event_delete(struct eloop_ctx *, int, int);
 int eloop_q_timeout_add_sec(struct eloop_ctx *, int queue,
     time_t, void (*)(void *), void *);
 int eloop_q_timeout_add_tv(struct eloop_ctx *, int queue,
     const struct timespec *, void (*)(void *), void *);
-#if !defined(HAVE_KQUEUE)
-int eloop_timeout_add_now(struct eloop_ctx *, void (*)(void *), void *);
-#endif
 void eloop_q_timeout_delete(struct eloop_ctx *, int, void (*)(void *), void *);
-struct eloop_ctx * eloop_init(void *, void (*)(void *, int), const int *);
+
+int eloop_signal_set_cb(struct eloop_ctx *, const int *,
+    void (*)(int, void *), void *);
+int eloop_signal_mask(struct eloop_ctx *ctx, sigset_t *oldset);
+
+struct eloop_ctx * eloop_new(void);
 #if defined(HAVE_KQUEUE) || defined(HAVE_EPOLL)
 int eloop_requeue(struct eloop_ctx *);
 #else
