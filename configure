@@ -424,7 +424,7 @@ if $XCC _test.c -o _test >/dev/null 2>&3; then
 fi
 rm -f _test.c _test
 if ! $_CC; then
-	echo "$CC does not create executables"
+	echo "$CC does not create executables" >&2
 	exit 1
 fi
 [ "$CC" != cc ] && echo "CC=	$CC" >>$CONFIG_MK
@@ -853,24 +853,6 @@ EOF
 	rm -f _epoll.c _epoll
 fi
 if [ -z "$POLL" ]; then
-	printf "Testing for ppoll ... "
-	cat <<EOF >_ppoll.c
-#include <poll.h>
-#include <stdlib.h>
-int main(void) {
-	ppoll(NULL, 0, NULL, NULL);
-	return 0;
-}
-EOF
-	if $XCC _ppoll.c -o _ppoll 2>&3; then
-		POLL=ppoll
- 		echo "yes"
- 	else
- 		echo "no"
- 	fi
-	rm -f _ppoll.c _ppoll
-fi
-if [ -z "$POLL" ]; then
 	printf "Testing for pselect ... "
 	cat <<EOF >_pselect.c
 #include <sys/select.h>
@@ -907,8 +889,8 @@ pselect)
 	echo "#include		\"compat/pollts.h\"" >>$CONFIG_H
 	;;
 *)
-	echo "COMPAT_SRCS+=	compat/pollts.c" >>$CONFIG_MK
-	echo "#include		\"compat/pollts.h\"" >>$CONFIG_H
+	echo "No suitable polling function is available, not even pselect" >&2
+	exit 1
 	;;
 esac
 

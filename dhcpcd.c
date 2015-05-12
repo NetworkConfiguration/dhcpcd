@@ -584,7 +584,7 @@ dhcpcd_pollup(void *arg)
 		struct timespec tv;
 
 		tv.tv_sec = 0;
-		tv.tv_nsec = IF_POLL_UP * MSEC_PER_NSEC;
+		tv.tv_nsec = IF_POLL_UP * NSEC_PER_MSEC;
 		eloop_timeout_add_tv(ifp->ctx->eloop, &tv, dhcpcd_pollup, ifp);
 		return;
 	}
@@ -751,7 +751,7 @@ dhcpcd_startinterface(void *arg)
 			 * Loop until both IFF_UP and IFF_RUNNING are set */
 			if ((carrier = if_carrier(ifp)) == LINK_UNKNOWN) {
 				tv.tv_sec = 0;
-				tv.tv_nsec = IF_POLL_UP * MSEC_PER_NSEC;
+				tv.tv_nsec = IF_POLL_UP * NSEC_PER_MSEC;
 				eloop_timeout_add_tv(ifp->ctx->eloop,
 				    &tv, dhcpcd_startinterface, ifp);
 			} else

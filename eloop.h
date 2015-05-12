@@ -33,7 +33,8 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #else
-/* Attempt to autodetect kqueue or epoll */
+/* Attempt to autodetect kqueue or epoll.
+ * If we can't, the system has to support pselect, which is a POSIX call. */
 #if (defined(__unix__) || defined(unix)) && !defined(USG)
 #include <sys/param.h>
 #endif
