@@ -92,6 +92,36 @@ eloop_event_setup_fds(struct eloop *eloop)
 		i++;
 	}
 }
+
+/* Wrapper around pselect, to imitate the NetBSD pollts call. */
+static int
+pollts(struct pollfd * fds, nfds_t nfds,
+    const struct timespec *ts, const sigset_t *sigmask)
+{
+	fd_set read_fds;
+	nfds_t n;
+	int maxfd, r;
+
+	FD_ZERO(&read_fds);
+	maxfd = 0;
+	for (n = 0; n < nfds; n++) {
+		if (fds[n].events & POLLIN) {
+			FD_SET(fds[n].fd, &read_fds);
+			if (fds[n].fd > maxfd)
+				maxfd = fds[n].fd;
+		}
+	}
+
+	r = pselect(maxfd + 1, &read_fds, NULL, NULL, ts, sigmask);
+	if (r > 0) {
+		for (n = 0; n < nfds; n++) {
+			fds[n].revents =
+			    FD_ISSET(fds[n].fd, &read_fds) ? POLLIN : 0;
+		}
+	}
+
+	return r;
+}
 #endif
 
 int
