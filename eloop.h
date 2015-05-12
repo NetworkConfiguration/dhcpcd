@@ -47,19 +47,60 @@
 #endif
 #endif
 
+/* Our structures require TAILQ macros, which really every libc should
+ * ship as they are useful beyond belief.
+ * Sadly some libc's don't have sys/queue.h and some that do don't have
+ * the TAILQ_FOREACH macro. For those that don't, the application using
+ * this implementation will need to ship a working queue.h somewhere.
+ * If we don't have sys/queue.h found in config.h, then
+ * allow QUEUE_H to override loading queue.h in the current directory. */
+#ifndef TAILQ_FOREACH
 #ifdef HAVE_SYS_QUEUE_H
 #include <sys/queue.h>
+#elif defined(QUEUE_H)
+#define __QUEUE_HEADER(x) #x
+#define _QUEUE_HEADER(x) __QUEUE_HEADER(x)
+#include _QUEUE_HEADER(QUEUE_H)
 #else
 #include "queue.h"
 #endif
+#endif
 
+/* Some systems don't define timespec macros */
+#ifndef timespecclear
+#define timespecclear(tsp)      (tsp)->tv_sec = (time_t)((tsp)->tv_nsec = 0L)
+#define timespecisset(tsp)      ((tsp)->tv_sec || (tsp)->tv_nsec)
+#define timespeccmp(tsp, usp, cmp)                                      \
+        (((tsp)->tv_sec == (usp)->tv_sec) ?                             \
+            ((tsp)->tv_nsec cmp (usp)->tv_nsec) :                       \
+            ((tsp)->tv_sec cmp (usp)->tv_sec))
+#define timespecadd(tsp, usp, vsp)                                      \
+        do {                                                            \
+                (vsp)->tv_sec = (tsp)->tv_sec + (usp)->tv_sec;          \
+                (vsp)->tv_nsec = (tsp)->tv_nsec + (usp)->tv_nsec;       \
+                if ((vsp)->tv_nsec >= 1000000000L) {                    \
+                        (vsp)->tv_sec++;                                \
+                        (vsp)->tv_nsec -= 1000000000L;                  \
+                }                                                       \
+        } while (/* CONSTCOND */ 0)
+#define timespecsub(tsp, usp, vsp)                                      \
+        do {                                                            \
+                (vsp)->tv_sec = (tsp)->tv_sec - (usp)->tv_sec;          \
+                (vsp)->tv_nsec = (tsp)->tv_nsec - (usp)->tv_nsec;       \
+                if ((vsp)->tv_nsec < 0) {                               \
+                        (vsp)->tv_sec--;                                \
+                        (vsp)->tv_nsec += 1000000000L;                  \
+                }                                                       \
+        } while (/* CONSTCOND */ 0)
+#endif
+
+/* eloop queues are really only for deleting timeouts registered
+ * for a function or object.
+ * The idea being that one interface as different timeouts for
+ * say DHCP and DHCPv6. */
 #ifndef ELOOP_QUEUE
   #define ELOOP_QUEUE 1
 #endif
-
-/* EXIT_FAILURE is a non zero value and EXIT_SUCCESS is zero.
- * To add a CONTINUE definition, simply do the opposite of EXIT_FAILURE. */
-#define ELOOP_CONTINUE	-EXIT_FAILURE
 
 struct eloop_event {
 	TAILQ_ENTRY(eloop_event) next;

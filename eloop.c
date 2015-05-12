@@ -42,11 +42,16 @@
 #ifndef UNUSED
 #define UNUSED(a) (void)((a))
 #endif
+#ifndef __unused
+#ifdef __GNUC__
+#define __unused   __attribute__((__unused__))
+#else
+#define __unused
+#endif
+#endif
 
 #ifndef MSEC_PER_SEC
 #define MSEC_PER_SEC	1000L
-#endif
-#ifndef NSEC_PER_MSEC
 #define NSEC_PER_MSEC	1000000L
 #endif
 

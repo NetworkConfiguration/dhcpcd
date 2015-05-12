@@ -1327,13 +1327,6 @@ main(int argc, char **argv)
 	}
 
 	memset(&ctx, 0, sizeof(ctx));
-#ifdef USE_SIGNALS
-#ifndef HAVE_KQUEUE
-	dhcpcd_ctx = &ctx;
-#endif
-	sig = 0;
-	siga = NULL;
-#endif
 	closefrom(3);
 
 	ctx.log_fd = -1;
