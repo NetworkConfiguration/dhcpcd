@@ -268,7 +268,7 @@ eloop_q_timeout_add_tv(struct eloop_ctx *ctx, int queue,
 	struct timespec now, w;
 	struct eloop_timeout *t, *tt = NULL;
 
-	get_monotonic(&now);
+	clock_gettime(CLOCK_MONOTONIC, &now);
 	timespecadd(&now, when, &w);
 	/* Check for time_t overflow. */
 	if (timespeccmp(&w, &now, <)) {
@@ -465,7 +465,7 @@ eloop_init(void *ectx, void (*signal_cb)(void *, int), const int *signals)
 	struct timespec now;
 
 	/* Check we have a working monotonic clock. */
-	if (get_monotonic(&now) == -1)
+	if (clock_gettime(CLOCK_MONOTONIC, &now) == -1)
 		return NULL;
 
 	ctx = calloc(1, sizeof(*ctx));

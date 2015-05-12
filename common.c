@@ -25,11 +25,6 @@
  * SUCH DAMAGE.
  */
 
-#ifdef __APPLE__
-#  include <mach/mach_time.h>
-#  include <mach/kern_return.h>
-#endif
-
 #include <sys/param.h>
 #include <sys/time.h>
 
@@ -79,64 +74,6 @@ get_hostname(char *buf, size_t buflen, int short_hostname)
 	}
 
 	return buf;
-}
-
-/* Handy function to get the time.
- * We only care about time advancements, not the actual time itself
- * Which is why we use CLOCK_MONOTONIC, but it is not available on all
- * platforms.
- */
-#define NO_MONOTONIC "host does not support a monotonic clock - timing can skew"
-int
-get_monotonic(struct timespec *ts)
-{
-
-#if defined(_POSIX_MONOTONIC_CLOCK) && defined(CLOCK_MONOTONIC)
-	return clock_gettime(CLOCK_MONOTONIC, ts);
-#elif defined(__APPLE__)
-	/* We can use mach kernel functions here.
-	 * This is crap though - why can't they implement clock_gettime?*/
-	static struct mach_timebase_info info = { 0, 0 };
-	static double factor = 0.0;
-	uint64_t nano;
-	long rem;
-
-	if (!posix_clock_set) {
-		if (mach_timebase_info(&info) == KERN_SUCCESS) {
-			factor = (double)info.numer / (double)info.denom;
-			clock_monotonic = posix_clock_set = 1;
-		}
-	}
-	if (clock_monotonic) {
-		nano = mach_absolute_time();
-		if ((info.denom != 1 || info.numer != 1) && factor != 0.0)
-			nano *= factor;
-		ts->tv_sec = nano / NSEC_PER_SEC;
-		ts->tv_nsec = nano % NSEC_PER_SEC;
-		if (ts->tv_nsec < 0) {
-			ts->tv_sec--;
-			ts->tv_nsec += NSEC_PER_SEC;
-		}
-		return 0;
-	}
-#endif
-
-#if 0
-	/* Something above failed, so fall back to gettimeofday */
-	if (!posix_clock_set) {
-		logger(NULL, LOG_WARNING, NO_MONOTONIC);
-		posix_clock_set = 1;
-	}
-#endif
-	{
-		struct timeval tv;
-		if (gettimeofday(&tv, NULL) == 0) {
-			TIMEVAL_TO_TIMESPEC(&tv, ts);
-			return 0;
-		}
-	}
-
-	return -1;
 }
 
 #if USE_LOGFILE
@@ -301,7 +238,7 @@ uptime(void)
 {
 	struct timespec tv;
 
-	if (get_monotonic(&tv) == -1)
+	if (clock_gettime(CLOCK_MONOTONIC, &tv) == -1)
 		return -1;
 	return tv.tv_sec;
 }

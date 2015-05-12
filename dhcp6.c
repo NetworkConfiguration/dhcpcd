@@ -2106,7 +2106,7 @@ dhcp6_validatelease(struct interface *ifp,
 	state->renew = state->rebind = state->expire = 0;
 	state->lowpl = ND6_INFINITE_LIFETIME;
 	if (!acquired) {
-		get_monotonic(&aq);
+		clock_gettime(CLOCK_MONOTONIC, &aq);
 		acquired = &aq;
 	}
 	nia = dhcp6_findia(ifp, m, len, sfrom, acquired);
@@ -2181,7 +2181,7 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	if ((now = time(NULL)) == -1)
 		goto ex;
 
-	get_monotonic(&acquired);
+	clock_gettime(CLOCK_MONOTONIC, &acquired);
 	acquired.tv_sec -= now - st.st_mtime;
 
 	/* Check to see if the lease is still valid */

@@ -325,7 +325,7 @@ ipv6nd_expire(struct interface *ifp, uint32_t seconds)
 	if (ifp->ctx->ipv6 == NULL)
 		return;
 
-	get_monotonic(&now);
+	clock_gettime(CLOCK_MONOTONIC, &now);
 
 	TAILQ_FOREACH(rap, ifp->ctx->ipv6->ra_routers, next) {
 		if (rap->iface == ifp) {
@@ -846,7 +846,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 		rap->data_len = len;
 	}
 
-	get_monotonic(&rap->received);
+	clock_gettime(CLOCK_MONOTONIC, &rap->received);
 	rap->flags = nd_ra->nd_ra_flags_reserved;
 	if (new_rap == 0 && rap->lifetime == 0)
 		logger(ifp->ctx, LOG_WARNING, "%s: %s router available",
@@ -1429,7 +1429,7 @@ ipv6nd_expirera(void *arg)
 	uint8_t expired, valid, validone;
 
 	ifp = arg;
-	get_monotonic(&now);
+	clock_gettime(CLOCK_MONOTONIC, &now);
 	expired = 0;
 	timespecclear(&next);
 

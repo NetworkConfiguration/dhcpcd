@@ -685,7 +685,7 @@ ipv6_addaddr(struct ipv6_addr *ap, const struct timespec *now)
 		struct timespec n;
 
 		if (now == NULL) {
-			get_monotonic(&n);
+			clock_gettime(CLOCK_MONOTONIC, &n);
 			now = &n;
 		}
 		timespecsub(now, &ap->acquired, &n);
@@ -838,7 +838,7 @@ ipv6_addaddrs(struct ipv6_addrhead *addrs)
 			if (ap->flags & IPV6_AF_NEW)
 				i++;
 			if (!timespecisset(&now))
-				get_monotonic(&now);
+				clock_gettime(CLOCK_MONOTONIC, &now);
 			ipv6_addaddr(ap, &now);
 		}
 	}
@@ -884,7 +884,7 @@ ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
 			    DHCPCD_EXITING) && apf)
 			{
 				if (!timespecisset(&now))
-					get_monotonic(&now);
+					clock_gettime(CLOCK_MONOTONIC, &now);
 				ipv6_addaddr(apf, &now);
 			}
 			if (drop == 2)
@@ -1475,7 +1475,7 @@ ipv6_tempdadcallback(void *arg)
 			    ia->iface->name);
 			return;
 		}
-		get_monotonic(&tv);
+		clock_gettime(CLOCK_MONOTONIC, &tv);
 		if ((ia1 = ipv6_createtempaddr(ia, &tv)) == NULL)
 			logger(ia->iface->ctx, LOG_ERR,
 			    "ipv6_createtempaddr: %m");
@@ -1701,7 +1701,7 @@ ipv6_regentempaddr(void *arg)
 
 	logger(ia->iface->ctx, LOG_DEBUG, "%s: regen temp addr %s",
 	    ia->iface->name, ia->saddr);
-	get_monotonic(&tv);
+	clock_gettime(CLOCK_MONOTONIC, &tv);
 	ia1 = ipv6_createtempaddr(ia, &tv);
 	if (ia1)
 		ipv6_addaddr(ia1, &tv);
