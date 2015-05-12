@@ -93,6 +93,7 @@ eloop_event_setup_fds(struct eloop *eloop)
 	}
 }
 
+#ifndef pollts
 /* Wrapper around pselect, to imitate the NetBSD pollts call. */
 static int
 pollts(struct pollfd * fds, nfds_t nfds,
@@ -122,6 +123,7 @@ pollts(struct pollfd * fds, nfds_t nfds,
 
 	return r;
 }
+#endif
 #endif
 
 int
