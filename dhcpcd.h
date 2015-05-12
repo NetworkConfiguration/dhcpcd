@@ -105,7 +105,7 @@ struct dhcpcd_ctx {
 #ifdef USE_SIGNALS
 	sigset_t sigset;
 #endif
-	struct eloop_ctx *eloop;
+	struct eloop *eloop;
 
 	int control_fd;
 	int control_unpriv_fd;

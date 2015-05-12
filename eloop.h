@@ -60,7 +60,7 @@ struct eloop_timeout {
 	int queue;
 };
 
-struct eloop_ctx {
+struct eloop {
 	size_t events_len;
 	TAILQ_HEAD (event_head, eloop_event) events;
 	struct event_head free_events;
@@ -85,11 +85,10 @@ struct eloop_ctx {
 	int exitcode;
 };
 
-int eloop_event_add(struct eloop_ctx *, int,
+int eloop_event_add(struct eloop *, int,
     void (*)(void *), void *,
     void (*)(void *), void *);
-void eloop_event_delete(struct eloop_ctx *, int, int);
-
+void eloop_event_delete(struct eloop *, int, int);
 
 #define eloop_timeout_add_tv(a, b, c, d) \
     eloop_q_timeout_add_tv(a, ELOOP_QUEUE, b, c, d)
@@ -97,24 +96,24 @@ void eloop_event_delete(struct eloop_ctx *, int, int);
     eloop_q_timeout_add_sec(a, ELOOP_QUEUE, b, c, d)
 #define eloop_timeout_delete(a, b, c) \
     eloop_q_timeout_delete(a, ELOOP_QUEUE, b, c)
-int eloop_q_timeout_add_sec(struct eloop_ctx *, int queue,
+int eloop_q_timeout_add_sec(struct eloop *, int queue,
     time_t, void (*)(void *), void *);
-int eloop_q_timeout_add_tv(struct eloop_ctx *, int queue,
+int eloop_q_timeout_add_tv(struct eloop *, int queue,
     const struct timespec *, void (*)(void *), void *);
-void eloop_q_timeout_delete(struct eloop_ctx *, int, void (*)(void *), void *);
+void eloop_q_timeout_delete(struct eloop *, int, void (*)(void *), void *);
 
-int eloop_signal_set_cb(struct eloop_ctx *, const int *,
+int eloop_signal_set_cb(struct eloop *, const int *,
     void (*)(int, void *), void *);
-int eloop_signal_mask(struct eloop_ctx *ctx, sigset_t *oldset);
+int eloop_signal_mask(struct eloop *, sigset_t *oldset);
 
-struct eloop_ctx * eloop_new(void);
+struct eloop * eloop_new(void);
 #if defined(HAVE_KQUEUE) || defined(HAVE_EPOLL)
-int eloop_requeue(struct eloop_ctx *);
+int eloop_requeue(struct eloop *);
 #else
 #define eloop_requeue(a, b) (0)
 #endif
-void eloop_free(struct eloop_ctx *);
-void eloop_exit(struct eloop_ctx *, int);
-int eloop_start(struct eloop_ctx *, sigset_t *);
+void eloop_free(struct eloop *);
+void eloop_exit(struct eloop *, int);
+int eloop_start(struct eloop *, sigset_t *);
 
 #endif
