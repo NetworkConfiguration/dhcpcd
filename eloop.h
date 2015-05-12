@@ -30,7 +30,28 @@
 
 #include <time.h>
 
+#ifdef HAVE_CONFIG_H
 #include "config.h"
+#else
+/* Attempt to autodetect kqueue or epoll */
+#if (defined(__unix__) || defined(unix)) && !defined(USG)
+#include <sys/param.h>
+#endif
+#if defined(BSD)
+/* Assume BSD has a working sys/queue.h and kqueue(2) interface */
+#define HAVE_SYS_QUEUE_H
+#define HAVE_KQUEUE
+#elif defined(__linux__)
+/* Assume Linux has a working epoll(3) interface */
+#define HAVE_EPOLL
+#endif
+#endif
+
+#ifdef HAVE_SYS_QUEUE_H
+#include <sys/queue.h>
+#else
+#include "queue.h"
+#endif
 
 #ifndef ELOOP_QUEUE
   #define ELOOP_QUEUE 1
@@ -90,16 +111,20 @@ int eloop_event_add(struct eloop *, int,
     void (*)(void *), void *);
 void eloop_event_delete(struct eloop *, int, int);
 
-#define eloop_timeout_add_tv(a, b, c, d) \
-    eloop_q_timeout_add_tv(a, ELOOP_QUEUE, b, c, d)
-#define eloop_timeout_add_sec(a, b, c, d) \
-    eloop_q_timeout_add_sec(a, ELOOP_QUEUE, b, c, d)
-#define eloop_timeout_delete(a, b, c) \
-    eloop_q_timeout_delete(a, ELOOP_QUEUE, b, c)
-int eloop_q_timeout_add_sec(struct eloop *, int queue,
-    time_t, void (*)(void *), void *);
+#define eloop_timeout_add_tv(eloop, tv, cb, ctx) \
+    eloop_q_timeout_add_tv((eloop), ELOOP_QUEUE, (tv), (cb), (ctx))
+#define eloop_timeout_add_sec(eloop, tv, cb, ctx) \
+    eloop_q_timeout_add_sec((eloop), ELOOP_QUEUE, (tv), (cb), (ctx))
+#define eloop_timeout_add_msec(eloop, ms, cb, ctx) \
+    eloop_q_timeout_add_msec((eloop), ELOOP_QUEUE, (ms), (cb), (ctx))
+#define eloop_timeout_delete(eloop, cb, ctx) \
+    eloop_q_timeout_delete((eloop), ELOOP_QUEUE, (cb), (ctx))
 int eloop_q_timeout_add_tv(struct eloop *, int queue,
     const struct timespec *, void (*)(void *), void *);
+int eloop_q_timeout_add_sec(struct eloop *, int queue,
+    time_t, void (*)(void *), void *);
+int eloop_q_timeout_add_msec(struct eloop *, int queue,
+    long, void (*)(void *), void *);
 void eloop_q_timeout_delete(struct eloop *, int, void (*)(void *), void *);
 
 int eloop_signal_set_cb(struct eloop *, const int *,
@@ -110,7 +135,7 @@ struct eloop * eloop_new(void);
 #if defined(HAVE_KQUEUE) || defined(HAVE_EPOLL)
 int eloop_requeue(struct eloop *);
 #else
-#define eloop_requeue(a, b) (0)
+#define eloop_requeue(eloop) (0)
 #endif
 void eloop_free(struct eloop *);
 void eloop_exit(struct eloop *, int);

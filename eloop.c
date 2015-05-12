@@ -33,18 +33,22 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
 #include <unistd.h>
 
 /* config.h should define HAVE_KQUEUE, HAVE_EPOLL, etc */
 #include "config.h"
 #include "eloop.h"
 
-/* custom syslog wrapper for dhcpcd */
-#include "common.h"
-#include "dhcpcd.h"
-#define syslog(PRIO, FMT, ...) \
-	logger((struct dhcpcd_ctx *)eloop->signal_cb_ctx, PRIO, FMT, __VA_ARGS__)
+#ifndef UNUSED
+#define UNUSED(a) (void)((a))
+#endif
+
+#ifndef MSEC_PER_SEC
+#define MSEC_PER_SEC	1000L
+#endif
+#ifndef NSEC_PER_MSEC
+#define NSEC_PER_MSEC	1000000L
+#endif
 
 #if defined(HAVE_KQUEUE)
 #include <sys/event.h>
@@ -138,7 +142,7 @@ eloop_event_add(struct eloop *eloop, int fd,
 				e->write_cb = write_cb;
 				e->write_cb_arg = write_cb_arg;
 			}
-			eloop_event_setup_fds(eloop)
+			eloop_event_setup_fds(eloop);
 			return error;
 		}
 	}
@@ -196,7 +200,6 @@ eloop_event_add(struct eloop *eloop, int fd,
 	return 0;
 
 err:
-	syslog(LOG_ERR, "%s: %m", __func__);
 	if (e) {
 		eloop->events_len--;
 		TAILQ_INSERT_TAIL(&eloop->free_events, e, next);
@@ -291,11 +294,8 @@ eloop_q_timeout_add_tv(struct eloop *eloop, int queue,
 		if ((t = TAILQ_FIRST(&eloop->free_timeouts))) {
 			TAILQ_REMOVE(&eloop->free_timeouts, t, next);
 		} else {
-			t = malloc(sizeof(*t));
-			if (t == NULL) {
-				syslog(LOG_ERR, "%s: %m", __func__);
+			if ((t = malloc(sizeof(*t))) == NULL)
 				return -1;
-			}
 		}
 	}
 
@@ -327,19 +327,26 @@ eloop_q_timeout_add_sec(struct eloop *eloop, int queue, time_t when,
 	return eloop_q_timeout_add_tv(eloop, queue, &tv, callback, arg);
 }
 
+int
+eloop_q_timeout_add_msec(struct eloop *eloop, int queue, long when,
+    void (*callback)(void *), void *arg)
+{
+	struct timespec tv;
+
+	tv.tv_sec = when / MSEC_PER_SEC;
+	tv.tv_nsec = (when % MSEC_PER_SEC) * NSEC_PER_MSEC;
+	return eloop_q_timeout_add_tv(eloop, queue, &tv, callback, arg);
+}
+
 #if !defined(HAVE_KQUEUE)
 static int
 eloop_timeout_add_now(struct eloop *eloop,
     void (*callback)(void *), void *arg)
 {
 
-	if (ctx->timeout0 != NULL) {
-		syslog(LOG_WARNING, "%s: timeout0 already set", __func__);
-		return eloop_q_timeout_add_sec(eloop, 0, 0, callback, arg);
-	}
-
-	ctx->timeout0 = callback;
-	ctx->timeout0_arg = arg;
+	assert(eloop->timeout0 == NULL);
+	eloop->timeout0 = callback;
+	eloop->timeout0_arg = arg;
 	return 0;
 }
 #endif
@@ -477,15 +484,15 @@ struct eloop_siginfo {
 	int sig;
 	struct eloop *eloop;
 };
-static struct eloop_siginfo eloop_siginfo;
-static struct eloop *eloop;
+static struct eloop_siginfo _eloop_siginfo;
+static struct eloop *_eloop;
 
 static void
 eloop_signal1(void *arg)
 {
 	struct eloop_siginfo *si = arg;
 
-	si->eloop->signal_cb(si->sig, si->eloop->signal_cb_arg);
+	si->eloop->signal_cb(si->sig, si->eloop->signal_cb_ctx);
 }
 
 static void
@@ -495,9 +502,10 @@ eloop_signal3(int sig, __unused siginfo_t *siginfo, __unused void *arg)
 	/* So that we can operate safely under a signal we instruct
 	 * eloop to pass a copy of the siginfo structure to handle_signal1
 	 * as the very first thing to do. */
-	eloop_siginfo.sig = sig;
-	eloop_siginfo.eloop = eloop;
-	eloop_timeout_add_now(eloop, eloop_signal1, &eloop_siginfo);
+	_eloop_siginfo.eloop = _eloop;
+	_eloop_siginfo.sig = sig;
+	eloop_timeout_add_now(_eloop_siginfo.eloop,
+	    eloop_signal1, &_eloop_siginfo);
 }
 #endif
 
@@ -595,14 +603,16 @@ eloop_start(struct eloop *eloop, sigset_t *signals)
 	struct eloop_timeout *t;
 	struct timespec now, ts, *tsp;
 	void (*t0)(void *);
-#if defined(HAVE_EPOLL) || !defined(USE_SIGNALS)
-	int timeout;
-#endif
 #if defined(HAVE_KQUEUE)
 	struct kevent ke;
 	UNUSED(signals);
 #elif defined(HAVE_EPOLL)
 	struct epoll_event epe;
+#endif
+#ifndef HAVE_KQUEUE
+	int timeout;
+
+	_eloop = eloop;
 #endif
 
 	for (;;) {
@@ -630,12 +640,10 @@ eloop_start(struct eloop *eloop, sigset_t *signals)
 			/* No timeouts, so wait forever */
 			tsp = NULL;
 
-		if (tsp == NULL && eloop->events_len == 0) {
-			syslog(LOG_WARNING, "%s: nothing to do", __func__);
+		if (tsp == NULL && eloop->events_len == 0)
 			break;
-		}
 
-#if defined(HAVE_EPOLL) || !defined(USE_SIGNALS)
+#ifndef HAVE_KQUEUE
 		if (tsp == NULL)
 			timeout = -1;
 		else if (tsp->tv_sec > INT_MAX / 1000 ||
@@ -650,23 +658,23 @@ eloop_start(struct eloop *eloop, sigset_t *signals)
 #if defined(HAVE_KQUEUE)
 		n = kevent(eloop->poll_fd, NULL, 0, &ke, 1, tsp);
 #elif defined(HAVE_EPOLL)
-#ifdef USE_SIGNALS
-		n = epoll_pwait(eloop->poll_fd, &epe, 1, timeout, signals);
+		if (signals)
+			n = epoll_pwait(eloop->poll_fd, &epe, 1,
+			    timeout, signals);
+		else
+			n = epoll_wait(eloop->poll_fd, &epe, 1, timeout);
 #else
-		n = epoll_wait(eloop->poll_fd, &epe, 1, timeout);
-#endif
-#else
-#ifdef USE_SIGNALS
-		n = pollts(eloop->fds, (nfds_t)eloop->events_len, tsp, signals);
-#else
-		n = poll(eloop->fds, (nfds_t)eloop->events_len, timeout);
-#endif
+		if (signals)
+			n = pollts(eloop->fds, (nfds_t)eloop->events_len,
+			    tsp, signals);
+		else
+			n = poll(eloop->fds, (nfds_t)eloop->events_len,
+			    timeout);
 #endif
 		if (n == -1) {
 			if (errno == EINTR)
 				continue;
-			syslog(LOG_ERR, "%s: poll: %m", __func__);
-			break;
+			return -errno;
 		}
 
 		/* Process any triggered events.

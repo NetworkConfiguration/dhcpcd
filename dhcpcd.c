@@ -1803,6 +1803,10 @@ main(int argc, char **argv)
 	}
 
 	i = eloop_start(ctx.eloop, &ctx.sigset);
+	if (i < 0) {
+		syslog(LOG_ERR, "eloop_start: %m");
+		goto exit_failure;
+	}
 	goto exit1;
 
 exit_success:
