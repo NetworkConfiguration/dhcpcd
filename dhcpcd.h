@@ -153,6 +153,7 @@ struct dhcpcd_ctx {
 
 #ifdef USE_SIGNALS
 extern const int dhcpcd_signals[];
+extern const size_t dhcpcd_signals_len;
 #endif
 
 int dhcpcd_oneup(struct dhcpcd_ctx *);

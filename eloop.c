@@ -455,9 +455,7 @@ eloop_requeue(struct eloop *eloop)
 	if (eloop_open(eloop) == -1)
 		return -1;
 #if defined (HAVE_KQUEUE)
-	i = 0;
-	while (eloop->signals[i] != 0)
-		i++;
+	i = eloop->signals_len;
 	TAILQ_FOREACH(e, &eloop->events, next) {
 		i++;
 		if (e->write_cb)
@@ -467,7 +465,7 @@ eloop_requeue(struct eloop *eloop)
 	if ((ke = malloc(sizeof(*ke) * i)) == NULL)
 		return -1;
 
-	for (i = 0; eloop->signals[i] != 0; i++)
+	for (i = 0; i < eloop->signals_len; i++)
 		EV_SET(&ke[i], (uintptr_t)eloop->signals[i],
 		    EVFILT_SIGNAL, EV_ADD, 0, 0, UPTR(NULL));
 
@@ -506,11 +504,13 @@ eloop_requeue(struct eloop *eloop)
 
 int
 eloop_signal_set_cb(struct eloop *eloop,
-    const int *signals, void (*signal_cb)(int, void *), void *signal_cb_ctx)
+    const int *signals, size_t signals_len,
+    void (*signal_cb)(int, void *), void *signal_cb_ctx)
 {
 
 	assert(eloop);
 	eloop->signals = signals;
+	eloop->signals_len = signals_len;
 	eloop->signal_cb = signal_cb;
 	eloop->signal_cb_ctx = signal_cb_ctx;
 	return eloop_requeue(eloop);
@@ -551,7 +551,7 @@ eloop_signal_mask(struct eloop *eloop, sigset_t *oldset)
 {
 	sigset_t newset;
 #ifndef HAVE_KQUEUE
-	int i;
+	size_t i;
 	struct sigaction sa;
 #endif
 
@@ -567,7 +567,7 @@ eloop_signal_mask(struct eloop *eloop, sigset_t *oldset)
 	sa.sa_flags = SA_SIGINFO;
 	sigemptyset(&sa.sa_mask);
 
-	for (i = 0; eloop->signals[i]; i++) {
+	for (i = 0; i < eloop->signals_len; i++) {
 		if (sigaction(eloop->signals[i], &sa, NULL) == -1)
 			return -1;
 	}

@@ -134,6 +134,7 @@ struct eloop {
 	void (*timeout0)(void *);
 	void *timeout0_arg;
 	const int *signals;
+	size_t signals_len;
 	void (*signal_cb)(int, void *);
 	void *signal_cb_ctx;
 
@@ -169,7 +170,7 @@ int eloop_q_timeout_add_msec(struct eloop *, int queue,
     long, void (*)(void *), void *);
 void eloop_q_timeout_delete(struct eloop *, int, void (*)(void *), void *);
 
-int eloop_signal_set_cb(struct eloop *, const int *,
+int eloop_signal_set_cb(struct eloop *, const int *, size_t,
     void (*)(int, void *), void *);
 int eloop_signal_mask(struct eloop *, sigset_t *oldset);
 

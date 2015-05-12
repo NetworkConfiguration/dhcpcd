@@ -138,6 +138,10 @@
 # endif
 #endif
 
+#ifndef __arraycount
+#define __arraycount(__x)       (sizeof(__x) / sizeof(__x[0]))
+#endif
+
 /* We don't really need this as our supported systems define __restrict
  * automatically for us, but it is here for completeness. */
 #ifndef __restrict

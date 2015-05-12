@@ -73,9 +73,9 @@ const int dhcpcd_signals[] = {
 	SIGHUP,
 	SIGUSR1,
 	SIGUSR2,
-	SIGPIPE,
-	0
+	SIGPIPE
 };
+const size_t dhcpcd_signals_len = __arraycount(dhcpcd_signals);
 #endif
 
 #if defined(USE_SIGNALS) || !defined(THERE_IS_NO_FORK)
@@ -1311,8 +1311,8 @@ main(int argc, char **argv)
 	pid_t pid;
 #endif
 #ifdef USE_SIGNALS
-	int sig;
-	const char *siga;
+	int sig = 0;
+	const char *siga = NULL;
 #endif
 
 	/* Test for --help and --version */
@@ -1690,7 +1690,8 @@ main(int argc, char **argv)
 	logger(&ctx, LOG_DEBUG, PACKAGE "-" VERSION " starting");
 	ctx.options |= DHCPCD_STARTED;
 #ifdef USE_SIGNALS
-	if (eloop_signal_set_cb(ctx.eloop, dhcpcd_signals,
+	if (eloop_signal_set_cb(ctx.eloop,
+	    dhcpcd_signals, dhcpcd_signals_len,
 	    signal_cb, &ctx) == -1)
 	{
 		logger(&ctx, LOG_ERR, "eloop_signal_mask: %m");
