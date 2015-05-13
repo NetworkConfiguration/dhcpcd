@@ -344,6 +344,8 @@ EOF
 	sunos*);;
 	*)		echo "CFLAGS+=	-Wstrict-overflow" >>$CONFIG_MK;;
 	esac
+else
+	echo "CPPFLAGS+=	-DNDEBUG" >>$CONFIG_MK
 fi
 
 if [ -z "$EMBEDDED" -o "$EMBEDDED" = yes ]; then
