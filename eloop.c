@@ -142,6 +142,10 @@ eloop_event_add(struct eloop *eloop, int fd,
 
 	assert(eloop != NULL);
 	assert(read_cb != NULL || write_cb != NULL);
+	if (fd == -1) {
+		errno = EINVAL;
+		return -1;
+	}
 
 #ifdef HAVE_EPOLL
 	memset(&epe, 0, sizeof(epe));
@@ -258,7 +262,6 @@ eloop_event_delete(struct eloop *eloop, int fd, int write_only)
 #endif
 
 	assert(eloop != NULL);
-	assert(fd != -1);
 
 	TAILQ_FOREACH(e, &eloop->events, next) {
 		if (e->fd == fd) {
