@@ -140,6 +140,9 @@ eloop_event_add(struct eloop *eloop, int fd,
 	struct pollfd *nfds;
 #endif
 
+	assert(eloop != NULL);
+	assert(read_cb != NULL || write_cb != NULL);
+
 #ifdef HAVE_EPOLL
 	memset(&epe, 0, sizeof(epe));
 	epe.data.fd = fd;
@@ -254,6 +257,9 @@ eloop_event_delete(struct eloop *eloop, int fd, int write_only)
 	struct epoll_event epe;
 #endif
 
+	assert(eloop != NULL);
+	assert(fd != -1);
+
 	TAILQ_FOREACH(e, &eloop->events, next) {
 		if (e->fd == fd) {
 			if (write_only) {
@@ -309,6 +315,10 @@ eloop_q_timeout_add_tv(struct eloop *eloop, int queue,
 {
 	struct timespec now, w;
 	struct eloop_timeout *t, *tt = NULL;
+
+	assert(eloop != NULL);
+	assert(when != NULL);
+	assert(callback != NULL);
 
 	clock_gettime(CLOCK_MONOTONIC, &now);
 	timespecadd(&now, when, &w);
@@ -394,6 +404,8 @@ eloop_q_timeout_delete(struct eloop *eloop, int queue,
 {
 	struct eloop_timeout *t, *tt;
 
+	assert(eloop != NULL);
+
 	TAILQ_FOREACH_SAFE(t, &eloop->timeouts, next, tt) {
 		if ((queue == 0 || t->queue == queue) &&
 		    t->arg == arg &&
@@ -409,6 +421,8 @@ void
 eloop_exit(struct eloop *eloop, int code)
 {
 
+	assert(eloop != NULL);
+
 	eloop->exitcode = code;
 	eloop->exitnow = 1;
 }
@@ -417,6 +431,7 @@ eloop_exit(struct eloop *eloop, int code)
 static int
 eloop_open(struct eloop *eloop)
 {
+
 #if defined(HAVE_KQUEUE1)
 	return (eloop->poll_fd = kqueue1(O_CLOEXEC));
 #elif defined(HAVE_KQUEUE)
@@ -449,6 +464,8 @@ eloop_requeue(struct eloop *eloop)
 #elif defined(HAVE_EPOLL)
 	struct epoll_event epe;
 #endif
+
+	assert(eloop != NULL);
 
 	if (eloop->poll_fd != -1)
 		close(eloop->poll_fd);
@@ -508,7 +525,8 @@ eloop_signal_set_cb(struct eloop *eloop,
     void (*signal_cb)(int, void *), void *signal_cb_ctx)
 {
 
-	assert(eloop);
+	assert(eloop != NULL);
+
 	eloop->signals = signals;
 	eloop->signals_len = signals_len;
 	eloop->signal_cb = signal_cb;
@@ -554,6 +572,8 @@ eloop_signal_mask(struct eloop *eloop, sigset_t *oldset)
 	size_t i;
 	struct sigaction sa;
 #endif
+
+	assert(eloop != NULL);
 
 	sigfillset(&newset);
 	if (sigprocmask(SIG_SETMASK, &newset, oldset) == -1)
@@ -651,6 +671,8 @@ eloop_start(struct eloop *eloop, sigset_t *signals)
 
 	_eloop = eloop;
 #endif
+
+	assert(eloop != NULL);
 
 	for (;;) {
 		if (eloop->exitnow)
