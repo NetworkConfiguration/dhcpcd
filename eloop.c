@@ -579,8 +579,6 @@ eloop_signal_mask(struct eloop *eloop, sigset_t *oldset)
 	assert(eloop != NULL);
 
 	sigfillset(&newset);
-	if (oldset)
-		sigemptyset(oldset);
 	if (sigprocmask(SIG_SETMASK, &newset, oldset) == -1)
 		return -1;
 
