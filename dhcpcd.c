@@ -234,8 +234,8 @@ dhcpcd_ipwaited(struct dhcpcd_ctx *ctx)
 	struct interface *ifp;
 
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-		if (!dhcpcd_ifipwaited(ifp, ifp->options->options)) {
-			if (ifp->options->options & DHCPCD_WAITOPTS) {
+		if (ifp->options->options & DHCPCD_WAITOPTS) {
+			if (!dhcpcd_ifipwaited(ifp, ifp->options->options)) {
 				logger(ctx, LOG_DEBUG,
 				    "%s: waiting for an ip address",
 				    ifp->name);
@@ -248,7 +248,7 @@ dhcpcd_ipwaited(struct dhcpcd_ctx *ctx)
 		return 1;
 
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-		if (dhcpcd_ifipwaited(ifp, ifp->options->options))
+		if (dhcpcd_ifipwaited(ifp, ctx->options))
 			return 1;
 	}
 
