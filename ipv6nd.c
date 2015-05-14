@@ -740,14 +740,13 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 	struct nd_opt_prefix_info *pi;
 	struct nd_opt_mtu *mtu;
 	struct nd_opt_rdnss *rdnss;
-	uint32_t lifetime, mtuv;
+	uint32_t mtuv;
 	uint8_t *p;
 	char buf[INET6_ADDRSTRLEN];
 	const char *cbp;
 	struct ra *rap;
 	struct nd_opt_hdr *ndo;
 	struct ipv6_addr *ap;
-	char *opt, *opt2;
 	struct dhcp_opt *dho;
 	uint8_t new_rap, new_data;
 #ifdef IPV6_MANAGETEMPADDR
@@ -871,7 +870,6 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 
 	len -= sizeof(struct nd_router_advert);
 	p = ((uint8_t *)icp) + sizeof(struct nd_router_advert);
-	lifetime = ~0U;
 	for (; len > 0; p += olen, len -= olen) {
 		if (len < sizeof(struct nd_opt_hdr)) {
 			logger(ifp->ctx, LOG_ERR,
@@ -919,7 +917,6 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 		if (has_option_mask(ifp->options->nomasknd, ndo->nd_opt_type))
 			continue;
 
-		opt = opt2 = NULL;
 		switch (ndo->nd_opt_type) {
 		case ND_OPT_PREFIX_INFORMATION:
 			pi = (struct nd_opt_prefix_info *)(void *)ndo;
@@ -1045,8 +1042,6 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 				}
 			}
 #endif
-
-			lifetime = ap->prefix_vltime;
 			break;
 
 		case ND_OPT_MTU:
@@ -1229,7 +1224,7 @@ ipv6nd_getoption(struct dhcpcd_ctx *ctx,
 			errno = EINVAL;
 			return NULL;
 		}
-		*len = (o->nd_opt_len * 8) - sizeof(*o);
+		*len = ND_OPTION_LEN(o);
 		*code = o->nd_opt_type;
 	} else
 		o = NULL;
@@ -1302,7 +1297,7 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 				errno =	EINVAL;
 				break;
 			}
-			len -= o->nd_opt_len * 8;
+			len -= (size_t)(o->nd_opt_len * 8);
 			if (has_option_mask(rap->iface->options->nomasknd,
 			    o->nd_opt_type))
 				continue;
@@ -1344,7 +1339,6 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 			}
 			n++;
 		}
-			
 	}
 	return (ssize_t)n;
 }

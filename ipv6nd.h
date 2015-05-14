@@ -67,9 +67,11 @@ struct rs_state {
 #define ND_CFIRST_OPTION(m)						       \
     ((const struct nd_opt_hdr *)					       \
         ((const uint8_t *)(m)->data + sizeof(struct nd_router_advert)))
-#define ND_OPTION_LEN(o) (((o)->nd_opt_len * 8) - sizeof(struct nd_opt_hdr))
+#define ND_OPTION_LEN(o) ((size_t)((o)->nd_opt_len * 8) -		       \
+    sizeof(struct nd_opt_hdr))
 #define ND_CNEXT_OPTION(o)						       \
-    ((const struct nd_opt_hdr *)((const uint8_t *)(o) + ((o)->nd_opt_len * 8)))
+    ((const struct nd_opt_hdr *)((const uint8_t *)(o) +			       \
+    (size_t)((o)->nd_opt_len * 8)))
 #define ND_COPTION_DATA(o)						       \
     ((const uint8_t *)(o) + sizeof(struct nd_opt_hdr))
 
