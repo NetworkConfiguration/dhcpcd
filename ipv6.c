@@ -35,19 +35,6 @@
 #include <netinet/in.h>
 #include <netinet/if_ether.h>
 
-#ifndef __linux__
-#  ifndef __QNX__
-#    include <sys/endian.h>
-#  endif
-#  include <net/if.h>
-#  ifdef __FreeBSD__ /* Needed so that including netinet6/in6_var.h works */
-#    include <net/if_var.h>
-#  endif
-#  ifndef __sun
-#    include <netinet6/in6_var.h>
-#  endif
-#endif
-
 #include <errno.h>
 #include <ifaddrs.h>
 #include <inttypes.h>
