@@ -2615,7 +2615,7 @@ dhcp6_handledata(void *arg)
 	if (bytes == -1) {
 		logger(dctx, LOG_ERR, "%s: recvmsg: %m", __func__);
 		close(ctx->dhcp_fd);
-		eloop_event_delete(dctx->eloop, ctx->dhcp_fd, 0);
+		eloop_event_delete(dctx->eloop, ctx->dhcp_fd);
 		ctx->dhcp_fd = -1;
 		return;
 	}
@@ -3391,7 +3391,7 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 	}
 	if (ifp == NULL && ctx->ipv6) {
 		if (ctx->ipv6->dhcp_fd != -1) {
-			eloop_event_delete(ctx->eloop, ctx->ipv6->dhcp_fd, 0);
+			eloop_event_delete(ctx->eloop, ctx->ipv6->dhcp_fd);
 			close(ctx->ipv6->dhcp_fd);
 			ctx->ipv6->dhcp_fd = -1;
 		}

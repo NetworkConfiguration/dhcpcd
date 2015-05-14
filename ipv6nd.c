@@ -217,7 +217,7 @@ ipv6nd_open(struct dhcpcd_ctx *dctx)
 
 eexit:
 	if (ctx->nd_fd != -1) {
-		eloop_event_delete(dctx->eloop, ctx->nd_fd, 0);
+		eloop_event_delete(dctx->eloop, ctx->nd_fd);
 		close(ctx->nd_fd);
 		ctx->nd_fd = -1;
 	}
@@ -480,7 +480,7 @@ ipv6nd_free(struct interface *ifp)
 	}
 	if (ifp == NULL) {
 		if (ctx->ipv6->nd_fd != -1) {
-			eloop_event_delete(ctx->eloop, ctx->ipv6->nd_fd, 0);
+			eloop_event_delete(ctx->eloop, ctx->ipv6->nd_fd);
 			close(ctx->ipv6->nd_fd);
 			ctx->ipv6->nd_fd = -1;
 		}
@@ -1646,7 +1646,7 @@ ipv6nd_handledata(void *arg)
 	len = recvmsg(ctx->nd_fd, &ctx->rcvhdr, 0);
 	if (len == -1) {
 		logger(dctx, LOG_ERR, "recvmsg: %m");
-		eloop_event_delete(dctx->eloop, ctx->nd_fd, 0);
+		eloop_event_delete(dctx->eloop, ctx->nd_fd);
 		close(ctx->nd_fd);
 		ctx->nd_fd = -1;
 		return;

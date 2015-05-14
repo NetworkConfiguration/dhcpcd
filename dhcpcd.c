@@ -871,7 +871,7 @@ handle_link(void *arg)
 	ctx = arg;
 	if (if_managelink(ctx) == -1) {
 		logger(ctx, LOG_ERR, "if_managelink: %m");
-		eloop_event_delete(ctx->eloop, ctx->link_fd, 0);
+		eloop_event_delete(ctx->eloop, ctx->link_fd);
 		close(ctx->link_fd);
 		ctx->link_fd = -1;
 	}
@@ -1191,7 +1191,7 @@ dhcpcd_getinterfaces(void *arg)
 	}
 	if (write(fd->fd, &len, sizeof(len)) != sizeof(len))
 		return;
-	eloop_event_delete(fd->ctx->eloop, fd->fd, 1);
+	eloop_event_remove_writecb(fd->ctx->eloop, fd->fd);
 	TAILQ_FOREACH(ifp, fd->ctx->ifaces, next) {
 		if (send_interface(fd, ifp) == -1)
 			logger(ifp->ctx, LOG_ERR,
@@ -1821,7 +1821,7 @@ exit1:
 	}
 	free(ctx.duid);
 	if (ctx.link_fd != -1) {
-		eloop_event_delete(ctx.eloop, ctx.link_fd, 0);
+		eloop_event_delete(ctx.eloop, ctx.link_fd);
 		close(ctx.link_fd);
 	}
 

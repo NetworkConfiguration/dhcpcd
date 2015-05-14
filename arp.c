@@ -377,7 +377,7 @@ arp_close(struct interface *ifp)
 		return;
 
 	if (state->arp_fd != -1) {
-		eloop_event_delete(ifp->ctx->eloop, state->arp_fd, 0);
+		eloop_event_delete(ifp->ctx->eloop, state->arp_fd);
 		close(state->arp_fd);
 		state->arp_fd = -1;
 	}

@@ -221,8 +221,10 @@ eloop_event_add(struct eloop *eloop, int fd,
 	e->write_cb_arg = write_cb_arg;
 
 #if defined(HAVE_KQUEUE)
-	EV_SET(&ke[0], (uintptr_t)fd, EVFILT_READ, EV_ADD, 0, 0, UPTR(e));
-	if (write_cb)
+	if (read_cb != NULL)
+		EV_SET(&ke[0], (uintptr_t)fd, EVFILT_READ,
+		    EV_ADD, 0, 0, UPTR(e));
+	if (write_cb != NULL)
 		EV_SET(&ke[1], (uintptr_t)fd, EVFILT_WRITE,
 		    EV_ADD, 0, 0, UPTR(e));
 	if (kevent(eloop->poll_fd, ke, write_cb ? 2 : 1, NULL, 0, NULL) == -1)
@@ -252,7 +254,7 @@ err:
 }
 
 void
-eloop_event_delete(struct eloop *eloop, int fd, int write_only)
+eloop_event_delete_write(struct eloop *eloop, int fd, int write_only)
 {
 	struct eloop_event *e;
 #if defined(HAVE_KQUEUE)
@@ -265,8 +267,8 @@ eloop_event_delete(struct eloop *eloop, int fd, int write_only)
 
 	TAILQ_FOREACH(e, &eloop->events, next) {
 		if (e->fd == fd) {
-			if (write_only) {
-				if (e->write_cb) {
+			if (write_only && e->read_cb != NULL) {
+				if (e->write_cb != NULL) {
 					e->write_cb = NULL;
 					e->write_cb_arg = NULL;
 #if defined(HAVE_KQUEUE)
@@ -284,7 +286,6 @@ eloop_event_delete(struct eloop *eloop, int fd, int write_only)
 					    EPOLL_CTL_MOD, fd, &epe);
 #endif
 				}
-
 			} else {
 				TAILQ_REMOVE(&eloop->events, e, next);
 #if defined(HAVE_KQUEUE)
@@ -762,12 +763,13 @@ eloop_start(struct eloop *eloop, sigset_t *signals)
 #elif defined(HAVE_EPOLL)
 		if (n) {
 			e = (struct eloop_event *)epe.data.ptr;
-			if (epe.events & EPOLLOUT && e->write_cb) {
+			if (epe.events & EPOLLOUT && e->write_cb != NULL) {
 				e->write_cb(e->write_cb_arg);
 				continue;
 			}
 			if (epe.events &
-			    (EPOLLIN | EPOLLERR | EPOLLHUP))
+			    (EPOLLIN | EPOLLERR | EPOLLHUP) &&
+			    e->read_cb != NULL)
 			{
 				e->read_cb(e->read_cb_arg);
 				continue;
@@ -777,12 +779,12 @@ eloop_start(struct eloop *eloop, sigset_t *signals)
 		if (n > 0) {
 			TAILQ_FOREACH(e, &eloop->events, next) {
 				if (e->pollfd->revents & POLLOUT &&
-				    e->write_cb)
+				    e->write_cb != NULL)
 				{
 					e->write_cb(e->write_cb_arg);
 					break;
 				}
-				if (e->pollfd->revents) {
+				if (e->pollfd->revents && e->read_cb != NULL) {
 					e->read_cb(e->read_cb_arg);
 					break;
 				}

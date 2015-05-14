@@ -152,7 +152,11 @@ struct eloop {
 int eloop_event_add(struct eloop *, int,
     void (*)(void *), void *,
     void (*)(void *), void *);
-void eloop_event_delete(struct eloop *, int, int);
+#define eloop_event_delete(eloop, fd) \
+    eloop_event_delete_write((eloop), (fd), 0)
+#define eloop_event_remove_writecb(eloop, fd) \
+    eloop_event_delete_write((eloop), (fd), 1)
+void eloop_event_delete_write(struct eloop *, int, int);
 
 #define eloop_timeout_add_tv(eloop, tv, cb, ctx) \
     eloop_q_timeout_add_tv((eloop), ELOOP_QUEUE, (tv), (cb), (ctx))
@@ -162,11 +166,11 @@ void eloop_event_delete(struct eloop *, int, int);
     eloop_q_timeout_add_msec((eloop), ELOOP_QUEUE, (ms), (cb), (ctx))
 #define eloop_timeout_delete(eloop, cb, ctx) \
     eloop_q_timeout_delete((eloop), ELOOP_QUEUE, (cb), (ctx))
-int eloop_q_timeout_add_tv(struct eloop *, int queue,
+int eloop_q_timeout_add_tv(struct eloop *, int,
     const struct timespec *, void (*)(void *), void *);
-int eloop_q_timeout_add_sec(struct eloop *, int queue,
+int eloop_q_timeout_add_sec(struct eloop *, int,
     time_t, void (*)(void *), void *);
-int eloop_q_timeout_add_msec(struct eloop *, int queue,
+int eloop_q_timeout_add_msec(struct eloop *, int,
     long, void (*)(void *), void *);
 void eloop_q_timeout_delete(struct eloop *, int, void (*)(void *), void *);
 

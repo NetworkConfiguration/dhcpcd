@@ -1437,7 +1437,7 @@ dhcp_close(struct interface *ifp)
 		return;
 
 	if (state->raw_fd != -1) {
-		eloop_event_delete(ifp->ctx->eloop, state->raw_fd, 0);
+		eloop_event_delete(ifp->ctx->eloop, state->raw_fd);
 		close(state->raw_fd);
 		state->raw_fd = -1;
 	}
@@ -2951,7 +2951,7 @@ dhcp_handleudp(void *arg)
 	 * from the raw fd */
 	if (read(ctx->udp_fd, buffer, sizeof(buffer)) == -1) {
 		logger(ctx, LOG_ERR, "%s: %m", __func__);
-		eloop_event_delete(ctx->eloop, ctx->udp_fd, 0);
+		eloop_event_delete(ctx->eloop, ctx->udp_fd);
 		close(ctx->udp_fd);
 		ctx->udp_fd = -1;
 	}
@@ -3046,7 +3046,7 @@ dhcp_free(struct interface *ifp)
 	}
 	if (ifp == NULL) {
 		if (ctx->udp_fd != -1) {
-			eloop_event_delete(ctx->eloop, ctx->udp_fd, 0);
+			eloop_event_delete(ctx->eloop, ctx->udp_fd);
 			close(ctx->udp_fd);
 			ctx->udp_fd = -1;
 		}
