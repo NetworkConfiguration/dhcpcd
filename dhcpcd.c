@@ -212,24 +212,48 @@ dhcpcd_oneup(struct dhcpcd_ctx *ctx)
 	return 0;
 }
 
-int
-dhcpcd_ipwaited(struct dhcpcd_ctx *ctx)
+static int
+dhcpcd_ifipwaited(struct interface *ifp, unsigned long long opts)
 {
 
-	if (ctx->options & DHCPCD_WAITIP4 &&
-	    !ipv4_addrexists(ctx, NULL))
+	if (opts & DHCPCD_WAITIP4 && !ipv4_ifaddrexists(ifp))
 		return 0;
-	if (ctx->options & DHCPCD_WAITIP6 &&
-	    !ipv6nd_findaddr(ctx, NULL, 0) &&
-	    !dhcp6_findaddr(ctx, NULL, 0))
+	if (opts & DHCPCD_WAITIP6 && !ipv6_iffindaddr(ifp, NULL))
 		return 0;
-	if (ctx->options & DHCPCD_WAITIP &&
-	    !(ctx->options & (DHCPCD_WAITIP4 | DHCPCD_WAITIP6)) &&
-	    !ipv4_addrexists(ctx, NULL) &&
-	    !ipv6nd_findaddr(ctx, NULL, 0) &&
-	    !dhcp6_findaddr(ctx, NULL, 0))
+	if (opts & DHCPCD_WAITIP &&
+	    !(opts & (DHCPCD_WAITIP4 | DHCPCD_WAITIP6)) &&
+	    !ipv4_ifaddrexists(ifp) &&
+	    !ipv6_iffindaddr(ifp, NULL))
 		return 0;
 	return 1;
+}
+
+static int
+dhcpcd_ipwaited(struct dhcpcd_ctx *ctx)
+{
+	struct interface *ifp;
+
+	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+		if (!dhcpcd_ifipwaited(ifp, ifp->options->options)) {
+			if (ifp->options->options & DHCPCD_WAITOPTS) {
+				logger(ctx, LOG_DEBUG,
+				    "%s: waiting for an ip address",
+				    ifp->name);
+				return 0;
+			}
+		}
+	}
+
+	if (!(ctx->options & DHCPCD_WAITOPTS))
+		return 1;
+
+	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+		if (dhcpcd_ifipwaited(ifp, ifp->options->options))
+			return 1;
+	}
+
+	logger(ctx, LOG_DEBUG, "waiting for an ip address");
+	return 0;
 }
 
 /* Returns the pid of the child, otherwise 0. */

@@ -285,7 +285,7 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	if (ifp->ctx->options & DHCPCD_DUMPLEASE)
 		elen = 2;
 	else
-		elen = 13;
+		elen = 12;
 
 #define EMALLOC(i, l) if ((env[(i)] = malloc((l))) == NULL) goto eexit;
 	/* Make our env + space for profile, wireless and debug */
@@ -371,12 +371,6 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	else
 		env[11] = strdup("if_oneup=false");
 	if (env[11] == NULL)
-		goto eexit;
-	if (dhcpcd_ipwaited(ifp->ctx))
-		env[12] = strdup("if_ipwaited=true");
-	else
-		env[12] = strdup("if_ipwaited=false");
-	if (env[12] == NULL)
 		goto eexit;
 	if (ifo->options & DHCPCD_DEBUG) {
 		e = strlen("syslog_debug=true") + 1;

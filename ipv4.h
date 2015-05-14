@@ -75,6 +75,7 @@ int ipv4_ifcmp(const struct interface *, const struct interface *);
 uint8_t inet_ntocidr(struct in_addr);
 int inet_cidrtoaddr(int, struct in_addr *);
 uint32_t ipv4_getnetmask(uint32_t);
+int ipv4_ifaddrexists(const struct interface *);
 int ipv4_addrexists(struct dhcpcd_ctx *, const struct in_addr *);
 
 #define STATE_ADDED		0x01

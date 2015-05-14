@@ -156,6 +156,15 @@ ipv4_findaddr(struct dhcpcd_ctx *ctx, const struct in_addr *addr)
 }
 
 int
+ipv4_ifaddrexists(const struct interface *ifp)
+{
+	const struct dhcp_state *state;
+
+	state = D_CSTATE(ifp);
+	return (state && state->addr.s_addr != INADDR_ANY);
+}
+
+int
 ipv4_addrexists(struct dhcpcd_ctx *ctx, const struct in_addr *addr)
 {
 	struct interface *ifp;
