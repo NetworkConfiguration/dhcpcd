@@ -1580,9 +1580,7 @@ again:
 	cbp = inet_ntop(AF_INET6, &ia->addr, buf, sizeof(buf));
 	if (cbp)
 		snprintf(ia->saddr, sizeof(ia->saddr), "%s/%d",
-		    cbp, ia->prefix_len);
-	else
-		ia->saddr[0] = '\0';
+		    cbp, ia->prefix_len); else ia->saddr[0] = '\0';
 
 	TAILQ_INSERT_TAIL(&state->addrs, ia, next);
 	return ia;

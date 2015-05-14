@@ -1274,35 +1274,35 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 		/* Set some useful variables that we derive from the DHCP
 		 * message but are not necessarily in the options */
 		addr.s_addr = dhcp->yiaddr ? dhcp->yiaddr : dhcp->ciaddr;
-		setvar(ifp->ctx, &ep, prefix, "ip_address", inet_ntoa(addr));
+		addvar(ifp->ctx, &ep, prefix, "ip_address", inet_ntoa(addr));
 		if (get_option_addr(ifp->ctx, &net,
 		    dhcp, DHO_SUBNETMASK) == -1) {
 			net.s_addr = ipv4_getnetmask(addr.s_addr);
-			setvar(ifp->ctx, &ep, prefix,
+			addvar(ifp->ctx, &ep, prefix,
 			    "subnet_mask", inet_ntoa(net));
 		}
 		snprintf(cidr, sizeof(cidr), "%d", inet_ntocidr(net));
-		setvar(ifp->ctx, &ep, prefix, "subnet_cidr", cidr);
+		addvar(ifp->ctx, &ep, prefix, "subnet_cidr", cidr);
 		if (get_option_addr(ifp->ctx, &brd,
 		    dhcp, DHO_BROADCAST) == -1) {
 			brd.s_addr = addr.s_addr | ~net.s_addr;
-			setvar(ifp->ctx, &ep, prefix,
+			addvar(ifp->ctx, &ep, prefix,
 			    "broadcast_address", inet_ntoa(brd));
 		}
 		addr.s_addr = dhcp->yiaddr & net.s_addr;
-		setvar(ifp->ctx, &ep, prefix,
+		addvar(ifp->ctx, &ep, prefix,
 		    "network_number", inet_ntoa(addr));
 	}
 
 	if (*dhcp->bootfile && !(overl & 1)) {
 		print_string(safe, sizeof(safe), STRING,
 		    dhcp->bootfile, sizeof(dhcp->bootfile));
-		setvar(ifp->ctx, &ep, prefix, "filename", safe);
+		addvar(ifp->ctx, &ep, prefix, "filename", safe);
 	}
 	if (*dhcp->servername && !(overl & 2)) {
 		print_string(safe, sizeof(safe), STRING | DOMAIN,
 		    dhcp->servername, sizeof(dhcp->servername));
-		setvar(ifp->ctx, &ep, prefix, "server_name", safe);
+		addvar(ifp->ctx, &ep, prefix, "server_name", safe);
 	}
 
 	/* Zero our indexes */

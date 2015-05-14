@@ -184,8 +184,10 @@ void logger_close(struct dhcpcd_ctx *);
 #endif
 
 ssize_t setvar(struct dhcpcd_ctx *,
+    char **, const char *, const char *, const char *);
+ssize_t addvar(struct dhcpcd_ctx *,
     char ***, const char *, const char *, const char *);
-ssize_t setvard(struct dhcpcd_ctx *,
+ssize_t addvard(struct dhcpcd_ctx *,
     char ***, const char *, const char *, size_t);
 time_t uptime(void);
 

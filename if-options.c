@@ -100,6 +100,7 @@
 #define O_REJECT		O_BASE + 40
 #define O_IPV6RA_ACCEPT_NOPUBLIC	O_BASE + 41
 #define O_BOOTP			O_BASE + 42
+#define O_DEFINEND		O_BASE + 43
 
 const struct option cf_options[] = {
 	{"background",      no_argument,       NULL, 'b'},
@@ -175,6 +176,7 @@ const struct option cf_options[] = {
 	{"dev",             required_argument, NULL, O_DEV},
 	{"nodev",           no_argument,       NULL, O_NODEV},
 	{"define",          required_argument, NULL, O_DEFINE},
+	{"definend",        required_argument, NULL, O_DEFINEND},
 	{"define6",         required_argument, NULL, O_DEFINE6},
 	{"embed",           required_argument, NULL, O_EMBED},
 	{"encap",           required_argument, NULL, O_ENCAP},
@@ -519,11 +521,22 @@ set_option_space(struct dhcpcd_ctx *ctx,
 {
 
 #if !defined(INET) && !defined(INET6)
-	/* Satisfy use */
-	ctx = NULL;
+	UNUSED(ctx);
 #endif
 
 #ifdef INET6
+	if (strncmp(arg, "nd_", strlen("nd_")) == 0) {
+		*d = ctx->nd_opts;
+		*dl = ctx->nd_opts_len;
+		*od = ifo->nd_override;
+		*odl = ifo->nd_override_len;
+		*request = ifo->requestmasknd;
+		*require = ifo->requiremasknd;
+		*no = ifo->nomasknd;
+		*reject = ifo->rejectmasknd;
+		return arg + strlen("nd_");
+	}
+
 	if (strncmp(arg, "dhcp6_", strlen("dhcp6_")) == 0) {
 		*d = ctx->dhcp6_opts;
 		*dl = ctx->dhcp6_opts_len;
@@ -1466,6 +1479,12 @@ err_sla:
 		dop = &ifo->dhcp_override;
 		dop_len = &ifo->dhcp_override_len;
 		/* FALLTHROUGH */
+	case O_DEFINEND:
+		if (dop == NULL) {
+			dop = &ifo->nd_override;
+			dop_len = &ifo->nd_override_len;
+		}
+		/* FALLTHROUGH */
 	case O_DEFINE6:
 		if (dop == NULL) {
 			dop = &ifo->dhcp6_override;
@@ -1689,10 +1708,17 @@ err_sla:
 		ndop->len = (size_t)l;
 		ndop->var = np;
 		/* Save the define for embed and encap options */
-		if (opt == O_DEFINE || opt == O_DEFINE6 || opt == O_VENDOPT)
+		switch (opt) {
+		case O_DEFINE:
+		case O_DEFINEND:
+		case O_DEFINE6:
+		case O_VENDOPT:
 			*ldop = ndop;
-		else if (opt == O_ENCAP)
+			break;
+		case O_ENCAP:
 			*edop = ndop;
+			break;
+		}
 		break;
 	case O_VENDCLASS:
 		fp = strwhite(arg);
@@ -2100,6 +2126,14 @@ read_config(struct dhcpcd_ctx *ctx,
 			ifo->dhcp_override_len = INITDEFINES;
 #endif
 
+#if defined(INET6) && defined(INITDEFINENDS)
+		ifo->nd_override =
+		    calloc(INITDEFINENDS, sizeof(*ifo->nd_override));
+		if (ifo->nd_override == NULL)
+			logger(ctx, LOG_ERR, "%s: %m", __func__);
+		else
+			ifo->nd_override_len = INITDEFINENDS;
+#endif
 #if defined(INET6) && defined(INITDEFINE6S)
 		ifo->dhcp6_override =
 		    calloc(INITDEFINE6S, sizeof(*ifo->dhcp6_override));
@@ -2172,15 +2206,24 @@ read_config(struct dhcpcd_ctx *ctx,
 		ifo->dhcp_override_len = 0;
 
 #ifdef INET6
+		ctx->nd_opts = ifo->nd_override;
+		ctx->nd_opts_len = ifo->nd_override_len;
 		ctx->dhcp6_opts = ifo->dhcp6_override;
 		ctx->dhcp6_opts_len = ifo->dhcp6_override_len;
 #else
+		for (i = 0, opt = ifo->nd_override;
+		    i < ifo->nd_override_len;
+		    i++, opt++)
+			free_dhcp_opt_embenc(opt);
+		free(ifo->nd_override);
 		for (i = 0, opt = ifo->dhcp6_override;
 		    i < ifo->dhcp6_override_len;
 		    i++, opt++)
 			free_dhcp_opt_embenc(opt);
 		free(ifo->dhcp6_override);
 #endif
+		ifo->nd_override = NULL;
+		ifo->nd_override_len = 0;
 		ifo->dhcp6_override = NULL;
 		ifo->dhcp6_override_len = 0;
 
@@ -2334,6 +2377,11 @@ free_options(struct if_options *ifo)
 		    opt++, ifo->dhcp_override_len--)
 			free_dhcp_opt_embenc(opt);
 		free(ifo->dhcp_override);
+		for (opt = ifo->nd_override;
+		    ifo->nd_override_len > 0;
+		    opt++, ifo->nd_override_len--)
+			free_dhcp_opt_embenc(opt);
+		free(ifo->nd_override);
 		for (opt = ifo->dhcp6_override;
 		    ifo->dhcp6_override_len > 0;
 		    opt++, ifo->dhcp6_override_len--)

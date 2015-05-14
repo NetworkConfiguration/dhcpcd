@@ -203,33 +203,44 @@ logger(struct dhcpcd_ctx *ctx, int pri, const char *fmt, ...)
 
 ssize_t
 setvar(struct dhcpcd_ctx *ctx,
-    char ***e, const char *prefix, const char *var, const char *value)
+    char **e, const char *prefix, const char *var, const char *value)
 {
 	size_t len = strlen(var) + strlen(value) + 3;
 
 	if (prefix)
 		len += strlen(prefix) + 1;
-	**e = malloc(len);
-	if (**e == NULL) {
+	*e = malloc(len);
+	if (*e == NULL) {
 		logger(ctx, LOG_ERR, "%s: %m", __func__);
 		return -1;
 	}
 	if (prefix)
-		snprintf(**e, len, "%s_%s=%s", prefix, var, value);
+		snprintf(*e, len, "%s_%s=%s", prefix, var, value);
 	else
-		snprintf(**e, len, "%s=%s", var, value);
-	(*e)++;
+		snprintf(*e, len, "%s=%s", var, value);
 	return (ssize_t)len;
 }
 
 ssize_t
-setvard(struct dhcpcd_ctx *ctx,
+addvar(struct dhcpcd_ctx *ctx,
+    char ***e, const char *prefix, const char *var, const char *value)
+{
+	ssize_t len;
+
+	len = setvar(ctx, *e, prefix, var, value);
+	if (len != -1)
+		(*e)++;
+	return (ssize_t)len;
+}
+
+ssize_t
+addvard(struct dhcpcd_ctx *ctx,
     char ***e, const char *prefix, const char *var, size_t value)
 {
 	char buffer[32];
 
 	snprintf(buffer, sizeof(buffer), "%zu", value);
-	return setvar(ctx, e, prefix, var, buffer);
+	return addvar(ctx, e, prefix, var, buffer);
 }
 
 

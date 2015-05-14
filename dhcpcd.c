@@ -164,6 +164,14 @@ free_globals(struct dhcpcd_ctx *ctx)
 	}
 #endif
 #ifdef INET6
+	if (ctx->nd_opts) {
+		for (opt = ctx->nd_opts;
+		    ctx->nd_opts_len > 0;
+		    opt++, ctx->nd_opts_len--)
+			free_dhcp_opt_embenc(opt);
+		free(ctx->nd_opts);
+		ctx->nd_opts = NULL;
+	}
 	if (ctx->dhcp6_opts) {
 		for (opt = ctx->dhcp6_opts;
 		    ctx->dhcp6_opts_len > 0;
@@ -1454,6 +1462,9 @@ main(int argc, char **argv)
 #endif
 #ifdef INET6
 		if (family == 0 || family == AF_INET6) {
+			printf("\nND options:\n");
+			ipv6nd_printoptions(&ctx,
+			    ifo->nd_override, ifo->nd_override_len);
 			printf("\nDHCPv6 options:\n");
 			dhcp6_printoptions(&ctx,
 			    ifo->dhcp6_override, ifo->dhcp6_override_len);

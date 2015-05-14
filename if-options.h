@@ -153,11 +153,15 @@ struct if_options {
 	uint8_t requiremask[256 / NBBY];
 	uint8_t nomask[256 / NBBY];
 	uint8_t rejectmask[256 / NBBY];
+	uint8_t dstmask[256 / NBBY];
+	uint8_t requestmasknd[(UINT16_MAX + 1) / NBBY];
+	uint8_t requiremasknd[(UINT16_MAX + 1) / NBBY];
+	uint8_t nomasknd[(UINT16_MAX + 1) / NBBY];
+	uint8_t rejectmasknd[(UINT16_MAX + 1) / NBBY];
 	uint8_t requestmask6[(UINT16_MAX + 1) / NBBY];
 	uint8_t requiremask6[(UINT16_MAX + 1) / NBBY];
 	uint8_t nomask6[(UINT16_MAX + 1) / NBBY];
 	uint8_t rejectmask6[(UINT16_MAX + 1) / NBBY];
-	uint8_t dstmask[256 / NBBY];
 	uint32_t leasetime;
 	time_t timeout;
 	time_t reboot;
@@ -191,6 +195,8 @@ struct if_options {
 
 	struct dhcp_opt *dhcp_override;
 	size_t dhcp_override_len;
+	struct dhcp_opt *nd_override;
+	size_t nd_override_len;
 	struct dhcp_opt *dhcp6_override;
 	size_t dhcp6_override_len;
 	uint32_t vivco_en;

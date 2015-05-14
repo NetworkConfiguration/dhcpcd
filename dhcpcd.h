@@ -135,6 +135,8 @@ struct dhcpcd_ctx {
 	unsigned char secret[SECRET_LEN];
 	size_t secret_len;
 
+	struct dhcp_opt *nd_opts;
+	size_t nd_opts_len;
 	struct dhcp_opt *dhcp6_opts;
 	size_t dhcp6_opts_len;
 	struct ipv6_ctx *ipv6;
