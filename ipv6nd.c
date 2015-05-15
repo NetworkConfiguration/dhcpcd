@@ -1294,10 +1294,9 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 		/* Unlike DHCP, ND6 options *may* occur more than once.
 		 * There is also no provision for option concatenation
 		 * unlike DHCP. */
-		len = rap->data_len;
-		if (ND_CFIRST_OPTION(rap))
-			len -= (size_t)((const uint8_t *)ND_CFIRST_OPTION(rap)
-			    - rap->data);
+		len = rap->data_len -
+		    ((size_t)((const uint8_t *)ND_CFIRST_OPTION(rap) -
+		    rap->data));
 
 		for (o = ND_CFIRST_OPTION(rap);
 		    len >= (ssize_t)sizeof(*o);
