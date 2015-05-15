@@ -331,13 +331,14 @@ CFLAGS+=	-Wmissing-format-attribute -Wnested-externs
 CFLAGS+=	-Winline -Wcast-align -Wcast-qual -Wpointer-arith
 CFLAGS+=	-Wreturn-type -Wswitch -Wshadow
 CFLAGS+=	-Wcast-qual -Wwrite-strings
-CFLAGS+=	-Wconversion
 CFLAGS+=	-Wformat=2
 CFLAGS+=	-Wpointer-sign -Wmissing-noreturn
 EOF
 	case "$OS" in
 	mirbsd*|openbsd*);; # OpenBSD has many redundant decs in system headers
-	*)		echo "CFLAGS+=	-Wredundant-decls" >>$CONFIG_MK;;
+	*)		echo "CFLAGS+=	-Wredundant-decls" >>$CONFIG_MK
+			echo "CFLAGS+=	-Wconversion" >>$CONFIG_MK
+			;;
 	esac
 
 	case "$OS" in

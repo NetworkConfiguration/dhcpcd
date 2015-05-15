@@ -445,14 +445,14 @@ ipv6nd_findaddr(struct dhcpcd_ctx *ctx, const struct in6_addr *addr,
 }
 
 static void
-ipv6nd_removefreedrop_ra(struct ra *rap, int remove, int drop)
+ipv6nd_removefreedrop_ra(struct ra *rap, int remove_ra, int drop_ra)
 {
 
 	eloop_timeout_delete(rap->iface->ctx->eloop, NULL, rap->iface);
 	eloop_timeout_delete(rap->iface->ctx->eloop, NULL, rap);
-	if (remove && !drop)
+	if (remove_ra && !drop_ra)
 		TAILQ_REMOVE(rap->iface->ctx->ipv6->ra_routers, rap, next);
-	ipv6_freedrop_addrs(&rap->addrs, drop, NULL);
+	ipv6_freedrop_addrs(&rap->addrs, drop_ra, NULL);
 	free(rap->data);
 	free(rap);
 }
@@ -1302,7 +1302,7 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 		    len >= (ssize_t)sizeof(*o);
 		    o = ND_CNEXT_OPTION(o))
 		{
-			if (o->nd_opt_len * 8 > len) {
+			if ((size_t)o->nd_opt_len * 8 > len) {
 				errno =	EINVAL;
 				break;
 			}
