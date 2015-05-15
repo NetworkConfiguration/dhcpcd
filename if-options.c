@@ -646,7 +646,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	int e, i, t;
 	long l;
 	unsigned long u;
-	char *p = NULL, *fp, *np, **nconf;
+	char *p = NULL, *bp, *fp, *np, **nconf;
 	ssize_t s;
 	struct in_addr addr, addr2;
 	in_addr_t *naddr;
@@ -1554,13 +1554,18 @@ err_sla:
 		/* length */
 		if (np) {
 			*np++ = '\0';
+			bp = NULL; /* No bitflag */
 			l = (long)strtou(np, NULL, 0, 0, LONG_MAX, &e);
 			if (e) {
-				logger(ctx, LOG_ERR, "failed to convert length");
+				logger(ctx,LOG_ERR, "failed to convert length");
 				return -1;
 			}
-		} else
+		} else {
 			l = 0;
+			bp = strchr(arg, '='); /* bitflag assignment */
+			if (bp)
+				*bp++ = '\0';
+		}
 		t = 0;
 		if (strcasecmp(arg, "request") == 0) {
 			t |= REQUEST;
@@ -1609,6 +1614,8 @@ err_sla:
 			t |= STRING;
 		else if (strcasecmp(arg, "byte") == 0)
 			t |= UINT8;
+		else if (strcasecmp(arg, "bitflags") == 0)
+			t |= BITFLAG;
 		else if (strcasecmp(arg, "uint16") == 0)
 			t |= UINT16;
 		else if (strcasecmp(arg, "int16") == 0)
@@ -1656,6 +1663,11 @@ err_sla:
 			logger(ctx, LOG_WARNING, "ignoring array for strings");
 			t &= ~ARRAY;
 		}
+		if (t & BITFLAG) {
+			if (bp == NULL)
+				logger(ctx, LOG_WARNING,
+				    "missing bitflag assignment");
+		}
 		/* variable */
 		if (!fp) {
 			if (!(t & OPTION)) {
@@ -1669,10 +1681,16 @@ err_sla:
 			fp = strwhite(arg);
 			if (fp)
 				*fp++ = '\0';
-			np = strdup(arg);
-			if (np == NULL) {
-				logger(ctx, LOG_ERR, "%s: %m", __func__);
-				return -1;
+			if (strcasecmp(arg, "reserved")) {
+				np = strdup(arg);
+				if (np == NULL) {
+					logger(ctx, LOG_ERR,
+					    "%s: %m", __func__);
+					return -1;
+				}
+			} else {
+				np = NULL;
+				t |= RESERVED;
 			}
 		}
 		if (opt != O_EMBED) {
@@ -1707,6 +1725,13 @@ err_sla:
 		ndop->type = t;
 		ndop->len = (size_t)l;
 		ndop->var = np;
+		if (bp) {
+			dl = strlen(bp);
+			memcpy(ndop->bitflags, bp, dl);
+			memset(ndop->bitflags + dl, 0,
+			    sizeof(ndop->bitflags) - dl);
+		} else
+			memset(ndop->bitflags, 0, sizeof(ndop->bitflags));
 		/* Save the define for embed and encap options */
 		switch (opt) {
 		case O_DEFINE:
