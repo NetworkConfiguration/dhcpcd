@@ -1593,12 +1593,16 @@ send_message(struct interface *ifp, uint8_t type,
 	struct ipv4_addr *ia;
 #endif
 
-	if (!callback)
+	s = -1;
+	if (!callback) {
+		/* No carrier? Don't bother sending the packet. */
+		if (ifp->carrier == LINK_DOWN)
+			return;
 		logger(ifp->ctx, LOG_DEBUG, "%s: sending %s with xid 0x%x",
 		    ifp->name,
 		    ifo->options & DHCPCD_BOOTP ? "BOOTP" : get_dhcp_op(type),
 		    state->xid);
-	else {
+	} else {
 		if (state->interval == 0)
 			state->interval = 4;
 		else {
@@ -1610,6 +1614,10 @@ send_message(struct interface *ifp, uint8_t type,
 		tv.tv_nsec = (suseconds_t)arc4random_uniform(
 		    (DHCP_RAND_MAX - DHCP_RAND_MIN) * NSEC_PER_SEC);
 		timespecnorm(&tv);
+		/* No carrier? Don't bother sending the packet.
+		 * However, we do need to advance the timeout. */
+		if (ifp->carrier == LINK_DOWN)
+			goto fail;
 		logger(ifp->ctx, LOG_DEBUG,
 		    "%s: sending %s (xid 0x%x), next in %0.1f seconds",
 		    ifp->name,
@@ -1635,8 +1643,7 @@ send_message(struct interface *ifp, uint8_t type,
 		if (s == -1 && errno != EADDRINUSE)
 			logger(ifp->ctx, LOG_ERR,
 			    "%s: dhcp_openudp: %m", ifp->name);
-	} else
-		s = -1;
+	}
 
 	/* If we couldn't open a UDP port for our IP address
 	 * then we cannot renew.

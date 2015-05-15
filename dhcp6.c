@@ -1019,6 +1019,9 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 	const char *broad_uni;
 	const struct in6_addr alldhcp = IN6ADDR_LINKLOCAL_ALLDHCP_INIT;
 
+	if (!callback && ifp->carrier == LINK_DOWN)
+		return 0;
+
 	memset(&dst, 0, sizeof(dst));
 	dst.sin6_family = AF_INET6;
 	dst.sin6_port = htons(DHCP6_SERVER_PORT);
@@ -1106,16 +1109,17 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 		}
 
 logsend:
-		logger(ifp->ctx, LOG_DEBUG,
-		    "%s: %s %s (xid 0x%02x%02x%02x),"
-		    " next in %0.1f seconds",
-		    ifp->name,
-		    broad_uni,
-		    dhcp6_get_op(state->send->type),
-		    state->send->xid[0],
-		    state->send->xid[1],
-		    state->send->xid[2],
-		    timespec_to_double(&state->RT));
+		if (ifp->carrier != LINK_DOWN)
+			logger(ifp->ctx, LOG_DEBUG,
+			    "%s: %s %s (xid 0x%02x%02x%02x),"
+			    " next in %0.1f seconds",
+			    ifp->name,
+			    broad_uni,
+			    dhcp6_get_op(state->send->type),
+			    state->send->xid[0],
+			    state->send->xid[1],
+			    state->send->xid[2],
+			    timespec_to_double(&state->RT));
 
 		/* Wait the initial delay */
 		if (state->IMD) {
@@ -1125,6 +1129,9 @@ logsend:
 			return 0;
 		}
 	}
+
+	if (ifp->carrier == LINK_DOWN)
+		return 0;
 
 	/* Update the elapsed time */
 	dhcp6_updateelapsed(ifp, state->send, state->send_len);
