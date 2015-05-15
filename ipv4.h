@@ -108,7 +108,7 @@ void ipv4_ctxfree(struct dhcpcd_ctx *);
 #define ipv4_freeroutes(a) {}
 #define ipv4_free(a) {}
 #define ipv4_ctxfree(a) {}
-#define ipv4_addrexists(a, b) (0)
+#define ipv4_ifaddrexists(a) (0)
 #endif
 
 #endif

@@ -279,6 +279,7 @@ void ipv6_buildroutes(struct dhcpcd_ctx *);
 #else
 #define ipv6_init(a) (NULL)
 #define ipv6_start(a) (-1)
+#define ipv6_iffindaddr(a, b) (NULL)
 #define ipv6_free_ll_callbacks(a) {}
 #define ipv6_free(a) {}
 #define ipv6_drop(a) {}
