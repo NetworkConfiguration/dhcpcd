@@ -354,7 +354,7 @@ ipv6nd_expire(struct interface *ifp, uint32_t seconds)
 
 	TAILQ_FOREACH(rap, ifp->ctx->ipv6->ra_routers, next) {
 		if (rap->iface == ifp) {
-			rap->received = now;
+			rap->acquired = now;
 			rap->expired = seconds ? 0 : 1;
 			if (seconds) {
 				struct ipv6_addr *ap;
@@ -846,7 +846,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 		rap->data_len = len;
 	}
 
-	clock_gettime(CLOCK_MONOTONIC, &rap->received);
+	clock_gettime(CLOCK_MONOTONIC, &rap->acquired);
 	rap->flags = nd_ra->nd_ra_flags_reserved;
 	if (new_rap == 0 && rap->lifetime == 0)
 		logger(ifp->ctx, LOG_WARNING, "%s: %s router available",
@@ -993,7 +993,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 					ap->saddr[0] = '\0';
 				}
 				ap->dadcallback = ipv6nd_dadcallback;
-				ap->created = ap->acquired = rap->received;
+				ap->created = ap->acquired = rap->acquired;
 				TAILQ_INSERT_TAIL(&rap->addrs, ap, next);
 
 #ifdef IPV6_MANAGETEMPADDR
@@ -1013,7 +1013,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 				new_ap = 0;
 #endif
 				ap->flags &= ~IPV6_AF_STALE;
-				ap->acquired = rap->received;
+				ap->acquired = rap->acquired;
 			}
 			if (pi->nd_opt_pi_flags_reserved &
 			    ND_OPT_PI_FLAG_ONLINK)
@@ -1106,7 +1106,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 	}
 	ipv6_addaddrs(&rap->addrs);
 #ifdef IPV6_MANAGETEMPADDR
-	ipv6_addtempaddrs(ifp, &rap->received);
+	ipv6_addtempaddrs(ifp, &rap->acquired);
 #endif
 
 	/* Find any freshly added routes, such as the subnet route.
@@ -1252,7 +1252,9 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 	struct dhcp_opt *opt;
 	const struct nd_opt_hdr *o;
 	struct ipv6_addr *ia;
+	struct timespec now;
 
+	clock_gettime(CLOCK_MONOTONIC, &now);
 	i = n = 0;
 	TAILQ_FOREACH(rap, ifp->ctx->ipv6->ra_routers, next) {
 		if (rap->iface != ifp)
@@ -1267,6 +1269,14 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 		if (env)
 			setvar(rap->iface->ctx, &env[n], ndprefix,
 			    "from", rap->sfrom);
+		n++;
+		if (env)
+			setvard(rap->iface->ctx, &env[n], ndprefix,
+			    "acquired", (size_t)rap->acquired.tv_sec);
+		n++;
+		if (env)
+			setvard(rap->iface->ctx, &env[n], ndprefix,
+			    "now", (size_t)now.tv_sec);
 		n++;
 
 		/* Zero our indexes */
@@ -1328,8 +1338,11 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 		 * from the prefix information options as well. */
 		j = 0;
 		TAILQ_FOREACH(ia, &rap->addrs, next) {
-			if (!(ia->flags & IPV6_AF_AUTOCONF) ||
-			    ia->flags & IPV6_AF_TEMPORARY)
+			if (!(ia->flags & IPV6_AF_AUTOCONF)
+#ifdef IPV6_AF_TEMPORARY
+			    || ia->flags & IPV6_AF_TEMPORARY
+#endif
+			    )
 				continue;
 			j++;
 			if (env) {
@@ -1379,7 +1392,7 @@ ipv6nd_expirera(void *arg)
 		if (rap->lifetime) {
 			lt.tv_sec = (time_t)rap->lifetime;
 			lt.tv_nsec = 0;
-			timespecadd(&rap->received, &lt, &expire);
+			timespecadd(&rap->acquired, &lt, &expire);
 			if (rap->lifetime == 0 || timespeccmp(&now, &expire, >))
 			{
 				if (!rap->expired) {

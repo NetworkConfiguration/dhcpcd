@@ -222,6 +222,17 @@ setvar(struct dhcpcd_ctx *ctx,
 }
 
 ssize_t
+setvard(struct dhcpcd_ctx *ctx,
+    char **e, const char *prefix, const char *var, size_t value)
+{
+
+	char buffer[32];
+
+	snprintf(buffer, sizeof(buffer), "%zu", value);
+	return setvar(ctx, e, prefix, var, buffer);
+}
+
+ssize_t
 addvar(struct dhcpcd_ctx *ctx,
     char ***e, const char *prefix, const char *var, const char *value)
 {

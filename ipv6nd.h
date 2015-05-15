@@ -41,7 +41,7 @@ struct ra {
 	char sfrom[INET6_ADDRSTRLEN];
 	unsigned char *data;
 	size_t data_len;
-	struct timespec received;
+	struct timespec acquired;
 	unsigned char flags;
 	uint32_t lifetime;
 	uint32_t reachable;
