@@ -760,7 +760,8 @@ ipv4_deladdr(struct interface *ifp,
 		logger(ifp->ctx, LOG_ERR, "%s: %s: %m", ifp->name, __func__);
 
 	dstate = D_STATE(ifp);
-	if (dstate->addr.s_addr == addr->s_addr &&
+	if (dstate &&
+	    dstate->addr.s_addr == addr->s_addr &&
 	    dstate->net.s_addr == net->s_addr)
 	{
 		dstate->added = 0;
