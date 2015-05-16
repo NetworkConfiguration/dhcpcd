@@ -923,6 +923,9 @@ ipv4_preferanother(struct interface *ifp)
 	struct interface *ifn;
 	int preferred;
 
+	if (state == NULL)
+		return 0;
+
 	preferred = 0;
 	if (!state->added)
 		goto out;
