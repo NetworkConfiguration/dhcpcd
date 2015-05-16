@@ -32,6 +32,7 @@
 #include <arpa/inet.h>
 #include <net/route.h>
 
+#include <assert.h>
 #include <ctype.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -884,6 +885,8 @@ static void
 ipv4_finalisert(struct interface *ifp)
 {
 	const struct dhcp_state *state = D_CSTATE(ifp);
+
+	assert(state != NULL);
 
 	/* Find any freshly added routes, such as the subnet route.
 	 * We do this because we cannot rely on recieving the kernel
