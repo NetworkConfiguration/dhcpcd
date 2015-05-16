@@ -1326,7 +1326,7 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 
 	reload_config(ctx);
 	/* XXX: Respect initial commandline options? */
-	reconf_reboot(ctx, do_reboot, argc, argv, optind);
+	reconf_reboot(ctx, do_reboot, argc, argv, optind - 1);
 	return 0;
 }
 
