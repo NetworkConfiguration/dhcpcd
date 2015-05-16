@@ -2763,31 +2763,36 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	astate = NULL;
 
-#ifndef IN_IFF_TENTATIVE
+#ifdef IN_IFF_TENTATIVE
+	addr.s_addr = state->offer->yiaddr;
+	astate = arp_new(ifp, &addr);
+	if (astate) {
+		astate->probed_cb = dhcp_arp_probed;
+		astate->conflicted_cb = dhcp_arp_conflicted;
+		/* No need to start the probe as we'll
+		 * listen to the kernel stating DAD or not and
+		 * that action look look for our ARP state  for
+		 * what to do. */
+	}
+#else
 	if (ifo->options & DHCPCD_ARP
 	    && state->addr.s_addr != state->offer->yiaddr)
-#endif
 	{
 		addr.s_addr = state->offer->yiaddr;
-#ifndef IN_IFF_TENTATIVE
 		/* If the interface already has the address configured
 		 * then we can't ARP for duplicate detection. */
 		ia = ipv4_findaddr(ifp->ctx, &addr);
 		if (ia) {
-#endif
 			astate = arp_new(ifp, &addr);
 			if (astate) {
 				astate->probed_cb = dhcp_arp_probed;
 				astate->conflicted_cb = dhcp_arp_conflicted;
-#ifndef IN_IFF_TENTATIVE
 				arp_probe(astate);
-#endif
 			}
-#ifndef IN_IFF_TENTATIVE
 			return;
 		}
-#endif
 	}
+#endif
 
 	dhcp_bind(ifp, astate);
 }
