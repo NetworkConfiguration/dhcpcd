@@ -80,11 +80,13 @@ int ipv4_addrexists(struct dhcpcd_ctx *, const struct in_addr *);
 
 #define STATE_ADDED		0x01
 #define STATE_FAKE		0x02
+#define STATE_TENTATIVE		0x04
 
 void ipv4_buildroutes(struct dhcpcd_ctx *);
 void ipv4_finaliseaddr(struct interface *);
 int ipv4_deladdr(struct interface *ifp, const struct in_addr *,
     const struct in_addr *);
+int ipv4_preferanother(struct interface *ifp);
 void ipv4_applyaddr(void *);
 int ipv4_handlert(struct dhcpcd_ctx *, int, struct rt *);
 void ipv4_freerts(struct rt_head *);
