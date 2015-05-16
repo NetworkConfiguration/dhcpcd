@@ -909,7 +909,7 @@ ipv4_finaliseaddr(struct interface *ifp)
 	    ipv4_iffindaddr(ifp, &lease->addr, NULL))
 		delete_address(ifp);
 
-	state->added &= ~(STATE_FAKE | STATE_TENTATIVE);
+	state->added &= (uint8_t)~(STATE_FAKE | STATE_TENTATIVE);
 	ipv4_finalisert(ifp);
 }
 
@@ -996,7 +996,7 @@ ipv4_applyaddr(void *arg)
 				    ifp->name,
 				    inet_ntoa(lease->addr),
 				    ifn->name);
-				state->added &= ~STATE_TENTATIVE;
+				state->added &= (uint8_t)~STATE_TENTATIVE;
 				return;
 			}
 			logger(ifp->ctx, LOG_INFO, "%s: preferring %s on %s",
