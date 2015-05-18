@@ -55,11 +55,11 @@ FOSSILID?=	current
 
 DISTPREFIX?=	${PROG}-${VERSION}
 DISTFILEGZ?=	${DISTPREFIX}.tar.gz
-DISTFILE?=	${DISTPREFIX}.tar.bz2
+DISTFILE?=	${DISTPREFIX}.tar.xz
 
 HOST_SH?=	/bin/sh
 
-CLEANFILES+=	*.tar.bz2
+CLEANFILES+=	*.tar.xz
 
 .PHONY:		import import-bsd dev test
 
@@ -139,7 +139,7 @@ distclean: clean
 
 dist:
 	fossil tarball --name ${DISTPREFIX} ${FOSSILID} ${DISTFILEGZ}
-	gunzip -c ${DISTFILEGZ} |  bzip2 >${DISTFILE}
+	gunzip -c ${DISTFILEGZ} | xz >${DISTFILE}
 	rm ${DISTFILEGZ}
 
 snapshot:
