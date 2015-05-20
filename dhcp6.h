@@ -232,6 +232,8 @@ struct dhcp6_state {
 #ifdef INET6
 void dhcp6_printoptions(const struct dhcpcd_ctx *,
     const struct dhcp_opt *, size_t);
+struct ipv6_addr *dhcp6_iffindaddr(struct interface *ifp,
+    const struct in6_addr *addr, short flags);
 struct ipv6_addr *dhcp6_findaddr(struct dhcpcd_ctx *, const struct in6_addr *,
     short);
 size_t dhcp6_find_delegates(struct interface *);
@@ -247,7 +249,6 @@ int dhcp6_dadcompleted(const struct interface *);
 void dhcp6_drop(struct interface *, const char *);
 int dhcp6_dump(struct interface *);
 #else
-#define dhcp6_findaddr(a, b, c) (0)
 #define dhcp6_find_delegates(a) {}
 #define dhcp6_start(a, b) (0)
 #define dhcp6_reboot(a) {}

@@ -224,14 +224,14 @@ static int
 dhcpcd_ifipwaited(struct interface *ifp, unsigned long long opts)
 {
 
-	if (opts & DHCPCD_WAITIP4 && !ipv4_ifaddrexists(ifp))
+	if (opts & DHCPCD_WAITIP4 && !ipv4_hasaddr(ifp))
 		return 0;
-	if (opts & DHCPCD_WAITIP6 && !ipv6_iffindaddr(ifp, NULL))
+	if (opts & DHCPCD_WAITIP6 && !ipv6_hasaddr(ifp))
 		return 0;
 	if (opts & DHCPCD_WAITIP &&
 	    !(opts & (DHCPCD_WAITIP4 | DHCPCD_WAITIP6)) &&
-	    !ipv4_ifaddrexists(ifp) &&
-	    !ipv6_iffindaddr(ifp, NULL))
+	    !ipv4_hasaddr(ifp) &&
+	    !ipv6_hasaddr(ifp))
 		return 0;
 	return 1;
 }

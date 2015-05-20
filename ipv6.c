@@ -1036,6 +1036,17 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 	}
 }
 
+int
+ipv6_hasaddr(struct interface *ifp)
+{
+
+	if (ipv6nd_iffindaddr(ifp, NULL, 0) != NULL)
+		return 1;
+	if (dhcp6_iffindaddr(ifp, NULL, 0) != NULL)
+		return 1;
+	return 0;
+}
+
 const struct ipv6_addr *
 ipv6_iffindaddr(const struct interface *ifp, const struct in6_addr *addr)
 {

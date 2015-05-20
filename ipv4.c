@@ -157,33 +157,14 @@ ipv4_findaddr(struct dhcpcd_ctx *ctx, const struct in_addr *addr)
 }
 
 int
-ipv4_ifaddrexists(const struct interface *ifp)
+ipv4_hasaddr(const struct interface *ifp)
 {
 	const struct dhcp_state *state;
 
 	state = D_CSTATE(ifp);
-	return (state && state->addr.s_addr != INADDR_ANY);
-}
-
-int
-ipv4_addrexists(struct dhcpcd_ctx *ctx, const struct in_addr *addr)
-{
-	struct interface *ifp;
-	struct dhcp_state *state;
-
-	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-		state = D_STATE(ifp);
-		if (state) {
-			if (addr == NULL) {
-				if (state->addr.s_addr != INADDR_ANY)
-					return 1;
-			} else if (addr->s_addr == state->addr.s_addr)
-				return 1;
-		}
-		if (addr != NULL && ipv4_iffindaddr(ifp, addr, NULL))
-			return 1;
-	}
-	return 0;
+	return (state &&
+	    state->added == STATE_ADDED &&
+	    state->addr.s_addr != INADDR_ANY);
 }
 
 void
@@ -716,7 +697,7 @@ ipv4_buildroutes(struct dhcpcd_ctx *ctx)
 					or = ipv4_findrt(ctx, rt, 1);
 					if (or == NULL ||
 					    or->gate.s_addr != rt->gate.s_addr)
- 						continue;
+						continue;
 				} else {
 					if (n_route(rt) != 0)
 						continue;

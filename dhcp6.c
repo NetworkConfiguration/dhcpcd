@@ -1693,7 +1693,7 @@ dhcp6_checkstatusok(const struct interface *ifp,
 	return -1;
 }
 
-static struct ipv6_addr *
+struct ipv6_addr *
 dhcp6_iffindaddr(struct interface *ifp, const struct in6_addr *addr,
     short flags)
 {

@@ -2096,7 +2096,7 @@ read_config(struct dhcpcd_ctx *ctx,
 	char *line, *buf, *option, *p;
 	size_t buflen;
 	ssize_t vlen;
-	int skip = 0, have_profile = 0;
+	int skip = 0, have_profile = 0, new_block, had_block;
 #ifndef EMBEDDED_CONFIG
 	const char * const *e;
 	size_t ol;
@@ -2282,10 +2282,16 @@ read_config(struct dhcpcd_ctx *ctx,
 			    *(p - 1) != '\\')
 				*p-- = '\0';
 		}
+		if (new_block) {
+			had_block = 1;
+			new_block = 0;
+			ifo->options &= ~DHCPCD_WAITOPTS;
+		}
 		/* Start of an interface block, skip if not ours */
 		if (strcmp(option, "interface") == 0) {
 			char **n;
 
+			new_block = 1;
 			if (ifname && line && strcmp(line, ifname) == 0)
 				skip = 0;
 			else
@@ -2312,6 +2318,7 @@ read_config(struct dhcpcd_ctx *ctx,
 		}
 		/* Start of an ssid block, skip if not ours */
 		if (strcmp(option, "ssid") == 0) {
+			new_block = 1;
 			if (ssid && line && strcmp(line, ssid) == 0)
 				skip = 0;
 			else
@@ -2320,6 +2327,7 @@ read_config(struct dhcpcd_ctx *ctx,
 		}
 		/* Start of a profile block, skip if not ours */
 		if (strcmp(option, "profile") == 0) {
+			new_block = 1;
 			if (profile && line && strcmp(line, profile) == 0) {
 				skip = 0;
 				have_profile = 1;
@@ -2344,6 +2352,8 @@ read_config(struct dhcpcd_ctx *ctx,
 		return NULL;
 	}
 
+	if (!had_block)
+		ifo->options &= ~DHCPCD_WAITOPTS;
 	finish_config(ifo);
 	return ifo;
 }
@@ -2353,17 +2363,26 @@ add_options(struct dhcpcd_ctx *ctx, const char *ifname,
     struct if_options *ifo, int argc, char **argv)
 {
 	int oi, opt, r;
+	unsigned long long wait_opts;
 
 	if (argc == 0)
 		return 1;
 
 	optind = 0;
 	r = 1;
+	/* Don't apply the command line wait options to each interface,
+	 * only use the dhcpcd.conf entry for that. */
+	if (ifname != NULL)
+		wait_opts = ifo->options & DHCPCD_WAITOPTS;
 	while ((opt = getopt_long(argc, argv, IF_OPTS, cf_options, &oi)) != -1)
 	{
 		r = parse_option(ctx, ifname, ifo, opt, optarg, NULL, NULL);
 		if (r != 1)
 			break;
+	}
+	if (ifname != NULL) {
+		ifo->options &= ~DHCPCD_WAITOPTS;
+		ifo->options |= wait_opts;
 	}
 
 	finish_config(ifo);
