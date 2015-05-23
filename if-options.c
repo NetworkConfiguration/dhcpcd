@@ -2271,6 +2271,7 @@ read_config(struct dhcpcd_ctx *ctx,
 
 	ldop = edop = NULL;
 	skip = have_profile = new_block = 0;
+	had_block = ifname == NULL ? 1 : 0;
 	while ((line = get_line(&buf, &buflen, fp))) {
 		option = strsep(&line, " \t");
 		if (line)
@@ -2283,7 +2284,7 @@ read_config(struct dhcpcd_ctx *ctx,
 			    *(p - 1) != '\\')
 				*p-- = '\0';
 		}
-		if (new_block) {
+		if (skip == 0 && new_block) {
 			had_block = 1;
 			new_block = 0;
 			ifo->options &= ~DHCPCD_WAITOPTS;
