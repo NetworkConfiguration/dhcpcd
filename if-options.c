@@ -2096,7 +2096,7 @@ read_config(struct dhcpcd_ctx *ctx,
 	char *line, *buf, *option, *p;
 	size_t buflen;
 	ssize_t vlen;
-	int skip = 0, have_profile = 0, new_block, had_block;
+	int skip, have_profile, new_block, had_block;
 #ifndef EMBEDDED_CONFIG
 	const char * const *e;
 	size_t ol;
@@ -2270,6 +2270,7 @@ read_config(struct dhcpcd_ctx *ctx,
 		ifo->mtime = sb.st_mtime;
 
 	ldop = edop = NULL;
+	skip = have_profile = new_block = 0;
 	while ((line = get_line(&buf, &buflen, fp))) {
 		option = strsep(&line, " \t");
 		if (line)
