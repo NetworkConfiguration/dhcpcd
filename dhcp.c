@@ -644,6 +644,14 @@ get_option_routes(struct interface *ifp, const struct dhcp_message *dhcp)
 				free(route);
 				continue;
 			}
+			/* A host route is normally set by having the
+			 * gateway match the destination or assigned address */
+			if (route->gate.s_addr == route->dest.s_addr ||
+			    route->gate.s_addr == dhcp->yiaddr)
+			{
+				route->gate.s_addr = htonl(INADDR_ANY);
+				route->net.s_addr = htonl(INADDR_BROADCAST);
+			}
 			route->net.s_addr = route_netmask(route->dest.s_addr);
 			TAILQ_INSERT_TAIL(routes, route, next);
 		}

@@ -512,28 +512,6 @@ get_routes(struct interface *ifp)
 	return get_option_routes(ifp, D_STATE(ifp)->new);
 }
 
-/* Some DHCP servers add set host routes by setting the gateway
- * to the assigned IP address or the destination address.
- * We need to change this. */
-static struct rt_head *
-massage_host_routes(struct rt_head *rt, const struct interface *ifp)
-{
-	struct rt *r;
-
-	if (rt) {
-		TAILQ_FOREACH(r, rt, next) {
-			if (r->gate.s_addr == D_CSTATE(ifp)->addr.s_addr ||
-			    r->gate.s_addr == r->dest.s_addr)
-			{
-				r->gate.s_addr = htonl(INADDR_ANY);
-				r->net.s_addr = htonl(INADDR_BROADCAST);
-			}
-		}
-	}
-	return rt;
-}
-
-
 static struct rt_head *
 add_destination_route(struct rt_head *rt, const struct interface *ifp)
 {
@@ -654,7 +632,6 @@ ipv4_buildroutes(struct dhcpcd_ctx *ctx)
 		if (state == NULL || state->new == NULL || !state->added)
 			continue;
 		dnr = get_routes(ifp);
-		dnr = massage_host_routes(dnr, ifp);
 		dnr = add_subnet_route(dnr, ifp);
 #ifdef IPV4_LOOPBACK_ROUTE
 		dnr = add_loopback_route(dnr, ifp);
