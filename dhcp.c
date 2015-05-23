@@ -2792,7 +2792,7 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 		/* If the interface already has the address configured
 		 * then we can't ARP for duplicate detection. */
 		ia = ipv4_findaddr(ifp->ctx, &addr);
-		if (ia) {
+		if (ia == NULL) {
 			astate = arp_new(ifp, &addr);
 			if (astate) {
 				astate->probed_cb = dhcp_arp_probed;
