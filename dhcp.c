@@ -1644,7 +1644,7 @@ send_message(struct interface *ifp, uint8_t type,
 	    ((ia = ipv4_iffindaddr(ifp, &state->addr, NULL)) &&
 	    !(ia->addr_flags & IN_IFF_NOTUSEABLE)) &&
 #endif
-	    (state->new->cookie == htonl(MAGIC_COOKIE) ||
+	    (state->lease.server.s_addr ||
 	    ifp->options->options & DHCPCD_INFORM))
 	{
 		s = dhcp_openudp(ifp);
@@ -2344,7 +2344,7 @@ dhcp_drop(struct interface *ifp, const char *reason)
 		unlink(state->leasefile);
 		if (ifp->carrier != LINK_DOWN &&
 		    state->new != NULL &&
-		    state->new->cookie == htonl(MAGIC_COOKIE))
+		    state->lease.server.s_addr != INADDR_ANY)
 		{
 			logger(ifp->ctx, LOG_INFO, "%s: releasing lease of %s",
 			    ifp->name, inet_ntoa(state->lease.addr));
