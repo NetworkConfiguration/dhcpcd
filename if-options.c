@@ -469,7 +469,6 @@ parse_addr(struct dhcpcd_ctx *ctx,
     struct in_addr *addr, struct in_addr *net, const char *arg)
 {
 	char *p;
-	int i;
 
 	if (arg == NULL || *arg == '\0') {
 		if (addr != NULL)
@@ -479,10 +478,13 @@ parse_addr(struct dhcpcd_ctx *ctx,
 		return 0;
 	}
 	if ((p = strchr(arg, '/')) != NULL) {
+		int e;
+		intmax_t i;
+
 		*p++ = '\0';
-		if (net != NULL &&
-		    (sscanf(p, "%d", &i) != 1 ||
-			inet_cidrtoaddr(i, net) != 0))
+		i = strtoi(p, NULL, 10, 0, 32, &e);
+		if (e != 0 ||
+		    (net != NULL && inet_cidrtoaddr((int)i, net) != 0))
 		{
 			logger(ctx, LOG_ERR, "`%s' is not a valid CIDR", p);
 			return -1;
