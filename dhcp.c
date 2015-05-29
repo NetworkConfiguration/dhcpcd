@@ -2160,6 +2160,7 @@ dhcp_message_new(const struct in_addr *addr, const struct in_addr *mask)
 	if (dhcp == NULL)
 		return NULL;
 	dhcp->yiaddr = addr->s_addr;
+	dhcp->cookie = htonl(MAGIC_COOKIE);
 	p = dhcp->options;
 	if (mask && mask->s_addr != INADDR_ANY) {
 		*p++ = DHO_SUBNETMASK;
