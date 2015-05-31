@@ -407,19 +407,21 @@ configure_interface1(struct interface *ifp)
 	if (ifo->metric != -1)
 		ifp->metric = (unsigned int)ifo->metric;
 
+	/* If we're a psuedo interface, ensure we disable as much as we can */
+	if (ifp->options->options & DHCPCD_PFXDLGONLY)
+		ifp->options->options &=
+		    ~(DHCPCD_IPV4 | DHCPCD_IPV6RS | DHCPCD_WAITIP | DHCPCD_WAITIP6);
+
 	if (!(ifo->options & DHCPCD_IPV4))
-		ifo->options &= ~(DHCPCD_DHCP | DHCPCD_IPV4LL);
+		ifo->options &= ~(DHCPCD_DHCP | DHCPCD_IPV4LL | DHCPCD_WAITIP4);
 
 	if (!(ifo->options & DHCPCD_IPV6))
-		ifo->options &= ~(DHCPCD_IPV6RS | DHCPCD_DHCP6);
+		ifo->options &=
+		    ~(DHCPCD_IPV6RS | DHCPCD_DHCP6 | DHCPCD_WAITIP6);
 
 	if (ifo->options & DHCPCD_SLAACPRIVATE &&
 	    !(ifp->ctx->options & (DHCPCD_DUMPLEASE | DHCPCD_TEST)))
 		ifo->options |= DHCPCD_IPV6RA_OWN;
-
-	/* If we're a psuedo interface, ensure we disable as much as we can */
-	if (ifp->options->options & DHCPCD_PFXDLGONLY)
-		ifp->options->options &= ~(DHCPCD_IPV4 | DHCPCD_IPV6RS);
 
 	/* We want to disable kernel interface RA as early as possible. */
 	if (ifo->options & DHCPCD_IPV6RS &&
