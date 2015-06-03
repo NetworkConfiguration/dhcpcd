@@ -101,6 +101,7 @@
 #define O_IPV6RA_ACCEPT_NOPUBLIC	O_BASE + 41
 #define O_BOOTP			O_BASE + 42
 #define O_DEFINEND		O_BASE + 43
+#define O_NODELAY		O_BASE + 44
 
 const struct option cf_options[] = {
 	{"background",      no_argument,       NULL, 'b'},
@@ -195,6 +196,7 @@ const struct option cf_options[] = {
 	{"ia_pd_mix",       no_argument,       NULL, O_PFXDLGMIX},
 	{"reject",          required_argument, NULL, O_REJECT},
 	{"bootp",           no_argument,       NULL, O_BOOTP},
+	{"nodelay",         no_argument,       NULL, O_NODELAY},
 	{NULL,              0,                 NULL, '\0'}
 };
 
@@ -2016,6 +2018,9 @@ err_sla:
 	case O_BOOTP:
 		ifo->options |= DHCPCD_BOOTP;
 		break;
+	case O_NODELAY:
+		ifo->options &= ~DHCPCD_INITIAL_DELAY;
+		break;
 	default:
 		return 0;
 	}
@@ -2115,7 +2120,7 @@ read_config(struct dhcpcd_ctx *ctx,
 		logger(ctx, LOG_ERR, "%s: %m", __func__);
 		return NULL;
 	}
-	ifo->options |= DHCPCD_DAEMONISE | DHCPCD_LINK;
+	ifo->options |= DHCPCD_DAEMONISE | DHCPCD_LINK | DHCPCD_INITIAL_DELAY;
 #ifdef PLUGIN_DEV
 	ifo->options |= DHCPCD_DEV;
 #endif

@@ -1697,6 +1697,11 @@ ipv6nd_startrs(struct interface *ifp)
 	struct timespec tv;
 
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
+	if (!(ifp->options->options & DHCPCD_INITIAL_DELAY)) {
+		ipv6nd_startrs1(ifp);
+		return;
+	}
+
 	tv.tv_sec = 0;
 	tv.tv_nsec = (suseconds_t)arc4random_uniform(
 	    MAX_RTR_SOLICITATION_DELAY * NSEC_PER_SEC);

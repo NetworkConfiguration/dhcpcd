@@ -1054,6 +1054,9 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 		    state->send->xid[1],
 		    state->send->xid[2]);
 	else {
+		if (state->IMD &&
+		    !(ifp->options->options & DHCPCD_INITIAL_DELAY))
+			state->IMD = 0;
 		if (state->IMD) {
 			/* Some buggy PPP servers close the link too early
 			 * after sending an invalid status in their reply
