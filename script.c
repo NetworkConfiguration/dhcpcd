@@ -622,13 +622,9 @@ script_runreason(const struct interface *ifp, const char *reason)
 
 	if (ifp->options->script &&
 	    (ifp->options->script[0] == '\0' ||
-	    strcmp(ifp->options->script, "/dev/null") == 0))
+	    strcmp(ifp->options->script, "/dev/null") == 0) &&
+	    TAILQ_FIRST(&ifp->ctx->control_fds) == NULL)
 		return 0;
-
-	argv[0] = ifp->options->script ? ifp->options->script : UNCONST(SCRIPT);
-	argv[1] = NULL;
-	logger(ifp->ctx, LOG_DEBUG, "%s: executing `%s' %s",
-	    ifp->name, argv[0], reason);
 
 	/* Make our env */
 	elen = (size_t)make_env(ifp, reason, &env);
@@ -636,6 +632,17 @@ script_runreason(const struct interface *ifp, const char *reason)
 		logger(ifp->ctx, LOG_ERR, "%s: make_env: %m", ifp->name);
 		return -1;
 	}
+
+	if (ifp->options->script &&
+	    (ifp->options->script[0] == '\0' ||
+	    strcmp(ifp->options->script, "/dev/null") == 0))
+	    	goto send_listeners;
+
+	argv[0] = ifp->options->script ? ifp->options->script : UNCONST(SCRIPT);
+	argv[1] = NULL;
+	logger(ifp->ctx, LOG_DEBUG, "%s: executing `%s' %s",
+	    ifp->name, argv[0], reason);
+
 	/* Resize for PATH and RC_SVCNAME */
 	svcname = getenv(RC_SVCNAME);
 	ep = realloc(env, sizeof(char *) * (elen + 2 + (svcname ? 1 : 0)));
@@ -694,6 +701,7 @@ script_runreason(const struct interface *ifp, const char *reason)
 			    __func__, argv[0], strsignal(WTERMSIG(status)));
 	}
 
+send_listeners:
 	/* Send to our listeners */
 	bigenv = NULL;
 	status = 0;
