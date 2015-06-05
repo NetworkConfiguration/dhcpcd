@@ -46,7 +46,7 @@
 # define SECRET			SYSCONFDIR "/" PACKAGE ".secret"
 #endif
 #ifndef LEASEFILE
-# define LEASEFILE		DBDIR "/" PACKAGE "-%s%s%s.lease"
+# define LEASEFILE		DBDIR "/" PACKAGE "-%s%s.lease"
 #endif
 #ifndef LEASEFILE6
 # define LEASEFILE6		LEASEFILE "6"

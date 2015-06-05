@@ -889,7 +889,7 @@ ipv4_preferanother(struct interface *ifp)
 		goto out;
 
 	TAILQ_FOREACH(ifn, ifp->ctx->ifaces, next) {
-		if (ifn == ifp || strcmp(ifn->name, ifp->name) == 0)
+		if (ifn == ifp)
 			break; /* We are already the most preferred */
 		nstate = D_STATE(ifn);
 		if (nstate && !nstate->added &&
@@ -946,7 +946,7 @@ ipv4_applyaddr(void *arg)
 	/* Ensure only one interface has the address */
 	r = 0;
 	TAILQ_FOREACH(ifn, ifp->ctx->ifaces, next) {
-		if (ifn == ifp || strcmp(ifn->name, ifp->name) == 0) {
+		if (ifn == ifp) {
 			r = 1; /* past ourselves */
 			continue;
 		}
@@ -975,7 +975,7 @@ ipv4_applyaddr(void *arg)
 	/* Does another interface already have the address from a prior boot? */
 	if (ifn == NULL) {
 		TAILQ_FOREACH(ifn, ifp->ctx->ifaces, next) {
-			if (ifn == ifp || strcmp(ifn->name, ifp->name) == 0)
+			if (ifn == ifp)
 				continue;
 			ap = ipv4_iffindaddr(ifn, &lease->addr, NULL);
 			if (ap)

@@ -94,7 +94,7 @@
 #define O_CONTROLGRP		O_BASE + 34
 #define O_SLAAC			O_BASE + 35
 #define O_GATEWAY		O_BASE + 36
-#define O_PFXDLGMIX		O_BASE + 37
+// unassigned			O_BASE + 37
 #define O_IPV6RA_AUTOCONF	O_BASE + 38
 #define O_IPV6RA_NOAUTOCONF	O_BASE + 39
 #define O_REJECT		O_BASE + 40
@@ -193,7 +193,6 @@ const struct option cf_options[] = {
 	{"controlgroup",    required_argument, NULL, O_CONTROLGRP},
 	{"slaac",           required_argument, NULL, O_SLAAC},
 	{"gateway",         no_argument,       NULL, O_GATEWAY},
-	{"ia_pd_mix",       no_argument,       NULL, O_PFXDLGMIX},
 	{"reject",          required_argument, NULL, O_REJECT},
 	{"bootp",           no_argument,       NULL, O_BOOTP},
 	{"nodelay",         no_argument,       NULL, O_NODELAY},
@@ -2011,9 +2010,6 @@ err_sla:
 			ifo->options |= DHCPCD_SLAACPRIVATE;
 		else
 			ifo->options &= ~DHCPCD_SLAACPRIVATE;
-		break;
-	case O_PFXDLGMIX:
-		ifo->options |= DHCPCD_PFXDLGMIX;
 		break;
 	case O_BOOTP:
 		ifo->options |= DHCPCD_BOOTP;

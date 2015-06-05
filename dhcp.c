@@ -3025,7 +3025,7 @@ dhcp_dump(struct interface *ifp)
 	state->raw_fd = state->arp_fd = -1;
 	TAILQ_INIT(&state->arp_states);
 	dhcp_set_leasefile(state->leasefile, sizeof(state->leasefile),
-	    AF_INET, ifp, "");
+	    AF_INET, ifp);
 	state->new = read_lease(ifp);
 	if (state->new == NULL) {
 		logger(ifp->ctx, LOG_ERR, "%s: %s: %m",
@@ -3107,7 +3107,7 @@ dhcp_init(struct interface *ifp)
 	state->reason = "PREINIT";
 	state->nakoff = 0;
 	dhcp_set_leasefile(state->leasefile, sizeof(state->leasefile),
-	    AF_INET, ifp, "");
+	    AF_INET, ifp);
 
 	ifo = ifp->options;
 	/* We need to drop the leasefile so that dhcp_start

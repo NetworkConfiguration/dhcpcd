@@ -106,8 +106,7 @@ int make_option_mask(const struct dhcp_opt *, size_t,
 size_t encode_rfc1035(const char *src, uint8_t *dst);
 ssize_t decode_rfc3397(char *, size_t, const uint8_t *, size_t);
 ssize_t print_string(char *, size_t, int, const uint8_t *, size_t);
-int dhcp_set_leasefile(char *, size_t, int,
-    const struct interface *, const char *);
+int dhcp_set_leasefile(char *, size_t, int, const struct interface *);
 
 size_t dhcp_envoption(struct dhcpcd_ctx *,
     char **, const char *, const char *, struct dhcp_opt *,

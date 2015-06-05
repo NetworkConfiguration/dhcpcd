@@ -548,13 +548,11 @@ if_findindexname(struct if_head *ifaces, unsigned int idx, const char *name)
 		struct interface *ifp;
 
 		TAILQ_FOREACH(ifp, ifaces, next) {
-			if ((ifp->options == NULL ||
-			    !(ifp->options->options & DHCPCD_PFXDLGONLY)) &&
-			    ((name && strcmp(ifp->name, name) == 0) ||
+			if ((name && strcmp(ifp->name, name) == 0) ||
 #ifdef __linux__
 			    (name && strcmp(ifp->alias, name) == 0) ||
 #endif
-			    (!name && ifp->index == idx)))
+			    (!name && ifp->index == idx))
 				return ifp;
 		}
 	}
@@ -602,14 +600,6 @@ if_cmp(const struct interface *si, const struct interface *ti)
 #ifdef INET
 	int r;
 #endif
-
-	/* Always prefer master interfaces */
-	if (!(si->options->options & DHCPCD_PFXDLGONLY) &&
-	    ti->options->options & DHCPCD_PFXDLGONLY)
-		return -1;
-	if (si->options->options & DHCPCD_PFXDLGONLY &&
-	    !(ti->options->options & DHCPCD_PFXDLGONLY))
-		return 1;
 
 	/* Check carrier status first */
 	if (si->carrier > ti->carrier)

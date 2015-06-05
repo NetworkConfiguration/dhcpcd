@@ -625,7 +625,7 @@ ipv6_addaddr(struct ipv6_addr *ap, const struct timespec *now)
 
 	/* Ensure no other interface has this address */
 	TAILQ_FOREACH(ifp, ap->iface->ctx->ifaces, next) {
-		if (ifp == ap->iface || strcmp(ifp->name, ap->iface->name) == 0)
+		if (ifp == ap->iface)
 			continue;
 		state = IPV6_STATE(ifp);
 		if (state == NULL)
@@ -798,9 +798,7 @@ ipv6_addaddrs(struct ipv6_addrhead *addrs)
 		{
 			apf = ipv6_findaddr(ap->iface->ctx,
 			    &ap->addr, IPV6_AF_ADDED);
-			if (apf && apf->iface != ap->iface &&
-			    strcmp(apf->iface->name, ap->iface->name))
-			{
+			if (apf && apf->iface != ap->iface) {
 				if (apf->iface->metric <= ap->iface->metric) {
 					logger(apf->iface->ctx, LOG_INFO,
 					    "%s: preferring %s on %s",
@@ -864,8 +862,7 @@ ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
 			/* Find the same address somewhere else */
 			apf = ipv6_findaddr(ap->iface->ctx, &ap->addr, 0);
 			if (apf == NULL ||
-			    (apf->iface != ap->iface &&
-			    strcmp(apf->iface->name, ap->iface->name)))
+			    (apf->iface != ap->iface))
 				ipv6_deleteaddr(ap);
 			if (!(ap->iface->options->options &
 			    DHCPCD_EXITING) && apf)
@@ -931,108 +928,104 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 		errno = ESRCH;
 		return;
 	}
-	TAILQ_FOREACH(ifp, ifs, next) {
-		/* Each psuedo interface also stores addresses */
-		if (strcmp(ifp->name, ifname))
-			continue;
-		state = ipv6_getstate(ifp);
-		if (state == NULL)
-			continue;
+	if ((ifp = if_find(ifs, ifname)) == NULL)
+		return;
+	if ((state = ipv6_getstate(ifp)) == NULL)
+		return;
 
-		if (!IN6_IS_ADDR_LINKLOCAL(addr)) {
-			ipv6nd_handleifa(ctx, cmd, ifname, addr, flags);
-			dhcp6_handleifa(ctx, cmd, ifname, addr, flags);
-		}
+	if (!IN6_IS_ADDR_LINKLOCAL(addr)) {
+		ipv6nd_handleifa(ctx, cmd, ifname, addr, flags);
+		dhcp6_handleifa(ctx, cmd, ifname, addr, flags);
+	}
 
-		TAILQ_FOREACH(ap, &state->addrs, next) {
-			if (IN6_ARE_ADDR_EQUAL(&ap->addr, addr))
-				break;
-		}
-
-		switch (cmd) {
-		case RTM_DELADDR:
-			if (ap) {
-				TAILQ_REMOVE(&state->addrs, ap, next);
-				ipv6_freeaddr(ap);
-			}
+	TAILQ_FOREACH(ap, &state->addrs, next) {
+		if (IN6_ARE_ADDR_EQUAL(&ap->addr, addr))
 			break;
-		case RTM_NEWADDR:
-			if (ap == NULL) {
-				char buf[INET6_ADDRSTRLEN];
-				const char *cbp;
+	}
 
-				ap = calloc(1, sizeof(*ap));
-				ap->iface = ifp;
-				ap->addr = *addr;
-				ap->prefix_len = prefix_len;
-				ipv6_makeprefix(&ap->prefix, &ap->addr,
-				    ap->prefix_len);
-				cbp = inet_ntop(AF_INET6, &addr->s6_addr,
-				    buf, sizeof(buf));
-				if (cbp)
-					snprintf(ap->saddr, sizeof(ap->saddr),
-					    "%s/%d", cbp, prefix_len);
-				if (if_getlifetime6(ap) == -1) {
-					/* No support or address vanished.
-					 * Either way, just set a deprecated
-					 * infinite time lifetime and continue.
-					 * This is fine because we only want
-					 * to know this when trying to extend
-					 * temporary addresses.
-					 * As we can't extend infinite, we'll
-					 * create a new temporary address. */
-					ap->prefix_pltime = 0;
-					ap->prefix_vltime =
-					    ND6_INFINITE_LIFETIME;
-				}
-				/* This is a minor regression against RFC 4941
-				 * because the kernel only knows when the
-				 * lifetimes were last updated, not when the
-				 * address was initially created.
-				 * Provided dhcpcd is not restarted, this
-				 * won't be a problem.
-				 * If we don't like it, we can always
-				 * pretend lifetimes are infinite and always
-				 * generate a new temporary address on
-				 * restart. */
-				ap->acquired = ap->created;
-				TAILQ_INSERT_TAIL(&state->addrs,
-				    ap, next);
+	switch (cmd) {
+	case RTM_DELADDR:
+		if (ap) {
+			TAILQ_REMOVE(&state->addrs, ap, next);
+			ipv6_freeaddr(ap);
+		}
+		break;
+	case RTM_NEWADDR:
+		if (ap == NULL) {
+			char buf[INET6_ADDRSTRLEN];
+			const char *cbp;
+
+			ap = calloc(1, sizeof(*ap));
+			ap->iface = ifp;
+			ap->addr = *addr;
+			ap->prefix_len = prefix_len;
+			ipv6_makeprefix(&ap->prefix, &ap->addr,
+			    ap->prefix_len);
+			cbp = inet_ntop(AF_INET6, &addr->s6_addr,
+			    buf, sizeof(buf));
+			if (cbp)
+				snprintf(ap->saddr, sizeof(ap->saddr),
+				    "%s/%d", cbp, prefix_len);
+			if (if_getlifetime6(ap) == -1) {
+				/* No support or address vanished.
+				 * Either way, just set a deprecated
+				 * infinite time lifetime and continue.
+				 * This is fine because we only want
+				 * to know this when trying to extend
+				 * temporary addresses.
+				 * As we can't extend infinite, we'll
+				 * create a new temporary address. */
+				ap->prefix_pltime = 0;
+				ap->prefix_vltime =
+				    ND6_INFINITE_LIFETIME;
 			}
-			ap->addr_flags = flags;
+			/* This is a minor regression against RFC 4941
+			 * because the kernel only knows when the
+			 * lifetimes were last updated, not when the
+			 * address was initially created.
+			 * Provided dhcpcd is not restarted, this
+			 * won't be a problem.
+			 * If we don't like it, we can always
+			 * pretend lifetimes are infinite and always
+			 * generate a new temporary address on
+			 * restart. */
+			ap->acquired = ap->created;
+			TAILQ_INSERT_TAIL(&state->addrs,
+			    ap, next);
+		}
+		ap->addr_flags = flags;
 #ifdef IPV6_MANAGETEMPADDR
-			if (ap->addr_flags & IN6_IFF_TEMPORARY)
-				ap->flags |= IPV6_AF_TEMPORARY;
+		if (ap->addr_flags & IN6_IFF_TEMPORARY)
+			ap->flags |= IPV6_AF_TEMPORARY;
 #endif
-			if (IN6_IS_ADDR_LINKLOCAL(&ap->addr)) {
+		if (IN6_IS_ADDR_LINKLOCAL(&ap->addr)) {
 #ifdef IPV6_POLLADDRFLAG
-				if (ap->addr_flags & IN6_IFF_TENTATIVE) {
-					struct timespec tv;
+			if (ap->addr_flags & IN6_IFF_TENTATIVE) {
+				struct timespec tv;
 
-					ms_to_ts(&tv, RETRANS_TIMER / 2);
-					eloop_timeout_add_tv(
-					    ap->iface->ctx->eloop,
-					    &tv, ipv6_checkaddrflags, ap);
-					break;
-				}
+				ms_to_ts(&tv, RETRANS_TIMER / 2);
+				eloop_timeout_add_tv(
+				    ap->iface->ctx->eloop,
+				    &tv, ipv6_checkaddrflags, ap);
+				break;
+			}
 #endif
 
-				if (!(ap->addr_flags & IN6_IFF_NOTUSEABLE)) {
-					/* Now run any callbacks.
-					 * Typically IPv6RS or DHCPv6 */
-					while ((cb =
-					    TAILQ_FIRST(&state->ll_callbacks)))
-					{
-						TAILQ_REMOVE(
-						    &state->ll_callbacks,
-						    cb, next);
-						cb->callback(cb->arg);
-						free(cb);
-					}
+			if (!(ap->addr_flags & IN6_IFF_NOTUSEABLE)) {
+				/* Now run any callbacks.
+				 * Typically IPv6RS or DHCPv6 */
+				while ((cb =
+				    TAILQ_FIRST(&state->ll_callbacks)))
+				{
+					TAILQ_REMOVE(
+					    &state->ll_callbacks,
+					    cb, next);
+					cb->callback(cb->arg);
+					free(cb);
 				}
 			}
-			break;
 		}
+		break;
 	}
 }
 

@@ -407,11 +407,6 @@ configure_interface1(struct interface *ifp)
 	if (ifo->metric != -1)
 		ifp->metric = (unsigned int)ifo->metric;
 
-	/* If we're a psuedo interface, ensure we disable as much as we can */
-	if (ifp->options->options & DHCPCD_PFXDLGONLY)
-		ifp->options->options &=
-		    ~(DHCPCD_IPV4 | DHCPCD_IPV6RS | DHCPCD_WAITIP | DHCPCD_WAITIP6);
-
 	if (!(ifo->options & DHCPCD_IPV4))
 		ifo->options &= ~(DHCPCD_DHCP | DHCPCD_IPV4LL | DHCPCD_WAITIP4);
 
@@ -730,8 +725,6 @@ warn_iaid_conflict(struct interface *ifp, uint8_t *iaid)
 	TAILQ_FOREACH(ifn, ifp->ctx->ifaces, next) {
 		if (ifn == ifp)
 			continue;
-		if (ifn->options->options & DHCPCD_PFXDLGONLY)
-			continue;
 		if (memcmp(ifn->options->iaid, iaid,
 		    sizeof(ifn->options->iaid)) == 0)
 			break;
@@ -743,7 +736,7 @@ warn_iaid_conflict(struct interface *ifp, uint8_t *iaid)
 	}
 
 	/* This is only a problem if the interfaces are on the same network. */
-	if (ifn && strcmp(ifp->name, ifn->name))
+	if (ifn)
 		logger(ifp->ctx, LOG_ERR,
 		    "%s: IAID conflicts with one assigned to %s",
 		    ifp->name, ifn->name);
@@ -801,17 +794,14 @@ dhcpcd_startinterface(void *arg)
 		if (ifp->ctx->duid == NULL) {
 			if (duid_init(ifp) == 0)
 				return;
-			if (!(ifo->options & DHCPCD_PFXDLGONLY))
-				logger(ifp->ctx, LOG_INFO, "DUID %s",
-				    hwaddr_ntoa(ifp->ctx->duid,
-				    ifp->ctx->duid_len,
-				    buf, sizeof(buf)));
+			logger(ifp->ctx, LOG_INFO, "DUID %s",
+			    hwaddr_ntoa(ifp->ctx->duid,
+			    ifp->ctx->duid_len,
+			    buf, sizeof(buf)));
 		}
 	}
 
-	if (ifo->options & (DHCPCD_DUID | DHCPCD_IPV6) &&
-	    !(ifo->options & DHCPCD_PFXDLGONLY))
-	{
+	if (ifo->options & (DHCPCD_DUID | DHCPCD_IPV6)) {
 		/* Report IAIDs */
 		logger(ifp->ctx, LOG_INFO, "%s: IAID %s", ifp->name,
 		    hwaddr_ntoa(ifo->iaid, sizeof(ifo->iaid),
@@ -1128,16 +1118,8 @@ stop_all_interfaces(struct dhcpcd_ctx *ctx, int do_release)
 {
 	struct interface *ifp;
 
-	/* drop_dhcp could change the order, so we do it like this. */
-	for (;;) {
-		/* Be sane and drop the last config first,
-		 * skipping any pseudo interfaces */
-		TAILQ_FOREACH_REVERSE(ifp, ctx->ifaces, if_head, next) {
-			if (!(ifp->options->options & DHCPCD_PFXDLGONLY))
-				break;
-		}
-		if (ifp == NULL)
-			break;
+	/* Drop the last interface first */
+	while ((ifp = TAILQ_LAST(ctx->ifaces, if_head)) != NULL) {
 		if (do_release) {
 			ifp->options->options |= DHCPCD_RELEASE;
 			ifp->options->options &= ~DHCPCD_PERSISTENT;
@@ -1418,10 +1400,7 @@ main(int argc, char **argv)
 			i = 1;
 			break;
 		case 'U':
-			if (i == 3)
-				i = 4;
-			else if (i != 4)
-				i = 3;
+			i = 3;
 			break;
 		case 'V':
 			i = 2;
@@ -1481,8 +1460,6 @@ main(int argc, char **argv)
 			ctx.options |= DHCPCD_TEST;
 		else
 			ctx.options |= DHCPCD_DUMPLEASE;
-		if (i == 4)
-			ctx.options |= DHCPCD_PFXDLGONLY;
 		ctx.options |= DHCPCD_PERSISTENT;
 		ctx.options &= ~DHCPCD_DAEMONISE;
 	}
@@ -1577,8 +1554,6 @@ main(int argc, char **argv)
 			}
 		}
 		configure_interface(ifp, ctx.argc, ctx.argv, 0);
-		if (ctx.options & DHCPCD_PFXDLGONLY)
-			ifp->options->options |= DHCPCD_PFXDLGONLY;
 		if (family == 0 || family == AF_INET) {
 			if (dhcp_dump(ifp) == -1)
 				i = 1;

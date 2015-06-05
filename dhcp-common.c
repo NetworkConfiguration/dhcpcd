@@ -755,7 +755,7 @@ print_option(char *s, size_t len, const struct dhcp_opt *opt,
 
 int
 dhcp_set_leasefile(char *leasefile, size_t len, int family,
-    const struct interface *ifp, const char *extra)
+    const struct interface *ifp)
 {
 	char ssid[len];
 
@@ -782,7 +782,7 @@ dhcp_set_leasefile(char *leasefile, size_t len, int family,
 		ssid[0] = '\0';
 	return snprintf(leasefile, len,
 	    family == AF_INET ? LEASEFILE : LEASEFILE6,
-	    ifp->name, ssid, extra);
+	    ifp->name, ssid);
 }
 
 static size_t
