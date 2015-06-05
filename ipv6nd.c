@@ -759,7 +759,7 @@ ipv6nd_ra_has_public_addr(const struct ra *rap)
 
 static void
 ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
-    struct icmp6_hdr *icp, size_t len)
+    struct icmp6_hdr *icp, size_t len, int hoplimit)
 {
 	struct ipv6_ctx *ctx = dctx->ipv6;
 	size_t i, olen;
@@ -780,9 +780,24 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 	uint8_t new_ap;
 #endif
 
+	if (ifp == NULL) {
+#ifdef DEBUG_RS
+		logger(dctx, LOG_DEBUG,
+		    "RA for unexpected interface from %s", ctx->sfrom);
+#endif
+		return;
+	}
+
 	if (len < sizeof(struct nd_router_advert)) {
 		logger(dctx, LOG_ERR,
 		    "IPv6 RA packet too short from %s", ctx->sfrom);
+		return;
+	}
+
+	/* RFC 4861 7.1.2 */
+	if (hoplimit != 255) {
+		logger(dctx, LOG_ERR,
+		    "invalid hoplimit(%d) in RA from %s", hoplimit, ctx->sfrom);
 		return;
 	}
 
@@ -792,13 +807,6 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 		return;
 	}
 
-	if (ifp == NULL) {
-#ifdef DEBUG_RS
-		logger(dctx, LOG_DEBUG,
-		    "RA for unexpected interface from %s", ctx->sfrom);
-#endif
-		return;
-	}
 	if (!(ifp->options->options & DHCPCD_IPV6RS)) {
 #ifdef DEBUG_RS
 		logger(ifp->ctx, LOG_DEBUG, "%s: unexpected RA from %s",
@@ -926,7 +934,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 				if (dho->option == ndo->nd_opt_type)
 					break;
 			}
-			if (dho != NULL)		
+			if (dho != NULL)
 				logger(ifp->ctx, LOG_WARNING,
 				    "%s: reject RA (option %s) from %s",
 				    ifp->name, dho->var, ctx->sfrom);
@@ -1497,7 +1505,7 @@ ipv6nd_drop(struct interface *ifp)
 
 static void
 ipv6nd_handlena(struct dhcpcd_ctx *dctx, struct interface *ifp,
-    struct icmp6_hdr *icp, size_t len)
+    struct icmp6_hdr *icp, size_t len, int hoplimit)
 {
 	struct ipv6_ctx *ctx = dctx->ipv6;
 	struct nd_neighbor_advert *nd_na;
@@ -1517,6 +1525,13 @@ ipv6nd_handlena(struct dhcpcd_ctx *dctx, struct interface *ifp,
 	if ((size_t)len < sizeof(struct nd_neighbor_advert)) {
 		logger(ifp->ctx, LOG_ERR, "%s: IPv6 NA too short from %s",
 		    ifp->name, ctx->sfrom);
+		return;
+	}
+
+	/* RFC 4861 7.1.2 */
+	if (hoplimit != 255) {
+		logger(dctx, LOG_ERR,
+		    "invalid hoplimit(%d) in NA from %s", hoplimit, ctx->sfrom);
 		return;
 	}
 
@@ -1623,9 +1638,9 @@ ipv6nd_handledata(void *arg)
 		}
 	}
 
-	if (pkt.ipi6_ifindex == 0 || hoplimit == 0) {
+	if (pkt.ipi6_ifindex == 0) {
 		logger(dctx, LOG_ERR,
-		    "IPv6 RA/NA did not contain index or hop limit from %s",
+		    "IPv6 RA/NA did not contain index from %s",
 		    ctx->sfrom);
 		return;
 	}
@@ -1644,10 +1659,12 @@ ipv6nd_handledata(void *arg)
 	if (icp->icmp6_code == 0) {
 		switch(icp->icmp6_type) {
 			case ND_NEIGHBOR_ADVERT:
-				ipv6nd_handlena(dctx, ifp, icp, (size_t)len);
+				ipv6nd_handlena(dctx, ifp, icp, (size_t)len,
+				   hoplimit);
 				return;
 			case ND_ROUTER_ADVERT:
-				ipv6nd_handlera(dctx, ifp, icp, (size_t)len);
+				ipv6nd_handlera(dctx, ifp, icp, (size_t)len,
+				   hoplimit);
 				return;
 		}
 	}
