@@ -1897,6 +1897,8 @@ dhcp_arp_probed(struct arp_state *astate)
 	dhcp_close(astate->iface);
 	eloop_timeout_delete(astate->iface->ctx->eloop, NULL, astate->iface);
 #ifdef IN_IFF_TENTATIVE
+	logger(astate->iface->ctx, LOG_DEBUG, "%s: DAD completed for %s",
+	    astate->iface->name, inet_ntoa(astate->addr));
 	ipv4_finaliseaddr(astate->iface);
 	arp_close(astate->iface);
 #else
