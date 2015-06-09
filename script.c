@@ -370,6 +370,12 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 		snprintf(env[elen++], e, "if_afwaiting=%d", af);
 	}
 	if ((af = dhcpcd_afwaiting(ifp->ctx)) != AF_MAX) {
+		TAILQ_FOREACH(ifp2, ifp->ctx->ifaces, next) {
+			if ((af = dhcpcd_ifafwaiting(ifp2)) != AF_MAX)
+				break;
+		}
+	}
+	if (af != AF_MAX) {
 		e = 20;
 		EMALLOC(elen, e);
 		snprintf(env[elen++], e, "af_waiting=%d", af);
