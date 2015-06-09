@@ -232,7 +232,7 @@ struct dhcp6_state {
 #ifdef INET6
 void dhcp6_printoptions(const struct dhcpcd_ctx *,
     const struct dhcp_opt *, size_t);
-struct ipv6_addr *dhcp6_iffindaddr(struct interface *ifp,
+const struct ipv6_addr *dhcp6_iffindaddr(const struct interface *ifp,
     const struct in6_addr *addr, short flags);
 struct ipv6_addr *dhcp6_findaddr(struct dhcpcd_ctx *, const struct in6_addr *,
     short);

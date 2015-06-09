@@ -162,7 +162,8 @@ extern const int dhcpcd_signals[];
 extern const size_t dhcpcd_signals_len;
 #endif
 
-int dhcpcd_oneup(struct dhcpcd_ctx *);
+int dhcpcd_ifafwaiting(const struct interface *);
+int dhcpcd_afwaiting(const struct dhcpcd_ctx *);
 pid_t dhcpcd_daemonise(struct dhcpcd_ctx *);
 
 int dhcpcd_handleargs(struct dhcpcd_ctx *, struct fd_list *, int, char **);

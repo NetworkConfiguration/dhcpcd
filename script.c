@@ -230,6 +230,7 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 #endif
 	const struct if_options *ifo = ifp->options;
 	const struct interface *ifp2;
+	int af;
 #ifdef INET
 	int dhcp;
 	const struct dhcp_state *state;
@@ -285,11 +286,11 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	if (ifp->ctx->options & DHCPCD_DUMPLEASE)
 		elen = 2;
 	else
-		elen = 12;
+		elen = 11;
 
 #define EMALLOC(i, l) if ((env[(i)] = malloc((l))) == NULL) goto eexit;
 	/* Make our env + space for profile, wireless and debug */
-	env = calloc(1, sizeof(char *) * (elen + 3 + 1));
+	env = calloc(1, sizeof(char *) * (elen + 4 + 1));
 	if (env == NULL)
 		goto eexit;
 	e = strlen("interface") + strlen(ifp->name) + 2;
@@ -363,12 +364,16 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	}
 	if (env[9] == NULL || env[10] == NULL)
 		goto eexit;
-	if (dhcpcd_oneup(ifp->ctx))
-		env[11] = strdup("if_oneup=true");
-	else
-		env[11] = strdup("if_oneup=false");
-	if (env[11] == NULL)
-		goto eexit;
+	if ((af = dhcpcd_ifafwaiting(ifp)) != AF_MAX) {
+		e = 20;
+		EMALLOC(elen, e);
+		snprintf(env[elen++], e, "if_afwaiting=%d", af);
+	}
+	if ((af = dhcpcd_afwaiting(ifp->ctx)) != AF_MAX) {
+		e = 20;
+		EMALLOC(elen, e);
+		snprintf(env[elen++], e, "af_waiting=%d", af);
+	}
 	if (ifo->options & DHCPCD_DEBUG) {
 		e = strlen("syslog_debug=true") + 1;
 		EMALLOC(elen, e);

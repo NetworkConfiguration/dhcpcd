@@ -1682,24 +1682,16 @@ dhcp6_checkstatusok(const struct interface *ifp,
 	return -1;
 }
 
-struct ipv6_addr *
-dhcp6_iffindaddr(struct interface *ifp, const struct in6_addr *addr,
+const struct ipv6_addr *
+dhcp6_iffindaddr(const struct interface *ifp, const struct in6_addr *addr,
     short flags)
 {
-	struct dhcp6_state *state;
-	struct ipv6_addr *ap;
+	const struct dhcp6_state *state;
+	const struct ipv6_addr *ap;
 
-	state = D6_STATE(ifp);
-	if (state) {
+	if ((state = D6_STATE(ifp)) != NULL) {
 		TAILQ_FOREACH(ap, &state->addrs, next) {
-			if (addr == NULL) {
-				if ((ap->flags &
-				    (IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED)) ==
-				    (IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED))
-					return ap;
-			} else if (ap->prefix_vltime &&
-			    IN6_ARE_ADDR_EQUAL(&ap->addr, addr) &&
-			    (!flags || ap->flags & flags))
+			if (ipv6_findaddrmatch(ap, addr, flags))
 				return ap;
 		}
 	}
@@ -1712,11 +1704,15 @@ dhcp6_findaddr(struct dhcpcd_ctx *ctx, const struct in6_addr *addr,
 {
 	struct interface *ifp;
 	struct ipv6_addr *ap;
+	struct dhcp6_state *state;
 
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-		ap = dhcp6_iffindaddr(ifp, addr, flags);
-		if (ap)
-			return ap;
+		if ((state = D6_STATE(ifp)) != NULL) {
+			TAILQ_FOREACH(ap, &state->addrs, next) {
+				if (ipv6_findaddrmatch(ap, addr, flags))
+					return ap;
+			}
+		}
 	}
 	return NULL;
 }
@@ -1751,7 +1747,10 @@ dhcp6_findna(struct interface *ifp, uint16_t ot, const uint8_t *iaid,
 			continue;
 		}
 		iap = (const struct dhcp6_ia_addr *)D6_COPTION_DATA(o);
-		a = dhcp6_iffindaddr(ifp, &iap->addr, 0);
+		TAILQ_FOREACH(a, &state->addrs, next) {
+			if (ipv6_findaddrmatch(a, &iap->addr, 0))
+				break;
+		}
 		if (a == NULL) {
 			a = calloc(1, sizeof(*a));
 			if (a == NULL) {

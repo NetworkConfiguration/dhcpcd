@@ -752,6 +752,24 @@ ipv6_publicaddr(const struct ipv6_addr *ia)
 	    !(ia->addr_flags & IN6_IFF_NOTUSEABLE));
 }
 
+int
+ipv6_findaddrmatch(const struct ipv6_addr *addr, const struct in6_addr *match,
+    short flags)
+{
+
+	if (match == NULL) {
+		if ((addr->flags &
+		    (IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED)) ==
+		    (IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED))
+			return 1;
+	} else if (addr->prefix_vltime &&
+	    IN6_ARE_ADDR_EQUAL(&addr->addr, match) &&
+	    (!flags || addr->flags & flags))
+		return 1;
+
+	return 0;
+}
+
 struct ipv6_addr *
 ipv6_findaddr(struct dhcpcd_ctx *ctx, const struct in6_addr *addr, short flags)
 {
@@ -1030,7 +1048,7 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 }
 
 int
-ipv6_hasaddr(struct interface *ifp)
+ipv6_hasaddr(const struct interface *ifp)
 {
 
 	if (ipv6nd_iffindaddr(ifp, NULL, 0) != NULL)

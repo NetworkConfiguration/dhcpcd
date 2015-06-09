@@ -206,20 +206,6 @@ handle_exit_timeout(void *arg)
 	dhcpcd_daemonise(ctx);
 }
 
-int
-dhcpcd_oneup(struct dhcpcd_ctx *ctx)
-{
-	const struct interface *ifp;
-
-	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-		if (D_STATE_RUNNING(ifp) ||
-		    RS_STATE_RUNNING(ifp) ||
-		    D6_STATE_RUNNING(ifp))
-			return 1;
-	}
-	return 0;
-}
-
 static const char *
 dhcpcd_af(int af)
 {
@@ -236,10 +222,12 @@ dhcpcd_af(int af)
 	}
 }
 
-static int
-dhcpcd_ifafwaiting(struct interface *ifp, unsigned long long opts)
+int
+dhcpcd_ifafwaiting(const struct interface *ifp)
 {
+	unsigned long long opts;
 
+	opts = ifp->options->options;
 	if (opts & DHCPCD_WAITIP4 && !ipv4_hasaddr(ifp))
 		return AF_INET;
 	if (opts & DHCPCD_WAITIP6 && !ipv6_hasaddr(ifp))
@@ -251,27 +239,15 @@ dhcpcd_ifafwaiting(struct interface *ifp, unsigned long long opts)
 	return AF_MAX;
 }
 
-static int
-dhcpcd_ipwaited(struct dhcpcd_ctx *ctx)
+int
+dhcpcd_afwaiting(const struct dhcpcd_ctx *ctx)
 {
-	struct interface *ifp;
-	int af;
 	unsigned long long opts;
-
-	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-		if (ifp->options->options & DHCPCD_WAITOPTS) {
-			af = dhcpcd_ifafwaiting(ifp, ifp->options->options);
-			if (af != AF_MAX) {
-				logger(ctx, LOG_DEBUG,
-				    "%s: waiting for an %s address",
-				    ifp->name, dhcpcd_af(af));
-				return 0;
-			}
-		}
-	}
+	const struct interface *ifp;
+	int af;
 
 	if (!(ctx->options & DHCPCD_WAITOPTS))
-		return 1;
+		return AF_MAX;
 
 	opts = ctx->options;
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
@@ -291,10 +267,33 @@ dhcpcd_ipwaited(struct dhcpcd_ctx *ctx)
 	else if (opts & DHCPCD_WAITIP6)
 		af = AF_INET6;
 	else
-		return 1;
+		return AF_MAX;
+	return af;
+}
 
-	logger(ctx, LOG_DEBUG, "waiting for an %s address", dhcpcd_af(af));
-	return 0;
+static int
+dhcpcd_ipwaited(struct dhcpcd_ctx *ctx)
+{
+	struct interface *ifp;
+	int af;
+
+	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+		if ((af = dhcpcd_ifafwaiting(ifp)) != AF_MAX) {
+			logger(ctx, LOG_DEBUG,
+			    "%s: waiting for an %s address",
+			    ifp->name, dhcpcd_af(af));
+			return 0;
+		}
+	}
+
+	if ((af = dhcpcd_afwaiting(ctx)) != AF_MAX) {
+		logger(ctx, LOG_DEBUG,
+		    "waiting for an %s address",
+		    dhcpcd_af(af));
+		return 0;
+	}
+
+	return 1;
 }
 
 /* Returns the pid of the child, otherwise 0. */

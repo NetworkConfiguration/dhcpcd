@@ -432,19 +432,13 @@ ipv6nd_iffindaddr(const struct interface *ifp, const struct in6_addr *addr,
 		if (rap->iface != ifp)
 			continue;
 		TAILQ_FOREACH(ap, &rap->addrs, next) {
-			if (addr == NULL) {
-				if ((ap->flags &
-				    (IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED)) ==
-				    (IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED))
-					return ap;
-			} else if (ap->prefix_vltime &&
-			    IN6_ARE_ADDR_EQUAL(&ap->addr, addr) &&
-			    (!flags || ap->flags & flags))
+			if (ipv6_findaddrmatch(ap, addr, flags))
 				return ap;
 		}
 	}
 	return NULL;
 }
+
 struct ipv6_addr *
 ipv6nd_findaddr(struct dhcpcd_ctx *ctx, const struct in6_addr *addr,
     short flags)
@@ -457,14 +451,7 @@ ipv6nd_findaddr(struct dhcpcd_ctx *ctx, const struct in6_addr *addr,
 
 	TAILQ_FOREACH(rap, ctx->ipv6->ra_routers, next) {
 		TAILQ_FOREACH(ap, &rap->addrs, next) {
-			if (addr == NULL) {
-				if ((ap->flags &
-				    (IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED)) ==
-				    (IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED))
-					return ap;
-			} else if (ap->prefix_vltime &&
-			    IN6_ARE_ADDR_EQUAL(&ap->addr, addr) &&
-			    (!flags || ap->flags & flags))
+			if (ipv6_findaddrmatch(ap, addr, flags))
 				return ap;
 		}
 	}
