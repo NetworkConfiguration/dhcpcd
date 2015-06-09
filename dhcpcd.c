@@ -220,33 +220,51 @@ dhcpcd_oneup(struct dhcpcd_ctx *ctx)
 	return 0;
 }
 
+static const char *
+dhcpcd_af(int af)
+{
+
+	switch (af) {
+	case AF_UNSPEC:
+		return "IP";
+	case AF_INET:
+		return "IPv4";
+	case AF_INET6:
+		return "IPv6";
+	default:
+		return NULL;
+	}
+}
+
 static int
-dhcpcd_ifipwaited(struct interface *ifp, unsigned long long opts)
+dhcpcd_ifafwaiting(struct interface *ifp, unsigned long long opts)
 {
 
 	if (opts & DHCPCD_WAITIP4 && !ipv4_hasaddr(ifp))
-		return 0;
+		return AF_INET;
 	if (opts & DHCPCD_WAITIP6 && !ipv6_hasaddr(ifp))
-		return 0;
+		return AF_INET6;
 	if (opts & DHCPCD_WAITIP &&
 	    !(opts & (DHCPCD_WAITIP4 | DHCPCD_WAITIP6)) &&
-	    !ipv4_hasaddr(ifp) &&
-	    !ipv6_hasaddr(ifp))
-		return 0;
-	return 1;
+	    !ipv4_hasaddr(ifp) && !ipv6_hasaddr(ifp))
+		return AF_UNSPEC;
+	return AF_MAX;
 }
 
 static int
 dhcpcd_ipwaited(struct dhcpcd_ctx *ctx)
 {
 	struct interface *ifp;
+	int af;
+	unsigned long long opts;
 
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 		if (ifp->options->options & DHCPCD_WAITOPTS) {
-			if (!dhcpcd_ifipwaited(ifp, ifp->options->options)) {
+			af = dhcpcd_ifafwaiting(ifp, ifp->options->options);
+			if (af != AF_MAX) {
 				logger(ctx, LOG_DEBUG,
-				    "%s: waiting for an ip address",
-				    ifp->name);
+				    "%s: waiting for an %s address",
+				    ifp->name, dhcpcd_af(af));
 				return 0;
 			}
 		}
@@ -255,12 +273,27 @@ dhcpcd_ipwaited(struct dhcpcd_ctx *ctx)
 	if (!(ctx->options & DHCPCD_WAITOPTS))
 		return 1;
 
+	opts = ctx->options;
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-		if (dhcpcd_ifipwaited(ifp, ctx->options))
-			return 1;
+		if (opts & (DHCPCD_WAITIP | DHCPCD_WAITIP4) &&
+		    ipv4_hasaddr(ifp))
+			opts &= ~(DHCPCD_WAITIP | DHCPCD_WAITIP4);
+		if (opts & (DHCPCD_WAITIP | DHCPCD_WAITIP6) &&
+		    ipv6_hasaddr(ifp))
+			opts &= ~(DHCPCD_WAITIP | DHCPCD_WAITIP6);
+		if (!(opts & DHCPCD_WAITOPTS))
+			break;
 	}
+	if (opts & DHCPCD_WAITIP)
+		af = AF_UNSPEC;
+	else if (opts & DHCPCD_WAITIP4)
+		af = AF_INET;
+	else if (opts & DHCPCD_WAITIP6)
+		af = AF_INET6;
+	else
+		return 1;
 
-	logger(ctx, LOG_DEBUG, "waiting for an ip address");
+	logger(ctx, LOG_DEBUG, "waiting for an %s address", dhcpcd_af(af));
 	return 0;
 }
 
