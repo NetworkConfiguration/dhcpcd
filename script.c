@@ -258,7 +258,7 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 			ra = 1;
 #endif
 #ifdef INET
-		else if (strcmp(reason, "IPV4LL") == 0)
+		else if (state->added != STATE_ADDED)
 			ipv4ll = 1;
 		else
 			dhcp = 1;
@@ -280,6 +280,8 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 		/* This space left intentionally blank */
 	}
 #ifdef INET
+	else if (strcmp(reason, "IPV4LL") == 0)
+		ipv4ll = 1;
 	else
 		dhcp = 1;
 #endif
