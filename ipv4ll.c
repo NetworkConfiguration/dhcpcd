@@ -119,7 +119,7 @@ ipv4ll_env(char **env, const char *prefix, const struct interface *ifp)
 		return -1;
 	netnum.s_addr = state->addr.s_addr & inaddr_llmask.s_addr;
 	if (asprintf(&env[4], "%s%snetwork_number=%s",
-	    prefix, pf, inet_ntoa(inaddr_llbcast)) == -1)
+	    prefix, pf, inet_ntoa(netnum)) == -1)
 		return -1;
 	return 5;
 }
