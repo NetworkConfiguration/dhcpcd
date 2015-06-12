@@ -138,9 +138,12 @@ ipv4ll_probed(struct arp_state *astate)
 	state = IPV4LL_STATE(ifp);
 	assert(state != NULL);
 
-	logger(ifp->ctx, LOG_INFO, "%s: using IPv4LL address %s",
-	    ifp->name, inet_ntoa(astate->addr));
 	ia = ipv4_iffindaddr(ifp, &astate->addr, &inaddr_llmask);
+#ifdef IN_IFF_NOTREADY
+	if (ia == NULL || ia->addr_flags & IN_IFF_NOTREADY)
+#endif
+		logger(ifp->ctx, LOG_INFO, "%s: using IPv4LL address %s",
+		  ifp->name, inet_ntoa(astate->addr));
 	if (ia == NULL)
 		ia = ipv4_addaddr(ifp, &astate->addr,
 		    &inaddr_llmask, &inaddr_llbcast);
@@ -302,6 +305,8 @@ ipv4ll_start(void *arg)
 			    ifp->name, inet_ntoa(ia->addr));
 			return;
 		}
+		logger(ifp->ctx, LOG_INFO, "%s: using IPv4LL address %s",
+		  ifp->name, inet_ntoa(astate->addr));
 #endif
 		ipv4ll_probed(astate);
 		return;
