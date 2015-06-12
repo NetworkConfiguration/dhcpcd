@@ -3252,9 +3252,7 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 	else
 		options = 0;
 	dropdele = (options & (DHCPCD_STOPPING | DHCPCD_RELEASE) &&
-	    (options &
-	    (DHCPCD_EXITING | DHCPCD_PERSISTENT)) !=
-	    (DHCPCD_EXITING | DHCPCD_PERSISTENT));
+	    (options & DHCPCD_NODROP) != DHCPCD_NODROP);
 
 	if (ifp->ctx->eloop)
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
@@ -3277,9 +3275,7 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 		state->new = NULL;
 		state->new_len = 0;
 		if (drop && state->old &&
-		    (options &
-		    (DHCPCD_EXITING | DHCPCD_PERSISTENT)) !=
-		    (DHCPCD_EXITING | DHCPCD_PERSISTENT))
+		    (options & DHCPCD_NODROP) != DHCPCD_NODROP)
 		{
 			if (reason == NULL)
 				reason = "STOP6";
