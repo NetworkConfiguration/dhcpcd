@@ -35,6 +35,20 @@
         (IN_IFF_TENTATIVE | IN_IFF_DUPLICATED | IN_IFF_DETACHED)
 #endif
 
+#ifndef HTONL
+#if BYTE_ORDER == BIG_ENDIAN
+#define HTONL(A) (A)
+#elif BYTE_ORDER == LITTLE_ENDIAN
+#define HTONL(A) \
+    ((((uint32_t)(A) & 0xff000000) >> 24) | \
+    (((uint32_t)(A) & 0x00ff0000) >> 8) | \
+    (((uint32_t)(A) & 0x0000ff00) << 8) | \
+    (((uint32_t)(A) & 0x000000ff) << 24))
+#endif
+#else
+#error Endian unknown
+#endif /* HTONL */
+
 struct rt {
 	TAILQ_ENTRY(rt) next;
 	struct in_addr dest;
