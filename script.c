@@ -47,6 +47,7 @@
 #include "dhcp6.h"
 #include "if.h"
 #include "if-options.h"
+#include "ipv4ll.h"
 #include "ipv6nd.h"
 #include "script.h"
 
@@ -232,7 +233,7 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	const struct interface *ifp2;
 	int af;
 #ifdef INET
-	int dhcp;
+	int dhcp, ipv4ll;
 	const struct dhcp_state *state;
 #endif
 #ifdef INET6
@@ -241,7 +242,7 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 #endif
 
 #ifdef INET
-	dhcp = 0;
+	dhcp = ipv4ll = 0;
 	state = D_STATE(ifp);
 #endif
 #ifdef INET6
@@ -257,6 +258,8 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 			ra = 1;
 #endif
 #ifdef INET
+		else if (strcmp(reason, "IPV4LL") == 0)
+			ipv4ll = 1;
 		else
 			dhcp = 1;
 #endif
@@ -449,6 +452,19 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 
 dumplease:
 #ifdef INET
+	if (ipv4ll) {
+		n = ipv4ll_env(NULL, NULL, ifp);
+		if (n > 0) {
+			nenv = realloc(env, sizeof(char *) *
+			    (elen + (size_t)n + 1));
+			if (nenv == NULL)
+				goto eexit;
+			env = nenv;
+			if ((n = ipv4ll_env(env + elen, "new", ifp)) == -1)
+				goto eexit;
+			elen += (size_t)n;
+		}
+	}
 	if (dhcp && state && state->new) {
 		n = dhcp_env(NULL, NULL, state->new, ifp);
 		if (n > 0) {

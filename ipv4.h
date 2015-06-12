@@ -83,9 +83,11 @@ int ipv4_hasaddr(const struct interface *);
 
 void ipv4_buildroutes(struct dhcpcd_ctx *);
 void ipv4_finaliseaddr(struct interface *);
-int ipv4_deladdr(struct interface *ifp, const struct in_addr *,
+int ipv4_deladdr(struct interface *, const struct in_addr *,
     const struct in_addr *);
-int ipv4_preferanother(struct interface *ifp);
+int ipv4_preferanother(struct interface *);
+struct ipv4_addr *ipv4_addaddr(struct interface *,
+    const struct in_addr *, const struct in_addr *, const struct in_addr *);
 void ipv4_applyaddr(void *);
 int ipv4_handlert(struct dhcpcd_ctx *, int, struct rt *);
 void ipv4_freerts(struct rt_head *);

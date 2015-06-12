@@ -47,6 +47,7 @@
 #include "if.h"
 #include "if-options.h"
 #include "ipv4.h"
+#include "ipv4ll.h"
 #include "script.h"
 
 #define IPV4_LOOPBACK_ROUTE
@@ -633,6 +634,8 @@ ipv4_buildroutes(struct dhcpcd_ctx *ctx)
 			continue;
 		dnr = get_routes(ifp);
 		dnr = add_subnet_route(dnr, ifp);
+		if ((rt = ipv4ll_subnet_route(ifp)) != NULL)
+			TAILQ_INSERT_HEAD(dnr, rt, next);
 #ifdef IPV4_LOOPBACK_ROUTE
 		dnr = add_loopback_route(dnr, ifp);
 #endif
@@ -782,59 +785,67 @@ ipv4_getstate(struct interface *ifp)
 	return state;
 }
 
-static int
-ipv4_addaddr(struct interface *ifp, const struct dhcp_lease *lease)
+struct ipv4_addr *
+ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
+    const struct in_addr *mask, const struct in_addr *bcast)
 {
 	struct ipv4_state *state;
 	struct ipv4_addr *ia;
-	struct dhcp_state *dstate;
 
 	if ((state = ipv4_getstate(ifp)) == NULL) {
 		logger(ifp->ctx, LOG_ERR, "%s: ipv4_getstate: %m", __func__);
-		return -1;
+		return NULL;
 	}
 	if (ifp->options->options & DHCPCD_NOALIAS) {
 		struct ipv4_addr *ian;
 
 		TAILQ_FOREACH_SAFE(ia, &state->addrs, next, ian) {
-			if (ia->addr.s_addr != lease->addr.s_addr)
+			if (ia->addr.s_addr != addr->s_addr)
 				ipv4_deladdr(ifp, &ia->addr, &ia->net);
 		}
 	}
 
 	if ((ia = malloc(sizeof(*ia))) == NULL) {
 		logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
-		return -1;
+		return NULL;
 	}
 
 	logger(ifp->ctx, LOG_DEBUG, "%s: adding IP address %s/%d",
-	    ifp->name, inet_ntoa(lease->addr),
-	    inet_ntocidr(lease->net));
-	if (if_addaddress(ifp, &lease->addr, &lease->net, &lease->brd) == -1) {
+	    ifp->name, inet_ntoa(*addr), inet_ntocidr(*mask));
+	if (if_addaddress(ifp, addr, mask, bcast) == -1) {
 		if (errno != EEXIST)
 			logger(ifp->ctx, LOG_ERR, "%s: if_addaddress: %m",
 			    __func__);
 		free(ia);
-		return -1;
+		return NULL;
 	}
 
 	ia->iface = ifp;
-	ia->addr = lease->addr;
-	ia->net = lease->net;
+	ia->addr = *addr;
+	ia->net = *mask;
 #ifdef IN_IFF_TENTATIVE
 	ia->addr_flags = IN_IFF_TENTATIVE;
 #endif
 	TAILQ_INSERT_TAIL(&state->addrs, ia, next);
+	return ia;
+}
 
-	dstate = D_STATE(ifp);
+static int
+ipv4_daddaddr(struct interface *ifp, const struct dhcp_lease *lease)
+{
+	struct dhcp_state *state;
+
+	if (ipv4_addaddr(ifp, &lease->addr, &lease->net, &lease->brd) == NULL)
+		return -1;
+
+	state = D_STATE(ifp);
 #ifdef IN_IFF_TENTATIVE
-	dstate->added |= STATE_ADDED;
+	state->added |= STATE_ADDED;
 #else
-	dstate->added = STATE_ADDED;
+	state->added = STATE_ADDED;
 #endif
-	dstate->defend = 0;
-	dstate->addr.s_addr = lease->addr.s_addr;
-	dstate->net.s_addr = lease->net.s_addr;
+	state->addr.s_addr = lease->addr.s_addr;
+	state->net.s_addr = lease->net.s_addr;
 
 	return 0;
 }
@@ -900,7 +911,7 @@ ipv4_preferanother(struct interface *ifp)
 			if (ifn->options->options & DHCPCD_ARP)
 				dhcp_bind(ifn, NULL);
 			else {
-				ipv4_addaddr(ifn, &nstate->lease);
+				ipv4_daddaddr(ifn, &nstate->lease);
 				nstate->added = STATE_ADDED;
 			}
 			break;
@@ -994,7 +1005,7 @@ ipv4_applyaddr(void *arg)
 		    ifp->name, inet_ntoa(lease->addr),
 		    inet_ntocidr(lease->net));
 	else {
-		r = ipv4_addaddr(ifp, lease);
+		r = ipv4_daddaddr(ifp, lease);
 		if (r == -1 && errno != EEXIST)
 			return;
 	}

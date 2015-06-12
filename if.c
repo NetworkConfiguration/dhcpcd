@@ -67,6 +67,7 @@
 #include "if.h"
 #include "if-options.h"
 #include "ipv4.h"
+#include "ipv4ll.h"
 #include "ipv6nd.h"
 
 #ifdef __QNX__
@@ -80,8 +81,9 @@ if_free(struct interface *ifp)
 
 	if (ifp == NULL)
 		return;
-	ipv4_free(ifp);
+	ipv4ll_free(ifp);
 	dhcp_free(ifp);
+	ipv4_free(ifp);
 	dhcp6_free(ifp);
 	ipv6nd_free(ifp);
 	ipv6_free(ifp);

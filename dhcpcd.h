@@ -50,11 +50,12 @@
 #define LINK_DOWN	-1
 
 #define IF_DATA_IPV4	0
-#define IF_DATA_DHCP	1
-#define IF_DATA_IPV6	2
-#define IF_DATA_IPV6ND	3
-#define IF_DATA_DHCP6	4
-#define IF_DATA_MAX	5
+#define IF_DATA_IPV4LL	1
+#define IF_DATA_DHCP	2
+#define IF_DATA_IPV6	3
+#define IF_DATA_IPV6ND	4
+#define IF_DATA_DHCP6	5
+#define IF_DATA_MAX	6
 
 /* If the interface does not support carrier status (ie PPP),
  * dhcpcd can poll it for the relevant flags periodically */

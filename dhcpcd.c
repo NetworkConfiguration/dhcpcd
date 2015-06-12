@@ -61,6 +61,7 @@ const char dhcpcd_copyright[] = "Copyright (c) 2006-2015 Roy Marples";
 #include "if.h"
 #include "if-options.h"
 #include "ipv4.h"
+#include "ipv4ll.h"
 #include "ipv6.h"
 #include "ipv6nd.h"
 #include "script.h"
@@ -380,6 +381,7 @@ dhcpcd_drop(struct interface *ifp, int stop)
 	dhcp6_drop(ifp, stop ? NULL : "EXPIRE6");
 	ipv6nd_drop(ifp);
 	ipv6_drop(ifp);
+	ipv4ll_drop(ifp);
 	dhcp_drop(ifp, stop ? "STOP" : "EXPIRE");
 	arp_close(ifp);
 }

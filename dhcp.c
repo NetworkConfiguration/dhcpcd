@@ -1782,8 +1782,7 @@ dhcp_discover(void *arg)
 	if (ifo->fallback)
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    ifo->reboot, dhcp_fallback, ifp);
-	else if (ifo->options & DHCPCD_IPV4LL &&
-	    !IN_LINKLOCAL(htonl(state->addr.s_addr)))
+	else if (ifo->options & DHCPCD_IPV4LL)
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    ifo->reboot, ipv4ll_start, ifp);
 	if (ifo->options & DHCPCD_REQUEST)
@@ -1895,6 +1894,10 @@ dhcp_arp_probed(struct arp_state *astate)
 		return;
 	}
 	dhcp_close(astate->iface);
+
+	/* Stop IPv4LL now we have a working DHCP address */
+	ipv4ll_drop(astate->iface);
+
 	eloop_timeout_delete(astate->iface->ctx->eloop, NULL, astate->iface);
 #ifdef IN_IFF_TENTATIVE
 	logger(astate->iface->ctx, LOG_DEBUG, "%s: DAD completed for %s",
@@ -1980,7 +1983,6 @@ dhcp_bind(struct interface *ifp, struct arp_state *astate)
 	struct dhcp_state *state = D_STATE(ifp);
 	struct if_options *ifo = ifp->options;
 	struct dhcp_lease *lease = &state->lease;
-	uint8_t ipv4ll = 0;
 
 	if (state->state == DHS_BOUND)
 		goto applyaddr;
@@ -1999,12 +2001,6 @@ dhcp_bind(struct interface *ifp, struct arp_state *astate)
 		    inet_ntocidr(lease->net));
 		lease->leasetime = ~0U;
 		state->reason = "STATIC";
-	} else if (state->new->cookie != htonl(MAGIC_COOKIE)) {
-		logger(ifp->ctx, LOG_INFO, "%s: using IPv4LL address %s",
-		    ifp->name, inet_ntoa(lease->addr));
-		lease->leasetime = ~0U;
-		state->reason = "IPV4LL";
-		ipv4ll = 1;
 	} else if (ifo->options & DHCPCD_INFORM) {
 		if (ifo->req_addr.s_addr != 0)
 			lease->addr.s_addr = ifo->req_addr.s_addr;
@@ -2121,7 +2117,7 @@ applyaddr:
 #ifdef IN_IFF_TENTATIVE
 		if (astate)
 			arp_free_but(astate);
-		else if (!ipv4ll)
+		else
 			arp_close(ifp);
 #else
 		if (state->added) {
@@ -2132,10 +2128,9 @@ applyaddr:
 			}
 			if (astate) {
 				arp_announce(astate);
-				if (!ipv4ll)
-					arp_free_but(astate);
+				arp_free_but(astate);
 			}
-		} else if (!ipv4ll)
+		} else
 			arp_close(ifp);
 #endif
 	}
@@ -2299,8 +2294,7 @@ dhcp_reboot(struct interface *ifp)
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 
 	/* Need to add this before dhcp_expire and friends. */
-	if (!ifo->fallback && ifo->options & DHCPCD_IPV4LL &&
-	    !IN_LINKLOCAL(htonl(state->addr.s_addr)))
+	if (!ifo->fallback && ifo->options & DHCPCD_IPV4LL)
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    ifo->reboot, ipv4ll_start, ifp);
 
@@ -2657,24 +2651,13 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 			case 0:
 				log_dhcp(LOG_WARNING, "IPv4LL disabled from",
 				    ifp, dhcp, from);
-				dhcp_drop(ifp, "EXPIRE");
+				ipv4ll_drop(ifp);
 				arp_close(ifp);
-				eloop_timeout_delete(ifp->ctx->eloop,
-				    NULL, ifp);
-				eloop_timeout_add_sec(ifp->ctx->eloop,
-				    DHCP_MAX, dhcp_discover,
-				    ifp);
 				break;
 			case 1:
 				log_dhcp(LOG_WARNING, "IPv4LL enabled from",
 				    ifp, dhcp, from);
-				eloop_timeout_delete(ifp->ctx->eloop,
-				    NULL, ifp);
-				if (IN_LINKLOCAL(htonl(state->addr.s_addr)))
-					eloop_timeout_add_sec(ifp->ctx->eloop,
-					    DHCP_MAX, dhcp_discover, ifp);
-				else
-					ipv4ll_start(ifp);
+				ipv4ll_start(ifp);
 				break;
 			default:
 				logger(ifp->ctx, LOG_ERR,
@@ -2682,6 +2665,9 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 				    ifp->name, tmp);
 				break;
 			}
+			eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
+			eloop_timeout_add_sec(ifp->ctx->eloop,
+			    DHCP_MAX, dhcp_discover, ifp);
 		}
 		return;
 	}

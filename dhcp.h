@@ -231,11 +231,6 @@ struct dhcp_state {
 	struct arp_statehead arp_states;
 
 	size_t arping_index;
-
-	struct arp_state *arp_ipv4ll;
-	unsigned int conflicts;
-	time_t defend;
-	char randomstate[128];
 };
 
 #define D_STATE(ifp)							       \
@@ -258,7 +253,6 @@ void dhcp_printoptions(const struct dhcpcd_ctx *,
 int get_option_addr(struct dhcpcd_ctx *,struct in_addr *,
     const struct dhcp_message *, uint8_t);
 #define IS_BOOTP(i, m) ((m) &&						    \
-	    !IN_LINKLOCAL(htonl((m)->yiaddr)) &&			    \
 	    get_option_uint8((i)->ctx, NULL, (m), DHO_MESSAGETYPE) == -1)
 struct rt_head *get_option_routes(struct interface *,
     const struct dhcp_message *);
