@@ -40,11 +40,12 @@
 #include "eloop.h"
 #include "if.h"
 #include "if-options.h"
+#include "ipv4.h"
 #include "ipv4ll.h"
 #include "script.h"
 
-static const struct in_addr inaddr_llmask = { htonl(LINKLOCAL_MASK) };
-static const struct in_addr inaddr_llbcast = { htonl(LINKLOCAL_BRDC) };
+static const struct in_addr inaddr_llmask = { HTONL(LINKLOCAL_MASK) };
+static const struct in_addr inaddr_llbcast = { HTONL(LINKLOCAL_BRDC) };
 
 static in_addr_t
 ipv4ll_pick_addr(const struct arp_state *astate)
@@ -335,7 +336,7 @@ ipv4ll_freedrop(struct interface *ifp, int drop)
 
 	/* Unlike other protocols, we don't run a script on stopping IPv4LL
 	 * because we piggy back on the state of DHCP. */
-	if (drop) {
+	if (drop && (ifp->options->options & DHCPCD_NODROP) != DHCPCD_NODROP) {
 		if (state->addr.s_addr != INADDR_ANY) {
 			ipv4_deladdr(ifp, &state->addr, &inaddr_llmask);
 			state->addr.s_addr = INADDR_ANY;
