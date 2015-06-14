@@ -160,12 +160,15 @@ ipv4_findaddr(struct dhcpcd_ctx *ctx, const struct in_addr *addr)
 int
 ipv4_hasaddr(const struct interface *ifp)
 {
-	const struct dhcp_state *state;
+	const struct dhcp_state *dstate;
+	const struct ipv4ll_state *istate;
 
-	state = D_CSTATE(ifp);
-	return (state &&
-	    state->added == STATE_ADDED &&
-	    state->addr.s_addr != INADDR_ANY);
+	dstate = D_CSTATE(ifp);
+	istate = IPV4LL_CSTATE(ifp);
+	return ((dstate &&
+	    dstate->added == STATE_ADDED &&
+	    dstate->addr.s_addr != INADDR_ANY) ||
+	    (istate && istate->addr.s_addr != INADDR_ANY));
 }
 
 void
