@@ -201,7 +201,7 @@ ipv4ll_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 		fail = astate->addr.s_addr;
 
 	/* RFC 3927 2.5, Conflict Defense */
-	if (IN_LINKLOCAL(htonl(state->addr.s_addr)) &&
+	if (IN_LINKLOCAL(ntohl(state->addr.s_addr)) &&
 	    amsg && amsg->sip.s_addr == state->addr.s_addr)
 		fail = state->addr.s_addr;
 
@@ -331,11 +331,10 @@ ipv4ll_freedrop(struct interface *ifp, int drop)
 	struct ipv4ll_state *state;
 
 	assert(ifp != NULL);
-	if ((state = IPV4LL_STATE(ifp)) == NULL)
-		return;
+	state = IPV4LL_STATE(ifp);
 
 	/* Free ARP state first because ipv4_deladdr might also ... */
-	if (state->arp) {
+	if (state && state->arp) {
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, state->arp);
 		arp_free(state->arp);
 		state->arp = NULL;
@@ -344,11 +343,24 @@ ipv4ll_freedrop(struct interface *ifp, int drop)
 	/* Unlike other protocols, we don't run a script on stopping IPv4LL
 	 * because we piggy back on the state of DHCP. */
 	if (drop && (ifp->options->options & DHCPCD_NODROP) != DHCPCD_NODROP) {
-		if (state->addr.s_addr != INADDR_ANY) {
+		struct ipv4_state *istate;
+		struct ipv4_addr *ia, *ian;
+
+		if (state && state->addr.s_addr != INADDR_ANY) {
 			ipv4_deladdr(ifp, &state->addr, &inaddr_llmask);
 			state->addr.s_addr = INADDR_ANY;
 		}
+
+		/* Free any other link local addresses that might exist. */
+		istate = IPV4_STATE(ifp);
+		TAILQ_FOREACH_SAFE(ia, &istate->addrs, next, ian) {
+			if (IN_LINKLOCAL(ntohl(ia->addr.s_addr)))
+				ipv4_deladdr(ifp, &ia->addr, &ia->net);
+		}
 	}
-	free(state);
-	ifp->if_data[IF_DATA_IPV4LL] = NULL;
+
+	if (state) {
+		free(state);
+		ifp->if_data[IF_DATA_IPV4LL] = NULL;
+	}
 }

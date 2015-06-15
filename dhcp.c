@@ -1895,9 +1895,6 @@ dhcp_arp_probed(struct arp_state *astate)
 	}
 	dhcp_close(astate->iface);
 
-	/* Stop IPv4LL now we have a working DHCP address */
-	ipv4ll_drop(astate->iface);
-
 	eloop_timeout_delete(astate->iface->ctx->eloop, NULL, astate->iface);
 #ifdef IN_IFF_TENTATIVE
 	logger(astate->iface->ctx, LOG_DEBUG, "%s: DAD completed for %s",
@@ -1907,6 +1904,9 @@ dhcp_arp_probed(struct arp_state *astate)
 #else
 	dhcp_bind(astate->iface, astate);
 #endif
+
+	/* Stop IPv4LL now we have a working DHCP address */
+	ipv4ll_drop(astate->iface);
 }
 
 static void
