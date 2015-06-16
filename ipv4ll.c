@@ -344,7 +344,6 @@ ipv4ll_freedrop(struct interface *ifp, int drop)
 	 * because we piggy back on the state of DHCP. */
 	if (drop && (ifp->options->options & DHCPCD_NODROP) != DHCPCD_NODROP) {
 		struct ipv4_state *istate;
-		struct ipv4_addr *ia, *ian;
 
 		if (state && state->addr.s_addr != INADDR_ANY) {
 			ipv4_deladdr(ifp, &state->addr, &inaddr_llmask);
@@ -352,10 +351,13 @@ ipv4ll_freedrop(struct interface *ifp, int drop)
 		}
 
 		/* Free any other link local addresses that might exist. */
-		istate = IPV4_STATE(ifp);
-		TAILQ_FOREACH_SAFE(ia, &istate->addrs, next, ian) {
-			if (IN_LINKLOCAL(ntohl(ia->addr.s_addr)))
-				ipv4_deladdr(ifp, &ia->addr, &ia->net);
+		if ((istate = IPV4_STATE(ifp)) != NULL) {
+			struct ipv4_addr *ia, *ian;
+
+			TAILQ_FOREACH_SAFE(ia, &istate->addrs, next, ian) {
+				if (IN_LINKLOCAL(ntohl(ia->addr.s_addr)))
+					ipv4_deladdr(ifp, &ia->addr, &ia->net);
+			}
 		}
 	}
 
