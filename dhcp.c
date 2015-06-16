@@ -1284,7 +1284,8 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 		addr.s_addr = dhcp->yiaddr ? dhcp->yiaddr : dhcp->ciaddr;
 		addvar(ifp->ctx, &ep, prefix, "ip_address", inet_ntoa(addr));
 		if (get_option_addr(ifp->ctx, &net,
-		    dhcp, DHO_SUBNETMASK) == -1) {
+		    dhcp, DHO_SUBNETMASK) == -1)
+		{
 			net.s_addr = ipv4_getnetmask(addr.s_addr);
 			addvar(ifp->ctx, &ep, prefix,
 			    "subnet_mask", inet_ntoa(net));
@@ -1292,7 +1293,8 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 		snprintf(cidr, sizeof(cidr), "%d", inet_ntocidr(net));
 		addvar(ifp->ctx, &ep, prefix, "subnet_cidr", cidr);
 		if (get_option_addr(ifp->ctx, &brd,
-		    dhcp, DHO_BROADCAST) == -1) {
+		    dhcp, DHO_BROADCAST) == -1)
+		{
 			brd.s_addr = addr.s_addr | ~net.s_addr;
 			addvar(ifp->ctx, &ep, prefix,
 			    "broadcast_address", inet_ntoa(brd));
