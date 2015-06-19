@@ -526,35 +526,32 @@ print_string(char *dst, size_t len, int type, const uint8_t *data, size_t dl)
 
 #define ADDRSZ		4
 #define ADDR6SZ		16
-static size_t
+static ssize_t
 dhcp_optlen(const struct dhcp_opt *opt, size_t dl)
 {
 	size_t sz;
-
-	if (dl == 0)
-		return 0;
 
 	if (opt->type == 0 ||
 	    opt->type & (STRING | BINHEX | RFC3442 | RFC5969))
 	{
 		if (opt->len) {
 			if ((size_t)opt->len > dl)
-				return 0;
-			return (size_t)opt->len;
+				return -1;
+			return (ssize_t)opt->len;
 		}
-		return dl;
+		return (ssize_t)dl;
 	}
 
 	if ((opt->type & (ADDRIPV4 | ARRAY)) == (ADDRIPV4 | ARRAY)) {
 		if (dl < ADDRSZ)
-			return 0;
-		return dl - (dl % ADDRSZ);
+			return -1;
+		return (ssize_t)(dl - (dl % ADDRSZ));
 	}
 
 	if ((opt->type & (ADDRIPV6 | ARRAY)) == (ADDRIPV6 | ARRAY)) {
 		if (dl < ADDR6SZ)
-			return 0;
-		return dl - (dl % ADDR6SZ);
+			return -1;
+		return (ssize_t)(dl - (dl % ADDR6SZ));
 	}
 
 	if (opt->type & (UINT32 | ADDRIPV4))
@@ -567,8 +564,8 @@ dhcp_optlen(const struct dhcp_opt *opt, size_t dl)
 		sz = ADDR6SZ;
 	else
 		/* If we don't know the size, assume it's valid */
-		return dl;
-	return (dl < sz ? 0 : sz);
+		return (ssize_t)dl;
+	return dl < sz ? -1 : (ssize_t)sz;
 }
 
 static ssize_t
@@ -831,6 +828,7 @@ dhcp_envoption(struct dhcpcd_ctx *ctx, char **env, const char *prefix,
     const uint8_t *od, size_t ol)
 {
 	size_t e, i, n, eos, eol;
+	ssize_t eo;
 	unsigned int eoc;
 	const uint8_t *eod;
 	int ov;
@@ -874,20 +872,30 @@ dhcp_envoption(struct dhcpcd_ctx *ctx, char **env, const char *prefix,
 	 * is a fixed layout */
 	n = 0;
 	for (i = 0, eopt = opt->embopts; i < opt->embopts_len; i++, eopt++) {
-		e = dhcp_optlen(eopt, ol);
-		if (e == 0) {
-			/* An option was expected, but there is not enough
+		eo = dhcp_optlen(eopt, ol);
+		if (eo == -1) {
+			if (env == NULL)
+				logger(ctx, LOG_ERR,
+				    "%s: %s: malformed embedded option %d:%d",
+				    ifname, __func__, opt->option,
+				    eopt->option);
+			goto out;
+		}
+		if (eo == 0) {
+			/* An option was expected, but there is no data
 			 * data for it.
 			 * This may not be an error as some options like
 			 * DHCP FQDN in RFC4702 have a string as the last
 			 * option which is optional.
 			 * FIXME: Add an flag to the options to indicate
 			 * wether this is allowable or not. */
-			 if (ol != 0 || i + 1 < opt->embopts_len)
-				logger(ctx, LOG_WARNING,
-				    "%s: %s: malformed option %d",
-				    ifname, __func__, opt->option);
-			 goto out;
+			if (env == NULL &&
+			    (ol != 0 || i + 1 < opt->embopts_len))
+				logger(ctx, LOG_ERR,
+				    "%s: %s: malformed embedded option %d:%d",
+				    ifname, __func__, opt->option,
+				    eopt->option);
+			goto out;
 		}
 		/* Use the option prefix if the embedded option
 		 * name is different.
@@ -895,11 +903,11 @@ dhcp_envoption(struct dhcpcd_ctx *ctx, char **env, const char *prefix,
 		if (!(eopt->type & RESERVED)) {
 			ov = strcmp(opt->var, eopt->var);
 			if (dhcp_envoption1(ctx, env == NULL ? NULL : &env[n],
-			    pfx, eopt, ov, od, e, ifname))
+			    pfx, eopt, ov, od, (size_t)eo, ifname))
 				n++;
 		}
-		od += e;
-		ol -= e;
+		od += (size_t)eo;
+		ol -= (size_t)eo;
 	}
 
 	/* Enumerate our encapsulated options */
