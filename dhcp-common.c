@@ -875,9 +875,20 @@ dhcp_envoption(struct dhcpcd_ctx *ctx, char **env, const char *prefix,
 	n = 0;
 	for (i = 0, eopt = opt->embopts; i < opt->embopts_len; i++, eopt++) {
 		e = dhcp_optlen(eopt, ol);
-		if (e == 0)
-			/* Report error? */
-			return 0;
+		if (e == 0) {
+			/* An option was expected, but there is not enough
+			 * data for it.
+			 * This may not be an error as some options like
+			 * DHCP FQDN in RFC4702 have a string as the last
+			 * option which is optional.
+			 * FIXME: Add an flag to the options to indicate
+			 * wether this is allowable or not. */
+			 if (ol != 0 || i + 1 < opt->embopts_len)
+				logger(ctx, LOG_WARNING,
+				    "%s: %s: malformed option %d",
+				    ifname, __func__, opt->option);
+			 goto out;
+		}
 		/* Use the option prefix if the embedded option
 		 * name is different.
 		 * This avoids new_fqdn_fqdn which would be silly. */
@@ -932,6 +943,7 @@ dhcp_envoption(struct dhcpcd_ctx *ctx, char **env, const char *prefix,
 		}
 	}
 
+out:
 	if (env)
 		free(pfx);
 
