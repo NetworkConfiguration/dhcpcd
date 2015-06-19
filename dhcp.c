@@ -168,30 +168,9 @@ get_option(struct dhcpcd_ctx *ctx,
 
 	while (p < e) {
 		o = *p++;
-		if (o == opt) {
-			if (op) {
-				if (!ctx->opt_buffer) {
-					ctx->opt_buffer =
-					    malloc(DHCP_OPTION_LEN +
-					    BOOTFILE_LEN + SERVERNAME_LEN);
-					if (ctx->opt_buffer == NULL)
-						return NULL;
-				}
-				if (!bp)
-					bp = ctx->opt_buffer;
-				memcpy(bp, op, ol);
-				bp += ol;
-			}
-			ol = *p;
-			if (p + ol > e) {
-				errno = EINVAL;
-				return NULL;
-			}
-			op = p + 1;
-			bl += ol;
-		}
 		switch (o) {
 		case DHO_PAD:
+			/* No length to read */
 			continue;
 		case DHO_END:
 			if (overl & 1) {
@@ -206,17 +185,48 @@ get_option(struct dhcpcd_ctx *ctx,
 				e = p + sizeof(dhcp->servername);
 			} else
 				goto exit;
-			break;
-		case DHO_OPTIONSOVERLOADED:
+			/* No length to read */
+			continue;
+		}
+
+		/* Check we can read the length */
+		if (p == e) {
+			errno = EINVAL;
+			return NULL;
+		}
+		l = *p++;
+
+		if (o == DHO_OPTIONSOVERLOADED) {
 			/* Ensure we only get this option once by setting
 			 * the last bit as well as the value.
 			 * This is valid because only the first two bits
 			 * actually mean anything in RFC2132 Section 9.3 */
-			if (!overl)
-				overl = 0x80 | p[1];
-			break;
+			if (l == 1 && !overl)
+				overl = 0x80 | p[0];
 		}
-		l = *p++;
+
+		if (o == opt) {
+			if (op) {
+				if (!ctx->opt_buffer) {
+					ctx->opt_buffer =
+					    malloc(DHCP_OPTION_LEN +
+					    BOOTFILE_LEN + SERVERNAME_LEN);
+					if (ctx->opt_buffer == NULL)
+						return NULL;
+				}
+				if (!bp)
+					bp = ctx->opt_buffer;
+				memcpy(bp, op, ol);
+				bp += ol;
+			}
+			ol = l;
+			if (p + ol >= e) {
+				errno = EINVAL;
+				return NULL;
+			}
+			op = p;
+			bl += ol;
+		}
 		p += l;
 	}
 
