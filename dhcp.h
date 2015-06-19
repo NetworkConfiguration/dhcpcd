@@ -213,9 +213,6 @@ struct dhcp_state {
 	int socket;
 
 	int raw_fd;
-	size_t buffer_size, buffer_len, buffer_pos;
-	unsigned char *buffer;
-
 	struct in_addr addr;
 	struct in_addr net;
 	struct in_addr dst;

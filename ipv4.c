@@ -1113,6 +1113,9 @@ ipv4_free(struct interface *ifp)
 				free(addr);
 			}
 			ipv4_freerts(&state->routes);
+#ifdef BSD
+			free(state->buffer);
+#endif
 			free(state);
 		}
 	}

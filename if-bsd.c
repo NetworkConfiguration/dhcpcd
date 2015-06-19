@@ -293,7 +293,7 @@ const char *if_pfname = "Berkley Packet Filter";
 int
 if_openrawsocket(struct interface *ifp, uint16_t protocol)
 {
-	struct dhcp_state *state;
+	struct ipv4_state *state;
 	int fd = -1;
 	struct ifreq ifr;
 	int ibuf_len = 0;
@@ -318,8 +318,7 @@ if_openrawsocket(struct interface *ifp, uint16_t protocol)
 	if (fd == -1)
 		return -1;
 
-	state = D_STATE(ifp);
-
+	state = IPV4_STATE(ifp);
 	memset(&pv, 0, sizeof(pv));
 	if (ioctl(fd, BIOCVERSION, &pv) == -1)
 		goto eexit;
@@ -403,9 +402,9 @@ if_readrawpacket(struct interface *ifp, uint16_t protocol,
 	struct bpf_hdr packet;
 	ssize_t bytes;
 	const unsigned char *payload;
-	struct dhcp_state *state;
+	struct ipv4_state *state;
 
-	state = D_STATE(ifp);
+	state = IPV4_STATE(ifp);
 	fd = ipv4_protocol_fd(ifp, protocol);
 
 	*flags = 0;

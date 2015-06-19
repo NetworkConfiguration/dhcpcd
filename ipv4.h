@@ -79,6 +79,12 @@ TAILQ_HEAD(ipv4_addrhead, ipv4_addr);
 struct ipv4_state {
 	struct ipv4_addrhead addrs;
 	struct rt_head routes;
+
+#ifdef BSD
+	/* Buffer for BPF */
+	size_t buffer_size, buffer_len, buffer_pos;
+	unsigned char *buffer;
+#endif
 };
 
 #define IPV4_STATE(ifp)							       \

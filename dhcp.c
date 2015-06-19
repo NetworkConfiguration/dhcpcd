@@ -3052,7 +3052,6 @@ dhcp_free(struct interface *ifp)
 		free(state->old);
 		free(state->new);
 		free(state->offer);
-		free(state->buffer);
 		free(state->clientid);
 		free(state);
 		ifp->if_data[IF_DATA_DHCP] = NULL;
