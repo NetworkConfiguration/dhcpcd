@@ -349,6 +349,15 @@ arp_free(struct arp_state *astate)
 		state = D_STATE(astate->iface);
 		TAILQ_REMOVE(&state->arp_states, astate, next);
 		free(astate);
+
+		/* If there are no more ARP states, close the socket. */
+		if (state->arp_fd != -1 &&
+		    TAILQ_FIRST(&state->arp_states) == NULL)
+		{
+			eloop_event_delete(ifp->ctx->eloop, state->arp_fd);
+			close(state->arp_fd);
+			state->arp_fd = -1;
+		}
 	}
 }
 
