@@ -1215,7 +1215,7 @@ if_sendrawpacket(const struct interface *ifp, uint16_t protocol,
 		    &ipv4_bcast_addr, sizeof(ipv4_bcast_addr));
 	else
 		memset(&su.sll.sll_addr, 0xff, ifp->hwlen);
-	fd = ipv4_protocol(ifp, protocol);
+	fd = ipv4_protocol_fd(ifp, protocol);
 
 	return sendto(fd, data, len, 0, &su.sa, sizeof(su.sll));
 }
@@ -1248,7 +1248,7 @@ if_readrawpacket(struct interface *ifp, uint16_t protocol,
 #endif
 
 	state = D_STATE(ifp);
-	fd = ipv4_protocol(ifp, protocol);
+	fd = ipv4_protocol_fd(ifp, protocol);
 	bytes = recvmsg(fd, &msg, 0);
 	if (bytes == -1)
 		return -1;
