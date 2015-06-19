@@ -1924,11 +1924,13 @@ dhcp_arp_probed(struct arp_state *astate)
 static void
 dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 {
+	struct interface *ifp;
 	struct dhcp_state *state;
 	struct if_options *ifo;
 
-	state = D_STATE(astate->iface);
-	ifo = astate->iface->options;
+	ifp = astate->iface;
+	ifo = ifp->options;
+	state = D_STATE(ifp);
 	if (state->arping_index &&
 	    state->arping_index <= ifo->arping_len &&
 	    amsg &&
@@ -1940,9 +1942,9 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 
 		astate->failed.s_addr = ifo->arping[state->arping_index - 1];
 		arp_report_conflicted(astate, amsg);
-		hwaddr_ntoa(amsg->sha, astate->iface->hwlen, buf, sizeof(buf));
-		if (dhcpcd_selectprofile(astate->iface, buf) == -1 &&
-		    dhcpcd_selectprofile(astate->iface,
+		hwaddr_ntoa(amsg->sha, ifp->hwlen, buf, sizeof(buf));
+		if (dhcpcd_selectprofile(ifp, buf) == -1 &&
+		    dhcpcd_selectprofile(ifp,
 		        inet_ntoa(astate->failed)) == -1)
 		{
 			/* We didn't find a profile for this
@@ -1951,11 +1953,10 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 			dhcp_arp_probed(astate);
 			return;
 		}
-		dhcp_close(astate->iface);
-		arp_close(astate->iface);
-		eloop_timeout_delete(astate->iface->ctx->eloop, NULL,
-		    astate->iface);
-		dhcpcd_startinterface(astate->iface);
+		dhcp_close(ifp);
+		arp_free(astate);
+		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
+		dhcpcd_startinterface(ifp);
 	}
 
 	/* RFC 2131 3.1.5, Client-server interaction
@@ -1976,16 +1977,16 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 		arp_report_conflicted(astate, amsg);
 		unlink(state->leasefile);
 		if (!state->lease.frominfo)
-			dhcp_decline(astate->iface);
+			dhcp_decline(ifp);
 #ifdef IN_IFF_DUPLICATED
-		ia = ipv4_iffindaddr(astate->iface, &astate->addr, NULL);
+		ia = ipv4_iffindaddr(ifp, &astate->addr, NULL);
 		if (ia)
-			ipv4_deladdr(astate->iface, &ia->addr, &ia->net);
+			ipv4_deladdr(ifp, &ia->addr, &ia->net);
 #endif
-		eloop_timeout_delete(astate->iface->ctx->eloop, NULL,
-		    astate->iface);
-		eloop_timeout_add_sec(astate->iface->ctx->eloop,
-		    DHCP_RAND_MAX, dhcp_discover, astate->iface);
+		arp_free(astate);
+		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
+		eloop_timeout_add_sec(ifp->ctx->eloop,
+		    DHCP_RAND_MAX, dhcp_discover, ifp);
 	}
 }
 
