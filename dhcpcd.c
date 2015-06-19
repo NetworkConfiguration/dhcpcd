@@ -1633,10 +1633,6 @@ main(int argc, char **argv)
 	}
 #endif
 
-	if (geteuid())
-		logger(&ctx, LOG_WARNING,
-		    PACKAGE " will not work correctly unless run as root");
-
 #ifdef USE_SIGNALS
 	if (sig != 0) {
 		pid = read_pid(ctx.pidfile);
