@@ -122,12 +122,12 @@ arp_packet(void *arg)
 	struct arphdr ar;
 	struct arp_msg arm;
 	ssize_t bytes;
-	struct dhcp_state *state;
+	struct iarp_state *state;
 	struct arp_state *astate, *astaten;
 	unsigned char *hw_s, *hw_t;
 	int flags;
 
-	state = D_STATE(ifp);
+	state = ARP_STATE(ifp);
 	flags = 0;
 	while (!(flags & RAW_EOF)) {
 		bytes = if_readrawpacket(ifp, ETHERTYPE_ARP,
@@ -186,17 +186,17 @@ arp_packet(void *arg)
 static void
 arp_open(struct interface *ifp)
 {
-	struct dhcp_state *state;
+	struct iarp_state *state;
 
-	state = D_STATE(ifp);
-	if (state->arp_fd == -1) {
-		state->arp_fd = if_openrawsocket(ifp, ETHERTYPE_ARP);
-		if (state->arp_fd == -1) {
+	state = ARP_STATE(ifp);
+	if (state->fd == -1) {
+		state->fd = if_openrawsocket(ifp, ETHERTYPE_ARP);
+		if (state->fd == -1) {
 			logger(ifp->ctx, LOG_ERR, "%s: %s: %m",
 			    __func__, ifp->name);
 			return;
 		}
-		eloop_event_add(ifp->ctx->eloop, state->arp_fd,
+		eloop_event_add(ifp->ctx->eloop, state->fd,
 		    arp_packet, ifp, NULL, NULL);
 	}
 }
@@ -297,10 +297,10 @@ arp_probe(struct arp_state *astate)
 struct arp_state *
 arp_find(struct interface *ifp, const struct in_addr *addr)
 {
+	struct iarp_state *state;
 	struct arp_state *astate;
-	struct dhcp_state *state;
 
-	if ((state = D_STATE(ifp)) == NULL)
+	if ((state = ARP_STATE(ifp)) == NULL)
 		goto out;
 	TAILQ_FOREACH(astate, &state->arp_states, next) {
 		if (astate->addr.s_addr == addr->s_addr && astate->iface == ifp)
@@ -314,20 +314,31 @@ out:
 struct arp_state *
 arp_new(struct interface *ifp, const struct in_addr *addr)
 {
+	struct iarp_state *state;
 	struct arp_state *astate;
-	struct dhcp_state *state;
 
-	if (addr && (astate = arp_find(ifp, addr)))
-		return astate;
+	if ((state = ARP_STATE(ifp)) == NULL) {
+	        ifp->if_data[IF_DATA_ARP] = malloc(sizeof(*state));
+		state = ARP_STATE(ifp);
+		if (state == NULL) {
+			logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
+			return NULL;
+		}
+		state->fd = -1;
+		TAILQ_INIT(&state->arp_states);
+	} else {
+		if (addr && (astate = arp_find(ifp, addr)))
+			return astate;
+	}
 
 	if ((astate = calloc(1, sizeof(*astate))) == NULL) {
 		logger(ifp->ctx, LOG_ERR, "%s: %s: %m", ifp->name, __func__);
 		return NULL;
 	}
-	state = D_STATE(ifp);
 	astate->iface = ifp;
 	if (addr)
 		astate->addr = *addr;
+	state = ARP_STATE(ifp);
 	TAILQ_INSERT_TAIL(&state->arp_states, astate, next);
 	return astate;
 }
@@ -342,21 +353,25 @@ arp_cancel(struct arp_state *astate)
 void
 arp_free(struct arp_state *astate)
 {
-	struct dhcp_state *state;
 
-	if (astate) {
-		eloop_timeout_delete(astate->iface->ctx->eloop, NULL, astate);
-		state = D_STATE(astate->iface);
+	if (astate != NULL) {
+		struct interface *ifp;
+		struct iarp_state *state;
+
+		ifp = astate->iface;
+		eloop_timeout_delete(ifp->ctx->eloop, NULL, astate);
+		state =	ARP_STATE(ifp);
 		TAILQ_REMOVE(&state->arp_states, astate, next);
 		free(astate);
 
 		/* If there are no more ARP states, close the socket. */
-		if (state->arp_fd != -1 &&
+		if (state->fd != -1 &&
 		    TAILQ_FIRST(&state->arp_states) == NULL)
 		{
-			eloop_event_delete(ifp->ctx->eloop, state->arp_fd);
-			close(state->arp_fd);
-			state->arp_fd = -1;
+			eloop_event_delete(ifp->ctx->eloop, state->fd);
+			close(state->fd);
+			free(state);
+			ifp->if_data[IF_DATA_ARP] = NULL;
 		}
 	}
 }
@@ -364,10 +379,10 @@ arp_free(struct arp_state *astate)
 void
 arp_free_but(struct arp_state *astate)
 {
+	struct iarp_state *state;
 	struct arp_state *p, *n;
-	struct dhcp_state *state;
 
-	state = D_STATE(astate->iface);
+	state = ARP_STATE(astate->iface);
 	TAILQ_FOREACH_SAFE(p, &state->arp_states, next, n) {
 		if (p != astate)
 			arp_free(p);
@@ -377,24 +392,16 @@ arp_free_but(struct arp_state *astate)
 void
 arp_close(struct interface *ifp)
 {
-	struct dhcp_state *state = D_STATE(ifp);
+	struct iarp_state *state;
 	struct arp_state *astate;
 
-	if (state == NULL)
-		return;
-
-	if (state->arp_fd != -1) {
-		eloop_event_delete(ifp->ctx->eloop, state->arp_fd);
-		close(state->arp_fd);
-		state->arp_fd = -1;
-	}
-
-	while ((astate = TAILQ_FIRST(&state->arp_states))) {
-#ifndef __clang_analyzer__
-		/* clang guard needed for a more compex variant on this bug:
-		 * http://llvm.org/bugs/show_bug.cgi?id=18222 */
+	/* Freeing the last state will also free the main state,
+	 * so test for both. */
+	for (;;) {
+		if ((state = ARP_STATE(ifp)) == NULL ||
+		    (astate = TAILQ_FIRST(&state->arp_states)) == NULL)
+			break;
 		arp_free(astate);
-#endif
 	}
 }
 
@@ -403,10 +410,10 @@ arp_handleifa(int cmd, struct interface *ifp, const struct in_addr *addr,
     int flags)
 {
 #ifdef IN_IFF_DUPLICATED
-	struct dhcp_state *state = D_STATE(ifp);
+	struct iarp_state *state;
 	struct arp_state *astate, *asn;
 
-	if (cmd != RTM_NEWADDR || (state = D_STATE(ifp)) == NULL)
+	if (cmd != RTM_NEWADDR || (state = ARP_STATE(ifp)) == NULL)
 		return;
 
 	TAILQ_FOREACH_SAFE(astate, &state->arp_states, next, asn) {

@@ -1197,7 +1197,6 @@ ssize_t
 if_sendrawpacket(const struct interface *ifp, uint16_t protocol,
     const void *data, size_t len)
 {
-	const struct dhcp_state *state;
 	union sockunion {
 		struct sockaddr sa;
 		struct sockaddr_ll sll;
@@ -1216,11 +1215,7 @@ if_sendrawpacket(const struct interface *ifp, uint16_t protocol,
 		    &ipv4_bcast_addr, sizeof(ipv4_bcast_addr));
 	else
 		memset(&su.sll.sll_addr, 0xff, ifp->hwlen);
-	state = D_CSTATE(ifp);
-	if (protocol == ETHERTYPE_ARP)
-		fd = state->arp_fd;
-	else
-		fd = state->raw_fd;
+	fd = ipv4_protocol(ifp, protocol);
 
 	return sendto(fd, data, len, 0, &su.sa, sizeof(su.sll));
 }
@@ -1253,10 +1248,7 @@ if_readrawpacket(struct interface *ifp, uint16_t protocol,
 #endif
 
 	state = D_STATE(ifp);
-	if (protocol == ETHERTYPE_ARP)
-		fd = state->arp_fd;
-	else
-		fd = state->raw_fd;
+	fd = ipv4_protocol(ifp, protocol);
 	bytes = recvmsg(fd, &msg, 0);
 	if (bytes == -1)
 		return -1;

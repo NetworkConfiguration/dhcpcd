@@ -65,6 +65,16 @@ struct arp_state {
 };
 TAILQ_HEAD(arp_statehead, arp_state);
 
+struct iarp_state {
+	int fd;
+	struct arp_statehead arp_states;
+};
+
+#define ARP_STATE(ifp)							       \
+	((struct iarp_state *)(ifp)->if_data[IF_DATA_ARP])
+#define ARP_CSTATE(ifp)							       \
+	((const struct iarp_state *)(ifp)->if_data[IF_DATA_ARP])
+
 #ifdef INET
 void arp_report_conflicted(const struct arp_state *, const struct arp_msg *);
 void arp_announce(struct arp_state *);

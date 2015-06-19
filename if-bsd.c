@@ -381,7 +381,6 @@ if_sendrawpacket(const struct interface *ifp, uint16_t protocol,
 	struct iovec iov[2];
 	struct ether_header hw;
 	int fd;
-	const struct dhcp_state *state;
 
 	memset(&hw, 0, ETHER_HDR_LEN);
 	memset(&hw.ether_dhost, 0xff, ETHER_ADDR_LEN);
@@ -390,11 +389,7 @@ if_sendrawpacket(const struct interface *ifp, uint16_t protocol,
 	iov[0].iov_len = ETHER_HDR_LEN;
 	iov[1].iov_base = UNCONST(data);
 	iov[1].iov_len = len;
-	state = D_CSTATE(ifp);
-	if (protocol == ETHERTYPE_ARP)
-		fd = state->arp_fd;
-	else
-		fd = state->raw_fd;
+	fd = ipv4_protocol_fd(ifp, protocol);
 	return writev(fd, iov, 2);
 }
 
@@ -411,10 +406,7 @@ if_readrawpacket(struct interface *ifp, uint16_t protocol,
 	struct dhcp_state *state;
 
 	state = D_STATE(ifp);
-	if (protocol == ETHERTYPE_ARP)
-		fd = state->arp_fd;
-	else
-		fd = state->raw_fd;
+	fd = ipv4_protocol_fd(ifp, protocol);
 
 	*flags = 0;
 	for (;;) {

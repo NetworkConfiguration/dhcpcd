@@ -88,6 +88,7 @@ struct ipv4_state {
 
 #ifdef INET
 int ipv4_init(struct dhcpcd_ctx *);
+int ipv4_protocol_fd(const struct interface *, uint16_t);
 int ipv4_ifcmp(const struct interface *, const struct interface *);
 uint8_t inet_ntocidr(struct in_addr);
 int inet_cidrtoaddr(int, struct in_addr *);

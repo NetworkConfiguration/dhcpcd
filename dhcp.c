@@ -3023,8 +3023,7 @@ dhcp_dump(struct interface *ifp)
 	ifp->if_data[IF_DATA_DHCP] = state = calloc(1, sizeof(*state));
 	if (state == NULL)
 		goto eexit;
-	state->raw_fd = state->arp_fd = -1;
-	TAILQ_INIT(&state->arp_states);
+	state->raw_fd = -1;
 	dhcp_set_leasefile(state->leasefile, sizeof(state->leasefile),
 	    AF_INET, ifp);
 	state->new = read_lease(ifp);
@@ -3097,8 +3096,7 @@ dhcp_init(struct interface *ifp)
 		if (state == NULL)
 			return -1;
 		/* 0 is a valid fd, so init to -1 */
-		state->raw_fd = state->arp_fd = -1;
-		TAILQ_INIT(&state->arp_states);
+		state->raw_fd = -1;
 
 		/* Now is a good time to find IPv4 routes */
 		if_initrt(ifp);

@@ -213,7 +213,6 @@ struct dhcp_state {
 	int socket;
 
 	int raw_fd;
-	int arp_fd;
 	size_t buffer_size, buffer_len, buffer_pos;
 	unsigned char *buffer;
 
@@ -224,12 +223,8 @@ struct dhcp_state {
 
 	char leasefile[sizeof(LEASEFILE) + IF_NAMESIZE + (IF_SSIDSIZE * 4)];
 	time_t start_uptime;
-
 	unsigned char *clientid;
-
 	struct authstate auth;
-	struct arp_statehead arp_states;
-
 	size_t arping_index;
 };
 

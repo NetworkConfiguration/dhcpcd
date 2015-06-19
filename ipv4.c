@@ -28,6 +28,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
+#include <netinet/if_ether.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <net/route.h>
@@ -198,6 +199,23 @@ ipv4_init(struct dhcpcd_ctx *ctx)
 		TAILQ_INIT(ctx->ipv4_kroutes);
 	}
 	return 0;
+}
+
+int
+ipv4_protocol_fd(const struct interface *ifp, uint16_t protocol)
+{
+
+	if (protocol == ETHERTYPE_ARP) {
+		const struct iarp_state *istate;
+
+		istate = ARP_CSTATE(ifp);
+		return istate->fd;
+	} else {
+		const struct dhcp_state *dstate;
+
+		dstate = D_CSTATE(ifp);
+		return dstate->raw_fd;
+	}
 }
 
 /* Interface comparer for working out ordering. */
