@@ -802,6 +802,10 @@ ipv4_getstate(struct interface *ifp)
 		}
 		TAILQ_INIT(&state->addrs);
 		TAILQ_INIT(&state->routes);
+#ifdef BSD
+		state->buffer_size = state->buffer_len = state->buffer_pos = 0;
+		state->buffer = NULL;
+#endif
 	}
 	return state;
 }
