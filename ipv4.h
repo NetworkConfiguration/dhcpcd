@@ -93,6 +93,7 @@ struct ipv4_state {
 	((const struct ipv4_state *)(ifp)->if_data[IF_DATA_IPV4])
 
 #ifdef INET
+struct ipv4_state *ipv4_getstate(struct interface *);
 int ipv4_init(struct dhcpcd_ctx *);
 int ipv4_protocol_fd(const struct interface *, uint16_t);
 int ipv4_ifcmp(const struct interface *, const struct interface *);

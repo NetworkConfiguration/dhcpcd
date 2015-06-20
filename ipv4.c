@@ -787,7 +787,7 @@ delete_address(struct interface *ifp)
 	return r;
 }
 
-static struct ipv4_state *
+struct ipv4_state *
 ipv4_getstate(struct interface *ifp)
 {
 	struct ipv4_state *state;

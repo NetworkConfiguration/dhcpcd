@@ -891,8 +891,11 @@ dhcpcd_startinterface(void *arg)
 		}
 	}
 
-	if (ifo->options & DHCPCD_IPV4)
-		dhcp_start(ifp);
+	if (ifo->options & DHCPCD_IPV4) {
+		/* Ensure we have an IPv4 state before starting DHCP */
+		if (ipv4_getstate(ifp) != NULL)
+			dhcp_start(ifp);
+	}
 }
 
 static void
