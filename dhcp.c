@@ -2101,11 +2101,7 @@ dhcp_bind(struct interface *ifp, struct arp_state *astate)
 		    " seconds",
 		    ifp->name, lease->renewaltime, lease->rebindtime);
 	}
-	if (!(ifo->options & DHCPCD_STATIC) &&
-	    state->new->cookie != htonl(MAGIC_COOKIE))
-		state->state = DHS_IPV4LL_BOUND;
-	else
-		state->state = DHS_BOUND;
+	state->state = DHS_BOUND;
 	if (!state->lease.frominfo &&
 	    !(ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC)))
 		if (write_lease(ifp, state->new) == -1)
@@ -2338,16 +2334,6 @@ dhcp_drop(struct interface *ifp, const char *reason)
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 		return;
 	}
-	/* Don't reset DHCP state if we have an IPv4LL address and link is up,
-	 * unless the interface is departing. */
-	if (state->state != DHS_IPV4LL_BOUND ||
-	    ifp->carrier != LINK_UP ||
-	    ifp->options->options & DHCPCD_DEPARTED)
-	{
-		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
-		dhcp_auth_reset(&state->auth);
-		dhcp_close(ifp);
-	}
 
 	if (ifp->options->options & DHCPCD_RELEASE) {
 		unlink(state->leasefile);
@@ -2367,6 +2353,10 @@ dhcp_drop(struct interface *ifp, const char *reason)
 #endif
 		}
 	}
+
+	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
+	dhcp_auth_reset(&state->auth);
+	dhcp_close(ifp);
 
 	free(state->old);
 	state->old = state->new;
@@ -2655,8 +2645,7 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 			    "%s: message: %s", ifp->name, msg);
 			free(msg);
 		}
-		if ((state->state == DHS_DISCOVER ||
-		    state->state == DHS_IPV4LL_BOUND) &&
+		if (state->state == DHS_DISCOVER &&
 		    get_option_uint8(ifp->ctx, &tmp, dhcp,
 		    DHO_AUTOCONFIGURE) == 0)
 		{
@@ -2710,9 +2699,7 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 	}
 #endif
 
-	if ((type == 0 || type == DHCP_OFFER) &&
-	    (state->state == DHS_DISCOVER || state->state == DHS_IPV4LL_BOUND))
-	{
+	if ((type == 0 || type == DHCP_OFFER) && state->state == DHS_DISCOVER) {
 		lease->frominfo = 0;
 		lease->addr.s_addr = dhcp->yiaddr;
 		lease->cookie = dhcp->cookie;
