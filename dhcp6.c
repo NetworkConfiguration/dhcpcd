@@ -1219,14 +1219,12 @@ dhcp6_sendconfirm(void *arg)
 	dhcp6_sendmessage(arg, dhcp6_sendconfirm);
 }
 
-/*
 static void
 dhcp6_sendrelease(void *arg)
 {
 
 	dhcp6_sendmessage(arg, dhcp6_sendrelease);
 }
-*/
 
 static void
 dhcp6_startrenew(void *arg)
@@ -1602,6 +1600,18 @@ dhcp6_startexpire(void *arg)
 }
 
 static void
+dhcp6_finishrelease(void *arg)
+{
+	struct interface *ifp;
+	struct dhcp6_state *state;
+
+	ifp = (struct interface *)arg;
+	state = D6_STATE(ifp);
+	state->state = DH6S_RELEASED;
+	dhcp6_drop(ifp, "RELEASE6");
+}
+
+static void
 dhcp6_startrelease(struct interface *ifp)
 {
 	struct dhcp6_state *state;
@@ -1615,18 +1625,22 @@ dhcp6_startrelease(struct interface *ifp)
 	state->RTC = 0;
 	state->IRT = REL_TIMEOUT;
 	state->MRT = 0;
+	/* MRC of REL_MAX_RC is optional in RFC 3315 18.1.6 */
+#if 0
 	state->MRC = REL_MAX_RC;
-	//state->MRCcallback = dhcp6_failrelease;
+	state->MRCcallback = dhcp6_finishrelease;
+#else
+	state->MRC = 0;
 	state->MRCcallback = NULL;
+#endif
 
 	if (dhcp6_makemessage(ifp) == -1)
 		logger(ifp->ctx, LOG_ERR,
 		    "%s: dhcp6_makemessage: %m", ifp->name);
-	else
-		/* XXX: We should loop a few times
-		 * Luckily RFC3315 section 18.1.6 says this is optional */
-		//dhcp6_sendrelease(ifp);
-		dhcp6_sendmessage(ifp, NULL);
+	else {
+		dhcp6_sendrelease(ifp);
+		dhcp6_finishrelease(ifp);
+	}
 }
 
 static int
@@ -3262,10 +3276,20 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 
 	state = D6_STATE(ifp);
 	if (state) {
-		dhcp_auth_reset(&state->auth);
+		/* Failure to send the release may cause this function to
+		 * re-enter */
+		if (state->state == DH6S_RELEASE) {
+			dhcp6_finishrelease(ifp);
+			return;
+		}
+
 		if (drop && options & DHCPCD_RELEASE) {
-			if (ifp->carrier == LINK_UP)
+			if (ifp->carrier == LINK_UP &&
+			    state->state != DH6S_RELEASED)
+			{
 				dhcp6_startrelease(ifp);
+				return;
+			}
 			unlink(state->leasefile);
 		}
 		dhcp6_freedrop_addrs(ifp, drop, NULL);

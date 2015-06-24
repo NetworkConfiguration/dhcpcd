@@ -2336,6 +2336,12 @@ dhcp_drop(struct interface *ifp, const char *reason)
 	}
 
 	if (ifp->options->options & DHCPCD_RELEASE) {
+		/* Failure to send the release may cause this function to
+		 * re-enter so guard by setting the state. */
+		if (state->state == DHS_RELEASE)
+			return;
+		state->state = DHS_RELEASE;
+
 		unlink(state->leasefile);
 		if (ifp->carrier != LINK_DOWN &&
 		    state->new != NULL &&
