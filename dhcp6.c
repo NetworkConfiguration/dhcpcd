@@ -1082,7 +1082,7 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 		else
 			timespecadd(&state->RT, &RTprev, &state->RT);
 
-		if (state->RT.tv_sec > state->MRT) {
+		if (state->MRT != 0 && state->RT.tv_sec > state->MRT) {
 			RTprev.tv_sec = state->MRT;
 			RTprev.tv_nsec = 0;
 			state->RT.tv_sec = state->MRT;
