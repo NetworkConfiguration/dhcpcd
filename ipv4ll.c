@@ -243,6 +243,16 @@ ipv4ll_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 		ipv4ll_probe, astate);
 }
 
+static void
+ipv4ll_arpfree(struct arp_state *astate)
+{
+	struct ipv4ll_state *state;
+
+	state = IPV4LL_STATE(astate->iface);
+	if (state->arp == astate)
+		state->arp = NULL;
+}
+
 void
 ipv4ll_start(void *arg)
 {
@@ -289,6 +299,7 @@ ipv4ll_start(void *arg)
 	astate->probed_cb = ipv4ll_probed;
 	astate->announced_cb = ipv4ll_announced;
 	astate->conflicted_cb = ipv4ll_conflicted;
+	astate->free_cb = ipv4ll_arpfree;
 
 	/* Find an existing IPv4LL address and ensure we can work with it. */
 	ia = ipv4_iffindlladdr(ifp);

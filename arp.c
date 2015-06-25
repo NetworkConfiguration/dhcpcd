@@ -98,7 +98,7 @@ void
 arp_report_conflicted(const struct arp_state *astate, const struct arp_msg *amsg)
 {
 
-	if (amsg) {
+	if (amsg != NULL) {
 		char buf[HWADDR_LEN * 3];
 
 		logger(astate->iface->ctx, LOG_ERR,
@@ -362,6 +362,8 @@ arp_free(struct arp_state *astate)
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, astate);
 		state =	ARP_STATE(ifp);
 		TAILQ_REMOVE(&state->arp_states, astate, next);
+		if (astate->free_cb)
+			astate->free_cb(astate);
 		free(astate);
 
 		/* If there are no more ARP states, close the socket. */
