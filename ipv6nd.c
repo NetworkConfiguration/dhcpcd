@@ -1120,7 +1120,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 		    " (no public prefix, no managed address)",
 		    rap->iface->name, rap->sfrom);
 		rap->no_public_warned = 1;
-		return;
+		goto handle_flag;
 	}
 	if (ifp->ctx->options & DHCPCD_TEST) {
 		script_runreason(ifp, "TEST");
