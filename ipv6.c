@@ -749,7 +749,7 @@ int
 ipv6_publicaddr(const struct ipv6_addr *ia)
 {
 	return (ia->prefix_pltime &&
-	    (ia->addr.s6_addr[0] & 0xfe) != 0xc &&
+	    (ia->addr.s6_addr[0] & 0xfe) != 0xfc &&
 	    !(ia->addr_flags & IN6_IFF_NOTUSEABLE));
 }
 
