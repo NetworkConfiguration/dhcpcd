@@ -158,6 +158,7 @@ ipv4ll_probed(struct arp_state *astate)
 	state->addr = astate->addr;
 	state->defend = 0;
 	ipv4_buildroutes(ifp->ctx);
+	arp_announce(astate);
 	script_runreason(ifp, "IPV4LL");
 	dhcpcd_daemonise(ifp->ctx);
 }
