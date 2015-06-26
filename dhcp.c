@@ -1907,6 +1907,7 @@ dhcp_arp_probed(struct arp_state *astate)
 	logger(astate->iface->ctx, LOG_DEBUG, "%s: DAD completed for %s",
 	    astate->iface->name, inet_ntoa(astate->addr));
 	dhcp_bind(astate->iface);
+	arp_announce(astate);
 
 	/* Stop IPv4LL now we have a working DHCP address */
 	ipv4ll_drop(astate->iface);
