@@ -104,10 +104,8 @@ int ipv4_hasaddr(const struct interface *);
 
 #define STATE_ADDED		0x01
 #define STATE_FAKE		0x02
-#define STATE_TENTATIVE		0x04
 
 void ipv4_buildroutes(struct dhcpcd_ctx *);
-void ipv4_finaliseaddr(struct interface *);
 int ipv4_deladdr(struct interface *, const struct in_addr *,
     const struct in_addr *);
 int ipv4_preferanother(struct interface *);

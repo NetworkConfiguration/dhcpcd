@@ -864,50 +864,12 @@ ipv4_daddaddr(struct interface *ifp, const struct dhcp_lease *lease)
 		return -1;
 
 	state = D_STATE(ifp);
-#ifdef IN_IFF_TENTATIVE
-	state->added |= STATE_ADDED;
-#else
 	state->added = STATE_ADDED;
-#endif
+
 	state->addr.s_addr = lease->addr.s_addr;
 	state->net.s_addr = lease->net.s_addr;
 
 	return 0;
-}
-
-static void
-ipv4_finalisert(struct interface *ifp)
-{
-	const struct dhcp_state *state = D_CSTATE(ifp);
-
-	assert(state != NULL);
-
-	/* Find any freshly added routes, such as the subnet route.
-	 * We do this because we cannot rely on recieving the kernel
-	 * notification right now via our link socket. */
-	if_initrt(ifp);
-	ipv4_buildroutes(ifp->ctx);
-	script_runreason(ifp, state->reason);
-
-	dhcpcd_daemonise(ifp->ctx);
-}
-
-void
-ipv4_finaliseaddr(struct interface *ifp)
-{
-	struct dhcp_state *state = D_STATE(ifp);
-	struct dhcp_lease *lease;
-
-	lease = &state->lease;
-
-	/* Delete the old address if different */
-	if (state->addr.s_addr != lease->addr.s_addr &&
-	    state->addr.s_addr != 0 &&
-	    ipv4_iffindaddr(ifp, &lease->addr, NULL))
-		delete_address(ifp);
-
-	state->added &= (uint8_t)~(STATE_FAKE | STATE_TENTATIVE);
-	ipv4_finalisert(ifp);
 }
 
 int
@@ -996,7 +958,6 @@ ipv4_applyaddr(void *arg)
 				    ifp->name,
 				    inet_ntoa(lease->addr),
 				    ifn->name);
-				state->added &= (uint8_t)~STATE_TENTATIVE;
 				return;
 			}
 			logger(ifp->ctx, LOG_INFO, "%s: preferring %s on %s",
@@ -1045,7 +1006,24 @@ ipv4_applyaddr(void *arg)
 		return;
 #endif
 
-	ipv4_finaliseaddr(ifp);
+	/* Delete the old address if different */
+	if (state->addr.s_addr != lease->addr.s_addr &&
+	    state->addr.s_addr != 0 &&
+	    ipv4_iffindaddr(ifp, &lease->addr, NULL))
+		delete_address(ifp);
+
+	state->added = STATE_ADDED;
+	state->addr.s_addr = lease->addr.s_addr;
+	state->net.s_addr = lease->net.s_addr;
+
+	/* Find any freshly added routes, such as the subnet route.
+	 * We do this because we cannot rely on recieving the kernel
+	 * notification right now via our link socket. */
+	if_initrt(ifp);
+	ipv4_buildroutes(ifp->ctx);
+	script_runreason(ifp, state->reason);
+
+	dhcpcd_daemonise(ifp->ctx);
 }
 
 void
