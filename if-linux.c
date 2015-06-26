@@ -398,7 +398,6 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 	size_t len;
 	struct rtmsg *rtm;
 	struct rtattr *rta;
-	struct in_addr prefsrc;
 
 	len = nlm->nlmsg_len - sizeof(*nlm);
 	if (len < sizeof(*rtm)) {
@@ -415,7 +414,6 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 	if (rtm->rtm_scope == RT_SCOPE_HOST)
 		rt->flags |= RTF_HOST;
 
-	prefsrc.s_addr = INADDR_ANY;
 	rta = (struct rtattr *)RTM_RTA(rtm);
 	len = RTM_PAYLOAD(nlm);
 	while (RTA_OK(rta, len)) {
@@ -429,8 +427,8 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 			    sizeof(rt->gate.s_addr));
 			break;
 		case RTA_PREFSRC:
-			memcpy(&prefsrc.s_addr, RTA_DATA(rta),
-			    sizeof(prefsrc.s_addr));
+			memcpy(&rt->src.s_addr, RTA_DATA(rta),
+			    sizeof(rt->src.s_addr));
 			break;
 		case RTA_OIF:
 			rt->iface = if_findindex(ctx->ifaces,
@@ -444,7 +442,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 	}
 
 	inet_cidrtoaddr(rtm->rtm_dst_len, &rt->net);
-	if (rt->iface == NULL && prefsrc.s_addr != INADDR_ANY) {
+	if (rt->iface == NULL && rt->src.s_addr != INADDR_ANY) {
 		struct ipv4_addr *ap;
 
 		/* For some reason the default route comes back with the

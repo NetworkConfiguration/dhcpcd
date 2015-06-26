@@ -87,6 +87,7 @@ ipv4ll_subnet_route(const struct interface *ifp)
 	rt->dest.s_addr = state->addr.s_addr & inaddr_llmask.s_addr;
 	rt->net = inaddr_llmask;
 	rt->gate.s_addr = INADDR_ANY;
+	rt->src = state->addr;
 	return rt;
 }
 
@@ -376,5 +377,7 @@ ipv4ll_freedrop(struct interface *ifp, int drop)
 	if (state) {
 		free(state);
 		ifp->if_data[IF_DATA_IPV4LL] = NULL;
+
+		ipv4_buildroutes(ifp->ctx);
 	}
 }

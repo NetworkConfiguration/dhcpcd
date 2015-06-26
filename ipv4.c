@@ -474,6 +474,7 @@ add_subnet_route(struct rt_head *rt, const struct interface *ifp)
 	r->dest.s_addr = s->addr.s_addr & s->net.s_addr;
 	r->net.s_addr = s->net.s_addr;
 	r->gate.s_addr = INADDR_ANY;
+	r->src = s->addr;
 
 	TAILQ_INSERT_HEAD(rt, r, next);
 	return rt;
@@ -499,9 +500,10 @@ add_loopback_route(struct rt_head *rt, const struct interface *ifp)
 		ipv4_freeroutes(rt);
 		return NULL;
 	}
-	r->dest.s_addr = s->addr.s_addr;
+	r->dest = s->addr;
 	r->net.s_addr = INADDR_BROADCAST;
 	r->gate.s_addr = htonl(INADDR_LOOPBACK);
+	r->src = s->addr;
 	TAILQ_INSERT_HEAD(rt, r, next);
 	return rt;
 }
@@ -512,9 +514,11 @@ get_routes(struct interface *ifp)
 {
 	struct rt_head *nrt;
 	struct rt *rt, *r = NULL;
+	const struct dhcp_state *state;
 
 	if (ifp->options->routes && TAILQ_FIRST(ifp->options->routes)) {
-		nrt = malloc(sizeof(*nrt));
+		if ((nrt = malloc(sizeof(*nrt))) == NULL)
+			return NULL;
 		TAILQ_INIT(nrt);
 		TAILQ_FOREACH(rt, ifp->options->routes, next) {
 			if (rt->gate.s_addr == 0)
@@ -528,20 +532,30 @@ get_routes(struct interface *ifp)
 			memcpy(r, rt, sizeof(*r));
 			TAILQ_INSERT_TAIL(nrt, r, next);
 		}
-		return nrt;
+	} else
+		nrt = get_option_routes(ifp, D_STATE(ifp)->new);
+
+	/* Copy our address as the source address */
+	if (nrt) {
+		state = D_CSTATE(ifp);
+		TAILQ_FOREACH(rt, nrt, next) {
+			rt->src = state->addr;
+		}
 	}
 
-	return get_option_routes(ifp, D_STATE(ifp)->new);
+	return nrt;
 }
 
 static struct rt_head *
 add_destination_route(struct rt_head *rt, const struct interface *ifp)
 {
 	struct rt *r;
+	const struct dhcp_state *state;
 
 	if (rt == NULL || /* failed a malloc earlier probably */
 	    !(ifp->flags & IFF_POINTOPOINT) ||
-	    !has_option_mask(ifp->options->dstmask, DHO_ROUTER))
+	    !has_option_mask(ifp->options->dstmask, DHO_ROUTER) ||
+	    (state = D_CSTATE(ifp)) == NULL)
 		return rt;
 
 	r = malloc(sizeof(*r));
@@ -552,7 +566,7 @@ add_destination_route(struct rt_head *rt, const struct interface *ifp)
 	}
 	r->dest.s_addr = INADDR_ANY;
 	r->net.s_addr = INADDR_ANY;
-	r->gate.s_addr = D_CSTATE(ifp)->dst.s_addr;
+	r->gate.s_addr = state->dst.s_addr;
 	TAILQ_INSERT_HEAD(rt, r, next);
 	return rt;
 }
@@ -594,7 +608,8 @@ add_router_host_route(struct rt_head *rt, const struct interface *ifp)
 		}
 		if (rtn != rtp)
 			continue;
-		state = D_CSTATE(ifp);
+		if ((state = D_CSTATE(ifp)) == NULL)
+			continue;
 		ifo = ifp->options;
 		if (ifp->flags & IFF_NOARP) {
 			if (!(ifo->options & DHCPCD_ROUTER_HOST_ROUTE_WARNED) &&
@@ -642,8 +657,7 @@ ipv4_buildroutes(struct dhcpcd_ctx *ctx)
 	 * our routes are managed correctly. */
 	if_sortinterfaces(ctx);
 
-	nrs = malloc(sizeof(*nrs));
-	if (nrs == NULL) {
+	if ((nrs = malloc(sizeof(*nrs))) == NULL) {
 		logger(ctx, LOG_ERR, "%s: %m", __func__);
 		return;
 	}
@@ -651,12 +665,24 @@ ipv4_buildroutes(struct dhcpcd_ctx *ctx)
 
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 		state = D_CSTATE(ifp);
-		if (state == NULL || state->new == NULL || !state->added)
-			continue;
-		dnr = get_routes(ifp);
-		dnr = add_subnet_route(dnr, ifp);
-		if ((rt = ipv4ll_subnet_route(ifp)) != NULL)
+		if (state != NULL && state->new != NULL && state->added) {
+			dnr = get_routes(ifp);
+			dnr = add_subnet_route(dnr, ifp);
+		} else
+			dnr = NULL;
+		if ((rt = ipv4ll_subnet_route(ifp)) != NULL) {
+			if (dnr == NULL) {
+				if ((dnr = malloc(sizeof(*dnr))) == NULL) {
+					logger(ifp->ctx, LOG_ERR,
+					    "%s: malloc %m", __func__);
+					continue;
+				}
+				TAILQ_INIT(dnr);
+			}
 			TAILQ_INSERT_HEAD(dnr, rt, next);
+		}
+		if (dnr == NULL)
+			continue;
 #ifdef IPV4_LOOPBACK_ROUTE
 		dnr = add_loopback_route(dnr, ifp);
 #endif
@@ -664,7 +690,7 @@ ipv4_buildroutes(struct dhcpcd_ctx *ctx)
 			dnr = add_router_host_route(dnr, ifp);
 			dnr = add_destination_route(dnr, ifp);
 		}
-		if (dnr == NULL) /* failed to malloc all new routes */
+		if (dnr == NULL)
 			continue;
 		TAILQ_FOREACH_SAFE(rt, dnr, next, rtn) {
 			rt->iface = ifp;
@@ -675,7 +701,6 @@ ipv4_buildroutes(struct dhcpcd_ctx *ctx)
 			/* Is this route already in our table? */
 			if ((find_route(nrs, rt, NULL)) != NULL)
 				continue;
-			rt->src.s_addr = state->addr.s_addr;
 			/* Do we already manage it? */
 			if ((or = find_route(ctx->ipv4_routes, rt, NULL))) {
 				if (state->added & STATE_FAKE)
@@ -685,7 +710,7 @@ ipv4_buildroutes(struct dhcpcd_ctx *ctx)
 #ifdef HAVE_ROUTE_METRIC
 				    rt->metric != or->metric ||
 #endif
-				    or->src.s_addr != state->addr.s_addr ||
+				    rt->src.s_addr != or->src.s_addr ||
 				    rt->gate.s_addr != or->gate.s_addr)
 				{
 					if (c_route(or, rt) != 0)
