@@ -1914,7 +1914,7 @@ dhcp_arp_probed(struct arp_state *astate)
 	ipv4_finaliseaddr(astate->iface);
 	arp_close(astate->iface);
 #else
-	dhcp_bind(astate->iface, astate);
+	dhcp_bind(astate->iface);
 #endif
 
 	/* Stop IPv4LL now we have a working DHCP address */
@@ -1991,11 +1991,12 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 }
 
 void
-dhcp_bind(struct interface *ifp, struct arp_state *astate)
+dhcp_bind(struct interface *ifp)
 {
 	struct dhcp_state *state = D_STATE(ifp);
 	struct if_options *ifo = ifp->options;
 	struct dhcp_lease *lease = &state->lease;
+	struct arp_state *astate;
 
 	if (state->state == DHS_BOUND)
 		goto applyaddr;
@@ -2110,9 +2111,8 @@ dhcp_bind(struct interface *ifp, struct arp_state *astate)
 
 applyaddr:
 #ifdef IN_IFF_TENTATIVE
-	if (astate == NULL) {
-		astate = arp_new(ifp, &lease->addr);
-		if (astate) {
+	if ((astate = arp_find(ifp, &lease->addr)) == NULL) {
+		if ((astate = arp_new(ifp, &lease->addr)) != NULL) {
 			astate->probed_cb = dhcp_arp_probed;
 			astate->conflicted_cb = dhcp_arp_conflicted;
 		}
@@ -2151,7 +2151,7 @@ dhcp_timeout(void *arg)
 	struct interface *ifp = arg;
 	struct dhcp_state *state = D_STATE(ifp);
 
-	dhcp_bind(ifp, NULL);
+	dhcp_bind(ifp);
 	state->interval = 0;
 	dhcp_discover(ifp);
 }
@@ -2198,7 +2198,7 @@ dhcp_static(struct interface *ifp)
 	state->offer = dhcp_message_new(&ifo->req_addr, &ifo->req_mask);
 	if (state->offer) {
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
-		dhcp_bind(ifp, NULL);
+		dhcp_bind(ifp);
 	}
 }
 
@@ -2234,7 +2234,7 @@ dhcp_inform(struct interface *ifp)
 			    dhcp_message_new(&ifo->req_addr, &ifo->req_mask);
 		if (state->offer) {
 			ifo->options |= DHCPCD_STATIC;
-			dhcp_bind(ifp, NULL);
+			dhcp_bind(ifp);
 			ifo->options &= ~DHCPCD_STATIC;
 		}
 	}
@@ -2487,7 +2487,6 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 	unsigned int i;
 	size_t auth_len;
 	char *msg;
-	struct arp_state *astate;
 	struct ipv4_addr *ia;
 
 	/* We may have found a BOOTP server */
@@ -2777,7 +2776,6 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 
 	lease->frominfo = 0;
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
-	astate = NULL;
 
 #ifndef IN_IFF_TENTATIVE
 	if (ifo->options & DHCPCD_ARP
@@ -2788,6 +2786,8 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 		 * then we can't ARP for duplicate detection. */
 		ia = ipv4_findaddr(ifp->ctx, &addr);
 		if (ia == NULL) {
+			struct arp_state *astate;
+
 			astate = arp_new(ifp, &addr);
 			if (astate) {
 				astate->probed_cb = dhcp_arp_probed;
@@ -2799,7 +2799,7 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 	}
 #endif
 
-	dhcp_bind(ifp, astate);
+	dhcp_bind(ifp);
 }
 
 static size_t

@@ -934,7 +934,7 @@ ipv4_preferanother(struct interface *ifp)
 			preferred = 1;
 			delete_address(ifp);
 			if (ifn->options->options & DHCPCD_ARP)
-				dhcp_bind(ifn, NULL);
+				dhcp_bind(ifn);
 			else {
 				ipv4_daddaddr(ifn, &nstate->lease);
 				nstate->added = STATE_ADDED;
