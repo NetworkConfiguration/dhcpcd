@@ -448,7 +448,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 		/* For some reason the default route comes back with the
 		 * loopback interface in RTA_OIF? Lets find it by
 		 * preferred source address */
-		if ((ap = ipv4_findaddr(ctx, &prefsrc)))
+		if ((ap = ipv4_findaddr(ctx, &rt->src)))
 			rt->iface = ap->iface;
 	}
 	return 0;
