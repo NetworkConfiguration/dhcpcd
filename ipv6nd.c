@@ -870,9 +870,6 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 
 	clock_gettime(CLOCK_MONOTONIC, &rap->acquired);
 	rap->flags = nd_ra->nd_ra_flags_reserved;
-	if (new_rap == 0 && rap->lifetime == 0)
-		logger(ifp->ctx, LOG_WARNING, "%s: %s router available",
-		   ifp->name, rap->sfrom);
 	rap->lifetime = ntohs(nd_ra->nd_ra_router_lifetime);
 	if (nd_ra->nd_ra_reachable) {
 		rap->reachable = ntohl(nd_ra->nd_ra_reachable);
