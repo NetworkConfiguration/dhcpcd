@@ -50,6 +50,9 @@ struct ipv4ll_state {
 	((struct ipv4ll_state *)(ifp)->if_data[IF_DATA_IPV4LL])
 #define IPV4LL_CSTATE(ifp)						       \
 	((const struct ipv4ll_state *)(ifp)->if_data[IF_DATA_IPV4LL])
+#define IPV4LL_STATE_RUNNING(ifp)					       \
+	(IPV4LL_CSTATE((ifp)) &&					       \
+	IN_LINKLOCAL(ntohl(IPV4LL_CSTATE((ifp))->addr.s_addr)))
 
 struct rt* ipv4ll_subnet_route(const struct interface *);
 ssize_t ipv4ll_env(char **, const char *, const struct interface *);

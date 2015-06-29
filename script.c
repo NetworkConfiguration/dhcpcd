@@ -354,6 +354,7 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	} else if (1 == 2 /* appease ifdefs */
 #ifdef INET
 	    || (dhcp && state && state->new)
+	    || (ipv4ll && IPV4LL_STATE_RUNNING(ifp))
 #endif
 #ifdef INET6
 	    || (dhcp6 && d6_state && d6_state->new)
