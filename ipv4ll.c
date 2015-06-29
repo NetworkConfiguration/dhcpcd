@@ -25,6 +25,8 @@
  * SUCH DAMAGE.
  */
 
+#include <arpa/inet.h>
+
 #include <assert.h>
 #include <errno.h>
 #include <signal.h>
@@ -36,7 +38,6 @@
 #include "config.h"
 #include "arp.h"
 #include "common.h"
-#include "dhcp.h"
 #include "eloop.h"
 #include "if.h"
 #include "if-options.h"
@@ -187,12 +188,14 @@ ipv4ll_probe(void *arg)
 static void
 ipv4ll_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 {
+	struct interface *ifp;
 	struct ipv4ll_state *state;
 	in_addr_t fail;
 
 	assert(astate != NULL);
 	assert(astate->iface != NULL);
-	state = IPV4LL_STATE(astate->iface);
+	ifp = astate->iface;
+	state = IPV4LL_STATE(ifp);
 	assert(state != NULL);
 
 	fail = 0;
@@ -221,15 +224,17 @@ ipv4ll_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 		defend.tv_nsec = state->defend.tv_nsec;
 		clock_gettime(CLOCK_MONOTONIC, &now);
 		if (timespeccmp(&defend, &now, >)) {
-			logger(astate->iface->ctx, LOG_WARNING,
+			logger(ifp->ctx, LOG_WARNING,
 			    "%s: IPv4LL %d second defence failed for %s",
-			    astate->iface->name, DEFEND_INTERVAL,
+			    ifp->name, DEFEND_INTERVAL,
 			    inet_ntoa(state->addr));
-			dhcp_drop(astate->iface, "EXPIRE");
+			ipv4_deladdr(ifp, &state->addr, &inaddr_llmask, 1);
+			state->addr.s_addr = INADDR_ANY;
+			script_runreason(ifp, "IPV4LL");
 		} else {
-			logger(astate->iface->ctx, LOG_DEBUG,
+			logger(ifp->ctx, LOG_DEBUG,
 			    "%s: defended IPv4LL address %s",
-			    astate->iface->name, inet_ntoa(state->addr));
+			    ifp->name, inet_ntoa(state->addr));
 			state->defend = now;
 			return;
 		}
@@ -237,11 +242,11 @@ ipv4ll_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 
 	arp_cancel(astate);
 	if (++state->conflicts == MAX_CONFLICTS)
-		logger(astate->iface->ctx, LOG_ERR,
+		logger(ifp->ctx, LOG_ERR,
 		    "%s: failed to acquire an IPv4LL address",
-		    astate->iface->name);
+		    ifp->name);
 	astate->addr.s_addr = ipv4ll_pick_addr(astate);
-	eloop_timeout_add_sec(astate->iface->ctx->eloop,
+	eloop_timeout_add_sec(ifp->ctx->eloop,
 		state->conflicts >= MAX_CONFLICTS ?
 		RATE_LIMIT_INTERVAL : PROBE_WAIT,
 		ipv4ll_probe, astate);
@@ -309,7 +314,7 @@ ipv4ll_start(void *arg)
 	ia = ipv4_iffindlladdr(ifp);
 #ifdef IN_IFF_TENTATIVE
 	if (ia != NULL && ia->addr_flags & IN_IFF_DUPLICATED) {
-		ipv4_deladdr(ifp, &ia->addr, &ia->net);
+		ipv4_deladdr(ifp, &ia->addr, &ia->net, 0);
 		ia = NULL;
 	}
 #endif
@@ -355,13 +360,11 @@ ipv4ll_freedrop(struct interface *ifp, int drop)
 		state->arp = NULL;
 	}
 
-	/* Unlike other protocols, we don't run a script on stopping IPv4LL
-	 * because we piggy back on the state of DHCP. */
 	if (drop && (ifp->options->options & DHCPCD_NODROP) != DHCPCD_NODROP) {
 		struct ipv4_state *istate;
 
 		if (state && state->addr.s_addr != INADDR_ANY) {
-			ipv4_deladdr(ifp, &state->addr, &inaddr_llmask);
+			ipv4_deladdr(ifp, &state->addr, &inaddr_llmask, 1);
 			state->addr.s_addr = INADDR_ANY;
 		}
 
@@ -371,9 +374,11 @@ ipv4ll_freedrop(struct interface *ifp, int drop)
 
 			TAILQ_FOREACH_SAFE(ia, &istate->addrs, next, ian) {
 				if (IN_LINKLOCAL(ntohl(ia->addr.s_addr)))
-					ipv4_deladdr(ifp, &ia->addr, &ia->net);
+					ipv4_deladdr(ifp, &ia->addr,
+					    &ia->net, 0);
 			}
 		}
+		script_runreason(ifp, "IPV4LL");
 	}
 
 	if (state) {

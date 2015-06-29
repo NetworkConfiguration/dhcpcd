@@ -28,6 +28,8 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
+#include <arpa/inet.h>
+
 #include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/if_ether.h>
@@ -44,7 +46,6 @@
 #include "if.h"
 #include "ipv4.h"
 #include "common.h"
-#include "dhcp.h"
 #include "dhcpcd.h"
 #include "eloop.h"
 #include "if.h"
@@ -135,7 +136,7 @@ arp_packet(void *arg)
 		if (bytes == -1) {
 			logger(ifp->ctx, LOG_ERR,
 			    "%s: arp if_readrawpacket: %m", ifp->name);
-			dhcp_close(ifp);
+			arp_close(ifp);
 			return;
 		}
 		/* We must have a full ARP header */

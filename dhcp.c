@@ -1976,7 +1976,7 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 #ifdef IN_IFF_DUPLICATED
 		ia = ipv4_iffindaddr(ifp, &astate->addr, NULL);
 		if (ia)
-			ipv4_deladdr(ifp, &ia->addr, &ia->net);
+			ipv4_deladdr(ifp, &ia->addr, &ia->net, 1);
 #endif
 		arp_free(astate);
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
@@ -2653,7 +2653,7 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 		    ifp, dhcp, from);
 		if (type)
 			dhcp_decline(ifp);
-		ipv4_deladdr(ifp, &ia->addr, &ia->net);
+		ipv4_deladdr(ifp, &ia->addr, &ia->net, 0);
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    DHCP_RAND_MAX, dhcp_discover, ifp);

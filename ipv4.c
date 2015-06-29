@@ -209,11 +209,13 @@ ipv4_protocol_fd(const struct interface *ifp, uint16_t protocol)
 		const struct iarp_state *istate;
 
 		istate = ARP_CSTATE(ifp);
+		assert(istate != NULL);
 		return istate->fd;
 	} else {
 		const struct dhcp_state *dstate;
 
 		dstate = D_CSTATE(ifp);
+		assert(dstate != NULL);
 		return dstate->raw_fd;
 	}
 }
@@ -752,7 +754,7 @@ ipv4_buildroutes(struct dhcpcd_ctx *ctx)
 
 int
 ipv4_deladdr(struct interface *ifp,
-    const struct in_addr *addr, const struct in_addr *net)
+    const struct in_addr *addr, const struct in_addr *net, int keeparp)
 {
 	struct dhcp_state *dstate;
 	int r;
@@ -768,7 +770,7 @@ ipv4_deladdr(struct interface *ifp,
 	    errno != ENODEV)
 		logger(ifp->ctx, LOG_ERR, "%s: %s: %m", ifp->name, __func__);
 
-	if ((astate = arp_find(ifp, addr)) != NULL)
+	if (!keeparp && (astate = arp_find(ifp, addr)) != NULL)
 		arp_free(astate);
 
 	state = IPV4_STATE(ifp);
@@ -808,7 +810,7 @@ delete_address(struct interface *ifp)
 	if (ifo->options & DHCPCD_INFORM ||
 	    (ifo->options & DHCPCD_STATIC && ifo->req_addr.s_addr == 0))
 		return 0;
-	r = ipv4_deladdr(ifp, &state->addr, &state->net);
+	r = ipv4_deladdr(ifp, &state->addr, &state->net, 0);
 	return r;
 }
 
@@ -851,7 +853,7 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 
 		TAILQ_FOREACH_SAFE(ia, &state->addrs, next, ian) {
 			if (ia->addr.s_addr != addr->s_addr)
-				ipv4_deladdr(ifp, &ia->addr, &ia->net);
+				ipv4_deladdr(ifp, &ia->addr, &ia->net, 0);
 		}
 	}
 
@@ -989,7 +991,7 @@ ipv4_applyaddr(void *arg)
 			    ifn->name,
 			    inet_ntoa(lease->addr),
 			    ifp->name);
-			ipv4_deladdr(ifn, &nstate->addr, &nstate->net);
+			ipv4_deladdr(ifn, &nstate->addr, &nstate->net, 0);
 			break;
 		}
 	}
@@ -1001,14 +1003,14 @@ ipv4_applyaddr(void *arg)
 				continue;
 			ap = ipv4_iffindaddr(ifn, &lease->addr, NULL);
 			if (ap)
-				ipv4_deladdr(ifn, &ap->addr, &ap->net);
+				ipv4_deladdr(ifn, &ap->addr, &ap->net, 0);
 		}
 	}
 
 	/* If the netmask is different, delete the addresss */
 	ap = ipv4_iffindaddr(ifp, &lease->addr, NULL);
 	if (ap && ap->net.s_addr != lease->net.s_addr)
-		ipv4_deladdr(ifp, &ap->addr, &ap->net);
+		ipv4_deladdr(ifp, &ap->addr, &ap->net, 0);
 
 	if (ipv4_iffindaddr(ifp, &lease->addr, &lease->net))
 		logger(ifp->ctx, LOG_DEBUG,

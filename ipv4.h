@@ -107,7 +107,7 @@ int ipv4_hasaddr(const struct interface *);
 
 void ipv4_buildroutes(struct dhcpcd_ctx *);
 int ipv4_deladdr(struct interface *, const struct in_addr *,
-    const struct in_addr *);
+    const struct in_addr *, int);
 int ipv4_preferanother(struct interface *);
 struct ipv4_addr *ipv4_addaddr(struct interface *,
     const struct in_addr *, const struct in_addr *, const struct in_addr *);
