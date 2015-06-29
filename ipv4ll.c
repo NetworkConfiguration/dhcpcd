@@ -157,7 +157,7 @@ ipv4ll_probed(struct arp_state *astate)
 	    ifp->name, inet_ntoa(astate->addr));
 #endif
 	state->addr = astate->addr;
-	state->defend = 0;
+	timespecclear(&state->defend);
 	ipv4_buildroutes(ifp->ctx);
 	arp_announce(astate);
 	script_runreason(ifp, "IPV4LL");
@@ -214,11 +214,13 @@ ipv4ll_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 	arp_report_conflicted(astate, amsg);
 
 	if (astate->failed.s_addr == state->addr.s_addr) {
-		time_t up;
+		struct timespec now, defend;
 
 		/* RFC 3927 Section 2.5 */
-		up = uptime();
-		if (state->defend + DEFEND_INTERVAL > up) {
+		defend.tv_sec = state->defend.tv_sec + DEFEND_INTERVAL;
+		defend.tv_nsec = state->defend.tv_nsec;
+		clock_gettime(CLOCK_MONOTONIC, &now);
+		if (timespeccmp(&defend, &now, >)) {
 			logger(astate->iface->ctx, LOG_WARNING,
 			    "%s: IPv4LL %d second defence failed for %s",
 			    astate->iface->name, DEFEND_INTERVAL,
@@ -228,7 +230,7 @@ ipv4ll_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 			logger(astate->iface->ctx, LOG_DEBUG,
 			    "%s: defended IPv4LL address %s",
 			    astate->iface->name, inet_ntoa(state->addr));
-			state->defend = up;
+			state->defend = now;
 			return;
 		}
 	}

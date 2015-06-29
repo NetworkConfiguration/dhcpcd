@@ -42,7 +42,7 @@ struct ipv4ll_state {
 	struct in_addr addr;
 	struct arp_state *arp;
 	unsigned int conflicts;
-	time_t defend;
+	struct timespec defend;
 	char randomstate[128];
 };
 

@@ -170,7 +170,7 @@ enum DH6S {
 
 struct dhcp6_state {
 	enum DH6S state;
-	time_t start_uptime;
+	struct timespec started;
 
 	/* Message retransmission timings */
 	struct timespec RT;

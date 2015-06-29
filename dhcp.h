@@ -218,7 +218,7 @@ struct dhcp_state {
 	uint8_t added;
 
 	char leasefile[sizeof(LEASEFILE) + IF_NAMESIZE + (IF_SSIDSIZE * 4)];
-	time_t start_uptime;
+	struct timespec started;
 	unsigned char *clientid;
 	struct authstate auth;
 	size_t arping_index;

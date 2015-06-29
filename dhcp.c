@@ -736,7 +736,6 @@ make_message(struct dhcp_message **message,
 	struct if_options *ifo = ifp->options;
 	const struct dhcp_state *state = D_CSTATE(ifp);
 	const struct dhcp_lease *lease = &state->lease;
-	time_t up = uptime() - state->start_uptime;
 	char hbuf[HOSTNAME_MAX_LEN + 1];
 	const char *hostname;
 	const struct vivco *vivco;
@@ -776,10 +775,14 @@ make_message(struct dhcp_message **message,
 		dhcp->flags = htons(BROADCAST_FLAG);
 
 	if (type != DHCP_DECLINE && type != DHCP_RELEASE) {
-		if (up < 0 || up > (time_t)UINT16_MAX)
+		struct timespec tv;
+
+		clock_gettime(CLOCK_MONOTONIC, &tv);
+		timespecsub(&tv, &state->started, &tv);
+		if (tv.tv_sec < 0 || tv.tv_sec > (time_t)UINT16_MAX)
 			dhcp->secs = htons((uint16_t)UINT16_MAX);
 		else
-			dhcp->secs = htons((uint16_t)up);
+			dhcp->secs = htons((uint16_t)tv.tv_sec);
 	}
 	dhcp->xid = htonl(state->xid);
 	dhcp->cookie = htonl(MAGIC_COOKIE);
@@ -3158,7 +3161,7 @@ dhcp_start1(void *arg)
 	}
 
 	state = D_STATE(ifp);
-	state->start_uptime = uptime();
+	clock_gettime(CLOCK_MONOTONIC, &state->started);
 	free(state->offer);
 	state->offer = NULL;
 

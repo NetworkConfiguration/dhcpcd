@@ -299,7 +299,7 @@ dhcp6_updateelapsed(struct interface *ifp, struct dhcp6_message *m, size_t len)
 	struct dhcp6_state *state;
 	const struct dhcp6_option *co;
 	struct dhcp6_option *o;
-	time_t up;
+	struct timespec tv;
 	uint16_t u16;
 
 	co = dhcp6_getmoption(D6_OPTION_ELAPSED, m, len);
@@ -308,10 +308,10 @@ dhcp6_updateelapsed(struct interface *ifp, struct dhcp6_message *m, size_t len)
 
 	o = __UNCONST(co);
 	state = D6_STATE(ifp);
-	up = uptime() - state->start_uptime;
-	if (up < 0 || up > (time_t)UINT16_MAX)
-		up = (time_t)UINT16_MAX;
-	u16 = htons((uint16_t)up);
+	clock_gettime(CLOCK_MONOTONIC, &tv);
+	if (tv.tv_sec < 0 || tv.tv_sec > (time_t)UINT16_MAX)
+		tv.tv_sec = (time_t)UINT16_MAX;
+	u16 = htons((uint16_t)tv.tv_sec);
 	memcpy(D6_OPTION_DATA(o), &u16, sizeof(u16));
 	return 0;
 }
@@ -1235,7 +1235,7 @@ dhcp6_startrenew(void *arg)
 	ifp = arg;
 	state = D6_STATE(ifp);
 	state->state = DH6S_RENEW;
-	state->start_uptime = uptime();
+	clock_gettime(CLOCK_MONOTONIC, &state->started);
 	state->RTC = 0;
 	state->IRT = REN_TIMEOUT;
 	state->MRT = REN_MAX_RT;
@@ -1375,7 +1375,7 @@ dhcp6_startdiscover(void *arg)
 	logger(ifp->ctx, LOG_INFO, "%s: soliciting a DHCPv6 lease", ifp->name);
 	state = D6_STATE(ifp);
 	state->state = DH6S_DISCOVER;
-	state->start_uptime = uptime();
+	clock_gettime(CLOCK_MONOTONIC, &state->started);
 	state->RTC = 0;
 	state->IMD = SOL_MAX_DELAY;
 	state->IRT = SOL_TIMEOUT;
@@ -1535,7 +1535,7 @@ dhcp6_startconfirm(struct interface *ifp)
 
 	state = D6_STATE(ifp);
 	state->state = DH6S_CONFIRM;
-	state->start_uptime = uptime();
+	clock_gettime(CLOCK_MONOTONIC, &state->started);
 	state->RTC = 0;
 	state->IMD = CNF_MAX_DELAY;
 	state->IRT = CNF_TIMEOUT;
@@ -1566,7 +1566,7 @@ dhcp6_startinform(void *arg)
 		logger(ifp->ctx, LOG_INFO,
 		    "%s: requesting DHCPv6 information", ifp->name);
 	state->state = DH6S_INFORM;
-	state->start_uptime = uptime();
+	clock_gettime(CLOCK_MONOTONIC, &state->started);
 	state->RTC = 0;
 	state->IMD = INF_MAX_DELAY;
 	state->IRT = INF_TIMEOUT;
@@ -1621,7 +1621,7 @@ dhcp6_startrelease(struct interface *ifp)
 		return;
 
 	state->state = DH6S_RELEASE;
-	state->start_uptime = uptime();
+	clock_gettime(CLOCK_MONOTONIC, &state->started);
 	state->RTC = 0;
 	state->IRT = REL_TIMEOUT;
 	state->MRT = 0;

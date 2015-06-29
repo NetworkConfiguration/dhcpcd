@@ -191,7 +191,6 @@ ssize_t addvar(struct dhcpcd_ctx *,
     char ***, const char *, const char *, const char *);
 ssize_t addvard(struct dhcpcd_ctx *,
     char ***, const char *, const char *, size_t);
-time_t uptime(void);
 
 char *hwaddr_ntoa(const unsigned char *, size_t, char *, size_t);
 size_t hwaddr_aton(unsigned char *, const char *);
