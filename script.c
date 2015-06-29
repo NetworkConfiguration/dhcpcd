@@ -235,6 +235,7 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 #ifdef INET
 	int dhcp, ipv4ll;
 	const struct dhcp_state *state;
+	const struct ipv4ll_state *istate;
 #endif
 #ifdef INET6
 	const struct dhcp6_state *d6_state;
@@ -244,6 +245,7 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 #ifdef INET
 	dhcp = ipv4ll = 0;
 	state = D_STATE(ifp);
+	istate = IPV4LL_CSTATE(ifp);
 #endif
 #ifdef INET6
 	dhcp6 = ra = 0;
@@ -463,7 +465,8 @@ dumplease:
 			if (nenv == NULL)
 				goto eexit;
 			env = nenv;
-			if ((n = ipv4ll_env(env + elen, "new", ifp)) == -1)
+			if ((n = ipv4ll_env(env + elen,
+			    istate->down ? "old" : "new", ifp)) == -1)
 				goto eexit;
 			elen += (size_t)n;
 		}
@@ -607,6 +610,10 @@ send_interface(struct fd_list *fd, const struct interface *ifp)
 	if (D_STATE_RUNNING(ifp)) {
 		d = D_CSTATE(ifp);
 		if (send_interface1(fd, ifp, d->reason) == -1)
+			retval = -1;
+	}
+	if (IPV4LL_STATE_RUNNING(ifp)) {
+		if (send_interface1(fd, ifp, "IPV4LL") == -1)
 			retval = -1;
 	}
 #endif

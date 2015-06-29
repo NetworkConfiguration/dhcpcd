@@ -44,6 +44,7 @@ struct ipv4ll_state {
 	unsigned int conflicts;
 	struct timespec defend;
 	char randomstate[128];
+	uint8_t down;
 };
 
 #define IPV4LL_STATE(ifp)						       \
@@ -51,7 +52,7 @@ struct ipv4ll_state {
 #define IPV4LL_CSTATE(ifp)						       \
 	((const struct ipv4ll_state *)(ifp)->if_data[IF_DATA_IPV4LL])
 #define IPV4LL_STATE_RUNNING(ifp)					       \
-	(IPV4LL_CSTATE((ifp)) &&					       \
+	(IPV4LL_CSTATE((ifp)) && !IPV4LL_CSTATE((ifp))->down &&	       \
 	IN_LINKLOCAL(ntohl(IPV4LL_CSTATE((ifp))->addr.s_addr)))
 
 struct rt* ipv4ll_subnet_route(const struct interface *);

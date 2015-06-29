@@ -229,8 +229,9 @@ ipv4ll_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 			    ifp->name, DEFEND_INTERVAL,
 			    inet_ntoa(state->addr));
 			ipv4_deladdr(ifp, &state->addr, &inaddr_llmask, 1);
-			state->addr.s_addr = INADDR_ANY;
+			state->down = 1;
 			script_runreason(ifp, "IPV4LL");
+			state->addr.s_addr = INADDR_ANY;
 		} else {
 			logger(ifp->ctx, LOG_DEBUG,
 			    "%s: defended IPv4LL address %s",
