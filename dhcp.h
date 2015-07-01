@@ -243,7 +243,7 @@ void dhcp_printoptions(const struct dhcpcd_ctx *,
     const struct dhcp_opt *, size_t);
 int get_option_addr(struct dhcpcd_ctx *,struct in_addr *,
     const struct dhcp_message *, uint8_t);
-#define IS_BOOTP(i, m) ((m) &&						    \
+#define IS_BOOTP(i, m) ((m) != NULL &&						    \
 	    get_option_uint8((i)->ctx, NULL, (m), DHO_MESSAGETYPE) == -1)
 struct rt_head *get_option_routes(struct interface *,
     const struct dhcp_message *);

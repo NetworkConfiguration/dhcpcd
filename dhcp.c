@@ -1660,31 +1660,26 @@ send_message(struct interface *ifp, uint8_t type,
 	    !(ia->addr_flags & IN_IFF_NOTUSEABLE)) &&
 #endif
 	    (state->lease.server.s_addr ||
-	    ifp->options->options & DHCPCD_INFORM))
+	    ifp->options->options & DHCPCD_INFORM) &&
+	    !IS_BOOTP(ifp, state->new))
 	{
 		s = dhcp_openudp(ifp);
-		if (s == -1 && errno != EADDRINUSE)
-			logger(ifp->ctx, LOG_ERR,
-			    "%s: dhcp_openudp: %m", ifp->name);
+		if (s == -1) {
+			if (errno != EADDRINUSE)
+				logger(ifp->ctx, LOG_ERR,
+				    "%s: dhcp_openudp: %m", ifp->name);
+			/* We cannot renew */
+			a = state->addr.s_addr;
+			state->addr.s_addr = INADDR_ANY;
+		}
 	}
 
-	/* If we couldn't open a UDP port for our IP address
-	 * then we cannot renew.
-	 * This could happen if our IP was pulled out from underneath us.
-	 * Also, we should not unicast from a BOOTP lease. */
-	if (s == -1 ||
-	    (!(ifo->options & DHCPCD_INFORM) &&
-	    IS_BOOTP(ifp, state->new)))
-	{
-		a = state->addr.s_addr;
-		state->addr.s_addr = INADDR_ANY;
-	}
 	r = make_message(&dhcp, ifp, type);
+	if (a != INADDR_ANY)
+		state->addr.s_addr = a;
 	if (r == -1)
 		goto fail;
 	len = (size_t)r;
-	if (a)
-		state->addr.s_addr = a;
 	from.s_addr = dhcp->ciaddr;
 	if (from.s_addr)
 		to.s_addr = state->lease.server.s_addr;
