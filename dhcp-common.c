@@ -27,6 +27,8 @@
 
 #include <sys/utsname.h>
 
+#include <arpa/nameser.h>
+
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -277,6 +279,11 @@ decode_rfc3397(char *out, size_t len, const uint8_t *p, size_t pl)
 	int hops;
 	uint8_t ltype;
 
+	if (pl > NS_MAXCDNAME) {
+		errno = E2BIG;
+		return -1;
+	}
+
 	count = 0;
 	start = out;
 	start_len = len;
@@ -328,6 +335,10 @@ decode_rfc3397(char *out, size_t len, const uint8_t *p, size_t pl)
 						errno = ENOBUFS;
 						return -1;
 					}
+					if (l + 1 > NS_MAXLABEL) {
+						errno = EINVAL;
+						return -1;
+					}
 					memcpy(out, q, l);
 					out += l;
 					*out++ = '.';
@@ -355,6 +366,10 @@ decode_rfc3397(char *out, size_t len, const uint8_t *p, size_t pl)
 	if (count)
 		/* Don't count the trailing NUL */
 		count--;
+	if (count > NS_MAXDNAME) {
+		errno = E2BIG;
+		return -1;
+	}
 	return (ssize_t)count;
 }
 
@@ -404,7 +419,7 @@ valid_domainname(char *lbl, int type)
 		    !start && *lbl != ' ' && *lbl != '\0') ||
 		    isalnum(c))
 		{
-			if (++len > 63) {
+			if (++len > NS_MAXLABEL) {
 				errno = ERANGE;
 				errset = 1;
 				break;
