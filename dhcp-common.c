@@ -289,8 +289,13 @@ decode_rfc3397(char *out, size_t len, const uint8_t *p, size_t pl)
 		 * the name isn't fully qualified (ie, not terminated) */
 		while (q < e && (l = (size_t)*q++)) {
 			ltype = l & 0xc0;
-			if (ltype == 0x80 || ltype == 0x40)
+			if (ltype == 0x80 || ltype == 0x40) {
+				/* Currently reserved for future use as noted
+				 * in RFC1035 4.1.4 as the 10 and 01
+				 * combinations. */
+				errno = ENOTSUP;
 				return -1;
+			}
 			else if (ltype == 0xc0) { /* pointer */
 				if (q == e) {
 					errno = ERANGE;
