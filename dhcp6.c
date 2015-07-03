@@ -309,6 +309,7 @@ dhcp6_updateelapsed(struct interface *ifp, struct dhcp6_message *m, size_t len)
 	o = __UNCONST(co);
 	state = D6_STATE(ifp);
 	clock_gettime(CLOCK_MONOTONIC, &tv);
+	timespecsub(&tv, &state->started, &tv);
 	if (tv.tv_sec < 0 || tv.tv_sec > (time_t)UINT16_MAX)
 		tv.tv_sec = (time_t)UINT16_MAX;
 	u16 = htons((uint16_t)tv.tv_sec);
