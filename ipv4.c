@@ -28,10 +28,11 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
+#include <arpa/inet.h>
+#include <net/if.h>
+#include <net/route.h>
 #include <netinet/if_ether.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
-#include <net/route.h>
 
 #include <assert.h>
 #include <ctype.h>

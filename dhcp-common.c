@@ -45,6 +45,13 @@
 #include "if.h"
 #include "ipv6.h"
 
+/* Support very old arpa/nameser.h as found in OpenBSD */
+#ifndef NS_MAXDNAME
+#define NS_MAXCDNAME MAXCDNAME
+#define NS_MAXDNAME MAXDNAME
+#define NS_MAXLABEL MAXLABEL
+#endif
+
 void
 dhcp_print_option_encoding(const struct dhcp_opt *opt, int cols)
 {
