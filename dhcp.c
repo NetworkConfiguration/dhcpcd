@@ -2134,10 +2134,15 @@ dhcp_static(struct interface *ifp)
 {
 	struct if_options *ifo;
 	struct dhcp_state *state;
+	struct ipv4_addr *ia;
 
 	state = D_STATE(ifp);
 	ifo = ifp->options;
-	if (ifo->req_addr.s_addr == INADDR_ANY) {
+
+	ia = NULL;
+	if (ifo->req_addr.s_addr == INADDR_ANY &&
+	    (ia = ipv4_iffindaddr(ifp, NULL, NULL)) == NULL)
+	{
 		logger(ifp->ctx, LOG_INFO,
 		    "%s: waiting for 3rd party to "
 		    "configure IP address",
@@ -2146,7 +2151,9 @@ dhcp_static(struct interface *ifp)
 		script_runreason(ifp, state->reason);
 		return;
 	}
-	state->offer = dhcp_message_new(&ifo->req_addr, &ifo->req_mask);
+
+	state->offer = dhcp_message_new(ia ? &ia->addr : &ifo->req_addr,
+	    ia ? &ia->net : &ifo->req_mask);
 	if (state->offer) {
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 		dhcp_bind(ifp);
