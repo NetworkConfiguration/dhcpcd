@@ -1681,7 +1681,7 @@ send_message(struct interface *ifp, uint8_t type,
 		goto fail;
 	len = (size_t)r;
 	from.s_addr = dhcp->ciaddr;
-	if (from.s_addr)
+	if (s != -1 && from.s_addr != INADDR_ANY)
 		to.s_addr = state->lease.server.s_addr;
 	else
 		to.s_addr = INADDR_ANY;
