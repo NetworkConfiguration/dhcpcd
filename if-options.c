@@ -1634,7 +1634,7 @@ err_sla:
 		else if (strcasecmp(arg, "ascii") == 0)
 			t |= STRING | ASCII;
 		else if (strcasecmp(arg, "domain") == 0)
-			t |= STRING | DOMAIN | RFC3397;
+			t |= STRING | DOMAIN | RFC1035;
 		else if (strcasecmp(arg, "dname") == 0)
 			t |= STRING | DOMAIN;
 		else if (strcasecmp(arg, "binhex") == 0)
@@ -1661,7 +1661,7 @@ err_sla:
 			l = 0;
 		}
 		if (t & ARRAY && t & (STRING | BINHEX) &&
-		    !(t & (RFC3397 | DOMAIN)))
+		    !(t & (RFC1035 | DOMAIN)))
 		{
 			logger(ctx, LOG_WARNING, "ignoring array for strings");
 			t &= ~ARRAY;

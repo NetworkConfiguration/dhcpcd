@@ -428,12 +428,12 @@ decode_rfc3361(const uint8_t *data, size_t dl)
 	dl--;
 	switch (enc) {
 	case 0:
-		if ((r = decode_rfc3397(NULL, 0, data, dl)) > 0) {
+		if ((r = decode_rfc1035(NULL, 0, data, dl)) > 0) {
 			l = (size_t)r;
 			sip = malloc(l);
 			if (sip == NULL)
 				return 0;
-			decode_rfc3397(sip, l, data, dl);
+			decode_rfc1035(sip, l, data, dl);
 		}
 		break;
 	case 1:

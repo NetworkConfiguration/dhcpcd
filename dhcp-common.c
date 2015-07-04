@@ -87,7 +87,7 @@ dhcp_print_option_encoding(const struct dhcp_opt *opt, int cols)
 		printf(" flag");
 	else if (opt->type & BITFLAG)
 		printf(" bitflags");
-	else if (opt->type & RFC3397)
+	else if (opt->type & RFC1035)
 		printf(" domain");
 	else if (opt->type & DOMAIN)
 		printf(" dname");
@@ -273,12 +273,12 @@ encode_rfc1035(const char *src, uint8_t *dst)
 	return len;
 }
 
-/* Decode an RFC3397 DNS search order option into a space
+/* Decode an RFC1035 DNS search order option into a space
  * separated string. Returns length of string (including
  * terminating zero) or zero on error. out may be NULL
  * to just determine output length. */
 ssize_t
-decode_rfc3397(char *out, size_t len, const uint8_t *p, size_t pl)
+decode_rfc1035(char *out, size_t len, const uint8_t *p, size_t pl)
 {
 	const char *start;
 	size_t start_len, l, count;
@@ -613,15 +613,15 @@ print_option(char *s, size_t len, const struct dhcp_opt *opt,
 	UNUSED(ifname);
 #endif
 
-	if (opt->type & RFC3397) {
-		sl = decode_rfc3397(NULL, 0, data, dl);
+	if (opt->type & RFC1035) {
+		sl = decode_rfc1035(NULL, 0, data, dl);
 		if (sl == 0 || sl == -1)
 			return sl;
 		l = (size_t)sl + 1;
 		tmp = malloc(l);
 		if (tmp == NULL)
 			return -1;
-		decode_rfc3397(tmp, l, data, dl);
+		decode_rfc1035(tmp, l, data, dl);
 		sl = print_string(s, len, opt->type, (uint8_t *)tmp, l - 1);
 		free(tmp);
 		return sl;
