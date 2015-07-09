@@ -363,10 +363,13 @@ ipv4ll_freedrop(struct interface *ifp, int drop)
 
 	if (drop && (ifp->options->options & DHCPCD_NODROP) != DHCPCD_NODROP) {
 		struct ipv4_state *istate;
+		int dropped;
 
+		dropped = 0;
 		if (state && state->addr.s_addr != INADDR_ANY) {
 			ipv4_deladdr(ifp, &state->addr, &inaddr_llmask, 1);
 			state->addr.s_addr = INADDR_ANY;
+			dropped = 1;
 		}
 
 		/* Free any other link local addresses that might exist. */
@@ -374,12 +377,16 @@ ipv4ll_freedrop(struct interface *ifp, int drop)
 			struct ipv4_addr *ia, *ian;
 
 			TAILQ_FOREACH_SAFE(ia, &istate->addrs, next, ian) {
-				if (IN_LINKLOCAL(ntohl(ia->addr.s_addr)))
+				if (IN_LINKLOCAL(ntohl(ia->addr.s_addr))) {
 					ipv4_deladdr(ifp, &ia->addr,
 					    &ia->net, 0);
+					dropped = 1;
+				}
 			}
 		}
-		script_runreason(ifp, "IPV4LL");
+
+		if (dropped)
+			script_runreason(ifp, "IPV4LL");
 	}
 
 	if (state) {
