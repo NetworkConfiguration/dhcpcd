@@ -904,7 +904,9 @@ dhcpcd_prestartinterface(void *arg)
 	struct interface *ifp = arg;
 
 	pre_start(ifp);
-	if (if_up(ifp) == -1)
+	if ((!(ifp->ctx->options & DHCPCD_MASTER) ||
+	    ifp->options->options & DHCPCD_IF_UP) &&
+	    if_up(ifp) == -1)
 		logger(ifp->ctx, LOG_ERR, "%s: if_up: %m", ifp->name);
 
 	if (ifp->options->options & DHCPCD_LINK &&
