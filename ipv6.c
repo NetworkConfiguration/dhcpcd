@@ -745,6 +745,7 @@ ipv6_addaddr(struct ipv6_addr *ap, const struct timespec *now)
 	return 0;
 }
 
+#ifdef IGNORE_RA_NOPUBLICADDR
 int
 ipv6_publicaddr(const struct ipv6_addr *ia)
 {
@@ -752,6 +753,7 @@ ipv6_publicaddr(const struct ipv6_addr *ia)
 	    (ia->addr.s6_addr[0] & 0xfe) != 0xfc &&
 	    !(ia->addr_flags & IN6_IFF_NOTUSEABLE));
 }
+#endif
 
 int
 ipv6_findaddrmatch(const struct ipv6_addr *addr, const struct in6_addr *match,
