@@ -888,8 +888,7 @@ ppoll)
 	echo "#define pollts		ppoll" >>$CONFIG_H
 	;;
 pselect)
-	echo "COMPAT_SRCS+=	compat/pselect.c" >>$CONFIG_MK
-	echo "#include		\"compat/pollts.h\"" >>$CONFIG_H
+	# eloop assumes pselect if it cannot find anything suitable
 	;;
 *)
 	echo "No suitable polling function is available, not even pselect" >&2
