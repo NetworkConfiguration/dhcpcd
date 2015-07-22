@@ -104,16 +104,6 @@
 #define IPV6_MANAGETEMPADDR
 #endif
 
-/* NetBSD at least will try and contact a global address if there is a default
- * route but there is no global address on the interface to connect with.
- * As a safety measure, we ignore RA's until a public address is found.
- * This is the wrong thing todo, as Linux seems to abort early - maybe
- * because there is no matching source address for the destination address.
- * Until this is resolved, we have this restriction in place. */
-#ifdef BSD
-#define IGNORE_RA_NOPUBLICADDR
-#endif
-
 struct ipv6_addr {
 	TAILQ_ENTRY(ipv6_addr) next;
 	struct interface *iface;

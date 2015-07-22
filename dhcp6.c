@@ -505,7 +505,6 @@ dhcp6_delegateaddr(struct in6_addr *addr, struct interface *ifp,
 	return sla->prefix_len;
 }
 
-#ifdef IGNORE_RA_NOPUBLICADDR
 int
 dhcp6_has_public_addr(const struct interface *ifp)
 {
@@ -520,7 +519,6 @@ dhcp6_has_public_addr(const struct interface *ifp)
 	}
 	return 0;
 }
-#endif
 
 static int
 dhcp6_makemessage(struct interface *ifp)
@@ -3027,9 +3025,7 @@ recv:
 			eloop_timeout_add_sec(ifp->ctx->eloop,
 			    (time_t)state->expire, dhcp6_startexpire, ifp);
 
-#ifdef IGNORE_RA_NOPUBLICADDR
 		ipv6nd_runignoredra(ifp);
-#endif
 		ipv6_addaddrs(&state->addrs);
 		dhcp6_delegate_prefix(ifp);
 

@@ -371,12 +371,9 @@ and/or user selection rather than the kernel.
 .It Ic ipv6ra_accept_nopublic
 Some IPv6 routers advertise themselves as a default router without any
 public prefixes or managed addresses.
-On non Linux systems
+Generally, this is incorrect behaviour and
 .Nm dhcpcd
-will ignore the advertisement,
-unless this option is turned on,
-so that attempts to access a remote public IPv6 address without a local
-public IPv6 address fail quickly.
+will ignore the advertisement unless this option is turned on.
 .It Ic ipv6rs
 Enables IPv6 Router Advertisment solicitation.
 This is on by default, but is documented here in the case where it is disabled

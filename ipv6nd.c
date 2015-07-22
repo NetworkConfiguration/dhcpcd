@@ -731,7 +731,6 @@ try_script:
 	}
 }
 
-#ifdef IGNORE_RA_NOPUBLICADDR
 static int
 ipv6nd_ra_has_public_addr(const struct ra *rap)
 {
@@ -744,7 +743,6 @@ ipv6nd_ra_has_public_addr(const struct ra *rap)
 	}
 	return 0;
 }
-#endif
 
 static void
 ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
@@ -1108,7 +1106,6 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 	if (new_rap)
 		add_router(ifp->ctx->ipv6, rap);
 
-#ifdef IGNORE_RA_NOPUBLICADDR
 	if (!ipv6nd_ra_has_public_addr(rap) &&
 	    !(rap->iface->options->options & DHCPCD_IPV6RA_ACCEPT_NOPUBLIC) &&
 	    (!(rap->flags & ND_RA_FLAG_MANAGED) ||
@@ -1122,8 +1119,6 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 		rap->no_public_warned = 1;
 		goto handle_flag;
 	}
-#endif
-
 	if (ifp->ctx->options & DHCPCD_TEST) {
 		script_runreason(ifp, "TEST");
 		goto handle_flag;
@@ -1171,7 +1166,6 @@ nodhcp6:
 	ipv6nd_expirera(ifp);
 }
 
-#ifdef IGNORE_RA_NOPUBLICADDR
 /* Run RA's we ignored becuase they had no public addresses
  * This should only be called when DHCPv6 applies a public address */
 void
@@ -1199,7 +1193,6 @@ ipv6nd_runignoredra(struct interface *ifp)
 		}
 	}
 }
-#endif
 
 int
 ipv6nd_hasra(const struct interface *ifp)
