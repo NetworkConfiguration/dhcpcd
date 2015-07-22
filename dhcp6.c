@@ -3140,8 +3140,8 @@ dhcp6_start1(void *arg)
 	const struct dhcp_compat *dhc;
 
 	state = D6_STATE(ifp);
-	/* Match any DHCPv4 opton to DHCPv6 options if given for easy
-	 * configuration */
+	/* If no DHCPv6 options are configured,
+	   match configured DHCPv4 options to DHCPv6 equivalents. */
 	for (i = 0; i < sizeof(ifo->requestmask6); i++) {
 		if (ifo->requestmask6[i] != '\0')
 			break;
@@ -3157,7 +3157,7 @@ dhcp6_start1(void *arg)
 			add_option_mask(ifo->requestmask6, D6_OPTION_FQDN);
 	}
 
-	/* Rapid commit won't wor with Prefix Delegation Exclusion */
+	/* Rapid commit won't work with Prefix Delegation Exclusion */
 	if (dhcp6_findselfsla(ifp, NULL))
 		del_option_mask(ifo->requestmask6, D6_OPTION_RAPID_COMMIT);
 
