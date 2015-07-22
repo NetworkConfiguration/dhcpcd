@@ -1230,7 +1230,6 @@ if_readrawpacket(struct interface *ifp, uint16_t protocol,
 		.msg_iov = &iov,
 		.msg_iovlen = 1,
 	};
-	struct dhcp_state *state;
 #ifdef PACKET_AUXDATA
 	unsigned char cmsgbuf[CMSG_LEN(sizeof(struct tpacket_auxdata))];
 	struct cmsghdr *cmsg;
@@ -1245,7 +1244,6 @@ if_readrawpacket(struct interface *ifp, uint16_t protocol,
 	msg.msg_controllen = sizeof(cmsgbuf);
 #endif
 
-	state = D_STATE(ifp);
 	fd = ipv4_protocol_fd(ifp, protocol);
 	bytes = recvmsg(fd, &msg, 0);
 	if (bytes == -1)
