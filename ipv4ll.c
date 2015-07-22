@@ -350,9 +350,11 @@ void
 ipv4ll_freedrop(struct interface *ifp, int drop)
 {
 	struct ipv4ll_state *state;
+	int dropped;
 
 	assert(ifp != NULL);
 	state = IPV4LL_STATE(ifp);
+	dropped = 0;
 
 	/* Free ARP state first because ipv4_deladdr might also ... */
 	if (state && state->arp) {
@@ -363,9 +365,7 @@ ipv4ll_freedrop(struct interface *ifp, int drop)
 
 	if (drop && (ifp->options->options & DHCPCD_NODROP) != DHCPCD_NODROP) {
 		struct ipv4_state *istate;
-		int dropped;
 
-		dropped = 0;
 		if (state && state->addr.s_addr != INADDR_ANY) {
 			ipv4_deladdr(ifp, &state->addr, &inaddr_llmask, 1);
 			state->addr.s_addr = INADDR_ANY;
@@ -393,6 +393,7 @@ ipv4ll_freedrop(struct interface *ifp, int drop)
 		free(state);
 		ifp->if_data[IF_DATA_IPV4LL] = NULL;
 
-		ipv4_buildroutes(ifp->ctx);
+		if (dropped)
+			ipv4_buildroutes(ifp->ctx);
 	}
 }
