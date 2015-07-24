@@ -92,6 +92,29 @@ ipv4ll_subnet_route(const struct interface *ifp)
 	return rt;
 }
 
+struct rt *
+ipv4ll_default_route(const struct interface *ifp)
+{
+	const struct ipv4ll_state *state;
+	struct rt *rt;
+
+	assert(ifp != NULL);
+	if ((state = IPV4LL_CSTATE(ifp)) == NULL ||
+	    state->addr.s_addr == INADDR_ANY)
+		return NULL;
+
+	if ((rt = malloc(sizeof(*rt))) == NULL) {
+		logger(ifp->ctx, LOG_ERR, "%s: malloc: %m", __func__);
+		return NULL;
+	}
+	rt->iface = ifp;
+	rt->dest.s_addr = INADDR_ANY;
+	rt->net.s_addr = INADDR_ANY;
+	rt->gate.s_addr = INADDR_ANY;
+	rt->src = state->addr;
+	return rt;
+}
+
 ssize_t
 ipv4ll_env(char **env, const char *prefix, const struct interface *ifp)
 {

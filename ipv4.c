@@ -293,6 +293,11 @@ desc_route(const char *cmd, const struct rt *rt)
 	else if (rt->net.s_addr == htonl(INADDR_BROADCAST))
 		logger(ctx, LOG_INFO, "%s: %s host route to %s via %s",
 		    ifname, cmd, addr, inet_ntoa(rt->gate));
+	else if (rt->dest.s_addr == htonl(INADDR_ANY) &&
+	    rt->net.s_addr == htonl(INADDR_ANY) &&
+	    rt->gate.s_addr == htonl(INADDR_ANY))
+		logger(ctx, LOG_INFO, "%s: %s default route",
+		    ifname, cmd);
 	else if (rt->gate.s_addr == htonl(INADDR_ANY))
 		logger(ctx, LOG_INFO, "%s: %s route to %s/%d",
 		    ifname, cmd, addr, inet_ntocidr(rt->net));
@@ -648,13 +653,60 @@ add_router_host_route(struct rt_head *rt, const struct interface *ifp)
 	return rt;
 }
 
+static int
+ipv4_doroute(struct rt *rt, struct rt_head *nrs)
+{
+	const struct dhcp_state *state;
+	struct rt *or;
+
+	state = D_CSTATE(rt->iface);
+#ifdef HAVE_ROUTE_METRIC
+	rt->metric = rt->iface->metric;
+#endif
+	rt->flags = state->added & STATE_FAKE;
+	/* Is this route already in our table? */
+	if ((find_route(nrs, rt, NULL)) != NULL)
+		return 0;
+	/* Do we already manage it? */
+	if ((or = find_route(rt->iface->ctx->ipv4_routes, rt, NULL))) {
+		if (state->added & STATE_FAKE)
+			return 0;
+		if (or->flags & STATE_FAKE ||
+		    or->iface != rt->iface ||
+#ifdef HAVE_ROUTE_METRIC
+		    rt->metric != or->metric ||
+#endif
+		    rt->src.s_addr != or->src.s_addr ||
+		    rt->gate.s_addr != or->gate.s_addr)
+		{
+			if (c_route(or, rt) != 0)
+				return 0;
+		}
+		TAILQ_REMOVE(rt->iface->ctx->ipv4_routes, or, next);
+		free(or);
+	} else {
+		if (state->added & STATE_FAKE) {
+			or = ipv4_findrt(rt->iface->ctx, rt, 1);
+			if (or == NULL ||
+			    or->gate.s_addr != rt->gate.s_addr)
+				return 0;
+		} else {
+			if (n_route(rt) != 0)
+				return 0;
+		}
+	}
+	rt->flags |= STATE_ADDED;
+	return 1;
+}
+
 void
 ipv4_buildroutes(struct dhcpcd_ctx *ctx)
 {
 	struct rt_head *nrs, *dnr;
-	struct rt *or, *rt, *rtn;
+	struct rt *rt, *rtn;
 	struct interface *ifp;
 	const struct dhcp_state *state;
+	int has_default;
 
 	/* We need to have the interfaces in the correct order to ensure
 	 * our routes are managed correctly. */
@@ -666,6 +718,7 @@ ipv4_buildroutes(struct dhcpcd_ctx *ctx)
 	}
 	TAILQ_INIT(nrs);
 
+	has_default = 0;
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 		state = D_CSTATE(ifp);
 		if (state != NULL && state->new != NULL && state->added) {
@@ -697,46 +750,27 @@ ipv4_buildroutes(struct dhcpcd_ctx *ctx)
 			continue;
 		TAILQ_FOREACH_SAFE(rt, dnr, next, rtn) {
 			rt->iface = ifp;
-#ifdef HAVE_ROUTE_METRIC
-			rt->metric = ifp->metric;
-#endif
-			rt->flags = state->added & STATE_FAKE;
-			/* Is this route already in our table? */
-			if ((find_route(nrs, rt, NULL)) != NULL)
-				continue;
-			/* Do we already manage it? */
-			if ((or = find_route(ctx->ipv4_routes, rt, NULL))) {
-				if (state->added & STATE_FAKE)
-					continue;
-				if (or->flags & STATE_FAKE ||
-				    or->iface != ifp ||
-#ifdef HAVE_ROUTE_METRIC
-				    rt->metric != or->metric ||
-#endif
-				    rt->src.s_addr != or->src.s_addr ||
-				    rt->gate.s_addr != or->gate.s_addr)
-				{
-					if (c_route(or, rt) != 0)
-						continue;
-				}
-				TAILQ_REMOVE(ctx->ipv4_routes, or, next);
-				free(or);
-			} else {
-				if (state->added & STATE_FAKE) {
-					or = ipv4_findrt(ctx, rt, 1);
-					if (or == NULL ||
-					    or->gate.s_addr != rt->gate.s_addr)
-						continue;
-				} else {
-					if (n_route(rt) != 0)
-						continue;
-				}
+			if (ipv4_doroute(rt, nrs) == 1) {
+				TAILQ_REMOVE(dnr, rt, next);
+				TAILQ_INSERT_TAIL(nrs, rt, next);
+				if (rt->dest.s_addr == INADDR_ANY)
+					has_default = 1;
 			}
-			rt->flags |= STATE_ADDED;
-			TAILQ_REMOVE(dnr, rt, next);
-			TAILQ_INSERT_TAIL(nrs, rt, next);
 		}
 		ipv4_freeroutes(dnr);
+	}
+
+	/* If we don't manage a default route, grab one without a
+	 * gateway for any IPv4LL enabled interfaces. */
+	if (!has_default) {
+		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+			if ((rt = ipv4ll_default_route(ifp)) != NULL) {
+				if (ipv4_doroute(rt, nrs) == 1)
+					TAILQ_INSERT_TAIL(nrs, rt, next);
+				else
+					free(rt);
+			}
+		}
 	}
 
 	/* Remove old routes we used to manage */
