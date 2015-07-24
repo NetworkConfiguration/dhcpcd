@@ -3200,7 +3200,7 @@ dhcp_start1(void *arg)
 	}
 	/* We don't want to read the old lease if we NAK an old test */
 	nolease = state->offer && ifp->ctx->options & DHCPCD_TEST;
-	if (!nolease) {
+	if (!nolease && ifo->options & DHCPCD_DHCP) {
 		state->offer = read_lease(ifp);
 		/* Check the saved lease matches the type we want */
 		if (state->offer) {
