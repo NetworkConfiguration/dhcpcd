@@ -123,6 +123,8 @@ struct dhcpcd_ctx {
 	struct dhcp_opt *vivso;
 	size_t vivso_len;
 
+	char *randomstate; /* original state */
+
 #ifdef INET
 	struct dhcp_opt *dhcp_opts;
 	size_t dhcp_opts_len;

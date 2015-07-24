@@ -52,6 +52,10 @@ static in_addr_t
 ipv4ll_pick_addr(const struct arp_state *astate)
 {
 	struct in_addr addr;
+	struct ipv4ll_state *istate;
+
+	istate = IPV4LL_STATE(astate->iface);
+	setstate(istate->randomstate);
 
 	do {
 		/* RFC 3927 Section 2.1 states that the first 256 and
@@ -65,6 +69,9 @@ ipv4ll_pick_addr(const struct arp_state *astate)
 			continue;
 		/* Ensure we don't have the address on another interface */
 	} while (ipv4_findaddr(astate->iface->ctx, &addr) != NULL);
+
+	/* Restore the original random state */
+	setstate(astate->iface->ctx->randomstate);
 
 	return addr.s_addr;
 }
@@ -315,6 +322,7 @@ ipv4ll_start(void *arg)
 	 * the same address without persistent storage. */
 	if (state->conflicts == 0) {
 		unsigned int seed;
+		char *orig;
 
 		if (sizeof(seed) > ifp->hwlen) {
 			seed = 0;
@@ -322,7 +330,15 @@ ipv4ll_start(void *arg)
 		} else
 			memcpy(&seed, ifp->hwaddr + ifp->hwlen - sizeof(seed),
 			    sizeof(seed));
-		initstate(seed, state->randomstate, sizeof(state->randomstate));
+		orig = initstate(seed,
+		    state->randomstate, sizeof(state->randomstate));
+
+		/* Save the original state. */
+		if (ifp->ctx->randomstate == NULL)
+			ifp->ctx->randomstate = orig;
+
+		/* Set back the original state until we need the seeded one. */
+		setstate(ifp->ctx->randomstate);
 	}
 
 	if ((astate = arp_new(ifp, NULL)) == NULL)
@@ -358,7 +374,6 @@ ipv4ll_start(void *arg)
 		return;
 	}
 
-	setstate(state->randomstate);
 	logger(ifp->ctx, LOG_INFO, "%s: probing for an IPv4LL address",
 	    ifp->name);
 	astate->addr.s_addr = ipv4ll_pick_addr(astate);
@@ -407,16 +422,15 @@ ipv4ll_freedrop(struct interface *ifp, int drop)
 				}
 			}
 		}
-
-		if (dropped)
-			script_runreason(ifp, "IPV4LL");
 	}
 
 	if (state) {
 		free(state);
 		ifp->if_data[IF_DATA_IPV4LL] = NULL;
 
-		if (dropped)
+		if (dropped) {
 			ipv4_buildroutes(ifp->ctx);
+			script_runreason(ifp, "IPV4LL");
+		}
 	}
 }
