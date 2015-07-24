@@ -2322,6 +2322,8 @@ dhcp_drop(struct interface *ifp, const char *reason)
 	dhcp_auth_reset(&state->auth);
 	dhcp_close(ifp);
 
+	free(state->offer);
+	state->offer = NULL;
 	free(state->old);
 	state->old = state->new;
 	state->new = NULL;
