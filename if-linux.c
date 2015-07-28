@@ -437,7 +437,25 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 		case RTA_PRIORITY:
 			rt->metric = *(unsigned int *)RTA_DATA(rta);
 			break;
+		case RTA_METRICS:
+		{
+			struct rtattr *r2;
+			size_t l2;
+
+			l2 = rta->rta_len;
+			r2 = (struct rtattr *)RTA_DATA(rta);
+			while (RTA_OK(r2, l2)) {
+				switch (r2->rta_type) {
+				case RTAX_MTU:
+					rt->mtu = *(unsigned int *)RTA_DATA(r2);
+					break;
+				}
+				r2 = RTA_NEXT(r2, l2);
+			}
+			break;
 		}
+		}
+
 		rta = RTA_NEXT(rta, len);
 	}
 
@@ -498,6 +516,23 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct nlmsghdr *nlm)
 		case RTA_PRIORITY:
 			rt->metric = *(unsigned int *)RTA_DATA(rta);
 			break;
+		case RTA_METRICS:
+		{
+			struct rtattr *r2;
+			size_t l2;
+
+			l2 = rta->rta_len;
+			r2 = (struct rtattr *)RTA_DATA(rta);
+			while (RTA_OK(r2, l2)) {
+				switch (r2->rta_type) {
+				case RTAX_MTU:
+					rt->mtu = *(unsigned int *)RTA_DATA(r2);
+					break;
+				}
+				r2 = RTA_NEXT(r2, l2);
+			}
+			break;
+		}
 		}
 		rta = RTA_NEXT(rta, len);
 	}
