@@ -276,6 +276,23 @@ get_option_uint32(struct dhcpcd_ctx *ctx,
 }
 
 static int
+get_option_uint16(struct dhcpcd_ctx *ctx,
+    uint16_t *i, const struct dhcp_message *dhcp, uint8_t option)
+{
+	const uint8_t *p;
+	size_t len;
+	uint16_t d;
+
+	p = get_option(ctx, dhcp, option, &len);
+	if (!p || len < (ssize_t)sizeof(d))
+		return -1;
+	memcpy(&d, p, sizeof(d));
+	if (i)
+		*i = ntohs(d);
+	return 0;
+}
+
+static int
 get_option_uint8(struct dhcpcd_ctx *ctx,
     uint8_t *i, const struct dhcp_message *dhcp, uint8_t option)
 {
@@ -583,7 +600,7 @@ route_netmask(uint32_t ip_in)
 /* We need to obey routing options.
  * If we have a CSR then we only use that.
  * Otherwise we add static routes and then routers. */
-struct rt_head *
+static struct rt_head *
 get_option_routes(struct interface *ifp, const struct dhcp_message *dhcp)
 {
 	struct if_options *ifo = ifp->options;
@@ -686,6 +703,40 @@ get_option_routes(struct interface *ifp, const struct dhcp_message *dhcp)
 		}
 	}
 
+	return routes;
+}
+
+uint16_t
+dhcp_get_mtu(const struct interface *ifp)
+{
+	const struct dhcp_message *dhcp;
+	uint16_t mtu;
+
+	if ((dhcp = D_CSTATE(ifp)->new) == NULL ||
+	    has_option_mask(ifp->options->nomask, DHO_MTU) ||
+	    get_option_uint16(ifp->ctx, &mtu, dhcp, DHO_MTU) == -1)
+		return 0;
+	return mtu;
+}
+
+/* Grab our routers from the DHCP message and apply any MTU value
+ * the message contains */
+struct rt_head *
+dhcp_get_routes(struct interface *ifp)
+{
+	struct rt_head *routes;
+	uint16_t mtu;
+	const struct dhcp_message *dhcp;
+
+	dhcp = D_CSTATE(ifp)->new;
+	routes = get_option_routes(ifp, dhcp);
+	if ((mtu = dhcp_get_mtu(ifp)) != 0) {
+		struct rt *rt;
+
+		TAILQ_FOREACH(rt, routes, next) {
+			rt->mtu = mtu;
+		}
+	}
 	return routes;
 }
 

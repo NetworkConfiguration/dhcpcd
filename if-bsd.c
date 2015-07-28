@@ -500,6 +500,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct rt_msghdr *rtm)
 
 	get_addrs(rtm->rtm_addrs, cp, rti_info);
 	memset(rt, 0, sizeof(*rt));
+	rt->flags = (unsigned int)rtm->rtm_flags;
 	COPYOUT(rt->dest, rti_info[RTAX_DST]);
 	if (rtm->rtm_addrs & RTA_NETMASK)
 		COPYOUT(rt->net, rti_info[RTAX_NETMASK]);
@@ -507,6 +508,9 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct rt_msghdr *rtm)
 		rt->net.s_addr = INADDR_BROADCAST;
 	COPYOUT(rt->gate, rti_info[RTAX_GATEWAY]);
 	COPYOUT(rt->src, rti_info[RTAX_IFA]);
+
+	if (rtm->rtm_inits & RTV_MTU)
+		rt->mtu = (unsigned int)rtm->rtm_rmx.rmx_mtu;
 
 	if (rtm->rtm_index)
 		rt->iface = if_findindex(ctx->ifaces, rtm->rtm_index);
@@ -516,6 +520,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct rt_msghdr *rtm)
 		sdl = (struct sockaddr_dl *)(void *)rti_info[RTAX_IFP];
 		rt->iface = if_findsdl(ctx, sdl);
 	}
+
 	/* If we don't have an interface and it's a host route, it maybe
 	 * to a local ip via the loopback interface. */
 	if (rt->iface == NULL &&
@@ -658,6 +663,11 @@ if_route(unsigned char cmd, const struct rt *rt)
 
 		if (rtm.hdr.rtm_addrs & RTA_IFA)
 			ADDADDR(&state->addr);
+
+		if (rt->mtu) {
+			rtm.hdr.rtm_inits |= RTV_MTU;
+			rtm.hdr.rtm_rmx.rmx_mtu = rt->mtu;
+		}
 	}
 
 #undef ADDADDR
@@ -896,6 +906,9 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct rt_msghdr *rtm)
 	} else
 		ipv6_mask(&rt->net, 128);
 	COPYOUT6(rt->gate, rti_info[RTAX_GATEWAY]);
+
+	if (rtm->rtm_inits & RTV_MTU)
+		rt->mtu = (unsigned int)rtm->rtm_rmx.rmx_mtu;
 
 	if (rtm->rtm_index)
 		rt->iface = if_findindex(ctx->ifaces, rtm->rtm_index);

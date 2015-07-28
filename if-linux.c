@@ -922,6 +922,27 @@ add_attr_32(struct nlmsghdr *n, unsigned short maxlen, unsigned short type,
 	return 0;
 }
 
+static int
+rta_add_attr_32(struct rtattr *rta, unsigned short maxlen,
+    unsigned short type, uint32_t data)
+{
+	unsigned short len = RTA_LENGTH(sizeof(data));
+	struct rtattr *subrta;
+
+	if (RTA_ALIGN(rta->rta_len) + len > maxlen) {
+		errno = ENOBUFS;
+		return -1;
+	}
+
+	subrta = (struct rtattr*)(void *)
+	    (((char*)rta) + RTA_ALIGN(rta->rta_len));
+	subrta->rta_type = type;
+	subrta->rta_len = len;
+	memcpy(RTA_DATA(subrta), &data, sizeof(data));
+	rta->rta_len = (unsigned short)(NLMSG_ALIGN(rta->rta_len) + len);
+	return 0;
+}
+
 #ifdef HAVE_NL80211_H
 static struct nlattr *
 nla_next(struct nlattr *nla, size_t *rem)
@@ -1374,6 +1395,17 @@ if_route(unsigned char cmd, const struct rt *rt)
 	if (rt->metric)
 		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_PRIORITY, rt->metric);
 
+	if (cmd != RTM_DELETE && rt->mtu) {
+		char metricsbuf[32];
+		struct rtattr *metrics = (void *)metricsbuf;
+
+		metrics->rta_type = RTA_METRICS;
+		metrics->rta_len = RTA_LENGTH(0);
+		rta_add_attr_32(metrics, sizeof(metricsbuf), RTAX_MTU, rt->mtu);
+		add_attr_l(&nlm.hdr, sizeof(nlm), RTA_METRICS,
+		    RTA_DATA(metrics), (unsigned short)RTA_PAYLOAD(metrics));
+	}
+
 	if (send_netlink(rt->iface->ctx, NULL,
 	    NETLINK_ROUTE, &nlm.hdr, NULL) == -1)
 		retval = -1;
@@ -1488,27 +1520,6 @@ if_address6(const struct ipv6_addr *ap, int action)
 	return retval;
 }
 
-static int
-rta_add_attr_32(struct rtattr *rta, unsigned short maxlen,
-    unsigned short type, uint32_t data)
-{
-	unsigned short len = RTA_LENGTH(sizeof(data));
-	struct rtattr *subrta;
-
-	if (RTA_ALIGN(rta->rta_len) + len > maxlen) {
-		errno = ENOBUFS;
-		return -1;
-	}
-
-	subrta = (struct rtattr*)(void *)
-	    (((char*)rta) + RTA_ALIGN(rta->rta_len));
-	subrta->rta_type = type;
-	subrta->rta_len = len;
-	memcpy(RTA_DATA(subrta), &data, sizeof(data));
-	rta->rta_len = (unsigned short)(NLMSG_ALIGN(rta->rta_len) + len);
-	return 0;
-}
-
 int
 if_route6(unsigned char cmd, const struct rt6 *rt)
 {
@@ -1565,7 +1576,7 @@ if_route6(unsigned char cmd, const struct rt6 *rt)
 			add_attr_32(&nlm.hdr, sizeof(nlm),
 			    RTA_PRIORITY, rt->metric);
 	}
-	if (cmd == RTM_ADD && rt->mtu) {
+	if (cmd != RTM_DELETE && rt->mtu) {
 		char metricsbuf[32];
 		struct rtattr *metrics = (void *)metricsbuf;
 

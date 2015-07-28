@@ -87,7 +87,7 @@ ipv4ll_subnet_route(const struct interface *ifp)
 	    state->addr.s_addr == INADDR_ANY)
 		return NULL;
 
-	if ((rt = malloc(sizeof(*rt))) == NULL) {
+	if ((rt = calloc(1, sizeof(*rt))) == NULL) {
 		logger(ifp->ctx, LOG_ERR, "%s: malloc: %m", __func__);
 		return NULL;
 	}
@@ -110,7 +110,7 @@ ipv4ll_default_route(const struct interface *ifp)
 	    state->addr.s_addr == INADDR_ANY)
 		return NULL;
 
-	if ((rt = malloc(sizeof(*rt))) == NULL) {
+	if ((rt = calloc(1, sizeof(*rt))) == NULL) {
 		logger(ifp->ctx, LOG_ERR, "%s: malloc: %m", __func__);
 		return NULL;
 	}

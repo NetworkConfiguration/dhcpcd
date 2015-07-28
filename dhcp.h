@@ -245,8 +245,8 @@ int get_option_addr(struct dhcpcd_ctx *,struct in_addr *,
     const struct dhcp_message *, uint8_t);
 #define IS_BOOTP(i, m) ((m) != NULL &&						    \
 	    get_option_uint8((i)->ctx, NULL, (m), DHO_MESSAGETYPE) == -1)
-struct rt_head *get_option_routes(struct interface *,
-    const struct dhcp_message *);
+uint16_t dhcp_get_mtu(const struct interface *);
+struct rt_head *dhcp_get_routes(struct interface *);
 ssize_t dhcp_env(char **, const char *, const struct dhcp_message *,
     const struct interface *);
 
