@@ -1847,6 +1847,7 @@ ipv6_handlert(struct dhcpcd_ctx *ctx, int cmd, struct rt6 *rt)
 static int
 nc_route(struct rt6 *ort, struct rt6 *nrt)
 {
+	int change;
 
 	/* Don't set default routes if not asked to */
 	if (IN6_IS_ADDR_UNSPECIFIED(&nrt->dest) &&
@@ -1856,6 +1857,7 @@ nc_route(struct rt6 *ort, struct rt6 *nrt)
 
 	desc_route(ort == NULL ? "adding" : "changing", nrt);
 
+	change = 0;
 	if (ort == NULL) {
 		ort = ipv6_findrt(nrt->iface->ctx, nrt, 0);
 		if (ort &&
@@ -1865,7 +1867,27 @@ nc_route(struct rt6 *ort, struct rt6 *nrt)
 		    ort->metric == nrt->metric &&
 #endif
 		    IN6_ARE_ADDR_EQUAL(&ort->gate, &nrt->gate))))
+		{
+			if (ort->mtu == nrt->mtu)
+				return 0;
+			change = 1;
+		}
+	}
+
+#ifdef RTF_CLONING
+	/* BSD can set routes to be cloning routes.
+	 * Cloned routes inherit the parent flags.
+	 * As such, we need to delete and re-add the route to flush children
+	 * to correct the flags. */
+	if (change && ort != NULL && ort->flags & RTF_CLONING)
+		change = 0;
+#endif
+
+	if (change) {
+		if (if_route6(RTM_CHANGE, nrt) == 0)
 			return 0;
+		if (errno != ESRCH)
+			logger(nrt->iface->ctx, LOG_ERR, "if_route6 (CHG): %m");
 	}
 
 #ifdef HAVE_ROUTE_METRIC
