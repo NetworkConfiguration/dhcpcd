@@ -2531,12 +2531,15 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 		else
 			logger(ifp->ctx, LOG_DEBUG,
 			    "%s: accepted reconfigure key", ifp->name);
-	} else if (ifo->auth.options & DHCPCD_AUTH_REQUIRE) {
-		log_dhcp1(LOG_ERR, "no authentication", ifp, dhcp, from, 0);
-		return;
-	} else if (ifo->auth.options & DHCPCD_AUTH_SEND)
+	} else if (ifo->auth.options & DHCPCD_AUTH_SEND) {
+		if (ifo->auth.options & DHCPCD_AUTH_REQUIRE) {
+			log_dhcp1(LOG_ERR, "no authentication",
+			    ifp, dhcp, from, 0);
+			return;
+		}
 		log_dhcp1(LOG_WARNING, "no authentication",
 		    ifp, dhcp, from, 0);
+	}
 
 	/* RFC 3203 */
 	if (type == DHCP_FORCERENEW) {
@@ -2550,7 +2553,8 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 		if (auth == NULL) {
 			log_dhcp(LOG_ERR, "unauthenticated Force Renew",
 			    ifp, dhcp, from);
-			return;
+			if (ifo->auth.options & DHCPCD_AUTH_REQUIRE)
+				return;
 		}
 		if (state->state != DHS_BOUND && state->state != DHS_INFORM) {
 			log_dhcp(LOG_DEBUG, "not bound, ignoring Force Renew",

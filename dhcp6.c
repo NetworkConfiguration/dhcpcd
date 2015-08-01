@@ -2750,13 +2750,16 @@ dhcp6_handledata(void *arg)
 		else
 			logger(ifp->ctx, LOG_DEBUG,
 			    "%s: accepted reconfigure key", ifp->name);
-	} else if (ifo->auth.options & DHCPCD_AUTH_REQUIRE) {
-		logger(ifp->ctx, LOG_ERR,
-		    "%s: no authentication from %s", ifp->name, ctx->sfrom);
-		return;
-	} else if (ifo->auth.options & DHCPCD_AUTH_SEND)
+	} else if (ifo->auth.options & DHCPCD_AUTH_SEND) {
+		if (ifo->auth.options & DHCPCD_AUTH_REQUIRE) {
+			logger(ifp->ctx, LOG_ERR,
+			    "%s: no authentication from %s",
+			    ifp->name, ctx->sfrom);
+			return;
+		}
 		logger(ifp->ctx, LOG_WARNING,
 		    "%s: no authentication from %s", ifp->name, ctx->sfrom);
+	}
 
 	op = dhcp6_get_op(r->type);
 	switch(r->type) {
@@ -2860,7 +2863,8 @@ dhcp6_handledata(void *arg)
 			logger(ifp->ctx, LOG_ERR,
 			    "%s: unauthenticated %s from %s",
 			    ifp->name, op, ctx->sfrom);
-			return;
+			if (ifo->auth.options & DHCPCD_AUTH_REQUIRE)
+				return;
 		}
 		logger(ifp->ctx, LOG_INFO, "%s: %s from %s",
 		    ifp->name, op, ctx->sfrom);
