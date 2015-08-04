@@ -189,29 +189,10 @@ ipv6nd_open(struct dhcpcd_ctx *dctx)
 	ctx = dctx->ipv6;
 	if (ctx->nd_fd != -1)
 		return ctx->nd_fd;
-#ifdef SOCK_CLOEXEC
-	ctx->nd_fd = socket(PF_INET6, SOCK_RAW | SOCK_CLOEXEC | SOCK_NONBLOCK,
-	    IPPROTO_ICMPV6);
+	ctx->nd_fd = xsocket(PF_INET6, SOCK_RAW, IPPROTO_ICMPV6,
+	    O_NONBLOCK|O_CLOEXEC);
 	if (ctx->nd_fd == -1)
 		return -1;
-#else
-	if ((ctx->nd_fd = socket(PF_INET6, SOCK_RAW, IPPROTO_ICMPV6)) == -1)
-		return -1;
-	if ((on = fcntl(ctx->nd_fd, F_GETFD, 0)) == -1 ||
-	    fcntl(ctx->nd_fd, F_SETFD, on | FD_CLOEXEC) == -1)
-	{
-		close(ctx->nd_fd);
-		ctx->nd_fd = -1;
-	        return -1;
-	}
-	if ((on = fcntl(ctx->nd_fd, F_GETFL, 0)) == -1 ||
-	    fcntl(ctx->nd_fd, F_SETFL, on | O_NONBLOCK) == -1)
-	{
-		close(ctx->nd_fd);
-		ctx->nd_fd = -1;
-	        return -1;
-	}
-#endif
 
 	/* RFC4861 4.1 */
 	on = 255;

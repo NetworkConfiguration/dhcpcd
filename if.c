@@ -58,6 +58,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include "config.h"
 #include "common.h"
@@ -100,7 +101,7 @@ if_carrier(struct interface *iface)
 	struct ifmediareq ifmr;
 #endif
 
-	if ((s = socket(PF_INET, SOCK_DGRAM, 0)) == -1)
+	if ((s = xsocket(PF_INET, SOCK_DGRAM, 0, O_CLOEXEC)) == -1)
 		return LINK_UNKNOWN;
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, iface->name, sizeof(ifr.ifr_name));
@@ -131,7 +132,7 @@ if_setflag(struct interface *ifp, short flag)
 	struct ifreq ifr;
 	int s, r;
 
-	if ((s = socket(PF_INET, SOCK_DGRAM, 0)) == -1)
+	if ((s = xsocket(PF_INET, SOCK_DGRAM, 0, O_CLOEXEC)) == -1)
 		return -1;
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
@@ -246,11 +247,11 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 #endif
 
 #ifdef SIOCGIFPRIORITY
-	if ((s_inet = socket(PF_INET, SOCK_DGRAM, 0)) == -1)
+	if ((s_inet = xsocket(PF_INET, SOCK_DGRAM, 0, O_CLOEXEC)) == -1)
 		return NULL;
 #endif
 #ifdef IFLR_ACTIVE
-	if ((s_link = socket(PF_LINK, SOCK_DGRAM, 0)) == -1) {
+	if ((s_link = xsocket(PF_LINK, SOCK_DGRAM, 0, O_CLOEXEC)) == -1) {
 #ifdef SIOCGIFPRIORITY
 		close(s_inet);
 #endif
@@ -583,7 +584,7 @@ if_domtu(const char *ifname, short int mtu)
 	int s, r;
 	struct ifreq ifr;
 
-	if ((s = socket(PF_INET, SOCK_DGRAM, 0)) == -1)
+	if ((s = xsocket(PF_INET, SOCK_DGRAM, 0, O_CLOEXEC)) == -1)
 		return -1;
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
@@ -663,4 +664,32 @@ if_sortinterfaces(struct dhcpcd_ctx *ctx)
 			TAILQ_INSERT_TAIL(&sorted, ifp, next);
 	}
 	TAILQ_CONCAT(ctx->ifaces, &sorted, next);
+}
+
+int
+xsocket(int domain, int type, int protocol, int flags)
+{
+#ifdef SOCK_CLOEXEC
+	if (flags & O_CLOEXEC)
+		type |= SOCK_CLOEXEC;
+	if (flags & O_NONBLOCK)
+		type |= SOCK_NONBLOCK;
+
+	return socket(domain, type, protocol);
+#else
+	int s, xflags;
+
+	if ((s = socket(domain, type, protocol)) == -1)
+		return -1;
+	if ((flags & O_CLOEXEC) && (xflags = fcntl(s, F_GETFD, 0)) == -1 ||
+	    fcntl(s, F_SETFD, xlags | FD_CLOEXEC) == -1)
+		goto out;
+	if ((flags & O_NONBLOCK) && (xflags = fcntl(s, F_GETFL, 0)) == -1 ||
+	    fcntl(s, F_SETFL, xflags | O_NONBLOCK) == -1)
+		goto out;
+	return s;
+out:
+	close(s);
+	return -1;
+#endif
 }
