@@ -1390,6 +1390,14 @@ main(int argc, char **argv)
 	ifo = NULL;
 	ctx.cffile = CONFIG;
 	ctx.pid_fd = ctx.control_fd = ctx.control_unpriv_fd = ctx.link_fd = -1;
+	ctx.pf_inet_fd = -1;
+#if defined(INET6) && defined(BSD)
+	ctx.pf_inet6_fd = -1;
+#endif
+#ifdef IFLR_ACTIVE
+	ctx.pf_link_fd = -1;
+#endif
+
 	TAILQ_INIT(&ctx.control_fds);
 #ifdef PLUGIN_DEV
 	ctx.dev_fd = -1;
@@ -1755,17 +1763,12 @@ main(int argc, char **argv)
 	if (ctx.ifc == 1 && !(ctx.options & DHCPCD_BACKGROUND))
 		ctx.options |= DHCPCD_WAITIP;
 
-	/* RTM_NEWADDR goes through the link socket as well which we
-	 * need for IPv6 DAD, so we check for DHCPCD_LINK in
-	 * dhcpcd_handlecarrier instead.
-	 * We also need to open this before checking for interfaces below
-	 * so that we pickup any new addresses during the discover phase. */
-	ctx.link_fd = if_openlinksocket();
-	if (ctx.link_fd == -1)
-		logger(&ctx, LOG_ERR, "open_link_socket: %m");
-	else
-		eloop_event_add(ctx.eloop, ctx.link_fd,
-		    handle_link, &ctx, NULL, NULL);
+	/* Open our persistent sockets. */
+	if (if_opensockets(&ctx) == -1) {
+		logger(&ctx, LOG_ERR, "if_opensockets: %m");
+		goto exit_failure;
+	}
+	eloop_event_add(ctx.eloop, ctx.link_fd, handle_link, &ctx, NULL, NULL);
 
 	/* Start any dev listening plugin which may want to
 	 * change the interface name provided by the kernel */
@@ -1870,6 +1873,17 @@ exit1:
 		eloop_event_delete(ctx.eloop, ctx.link_fd);
 		close(ctx.link_fd);
 	}
+	if (ctx.pf_inet_fd != -1)
+		close(ctx.pf_inet_fd);
+#if defined(INET6) && defined(BSD)
+	if (ctx.pf_inet6_fd != -1)
+		close(ctx.pf_inet6_fd);
+#endif
+#ifdef IFLR_ACTIVE
+	if (ctx.pf_link_fd != -1)
+		close(ctx.pf_link_fd);
+#endif
+
 
 	free_options(ifo);
 	free_globals(&ctx);

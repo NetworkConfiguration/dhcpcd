@@ -242,7 +242,7 @@ if_conf(struct interface *ifp)
 
 /* XXX work out Virtal Interface Masters */
 int
-if_vimaster(__unused const char *ifname)
+if_vimaster(__unused const struct dhcpcd_ctx *ctx, __unused const char *ifname)
 {
 
 	return 0;

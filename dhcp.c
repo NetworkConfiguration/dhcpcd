@@ -902,9 +902,9 @@ make_message(struct dhcp_message **message,
 
 			*p++ = DHO_MAXMESSAGESIZE;
 			*p++ = 2;
-			mtu = if_getmtu(ifp->name);
+			mtu = if_getmtu(ifp);
 			if (mtu < MTU_MIN) {
-				if (if_setmtu(ifp->name, MTU_MIN) == 0)
+				if (if_setmtu(ifp, MTU_MIN) == 0)
 					sz = MTU_MIN;
 			} else if (mtu > MTU_MAX) {
 				/* Even though our MTU could be greater than
