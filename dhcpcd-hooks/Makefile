@@ -22,6 +22,8 @@ clean:
 proginstall: ${HOOKSCRIPTS}
 	${INSTALL} -d ${DESTDIR}${SCRIPTSDIR}
 	${INSTALL} -m ${NONBINMODE} ${SCRIPTS} ${DESTDIR}${SCRIPTSDIR}
+	# We need to remove the old MTU change script if we at all can.
+	rm -f ${DESTDIR}${SCRIPTSDIR}/10-mtu
 
 install: proginstall
 
