@@ -249,28 +249,12 @@ if_vimaster(__unused const struct dhcpcd_ctx *ctx, __unused const char *ifname)
 }
 
 static int
-_open_link_socket(struct sockaddr_nl *nl, int flags, int protocol)
+_open_link_socket(struct sockaddr_nl *nl, int protocol)
 {
 	int fd;
 
-#ifdef SOCK_CLOEXEC
-	if (flags)
-		flags = SOCK_CLOEXEC;
-	fd = socket(AF_NETLINK, SOCK_RAW | flags, protocol);
-	if (fd == -1)
+	if ((fd = xsocket(AF_NETLINK, SOCK_RAW, protocol, O_CLOEXEC)) == -1)
 		return -1;
-#else
-	fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
-	if (fd == -1)
-		return -1;
-	if (flags &&
-	    (flags = fcntl(fd, F_GETFD, 0)) == -1 ||
-	    fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == -1)
-	{
-		close(fd);
-	        return -1;
-	}
-#endif
 	nl->nl_family = AF_NETLINK;
 	if (bind(fd, (struct sockaddr *)nl, sizeof(*nl)) == -1) {
 		close(fd);
@@ -294,7 +278,7 @@ if_openlinksocket(void)
 	snl.nl_groups |= RTMGRP_IPV6_ROUTE | RTMGRP_IPV6_IFADDR | RTMGRP_NEIGH;
 #endif
 
-	return _open_link_socket(&snl, 1, NETLINK_ROUTE);
+	return _open_link_socket(&snl, NETLINK_ROUTE);
 }
 
 static int
@@ -889,7 +873,7 @@ send_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	static unsigned int seq;
 
 	memset(&snl, 0, sizeof(snl));
-	if ((s = _open_link_socket(&snl, 0, protocol)) == -1)
+	if ((s = _open_link_socket(&snl, protocol)) == -1)
 		return -1;
 	memset(&iov, 0, sizeof(iov));
 	iov.iov_base = hdr;
@@ -1201,28 +1185,10 @@ if_openrawsocket(struct interface *ifp, uint16_t protocol)
 	int n;
 #endif
 
-#ifdef SOCK_CLOEXEC
-	if ((s = socket(PF_PACKET, SOCK_DGRAM | SOCK_CLOEXEC | SOCK_NONBLOCK,
-	    htons(protocol))) == -1)
+	if ((s = xsocket(PF_PACKET, SOCK_DGRAM, htons(protocol),
+	    O_CLOEXEC | O_NONBLOCK)) == -1)
 		return -1;
-#else
-	int flags;
 
-	if ((s = socket(PF_PACKET, SOCK_DGRAM, htons(protocol))) == -1)
-		return -1;
-	if ((flags = fcntl(s, F_GETFD, 0)) == -1 ||
-	    fcntl(s, F_SETFD, flags | FD_CLOEXEC) == -1)
-	{
-		close(s);
-	        return -1;
-	}
-	if ((flags = fcntl(s, F_GETFL, 0)) == -1 ||
-	    fcntl(s, F_SETFL, flags | O_NONBLOCK) == -1)
-	{
-		close(s);
-	        return -1;
-	}
-#endif
 	/* Install the DHCP filter */
 	memset(&pf, 0, sizeof(pf));
 	if (protocol == ETHERTYPE_ARP) {
