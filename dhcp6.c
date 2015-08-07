@@ -2245,7 +2245,9 @@ auth:
 		else
 			logger(ifp->ctx, LOG_DEBUG,
 			    "%s: accepted reconfigure key", ifp->name);
-	} else if (ifp->options->auth.options & DHCPCD_AUTH_SENDREQUIRE) {
+	} else if ((ifp->options->auth.options & DHCPCD_AUTH_SENDREQUIRE) ==
+	    DHCPCD_AUTH_SENDREQUIRE)
+	{
 		logger(ifp->ctx, LOG_ERR,
 		    "%s: authentication now required", ifp->name);
 		goto ex;
