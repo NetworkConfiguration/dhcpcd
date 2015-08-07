@@ -696,6 +696,7 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 			script_runreason(ifp, "NOCARRIER");
 #ifdef NOCARRIER_PRESERVE_IP
 			arp_close(ifp);
+			dhcp_abort(ifp);
 			if_sortinterfaces(ctx);
 			ipv4_preferanother(ifp);
 			ipv6nd_expire(ifp, 0);

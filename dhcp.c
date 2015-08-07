@@ -3342,13 +3342,8 @@ dhcp_start1(void *arg)
 	}
 
 	if (!(ifo->options & DHCPCD_DHCP)) {
-		if (ifo->options & DHCPCD_IPV4LL) {
-			if (state->offer && state->offer->cookie != 0) {
-				free(state->offer);
-				state->offer = NULL;
-			}
+		if (ifo->options & DHCPCD_IPV4LL)
 			ipv4ll_start(ifp);
-		}
 		return;
 	}
 
@@ -3383,6 +3378,13 @@ dhcp_start(struct interface *ifp)
 	    ifp->name, timespec_to_double(&tv));
 
 	eloop_timeout_add_tv(ifp->ctx->eloop, &tv, dhcp_start1, ifp);
+}
+
+void
+dhcp_abort(struct interface *ifp)
+{
+
+	eloop_timeout_delete(ifp->ctx->eloop, dhcp_start1, ifp);
 }
 
 void
