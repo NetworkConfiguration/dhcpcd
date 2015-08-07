@@ -81,6 +81,7 @@
 #include "if.h"
 #include "if-options.h"
 #include "ipv4.h"
+#include "ipv4ll.h"
 #include "ipv6.h"
 #include "ipv6nd.h"
 
@@ -508,6 +509,7 @@ int
 if_route(unsigned char cmd, const struct rt *rt)
 {
 	const struct dhcp_state *state;
+	const struct ipv4ll_state *istate;
 	union sockunion {
 		struct sockaddr sa;
 		struct sockaddr_in sin;
@@ -534,10 +536,14 @@ if_route(unsigned char cmd, const struct rt *rt)
 		ADDSU;							      \
 	}
 
-	if (cmd != RTM_DELETE)
+	if (cmd != RTM_DELETE) {
 		state = D_CSTATE(rt->iface);
-	else	/* appease GCC */
+		istate = IPV4LL_DSTATE(rt->iface);
+	} else {
+		/* appease GCC */
 		state = NULL;
+		istate = NULL;
+	}
 	memset(&rtm, 0, sizeof(rtm));
 	rtm.hdr.rtm_version = RTM_VERSION;
 	rtm.hdr.rtm_seq = 1;
@@ -554,9 +560,14 @@ if_route(unsigned char cmd, const struct rt *rt)
 	if (cmd != RTM_DELETE) {
 		rtm.hdr.rtm_addrs |= RTA_IFA | RTA_IFP;
 		/* None interface subnet routes are static. */
-		if (rt->gate.s_addr != INADDR_ANY ||
+		if ((rt->gate.s_addr != INADDR_ANY ||
 		    rt->net.s_addr != state->net.s_addr ||
-		    rt->dest.s_addr != (state->addr.s_addr & state->net.s_addr))
+		    rt->dest.s_addr !=
+		    (state->addr.s_addr & state->net.s_addr)) &&
+		    (istate == NULL ||
+		    rt->dest.s_addr !=
+		    (istate->addr.s_addr & inaddr_llmask.s_addr) ||
+		    rt->net.s_addr != inaddr_llmask.s_addr))
 			rtm.hdr.rtm_flags |= RTF_STATIC;
 		else {
 #ifdef RTF_CLONING
@@ -627,7 +638,7 @@ if_route(unsigned char cmd, const struct rt *rt)
 		}
 
 		if (rtm.hdr.rtm_addrs & RTA_IFA)
-			ADDADDR(&state->addr);
+			ADDADDR(istate == NULL ? &state->addr : &istate->addr);
 
 		if (rt->mtu) {
 			rtm.hdr.rtm_inits |= RTV_MTU;

@@ -80,6 +80,7 @@
 #include "dhcp.h"
 #include "if.h"
 #include "ipv4.h"
+#include "ipv4ll.h"
 #include "ipv6.h"
 #include "ipv6nd.h"
 
@@ -1335,7 +1336,8 @@ if_route(unsigned char cmd, const struct rt *rt)
 {
 	struct nlmr nlm;
 	int retval = 0;
-	struct dhcp_state *state;
+	const struct dhcp_state *state;
+	const struct ipv4ll_state *istate;
 
 	memset(&nlm, 0, sizeof(nlm));
 	nlm.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
@@ -1356,14 +1358,18 @@ if_route(unsigned char cmd, const struct rt *rt)
 	nlm.rt.rtm_family = AF_INET;
 	nlm.rt.rtm_table = RT_TABLE_MAIN;
 
-	state = D_STATE(rt->iface);
+	state = D_CSTATE(rt->iface);
+	istate = IPV4LL_CSTATE(rt->iface);
 	if (cmd == RTM_DELETE)
 		nlm.rt.rtm_scope = RT_SCOPE_NOWHERE;
 	else {
 		/* We only change route metrics for kernel routes */
-		if (rt->dest.s_addr ==
+		if ((rt->dest.s_addr ==
 		    (state->addr.s_addr & state->net.s_addr) &&
-		    rt->net.s_addr == state->net.s_addr)
+		    rt->net.s_addr == state->net.s_addr) ||
+		    (istate && rt->dest.s_addr ==
+		    (istate->addr.s_addr & inaddr_llmask.s_addr) &&
+		    rt->net.s_addr == inaddr_llmask.s_addr))
 			nlm.rt.rtm_protocol = RTPROT_KERNEL;
 		else
 			nlm.rt.rtm_protocol = RTPROT_BOOT;
@@ -1383,7 +1389,8 @@ if_route(unsigned char cmd, const struct rt *rt)
 	    &rt->dest.s_addr, sizeof(rt->dest.s_addr));
 	if (nlm.rt.rtm_protocol == RTPROT_KERNEL) {
 		add_attr_l(&nlm.hdr, sizeof(nlm), RTA_PREFSRC,
-		    &state->addr.s_addr, sizeof(state->addr.s_addr));
+		    istate == NULL ? &state->addr.s_addr : &istate->addr.s_addr,
+		    sizeof(state->addr.s_addr));
 	}
 	/* If a host route then don't add the gateway */
 	if ((cmd == RTM_ADD || cmd == RTM_CHANGE) &&

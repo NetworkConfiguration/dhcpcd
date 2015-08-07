@@ -45,8 +45,8 @@
 #include "ipv4ll.h"
 #include "script.h"
 
-static const struct in_addr inaddr_llmask = { HTONL(LINKLOCAL_MASK) };
-static const struct in_addr inaddr_llbcast = { HTONL(LINKLOCAL_BRDC) };
+const struct in_addr inaddr_llmask = { HTONL(LINKLOCAL_MASK) };
+const struct in_addr inaddr_llbcast = { HTONL(LINKLOCAL_BRDC) };
 
 static in_addr_t
 ipv4ll_pick_addr(const struct arp_state *astate)
@@ -189,6 +189,7 @@ ipv4ll_probed(struct arp_state *astate)
 #endif
 	state->addr = astate->addr;
 	timespecclear(&state->defend);
+	if_initrt(ifp);
 	ipv4_buildroutes(ifp->ctx);
 	arp_announce(astate);
 	script_runreason(ifp, "IPV4LL");

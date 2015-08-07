@@ -30,6 +30,9 @@
 
 #include "arp.h"
 
+extern const struct in_addr inaddr_llmask;
+extern const struct in_addr inaddr_llbcast;
+
 #define LINKLOCAL_ADDR	0xa9fe0000
 #define LINKLOCAL_MASK	IN_CLASSB_NET
 #define LINKLOCAL_BRDC	(LINKLOCAL_ADDR | ~LINKLOCAL_MASK)

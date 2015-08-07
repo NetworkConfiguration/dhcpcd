@@ -443,7 +443,7 @@ nc_route(struct rt *ort, struct rt *nrt)
 #ifdef HAVE_ROUTE_METRIC
 	/* With route metrics, we can safely add the new route before
 	 * deleting the old route. */
-	if (if_route(RTM_ADD, nrt)  == 0) {
+	if (if_route(RTM_ADD, nrt) == 0) {
 		if (ort && if_route(RTM_DELETE, ort) == -1 && errno != ESRCH)
 			logger(nrt->iface->ctx, LOG_ERR, "if_route (DEL): %m");
 		return 0;
