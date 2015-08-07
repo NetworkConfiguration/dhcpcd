@@ -532,13 +532,13 @@ if_route(unsigned char cmd, const struct rt *rt)
 		memset(&su, 0, sizeof(su));				      \
 		su.sin.sin_family = AF_INET;				      \
 		su.sin.sin_len = sizeof(su.sin);			      \
-		(&su.sin)->sin_addr = *addr;				      \
+		(&su.sin)->sin_addr = *(addr);				      \
 		ADDSU;							      \
 	}
 
 	if (cmd != RTM_DELETE) {
 		state = D_CSTATE(rt->iface);
-		istate = IPV4LL_DSTATE(rt->iface);
+		istate = IPV4LL_CSTATE(rt->iface);
 	} else {
 		/* appease GCC */
 		state = NULL;
@@ -778,7 +778,7 @@ if_address6(const struct ipv6_addr *ia, int action)
 #define ADDADDR(v, addr) {						      \
 		(v)->sin6_family = AF_INET6;				      \
 		(v)->sin6_len = sizeof(*v);				      \
-		(v)->sin6_addr = *addr;					      \
+		(v)->sin6_addr = *(addr);				      \
 	}
 
 	ADDADDR(&ifa.ifra_addr, &ia->addr);
