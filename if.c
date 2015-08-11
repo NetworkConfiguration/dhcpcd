@@ -496,20 +496,23 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 			}
 		}
 
-		/* Handle any platform init for the interface */
-		if (if_init(ifp) == -1) {
-			logger(ifp->ctx, LOG_ERR, "%s: if_init: %m", p);
-			if_free(ifp);
-			continue;
-		}
+		if (!(ctx->options & (DHCPCD_DUMPLEASE | DHCPCD_TEST))) {
+			/* Handle any platform init for the interface */
+			if (if_init(ifp) == -1) {
+				logger(ifp->ctx, LOG_ERR, "%s: if_init: %m", p);
+				if_free(ifp);
+				continue;
+			}
 
-		/* Ensure that the MTU is big enough for DHCP */
-		if (if_getmtu(ifp) < MTU_MIN &&
-		    if_setmtu(ifp, MTU_MIN) == -1)
-		{
-			logger(ifp->ctx, LOG_ERR, "%s: set_mtu: %m", p);
-			if_free(ifp);
-			continue;
+			/* Ensure that the MTU is big enough for DHCP */
+			if (if_getmtu(ifp) < MTU_MIN &&
+			    if_setmtu(ifp, MTU_MIN) == -1)
+			{
+				logger(ifp->ctx, LOG_ERR,
+				    "%s: if_setmtu: %m", p);
+				if_free(ifp);
+				continue;
+			}
 		}
 
 #ifdef SIOCGIFPRIORITY
