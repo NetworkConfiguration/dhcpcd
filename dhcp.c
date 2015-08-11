@@ -900,21 +900,27 @@ make_message(struct dhcp_message **message,
 		if (!(ifo->options & DHCPCD_BOOTP)) {
 			int mtu;
 
-			*p++ = DHO_MAXMESSAGESIZE;
-			*p++ = 2;
-			mtu = if_getmtu(ifp);
-			if (mtu < MTU_MIN) {
-				if (if_setmtu(ifp, MTU_MIN) == 0)
-					sz = MTU_MIN;
+			if ((mtu = if_getmtu(ifp)) == -1)
+				logger(ifp->ctx, LOG_ERR,
+				    "%s: if_getmtu: %m", ifp->name);
+			else if (mtu < MTU_MIN) {
+				if (if_setmtu(ifp, MTU_MIN) == -1)
+					logger(ifp->ctx, LOG_ERR,
+					    "%s: if_setmtu: %m", ifp->name);
+				mtu = MTU_MIN;
 			} else if (mtu > MTU_MAX) {
 				/* Even though our MTU could be greater than
 				 * MTU_MAX (1500) dhcpcd does not presently
 				 * handle DHCP packets any bigger. */
 				mtu = MTU_MAX;
 			}
-			sz = htons((uint16_t)mtu);
-			memcpy(p, &sz, 2);
-			p += 2;
+			if (mtu != -1) {
+				*p++ = DHO_MAXMESSAGESIZE;
+				*p++ = 2;
+				sz = htons((uint16_t)mtu);
+				memcpy(p, &sz, 2);
+				p += 2;
+			}
 		}
 
 		if (ifo->userclass[0]) {
