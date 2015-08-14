@@ -880,17 +880,22 @@ ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
 		{
 			if (drop == 2)
 				TAILQ_REMOVE(addrs, ap, next);
-			/* Find the same address somewhere else */
-			apf = ipv6_findaddr(ap->iface->ctx, &ap->addr, 0);
-			if (apf == NULL ||
-			    (apf->iface != ap->iface))
-				ipv6_deleteaddr(ap);
-			if (!(ap->iface->options->options &
-			    DHCPCD_EXITING) && apf)
-			{
-				if (!timespecisset(&now))
-					clock_gettime(CLOCK_MONOTONIC, &now);
-				ipv6_addaddr(apf, &now);
+			/* Don't drop link-local addresses. */
+			if (!IN6_IS_ADDR_LINKLOCAL(&ap->addr)) {
+				/* Find the same address somewhere else */
+				apf = ipv6_findaddr(ap->iface->ctx, &ap->addr,
+				    0);
+				if ((apf == NULL ||
+				    (apf->iface != ap->iface)))
+					ipv6_deleteaddr(ap);
+				if (!(ap->iface->options->options &
+				    DHCPCD_EXITING) && apf)
+				{
+					if (!timespecisset(&now))
+						clock_gettime(CLOCK_MONOTONIC,
+						    &now);
+					ipv6_addaddr(apf, &now);
+				}
 			}
 			if (drop == 2)
 				ipv6_freeaddr(ap);
