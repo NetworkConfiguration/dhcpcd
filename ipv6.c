@@ -644,7 +644,9 @@ ipv6_addaddr(struct ipv6_addr *ap, const struct timespec *now)
 		ap->flags |= IPV6_AF_DADCOMPLETED;
 
 	logger(ap->iface->ctx, ap->flags & IPV6_AF_NEW ? LOG_INFO : LOG_DEBUG,
-	    "%s: adding address %s", ap->iface->name, ap->saddr);
+	    "%s: adding %saddress %s", ap->iface->name,
+	    ap->flags & IPV6_AF_TEMPORARY ? "temporary " : "",
+	    ap->saddr);
 	if (ap->prefix_pltime == ND6_INFINITE_LIFETIME &&
 	    ap->prefix_vltime == ND6_INFINITE_LIFETIME)
 		logger(ap->iface->ctx, LOG_DEBUG,
