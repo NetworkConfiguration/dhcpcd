@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd July 28, 2015
+.Dd August 21, 2015
 .Dt DHCPCD 8
 .Os
 .Sh NAME
@@ -203,7 +203,7 @@ This script runs each script found in
 in a lexical order.
 The default installation supplies the scripts
 .Pa 01-test ,
-.Pa 10-mtu ,
+.Pa 02-dump ,
 .Pa 10-wpa_supplicant ,
 .Pa 15-timezone ,
 .Pa 20-resolv.conf
