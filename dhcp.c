@@ -712,6 +712,7 @@ dhcp_get_mtu(const struct interface *ifp)
 	const struct dhcp_message *dhcp;
 	uint16_t mtu;
 
+	mtu = 0; /* bogus gcc warning */
 	if ((dhcp = D_CSTATE(ifp)->new) == NULL ||
 	    has_option_mask(ifp->options->nomask, DHO_MTU) ||
 	    get_option_uint16(ifp->ctx, &mtu, dhcp, DHO_MTU) == -1)
