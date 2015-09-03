@@ -2221,7 +2221,7 @@ dhcp_arp_bind(struct interface *ifp)
 		return;
 	}
 #else
-	if (ifo->options & DHCPCD_ARP) {
+	if (ifp->options->options & DHCPCD_ARP) {
 		if (ia == NULL) {
 			if ((astate = arp_new(ifp, &addr)) != NULL) {
 				astate->probed_cb = dhcp_arp_probed;
@@ -2554,7 +2554,9 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 	unsigned int i;
 	size_t auth_len;
 	char *msg;
+#ifdef IN_IFF_DUPLICATED
 	struct ipv4_addr *ia;
+#endif
 
 	/* We may have found a BOOTP server */
 	if (get_option_uint8(ifp->ctx, &type, dhcp, DHO_MESSAGETYPE) == -1)
