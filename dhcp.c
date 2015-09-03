@@ -2221,17 +2221,20 @@ dhcp_arp_bind(struct interface *ifp)
 		return;
 	}
 #else
-	if (ifp->options->options & DHCPCD_ARP) {
-		if (ia == NULL) {
-			if ((astate = arp_new(ifp, &addr)) != NULL) {
-				astate->probed_cb = dhcp_arp_probed;
-				astate->conflicted_cb = dhcp_arp_conflicted;
-				astate->announced_cb = dhcp_arp_announced;
-				/* We need to handle DAD. */
-				arp_probe(astate);
-			}
-			return;
+	if (ifp->options->options & DHCPCD_ARP && ia == NULL) {
+		struct dhcp_lease l;
+
+		get_lease(ifp->ctx, &l, state->offer);
+		logger(ifp->ctx, LOG_INFO, "%s: probing static address %s/%d",
+		    ifp->name, inet_ntoa(l.addr), inet_ntocidr(l.net));
+		if ((astate = arp_new(ifp, &addr)) != NULL) {
+			astate->probed_cb = dhcp_arp_probed;
+			astate->conflicted_cb = dhcp_arp_conflicted;
+			astate->announced_cb = dhcp_arp_announced;
+			/* We need to handle DAD. */
+			arp_probe(astate);
 		}
+		return;
 	}
 #endif
 

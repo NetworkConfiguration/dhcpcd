@@ -810,7 +810,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			ifo->req_mask.s_addr = 0;
 		}
 		ifo->options |= DHCPCD_INFORM | DHCPCD_PERSISTENT;
-		ifo->options &= ~(DHCPCD_ARP | DHCPCD_STATIC);
+		ifo->options &= ~DHCPCD_STATIC;
 		break;
 	case 't':
 		ifo->timeout = (time_t)strtoi(arg, NULL, 0, 0, INT32_MAX, &e);
