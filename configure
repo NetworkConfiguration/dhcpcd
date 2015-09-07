@@ -1160,9 +1160,22 @@ if ! $HOOKSET; then
 	NTPD=$(_which ntpd)
 	if [ -n "$NTPD" ]; then
 		echo "$NTPD (50-ntp.conf)"
-		HOOKS="$HOOKS${HOOKS:+ }50-ntp.conf"
 	else
 		echo "not found"
+	fi
+	printf "Checking for chronyd ... "
+	CHRONYD=$(_which chronyd)
+	if [ -n "$CHRONYD" ]; then
+		echo "$CHRONYD (50-ntp.conf)"
+	else
+		echo "not found"
+	fi
+	if [ -n "$NTPD" -o -n "$CHRONYD" ]; then
+		HOOKS="$HOOKS${HOOKS:+ }50-ntp.conf"
+	fi
+	# Warn if both are detected
+	if [ -n "$NTPD" -a -n "$CHRONYD" ]; then
+		echo "NTP will default to $NTPD"
 	fi
 
 	printf "Checking for ypbind ... "
