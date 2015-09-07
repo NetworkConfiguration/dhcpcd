@@ -1620,9 +1620,10 @@ dhcp6_finishrelease(void *arg)
 	struct dhcp6_state *state;
 
 	ifp = (struct interface *)arg;
-	state = D6_STATE(ifp);
-	state->state = DH6S_RELEASED;
-	dhcp6_drop(ifp, "RELEASE6");
+	if ((state = D6_STATE(ifp)) != NULL) {
+		state->state = DH6S_RELEASED;
+		dhcp6_drop(ifp, "RELEASE6");
+	}
 }
 
 static void
