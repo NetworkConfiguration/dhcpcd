@@ -1457,7 +1457,7 @@ if_addrflags(__unused const struct in_addr *addr,
 
 #ifdef INET6
 int
-if_address6(const struct ipv6_addr *ap, int action)
+if_address6(const struct ipv6_addr *ia, int action)
 {
 	struct nlma nlm;
 	struct ifa_cacheinfo cinfo;
@@ -1476,39 +1476,40 @@ if_address6(const struct ipv6_addr *ap, int action)
 		nlm.hdr.nlmsg_type = RTM_NEWADDR;
 	} else
 		nlm.hdr.nlmsg_type = RTM_DELADDR;
-	nlm.ifa.ifa_index = ap->iface->index;
+	nlm.ifa.ifa_index = ia->iface->index;
 	nlm.ifa.ifa_family = AF_INET6;
-	if (ap->addr_flags & IFA_F_TEMPORARY) {
+#ifdef IPV6_MANAGETEMPADDR
+	if (ia->flags & IPV6_AF_TEMPORARY) {
+		/* Currently the kernel filters out these flags */
 #ifdef IFA_F_NOPREFIXROUTE
 		flags |= IFA_F_TEMPORARY;
 #else
 		nlm.ifa.ifa_flags |= IFA_F_TEMPORARY;
 #endif
 	}
-#ifdef IFA_F_MANAGETEMPADDR
-	else if (ap->flags & IPV6_AF_AUTOCONF &&
-	    ip6_use_tempaddr(ap->iface->name))
+#elif IFA_F_MANAGETEMPADDR
+	if (ia->flags & IPV6_AF_AUTOCONF)
 		flags |= IFA_F_MANAGETEMPADDR;
 #endif
 
 	/* Add as /128 if no IFA_F_NOPREFIXROUTE ? */
-	nlm.ifa.ifa_prefixlen = ap->prefix_len;
+	nlm.ifa.ifa_prefixlen = ia->prefix_len;
 	/* This creates the aliased interface */
 	add_attr_l(&nlm.hdr, sizeof(nlm), IFA_LABEL,
-	    ap->iface->alias, (unsigned short)(strlen(ap->iface->alias) + 1));
+	    ia->iface->alias, (unsigned short)(strlen(ia->iface->alias) + 1));
 	add_attr_l(&nlm.hdr, sizeof(nlm), IFA_LOCAL,
-	    &ap->addr.s6_addr, sizeof(ap->addr.s6_addr));
+	    &ia->addr.s6_addr, sizeof(ia->addr.s6_addr));
 
 	if (action >= 0) {
 		memset(&cinfo, 0, sizeof(cinfo));
-		cinfo.ifa_prefered = ap->prefix_pltime;
-		cinfo.ifa_valid = ap->prefix_vltime;
+		cinfo.ifa_prefered = ia->prefix_pltime;
+		cinfo.ifa_valid = ia->prefix_vltime;
 		add_attr_l(&nlm.hdr, sizeof(nlm), IFA_CACHEINFO,
 		    &cinfo, sizeof(cinfo));
 	}
 
 #ifdef IFA_F_NOPREFIXROUTE
-	if (!IN6_IS_ADDR_LINKLOCAL(&ap->addr))
+	if (!IN6_IS_ADDR_LINKLOCAL(&ia->addr))
 		flags |= IFA_F_NOPREFIXROUTE;
 #endif
 #if defined(IFA_F_NOPREFIXROUTE) || defined(IFA_F_MANAGETEMPADDR)
@@ -1516,7 +1517,7 @@ if_address6(const struct ipv6_addr *ap, int action)
 		add_attr_32(&nlm.hdr, sizeof(nlm), IFA_FLAGS, flags);
 #endif
 
-	if (send_netlink(ap->iface->ctx, NULL, NETLINK_ROUTE, &nlm.hdr,
+	if (send_netlink(ia->iface->ctx, NULL, NETLINK_ROUTE, &nlm.hdr,
 	    NULL) == -1)
 		retval = -1;
 	return retval;
