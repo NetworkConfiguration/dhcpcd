@@ -455,6 +455,23 @@ EOF
 	# where the SSID associated to won't be reported by nl80211
 	# but will be via WEXT.
 	echo "DHCPCD_SRCS+=	if-linux-wext.c" >>$CONFIG_MK
+
+	printf "Testing for IFLA_AF_SPEC ... "
+	cat <<EOF >_IFLA_AF_SPEC.c
+#include <linux/if_link.h>
+int main(void) {
+	int x = IFLA_AF_SPEC;
+	return x;
+}
+EOF
+	if $XCC _IFLA_AF_SPEC.c -o _IFLA_AF_SPEC 2>&3; then
+		echo "yes"
+		echo "#define HAVE_IFLA_AF_SPEC" >>$CONFIG_H
+	else
+		echo "no"
+	fi
+	rm -f _IFLA_AF_SPEC.c IFLA_AF_SPEC
+
 fi
 
 abort=false

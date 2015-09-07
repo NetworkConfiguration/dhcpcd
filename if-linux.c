@@ -51,12 +51,6 @@
 # define IFLA_WIRELESS (IFLA_MASTER + 1)
 #endif
 
-/* Linux has these in an enum and there is just no way to work
- * out of they exist at compile time. Silly silly silly. */
-#define IFLA_AF_SPEC			26
-#define IFLA_INET6_ADDR_GEN_MODE	8
-#define IN6_ADDR_GEN_MODE_NONE		1
-
 /* For some reason, glibc doesn't include newer flags from linux/if.h
  * However, we cannot include linux/if.h directly as it conflicts
  * with the glibc version. D'oh! */
@@ -1713,8 +1707,9 @@ add_attr_nest_end(struct nlmsghdr *n, struct rtattr *nest)
 }
 
 static int
-if_disable_autolinklocal(struct dhcpcd_ctx *ctx, int ifindex)
+if_disable_autolinklocal(struct dhcpcd_ctx *ctx, unsigned int ifindex)
 {
+#ifdef HAVE_IFLA_AF_SPEC
 	struct nlml nlm;
 	struct rtattr *afs, *afs6;
 
@@ -1723,7 +1718,7 @@ if_disable_autolinklocal(struct dhcpcd_ctx *ctx, int ifindex)
 	nlm.hdr.nlmsg_type = RTM_NEWLINK;
 	nlm.hdr.nlmsg_flags = NLM_F_REQUEST;
 	nlm.i.ifi_family = AF_INET6;
-	nlm.i.ifi_index = ifindex;
+	nlm.i.ifi_index = (int)ifindex;
 	afs = add_attr_nest(&nlm.hdr, sizeof(nlm), IFLA_AF_SPEC);
 	afs6 = add_attr_nest(&nlm.hdr, sizeof(nlm), AF_INET6);
 	add_attr_8(&nlm.hdr, sizeof(nlm), IFLA_INET6_ADDR_GEN_MODE,
@@ -1732,6 +1727,10 @@ if_disable_autolinklocal(struct dhcpcd_ctx *ctx, int ifindex)
 	add_attr_nest_end(&nlm.hdr, afs);
 
 	return send_netlink(ctx, NULL, NETLINK_ROUTE, &nlm.hdr, NULL);
+#else
+	errno = ENOTSUP;
+	return -1;
+#endif
 }
 
 static const char *prefix = "/proc/sys/net/ipv6/conf";
@@ -1746,7 +1745,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 	if (ifp == NULL)
 		ifname = "all";
 	else if (own) {
-		if (if_disable_autolinklocal(ctx, (int)ifp->index) == -1)
+		if (if_disable_autolinklocal(ctx, ifp->index) == -1)
 			logger(ctx, LOG_DEBUG,
 			    "%s: if_disable_autolinklocal: %m", ifp->name);
 	}
