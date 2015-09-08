@@ -1599,12 +1599,12 @@ _if_checkipv6(int s, struct dhcpcd_ctx *ctx,
 	if (ra == -1)
 		/* The sysctl probably doesn't exist, but this isn't an
 		 * error as such so just log it and continue */
-		logger(ifp->ctx, errno == ENOENT ? LOG_DEBUG : LOG_WARNING,
+		logger(ctx, errno == ENOENT ? LOG_DEBUG : LOG_WARNING,
 		    "IPV6CTL_ACCEPT_RTADV: %m");
 	else if (ra != 0 && own) {
-		logger(ifp->ctx, LOG_DEBUG, "disabling Kernel IPv6 RA support");
+		logger(ctx, LOG_DEBUG, "disabling Kernel IPv6 RA support");
 		if (set_inet6_sysctl(IPV6CTL_ACCEPT_RTADV, 0) == -1) {
-			logger(ifp->ctx, LOG_ERR, "IPV6CTL_ACCEPT_RTADV: %m");
+			logger(ctx, LOG_ERR, "IPV6CTL_ACCEPT_RTADV: %m");
 			return ra;
 		}
 		ra = 0;
