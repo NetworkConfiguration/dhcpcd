@@ -2120,7 +2120,8 @@ dhcp_bind(struct interface *ifp)
 	if (state->reason == NULL) {
 		if (state->old && !(state->added & STATE_FAKE)) {
 			if (state->old->yiaddr == state->new->yiaddr &&
-			    lease->server.s_addr)
+			    lease->server.s_addr &&
+			    state->state != DHS_REBIND)
 				state->reason = "RENEW";
 			else
 				state->reason = "REBIND";
