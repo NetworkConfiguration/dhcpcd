@@ -46,18 +46,6 @@
 #include <netinet/in.h>
 #include <net/route.h>
 
-/* Support older kernels */
-#ifndef IFLA_WIRELESS
-# define IFLA_WIRELESS (IFLA_MASTER + 1)
-#endif
-
-/* For some reason, glibc doesn't include newer flags from linux/if.h
- * However, we cannot include linux/if.h directly as it conflicts
- * with the glibc version. D'oh! */
-#ifndef IFF_LOWER_UP
-#define IFF_LOWER_UP	0x10000		/* driver signals L1 up		*/
-#endif
-
 #include <errno.h>
 #include <fcntl.h>
 #include <ctype.h>
@@ -83,6 +71,18 @@
 #include <linux/nl80211.h>
 #endif
 int if_getssid_wext(const char *ifname, uint8_t *ssid);
+
+/* Support older kernels */
+#ifndef IFLA_WIRELESS
+#define IFLA_WIRELESS (IFLA_MASTER + 1)
+#endif
+
+/* For some reason, glibc doesn't include newer flags from linux/if.h
+ * However, we cannot include linux/if.h directly as it conflicts
+ * with the glibc version. D'oh! */
+#ifndef IFF_LOWER_UP
+#define IFF_LOWER_UP	0x10000		/* driver signals L1 up		*/
+#endif
 
 #define bpf_insn		sock_filter
 #define BPF_SKIPTYPE
