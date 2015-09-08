@@ -12,7 +12,7 @@ TOP?=		.
 include ${TOP}/iconfig.mk
 
 CSTD?=		c99
-CFLAGS+=	-std=${CSTD} --analyze
+CFLAGS+=	-std=${CSTD}
 
 SRCS+=		${DHCPCD_SRCS}
 
