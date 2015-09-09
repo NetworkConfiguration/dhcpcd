@@ -1903,7 +1903,7 @@ nc_route(struct rt6 *ort, struct rt6 *nrt)
 
 	/* If the old route does not have an interface, give it the
 	 * interface of the new route for context. */
-	if (ort->iface == NULL)
+	if (ort && ort->iface == NULL)
 		ort->iface = nrt->iface;
 
 #ifdef HAVE_ROUTE_METRIC
