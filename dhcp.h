@@ -237,7 +237,6 @@ struct dhcp_state {
 #ifdef INET
 char *decode_rfc3361(const uint8_t *, size_t);
 ssize_t decode_rfc3442(char *, size_t, const uint8_t *p, size_t);
-ssize_t decode_rfc5969(char *, size_t, const uint8_t *p, size_t);
 
 void dhcp_printoptions(const struct dhcpcd_ctx *,
     const struct dhcp_opt *, size_t);

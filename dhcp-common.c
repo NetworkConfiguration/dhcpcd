@@ -103,8 +103,6 @@ dhcp_print_option_encoding(const struct dhcp_opt *opt, int cols)
 		printf(" rfc3361");
 	if (opt->type & RFC3442)
 		printf(" rfc3442");
-	if (opt->type & RFC5969)
-		printf(" rfc5969");
 	if (opt->type & REQUEST)
 		printf(" request");
 	if (opt->type & NOREQ)
@@ -559,7 +557,7 @@ dhcp_optlen(const struct dhcp_opt *opt, size_t dl)
 	size_t sz;
 
 	if (opt->type == 0 ||
-	    opt->type & (STRING | BINHEX | RFC3442 | RFC5969))
+	    opt->type & (STRING | BINHEX | RFC3442))
 	{
 		if (opt->len) {
 			if ((size_t)opt->len > dl)
@@ -639,9 +637,6 @@ print_option(char *s, size_t len, const struct dhcp_opt *opt,
 
 	if (opt->type & RFC3442)
 		return decode_rfc3442(s, len, data, dl);
-
-	if (opt->type & RFC5969)
-		return decode_rfc5969(s, len, data, dl);
 #endif
 
 	if (opt->type & STRING)

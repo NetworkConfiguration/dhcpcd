@@ -1658,8 +1658,6 @@ err_sla:
 			t |= STRING | RFC3361;
 		else if (strcasecmp(arg, "rfc3442") ==0)
 			t |= STRING | RFC3442;
-		else if (strcasecmp(arg, "rfc5969") == 0)
-			t |= STRING | RFC5969;
 		else if (strcasecmp(arg, "option") == 0)
 			t |= OPTION;
 		else {
