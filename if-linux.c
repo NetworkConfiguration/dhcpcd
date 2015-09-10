@@ -1329,9 +1329,8 @@ int
 if_route(unsigned char cmd, const struct rt *rt)
 {
 	struct nlmr nlm;
-	int retval = 0;
-	const struct dhcp_state *state;
-	const struct ipv4ll_state *istate;
+	struct in_addr src_addr;
+	int subnet;
 
 	memset(&nlm, 0, sizeof(nlm));
 	nlm.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
@@ -1352,18 +1351,12 @@ if_route(unsigned char cmd, const struct rt *rt)
 	nlm.rt.rtm_family = AF_INET;
 	nlm.rt.rtm_table = RT_TABLE_MAIN;
 
-	state = D_CSTATE(rt->iface);
-	istate = IPV4LL_CSTATE(rt->iface);
-	if (cmd == RTM_DELETE)
+	if (cmd == RTM_DELETE) {
 		nlm.rt.rtm_scope = RT_SCOPE_NOWHERE;
-	else {
-		/* We only change route metrics for kernel routes */
-		if ((rt->dest.s_addr ==
-		    (state->addr.s_addr & state->net.s_addr) &&
-		    rt->net.s_addr == state->net.s_addr) ||
-		    (istate && rt->dest.s_addr ==
-		    (istate->addr.s_addr & inaddr_llmask.s_addr) &&
-		    rt->net.s_addr == inaddr_llmask.s_addr))
+		subnet = -1;
+	} else {
+		/* Subnet routes are RTPROT_KERNEL otherwise RTPROT_BOOT */
+		if ((subnet = ipv4_srcaddr(rt, &src_addr)) == 1)
 			nlm.rt.rtm_protocol = RTPROT_KERNEL;
 		else
 			nlm.rt.rtm_protocol = RTPROT_BOOT;
@@ -1381,37 +1374,37 @@ if_route(unsigned char cmd, const struct rt *rt)
 	nlm.rt.rtm_dst_len = inet_ntocidr(rt->net);
 	add_attr_l(&nlm.hdr, sizeof(nlm), RTA_DST,
 	    &rt->dest.s_addr, sizeof(rt->dest.s_addr));
-	if (nlm.rt.rtm_protocol == RTPROT_KERNEL) {
-		add_attr_l(&nlm.hdr, sizeof(nlm), RTA_PREFSRC,
-		    istate == NULL ? &state->addr.s_addr : &istate->addr.s_addr,
-		    sizeof(state->addr.s_addr));
-	}
 	/* If a host route then don't add the gateway */
-	if ((cmd == RTM_ADD || cmd == RTM_CHANGE) &&
-	    rt->net.s_addr != INADDR_BROADCAST)
-		add_attr_l(&nlm.hdr, sizeof(nlm), RTA_GATEWAY,
-		    &rt->gate.s_addr, sizeof(rt->gate.s_addr));
+	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
+		if (rt->net.s_addr != INADDR_BROADCAST)
+			add_attr_l(&nlm.hdr, sizeof(nlm), RTA_GATEWAY,
+			    &rt->gate.s_addr, sizeof(rt->gate.s_addr));
+		if (rt->gate.s_addr != htonl(INADDR_LOOPBACK))
+			add_attr_32(&nlm.hdr, sizeof(nlm), RTA_OIF,
+			    rt->iface->index);
+		if (subnet != -1) {
+			add_attr_l(&nlm.hdr, sizeof(nlm), RTA_PREFSRC,
+			    &src_addr.s_addr, sizeof(src_addr.s_addr));
+		}
+		if (rt->mtu) {
+			char metricsbuf[32];
+			struct rtattr *metrics = (void *)metricsbuf;
 
-	if (rt->gate.s_addr != htonl(INADDR_LOOPBACK))
-		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_OIF, rt->iface->index);
+			metrics->rta_type = RTA_METRICS;
+			metrics->rta_len = RTA_LENGTH(0);
+			rta_add_attr_32(metrics, sizeof(metricsbuf),
+			    RTAX_MTU, rt->mtu);
+			add_attr_l(&nlm.hdr, sizeof(nlm), RTA_METRICS,
+			    RTA_DATA(metrics),
+			    (unsigned short)RTA_PAYLOAD(metrics));
+		}
+	}
+
 	if (rt->metric)
 		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_PRIORITY, rt->metric);
 
-	if (cmd != RTM_DELETE && rt->mtu) {
-		char metricsbuf[32];
-		struct rtattr *metrics = (void *)metricsbuf;
-
-		metrics->rta_type = RTA_METRICS;
-		metrics->rta_len = RTA_LENGTH(0);
-		rta_add_attr_32(metrics, sizeof(metricsbuf), RTAX_MTU, rt->mtu);
-		add_attr_l(&nlm.hdr, sizeof(nlm), RTA_METRICS,
-		    RTA_DATA(metrics), (unsigned short)RTA_PAYLOAD(metrics));
-	}
-
-	if (send_netlink(rt->iface->ctx, NULL,
-	    NETLINK_ROUTE, &nlm.hdr, NULL) == -1)
-		retval = -1;
-	return retval;
+	return send_netlink(rt->iface->ctx, NULL,
+	    NETLINK_ROUTE, &nlm.hdr, NULL);
 }
 
 static int
@@ -1461,7 +1454,6 @@ if_address6(const struct ipv6_addr *ia, int action)
 {
 	struct nlma nlm;
 	struct ifa_cacheinfo cinfo;
-	int retval = 0;
 /* IFA_FLAGS is not a define, but is was added at the same time
  * IFA_F_NOPREFIXROUTE was do use that. */
 #if defined(IFA_F_NOPREFIXROUTE) || defined(IFA_F_MANAGETEMPADDR)
@@ -1517,17 +1509,14 @@ if_address6(const struct ipv6_addr *ia, int action)
 		add_attr_32(&nlm.hdr, sizeof(nlm), IFA_FLAGS, flags);
 #endif
 
-	if (send_netlink(ia->iface->ctx, NULL, NETLINK_ROUTE, &nlm.hdr,
-	    NULL) == -1)
-		retval = -1;
-	return retval;
+	return send_netlink(ia->iface->ctx, NULL,
+	    NETLINK_ROUTE, &nlm.hdr, NULL);
 }
 
 int
 if_route6(unsigned char cmd, const struct rt6 *rt)
 {
 	struct nlmr nlm;
-	int retval = 0;
 
 	memset(&nlm, 0, sizeof(nlm));
 	nlm.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
@@ -1590,10 +1579,8 @@ if_route6(unsigned char cmd, const struct rt6 *rt)
 		    RTA_DATA(metrics), (unsigned short)RTA_PAYLOAD(metrics));
 	}
 
-	if (send_netlink(rt->iface->ctx, NULL,
-	    NETLINK_ROUTE, &nlm.hdr, NULL) == -1)
-		retval = -1;
-	return retval;
+	return send_netlink(rt->iface->ctx, NULL,
+	    NETLINK_ROUTE, &nlm.hdr, NULL);
 }
 
 static int

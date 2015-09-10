@@ -508,8 +508,6 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct rt_msghdr *rtm)
 int
 if_route(unsigned char cmd, const struct rt *rt)
 {
-	const struct dhcp_state *state;
-	const struct ipv4ll_state *istate;
 	union sockunion {
 		struct sockaddr sa;
 		struct sockaddr_in sin;
@@ -522,6 +520,7 @@ if_route(unsigned char cmd, const struct rt *rt)
 	} rtm;
 	char *bp = rtm.buffer;
 	size_t l;
+	struct in_addr src_addr;
 
 #define ADDSU {								      \
 		l = RT_ROUNDUP(su.sa.sa_len);				      \
@@ -536,47 +535,35 @@ if_route(unsigned char cmd, const struct rt *rt)
 		ADDSU;							      \
 	}
 
-	if (cmd != RTM_DELETE) {
-		state = D_CSTATE(rt->iface);
-		istate = IPV4LL_CSTATE(rt->iface);
-	} else {
-		/* appease GCC */
-		state = NULL;
-		istate = NULL;
-	}
 	memset(&rtm, 0, sizeof(rtm));
 	rtm.hdr.rtm_version = RTM_VERSION;
 	rtm.hdr.rtm_seq = 1;
 	rtm.hdr.rtm_type = cmd;
 	rtm.hdr.rtm_addrs = RTA_DST;
-	if (cmd == RTM_ADD || cmd == RTM_CHANGE)
-		rtm.hdr.rtm_addrs |= RTA_GATEWAY;
 	rtm.hdr.rtm_flags = RTF_UP;
 #ifdef RTF_PINNED
 	if (cmd != RTM_ADD)
 		rtm.hdr.rtm_flags |= RTF_PINNED;
 #endif
 
-	if (cmd != RTM_DELETE) {
-		rtm.hdr.rtm_addrs |= RTA_IFA | RTA_IFP;
-		/* None interface subnet routes are static. */
-		if ((rt->gate.s_addr != INADDR_ANY ||
-		    rt->net.s_addr != state->net.s_addr ||
-		    rt->dest.s_addr !=
-		    (state->addr.s_addr & state->net.s_addr)) &&
-		    (istate == NULL ||
-		    rt->dest.s_addr !=
-		    (istate->addr.s_addr & inaddr_llmask.s_addr) ||
-		    rt->net.s_addr != inaddr_llmask.s_addr))
-			rtm.hdr.rtm_flags |= RTF_STATIC;
-		else {
+	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
+		int subnet;
+
+		rtm.hdr.rtm_addrs |= RTA_GATEWAY | RTA_IFA | RTA_IFP;
+		/* Subnet routes are clonning or connected if supported.
+		 * All other routes are static. */
+		subnet = ipv4_srcaddr(rt, &src_addr);
+		if (subnet == 1) {
 #ifdef RTF_CLONING
 			rtm.hdr.rtm_flags |= RTF_CLONING;
 #endif
 #ifdef RTP_CONNECTED
 			rtm.hdr.rtm_priority = RTP_CONNECTED;
 #endif
-		}
+		} else
+			rtm.hdr.rtm_flags |= RTF_STATIC;
+		if (subnet == -1) /* unikely */
+			rtm.hdr.rtm_addrs &= ~RTA_IFA;
 	}
 	if (rt->net.s_addr == htonl(INADDR_BROADCAST) &&
 	    rt->gate.s_addr == htonl(INADDR_ANY))
@@ -607,7 +594,7 @@ if_route(unsigned char cmd, const struct rt *rt)
 	}
 	if ((cmd == RTM_ADD || cmd == RTM_CHANGE) &&
 	    !(rtm.hdr.rtm_flags & RTF_GATEWAY))
-		rtm.hdr.rtm_addrs |= RTA_IFA | RTA_IFP;
+		rtm.hdr.rtm_addrs |= RTA_IFP;
 
 	ADDADDR(&rt->dest);
 	if (rtm.hdr.rtm_addrs & RTA_GATEWAY) {
@@ -638,7 +625,7 @@ if_route(unsigned char cmd, const struct rt *rt)
 		}
 
 		if (rtm.hdr.rtm_addrs & RTA_IFA)
-			ADDADDR(istate == NULL ? &state->addr : &istate->addr);
+			ADDADDR(&src_addr);
 
 		if (rt->mtu) {
 			rtm.hdr.rtm_inits |= RTV_MTU;
