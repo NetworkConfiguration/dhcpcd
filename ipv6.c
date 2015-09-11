@@ -1895,7 +1895,7 @@ nc_route(struct rt6 *ort, struct rt6 *nrt)
 #endif
 
 	if (change) {
-		if (if_route6(RTM_CHANGE, nrt) == 0)
+		if (if_route6(RTM_CHANGE, nrt) != -1)
 			return 0;
 		if (errno != ESRCH)
 			logger(nrt->iface->ctx, LOG_ERR, "if_route6 (CHG): %m");
@@ -1909,7 +1909,7 @@ nc_route(struct rt6 *ort, struct rt6 *nrt)
 #ifdef HAVE_ROUTE_METRIC
 	/* With route metrics, we can safely add the new route before
 	 * deleting the old route. */
-	if (if_route6(RTM_ADD, nrt) == 0) {
+	if (if_route6(RTM_ADD, nrt) != -1) {
 		if (ort && if_route6(RTM_DELETE, ort) == -1 &&
 		    errno != ESRCH)
 			logger(nrt->iface->ctx, LOG_ERR, "if_route6 (DEL): %m");
@@ -1926,7 +1926,7 @@ nc_route(struct rt6 *ort, struct rt6 *nrt)
 	 * adding the new one. */
 	if (ort && if_route6(RTM_DELETE, ort) == -1 && errno != ESRCH)
 		logger(nrt->iface->ctx, LOG_ERR, "if_route6: %m");
-	if (if_route6(RTM_ADD, nrt) == 0)
+	if (if_route6(RTM_ADD, nrt) != -1)
 		return 0;
 #ifdef HAVE_ROUTE_METRIC
 logerr:
@@ -1941,8 +1941,8 @@ d_route(struct rt6 *rt)
 	int retval;
 
 	desc_route("deleting", rt);
-	retval = if_route6(RTM_DELETE, rt);
-	if (retval != 0 && errno != ENOENT && errno != ESRCH)
+	retval = if_route6(RTM_DELETE, rt) == -1 ? -1 : 0;
+	if (retval == -1 && errno != ENOENT && errno != ESRCH)
 		logger(rt->iface->ctx, LOG_ERR,
 		    "%s: if_delroute6: %m", rt->iface->name);
 	return retval;
