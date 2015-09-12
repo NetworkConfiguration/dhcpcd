@@ -331,9 +331,11 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		if (ctx->ifac && i == ctx->ifac)
 			continue;
 
+#ifdef PLUGIN_DEV
 		/* Ensure that the interface name has settled */
 		if (!dev_initialized(ctx, p))
 			continue;
+#endif
 
 		/* Don't allow loopback or pointopoint unless explicit */
 		if (ifa->ifa_flags & (IFF_LOOPBACK | IFF_POINTOPOINT)) {

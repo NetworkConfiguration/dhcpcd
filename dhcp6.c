@@ -693,7 +693,6 @@ dhcp6_makemessage(struct interface *ifp)
 	unicast = NULL;
 	/* Depending on state, get the unicast address */
 	switch(state->state) {
-		break;
 	case DH6S_INIT: /* FALLTHROUGH */
 	case DH6S_DISCOVER:
 		type = DHCP6_SOLICIT;
