@@ -37,9 +37,12 @@
 
 #ifdef BSD
 /* Purely for the ND6_IFF_AUTO_LINKLOCAL #define which is solely used
- * to generate the our CAN_ADD_LLADDR #define. */
-#include <netinet6/in6_var.h>
-#include <netinet6/nd6.h>
+ * to generate our CAN_ADD_LLADDR #define. */
+#  ifdef __FreeBSD__
+#    include <net/if_var.h>
+#  endif
+#  include <netinet6/in6_var.h>
+#  include <netinet6/nd6.h>
 #endif
 
 #include <errno.h>
