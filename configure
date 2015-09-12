@@ -470,7 +470,7 @@ EOF
 	else
 		echo "no"
 	fi
-	rm -f _IFLA_AF_SPEC.c IFLA_AF_SPEC
+	rm -f _IFLA_AF_SPEC.c _IFLA_AF_SPEC
 
 fi
 
