@@ -336,6 +336,8 @@ CFLAGS+=	-Wpointer-sign -Wmissing-noreturn
 EOF
 	case "$OS" in
 	mirbsd*|openbsd*);; # OpenBSD has many redundant decs in system headers
+	bitrig*)	echo "CFLAGS+=	-Wredundant-decls" >>$CONFIG_MK
+			;; # Bitrig spouts many conversion errors with htons
 	*)		echo "CFLAGS+=	-Wredundant-decls" >>$CONFIG_MK
 			echo "CFLAGS+=	-Wconversion" >>$CONFIG_MK
 			;;
