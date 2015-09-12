@@ -102,6 +102,16 @@
 #  endif
 #endif
 
+#if defined(HAVE_IFLA_AF_SPEC) || defined(ND6_IFF_AUTO_LINKLOCAL)
+/* If we're using a private SLAAC address on wireless,
+ * don't add it until we have associated as we randomise
+ * it based on the SSID. */
+#define CAN_ADD_LLADDR(ifp) \
+	(!((ifp)->options->options & DHCPCD_SLAACPRIVATE) || \
+	    (ifp)->carrier != LINK_DOWN)
+#else
+#define CAN_ADD_LLADDR(ifp) (1)
+#endif
 
 #ifdef IPV6_MANAGETEMPADDR
 static void ipv6_regentempifid(void *);
@@ -882,10 +892,12 @@ ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
 		    (DHCPCD_EXITING | DHCPCD_PERSISTENT)) !=
 		    (DHCPCD_EXITING | DHCPCD_PERSISTENT))
 		{
-			if (drop == 2)
-				TAILQ_REMOVE(addrs, ap, next);
 			/* Don't drop link-local addresses. */
-			if (!IN6_IS_ADDR_LINKLOCAL(&ap->addr)) {
+			if (!(IN6_IS_ADDR_LINKLOCAL(&ap->addr) &&
+			    CAN_ADD_LLADDR(ap->iface)))
+			{
+				if (drop == 2)
+					TAILQ_REMOVE(addrs, ap, next);
 				/* Find the same address somewhere else */
 				apf = ipv6_findaddr(ap->iface->ctx, &ap->addr,
 				    0);
@@ -900,9 +912,9 @@ ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
 						    &now);
 					ipv6_addaddr(apf, &now);
 				}
+				if (drop == 2)
+					ipv6_freeaddr(ap);
 			}
-			if (drop == 2)
-				ipv6_freeaddr(ap);
 		}
 		if (drop != 2)
 			ipv6_freeaddr(ap);
@@ -945,11 +957,13 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 	struct ll_callback *cb;
 
 #if 0
-	char buf[INET6_ADDRSTRLEN];
-	inet_ntop(AF_INET6, &addr->s6_addr,
-	    buf, INET6_ADDRSTRLEN);
-	logger(ctx, LOG_DEBUG, "%s: cmd %d addr %s flags %d",
-	    ifname, cmd, buf, flags);
+	char dbuf[INET6_ADDRSTRLEN];
+	const char *dbp;
+
+	dbp = inet_ntop(AF_INET6, &addr->s6_addr,
+	    dbuf, INET6_ADDRSTRLEN);
+	logger(ctx, LOG_INFO, "%s: cmd %d addr %s flags %d",
+	    ifname, cmd, dbp, flags);
 #endif
 
 	if (ifs == NULL)
@@ -1277,7 +1291,9 @@ ipv6_start(struct interface *ifp)
 	} else
 		ap = NULL;
 
-	if (ap == NULL && ipv6_addlinklocal(ifp) == -1)
+	if (ap == NULL &&
+	    CAN_ADD_LLADDR(ifp) &&
+	    ipv6_addlinklocal(ifp) == -1)
 		return -1;
 
 	/* Load existing routes */
@@ -1299,7 +1315,7 @@ ipv6_freedrop(struct interface *ifp, int drop)
 
 	ipv6_freedrop_addrs(&state->addrs, drop ? 2 : 0, NULL);
 
-	/* Becuase we need to cache the addresses we don't control,
+	/* Because we need to cache the addresses we don't control,
 	 * we only free the state on when NOT dropping addresses. */
 	if (drop == 0) {
 		while ((cb = TAILQ_FIRST(&state->ll_callbacks))) {
