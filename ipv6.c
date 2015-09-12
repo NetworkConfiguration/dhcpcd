@@ -35,6 +35,13 @@
 #include <netinet/in.h>
 #include <netinet/if_ether.h>
 
+#ifdef BSD
+/* Purely for the ND6_IFF_AUTO_LINKLOCAL #define which is solely used
+ * to generate the our CAN_ADD_LLADDR #define. */
+#include <netinet6/in6_var.h>
+#include <netinet6/nd6.h>
+#endif
+
 #include <errno.h>
 #include <ifaddrs.h>
 #include <inttypes.h>
