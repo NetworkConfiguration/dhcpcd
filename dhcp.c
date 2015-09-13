@@ -40,6 +40,7 @@
 #include <netinet/udp.h>
 #undef __FAVOR_BSD
 
+#include <assert.h>
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -1390,6 +1391,8 @@ static void
 get_lease(struct dhcpcd_ctx *ctx,
     struct dhcp_lease *lease, const struct dhcp_message *dhcp)
 {
+
+	assert(dhcp != NULL);
 
 	lease->cookie = dhcp->cookie;
 	/* BOOTP does not set yiaddr for replies when ciaddr is set. */
