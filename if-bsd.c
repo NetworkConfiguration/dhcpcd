@@ -1470,24 +1470,6 @@ _if_checkipv6(int s, struct dhcpcd_ctx *ctx,
 		int override;
 #endif
 
-#ifdef ND6_IFF_IFDISABLED
-		if (del_if_nd6_flag(s, ifp, ND6_IFF_IFDISABLED) == -1) {
-			logger(ifp->ctx, LOG_ERR,
-			    "%s: del_if_nd6_flag: ND6_IFF_IFDISABLED: %m",
-			    ifp->name);
-			return -1;
-		}
-#endif
-
-#ifdef ND6_IFF_PERFORMNUD
-		if (set_if_nd6_flag(s, ifp, ND6_IFF_PERFORMNUD) == -1) {
-			logger(ifp->ctx, LOG_ERR,
-			    "%s: set_if_nd6_flag: ND6_IFF_PERFORMNUD: %m",
-			    ifp->name);
-			return -1;
-		}
-#endif
-
 #ifdef ND6_IFF_AUTO_LINKLOCAL
 		if (own) {
 			int all;
@@ -1516,18 +1498,11 @@ _if_checkipv6(int s, struct dhcpcd_ctx *ctx,
 		}
 #endif
 
-#ifdef SIOCIFAFATTACH
-		if (af_attach(s, ifp, AF_INET6) == -1) {
+#ifdef ND6_IFF_PERFORMNUD
+		if (set_if_nd6_flag(s, ifp, ND6_IFF_PERFORMNUD) == -1) {
 			logger(ifp->ctx, LOG_ERR,
-			    "%s: af_attach: %m", ifp->name);
-			return 1;
-		}
-#endif
-
-#ifdef SIOCGIFXFLAGS
-		if (set_ifxflags(s, ifp, own) == -1) {
-			logger(ifp->ctx, LOG_ERR,
-			    "%s: set_ifxflags: %m", ifp->name);
+			    "%s: set_if_nd6_flag: ND6_IFF_PERFORMNUD: %m",
+			    ifp->name);
 			return -1;
 		}
 #endif
@@ -1571,6 +1546,38 @@ _if_checkipv6(int s, struct dhcpcd_ctx *ctx,
 		} else if (ra == 0 && !own)
 			logger(ifp->ctx, LOG_WARNING,
 			    "%s: IPv6 kernel autoconf disabled", ifp->name);
+#endif
+
+		/* Enabling IPv6 by whatever means must be the
+		 * last action undertaken to ensure kernel RS and
+		 * LLADDR auto configuration are disabled where applicable. */
+
+#ifdef SIOCIFAFATTACH
+		if (af_attach(s, ifp, AF_INET6) == -1) {
+			logger(ifp->ctx, LOG_ERR,
+			    "%s: af_attach: %m", ifp->name);
+			return 1;
+		}
+#endif
+
+#ifdef SIOCGIFXFLAGS
+		if (set_ifxflags(s, ifp, own) == -1) {
+			logger(ifp->ctx, LOG_ERR,
+			    "%s: set_ifxflags: %m", ifp->name);
+			return -1;
+		}
+#endif
+
+#ifdef ND6_IFF_IFDISABLED
+		if (del_if_nd6_flag(s, ifp, ND6_IFF_IFDISABLED) == -1) {
+			logger(ifp->ctx, LOG_ERR,
+			    "%s: del_if_nd6_flag: ND6_IFF_IFDISABLED: %m",
+			    ifp->name);
+			return -1;
+		}
+#endif
+
+#ifdef ND6_IFF_ACCEPT_RTADV
 #ifdef ND6_IFF_OVERRIDE_RTADV
 		if (override == 0 && ra)
 			return ctx->ra_global;
