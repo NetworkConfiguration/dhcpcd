@@ -55,6 +55,10 @@ cleared or IN6_IFF_DUPLICATED is set and take action accordingly.
 BSD systems where this has been fixed or is known to work are:
     NetBSD-7.0
 
+OpenBSD will always add it's own link-local address if no link-local address
+exists, because it doesn't check if the address we are adding is a link-local
+address or not.
+
 Some BSD systems do not announce cached neighbour route changes based
 on reachability to userland. For such systems, IPv6 routers will always
 be assumed to be reachable until they either stop being a router or expire.
