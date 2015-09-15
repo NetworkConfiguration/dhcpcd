@@ -28,6 +28,15 @@
 
 #include <string.h>
 
+#ifdef __GLIBC__
+#  include <endian.h>
+#endif
+#ifdef BSD
+#  ifndef __QNX__
+#    include <sys/endian.h>
+#  endif
+#endif
+
 #include "../common.h"
 #include "sha256.h"
 
