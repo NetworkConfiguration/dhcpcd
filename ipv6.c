@@ -2155,7 +2155,8 @@ ipv6_buildroutes(struct dhcpcd_ctx *ctx)
 			    rt->metric != or->metric ||
 #endif
 		//	    or->src.s_addr != ifp->addr.s_addr ||
-			    !IN6_ARE_ADDR_EQUAL(&rt->gate, &or->gate))
+			    !IN6_ARE_ADDR_EQUAL(&or->gate, &rt->gate) ||
+			    or->mtu != rt->mtu)
 			{
 				if (c_route(or, rt) != 0)
 					continue;
