@@ -752,11 +752,11 @@ ipv4_doroute(struct rt *rt, struct rt_head *nrs)
 		if (or->state & STATE_FAKE ||
 		    or->iface != rt->iface ||
 #ifdef HAVE_ROUTE_METRIC
-		    rt->metric != or->metric ||
+		    or->metric != rt->metric ||
 #endif
-		    rt->src.s_addr != or->src.s_addr ||
-		    rt->gate.s_addr != or->gate.s_addr ||
-		    rt->mtu != or->mtu)
+		    or->src.s_addr != rt->src.s_addr ||
+		    or->gate.s_addr != rt->gate.s_addr ||
+		    or->mtu != rt->mtu)
 		{
 			if (c_route(or, rt) != 0)
 				return 0;
