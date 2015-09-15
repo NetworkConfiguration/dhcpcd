@@ -1150,16 +1150,15 @@ reconf_reboot(struct dhcpcd_ctx *ctx, int action, int argc, char **argv, int oi)
 }
 
 static void
-stop_all_interfaces(struct dhcpcd_ctx *ctx, int do_release)
+stop_all_interfaces(struct dhcpcd_ctx *ctx, unsigned long long opts)
 {
 	struct interface *ifp;
 
 	/* Drop the last interface first */
 	while ((ifp = TAILQ_LAST(ctx->ifaces, if_head)) != NULL) {
-		if (do_release) {
-			ifp->options->options |= DHCPCD_RELEASE;
+		ifp->options->options |= opts;
+		if (ifp->options->options & DHCPCD_RELEASE)
 			ifp->options->options &= ~DHCPCD_PERSISTENT;
-		}
 		ifp->options->options |= DHCPCD_EXITING;
 		stop_interface(ifp);
 	}
@@ -1172,9 +1171,10 @@ signal_cb(int sig, void *arg)
 {
 	struct dhcpcd_ctx *ctx = arg;
 	struct interface *ifp;
-	int do_release, exit_code;
+	unsigned long long opts;
+	int exit_code;
 
-	do_release = 0;
+	opts = 0;
 	exit_code = EXIT_FAILURE;
 	switch (sig) {
 	case SIGINT:
@@ -1186,7 +1186,7 @@ signal_cb(int sig, void *arg)
 		break;
 	case SIGALRM:
 		logger(ctx, LOG_INFO, sigmsg, "SIGALRM", "releasing");
-		do_release = 1;
+		opts |= DHCPCD_RELEASE;
 		exit_code = EXIT_SUCCESS;
 		break;
 	case SIGHUP:
@@ -1220,7 +1220,7 @@ signal_cb(int sig, void *arg)
 	}
 
 	if (!(ctx->options & DHCPCD_TEST))
-		stop_all_interfaces(ctx, do_release);
+		stop_all_interfaces(ctx, opts);
 	eloop_exit(ctx->eloop, exit_code);
 }
 #endif
@@ -1259,8 +1259,8 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
     int argc, char **argv)
 {
 	struct interface *ifp;
-	int do_exit = 0, do_release = 0, do_reboot = 0;
-	int opt, oi = 0;
+	unsigned long long opts;
+	int opt, oi, do_reboot;
 	size_t len, l;
 	char *tmp, *p;
 
@@ -1309,6 +1309,9 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 	free(tmp);
 
 	optind = 0;
+	oi = 0;
+	opts = 0;
+	do_reboot = 0;
 	while ((opt = getopt_long(argc, argv, IF_OPTS, cf_options, &oi)) != -1)
 	{
 		switch (opt) {
@@ -1316,31 +1319,32 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 			/* Assumed if below not set */
 			break;
 		case 'k':
-			do_release = 1;
+			opts |= DHCPCD_RELEASE;
 			break;
 		case 'n':
 			do_reboot = 1;
 			break;
+		case 'p':
+			opts |= DHCPCD_PERSISTENT;
+			break;
 		case 'x':
-			do_exit = 1;
+			opts |= DHCPCD_EXITING;
 			break;
 		}
 	}
 
-	if (do_release || do_exit) {
+	if (opts & (DHCPCD_EXITING | DHCPCD_RELEASE)) {
 		if (optind == argc) {
-			stop_all_interfaces(ctx, do_release);
+			stop_all_interfaces(ctx, opts);
 			eloop_exit(ctx->eloop, EXIT_SUCCESS);
 			return 0;
 		}
 		for (oi = optind; oi < argc; oi++) {
 			if ((ifp = if_find(ctx->ifaces, argv[oi])) == NULL)
 				continue;
-			if (do_release) {
-				ifp->options->options |= DHCPCD_RELEASE;
+			ifp->options->options |= opts;
+			if (opts & DHCPCD_RELEASE)
 				ifp->options->options &= ~DHCPCD_PERSISTENT;
-			}
-			ifp->options->options |= DHCPCD_EXITING;
 			stop_interface(ifp);
 		}
 		return 0;
@@ -1437,9 +1441,14 @@ main(int argc, char **argv)
 			sig = SIGHUP;
 			siga = "HUP";
 			break;
+		case 'p':
+			/* Force going via command socket as we're
+			 * out of user definable signals. */
+			i = 4;
+			break;
 		case 'x':
 			sig = SIGTERM;
-			siga = "TERM";;
+			siga = "TERM";
 			break;
 #endif
 		case 'T':
@@ -1501,7 +1510,7 @@ main(int argc, char **argv)
 		goto exit_success;
 	}
 	ctx.options = ifo->options;
-	if (i != 0) {
+	if (i == 1 || i == 3) {
 		if (i == 1)
 			ctx.options |= DHCPCD_TEST;
 		else
@@ -1615,7 +1624,7 @@ main(int argc, char **argv)
 
 #ifdef USE_SIGNALS
 	if (!(ctx.options & DHCPCD_TEST) &&
-	    (sig == 0 || ctx.ifc != 0))
+	    (sig == 0 || i == 4 || ctx.ifc != 0))
 	{
 #endif
 		if (ctx.options & DHCPCD_MASTER)
