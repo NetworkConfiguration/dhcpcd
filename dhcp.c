@@ -1980,10 +1980,14 @@ dhcp_bind(struct interface *ifp)
 	struct dhcp_lease *lease = &state->lease;
 
 	state->reason = NULL;
-	free(state->old);
-	state->old = state->new;
-	state->new = state->offer;
-	state->offer = NULL;
+	/* If we don't have an offer, we are re-binding a lease on preference,
+	 * normally when two interfaces have a lease matching IP addresses. */
+	if (state->offer) {
+		free(state->old);
+		state->old = state->new;
+		state->new = state->offer;
+		state->offer = NULL;
+	}
 	get_lease(ifp->ctx, lease, state->new);
 	if (ifo->options & DHCPCD_STATIC) {
 		logger(ifp->ctx, LOG_INFO, "%s: using static address %s/%d",
