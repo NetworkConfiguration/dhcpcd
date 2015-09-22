@@ -1902,7 +1902,7 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			state->expire = a->prefix_vltime;
 		i++;
 
-		p = D6_COPTION_DATA(o) + sizeof(pdp);
+		p = D6_COPTION_DATA(o) + sizeof(*pdp);
 		ol = (uint16_t)(ol - sizeof(pdp));
 		ex = dhcp6_findoption(D6_OPTION_PD_EXCLUDE, p, ol);
 		a->prefix_exclude_len = 0;
