@@ -113,7 +113,8 @@ static const char * const dhcp6_statuses[] = {
 	"No Addresses Available",
 	"No Binding",
 	"Not On Link",
-	"Use Multicast"
+	"Use Multicast",
+	"No Prefix Available"
 };
 
 struct dhcp6_ia_addr {
