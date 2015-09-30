@@ -1663,7 +1663,8 @@ dhcp6_checkstatusok(const struct interface *ifp,
 {
 	const struct dhcp6_option *o;
 	uint16_t code;
-	char *status;
+	char buf[32], *sbuf;
+	const char *status;
 
 	if (p)
 		o = dhcp6_findoption(D6_OPTION_STATUS_CODE, p, len);
@@ -1689,24 +1690,25 @@ dhcp6_checkstatusok(const struct interface *ifp,
 	len -= sizeof(code);
 
 	if (len == 0) {
-		if (code < sizeof(dhcp6_statuses) / sizeof(char *)) {
-			p = (const uint8_t *)dhcp6_statuses[code];
-			len = strlen((const char *)p);
-		} else
-			p = NULL;
-	} else
-		p += sizeof(code);
-
-	status = malloc(len + 1);
-	if (status == NULL) {
-		logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
-		return -1;
+		sbuf = NULL;
+		if (code < sizeof(dhcp6_statuses) / sizeof(char *))
+			status = dhcp6_statuses[code];
+		else {
+			snprintf(buf, sizeof(buf), "Unknown Status (%d)", code);
+			status = buf;
+		}
+	} else {
+		if ((sbuf = malloc(len + 1)) == NULL) {
+			logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
+			return -1;
+		}
+		memcpy(sbuf, p + sizeof(code), len);
+		sbuf[len] = '\0';
+		status = sbuf;
 	}
-	if (p)
-		memcpy(status, p, len);
-	status[len] = '\0';
+
 	logger(ifp->ctx, LOG_ERR, "%s: DHCPv6 REPLY: %s", ifp->name, status);
-	free(status);
+	free(sbuf);
 	return -1;
 }
 
