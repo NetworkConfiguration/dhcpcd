@@ -102,6 +102,7 @@
 #define O_BOOTP			O_BASE + 42
 #define O_DEFINEND		O_BASE + 43
 #define O_NODELAY		O_BASE + 44
+#define O_INFORM6		O_BASE + 45
 
 const struct option cf_options[] = {
 	{"background",      no_argument,       NULL, 'b'},
@@ -122,6 +123,7 @@ const struct option cf_options[] = {
 	{"quiet",           no_argument,       NULL, 'q'},
 	{"request",         optional_argument, NULL, 'r'},
 	{"inform",          optional_argument, NULL, 's'},
+	{"inform6",         optional_argument, NULL, O_INFORM6},
 	{"timeout",         required_argument, NULL, 't'},
 	{"userclass",       required_argument, NULL, 'u'},
 	{"vendor",          required_argument, NULL, 'v'},
@@ -795,12 +797,6 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		ifo->req_mask.s_addr = 0;
 		break;
 	case 's':
-		if (ifo->options & DHCPCD_IPV6 &&
-		    !(ifo->options & DHCPCD_IPV4))
-		{
-			ifo->options |= DHCPCD_INFORM;
-			break;
-		}
 		if (arg && *arg != '\0') {
 			if (parse_addr(ctx,
 			    &ifo->req_addr, &ifo->req_mask, arg) != 0)
@@ -811,6 +807,9 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		}
 		ifo->options |= DHCPCD_INFORM | DHCPCD_PERSISTENT;
 		ifo->options &= ~DHCPCD_STATIC;
+		break;
+	case O_INFORM6:
+		ifo->options |= DHCPCD_INFORM6;
 		break;
 	case 't':
 		ifo->timeout = (time_t)strtoi(arg, NULL, 0, 0, INT32_MAX, &e);

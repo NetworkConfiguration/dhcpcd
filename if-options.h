@@ -105,7 +105,7 @@
 #define DHCPCD_DHCP			(1ULL << 49)
 #define DHCPCD_DHCP6			(1ULL << 50)
 #define DHCPCD_IF_UP			(1ULL << 51)
-// unassigned				(1ULL << 52)
+#define DHCPCD_INFORM6			(1ULL << 52)
 // unassinged				(1ULL << 53)
 #define DHCPCD_IPV6RA_AUTOCONF		(1ULL << 54)
 #define DHCPCD_ROUTER_HOST_ROUTE_WARNED	(1ULL << 55)

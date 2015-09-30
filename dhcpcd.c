@@ -852,20 +852,21 @@ dhcpcd_startinterface(void *arg)
 	}
 
 	if (ifo->options & DHCPCD_IPV6) {
-		if (ifo->options & DHCPCD_IPV6RS &&
-		    !(ifo->options & DHCPCD_INFORM))
+		if (ifo->options & DHCPCD_IPV6RS)
 			ipv6nd_startrs(ifp);
 
 		if (ifo->options & DHCPCD_DHCP6)
 			dhcp6_find_delegates(ifp);
 
 		if (!(ifo->options & DHCPCD_IPV6RS) ||
-		    ifo->options & DHCPCD_IA_FORCED)
+		    ifo->options & (DHCPCD_IA_FORCED | DHCPCD_INFORM6))
 		{
 			ssize_t nolease;
 
 			if (ifo->options & DHCPCD_IA_FORCED)
 				nolease = dhcp6_start(ifp, DH6S_INIT);
+			else if (ifo->options & DHCPCD_INFORM6)
+				nolease = dhcp6_start(ifp, DH6S_INFORM);
 			else {
 				nolease = 0;
 				/* Enabling the below doesn't really make
