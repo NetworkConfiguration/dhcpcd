@@ -1697,7 +1697,7 @@ add_attr_nest_end(struct nlmsghdr *n, struct rtattr *nest)
 static int
 if_disable_autolinklocal(struct dhcpcd_ctx *ctx, unsigned int ifindex)
 {
-#ifdef HAVE_IFLA_AF_SPEC
+#ifdef HAVE_IN6_ADDR_GEN_MODE_NONE
 	struct nlml nlm;
 	struct rtattr *afs, *afs6;
 
@@ -1716,6 +1716,8 @@ if_disable_autolinklocal(struct dhcpcd_ctx *ctx, unsigned int ifindex)
 
 	return send_netlink(ctx, NULL, NETLINK_ROUTE, &nlm.hdr, NULL);
 #else
+	UNUSED(ctx);
+	UNUSED(ifindex);
 	errno = ENOTSUP;
 	return -1;
 #endif

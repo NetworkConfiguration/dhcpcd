@@ -458,21 +458,21 @@ EOF
 	# but will be via WEXT.
 	echo "DHCPCD_SRCS+=	if-linux-wext.c" >>$CONFIG_MK
 
-	printf "Testing for IFLA_AF_SPEC ... "
-	cat <<EOF >_IFLA_AF_SPEC.c
+	printf "Testing for IN6_ADDR_GEN_MODE_NONE ... "
+	cat <<EOF >_IN6_ADDR_GEN_MODE_NONE.c
 #include <linux/if_link.h>
 int main(void) {
-	int x = IFLA_AF_SPEC;
+	int x = IN6_ADDR_GEN_MODE_NONE;
 	return x;
 }
 EOF
-	if $XCC _IFLA_AF_SPEC.c -o _IFLA_AF_SPEC 2>&3; then
+	if $XCC _IN6_ADDR_GEN_MODE_NONE.c -o _IN6_ADDR_GEN_MODE_NONE 2>&3; then
 		echo "yes"
-		echo "#define HAVE_IFLA_AF_SPEC" >>$CONFIG_H
+		echo "#define HAVE_IN6_ADDR_GEN_MODE_NONE" >>$CONFIG_H
 	else
 		echo "no"
 	fi
-	rm -f _IFLA_AF_SPEC.c _IFLA_AF_SPEC
+	rm -f _IN6_ADDR_GEN_MODE_NONE.c _IN6_ADDR_GEN_MODE_NONE
 
 fi
 
