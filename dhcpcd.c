@@ -1719,9 +1719,11 @@ main(int argc, char **argv)
 			/* Lock the file so that only one instance of dhcpcd
 			 * runs on an interface */
 			if (flock(ctx.pid_fd, LOCK_EX | LOCK_NB) == -1) {
-				logger(&ctx, LOG_ERR, "flock `%s': %m", ctx.pidfile);
-				close(ctx.pid_fd);
-				ctx.pid_fd = -1;
+				logger(&ctx, LOG_ERR, "flock `%s': %m",
+				    ctx.pidfile);
+				/* We don't want to unlink the pidfile as
+				 * another dhcpcd instance could be using it. */
+				ctx.pidfile[0] = '\0';
 				goto exit_failure;
 			}
 #endif
@@ -1730,8 +1732,9 @@ main(int argc, char **argv)
 			    fcntl(ctx.pid_fd, F_SETFD, opt | FD_CLOEXEC) == -1)
 			{
 				logger(&ctx, LOG_ERR, "fcntl: %m");
-				close(ctx.pid_fd);
-				ctx.pid_fd = -1;
+				/* We don't want to unlink the pidfile as
+				 * another dhcpcd instance could be using it. */
+				ctx.pidfile[0] = '\0';
 				goto exit_failure;
 			}
 #endif
@@ -1905,7 +1908,8 @@ exit1:
 		logger(&ctx, LOG_ERR, "control_stop: %m:");
 	if (ctx.pid_fd != -1) {
 		close(ctx.pid_fd);
-		unlink(ctx.pidfile);
+		if (ctx.pidfile[0] != '\0')
+			unlink(ctx.pidfile);
 	}
 	eloop_free(ctx.eloop);
 
