@@ -898,9 +898,10 @@ dhcp_envoption(struct dhcpcd_ctx *ctx, char **env, const char *prefix,
 		if (eo == -1) {
 			if (env == NULL)
 				logger(ctx, LOG_ERR,
-				    "%s: %s: malformed embedded option %d:%d",
+				    "%s: %s: malformed embedded option"
+				    " %d:%d/%zu",
 				    ifname, __func__, opt->option,
-				    eopt->option);
+				    eopt->option, i);
 			goto out;
 		}
 		if (eo == 0) {
@@ -908,15 +909,13 @@ dhcp_envoption(struct dhcpcd_ctx *ctx, char **env, const char *prefix,
 			 * data for it.
 			 * This may not be an error as some options like
 			 * DHCP FQDN in RFC4702 have a string as the last
-			 * option which is optional.
-			 * FIXME: Add an flag to the options to indicate
-			 * wether this is allowable or not. */
+			 * option which is optional. */
 			if (env == NULL &&
-			    (ol != 0 || i + 1 < opt->embopts_len))
+			    (ol != 0 || !(eopt->type & OPTIONAL)))
 				logger(ctx, LOG_ERR,
-				    "%s: %s: malformed embedded option %d:%d",
+				    "%s: %s: missing embedded option %d:%d/%zu",
 				    ifname, __func__, opt->option,
-				    eopt->option);
+				    eopt->option, i);
 			goto out;
 		}
 		/* Use the option prefix if the embedded option

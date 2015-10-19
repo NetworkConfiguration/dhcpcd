@@ -1599,6 +1599,17 @@ err_sla:
 			}
 			*fp++ = '\0';
 		}
+		if (strcasecmp(arg, "optional") == 0) {
+			t |= OPTIONAL;
+			arg = strskipwhite(fp);
+			fp = strwhite(arg);
+			if (fp == NULL) {
+				logger(ctx, LOG_ERR,
+				    "incomplete optional type");
+				return -1;
+			}
+			*fp++ = '\0';
+		}
 		if (strcasecmp(arg, "index") == 0) {
 			t |= INDEX;
 			arg = strskipwhite(fp);

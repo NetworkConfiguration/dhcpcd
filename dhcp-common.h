@@ -52,7 +52,7 @@
 #define RFC3361		(1 << 9)
 #define RFC1035		(1 << 10)
 #define RFC3442		(1 << 11)
-/* unassigned		(1 << 12) */
+#define OPTIONAL	(1 << 12)
 #define ADDRIPV6	(1 << 13)
 #define BINHEX		(1 << 14)
 #define FLAG		(1 << 15)
