@@ -1915,6 +1915,7 @@ exit1:
 
 	if (ctx.options & DHCPCD_STARTED && !(ctx.options & DHCPCD_FORKED))
 		logger(&ctx, LOG_INFO, PACKAGE " exited");
+	logger(&ctx, LOG_INFO, "error : %m");
 	logger_close(&ctx);
 	free(ctx.logfile);
 	return i;

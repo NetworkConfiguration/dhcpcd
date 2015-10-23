@@ -132,7 +132,7 @@ logger(struct dhcpcd_ctx *ctx, int pri, const char *fmt, ...)
 	if (ctx == NULL || !(ctx->options & DHCPCD_QUIET) || ctx->log_fd != -1)
 	{
 		const char *p;
-		char *fp = fmt_cpy, *serr = NULL, serr_buf[128];
+		char *fp = fmt_cpy, *serr = NULL;
 		size_t fmt_left = sizeof(fmt_cpy) - 1, fmt_wrote;
 
 		for (p = fmt; *p != '\0'; p++) {
@@ -145,12 +145,13 @@ logger(struct dhcpcd_ctx *ctx, int pri, const char *fmt, ...)
 				p++;
 			} else if (p[0] == '%' && p[1] == 'm') {
 				if (serr == NULL) {
-					if (strerror_r(serrno, serr_buf,
-					    sizeof(serr_buf)))
-						snprintf(serr_buf,
-						    sizeof(serr_buf),
-						    "Error %d", serrno);
-					serr = serr_buf;
+					/* strerror_r isn't portable.
+					 * strerror_l isn't widely found
+					 * and also problematic to use.
+					 * dhcpcd is only threaded in RTEMS
+					 * where strerror is threadsafe,
+					 * so this should be fine. */
+					serr = strerror(serrno);
 				}
 				fmt_wrote = strlcpy(fp, serr, fmt_left);
 				if (fmt_wrote > fmt_left)
