@@ -113,9 +113,6 @@
 #endif
 
 #if __GNUC__ > 2 || defined(__INTEL_COMPILER)
-# ifndef __dead
-#  define __dead __attribute__((__noreturn__))
-# endif
 # ifndef __packed
 #  define __packed   __attribute__((__packed__))
 # endif
@@ -126,9 +123,6 @@
 #  define __unused   __attribute__((__unused__))
 # endif
 #else
-# ifndef __dead
-#  define __dead
-# endif
 # ifndef __packed
 #  define __packed
 # endif
@@ -172,7 +166,7 @@ int get_monotonic(struct timespec *);
 #if USE_LOGFILE
 void logger_open(struct dhcpcd_ctx *);
 #define logger_mask(ctx, lvl) setlogmask((lvl))
-__printflike(3, 4) void logger(struct dhcpcd_ctx *, int, const char *, ...);
+void logger(struct dhcpcd_ctx *, int, const char *, ...) __printflike(3, 4);
 void logger_close(struct dhcpcd_ctx *);
 #else
 #define logger_open(ctx) openlog(PACKAGE, LOG_PERROR | LOG_PID, LOG_DAEMON)
