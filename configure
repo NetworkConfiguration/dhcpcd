@@ -717,7 +717,7 @@ if [ -z "$HAVE_PRINTF_M" ]; then
 /* glibc has always had it */
 #elif defined(__UCLIBC_HAS_PRINTF_M_SPEC__)
 /* test uClibc
-#elif defined(__NetBSD_Version__) && __NetBSD_Version__ >= 799002100
+// NOTYET #elif defined(__NetBSD_Version__) && __NetBSD_Version__ >= 799002100
 /* NetBSD libc has had it since 7.99.22 */
 #else
 /* If you're using musl libc (or any other libc with printf %m support),

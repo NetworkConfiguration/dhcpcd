@@ -1898,7 +1898,6 @@ exit1:
 		close(ctx.pf_link_fd);
 #endif
 
-
 	free_options(ifo);
 	free_globals(&ctx);
 	ipv4_ctxfree(&ctx);
@@ -1915,7 +1914,6 @@ exit1:
 
 	if (ctx.options & DHCPCD_STARTED && !(ctx.options & DHCPCD_FORKED))
 		logger(&ctx, LOG_INFO, PACKAGE " exited");
-	logger(&ctx, LOG_INFO, "error : %m");
 	logger_close(&ctx);
 	free(ctx.logfile);
 	return i;
