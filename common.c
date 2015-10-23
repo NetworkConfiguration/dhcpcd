@@ -132,7 +132,7 @@ logger(struct dhcpcd_ctx *ctx, int pri, const char *fmt, ...)
 	if (ctx == NULL || !(ctx->options & DHCPCD_QUIET) || ctx->log_fd != -1)
 	{
 		const char *p;
-		char *fp = fmt_cpy, *serr = NULL;
+		char *fp = fmt_cpy, *serr = NULL, serr_buf[128];
 		size_t fmt_left = sizeof(fmt_cpy) - 1, fmt_wrote;
 
 		for (p = fmt; *p != '\0'; p++) {
@@ -144,8 +144,14 @@ logger(struct dhcpcd_ctx *ctx, int pri, const char *fmt, ...)
 				fmt_left -= 2;
 				p++;
 			} else if (p[0] == '%' && p[1] == 'm') {
-				if (serr == NULL)
-					serr = strerror(serrno);
+				if (serr == NULL) {
+					if (strerror_r(serrno, serr_buf,
+					    sizeof(serr_buf)))
+						snprintf(serr_buf,
+						    sizeof(serr_buf),
+						    "Error %d", serrno);
+					serr = serr_buf;
+				}
 				fmt_wrote = strlcpy(fp, serr, fmt_left);
 				if (fmt_wrote > fmt_left)
 					break;
@@ -162,7 +168,6 @@ logger(struct dhcpcd_ctx *ctx, int pri, const char *fmt, ...)
 		*fp++ = '\0';
 		fmt = fmt_cpy;
 	}
-
 #endif
 
 	if (ctx == NULL || !(ctx->options & DHCPCD_QUIET)) {
