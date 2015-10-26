@@ -112,6 +112,19 @@ logger_close(struct dhcpcd_ctx *ctx)
 	closelog();
 }
 
+/*
+ * NetBSD's gcc has been modified to check for the non standard %m in printf
+ * like functions and warn noisily about it that they should be marked as
+ * syslog like instead.
+ * This is all well and good, but our logger also goes via vfprintf and
+ * when marked as a sysloglike funcion, gcc will then warn us that the
+ * function should be printflike instead!
+ * This creates an infinte loop of gcc warnings.
+ * Until NetBSD solves this issue, we have to disable a gcc diagnostic
+ * for our fully standards compliant code in the logger function.
+ */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmissing-format-attribute"
 void
 logger(struct dhcpcd_ctx *ctx, int pri, const char *fmt, ...)
 {
@@ -148,6 +161,9 @@ logger(struct dhcpcd_ctx *ctx, int pri, const char *fmt, ...)
 					/* strerror_r isn't portable.
 					 * strerror_l isn't widely found
 					 * and also problematic to use.
+					 * Also, if strerror_l exists then
+					 * strerror could easily be made
+					 * treadsafe in the same libc.
 					 * dhcpcd is only threaded in RTEMS
 					 * where strerror is threadsafe,
 					 * so this should be fine. */
@@ -206,6 +222,7 @@ logger(struct dhcpcd_ctx *ctx, int pri, const char *fmt, ...)
 	va_end(va);
 }
 #endif
+#pragma GCC diagnostic pop
 
 ssize_t
 setvar(struct dhcpcd_ctx *ctx,
