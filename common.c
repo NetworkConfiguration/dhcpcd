@@ -123,8 +123,10 @@ logger_close(struct dhcpcd_ctx *ctx)
  * Until NetBSD solves this issue, we have to disable a gcc diagnostic
  * for our fully standards compliant code in the logger function.
  */
+#if defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ > 5))
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmissing-format-attribute"
+#endif
 void
 logger(struct dhcpcd_ctx *ctx, int pri, const char *fmt, ...)
 {
@@ -222,7 +224,9 @@ logger(struct dhcpcd_ctx *ctx, int pri, const char *fmt, ...)
 	va_end(va);
 }
 #endif
+#if defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ > 5))
 #pragma GCC diagnostic pop
+#endif
 
 ssize_t
 setvar(struct dhcpcd_ctx *ctx,
