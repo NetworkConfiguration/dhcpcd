@@ -1897,10 +1897,25 @@ dhcp_arp_probed(struct arp_state *astate)
 	    astate->iface->name, inet_ntoa(astate->addr));
 	if (state->state != DHS_INFORM)
 		dhcp_bind(astate->iface);
+#ifndef IN_IFF_TENTATIVE
+	else {
+		struct dhcp_message *oldnew;
+
+		oldnew = state->new;
+		state->new = state->offer;
+		get_lease(astate->iface->ctx, &state->lease, state->new);
+		ipv4_applyaddr(astate->iface);
+		state->new = oldnew;
+	}
+#endif
+		
 	arp_announce(astate);
 
 	/* Stop IPv4LL now we have a working DHCP address */
 	ipv4ll_drop(astate->iface);
+
+	if (ifo->options & DHCPCD_INFORM)
+		dhcp_inform(astate->iface);
 }
 
 static void
@@ -2163,7 +2178,7 @@ dhcp_arp_address(struct interface *ifp)
 		struct dhcp_lease l;
 
 		get_lease(ifp->ctx, &l, state->offer);
-		logger(ifp->ctx, LOG_INFO, "%s: probing static address %s/%d",
+		logger(ifp->ctx, LOG_INFO, "%s: probing address %s/%d",
 		    ifp->name, inet_ntoa(l.addr), inet_ntocidr(l.net));
 		if ((astate = arp_new(ifp, &addr)) != NULL) {
 			astate->probed_cb = dhcp_arp_probed;
@@ -2226,6 +2241,7 @@ dhcp_inform(struct interface *ifp)
 	state = D_STATE(ifp);
 	ifo = ifp->options;
 
+	state->state = DHS_INFORM;
 	free(state->offer);
 	state->offer = NULL;
 
@@ -2262,7 +2278,6 @@ dhcp_inform(struct interface *ifp)
 
 	state->offer = dhcp_message_new(&ia->addr, &ia->net);
 	if (state->offer) {
-		state->state = DHS_INFORM;
 		state->xid = dhcp_xid(ifp);
 		get_lease(ifp->ctx, &state->lease, state->offer);
 		send_inform(ifp);

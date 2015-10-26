@@ -1166,9 +1166,10 @@ ipv4_applyaddr(void *arg)
 	 * notification right now via our link socket. */
 	if_initrt(ifp);
 	ipv4_buildroutes(ifp->ctx);
-	script_runreason(ifp, state->reason);
-
-	dhcpcd_daemonise(ifp->ctx);
+	if (state->state == DHS_BOUND) {
+		script_runreason(ifp, state->reason);
+		dhcpcd_daemonise(ifp->ctx);
+	}
 }
 
 void
@@ -1222,8 +1223,8 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 		}
 	}
 
-	dhcp_handleifa(cmd, ifp, addr, net, dst, flags);
 	arp_handleifa(cmd, ifp, addr, flags);
+	dhcp_handleifa(cmd, ifp, addr, net, dst, flags);
 }
 
 void
