@@ -1823,7 +1823,8 @@ main(int argc, char **argv)
 	opt = 0;
 	TAILQ_FOREACH(ifp, ctx.ifaces, next) {
 		run_preinit(ifp);
-		if (ifp->carrier != LINK_DOWN)
+		if (!(ifp->options->options & DHCPCD_LINK) ||
+		    ifp->carrier != LINK_DOWN)
 			opt = 1;
 	}
 
