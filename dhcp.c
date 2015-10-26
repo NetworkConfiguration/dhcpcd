@@ -1895,7 +1895,8 @@ dhcp_arp_probed(struct arp_state *astate)
 
 	logger(astate->iface->ctx, LOG_DEBUG, "%s: DAD completed for %s",
 	    astate->iface->name, inet_ntoa(astate->addr));
-	dhcp_bind(astate->iface);
+	if (state->state != DHS_INFORM)
+		dhcp_bind(astate->iface);
 	arp_announce(astate);
 
 	/* Stop IPv4LL now we have a working DHCP address */
@@ -1996,10 +1997,6 @@ dhcp_bind(struct interface *ifp)
 		lease->leasetime = ~0U;
 		state->reason = "STATIC";
 	} else if (ifo->options & DHCPCD_INFORM) {
-		if (ifo->req_addr.s_addr != 0)
-			lease->addr.s_addr = ifo->req_addr.s_addr;
-		else
-			lease->addr.s_addr = state->addr.s_addr;
 		logger(ifp->ctx, LOG_INFO, "%s: received approval for %s",
 		    ifp->name, inet_ntoa(lease->addr));
 		lease->leasetime = ~0U;
@@ -2126,8 +2123,8 @@ dhcp_message_new(const struct in_addr *addr, const struct in_addr *mask)
 	return dhcp;
 }
 
-static void
-dhcp_arp_bind(struct interface *ifp)
+static int
+dhcp_arp_address(struct interface *ifp)
 {
 	const struct dhcp_state *state;
 	struct in_addr addr;
@@ -2137,7 +2134,8 @@ dhcp_arp_bind(struct interface *ifp)
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 
 	state = D_CSTATE(ifp);
-	addr.s_addr = state->offer->yiaddr;
+	addr.s_addr = state->offer->yiaddr == INADDR_ANY ?
+	    state->offer->ciaddr : state->offer->yiaddr;
 	/* If the interface already has the address configured
 	 * then we can't ARP for duplicate detection. */
 	ia = ipv4_findaddr(ifp->ctx, &addr);
@@ -2158,7 +2156,7 @@ dhcp_arp_bind(struct interface *ifp)
 		} else
 			logger(ifp->ctx, LOG_INFO, "%s: waiting for DAD on %s",
 			    ifp->name, inet_ntoa(addr));
-		return;
+		return 0;
 	}
 #else
 	if (ifp->options->options & DHCPCD_ARP && ia == NULL) {
@@ -2174,11 +2172,19 @@ dhcp_arp_bind(struct interface *ifp)
 			/* We need to handle DAD. */
 			arp_probe(astate);
 		}
-		return;
+		return 0;
 	}
 #endif
 
-	dhcp_bind(ifp);
+	return 1;
+}
+
+static void
+dhcp_arp_bind(struct interface *ifp)
+{
+
+	if (dhcp_arp_address(ifp) == 1)
+		dhcp_bind(ifp);
 }
 
 static void
@@ -2215,41 +2221,52 @@ dhcp_inform(struct interface *ifp)
 {
 	struct dhcp_state *state;
 	struct if_options *ifo;
-	struct ipv4_addr *ap;
+	struct ipv4_addr *ia;
 
 	state = D_STATE(ifp);
 	ifo = ifp->options;
-	if (ifp->ctx->options & DHCPCD_TEST) {
-		state->addr.s_addr = ifo->req_addr.s_addr;
-		state->net.s_addr = ifo->req_mask.s_addr;
-	} else {
-		if (ifo->req_addr.s_addr == INADDR_ANY) {
-			state = D_STATE(ifp);
-			ap = ipv4_iffindaddr(ifp, NULL, NULL);
-			if (ap == NULL) {
-				logger(ifp->ctx, LOG_INFO,
-				    "%s: waiting for 3rd party to "
-				    "configure IP address",
-				    ifp->name);
+
+	free(state->offer);
+	state->offer = NULL;
+
+	if (ifo->req_addr.s_addr == INADDR_ANY) {
+		ia = ipv4_iffindaddr(ifp, NULL, NULL);
+		if (ia == NULL) {
+			logger(ifp->ctx, LOG_INFO,
+			    "%s: waiting for 3rd party to configure IP address",
+			    ifp->name);
+			if (!(ifp->ctx->options & DHCPCD_TEST)) {
 				state->reason = "3RDPARTY";
 				script_runreason(ifp, state->reason);
+			}
+			return;
+		}
+	} else {
+		ia = ipv4_iffindaddr(ifp, &ifo->req_addr, &ifo->req_mask);
+		if (ia == NULL) {
+			if (ifp->ctx->options & DHCPCD_TEST) {
+				logger(ifp->ctx, LOG_ERR,
+				    "%s: cannot add IP address in test mode",
+				    ifp->name);
 				return;
 			}
-			state->offer =
-			    dhcp_message_new(&ap->addr, &ap->net);
-		} else
-			state->offer =
-			    dhcp_message_new(&ifo->req_addr, &ifo->req_mask);
-		if (state->offer) {
-			ifo->options |= DHCPCD_STATIC;
-			dhcp_bind(ifp);
-			ifo->options &= ~DHCPCD_STATIC;
+			state->offer = dhcp_message_new(&ifo->req_addr,
+			    &ifo->req_mask);
+			if (dhcp_arp_address(ifp) == 0)
+				return;
+			ia = ipv4_iffindaddr(ifp,
+			    &ifo->req_addr, &ifo->req_mask);
+			assert(ia != NULL);
 		}
 	}
 
-	state->state = DHS_INFORM;
-	state->xid = dhcp_xid(ifp);
-	send_inform(ifp);
+	state->offer = dhcp_message_new(&ia->addr, &ia->net);
+	if (state->offer) {
+		state->state = DHS_INFORM;
+		state->xid = dhcp_xid(ifp);
+		get_lease(ifp->ctx, &state->lease, state->offer);
+		send_inform(ifp);
+	}
 }
 
 void
@@ -2343,7 +2360,9 @@ dhcp_drop(struct interface *ifp, const char *reason)
 		return;
 	}
 
-	if (ifp->options->options & DHCPCD_RELEASE) {
+	if (ifp->options->options & DHCPCD_RELEASE &&
+	    !(ifp->options->options & DHCPCD_INFORM))
+	{
 		/* Failure to send the release may cause this function to
 		 * re-enter so guard by setting the state. */
 		if (state->state == DHS_RELEASE)
@@ -3362,7 +3381,7 @@ dhcp_handleifa(int cmd, struct interface *ifp,
 	const struct in_addr *addr,
 	const struct in_addr *net,
 	const struct in_addr *dst,
-	__unused int flags)
+	int flags)
 {
 	struct dhcp_state *state;
 	struct if_options *ifo;
@@ -3387,6 +3406,13 @@ dhcp_handleifa(int cmd, struct interface *ifp,
 
 	if (cmd != RTM_NEWADDR)
 		return;
+
+#ifdef IN_IFF_NOTUSEABLE
+	if (flags & IN_IFF_NOTUSEABLE)
+		return;
+#else
+	UNUSED(flags);
+#endif
 
 	ifo = ifp->options;
 	if (ifo->options & DHCPCD_INFORM) {
