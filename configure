@@ -716,7 +716,7 @@ if [ -z "$HAVE_PRINTF_M" ]; then
 #ifdef __GLIBC__
 /* glibc has always had it */
 #elif defined(__UCLIBC_HAS_PRINTF_M_SPEC__)
-/* test uClibc
+/* test uClibc */
 #else
 /* If you're using musl libc (or any other libc with printf %m support),
  * you'll have to pass --with-printf_m to configure to shrink the binary
