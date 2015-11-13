@@ -97,6 +97,9 @@ arc4_getword(struct arc4_stream *as)
 	return (uint32_t)val;
 }
 
+/* We don't care about any error on read, just use what we have
+ * on the stack. So mask off this GCC warning. */
+#pragma GCC diagnostic ignored "-Wunused-result"
 static void
 arc4_stir(struct arc4_stream *as)
 {
