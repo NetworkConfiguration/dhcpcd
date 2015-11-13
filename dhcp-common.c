@@ -55,7 +55,6 @@
 const char *
 dhcp_get_hostname(char *buf, size_t buf_len, const struct if_options *ifo)
 {
-	char *hostname;
 
 	if (ifo->hostname[0] == '\0') {
 		if (gethostname(buf, buf_len) != 0)
