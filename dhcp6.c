@@ -1251,7 +1251,17 @@ dhcp6_startrenew(void *arg)
 	struct dhcp6_state *state;
 
 	ifp = arg;
-	state = D6_STATE(ifp);
+	if ((state = D6_STATE(ifp)) == NULL)
+		return;
+
+	/* Only renew in the bound or renew states */
+	if (state->state != DH6S_BOUND &&
+	    state->state != DH6S_RENEW)
+		return;
+
+	/* Remove the timeout as the renew may have been forced. */
+	eloop_timeout_delete(ifp->ctx->eloop, dhcp6_startrenew, ifp);
+
 	state->state = DH6S_RENEW;
 	state->RTC = 0;
 	state->IRT = REN_TIMEOUT;
@@ -1263,6 +1273,12 @@ dhcp6_startrenew(void *arg)
 		    "%s: dhcp6_makemessage: %m", ifp->name);
 	else
 		dhcp6_sendrenew(ifp);
+}
+
+void dhcp6_renew(struct interface *ifp)
+{
+
+	dhcp6_startrenew(ifp);
 }
 
 int
@@ -2894,8 +2910,6 @@ dhcp6_handledata(void *arg)
 				    ifp->name, op);
 				return;
 			}
-			eloop_timeout_delete(ifp->ctx->eloop,
-			    dhcp6_startrenew, ifp);
 			dhcp6_startrenew(ifp);
 			break;
 		case DHCP6_INFORMATION_REQ:

@@ -1165,13 +1165,37 @@ stop_all_interfaces(struct dhcpcd_ctx *ctx, unsigned long long opts)
 	}
 }
 
+static void
+dhcpcd_ifrenew(struct interface *ifp)
+{
+
+#define DHCPCD_RARENEW (DHCPCD_IPV6 | DHCPCD_IPV6RS)
+	if (ifp->options->options & DHCPCD_LINK &&
+	    ifp->carrier != LINK_DOWN)
+	{
+		dhcp_renew(ifp);
+		if ((ifp->options->options & DHCPCD_RARENEW) == DHCPCD_RARENEW)
+			ipv6nd_startrs(ifp);
+		dhcp6_renew(ifp);
+	}
+}
+
+static void
+dhcpcd_renew(struct dhcpcd_ctx *ctx)
+{
+	struct interface *ifp;
+
+	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+		dhcpcd_ifrenew(ifp);
+	}
+}
+
 #ifdef USE_SIGNALS
 #define sigmsg "received %s, %s"
 static void
 signal_cb(int sig, void *arg)
 {
 	struct dhcpcd_ctx *ctx = arg;
-	struct interface *ifp;
 	unsigned long long opts;
 	int exit_code;
 
@@ -1199,10 +1223,8 @@ signal_cb(int sig, void *arg)
 		    ctx->argc - ctx->ifc);
 		return;
 	case SIGUSR1:
-		logger(ctx, LOG_INFO, sigmsg, "SIGUSR1", "reconfiguring");
-		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-			ipv4_applyaddr(ifp);
-		}
+		logger(ctx, LOG_INFO, sigmsg, "SIGUSR1", "renewing");
+		dhcpcd_renew(ctx);
 		return;
 	case SIGUSR2:
 		logger_close(ctx);
@@ -1261,7 +1283,7 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 {
 	struct interface *ifp;
 	unsigned long long opts;
-	int opt, oi, do_reboot;
+	int opt, oi, do_reboot, do_renew;
 	size_t len, l;
 	char *tmp, *p;
 
@@ -1312,7 +1334,7 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 	optind = 0;
 	oi = 0;
 	opts = 0;
-	do_reboot = 0;
+	do_reboot = do_renew = 0;
 	while ((opt = getopt_long(argc, argv, IF_OPTS, cf_options, &oi)) != -1)
 	{
 		switch (opt) {
@@ -1331,6 +1353,9 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 		case 'x':
 			opts |= DHCPCD_EXITING;
 			break;
+		case 'N':
+			do_renew = 1;
+			break;
 		}
 	}
 
@@ -1347,6 +1372,19 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 			if (opts & DHCPCD_RELEASE)
 				ifp->options->options &= ~DHCPCD_PERSISTENT;
 			stop_interface(ifp);
+		}
+		return 0;
+	}
+
+	if (do_renew) {
+		if (optind == argc) {
+			dhcpcd_renew(ctx);
+			return 0;
+		}
+		for (oi = optind; oi < argc; oi++) {
+			if ((ifp = if_find(ctx->ifaces, argv[oi])) == NULL)
+				continue;
+			dhcpcd_ifrenew(ifp);
 		}
 		return 0;
 	}
@@ -1450,6 +1488,10 @@ main(int argc, char **argv)
 		case 'x':
 			sig = SIGTERM;
 			siga = "TERM";
+			break;
+		case 'N':
+			sig = SIGUSR1;
+			siga = "USR1";
 			break;
 #endif
 		case 'T':
@@ -1669,14 +1711,14 @@ main(int argc, char **argv)
 			logger(&ctx, LOG_INFO, "sending signal %s to pid %d",
 			    siga, pid);
 		if (pid == 0 || kill(pid, sig) != 0) {
-			if (sig != SIGHUP && errno != EPERM)
+			if (sig != SIGHUP && sig != SIGUSR1 && errno != EPERM)
 				logger(&ctx, LOG_ERR, ""PACKAGE" not running");
 			if (pid != 0 && errno != ESRCH) {
 				logger(&ctx, LOG_ERR, "kill: %m");
 				goto exit_failure;
 			}
 			unlink(ctx.pidfile);
-			if (sig != SIGHUP)
+			if (sig != SIGHUP && sig != SIGUSR1)
 				goto exit_failure;
 		} else {
 			struct timespec ts;

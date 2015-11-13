@@ -144,6 +144,7 @@ const struct option cf_options[] = {
 	{"nolink",          no_argument,       NULL, 'K'},
 	{"noipv4ll",        no_argument,       NULL, 'L'},
 	{"master",          no_argument,       NULL, 'M'},
+	{"renew",           no_argument,       NULL, 'N'},
 	{"nooption",        optional_argument, NULL, 'O'},
 	{"require",         required_argument, NULL, 'Q'},
 	{"static",          required_argument, NULL, 'S'},
@@ -684,6 +685,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	case 'g': /* FALLTHROUGH */
 	case 'n': /* FALLTHROUGH */
 	case 'x': /* FALLTHROUGH */
+	case 'N': /* FALLTHROUGH */
 	case 'T': /* FALLTHROUGH */
 	case 'U': /* FALLTHROUGH */
 	case 'V': /* We need to handle non interface options */

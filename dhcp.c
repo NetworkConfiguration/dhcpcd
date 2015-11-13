@@ -1829,21 +1829,37 @@ dhcp_decline(struct interface *ifp)
 }
 
 static void
-dhcp_renew(void *arg)
+dhcp_startrenew(void *arg)
 {
 	struct interface *ifp = arg;
-	struct dhcp_state *state = D_STATE(ifp);
-	struct dhcp_lease *lease = &state->lease;
+	struct dhcp_state *state;
+	struct dhcp_lease *lease;
 
+	if ((state = D_STATE(ifp)) == NULL)
+		return;
+
+	/* Only renew in the bound or renew states */
+	if (state->state != DHS_BOUND &&
+	    state->state != DHS_RENEW)
+		return;
+
+	/* Remove the timeout as the renew may have been forced. */
+	eloop_timeout_delete(ifp->ctx->eloop, dhcp_startrenew, ifp);
+
+	lease = &state->lease;
 	logger(ifp->ctx, LOG_DEBUG, "%s: renewing lease of %s",
 	    ifp->name, inet_ntoa(lease->addr));
-	logger(ifp->ctx, LOG_DEBUG, "%s: rebind in %"PRIu32" seconds,"
-	    " expire in %"PRIu32" seconds",
-	    ifp->name, lease->rebindtime - lease->renewaltime,
-	    lease->leasetime - lease->renewaltime);
 	state->state = DHS_RENEW;
 	state->xid = dhcp_xid(ifp);
+	state->interval = 0;
 	send_renew(ifp);
+}
+
+void
+dhcp_renew(struct interface *ifp)
+{
+
+	dhcp_startrenew(ifp);
 }
 
 static void
@@ -1867,6 +1883,7 @@ dhcp_rebind(void *arg)
 	state->state = DHS_REBIND;
 	eloop_timeout_delete(ifp->ctx->eloop, send_renew, ifp);
 	state->lease.server.s_addr = 0;
+	state->interval = 0;
 	ifp->options->options &= ~(DHCPCD_CSR_WARNED |
 	    DHCPCD_ROUTER_HOST_ROUTE_WARNED);
 	send_rebind(ifp);
@@ -2085,7 +2102,7 @@ dhcp_bind(struct interface *ifp)
 		lease->renewaltime = lease->rebindtime = lease->leasetime;
 	else {
 		eloop_timeout_add_sec(ifp->ctx->eloop,
-		    (time_t)lease->renewaltime, dhcp_renew, ifp);
+		    (time_t)lease->renewaltime, dhcp_startrenew, ifp);
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    (time_t)lease->rebindtime, dhcp_rebind, ifp);
 		eloop_timeout_add_sec(ifp->ctx->eloop,
@@ -2598,11 +2615,9 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 		log_dhcp(LOG_ERR, "Force Renew from", ifp, dhcp, from);
 		/* The rebind and expire timings are still the same, we just
 		 * enter the renew state early */
-		if (state->state == DHS_BOUND) {
-			eloop_timeout_delete(ifp->ctx->eloop,
-			    dhcp_renew, ifp);
+		if (state->state == DHS_BOUND)
 			dhcp_renew(ifp);
-		} else {
+		else {
 			eloop_timeout_delete(ifp->ctx->eloop,
 			    send_inform, ifp);
 			dhcp_inform(ifp);
