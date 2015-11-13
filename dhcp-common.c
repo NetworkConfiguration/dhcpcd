@@ -52,6 +52,37 @@
 #define NS_MAXLABEL MAXLABEL
 #endif
 
+const char *
+dhcp_get_hostname(char *buf, size_t buf_len, const struct if_options *ifo)
+{
+	char *hostname;
+
+	if (ifo->hostname[0] == '\0') {
+		if (gethostname(buf, buf_len) != 0)
+			return NULL;
+		buf[buf_len - 1] = '\0';
+	} else
+		strlcpy(buf, ifo->hostname, sizeof(buf));
+
+	/* Deny sending of these local hostnames */
+	if (strcmp(buf, "(none)") == 0 ||
+	    strcmp(buf, "localhost") == 0 ||
+	    strncmp(buf, "localhost.", strlen("localhost.")) == 0 ||
+	    buf[0] == '.')
+		return NULL;
+
+	/* Shorten the hostname if required */
+	if (ifo->options & DHCPCD_HOSTNAME_SHORT) {
+		char *hp;
+
+		hp = strchr(buf, '.');
+		if (hp != NULL)
+			*hp = '\0';
+	}
+
+	return buf;
+}
+
 void
 dhcp_print_option_encoding(const struct dhcp_opt *opt, int cols)
 {

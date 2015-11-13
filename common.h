@@ -154,7 +154,6 @@
 #endif
 
 void get_line_free(void);
-const char *get_hostname(char *, size_t, int);
 extern int clock_monotonic;
 int get_monotonic(struct timespec *);
 

@@ -559,13 +559,9 @@ dhcp6_makemessage(struct interface *ifp)
 		 * hostname and FQDN according to RFC4702 */
 		fqdn = FQDN_BOTH;
 	}
-	if (fqdn != FQDN_DISABLE) {
-		if (ifo->hostname[0] == '\0')
-			hostname = get_hostname(hbuf, sizeof(hbuf),
-			    ifo->options & DHCPCD_HOSTNAME_SHORT ? 1 : 0);
-		else
-			hostname = ifo->hostname;
-	} else
+	if (fqdn != FQDN_DISABLE)
+		hostname = dhcp_get_hostname(hbuf, sizeof(hbuf), ifo);
+	else
 		hostname = NULL; /* appearse gcc */
 
 	/* Work out option size first */

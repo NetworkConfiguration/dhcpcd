@@ -883,11 +883,7 @@ make_message(struct dhcp_message **message,
 			}
 		}
 
-		if (ifo->hostname[0] == '\0')
-			hostname = get_hostname(hbuf, sizeof(hbuf),
-			    ifo->options & DHCPCD_HOSTNAME_SHORT ? 1 : 0);
-		else
-			hostname = ifo->hostname;
+		hostname = dhcp_get_hostname(hbuf, sizeof(hbuf), ifo);
 
 		/*
 		 * RFC4702 3.1 States that if we send the Client FQDN option

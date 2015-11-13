@@ -53,29 +53,6 @@
 #  define _PATH_DEVNULL "/dev/null"
 #endif
 
-const char *
-get_hostname(char *buf, size_t buflen, int short_hostname)
-{
-	char *p;
-
-	if (gethostname(buf, buflen) != 0)
-		return NULL;
-	buf[buflen - 1] = '\0';
-	if (strcmp(buf, "(none)") == 0 ||
-	    strcmp(buf, "localhost") == 0 ||
-	    strncmp(buf, "localhost.", strlen("localhost.")) == 0 ||
-	    buf[0] == '.')
-		return NULL;
-
-	if (short_hostname) {
-		p = strchr(buf, '.');
-		if (p)
-			*p = '\0';
-	}
-
-	return buf;
-}
-
 #if USE_LOGFILE
 void
 logger_open(struct dhcpcd_ctx *ctx)
