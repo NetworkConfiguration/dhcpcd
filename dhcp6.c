@@ -2185,6 +2185,7 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	struct timespec acquired;
 	time_t now;
 	int retval;
+	size_t newlen;
 	void *newnew;
 
 	state = D6_STATE(ifp);
@@ -2217,14 +2218,15 @@ dhcp6_readlease(struct interface *ifp, int validate)
 			retval = 0;
 			break;
 		}
-		state->new_len += BUFSIZ;
-		if (state->new_len > UINT32_MAX) {
+		newlen = state->new_len + BUFSIZ;
+		if (newlen > UINT32_MAX || newlen < state->new_len) {
 			errno = E2BIG;
 			break;
 		}
-		if ((newnew = realloc(state->new, state->new_len)) == NULL)
+		if ((newnew = realloc(state->new, newlen)) == NULL)
 			break;
 		state->new = newnew;
+		state->new_len = newlen;
 	}
 	close(fd);
 	if (retval == -1)
