@@ -2189,18 +2189,14 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	void *newnew;
 
 	state = D6_STATE(ifp);
-	if (state->leasefile[0] == '\0')
-		logger(ifp->ctx, LOG_DEBUG, "reading standard input");
-	else {
-		if (stat(state->leasefile, &st) == -1)
-			return -1;
+	if (state->leasefile[0] == '\0') {
+ 		logger(ifp->ctx, LOG_DEBUG, "reading standard input");
+		fd = fileno(stdin);
+	} else {
 		logger(ifp->ctx, LOG_DEBUG, "%s: reading lease `%s'",
 		    ifp->name, state->leasefile);
-	}
-	if (state->leasefile[0] == '\0')
-		fd = fileno(stdin);
-	else
 		fd = open(state->leasefile, O_RDONLY);
+	}
 	if (fd == -1)
 		return -1;
 	state->new_len = 0;
@@ -2232,6 +2228,9 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	if (retval == -1)
 		goto ex;
 
+	if (ifp->ctx->options & DHCPCD_DUMPLEASE)
+		return 0;
+
 	/* If not validating IA's and if they have expired,
 	 * skip to the auth check. */
 	if (!validate) {
@@ -2239,24 +2238,21 @@ dhcp6_readlease(struct interface *ifp, int validate)
 		goto auth;
 	}
 
-	if ((now = time(NULL)) == -1) {
-		retval = 1;
+	retval = -1;
+	if (stat(state->leasefile, &st) == -1)
 		goto ex;
-	}
-
 	clock_gettime(CLOCK_MONOTONIC, &acquired);
+	if ((now = time(NULL)) == -1)
+		goto ex;
 	acquired.tv_sec -= now - st.st_mtime;
 
 	/* Check to see if the lease is still valid */
 	fd = dhcp6_validatelease(ifp, state->new, state->new_len, NULL,
 	    &acquired);
-	if (fd == -1) {
-		retval = 1;
+	if (fd == -1)
 		goto ex;
-	}
 
-	if (!(ifp->ctx->options & DHCPCD_DUMPLEASE) &&
-	    state->expire != ND6_INFINITE_LIFETIME &&
+	if (state->expire != ND6_INFINITE_LIFETIME &&
 	    state->leasefile[0] != '\0')
 	{
 		if ((time_t)state->expire < now - st.st_mtime) {

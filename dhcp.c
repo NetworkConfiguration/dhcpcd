@@ -1153,6 +1153,9 @@ read_lease(struct interface *ifp)
 		return NULL;
 	}
 
+	if (ifp->ctx->options & DHCPCD_DUMPLEASE)
+		return dhcp;
+
 	/* We may have found a BOOTP server */
 	if (get_option_uint8(ifp->ctx, &type, dhcp, DHO_MESSAGETYPE) == -1)
 		type = 0;
