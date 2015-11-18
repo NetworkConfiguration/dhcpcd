@@ -1634,7 +1634,7 @@ main(int argc, char **argv)
 			ctx.ifaces = if_discover(&ctx,
 			    argc - optind, argv + optind);
 		} else {
-			if ((ctx.ifaces = malloc(sizeof(ctx.ifaces))) != NULL)
+			if ((ctx.ifaces = malloc(sizeof(*ctx.ifaces))) != NULL)
 				TAILQ_INIT(ctx.ifaces);
 		}
 		if (ctx.ifaces == NULL) {
