@@ -1374,9 +1374,8 @@ if_route(unsigned char cmd, const struct rt *rt)
 	nlm.rt.rtm_dst_len = inet_ntocidr(rt->net);
 	add_attr_l(&nlm.hdr, sizeof(nlm), RTA_DST,
 	    &rt->dest.s_addr, sizeof(rt->dest.s_addr));
-	/* If a host route then don't add the gateway */
 	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
-		if (rt->net.s_addr != INADDR_BROADCAST)
+		if (rt->gate.s_addr != htonl(INADDR_ANY))
 			add_attr_l(&nlm.hdr, sizeof(nlm), RTA_GATEWAY,
 			    &rt->gate.s_addr, sizeof(rt->gate.s_addr));
 		if (rt->gate.s_addr != htonl(INADDR_LOOPBACK))
