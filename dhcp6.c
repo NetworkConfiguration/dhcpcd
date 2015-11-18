@@ -2185,6 +2185,7 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	struct timespec acquired;
 	time_t now;
 	int retval;
+	void *newnew;
 
 	state = D6_STATE(ifp);
 	if (state->leasefile[0] == '\0')
@@ -2195,23 +2196,38 @@ dhcp6_readlease(struct interface *ifp, int validate)
 		logger(ifp->ctx, LOG_DEBUG, "%s: reading lease `%s'",
 		    ifp->name, state->leasefile);
 	}
-	if (st.st_size > UINT32_MAX) {
-		errno = E2BIG;
-		return -1;
-	}
 	if (state->leasefile[0] == '\0')
 		fd = fileno(stdin);
 	else
 		fd = open(state->leasefile, O_RDONLY);
 	if (fd == -1)
 		return -1;
-	if ((state->new = malloc((size_t)st.st_size)) == NULL)
+	state->new_len = 0;
+	if ((state->new = malloc(BUFSIZ)) == NULL)
 		return -1;
 	retval = -1;
-	state->new_len = (size_t)st.st_size;
-	bytes = read(fd, state->new, state->new_len);
+	/* DHCPv6 messages have no real maximum size.
+	 * As we could be reading from stdin, we loop like so. */
+	for (;;) {
+		bytes = read(fd, state->new + state->new_len, BUFSIZ);
+		if (bytes == -1)
+			break;
+		if (bytes < BUFSIZ) {
+			state->new_len += (size_t)bytes;
+			retval = 0;
+			break;
+		}
+		state->new_len += BUFSIZ;
+		if (state->new_len > UINT32_MAX) {
+			errno = E2BIG;
+			break;
+		}
+		if ((newnew = realloc(state->new, state->new_len)) == NULL)
+			break;
+		state->new = newnew;
+	}
 	close(fd);
-	if (bytes != (ssize_t)state->new_len)
+	if (retval == -1)
 		goto ex;
 
 	/* If not validating IA's and if they have expired,
@@ -2221,8 +2237,10 @@ dhcp6_readlease(struct interface *ifp, int validate)
 		goto auth;
 	}
 
-	if ((now = time(NULL)) == -1)
+	if ((now = time(NULL)) == -1) {
+		retval = 1;
 		goto ex;
+	}
 
 	clock_gettime(CLOCK_MONOTONIC, &acquired);
 	acquired.tv_sec -= now - st.st_mtime;
@@ -2230,11 +2248,14 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	/* Check to see if the lease is still valid */
 	fd = dhcp6_validatelease(ifp, state->new, state->new_len, NULL,
 	    &acquired);
-	if (fd == -1)
+	if (fd == -1) {
+		retval = 1;
 		goto ex;
+	}
 
 	if (!(ifp->ctx->options & DHCPCD_DUMPLEASE) &&
-	    state->expire != ND6_INFINITE_LIFETIME)
+	    state->expire != ND6_INFINITE_LIFETIME &&
+	    state->leasefile[0] != '\0')
 	{
 		if ((time_t)state->expire < now - st.st_mtime) {
 			logger(ifp->ctx,
@@ -2246,7 +2267,6 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	}
 
 auth:
-
 	retval = 0;
 	/* Authenticate the message */
 	o = dhcp6_getmoption(D6_OPTION_AUTH, state->new, state->new_len);
