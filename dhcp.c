@@ -1126,15 +1126,21 @@ read_lease(struct interface *ifp)
 	uint8_t type;
 	size_t auth_len;
 
-	fd = open(state->leasefile, O_RDONLY);
+	if (state->leasefile[0] == '\0')
+		fd = fileno(stdin);
+	else
+		fd = open(state->leasefile, O_RDONLY);
 	if (fd == -1) {
 		if (errno != ENOENT)
 			logger(ifp->ctx, LOG_ERR, "%s: open `%s': %m",
 			    ifp->name, state->leasefile);
 		return NULL;
 	}
-	logger(ifp->ctx, LOG_DEBUG, "%s: reading lease `%s'",
-	    ifp->name, state->leasefile);
+	if (state->leasefile[0] == '\0')
+		logger(ifp->ctx, LOG_DEBUG, "reading standard input");
+	else
+		logger(ifp->ctx, LOG_DEBUG, "%s: reading lease `%s'",
+		    ifp->name, state->leasefile);
 	dhcp = calloc(1, sizeof(*dhcp));
 	if (dhcp == NULL) {
 		close(fd);

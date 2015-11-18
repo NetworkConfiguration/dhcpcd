@@ -1628,15 +1628,15 @@ main(int argc, char **argv)
 	}
 
 	if (ctx.options & DHCPCD_DUMPLEASE) {
-		if (optind != argc - 1) {
-			logger(&ctx, LOG_ERR,
-			    "dumplease requires an interface");
-			goto exit_failure;
+		if (optind != argc) {
+			/* We need to try and find the interface so we can load
+			 * the hardware address to compare automated IAID */
+			ctx.ifaces = if_discover(&ctx,
+			    argc - optind, argv + optind);
+		} else {
+			if ((ctx.ifaces = malloc(sizeof(ctx.ifaces))) != NULL)
+				TAILQ_INIT(ctx.ifaces);
 		}
-		i = 0;
-		/* We need to try and find the interface so we can
-		 * load the hardware address to compare automated IAID */
-		ctx.ifaces = if_discover(&ctx, 1, argv + optind);
 		if (ctx.ifaces == NULL) {
 			logger(&ctx, LOG_ERR, "if_discover: %m");
 			goto exit_failure;
@@ -1648,7 +1648,9 @@ main(int argc, char **argv)
 				logger(&ctx, LOG_ERR, "%s: %m", __func__);
 				goto exit_failure;
 			}
-			strlcpy(ctx.pidfile, argv[optind], sizeof(ctx.pidfile));
+			if (optind != argc)
+				strlcpy(ctx.pidfile, argv[optind],
+				    sizeof(ctx.pidfile));
 			ifp->ctx = &ctx;
 			TAILQ_INSERT_HEAD(ctx.ifaces, ifp, next);
 			if (family == 0) {
@@ -1659,6 +1661,7 @@ main(int argc, char **argv)
 			}
 		}
 		configure_interface(ifp, ctx.argc, ctx.argv, 0);
+		i = 0;
 		if (family == 0 || family == AF_INET) {
 			if (dhcp_dump(ifp) == -1)
 				i = 1;

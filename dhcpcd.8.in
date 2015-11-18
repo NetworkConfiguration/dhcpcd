@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd November 13, 2015
+.Dd November 18, 2015
 .Dt DHCPCD 8
 .Os
 .Sh NAME
@@ -633,8 +633,7 @@ before starting
 Dumps the last lease for the
 .Ar interface
 to stdout.
-.Ar interface
-could also be a path to a DHCP wire formatted file.
+If omitted, standard input is used to read a DHCP wire formatted message.
 Use the
 .Fl 4
 or

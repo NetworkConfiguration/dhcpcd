@@ -2187,15 +2187,23 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	int retval;
 
 	state = D6_STATE(ifp);
-	if (stat(state->leasefile, &st) == -1)
-		return -1;
-	logger(ifp->ctx, LOG_DEBUG, "%s: reading lease `%s'",
-	    ifp->name, state->leasefile);
+	if (state->leasefile[0] == '\0')
+		logger(ifp->ctx, LOG_DEBUG, "reading standard input");
+	else {
+		if (stat(state->leasefile, &st) == -1)
+			return -1;
+		logger(ifp->ctx, LOG_DEBUG, "%s: reading lease `%s'",
+		    ifp->name, state->leasefile);
+	}
 	if (st.st_size > UINT32_MAX) {
 		errno = E2BIG;
 		return -1;
 	}
-	if ((fd = open(state->leasefile, O_RDONLY)) == -1)
+	if (state->leasefile[0] == '\0')
+		fd = fileno(stdin);
+	else
+		fd = open(state->leasefile, O_RDONLY);
+	if (fd == -1)
 		return -1;
 	if ((state->new = malloc((size_t)st.st_size)) == NULL)
 		return -1;
