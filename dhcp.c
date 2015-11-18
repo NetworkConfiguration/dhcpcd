@@ -611,8 +611,9 @@ get_option_routes(struct interface *ifp, const struct dhcp_message *dhcp)
 			{
 				route->gate.s_addr = htonl(INADDR_ANY);
 				route->net.s_addr = htonl(INADDR_BROADCAST);
-			}
-			route->net.s_addr = route_netmask(route->dest.s_addr);
+			} else
+				route->net.s_addr =
+				    route_netmask(route->dest.s_addr);
 			TAILQ_INSERT_TAIL(routes, route, next);
 		}
 	}
