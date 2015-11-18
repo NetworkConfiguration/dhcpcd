@@ -592,6 +592,8 @@ if_route(unsigned char cmd, const struct rt *rt)
 		rtm.hdr.rtm_addrs |= RTA_NETMASK;
 		if (rtm.hdr.rtm_flags & RTF_STATIC)
 			rtm.hdr.rtm_flags |= RTF_GATEWAY;
+		if (rt->net.s_addr == htonl(INADDR_BROADCAST))
+			rtm.hdr.rtm_flags |= RTF_HOST;
 	}
 	if ((cmd == RTM_ADD || cmd == RTM_CHANGE) &&
 	    !(rtm.hdr.rtm_flags & RTF_GATEWAY))
@@ -599,12 +601,11 @@ if_route(unsigned char cmd, const struct rt *rt)
 
 	ADDADDR(&rt->dest);
 	if (rtm.hdr.rtm_addrs & RTA_GATEWAY) {
-#ifdef RTF_CLONING
-		if ((rtm.hdr.rtm_flags & (RTF_HOST | RTF_CLONING) &&
-#else
 		if ((rtm.hdr.rtm_flags & RTF_HOST &&
+		    rt->gate.s_addr == htonl(INADDR_ANY)) ||
+#ifdef RTF_CLONING
+		    rtm.hdr.rtm_flags & RTF_CLONING ||
 #endif
-		    rt->gate.s_addr != htonl(INADDR_LOOPBACK)) ||
 		    !(rtm.hdr.rtm_flags & RTF_STATIC))
 		{
 			if_linkaddr(&su.sdl, rt->iface);
