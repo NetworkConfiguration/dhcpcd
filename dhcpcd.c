@@ -1664,11 +1664,11 @@ main(int argc, char **argv)
 		i = 0;
 		if (family == 0 || family == AF_INET) {
 			if (dhcp_dump(ifp) == -1)
-				i = 1;
+				i = -1;
 		}
 		if (family == 0 || family == AF_INET6) {
 			if (dhcp6_dump(ifp) == -1)
-				i = 1;
+				i = -1;
 		}
 		if (i == -1)
 			goto exit_failure;
