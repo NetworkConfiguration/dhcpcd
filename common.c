@@ -177,6 +177,10 @@ logger(struct dhcpcd_ctx *ctx, int pri, const char *fmt, ...)
 		va_end(vac);
 	}
 
+	/* Don't send to syslog if dumping leases or testing */
+	if (ctx->options & (DHCPCD_DUMPLEASE | DHCPCD_TEST))
+		goto out;
+
 	if (ctx && ctx->log_fd != -1) {
 		if (pri < LOG_DEBUG || (ctx->options & DHCPCD_DEBUG)) {
 			struct timeval tv;
@@ -206,6 +210,7 @@ logger(struct dhcpcd_ctx *ctx, int pri, const char *fmt, ...)
 #endif
 		vsyslog(pri, fmt, va);
 	}
+out:
 	va_end(va);
 }
 #endif
