@@ -113,9 +113,6 @@ logger(struct dhcpcd_ctx *ctx, int pri, const char *fmt, ...)
 	char fmt_cpy[1024];
 #endif
 
-	if (pri >= LOG_DEBUG && ctx && !(ctx->options & DHCPCD_DEBUG))
-		return;
-
 	serrno = errno;
 	va_start(va, fmt);
 
@@ -166,38 +163,49 @@ logger(struct dhcpcd_ctx *ctx, int pri, const char *fmt, ...)
 	}
 #endif
 
-	if (ctx == NULL || !(ctx->options & DHCPCD_QUIET)) {
+	if ((ctx == NULL || !(ctx->options & DHCPCD_QUIET)) &&
+	    (pri < LOG_DEBUG || (ctx->options & DHCPCD_DEBUG)))
+	{
 		va_list vac;
 
 		va_copy(vac, va);
+#ifdef HAVE_PRINTF_M
+		errno = serrno;
+#endif
 		vfprintf(pri <= LOG_ERR ? stderr : stdout, fmt, vac);
 		fputc('\n', pri <= LOG_ERR ? stderr : stdout);
 		va_end(vac);
 	}
 
-#ifdef HAVE_PRINTF_M
-	errno = serrno;
-#endif
 	if (ctx && ctx->log_fd != -1) {
-		struct timeval tv;
-		char buf[32];
+		if (pri < LOG_DEBUG || (ctx->options & DHCPCD_DEBUG)) {
+			struct timeval tv;
+			char buf[32];
 
-		/* Write the time, syslog style. month day time - */
-		if (gettimeofday(&tv, NULL) != -1) {
-			time_t now;
-			struct tm tmnow;
+			/* Write the time, syslog style. month day time - */
+			if (gettimeofday(&tv, NULL) != -1) {
+				time_t now;
+				struct tm tmnow;
 
-			tzset();
-			now = tv.tv_sec;
-			localtime_r(&now, &tmnow);
-			strftime(buf, sizeof(buf), "%b %d %T ", &tmnow);
-			dprintf(ctx->log_fd, "%s", buf);
+				tzset();
+				now = tv.tv_sec;
+				localtime_r(&now, &tmnow);
+				strftime(buf, sizeof(buf), "%b %d %T ", &tmnow);
+				dprintf(ctx->log_fd, "%s", buf);
+			}
+
+#ifdef HAVE_PRINTF_M
+			errno = serrno;
+#endif
+			vdprintf(ctx->log_fd, fmt, va);
+			dprintf(ctx->log_fd, "\n");
 		}
-
-		vdprintf(ctx->log_fd, fmt, va);
-		dprintf(ctx->log_fd, "\n");
-	} else
+	} else {
+#ifdef HAVE_PRINTF_M
+		errno = serrno;
+#endif
 		vsyslog(pri, fmt, va);
+	}
 	va_end(va);
 }
 #endif
