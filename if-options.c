@@ -145,7 +145,7 @@ const struct option cf_options[] = {
 	{"noipv4ll",        no_argument,       NULL, 'L'},
 	{"master",          no_argument,       NULL, 'M'},
 	{"renew",           no_argument,       NULL, 'N'},
-	{"nooption",        optional_argument, NULL, 'O'},
+	{"nooption",        required_argument, NULL, 'O'},
 	{"require",         required_argument, NULL, 'Q'},
 	{"static",          required_argument, NULL, 'S'},
 	{"test",            no_argument,       NULL, 'T'},
