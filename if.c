@@ -94,14 +94,16 @@ if_opensockets(struct dhcpcd_ctx *ctx)
 	if ((ctx->link_fd = if_openlinksocket()) == -1)
 		return -1;
 
+	/* We use this socket for some operations without INET. */
 	ctx->pf_inet_fd = xsocket(PF_INET, SOCK_DGRAM, 0, O_CLOEXEC);
 	if (ctx->pf_inet_fd == -1)
 		return -1;
 
 #if defined(INET6) && defined(BSD)
 	ctx->pf_inet6_fd = xsocket(PF_INET6, SOCK_DGRAM, 0, O_CLOEXEC);
-	if (ctx->pf_inet6_fd == -1)
-		return -1;
+	/* Don't return an error so we at least work on kernels witout INET6
+	 * even though we expect INET6 support.
+	 * We will fail noisily elsewhere anyway. */
 #endif
 
 #ifdef IFLR_ACTIVE
