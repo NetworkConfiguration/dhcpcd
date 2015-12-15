@@ -61,7 +61,7 @@ dhcp_get_hostname(char *buf, size_t buf_len, const struct if_options *ifo)
 			return NULL;
 		buf[buf_len - 1] = '\0';
 	} else
-		strlcpy(buf, ifo->hostname, sizeof(buf));
+		strlcpy(buf, ifo->hostname, buf_len);
 
 	/* Deny sending of these local hostnames */
 	if (strcmp(buf, "(none)") == 0 ||
