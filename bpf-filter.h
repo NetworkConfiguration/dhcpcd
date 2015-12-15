@@ -34,8 +34,11 @@ static const struct bpf_insn arp_bpf_filter [] = {
 #ifndef BPF_SKIPTYPE
 	/* Make sure this is an ARP packet... */
 	BPF_STMT(BPF_LD + BPF_H + BPF_ABS, 12),
-	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ETHERTYPE_ARP, 0, 4),
+	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ETHERTYPE_ARP, 0, 6),
 #endif
+	/* Make sure this is for IP ... */
+	BPF_STMT(BPF_LD + BPF_H + BPF_ABS, 16 + BPF_ETHCOOK),
+	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ETHERTYPE_IP, 0, 4),
 	/* Make sure this is an ARP REQUEST... */
 	BPF_STMT(BPF_LD + BPF_H + BPF_ABS, 20 + BPF_ETHCOOK),
 	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ARPOP_REQUEST, 1, 0),
