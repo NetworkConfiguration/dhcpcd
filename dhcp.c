@@ -1931,7 +1931,11 @@ dhcp_arp_probed(struct arp_state *astate)
 		state->new = oldnew;
 	}
 #endif
-		
+
+	/* If we forked, stop here. */
+	if (astate->iface->ctx->options & DHCPCD_FORKED)
+		return;
+
 	arp_announce(astate);
 
 	/* Stop IPv4LL now we have a working DHCP address */
@@ -2135,6 +2139,9 @@ dhcp_timeout(void *arg)
 	struct dhcp_state *state = D_STATE(ifp);
 
 	dhcp_bind(ifp);
+	/* If we forked, stop here. */
+	if (ifp->ctx->options & DHCPCD_FORKED)
+		return;
 	state->interval = 0;
 	dhcp_discover(ifp);
 }
