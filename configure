@@ -21,7 +21,6 @@ TARGET=
 DEBUG=
 FORK=
 STATIC=
-INCLUDEDIR=
 DEVS=
 EMBEDDED=
 POLL=
@@ -78,8 +77,7 @@ for x do
 	--serviceexists) SERVICEEXISTS=$var;;
 	--servicecmd) SERVICECMD=$var;;
 	--servicestatus) SERVICESTATUS=$var;;
-	--includedir) eval INCLUDEDIR="$INCLUDEDIR${INCLUDEDIR:+ }$var";;
-	--datadir|--infodir) ;; # ignore autotools
+	--datadir|--infodir|--includedir) ;; # ignore autotools
 	--disable-maintainer-mode|--disable-dependency-tracking) ;;
 	--disable-silent-rules) ;;
 	-V|--version)
@@ -316,9 +314,6 @@ esac
 if [ "$STATIC" = yes ]; then
 	echo "LDFLAGS+=	-static" >>$CONFIG_MK
 fi
-for x in $INCLUDEDIR; do
-	echo "CPPFLAGS+=	-I$x" >>$CONFIG_MK
-done
 
 if [ -z "$DEBUG" -a -f .fslckout ]; then
 	printf "Found fossil checkout ... "
