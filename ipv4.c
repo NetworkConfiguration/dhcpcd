@@ -1166,6 +1166,13 @@ ipv4_applyaddr(void *arg)
 	 * notification right now via our link socket. */
 	if_initrt(ifp);
 	ipv4_buildroutes(ifp->ctx);
+	/* Announce the address */
+	if (ifo->options & DHCPCD_ARP) {
+		struct arp_state *astate;
+
+		if ((astate = arp_new(ifp, &state->addr)) != NULL)
+			arp_announce(astate);
+	}
 	if (state->state == DHS_BOUND) {
 		script_runreason(ifp, state->reason);
 		dhcpcd_daemonise(ifp->ctx);

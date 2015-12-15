@@ -1936,8 +1936,6 @@ dhcp_arp_probed(struct arp_state *astate)
 	if (astate->iface->ctx->options & DHCPCD_FORKED)
 		return;
 
-	arp_announce(astate);
-
 	/* Stop IPv4LL now we have a working DHCP address */
 	ipv4ll_drop(astate->iface);
 
