@@ -407,14 +407,13 @@ stop_interface(struct interface *ifp)
 	else
 		script_runreason(ifp, "STOPPED");
 
-stop:
 	/* Delete all timeouts for the interfaces */
 	eloop_q_timeout_delete(ctx->eloop, 0, NULL, ifp);
 
-	/* Remove the interface from our list */
-	TAILQ_REMOVE(ifp->ctx->ifaces, ifp, next);
-	if_free(ifp);
+	/* De-activate the interface */
+	ifp->active = 0;
 
+stop:
 	if (!(ctx->options & (DHCPCD_MASTER | DHCPCD_TEST)))
 		eloop_exit(ctx->eloop, EXIT_FAILURE);
 }
@@ -1019,6 +1018,8 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 			    ifp->name);
 		ifp->options->options |= DHCPCD_DEPARTED;
 		stop_interface(ifp);
+		TAILQ_REMOVE(ctx->ifaces, ifp, next);
+		if_free(ifp);
 		return 0;
 	}
 
@@ -1057,6 +1058,12 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 			dhcpcd_initstate(ifp, 0);
 			run_preinit(ifp);
 			iff = ifp;
+			iff->active = 0;
+		}
+		if (!iff->active) {
+			iff->active = 1;
+			dhcpcd_initstate(iff, 0);
+			run_preinit(iff);
 		}
 		if (action > 0)
 			dhcpcd_prestartinterface(iff);
@@ -1133,36 +1140,28 @@ reload_config(struct dhcpcd_ctx *ctx)
 static void
 reconf_reboot(struct dhcpcd_ctx *ctx, int action, int argc, char **argv, int oi)
 {
-	struct if_head *ifs;
-	struct interface *ifn, *ifp;
+	int i;
+	struct interface *ifp;
 
-	ifs = if_discover(ctx, argc - oi, argv + oi);
-	if (ifs == NULL) {
-		logger(ctx, LOG_ERR, "%s: if_discover: %m", __func__);
-		return;
-	}
-
-	while ((ifp = TAILQ_FIRST(ifs))) {
-		TAILQ_REMOVE(ifs, ifp, next);
-		if (!(ifp->active)) {
-			if_free(ifp);
-			continue;
+	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+		for (i = oi; i < argc; i++) {
+			if (strcmp(ifp->name, argv[i]) == 0)
+				break;
 		}
-		ifn = if_find(ctx->ifaces, ifp->name);
-		if (ifn) {
+		if (oi != argc && i == argc)
+			continue;
+		if (ifp->active) {
 			if (action)
-				if_reboot(ifn, argc, argv);
+				if_reboot(ifp, argc, argv);
 			else
-				ipv4_applyaddr(ifn);
-			if_free(ifp);
-		} else {
-			TAILQ_INSERT_TAIL(ctx->ifaces, ifp, next);
+				ipv4_applyaddr(ifp);
+		} else if (i != argc) {
+			ifp->active = 1;
 			dhcpcd_initstate1(ifp, argc, argv, 0);
 			run_preinit(ifp);
 			dhcpcd_prestartinterface(ifp);
 		}
 	}
-	free(ifs);
 }
 
 static void
@@ -1171,7 +1170,7 @@ stop_all_interfaces(struct dhcpcd_ctx *ctx, unsigned long long opts)
 	struct interface *ifp;
 
 	/* Drop the last interface first */
-	while ((ifp = TAILQ_LAST(ctx->ifaces, if_head)) != NULL) {
+	TAILQ_FOREACH_REVERSE(ifp, ctx->ifaces, if_head, next) {
 		if (ifp->options) {
 			ifp->options->options |= opts;
 			if (ifp->options->options & DHCPCD_RELEASE)
