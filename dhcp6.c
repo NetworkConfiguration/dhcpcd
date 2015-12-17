@@ -2692,7 +2692,9 @@ dhcp6_handledata(void *arg)
 	}
 
 	TAILQ_FOREACH(ifp, dctx->ifaces, next) {
-		if (ifp->index == (unsigned int)pkt.ipi6_ifindex)
+		if (ifp->active &&
+		    ifp->index == (unsigned int)pkt.ipi6_ifindex &&
+		    ifp->options->options & DHCPCD_DHCP6)
 			break;
 	}
 	if (ifp == NULL) {
