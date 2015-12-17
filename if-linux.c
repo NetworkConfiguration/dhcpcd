@@ -46,6 +46,7 @@
 #include <netinet/in.h>
 #include <net/route.h>
 
+#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <ctype.h>
@@ -377,6 +378,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 	size_t len;
 	struct rtmsg *rtm;
 	struct rtattr *rta;
+	unsigned int ifindex;
 
 	len = nlm->nlmsg_len - sizeof(*nlm);
 	if (len < sizeof(*rtm)) {
@@ -395,6 +397,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 
 	rta = (struct rtattr *)RTM_RTA(rtm);
 	len = RTM_PAYLOAD(nlm);
+	ifindex = 0;
 	while (RTA_OK(rta, len)) {
 		switch (rta->rta_type) {
 		case RTA_DST:
@@ -410,8 +413,8 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 			    sizeof(rt->src.s_addr));
 			break;
 		case RTA_OIF:
-			rt->iface = if_findindex(ctx->ifaces,
-			    *(unsigned int *)RTA_DATA(rta));
+			ifindex = *(unsigned int *)RTA_DATA(rta);
+			rt->iface = if_findindex(ctx->ifaces, ifindex);
 			break;
 		case RTA_PRIORITY:
 			rt->metric = *(unsigned int *)RTA_DATA(rta);
@@ -448,6 +451,11 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 		if ((ap = ipv4_findaddr(ctx, &rt->src)))
 			rt->iface = ap->iface;
 	}
+	/* If we still don't have an interface, create a temporary one */
+	if (rt->iface == NULL) {
+		rt->iface = if_newoif(ctx, ifindex);
+		assert(rt->iface != NULL);
+	}
 	return 0;
 }
 #endif
@@ -459,6 +467,7 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct nlmsghdr *nlm)
 	size_t len;
 	struct rtmsg *rtm;
 	struct rtattr *rta;
+	unsigned int ifindex;
 
 	len = nlm->nlmsg_len - sizeof(*nlm);
 	if (len < sizeof(*rtm)) {
@@ -489,8 +498,10 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct nlmsghdr *nlm)
 			    sizeof(rt->gate.s6_addr));
 			break;
 		case RTA_OIF:
-			rt->iface = if_findindex(ctx->ifaces,
-			    *(unsigned int *)RTA_DATA(rta));
+			ifindex = *(unsigned int *)RTA_DATA(rta);
+			rt->iface = if_findindex(ctx->ifaces, ifindex);
+			if (rt->iface == NULL)
+				rt->iface = if_newoif(ctx, ifindex);
 			break;
 		case RTA_PRIORITY:
 			rt->metric = *(unsigned int *)RTA_DATA(rta);
@@ -516,6 +527,7 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct nlmsghdr *nlm)
 		rta = RTA_NEXT(rta, len);
 	}
 
+	assert(rt->iface != NULL);
 	return 0;
 }
 #endif
@@ -1378,9 +1390,6 @@ if_route(unsigned char cmd, const struct rt *rt)
 		if (rt->gate.s_addr != htonl(INADDR_ANY))
 			add_attr_l(&nlm.hdr, sizeof(nlm), RTA_GATEWAY,
 			    &rt->gate.s_addr, sizeof(rt->gate.s_addr));
-		if (rt->gate.s_addr != htonl(INADDR_LOOPBACK))
-			add_attr_32(&nlm.hdr, sizeof(nlm), RTA_OIF,
-			    rt->iface->index);
 		if (subnet != -1) {
 			add_attr_l(&nlm.hdr, sizeof(nlm), RTA_PREFSRC,
 			    &src_addr.s_addr, sizeof(src_addr.s_addr));
@@ -1398,6 +1407,9 @@ if_route(unsigned char cmd, const struct rt *rt)
 			    (unsigned short)RTA_PAYLOAD(metrics));
 		}
 	}
+
+	if (rt->gate.s_addr != htonl(INADDR_LOOPBACK))
+		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_OIF, rt->iface->index);
 
 	if (rt->metric)
 		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_PRIORITY, rt->metric);

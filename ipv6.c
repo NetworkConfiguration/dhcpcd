@@ -1927,11 +1927,6 @@ nc_route(struct rt6 *ort, struct rt6 *nrt)
 			logger(nrt->iface->ctx, LOG_ERR, "if_route6 (CHG): %m");
 	}
 
-	/* If the old route does not have an interface, give it the
-	 * interface of the new route for context. */
-	if (ort && ort->iface == NULL)
-		ort->iface = nrt->iface;
-
 #ifdef HAVE_ROUTE_METRIC
 	/* With route metrics, we can safely add the new route before
 	 * deleting the old route. */

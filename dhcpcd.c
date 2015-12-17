@@ -1932,6 +1932,13 @@ exit1:
 		}
 		free(ctx.ifaces);
 	}
+	if (ctx.oifaces) {
+		while ((ifp = TAILQ_FIRST(ctx.oifaces))) {
+			TAILQ_REMOVE(ctx.oifaces, ifp, next);
+			if_free(ifp);
+		}
+		free(ctx.oifaces);
+	}
 	free(ctx.duid);
 	if (ctx.link_fd != -1) {
 		eloop_event_delete(ctx.eloop, ctx.link_fd);

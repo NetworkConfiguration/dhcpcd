@@ -579,6 +579,43 @@ if_findindex(struct if_head *ifaces, unsigned int idx)
 	return if_findindexname(ifaces, idx, NULL);
 }
 
+/* Creates a new interface just for handling route messages to the kernel
+ * if we ever need to change a route on an interface dhcpcd is NOT running on. */
+struct interface *
+if_newoif(struct dhcpcd_ctx *ctx, unsigned int idx)
+{
+	struct interface *ifp;
+
+	if (ctx->oifaces == NULL) {
+		if ((ctx->oifaces = malloc(sizeof(*ctx->oifaces))) == NULL) {
+			logger(ctx, LOG_ERR, "%s: malloc: %m", __func__);
+			return NULL;
+		}
+		TAILQ_INIT(ctx->oifaces);
+	} else {
+		TAILQ_FOREACH(ifp, ctx->oifaces, next) {
+			if (ifp->index == idx)
+				return ifp;
+		}
+	}
+
+	if ((ifp = calloc(1, sizeof(*ifp))) == NULL) {
+		logger(ctx, LOG_ERR, "%s: calloc: %m", __func__);
+		return NULL;
+	}
+
+	if (if_indextoname(idx, ifp->name) == NULL) {
+		logger(ctx, LOG_ERR, "%s: if_indextoname: %m", __func__);
+		free(ifp);
+		return NULL;
+	}
+
+	ifp->ctx = ctx;
+	ifp->index = idx;
+	TAILQ_INSERT_TAIL(ctx->oifaces, ifp, next);
+	return ifp;
+}
+
 int
 if_domtu(const struct interface *ifp, short int mtu)
 {

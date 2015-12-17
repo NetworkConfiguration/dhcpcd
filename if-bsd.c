@@ -58,6 +58,7 @@
 #  include <net80211/ieee80211_ioctl.h>
 #endif
 
+#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <fnmatch.h>
@@ -482,9 +483,11 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct rt_msghdr *rtm)
 	if (rtm->rtm_inits & RTV_MTU)
 		rt->mtu = (unsigned int)rtm->rtm_rmx.rmx_mtu;
 
-	if (rtm->rtm_index)
+	if (rtm->rtm_index) {
 		rt->iface = if_findindex(ctx->ifaces, rtm->rtm_index);
-	else if (rtm->rtm_addrs & RTA_IFP) {
+		if (rt->iface == NULL)
+			rt->iface = if_newoif(ctx, rtm->rtm_index);
+	} else if (rtm->rtm_addrs & RTA_IFP) {
 		struct sockaddr_dl *sdl;
 
 		sdl = (struct sockaddr_dl *)(void *)rti_info[RTAX_IFP];
@@ -501,6 +504,8 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct rt_msghdr *rtm)
 		if ((ia = ipv4_findaddr(ctx, &rt->dest)))
 			rt->iface = ia->iface;
 	}
+
+	assert(rt->iface != NULL);
 
 	return 0;
 }
@@ -863,9 +868,11 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct rt_msghdr *rtm)
 	if (rtm->rtm_inits & RTV_MTU)
 		rt->mtu = (unsigned int)rtm->rtm_rmx.rmx_mtu;
 
-	if (rtm->rtm_index)
+	if (rtm->rtm_index) {
 		rt->iface = if_findindex(ctx->ifaces, rtm->rtm_index);
-	else if (rtm->rtm_addrs & RTA_IFP) {
+		if (rt->iface == NULL)
+			rt->iface = if_newoif(ctx, rtm->rtm_index);
+	} else if (rtm->rtm_addrs & RTA_IFP) {
 		struct sockaddr_dl *sdl;
 
 		sdl = (struct sockaddr_dl *)(void *)rti_info[RTAX_IFP];
@@ -881,6 +888,8 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct rt_msghdr *rtm)
 		if ((ia = ipv6_findaddr(ctx, &rt->dest, 0)))
 			rt->iface = ia->iface;
 	}
+
+	assert(rt->iface != NULL);
 
 	return 0;
 }
