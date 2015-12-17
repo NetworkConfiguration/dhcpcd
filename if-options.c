@@ -2342,8 +2342,6 @@ read_config(struct dhcpcd_ctx *ctx,
 				continue;
 			}
 			ctx->ifcc++;
-			logger(ctx, LOG_DEBUG, "allowing interface %s",
-			    ctx->ifcv[ctx->ifcc - 1]);
 			continue;
 		}
 		/* Start of an ssid block, skip if not ours */
