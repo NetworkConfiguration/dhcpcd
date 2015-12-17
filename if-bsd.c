@@ -483,11 +483,9 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct rt_msghdr *rtm)
 	if (rtm->rtm_inits & RTV_MTU)
 		rt->mtu = (unsigned int)rtm->rtm_rmx.rmx_mtu;
 
-	if (rtm->rtm_index) {
+	if (rtm->rtm_index)
 		rt->iface = if_findindex(ctx->ifaces, rtm->rtm_index);
-		if (rt->iface == NULL)
-			rt->iface = if_newoif(ctx, rtm->rtm_index);
-	} else if (rtm->rtm_addrs & RTA_IFP) {
+	else if (rtm->rtm_addrs & RTA_IFP) {
 		struct sockaddr_dl *sdl;
 
 		sdl = (struct sockaddr_dl *)(void *)rti_info[RTAX_IFP];
@@ -868,11 +866,9 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct rt_msghdr *rtm)
 	if (rtm->rtm_inits & RTV_MTU)
 		rt->mtu = (unsigned int)rtm->rtm_rmx.rmx_mtu;
 
-	if (rtm->rtm_index) {
+	if (rtm->rtm_index)
 		rt->iface = if_findindex(ctx->ifaces, rtm->rtm_index);
-		if (rt->iface == NULL)
-			rt->iface = if_newoif(ctx, rtm->rtm_index);
-	} else if (rtm->rtm_addrs & RTA_IFP) {
+	else if (rtm->rtm_addrs & RTA_IFP) {
 		struct sockaddr_dl *sdl;
 
 		sdl = (struct sockaddr_dl *)(void *)rti_info[RTAX_IFP];

@@ -75,6 +75,7 @@ struct interface {
 	char alias[IF_NAMESIZE];
 #endif
 	unsigned int index;
+	int active;
 	unsigned int flags;
 	sa_family_t family;
 	unsigned char hwaddr[HWADDR_LEN];
@@ -111,7 +112,6 @@ struct dhcpcd_ctx {
 	unsigned char *duid;
 	size_t duid_len;
 	struct if_head *ifaces;
-	struct if_head *oifaces;	/* interfaces not directly controlled */
 
 	int pf_inet_fd;
 #if defined(INET6) && defined(BSD)

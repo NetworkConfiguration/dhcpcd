@@ -397,7 +397,6 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 
 	rta = (struct rtattr *)RTM_RTA(rtm);
 	len = RTM_PAYLOAD(nlm);
-	ifindex = 0;
 	while (RTA_OK(rta, len)) {
 		switch (rta->rta_type) {
 		case RTA_DST:
@@ -451,11 +450,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 		if ((ap = ipv4_findaddr(ctx, &rt->src)))
 			rt->iface = ap->iface;
 	}
-	/* If we still don't have an interface, create a temporary one */
-	if (rt->iface == NULL) {
-		rt->iface = if_newoif(ctx, ifindex);
-		assert(rt->iface != NULL);
-	}
+	assert(rt->iface != NULL);
 	return 0;
 }
 #endif
@@ -500,8 +495,6 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct nlmsghdr *nlm)
 		case RTA_OIF:
 			ifindex = *(unsigned int *)RTA_DATA(rta);
 			rt->iface = if_findindex(ctx->ifaces, ifindex);
-			if (rt->iface == NULL)
-				rt->iface = if_newoif(ctx, ifindex);
 			break;
 		case RTA_PRIORITY:
 			rt->metric = *(unsigned int *)RTA_DATA(rta);

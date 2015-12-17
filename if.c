@@ -244,7 +244,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 {
 	struct ifaddrs *ifaddrs, *ifa;
 	char *p;
-	int i;
+	int i, active;
 	struct if_head *ifs;
 	struct interface *ifp;
 #ifdef __linux__
@@ -293,6 +293,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		if (ifp)
 			continue;
 
+		active = 1;
 		if (argc > 0) {
 			for (i = 0; i < argc; i++) {
 #ifdef __linux__
@@ -308,9 +309,14 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 					break;
 #endif
 			}
-			if (i == argc)
-				continue;
-			p = argv[i];
+			if (i == argc) {
+				active = 0;
+				p =  ifa->ifa_name;
+#ifdef __linux__
+				strlcpy(ifn, ifa->ifa_name, sizeof(ifn));
+#endif
+			} else
+				p = argv[i];
 		} else {
 			p = ifa->ifa_name;
 #ifdef __linux__
@@ -322,16 +328,17 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 			if (argc == -1 && strcmp(argv[0], ifa->ifa_name) != 0)
 				continue;
 		}
+
 		for (i = 0; i < ctx->ifdc; i++)
 			if (!fnmatch(ctx->ifdv[i], p, 0))
 				break;
 		if (i < ctx->ifdc)
-			continue;
+			active = 0;
 		for (i = 0; i < ctx->ifac; i++)
 			if (!fnmatch(ctx->ifav[i], p, 0))
 				break;
 		if (ctx->ifac && i == ctx->ifac)
-			continue;
+			active = 0;
 
 #ifdef PLUGIN_DEV
 		/* Ensure that the interface name has settled */
@@ -343,7 +350,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		if (ifa->ifa_flags & (IFF_LOOPBACK | IFF_POINTOPOINT)) {
 			if ((argc == 0 || argc == -1) &&
 			    ctx->ifac == 0 && !if_hasconf(ctx, p))
-				continue;
+				active = 0;
 		}
 
 		if (if_vimaster(ctx, p) == 1) {
@@ -401,7 +408,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 #if defined(IFT_BRIDGE) || defined(IFT_PPP) || defined(IFT_PROPVIRTUAL)
 				/* Don't allow unless explicit */
 				if ((argc == 0 || argc == -1) &&
-				    ctx->ifac == 0 &&
+				    ctx->ifac == 0 && active &&
 				    !if_hasconf(ctx, ifp->name))
 				{
 					logger(ifp->ctx, LOG_DEBUG,
@@ -409,8 +416,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 					    " interface type and"
 					    " no config",
 					    ifp->name);
-					if_free(ifp);
-					continue;
+					active = 0;
 				}
 				/* FALLTHROUGH */
 #endif
@@ -438,13 +444,12 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 				if ((argc == 0 || argc == -1) &&
 				    ctx->ifac == 0 &&
 				    !if_hasconf(ctx, ifp->name))
-				{
-					if_free(ifp);
-					continue;
-				}
-				logger(ifp->ctx, LOG_WARNING,
-				    "%s: unsupported interface type %.2x",
-				    ifp->name, sdl->sdl_type);
+				    	active = false;
+				if (active)
+					logger(ifp->ctx, LOG_WARNING,
+					    "%s: unsupported"
+					    " interface type %.2x",
+					    ifp->name, sdl->sdl_type);
 				/* Pretend it's ethernet */
 				ifp->family = ARPHRD_ETHER;
 				break;
@@ -473,10 +478,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		if (ifp->family != ARPHRD_ETHER) {
 			if ((argc == 0 || argc == -1) &&
 			    ctx->ifac == 0 && !if_hasconf(ctx, ifp->name))
-			{
-				if_free(ifp);
-				continue;
-			}
+			    	active = 0;
 			switch (ifp->family) {
 			case ARPHRD_IEEE1394:
 			case ARPHRD_INFINIBAND:
@@ -492,9 +494,11 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 /* IFT already checked */
 #ifndef AF_LINK
 			default:
-				logger(ifp->ctx, LOG_WARNING,
-				    "%s: unsupported interface family %.2x",
-				    ifp->name, ifp->family);
+				if (active)
+					logger(ifp->ctx, LOG_WARNING,
+					    "%s: unsupported"
+					    " interface family %.2x",
+					    ifp->name, ifp->family);
 				break;
 #endif
 			}
@@ -502,14 +506,14 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 
 		if (!(ctx->options & (DHCPCD_DUMPLEASE | DHCPCD_TEST))) {
 			/* Handle any platform init for the interface */
-			if (if_init(ifp) == -1) {
+			if (active && if_init(ifp) == -1) {
 				logger(ifp->ctx, LOG_ERR, "%s: if_init: %m", p);
 				if_free(ifp);
 				continue;
 			}
 
 			/* Ensure that the MTU is big enough for DHCP */
-			if (if_getmtu(ifp) < MTU_MIN &&
+			if (if_getmtu(ifp) < MTU_MIN && active &&
 			    if_setmtu(ifp, MTU_MIN) == -1)
 			{
 				logger(ifp->ctx, LOG_ERR,
@@ -535,6 +539,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		}
 #endif
 
+		ifp->active = active;
 		TAILQ_INSERT_TAIL(ifs, ifp, next);
 	}
 
@@ -577,43 +582,6 @@ if_findindex(struct if_head *ifaces, unsigned int idx)
 {
 
 	return if_findindexname(ifaces, idx, NULL);
-}
-
-/* Creates a new interface just for handling route messages to the kernel
- * if we ever need to change a route on an interface dhcpcd is NOT running on. */
-struct interface *
-if_newoif(struct dhcpcd_ctx *ctx, unsigned int idx)
-{
-	struct interface *ifp;
-
-	if (ctx->oifaces == NULL) {
-		if ((ctx->oifaces = malloc(sizeof(*ctx->oifaces))) == NULL) {
-			logger(ctx, LOG_ERR, "%s: malloc: %m", __func__);
-			return NULL;
-		}
-		TAILQ_INIT(ctx->oifaces);
-	} else {
-		TAILQ_FOREACH(ifp, ctx->oifaces, next) {
-			if (ifp->index == idx)
-				return ifp;
-		}
-	}
-
-	if ((ifp = calloc(1, sizeof(*ifp))) == NULL) {
-		logger(ctx, LOG_ERR, "%s: calloc: %m", __func__);
-		return NULL;
-	}
-
-	if (if_indextoname(idx, ifp->name) == NULL) {
-		logger(ctx, LOG_ERR, "%s: if_indextoname: %m", __func__);
-		free(ifp);
-		return NULL;
-	}
-
-	ifp->ctx = ctx;
-	ifp->index = idx;
-	TAILQ_INSERT_TAIL(ctx->oifaces, ifp, next);
-	return ifp;
 }
 
 int

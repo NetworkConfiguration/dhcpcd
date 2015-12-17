@@ -101,7 +101,6 @@ int if_carrier(struct interface *);
 /* The below functions are provided by if-KERNEL.c */
 int if_conf(struct interface *);
 int if_init(struct interface *);
-struct interface *if_newoif(struct dhcpcd_ctx *, unsigned int);
 int if_getssid(struct interface *);
 int if_vimaster(const struct dhcpcd_ctx *ctx, const char *);
 int if_opensockets(struct dhcpcd_ctx *);
