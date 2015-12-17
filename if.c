@@ -607,7 +607,13 @@ if_cmp(const struct interface *si, const struct interface *ti)
 	int r;
 #endif
 
-	/* Check carrier status first */
+	/* Check active first */
+	if (si->active && !ti->active)
+		return -1;
+	if (!si->active && ti->active)
+		return 1;
+
+	/* Check carrier status next */
 	if (si->carrier > ti->carrier)
 		return -1;
 	if (si->carrier < ti->carrier)
