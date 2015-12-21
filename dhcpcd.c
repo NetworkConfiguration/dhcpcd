@@ -1482,16 +1482,12 @@ main(int argc, char **argv)
 		case 'f':
 			ctx.cffile = optarg;
 			break;
-#ifdef USE_SIGNALS
-		case 'g':
-			sig = SIGUSR1;
-			siga = "USR1";
-			break;
 		case 'j':
 			ctx.logfile = strdup(optarg);
 			logger_close(&ctx);
 			logger_open(&ctx);
 			break;
+#ifdef USE_SIGNALS
 		case 'k':
 			sig = SIGALRM;
 			siga = "ARLM";
@@ -1500,6 +1496,7 @@ main(int argc, char **argv)
 			sig = SIGHUP;
 			siga = "HUP";
 			break;
+		case 'g':
 		case 'p':
 			/* Force going via command socket as we're
 			 * out of user definable signals. */
