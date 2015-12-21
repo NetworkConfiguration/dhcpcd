@@ -444,7 +444,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 				if ((argc == 0 || argc == -1) &&
 				    ctx->ifac == 0 &&
 				    !if_hasconf(ctx, ifp->name))
-				    	active = false;
+					active = false;
 				if (active)
 					logger(ifp->ctx, LOG_WARNING,
 					    "%s: unsupported"
@@ -478,7 +478,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		if (ifp->family != ARPHRD_ETHER) {
 			if ((argc == 0 || argc == -1) &&
 			    ctx->ifac == 0 && !if_hasconf(ctx, ifp->name))
-			    	active = 0;
+				active = 0;
 			switch (ifp->family) {
 			case ARPHRD_IEEE1394:
 			case ARPHRD_INFINIBAND:
