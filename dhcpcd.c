@@ -1693,8 +1693,11 @@ main(int argc, char **argv)
 	}
 
 #ifdef USE_SIGNALS
-	if (!(ctx.options & DHCPCD_TEST) &&
-	    (sig == 0 || i == 4 || ctx.ifc != 0))
+	/* Test against siga instead of sig to avoid gcc
+	 * warning about a bogus potential signed overflow.
+	 * The end result will be the same. */
+	if ((siga == NULL || i == 4 || ctx.ifc != 0) &&
+	    !(ctx.options & DHCPCD_TEST))
 	{
 #endif
 		if (ctx.options & DHCPCD_MASTER)
