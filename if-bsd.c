@@ -252,12 +252,27 @@ static struct interface *
 if_findsdl(struct dhcpcd_ctx *ctx, struct sockaddr_dl *sdl)
 {
 
+	if (sdl->sdl_index)
+		return if_findindex(ctx->ifaces, sdl->sdl_index);
+
 	if (sdl->sdl_nlen) {
 		char ifname[IF_NAMESIZE];
+
 		memcpy(ifname, sdl->sdl_data, sdl->sdl_nlen);
 		ifname[sdl->sdl_nlen] = '\0';
 		return if_find(ctx->ifaces, ifname);
 	}
+	if (sdl->sdl_alen) {
+		struct interface *ifp;
+
+		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+			if (ifp->hwlen == sdl->sdl_alen &&
+			    memcmp(ifp->hwaddr,
+			    sdl->sdl_data, sdl->sdl_alen) == 0)
+				return ifp;
+		}
+	}
+
 	return NULL;
 }
 #endif
@@ -449,6 +464,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct rt_msghdr *rtm)
 {
 	char *cp;
 	struct sockaddr *sa, *rti_info[RTAX_MAX];
+	struct sockaddr_dl *sdl;
 
 	cp = (char *)(void *)(rtm + 1);
 	sa = (struct sockaddr *)(void *)cp;
@@ -486,10 +502,12 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct rt_msghdr *rtm)
 	if (rtm->rtm_index)
 		rt->iface = if_findindex(ctx->ifaces, rtm->rtm_index);
 	else if (rtm->rtm_addrs & RTA_IFP) {
-		struct sockaddr_dl *sdl;
-
 		sdl = (struct sockaddr_dl *)(void *)rti_info[RTAX_IFP];
 		rt->iface = if_findsdl(ctx, sdl);
+	} else if (rtm->rtm_addrs & RTA_GATEWAY) {
+		sdl = (struct sockaddr_dl *)(void *)rti_info[RTAX_GATEWAY];
+		if (sdl->sdl_family == AF_LINK)
+			rt->iface = if_findsdl(ctx, sdl);
 	}
 
 	/* If we don't have an interface and it's a host route, it maybe
@@ -791,6 +809,7 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct rt_msghdr *rtm)
 {
 	char *cp;
 	struct sockaddr *sa, *rti_info[RTAX_MAX];
+	struct sockaddr_dl *sdl;
 
 	cp = (char *)(void *)(rtm + 1);
 	sa = (struct sockaddr *)(void *)cp;
@@ -869,11 +888,14 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct rt_msghdr *rtm)
 	if (rtm->rtm_index)
 		rt->iface = if_findindex(ctx->ifaces, rtm->rtm_index);
 	else if (rtm->rtm_addrs & RTA_IFP) {
-		struct sockaddr_dl *sdl;
-
 		sdl = (struct sockaddr_dl *)(void *)rti_info[RTAX_IFP];
 		rt->iface = if_findsdl(ctx, sdl);
+	} else if (rtm->rtm_addrs & RTA_GATEWAY) {
+		sdl = (struct sockaddr_dl *)(void *)rti_info[RTAX_GATEWAY];
+		if (sdl->sdl_family == AF_LINK)
+			rt->iface = if_findsdl(ctx, sdl);
 	}
+
 	/* If we don't have an interface and it's a host route, it maybe
 	 * to a local ip via the loopback interface. */
 	if (rt->iface == NULL &&
