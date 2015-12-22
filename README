@@ -120,11 +120,10 @@ gmake-4 or any BSD make.
 Hooks
 -----
 Not all the hooks in dhcpcd-hooks are installed by default.
-By default we install 01-test, 02-dump, 10-mtu, 10-wpa_supplicant,
-15-timezone, 20-resolv.conf, 29-lookup-hostname and 30-hostname.
-The other hooks, 15-timezone, 29-lookup-hostname are installed
-to $(datadir)/dhcpcd/hooks by default and need to be copied to
-$(libexecdir)/dhcpcd-hooks for use.
+By default we install 01-test, 02-dump, 10-mtu, 20-resolv.conf and 30-hostname.
+The other hooks, 10-wpa_supplicant, 15-timezone, 29-lookup-hostname
+are installed to $(datadir)/dhcpcd/hooks by default and need to be
+copied to $(libexecdir)/dhcpcd-hooks for use.
 The configure program attempts to find hooks for systems you have installed.
 To add more simply
 ./configure -with-hook=ntp.conf

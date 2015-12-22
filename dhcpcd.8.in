@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd December 4, 2015
+.Dd December 22, 2015
 .Dt DHCPCD 8
 .Os
 .Sh NAME
@@ -205,8 +205,6 @@ in a lexical order.
 The default installation supplies the scripts
 .Pa 01-test ,
 .Pa 02-dump ,
-.Pa 10-wpa_supplicant ,
-.Pa 15-timezone ,
 .Pa 20-resolv.conf
 and
 .Pa 30-hostname .
@@ -218,6 +216,19 @@ See
 for details on how these scripts work.
 .Nm
 currently ignores the exit code of the script.
+.Pp
+More scripts are supplied in
+.Pa @DATADIR@/dhcpcd/hooks
+and need to be copied to
+.Pa @HOOKDIR@
+if you intend to use them.
+For example, you could install
+.Pa 10-wpa_supplicant
+so that
+.Nm
+can ensure that
+.Xr wpa_supplicant 8
+is always running on a hot-plugged wireless interface.
 .Ss Fine tuning
 You can fine-tune the behaviour of
 .Nm
@@ -377,7 +388,8 @@ If
 is not running, then it starts up as normal.
 This may also cause
 .Xr wpa_supplicant 8
-to reload its configuration for each interface as well.
+to reload its configuration for each interface as well if the
+relevant hook script has been installed.
 .It Fl N , Fl Fl renew Op Ar interface
 Notifies
 .Nm
@@ -391,8 +403,6 @@ Unlike the
 .Fl n , Fl Fl rebind
 option above, the configuration for
 .Nm
-and
-.Xr wpa_supplicant 8
 is not reloaded.
 .It Fl o , Fl Fl option Ar option
 Request the DHCP
