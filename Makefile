@@ -129,7 +129,10 @@ _confinstall:
 	test -e ${DESTDIR}${SYSCONFDIR}/dhcpcd.conf || \
 		${INSTALL} -m ${CONFMODE} dhcpcd.conf ${DESTDIR}${SYSCONFDIR}
 
-install: proginstall _maninstall _confinstall
+eginstall:
+	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@; cd ..; done
+
+install: proginstall _maninstall _confinstall eginstall
 
 clean:
 	rm -f ${OBJS} ${PROG} ${PROG}.core ${CLEANFILES}

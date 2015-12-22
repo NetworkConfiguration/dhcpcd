@@ -36,6 +36,8 @@ proginstall: ${DPLUGS}
 	${INSTALL} -d ${DESTDIR}${DEVDIR}
 	${INSTALL} -m ${BINMODE} ${PROG} ${DPLUGS} ${DESTDIR}${DEVDIR}
 
+eginstall:
+
 install: proginstall
 
 clean:
