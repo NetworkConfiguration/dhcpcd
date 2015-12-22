@@ -4,9 +4,13 @@ include ${TOP}/iconfig.mk
 
 SCRIPTSDIR=	${LIBEXECDIR}/dhcpcd-hooks
 SCRIPTS=	01-test 02-dump
-SCRIPTS+=	10-wpa_supplicant 15-timezone 20-resolv.conf
+SCRIPTS+=	10-wpa_supplicant 20-resolv.conf
 SCRIPTS+=	29-lookup-hostname 30-hostname
 SCRIPTS+=	${HOOKSCRIPTS}
+
+# Some hooks should not be installed by default
+FILESDIR=	${DATADIR}/dhcpcd/hooks
+FILES=		15-timezone
 
 50-ypbind: 50-ypbind.in
 	${SED} \
@@ -25,7 +29,11 @@ proginstall: ${HOOKSCRIPTS}
 	# We need to remove the old MTU change script if we at all can.
 	rm -f ${DESTDIR}${SCRIPTSDIR}/10-mtu
 
-install: proginstall
+eginstall:
+	${INSTALL} -d ${DESTDIR}${FILESDIR}
+	${INSTALL} -m ${NONBINMODE} ${FILES} ${DESTDIR}${FILESDIR}
+
+install: proginstall eginstall
 
 import: ${HOOKSCRIPTS}
 	${INSTALL} -d /tmp/${DISTPREFIX}/dhcpcd-hooks

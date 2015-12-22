@@ -52,6 +52,7 @@ for x do
 	--dbdir) DBDIR=$var;;
 	--rundir) RUNDIR=$var;;
 	--mandir) MANDIR=$var;;
+	--datadir) DATADIR=$var;;
 	--with-ccopts|CFLAGS) CFLAGS=$var;;
 	CC) CC=$var;;
 	CPPFLAGS) CPPFLAGS=$var;;
@@ -77,7 +78,7 @@ for x do
 	--serviceexists) SERVICEEXISTS=$var;;
 	--servicecmd) SERVICECMD=$var;;
 	--servicestatus) SERVICESTATUS=$var;;
-	--datadir|--infodir|--includedir) ;; # ignore autotools
+	--infodir|--includedir) ;; # ignore autotools
 	--disable-maintainer-mode|--disable-dependency-tracking) ;;
 	--disable-silent-rules) ;;
 	-V|--version)
@@ -160,6 +161,7 @@ done
 : ${DBDIR:=$STATEDIR/db}
 : ${RUNDIR:=$STATEDIR/run}
 : ${MANDIR:=${PREFIX:-/usr}/share/man}
+: ${DATADIR:=${PREFIX:-/usr}/share}
 
 eval SYSCONFDIR="$SYSCONFDIR"
 eval LIBDIR="$LIBDIR"
@@ -168,6 +170,7 @@ eval STATEDIR="$STATEDIR"
 eval DBDIR="$DBDIR"
 eval RUNDIR="$RUNDIR"
 eval MANDIR="$MANDIR"
+eval DATADIR="$DATADIR"
 
 _which()
 {
@@ -243,6 +246,7 @@ for x in SYSCONFDIR SBINDIR LIBDIR LIBEXECDIR DBDIR RUNDIR; do
 done
 echo "LIBDIR=		$LIBDIR" >>$CONFIG_MK
 echo "MANDIR=		$MANDIR" >>$CONFIG_MK
+echo "DATADIR=		$DATADIR" >>$CONFIG_MK
 
 # Always obey CC.
 if [ -n "$CC" ]; then
@@ -1283,6 +1287,7 @@ echo "   LIBEXECDIR =		$LIBEXECDIR"
 echo "   DBDIR =		$DBDIR"
 echo "   RUNDIR =		$RUNDIR"
 echo "   MANDIR =		$MANDIR"
+echo "   DATADIR =		$DATADIR"
 echo "   HOOKSCRIPTS =	$HOOKS"
 echo
 
