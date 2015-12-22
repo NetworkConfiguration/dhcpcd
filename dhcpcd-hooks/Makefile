@@ -5,12 +5,13 @@ include ${TOP}/iconfig.mk
 SCRIPTSDIR=	${LIBEXECDIR}/dhcpcd-hooks
 SCRIPTS=	01-test 02-dump
 SCRIPTS+=	10-wpa_supplicant 20-resolv.conf
-SCRIPTS+=	29-lookup-hostname 30-hostname
+SCRIPTS+=	30-hostname
 SCRIPTS+=	${HOOKSCRIPTS}
 
 # Some hooks should not be installed by default
 FILESDIR=	${DATADIR}/dhcpcd/hooks
 FILES=		15-timezone
+FILES+=		29-lookup-hostname
 
 50-ypbind: 50-ypbind.in
 	${SED} \
