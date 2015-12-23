@@ -1250,7 +1250,7 @@ if ! $HOOKSET; then
 			echo "YPDOMAIN_SUFFIX=" >>$CONFIG_MK
 		fi
 		echo "$YPBIND ($YPHOOK${YPOS:+ }$YPOS)"
-		HOOKS="$HOOKS${HOOKS:+ }$YPHOOK"
+		EGHOOKS="$EGHOOKS${EGHOOKS:+ }$YPHOOK"
 	else
 		echo "not found"
 	fi
@@ -1275,9 +1275,28 @@ if cd dhcpcd-hooks; then
 			esac
 		fi
 	done
+	for x in $EGHOOKSCRIPTS; do
+		printf "Finding example hook $x ... "
+		for h in [0-9][0-9]"-$x" \
+		    [0-9][0-9]"-$x.sh" \
+		    [0-9][0-9]"-$x.conf"
+		do
+			[ -e "$h" ] && break
+		done
+		if [ ! -e "$h" ]; then
+			echo "no"
+		else
+			echo "$h"
+			case " $EGHOOKS " in
+			*" $h "*)	;;
+			*)		EGHOOKS="$EGHOOKS${EGHOOKS:+ }$h";;
+			esac
+		fi
+	done
 	cd ..
 fi
 echo "HOOKSCRIPTS=	$HOOKS" >>$CONFIG_MK
+echo "EGHOOKSCRIPTS=	$EGHOOKS" >>$CONFIG_MK
 
 echo
 echo "   SYSCONFDIR =		$SYSCONFDIR"
@@ -1285,10 +1304,11 @@ echo "   SBINDIR =		$SBINDIR"
 echo "   LIBDIR =		$LIBDIR"
 echo "   LIBEXECDIR =		$LIBEXECDIR"
 echo "   DBDIR =		$DBDIR"
-echo "   RUNDIR =		$RUNDIR"
+echo "   RUNDIR =		$RUNDIR"	
 echo "   MANDIR =		$MANDIR"
 echo "   DATADIR =		$DATADIR"
 echo "   HOOKSCRIPTS =	$HOOKS"
+echo "   EGHOOKSCRIPTS =	$EGHOOKS"
 echo
 
 rm -f dhcpcd tests/test

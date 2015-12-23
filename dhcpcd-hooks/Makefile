@@ -13,6 +13,7 @@ FILESDIR=	${DATADIR}/dhcpcd/hooks
 FILES=		10-wpa_supplicant
 FILES+=		15-timezone
 FILES+=		29-lookup-hostname
+FILES+=		${EGHOOKSCRIPTS}
 
 50-ypbind: 50-ypbind.in
 	${SED} \
@@ -20,7 +21,7 @@ FILES+=		29-lookup-hostname
 		-e 's:@YPDOMAIN_SUFFIX@:${YPDOMAIN_SUFFIX}:g' \
 		50-ypbind.in > $@
 
-all: ${HOOKSCRIPTS}
+all: ${HOOKSCRIPTS} ${EGHOOKSCRIPTS}
 
 clean:
 	rm -f 50-ypbind
@@ -31,7 +32,7 @@ proginstall: ${HOOKSCRIPTS}
 	# We need to remove the old MTU change script if we at all can.
 	rm -f ${DESTDIR}${SCRIPTSDIR}/10-mtu
 
-eginstall:
+eginstall: ${EGHOOKSCRIPTS}
 	${INSTALL} -d ${DESTDIR}${FILESDIR}
 	${INSTALL} -m ${NONBINMODE} ${FILES} ${DESTDIR}${FILESDIR}
 
