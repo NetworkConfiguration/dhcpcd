@@ -835,7 +835,7 @@ dhcp_set_leasefile(char *leasefile, size_t len, int family,
 }
 
 static size_t
-dhcp_envoption1(struct dhcpcd_ctx *ctx, char **env, const char *prefix,
+dhcp_envoption1(char **env, const char *prefix,
     const struct dhcp_opt *opt, int vname, const uint8_t *od, size_t ol,
     const char *ifname)
 {
@@ -858,10 +858,8 @@ dhcp_envoption1(struct dhcpcd_ctx *ctx, char **env, const char *prefix,
 	if (env == NULL)
 		return e;
 	v = val = *env = malloc(e);
-	if (v == NULL) {
-		logger(ctx, LOG_ERR, "%s: %m", __func__);
+	if (v == NULL)
 		return 0;
-	}
 	if (vname)
 		v += snprintf(val, e, "%s_%s=", prefix, opt->var);
 	else
@@ -889,10 +887,14 @@ dhcp_envoption(struct dhcpcd_ctx *ctx, char **env, const char *prefix,
 
 	/* If no embedded or encapsulated options, it's easy */
 	if (opt->embopts_len == 0 && opt->encopts_len == 0) {
-		if (!(opt->type & RESERVED) &&
-		    dhcp_envoption1(ctx, env == NULL ? NULL : &env[0],
-		    prefix, opt, 1, od, ol, ifname))
-			return 1;
+		if (!(opt->type & RESERVED)) {
+			if (dhcp_envoption1(env == NULL ? NULL : &env[0],
+			    prefix, opt, 1, od, ol, ifname))
+				return 1;
+			else
+				logger(ctx, LOG_ERR, "%s: %s %d: %m",
+				    ifname, __func__, opt->option);
+		}
 		return 0;
 	}
 
@@ -928,8 +930,8 @@ dhcp_envoption(struct dhcpcd_ctx *ctx, char **env, const char *prefix,
 		if (eo == -1) {
 			if (env == NULL)
 				logger(ctx, LOG_ERR,
-				    "%s: %s: malformed embedded option"
-				    " %d:%d/%zu",
+				    "%s: %s %d.%d/%zu: "
+				    "malformed embedded option",
 				    ifname, __func__, opt->option,
 				    eopt->option, i);
 			goto out;
@@ -943,7 +945,7 @@ dhcp_envoption(struct dhcpcd_ctx *ctx, char **env, const char *prefix,
 			if (env == NULL &&
 			    (ol != 0 || !(eopt->type & OPTIONAL)))
 				logger(ctx, LOG_ERR,
-				    "%s: %s: missing embedded option %d:%d/%zu",
+				    "%s: %s %d.%d/%zu: missing embedded option",
 				    ifname, __func__, opt->option,
 				    eopt->option, i);
 			goto out;
@@ -953,9 +955,14 @@ dhcp_envoption(struct dhcpcd_ctx *ctx, char **env, const char *prefix,
 		 * This avoids new_fqdn_fqdn which would be silly. */
 		if (!(eopt->type & RESERVED)) {
 			ov = strcmp(opt->var, eopt->var);
-			if (dhcp_envoption1(ctx, env == NULL ? NULL : &env[n],
+			if (dhcp_envoption1(env == NULL ? NULL : &env[n],
 			    pfx, eopt, ov, od, (size_t)eo, ifname))
 				n++;
+			else if (env == NULL)
+				logger(ctx, LOG_ERR,
+				    "%s: %s %d.%d/%zu: %m",
+				    ifname, __func__,
+				    opt->option, eopt->option, i);
 		}
 		od += (size_t)eo;
 		ol -= (size_t)eo;
