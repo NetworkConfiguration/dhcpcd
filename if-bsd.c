@@ -35,13 +35,12 @@
 #include <sys/uio.h>
 #include <sys/utsname.h>
 
+#include "config.h"
+
 #include <arpa/inet.h>
 #include <net/bpf.h>
 #include <net/if.h>
 #include <net/if_dl.h>
-#ifdef __FreeBSD__ /* Needed so that including netinet6/in6_var.h works */
-#  include <net/if_var.h>
-#endif
 #include <net/if_media.h>
 #include <net/route.h>
 #include <netinet/if_ether.h>
@@ -76,7 +75,6 @@
 #undef IPV6CTL_ACCEPT_RTADV
 #endif
 
-#include "config.h"
 #include "common.h"
 #include "dhcp.h"
 #include "if.h"

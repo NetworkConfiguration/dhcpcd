@@ -368,8 +368,15 @@ fi
 
 case "$OS" in
 freebsd*|kfreebsd*)
+	# FreeBSD hide some newer POSIX APIs behind _GNU_SOURCE ...
 	echo "CPPFLAGS+=	-D_GNU_SOURCE" >>$CONFIG_MK
+	case "$OS" in
+	kfreebsd*)	echo "CPPFLAGS+=	-DBSD" >>$CONFIG_MK;;
+	esac
 	echo "DHCPCD_SRCS+=	if-bsd.c" >>$CONFIG_MK
+	# Whacky includes needed to buck the trend
+	echo "#include		<net/if.h>" >>$CONFIG_H
+	echo "#include		<net/if_var.h>" >>$CONFIG_H
 	;;
 linux*)
 	echo "CPPFLAGS+=	-D_GNU_SOURCE" >>$CONFIG_MK

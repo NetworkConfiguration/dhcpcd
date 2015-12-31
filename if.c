@@ -30,12 +30,11 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 
+#include "config.h"
+
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <netinet/in.h>
-#ifdef __FreeBSD__ /* Needed so that including netinet6/in6_var.h works */
-#  include <net/if_var.h>
-#endif
 #ifdef AF_LINK
 #  include <net/if_dl.h>
 #  include <net/if_types.h>
@@ -60,7 +59,6 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "config.h"
 #include "common.h"
 #include "dev.h"
 #include "dhcp.h"
