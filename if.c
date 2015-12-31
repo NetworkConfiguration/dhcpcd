@@ -444,7 +444,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 				if ((argc == 0 || argc == -1) &&
 				    ctx->ifac == 0 &&
 				    !if_hasconf(ctx, ifp->name))
-					active = false;
+					active = 0;
 				if (active)
 					logger(ifp->ctx, LOG_WARNING,
 					    "%s: unsupported"
