@@ -96,7 +96,8 @@ eexit:
 }
 
 void
-arp_report_conflicted(const struct arp_state *astate, const struct arp_msg *amsg)
+arp_report_conflicted(const struct arp_state *astate,
+    const struct arp_msg *amsg)
 {
 
 	if (amsg != NULL) {
