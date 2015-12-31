@@ -221,6 +221,9 @@ if [ -z "$OS" ]; then
 	case "$VENDOR" in
 	linux*|kfreebsd*) OS=$VENDOR; VENDOR= ;;
 	esac
+	case "$REST" in
+	gnu/kfreebsd*)		OS="kfreebsd"; VENDOR= ;;
+	esac
 	# Special case
 	case "$OS" in
 	gnu*) OS=hurd;; # No HURD support as yet
@@ -304,7 +307,7 @@ else
 	ALLOW_USR_LIBS=true
 fi
 case "$OS" in
-linux*|sunos*) ;;
+linux*|sunos*|kfreebsd*) ;;
 *)
 	if ! [ -x "$LDELF" -o -x /libexec/ld-elf.so.[0-9]* ] && \
 	    [ -z "$PREFIX" -o "$PREFIX" = "/" ]
@@ -375,6 +378,9 @@ freebsd*|kfreebsd*)
 	esac
 	echo "DHCPCD_SRCS+=	if-bsd.c" >>$CONFIG_MK
 	# Whacky includes needed to buck the trend
+	case "$OS" in
+	kfreebsd*)	echo "#include		<inttypes.h>" >>$CONFIG_H;
+	esac
 	echo "#include		<net/if.h>" >>$CONFIG_H
 	echo "#include		<net/if_var.h>" >>$CONFIG_H
 	;;
