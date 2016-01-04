@@ -1224,12 +1224,13 @@ dhcp_getoption(struct dhcpcd_ctx *ctx,
 		*os = 2; /* code + len */
 		*code = (unsigned int)*od++;
 		*len = (size_t)*od++;
-		if (*len > ol) {
+		if (*len > ol - *os) {
 			errno = EINVAL;
 			return NULL;
 		}
 	}
 
+	*oopt = NULL;
 	for (i = 0, opt = ctx->dhcp_opts; i < ctx->dhcp_opts_len; i++, opt++) {
 		if (opt->option == *code) {
 			*oopt = opt;
