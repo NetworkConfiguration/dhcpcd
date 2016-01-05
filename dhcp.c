@@ -1225,7 +1225,7 @@ dhcp_getoption(struct dhcpcd_ctx *ctx,
 		*code = (unsigned int)*od++;
 		*len = (size_t)*od++;
 		if (*len > ol - *os) {
-			errno = EINVAL;
+			errno = ERANGE;
 			return NULL;
 		}
 	}

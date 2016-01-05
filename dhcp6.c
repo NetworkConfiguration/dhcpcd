@@ -261,7 +261,7 @@ dhcp6_getoption(struct dhcpcd_ctx *ctx,
 		o = (const struct dhcp6_option *)od;
 		*len = ntohs(o->len);
 		if (*len > ol - *os) {
-			errno = EINVAL;
+			errno = ERANGE;
 			return NULL;
 		}
 		*code = ntohs(o->code);
