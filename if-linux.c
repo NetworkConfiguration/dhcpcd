@@ -870,7 +870,6 @@ send_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	struct sockaddr_nl snl;
 	struct iovec iov;
 	struct msghdr msg;
-	static unsigned int seq;
 
 	memset(&snl, 0, sizeof(snl));
 	if ((s = _open_link_socket(&snl, protocol)) == -1)
@@ -885,7 +884,7 @@ send_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	msg.msg_iovlen = 1;
 	/* Request a reply */
 	hdr->nlmsg_flags |= NLM_F_ACK;
-	hdr->nlmsg_seq = ++seq;
+	hdr->nlmsg_seq = ++ctx->seq;
 
 	if (sendmsg(s, &msg, 0) != -1)
 		r = get_netlink(ctx, ifp, s, 0, callback);

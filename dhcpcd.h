@@ -121,6 +121,7 @@ struct dhcpcd_ctx {
 	int pf_link_fd;
 #endif
 	int link_fd;
+	int seq;	/* route message sequence no */
 
 #ifdef USE_SIGNALS
 	sigset_t sigset;

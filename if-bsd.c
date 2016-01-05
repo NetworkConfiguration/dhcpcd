@@ -556,11 +556,11 @@ if_route(unsigned char cmd, const struct rt *rt)
 
 	memset(&rtm, 0, sizeof(rtm));
 	rtm.hdr.rtm_version = RTM_VERSION;
-	rtm.hdr.rtm_seq = 1;
 	rtm.hdr.rtm_type = cmd;
 	rtm.hdr.rtm_addrs = RTA_DST;
 	rtm.hdr.rtm_flags = RTF_UP;
 	rtm.hdr.rtm_pid = getpid();
+	rtm.hdr.rtm_seq = ++rt->iface->ctx->seq;
 #ifdef RTF_PINNED
 	if (cmd != RTM_ADD)
 		rtm.hdr.rtm_flags |= RTF_PINNED;
@@ -944,10 +944,10 @@ if_route6(unsigned char cmd, const struct rt6 *rt)
 
 	memset(&rtm, 0, sizeof(rtm));
 	rtm.hdr.rtm_version = RTM_VERSION;
-	rtm.hdr.rtm_seq = 1;
 	rtm.hdr.rtm_type = cmd;
 	rtm.hdr.rtm_flags = RTF_UP | (int)rt->flags;
 	rtm.hdr.rtm_pid = getpid();
+	rtm.hdr.rtm_seq = ++rt->iface->ctx->seq;
 #ifdef RTF_PINNED
 	if (rtm.hdr.rtm_type != RTM_ADD)
 		rtm.hdr.rtm_flags |= RTF_PINNED;
