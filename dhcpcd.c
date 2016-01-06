@@ -1832,7 +1832,7 @@ main(int argc, char **argv)
 	    dhcpcd_signals, dhcpcd_signals_len,
 	    signal_cb, &ctx) == -1)
 	{
-		logger(&ctx, LOG_ERR, "eloop_signal_mask: %m");
+		logger(&ctx, LOG_ERR, "eloop_signal_set_cb: %m");
 		goto exit_failure;
 	}
 	/* Save signal mask, block and redirect signals to our handler */
