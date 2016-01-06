@@ -599,7 +599,7 @@ dhcp_optlen(const struct dhcp_opt *opt, size_t dl)
 		/* All other types are variable length */
 		if (opt->len) {
 			if ((size_t)opt->len > dl) {
-				errno = ENODATA;
+				errno = EOVERFLOW;
 				return -1;
 			}
 			return (ssize_t)opt->len;
@@ -607,7 +607,7 @@ dhcp_optlen(const struct dhcp_opt *opt, size_t dl)
 		return (ssize_t)dl;
 	}
 	if (dl < sz) {
-		errno = ENODATA;
+		errno = EOVERFLOW;
 		return -1;
 	}
 
