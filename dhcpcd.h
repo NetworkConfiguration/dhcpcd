@@ -122,6 +122,7 @@ struct dhcpcd_ctx {
 #endif
 	int link_fd;
 	int seq;	/* route message sequence no */
+	int sseq;	/* successful seq no sent */
 
 #ifdef USE_SIGNALS
 	sigset_t sigset;
@@ -139,6 +140,13 @@ struct dhcpcd_ctx {
 	size_t vivso_len;
 
 	char *randomstate; /* original state */
+
+	/* Used to track the last routing message,
+	 * so we can ignore messages the parent process sent
+	 * but the child receives when forking.
+	 * getppid(2) is unreliable because we detach. */
+	pid_t ppid;	/* parent pid */
+	int pseq;	/* last seq in parent */
 
 #ifdef INET
 	struct dhcp_opt *dhcp_opts;

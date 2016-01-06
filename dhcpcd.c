@@ -322,29 +322,38 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 	if (ctx->options & DHCPCD_DAEMONISED ||
 	    !(ctx->options & DHCPCD_DAEMONISE))
 		return 0;
+	logger(ctx, LOG_DEBUG, "forking to background");
+
 	/* Setup a signal pipe so parent knows when to exit. */
 	if (pipe(sidpipe) == -1) {
 		logger(ctx, LOG_ERR, "pipe: %m");
 		return 0;
 	}
-	logger(ctx, LOG_DEBUG, "forking to background");
+
+	/* Store the pid and routing message seq number so we can identify
+	 * the last message successfully sent to the kernel.
+	 * This allows us to ignore all messages we sent after forking
+	 * and detaching. */
+	ctx->ppid = getpid();
+	ctx->pseq = ctx->sseq;
+
 	switch (pid = fork()) {
 	case -1:
 		logger(ctx, LOG_ERR, "fork: %m");
 		return 0;
 	case 0:
 		setsid();
+		/* Notify parent it's safe to exit as we've detached. */
+		close(sidpipe[0]);
+		if (write(sidpipe[1], &buf, 1) == -1)
+			logger(ctx, LOG_ERR, "failed to notify parent: %m");
+		close(sidpipe[1]);
 		/* Some polling methods don't survive after forking,
 		 * so ensure we can requeue all our events. */
 		if (eloop_requeue(ctx->eloop) == -1) {
 			logger(ctx, LOG_ERR, "eloop_requeue: %m");
 			eloop_exit(ctx->eloop, EXIT_FAILURE);
 		}
-		/* Notify parent it's safe to exit as we've detached. */
-		close(sidpipe[0]);
-		if (write(sidpipe[1], &buf, 1) == -1)
-			logger(ctx, LOG_ERR, "failed to notify parent: %m");
-		close(sidpipe[1]);
 		if ((fd = open(_PATH_DEVNULL, O_RDWR, 0)) != -1) {
 			dup2(fd, STDIN_FILENO);
 			dup2(fd, STDOUT_FILENO);

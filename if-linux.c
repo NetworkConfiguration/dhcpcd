@@ -886,9 +886,10 @@ send_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	hdr->nlmsg_flags |= NLM_F_ACK;
 	hdr->nlmsg_seq = ++ctx->seq;
 
-	if (sendmsg(s, &msg, 0) != -1)
+	if (sendmsg(s, &msg, 0) != -1) {
+		ctx->sseq = ctx-seq;
 		r = get_netlink(ctx, ifp, s, 0, callback);
-	else
+	} else
 		r = -1;
 	close(s);
 	return r;
