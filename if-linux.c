@@ -969,7 +969,7 @@ static struct nlattr *
 nla_next(struct nlattr *nla, size_t *rem)
 {
 
-	*rem -= NLA_ALIGN(nla->nla_len);
+	*rem -= (size_t)NLA_ALIGN(nla->nla_len);
 	return (struct nlattr *)(void *)((char *)nla + NLA_ALIGN(nla->nla_len));
 }
 
