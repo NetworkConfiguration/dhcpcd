@@ -884,10 +884,12 @@ send_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	msg.msg_iovlen = 1;
 	/* Request a reply */
 	hdr->nlmsg_flags |= NLM_F_ACK;
-	hdr->nlmsg_seq = ++ctx->seq;
+	hdr->nlmsg_seq = (uint32_t)++ctx->seq;
+	if ((unsigned int)ctx->seq > UINT32_MAX)
+		ctx->seq = 0;
 
 	if (sendmsg(s, &msg, 0) != -1) {
-		ctx->sseq = ctx-seq;
+		ctx->sseq = ctx->seq;
 		r = get_netlink(ctx, ifp, s, 0, callback);
 	} else
 		r = -1;
