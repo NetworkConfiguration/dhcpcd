@@ -41,3 +41,4 @@ install: proginstall eginstall
 import: ${HOOKSCRIPTS}
 	${INSTALL} -d /tmp/${DISTPREFIX}/dhcpcd-hooks
 	${INSTALL} -m ${NONBINMODE} ${SCRIPTS} /tmp/${DISTPREFIX}/dhcpcd-hooks
+	${INSTALL} -m ${NONBINMODE} ${FILES} /tmp/${DISTPREFIX}/dhcpcd-hooks
