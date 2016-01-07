@@ -249,7 +249,7 @@ for x in SYSCONFDIR SBINDIR LIBDIR LIBEXECDIR DBDIR RUNDIR; do
 done
 echo "LIBDIR=		$LIBDIR" >>$CONFIG_MK
 echo "MANDIR=		$MANDIR" >>$CONFIG_MK
-echo "DATADIR=		$DATADIR" >>$CONFIG_MK
+echo "DATADIR=	$DATADIR" >>$CONFIG_MK
 
 # Always obey CC.
 if [ -n "$CC" ]; then
