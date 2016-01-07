@@ -2789,6 +2789,16 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 		    get_option_addr(ifp->ctx,
 		    &lease->server, dhcp, DHO_SERVERID) != 0)
 			lease->server.s_addr = INADDR_ANY;
+
+		/* Test for rapid commit in the OFFER */
+		if (!(ifp->ctx->options & DHCPCD_TEST) &&
+		    has_option_mask(ifo->requestmask, DHO_RAPIDCOMMIT) &&
+		    get_option(ifp->ctx, dhcp, DHO_RAPIDCOMMIT, NULL))
+		{
+			state->state = DHS_REQUEST;
+			goto rapidcommit;
+		}
+
 		log_dhcp(LOG_INFO, "offered", ifp, dhcp, from);
 		free(state->offer);
 		state->offer = dhcp;
@@ -2831,6 +2841,20 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 			return;
 		}
 
+		if (state->state == DHS_DISCOVER) {
+			/* We only allow ACK of rapid commit DISCOVER. */
+			if (has_option_mask(ifo->requestmask,
+			    DHO_RAPIDCOMMIT) &&
+			    get_option(ifp->ctx, dhcp, DHO_RAPIDCOMMIT, NULL))
+				state->state = DHS_REQUEST;
+			else {
+				log_dhcp(LOG_DEBUG, "ignoring ack of",
+				    ifp, dhcp, from);
+				return;
+			}
+		}
+
+rapidcommit:
 		if (!(ifo->options & DHCPCD_INFORM))
 			log_dhcp(LOG_DEBUG, "acknowledged", ifp, dhcp, from);
 		else
