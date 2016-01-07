@@ -2168,7 +2168,7 @@ read_config(struct dhcpcd_ctx *ctx,
 	buflen = 0;
 
 	/* Parse our embedded options file */
-	if (ifname == NULL) {
+	if (ifname == NULL && !(ctx->options & DHCPCD_PRINT_PIDFILE)) {
 		/* Space for initial estimates */
 #if defined(INET) && defined(INITDEFINES)
 		ifo->dhcp_override =
