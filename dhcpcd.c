@@ -109,7 +109,7 @@ static void
 usage(void)
 {
 
-printf("usage: "PACKAGE"\t[-46ABbDdEGgHJKkLnpqTVw]\n"
+printf("usage: "PACKAGE"\t[-46ABbDdEGgHJKkLnPpqTVw]\n"
 	"\t\t[-C, --nohook hook] [-c, --script script]\n"
 	"\t\t[-e, --env value] [-F, --fqdn FQDN] [-f, --config file]\n"
 	"\t\t[-h, --hostname hostname] [-I, --clientid clientid]\n"
@@ -1477,7 +1477,9 @@ main(int argc, char **argv)
 	ctx.udp_fd = -1;
 #endif
 	i = 0;
-	while ((opt = getopt_long(argc, argv, IF_OPTS, cf_options, &oi)) != -1)
+	while ((opt = getopt_long(argc, argv,
+	    ctx.options & DHCPCD_PRINT_PIDFILE ? NOERR_IF_OPTS : IF_OPTS,
+	    cf_options, &oi)) != -1)
 	{
 		switch (opt) {
 		case '4':
@@ -1518,6 +1520,9 @@ main(int argc, char **argv)
 			siga = "USR1";
 			break;
 #endif
+		case 'P':
+			ctx.options |= DHCPCD_PRINT_PIDFILE;
+			break;
 		case 'T':
 			i = 1;
 			break;
@@ -1528,6 +1533,8 @@ main(int argc, char **argv)
 			i = 2;
 			break;
 		case '?':
+			if (ctx.options & DHCPCD_PRINT_PIDFILE)
+				continue;
 			usage();
 			goto exit_failure;
 		}
@@ -1539,10 +1546,15 @@ main(int argc, char **argv)
 	ctx.ifv = argv + optind;
 
 	ifo = read_config(&ctx, NULL, NULL, NULL);
-	if (ifo == NULL)
+	if (ifo == NULL) {
+		if (ctx.options & DHCPCD_PRINT_PIDFILE)
+			goto printpidfile;
 		goto exit_failure;
+	}
 	opt = add_options(&ctx, NULL, ifo, argc, argv);
 	if (opt != 1) {
+		if (ctx.options & DHCPCD_PRINT_PIDFILE)
+			goto printpidfile;
 		if (opt == 0)
 			usage();
 		goto exit_failure;
@@ -1576,7 +1588,7 @@ main(int argc, char **argv)
 #endif
 		goto exit_success;
 	}
-	ctx.options = ifo->options;
+	ctx.options |= ifo->options;
 	if (i == 1 || i == 3) {
 		if (i == 1)
 			ctx.options |= DHCPCD_TEST;
@@ -1592,17 +1604,9 @@ main(int argc, char **argv)
 
 	if (ctx.options & DHCPCD_DEBUG)
 		logger_mask(&ctx, LOG_UPTO(LOG_DEBUG));
-	if (ctx.options & DHCPCD_QUIET) {
-		i = open(_PATH_DEVNULL, O_RDWR);
-		if (i == -1)
-			logger(&ctx, LOG_ERR, "%s: open: %m", __func__);
-		else {
-			dup2(i, STDERR_FILENO);
-			close(i);
-		}
-	}
 
 	if (!(ctx.options & (DHCPCD_TEST | DHCPCD_DUMPLEASE))) {
+printpidfile:
 		/* If we have any other args, we should run as a single dhcpcd
 		 *  instance for that interface. */
 		if (optind == argc - 1 && !(ctx.options & DHCPCD_MASTER)) {
@@ -1631,6 +1635,10 @@ main(int argc, char **argv)
 			snprintf(ctx.pidfile, sizeof(ctx.pidfile),
 			    PIDFILE, "", "", "");
 			ctx.options |= DHCPCD_MASTER;
+		}
+		if (ctx.options & DHCPCD_PRINT_PIDFILE) {
+			printf("%s\n", ctx.pidfile);
+			goto exit_success;
 		}
 	}
 

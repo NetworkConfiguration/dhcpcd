@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2015 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2016 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -144,6 +144,7 @@ const struct option cf_options[] = {
 	{"master",          no_argument,       NULL, 'M'},
 	{"renew",           no_argument,       NULL, 'N'},
 	{"nooption",        required_argument, NULL, 'O'},
+	{"printpidfile",    no_argument,       NULL, 'P'},
 	{"require",         required_argument, NULL, 'Q'},
 	{"static",          required_argument, NULL, 'S'},
 	{"test",            no_argument,       NULL, 'T'},
@@ -684,6 +685,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	case 'n': /* FALLTHROUGH */
 	case 'x': /* FALLTHROUGH */
 	case 'N': /* FALLTHROUGH */
+	case 'P': /* FALLTHROUGH */
 	case 'T': /* FALLTHROUGH */
 	case 'U': /* FALLTHROUGH */
 	case 'V': /* We need to handle non interface options */
@@ -2400,7 +2402,9 @@ add_options(struct dhcpcd_ctx *ctx, const char *ifname,
 	 * only use the dhcpcd.conf entry for that. */
 	if (ifname != NULL)
 		wait_opts = ifo->options & DHCPCD_WAITOPTS;
-	while ((opt = getopt_long(argc, argv, IF_OPTS, cf_options, &oi)) != -1)
+	while ((opt = getopt_long(argc, argv,
+	    ctx->options & DHCPCD_PRINT_PIDFILE ? NOERR_IF_OPTS : IF_OPTS,
+	    cf_options, &oi)) != -1)
 	{
 		r = parse_option(ctx, ifname, ifo, opt, optarg, NULL, NULL);
 		if (r != 1)

@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2015 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2016 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -112,6 +112,10 @@ logger(struct dhcpcd_ctx *ctx, int pri, const char *fmt, ...)
 #ifndef HAVE_PRINTF_M
 	char fmt_cpy[1024];
 #endif
+
+	/* If we're printing the pidfile, don't do anything. */
+	if (ctx != NULL && ctx->options & DHCPCD_PRINT_PIDFILE)
+		return;
 
 	serrno = errno;
 	va_start(va, fmt);
