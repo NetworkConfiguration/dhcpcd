@@ -493,9 +493,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct rt_msghdr *rtm)
 		rt->net.s_addr = INADDR_BROADCAST;
 	COPYOUT(rt->gate, rti_info[RTAX_GATEWAY]);
 	COPYOUT(rt->src, rti_info[RTAX_IFA]);
-
-	if (rtm->rtm_inits & RTV_MTU)
-		rt->mtu = (unsigned int)rtm->rtm_rmx.rmx_mtu;
+	rt->mtu = (unsigned int)rtm->rtm_rmx.rmx_mtu;
 
 	if (rtm->rtm_index)
 		rt->iface = if_findindex(ctx->ifaces, rtm->rtm_index);
@@ -886,9 +884,7 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct rt_msghdr *rtm)
 	} else
 		ipv6_mask(&rt->net, 128);
 	COPYOUT6(rt->gate, rti_info[RTAX_GATEWAY]);
-
-	if (rtm->rtm_inits & RTV_MTU)
-		rt->mtu = (unsigned int)rtm->rtm_rmx.rmx_mtu;
+	rt->mtu = (unsigned int)rtm->rtm_rmx.rmx_mtu;
 
 	if (rtm->rtm_index)
 		rt->iface = if_findindex(ctx->ifaces, rtm->rtm_index);

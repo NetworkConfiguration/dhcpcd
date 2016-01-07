@@ -2170,14 +2170,15 @@ dhcp_message_new(const struct in_addr *addr, const struct in_addr *mask)
 static int
 dhcp_arp_address(struct interface *ifp)
 {
-	const struct dhcp_state *state;
+	struct dhcp_state *state;
 	struct in_addr addr;
 	struct ipv4_addr *ia;
 	struct arp_state *astate;
 
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 
-	state = D_CSTATE(ifp);
+	state = D_STATE(ifp);
+	state->state = DHS_PROBE;
 	addr.s_addr = state->offer->yiaddr == INADDR_ANY ?
 	    state->offer->ciaddr : state->offer->yiaddr;
 	/* If the interface already has the address configured
@@ -2641,7 +2642,7 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 		/* Before we supported FORCERENEW we closed off the raw
 		 * port so we effectively ignored all messages.
 		 * As such we'll not log by default here. */
-		//log_dhcp(LOG_DEBUG, "bound, ignoring", iface, dhcp, from);
+		//log_dhcp(LOG_DEBUG, "bound, ignoring", ifp, dhcp, from);
 		return;
 	}
 
@@ -2653,6 +2654,13 @@ dhcp_handledhcp(struct interface *ifp, struct dhcp_message **dhcpp,
 		    inet_ntoa(*from));
 		return;
 	}
+
+	if (state->state == DHS_PROBE) {
+		/* Ignore any DHCP messages whilst probing a lease to bind. */
+		log_dhcp(LOG_DEBUG, "probing, ignoring", ifp, dhcp, from);
+		return;
+	}
+
 	/* reset the message counter */
 	state->interval = 0;
 
