@@ -1020,11 +1020,12 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 			errno = ESRCH;
 			return -1;
 		}
-		if (ifp->active)
+		if (ifp->active) {
 			logger(ctx, LOG_DEBUG, "%s: interface departed",
 			    ifp->name);
-		ifp->options->options |= DHCPCD_DEPARTED;
-		stop_interface(ifp);
+			ifp->options->options |= DHCPCD_DEPARTED;
+			stop_interface(ifp);
+		}
 		TAILQ_REMOVE(ctx->ifaces, ifp, next);
 		if_free(ifp);
 		return 0;
