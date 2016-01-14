@@ -1031,15 +1031,6 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 		return 0;
 	}
 
-	/* If running off an interface list, check it's in it. */
-	if (ctx->ifc && action != 2) {
-		for (i = 0; i < ctx->ifc; i++)
-			if (strcmp(ctx->ifv[i], ifname) == 0)
-				break;
-		if (i >= ctx->ifc)
-			return 0;
-	}
-
 	i = -1;
 	ifs = if_discover(ctx, -1, UNCONST(argv));
 	if (ifs == NULL) {
@@ -1047,33 +1038,42 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 		return -1;
 	}
 	TAILQ_FOREACH_SAFE(ifp, ifs, next, ifn) {
-		if (!ifp->active || strcmp(ifp->name, ifname) != 0)
+		if (strcmp(ifp->name, ifname) != 0)
 			continue;
+
+		/* If running off an interface list, check it's in it. */
+		if (ctx->ifc) {
+			for (i = 0; i < ctx->ifc; i++)
+				if (strcmp(ctx->ifv[i], ifname) == 0)
+					break;
+			if (i >= ctx->ifc)
+				ifp->active = 0;
+		}
+
 		i = 0;
 		/* Check if we already have the interface */
 		iff = if_find(ctx->ifaces, ifp->name);
 		if (iff) {
-			logger(ctx, LOG_DEBUG, "%s: interface updated", iff->name);
+			if (iff->active)
+				logger(ctx, LOG_DEBUG, "%s: interface updated",
+				    iff->name);
 			/* The flags and hwaddr could have changed */
 			iff->flags = ifp->flags;
 			iff->hwlen = ifp->hwlen;
 			if (ifp->hwlen != 0)
 				memcpy(iff->hwaddr, ifp->hwaddr, iff->hwlen);
 		} else {
-			logger(ctx, LOG_DEBUG, "%s: interface added", ifp->name);
 			TAILQ_REMOVE(ifs, ifp, next);
 			TAILQ_INSERT_TAIL(ctx->ifaces, ifp, next);
+			if (!ifp->active)
+				continue;
+			logger(ctx, LOG_DEBUG, "%s: interface added",
+			    ifp->name);
 			dhcpcd_initstate(ifp, 0);
 			run_preinit(ifp);
 			iff = ifp;
-			iff->active = 0;
 		}
-		if (!iff->active) {
-			iff->active = 1;
-			dhcpcd_initstate(iff, 0);
-			run_preinit(iff);
-		}
-		if (action > 0)
+		if (action > 0 && iff->active)
 			dhcpcd_prestartinterface(iff);
 	}
 
