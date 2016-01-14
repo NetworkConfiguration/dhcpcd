@@ -318,6 +318,12 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 			return 0;
 	}
 
+	if (ctx->options & DHCPCD_ONESHOT) {
+		logger(ctx, LOG_INFO, "exiting due to oneshot");
+		eloop_exit(ctx->eloop, EXIT_SUCCESS);
+		return 0;
+	}
+
 	eloop_timeout_delete(ctx->eloop, handle_exit_timeout, ctx);
 	if (ctx->options & DHCPCD_DAEMONISED ||
 	    !(ctx->options & DHCPCD_DAEMONISE))

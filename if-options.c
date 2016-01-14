@@ -153,6 +153,9 @@ const struct option cf_options[] = {
 	{"whitelist",       required_argument, NULL, 'W'},
 	{"blacklist",       required_argument, NULL, 'X'},
 	{"denyinterfaces",  required_argument, NULL, 'Z'},
+	{"oneshot",         no_argument,       NULL, '1'},
+	{"ipv4only",        no_argument,       NULL, '4'},
+	{"ipv6only",        no_argument,       NULL, '6'},
 	{"arping",          required_argument, NULL, O_ARPING},
 	{"destination",     required_argument, NULL, O_DESTINATION},
 	{"fallback",        required_argument, NULL, O_FALLBACK},
@@ -164,8 +167,6 @@ const struct option cf_options[] = {
 	{"ipv6ra_own",      no_argument,       NULL, O_IPV6RA_OWN},
 	{"ipv6ra_own_default", no_argument,    NULL, O_IPV6RA_OWN_D},
 	{"ipv6ra_accept_nopublic", no_argument, NULL, O_IPV6RA_ACCEPT_NOPUBLIC},
-	{"ipv4only",        no_argument,       NULL, '4'},
-	{"ipv6only",        no_argument,       NULL, '6'},
 	{"ipv4",            no_argument,       NULL, O_IPV4},
 	{"noipv4",          no_argument,       NULL, O_NOIPV4},
 	{"ipv6",            no_argument,       NULL, O_IPV6},
@@ -1177,6 +1178,9 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	case 'Z':
 		if (ifname == NULL)
 			ctx->ifdv = splitv(ctx, &ctx->ifdc, ctx->ifdv, arg);
+		break;
+	case '1':
+		ifo->options |= DHCPCD_ONESHOT;
 		break;
 	case '4':
 		ifo->options &= ~DHCPCD_IPV6;
