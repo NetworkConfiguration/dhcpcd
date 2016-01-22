@@ -236,7 +236,6 @@ struct ipv6_ctx {
 };
 
 struct ipv6_ctx *ipv6_init(struct dhcpcd_ctx *);
-ssize_t ipv6_printaddr(char *, size_t, const uint8_t *, const char *);
 int ipv6_makestableprivate(struct in6_addr *addr,
     const struct in6_addr *prefix, int prefix_len,
     const struct interface *ifp, int *dad_counter);
