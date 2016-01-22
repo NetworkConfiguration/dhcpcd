@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2015 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2016 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -25,6 +25,9 @@
  * SUCH DAMAGE.
  */
 
+#if (defined(__unix__) || defined(unix)) && !defined(USG)
+#include <sys/param.h>
+#endif
 #include <sys/time.h>
 
 #include <assert.h>
@@ -36,8 +39,64 @@
 #include <unistd.h>
 
 /* config.h should define HAVE_KQUEUE, HAVE_EPOLL, etc */
+#ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
+
+/* Attempt to autodetect kqueue or epoll.
+ * Failing that, fall back to pselect. */
+#if !defined(HAVE_KQUEUE) && !defined(HAVE_EPOLL) && !defined(HAVE_PSELECT) && \
+    !defined(HAVE_POLLTS) && !defined(HAVE_PPOLL)
+#if defined(BSD)
+/* Assume BSD has a working sys/queue.h and kqueue(2) interface */
+#define HAVE_SYS_QUEUE_H
+#define HAVE_KQUEUE
+#elif defined(__linux__)
+/* Assume Linux has a working epoll(3) interface */
+#define HAVE_EPOLL
+#else
+/* pselect(2) is a POSIX standard. */
+#define HAVE_PSELECT
+#endif
+#endif
+
+/* pollts and ppoll require poll.
+ * pselect is wrapped in a pollts/ppoll style interface
+ * and as such require poll as well. */
+#if defined(HAVE_PSELECT) || defined(HAVE_POLLTS) || defined(HAVE_PPOLL)
+#ifndef HAVE_POLL
+#define HAVE_POLL
+#endif
+#if defined(HAVE_POLLTS)
+#define POLLTS pollts
+#elif defined(HAVE_PPOLL)
+#define POLLTS ppoll
+#else
+#define POLLTS eloop_pollts
+#define ELOOP_NEED_POLLTS
+#endif
+#endif
+
 #include "eloop.h"
+
+/* Our structures require TAILQ macros, which really every libc should
+ * ship as they are useful beyond belief.
+ * Sadly some libc's don't have sys/queue.h and some that do don't have
+ * the TAILQ_FOREACH macro. For those that don't, the application using
+ * this implementation will need to ship a working queue.h somewhere.
+ * If we don't have sys/queue.h found in config.h, then
+ * allow QUEUE_H to override loading queue.h in the current directory. */
+#ifndef TAILQ_FOREACH
+#ifdef HAVE_SYS_QUEUE_H
+#include <sys/queue.h>
+#elif defined(QUEUE_H)
+#define __QUEUE_HEADER(x) #x
+#define _QUEUE_HEADER(x) __QUEUE_HEADER(x)
+#include _QUEUE_HEADER(QUEUE_H)
+#else
+#include "queue.h"
+#endif
+#endif
 
 #ifndef UNUSED
 #define UNUSED(a) (void)((a))
@@ -67,12 +126,62 @@
 #define UPTR(x)	(x)
 #define LENC(x)	((int)(x))
 #endif
-#define eloop_event_setup_fds(eloop)
 #elif defined(HAVE_EPOLL)
 #include <sys/epoll.h>
-#define eloop_event_setup_fds(eloop)
-#else
+#elif defined(HAVE_POLL)
+#if defined(HAVE_PSELECT)
+#include <sys/select.h>
+#endif
 #include <poll.h>
+#endif
+
+struct eloop_event {
+	TAILQ_ENTRY(eloop_event) next;
+	int fd;
+	void (*read_cb)(void *);
+	void *read_cb_arg;
+	void (*write_cb)(void *);
+	void *write_cb_arg;
+#ifdef HAVE_POLL
+	struct pollfd *pollfd;
+#endif
+};
+
+struct eloop_timeout {
+	TAILQ_ENTRY(eloop_timeout) next;
+	struct timespec when;
+	void (*callback)(void *);
+	void *arg;
+	int queue;
+};
+
+struct eloop {
+	size_t events_len;
+	TAILQ_HEAD (event_head, eloop_event) events;
+	struct event_head free_events;
+
+	TAILQ_HEAD (timeout_head, eloop_timeout) timeouts;
+	struct timeout_head free_timeouts;
+
+	void (*timeout0)(void *);
+	void *timeout0_arg;
+	const int *signals;
+	size_t signals_len;
+	void (*signal_cb)(int, void *);
+	void *signal_cb_ctx;
+
+#if defined(HAVE_KQUEUE) || defined(HAVE_EPOLL)
+	int poll_fd;
+#elif defined(HAVE_POLL)
+	struct pollfd *fds;
+	size_t fds_len;
+#endif
+
+	int exitnow;
+	int exitcode;
+};
+
+#ifdef HAVE_POLL
 static void
 eloop_event_setup_fds(struct eloop *eloop)
 {
@@ -93,10 +202,10 @@ eloop_event_setup_fds(struct eloop *eloop)
 	}
 }
 
-#ifndef pollts
+#ifdef ELOOP_NEED_POLLTS
 /* Wrapper around pselect, to imitate the NetBSD pollts call. */
 static int
-pollts(struct pollfd * fds, nfds_t nfds,
+eloop_pollts(struct pollfd * fds, nfds_t nfds,
     const struct timespec *ts, const sigset_t *sigmask)
 {
 	fd_set read_fds;
@@ -123,8 +232,10 @@ pollts(struct pollfd * fds, nfds_t nfds,
 
 	return r;
 }
-#endif
-#endif
+#endif /* pollts */
+#else /* !HAVE_POLL */
+#define eloop_event_setup_fds(a) {}
+#endif /* HAVE_POLL */
 
 int
 eloop_event_add(struct eloop *eloop, int fd,
@@ -136,7 +247,7 @@ eloop_event_add(struct eloop *eloop, int fd,
 	struct kevent ke[2];
 #elif defined(HAVE_EPOLL)
 	struct epoll_event epe;
-#else
+#elif defined(HAVE_POLL)
 	struct pollfd *nfds;
 #endif
 
@@ -202,7 +313,7 @@ eloop_event_add(struct eloop *eloop, int fd,
 
 	/* Ensure we can actually listen to it */
 	eloop->events_len++;
-#if !defined(HAVE_KQUEUE) && !defined(HAVE_EPOLL)
+#ifdef HAVE_POLL
 	if (eloop->events_len > eloop->fds_len) {
 		nfds = realloc(eloop->fds,
 		    sizeof(*eloop->fds) * (eloop->fds_len + 5));
@@ -456,10 +567,16 @@ eloop_open(struct eloop *eloop)
 	return (eloop->poll_fd = epoll_create1(EPOLL_CLOEXEC));
 #endif
 }
+#endif
 
 int
 eloop_requeue(struct eloop *eloop)
 {
+#if defined(HAVE_POLL)
+
+	UNUSED(eloop);
+	return 0;
+#else /* !HAVE_POLL */
 	struct eloop_event *e;
 	int error;
 #if defined(HAVE_KQUEUE)
@@ -520,8 +637,8 @@ eloop_requeue(struct eloop *eloop)
 #endif
 
 	return error;
+#endif /* HAVE_POLL */
 }
-#endif
 
 int
 eloop_signal_set_cb(struct eloop *eloop,
@@ -651,7 +768,7 @@ void eloop_free(struct eloop *eloop)
 	}
 #if defined(HAVE_KQUEUE) || defined(HAVE_EPOLL)
 	close(eloop->poll_fd);
-#else
+#elif defined(HAVE_POLL)
 	free(eloop->fds);
 #endif
 	free(eloop);
@@ -727,9 +844,9 @@ eloop_start(struct eloop *eloop, sigset_t *signals)
 			    timeout, signals);
 		else
 			n = epoll_wait(eloop->poll_fd, &epe, 1, timeout);
-#else
+#elif defined(HAVE_POLL)
 		if (signals)
-			n = pollts(eloop->fds, (nfds_t)eloop->events_len,
+			n = POLLTS(eloop->fds, (nfds_t)eloop->events_len,
 			    tsp, signals);
 		else
 			n = poll(eloop->fds, (nfds_t)eloop->events_len,
@@ -775,7 +892,7 @@ eloop_start(struct eloop *eloop, sigset_t *signals)
 				continue;
 			}
 		}
-#else
+#elif defined(HAVE_POLL)
 		if (n > 0) {
 			TAILQ_FOREACH(e, &eloop->events, next) {
 				if (e->pollfd->revents & POLLOUT &&

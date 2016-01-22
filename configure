@@ -949,11 +949,14 @@ kqueue)
 epoll)
 	echo "#define HAVE_EPOLL" >>$CONFIG_H
 	;;
+pollts)
+	echo "#define HAVE_POLLTS" >>$CONFIG_H
+	;;
 ppoll)
-	echo "#define pollts		ppoll" >>$CONFIG_H
+	echo "#define HAVE_PPOLL" >>$CONFIG_H
 	;;
 pselect)
-	# eloop assumes pselect if it cannot find anything suitable
+	echo "#define HAVE_PSELECT" >>$CONFIG_H
 	;;
 *)
 	echo "No suitable polling function is available, not even pselect" >&2
