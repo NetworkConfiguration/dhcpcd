@@ -79,25 +79,6 @@
 
 #include "eloop.h"
 
-/* Our structures require TAILQ macros, which really every libc should
- * ship as they are useful beyond belief.
- * Sadly some libc's don't have sys/queue.h and some that do don't have
- * the TAILQ_FOREACH macro. For those that don't, the application using
- * this implementation will need to ship a working queue.h somewhere.
- * If we don't have sys/queue.h found in config.h, then
- * allow QUEUE_H to override loading queue.h in the current directory. */
-#ifndef TAILQ_FOREACH
-#ifdef HAVE_SYS_QUEUE_H
-#include <sys/queue.h>
-#elif defined(QUEUE_H)
-#define __QUEUE_HEADER(x) #x
-#define _QUEUE_HEADER(x) __QUEUE_HEADER(x)
-#include _QUEUE_HEADER(QUEUE_H)
-#else
-#include "queue.h"
-#endif
-#endif
-
 #ifndef UNUSED
 #define UNUSED(a) (void)((a))
 #endif
@@ -133,6 +114,25 @@
 #include <sys/select.h>
 #endif
 #include <poll.h>
+#endif
+
+/* Our structures require TAILQ macros, which really every libc should
+ * ship as they are useful beyond belief.
+ * Sadly some libc's don't have sys/queue.h and some that do don't have
+ * the TAILQ_FOREACH macro. For those that don't, the application using
+ * this implementation will need to ship a working queue.h somewhere.
+ * If we don't have sys/queue.h found in config.h, then
+ * allow QUEUE_H to override loading queue.h in the current directory. */
+#ifndef TAILQ_FOREACH
+#ifdef HAVE_SYS_QUEUE_H
+#include <sys/queue.h>
+#elif defined(QUEUE_H)
+#define __QUEUE_HEADER(x) #x
+#define _QUEUE_HEADER(x) __QUEUE_HEADER(x)
+#include _QUEUE_HEADER(QUEUE_H)
+#else
+#include "queue.h"
+#endif
 #endif
 
 struct eloop_event {
