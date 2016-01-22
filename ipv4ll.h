@@ -28,6 +28,7 @@
 #ifndef IPV4LL_H
 #define IPV4LL_H
 
+#ifdef INET
 #include "arp.h"
 
 extern const struct in_addr inaddr_llmask;
@@ -68,5 +69,10 @@ void ipv4ll_handle_failure(void *);
 #define ipv4ll_free(ifp) ipv4ll_freedrop((ifp), 0);
 #define ipv4ll_drop(ifp) ipv4ll_freedrop((ifp), 1);
 void ipv4ll_freedrop(struct interface *, int);
+#else
+#define IPV4LL_STATE_RUNNING(ifp) (0)
+#define ipv4ll_free(a) {}
+#define ipv4ll_drop(a) {}
+#endif
 
 #endif

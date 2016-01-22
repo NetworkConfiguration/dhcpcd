@@ -138,7 +138,7 @@ void ipv4_ctxfree(struct dhcpcd_ctx *);
 #define ipv4_free(a) {}
 #define ipv4_ctxfree(a) {}
 #define ipv4_hasaddr(a) (0)
-#define ipv4_preferanother(a) (0)
+#define ipv4_preferanother(a) {}
 #endif
 
 #endif
