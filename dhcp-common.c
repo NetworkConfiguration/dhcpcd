@@ -64,10 +64,10 @@ dhcp_get_hostname(char *buf, size_t buf_len, const struct if_options *ifo)
 		strlcpy(buf, ifo->hostname, buf_len);
 
 	/* Deny sending of these local hostnames */
-	if (strcmp(buf, "(none)") == 0 ||
+	if (buf[0] == '\0' || buf[0] == '.' ||
+	    strcmp(buf, "(none)") == 0 ||
 	    strcmp(buf, "localhost") == 0 ||
-	    strncmp(buf, "localhost.", strlen("localhost.")) == 0 ||
-	    buf[0] == '.')
+	    strncmp(buf, "localhost.", strlen("localhost.")) == 0)
 		return NULL;
 
 	/* Shorten the hostname if required */
