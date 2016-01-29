@@ -1371,15 +1371,15 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 					memset(&ia->addr, 0, sizeof(ia->addr));
 				}
 				if (p && ia->ia_type == D6_OPTION_IA_PD) {
-					i = (int)strtoi(p, NULL, 0, 8, 120, &e);
+					ia->prefix_len = (uint8_t)strtou(p,
+					    NULL, 0, 8, 120, &e);
 					if (e) {
 						logger(ctx, LOG_ERR,
 						    "%s: failed to convert"
 						    " prefix len",
 						    p);
 						ia->prefix_len = 0;
-					} else
-						ia->prefix_len = (uint8_t)i;
+					}
 				}
 			}
 			ia->sla_max = 0;
@@ -1431,8 +1431,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 					}
 				}
 				if (np) {
-					sla->prefix_len = (uint8_t)strtoi(np,
-					    NULL, 0, 0, 128, &e);
+					sla->prefix_len = (uint8_t)strtou(np,
+					    NULL, 0, 0, 120, &e);
 					if (e) {
 						logger(ctx, LOG_ERR, "%s: failed to "
 						    "convert prefix len",
