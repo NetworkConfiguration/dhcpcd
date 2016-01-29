@@ -54,6 +54,12 @@
 #include "ipv6nd.h"
 #include "script.h"
 
+#ifdef HAVE_SYS_BITOPS_H
+#include <sys/bitops.h>
+#else
+#include "compat/bitops.h"
+#endif
+
 #ifndef __UNCONST
 #define __UNCONST(a) ((void *)(unsigned long)(const void *)(a))
 #endif
@@ -373,40 +379,6 @@ dhcp6_findselfsla(struct interface *ifp, const uint8_t *iaid)
 	}
 	return NULL;
 }
-
-
-#ifndef ffs32
-static int
-ffs32(uint32_t n)
-{
-	int v;
-
-	if (!n)
-		return 0;
-
-	v = 1;
-	if ((n & 0x0000FFFFU) == 0) {
-		n >>= 16;
-		v += 16;
-	}
-	if ((n & 0x000000FFU) == 0) {
-		n >>= 8;
-		v += 8;
-	}
-	if ((n & 0x0000000FU) == 0) {
-		n >>= 4;
-		v += 4;
-	}
-	if ((n & 0x00000003U) == 0) {
-		n >>= 2;
-		v += 2;
-	}
-	if ((n & 0x00000001U) == 0)
-		v += 1;
-
-	return v;
-}
-#endif
 
 static int
 dhcp6_delegateaddr(struct in6_addr *addr, struct interface *ifp,

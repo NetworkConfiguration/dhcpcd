@@ -1002,9 +1002,7 @@ EOF
 	rm -f _ffs64.c _ffs64
 fi
 if [ "$FFS64" = yes ]; then
-	echo "CPPFLAGS+=	-DHAVE_SYS_BITOPS_H" >>$CONFIG_MK
-else
-	echo "#include		\"compat/ffs64.h\"" >>$CONFIG_H
+	echo "#define HAVE_SYS_BITOPS_H" >>$CONFIG_H
 fi
 
 if [ -z "$MD5" ]; then

@@ -39,6 +39,8 @@
 
 #ifdef HAVE_SYS_BITOPS_H
 #include <sys/bitops.h>
+#else
+#include "compat/bitops.h"
 #endif
 
 #ifdef BSD
