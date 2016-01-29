@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd October 19, 2015
+.Dd January 29, 2016
 .Dt DHCPCD.CONF 5
 .Os
 .Sh NAME
@@ -252,7 +252,7 @@ Request a DHCPv6 Temporary Address for
 You can request more than one ia_ta by specifying a unique
 .Ar iaid
 for each one.
-.It Ic ia_pd Op Ar iaid Oo / Ar prefix / Ar prefix_len Oc Op Ar interface Op / Ar sla_id Op / Ar prefix_len
+.It Ic ia_pd Op Ar iaid Oo / Ar prefix / Ar prefix_len Oc Op Ar interface Op / Ar sla_id Op / Ar prefix_len Op / Ar suffix
 Request a DHCPv6 Delegated Prefix for
 .Ar iaid .
 This option must be used in an
@@ -273,7 +273,9 @@ Otherwise addresses are only assigned for each
 .Ar interface
 and
 .Ar sla_id .
-Each assigned address will have a suffix of 1.
+Each assigned address will have a
+.Ar suffix ,
+defaulting to 1.
 You cannot assign a prefix to the requesting interface unless the
 DHCPv6 server supports
 .Li RFC6603

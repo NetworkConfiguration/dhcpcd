@@ -2336,6 +2336,7 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 	char sabuf[INET6_ADDRSTRLEN];
 	const char *sa;
 	int pfxlen;
+	uint64_t vl;
 
 	/* RFC6603 Section 4.2 */
 	if (strcmp(ifp->name, ifs->name) == 0) {
@@ -2354,6 +2355,12 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 	    sla, ia)) == -1)
 		return NULL;
 
+	if (ffs64(sla->suffix) > 128 - pfxlen) {
+		logger(ifp->ctx, LOG_ERR,
+		    "%s: suffix %" PRIu64 " + prefix_len %d > 128",
+		    ifp->name, sla->suffix, pfxlen);
+		return NULL;
+	}
 
 	a = calloc(1, sizeof(*a));
 	if (a == NULL) {
@@ -2371,11 +2378,11 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 	a->prefix = addr;
 	a->prefix_len = (uint8_t)pfxlen;
 
-	/* Wang a 1 at the end as the prefix could be >64
-	 * making SLAAC impossible. */
-	a->addr = a->prefix;
-	a->addr.s6_addr[sizeof(a->addr.s6_addr) - 1] =
-	    (uint8_t)(a->addr.s6_addr[sizeof(a->addr.s6_addr) - 1] + 1);
+	/* Add our suffix */
+	a->addr = addr;
+	vl = be64dec(addr.s6_addr + 8);
+	vl |= sla->suffix;
+	be64enc(a->addr.s6_addr + 8, vl);
 
 	state = D6_STATE(ifp);
 	/* Remove any exiting address */

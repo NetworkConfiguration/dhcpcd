@@ -1408,18 +1408,19 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			if (strlcpy(sla->ifname, p,
 			    sizeof(sla->ifname)) >= sizeof(sla->ifname))
 			{
-				logger(ctx, LOG_ERR, "%s: interface name too long",
-				    arg);
+				logger(ctx, LOG_ERR,
+				    "%s: interface name too long", arg);
 				goto err_sla;
 			}
+			sla->sla_set = 0;
+			sla->prefix_len = 0;
+			sla->suffix = 1;
 			p = np;
 			if (p) {
 				np = strchr(p, '/');
 				if (np)
 					*np++ = '\0';
-				if (*p == '\0')
-					sla->sla_set = 0;
-				else {
+				if (*p != '\0') {
 					sla->sla = (uint32_t)strtou(p, NULL,
 					    0, 0, UINT32_MAX, &e);
 					sla->sla_set = 1;
@@ -1430,20 +1431,40 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 						goto err_sla;
 					}
 				}
-				if (np) {
+				p = np;
+			}
+			if (p) {
+				np = strchr(p, '/');
+				if (np)
+					*np++ = '\0';
+				if (*p != '\0') {
 					sla->prefix_len = (uint8_t)strtou(np,
-					    NULL, 0, 0, 120, &e);
+				    NULL, 0, 0, 120, &e);
 					if (e) {
-						logger(ctx, LOG_ERR, "%s: failed to "
+						logger(ctx, LOG_ERR,
+						    "%s: failed to "
 						    "convert prefix len",
 						    ifname);
 						goto err_sla;
 					}
-				} else
-					sla->prefix_len = 0;
-			} else {
-				sla->sla_set = 0;
-				sla->prefix_len = 0;
+				}
+				p = np;
+			}
+			if (p) {
+				np = strchr(p, '/');
+				if (np)
+					*np = '\0';
+				if (*p != '\0') {
+					sla->suffix = (uint64_t)strtou(p, NULL,
+					    0, 0, UINT64_MAX, &e);
+					if (e) {
+						logger(ctx, LOG_ERR,
+						    "%s: failed to "
+						    "convert suffix",
+						    ifname);
+						goto err_sla;
+					}
+				}
 			}
 			/* Sanity check */
 			for (sl = 0; sl < ia->sla_len - 1; sl++) {
