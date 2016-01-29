@@ -2379,10 +2379,22 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 	a->prefix_len = (uint8_t)pfxlen;
 
 	/* Add our suffix */
-	a->addr = addr;
-	vl = be64dec(addr.s6_addr + 8);
-	vl |= sla->suffix;
-	be64enc(a->addr.s6_addr + 8, vl);
+	if (sla->suffix) {
+		a->addr = addr;
+		vl = be64dec(addr.s6_addr + 8);
+		vl |= sla->suffix;
+		be64enc(a->addr.s6_addr + 8, vl);
+	} else {
+		a->dadcounter = ipv6_makeaddr(&a->addr, ifp,
+		    &a->prefix, a->prefix_len);
+		if (a->dadcounter == -1) {
+			logger(ifp->ctx, LOG_ERR,
+			    "%s: error adding slaac to prefix_len %d",
+			    ifp->name, a->prefix_len);
+			free(a);
+			return NULL;
+		}
+	}
 
 	state = D6_STATE(ifp);
 	/* Remove any exiting address */

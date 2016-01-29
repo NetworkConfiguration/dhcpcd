@@ -276,6 +276,9 @@ and
 Each assigned address will have a
 .Ar suffix ,
 defaulting to 1.
+If the
+.Ar suffix
+is 0 then a slaac address is assigned.
 You cannot assign a prefix to the requesting interface unless the
 DHCPv6 server supports
 .Li RFC6603
