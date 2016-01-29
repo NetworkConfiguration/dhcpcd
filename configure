@@ -985,6 +985,28 @@ if [ "$BE64ENC" = no ]; then
 	echo "#include		\"compat/endian.h\"" >>$CONFIG_H
 fi
 
+if [ -z "$FFS64" ]; then
+	printf "Testing for ffs64 ... "
+	cat <<EOF >_ffs64.c
+#include <sys/bitops.h>
+int main(void) {
+	return (int)ffs64(1337);
+}
+EOF
+	if $XCC _ffs64.c -o _ffs64 2>&3; then
+		FFS64=yes
+	else
+		FFS64=no
+	fi
+	echo "$FFS64"
+	rm -f _ffs64.c _ffs64
+fi
+if [ "$FFS64" = yes ]; then
+	echo "CPPFLAGS+=	-DHAVE_SYS_BITOPS_H" >>$CONFIG_MK
+else
+	echo "#include		\"compat/ffs64.h\"" >>$CONFIG_H
+fi
+
 if [ -z "$MD5" ]; then
 	MD5_LIB=
 	printf "Testing for MD5Init ... "

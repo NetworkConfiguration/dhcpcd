@@ -37,6 +37,10 @@
 
 #include "config.h"
 
+#ifdef HAVE_SYS_BITOPS_H
+#include <sys/bitops.h>
+#endif
+
 #ifdef BSD
 /* Purely for the ND6_IFF_AUTO_LINKLOCAL #define which is solely used
  * to generate our CAN_ADD_LLADDR #define. */
@@ -518,16 +522,16 @@ ipv6_userprefix(
 {
 	uint64_t vh, vl, user_low, user_high;
 
-	if (prefix_len < 0 || prefix_len > 120 ||
-	    result_len < 0 || result_len > 120)
+	if (prefix_len < 0 || prefix_len > 128 ||
+	    result_len < 0 || result_len > 128)
 	{
 		errno = EINVAL;
 		return -1;
 	}
 
 	/* Check that the user_number fits inside result_len less prefix_len */
-	if (result_len < prefix_len || user_number > INT_MAX ||
-	    ffs((int)user_number) > result_len - prefix_len)
+	if (result_len < prefix_len ||
+	    ffs64(user_number) > result_len - prefix_len)
 	{
 	       errno = ERANGE;
 	       return -1;
