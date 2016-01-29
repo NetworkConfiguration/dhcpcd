@@ -32,7 +32,7 @@
 #ifndef COMPAT_BITOPS_H
 #define COMPAT_BITOPS_H
 
-#include <sys/stdint.h>
+#include <stdint.h>
 #include "../common.h"
 
 /*
