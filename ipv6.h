@@ -70,6 +70,14 @@
 #define IDGEN_RETRIES	3
 #define IDGEN_DELAY	1 /* second */
 
+#ifndef IN6_ARE_MASKED_ADDR_EQUAL
+#define IN6_ARE_MASKED_ADDR_EQUAL(d, a, m)	(	\
+	(((d)->s6_addr32[0] ^ (a)->s6_addr32[0]) & (m)->s6_addr32[0]) == 0 && \
+	(((d)->s6_addr32[1] ^ (a)->s6_addr32[1]) & (m)->s6_addr32[1]) == 0 && \
+	(((d)->s6_addr32[2] ^ (a)->s6_addr32[2]) & (m)->s6_addr32[2]) == 0 && \
+	(((d)->s6_addr32[3] ^ (a)->s6_addr32[3]) & (m)->s6_addr32[3]) == 0 )
+#endif
+
 /*
  * BSD kernels don't inform userland of DAD results.
  * See the discussion here:
@@ -263,6 +271,8 @@ int ipv6_findaddrmatch(const struct ipv6_addr *, const struct in6_addr *,
     short);
 struct ipv6_addr *ipv6_findaddr(struct dhcpcd_ctx *,
     const struct in6_addr *, short);
+struct ipv6_addr *ipv6_findmaskaddr(struct dhcpcd_ctx *,
+    const struct in6_addr *);
 #define ipv6_linklocal(ifp) ipv6_iffindaddr((ifp), NULL)
 int ipv6_addlinklocalcallback(struct interface *, void (*)(void *), void *);
 void ipv6_freeaddr(struct ipv6_addr *);

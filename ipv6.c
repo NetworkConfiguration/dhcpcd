@@ -1090,6 +1090,39 @@ ipv6_iffindaddr(const struct interface *ifp, const struct in6_addr *addr)
 	return NULL;
 }
 
+static struct ipv6_addr *
+ipv6_iffindmaskaddr(const struct interface *ifp, const struct in6_addr *addr)
+{
+	struct ipv6_state *state;
+	struct ipv6_addr *ap;
+	struct in6_addr mask;
+
+	state = IPV6_STATE(ifp);
+	if (state) {
+		TAILQ_FOREACH(ap, &state->addrs, next) {
+			if (ipv6_mask(&mask, ap->prefix_len) == -1)
+				continue;
+			if (IN6_ARE_MASKED_ADDR_EQUAL(&ap->addr, addr, &mask))
+				return ap;
+		}
+	}
+	return NULL;
+}
+
+struct ipv6_addr *
+ipv6_findmaskaddr(struct dhcpcd_ctx *ctx, const struct in6_addr *addr)
+{
+	struct interface *ifp;
+	struct ipv6_addr *ap;
+
+	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+		ap = ipv6_iffindmaskaddr(ifp, addr);
+		if (ap != NULL)
+			return ap;
+	}
+	return NULL;
+}
+
 int
 ipv6_addlinklocalcallback(struct interface *ifp,
     void (*callback)(void *), void *arg)
