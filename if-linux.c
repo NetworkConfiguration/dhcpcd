@@ -349,7 +349,7 @@ get_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp, int fd, int flags,
 			continue;
 		}
 
-		for (nlm = (struct nlmsghdr *)(void *)buf;
+		for (nlm = (void *)buf;
 		     nlm && NLMSG_OK(nlm, (size_t)bytes);
 		     nlm = NLMSG_NEXT(nlm, bytes))
 		{
@@ -788,7 +788,7 @@ link_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	ifi = NLMSG_DATA(nlm);
 	if (ifi->ifi_flags & IFF_LOOPBACK)
 		return 0;
-	rta = (struct rtattr *)(void *)((char *)ifi +NLMSG_ALIGN(sizeof(*ifi)));
+	rta = (void *)((char *)ifi + NLMSG_ALIGN(sizeof(*ifi)));
 	len = NLMSG_PAYLOAD(nlm, sizeof(*ifi));
 	*ifn = '\0';
 	hwaddr = NULL;
@@ -955,8 +955,7 @@ rta_add_attr_32(struct rtattr *rta, unsigned short maxlen,
 		return -1;
 	}
 
-	subrta = (struct rtattr*)(void *)
-	    (((char*)rta) + RTA_ALIGN(rta->rta_len));
+	subrta = (void *)((char*)rta + RTA_ALIGN(rta->rta_len));
 	subrta->rta_type = type;
 	subrta->rta_len = len;
 	memcpy(RTA_DATA(subrta), &data, sizeof(data));
@@ -970,7 +969,7 @@ nla_next(struct nlattr *nla, size_t *rem)
 {
 
 	*rem -= (size_t)NLA_ALIGN(nla->nla_len);
-	return (struct nlattr *)(void *)((char *)nla + NLA_ALIGN(nla->nla_len));
+	return (void *)((char *)nla + NLA_ALIGN(nla->nla_len));
 }
 
 #define NLA_TYPE(nla) ((nla)->nla_type & NLA_TYPE_MASK)
@@ -1044,7 +1043,7 @@ gnl_parse(struct nlmsghdr *nlm, struct nlattr *tb[], int maxtype)
 
 	memset(tb, 0, sizeof(*tb) * ((unsigned int)maxtype + 1));
 	ghdr = NLMSG_DATA(nlm);
-	head = (struct nlattr *)(void *)((char *) ghdr + GENL_HDRLEN);
+	head = (void *)((char *)ghdr + GENL_HDRLEN);
 	len = nlm->nlmsg_len - GENL_HDRLEN - NLMSG_HDRLEN;
 	NLA_FOR_EACH_ATTR(nla, head, len, rem) {
 		type = NLA_TYPE(nla);
