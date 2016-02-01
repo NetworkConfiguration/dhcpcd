@@ -243,7 +243,7 @@ ipv6nd_makersprobe(struct interface *ifp)
 	state->rs = calloc(1, state->rslen);
 	if (state->rs == NULL)
 		return -1;
-	rs = (struct nd_router_solicit *)(void *)state->rs;
+	rs = (void *)state->rs;
 	rs->nd_rs_type = ND_ROUTER_SOLICIT;
 	rs->nd_rs_code = 0;
 	rs->nd_rs_cksum = 0;
@@ -924,7 +924,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 
 		switch (ndo->nd_opt_type) {
 		case ND_OPT_PREFIX_INFORMATION:
-			pi = (struct nd_opt_prefix_info *)(void *)ndo;
+			pi = (void *)ndo;
 			if (pi->nd_opt_pi_len != 4) {
 				logger(ifp->ctx, new_data ? LOG_ERR : LOG_DEBUG,
 				    "%s: invalid option len for prefix",
@@ -1050,7 +1050,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 			break;
 
 		case ND_OPT_MTU:
-			mtu = (struct nd_opt_mtu *)(void *)p;
+			mtu = (void *)p;
 			mtuv = ntohl(mtu->nd_opt_mtu_mtu);
 			if (mtuv < IPV6_MMTU) {
 				logger(ifp->ctx, LOG_ERR, "%s: invalid MTU %d",
@@ -1061,7 +1061,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 			break;
 
 		case ND_OPT_RDNSS:
-			rdnss = (struct nd_opt_rdnss *)(void *)p;
+			rdnss = (void *)p;
 			if (rdnss->nd_opt_rdnss_lifetime &&
 			    rdnss->nd_opt_rdnss_len > 1)
 				rap->hasdns = 1;

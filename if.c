@@ -198,10 +198,8 @@ static void if_learnaddrs1(struct dhcpcd_ctx *ctx, struct if_head *ifs,
 		switch(ifa->ifa_addr->sa_family) {
 #ifdef INET
 		case AF_INET:
-			addr = (const struct sockaddr_in *)
-			    (void *)ifa->ifa_addr;
-			net = (const struct sockaddr_in *)
-			    (void *)ifa->ifa_netmask;
+			addr = (void *)ifa->ifa_addr;
+			net = (void *)ifa->ifa_netmask;
 			if (ifa->ifa_flags & IFF_POINTOPOINT)
 				dst = (const struct sockaddr_in *)
 				    (void *)ifa->ifa_dstaddr;
@@ -216,8 +214,8 @@ static void if_learnaddrs1(struct dhcpcd_ctx *ctx, struct if_head *ifs,
 #endif
 #ifdef INET6
 		case AF_INET6:
-			sin6 = (struct sockaddr_in6 *)(void *)ifa->ifa_addr;
-			net6 = (struct sockaddr_in6 *)(void *)ifa->ifa_netmask;
+			sin6 = (void *)ifa->ifa_addr;
+			net6 = (void *)ifa->ifa_netmask;
 #ifdef __KAME__
 			if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr))
 				/* Remove the scope from the address */
@@ -374,7 +372,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 
 		if (ifa->ifa_addr != NULL) {
 #ifdef AF_LINK
-			sdl = (const struct sockaddr_dl *)(void *)ifa->ifa_addr;
+			sdl = (const void *)ifa->ifa_addr;
 
 #ifdef IFLR_ACTIVE
 			/* We need to check for active address */
@@ -458,7 +456,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 #endif
 			memcpy(ifp->hwaddr, CLLADDR(sdl), ifp->hwlen);
 #elif AF_PACKET
-			sll = (const struct sockaddr_ll *)(void *)ifa->ifa_addr;
+			sll = (const void *)ifa->ifa_addr;
 			ifp->index = (unsigned int)sll->sll_ifindex;
 			ifp->family = sll->sll_hatype;
 			ifp->hwlen = sll->sll_halen;
