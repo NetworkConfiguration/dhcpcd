@@ -424,13 +424,13 @@ dhcp6_delegateaddr(struct in6_addr *addr, struct interface *ifp,
 
 			sla_max = 0;
 			TAILQ_FOREACH(ifi, ifp->ctx->ifaces, next) {
-				if (ifi != ifp && ifi->index > sla_max)
+				if (ifi->index > sla_max)
 					sla_max = ifi->index;
 			}
 		} else
 			sla_max = ia->sla_max;
 
-		bits = ffs32(sla_max);
+		bits = fls32(sla_max);
 
 		if (prefix->prefix_len + bits > UINT8_MAX)
 			asla.prefix_len = UINT8_MAX;
@@ -443,10 +443,9 @@ dhcp6_delegateaddr(struct in6_addr *addr, struct interface *ifp,
 				asla.prefix_len = 64;
 			else
 				asla.prefix_len = (uint8_t)ROUNDUP8(asla.prefix_len);
-
 		}
 
-#define BIT(n) (1l << (n))
+#define BIT(n) (1UL << (n))
 #define BIT_MASK(len) (BIT(len) - 1)
 		if (ia->sla_max == 0)
 			/* Work out the real sla_max from our bits used */
@@ -2355,7 +2354,7 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 	    sla, ia)) == -1)
 		return NULL;
 
-	if (ffs64(sla->suffix) > 128 - pfxlen) {
+	if (fls64(sla->suffix) > 128 - pfxlen) {
 		logger(ifp->ctx, LOG_ERR,
 		    "%s: suffix %" PRIu64 " + prefix_len %d > 128",
 		    ifp->name, sla->suffix, pfxlen);

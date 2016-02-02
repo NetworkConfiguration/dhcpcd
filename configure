@@ -985,23 +985,23 @@ if [ "$BE64ENC" = no ]; then
 	echo "#include		\"compat/endian.h\"" >>$CONFIG_H
 fi
 
-if [ -z "$FFS64" ]; then
-	printf "Testing for ffs64 ... "
-	cat <<EOF >_ffs64.c
+if [ -z "$FLS64" ]; then
+	printf "Testing for fls64 ... "
+	cat <<EOF >_fls64.c
 #include <sys/bitops.h>
 int main(void) {
-	return (int)ffs64(1337);
+	return (int)fls64(1337);
 }
 EOF
-	if $XCC _ffs64.c -o _ffs64 2>&3; then
-		FFS64=yes
+	if $XCC _fls64.c -o _fls64 2>&3; then
+		FLS64=yes
 	else
-		FFS64=no
+		FLS64=no
 	fi
-	echo "$FFS64"
-	rm -f _ffs64.c _ffs64
+	echo "$FLS64"
+	rm -f _fls64.c _fls64
 fi
-if [ "$FFS64" = yes ]; then
+if [ "$FLS64" = yes ]; then
 	echo "#define HAVE_SYS_BITOPS_H" >>$CONFIG_H
 fi
 
