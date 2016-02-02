@@ -524,8 +524,9 @@ ipv6_userprefix(
 {
 	uint64_t vh, vl, user_low, user_high;
 
-	if (prefix_len < 0 || prefix_len > 128 ||
-	    result_len < 0 || result_len > 128)
+	if (prefix_len < 1 || prefix_len > 128 ||
+	    result_len < 1 || result_len > 128 ||
+	    user_number == 0)
 	{
 		errno = EINVAL;
 		return -1;
@@ -533,19 +534,30 @@ ipv6_userprefix(
 
 	/* Check that the user_number fits inside result_len less prefix_len */
 	if (result_len < prefix_len ||
-	    ffs64(user_number) > result_len - prefix_len)
+	    fls64(user_number) > result_len - prefix_len)
 	{
 	       errno = ERANGE;
 	       return -1;
 	}
 
-	/* virtually shift user number by dest_len, then split at 64 */
-	if (result_len >= 64) {
-		user_high = user_number << (result_len - 64);
+	/* Shift user_number so it fit's just inside result_len.
+	 * Shifting by 0 or sizeof(user_number) is undefined,
+	 * so we cater for that. */
+	if (result_len == 128) {
+		user_high = 0;
+		user_low = user_number;
+	} else if (result_len > 64) {
+		if (prefix_len >= 64)
+			user_high = 0;
+		else
+			user_high = user_number >> (result_len - prefix_len);
+		user_low = user_number << (128 - result_len);
+	} else if (result_len == 64) {
+		user_high = user_number;
 		user_low = 0;
 	} else {
-		user_high = user_number >> (64 - result_len);
-		user_low = user_number << result_len;
+		user_high = user_number << (64 - result_len);
+		user_low = 0;
 	}
 
 	/* convert to two 64bit host order values */
