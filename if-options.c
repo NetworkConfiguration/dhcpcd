@@ -1486,7 +1486,9 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 					    sla->ifname);
 					goto err_sla;
 				}
-				if (slap->sla == 0 || sla->sla == 0) {
+				if (slap->sla_set &&
+				    (slap->sla == 0 || sla->sla == 0))
+				{
 					logger(ctx, LOG_ERR, "%s: cannot"
 					    " assign multiple prefixes"
 					    " with a SLA of 0",
