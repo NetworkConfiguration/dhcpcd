@@ -45,9 +45,6 @@
 
 #define ALLROUTERS "ff02::2"
 
-#define ROUNDUP8(a)  (1 + (((a) - 1) |  7))
-#define ROUNDUP16(a) (1 + (((a) - 1) | 16))
-
 #define EUI64_GBIT		0x01
 #define EUI64_UBIT		0x02
 #define EUI64_TO_IFID(in6)	do {(in6)->s6_addr[8] ^= EUI64_UBIT; } while (0)

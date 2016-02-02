@@ -51,6 +51,8 @@
 #define TOSTRING(a)		STRINGIFY(a)
 #define UNUSED(a)		(void)(a)
 
+#define ROUNDUP8(a)		(1 + (((a) - 1) |  7))
+
 #define USEC_PER_SEC		1000000L
 #define USEC_PER_NSEC		1000L
 #define NSEC_PER_SEC		1000000000L
