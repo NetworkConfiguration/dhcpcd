@@ -438,11 +438,13 @@ dhcp6_delegateaddr(struct in6_addr *addr, struct interface *ifp,
 			asla.prefix_len = (uint8_t)(prefix->prefix_len + bits);
 
 			/* Make a 64 prefix by default, as this maks SLAAC
-			 * possible. Otherwise round up to the nearest octet. */
+			 * possible.
+			 * Otherwise round up to the nearest 4 bits. */
 			if (asla.prefix_len <= 64)
 				asla.prefix_len = 64;
 			else
-				asla.prefix_len = (uint8_t)ROUNDUP8(asla.prefix_len);
+				asla.prefix_len =
+				    (uint8_t)ROUNDUP4(asla.prefix_len);
 		}
 
 #define BIT(n) (1UL << (n))
