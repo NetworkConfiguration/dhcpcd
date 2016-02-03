@@ -1438,7 +1438,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 				if (np)
 					*np++ = '\0';
 				if (*p != '\0') {
-					sla->prefix_len = (uint8_t)strtou(np,
+					sla->prefix_len = (uint8_t)strtou(p,
 				    NULL, 0, 0, 120, &e);
 					if (e) {
 						logger(ctx, LOG_ERR,
