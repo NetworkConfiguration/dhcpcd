@@ -860,19 +860,25 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct rt_msghdr *rtm)
 		 * Either way it needs to be zeroed out.
 		 */
 		struct sockaddr_in6 *sin6;
-		size_t e, i, len = 0, final = 0;
+		size_t e, i, final = 0, illegal = 0;
+		const unsigned char *p;
 
 		sin6 = (void *)rti_info[RTAX_NETMASK];
 		rt->net = sin6->sin6_addr;
 		e = sin6->sin6_len - offsetof(struct sockaddr_in6, sin6_addr);
 		if (e > sizeof(struct in6_addr))
 			e = sizeof(struct in6_addr);
-		for (i = 0; i < e; i++) {
-			switch (rt->net.s6_addr[i] & 0xff) {
+		for (p = (const unsigned char *)&sin6->sin6_addr, i = 0;
+		    i < e;
+		    p++)
+		{
+			if (final && *p) {
+				illegal = 1;
+				rt->net.s6_addr[i++] = 0x00;
+				continue;
+			}
+			switch (*p & 0xff) {
 			case 0xff:
-				/* We don't really want the length,
-				 * just that it's valid */
-				len++;
 				break;
 			case 0xfe:
 			case 0xfc:
@@ -881,19 +887,18 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct rt_msghdr *rtm)
 			case 0xe0:
 			case 0xc0:
 			case 0x80:
-				len++;
 				final = 1;
 				break;
 			default:
-				rt->net.s6_addr[i] = 0x00;
 				final = 1;
+				illegal = 1;
 				break;
 			}
-			if (final)
-				break;
+			if (!illegal)
+				rt->net.s6_addr[i++] &= *p;
+			else
+				rt->net.s6_addr[i++] = 0x00;
 		}
-		if (len == 0)
-			i = 0;
 		while (i < sizeof(rt->net.s6_addr))
 			rt->net.s6_addr[i++] = 0x00;
 	} else
