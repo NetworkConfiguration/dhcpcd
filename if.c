@@ -562,7 +562,7 @@ if_findindexname(struct if_head *ifaces, unsigned int idx, const char *name)
 		}
 	}
 
-	errno = ESRCH;
+	errno = ENXIO;
 	return NULL;
 }
 
