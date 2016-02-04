@@ -425,6 +425,7 @@ stop_interface(struct interface *ifp)
 
 	/* De-activate the interface */
 	ifp->active = IF_INACTIVE;
+	ifp->options->options &= ~DHCPCD_STOPPING;
 
 stop:
 	if (!(ctx->options & (DHCPCD_MASTER | DHCPCD_TEST)))

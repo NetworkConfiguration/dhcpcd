@@ -3131,15 +3131,43 @@ errexit:
 }
 
 static void
-dhcp6_start1(void *arg)
+dhcp6_activateinterfaces(struct interface *ifp)
 {
-	struct interface *ifp = arg, *ifd;
-	struct if_options *ifo = ifp->options;
-	struct dhcp6_state *state;
+	struct interface *ifd;
 	size_t i, j;
-	const struct dhcp_compat *dhc;
 	struct if_ia *ia;
 	struct if_sla *sla;
+
+	for (i = 0; i < ifp->options->ia_len; i++) {
+		ia = &ifp->options->ia[i];
+		for (j = 0; j < ia->sla_len; j++) {
+			sla = &ia->sla[j];
+			ifd = if_find(ifp->ctx->ifaces, sla->ifname);
+			if (ifd == NULL) {
+				logger(ifp->ctx, LOG_WARNING,
+				    "%s: cannot delegate to %s: %m",
+				    ifp->name, sla->ifname);
+				continue;
+			}
+			if (!ifd->active) {
+				logger(ifp->ctx, LOG_INFO,
+				    "%s: activating for delegation",
+				    sla->ifname);
+				dhcpcd_activateinterface(ifd,
+				    DHCPCD_IPV6 | DHCPCD_DHCP6);
+			}
+		}
+	}
+}
+
+static void
+dhcp6_start1(void *arg)
+{
+	struct interface *ifp = arg;
+	struct if_options *ifo = ifp->options;
+	struct dhcp6_state *state;
+	size_t i;
+	const struct dhcp_compat *dhc;
 
 	state = D6_STATE(ifp);
 	/* If no DHCPv6 options are configured,
@@ -3171,28 +3199,7 @@ dhcp6_start1(void *arg)
 		dhcp6_startinit(ifp);
 	}
 
-	/* Activate any interfaces we need to */
-	/* Ensure we have all interfaces */
-	for (i = 0; i < ifo->ia_len; i++) {
-		ia = &ifo->ia[i];
-		for (j = 0; j < ia->sla_len; j++) {
-			sla = &ia->sla[j];
-			ifd = if_find(ifp->ctx->ifaces, sla->ifname);
-			if (ifd == NULL) {
-				logger(ifp->ctx, LOG_WARNING,
-				    "%s: cannot delegate to %s: %m",
-				    ifp->name, sla->ifname);
-				continue;
-			}
-			if (!ifd->active) {
-				logger(ifp->ctx, LOG_INFO,
-				    "%s: activating for delegation",
-				    sla->ifname);
-				dhcpcd_activateinterface(ifd,
-				    DHCPCD_IPV6 | DHCPCD_DHCP6);
-			}
-		}
-	}
+	dhcp6_activateinterfaces(ifp);
 }
 
 int
@@ -3219,6 +3226,7 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 		}
 		/* We're already running DHCP6 */
 		/* XXX: What if the managed flag vanishes from all RA? */
+		dhcp6_activateinterfaces(ifp);
 		return 0;
 	}
 
