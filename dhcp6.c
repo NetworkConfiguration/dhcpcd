@@ -2466,31 +2466,6 @@ dhcp6_delegate_prefix(struct interface *ifp)
 	ifo = ifp->options;
 	state = D6_STATE(ifp);
 
-	/* Ensure we have all interfaces */
-	for (i = 0; i < ifo->ia_len; i++) {
-		ia = &ifo->ia[i];
-		for (j = 0; j < ia->sla_len; j++) {
-			sla = &ia->sla[j];
-			for (k = 0; k < i; j++)
-				if (strcmp(sla->ifname, ia->sla[j].ifname) == 0)
-					break;
-			if (j >= i) {
-				ifd = if_find(ifp->ctx->ifaces, sla->ifname);
-				if (ifd == NULL)
-					logger(ifp->ctx, LOG_ERR,
-					    "%s: interface does not exist"
-					    " for delegation",
-					    sla->ifname);
-				else if (!ifd->active) {
-					logger(ifp->ctx, LOG_INFO,
-					    "%s: activating for delegation",
-					    sla->ifname);
-					dhcpcd_activateinterface(ifd);
-				}
-			}
-		}
-	}
-
 	TAILQ_FOREACH(ifd, ifp->ctx->ifaces, next) {
 		if (!ifd->active)
 			continue;
@@ -3158,11 +3133,13 @@ errexit:
 static void
 dhcp6_start1(void *arg)
 {
-	struct interface *ifp = arg;
+	struct interface *ifp = arg, *ifd;
 	struct if_options *ifo = ifp->options;
 	struct dhcp6_state *state;
-	size_t i;
+	size_t i, j;
 	const struct dhcp_compat *dhc;
+	struct if_ia *ia;
+	struct if_sla *sla;
 
 	state = D6_STATE(ifp);
 	/* If no DHCPv6 options are configured,
@@ -3192,6 +3169,28 @@ dhcp6_start1(void *arg)
 	} else {
 		del_option_mask(ifo->requestmask6, D6_OPTION_INFO_REFRESH_TIME);
 		dhcp6_startinit(ifp);
+	}
+
+	/* Activate any interfaces we need to */
+	/* Ensure we have all interfaces */
+	for (i = 0; i < ifo->ia_len; i++) {
+		ia = &ifo->ia[i];
+		for (j = 0; j < ia->sla_len; j++) {
+			sla = &ia->sla[j];
+			ifd = if_find(ifp->ctx->ifaces, sla->ifname);
+			if (ifd == NULL) {
+				logger(ifp->ctx, LOG_WARNING,
+				    "%s: cannot delegate to %s: %m",
+				    ifp->name, sla->ifname);
+				continue;
+			}
+			if (!ifd->active) {
+				logger(ifp->ctx, LOG_INFO,
+				    "%s: activating for delegation",
+				    sla->ifname);
+				dhcpcd_activateinterface(ifd);
+			}
+		}
 	}
 }
 
