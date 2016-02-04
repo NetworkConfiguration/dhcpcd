@@ -226,7 +226,7 @@ dhcpcd_ifafwaiting(const struct interface *ifp)
 {
 	unsigned long long opts;
 
-	if (!ifp->active)
+	if (ifp->active != IF_ACTIVE_USER)
 		return AF_MAX;
 
 	opts = ifp->options->options;
@@ -424,7 +424,7 @@ stop_interface(struct interface *ifp)
 	eloop_q_timeout_delete(ctx->eloop, 0, NULL, ifp);
 
 	/* De-activate the interface */
-	ifp->active = 0;
+	ifp->active = IF_INACTIVE;
 
 stop:
 	if (!(ctx->options & (DHCPCD_MASTER | DHCPCD_TEST)))
@@ -1003,7 +1003,7 @@ dhcpcd_activateinterface(struct interface *ifp)
 {
 
 	if (!ifp->active) {
-		ifp->active = 1;
+		ifp->active = IF_ACTIVE;
 		dhcpcd_initstate(ifp, 0);
 		run_preinit(ifp);
 		dhcpcd_prestartinterface(ifp);
@@ -1067,7 +1067,7 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 				if (strcmp(ctx->ifv[i], ifname) == 0)
 					break;
 			if (i >= ctx->ifc)
-				ifp->active = 0;
+				ifp->active = IF_INACTIVE;
 		}
 
 		i = 0;
@@ -1184,7 +1184,7 @@ reconf_reboot(struct dhcpcd_ctx *ctx, int action, int argc, char **argv, int oi)
 			else
 				ipv4_applyaddr(ifp);
 		} else if (i != argc) {
-			ifp->active = 1;
+			ifp->active = IF_ACTIVE_USER;
 			dhcpcd_initstate1(ifp, argc, argv, 0);
 			run_preinit(ifp);
 			dhcpcd_prestartinterface(ifp);
@@ -1908,7 +1908,7 @@ printpidfile:
 			    ctx.ifv[i]);
 	}
 	TAILQ_FOREACH(ifp, ctx.ifaces, next) {
-		if (ifp->active)
+		if (ifp->active == IF_ACTIVE_USER)
 			break;
 	}
 	if (ifp == NULL) {

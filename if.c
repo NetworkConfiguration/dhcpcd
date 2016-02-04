@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2015 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2016 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -289,7 +289,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		if (ifp)
 			continue;
 
-		active = 1;
+		active = IF_ACTIVE_USER;
 		if (argc > 0) {
 			for (i = 0; i < argc; i++) {
 #ifdef __linux__
@@ -306,7 +306,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 #endif
 			}
 			if (i == argc) {
-				active = 0;
+				active = IF_INACTIVE;
 				p =  ifa->ifa_name;
 #ifdef __linux__
 				strlcpy(ifn, ifa->ifa_name, sizeof(ifn));
@@ -329,12 +329,12 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 			if (!fnmatch(ctx->ifdv[i], p, 0))
 				break;
 		if (i < ctx->ifdc)
-			active = 0;
+			active = IF_INACTIVE;
 		for (i = 0; i < ctx->ifac; i++)
 			if (!fnmatch(ctx->ifav[i], p, 0))
 				break;
 		if (ctx->ifac && i == ctx->ifac)
-			active = 0;
+			active = IF_INACTIVE;
 
 #ifdef PLUGIN_DEV
 		/* Ensure that the interface name has settled */
@@ -346,7 +346,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		if (ifa->ifa_flags & (IFF_LOOPBACK | IFF_POINTOPOINT)) {
 			if ((argc == 0 || argc == -1) &&
 			    ctx->ifac == 0 && !if_hasconf(ctx, p))
-				active = 0;
+				active = IF_INACTIVE;
 		}
 
 		if (if_vimaster(ctx, p) == 1) {
@@ -412,7 +412,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 					    " interface type and"
 					    " no config",
 					    ifp->name);
-					active = 0;
+					active = IF_INACTIVE;
 				}
 				/* FALLTHROUGH */
 #endif
@@ -440,7 +440,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 				if ((argc == 0 || argc == -1) &&
 				    ctx->ifac == 0 &&
 				    !if_hasconf(ctx, ifp->name))
-					active = 0;
+					active = IF_INACTIVE;
 				if (active)
 					logger(ifp->ctx, LOG_WARNING,
 					    "%s: unsupported"
@@ -474,7 +474,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		if (ifp->family != ARPHRD_ETHER) {
 			if ((argc == 0 || argc == -1) &&
 			    ctx->ifac == 0 && !if_hasconf(ctx, ifp->name))
-				active = 0;
+				active = IF_INACTIVE;
 			switch (ifp->family) {
 			case ARPHRD_IEEE1394:
 			case ARPHRD_INFINIBAND:
@@ -604,9 +604,9 @@ if_cmp(const struct interface *si, const struct interface *ti)
 #endif
 
 	/* Check active first */
-	if (si->active && !ti->active)
+	if (si->active > ti->active)
 		return -1;
-	if (!si->active && ti->active)
+	if (si->active < ti->active)
 		return 1;
 
 	/* Check carrier status next */

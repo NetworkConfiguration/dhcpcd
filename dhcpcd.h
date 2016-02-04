@@ -45,6 +45,10 @@
 #define PROFILE_LEN	64
 #define SECRET_LEN	64
 
+#define IF_INACTIVE	0
+#define IF_ACTIVE	1
+#define IF_ACTIVE_USER	2
+
 #define LINK_UP		1
 #define LINK_UNKNOWN	0
 #define LINK_DOWN	-1
