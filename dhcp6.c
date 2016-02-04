@@ -3047,7 +3047,6 @@ recv:
 
 		ipv6nd_runignoredra(ifp);
 		ipv6_addaddrs(&state->addrs);
-		dhcp6_delegate_prefix(ifp);
 
 		if (state->state == DH6S_INFORMED)
 			logger(ifp->ctx, has_new ? LOG_INFO : LOG_DEBUG,
@@ -3064,6 +3063,7 @@ recv:
 		if_initrt6(ifp);
 		ipv6_buildroutes(ifp->ctx);
 		dhcp6_writelease(ifp);
+		dhcp6_delegate_prefix(ifp);
 		dhcp6_script_try_run(ifp, 0);
 	}
 
@@ -3188,7 +3188,8 @@ dhcp6_start1(void *arg)
 				logger(ifp->ctx, LOG_INFO,
 				    "%s: activating for delegation",
 				    sla->ifname);
-				dhcpcd_activateinterface(ifd);
+				dhcpcd_activateinterface(ifd,
+				    DHCPCD_IPV6 | DHCPCD_DHCP6);
 			}
 		}
 	}

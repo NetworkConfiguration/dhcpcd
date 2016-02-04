@@ -671,13 +671,21 @@ dhcpcd_pollup(void *arg)
 }
 
 static void
-dhcpcd_initstate1(struct interface *ifp, int argc, char **argv,
-    unsigned long long options)
+dhcpcd_initstate2(struct interface *ifp, unsigned long long options)
 {
 	struct if_options *ifo;
 
-	configure_interface(ifp, argc, argv, options);
-	ifo = ifp->options;
+	if (options) {
+		if ((ifo = default_config(ifp->ctx)) == NULL) {
+			logger(ifp->ctx, LOG_ERR, "%s: %s: %m",
+			    ifp->name, __func__);
+			return;
+		}
+		ifo->options |= options;
+		free(ifp->options);
+		ifp->options = ifo;
+	} else
+		ifo = ifp->options;
 
 	if (ifo->options & DHCPCD_IPV4 && ipv4_init(ifp->ctx) == -1) {
 		logger(ifp->ctx, LOG_ERR, "ipv4_init: %m");
@@ -696,6 +704,15 @@ dhcpcd_initstate1(struct interface *ifp, int argc, char **argv,
 		logger(ifp->ctx, LOG_ERR, "%s: ipv6_start: %m", ifp->name);
 		ifo->options &= ~DHCPCD_IPV6;
 	}
+}
+
+static void
+dhcpcd_initstate1(struct interface *ifp, int argc, char **argv,
+    unsigned long long options)
+{
+
+	configure_interface(ifp, argc, argv, options);
+	dhcpcd_initstate2(ifp, 0);
 }
 
 static void
@@ -999,12 +1016,13 @@ run_preinit(struct interface *ifp)
 }
 
 void
-dhcpcd_activateinterface(struct interface *ifp)
+dhcpcd_activateinterface(struct interface *ifp, unsigned long long options)
 {
 
 	if (!ifp->active) {
 		ifp->active = IF_ACTIVE;
-		dhcpcd_initstate(ifp, 0);
+		dhcpcd_initstate2(ifp, options);
+		configure_interface1(ifp);
 		run_preinit(ifp);
 		dhcpcd_prestartinterface(ifp);
 	}

@@ -2141,6 +2141,32 @@ get_line(char ** __restrict buf, size_t * __restrict buflen,
 }
 
 struct if_options *
+default_config(struct dhcpcd_ctx *ctx)
+{
+	struct if_options *ifo;
+
+	/* Seed our default options */
+	if ((ifo = calloc(1, sizeof(*ifo))) == NULL) {
+		logger(ctx, LOG_ERR, "%s: %m", __func__);
+		return NULL;
+	}
+	ifo->options |= DHCPCD_IF_UP | DHCPCD_LINK | DHCPCD_INITIAL_DELAY;
+	ifo->timeout = DEFAULT_TIMEOUT;
+	ifo->reboot = DEFAULT_REBOOT;
+	ifo->metric = -1;
+	ifo->auth.options |= DHCPCD_AUTH_REQUIRE;
+	TAILQ_INIT(&ifo->auth.tokens);
+
+	/* Inherit some global defaults */
+	if (ctx->options & DHCPCD_PERSISTENT)
+		ifo->options |= DHCPCD_PERSISTENT;
+	if (ctx->options & DHCPCD_SLAACPRIVATE)
+		ifo->options |= DHCPCD_SLAACPRIVATE;
+
+	return ifo;
+}
+
+struct if_options *
 read_config(struct dhcpcd_ctx *ctx,
     const char *ifname, const char *ssid, const char *profile)
 {
@@ -2162,13 +2188,9 @@ read_config(struct dhcpcd_ctx *ctx,
 	struct dhcp_opt *ldop, *edop;
 
 	/* Seed our default options */
-	ifo = calloc(1, sizeof(*ifo));
-	if (ifo == NULL) {
-		logger(ctx, LOG_ERR, "%s: %m", __func__);
+	if ((ifo = default_config(ctx)) == NULL)
 		return NULL;
-	}
-	ifo->options |= DHCPCD_DAEMONISE | DHCPCD_LINK | DHCPCD_INITIAL_DELAY;
-	ifo->options |= DHCPCD_IF_UP;
+	ifo->options |= DHCPCD_DAEMONISE;
 #ifdef PLUGIN_DEV
 	ifo->options |= DHCPCD_DEV;
 #endif
@@ -2181,11 +2203,6 @@ read_config(struct dhcpcd_ctx *ctx,
 	ifo->options |= DHCPCD_IPV6RA_AUTOCONF | DHCPCD_IPV6RA_REQRDNSS;
 	ifo->options |= DHCPCD_DHCP6;
 #endif
-	ifo->timeout = DEFAULT_TIMEOUT;
-	ifo->reboot = DEFAULT_REBOOT;
-	ifo->metric = -1;
-	ifo->auth.options |= DHCPCD_AUTH_REQUIRE;
-	TAILQ_INIT(&ifo->auth.tokens);
 
 	vlen = dhcp_vendor((char *)ifo->vendorclassid + 1,
 	            sizeof(ifo->vendorclassid) - 1);
