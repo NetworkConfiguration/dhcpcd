@@ -2153,7 +2153,6 @@ get_line(char ** __restrict buf, size_t * __restrict buflen,
 			break;
 		}
 	}
-	printf ("*%s*\n", p);
 	return p;
 }
 
