@@ -2125,8 +2125,9 @@ static char *
 get_line(char ** __restrict buf, size_t * __restrict buflen,
     FILE * __restrict fp)
 {
-	char *p;
+	char *p, *c;
 	ssize_t bytes;
+	int quoted;
 
 	do {
 		bytes = getline(buf, buflen, fp);
@@ -2137,6 +2138,22 @@ get_line(char ** __restrict buf, size_t * __restrict buflen,
 	} while (*p == '\0' || *p == '\n' || *p == '#' || *p == ';');
 	if ((*buf)[--bytes] == '\n')
 		(*buf)[bytes] = '\0';
+
+	/* Strip embedded comments unless in a quoted string or escaped */
+	quoted = 0;
+	for (c = p; *c != '\0'; c++) {
+		if (*c == '\\') {
+			c++; /* escaped */
+			continue;
+		}
+		if (*c == '"')
+			quoted = !quoted;
+		else if (*c == '#' && !quoted) {
+			*c = '\0';
+			break;
+		}
+	}
+	printf ("*%s*\n", p);
 	return p;
 }
 
