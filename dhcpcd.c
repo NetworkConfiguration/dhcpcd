@@ -790,7 +790,7 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 			dhcpcd_handleinterface(ctx, 0, ifp->name);
 #endif
 			if (ifp->wireless) {
-				uint8_t ossid[IF_SSIDSIZE];
+				uint8_t ossid[IF_SSIDLEN];
 #ifdef NOCARRIER_PRESERVE_IP
 				size_t olen;
 

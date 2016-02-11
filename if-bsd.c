@@ -149,7 +149,7 @@ if_getssid1(int s, const char *ifname, uint8_t *ssid)
 	struct ieee80211_nwid nwid;
 #elif defined(IEEE80211_IOC_SSID)
 	struct ieee80211req ireq;
-	char nwid[IEEE80211_NWID_LEN + 1];
+	char nwid[IEEE80211_NWID_LEN];
 #endif
 
 #if defined(SIOCG80211NWID) /* NetBSD */
@@ -160,13 +160,11 @@ if_getssid1(int s, const char *ifname, uint8_t *ssid)
 	if (ioctl(s, SIOCG80211NWID, &ifr) == 0) {
 		if (ssid == NULL)
 			retval = nwid.i_len;
-		else if (nwid.i_len > IF_SSIDSIZE) {
+		else if (nwid.i_len > IF_SSIDLEN)
 			errno = ENOBUFS;
-			retval = -1;
-		} else {
+		else {
 			retval = nwid.i_len;
 			memcpy(ssid, nwid.i_nwid, nwid.i_len);
-			ssid[nwid.i_len] = '\0';
 		}
 	}
 #elif defined(IEEE80211_IOC_SSID) /* FreeBSD */
@@ -179,15 +177,15 @@ if_getssid1(int s, const char *ifname, uint8_t *ssid)
 	if (ioctl(s, SIOCG80211, &ireq) == 0) {
 		if (ssid == NULL)
 			retval = ireq.i_len;
-		else if (ireq.i_len > IF_SSIDSIZE - 1) {
+		else if (ireq.i_len > IF_SSIDLEN)
 			errno = ENOBUFS;
-			retval = -1;
-		} else  {
+		else  {
 			retval = ireq.i_len;
 			memcpy(ssid, nwid, ireq.i_len);
-			ssid[ireq.i_len] = '\0';
 		}
 	}
+#else
+	errno = ENOSYS;
 #endif
 
 	return retval;
@@ -201,6 +199,9 @@ if_getssid(struct interface *ifp)
 	r = if_getssid1(ifp->ctx->pf_inet_fd, ifp->name, ifp->ssid);
 	if (r != -1)
 		ifp->ssid_len = (unsigned int)r;
+	else
+		ifp->ssid_len = 0;
+	ifp->ssid[ifp->ssid_len] = '\0';
 	return r;
 }
 

@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2009-2015 Roy Marples <roy@marples.name>
+ * Copyright (c) 2009-2016 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -58,7 +58,7 @@
 
 /* We can't include if.h or dhcpcd.h because
  * they would pull in net/if.h, which defeats the purpose of this hack. */
-#define IF_SSIDSIZE 33
+#define IF_SSIDLEN 32
 int if_getssid_wext(const char *ifname, uint8_t *ssid);
 
 int
@@ -73,12 +73,11 @@ if_getssid_wext(const char *ifname, uint8_t *ssid)
 	memset(&iwr, 0, sizeof(iwr));
 	strlcpy(iwr.ifr_name, ifname, sizeof(iwr.ifr_name));
 	iwr.u.essid.pointer = ssid;
-	iwr.u.essid.length = IF_SSIDSIZE - 1;
+	iwr.u.essid.length = IF_SSIDLEN;
 
-	if (ioctl(s, SIOCGIWESSID, &iwr) == 0) {
+	if (ioctl(s, SIOCGIWESSID, &iwr) == 0)
 		retval = iwr.u.essid.length;
-		ssid[retval] = '\0';
-	} else
+	else
 		retval = -1;
 	close(s);
 	return retval;

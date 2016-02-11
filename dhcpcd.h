@@ -41,7 +41,7 @@
 #include "if-options.h"
 
 #define HWADDR_LEN	20
-#define IF_SSIDSIZE	33
+#define IF_SSIDLEN	32
 #define PROFILE_LEN	64
 #define SECRET_LEN	64
 
@@ -87,7 +87,7 @@ struct interface {
 	unsigned int metric;
 	int carrier;
 	int wireless;
-	uint8_t ssid[IF_SSIDSIZE];
+	uint8_t ssid[IF_SSIDLEN + 1]; /* NULL terminated */
 	unsigned int ssid_len;
 
 	char profile[PROFILE_LEN];

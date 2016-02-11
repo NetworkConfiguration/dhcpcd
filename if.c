@@ -525,6 +525,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
 		if (ioctl(ctx->pf_inet_fd, SIOCGIFPRIORITY, &ifr) == 0)
 			ifp->metric = (unsigned int)ifr.ifr_metric;
+		if_getssid(ifp);
 #else
 		/* We reserve the 100 range for virtual interfaces, if and when
 		 * we can work them out. */

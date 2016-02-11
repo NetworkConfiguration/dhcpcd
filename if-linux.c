@@ -1106,7 +1106,7 @@ _if_getssid(__unused struct dhcpcd_ctx *ctx, struct interface *ifp,
 	}
 
 	ifp->ssid_len = NLA_LEN(tb[NL80211_ATTR_SSID]);
-	if (ifp->ssid_len > sizeof(ifp->ssid) - 1) {
+	if (ifp->ssid_len > IF_SSIDLEN) {
 		errno = ENOBUFS;
 		ifp->ssid_len = 0;
 		return -1;
@@ -1114,7 +1114,6 @@ _if_getssid(__unused struct dhcpcd_ctx *ctx, struct interface *ifp,
 	memcpy(ifp->ssid, NLA_DATA(tb[NL80211_ATTR_SSID]), ifp->ssid_len);
 
 out:
-	ifp->ssid[ifp->ssid_len] = '\0';
 	return (int)ifp->ssid_len;
 }
 
@@ -1148,10 +1147,16 @@ if_getssid(struct interface *ifp)
 	r = if_getssid_wext(ifp->name, ifp->ssid);
 	if (r != -1)
 		ifp->ssid_len = (unsigned int)r;
+	else {
 #ifdef HAVE_NL80211_H
-	else if (r == -1)
 		r = if_getssid_nl80211(ifp);
+		if (r == -1)
+			ifp->ssid_len = 0;
+#else
+		ifp->ssid_len = 0;
 #endif
+	}
+	ifp->ssid[ifp->ssid_len] = '\0';
 	return r;
 }
 
