@@ -138,7 +138,7 @@ arc4_stir_if_needed(struct arc4_stream *as)
 	pid_t pid;
 
 	pid = getpid();
-	if (as->count <= sizeof(uint32_t) || !as->stir_pid != pid) {
+	if (as->count <= sizeof(uint32_t) || as->stir_pid != pid) {
 		as->stir_pid = pid;
 		arc4_stir(as);
 	} else
