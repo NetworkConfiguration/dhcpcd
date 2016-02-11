@@ -179,7 +179,7 @@ if_getssid1(int s, const char *ifname, uint8_t *ssid)
 	if (ioctl(s, SIOCG80211, &ireq) == 0) {
 		if (ssid == NULL)
 			retval = ireq.i_len;
-		else if (ireq.i_len > IF_SSIDSIZE) {
+		else if (ireq.i_len > IF_SSIDSIZE - 1) {
 			errno = ENOBUFS;
 			retval = -1;
 		} else  {

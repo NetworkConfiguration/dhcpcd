@@ -1106,7 +1106,7 @@ _if_getssid(__unused struct dhcpcd_ctx *ctx, struct interface *ifp,
 	}
 
 	ifp->ssid_len = NLA_LEN(tb[NL80211_ATTR_SSID]);
-	if (ifp->ssid_len > sizeof(ifp->ssid)) {
+	if (ifp->ssid_len > sizeof(ifp->ssid) - 1) {
 		errno = ENOBUFS;
 		ifp->ssid_len = 0;
 		return -1;
