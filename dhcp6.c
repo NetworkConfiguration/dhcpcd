@@ -2820,6 +2820,7 @@ dhcp6_handledata(void *arg)
 				state->state = DH6S_REQUEST;
 			else
 				op = NULL;
+			/* FALLTHROUGH */
 		case DH6S_REQUEST: /* FALLTHROUGH */
 		case DH6S_RENEW: /* FALLTHROUGH */
 		case DH6S_REBIND:
