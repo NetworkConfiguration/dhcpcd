@@ -1137,6 +1137,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			}
 			nconf = realloc(ifo->config, sizeof(char *) * (dl + 2));
 			if (nconf == NULL) {
+				free(p);
 				logger(ctx, LOG_ERR, "%s: %m", __func__);
 				return -1;
 			}
