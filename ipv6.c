@@ -251,6 +251,8 @@ ipv6_readsecret(struct dhcpcd_ctx *ctx)
 
 eexit:
 	logger(ctx, LOG_ERR, "error writing secret: %s: %m", SECRET);
+	if (fp != NULL)
+		fclose(fp);
 	unlink(SECRET);
 	ctx->secret_len = 0;
 	return -1;
