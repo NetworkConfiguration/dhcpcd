@@ -1299,13 +1299,12 @@ ipv6_tryaddlinklocal(struct interface *ifp)
 	return ipv6_addlinklocal(ifp);
 }
 
-struct ipv6_addr *
+static struct ipv6_addr *
 ipv6_newaddr(struct interface *ifp, struct in6_addr *addr, uint8_t prefix_len)
 {
 	struct ipv6_addr *ia;
 	char buf[INET6_ADDRSTRLEN];
 	const char *cbp;
-	struct ipv6_state *state;
 
 	if ((ia = calloc(1, sizeof(*ia))) == NULL)
 		return NULL;
@@ -1324,9 +1323,6 @@ ipv6_newaddr(struct interface *ifp, struct in6_addr *addr, uint8_t prefix_len)
 		    cbp, ia->prefix_len);
 	else
 		ia->saddr[0] = '\0';
-
-	state = IPV6_STATE(ifp);
-	TAILQ_INSERT_TAIL(&state->addrs, ia, next);
 	return ia;
 }
 
@@ -1404,10 +1400,14 @@ ipv6_startstatic(struct interface *ifp)
 		ia = NULL;
 	}
 	if (ia == NULL) {
+		struct ipv6_state *state;
+
 		ia = ipv6_newaddr(ifp, &ifp->options->req_addr6,
 		    ifp->options->req_prefix_len);
 		if (ia == NULL)
 	    		return -1;
+		state = IPV6_STATE(ifp);
+		TAILQ_INSERT_TAIL(&state->addrs, ia, next);
 		run_script = 0;
 	} else
 		run_script = 1;
