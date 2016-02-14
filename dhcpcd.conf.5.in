@@ -208,6 +208,43 @@ Enable DHCPv6 on the interface, on by default.
 Enable IPv4 on the interface, on by default.
 .It Ic ipv6
 Enable IPv6 on the interface, on by default.
+.It Ic request Op Ar address
+Request the
+.Ar address
+in the DHCP DISCOVER message.
+There is no guarantee this is the address the DHCP server will actually give.
+If no
+.Ar address
+is given then the first address currently assigned to the
+.Ar interface
+is used.
+.It Ic inform Op Ar address Ns Op Ar /cidr
+Behaves like
+.Ic request
+as above, but sends a DHCP INFORM instead of DISCOVER/REQUEST.
+This does not get a lease as such, just notifies the DHCP server of the
+.Ar address
+in use.
+You should also include the optional
+.Ar cidr
+network number in case the address is not already configured on the interface.
+.Nm dhcpcd
+remains running and pretends it has an infinite lease.
+.Nm dhcpcd
+will not de-configure the interface when it exits.
+If
+.Nm dhcpcd
+fails to contact a DHCP server then it returns a failure instead of falling
+back on IPv4LL.
+.It Ic inform6
+Performs a DHCPv6 Information Request.
+No address is requested or specified, but all other DHCPv6 options are allowed.
+This is normally performed automatically when the IPv6 Router Advertises
+that the client should perform this operation.
+This option is only needed when
+.Nm dhcpcd
+is not processing IPv6RA messages and the need for DHCPv6 Information Request
+exists.
 .It Ic persistent
 .Nm dhcpcd
 normally de-configures the interface and configuration when it exits.
