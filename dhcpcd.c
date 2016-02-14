@@ -926,6 +926,8 @@ dhcpcd_startinterface(void *arg)
 	}
 
 	if (ifo->options & DHCPCD_IPV6) {
+		ipv6_startstatic(ifp);
+
 		if (ifo->options & DHCPCD_IPV6RS)
 			ipv6nd_startrs(ifp);
 

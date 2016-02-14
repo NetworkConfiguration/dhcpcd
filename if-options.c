@@ -1110,6 +1110,24 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 				logger(ctx, LOG_ERR, "invalid MTU %s", p);
 				return -1;
 			}
+		} else if (strncmp(arg, "ip6_address=", strlen("ip6_address=")) == 0) {
+			np = strchr(p, '/');
+			if (np)
+				*np++ = '\0';
+			if (inet_pton(AF_INET6, p, &ifo->req_addr6) == 1) {
+				if (np) {
+					ifo->req_prefix_len = (uint8_t)strtou(np,
+					    NULL, 0, 0, 128, &e);
+					if (e) {
+						logger(ctx, LOG_ERR,
+						    "%s: failed to "
+						    "convert prefix len",
+						    ifname);
+						return -1;
+					}
+				} else
+					ifo->req_prefix_len = 128;
+			}
 		} else {
 			dl = 0;
 			if (ifo->config != NULL) {

@@ -65,6 +65,7 @@
 #include "eloop.h"
 #include "ipv6.h"
 #include "ipv6nd.h"
+#include "script.h"
 
 #ifdef HAVE_MD5_H
 #  ifndef DEPGEN
@@ -88,25 +89,6 @@
 #  warning kernel does not report IPv6 address flag changes
 #  warning polling tentative address flags periodically
 #endif
-
-#ifdef __linux__
-   /* Match Linux defines to BSD */
-#  define IN6_IFF_TEMPORARY IFA_F_TEMPORARY
-#  ifdef IFA_F_OPTIMISTIC
-#    define IN6_IFF_TENTATIVE	(IFA_F_TENTATIVE | IFA_F_OPTIMISTIC)
-#  else
-#    define IN6_IFF_TENTATIVE   (IFA_F_TENTATIVE | 0x04)
-#  endif
-#  ifdef IF_F_DADFAILED
-#    define IN6_IFF_DUPLICATED	IFA_F_DADFAILED
-#  else
-#    define IN6_IFF_DUPLICATED	0x08
-#  endif
-#  define IN6_IFF_DETACHED	0
-#endif
-
-#define IN6_IFF_NOTUSEABLE \
-	(IN6_IFF_TENTATIVE | IN6_IFF_DUPLICATED | IN6_IFF_DETACHED)
 
 /* Hackery at it's finest. */
 #ifndef s6_addr32
@@ -382,7 +364,7 @@ ipv6_makestableprivate(struct in6_addr *addr,
 }
 
 int
-ipv6_makeaddr(struct in6_addr *addr, const struct interface *ifp,
+ipv6_makeaddr(struct in6_addr *addr, struct interface *ifp,
     const struct in6_addr *prefix, int prefix_len)
 {
 	const struct ipv6_addr *ap;
@@ -647,7 +629,7 @@ ipv6_addaddr(struct ipv6_addr *ap, const struct timespec *now)
 	}
 
 	if (!(ap->flags & IPV6_AF_DADCOMPLETED) &&
-	    ipv6_iffindaddr(ap->iface, &ap->addr))
+	    ipv6_iffindaddr(ap->iface, &ap->addr, IN6_IFF_NOTUSEABLE))
 		ap->flags |= IPV6_AF_DADCOMPLETED;
 
 	logger(ap->iface->ctx, ap->flags & IPV6_AF_NEW ? LOG_INFO : LOG_DEBUG,
@@ -1039,7 +1021,7 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 		if (ap->addr_flags & IN6_IFF_TEMPORARY)
 			ap->flags |= IPV6_AF_TEMPORARY;
 #endif
-		if (IN6_IS_ADDR_LINKLOCAL(&ap->addr)) {
+		if (IN6_IS_ADDR_LINKLOCAL(&ap->addr) || ap->dadcallback) {
 #ifdef IPV6_POLLADDRFLAG
 			if (ap->addr_flags & IN6_IFF_TENTATIVE) {
 				struct timespec tv;
@@ -1052,7 +1034,12 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 			}
 #endif
 
-			if (!(ap->addr_flags & IN6_IFF_NOTUSEABLE)) {
+			if (ap->dadcallback)
+				ap->dadcallback(ap);
+
+			if (IN6_IS_ADDR_LINKLOCAL(&ap->addr) &&
+			    !(ap->addr_flags & IN6_IFF_NOTUSEABLE))
+			{
 				/* Now run any callbacks.
 				 * Typically IPv6RS or DHCPv6 */
 				while ((cb =
@@ -1081,22 +1068,23 @@ ipv6_hasaddr(const struct interface *ifp)
 	return 0;
 }
 
-const struct ipv6_addr *
-ipv6_iffindaddr(const struct interface *ifp, const struct in6_addr *addr)
+struct ipv6_addr *
+ipv6_iffindaddr(struct interface *ifp, const struct in6_addr *addr,
+    int revflags)
 {
-	const struct ipv6_state *state;
-	const struct ipv6_addr *ap;
+	struct ipv6_state *state;
+	struct ipv6_addr *ap;
 
-	state = IPV6_CSTATE(ifp);
+	state = IPV6_STATE(ifp);
 	if (state) {
 		TAILQ_FOREACH(ap, &state->addrs, next) {
 			if (addr == NULL) {
 				if (IN6_IS_ADDR_LINKLOCAL(&ap->addr) &&
-				    !(ap->addr_flags & IN6_IFF_NOTUSEABLE))
+				    (!revflags || !(ap->addr_flags & revflags)))
 					return ap;
 			} else {
 				if (IN6_ARE_ADDR_EQUAL(&ap->addr, addr) &&
-				    !(ap->addr_flags & IN6_IFF_TENTATIVE))
+				    (!revflags || !(ap->addr_flags & revflags)))
 					return ap;
 			}
 		}
@@ -1295,39 +1283,146 @@ nextslaacprivate:
 	return 1;
 }
 
-/* Ensure the interface has a link-local address */
-int
-ipv6_start(struct interface *ifp)
+static int
+ipv6_tryaddlinklocal(struct interface *ifp)
 {
-	const struct ipv6_state *state;
-	const struct ipv6_addr *ap;
 
 	/* We can't assign a link-locak address to this,
 	 * the ppp process has to. */
 	if (ifp->flags & IFF_POINTOPOINT)
 		return 0;
 
-	state = IPV6_CSTATE(ifp);
-	if (state) {
-		TAILQ_FOREACH(ap, &state->addrs, next) {
-			if (IN6_IS_ADDR_LINKLOCAL(&ap->addr) &&
-			    !(ap->addr_flags & IN6_IFF_DUPLICATED))
-				break;
-		}
+	if (ipv6_iffindaddr(ifp, NULL, IN6_IFF_DUPLICATED) != NULL ||
+	    !CAN_ADD_LLADDR(ifp))
+		return 0;
+
+	return ipv6_addlinklocal(ifp);
+}
+
+struct ipv6_addr *
+ipv6_newaddr(struct interface *ifp, struct in6_addr *addr, uint8_t prefix_len)
+{
+	struct ipv6_addr *ia;
+	char buf[INET6_ADDRSTRLEN];
+	const char *cbp;
+	struct ipv6_state *state;
+
+	if ((ia = calloc(1, sizeof(*ia))) == NULL)
+		return NULL;
+	ia->iface = ifp;
+	ia->flags = IPV6_AF_NEW;
+	ia->addr_flags = IN6_IFF_TENTATIVE;
+	ia->addr = *addr;
+	ia->prefix_len = prefix_len;
+	if (ipv6_makeprefix(&ia->prefix, &ia->addr, ia->prefix_len) == -1) {
+		free(ia);
+		return NULL;
+	}
+	cbp = inet_ntop(AF_INET6, &ia->addr, buf, sizeof(buf));
+	if (cbp)
+		snprintf(ia->saddr, sizeof(ia->saddr), "%s/%d",
+		    cbp, ia->prefix_len);
+	else
+		ia->saddr[0] = '\0';
+
+	state = IPV6_STATE(ifp);
+	TAILQ_INSERT_TAIL(&state->addrs, ia, next);
+	return ia;
+}
+
+static void
+ipv6_staticdadcallback(void *arg)
+{
+	struct ipv6_addr *ia = arg;
+	int wascompleted;
+
+	wascompleted = (ia->flags & IPV6_AF_DADCOMPLETED);
+	ia->flags |= IPV6_AF_DADCOMPLETED;
+	if (ia->flags & IPV6_AF_DUPLICATED)
+		logger(ia->iface->ctx, LOG_WARNING, "%s: DAD detected %s",
+		    ia->iface->name, ia->saddr);
+	else if (!wascompleted) {
+		logger(ia->iface->ctx, LOG_DEBUG, "%s: IPv6 static DAD completed",
+		    ia->iface->name);
+		script_runreason(ia->iface, "STATIC6");
+	}
+}
+
+ssize_t
+ipv6_env(char **env, const char *prefix, const struct interface *ifp)
+{
+	char **ep;
+	ssize_t n;
+	struct ipv6_addr *ia;
+
+	ep = env;
+	n = 0;
+	ia = ipv6_iffindaddr(UNCONST(ifp), &ifp->options->req_addr6, IN6_IFF_NOTUSEABLE);
+	if (ia) {
+		if (env)
+			addvar(ifp->ctx, &ep, prefix, "ip6_address", ia->saddr);
+		n++;
+	}
+
+	return n;
+}
+
+int
+ipv6_startstatic(struct interface *ifp)
+{
+	struct ipv6_addr *ia;
+	int run_script;
+
+	if (IN6_IS_ADDR_UNSPECIFIED(&ifp->options->req_addr6))
+		return 0;
+
+	ia = ipv6_iffindaddr(ifp, &ifp->options->req_addr6, 0);
+	if (ia != NULL &&
+	    (ia->prefix_len != ifp->options->req_prefix_len ||
+	    ia->addr_flags & IN6_IFF_NOTUSEABLE))
+	{
+		ipv6_deleteaddr(ia);
+		ia = NULL;
+	}
+	if (ia == NULL) {
+		ia = ipv6_newaddr(ifp, &ifp->options->req_addr6,
+		    ifp->options->req_prefix_len);
+		if (ia == NULL)
+	    		return -1;
+		run_script = 0;
+	} else
+		run_script = 1;
+	ia->flags |= IPV6_AF_STATIC | IPV6_AF_ONLINK;
+	ia->prefix_vltime = ND6_INFINITE_LIFETIME;
+	ia->prefix_pltime = ND6_INFINITE_LIFETIME;
+	ia->dadcallback = ipv6_staticdadcallback;
+	ipv6_addaddr(ia, NULL);
+	if_initrt6(ifp);
+	ipv6_buildroutes(ifp->ctx);
+	if (run_script)
+		script_runreason(ifp, "STATIC6");
+	return 1;
+}
+
+/* Ensure the interface has a link-local address */
+int
+ipv6_start(struct interface *ifp)
+{
+
+	if (ipv6_tryaddlinklocal(ifp) == -1)
+		return -1;
+
+	if (IPV6_CSTATE(ifp)) {
 		/* Regenerate new ids */
 		if (ifp->options->options & DHCPCD_IPV6RA_OWN &&
 		    ip6_use_tempaddr(ifp->name))
 			ipv6_regentempifid(ifp);
-	} else
-		ap = NULL;
-
-	if (ap == NULL &&
-	    CAN_ADD_LLADDR(ifp) &&
-	    ipv6_addlinklocal(ifp) == -1)
-		return -1;
+	}
 
 	/* Load existing routes */
 	if_initrt6(ifp);
+	if (!IN6_IS_ADDR_UNSPECIFIED(&ifp->options->req_addr6))
+		ipv6_buildroutes(ifp->ctx);
 	return 0;
 }
 
@@ -1344,10 +1439,12 @@ ipv6_freedrop(struct interface *ifp, int drop)
 		return;
 
 	ipv6_freedrop_addrs(&state->addrs, drop ? 2 : 0, NULL);
-
-	/* Because we need to cache the addresses we don't control,
-	 * we only free the state on when NOT dropping addresses. */
-	if (drop == 0) {
+	if (drop) {
+		if_initrt6(ifp);
+		ipv6_buildroutes(ifp->ctx);
+	} else {
+		/* Because we need to cache the addresses we don't control,
+		 * we only free the state on when NOT dropping addresses. */
 		while ((cb = TAILQ_FIRST(&state->ll_callbacks))) {
 			TAILQ_REMOVE(&state->ll_callbacks, cb, next);
 			free(cb);
@@ -2064,6 +2161,29 @@ make_router(const struct ra *rap)
 	    IN6_ARE_ADDR_EQUAL(&((rtp)->net), &in6addr_any))
 
 static void
+ipv6_build_static_routes(struct dhcpcd_ctx *ctx, struct rt6_head *dnr)
+{
+	const struct interface *ifp;
+	const struct ipv6_state *state;
+	const struct ipv6_addr *ia;
+	struct rt6 *rt;
+
+	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+		if ((state = IPV6_CSTATE(ifp)) == NULL)
+			continue;
+		TAILQ_FOREACH(ia, &state->addrs, next) {
+			if ((ia->flags & (IPV6_AF_ADDED | IPV6_AF_STATIC)) ==
+			    (IPV6_AF_ADDED | IPV6_AF_STATIC))
+			{
+				rt = make_prefix(ifp, NULL, ia);
+				if (rt)
+					TAILQ_INSERT_TAIL(dnr, rt, next);
+			}
+		}
+	}
+}
+
+static void
 ipv6_build_ra_routes(struct ipv6_ctx *ctx, struct rt6_head *dnr, int expired)
 {
 	struct rt6 *rt;
@@ -2125,6 +2245,9 @@ ipv6_buildroutes(struct dhcpcd_ctx *ctx)
 	if_sortinterfaces(ctx);
 
 	TAILQ_INIT(&dnr);
+
+	/* Should static take priority? */
+	ipv6_build_static_routes(ctx, &dnr);
 
 	/* First add reachable routers and their prefixes */
 	ipv6_build_ra_routes(ctx->ipv6, &dnr, 0);

@@ -551,7 +551,7 @@ ipv6nd_scriptrun(struct ra *rap)
 		{
 			hasaddress = 1;
 			if (!(ap->flags & IPV6_AF_DADCOMPLETED) &&
-			    ipv6_iffindaddr(ap->iface, &ap->addr))
+			    ipv6_iffindaddr(ap->iface, &ap->addr, IN6_IFF_TENTATIVE))
 				ap->flags |= IPV6_AF_DADCOMPLETED;
 			if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0) {
 				logger(ap->iface->ctx, LOG_DEBUG,
@@ -798,7 +798,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 		return;
 	}
 
-	if (ipv6_iffindaddr(ifp, &ctx->from.sin6_addr)) {
+	if (ipv6_iffindaddr(ifp, &ctx->from.sin6_addr, IN6_IFF_TENTATIVE)) {
 		logger(ifp->ctx, LOG_DEBUG,
 		    "%s: ignoring RA from ourself %s", ifp->name, ctx->sfrom);
 		return;
