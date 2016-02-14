@@ -1344,8 +1344,27 @@ ipv6_staticdadcallback(void *arg)
 	else if (!wascompleted) {
 		logger(ia->iface->ctx, LOG_DEBUG, "%s: IPv6 static DAD completed",
 		    ia->iface->name);
-		script_runreason(ia->iface, "STATIC6");
 	}
+
+#define FINISHED (IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED)
+	if (!wascompleted) {
+		struct interface *ifp;
+		struct ipv6_state *state;
+
+		ifp = ia->iface;
+		state = IPV6_STATE(ifp);
+		TAILQ_FOREACH(ia, &state->addrs, next) {
+			if (ia->flags & IPV6_AF_STATIC &&
+			    (ia->flags & FINISHED) != FINISHED)
+			{
+				wascompleted = 1;
+				break;
+			}
+		}
+		if (!wascompleted)
+			script_runreason(ifp, "STATIC6");
+	}
+#undef FINISHED
 }
 
 ssize_t
