@@ -218,6 +218,7 @@ struct ipv6_state {
 	((struct ipv6_state *)(ifp)->if_data[IF_DATA_IPV6])
 #define IPV6_CSTATE(ifp)						       \
 	((const struct ipv6_state *)(ifp)->if_data[IF_DATA_IPV6])
+#define IPV6_STATE_RUNNING(ifp) ipv6_staticdadcompleted((ifp))
 
 /* dhcpcd requires CMSG_SPACE to evaluate to a compile time constant. */
 #ifdef __QNX__
@@ -310,6 +311,7 @@ void ipv6_addtempaddrs(struct interface *, const struct timespec *);
 #endif
 
 int ipv6_start(struct interface *);
+int ipv6_staticdadcompleted(const struct interface *);
 int ipv6_startstatic(struct interface *);
 ssize_t ipv6_env(char **, const char *, const struct interface *);
 void ipv6_ctxfree(struct dhcpcd_ctx *);
@@ -321,6 +323,7 @@ void ipv6_buildroutes(struct dhcpcd_ctx *);
 #define ipv6_init(a) (NULL)
 #define ipv6_start(a) (-1)
 #define ipv6_startstatic(a)
+#define ipv6_staticdadcompleted(a) (0)
 #define ipv6_hasaddr(a) (0)
 #define ipv6_free_ll_callbacks(a) {}
 #define ipv6_free(a) {}

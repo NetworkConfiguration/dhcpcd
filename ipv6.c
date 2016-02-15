@@ -1383,6 +1383,25 @@ ipv6_env(char **env, const char *prefix, const struct interface *ifp)
 }
 
 int
+ipv6_staticdadcompleted(const struct interface *ifp)
+{
+	const struct ipv6_state *state;
+	const struct ipv6_addr *ia;
+	int n;
+
+	if ((state = IPV6_CSTATE(ifp)) == NULL)
+		return 0;
+	n = 0;
+#define COMPLETED (IPV6_AF_STATIC | IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED)
+	TAILQ_FOREACH(ia, &state->addrs, next) {
+		if ((ia->flags & COMPLETED) == COMPLETED &&
+		    !(ia->addr_flags & IN6_IFF_NOTUSEABLE))
+			n++;
+	}
+	return n;
+}
+
+int
 ipv6_startstatic(struct interface *ifp)
 {
 	struct ipv6_addr *ia;

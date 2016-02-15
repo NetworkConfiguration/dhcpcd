@@ -356,20 +356,13 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	{
 		env[9] = strdup("if_up=false");
 		env[10] = strdup("if_down=false");
-#ifdef INET6
-	} else if (strcmp(reason, "STATIC6") == 0) {
-		/* For the time being, a static IPv6 address is does not qualify
-		 * the interface to be up.
-		 * Should we consider the presence of a static DNS server? */
-		env[9] = strdup("if_up=false");
-		env[10] = strdup("if_down=false");
-#endif
 	} else if (1 == 2 /* appease ifdefs */
 #ifdef INET
 	    || (dhcp && state && state->new)
 	    || (ipv4ll && IPV4LL_STATE_RUNNING(ifp))
 #endif
 #ifdef INET6
+	    || (static6 && IPV6_STATE_RUNNING(ifp))
 	    || (dhcp6 && d6_state && d6_state->new)
 	    || (ra && ipv6nd_hasra(ifp))
 #endif
@@ -644,6 +637,10 @@ send_interface(struct fd_list *fd, const struct interface *ifp)
 #endif
 
 #ifdef INET6
+	if (IPV6_STATE_RUNNING(ifp)) {
+		if (send_interface1(fd, ifp, "STATIC6") == -1)
+			retval = -1;
+	}
 	if (RS_STATE_RUNNING(ifp)) {
 		if (send_interface1(fd, ifp, "ROUTERADVERT") == -1)
 			retval = -1;
