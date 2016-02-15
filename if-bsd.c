@@ -1032,7 +1032,7 @@ if_route6(unsigned char cmd, const struct rt6 *rt)
 		}
 
 		if (rtm.hdr.rtm_addrs & RTA_IFA) {
-			struct ipv6_addr *lla;
+			const struct ipv6_addr *lla;
 
 			lla = ipv6_linklocal(UNCONST(rt->iface));
 			if (lla == NULL) /* unlikely */
