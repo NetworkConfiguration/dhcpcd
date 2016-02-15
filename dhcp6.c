@@ -481,21 +481,6 @@ dhcp6_delegateaddr(struct in6_addr *addr, struct interface *ifp,
 	return sla->prefix_len;
 }
 
-int
-dhcp6_has_public_addr(const struct interface *ifp)
-{
-	const struct dhcp6_state *state = D6_CSTATE(ifp);
-	const struct ipv6_addr *ia;
-
-	if (state == NULL)
-		return 0;
-	TAILQ_FOREACH(ia, &state->addrs, next) {
-		if (ipv6_publicaddr(ia))
-			return 1;
-	}
-	return 0;
-}
-
 static int
 dhcp6_makemessage(struct interface *ifp)
 {
@@ -3046,7 +3031,6 @@ recv:
 			eloop_timeout_add_sec(ifp->ctx->eloop,
 			    (time_t)state->expire, dhcp6_startexpire, ifp);
 
-		ipv6nd_runignoredra(ifp);
 		ipv6_addaddrs(&state->addrs);
 
 		if (state->state == DH6S_INFORMED)

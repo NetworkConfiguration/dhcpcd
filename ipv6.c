@@ -740,13 +740,6 @@ ipv6_addaddr(struct ipv6_addr *ap, const struct timespec *now)
 	return 0;
 }
 
-int
-ipv6_publicaddr(const struct ipv6_addr *ia)
-{
-	return (ia->prefix_pltime &&
-	    (ia->addr.s6_addr[0] & 0xfe) != 0xfc &&
-	    !(ia->addr_flags & IN6_IFF_NOTUSEABLE));
-}
 
 int
 ipv6_findaddrmatch(const struct ipv6_addr *addr, const struct in6_addr *match,
@@ -2239,8 +2232,7 @@ ipv6_build_ra_routes(struct ipv6_ctx *ctx, struct rt6_head *dnr, int expired)
 			}
 		}
 		if (rap->lifetime && rap->iface->options->options &
-		    (DHCPCD_IPV6RA_OWN | DHCPCD_IPV6RA_OWN_DEFAULT) &&
-		    !rap->no_public_warned)
+		    (DHCPCD_IPV6RA_OWN | DHCPCD_IPV6RA_OWN_DEFAULT))
 		{
 			rt = make_router(rap);
 			if (rt)

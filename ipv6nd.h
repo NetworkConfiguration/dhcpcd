@@ -50,7 +50,6 @@ struct ra {
 	struct ipv6_addrhead addrs;
 	uint8_t hasdns;
 	uint8_t expired;
-	uint8_t no_public_warned;
 };
 
 TAILQ_HEAD(ra_head, ra);
@@ -110,7 +109,6 @@ ssize_t ipv6nd_free(struct interface *);
 void ipv6nd_expirera(void *arg);
 int ipv6nd_hasra(const struct interface *);
 int ipv6nd_hasradhcp(const struct interface *);
-void ipv6nd_runignoredra(struct interface *);
 void ipv6nd_handleifa(struct dhcpcd_ctx *, int,
     const char *, const struct in6_addr *, int);
 int ipv6nd_dadcompleted(const struct interface *);

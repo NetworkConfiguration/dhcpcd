@@ -712,24 +712,6 @@ try_script:
 	}
 }
 
-static int
-ipv6nd_has_public_addr(const struct interface *ifp)
-{
-	const struct ra *rap;
-	const struct ipv6_addr *ia;
-
-	TAILQ_FOREACH(rap, ifp->ctx->ipv6->ra_routers, next) {
-		if (rap->iface == ifp) {
-			TAILQ_FOREACH(ia, &rap->addrs, next) {
-				if (ia->flags & IPV6_AF_AUTOCONF &&
-				    ipv6_publicaddr(ia))
-					return 1;
-			}
-		}
-	}
-	return 0;
-}
-
 static void
 ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
     struct icmp6_hdr *icp, size_t len, int hoplimit)
@@ -820,7 +802,6 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 		if (rap) {
 			free(rap->data);
 			rap->data_len = 0;
-			rap->no_public_warned = 0;
 		}
 		new_data = 1;
 	} else
@@ -1093,19 +1074,6 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 	if (new_rap)
 		add_router(ifp->ctx->ipv6, rap);
 
-	if (!ipv6nd_has_public_addr(rap->iface) &&
-	    !(rap->iface->options->options & DHCPCD_IPV6RA_ACCEPT_NOPUBLIC) &&
-	    (!(rap->flags & ND_RA_FLAG_MANAGED) ||
-	    !dhcp6_has_public_addr(rap->iface)))
-	{
-		logger(rap->iface->ctx,
-		    rap->no_public_warned ? LOG_DEBUG : LOG_WARNING,
-		    "%s: ignoring RA from %s"
-		    " (no public prefix, no managed address)",
-		    rap->iface->name, rap->sfrom);
-		rap->no_public_warned = 1;
-		goto handle_flag;
-	}
 	if (ifp->ctx->options & DHCPCD_TEST) {
 		script_runreason(ifp, "TEST");
 		goto handle_flag;
@@ -1151,34 +1119,6 @@ nodhcp6:
 
 	/* Expire should be called last as the rap object could be destroyed */
 	ipv6nd_expirera(ifp);
-}
-
-/* Run RA's we ignored becuase they had no public addresses
- * This should only be called when DHCPv6 applies a public address */
-void
-ipv6nd_runignoredra(struct interface *ifp)
-{
-	struct ra *rap;
-
-	TAILQ_FOREACH(rap, ifp->ctx->ipv6->ra_routers, next) {
-		if (rap->iface == ifp &&
-		    !rap->expired &&
-		    rap->no_public_warned)
-		{
-			rap->no_public_warned = 0;
-			logger(rap->iface->ctx, LOG_INFO,
-			    "%s: applying ignored RA from %s",
-			    rap->iface->name, rap->sfrom);
-			if (ifp->ctx->options & DHCPCD_TEST) {
-				script_runreason(ifp, "TEST");
-				continue;
-			}
-			if (ipv6nd_scriptrun(rap))
-				return;
-			eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
-			eloop_timeout_delete(ifp->ctx->eloop, NULL, rap);
-		}
-	}
 }
 
 int
