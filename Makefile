@@ -150,9 +150,8 @@ snapshot:
 	rm -rf /tmp/${DISTPREFIX}
 	${INSTALL} -d /tmp/${DISTPREFIX}
 	cp -RPp * /tmp/${DISTPREFIX}
-	cd /tmp/${DISTPREFIX} && ${MAKE} distclean
-	cd /tmp && tar -cvjpf ${DISTFILE} ${DISTPREFIX}
-	mv /tmp/${DISTFILE} .
+	${MAKE} -C /tmp/${DISTPREFIX} distclean
+	tar cf - -C /tmp ${DISTPREFIX} | xz >${DISTFILE}
 	ls -l ${DISTFILE}
 
 import: ${SRCS}
