@@ -1007,7 +1007,8 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 				 * temporary address also exists then
 				 * extend the existing one rather than
 				 * create a new one */
-				if (ipv6_iffindaddr(ifp, &ap->addr) &&
+				if (ipv6_iffindaddr(ifp, &ap->addr,
+				    IN6_IFF_NOTUSEABLE) &&
 				    ipv6_settemptime(ap, 0))
 					new_ap = 0;
 				else
