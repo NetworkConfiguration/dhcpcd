@@ -596,9 +596,9 @@ send_interface1(struct fd_list *fd, const struct interface *iface,
 	elen = (size_t)arraytostr((const char *const *)env, &s);
 	if ((ssize_t)elen == -1) {
 		free(s);
-		return -1;
-	}
-	retval = control_queue(fd, s, elen, 1);
+		retval = -1;
+	} else
+		retval = control_queue(fd, s, elen, 1);
 	ep = env;
 	while (*ep)
 		free(*ep++);
