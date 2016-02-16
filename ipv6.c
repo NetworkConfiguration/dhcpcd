@@ -228,6 +228,7 @@ ipv6_readsecret(struct dhcpcd_ctx *ctx)
 	    hwaddr_ntoa(ctx->secret, ctx->secret_len, line, sizeof(line)));
 	if (fclose(fp) == EOF)
 		x = -1;
+	fp = NULL;
 	if (x > 0)
 		return (ssize_t)ctx->secret_len;
 
