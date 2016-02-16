@@ -3039,9 +3039,11 @@ recv:
 			    ifp->name, state->renew);
 		else if (state->renew || state->rebind)
 			logger(ifp->ctx, has_new ? LOG_INFO : LOG_DEBUG,
-			    "%s: renew in %"PRIu32" seconds,"
-			    " rebind in %"PRIu32" seconds",
-			    ifp->name, state->renew, state->rebind);
+			    "%s: renew in %"PRIu32", "
+			    "rebind in %"PRIu32", "
+			    "expire in %"PRIu32" seconds",
+			    ifp->name,
+			    state->renew, state->rebind, state->expire);
 		else if (state->expire == 0)
 			logger(ifp->ctx, has_new ? LOG_INFO : LOG_DEBUG,
 			    "%s: will expire", ifp->name);
