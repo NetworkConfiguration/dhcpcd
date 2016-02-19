@@ -1728,7 +1728,7 @@ dhcp6_findna(struct interface *ifp, uint16_t ot, const uint8_t *iaid,
 	char iabuf[INET6_ADDRSTRLEN];
 	const char *ia;
 	int i;
-	uint32_t u32;
+	uint32_t u32, pltime, vltime;
 	size_t off;
 	const struct dhcp6_ia_addr *iap;
 
@@ -1748,6 +1748,16 @@ dhcp6_findna(struct interface *ifp, uint16_t ot, const uint8_t *iaid,
 			continue;
 		}
 		iap = (const struct dhcp6_ia_addr *)D6_COPTION_DATA(o);
+		pltime = ntohl(iap->pltime);
+		vltime = ntohl(iap->vltime);
+		/* RFC 3315 22.6 */
+		if (pltime > vltime) {
+			errno = EINVAL;
+			logger(ifp->ctx, LOG_ERR,
+			    "%s: IA Address pltime %"PRIu32" > vltime %"PRIu32,
+			    ifp->name, pltime, vltime);
+			continue;
+		}
 		TAILQ_FOREACH(a, &state->addrs, next) {
 			if (ipv6_findaddrmatch(a, &iap->addr, 0))
 				break;
@@ -1787,11 +1797,10 @@ dhcp6_findna(struct interface *ifp, uint16_t ot, const uint8_t *iaid,
 			a->flags &= ~IPV6_AF_STALE;
 		}
 		a->acquired = *acquired;
-		a->prefix_pltime = ntohl(iap->pltime);
-		u32 = ntohl(iap->vltime);
-		if (a->prefix_vltime != u32) {
+		a->prefix_pltime = pltime;
+		if (a->prefix_vltime != vltime) {
 			a->flags |= IPV6_AF_NEW;
-			a->prefix_vltime = u32;
+			a->prefix_vltime = vltime;
 		}
 		if (a->prefix_pltime && a->prefix_pltime < state->lowpl)
 		    state->lowpl = a->prefix_pltime;
@@ -2022,6 +2031,16 @@ dhcp6_findia(struct interface *ifp, const struct dhcp6_message *m, size_t l,
 			rebind = ntohl(u32);
 			p += sizeof(u32);
 			ol = (uint16_t)(ol - sizeof(u32));
+
+			/* RFC 3315 22.4 */
+			if (rebind > 0 && renew > rebind) {
+				logger(ifp->ctx, LOG_WARNING,
+				    "%s: IAID %s T1 (%d) > T2 (%d) from %s",
+				    ifp->name,
+				    hwaddr_ntoa(iaid, sizeof(iaid), buf, sizeof(buf)),
+				    renew, rebind, sfrom);
+				continue;
+			}
 		} else
 			renew = rebind = 0; /* appease gcc */
 		if (dhcp6_checkstatusok(ifp, NULL, p, ol) == -1) {
@@ -2045,14 +2064,6 @@ dhcp6_findia(struct interface *ifp, const struct dhcp6_message *m, size_t l,
 			}
 		}
 		if (code != D6_OPTION_IA_TA) {
-			if (renew > rebind && rebind > 0) {
-				if (sfrom)
-				    logger(ifp->ctx, LOG_WARNING,
-					"%s: T1 (%d) > T2 (%d) from %s",
-					ifp->name, renew, rebind, sfrom);
-				renew = 0;
-				rebind = 0;
-			}
 			if (renew != 0 &&
 			    (renew < state->renew || state->renew == 0))
 				state->renew = renew;
@@ -2984,6 +2995,37 @@ recv:
 	case DH6S_CONFIRM:
 		if (state->reason == NULL)
 			state->reason = "REBOOT6";
+		if (state->renew != 0) {
+			int all_expired = 1;
+
+			TAILQ_FOREACH(ap, &state->addrs, next) { 
+				if (ap->prefix_vltime <= state->renew)
+					logger(ifp->ctx, LOG_WARNING,
+					    "%s: %s will expire before renewal",
+					    ifp->name, ap->saddr);
+				else
+					all_expired = 0;
+			}
+			if (all_expired) {
+				/* All address's vltime happens at or before
+				 * the configured T1 in the IA.
+				 * This is a badly configured server and we
+				 * have to use our own notion of what
+				 * T1 and T2 should be as a result.
+				 *
+				 * Doing this violates RFC 3315 22.4:
+				 * In a message sent by a server to a client,
+				 * the client MUST use the values in the T1
+				 * and T2 fields for the T1 and T2 parameters,
+				 * unless those values in those fields are 0.
+				 */
+				logger(ifp->ctx, LOG_WARNING,
+				    "%s: ignoring T1 %"PRIu32
+				    " to due address expiry",
+				    ifp->name, state->renew);
+				state->renew = state->rebind = 0;
+			}
+		}
 		if (state->renew == 0) {
 			if (state->expire == ND6_INFINITE_LIFETIME)
 				state->renew = ND6_INFINITE_LIFETIME;
