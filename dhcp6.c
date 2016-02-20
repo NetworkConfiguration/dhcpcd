@@ -1826,6 +1826,7 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 	size_t off;
 	uint16_t ol;
 	const struct dhcp6_pd_addr *pdp;
+	uint32_t pltime, vltime;
 
 	i = 0;
 	state = D6_STATE(ifp);
@@ -1844,10 +1845,23 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 		}
 
 		pdp = (const struct dhcp6_pd_addr *)D6_COPTION_DATA(o);
+
+		pltime = ntohl(pdp->pltime);
+		vltime = ntohl(pdp->vltime);
+		/* RFC 3315 22.6 */
+		if (pltime > vltime) {
+			errno = EINVAL;
+			logger(ifp->ctx, LOG_ERR,
+			    "%s: IA Prefix pltime %"PRIu32" > vltime %"PRIu32,
+			    ifp->name, pltime, vltime);
+			continue;
+		}
+
 		TAILQ_FOREACH(a, &state->addrs, next) {
 			if (IN6_ARE_ADDR_EQUAL(&a->prefix, &pdp->prefix))
 				break;
 		}
+
 		if (a == NULL) {
 			a = calloc(1, sizeof(*a));
 			if (a == NULL) {
@@ -1876,8 +1890,8 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 		}
 
 		a->acquired = *acquired;
-		a->prefix_pltime = ntohl(pdp->pltime);
-		a->prefix_vltime = ntohl(pdp->vltime);
+		a->prefix_pltime = pltime;
+		a->prefix_vltime = vltime;
 
 		if (a->prefix_pltime && a->prefix_pltime < state->lowpl)
 			state->lowpl = a->prefix_pltime;
@@ -2999,8 +3013,7 @@ recv:
 			int all_expired = 1;
 
 			TAILQ_FOREACH(ap, &state->addrs, next) { 
-				if (ap->flags &
-				    (IPV6_AF_DELEGATEDPFX | IPV6_AF_STALE))
+				if (ap->flags & IPV6_AF_STALE)
 					continue;
 				if (ap->prefix_vltime <= state->renew)
 					logger(ifp->ctx, LOG_WARNING,
