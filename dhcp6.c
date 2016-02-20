@@ -2999,6 +2999,9 @@ recv:
 			int all_expired = 1;
 
 			TAILQ_FOREACH(ap, &state->addrs, next) { 
+				if (ap->flags &
+				    (IPV6_AF_DELEGATEDPFX | IPV6_AF_STALE))
+					continue;
 				if (ap->prefix_vltime <= state->renew)
 					logger(ifp->ctx, LOG_WARNING,
 					    "%s: %s will expire before renewal",
