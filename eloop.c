@@ -1,7 +1,7 @@
 /*
- * dhcpcd - DHCP client daemon
+ * eloop - portable event based main loop.
  * Copyright (c) 2006-2016 Roy Marples <roy@marples.name>
- * All rights reserved
+ * All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -38,7 +38,7 @@
 #include <string.h>
 #include <unistd.h>
 
-/* config.h should define HAVE_KQUEUE, HAVE_EPOLL, etc */
+/* config.h should define HAVE_KQUEUE, HAVE_EPOLL, etc. */
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -48,11 +48,11 @@
 #if !defined(HAVE_KQUEUE) && !defined(HAVE_EPOLL) && !defined(HAVE_PSELECT) && \
     !defined(HAVE_POLLTS) && !defined(HAVE_PPOLL)
 #if defined(BSD)
-/* Assume BSD has a working sys/queue.h and kqueue(2) interface */
+/* Assume BSD has a working sys/queue.h and kqueue(2) interface. */
 #define HAVE_SYS_QUEUE_H
 #define HAVE_KQUEUE
 #elif defined(__linux__)
-/* Assume Linux has a working epoll(3) interface */
+/* Assume Linux has a working epoll(3) interface. */
 #define HAVE_EPOLL
 #else
 /* pselect(2) is a POSIX standard. */
@@ -99,8 +99,8 @@
 #include <sys/event.h>
 #include <fcntl.h>
 #ifdef __NetBSD__
-/* udata is void * except on NetBSD
- * lengths are int except on NetBSD */
+/* udata is void * except on NetBSD.
+ * lengths are int except on NetBSD. */
 #define UPTR(x)	((intptr_t)(x))
 #define LENC(x)	(x)
 #else
@@ -274,7 +274,7 @@ eloop_event_add(struct eloop *eloop, int fd,
 		epe.events |= EPOLLOUT;
 #endif
 
-	/* We should only have one callback monitoring the fd */
+	/* We should only have one callback monitoring the fd. */
 	TAILQ_FOREACH(e, &eloop->events, next) {
 		if (e->fd == fd) {
 			int error;
@@ -310,7 +310,7 @@ eloop_event_add(struct eloop *eloop, int fd,
 		}
 	}
 
-	/* Allocate a new event if no free ones already allocated */
+	/* Allocate a new event if no free ones already allocated. */
 	if ((e = TAILQ_FIRST(&eloop->free_events))) {
 		TAILQ_REMOVE(&eloop->free_events, e, next);
 	} else {
@@ -319,7 +319,7 @@ eloop_event_add(struct eloop *eloop, int fd,
 			goto err;
 	}
 
-	/* Ensure we can actually listen to it */
+	/* Ensure we can actually listen to it. */
 	eloop->events_len++;
 #ifdef HAVE_POLL
 	if (eloop->events_len > eloop->fds_len) {
@@ -332,7 +332,7 @@ eloop_event_add(struct eloop *eloop, int fd,
 	}
 #endif
 
-	/* Now populate the structure and add it to the list */
+	/* Now populate the structure and add it to the list. */
 	e->fd = fd;
 	e->read_cb = read_cb;
 	e->read_cb_arg = read_cb_arg;
@@ -451,7 +451,7 @@ eloop_q_timeout_add_tv(struct eloop *eloop, int queue,
 		return -1;
 	}
 
-	/* Remove existing timeout if present */
+	/* Remove existing timeout if present. */
 	TAILQ_FOREACH(t, &eloop->timeouts, next) {
 		if (t->callback == callback && t->arg == arg) {
 			TAILQ_REMOVE(&eloop->timeouts, t, next);
@@ -460,7 +460,7 @@ eloop_q_timeout_add_tv(struct eloop *eloop, int queue,
 	}
 
 	if (t == NULL) {
-		/* No existing, so allocate or grab one from the free pool */
+		/* No existing, so allocate or grab one from the free pool. */
 		if ((t = TAILQ_FIRST(&eloop->free_timeouts))) {
 			TAILQ_REMOVE(&eloop->free_timeouts, t, next);
 		} else {
@@ -808,7 +808,7 @@ eloop_start(struct eloop *eloop, sigset_t *signals)
 		if (eloop->exitnow)
 			break;
 
-		/* Run all timeouts first */
+		/* Run all timeouts first. */
 		if (eloop->timeout0) {
 			t0 = eloop->timeout0;
 			eloop->timeout0 = NULL;
@@ -826,7 +826,7 @@ eloop_start(struct eloop *eloop, sigset_t *signals)
 			timespecsub(&t->when, &now, &ts);
 			tsp = &ts;
 		} else
-			/* No timeouts, so wait forever */
+			/* No timeouts, so wait forever. */
 			tsp = NULL;
 
 		if (tsp == NULL && eloop->events_len == 0)
