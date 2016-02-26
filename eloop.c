@@ -34,6 +34,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <signal.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -182,6 +183,24 @@ struct eloop {
 };
 
 #ifdef HAVE_POLL
+/* Handy routing to check for potential overflow.
+ * reallocarray(3) and reallocarr(3) are not portable and this
+ * implementation is smaller than using either in libc in
+ * the final binary size. */
+#define SQRT_SIZE_MAX (((size_t)1) << (sizeof(size_t) * CHAR_BIT / 2))
+static void *
+eloop_realloca(void *ptr, size_t n, size_t size)
+{
+
+	if ((n | size) >= SQRT_SIZE_MAX && n > SIZE_MAX / size) {
+		errno = EOVERFLOW;
+		return NULL;
+	}
+	return realloc(ptr, n * size);
+}
+#endif
+
+#ifdef HAVE_POLL
 static void
 eloop_event_setup_fds(struct eloop *eloop)
 {
@@ -323,8 +342,8 @@ eloop_event_add(struct eloop *eloop, int fd,
 	eloop->events_len++;
 #ifdef HAVE_POLL
 	if (eloop->events_len > eloop->fds_len) {
-		nfds = realloc(eloop->fds,
-		    sizeof(*eloop->fds) * (eloop->fds_len + 5));
+		nfds = eloop_realloca(eloop->fds,
+		    (eloop->fds_len + 5), sizeof(*eloop->fds));
 		if (nfds == NULL)
 			goto err;
 		eloop->fds_len += 5;
