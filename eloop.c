@@ -143,9 +143,6 @@ struct eloop_event {
 	void *read_cb_arg;
 	void (*write_cb)(void *);
 	void *write_cb_arg;
-#ifdef HAVE_POLL
-	struct pollfd *pollfd;
-#endif
 };
 
 struct eloop_timeout {
@@ -216,7 +213,6 @@ eloop_event_setup_fds(struct eloop *eloop)
 		if (e->write_cb)
 			eloop->fds[i].events |= POLLOUT;
 		eloop->fds[i].revents = 0;
-		e->pollfd = &eloop->fds[i];
 		i++;
 	}
 }
@@ -936,16 +932,22 @@ eloop_start(struct eloop *eloop, sigset_t *signals)
 		}
 #elif defined(HAVE_POLL)
 		if (n > 0) {
-			TAILQ_FOREACH(e, &eloop->events, next) {
-				if (e->pollfd->revents & POLLOUT &&
-				    e->write_cb != NULL)
-				{
-					e->write_cb(e->write_cb_arg);
-					break;
+			size_t i;
+
+			for (i = 0; i < eloop->events_len; i++) {
+				if (eloop->fds[i].revents & POLLOUT) {
+					e = eloop->event_fds[eloop->fds[i].fd];
+					if (e->write_cb != NULL) {
+						e->write_cb(e->write_cb_arg);
+						break;
+					}
 				}
-				if (e->pollfd->revents && e->read_cb != NULL) {
-					e->read_cb(e->read_cb_arg);
-					break;
+				if (eloop->fds[i].revents) {
+					e = eloop->event_fds[eloop->fds[i].fd];
+					if (e->read_cb != NULL) {
+						e->read_cb(e->read_cb_arg);
+						break;
+					}
 				}
 			}
 		}
