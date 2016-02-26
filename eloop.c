@@ -160,6 +160,8 @@ struct eloop {
 	size_t events_len;
 	TAILQ_HEAD (event_head, eloop_event) events;
 	struct event_head free_events;
+	int events_maxfd;
+	struct eloop_event **event_fds;
 
 	TAILQ_HEAD (timeout_head, eloop_timeout) timeouts;
 	struct timeout_head free_timeouts;
@@ -182,7 +184,6 @@ struct eloop {
 	int exitcode;
 };
 
-#ifdef HAVE_POLL
 /* Handy routing to check for potential overflow.
  * reallocarray(3) and reallocarr(3) are not portable and this
  * implementation is smaller than using either in libc in
@@ -198,7 +199,6 @@ eloop_realloca(void *ptr, size_t n, size_t size)
 	}
 	return realloc(ptr, n * size);
 }
-#endif
 
 #ifdef HAVE_POLL
 static void
@@ -294,8 +294,8 @@ eloop_event_add(struct eloop *eloop, int fd,
 #endif
 
 	/* We should only have one callback monitoring the fd. */
-	TAILQ_FOREACH(e, &eloop->events, next) {
-		if (e->fd == fd) {
+	if (fd <= eloop->events_maxfd) {
+		if ((e = eloop->event_fds[fd]) != NULL) {
 			int error;
 
 #if defined(HAVE_KQUEUE)
@@ -327,6 +327,23 @@ eloop_event_add(struct eloop *eloop, int fd,
 			eloop_event_setup_fds(eloop);
 			return error;
 		}
+	} else {
+		struct eloop_event **new_fds;
+		int maxfd, i;
+
+		/* Reserve ourself and 4 more. */
+		maxfd = fd + 4;
+		new_fds = eloop_realloca(eloop->event_fds,
+		    ((size_t)maxfd + 1), sizeof(*eloop->event_fds));
+		if (new_fds == NULL)
+			return -1;
+
+		/* set new entries NULL as the fd's may not be contiguous. */
+		for (i = maxfd; i > eloop->events_maxfd; i--)
+			new_fds[i] = NULL;
+
+		eloop->event_fds = new_fds;
+		eloop->events_maxfd = maxfd;
 	}
 
 	/* Allocate a new event if no free ones already allocated. */
@@ -374,6 +391,7 @@ eloop_event_add(struct eloop *eloop, int fd,
 #endif
 
 	TAILQ_INSERT_HEAD(&eloop->events, e, next);
+	eloop->event_fds[e->fd] = e;
 	eloop_event_setup_fds(eloop);
 	return 0;
 
@@ -397,52 +415,53 @@ eloop_event_delete_write(struct eloop *eloop, int fd, int write_only)
 
 	assert(eloop != NULL);
 
-	TAILQ_FOREACH(e, &eloop->events, next) {
-		if (e->fd == fd) {
-			if (write_only && e->read_cb != NULL) {
-				if (e->write_cb != NULL) {
-					e->write_cb = NULL;
-					e->write_cb_arg = NULL;
+	if (fd > eloop->events_maxfd ||
+	    (e = eloop->event_fds[fd]) == NULL)
+		return;
+
+	if (write_only) {
+		if (e->write_cb == NULL)
+			return;
+		if (e->read_cb == NULL)
+			goto remove;
+		e->write_cb = NULL;
+		e->write_cb_arg = NULL;
 #if defined(HAVE_KQUEUE)
-					EV_SET(&ke[0], (uintptr_t)fd,
-					    EVFILT_WRITE, EV_DELETE,
-					    0, 0, UPTR(NULL));
-					kevent(eloop->poll_fd, ke, 1, NULL, 0,
-					    NULL);
+		EV_SET(&ke[0], (uintptr_t)e->fd,
+		    EVFILT_WRITE, EV_DELETE, 0, 0, UPTR(NULL));
+		kevent(eloop->poll_fd, ke, 1, NULL, 0, NULL);
 #elif defined(HAVE_EPOLL)
-					memset(&epe, 0, sizeof(epe));
-					epe.data.fd = e->fd;
-					epe.data.ptr = e;
-					epe.events = EPOLLIN;
-					epoll_ctl(eloop->poll_fd,
-					    EPOLL_CTL_MOD, fd, &epe);
+		memset(&epe, 0, sizeof(epe));
+		epe.data.fd = e->fd;
+		epe.data.ptr = e;
+		epe.events = EPOLLIN;
+		epoll_ctl(eloop->poll_fd, EPOLL_CTL_MOD, fd, &epe);
 #endif
-				}
-			} else {
-				TAILQ_REMOVE(&eloop->events, e, next);
-#if defined(HAVE_KQUEUE)
-				EV_SET(&ke[0], (uintptr_t)fd, EVFILT_READ,
-				    EV_DELETE, 0, 0, UPTR(NULL));
-				if (e->write_cb)
-					EV_SET(&ke[1], (uintptr_t)fd,
-					    EVFILT_WRITE, EV_DELETE,
-					    0, 0, UPTR(NULL));
-				kevent(eloop->poll_fd, ke, e->write_cb ? 2 : 1,
-				    NULL, 0, NULL);
-#elif defined(HAVE_EPOLL)
-				/* NULL event is safe because we
-				 * rely on epoll_pwait which as added
-				 * after the delete without event was fixed. */
-				epoll_ctl(eloop->poll_fd, EPOLL_CTL_DEL,
-				    fd, NULL);
-#endif
-				TAILQ_INSERT_TAIL(&eloop->free_events, e, next);
-				eloop->events_len--;
-			}
-			eloop_event_setup_fds(eloop);
-			break;
-		}
+		eloop_event_setup_fds(eloop);
+		return;
 	}
+
+remove:
+	TAILQ_REMOVE(&eloop->events, e, next);
+	eloop->event_fds[e->fd] = NULL;
+	TAILQ_INSERT_TAIL(&eloop->free_events, e, next);
+	eloop->events_len--;
+
+#if defined(HAVE_KQUEUE)
+	EV_SET(&ke[0], (uintptr_t)fd, EVFILT_READ,
+	    EV_DELETE, 0, 0, UPTR(NULL));
+	if (e->write_cb)
+		EV_SET(&ke[1], (uintptr_t)fd,
+		    EVFILT_WRITE, EV_DELETE, 0, 0, UPTR(NULL));
+	kevent(eloop->poll_fd, ke, e->write_cb ? 2 : 1, NULL, 0, NULL);
+#elif defined(HAVE_EPOLL)
+	/* NULL event is safe because we
+	 * rely on epoll_pwait which as added
+	 * after the delete without event was fixed. */
+	epoll_ctl(eloop->poll_fd, EPOLL_CTL_DEL, fd, NULL);
+#endif
+
+	eloop_event_setup_fds(eloop);
 }
 
 int
@@ -750,6 +769,7 @@ eloop_new(void)
 	eloop = calloc(1, sizeof(*eloop));
 	if (eloop) {
 		TAILQ_INIT(&eloop->events);
+		eloop->events_maxfd = -1;
 		TAILQ_INIT(&eloop->free_events);
 		TAILQ_INIT(&eloop->timeouts);
 		TAILQ_INIT(&eloop->free_timeouts);
@@ -771,6 +791,7 @@ void eloop_free(struct eloop *eloop)
 	if (eloop == NULL)
 		return;
 
+	free(eloop->event_fds);
 	while ((e = TAILQ_FIRST(&eloop->events))) {
 		TAILQ_REMOVE(&eloop->events, e, next);
 		free(e);
