@@ -354,12 +354,6 @@ eloop_event_add(struct eloop *eloop, int fd,
 		goto err;
 #endif
 
-	/* The order of events should not matter.
-	 * However, some PPP servers love to close the link right after
-	 * sending their final message. So to ensure dhcpcd processes this
-	 * message (which is likely to be that the DHCP addresses are wrong)
-	 * we insert new events at the queue head as the link fd will be
-	 * the first event added. */
 	TAILQ_INSERT_HEAD(&eloop->events, e, next);
 	eloop_event_setup_fds(eloop);
 	return 0;
