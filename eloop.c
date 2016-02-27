@@ -772,7 +772,10 @@ eloop_new(void)
 		eloop->exitcode = EXIT_FAILURE;
 #if defined(HAVE_KQUEUE) || defined(HAVE_EPOLL)
 		eloop->poll_fd = -1;
-		eloop_open(eloop);
+		if (eloop_open(eloop) == -1) {
+			eloop_free(eloop);
+			return NULL;
+		}
 #endif
 	}
 
