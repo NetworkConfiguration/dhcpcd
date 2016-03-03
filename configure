@@ -116,7 +116,7 @@ Fine tuning of the installation directories:
   --sbindir=DIR           system admin executables [PREFIX/sbin]
   --libexecdir=DIR        program executables [PREFIX/libexec]
   --sysconfdir=DIR        read-only single-machine data [PREFIX/etc]
-  --localstatedir=DIR     modifiable single-machine data [PREFIX/var]
+  --localstatedir=DIR     modifiable single-machine data [/var]
   --libdir=DIR            object code libraries [PREFIX/lib]
   --includedir=DIR        C header files [PREFIX/include]
   --mandir=DIR            man documentation [PREFIX/man]
