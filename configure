@@ -432,6 +432,12 @@ echo "Using compiler .. $CC"
 XCC="$CC `$SED -n -e 's/CPPFLAGS+=*\(.*\)/\1/p' $CONFIG_MK`"
 XCC="$XCC `$SED -n -e 's/CFLAGS+=*\(.*\)/\1/p' $CONFIG_MK`"
 
+# When running tests, treat all warnings as errors.
+# This avoids the situation where we link to a libc symbol
+# without the correct header because it might be hidden behind
+# a _*_SOURCE #define guard.
+XCC="$XCC -Wall -Werror"
+
 # Now test we can use the compiler with our CFLAGS
 cat <<EOF >_test.c
 int main(void) {
