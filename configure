@@ -309,7 +309,11 @@ fi
 case "$OS" in
 linux*|sunos*|kfreebsd*) ;;
 *)
-	if ! [ -x "$LDELF" -o -x /libexec/ld-elf.so.[0-9]* ] && \
+	# There might be more than one ...
+	for LDELFN in /libexec/ld-elf.so.[0-9]*; do
+		[ -x "$LDELFN" ] && break
+	done
+	if ! [ -x "$LDELF" -o -x "$LDELFN" ] && \
 	    [ -z "$PREFIX" -o "$PREFIX" = "/" ]
 	then
 		echo "Forcing a static build for $OS and \$PREFIX of /"
