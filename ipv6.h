@@ -221,7 +221,8 @@ struct ipv6_state {
 #define IPV6_STATE_RUNNING(ifp) ipv6_staticdadcompleted((ifp))
 
 /* dhcpcd requires CMSG_SPACE to evaluate to a compile time constant. */
-#ifdef __QNX__
+#if defined(__QNX) || \
+	(defined(__NetBSD_Version__) && __NetBSD_Version__ < 600000000)
 #undef CMSG_SPACE
 #endif
 
