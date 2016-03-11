@@ -546,7 +546,7 @@ cat <<EOF >_inet_ntoa.c
 #include <netinet/in.h>
 #include <arpa/inet.h>
 int main(void) {
-	struct in_addr in = {};
+	struct in_addr in = { .s_addr = 0 };
 	inet_ntoa(in);
 	return 0;
 }
