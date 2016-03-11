@@ -689,7 +689,8 @@ if [ -z "$STRTOI" ]; then
 #include <inttypes.h>
 int main(void) {
 	int e;
-	return strtoi("1234", NULL, 0, 0, INT32_MAX, &e);
+	strtoi("1234", NULL, 0, 0, INT32_MAX, &e);
+	return 0;
 }
 EOF
 	if $XCC _strtoi.c -o _strtoi 2>&3; then
@@ -977,6 +978,7 @@ if [ -z "$BE64ENC" ]; then
 #include <stdlib.h>
 int main(void) {
 	be64enc(NULL, 0);
+	return 0;
 }
 EOF
 	if $XCC _be64enc.c -o _be64enc 2>&3; then
