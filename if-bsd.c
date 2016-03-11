@@ -594,6 +594,9 @@ if_route(unsigned char cmd, const struct rt *rt)
 #ifdef RTF_CLONING
 			rtm.hdr.rtm_flags |= RTF_CLONING;
 #endif
+#ifdef RTF_CONNECTED
+			rtm.hdr.rtm_flags |= RTF_CONNECTED;
+#endif
 #ifdef RTP_CONNECTED
 			rtm.hdr.rtm_priority = RTP_CONNECTED;
 #endif
@@ -641,6 +644,9 @@ if_route(unsigned char cmd, const struct rt *rt)
 		    rt->gate.s_addr == htonl(INADDR_ANY)) ||
 #ifdef RTF_CLONING
 		    rtm.hdr.rtm_flags & RTF_CLONING ||
+#endif
+#ifdef RTF_CONNECTED
+		    rtm.hdr.rtm_flags & RTF_CONNECTED ||
 #endif
 		    !(rtm.hdr.rtm_flags & RTF_STATIC))
 		{
@@ -997,6 +1003,9 @@ if_route6(unsigned char cmd, const struct rt6 *rt)
 	if (IN6_IS_ADDR_UNSPECIFIED(&rt->gate)) {
 #ifdef RTF_CLONING
 		rtm.hdr.rtm_flags |= RTF_CLONING;
+#endif
+#ifdef RTF_CONNECTED
+		rtm.hdr.rtm_flags |= RTF_CONNECTED;
 #endif
 #ifdef RTP_CONNECTED
 		rtm.hdr.rtm_priority = RTP_CONNECTED;
