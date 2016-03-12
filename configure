@@ -24,6 +24,7 @@ STATIC=
 DEVS=
 EMBEDDED=
 POLL=
+STATUSARG=
 
 for x do
 	opt=${x%%=*}
@@ -78,6 +79,7 @@ for x do
 	--serviceexists) SERVICEEXISTS=$var;;
 	--servicecmd) SERVICECMD=$var;;
 	--servicestatus) SERVICESTATUS=$var;;
+	--statusarg) STATUSARG=$var;;
 	--infodir|--includedir) ;; # ignore autotools
 	--disable-maintainer-mode|--disable-dependency-tracking) ;;
 	--disable-silent-rules) ;;
@@ -1252,6 +1254,12 @@ SERVICESTATUS=$(echo "$SERVICESTATUS" | $SED \
 	-e 's:\$:\\\\\$\$:g' \
 )
 echo "SERVICESTATUS=	$SERVICESTATUS" >>config.mk
+if [ -z "$STATUSARG" ]; then
+	case "$OS" in
+	freebsd*)	STATUSARG="onestatus";;
+	esac
+fi
+echo "STATUSARG=	$STATUSARG" >>config.mk
 
 HOOKS=
 if ! $HOOKSET; then
@@ -1357,6 +1365,7 @@ echo "   MANDIR =		$MANDIR"
 echo "   DATADIR =		$DATADIR"
 echo "   HOOKSCRIPTS =	$HOOKS"
 echo "   EGHOOKSCRIPTS =	$EGHOOKS"
+echo "   STATUSARG = 		$STATUSARG"
 echo
 
 rm -f dhcpcd tests/test

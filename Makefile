@@ -46,6 +46,7 @@ SED_HOOKDIR=		-e 's:@HOOKDIR@:${HOOKDIR}:g'
 SED_SERVICEEXISTS=	-e 's:@SERVICEEXISTS@:${SERVICEEXISTS}:g'
 SED_SERVICECMD=		-e 's:@SERVICECMD@:${SERVICECMD}:g'
 SED_SERVICESTATUS=	-e 's:@SERVICESTATUS@:${SERVICESTATUS}:g'
+SED_STATUSARG=		-e 's:@STATUSARG@:${STATUSARG}:g'
 SED_SCRIPT=		-e 's:@SCRIPT@:${SCRIPT}:g'
 SED_SYS=		-e 's:@SYSCONFDIR@:${SYSCONFDIR}:g'
 
@@ -66,10 +67,11 @@ CLEANFILES+=	*.tar.xz
 
 .SUFFIXES:	.in
 
-.in:
+.in: Makefile config.mk
 	${SED} ${SED_RUNDIR} ${SED_DBDIR} ${SED_LIBDIR} ${SED_HOOKDIR} \
 		${SED_SYS} ${SED_SCRIPT} ${SED_DATADIR} \
 		${SED_SERVICEEXISTS} ${SED_SERVICECMD} ${SED_SERVICESTATUS} \
+		${SED_STATUSARG} \
 		$< > $@
 
 all: config.h ${PROG} ${SCRIPTS} ${MAN5} ${MAN8}
@@ -78,7 +80,7 @@ all: config.h ${PROG} ${SCRIPTS} ${MAN5} ${MAN8}
 dev:
 	cd dev && ${MAKE}
 
-.c.o:
+.c.o: Makefile config.mk
 	${CC} ${CFLAGS} ${CPPFLAGS} -c $< -o $@
 
 CLEANFILES+=	dhcpcd-embedded.h dhcpcd-embedded.c
