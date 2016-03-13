@@ -46,7 +46,6 @@
 #include <netinet/in.h>
 #include <net/route.h>
 
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <ctype.h>
@@ -450,7 +449,11 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 		if ((ap = ipv4_findaddr(ctx, &rt->src)))
 			rt->iface = ap->iface;
 	}
-	assert(rt->iface != NULL);
+
+	if (rt->iface == NULL) {
+		errno = ESRCH;
+		return -1;
+	}
 	return 0;
 }
 #endif
@@ -520,7 +523,10 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct nlmsghdr *nlm)
 		rta = RTA_NEXT(rta, len);
 	}
 
-	assert(rt->iface != NULL);
+	if (rt->iface == NULL) {
+		errno = ESRCH;
+		return -1;
+	}
 	return 0;
 }
 #endif

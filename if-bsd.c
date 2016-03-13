@@ -57,7 +57,6 @@
 #  include <net80211/ieee80211_ioctl.h>
 #endif
 
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <fnmatch.h>
@@ -550,8 +549,10 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct rt_msghdr *rtm)
 			rt->iface = ia->iface;
 	}
 
-	assert(rt->iface != NULL);
-
+	if (rt->iface == NULL) {
+		errno = ESRCH;
+		return -1;
+	}
 	return 0;
 }
 
@@ -965,8 +966,10 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct rt_msghdr *rtm)
 			rt->iface = ia->iface;
 	}
 
-	assert(rt->iface != NULL);
-
+	if (rt->iface == NULL) {
+		errno = ESRCH;
+		return -1;
+	}
 	return 0;
 }
 
