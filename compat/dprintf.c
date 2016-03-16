@@ -41,7 +41,7 @@ vdprintf(int fd, const char * __restrict fmt, va_list va)
 	if ((e = dup(fd)) == -1)
 		return -1;
 
-	if ((fp = fdopen(e, "r+")) == NULL) {
+	if ((fp = fdopen(e, "w")) == NULL) {
 		close(e);
 		return -1;
 	}
