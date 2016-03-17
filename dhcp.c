@@ -3089,7 +3089,7 @@ dhcp_open(struct interface *ifp)
 			return -1;
 		}
 		eloop_event_add(ifp->ctx->eloop,
-		    state->raw_fd, dhcp_handlepacket, ifp, NULL, NULL);
+		    state->raw_fd, dhcp_handlepacket, ifp);
 	}
 	return 0;
 }
@@ -3267,8 +3267,7 @@ dhcp_start1(void *arg)
 				    "%s: dhcp_openudp: %m", __func__);
 		} else
 			eloop_event_add(ifp->ctx->eloop,
-			    ifp->ctx->udp_fd, dhcp_handleudp,
-			    ifp->ctx, NULL, NULL);
+			    ifp->ctx->udp_fd, dhcp_handleudp, ifp->ctx);
 	}
 
 	if (dhcp_init(ifp) == -1) {

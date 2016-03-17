@@ -261,7 +261,7 @@ eloop_pollts(struct pollfd * fds, nfds_t nfds,
 #endif /* HAVE_POLL */
 
 int
-eloop_event_add(struct eloop *eloop, int fd,
+eloop_event_add_rw(struct eloop *eloop, int fd,
     void (*read_cb)(void *), void *read_cb_arg,
     void (*write_cb)(void *), void *write_cb_arg)
 {
@@ -397,6 +397,22 @@ err:
 		TAILQ_INSERT_TAIL(&eloop->free_events, e, next);
 	}
 	return -1;
+}
+
+int
+eloop_event_add(struct eloop *eloop, int fd,
+    void (*read_cb)(void *), void *read_cb_arg)
+{
+
+	return eloop_event_add_rw(eloop, fd, read_cb, read_cb_arg, NULL, NULL);
+}
+
+int
+eloop_event_add_w(struct eloop *eloop, int fd,
+    void (*write_cb)(void *), void *write_cb_arg)
+{
+
+	return eloop_event_add_rw(eloop, fd, NULL,NULL, write_cb, write_cb_arg);
 }
 
 void

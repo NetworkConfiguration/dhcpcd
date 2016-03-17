@@ -181,8 +181,7 @@ control_handle1(struct dhcpcd_ctx *ctx, int lfd, unsigned int fd_flags)
 		TAILQ_INIT(&l->queue);
 		TAILQ_INIT(&l->free_queue);
 		TAILQ_INSERT_TAIL(&ctx->control_fds, l, next);
-		eloop_event_add(ctx->eloop, l->fd,
-		    control_handle_data, l, NULL, NULL);
+		eloop_event_add(ctx->eloop, l->fd, control_handle_data, l);
 	} else
 		close(fd);
 }
@@ -263,14 +262,13 @@ control_start(struct dhcpcd_ctx *ctx, const char *ifname)
 		return -1;
 
 	ctx->control_fd = fd;
-	eloop_event_add(ctx->eloop, fd, control_handle, ctx, NULL, NULL);
+	eloop_event_add(ctx->eloop, fd, control_handle, ctx);
 
 	if (ifname == NULL && (fd = control_start1(ctx, NULL, S_UNPRIV)) != -1){
 		/* We must be in master mode, so create an unpriviledged socket
 		 * to allow normal users to learn the status of dhcpcd. */
 		ctx->control_unpriv_fd = fd;
-		eloop_event_add(ctx->eloop, fd, control_handle_unpriv,
-		    ctx, NULL, NULL);
+		eloop_event_add(ctx->eloop, fd, control_handle_unpriv, ctx);
 	}
 	return ctx->control_fd;
 }
@@ -410,8 +408,7 @@ control_queue(struct fd_list *fd, char *data, size_t data_len, uint8_t fit)
 	d->data_len = data_len;
 	d->freeit = fit;
 	TAILQ_INSERT_TAIL(&fd->queue, d, next);
-	eloop_event_add(fd->ctx->eloop, fd->fd,
-	    NULL, NULL, control_writeone, fd);
+	eloop_event_add_w(fd->ctx->eloop, fd->fd, control_writeone, fd);
 	return 0;
 }
 

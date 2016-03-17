@@ -1369,7 +1369,7 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 		return control_queue(fd, UNCONST(fd->ctx->cffile),
 		    strlen(fd->ctx->cffile) + 1, 0);
 	} else if (strcmp(*argv, "--getinterfaces") == 0) {
-		eloop_event_add(fd->ctx->eloop, fd->fd, NULL, NULL,
+		eloop_event_add_w(fd->ctx->eloop, fd->fd,
 		    dhcpcd_getinterfaces, fd);
 		return 0;
 	} else if (strcmp(*argv, "--listen") == 0) {
@@ -1910,7 +1910,7 @@ printpidfile:
 
 	/* Start handling kernel messages for interfaces, addreses and
 	 * routes. */
-	eloop_event_add(ctx.eloop, ctx.link_fd, handle_link, &ctx, NULL, NULL);
+	eloop_event_add(ctx.eloop, ctx.link_fd, handle_link, &ctx);
 
 	/* Start any dev listening plugin which may want to
 	 * change the interface name provided by the kernel */

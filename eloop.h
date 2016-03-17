@@ -69,8 +69,12 @@
 /* Forward declare eloop - the content should be invisible to the outside */
 struct eloop;
 
-int eloop_event_add(struct eloop *, int,
+int eloop_event_add_rw(struct eloop *, int,
     void (*)(void *), void *,
+    void (*)(void *), void *);
+int eloop_event_add(struct eloop *, int,
+    void (*)(void *), void *);
+int eloop_event_add_w(struct eloop *, int,
     void (*)(void *), void *);
 #define eloop_event_delete(eloop, fd) \
     eloop_event_delete_write((eloop), (fd), 0)

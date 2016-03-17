@@ -218,8 +218,7 @@ ipv6nd_open(struct dhcpcd_ctx *dctx)
 	    &filt, sizeof(filt)) == -1)
 		goto eexit;
 
-	eloop_event_add(dctx->eloop, ctx->nd_fd,
-	    ipv6nd_handledata, dctx, NULL, NULL);
+	eloop_event_add(dctx->eloop, ctx->nd_fd,  ipv6nd_handledata, dctx);
 	return ctx->nd_fd;
 
 eexit:
