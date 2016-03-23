@@ -106,6 +106,17 @@ If dhcpcd cannot load this file at runtime, dhcpcd will work but will not be
 able to decode any DHCP/DHCPv6 options that are not defined by the user
 in /etc/dhcpcd.conf.
 
+dhcpcd uses eloop.c, which is a portable main event loop with timeouts and
+signal handling. Unlike libevent and similar, it can be transplanted directly
+within the application - the only caveat outside of POSIX calls is that
+you provide queue.h based on a recent BSD (glibc sys/queue.h is not enough).
+eloop supports the following polling mechanisms, listed in order of preference:
+	kqueue, epoll, pollts, ppoll and pselect.
+If signal handling is disabled (ie in RTEMS or other single process
+OS's) then eloop can use poll.
+You can decide will polling mechanism dhcpcd will select in eloop like so
+./configure --with-poll=[kqueue|epoll|pselect|pollts|ppoll]
+
 To prepare dhcpcd for import into a platform source tree (like NetBSD)
 you can use the make import target to create /tmp/dhcpcd-$version and
 populate it with all the source files and hooks needed.
