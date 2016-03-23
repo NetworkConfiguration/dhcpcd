@@ -174,8 +174,8 @@ dev_start(struct dhcpcd_ctx *ctx)
 
 	ctx->dev_fd = dev_start1(ctx);
 	if (ctx->dev_fd != -1) {
-		if (eloop_event_add(ctx->eloop,
-			ctx->dev_fd, dev_handle_data, ctx, NULL, NULL) == -1)
+		if (eloop_event_add(ctx->eloop, ctx->dev_fd,
+		    dev_handle_data, ctx) == -1)
 		{
 			logger(ctx, LOG_ERR,
 			    "%s: eloop_event_add: %m", __func__);
