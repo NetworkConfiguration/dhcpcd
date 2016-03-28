@@ -246,7 +246,7 @@ control_start1(struct dhcpcd_ctx *ctx, const char *ifname, mode_t fmode)
 		unlink(sa.sun_path);
 		return -1;
 	}
-	
+
 	if ((fmode & S_UNPRIV) != S_UNPRIV)
 		strlcpy(ctx->control_sock, sa.sun_path,
 		    sizeof(ctx->control_sock));
