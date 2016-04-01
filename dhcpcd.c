@@ -64,6 +64,10 @@ const char dhcpcd_copyright[] = "Copyright (c) 2006-2016 Roy Marples";
 #include "ipv6nd.h"
 #include "script.h"
 
+#ifdef HAVE_UTIL_H
+#include <util.h>
+#endif
+
 #ifdef USE_SIGNALS
 const int dhcpcd_signals[] = {
 	SIGTERM,
@@ -75,34 +79,6 @@ const int dhcpcd_signals[] = {
 	SIGPIPE
 };
 const size_t dhcpcd_signals_len = __arraycount(dhcpcd_signals);
-#endif
-
-#if defined(USE_SIGNALS) || !defined(THERE_IS_NO_FORK)
-static pid_t
-read_pid(const char *pidfile)
-{
-	FILE *fp;
-	pid_t pid;
-
-	if ((fp = fopen(pidfile, "r")) == NULL) {
-		errno = ENOENT;
-		return 0;
-	}
-	if (fscanf(fp, "%d", &pid) != 1)
-		pid = 0;
-	fclose(fp);
-	return pid;
-}
-
-static int
-write_pid(int fd, pid_t pid)
-{
-
-	if (ftruncate(fd, (off_t)0) == -1)
-		return -1;
-	lseek(fd, (off_t)0, SEEK_SET);
-	return dprintf(fd, "%d\n", (int)pid);
-}
 #endif
 
 static void
@@ -307,7 +283,7 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 	errno = ENOSYS;
 	return 0;
 #else
-	pid_t pid;
+	pid_t pid, lpid;
 	char buf = '\0';
 	int sidpipe[2], fd;
 
@@ -348,6 +324,9 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 		logger(ctx, LOG_ERR, "fork: %m");
 		return 0;
 	case 0:
+		if ((lpid = pidfile_lock(ctx->pidfile)) != 0)
+			logger(ctx, LOG_ERR, "%s: pidfile_lock %d: %m",
+			    __func__, lpid);
 		setsid();
 		/* Notify parent it's safe to exit as we've detached. */
 		close(sidpipe[0]);
@@ -378,9 +357,6 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 	/* Done with the fd now */
 	if (pid != 0) {
 		logger(ctx, LOG_INFO, "forked to background, child pid %d", pid);
-		write_pid(ctx->pid_fd, pid);
-		close(ctx->pid_fd);
-		ctx->pid_fd = -1;
 		ctx->options |= DHCPCD_FORKED;
 		eloop_exit(ctx->eloop, EXIT_SUCCESS);
 		return pid;
@@ -1504,7 +1480,7 @@ main(int argc, char **argv)
 
 	ifo = NULL;
 	ctx.cffile = CONFIG;
-	ctx.pid_fd = ctx.control_fd = ctx.control_unpriv_fd = ctx.link_fd = -1;
+	ctx.control_fd = ctx.control_unpriv_fd = ctx.link_fd = -1;
 	ctx.pf_inet_fd = -1;
 #if defined(INET6) && defined(BSD)
 	ctx.pf_inet6_fd = -1;
@@ -1788,14 +1764,14 @@ printpidfile:
 
 #ifdef USE_SIGNALS
 	if (sig != 0) {
-		pid = read_pid(ctx.pidfile);
-		if (pid != 0)
+		pid = pidfile_read(ctx.pidfile);
+		if (pid != 0 && pid != -1)
 			logger(&ctx, LOG_INFO, "sending signal %s to pid %d",
 			    siga, pid);
-		if (pid == 0 || kill(pid, sig) != 0) {
+		if (pid == 0 || pid == -1 || kill(pid, sig) != 0) {
 			if (sig != SIGHUP && sig != SIGUSR1 && errno != EPERM)
 				logger(&ctx, LOG_ERR, ""PACKAGE" not running");
-			if (pid != 0 && errno != ESRCH) {
+			if (pid != 0 && pid != -1 && errno != ESRCH) {
 				logger(&ctx, LOG_ERR, "kill: %m");
 				goto exit_failure;
 			}
@@ -1814,7 +1790,7 @@ printpidfile:
 			ts.tv_nsec = 100000000; /* 10th of a second */
 			for(i = 0; i < 100; i++) {
 				nanosleep(&ts, NULL);
-				if (read_pid(ctx.pidfile) == 0)
+				if (pidfile_read(ctx.pidfile) == -1)
 					goto exit_success;
 			}
 			logger(&ctx, LOG_ERR, "pid %d failed to exit", pid);
@@ -1823,9 +1799,7 @@ printpidfile:
 	}
 
 	if (!(ctx.options & DHCPCD_TEST)) {
-		if ((pid = read_pid(ctx.pidfile)) > 0 &&
-		    kill(pid, 0) == 0)
-		{
+		if ((pid = pidfile_lock(ctx.pidfile)) != 0) {
 			logger(&ctx, LOG_ERR, ""PACKAGE
 			    " already running on pid %d (%s)",
 			    pid, ctx.pidfile);
@@ -1837,40 +1811,6 @@ printpidfile:
 			logger(&ctx, LOG_ERR, "mkdir `%s': %m", RUNDIR);
 		if (mkdir(DBDIR, 0755) == -1 && errno != EEXIST)
 			logger(&ctx, LOG_ERR, "mkdir `%s': %m", DBDIR);
-
-		opt = O_WRONLY | O_CREAT | O_NONBLOCK;
-#ifdef O_CLOEXEC
-		opt |= O_CLOEXEC;
-#endif
-		ctx.pid_fd = open(ctx.pidfile, opt, 0664);
-		if (ctx.pid_fd == -1)
-			logger(&ctx, LOG_ERR, "open `%s': %m", ctx.pidfile);
-		else {
-#ifdef LOCK_EX
-			/* Lock the file so that only one instance of dhcpcd
-			 * runs on an interface */
-			if (flock(ctx.pid_fd, LOCK_EX | LOCK_NB) == -1) {
-				logger(&ctx, LOG_ERR, "flock `%s': %m",
-				    ctx.pidfile);
-				/* We don't want to unlink the pidfile as
-				 * another dhcpcd instance could be using it. */
-				ctx.pidfile[0] = '\0';
-				goto exit_failure;
-			}
-#endif
-#ifndef O_CLOEXEC
-			if ((opt = fcntl(ctx.pid_fd, F_GETFD)) == -1 ||
-			    fcntl(ctx.pid_fd, F_SETFD, opt | FD_CLOEXEC) == -1)
-			{
-				logger(&ctx, LOG_ERR, "fcntl: %m");
-				/* We don't want to unlink the pidfile as
-				 * another dhcpcd instance could be using it. */
-				ctx.pidfile[0] = '\0';
-				goto exit_failure;
-			}
-#endif
-			write_pid(ctx.pid_fd, getpid());
-		}
 	}
 
 	if (ctx.options & DHCPCD_MASTER) {
@@ -2048,16 +1988,15 @@ exit1:
 	dev_stop(&ctx);
 	if (control_stop(&ctx) == -1)
 		logger(&ctx, LOG_ERR, "control_stop: %m:");
-	if (ctx.pid_fd != -1) {
-		close(ctx.pid_fd);
-		if (ctx.pidfile[0] != '\0')
-			unlink(ctx.pidfile);
-	}
 	eloop_free(ctx.eloop);
 
 	if (ctx.options & DHCPCD_STARTED && !(ctx.options & DHCPCD_FORKED))
 		logger(&ctx, LOG_INFO, PACKAGE " exited");
 	logger_close(&ctx);
 	free(ctx.logfile);
+#ifdef USE_SIGNALS
+	if (ctx.options & DHCPCD_FORKED)
+		_exit(i); /* so atexit won't remove our pidfile */
+#endif
 	return i;
 }

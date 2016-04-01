@@ -67,6 +67,7 @@ for x do
 	--without-closefrom) CLOSEFROM=no;;
 	--without-getline) GETLINE=no;;
 	--without-strlcpy) STRLCPY=no;;
+	--without-pidfile_lock) PIDFILE_LOCK=no;;
 	--with-printf_m) HAVE_PRINTF_M=yes;;
 	--without-printf_m) HAVE_PRINTF_M=no;;
         --without-posix_spawn) POSIX_SPAWN=no;;
@@ -685,6 +686,43 @@ fi
 if [ "$STRLCPY" = no ]; then
 	echo "COMPAT_SRCS+=	compat/strlcpy.c" >>$CONFIG_MK
 	echo "#include		\"compat/strlcpy.h\"" >>$CONFIG_H
+fi
+
+if [ -z "$PIDFILE_LOCK" ]; then
+	printf "Testing for pidfile_lock ... "
+	cat <<EOF >_pidfile.c
+#include <stdlib.h>
+#include <util.h>
+int main(void) {
+	pidfile_lock(NULL);
+	return 0;
+}
+EOF
+	# We only want to link to libutil if it exists in /lib
+	if $ALLOW_USR_LIBS; then
+		set -- /
+	else
+		set -- $(ls /lib/libutil.so.* 2>/dev/null)
+	fi
+	if $XCC _pidfile.c -o _pidfile 2>&3; then
+		PIDFILE_LOCK=yes
+	elif [ -e "$1" ] &&  $XCC _pidfile.c -o _pidfile -lutil 2>&3; then
+		PIDFILE_LOCK="yes (-lutil)"
+		LIBUTIL="-lutil"
+	else
+		PIDFILE_LOCK=no
+	fi
+	echo "$PIDFILE_LOCK"
+	rm -f _pidfile.c _pidfile
+fi
+if [ "$PIDFILE_LOCK" = no ]; then
+	echo "COMPAT_SRCS+=	compat/pidfile.c" >>$CONFIG_MK
+	echo "#include		\"compat/pidfile.h\"" >>$CONFIG_H
+else
+	echo "#define HAVE_UTIL_H" >>$CONFIG_H
+	if [ -n "$LIBUTIL" ]; then
+		echo "LDADD+=		$LIBUTIL" >>$CONFIG_MK
+	fi
 fi
 
 if [ -z "$STRTOI" ]; then
