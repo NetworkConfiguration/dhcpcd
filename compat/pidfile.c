@@ -25,6 +25,8 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/file.h>
+
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
@@ -37,7 +39,7 @@
 #include <unistd.h>
 
 #include "pidfile.h"
-#include "../defs.h"
+#include "../config.h"
 
 static pid_t pidfile_pid;
 static char *pidfile_path;
@@ -146,7 +148,7 @@ pidfile_lock(const char *path)
 			pidfile_fd = -1;
 			/* Don't unlink, other process has lock. */
 			errno = error;
-			return -1;
+			return errno == EAGAIN ? pidfile_read(path) : -1;
 		}
 #endif
 #ifndef O_CLOEXEC

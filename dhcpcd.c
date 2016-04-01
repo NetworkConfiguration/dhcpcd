@@ -1800,9 +1800,13 @@ printpidfile:
 
 	if (!(ctx.options & DHCPCD_TEST)) {
 		if ((pid = pidfile_lock(ctx.pidfile)) != 0) {
-			logger(&ctx, LOG_ERR, ""PACKAGE
-			    " already running on pid %d (%s)",
-			    pid, ctx.pidfile);
+			if (pid == -1)
+				logger(&ctx, LOG_ERR, "%s: pidfile_lock: %m",
+				    __func__);
+			else	
+				logger(&ctx, LOG_ERR, ""PACKAGE
+				    " already running on pid %d (%s)",
+				    pid, ctx.pidfile);
 			goto exit_failure;
 		}
 
