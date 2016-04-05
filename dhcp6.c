@@ -90,7 +90,7 @@ static const struct dhcp6_op dhcp6_ops[] = {
 	{ DHCP6_CONFIRM, "CONFIRM6" },
 	{ DHCP6_INFORMATION_REQ, "INFORM6" },
 	{ DHCP6_RELEASE, "RELEASE6" },
-	{ DHCP6_RECONFIGURE, "RECONFIURE6" },
+	{ DHCP6_RECONFIGURE, "RECONFIGURE6" },
 	{ 0, NULL }
 };
 
