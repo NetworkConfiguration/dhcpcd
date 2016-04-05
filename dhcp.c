@@ -96,7 +96,7 @@ static const struct dhcp_op dhcp_ops[] = {
 	{ DHCP_NAK,        "NAK" },
 	{ DHCP_RELEASE,    "RELEASE" },
 	{ DHCP_INFORM,     "INFORM" },
-	{ DHCP_FORCERENEW, "DHCP_FORCERENEW"},
+	{ DHCP_FORCERENEW, "FORCERENEW"},
 	{ 0, NULL }
 };
 
