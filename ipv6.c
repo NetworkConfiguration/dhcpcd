@@ -1472,8 +1472,10 @@ ipv6_freedrop(struct interface *ifp, int drop)
 
 	ipv6_freedrop_addrs(&state->addrs, drop ? 2 : 0, NULL);
 	if (drop) {
-		if_initrt6(ifp);
-		ipv6_buildroutes(ifp->ctx);
+		if (ifp->ctx->ipv6 != NULL) {
+			if_initrt6(ifp);
+			ipv6_buildroutes(ifp->ctx);
+		}
 	} else {
 		/* Because we need to cache the addresses we don't control,
 		 * we only free the state on when NOT dropping addresses. */
