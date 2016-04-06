@@ -176,7 +176,7 @@ if_hasconf(struct dhcpcd_ctx *ctx, const char *ifname)
 	return 0;
 }
 
-static void if_learnaddrs1(struct dhcpcd_ctx *ctx, struct if_head *ifs,
+static void if_learnaddrs(struct dhcpcd_ctx *ctx, struct if_head *ifs,
     struct ifaddrs *ifaddrs)
 {
 	struct ifaddrs *ifa;
@@ -540,7 +540,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		TAILQ_INSERT_TAIL(ifs, ifp, next);
 	}
 
-	if_learnaddrs1(ctx, ifs, ifaddrs);
+	if_learnaddrs(ctx, ifs, ifaddrs);
 	freeifaddrs(ifaddrs);
 
 	return ifs;
