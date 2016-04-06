@@ -878,6 +878,7 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct rt_msghdr *rtm)
 	memset(rt, 0, sizeof(*rt));
 	rt->flags = (unsigned int)rtm->rtm_flags;
 	COPYOUT6(rt->dest, rti_info[RTAX_DST]);
+	DESCOPE(&rt->dest);
 	if (rtm->rtm_addrs & RTA_NETMASK) {
 		/*
 		 * We need to zero out the struct beyond sin6_len and
@@ -931,6 +932,7 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct rt_msghdr *rtm)
 	} else
 		ipv6_mask(&rt->net, 128);
 	COPYOUT6(rt->gate, rti_info[RTAX_GATEWAY]);
+	DESCOPE(&rt->gate);
 	rt->mtu = (unsigned int)rtm->rtm_rmx.rmx_mtu;
 
 	if (rtm->rtm_index)
@@ -1037,7 +1039,8 @@ if_route6(unsigned char cmd, const struct rt6 *rt)
 
 	if (cmd == RTM_ADD)
 		rtm.hdr.rtm_addrs |= RTA_GATEWAY;
-	if (cmd == RTM_ADD && !(rtm.hdr.rtm_flags & RTF_REJECT))
+	if ((cmd == RTM_ADD || cmd == RTM_CHANGE)
+	    && !(rtm.hdr.rtm_flags & RTF_REJECT))
 		rtm.hdr.rtm_addrs |= RTA_IFP | RTA_IFA;
 
 	ADDADDR(&rt->dest);
