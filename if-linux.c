@@ -367,6 +367,7 @@ get_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp, int fd, int flags,
 				goto eexit;
 			buf = nbuf;
 		}
+		nladdr.nl_pid = 0; /* XXX clang static analyzer bug? */
 		nladdr_len = sizeof(nladdr);
 		bytes = recvfrom(fd, buf, buflen, flags,
 		    (struct sockaddr *)&nladdr, &nladdr_len);
