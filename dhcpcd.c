@@ -1482,9 +1482,6 @@ main(int argc, char **argv)
 	ctx.cffile = CONFIG;
 	ctx.control_fd = ctx.control_unpriv_fd = ctx.link_fd = -1;
 	ctx.pf_inet_fd = -1;
-#if defined(INET6) && defined(BSD)
-	ctx.pf_inet6_fd = -1;
-#endif
 #ifdef IFLR_ACTIVE
 	ctx.pf_link_fd = -1;
 #endif

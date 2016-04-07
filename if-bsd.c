@@ -837,6 +837,7 @@ if_address6(const struct ipv6_addr *ia, int action)
 {
 	struct in6_aliasreq ifa;
 	struct in6_addr mask;
+	struct priv *priv;
 
 	memset(&ifa, 0, sizeof(ifa));
 	strlcpy(ifa.ifra_name, ia->iface->name, sizeof(ifa.ifra_name));
@@ -871,7 +872,8 @@ if_address6(const struct ipv6_addr *ia, int action)
 	ifa.ifra_lifetime.ia6t_pltime = ia->prefix_pltime;
 #undef ADDADDR
 
-	return ioctl(ia->iface->ctx->pf_inet6_fd,
+	priv = (struct priv *)ia->iface->ctx->priv;
+	return ioctl(priv->pf_inet6_fd,
 	    action < 0 ? SIOCDIFADDR_IN6 : SIOCAIFADDR_IN6, &ifa);
 }
 
@@ -1161,13 +1163,15 @@ if_addrflags6(const struct in6_addr *addr, const struct interface *ifp)
 {
 	int flags;
 	struct in6_ifreq ifr6;
+	struct priv *priv;
 
 	memset(&ifr6, 0, sizeof(ifr6));
 	strlcpy(ifr6.ifr_name, ifp->name, sizeof(ifr6.ifr_name));
 	ifr6.ifr_addr.sin6_family = AF_INET6;
 	ifr6.ifr_addr.sin6_addr = *addr;
 	ifa_scope(&ifr6.ifr_addr, ifp->index);
-	if (ioctl(ifp->ctx->pf_inet6_fd, SIOCGIFAFLAG_IN6, &ifr6) != -1)
+	priv = (struct priv *)ifp->ctx->priv;
+	if (ioctl(priv->pf_inet6_fd, SIOCGIFAFLAG_IN6, &ifr6) != -1)
 		flags = ifr6.ifr_ifru.ifru_flags6;
 	else
 		flags = -1;
@@ -1180,14 +1184,15 @@ if_getlifetime6(struct ipv6_addr *ia)
 	struct in6_ifreq ifr6;
 	time_t t;
 	struct in6_addrlifetime *lifetime;
+	struct priv *priv;
 
 	memset(&ifr6, 0, sizeof(ifr6));
 	strlcpy(ifr6.ifr_name, ia->iface->name, sizeof(ifr6.ifr_name));
 	ifr6.ifr_addr.sin6_family = AF_INET6;
 	ifr6.ifr_addr.sin6_addr = ia->addr;
 	ifa_scope(&ifr6.ifr_addr, ia->iface->index);
-	if (ioctl(ia->iface->ctx->pf_inet6_fd,
-	    SIOCGIFALIFETIME_IN6, &ifr6) == -1)
+	priv = (struct priv *)ia->iface->ctx->priv;
+	if (ioctl(priv->pf_inet6_fd, SIOCGIFALIFETIME_IN6, &ifr6) == -1)
 		return -1;
 
 	t = time(NULL);
@@ -1768,7 +1773,9 @@ _if_checkipv6(int s, struct dhcpcd_ctx *ctx,
 int
 if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 {
+	struct priv *priv;
 
-	return _if_checkipv6(ctx->pf_inet6_fd, ctx, ifp, own);
+	priv = (struct priv *)ctx->priv;
+	return _if_checkipv6(priv->pf_inet6_fd, ctx, ifp, own);
 }
 #endif
