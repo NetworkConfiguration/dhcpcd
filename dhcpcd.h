@@ -117,12 +117,10 @@ struct dhcpcd_ctx {
 	struct if_head *ifaces;
 
 	int pf_inet_fd;
-#if defined(INET6) && defined(BSD)
-	int pf_inet6_fd;
-#endif
 #ifdef IFLR_ACTIVE
 	int pf_link_fd;
 #endif
+	void *priv;
 	int link_fd;
 	int seq;	/* route message sequence no */
 	int sseq;	/* successful seq no sent */

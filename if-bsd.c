@@ -105,6 +105,10 @@
 #  define CLLADDR(s) ((const char *)((s)->sdl_data + (s)->sdl_nlen))
 #endif
 
+struct priv {
+	int pf_inet6_fd;
+};
+
 int
 if_init(__unused struct interface *iface)
 {
@@ -120,10 +124,35 @@ if_conf(__unused struct interface *iface)
 }
 
 int
-if_openlinksocket(void)
+if_opensockets_os(struct dhcpcd_ctx *ctx)
 {
+	struct priv *priv;
 
-	return xsocket(PF_ROUTE, SOCK_RAW, 0, SOCK_NONBLOCK | SOCK_CLOEXEC);
+	if ((priv = malloc(sizeof(*priv))) == NULL)
+		return -1;
+	ctx->priv = priv;
+
+#ifdef INET6
+	priv->pf_inet6_fd = xsocket(PF_INET6, SOCK_DGRAM, 0, SOCK_CLOEXEC);
+	/* Don't return an error so we at least work on kernels witout INET6
+	 * even though we expect INET6 support.
+	 * We will fail noisily elsewhere anyway. */
+#else
+	priv->pf_inet6_fd = -1;
+#endif
+
+	ctx->pf_link_fd = xsocket(PF_LINK, SOCK_DGRAM, 0, SOCK_CLOEXEC);
+	return ctx->pf_link_fd == -1 ? -1 : 0;
+}
+
+void
+if_closesockets_os(struct dhcpcd_ctx *ctx)
+{
+	struct priv *priv;
+
+	priv = (struct priv *)ctx->priv;
+	if (priv->pf_inet6_fd != -1)
+		close(priv->pf_inet6_fd);
 }
 
 #if defined(INET) || defined(INET6)

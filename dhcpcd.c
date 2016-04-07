@@ -1974,17 +1974,7 @@ exit1:
 		eloop_event_delete(ctx.eloop, ctx.link_fd);
 		close(ctx.link_fd);
 	}
-	if (ctx.pf_inet_fd != -1)
-		close(ctx.pf_inet_fd);
-#if defined(INET6) && defined(BSD)
-	if (ctx.pf_inet6_fd != -1)
-		close(ctx.pf_inet6_fd);
-#endif
-#ifdef IFLR_ACTIVE
-	if (ctx.pf_link_fd != -1)
-		close(ctx.pf_link_fd);
-#endif
-
+	if_closesockets(&ctx);
 	free_options(ifo);
 	free_globals(&ctx);
 	ipv4_ctxfree(&ctx);

@@ -89,7 +89,7 @@ int
 if_opensockets(struct dhcpcd_ctx *ctx)
 {
 
-	if ((ctx->link_fd = if_openlinksocket()) == -1)
+	if (if_opensockets_os(ctx) == -1)
 		return -1;
 
 	/* We use this socket for some operations without INET. */
@@ -111,6 +111,23 @@ if_opensockets(struct dhcpcd_ctx *ctx)
 #endif
 
 	return 0;
+}
+
+void
+if_closesockets(struct dhcpcd_ctx *ctx)
+{
+
+	if (ctx->pf_inet_fd != -1)
+		close(ctx->pf_inet_fd);
+#ifdef IFLR_ACTIVE
+	if (ctx->pf_link_fd != -1)
+		close(ctx->pf_link_fd);
+#endif
+
+	if (ctx->priv) {
+		if_closesockets_os(ctx);
+		free(ctx->priv);
+	}
 }
 
 int
