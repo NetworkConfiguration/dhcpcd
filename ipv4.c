@@ -422,7 +422,7 @@ ipv4_freerts(struct rt_head *routes)
 /* If something other than dhcpcd removes a route,
  * we need to remove it from our internal table. */
 int
-ipv4_handlert(struct dhcpcd_ctx *ctx, int cmd, struct rt *rt)
+ipv4_handlert(struct dhcpcd_ctx *ctx, int cmd, const struct rt *rt)
 {
 	struct rt *f;
 

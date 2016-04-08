@@ -1997,7 +1997,7 @@ ipv6_freerts(struct rt6_head *routes)
 /* If something other than dhcpcd removes a route,
  * we need to remove it from our internal table. */
 int
-ipv6_handlert(struct dhcpcd_ctx *ctx, int cmd, struct rt6 *rt)
+ipv6_handlert(struct dhcpcd_ctx *ctx, int cmd, const struct rt6 *rt)
 {
 	struct rt6 *f;
 

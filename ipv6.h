@@ -315,7 +315,7 @@ int ipv6_staticdadcompleted(const struct interface *);
 int ipv6_startstatic(struct interface *);
 ssize_t ipv6_env(char **, const char *, const struct interface *);
 void ipv6_ctxfree(struct dhcpcd_ctx *);
-int ipv6_handlert(struct dhcpcd_ctx *, int cmd, struct rt6 *);
+int ipv6_handlert(struct dhcpcd_ctx *, int cmd, const struct rt6 *);
 void ipv6_freerts(struct rt6_head *);
 void ipv6_buildroutes(struct dhcpcd_ctx *);
 

@@ -114,7 +114,7 @@ int ipv4_preferanother(struct interface *);
 struct ipv4_addr *ipv4_addaddr(struct interface *,
     const struct in_addr *, const struct in_addr *, const struct in_addr *);
 void ipv4_applyaddr(void *);
-int ipv4_handlert(struct dhcpcd_ctx *, int, struct rt *);
+int ipv4_handlert(struct dhcpcd_ctx *, int, const struct rt *);
 void ipv4_freerts(struct rt_head *);
 
 struct ipv4_addr *ipv4_iffindaddr(struct interface *,
