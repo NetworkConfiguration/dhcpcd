@@ -806,10 +806,6 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 		new_data = 1;
 	} else
 		new_data = 0;
-	if (new_data || ifp->options->options & DHCPCD_DEBUG)
-		logger(ifp->ctx, LOG_INFO, "%s: Router Advertisement from %s",
-		    ifp->name, ctx->sfrom);
-
 	if (rap == NULL) {
 		rap = calloc(1, sizeof(*rap));
 		if (rap == NULL) {
@@ -834,6 +830,14 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 		memcpy(rap->data, icp, len);
 		rap->data_len = len;
 	}
+
+	/* We could change the debug level based on new_data, but some
+	 * routers like to decrease the advertised valid and preferred times
+	 * in accordance with the own prefix times which would result in too
+	 * much needless log spam. */
+	logger(ifp->ctx, new_rap ? LOG_INFO : LOG_DEBUG,
+	    "%s: Router Advertisement from %s",
+	    ifp->name, ctx->sfrom);
 
 	clock_gettime(CLOCK_MONOTONIC, &rap->acquired);
 	rap->flags = nd_ra->nd_ra_flags_reserved;

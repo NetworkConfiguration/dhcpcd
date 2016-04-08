@@ -39,7 +39,7 @@ struct ra {
 	struct interface *iface;
 	struct in6_addr from;
 	char sfrom[INET6_ADDRSTRLEN];
-	unsigned char *data;
+	uint8_t *data;
 	size_t data_len;
 	struct timespec acquired;
 	unsigned char flags;
