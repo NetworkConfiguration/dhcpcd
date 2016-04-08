@@ -444,3 +444,25 @@ ipv4ll_freedrop(struct interface *ifp, int drop)
 		}
 	}
 }
+
+int
+ipv4ll_handlert(struct dhcpcd_ctx *ctx, __unused int cmd, const struct rt *rt)
+{
+	struct interface *ifp;
+
+	/* Only interested in default route changes. */
+	if (rt->dest.s_addr != INADDR_ANY)
+		return 0;
+
+	/* If any interface is running IPv4LL, rebuild our routing table. */
+	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+		if (IPV4LL_STATE_RUNNING(ifp))
+			break;
+	}
+	if (ifp != NULL) {
+		if_initrt(ifp);
+		ipv4_buildroutes(ctx);
+	}
+
+	return 0;
+}

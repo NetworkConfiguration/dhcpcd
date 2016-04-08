@@ -768,7 +768,7 @@ if_initrt(struct interface *ifp)
 	for (p = buf; p < end; p += rtm->rtm_msglen) {
 		rtm = (void *)p;
 		if (if_copyrt(ifp->ctx, &rt, rtm) == 0)
-			ipv4_handlert(ifp->ctx, RTM_ADD, &rt);
+			ipv4_handlert(ifp->ctx, RTM_ADD, &rt, 1);
 	}
 	free(buf);
 	return 0;
@@ -1316,7 +1316,7 @@ if_managelink(struct dhcpcd_ctx *ctx)
 #ifdef INET
 			case AF_INET:
 				if (if_copyrt(ctx, &rt, rtm) == 0)
-					ipv4_handlert(ctx, rtm->rtm_type, &rt);
+					ipv4_handlert(ctx, rtm->rtm_type,&rt,0);
 				break;
 #endif
 #ifdef INET6

@@ -608,7 +608,7 @@ link_route(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 #ifdef INET
 	case AF_INET:
 		if (if_copyrt(ctx, &rt, nlm) == 0)
-			ipv4_handlert(ctx, cmd, &rt);
+			ipv4_handlert(ctx, cmd, &rt, 0);
 		break;
 #endif
 #ifdef INET6
@@ -1463,7 +1463,7 @@ _if_initrt(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 	struct rt rt;
 
 	if (if_copyrt(ctx, &rt, nlm) == 0)
-		ipv4_handlert(ctx, RTM_ADD, &rt);
+		ipv4_handlert(ctx, RTM_ADD, &rt, 1);
 	return 0;
 }
 
