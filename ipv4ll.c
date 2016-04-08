@@ -445,12 +445,12 @@ ipv4ll_freedrop(struct interface *ifp, int drop)
 	}
 }
 
-int
-ipv4ll_handlert(struct dhcpcd_ctx *ctx, __unused int cmd, const struct rt *rt)
-{
 /* This may cause issues in BSD systems, where running as a single dhcpcd
  * daemon would solve this issue easily. */
 #ifdef HAVE_ROUTE_METRIC
+int
+ipv4ll_handlert(struct dhcpcd_ctx *ctx, __unused int cmd, const struct rt *rt)
+{
 	struct interface *ifp;
 
 	/* Only interested in default route changes. */
@@ -466,7 +466,7 @@ ipv4ll_handlert(struct dhcpcd_ctx *ctx, __unused int cmd, const struct rt *rt)
 		if_initrt(ifp);
 		ipv4_buildroutes(ctx);
 	}
-#endif
 
 	return 0;
 }
+#endif

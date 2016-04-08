@@ -65,7 +65,11 @@ ssize_t ipv4ll_env(char **, const char *, const struct interface *);
 void ipv4ll_start(void *);
 void ipv4ll_claimed(void *);
 void ipv4ll_handle_failure(void *);
+#ifdef HAVE_ROUTE_METRIC
 int ipv4ll_handlert(struct dhcpcd_ctx *, int, const struct rt *);
+#else
+#define ipv4ll_handlert(a, b, c) (0)
+#endif
 
 #define ipv4ll_free(ifp) ipv4ll_freedrop((ifp), 0);
 #define ipv4ll_drop(ifp) ipv4ll_freedrop((ifp), 1);
