@@ -141,8 +141,9 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 	priv->pf_inet6_fd = -1;
 #endif
 
-	ctx->pf_link_fd = xsocket(PF_LINK, SOCK_DGRAM, 0, SOCK_CLOEXEC);
-	return ctx->pf_link_fd == -1 ? -1 : 0;
+	ctx->link_fd = xsocket(PF_ROUTE, SOCK_RAW, 0,
+	    SOCK_CLOEXEC | SOCK_NONBLOCK);
+	return ctx->link_fd == -1 ? -1 : 0;
 }
 
 void
