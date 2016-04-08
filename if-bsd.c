@@ -1069,11 +1069,11 @@ if_route6(unsigned char cmd, const struct rt6 *rt)
 	} else
 		rtm.hdr.rtm_flags |= RTF_GATEWAY | RTF_STATIC;
 
-	if (cmd == RTM_ADD)
+	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
 		rtm.hdr.rtm_addrs |= RTA_GATEWAY;
-	if ((cmd == RTM_ADD || cmd == RTM_CHANGE)
-	    && !(rtm.hdr.rtm_flags & RTF_REJECT))
-		rtm.hdr.rtm_addrs |= RTA_IFP | RTA_IFA;
+	    	if (!(rtm.hdr.rtm_flags & RTF_REJECT))
+			rtm.hdr.rtm_addrs |= RTA_IFP | RTA_IFA;
+	}
 
 	ADDADDR(&rt->dest);
 	if (rtm.hdr.rtm_addrs & RTA_GATEWAY) {
@@ -1088,9 +1088,7 @@ if_route6(unsigned char cmd, const struct rt6 *rt)
 	if (rtm.hdr.rtm_addrs & RTA_NETMASK)
 		ADDADDR(&rt->net);
 
-	if ((cmd == RTM_ADD || cmd == RTM_CHANGE) &&
-	    (rtm.hdr.rtm_addrs & (RTA_IFP | RTA_IFA)))
-	{
+	if (rtm.hdr.rtm_addrs & (RTA_IFP | RTA_IFA)) {
 		rtm.hdr.rtm_index = (unsigned short)rt->iface->index;
 		if (rtm.hdr.rtm_addrs & RTA_IFP) {
 			if_linkaddr(&su.sdl, rt->iface);
