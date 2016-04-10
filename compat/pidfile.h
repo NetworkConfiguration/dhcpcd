@@ -30,7 +30,8 @@
 
 #include <unistd.h>
 
-pid_t		pidfile_read(const char *);
+int		pidfile_clean(void);
 pid_t		pidfile_lock(const char *);
+pid_t		pidfile_read(const char *);
 
 #endif
