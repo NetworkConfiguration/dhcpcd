@@ -1683,14 +1683,18 @@ err_sla:
 			t |= UINT8;
 		else if (strcasecmp(arg, "bitflags") == 0)
 			t |= BITFLAG;
+		else if (strcasecmp(arg, "uint8") == 0)
+			t |= UINT8;
+		else if (strcasecmp(arg, "int8") == 0)
+			t |= INT8;
 		else if (strcasecmp(arg, "uint16") == 0)
 			t |= UINT16;
 		else if (strcasecmp(arg, "int16") == 0)
-			t |= SINT16;
+			t |= INT16;
 		else if (strcasecmp(arg, "uint32") == 0)
 			t |= UINT32;
 		else if (strcasecmp(arg, "int32") == 0)
-			t |= SINT32;
+			t |= INT32;
 		else if (strcasecmp(arg, "flag") == 0)
 			t |= FLAG;
 		else if (strcasecmp(arg, "raw") == 0)
