@@ -362,15 +362,6 @@ else
 	echo "CPPFLAGS+=	-DNDEBUG" >>$CONFIG_MK
 fi
 
-if [ -z "$EMBEDDED" -o "$EMBEDDED" = yes ]; then
-	echo "dhcpcd-definitions.conf will be embedded in dhcpcd itself"
-	echo "DHCPCD_SRCS+=	dhcpcd-embedded.c" >>$CONFIG_MK
-else
-	echo "dhcpcd-definitions.conf will be installed to $LIBEXECDIR"
-	echo "CFLAGS+= -DEMBEDDED_CONFIG=\\\"$LIBEXECDIR/dhcpcd-definitions.conf\\\"" >>$CONFIG_MK
-	echo "EMBEDDEDINSTALL=	_embeddedinstall" >>$CONFIG_MK
-fi
-
 if [ -n "$FORK" -a "$FORK" != yes -a "$FORK" != true ]; then
 	echo "There is no fork"
 	echo "CPPFLAGS+=	-DTHERE_IS_NO_FORK" >>$CONFIG_MK
@@ -462,6 +453,15 @@ if ! $_CC; then
 fi
 [ "$CC" != cc ] && echo "CC=	$CC" >>$CONFIG_MK
 $CC --version | $SED -e '1!d'
+
+if [ -z "$EMBEDDED" -o "$EMBEDDED" = yes ]; then
+	echo "dhcpcd-definitions.conf will be embedded in dhcpcd itself"
+	echo "DHCPCD_SRCS+=	dhcpcd-embedded.c" >>$CONFIG_MK
+else
+	echo "dhcpcd-definitions.conf will be installed to $LIBEXECDIR"
+	echo "CPPFLAGS+=	-DEMBEDDED_CONFIG=\\\"$LIBEXECDIR/dhcpcd-definitions.conf\\\"" >>$CONFIG_MK
+	echo "EMBEDDEDINSTALL=	_embeddedinstall" >>$CONFIG_MK
+fi
 
 if [ "$OS" = linux ]; then
 	printf "Testing for nl80211 ... "
