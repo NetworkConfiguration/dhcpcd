@@ -255,6 +255,15 @@ ipv6nd_makersprobe(struct interface *ifp)
 	return 0;
 }
 
+static void ipv6nd_dropdhcp6(struct interface *ifp)
+{
+	const struct dhcp6_state *d6;
+
+	/* Don't drop DHCP6 if the interface is delegated to. */
+	if ((d6 = D6_CSTATE(ifp)) != NULL && d6->state != DH6S_DELEGATED)
+		dhcp6_drop(ifp, "EXPIRE6");
+}
+
 static void
 ipv6nd_sendrsprobe(void *arg)
 {
@@ -318,7 +327,7 @@ ipv6nd_sendrsprobe(void *arg)
 		logger(ifp->ctx, LOG_WARNING,
 		    "%s: no IPv6 Routers available", ifp->name);
 		ipv6nd_drop(ifp);
-		dhcp6_drop(ifp, "EXPIRE6");
+		ipv6nd_dropdhcp6(ifp);
 	}
 }
 
@@ -1383,7 +1392,7 @@ ipv6nd_expirera(void *arg)
 
 	/* No valid routers? Kill any DHCPv6. */
 	if (!validone)
-		dhcp6_drop(ifp, "EXPIRE6");
+		ipv6nd_dropdhcp6(ifp);
 }
 
 void
