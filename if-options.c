@@ -1444,6 +1444,13 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 						    ifname);
 						goto err_sla;
 					}
+					if (sla->sla == 0) {
+						logger(ctx, LOG_WARNING,
+						    "%s: sla of 0 is not "
+						    "RFC3633 (section 12.1) "
+						    "compliant",
+						    ifname);
+					}
 				}
 				p = np;
 			}
