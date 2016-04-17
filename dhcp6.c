@@ -3140,7 +3140,7 @@ dhcp6_open(struct dhcpcd_ctx *dctx)
 
 	ctx = dctx->ipv6;
 #define SOCK_FLAGS	SOCK_CLOEXEC | SOCK_NONBLOCK
-	ctx->dhcp_fd = xsocket(PF_INET6, SOCK_DGRAM, IPPROTO_UDP, SOCK_FLAGS);
+	ctx->dhcp_fd = xsocket(PF_INET6, SOCK_DGRAM | SOCK_FLAGS, IPPROTO_UDP);
 #undef SOCK_FLAGS
 	if (ctx->dhcp_fd == -1)
 		return -1;

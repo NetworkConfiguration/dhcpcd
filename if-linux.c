@@ -253,7 +253,7 @@ _open_link_socket(struct sockaddr_nl *nl, int protocol)
 {
 	int fd;
 
-	if ((fd = xsocket(AF_NETLINK, SOCK_RAW, protocol, SOCK_CLOEXEC)) == -1)
+	if ((fd = xsocket(AF_NETLINK, SOCK_RAW | SOCK_CLOEXEC, protocol)) == -1)
 		return -1;
 	nl->nl_family = AF_NETLINK;
 	if (bind(fd, (struct sockaddr *)nl, sizeof(*nl)) == -1) {
@@ -1230,7 +1230,7 @@ if_openrawsocket(struct interface *ifp, uint16_t protocol)
 #endif
 
 #define SF	SOCK_CLOEXEC | SOCK_NONBLOCK
-	if ((s = xsocket(PF_PACKET, SOCK_DGRAM, htons(protocol), SF)) == -1)
+	if ((s = xsocket(PF_PACKET, SOCK_DGRAM | SF, htons(protocol))) == -1)
 		return -1;
 #undef SF
 

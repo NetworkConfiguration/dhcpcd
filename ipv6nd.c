@@ -190,7 +190,7 @@ ipv6nd_open(struct dhcpcd_ctx *dctx)
 	if (ctx->nd_fd != -1)
 		return ctx->nd_fd;
 #define SOCK_FLAGS	SOCK_CLOEXEC | SOCK_NONBLOCK
-	ctx->nd_fd = xsocket(PF_INET6, SOCK_RAW, IPPROTO_ICMPV6, SOCK_FLAGS);
+	ctx->nd_fd = xsocket(PF_INET6, SOCK_RAW | SOCK_FLAGS, IPPROTO_ICMPV6);
 #undef SOCK_FLAGS
 	if (ctx->nd_fd == -1)
 		return -1;
