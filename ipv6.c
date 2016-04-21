@@ -510,8 +510,7 @@ ipv6_userprefix(
 	uint64_t vh, vl, user_low, user_high;
 
 	if (prefix_len < 1 || prefix_len > 128 ||
-	    result_len < 1 || result_len > 128 ||
-	    user_number == 0)
+	    result_len < 1 || result_len > 128)
 	{
 		errno = EINVAL;
 		return -1;
@@ -523,6 +522,12 @@ ipv6_userprefix(
 	{
 	       errno = ERANGE;
 	       return -1;
+	}
+
+	/* If user_number is zero, just copy the prefix into the result. */
+	if (user_number == 0) {
+		*result = *prefix;
+		return 0;
 	}
 
 	/* Shift user_number so it fit's just inside result_len.

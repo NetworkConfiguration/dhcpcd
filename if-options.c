@@ -1444,13 +1444,6 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 						    ifname);
 						goto err_sla;
 					}
-					if (sla->sla == 0) {
-						logger(ctx, LOG_WARNING,
-						    "%s: sla of 0 is not "
-						    "RFC3633 (section 12.1) "
-						    "compliant",
-						    ifname);
-					}
 				}
 				p = np;
 			}
@@ -1507,13 +1500,13 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 					    sla->ifname);
 					goto err_sla;
 				}
-				if (slap->sla_set &&
-				    (slap->sla == 0 || sla->sla == 0))
+				if (slap->sla_set && sla->sla_set &&
+				    slap->sla == sla->sla)
 				{
 					logger(ctx, LOG_ERR, "%s: cannot"
-					    " assign multiple prefixes"
-					    " with a SLA of 0",
-					    ifname);
+					    " assign the same SLA %u"
+					    " more than once",
+					    sla->ifname, sla->sla);
 					goto err_sla;
 				}
 			}

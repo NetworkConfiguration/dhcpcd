@@ -409,10 +409,7 @@ dhcp6_delegateaddr(struct in6_addr *addr, struct interface *ifp,
 		sla = &asla;
 	} else if (sla->prefix_len == 0) {
 		asla.sla = sla->sla;
-		if (asla.sla == 0)
-			asla.prefix_len = prefix->prefix_len;
-		else
-			asla.prefix_len = 0;
+		asla.prefix_len = 0;
 		sla = &asla;
 	}
 	if (sla->prefix_len == 0) {
@@ -455,9 +452,7 @@ dhcp6_delegateaddr(struct in6_addr *addr, struct interface *ifp,
 			    prefix->prefix_len);
 	}
 
-	if (sla->sla == 0) {
-		*addr = prefix->prefix;
-	} else if (ipv6_userprefix(&prefix->prefix, prefix->prefix_len,
+	if (ipv6_userprefix(&prefix->prefix, prefix->prefix_len,
 		sla->sla, addr, sla->prefix_len) == -1)
 	{
 		sa = inet_ntop(AF_INET6, &prefix->prefix,
