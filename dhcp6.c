@@ -2387,7 +2387,10 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 	a->prefix_len = (uint8_t)pfxlen;
 
 	/* If sla is zero and the prefix length hasn't changed,
-	 * don't install a blackhole route. */
+	 * don't install a blackhole route.
+	 * This does violate RFC3315 section 12.1, but technically
+	 * the end result is no different from assigning the entire
+	 * delegation so I'm OK with it. */
 	if (sla->sla_set && sla->sla == 0 && prefix->prefix_len == pfxlen)
 		prefix->flags |= IPV6_AF_DELEGATEDZERO;
 
