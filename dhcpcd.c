@@ -1467,7 +1467,6 @@ main(int argc, char **argv)
 	}
 
 	memset(&ctx, 0, sizeof(ctx));
-	closefrom(3);
 
 	ctx.log_fd = -1;
 	logger_open(&ctx);
