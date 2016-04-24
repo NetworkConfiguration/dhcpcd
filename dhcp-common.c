@@ -207,7 +207,7 @@ make_option_mask(const struct dhcp_opt *dopts, size_t dopts_len,
 			continue;
 		match = 0;
 		for (i = 0, opt = odopts; i < odopts_len; i++, opt++) {
-			if (opt->var == NULL && opt->option == 0)
+			if (opt->var == NULL || opt->option == 0)
 				continue; /* buggy dhcpcd-definitions.conf */
 			if (strcmp(opt->var, token) == 0)
 				match = 1;
