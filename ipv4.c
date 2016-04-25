@@ -1162,13 +1162,11 @@ ipv4_applyaddr(void *arg)
 		}
 	}
 
-	/* If the netmask or broadcast is different, delete the addresss */
+	/* If the netmask or broadcast is different, re-add the addresss */
 	ap = ipv4_iffindaddr(ifp, &lease->addr, NULL);
-	if (ap && (ap->net.s_addr != lease->net.s_addr ||
-	    ap->brd.s_addr != lease->brd.s_addr))
-		ipv4_deladdr(ifp, &ap->addr, &ap->net, 0);
-
-	if (ipv4_iffindaddr(ifp, &lease->addr, &lease->net))
+	if (ap &&
+	    ap->net.s_addr == lease->net.s_addr &&
+	    ap->brd.s_addr == lease->brd.s_addr)
 		logger(ifp->ctx, LOG_DEBUG,
 		    "%s: IP address %s/%d already exists",
 		    ifp->name, inet_ntoa(lease->addr),
@@ -1244,7 +1242,7 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 		return;
 	}
 
-	ap = ipv4_iffindaddr(ifp, addr, net);
+	ap = ipv4_iffindaddr(ifp, addr, NULL);
 	if (cmd == RTM_NEWADDR) {
 		if (ap == NULL) {
 			if ((ap = malloc(sizeof(*ap))) == NULL) {
@@ -1253,10 +1251,10 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 			}
 			ap->iface = ifp;
 			ap->addr = *addr;
-			ap->net = *net;
-			ap->brd = *brd;
 			TAILQ_INSERT_TAIL(&state->addrs, ap, next);
 		}
+		ap->net = *net;
+		ap->brd = *brd;
 		ap->addr_flags = flags;
 	} else if (cmd == RTM_DELADDR) {
 		if (ap) {
