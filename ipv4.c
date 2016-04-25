@@ -676,7 +676,7 @@ add_destination_route(struct rt_head *rt, const struct interface *ifp)
 	}
 	r->dest.s_addr = INADDR_ANY;
 	r->net.s_addr = INADDR_ANY;
-	r->gate.s_addr = state->dst.s_addr;
+	r->gate.s_addr = state->brd.s_addr;
 	r->mtu = dhcp_get_mtu(ifp);
 	r->src = state->addr;
 	TAILQ_INSERT_HEAD(rt, r, next);
@@ -1026,6 +1026,7 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 	ia->iface = ifp;
 	ia->addr = *addr;
 	ia->net = *mask;
+	ia->brd = *bcast;
 #ifdef IN_IFF_TENTATIVE
 	ia->addr_flags = IN_IFF_TENTATIVE;
 #endif
@@ -1158,9 +1159,10 @@ ipv4_applyaddr(void *arg)
 		}
 	}
 
-	/* If the netmask is different, delete the addresss */
+	/* If the netmask or broadcast is different, delete the addresss */
 	ap = ipv4_iffindaddr(ifp, &lease->addr, NULL);
-	if (ap && ap->net.s_addr != lease->net.s_addr)
+	if (ap && (ap->net.s_addr != lease->net.s_addr ||
+	    ap->brd.s_addr != lease->brd.s_addr))
 		ipv4_deladdr(ifp, &ap->addr, &ap->net, 0);
 
 	if (ipv4_iffindaddr(ifp, &lease->addr, &lease->net))
@@ -1216,7 +1218,7 @@ void
 ipv4_handleifa(struct dhcpcd_ctx *ctx,
     int cmd, struct if_head *ifs, const char *ifname,
     const struct in_addr *addr, const struct in_addr *net,
-    const struct in_addr *dst, int flags)
+    const struct in_addr *brd, int flags)
 {
 	struct interface *ifp;
 	struct ipv4_state *state;
@@ -1249,10 +1251,7 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 			ap->iface = ifp;
 			ap->addr = *addr;
 			ap->net = *net;
-			if (dst)
-				ap->dst.s_addr = dst->s_addr;
-			else
-				ap->dst.s_addr = INADDR_ANY;
+			ap->brd = *brd;
 			TAILQ_INSERT_TAIL(&state->addrs, ap, next);
 		}
 		ap->addr_flags = flags;
@@ -1264,7 +1263,7 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 	}
 
 	arp_handleifa(cmd, ifp, addr, flags);
-	dhcp_handleifa(cmd, ifp, addr, net, dst, flags);
+	dhcp_handleifa(cmd, ifp, addr, net, brd, flags);
 }
 
 void

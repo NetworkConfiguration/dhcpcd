@@ -215,7 +215,7 @@ struct dhcp_state {
 	int raw_fd;
 	struct in_addr addr;
 	struct in_addr net;
-	struct in_addr dst;
+	struct in_addr brd;
 	uint8_t added;
 
 	char leasefile[sizeof(LEASEFILE) + IF_NAMESIZE + (IF_SSIDLEN * 4)];

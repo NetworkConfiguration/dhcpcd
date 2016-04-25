@@ -72,7 +72,7 @@ struct ipv4_addr {
 	TAILQ_ENTRY(ipv4_addr) next;
 	struct in_addr addr;
 	struct in_addr net;
-	struct in_addr dst;
+	struct in_addr brd;
 	struct interface *iface;
 	int addr_flags;
 };

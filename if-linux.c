@@ -630,7 +630,7 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 	struct ifaddrmsg *ifa;
 	struct priv *priv;
 #ifdef INET
-	struct in_addr addr, net, dest;
+	struct in_addr addr, net, brd;
 #endif
 #ifdef INET6
 	struct in6_addr addr6;
@@ -661,26 +661,29 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 	switch (ifa->ifa_family) {
 #ifdef INET
 	case AF_INET:
-		addr.s_addr = dest.s_addr = INADDR_ANY;
-		dest.s_addr = INADDR_ANY;
+		addr.s_addr = dest.s_addr = brd.s_addr = INADDR_ANY;
 		inet_cidrtoaddr(ifa->ifa_prefixlen, &net);
 		while (RTA_OK(rta, len)) {
 			switch (rta->rta_type) {
 			case IFA_ADDRESS:
 				if (ifp->flags & IFF_POINTOPOINT) {
-					memcpy(&dest.s_addr, RTA_DATA(rta),
-					       sizeof(addr.s_addr));
+					memcpy(&brd.s_addr, RTA_DATA(rta),
+					    sizeof(brd.s_addr));
 				}
+				break;
+			case IFA_BROADCAST:
+				memcpy(&brd.s_addr, RTA_DATA(rta),
+				    sizeof(brd.s_addr));
 				break;
 			case IFA_LOCAL:
 				memcpy(&addr.s_addr, RTA_DATA(rta),
-				       sizeof(addr.s_addr));
+				    sizeof(addr.s_addr));
 				break;
 			}
 			rta = RTA_NEXT(rta, len);
 		}
 		ipv4_handleifa(ctx, nlm->nlmsg_type, NULL, ifp->name,
-		    &addr, &net, &dest, ifa->ifa_flags);
+		    &addr, &net, &brd, ifa->ifa_flags);
 		break;
 #endif
 #ifdef INET6

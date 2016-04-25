@@ -192,7 +192,7 @@ static void if_learnaddrs(struct dhcpcd_ctx *ctx, struct if_head *ifs,
 	struct ifaddrs *ifa;
 	struct interface *ifp;
 #ifdef INET
-	const struct sockaddr_in *addr, *net, *dst;
+	const struct sockaddr_in *addr, *net, *brd;
 #endif
 #ifdef INET6
 	struct sockaddr_in6 *sin6, *net6;
@@ -211,15 +211,14 @@ static void if_learnaddrs(struct dhcpcd_ctx *ctx, struct if_head *ifs,
 			addr = (void *)ifa->ifa_addr;
 			net = (void *)ifa->ifa_netmask;
 			if (ifa->ifa_flags & IFF_POINTOPOINT)
-				dst = (const struct sockaddr_in *)
+				brd = (const struct sockaddr_in *)
 				    (void *)ifa->ifa_dstaddr;
 			else
-				dst = NULL;
+				brd = (void *)ifa->ifa_broadaddr;
 			ifa_flags = if_addrflags(&addr->sin_addr, ifp);
 			ipv4_handleifa(ctx, RTM_NEWADDR, ifs, ifa->ifa_name,
-				&addr->sin_addr,
-				&net->sin_addr,
-				dst ? &dst->sin_addr : NULL, ifa_flags);
+				&addr->sin_addr, &net->sin_addr, &brd->sin_addr,
+				ifa_flags);
 			break;
 #endif
 #ifdef INET6

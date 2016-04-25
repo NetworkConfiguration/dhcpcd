@@ -2995,7 +2995,7 @@ dhcp_handlepacket(void *arg)
 			continue;
 		}
 		if (ifp->flags & IFF_POINTOPOINT &&
-		    state->dst.s_addr != from.s_addr)
+		    state->brd.s_addr != from.s_addr)
 		{
 			logger(ifp->ctx, LOG_WARNING,
 			    "%s: server %s is not destination",
@@ -3453,7 +3453,7 @@ void
 dhcp_handleifa(int cmd, struct interface *ifp,
 	const struct in_addr *addr,
 	const struct in_addr *net,
-	const struct in_addr *dst,
+	const struct in_addr *brd,
 	int flags)
 {
 	struct dhcp_state *state;
@@ -3504,11 +3504,11 @@ dhcp_handleifa(int cmd, struct interface *ifp,
 	state->new = dhcp_message_new(addr, net);
 	if (state->new == NULL)
 		return;
-	state->dst.s_addr = dst ? dst->s_addr : INADDR_ANY;
-	if (dst) {
+	state->brd = *brd;
+	if (ifp->flags & IFF_POINTOPOINT) {
 		for (i = 1; i < 255; i++)
 			if (i != DHO_ROUTER && has_option_mask(ifo->dstmask,i))
-				dhcp_message_add_addr(state->new, i, *dst);
+				dhcp_message_add_addr(state->new, i, *brd);
 	}
 	state->reason = "STATIC";
 	ipv4_buildroutes(ifp->ctx);
@@ -3516,7 +3516,7 @@ dhcp_handleifa(int cmd, struct interface *ifp,
 	if (ifo->options & DHCPCD_INFORM) {
 		state->state = DHS_INFORM;
 		state->xid = dhcp_xid(ifp);
-		state->lease.server.s_addr = dst ? dst->s_addr : INADDR_ANY;
+		state->lease.server = *brd;
 		state->addr = *addr;
 		state->net = *net;
 		dhcp_inform(ifp);
