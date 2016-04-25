@@ -1172,6 +1172,13 @@ ipv4_applyaddr(void *arg)
 		    ifp->name, inet_ntoa(lease->addr),
 		    inet_ntocidr(lease->net));
 	else {
+#if __linux__
+		/* Linux does not change netmask/broadcast address
+		 * for re-added addresses, so we need to delete the old one
+		 * first. */
+		if (ap != NULL)
+			ipv4_deladdr(ifp, &ap->addr, &ap->net, 0);
+#endif
 		r = ipv4_daddaddr(ifp, lease);
 		if (r == -1 && errno != EEXIST)
 			return;
