@@ -3466,7 +3466,8 @@ dhcp_handleifa(int cmd, struct interface *ifp,
 
 	if (cmd == RTM_DELADDR) {
 		if (state->addr.s_addr == addr->s_addr &&
-		    state->net.s_addr == net->s_addr)
+		    state->net.s_addr == net->s_addr &&
+		    state->brd.s_addr == brd->s_addr)
 		{
 			logger(ifp->ctx, LOG_INFO,
 			    "%s: removing IP address %s/%d",
