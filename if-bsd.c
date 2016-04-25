@@ -1072,7 +1072,7 @@ if_route6(unsigned char cmd, const struct rt6 *rt)
 
 	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
 		rtm.hdr.rtm_addrs |= RTA_GATEWAY;
-	    	if (!(rtm.hdr.rtm_flags & RTF_REJECT))
+		if (!(rtm.hdr.rtm_flags & RTF_REJECT))
 			rtm.hdr.rtm_addrs |= RTA_IFP | RTA_IFA;
 	}
 
