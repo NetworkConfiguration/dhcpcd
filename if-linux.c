@@ -661,7 +661,7 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 	switch (ifa->ifa_family) {
 #ifdef INET
 	case AF_INET:
-		addr.s_addr = dest.s_addr = brd.s_addr = INADDR_ANY;
+		addr.s_addr = brd.s_addr = INADDR_ANY;
 		inet_cidrtoaddr(ifa->ifa_prefixlen, &net);
 		while (RTA_OK(rta, len)) {
 			switch (rta->rta_type) {
