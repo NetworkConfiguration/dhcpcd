@@ -1917,6 +1917,10 @@ dhcp_arp_probed(struct arp_state *astate)
 		return;
 	}
 
+	/* Already bound so DAD has worked */
+	if (state->state == DHS_BOUND)
+		return;
+
 	logger(astate->iface->ctx, LOG_DEBUG, "%s: DAD completed for %s",
 	    astate->iface->name, inet_ntoa(astate->addr));
 	if (state->state != DHS_INFORM)
