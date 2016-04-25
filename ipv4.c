@@ -357,7 +357,7 @@ find_route(struct rt_head *rts, const struct rt *r, const struct rt *srt)
 static void
 desc_route(const char *cmd, const struct rt *rt)
 {
-	char addr[sizeof("000.000.000.000") + 1];
+	char addr[INET_ADDRSTRLEN];
 	struct dhcpcd_ctx *ctx = rt->iface ? rt->iface->ctx : NULL;
 	const char *ifname = rt->iface ? rt->iface->name : NULL;
 
@@ -913,7 +913,8 @@ ipv4_deladdr(struct interface *ifp,
 	struct ipv4_addr *ap;
 	struct arp_state *astate;
 
-	logger(ifp->ctx, LOG_DEBUG, "%s: deleting IP address %s/%d",
+	logger(ifp->ctx, LOG_DEBUG,
+	    "%s: deleting IP address %s/%d",
 	    ifp->name, inet_ntoa(*addr), inet_ntocidr(*net));
 
 	r = if_deladdress(ifp, addr, net);
@@ -994,6 +995,7 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 {
 	struct ipv4_state *state;
 	struct ipv4_addr *ia;
+	char bcast_str[INET_ADDRSTRLEN];
 
 	if ((state = ipv4_getstate(ifp)) == NULL) {
 		logger(ifp->ctx, LOG_ERR, "%s: ipv4_getstate: %m", __func__);
@@ -1013,8 +1015,9 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 		return NULL;
 	}
 
-	logger(ifp->ctx, LOG_DEBUG, "%s: adding IP address %s/%d",
-	    ifp->name, inet_ntoa(*addr), inet_ntocidr(*mask));
+	strlcpy(bcast_str, inet_ntoa(*bcast), sizeof(bcast_str));
+	logger(ifp->ctx, LOG_DEBUG, "%s: adding IP address %s/%d broadcast %s",
+	    ifp->name, inet_ntoa(*addr), inet_ntocidr(*mask), bcast_str);
 	if (if_addaddress(ifp, addr, mask, bcast) == -1) {
 		if (errno != EEXIST)
 			logger(ifp->ctx, LOG_ERR, "%s: if_addaddress: %m",
