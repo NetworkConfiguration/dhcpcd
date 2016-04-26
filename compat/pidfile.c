@@ -50,6 +50,9 @@ __RCSID("$NetBSD: pidfile.c,v 1.14 2016/04/12 20:40:43 roy Exp $");
 #include "../config.h"
 #include "../defs.h"
 
+#undef _PATH_VARRUN
+#define _PATH_VARRUN	RUNDIR
+
 static pid_t pidfile_pid;
 static char pidfile_path[PATH_MAX];
 static int pidfile_fd = -1;
