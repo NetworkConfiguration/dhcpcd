@@ -201,10 +201,6 @@ pidfile_lock(const char *path)
 	if (pidfile_fd == -1) {
 		int fd, opts;
 
-		/* Ensure we have the needed directories */
-		if (mkdir(RUNDIR, 0755) == -1 && errno != EEXIST)
-			return -1;
-
 		opts = O_WRONLY | O_CREAT | O_NONBLOCK;
 #ifdef O_CLOEXEC
 		opts |= O_CLOEXEC;

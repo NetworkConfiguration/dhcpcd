@@ -1790,6 +1790,12 @@ printpidfile:
 	}
 
 	if (!(ctx.options & DHCPCD_TEST)) {
+		/* Ensure we have the needed directories */
+		if (mkdir(RUNDIR, 0755) == -1 && errno != EEXIST)
+			logger(&ctx, LOG_ERR, "mkdir `%s': %m", RUNDIR);
+		if (mkdir(DBDIR, 0755) == -1 && errno != EEXIST)
+			logger(&ctx, LOG_ERR, "mkdir `%s': %m", DBDIR);
+
 		if ((pid = pidfile_lock(ctx.pidfile)) != 0) {
 			if (pid == -1)
 				logger(&ctx, LOG_ERR, "%s: pidfile_lock: %m",
@@ -1800,12 +1806,6 @@ printpidfile:
 				    pid, ctx.pidfile);
 			goto exit_failure;
 		}
-
-		/* Ensure we have the needed directories */
-		if (mkdir(RUNDIR, 0755) == -1 && errno != EEXIST)
-			logger(&ctx, LOG_ERR, "mkdir `%s': %m", RUNDIR);
-		if (mkdir(DBDIR, 0755) == -1 && errno != EEXIST)
-			logger(&ctx, LOG_ERR, "mkdir `%s': %m", DBDIR);
 	}
 
 	if (ctx.options & DHCPCD_MASTER) {
