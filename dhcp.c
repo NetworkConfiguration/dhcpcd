@@ -1082,12 +1082,6 @@ write_lease(const struct interface *ifp, const struct dhcp_message *dhcp)
 	uint8_t o = 0;
 	const struct dhcp_state *state = D_CSTATE(ifp);
 
-	/* We don't write BOOTP leases */
-	if (IS_BOOTP(ifp, dhcp)) {
-		unlink(state->leasefile);
-		return 0;
-	}
-
 	logger(ifp->ctx, LOG_DEBUG, "%s: writing lease `%s'",
 	    ifp->name, state->leasefile);
 
