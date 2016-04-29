@@ -1812,17 +1812,23 @@ dhcp_request(void *arg)
 static int
 dhcp_leaseextend(struct interface *ifp)
 {
-	struct arp_state *astate;
 
-	if ((astate = arp_new(ifp, NULL)) == NULL)
-		return -1;
+	if (ifp->options->options & DHCPCD_ARP) {
+		struct arp_state *astate;
 
-	if (arp_open(ifp) == -1)
-		return -1;
+		if ((astate = arp_new(ifp, NULL)) == NULL)
+			return -1;
 
-	astate->conflicted_cb = dhcp_arp_conflicted;
-	logger(ifp->ctx, LOG_WARNING,
-	    "%s: keeping lease until DaD failure or DHCP", ifp->name);
+		if (arp_open(ifp) == -1)
+			return -1;
+
+		astate->conflicted_cb = dhcp_arp_conflicted;
+		logger(ifp->ctx, LOG_WARNING,
+		    "%s: extending lease until DaD failure or DHCP", ifp->name);
+		return 0;
+	}
+
+	logger(ifp->ctx, LOG_WARNING, "%s: extending lease", ifp->name);
 	return 0;
 }
 
