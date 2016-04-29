@@ -1864,13 +1864,6 @@ dhcp_renew(struct interface *ifp)
 }
 
 static void
-dhcp_arp_announced(struct arp_state *astate)
-{
-
-	arp_close(astate->iface);
-}
-
-static void
 dhcp_rebind(void *arg)
 {
 	struct interface *ifp = arg;
@@ -2188,7 +2181,6 @@ dhcp_arp_address(struct interface *ifp)
 		if ((astate = arp_new(ifp, &addr)) != NULL) {
 			astate->probed_cb = dhcp_arp_probed;
 			astate->conflicted_cb = dhcp_arp_conflicted;
-			astate->announced_cb = dhcp_arp_announced;
 		}
 		if (ia == NULL) {
 			struct dhcp_lease l;
@@ -2211,7 +2203,6 @@ dhcp_arp_address(struct interface *ifp)
 		if ((astate = arp_new(ifp, &addr)) != NULL) {
 			astate->probed_cb = dhcp_arp_probed;
 			astate->conflicted_cb = dhcp_arp_conflicted;
-			astate->announced_cb = dhcp_arp_announced;
 			/* We need to handle DAD. */
 			arp_probe(astate);
 		}

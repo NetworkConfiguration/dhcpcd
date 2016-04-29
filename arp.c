@@ -215,8 +215,7 @@ arp_announced(void *arg)
 		return;
 	}
 
-	/* Nothing more to do, so free us */
-	arp_free(astate);
+	/* Keep ARP open so we can detect duplicates. */
 }
 
 static void
