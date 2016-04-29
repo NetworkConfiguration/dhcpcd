@@ -912,6 +912,7 @@ ipv4_deladdr(struct interface *ifp,
 	struct ipv4_state *state;
 	struct ipv4_addr *ap;
 	struct arp_state *astate;
+	uint32_t a, n;
 
 	logger(ifp->ctx, LOG_DEBUG,
 	    "%s: deleting IP address %s/%d",
@@ -925,6 +926,8 @@ ipv4_deladdr(struct interface *ifp,
 	if (!keeparp && (astate = arp_find(ifp, addr)) != NULL)
 		arp_free(astate);
 
+	a = addr->s_addr;
+	n = net->s_addr;
 	state = IPV4_STATE(ifp);
 	TAILQ_FOREACH(ap, &state->addrs, next) {
 		if (ap->addr.s_addr == addr->s_addr &&
@@ -939,10 +942,7 @@ ipv4_deladdr(struct interface *ifp,
 	/* Have to do this last incase the function arguments
 	 * were these very pointers. */
 	dstate = D_STATE(ifp);
-	if (dstate &&
-	    dstate->addr.s_addr == addr->s_addr &&
-	    dstate->net.s_addr == net->s_addr)
-	{
+	if (dstate && dstate->addr.s_addr == a && dstate->net.s_addr == n) {
 		dstate->added = 0;
 		dstate->addr.s_addr = 0;
 		dstate->net.s_addr = 0;
