@@ -118,7 +118,8 @@ struct udp_dhcp_packet
 
 static const size_t udp_dhcp_len = sizeof(struct udp_dhcp_packet);
 
-static int dhcp_open(struct interface *ifp);
+static int dhcp_open(struct interface *);
+static void dhcp_arp_conflicted(struct arp_state *, const struct arp_msg *);
 
 void
 dhcp_printoptions(const struct dhcpcd_ctx *ctx,
@@ -1808,18 +1809,48 @@ dhcp_request(void *arg)
 	send_request(ifp);
 }
 
-static void
-dhcp_expire(void *arg)
+static int
+dhcp_leaseextend(struct interface *ifp)
 {
-	struct interface *ifp = arg;
+	struct arp_state *astate;
+
+	if ((astate = arp_new(ifp, NULL)) == NULL)
+		return -1;
+
+	if (arp_open(ifp) == -1)
+		return -1;
+
+	astate->conflicted_cb = dhcp_arp_conflicted;
+	logger(ifp->ctx, LOG_WARNING,
+	    "%s: keeping lease until DaD failure or DHCP", ifp->name);
+	return 0;
+}
+
+static void
+dhcp_expire1(struct interface *ifp)
+{
 	struct dhcp_state *state = D_STATE(ifp);
 
-	logger(ifp->ctx, LOG_ERR, "%s: DHCP lease expired", ifp->name);
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	dhcp_drop(ifp, "EXPIRE");
 	unlink(state->leasefile);
 	state->interval = 0;
 	dhcp_discover(ifp);
+
+}
+static void
+dhcp_expire(void *arg)
+{
+	struct interface *ifp = arg;
+
+	logger(ifp->ctx, LOG_ERR, "%s: DHCP lease expired", ifp->name);
+	if (ifp->options->options & DHCPCD_LASTLEASE) {
+		if (dhcp_leaseextend(ifp) == 0)
+			return;
+		logger(ifp->ctx, LOG_ERR, "%s: dhcp_leaseextend: %m",
+		    ifp->name);
+	}
+	dhcp_expire1(ifp);
 }
 
 static void
@@ -2003,6 +2034,21 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    DHCP_RAND_MAX, dhcp_discover, ifp);
 	}
+
+	/* Bound address */
+	if (amsg &&
+	    (amsg->sip.s_addr == state->addr.s_addr ||
+	    (amsg->sip.s_addr == 0 && amsg->tip.s_addr == state->addr.s_addr)))
+	{
+		astate->failed = state->addr;
+		arp_report_conflicted(astate, amsg);
+		if (state->state == DHS_BOUND) {
+			/* For now, just report the duplicated address */
+		} else {
+			arp_free(astate);
+			dhcp_expire1(ifp);
+		}
+	}
 }
 
 void
@@ -2123,7 +2169,7 @@ dhcp_bind(struct interface *ifp)
 }
 
 static void
-dhcp_timeout(void *arg)
+dhcp_lastlease(void *arg)
 {
 	struct interface *ifp = arg;
 	struct dhcp_state *state = D_STATE(ifp);
@@ -2133,6 +2179,11 @@ dhcp_timeout(void *arg)
 	if (ifp->ctx->options & DHCPCD_FORKED)
 		return;
 	state->interval = 0;
+	if (dhcp_leaseextend(ifp) == -1) {
+		logger(ifp->ctx, LOG_ERR, "%s: dhcp_leaseextend: %m",
+		    ifp->name);
+		dhcp_expire(ifp);
+	}
 	dhcp_discover(ifp);
 }
 
@@ -2368,7 +2419,7 @@ dhcp_reboot(struct interface *ifp)
 
 	if (ifo->options & DHCPCD_LASTLEASE && state->lease.frominfo)
 		eloop_timeout_add_sec(ifp->ctx->eloop,
-		    ifo->reboot, dhcp_timeout, ifp);
+		    ifo->reboot, dhcp_lastlease, ifp);
 	else if (!(ifo->options & DHCPCD_INFORM))
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    ifo->reboot, dhcp_expire, ifp);
@@ -3352,7 +3403,8 @@ dhcp_start1(void *arg)
 				free(state->offer);
 				state->offer = NULL;
 			}
-		} else if (state->lease.leasetime != ~0U &&
+		} else if (!(ifo->options & DHCPCD_LASTLEASE) &&
+		    state->lease.leasetime != ~0U &&
 		    stat(state->leasefile, &st) == 0)
 		{
 			time_t now;
