@@ -1850,7 +1850,7 @@ dhcp_expire(void *arg)
 	struct interface *ifp = arg;
 
 	logger(ifp->ctx, LOG_ERR, "%s: DHCP lease expired", ifp->name);
-	if (ifp->options->options & DHCPCD_LASTLEASE) {
+	if (ifp->options->options & DHCPCD_LASTLEASE_EXTEND) {
 		if (dhcp_leaseextend(ifp) == 0)
 			return;
 		logger(ifp->ctx, LOG_ERR, "%s: dhcp_leaseextend: %m",
@@ -2185,7 +2185,9 @@ dhcp_lastlease(void *arg)
 	if (ifp->ctx->options & DHCPCD_FORKED)
 		return;
 	state->interval = 0;
-	if (dhcp_leaseextend(ifp) == -1) {
+	if (ifp->options->options & DHCPCD_LASTLEASE_EXTEND &&
+	    dhcp_leaseextend(ifp) == -1)
+	{
 		logger(ifp->ctx, LOG_ERR, "%s: dhcp_leaseextend: %m",
 		    ifp->name);
 		dhcp_expire(ifp);
@@ -3409,7 +3411,7 @@ dhcp_start1(void *arg)
 				free(state->offer);
 				state->offer = NULL;
 			}
-		} else if (!(ifo->options & DHCPCD_LASTLEASE) &&
+		} else if (!(ifo->options & DHCPCD_LASTLEASE_EXTEND) &&
 		    state->lease.leasetime != ~0U &&
 		    stat(state->leasefile, &st) == 0)
 		{
@@ -3469,6 +3471,11 @@ dhcp_start(struct interface *ifp)
 
 	if (!(ifp->options->options & DHCPCD_IPV4))
 		return;
+
+	/* If we violate RFC2131 section 3.7 then require ARP
+	 * to detect if any other client wants our address. */
+	if (ifp->options->options & DHCPCD_LASTLEASE_EXTEND)
+		ifp->options->options |= DHCPCD_ARP;
 
 	/* No point in delaying a static configuration */
 	if (ifp->options->options & DHCPCD_STATIC ||
