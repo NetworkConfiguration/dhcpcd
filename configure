@@ -177,7 +177,7 @@ eval DATADIR="$DATADIR"
 _which()
 {
 	x="$(which "$1" 2>/dev/null)"
-	if [ -n "$x" ]; then
+	if [ $? = 0 -a -n "$x" ]; then
 		echo "$x"
 		return 0
 	fi
