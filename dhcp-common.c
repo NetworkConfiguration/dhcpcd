@@ -27,8 +27,6 @@
 
 #include <sys/utsname.h>
 
-#include <arpa/nameser.h>
-
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -36,6 +34,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#include <arpa/nameser.h> /* after normal includes for sunos */
 
 #include "config.h"
 

@@ -34,7 +34,7 @@
 #include "config.h"
 
 #ifndef __linux__
-#  ifndef __QNX__
+#  if !defined(__QNX__) && !defined(__sun)
 #    include <sys/endian.h>
 #  endif
 #  include <net/if.h>

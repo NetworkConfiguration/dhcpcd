@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2015 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2016 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -41,21 +41,35 @@
 #include "ipv6nd.h"
 
 int
-if_init(__unused struct interface *iface)
+if_init(__unused struct interface *ifp)
 {
 
 	return 0;
 }
 
 int
-if_conf(__unused struct interface *iface)
+if_conf(__unused struct interface *ifp)
 {
 
 	return 0;
 }
 
 int
-if_openlinksocket(void)
+if_opensockets_os(struct dhcpcd_ctx *ctx)
+{
+
+	errno = ENOTSUP;
+	return -1;
+}
+
+void
+if_closesockets_os(struct dhcpcd_ctx *ctx)
+{
+
+}
+
+int
+if_getssid(struct interface *ifp)
 {
 
 	errno = ENOTSUP;
@@ -63,23 +77,32 @@ if_openlinksocket(void)
 }
 
 int
-if_getssid(const char *ifname, char *ssid)
+if_vimaster(__unused const struct dhcpcd_ctx *ctx, __unused const char *ifname)
+{
+
+	return 0;
+}
+
+int
+if_managelink(struct dhcpcd_ctx *ctx)
 {
 
 	errno = ENOTSUP;
 	return -1;
 }
 
-int
-if_vimaster(const char *ifname)
+if_machinearch(char *str, size_t len)
 {
 
-	return 0;
+	errno = ENOTSUP;
+	return -1;
 }
 
 #ifdef INET
+const char *if_pfname = "SunOS";
+
 int
-if_openrawsocket(struct interface *ifp, int protocol)
+if_openrawsocket(struct interface *ifp, uint16_t protocol)
 {
 
 	errno = ENOTSUP;
@@ -87,7 +110,7 @@ if_openrawsocket(struct interface *ifp, int protocol)
 }
 
 ssize_t
-if_sendrawpacket(const struct interface *ifp, int protocol,
+if_sendrawpacket(const struct interface *ifp, uint16_t protocol,
     const void *data, size_t len)
 {
 
@@ -96,7 +119,7 @@ if_sendrawpacket(const struct interface *ifp, int protocol,
 }
 
 ssize_t
-if_readrawpacket(struct interface *ifp, int protocol,
+if_readrawpacket(struct interface *ifp, uint16_t protocol,
     void *data, size_t len, int *flags)
 {
 
@@ -105,8 +128,8 @@ if_readrawpacket(struct interface *ifp, int protocol,
 }
 
 int
-if_address(const struct interface *iface, const struct in_addr *address,
-    const struct in_addr *netmask, const struct in_addr *broadcast,
+if_address(const struct interface *iface, const struct in_addr *addr,
+    const struct in_addr *net, const struct in_addr *bcast,
     int action)
 {
 
@@ -115,7 +138,23 @@ if_address(const struct interface *iface, const struct in_addr *address,
 }
 
 int
-if_route(const struct rt *rt, int action)
+if_addrflags(const struct in_addr *addr, const struct interface *ifp)
+{
+
+	errno = ENOTSUP;
+	return -1;
+}
+
+int
+if_route(unsigned char cmd, const struct rt *rt)
+{
+
+	errno = ENOTSUP;
+	return -1;
+}
+
+int
+if_initrt(struct interface *ifp)
 {
 
 	errno = ENOTSUP;
@@ -133,48 +172,39 @@ if_address6(const struct ipv6_addr *a, int action)
 }
 
 int
-if_route6(const struct rt6 *rt, int action)
-{
-
-	errno = ENOTSUP;
-	return -1;
-}
-#endif
-
-#ifdef INET6
-int
 if_addrflags6(const struct in6_addr *addr, const struct interface *ifp)
 {
 
 	errno = ENOTSUP;
 	return -1;
 }
-#endif
 
 int
-if_managelink(struct dhcpcd_ctx *ctx)
+if_getlifetime6(struct ipv6_addr *addr)
 {
 
 	errno = ENOTSUP;
 	return -1;
 }
 
-if_machinearch(char *str, size_t len)
+int
+if_route6(unsigned char cmd, const struct rt6 *rt)
 {
 
 	errno = ENOTSUP;
 	return -1;
 }
 
-#ifdef INET6
-void
-if_rarestore(struct dhcpcd_ctx *ctx)
+int
+if_initrt6(struct interface *ifp)
 {
 
+	errno = ENOTSUP;
+	return -1;
 }
 
 int
-if_checkipv6(struct dhcpcd_ctx *ctx, const char *ifname, int own)
+if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 {
 
 	errno = ENOTSUP;
