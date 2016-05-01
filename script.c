@@ -408,13 +408,13 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 		ssize_t psl;
 
 		pfx_len = strlen(pfx);
-		psl = print_string(NULL, 0, ESCSTRING,
+		psl = print_string(NULL, 0, OT_ESCSTRING,
 		    (const uint8_t *)ifp->ssid, ifp->ssid_len);
 		if (psl != -1) {
 			EMALLOC(elen, pfx_len + (size_t)psl + 1);
 			memcpy(env[elen], pfx, pfx_len);
 			print_string(env[elen] + pfx_len, (size_t)psl + 1,
-			    ESCSTRING,
+			    OT_ESCSTRING,
 			    (const uint8_t *)ifp->ssid, ifp->ssid_len);
 			elen++;
 		}

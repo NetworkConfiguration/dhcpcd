@@ -983,10 +983,10 @@ make_message(struct dhcp_message **message,
 		    i < ifp->ctx->dhcp_opts_len;
 		    i++, opt++)
 		{
-			if (!(opt->type & REQUEST ||
+			if (!(opt->type & OT_REQUEST ||
 			    has_option_mask(ifo->requestmask, opt->option)))
 				continue;
-			if (opt->type & NOREQ)
+			if (opt->type & OT_NOREQ)
 				continue;
 			if (type == DHCP_INFORM &&
 			    (opt->option == DHO_RENEWALTIME ||
@@ -1007,10 +1007,10 @@ make_message(struct dhcp_message **message,
 					break;
 			if (lp < p)
 				continue;
-			if (!(opt->type & REQUEST ||
+			if (!(opt->type & OT_REQUEST ||
 			    has_option_mask(ifo->requestmask, opt->option)))
 				continue;
-			if (opt->type & NOREQ)
+			if (opt->type & OT_NOREQ)
 				continue;
 			if (type == DHCP_INFORM &&
 			    (opt->option == DHO_RENEWALTIME ||
@@ -1320,12 +1320,12 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 	}
 
 	if (*dhcp->bootfile && !(overl & 1)) {
-		print_string(safe, sizeof(safe), STRING,
+		print_string(safe, sizeof(safe), OT_STRING,
 		    dhcp->bootfile, sizeof(dhcp->bootfile));
 		addvar(ifp->ctx, &ep, prefix, "filename", safe);
 	}
 	if (*dhcp->servername && !(overl & 2)) {
-		print_string(safe, sizeof(safe), STRING | DOMAIN,
+		print_string(safe, sizeof(safe), OT_STRING | OT_DOMAIN,
 		    dhcp->servername, sizeof(dhcp->servername));
 		addvar(ifp->ctx, &ep, prefix, "server_name", safe);
 	}
@@ -2522,7 +2522,7 @@ log_dhcp1(int lvl, const char *msg,
 				free(a);
 				return;
 			}
-			print_string(tmp, tmpl, STRING, (uint8_t *)a, al);
+			print_string(tmp, tmpl, OT_STRING, (uint8_t *)a, al);
 			free(a);
 			a = tmp;
 		}
@@ -2539,7 +2539,7 @@ log_dhcp1(int lvl, const char *msg,
 	tfrom = "from";
 	r = get_option_addr(ifp->ctx, &addr, dhcp, DHO_SERVERID);
 	if (dhcp->servername[0] && r == 0) {
-		print_string(sname, sizeof(sname), STRING,
+		print_string(sname, sizeof(sname), OT_STRING,
 		    dhcp->servername, strlen((const char *)dhcp->servername));
 		if (a == NULL)
 			logger(ifp->ctx, lvl, "%s: %s %s %s `%s'",

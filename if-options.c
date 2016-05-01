@@ -1626,7 +1626,7 @@ err_sla:
 		}
 		t = 0;
 		if (strcasecmp(arg, "request") == 0) {
-			t |= REQUEST;
+			t |= OT_REQUEST;
 			arg = strskipwhite(fp);
 			fp = strwhite(arg);
 			if (fp == NULL) {
@@ -1635,7 +1635,7 @@ err_sla:
 			}
 			*fp++ = '\0';
 		} else if (strcasecmp(arg, "norequest") == 0) {
-			t |= NOREQ;
+			t |= OT_NOREQ;
 			arg = strskipwhite(fp);
 			fp = strwhite(arg);
 			if (fp == NULL) {
@@ -1645,7 +1645,7 @@ err_sla:
 			*fp++ = '\0';
 		}
 		if (strcasecmp(arg, "optional") == 0) {
-			t |= OPTIONAL;
+			t |= OT_OPTIONAL;
 			arg = strskipwhite(fp);
 			fp = strwhite(arg);
 			if (fp == NULL) {
@@ -1656,7 +1656,7 @@ err_sla:
 			*fp++ = '\0';
 		}
 		if (strcasecmp(arg, "index") == 0) {
-			t |= INDEX;
+			t |= OT_INDEX;
 			arg = strskipwhite(fp);
 			fp = strwhite(arg);
 			if (fp == NULL) {
@@ -1666,7 +1666,7 @@ err_sla:
 			*fp++ = '\0';
 		}
 		if (strcasecmp(arg, "array") == 0) {
-			t |= ARRAY;
+			t |= OT_ARRAY;
 			arg = strskipwhite(fp);
 			fp = strwhite(arg);
 			if (fp == NULL) {
@@ -1676,72 +1676,72 @@ err_sla:
 			*fp++ = '\0';
 		}
 		if (strcasecmp(arg, "ipaddress") == 0)
-			t |= ADDRIPV4;
+			t |= OT_ADDRIPV4;
 		else if (strcasecmp(arg, "ip6address") == 0)
-			t |= ADDRIPV6;
+			t |= OT_ADDRIPV6;
 		else if (strcasecmp(arg, "string") == 0)
-			t |= STRING;
+			t |= OT_STRING;
 		else if (strcasecmp(arg, "byte") == 0)
-			t |= UINT8;
+			t |= OT_UINT8;
 		else if (strcasecmp(arg, "bitflags") == 0)
-			t |= BITFLAG;
+			t |= OT_BITFLAG;
 		else if (strcasecmp(arg, "uint8") == 0)
-			t |= UINT8;
+			t |= OT_UINT8;
 		else if (strcasecmp(arg, "int8") == 0)
-			t |= INT8;
+			t |= OT_INT8;
 		else if (strcasecmp(arg, "uint16") == 0)
-			t |= UINT16;
+			t |= OT_UINT16;
 		else if (strcasecmp(arg, "int16") == 0)
-			t |= INT16;
+			t |= OT_INT16;
 		else if (strcasecmp(arg, "uint32") == 0)
-			t |= UINT32;
+			t |= OT_UINT32;
 		else if (strcasecmp(arg, "int32") == 0)
-			t |= INT32;
+			t |= OT_INT32;
 		else if (strcasecmp(arg, "flag") == 0)
-			t |= FLAG;
+			t |= OT_FLAG;
 		else if (strcasecmp(arg, "raw") == 0)
-			t |= STRING | RAW;
+			t |= OT_STRING | OT_RAW;
 		else if (strcasecmp(arg, "ascii") == 0)
-			t |= STRING | ASCII;
+			t |= OT_STRING | OT_ASCII;
 		else if (strcasecmp(arg, "domain") == 0)
-			t |= STRING | DOMAIN | RFC1035;
+			t |= OT_STRING | OT_DOMAIN | OT_RFC1035;
 		else if (strcasecmp(arg, "dname") == 0)
-			t |= STRING | DOMAIN;
+			t |= OT_STRING | OT_DOMAIN;
 		else if (strcasecmp(arg, "binhex") == 0)
-			t |= STRING | BINHEX;
+			t |= OT_STRING | OT_BINHEX;
 		else if (strcasecmp(arg, "embed") == 0)
-			t |= EMBED;
+			t |= OT_EMBED;
 		else if (strcasecmp(arg, "encap") == 0)
-			t |= ENCAP;
+			t |= OT_ENCAP;
 		else if (strcasecmp(arg, "rfc3361") ==0)
-			t |= STRING | RFC3361;
+			t |= OT_STRING | OT_RFC3361;
 		else if (strcasecmp(arg, "rfc3442") ==0)
-			t |= STRING | RFC3442;
+			t |= OT_STRING | OT_RFC3442;
 		else if (strcasecmp(arg, "option") == 0)
-			t |= OPTION;
+			t |= OT_OPTION;
 		else {
 			logger(ctx, LOG_ERR, "unknown type: %s", arg);
 			return -1;
 		}
-		if (l && !(t & (STRING | BINHEX))) {
+		if (l && !(t & (OT_STRING | OT_BINHEX))) {
 			logger(ctx, LOG_WARNING,
 			    "ignoring length for type `%s'", arg);
 			l = 0;
 		}
-		if (t & ARRAY && t & (STRING | BINHEX) &&
-		    !(t & (RFC1035 | DOMAIN)))
+		if (t & OT_ARRAY && t & (OT_STRING | OT_BINHEX) &&
+		    !(t & (OT_RFC1035 | OT_DOMAIN)))
 		{
 			logger(ctx, LOG_WARNING, "ignoring array for strings");
-			t &= ~ARRAY;
+			t &= ~OT_ARRAY;
 		}
-		if (t & BITFLAG) {
+		if (t & OT_BITFLAG) {
 			if (bp == NULL)
 				logger(ctx, LOG_WARNING,
 				    "missing bitflag assignment");
 		}
 		/* variable */
 		if (!fp) {
-			if (!(t & OPTION)) {
+			if (!(t & OT_OPTION)) {
 			        logger(ctx, LOG_ERR,
 				    "type %s requires a variable name", arg);
 				return -1;
@@ -1761,7 +1761,7 @@ err_sla:
 				}
 			} else {
 				np = NULL;
-				t |= RESERVED;
+				t |= OT_RESERVED;
 			}
 		}
 		if (opt != O_EMBED) {

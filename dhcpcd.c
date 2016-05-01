@@ -574,7 +574,7 @@ dhcpcd_selectprofile(struct interface *ifp, const char *profile)
 	if (ifp->ssid_len) {
 		ssize_t r;
 
-		r = print_string(pssid, sizeof(pssid), ESCSTRING,
+		r = print_string(pssid, sizeof(pssid), OT_ESCSTRING,
 		    ifp->ssid, ifp->ssid_len);
 		if (r == -1) {
 			logger(ifp->ctx, LOG_ERR,

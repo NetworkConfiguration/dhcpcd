@@ -538,8 +538,8 @@ dhcp6_makemessage(struct interface *ifp)
 			}
 			if (n < ifo->dhcp6_override_len)
 			    continue;
-			if (!(opt->type & NOREQ) &&
-			    (opt->type & REQUEST ||
+			if (!(opt->type & OT_NOREQ) &&
+			    (opt->type & OT_REQUEST ||
 			    has_option_mask(ifo->requestmask6, opt->option)))
 			{
 				n_options++;
@@ -550,8 +550,8 @@ dhcp6_makemessage(struct interface *ifp)
 		    l < ifo->dhcp6_override_len;
 		    l++, opt++)
 		{
-			if (!(opt->type & NOREQ) &&
-			    (opt->type & REQUEST ||
+			if (!(opt->type & OT_NOREQ) &&
+			    (opt->type & OT_REQUEST ||
 			    has_option_mask(ifo->requestmask6, opt->option)))
 			{
 				n_options++;
@@ -856,30 +856,30 @@ dhcp6_makemessage(struct interface *ifp)
 				}
 				if (n < ifo->dhcp6_override_len)
 				    continue;
-				if (!(opt->type & NOREQ) &&
-				    (opt->type & REQUEST ||
+				if (!(opt->type & OT_NOREQ) &&
+				    (opt->type & OT_REQUEST ||
 				    has_option_mask(ifo->requestmask6,
 				        opt->option)))
 				{
 					u16 = htons((uint16_t)opt->option);
 					memcpy(p, &u16, sizeof(u16));
 					p += sizeof(u16);
-					o->len = (uint16_t)(o->len + sizeof(u16));
+					o->len = (uint16_t)(o->len+sizeof(u16));
 				}
 			}
 			for (l = 0, opt = ifo->dhcp6_override;
 			    l < ifo->dhcp6_override_len;
 			    l++, opt++)
 			{
-				if (!(opt->type & NOREQ) &&
-				    (opt->type & REQUEST ||
+				if (!(opt->type & OT_NOREQ) &&
+				    (opt->type & OT_REQUEST ||
 				    has_option_mask(ifo->requestmask6,
 				        opt->option)))
 				{
 					u16 = htons((uint16_t)opt->option);
 					memcpy(p, &u16, sizeof(u16));
 					p += sizeof(u16);
-					o->len = (uint16_t)(o->len + sizeof(u16));
+					o->len = (uint16_t)(o->len+sizeof(u16));
 				}
 			}
 			if (dhcp6_findselfsla(ifp, NULL)) {
