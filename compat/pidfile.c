@@ -29,16 +29,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-#if defined(LIBC_SCCS) && !defined(lint)
-__RCSID("$NetBSD: pidfile.c,v 1.14 2016/04/12 20:40:43 roy Exp $");
-#endif
-
 #include <sys/param.h>
 
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <paths.h>
 #include <stdbool.h>
 #include <stdlib.h>
