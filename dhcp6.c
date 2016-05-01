@@ -429,7 +429,7 @@ dhcp6_delegateaddr(struct in6_addr *addr, struct interface *ifp,
 
 		bits = fls32(sla_max);
 
-		if (prefix->prefix_len + bits > UINT8_MAX)
+		if (prefix->prefix_len + bits > (int)UINT8_MAX)
 			asla.prefix_len = UINT8_MAX;
 		else {
 			asla.prefix_len = (uint8_t)(prefix->prefix_len + bits);
