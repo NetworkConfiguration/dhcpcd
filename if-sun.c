@@ -25,11 +25,18 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/ioctl.h>
 #include <sys/utsname.h>
 
 #include <errno.h>
-#include <fcntl.h>
+#include <ifaddrs.h>
+#include <libdlpi.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
+
+#include <net/if_dl.h>
+#include <net/if_types.h>
 
 #include "config.h"
 #include "common.h"
@@ -58,8 +65,7 @@ int
 if_opensockets_os(struct dhcpcd_ctx *ctx)
 {
 
-	errno = ENOTSUP;
-	return -1;
+	return 0;
 }
 
 void
@@ -91,11 +97,104 @@ if_managelink(struct dhcpcd_ctx *ctx)
 	return -1;
 }
 
+int
 if_machinearch(char *str, size_t len)
 {
 
 	errno = ENOTSUP;
 	return -1;
+}
+
+struct linkwalk {
+	struct ifaddrs	*lw_ifa;
+	int		lw_error;
+};
+
+static boolean_t
+if_newaddr(const char *ifname, void *arg)
+{
+	struct linkwalk		*lw = arg;
+	struct ifaddrs		*ifa;
+	dlpi_handle_t		dh;
+	dlpi_info_t		dlinfo;
+	uint8_t			pa[DLPI_PHYSADDR_MAX];
+	unsigned int		pa_len;
+	struct sockaddr_dl	*sdl;
+
+	ifa = NULL;
+	if (dlpi_open(ifname, &dh, 0) != DLPI_SUCCESS)
+		goto failed1;
+	if (dlpi_info(dh, &dlinfo, 0) != DLPI_SUCCESS)
+		goto failed;
+
+	/* For some reason, dlpi_info won't return the
+	 * physical address, it's all zero's.
+	 * So cal dlpi_get_physaddr. */
+	pa_len = DLPI_PHYSADDR_MAX;
+	if (dlpi_get_physaddr(dh, DL_CURR_PHYS_ADDR,
+	    pa, &pa_len) != DLPI_SUCCESS)
+		goto failed;
+
+	if ((ifa = calloc(1, sizeof(*ifa))) == NULL)
+		goto failed;
+	if ((ifa->ifa_addr = calloc(1, sizeof(struct sockaddr_dl))) == NULL)
+		goto failed;
+
+	if ((ifa->ifa_name = strdup(ifname)) == NULL)
+		goto failed;
+
+	sdl = (struct sockaddr_dl *)ifa->ifa_addr;
+
+	sdl->sdl_family = AF_LINK;
+	switch (dlinfo.di_mactype) {
+	case DL_ETHER:
+		sdl->sdl_type = IFT_ETHER;
+		break;
+	case DL_IB:
+		sdl->sdl_type = IFT_IB;
+		break;
+	default:
+		sdl->sdl_type = IFT_OTHER;
+		break;
+	}
+
+	sdl->sdl_alen = pa_len;
+	memcpy(sdl->sdl_data, pa, pa_len);
+
+	ifa->ifa_next = lw->lw_ifa;
+	lw->lw_ifa = ifa;
+	dlpi_close(dh);
+	return (B_FALSE);
+
+failed:
+	dlpi_close(dh);
+	if (ifa != NULL) {
+		free(ifa->ifa_name);
+		free(ifa->ifa_addr);
+		free(ifa);
+	}
+failed1:
+	lw->lw_error = errno;
+	return (B_TRUE);
+}
+
+/* all getifaddrs(3) should support AF_LINK, but hey ho */
+int
+if_getifaddrs(struct ifaddrs **ifap)
+{
+	struct linkwalk	lw = { NULL, 0 };
+	int error;
+
+	error = 0;
+	dlpi_walk(if_newaddr, &lw, 0);
+	if (lw.lw_error != 0) {
+		freeifaddrs(lw.lw_ifa);
+		errno = lw.lw_error;
+		return -1;
+	}
+
+	*ifap = lw.lw_ifa;
+	return 0;
 }
 
 #ifdef INET

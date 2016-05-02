@@ -271,8 +271,13 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 	const struct sockaddr_ll *sll;
 #endif
 
+#ifdef GETIFADDRS_AFLINK
 	if (getifaddrs(&ifaddrs) == -1)
 		return NULL;
+#else
+	if (if_getifaddrs(&ifaddrs) == -1)
+		return NULL;
+#endif
 	ifs = malloc(sizeof(*ifs));
 	if (ifs == NULL)
 		return NULL;
@@ -549,8 +554,15 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		TAILQ_INSERT_TAIL(ifs, ifp, next);
 	}
 
-	if_learnaddrs(ctx, ifs, ifaddrs);
+#ifdef GETIFADDRS_AFLINK
+	{
+#else
 	freeifaddrs(ifaddrs);
+	if (getifaddrs(&ifaddrs) != -1) {
+#endif
+		if_learnaddrs(ctx, ifs, ifaddrs);
+		freeifaddrs(ifaddrs);
+	}
 
 	return ifs;
 }
