@@ -691,7 +691,7 @@ script_runreason(const struct interface *ifp, const char *reason)
 
 	/* Resize for PATH and RC_SVCNAME */
 	svcname = getenv(RC_SVCNAME);
-	ep = reallocarray(env, elen + 2 + svcname ? 1 : 0, sizeof(char *));
+	ep = reallocarray(env, elen + 2 + (svcname ? 1 : 0), sizeof(char *));
 	if (ep == NULL) {
 		elen = 0;
 		goto out;
