@@ -1286,10 +1286,15 @@ if_sendrawpacket(const struct interface *ifp, uint16_t protocol,
 	su.sll.sll_ifindex = (int)ifp->index;
 	su.sll.sll_hatype = htons(ifp->family);
 	su.sll.sll_halen = (unsigned char)ifp->hwlen;
-	if (ifp->family == ARPHRD_INFINIBAND)
+	if (ifp->family == ARPHRD_INFINIBAND) {
+		/* sockaddr_ll is not big enough for IPoIB which is why
+		 * sockaddr_storage is included in the union.
+		 * Ugly as sin, but it works. */
+		/* coverity[buffer-size] */
+		/* coverity[overrun-buffer-arg] */
 		memcpy(&su.sll.sll_addr,
 		    &ipv4_bcast_addr, sizeof(ipv4_bcast_addr));
-	else
+	} else
 		memset(&su.sll.sll_addr, 0xff, ifp->hwlen);
 	fd = ipv4_protocol_fd(ifp, protocol);
 
