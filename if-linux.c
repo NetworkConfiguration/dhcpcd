@@ -925,9 +925,9 @@ send_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	msg.msg_iovlen = 1;
 	/* Request a reply */
 	hdr->nlmsg_flags |= NLM_F_ACK;
-	hdr->nlmsg_seq = (uint32_t)++ctx->seq;
-	if ((unsigned int)ctx->seq > UINT32_MAX)
+	if (++ctx->seq > UINT32_MAX)
 		ctx->seq = 0;
+	hdr->nlmsg_seq = (uint32_t)ctx->seq;
 	if (sendmsg(s, &msg, 0) != -1) {
 		ctx->sseq = ctx->seq;
 		r = get_netlink(ctx, ifp, s, 0, callback);
@@ -1290,7 +1290,7 @@ if_sendrawpacket(const struct interface *ifp, uint16_t protocol,
 		/* sockaddr_ll is not big enough for IPoIB which is why
 		 * sockaddr_storage is included in the union.
 		 * Ugly as sin, but it works. */
-		/* coverity[buffer-size] */
+		/* coverity[buffer_size] */
 		/* coverity[overrun-buffer-arg] */
 		memcpy(&su.sll.sll_addr,
 		    &ipv4_bcast_addr, sizeof(ipv4_bcast_addr));
