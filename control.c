@@ -314,17 +314,19 @@ int
 control_open(struct dhcpcd_ctx *ctx, const char *ifname)
 {
 	struct sockaddr_un sa;
-	socklen_t len;
 
-	if ((ctx->control_fd = make_sock(&sa, ifname, 0)) == -1)
-		return -1;
-	len = (socklen_t)SUN_LEN(&sa);
-	if (connect(ctx->control_fd, (struct sockaddr *)&sa, len) == -1) {
-		close(ctx->control_fd);
-		ctx->control_fd = -1;
-		return -1;
+	if ((ctx->control_fd = make_sock(&sa, ifname, 0)) != -1) {
+		socklen_t len;
+		int r;
+		
+		len = (socklen_t)SUN_LEN(&sa);
+		r = connect(ctx->control_fd, (struct sockaddr *)&sa, len);
+		if (r == -1) {
+			close(ctx->control_fd);
+			ctx->control_fd = -1;
+		}
 	}
-	return 0;
+	return ctx->control_fd;
 }
 
 ssize_t
