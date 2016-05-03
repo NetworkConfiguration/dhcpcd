@@ -1455,12 +1455,6 @@ main(int argc, char **argv)
 	const char *siga = NULL;
 #endif
 
-	int seq;
-	seq = INT_MAX;
-	printf ("%d\n", seq);
-	seq++;
-	printf ("%u\n", (uint32_t)seq);
-
 	/* Test for --help and --version */
 	if (argc > 1) {
 		if (strcmp(argv[1], "--help") == 0) {
@@ -1732,13 +1726,11 @@ printpidfile:
 	    !(ctx.options & DHCPCD_TEST))
 	{
 #endif
-		if (ctx.options & DHCPCD_MASTER)
-			i = -1;
-		else
-			i = control_open(&ctx, argv[optind]);
-		if (i == -1)
-			i = control_open(&ctx, NULL);
-		if (i != -1) {
+		if (!(ctx.options & DHCPCD_MASTER))
+			ctx.control_fd = control_open(argv[optind]);
+		if (ctx.control_fd == -1)
+			ctx.control_fd = control_open(NULL);
+		if (ctx.control_fd != -1) {
 			logger(&ctx, LOG_INFO,
 			    "sending commands to master dhcpcd process");
 			len = control_send(&ctx, argc, argv);

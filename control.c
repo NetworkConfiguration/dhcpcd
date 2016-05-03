@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2015 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2016 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -311,22 +311,21 @@ freeit:
 }
 
 int
-control_open(struct dhcpcd_ctx *ctx, const char *ifname)
+control_open(const char *ifname)
 {
 	struct sockaddr_un sa;
+	int fd;
 
-	if ((ctx->control_fd = make_sock(&sa, ifname, 0)) != -1) {
+	if ((fd = make_sock(&sa, ifname, 0)) != -1) {
 		socklen_t len;
-		int r;
 		
 		len = (socklen_t)SUN_LEN(&sa);
-		r = connect(ctx->control_fd, (struct sockaddr *)&sa, len);
-		if (r == -1) {
-			close(ctx->control_fd);
-			ctx->control_fd = -1;
+		if (connect(fd, (struct sockaddr *)&sa, len) == -1) {
+			close(fd);
+			fd = -1;
 		}
 	}
-	return ctx->control_fd;
+	return fd;
 }
 
 ssize_t
