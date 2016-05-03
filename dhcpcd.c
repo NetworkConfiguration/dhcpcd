@@ -1697,7 +1697,8 @@ printpidfile:
 			ifp->ctx = &ctx;
 			TAILQ_INSERT_HEAD(ctx.ifaces, ifp, next);
 			if (family == 0) {
-				if (ctx.pidfile[strlen(ctx.pidfile) - 1] == '6')
+				if (ctx.pidfile[0] != '\0' &&
+				    ctx.pidfile[strlen(ctx.pidfile) - 1] == '6')
 					family = AF_INET6;
 				else
 					family = AF_INET;
