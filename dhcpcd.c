@@ -1455,6 +1455,12 @@ main(int argc, char **argv)
 	const char *siga = NULL;
 #endif
 
+	int seq;
+	seq = INT_MAX;
+	printf ("%d\n", seq);
+	seq++;
+	printf ("%u\n", (uint32_t)seq);
+
 	/* Test for --help and --version */
 	if (argc > 1) {
 		if (strcmp(argv[1], "--help") == 0) {
