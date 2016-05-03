@@ -409,21 +409,25 @@ ipv6_makeaddr(struct in6_addr *addr, struct interface *ifp,
 int
 ipv6_makeprefix(struct in6_addr *prefix, const struct in6_addr *addr, int len)
 {
-	int bytelen, bitlen;
+	int bytes, bits;
 
 	if (len < 0 || len > 128) {
 		errno = EINVAL;
 		return -1;
 	}
 
-	bytelen = len / NBBY;
-	bitlen = len % NBBY;
-	memcpy(&prefix->s6_addr, &addr->s6_addr, (size_t)bytelen);
-	if (bitlen != 0)
-		prefix->s6_addr[bytelen] =
-		    (uint8_t)(prefix->s6_addr[bytelen] >> (NBBY - bitlen));
-	memset((char *)prefix->s6_addr + bytelen, 0,
-	    sizeof(prefix->s6_addr) - (size_t)bytelen);
+	bytes = len / NBBY;
+	bits = len % NBBY;
+	memcpy(&prefix->s6_addr, &addr->s6_addr, (size_t)bytes);
+	if (bits != 0) {
+		/* Coverify false positive.
+		 * bytelen cannot be 16 if bitlen is non zero */
+		/* coverity[overrun-local] */
+		prefix->s6_addr[bytes] =
+		    (uint8_t)(prefix->s6_addr[bytes] >> (NBBY - bits));
+	}
+	memset((char *)prefix->s6_addr + bytes, 0,
+	    sizeof(prefix->s6_addr) - (size_t)bytes);
 	return 0;
 }
 
@@ -444,8 +448,12 @@ ipv6_mask(struct in6_addr *mask, int len)
 	bits = len % NBBY;
 	for (i = 0; i < bytes; i++)
 		mask->s6_addr[i] = 0xff;
-	if (bits)
+	if (bits) {
+		/* Coverify false positive.
+		 * bytelen cannot be 16 if bitlen is non zero */
+		/* coverity[overrun-local] */
 		mask->s6_addr[bytes] = masks[bits - 1];
+	}
 	return 0;
 }
 
@@ -2350,7 +2358,8 @@ ipv6_buildroutes(struct dhcpcd_ctx *ctx)
 	}
 
 	/* Free any routes we failed to add/change */
-	while ((rt = TAILQ_FIRST(&dnr))) {
+	/* coverity[use_after_free] */
+	while ((rt = TAILQ_FIRST(&dnr)) != NULL) {
 		TAILQ_REMOVE(&dnr, rt, next);
 		free(rt);
 	}
@@ -2358,7 +2367,7 @@ ipv6_buildroutes(struct dhcpcd_ctx *ctx)
 	/* Remove old routes we used to manage
 	 * If we own the default route, but not RA management itself
 	 * then we need to preserve the last best default route we had */
-	while ((rt = TAILQ_LAST(ctx->ipv6->routes, rt6_head))) {
+	while ((rt = TAILQ_LAST(ctx->ipv6->routes, rt6_head)) != NULL) {
 		TAILQ_REMOVE(ctx->ipv6->routes, rt, next);
 		if (find_route6(nrs, rt) == NULL) {
 			o = rt->iface->options->options;
