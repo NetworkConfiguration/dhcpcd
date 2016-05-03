@@ -1144,7 +1144,7 @@ read_lease(struct interface *ifp)
 		    ifp->name, state->leasefile);
 	dhcp = calloc(1, sizeof(*dhcp));
 	if (dhcp == NULL) {
-		if (state->leasefile[0] != '\0')
+		if (fd_opened)
 			close(fd);
 		return NULL;
 	}
