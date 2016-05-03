@@ -2176,13 +2176,19 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	} else {
 		logger(ifp->ctx, LOG_DEBUG, "%s: reading lease `%s'",
 		    ifp->name, state->leasefile);
-		fd = open(state->leasefile, O_RDONLY);
+		if (stat(state->leasefile, &st) == -1)
+			fd = -1;
+		else
+			fd = open(state->leasefile, O_RDONLY);
 	}
 	if (fd == -1)
 		return -1;
 	state->new_len = 0;
-	if ((state->new = malloc(BUFSIZ)) == NULL)
+	if ((state->new = malloc(BUFSIZ)) == NULL) {
+		if (state->leasefile[0] != '\0')
+			close(fd);
 		return -1;
+	}
 	retval = -1;
 	/* DHCPv6 messages have no real maximum size.
 	 * As we could be reading from stdin, we loop like so. */
@@ -2205,11 +2211,13 @@ dhcp6_readlease(struct interface *ifp, int validate)
 		state->new = newnew;
 		state->new_len = newlen;
 	}
-	close(fd);
+	if (state->leasefile[0] != '\0')
+		close(fd);
 	if (retval == -1)
 		goto ex;
 
-	if (ifp->ctx->options & DHCPCD_DUMPLEASE)
+	if (ifp->ctx->options & DHCPCD_DUMPLEASE ||
+	    state->leasefile[0] == '\0')
 		return 0;
 
 	/* If not validating IA's and if they have expired,
@@ -2220,8 +2228,6 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	}
 
 	retval = -1;
-	if (stat(state->leasefile, &st) == -1)
-		goto ex;
 	clock_gettime(CLOCK_MONOTONIC, &acquired);
 	if ((now = time(NULL)) == -1)
 		goto ex;
@@ -2282,7 +2288,8 @@ ex:
 	free(state->new);
 	state->new = NULL;
 	state->new_len = 0;
-	if (!(ifp->ctx->options & DHCPCD_DUMPLEASE))
+	if (!(ifp->ctx->options & DHCPCD_DUMPLEASE) &&
+	    state->leasefile[0] != '\0')
 		unlink(state->leasefile);
 	return retval;
 }

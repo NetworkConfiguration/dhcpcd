@@ -198,7 +198,7 @@ get_option(struct dhcpcd_ctx *ctx,
 		}
 		l = *p++;
 
-		if (o == DHO_OPTIONSOVERLOADED) {
+		if (o == DHO_OPTSOVERLOADED) {
 			/* Ensure we only get this option once by setting
 			 * the last bit as well as the value.
 			 * This is valid because only the first two bits
@@ -1139,11 +1139,13 @@ read_lease(struct interface *ifp)
 		    ifp->name, state->leasefile);
 	dhcp = calloc(1, sizeof(*dhcp));
 	if (dhcp == NULL) {
-		close(fd);
+		if (state->leasefile[0] != '\0')
+			close(fd);
 		return NULL;
 	}
 	bytes = read(fd, dhcp, sizeof(*dhcp));
-	close(fd);
+	if (state->leasefile[0] != '\0')
+		close(fd);
 	if (bytes < 0) {
 		free(dhcp);
 		return NULL;
@@ -1254,7 +1256,8 @@ dhcp_env(char **env, const char *prefix, const struct dhcp_message *dhcp,
 
 	e = 0;
 	ifo = ifp->options;
-	get_option_uint8(ifp->ctx, &overl, dhcp, DHO_OPTIONSOVERLOADED);
+	if (get_option_uint8(ifp->ctx, &overl, dhcp, DHO_OPTSOVERLOADED) == -1)
+		overl = 0;
 
 	if (env == NULL) {
 		if (dhcp->yiaddr || dhcp->ciaddr)
@@ -2008,6 +2011,7 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 		arp_free(astate);
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 		dhcpcd_startinterface(ifp);
+		return;
 	}
 
 	/* RFC 2131 3.1.5, Client-server interaction
@@ -2039,6 +2043,7 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    DHCP_RAND_MAX, dhcp_discover, ifp);
+		return;
 	}
 
 	/* Bound address */
@@ -2054,6 +2059,7 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 			arp_free(astate);
 			dhcp_expire1(ifp);
 		}
+		return;
 	}
 }
 

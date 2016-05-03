@@ -95,7 +95,7 @@ enum DHO {
 	DHO_VENDOR                 = 43,
 	DHO_IPADDRESS              = 50,
 	DHO_LEASETIME              = 51,
-	DHO_OPTIONSOVERLOADED      = 52,
+	DHO_OPTSOVERLOADED         = 52,
 	DHO_MESSAGETYPE            = 53,
 	DHO_SERVERID               = 54,
 	DHO_PARAMETERREQUESTLIST   = 55,
