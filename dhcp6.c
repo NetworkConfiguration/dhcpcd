@@ -2176,10 +2176,11 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	} else {
 		logger(ifp->ctx, LOG_DEBUG, "%s: reading lease `%s'",
 		    ifp->name, state->leasefile);
-		if (stat(state->leasefile, &st) == -1)
+		fd = open(state->leasefile, O_RDONLY);
+		if (fd != -1 && fstat(fd, &st) == -1) {
+			close(fd);
 			fd = -1;
-		else
-			fd = open(state->leasefile, O_RDONLY);
+		}
 	}
 	if (fd == -1)
 		return -1;
