@@ -45,6 +45,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1115,6 +1116,7 @@ static struct dhcp_message *
 read_lease(struct interface *ifp)
 {
 	int fd;
+	bool fd_opened;
 	struct dhcp_message *dhcp;
 	struct dhcp_state *state = D_STATE(ifp);
 	ssize_t bytes;
@@ -1122,10 +1124,13 @@ read_lease(struct interface *ifp)
 	uint8_t type;
 	size_t auth_len;
 
-	if (state->leasefile[0] == '\0')
+	if (state->leasefile[0] == '\0') {
 		fd = fileno(stdin);
-	else
+		fd_opened = false;
+	} else {
 		fd = open(state->leasefile, O_RDONLY);
+		fd_opened = true;
+	}
 	if (fd == -1) {
 		if (errno != ENOENT)
 			logger(ifp->ctx, LOG_ERR, "%s: open `%s': %m",
@@ -1144,7 +1149,7 @@ read_lease(struct interface *ifp)
 		return NULL;
 	}
 	bytes = read(fd, dhcp, sizeof(*dhcp));
-	if (state->leasefile[0] != '\0')
+	if (fd_opened)
 		close(fd);
 	if (bytes < 0) {
 		free(dhcp);

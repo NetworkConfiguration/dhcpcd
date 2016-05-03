@@ -37,6 +37,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -2168,11 +2169,13 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	int retval;
 	size_t newlen;
 	void *newnew;
+	bool fd_opened;
 
 	state = D6_STATE(ifp);
 	if (state->leasefile[0] == '\0') {
  		logger(ifp->ctx, LOG_DEBUG, "reading standard input");
 		fd = fileno(stdin);
+		fd_opened = false;
 	} else {
 		logger(ifp->ctx, LOG_DEBUG, "%s: reading lease `%s'",
 		    ifp->name, state->leasefile);
@@ -2181,12 +2184,13 @@ dhcp6_readlease(struct interface *ifp, int validate)
 			close(fd);
 			fd = -1;
 		}
+		fd_opened = true;
 	}
 	if (fd == -1)
 		return -1;
 	state->new_len = 0;
 	if ((state->new = malloc(BUFSIZ)) == NULL) {
-		if (state->leasefile[0] != '\0')
+		if (fd_opened)
 			close(fd);
 		return -1;
 	}
@@ -2212,7 +2216,7 @@ dhcp6_readlease(struct interface *ifp, int validate)
 		state->new = newnew;
 		state->new_len = newlen;
 	}
-	if (state->leasefile[0] != '\0')
+	if (fd_opened)
 		close(fd);
 	if (retval == -1)
 		goto ex;
