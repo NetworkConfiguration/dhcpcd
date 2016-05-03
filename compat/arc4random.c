@@ -114,12 +114,16 @@ arc4_stir(struct arc4_stream *as)
 	gettimeofday(&rdat.tv, NULL);
 	fd = open("/dev/urandom", O_RDONLY);
 	if (fd != -1) {
+		/* If there is an error reading, just use what is
+		 * on the stack. */
+		/* coverity[check_return] */
 		(void)read(fd, rdat.rnd, sizeof(rdat.rnd));
 		close(fd);
 	}
 
 	/* fd < 0?  Ah, what the heck. We'll just take
 	 * whatever was on the stack... */
+	/* coverity[uninit_use_in_call] */
 	arc4_addrandom(as, (void *) &rdat, sizeof(rdat));
 
 	/*
