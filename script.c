@@ -691,7 +691,7 @@ script_runreason(const struct interface *ifp, const char *reason)
 
 	/* Resize for PATH and RC_SVCNAME */
 	svcname = getenv(RC_SVCNAME);
-	ep = realloc(env, sizeof(char *) * (elen + 2 + (svcname ? 1 : 0)));
+	ep = reallocarray(env, elen + 2 + svcname ? 1 : 0, sizeof(char *));
 	if (ep == NULL) {
 		elen = 0;
 		goto out;
@@ -778,7 +778,9 @@ out:
 	while (*ep)
 		free(*ep++);
 	free(env);
-	if (elen == 0)
+	if (elen == 0) {
+		logger(ifp->ctx, LOG_ERR, "%s: malloc: %m", __func__);
 		return -1;
+	}
 	return WEXITSTATUS(status);
 }

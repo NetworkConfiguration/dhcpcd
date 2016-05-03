@@ -70,6 +70,7 @@ for x do
 	--with-printf_m) HAVE_PRINTF_M=yes;;
 	--without-printf_m) HAVE_PRINTF_M=no;;
         --without-posix_spawn) POSIX_SPAWN=no;;
+	--without-reallocarrray) REALLOCARRAY=no;;
 	--without-md5) MD5=no;;
 	--without-sha2) SHA2=no;;
 	--without-sha256) SHA2=no;;
@@ -382,6 +383,11 @@ freebsd*|kfreebsd*)
 	esac
 	echo "#include		<net/if.h>" >>$CONFIG_H
 	echo "#include		<net/if_var.h>" >>$CONFIG_H
+	;;
+netbsd*)
+	# reallocarray(3) is guarded by _OPENBSD_SOURCE
+	echo "CPPFLAGS+=	-D_OPENBSD_SOURCE" >>$CONFIG_MK
+	echo "DHCPCD_SRCS+=	if-bsd.c" >>$CONFIG_MK
 	;;
 linux*)
 	echo "CPPFLAGS+=	-D_GNU_SOURCE" >>$CONFIG_MK
@@ -888,6 +894,29 @@ if [ "$POSIX_SPAWN" = no ]; then
 	echo "COMPAT_SRCS+=	compat/posix_spawn.c" >>$CONFIG_MK
 else
 	echo "#define HAVE_SPAWN_H" >>$CONFIG_H
+fi
+
+if [ -z "$REALLOCARRAY" ]; then
+	printf "Testing for reallocarray ... "
+	cat <<EOF >_reallocarray.c
+#include <stdlib.h>
+
+int main(void) {
+	reallocarray(NULL, 0, 0);
+	return 0;
+}
+EOF
+	if $XCC _reallocarray.c -o _reallocarray 2>&3; then
+		REALLOCARRAY=yes
+	else
+		REALLOCARRAY=no
+	fi
+	echo "$REALLOCARRAY"
+	rm -f _reallocarray.c _reallocarray
+fi
+if [ "$REALLOCARRAY" = no ]; then
+	echo "COMPAT_SRCS+=	compat/reallocarray.c" >>$CONFIG_MK
+	echo "#include		\"compat/reallocarray.h\"">>$CONFIG_H
 fi
 
 if [ -z "$POLL" ]; then
