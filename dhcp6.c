@@ -2196,9 +2196,11 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	}
 	retval = -1;
 	/* DHCPv6 messages have no real maximum size.
-	 * As we could be reading from stdin, we loop like so. */
+	 * As we could be reading from stdin, we loop like so.
+	 * state->new_len refers to the buffer position,
+	 * but the buffer itself always BUFSIZ bigger. */
 	for (;;) {
-		bytes = read(fd, state->new + state->new_len, BUFSIZ);
+		bytes = read(fd, (char *)state->new + state->new_len, BUFSIZ);
 		if (bytes == -1)
 			break;
 		if (bytes < BUFSIZ) {
@@ -2206,7 +2208,7 @@ dhcp6_readlease(struct interface *ifp, int validate)
 			retval = 0;
 			break;
 		}
-		newlen = state->new_len + BUFSIZ;
+		newlen = state->new_len + (BUFSIZ * 2);
 		if (newlen > UINT32_MAX || newlen < state->new_len) {
 			errno = E2BIG;
 			break;
@@ -2214,7 +2216,7 @@ dhcp6_readlease(struct interface *ifp, int validate)
 		if ((newnew = realloc(state->new, newlen)) == NULL)
 			break;
 		state->new = newnew;
-		state->new_len = newlen;
+		state->new_len += BUFSIZ;
 	}
 	if (fd_opened)
 		close(fd);
