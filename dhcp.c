@@ -1148,11 +1148,16 @@ read_lease(struct interface *ifp)
 			close(fd);
 		return NULL;
 	}
-	bytes = read(fd, dhcp, sizeof(*dhcp));
+	bytes = read(fd, (char *)dhcp, sizeof(*dhcp));
 	if (fd_opened)
 		close(fd);
-	if (bytes < 0) {
+	if (bytes == -1) {
 		free(dhcp);
+		return NULL;
+	}
+	if ((size_t)bytes < offsetof(struct dhcp_message, cookie)) {
+		free(dhcp);
+		errno = EINVAL;
 		return NULL;
 	}
 
@@ -3067,6 +3072,12 @@ dhcp_handlepacket(void *arg)
 			    ifp->name, inet_ntoa(from));
 			continue;
 		}
+		if (bytes < offsetof(struct dhcp_message, cookie)) {
+			logger(ifp->ctx, LOG_ERR,
+			    "%s: truncated packet from %s",
+			    ifp->name, inet_ntoa(from));
+			continue;
+		}
 		if (dhcp == NULL) {
 		        dhcp = calloc(1, sizeof(*dhcp));
 			if (dhcp == NULL) {
@@ -3076,11 +3087,8 @@ dhcp_handlepacket(void *arg)
 			}
 		}
 		memcpy(dhcp, pp, bytes);
-		if (dhcp->cookie != htonl(MAGIC_COOKIE)) {
-			logger(ifp->ctx, LOG_DEBUG, "%s: bogus cookie from %s",
-			    ifp->name, inet_ntoa(from));
-			continue;
-		}
+		if (bytes < (ssize_t)sizeof(*dhcp))
+			memset((char *)dhcp + bytes, 0, sizeof(*dhcp) - bytes);
 		/* Ensure packet is for us */
 		if (ifp->hwlen <= sizeof(dhcp->chaddr) &&
 		    memcmp(dhcp->chaddr, ifp->hwaddr, ifp->hwlen))
