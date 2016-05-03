@@ -1117,10 +1117,7 @@ read_lease(struct interface *ifp)
 {
 	int fd;
 	bool fd_opened;
-	union {
-		uint8_t *buf;
-		struct dhcp_message *dhcp;
-	} u;
+	void *dhcp;
 	struct dhcp_state *state = D_STATE(ifp);
 	ssize_t bytes;
 	const uint8_t *auth;
@@ -1145,42 +1142,42 @@ read_lease(struct interface *ifp)
 	else
 		logger(ifp->ctx, LOG_DEBUG, "%s: reading lease `%s'",
 		    ifp->name, state->leasefile);
-	u.buf = calloc(1, sizeof(*u.dhcp));
-	if (u.buf == NULL) {
+	dhcp = calloc(1, sizeof(struct dhcp_message));
+	if (dhcp == NULL) {
 		if (fd_opened)
 			close(fd);
 		return NULL;
 	}
-	bytes = read(fd, u.buf, sizeof(*u.dhcp));
+	bytes = read(fd, dhcp, sizeof(struct dhcp_message));
 	if (fd_opened)
 		close(fd);
 	if (bytes == -1) {
-		free(u.buf);
+		free(dhcp);
 		return NULL;
 	}
 	if ((size_t)bytes < offsetof(struct dhcp_message, cookie)) {
-		free(u.buf);
+		free(dhcp);
 		errno = EINVAL;
 		return NULL;
 	}
 
 	if (ifp->ctx->options & DHCPCD_DUMPLEASE)
-		return u.dhcp;
+		return dhcp;
 
 	/* We may have found a BOOTP server */
-	if (get_option_uint8(ifp->ctx, &type, u.dhcp, DHO_MESSAGETYPE) == -1)
+	if (get_option_uint8(ifp->ctx, &type, dhcp, DHO_MESSAGETYPE) == -1)
 		type = 0;
 
 	/* Authenticate the message */
-	auth = get_option(ifp->ctx, u.dhcp, DHO_AUTHENTICATION, &auth_len);
+	auth = get_option(ifp->ctx, dhcp, DHO_AUTHENTICATION, &auth_len);
 	if (auth) {
 		if (dhcp_auth_validate(&state->auth, &ifp->options->auth,
-		    (uint8_t *)u.dhcp, sizeof(*u.dhcp), 4, type,
+		    dhcp, sizeof(struct dhcp_message), 4, type,
 		    auth, auth_len) == NULL)
 		{
 			logger(ifp->ctx, LOG_DEBUG,
 			    "%s: dhcp_auth_validate: %m", ifp->name);
-			free(u.buf);
+			free(dhcp);
 			return NULL;
 		}
 		if (state->auth.token)
@@ -1195,11 +1192,11 @@ read_lease(struct interface *ifp)
 	{
 		logger(ifp->ctx, LOG_ERR,
 		    "%s: authentication now required", ifp->name);
-		free(u.buf);
+		free(dhcp);
 		return NULL;
 	}
 
-	return u.dhcp;
+	return dhcp;
 }
 
 static const struct dhcp_opt *
