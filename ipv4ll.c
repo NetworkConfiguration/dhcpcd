@@ -353,6 +353,7 @@ ipv4ll_start(void *arg)
 		} else
 			memcpy(&seed, ifp->hwaddr + ifp->hwlen - sizeof(seed),
 			    sizeof(seed));
+		/* coverity[dont_call] */
 		orig = initstate(seed,
 		    state->randomstate, sizeof(state->randomstate));
 
