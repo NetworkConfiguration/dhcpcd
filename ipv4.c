@@ -841,6 +841,7 @@ ipv4_buildroutes(struct dhcpcd_ctx *ctx)
 				if ((dnr = malloc(sizeof(*dnr))) == NULL) {
 					logger(ifp->ctx, LOG_ERR,
 					    "%s: malloc %m", __func__);
+					free(rt);
 					continue;
 				}
 				TAILQ_INIT(dnr);
