@@ -319,7 +319,7 @@ if_findsa(struct dhcpcd_ctx *ctx, const struct sockaddr *sa)
 	{
 		const struct sockaddr_dl *sdl;
 
-		sdl = (void *)sa;
+		sdl = (const void *)sa;
 		return if_findsdl(ctx, sdl);
 	}
 #ifdef INET
@@ -328,7 +328,7 @@ if_findsa(struct dhcpcd_ctx *ctx, const struct sockaddr *sa)
 		const struct sockaddr_in *sin;
 		struct ipv4_addr *ia;
 
-		sin = (void *)sa;
+		sin = (const void *)sa;
 		if ((ia = ipv4_findmaskaddr(ctx, &sin->sin_addr)))
 			return ia->iface;
 		break;
@@ -340,7 +340,7 @@ if_findsa(struct dhcpcd_ctx *ctx, const struct sockaddr *sa)
 		const struct sockaddr_in6 *sin;
 		struct ipv6_addr *ia;
 
-		sin = (void *)sa;
+		sin = (const void *)sa;
 		if ((ia = ipv6_findmaskaddr(ctx, &sin->sin6_addr)))
 			return ia->iface;
 		break;
@@ -563,9 +563,6 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct rt_msghdr *rtm)
 {
 	char *cp;
 	struct sockaddr *sa, *rti_info[RTAX_MAX];
-	struct sockaddr_dl *sdl;
-	struct sockaddr_in *sin;
-	struct ipv4_addr *ia;
 
 	cp = (void *)(rtm + 1);
 	sa = (void *)cp;
@@ -610,6 +607,8 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct rt_msghdr *rtm)
 	if (rt->iface == NULL &&
 	    !(~rtm->rtm_flags & (RTF_HOST | RTF_GATEWAY)))
 	{
+		struct ipv4_addr *ia;
+
 		if ((ia = ipv4_findaddr(ctx, &rt->dest)))
 			rt->iface = ia->iface;
 	}
@@ -921,9 +920,6 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct rt_msghdr *rtm)
 {
 	char *cp;
 	struct sockaddr *sa, *rti_info[RTAX_MAX];
-	struct sockaddr_dl *sdl;
-	struct sockaddr_in6 *sin;
-	struct ipv6_addr *ia;
 
 	cp = (void *)(rtm + 1);
 	sa = (void *)cp;
@@ -1016,6 +1012,8 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct rt_msghdr *rtm)
 	if (rt->iface == NULL &&
 	    !(~rtm->rtm_flags & (RTF_HOST | RTF_GATEWAY)))
 	{
+		struct ipv6_addr *ia;
+
 		if ((ia = ipv6_findaddr(ctx, &rt->dest, 0)))
 			rt->iface = ia->iface;
 	}
