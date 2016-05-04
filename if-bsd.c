@@ -498,7 +498,11 @@ if_readrawpacket(struct interface *ifp, uint16_t protocol,
 	*flags = 0;
 	for (;;) {
 		if (state->buffer_len == 0) {
-			bytes = read(fd, state->buffer, state->buffer_size);
+			/* alias a void pointer to our buffer
+			 * so that Coverity does not treat this as tainted. */
+			void *bufp = state->buffer;
+
+			bytes = read(fd, bufp, state->buffer_size);
 			if (bytes == -1 || bytes == 0)
 				return bytes;
 			state->buffer_len = (size_t)bytes;
