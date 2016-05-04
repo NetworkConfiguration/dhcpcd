@@ -205,7 +205,7 @@ pidfile_lock(const char *path)
 		opts |=	O_EXLOCK;
 #endif
 		if ((fd = open(path, opts, 0644)) == -1)
-			return -1;
+			goto return_pid;
 #ifndef O_CLOEXEC
 		if ((opts = fcntl(fd, F_GETFD)) == -1 ||
 		    fctnl(fd, F_SETFL, opts | FD_CLOEXEC) == -1)
@@ -229,6 +229,8 @@ pidfile_lock(const char *path)
 			fd = -1;
 		}
 #endif
+
+return_pid:
 		if (fd == -1) {
 			pid_t pid;
 
