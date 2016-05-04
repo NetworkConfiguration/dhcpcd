@@ -278,7 +278,7 @@ get_addrs(int type, char *cp, struct sockaddr **sa)
 
 #if defined(INET) || defined(INET6)
 static struct interface *
-if_findsdl(struct dhcpcd_ctx *ctx, struct sockaddr_dl *sdl)
+if_findsdl(struct dhcpcd_ctx *ctx, const struct sockaddr_dl *sdl)
 {
 
 	if (sdl->sdl_index)
@@ -302,6 +302,56 @@ if_findsdl(struct dhcpcd_ctx *ctx, struct sockaddr_dl *sdl)
 		}
 	}
 
+	errno = ENOENT;
+	return NULL;
+}
+
+static struct interface *
+if_findsa(struct dhcpcd_ctx *ctx, const struct sockaddr *sa)
+{
+	if (sa == NULL) {
+		errno = EINVAL;
+		return NULL;
+	}
+
+	switch (sa->sa_family) {
+	case AF_LINK:
+	{
+		const struct sockaddr_dl *sdl;
+
+		sdl = (void *)sa;
+		return if_findsdl(ctx, sdl);
+	}
+#ifdef INET
+	case AF_INET:
+	{
+		const struct sockaddr_in *sin;
+		struct ipv4_addr *ia;
+
+		sin = (void *)sa;
+		if ((ia = ipv4_findmaskaddr(ctx, &sin->sin_addr)))
+			return ia->iface;
+		break;
+	}
+#endif
+#ifdef INET6
+	case AF_INET6:
+	{
+		const struct sockaddr_in6 *sin;
+		struct ipv6_addr *ia;
+
+		sin = (void *)sa;
+		if ((ia = ipv6_findmaskaddr(ctx, &sin->sin6_addr)))
+			return ia->iface;
+		break;
+	}
+#endif
+	default:
+		errno = EAFNOSUPPORT;
+		return NULL;
+	}
+
+	errno = ENOENT;
 	return NULL;
 }
 #endif
@@ -480,6 +530,7 @@ next:
 	}
 }
 
+
 int
 if_address(const struct interface *ifp, const struct in_addr *address,
     const struct in_addr *netmask, const struct in_addr *broadcast,
@@ -549,27 +600,10 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct rt_msghdr *rtm)
 
 	if (rtm->rtm_index)
 		rt->iface = if_findindex(ctx->ifaces, rtm->rtm_index);
-	else if (rtm->rtm_addrs & RTA_IFP) {
-		sdl = (void *)rti_info[RTAX_IFP];
-		rt->iface = if_findsdl(ctx, sdl);
-	} else if (rtm->rtm_addrs & RTA_GATEWAY) {
-		sa = rti_info[RTAX_GATEWAY];
-		switch (sa->sa_family) {
-		case AF_LINK:
-			sdl = (void *)sa;
-			rt->iface = if_findsdl(ctx, sdl);
-			break;
-		case AF_INET:
-			sin = (void *)sa;
-			if ((ia = ipv4_findmaskaddr(ctx, &sin->sin_addr)))
-				rt->iface = ia->iface;
-			break;
-		default:
-			errno = EAFNOSUPPORT;
-			logger(ctx, LOG_ERR, "%s: %m", __func__);
-			return -1;
-		}
-	}
+	else if (rtm->rtm_addrs & RTA_IFP)
+		rt->iface = if_findsa(ctx, rti_info[RTAX_IFP]);
+	else if (rtm->rtm_addrs & RTA_GATEWAY)
+		rt->iface = if_findsa(ctx, rti_info[RTAX_GATEWAY]);
 
 	/* If we don't have an interface and it's a host route, it maybe
 	 * to a local ip via the loopback interface. */
@@ -762,8 +796,10 @@ if_initrt(struct interface *ifp)
 		return 0;
 	if ((buf = malloc(needed)) == NULL)
 		return -1;
-	if (sysctl(mib, 6, buf, &needed, NULL, 0) == -1)
+	if (sysctl(mib, 6, buf, &needed, NULL, 0) == -1) {
+		free(buf);
 		return -1;
+	}
 
 	end = buf + needed;
 	for (p = buf; p < end; p += rtm->rtm_msglen) {
@@ -970,27 +1006,10 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct rt_msghdr *rtm)
 
 	if (rtm->rtm_index)
 		rt->iface = if_findindex(ctx->ifaces, rtm->rtm_index);
-	else if (rtm->rtm_addrs & RTA_IFP) {
-		sdl = (void *)rti_info[RTAX_IFP];
-		rt->iface = if_findsdl(ctx, sdl);
-	} else if (rtm->rtm_addrs & RTA_GATEWAY) {
-		sa = rti_info[RTAX_GATEWAY];
-		switch (sa->sa_family) {
-		case AF_LINK:
-			sdl = (void *)sa;
-			rt->iface = if_findsdl(ctx, sdl);
-			break;
-		case AF_INET6:
-			sin = (void *)sa;
-			if ((ia = ipv6_findmaskaddr(ctx, &sin->sin6_addr)))
-				rt->iface = ia->iface;
-			break;
-		default:
-			errno = EAFNOSUPPORT;
-			logger(ctx, LOG_ERR, "%s: %m", __func__);
-			return -1;
-		}
-	}
+	else if (rtm->rtm_addrs & RTA_IFP)
+		rt->iface = if_findsa(ctx, rti_info[RTAX_IFP]);
+	else if (rtm->rtm_addrs & RTA_GATEWAY)
+		rt->iface = if_findsa(ctx, rti_info[RTAX_GATEWAY]);
 
 	/* If we don't have an interface and it's a host route, it maybe
 	 * to a local ip via the loopback interface. */
@@ -1145,8 +1164,10 @@ if_initrt6(struct interface *ifp)
 		return 0;
 	if ((buf = malloc(needed)) == NULL)
 		return -1;
-	if (sysctl(mib, 6, buf, &needed, NULL, 0) == -1)
+	if (sysctl(mib, 6, buf, &needed, NULL, 0) == -1) {
+		free(buf);
 		return -1;
+	}
 
 	end = buf + needed;
 	for (p = buf; p < end; p += rtm->rtm_msglen) {
