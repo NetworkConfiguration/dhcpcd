@@ -986,6 +986,11 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 			const char *cbp;
 
 			ap = calloc(1, sizeof(*ap));
+			if (ap == NULL) {
+				logger(ctx, LOG_ERR,
+				    "%s: calloc: %m", __func__);
+				break;
+			}
 			ap->iface = ifp;
 			ap->addr = *addr;
 			ap->prefix_len = prefix_len;
