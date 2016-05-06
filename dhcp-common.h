@@ -37,8 +37,9 @@
 #include "dhcpcd.h"
 
 /* Max MTU - defines dhcp option length */
-#define	MTU_MAX			1500
-#define	MTU_MIN			 576
+#define	IP_UDP_SIZE		  28
+#define	MTU_MAX			1500 - IP_UDP_SIZE
+#define	MTU_MIN			 576 + IP_UDP_SIZE
 
 #define	OT_REQUEST		(1 << 0)
 #define	OT_UINT8		(1 << 1)
@@ -117,5 +118,6 @@ size_t dhcp_envoption(struct dhcpcd_ctx *,
     const uint8_t *, size_t, struct dhcp_opt **),
     const uint8_t *od, size_t ol);
 void dhcp_zero_index(struct dhcp_opt *);
+size_t dhcp_read_lease_fd(int, uint8_t **);
 
 #endif

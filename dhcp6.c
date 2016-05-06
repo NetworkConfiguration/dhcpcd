@@ -2162,18 +2162,16 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	struct dhcp6_state *state;
 	struct stat st;
 	int fd;
-	ssize_t bytes;
+	uint8_t *lease;
 	const struct dhcp6_option *o;
 	struct timespec acquired;
 	time_t now;
 	int retval;
-	size_t newlen;
-	void *newnew;
 	bool fd_opened;
 
 	state = D6_STATE(ifp);
 	if (state->leasefile[0] == '\0') {
- 		logger(ifp->ctx, LOG_DEBUG, "reading standard input");
+		logger(ifp->ctx, LOG_DEBUG, "reading standard input");
 		fd = fileno(stdin);
 		fd_opened = false;
 	} else {
@@ -2188,39 +2186,13 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	}
 	if (fd == -1)
 		return -1;
-	state->new_len = 0;
-	if ((state->new = malloc(BUFSIZ)) == NULL) {
-		if (fd_opened)
-			close(fd);
-		return -1;
-	}
 	retval = -1;
-	/* DHCPv6 messages have no real maximum size.
-	 * As we could be reading from stdin, we loop like so.
-	 * state->new_len refers to the buffer position,
-	 * but the buffer itself always BUFSIZ bigger. */
-	for (;;) {
-		bytes = read(fd, (char *)state->new + state->new_len, BUFSIZ);
-		if (bytes == -1)
-			break;
-		if (bytes < BUFSIZ) {
-			state->new_len += (size_t)bytes;
-			retval = 0;
-			break;
-		}
-		newlen = state->new_len + (BUFSIZ * 2);
-		if (newlen > UINT32_MAX || newlen < state->new_len) {
-			errno = E2BIG;
-			break;
-		}
-		if ((newnew = realloc(state->new, newlen)) == NULL)
-			break;
-		state->new = newnew;
-		state->new_len += BUFSIZ;
-	}
+	lease = NULL;
+	state->new_len = dhcp_read_lease_fd(fd, &lease);
+	state->new = (struct dhcp6_message *)lease;
 	if (fd_opened)
 		close(fd);
-	if (retval == -1)
+	if (state->new_len == 0)
 		goto ex;
 
 	if (ifp->ctx->options & DHCPCD_DUMPLEASE ||
@@ -2234,7 +2206,6 @@ dhcp6_readlease(struct interface *ifp, int validate)
 		goto auth;
 	}
 
-	retval = -1;
 	clock_gettime(CLOCK_MONOTONIC, &acquired);
 	if ((now = time(NULL)) == -1)
 		goto ex;

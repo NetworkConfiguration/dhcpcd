@@ -1056,3 +1056,39 @@ dhcp_zero_index(struct dhcp_opt *opt)
 	for (i = 0, o = opt->encopts; i < opt->encopts_len; i++, o++)
 		dhcp_zero_index(o);
 }
+
+size_t
+dhcp_read_lease_fd(int fd, uint8_t **lease)
+{
+	uint8_t *buf, *nbuf;
+	size_t len, new_len;
+	ssize_t bytes;
+
+	if ((buf = malloc(BUFSIZ)) == NULL)
+		goto out;
+
+	len = 0;
+	for (;;) {
+		bytes = read(fd, buf + len, BUFSIZ);
+		if (bytes == -1)
+			break;
+		if (bytes < BUFSIZ) {
+			*lease = buf;
+			return len + (size_t)bytes;
+		}
+		new_len = len + (BUFSIZ * 2);
+		if (new_len > UINT32_MAX || new_len < len) {
+			errno = E2BIG;
+			break;
+		}
+		if ((nbuf = realloc(buf, new_len)) == NULL)
+			break;
+		buf = nbuf;
+		len += BUFSIZ;
+	}
+
+	free(buf);
+out:
+	*lease = NULL;
+	return 0;
+}
