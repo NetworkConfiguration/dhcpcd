@@ -361,12 +361,13 @@ read_hwaddr_aton(uint8_t **data, const char *path)
 			if (buf_len >= len)
 				*data = (uint8_t *)buf;
 			else {
-				free(buf);
 				if ((*data = malloc(len)) == NULL)
 					len = 0;
 			}
 			if (len != 0)
-				len = hwaddr_aton(*data, buf);
+				(void)hwaddr_aton(*data, buf);
+			if (buf_len < len)
+				free(buf);
 			break;
 		}
 	}
