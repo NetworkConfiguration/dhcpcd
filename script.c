@@ -421,7 +421,7 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 	}
 #ifdef INET
 	if (dhcp && state && state->old) {
-		n = dhcp_env(NULL, NULL, state->old, ifp);
+		n = dhcp_env(NULL, NULL, state->old, state->old_len, ifp);
 		if (n == -1)
 			goto eexit;
 		if (n > 0) {
@@ -430,7 +430,8 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 			if (nenv == NULL)
 				goto eexit;
 			env = nenv;
-			n = dhcp_env(env + elen, "old", state->old, ifp);
+			n = dhcp_env(env + elen, "old",
+			    state->old, state->old_len, ifp);
 			if (n == -1)
 				goto eexit;
 			elen += (size_t)n;
@@ -476,7 +477,7 @@ dumplease:
 		}
 	}
 	if (dhcp && state && state->new) {
-		n = dhcp_env(NULL, NULL, state->new, ifp);
+		n = dhcp_env(NULL, NULL, state->new, state->new_len, ifp);
 		if (n > 0) {
 			nenv = realloc(env, sizeof(char *) *
 			    (elen + (size_t)n + 1));
@@ -484,7 +485,7 @@ dumplease:
 				goto eexit;
 			env = nenv;
 			n = dhcp_env(env + elen, "new",
-			    state->new, ifp);
+			    state->new, state->new_len, ifp);
 			if (n == -1)
 				goto eexit;
 			elen += (size_t)n;

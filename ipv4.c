@@ -324,11 +324,9 @@ ipv4_ifcmp(const struct interface *si, const struct interface *ti)
 	/* If we are either, they neither have a lease, or they both have.
 	 * We need to check for IPv4LL and make it non-preferred. */
 	if (sis->new && tis->new) {
-		int sill = (sis->new->cookie == htonl(MAGIC_COOKIE));
-		int till = (tis->new->cookie == htonl(MAGIC_COOKIE));
-		if (sill && !till)
+		if (IS_DHCP(sis->new) && !IS_DHCP(tis->new))
 			return -1;
-		if (!sill && till)
+		if (!IS_DHCP(sis->new) && IS_DHCP(tis->new))
 			return 1;
 	}
 	return 0;
@@ -1098,7 +1096,6 @@ ipv4_applyaddr(void *arg)
 {
 	struct interface *ifp = arg, *ifn;
 	struct dhcp_state *state = D_STATE(ifp), *nstate;
-	struct dhcp_message *dhcp;
 	struct dhcp_lease *lease;
 	struct if_options *ifo = ifp->options;
 	struct ipv4_addr *ap;
@@ -1106,11 +1103,11 @@ ipv4_applyaddr(void *arg)
 
 	if (state == NULL)
 		return;
-	dhcp = state->new;
-	lease = &state->lease;
 
+	lease = &state->lease;
 	if_sortinterfaces(ifp->ctx);
-	if (dhcp == NULL) {
+
+	if (state->new == NULL) {
 		if ((ifo->options & (DHCPCD_EXITING | DHCPCD_PERSISTENT)) !=
 		    (DHCPCD_EXITING | DHCPCD_PERSISTENT))
 		{
