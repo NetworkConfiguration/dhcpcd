@@ -156,7 +156,6 @@ struct dhcpcd_ctx {
 	struct rt_head *ipv4_kroutes;
 
 	int udp_fd;
-	uint8_t packet[1500];	/* maximum packet we deal with */
 
 	/* Our aggregate option buffer.
 	 * We ONLY use this when options are split, which for most purposes is

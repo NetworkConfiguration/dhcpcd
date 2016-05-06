@@ -3093,7 +3093,7 @@ static void
 dhcp_handlepacket(void *arg)
 {
 	struct interface *ifp = arg;
-	uint8_t *bootp;
+	uint8_t *bootp, buf[MTU_MAX];
 	size_t bytes;
 	struct in_addr from;
 	int i, flags;
@@ -3104,7 +3104,7 @@ dhcp_handlepacket(void *arg)
 	bootp = NULL;
 	while (!(flags & RAW_EOF)) {
 		bytes = (size_t)if_readrawpacket(ifp, ETHERTYPE_IP,
-		    ifp->ctx->packet, sizeof(ifp->ctx->packet), &flags);
+		    buf, sizeof(buf), &flags);
 		if ((ssize_t)bytes == -1) {
 			logger(ifp->ctx, LOG_ERR,
 			    "%s: dhcp if_readrawpacket: %m", ifp->name);
@@ -3112,7 +3112,7 @@ dhcp_handlepacket(void *arg)
 			arp_close(ifp);
 			break;
 		}
-		if (valid_udp_packet(ifp->ctx->packet, bytes,
+		if (valid_udp_packet(buf, bytes,
 		    &from, flags & RAW_PARTIALCSUM) == -1)
 		{
 			logger(ifp->ctx, LOG_ERR,
@@ -3142,7 +3142,7 @@ dhcp_handlepacket(void *arg)
 			    ifp->name, inet_ntoa(from));
 		}
 
-		bytes = get_udp_data(&bootp, ifp->ctx->packet);
+		bytes = get_udp_data(&bootp, buf);
 		if (bytes < sizeof(struct bootp)) {
 			logger(ifp->ctx, LOG_ERR,
 			    "%s: truncated packet (%zu) from %s",
