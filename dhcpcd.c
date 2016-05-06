@@ -592,12 +592,14 @@ configure_interface(struct interface *ifp, int argc, char **argv,
 
 	old = ifp->options ? ifp->options->mtime : 0;
 	dhcpcd_selectprofile(ifp, NULL);
+	if (ifp->options == NULL)
+		return;
 	add_options(ifp->ctx, ifp->name, ifp->options, argc, argv);
 	ifp->options->options |= options;
 	configure_interface1(ifp);
 
 	/* If the mtime has changed drop any old lease */
-	if (ifp->options && old != 0 && ifp->options->mtime != old) {
+	if (old != 0 && ifp->options->mtime != old) {
 		logger(ifp->ctx, LOG_WARNING,
 		    "%s: confile file changed, expiring leases", ifp->name);
 		dhcpcd_drop(ifp, 0);
