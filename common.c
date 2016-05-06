@@ -358,10 +358,15 @@ read_hwaddr_aton(uint8_t **data, const char *path)
 	*data = NULL;
 	while ((llen = getline(&buf, &buf_len, fp)) != -1) {
 		if ((len = hwaddr_aton(NULL, buf)) != 0) {
-			if ((*data = malloc(len)) != NULL)
+			if (buf_len >= len)
+				*data = (uint8_t *)buf;
+			else {
+				free(buf);
+				if ((*data = malloc(len)) == NULL)
+					len = 0;
+			}
+			if (len != 0)
 				len = hwaddr_aton(*data, buf);
-			else
-				len = 0;
 			break;
 		}
 	}
