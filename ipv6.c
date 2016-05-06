@@ -1208,8 +1208,8 @@ ipv6_addlinklocal(struct interface *ifp)
 	if (ap == NULL)
 		return -1;
 
+	dadcounter = 0;
 	if (ifp->options->options & DHCPCD_SLAACPRIVATE) {
-		dadcounter = 0;
 nextslaacprivate:
 		if (ipv6_makestableprivate(&ap->addr,
 			&ap->prefix, ap->prefix_len, ifp, &dadcounter) == -1)
