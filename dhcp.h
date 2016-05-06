@@ -235,11 +235,10 @@ struct dhcp_state {
 #define D_STATE_RUNNING(ifp)						       \
 	(D_CSTATE((ifp)) && D_CSTATE((ifp))->new && D_CSTATE((ifp))->reason)
 
-#define IS_DHCP(b)	((b) != NULL &&			\
-			    (b)->vend[0] == 0x63 &&	\
-			    (b)->vend[1] == 0x82 &&	\
-			    (b)->vend[2] == 0x53 &&	\
-			    (b)->vend[3] == 0x63)
+#define IS_DHCP(b)	((b)->vend[0] == 0x63 &&	\
+			 (b)->vend[1] == 0x82 &&	\
+			 (b)->vend[2] == 0x53 &&	\
+			 (b)->vend[3] == 0x63)
 
 #include "dhcpcd.h"
 #include "if-options.h"
