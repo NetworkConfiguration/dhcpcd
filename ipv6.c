@@ -179,43 +179,28 @@ ipv6_readsecret(struct dhcpcd_ctx *ctx)
 	uint32_t r;
 	int x;
 
-	if ((fp = fopen(SECRET, "r"))) {
-		len = 0;
-		while (fgets(line, sizeof(line), fp)) {
-			len = strlen(line);
-			if (len) {
-				if (line[len - 1] == '\n')
-					line[len - 1] = '\0';
-			}
-			len = hwaddr_aton(NULL, line);
-			if (len) {
-				ctx->secret_len = hwaddr_aton(ctx->secret,
-				    line);
-				break;
-			}
-			len = 0;
-		}
-		fclose(fp);
-		if (len)
-			return (ssize_t)len;
-	} else {
-		if (errno != ENOENT)
-			logger(ctx, LOG_ERR,
-			    "error reading secret: %s: %m", SECRET);
-	}
+	if ((ctx->secret_len = read_hwaddr_aton(&ctx->secret, SECRET)) != 0)
+		return (ssize_t)ctx->secret_len;
+
+	if (errno != ENOENT)
+		logger(ctx, LOG_ERR, "error reading secret: %s: %m", SECRET);
 
 	/* Chaining arc4random should be good enough.
 	 * RFC7217 section 5.1 states the key SHOULD be at least 128 bits.
 	 * To attempt and future proof ourselves, we'll generate a key of
 	 * 512 bits (64 bytes). */
+	if (ctx->secret_len < 64) {
+		if ((ctx->secret = malloc(64)) == NULL) {
+			logger(ctx, LOG_ERR, "%s: malloc: %m", __func__);
+			return -1;
+		}
+		ctx->secret_len = 64;
+	}
 	p = ctx->secret;
-	ctx->secret_len = 0;
 	for (len = 0; len < 512 / NBBY; len += sizeof(r)) {
 		r = arc4random();
 		memcpy(p, &r, sizeof(r));
 		p += sizeof(r);
-		ctx->secret_len += sizeof(r);
-
 	}
 
 	/* Ensure that only the dhcpcd user can read the secret.
@@ -1514,6 +1499,7 @@ ipv6_ctxfree(struct dhcpcd_ctx *ctx)
 	if (ctx->ipv6 == NULL)
 		return;
 
+	free(ctx->secret);
 	ipv6_freerts(ctx->ipv6->routes);
 	free(ctx->ipv6->routes);
 	free(ctx->ipv6->ra_routers);

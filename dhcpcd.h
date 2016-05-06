@@ -164,7 +164,7 @@ struct dhcpcd_ctx {
 	size_t opt_buffer_len;
 #endif
 #ifdef INET6
-	unsigned char secret[SECRET_LEN];
+	uint8_t *secret;
 	size_t secret_len;
 
 	struct dhcp_opt *nd_opts;
