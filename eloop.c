@@ -181,10 +181,11 @@ struct eloop {
 	int exitcode;
 };
 
+#ifdef HAVE_REALLOCARRAY
+#define	eloop_realloca	reallocarray
+#else
 /* Handy routing to check for potential overflow.
- * reallocarray(3) and reallocarr(3) are not portable and this
- * implementation is smaller than using either in libc in
- * the final binary size. */
+ * reallocarray(3) and reallocarr(3) are not portable. */
 #define SQRT_SIZE_MAX (((size_t)1) << (sizeof(size_t) * CHAR_BIT / 2))
 static void *
 eloop_realloca(void *ptr, size_t n, size_t size)
@@ -196,6 +197,7 @@ eloop_realloca(void *ptr, size_t n, size_t size)
 	}
 	return realloc(ptr, n * size);
 }
+#endif
 
 #ifdef HAVE_POLL
 static void

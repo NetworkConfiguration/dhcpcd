@@ -917,6 +917,8 @@ fi
 if [ "$REALLOCARRAY" = no ]; then
 	echo "COMPAT_SRCS+=	compat/reallocarray.c" >>$CONFIG_MK
 	echo "#include		\"compat/reallocarray.h\"">>$CONFIG_H
+else
+	echo "#define HAVE_REALLOCARRAY" >>$CONFIG_H
 fi
 
 if [ -z "$POLL" ]; then
