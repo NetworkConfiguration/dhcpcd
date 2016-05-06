@@ -2163,8 +2163,8 @@ make_prefix(const struct interface *ifp, const struct ra *rap,
 	    !(addr->flags & (IPV6_AF_ONLINK | IPV6_AF_DELEGATEDPFX)))
 		return NULL;
 
-	/* Don't install a blackhole route when not creating bigger prefixes */
-	if (addr->flags & IPV6_AF_DELEGATEDZERO)
+	/* Don't install a reject route when not creating bigger prefixes */
+	if (addr->flags & IPV6_AF_NOREJECT)
 		return NULL;
 
 	r = make_route(ifp, rap);

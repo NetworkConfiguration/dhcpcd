@@ -1511,9 +1511,19 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			for (sl = 0; sl < ia->sla_len - 1; sl++) {
 				slap = &ia->sla[sl];
 				if (slap->sla_set != sla->sla_set) {
-					logger(ctx, LOG_WARNING,
+					logger(ctx, LOG_ERR,
 					    "%s: cannot mix automatic "
 					    "and fixed SLA",
+					    sla->ifname);
+					goto err_sla;
+				}
+				if (ia->prefix_len &&
+				    (sla->prefix_len == ia->prefix_len ||
+				    slap->prefix_len == ia->prefix_len))
+				{
+					logger(ctx, LOG_ERR,
+					    "%s: cannot delegte the same"
+					    "prefix length more than once",
 					    sla->ifname);
 					goto err_sla;
 				}
