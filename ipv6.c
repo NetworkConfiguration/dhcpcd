@@ -593,6 +593,13 @@ ipv6_deleteaddr(struct ipv6_addr *ia)
 	    errno != EADDRNOTAVAIL && errno != ENXIO && errno != ENODEV)
 		logger(ia->iface->ctx, LOG_ERR, "if_deladdress6: :%m");
 
+	/* NOREJECT is set if we delegated exactly the prefix to another
+	 * address.
+	 * This can only be one address, so just clear the flag.
+	 * This should ensure the reject route will be restored. */
+	if (ia->delegating_prefix != NULL)
+		ia->delegating_prefix->flags &= ~IPV6_AF_NOREJECT;
+
 	state = IPV6_STATE(ia->iface);
 	TAILQ_FOREACH(ap, &state->addrs, next) {
 		if (IN6_ARE_ADDR_EQUAL(&ap->addr, &ia->addr)) {
@@ -720,7 +727,7 @@ ipv6_addaddr(struct ipv6_addr *ap, const struct timespec *now)
 
 	ap->flags &= ~IPV6_AF_NEW;
 	ap->flags |= IPV6_AF_ADDED;
-	if (ap->delegating_iface)
+	if (ap->delegating_prefix != NULL)
 		ap->flags |= IPV6_AF_DELEGATED;
 
 #ifdef IPV6_POLLADDRFLAG
@@ -839,6 +846,16 @@ ipv6_addaddrs(struct ipv6_addrhead *addrs)
 void
 ipv6_freeaddr(struct ipv6_addr *ap)
 {
+	struct ipv6_addr *ia;
+
+	/* Forget the reference */
+	if (ap->flags & IPV6_AF_DELEGATEDPFX) {
+		TAILQ_FOREACH(ia, &ap->pd_pfxs, pd_next) {
+			ia->delegating_prefix = NULL;
+		}
+	} else if (ap->delegating_prefix != NULL) {
+		TAILQ_REMOVE(&ap->delegating_prefix->pd_pfxs, ap, pd_next);
+	}
 
 	eloop_q_timeout_delete(ap->iface->ctx->eloop, 0, NULL, ap);
 	free(ap);
@@ -853,7 +870,9 @@ ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
 
 	timespecclear(&now);
 	TAILQ_FOREACH_SAFE(ap, addrs, next, apn) {
-		if (ifd && ap->delegating_iface != ifd)
+		if (ifd != NULL &&
+		    (ap->delegating_prefix == NULL ||
+		    ap->delegating_prefix->iface != ifd))
 			continue;
 		if (drop != 2)
 			TAILQ_REMOVE(addrs, ap, next);

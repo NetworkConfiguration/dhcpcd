@@ -1273,7 +1273,7 @@ dhcp6_dadcallback(void *arg)
 		{
 			struct ipv6_addr *ap2;
 
-			valid = (ap->delegating_iface == NULL);
+			valid = (ap->delegating_prefix == NULL);
 			TAILQ_FOREACH(ap2, &state->addrs, next) {
 				if (ap2->flags & IPV6_AF_ADDED &&
 				    !(ap2->flags & IPV6_AF_DADCOMPLETED))
@@ -1286,7 +1286,7 @@ dhcp6_dadcallback(void *arg)
 				logger(ap->iface->ctx, LOG_DEBUG,
 				    "%s: DHCPv6 DAD completed", ifp->name);
 				script_runreason(ifp,
-				    ap->delegating_iface ?
+				    ap->delegating_prefix ?
 				    "DELEGATED6" : state->reason);
 				if (valid)
 					dhcpcd_daemonise(ifp->ctx);
@@ -1878,10 +1878,13 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			    iabuf, sizeof(iabuf));
 			snprintf(a->saddr, sizeof(a->saddr),
 			    "%s/%d", ia, a->prefix_len);
+			TAILQ_INIT(&a->pd_pfxs);
 			TAILQ_INSERT_TAIL(&state->addrs, a, next);
 		} else {
-			if (!(a->flags & IPV6_AF_DELEGATEDPFX))
+			if (!(a->flags & IPV6_AF_DELEGATEDPFX)) {
 				a->flags |= IPV6_AF_NEW | IPV6_AF_DELEGATEDPFX;
+				TAILQ_INIT(&a->pd_pfxs);
+			}
 			a->flags &= ~(IPV6_AF_STALE | IPV6_AF_REQUEST);
 			if (a->prefix_vltime != ntohl(pdp->vltime))
 				a->flags |= IPV6_AF_NEW;
@@ -2321,7 +2324,7 @@ dhcp6_startinit(struct interface *ifp)
 
 static struct ipv6_addr *
 dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
-    const struct if_sla *sla, struct if_ia *if_ia, struct interface *ifs)
+    const struct if_sla *sla, struct if_ia *if_ia)
 {
 	struct dhcp6_state *state;
 	struct in6_addr addr, daddr;
@@ -2388,12 +2391,13 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 		ia->dadcallback = dhcp6_dadcallback;
 		memcpy(&ia->iaid, &prefix->iaid, sizeof(ia->iaid));
 		ia->created = ia->acquired = prefix->acquired;
-		ia->prefix = addr;
-		ia->prefix_len = (uint8_t)pfxlen;
+		ia->addr = daddr;
 
 		TAILQ_INSERT_TAIL(&state->addrs, ia, next);
+		TAILQ_INSERT_TAIL(&prefix->pd_pfxs, ia, pd_next);
 	}
-	ia->delegating_iface = ifs;
+	ia->delegating_prefix = prefix;
+	ia->prefix = addr;
 	ia->prefix_len = (uint8_t)pfxlen;
 	ia->prefix_pltime = prefix->prefix_pltime;
 	ia->prefix_vltime = prefix->prefix_vltime;
@@ -2429,8 +2433,8 @@ dhcp6_script_try_run(struct interface *ifp, int delegated)
 			    ipv6_iffindaddr(ap->iface, &ap->addr, IN6_IFF_TENTATIVE))
 				ap->flags |= IPV6_AF_DADCOMPLETED;
 			if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0 &&
-			    ((delegated && ap->delegating_iface) ||
-			    (!delegated && !ap->delegating_iface)))
+			    ((delegated && ap->delegating_prefix) ||
+			    (!delegated && !ap->delegating_prefix)))
 			{
 				completed = 0;
 				break;
@@ -2492,7 +2496,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 						break;
 					}
 					if (dhcp6_ifdelegateaddr(ifd, ap,
-					    NULL, ia, ifp))
+					    NULL, ia))
 						k++;
 				}
 				for (j = 0; j < ia->sla_len; j++) {
@@ -2508,7 +2512,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 						break;
 					}
 					if (dhcp6_ifdelegateaddr(ifd, ap,
-					    sla, ia, ifp))
+					    sla, ia))
 						k++;
 				}
 				if (carrier_warned ||abrt)
@@ -2574,7 +2578,7 @@ dhcp6_find_delegates(struct interface *ifp)
 						return 1;
 					}
 					if (dhcp6_ifdelegateaddr(ifp, ap,
-					    sla, ia, ifd))
+					    sla, ia))
 					    k++;
 				}
 			}
@@ -3356,7 +3360,9 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 			return;
 		}
 
-		if (drop && options & DHCPCD_RELEASE) {
+		if (drop && options & DHCPCD_RELEASE &&
+		    state->state != DH6S_DELEGATED)
+		{
 			if (ifp->carrier == LINK_UP &&
 			    state->state != DH6S_RELEASED)
 			{
@@ -3550,7 +3556,7 @@ delegated:
 	state = D6_CSTATE(ifp);
 	i = 0;
 	TAILQ_FOREACH(ap, &state->addrs, next) {
-		if (ap->delegating_iface) {
+		if (ap->delegating_prefix) {
 			i += strlen(ap->saddr) + 1;
 		}
 	}
@@ -3563,7 +3569,7 @@ delegated:
 		}
 		v += snprintf(val, i, "%s_delegated_dhcp6_prefix=", prefix);
 		TAILQ_FOREACH(ap, &state->addrs, next) {
-			if (ap->delegating_iface) {
+			if (ap->delegating_prefix) {
 				/* Can't use stpcpy(3) due to "security" */
 				const char *sap = ap->saddr;
 

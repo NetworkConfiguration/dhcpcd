@@ -138,6 +138,7 @@
 #define IN6_IFF_NOTUSEABLE \
 	(IN6_IFF_TENTATIVE | IN6_IFF_DUPLICATED | IN6_IFF_DETACHED)
 
+TAILQ_HEAD(ipv6_addrhead, ipv6_addr);
 struct ipv6_addr {
 	TAILQ_ENTRY(ipv6_addr) next;
 	struct interface *iface;
@@ -153,7 +154,11 @@ struct ipv6_addr {
 	char saddr[INET6_ADDRSTRLEN];
 	uint8_t iaid[4];
 	uint16_t ia_type;
-	struct interface *delegating_iface;
+
+	struct ipv6_addr *delegating_prefix;
+	struct ipv6_addrhead pd_pfxs;
+	TAILQ_ENTRY(ipv6_addr) pd_next;
+
 	uint8_t prefix_exclude_len;
 	struct in6_addr prefix_exclude;
 
@@ -163,7 +168,6 @@ struct ipv6_addr {
 	size_t nslen;
 	int nsprobes;
 };
-TAILQ_HEAD(ipv6_addrhead, ipv6_addr);
 
 #define	IPV6_AF_ONLINK		0x0001
 #define	IPV6_AF_NEW		0x0002
