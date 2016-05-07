@@ -2321,18 +2321,18 @@ dhcp6_startinit(struct interface *ifp)
 
 static struct ipv6_addr *
 dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
-    const struct if_sla *sla, struct if_ia *ia, struct interface *ifs)
+    const struct if_sla *sla, struct if_ia *if_ia, struct interface *ifs)
 {
 	struct dhcp6_state *state;
-	struct in6_addr addr;
-	struct ipv6_addr *a, *ap, *apn;
+	struct in6_addr addr, daddr;
+	struct ipv6_addr *ia;
 	char sabuf[INET6_ADDRSTRLEN];
 	const char *sa;
-	int pfxlen;
+	int pfxlen, dadcounter;
 	uint64_t vl;
 
 	/* RFC6603 Section 4.2 */
-	if (strcmp(ifp->name, ifs->name) == 0) {
+	if (strcmp(ifp->name, prefix->iface->name) == 0) {
 		if (prefix->prefix_exclude_len == 0) {
 			/* Don't spam the log automatically */
 			if (sla)
@@ -2345,7 +2345,7 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 		pfxlen = prefix->prefix_exclude_len;
 		memcpy(&addr, &prefix->prefix_exclude, sizeof(addr));
 	} else if ((pfxlen = dhcp6_delegateaddr(&addr, ifp, prefix,
-	    sla, ia)) == -1)
+	    sla, if_ia)) == -1)
 		return NULL;
 
 	if (fls64(sla->suffix) > 128 - pfxlen) {
@@ -2355,62 +2355,60 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 		return NULL;
 	}
 
-	a = calloc(1, sizeof(*a));
-	if (a == NULL) {
-		logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
-		return NULL;
+	/* Add our suffix */
+	if (sla->suffix) {
+		daddr = addr;
+		vl = be64dec(addr.s6_addr + 8);
+		vl |= sla->suffix;
+		be64enc(daddr.s6_addr + 8, vl);
+	} else {
+		dadcounter = ipv6_makeaddr(&daddr, ifp, &addr, pfxlen);
+		if (dadcounter == -1) {
+			logger(ifp->ctx, LOG_ERR,
+			    "%s: error adding slaac to prefix_len %d",
+			    ifp->name, pfxlen);
+			return NULL;
+		}
 	}
-	a->iface = ifp;
-	a->flags = IPV6_AF_NEW | IPV6_AF_ONLINK;
-	a->dadcallback = dhcp6_dadcallback;
-	a->delegating_iface = ifs;
-	memcpy(&a->iaid, &prefix->iaid, sizeof(a->iaid));
-	a->created = a->acquired = prefix->acquired;
-	a->prefix_pltime = prefix->prefix_pltime;
-	a->prefix_vltime = prefix->prefix_vltime;
-	a->prefix = addr;
-	a->prefix_len = (uint8_t)pfxlen;
+
+	/* Find an existing address */
+	state = D6_STATE(ifp);
+	TAILQ_FOREACH(ia, &state->addrs, next) {
+		if (IN6_ARE_ADDR_EQUAL(&ia->addr, &daddr))
+			break;
+	}
+	if (ia == NULL) {
+		ia = calloc(1, sizeof(*ia));
+		if (ia == NULL) {
+			logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
+			return NULL;
+		}
+		ia->iface = ifp;
+		ia->flags = IPV6_AF_NEW | IPV6_AF_ONLINK;
+		ia->dadcallback = dhcp6_dadcallback;
+		memcpy(&ia->iaid, &prefix->iaid, sizeof(ia->iaid));
+		ia->created = ia->acquired = prefix->acquired;
+		ia->prefix = addr;
+		ia->prefix_len = (uint8_t)pfxlen;
+
+		TAILQ_INSERT_TAIL(&state->addrs, ia, next);
+	}
+	ia->delegating_iface = ifs;
+	ia->prefix_len = (uint8_t)pfxlen;
+	ia->prefix_pltime = prefix->prefix_pltime;
+	ia->prefix_vltime = prefix->prefix_vltime;
+
+	sa = inet_ntop(AF_INET6, &ia->addr, sabuf, sizeof(sabuf));
+	snprintf(ia->saddr, sizeof(ia->saddr), "%s/%d", sa, ia->prefix_len);
 
 	/* If the prefix length hasn't changed,
 	 * don't install a reject route. */
 	if (prefix->prefix_len == pfxlen)
 		prefix->flags |= IPV6_AF_NOREJECT;
+	else
+		prefix->flags &= ~IPV6_AF_NOREJECT;
 
-	/* Add our suffix */
-	if (sla->suffix) {
-		a->addr = addr;
-		vl = be64dec(addr.s6_addr + 8);
-		vl |= sla->suffix;
-		be64enc(a->addr.s6_addr + 8, vl);
-	} else {
-		a->dadcounter = ipv6_makeaddr(&a->addr, ifp,
-		    &a->prefix, a->prefix_len);
-		if (a->dadcounter == -1) {
-			logger(ifp->ctx, LOG_ERR,
-			    "%s: error adding slaac to prefix_len %d",
-			    ifp->name, a->prefix_len);
-			free(a);
-			return NULL;
-		}
-	}
-
-	state = D6_STATE(ifp);
-	/* Remove any exiting address */
-	TAILQ_FOREACH_SAFE(ap, &state->addrs, next, apn) {
-		if (IN6_ARE_ADDR_EQUAL(&ap->addr, &a->addr)) {
-			TAILQ_REMOVE(&state->addrs, ap, next);
-			/* Keep our flags */
-			a->flags |= ap->flags;
-			a->flags &= ~IPV6_AF_NEW;
-			a->created = ap->created;
-			ipv6_freeaddr(ap);
-		}
-	}
-
-	sa = inet_ntop(AF_INET6, &a->addr, sabuf, sizeof(sabuf));
-	snprintf(a->saddr, sizeof(a->saddr), "%s/%d", sa, a->prefix_len);
-	TAILQ_INSERT_TAIL(&state->addrs, a, next);
-	return a;
+	return ia;
 }
 
 static void
