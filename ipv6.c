@@ -581,7 +581,6 @@ ipv6_checkaddrflags(void *arg)
 }
 #endif
 
-
 static void
 ipv6_deleteaddr(struct ipv6_addr *ia)
 {
