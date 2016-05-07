@@ -153,7 +153,7 @@ struct ipv6_addr {
 	char saddr[INET6_ADDRSTRLEN];
 	uint8_t iaid[4];
 	uint16_t ia_type;
-	struct ipv6_addr *delegating_prefix;
+	struct interface *delegating_iface;
 	uint8_t prefix_exclude_len;
 	struct in6_addr prefix_exclude;
 

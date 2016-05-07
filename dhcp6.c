@@ -1273,7 +1273,7 @@ dhcp6_dadcallback(void *arg)
 		{
 			struct ipv6_addr *ap2;
 
-			valid = (ap->delegating_prefix == NULL);
+			valid = (ap->delegating_iface == NULL);
 			TAILQ_FOREACH(ap2, &state->addrs, next) {
 				if (ap2->flags & IPV6_AF_ADDED &&
 				    !(ap2->flags & IPV6_AF_DADCOMPLETED))
@@ -1286,7 +1286,7 @@ dhcp6_dadcallback(void *arg)
 				logger(ap->iface->ctx, LOG_DEBUG,
 				    "%s: DHCPv6 DAD completed", ifp->name);
 				script_runreason(ifp,
-				    ap->delegating_prefix ?
+				    ap->delegating_iface ?
 				    "DELEGATED6" : state->reason);
 				if (valid)
 					dhcpcd_daemonise(ifp->ctx);
@@ -2321,18 +2321,18 @@ dhcp6_startinit(struct interface *ifp)
 
 static struct ipv6_addr *
 dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
-    const struct if_sla *sla, struct if_ia *if_ia)
+    const struct if_sla *sla, struct if_ia *ia, struct interface *ifs)
 {
 	struct dhcp6_state *state;
-	struct in6_addr addr, daddr;
-	struct ipv6_addr *ia;
+	struct in6_addr addr;
+	struct ipv6_addr *a, *ap, *apn;
 	char sabuf[INET6_ADDRSTRLEN];
 	const char *sa;
-	int pfxlen, dadcounter;
+	int pfxlen;
 	uint64_t vl;
 
 	/* RFC6603 Section 4.2 */
-	if (strcmp(ifp->name, prefix->iface->name) == 0) {
+	if (strcmp(ifp->name, ifs->name) == 0) {
 		if (prefix->prefix_exclude_len == 0) {
 			/* Don't spam the log automatically */
 			if (sla)
@@ -2345,7 +2345,7 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 		pfxlen = prefix->prefix_exclude_len;
 		memcpy(&addr, &prefix->prefix_exclude, sizeof(addr));
 	} else if ((pfxlen = dhcp6_delegateaddr(&addr, ifp, prefix,
-	    sla, if_ia)) == -1)
+	    sla, ia)) == -1)
 		return NULL;
 
 	if (fls64(sla->suffix) > 128 - pfxlen) {
@@ -2355,60 +2355,62 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 		return NULL;
 	}
 
-	/* Add our suffix */
-	if (sla->suffix) {
-		daddr = addr;
-		vl = be64dec(addr.s6_addr + 8);
-		vl |= sla->suffix;
-		be64enc(daddr.s6_addr + 8, vl);
-	} else {
-		dadcounter = ipv6_makeaddr(&daddr, ifp, &addr, pfxlen);
-		if (dadcounter == -1) {
-			logger(ifp->ctx, LOG_ERR,
-			    "%s: error adding slaac to prefix_len %d",
-			    ifp->name, pfxlen);
-			return NULL;
-		}
+	a = calloc(1, sizeof(*a));
+	if (a == NULL) {
+		logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
+		return NULL;
 	}
-
-	/* Find an existing address */
-	state = D6_STATE(ifp);
-	TAILQ_FOREACH(ia, &state->addrs, next) {
-		if (IN6_ARE_ADDR_EQUAL(&ia->addr, &daddr))
-			break;
-	}
-	if (ia == NULL) {
-		ia = calloc(1, sizeof(*ia));
-		if (ia == NULL) {
-			logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
-			return NULL;
-		}
-		ia->iface = ifp;
-		ia->flags = IPV6_AF_NEW | IPV6_AF_ONLINK;
-		ia->dadcallback = dhcp6_dadcallback;
-		memcpy(&ia->iaid, &prefix->iaid, sizeof(ia->iaid));
-		ia->created = ia->acquired = prefix->acquired;
-		ia->prefix = addr;
-		ia->prefix_len = (uint8_t)pfxlen;
-
-		TAILQ_INSERT_TAIL(&state->addrs, ia, next);
-	}
-	ia->delegating_prefix = prefix;
-	ia->prefix_len = (uint8_t)pfxlen;
-	ia->prefix_pltime = prefix->prefix_pltime;
-	ia->prefix_vltime = prefix->prefix_vltime;
-
-	sa = inet_ntop(AF_INET6, &ia->addr, sabuf, sizeof(sabuf));
-	snprintf(ia->saddr, sizeof(ia->saddr), "%s/%d", sa, ia->prefix_len);
+	a->iface = ifp;
+	a->flags = IPV6_AF_NEW | IPV6_AF_ONLINK;
+	a->dadcallback = dhcp6_dadcallback;
+	a->delegating_iface = ifs;
+	memcpy(&a->iaid, &prefix->iaid, sizeof(a->iaid));
+	a->created = a->acquired = prefix->acquired;
+	a->prefix_pltime = prefix->prefix_pltime;
+	a->prefix_vltime = prefix->prefix_vltime;
+	a->prefix = addr;
+	a->prefix_len = (uint8_t)pfxlen;
 
 	/* If the prefix length hasn't changed,
 	 * don't install a reject route. */
 	if (prefix->prefix_len == pfxlen)
 		prefix->flags |= IPV6_AF_NOREJECT;
-	else
-		prefix->flags &= ~IPV6_AF_NOREJECT;
 
-	return ia;
+	/* Add our suffix */
+	if (sla->suffix) {
+		a->addr = addr;
+		vl = be64dec(addr.s6_addr + 8);
+		vl |= sla->suffix;
+		be64enc(a->addr.s6_addr + 8, vl);
+	} else {
+		a->dadcounter = ipv6_makeaddr(&a->addr, ifp,
+		    &a->prefix, a->prefix_len);
+		if (a->dadcounter == -1) {
+			logger(ifp->ctx, LOG_ERR,
+			    "%s: error adding slaac to prefix_len %d",
+			    ifp->name, a->prefix_len);
+			free(a);
+			return NULL;
+		}
+	}
+
+	state = D6_STATE(ifp);
+	/* Remove any exiting address */
+	TAILQ_FOREACH_SAFE(ap, &state->addrs, next, apn) {
+		if (IN6_ARE_ADDR_EQUAL(&ap->addr, &a->addr)) {
+			TAILQ_REMOVE(&state->addrs, ap, next);
+			/* Keep our flags */
+			a->flags |= ap->flags;
+			a->flags &= ~IPV6_AF_NEW;
+			a->created = ap->created;
+			ipv6_freeaddr(ap);
+		}
+	}
+
+	sa = inet_ntop(AF_INET6, &a->addr, sabuf, sizeof(sabuf));
+	snprintf(a->saddr, sizeof(a->saddr), "%s/%d", sa, a->prefix_len);
+	TAILQ_INSERT_TAIL(&state->addrs, a, next);
+	return a;
 }
 
 static void
@@ -2429,8 +2431,8 @@ dhcp6_script_try_run(struct interface *ifp, int delegated)
 			    ipv6_iffindaddr(ap->iface, &ap->addr, IN6_IFF_TENTATIVE))
 				ap->flags |= IPV6_AF_DADCOMPLETED;
 			if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0 &&
-			    ((delegated && ap->delegating_prefix) ||
-			    (!delegated && !ap->delegating_prefix)))
+			    ((delegated && ap->delegating_iface) ||
+			    (!delegated && !ap->delegating_iface)))
 			{
 				completed = 0;
 				break;
@@ -2492,7 +2494,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 						break;
 					}
 					if (dhcp6_ifdelegateaddr(ifd, ap,
-					    NULL, ia))
+					    NULL, ia, ifp))
 						k++;
 				}
 				for (j = 0; j < ia->sla_len; j++) {
@@ -2508,7 +2510,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 						break;
 					}
 					if (dhcp6_ifdelegateaddr(ifd, ap,
-					    sla, ia))
+					    sla, ia, ifp))
 						k++;
 				}
 				if (carrier_warned ||abrt)
@@ -2574,7 +2576,7 @@ dhcp6_find_delegates(struct interface *ifp)
 						return 1;
 					}
 					if (dhcp6_ifdelegateaddr(ifp, ap,
-					    sla, ia))
+					    sla, ia, ifd))
 					    k++;
 				}
 			}
@@ -3550,7 +3552,7 @@ delegated:
 	state = D6_CSTATE(ifp);
 	i = 0;
 	TAILQ_FOREACH(ap, &state->addrs, next) {
-		if (ap->delegating_prefix) {
+		if (ap->delegating_iface) {
 			i += strlen(ap->saddr) + 1;
 		}
 	}
@@ -3563,7 +3565,7 @@ delegated:
 		}
 		v += snprintf(val, i, "%s_delegated_dhcp6_prefix=", prefix);
 		TAILQ_FOREACH(ap, &state->addrs, next) {
-			if (ap->delegating_prefix) {
+			if (ap->delegating_iface) {
 				/* Can't use stpcpy(3) due to "security" */
 				const char *sap = ap->saddr;
 
