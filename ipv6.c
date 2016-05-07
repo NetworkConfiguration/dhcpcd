@@ -1439,7 +1439,7 @@ ipv6_startstatic(struct interface *ifp)
 		ia = ipv6_newaddr(ifp, &ifp->options->req_addr6,
 		    ifp->options->req_prefix_len);
 		if (ia == NULL)
-	    		return -1;
+			return -1;
 		state = IPV6_STATE(ifp);
 		TAILQ_INSERT_TAIL(&state->addrs, ia, next);
 		run_script = 0;
