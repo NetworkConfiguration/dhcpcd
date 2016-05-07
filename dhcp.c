@@ -213,11 +213,7 @@ get_option(struct dhcpcd_ctx *ctx,
 		if (o == opt) {
 			if (op) {
 				/* We must concatonate the options. */
-				if ((bp && ctx->opt_buffer &&
-				    (size_t)(bp - ctx->opt_buffer) + ol >
-				    ctx->opt_buffer_len) ||
-				    ol > ctx->opt_buffer_len)
-				{
+				if (bl + l > ctx->opt_buffer_len) {
 					size_t pos;
 					uint8_t *nb;
 
@@ -226,12 +222,11 @@ get_option(struct dhcpcd_ctx *ctx,
 						    (bp - ctx->opt_buffer);
 					else
 						pos = 0;
-					nb = realloc(ctx->opt_buffer,
-					    ctx->opt_buffer_len + ol);
+					nb = realloc(ctx->opt_buffer, bl + l);
 					if (nb == NULL)
 						return NULL;
 					ctx->opt_buffer = nb;
-					ctx->opt_buffer_len += ol;
+					ctx->opt_buffer_len = bl + l;
 					bp = ctx->opt_buffer + pos;
 				}
 				if (bp == NULL)
