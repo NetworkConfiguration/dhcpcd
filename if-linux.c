@@ -1617,12 +1617,10 @@ if_route6(unsigned char cmd, const struct rt6 *rt)
 		add_attr_l(&nlm.hdr, sizeof(nlm), RTA_GATEWAY,
 		    &rt->gate.s6_addr, sizeof(rt->gate.s6_addr));
 
-	if (!(rt->flags & RTF_REJECT)) {
-		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_OIF, rt->iface->index);
-		if (rt->metric)
-			add_attr_32(&nlm.hdr, sizeof(nlm),
-			    RTA_PRIORITY, rt->metric);
-	}
+	add_attr_32(&nlm.hdr, sizeof(nlm), RTA_OIF, rt->iface->index);
+	if (rt->metric)
+		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_PRIORITY, rt->metric);
+
 	if (cmd != RTM_DELETE && rt->mtu) {
 		char metricsbuf[32];
 		struct rtattr *metrics = (void *)metricsbuf;

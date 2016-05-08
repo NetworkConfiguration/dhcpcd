@@ -2185,6 +2185,22 @@ make_prefix(const struct interface *ifp, const struct ra *rap,
 	if (addr->flags & IPV6_AF_NOREJECT)
 		return NULL;
 
+	/* This address is the delegated prefix, so add a reject route for
+	 * it via the loopback interface. */
+	if (addr->flags & IPV6_AF_DELEGATEDPFX) {
+		struct interface *lo0;
+
+		TAILQ_FOREACH(lo0, ifp->ctx->ifaces, next) {
+			if (lo0->flags & IFF_LOOPBACK)
+				break;
+		}
+		if (lo0 == NULL)
+			logger(ifp->ctx, LOG_WARNING,
+			    "cannot find a loopback interface to reject via");
+		else
+			ifp = lo0;
+	}
+
 	r = make_route(ifp, rap);
 	if (r == NULL)
 		return NULL;
@@ -2379,7 +2395,9 @@ ipv6_buildroutes(struct dhcpcd_ctx *ctx)
 	while ((rt = TAILQ_LAST(ctx->ipv6->routes, rt6_head)) != NULL) {
 		TAILQ_REMOVE(ctx->ipv6->routes, rt, next);
 		if (find_route6(nrs, rt) == NULL) {
-			o = rt->iface->options->options;
+			o = rt->iface->options ?
+			    rt->iface->options->options :
+			    rt->iface->ctx->options;
 			if (!have_default &&
 			    (o & DHCPCD_IPV6RA_OWN_DEFAULT) &&
 			    !(o & DHCPCD_IPV6RA_OWN) &&
@@ -2388,7 +2406,7 @@ ipv6_buildroutes(struct dhcpcd_ctx *ctx)
 				/* no need to add it back to our routing table
 				 * as we delete an exiting route when we add
 				 * a new one */
-			else if ((rt->iface->options->options &
+			else if ((o &
 				(DHCPCD_EXITING | DHCPCD_PERSISTENT)) !=
 				(DHCPCD_EXITING | DHCPCD_PERSISTENT))
 				d_route(rt);
