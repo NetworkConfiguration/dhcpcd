@@ -815,8 +815,8 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 	*p++ = type;
 
 #define AREA_LEFT	(size_t)(e - p)
-#define AREA_FIT(s)	if ((s) > AREA_LEFT) goto toobig;
-#define AREA_CHECK(s)	if ((s) + 2UL > AREA_LEFT) goto toobig;
+#define AREA_FIT(s)	if ((s) > AREA_LEFT) goto toobig
+#define AREA_CHECK(s)	if ((s) + 2UL > AREA_LEFT) goto toobig
 #define PUT_ADDR(o, a)	do {		\
 	AREA_CHECK(4);			\
 	*p++ = (o);			\
