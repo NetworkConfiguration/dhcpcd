@@ -3341,7 +3341,7 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 	if (ifp->options)
 		options = ifp->options->options;
 	else
-		options = 0;
+		options = ifp->ctx->options;
 	dropdele = (options & (DHCPCD_STOPPING | DHCPCD_RELEASE) &&
 	    (options & DHCPCD_NODROP) != DHCPCD_NODROP);
 

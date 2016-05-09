@@ -1172,6 +1172,7 @@ stop_all_interfaces(struct dhcpcd_ctx *ctx, unsigned long long opts)
 {
 	struct interface *ifp;
 
+	ctx->options |= DHCPCD_EXITING;
 	/* Drop the last interface first */
 	TAILQ_FOREACH_REVERSE(ifp, ctx->ifaces, if_head, next) {
 		if (ifp->options) {
