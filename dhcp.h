@@ -131,9 +131,6 @@ enum FQDN {
 	FQDN_BOTH       = 0x31
 };
 
-/* Some crappy DHCP servers require the BOOTP minimum length */
-#define BOOTP_MESSAGE_LENTH_MIN 300
-
 /* Don't import common.h as that defines __unused which causes problems
  * on some Linux systems which define it as part of a structure */
 #if __GNUC__ > 2 || defined(__INTEL_COMPILER)

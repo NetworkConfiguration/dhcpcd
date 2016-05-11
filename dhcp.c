@@ -1084,9 +1084,12 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 	*p++ = DHO_END;
 	len = (size_t)(p - (uint8_t *)bootp);
 
-	/* Pad out to the BOOTP minimum message length.
-	 * Some DHCP servers incorrectly require this. */
-	while (len < BOOTP_MESSAGE_LENTH_MIN) {
+	/* Pad out to the BOOTP message length.
+	 * Even if we send a DHCP packet with a variable length vendor area,
+	 * some servers / relay agents don't like packets smaller than
+	 * a BOOTP message which is fine because that's stipulated
+	 * in RFC1542 section 2.1. */
+	while (len < sizeof(*bootp)) {
 		*p++ = DHO_PAD;
 		len++;
 	}
@@ -3136,14 +3139,26 @@ dhcp_handlepacket(void *arg)
 			    "%s: server %s is not destination",
 			    ifp->name, inet_ntoa(from));
 		}
-
+		/*
+		 * DHCP has a variable option area rather than a fixed
+		 * vendor area.
+		 * Because DHCP uses the BOOTP protocol it should
+		 * still send BOOTP sized packets to be RFC compliant.
+		 * However some servers send a truncated vendor area.
+		 * dhcpcd can work fine without the vendor area being sent.
+		 */
 		bytes = get_udp_data(&bootp, buf);
-		if (bytes < sizeof(struct bootp)) {
+		if (bytes < offsetof(struct bootp, vend)) {
 			logger(ifp->ctx, LOG_ERR,
 			    "%s: truncated packet (%zu) from %s",
 			    ifp->name, bytes, inet_ntoa(from));
 			continue;
 		}
+		/* But to make our IS_DHCP macro easy, ensure the vendor
+		 * area has at least 4 octets. */
+		while (bytes < offsetof(struct bootp, vend) + 4)
+			bootp[bytes++] = '\0';
+
 		dhcp_handledhcp(ifp, (struct bootp *)bootp, bytes, &from);
 		if (state->raw_fd == -1)
 			break;
