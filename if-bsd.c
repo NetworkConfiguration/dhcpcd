@@ -772,7 +772,7 @@ if_route(unsigned char cmd, const struct rt *rt)
 }
 
 int
-if_initrt(struct interface *ifp)
+if_initrt(struct dhcpcd_ctx *ctx) 
 {
 	struct rt_msghdr *rtm;
 	int mib[6];
@@ -780,7 +780,7 @@ if_initrt(struct interface *ifp)
 	char *buf, *p, *end;
 	struct rt rt;
 
-	ipv4_freerts(ifp->ctx->ipv4_kroutes);
+	ipv4_freerts(ctx->ipv4_kroutes);
 
 	mib[0] = CTL_NET;
 	mib[1] = PF_ROUTE;
@@ -803,8 +803,8 @@ if_initrt(struct interface *ifp)
 	end = buf + needed;
 	for (p = buf; p < end; p += rtm->rtm_msglen) {
 		rtm = (void *)p;
-		if (if_copyrt(ifp->ctx, &rt, rtm) == 0)
-			ipv4_handlert(ifp->ctx, RTM_ADD, &rt, 1);
+		if (if_copyrt(ctx, &rt, rtm) == 0)
+			ipv4_handlert(ctx, RTM_ADD, &rt, 1);
 	}
 	free(buf);
 	return 0;
@@ -1139,7 +1139,7 @@ if_route6(unsigned char cmd, const struct rt6 *rt)
 }
 
 int
-if_initrt6(struct interface *ifp)
+if_initrt6(struct dhcpcd_ctx *ctx)
 {
 	struct rt_msghdr *rtm;
 	int mib[6];
@@ -1147,7 +1147,7 @@ if_initrt6(struct interface *ifp)
 	char *buf, *p, *end;
 	struct rt6 rt;
 
-	ipv6_freerts(&ifp->ctx->ipv6->kroutes);
+	ipv6_freerts(&ctx->ipv6->kroutes);
 
 	mib[0] = CTL_NET;
 	mib[1] = PF_ROUTE;
@@ -1170,8 +1170,8 @@ if_initrt6(struct interface *ifp)
 	end = buf + needed;
 	for (p = buf; p < end; p += rtm->rtm_msglen) {
 		rtm = (void *)p;
-		if (if_copyrt6(ifp->ctx, &rt, rtm) == 0)
-			ipv6_handlert(ifp->ctx, RTM_ADD, &rt);
+		if (if_copyrt6(ctx, &rt, rtm) == 0)
+			ipv6_handlert(ctx, RTM_ADD, &rt);
 	}
 	free(buf);
 	return 0;

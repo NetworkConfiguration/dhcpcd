@@ -155,7 +155,7 @@ int if_address(const struct interface *,
 int if_addrflags(const struct in_addr *, const struct interface *);
 
 int if_route(unsigned char, const struct rt *rt);
-int if_initrt(struct interface *);
+int if_initrt(struct dhcpcd_ctx *);
 #endif
 
 #ifdef INET6
@@ -176,7 +176,7 @@ int if_addrflags6(const struct in6_addr *, const struct interface *);
 int if_getlifetime6(struct ipv6_addr *);
 
 int if_route6(unsigned char, const struct rt6 *rt);
-int if_initrt6(struct interface *);
+int if_initrt6(struct dhcpcd_ctx *);
 #else
 #define if_checkipv6(a, b, c) (-1)
 #endif

@@ -1099,7 +1099,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 	/* Find any freshly added routes, such as the subnet route.
 	 * We do this because we cannot rely on recieving the kernel
 	 * notification right now via our link socket. */
-	if_initrt6(ifp);
+	if_initrt6(ifp->ctx);
 
 	ipv6_buildroutes(ifp->ctx);
 	if (ipv6nd_scriptrun(rap))

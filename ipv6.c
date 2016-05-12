@@ -1450,7 +1450,7 @@ ipv6_startstatic(struct interface *ifp)
 	ia->prefix_pltime = ND6_INFINITE_LIFETIME;
 	ia->dadcallback = ipv6_staticdadcallback;
 	ipv6_addaddr(ia, NULL);
-	if_initrt6(ifp);
+	if_initrt6(ifp->ctx);
 	ipv6_buildroutes(ifp->ctx);
 	if (run_script)
 		script_runreason(ifp, "STATIC6");
@@ -1473,7 +1473,7 @@ ipv6_start(struct interface *ifp)
 	}
 
 	/* Load existing routes */
-	if_initrt6(ifp);
+	if_initrt6(ifp->ctx);
 	if (!IN6_IS_ADDR_UNSPECIFIED(&ifp->options->req_addr6))
 		ipv6_buildroutes(ifp->ctx);
 	return 0;
@@ -1494,7 +1494,7 @@ ipv6_freedrop(struct interface *ifp, int drop)
 	ipv6_freedrop_addrs(&state->addrs, drop ? 2 : 0, NULL);
 	if (drop) {
 		if (ifp->ctx->ipv6 != NULL) {
-			if_initrt6(ifp);
+			if_initrt6(ifp->ctx);
 			ipv6_buildroutes(ifp->ctx);
 		}
 	} else {

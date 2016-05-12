@@ -1205,7 +1205,7 @@ ipv4_applyaddr(void *arg)
 	/* Find any freshly added routes, such as the subnet route.
 	 * We do this because we cannot rely on recieving the kernel
 	 * notification right now via our link socket. */
-	if_initrt(ifp);
+	if_initrt(ifp->ctx);
 	ipv4_buildroutes(ifp->ctx);
 	/* Announce the address */
 	if (ifo->options & DHCPCD_ARP) {

@@ -202,7 +202,7 @@ test:
 		return;
 	}
 	timespecclear(&state->defend);
-	if_initrt(ifp);
+	if_initrt(ifp->ctx);
 	ipv4_buildroutes(ifp->ctx);
 	arp_announce(astate);
 	script_runreason(ifp, "IPV4LL");
@@ -476,12 +476,11 @@ ipv4ll_handlert(struct dhcpcd_ctx *ctx, __unused int cmd, const struct rt *rt)
 
 	/* If any interface is running IPv4LL, rebuild our routing table. */
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-		if (IPV4LL_STATE_RUNNING(ifp))
+		if (IPV4LL_STATE_RUNNING(ifp)) {
+			if_initrt(ifp->ctx);
+			ipv4_buildroutes(ifp->ctx);
 			break;
-	}
-	if (ifp != NULL) {
-		if_initrt(ifp);
-		ipv4_buildroutes(ctx);
+		}
 	}
 
 	return 0;

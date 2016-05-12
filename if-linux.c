@@ -1474,11 +1474,11 @@ _if_initrt(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 }
 
 int
-if_initrt(struct interface *ifp)
+if_initrt(struct dhcpcd_ctx *ctx)
 {
 	struct nlmr nlm;
 
-	ipv4_freerts(ifp->ctx->ipv4_kroutes);
+	ipv4_freerts(ctx->ipv4_kroutes);
 
 	memset(&nlm, 0, sizeof(nlm));
 	nlm.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
@@ -1487,10 +1487,8 @@ if_initrt(struct interface *ifp)
 	nlm.hdr.nlmsg_flags |= NLM_F_REQUEST;
 	nlm.rt.rtm_family = AF_INET;
 	nlm.rt.rtm_table = RT_TABLE_MAIN;
-	add_attr_32(&nlm.hdr, sizeof(nlm), RTA_OIF, ifp->index);
 
-	return send_netlink(ifp->ctx, ifp,
-	    NETLINK_ROUTE, &nlm.hdr, &_if_initrt);
+	return send_netlink(ctx, NULL, NETLINK_ROUTE, &nlm.hdr, &_if_initrt);
 }
 
 int
@@ -1648,11 +1646,11 @@ _if_initrt6(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 }
 
 int
-if_initrt6(struct interface *ifp)
+if_initrt6(struct dhcpcd_ctx *ctx)
 {
 	struct nlmr nlm;
 
-	ipv6_freerts(&ifp->ctx->ipv6->kroutes);
+	ipv6_freerts(&ctx->ipv6->kroutes);
 
 	memset(&nlm, 0, sizeof(nlm));
 	nlm.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
@@ -1661,10 +1659,8 @@ if_initrt6(struct interface *ifp)
 	nlm.hdr.nlmsg_flags |= NLM_F_REQUEST;
 	nlm.rt.rtm_family = AF_INET6;
 	nlm.rt.rtm_table = RT_TABLE_MAIN;
-	add_attr_32(&nlm.hdr, sizeof(nlm), RTA_OIF, ifp->index);
 
-	return send_netlink(ifp->ctx, ifp,
-	    NETLINK_ROUTE, &nlm.hdr, &_if_initrt6);
+	return send_netlink(ctx, NULL, NETLINK_ROUTE, &nlm.hdr, &_if_initrt6);
 }
 
 int
