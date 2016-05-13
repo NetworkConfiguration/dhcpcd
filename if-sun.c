@@ -265,6 +265,9 @@ if_parsert(struct dhcpcd_ctx *ctx, unsigned int level, unsigned int name,
 	if ((s = open("/dev/arp", O_RDWR)) == -1)
 		return -1;
 
+	/* Assume we are erroring. */
+	retval = -1;
+
 	tor->PRIM_type = T_SVR4_OPTMGMT_REQ;
 	tor->OPT_offset = sizeof (struct T_optmgmt_req);
 	tor->OPT_length = sizeof (struct opthdr);
@@ -277,15 +280,17 @@ if_parsert(struct dhcpcd_ctx *ctx, unsigned int level, unsigned int name,
 
 	ctlbuf.buf = (char *)buf;
 	ctlbuf.len = tor->OPT_length + tor->OPT_offset;
-	if (putmsg(s, &ctlbuf, NULL, 0) == 1) {
-		close(s);
-		return -1;
-	}
+	if (putmsg(s, &ctlbuf, NULL, 0) == 1)
+		goto out;
 
 	req = (struct opthdr *)&toa[1];
 	ctlbuf.maxlen = sizeof(buf);
 
-	retval = -1;
+	/* Create a reasonable buffer to start with */
+	databuf.maxlen = BUFSIZ * 2;
+	if ((databuf.buf = malloc(databuf.maxlen)) == NULL)
+		goto out;
+
 	for (;;) {
 		flags = 0;
 		if ((code = getmsg(s, &ctlbuf, 0, &flags)) == -1)
@@ -295,6 +300,7 @@ if_parsert(struct dhcpcd_ctx *ctx, unsigned int level, unsigned int name,
 		    toa->MGMT_flags == T_SUCCESS &&
 		    (size_t)ctlbuf.len >= sizeof(struct T_optmgmt_ack))
 		{
+			/* End of messages, so return success! */
 			retval = 0;
 			break;
 		}
@@ -311,26 +317,33 @@ if_parsert(struct dhcpcd_ctx *ctx, unsigned int level, unsigned int name,
 			break;
 		}
 
-		databuf.maxlen = req->len;
-		if ((databuf.buf = malloc(databuf.maxlen)) == NULL)
-			break;
+		/* Try to ensure out buffer is big enough
+		 * for future messages as well. */
+		if ((size_t)databuf.maxlen < req->len) {
+			size_t newlen;
+
+			free(databuf.buf);
+			newlen = roundup(req->len, BUFSIZ);
+			if ((databuf.buf = malloc(newlen)) == NULL)
+				break;
+			databuf.maxlen = newlen;
+		}
 
 		flags = 0;
-		if (getmsg(s, NULL, &databuf, &flags) == -1) {
-			free(databuf.buf);
+		if (getmsg(s, NULL, &databuf, &flags) == -1)
 			break;
-		}
 
+		/* We always have to get the data before moving onto
+		 * the next item, so don't move this test higher up
+		 * to avoid the buffer allocation and getmsg calls. */
 		if (req->level == level && req->name == name) {
-			if (walkrt(ctx, databuf.buf, databuf.len) == -1) {
-				free(databuf.buf);
+			if (walkrt(ctx, databuf.buf, req->len) == -1)
 				break;
-			}
 		}
-
-		free(databuf.buf);
 	}
 
+	free(databuf.buf);
+out:
 	close(s);
 	return retval;
 }
@@ -448,8 +461,19 @@ if_walkrt(struct dhcpcd_ctx *ctx, char *data, size_t len)
 		rt.iface = if_find(ctx->ifaces, ifname);
 		if (rt.iface != NULL)
 			ipv4_handlert(ctx, RTM_ADD, &rt, 1);
-		else
-			printf ("XX %s\n", ifname);
+		else {
+			char destbuf[INET6_ADDRSTRLEN];
+			char gatebuf[INET6_ADDRSTRLEN];
+			const char *dest, *gate;
+
+			dest = inet_ntop(AF_INET, &rt.dest,
+			    destbuf, INET6_ADDRSTRLEN);
+			gate = inet_ntop(AF_INET, &rt.gate,
+			    gatebuf, INET6_ADDRSTRLEN);
+			logger(ctx, LOG_ERR,
+			    "no iface (%s) for route to %s via %s",
+			    ifname, dest, gate);
+		}
 	} while (++re < e);
 	return 0;
 }
@@ -540,8 +564,19 @@ if_walkrt6(struct dhcpcd_ctx *ctx, char *data, size_t len)
 		rt.iface = if_find(ctx->ifaces, ifname);
 		if (rt.iface != NULL)
 			ipv6_handlert(ctx, RTM_ADD, &rt);
-		else
-			printf ("XX %s\n", ifname);
+		else {
+			char destbuf[INET6_ADDRSTRLEN];
+			char gatebuf[INET6_ADDRSTRLEN];
+			const char *dest, *gate;
+
+			dest = inet_ntop(AF_INET6, &rt.dest,
+			    destbuf, INET6_ADDRSTRLEN);
+			gate = inet_ntop(AF_INET6, &rt.gate,
+			    gatebuf, INET6_ADDRSTRLEN);
+			logger(ctx, LOG_ERR,
+			    "no iface (%s) for route to %s via %s",
+			    ifname, dest, gate);
+		}
 	} while (++re < e);
 	return 0;
 }
