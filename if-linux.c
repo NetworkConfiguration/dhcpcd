@@ -392,7 +392,7 @@ get_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp, int fd, int flags,
 			r = err_netlink(nlm);
 			if (r == -1)
 				goto eexit;
-			
+
 			if (r == 0 && callback) {
 				r = callback(ctx, ifp, nlm);
 				if (r != 0)
@@ -1019,7 +1019,9 @@ nla_next(struct nlattr *nla, size_t *rem)
 	(nla)->nla_len <= rem)
 #define NLA_DATA(nla) ((char *)(nla) + NLA_HDRLEN)
 #define NLA_FOR_EACH_ATTR(pos, head, len, rem) \
-	for (pos = head, rem = len; NLA_OK(pos, rem); pos = nla_next(pos, &(rem)))
+	for (pos = head, rem = len; \
+	     NLA_OK(pos, rem); \
+	     pos = nla_next(pos, &(rem)))
 
 struct nlmg
 {
