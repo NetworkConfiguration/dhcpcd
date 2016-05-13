@@ -360,7 +360,7 @@ if_findsa(struct dhcpcd_ctx *ctx, const struct sockaddr *sa)
 const char *if_pfname = "Berkley Packet Filter";
 
 void
-if_closeraw(int fd)
+if_closeraw(__unused struct interface *ifp, int fd)
 {
 
 	close(fd);

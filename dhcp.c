@@ -1499,7 +1499,7 @@ dhcp_close(struct interface *ifp)
 
 	if (state->raw_fd != -1) {
 		eloop_event_delete(ifp->ctx->eloop, state->raw_fd);
-		if_closeraw(state->raw_fd);
+		if_closeraw(ifp, state->raw_fd);
 		state->raw_fd = -1;
 	}
 

@@ -143,7 +143,7 @@ int if_openraw(struct interface *, uint16_t);
 ssize_t if_sendraw(const struct interface *, int, uint16_t,
     const void *, size_t);
 ssize_t if_readraw(struct interface *, int, void *, size_t, int *);
-void if_closeraw(int);
+void if_closeraw(struct interface *, int);
 
 int if_address(const struct interface *,
     const struct in_addr *, const struct in_addr *,

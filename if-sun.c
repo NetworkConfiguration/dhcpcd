@@ -352,9 +352,10 @@ out:
 const char *if_pfname = "SunOS";
 
 void
-if_closeraw(int fd)
+if_closeraw(struct interface *ifp, int fd)
 {
 
+	UNUSED(ifp);
 	UNUSED(fd);
 }
 

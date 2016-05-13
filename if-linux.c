@@ -1219,7 +1219,7 @@ struct nlmr
 const char *if_pfname = "Packet Socket";
 
 void
-if_closeraw(int fd)
+if_closeraw(__unused struct interface *ifp, int fd)
 {
 
 	close(fd);

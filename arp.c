@@ -391,7 +391,7 @@ arp_free(struct arp_state *astate)
 		    TAILQ_FIRST(&state->arp_states) == NULL)
 		{
 			eloop_event_delete(ifp->ctx->eloop, state->fd);
-			if_closeraw(state->fd);
+			if_closeraw(ifp, state->fd);
 			free(state);
 			ifp->if_data[IF_DATA_ARP] = NULL;
 		}
