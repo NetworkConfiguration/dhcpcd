@@ -1218,8 +1218,15 @@ struct nlmr
 #ifdef INET
 const char *if_pfname = "Packet Socket";
 
+void
+if_closeraw(int fd)
+{
+
+	close(fd);
+}
+
 int
-if_openrawsocket(struct interface *ifp, uint16_t protocol)
+if_openraw(struct interface *ifp, uint16_t protocol)
 {
 	int s;
 	union sockunion {
@@ -1270,7 +1277,7 @@ eexit:
 }
 
 ssize_t
-if_sendrawpacket(const struct interface *ifp, uint16_t protocol,
+if_sendraw(const struct interface *ifp, int fd, uint16_t protocol,
     const void *data, size_t len)
 {
 	union sockunion {
@@ -1278,7 +1285,6 @@ if_sendrawpacket(const struct interface *ifp, uint16_t protocol,
 		struct sockaddr_ll sll;
 		struct sockaddr_storage ss;
 	} su;
-	int fd;
 
 	memset(&su, 0, sizeof(su));
 	su.sll.sll_family = AF_PACKET;
@@ -1296,13 +1302,12 @@ if_sendrawpacket(const struct interface *ifp, uint16_t protocol,
 		    &ipv4_bcast_addr, sizeof(ipv4_bcast_addr));
 	} else
 		memset(&su.sll.sll_addr, 0xff, ifp->hwlen);
-	fd = ipv4_protocol_fd(ifp, protocol);
 
 	return sendto(fd, data, len, 0, &su.sa, sizeof(su.sll));
 }
 
 ssize_t
-if_readrawpacket(struct interface *ifp, uint16_t protocol,
+if_readraw(__unused struct interface *ifp, int fd,
     void *data, size_t len, int *flags)
 {
 	struct iovec iov = {
@@ -1320,14 +1325,12 @@ if_readrawpacket(struct interface *ifp, uint16_t protocol,
 #endif
 
 	ssize_t bytes;
-	int fd = -1;
 
 #ifdef PACKET_AUXDATA
 	msg.msg_control = cmsgbuf;
 	msg.msg_controllen = sizeof(cmsgbuf);
 #endif
 
-	fd = ipv4_protocol_fd(ifp, protocol);
 	bytes = recvmsg(fd, &msg, 0);
 	if (bytes == -1)
 		return -1;

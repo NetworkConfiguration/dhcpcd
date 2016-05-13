@@ -278,25 +278,6 @@ ipv4_init(struct dhcpcd_ctx *ctx)
 	return 0;
 }
 
-int
-ipv4_protocol_fd(const struct interface *ifp, uint16_t protocol)
-{
-
-	if (protocol == ETHERTYPE_ARP) {
-		const struct iarp_state *istate;
-
-		istate = ARP_CSTATE(ifp);
-		assert(istate != NULL);
-		return istate->fd;
-	} else {
-		const struct dhcp_state *dstate;
-
-		dstate = D_CSTATE(ifp);
-		assert(dstate != NULL);
-		return dstate->raw_fd;
-	}
-}
-
 /* Interface comparer for working out ordering. */
 int
 ipv4_ifcmp(const struct interface *si, const struct interface *ti)

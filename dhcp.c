@@ -1499,7 +1499,7 @@ dhcp_close(struct interface *ifp)
 
 	if (state->raw_fd != -1) {
 		eloop_event_delete(ifp->ctx->eloop, state->raw_fd);
-		close(state->raw_fd);
+		if_closeraw(state->raw_fd);
 		state->raw_fd = -1;
 	}
 
@@ -1727,12 +1727,12 @@ send_message(struct interface *ifp, uint8_t type,
 		size_t ulen;
 
 		r = 0;
-		udp = dhcp_makeudppacket(&ulen, (uint8_t *)bootp, len, from, to);
+		udp = dhcp_makeudppacket(&ulen, (uint8_t *)bootp, len, from,to);
 		if (udp == NULL) {
 			logger(ifp->ctx, LOG_ERR, "dhcp_makeudppacket: %m");
 		} else {
-			r = if_sendrawpacket(ifp, ETHERTYPE_IP,
-			    (uint8_t *)udp, ulen);
+			r = if_sendraw(ifp, state->raw_fd,
+			    ETHERTYPE_IP, (uint8_t *)udp, ulen);
 			free(udp);
 		}
 		/* If we failed to send a raw packet this normally means
@@ -1742,7 +1742,7 @@ send_message(struct interface *ifp, uint8_t type,
 		 * stopping the interface. */
 		if (r == -1) {
 			logger(ifp->ctx, LOG_ERR,
-			    "%s: if_sendrawpacket: %m", ifp->name);
+			    "%s: if_sendraw: %m", ifp->name);
 			switch(errno) {
 			case ENETDOWN:
 			case ENETRESET:
@@ -3101,7 +3101,7 @@ dhcp_handlepacket(void *arg)
 	flags = 0;
 	bootp = NULL;
 	while (!(flags & RAW_EOF)) {
-		bytes = (size_t)if_readrawpacket(ifp, ETHERTYPE_IP,
+		bytes = (size_t)if_readraw(ifp, state->raw_fd,
 		    buf, sizeof(buf), &flags);
 		if ((ssize_t)bytes == -1) {
 			logger(ifp->ctx, LOG_ERR,
@@ -3190,7 +3190,7 @@ dhcp_open(struct interface *ifp)
 
 	state = D_STATE(ifp);
 	if (state->raw_fd == -1) {
-		state->raw_fd = if_openrawsocket(ifp, ETHERTYPE_IP);
+		state->raw_fd = if_openraw(ifp, ETHERTYPE_IP);
 		if (state->raw_fd == -1) {
 			if (errno == ENOENT) {
 				logger(ifp->ctx, LOG_ERR,

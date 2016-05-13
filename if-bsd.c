@@ -359,8 +359,15 @@ if_findsa(struct dhcpcd_ctx *ctx, const struct sockaddr *sa)
 #ifdef INET
 const char *if_pfname = "Berkley Packet Filter";
 
+void
+if_closeraw(int fd)
+{
+
+	close(fd);
+}
+
 int
-if_openrawsocket(struct interface *ifp, uint16_t protocol)
+if_openraw(struct interface *ifp, uint16_t protocol)
 {
 	struct ipv4_state *state;
 	int fd = -1;
@@ -462,12 +469,11 @@ eexit:
 }
 
 ssize_t
-if_sendrawpacket(const struct interface *ifp, uint16_t protocol,
+if_sendraw(__unused const struct interface *ifp, int fd, uint16_t protocol,
     const void *data, size_t len)
 {
 	struct iovec iov[2];
 	struct ether_header hw;
-	int fd;
 
 	memset(&hw, 0, ETHER_HDR_LEN);
 	memset(&hw.ether_dhost, 0xff, ETHER_ADDR_LEN);
@@ -476,25 +482,20 @@ if_sendrawpacket(const struct interface *ifp, uint16_t protocol,
 	iov[0].iov_len = ETHER_HDR_LEN;
 	iov[1].iov_base = UNCONST(data);
 	iov[1].iov_len = len;
-	fd = ipv4_protocol_fd(ifp, protocol);
 	return writev(fd, iov, 2);
 }
 
 /* BPF requires that we read the entire buffer.
  * So we pass the buffer in the API so we can loop on >1 packet. */
 ssize_t
-if_readrawpacket(struct interface *ifp, uint16_t protocol,
-    void *data, size_t len, int *flags)
+if_readraw(struct interface *ifp, int fd, void *data, size_t len, int *flags)
 {
-	int fd;
 	struct bpf_hdr packet;
 	ssize_t bytes;
 	const unsigned char *payload;
 	struct ipv4_state *state;
 
 	state = IPV4_STATE(ifp);
-	fd = ipv4_protocol_fd(ifp, protocol);
-
 	*flags = 0;
 	for (;;) {
 		if (state->buffer_len == 0) {

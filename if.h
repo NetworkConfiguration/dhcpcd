@@ -139,10 +139,11 @@ int if_managelink(struct dhcpcd_ctx *);
 
 #ifdef INET
 extern const char *if_pfname;
-int if_openrawsocket(struct interface *, uint16_t);
-ssize_t if_sendrawpacket(const struct interface *,
-    uint16_t, const void *, size_t);
-ssize_t if_readrawpacket(struct interface *, uint16_t, void *, size_t, int *);
+int if_openraw(struct interface *, uint16_t);
+ssize_t if_sendraw(const struct interface *, int, uint16_t,
+    const void *, size_t);
+ssize_t if_readraw(struct interface *, int, void *, size_t, int *);
+void if_closeraw(int);
 
 int if_address(const struct interface *,
     const struct in_addr *, const struct in_addr *,

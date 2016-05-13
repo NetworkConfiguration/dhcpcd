@@ -351,8 +351,15 @@ out:
 #ifdef INET
 const char *if_pfname = "SunOS";
 
+void
+if_closeraw(int fd)
+{
+
+	UNUSED(fd);
+}
+
 int
-if_openrawsocket(struct interface *ifp, uint16_t protocol)
+if_openraw(struct interface *ifp, uint16_t protocol)
 {
 
 	UNUSED(ifp);
@@ -362,11 +369,12 @@ if_openrawsocket(struct interface *ifp, uint16_t protocol)
 }
 
 ssize_t
-if_sendrawpacket(const struct interface *ifp, uint16_t protocol,
+if_sendraw(const struct interface *ifp, int fd, uint16_t protocol,
     const void *data, size_t len)
 {
 
 	UNUSED(ifp);
+	UNUSED(fd);
 	UNUSED(protocol);
 	UNUSED(data);
 	UNUSED(len);
@@ -375,12 +383,12 @@ if_sendrawpacket(const struct interface *ifp, uint16_t protocol,
 }
 
 ssize_t
-if_readrawpacket(struct interface *ifp, uint16_t protocol,
+if_readraw(struct interface *ifp, int fd,
     void *data, size_t len, int *flags)
 {
 
 	UNUSED(ifp);
-	UNUSED(protocol);
+	UNUSED(fd);
 	UNUSED(data);
 	UNUSED(len);
 	UNUSED(flags);

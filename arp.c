@@ -62,6 +62,7 @@ arp_request(const struct interface *ifp, in_addr_t sip, in_addr_t tip)
 	struct arphdr ar;
 	size_t len;
 	uint8_t *p;
+	const struct iarp_state *state;
 
 	ar.ar_hrd = htons(ifp->family);
 	ar.ar_pro = htons(ETHERTYPE_IP);
@@ -88,7 +89,9 @@ arp_request(const struct interface *ifp, in_addr_t sip, in_addr_t tip)
 	APPEND(&sip, sizeof(sip));
 	ZERO(ifp->hwlen);
 	APPEND(&tip, sizeof(tip));
-	return if_sendrawpacket(ifp, ETHERTYPE_ARP, arp_buffer, len);
+
+	state = ARP_CSTATE(ifp);
+	return if_sendraw(ifp, state->fd, ETHERTYPE_ARP, arp_buffer, len);
 
 eexit:
 	errno = ENOBUFS;
@@ -132,7 +135,7 @@ arp_packet(void *arg)
 	state = ARP_STATE(ifp);
 	flags = 0;
 	while (!(flags & RAW_EOF)) {
-		bytes = if_readrawpacket(ifp, ETHERTYPE_ARP,
+		bytes = if_readraw(ifp, state->fd,
 		    arp_buffer, sizeof(arp_buffer), &flags);
 		if (bytes == -1) {
 			logger(ifp->ctx, LOG_ERR,
@@ -200,7 +203,7 @@ arp_open(struct interface *ifp)
 
 	state = ARP_STATE(ifp);
 	if (state->fd == -1) {
-		state->fd = if_openrawsocket(ifp, ETHERTYPE_ARP);
+		state->fd = if_openraw(ifp, ETHERTYPE_ARP);
 		if (state->fd == -1) {
 			logger(ifp->ctx, LOG_ERR, "%s: %s: %m",
 			    __func__, ifp->name);
@@ -388,7 +391,7 @@ arp_free(struct arp_state *astate)
 		    TAILQ_FIRST(&state->arp_states) == NULL)
 		{
 			eloop_event_delete(ifp->ctx->eloop, state->fd);
-			close(state->fd);
+			if_closeraw(state->fd);
 			free(state);
 			ifp->if_data[IF_DATA_ARP] = NULL;
 		}
