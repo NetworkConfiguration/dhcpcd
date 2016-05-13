@@ -211,14 +211,13 @@ static void if_learnaddrs(struct dhcpcd_ctx *ctx, struct if_head *ifs,
 			addr = (void *)ifa->ifa_addr;
 			net = (void *)ifa->ifa_netmask;
 			if (ifa->ifa_flags & IFF_POINTOPOINT)
-				brd = (const struct sockaddr_in *)
-				    (void *)ifa->ifa_dstaddr;
+				brd = (void *)ifa->ifa_dstaddr;
 			else
 				brd = (void *)ifa->ifa_broadaddr;
 			ifa_flags = if_addrflags(&addr->sin_addr, ifp);
 			ipv4_handleifa(ctx, RTM_NEWADDR, ifs, ifa->ifa_name,
-				&addr->sin_addr, &net->sin_addr, &brd->sin_addr,
-				ifa_flags);
+				&addr->sin_addr, &net->sin_addr,
+				brd ? &brd->sin_addr : NULL, ifa_flags);
 			break;
 #endif
 #ifdef INET6

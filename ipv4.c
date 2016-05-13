@@ -1259,7 +1259,10 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 			TAILQ_INSERT_TAIL(&state->addrs, ap, next);
 		}
 		ap->net = *net;
-		ap->brd = *brd;
+		if (brd != NULL)
+			ap->brd = *brd;
+		else
+			ap->brd.s_addr = INADDR_ANY;
 		ap->addr_flags = flags;
 	} else if (cmd == RTM_DELADDR) {
 		if (ap) {
