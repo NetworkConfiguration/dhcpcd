@@ -149,14 +149,12 @@ if_newaddr(const char *ifname, void *arg)
 
 	if ((ifa = calloc(1, sizeof(*ifa))) == NULL)
 		goto failed;
-	if ((ifa->ifa_addr = calloc(1, sizeof(struct sockaddr_dl))) == NULL)
-		goto failed;
-
 	if ((ifa->ifa_name = strdup(ifname)) == NULL)
 		goto failed;
+	if ((sdl = calloc(1, sizeof(*sdl))) == NULL)
+		goto failed;
 
-	sdl = (struct sockaddr_dl *)ifa->ifa_addr;
-
+	ifa->ifa_addr = (struct sockaddr *)sdl;
 	sdl->sdl_family = AF_LINK;
 	switch (dlinfo.di_mactype) {
 	case DL_ETHER:
@@ -190,12 +188,43 @@ failed1:
 	return (B_TRUE);
 }
 
+/* Creates an empty sockaddr_dl for lo0. */
+static struct ifaddrs *
+if_ifa_lo0(void)
+{
+	struct ifaddrs *ifa;
+	struct sockaddr_dl *sdl;
+
+	if ((ifa = calloc(1, sizeof(*ifa))) == NULL)
+		return NULL;
+	if ((sdl = calloc(1, sizeof(*sdl))) == NULL) {
+		free(ifa);
+		return NULL;
+	}
+	if ((ifa->ifa_name = strdup("lo0")) == NULL) {
+		free(ifa);
+		free(sdl);
+		return NULL;
+	}
+
+	ifa->ifa_addr = (struct sockaddr *)sdl;
+	ifa->ifa_flags = IFF_LOOPBACK;
+	sdl->sdl_family = AF_LINK;
+
+	return ifa;
+}
+
 /* all getifaddrs(3) should support AF_LINK, but hey ho */
 int
 if_getifaddrs(struct ifaddrs **ifap)
 {
-	struct linkwalk		lw = { NULL, 0 };
+	struct linkwalk		lw;
 
+	/* lo0 doesn't appear in dlpi_walk, so fudge it. */
+	if ((lw.lw_ifa = if_ifa_lo0()) == NULL)
+		return -1;
+
+	lw.lw_error = 0;
 	dlpi_walk(if_newaddr, &lw, 0);
 	if (lw.lw_error != 0) {
 		freeifaddrs(lw.lw_ifa);
