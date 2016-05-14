@@ -3100,69 +3100,57 @@ dhcp_handlepacket(void *arg)
 	/* Need this API due to BPF */
 	flags = 0;
 	bootp = NULL;
-	while (!(flags & RAW_EOF)) {
-		bytes = (size_t)if_readraw(ifp, state->raw_fd,
-		    buf, sizeof(buf), &flags);
-		if ((ssize_t)bytes == -1) {
-			logger(ifp->ctx, LOG_ERR,
-			    "%s: dhcp if_readrawpacket: %m", ifp->name);
-			dhcp_close(ifp);
-			arp_close(ifp);
-			break;
-		}
-		if (valid_udp_packet(buf, bytes,
-		    &from, flags & RAW_PARTIALCSUM) == -1)
-		{
-			logger(ifp->ctx, LOG_ERR,
-			    "%s: invalid UDP packet from %s",
-			    ifp->name, inet_ntoa(from));
-			continue;
-		}
-		i = whitelisted_ip(ifp->options, from.s_addr);
-		if (i == 0) {
-			logger(ifp->ctx, LOG_WARNING,
-			    "%s: non whitelisted DHCP packet from %s",
-			    ifp->name, inet_ntoa(from));
-			continue;
-		} else if (i != 1 &&
-		    blacklisted_ip(ifp->options, from.s_addr) == 1)
-		{
-			logger(ifp->ctx, LOG_WARNING,
-			    "%s: blacklisted DHCP packet from %s",
-			    ifp->name, inet_ntoa(from));
-			continue;
-		}
-		if (ifp->flags & IFF_POINTOPOINT &&
-		    state->brd.s_addr != from.s_addr)
-		{
-			logger(ifp->ctx, LOG_WARNING,
-			    "%s: server %s is not destination",
-			    ifp->name, inet_ntoa(from));
-		}
-		/*
-		 * DHCP has a variable option area rather than a fixed
-		 * vendor area.
-		 * Because DHCP uses the BOOTP protocol it should
-		 * still send BOOTP sized packets to be RFC compliant.
-		 * However some servers send a truncated vendor area.
-		 * dhcpcd can work fine without the vendor area being sent.
-		 */
-		bytes = get_udp_data(&bootp, buf);
-		if (bytes < offsetof(struct bootp, vend)) {
-			logger(ifp->ctx, LOG_ERR,
-			    "%s: truncated packet (%zu) from %s",
-			    ifp->name, bytes, inet_ntoa(from));
-			continue;
-		}
-		/* But to make our IS_DHCP macro easy, ensure the vendor
-		 * area has at least 4 octets. */
-		while (bytes < offsetof(struct bootp, vend) + 4)
-			bootp[bytes++] = '\0';
-
-		dhcp_handledhcp(ifp, (struct bootp *)bootp, bytes, &from);
-		if (state->raw_fd == -1)
-			break;
+	bytes = (size_t)if_readraw(ifp, state->raw_fd,buf, sizeof(buf), &flags);
+	if ((ssize_t)bytes == -1) {
+		logger(ifp->ctx, LOG_ERR,
+		    "%s: dhcp if_readrawpacket: %m", ifp->name);
+		dhcp_close(ifp);
+		arp_close(ifp);
+		return;
 	}
+	if (valid_udp_packet(buf, bytes, &from, flags & RAW_PARTIALCSUM) == -1)
+	{
+		logger(ifp->ctx, LOG_ERR, "%s: invalid UDP packet from %s",
+		    ifp->name, inet_ntoa(from));
+		return;
+	}
+	i = whitelisted_ip(ifp->options, from.s_addr);
+	if (i == 0) {
+		logger(ifp->ctx, LOG_WARNING,
+		    "%s: non whitelisted DHCP packet from %s",
+		    ifp->name, inet_ntoa(from));
+		return;
+	} else if (i != 1 && blacklisted_ip(ifp->options, from.s_addr) == 1) {
+		logger(ifp->ctx, LOG_WARNING,
+		    "%s: blacklisted DHCP packet from %s",
+		    ifp->name, inet_ntoa(from));
+		return;
+	}
+	if (ifp->flags & IFF_POINTOPOINT && state->brd.s_addr != from.s_addr) {
+		logger(ifp->ctx, LOG_WARNING,
+		    "%s: server %s is not destination",
+		    ifp->name, inet_ntoa(from));
+	}
+	/*
+	 * DHCP has a variable option area rather than a fixed vendor area.
+	 * Because DHCP uses the BOOTP protocol it should still send BOOTP
+	 * sized packets to be RFC compliant.
+	 * However some servers send a truncated vendor area.
+	 * dhcpcd can work fine without the vendor area being sent.
+	 */
+	bytes = get_udp_data(&bootp, buf);
+	if (bytes < offsetof(struct bootp, vend)) {
+		logger(ifp->ctx, LOG_ERR,
+		    "%s: truncated packet (%zu) from %s",
+		    ifp->name, bytes, inet_ntoa(from));
+		return;
+	}
+	/* But to make our IS_DHCP macro easy, ensure the vendor
+	 * area has at least 4 octets. */
+	while (bytes < offsetof(struct bootp, vend) + 4)
+		bootp[bytes++] = '\0';
+
+	dhcp_handledhcp(ifp, (struct bootp *)bootp, bytes, &from);
 }
 
 static void

@@ -123,7 +123,7 @@ arp_packet(void *arg)
 {
 	struct interface *ifp = arg;
 	const struct interface *ifn;
-	uint8_t arp_buffer[ARP_LEN];
+	uint8_t buf[ARP_LEN];
 	struct arphdr ar;
 	struct arp_msg arm;
 	ssize_t bytes;
@@ -134,65 +134,62 @@ arp_packet(void *arg)
 
 	state = ARP_STATE(ifp);
 	flags = 0;
-	while (!(flags & RAW_EOF)) {
-		bytes = if_readraw(ifp, state->fd,
-		    arp_buffer, sizeof(arp_buffer), &flags);
-		if (bytes == -1) {
-			logger(ifp->ctx, LOG_ERR,
-			    "%s: arp if_readrawpacket: %m", ifp->name);
-			arp_close(ifp);
-			return;
-		}
-		/* We must have a full ARP header */
-		if ((size_t)bytes < sizeof(ar))
-			continue;
-		memcpy(&ar, arp_buffer, sizeof(ar));
-		/* Families must match */
-		if (ar.ar_hrd != htons(ifp->family))
-			continue;
+	bytes = if_readraw(ifp, state->fd, buf, sizeof(buf), &flags);
+	if (bytes == -1) {
+		logger(ifp->ctx, LOG_ERR,
+		    "%s: arp if_readrawpacket: %m", ifp->name);
+		arp_close(ifp);
+		return;
+	}
+	/* We must have a full ARP header */
+	if ((size_t)bytes < sizeof(ar))
+		return;
+	memcpy(&ar, buf, sizeof(ar));
+	/* Families must match */
+	if (ar.ar_hrd != htons(ifp->family))
+		return;
 #if 0
-		/* These checks are enforced in the BPF filter. */
-		/* Protocol must be IP. */
-		if (ar.ar_pro != htons(ETHERTYPE_IP))
-			continue;
-		/* Only these types are recognised */
-		if (ar.ar_op != htons(ARPOP_REPLY) &&
-		    ar.ar_op != htons(ARPOP_REQUEST))
-			continue;
+	/* These checks are enforced in the BPF filter. */
+	/* Protocol must be IP. */
+	if (ar.ar_pro != htons(ETHERTYPE_IP))
+		continue;
+	/* Only these types are recognised */
+	if (ar.ar_op != htons(ARPOP_REPLY) &&
+	    ar.ar_op != htons(ARPOP_REQUEST))
+		continue;
 #endif
-		if (ar.ar_pln != sizeof(arm.sip.s_addr))
-			continue;
+	if (ar.ar_pln != sizeof(arm.sip.s_addr))
+		return;
 
-		/* Get pointers to the hardware addreses */
-		hw_s = arp_buffer + sizeof(ar);
-		hw_t = hw_s + ar.ar_hln + ar.ar_pln;
-		/* Ensure we got all the data */
-		if ((hw_t + ar.ar_hln + ar.ar_pln) - arp_buffer > bytes)
-			continue;
-		/* Ignore messages from ourself */
-		TAILQ_FOREACH(ifn, ifp->ctx->ifaces, next) {
-			if (ar.ar_hln == ifn->hwlen &&
-			    memcmp(hw_s, ifn->hwaddr, ifn->hwlen) == 0)
-				break;
-		}
-		if (ifn) {
+	/* Get pointers to the hardware addreses */
+	hw_s = buf + sizeof(ar);
+	hw_t = hw_s + ar.ar_hln + ar.ar_pln;
+	/* Ensure we got all the data */
+	if ((hw_t + ar.ar_hln + ar.ar_pln) - buf > bytes)
+		return;
+	/* Ignore messages from ourself */
+	TAILQ_FOREACH(ifn, ifp->ctx->ifaces, next) {
+		if (ar.ar_hln == ifn->hwlen &&
+		    memcmp(hw_s, ifn->hwaddr, ifn->hwlen) == 0)
+			break;
+	}
+	if (ifn) {
 #if 0
-			logger(ifp->ctx, LOG_DEBUG,
-			    "%s: ignoring ARP from self", ifp->name);
+		logger(ifp->ctx, LOG_DEBUG,
+		    "%s: ignoring ARP from self", ifp->name);
 #endif
-			continue;
-		}
-		/* Copy out the HW and IP addresses */
-		memcpy(&arm.sha, hw_s, ar.ar_hln);
-		memcpy(&arm.sip.s_addr, hw_s + ar.ar_hln, ar.ar_pln);
-		memcpy(&arm.tha, hw_t, ar.ar_hln);
-		memcpy(&arm.tip.s_addr, hw_t + ar.ar_hln, ar.ar_pln);
+		return;
+	}
+	/* Copy out the HW and IP addresses */
+	memcpy(&arm.sha, hw_s, ar.ar_hln);
+	memcpy(&arm.sip.s_addr, hw_s + ar.ar_hln, ar.ar_pln);
+	memcpy(&arm.tha, hw_t, ar.ar_hln);
+	memcpy(&arm.tip.s_addr, hw_t + ar.ar_hln, ar.ar_pln);
 
-		/* Run the conflicts */
-		TAILQ_FOREACH_SAFE(astate, &state->arp_states, next, astaten) {
-			if (astate->conflicted_cb)
-				astate->conflicted_cb(astate, &arm);
-		}
+	/* Run the conflicts */
+	TAILQ_FOREACH_SAFE(astate, &state->arp_states, next, astaten) {
+		if (astate->conflicted_cb)
+			astate->conflicted_cb(astate, &arm);
 	}
 }
 

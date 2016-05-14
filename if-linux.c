@@ -1334,7 +1334,7 @@ if_readraw(__unused struct interface *ifp, int fd,
 	bytes = recvmsg(fd, &msg, 0);
 	if (bytes == -1)
 		return -1;
-	*flags = RAW_EOF; /* We only ever read one packet */
+	*flags = 0;
 	if (bytes) {
 #ifdef PACKET_AUXDATA
 		for (cmsg = CMSG_FIRSTHDR(&msg);

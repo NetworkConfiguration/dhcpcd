@@ -522,10 +522,8 @@ if_readraw(struct interface *ifp, int fd, void *data, size_t len, int *flags)
 next:
 		state->buffer_pos += BPF_WORDALIGN(packet.bh_hdrlen +
 		    packet.bh_caplen);
-		if (state->buffer_pos >= state->buffer_len) {
+		if (state->buffer_pos >= state->buffer_len)
 			state->buffer_len = state->buffer_pos = 0;
-			*flags |= RAW_EOF;
-		}
 		if (bytes != -1)
 			return bytes;
 	}

@@ -80,8 +80,7 @@
 	    ((addr & IN_CLASSB_NET) == 0xc0a80000))
 #endif
 
-#define RAW_EOF			1 << 0
-#define RAW_PARTIALCSUM		2 << 0
+#define RAW_PARTIALCSUM		1 << 0
 
 #ifdef __sun
 /* platform does not supply AF_LINK with getifaddrs. */
