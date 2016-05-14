@@ -61,10 +61,6 @@
 #include "compat/bitops.h"
 #endif
 
-#ifndef __UNCONST
-#define __UNCONST(a) ((void *)(unsigned long)(const void *)(a))
-#endif
-
 /* DHCPCD Project has been assigned an IANA PEN of 40712 */
 #define DHCPCD_IANA_PEN 40712
 
@@ -317,7 +313,7 @@ dhcp6_updateelapsed(struct interface *ifp, struct dhcp6_message *m, size_t len)
 	if (co == NULL)
 		return -1;
 
-	o = __UNCONST(co);
+	o = UNCONST(co);
 	state = D6_STATE(ifp);
 	clock_gettime(CLOCK_MONOTONIC, &tv);
 	if (state->RTC == 0) {
@@ -951,7 +947,7 @@ dhcp6_update_auth(struct interface *ifp, struct dhcp6_message *m, size_t len)
 	if (co == NULL)
 		return -1;
 
-	o = __UNCONST(co);
+	o = UNCONST(co);
 	state = D6_STATE(ifp);
 
 	return dhcp_auth_encode(&ifp->options->auth, state->auth.token,
