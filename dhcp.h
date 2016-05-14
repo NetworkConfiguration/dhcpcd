@@ -39,26 +39,26 @@
 #include "dhcp-common.h"
 
 /* UDP port numbers for DHCP */
-#define DHCP_SERVER_PORT    67
-#define DHCP_CLIENT_PORT    68
+#define BOOTPS			67
+#define BOOTPC			68
 
-#define MAGIC_COOKIE        0x63825363
-#define BROADCAST_FLAG      0x8000
+#define MAGIC_COOKIE		0x63825363
+#define BROADCAST_FLAG		0x8000
 
 /* DHCP message OP code */
-#define DHCP_BOOTREQUEST    1
-#define DHCP_BOOTREPLY      2
+#define DHCP_BOOTREQUEST	1
+#define DHCP_BOOTREPLY		2
 
 /* DHCP message type */
-#define DHCP_DISCOVER       1
-#define DHCP_OFFER          2
-#define DHCP_REQUEST        3
-#define DHCP_DECLINE        4
-#define DHCP_ACK            5
-#define DHCP_NAK            6
-#define DHCP_RELEASE        7
-#define DHCP_INFORM         8
-#define DHCP_FORCERENEW     9
+#define DHCP_DISCOVER		1
+#define DHCP_OFFER		2
+#define DHCP_REQUEST		3
+#define DHCP_DECLINE		4
+#define DHCP_ACK		5
+#define DHCP_NAK		6
+#define DHCP_RELEASE		7
+#define DHCP_INFORM		8
+#define DHCP_FORCERENEW		9
 
 /* Constants taken from RFC 2131. */
 #define T1			0.5

@@ -1244,14 +1244,14 @@ if_openraw(struct interface *ifp, uint16_t protocol)
 		return -1;
 #undef SF
 
-	/* Install the DHCP filter */
+	/* Install the filter. */
 	memset(&pf, 0, sizeof(pf));
 	if (protocol == ETHERTYPE_ARP) {
 		pf.filter = UNCONST(arp_bpf_filter);
 		pf.len = arp_bpf_filter_len;
 	} else {
-		pf.filter = UNCONST(dhcp_bpf_filter);
-		pf.len = dhcp_bpf_filter_len;
+		pf.filter = UNCONST(bootp_bpf_filter);
+		pf.len = bootp_bpf_filter_len;
 	}
 	if (setsockopt(s, SOL_SOCKET, SO_ATTACH_FILTER, &pf, sizeof(pf)) != 0)
 		goto eexit;

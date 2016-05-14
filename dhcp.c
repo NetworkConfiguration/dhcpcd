@@ -1539,7 +1539,7 @@ dhcp_openudp(struct interface *ifp)
 #endif
 	memset(&sin, 0, sizeof(sin));
 	sin.sin_family = AF_INET;
-	sin.sin_port = htons(DHCP_CLIENT_PORT);
+	sin.sin_port = htons(BOOTPC);
 	if (ifp) {
 		state = D_STATE(ifp);
 		sin.sin_addr.s_addr = state->addr.s_addr;
@@ -1607,8 +1607,8 @@ dhcp_makeudppacket(size_t *sz, const uint8_t *data, size_t length,
 	else
 		ip->ip_dst.s_addr = dest.s_addr;
 
-	udp->uh_sport = htons(DHCP_CLIENT_PORT);
-	udp->uh_dport = htons(DHCP_SERVER_PORT);
+	udp->uh_sport = htons(BOOTPC);
+	udp->uh_dport = htons(BOOTPS);
 	udp->uh_ulen = htons((uint16_t)(sizeof(*udp) + length));
 	ip->ip_len = udp->uh_ulen;
 	udp->uh_sum = checksum(udpp, sizeof(*ip) +  sizeof(*udp) + length);
@@ -1717,7 +1717,7 @@ send_message(struct interface *ifp, uint8_t type,
 		memset(&sin, 0, sizeof(sin));
 		sin.sin_family = AF_INET;
 		sin.sin_addr.s_addr = to.s_addr;
-		sin.sin_port = htons(DHCP_SERVER_PORT);
+		sin.sin_port = htons(BOOTPS);
 		r = sendto(s, (uint8_t *)bootp, len, 0,
 		    (struct sockaddr *)&sin, sizeof(sin));
 		if (r == -1)

@@ -447,14 +447,14 @@ if_openraw(struct interface *ifp, uint16_t protocol)
 		goto eexit;
 #endif
 
-	/* Install the DHCP filter */
+	/* Install the filter. */
 	memset(&pf, 0, sizeof(pf));
 	if (protocol == ETHERTYPE_ARP) {
 		pf.bf_insns = UNCONST(arp_bpf_filter);
 		pf.bf_len = arp_bpf_filter_len;
 	} else {
-		pf.bf_insns = UNCONST(dhcp_bpf_filter);
-		pf.bf_len = dhcp_bpf_filter_len;
+		pf.bf_insns = UNCONST(bootp_bpf_filter);
+		pf.bf_len = bootp_bpf_filter_len;
 	}
 	if (ioctl(fd, BIOCSETF, &pf) == -1)
 		goto eexit;
