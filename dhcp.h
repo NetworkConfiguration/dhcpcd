@@ -38,16 +38,16 @@
 #include "auth.h"
 #include "dhcp-common.h"
 
-/* UDP port numbers for DHCP */
+/* UDP port numbers for BOOTP */
 #define BOOTPS			67
 #define BOOTPC			68
 
 #define MAGIC_COOKIE		0x63825363
 #define BROADCAST_FLAG		0x8000
 
-/* DHCP message OP code */
-#define DHCP_BOOTREQUEST	1
-#define DHCP_BOOTREPLY		2
+/* BOOTP message OP code */
+#define BOOTREQUEST		1
+#define BOOTREPLY		2
 
 /* DHCP message type */
 #define DHCP_DISCOVER		1

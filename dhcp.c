@@ -771,7 +771,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 			bootp->ciaddr = state->addr.s_addr;
 	}
 
-	bootp->op = DHCP_BOOTREQUEST;
+	bootp->op = BOOTREQUEST;
 	bootp->htype = (uint8_t)ifp->family;
 	switch (ifp->family) {
 	case ARPHRD_ETHER:
