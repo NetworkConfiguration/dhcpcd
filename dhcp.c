@@ -2669,6 +2669,12 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 #define LOGDHCP(l, m) \
 	log_dhcp((l), (m), ifp, bootp, bootp_len, from, 1)
 
+	if (bootp->op != BOOTREPLY) {
+		logger(ifp->ctx, LOG_DEBUG, "%s: op (%d) is not BOOTREPLY",
+		    ifp->name, bootp->op);
+		return;
+	}
+
 	/* Ensure packet is for us */
 	if (ifp->hwlen <= sizeof(bootp->chaddr) &&
 	    memcmp(bootp->chaddr, ifp->hwaddr, ifp->hwlen))
