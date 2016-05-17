@@ -188,7 +188,7 @@ struct ipv6_addr {
 struct rt6 {
 	TAILQ_ENTRY(rt6) next;
 	struct in6_addr dest;
-	struct in6_addr net;
+	struct in6_addr mask;
 	struct in6_addr gate;
 	const struct interface *iface;
 	unsigned int flags;

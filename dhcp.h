@@ -171,7 +171,7 @@ struct bootp {
 
 struct dhcp_lease {
 	struct in_addr addr;
-	struct in_addr net;
+	struct in_addr mask;
 	struct in_addr brd;
 	uint32_t leasetime;
 	uint32_t renewaltime;
@@ -214,7 +214,7 @@ struct dhcp_state {
 
 	int raw_fd;
 	struct in_addr addr;
-	struct in_addr net;
+	struct in_addr mask;
 	struct in_addr brd;
 	uint8_t added;
 

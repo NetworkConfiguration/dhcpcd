@@ -475,7 +475,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 		rta = RTA_NEXT(rta, len);
 	}
 
-	inet_cidrtoaddr(rtm->rtm_dst_len, &rt->net);
+	inet_cidrtoaddr(rtm->rtm_dst_len, &rt->mask);
 	if (rt->iface == NULL && rt->src.s_addr != INADDR_ANY) {
 		struct ipv4_addr *ap;
 
@@ -517,7 +517,7 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct nlmsghdr *nlm)
 		rt->flags = RTF_REJECT;
 	if (rtm->rtm_scope == RT_SCOPE_HOST)
 		rt->flags |= RTF_HOST;
-	ipv6_mask(&rt->net, rtm->rtm_dst_len);
+	ipv6_mask(&rt->mask, rtm->rtm_dst_len);
 
 	rta = (struct rtattr *)RTM_RTA(rtm);
 	len = RTM_PAYLOAD(nlm);
@@ -1425,14 +1425,14 @@ if_route(unsigned char cmd, const struct rt *rt)
 			nlm.rt.rtm_scope = RT_SCOPE_HOST;
 		else if (rt->gate.s_addr == INADDR_ANY ||
 		    (rt->gate.s_addr == rt->dest.s_addr &&
-			rt->net.s_addr == INADDR_BROADCAST))
+			rt->mask.s_addr == INADDR_BROADCAST))
 			nlm.rt.rtm_scope = RT_SCOPE_LINK;
 		else
 			nlm.rt.rtm_scope = RT_SCOPE_UNIVERSE;
 		nlm.rt.rtm_type = RTN_UNICAST;
 	}
 
-	nlm.rt.rtm_dst_len = inet_ntocidr(rt->net);
+	nlm.rt.rtm_dst_len = inet_ntocidr(rt->mask);
 	add_attr_l(&nlm.hdr, sizeof(nlm), RTA_DST,
 	    &rt->dest.s_addr, sizeof(rt->dest.s_addr));
 	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
@@ -1612,7 +1612,7 @@ if_route6(unsigned char cmd, const struct rt6 *rt)
 			nlm.rt.rtm_type = RTN_UNICAST;
 	}
 
-	nlm.rt.rtm_dst_len = ipv6_prefixlen(&rt->net);
+	nlm.rt.rtm_dst_len = ipv6_prefixlen(&rt->mask);
 	add_attr_l(&nlm.hdr, sizeof(nlm), RTA_DST,
 	    &rt->dest.s6_addr, sizeof(rt->dest.s6_addr));
 

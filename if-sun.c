@@ -547,13 +547,13 @@ if_readraw(struct interface *ifp, int fd,
 
 int
 if_address(const struct interface *ifp, const struct in_addr *addr,
-    const struct in_addr *net, const struct in_addr *bcast,
+    const struct in_addr *mask, const struct in_addr *bcast,
     int action)
 {
 
 	UNUSED(ifp);
 	UNUSED(addr);
-	UNUSED(net);
+	UNUSED(mask);
 	UNUSED(bcast);
 	UNUSED(action);
 	errno = ENOTSUP;
@@ -608,7 +608,7 @@ if_walkrt(struct dhcpcd_ctx *ctx, char *data, size_t len)
 		}
 		memset(&rt, 0, sizeof(rt));
 		rt.dest.s_addr = re->ipRouteDest;
-		rt.net.s_addr = re->ipRouteMask;
+		rt.mask.s_addr = re->ipRouteMask;
 		rt.gate.s_addr = re->ipRouteNextHop;
 		rt.flags = re->ipRouteInfo.re_flags;
 		rt.src.s_addr = re->ipRouteInfo.re_src_addr;
@@ -713,7 +713,7 @@ if_walkrt6(struct dhcpcd_ctx *ctx, char *data, size_t len)
 		}
 		memset(&rt, 0, sizeof(rt));
 		rt.dest = re->ipv6RouteDest;
-		ipv6_mask(&rt.net, re->ipv6RoutePfxLength);
+		ipv6_mask(&rt.mask, re->ipv6RoutePfxLength);
 		rt.gate = re->ipv6RouteNextHop;
 		rt.mtu = re->ipv6RouteInfo.re_max_frag;
 

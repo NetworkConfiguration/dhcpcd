@@ -431,7 +431,7 @@ decode_rfc3442_rt(struct dhcpcd_ctx *ctx, const uint8_t *data, size_t dl)
 		if (ocets > 0) {
 			memcpy(&rt->dest.s_addr, p, ocets);
 			p += ocets;
-			rt->net.s_addr = htonl(~0U << (32 - cidr));
+			rt->mask.s_addr = htonl(~0U << (32 - cidr));
 		}
 
 		/* Finally, snag the router */
@@ -626,9 +626,9 @@ get_option_routes(struct interface *ifp,
 			    route->gate.s_addr == bootp->yiaddr)
 			{
 				route->gate.s_addr = htonl(INADDR_ANY);
-				route->net.s_addr = htonl(INADDR_BROADCAST);
+				route->mask.s_addr = htonl(INADDR_BROADCAST);
 			} else
-				route->net.s_addr =
+				route->mask.s_addr =
 				    route_netmask(route->dest.s_addr);
 			TAILQ_INSERT_TAIL(routes, route, next);
 		}
@@ -761,7 +761,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 	*bootpm = bootp;
 
 	if ((type == DHCP_INFORM || type == DHCP_RELEASE ||
-	    (type == DHCP_REQUEST && state->net.s_addr == lease->net.s_addr &&
+	    (type == DHCP_REQUEST && state->mask.s_addr == lease->mask.s_addr &&
 	    (state->new == NULL || IS_DHCP(state->new)))))
 	{
 		/* In-case we haven't actually configured the address yet */
@@ -1438,15 +1438,18 @@ get_lease(struct interface *ifp,
 	lease->addr.s_addr = bootp->yiaddr ? bootp->yiaddr : bootp->ciaddr;
 	ctx = ifp->ctx;
 	if (ifp->options->options & DHCPCD_INFORM) {
-		lease->net = ifp->options->req_mask;
-		lease->brd.s_addr = lease->addr.s_addr | ~lease->net.s_addr;
+		lease->mask = ifp->options->req_mask;
+		lease->brd.s_addr = lease->addr.s_addr | ~lease->mask.s_addr;
 	} else {
-		if (get_option_addr(ctx, &lease->net, bootp, len,
+		if (get_option_addr(ctx, &lease->mask, bootp, len,
 		    DHO_SUBNETMASK) == -1)
-			lease->net.s_addr = ipv4_getnetmask(lease->addr.s_addr);
+			lease->mask.s_addr =
+			    ipv4_getnetmask(lease->addr.s_addr);
+		if (get_option_addr(ctx, &lease->brd, bootp, len,
+		    DHO_BROADCAST) == -1)
+			lease->brd.s_addr =
+			    lease->addr.s_addr | ~lease->mask.s_addr;
 	}
-	if (get_option_addr(ctx, &lease->brd, bootp, len, DHO_BROADCAST) == -1)
-		lease->brd.s_addr = lease->addr.s_addr | ~lease->net.s_addr;
 	if (get_option_uint32(ctx, &lease->leasetime,
 	    bootp, len, DHO_LEASETIME) != 0)
 		lease->leasetime = ~0U; /* Default to infinite lease */
@@ -2080,7 +2083,7 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 #ifdef IN_IFF_DUPLICATED
 		ia = ipv4_iffindaddr(ifp, &astate->addr, NULL);
 		if (ia)
-			ipv4_deladdr(ifp, &ia->addr, &ia->net, 1);
+			ipv4_deladdr(ifp, &ia->addr, &ia->mask, 1);
 #endif
 		arp_free(astate);
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
@@ -2129,7 +2132,7 @@ dhcp_bind(struct interface *ifp)
 	if (ifo->options & DHCPCD_STATIC) {
 		logger(ifp->ctx, LOG_INFO, "%s: using static address %s/%d",
 		    ifp->name, inet_ntoa(lease->addr),
-		    inet_ntocidr(lease->net));
+		    inet_ntocidr(lease->mask));
 		lease->leasetime = ~0U;
 		state->reason = "STATIC";
 	} else if (ifo->options & DHCPCD_INFORM) {
@@ -2304,7 +2307,7 @@ dhcp_arp_address(struct interface *ifp)
 
 			get_lease(ifp, &l, state->offer, state->offer_len);
 			/* Add the address now, let the kernel handle DAD. */
-			ipv4_addaddr(ifp, &l.addr, &l.net, &l.brd);
+			ipv4_addaddr(ifp, &l.addr, &l.mask, &l.brd);
 		} else
 			logger(ifp->ctx, LOG_INFO, "%s: waiting for DAD on %s",
 			    ifp->name, inet_ntoa(addr));
@@ -2316,7 +2319,7 @@ dhcp_arp_address(struct interface *ifp)
 
 		get_lease(ifp, &l, state->offer, state->offer_len);
 		logger(ifp->ctx, LOG_INFO, "%s: probing address %s/%d",
-		    ifp->name, inet_ntoa(l.addr), inet_ntocidr(l.net));
+		    ifp->name, inet_ntoa(l.addr), inet_ntocidr(l.mask));
 		if ((astate = arp_new(ifp, &addr)) != NULL) {
 			astate->probed_cb = dhcp_arp_probed;
 			astate->conflicted_cb = dhcp_arp_conflicted;
@@ -2363,7 +2366,7 @@ dhcp_static(struct interface *ifp)
 
 	state->offer_len = dhcp_message_new(&state->offer,
 	    ia ? &ia->addr : &ifo->req_addr,
-	    ia ? &ia->net : &ifo->req_mask);
+	    ia ? &ia->mask : &ifo->req_mask);
 	if (state->offer_len)
 		dhcp_arp_bind(ifp);
 }
@@ -2406,7 +2409,7 @@ dhcp_inform(struct interface *ifp)
 			ia = ipv4_iffindaddr(ifp, &ifo->req_addr, NULL);
 			if (ia != NULL)
 				/* Netmask must be different, delete it. */
-				ipv4_deladdr(ifp, &ia->addr, &ia->net, 1);
+				ipv4_deladdr(ifp, &ia->addr, &ia->mask, 1);
 			state->offer_len = dhcp_message_new(&state->offer,
 			    &ifo->req_addr, &ifo->req_mask);
 			if (dhcp_arp_address(ifp) == 0)
@@ -2417,7 +2420,7 @@ dhcp_inform(struct interface *ifp)
 		}
 	}
 
-	state->offer_len = dhcp_message_new(&state->offer, &ia->addr, &ia->net);
+	state->offer_len = dhcp_message_new(&state->offer, &ia->addr, &ia->mask);
 	if (state->offer_len) {
 		state->xid = dhcp_xid(ifp);
 		get_lease(ifp, &state->lease, state->offer, state->offer_len);
@@ -2915,7 +2918,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 		LOGDHCP(LOG_WARNING, "declined duplicate address");
 		if (type)
 			dhcp_decline(ifp);
-		ipv4_deladdr(ifp, &ia->addr, &ia->net, 0);
+		ipv4_deladdr(ifp, &ia->addr, &ia->mask, 0);
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    DHCP_RAND_MAX, dhcp_discover, ifp);
@@ -3460,7 +3463,8 @@ dhcp_start1(void *arg)
 		get_lease(ifp, &state->lease, state->offer, state->offer_len);
 		state->lease.frominfo = 1;
 		if (state->new == NULL &&
-		    ipv4_iffindaddr(ifp, &state->lease.addr, &state->lease.net))
+		    ipv4_iffindaddr(ifp,
+		    &state->lease.addr, &state->lease.mask))
 		{
 			/* We still have the IP address from the last lease.
 			 * Fake add the address and routes from it so the lease
@@ -3470,7 +3474,7 @@ dhcp_start1(void *arg)
 				memcpy(state->new,
 				    state->offer, state->offer_len);
 				state->addr = state->lease.addr;
-				state->net = state->lease.net;
+				state->mask = state->lease.mask;
 				state->added |= STATE_ADDED | STATE_FAKE;
 				ipv4_buildroutes(ifp->ctx);
 			} else
@@ -3597,7 +3601,7 @@ dhcp_abort(struct interface *ifp)
 void
 dhcp_handleifa(int cmd, struct interface *ifp,
 	const struct in_addr *addr,
-	const struct in_addr *net,
+	const struct in_addr *mask,
 	const struct in_addr *brd,
 	int flags)
 {
@@ -3611,13 +3615,13 @@ dhcp_handleifa(int cmd, struct interface *ifp,
 
 	if (cmd == RTM_DELADDR) {
 		if (state->addr.s_addr == addr->s_addr &&
-		    state->net.s_addr == net->s_addr &&
+		    state->mask.s_addr == mask->s_addr &&
 		    state->brd.s_addr == brd->s_addr)
 		{
 			logger(ifp->ctx, LOG_INFO,
 			    "%s: removing IP address %s/%d",
 			    ifp->name, inet_ntoa(state->addr),
-			    inet_ntocidr(state->net));
+			    inet_ntocidr(state->mask));
 			dhcp_drop(ifp, "EXPIRE");
 		}
 		return;
@@ -3647,7 +3651,7 @@ dhcp_handleifa(int cmd, struct interface *ifp,
 
 	free(state->old);
 	state->old = state->new;
-	state->new_len = dhcp_message_new(&state->new, addr, net);
+	state->new_len = dhcp_message_new(&state->new, addr, mask);
 	if (state->new == NULL)
 		return;
 	state->brd = *brd;
@@ -3664,7 +3668,7 @@ dhcp_handleifa(int cmd, struct interface *ifp,
 		state->xid = dhcp_xid(ifp);
 		state->lease.server = *brd;
 		state->addr = *addr;
-		state->net = *net;
+		state->mask = *mask;
 		dhcp_inform(ifp);
 	}
 }

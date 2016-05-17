@@ -587,9 +587,9 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct rt_msghdr *rtm)
 	rt->flags = (unsigned int)rtm->rtm_flags;
 	COPYOUT(rt->dest, rti_info[RTAX_DST]);
 	if (rtm->rtm_addrs & RTA_NETMASK)
-		COPYOUT(rt->net, rti_info[RTAX_NETMASK]);
+		COPYOUT(rt->mask, rti_info[RTAX_NETMASK]);
 	else
-		rt->net.s_addr = INADDR_BROADCAST;
+		rt->mask.s_addr = INADDR_BROADCAST;
 	COPYOUT(rt->gate, rti_info[RTAX_GATEWAY]);
 	COPYOUT(rt->src, rti_info[RTAX_IFA]);
 	rt->mtu = (unsigned int)rtm->rtm_rmx.rmx_mtu;
@@ -688,7 +688,7 @@ if_route(unsigned char cmd, const struct rt *rt)
 		if (subnet == -1) /* unikely */
 			rtm.hdr.rtm_addrs &= ~RTA_IFA;
 	}
-	if (rt->net.s_addr == htonl(INADDR_BROADCAST) &&
+	if (rt->mask.s_addr == htonl(INADDR_BROADCAST) &&
 	    rt->gate.s_addr == htonl(INADDR_ANY))
 	{
 #ifdef RTF_CLONING
@@ -704,7 +704,7 @@ if_route(unsigned char cmd, const struct rt *rt)
 		rtm.hdr.rtm_flags |= RTF_HOST;
 #endif
 	} else if (rt->gate.s_addr == htonl(INADDR_LOOPBACK) &&
-	    rt->net.s_addr == htonl(INADDR_BROADCAST))
+	    rt->mask.s_addr == htonl(INADDR_BROADCAST))
 	{
 		rtm.hdr.rtm_flags |= RTF_HOST | RTF_GATEWAY;
 		/* Going via lo0 so remove the interface flags */
@@ -714,7 +714,7 @@ if_route(unsigned char cmd, const struct rt *rt)
 		rtm.hdr.rtm_addrs |= RTA_NETMASK;
 		if (rtm.hdr.rtm_flags & RTF_STATIC)
 			rtm.hdr.rtm_flags |= RTF_GATEWAY;
-		if (rt->net.s_addr == htonl(INADDR_BROADCAST))
+		if (rt->mask.s_addr == htonl(INADDR_BROADCAST))
 			rtm.hdr.rtm_flags |= RTF_HOST;
 	}
 	if ((cmd == RTM_ADD || cmd == RTM_CHANGE) &&
@@ -740,7 +740,7 @@ if_route(unsigned char cmd, const struct rt *rt)
 	}
 
 	if (rtm.hdr.rtm_addrs & RTA_NETMASK)
-		ADDADDR(&rt->net);
+		ADDADDR(&rt->mask);
 
 	if ((cmd == RTM_ADD || cmd == RTM_CHANGE) &&
 	    (rtm.hdr.rtm_addrs & (RTA_IFP | RTA_IFA)))
@@ -956,7 +956,7 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct rt_msghdr *rtm)
 		const unsigned char *p;
 
 		sin6 = (void *)rti_info[RTAX_NETMASK];
-		rt->net = sin6->sin6_addr;
+		rt->mask = sin6->sin6_addr;
 		e = sin6->sin6_len - offsetof(struct sockaddr_in6, sin6_addr);
 		if (e > sizeof(struct in6_addr))
 			e = sizeof(struct in6_addr);
@@ -966,7 +966,7 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct rt_msghdr *rtm)
 		{
 			if (final && *p) {
 				illegal = 1;
-				rt->net.s6_addr[i++] = 0x00;
+				rt->mask.s6_addr[i++] = 0x00;
 				continue;
 			}
 			switch (*p & 0xff) {
@@ -987,14 +987,14 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct rt_msghdr *rtm)
 				break;
 			}
 			if (!illegal)
-				rt->net.s6_addr[i++] &= *p;
+				rt->mask.s6_addr[i++] &= *p;
 			else
-				rt->net.s6_addr[i++] = 0x00;
+				rt->mask.s6_addr[i++] = 0x00;
 		}
-		while (i < sizeof(rt->net.s6_addr))
-			rt->net.s6_addr[i++] = 0x00;
+		while (i < sizeof(rt->mask.s6_addr))
+			rt->mask.s6_addr[i++] = 0x00;
 	} else
-		ipv6_mask(&rt->net, 128);
+		ipv6_mask(&rt->mask, 128);
 	COPYOUT6(rt->gate, rti_info[RTAX_GATEWAY]);
 	DESCOPE(&rt->gate);
 	rt->mtu = (unsigned int)rtm->rtm_rmx.rmx_mtu;
@@ -1103,7 +1103,7 @@ if_route6(unsigned char cmd, const struct rt6 *rt)
 	}
 
 	if (rtm.hdr.rtm_addrs & RTA_NETMASK)
-		ADDADDR(&rt->net);
+		ADDADDR(&rt->mask);
 
 	if (rtm.hdr.rtm_addrs & (RTA_IFP | RTA_IFA)) {
 		rtm.hdr.rtm_index = (unsigned short)rt->iface->index;
@@ -1252,7 +1252,7 @@ if_managelink(struct dhcpcd_ctx *ctx)
 #endif
 #ifdef INET6
 	struct rt6 rt6;
-	struct in6_addr ia6, net6;
+	struct in6_addr ia6, mask6;
 	struct sockaddr_in6 *sin6;
 #endif
 #if (defined(INET) && defined(IN_IFF_TENTATIVE)) || defined(INET6)
@@ -1407,7 +1407,7 @@ if_managelink(struct dhcpcd_ctx *ctx)
 			case AF_INET:
 			case 255: /* FIXME: Why 255? */
 				COPYOUT(rt.dest, rti_info[RTAX_IFA]);
-				COPYOUT(rt.net, rti_info[RTAX_NETMASK]);
+				COPYOUT(rt.mask, rti_info[RTAX_NETMASK]);
 				COPYOUT(rt.gate, rti_info[RTAX_BRD]);
 				if (rtm->rtm_type == RTM_NEWADDR) {
 					ifa_flags = if_addrflags(&rt.dest, ifp);
@@ -1417,7 +1417,7 @@ if_managelink(struct dhcpcd_ctx *ctx)
 					ifa_flags = 0;
 				ipv4_handleifa(ctx, rtm->rtm_type,
 				    NULL, ifp->name,
-				    &rt.dest, &rt.net, &rt.gate, ifa_flags);
+				    &rt.dest, &rt.mask, &rt.gate, ifa_flags);
 				break;
 #endif
 #ifdef INET6
@@ -1426,8 +1426,8 @@ if_managelink(struct dhcpcd_ctx *ctx)
 				ia6 = sin6->sin6_addr;
 				DESCOPE(&ia6);
 				sin6 = (void *)rti_info[RTAX_NETMASK];
-				net6 = sin6->sin6_addr;
-				DESCOPE(&net6);
+				mask6 = sin6->sin6_addr;
+				DESCOPE(&mask6);
 				if (rtm->rtm_type == RTM_NEWADDR) {
 					ifa_flags = if_addrflags6(&ia6, ifp);
 					if (ifa_flags == -1)
@@ -1435,7 +1435,7 @@ if_managelink(struct dhcpcd_ctx *ctx)
 				} else
 					ifa_flags = 0;
 				ipv6_handleifa(ctx, rtm->rtm_type, NULL,
-				    ifp->name, &ia6, ipv6_prefixlen(&net6),
+				    ifp->name, &ia6, ipv6_prefixlen(&mask6),
 				    ifa_flags);
 				break;
 #endif

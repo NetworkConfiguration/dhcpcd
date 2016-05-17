@@ -55,7 +55,7 @@
 struct rt {
 	TAILQ_ENTRY(rt) next;
 	struct in_addr dest;
-	struct in_addr net;
+	struct in_addr mask;
 	struct in_addr gate;
 	const struct interface *iface;
 #ifdef HAVE_ROUTE_METRIC
@@ -71,7 +71,7 @@ TAILQ_HEAD(rt_head, rt);
 struct ipv4_addr {
 	TAILQ_ENTRY(ipv4_addr) next;
 	struct in_addr addr;
-	struct in_addr net;
+	struct in_addr mask;
 	struct in_addr brd;
 	struct interface *iface;
 	int addr_flags;

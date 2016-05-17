@@ -97,7 +97,7 @@ ipv4ll_subnet_route(const struct interface *ifp)
 	}
 	rt->iface = ifp;
 	rt->dest.s_addr = state->addr.s_addr & inaddr_llmask.s_addr;
-	rt->net = inaddr_llmask;
+	rt->mask = inaddr_llmask;
 	rt->gate.s_addr = INADDR_ANY;
 	rt->src = state->addr;
 	return rt;
@@ -120,7 +120,7 @@ ipv4ll_default_route(const struct interface *ifp)
 	}
 	rt->iface = ifp;
 	rt->dest.s_addr = INADDR_ANY;
-	rt->net.s_addr = INADDR_ANY;
+	rt->mask.s_addr = INADDR_ANY;
 	rt->gate.s_addr = INADDR_ANY;
 	rt->src = state->addr;
 	return rt;
@@ -444,7 +444,7 @@ ipv4ll_freedrop(struct interface *ifp, int drop)
 			TAILQ_FOREACH_SAFE(ia, &istate->addrs, next, ian) {
 				if (IN_LINKLOCAL(ntohl(ia->addr.s_addr))) {
 					ipv4_deladdr(ifp, &ia->addr,
-					    &ia->net, 0);
+					    &ia->mask, 0);
 					dropped = 1;
 				}
 			}
