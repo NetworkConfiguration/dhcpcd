@@ -1426,17 +1426,25 @@ dhcp_env(char **env, const char *prefix,
 }
 
 static void
-get_lease(struct dhcpcd_ctx *ctx,
+get_lease(struct interface *ifp,
     struct dhcp_lease *lease, const struct bootp *bootp, size_t len)
 {
+	struct dhcpcd_ctx *ctx;
 
 	assert(bootp != NULL);
 
 	memcpy(&lease->cookie, bootp->vend, sizeof(lease->cookie));
 	/* BOOTP does not set yiaddr for replies when ciaddr is set. */
 	lease->addr.s_addr = bootp->yiaddr ? bootp->yiaddr : bootp->ciaddr;
-	if (get_option_addr(ctx, &lease->net, bootp, len, DHO_SUBNETMASK) == -1)
-		lease->net.s_addr = ipv4_getnetmask(lease->addr.s_addr);
+	ctx = ifp->ctx;
+	if (ifp->options->options & DHCPCD_INFORM) {
+		lease->net = ifp->options->req_mask;
+		lease->brd.s_addr = lease->addr.s_addr | ~lease->net.s_addr;
+	} else {
+		if (get_option_addr(ctx, &lease->net, bootp, len,
+		    DHO_SUBNETMASK) == -1)
+			lease->net.s_addr = ipv4_getnetmask(lease->addr.s_addr);
+	}
 	if (get_option_addr(ctx, &lease->brd, bootp, len, DHO_BROADCAST) == -1)
 		lease->brd.s_addr = lease->addr.s_addr | ~lease->net.s_addr;
 	if (get_option_uint32(ctx, &lease->leasetime,
@@ -1991,7 +1999,7 @@ dhcp_arp_probed(struct arp_state *astate)
 		len = state->new_len;
 		state->new = state->offer;
 		state->new_len = state->offer_len;
-		get_lease(astate->iface->ctx, &state->lease,
+		get_lease(astate->iface, &state->lease,
 		    state->new, state->new_len);
 		ipv4_applyaddr(astate->iface);
 		state->new = bootp;
@@ -2117,7 +2125,7 @@ dhcp_bind(struct interface *ifp)
 		state->offer = NULL;
 		state->offer_len = 0;
 	}
-	get_lease(ifp->ctx, lease, state->new, state->new_len);
+	get_lease(ifp, lease, state->new, state->new_len);
 	if (ifo->options & DHCPCD_STATIC) {
 		logger(ifp->ctx, LOG_INFO, "%s: using static address %s/%d",
 		    ifp->name, inet_ntoa(lease->addr),
@@ -2294,7 +2302,7 @@ dhcp_arp_address(struct interface *ifp)
 		if (ia == NULL) {
 			struct dhcp_lease l;
 
-			get_lease(ifp->ctx, &l, state->offer, state->offer_len);
+			get_lease(ifp, &l, state->offer, state->offer_len);
 			/* Add the address now, let the kernel handle DAD. */
 			ipv4_addaddr(ifp, &l.addr, &l.net, &l.brd);
 		} else
@@ -2306,7 +2314,7 @@ dhcp_arp_address(struct interface *ifp)
 	if (ifp->options->options & DHCPCD_ARP && ia == NULL) {
 		struct dhcp_lease l;
 
-		get_lease(ifp->ctx, &l, state->offer, state->offer_len);
+		get_lease(ifp, &l, state->offer, state->offer_len);
 		logger(ifp->ctx, LOG_INFO, "%s: probing address %s/%d",
 		    ifp->name, inet_ntoa(l.addr), inet_ntocidr(l.net));
 		if ((astate = arp_new(ifp, &addr)) != NULL) {
@@ -2395,6 +2403,10 @@ dhcp_inform(struct interface *ifp)
 				    ifp->name);
 				return;
 			}
+			ia = ipv4_iffindaddr(ifp, &ifo->req_addr, NULL);
+			if (ia != NULL)
+				/* Netmask must be different, delete it. */
+				ipv4_deladdr(ifp, &ia->addr, &ia->net, 1);
 			state->offer_len = dhcp_message_new(&state->offer,
 			    &ifo->req_addr, &ifo->req_mask);
 			if (dhcp_arp_address(ifp) == 0)
@@ -2408,8 +2420,7 @@ dhcp_inform(struct interface *ifp)
 	state->offer_len = dhcp_message_new(&state->offer, &ia->addr, &ia->net);
 	if (state->offer_len) {
 		state->xid = dhcp_xid(ifp);
-		get_lease(ifp->ctx, &state->lease,
-		    state->offer, state->offer_len);
+		get_lease(ifp, &state->lease, state->offer, state->offer_len);
 		send_inform(ifp);
 	}
 }
@@ -3446,8 +3457,7 @@ dhcp_start1(void *arg)
 		}
 	}
 	if (state->offer) {
-		get_lease(ifp->ctx, &state->lease,
-		    state->offer, state->offer_len);
+		get_lease(ifp, &state->lease, state->offer, state->offer_len);
 		state->lease.frominfo = 1;
 		if (state->new == NULL &&
 		    ipv4_iffindaddr(ifp, &state->lease.addr, &state->lease.net))
