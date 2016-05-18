@@ -531,13 +531,13 @@ next:
 
 
 int
-if_address(unsigned char cmd, struct ipv4_addr *ia)
+if_address(unsigned char cmd, const struct ipv4_addr *ia)
 {
 	int r;
 	struct in_aliasreq ifra;
 
 	memset(&ifra, 0, sizeof(ifra));
-	strlcpy(ifra.ifra_name, ifp->name, sizeof(ifra.ifra_name));
+	strlcpy(ifra.ifra_name, ia->iface->name, sizeof(ifra.ifra_name));
 
 #define ADDADDR(var, addr) do {						      \
 		(var)->sin_family = AF_INET;				      \
@@ -550,7 +550,7 @@ if_address(unsigned char cmd, struct ipv4_addr *ia)
 		ADDADDR(&ifra.ifra_broadaddr, &ia->brd);
 #undef ADDADDR
 
-	r = ioctl(ifp->ctx->pf_inet_fd,
+	r = ioctl(ia->iface->ctx->pf_inet_fd,
 	    cmd == RTM_DELADDR ? SIOCDIFADDR : SIOCAIFADDR, &ifra);
 	return r;
 }
@@ -823,10 +823,11 @@ if_addrflags(const struct in_addr *addr, const struct interface *ifp)
 		return -1;
 	return ifr.ifr_addrflags;
 #else
-	UNUSED(ia);
+	UNUSED(addr);
+	UNUSED(ifp);
+	return 0;
 #endif
 }
-#endif
 #endif /* INET */
 
 #ifdef INET6
