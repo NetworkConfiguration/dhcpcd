@@ -831,8 +831,8 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 	if (lease->addr.s_addr && lease->cookie == htonl(MAGIC_COOKIE)) {
 		if (type == DHCP_DECLINE ||
 		    (type == DHCP_REQUEST &&
-			state->addr != NULL &&
-			lease->addr.s_addr != state->addr->addr.s_addr))
+		    (state->addr == NULL ||
+		    lease->addr.s_addr != state->addr->addr.s_addr)))
 		{
 			PUT_ADDR(DHO_IPADDRESS, &lease->addr);
 			if (lease->server.s_addr)
