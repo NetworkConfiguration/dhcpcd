@@ -75,8 +75,15 @@ struct ipv4_addr {
 	struct in_addr brd;
 	struct interface *iface;
 	int addr_flags;
+	char saddr[INET_ADDRSTRLEN + 3];
 };
 TAILQ_HEAD(ipv4_addrhead, ipv4_addr);
+
+#define	IPV4_ADDR_EQ(a1, a2)	((a1) && (a1)->addr.s_addr == (a2)->addr.s_addr)
+#define	IPV4_MASK1_EQ(a1, a2)	((a1) && (a1)->mask.s_addr == (a2)->mask.s_addr)
+#define	IPV4_MASK_EQ(a1, a2)	(IPV4_ADDR_EQ(a1, a2) && IPV4_MASK1_EQ(a1, a2))
+#define	IPV4_BRD1_EQ(a1, a2)	((a1) && (a1)->brd.s_addr == (a2)->brd.s_addr)
+#define	IPV4_BRD_EQ(a1, a2)	(IPV4_MASK_EQ(a1, a2) && IPV4_BRD1_EQ(a1, a2))
 
 struct ipv4_state {
 	struct ipv4_addrhead addrs;
@@ -107,8 +114,7 @@ int ipv4_hasaddr(const struct interface *);
 #define STATE_FAKE		0x02
 
 void ipv4_buildroutes(struct dhcpcd_ctx *);
-int ipv4_deladdr(struct interface *, const struct in_addr *,
-    const struct in_addr *, int);
+int ipv4_deladdr(struct ipv4_addr *, int);
 int ipv4_preferanother(struct interface *);
 struct ipv4_addr *ipv4_addaddr(struct interface *,
     const struct in_addr *, const struct in_addr *, const struct in_addr *);

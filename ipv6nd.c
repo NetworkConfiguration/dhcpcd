@@ -657,9 +657,9 @@ ipv6nd_dadcallback(void *arg)
 			}
 			logger(ifp->ctx, LOG_INFO, "%s: deleting address %s",
 				ifp->name, ap->saddr);
-			if (if_deladdress6(ap) == -1 &&
+			if (if_address6(RTM_DELADDR, ap) == -1 &&
 			    errno != EADDRNOTAVAIL && errno != ENXIO)
-				logger(ifp->ctx, LOG_ERR, "if_deladdress6: %m");
+				logger(ifp->ctx, LOG_ERR, "if_address6: %m");
 			dadcounter = ap->dadcounter;
 			if (ipv6_makestableprivate(&ap->addr,
 			    &ap->prefix, ap->prefix_len,

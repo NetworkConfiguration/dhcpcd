@@ -144,14 +144,7 @@ ssize_t if_sendraw(const struct interface *, int, uint16_t,
 ssize_t if_readraw(struct interface *, int, void *, size_t, int *);
 void if_closeraw(struct interface *, int);
 
-int if_address(const struct interface *,
-    const struct in_addr *, const struct in_addr *,
-    const struct in_addr *, int);
-#define if_addaddress(ifp, addr, net, brd)	\
-	if_address(ifp, addr, net, brd, 1)
-#define if_deladdress(ifp, addr, net)		\
-	if_address(ifp, addr, net, NULL, -1)
-
+int if_address(unsigned char, const struct ipv4_addr *);
 int if_addrflags(const struct in_addr *, const struct interface *);
 
 int if_route(unsigned char, const struct rt *rt);
@@ -168,10 +161,7 @@ int ip6_temp_valid_lifetime(const char *ifname);
 #define ip6_use_tempaddr(a) (0)
 #endif
 
-int if_address6(const struct ipv6_addr *, int);
-#define if_addaddress6(a) if_address6(a, 1)
-#define if_deladdress6(a) if_address6(a, -1)
-
+int if_address6(unsigned char, const struct ipv6_addr *);
 int if_addrflags6(const struct in6_addr *, const struct interface *);
 int if_getlifetime6(struct ipv6_addr *);
 

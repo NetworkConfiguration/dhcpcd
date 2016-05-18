@@ -1354,9 +1354,7 @@ if_readraw(__unused struct interface *ifp, int fd,
 }
 
 int
-if_address(const struct interface *iface,
-    const struct in_addr *address, const struct in_addr *netmask,
-    const struct in_addr *broadcast, int action)
+if_address(unsigned char cmd, const struct ipv4_addr *addr)
 {
 	struct nlma nlm;
 	int retval = 0;
@@ -1364,24 +1362,24 @@ if_address(const struct interface *iface,
 	memset(&nlm, 0, sizeof(nlm));
 	nlm.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifaddrmsg));
 	nlm.hdr.nlmsg_flags = NLM_F_REQUEST;
-	if (action >= 0) {
+	nlm.hdr.nlmsg_type = cmd;
+	if (cmd == RTM_NEWADDR)
 		nlm.hdr.nlmsg_flags |= NLM_F_CREATE | NLM_F_REPLACE;
-		nlm.hdr.nlmsg_type = RTM_NEWADDR;
-	} else
-		nlm.hdr.nlmsg_type = RTM_DELADDR;
-	nlm.ifa.ifa_index = iface->index;
+	nlm.ifa.ifa_index = addr->iface->index;
 	nlm.ifa.ifa_family = AF_INET;
-	nlm.ifa.ifa_prefixlen = inet_ntocidr(*netmask);
+	nlm.ifa.ifa_prefixlen = inet_ntocidr(addr->mask);
 	/* This creates the aliased interface */
 	add_attr_l(&nlm.hdr, sizeof(nlm), IFA_LABEL,
-	    iface->alias, (unsigned short)(strlen(iface->alias) + 1));
+	    addr->iface->alias,
+	    (unsigned short)(strlen(addr->iface->alias) + 1));
 	add_attr_l(&nlm.hdr, sizeof(nlm), IFA_LOCAL,
-	    &address->s_addr, sizeof(address->s_addr));
-	if (action >= 0 && broadcast)
+	    &addr->addr.s_addr, sizeof(addr->addr.s_addr));
+	if (cmd == RTM_NEWADDR)
 		add_attr_l(&nlm.hdr, sizeof(nlm), IFA_BROADCAST,
-		    &broadcast->s_addr, sizeof(broadcast->s_addr));
+		    &addr->brd.s_addr, sizeof(addr->brd.s_addr));
 
-	if (send_netlink(iface->ctx, NULL, NETLINK_ROUTE, &nlm.hdr, NULL) == -1)
+	if (send_netlink(addr->iface->ctx, NULL,
+	    NETLINK_ROUTE, &nlm.hdr, NULL) == -1)
 		retval = -1;
 	return retval;
 }
@@ -1508,7 +1506,7 @@ if_addrflags(__unused const struct in_addr *addr,
 
 #ifdef INET6
 int
-if_address6(const struct ipv6_addr *ia, int action)
+if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 {
 	struct nlma nlm;
 	struct ifa_cacheinfo cinfo;
@@ -1521,11 +1519,9 @@ if_address6(const struct ipv6_addr *ia, int action)
 	memset(&nlm, 0, sizeof(nlm));
 	nlm.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifaddrmsg));
 	nlm.hdr.nlmsg_flags = NLM_F_REQUEST;
-	if (action >= 0) {
+	nlm.hdr.nlmsg_type = cmd;
+	if (cmd == RTM_NEWADDR)
 		nlm.hdr.nlmsg_flags |= NLM_F_CREATE | NLM_F_REPLACE;
-		nlm.hdr.nlmsg_type = RTM_NEWADDR;
-	} else
-		nlm.hdr.nlmsg_type = RTM_DELADDR;
 	nlm.ifa.ifa_index = ia->iface->index;
 	nlm.ifa.ifa_family = AF_INET6;
 #ifdef IPV6_MANAGETEMPADDR
@@ -1550,7 +1546,7 @@ if_address6(const struct ipv6_addr *ia, int action)
 	add_attr_l(&nlm.hdr, sizeof(nlm), IFA_LOCAL,
 	    &ia->addr.s6_addr, sizeof(ia->addr.s6_addr));
 
-	if (action >= 0) {
+	if (cmd == RTM_NEWADDR) {
 		memset(&cinfo, 0, sizeof(cinfo));
 		cinfo.ifa_prefered = ia->prefix_pltime;
 		cinfo.ifa_valid = ia->prefix_vltime;

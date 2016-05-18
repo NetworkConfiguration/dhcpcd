@@ -203,31 +203,33 @@ ipv4_srcaddr(const struct rt *rt, struct in_addr *addr)
 
 	/* Prefer DHCP source address if matching */
 	dstate = D_CSTATE(rt->iface);
-	if (dstate &&
-	    rt->mask.s_addr == dstate->mask.s_addr &&
-	    rt->dest.s_addr == (dstate->addr.s_addr & dstate->mask.s_addr))
+	if (dstate && dstate->addr &&
+	    rt->mask.s_addr == dstate->addr->mask.s_addr &&
+	    rt->dest.s_addr ==
+	    (dstate->addr->addr.s_addr & dstate->addr->mask.s_addr))
 	{
-		*addr = dstate->addr;
+		*addr = dstate->addr->addr;
 		return 1;
 	}
 
 	/* Then IPv4LL source address if matching */
 	istate = IPV4LL_CSTATE(rt->iface);
-	if (istate &&
-	    rt->mask.s_addr == inaddr_llmask.s_addr &&
-	    rt->dest.s_addr == (istate->addr.s_addr & inaddr_llmask.s_addr))
+	if (istate && istate->addr &&
+	    rt->mask.s_addr == istate->addr->mask.s_addr &&
+	    rt->dest.s_addr ==
+	    (istate->addr->addr.s_addr & istate->addr->mask.s_addr))
 	{
-		*addr = istate->addr;
+		*addr = istate->addr->addr;
 		return 1;
 	}
 
 	/* If neither match, return DHCP then IPv4LL */
-	if (dstate) {
-		*addr = dstate->addr;
+	if (dstate && dstate->addr) {
+		*addr = dstate->addr->addr;
 		return 0;
 	}
-	if (istate) {
-		*addr = istate->addr;
+	if (istate && istate->addr) {
+		*addr = istate->addr->addr;
 		return 0;
 	}
 
@@ -245,8 +247,8 @@ ipv4_hasaddr(const struct interface *ifp)
 	istate = IPV4LL_CSTATE(ifp);
 	return ((dstate &&
 	    dstate->added == STATE_ADDED &&
-	    dstate->addr.s_addr != INADDR_ANY) ||
-	    (istate && istate->addr.s_addr != INADDR_ANY));
+	    dstate->addr != NULL) ||
+	    (istate && istate->addr));
 }
 
 void
@@ -540,19 +542,19 @@ d_route(struct rt *rt)
 static struct rt_head *
 add_subnet_route(struct rt_head *rt, const struct interface *ifp)
 {
-	const struct dhcp_state *s;
+	const struct dhcp_state *state;
 	struct rt *r;
 
 	if (rt == NULL) /* earlier malloc failed */
 		return NULL;
 
-	s = D_CSTATE(ifp);
+	state = D_CSTATE(ifp);
 	/* Don't create a subnet route for these addresses */
-	if (s->mask.s_addr == INADDR_ANY)
+	if (state->addr->mask.s_addr == INADDR_ANY)
 		return rt;
 #ifndef BSD
 	/* BSD adds a route in this instance */
-	if (s->mask.s_addr == INADDR_BROADCAST)
+	if (state->addr->mask.s_addr == INADDR_BROADCAST)
 		return rt;
 #endif
 
@@ -561,11 +563,11 @@ add_subnet_route(struct rt_head *rt, const struct interface *ifp)
 		ipv4_freeroutes(rt);
 		return NULL;
 	}
-	r->dest.s_addr = s->addr.s_addr & s->mask.s_addr;
-	r->mask.s_addr = s->mask.s_addr;
+	r->dest.s_addr = state->addr->addr.s_addr & state->addr->mask.s_addr;
+	r->mask.s_addr = state->addr->mask.s_addr;
 	r->gate.s_addr = INADDR_ANY;
 	r->mtu = dhcp_get_mtu(ifp);
-	r->src = s->addr;
+	r->src = state->addr->addr;
 
 	TAILQ_INSERT_HEAD(rt, r, next);
 	return rt;
@@ -629,7 +631,7 @@ get_routes(struct interface *ifp)
 	if (nrt) {
 		state = D_CSTATE(ifp);
 		TAILQ_FOREACH(rt, nrt, next) {
-			rt->src = state->addr;
+			rt->src = state->addr->addr;
 		}
 	}
 
@@ -655,9 +657,9 @@ add_destination_route(struct rt_head *rt, const struct interface *ifp)
 	}
 	r->dest.s_addr = INADDR_ANY;
 	r->mask.s_addr = INADDR_ANY;
-	r->gate.s_addr = state->brd.s_addr;
+	r->gate = state->addr->brd;
 	r->mtu = dhcp_get_mtu(ifp);
-	r->src = state->addr;
+	r->src = state->addr->addr;
 	TAILQ_INSERT_HEAD(rt, r, next);
 	return rt;
 }
@@ -731,7 +733,7 @@ add_router_host_route(struct rt_head *rt, const struct interface *ifp)
 		rtn->mask.s_addr = htonl(INADDR_BROADCAST);
 		rtn->gate.s_addr = htonl(INADDR_ANY);
 		rtn->mtu = dhcp_get_mtu(ifp);
-		rtn->src = state->addr;
+		rtn->src = state->addr->addr;
 		TAILQ_INSERT_BEFORE(rtp, rtn, next);
 	}
 	return rt;
@@ -884,49 +886,43 @@ ipv4_buildroutes(struct dhcpcd_ctx *ctx)
 }
 
 int
-ipv4_deladdr(struct interface *ifp,
-    const struct in_addr *addr, const struct in_addr *mask, int keeparp)
+ipv4_deladdr(struct ipv4_addr *addr, int keeparp)
 {
-	struct dhcp_state *dstate;
+	struct interface *ifp;
 	int r;
 	struct ipv4_state *state;
 	struct ipv4_addr *ap;
 	struct arp_state *astate;
-	uint32_t a, n;
 
-	logger(ifp->ctx, LOG_DEBUG,
-	    "%s: deleting IP address %s/%d",
-	    ifp->name, inet_ntoa(*addr), inet_ntocidr(*mask));
+	logger(addr->iface->ctx, LOG_DEBUG,
+	    "%s: deleting IP address %s", addr->iface->name, addr->saddr);
 
-	r = if_deladdress(ifp, addr, mask);
+	r = if_address(RTM_DELADDR, addr);
 	if (r == -1 && errno != EADDRNOTAVAIL && errno != ENXIO &&
 	    errno != ENODEV)
-		logger(ifp->ctx, LOG_ERR, "%s: %s: %m", ifp->name, __func__);
+		logger(addr->iface->ctx, LOG_ERR, "%s: %s: %m",
+		    addr->iface->name, __func__);
 
-	if (!keeparp && (astate = arp_find(ifp, addr)) != NULL)
+	if (!keeparp && (astate = arp_find(addr->iface, &addr->addr)) != NULL)
 		arp_free(astate);
 
-	a = addr->s_addr;
-	n = mask->s_addr;
-	state = IPV4_STATE(ifp);
+	state = IPV4_STATE(addr->iface);
 	TAILQ_FOREACH(ap, &state->addrs, next) {
-		if (ap->addr.s_addr == addr->s_addr &&
-		    ap->mask.s_addr == mask->s_addr)
-		{
+		if (IPV4_MASK_EQ(ap, addr)) {
+			struct dhcp_state *dstate;
+
 			TAILQ_REMOVE(&state->addrs, ap, next);
 			free(ap);
+
+			dstate = D_STATE(ifp);
+			if (dstate && dstate->addr == ap) {
+				dstate->added = 0;
+				dstate->addr = NULL;
+			}
 			break;
 		}
 	}
 
-	/* Have to do this last incase the function arguments
-	 * were these very pointers. */
-	dstate = D_STATE(ifp);
-	if (dstate && dstate->addr.s_addr == a && dstate->mask.s_addr == n) {
-		dstate->added = 0;
-		dstate->addr.s_addr = 0;
-		dstate->mask.s_addr = 0;
-	}
 	return r;
 }
 
@@ -942,7 +938,7 @@ delete_address(struct interface *ifp)
 	if (ifo->options & DHCPCD_INFORM ||
 	    (ifo->options & DHCPCD_STATIC && ifo->req_addr.s_addr == 0))
 		return 0;
-	r = ipv4_deladdr(ifp, &state->addr, &state->mask, 0);
+	r = ipv4_deladdr(state->addr, 0);
 	return r;
 }
 
@@ -975,7 +971,6 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 {
 	struct ipv4_state *state;
 	struct ipv4_addr *ia;
-	char bcast_str[INET_ADDRSTRLEN];
 
 	if ((state = ipv4_getstate(ifp)) == NULL) {
 		logger(ifp->ctx, LOG_ERR, "%s: ipv4_getstate: %m", __func__);
@@ -986,23 +981,12 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 
 		TAILQ_FOREACH_SAFE(ia, &state->addrs, next, ian) {
 			if (ia->addr.s_addr != addr->s_addr)
-				ipv4_deladdr(ifp, &ia->addr, &ia->mask, 0);
+				ipv4_deladdr(ia, 0);
 		}
 	}
 
 	if ((ia = malloc(sizeof(*ia))) == NULL) {
 		logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
-		return NULL;
-	}
-
-	strlcpy(bcast_str, inet_ntoa(*bcast), sizeof(bcast_str));
-	logger(ifp->ctx, LOG_DEBUG, "%s: adding IP address %s/%d broadcast %s",
-	    ifp->name, inet_ntoa(*addr), inet_ntocidr(*mask), bcast_str);
-	if (if_addaddress(ifp, addr, mask, bcast) == -1) {
-		if (errno != EEXIST)
-			logger(ifp->ctx, LOG_ERR, "%s: if_addaddress: %m",
-			    __func__);
-		free(ia);
 		return NULL;
 	}
 
@@ -1013,6 +997,18 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 #ifdef IN_IFF_TENTATIVE
 	ia->addr_flags = IN_IFF_TENTATIVE;
 #endif
+	snprintf(ia->saddr, sizeof(ia->saddr), "%s/%d",
+	    inet_ntoa(*addr), inet_ntocidr(*mask));
+	logger(ifp->ctx, LOG_DEBUG, "%s: adding IP address %s broadcast %s",
+	    ifp->name, ia->saddr, inet_ntoa(*bcast));
+	if (if_address(RTM_NEWADDR, ia) == -1) {
+		if (errno != EEXIST)
+			logger(ifp->ctx, LOG_ERR, "%s: if_addaddress: %m",
+			    __func__);
+		free(ia);
+		return NULL;
+	}
+
 	TAILQ_INSERT_TAIL(&state->addrs, ia, next);
 	return ia;
 }
@@ -1021,16 +1017,15 @@ static int
 ipv4_daddaddr(struct interface *ifp, const struct dhcp_lease *lease)
 {
 	struct dhcp_state *state;
+	struct ipv4_addr *ia;
 
-	if (ipv4_addaddr(ifp, &lease->addr, &lease->mask, &lease->brd) == NULL)
+	ia = ipv4_addaddr(ifp, &lease->addr, &lease->mask, &lease->brd);
+	if (ia == NULL)
 		return -1;
 
 	state = D_STATE(ifp);
 	state->added = STATE_ADDED;
-
-	state->addr.s_addr = lease->addr.s_addr;
-	state->mask.s_addr = lease->mask.s_addr;
-
+	state->addr = ia;
 	return 0;
 }
 
@@ -1053,7 +1048,8 @@ ipv4_preferanother(struct interface *ifp)
 			break; /* We are already the most preferred */
 		nstate = D_STATE(ifn);
 		if (nstate && !nstate->added &&
-		    nstate->lease.addr.s_addr == state->addr.s_addr)
+		    state->addr != NULL &&
+		    nstate->lease.addr.s_addr == state->addr->addr.s_addr)
 		{
 			preferred = 1;
 			delete_address(ifp);
@@ -1079,7 +1075,7 @@ ipv4_applyaddr(void *arg)
 	struct dhcp_state *state = D_STATE(ifp), *nstate;
 	struct dhcp_lease *lease;
 	struct if_options *ifo = ifp->options;
-	struct ipv4_addr *ap;
+	struct ipv4_addr *ia;
 	int r;
 
 	if (state == NULL)
@@ -1111,7 +1107,8 @@ ipv4_applyaddr(void *arg)
 		}
 		nstate = D_STATE(ifn);
 		if (nstate && nstate->added &&
-		    nstate->addr.s_addr == lease->addr.s_addr)
+		    nstate->addr &&
+		    nstate->addr->addr.s_addr == lease->addr.s_addr)
 		{
 			if (r == 0) {
 				logger(ifp->ctx, LOG_INFO,
@@ -1125,7 +1122,7 @@ ipv4_applyaddr(void *arg)
 			    ifn->name,
 			    inet_ntoa(lease->addr),
 			    ifp->name);
-			ipv4_deladdr(ifn, &nstate->addr, &nstate->mask, 0);
+			ipv4_deladdr(nstate->addr, 0);
 			break;
 		}
 	}
@@ -1135,53 +1132,52 @@ ipv4_applyaddr(void *arg)
 		TAILQ_FOREACH(ifn, ifp->ctx->ifaces, next) {
 			if (ifn == ifp)
 				continue;
-			ap = ipv4_iffindaddr(ifn, &lease->addr, NULL);
-			if (ap)
-				ipv4_deladdr(ifn, &ap->addr, &ap->mask, 0);
+			ia = ipv4_iffindaddr(ifn, &lease->addr, NULL);
+			if (ia != NULL)
+				ipv4_deladdr(ia, 0);
 		}
 	}
 
 	/* If the netmask or broadcast is different, re-add the addresss */
-	ap = ipv4_iffindaddr(ifp, &lease->addr, NULL);
-	if (ap &&
-	    ap->mask.s_addr == lease->mask.s_addr &&
-	    ap->brd.s_addr == lease->brd.s_addr)
+	ia = ipv4_iffindaddr(ifp, &lease->addr, NULL);
+	if (ia &&
+	    ia->mask.s_addr == lease->mask.s_addr &&
+	    ia->brd.s_addr == lease->brd.s_addr)
 		logger(ifp->ctx, LOG_DEBUG,
-		    "%s: IP address %s/%d already exists",
-		    ifp->name, inet_ntoa(lease->addr),
-		    inet_ntocidr(lease->mask));
+		    "%s: IP address %s already exists",
+		    ifp->name, ia->saddr);
 	else {
 #if __linux__
 		/* Linux does not change netmask/broadcast address
 		 * for re-added addresses, so we need to delete the old one
 		 * first. */
-		if (ap != NULL)
-			ipv4_deladdr(ifp, &ap->addr, &ap->mask, 0);
+		if (ia != NULL)
+			ipv4_deladdr(ia, 0);
 #endif
 		r = ipv4_daddaddr(ifp, lease);
 		if (r == -1 && errno != EEXIST)
 			return;
 	}
 
-#ifdef IN_IFF_NOTUSEABLE
-	ap = ipv4_iffindaddr(ifp, &lease->addr, NULL);
-	if (ap == NULL) {
+	ia = ipv4_iffindaddr(ifp, &lease->addr, NULL);
+	if (ia == NULL) {
 		logger(ifp->ctx, LOG_ERR, "%s: added address vanished",
 		    ifp->name);
 		return;
-	} else if (ap->addr_flags & IN_IFF_NOTUSEABLE)
+	}
+#ifdef IN_IFF_NOTUSEABLE
+	if (ia->addr_flags & IN_IFF_NOTUSEABLE)
 		return;
 #endif
 
 	/* Delete the old address if different */
-	if (state->addr.s_addr != lease->addr.s_addr &&
-	    state->addr.s_addr != 0 &&
+	if (state->addr &&
+	    state->addr->addr.s_addr != lease->addr.s_addr &&
 	    ipv4_iffindaddr(ifp, &lease->addr, NULL))
 		delete_address(ifp);
 
+	state->addr = ia;
 	state->added = STATE_ADDED;
-	state->addr.s_addr = lease->addr.s_addr;
-	state->mask.s_addr = lease->mask.s_addr;
 
 	/* Find any freshly added routes, such as the subnet route.
 	 * We do this because we cannot rely on recieving the kernel
@@ -1192,7 +1188,7 @@ ipv4_applyaddr(void *arg)
 	if (ifo->options & DHCPCD_ARP) {
 		struct arp_state *astate;
 
-		if ((astate = arp_new(ifp, &state->addr)) != NULL)
+		if ((astate = arp_new(ifp, &state->addr->addr)) != NULL)
 			arp_announce(astate);
 	}
 	if (state->state == DHS_BOUND) {
@@ -1209,7 +1205,7 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 {
 	struct interface *ifp;
 	struct ipv4_state *state;
-	struct ipv4_addr *ap;
+	struct ipv4_addr *ia;
 
 	if (ifs == NULL)
 		ifs = ctx->ifaces;
@@ -1228,46 +1224,56 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 		return;
 	}
 
-	ap = ipv4_iffindaddr(ifp, addr, NULL);
-	if (cmd == RTM_NEWADDR) {
-		if (ap == NULL) {
-			if ((ap = malloc(sizeof(*ap))) == NULL) {
+	ia = ipv4_iffindaddr(ifp, addr, NULL);
+	switch (cmd) {
+	case RTM_NEWADDR:
+		if (ia == NULL) {
+			if ((ia = malloc(sizeof(*ia))) == NULL) {
 				logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
 				return;
 			}
-			ap->iface = ifp;
-			ap->addr = *addr;
-			TAILQ_INSERT_TAIL(&state->addrs, ap, next);
+			ia->iface = ifp;
+			ia->addr = *addr;
+			TAILQ_INSERT_TAIL(&state->addrs, ia, next);
 		}
-		ap->mask = *mask;
+		/* Mask could have changed */
+		ia->mask = *mask;
+		snprintf(ia->saddr, sizeof(ia->saddr), "%s/%d",
+		    inet_ntoa(*addr), inet_ntocidr(*mask));
 		if (brd != NULL)
-			ap->brd = *brd;
+			ia->brd = *brd;
 		else
-			ap->brd.s_addr = INADDR_ANY;
-		ap->addr_flags = flags;
-	} else if (cmd == RTM_DELADDR) {
-		if (ap) {
-			TAILQ_REMOVE(&state->addrs, ap, next);
-			free(ap);
-		}
+			ia->brd.s_addr = INADDR_ANY;
+		ia->addr_flags = flags;
+		break;
+	case RTM_DELADDR:
+		if (ia == NULL)
+			return;
+		TAILQ_REMOVE(&state->addrs, ia, next);
+		break;
+	default:
+		return;
 	}
 
-	arp_handleifa(cmd, ifp, addr, flags);
-	dhcp_handleifa(cmd, ifp, addr, mask, brd, flags);
+	arp_handleifa(cmd, ia);
+	dhcp_handleifa(cmd, ia);
+	
+	if (cmd == RTM_DELADDR)
+		free(ia);
 }
 
 void
 ipv4_free(struct interface *ifp)
 {
 	struct ipv4_state *state;
-	struct ipv4_addr *addr;
+	struct ipv4_addr *ia;
 
 	if (ifp) {
 		state = IPV4_STATE(ifp);
 		if (state) {
-		        while ((addr = TAILQ_FIRST(&state->addrs))) {
-				TAILQ_REMOVE(&state->addrs, addr, next);
-				free(addr);
+		        while ((ia = TAILQ_FIRST(&state->addrs))) {
+				TAILQ_REMOVE(&state->addrs, ia, next);
+				free(ia);
 			}
 			ipv4_freerts(&state->routes);
 #ifdef BSD

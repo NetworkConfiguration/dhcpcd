@@ -589,9 +589,9 @@ ipv6_deleteaddr(struct ipv6_addr *ia)
 
 	logger(ia->iface->ctx, LOG_INFO, "%s: deleting address %s",
 	    ia->iface->name, ia->saddr);
-	if (if_deladdress6(ia) == -1 &&
+	if (if_address6(RTM_DELADDR, ia) == -1 &&
 	    errno != EADDRNOTAVAIL && errno != ENXIO && errno != ENODEV)
-		logger(ia->iface->ctx, LOG_ERR, "if_deladdress6: :%m");
+		logger(ia->iface->ctx, LOG_ERR, "if_address6: :%m");
 
 	/* NOREJECT is set if we delegated exactly the prefix to another
 	 * address.
@@ -701,7 +701,7 @@ ipv6_addaddr(struct ipv6_addr *ap, const struct timespec *now)
 #endif
 	}
 
-	if (if_addaddress6(ap) == -1) {
+	if (if_address6(RTM_NEWADDR, ap) == -1) {
 		logger(ap->iface->ctx, LOG_ERR, "if_addaddress6: %m");
 		/* Restore real pltime and vltime */
 		ap->prefix_pltime = pltime;
@@ -824,10 +824,10 @@ ipv6_addaddrs(struct ipv6_addrhead *addrs)
 				    apf->iface->name,
 				    ap->saddr,
 				    ap->iface->name);
-				if (if_deladdress6(apf) == -1 &&
+				if (if_address6(RTM_DELADDR, apf) == -1 &&
 				    errno != EADDRNOTAVAIL && errno != ENXIO)
 					logger(apf->iface->ctx, LOG_ERR,
-					    "if_deladdress6: %m");
+					    "if_address6: %m");
 				apf->flags &=
 				    ~(IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED);
 			} else if (apf)

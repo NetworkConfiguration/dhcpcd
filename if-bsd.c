@@ -531,9 +531,7 @@ next:
 
 
 int
-if_address(const struct interface *ifp, const struct in_addr *address,
-    const struct in_addr *netmask, const struct in_addr *broadcast,
-    int action)
+if_address(unsigned char cmd, struct ipv4_addr *ia)
 {
 	int r;
 	struct in_aliasreq ifra;
@@ -546,14 +544,14 @@ if_address(const struct interface *ifp, const struct in_addr *address,
 		(var)->sin_len = sizeof(*(var));			      \
 		(var)->sin_addr = *(addr);				      \
 	} while (/*CONSTCOND*/0)
-	ADDADDR(&ifra.ifra_addr, address);
-	ADDADDR(&ifra.ifra_mask, netmask);
-	if (action >= 0 && broadcast)
-		ADDADDR(&ifra.ifra_broadaddr, broadcast);
+	ADDADDR(&ifra.ifra_addr, &ia->addr);
+	ADDADDR(&ifra.ifra_mask, &ia->mask);
+	if (cmd == RTM_NEWADDR && ia->brd.s_addr != INADDR_ANY)
+		ADDADDR(&ifra.ifra_broadaddr, &ia->brd);
 #undef ADDADDR
 
 	r = ioctl(ifp->ctx->pf_inet_fd,
-	    action < 0 ? SIOCDIFADDR : SIOCAIFADDR, &ifra);
+	    cmd == RTM_DELADDR ? SIOCDIFADDR : SIOCAIFADDR, &ifra);
 	return r;
 }
 
@@ -809,10 +807,10 @@ if_initrt(struct dhcpcd_ctx *ctx)
 	return 0;
 }
 
-#ifdef SIOCGIFAFLAG_IN
 int
 if_addrflags(const struct in_addr *addr, const struct interface *ifp)
 {
+#ifdef SIOCGIFAFLAG_IN
 	struct ifreq ifr;
 	struct sockaddr_in *sin;
 
@@ -824,15 +822,9 @@ if_addrflags(const struct in_addr *addr, const struct interface *ifp)
 	if (ioctl(ifp->ctx->pf_inet_fd, SIOCGIFAFLAG_IN, &ifr) == -1)
 		return -1;
 	return ifr.ifr_addrflags;
-}
 #else
-int
-if_addrflags(__unused const struct in_addr *addr,
-    __unused const struct interface *ifp)
-{
-
-	errno = ENOTSUP;
-	return 0;
+	UNUSED(ia);
+#endif
 }
 #endif
 #endif /* INET */
@@ -869,7 +861,7 @@ ifa_scope(struct sockaddr_in6 *sin, unsigned int ifindex)
 #endif
 
 int
-if_address6(const struct ipv6_addr *ia, int action)
+if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 {
 	struct in6_aliasreq ifa;
 	struct in6_addr mask;
@@ -910,7 +902,7 @@ if_address6(const struct ipv6_addr *ia, int action)
 
 	priv = (struct priv *)ia->iface->ctx->priv;
 	return ioctl(priv->pf_inet6_fd,
-	    action < 0 ? SIOCDIFADDR_IN6 : SIOCAIFADDR_IN6, &ifa);
+	    cmd == RTM_DELADDR ? SIOCDIFADDR_IN6 : SIOCAIFADDR_IN6, &ifa);
 }
 
 

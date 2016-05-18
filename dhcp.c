@@ -760,16 +760,12 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 		return -1;
 	*bootpm = bootp;
 
-	if ((type == DHCP_INFORM || type == DHCP_RELEASE ||
-	    (type == DHCP_REQUEST && state->mask.s_addr == lease->mask.s_addr &&
+	if (state->addr != NULL &&
+	    (type == DHCP_INFORM || type == DHCP_RELEASE ||
+	    (type == DHCP_REQUEST &&
+	    state->addr->mask.s_addr == lease->mask.s_addr &&
 	    (state->new == NULL || IS_DHCP(state->new)))))
-	{
-		/* In-case we haven't actually configured the address yet */
-		if (type == DHCP_INFORM && state->addr.s_addr == 0)
-			bootp->ciaddr = lease->addr.s_addr;
-		else
-			bootp->ciaddr = state->addr.s_addr;
-	}
+		bootp->ciaddr = state->addr->addr.s_addr;
 
 	bootp->op = BOOTREQUEST;
 	bootp->htype = (uint8_t)ifp->family;
@@ -835,7 +831,8 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 	if (lease->addr.s_addr && lease->cookie == htonl(MAGIC_COOKIE)) {
 		if (type == DHCP_DECLINE ||
 		    (type == DHCP_REQUEST &&
-			lease->addr.s_addr != state->addr.s_addr))
+			state->addr != NULL &&
+			lease->addr.s_addr != state->addr->addr.s_addr))
 		{
 			PUT_ADDR(DHO_IPADDRESS, &lease->addr);
 			if (lease->server.s_addr)
@@ -1553,9 +1550,9 @@ dhcp_openudp(struct interface *ifp)
 	sin.sin_port = htons(BOOTPC);
 	if (ifp) {
 		state = D_STATE(ifp);
-		sin.sin_addr.s_addr = state->addr.s_addr;
-	} else
-		state = NULL; /* appease gcc */
+		if (state->addr)
+			sin.sin_addr.s_addr = state->addr->addr.s_addr;
+	}
 	if (bind(s, (struct sockaddr *)&sin, sizeof(sin)) == -1)
 		goto eexit;
 
@@ -1646,7 +1643,7 @@ send_message(struct interface *ifp, uint8_t type,
 	size_t len;
 	ssize_t r;
 	struct in_addr from, to;
-	in_addr_t a = INADDR_ANY;
+	struct ipv4_addr *iap;
 	struct timespec tv;
 	int s;
 #ifdef IN_IFF_NOTUSEABLE
@@ -1689,11 +1686,11 @@ send_message(struct interface *ifp, uint8_t type,
 	if (dhcp_open(ifp) == -1)
 		return;
 
+	iap = state->addr;
 	if (state->added && !(state->added & STATE_FAKE) &&
-	    state->addr.s_addr != INADDR_ANY &&
-	    state->new != NULL &&
+	    state->addr != NULL && state->new != NULL &&
 #ifdef IN_IFF_NOTUSEABLE
-	    ((ia = ipv4_iffindaddr(ifp, &state->addr, NULL)) &&
+	    ((ia = ipv4_iffindaddr(ifp, &state->addr->addr, NULL)) &&
 	    !(ia->addr_flags & IN_IFF_NOTUSEABLE)) &&
 #endif
 	    (state->lease.server.s_addr ||
@@ -1706,14 +1703,12 @@ send_message(struct interface *ifp, uint8_t type,
 				logger(ifp->ctx, LOG_ERR,
 				    "%s: dhcp_openudp: %m", ifp->name);
 			/* We cannot renew */
-			a = state->addr.s_addr;
-			state->addr.s_addr = INADDR_ANY;
+			state->addr = NULL;
 		}
 	}
 
 	r = make_message(&bootp, ifp, type);
-	if (a != INADDR_ANY)
-		state->addr.s_addr = a;
+	state->addr = iap;
 	if (r == -1)
 		goto fail;
 	len = (size_t)r;
@@ -2081,9 +2076,9 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 		    !state->lease.frominfo)
 			dhcp_decline(ifp);
 #ifdef IN_IFF_DUPLICATED
-		ia = ipv4_iffindaddr(ifp, &astate->addr, NULL);
+		ia = ipv4_iffindaddr(ifp, &astate->addr->addr, NULL);
 		if (ia)
-			ipv4_deladdr(ifp, &ia->addr, &ia->mask, 1);
+			ipv4_deladdr(ia->addr, 1);
 #endif
 		arp_free(astate);
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
@@ -2093,11 +2088,12 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 	}
 
 	/* Bound address */
-	if (amsg &&
-	    (amsg->sip.s_addr == state->addr.s_addr ||
-	    (amsg->sip.s_addr == 0 && amsg->tip.s_addr == state->addr.s_addr)))
+	if (amsg && state->addr &&
+	    (amsg->sip.s_addr == state->addr->addr.s_addr ||
+	    (amsg->sip.s_addr == 0 &&
+	    amsg->tip.s_addr == state->addr->addr.s_addr)))
 	{
-		astate->failed = state->addr;
+		astate->failed = state->addr->addr;
 		arp_report_conflicted(astate, amsg);
 		if (state->state == DHS_BOUND) {
 			/* For now, just report the duplicated address */
@@ -2179,7 +2175,8 @@ dhcp_bind(struct interface *ifp)
 				    ifp->name, lease->renewaltime);
 			}
 			logger(ifp->ctx,
-			    lease->addr.s_addr == state->addr.s_addr &&
+			    state->addr &&
+			    lease->addr.s_addr == state->addr->addr.s_addr &&
 			    !(state->added & STATE_FAKE) ?
 			    LOG_DEBUG : LOG_INFO,
 			    "%s: leased %s for %"PRIu32" seconds", ifp->name,
@@ -2409,7 +2406,7 @@ dhcp_inform(struct interface *ifp)
 			ia = ipv4_iffindaddr(ifp, &ifo->req_addr, NULL);
 			if (ia != NULL)
 				/* Netmask must be different, delete it. */
-				ipv4_deladdr(ifp, &ia->addr, &ia->mask, 1);
+				ipv4_deladdr(ia, 1);
 			state->offer_len = dhcp_message_new(&state->offer,
 			    &ifo->req_addr, &ifo->req_mask);
 			if (dhcp_arp_address(ifp) == 0)
@@ -2420,7 +2417,9 @@ dhcp_inform(struct interface *ifp)
 		}
 	}
 
-	state->offer_len = dhcp_message_new(&state->offer, &ia->addr, &ia->mask);
+	state->addr = ia;
+	state->offer_len = dhcp_message_new(&state->offer,
+	    &ia->addr, &ia->mask);
 	if (state->offer_len) {
 		state->xid = dhcp_xid(ifp);
 		get_lease(ifp, &state->lease, state->offer, state->offer_len);
@@ -2438,7 +2437,8 @@ dhcp_reboot_newopts(struct interface *ifp, unsigned long long oldopts)
 		return;
 	ifo = ifp->options;
 	if ((ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC) &&
-		state->addr.s_addr != ifo->req_addr.s_addr) ||
+		(state->addr == NULL ||
+		state->addr->addr.s_addr != ifo->req_addr.s_addr)) ||
 	    (oldopts & (DHCPCD_INFORM | DHCPCD_STATIC) &&
 		!(ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC))))
 	{
@@ -3146,7 +3146,9 @@ dhcp_handlepacket(void *arg)
 		    ifp->name, inet_ntoa(from));
 		return;
 	}
-	if (ifp->flags & IFF_POINTOPOINT && state->brd.s_addr != from.s_addr) {
+	if (ifp->flags & IFF_POINTOPOINT &&
+	    (state->addr == NULL || state->addr->brd.s_addr != from.s_addr))
+	{
 		logger(ifp->ctx, LOG_WARNING,
 		    "%s: server %s is not destination",
 		    ifp->name, inet_ntoa(from));
@@ -3460,11 +3462,13 @@ dhcp_start1(void *arg)
 		}
 	}
 	if (state->offer) {
+		struct ipv4_addr *ia;
+
 		get_lease(ifp, &state->lease, state->offer, state->offer_len);
 		state->lease.frominfo = 1;
 		if (state->new == NULL &&
-		    ipv4_iffindaddr(ifp,
-		    &state->lease.addr, &state->lease.mask))
+		    (ia = ipv4_iffindaddr(ifp,
+		    &state->lease.addr, &state->lease.mask)) != NULL)
 		{
 			/* We still have the IP address from the last lease.
 			 * Fake add the address and routes from it so the lease
@@ -3473,19 +3477,17 @@ dhcp_start1(void *arg)
 			if (state->new) {
 				memcpy(state->new,
 				    state->offer, state->offer_len);
-				state->addr = state->lease.addr;
-				state->mask = state->lease.mask;
+				state->new_len = state->offer_len;
+				state->addr = ia;
 				state->added |= STATE_ADDED | STATE_FAKE;
 				ipv4_buildroutes(ifp->ctx);
 			} else
 				logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
 		}
 		if (!IS_DHCP(state->offer)) {
-			if (state->offer->yiaddr == state->addr.s_addr) {
-				free(state->offer);
-				state->offer = NULL;
-				state->offer_len = 0;
-			}
+			free(state->offer);
+			state->offer = NULL;
+			state->offer_len = 0;
 		} else if (!(ifo->options & DHCPCD_LASTLEASE_EXTEND) &&
 		    state->lease.leasetime != ~0U &&
 		    stat(state->leasefile, &st) == 0)
@@ -3599,29 +3601,22 @@ dhcp_abort(struct interface *ifp)
 }
 
 void
-dhcp_handleifa(int cmd, struct interface *ifp,
-	const struct in_addr *addr,
-	const struct in_addr *mask,
-	const struct in_addr *brd,
-	int flags)
+dhcp_handleifa(int cmd, struct ipv4_addr *ia)
 {
+	struct interface *ifp;
 	struct dhcp_state *state;
 	struct if_options *ifo;
 	uint8_t i;
 
+	ifp = ia->iface;
 	state = D_STATE(ifp);
 	if (state == NULL)
 		return;
 
 	if (cmd == RTM_DELADDR) {
-		if (state->addr.s_addr == addr->s_addr &&
-		    state->mask.s_addr == mask->s_addr &&
-		    state->brd.s_addr == brd->s_addr)
-		{
+		if (IPV4_BRD_EQ(state->addr, ia)) {
 			logger(ifp->ctx, LOG_INFO,
-			    "%s: removing IP address %s/%d",
-			    ifp->name, inet_ntoa(state->addr),
-			    inet_ntocidr(state->mask));
+			    "%s: removing IP address %s", ifp->name, ia->saddr);
 			dhcp_drop(ifp, "EXPIRE");
 		}
 		return;
@@ -3631,10 +3626,8 @@ dhcp_handleifa(int cmd, struct interface *ifp,
 		return;
 
 #ifdef IN_IFF_NOTUSEABLE
-	if (flags & IN_IFF_NOTUSEABLE)
+	if (ia->flags & IN_IFF_NOTUSEABLE)
 		return;
-#else
-	UNUSED(flags);
 #endif
 
 	ifo = ifp->options;
@@ -3651,14 +3644,13 @@ dhcp_handleifa(int cmd, struct interface *ifp,
 
 	free(state->old);
 	state->old = state->new;
-	state->new_len = dhcp_message_new(&state->new, addr, mask);
+	state->new_len = dhcp_message_new(&state->new, &ia->addr, &ia->mask);
 	if (state->new == NULL)
 		return;
-	state->brd = *brd;
 	if (ifp->flags & IFF_POINTOPOINT) {
 		for (i = 1; i < 255; i++)
 			if (i != DHO_ROUTER && has_option_mask(ifo->dstmask,i))
-				dhcp_message_add_addr(state->new, i, *brd);
+				dhcp_message_add_addr(state->new, i, ia->brd);
 	}
 	state->reason = "STATIC";
 	ipv4_buildroutes(ifp->ctx);
@@ -3666,9 +3658,8 @@ dhcp_handleifa(int cmd, struct interface *ifp,
 	if (ifo->options & DHCPCD_INFORM) {
 		state->state = DHS_INFORM;
 		state->xid = dhcp_xid(ifp);
-		state->lease.server = *brd;
-		state->addr = *addr;
-		state->mask = *mask;
+		state->lease.server.s_addr = INADDR_ANY;
+		state->addr = ia;
 		dhcp_inform(ifp);
 	}
 }

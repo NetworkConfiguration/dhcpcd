@@ -425,8 +425,7 @@ arp_close(struct interface *ifp)
 }
 
 void
-arp_handleifa(int cmd, struct interface *ifp, const struct in_addr *addr,
-    int flags)
+arp_handleifa(int cmd, struct ipv4_addr *addr)
 {
 #ifdef IN_IFF_DUPLICATED
 	struct iarp_state *state;
@@ -436,7 +435,7 @@ arp_handleifa(int cmd, struct interface *ifp, const struct in_addr *addr,
 		return;
 
 	TAILQ_FOREACH_SAFE(astate, &state->arp_states, next, asn) {
-		if (astate->addr.s_addr == addr->s_addr) {
+		if (astate->addr.s_addr == addr->addr.s_addr) {
 			if (flags & IN_IFF_DUPLICATED) {
 				if (astate->conflicted_cb)
 					astate->conflicted_cb(astate, NULL);
@@ -448,8 +447,6 @@ arp_handleifa(int cmd, struct interface *ifp, const struct in_addr *addr,
 	}
 #else
 	UNUSED(cmd);
-	UNUSED(ifp);
 	UNUSED(addr);
-	UNUSED(flags);
 #endif
 }

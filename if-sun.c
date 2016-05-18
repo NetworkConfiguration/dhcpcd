@@ -546,26 +546,20 @@ if_readraw(struct interface *ifp, int fd,
 }
 
 int
-if_address(const struct interface *ifp, const struct in_addr *addr,
-    const struct in_addr *mask, const struct in_addr *bcast,
-    int action)
+if_address(unsigned char cmd, struct ipv4_addr *ia)
 {
 
-	UNUSED(ifp);
-	UNUSED(addr);
-	UNUSED(mask);
-	UNUSED(bcast);
-	UNUSED(action);
+	UNUSED(cmd);
+	UNUSED(ia);
 	errno = ENOTSUP;
 	return -1;
 }
 
 int
-if_addrflags(const struct in_addr *addr, const struct interface *ifp)
+if_addrflags(const struct ipv4_addr *ia)
 {
 
-	UNUSED(addr);
-	UNUSED(ifp);
+	UNUSED(ia);
 	errno = ENOTSUP;
 	return -1;
 }
@@ -646,21 +640,20 @@ if_initrt(struct dhcpcd_ctx *ctx)
 
 #ifdef INET6
 int
-if_address6(const struct ipv6_addr *addr, int action)
+if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 {
 
-	UNUSED(addr);
+	UNUSED(cmd);
 	UNUSED(action);
 	errno = ENOTSUP;
 	return -1;
 }
 
 int
-if_addrflags6(const struct in6_addr *addr, const struct interface *ifp)
+if_addrflags6(const struct ipv6_addr *ia)
 {
 
-	UNUSED(addr);
-	UNUSED(ifp);
+	UNUSED(ia);
 	errno = ENOTSUP;
 	return -1;
 }

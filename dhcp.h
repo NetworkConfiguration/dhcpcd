@@ -213,9 +213,7 @@ struct dhcp_state {
 	int socket;
 
 	int raw_fd;
-	struct in_addr addr;
-	struct in_addr mask;
-	struct in_addr brd;
+	struct ipv4_addr *addr;
 	uint8_t added;
 
 	char leasefile[sizeof(LEASEFILE) + IF_NAMESIZE + (IF_SSIDLEN * 4)];
@@ -251,10 +249,7 @@ struct rt_head *dhcp_get_routes(struct interface *);
 ssize_t dhcp_env(char **, const char *, const struct bootp *, size_t,
     const struct interface *);
 
-void dhcp_handleifa(int, struct interface *,
-    const struct in_addr *, const struct in_addr *, const struct in_addr *,
-    int);
-
+void dhcp_handleifa(int, struct ipv4_addr *);
 void dhcp_drop(struct interface *, const char *);
 void dhcp_start(struct interface *);
 void dhcp_abort(struct interface *);
