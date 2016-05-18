@@ -556,10 +556,11 @@ if_address(unsigned char cmd, struct ipv4_addr *ia)
 }
 
 int
-if_addrflags(const struct ipv4_addr *ia)
+if_addrflags(const struct in_addr *addr, const struct interface *ifp)
 {
 
-	UNUSED(ia);
+	UNUSED(addr);
+	UNUSED(ifp);
 	errno = ENOTSUP;
 	return -1;
 }
@@ -650,10 +651,11 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 }
 
 int
-if_addrflags6(const struct ipv6_addr *ia)
+if_addrflags6(const struct in6_addr *addr, const struct interface *ifp)
 {
 
-	UNUSED(ia);
+	UNUSED(addr);
+	UNUSED(ifp);
 	errno = ENOTSUP;
 	return -1;
 }
