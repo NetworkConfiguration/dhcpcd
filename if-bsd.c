@@ -142,7 +142,7 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 #endif
 
 #define SOCK_FLAGS	(SOCK_CLOEXEC | SOCK_NONBLOCK)
-	ctx->link_fd = xsocket(PF_ROUTE, SOCK_RAW | SOCK_FLAGS, 0);
+	ctx->link_fd = xsocket(PF_ROUTE, SOCK_RAW | SOCK_FLAGS, AF_UNSPEC);
 #undef SOCK_FLAGS
 	return ctx->link_fd == -1 ? -1 : 0;
 }
