@@ -37,6 +37,10 @@
 
 #include <inet/ip.h>
 
+/* private interface we can hook into to get
+ * a better getifaddrs(3). */
+#include <libsocket_priv.h>
+
 #include <net/if_dl.h>
 #include <net/if_types.h>
 
@@ -192,6 +196,7 @@ if_newaddr(const char *ifname, void *arg)
 		goto failed;
 
 	ifa->ifa_addr = (struct sockaddr *)sdl;
+	sdl->sdl_index = if_nametoindex(ifname);
 	sdl->sdl_family = AF_LINK;
 	switch (dlinfo.di_mactype) {
 	case DL_ETHER:
@@ -247,20 +252,26 @@ if_ifa_lo0(void)
 	ifa->ifa_addr = (struct sockaddr *)sdl;
 	ifa->ifa_flags = IFF_LOOPBACK;
 	sdl->sdl_family = AF_LINK;
+	sdl->sdl_index = if_nametoindex("lo0");
 
 	return ifa;
 }
 
-/* all getifaddrs(3) should support AF_LINK, but hey ho */
+/* getifaddrs(3) does not support AF_LINK, strips aliases and won't
+ * report addresses that are not UP.
+ * As such it's just totally useless, so we need to roll our own. */
 int
 if_getifaddrs(struct ifaddrs **ifap)
 {
 	struct linkwalk		lw;
+	struct ifaddrs		*ifa;
 
-	/* lo0 doesn't appear in dlpi_walk, so fudge it. */
-	if ((lw.lw_ifa = if_ifa_lo0()) == NULL)
+	/* Private libc function which we should not have to call
+	 * to get non UP addresses. */
+	if (getallifaddrs(AF_UNSPEC, &lw.lw_ifa, 0) == -1)
 		return -1;
 
+	/* Start with some AF_LINK addresses. */
 	lw.lw_error = 0;
 	dlpi_walk(if_newaddr, &lw, 0);
 	if (lw.lw_error != 0) {
@@ -269,7 +280,14 @@ if_getifaddrs(struct ifaddrs **ifap)
 		return -1;
 	}
 
-	*ifap = lw.lw_ifa;
+	/* lo0 doesn't appear in dlpi_walk, so fudge it. */
+	if ((ifa = if_ifa_lo0()) == NULL) {
+		freeifaddrs(lw.lw_ifa);
+		return -1;
+	}
+	ifa->ifa_next = lw.lw_ifa;
+
+	*ifap = ifa;
 	return 0;
 }
 
@@ -546,7 +564,7 @@ if_readraw(struct interface *ifp, int fd,
 }
 
 int
-if_address(unsigned char cmd, struct ipv4_addr *ia)
+if_address(unsigned char cmd, const struct ipv4_addr *ia)
 {
 
 	UNUSED(cmd);
@@ -645,7 +663,7 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 {
 
 	UNUSED(cmd);
-	UNUSED(action);
+	UNUSED(ia);
 	errno = ENOTSUP;
 	return -1;
 }

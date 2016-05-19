@@ -83,9 +83,11 @@
 #define RAW_PARTIALCSUM		1 << 0
 
 #ifdef __sun
-/* platform does not supply AF_LINK with getifaddrs. */
+/* Solaris getifaddrs is very un-suitable for dhcpcd.
+ * See if-sun.c for details why. */
 struct ifaddrs;
 int if_getifaddrs(struct ifaddrs **);
+#define	getifaddrs	if_getaddrs
 #else
 #define GETIFADDRS_AFLINK
 #endif
