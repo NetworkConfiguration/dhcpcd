@@ -1434,8 +1434,12 @@ get_lease(struct interface *ifp,
 	/* BOOTP does not set yiaddr for replies when ciaddr is set. */
 	lease->addr.s_addr = bootp->yiaddr ? bootp->yiaddr : bootp->ciaddr;
 	ctx = ifp->ctx;
-	if (ifp->options->options & DHCPCD_INFORM) {
-		lease->mask = ifp->options->req_mask;
+	if (ifp->options->options & (DHCPCD_STATIC | DHCPCD_INFORM)) {
+		if (ifp->options->req_mask.s_addr == INADDR_ANY)
+			lease->mask.s_addr =
+			    ipv4_getnetmask(lease->addr.s_addr);
+		else
+			lease->mask = ifp->options->req_mask;
 		lease->brd.s_addr = lease->addr.s_addr | ~lease->mask.s_addr;
 	} else {
 		if (get_option_addr(ctx, &lease->mask, bootp, len,
