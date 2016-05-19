@@ -378,7 +378,7 @@ ipv4ll_start(void *arg)
 	ia = ipv4_iffindlladdr(ifp);
 #ifdef IN_IFF_TENTATIVE
 	if (ia != NULL && ia->addr_flags & IN_IFF_DUPLICATED) {
-		ipv4_deladdr(ifp, &ia->addr, &ia->net, 0);
+		ipv4_deladdr(ia, 0);
 		ia = NULL;
 	}
 #endif

@@ -431,15 +431,15 @@ arp_handleifa(int cmd, struct ipv4_addr *addr)
 	struct iarp_state *state;
 	struct arp_state *astate, *asn;
 
-	if (cmd != RTM_NEWADDR || (state = ARP_STATE(ifp)) == NULL)
+	if (cmd != RTM_NEWADDR || (state = ARP_STATE(addr->iface)) == NULL)
 		return;
 
 	TAILQ_FOREACH_SAFE(astate, &state->arp_states, next, asn) {
 		if (astate->addr.s_addr == addr->addr.s_addr) {
-			if (flags & IN_IFF_DUPLICATED) {
+			if (addr->addr_flags & IN_IFF_DUPLICATED) {
 				if (astate->conflicted_cb)
 					astate->conflicted_cb(astate, NULL);
-			} else if (!(flags & IN_IFF_NOTUSEABLE)) {
+			} else if (!(addr->addr_flags & IN_IFF_NOTUSEABLE)) {
 				if (astate->probed_cb)
 					astate->probed_cb(astate);
 			}

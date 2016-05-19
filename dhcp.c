@@ -2076,9 +2076,8 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 		    !state->lease.frominfo)
 			dhcp_decline(ifp);
 #ifdef IN_IFF_DUPLICATED
-		ia = ipv4_iffindaddr(ifp, &astate->addr->addr, NULL);
-		if (ia)
-			ipv4_deladdr(ia->addr, 1);
+		if ((ia = ipv4_iffindaddr(ifp, &astate->addr, NULL)) != NULL)
+			ipv4_deladdr(ia, 1);
 #endif
 		arp_free(astate);
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
@@ -2918,7 +2917,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 		LOGDHCP(LOG_WARNING, "declined duplicate address");
 		if (type)
 			dhcp_decline(ifp);
-		ipv4_deladdr(ifp, &ia->addr, &ia->mask, 0);
+		ipv4_deladdr(ia, 0);
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    DHCP_RAND_MAX, dhcp_discover, ifp);
@@ -3626,7 +3625,7 @@ dhcp_handleifa(int cmd, struct ipv4_addr *ia)
 		return;
 
 #ifdef IN_IFF_NOTUSEABLE
-	if (ia->flags & IN_IFF_NOTUSEABLE)
+	if (ia->addr_flags & IN_IFF_NOTUSEABLE)
 		return;
 #endif
 
