@@ -270,12 +270,11 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 	const struct sockaddr_ll *sll;
 #endif
 
-	if (if_getifaddrs(&ifaddrs) == -1)
+	if (getifaddrs(&ifaddrs) == -1)
 		return NULL;
 
-	ifs = malloc(sizeof(*ifs));
-	if (ifs == NULL)
-		return NULL;
+	if ((ifs = malloc(sizeof(*ifs))) == NULL)
+		goto failed;
 	TAILQ_INIT(ifs);
 
 	for (ifa = ifaddrs; ifa; ifa = ifa->ifa_next) {
@@ -550,8 +549,8 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 	}
 
 	if_learnaddrs(ctx, ifs, ifaddrs);
+failed:
 	freeifaddrs(ifaddrs);
-
 	return ifs;
 }
 
