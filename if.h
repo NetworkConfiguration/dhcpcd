@@ -87,7 +87,7 @@
  * See if-sun.c for details why. */
 struct ifaddrs;
 int if_getifaddrs(struct ifaddrs **);
-#define	getifaddrs	if_getaddrs
+#define	getifaddrs	if_getifaddrs
 #else
 #define GETIFADDRS_AFLINK
 #endif
