@@ -888,7 +888,6 @@ ipv4_buildroutes(struct dhcpcd_ctx *ctx)
 int
 ipv4_deladdr(struct ipv4_addr *addr, int keeparp)
 {
-	struct interface *ifp;
 	int r;
 	struct ipv4_state *state;
 	struct ipv4_addr *ap;
@@ -911,10 +910,10 @@ ipv4_deladdr(struct ipv4_addr *addr, int keeparp)
 		if (IPV4_MASK_EQ(ap, addr)) {
 			struct dhcp_state *dstate;
 
+			dstate = D_STATE(ap->iface);
 			TAILQ_REMOVE(&state->addrs, ap, next);
 			free(ap);
 
-			dstate = D_STATE(ifp);
 			if (dstate && dstate->addr == ap) {
 				dstate->added = 0;
 				dstate->addr = NULL;
