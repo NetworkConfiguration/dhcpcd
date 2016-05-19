@@ -1086,7 +1086,7 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 
 void
 dhcpcd_handlehwaddr(struct dhcpcd_ctx *ctx, const char *ifname,
-    const uint8_t *hwaddr, uint8_t hwlen)
+    const void *hwaddr, uint8_t hwlen)
 {
 	struct interface *ifp;
 	char buf[sizeof(ifp->hwaddr) * 3];

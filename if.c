@@ -460,7 +460,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 			}
 			ifp->hwlen = sdl->sdl_alen;
 #ifndef CLLADDR
-#  define CLLADDR(s) ((const char *)((s)->sdl_data + (s)->sdl_nlen))
+#  define CLLADDR(s) (const void *)((s)->sdl_data + (s)->sdl_nlen)
 #endif
 			memcpy(ifp->hwaddr, CLLADDR(sdl), ifp->hwlen);
 #elif AF_PACKET
