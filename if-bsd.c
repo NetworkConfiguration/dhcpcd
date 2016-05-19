@@ -171,7 +171,7 @@ if_linkaddr(struct sockaddr_dl *sdl, const struct interface *ifp)
 #endif
 
 static int
-if_getssid1(int s, const char *ifname, uint8_t *ssid)
+if_getssid1(int s, const char *ifname, void *ssid)
 {
 	int retval = -1;
 #if defined(SIOCG80211NWID)
@@ -263,7 +263,7 @@ if_vimaster(const struct dhcpcd_ctx *ctx, const char *ifname)
 }
 
 static void
-get_addrs(int type, uint8_t *cp, struct sockaddr **sa)
+get_addrs(int type, void *cp, struct sockaddr **sa)
 {
 	int i;
 
@@ -492,7 +492,7 @@ if_readraw(struct interface *ifp, int fd, void *data, size_t len, int *flags)
 {
 	struct bpf_hdr packet;
 	ssize_t bytes;
-	const unsigned char *payload;
+	const char *payload;
 	struct ipv4_state *state;
 
 	state = IPV4_STATE(ifp);
@@ -769,7 +769,7 @@ if_route(unsigned char cmd, const struct rt *rt)
 }
 
 int
-if_initrt(struct dhcpcd_ctx *ctx) 
+if_initrt(struct dhcpcd_ctx *ctx)
 {
 	struct rt_msghdr *rtm;
 	int mib[6];
@@ -1350,7 +1350,6 @@ static void
 if_ifa(struct dhcpcd_ctx *ctx, struct ifa_msghdr *ifam)
 {
 	struct interface *ifp;
-	uint8_t *cp;
 	struct sockaddr *rti_info[RTAX_MAX];
 
 	/* XXX We have no way of knowing who generated these
@@ -1358,8 +1357,7 @@ if_ifa(struct dhcpcd_ctx *ctx, struct ifa_msghdr *ifam)
 	 * avoid listening to our own delete messages. */
 	if ((ifp = if_findindex(ctx->ifaces, ifam->ifam_index)) == NULL)
 		return;
-	cp = (void *)(ifam + 1);
-	get_addrs(ifam->ifam_addrs, cp, rti_info);
+	get_addrs(ifam->ifam_addrs, ifam + 1, rti_info);
 	if (rti_info[RTAX_IFA] == NULL)
 		return;
 	switch (rti_info[RTAX_IFA]->sa_family) {
@@ -1456,7 +1454,7 @@ int
 if_handlelink(struct dhcpcd_ctx *ctx)
 {
 	/* route and ifwatchd like a msg buf size of 2048 */
-	uint8_t buf[2048], *p, *e;
+	char buf[2048], *p, *e;
 	size_t msglen;
 	ssize_t bytes;
 

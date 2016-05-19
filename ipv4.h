@@ -92,7 +92,7 @@ struct ipv4_state {
 #ifdef BSD
 	/* Buffer for BPF */
 	size_t buffer_size, buffer_len, buffer_pos;
-	uint8_t *buffer;
+	char *buffer;
 #endif
 };
 
