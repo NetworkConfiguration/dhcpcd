@@ -136,7 +136,7 @@ if_vimaster(__unused const struct dhcpcd_ctx *ctx, __unused const char *ifname)
 }
 
 int
-if_managelink(struct dhcpcd_ctx *ctx)
+if_handlelink(struct dhcpcd_ctx *ctx)
 {
 
 	UNUSED(ctx);

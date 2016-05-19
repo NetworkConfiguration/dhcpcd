@@ -1227,7 +1227,7 @@ if_getlifetime6(struct ipv6_addr *ia)
 #endif
 
 int
-if_managelink(struct dhcpcd_ctx *ctx)
+if_handlelink(struct dhcpcd_ctx *ctx)
 {
 	/* route and ifwatchd like a msg buf size of 2048 */
 	char msg[2048], *p, *e, *cp;

@@ -111,7 +111,7 @@ int if_opensockets(struct dhcpcd_ctx *);
 int if_opensockets_os(struct dhcpcd_ctx *);
 void if_closesockets(struct dhcpcd_ctx *);
 void if_closesockets_os(struct dhcpcd_ctx *);
-int if_managelink(struct dhcpcd_ctx *);
+int if_handlelink(struct dhcpcd_ctx *);
 
 /* dhcpcd uses the same routing flags as BSD.
  * If the platform doesn't use these flags,

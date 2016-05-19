@@ -885,7 +885,7 @@ link_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp,
 }
 
 int
-if_managelink(struct dhcpcd_ctx *ctx)
+if_handlelink(struct dhcpcd_ctx *ctx)
 {
 
 	return get_netlink(ctx, NULL,

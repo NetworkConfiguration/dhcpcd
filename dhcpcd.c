@@ -986,13 +986,13 @@ dhcpcd_activateinterface(struct interface *ifp, unsigned long long options)
 }
 
 static void
-handle_link(void *arg)
+dhcpcd_handlelink(void *arg)
 {
 	struct dhcpcd_ctx *ctx;
 
 	ctx = arg;
-	if (if_managelink(ctx) == -1) {
-		logger(ctx, LOG_ERR, "if_managelink: %m");
+	if (if_handlelink(ctx) == -1) {
+		logger(ctx, LOG_ERR, "if_handlelink: %m");
 		eloop_event_delete(ctx->eloop, ctx->link_fd);
 		close(ctx->link_fd);
 		ctx->link_fd = -1;
@@ -1828,7 +1828,7 @@ printpidfile:
 
 	/* Start handling kernel messages for interfaces, addreses and
 	 * routes. */
-	eloop_event_add(ctx.eloop, ctx.link_fd, handle_link, &ctx);
+	eloop_event_add(ctx.eloop, ctx.link_fd, dhcpcd_handlelink, &ctx);
 
 	/* Start any dev listening plugin which may want to
 	 * change the interface name provided by the kernel */
