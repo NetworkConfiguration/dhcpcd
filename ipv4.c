@@ -578,13 +578,13 @@ static struct rt_head *
 add_loopback_route(struct rt_head *rt, const struct interface *ifp)
 {
 	struct rt *r;
-	const struct dhcp_state *s;
+	const struct dhcp_state *state;
 
 	if (rt == NULL) /* earlier malloc failed */
 		return NULL;
 
-	s = D_CSTATE(ifp);
-	if (s->addr.s_addr == INADDR_ANY)
+	state = D_CSTATE(ifp);
+	if (state->addr == NULL)
 		return rt;
 
 	if ((r = calloc(1, sizeof(*r))) == NULL) {
@@ -592,11 +592,11 @@ add_loopback_route(struct rt_head *rt, const struct interface *ifp)
 		ipv4_freeroutes(rt);
 		return NULL;
 	}
-	r->dest = s->addr;
+	r->dest = state->addr->addr;
 	r->mask.s_addr = INADDR_BROADCAST;
 	r->gate.s_addr = htonl(INADDR_LOOPBACK);
 	r->mtu = dhcp_get_mtu(ifp);
-	r->src = s->addr;
+	r->src = state->addr->addr;
 	TAILQ_INSERT_HEAD(rt, r, next);
 	return rt;
 }
