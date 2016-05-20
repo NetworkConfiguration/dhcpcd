@@ -906,7 +906,6 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 	    cmd == RTM_DELADDR ? SIOCDIFADDR_IN6 : SIOCAIFADDR_IN6, &ifa);
 }
 
-
 static int
 if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct rt_msghdr *rtm)
 {
