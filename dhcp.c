@@ -782,7 +782,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 	    type != DHCP_DECLINE &&
 	    type != DHCP_RELEASE)
 		bootp->flags = htons(BROADCAST_FLAG);
-#if 0
+
 	if (type != DHCP_DECLINE && type != DHCP_RELEASE) {
 		struct timespec tv;
 
@@ -793,7 +793,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 		else
 			bootp->secs = htons((uint16_t)tv.tv_sec);
 	}
-#endif
+
 	bootp->xid = htonl(state->xid);
 
 	if (ifo->options & DHCPCD_BOOTP)
