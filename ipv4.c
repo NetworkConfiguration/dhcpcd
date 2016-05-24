@@ -1212,10 +1212,6 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 		errno = ESRCH;
 		return;
 	}
-	if (addr->s_addr == INADDR_ANY) {
-		errno = EINVAL;
-		return;
-	}
 	if ((ifp = if_find(ifs, ifname)) == NULL)
 		return;
 	if ((state = ipv4_getstate(ifp)) == NULL) {
@@ -1254,9 +1250,11 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 		return;
 	}
 
-	arp_handleifa(cmd, ia);
-	dhcp_handleifa(cmd, ia);
-	
+	if (addr->s_addr != INADDR_ANY && addr->s_addr != INADDR_BROADCAST) {
+		arp_handleifa(cmd, ia);
+		dhcp_handleifa(cmd, ia);
+	}
+
 	if (cmd == RTM_DELADDR)
 		free(ia);
 }
