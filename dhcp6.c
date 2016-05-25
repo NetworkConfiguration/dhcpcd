@@ -2954,8 +2954,8 @@ dhcp6_handledata(void *arg)
 		}
 		if (ap == NULL)
 			ap = TAILQ_FIRST(&state->addrs);
-		logger(ifp->ctx, LOG_INFO, "%s: ADV %p %s from %s",
-		    ifp->name, ap, ap->saddr, ctx->sfrom);
+		logger(ifp->ctx, LOG_INFO, "%s: ADV %s from %s",
+		    ifp->name, ap->saddr, ctx->sfrom);
 		if (ifp->ctx->options & DHCPCD_TEST)
 			break;
 		dhcp6_startrequest(ifp);
