@@ -420,14 +420,17 @@ configure_interface1(struct interface *ifp)
 	if (ifo->options & DHCPCD_RELEASE)
 		ifo->options &= ~DHCPCD_PERSISTENT;
 
-	if (ifp->flags & IFF_POINTOPOINT && !(ifo->options & DHCPCD_INFORM))
-		ifo->options |= DHCPCD_STATIC;
+	if (ifp->flags & (IFF_POINTOPOINT | IFF_LOOPBACK)) {
+		ifo->options &= ~DHCPCD_ARP;
+		if (!(ifp->flags & IFF_MULTICAST))
+			ifo->options &= ~DHCPCD_IPV6RS;
+		if (!(ifo->options & DHCPCD_INFORM))
+			ifo->options |= DHCPCD_STATIC;
+	}
 	if (ifp->flags & IFF_NOARP ||
+	    !(ifo->options & DHCPCD_ARP) ||
 	    ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC))
 		ifo->options &= ~DHCPCD_IPV4LL;
-	if (ifp->flags & (IFF_POINTOPOINT | IFF_LOOPBACK) ||
-	    !(ifp->flags & IFF_MULTICAST))
-		ifo->options &= ~DHCPCD_IPV6RS;
 
 	if (ifo->metric != -1)
 		ifp->metric = (unsigned int)ifo->metric;
