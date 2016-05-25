@@ -548,6 +548,10 @@ add_subnet_route(struct rt_head *rt, const struct interface *ifp)
 	if (rt == NULL) /* earlier malloc failed */
 		return NULL;
 
+	/* P2P interfaces don't have subnet routes as such. */
+	if (ifp->flags & IFF_POINTOPOINT)
+		return rt;
+
 	state = D_CSTATE(ifp);
 	/* Don't create a subnet route for these addresses */
 	if (state->addr->mask.s_addr == INADDR_ANY)
@@ -676,6 +680,10 @@ add_router_host_route(struct rt_head *rt, const struct interface *ifp)
 
 	if (rt == NULL) /* earlier malloc failed */
 		return NULL;
+
+	/* Don't add a host route for these interfaces. */
+	if (ifp->flags & (IFF_LOOPBACK | IFF_POINTOPOINT))
+		return rt;
 
 	TAILQ_FOREACH(rtp, rt, next) {
 		if (rtp->dest.s_addr != INADDR_ANY)
