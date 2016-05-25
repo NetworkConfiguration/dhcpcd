@@ -1377,12 +1377,19 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 	case AF_INET:
 	case 255: /* FIXME: Why 255? */
 	{
+		const struct sockaddr_in *sin;
 		struct in_addr addr, mask, bcast;
 		int flags;
 
-		COPYOUT(addr, rti_info[RTAX_IFA]);
-		COPYOUT(mask, rti_info[RTAX_NETMASK]);
-		COPYOUT(bcast, rti_info[RTAX_BRD]);
+		sin = (const void *)rti_info[RTAX_IFA];
+		addr.s_addr = sin != NULL && sin->sin_family == AF_INET ?
+		    sin->sin_addr.s_addr : INADDR_ANY;
+		sin = (const void *)rti_info[RTAX_NETMASK];
+		mask.s_addr = sin != NULL && sin->sin_family == AF_INET ?
+		    sin->sin_addr.s_addr : INADDR_ANY;
+		sin = (const void *)rti_info[RTAX_BRD];
+		bcast.s_addr = sin != NULL && sin->sin_family == AF_INET ?
+		    sin->sin_addr.s_addr : INADDR_ANY;
 		if (ifam->ifam_type == RTM_NEWADDR) {
 			if ((flags = if_addrflags(&addr, ifp)) == -1)
 				break;
