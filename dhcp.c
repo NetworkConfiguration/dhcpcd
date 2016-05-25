@@ -668,7 +668,7 @@ dhcp_get_mtu(const struct interface *ifp)
 	if ((state = D_CSTATE(ifp)) == NULL ||
 	    has_option_mask(ifp->options->nomask, DHO_MTU) ||
 	    get_option_uint16(ifp->ctx, &mtu,
-		    	      state->new, state->new_len, DHO_MTU) == -1)
+			      state->new, state->new_len, DHO_MTU) == -1)
 		return 0;
 	return mtu;
 }
@@ -1435,12 +1435,18 @@ get_lease(struct interface *ifp,
 	lease->addr.s_addr = bootp->yiaddr ? bootp->yiaddr : bootp->ciaddr;
 	ctx = ifp->ctx;
 	if (ifp->options->options & (DHCPCD_STATIC | DHCPCD_INFORM)) {
-		if (ifp->options->req_mask.s_addr == INADDR_ANY)
-			lease->mask.s_addr =
-			    ipv4_getnetmask(lease->addr.s_addr);
-		else
+		if (ifp->options->req_addr.s_addr != INADDR_ANY) {
 			lease->mask = ifp->options->req_mask;
-		lease->brd.s_addr = lease->addr.s_addr | ~lease->mask.s_addr;
+			lease->brd.s_addr =
+			    lease->addr.s_addr | ~lease->mask.s_addr;
+		} else {
+			const struct ipv4_addr *ia;
+
+			ia = ipv4_iffindaddr(ifp, &lease->addr, NULL);
+			assert(ia != NULL);
+			lease->mask = ia->mask;
+			lease->brd = ia->brd;
+		}
 	} else {
 		if (get_option_addr(ctx, &lease->mask, bootp, len,
 		    DHO_SUBNETMASK) == -1)
@@ -2264,10 +2270,10 @@ dhcp_message_new(struct bootp **bootp,
 	p = (*bootp)->vend;
 
 	cookie = htonl(MAGIC_COOKIE);
-	memcpy(&cookie, p, sizeof(cookie));
+	memcpy(p, &cookie, sizeof(cookie));
 	p += sizeof(cookie);
 
-	if (mask && mask->s_addr != INADDR_ANY) {
+	if (mask->s_addr != INADDR_ANY) {
 		*p++ = DHO_SUBNETMASK;
 		*p++ = sizeof(mask->s_addr);
 		memcpy(p, &mask->s_addr, sizeof(mask->s_addr));
@@ -3552,6 +3558,13 @@ dhcp_start(struct interface *ifp)
 
 	if (!(ifp->options->options & DHCPCD_IPV4))
 		return;
+
+	/* If we haven't been given a netmask for our requested address,
+	 * set it now. */
+	if (ifp->options->req_addr.s_addr != INADDR_ANY &&
+	    ifp->options->req_mask.s_addr == INADDR_ANY)
+		ifp->options->req_mask.s_addr =
+		    ipv4_getnetmask(ifp->options->req_addr.s_addr);
 
 	/* If we haven't specified a ClientID and our hardware address
 	 * length is greater than BOOTP CHADDR then we enforce a ClientID
