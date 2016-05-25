@@ -2948,9 +2948,14 @@ dhcp6_handledata(void *arg)
 	case DHCP6_ADVERTISE:
 		if (state->state == DH6S_REQUEST) /* rapid commit */
 			break;
-		ap = TAILQ_FIRST(&state->addrs);
-		logger(ifp->ctx, LOG_INFO, "%s: ADV %s from %s",
-		    ifp->name, ap->saddr, ctx->sfrom);
+		TAILQ_FOREACH(ap, &state->addrs, next) {
+			if (!(ap->flags & IPV6_AF_REQUEST))
+				break;
+		}
+		if (ap == NULL)
+			ap = TAILQ_FIRST(&state->addrs);
+		logger(ifp->ctx, LOG_INFO, "%s: ADV %p %s from %s",
+		    ifp->name, ap, ap->saddr, ctx->sfrom);
 		if (ifp->ctx->options & DHCPCD_TEST)
 			break;
 		dhcp6_startrequest(ifp);
