@@ -2520,7 +2520,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 		if (k && !carrier_warned) {
 			ifd_state = D6_STATE(ifd);
 			ipv6_addaddrs(&ifd_state->addrs);
-			if_initrt(ifd->ctx);
+			if_initrt6(ifd->ctx);
 			ipv6_buildroutes(ifd->ctx);
 			dhcp6_script_try_run(ifd, 1);
 		}
@@ -3422,6 +3422,20 @@ dhcp6_free(struct interface *ifp)
 {
 
 	dhcp6_freedrop(ifp, 0, NULL);
+}
+
+void dhcp6_dropnondelegates(struct interface *ifp)
+{
+	struct dhcp6_state *state;
+	struct ipv6_addr *ia;
+
+	if ((state = D6_STATE(ifp)) == NULL)
+		return;
+	TAILQ_FOREACH(ia, &state->addrs, next) {
+		if (ia->flags & (IPV6_AF_DELEGATED | IPV6_AF_DELEGATEDPFX))
+			return;
+	}
+	dhcp6_drop(ifp, "EXPIRE6");
 }
 
 void
