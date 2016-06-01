@@ -1165,7 +1165,12 @@ read_lease(struct interface *ifp, struct bootp **bootp)
 		return 0;
 	}
 
-	if (bytes < sizeof(**bootp)) {
+	/* Ensure the packet is at lease BOOTP sized
+	 * with a vendor area of 4 octets
+	 * (it should be more, and our read packet enforces this so this
+	 * code should not be needed, but of course people could
+	 * scribble whatever in the stored lease file. */
+	if (bytes < offsetof(struct bootp, vend) + 4) {
 		free(lease);
 		logger(ifp->ctx, LOG_ERR, "%s: truncated lease", __func__);
 		return 0;
