@@ -2246,6 +2246,9 @@ dhcp_lastlease(void *arg)
 	struct interface *ifp = arg;
 	struct dhcp_state *state = D_STATE(ifp);
 
+	logger(ifp->ctx, LOG_INFO,
+	    "%s: timed out contacting a DHCP server, using last lease",
+	    ifp->name);
 	dhcp_bind(ifp);
 	/* If we forked, stop here. */
 	if (ifp->ctx->options & DHCPCD_FORKED)
