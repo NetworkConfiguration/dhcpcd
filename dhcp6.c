@@ -2484,12 +2484,11 @@ dhcp6_delegate_prefix(struct interface *ifp)
 		TAILQ_FOREACH(ap, &state->addrs, next) {
 			if (!(ap->flags & IPV6_AF_DELEGATEDPFX))
 				continue;
-			if (ap->flags & IPV6_AF_NEW) {
-				ap->flags &= ~IPV6_AF_NEW;
-				logger(ifp->ctx, LOG_DEBUG,
-				    "%s: delegated prefix %s",
-				    ifp->name, ap->saddr);
-			}
+			logger(ifp->ctx,
+			    ap->flags & IPV6_AF_NEW ? LOG_INFO : LOG_DEBUG,
+			    "%s: delegated prefix %s",
+			    ifp->name, ap->saddr);
+			ap->flags &= ~IPV6_AF_NEW;
 			for (i = 0; i < ifo->ia_len; i++) {
 				ia = &ifo->ia[i];
 				if (memcmp(ia->iaid, ap->iaid,
