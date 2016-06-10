@@ -1866,6 +1866,9 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			continue;
 		}
 
+		pltime = 20;
+		vltime = 30;
+
 		TAILQ_FOREACH(a, &state->addrs, next) {
 			if (IN6_ARE_ADDR_EQUAL(&a->prefix, &pdp->prefix))
 				break;
@@ -2476,6 +2479,11 @@ dhcp6_delegate_prefix(struct interface *ifp)
 	ifo = ifp->options;
 	state = D6_STATE(ifp);
 
+	/* Clear the logged flag. */
+	TAILQ_FOREACH(ap, &state->addrs, next) {
+		ap->flags &= ~IPV6_AF_DELEGATEDLOG;
+	}
+
 	TAILQ_FOREACH(ifd, ifp->ctx->ifaces, next) {
 		if (!ifd->active)
 			continue;
@@ -2484,11 +2492,16 @@ dhcp6_delegate_prefix(struct interface *ifp)
 		TAILQ_FOREACH(ap, &state->addrs, next) {
 			if (!(ap->flags & IPV6_AF_DELEGATEDPFX))
 				continue;
-			logger(ifp->ctx,
-			    ap->flags & IPV6_AF_NEW ? LOG_INFO : LOG_DEBUG,
-			    "%s: delegated prefix %s",
-			    ifp->name, ap->saddr);
-			ap->flags &= ~IPV6_AF_NEW;
+			if (!(ap->flags & IPV6_AF_DELEGATEDLOG)) {
+				/* We only want to log this the once as we loop
+				 * through many interfaces first. */
+				ap->flags |= IPV6_AF_DELEGATEDLOG;
+				logger(ifp->ctx,
+				    ap->flags & IPV6_AF_NEW ?LOG_INFO:LOG_DEBUG,
+				    "%s: delegated prefix %s",
+				    ifp->name, ap->saddr);
+				ap->flags &= ~IPV6_AF_NEW;
+			}
 			for (i = 0; i < ifo->ia_len; i++) {
 				ia = &ifo->ia[i];
 				if (memcmp(ia->iaid, ap->iaid,

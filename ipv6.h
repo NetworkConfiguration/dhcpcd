@@ -181,8 +181,9 @@ struct ipv6_addr {
 #define	IPV6_AF_NOREJECT	0x0200
 #define	IPV6_AF_REQUEST		0x0400
 #define	IPV6_AF_STATIC		0x0800
+#define IPV6_AF_DELEGATEDLOG	0x1000
 #ifdef IPV6_MANAGETEMPADDR
-#define	IPV6_AF_TEMPORARY	0X1000
+#define	IPV6_AF_TEMPORARY	0X2000
 #endif
 
 struct rt6 {
