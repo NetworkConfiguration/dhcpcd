@@ -1866,9 +1866,6 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			continue;
 		}
 
-		pltime = 20;
-		vltime = 30;
-
 		TAILQ_FOREACH(a, &state->addrs, next) {
 			if (IN6_ARE_ADDR_EQUAL(&a->prefix, &pdp->prefix))
 				break;
