@@ -2404,7 +2404,7 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 		ia->flags = IPV6_AF_NEW | IPV6_AF_ONLINK;
 		ia->dadcallback = dhcp6_dadcallback;
 		memcpy(&ia->iaid, &prefix->iaid, sizeof(ia->iaid));
-		ia->created = ia->acquired = prefix->acquired;
+		ia->created = prefix->acquired;
 		ia->addr = daddr;
 
 		TAILQ_INSERT_TAIL(&state->addrs, ia, next);
@@ -2413,6 +2413,7 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 	ia->delegating_prefix = prefix;
 	ia->prefix = addr;
 	ia->prefix_len = (uint8_t)pfxlen;
+	ia->acquired = prefix->acquired;
 	ia->prefix_pltime = prefix->prefix_pltime;
 	ia->prefix_vltime = prefix->prefix_vltime;
 
