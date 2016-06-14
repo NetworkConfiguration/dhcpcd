@@ -2508,6 +2508,8 @@ dhcp_reboot(struct interface *ifp)
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    ifo->reboot, ipv4ll_start, ifp);
 
+	logger(ifp->ctx, LOG_INFO, "DEBUG %llu %d\n", ifo->options & DHCPCD_LASTLEASE,
+	    state->lease.frominfo);
 	if (ifo->options & DHCPCD_LASTLEASE && state->lease.frominfo)
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    ifo->reboot, dhcp_lastlease, ifp);
