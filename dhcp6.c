@@ -171,9 +171,6 @@ dhcp6_makevendor(struct dhcp6_option *o, const struct interface *ifp)
 	char vendor[VENDORCLASSID_MAX_LEN];
 
 	ifo = ifp->options;
-	if (has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_CLASS))
-		return 0;
-
 	len = sizeof(uint32_t); /* IANA PEN */
 	if (ifo->vivco_en) {
 		for (i = 0, vivco = ifo->vivco;
@@ -591,7 +588,8 @@ dhcp6_makemessage(struct interface *ifp)
 	len += sizeof(*state->send);
 	len += sizeof(*o) + ifp->ctx->duid_len;
 	len += sizeof(*o) + sizeof(uint16_t); /* elapsed */
-	len += sizeof(*o) + dhcp6_makevendor(NULL, ifp);
+	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_CLASS))
+		len += sizeof(*o) + dhcp6_makevendor(NULL, ifp);
 
 	/* IA */
 	m = NULL;
@@ -740,8 +738,10 @@ dhcp6_makemessage(struct interface *ifp)
 	p = D6_OPTION_DATA(o);
 	memset(p, 0, sizeof(uint16_t));
 
-	o = D6_NEXT_OPTION(o);
-	dhcp6_makevendor(o, ifp);
+	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_CLASS)) {
+		o = D6_NEXT_OPTION(o);
+		dhcp6_makevendor(o, ifp);
+	}
 
 	if (state->state == DH6S_DISCOVER &&
 	    !(ifp->ctx->options & DHCPCD_TEST) &&
