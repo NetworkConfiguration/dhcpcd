@@ -171,6 +171,9 @@ dhcp6_makevendor(struct dhcp6_option *o, const struct interface *ifp)
 	char vendor[VENDORCLASSID_MAX_LEN];
 
 	ifo = ifp->options;
+	if (has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_CLASS))
+		return 0;
+
 	len = sizeof(uint32_t); /* IANA PEN */
 	if (ifo->vivco_en) {
 		for (i = 0, vivco = ifo->vivco;
