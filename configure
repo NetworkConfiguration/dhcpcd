@@ -57,6 +57,7 @@ for x do
 	--with-ccopts|CFLAGS) CFLAGS=$var;;
 	CC) CC=$var;;
 	CPPFLAGS) CPPFLAGS=$var;;
+	PKG_CONFIG) PKG_CONFIG=$var;;
 	--with-hook) HOOKSCRIPTS="$HOOKSCRIPTS${HOOKSCRIPTS:+ }$var";;
 	--with-hooks|HOOKSCRIPTS) HOOKSCRIPTS=$var; HOOKSET=true;;
 	--build) BUILD=$var;;
@@ -141,6 +142,7 @@ Some influential environment variables:
   CPPFLAGS    C/C++ preprocessor flags, e.g. -I<include dir> if you have
               headers in a nonstandard directory <include dir>
   CPP         C preprocessor
+  PKG_CONFIG  pkg-config executable
 
 Use these variables to override the choices made by \`configure' or to help
 it to find libraries and programs with nonstandard names/locations.
@@ -153,6 +155,7 @@ done
 
 : ${SED:=sed}
 : ${GREP:=grep}
+: ${PKG_CONFIG:=pkg-config}
 : ${WC:=wc}
 
 : ${FORK:=yes}
@@ -1204,9 +1207,9 @@ fi
 
 if [ "$DEV" != no -a "$UDEV" != no ]; then
 	printf "Checking for libudev ... "
-	if type pkg-config >/dev/null 2>&1; then
-		LIBUDEV_CFLAGS=$(pkg-config --cflags libudev 2>&3)
-		LIBUDEV_LIBS=$(pkg-config --libs libudev 2>&3)
+	if type "$PKG_CONFIG" >/dev/null 2>&1; then
+		LIBUDEV_CFLAGS=$("$PKG_CONFIG" --cflags libudev 2>&3)
+		LIBUDEV_LIBS=$("$PKG_CONFIG" --libs libudev 2>&3)
 	fi
 fi
 if [ "$DEV" != no -a "$UDEV" != no -a -n "$LIBUDEV_LIBS" ]; then
