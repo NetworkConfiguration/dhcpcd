@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd April 30, 2016
+.Dd June 27, 2016
 .Dt DHCPCD 8
 .Os
 .Sh NAME
@@ -133,7 +133,7 @@ This feature needs to be enabled in the kernel and
 will start using it.
 .Pp
 .Nm
-is also an implemenation of the DHCPv6 client as specified in
+is also an implementation of the DHCPv6 client as specified in
 .Li RFC 3315 .
 By default,
 .Nm
@@ -187,7 +187,7 @@ Using a single interface also affects the
 and
 .Fl x
 options where the same interface will need to be specified as a lack of an
-interace will imply Master mode which this is not.
+interafce will imply Master mode which this is not.
 To force starting in Master mode with only one interface, the
 .Fl M , Fl Fl master
 option can be used.
@@ -732,7 +732,7 @@ configuration.
 If restricting
 .Nm
 to a single interface and optionally address family via the command-line
-then all futher calls to
+then all further calls to
 .Nm
 to rebind, reconfigure or exit need to include the same restrictive flags
 so that

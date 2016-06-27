@@ -1098,7 +1098,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 	return (ssize_t)len;
 
 toobig:
-	logger(ifp->ctx, LOG_ERR, "%s: DHCP messge too big", ifp->name);
+	logger(ifp->ctx, LOG_ERR, "%s: DHCP message too big", ifp->name);
 	free(bootp);
 	return -1;
 }
@@ -2725,7 +2725,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 		type = 0;
 	else if (ifo->options & DHCPCD_BOOTP) {
 		logger(ifp->ctx, LOG_DEBUG,
-		    "%s: ignoring DHCP reply (excpecting BOOTP)",
+		    "%s: ignoring DHCP reply (expecting BOOTP)",
 		    ifp->name);
 		return;
 	}
