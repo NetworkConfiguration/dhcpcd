@@ -3093,7 +3093,7 @@ valid_udp_packet(uint8_t *data, size_t data_len, struct in_addr *from,
 	}
 
 	bytes = ntohs(p->ip.ip_len);
-	if (data_len < bytes) {
+	if (bytes > data_len) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -3167,13 +3167,15 @@ dhcp_handlepacket(struct interface *ifp, uint8_t *data, size_t len, int flags)
 	 * dhcpcd can work fine without the vendor area being sent.
 	 */
 	udp_len = get_udp_data(&bootp, data);
+	/* udp_len must be correct because the values are checked in
+	 * valid_udp_packet(). */
 	if (udp_len < offsetof(struct bootp, vend)) {
 		logger(ifp->ctx, LOG_ERR,
 		    "%s: truncated packet (%zu) from %s",
 		    ifp->name, udp_len, inet_ntoa(from));
 		return;
 	}
-	/* But to make our IS_DHCP macro easy, ensure the vendor
+	/* To make our IS_DHCP macro easy, ensure the vendor
 	 * area has at least 4 octets. */
 	while (udp_len < offsetof(struct bootp, vend) + 4)
 		bootp[udp_len++] = '\0';
