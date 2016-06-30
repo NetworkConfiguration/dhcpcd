@@ -106,8 +106,14 @@
 #define CAN_ADD_LLADDR(ifp) \
 	(!((ifp)->options->options & DHCPCD_SLAACPRIVATE) || \
 	    (ifp)->carrier != LINK_DOWN)
-#else
+#elif __NetBSD__
+/* Earlier versions of NetBSD don't add duplicate LLADDR's if the interface
+ * is brought up and one already exists. */
 #define CAN_ADD_LLADDR(ifp) (1)
+#else
+/* We have no control over the OS adding the LLADDR, so just let it do it
+ * as we cannot force our own view on it. */
+#define CAN_ADD_LLADDR(ifp) (0)
 #endif
 
 #ifdef IPV6_MANAGETEMPADDR
