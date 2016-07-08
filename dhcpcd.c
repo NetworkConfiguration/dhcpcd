@@ -582,8 +582,11 @@ dhcpcd_selectprofile(struct interface *ifp, const char *profile)
 
 	free_options(ifp->options);
 	ifp->options = ifo;
-	if (profile)
+	if (profile) {
+		add_options(ifp->ctx, ifp->name, ifp->options,
+		    ifp->ctx->argc, ifp->ctx->argv);
 		configure_interface1(ifp);
+	}
 	return 1;
 }
 
