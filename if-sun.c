@@ -977,9 +977,9 @@ if_readraw(struct interface *ifp, int fd,
 	int			r;
 	size_t			mlen;
 
-	*flags = 0;
 	if ((di = if_findraw(ifp, fd)) == NULL)
 		return -1;
+	*flags = RAW_EOF; /* We only ever read one packet. */
 	mlen = len;
 	r = dlpi_recv(di->dh, NULL, NULL, data, &mlen, -1, NULL);
 	return r == DLPI_SUCCESS ? (ssize_t)mlen : -1;
