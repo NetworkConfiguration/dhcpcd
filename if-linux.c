@@ -1368,10 +1368,12 @@ if_address(unsigned char cmd, const struct ipv4_addr *addr)
 	nlm.ifa.ifa_index = addr->iface->index;
 	nlm.ifa.ifa_family = AF_INET;
 	nlm.ifa.ifa_prefixlen = inet_ntocidr(addr->mask);
+#if 0
 	/* This creates the aliased interface */
 	add_attr_l(&nlm.hdr, sizeof(nlm), IFA_LABEL,
 	    addr->iface->alias,
 	    (unsigned short)(strlen(addr->iface->alias) + 1));
+#endif
 	add_attr_l(&nlm.hdr, sizeof(nlm), IFA_LOCAL,
 	    &addr->addr.s_addr, sizeof(addr->addr.s_addr));
 	if (cmd == RTM_NEWADDR)
@@ -1540,9 +1542,11 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 
 	/* Add as /128 if no IFA_F_NOPREFIXROUTE ? */
 	nlm.ifa.ifa_prefixlen = ia->prefix_len;
+#if 0
 	/* This creates the aliased interface */
 	add_attr_l(&nlm.hdr, sizeof(nlm), IFA_LABEL,
 	    ia->iface->alias, (unsigned short)(strlen(ia->iface->alias) + 1));
+#endif
 	add_attr_l(&nlm.hdr, sizeof(nlm), IFA_LOCAL,
 	    &ia->addr.s6_addr, sizeof(ia->addr.s6_addr));
 

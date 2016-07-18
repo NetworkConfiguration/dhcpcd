@@ -105,6 +105,20 @@ int if_domtu(const struct interface *, short int);
 #define if_setmtu(ifp, mtu) if_domtu((ifp), (mtu))
 int if_carrier(struct interface *);
 
+/*
+ * Helper to decode an interface name of bge0:1 to
+ * devname = bge0, drvname = bge0, ppa = 0, lun = 1.
+ * If ppa or lun are invalid they are set to -1.
+ */
+struct if_spec {
+	char ifname[IF_NAMESIZE];
+	char devname[IF_NAMESIZE];
+	char drvname[IF_NAMESIZE];
+	int ppa;
+	int lun;
+};
+int if_nametospec(const char *, struct if_spec *);
+
 /* The below functions are provided by if-KERNEL.c */
 int if_conf(struct interface *);
 int if_init(struct interface *);
