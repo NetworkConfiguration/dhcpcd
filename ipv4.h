@@ -40,6 +40,18 @@
 #undef HTONL
 #endif
 
+#ifndef BYTE_ORDER
+#define	BIG_ENDIAN	1234
+#define	LITTLE_ENDIAN	4321
+#if defined(_BIG_ENDIAN)
+#define	BYTE_ORDER	BIG_ENDIAN
+#elif defined(_LITTLE_ENDIAN)
+#define	BYTE_ORDER	LITTLE_ENDIAN
+#else
+#error Endian unknown
+#endif
+#endif
+
 #if BYTE_ORDER == BIG_ENDIAN
 #define HTONL(A) (A)
 #elif BYTE_ORDER == LITTLE_ENDIAN
@@ -48,8 +60,6 @@
     (((uint32_t)(A) & 0x00ff0000) >> 8) | \
     (((uint32_t)(A) & 0x0000ff00) << 8) | \
     (((uint32_t)(A) & 0x000000ff) << 24))
-#else
-#error Endian unknown
 #endif /* BYTE_ORDER */
 
 struct rt {
