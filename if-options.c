@@ -2340,19 +2340,25 @@ read_config(struct dhcpcd_ctx *ctx,
 		buf = malloc(buflen);
 		if (buf == NULL) {
 			logger(ctx, LOG_ERR, "%s: %m", __func__);
+			free_options(ifo);
 			return NULL;
 		}
 		ldop = edop = NULL;
 		for (e = dhcpcd_embedded_conf; *e; e++) {
 			ol = strlen(*e) + 1;
 			if (ol > buflen) {
+				char *nbuf;
+
 				buflen = ol;
-				buf = realloc(buf, buflen);
-				if (buf == NULL) {
-					logger(ctx, LOG_ERR, "%s: %m", __func__);
+				nbuf = realloc(buf, buflen);
+				if (nbuf == NULL) {
+					logger(ctx, LOG_ERR,
+					    "%s: %m", __func__);
 					free(buf);
+					free_options(ifo);
 					return NULL;
 				}
+				buf = nbuf;
 			}
 			memcpy(buf, *e, ol);
 			line = buf;
