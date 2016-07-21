@@ -51,6 +51,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <ifaddrs.h>
+#include <inttypes.h>
 #include <fnmatch.h>
 #include <stddef.h>
 #include <stdio.h>
