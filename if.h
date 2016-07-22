@@ -51,6 +51,12 @@
 #  endif
 #endif
 
+#ifndef ALIAS_ADDR
+#  ifdef __sun
+#    define ALIAS_ADDR
+#  endif
+#endif
+
 #include "config.h"
 #include "dhcpcd.h"
 #include "ipv4.h"

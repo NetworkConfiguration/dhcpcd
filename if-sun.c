@@ -61,6 +61,10 @@
 #include "ipv6.h"
 #include "ipv6nd.h"
 
+#ifndef ARP_MOD_NAME
+#  define ARP_MOD_NAME        "arp"
+#endif
+
 #define COPYOUT(sin, sa) do {						      \
 	if ((sa) && ((sa)->sa_family == AF_INET))			      \
 		(sin) = ((const struct sockaddr_in *)(const void *)	      \
@@ -88,11 +92,16 @@ struct dl_if {
 	uint8_t			broadcast[DLPI_PHYSADDR_MAX];
 };
 TAILQ_HEAD(dl_if_head, dl_if);
+#endif
 
 struct priv {
+#ifdef INET
 	struct dl_if_head dl_ifs;
-};
 #endif
+#ifdef INET6
+	int pf_inet6_fd;
+#endif
+};
 
 int
 if_init(__unused struct interface *ifp)
@@ -111,15 +120,20 @@ if_conf(__unused struct interface *ifp)
 int
 if_opensockets_os(struct dhcpcd_ctx *ctx)
 {
-#ifdef INET
 	struct priv		*priv;
 
 	if ((priv = malloc(sizeof(*priv))) == NULL)
 		return -1;
 	ctx->priv = priv;
+#ifdef INET
 	TAILQ_INIT(&priv->dl_ifs);
-#else
-	ctx->priv = NULL;
+#endif
+
+#ifdef INET6
+	priv->pf_inet6_fd = xsocket(PF_INET6, SOCK_DGRAM | SOCK_CLOEXEC, 0);
+	/* Don't return an error so we at least work on kernels witout INET6
+	 * even though we expect INET6 support.
+	 * We will fail noisily elsewhere anyway. */
 #endif
 
 	ctx->link_fd = socket(PF_ROUTE,
@@ -134,6 +148,13 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 void
 if_closesockets_os(struct dhcpcd_ctx *ctx)
 {
+#ifdef INET6
+	struct priv		*priv;
+
+	priv = (struct priv *)ctx->priv;
+	if (priv->pf_inet6_fd != -1)
+		close(priv->pf_inet6_fd);
+#endif
 
 	/* each interface should have closed itself */
 	free(ctx->priv);
@@ -827,6 +848,164 @@ out:
 	return retval;
 }
 
+static int
+if_addaddr(int fd, const char *ifname,
+    struct sockaddr_storage *addr, struct sockaddr_storage *mask)
+{
+	struct lifreq		lifr;
+
+	memset(&lifr, 0, sizeof(lifr));
+	strlcpy(lifr.lifr_name, ifname, sizeof(lifr.lifr_name));
+
+	/* First assign the netmask. */
+	lifr.lifr_addr = *mask;
+	if (ioctl(fd, SIOCSLIFNETMASK, &lifr) == -1)
+		return -1;
+
+	/* Then assign the address. */
+	lifr.lifr_addr = *addr;
+	if (ioctl(fd, SIOCSLIFADDR, &lifr) == -1)
+		return -1;
+
+	/* Now bring it up. */
+	if (ioctl(fd, SIOCGLIFFLAGS, &lifr) == -1)
+		return -1;
+	if (!(lifr.lifr_flags & IFF_UP)) {
+		lifr.lifr_flags |= IFF_UP;
+		if (ioctl(fd, SIOCSLIFFLAGS, &lifr) == -1)
+			return -1;
+	}
+	return 0;
+}
+
+static int
+if_plumblif(int cmd, const struct dhcpcd_ctx *ctx, int af, const char *ifname)
+{
+	struct lifreq		lifr;
+	int			s;
+
+	memset(&lifr, 0, sizeof(lifr));
+	strlcpy(lifr.lifr_name, ifname, sizeof(lifr.lifr_name));
+	lifr.lifr_addr.ss_family = af;
+	if (af == AF_INET)
+		s = ctx->pf_inet_fd;
+	else {
+		struct priv	*priv;
+
+		priv = (struct priv *)ctx->priv;
+		s = priv->pf_inet6_fd;
+	}
+	return ioctl(s,
+	    cmd == RTM_NEWADDR ? SIOCLIFADDIF : SIOCLIFREMOVEIF,
+	    &lifr) == -1 && errno != EEXIST ? -1 : 0;
+}
+
+static int
+if_plumbif(const struct dhcpcd_ctx *ctx, int af, const char *ifname)
+{
+	dlpi_handle_t		dh;
+	int			fd, af_fd, mux_fd, retval;
+	struct lifreq		lifr;
+	const char		*udp_dev;
+
+	memset(&lifr, 0, sizeof(lifr));
+	switch (af) {
+	case AF_INET:
+		lifr.lifr_flags = IFF_IPV4;
+		af_fd = ctx->pf_inet_fd;
+		udp_dev = UDP_DEV_NAME;
+		break;
+	case AF_INET6:
+	{
+		struct priv *priv;
+
+		lifr.lifr_flags = IFF_IPV6;
+		priv = (struct priv *)ctx->priv;
+		af_fd = priv->pf_inet6_fd;
+		udp_dev = UDP6_DEV_NAME;
+		break;
+	}
+	default:
+		errno = EPROTONOSUPPORT;
+		return -1;
+	}
+
+	if (dlpi_open(ifname, &dh, DLPI_NOATTACH) != DLPI_SUCCESS) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	fd = dlpi_fd(dh);
+	retval = -1;
+	mux_fd = -1;
+	if (ioctl(fd, I_PUSH, IP_MOD_NAME) == -1)
+		goto out;
+	strlcpy(lifr.lifr_name, ifname, sizeof(lifr.lifr_name));
+	if (ioctl(fd, SIOCSLIFNAME, &lifr) == -1)
+		goto out;
+
+	/* Get full flags. */
+	if (ioctl(af_fd, SIOCGLIFFLAGS, &lifr) == -1)
+		goto out;
+
+	/* Open UDP as a multiplexor to PLINK the interface stream.
+	 * UDP is used because STREAMS will not let you PLINK a driver
+	 * under itself and IP is generally  at the bottom of the stream. */
+	if ((mux_fd = open(udp_dev, O_RDWR)) == -1)
+		goto out;
+	/* POP off all undesired modules. */
+	while (ioctl(mux_fd, I_POP, 0) != -1)
+		;
+	if (errno != EINVAL)
+		goto out;
+
+	if (lifr.lifr_flags & IFF_IPV4 && !(lifr.lifr_flags & IFF_NOARP)) {
+		if (ioctl(mux_fd, I_PUSH, ARP_MOD_NAME) == -1)
+			goto out;
+	}
+
+	/* PLINK the interface stream so it persists. */
+	if (ioctl(mux_fd, I_PLINK, fd) == -1)
+		goto out;
+
+	retval = 0;
+
+out:
+	dlpi_close(dh);
+	if (mux_fd != -1)
+		close(mux_fd);
+	return retval;
+}
+
+static int
+if_unplumbif(const struct dhcpcd_ctx *ctx, int af, const char *ifname)
+{
+	struct sockaddr_storage addr, mask;
+
+	/* For the time being, don't unplumb the interface, just
+	 * set the address to zero. */
+	memset(&addr, 0, sizeof(addr));
+	addr.ss_family = af;
+	memset(&mask, 0, sizeof(mask));
+	mask.ss_family = af;
+	return if_addaddr(ctx->pf_inet_fd, ifname , &addr, &mask);
+}
+
+static int
+if_plumb(int cmd, const struct dhcpcd_ctx *ctx, int af, const char *ifname)
+{
+	struct if_spec		spec;
+
+	if (if_nametospec(ifname, &spec) == -1)
+		return -1;
+	if (spec.lun != -1)
+		return if_plumblif(cmd, ctx, af, ifname);
+	if (cmd == RTM_NEWADDR)
+		return if_plumbif(ctx, af, ifname);
+	else
+		return if_unplumbif(ctx, af, ifname);
+}
+
 #ifdef INET
 const char *if_pfname = "DLPI";
 
@@ -981,6 +1160,7 @@ if_readraw(struct interface *ifp, int fd,
 		return -1;
 	*flags = RAW_EOF; /* We only ever read one packet. */
 	mlen = len;
+	*flags = RAW_EOF; /* We only ever read one packet. */
 	r = dlpi_recv(di->dh, NULL, NULL, data, &mlen, -1, NULL);
 	return r == DLPI_SUCCESS ? (ssize_t)mlen : -1;
 }
@@ -988,11 +1168,29 @@ if_readraw(struct interface *ifp, int fd,
 int
 if_address(unsigned char cmd, const struct ipv4_addr *ia)
 {
+	struct sockaddr_storage	ss_addr, ss_mask;
+	struct sockaddr_in	*sin_addr, *sin_mask;
 
-	UNUSED(cmd);
-	UNUSED(ia);
-	errno = ENOTSUP;
-	return -1;
+	/* Either remove the alias or ensure it exists. */
+	if (if_plumb(cmd, ia->iface->ctx, AF_INET, ia->alias) == -1)
+		return -1;
+
+	if (cmd == RTM_DELADDR)
+		return 0;
+
+	if (cmd != RTM_NEWADDR) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	sin_addr = (struct sockaddr_in *)&ss_addr;
+	sin_addr->sin_family = AF_INET;
+	sin_addr->sin_addr = ia->addr;
+	sin_mask = (struct sockaddr_in *)&ss_mask;
+	sin_mask->sin_family = AF_INET;
+	sin_mask->sin_addr = ia->mask;
+	return if_addaddr(ia->iface->ctx->pf_inet_fd,
+	    ia->alias, &ss_addr, &ss_mask);
 }
 
 int
@@ -1083,11 +1281,27 @@ if_initrt(struct dhcpcd_ctx *ctx)
 int
 if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 {
+	struct sockaddr_storage	ss_addr, ss_mask;
+	struct sockaddr_in6	*sin6_addr, *sin6_mask;
+	struct priv		*priv;
 
-	UNUSED(cmd);
-	UNUSED(ia);
-	errno = ENOTSUP;
-	return -1;
+	if (cmd == RTM_DELADDR)
+		return if_plumb(cmd, ia->iface->ctx, AF_INET6, ia->alias);
+
+	if (cmd != RTM_NEWADDR) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	priv = (struct priv *)ia->iface->ctx->priv;
+	sin6_addr = (struct sockaddr_in6 *)&ss_addr;
+	sin6_addr->sin6_family = AF_INET6;
+	sin6_addr->sin6_addr = ia->addr;
+	sin6_mask = (struct sockaddr_in6 *)&ss_mask;
+	sin6_mask->sin6_family = AF_INET6;
+	ipv6_mask(&sin6_mask->sin6_addr, ia->prefix_len);
+	return if_addaddr(priv->pf_inet6_fd,
+	    ia->alias, &ss_addr, &ss_mask);
 }
 
 int

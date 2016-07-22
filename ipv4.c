@@ -972,12 +972,62 @@ ipv4_getstate(struct interface *ifp)
 	return state;
 }
 
+#ifdef ALIAS_ADDR
+/* Find the next logical aliase address we can use. */
+static int
+ipv4_aliasaddr(struct ipv4_addr *ia, struct ipv4_addr **repl)
+{
+	struct ipv4_state *state;
+	struct ipv4_addr *iap;
+	unsigned int lun;
+	char alias[IF_NAMESIZE];
+
+	if (ia->alias[0] != '\0')
+		return 0;
+
+	lun = 0;
+	state = IPV4_STATE(ia->iface);
+find_lun:
+	if (lun == 0)
+		strlcpy(alias, ia->iface->name, sizeof(alias));
+	else
+		snprintf(alias, sizeof(alias), "%s:%u", ia->iface->name, lun);
+	TAILQ_FOREACH(iap, &state->addrs, next) {
+		if (iap->iface != ia->iface)
+			continue;
+		if (iap->addr.s_addr == INADDR_ANY) {
+			/* No address assigned? Lets use it. */
+			strlcpy(ia->alias, iap->alias, sizeof(ia->alias));
+			if (repl)
+				*repl = iap;
+			return 1;
+		}
+		if (strcmp(iap->alias, alias) == 0)
+			break;
+	}
+	if (iap != NULL) {
+		if (lun == UINT_MAX) {
+			errno = ERANGE;
+			return -1;
+		}
+		lun++;
+		goto find_lun;
+	}
+	strlcpy(ia->alias, alias, sizeof(ia->alias));
+	return 0;
+}
+#endif
+
 struct ipv4_addr *
 ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
     const struct in_addr *mask, const struct in_addr *bcast)
 {
 	struct ipv4_state *state;
 	struct ipv4_addr *ia;
+#ifdef ALIAS_ADDR
+	int replaced;
+	struct ipv4_addr *replaced_ia;
+#endif
 
 	if ((state = ipv4_getstate(ifp)) == NULL) {
 		logger(ifp->ctx, LOG_ERR, "%s: ipv4_getstate: %m", __func__);
@@ -1006,6 +1056,15 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 #endif
 	snprintf(ia->saddr, sizeof(ia->saddr), "%s/%d",
 	    inet_ntoa(*addr), inet_ntocidr(*mask));
+
+#ifdef ALIAS_ADDR
+	if ((replaced = ipv4_aliasaddr(ia, &replaced_ia)) == -1) {
+		logger(ifp->ctx, LOG_ERR, "%s: ipv4_aliasaddr: %m", ifp->name);
+		free(ia);
+		return NULL;
+	}
+#endif
+
 	logger(ifp->ctx, LOG_DEBUG, "%s: adding IP address %s broadcast %s",
 	    ifp->name, ia->saddr, inet_ntoa(*bcast));
 	if (if_address(RTM_NEWADDR, ia) == -1) {
@@ -1015,6 +1074,13 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 		free(ia);
 		return NULL;
 	}
+
+#ifdef ALIAS_ADDR
+	if (replaced) {
+		TAILQ_REMOVE(&state->addrs, replaced_ia, next);
+		free(replaced_ia);
+	}
+#endif
 
 	TAILQ_INSERT_TAIL(&state->addrs, ia, next);
 	return ia;
@@ -1237,6 +1303,9 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 			}
 			ia->iface = ifp;
 			ia->addr = *addr;
+#ifdef ALIAS_ADDR
+			strlcpy(ia->alias, ifname, sizeof(ia->alias));
+#endif
 			TAILQ_INSERT_TAIL(&state->addrs, ia, next);
 		}
 		/* Mask could have changed */

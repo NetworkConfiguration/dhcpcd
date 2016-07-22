@@ -616,8 +616,8 @@ ipv6_deleteaddr(struct ipv6_addr *ia)
 	}
 }
 
-int
-ipv6_addaddr(struct ipv6_addr *ap, const struct timespec *now)
+static int
+ipv6_addaddr1(struct ipv6_addr *ap, const struct timespec *now)
 {
 	struct interface *ifp;
 	struct ipv6_state *state;
@@ -751,6 +751,74 @@ ipv6_addaddr(struct ipv6_addr *ap, const struct timespec *now)
 	return 0;
 }
 
+#ifdef ALIAS_ADDR
+/* Find the next logical aliase address we can use. */
+static int
+ipv6_aliasaddr(struct ipv6_addr *ia, struct ipv6_addr **repl)
+{
+	struct ipv6_state *state;
+	struct ipv6_addr *iap;
+	unsigned int unit;
+	char alias[IF_NAMESIZE];
+
+	unit = 0;
+	state = IPV6_STATE(ia->iface);
+find_unit:
+	if (unit == 0)
+		strlcpy(alias, ia->iface->name, sizeof(alias));
+	else
+		snprintf(alias, sizeof(alias), "%s:%u", ia->iface->name, unit);
+	TAILQ_FOREACH(iap, &state->addrs, next) {
+		if (iap->iface != ia->iface)
+			continue;
+		if (IN6_IS_ADDR_UNSPECIFIED(&iap->addr)) {
+			/* No address assigned? Lets use it. */
+			strlcpy(ia->alias, iap->alias, sizeof(ia->alias));
+			if (repl)
+				*repl = iap;
+			return 1;
+		}
+		if (strcmp(iap->alias, alias) == 0)
+			break;
+	}
+	if (iap != NULL) {
+		if (unit == UINT_MAX) {
+			errno = ERANGE;
+			return -1;
+		}
+		unit++;
+		goto find_unit;
+	}
+	strlcpy(ia->alias, alias, sizeof(ia->alias));
+	return 0;
+}
+#endif
+
+int
+ipv6_addaddr(struct ipv6_addr *ia, const struct timespec *now)
+{
+	int r;
+#ifdef ALIAS_ADDR
+	int replaced;
+	struct ipv6_addr *replaced_ia;
+
+	if ((replaced = ipv6_aliasaddr(ia, &replaced_ia)) == -1)
+		return -1;
+#endif
+
+	if ((r = ipv6_addaddr1(ia, now)) == 0) {
+#ifdef ALIAS_ADDR
+		if (replaced) {
+			struct ipv6_state *state;
+
+			state = IPV6_STATE(ia->iface);
+			TAILQ_REMOVE(&state->addrs, replaced_ia, next);
+			ipv6_freeaddr(replaced_ia);
+		}
+#endif
+	}
+	return r;
+}
 
 int
 ipv6_findaddrmatch(const struct ipv6_addr *addr, const struct in6_addr *match,
@@ -1000,6 +1068,9 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 				    "%s: calloc: %m", __func__);
 				break;
 			}
+#ifdef ALIAS_ADDR
+			strlcpy(ap->alias, ifname, sizeof(ap->alias));
+#endif
 			ap->iface = ifp;
 			ap->addr = *addr;
 			ap->prefix_len = prefix_len;

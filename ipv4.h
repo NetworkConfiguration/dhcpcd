@@ -86,6 +86,9 @@ struct ipv4_addr {
 	struct interface *iface;
 	int addr_flags;
 	char saddr[INET_ADDRSTRLEN + 3];
+#ifdef ALIAS_ADDR
+	char alias[IF_NAMESIZE];
+#endif
 };
 TAILQ_HEAD(ipv4_addrhead, ipv4_addr);
 

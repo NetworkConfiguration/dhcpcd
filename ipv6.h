@@ -32,6 +32,7 @@
 #include <netinet/in.h>
 
 #include "config.h"
+#include "if.h"
 
 #ifndef __linux__
 #  if !defined(__QNX__) && !defined(__sun)
@@ -167,6 +168,10 @@ struct ipv6_addr {
 	uint8_t *ns;
 	size_t nslen;
 	int nsprobes;
+
+#ifdef ALIAS_ADDR
+	char alias[IF_NAMESIZE];
+#endif
 };
 
 #define	IPV6_AF_ONLINK		0x0001
