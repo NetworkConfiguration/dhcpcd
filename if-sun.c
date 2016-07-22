@@ -1285,8 +1285,12 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 	struct sockaddr_in6	*sin6_addr, *sin6_mask;
 	struct priv		*priv;
 
+	/* Either remove the alias or ensure it exists. */
+	if (if_plumb(cmd, ia->iface->ctx, AF_INET, ia->alias) == -1)
+		return -1;
+
 	if (cmd == RTM_DELADDR)
-		return if_plumb(cmd, ia->iface->ctx, AF_INET6, ia->alias);
+		return 0;
 
 	if (cmd != RTM_NEWADDR) {
 		errno = EINVAL;
