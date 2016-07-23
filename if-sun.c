@@ -65,6 +65,17 @@
 #  define ARP_MOD_NAME        "arp"
 #endif
 
+#ifdef RTF_CLONING
+/* Solaris has this in route.h but the man page says the kernel ignores it. */
+#undef RTF_CLONING
+#endif
+
+#ifndef RT_ROUNDUP
+#define RT_ROUNDUP(a)							      \
+	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
+#define RT_ADVANCE(x, n) (x += RT_ROUNDUP(salen(n)))
+#endif
+
 #define COPYOUT(sin, sa) do {						      \
 	if ((sa) && ((sa)->sa_family == AF_INET))			      \
 		(sin) = ((const struct sockaddr_in *)(const void *)	      \
@@ -320,29 +331,42 @@ if_getifaddrs(struct ifaddrs **ifap)
 }
 
 static int
+salen(const struct sockaddr *sa)
+{
+
+	switch (sa->sa_family) {
+	case AF_LINK:
+		return sizeof(struct sockaddr_dl);
+	case AF_INET:
+		return sizeof(struct sockaddr_in);
+	case AF_INET6:
+		return sizeof(struct sockaddr_in6);
+	default:
+		return sizeof(struct sockaddr);
+	}
+}
+
+static void
+if_linkaddr(struct sockaddr_dl *sdl, const struct interface *ifp)
+{
+
+	memset(sdl, 0, sizeof(*sdl));
+	sdl->sdl_family = AF_LINK;
+	sdl->sdl_nlen = sdl->sdl_alen = sdl->sdl_slen = 0;
+	sdl->sdl_index = (unsigned short)ifp->index;
+}
+
+static int
 get_addrs(int type, const void *data, const struct sockaddr **sa)
 {
+	const char *cp;
 	int i;
-	const char *p;
 
-	p = data;
+	cp = data;
 	for (i = 0; i < RTAX_MAX; i++) {
 		if (type & (1 << i)) {
-			sa[i] = (const struct sockaddr *)p;
-			switch (sa[i]->sa_family) {
-			case AF_LINK:
-				p += sizeof(struct sockaddr_dl);
-				break;
-			case AF_INET:
-				p += sizeof(struct sockaddr_in);
-				break;
-			case AF_INET6:
-				p += sizeof(struct sockaddr_in6);
-				break;
-			default:
-				errno = EINVAL;
-				return -1;
-			}
+			sa[i] = (const struct sockaddr *)cp;
+			RT_ADVANCE(cp, sa[i]);
 		} else
 			sa[i] = NULL;
 	}
@@ -1006,6 +1030,7 @@ if_plumb(int cmd, const struct dhcpcd_ctx *ctx, int af, const char *ifname)
 		return if_unplumbif(ctx, af, ifname);
 }
 
+
 #ifdef INET
 const char *if_pfname = "DLPI";
 
@@ -1206,11 +1231,121 @@ if_addrflags(const struct in_addr *addr, const struct interface *ifp)
 int
 if_route(unsigned char cmd, const struct rt *rt)
 {
+	union sockunion {
+		struct sockaddr sa;
+		struct sockaddr_in sin;
+		struct sockaddr_dl sdl;
+	} su;
+	struct rtm
+	{
+		struct rt_msghdr hdr;
+		char buffer[sizeof(su) * RTAX_MAX];
+	} rtm;
+	char *bp = rtm.buffer;
+	size_t l;
+	struct in_addr src_addr;
 
-	UNUSED(cmd);
-	UNUSED(rt);
-	errno = ENOTSUP;
-	return -1;
+	if ((cmd == RTM_ADD || cmd == RTM_DELETE || cmd == RTM_CHANGE) &&
+	    rt->iface->ctx->options & DHCPCD_DAEMONISE &&
+	    !(rt->iface->ctx->options & DHCPCD_DAEMONISED))
+		rt->iface->ctx->options |= DHCPCD_RTM_PPID;
+
+#define ADDSU {								      \
+		l = RT_ROUNDUP(salen(&su.sa));				      \
+		memcpy(bp, &su, l);					      \
+		bp += l;						      \
+	}
+#define ADDADDR(addr) {							      \
+		memset(&su, 0, sizeof(su));				      \
+		su.sin.sin_family = AF_INET;				      \
+		(&su.sin)->sin_addr = *(addr);				      \
+		ADDSU;							      \
+	}
+
+	memset(&rtm, 0, sizeof(rtm));
+	rtm.hdr.rtm_version = RTM_VERSION;
+	rtm.hdr.rtm_type = cmd;
+	rtm.hdr.rtm_addrs = RTA_DST;
+	rtm.hdr.rtm_flags = RTF_UP;
+	rtm.hdr.rtm_seq = ++rt->iface->ctx->seq;
+
+	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
+		int subnet;
+
+		rtm.hdr.rtm_addrs |= RTA_GATEWAY | RTA_IFA | RTA_IFP;
+		/* Subnet routes are clonning or connected if supported.
+		 * All other routes are static. */
+		subnet = ipv4_srcaddr(rt, &src_addr);
+		if (subnet == 1) {
+			/* XXX FIXME: How to tell kernel route is subnet? */
+		} else
+			rtm.hdr.rtm_flags |= RTF_STATIC;
+		if (subnet == -1) /* unikely */
+			rtm.hdr.rtm_addrs &= ~RTA_IFA;
+	}
+	if (rt->mask.s_addr == htonl(INADDR_BROADCAST) &&
+	    rt->gate.s_addr == htonl(INADDR_ANY))
+	{
+		rtm.hdr.rtm_flags |= RTF_HOST;
+	} else if (rt->gate.s_addr == htonl(INADDR_LOOPBACK) &&
+	    rt->mask.s_addr == htonl(INADDR_BROADCAST))
+	{
+		rtm.hdr.rtm_flags |= RTF_HOST | RTF_GATEWAY;
+		/* Going via lo0 so remove the interface flags */
+		if (cmd == RTM_ADD)
+			rtm.hdr.rtm_addrs &= ~(RTA_IFA | RTA_IFP);
+	} else {
+		rtm.hdr.rtm_addrs |= RTA_NETMASK;
+		if (rtm.hdr.rtm_flags & RTF_STATIC)
+			rtm.hdr.rtm_flags |= RTF_GATEWAY;
+		if (rt->mask.s_addr == htonl(INADDR_BROADCAST))
+			rtm.hdr.rtm_flags |= RTF_HOST;
+	}
+	if ((cmd == RTM_ADD || cmd == RTM_CHANGE) &&
+	    !(rtm.hdr.rtm_flags & RTF_GATEWAY))
+		rtm.hdr.rtm_addrs |= RTA_IFP;
+
+	ADDADDR(&rt->dest);
+	if (rtm.hdr.rtm_addrs & RTA_GATEWAY) {
+		if ((rtm.hdr.rtm_flags & RTF_HOST &&
+		    rt->gate.s_addr == htonl(INADDR_ANY)) ||
+		    !(rtm.hdr.rtm_flags & RTF_STATIC))
+		{
+			if_linkaddr(&su.sdl, rt->iface);
+			ADDSU;
+		} else
+			ADDADDR(&rt->gate);
+	}
+
+	if (rtm.hdr.rtm_addrs & RTA_NETMASK)
+		ADDADDR(&rt->mask);
+
+	if ((cmd == RTM_ADD || cmd == RTM_CHANGE) &&
+	    (rtm.hdr.rtm_addrs & (RTA_IFP | RTA_IFA)))
+	{
+		rtm.hdr.rtm_index = (unsigned short)rt->iface->index;
+		if (rtm.hdr.rtm_addrs & RTA_IFP) {
+			if_linkaddr(&su.sdl, rt->iface);
+			ADDSU;
+		}
+
+		if (rtm.hdr.rtm_addrs & RTA_IFA)
+			ADDADDR(&src_addr);
+
+		if (rt->mtu) {
+			rtm.hdr.rtm_inits |= RTV_MTU;
+			rtm.hdr.rtm_rmx.rmx_mtu = rt->mtu;
+		}
+	}
+
+#undef ADDADDR
+#undef ADDSU
+
+	rtm.hdr.rtm_msglen = (unsigned short)(bp - (char *)&rtm);
+	if (write(rt->iface->ctx->link_fd, &rtm, rtm.hdr.rtm_msglen) == -1)
+		return -1;
+	rt->iface->ctx->sseq = rt->iface->ctx->seq;
+	return 0;
 }
 
 static int
@@ -1330,11 +1465,102 @@ if_getlifetime6(struct ipv6_addr *addr)
 int
 if_route6(unsigned char cmd, const struct rt6 *rt)
 {
+	union sockunion {
+		struct sockaddr sa;
+		struct sockaddr_in6 sin;
+		struct sockaddr_dl sdl;
+	} su;
+	struct rtm
+	{
+		struct rt_msghdr hdr;
+		char buffer[sizeof(su) * RTAX_MAX];
+	} rtm;
+	char *bp = rtm.buffer;
+	size_t l;
 
-	UNUSED(cmd);
-	UNUSED(rt);
-	errno = ENOTSUP;
-	return -1;
+	if ((cmd == RTM_ADD || cmd == RTM_DELETE || cmd == RTM_CHANGE) &&
+	    rt->iface->ctx->options & DHCPCD_DAEMONISE &&
+	    !(rt->iface->ctx->options & DHCPCD_DAEMONISED))
+		rt->iface->ctx->options |= DHCPCD_RTM_PPID;
+
+#define ADDSU {								      \
+		l = RT_ROUNDUP(salen(&su.sa));				      \
+		memcpy(bp, &su, l);					      \
+		bp += l;						      \
+	}
+
+#define ADDADDRS(addr, scope) {						      \
+		memset(&su, 0, sizeof(su));				      \
+		su.sin.sin6_family = AF_INET6;				      \
+		(&su.sin)->sin6_addr = *addr;				      \
+		/* if (scope)						      \
+			ifa_scope(&su.sin, scope); */			      \
+		ADDSU;							      \
+	}
+
+#define ADDADDR(addr) ADDADDRS(addr, 0)
+
+	memset(&rtm, 0, sizeof(rtm));
+	rtm.hdr.rtm_version = RTM_VERSION;
+	rtm.hdr.rtm_type = cmd;
+	rtm.hdr.rtm_flags = RTF_UP | (int)rt->flags;
+	rtm.hdr.rtm_seq = ++rt->iface->ctx->seq;
+	rtm.hdr.rtm_addrs = RTA_DST | RTA_NETMASK;
+	/* None interface subnet routes are static. */
+	if (IN6_IS_ADDR_UNSPECIFIED(&rt->gate)) {
+		/* XXX FIXME: How to tell kernel route is subnet? */
+	} else
+		rtm.hdr.rtm_flags |= RTF_GATEWAY | RTF_STATIC;
+
+	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
+		rtm.hdr.rtm_addrs |= RTA_GATEWAY;
+		if (!(rtm.hdr.rtm_flags & RTF_REJECT))
+			rtm.hdr.rtm_addrs |= RTA_IFP | RTA_IFA;
+	}
+
+	ADDADDR(&rt->dest);
+	if (rtm.hdr.rtm_addrs & RTA_GATEWAY) {
+		if (IN6_IS_ADDR_UNSPECIFIED(&rt->gate)) {
+			if_linkaddr(&su.sdl, rt->iface);
+			ADDSU;
+		} else {
+			ADDADDRS(&rt->gate, rt->iface->index);
+		}
+	}
+
+	if (rtm.hdr.rtm_addrs & RTA_NETMASK)
+		ADDADDR(&rt->mask);
+
+	if (rtm.hdr.rtm_addrs & (RTA_IFP | RTA_IFA)) {
+		rtm.hdr.rtm_index = (unsigned short)rt->iface->index;
+		if (rtm.hdr.rtm_addrs & RTA_IFP) {
+			if_linkaddr(&su.sdl, rt->iface);
+			ADDSU;
+		}
+
+		if (rtm.hdr.rtm_addrs & RTA_IFA) {
+			const struct ipv6_addr *lla;
+
+			lla = ipv6_linklocal(UNCONST(rt->iface));
+			if (lla == NULL) /* unlikely */
+					return -1;
+			ADDADDRS(&lla->addr, rt->iface->index);
+		}
+
+		if (rt->mtu) {
+			rtm.hdr.rtm_inits |= RTV_MTU;
+			rtm.hdr.rtm_rmx.rmx_mtu = rt->mtu;
+		}
+	}
+
+#undef ADDADDR
+#undef ADDSU
+
+	rtm.hdr.rtm_msglen = (unsigned short)(bp - (char *)&rtm);
+	if (write(rt->iface->ctx->link_fd, &rtm, rtm.hdr.rtm_msglen) == -1)
+		return -1;
+	rt->iface->ctx->sseq = rt->iface->ctx->seq;
+	return 0;
 }
 
 static int
