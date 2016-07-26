@@ -820,8 +820,7 @@ if_addrflags(const struct ipv4_addr *ia)
 		return -1;
 	return ifr.ifr_addrflags;
 #else
-	UNUSED(addr);
-	UNUSED(ifp);
+	UNUSED(ia);
 	return 0;
 #endif
 }
@@ -1174,8 +1173,8 @@ if_addrflags6(const struct ipv6_addr *ia)
 	strlcpy(ifr6.ifr_name, ia->iface->name, sizeof(ifr6.ifr_name));
 	ifr6.ifr_addr.sin6_family = AF_INET6;
 	ifr6.ifr_addr.sin6_addr = ia->addr;
-	ifa_scope(&ifr6.ifr_addr, ifp->index);
-	priv = (struct priv *)ifp->ctx->priv;
+	ifa_scope(&ifr6.ifr_addr, ia->iface->index);
+	priv = (struct priv *)ia->iface->ctx->priv;
 	if (ioctl(priv->pf_inet6_fd, SIOCGIFAFLAG_IN6, &ifr6) != -1)
 		flags = ifr6.ifr_ifru.ifru_flags6;
 	else
