@@ -2288,6 +2288,7 @@ make_prefix(const struct interface *ifp, const struct ra *rap,
 		r->gate = in6addr_loopback;
 	} else
 		r->gate = in6addr_any;
+	r->src = addr->addr;
 	return r;
 }
 
@@ -2433,15 +2434,14 @@ ipv6_buildroutes(struct dhcpcd_ctx *ctx)
 		/* Is this route already in our table? */
 		if (find_route6(nrs, rt) != NULL)
 			continue;
-		//rt->src.s_addr = ifp->addr.s_addr;
 		/* Do we already manage it? */
 		if ((or = find_route6(ctx->ipv6->routes, rt))) {
 			if (or->iface != rt->iface ||
 #ifdef HAVE_ROUTE_METRIC
 			    rt->metric != or->metric ||
 #endif
-		//	    or->src.s_addr != ifp->addr.s_addr ||
 			    !IN6_ARE_ADDR_EQUAL(&or->gate, &rt->gate) ||
+			    // !IN6_ARE_ADDR_EQUAL(&or->src, &rt->src) ||
 			    or->mtu != rt->mtu)
 			{
 				if (c_route(or, rt) != 0)

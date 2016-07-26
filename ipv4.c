@@ -191,53 +191,6 @@ ipv4_findmaskaddr(struct dhcpcd_ctx *ctx, const struct in_addr *addr)
 }
 
 int
-ipv4_srcaddr(const struct rt *rt, struct in_addr *addr)
-{
-	const struct dhcp_state *dstate;
-	const struct ipv4ll_state *istate;
-
-	if (rt->iface == NULL) {
-		errno = ENOENT;
-		return -1;
-	}
-
-	/* Prefer DHCP source address if matching */
-	dstate = D_CSTATE(rt->iface);
-	if (dstate && dstate->addr &&
-	    rt->mask.s_addr == dstate->addr->mask.s_addr &&
-	    rt->dest.s_addr ==
-	    (dstate->addr->addr.s_addr & dstate->addr->mask.s_addr))
-	{
-		*addr = dstate->addr->addr;
-		return 1;
-	}
-
-	/* Then IPv4LL source address if matching */
-	istate = IPV4LL_CSTATE(rt->iface);
-	if (istate && istate->addr &&
-	    rt->mask.s_addr == istate->addr->mask.s_addr &&
-	    rt->dest.s_addr ==
-	    (istate->addr->addr.s_addr & istate->addr->mask.s_addr))
-	{
-		*addr = istate->addr->addr;
-		return 1;
-	}
-
-	/* If neither match, return DHCP then IPv4LL */
-	if (dstate && dstate->addr) {
-		*addr = dstate->addr->addr;
-		return 0;
-	}
-	if (istate && istate->addr) {
-		*addr = istate->addr->addr;
-		return 0;
-	}
-
-	errno = ESRCH;
-	return -1;
-}
-
-int
 ipv4_hasaddr(const struct interface *ifp)
 {
 	const struct dhcp_state *dstate;
@@ -770,8 +723,8 @@ ipv4_doroute(struct rt *rt, struct rt_head *nrs)
 #ifdef HAVE_ROUTE_METRIC
 		    or->metric != rt->metric ||
 #endif
-		    or->src.s_addr != rt->src.s_addr ||
 		    or->gate.s_addr != rt->gate.s_addr ||
+		    or->src.s_addr != rt->src.s_addr ||
 		    or->mtu != rt->mtu)
 		{
 			if (c_route(or, rt) != 0)

@@ -1390,8 +1390,6 @@ int
 if_route(unsigned char cmd, const struct rt *rt)
 {
 	struct nlmr nlm;
-	struct in_addr src_addr;
-	int subnet;
 
 	memset(&nlm, 0, sizeof(nlm));
 	nlm.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
@@ -1414,10 +1412,9 @@ if_route(unsigned char cmd, const struct rt *rt)
 
 	if (cmd == RTM_DELETE) {
 		nlm.rt.rtm_scope = RT_SCOPE_NOWHERE;
-		subnet = -1;
 	} else {
 		/* Subnet routes are RTPROT_KERNEL otherwise RTPROT_BOOT */
-		if ((subnet = ipv4_srcaddr(rt, &src_addr)) == 1)
+		if (rt->gate.s_addr == ntohl(INADDR_ANY))
 			nlm.rt.rtm_protocol = RTPROT_KERNEL;
 		else
 			nlm.rt.rtm_protocol = RTPROT_BOOT;
@@ -1439,9 +1436,9 @@ if_route(unsigned char cmd, const struct rt *rt)
 		if (rt->gate.s_addr != htonl(INADDR_ANY))
 			add_attr_l(&nlm.hdr, sizeof(nlm), RTA_GATEWAY,
 			    &rt->gate.s_addr, sizeof(rt->gate.s_addr));
-		if (subnet != -1) {
+		if (rt->src.s_addr != ntohl(INADDR_ANY)) {
 			add_attr_l(&nlm.hdr, sizeof(nlm), RTA_PREFSRC,
-			    &src_addr.s_addr, sizeof(src_addr.s_addr));
+			    &rt->src.s_addr, sizeof(rt->src.s_addr));
 		}
 		if (rt->mtu) {
 			char metricsbuf[32];
@@ -1624,15 +1621,26 @@ if_route6(unsigned char cmd, const struct rt6 *rt)
 	if (rt->metric)
 		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_PRIORITY, rt->metric);
 
-	if (cmd != RTM_DELETE && rt->mtu) {
-		char metricsbuf[32];
-		struct rtattr *metrics = (void *)metricsbuf;
+	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
+#if 0
+		/* XXX This fails to work, why? */
+		if (!IN6_IS_ADDR_UNSPECIFIED(&rt->src)) {
+			add_attr_l(&nlm.hdr, sizeof(nlm), RTA_PREFSRC,
+			    &rt->src.s6_addr, sizeof(rt->src.s6_addr));
+		}
+#endif
+		if (rt->mtu) {
+			char metricsbuf[32];
+			struct rtattr *metrics = (void *)metricsbuf;
 
-		metrics->rta_type = RTA_METRICS;
-		metrics->rta_len = RTA_LENGTH(0);
-		rta_add_attr_32(metrics, sizeof(metricsbuf), RTAX_MTU, rt->mtu);
-		add_attr_l(&nlm.hdr, sizeof(nlm), RTA_METRICS,
-		    RTA_DATA(metrics), (unsigned short)RTA_PAYLOAD(metrics));
+			metrics->rta_type = RTA_METRICS;
+			metrics->rta_len = RTA_LENGTH(0);
+			rta_add_attr_32(metrics, sizeof(metricsbuf),
+			    RTAX_MTU, rt->mtu);
+			add_attr_l(&nlm.hdr, sizeof(nlm), RTA_METRICS,
+			    RTA_DATA(metrics),
+			    (unsigned short)RTA_PAYLOAD(metrics));
+		}
 	}
 
 	return send_netlink(rt->iface->ctx, NULL,

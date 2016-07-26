@@ -668,13 +668,12 @@ if_route(unsigned char cmd, const struct rt *rt)
 #endif
 
 	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
-		int subnet;
-
-		rtm.hdr.rtm_addrs |= RTA_GATEWAY | RTA_IFA | RTA_IFP;
+		rtm.hdr.rtm_addrs |= RTA_GATEWAY | RTA_IFP;
+		if (rt->src.s_addr != htonl(INADDR_ANY))
+			rtm.hdr.rtm_addrs |= RTA_IFA;
 		/* Subnet routes are clonning or connected if supported.
 		 * All other routes are static. */
-		subnet = ipv4_srcaddr(rt, &src_addr);
-		if (subnet == 1) {
+		if (rt->gate.s_addr == htonl(INADDR_ANY)) {
 #ifdef RTF_CLONING
 			rtm.hdr.rtm_flags |= RTF_CLONING;
 #endif
@@ -686,8 +685,6 @@ if_route(unsigned char cmd, const struct rt *rt)
 #endif
 		} else
 			rtm.hdr.rtm_flags |= RTF_STATIC;
-		if (subnet == -1) /* unikely */
-			rtm.hdr.rtm_addrs &= ~RTA_IFA;
 	}
 	if (rt->mask.s_addr == htonl(INADDR_BROADCAST) &&
 	    rt->gate.s_addr == htonl(INADDR_ANY))

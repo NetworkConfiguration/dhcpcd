@@ -197,6 +197,7 @@ struct rt6 {
 	struct in6_addr mask;
 	struct in6_addr gate;
 	const struct interface *iface;
+	struct in6_addr src;
 	unsigned int flags;
 #ifdef HAVE_ROUTE_METRIC
 	unsigned int metric;
