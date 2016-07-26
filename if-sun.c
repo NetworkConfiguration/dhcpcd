@@ -451,6 +451,26 @@ if_findsa(struct dhcpcd_ctx *ctx, const struct sockaddr *sa)
 }
 
 #ifdef INET
+static void
+if_finishrt(struct rt *rt)
+{
+
+	/* Solaris has a subnet route with the gateway
+	 * of the owning address.
+	 * dhcpcd has a blank gateway here to indicate a
+	 * subnet route. */
+	if (rt->gate.s_addr != ntohl(INADDR_ANY) &&
+	    ipv4_iffindaddr(UNCONST(rt->iface), &rt->gate, NULL))
+		rt->gate.s_addr = ntohl(INADDR_ANY);
+
+	/* Solaris likes to set route MTU to match
+	 * interface MTU when adding routes.
+	 * This confuses dhcpcd as it expects MTU to be 0
+	 * when no explicit MTU has been set. */
+	if (rt->mtu == (unsigned int)if_getmtu(rt->iface))
+		rt->mtu = 0;
+}
+
 static int
 if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 {
@@ -471,7 +491,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 	else
 		rt->mask.s_addr = INADDR_BROADCAST;
 	COPYOUT(rt->gate, rti_info[RTAX_GATEWAY]);
-	COPYOUT(rt->src, rti_info[RTAX_IFA]);
+	COPYOUT(rt->src, rti_info[RTAX_SRC]);
 	rt->mtu = (unsigned int)rtm->rtm_rmx.rmx_mtu;
 
 	if (rtm->rtm_index)
@@ -496,11 +516,34 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 		errno = ESRCH;
 		return -1;
 	}
+
+	if_finishrt(rt);
+
 	return 0;
 }
 #endif
 
 #ifdef INET6
+static void
+if_finishrt6(struct rt6 *rt)
+{
+
+	/* Solaris has a subnet route with the gateway
+	 * of the owning address.
+	 * dhcpcd has a blank gateway here to indicate a
+	 * subnet route. */
+	if (!IN6_IS_ADDR_UNSPECIFIED(&rt->gate) &&
+	    ipv6_iffindaddr(UNCONST(rt->iface), &rt->gate, 0))
+		rt->gate = in6addr_any;
+
+	/* Solarais likes to set route MTU to match
+	 * interface MTU when adding routes.
+	 * This confuses dhcpcd as it expects MTU to be 0
+	 * when no explicit MTU has been set. */
+	if (rt->mtu == (unsigned int)if_getmtu(rt->iface))
+		rt->mtu = 0;
+}
+
 static int
 if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, const struct rt_msghdr *rtm)
 {
@@ -545,6 +588,9 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, const struct rt_msghdr *rtm)
 		errno = ESRCH;
 		return -1;
 	}
+
+	if_finishrt6(rt);
+
 	return 0;
 }
 #endif
@@ -657,20 +703,14 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 	case AF_INET:
 	{
 		struct in_addr addr, mask, bcast;
-		int flags;
 
 		COPYOUT(addr, rti_info[RTAX_IFA]);
 		COPYOUT(mask, rti_info[RTAX_NETMASK]);
 		COPYOUT(bcast, rti_info[RTAX_BRD]);
-		if (ifam->ifam_type == RTM_NEWADDR) {
-			if ((flags = if_addrflags(&addr, ifp)) == -1)
-				break;
-		} else
-			flags = 0;
 		ipv4_handleifa(ctx,
 		    ifam->ifam_type == RTM_CHGADDR ?
 		    RTM_NEWADDR : ifam->ifam_type,
-		    NULL, ifp->name, &addr, &mask, &bcast, flags);
+		    NULL, ifp->name, &addr, &mask, &bcast);
 		break;
 	}
 #endif
@@ -679,21 +719,15 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 	{
 		struct in6_addr addr6, mask6;
 		const struct sockaddr_in6 *sin6;
-		int flags;
 
 		sin6 = (const void *)rti_info[RTAX_IFA];
 		addr6 = sin6->sin6_addr;
 		sin6 = (const void *)rti_info[RTAX_NETMASK];
 		mask6 = sin6->sin6_addr;
-		if (ifam->ifam_type == RTM_NEWADDR) {
-			if ((flags = if_addrflags6(&addr6, ifp)) == -1)
-				break;
-		} else
-			flags = 0;
 		ipv6_handleifa(ctx,
 		    ifam->ifam_type == RTM_CHGADDR ?
 		    RTM_NEWADDR : ifam->ifam_type,
-		    NULL, ifp->name, &addr6, ipv6_prefixlen(&mask6), flags);
+		    NULL, ifp->name, &addr6, ipv6_prefixlen(&mask6));
 		break;
 	}
 #endif
@@ -942,7 +976,8 @@ if_plumbif(const struct dhcpcd_ctx *ctx, int af, const char *ifname)
 	{
 		struct priv *priv;
 
-		lifr.lifr_flags = IFF_IPV6;
+		/* We will take care of setting the link local address. */
+		lifr.lifr_flags = IFF_IPV6 | IFF_NOLINKLOCAL;
 		priv = (struct priv *)ctx->priv;
 		af_fd = priv->pf_inet6_fd;
 		udp_dev = UDP6_DEV_NAME;
@@ -1029,6 +1064,98 @@ if_plumb(int cmd, const struct dhcpcd_ctx *ctx, int af, const char *ifname)
 		return if_unplumbif(ctx, af, ifname);
 }
 
+static int
+if_rtmsg(unsigned char cmd, const struct interface *ifp,
+    int addrs, int flags,
+    const struct sockaddr *dst, const struct sockaddr *mask,
+    const struct sockaddr *gate, const struct sockaddr *src,
+    uint32_t mtu)
+{
+	struct rtm
+	{
+		struct rt_msghdr hdr;
+		char buffer[sizeof(struct sockaddr_storage) * RTAX_MAX];
+	} rtm;
+	char *bp = rtm.buffer;
+	size_t l;
+
+	/* WARNING: Solaris will not allow you to delete RTF_KERNEL routes.
+	 * This includes subnet/prefix routes. */
+
+	if ((cmd == RTM_ADD || cmd == RTM_DELETE || cmd == RTM_CHANGE) &&
+	    ifp->ctx->options & DHCPCD_DAEMONISE &&
+	    !(ifp->ctx->options & DHCPCD_DAEMONISED))
+		ifp->ctx->options |= DHCPCD_RTM_PPID;
+
+#define ADDSA(sa) {							      \
+		l = RT_ROUNDUP(salen((sa)));				      \
+		memcpy(bp, (sa), l);					      \
+		bp += l;						      \
+	}
+
+	memset(&rtm, 0, sizeof(rtm));
+	rtm.hdr.rtm_version = RTM_VERSION;
+	rtm.hdr.rtm_type = cmd;
+	rtm.hdr.rtm_seq = ++ifp->ctx->seq;
+	rtm.hdr.rtm_flags = flags;
+	rtm.hdr.rtm_addrs = RTA_DST | RTA_GATEWAY | addrs;
+
+	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
+		rtm.hdr.rtm_flags |= RTF_UP;
+		if (!(rtm.hdr.rtm_flags & RTF_REJECT) ||
+		    !(rtm.hdr.rtm_flags & RTF_GATEWAY))
+			rtm.hdr.rtm_addrs |= RTA_IFP;
+		if (mtu != 0) {
+			rtm.hdr.rtm_inits |= RTV_MTU;
+			rtm.hdr.rtm_rmx.rmx_mtu = mtu;
+		}
+	}
+
+	ADDSA(dst);
+	ADDSA(gate);
+	if (rtm.hdr.rtm_addrs & RTA_NETMASK)
+		ADDSA(mask);
+
+	if (rtm.hdr.rtm_addrs & RTA_IFP) {
+		struct sockaddr_dl sdl;
+
+		if_linkaddr(&sdl, ifp);
+		ADDSA((struct sockaddr *)&sdl);
+	}
+
+/* This no workie :/ */
+#if 0
+	/* route(1M) says RTA_IFA is accepted but ignored
+	 * it's unclear how RTA_SRC is different. */
+	if (rtm.hdr.rtm_addrs & RTA_IFA) {
+		rtm.hdr.rtm_addrs &= ~RTA_IFA;
+		rtm.hdr.rtm_addrs |= RTA_SRC;
+	}
+	if (rtm.hdr.rtm_addrs & RTA_SRC)
+		ADDSA(src);
+#endif
+
+#undef ADDSA
+
+	rtm.hdr.rtm_msglen = (unsigned short)(bp - (char *)&rtm);
+	if (write(ifp->ctx->link_fd, &rtm, rtm.hdr.rtm_msglen) == -1)
+		return -1;
+	ifp->ctx->sseq = ifp->ctx->seq;
+	return 0;
+}
+
+static int
+if_addrflags0(int fd, const char *ifname)
+{
+	struct lifreq		lifr;
+
+	memset(&lifr, 0, sizeof(lifr));
+	strlcpy(lifr.lifr_name, ifname, sizeof(lifr.lifr_name));
+	if (ioctl(fd, SIOCGLIFFLAGS, &lifr) == -1)
+		return -1;
+
+	return lifr.lifr_flags;
+}
 
 #ifdef INET
 const char *if_pfname = "DLPI";
@@ -1218,133 +1345,71 @@ if_address(unsigned char cmd, const struct ipv4_addr *ia)
 }
 
 int
-if_addrflags(const struct in_addr *addr, const struct interface *ifp)
+if_addrflags(const struct ipv4_addr *ia)
 {
+	int		flags, aflags;
 
-	UNUSED(addr);
-	UNUSED(ifp);
-	errno = ENOTSUP;
-	return -1;
+	aflags = if_addrflags0(ia->iface->ctx->pf_inet_fd, ia->alias);
+	flags = 0;
+	if (aflags & IFF_DUPLICATE)
+		flags |= IN_IFF_DUPLICATED;
+	return flags;
 }
 
 int
 if_route(unsigned char cmd, const struct rt *rt)
 {
-	union sockunion {
-		struct sockaddr sa;
-		struct sockaddr_in sin;
-		struct sockaddr_dl sdl;
-	} su;
-	struct rtm
-	{
-		struct rt_msghdr hdr;
-		char buffer[sizeof(su) * RTAX_MAX];
-	} rtm;
-	char *bp = rtm.buffer;
-	size_t l;
-	struct in_addr src_addr;
+	struct		sockaddr_in dst, mask, gate, *g, src;
+	int		addrs, flags;
 
-	if ((cmd == RTM_ADD || cmd == RTM_DELETE || cmd == RTM_CHANGE) &&
-	    rt->iface->ctx->options & DHCPCD_DAEMONISE &&
-	    !(rt->iface->ctx->options & DHCPCD_DAEMONISED))
-		rt->iface->ctx->options |= DHCPCD_RTM_PPID;
+	dst.sin_family = AF_INET;
+	dst.sin_addr = rt->dest;
+	mask.sin_family = AF_INET;
+	mask.sin_addr = rt->mask;
+	gate.sin_family = AF_INET;
+	gate.sin_addr = rt->gate;
+	src.sin_family = AF_INET;
+	src.sin_addr= rt->src;
 
-#define ADDSU {								      \
-		l = RT_ROUNDUP(salen(&su.sa));				      \
-		memcpy(bp, &su, l);					      \
-		bp += l;						      \
-	}
-#define ADDADDR(addr) {							      \
-		memset(&su, 0, sizeof(su));				      \
-		su.sin.sin_family = AF_INET;				      \
-		(&su.sin)->sin_addr = *(addr);				      \
-		ADDSU;							      \
-	}
-
-	memset(&rtm, 0, sizeof(rtm));
-	rtm.hdr.rtm_version = RTM_VERSION;
-	rtm.hdr.rtm_type = cmd;
-	rtm.hdr.rtm_addrs = RTA_DST;
-	rtm.hdr.rtm_flags = RTF_UP;
-	rtm.hdr.rtm_seq = ++rt->iface->ctx->seq;
+	addrs = 0;
+	flags = 0;
 
 	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
-		int subnet;
-
-		rtm.hdr.rtm_addrs |= RTA_GATEWAY | RTA_IFA | RTA_IFP;
-		/* Subnet routes are clonning or connected if supported.
+		addrs |= RTA_GATEWAY | RTA_IFP;
+		/* Subnet routes are cloning or connected if supported.
 		 * All other routes are static. */
-		subnet = ipv4_srcaddr(rt, &src_addr);
-		if (subnet == 1) {
-			/* XXX FIXME: How to tell kernel route is subnet? */
-		} else
-			rtm.hdr.rtm_flags |= RTF_STATIC;
-		if (subnet == -1) /* unikely */
-			rtm.hdr.rtm_addrs &= ~RTA_IFA;
+		if (rt->gate.s_addr != ntohl(INADDR_ANY))
+			flags |= RTF_STATIC;
+		if (rt->src.s_addr != ntohl(INADDR_ANY))
+			addrs |= RTA_IFA;
 	}
+
 	if (rt->mask.s_addr == htonl(INADDR_BROADCAST) &&
 	    rt->gate.s_addr == htonl(INADDR_ANY))
 	{
-		rtm.hdr.rtm_flags |= RTF_HOST;
+		flags |= RTF_HOST;
 	} else if (rt->gate.s_addr == htonl(INADDR_LOOPBACK) &&
 	    rt->mask.s_addr == htonl(INADDR_BROADCAST))
 	{
-		rtm.hdr.rtm_flags |= RTF_HOST | RTF_GATEWAY;
+		flags |= RTF_HOST | RTF_GATEWAY;
 		/* Going via lo0 so remove the interface flags */
-		if (cmd == RTM_ADD)
-			rtm.hdr.rtm_addrs &= ~(RTA_IFA | RTA_IFP);
+		addrs &= ~(RTA_IFA | RTA_IFP);
 	} else {
-		rtm.hdr.rtm_addrs |= RTA_NETMASK;
-		if (rtm.hdr.rtm_flags & RTF_STATIC)
-			rtm.hdr.rtm_flags |= RTF_GATEWAY;
+		addrs |= RTA_NETMASK;
+		if (flags & RTF_STATIC)
+			flags |= RTF_GATEWAY;
 		if (rt->mask.s_addr == htonl(INADDR_BROADCAST))
-			rtm.hdr.rtm_flags |= RTF_HOST;
-	}
-	if ((cmd == RTM_ADD || cmd == RTM_CHANGE) &&
-	    !(rtm.hdr.rtm_flags & RTF_GATEWAY))
-		rtm.hdr.rtm_addrs |= RTA_IFP;
-
-	ADDADDR(&rt->dest);
-	if (rtm.hdr.rtm_addrs & RTA_GATEWAY) {
-		if ((rtm.hdr.rtm_flags & RTF_HOST &&
-		    rt->gate.s_addr == htonl(INADDR_ANY)) ||
-		    !(rtm.hdr.rtm_flags & RTF_STATIC))
-		{
-			if_linkaddr(&su.sdl, rt->iface);
-			ADDSU;
-		} else
-			ADDADDR(&rt->gate);
+			flags |= RTF_HOST;
 	}
 
-	if (rtm.hdr.rtm_addrs & RTA_NETMASK)
-		ADDADDR(&rt->mask);
-
-	if ((cmd == RTM_ADD || cmd == RTM_CHANGE) &&
-	    (rtm.hdr.rtm_addrs & (RTA_IFP | RTA_IFA)))
-	{
-		rtm.hdr.rtm_index = (unsigned short)rt->iface->index;
-		if (rtm.hdr.rtm_addrs & RTA_IFP) {
-			if_linkaddr(&su.sdl, rt->iface);
-			ADDSU;
-		}
-
-		if (rtm.hdr.rtm_addrs & RTA_IFA)
-			ADDADDR(&src_addr);
-
-		if (rt->mtu) {
-			rtm.hdr.rtm_inits |= RTV_MTU;
-			rtm.hdr.rtm_rmx.rmx_mtu = rt->mtu;
-		}
-	}
-
-#undef ADDADDR
-#undef ADDSU
-
-	rtm.hdr.rtm_msglen = (unsigned short)(bp - (char *)&rtm);
-	if (write(rt->iface->ctx->link_fd, &rtm, rtm.hdr.rtm_msglen) == -1)
-		return -1;
-	rt->iface->ctx->sseq = rt->iface->ctx->seq;
-	return 0;
+	if ((flags & RTF_HOST && rt->gate.s_addr == htonl(INADDR_ANY)) ||
+	    !(flags & RTF_STATIC))
+		g = &src;
+	else
+		g = &gate;
+	return if_rtmsg(cmd, rt->iface, addrs, flags,
+	    (struct sockaddr *)&dst, (struct sockaddr *)&mask,
+	    (struct sockaddr *)g, (struct sockaddr *)&src, rt->mtu);
 }
 
 static int
@@ -1383,12 +1448,13 @@ if_walkrt(struct dhcpcd_ctx *ctx, char *data, size_t len)
 
 		if_octetstr(ifname, &re->ipRouteIfIndex, sizeof(ifname));
 		rt.iface = if_find(ctx->ifaces, ifname);
-		if (rt.iface != NULL)
+		if (rt.iface != NULL) {
+			if_finishrt(&rt);
 			ipv4_handlert(ctx, RTM_ADD, &rt, 1);
-		else {
-			char destbuf[INET6_ADDRSTRLEN];
-			char gatebuf[INET6_ADDRSTRLEN];
-			const char *dest, *gate;
+		} else {
+			char		destbuf[INET6_ADDRSTRLEN];
+			char		gatebuf[INET6_ADDRSTRLEN];
+			const char	*dest, *gate;
 
 			dest = inet_ntop(AF_INET, &rt.dest,
 			    destbuf, INET6_ADDRSTRLEN);
@@ -1418,9 +1484,10 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 	struct sockaddr_storage	ss_addr, ss_mask;
 	struct sockaddr_in6	*sin6_addr, *sin6_mask;
 	struct priv		*priv;
+	int			r;
 
 	/* Either remove the alias or ensure it exists. */
-	if (if_plumb(cmd, ia->iface->ctx, AF_INET, ia->alias) == -1)
+	if (if_plumb(cmd, ia->iface->ctx, AF_INET6, ia->alias) == -1)
 		return -1;
 
 	if (cmd == RTM_DELADDR)
@@ -1438,18 +1505,25 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 	sin6_mask = (struct sockaddr_in6 *)&ss_mask;
 	sin6_mask->sin6_family = AF_INET6;
 	ipv6_mask(&sin6_mask->sin6_addr, ia->prefix_len);
-	return if_addaddr(priv->pf_inet6_fd,
+	r = if_addaddr(priv->pf_inet6_fd,
 	    ia->alias, &ss_addr, &ss_mask);
+	if (r == -1 && errno == EEXIST)
+		return 0;
+	return r;
 }
 
 int
-if_addrflags6(const struct in6_addr *addr, const struct interface *ifp)
+if_addrflags6(const struct ipv6_addr *ia)
 {
+	struct priv		*priv;
+	int			aflags, flags;
 
-	UNUSED(addr);
-	UNUSED(ifp);
-	errno = ENOTSUP;
-	return -1;
+	priv = (struct priv *)ia->iface->ctx->priv;
+	aflags = if_addrflags0(priv->pf_inet6_fd, ia->alias);
+	flags = 0;
+	if (aflags & IFF_DUPLICATE)
+		flags |= IN6_IFF_DUPLICATED;
+	return flags;
 }
 
 int
@@ -1464,102 +1538,34 @@ if_getlifetime6(struct ipv6_addr *addr)
 int
 if_route6(unsigned char cmd, const struct rt6 *rt)
 {
-	union sockunion {
-		struct sockaddr sa;
-		struct sockaddr_in6 sin;
-		struct sockaddr_dl sdl;
-	} su;
-	struct rtm
-	{
-		struct rt_msghdr hdr;
-		char buffer[sizeof(su) * RTAX_MAX];
-	} rtm;
-	char *bp = rtm.buffer;
-	size_t l;
+	struct sockaddr_in6 dst, mask, gate, *g, src;
+	int addrs, flags;
 
-	if ((cmd == RTM_ADD || cmd == RTM_DELETE || cmd == RTM_CHANGE) &&
-	    rt->iface->ctx->options & DHCPCD_DAEMONISE &&
-	    !(rt->iface->ctx->options & DHCPCD_DAEMONISED))
-		rt->iface->ctx->options |= DHCPCD_RTM_PPID;
+	dst.sin6_family = AF_INET6;
+	dst.sin6_addr = rt->dest;
+	mask.sin6_family = AF_INET6;
+	mask.sin6_addr = rt->mask;
+	gate.sin6_family = AF_INET6;
+	gate.sin6_addr = rt->gate;
+	src.sin6_family = AF_INET6;
+	src.sin6_addr = rt->src;
 
-#define ADDSU {								      \
-		l = RT_ROUNDUP(salen(&su.sa));				      \
-		memcpy(bp, &su, l);					      \
-		bp += l;						      \
-	}
+	addrs = RTA_NETMASK;
+	flags = 0;
 
-#define ADDADDRS(addr, scope) {						      \
-		memset(&su, 0, sizeof(su));				      \
-		su.sin.sin6_family = AF_INET6;				      \
-		(&su.sin)->sin6_addr = *addr;				      \
-		/* if (scope)						      \
-			ifa_scope(&su.sin, scope); */			      \
-		ADDSU;							      \
-	}
-
-#define ADDADDR(addr) ADDADDRS(addr, 0)
-
-	memset(&rtm, 0, sizeof(rtm));
-	rtm.hdr.rtm_version = RTM_VERSION;
-	rtm.hdr.rtm_type = cmd;
-	rtm.hdr.rtm_flags = RTF_UP | (int)rt->flags;
-	rtm.hdr.rtm_seq = ++rt->iface->ctx->seq;
-	rtm.hdr.rtm_addrs = RTA_DST | RTA_NETMASK;
-	/* None interface subnet routes are static. */
 	if (IN6_IS_ADDR_UNSPECIFIED(&rt->gate)) {
 		/* XXX FIXME: How to tell kernel route is subnet? */
 	} else
-		rtm.hdr.rtm_flags |= RTF_GATEWAY | RTF_STATIC;
+		flags |= RTF_GATEWAY | RTF_STATIC;
 
-	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
-		rtm.hdr.rtm_addrs |= RTA_GATEWAY;
-		if (!(rtm.hdr.rtm_flags & RTF_REJECT))
-			rtm.hdr.rtm_addrs |= RTA_IFP | RTA_IFA;
-	}
+	if (IN6_IS_ADDR_UNSPECIFIED(&rt->gate))
+		g = &src;
+	else
+		g = &gate;
 
-	ADDADDR(&rt->dest);
-	if (rtm.hdr.rtm_addrs & RTA_GATEWAY) {
-		if (IN6_IS_ADDR_UNSPECIFIED(&rt->gate)) {
-			if_linkaddr(&su.sdl, rt->iface);
-			ADDSU;
-		} else {
-			ADDADDRS(&rt->gate, rt->iface->index);
-		}
-	}
-
-	if (rtm.hdr.rtm_addrs & RTA_NETMASK)
-		ADDADDR(&rt->mask);
-
-	if (rtm.hdr.rtm_addrs & (RTA_IFP | RTA_IFA)) {
-		rtm.hdr.rtm_index = (unsigned short)rt->iface->index;
-		if (rtm.hdr.rtm_addrs & RTA_IFP) {
-			if_linkaddr(&su.sdl, rt->iface);
-			ADDSU;
-		}
-
-		if (rtm.hdr.rtm_addrs & RTA_IFA) {
-			const struct ipv6_addr *lla;
-
-			lla = ipv6_linklocal(UNCONST(rt->iface));
-			if (lla == NULL) /* unlikely */
-					return -1;
-			ADDADDRS(&lla->addr, rt->iface->index);
-		}
-
-		if (rt->mtu) {
-			rtm.hdr.rtm_inits |= RTV_MTU;
-			rtm.hdr.rtm_rmx.rmx_mtu = rt->mtu;
-		}
-	}
-
-#undef ADDADDR
-#undef ADDSU
-
-	rtm.hdr.rtm_msglen = (unsigned short)(bp - (char *)&rtm);
-	if (write(rt->iface->ctx->link_fd, &rtm, rtm.hdr.rtm_msglen) == -1)
-		return -1;
-	rt->iface->ctx->sseq = rt->iface->ctx->seq;
-	return 0;
+	return if_rtmsg(cmd, rt->iface, addrs, flags,
+	    (struct sockaddr *)&dst, (struct sockaddr *)&mask,
+	    (struct sockaddr *)g, (struct sockaddr *)&src, rt->mtu);
 }
 
 static int
@@ -1597,9 +1603,10 @@ if_walkrt6(struct dhcpcd_ctx *ctx, char *data, size_t len)
 
 		if_octetstr(ifname, &re->ipv6RouteIfIndex, sizeof(ifname));
 		rt.iface = if_find(ctx->ifaces, ifname);
-		if (rt.iface != NULL)
+		if (rt.iface != NULL) {
+			if_finishrt6(&rt);
 			ipv6_handlert(ctx, RTM_ADD, &rt);
-		else {
+		} else {
 			char destbuf[INET6_ADDRSTRLEN];
 			char gatebuf[INET6_ADDRSTRLEN];
 			const char *dest, *gate;
