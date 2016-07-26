@@ -188,13 +188,12 @@ if_vimaster(__unused const struct dhcpcd_ctx *ctx, __unused const char *ifname)
 }
 
 int
-if_machinearch(char *str, size_t len)
+if_machinearch(__unused char *str, __unused size_t len)
 {
 
-	UNUSED(str);
-	UNUSED(len);
-	errno = ENOTSUP;
-	return -1;
+	/* There is no extra data really.
+	 * isainfo -v does return amd64, but also i386. */
+	return 0;
 }
 
 struct linkwalk {
