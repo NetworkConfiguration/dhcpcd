@@ -416,11 +416,6 @@ sunos*)
 	    >>$CONFIG_MK
 	echo "DHCPCD_SRCS+=	if-sun.c" >>$CONFIG_MK
 	echo "LDADD+=		-ldlpi" >>$CONFIG_MK
-
-	# IPv6 won't work, but it will at least compile.
-	echo "CPPFLAGS+=	-DIN6_IFF_DETACHED=0" >>$CONFIG_MK
-	echo "CPPFLAGS+=	-DIN6_IFF_TENTATIVE=0" >>$CONFIG_MK
-	echo "CPPFLAGS+=	-DIN6_IFF_DUPLICATED=0" >>$CONFIG_MK
 	;;
 *)
 	echo "DHCPCD_SRCS+=	if-bsd.c" >>$CONFIG_MK
