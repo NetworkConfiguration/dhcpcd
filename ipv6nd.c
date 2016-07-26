@@ -1310,6 +1310,11 @@ ipv6nd_handleifa(int cmd, struct ipv6_addr *addr)
 {
 	struct ra *rap;
 
+	/* IPv6 init may not have happened yet if we are learning
+	 * existing addresses when dhcpcd starts. */
+	if (addr->iface->ctx->ipv6 == NULL)
+		return;
+
 	TAILQ_FOREACH(rap, addr->iface->ctx->ipv6->ra_routers, next) {
 		if (rap->iface != addr->iface)
 			continue;
