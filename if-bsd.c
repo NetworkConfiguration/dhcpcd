@@ -635,7 +635,6 @@ if_route(unsigned char cmd, const struct rt *rt)
 	} rtm;
 	char *bp = rtm.buffer;
 	size_t l;
-	struct in_addr src_addr;
 
 	if ((cmd == RTM_ADD || cmd == RTM_DELETE || cmd == RTM_CHANGE) &&
 	    rt->iface->ctx->options & DHCPCD_DAEMONISE &&
@@ -740,9 +739,7 @@ if_route(unsigned char cmd, const struct rt *rt)
 	if (rtm.hdr.rtm_addrs & RTA_NETMASK)
 		ADDADDR(&rt->mask);
 
-	if ((cmd == RTM_ADD || cmd == RTM_CHANGE) &&
-	    (rtm.hdr.rtm_addrs & (RTA_IFP | RTA_IFA)))
-	{
+	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
 		rtm.hdr.rtm_index = (unsigned short)rt->iface->index;
 		if (rtm.hdr.rtm_addrs & RTA_IFP) {
 			if_linkaddr(&su.sdl, rt->iface);
@@ -750,7 +747,7 @@ if_route(unsigned char cmd, const struct rt *rt)
 		}
 
 		if (rtm.hdr.rtm_addrs & RTA_IFA)
-			ADDADDR(&src_addr);
+			ADDADDR(&rt->src);
 
 		if (rt->mtu) {
 			rtm.hdr.rtm_inits |= RTV_MTU;
@@ -1095,7 +1092,7 @@ if_route6(unsigned char cmd, const struct rt6 *rt)
 	if (rtm.hdr.rtm_addrs & RTA_NETMASK)
 		ADDADDR(&rt->mask);
 
-	if (rtm.hdr.rtm_addrs & (RTA_IFP | RTA_IFA)) {
+	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
 		rtm.hdr.rtm_index = (unsigned short)rt->iface->index;
 		if (rtm.hdr.rtm_addrs & RTA_IFP) {
 			if_linkaddr(&su.sdl, rt->iface);
