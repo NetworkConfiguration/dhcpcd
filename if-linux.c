@@ -683,7 +683,7 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 			rta = RTA_NEXT(rta, len);
 		}
 		ipv4_handleifa(ctx, nlm->nlmsg_type, NULL, ifp->name,
-		    &addr, &net, &brd, ifa->ifa_flags);
+		    &addr, &net, &brd);
 		break;
 #endif
 #ifdef INET6
@@ -699,7 +699,7 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 			rta = RTA_NEXT(rta, len);
 		}
 		ipv6_handleifa(ctx, nlm->nlmsg_type, NULL, ifp->name,
-		    &addr6, ifa->ifa_prefixlen, ifa->ifa_flags);
+		    &addr6, ifa->ifa_prefixlen);
 		break;
 #endif
 	}
@@ -1494,8 +1494,7 @@ if_initrt(struct dhcpcd_ctx *ctx)
 }
 
 int
-if_addrflags(__unused const struct in_addr *addr,
-    __unused const struct interface *ifp)
+if_addrflags(__unused const struct ipv4_addr *addr)
 {
 
 	/* Linux has no support for IPv4 address flags */
@@ -1677,7 +1676,7 @@ if_initrt6(struct dhcpcd_ctx *ctx)
 }
 
 int
-if_addrflags6(const struct in6_addr *addr, const struct interface *ifp)
+if_addrflags6(const struct ipv6_addr *ia)
 {
 	FILE *fp;
 	char *p, ifaddress[33], address[33], name[IF_NAMESIZE + 1];
@@ -1689,8 +1688,8 @@ if_addrflags6(const struct in6_addr *addr, const struct interface *ifp)
 		return -1;
 
 	p = ifaddress;
-	for (i = 0; i < (int)sizeof(addr->s6_addr); i++) {
-		p += snprintf(p, 3, "%.2x", addr->s6_addr[i]);
+	for (i = 0; i < (int)sizeof(ia->addr.s6_addr); i++) {
+		p += snprintf(p, 3, "%.2x", ia->addr.s6_addr[i]);
 	}
 	*p = '\0';
 
@@ -1699,10 +1698,10 @@ if_addrflags6(const struct in6_addr *addr, const struct interface *ifp)
 	{
 		if (strlen(address) != 32) {
 			fclose(fp);
-			errno = ENOTSUP;
+			errno = EINVAL;
 			return -1;
 		}
-		if (strcmp(name, ifp->name) == 0 &&
+		if (strcmp(name, ia->iface->name) == 0 &&
 		    strcmp(ifaddress, address) == 0)
 		{
 			fclose(fp);

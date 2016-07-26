@@ -198,8 +198,6 @@ static void if_learnaddrs(struct dhcpcd_ctx *ctx, struct if_head *ifs,
 #ifdef INET6
 	struct sockaddr_in6 *sin6, *net6;
 #endif
-	int ifa_flags;
-
 
 	for (ifa = ifaddrs; ifa; ifa = ifa->ifa_next) {
 		if (ifa->ifa_addr == NULL)
@@ -215,10 +213,9 @@ static void if_learnaddrs(struct dhcpcd_ctx *ctx, struct if_head *ifs,
 				brd = (void *)ifa->ifa_dstaddr;
 			else
 				brd = (void *)ifa->ifa_broadaddr;
-			ifa_flags = if_addrflags(&addr->sin_addr, ifp);
 			ipv4_handleifa(ctx, RTM_NEWADDR, ifs, ifa->ifa_name,
 				&addr->sin_addr, &net->sin_addr,
-				brd ? &brd->sin_addr : NULL, ifa_flags);
+				brd ? &brd->sin_addr : NULL);
 			break;
 #endif
 #ifdef INET6
@@ -231,13 +228,9 @@ static void if_learnaddrs(struct dhcpcd_ctx *ctx, struct if_head *ifs,
 				sin6->sin6_addr.s6_addr[2] =
 				    sin6->sin6_addr.s6_addr[3] = '\0';
 #endif
-			ifa_flags = if_addrflags6(&sin6->sin6_addr, ifp);
-			if (ifa_flags != -1)
-				ipv6_handleifa(ctx, RTM_NEWADDR, ifs,
-				    ifa->ifa_name,
-				    &sin6->sin6_addr,
-				    ipv6_prefixlen(&net6->sin6_addr),
-				    ifa_flags);
+			ipv6_handleifa(ctx, RTM_NEWADDR, ifs,
+			    ifa->ifa_name, &sin6->sin6_addr,
+			    ipv6_prefixlen(&net6->sin6_addr));
 			break;
 #endif
 		}

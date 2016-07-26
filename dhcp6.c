@@ -3467,22 +3467,12 @@ void dhcp6_dropnondelegates(struct interface *ifp)
 }
 
 void
-dhcp6_handleifa(struct dhcpcd_ctx *ctx, int cmd, const char *ifname,
-    const struct in6_addr *addr, int flags)
+dhcp6_handleifa(int cmd, struct ipv6_addr *ia)
 {
-	struct interface *ifp;
 	struct dhcp6_state *state;
 
-	if (ctx->ifaces == NULL)
-		return;
-
-	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-		state = D6_STATE(ifp);
-		if (state == NULL || strcmp(ifp->name, ifname))
-			continue;
-		ipv6_handleifa_addrs(cmd, &state->addrs, addr, flags);
-	}
-
+	if ((state = D6_STATE(ia->iface)) != NULL)
+		ipv6_handleifa_addrs(cmd, &state->addrs, ia);
 }
 
 ssize_t

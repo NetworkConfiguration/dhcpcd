@@ -1227,7 +1227,7 @@ void
 ipv4_handleifa(struct dhcpcd_ctx *ctx,
     int cmd, struct if_head *ifs, const char *ifname,
     const struct in_addr *addr, const struct in_addr *mask,
-    const struct in_addr *brd, int flags)
+    const struct in_addr *brd)
 {
 	struct interface *ifp;
 	struct ipv4_state *state;
@@ -1269,7 +1269,7 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 			ia->brd = *brd;
 		else
 			ia->brd.s_addr = INADDR_ANY;
-		ia->addr_flags = flags;
+		ia->addr_flags = if_addrflags(ia);
 		break;
 	case RTM_DELADDR:
 		if (ia == NULL)

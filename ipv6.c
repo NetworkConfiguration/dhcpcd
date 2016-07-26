@@ -566,17 +566,15 @@ void
 ipv6_checkaddrflags(void *arg)
 {
 	struct ipv6_addr *ap;
-	int ifa_flags;
 
 	ap = arg;
-	ifa_flags = if_addrflags6(&ap->addr, ap->iface);
 	if (ifa_flags == -1)
 		logger(ap->iface->ctx, LOG_ERR,
 		    "%s: if_addrflags6: %m", ap->iface->name);
 	else if (!(ifa_flags & IN6_IFF_TENTATIVE)) {
 		ipv6_handleifa(ap->iface->ctx, RTM_NEWADDR,
 		    ap->iface->ctx->ifaces, ap->iface->name,
-		    &ap->addr, ap->prefix_len, ifa_flags);
+		    &ap->addr, ap->prefix_len);
 	} else {
 		struct timespec tv;
 
@@ -1012,11 +1010,11 @@ ipv6_getstate(struct interface *ifp)
 void
 ipv6_handleifa(struct dhcpcd_ctx *ctx,
     int cmd, struct if_head *ifs, const char *ifname,
-    const struct in6_addr *addr, uint8_t prefix_len, int flags)
+    const struct in6_addr *addr, uint8_t prefix_len)
 {
 	struct interface *ifp;
 	struct ipv6_state *state;
-	struct ipv6_addr *ap;
+	struct ipv6_addr *ia;
 	struct ll_callback *cb;
 
 #if 0
@@ -1025,63 +1023,55 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 
 	dbp = inet_ntop(AF_INET6, &addr->s6_addr,
 	    dbuf, INET6_ADDRSTRLEN);
-	logger(ctx, LOG_INFO, "%s: cmd %d addr %s flags %d",
-	    ifname, cmd, dbp, flags);
+	logger(ctx, LOG_INFO, "%s: cmd %d addr %s",
+	    ifname, cmd, dbp);
 #endif
 
 	if (ifs == NULL)
 		ifs = ctx->ifaces;
-	if (ifs == NULL) {
-		errno = ESRCH;
+	if (ifs == NULL)
 		return;
-	}
 	if ((ifp = if_find(ifs, ifname)) == NULL)
 		return;
 	if ((state = ipv6_getstate(ifp)) == NULL)
 		return;
 
-	if (!IN6_IS_ADDR_LINKLOCAL(addr)) {
-		ipv6nd_handleifa(ctx, cmd, ifname, addr, flags);
-		dhcp6_handleifa(ctx, cmd, ifname, addr, flags);
-	}
-
-	TAILQ_FOREACH(ap, &state->addrs, next) {
-		if (IN6_ARE_ADDR_EQUAL(&ap->addr, addr))
+	TAILQ_FOREACH(ia, &state->addrs, next) {
+		if (IN6_ARE_ADDR_EQUAL(&ia->addr, addr))
 			break;
 	}
 
 	switch (cmd) {
 	case RTM_DELADDR:
-		if (ap) {
-			TAILQ_REMOVE(&state->addrs, ap, next);
-			ipv6_freeaddr(ap);
+		if (ia != NULL) {
+			TAILQ_REMOVE(&state->addrs, ia, next);
+			/* We'll free it at the end of the function. */
 		}
 		break;
 	case RTM_NEWADDR:
-		if (ap == NULL) {
+		if (ia == NULL) {
 			char buf[INET6_ADDRSTRLEN];
 			const char *cbp;
 
-			ap = calloc(1, sizeof(*ap));
-			if (ap == NULL) {
+			if ((ia = calloc(1, sizeof(*ia))) == NULL) {
 				logger(ctx, LOG_ERR,
 				    "%s: calloc: %m", __func__);
 				break;
 			}
 #ifdef ALIAS_ADDR
-			strlcpy(ap->alias, ifname, sizeof(ap->alias));
+			strlcpy(ia->alias, ifname, sizeof(ia->alias));
 #endif
-			ap->iface = ifp;
-			ap->addr = *addr;
-			ap->prefix_len = prefix_len;
-			ipv6_makeprefix(&ap->prefix, &ap->addr,
-			    ap->prefix_len);
+			ia->iface = ifp;
+			ia->addr = *addr;
+			ia->prefix_len = prefix_len;
+			ipv6_makeprefix(&ia->prefix, &ia->addr,
+			    ia->prefix_len);
 			cbp = inet_ntop(AF_INET6, &addr->s6_addr,
 			    buf, sizeof(buf));
 			if (cbp)
-				snprintf(ap->saddr, sizeof(ap->saddr),
+				snprintf(ia->saddr, sizeof(ia->saddr),
 				    "%s/%d", cbp, prefix_len);
-			if (if_getlifetime6(ap) == -1) {
+			if (if_getlifetime6(ia) == -1) {
 				/* No support or address vanished.
 				 * Either way, just set a deprecated
 				 * infinite time lifetime and continue.
@@ -1090,8 +1080,8 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 				 * temporary addresses.
 				 * As we can't extend infinite, we'll
 				 * create a new temporary address. */
-				ap->prefix_pltime = 0;
-				ap->prefix_vltime =
+				ia->prefix_pltime = 0;
+				ia->prefix_vltime =
 				    ND6_INFINITE_LIFETIME;
 			}
 			/* This is a minor regression against RFC 4941
@@ -1104,33 +1094,32 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 			 * pretend lifetimes are infinite and always
 			 * generate a new temporary address on
 			 * restart. */
-			ap->acquired = ap->created;
-			TAILQ_INSERT_TAIL(&state->addrs,
-			    ap, next);
+			ia->acquired = ia->created;
+			TAILQ_INSERT_TAIL(&state->addrs, ia, next);
 		}
-		ap->addr_flags = flags;
+		ia->addr_flags = if_addrflags6(ia);
 #ifdef IPV6_MANAGETEMPADDR
-		if (ap->addr_flags & IN6_IFF_TEMPORARY)
-			ap->flags |= IPV6_AF_TEMPORARY;
+		if (ia->addr_flags & IN6_IFF_TEMPORARY)
+			ia->flags |= IPV6_AF_TEMPORARY;
 #endif
-		if (IN6_IS_ADDR_LINKLOCAL(&ap->addr) || ap->dadcallback) {
+		if (IN6_IS_ADDR_LINKLOCAL(&ia->addr) || ia->dadcallback) {
 #ifdef IPV6_POLLADDRFLAG
-			if (ap->addr_flags & IN6_IFF_TENTATIVE) {
+			if (ia->addr_flags & IN6_IFF_TENTATIVE) {
 				struct timespec tv;
 
 				ms_to_ts(&tv, RETRANS_TIMER / 2);
 				eloop_timeout_add_tv(
-				    ap->iface->ctx->eloop,
-				    &tv, ipv6_checkaddrflags, ap);
+				    ia->iface->ctx->eloop,
+				    &tv, ipv6_checkaddrflags, ia);
 				break;
 			}
 #endif
 
-			if (ap->dadcallback)
-				ap->dadcallback(ap);
+			if (ia->dadcallback)
+				ia->dadcallback(ia);
 
-			if (IN6_IS_ADDR_LINKLOCAL(&ap->addr) &&
-			    !(ap->addr_flags & IN6_IFF_NOTUSEABLE))
+			if (IN6_IS_ADDR_LINKLOCAL(&ia->addr) &&
+			    !(ia->addr_flags & IN6_IFF_NOTUSEABLE))
 			{
 				/* Now run any callbacks.
 				 * Typically IPv6RS or DHCPv6 */
@@ -1146,6 +1135,17 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 			}
 		}
 		break;
+	}
+
+	if (ia != NULL) {
+		if (!IN6_IS_ADDR_LINKLOCAL(&ia->addr)) {
+			ipv6nd_handleifa(cmd, ia);
+			dhcp6_handleifa(cmd, ia);
+		}
+
+		/* Done with the ia now, so free it. */
+		if (cmd == RTM_DELADDR)
+			ipv6_freeaddr(ia);
 	}
 }
 
@@ -1604,44 +1604,45 @@ ipv6_ctxfree(struct dhcpcd_ctx *ctx)
 
 int
 ipv6_handleifa_addrs(int cmd,
-    struct ipv6_addrhead *addrs, const struct in6_addr *addr, int flags)
+    struct ipv6_addrhead *addrs, const struct ipv6_addr *addr)
 {
-	struct ipv6_addr *ap, *apn;
+	struct ipv6_addr *ia, *ian;
 	uint8_t found, alldadcompleted;
 
 	alldadcompleted = 1;
 	found = 0;
-	TAILQ_FOREACH_SAFE(ap, addrs, next, apn) {
-		if (!IN6_ARE_ADDR_EQUAL(addr, &ap->addr)) {
-			if (ap->flags & IPV6_AF_ADDED &&
-			    !(ap->flags & IPV6_AF_DADCOMPLETED))
+	TAILQ_FOREACH_SAFE(ia, addrs, next, ian) {
+		if (!IN6_ARE_ADDR_EQUAL(&addr->addr, &ia->addr)) {
+			if (ia->flags & IPV6_AF_ADDED &&
+			    !(ia->flags & IPV6_AF_DADCOMPLETED))
 				alldadcompleted = 0;
 			continue;
 		}
 		switch (cmd) {
 		case RTM_DELADDR:
-			if (ap->flags & IPV6_AF_ADDED) {
-				logger(ap->iface->ctx, LOG_INFO,
+			if (ia->flags & IPV6_AF_ADDED) {
+				logger(ia->iface->ctx, LOG_INFO,
 				    "%s: deleted address %s",
-				    ap->iface->name, ap->saddr);
-				ap->flags &= ~IPV6_AF_ADDED;
+				    ia->iface->name, ia->saddr);
+				ia->flags &= ~IPV6_AF_ADDED;
 			}
 			break;
 		case RTM_NEWADDR:
 			/* Safety - ignore tentative announcements */
-			if (flags & (IN6_IFF_DETACHED |IN6_IFF_TENTATIVE))
+			if (addr->addr_flags &
+			    (IN6_IFF_DETACHED | IN6_IFF_TENTATIVE))
 				break;
-			if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0) {
+			if ((ia->flags & IPV6_AF_DADCOMPLETED) == 0) {
 				found++;
-				if (flags & IN6_IFF_DUPLICATED)
-					ap->flags |= IPV6_AF_DUPLICATED;
+				if (addr->addr_flags & IN6_IFF_DUPLICATED)
+					ia->flags |= IPV6_AF_DUPLICATED;
 				else
-					ap->flags &= ~IPV6_AF_DUPLICATED;
-				if (ap->dadcallback)
-					ap->dadcallback(ap);
+					ia->flags &= ~IPV6_AF_DUPLICATED;
+				if (ia->dadcallback)
+					ia->dadcallback(ia);
 				/* We need to set this here in-case the
 				 * dadcallback function checks it */
-				ap->flags |= IPV6_AF_DADCOMPLETED;
+				ia->flags |= IPV6_AF_DADCOMPLETED;
 			}
 			break;
 		}
