@@ -51,6 +51,15 @@
 #  endif
 #endif
 
+/*
+ * Systems which handle 1 address per alias.
+ * Currenly this is just Solaris.
+ * While Linux can do aliased addresses, it is only useful for their
+ * legacy ifconfig(8) tool which cannot display >1 IPv4 address
+ * (it can display many IPv6 addresses which makes the limitation odd).
+ * Linux has ip(8) which is a more feature rich tool, without the above
+ * restriction.
+ */
 #ifndef ALIAS_ADDR
 #  ifdef __sun
 #    define ALIAS_ADDR
@@ -99,8 +108,6 @@
 struct ifaddrs;
 int if_getifaddrs(struct ifaddrs **);
 #define	getifaddrs	if_getifaddrs
-#else
-#define GETIFADDRS_AFLINK
 #endif
 
 int if_setflag(struct interface *ifp, short flag);
