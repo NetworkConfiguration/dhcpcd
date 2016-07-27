@@ -947,8 +947,6 @@ find_lun:
 	else
 		snprintf(alias, sizeof(alias), "%s:%u", ia->iface->name, lun);
 	TAILQ_FOREACH(iap, &state->addrs, next) {
-		if (iap->iface != ia->iface)
-			continue;
 		if (iap->addr.s_addr == INADDR_ANY) {
 			/* No address assigned? Lets use it. */
 			strlcpy(ia->alias, iap->alias, sizeof(ia->alias));
@@ -959,6 +957,7 @@ find_lun:
 		if (strcmp(iap->alias, alias) == 0)
 			break;
 	}
+
 	if (iap != NULL) {
 		if (lun == UINT_MAX) {
 			errno = ERANGE;
@@ -967,6 +966,7 @@ find_lun:
 		lun++;
 		goto find_lun;
 	}
+
 	strlcpy(ia->alias, alias, sizeof(ia->alias));
 	return 0;
 }

@@ -747,6 +747,27 @@ ipv6_addaddr1(struct ipv6_addr *ap, const struct timespec *now)
 	}
 #endif
 
+#ifdef __sun
+	/* Solaris does not announce new addresses which need DaD
+	 * so we need to take a copy and add it to our list.
+	 * Otherwise aliasing gets confused if we add another
+	 * address during DaD. */
+
+	state = IPV6_STATE(ap->iface);
+	TAILQ_FOREACH(nap, &state->addrs, next) {
+		if (IN6_ARE_ADDR_EQUAL(&nap->addr, &ap->addr))
+			break;
+	}
+	if (nap == NULL) {
+		if ((nap = malloc(sizeof(*nap))) == NULL) {
+			syslog(LOG_ERR, "%s: malloc: %m", __func__);
+			return 0; /* Well, we did add the address */
+		}
+		memcpy(nap, ap, sizeof(*nap));
+		TAILQ_INSERT_TAIL(&state->addrs, nap, next);
+	}
+#endif
+
 	return 0;
 }
 
@@ -760,16 +781,28 @@ ipv6_aliasaddr(struct ipv6_addr *ia, struct ipv6_addr **repl)
 	unsigned int unit;
 	char alias[IF_NAMESIZE];
 
-	unit = 0;
+	if (ia->alias[0] != '\0')
+		return 0;
+
 	state = IPV6_STATE(ia->iface);
+
+	/* First find an existng address.
+	 * This can happen when dhcpcd restarts as ND and DHCPv6
+	 * maintain their own lists of addresses. */
+	TAILQ_FOREACH(iap, &state->addrs, next) {
+		if (IN6_ARE_ADDR_EQUAL(&iap->addr, &ia->addr)) {
+			strlcpy(ia->alias, iap->alias, sizeof(ia->alias));
+			return 0;
+		}
+	}
+
+	unit = 0;
 find_unit:
 	if (unit == 0)
 		strlcpy(alias, ia->iface->name, sizeof(alias));
 	else
 		snprintf(alias, sizeof(alias), "%s:%u", ia->iface->name, unit);
 	TAILQ_FOREACH(iap, &state->addrs, next) {
-		if (iap->iface != ia->iface)
-			continue;
 		if (IN6_IS_ADDR_UNSPECIFIED(&iap->addr)) {
 			/* No address assigned? Lets use it. */
 			strlcpy(ia->alias, iap->alias, sizeof(ia->alias));
@@ -780,6 +813,7 @@ find_unit:
 		if (strcmp(iap->alias, alias) == 0)
 			break;
 	}
+
 	if (iap != NULL) {
 		if (unit == UINT_MAX) {
 			errno = ERANGE;
@@ -788,6 +822,7 @@ find_unit:
 		unit++;
 		goto find_unit;
 	}
+
 	strlcpy(ia->alias, alias, sizeof(ia->alias));
 	return 0;
 }
