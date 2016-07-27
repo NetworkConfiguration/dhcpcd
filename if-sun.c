@@ -1345,6 +1345,8 @@ if_addrflags(const struct ipv4_addr *ia)
 	int		flags, aflags;
 
 	aflags = if_addrflags0(ia->iface->ctx->pf_inet_fd, ia->alias);
+	if (aflags == -1)
+		return -1;
 	flags = 0;
 	if (aflags & IFF_DUPLICATE)
 		flags |= IN_IFF_DUPLICATED;

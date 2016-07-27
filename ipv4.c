@@ -1233,6 +1233,7 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 	struct interface *ifp;
 	struct ipv4_state *state;
 	struct ipv4_addr *ia;
+	int flags;
 
 	if (ifs == NULL)
 		ifs = ctx->ifaces;
@@ -1270,7 +1271,15 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 			ia->brd = *brd;
 		else
 			ia->brd.s_addr = INADDR_ANY;
-		ia->addr_flags = if_addrflags(ia);
+
+		flags = if_addrflags(ia);
+		if (flags == -1) {
+			logger(ia->iface->ctx, LOG_ERR,
+			    "%s: %s: if_addrflags: %m",
+			    ia->iface->name, ia->saddr);
+			return;
+		}
+		ia->addr_flags = flags;
 		break;
 	case RTM_DELADDR:
 		if (ia == NULL)

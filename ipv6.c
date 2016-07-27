@@ -566,22 +566,29 @@ ipv6_userprefix(
 void
 ipv6_checkaddrflags(void *arg)
 {
-	struct ipv6_addr *ap;
+	struct ipv6_addr *ia;
+	int flags;
 
-	ap = arg;
-	if (ifa_flags == -1)
-		logger(ap->iface->ctx, LOG_ERR,
-		    "%s: if_addrflags6: %m", ap->iface->name);
-	else if (!(ifa_flags & IN6_IFF_TENTATIVE)) {
-		ipv6_handleifa(ap->iface->ctx, RTM_NEWADDR,
-		    ap->iface->ctx->ifaces, ap->iface->name,
-		    &ap->addr, ap->prefix_len);
+	ia = arg;
+	if ((flags = if_addrflags6(ia)) == -1) {
+		logger(ia->iface->ctx, LOG_ERR,
+		    "%s: if_addrflags6: %m", ia->iface->name);
+		return;
+	}
+
+	ia->addr_flags = flags;
+	if (!(ia->addr_flags & IN6_IFF_TENTATIVE)) {
+		/* Simulate the kernel announcing the new address. */
+		ipv6_handleifa(ia->iface->ctx, RTM_NEWADDR,
+		    ia->iface->ctx->ifaces, ia->iface->name,
+		    &ia->addr, ia->prefix_len);
 	} else {
+		/* Still tentative? Check again in a bit. */
 		struct timespec tv;
 
 		ms_to_ts(&tv, RETRANS_TIMER / 2);
-		eloop_timeout_add_tv(ap->iface->ctx->eloop, &tv,
-		    ipv6_checkaddrflags, ap);
+		eloop_timeout_add_tv(ia->iface->ctx->eloop, &tv,
+		    ipv6_checkaddrflags, ia);
 	}
 }
 #endif
@@ -1052,6 +1059,7 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 	struct ipv6_state *state;
 	struct ipv6_addr *ia;
 	struct ll_callback *cb;
+	int flags;
 
 #if 0
 	char dbuf[INET6_ADDRSTRLEN];
@@ -1133,7 +1141,14 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 			ia->acquired = ia->created;
 			TAILQ_INSERT_TAIL(&state->addrs, ia, next);
 		}
-		ia->addr_flags = if_addrflags6(ia);
+		flags = if_addrflags6(ia);
+		if (flags == -1) {
+			logger(ia->iface->ctx, LOG_ERR,
+			    "%s: %s: if_addrflags6: %m",
+			    ia->iface->name, ia->saddr);
+			return;
+		}
+		ia->addr_flags = flags;
 #ifdef IPV6_MANAGETEMPADDR
 		if (ia->addr_flags & IN6_IFF_TEMPORARY)
 			ia->flags |= IPV6_AF_TEMPORARY;
