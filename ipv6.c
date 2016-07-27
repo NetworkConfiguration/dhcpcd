@@ -99,7 +99,8 @@
 #  endif
 #endif
 
-#if defined(HAVE_IN6_ADDR_GEN_MODE_NONE) || defined(ND6_IFF_AUTO_LINKLOCAL)
+#if defined(HAVE_IN6_ADDR_GEN_MODE_NONE) || defined(ND6_IFF_AUTO_LINKLOCAL) || \
+    defined(IFF_NOLINKLOCAL)
 /* If we're using a private SLAAC address on wireless,
  * don't add it until we have associated as we randomise
  * it based on the SSID. */
