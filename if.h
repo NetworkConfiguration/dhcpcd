@@ -90,6 +90,10 @@
 #define RAW_PARTIALCSUM		2 << 0
 
 #ifdef __sun
+/* Solaris stupidly defines this for compat with BSD
+ * but then ignores it. */
+#undef RTF_CLONING
+
 /* Solaris getifaddrs is very un-suitable for dhcpcd.
  * See if-sun.c for details why. */
 struct ifaddrs;

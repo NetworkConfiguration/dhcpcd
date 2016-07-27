@@ -65,11 +65,6 @@
 #  define ARP_MOD_NAME        "arp"
 #endif
 
-#ifdef RTF_CLONING
-/* Solaris has this in route.h but the man page says the kernel ignores it. */
-#undef RTF_CLONING
-#endif
-
 #ifndef RT_ROUNDUP
 #define RT_ROUNDUP(a)							      \
 	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
