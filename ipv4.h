@@ -30,21 +30,6 @@
 
 #include "dhcpcd.h"
 
-#ifdef __sun
-   /* Solaris lacks these defines.
-    * While it supports DaD, to seems to only expose IFF_DUPLICATE
-    * so we have no way of knowing if it's tentative or not.
-    * I don't even know if Solaris has any special treatment for tentative. */
-#  define IN_IFF_TENTATIVE	0
-#  define IN_IFF_DUPLICATED	0x02
-#  define IN_IFF_DETACHED	0
-#endif
-
-#ifdef IN_IFF_TENTATIVE
-#define IN_IFF_NOTUSEABLE \
-        (IN_IFF_TENTATIVE | IN_IFF_DUPLICATED | IN_IFF_DETACHED)
-#endif
-
 /* Prefer our macro */
 #ifdef HTONL
 #undef HTONL
@@ -71,6 +56,21 @@
     (((uint32_t)(A) & 0x0000ff00) << 8) | \
     (((uint32_t)(A) & 0x000000ff) << 24))
 #endif /* BYTE_ORDER */
+
+#ifdef __sun
+   /* Solaris lacks these defines.
+    * While it supports DaD, to seems to only expose IFF_DUPLICATE
+    * so we have no way of knowing if it's tentative or not.
+    * I don't even know if Solaris has any special treatment for tentative. */
+#  define IN_IFF_TENTATIVE	0
+#  define IN_IFF_DUPLICATED	0x02
+#  define IN_IFF_DETACHED	0
+#endif
+
+#ifdef IN_IFF_TENTATIVE
+#define IN_IFF_NOTUSEABLE \
+        (IN_IFF_TENTATIVE | IN_IFF_DUPLICATED | IN_IFF_DETACHED)
+#endif
 
 struct rt {
 	TAILQ_ENTRY(rt) next;

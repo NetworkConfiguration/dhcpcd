@@ -53,8 +53,9 @@
 #include "script.h"
 
 #define IPV4_LOOPBACK_ROUTE
-#if defined(__linux__) || (defined(BSD) && defined(RTF_LOCAL))
-/* Linux has had loopback routes in the local table since 2.2 */
+#if defined(__linux__) || defined(__sun) || (defined(BSD) && defined(RTF_LOCAL))
+/* Linux has had loopback routes in the local table since 2.2
+ * Solaris does not seem to support loopback routes. */
 #undef IPV4_LOOPBACK_ROUTE
 #endif
 
