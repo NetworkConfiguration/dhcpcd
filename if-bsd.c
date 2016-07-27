@@ -816,7 +816,7 @@ if_addrflags(const struct ipv4_addr *ia)
 	sin = (void *)&ifr.ifr_addr;
 	sin->sin_family = AF_INET;
 	sin->sin_addr = ia->addr;
-	if (ioctl(ifp->ctx->pf_inet_fd, SIOCGIFAFLAG_IN, &ifr) == -1)
+	if (ioctl(ia->iface->ctx->pf_inet_fd, SIOCGIFAFLAG_IN, &ifr) == -1)
 		return -1;
 	return ifr.ifr_addrflags;
 #else
