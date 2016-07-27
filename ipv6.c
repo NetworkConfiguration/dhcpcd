@@ -790,14 +790,15 @@ ipv6_aliasaddr(struct ipv6_addr *ia, struct ipv6_addr **repl)
 
 	if (ia->alias[0] != '\0')
 		return 0;
-
 	state = IPV6_STATE(ia->iface);
 
 	/* First find an existng address.
 	 * This can happen when dhcpcd restarts as ND and DHCPv6
 	 * maintain their own lists of addresses. */
 	TAILQ_FOREACH(iap, &state->addrs, next) {
-		if (IN6_ARE_ADDR_EQUAL(&iap->addr, &ia->addr)) {
+		if (iap->alias[0] != '\0' &&
+		    IN6_ARE_ADDR_EQUAL(&iap->addr, &ia->addr))
+		{
 			strlcpy(ia->alias, iap->alias, sizeof(ia->alias));
 			return 0;
 		}
@@ -810,6 +811,8 @@ find_unit:
 	else
 		snprintf(alias, sizeof(alias), "%s:%u", ia->iface->name, unit);
 	TAILQ_FOREACH(iap, &state->addrs, next) {
+		if (iap->alias[0] == '\0')
+			continue;
 		if (IN6_IS_ADDR_UNSPECIFIED(&iap->addr)) {
 			/* No address assigned? Lets use it. */
 			strlcpy(ia->alias, iap->alias, sizeof(ia->alias));
@@ -840,11 +843,15 @@ ipv6_addaddr(struct ipv6_addr *ia, const struct timespec *now)
 {
 	int r;
 #ifdef ALIAS_ADDR
-	int replaced;
+	int replaced, blank;
 	struct ipv6_addr *replaced_ia;
 
+	blank = (ia->alias[0] == '\0');
 	if ((replaced = ipv6_aliasaddr(ia, &replaced_ia)) == -1)
 		return -1;
+	if (blank)
+		logger(ia->iface->ctx, LOG_DEBUG, "%s: aliased %s",
+		    ia->alias, ia->saddr);
 #endif
 
 	if ((r = ipv6_addaddr1(ia, now)) == 0) {

@@ -947,7 +947,7 @@ find_lun:
 	else
 		snprintf(alias, sizeof(alias), "%s:%u", ia->iface->name, lun);
 	TAILQ_FOREACH(iap, &state->addrs, next) {
-		if (iap->addr.s_addr == INADDR_ANY) {
+		if (iap->alias[0] != '\0' && iap->addr.s_addr == INADDR_ANY) {
 			/* No address assigned? Lets use it. */
 			strlcpy(ia->alias, iap->alias, sizeof(ia->alias));
 			if (repl)
@@ -979,7 +979,7 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 	struct ipv4_state *state;
 	struct ipv4_addr *ia;
 #ifdef ALIAS_ADDR
-	int replaced;
+	int replaced, blank;
 	struct ipv4_addr *replaced_ia;
 #endif
 
@@ -1012,11 +1012,15 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 	    inet_ntoa(*addr), inet_ntocidr(*mask));
 
 #ifdef ALIAS_ADDR
+	blank = (ia->alias[0] == '\0');
 	if ((replaced = ipv4_aliasaddr(ia, &replaced_ia)) == -1) {
 		logger(ifp->ctx, LOG_ERR, "%s: ipv4_aliasaddr: %m", ifp->name);
 		free(ia);
 		return NULL;
 	}
+	if (blank)
+		logger(ia->iface->ctx, LOG_DEBUG, "%s: aliased %s",
+		    ia->alias, ia->saddr);
 #endif
 
 	logger(ifp->ctx, LOG_DEBUG, "%s: adding IP address %s broadcast %s",
