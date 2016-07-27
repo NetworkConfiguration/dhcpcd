@@ -101,6 +101,7 @@
 #define O_NODELAY		O_BASE + 44
 #define O_INFORM6		O_BASE + 45
 #define O_LASTLEASE_EXTEND	O_BASE + 46
+#define O_INACTIVE		O_BASE + 47
 
 const struct option cf_options[] = {
 	{"background",      no_argument,       NULL, 'b'},
@@ -200,6 +201,7 @@ const struct option cf_options[] = {
 	{"nodelay",         no_argument,       NULL, O_NODELAY},
 	{"noup",            no_argument,       NULL, O_NOUP},
 	{"lastleaseextend", no_argument,       NULL, O_LASTLEASE_EXTEND},
+	{"inactive",        no_argument,       NULL, O_INACTIVE},
 	{NULL,              0,                 NULL, '\0'}
 };
 
@@ -2132,6 +2134,9 @@ err_sla:
 		break;
 	case O_LASTLEASE_EXTEND:
 		ifo->options |= DHCPCD_LASTLEASE | DHCPCD_LASTLEASE_EXTEND;
+		break;
+	case O_INACTIVE:
+		ifo->options |= DHCPCD_INACTIVE;
 		break;
 	default:
 		return 0;

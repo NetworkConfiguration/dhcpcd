@@ -291,20 +291,20 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		if (ifp)
 			continue;
 
-		active = IF_ACTIVE_USER;
 		if (argc > 0) {
 			for (i = 0; i < argc; i++) {
 				if (strcmp(argv[i], spec.devname) == 0)
 					break;
 			}
-			if (i == argc)
-				active = IF_INACTIVE;
+			active = (i == argc) ? IF_INACTIVE : IF_ACTIVE_USER;
 		} else {
 			/* -1 means we're discovering against a specific
 			 * interface, but we still need the below rules
 			 * to apply. */
 			if (argc == -1 && strcmp(argv[0], spec.devname) != 0)
 				continue;
+			active = ctx->options & DHCPCD_INACTIVE ?
+			    IF_INACTIVE: IF_ACTIVE_USER;
 		}
 
 		for (i = 0; i < ctx->ifdc; i++)

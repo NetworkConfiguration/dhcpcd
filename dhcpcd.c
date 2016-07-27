@@ -1043,7 +1043,7 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 			continue;
 
 		/* If running off an interface list, check it's in it. */
-		if (ctx->ifc) {
+		if (ctx->ifc || ctx->options & DHCPCD_INACTIVE) {
 			for (i = 0; i < ctx->ifc; i++)
 				if (strcmp(ctx->ifv[i], ifname) == 0)
 					break;
@@ -1860,7 +1860,9 @@ printpidfile:
 	}
 	if (ifp == NULL) {
 		if (ctx.ifc == 0)
-			logger(&ctx, LOG_ERR, "no valid interfaces found");
+			logger(&ctx,
+			    ctx.options & DHCPCD_INACTIVE ? LOG_DEBUG : LOG_ERR,
+			    "no valid interfaces found");
 		else
 			goto exit_failure;
 		if (!(ctx.options & DHCPCD_LINK)) {
@@ -1904,7 +1906,9 @@ printpidfile:
 		    ctx.options & DHCPCD_LINK &&
 		    !(ctx.options & DHCPCD_WAITIP))
 		{
-			logger(&ctx, LOG_WARNING,
+			logger(&ctx,
+			    ctx.options & DHCPCD_INACTIVE ?
+			    LOG_DEBUG : LOG_WARNING,
 			    "no interfaces have a carrier");
 			if (dhcpcd_daemonise(&ctx))
 				goto exit_success;
