@@ -2434,11 +2434,14 @@ ipv6_buildroutes(struct dhcpcd_ctx *ctx)
 
 	/* Should static take priority? */
 	ipv6_build_static_routes(ctx, &dnr);
+#ifdef HAVE_ROUTE_METRIC
+	rt = TAILQ_LAST(&dnr, rt6_head);
+#endif
 
 	/* First add reachable routers and their prefixes */
 	ipv6_build_ra_routes(ctx->ipv6, &dnr, 0);
 #ifdef HAVE_ROUTE_METRIC
-	have_default = (TAILQ_FIRST(&dnr) != NULL);
+	have_default = (rt != TAILQ_LAST(&dnr, rt6_head));
 #endif
 
 	/* We have no way of knowing if prefixes added by DHCP are reachable
