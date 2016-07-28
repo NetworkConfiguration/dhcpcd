@@ -346,7 +346,6 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		ifp->ctx = ctx;
 		strlcpy(ifp->name, spec.devname, sizeof(ifp->name));
 		ifp->flags = ifa->ifa_flags;
-		ifp->carrier = if_carrier(ifp);
 
 		if (ifa->ifa_addr != NULL) {
 #ifdef AF_LINK
@@ -516,6 +515,10 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 #endif
 
 		ifp->active = active;
+		if (ifp->active)
+			ifp->carrier = if_carrier(ifp);
+		else
+			ifp->carrier = LINK_UNKNOWN;
 		TAILQ_INSERT_TAIL(ifs, ifp, next);
 	}
 

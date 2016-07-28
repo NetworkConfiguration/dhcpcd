@@ -397,6 +397,8 @@ stop_interface(struct interface *ifp)
 	/* De-activate the interface */
 	ifp->active = IF_INACTIVE;
 	ifp->options->options &= ~DHCPCD_STOPPING;
+	/* Set the link state to unknown as we're no longer tracking it. */
+	ifp->carrier = LINK_UNKNOWN;
 
 stop:
 	if (!(ctx->options & (DHCPCD_MASTER | DHCPCD_TEST)))
@@ -1047,8 +1049,10 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 			for (i = 0; i < ctx->ifc; i++)
 				if (strcmp(ctx->ifv[i], ifname) == 0)
 					break;
-			if (i >= ctx->ifc)
+			if (i >= ctx->ifc) {
 				ifp->active = IF_INACTIVE;
+				ifp->carrier = LINK_UNKNOWN;
+			}
 		}
 
 		i = 0;
