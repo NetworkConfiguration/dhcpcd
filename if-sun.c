@@ -1356,17 +1356,24 @@ if_addrflags(const struct ipv4_addr *ia)
 int
 if_route(unsigned char cmd, const struct rt *rt)
 {
-	struct		sockaddr_in dst, mask, gate, *g, src;
-	int		addrs, flags;
-
-	dst.sin_family = AF_INET;
-	dst.sin_addr = rt->dest;
-	mask.sin_family = AF_INET;
-	mask.sin_addr = rt->mask;
-	gate.sin_family = AF_INET;
-	gate.sin_addr = rt->gate;
-	src.sin_family = AF_INET;
-	src.sin_addr= rt->src;
+	struct sockaddr_in	dst = {
+		.sin_family = AF_INET,
+		.sin_addr = rt->dest
+	};
+	struct sockaddr_in	mask = {
+		.sin_family = AF_INET,
+		.sin_addr = rt->mask
+	};
+	struct sockaddr_in	gate = {
+		.sin_family = AF_INET,
+		.sin_addr = rt->gate
+	};
+	struct sockaddr_in	src = {
+		.sin_family = AF_INET,
+		.sin_addr = rt->src
+	};
+	struct sockaddr_in	*g;
+	int			addrs, flags;
 
 	addrs = 0;
 	flags = 0;
@@ -1535,17 +1542,24 @@ if_getlifetime6(struct ipv6_addr *addr)
 int
 if_route6(unsigned char cmd, const struct rt6 *rt)
 {
-	struct sockaddr_in6 dst, mask, gate, *g, src;
-	int addrs, flags;
-
-	dst.sin6_family = AF_INET6;
-	dst.sin6_addr = rt->dest;
-	mask.sin6_family = AF_INET6;
-	mask.sin6_addr = rt->mask;
-	gate.sin6_family = AF_INET6;
-	gate.sin6_addr = rt->gate;
-	src.sin6_family = AF_INET6;
-	src.sin6_addr = rt->src;
+	struct sockaddr_in6	dst = {
+		.sin6_family = AF_INET6,
+		.sin6_addr = rt->dest
+	};
+	struct sockaddr_in6	mask = {
+		.sin6_family = AF_INET6,
+		.sin6_addr = rt->mask
+	};
+	struct sockaddr_in6	gate = {
+		.sin6_family = AF_INET6,
+		.sin6_addr = rt->gate
+	};
+	struct sockaddr_in6	src = {
+		.sin6_family = AF_INET6,
+		.sin6_addr = rt->src
+	};
+	struct sockaddr_in6	*g;
+	int			addrs, flags;
 
 	addrs = RTA_NETMASK;
 	flags = 0;
