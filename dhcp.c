@@ -3657,7 +3657,7 @@ dhcp_handleifa(int cmd, struct ipv4_addr *ia)
 	if (cmd == RTM_DELADDR) {
 		if (IPV4_BRD_EQ(state->addr, ia)) {
 			logger(ifp->ctx, LOG_INFO,
-			    "%s: removing IP address %s", ifp->name, ia->saddr);
+			    "%s: deleted IP address %s", ifp->name, ia->saddr);
 			dhcp_drop(ifp, "EXPIRE");
 		}
 		return;

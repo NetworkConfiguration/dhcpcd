@@ -2179,7 +2179,7 @@ ipv6_handlert(struct dhcpcd_ctx *ctx, int cmd, const struct rt6 *rt)
 		}
 		/* If we manage the route, remove it */
 		if ((f = find_route6(ctx->ipv6->routes, rt))) {
-			desc_route("removing", f);
+			desc_route("deleted", f);
 			TAILQ_REMOVE(ctx->ipv6->routes, f, next);
 			free(f);
 		}
