@@ -909,6 +909,8 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 	struct in6_addr mask;
 	struct priv *priv;
 
+	priv = (struct priv *)ia->iface->ctx->priv;
+
 	memset(&ifa, 0, sizeof(ifa));
 	strlcpy(ifa.ifra_name, ia->iface->name, sizeof(ifa.ifra_name));
 	/*
@@ -938,11 +940,41 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 	ifa_scope(&ifa.ifra_addr, ia->iface->index);
 	ipv6_mask(&mask, ia->prefix_len);
 	ADDADDR(&ifa.ifra_prefixmask, &mask);
+
+	/*
+	 * Every BSD kernel wants to add the prefix of the address to it's
+	 * list of RA received prefixes.
+	 * THIS IS WRONG because there (as the comments in the kernel state)
+	 * is no API for managing prefix lifetime and the kernel should not
+	 * pretend it's from a RA either.
+	 *
+	 * The issue is that the very first assigned prefix will inherit the
+	 * lifetime of the address, but any subsequent alteration of the
+	 * address OR it's lifetime will not affect the prefix lifetime.
+	 * As such, we cannot stop the prefix from timing out and then
+	 * constantly removing the prefix route dhcpcd is capable of adding
+	 * in it's absense.
+	 *
+	 * What we can do to mitigate the issue is to add the adress with
+	 * infinite lifetimes, so the prefix route will never time out.
+	 * Once done, we can then set lifetimes on the address and all is good.
+	 * The downside of this approach is that we need to manually remove
+	 * the kernel route because it has no lifetime, but this is OK as
+	 * dhcpcd will handle this too.
+	 *
+	 * This issue is discussed on the NetBSD mailing lists here:
+	 * http://mail-index.netbsd.org/tech-net/2016/08/05/msg006044.html
+	 */
+	if (cmd == RTM_NEWADDR && !(ia->flags & IPV6_AF_ADDED)) {
+		ifa.ifra_lifetime.ia6t_vltime = ND6_INFINITE_LIFETIME;
+		ifa.ifra_lifetime.ia6t_pltime = ND6_INFINITE_LIFETIME;
+		(void)ioctl(priv->pf_inet6_fd, SIOCAIFADDR_IN6, &ifa);
+	}
+
 	ifa.ifra_lifetime.ia6t_vltime = ia->prefix_vltime;
 	ifa.ifra_lifetime.ia6t_pltime = ia->prefix_pltime;
 #undef ADDADDR
 
-	priv = (struct priv *)ia->iface->ctx->priv;
 	return ioctl(priv->pf_inet6_fd,
 	    cmd == RTM_DELADDR ? SIOCDIFADDR_IN6 : SIOCAIFADDR_IN6, &ifa);
 }
