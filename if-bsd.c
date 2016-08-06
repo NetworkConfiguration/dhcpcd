@@ -1143,8 +1143,10 @@ if_route6(unsigned char cmd, const struct rt6 *rt)
 
 	if (IN6_IS_ADDR_UNSPECIFIED(&rt->gate))
 		g = NULL;
-	else
+	else {
 		g = &gate;
+		ifa_scope(g, rt->iface->index);
+	}
 
 	return if_rtmsg(cmd, rt->iface, addrs, flags,
 #ifdef RTP_CONNECTED
