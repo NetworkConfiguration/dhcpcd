@@ -1122,7 +1122,7 @@ if_route6(unsigned char cmd, const struct rt6 *rt)
 #endif
 
 	addrs = RTA_NETMASK;
-	flags = 0;
+	flags = (int)rt->flags;
 #ifdef RTF_PINNED
 	if (cmd != RTM_ADD)
 		flags |= RTF_PINNED;
