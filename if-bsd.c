@@ -967,6 +967,8 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 	 * This issue is discussed on the NetBSD mailing lists here:
 	 * http://mail-index.netbsd.org/tech-net/2016/08/05/msg006044.html
 	 *
+	 * NOT fixed in NetBSD - patch under development
+	 * NOT fixed in FreeBSD - bug 195197
 	 * Fixed in OpenBSD-5.9
 	 */
 #if !(defined(OpenBSD) && OpenBSD >= 201605)
