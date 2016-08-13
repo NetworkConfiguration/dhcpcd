@@ -2398,6 +2398,7 @@ dhcp_inform(struct interface *ifp)
 	state->state = DHS_INFORM;
 	free(state->offer);
 	state->offer = NULL;
+	state->offer_len = 0;
 
 	if (ifo->req_addr.s_addr == INADDR_ANY) {
 		ia = ipv4_iffindaddr(ifp, NULL, NULL);
@@ -2973,8 +2974,8 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 				return;
 			}
 		}
-		memcpy(state->offer, bootp, bootp_len);
 		state->offer_len = bootp_len;
+		memcpy(state->offer, bootp, bootp_len);
 		bootp_copied = true;
 		if (ifp->ctx->options & DHCPCD_TEST) {
 			free(state->old);
@@ -3051,8 +3052,8 @@ rapidcommit:
 				return;
 			}
 		}
-		memcpy(state->offer, bootp, bootp_len);
 		state->offer_len = bootp_len;
+		memcpy(state->offer, bootp, bootp_len);
 	}
 
 	lease->frominfo = 0;
@@ -3436,6 +3437,7 @@ dhcp_start1(void *arg)
 	clock_gettime(CLOCK_MONOTONIC, &state->started);
 	free(state->offer);
 	state->offer = NULL;
+	state->offer_len = 0;
 
 	if (state->arping_index < ifo->arping_len) {
 		struct arp_state *astate;
@@ -3492,6 +3494,7 @@ dhcp_start1(void *arg)
 			{
 				free(state->offer);
 				state->offer = NULL;
+				state->offer_len = 0;
 			}
 		}
 	}
