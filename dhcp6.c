@@ -3174,6 +3174,29 @@ dhcp6_open(struct dhcpcd_ctx *dctx)
 		logger(dctx, LOG_WARNING, "setsockopt: SO_REUSEPORT: %m");
 #endif
 
+#ifdef SO_BINDTODEVICE
+	/* If we're not running in master mode, we can bind directly to the
+	 * interface. This allows separate daemons to work on separate
+	 * interfaces. */
+	if (!(dctx->options & DHCPCD_MASTER)) {
+		const struct interface *ifp;
+		struct ifreq ifr;
+
+		TAILQ_FOREACH(ifp, dctx->ifaces, next) {
+			if (ifp->active)
+				break;
+		}
+		if (ifp != NULL) {
+			memset(&ifr, 0, sizeof(ifr));
+			strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
+			if (setsockopt(ctx->dhcp_fd, SOL_SOCKET, SO_BINDTODEVICE, &ifr,
+			    sizeof(ifr)) == -1)
+				logger(dctx, LOG_WARNING,
+				    "setsockopt: SO_BINDTODEVICE: %m");
+		}
+	}
+#endif
+
 	if (bind(ctx->dhcp_fd, (struct sockaddr *)&sa, sizeof(sa)) == -1)
 		goto errexit;
 
