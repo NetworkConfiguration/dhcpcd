@@ -1538,7 +1538,6 @@ dhcp_openudp(struct interface *ifp)
 	struct dhcp_state *state;
 #ifdef SO_BINDTODEVICE
 	struct ifreq ifr;
-	char *p;
 #endif
 
 	if ((s = xsocket(PF_INET, SOCK_DGRAM|SOCK_CLOEXEC, IPPROTO_UDP)) == -1)
@@ -1551,10 +1550,6 @@ dhcp_openudp(struct interface *ifp)
 	if (ifp) {
 		memset(&ifr, 0, sizeof(ifr));
 		strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
-		/* We can only bind to the real device */
-		p = strchr(ifr.ifr_name, ':');
-		if (p)
-			*p = '\0';
 		if (setsockopt(s, SOL_SOCKET, SO_BINDTODEVICE, &ifr,
 		    sizeof(ifr)) == -1)
 		        goto eexit;
