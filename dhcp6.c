@@ -3184,7 +3184,7 @@ dhcp6_open(struct dhcpcd_ctx *dctx)
 			if (ifp->active)
 				break;
 		}
-		if ((ia = ipv6_linklocal(ifp)) != NULL) {
+		if (ifp != NULL && (ia = ipv6_linklocal(ifp)) != NULL) {
 			memcpy(&sa.sin6_addr, &ia->addr, sizeof(sa.sin6_addr));
 			sa.sin6_scope_id = ifp->index;
 		}
