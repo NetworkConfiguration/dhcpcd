@@ -967,11 +967,13 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 	 * This issue is discussed on the NetBSD mailing lists here:
 	 * http://mail-index.netbsd.org/tech-net/2016/08/05/msg006044.html
 	 *
-	 * NOT fixed in NetBSD - patch under development
+	 * Fixed in NetBSD-7.99.36
 	 * NOT fixed in FreeBSD - bug 195197
 	 * Fixed in OpenBSD-5.9
 	 */
-#if !(defined(OpenBSD) && OpenBSD >= 201605)
+
+#if !((defined(__NetBSD_Version__) && __NetBSD_Version__ >= 799003600) || \
+      (defined(OpenBSD) && OpenBSD >= 201605))
 	if (cmd == RTM_NEWADDR && !(ia->flags & IPV6_AF_ADDED)) {
 		ifa.ifra_lifetime.ia6t_vltime = ND6_INFINITE_LIFETIME;
 		ifa.ifra_lifetime.ia6t_pltime = ND6_INFINITE_LIFETIME;
