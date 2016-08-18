@@ -1135,7 +1135,8 @@ reload_config(struct dhcpcd_ctx *ctx)
 	struct if_options *ifo;
 
 	free_globals(ctx);
-	ifo = read_config(ctx, NULL, NULL, NULL);
+	if ((ifo = read_config(ctx, NULL, NULL, NULL)) == NULL)
+		return;
 	add_options(ctx, NULL, ifo, ctx->argc, ctx->argv);
 	/* We need to preserve these two options. */
 	if (ctx->options & DHCPCD_MASTER)
