@@ -1687,10 +1687,6 @@ _if_checkipv6(int s, struct dhcpcd_ctx *ctx,
 	int ra;
 
 	if (ifp) {
-#ifdef ND6_IFF_OVERRIDE_RTADV
-		int override;
-#endif
-
 #ifdef ND6_IFF_AUTO_LINKLOCAL
 		if (own) {
 			int all;
@@ -1725,24 +1721,6 @@ _if_checkipv6(int s, struct dhcpcd_ctx *ctx,
 			    "%s: set_if_nd6_flag: ND6_IFF_PERFORMNUD: %m",
 			    ifp->name);
 			return -1;
-		}
-#endif
-
-#ifdef ND6_IFF_OVERRIDE_RTADV
-		override = get_if_nd6_flag(s, ifp, ND6_IFF_OVERRIDE_RTADV);
-		if (override == -1)
-			logger(ifp->ctx, LOG_ERR,
-			    "%s: get_if_nd6_flag: ND6_IFF_OVERRIDE_RTADV: %m",
-			    ifp->name);
-		else if (override == 0 && own) {
-			if (set_if_nd6_flag(s, ifp, ND6_IFF_OVERRIDE_RTADV)
-			    == -1)
-				logger(ifp->ctx, LOG_ERR,
-				    "%s: set_if_nd6_flag: "
-				    "ND6_IFF_OVERRIDE_RTADV: %m",
-				    ifp->name);
-			else
-				override = 1;
 		}
 #endif
 
@@ -1799,10 +1777,6 @@ _if_checkipv6(int s, struct dhcpcd_ctx *ctx,
 #endif
 
 #ifdef ND6_IFF_ACCEPT_RTADV
-#ifdef ND6_IFF_OVERRIDE_RTADV
-		if (override == 0 && ra)
-			return ctx->ra_global;
-#endif
 		return ra;
 #else
 		return ctx->ra_global;
