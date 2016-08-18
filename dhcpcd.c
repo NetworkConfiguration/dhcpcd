@@ -379,9 +379,6 @@ stop_interface(struct interface *ifp)
 	struct dhcpcd_ctx *ctx;
 
 	ctx = ifp->ctx;
-	if (!ifp->active)
-		goto stop;
-
 	logger(ctx, LOG_INFO, "%s: removing interface", ifp->name);
 	ifp->options->options |= DHCPCD_STOPPING;
 
@@ -400,7 +397,6 @@ stop_interface(struct interface *ifp)
 	/* Set the link state to unknown as we're no longer tracking it. */
 	ifp->carrier = LINK_UNKNOWN;
 
-stop:
 	if (!(ctx->options & (DHCPCD_MASTER | DHCPCD_TEST)))
 		eloop_exit(ctx->eloop, EXIT_FAILURE);
 }
@@ -1185,13 +1181,13 @@ stop_all_interfaces(struct dhcpcd_ctx *ctx, unsigned long long opts)
 	ctx->options |= DHCPCD_EXITING;
 	/* Drop the last interface first */
 	TAILQ_FOREACH_REVERSE(ifp, ctx->ifaces, if_head, next) {
-		if (ifp->options) {
+		if (ifp->active) {
 			ifp->options->options |= opts;
 			if (ifp->options->options & DHCPCD_RELEASE)
 				ifp->options->options &= ~DHCPCD_PERSISTENT;
 			ifp->options->options |= DHCPCD_EXITING;
+			stop_interface(ifp);
 		}
-		stop_interface(ifp);
 	}
 }
 
@@ -1403,6 +1399,8 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 		}
 		for (oi = optind; oi < argc; oi++) {
 			if ((ifp = if_find(ctx->ifaces, argv[oi])) == NULL)
+				continue;
+			if (!ifp->active)
 				continue;
 			ifp->options->options |= opts;
 			if (opts & DHCPCD_RELEASE)
