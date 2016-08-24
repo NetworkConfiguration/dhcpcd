@@ -287,7 +287,7 @@ parse_string_hwaddr(char *sbuf, size_t slen, const char *str, int clid)
 	size_t l;
 	const char *p;
 	int i, punt_last = 0;
-	char c[4];
+	char c[4], cmd;
 
 	/* If surrounded by quotes then it's a string */
 	if (*str == '"') {
@@ -325,28 +325,25 @@ parse_string_hwaddr(char *sbuf, size_t slen, const char *str, int clid)
 		}
 		if (*str == '\\') {
 			str++;
-			switch(*str) {
+			switch((cmd = *str++)) {
 			case '\0':
+				str--;
 				break;
 			case 'b':
 				if (sbuf)
 					*sbuf++ = '\b';
-				str++;
 				break;
 			case 'n':
 				if (sbuf)
 					*sbuf++ = '\n';
-				str++;
 				break;
 			case 'r':
 				if (sbuf)
 					*sbuf++ = '\r';
-				str++;
 				break;
 			case 't':
 				if (sbuf)
 					*sbuf++ = '\t';
-				str++;
 				break;
 			case 'x':
 				/* Grab a hex code */
@@ -380,8 +377,7 @@ parse_string_hwaddr(char *sbuf, size_t slen, const char *str, int clid)
 				break;
 			default:
 				if (sbuf)
-					*sbuf++ = *str;
-				str++;
+					*sbuf++ = cmd;
 				break;
 			}
 		} else {
