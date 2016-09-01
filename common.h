@@ -196,4 +196,6 @@ ssize_t addvard(struct dhcpcd_ctx *,
 char *hwaddr_ntoa(const uint8_t *, size_t, char *, size_t);
 size_t hwaddr_aton(uint8_t *, const char *);
 size_t read_hwaddr_aton(uint8_t **, const char *);
+
+ssize_t recvmsg_alloc(int fd, struct msghdr *msg);
 #endif

@@ -53,6 +53,9 @@
 #  define _PATH_DEVNULL "/dev/null"
 #endif
 
+/* Most route(4) messages are less than 256 bytes. */
+#define IOVEC_BUFSIZ	256
+
 #if USE_LOGFILE
 void
 logger_open(struct dhcpcd_ctx *ctx)
@@ -373,4 +376,54 @@ read_hwaddr_aton(uint8_t **data, const char *path)
 	}
 	fclose(fp);
 	return len;
+}
+
+static void *
+iovec_realloc(struct iovec *iov, size_t size)
+{
+
+	if (iov->iov_len < size) {
+		void *n;
+
+		if ((n = realloc(iov->iov_base, size)) == NULL)
+			return NULL;
+		iov->iov_base = n;
+		iov->iov_len = size;
+	}
+	return iov->iov_base;
+}
+
+ssize_t
+recvmsg_alloc(int fd, struct msghdr *msg)
+{
+	ssize_t bytes;
+
+	if (msg->msg_iovlen == 0)
+		msg->msg_iovlen = 1;
+
+	for (;;) {
+		msg->msg_flags = 0;
+		if ((bytes = recvmsg(fd, msg, MSG_PEEK | MSG_TRUNC)) == -1)
+			return -1;
+		if (!(msg->msg_flags & MSG_TRUNC))
+			break;
+
+		/* Some buggy kernels return the truncated size. */
+		if (msg->msg_iov->iov_len == (size_t)bytes) {
+			size_t nl;
+
+			nl = (size_t)roundup(bytes + 1, IOVEC_BUFSIZ);
+			if (iovec_realloc(msg->msg_iov, nl) == NULL)
+				return -1;
+		} else {
+			if (iovec_realloc(msg->msg_iov, (size_t)bytes) == NULL)
+				return -1;
+			break;
+		}
+
+		printf ("NEW SIZE %zu", msg->msg_iov->iov_len);
+	}
+
+	bytes = recvmsg(fd, msg, 0);
+	return msg->msg_flags & MSG_TRUNC ? -1 : bytes;
 }
