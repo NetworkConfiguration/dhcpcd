@@ -337,72 +337,44 @@ static int
 get_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp, int fd, int flags,
     int (*callback)(struct dhcpcd_ctx *, struct interface *, struct nlmsghdr *))
 {
-	char *buf = NULL, *nbuf;
-	ssize_t bytes;
-	size_t buflen;
-	struct nlmsghdr *nlm;
+	struct msghdr msg;
 	struct sockaddr_nl nladdr;
-	socklen_t nladdr_len;
+	ssize_t bytes;
+	struct nlmsghdr *nlm;
 	int r;
 
-	buflen = 0;
-	r = -1;
-	for (;;) {
-		bytes = recv(fd, NULL, 0,
-		    flags | MSG_PEEK | MSG_DONTWAIT | MSG_TRUNC);
-		if (bytes == -1)
-			goto eexit;
-		if ((size_t)bytes == buflen) {
-			/* Support kernels older than 2.6.22 */
-			if (bytes == 0)
-				bytes = 512;
-			else
-				bytes *= 2;
-		}
-		if (buflen < (size_t)bytes) {
-			/* Alloc 1 more so we work with older kernels */
-			buflen = (size_t)bytes + 1;
-			nbuf = realloc(buf, buflen);
-			if (nbuf == NULL)
-				goto eexit;
-			buf = nbuf;
-		}
-		nladdr.nl_pid = 0; /* XXX clang static analyzer bug? */
-		nladdr_len = sizeof(nladdr);
-		bytes = recvfrom(fd, buf, buflen, flags,
-		    (struct sockaddr *)&nladdr, &nladdr_len);
-		if (bytes == -1 || bytes == 0)
-			goto eexit;
+	memset(&msg, 0, sizeof(msg));
+	msg.msg_flags = flags;
+	msg.msg_name = &nladdr;
+	msg.msg_namelen = sizeof(nladdr);
+	memset(&nladdr, 0, sizeof(nladdr));
+	msg.msg_iov = &ctx->iov;
+	if ((bytes = recvmsg_alloc(fd, &msg)) == -1)
+		return -1;
 
-		/* Check sender */
-		if (nladdr_len != sizeof(nladdr)) {
-			errno = EINVAL;
-			goto eexit;
-		}
-		/* Ignore message if it is not from kernel */
-		if (nladdr.nl_pid != 0) {
-			r = 0;
-			continue;
-		}
+	/* Check sender */
+	if (msg.msg_namelen != sizeof(nladdr)) {
+		errno = EINVAL;
+		return -1;
+	}
+	/* Ignore message if it is not from kernel */
+	if (nladdr.nl_pid != 0)
+		return 0;
 
-		for (nlm = (void *)buf;
-		     nlm && NLMSG_OK(nlm, (size_t)bytes);
-		     nlm = NLMSG_NEXT(nlm, bytes))
-		{
-			r = err_netlink(nlm);
-			if (r == -1)
-				goto eexit;
-
-			if (r == 0 && callback) {
-				r = callback(ctx, ifp, nlm);
-				if (r != 0)
-					goto eexit;
-			}
+	r = 0;
+	for (nlm = ctx->iov.iov_base;
+	     nlm && NLMSG_OK(nlm, (size_t)bytes);
+	     nlm = NLMSG_NEXT(nlm, bytes))
+	{
+		if ((r = err_netlink(nlm)) == -1)
+			return -1;
+		if (r == 0 && callback) {
+			r = callback(ctx, ifp, nlm);
+			if (r != 0)
+				return r;
 		}
 	}
 
-eexit:
-	free(buf);
 	return r;
 }
 

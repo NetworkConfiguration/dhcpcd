@@ -402,7 +402,7 @@ recvmsg_alloc(int fd, struct msghdr *msg)
 		msg->msg_iovlen = 1;
 
 	for (;;) {
-		msg->msg_flags = 0;
+		msg->msg_flags &= ~MSG_TRUNC;
 		if ((bytes = recvmsg(fd, msg, MSG_PEEK | MSG_TRUNC)) == -1)
 			return -1;
 		if (!(msg->msg_flags & MSG_TRUNC))
