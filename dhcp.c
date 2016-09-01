@@ -3653,9 +3653,12 @@ dhcp_handleifa(int cmd, struct ipv4_addr *ia)
 		return;
 
 	if (cmd == RTM_DELADDR) {
-		if (IPV4_BRD_EQ(state->addr, ia)) {
+		if (state->addr == ia) {
 			logger(ifp->ctx, LOG_INFO,
 			    "%s: deleted IP address %s", ifp->name, ia->saddr);
+			state->addr = NULL;
+			/* Don't clear the added state as we need
+			 * to drop the lease. */
 			dhcp_drop(ifp, "EXPIRE");
 		}
 		return;

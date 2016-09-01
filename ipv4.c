@@ -896,7 +896,10 @@ delete_address(struct interface *ifp)
 
 	state = D_STATE(ifp);
 	ifo = ifp->options;
-	if (ifo->options & DHCPCD_INFORM ||
+	/* The lease could have been added, but the address deleted
+	 * by a 3rd party. */
+	if (state->addr == NULL ||
+	    ifo->options & DHCPCD_INFORM ||
 	    (ifo->options & DHCPCD_STATIC && ifo->req_addr.s_addr == 0))
 		return 0;
 	r = ipv4_deladdr(state->addr, 0);
