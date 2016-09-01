@@ -420,8 +420,6 @@ recvmsg_alloc(int fd, struct msghdr *msg)
 				return -1;
 			break;
 		}
-
-		printf ("NEW SIZE %zu", msg->msg_iov->iov_len);
 	}
 
 	bytes = recvmsg(fd, msg, 0);
