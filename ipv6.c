@@ -1626,6 +1626,12 @@ ipv6_freedrop(struct interface *ifp, int drop)
 	if ((state = IPV6_STATE(ifp)) == NULL)
 		return;
 
+	/* If we got here, we can get rid of any LL callbacks. */
+	while ((cb = TAILQ_FIRST(&state->ll_callbacks))) {
+		TAILQ_REMOVE(&state->ll_callbacks, cb, next);
+		free(cb);
+	}
+
 	ipv6_freedrop_addrs(&state->addrs, drop ? 2 : 0, NULL);
 	if (drop) {
 		if (ifp->ctx->ipv6 != NULL) {
@@ -1635,10 +1641,6 @@ ipv6_freedrop(struct interface *ifp, int drop)
 	} else {
 		/* Because we need to cache the addresses we don't control,
 		 * we only free the state on when NOT dropping addresses. */
-		while ((cb = TAILQ_FIRST(&state->ll_callbacks))) {
-			TAILQ_REMOVE(&state->ll_callbacks, cb, next);
-			free(cb);
-		}
 		free(state);
 		ifp->if_data[IF_DATA_IPV6] = NULL;
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
