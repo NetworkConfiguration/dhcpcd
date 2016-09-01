@@ -1297,7 +1297,8 @@ if_ifinfo(struct dhcpcd_ctx *ctx, const struct if_msghdr *ifm)
 		state = LINK_DOWN;
 		break;
 	case LINK_STATE_UP:
-		state = LINK_UP;
+		/* Some BSD's don't take the link down on downed interface. */
+		state = ifm->ifm_flags & IFF_UP ? LINK_UP : LINK_DOWN;
 		break;
 	default:
 		/* handle_carrier will re-load the interface flags and check for
@@ -1434,6 +1435,31 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 		sin = (const void *)rti_info[RTAX_BRD];
 		bcast.s_addr = sin != NULL && sin->sin_family == AF_INET ?
 		    sin->sin_addr.s_addr : INADDR_ANY;
+
+#ifdef __FreeBSD__
+		/* FreeBSD sends RTM_DELADDR for each assigned address
+		 * to an interface just brought down.
+		 * This is wrong, because the address still exists.
+		 * So we need to ignore it.
+		 * Oddly enough this only happens for INET addresses. */
+		if (ifam->ifam_type == RTM_DELADDR) {
+			struct ifreq ifr;
+			struct sockaddr_in *ifr_sin;
+
+			memset(&ifr, 0, sizeof(ifr));
+			strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
+			ifr_sin = (void *)&ifr.ifr_addr;
+			ifr_sin->sin_family = AF_INET;
+			ifr_sin->sin_addr = addr;
+			if (ioctl(ctx->pf_inet_fd, SIOCGIFADDR, &ifr) == 0) {
+				logger(ctx, LOG_WARNING,
+				    "%s: ignored false RTM_DELADDR for %s",
+				    ifp->name, inet_ntoa(addr));
+				break;
+			}
+		}
+#endif
+
 		ipv4_handleifa(ctx, ifam->ifam_type, NULL, ifp->name,
 		    &addr, &mask, &bcast);
 		break;
