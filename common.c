@@ -27,6 +27,9 @@
 
 #include <sys/param.h>
 #include <sys/time.h>
+#ifdef __sun
+#include <sys/sysmacros.h>
+#endif
 
 #include <ctype.h>
 #include <err.h>

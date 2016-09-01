@@ -769,20 +769,15 @@ if_dispatch(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 int
 if_handlelink(struct dhcpcd_ctx *ctx)
 {
-	char buf[2048];
-	const char *p, *e;
-	size_t msglen;
+	struct msghdr msg;
 	ssize_t bytes;
-	const struct rt_msghdr *rtm;
 
-	if ((bytes = read(ctx->link_fd, buf, sizeof(buf))) == -1)
+	memset(&msg, 0, sizeof(msg));
+	msg.msg_iov = &ctx->iov;
+
+	if ((bytes = recvmsg_alloc(ctx->link_fd, &msg)) == -1)
 		return -1;
-	e = buf + bytes;
-	for (p = buf; p < e; p += msglen) {
-		rtm = (const  void *)p;
-		msglen = rtm->rtm_msglen;
-		if_dispatch(ctx, rtm);
-	}
+	if_dispatch(ctx, ctx->iov.iov_base);
 	return 0;
 }
 
