@@ -420,7 +420,7 @@ recvmsg_realloc(int fd, struct msghdr *msg, int flags)
 	}
 
 	slen = recvmsg(fd, msg, flags);
-	if (msg->msg_flags & MSG_TRUNC) {
+	if (slen != -1 && msg->msg_flags & MSG_TRUNC) {
 		/* This should not be possible ... */
 		errno = ENOBUFS;
 		return -1;
