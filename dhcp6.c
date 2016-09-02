@@ -2647,7 +2647,7 @@ dhcp6_handledata(void *arg)
 	dctx = arg;
 	ctx = dctx->ipv6;
 	ctx->rcvhdr.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo));
-	bytes = recvmsg(ctx->dhcp_fd, &ctx->rcvhdr, 0);
+	bytes = recvmsg_realloc(ctx->dhcp_fd, &ctx->rcvhdr, 0);
 	if (bytes == -1) {
 		logger(dctx, LOG_ERR, "%s: recvmsg: %m", __func__);
 		close(ctx->dhcp_fd);

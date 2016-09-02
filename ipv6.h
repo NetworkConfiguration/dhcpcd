@@ -260,17 +260,14 @@ struct ipv6_state {
 #define IP6BUFLEN	(CMSG_SPACE(sizeof(struct in6_pktinfo)) + \
 			CMSG_SPACE(sizeof(int)))
 
-
 #ifdef INET6
 struct ipv6_ctx {
+	unsigned char ctlbuf[IP6BUFLEN];
 	struct sockaddr_in6 from;
 	struct msghdr sndhdr;
-	struct iovec sndiov[2];
+	struct iovec sndiov;
 	unsigned char sndbuf[CMSG_SPACE(sizeof(struct in6_pktinfo))];
 	struct msghdr rcvhdr;
-	struct iovec rcviov[2];
-	unsigned char rcvbuf[IP6BUFLEN];
-	unsigned char ansbuf[1500];
 	char ntopbuf[INET6_ADDRSTRLEN];
 	const char *sfrom;
 

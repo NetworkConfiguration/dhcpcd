@@ -1551,7 +1551,7 @@ ipv6nd_handledata(void *arg)
 	ctx = dctx->ipv6;
 	ctx->rcvhdr.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo)) +
 	    CMSG_SPACE(sizeof(int));
-	len = recvmsg(ctx->nd_fd, &ctx->rcvhdr, 0);
+	len = recvmsg_realloc(ctx->nd_fd, &ctx->rcvhdr, 0);
 	if (len == -1) {
 		logger(dctx, LOG_ERR, "recvmsg: %m");
 		eloop_event_delete(dctx->eloop, ctx->nd_fd);
