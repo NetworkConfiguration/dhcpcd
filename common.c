@@ -31,6 +31,7 @@
 #include <sys/sysmacros.h>
 #endif
 
+#include <assert.h>
 #include <ctype.h>
 #include <err.h>
 #include <errno.h>
@@ -381,52 +382,49 @@ read_hwaddr_aton(uint8_t **data, const char *path)
 	return len;
 }
 
-static void *
-iovec_realloc(struct iovec *iov, size_t size)
-{
-
-	if (iov->iov_len < size) {
-		void *n;
-
-		if ((n = realloc(iov->iov_base, size)) == NULL)
-			return NULL;
-		iov->iov_base = n;
-		iov->iov_len = size;
-	}
-	return iov->iov_base;
-}
-
 ssize_t
 recvmsg_realloc(int fd, struct msghdr *msg, int flags)
 {
-	ssize_t len;
 	struct iovec *iov;
+	ssize_t slen;
+	size_t len;
+	void *n;
+
+	assert(msg != NULL);
+	assert((flags & (MSG_PEEK | MSG_TRUNC)) == 0);
 
 	/* Assume we are reallocing the last iovec. */
 	iov = &msg->msg_iov[msg->msg_iovlen - 1];
 
 	for (;;) {
 		msg->msg_flags = 0;
-		len = recvmsg(fd, msg, flags | MSG_PEEK | MSG_TRUNC);
-		if (len == -1)
+		slen = recvmsg(fd, msg, flags | MSG_PEEK | MSG_TRUNC);
+		if (slen == -1)
 			return -1;
 		if (!(msg->msg_flags & MSG_TRUNC))
 			break;
 
-		/* Some kernels return the truncated size. */
-		if (iov->iov_len == (size_t)len) {
-			size_t nl;
+		len = (size_t)slen;
 
-			nl = (size_t)roundup(len + 1, IOVEC_BUFSIZ);
-			if (iovec_realloc(iov, nl) == NULL)
-				return -1;
-		} else {
-			if (iovec_realloc(iov, (size_t)len) == NULL)
-				return -1;
+		/* Some kernels return the truncated size, but others
+		 * can return the actual size needed because
+		 * we passed MSG_TRUNC above. */
+		if (iov->iov_len == len)
+			len = roundup(len + 1, IOVEC_BUFSIZ);
+		else if (iov->iov_len > len)
 			break;
-		}
+		if ((n = realloc(iov->iov_base, len)) == NULL)
+			return -1;
+		iov->iov_base = n;
+		iov->iov_len = len;
 	}
 
-	len = recvmsg(fd, msg, flags);
-	return msg->msg_flags & MSG_TRUNC ? -1 : len;
+	msg->msg_flags = 0;
+	slen = recvmsg(fd, msg, flags);
+	if (msg->msg_flags & MSG_TRUNC) {
+		/* This should not be possible ... */
+		errno = ENOBUFS;
+		return -1;
+	}
+	return slen;
 }
