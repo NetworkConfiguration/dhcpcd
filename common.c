@@ -397,7 +397,7 @@ recvmsg_realloc(int fd, struct msghdr *msg, int flags)
 	iov = &msg->msg_iov[msg->msg_iovlen - 1];
 
 	for (;;) {
-		msg->msg_flags = 0;
+		/* Passing MSG_TRUNC should return the actual size needed. */
 		slen = recvmsg(fd, msg, flags | MSG_PEEK | MSG_TRUNC);
 		if (slen == -1)
 			return -1;
@@ -406,9 +406,9 @@ recvmsg_realloc(int fd, struct msghdr *msg, int flags)
 
 		len = (size_t)slen;
 
-		/* Some kernels return the truncated size, but others
-		 * can return the actual size needed because
-		 * we passed MSG_TRUNC above. */
+		/* Some kernels return the size of the receive buffer
+		 * on truncation, not the actual size needed.
+		 * So grow the buffer and try again. */
 		if (iov->iov_len == len)
 			len = roundup(len + 1, IOVEC_BUFSIZ);
 		else if (iov->iov_len > len)
@@ -419,7 +419,6 @@ recvmsg_realloc(int fd, struct msghdr *msg, int flags)
 		iov->iov_len = len;
 	}
 
-	msg->msg_flags = 0;
 	slen = recvmsg(fd, msg, flags);
 	if (msg->msg_flags & MSG_TRUNC) {
 		/* This should not be possible ... */
