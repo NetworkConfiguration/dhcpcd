@@ -399,7 +399,7 @@ iovec_realloc(struct iovec *iov, size_t size)
 ssize_t
 recvmsg_realloc(int fd, struct msghdr *msg, int flags)
 {
-	ssize_t bytes;
+	ssize_t len;
 	struct iovec *iov;
 
 	/* Assume we are reallocing the last iovec. */
@@ -407,26 +407,26 @@ recvmsg_realloc(int fd, struct msghdr *msg, int flags)
 
 	for (;;) {
 		msg->msg_flags = 0;
-		bytes = recvmsg(fd, msg, flags | MSG_PEEK | MSG_TRUNC);
-		if (bytes == -1)
+		len = recvmsg(fd, msg, flags | MSG_PEEK | MSG_TRUNC);
+		if (len == -1)
 			return -1;
 		if (!(msg->msg_flags & MSG_TRUNC))
 			break;
 
 		/* Some kernels return the truncated size. */
-		if (iov->iov_len == (size_t)bytes) {
+		if (iov->iov_len == (size_t)len) {
 			size_t nl;
 
-			nl = (size_t)roundup(bytes + 1, IOVEC_BUFSIZ);
+			nl = (size_t)roundup(len + 1, IOVEC_BUFSIZ);
 			if (iovec_realloc(iov, nl) == NULL)
 				return -1;
 		} else {
-			if (iovec_realloc(iov, (size_t)bytes) == NULL)
+			if (iovec_realloc(iov, (size_t)len) == NULL)
 				return -1;
 			break;
 		}
 	}
 
-	bytes = recvmsg(fd, msg, flags);
-	return msg->msg_flags & MSG_TRUNC ? -1 : bytes;
+	len = recvmsg(fd, msg, flags);
+	return msg->msg_flags & MSG_TRUNC ? -1 : len;
 }
