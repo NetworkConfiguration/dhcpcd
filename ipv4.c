@@ -1293,9 +1293,11 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 			TAILQ_INSERT_TAIL(&state->addrs, ia, next);
 		}
 		/* Mask could have changed */
-		ia->mask = *mask;
-		snprintf(ia->saddr, sizeof(ia->saddr), "%s/%d",
-		    inet_ntoa(*addr), inet_ntocidr(*mask));
+		if (mask->s_addr != INADDR_ANY) {
+			ia->mask = *mask;
+			snprintf(ia->saddr, sizeof(ia->saddr), "%s/%d",
+			    inet_ntoa(*addr), inet_ntocidr(*mask));
+		}
 		if (brd != NULL)
 			ia->brd = *brd;
 		else
