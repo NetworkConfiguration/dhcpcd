@@ -506,7 +506,22 @@ EOF
 		echo "no"
 	fi
 	rm -f _IN6_ADDR_GEN_MODE_NONE.c _IN6_ADDR_GEN_MODE_NONE
-
+else
+	printf "Testing for ifam_pid ... "
+	cat <<EOF >_ifam_pid.c
+#include <net/if.h>
+int main(void) {
+	struct ifa_msghdr ifam = { };
+	return (int)ifam.ifam_pid;
+}
+EOF
+	if $XCC _ifam_pid.c -o _ifam_pid 2>&3; then
+		echo "yes"
+		echo "#define HAVE_IFAM_PID" >>$CONFIG_H
+	else
+		echo "no"
+	fi
+	rm -f _ifam_pid.c _ifam_pid
 fi
 
 abort=false

@@ -344,12 +344,12 @@ get_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp, int fd, int flags,
 	int r;
 
 	memset(&msg, 0, sizeof(msg));
-	msg.msg_flags = flags;
 	msg.msg_name = &nladdr;
 	msg.msg_namelen = sizeof(nladdr);
 	memset(&nladdr, 0, sizeof(nladdr));
 	msg.msg_iov = &ctx->iov;
-	if ((bytes = recvmsg_alloc(fd, &msg)) == -1)
+	msg.msg_iovlen = 1;
+	if ((bytes = recvmsg_realloc(fd, &msg, flags)) == -1)
 		return -1;
 
 	/* Check sender */
