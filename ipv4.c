@@ -661,7 +661,8 @@ add_router_host_route(struct rt_head *rt, const struct interface *ifp)
 		return rt;
 
 	TAILQ_FOREACH(rtp, rt, next) {
-		if (rtp->dest.s_addr != INADDR_ANY)
+		if (rtp->dest.s_addr != INADDR_ANY ||
+		    rtp->gate.s_addr == INADDR_ANY)
 			continue;
 		/* Scan for a route to match */
 		TAILQ_FOREACH(rtn, rt, next) {
