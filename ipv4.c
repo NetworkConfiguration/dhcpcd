@@ -392,6 +392,19 @@ ipv4_handlert(struct dhcpcd_ctx *ctx, int cmd, const struct rt *rt, int flags)
 	return flags ? 0 : ipv4ll_handlert(ctx, cmd, rt);
 }
 
+static void
+d_kroute(struct rt *rt)
+{
+	struct dhcpcd_ctx *ctx;
+
+	ctx = rt->iface->ctx;
+	rt = ipv4_findrt(ctx, rt, 1);
+	if (rt != NULL) {
+		TAILQ_REMOVE(ctx->ipv4_kroutes, rt, next);
+		free(rt);
+	}
+}
+
 #define n_route(a)	 nc_route(NULL, a)
 #define c_route(a, b)	 nc_route(a, b)
 static int
@@ -469,8 +482,12 @@ nc_route(struct rt *ort, struct rt *nrt)
 
 	/* No route metrics, we need to delete the old route before
 	 * adding the new one. */
-	if (ort && if_route(RTM_DELETE, ort) == -1 && errno != ESRCH)
-		logger(nrt->iface->ctx, LOG_ERR, "if_route (DEL): %m");
+	if (ort) {
+		if (if_route(RTM_DELETE, ort) == -1 && errno != ESRCH)
+			logger(nrt->iface->ctx, LOG_ERR, "if_route (DEL): %m");
+		else
+			d_kroute(ort);
+	}
 	if (if_route(RTM_ADD, nrt) != -1)
 		return 0;
 #ifdef HAVE_ROUTE_METRIC
@@ -490,6 +507,10 @@ d_route(struct rt *rt)
 	if (retval == -1 && errno != ENOENT && errno != ESRCH)
 		logger(rt->iface->ctx, LOG_ERR,
 		    "%s: if_delroute: %m", rt->iface->name);
+	/* Remove the route from our kernel table so we can add a
+	 * IPv4LL default route if possible. */
+	else
+		d_kroute(rt);
 	return retval;
 }
 
