@@ -1281,9 +1281,10 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 
 		flags = if_addrflags(ia);
 		if (flags == -1) {
-			logger(ia->iface->ctx, LOG_ERR,
-			    "%s: %s: if_addrflags: %m",
-			    ia->iface->name, ia->saddr);
+			if (errno != EADDRNOTAVAIL)
+				logger(ia->iface->ctx, LOG_ERR,
+				    "%s: %s: if_addrflags: %m",
+				    ia->iface->name, ia->saddr);
 			return;
 		}
 		ia->addr_flags = flags;

@@ -1148,9 +1148,10 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 		}
 		flags = if_addrflags6(ia);
 		if (flags == -1) {
-			logger(ia->iface->ctx, LOG_ERR,
-			    "%s: %s: if_addrflags6: %m",
-			    ia->iface->name, ia->saddr);
+			if (errno != EADDRNOTAVAIL)
+				logger(ia->iface->ctx, LOG_ERR,
+				    "%s: %s: if_addrflags6: %m",
+				    ia->iface->name, ia->saddr);
 			return;
 		}
 		ia->addr_flags = flags;
