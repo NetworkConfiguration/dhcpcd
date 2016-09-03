@@ -857,7 +857,7 @@ ipv4_buildroutes(struct dhcpcd_ctx *ctx)
 
 	/* Remove old routes we used to manage */
 	if (ctx->ipv4_routes) {
-		TAILQ_FOREACH(rt, ctx->ipv4_routes, next) {
+		TAILQ_FOREACH_REVERSE(rt, ctx->ipv4_routes, rt_head, next) {
 			if (find_route(nrs, rt, NULL) == NULL &&
 			    (rt->iface->options->options &
 			    (DHCPCD_EXITING | DHCPCD_PERSISTENT)) !=
