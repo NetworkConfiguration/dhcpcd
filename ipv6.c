@@ -339,6 +339,11 @@ ipv6_makestableprivate(struct in6_addr *addr,
 	uint32_t dad;
 	int r;
 
+	if (ifp->ctx->secret_len == 0) {
+		if (ipv6_readsecret(ifp->ctx) == -1)
+			return -1;
+	}
+
 	dad = (uint32_t)*dad_counter;
 
 	/* For our implementation, we shall set the hardware address
@@ -367,10 +372,6 @@ ipv6_makeaddr(struct in6_addr *addr, struct interface *ifp,
 	}
 
 	if (ifp->options->options & DHCPCD_SLAACPRIVATE) {
-		if (ifp->ctx->secret_len == 0) {
-			if (ipv6_readsecret(ifp->ctx) == -1)
-				return -1;
-		}
 		dad = 0;
 		if (ipv6_makestableprivate(addr,
 		    prefix, prefix_len, ifp, &dad) == -1)
