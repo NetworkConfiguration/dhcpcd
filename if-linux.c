@@ -314,26 +314,6 @@ if_closesockets_os(struct dhcpcd_ctx *ctx)
 }
 
 static int
-err_netlink(struct nlmsghdr *nlm)
-{
-	struct nlmsgerr *err;
-	size_t len;
-
-	if (nlm->nlmsg_type != NLMSG_ERROR)
-		return 0;
-	len = nlm->nlmsg_len - sizeof(*nlm);
-	if (len < sizeof(*err)) {
-		errno = EBADMSG;
-		return -1;
-	}
-	err = (struct nlmsgerr *)NLMSG_DATA(nlm);
-	if (err->error == 0)
-		return (int)len;
-	errno = -err->error;
-	return -1;
-}
-
-static int
 get_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp, int fd, int flags,
     int (*callback)(struct dhcpcd_ctx *, struct interface *, struct nlmsghdr *))
 {
@@ -366,13 +346,25 @@ get_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp, int fd, int flags,
 	     nlm && NLMSG_OK(nlm, (size_t)bytes);
 	     nlm = NLMSG_NEXT(nlm, bytes))
 	{
-		if ((r = err_netlink(nlm)) == -1)
-			return -1;
-		if (r == 0 && callback) {
-			r = callback(ctx, ifp, nlm);
-			if (r != 0)
-				return r;
+		if (nlm->nlmsg_type == NLMSG_NOOP)
+			continue;
+		if (nlm->nlmsg_type == NLMSG_ERROR) {
+			struct nlmsgerr *err;
+
+			if (nlm->nlmsg_len - sizeof(*nlm) < sizeof(*err)) {
+				errno = EBADMSG;
+				return -1;
+			}
+			err = (struct nlmsgerr *)NLMSG_DATA(nlm);
+			if (err->error != 0) {
+				errno = -err->error;
+				return -1;
+			}
 		}
+		if (nlm->nlmsg_type == NLMSG_DONE)
+			break;
+		if ((r = callback(ctx, ifp, nlm)) != 0)
+			break;
 	}
 
 	return r;
