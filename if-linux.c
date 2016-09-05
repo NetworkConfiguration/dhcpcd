@@ -94,6 +94,7 @@ int if_getssid_wext(const char *ifname, uint8_t *ssid);
 struct priv {
 	int route_fd;
 	uint32_t route_pid;
+	struct iovec link_iov;
 };
 
 /* Broadcast address for IPoIB */
@@ -299,6 +300,8 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 	if (getsockname(priv->route_fd, (struct sockaddr *)&snl, &len) == -1)
 		return -1;
 	priv->route_pid = snl.nl_pid;
+	priv->link_iov.iov_base = NULL;
+	priv->link_iov.iov_len = 0;
 	return 0;
 }
 
@@ -309,12 +312,14 @@ if_closesockets_os(struct dhcpcd_ctx *ctx)
 
 	if (ctx->priv != NULL) {
 		priv = (struct priv *)ctx->priv;
+		free(priv->link_iov.iov_base);
 		close(priv->route_fd);
 	}
 }
 
 static int
-get_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp, int fd, int flags,
+get_netlink(struct dhcpcd_ctx *ctx, struct iovec *iov,
+    struct interface *ifp, int fd, int flags,
     int (*callback)(struct dhcpcd_ctx *, struct interface *, struct nlmsghdr *))
 {
 	struct msghdr msg;
@@ -327,7 +332,7 @@ get_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp, int fd, int flags,
 	msg.msg_name = &nladdr;
 	msg.msg_namelen = sizeof(nladdr);
 	memset(&nladdr, 0, sizeof(nladdr));
-	msg.msg_iov = &ctx->iov;
+	msg.msg_iov = iov;
 	msg.msg_iovlen = 1;
 	if ((bytes = recvmsg_realloc(fd, &msg, flags)) == -1)
 		return -1;
@@ -342,7 +347,7 @@ get_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp, int fd, int flags,
 		return 0;
 
 	r = 0;
-	for (nlm = ctx->iov.iov_base;
+	for (nlm = iov->iov_base;
 	     nlm && NLMSG_OK(nlm, (size_t)bytes);
 	     nlm = NLMSG_NEXT(nlm, bytes))
 	{
@@ -851,8 +856,10 @@ link_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp,
 int
 if_handlelink(struct dhcpcd_ctx *ctx)
 {
+	struct priv *priv;
 
-	return get_netlink(ctx, NULL,
+	priv = (struct priv *)ctx->priv;
+	return get_netlink(ctx, &priv->link_iov, NULL,
 	    ctx->link_fd, MSG_DONTWAIT, &link_netlink);
 }
 
@@ -892,7 +899,7 @@ send_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	hdr->nlmsg_seq = (uint32_t)++ctx->seq;
 	if (sendmsg(s, &msg, 0) != -1) {
 		ctx->sseq = ctx->seq;
-		r = get_netlink(ctx, ifp, s, 0, callback);
+		r = get_netlink(ctx, &ctx->iov, ifp, s, 0, callback);
 	} else
 		r = -1;
 	if (protocol != NETLINK_ROUTE)
