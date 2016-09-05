@@ -37,6 +37,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -1263,6 +1264,7 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 	struct ipv4_state *state;
 	struct ipv4_addr *ia;
 	int flags;
+	bool ia_is_new;
 
 	if (ifs == NULL)
 		ifs = ctx->ifaces;
@@ -1287,14 +1289,18 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 			}
 			ia->iface = ifp;
 			ia->addr = *addr;
+			ia->mask = *mask;
+			ia_is_new = true;
 #ifdef ALIAS_ADDR
 			strlcpy(ia->alias, ifname, sizeof(ia->alias));
 #endif
 			TAILQ_INSERT_TAIL(&state->addrs, ia, next);
-		}
+		} else
+			ia_is_new = false;
 		/* Mask could have changed */
-		if (mask->s_addr != INADDR_ANY &&
-		    mask->s_addr != ia->mask.s_addr)
+		if (ia_is_new ||
+		    (mask->s_addr != INADDR_ANY &&
+		    mask->s_addr != ia->mask.s_addr))
 		{
 			ia->mask = *mask;
 			snprintf(ia->saddr, sizeof(ia->saddr), "%s/%d",
