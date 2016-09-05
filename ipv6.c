@@ -1437,14 +1437,28 @@ nextslaacprivate:
 static int
 ipv6_tryaddlinklocal(struct interface *ifp)
 {
+	struct ipv6_addr *ia;
 
 	/* We can't assign a link-locak address to this,
 	 * the ppp process has to. */
 	if (ifp->flags & IFF_POINTOPOINT)
 		return 0;
 
-	if (ipv6_iffindaddr(ifp, NULL, IN6_IFF_DUPLICATED) != NULL ||
-	    !CAN_ADD_LLADDR(ifp))
+	ia = ipv6_iffindaddr(ifp, NULL, IN6_IFF_DUPLICATED);
+	if (ia != NULL) {
+#ifdef IPV6_POLLADDRFLAG
+		if (ia->addr_flags & IN6_IFF_TENTATIVE) {
+			struct timespec tv;
+
+			ms_to_ts(&tv, RETRANS_TIMER / 2);
+			eloop_timeout_add_tv(
+			    ia->iface->ctx->eloop,
+			    &tv, ipv6_checkaddrflags, ia);
+		}
+#endif
+		return 0;
+	}
+	if (!CAN_ADD_LLADDR(ifp))
 		return 0;
 
 	return ipv6_addlinklocal(ifp);
