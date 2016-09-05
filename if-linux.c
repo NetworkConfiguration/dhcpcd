@@ -363,7 +363,7 @@ get_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp, int fd, int flags,
 		}
 		if (nlm->nlmsg_type == NLMSG_DONE)
 			break;
-		if ((r = callback(ctx, ifp, nlm)) != 0)
+		if (callback && (r = callback(ctx, ifp, nlm)) != 0)
 			break;
 	}
 
