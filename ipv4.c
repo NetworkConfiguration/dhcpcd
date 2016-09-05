@@ -882,8 +882,9 @@ ipv4_deladdr(struct ipv4_addr *addr, int keeparp)
 	    "%s: deleting IP address %s", addr->iface->name, addr->saddr);
 
 	r = if_address(RTM_DELADDR, addr);
-	if (r == -1 && errno != EADDRNOTAVAIL && errno != ENXIO &&
-	    errno != ENODEV)
+	if (r == -1 &&
+	    errno != EADDRNOTAVAIL && errno != ESRCH &&
+	    errno != ENXIO && errno != ENODEV)
 		logger(addr->iface->ctx, LOG_ERR, "%s: %s: %m",
 		    addr->iface->name, __func__);
 

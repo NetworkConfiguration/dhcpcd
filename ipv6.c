@@ -601,8 +601,9 @@ ipv6_deleteaddr(struct ipv6_addr *ia)
 	logger(ia->iface->ctx, LOG_INFO, "%s: deleting address %s",
 	    ia->iface->name, ia->saddr);
 	if (if_address6(RTM_DELADDR, ia) == -1 &&
-	    errno != EADDRNOTAVAIL && errno != ENXIO && errno != ENODEV)
-		logger(ia->iface->ctx, LOG_ERR, "if_address6: :%m");
+	    errno != EADDRNOTAVAIL && errno != ESRCH &&
+	    errno != ENXIO && errno != ENODEV)
+		logger(ia->iface->ctx, LOG_ERR, "if_address6: %m");
 
 	/* NOREJECT is set if we delegated exactly the prefix to another
 	 * address.
