@@ -265,7 +265,7 @@ struct ipv6_ctx {
 	unsigned char ctlbuf[IP6BUFLEN];
 	struct sockaddr_in6 from;
 	struct msghdr sndhdr;
-	struct iovec sndiov;
+	struct iovec sndiov[1];
 	unsigned char sndbuf[CMSG_SPACE(sizeof(struct in6_pktinfo))];
 	struct msghdr rcvhdr;
 	char ntopbuf[INET6_ADDRSTRLEN];

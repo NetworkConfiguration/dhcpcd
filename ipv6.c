@@ -154,13 +154,13 @@ ipv6_init(struct dhcpcd_ctx *dhcpcd_ctx)
 	TAILQ_INIT(&ctx->kroutes);
 
 	ctx->sndhdr.msg_namelen = sizeof(struct sockaddr_in6);
-	ctx->sndhdr.msg_iov = &ctx->sndiov;
+	ctx->sndhdr.msg_iov = ctx->sndiov;
 	ctx->sndhdr.msg_iovlen = 1;
 	ctx->sndhdr.msg_control = ctx->sndbuf;
 	ctx->sndhdr.msg_controllen = sizeof(ctx->sndbuf);
 	ctx->rcvhdr.msg_name = &ctx->from;
 	ctx->rcvhdr.msg_namelen = sizeof(ctx->from);
-	ctx->rcvhdr.msg_iov = &dhcpcd_ctx->iov;
+	ctx->rcvhdr.msg_iov = dhcpcd_ctx->iov;
 	ctx->rcvhdr.msg_iovlen = 1;
 	ctx->rcvhdr.msg_control = ctx->ctlbuf;
 	// controllen is set at recieve
