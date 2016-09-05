@@ -773,12 +773,12 @@ if_handlelink(struct dhcpcd_ctx *ctx)
 	ssize_t bytes;
 
 	memset(&msg, 0, sizeof(msg));
-	msg.msg_iov = &ctx->iov;
+	msg.msg_iov = ctx->iov;
 	msg.msg_iovlen = 1;
 
 	if ((bytes = recvmsg_realloc(ctx->link_fd, &msg, 0)) == -1)
 		return -1;
-	if_dispatch(ctx, ctx->iov.iov_base);
+	if_dispatch(ctx, ctx->iov[0].iov_base);
 	return 0;
 }
 

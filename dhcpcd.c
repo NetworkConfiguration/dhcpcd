@@ -1970,7 +1970,7 @@ exit1:
 	if (control_stop(&ctx) == -1)
 		logger(&ctx, LOG_ERR, "control_stop: %m:");
 	eloop_free(ctx.eloop);
-	free(ctx.iov.iov_base);
+	free(ctx.iov[0].iov_base);
 
 	if (ctx.options & DHCPCD_STARTED && !(ctx.options & DHCPCD_FORKED))
 		logger(&ctx, LOG_INFO, PACKAGE " exited");
