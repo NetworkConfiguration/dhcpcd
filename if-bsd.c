@@ -1288,27 +1288,42 @@ static void
 if_ifinfo(struct dhcpcd_ctx *ctx, const struct if_msghdr *ifm)
 {
 	struct interface *ifp;
-	int state;
+	int link;
+#ifdef IPV6_POLLADDRFLAG
+	struct ipv6_state *state;
+	struct ipv6_addr *ia;
+	int flags;
+#endif
 
 	if ((ifp = if_findindex(ctx->ifaces, ifm->ifm_index)) == NULL)
 		return;
 	switch (ifm->ifm_data.ifi_link_state) {
 	case LINK_STATE_DOWN:
-		state = LINK_DOWN;
+		link = LINK_DOWN;
 		break;
 	case LINK_STATE_UP:
 		/* Some BSD's don't take the link down on downed interface. */
-		state = ifm->ifm_flags & IFF_UP ? LINK_UP : LINK_DOWN;
+		link = ifm->ifm_flags & IFF_UP ? LINK_UP : LINK_DOWN;
+
+#ifdef IPV6_POLLADDRFLAG
+		/* We need to update the address flags incase they were
+		 * marked tentative on down. */
+		state = IPV6_STATE(ifp);
+		TAILQ_FOREACH(ia, &state->addrs, next) {
+			if ((flags = if_addrflags6(ia)) != -1)
+				ia->addr_flags = flags;
+		}
+#endif
 		break;
 	default:
 		/* handle_carrier will re-load the interface flags and check for
 		 * IFF_RUNNING as some drivers that don't handle link state also
 		 * don't set IFF_RUNNING when this routing message is generated.
 		 * As such, it is a race ...*/
-		state = LINK_UNKNOWN;
+		link = LINK_UNKNOWN;
 		break;
 	}
-	dhcpcd_handlecarrier(ctx, state,
+	dhcpcd_handlecarrier(ctx, link,
 	    (unsigned int)ifm->ifm_flags, ifp->name);
 }
 
