@@ -411,9 +411,10 @@ recvmsg_realloc(int fd, struct msghdr *msg, int flags)
 		 * on truncation, not the actual size needed.
 		 * So grow the buffer and try again. */
 		if (iov->iov_len == len)
-			len = roundup(len + 1, IOVEC_BUFSIZ);
+			len++;
 		else if (iov->iov_len > len)
 			break;
+		len = roundup(len, IOVEC_BUFSIZ);
 		if ((n = realloc(iov->iov_base, len)) == NULL)
 			return -1;
 		iov->iov_base = n;
