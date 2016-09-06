@@ -1288,7 +1288,7 @@ static void
 if_ifinfo(struct dhcpcd_ctx *ctx, const struct if_msghdr *ifm)
 {
 	struct interface *ifp;
-	int link;
+	int link_state;
 #ifdef IPV6_POLLADDRFLAG
 	struct ipv6_state *state;
 	struct ipv6_addr *ia;
@@ -1299,11 +1299,11 @@ if_ifinfo(struct dhcpcd_ctx *ctx, const struct if_msghdr *ifm)
 		return;
 	switch (ifm->ifm_data.ifi_link_state) {
 	case LINK_STATE_DOWN:
-		link = LINK_DOWN;
+		link_state = LINK_DOWN;
 		break;
 	case LINK_STATE_UP:
-		/* Some BSD's don't take the link down on downed interface. */
-		link = ifm->ifm_flags & IFF_UP ? LINK_UP : LINK_DOWN;
+		/* dhcpcd considers the link down if IFF_UP is not set. */
+		link_state = ifm->ifm_flags & IFF_UP ? LINK_UP : LINK_DOWN;
 
 #ifdef IPV6_POLLADDRFLAG
 		/* We need to update the address flags incase they were
@@ -1320,10 +1320,10 @@ if_ifinfo(struct dhcpcd_ctx *ctx, const struct if_msghdr *ifm)
 		 * IFF_RUNNING as some drivers that don't handle link state also
 		 * don't set IFF_RUNNING when this routing message is generated.
 		 * As such, it is a race ...*/
-		link = LINK_UNKNOWN;
+		link_state = LINK_UNKNOWN;
 		break;
 	}
-	dhcpcd_handlecarrier(ctx, link,
+	dhcpcd_handlecarrier(ctx, link_state,
 	    (unsigned int)ifm->ifm_flags, ifp->name);
 }
 
