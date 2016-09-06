@@ -1289,11 +1289,6 @@ if_ifinfo(struct dhcpcd_ctx *ctx, const struct if_msghdr *ifm)
 {
 	struct interface *ifp;
 	int link_state;
-#ifdef IPV6_POLLADDRFLAG
-	struct ipv6_state *state;
-	struct ipv6_addr *ia;
-	int flags;
-#endif
 
 	if ((ifp = if_findindex(ctx->ifaces, ifm->ifm_index)) == NULL)
 		return;
@@ -1304,16 +1299,6 @@ if_ifinfo(struct dhcpcd_ctx *ctx, const struct if_msghdr *ifm)
 	case LINK_STATE_UP:
 		/* dhcpcd considers the link down if IFF_UP is not set. */
 		link_state = ifm->ifm_flags & IFF_UP ? LINK_UP : LINK_DOWN;
-
-#ifdef IPV6_POLLADDRFLAG
-		/* We need to update the address flags incase they were
-		 * marked tentative on down. */
-		state = IPV6_STATE(ifp);
-		TAILQ_FOREACH(ia, &state->addrs, next) {
-			if ((flags = if_addrflags6(ia)) != -1)
-				ia->addr_flags = flags;
-		}
-#endif
 		break;
 	default:
 		/* handle_carrier will re-load the interface flags and check for

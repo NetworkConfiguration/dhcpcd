@@ -1611,6 +1611,20 @@ ipv6_startstatic(struct interface *ifp)
 int
 ipv6_start(struct interface *ifp)
 {
+#ifdef IPV6_POLLADDRFLAG
+	struct ipv6_state *state;
+
+	/* We need to update the address flags. */
+	if ((state = IPV6_STATE(ifp)) != NULL) {
+		struct ipv6_addr *ia;
+		int flags;
+
+		TAILQ_FOREACH(ia, &state->addrs, next) {
+			if ((flags = if_addrflags6(ia)) != -1)
+				ia->addr_flags = flags;
+		}
+	}
+#endif
 
 	if (ipv6_tryaddlinklocal(ifp) == -1)
 		return -1;
