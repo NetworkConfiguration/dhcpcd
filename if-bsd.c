@@ -1449,7 +1449,7 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 		bcast.s_addr = sin != NULL && sin->sin_family == AF_INET ?
 		    sin->sin_addr.s_addr : INADDR_ANY;
 
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__DragonFly__)
 		/* FreeBSD sends RTM_DELADDR for each assigned address
 		 * to an interface just brought down.
 		 * This is wrong, because the address still exists.
