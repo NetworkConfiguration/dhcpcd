@@ -391,6 +391,7 @@ recvmsg_realloc(int fd, struct msghdr *msg, int flags)
 	void *n;
 
 	assert(msg != NULL);
+	assert(msg->msg_iov != NULL && msg->msg_iovlen > 0);
 	assert((flags & (MSG_PEEK | MSG_TRUNC)) == 0);
 
 	/* Assume we are reallocing the last iovec. */
