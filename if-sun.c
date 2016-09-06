@@ -770,15 +770,16 @@ int
 if_handlelink(struct dhcpcd_ctx *ctx)
 {
 	struct msghdr msg;
-	ssize_t bytes;
+	ssize_t len;
 
 	memset(&msg, 0, sizeof(msg));
 	msg.msg_iov = ctx->iov;
 	msg.msg_iovlen = 1;
 
-	if ((bytes = recvmsg_realloc(ctx->link_fd, &msg, 0)) == -1)
+	if ((len = recvmsg_realloc(ctx->link_fd, &msg, 0)) == -1)
 		return -1;
-	if_dispatch(ctx, ctx->iov[0].iov_base);
+	if (len != 0)
+		if_dispatch(ctx, ctx->iov[0].iov_base);
 	return 0;
 }
 
