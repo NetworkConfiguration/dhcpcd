@@ -49,6 +49,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <ctype.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -322,9 +323,10 @@ get_netlink(struct dhcpcd_ctx *ctx, struct iovec *iov,
 {
 	struct msghdr msg;
 	struct sockaddr_nl nladdr;
-	ssize_t bytes;
+	ssize_t len;
 	struct nlmsghdr *nlm;
 	int r;
+	unsigned int again;
 
 	memset(&msg, 0, sizeof(msg));
 	msg.msg_name = &nladdr;
@@ -332,8 +334,11 @@ get_netlink(struct dhcpcd_ctx *ctx, struct iovec *iov,
 	memset(&nladdr, 0, sizeof(nladdr));
 	msg.msg_iov = iov;
 	msg.msg_iovlen = 1;
-	if ((bytes = recvmsg_realloc(fd, &msg, flags)) == -1)
+recv_again:
+	if ((len = recvmsg_realloc(fd, &msg, flags)) == -1)
 		return -1;
+	if (len == 0)
+		return 0;
 
 	/* Check sender */
 	if (msg.msg_namelen != sizeof(nladdr)) {
@@ -345,10 +350,12 @@ get_netlink(struct dhcpcd_ctx *ctx, struct iovec *iov,
 		return 0;
 
 	r = 0;
+	again = 0;	/* Appease static analysis */
 	for (nlm = iov->iov_base;
-	     nlm && NLMSG_OK(nlm, (size_t)bytes);
-	     nlm = NLMSG_NEXT(nlm, bytes))
+	     nlm && NLMSG_OK(nlm, (size_t)len);
+	     nlm = NLMSG_NEXT(nlm, len))
 	{
+		again = (nlm->nlmsg_flags & NLM_F_MULTI);
 		if (nlm->nlmsg_type == NLMSG_NOOP)
 			continue;
 		if (nlm->nlmsg_type == NLMSG_ERROR) {
@@ -363,12 +370,18 @@ get_netlink(struct dhcpcd_ctx *ctx, struct iovec *iov,
 				errno = -err->error;
 				return -1;
 			}
-		}
-		if (nlm->nlmsg_type == NLMSG_DONE)
 			break;
+		}
+		if (nlm->nlmsg_type == NLMSG_DONE) {
+			again = 0;
+			break;
+		}
 		if (callback && (r = callback(ctx, ifp, nlm)) != 0)
 			break;
 	}
+
+	if (r == 0 && again)
+		goto recv_again;
 
 	return r;
 }
@@ -1456,7 +1469,6 @@ if_initrt(struct dhcpcd_ctx *ctx)
 	nlm.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
 	nlm.hdr.nlmsg_type = RTM_GETROUTE;
 	nlm.hdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_MATCH;
-	nlm.hdr.nlmsg_flags |= NLM_F_REQUEST;
 	nlm.rt.rtm_family = AF_INET;
 	nlm.rt.rtm_table = RT_TABLE_MAIN;
 
