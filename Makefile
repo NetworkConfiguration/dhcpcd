@@ -15,6 +15,7 @@ CSTD?=		c99
 CFLAGS+=	-std=${CSTD}
 
 SRCS+=		${DHCPCD_SRCS}
+DHCPCD_DEFS?=	dhcpcd-definitions.conf
 
 SRCS+=		auth.c
 CPPFLAGS+=	-I./crypt
@@ -85,10 +86,10 @@ dev:
 
 CLEANFILES+=	dhcpcd-embedded.h dhcpcd-embedded.c
 
-dhcpcd-embedded.h: genembedh dhcpcd-definitions.conf dhcpcd-embedded.h.in
+dhcpcd-embedded.h: genembedh ${DHCPCD_DEFS} dhcpcd-embedded.h.in
 	${HOST_SH} ${.ALLSRC} $^ > $@
 
-dhcpcd-embedded.c: genembedc dhcpcd-definitions.conf dhcpcd-embedded.h
+dhcpcd-embedded.c: genembedc ${DHCPCD_DEFS} dhcpcd-embedded.h
 	${HOST_SH} ${.ALLSRC} $^ > $@
 
 if-options.c: dhcpcd-embedded.h
@@ -104,9 +105,9 @@ ${PROG}: ${DEPEND} ${OBJS}
 test:
 	cd $@; ${MAKE} $@; ./$@
 
-_embeddedinstall: dhcpcd-definitions.conf
+_embeddedinstall: ${DHCPCD_DEFS}
 	${INSTALL} -d ${DESTDIR}${SCRIPTSDIR}
-	${INSTALL} -m ${CONFMODE} dhcpcd-definitions.conf ${DESTDIR}${SCRIPTSDIR}
+	${INSTALL} -m ${CONFMODE} ${DHCPCD_DEFS} ${DESTDIR}${SCRIPTSDIR}
 
 _proginstall: ${PROG}
 	${INSTALL} -d ${DESTDIR}${SBINDIR}

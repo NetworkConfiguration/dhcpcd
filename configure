@@ -24,7 +24,10 @@ STATIC=
 DEVS=
 EMBEDDED=
 POLL=
+SMALL=
 STATUSARG=
+
+DHCPCD_DEFS=dhcpcd-definitions.conf
 
 for x do
 	opt=${x%%=*}
@@ -81,6 +84,7 @@ for x do
 	--serviceexists) SERVICEEXISTS=$var;;
 	--servicecmd) SERVICECMD=$var;;
 	--servicestatus) SERVICESTATUS=$var;;
+	--small) SMALL=yes;;
 	--statusarg) STATUSARG=$var;;
 	--infodir|--includedir) ;; # ignore autotools
 	--disable-maintainer-mode|--disable-dependency-tracking) ;;
@@ -372,6 +376,13 @@ if [ -n "$FORK" -a "$FORK" != yes -a "$FORK" != true ]; then
 	echo "CPPFLAGS+=	-DTHERE_IS_NO_FORK" >>$CONFIG_MK
 fi
 
+if [ "$SMALL" = yes ]; then
+	echo "Building with -DSMALL"
+	echo "CPPFLAGS+=	-DSMALL" >>$CONFIG_MK
+	DHCPCD_DEFS=dhcpcd-definitions-small.conf
+	echo "DHCPCD_DEFS=	$DHCPCD_DEFS" >>$CONFIG_MK
+fi
+
 case "$OS" in
 freebsd*|kfreebsd*)
 	# FreeBSD hide some newer POSIX APIs behind _GNU_SOURCE ...
@@ -461,10 +472,10 @@ fi
 $CC --version | $SED -e '1!d'
 
 if [ -z "$EMBEDDED" -o "$EMBEDDED" = yes ]; then
-	echo "dhcpcd-definitions.conf will be embedded in dhcpcd itself"
+	echo "$DHCPCD_DEFS will be embedded in dhcpcd itself"
 	echo "DHCPCD_SRCS+=	dhcpcd-embedded.c" >>$CONFIG_MK
 else
-	echo "dhcpcd-definitions.conf will be installed to $LIBEXECDIR"
+	echo "$DHCPCD_DEFS will be installed to $LIBEXECDIR"
 	echo "CPPFLAGS+=	-DEMBEDDED_CONFIG=\\\"$LIBEXECDIR/dhcpcd-definitions.conf\\\"" >>$CONFIG_MK
 	echo "EMBEDDEDINSTALL=	_embeddedinstall" >>$CONFIG_MK
 fi
