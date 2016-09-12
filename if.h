@@ -43,6 +43,12 @@
 # endif
 #endif
 
+#if defined(__OpenBSD) || defined (__sun)
+#  define ROUTE_PER_GATEWAY
+/* XXX dhcpcd doesn't really support this yet.
+ * But that's generally OK if only dhcpcd is managing routes. */
+#endif
+
 /* Some systems have in-built IPv4 DAD.
  * However, we need them to do DAD at carrier up as well. */
 #ifdef IN_IFF_TENTATIVE

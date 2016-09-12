@@ -483,7 +483,7 @@ nc_route(struct rt *ort, struct rt *nrt)
 
 	/* No route metrics, we need to delete the old route before
 	 * adding the new one. */
-#ifdef __OpenBSD__
+#ifdef ROUTE_PER_GATEWAY
 	errno = 0;
 #endif
 	if (ort) {
@@ -492,8 +492,8 @@ nc_route(struct rt *ort, struct rt *nrt)
 		else
 			d_kroute(ort);
 	}
-#ifdef __OpenBSD__
-	/* OpenBSD allows many routes to the same dest with different gateways.
+#ifdef ROUTE_PER_GATEWAY
+	/* The OS allows many routes to the same dest with different gateways.
 	 * dhcpcd does not support this yet, so for the time being just keep on
 	 * deleting the route until there is an error. */
 	if (ort && errno == 0) {
