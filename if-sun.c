@@ -737,7 +737,7 @@ if_ifinfo(struct dhcpcd_ctx *ctx, const struct if_msghdr *ifm)
 
 	if ((ifp = if_findindex(ctx->ifaces, ifm->ifm_index)) == NULL)
 		return;
-	if (ifm->ifm_flags & IFF_OFFLINE)
+	if (ifm->ifm_flags & IFF_OFFLINE || !(ifm->ifm_flags & IFF_UP))
 		state = LINK_DOWN;
 	else
 		state = LINK_UP;
