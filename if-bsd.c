@@ -1502,6 +1502,9 @@ static void
 if_dispatch(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 {
 
+	if (rtm->rtm_version != RTM_VERSION)
+		return;
+
 	switch(rtm->rtm_type) {
 #ifdef RTM_IFANNOUNCE
 	case RTM_IFANNOUNCE:
