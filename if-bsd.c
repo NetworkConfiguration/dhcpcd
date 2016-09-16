@@ -737,7 +737,7 @@ if_route(unsigned char cmd, const struct rt *rt)
 #endif
 
 	addrs = 0;
-	flags = 0;
+	flags = (int)rt->flags;
 
 	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
 		addrs |= RTA_GATEWAY | RTA_IFP;
@@ -1490,7 +1490,7 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 		{
 			if (ifam->ifam_type != RTM_DELADDR || errno != EEXIST)
 				logger(ctx, LOG_ERR,
-				    "%s: if_addrflags1: %s: %m",
+				    "%s: if_addrflags: %s: %m",
 				    ifp->name, inet_ntoa(addr));
 			addrflags = 0;
 		}
@@ -1520,8 +1520,8 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 		{
 			if (ifam->ifam_type != RTM_DELADDR || errno != EEXIST)
 				logger(ctx, LOG_ERR,
-				    "%s: if_addrflags1: %s: %m",
-				    ifp->name, inet_ntoa(addr));
+				    "%s: if_addrflags: %m",
+				    ifp->name);
 			addrflags = 0;
 		}
 #endif

@@ -567,20 +567,25 @@ ipv6_checkaddrflags(void *arg)
 {
 	struct ipv6_addr *ia;
 	int flags;
+	const char *alias;
 
 	ia = arg;
-	if ((flags = if_addrflags6(ia)) == -1) {
+#ifdef ALIAS_ADDR
+	alias = ia->alias;
+#else
+	alias = NULL;
+#endif
+	if ((flags = if_addrflags6(ia->iface, &ia->addr, alias)) == -1) {
 		logger(ia->iface->ctx, LOG_ERR,
 		    "%s: if_addrflags6: %m", ia->iface->name);
 		return;
 	}
 
-	ia->addr_flags = flags;
 	if (!(ia->addr_flags & IN6_IFF_TENTATIVE)) {
 		/* Simulate the kernel announcing the new address. */
 		ipv6_handleifa(ia->iface->ctx, RTM_NEWADDR,
 		    ia->iface->ctx->ifaces, ia->iface->name,
-		    &ia->addr, ia->prefix_len);
+		    &ia->addr, ia->prefix_len, flags);
 	} else {
 		/* Still tentative? Check again in a bit. */
 		struct timespec tv;
@@ -1608,10 +1613,17 @@ ipv6_start(struct interface *ifp)
 	/* We need to update the address flags. */
 	if ((state = IPV6_STATE(ifp)) != NULL) {
 		struct ipv6_addr *ia;
+		const char *alias;
 		int flags;
 
 		TAILQ_FOREACH(ia, &state->addrs, next) {
-			if ((flags = if_addrflags6(ia)) != -1)
+#ifdef ALIAS_ADDR
+			alias = ia->alias;
+#else
+			alias = NULL;
+#endif
+			flags = if_addrflags6(ia->iface, &ia->addr, alias);
+			if (flags != -1)
 				ia->addr_flags = flags;
 		}
 	}
