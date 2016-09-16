@@ -165,6 +165,10 @@ int get_monotonic(struct timespec *);
  * However, this results in a ugly output on the command line
  * and relies on syslogd(8) starting before dhcpcd which is not
  * always the case. */
+#ifdef SMALL
+# undef USE_LOGFILE
+# define USE_LOGFILE 0
+#endif
 #ifndef USE_LOGFILE
 # define USE_LOGFILE 1
 #endif
