@@ -663,7 +663,7 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 			rta = RTA_NEXT(rta, len);
 		}
 		ipv4_handleifa(ctx, nlm->nlmsg_type, NULL, ifp->name,
-		    &addr, &net, &brd);
+		    &addr, &net, &brd, ifa->ifa_flags);
 		break;
 #endif
 #ifdef INET6
@@ -679,7 +679,7 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 			rta = RTA_NEXT(rta, len);
 		}
 		ipv6_handleifa(ctx, nlm->nlmsg_type, NULL, ifp->name,
-		    &addr6, ifa->ifa_prefixlen);
+		    &addr6, ifa->ifa_prefixlen, ifa->ifa_flags);
 		break;
 #endif
 	}
@@ -1660,7 +1660,7 @@ if_initrt6(struct dhcpcd_ctx *ctx)
 
 int
 if_addrflags6(const struct interface *ifp, const struct in6_addr *addr,
-    _unused const char *alias)
+    __unused const char *alias)
 {
 	FILE *fp;
 	char *p, ifaddress[33], address[33], name[IF_NAMESIZE + 1];
