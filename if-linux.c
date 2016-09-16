@@ -1476,7 +1476,8 @@ if_initrt(struct dhcpcd_ctx *ctx)
 }
 
 int
-if_addrflags(__unused const struct ipv4_addr *addr)
+if_addrflags(__unused const struct interface *ifp,
+__unused const struct in_addr *addr, __unused const char *alias)
 {
 
 	/* Linux has no support for IPv4 address flags */
@@ -1658,7 +1659,8 @@ if_initrt6(struct dhcpcd_ctx *ctx)
 }
 
 int
-if_addrflags6(const struct ipv6_addr *ia)
+if_addrflags6(const struct interface *ifp, const struct in6_addr *addr,
+    _unused const char *alias)
 {
 	FILE *fp;
 	char *p, ifaddress[33], address[33], name[IF_NAMESIZE + 1];
@@ -1670,8 +1672,8 @@ if_addrflags6(const struct ipv6_addr *ia)
 		return -1;
 
 	p = ifaddress;
-	for (i = 0; i < (int)sizeof(ia->addr.s6_addr); i++) {
-		p += snprintf(p, 3, "%.2x", ia->addr.s6_addr[i]);
+	for (i = 0; i < (int)sizeof(addr->s6_addr); i++) {
+		p += snprintf(p, 3, "%.2x", addr->s6_addr[i]);
 	}
 	*p = '\0';
 
@@ -1683,7 +1685,7 @@ if_addrflags6(const struct ipv6_addr *ia)
 			errno = EINVAL;
 			return -1;
 		}
-		if (strcmp(name, ia->iface->name) == 0 &&
+		if (strcmp(name, ifp->name) == 0 &&
 		    strcmp(ifaddress, address) == 0)
 		{
 			fclose(fp);

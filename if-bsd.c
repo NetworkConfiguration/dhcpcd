@@ -849,26 +849,30 @@ if_initrt(struct dhcpcd_ctx *ctx)
 	return 0;
 }
 
+#if !(defined(HAVE_IFADDRS_ADDRFLAGS) && defined(HAVE_IFAM_ADDRFLAGS))
 int
-if_addrflags(const struct ipv4_addr *ia)
+if_addrflags(const struct interface *ifp, const struct in_addr *addr,
+    __unused const char *alias)
 {
 #ifdef SIOCGIFAFLAG_IN
 	struct ifreq ifr;
 	struct sockaddr_in *sin;
 
 	memset(&ifr, 0, sizeof(ifr));
-	strlcpy(ifr.ifr_name, ia->iface->name, sizeof(ifr.ifr_name));
+	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
 	sin = (void *)&ifr.ifr_addr;
 	sin->sin_family = AF_INET;
-	sin->sin_addr = ia->addr;
-	if (ioctl(ia->iface->ctx->pf_inet_fd, SIOCGIFAFLAG_IN, &ifr) == -1)
+	sin->sin_addr = *addr;
+	if (ioctl(ifp->ctx->pf_inet_fd, SIOCGIFAFLAG_IN, &ifr) == -1)
 		return -1;
 	return ifr.ifr_addrflags;
 #else
-	UNUSED(ia);
+	UNUSED(ifp);
+	UNUSED(addr);
 	return 0;
 #endif
 }
+#endif
 #endif /* INET */
 
 #ifdef INET6
@@ -1213,25 +1217,28 @@ if_initrt6(struct dhcpcd_ctx *ctx)
 	return 0;
 }
 
+#if !(defined(HAVE_IFADDRS_ADDRFLAGS) && defined(HAVE_IFAM_ADDRFLAGS))
 int
-if_addrflags6(const struct ipv6_addr *ia)
+if_addrflags6(const struct interface *ifp, const struct in6_addr *addr,
+    __unused const char *alias)
 {
 	int flags;
 	struct in6_ifreq ifr6;
 	struct priv *priv;
 
 	memset(&ifr6, 0, sizeof(ifr6));
-	strlcpy(ifr6.ifr_name, ia->iface->name, sizeof(ifr6.ifr_name));
+	strlcpy(ifr6.ifr_name, ifp->name, sizeof(ifr6.ifr_name));
 	ifr6.ifr_addr.sin6_family = AF_INET6;
-	ifr6.ifr_addr.sin6_addr = ia->addr;
-	ifa_scope(&ifr6.ifr_addr, ia->iface->index);
-	priv = (struct priv *)ia->iface->ctx->priv;
+	ifr6.ifr_addr.sin6_addr = *addr;
+	ifa_scope(&ifr6.ifr_addr, ifp->index);
+	priv = (struct priv *)ifp->ctx->priv;
 	if (ioctl(priv->pf_inet6_fd, SIOCGIFAFLAG_IN6, &ifr6) != -1)
 		flags = ifr6.ifr_ifru.ifru_flags6;
 	else
 		flags = -1;
 	return flags;
 }
+#endif
 
 int
 if_getlifetime6(struct ipv6_addr *ia)
@@ -1405,6 +1412,7 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 {
 	struct interface *ifp;
 	const struct sockaddr *rti_info[RTAX_MAX];
+	int addrflags;
 
 #ifdef HAVE_IFAM_PID
 	if (if_ownmsgpid(ctx, ifam->ifam_pid, 0))
@@ -1416,6 +1424,9 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 	get_addrs(ifam->ifam_addrs, ifam + 1, rti_info);
 	if (rti_info[RTAX_IFA] == NULL)
 		return;
+#ifdef HAVE_IFAM_ADDRFLAGS
+	addrflags = ifam->ifam_addrflags;
+#endif
 	switch (rti_info[RTAX_IFA]->sa_family) {
 	case AF_LINK:
 	{
@@ -1473,8 +1484,20 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 		}
 #endif
 
+#ifndef HAVE_IFAM_ADDRFLAGS
+		if (ifam->ifam_type == RTM_DELADDR ||
+		    (addrflags = if_addrflags(ifp, &addr, NULL)) == -1)
+		{
+			if (ifam->ifam_type != RTM_DELADDR || errno != EEXIST)
+				logger(ctx, LOG_ERR,
+				    "%s: if_addrflags1: %s: %m",
+				    ifp->name, inet_ntoa(addr));
+			addrflags = 0;
+		}
+#endif
+
 		ipv4_handleifa(ctx, ifam->ifam_type, NULL, ifp->name,
-		    &addr, &mask, &bcast);
+		    &addr, &mask, &bcast, addrflags);
 		break;
 	}
 #endif
@@ -1490,8 +1513,21 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 		sin6 = (const void *)rti_info[RTAX_NETMASK];
 		mask6 = sin6->sin6_addr;
 		DESCOPE(&mask6);
+
+#ifndef HAVE_IFAM_ADDRFLAGS
+		if (ifam->ifam_type == RTM_DELADDR ||
+		    (addrflags = if_addrflags6(ifp, &addr6, NULL)) == -1)
+		{
+			if (ifam->ifam_type != RTM_DELADDR || errno != EEXIST)
+				logger(ctx, LOG_ERR,
+				    "%s: if_addrflags1: %s: %m",
+				    ifp->name, inet_ntoa(addr));
+			addrflags = 0;
+		}
+#endif
+
 		ipv6_handleifa(ctx, ifam->ifam_type, NULL,
-		    ifp->name, &addr6, ipv6_prefixlen(&mask6));
+		    ifp->name, &addr6, ipv6_prefixlen(&mask6), addrflags);
 		break;
 	}
 #endif

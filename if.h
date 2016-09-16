@@ -185,7 +185,8 @@ ssize_t if_readraw(struct interface *, int, void *, size_t, int *);
 void if_closeraw(struct interface *, int);
 
 int if_address(unsigned char, const struct ipv4_addr *);
-int if_addrflags(const struct ipv4_addr *);
+int if_addrflags(const struct interface *, const struct in_addr *,
+    const char *);
 
 int if_route(unsigned char, const struct rt *rt);
 int if_initrt(struct dhcpcd_ctx *);
@@ -202,7 +203,8 @@ int ip6_temp_valid_lifetime(const char *ifname);
 #endif
 
 int if_address6(unsigned char, const struct ipv6_addr *);
-int if_addrflags6(const struct ipv6_addr *);
+int if_addrflags6(const struct interface *, const struct in6_addr *,
+    const char *);
 int if_getlifetime6(struct ipv6_addr *);
 
 int if_route6(unsigned char, const struct rt6 *rt);

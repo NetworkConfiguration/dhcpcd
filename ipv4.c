@@ -1273,12 +1273,11 @@ void
 ipv4_handleifa(struct dhcpcd_ctx *ctx,
     int cmd, struct if_head *ifs, const char *ifname,
     const struct in_addr *addr, const struct in_addr *mask,
-    const struct in_addr *brd)
+    const struct in_addr *brd, const int addrflags)
 {
 	struct interface *ifp;
 	struct ipv4_state *state;
 	struct ipv4_addr *ia;
-	int flags;
 	bool ia_is_new;
 
 	if (ifs == NULL)
@@ -1325,16 +1324,7 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 			ia->brd = *brd;
 		else
 			ia->brd.s_addr = INADDR_ANY;
-
-		flags = if_addrflags(ia);
-		if (flags == -1) {
-			if (errno != EADDRNOTAVAIL)
-				logger(ia->iface->ctx, LOG_ERR,
-				    "%s: %s: if_addrflags: %m",
-				    ia->iface->name, ia->saddr);
-			return;
-		}
-		ia->addr_flags = flags;
+		ia->addr_flags = addrflags;
 		break;
 	case RTM_DELADDR:
 		if (ia == NULL)

@@ -1060,13 +1060,12 @@ ipv6_getstate(struct interface *ifp)
 void
 ipv6_handleifa(struct dhcpcd_ctx *ctx,
     int cmd, struct if_head *ifs, const char *ifname,
-    const struct in6_addr *addr, uint8_t prefix_len)
+    const struct in6_addr *addr, uint8_t prefix_len, int addrflags)
 {
 	struct interface *ifp;
 	struct ipv6_state *state;
 	struct ipv6_addr *ia;
 	struct ll_callback *cb;
-	int flags;
 
 #if 0
 	char dbuf[INET6_ADDRSTRLEN];
@@ -1148,15 +1147,7 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 			ia->acquired = ia->created;
 			TAILQ_INSERT_TAIL(&state->addrs, ia, next);
 		}
-		flags = if_addrflags6(ia);
-		if (flags == -1) {
-			if (errno != EADDRNOTAVAIL)
-				logger(ia->iface->ctx, LOG_ERR,
-				    "%s: %s: if_addrflags6: %m",
-				    ia->iface->name, ia->saddr);
-			return;
-		}
-		ia->addr_flags = flags;
+		ia->addr_flags = addrflags;
 #ifdef IPV6_MANAGETEMPADDR
 		if (ia->addr_flags & IN6_IFF_TEMPORARY)
 			ia->flags |= IPV6_AF_TEMPORARY;

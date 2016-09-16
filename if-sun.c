@@ -1340,11 +1340,12 @@ if_address(unsigned char cmd, const struct ipv4_addr *ia)
 }
 
 int
-if_addrflags(const struct ipv4_addr *ia)
+if_addrflags(const struct interface *ifp, __unused const struct in_addr *addr,
+    const char *alias)
 {
 	int		flags, aflags;
 
-	aflags = if_addrflags0(ia->iface->ctx->pf_inet_fd, ia->alias);
+	aflags = if_addrflags0(ifp->ctx->pf_inet_fd, alias);
 	if (aflags == -1)
 		return -1;
 	flags = 0;
@@ -1517,13 +1518,14 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 }
 
 int
-if_addrflags6(const struct ipv6_addr *ia)
+if_addrflags6(const struct interface *ifp, __unused const struct in6_addr *addr,
+    const char *alias)
 {
 	struct priv		*priv;
 	int			aflags, flags;
 
-	priv = (struct priv *)ia->iface->ctx->priv;
-	aflags = if_addrflags0(priv->pf_inet6_fd, ia->alias);
+	priv = (struct priv *)ifp->ctx->priv;
+	aflags = if_addrflags0(priv->pf_inet6_fd, alias);
 	flags = 0;
 	if (aflags & IFF_DUPLICATE)
 		flags |= IN6_IFF_DUPLICATED;

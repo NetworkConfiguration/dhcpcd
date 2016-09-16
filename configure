@@ -533,6 +533,22 @@ EOF
 		echo "no"
 	fi
 	rm -f _ifam_pid.c _ifam_pid
+
+	printf "Testing for ifam_addrflags ... "
+	cat <<EOF >_ifam_addrflags.c
+#include <net/if.h>
+int main(void) {
+	struct ifa_msghdr ifam = { };
+	return (int)ifam.ifam_addrflags;
+}
+EOF
+	if $XCC _ifam_addrflags.c -o _ifam_addrflags 2>&3; then
+		echo "yes"
+		echo "#define HAVE_IFAM_ADDRFLAGS" >>$CONFIG_H
+	else
+		echo "no"
+	fi
+	rm -f _ifam_addrflags.c _ifam_addrflags
 fi
 
 abort=false
@@ -546,9 +562,11 @@ int main(void) {
 	return getifaddrs(&ifap);
 }
 EOF
+LIBSOCKET=
 if $XCC _getifaddrs.c -o _getifaddrs 2>&3; then
 	echo "yes"
 elif $XCC _getifaddrs.c -o _getifaddrs -lsocket 2>&3; then
+	LIBSOCKET=-lsocket
 	echo "yes (-lsocket)"
 	echo "LDADD+=		-lsocket" >>$CONFIG_MK
 else
@@ -558,6 +576,24 @@ else
 fi
 rm -f _getifaddrs.c _getifaddrs
 $abort && exit 1
+
+printf "Testing for ifaddrs.ifa_addrflags ... "
+cat <<EOF >_getifaddrs_addrflags.c
+#include <sys/types.h>
+#include <ifaddrs.h>
+int main(void) {
+	struct ifaddrs *ifap;
+	getifaddrs(&ifap);
+	return (int)ifap->ifa_addrflags;
+}
+EOF
+if $XCC _getifaddrs_addrflags.c -o _getifaddrs_addrflags $LIBSOCKET 2>&3; then
+	echo "yes"
+	echo "#define HAVE_IFADDRS_ADDRFLAGS" >>$CONFIG_H
+else
+	echo "no"
+fi
+rm -f _getifaddrs_addrflags.c _getifaddrs_addrflags
 
 printf "Testing for clock_gettime ... "
 cat <<EOF >_clock_gettime.c
