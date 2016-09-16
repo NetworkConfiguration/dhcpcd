@@ -2160,7 +2160,7 @@ dhcp6_validatelease(struct interface *ifp,
     const char *sfrom, const struct timespec *acquired)
 {
 	struct dhcp6_state *state;
-	int nia;
+	int ok, nia;
 	struct timespec aq;
 
 	if (len <= sizeof(*m)) {
@@ -2170,7 +2170,7 @@ dhcp6_validatelease(struct interface *ifp,
 	}
 
 	state = D6_STATE(ifp);
-	if (dhcp6_checkstatusok(ifp, m, NULL, len) == -1)
+	if ((ok = dhcp6_checkstatusok(ifp, m, NULL, len)) == -1)
 		return -1;
 
 	state->renew = state->rebind = state->expire = 0;
@@ -2181,9 +2181,19 @@ dhcp6_validatelease(struct interface *ifp,
 	}
 	nia = dhcp6_findia(ifp, m, len, sfrom, acquired);
 	if (nia == 0) {
-		logger(ifp->ctx, LOG_ERR,
-		    "%s: no useable IA found in lease", ifp->name);
-		return -1;
+		if (state->state != DH6S_CONFIRM && ok != 1) {
+			logger(ifp->ctx, LOG_ERR,
+			    "%s: no useable IA found in lease", ifp->name);
+			return -1;
+		}
+
+		/* We are confirming and have an OK,
+		 * so look for ia's in our old lease.
+		 * IA's must have existed here otherwise we would
+		 * have rejected it earlier. */
+		assert(state->new != NULL && state->new_len != 0);
+		nia = dhcp6_findia(ifp, state->new, state->new_len,
+		    sfrom, acquired);
 	}
 	return nia;
 }
@@ -2690,7 +2700,6 @@ dhcp6_handledata(void *arg)
 	const struct if_options *ifo;
 	struct ipv6_addr *ap;
 	uint8_t has_new;
-	int error;
 	uint32_t u32;
 
 	dctx = arg;
@@ -2869,14 +2878,7 @@ dhcp6_handledata(void *arg)
 			}
 			break;
 		case DH6S_CONFIRM:
-			error = dhcp6_checkstatusok(ifp, r, NULL, len);
-			/* If we got an OK status the chances are that we
-			 * didn't get the IA's returned, so preserve them
-			 * from our saved response */
-			if (error == 1)
-				goto recv;
-			if (error == -1 ||
-			    dhcp6_validatelease(ifp, r, len,
+			if (dhcp6_validatelease(ifp, r, len,
 			    ctx->sfrom, NULL) == -1)
 			{
 				dhcp6_startdiscover(ifp);
@@ -3041,7 +3043,6 @@ dhcp6_handledata(void *arg)
 		return;
 	}
 
-recv:
 	has_new = 0;
 	TAILQ_FOREACH(ap, &state->addrs, next) {
 		if (ap->flags & IPV6_AF_NEW) {
