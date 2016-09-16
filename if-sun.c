@@ -25,6 +25,7 @@
  * SUCH DAMAGE.
  */
 
+#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <ifaddrs.h>
@@ -590,6 +591,19 @@ if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, const struct rt_msghdr *rtm)
 }
 #endif
 
+static int
+if_addrflags0(int fd, const char *ifname)
+{
+	struct lifreq		lifr;
+
+	memset(&lifr, 0, sizeof(lifr));
+	strlcpy(lifr.lifr_name, ifname, sizeof(lifr.lifr_name));
+	if (ioctl(fd, SIOCGLIFFLAGS, &lifr) == -1)
+		return -1;
+
+	return lifr.lifr_flags;
+}
+
 static void
 if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 {
@@ -667,11 +681,52 @@ if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 	}
 }
 
+static int
+sa_cmp(const struct sockaddr *x, const struct sockaddr *y)
+{
+
+	if (x->sa_family != y->sa_family)
+		return x->sa_family < y->sa_family ? -1 : 1;
+	switch (x->sa_family) {
+#ifdef INET
+	case AF_INET:
+	{
+		const struct sockaddr_in *xin, *yin;
+
+		xin = (const void *)x;
+		yin = (const void *)y;
+		if (xin->sin_addr.s_addr != yin->sin_addr.s_addr)
+			return xin->sin_addr.s_addr < yin->sin_addr.s_addr ?
+			    -1 : 1;
+		break;
+	}
+#endif
+#ifdef INET6
+	case AF_INET6:
+	{
+		const struct sockaddr_in6 *xin6, *yin6;
+
+		xin6 = (const void *)x;
+		yin6 = (const void *)y;
+		return memcmp(xin6->sin6_addr.s6_addr,
+		    yin6->sin6_addr.s6_addr,
+		    sizeof(xin6->sin6_addr.s6_addr));
+	}
+#endif
+	default:
+		assert(!"unknown sa_family");
+	}
+
+	return 0;
+}
+
 static void
 if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 {
-	struct interface *ifp;
-	const struct sockaddr *sa, *rti_info[RTAX_MAX];
+	struct interface	*ifp;
+	const struct sockaddr	*sa, *rti_info[RTAX_MAX];
+	int			flags;
+	const char		*ifalias;
 
 	/* XXX We have no way of knowing who generated these
 	 * messages wich truely sucks because we want to
@@ -680,9 +735,48 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 		return;
 	sa = (const void *)(ifam + 1);
 	get_addrs(ifam->ifam_addrs, sa, rti_info);
-	if (rti_info[RTAX_IFA] == NULL)
+	if ((sa = rti_info[RTAX_IFA]) == NULL)
 		return;
-	switch (rti_info[RTAX_IFA]->sa_family) {
+
+	/*
+	 * ifa_msghdr does not supply the alias, just the interface index.
+	 * This is very bad, because it means we have to call getifaddrs
+	 * and trawl the list of addresses to find the added address.
+	 * To make life worse, you can have the same address on the same
+	 * interface with different aliases.
+	 * So this hack is not entirely accurate.
+	 *
+	 * IF anyone is going to fix Solaris, plesse consider adding the
+	 * following fields to extend ifa_msghdr:
+	 *   ifam_alias
+	 *   ifam_pid
+	 */
+
+	ifalias = ifp->name;
+	if (ifam->ifam_type != RTM_DELADDR && sa->sa_family != AF_LINK) {
+		struct ifaddrs	*ifaddrs, *ifa;
+
+		if (getallifaddrs(sa->sa_family, &ifaddrs, 0) == -1)
+			return;
+		for (ifa = ifaddrs; ifa != NULL; ifa = ifa->ifa_next) {
+			if (ifa->ifa_addr != NULL) {
+				if (sa_cmp(sa, ifa->ifa_addr) == 0) {
+					/* Check it's for the right interace. */
+					struct interface	*ifpx;
+
+					ifpx = if_find(ctx->ifaces,
+					    ifa->ifa_name);
+					if (ifp == ifpx) {
+						ifalias = ifa->ifa_name;
+						break;
+					}
+				}
+			}
+		}
+		freeifaddrs(ifaddrs);
+	}
+
+	switch (sa->sa_family) {
 	case AF_LINK:
 	{
 		struct sockaddr_dl sdl;
@@ -702,27 +796,46 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 		COPYOUT(addr, rti_info[RTAX_IFA]);
 		COPYOUT(mask, rti_info[RTAX_NETMASK]);
 		COPYOUT(bcast, rti_info[RTAX_BRD]);
+
+		if (ifam->ifam_type != RTM_DELADDR) {
+			flags = if_addrflags0(ctx->pf_inet_fd, ifalias);
+			if (flags == -1)
+				break;
+		} else
+			flags = 0;
+
 		ipv4_handleifa(ctx,
 		    ifam->ifam_type == RTM_CHGADDR ?
 		    RTM_NEWADDR : ifam->ifam_type,
-		    NULL, ifp->name, &addr, &mask, &bcast);
+		    NULL, ifalias, &addr, &mask, &bcast, flags);
 		break;
 	}
 #endif
 #ifdef INET6
 	case AF_INET6:
 	{
-		struct in6_addr addr6, mask6;
-		const struct sockaddr_in6 *sin6;
+		struct in6_addr			addr6, mask6;
+		const struct sockaddr_in6	*sin6;
 
 		sin6 = (const void *)rti_info[RTAX_IFA];
 		addr6 = sin6->sin6_addr;
 		sin6 = (const void *)rti_info[RTAX_NETMASK];
 		mask6 = sin6->sin6_addr;
+
+		if (ifam->ifam_type != RTM_DELADDR) {
+			const struct priv	 *priv;
+
+			priv = (struct priv *)ctx->priv;
+			flags = if_addrflags0(priv->pf_inet6_fd, ifalias);
+			if (flags == -1)
+				break;
+		} else
+			flags = 0;
+
 		ipv6_handleifa(ctx,
 		    ifam->ifam_type == RTM_CHGADDR ?
 		    RTM_NEWADDR : ifam->ifam_type,
-		    NULL, ifp->name, &addr6, ipv6_prefixlen(&mask6));
+		    NULL, ifalias, &addr6, ipv6_prefixlen(&mask6), flags);
 		break;
 	}
 #endif
@@ -1137,19 +1250,6 @@ if_rtmsg(unsigned char cmd, const struct interface *ifp,
 		return -1;
 	ifp->ctx->sseq = ifp->ctx->seq;
 	return 0;
-}
-
-static int
-if_addrflags0(int fd, const char *ifname)
-{
-	struct lifreq		lifr;
-
-	memset(&lifr, 0, sizeof(lifr));
-	strlcpy(lifr.lifr_name, ifname, sizeof(lifr.lifr_name));
-	if (ioctl(fd, SIOCGLIFFLAGS, &lifr) == -1)
-		return -1;
-
-	return lifr.lifr_flags;
 }
 
 #ifdef INET
