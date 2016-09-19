@@ -1147,7 +1147,8 @@ out:
 static int
 if_unplumbif(const struct dhcpcd_ctx *ctx, int af, const char *ifname)
 {
-	struct sockaddr_storage addr, mask;
+	struct sockaddr_storage		addr, mask;
+	int				fd;
 
 	/* For the time being, don't unplumb the interface, just
 	 * set the address to zero. */
@@ -1155,7 +1156,27 @@ if_unplumbif(const struct dhcpcd_ctx *ctx, int af, const char *ifname)
 	addr.ss_family = af;
 	memset(&mask, 0, sizeof(mask));
 	mask.ss_family = af;
-	return if_addaddr(ctx->pf_inet_fd, ifname , &addr, &mask);
+	switch (af) {
+#ifdef INET
+	case AF_INET:
+		fd = ctx->pf_inet_fd;
+		break;
+#endif
+#ifdef INET6
+	case AF_INET6:
+	{
+		struct priv		*priv;
+
+		priv = (struct priv *)ctx->priv;
+		fd = priv->pf_inet6_fd;
+		break;
+	}
+#endif
+	default:
+		errno = EAFNOSUPPORT;
+		return -1;
+	}
+	return if_addaddr(fd, ifname, &addr, &mask);
 }
 
 static int
