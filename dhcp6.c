@@ -501,7 +501,7 @@ dhcp6_makemessage(struct interface *ifp)
 	const struct dhcp6_option *si, *unicast;
 	size_t l, n, len, ml;
 	uint8_t type;
-	uint16_t u16, n_options, auth_len;
+	uint16_t u16, n_options;
 	struct if_options *ifo;
 	const struct dhcp_opt *opt, *opt2;
 	uint8_t IA, *p;
@@ -511,6 +511,9 @@ dhcp6_makemessage(struct interface *ifp)
 	const char *hostname;
 	int fqdn;
 	struct dhcp6_ia_addr *iap;
+#ifdef AUTH
+	uint16_t auth_len;
+#endif
 #ifndef SMALL
 	struct dhcp6_option *eo;
 	struct dhcp6_pd_addr *pdp;
@@ -699,6 +702,7 @@ dhcp6_makemessage(struct interface *ifp)
 		return -1;
 	}
 
+#ifdef AUTH
 	auth_len = 0;
 	if (ifo->auth.options & DHCPCD_AUTH_SEND) {
 		ssize_t alen = dhcp_auth_encode(&ifo->auth,
@@ -715,6 +719,7 @@ dhcp6_makemessage(struct interface *ifp)
 			len += sizeof(*o) + auth_len;
 		}
 	}
+#endif
 
 	state->send = malloc(len);
 	if (state->send == NULL)
@@ -922,6 +927,7 @@ dhcp6_makemessage(struct interface *ifp)
 		}
 	}
 
+#ifdef AUTH
 	/* This has to be the last option */
 	if (ifo->auth.options & DHCPCD_AUTH_SEND && auth_len != 0) {
 		o = D6_NEXT_OPTION(o);
@@ -929,6 +935,7 @@ dhcp6_makemessage(struct interface *ifp)
 		o->len = htons((uint16_t)auth_len);
 		/* data will be filled at send message time */
 	}
+#endif
 
 	return 0;
 }
@@ -972,6 +979,7 @@ static void dhcp6_delete_delegates(struct interface *ifp)
 }
 #endif
 
+#ifdef AUTH
 static ssize_t
 dhcp6_update_auth(struct interface *ifp, struct dhcp6_message *m, size_t len)
 {
@@ -991,6 +999,7 @@ dhcp6_update_auth(struct interface *ifp, struct dhcp6_message *m, size_t len)
 	    6, state->send->type,
 	    D6_OPTION_DATA(o), ntohs(o->len));
 }
+#endif
 
 static int
 dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
@@ -1130,6 +1139,7 @@ logsend:
 
 	/* Update the elapsed time */
 	dhcp6_updateelapsed(ifp, state->send, state->send_len);
+#ifdef AUTH
 	if (ifp->options->auth.options & DHCPCD_AUTH_SEND &&
 	    dhcp6_update_auth(ifp, state->send, state->send_len) == -1)
 	{
@@ -1138,6 +1148,7 @@ logsend:
 		if (errno != ESRCH)
 			return -1;
 	}
+#endif
 
 	ctx = ifp->ctx->ipv6;
 	dst.sin6_scope_id = ifp->index;
@@ -2226,11 +2237,13 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	struct stat st;
 	int fd;
 	uint8_t *lease;
-	const struct dhcp6_option *o;
 	struct timespec acquired;
 	time_t now;
 	int retval;
 	bool fd_opened;
+#ifdef AUTH
+	const struct dhcp6_option *o;
+#endif
 
 	state = D6_STATE(ifp);
 	if (state->leasefile[0] == '\0') {
@@ -2294,6 +2307,7 @@ dhcp6_readlease(struct interface *ifp, int validate)
 
 auth:
 	retval = 0;
+#ifdef AUTH
 	/* Authenticate the message */
 	o = dhcp6_getmoption(D6_OPTION_AUTH, state->new, state->new_len);
 	if (o) {
@@ -2321,6 +2335,7 @@ auth:
 		    "%s: authentication now required", ifp->name);
 		goto ex;
 	}
+#endif
 
 	return fd;
 
@@ -2827,6 +2842,7 @@ dhcp6_handledata(void *arg)
 		}
 	}
 
+#ifdef AUTH
 	/* Authenticate the message */
 	auth = dhcp6_getmoption(D6_OPTION_AUTH, r, len);
 	if (auth) {
@@ -2857,6 +2873,9 @@ dhcp6_handledata(void *arg)
 		logger(ifp->ctx, LOG_WARNING,
 		    "%s: no authentication from %s", ifp->name, ctx->sfrom);
 	}
+#else
+	auth = NULL;
+#endif
 
 	op = dhcp6_get_op(r->type);
 	switch(r->type) {

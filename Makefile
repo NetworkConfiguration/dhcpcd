@@ -17,11 +17,7 @@ CFLAGS+=	-std=${CSTD}
 SRCS+=		${DHCPCD_SRCS}
 DHCPCD_DEFS?=	dhcpcd-definitions.conf
 
-SRCS+=		auth.c
-CPPFLAGS+=	-I./crypt
-CRYPT_SRCS=	crypt/hmac_md5.c ${MD5_SRC} ${SHA256_SRC}
-
-OBJS+=		${SRCS:.c=.o} ${COMPAT_SRCS:.c=.o} ${CRYPT_SRCS:.c=.o}
+OBJS+=		${SRCS:.c=.o} ${AUTH_SRCS:.c=.o} ${COMPAT_SRCS:.c=.o}
 
 SCRIPT=		${LIBEXECDIR}/dhcpcd-run-hooks
 HOOKDIR=	${LIBEXECDIR}/dhcpcd-hooks

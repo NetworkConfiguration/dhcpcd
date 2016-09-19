@@ -63,12 +63,14 @@ TAILQ_HEAD(token_head, token);
 
 struct auth {
 	int options;
+#ifdef AUTH
 	uint8_t protocol;
 	uint8_t algorithm;
 	uint8_t rdm;
 	uint64_t last_replay;
 	uint8_t last_replay_set;
 	struct token_head tokens;
+#endif
 };
 
 struct authstate {
