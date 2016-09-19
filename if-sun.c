@@ -756,6 +756,7 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 	if (ifam->ifam_type != RTM_DELADDR && sa->sa_family != AF_LINK) {
 		struct ifaddrs	*ifaddrs, *ifa;
 
+		ifaddrs = NULL;
 		if (getallifaddrs(sa->sa_family, &ifaddrs, 0) == -1)
 			return;
 		for (ifa = ifaddrs; ifa != NULL; ifa = ifa->ifa_next) {
