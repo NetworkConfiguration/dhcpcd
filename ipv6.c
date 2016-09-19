@@ -104,17 +104,27 @@
 /* If we're using a private SLAAC address on wireless,
  * don't add it until we have associated as we randomise
  * it based on the SSID. */
-#define CAN_ADD_LLADDR(ifp) \
+#define	CAN_ADD_LLADDR(ifp) \
 	(!((ifp)->options->options & DHCPCD_SLAACPRIVATE) || \
 	    (ifp)->carrier != LINK_DOWN)
+#ifdef __sun
+/* Although we can add our own LL addr, we cannot drop it
+ * without unplumbing the if which is a lot of code.
+ * So just keep it for the time being. */
+#define	CAN_DROP_LLADDR(ifp)	(0)
+#else
+#define	CAN_DROP_LLADDR(ifp)	(1)
+#endif
 #elif __NetBSD__
 /* Earlier versions of NetBSD don't add duplicate LLADDR's if the interface
  * is brought up and one already exists. */
-#define CAN_ADD_LLADDR(ifp) (1)
+#define	CAN_ADD_LLADDR(ifp)	(1)
+#define	CAN_DROP_LLADDR(ifp)	(1)
 #else
 /* We have no control over the OS adding the LLADDR, so just let it do it
  * as we cannot force our own view on it. */
-#define CAN_ADD_LLADDR(ifp) (0)
+#define	CAN_ADD_LLADDR(ifp)	(0)
+#define	CAN_DROP_LLADDR(ifp)	(0)
 #endif
 
 #ifdef IPV6_MANAGETEMPADDR
@@ -1009,8 +1019,8 @@ ipv6_freedrop_addrs(struct ipv6_addrhead *addrs, int drop,
 		    (DHCPCD_EXITING | DHCPCD_PERSISTENT))
 		{
 			/* Don't drop link-local addresses. */
-			if (!(IN6_IS_ADDR_LINKLOCAL(&ap->addr) &&
-			    CAN_ADD_LLADDR(ap->iface)))
+			if (!IN6_IS_ADDR_LINKLOCAL(&ap->addr) ||
+			    CAN_DROP_LLADDR(ap->iface))
 			{
 				if (drop == 2)
 					TAILQ_REMOVE(addrs, ap, next);
