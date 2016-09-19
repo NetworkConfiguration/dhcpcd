@@ -1827,8 +1827,6 @@ ipv6_gentempifid(struct interface *ifp)
 	    state->randomseed1, sizeof(state->randomseed1));
 
 again:
-	/* RFC4941 Section 3.2.1.1
-	 * Take the left-most 64bits and set bit 6 to zero */
 	MD5Init(&md5);
 	MD5Update(&md5, seed, sizeof(seed));
 	MD5Final(digest, &md5);
