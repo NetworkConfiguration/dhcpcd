@@ -13,6 +13,7 @@ include ${TOP}/iconfig.mk
 
 CSTD?=		c99
 CFLAGS+=	-std=${CSTD}
+CPPFLAGS+=	-I./crypt
 
 SRCS+=		${DHCPCD_SRCS}
 DHCPCD_DEFS?=	dhcpcd-definitions.conf
