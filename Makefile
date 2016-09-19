@@ -127,6 +127,8 @@ _confinstall:
 	${INSTALL} -d ${DESTDIR}${SYSCONFDIR}
 	test -e ${DESTDIR}${SYSCONFDIR}/dhcpcd.conf || \
 		${INSTALL} -m ${CONFMODE} dhcpcd.conf ${DESTDIR}${SYSCONFDIR}
+hooks:
+	cd dhcpcd-hooks; ${MAKE}; cd ..; done
 
 eginstall:
 	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@; cd ..; done
@@ -153,13 +155,19 @@ snapshot:
 	tar cf - -C /tmp ${DISTPREFIX} | xz >${DISTFILE}
 	ls -l ${DISTFILE}
 
-import: ${SRCS}
+import: ${SRCS} hooks
 	rm -rf /tmp/${DISTPREFIX}
 	${INSTALL} -d /tmp/${DISTPREFIX}
-	cp ${SRCS} dhcpcd.conf dhcpcd-definitions.conf *.in /tmp/${DISTPREFIX}
-	cp $$(${CC} ${CPPFLAGS} -DDEPGEN -MM ${SRCS} | \
+	cp genembedc genembedh /tmp/${DISTPREFIX}
+	cp $$(echo ${SRCS} | sed -e 's/\(dhcpcd-embedded.[ch]\)/\1.in/') \
+		/tmp/${DISTPREFIX}
+	cp dhcpcd.conf dhcpcd-definitions.conf *.in /tmp/${DISTPREFIX}
+	cp dhcpcd-definitions-small.conf *.in /tmp/${DISTPREFIX}
+	cp $$(${CC} ${CPPFLAGS} -DDEPGEN -MM \
+		$$(echo ${SRCS} | sed -e 's/dhcpcd-embedded.c//') | \
 		sed -e 's/^.*\.c //g' -e 's/.*\.c$$//g' -e 's/\\//g' | \
 		tr ' ' '\n' | \
+		sed -e '/^dhcpcd-embedded.h$$/d' | \
 		sed -e '/^compat\//d' | \
 		sed -e '/^crypt\//d' | \
 		sort -u) /tmp/${DISTPREFIX}; \
