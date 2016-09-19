@@ -85,7 +85,7 @@ CLEANFILES+=	dhcpcd-embedded.h dhcpcd-embedded.c
 dhcpcd-embedded.h: genembedh ${DHCPCD_DEFS} dhcpcd-embedded.h.in
 	${HOST_SH} ${.ALLSRC} $^ > $@
 
-dhcpcd-embedded.c: genembedc ${DHCPCD_DEFS} dhcpcd-embedded.h
+dhcpcd-embedded.c: genembedc ${DHCPCD_DEFS} dhcpcd-embedded.c.in
 	${HOST_SH} ${.ALLSRC} $^ > $@
 
 if-options.c: dhcpcd-embedded.h
