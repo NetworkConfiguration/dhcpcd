@@ -7,6 +7,7 @@ exec 3>config.log
 # Ensure that we do not inherit these from env
 HOOKSET=false
 INET=
+IPV4LL=
 INET6=
 ARC4RANDOM=
 CLOSEFROM=
@@ -45,6 +46,8 @@ for x do
 	--enable-static) STATIC=yes;;
 	--disable-ipv4) INET=no;;
 	--enable-ipv4) INET=yes;;
+	--disable-ipv4ll) IPV4LL=no;;
+	--enable-ipv4ll) IPV4LL=yes; INET=yes;;
 	--disable-ipv6) INET6=no;;
 	--enable-ipv6) INET6=yes;;
 	--disable-embedded) EMBEDDED=no;;
@@ -438,7 +441,11 @@ esac
 
 if [ -z "$INET" -o "$INET" = yes ]; then
 	echo "CPPFLAGS+=	-DINET" >>$CONFIG_MK
-	echo "DHCPCD_SRCS+=	arp.c dhcp.c ipv4.c ipv4ll.c" >>$CONFIG_MK
+	echo "DHCPCD_SRCS+=	arp.c dhcp.c ipv4.c" >>$CONFIG_MK
+fi
+if [ -z "$IPV4LL" -o "$IPV4LL" = yes ]; then
+	echo "CPPFLAGS+=	-DIPV4LL" >>$CONFIG_MK
+	echo "DHCPCD_SRCS+=	ipv4ll.c" >>$CONFIG_MK
 fi
 if [ -z "$INET6" -o "$INET6" = yes ]; then
 	echo "CPPFLAGS+=	-DINET6" >>$CONFIG_MK

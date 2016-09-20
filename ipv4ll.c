@@ -52,6 +52,7 @@ static const struct in_addr inaddr_llbcast = {
 	.s_addr = HTONL(LINKLOCAL_BCAST)
 };
 
+#ifdef IPV4LL
 static in_addr_t
 ipv4ll_pickaddr(struct arp_state *astate)
 {
@@ -489,4 +490,5 @@ ipv4ll_handlert(struct dhcpcd_ctx *ctx, __unused int cmd, const struct rt *rt)
 
 	return 0;
 }
+#endif
 #endif

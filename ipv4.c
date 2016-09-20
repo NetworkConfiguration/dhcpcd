@@ -196,14 +196,14 @@ int
 ipv4_hasaddr(const struct interface *ifp)
 {
 	const struct dhcp_state *dstate;
-	const struct ipv4ll_state *istate;
+
+	if (IPV4LL_STATE_RUNNING(ifp))
+		return 1;
 
 	dstate = D_CSTATE(ifp);
-	istate = IPV4LL_CSTATE(ifp);
-	return ((dstate &&
+	return (dstate &&
 	    dstate->added == STATE_ADDED &&
-	    dstate->addr != NULL) ||
-	    (istate && istate->addr));
+	    dstate->addr != NULL);
 }
 
 void

@@ -1845,9 +1845,11 @@ dhcp_discover(void *arg)
 	if (ifo->fallback)
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    ifo->reboot, dhcp_fallback, ifp);
+#ifdef IPV4LL
 	else if (ifo->options & DHCPCD_IPV4LL)
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    ifo->reboot, ipv4ll_start, ifp);
+#endif
 	if (ifo->options & DHCPCD_REQUEST)
 		logger(ifp->ctx, LOG_INFO,
 		    "%s: soliciting a DHCP lease (requesting %s)",
@@ -2510,10 +2512,12 @@ dhcp_reboot(struct interface *ifp)
 	state->lease.server.s_addr = 0;
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 
+#ifdef IPV4LL
 	/* Need to add this before dhcp_expire and friends. */
 	if (!ifo->fallback && ifo->options & DHCPCD_IPV4LL)
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    ifo->reboot, ipv4ll_start, ifp);
+#endif
 
 	if (ifo->options & DHCPCD_LASTLEASE && state->lease.frominfo)
 		eloop_timeout_add_sec(ifp->ctx->eloop,
@@ -2907,6 +2911,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 			    "%s: message: %s", ifp->name, msg);
 			free(msg);
 		}
+#ifdef IPV4LL
 		if (state->state == DHS_DISCOVER &&
 		    get_option_uint8(ifp->ctx, &tmp, bootp, bootp_len,
 		    DHO_AUTOCONFIGURE) == 0)
@@ -2931,6 +2936,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 			eloop_timeout_add_sec(ifp->ctx->eloop,
 			    DHCP_MAX, dhcp_discover, ifp);
 		}
+#endif
 		return;
 	}
 
@@ -3581,11 +3587,13 @@ dhcp_start1(void *arg)
 		}
 	}
 
+#ifdef IPV4LL
 	if (!(ifo->options & DHCPCD_DHCP)) {
 		if (ifo->options & DHCPCD_IPV4LL)
 			ipv4ll_start(ifp);
 		return;
 	}
+#endif
 
 	if (state->offer == NULL || !IS_DHCP(state->offer))
 		dhcp_discover(ifp);

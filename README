@@ -19,8 +19,12 @@ Currently this just removes non important options out of
 dhcpcd-definitions.conf, the custom logger and
 support for DHCPv6 Prefix Delegation.
 Other features maybe dropped as and when required.
-dhcpcd can also be made smaller by removing Authentication support with
---disable-auth.
+dhcpcd can also be made smaller by removing the IPv4 or IPv6 stack:
+  *  --disable-inet
+  *  --disable-inet6
+Or by removing the following features
+  *  --disable-auth
+  *  --disable-ipv4ll
 
 If you're cross compiling you may need set the platform if OS is different
 from the host.
