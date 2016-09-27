@@ -44,12 +44,12 @@ for x do
 	--enable-fork) FORK=yes;;
 	--disable-static) STATIC=no;;
 	--enable-static) STATIC=yes;;
-	--disable-ipv4) INET=no;;
-	--enable-ipv4) INET=yes;;
+	--disable-ipv4|--disable-inet) INET=no;;
+	--enable-ipv4|--enable-inet) INET=yes;;
 	--disable-ipv4ll) IPV4LL=no;;
 	--enable-ipv4ll) IPV4LL=yes; INET=yes;;
-	--disable-ipv6) INET6=no;;
-	--enable-ipv6) INET6=yes;;
+	--disable-ipv6|--disable-inet6) INET6=no;;
+	--enable-ipv6|--enable-inet6) INET6=yes;;
 	--disable-dhcp6) DHCP6=no;;
 	--enable-dhcp6) DHCP6=yes;;
 	--disable-embedded) EMBEDDED=no;;
@@ -445,21 +445,21 @@ if [ -z "$INET" -o "$INET" = yes ]; then
 	echo "Enabling INET support"
 	echo "CPPFLAGS+=	-DINET" >>$CONFIG_MK
 	echo "DHCPCD_SRCS+=	arp.c dhcp.c ipv4.c" >>$CONFIG_MK
-fi
-if [ -z "$IPV4LL" -o "$IPV4LL" = yes ]; then
-	echo "Enabling IPv4LL support"
-	echo "CPPFLAGS+=	-DIPV4LL" >>$CONFIG_MK
-	echo "DHCPCD_SRCS+=	ipv4ll.c" >>$CONFIG_MK
+	if [ -z "$IPV4LL" -o "$IPV4LL" = yes ]; then
+		echo "Enabling IPv4LL support"
+		echo "CPPFLAGS+=	-DIPV4LL" >>$CONFIG_MK
+		echo "DHCPCD_SRCS+=	ipv4ll.c" >>$CONFIG_MK
+	fi
 fi
 if [ -z "$INET6" -o "$INET6" = yes ]; then
 	echo "Enabling INET6 support"
 	echo "CPPFLAGS+=	-DINET6" >>$CONFIG_MK
 	echo "DHCPCD_SRCS+=	ipv6.c ipv6nd.c" >>$CONFIG_MK
-fi
-if [ -z "$DHCP6" -o "$DHCP6" = yes ]; then
-	echo "Enabling DHCPv6 support"
-	echo "CPPFLAGS+=	-DDHCP6" >>$CONFIG_MK
-	echo "DHCPCD_SRCS+=	dhcp6.c" >>$CONFIG_MK
+	if [ -z "$DHCP6" -o "$DHCP6" = yes ]; then
+		echo "Enabling DHCPv6 support"
+		echo "CPPFLAGS+=	-DDHCP6" >>$CONFIG_MK
+		echo "DHCPCD_SRCS+=	dhcp6.c" >>$CONFIG_MK
+	fi
 fi
 if [ -z "$AUTH" -o "$AUTH" = yes ]; then
 	echo "Enabling Authentiaction"

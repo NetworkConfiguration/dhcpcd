@@ -672,7 +672,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 #ifdef _REENTRANT
 	struct group grpbuf;
 #endif
-#ifdef INET6
+#ifdef DHCP6
 	size_t sl;
 	struct if_ia *ia;
 	uint8_t iaid[4];
@@ -1328,7 +1328,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	case O_NOALIAS:
 		ifo->options |= DHCPCD_NOALIAS;
 		break;
-#ifdef INET6
+#ifdef DHCP6
 	case O_IA_NA:
 		i = D6_OPTION_IA_NA;
 		/* FALLTHROUGH */
