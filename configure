@@ -50,6 +50,8 @@ for x do
 	--enable-ipv4ll) IPV4LL=yes; INET=yes;;
 	--disable-ipv6) INET6=no;;
 	--enable-ipv6) INET6=yes;;
+	--disable-dhcp6) DHCP6=no;;
+	--enable-dhcp6) DHCP6=yes;;
 	--disable-embedded) EMBEDDED=no;;
 	--enable-embedded) EMBEDDED=yes;;
 	--disable-auth) AUTH=no;;
@@ -440,16 +442,30 @@ sunos*)
 esac
 
 if [ -z "$INET" -o "$INET" = yes ]; then
+	echo "Enabling INET support"
 	echo "CPPFLAGS+=	-DINET" >>$CONFIG_MK
 	echo "DHCPCD_SRCS+=	arp.c dhcp.c ipv4.c" >>$CONFIG_MK
 fi
 if [ -z "$IPV4LL" -o "$IPV4LL" = yes ]; then
+	echo "Enabling IPv4LL support"
 	echo "CPPFLAGS+=	-DIPV4LL" >>$CONFIG_MK
 	echo "DHCPCD_SRCS+=	ipv4ll.c" >>$CONFIG_MK
 fi
 if [ -z "$INET6" -o "$INET6" = yes ]; then
+	echo "Enabling INET6 support"
 	echo "CPPFLAGS+=	-DINET6" >>$CONFIG_MK
-	echo "DHCPCD_SRCS+=	ipv6.c ipv6nd.c dhcp6.c" >>$CONFIG_MK
+	echo "DHCPCD_SRCS+=	ipv6.c ipv6nd.c" >>$CONFIG_MK
+fi
+if [ -z "$DHCP6" -o "$DHCP6" = yes ]; then
+	echo "Enabling DHCPv6 support"
+	echo "CPPFLAGS+=	-DDHCP6" >>$CONFIG_MK
+	echo "DHCPCD_SRCS+=	dhcp6.c" >>$CONFIG_MK
+fi
+if [ -z "$AUTH" -o "$AUTH" = yes ]; then
+	echo "Enabling Authentiaction"
+	echo "CPPFLAGS+=	-DAUTH" >>$CONFIG_MK
+	echo "AUTH_SRCS=	auth.c crypt/hmac_md5.c" >>$CONFIG_MK
+	echo "AUTH_SRCS+=	\${MD5_SRC} \${SHA256_SRC}" >>$CONFIG_MK
 fi
 
 echo "Using compiler .. $CC"
@@ -488,13 +504,6 @@ else
 	echo "$DHCPCD_DEFS will be installed to $LIBEXECDIR"
 	echo "CPPFLAGS+=	-DEMBEDDED_CONFIG=\\\"$LIBEXECDIR/dhcpcd-definitions.conf\\\"" >>$CONFIG_MK
 	echo "EMBEDDEDINSTALL=	_embeddedinstall" >>$CONFIG_MK
-fi
-
-if [ -z "$AUTH" -o "$AUTH" = yes ]; then
-	echo "Enabling Authentiaction"
-	echo "CPPFLAGS+=	-DAUTH" >>$CONFIG_MK
-	echo "AUTH_SRCS=	auth.c crypt/hmac_md5.c" >>$CONFIG_MK
-	echo "AUTH_SRCS+=	\${MD5_SRC} \${SHA256_SRC}" >>$CONFIG_MK
 fi
 
 if [ "$OS" = linux ]; then

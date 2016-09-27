@@ -72,6 +72,7 @@
 #define IPV6_RECVPKTINFO IPV6_PKTINFO
 #endif
 
+#ifdef DHCP6
 struct dhcp6_op {
 	uint16_t type;
 	const char *name;
@@ -3747,3 +3748,4 @@ dhcp6_dump(struct interface *ifp)
 	state->reason = "DUMP6";
 	return script_runreason(ifp, state->reason);
 }
+#endif

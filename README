@@ -22,9 +22,10 @@ Other features maybe dropped as and when required.
 dhcpcd can also be made smaller by removing the IPv4 or IPv6 stack:
   *  --disable-inet
   *  --disable-inet6
-Or by removing the following features
+Or by removing the following features:
   *  --disable-auth
   *  --disable-ipv4ll
+  *  --disable-dhcp6
 
 You can also move the embedded extended configuration from the dhcpcd binary
 to an external file (LIBEXECDIR/dhcpcd-definitions.conf)
