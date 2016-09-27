@@ -1455,6 +1455,23 @@ main(int argc, char **argv)
 			return EXIT_SUCCESS;
 		} else if (strcmp(argv[1], "--version") == 0) {
 			printf(""PACKAGE" "VERSION"\n%s\n", dhcpcd_copyright);
+			printf("Compiled in features:"
+#ifdef INET
+			" INET"
+#endif
+#ifdef IPV4LL
+			" IPv4LL"
+#endif
+#ifdef INET6
+			" INET6"
+#endif
+#ifdef DHCP6
+			" DHCPv6"
+#endif
+#ifdef AUTH
+			" AUTH"
+#endif
+			"\n");
 			return EXIT_SUCCESS;
 		}
 	}
