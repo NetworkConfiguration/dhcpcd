@@ -26,6 +26,13 @@ Or by removing the following features
   *  --disable-auth
   *  --disable-ipv4ll
 
+You can also move the embedded extended configuration from the dhcpcd binary
+to an external file (LIBEXECDIR/dhcpcd-definitions.conf)
+	--disable-embedded
+If dhcpcd cannot load this file at runtime, dhcpcd will work but will not be
+able to decode any DHCP/DHCPv6 options that are not defined by the user
+in /etc/dhcpcd.conf. This does not really change the total on disk size.
+
 If you're cross compiling you may need set the platform if OS is different
 from the host.
 --target=sparc-sun-netbsd5.0
@@ -87,7 +94,7 @@ SLAAC private addresses are just as private, just stable.
 
 ArchLinux presently sanitises all kernel headers to the latest version
 regardless of the version for your CPU. As such, Arch presently ships a
-3.12 kernel with 3.17 headers which claim that it suppors temporary address
+3.12 kernel with 3.17 headers which claim that it supports temporary address
 management and no automatic prefix route generation, both of which are
 obviously false. You will have to patch support either in the kernel or
 out of the headers (or dhcpcd itself) to have correct operation.
@@ -109,17 +116,6 @@ You can disable this with --without-dev, or without-udev.
 NOTE: in Gentoo at least, sys-fs/udev as provided by systemd leaks memory
 sys-fs/eudev, the fork of udev does not and as such is recommended.
 
-To shrink dhcpcd you can disable IPv4 or IPv6:
-	--disable-inet
-	--disable-inet6
-
-You can also move the embedded extended configuration from the dhcpcd binary
-to an external file (LIBEXECDIR/dhcpcd-definitions.conf)
-	--disable-embedded
-If dhcpcd cannot load this file at runtime, dhcpcd will work but will not be
-able to decode any DHCP/DHCPv6 options that are not defined by the user
-in /etc/dhcpcd.conf.
-
 dhcpcd uses eloop.c, which is a portable main event loop with timeouts and
 signal handling. Unlike libevent and similar, it can be transplanted directly
 within the application - the only caveat outside of POSIX calls is that
@@ -128,7 +124,7 @@ eloop supports the following polling mechanisms, listed in order of preference:
 	kqueue, epoll, pollts, ppoll and pselect.
 If signal handling is disabled (ie in RTEMS or other single process
 OS's) then eloop can use poll.
-You can decide will polling mechanism dhcpcd will select in eloop like so
+You can decide which polling mechanism dhcpcd will select in eloop like so
 ./configure --with-poll=[kqueue|epoll|pselect|pollts|ppoll]
 
 To prepare dhcpcd for import into a platform source tree (like NetBSD)
