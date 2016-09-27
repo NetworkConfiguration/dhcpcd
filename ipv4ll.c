@@ -45,6 +45,7 @@
 #include "ipv4ll.h"
 #include "script.h"
 
+#ifdef IPV4LL
 static const struct in_addr inaddr_llmask = {
 	.s_addr = HTONL(LINKLOCAL_MASK)
 };
@@ -52,7 +53,6 @@ static const struct in_addr inaddr_llbcast = {
 	.s_addr = HTONL(LINKLOCAL_BCAST)
 };
 
-#ifdef IPV4LL
 static in_addr_t
 ipv4ll_pickaddr(struct arp_state *astate)
 {
