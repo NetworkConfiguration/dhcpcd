@@ -101,21 +101,18 @@
 
 #if defined(HAVE_IN6_ADDR_GEN_MODE_NONE) || defined(ND6_IFF_AUTO_LINKLOCAL) || \
     defined(IFF_NOLINKLOCAL)
-/* If we're using a private SLAAC address on wireless,
- * don't add it until we have associated as we randomise
- * it based on the SSID. */
+/* Only add the LL address if we have a carrier, so DaD works. */
 #define	CAN_ADD_LLADDR(ifp) \
-	(!((ifp)->options->options & DHCPCD_SLAACPRIVATE) || \
-	    (ifp)->carrier != LINK_DOWN)
+    (!((ifp)->options->options & DHCPCD_LINK) || (ifp)->carrier != LINK_DOWN)
 #ifdef __sun
-/* Although we can add our own LL addr, we cannot drop it
+/* Although we can add our own LL address, we cannot drop it
  * without unplumbing the if which is a lot of code.
  * So just keep it for the time being. */
 #define	CAN_DROP_LLADDR(ifp)	(0)
 #else
 #define	CAN_DROP_LLADDR(ifp)	(1)
 #endif
-#elif __NetBSD__
+#elif defined(__NetBSD__)
 /* Earlier versions of NetBSD don't add duplicate LLADDR's if the interface
  * is brought up and one already exists. */
 #define	CAN_ADD_LLADDR(ifp)	(1)
