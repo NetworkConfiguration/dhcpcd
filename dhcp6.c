@@ -3130,18 +3130,10 @@ dhcp6_handledata(void *arg)
 				state->renew = state->rebind = 0;
 			}
 		}
-		if (state->renew == 0) {
-			if (state->expire == ND6_INFINITE_LIFETIME)
-				state->renew = ND6_INFINITE_LIFETIME;
-			else if (state->lowpl != ND6_INFINITE_LIFETIME)
-				state->renew = (uint32_t)(state->lowpl * 0.5);
-		}
-		if (state->rebind == 0) {
-			if (state->expire == ND6_INFINITE_LIFETIME)
-				state->rebind = ND6_INFINITE_LIFETIME;
-			else if (state->lowpl != ND6_INFINITE_LIFETIME)
-				state->rebind = (uint32_t)(state->lowpl * 0.8);
-		}
+		if (state->renew == 0 && state->lowpl != ND6_INFINITE_LIFETIME)
+			state->renew = (uint32_t)(state->lowpl * 0.5);
+		if (state->rebind == 0 && state->lowpl != ND6_INFINITE_LIFETIME)
+			state->rebind = (uint32_t)(state->lowpl * 0.8);
 		break;
 	default:
 		state->reason = "UNKNOWN6";
