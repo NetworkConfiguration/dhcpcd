@@ -596,8 +596,11 @@ configure_interface(struct interface *ifp, int argc, char **argv,
 
 	old = ifp->options ? ifp->options->mtime : 0;
 	dhcpcd_selectprofile(ifp, NULL);
-	if (ifp->options == NULL)
+	if (ifp->options == NULL) {
+		/* dhcpcd cannot continue with this interface. */
+		ifp->active = IF_INACTIVE;
 		return;
+	}
 	add_options(ifp->ctx, ifp->name, ifp->options, argc, argv);
 	ifp->options->options |= options;
 	configure_interface1(ifp);
@@ -671,7 +674,8 @@ dhcpcd_initstate1(struct interface *ifp, int argc, char **argv,
 {
 
 	configure_interface(ifp, argc, argv, options);
-	dhcpcd_initstate2(ifp, 0);
+	if (ifp->active)
+		dhcpcd_initstate2(ifp, 0);
 }
 
 static void
@@ -983,9 +987,13 @@ dhcpcd_activateinterface(struct interface *ifp, unsigned long long options)
 	if (!ifp->active) {
 		ifp->active = IF_ACTIVE;
 		dhcpcd_initstate2(ifp, options);
-		configure_interface1(ifp);
-		run_preinit(ifp);
-		dhcpcd_prestartinterface(ifp);
+		/* It's possible we might not have been able to load
+		 * a config. */
+		if (ifp->active) {
+			configure_interface1(ifp);
+			run_preinit(ifp);
+			dhcpcd_prestartinterface(ifp);
+		}
 	}
 }
 
