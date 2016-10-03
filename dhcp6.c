@@ -2923,7 +2923,7 @@ dhcp6_handledata(void *arg)
 				/* PD doesn't use CONFIRM, so REBIND could
 				 * throw up an invalid prefix if we
 				 * changed link */
-				if (state->state != DH6S_DISCOVER &&
+				if (state->state == DH6S_REBIND &&
 				    dhcp6_hasprefixdelegation(ifp))
 					dhcp6_startdiscover(ifp);
 #endif
