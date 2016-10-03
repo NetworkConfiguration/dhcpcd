@@ -2715,7 +2715,7 @@ dhcp6_handledata(void *arg)
 	const struct dhcp_opt *opt;
 	const struct if_options *ifo;
 	struct ipv6_addr *ap;
-	uint8_t has_new;
+	bool valid_op, has_new;
 	uint32_t u32;
 
 	dctx = arg;
@@ -2879,6 +2879,7 @@ dhcp6_handledata(void *arg)
 #endif
 
 	op = dhcp6_get_op(r->type);
+	valid_op = op != NULL;
 	switch(r->type) {
 	case DHCP6_REPLY:
 		switch(state->state) {
@@ -2906,12 +2907,16 @@ dhcp6_handledata(void *arg)
 			}
 			break;
 		case DH6S_DISCOVER:
-			if (has_option_mask(ifo->requestmask6,
-			    D6_OPTION_RAPID_COMMIT) &&
-			    dhcp6_getmoption(D6_OPTION_RAPID_COMMIT, r, len))
-				state->state = DH6S_REQUEST;
-			else
-				op = NULL;
+			/* Only accept REPLY in DISCOVER for RAPID_COMMIT.
+			 * Normally we get an ADVERTISE for a DISCOVER. */
+			if (!has_option_mask(ifo->requestmask6,
+			    D6_OPTION_RAPID_COMMIT) ||
+			    !dhcp6_getmoption(D6_OPTION_RAPID_COMMIT, r, len))
+			{
+				valid_op = false;
+				break;
+			}
+			/* Validate lease before setting state to REQUEST. */
 			/* FALLTHROUGH */
 		case DH6S_REQUEST: /* FALLTHROUGH */
 		case DH6S_RENEW: /* FALLTHROUGH */
@@ -2929,14 +2934,17 @@ dhcp6_handledata(void *arg)
 #endif
 				return;
 			}
+			if (state->state == DH6S_DISCOVER)
+				state->state = DH6S_REQUEST;
 			break;
 		default:
-			op = NULL;
+			valid_op = false;
+			break;
 		}
 		break;
 	case DHCP6_ADVERTISE:
 		if (state->state != DH6S_DISCOVER) {
-			op = NULL;
+			valid_op = false;
 			break;
 		}
 		/* RFC7083 */
@@ -3027,7 +3035,7 @@ dhcp6_handledata(void *arg)
 		    ifp->name, op, r->type);
 		return;
 	}
-	if (op == NULL) {
+	if (!valid_op) {
 		logger(ifp->ctx, LOG_WARNING,
 		    "%s: invalid state for DHCP6 type %s (%d)",
 		    ifp->name, op, r->type);
@@ -3064,10 +3072,10 @@ dhcp6_handledata(void *arg)
 		return;
 	}
 
-	has_new = 0;
+	has_new = false;
 	TAILQ_FOREACH(ap, &state->addrs, next) {
 		if (ap->flags & IPV6_AF_NEW) {
-			has_new = 1;
+			has_new = true;
 			break;
 		}
 	}
