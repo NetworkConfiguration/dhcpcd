@@ -657,15 +657,6 @@ dhcpcd_initstate2(struct interface *ifp, unsigned long long options)
 		logger(ifp->ctx, LOG_ERR, "ipv6_init: %m");
 		ifo->options &= ~DHCPCD_IPV6RS;
 	}
-
-	/* Add our link-local address before upping the interface
-	 * so our RFC7217 address beats the hwaddr based one.
-	 * This needs to happen before PREINIT incase a hook script
-	 * inadvertently ups the interface. */
-	if (ifo->options & DHCPCD_IPV6 && ipv6_start(ifp) == -1) {
-		logger(ifp->ctx, LOG_ERR, "%s: ipv6_start: %m", ifp->name);
-		ifo->options &= ~DHCPCD_IPV6;
-	}
 }
 
 static void
@@ -809,20 +800,6 @@ warn_iaid_conflict(struct interface *ifp, uint8_t *iaid)
 		    ifp->name, ifn->name);
 }
 
-static void
-pre_start(struct interface *ifp)
-{
-
-	/* Add our link-local address before upping the interface
-	 * so our RFC7217 address beats the hwaddr based one.
-	 * This is also a safety check incase it was ripped out
-	 * from under us. */
-	if (ifp->options->options & DHCPCD_IPV6 && ipv6_start(ifp) == -1) {
-		logger(ifp->ctx, LOG_ERR, "%s: ipv6_start: %m", ifp->name);
-		ifp->options->options &= ~DHCPCD_IPV6;
-	}
-}
-
 void
 dhcpcd_startinterface(void *arg)
 {
@@ -887,6 +864,10 @@ dhcpcd_startinterface(void *arg)
 		}
 	}
 
+	if (ifo->options & DHCPCD_IPV6 && ipv6_start(ifp) == -1) {
+		logger(ifp->ctx, LOG_ERR, "%s: ipv6_start: %m", ifp->name);
+		ifo->options &= ~DHCPCD_IPV6;
+	}
 	if (ifo->options & DHCPCD_IPV6) {
 		ipv6_startstatic(ifp);
 
@@ -941,7 +922,6 @@ dhcpcd_prestartinterface(void *arg)
 {
 	struct interface *ifp = arg;
 
-	pre_start(ifp);
 	if ((!(ifp->ctx->options & DHCPCD_MASTER) ||
 	    ifp->options->options & DHCPCD_IF_UP) &&
 	    if_up(ifp) == -1)
@@ -969,7 +949,6 @@ static void
 run_preinit(struct interface *ifp)
 {
 
-	pre_start(ifp);
 	if (ifp->ctx->options & DHCPCD_TEST)
 		return;
 

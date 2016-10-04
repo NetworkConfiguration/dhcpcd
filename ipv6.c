@@ -112,11 +112,6 @@
 #else
 #define	CAN_DROP_LLADDR(ifp)	(1)
 #endif
-#elif defined(__NetBSD__)
-/* Earlier versions of NetBSD don't add duplicate LLADDR's if the interface
- * is brought up and one already exists. */
-#define	CAN_ADD_LLADDR(ifp)	(1)
-#define	CAN_DROP_LLADDR(ifp)	(1)
 #else
 /* We have no control over the OS adding the LLADDR, so just let it do it
  * as we cannot force our own view on it. */
@@ -1648,8 +1643,6 @@ ipv6_start(struct interface *ifp)
 
 	/* Load existing routes */
 	if_initrt6(ifp->ctx);
-	if (!IN6_IS_ADDR_UNSPECIFIED(&ifp->options->req_addr6))
-		ipv6_buildroutes(ifp->ctx);
 	return 0;
 }
 
