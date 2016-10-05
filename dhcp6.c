@@ -208,7 +208,6 @@ dhcp6_makevendor(void *data, const struct interface *ifp)
 		vlen = 0; /* silence bogus gcc warning */
 	} else {
 		vlen = dhcp_vendor(vendor, sizeof(vendor));
-		printf ("VENDOR: %s***\n", vendor);
 		if (vlen == -1)
 			vlen = 0;
 		else
