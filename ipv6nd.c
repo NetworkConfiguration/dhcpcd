@@ -734,15 +734,14 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 	struct ipv6_ctx *ctx = dctx->ipv6;
 	size_t i, olen;
 	struct nd_router_advert *nd_ra;
-	struct nd_opt_prefix_info *pi;
-	struct nd_opt_mtu *mtu;
-	struct nd_opt_rdnss *rdnss;
-	uint32_t mtuv;
+	struct nd_opt_hdr ndo;
+	struct nd_opt_prefix_info pi;
+	struct nd_opt_mtu mtu;
+	struct nd_opt_rdnss rdnss;
 	uint8_t *p;
 	char buf[INET6_ADDRSTRLEN];
 	const char *cbp;
 	struct ra *rap;
-	struct nd_opt_hdr *ndo;
 	struct ipv6_addr *ap;
 	struct dhcp_opt *dho;
 	uint8_t new_rap, new_data;
@@ -876,13 +875,13 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 	len -= sizeof(struct nd_router_advert);
 	p = ((uint8_t *)icp) + sizeof(struct nd_router_advert);
 	for (; len > 0; p += olen, len -= olen) {
-		if (len < sizeof(struct nd_opt_hdr)) {
+		if (len < sizeof(ndo)) {
 			logger(ifp->ctx, LOG_ERR,
 			    "%s: short option", ifp->name);
 			break;
 		}
-		ndo = (struct nd_opt_hdr *)p;
-		olen = (size_t)ndo->nd_opt_len * 8;
+		memcpy(&ndo, p, sizeof(ndo));
+		olen = (size_t)ndo.nd_opt_len * 8;
 		if (olen == 0) {
 			logger(ifp->ctx, LOG_ERR,
 			    "%s: zero length option", ifp->name);
@@ -895,13 +894,13 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 		}
 
 		if (has_option_mask(ifp->options->rejectmasknd,
-		    ndo->nd_opt_type))
+		    ndo.nd_opt_type))
 		{
 			for (i = 0, dho = dctx->nd_opts;
 			    i < dctx->nd_opts_len;
 			    i++, dho++)
 			{
-				if (dho->option == ndo->nd_opt_type)
+				if (dho->option == ndo.nd_opt_type)
 					break;
 			}
 			if (dho != NULL)
@@ -911,7 +910,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 			else
 				logger(ifp->ctx, LOG_WARNING,
 				    "%s: reject RA (option %d) from %s",
-				    ifp->name, ndo->nd_opt_type, ctx->sfrom);
+				    ifp->name, ndo.nd_opt_type, ctx->sfrom);
 			if (new_rap)
 				ipv6nd_removefreedrop_ra(rap, 0, 0);
 			else
@@ -919,47 +918,47 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 			return;
 		}
 
-		if (has_option_mask(ifp->options->nomasknd, ndo->nd_opt_type))
+		if (has_option_mask(ifp->options->nomasknd, ndo.nd_opt_type))
 			continue;
 
-		switch (ndo->nd_opt_type) {
+		switch (ndo.nd_opt_type) {
 		case ND_OPT_PREFIX_INFORMATION:
-			pi = (void *)ndo;
-			if (pi->nd_opt_pi_len != 4) {
+			if (ndo.nd_opt_len != 4) {
 				logger(ifp->ctx, new_data ? LOG_ERR : LOG_DEBUG,
 				    "%s: invalid option len for prefix",
 				    ifp->name);
 				continue;
 			}
-			if (pi->nd_opt_pi_prefix_len > 128) {
+			memcpy(&pi, p, sizeof(pi));
+			if (pi.nd_opt_pi_prefix_len > 128) {
 				logger(ifp->ctx, new_data ? LOG_ERR : LOG_DEBUG,
 				    "%s: invalid prefix len",
 				    ifp->name);
 				continue;
 			}
-			if (IN6_IS_ADDR_MULTICAST(&pi->nd_opt_pi_prefix) ||
-			    IN6_IS_ADDR_LINKLOCAL(&pi->nd_opt_pi_prefix))
+			if (IN6_IS_ADDR_MULTICAST(&pi.nd_opt_pi_prefix) ||
+			    IN6_IS_ADDR_LINKLOCAL(&pi.nd_opt_pi_prefix))
 			{
 				logger(ifp->ctx, new_data ? LOG_ERR : LOG_DEBUG,
 				    "%s: invalid prefix in RA", ifp->name);
 				continue;
 			}
-			if (ntohl(pi->nd_opt_pi_preferred_time) >
-			    ntohl(pi->nd_opt_pi_valid_time))
+			if (ntohl(pi.nd_opt_pi_preferred_time) >
+			    ntohl(pi.nd_opt_pi_valid_time))
 			{
 				logger(ifp->ctx, new_data ? LOG_ERR : LOG_DEBUG,
 				    "%s: pltime > vltime", ifp->name);
 				continue;
 			}
 			TAILQ_FOREACH(ap, &rap->addrs, next)
-				if (ap->prefix_len ==pi->nd_opt_pi_prefix_len &&
+				if (ap->prefix_len ==pi.nd_opt_pi_prefix_len &&
 				    IN6_ARE_ADDR_EQUAL(&ap->prefix,
-				    &pi->nd_opt_pi_prefix))
+				    &pi.nd_opt_pi_prefix))
 					break;
 			if (ap == NULL) {
-				if (!(pi->nd_opt_pi_flags_reserved &
+				if (!(pi.nd_opt_pi_flags_reserved &
 				    ND_OPT_PI_FLAG_AUTO) &&
-				    !(pi->nd_opt_pi_flags_reserved &
+				    !(pi.nd_opt_pi_flags_reserved &
 				    ND_OPT_PI_FLAG_ONLINK))
 					continue;
 				ap = calloc(1, sizeof(*ap));
@@ -967,9 +966,9 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 					break;
 				ap->iface = rap->iface;
 				ap->flags = IPV6_AF_NEW;
-				ap->prefix_len = pi->nd_opt_pi_prefix_len;
-				ap->prefix = pi->nd_opt_pi_prefix;
-				if (pi->nd_opt_pi_flags_reserved &
+				ap->prefix_len = pi.nd_opt_pi_prefix_len;
+				ap->prefix = pi.nd_opt_pi_prefix;
+				if (pi.nd_opt_pi_flags_reserved &
 				    ND_OPT_PI_FLAG_AUTO &&
 				    ap->iface->options->options &
 				    DHCPCD_IPV6RA_AUTOCONF)
@@ -978,7 +977,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 					ap->dadcounter =
 					    ipv6_makeaddr(&ap->addr, ifp,
 					    &ap->prefix,
-					    pi->nd_opt_pi_prefix_len);
+					    pi.nd_opt_pi_prefix_len);
 					if (ap->dadcounter == -1) {
 						free(ap);
 						break;
@@ -1021,13 +1020,13 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 				ap->flags &= ~IPV6_AF_STALE;
 				ap->acquired = rap->acquired;
 			}
-			if (pi->nd_opt_pi_flags_reserved &
+			if (pi.nd_opt_pi_flags_reserved &
 			    ND_OPT_PI_FLAG_ONLINK)
 				ap->flags |= IPV6_AF_ONLINK;
 			ap->prefix_vltime =
-			    ntohl(pi->nd_opt_pi_valid_time);
+			    ntohl(pi.nd_opt_pi_valid_time);
 			ap->prefix_pltime =
-			    ntohl(pi->nd_opt_pi_preferred_time);
+			    ntohl(pi.nd_opt_pi_preferred_time);
 			ap->nsprobes = 0;
 
 #ifdef IPV6_MANAGETEMPADDR
@@ -1051,22 +1050,22 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 			break;
 
 		case ND_OPT_MTU:
-			mtu = (void *)p;
-			mtuv = ntohl(mtu->nd_opt_mtu_mtu);
-			if (mtuv < IPV6_MMTU) {
+			memcpy(&mtu, p, sizeof(mtu));
+			mtu.nd_opt_mtu_mtu = ntohl(mtu.nd_opt_mtu_mtu);
+			if (mtu.nd_opt_mtu_mtu < IPV6_MMTU) {
 				logger(ifp->ctx, LOG_ERR, "%s: invalid MTU %d",
-				    ifp->name, mtuv);
+				    ifp->name, mtu.nd_opt_mtu_mtu);
 				break;
 			}
-			rap->mtu = mtuv;
+			rap->mtu = mtu.nd_opt_mtu_mtu;
 			break;
 
 		case ND_OPT_RDNSS:
-			rdnss = (void *)p;
-			if (rdnss->nd_opt_rdnss_lifetime &&
-			    rdnss->nd_opt_rdnss_len > 1)
+			memcpy(&rdnss, p, sizeof(rdnss));
+			if (rdnss.nd_opt_rdnss_lifetime &&
+			    rdnss.nd_opt_rdnss_len > 1)
 				rap->hasdns = 1;
-
+			break;
 		default:
 			continue;
 		}
@@ -1180,25 +1179,25 @@ ipv6nd_getoption(struct dhcpcd_ctx *ctx,
     size_t *os, unsigned int *code, size_t *len,
     const uint8_t *od, size_t ol, struct dhcp_opt **oopt)
 {
-	const struct nd_opt_hdr *o;
+	struct nd_opt_hdr ndo;
 	size_t i;
 	struct dhcp_opt *opt;
 
 	if (od) {
-		*os = sizeof(*o);
+		*os = sizeof(ndo);
 		if (ol < *os) {
 			errno = EINVAL;
 			return NULL;
 		}
-		o = (const struct nd_opt_hdr *)od;
-		if (o->nd_opt_len > ol) {
+		memcpy(&ndo, od, sizeof(ndo));
+		i = ndo.nd_opt_len * 8;
+		if (i > ol) {
 			errno = EINVAL;
 			return NULL;
 		}
-		*len = ND_OPTION_LEN(o);
-		*code = o->nd_opt_type;
-	} else
-		o = NULL;
+		*len = i;
+		*code = ndo.nd_opt_type;
+	}
 
 	for (i = 0, opt = ctx->nd_opts;
 	    i < ctx->nd_opts_len; i++, opt++)
@@ -1209,19 +1208,20 @@ ipv6nd_getoption(struct dhcpcd_ctx *ctx,
 		}
 	}
 
-	if (o)
-		return ND_COPTION_DATA(o);
+	if (od)
+		return od + sizeof(ndo);
 	return NULL;
 }
 
 ssize_t
 ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 {
-	size_t i, j, n, len;
+	size_t i, j, n, len, olen;
 	struct ra *rap;
 	char ndprefix[32], abuf[24];
 	struct dhcp_opt *opt;
-	const struct nd_opt_hdr *o;
+	uint8_t *p;
+	struct nd_opt_hdr ndo;
 	struct ipv6_addr *ia;
 	struct timespec now;
 
@@ -1265,32 +1265,30 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 		/* Unlike DHCP, ND6 options *may* occur more than once.
 		 * There is also no provision for option concatenation
 		 * unlike DHCP. */
-		len = rap->data_len -
-		    ((size_t)((const uint8_t *)ND_CFIRST_OPTION(rap) -
-		    rap->data));
-
-		for (o = ND_CFIRST_OPTION(rap);
-		    len >= (ssize_t)sizeof(*o);
-		    o = ND_CNEXT_OPTION(o))
+		len = rap->data_len - sizeof(struct nd_router_advert);
+		for (p = rap->data + sizeof(struct nd_router_advert);
+		    len >= sizeof(ndo);
+		    p += olen, len -= olen)
 		{
-			if ((size_t)o->nd_opt_len * 8 > len) {
+			memcpy(&ndo, p, sizeof(ndo));
+			olen = ndo.nd_opt_len * 8;
+			if (olen > len) {
 				errno =	EINVAL;
 				break;
 			}
-			len -= (size_t)(o->nd_opt_len * 8);
 			if (has_option_mask(rap->iface->options->nomasknd,
-			    o->nd_opt_type))
+			    ndo.nd_opt_type))
 				continue;
 			for (j = 0, opt = rap->iface->options->nd_override;
 			    j < rap->iface->options->nd_override_len;
 			    j++, opt++)
-				if (opt->option == o->nd_opt_type)
+				if (opt->option == ndo.nd_opt_type)
 					break;
 			if (j == rap->iface->options->nd_override_len) {
 				for (j = 0, opt = rap->iface->ctx->nd_opts;
 				    j < rap->iface->ctx->nd_opts_len;
 				    j++, opt++)
-					if (opt->option == o->nd_opt_type)
+					if (opt->option == ndo.nd_opt_type)
 						break;
 				if (j == rap->iface->ctx->nd_opts_len)
 					opt = NULL;
@@ -1300,7 +1298,7 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 				    env == NULL ? NULL : &env[n],
 				    ndprefix, rap->iface->name,
 				    opt, ipv6nd_getoption,
-				    ND_COPTION_DATA(o), ND_OPTION_LEN(o));
+				    p + sizeof(ndo), olen - sizeof(ndo));
 			}
 		}
 

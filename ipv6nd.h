@@ -63,17 +63,6 @@ struct rs_state {
 #define RS_STATE(a) ((struct rs_state *)(ifp)->if_data[IF_DATA_IPV6ND])
 #define RS_STATE_RUNNING(a) (ipv6nd_hasra((a)) && ipv6nd_dadcompleted((a)))
 
-#define ND_CFIRST_OPTION(m)						       \
-    ((const struct nd_opt_hdr *)					       \
-        ((const uint8_t *)(m)->data + sizeof(struct nd_router_advert)))
-#define ND_OPTION_LEN(o) ((size_t)((o)->nd_opt_len * 8) -		       \
-    sizeof(struct nd_opt_hdr))
-#define ND_CNEXT_OPTION(o)						       \
-    ((const struct nd_opt_hdr *)((const uint8_t *)(o) +			       \
-    (size_t)((o)->nd_opt_len * 8)))
-#define ND_COPTION_DATA(o)						       \
-    ((const uint8_t *)(o) + sizeof(struct nd_opt_hdr))
-
 #define MAX_RTR_SOLICITATION_DELAY	1	/* seconds */
 #define MAX_UNICAST_SOLICIT		3	/* 3 transmissions */
 #define RTR_SOLICITATION_INTERVAL	4	/* seconds */
