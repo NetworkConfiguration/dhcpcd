@@ -1134,7 +1134,7 @@ read_lease(struct interface *ifp, struct bootp **bootp)
 	int fd;
 	bool fd_opened;
 	struct dhcp_state *state = D_STATE(ifp);
-	uint8_t *lease;
+	struct bootp *lease;
 	size_t bytes;
 	uint8_t type;
 #ifdef AUTH
@@ -1164,7 +1164,7 @@ read_lease(struct interface *ifp, struct bootp **bootp)
 		logger(ifp->ctx, LOG_DEBUG, "%s: reading lease `%s'",
 		    ifp->name, state->leasefile);
 
-	bytes = dhcp_read_lease_fd(fd, &lease);
+	bytes = dhcp_read_lease_fd(fd, (void **)&lease);
 	if (fd_opened)
 		close(fd);
 	if (bytes == 0) {
@@ -3082,14 +3082,14 @@ rapidcommit:
 	dhcp_arp_bind(ifp);
 }
 
-static size_t
-get_udp_data(uint8_t **data, uint8_t *udp)
+static void *
+get_udp_data(uint8_t *udp, size_t *len)
 {
 	struct udp_bootp_packet *p;
 
 	p = (struct udp_bootp_packet *)udp;
-	*data = udp + offsetof(struct udp_bootp_packet, bootp);
-	return ntohs(p->ip.ip_len) - sizeof(p->ip) - sizeof(p->udp);
+	*len = ntohs(p->ip.ip_len) - sizeof(p->ip) - sizeof(p->udp);
+	return udp + offsetof(struct udp_bootp_packet, bootp);
 }
 
 static int
@@ -3148,7 +3148,7 @@ valid_udp_packet(uint8_t *data, size_t data_len, struct in_addr *from,
 static void
 dhcp_handlepacket(struct interface *ifp, uint8_t *data, size_t len, int flags)
 {
-	uint8_t *bootp;
+	struct bootp *bootp;
 	struct in_addr from;
 	int i;
 	size_t udp_len;
@@ -3187,7 +3187,7 @@ dhcp_handlepacket(struct interface *ifp, uint8_t *data, size_t len, int flags)
 	 * However some servers send a truncated vendor area.
 	 * dhcpcd can work fine without the vendor area being sent.
 	 */
-	udp_len = get_udp_data(&bootp, data);
+	bootp = get_udp_data(data, &udp_len);
 	/* udp_len must be correct because the values are checked in
 	 * valid_udp_packet(). */
 	if (udp_len < offsetof(struct bootp, vend)) {
@@ -3198,10 +3198,13 @@ dhcp_handlepacket(struct interface *ifp, uint8_t *data, size_t len, int flags)
 	}
 	/* To make our IS_DHCP macro easy, ensure the vendor
 	 * area has at least 4 octets. */
-	while (udp_len < offsetof(struct bootp, vend) + 4)
-		bootp[udp_len++] = '\0';
+	len = udp_len - offsetof(struct bootp, vend);
+	while (len < 4) {
+		bootp->vend[len++] = '\0';
+		udp_len++;
+	}
 
-	dhcp_handledhcp(ifp, (struct bootp *)bootp, udp_len, &from);
+	dhcp_handledhcp(ifp, bootp, udp_len, &from);
 }
 
 static void

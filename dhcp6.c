@@ -996,7 +996,7 @@ dhcp6_update_auth(struct interface *ifp, struct dhcp6_message *m, size_t len)
 	state = D6_STATE(ifp);
 
 	return dhcp_auth_encode(&ifp->options->auth, state->auth.token,
-	    (uint8_t *)state->send, state->send_len,
+	    state->send, state->send_len,
 	    6, state->send->type,
 	    D6_OPTION_DATA(o), ntohs(o->len));
 }
@@ -2237,7 +2237,6 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	struct dhcp6_state *state;
 	struct stat st;
 	int fd;
-	uint8_t *lease;
 	struct timespec acquired;
 	time_t now;
 	int retval;
@@ -2264,9 +2263,7 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	if (fd == -1)
 		return -1;
 	retval = -1;
-	lease = NULL;
-	state->new_len = dhcp_read_lease_fd(fd, &lease);
-	state->new = (struct dhcp6_message *)lease;
+	state->new_len = dhcp_read_lease_fd(fd, (void **)&state->new);
 	if (fd_opened)
 		close(fd);
 	if (state->new_len == 0)
@@ -2313,7 +2310,7 @@ auth:
 	o = dhcp6_getmoption(D6_OPTION_AUTH, state->new, state->new_len);
 	if (o) {
 		if (dhcp_auth_validate(&state->auth, &ifp->options->auth,
-		    (uint8_t *)state->new, state->new_len, 6, state->new->type,
+		    state->new, state->new_len, 6, state->new->type,
 		    D6_COPTION_DATA(o), ntohs(o->len)) == NULL)
 		{
 			logger(ifp->ctx, LOG_DEBUG,
@@ -2848,7 +2845,7 @@ dhcp6_handledata(void *arg)
 	auth = dhcp6_getmoption(D6_OPTION_AUTH, r, len);
 	if (auth) {
 		if (dhcp_auth_validate(&state->auth, &ifo->auth,
-		    (uint8_t *)r, len, 6, r->type,
+		    r, len, 6, r->type,
 		    D6_COPTION_DATA(auth), ntohs(auth->len)) == NULL)
 		{
 			logger(ifp->ctx, LOG_DEBUG, "dhcp_auth_validate: %m");

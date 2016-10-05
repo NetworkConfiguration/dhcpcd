@@ -104,9 +104,10 @@ dhcp_auth_reset(struct authstate *state)
  */
 const struct token *
 dhcp_auth_validate(struct authstate *state, const struct auth *auth,
-    const uint8_t *m, size_t mlen, int mp,  int mt,
-    const uint8_t *data, size_t dlen)
+    const void *vm, size_t mlen, int mp,  int mt,
+    const void *vdata, size_t dlen)
 {
+	const uint8_t *m, *data;
 	uint8_t protocol, algorithm, rdm, *mm, type;
 	uint64_t replay;
 	uint32_t secretid;
@@ -121,6 +122,8 @@ dhcp_auth_validate(struct authstate *state, const struct auth *auth,
 		return NULL;
 	}
 
+	m = vm;
+	data = vdata;
 	/* Ensure that d is inside m which *may* not be the case for DHPCPv4 */
 	if (data < m || data > m + mlen || data + dlen > m + mlen) {
 		errno = ERANGE;
@@ -473,13 +476,13 @@ get_next_rdm_monotonic(struct auth *auth)
  */
 ssize_t
 dhcp_auth_encode(struct auth *auth, const struct token *t,
-    uint8_t *m, size_t mlen, int mp, int mt,
-    uint8_t *data, size_t dlen)
+    void *vm, size_t mlen, int mp, int mt,
+    void *vdata, size_t dlen)
 {
 	uint64_t rdm;
 	uint8_t hmac[HMAC_LENGTH];
 	time_t now;
-	uint8_t hops, *p, info;
+	uint8_t hops, *p, info, *m, *data;
 	uint32_t giaddr, secretid;
 
 	if (auth->protocol == 0 && t == NULL) {
@@ -538,7 +541,7 @@ dhcp_auth_encode(struct auth *auth, const struct token *t,
 
 	/* Work out the auth area size.
 	 * We only need to do this for DISCOVER messages */
-	if (data == NULL) {
+	if (vdata == NULL) {
 		dlen = 1 + 1 + 1 + 8;
 		switch(auth->protocol) {
 		case AUTH_PROTO_TOKEN:
@@ -562,6 +565,8 @@ dhcp_auth_encode(struct auth *auth, const struct token *t,
 	}
 
 	/* Ensure that d is inside m which *may* not be the case for DHPCPv4 */
+	m = vm;
+	data = vdata;
 	if (data < m || data > m + mlen || data + dlen > m + mlen) {
 		errno = ERANGE;
 		return -1;

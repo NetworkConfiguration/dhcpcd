@@ -83,10 +83,10 @@ void dhcp_auth_reset(struct authstate *);
 
 const struct token * dhcp_auth_validate(struct authstate *,
     const struct auth *,
-    const uint8_t *, size_t, int, int,
-    const uint8_t *, size_t);
+    const void *, size_t, int, int,
+    const void *, size_t);
 
 ssize_t dhcp_auth_encode(struct auth *, const struct token *,
-    uint8_t *, size_t, int, int,
-    uint8_t *, size_t);
+    void *, size_t, int, int,
+    void *, size_t);
 #endif

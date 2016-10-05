@@ -118,6 +118,6 @@ size_t dhcp_envoption(struct dhcpcd_ctx *,
     const uint8_t *, size_t, struct dhcp_opt **),
     const uint8_t *od, size_t ol);
 void dhcp_zero_index(struct dhcp_opt *);
-size_t dhcp_read_lease_fd(int, uint8_t **);
+size_t dhcp_read_lease_fd(int, void **);
 
 #endif

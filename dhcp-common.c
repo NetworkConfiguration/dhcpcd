@@ -1058,7 +1058,7 @@ dhcp_zero_index(struct dhcp_opt *opt)
 }
 
 size_t
-dhcp_read_lease_fd(int fd, uint8_t **lease)
+dhcp_read_lease_fd(int fd, void **lease)
 {
 	uint8_t *buf, *nbuf;
 	size_t len, new_len;
