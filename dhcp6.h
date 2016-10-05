@@ -100,18 +100,6 @@
 #include "dhcp.h"
 #include "ipv6.h"
 
-struct dhcp6_message {
-	uint8_t type;
-	uint8_t xid[3];
-	/* followed by options */
-} __packed;
-
-struct dhcp6_option {
-	uint16_t code;
-	uint16_t len;
-	/* followed by data */
-} __packed;
-
 #define D6_STATUS_OK		0
 #define D6_STATUS_FAIL		1
 #define D6_STATUS_NOADDR	2
@@ -212,23 +200,6 @@ struct dhcp6_state {
 #define D6_STATE_RUNNING(ifp)						       \
 	(D6_CSTATE((ifp)) &&						       \
 	D6_CSTATE((ifp))->reason && dhcp6_dadcompleted((ifp)))
-
-#define D6_FIRST_OPTION(m)						       \
-    ((struct dhcp6_option *)						       \
-        ((uint8_t *)(m) + sizeof(struct dhcp6_message)))
-#define D6_NEXT_OPTION(o)						       \
-    ((struct dhcp6_option *)						       \
-        (((uint8_t *)o) + sizeof(struct dhcp6_option) + ntohs((o)->len)))
-#define D6_OPTION_DATA(o)						       \
-    ((uint8_t *)(o) + sizeof(struct dhcp6_option))
-#define D6_CFIRST_OPTION(m)						       \
-    ((const struct dhcp6_option *)					       \
-        ((const uint8_t *)(m) + sizeof(struct dhcp6_message)))
-#define D6_CNEXT_OPTION(o)						       \
-    ((const struct dhcp6_option *)					       \
-        (((const uint8_t *)o) + sizeof(struct dhcp6_option) + ntohs((o)->len)))
-#define D6_COPTION_DATA(o)						       \
-    ((const uint8_t *)(o) + sizeof(struct dhcp6_option))
 
 #ifdef DHCP6
 void dhcp6_printoptions(const struct dhcpcd_ctx *,

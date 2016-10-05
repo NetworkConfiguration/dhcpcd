@@ -131,18 +131,6 @@ enum FQDN {
 	FQDN_BOTH       = 0x31
 };
 
-/* Don't import common.h as that defines __unused which causes problems
- * on some Linux systems which define it as part of a structure */
-#if __GNUC__ > 2 || defined(__INTEL_COMPILER)
-# ifndef __packed
-#  define __packed   __attribute__((__packed__))
-# endif
-#else
-# ifndef __packed
-#  define __packed
-# endif
-#endif
-
 /* Sizes for BOOTP options */
 #define	BOOTP_CHADDR_LEN	 16
 #define	BOOTP_SNAME_LEN		 64
@@ -167,7 +155,7 @@ struct bootp {
 	uint8_t file[BOOTP_FILE_LEN];		/* boot file name */
 	uint8_t vend[BOOTP_VEND_LEN];		/* vendor specific area */
 	/* DHCP allows a variable length vendor area */
-} __packed;
+};
 
 struct dhcp_lease {
 	struct in_addr addr;

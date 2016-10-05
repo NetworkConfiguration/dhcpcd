@@ -38,6 +38,7 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -73,6 +74,43 @@
 #endif
 
 #ifdef DHCP6
+
+struct dhcp6_message {
+	uint8_t type;
+	uint8_t xid[3];
+	/* followed by options */
+};
+__CTASSERT(sizeof(struct dhcp6_message) == 4);
+
+struct dhcp6_option {
+	uint16_t code;
+	uint16_t len;
+	/* followed by data */
+};
+__CTASSERT(sizeof(struct dhcp6_option) == 4);
+
+struct dhcp6_ia_na {
+	uint8_t iaid[4];
+	uint32_t t1;
+	uint32_t t2;
+};
+__CTASSERT(sizeof(struct dhcp6_ia_na) == 12);
+
+struct dhcp6_ia_addr {
+	struct in6_addr addr;
+	uint32_t pltime;
+	uint32_t vltime;
+};
+__CTASSERT(sizeof(struct dhcp6_ia_addr) == 16 + 8);
+
+struct dhcp6_pd_addr {
+	uint32_t pltime;
+	uint32_t vltime;
+	uint8_t prefix_len;
+	struct in6_addr prefix;
+} __packed;
+__CTASSERT(sizeof(struct dhcp6_pd_addr) == 8 + 1 + 16);
+
 struct dhcp6_op {
 	uint16_t type;
 	const char *name;
@@ -121,19 +159,6 @@ static const char * const dhcp6_statuses[] = {
 	"No Prefix Available"
 };
 
-struct dhcp6_ia_addr {
-	struct in6_addr addr;
-	uint32_t pltime;
-	uint32_t vltime;
-} __packed;
-
-struct dhcp6_pd_addr {
-	uint32_t pltime;
-	uint32_t vltime;
-	uint8_t prefix_len;
-	struct in6_addr prefix;
-} __packed;
-
 void
 dhcp6_printoptions(const struct dhcpcd_ctx *ctx,
     const struct dhcp_opt *opts, size_t opts_len)
@@ -160,16 +185,15 @@ dhcp6_printoptions(const struct dhcpcd_ctx *ctx,
 }
 
 static size_t
-dhcp6_makevendor(struct dhcp6_option *o, const struct interface *ifp)
+dhcp6_makevendor(void *data, const struct interface *ifp)
 {
 	const struct if_options *ifo;
 	size_t len, i;
 	uint8_t *p;
-	uint16_t u16;
-	uint32_t u32;
 	ssize_t vlen;
 	const struct vivco *vivco;
 	char vendor[VENDORCLASSID_MAX_LEN];
+	struct dhcp6_option o;
 
 	ifo = ifp->options;
 	len = sizeof(uint32_t); /* IANA PEN */
@@ -193,58 +217,86 @@ dhcp6_makevendor(struct dhcp6_option *o, const struct interface *ifp)
 		return 0;
 	}
 
-	if (o) {
-		o->code = htons(D6_OPTION_VENDOR_CLASS);
-		o->len = htons((uint16_t)len);
-		p = D6_OPTION_DATA(o);
-		u32 = htonl(ifo->vivco_en ? ifo->vivco_en : DHCPCD_IANA_PEN);
-		memcpy(p, &u32, sizeof(u32));
-		p += sizeof(u32);
+	if (data != NULL) {
+		uint32_t pen;
+		uint16_t hvlen;
+
+		p = data;
+		o.code = htons(D6_OPTION_VENDOR_CLASS);
+		o.len = htons((uint16_t)len);
+		memcpy(p, &o, sizeof(o));
+		p += sizeof(o);
+		pen = htonl(ifo->vivco_en ? ifo->vivco_en : DHCPCD_IANA_PEN);
+		memcpy(p, &pen, sizeof(pen));
+		p += sizeof(pen);
+
 		if (ifo->vivco_en) {
 			for (i = 0, vivco = ifo->vivco;
 			    i < ifo->vivco_len;
 			    i++, vivco++)
 			{
-				u16 = htons((uint16_t)vivco->len);
-				memcpy(p, &u16, sizeof(u16));
-				p += sizeof(u16);
+				hvlen = htons((uint16_t)vivco->len);
+				memcpy(p, &hvlen, sizeof(hvlen));
+				p += sizeof(len);
 				memcpy(p, vivco->data, vivco->len);
 				p += vivco->len;
 			}
 		} else if (vlen) {
-			u16 = htons((uint16_t)vlen);
-			memcpy(p, &u16, sizeof(u16));
-			p += sizeof(u16);
+			hvlen = htons((uint16_t)vlen);
+			memcpy(p, &hvlen, sizeof(hvlen));
+			p += sizeof(len);
 			memcpy(p, vendor, (size_t)vlen);
 		}
 	}
 
-	return len;
+	return sizeof(o) + len;
 }
 
-static const struct dhcp6_option *
-dhcp6_findoption(uint16_t code, const uint8_t *d, size_t len)
+static void *
+dhcp6_findoption(void *data, size_t data_len, uint16_t code, uint16_t *len)
 {
-	const struct dhcp6_option *o;
-	size_t ol;
+	uint8_t *d;
+	struct dhcp6_option o;
 
 	code = htons(code);
-	for (o = (const struct dhcp6_option *)d;
-	    len >= sizeof(*o);
-	    o = D6_CNEXT_OPTION(o))
-	{
-		ol = sizeof(*o) + ntohs(o->len);
-		if (ol > len) {
+	for (d = data; data_len != 0; d += o.len, data_len -= o.len) {
+		if (data_len < sizeof(o)) {
 			errno = EINVAL;
 			return NULL;
 		}
-		if (o->code == code)
-			return o;
-		len -= ol;
+		memcpy(&o, d, sizeof(o));
+		d += sizeof(o);
+		data_len -= sizeof(o);
+		o.len = htons(o.len);
+		if (data_len < o.len) {
+			errno = EINVAL;
+			return NULL;
+		}
+		if (o.code == code) {
+			if (len != NULL)
+				*len = o.len;
+			return d;
+		}
 	}
 
-	errno = ESRCH;
+	errno = ENOENT;
 	return NULL;
+}
+
+static void *
+dhcp6_findmoption(void *data, size_t data_len, uint16_t code,
+    uint16_t *len)
+{
+	uint8_t *d;
+
+	if (data_len < sizeof(struct dhcp6_message)) {
+		errno = EINVAL;
+		return false;
+	}
+	d = data;
+	d += sizeof(struct dhcp6_message);
+	data_len -= sizeof(struct dhcp6_message);
+	return dhcp6_findoption(d, data_len, code, len);
 }
 
 static const uint8_t *
@@ -252,25 +304,24 @@ dhcp6_getoption(struct dhcpcd_ctx *ctx,
     size_t *os, unsigned int *code, size_t *len,
     const uint8_t *od, size_t ol, struct dhcp_opt **oopt)
 {
-	const struct dhcp6_option *o;
+	struct dhcp6_option o;
 	size_t i;
 	struct dhcp_opt *opt;
 
-	if (od) {
-		*os = sizeof(*o);
+	if (od != NULL) {
+		*os = sizeof(o);
 		if (ol < *os) {
 			errno = EINVAL;
 			return NULL;
 		}
-		o = (const struct dhcp6_option *)od;
-		*len = ntohs(o->len);
+		memcpy(&o, od, sizeof(o));
+		*len = ntohs(o.len);
 		if (*len > ol - *os) {
 			errno = ERANGE;
 			return NULL;
 		}
-		*code = ntohs(o->code);
-	} else
-		o = NULL;
+		*code = ntohs(o.code);
+	}
 
 	*oopt = NULL;
 	for (i = 0, opt = ctx->dhcp6_opts;
@@ -282,39 +333,29 @@ dhcp6_getoption(struct dhcpcd_ctx *ctx,
 		}
 	}
 
-	if (o)
-		return D6_COPTION_DATA(o);
+	if (od != NULL)
+		return od + sizeof(o);
 	return NULL;
 }
 
-static const struct dhcp6_option *
-dhcp6_getmoption(uint16_t code, const struct dhcp6_message *m, size_t len)
-{
-
-	if (len < sizeof(*m)) {
-		errno = EINVAL;
-		return NULL;
-	}
-	len -= sizeof(*m);
-	return dhcp6_findoption(code,
-	    (const uint8_t *)D6_CFIRST_OPTION(m), len);
-}
-
-static int
+static bool
 dhcp6_updateelapsed(struct interface *ifp, struct dhcp6_message *m, size_t len)
 {
+	uint8_t *opt;
+	uint16_t opt_len;
 	struct dhcp6_state *state;
-	const struct dhcp6_option *co;
-	struct dhcp6_option *o;
 	struct timespec tv;
 	time_t hsec;
-	uint16_t u16;
+	uint16_t sec;
 
-	co = dhcp6_getmoption(D6_OPTION_ELAPSED, m, len);
-	if (co == NULL)
-		return -1;
+	opt = dhcp6_findmoption(m, len, D6_OPTION_ELAPSED, &opt_len);
+	if (opt == NULL)
+		return false;
+	if (opt_len != sizeof(sec)) {
+		errno = EINVAL;
+		return false;
+	}
 
-	o = UNCONST(co);
 	state = D6_STATE(ifp);
 	clock_gettime(CLOCK_MONOTONIC, &tv);
 	if (state->RTC == 0) {
@@ -335,9 +376,9 @@ dhcp6_updateelapsed(struct interface *ifp, struct dhcp6_message *m, size_t len)
 				hsec = UINT16_MAX;
 		}
 	}
-	u16 = htons((uint16_t)hsec);
-	memcpy(D6_OPTION_DATA(o), &u16, sizeof(u16));
-	return 0;
+	sec = htons((uint16_t)hsec);
+	memcpy(opt, &sec, sizeof(sec));
+	return true;
 }
 
 static void
@@ -498,28 +539,23 @@ dhcp6_makemessage(struct interface *ifp)
 {
 	struct dhcp6_state *state;
 	struct dhcp6_message *m;
-	struct dhcp6_option *o, *so;
-	const struct dhcp6_option *si, *unicast;
-	size_t l, n, len, ml;
+	struct dhcp6_option o;
+	uint8_t *p, *si, *unicast, IA;
+	size_t n, l, len, ml, hl;
 	uint8_t type;
-	uint16_t u16, n_options;
+	uint16_t si_len, uni_len, n_options;
+	uint8_t *o_lenp;
 	struct if_options *ifo;
 	const struct dhcp_opt *opt, *opt2;
-	uint8_t IA, *p;
 	uint32_t u32;
 	const struct ipv6_addr *ap;
 	char hbuf[HOSTNAME_MAX_LEN + 1];
 	const char *hostname;
 	int fqdn;
-	struct dhcp6_ia_addr *iap;
+	struct dhcp6_ia_na ia_na;
+	uint16_t ia_na_len;
 #ifdef AUTH
 	uint16_t auth_len;
-#endif
-#ifndef SMALL
-	struct dhcp6_option *eo;
-	struct dhcp6_pd_addr *pdp;
-	uint8_t u8;
-	const uint8_t *pp;
 #endif
 
 	state = D6_STATE(ifp);
@@ -565,7 +601,7 @@ dhcp6_makemessage(struct interface *ifp)
 			    has_option_mask(ifo->requestmask6, opt->option)))
 			{
 				n_options++;
-				len += sizeof(u16);
+				len += sizeof(o.len);
 			}
 		}
 #ifndef SMALL
@@ -578,30 +614,32 @@ dhcp6_makemessage(struct interface *ifp)
 			    has_option_mask(ifo->requestmask6, opt->option)))
 			{
 				n_options++;
-				len += sizeof(u16);
+				len += sizeof(o.len);
 			}
 		}
 		if (dhcp6_findselfsla(ifp, NULL)) {
 			n_options++;
-			len += sizeof(u16);
+			len += sizeof(o.len);
 		}
 #endif
 		if (len)
-			len += sizeof(*o);
+			len += sizeof(o);
 
-		if (fqdn != FQDN_DISABLE)
-			len += sizeof(*o) + 1 + encode_rfc1035(hostname, NULL);
+		if (fqdn != FQDN_DISABLE) {
+			hl = encode_rfc1035(hostname, NULL);
+			len += sizeof(o) + 1 + hl;
+		}
 
 		if ((ifo->auth.options & DHCPCD_AUTH_SENDREQUIRE) !=
 		    DHCPCD_AUTH_SENDREQUIRE)
-			len += sizeof(*o); /* Reconfigure Accept */
+			len += sizeof(o); /* Reconfigure Accept */
 	}
 
 	len += sizeof(*state->send);
-	len += sizeof(*o) + ifp->ctx->duid_len;
-	len += sizeof(*o) + sizeof(uint16_t); /* elapsed */
+	len += sizeof(o) + ifp->ctx->duid_len;
+	len += sizeof(o) + sizeof(uint16_t); /* elapsed */
 	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_CLASS))
-		len += sizeof(*o) + dhcp6_makevendor(NULL, ifp);
+		len += sizeof(o) + dhcp6_makevendor(NULL, ifp);
 
 	/* IA */
 	m = NULL;
@@ -618,12 +656,10 @@ dhcp6_makemessage(struct interface *ifp)
 			m = state->new;
 			ml = state->new_len;
 		}
-		si = dhcp6_getmoption(D6_OPTION_SERVERID, m, ml);
-		if (si == NULL) {
-			errno = ESRCH;
+		si = dhcp6_findmoption(m, ml, D6_OPTION_SERVERID, &si_len);
+		if (si == NULL)
 			return -1;
-		}
-		len += sizeof(*si) + ntohs(si->len);
+		len += sizeof(o) + si_len;
 		/* FALLTHROUGH */
 	case DH6S_REBIND:
 		/* FALLTHROUGH */
@@ -640,21 +676,21 @@ dhcp6_makemessage(struct interface *ifp)
 				continue;
 			if (ap->ia_type == D6_OPTION_IA_PD) {
 #ifndef SMALL
-				len += sizeof(*o) + sizeof(u8) +
+				len += sizeof(o) + sizeof(o.len) +
 				    sizeof(u32) + sizeof(u32) +
 				    sizeof(ap->prefix);
 				if (ap->prefix_exclude_len)
-					len += sizeof(*o) + 1 +
+					len += sizeof(o) + 1 +
 					    (uint8_t)((ap->prefix_exclude_len -
 					    ap->prefix_len - 1) / NBBY) + 1;
 #endif
 			} else
-				len += sizeof(*o) + sizeof(ap->addr) +
+				len += sizeof(o) + sizeof(ap->addr) +
 				    sizeof(u32) + sizeof(u32);
 		}
 		/* FALLTHROUGH */
 	case DH6S_INIT:
-		len += ifo->ia_len * (sizeof(*o) + (sizeof(u32) * 3));
+		len += ifo->ia_len * (sizeof(o) + (sizeof(u32) * 3));
 		IA = 1;
 		break;
 	default:
@@ -664,7 +700,7 @@ dhcp6_makemessage(struct interface *ifp)
 	if (state->state == DH6S_DISCOVER &&
 	    !(ifp->ctx->options & DHCPCD_TEST) &&
 	    has_option_mask(ifo->requestmask6, D6_OPTION_RAPID_COMMIT))
-		len += sizeof(*o);
+		len += sizeof(o);
 
 	if (m == NULL) {
 		m = state->new;
@@ -679,7 +715,7 @@ dhcp6_makemessage(struct interface *ifp)
 		break;
 	case DH6S_REQUEST:
 		type = DHCP6_REQUEST;
-		unicast = dhcp6_getmoption(D6_OPTION_UNICAST, m, ml);
+		unicast = dhcp6_findmoption(m, ml, D6_OPTION_UNICAST, &uni_len);
 		break;
 	case DH6S_CONFIRM:
 		type = DHCP6_CONFIRM;
@@ -689,14 +725,14 @@ dhcp6_makemessage(struct interface *ifp)
 		break;
 	case DH6S_RENEW:
 		type = DHCP6_RENEW;
-		unicast = dhcp6_getmoption(D6_OPTION_UNICAST, m, ml);
+		unicast = dhcp6_findmoption(m, ml, D6_OPTION_UNICAST, &uni_len);
 		break;
 	case DH6S_INFORM:
 		type = DHCP6_INFORMATION_REQ;
 		break;
 	case DH6S_RELEASE:
 		type = DHCP6_RELEASE;
-		unicast = dhcp6_getmoption(D6_OPTION_UNICAST, m, ml);
+		unicast = dhcp6_findmoption(m, ml, D6_OPTION_UNICAST, &uni_len);
 		break;
 	default:
 		errno = EINVAL;
@@ -717,7 +753,7 @@ dhcp6_makemessage(struct interface *ifp)
 			    "%s: dhcp_auth_encode: %m", ifp->name);
 		else if (alen != 0) {
 			auth_len = (uint16_t)alen;
-			len += sizeof(*o) + auth_len;
+			len += sizeof(o) + auth_len;
 		}
 	}
 #endif
@@ -730,152 +766,146 @@ dhcp6_makemessage(struct interface *ifp)
 	state->send->type = type;
 
 	/* If we found a unicast option, copy it to our state for sending */
-	if (unicast && ntohs(unicast->len) == sizeof(state->unicast))
-		memcpy(&state->unicast, D6_COPTION_DATA(unicast),
-		    sizeof(state->unicast));
+	if (unicast && uni_len == sizeof(state->unicast))
+		memcpy(&state->unicast, unicast, sizeof(state->unicast));
 	else
 		state->unicast = in6addr_any;
 
 	dhcp6_newxid(ifp, state->send);
 
-	o = D6_FIRST_OPTION(state->send);
-	o->code = htons(D6_OPTION_CLIENTID);
-	o->len = htons((uint16_t)ifp->ctx->duid_len);
-	memcpy(D6_OPTION_DATA(o), ifp->ctx->duid, ifp->ctx->duid_len);
+#define COPYIN1(_code, _len)		{	\
+	o.code = htons((_code));		\
+	o.len = htons((_len));			\
+	memcpy(p, &o, sizeof(o));		\
+	p += sizeof(o);				\
+}
+#define COPYIN(_code, _data, _len)	{	\
+	COPYIN1((_code), (_len));		\
+	if ((_len) != 0) {			\
+		memcpy(p, (_data), (_len));	\
+		p += (_len);			\
+	}					\
+}
+#define NEXTLEN (p + offsetof(struct dhcp6_option, len))
 
-	if (si) {
-		o = D6_NEXT_OPTION(o);
-		memcpy(o, si, sizeof(*si) + ntohs(si->len));
-	}
+	p = (uint8_t *)state->send + sizeof(*state->send);
+	COPYIN(D6_OPTION_CLIENTID, ifp->ctx->duid, ifp->ctx->duid_len);
 
-	o = D6_NEXT_OPTION(o);
-	o->code = htons(D6_OPTION_ELAPSED);
-	o->len = htons(sizeof(uint16_t));
-	p = D6_OPTION_DATA(o);
-	memset(p, 0, sizeof(uint16_t));
+	if (si != NULL)
+		COPYIN(D6_OPTION_SERVERID, si, si_len);
 
-	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_CLASS)) {
-		o = D6_NEXT_OPTION(o);
-		dhcp6_makevendor(o, ifp);
-	}
+	si_len = 0;
+	COPYIN(D6_OPTION_ELAPSED, &si_len, sizeof(si_len));
+
+	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_CLASS))
+		p += dhcp6_makevendor(p, ifp);
 
 	if (state->state == DH6S_DISCOVER &&
 	    !(ifp->ctx->options & DHCPCD_TEST) &&
 	    has_option_mask(ifo->requestmask6, D6_OPTION_RAPID_COMMIT))
-	{
-		o = D6_NEXT_OPTION(o);
-		o->code = htons(D6_OPTION_RAPID_COMMIT);
-		o->len = 0;
-	}
+		COPYIN1(D6_OPTION_RAPID_COMMIT, 0);
 
 	for (l = 0; IA && l < ifo->ia_len; l++) {
-		o = D6_NEXT_OPTION(o);
-		o->code = htons(ifo->ia[l].ia_type);
-		o->len = htons(sizeof(u32) + sizeof(u32) + sizeof(u32));
-		p = D6_OPTION_DATA(o);
-		memcpy(p, ifo->ia[l].iaid, sizeof(u32));
-		p += sizeof(u32);
-		memset(p, 0, sizeof(u32) + sizeof(u32));
+		o_lenp = NEXTLEN;
+		ia_na_len = sizeof(ia_na);
+		memcpy(ia_na.iaid, ifo->ia[l].iaid, sizeof(ia_na.iaid));
+		ia_na.t1 = 0;
+		ia_na.t2 = 0;
+		COPYIN(ifo->ia[l].ia_type, &ia_na, sizeof(ia_na));
 		TAILQ_FOREACH(ap, &state->addrs, next) {
 			if (ap->prefix_vltime == 0 &&
 			    !(ap->flags & IPV6_AF_REQUEST))
 				continue;
 			if (memcmp(ifo->ia[l].iaid, ap->iaid, sizeof(u32)))
 				continue;
-			so = D6_NEXT_OPTION(o);
 			if (ap->ia_type == D6_OPTION_IA_PD) {
 #ifndef SMALL
-				so->code = htons(D6_OPTION_IAPREFIX);
-				so->len = htons(sizeof(ap->prefix) +
-				    sizeof(u32) + sizeof(u32) + sizeof(u8));
-				pdp = (struct dhcp6_pd_addr *)
-				    D6_OPTION_DATA(so);
-				pdp->pltime = htonl(ap->prefix_pltime);
-				pdp->vltime = htonl(ap->prefix_vltime);
-				pdp->prefix_len = ap->prefix_len;
-				pdp->prefix = ap->prefix;
+				struct dhcp6_pd_addr pdp;
+				uint8_t *pdp_lp;
+
+				pdp_lp = NEXTLEN;
+				pdp.pltime = htonl(ap->prefix_pltime);
+				pdp.vltime = htonl(ap->prefix_vltime);
+				pdp.prefix_len = ap->prefix_len;
+				pdp.prefix = ap->prefix;
+				COPYIN(D6_OPTION_IAPREFIX, &pdp, sizeof(pdp));
+				ia_na_len += sizeof(o) + sizeof(pdp);
 
 				/* RFC6603 Section 4.2 */
 				if (ap->prefix_exclude_len) {
-					n = (size_t)((ap->prefix_exclude_len -
+					uint8_t exb[16], *ep, u8;
+					const uint8_t *pp;
+
+					n = ((ap->prefix_exclude_len -
 					    ap->prefix_len - 1) / NBBY) + 1;
-					eo = D6_NEXT_OPTION(so);
-					eo->code = htons(D6_OPTION_PD_EXCLUDE);
-					eo->len = (uint16_t)(n + 1);
-					p = D6_OPTION_DATA(eo);
-					*p++ = (uint8_t)ap->prefix_exclude_len;
+					ep = exb;
+					*ep++ = (uint8_t)ap->prefix_exclude_len;
 					pp = ap->prefix_exclude.s6_addr;
-					pp += (size_t)((ap->prefix_len - 1) / NBBY)
-					    + (n - 1);
+					pp += (size_t)
+					    ((ap->prefix_len - 1) / NBBY) +
+					    (n - 1);
 					u8 = ap->prefix_len % NBBY;
 					if (u8)
 						n--;
 					while (n-- > 0)
-						*p++ = *pp--;
+						*ep++ = *pp--;
 					if (u8)
-						*p = (uint8_t)(*pp << u8);
-					u16 = (uint16_t)(ntohs(so->len) +
-					    sizeof(*eo) + eo->len);
-					so->len = htons(u16);
-					eo->len = htons(eo->len);
+						*ep = (uint8_t)(*pp << u8);
+					n++;
+					COPYIN(D6_OPTION_PD_EXCLUDE, exb, n);
+					ia_na_len += sizeof(o) + n;
 				}
-
-				u16 = (uint16_t)(ntohs(o->len) + sizeof(*so)
-				    + ntohs(so->len));
-				o->len = htons(u16);
 #endif
 			} else {
-				so->code = htons(D6_OPTION_IA_ADDR);
-				so->len = sizeof(ap->addr) +
-				    sizeof(u32) + sizeof(u32);
-				iap = (struct dhcp6_ia_addr *)
-				    D6_OPTION_DATA(so);
-				iap->addr = ap->addr;
-				iap->pltime = htonl(ap->prefix_pltime);
-				iap->vltime = htonl(ap->prefix_vltime);
-				u16 = (uint16_t)(ntohs(o->len) + sizeof(*so)
-				    + so->len);
-				so->len = htons(so->len);
-				o->len = htons(u16);
+				struct dhcp6_ia_addr ia;
+
+				ia.addr = ap->addr;
+				ia.pltime = htonl(ap->prefix_pltime);
+				ia.vltime = htonl(ap->prefix_vltime);
+				COPYIN(D6_OPTION_IA_ADDR, &ia, sizeof(ia));
+				ia_na_len += sizeof(o) + sizeof(ia);
 			}
 		}
+
+		/* Update the total option lenth. */
+		ia_na_len = htons(ia_na_len);
+		memcpy(o_lenp, &ia_na_len, sizeof(ia_na_len));
 	}
 
 	if (state->send->type != DHCP6_RELEASE) {
 		if (fqdn != FQDN_DISABLE) {
-			o = D6_NEXT_OPTION(o);
-			o->code = htons(D6_OPTION_FQDN);
-			p = D6_OPTION_DATA(o);
-			switch (fqdn) {
-			case FQDN_BOTH:
-				*p = D6_FQDN_BOTH;
-				break;
-			case FQDN_PTR:
-				*p = D6_FQDN_PTR;
-				break;
-			default:
+			o_lenp = NEXTLEN;
+			COPYIN(D6_OPTION_FQDN, NULL, 0);
+			if (hl == 0)
 				*p = D6_FQDN_NONE;
-				break;
+			else {
+				switch (fqdn) {
+				case FQDN_BOTH:
+					*p = D6_FQDN_BOTH;
+					break;
+				case FQDN_PTR:
+					*p = D6_FQDN_PTR;
+					break;
+				default:
+					*p = D6_FQDN_NONE;
+					break;
+				}
 			}
-			l = encode_rfc1035(hostname, p + 1);
-			if (l == 0)
-				*p = D6_FQDN_NONE;
-			o->len = htons((uint16_t)(l + 1));
+			p++;
+			encode_rfc1035(hostname, p);
+			p += hl;
+			o.len = htons((uint16_t)(hl + 1));
+			memcpy(o_lenp, &o.len, sizeof(o.len));
 		}
 
 		if ((ifo->auth.options & DHCPCD_AUTH_SENDREQUIRE) !=
 		    DHCPCD_AUTH_SENDREQUIRE)
-		{
-			o = D6_NEXT_OPTION(o);
-			o->code = htons(D6_OPTION_RECONF_ACCEPT);
-			o->len = 0;
-		}
+			COPYIN(D6_OPTION_RECONF_ACCEPT, NULL, 0);
 
 		if (n_options) {
-			o = D6_NEXT_OPTION(o);
-			o->code = htons(D6_OPTION_ORO);
-			o->len = 0;
-			p = D6_OPTION_DATA(o);
+			o_lenp = NEXTLEN;
+			o.len = 0;
+			COPYIN1(D6_OPTION_ORO, 0);
 			for (l = 0, opt = ifp->ctx->dhcp6_opts;
 			    l < ifp->ctx->dhcp6_opts_len;
 			    l++, opt++)
@@ -896,10 +926,10 @@ dhcp6_makemessage(struct interface *ifp)
 				    has_option_mask(ifo->requestmask6,
 				        opt->option)))
 				{
-					u16 = htons((uint16_t)opt->option);
-					memcpy(p, &u16, sizeof(u16));
-					p += sizeof(u16);
-					o->len = (uint16_t)(o->len+sizeof(u16));
+					o.code = htons((uint16_t)opt->option);
+					memcpy(p, &o.code, sizeof(o.code));
+					p += sizeof(o.code);
+					o.len += sizeof(o.code);
 				}
 			}
 #ifndef SMALL
@@ -912,28 +942,28 @@ dhcp6_makemessage(struct interface *ifp)
 				    has_option_mask(ifo->requestmask6,
 				        opt->option)))
 				{
-					u16 = htons((uint16_t)opt->option);
-					memcpy(p, &u16, sizeof(u16));
-					p += sizeof(u16);
-					o->len = (uint16_t)(o->len+sizeof(u16));
+					o.code = htons((uint16_t)opt->option);
+					memcpy(p, &o.code, sizeof(o.code));
+					p += sizeof(o.code);
+					o.len += sizeof(o.code);
 				}
 			}
 			if (dhcp6_findselfsla(ifp, NULL)) {
-				u16 = htons(D6_OPTION_PD_EXCLUDE);
-				memcpy(p, &u16, sizeof(u16));
-				o->len = (uint16_t)(o->len + sizeof(u16));
+				o.code = htons(D6_OPTION_PD_EXCLUDE);
+				memcpy(p, &o.code, sizeof(o.code));
+				p += sizeof(o.code);
+				o.len += sizeof(o.code);
 			}
 #endif
-			o->len = htons(o->len);
+			o.len = htons(o.len);
+			memcpy(o_lenp, &o.len, sizeof(o.len));
 		}
 	}
 
 #ifdef AUTH
 	/* This has to be the last option */
 	if (ifo->auth.options & DHCPCD_AUTH_SEND && auth_len != 0) {
-		o = D6_NEXT_OPTION(o);
-		o->code = htons(D6_OPTION_AUTH);
-		o->len = htons((uint16_t)auth_len);
+		COPYIN1(D6_OPTION_AUTH, auth_len);
 		/* data will be filled at send message time */
 	}
 #endif
@@ -985,20 +1015,17 @@ static ssize_t
 dhcp6_update_auth(struct interface *ifp, struct dhcp6_message *m, size_t len)
 {
 	struct dhcp6_state *state;
-	const struct dhcp6_option *co;
-	struct dhcp6_option *o;
+	uint8_t *opt;
+	uint16_t opt_len;
 
-	co = dhcp6_getmoption(D6_OPTION_AUTH, m, len);
-	if (co == NULL)
+	opt = dhcp6_findmoption(m, len, D6_OPTION_AUTH, &opt_len);
+	if (opt == NULL)
 		return -1;
 
-	o = UNCONST(co);
 	state = D6_STATE(ifp);
-
 	return dhcp_auth_encode(&ifp->options->auth, state->auth.token,
-	    state->send, state->send_len,
-	    6, state->send->type,
-	    D6_OPTION_DATA(o), ntohs(o->len));
+	    (uint8_t *)state->send, state->send_len,
+	    6, state->send->type, opt, opt_len);
 }
 #endif
 
@@ -1686,37 +1713,37 @@ dhcp6_startrelease(struct interface *ifp)
 
 static int
 dhcp6_checkstatusok(const struct interface *ifp,
-    const struct dhcp6_message *m, const uint8_t *p, size_t len)
+    struct dhcp6_message *m, uint8_t *p, size_t len)
 {
-	const struct dhcp6_option *o;
-	uint16_t code;
+	uint8_t *opt;
+	uint16_t opt_len, code;
+	void * (*f)(void *, size_t, uint16_t, uint16_t *), *farg;
 	char buf[32], *sbuf;
 	const char *status;
 
+	f = p ? dhcp6_findoption : dhcp6_findmoption;
 	if (p)
-		o = dhcp6_findoption(D6_OPTION_STATUS_CODE, p, len);
+		farg = p;
 	else
-		o = dhcp6_getmoption(D6_OPTION_STATUS_CODE, m, len);
-	if (o == NULL) {
+		farg = m;
+	if ((opt = f(farg, len, D6_OPTION_STATUS_CODE, &opt_len)) == NULL) {
 		//logger(ifp->ctx, LOG_DEBUG, "%s: no status", ifp->name);
 		return 0;
 	}
 
-	len = ntohs(o->len);
-	if (len < sizeof(code)) {
+	if (opt_len < sizeof(code)) {
 		logger(ifp->ctx, LOG_ERR, "%s: status truncated", ifp->name);
 		return -1;
 	}
-
-	p = D6_COPTION_DATA(o);
-	memcpy(&code, p, sizeof(code));
+	memcpy(&code, opt, sizeof(code));
 	code = ntohs(code);
 	if (code == D6_STATUS_OK)
 		return 1;
 
-	len -= sizeof(code);
-
-	if (len == 0) {
+	/* Anything after the code is a message. */
+	opt += sizeof(code);
+	opt_len -= sizeof(code);
+	if (opt_len == 0) {
 		sbuf = NULL;
 		if (code < sizeof(dhcp6_statuses) / sizeof(char *))
 			status = dhcp6_statuses[code];
@@ -1725,11 +1752,11 @@ dhcp6_checkstatusok(const struct interface *ifp,
 			status = buf;
 		}
 	} else {
-		if ((sbuf = malloc(len + 1)) == NULL) {
+		if ((sbuf = malloc(opt_len + 1)) == NULL) {
 			logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
-			return -1;
+			return false;
 		}
-		memcpy(sbuf, p + sizeof(code), len);
+		memcpy(sbuf, opt, opt_len);
 		sbuf[len] = '\0';
 		status = sbuf;
 	}
@@ -1776,46 +1803,43 @@ dhcp6_findaddr(struct dhcpcd_ctx *ctx, const struct in6_addr *addr,
 
 static int
 dhcp6_findna(struct interface *ifp, uint16_t ot, const uint8_t *iaid,
-    const uint8_t *d, size_t l, const struct timespec *acquired)
+    uint8_t *d, size_t l, const struct timespec *acquired)
 {
 	struct dhcp6_state *state;
-	const struct dhcp6_option *o;
+	uint8_t *o, *nd;
+	uint16_t ol;
 	struct ipv6_addr *a;
 	char iabuf[INET6_ADDRSTRLEN];
-	const char *ia;
+	const char *ias;
 	int i;
-	uint32_t u32, pltime, vltime;
-	size_t off;
-	const struct dhcp6_ia_addr *iap;
+	struct dhcp6_ia_addr ia;
 
 	i = 0;
 	state = D6_STATE(ifp);
-	while ((o = dhcp6_findoption(D6_OPTION_IA_ADDR, d, l))) {
-		off = (size_t)((const uint8_t *)o - d);
-		l -= off;
-		d += off;
-		u32 = ntohs(o->len);
-		l -= sizeof(*o) + u32;
-		d += sizeof(*o) + u32;
-		if (u32 < 24) {
+	while ((o = dhcp6_findoption(d, l, D6_OPTION_IA_ADDR, &ol))) {
+		/* Set d and l first to ensure we find the next option. */
+		nd = o + ol;
+		l -= (size_t)(nd - d);
+		d = nd;
+		if (ol < 24) {
 			errno = EINVAL;
 			logger(ifp->ctx, LOG_ERR,
 			    "%s: IA Address option truncated", ifp->name);
 			continue;
 		}
-		iap = (const struct dhcp6_ia_addr *)D6_COPTION_DATA(o);
-		pltime = ntohl(iap->pltime);
-		vltime = ntohl(iap->vltime);
+		memcpy(&ia, o, ol);
+		ia.pltime = ntohl(ia.pltime);
+		ia.vltime = ntohl(ia.vltime);
 		/* RFC 3315 22.6 */
-		if (pltime > vltime) {
+		if (ia.pltime > ia.vltime) {
 			errno = EINVAL;
 			logger(ifp->ctx, LOG_ERR,
 			    "%s: IA Address pltime %"PRIu32" > vltime %"PRIu32,
-			    ifp->name, pltime, vltime);
+			    ifp->name, ia.pltime, ia.vltime);
 			continue;
 		}
 		TAILQ_FOREACH(a, &state->addrs, next) {
-			if (ipv6_findaddrmatch(a, &iap->addr, 0))
+			if (ipv6_findaddrmatch(a, &ia.addr, 0))
 				break;
 		}
 		if (a == NULL) {
@@ -1829,7 +1853,7 @@ dhcp6_findna(struct interface *ifp, uint16_t ot, const uint8_t *iaid,
 			a->dadcallback = dhcp6_dadcallback;
 			a->ia_type = ot;
 			memcpy(a->iaid, iaid, sizeof(a->iaid));
-			a->addr = iap->addr;
+			a->addr = ia.addr;
 			a->created = *acquired;
 
 			/*
@@ -1841,10 +1865,10 @@ dhcp6_findna(struct interface *ifp, uint16_t ot, const uint8_t *iaid,
 			 */
 			a->prefix_len = 128;
 			ipv6_makeprefix(&a->prefix, &a->addr, a->prefix_len);
-			ia = inet_ntop(AF_INET6, &a->addr,
+			ias = inet_ntop(AF_INET6, &a->addr,
 			    iabuf, sizeof(iabuf));
 			snprintf(a->saddr, sizeof(a->saddr),
-			    "%s/%d", ia, a->prefix_len);
+			    "%s/%d", ias, a->prefix_len);
 
 			TAILQ_INSERT_TAIL(&state->addrs, a, next);
 		} else {
@@ -1853,10 +1877,10 @@ dhcp6_findna(struct interface *ifp, uint16_t ot, const uint8_t *iaid,
 			a->flags &= ~IPV6_AF_STALE;
 		}
 		a->acquired = *acquired;
-		a->prefix_pltime = pltime;
-		if (a->prefix_vltime != vltime) {
+		a->prefix_pltime = ia.pltime;
+		if (a->prefix_vltime != ia.vltime) {
 			a->flags |= IPV6_AF_NEW;
-			a->prefix_vltime = vltime;
+			a->prefix_vltime = ia.vltime;
 		}
 		if (a->prefix_pltime && a->prefix_pltime < state->lowpl)
 		    state->lowpl = a->prefix_pltime;
@@ -1870,52 +1894,49 @@ dhcp6_findna(struct interface *ifp, uint16_t ot, const uint8_t *iaid,
 #ifndef SMALL
 static int
 dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
-    const uint8_t *d, size_t l, const struct timespec *acquired)
+    uint8_t *d, size_t l, const struct timespec *acquired)
 {
 	struct dhcp6_state *state;
-	const struct dhcp6_option *o, *ex;
-	const uint8_t *p, *op;
+	uint8_t *o, *nd;
 	struct ipv6_addr *a;
 	char iabuf[INET6_ADDRSTRLEN];
 	const char *ia;
 	int i;
-	uint8_t u8, *pw;
-	size_t off;
+	uint8_t nb, *pw;
 	uint16_t ol;
-	const struct dhcp6_pd_addr *pdp;
-	uint32_t pltime, vltime;
+	struct dhcp6_pd_addr pdp;
 
 	i = 0;
 	state = D6_STATE(ifp);
-	while ((o = dhcp6_findoption(D6_OPTION_IAPREFIX, d, l))) {
-		off = (size_t)((const uint8_t *)o - d);
-		l -= off;
-		d += off;
-		ol = ntohs(o->len);
-		l -= sizeof(*o) + ol;
-		d += sizeof(*o) + ol;
-		if (ol < sizeof(*pdp)) {
+	while ((o = dhcp6_findoption(d, l, D6_OPTION_IAPREFIX, &ol))) {
+		/* Set d and l first to ensure we find the next option. */
+		nd = o + ol;
+		l -= (size_t)(nd - d);
+		d = nd;
+		if (ol < sizeof(pdp)) {
 			errno = EINVAL;
 			logger(ifp->ctx, LOG_ERR,
 			    "%s: IA Prefix option truncated", ifp->name);
 			continue;
 		}
 
-		pdp = (const struct dhcp6_pd_addr *)D6_COPTION_DATA(o);
-
-		pltime = ntohl(pdp->pltime);
-		vltime = ntohl(pdp->vltime);
+		memcpy(&pdp, o, sizeof(pdp));
+		pdp.pltime = ntohl(pdp.pltime);
+		pdp.vltime = ntohl(pdp.vltime);
 		/* RFC 3315 22.6 */
-		if (pltime > vltime) {
+		if (pdp.pltime > pdp.vltime) {
 			errno = EINVAL;
 			logger(ifp->ctx, LOG_ERR,
 			    "%s: IA Prefix pltime %"PRIu32" > vltime %"PRIu32,
-			    ifp->name, pltime, vltime);
+			    ifp->name, pdp.pltime, pdp.vltime);
 			continue;
 		}
 
+		o += sizeof(pdp);
+		ol -= sizeof(pdp);
+
 		TAILQ_FOREACH(a, &state->addrs, next) {
-			if (IN6_ARE_ADDR_EQUAL(&a->prefix, &pdp->prefix))
+			if (IN6_ARE_ADDR_EQUAL(&a->prefix, &pdp.prefix))
 				break;
 		}
 
@@ -1931,8 +1952,8 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			a->dadcallback = dhcp6_dadcallback;
 			a->ia_type = D6_OPTION_IA_PD;
 			memcpy(a->iaid, iaid, sizeof(a->iaid));
-			a->prefix = pdp->prefix;
-			a->prefix_len = pdp->prefix_len;
+			a->prefix = pdp.prefix;
+			a->prefix_len = pdp.prefix_len;
 			ia = inet_ntop(AF_INET6, &a->prefix,
 			    iabuf, sizeof(iabuf));
 			snprintf(a->saddr, sizeof(a->saddr),
@@ -1945,13 +1966,13 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 				TAILQ_INIT(&a->pd_pfxs);
 			}
 			a->flags &= ~(IPV6_AF_STALE | IPV6_AF_REQUEST);
-			if (a->prefix_vltime != ntohl(pdp->vltime))
+			if (a->prefix_vltime != ntohl(pdp.vltime))
 				a->flags |= IPV6_AF_NEW;
 		}
 
 		a->acquired = *acquired;
-		a->prefix_pltime = pltime;
-		a->prefix_vltime = vltime;
+		a->prefix_pltime = pdp.pltime;
+		a->prefix_vltime = pdp.vltime;
 
 		if (a->prefix_pltime && a->prefix_pltime < state->lowpl)
 			state->lowpl = a->prefix_pltime;
@@ -1959,9 +1980,7 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			state->expire = a->prefix_vltime;
 		i++;
 
-		p = D6_COPTION_DATA(o) + sizeof(*pdp);
-		ol = (uint16_t)(ol - sizeof(*pdp));
-		ex = dhcp6_findoption(D6_OPTION_PD_EXCLUDE, p, ol);
+		o = dhcp6_findoption(o, ol, D6_OPTION_PD_EXCLUDE, &ol);
 		a->prefix_exclude_len = 0;
 		memset(&a->prefix_exclude, 0, sizeof(a->prefix_exclude));
 #if 0
@@ -1977,16 +1996,14 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			ex = w;
 		}
 #endif
-		if (ex == NULL)
+		if (o == NULL)
 			continue;
-		ol = ntohs(ex->len);
 		if (ol < 2) {
 			logger(ifp->ctx, LOG_ERR,
 			    "%s: truncated PD Exclude", ifp->name);
 			continue;
 		}
-		op = D6_COPTION_DATA(ex);
-		a->prefix_exclude_len = *op++;
+		a->prefix_exclude_len = *o++;
 		ol--;
 		if (((a->prefix_exclude_len - a->prefix_len - 1) / NBBY) + 1
 		    != ol)
@@ -1996,34 +2013,34 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			a->prefix_exclude_len = 0;
 			continue;
 		}
-		u8 = a->prefix_len % NBBY;
+		nb = a->prefix_len % NBBY;
 		memcpy(&a->prefix_exclude, &a->prefix,
 		    sizeof(a->prefix_exclude));
-		if (u8)
+		if (nb)
 			ol--;
 		pw = a->prefix_exclude.s6_addr +
 		    (a->prefix_exclude_len / NBBY) - 1;
 		while (ol-- > 0)
-			*pw-- = *op++;
-		if (u8)
-			*pw = (uint8_t)(*pw | (*op >> u8));
+			*pw-- = *o++;
+		if (nb)
+			*pw = (uint8_t)(*pw | (*o >> nb));
 	}
 	return i;
 }
 #endif
 
 static int
-dhcp6_findia(struct interface *ifp, const struct dhcp6_message *m, size_t l,
+dhcp6_findia(struct interface *ifp, struct dhcp6_message *m, size_t l,
     const char *sfrom, const struct timespec *acquired)
 {
 	struct dhcp6_state *state;
 	const struct if_options *ifo;
-	const struct dhcp6_option *o;
-	const uint8_t *p;
+	struct dhcp6_option o;
+	uint8_t *d, *p;
+	struct dhcp6_ia_na ia;
 	int i, e;
 	size_t j;
-	uint32_t u32, renew, rebind;
-	uint16_t code, ol;
+	uint16_t nl;
 	uint8_t iaid[4];
 	char buf[sizeof(iaid) * 3];
 	struct ipv6_addr *ap, *nap;
@@ -2041,43 +2058,48 @@ dhcp6_findia(struct interface *ifp, const struct dhcp6_message *m, size_t l,
 	TAILQ_FOREACH(ap, &state->addrs, next) {
 		ap->flags |= IPV6_AF_STALE;
 	}
+
+	d = (uint8_t *)m + sizeof(*m);
 	l -= sizeof(*m);
-	for (o = D6_CFIRST_OPTION(m); l > sizeof(*o); o = D6_CNEXT_OPTION(o)) {
-		ol = ntohs(o->len);
-		if (sizeof(*o) + ol > l) {
+	while (l > sizeof(o)) {
+		memcpy(&o, d, sizeof(o));
+		o.len = ntohs(o.len);
+		if (o.len > l || sizeof(o) + o.len > l) {
 			errno = EINVAL;
 			logger(ifp->ctx, LOG_ERR,
 			    "%s: option overflow", ifp->name);
 			break;
 		}
-		l -= sizeof(*o) + ol;
+		p = d + sizeof(o);
+		d = p + o.len;
+		l -= sizeof(o) + o.len;
 
-		code = ntohs(o->code);
-		switch(code) {
+		o.code = ntohs(o.code);
+		switch(o.code) {
 		case D6_OPTION_IA_TA:
-			u32 = 4;
+			nl = 4;
 			break;
 		case D6_OPTION_IA_NA:
 		case D6_OPTION_IA_PD:
-			u32 = 12;
+			nl = 12;
 			break;
 		default:
 			continue;
 		}
-		if (ol < u32) {
+		if (o.len < nl) {
 			errno = EINVAL;
 			logger(ifp->ctx, LOG_ERR,
 			    "%s: IA option truncated", ifp->name);
 			continue;
 		}
 
-		p = D6_COPTION_DATA(o);
-		memcpy(iaid, p, sizeof(iaid));
-		p += sizeof(iaid);
-		ol = (uint16_t)(ol - sizeof(iaid));
+		memcpy(&ia, p, nl);
+		p += nl;
+		o.len -= nl;
 
 		for (j = 0; j < ifo->ia_len; j++) {
-			if (memcmp(&ifo->ia[j].iaid, iaid, sizeof(iaid)) == 0)
+			if (memcmp(&ifo->ia[j].iaid, ia.iaid,
+			    sizeof(ia.iaid)) == 0)
 				break;
 		}
 		if (j == ifo->ia_len &&
@@ -2086,45 +2108,42 @@ dhcp6_findia(struct interface *ifp, const struct dhcp6_message *m, size_t l,
 			logger(ifp->ctx, LOG_DEBUG,
 			    "%s: ignoring unrequested IAID %s",
 			    ifp->name,
-			    hwaddr_ntoa(iaid, sizeof(iaid), buf, sizeof(buf)));
+			    hwaddr_ntoa(ia.iaid, sizeof(ia.iaid),
+			    buf, sizeof(buf)));
 			continue;
 		}
-		if ( j < ifo->ia_len && ifo->ia[j].ia_type != code) {
+		if ( j < ifo->ia_len && ifo->ia[j].ia_type != o.code) {
 			logger(ifp->ctx, LOG_ERR,
 			    "%s: IAID %s: option type mismatch",
 			    ifp->name,
-			    hwaddr_ntoa(iaid, sizeof(iaid), buf, sizeof(buf)));
+			    hwaddr_ntoa(ia.iaid, sizeof(ia.iaid),
+			    buf, sizeof(buf)));
 			continue;
 		}
 
-		if (code != D6_OPTION_IA_TA) {
-			memcpy(&u32, p, sizeof(u32));
-			renew = ntohl(u32);
-			p += sizeof(u32);
-			ol = (uint16_t)(ol - sizeof(u32));
-			memcpy(&u32, p, sizeof(u32));
-			rebind = ntohl(u32);
-			p += sizeof(u32);
-			ol = (uint16_t)(ol - sizeof(u32));
-
+		if (o.code != D6_OPTION_IA_TA) {
+			ia.t1 = ntohl(ia.t1);
+			ia.t2 = ntohl(ia.t2);
 			/* RFC 3315 22.4 */
-			if (rebind > 0 && renew > rebind) {
+			if (ia.t2 > 0 && ia.t1 > ia.t2) {
 				logger(ifp->ctx, LOG_WARNING,
 				    "%s: IAID %s T1 (%d) > T2 (%d) from %s",
 				    ifp->name,
 				    hwaddr_ntoa(iaid, sizeof(iaid), buf, sizeof(buf)),
-				    renew, rebind, sfrom);
+				    ia.t1, ia.t2, sfrom);
 				continue;
 			}
 		} else
-			renew = rebind = 0; /* appease gcc */
-		if (dhcp6_checkstatusok(ifp, NULL, p, ol) == -1) {
+			ia.t1 = ia.t2 = 0; /* appease gcc */
+		if (dhcp6_checkstatusok(ifp, NULL, p, o.len) == -1) {
 			e = 1;
 			continue;
 		}
-		if (code == D6_OPTION_IA_PD) {
+		if (o.code == D6_OPTION_IA_PD) {
 #ifndef SMALL
-			if (dhcp6_findpd(ifp, iaid, p, ol, acquired) == 0) {
+			if (dhcp6_findpd(ifp, ia.iaid, p, o.len,
+					 acquired) == 0)
+			{
 				logger(ifp->ctx, LOG_WARNING,
 				    "%s: %s: DHCPv6 REPLY missing Prefix",
 				    ifp->name, sfrom);
@@ -2132,7 +2151,8 @@ dhcp6_findia(struct interface *ifp, const struct dhcp6_message *m, size_t l,
 			}
 #endif
 		} else {
-			if (dhcp6_findna(ifp, code, iaid, p, ol, acquired) == 0)
+			if (dhcp6_findna(ifp, o.code, ia.iaid, p, o.len,
+					 acquired) == 0)
 			{
 				logger(ifp->ctx, LOG_WARNING,
 				    "%s: %s: DHCPv6 REPLY missing IA Address",
@@ -2140,16 +2160,17 @@ dhcp6_findia(struct interface *ifp, const struct dhcp6_message *m, size_t l,
 				continue;
 			}
 		}
-		if (code != D6_OPTION_IA_TA) {
-			if (renew != 0 &&
-			    (renew < state->renew || state->renew == 0))
-				state->renew = renew;
-			if (rebind != 0 &&
-			    (rebind < state->rebind || state->rebind == 0))
-				state->rebind = rebind;
+		if (o.code != D6_OPTION_IA_TA) {
+			if (ia.t1 != 0 &&
+			    (ia.t1 < state->renew || state->renew == 0))
+				state->renew = ia.t1;
+			if (ia.t2 != 0 &&
+			    (ia.t2 < state->rebind || state->rebind == 0))
+				state->rebind = ia.t2;
 		}
 		i++;
 	}
+
 	TAILQ_FOREACH_SAFE(ap, &state->addrs, next, nap) {
 		if (ap->flags & IPV6_AF_STALE) {
 			eloop_q_timeout_delete(ifp->ctx->eloop, 0, NULL, ap);
@@ -2168,7 +2189,7 @@ dhcp6_findia(struct interface *ifp, const struct dhcp6_message *m, size_t l,
 
 static int
 dhcp6_validatelease(struct interface *ifp,
-    const struct dhcp6_message *m, size_t len,
+    struct dhcp6_message *m, size_t len,
     const char *sfrom, const struct timespec *acquired)
 {
 	struct dhcp6_state *state;
@@ -2182,7 +2203,7 @@ dhcp6_validatelease(struct interface *ifp,
 	}
 
 	state = D6_STATE(ifp);
-	if ((ok = dhcp6_checkstatusok(ifp, m, NULL, len)) == -1)
+	if ((ok = dhcp6_checkstatusok(ifp, m, NULL, len) == -1))
 		return -1;
 
 	state->renew = state->rebind = state->expire = 0;
@@ -2237,12 +2258,14 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	struct dhcp6_state *state;
 	struct stat st;
 	int fd;
+	struct dhcp6_message *lease;
 	struct timespec acquired;
 	time_t now;
 	int retval;
 	bool fd_opened;
 #ifdef AUTH
-	const struct dhcp6_option *o;
+	uint8_t *o;
+	uint16_t ol;
 #endif
 
 	state = D6_STATE(ifp);
@@ -2263,7 +2286,9 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	if (fd == -1)
 		return -1;
 	retval = -1;
-	state->new_len = dhcp_read_lease_fd(fd, (void **)&state->new);
+	lease = NULL;
+	state->new_len = dhcp_read_lease_fd(fd, (void **)&lease);
+	state->new = lease;
 	if (fd_opened)
 		close(fd);
 	if (state->new_len == 0)
@@ -2307,11 +2332,11 @@ auth:
 	retval = 0;
 #ifdef AUTH
 	/* Authenticate the message */
-	o = dhcp6_getmoption(D6_OPTION_AUTH, state->new, state->new_len);
+	o = dhcp6_findmoption(state->new, state->new_len, D6_OPTION_AUTH, &ol);
 	if (o) {
 		if (dhcp_auth_validate(&state->auth, &ifp->options->auth,
-		    state->new, state->new_len, 6, state->new->type,
-		    D6_COPTION_DATA(o), ntohs(o->len)) == NULL)
+		    (uint8_t *)state->new, state->new_len, 6, state->new->type,
+		    o, ol) == NULL)
 		{
 			logger(ifp->ctx, LOG_DEBUG,
 			    "%s: dhcp_auth_validate: %m", ifp->name);
@@ -2708,12 +2733,17 @@ dhcp6_handledata(void *arg)
 	const char *op;
 	struct dhcp6_message *r;
 	struct dhcp6_state *state;
-	const struct dhcp6_option *o, *auth;
+	uint8_t *o;
+	uint16_t ol;
 	const struct dhcp_opt *opt;
 	const struct if_options *ifo;
 	struct ipv6_addr *ap;
 	bool valid_op, has_new;
 	uint32_t u32;
+#ifdef AUTH
+	uint8_t *auth;
+	uint16_t auth_len;
+#endif
 
 	dctx = arg;
 	ctx = dctx->ipv6;
@@ -2802,15 +2832,15 @@ dhcp6_handledata(void *arg)
 		return;
 	}
 
-	if (dhcp6_getmoption(D6_OPTION_SERVERID, r, len) == NULL) {
+	if (dhcp6_findmoption(r, len, D6_OPTION_SERVERID, NULL) == NULL) {
 		logger(ifp->ctx, LOG_DEBUG, "%s: no DHCPv6 server ID from %s",
 		    ifp->name, ctx->sfrom);
 		return;
 	}
 
-	o = dhcp6_getmoption(D6_OPTION_CLIENTID, r, len);
-	if (o == NULL || ntohs(o->len) != dctx->duid_len ||
-	    memcmp(D6_COPTION_DATA(o), dctx->duid, dctx->duid_len) != 0)
+	o = dhcp6_findmoption(r, len, D6_OPTION_CLIENTID, &ol);
+	if (o == NULL || ol != dctx->duid_len ||
+	    memcmp(o, dctx->duid, ol) != 0)
 	{
 		logger(ifp->ctx, LOG_DEBUG, "%s: incorrect client ID from %s",
 		    ifp->name, ctx->sfrom);
@@ -2823,7 +2853,7 @@ dhcp6_handledata(void *arg)
 	    i++, opt++)
 	{
 		if (has_option_mask(ifo->requiremask6, opt->option) &&
-		    dhcp6_getmoption((uint16_t)opt->option, r, len) == NULL)
+		    !dhcp6_findmoption(r, len, (uint16_t)opt->option, NULL))
 		{
 			logger(ifp->ctx, LOG_WARNING,
 			    "%s: reject DHCPv6 (no option %s) from %s",
@@ -2831,7 +2861,7 @@ dhcp6_handledata(void *arg)
 			return;
 		}
 		if (has_option_mask(ifo->rejectmask6, opt->option) &&
-		    dhcp6_getmoption((uint16_t)opt->option, r, len))
+		    dhcp6_findmoption(r, len, (uint16_t)opt->option, NULL))
 		{
 			logger(ifp->ctx, LOG_WARNING,
 			    "%s: reject DHCPv6 (option %s) from %s",
@@ -2842,11 +2872,10 @@ dhcp6_handledata(void *arg)
 
 #ifdef AUTH
 	/* Authenticate the message */
-	auth = dhcp6_getmoption(D6_OPTION_AUTH, r, len);
-	if (auth) {
+	auth = dhcp6_findmoption(r, len, D6_OPTION_AUTH, &auth_len);
+	if (auth != NULL) {
 		if (dhcp_auth_validate(&state->auth, &ifo->auth,
-		    r, len, 6, r->type,
-		    D6_COPTION_DATA(auth), ntohs(auth->len)) == NULL)
+		    (uint8_t *)r, len, 6, r->type, auth, auth_len) == NULL)
 		{
 			logger(ifp->ctx, LOG_DEBUG, "dhcp_auth_validate: %m");
 			logger(ifp->ctx, LOG_ERR,
@@ -2881,23 +2910,23 @@ dhcp6_handledata(void *arg)
 	case DHCP6_REPLY:
 		switch(state->state) {
 		case DH6S_INFORM:
-			if (dhcp6_checkstatusok(ifp, r, NULL, len) == -1)
+			if (!dhcp6_checkstatusok(ifp, r, NULL, len))
 				return;
 			/* RFC4242 */
-			o = dhcp6_getmoption(D6_OPTION_INFO_REFRESH_TIME,
-			    r, len);
-			if (o == NULL || ntohs(o->len) != sizeof(u32))
+			o = dhcp6_findmoption(r, len,
+					     D6_OPTION_INFO_REFRESH_TIME, &ol);
+			if (o == NULL || ol != sizeof(u32))
 				state->renew = IRT_DEFAULT;
 			else {
-				memcpy(&u32, D6_COPTION_DATA(o), sizeof(u32));
-				state->renew = ntohl(u32);
+				memcpy(&state->renew, o, ol);
+				state->renew = ntohl(state->renew);
 				if (state->renew < IRT_MINIMUM)
 					state->renew = IRT_MINIMUM;
 			}
 			break;
 		case DH6S_CONFIRM:
 			if (dhcp6_validatelease(ifp, r, len,
-			    ctx->sfrom, NULL) == -1)
+						ctx->sfrom, NULL) == -1)
 			{
 				dhcp6_startdiscover(ifp);
 				return;
@@ -2908,7 +2937,8 @@ dhcp6_handledata(void *arg)
 			 * Normally we get an ADVERTISE for a DISCOVER. */
 			if (!has_option_mask(ifo->requestmask6,
 			    D6_OPTION_RAPID_COMMIT) ||
-			    !dhcp6_getmoption(D6_OPTION_RAPID_COMMIT, r, len))
+			    !dhcp6_findmoption(r, len, D6_OPTION_RAPID_COMMIT,
+					      NULL))
 			{
 				valid_op = false;
 				break;
@@ -2945,34 +2975,40 @@ dhcp6_handledata(void *arg)
 			break;
 		}
 		/* RFC7083 */
-		o = dhcp6_getmoption(D6_OPTION_SOL_MAX_RT, r, len);
-		if (o && ntohs(o->len) >= sizeof(u32)) {
-			memcpy(&u32, D6_COPTION_DATA(o), sizeof(u32));
-			u32 = ntohl(u32);
-			if (u32 >= 60 && u32 <= 86400) {
+		o = dhcp6_findmoption(r, len, D6_OPTION_SOL_MAX_RT, &ol);
+		if (o && ol == sizeof(uint32_t)) {
+			uint32_t max_rt;
+
+			memcpy(&max_rt, o, sizeof(max_rt));
+			max_rt = ntohl(max_rt);
+			if (max_rt >= 60 && max_rt <= 86400) {
 				logger(ifp->ctx, LOG_DEBUG,
-				    "%s: SOL_MAX_RT %llu -> %d", ifp->name,
-				    (unsigned long long)state->sol_max_rt, u32);
-				state->sol_max_rt = (time_t)u32;
+				    "%s: SOL_MAX_RT %llu -> %u", ifp->name,
+				    (unsigned long long)state->sol_max_rt,
+				    max_rt);
+				state->sol_max_rt = (time_t)max_rt;
 			} else
 				logger(ifp->ctx, LOG_ERR,
-				    "%s: invalid SOL_MAX_RT %d",
-				    ifp->name, u32);
+				    "%s: invalid SOL_MAX_RT %u",
+				    ifp->name, max_rt);
 		}
-		o = dhcp6_getmoption(D6_OPTION_INF_MAX_RT, r, len);
-		if (o && ntohs(o->len) >= sizeof(u32)) {
-			memcpy(&u32, D6_COPTION_DATA(o), sizeof(u32));
-			u32 = ntohl(u32);
-			if (u32 >= 60 && u32 <= 86400) {
+		o = dhcp6_findmoption(r, len, D6_OPTION_INF_MAX_RT, &ol);
+		if (o && ol == sizeof(uint32_t)) {
+			uint32_t max_rt;
+
+			memcpy(&max_rt, o, sizeof(max_rt));
+			max_rt = ntohl(max_rt);
+			if (max_rt >= 60 && max_rt <= 86400) {
 				logger(ifp->ctx, LOG_DEBUG,
-				    "%s: INF_MAX_RT %llu -> %d",
+				    "%s: INF_MAX_RT %llu -> %u",
 				    ifp->name,
-				    (unsigned long long)state->inf_max_rt, u32);
-				state->inf_max_rt = (time_t)u32;
+				    (unsigned long long)state->inf_max_rt,
+				    max_rt);
+				state->inf_max_rt = (time_t)max_rt;
 			} else
 				logger(ifp->ctx, LOG_ERR,
-				    "%s: invalid INF_MAX_RT %d",
-				    ifp->name, u32);
+				    "%s: invalid INF_MAX_RT %u",
+				    ifp->name, max_rt);
 		}
 		if (dhcp6_validatelease(ifp, r, len, ctx->sfrom, NULL) == -1)
 			return;
@@ -2987,19 +3023,19 @@ dhcp6_handledata(void *arg)
 		}
 		logger(ifp->ctx, LOG_INFO, "%s: %s from %s",
 		    ifp->name, op, ctx->sfrom);
-		o = dhcp6_getmoption(D6_OPTION_RECONF_MSG, r, len);
+		o = dhcp6_findmoption(r, len, D6_OPTION_RECONF_MSG, &ol);
 		if (o == NULL) {
 			logger(ifp->ctx, LOG_ERR,
 			    "%s: missing Reconfigure Message option",
 			    ifp->name);
 			return;
 		}
-		if (ntohs(o->len) != 1) {
+		if (ol != 1) {
 			logger(ifp->ctx, LOG_ERR,
 			    "%s: missing Reconfigure Message type", ifp->name);
 			return;
 		}
-		switch(*D6_COPTION_DATA(o)) {
+		switch(*o) {
 		case DHCP6_RENEW:
 			if (state->state != DH6S_BOUND) {
 				logger(ifp->ctx, LOG_ERR,
@@ -3023,7 +3059,7 @@ dhcp6_handledata(void *arg)
 		default:
 			logger(ifp->ctx, LOG_ERR,
 			    "%s: unsupported %s type %d",
-			    ifp->name, op, *D6_COPTION_DATA(o));
+			    ifp->name, op, *o);
 			break;
 		}
 		return;
@@ -3586,9 +3622,9 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 {
 	const struct if_options *ifo;
 	struct dhcp_opt *opt, *vo;
-	const struct dhcp6_option *o;
+	const uint8_t *p;
+	struct dhcp6_option o;
 	size_t i, n;
-	uint16_t ol, oc;
 	char *pfx;
 	uint32_t en;
 	const struct dhcpcd_ctx *ctx;
@@ -3636,29 +3672,34 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 
 	/* Unlike DHCP, DHCPv6 options *may* occur more than once.
 	 * There is also no provision for option concatenation unlike DHCP. */
-	for (o = D6_CFIRST_OPTION(m);
-	    len > (ssize_t)sizeof(*o);
-	    o = D6_CNEXT_OPTION(o))
-	{
-		ol = ntohs(o->len);
-		if (sizeof(*o) + ol > len) {
+	p = (const uint8_t *)m + sizeof(*m);
+	len -= sizeof(*m);
+	for (; len != 0; p += o.len, len -= o.len) {
+		if (len < sizeof(o)) {
+			errno = EINVAL;
+			break;
+		}
+		memcpy(&o, p, sizeof(o));
+		p += sizeof(o);
+		len -= sizeof(o);
+		o.len = ntohs(o.len);
+		if (len < o.len) {
 			errno =	EINVAL;
 			break;
 		}
-		len -= sizeof(*o) + ol;
-		oc = ntohs(o->code);
-		if (has_option_mask(ifo->nomask6, oc))
+		o.code = ntohs(o.code);
+		if (has_option_mask(ifo->nomask6, o.code))
 			continue;
 		for (i = 0, opt = ifo->dhcp6_override;
 		    i < ifo->dhcp6_override_len;
 		    i++, opt++)
-			if (opt->option == oc)
+			if (opt->option == o.code)
 				break;
 		if (i == ifo->dhcp6_override_len &&
-		    oc == D6_OPTION_VENDOR_OPTS &&
-		    ol > sizeof(en))
+		    o.code == D6_OPTION_VENDOR_OPTS &&
+		    o.len > sizeof(en))
 		{
-			memcpy(&en, D6_COPTION_DATA(o), sizeof(en));
+			memcpy(&en, p, sizeof(en));
 			en = ntohl(en);
 			vo = vivso_find(en, ifp);
 		} else
@@ -3667,7 +3708,7 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 			for (i = 0, opt = ctx->dhcp6_opts;
 			    i < ctx->dhcp6_opts_len;
 			    i++, opt++)
-				if (opt->option == oc)
+				if (opt->option == o.code)
 					break;
 			if (i == ctx->dhcp6_opts_len)
 				opt = NULL;
@@ -3676,15 +3717,15 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 			n += dhcp_envoption(ifp->ctx,
 			    env == NULL ? NULL : &env[n],
 			    pfx, ifp->name,
-			    opt, dhcp6_getoption, D6_COPTION_DATA(o), ol);
+			    opt, dhcp6_getoption, p, o.len);
 		}
 		if (vo) {
 			n += dhcp_envoption(ifp->ctx,
 			    env == NULL ? NULL : &env[n],
 			    pfx, ifp->name,
 			    vo, dhcp6_getoption,
-			    D6_COPTION_DATA(o) + sizeof(en),
-			    ol - sizeof(en));
+			    p + sizeof(en),
+			    o.len - sizeof(en));
 		}
 	}
 	free(pfx);

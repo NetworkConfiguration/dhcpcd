@@ -83,6 +83,9 @@
 #define IPDEFTTL 64 /* RFC1340 */
 #endif
 
+/* Assert the bootp structure is correct size. */
+__CTASSERT(sizeof(struct bootp) == 300);
+
 struct dhcp_op {
 	uint8_t value;
 	const char *name;
@@ -115,7 +118,7 @@ struct udp_bootp_packet
 	struct ip ip;
 	struct udphdr udp;
 	uint8_t bootp[];
-} __packed;
+};
 
 static int dhcp_open(struct interface *);
 static void dhcp_arp_conflicted(struct arp_state *, const struct arp_msg *);

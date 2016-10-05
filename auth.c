@@ -323,6 +323,9 @@ gottoken:
 
 	/* RFC3318, section 5.2 - zero giaddr and hops */
 	if (mp == 4) {
+		/* Assert the bootp structure is correct size. */
+		__CTASSERT(sizeof(struct bootp) == 300);
+
 		*(mm + offsetof(struct bootp, hops)) = '\0';
 		memset(mm + offsetof(struct bootp, giaddr), 0, 4);
 	}
