@@ -3086,17 +3086,17 @@ rapidcommit:
 }
 
 static void *
-get_udp_data(uint8_t *udp, size_t *len)
+get_udp_data(void *udp, size_t *len)
 {
 	struct udp_bootp_packet *p;
 
 	p = (struct udp_bootp_packet *)udp;
 	*len = ntohs(p->ip.ip_len) - sizeof(p->ip) - sizeof(p->udp);
-	return udp + offsetof(struct udp_bootp_packet, bootp);
+	return (char *)udp + offsetof(struct udp_bootp_packet, bootp);
 }
 
 static int
-valid_udp_packet(uint8_t *data, size_t data_len, struct in_addr *from,
+valid_udp_packet(void *data, size_t data_len, struct in_addr *from,
     int noudpcsum)
 {
 	struct udp_bootp_packet *p;
