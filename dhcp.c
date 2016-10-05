@@ -83,8 +83,10 @@
 #define IPDEFTTL 64 /* RFC1340 */
 #endif
 
-/* Assert the bootp structure is correct size. */
-__CTASSERT(sizeof(struct bootp) == 300);
+/* Assert the correct structure size for on wire */
+__CTASSERT(sizeof(struct ip)		== 20);
+__CTASSERT(sizeof(struct udphdr)	== 8);
+__CTASSERT(sizeof(struct bootp)		== 300);
 
 struct dhcp_op {
 	uint8_t value;

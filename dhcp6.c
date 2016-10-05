@@ -75,6 +75,7 @@
 
 #ifdef DHCP6
 
+/* Assert the correct structure size for on wire */
 struct dhcp6_message {
 	uint8_t type;
 	uint8_t xid[3];
@@ -103,6 +104,8 @@ struct dhcp6_ia_addr {
 };
 __CTASSERT(sizeof(struct dhcp6_ia_addr) == 16 + 8);
 
+/* XXX FIXME: This is the only packed structure and it does not align.
+ * Maybe manually decode it? */
 struct dhcp6_pd_addr {
 	uint32_t pltime;
 	uint32_t vltime;

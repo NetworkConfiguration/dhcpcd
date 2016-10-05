@@ -55,6 +55,9 @@
 #define ARP_LEN								      \
 	(sizeof(struct arphdr) + (2 * sizeof(uint32_t)) + (2 * HWADDR_LEN))
 
+/* Assert the correct structure size for on wire */
+__CTASSERT(sizeof(struct arphdr) == 8);
+
 ssize_t
 arp_request(const struct interface *ifp, in_addr_t sip, in_addr_t tip)
 {
