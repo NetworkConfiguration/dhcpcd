@@ -62,7 +62,8 @@ struct nd_opt_rdnss {           /* RDNSS option RFC 6106 */
 	uint16_t	nd_opt_rdnss_reserved;
 	uint32_t	nd_opt_rdnss_lifetime;
         /* followed by list of IP prefixes */
-} __packed;
+};
+__CTASSERT(sizeof(struct nd_opt_rdnss) == 8);
 #endif
 
 #ifndef ND_OPT_DNSSL
@@ -73,7 +74,8 @@ struct nd_opt_dnssl {		/* DNSSL option RFC 6106 */
 	uint16_t	nd_opt_dnssl_reserved;
 	uint32_t	nd_opt_dnssl_lifetime;
 	/* followed by list of DNS servers */
-} __packed;
+};
+__CTASSERT(sizeof(struct nd_opt_rdnss) == 8);
 #endif
 
 /* Impossible options, so we can easily add extras */
