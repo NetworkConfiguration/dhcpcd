@@ -582,6 +582,7 @@ dhcp6_makemessage(struct interface *ifp)
 	n_options = 0;
 	len = 0;
 	si = NULL;
+	hl = 0; /* Appease gcc */
 	if (state->state != DH6S_RELEASE) {
 		for (l = 0, opt = ifp->ctx->dhcp6_opts;
 		    l < ifp->ctx->dhcp6_opts_len;
@@ -821,22 +822,21 @@ dhcp6_makemessage(struct interface *ifp)
 			if (ap->ia_type == D6_OPTION_IA_PD) {
 #ifndef SMALL
 				struct dhcp6_pd_addr pdp;
-				uint8_t *pdp_lp;
 
-				pdp_lp = NEXTLEN;
 				pdp.pltime = htonl(ap->prefix_pltime);
 				pdp.vltime = htonl(ap->prefix_vltime);
 				pdp.prefix_len = ap->prefix_len;
 				pdp.prefix = ap->prefix;
 				COPYIN(D6_OPTION_IAPREFIX, &pdp, sizeof(pdp));
-				ia_na_len += sizeof(o) + sizeof(pdp);
+				ia_na_len = (uint16_t)
+				    (ia_na_len + sizeof(o) + sizeof(pdp));
 
 				/* RFC6603 Section 4.2 */
 				if (ap->prefix_exclude_len) {
 					uint8_t exb[16], *ep, u8;
 					const uint8_t *pp;
 
-					n = ((ap->prefix_exclude_len -
+					n = (size_t)((ap->prefix_exclude_len -
 					    ap->prefix_len - 1) / NBBY) + 1;
 					ep = exb;
 					*ep++ = (uint8_t)ap->prefix_exclude_len;
@@ -853,7 +853,8 @@ dhcp6_makemessage(struct interface *ifp)
 						*ep = (uint8_t)(*pp << u8);
 					n++;
 					COPYIN(D6_OPTION_PD_EXCLUDE, exb, n);
-					ia_na_len += sizeof(o) + n;
+					ia_na_len = (uint16_t)
+					    (ia_na_len + sizeof(o) + n);
 				}
 #endif
 			} else {
@@ -863,7 +864,8 @@ dhcp6_makemessage(struct interface *ifp)
 				ia.pltime = htonl(ap->prefix_pltime);
 				ia.vltime = htonl(ap->prefix_vltime);
 				COPYIN(D6_OPTION_IA_ADDR, &ia, sizeof(ia));
-				ia_na_len += sizeof(o) + sizeof(ia);
+				ia_na_len = (uint16_t)
+				    (ia_na_len + sizeof(o) + sizeof(ia));
 			}
 		}
 
@@ -875,7 +877,7 @@ dhcp6_makemessage(struct interface *ifp)
 	if (state->send->type != DHCP6_RELEASE) {
 		if (fqdn != FQDN_DISABLE) {
 			o_lenp = NEXTLEN;
-			COPYIN(D6_OPTION_FQDN, NULL, 0);
+			COPYIN1(D6_OPTION_FQDN, 0);
 			if (hl == 0)
 				*p = D6_FQDN_NONE;
 			else {
@@ -900,7 +902,7 @@ dhcp6_makemessage(struct interface *ifp)
 
 		if ((ifo->auth.options & DHCPCD_AUTH_SENDREQUIRE) !=
 		    DHCPCD_AUTH_SENDREQUIRE)
-			COPYIN(D6_OPTION_RECONF_ACCEPT, NULL, 0);
+			COPYIN1(D6_OPTION_RECONF_ACCEPT, 0);
 
 		if (n_options) {
 			o_lenp = NEXTLEN;
@@ -929,7 +931,8 @@ dhcp6_makemessage(struct interface *ifp)
 					o.code = htons((uint16_t)opt->option);
 					memcpy(p, &o.code, sizeof(o.code));
 					p += sizeof(o.code);
-					o.len += sizeof(o.code);
+					o.len = (uint16_t)
+					    (o.len + sizeof(o.code));
 				}
 			}
 #ifndef SMALL
@@ -945,14 +948,15 @@ dhcp6_makemessage(struct interface *ifp)
 					o.code = htons((uint16_t)opt->option);
 					memcpy(p, &o.code, sizeof(o.code));
 					p += sizeof(o.code);
-					o.len += sizeof(o.code);
+					o.len = (uint16_t)
+					    (o.len + sizeof(o.code));
 				}
 			}
 			if (dhcp6_findselfsla(ifp, NULL)) {
 				o.code = htons(D6_OPTION_PD_EXCLUDE);
 				memcpy(p, &o.code, sizeof(o.code));
 				p += sizeof(o.code);
-				o.len += sizeof(o.code);
+				o.len = (uint16_t)(o.len + sizeof(o.code));
 			}
 #endif
 			o.len = htons(o.len);
@@ -1742,7 +1746,7 @@ dhcp6_checkstatusok(const struct interface *ifp,
 
 	/* Anything after the code is a message. */
 	opt += sizeof(code);
-	opt_len -= sizeof(code);
+	opt_len = (uint16_t)(opt_len - sizeof(code));
 	if (opt_len == 0) {
 		sbuf = NULL;
 		if (code < sizeof(dhcp6_statuses) / sizeof(char *))
@@ -1752,7 +1756,7 @@ dhcp6_checkstatusok(const struct interface *ifp,
 			status = buf;
 		}
 	} else {
-		if ((sbuf = malloc(opt_len + 1)) == NULL) {
+		if ((sbuf = malloc((size_t)opt_len + 1)) == NULL) {
 			logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
 			return false;
 		}
@@ -1933,7 +1937,7 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 		}
 
 		o += sizeof(pdp);
-		ol -= sizeof(pdp);
+		ol = (uint16_t)(ol - sizeof(pdp));
 
 		TAILQ_FOREACH(a, &state->addrs, next) {
 			if (IN6_ARE_ADDR_EQUAL(&a->prefix, &pdp.prefix))
@@ -2095,7 +2099,7 @@ dhcp6_findia(struct interface *ifp, struct dhcp6_message *m, size_t l,
 
 		memcpy(&ia, p, nl);
 		p += nl;
-		o.len -= nl;
+		o.len = (uint16_t)(o.len - nl);
 
 		for (j = 0; j < ifo->ia_len; j++) {
 			if (memcmp(&ifo->ia[j].iaid, ia.iaid,
