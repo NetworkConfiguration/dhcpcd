@@ -208,6 +208,7 @@ dhcp6_makevendor(void *data, const struct interface *ifp)
 		vlen = 0; /* silence bogus gcc warning */
 	} else {
 		vlen = dhcp_vendor(vendor, sizeof(vendor));
+		printf ("VENDOR: %s***\n", vendor);
 		if (vlen == -1)
 			vlen = 0;
 		else
@@ -247,7 +248,7 @@ dhcp6_makevendor(void *data, const struct interface *ifp)
 		} else if (vlen) {
 			hvlen = htons((uint16_t)vlen);
 			memcpy(p, &hvlen, sizeof(hvlen));
-			p += sizeof(len);
+			p += sizeof(hvlen);
 			memcpy(p, vendor, (size_t)vlen);
 		}
 	}
@@ -643,7 +644,7 @@ dhcp6_makemessage(struct interface *ifp)
 	len += sizeof(o) + ifp->ctx->duid_len;
 	len += sizeof(o) + sizeof(uint16_t); /* elapsed */
 	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_CLASS))
-		len += sizeof(o) + dhcp6_makevendor(NULL, ifp);
+		len += dhcp6_makevendor(NULL, ifp);
 
 	/* IA */
 	m = NULL;
