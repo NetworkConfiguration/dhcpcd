@@ -1190,7 +1190,7 @@ ipv6nd_getoption(struct dhcpcd_ctx *ctx,
 			return NULL;
 		}
 		memcpy(&ndo, od, sizeof(ndo));
-		i = ndo.nd_opt_len * 8;
+		i = (size_t)(ndo.nd_opt_len * 8);
 		if (i > ol) {
 			errno = EINVAL;
 			return NULL;
@@ -1271,7 +1271,7 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 		    p += olen, len -= olen)
 		{
 			memcpy(&ndo, p, sizeof(ndo));
-			olen = ndo.nd_opt_len * 8;
+			olen = (size_t)(ndo.nd_opt_len * 8);
 			if (olen > len) {
 				errno =	EINVAL;
 				break;
