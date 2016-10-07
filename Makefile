@@ -18,7 +18,7 @@ CPPFLAGS+=	-I./crypt
 SRCS+=		${DHCPCD_SRCS}
 DHCPCD_DEFS?=	dhcpcd-definitions.conf
 
-OBJS+=		${SRCS:.c=.o} ${AUTH_SRCS:.c=.o} ${COMPAT_SRCS:.c=.o}
+OBJS+=		${SRCS:.c=.o} ${CRYPT_SRCS:.c=.o} ${COMPAT_SRCS:.c=.o}
 
 SCRIPT=		${LIBEXECDIR}/dhcpcd-run-hooks
 HOOKDIR=	${LIBEXECDIR}/dhcpcd-hooks
