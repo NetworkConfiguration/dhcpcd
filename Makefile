@@ -91,8 +91,8 @@ dhcpcd-embedded.c: genembedc ${DHCPCD_DEFS} dhcpcd-embedded.c.in
 
 if-options.c: dhcpcd-embedded.h
 
-.depend: ${SRCS} ${COMPAT_SRCS} ${CRYPT_SRCS}
-	${CC} ${CPPFLAGS} -MM ${SRCS} ${COMPAT_SRCS} ${CRYPT_SRCS} > .depend
+.depend: ${SRCS} ${COMPAT_SRCS} ${AUTH_SRCS}
+	${CC} ${CPPFLAGS} -MM ${SRCS} ${COMPAT_SRCS} ${AUTH_SRCS} > .depend
 
 depend: .depend
 
@@ -172,10 +172,10 @@ import: ${SRCS} hooks
 		sed -e '/^compat\//d' | \
 		sed -e '/^crypt\//d' | \
 		sort -u) /tmp/${DISTPREFIX}; \
-	if test -n "${CRYPT_SRCS}"; then \
+	if test -n "${AUTH_SRCS}"; then \
 		${INSTALL} -d /tmp/${DISTPREFIX}/crypt; \
-		cp ${CRYPT_SRCS} /tmp/${DISTPREFIX}/crypt; \
-		cp $$(${CC} ${CPPFLAGS} -DDEPGEN -MM ${CRYPT_SRCS} | \
+		cp ${AUTH_SRCS} /tmp/${DISTPREFIX}/crypt; \
+		cp $$(${CC} ${CPPFLAGS} -DDEPGEN -MM ${AUTH_SRCS} | \
 			sed -e 's/^.*c //g' -e 's/.*\.c$$//g' -e 's/\\//g' | \
 			tr ' ' '\n' | sed -e '/\/\.\.\//d'  | \
 			sort -u) /tmp/${DISTPREFIX}/crypt; \
