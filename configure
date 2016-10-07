@@ -462,10 +462,11 @@ if [ -z "$INET6" -o "$INET6" = yes ]; then
 	fi
 fi
 if [ -z "$AUTH" -o "$AUTH" = yes ]; then
-	echo "Enabling Authentiaction"
+	echo "Enabling Authentication"
 	echo "CPPFLAGS+=	-DAUTH" >>$CONFIG_MK
-	echo "AUTH_SRCS=	auth.c crypt/hmac_md5.c" >>$CONFIG_MK
-	echo "AUTH_SRCS+=	\${MD5_SRC} \${SHA256_SRC}" >>$CONFIG_MK
+	echo "SRCS+=		auth.c" >>$CONFIG_MK
+	echo "CRYPT_SRCS+=	crypt/hmac_md5.c" >>$CONFIG_MK
+	echo "CRYPT_SRCS+=	\${MD5_SRC} \${SHA256_SRC}" >>$CONFIG_MK
 fi
 
 echo "Using compiler .. $CC"
