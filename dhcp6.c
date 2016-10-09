@@ -829,7 +829,8 @@ dhcp6_makemessage(struct interface *ifp)
 				pdp.pltime = htonl(ap->prefix_pltime);
 				pdp.vltime = htonl(ap->prefix_vltime);
 				pdp.prefix_len = ap->prefix_len;
-				pdp.prefix = ap->prefix;
+				/* pdp.prefix is not aligned, so copy it in. */
+				memcpy(&pdp.prefix, &ap->prefix, sizeof(pdp.prefix));
 				COPYIN(D6_OPTION_IAPREFIX, &pdp, sizeof(pdp));
 				ia_na_len = (uint16_t)
 				    (ia_na_len + sizeof(o) + sizeof(pdp));
@@ -1959,7 +1960,8 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			a->dadcallback = dhcp6_dadcallback;
 			a->ia_type = D6_OPTION_IA_PD;
 			memcpy(a->iaid, iaid, sizeof(a->iaid));
-			a->prefix = pdp.prefix;
+			/* pdp.prefix is not aligned so copy it in. */
+			memcpy(&a->prefix, &pdp.prefix, sizeof(a->prefix));
 			a->prefix_len = pdp.prefix_len;
 			ia = inet_ntop(AF_INET6, &a->prefix,
 			    iabuf, sizeof(iabuf));
