@@ -43,7 +43,7 @@
 # endif
 #endif
 
-#if defined(__OpenBSD) || defined (__sun)
+#if defined(__OpenBSD__) || defined (__sun)
 #  define ROUTE_PER_GATEWAY
 /* XXX dhcpcd doesn't really support this yet.
  * But that's generally OK if only dhcpcd is managing routes. */
