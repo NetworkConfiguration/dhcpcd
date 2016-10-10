@@ -1484,8 +1484,8 @@ ipv6nd_handlena(struct dhcpcd_ctx *dctx, struct interface *ifp,
 
 	if (ifp == NULL) {
 #ifdef DEBUG_NS
-		logger(ctx, LOG_DEBUG, "NA for unexpected interface from %s",
-		    dctx->sfrom);
+		logger(dctx, LOG_DEBUG, "NA for unexpected interface from %s",
+		    ctx->sfrom);
 #endif
 		return;
 	}
