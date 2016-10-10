@@ -1,6 +1,6 @@
 /*
- * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2015 Roy Marples <roy@marples.name>
+ * dhcpcd - ARP handler
+ * Copyright (c) 2006-2016 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -238,7 +238,8 @@ arp_announced(void *arg)
 		return;
 	}
 
-	/* Keep ARP open so we can detect duplicates. */
+	/* As there is no announced callback, free the ARP state. */
+	arp_free(astate);
 }
 
 static void
@@ -387,28 +388,26 @@ arp_cancel(struct arp_state *astate)
 void
 arp_free(struct arp_state *astate)
 {
+	struct interface *ifp;
+	struct iarp_state *state;
 
-	if (astate != NULL) {
-		struct interface *ifp;
-		struct iarp_state *state;
+	if (astate == NULL)
+		return;
 
-		ifp = astate->iface;
-		eloop_timeout_delete(ifp->ctx->eloop, NULL, astate);
-		state =	ARP_STATE(ifp);
-		TAILQ_REMOVE(&state->arp_states, astate, next);
-		if (astate->free_cb)
-			astate->free_cb(astate);
-		free(astate);
+	ifp = astate->iface;
+	eloop_timeout_delete(ifp->ctx->eloop, NULL, astate);
+	state =	ARP_STATE(ifp);
+	TAILQ_REMOVE(&state->arp_states, astate, next);
+	if (astate->free_cb)
+		astate->free_cb(astate);
+	free(astate);
 
-		/* If there are no more ARP states, close the socket. */
-		if (state->fd != -1 &&
-		    TAILQ_FIRST(&state->arp_states) == NULL)
-		{
-			eloop_event_delete(ifp->ctx->eloop, state->fd);
-			if_closeraw(ifp, state->fd);
-			free(state);
-			ifp->if_data[IF_DATA_ARP] = NULL;
-		}
+	/* If there are no more ARP states, close the socket. */
+	if (state->fd != -1 && TAILQ_FIRST(&state->arp_states) == NULL) {
+		eloop_event_delete(ifp->ctx->eloop, state->fd);
+		if_closeraw(ifp, state->fd);
+		free(state);
+		ifp->if_data[IF_DATA_ARP] = NULL;
 	}
 }
 
