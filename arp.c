@@ -235,7 +235,8 @@ arp_announced(void *arg)
 		return;
 	}
 
-	/* Keep ARP open so we can detect duplicates. */
+	/* As there is no announced callback, free the ARP state. */
+	arp_free(astate);
 }
 
 static void
