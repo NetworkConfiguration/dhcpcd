@@ -2317,13 +2317,13 @@ dhcp_arp_address(struct interface *ifp)
 	/* If the interface already has the address configured
 	 * then we can't ARP for duplicate detection. */
 	ia = ipv4_findaddr(ifp->ctx, &addr);
+	if ((astate = arp_new(ifp, &addr)) == NULL)
+		return -1;
+	astate->probed_cb = dhcp_arp_probed;
+	astate->conflicted_cb = dhcp_arp_conflicted;
 
 #ifdef IN_IFF_TENTATIVE
 	if (ia == NULL || ia->addr_flags & IN_IFF_NOTUSEABLE) {
-		if ((astate = arp_new(ifp, &addr)) != NULL) {
-			astate->probed_cb = dhcp_arp_probed;
-			astate->conflicted_cb = dhcp_arp_conflicted;
-		}
 		if (ia == NULL) {
 			struct dhcp_lease l;
 
@@ -2342,12 +2342,8 @@ dhcp_arp_address(struct interface *ifp)
 		get_lease(ifp, &l, state->offer, state->offer_len);
 		logger(ifp->ctx, LOG_INFO, "%s: probing address %s/%d",
 		    ifp->name, inet_ntoa(l.addr), inet_ntocidr(l.mask));
-		if ((astate = arp_new(ifp, &addr)) != NULL) {
-			astate->probed_cb = dhcp_arp_probed;
-			astate->conflicted_cb = dhcp_arp_conflicted;
-			/* We need to handle DAD. */
-			arp_probe(astate);
-		}
+		/* We need to handle DAD. */
+		arp_probe(astate);
 		return 0;
 	}
 #endif

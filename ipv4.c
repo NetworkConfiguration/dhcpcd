@@ -1260,7 +1260,7 @@ ipv4_applyaddr(void *arg)
 	if (ifo->options & DHCPCD_ARP) {
 		struct arp_state *astate;
 
-		if ((astate = arp_new(ifp, &state->addr->addr)) != NULL)
+		if ((astate = arp_find(ifp, &state->addr->addr)) != NULL)
 			arp_announce(astate);
 	}
 	if (state->state == DHS_BOUND) {
