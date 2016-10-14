@@ -123,7 +123,9 @@ struct udp_bootp_packet
 };
 
 static int dhcp_open(struct interface *);
+#ifdef ARP
 static void dhcp_arp_conflicted(struct arp_state *, const struct arp_msg *);
+#endif
 
 void
 dhcp_printoptions(const struct dhcpcd_ctx *ctx,
@@ -1880,20 +1882,26 @@ static int
 dhcp_leaseextend(struct interface *ifp)
 {
 
+#ifdef ARP
 	if (ifp->options->options & DHCPCD_ARP) {
+		const struct dhcp_state *state;
 		struct arp_state *astate;
 
-		if ((astate = arp_new(ifp, NULL)) == NULL)
+		state = D_CSTATE(ifp);
+		if ((astate = arp_new(ifp, &state->lease.addr)) == NULL)
 			return -1;
+		astate->conflicted_cb = dhcp_arp_conflicted;
 
+#ifndef KERNEL_RFC5227
 		if (arp_open(ifp) == -1)
 			return -1;
+#endif
 
-		astate->conflicted_cb = dhcp_arp_conflicted;
 		logger(ifp->ctx, LOG_WARNING,
 		    "%s: extending lease until DaD failure or DHCP", ifp->name);
 		return 0;
 	}
+#endif
 
 	logger(ifp->ctx, LOG_WARNING, "%s: extending lease", ifp->name);
 	return 0;
@@ -1926,12 +1934,14 @@ dhcp_expire(void *arg)
 	dhcp_expire1(ifp);
 }
 
+#ifdef ARP
 static void
 dhcp_decline(struct interface *ifp)
 {
 
 	send_message(ifp, DHCP_DECLINE, NULL);
 }
+#endif
 
 static void
 dhcp_startrenew(void *arg)
@@ -1987,14 +1997,18 @@ dhcp_rebind(void *arg)
 	send_rebind(ifp);
 }
 
+#ifdef ARP
 static void
 dhcp_arp_probed(struct arp_state *astate)
 {
+	struct interface *ifp;
 	struct dhcp_state *state;
 	struct if_options *ifo;
 
-	state = D_STATE(astate->iface);
-	ifo = astate->iface->options;
+	ifp = astate->iface;
+	state = D_STATE(ifp);
+	ifo = ifp->options;
+#ifdef ARPING
 	if (state->arping_index < ifo->arping_len) {
 		/* We didn't find a profile for this
 		 * address or hwaddr, so move to the next
@@ -2003,19 +2017,27 @@ dhcp_arp_probed(struct arp_state *astate)
 			astate->addr.s_addr =
 			    ifo->arping[state->arping_index - 1];
 			arp_probe(astate);
+			return;
 		}
-		dhcpcd_startinterface(astate->iface);
+		arp_free(astate);
+#ifdef KERNEL_RFC5227
+		/* As arping is finished, close the ARP socket.
+		 * The kernel will handle ACD from here. */
+		arp_close(ifp);
+#endif
+		dhcpcd_startinterface(ifp);
 		return;
 	}
+#endif
 
 	/* Already bound so DAD has worked */
 	if (state->state == DHS_BOUND)
 		return;
 
-	logger(astate->iface->ctx, LOG_DEBUG, "%s: DAD completed for %s",
-	    astate->iface->name, inet_ntoa(astate->addr));
+	logger(ifp->ctx, LOG_DEBUG, "%s: DAD completed for %s",
+	    ifp->name, inet_ntoa(astate->addr));
 	if (state->state != DHS_INFORM)
-		dhcp_bind(astate->iface);
+		dhcp_bind(ifp);
 #ifndef IN_IFF_TENTATIVE
 	else {
 		struct bootp *bootp;
@@ -2025,8 +2047,7 @@ dhcp_arp_probed(struct arp_state *astate)
 		len = state->new_len;
 		state->new = state->offer;
 		state->new_len = state->offer_len;
-		get_lease(astate->iface, &state->lease,
-		    state->new, state->new_len);
+		get_lease(ifp, &state->lease, state->new, state->new_len);
 		ipv4_applyaddr(astate->iface);
 		state->new = bootp;
 		state->new_len = len;
@@ -2034,14 +2055,14 @@ dhcp_arp_probed(struct arp_state *astate)
 #endif
 
 	/* If we forked, stop here. */
-	if (astate->iface->ctx->options & DHCPCD_FORKED)
+	if (ifp->ctx->options & DHCPCD_FORKED)
 		return;
 
 	/* Stop IPv4LL now we have a working DHCP address */
-	ipv4ll_drop(astate->iface);
+	ipv4ll_drop(ifp);
 
 	if (ifo->options & DHCPCD_INFORM)
-		dhcp_inform(astate->iface);
+		dhcp_inform(ifp);
 }
 
 static void
@@ -2049,11 +2070,15 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 {
 	struct interface *ifp;
 	struct dhcp_state *state;
+#ifdef ARPING
 	struct if_options *ifo;
+#endif
 
 	ifp = astate->iface;
-	ifo = ifp->options;
 	state = D_STATE(ifp);
+
+#ifdef ARPING
+	ifo = ifp->options;
 	if (state->arping_index &&
 	    state->arping_index <= ifo->arping_len &&
 	    amsg &&
@@ -2078,10 +2103,16 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 		}
 		dhcp_close(ifp);
 		arp_free(astate);
+#ifdef KERNEL_RFC5227
+		/* As arping is finished, close the ARP socket.
+		 * The kernel will handle ACD from here. */
+		arp_close(ifp);
+#endif
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 		dhcpcd_startinterface(ifp);
 		return;
 	}
+#endif
 
 	/* RFC 2131 3.1.5, Client-server interaction
 	 * NULL amsg means IN_IFF_DUPLICATED */
@@ -2131,6 +2162,7 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 		return;
 	}
 }
+#endif
 
 void
 dhcp_bind(struct interface *ifp)
@@ -2305,6 +2337,7 @@ dhcp_message_new(struct bootp **bootp,
 	return sizeof(**bootp);
 }
 
+#ifdef ARP
 static int
 dhcp_arp_address(struct interface *ifp)
 {
@@ -2322,13 +2355,13 @@ dhcp_arp_address(struct interface *ifp)
 	/* If the interface already has the address configured
 	 * then we can't ARP for duplicate detection. */
 	ia = ipv4_findaddr(ifp->ctx, &addr);
+	if ((astate = arp_new(ifp, &addr)) == NULL)
+		return 0;
+	astate->probed_cb = dhcp_arp_probed;
+	astate->conflicted_cb = dhcp_arp_conflicted;
 
 #ifdef IN_IFF_TENTATIVE
 	if (ia == NULL || ia->addr_flags & IN_IFF_NOTUSEABLE) {
-		if ((astate = arp_new(ifp, &addr)) != NULL) {
-			astate->probed_cb = dhcp_arp_probed;
-			astate->conflicted_cb = dhcp_arp_conflicted;
-		}
 		if (ia == NULL) {
 			struct dhcp_lease l;
 
@@ -2347,12 +2380,8 @@ dhcp_arp_address(struct interface *ifp)
 		get_lease(ifp, &l, state->offer, state->offer_len);
 		logger(ifp->ctx, LOG_INFO, "%s: probing address %s/%d",
 		    ifp->name, inet_ntoa(l.addr), inet_ntocidr(l.mask));
-		if ((astate = arp_new(ifp, &addr)) != NULL) {
-			astate->probed_cb = dhcp_arp_probed;
-			astate->conflicted_cb = dhcp_arp_conflicted;
-			/* We need to handle DAD. */
-			arp_probe(astate);
-		}
+		/* We need to handle DAD. */
+		arp_probe(astate);
 		return 0;
 	}
 #endif
@@ -2367,6 +2396,7 @@ dhcp_arp_bind(struct interface *ifp)
 	if (dhcp_arp_address(ifp) == 1)
 		dhcp_bind(ifp);
 }
+#endif
 
 static void
 dhcp_static(struct interface *ifp)
@@ -2395,7 +2425,11 @@ dhcp_static(struct interface *ifp)
 	    ia ? &ia->addr : &ifo->req_addr,
 	    ia ? &ia->mask : &ifo->req_mask);
 	if (state->offer_len)
+#ifdef ARP
 		dhcp_arp_bind(ifp);
+#else
+		dhcp_bind(ifp);
+#endif
 }
 
 void
@@ -2440,8 +2474,10 @@ dhcp_inform(struct interface *ifp)
 				ipv4_deladdr(ia, 1);
 			state->offer_len = dhcp_message_new(&state->offer,
 			    &ifo->req_addr, &ifo->req_mask);
+#ifdef ARP
 			if (dhcp_arp_address(ifp) == 0)
 				return;
+#endif
 			ia = ipv4_iffindaddr(ifp,
 			    &ifo->req_addr, &ifo->req_mask);
 			assert(ia != NULL);
@@ -2925,7 +2961,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 			case 0:
 				LOGDHCP(LOG_WARNING, "IPv4LL disabled from");
 				ipv4ll_drop(ifp);
-				arp_close(ifp);
+				arp_drop(ifp);
 				break;
 			case 1:
 				LOGDHCP(LOG_WARNING, "IPv4LL enabled from");
@@ -3084,7 +3120,11 @@ rapidcommit:
 	lease->frominfo = 0;
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 
+#ifdef ARP
 	dhcp_arp_bind(ifp);
+#else
+	dhcp_bind(ifp);
+#endif
 }
 
 static void *
@@ -3231,7 +3271,6 @@ dhcp_readpacket(void *arg)
 			logger(ifp->ctx, LOG_ERR,
 			    "%s: dhcp if_readrawpacket: %m", ifp->name);
 			dhcp_close(ifp);
-			arp_close(ifp);
 			return;
 		}
 		dhcp_handlepacket(ifp, buf, (size_t)bytes, flags);
@@ -3314,7 +3353,7 @@ dhcp_free(struct interface *ifp)
 	struct dhcpcd_ctx *ctx;
 
 	dhcp_close(ifp);
-	arp_close(ifp);
+	arp_drop(ifp);
 	if (state) {
 		free(state->old);
 		free(state->new);
@@ -3467,6 +3506,7 @@ dhcp_start1(void *arg)
 	state->offer = NULL;
 	state->offer_len = 0;
 
+#ifdef ARPING
 	if (state->arping_index < ifo->arping_len) {
 		struct arp_state *astate;
 
@@ -3478,6 +3518,7 @@ dhcp_start1(void *arg)
 		}
 		return;
 	}
+#endif
 
 	if (ifo->options & DHCPCD_STATIC) {
 		dhcp_static(ifp);

@@ -43,6 +43,14 @@
 #include "dhcpcd.h"
 #include "if.h"
 
+#ifdef IN_IFF_DUPLICATED
+/* NetBSD gained RFC 5227 support in the kernel.
+ * This means dhcpcd doesn't need ARP except for ARPing support. */
+#if defined(__NetBSD_Version__) && __NetBSD_Version__ >= 799003900
+#define KERNEL_RFC5227
+#endif
+#endif
+
 struct arp_msg {
 	uint16_t op;
 	unsigned char sha[HWADDR_LEN];
@@ -77,21 +85,25 @@ struct iarp_state {
 #define ARP_CSTATE(ifp)							       \
 	((const struct iarp_state *)(ifp)->if_data[IF_DATA_ARP])
 
-#ifdef INET
+#if defined(ARP) && (!defined(KERNEL_RFC5227) || defined(ARPING))
 int arp_open(struct interface *);
 ssize_t arp_request(const struct interface *, in_addr_t, in_addr_t);
-void arp_report_conflicted(const struct arp_state *, const struct arp_msg *);
-void arp_announce(struct arp_state *);
 void arp_probe(struct arp_state *);
+void arp_close(struct interface *);
+#endif
+
+#ifdef ARP
+void arp_report_conflicted(const struct arp_state *, const struct arp_msg *);
 struct arp_state *arp_new(struct interface *, const struct in_addr *);
+struct arp_state *arp_find(struct interface *, const struct in_addr *);
+void arp_announce(struct arp_state *);
 void arp_cancel(struct arp_state *);
 void arp_free(struct arp_state *);
 void arp_free_but(struct arp_state *);
-struct arp_state *arp_find(struct interface *, const struct in_addr *);
-void arp_close(struct interface *);
+void arp_drop(struct interface *);
 
 void arp_handleifa(int, struct ipv4_addr *);
 #else
-#define arp_close(a) {}
+#define arp_drop(a) {}
 #endif
 #endif

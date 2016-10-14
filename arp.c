@@ -52,6 +52,7 @@
 #include "if-options.h"
 #include "ipv4ll.h"
 
+#if defined(ARP) && (!defined(KERNEL_RFC5227) || defined(ARPING))
 #define ARP_LEN								      \
 	(sizeof(struct arphdr) + (2 * sizeof(uint32_t)) + (2 * HWADDR_LEN))
 
@@ -99,26 +100,6 @@ arp_request(const struct interface *ifp, in_addr_t sip, in_addr_t tip)
 eexit:
 	errno = ENOBUFS;
 	return -1;
-}
-
-void
-arp_report_conflicted(const struct arp_state *astate,
-    const struct arp_msg *amsg)
-{
-
-	if (amsg != NULL) {
-		char buf[HWADDR_LEN * 3];
-
-		logger(astate->iface->ctx, LOG_ERR,
-		    "%s: hardware address %s claims %s",
-		    astate->iface->name,
-		    hwaddr_ntoa(amsg->sha, astate->iface->hwlen,
-		    buf, sizeof(buf)),
-		    inet_ntoa(astate->failed));
-	} else
-		logger(astate->iface->ctx, LOG_ERR,
-		    "%s: DAD detected %s",
-		    astate->iface->name, inet_ntoa(astate->failed));
 }
 
 static void
@@ -184,6 +165,18 @@ arp_packet(struct interface *ifp, uint8_t *data, size_t len)
 	}
 }
 
+void
+arp_close(struct interface *ifp)
+{
+	struct iarp_state *state;
+
+	if ((state = ARP_STATE(ifp)) != NULL && state->fd != -1) {
+		eloop_event_delete(ifp->ctx->eloop, state->fd);
+		if_closeraw(ifp, state->fd);
+		state->fd = -1;
+	}
+}
+
 static void
 arp_read(void *arg)
 {
@@ -215,6 +208,8 @@ arp_open(struct interface *ifp)
 {
 	struct iarp_state *state;
 
+printf("ARP OPENED!!!\n");
+
 	state = ARP_STATE(ifp);
 	if (state->fd == -1) {
 		state->fd = if_openraw(ifp, ETHERTYPE_ARP);
@@ -226,57 +221,6 @@ arp_open(struct interface *ifp)
 		eloop_event_add(ifp->ctx->eloop, state->fd, arp_read, ifp);
 	}
 	return state->fd;
-}
-
-static void
-arp_announced(void *arg)
-{
-	struct arp_state *astate = arg;
-
-	if (astate->announced_cb) {
-		astate->announced_cb(astate);
-		return;
-	}
-
-	/* As there is no announced callback, free the ARP state. */
-	arp_free(astate);
-}
-
-static void
-arp_announce1(void *arg)
-{
-	struct arp_state *astate = arg;
-	struct interface *ifp = astate->iface;
-
-	if (++astate->claims < ANNOUNCE_NUM)
-		logger(ifp->ctx, LOG_DEBUG,
-		    "%s: ARP announcing %s (%d of %d), "
-		    "next in %d.0 seconds",
-		    ifp->name, inet_ntoa(astate->addr),
-		    astate->claims, ANNOUNCE_NUM, ANNOUNCE_WAIT);
-	else
-		logger(ifp->ctx, LOG_DEBUG,
-		    "%s: ARP announcing %s (%d of %d)",
-		    ifp->name, inet_ntoa(astate->addr),
-		    astate->claims, ANNOUNCE_NUM);
-	if (arp_request(ifp, astate->addr.s_addr, astate->addr.s_addr) == -1)
-		logger(ifp->ctx, LOG_ERR, "send_arp: %m");
-	eloop_timeout_add_sec(ifp->ctx->eloop, ANNOUNCE_WAIT,
-	    astate->claims < ANNOUNCE_NUM ? arp_announce1 : arp_announced,
-	    astate);
-}
-
-void
-arp_announce(struct arp_state *astate)
-{
-
-	if (arp_open(astate->iface) == -1) {
-		logger(astate->iface->ctx, LOG_ERR,
-		    "%s: %s: %m", __func__, astate->iface->name);
-		return;
-	}
-	astate->claims = 0;
-	arp_announce1(astate);
 }
 
 static void
@@ -327,6 +271,88 @@ arp_probe(struct arp_state *astate)
 	logger(astate->iface->ctx, LOG_DEBUG, "%s: probing for %s",
 	    astate->iface->name, inet_ntoa(astate->addr));
 	arp_probe1(astate);
+}
+#else	/* !ARP */
+#define arp_close(ifp) {}
+#endif	/* ARP */
+
+static void
+arp_announced(void *arg)
+{
+	struct arp_state *astate = arg;
+
+	if (astate->announced_cb) {
+		astate->announced_cb(astate);
+		return;
+	}
+
+	/* Keep the ARP state open to handle ongoing ACD. */
+}
+
+static void
+arp_announce1(void *arg)
+{
+	struct arp_state *astate = arg;
+	struct interface *ifp = astate->iface;
+
+#ifdef KERNEL_RFC5227
+	/* We rely on the kernel announcing correctly.
+	 * As the timings are not random we can callback safely. */
+	astate->claims++;
+#else
+	if (++astate->claims < ANNOUNCE_NUM)
+		logger(ifp->ctx, LOG_DEBUG,
+		    "%s: ARP announcing %s (%d of %d), "
+		    "next in %d.0 seconds",
+		    ifp->name, inet_ntoa(astate->addr),
+		    astate->claims, ANNOUNCE_NUM, ANNOUNCE_WAIT);
+	else
+		logger(ifp->ctx, LOG_DEBUG,
+		    "%s: ARP announcing %s (%d of %d)",
+		    ifp->name, inet_ntoa(astate->addr),
+		    astate->claims, ANNOUNCE_NUM);
+	if (arp_request(ifp, astate->addr.s_addr, astate->addr.s_addr) == -1)
+		logger(ifp->ctx, LOG_ERR, "send_arp: %m");
+#endif
+	eloop_timeout_add_sec(ifp->ctx->eloop, ANNOUNCE_WAIT,
+	    astate->claims < ANNOUNCE_NUM ? arp_announce1 : arp_announced,
+	    astate);
+}
+
+void
+arp_announce(struct arp_state *astate)
+{
+
+#ifndef KERNEL_RFC5227
+	if (arp_open(astate->iface) == -1) {
+		logger(astate->iface->ctx, LOG_ERR,
+		    "%s: %s: %m", __func__, astate->iface->name);
+		return;
+	}
+#endif
+
+	astate->claims = 0;
+	arp_announce1(astate);
+}
+
+void
+arp_report_conflicted(const struct arp_state *astate,
+    const struct arp_msg *amsg)
+{
+
+	if (amsg != NULL) {
+		char buf[HWADDR_LEN * 3];
+
+		logger(astate->iface->ctx, LOG_ERR,
+		    "%s: hardware address %s claims %s",
+		    astate->iface->name,
+		    hwaddr_ntoa(amsg->sha, astate->iface->hwlen,
+		    buf, sizeof(buf)),
+		    inet_ntoa(astate->failed));
+	} else
+		logger(astate->iface->ctx, LOG_ERR,
+		    "%s: DAD detected %s",
+		    astate->iface->name, inet_ntoa(astate->failed));
 }
 
 struct arp_state *
@@ -403,9 +429,8 @@ arp_free(struct arp_state *astate)
 	free(astate);
 
 	/* If there are no more ARP states, close the socket. */
-	if (state->fd != -1 && TAILQ_FIRST(&state->arp_states) == NULL) {
-		eloop_event_delete(ifp->ctx->eloop, state->fd);
-		if_closeraw(ifp, state->fd);
+	if (TAILQ_FIRST(&state->arp_states) == NULL) {
+		arp_close(ifp);
 		free(state);
 		ifp->if_data[IF_DATA_ARP] = NULL;
 	}
@@ -434,10 +459,11 @@ arp_free_but(struct arp_state *astate)
 }
 
 void
-arp_close(struct interface *ifp)
+arp_drop(struct interface *ifp)
 {
 
 	arp_free_but1(ifp, NULL);
+	arp_close(ifp);
 }
 
 void

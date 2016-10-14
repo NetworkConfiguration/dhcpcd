@@ -370,7 +370,7 @@ dhcpcd_drop(struct interface *ifp, int stop)
 	ipv6_drop(ifp);
 	ipv4ll_drop(ifp);
 	dhcp_drop(ifp, stop ? "STOP" : "EXPIRE");
-	arp_close(ifp);
+	arp_drop(ifp);
 }
 
 static void
@@ -722,7 +722,7 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 			ifp->carrier = LINK_DOWN;
 			script_runreason(ifp, "NOCARRIER");
 #ifdef NOCARRIER_PRESERVE_IP
-			arp_close(ifp);
+			arp_drop(ifp);
 			dhcp_abort(ifp);
 			if_sortinterfaces(ctx);
 			ipv4_preferanother(ifp);
@@ -1445,6 +1445,12 @@ main(int argc, char **argv)
 			printf("Compiled in features:"
 #ifdef INET
 			" INET"
+#endif
+#ifdef ARP
+			" ARP"
+#endif
+#ifdef ARPING
+			" ARPing"
 #endif
 #ifdef IPV4LL
 			" IPv4LL"
