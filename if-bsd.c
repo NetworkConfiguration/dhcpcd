@@ -1688,32 +1688,6 @@ ip6_temp_valid_lifetime(__unused const char *ifname)
 }
 #endif
 
-#define del_if_nd6_flag(s, ifname, flag) if_nd6_flag((s), (ifp), (flag), -1)
-#define get_if_nd6_flag(s, ifname, flag) if_nd6_flag((s), (ifp), (flag),  0)
-#define set_if_nd6_flag(s, ifname, flag) if_nd6_flag((s), (ifp), (flag),  1)
-static int
-if_nd6_flag(int s, const struct interface *ifp, unsigned int flag, int set)
-{
-	struct in6_ndireq nd;
-	unsigned int oflags;
-
-	memset(&nd, 0, sizeof(nd));
-	strlcpy(nd.ifname, ifp->name, sizeof(nd.ifname));
-	if (ioctl(s, SIOCGIFINFO_IN6, &nd) == -1)
-		return -1;
-	if (set == 0)
-		return nd.ndi.flags & flag ? 1 : 0;
-
-	oflags = nd.ndi.flags;
-	if (set == -1)
-		nd.ndi.flags &= ~flag;
-	else
-		nd.ndi.flags |= flag;
-	if (oflags == nd.ndi.flags)
-		return 0;
-	return ioctl(s, SIOCSIFINFO_FLAGS, &nd);
-}
-
 static int
 if_raflush(int s)
 {
@@ -1768,82 +1742,76 @@ set_ifxflags(int s, const struct interface *ifp, int own)
 }
 #endif
 
-static int
-_if_checkipv6(int s, struct dhcpcd_ctx *ctx,
-    const struct interface *ifp, int own)
+int
+if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 {
-	int ra;
+	struct priv *priv;
+	int s, ra;
+
+	priv = (struct priv *)ctx->priv;
+	s = priv->pf_inet6_fd;
 
 	if (ifp) {
-#ifdef ND6_IFF_AUTO_LINKLOCAL
-		if (own) {
-			int all;
+		struct in6_ndireq nd;
+		int flags;
 
-			all = get_if_nd6_flag(s, ifp, ND6_IFF_AUTO_LINKLOCAL);
-			if (all == -1)
-				logger(ifp->ctx, LOG_ERR,
-				    "%s: get_if_nd6_flag: "
-				    "ND6_IFF_AUTO_LINKLOCAL: %m",
-				    ifp->name);
-			else if (all != 0) {
-				logger(ifp->ctx, LOG_DEBUG,
-				    "%s: disabling Kernel IPv6 "
-				    "auto link-local support",
-				    ifp->name);
-				if (del_if_nd6_flag(s, ifp,
-				    ND6_IFF_AUTO_LINKLOCAL) == -1)
-				{
-					logger(ifp->ctx, LOG_ERR,
-					    "%s: del_if_nd6_flag: "
-					    "ND6_IFF_AUTO_LINKLOCAL: %m",
-					    ifp->name);
-					return -1;
-				}
-			}
+		memset(&nd, 0, sizeof(nd));
+		strlcpy(nd.ifname, ifp->name, sizeof(nd.ifname));
+		if (ioctl(s, SIOCGIFINFO_IN6, &nd) == -1)
+			return -1;
+		flags = (int)nd.ndi.flags;
+
+#ifdef ND6_IFF_AUTO_LINKLOCAL
+		if (own && flags & ND6_IFF_AUTO_LINKLOCAL) {
+			logger(ifp->ctx, LOG_DEBUG,
+			    "%s: disabling Kernel IPv6 auto link-local support",
+			    ifp->name);
+			flags &= ~ND6_IFF_AUTO_LINKLOCAL;
 		}
 #endif
 
 #ifdef ND6_IFF_PERFORMNUD
-		if (set_if_nd6_flag(s, ifp, ND6_IFF_PERFORMNUD) == -1) {
-			logger(ifp->ctx, LOG_ERR,
-			    "%s: set_if_nd6_flag: ND6_IFF_PERFORMNUD: %m",
-			    ifp->name);
-			return -1;
+		if ((flags & ND6_IFF_PERFORMNUD) == 0) {
+			/* NUD is kind of essential. */
+			flags |= ND6_IFF_PERFORMNUD;
 		}
 #endif
 
 #ifdef ND6_IFF_ACCEPT_RTADV
-		ra = get_if_nd6_flag(s, ifp, ND6_IFF_ACCEPT_RTADV);
-		if (ra == -1)
-			logger(ifp->ctx, LOG_ERR,
-			    "%s: get_if_nd6_flag: ND6_IFF_ACCEPT_RTADV: %m",
-			    ifp->name);
-		else if (ra != 0 && own) {
+		if (own && flags & ND6_IFF_ACCEPT_RTADV) {
 			logger(ifp->ctx, LOG_DEBUG,
 			    "%s: disabling Kernel IPv6 RA support",
 			    ifp->name);
-			if (del_if_nd6_flag(s, ifp, ND6_IFF_ACCEPT_RTADV)
-			    == -1)
-				logger(ifp->ctx, LOG_ERR,
-				    "%s: del_if_nd6_flag: "
-				    "ND6_IFF_ACCEPT_RTADV: %m",
-				    ifp->name);
-			else
-				ra = 0;
-		} else if (ra == 0 && !own)
-			logger(ifp->ctx, LOG_WARNING,
-			    "%s: IPv6 kernel autoconf disabled", ifp->name);
+			flags &= ~ND6_IFF_ACCEPT_RTADV;
+		}
+#ifdef ND6_IFF_OVERRIDE_RTADV
+		if (own && flags & ND6_IFF_OVERRIDE_RTADV)
+			flags &= ~ND6_IFF_OVERRIDE_RTADV;
 #endif
+#endif
+
+#ifdef ND6_IFF_IFDISABLED
+		flags &= ~ND6_IFF_IFDISABLED;
+#endif
+
+		if (nd.ndi.flags != (uint32_t)flags) {
+			nd.ndi.flags = (uint32_t)flags;
+			if (ioctl(s, SIOCSIFINFO_FLAGS, &nd) == -1) {
+				logger(ifp->ctx, LOG_ERR,
+				    "%s: SIOCSIFINFO_FLAGS: %m",
+				    ifp->name);
+				return -1;
+			}
+		}
 
 		/* Enabling IPv6 by whatever means must be the
 		 * last action undertaken to ensure kernel RS and
 		 * LLADDR auto configuration are disabled where applicable. */
-
 #ifdef SIOCIFAFATTACH
 		if (af_attach(s, ifp, AF_INET6) == -1) {
 			logger(ifp->ctx, LOG_ERR,
 			    "%s: af_attach: %m", ifp->name);
-			return 1;
+			return -1;
 		}
 #endif
 
@@ -1855,17 +1823,19 @@ _if_checkipv6(int s, struct dhcpcd_ctx *ctx,
 		}
 #endif
 
-#ifdef ND6_IFF_IFDISABLED
-		if (del_if_nd6_flag(s, ifp, ND6_IFF_IFDISABLED) == -1) {
-			logger(ifp->ctx, LOG_ERR,
-			    "%s: del_if_nd6_flag: ND6_IFF_IFDISABLED: %m",
-			    ifp->name);
-			return -1;
-		}
-#endif
-
 #ifdef ND6_IFF_ACCEPT_RTADV
-		return ra;
+#ifdef ND6_IFF_OVERRIDE_RTADV
+		switch (flags & (ND6_IFF_ACCEPT_RTADV|ND6_IFF_OVERRIDE_RTADV)) {
+		case (ND6_IFF_ACCEPT_RTADV|ND6_IFF_OVERRIDE_RTADV):
+			return 1;
+		case ND6_IFF_ACCEPT_RTADV:
+			return ctx->ra_global;
+		default:
+			return 0;
+		}
+#else
+		return flags & ND6_IFF_ACCEPT_RTADV ? 1 : 0;
+#endif
 #else
 		return ctx->ra_global;
 #endif
@@ -1898,14 +1868,5 @@ _if_checkipv6(int s, struct dhcpcd_ctx *ctx,
 
 	ctx->ra_global = ra;
 	return ra;
-}
-
-int
-if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
-{
-	struct priv *priv;
-
-	priv = (struct priv *)ctx->priv;
-	return _if_checkipv6(priv->pf_inet6_fd, ctx, ifp, own);
 }
 #endif
