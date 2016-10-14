@@ -2356,7 +2356,7 @@ dhcp_arp_address(struct interface *ifp)
 	 * then we can't ARP for duplicate detection. */
 	ia = ipv4_findaddr(ifp->ctx, &addr);
 	if ((astate = arp_new(ifp, &addr)) == NULL)
-		return 0;
+		return -1;
 	astate->probed_cb = dhcp_arp_probed;
 	astate->conflicted_cb = dhcp_arp_conflicted;
 
