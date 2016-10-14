@@ -268,6 +268,11 @@ ipv4ll_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 	if (state->addr != NULL &&
 	    astate->failed.s_addr == state->addr->addr.s_addr)
 	{
+#ifdef KERNEL_RFC5227
+		logger(ifp->ctx, LOG_WARNING,
+		    "%s: IPv4LL defence failed for %s",
+		    ifp->name, state->addr->saddr);
+#else
 		struct timespec now, defend;
 
 		/* RFC 3927 Section 2.5 says a defence should
@@ -296,7 +301,7 @@ ipv4ll_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 			state->defend = now;
 			return;
 		}
-
+#endif
 		ipv4_deladdr(state->addr, 1);
 		state->down = 1;
 		state->addr = NULL;

@@ -24,6 +24,8 @@ dhcpcd can also be made smaller by removing the IPv4 or IPv6 stack:
   *  --disable-inet6
 Or by removing the following features:
   *  --disable-auth
+  *  --disable-arp
+  *  --disable-arping
   *  --disable-ipv4ll
   *  --disable-dhcp6
 

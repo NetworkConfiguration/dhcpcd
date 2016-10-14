@@ -890,7 +890,11 @@ ipv4_deladdr(struct ipv4_addr *addr, int keeparp)
 	int r;
 	struct ipv4_state *state;
 	struct ipv4_addr *ap;
+#ifdef ARP
 	struct arp_state *astate;
+#else
+	UNUSED(keeparp);
+#endif
 
 	logger(addr->iface->ctx, LOG_DEBUG,
 	    "%s: deleting IP address %s", addr->iface->name, addr->saddr);
@@ -902,8 +906,10 @@ ipv4_deladdr(struct ipv4_addr *addr, int keeparp)
 		logger(addr->iface->ctx, LOG_ERR, "%s: %s: %m",
 		    addr->iface->name, __func__);
 
+#ifdef ARP
 	if (!keeparp && (astate = arp_find(addr->iface, &addr->addr)) != NULL)
 		arp_free(astate);
+#endif
 
 	state = IPV4_STATE(addr->iface);
 	TAILQ_FOREACH(ap, &state->addrs, next) {
@@ -1237,7 +1243,7 @@ ipv4_applyaddr(void *arg)
 		    ifp->name);
 		return;
 	}
-#ifdef IN_IFF_NOTUSEABLE
+#if defined(ARP) && defined(IN_IFF_NOTUSEABLE)
 	if (ia->addr_flags & IN_IFF_NOTUSEABLE)
 		return;
 #endif
@@ -1256,13 +1262,17 @@ ipv4_applyaddr(void *arg)
 	 * notification right now via our link socket. */
 	if_initrt(ifp->ctx);
 	ipv4_buildroutes(ifp->ctx);
+
+#ifdef ARP
 	/* Announce the address */
 	if (ifo->options & DHCPCD_ARP) {
 		struct arp_state *astate;
 
-		if ((astate = arp_new(ifp, &state->addr->addr)) != NULL)
+		if ((astate = arp_find(ifp, &state->addr->addr)) != NULL)
 			arp_announce(astate);
 	}
+#endif
+
 	if (state->state == DHS_BOUND) {
 		script_runreason(ifp, state->reason);
 		dhcpcd_daemonise(ifp->ctx);
@@ -1336,7 +1346,9 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 	}
 
 	if (addr->s_addr != INADDR_ANY && addr->s_addr != INADDR_BROADCAST) {
+#ifdef ARP
 		arp_handleifa(cmd, ia);
+#endif
 		dhcp_handleifa(cmd, ia);
 	}
 

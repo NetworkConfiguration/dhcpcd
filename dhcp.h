@@ -208,7 +208,9 @@ struct dhcp_state {
 	struct timespec started;
 	unsigned char *clientid;
 	struct authstate auth;
+#ifdef ARPING
 	size_t arping_index;
+#endif
 };
 
 #define D_STATE(ifp)							       \
