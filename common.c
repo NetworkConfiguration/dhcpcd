@@ -183,8 +183,8 @@ logger(struct dhcpcd_ctx *ctx, int pri, const char *fmt, ...)
 #ifdef HAVE_PRINTF_M
 		errno = serrno;
 #endif
-		vfprintf(pri <= LOG_ERR ? stderr : stdout, fmt, vac);
-		fputc('\n', pri <= LOG_ERR ? stderr : stdout);
+		vfprintf(stderr, fmt, vac);
+		fputc('\n', stderr);
 		va_end(vac);
 	}
 
