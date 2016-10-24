@@ -282,26 +282,28 @@ addvard(struct dhcpcd_ctx *ctx,
 	return addvar(ctx, e, prefix, var, buffer);
 }
 
-char *
-hwaddr_ntoa(const uint8_t *hwaddr, size_t hwlen, char *buf, size_t buflen)
+const char *
+hwaddr_ntoa(const void *hwaddr, size_t hwlen, char *buf, size_t buflen)
 {
+	const unsigned char *hp, *ep;
 	char *p;
-	size_t i;
 
-	if (buf == NULL) {
+	if (buf == NULL)
 		return NULL;
-	}
 
 	if (hwlen * 3 > buflen) {
 		errno = ENOBUFS;
-		return 0;
+		return NULL;
 	}
 
+	hp = hwaddr;
+	ep = hp + hwlen;
 	p = buf;
-	for (i = 0; i < hwlen; i++) {
-		if (i > 0)
+
+	while (hp < ep) {
+		if (hp != hwaddr)
 			*p ++= ':';
-		p += snprintf(p, 3, "%.2x", hwaddr[i]);
+		p += snprintf(p, 3, "%.2x", *hp++);
 	}
 	*p ++= '\0';
 	return buf;
