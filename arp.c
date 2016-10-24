@@ -208,8 +208,6 @@ arp_open(struct interface *ifp)
 {
 	struct iarp_state *state;
 
-printf("ARP OPENED!!!\n");
-
 	state = ARP_STATE(ifp);
 	if (state->fd == -1) {
 		state->fd = if_openraw(ifp, ETHERTYPE_ARP);
