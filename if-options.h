@@ -38,6 +38,7 @@
 #include <stdint.h>
 
 #include "auth.h"
+#include "route.h"
 
 /* Don't set any optional arguments here so we retain POSIX
  * compatibility with getopt */
@@ -176,7 +177,7 @@ struct if_options {
 
 	struct in_addr req_addr;
 	struct in_addr req_mask;
-	struct rt_head *routes;
+	struct rt_head routes;
 	struct in6_addr req_addr6;
 	uint8_t req_prefix_len;
 	unsigned int mtu;

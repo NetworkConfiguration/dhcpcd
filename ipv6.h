@@ -201,21 +201,6 @@ struct ipv6_addr {
 #define	IPV6_AF_TEMPORARY	0X2000
 #endif
 
-struct rt6 {
-	TAILQ_ENTRY(rt6) next;
-	struct in6_addr dest;
-	struct in6_addr mask;
-	struct in6_addr gate;
-	const struct interface *iface;
-	struct in6_addr src;
-	unsigned int flags;
-#ifdef HAVE_ROUTE_METRIC
-	unsigned int metric;
-#endif
-	unsigned int mtu;
-};
-TAILQ_HEAD(rt6_head, rt6);
-
 struct ll_callback {
 	TAILQ_ENTRY(ll_callback) next;
 	void (*callback)(void *);
@@ -273,9 +258,6 @@ struct ipv6_ctx {
 
 	int nd_fd;
 	struct ra_head *ra_routers;
-	struct rt6_head *routes;
-
-	struct rt6_head kroutes;
 
 	int dhcp_fd;
 };
@@ -332,9 +314,7 @@ int ipv6_staticdadcompleted(const struct interface *);
 int ipv6_startstatic(struct interface *);
 ssize_t ipv6_env(char **, const char *, const struct interface *);
 void ipv6_ctxfree(struct dhcpcd_ctx *);
-int ipv6_handlert(struct dhcpcd_ctx *, int cmd, const struct rt6 *);
-void ipv6_freerts(struct rt6_head *);
-void ipv6_buildroutes(struct dhcpcd_ctx *);
+bool inet6_getroutes(struct dhcpcd_ctx *, struct rt_head *);
 
 #else
 #define ipv6_init(a) (NULL)

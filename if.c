@@ -82,6 +82,7 @@ if_free(struct interface *ifp)
 	dhcp6_free(ifp);
 	ipv6nd_free(ifp);
 	ipv6_free(ifp);
+	rt_freeif(ifp);
 	free_options(ifp->options);
 	free(ifp);
 }
@@ -454,9 +455,6 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 				break;
 			}
 			ifp->hwlen = sdl->sdl_alen;
-#ifndef CLLADDR
-#  define CLLADDR(s) (const void *)((s)->sdl_data + (s)->sdl_nlen)
-#endif
 			memcpy(ifp->hwaddr, CLLADDR(sdl), ifp->hwlen);
 #elif AF_PACKET
 			sll = (const void *)ifa->ifa_addr;
@@ -631,6 +629,18 @@ if_findindex(struct if_head *ifaces, unsigned int idx)
 {
 
 	return if_findindexname(ifaces, idx, NULL);
+}
+
+struct interface *
+if_loopback(struct dhcpcd_ctx *ctx)
+{
+	struct interface *ifp;
+
+	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+		if (ifp->flags & IFF_LOOPBACK)
+			return ifp;
+	}
+	return NULL;
 }
 
 int

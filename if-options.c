@@ -52,6 +52,7 @@
 #include "if.h"
 #include "if-options.h"
 #include "ipv4.h"
+#include "sa.h"
 
 /* These options only make sense in the config file, so don't use any
    valid short options for them */
@@ -1071,6 +1072,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		    strncmp(arg, "ms_classless_static_routes=",
 		        strlen("ms_classless_static_routes=")) == 0)
 		{
+			struct in_addr addr3;
+
 			fp = np = strwhite(p);
 			if (np == NULL) {
 				logger(ctx, LOG_ERR,
@@ -1079,52 +1082,31 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			}
 			*np++ = '\0';
 			np = strskipwhite(np);
-			if (ifo->routes == NULL) {
-				ifo->routes = malloc(sizeof(*ifo->routes));
-				if (ifo->routes == NULL) {
-					logger(ctx, LOG_ERR,
-					    "%s: %m", __func__);
-					return -1;
-				}
-				TAILQ_INIT(ifo->routes);
-			}
-			rt = calloc(1, sizeof(*rt));
-			if (rt == NULL) {
-				logger(ctx, LOG_ERR, "%s: %m", __func__);
-				*fp = ' ';
-				return -1;
-			}
-			if (parse_addr(ctx, &rt->dest, &rt->mask, p) == -1 ||
-			    parse_addr(ctx, &rt->gate, NULL, np) == -1)
+			if (parse_addr(ctx, &addr, &addr2, p) == -1 ||
+			    parse_addr(ctx, &addr3, NULL, np) == -1)
 			{
-				free(rt);
 				*fp = ' ';
 				return -1;
 			}
-			TAILQ_INSERT_TAIL(ifo->routes, rt, next);
+			if ((rt = rt_new(if_find(ctx->ifaces, ifname))) == NULL) {
+				*fp = ' ';
+				return -1;
+			}
+			sa_in_init(&rt->rt_dest, &addr);
+			sa_in_init(&rt->rt_netmask, &addr2);
+			sa_in_init(&rt->rt_gateway, &addr3);
+			TAILQ_INSERT_TAIL(&ifo->routes, rt, rt_next);
 			*fp = ' ';
 		} else if (strncmp(arg, "routers=", strlen("routers=")) == 0) {
-			if (ifo->routes == NULL) {
-				ifo->routes = malloc(sizeof(*ifo->routes));
-				if (ifo->routes == NULL) {
-					logger(ctx, LOG_ERR,
-					    "%s: %m", __func__);
-					return -1;
-				}
-				TAILQ_INIT(ifo->routes);
-			}
-			rt = calloc(1, sizeof(*rt));
-			if (rt == NULL) {
-				logger(ctx, LOG_ERR, "%s: %m", __func__);
+			if (parse_addr(ctx, &addr, NULL, p) == -1)
 				return -1;
-			}
-			rt->dest.s_addr = INADDR_ANY;
-			rt->mask.s_addr = INADDR_ANY;
-			if (parse_addr(ctx, &rt->gate, NULL, p) == -1) {
-				free(rt);
+			if ((rt = rt_new(if_find(ctx->ifaces, ifname))) == NULL)
 				return -1;
-			}
-			TAILQ_INSERT_TAIL(ifo->routes, rt, next);
+			addr2.s_addr = INADDR_ANY;
+			sa_in_init(&rt->rt_dest, &addr2);
+			sa_in_init(&rt->rt_netmask, &addr2);
+			sa_in_init(&rt->rt_gateway, &addr);
+			TAILQ_INSERT_TAIL(&ifo->routes, rt, rt_next);
 		} else if (strncmp(arg, "interface_mtu=",
 		    strlen("interface_mtu=")) == 0 ||
 		    strncmp(arg, "mtu=", strlen("mtu=")) == 0)
@@ -2260,6 +2242,7 @@ default_config(struct dhcpcd_ctx *ctx)
 	ifo->reboot = DEFAULT_REBOOT;
 	ifo->metric = -1;
 	ifo->auth.options |= DHCPCD_AUTH_REQUIRE;
+	TAILQ_INIT(&ifo->routes);
 #ifdef AUTH
 	TAILQ_INIT(&ifo->auth.tokens);
 #endif
@@ -2599,7 +2582,7 @@ free_options(struct if_options *ifo)
 				free(ifo->config[i++]);
 			free(ifo->config);
 		}
-		ipv4_freeroutes(ifo->routes);
+		rt_headclear(&ifo->routes);
 		free(ifo->script);
 		free(ifo->arping);
 		free(ifo->blacklist);

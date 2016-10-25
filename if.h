@@ -35,20 +35,6 @@
 #include <netinet/in_var.h>	/* for IN_IFF_TENTATIVE et all */
 #endif
 
-/* Some systems have route metrics.
- * OpenBSD route priority is not this. */
-#ifndef HAVE_ROUTE_METRIC
-# if defined(__linux__)
-#  define HAVE_ROUTE_METRIC 1
-# endif
-#endif
-
-#if defined(__OpenBSD__) || defined (__sun)
-#  define ROUTE_PER_GATEWAY
-/* XXX dhcpcd doesn't really support this yet.
- * But that's generally OK if only dhcpcd is managing routes. */
-#endif
-
 /* Some systems have in-built IPv4 DAD.
  * However, we need them to do DAD at carrier up as well. */
 #ifdef IN_IFF_TENTATIVE
@@ -76,6 +62,7 @@
 #include "dhcpcd.h"
 #include "ipv4.h"
 #include "ipv6.h"
+#include "route.h"
 
 #define EUI64_ADDR_LEN			8
 #define INFINIBAND_ADDR_LEN		20
@@ -104,6 +91,12 @@
 #define RAW_EOF			1 << 0
 #define RAW_PARTIALCSUM		2 << 0
 
+#ifndef CLLADDR
+#ifdef AF_LINK
+#  define CLLADDR(sdl) (const void *)((sdl)->sdl_data + (sdl)->sdl_nlen)
+#endif
+#endif
+
 #ifdef __sun
 /* Solaris stupidly defines this for compat with BSD
  * but then ignores it. */
@@ -121,6 +114,7 @@ int if_setflag(struct interface *ifp, short flag);
 struct if_head *if_discover(struct dhcpcd_ctx *, int, char * const *);
 struct interface *if_find(struct if_head *, const char *);
 struct interface *if_findindex(struct if_head *, unsigned int);
+struct interface *if_loopback(struct dhcpcd_ctx *);
 void if_sortinterfaces(struct dhcpcd_ctx *);
 void if_free(struct interface *);
 int if_domtu(const struct interface *, short int);
@@ -207,8 +201,6 @@ int if_addrflags6(const struct interface *, const struct in6_addr *,
     const char *);
 int if_getlifetime6(struct ipv6_addr *);
 
-int if_route6(unsigned char, const struct rt6 *rt);
-int if_initrt6(struct dhcpcd_ctx *);
 #else
 #define if_checkipv6(a, b, c) (-1)
 #endif

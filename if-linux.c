@@ -1,5 +1,5 @@
 /*
- * dhcpcd - DHCP client daemon
+ * Linux interface driver for dhcpcd
  * Copyright (c) 2006-2016 Roy Marples <roy@marples.name>
  * All rights reserved
 
@@ -66,6 +66,8 @@
 #include "ipv4ll.h"
 #include "ipv6.h"
 #include "ipv6nd.h"
+#include "route.h"
+#include "sa.h"
 
 #ifdef HAVE_NL80211_H
 #include <linux/genetlink.h>
@@ -386,7 +388,6 @@ recv_again:
 	return r;
 }
 
-#ifdef INET
 static int
 if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 {
@@ -394,6 +395,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 	struct rtmsg *rtm;
 	struct rtattr *rta;
 	unsigned int ifindex;
+	struct sockaddr *sa;
 
 	len = nlm->nlmsg_len - sizeof(*nlm);
 	if (len < sizeof(*rtm)) {
@@ -401,37 +403,35 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 		return -1;
 	}
 	rtm = (struct rtmsg *)NLMSG_DATA(nlm);
-	if (rtm->rtm_table != RT_TABLE_MAIN || rtm->rtm_family != AF_INET)
+	if (rtm->rtm_table != RT_TABLE_MAIN)
 		return -1;
 
 	memset(rt, 0, sizeof(*rt));
 	if (rtm->rtm_type == RTN_UNREACHABLE)
-		rt->flags = RTF_REJECT;
+		rt->rt_flags |= RTF_REJECT;
 	if (rtm->rtm_scope == RT_SCOPE_HOST)
-		rt->flags |= RTF_HOST;
+		rt->rt_flags |= RTF_HOST;
 
 	rta = (struct rtattr *)RTM_RTA(rtm);
 	len = RTM_PAYLOAD(nlm);
 	while (RTA_OK(rta, len)) {
+		sa = NULL;
 		switch (rta->rta_type) {
 		case RTA_DST:
-			memcpy(&rt->dest.s_addr, RTA_DATA(rta),
-			    sizeof(rt->dest.s_addr));
+			sa = &rt->rt_dest;
 			break;
 		case RTA_GATEWAY:
-			memcpy(&rt->gate.s_addr, RTA_DATA(rta),
-			    sizeof(rt->gate.s_addr));
+			sa = &rt->rt_gateway;
 			break;
 		case RTA_PREFSRC:
-			memcpy(&rt->src.s_addr, RTA_DATA(rta),
-			    sizeof(rt->src.s_addr));
+			sa = &rt->rt_ifa;
 			break;
 		case RTA_OIF:
 			ifindex = *(unsigned int *)RTA_DATA(rta);
-			rt->iface = if_findindex(ctx->ifaces, ifindex);
+			rt->rt_ifp = if_findindex(ctx->ifaces, ifindex);
 			break;
 		case RTA_PRIORITY:
-			rt->metric = *(unsigned int *)RTA_DATA(rta);
+			rt->rt_metric = *(unsigned int *)RTA_DATA(rta);
 			break;
 		case RTA_METRICS:
 		{
@@ -443,7 +443,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 			while (RTA_OK(r2, l2)) {
 				switch (r2->rta_type) {
 				case RTAX_MTU:
-					rt->mtu = *(unsigned int *)RTA_DATA(r2);
+					rt->rt_mtu = *(unsigned int *)RTA_DATA(r2);
 					break;
 				}
 				r2 = RTA_NEXT(r2, l2);
@@ -452,11 +452,27 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 		}
 		}
 
+		if (sa != NULL) {
+			socklen_t salen;
+
+			sa->sa_family = rtm->rtm_family;
+			salen = sa_addrlen(sa);
+			memcpy((char *)sa + sa_addroffset(sa), RTA_DATA(rta),
+			    MIN(salen, RTA_PAYLOAD(rta)));
+		}
+
 		rta = RTA_NEXT(rta, len);
 	}
 
-	inet_cidrtoaddr(rtm->rtm_dst_len, &rt->mask);
-	if (rt->iface == NULL && rt->src.s_addr != INADDR_ANY) {
+	/* If no RTA_DST set the unspecified address for the family. */
+	if (rt->rt_dest.sa_family == AF_UNSPEC)
+		rt->rt_dest.sa_family = rtm->rtm_family;
+
+	rt->rt_netmask.sa_family = rtm->rtm_family;
+	sa_fromprefix(&rt->rt_netmask, rtm->rtm_dst_len);
+
+	#if 0
+	if (rt->rtp_ifp == NULL && rt->src.s_addr != INADDR_ANY) {
 		struct ipv4_addr *ap;
 
 		/* For some reason the default route comes back with the
@@ -465,102 +481,24 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 		if ((ap = ipv4_findaddr(ctx, &rt->src)))
 			rt->iface = ap->iface;
 	}
+	#endif
 
-	if (rt->iface == NULL) {
+	if (rt->rt_ifp == NULL) {
 		errno = ESRCH;
 		return -1;
 	}
 	return 0;
 }
-#endif
-
-#ifdef INET6
-static int
-if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, struct nlmsghdr *nlm)
-{
-	size_t len;
-	struct rtmsg *rtm;
-	struct rtattr *rta;
-	unsigned int ifindex;
-
-	len = nlm->nlmsg_len - sizeof(*nlm);
-	if (len < sizeof(*rtm)) {
-		errno = EBADMSG;
-		return -1;
-	}
-	rtm = (struct rtmsg *)NLMSG_DATA(nlm);
-	if (rtm->rtm_table != RT_TABLE_MAIN || rtm->rtm_family != AF_INET6)
-		return -1;
-
-	memset(rt, 0, sizeof(*rt));
-	if (rtm->rtm_type == RTN_UNREACHABLE)
-		rt->flags = RTF_REJECT;
-	if (rtm->rtm_scope == RT_SCOPE_HOST)
-		rt->flags |= RTF_HOST;
-	ipv6_mask(&rt->mask, rtm->rtm_dst_len);
-
-	rta = (struct rtattr *)RTM_RTA(rtm);
-	len = RTM_PAYLOAD(nlm);
-	while (RTA_OK(rta, len)) {
-		switch (rta->rta_type) {
-		case RTA_DST:
-			memcpy(&rt->dest.s6_addr, RTA_DATA(rta),
-			    sizeof(rt->dest.s6_addr));
-			break;
-		case RTA_GATEWAY:
-			memcpy(&rt->gate.s6_addr, RTA_DATA(rta),
-			    sizeof(rt->gate.s6_addr));
-			break;
-		case RTA_OIF:
-			ifindex = *(unsigned int *)RTA_DATA(rta);
-			rt->iface = if_findindex(ctx->ifaces, ifindex);
-			break;
-		case RTA_PRIORITY:
-			rt->metric = *(unsigned int *)RTA_DATA(rta);
-			break;
-		case RTA_METRICS:
-		{
-			struct rtattr *r2;
-			size_t l2;
-
-			l2 = rta->rta_len;
-			r2 = (struct rtattr *)RTA_DATA(rta);
-			while (RTA_OK(r2, l2)) {
-				switch (r2->rta_type) {
-				case RTAX_MTU:
-					rt->mtu = *(unsigned int *)RTA_DATA(r2);
-					break;
-				}
-				r2 = RTA_NEXT(r2, l2);
-			}
-			break;
-		}
-		}
-		rta = RTA_NEXT(rta, len);
-	}
-
-	if (rt->iface == NULL) {
-		errno = ESRCH;
-		return -1;
-	}
-	return 0;
-}
-#endif
 
 static int
 link_route(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
     struct nlmsghdr *nlm)
 {
 	size_t len;
-	struct rtmsg *rtm;
 	int cmd;
 	struct priv *priv;
-#ifdef INET
 	struct rt rt;
-#endif
-#ifdef INET6
-	struct rt6 rt6;
-#endif
+
 	switch (nlm->nlmsg_type) {
 	case RTM_NEWROUTE:
 		cmd = RTM_ADD;
@@ -573,7 +511,7 @@ link_route(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 	}
 
 	len = nlm->nlmsg_len - sizeof(*nlm);
-	if (len < sizeof(*rtm)) {
+	if (len < sizeof(struct rtmsg)) {
 		errno = EBADMSG;
 		return -1;
 	}
@@ -583,21 +521,8 @@ link_route(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 	if (nlm->nlmsg_pid == priv->route_pid)
 		return 0;
 
-	rtm = NLMSG_DATA(nlm);
-	switch (rtm->rtm_family) {
-#ifdef INET
-	case AF_INET:
-		if (if_copyrt(ctx, &rt, nlm) == 0)
-			ipv4_handlert(ctx, cmd, &rt, 0);
-		break;
-#endif
-#ifdef INET6
-	case AF_INET6:
-		if (if_copyrt6(ctx, &rt6, nlm) == 0)
-			ipv6_handlert(ctx, cmd, &rt6);
-		break;
-#endif
-	}
+	if (if_copyrt(ctx, &rt, nlm) == 0)
+		rt_recvrt(cmd, &rt);
 
 	return 0;
 }
@@ -1198,6 +1123,123 @@ struct nlmr
 	char buffer[256];
 };
 
+int
+if_route(unsigned char cmd, const struct rt *rt)
+{
+	struct nlmr nlm;
+	bool gateway_unspec;
+
+	printf ("\nROUTE %s\n\n", cmd == RTM_DELETE ? "DELETE" : "ADD");
+
+	memset(&nlm, 0, sizeof(nlm));
+	nlm.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
+	switch (cmd) {
+	case RTM_CHANGE:
+		nlm.hdr.nlmsg_type = RTM_NEWROUTE;
+		nlm.hdr.nlmsg_flags = NLM_F_CREATE | NLM_F_REPLACE;
+		break;
+	case RTM_ADD:
+		nlm.hdr.nlmsg_type = RTM_NEWROUTE;
+		nlm.hdr.nlmsg_flags = NLM_F_CREATE | NLM_F_EXCL;
+		break;
+	case RTM_DELETE:
+		nlm.hdr.nlmsg_type = RTM_DELROUTE;
+		break;
+	}
+	nlm.hdr.nlmsg_flags |= NLM_F_REQUEST;
+	nlm.rt.rtm_family = (unsigned char)rt->rt_dest.sa_family;
+	nlm.rt.rtm_table = RT_TABLE_MAIN;
+
+	gateway_unspec = sa_is_unspecified(&rt->rt_gateway);
+
+	if (cmd == RTM_DELETE) {
+		nlm.rt.rtm_scope = RT_SCOPE_NOWHERE;
+	} else {
+		/* Address generated routes are RTPROT_KERNEL,
+		 * otherwise RTPROT_BOOT */
+		if (rt->rt_dflags & RTDF_IFA_ROUTE)
+			nlm.rt.rtm_protocol = RTPROT_KERNEL;
+		else
+			nlm.rt.rtm_protocol = RTPROT_BOOT;
+		if (rt->rt_ifp->flags & IFF_LOOPBACK)
+			nlm.rt.rtm_scope = RT_SCOPE_HOST;
+		else if (gateway_unspec || sa_is_allones(&rt->rt_netmask))
+			nlm.rt.rtm_scope = RT_SCOPE_LINK;
+		else
+			nlm.rt.rtm_scope = RT_SCOPE_UNIVERSE;
+		nlm.rt.rtm_type = RTN_UNICAST;
+	}
+
+#define ADDSA(type, sa)							\
+	add_attr_l(&nlm.hdr, sizeof(nlm), (type),			\
+	    (const char *)(sa) + sa_addroffset((sa)),			\
+	    (unsigned short)sa_addrlen((sa)));
+	nlm.rt.rtm_dst_len = (unsigned char)sa_toprefix(&rt->rt_netmask);
+	ADDSA(RTA_DST, &rt->rt_dest);
+	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
+		if (!gateway_unspec)
+			ADDSA(RTA_GATEWAY, &rt->rt_gateway);
+		/* Cannot add tentative source addresses.
+		 * We don't know this here, so just skip INET6 ifa's.*/
+		if (!sa_is_unspecified(&rt->rt_ifa) &&
+		    rt->rt_ifa.sa_family != AF_INET6)
+			ADDSA(RTA_PREFSRC, &rt->rt_ifa);
+		if (rt->rt_mtu) {
+			char metricsbuf[32];
+			struct rtattr *metrics = (void *)metricsbuf;
+
+			metrics->rta_type = RTA_METRICS;
+			metrics->rta_len = RTA_LENGTH(0);
+			rta_add_attr_32(metrics, sizeof(metricsbuf),
+			    RTAX_MTU, rt->rt_mtu);
+			add_attr_l(&nlm.hdr, sizeof(nlm), RTA_METRICS,
+			    RTA_DATA(metrics),
+			    (unsigned short)RTA_PAYLOAD(metrics));
+		}
+	}
+
+	if (!sa_is_loopback(&rt->rt_gateway))
+		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_OIF, rt->rt_ifp->index);
+
+	if (rt->rt_metric != 0)
+		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_PRIORITY,
+		    rt->rt_metric);
+
+	return send_netlink(rt->rt_ifp->ctx, NULL,
+	    NETLINK_ROUTE, &nlm.hdr, NULL);
+}
+
+static int
+_if_initrt(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
+    struct nlmsghdr *nlm)
+{
+	struct rt rt;
+
+	if (if_copyrt(ctx, &rt, nlm) == 0) {
+		rt.rt_dflags |= RTDF_INIT;
+		rt_recvrt(RTM_ADD, &rt);
+	}
+	return 0;
+}
+
+int
+if_initrt(struct dhcpcd_ctx *ctx)
+{
+	struct nlmr nlm;
+
+	rt_headclear(&ctx->kroutes);
+
+	memset(&nlm, 0, sizeof(nlm));
+	nlm.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
+	nlm.hdr.nlmsg_type = RTM_GETROUTE;
+	nlm.hdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_MATCH;
+	nlm.rt.rtm_table = RT_TABLE_MAIN;
+	nlm.rt.rtm_family = AF_UNSPEC;
+
+	return send_netlink(ctx, NULL, NETLINK_ROUTE, &nlm.hdr, &_if_initrt);
+}
+
+
 #ifdef INET
 const char *if_pfname = "Packet Socket";
 
@@ -1370,112 +1412,6 @@ if_address(unsigned char cmd, const struct ipv4_addr *addr)
 }
 
 int
-if_route(unsigned char cmd, const struct rt *rt)
-{
-	struct nlmr nlm;
-
-	memset(&nlm, 0, sizeof(nlm));
-	nlm.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
-	switch (cmd) {
-	case RTM_CHANGE:
-		nlm.hdr.nlmsg_type = RTM_NEWROUTE;
-		nlm.hdr.nlmsg_flags = NLM_F_CREATE | NLM_F_REPLACE;
-		break;
-	case RTM_ADD:
-		nlm.hdr.nlmsg_type = RTM_NEWROUTE;
-		nlm.hdr.nlmsg_flags = NLM_F_CREATE | NLM_F_EXCL;
-		break;
-	case RTM_DELETE:
-		nlm.hdr.nlmsg_type = RTM_DELROUTE;
-		break;
-	}
-	nlm.hdr.nlmsg_flags |= NLM_F_REQUEST;
-	nlm.rt.rtm_family = AF_INET;
-	nlm.rt.rtm_table = RT_TABLE_MAIN;
-
-	if (cmd == RTM_DELETE) {
-		nlm.rt.rtm_scope = RT_SCOPE_NOWHERE;
-	} else {
-		/* Subnet routes are RTPROT_KERNEL otherwise RTPROT_BOOT */
-		if (rt->gate.s_addr == ntohl(INADDR_ANY))
-			nlm.rt.rtm_protocol = RTPROT_KERNEL;
-		else
-			nlm.rt.rtm_protocol = RTPROT_BOOT;
-		if (rt->iface->flags & IFF_LOOPBACK)
-			nlm.rt.rtm_scope = RT_SCOPE_HOST;
-		else if (rt->gate.s_addr == INADDR_ANY ||
-		    (rt->gate.s_addr == rt->dest.s_addr &&
-			rt->mask.s_addr == INADDR_BROADCAST))
-			nlm.rt.rtm_scope = RT_SCOPE_LINK;
-		else
-			nlm.rt.rtm_scope = RT_SCOPE_UNIVERSE;
-		nlm.rt.rtm_type = RTN_UNICAST;
-	}
-
-	nlm.rt.rtm_dst_len = inet_ntocidr(rt->mask);
-	add_attr_l(&nlm.hdr, sizeof(nlm), RTA_DST,
-	    &rt->dest.s_addr, sizeof(rt->dest.s_addr));
-	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
-		if (rt->gate.s_addr != htonl(INADDR_ANY))
-			add_attr_l(&nlm.hdr, sizeof(nlm), RTA_GATEWAY,
-			    &rt->gate.s_addr, sizeof(rt->gate.s_addr));
-		if (rt->src.s_addr != ntohl(INADDR_ANY)) {
-			add_attr_l(&nlm.hdr, sizeof(nlm), RTA_PREFSRC,
-			    &rt->src.s_addr, sizeof(rt->src.s_addr));
-		}
-		if (rt->mtu) {
-			char metricsbuf[32];
-			struct rtattr *metrics = (void *)metricsbuf;
-
-			metrics->rta_type = RTA_METRICS;
-			metrics->rta_len = RTA_LENGTH(0);
-			rta_add_attr_32(metrics, sizeof(metricsbuf),
-			    RTAX_MTU, rt->mtu);
-			add_attr_l(&nlm.hdr, sizeof(nlm), RTA_METRICS,
-			    RTA_DATA(metrics),
-			    (unsigned short)RTA_PAYLOAD(metrics));
-		}
-	}
-
-	if (rt->gate.s_addr != htonl(INADDR_LOOPBACK))
-		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_OIF, rt->iface->index);
-
-	if (rt->metric)
-		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_PRIORITY, rt->metric);
-
-	return send_netlink(rt->iface->ctx, NULL,
-	    NETLINK_ROUTE, &nlm.hdr, NULL);
-}
-
-static int
-_if_initrt(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
-    struct nlmsghdr *nlm)
-{
-	struct rt rt;
-
-	if (if_copyrt(ctx, &rt, nlm) == 0)
-		ipv4_handlert(ctx, RTM_ADD, &rt, 1);
-	return 0;
-}
-
-int
-if_initrt(struct dhcpcd_ctx *ctx)
-{
-	struct nlmr nlm;
-
-	ipv4_freerts(ctx->ipv4_kroutes);
-
-	memset(&nlm, 0, sizeof(nlm));
-	nlm.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
-	nlm.hdr.nlmsg_type = RTM_GETROUTE;
-	nlm.hdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_MATCH;
-	nlm.rt.rtm_family = AF_INET;
-	nlm.rt.rtm_table = RT_TABLE_MAIN;
-
-	return send_netlink(ctx, NULL, NETLINK_ROUTE, &nlm.hdr, &_if_initrt);
-}
-
-int
 if_addrflags(__unused const struct interface *ifp,
 __unused const struct in_addr *addr, __unused const char *alias)
 {
@@ -1548,114 +1484,6 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 
 	return send_netlink(ia->iface->ctx, NULL,
 	    NETLINK_ROUTE, &nlm.hdr, NULL);
-}
-
-int
-if_route6(unsigned char cmd, const struct rt6 *rt)
-{
-	struct nlmr nlm;
-
-	memset(&nlm, 0, sizeof(nlm));
-	nlm.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
-	switch (cmd) {
-	case RTM_CHANGE:
-		nlm.hdr.nlmsg_type = RTM_NEWROUTE;
-		nlm.hdr.nlmsg_flags = NLM_F_CREATE | NLM_F_REPLACE;
-		break;
-	case RTM_ADD:
-		nlm.hdr.nlmsg_type = RTM_NEWROUTE;
-		nlm.hdr.nlmsg_flags = NLM_F_CREATE | NLM_F_EXCL;
-		break;
-	case RTM_DELETE:
-		nlm.hdr.nlmsg_type = RTM_DELROUTE;
-		break;
-	}
-	nlm.hdr.nlmsg_flags |= NLM_F_REQUEST;
-	nlm.rt.rtm_family = AF_INET6;
-	nlm.rt.rtm_table = RT_TABLE_MAIN;
-
-	if (cmd == RTM_DELETE)
-		nlm.rt.rtm_scope = RT_SCOPE_NOWHERE;
-	else {
-		/* None interface subnet routes are static. */
-		if (rt->iface->flags & IFF_LOOPBACK)
-			nlm.rt.rtm_scope = RT_SCOPE_HOST;
-		else if (IN6_IS_ADDR_UNSPECIFIED(&rt->gate)) {
-			nlm.rt.rtm_protocol = RTPROT_KERNEL;
-			nlm.rt.rtm_scope = RT_SCOPE_LINK;
-		} else
-			nlm.rt.rtm_protocol = RTPROT_BOOT;
-		if (rt->flags & RTF_REJECT)
-			nlm.rt.rtm_type = RTN_UNREACHABLE;
-		else
-			nlm.rt.rtm_type = RTN_UNICAST;
-	}
-
-	nlm.rt.rtm_dst_len = ipv6_prefixlen(&rt->mask);
-	add_attr_l(&nlm.hdr, sizeof(nlm), RTA_DST,
-	    &rt->dest.s6_addr, sizeof(rt->dest.s6_addr));
-
-	if (cmd == RTM_ADD && !IN6_IS_ADDR_UNSPECIFIED(&rt->gate))
-		add_attr_l(&nlm.hdr, sizeof(nlm), RTA_GATEWAY,
-		    &rt->gate.s6_addr, sizeof(rt->gate.s6_addr));
-
-	add_attr_32(&nlm.hdr, sizeof(nlm), RTA_OIF, rt->iface->index);
-	if (rt->metric)
-		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_PRIORITY, rt->metric);
-
-	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
-#if 0
-		/* XXX This fails to work, why? */
-		if (!IN6_IS_ADDR_UNSPECIFIED(&rt->src)) {
-			add_attr_l(&nlm.hdr, sizeof(nlm), RTA_PREFSRC,
-			    &rt->src.s6_addr, sizeof(rt->src.s6_addr));
-		}
-#endif
-		if (rt->mtu) {
-			char metricsbuf[32];
-			struct rtattr *metrics = (void *)metricsbuf;
-
-			metrics->rta_type = RTA_METRICS;
-			metrics->rta_len = RTA_LENGTH(0);
-			rta_add_attr_32(metrics, sizeof(metricsbuf),
-			    RTAX_MTU, rt->mtu);
-			add_attr_l(&nlm.hdr, sizeof(nlm), RTA_METRICS,
-			    RTA_DATA(metrics),
-			    (unsigned short)RTA_PAYLOAD(metrics));
-		}
-	}
-
-	return send_netlink(rt->iface->ctx, NULL,
-	    NETLINK_ROUTE, &nlm.hdr, NULL);
-}
-
-static int
-_if_initrt6(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
-    struct nlmsghdr *nlm)
-{
-	struct rt6 rt;
-
-	if (if_copyrt6(ctx, &rt, nlm) == 0)
-		ipv6_handlert(ctx, RTM_ADD, &rt);
-	return 0;
-}
-
-int
-if_initrt6(struct dhcpcd_ctx *ctx)
-{
-	struct nlmr nlm;
-
-	ipv6_freerts(&ctx->ipv6->kroutes);
-
-	memset(&nlm, 0, sizeof(nlm));
-	nlm.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
-	nlm.hdr.nlmsg_type = RTM_GETROUTE;
-	nlm.hdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_MATCH;
-	nlm.hdr.nlmsg_flags |= NLM_F_REQUEST;
-	nlm.rt.rtm_family = AF_INET6;
-	nlm.rt.rtm_table = RT_TABLE_MAIN;
-
-	return send_netlink(ctx, NULL, NETLINK_ROUTE, &nlm.hdr, &_if_initrt6);
 }
 
 int

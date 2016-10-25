@@ -63,6 +63,7 @@
 #include "if.h"
 #include "ipv4.h"
 #include "ipv4ll.h"
+#include "sa.h"
 #include "script.h"
 
 #define DAD		"Duplicate address detected"
@@ -394,58 +395,77 @@ decode_rfc3442(char *out, size_t len, const uint8_t *p, size_t pl)
 	return (ssize_t)bytes;
 }
 
-static struct rt_head *
-decode_rfc3442_rt(struct dhcpcd_ctx *ctx, const uint8_t *data, size_t dl)
+static int
+decode_rfc3442_rt(struct rt_head *routes, struct interface *ifp,
+    const uint8_t *data, size_t dl, const struct bootp *bootp)
 {
 	const uint8_t *p = data;
 	const uint8_t *e;
 	uint8_t cidr;
 	size_t ocets;
-	struct rt_head *routes;
 	struct rt *rt = NULL;
+	struct in_addr dest, netmask, gateway;
+	int n;
 
 	/* Minimum is 5 -first is CIDR and a router length of 4 */
-	if (dl < 5)
-		return NULL;
+	if (dl < 5) {
+		errno = EINVAL;
+		return -1;
+	}
 
-	routes = malloc(sizeof(*routes));
-	TAILQ_INIT(routes);
+	n = 0;
 	e = p + dl;
 	while (p < e) {
 		cidr = *p++;
 		if (cidr > 32) {
-			ipv4_freeroutes(routes);
 			errno = EINVAL;
-			return NULL;
+			return -1;
 		}
 
 		ocets = (size_t)(cidr + 7) / NBBY;
 		if (p + 4 + ocets > e) {
-			ipv4_freeroutes(routes);
 			errno = ERANGE;
-			return NULL;
+			return -1;
 		}
 
-		rt = calloc(1, sizeof(*rt));
-		if (rt == NULL) {
-			logger(ctx, LOG_ERR, "%s: %m", __func__);
-			ipv4_freeroutes(routes);
-			return NULL;
-		}
-		TAILQ_INSERT_TAIL(routes, rt, next);
+		if ((rt = rt_new(ifp)) == NULL)
+			return -1;
+		TAILQ_INSERT_TAIL(routes, rt, rt_next);
 
 		/* If we have ocets then we have a destination and netmask */
+		dest.s_addr = 0;
 		if (ocets > 0) {
-			memcpy(&rt->dest.s_addr, p, ocets);
+			memcpy(&dest.s_addr, p, ocets);
 			p += ocets;
-			rt->mask.s_addr = htonl(~0U << (32 - cidr));
-		}
+			netmask.s_addr = htonl(~0U << (32 - cidr));
+		} else
+			netmask.s_addr = 0;
 
 		/* Finally, snag the router */
-		memcpy(&rt->gate.s_addr, p, 4);
+		memcpy(&gateway.s_addr, p, 4);
 		p += 4;
+
+		/* A host route is normally set by having the
+		 * gateway match the destination or assigned address */
+		if (gateway.s_addr == dest.s_addr ||
+		    (gateway.s_addr == bootp->yiaddr ||
+		    gateway.s_addr == bootp->ciaddr))
+		{
+			gateway.s_addr = INADDR_ANY;
+			netmask.s_addr = INADDR_BROADCAST;
+			rt->rt_flags = RTF_HOST;
+		}
+
+		sa_in_init(&rt->rt_dest, &dest);
+		sa_in_init(&rt->rt_dest, &netmask);
+		sa_in_init(&rt->rt_gateway, &gateway);
+
+		/* If CIDR is 32 then it's a host route. */
+		if (cidr == 32)
+			rt->rt_flags = RTF_HOST;
+		n++;
 	}
-	return routes;
+	return n;
 }
 
 char *
@@ -554,17 +574,18 @@ route_netmask(uint32_t ip_in)
 /* We need to obey routing options.
  * If we have a CSR then we only use that.
  * Otherwise we add static routes and then routers. */
-static struct rt_head *
-get_option_routes(struct interface *ifp,
+static int
+get_option_routes(struct rt_head *routes, struct interface *ifp,
     const struct bootp *bootp, size_t bootp_len)
 {
 	struct if_options *ifo = ifp->options;
 	const uint8_t *p;
 	const uint8_t *e;
-	struct rt_head *routes = NULL;
-	struct rt *route = NULL;
+	struct rt *rt = NULL;
+	struct in_addr dest, netmask, gateway;
 	size_t len;
 	const char *csr = "";
+	int n;
 
 	/* If we have CSR's then we MUST use these only */
 	if (!has_option_mask(ifo->nomask, DHO_CSR))
@@ -577,31 +598,23 @@ get_option_routes(struct interface *ifp,
 		if (p)
 			csr = "MS ";
 	}
-	if (p) {
-		routes = decode_rfc3442_rt(ifp->ctx, p, len);
-		if (routes) {
-			const struct dhcp_state *state;
+	if (p && (n = decode_rfc3442_rt(routes, ifp, p, len, bootp)) != -1) {
+		const struct dhcp_state *state;
 
-			state = D_CSTATE(ifp);
-			if (!(ifo->options & DHCPCD_CSR_WARNED) &&
-			    !(state->added & STATE_FAKE))
-			{
-				logger(ifp->ctx, LOG_DEBUG,
-				    "%s: using %sClassless Static Routes",
-				    ifp->name, csr);
-				ifo->options |= DHCPCD_CSR_WARNED;
-			}
-			return routes;
+		state = D_CSTATE(ifp);
+		if (!(ifo->options & DHCPCD_CSR_WARNED) &&
+		    !(state->added & STATE_FAKE))
+		{
+			logger(ifp->ctx, LOG_DEBUG,
+			    "%s: using %sClassless Static Routes",
+			    ifp->name, csr);
+			ifo->options |= DHCPCD_CSR_WARNED;
 		}
+		return n;
 	}
 
+	n = 0;
 	/* OK, get our static routes first. */
-	routes = malloc(sizeof(*routes));
-	if (routes == NULL) {
-		logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
-		return NULL;
-	}
-	TAILQ_INIT(routes);
 	if (!has_option_mask(ifo->nomask, DHO_STATICROUTE))
 		p = get_option(ifp->ctx, bootp, bootp_len,
 		    DHO_STATICROUTE, &len);
@@ -611,33 +624,33 @@ get_option_routes(struct interface *ifp,
 	if (p && len % 8 == 0) {
 		e = p + len;
 		while (p < e) {
-			if ((route = calloc(1, sizeof(*route))) == NULL) {
-				logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
-				ipv4_freeroutes(routes);
-				return NULL;
-			}
-			memcpy(&route->dest.s_addr, p, 4);
+			memcpy(&dest.s_addr, p, sizeof(dest.s_addr));
 			p += 4;
-			memcpy(&route->gate.s_addr, p, 4);
+			memcpy(&gateway.s_addr, p, sizeof(gateway.s_addr));
 			p += 4;
 			/* RFC 2131 Section 5.8 states default route is
 			 * illegal */
-			if (route->dest.s_addr == htonl(INADDR_ANY)) {
-				errno = EINVAL;
-				free(route);
+			if (sa_is_unspecified(&rt->rt_dest))
 				continue;
-			}
+			if ((rt = rt_new(ifp)) == NULL)
+				return -1;
+
 			/* A host route is normally set by having the
 			 * gateway match the destination or assigned address */
-			if (route->gate.s_addr == route->dest.s_addr ||
-			    route->gate.s_addr == bootp->yiaddr)
+			if (gateway.s_addr == dest.s_addr ||
+			     (gateway.s_addr == bootp->yiaddr ||
+			      gateway.s_addr == bootp->ciaddr))
 			{
-				route->gate.s_addr = htonl(INADDR_ANY);
-				route->mask.s_addr = htonl(INADDR_BROADCAST);
+				gateway.s_addr = INADDR_ANY;
+				netmask.s_addr = INADDR_BROADCAST;
+				rt->rt_flags = RTF_HOST;
 			} else
-				route->mask.s_addr =
-				    route_netmask(route->dest.s_addr);
-			TAILQ_INSERT_TAIL(routes, route, next);
+				netmask.s_addr = route_netmask(dest.s_addr);
+			sa_in_init(&rt->rt_dest, &dest);
+			sa_in_init(&rt->rt_netmask, &netmask);
+			sa_in_init(&rt->rt_gateway, &gateway);
+			TAILQ_INSERT_TAIL(routes, rt, rt_next);
+			n++;
 		}
 	}
 
@@ -648,19 +661,22 @@ get_option_routes(struct interface *ifp,
 		p = NULL;
 	if (p) {
 		e = p + len;
+		dest.s_addr = INADDR_ANY;
+		netmask.s_addr = INADDR_ANY;
 		while (p < e) {
-			if ((route = calloc(1, sizeof(*route))) == NULL) {
-				logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
-				ipv4_freeroutes(routes);
-				return NULL;
-			}
-			memcpy(&route->gate.s_addr, p, 4);
+			if ((rt = rt_new(ifp)) == NULL)
+				return -1;
+			memcpy(&gateway.s_addr, p, sizeof(gateway.s_addr));
 			p += 4;
-			TAILQ_INSERT_TAIL(routes, route, next);
+			sa_in_init(&rt->rt_dest, &dest);
+			sa_in_init(&rt->rt_netmask, &netmask);
+			sa_in_init(&rt->rt_gateway, &gateway);
+			TAILQ_INSERT_TAIL(routes, rt, rt_next);
+			n++;
 		}
 	}
 
-	return routes;
+	return n;
 }
 
 uint16_t
@@ -682,23 +698,14 @@ dhcp_get_mtu(const struct interface *ifp)
 
 /* Grab our routers from the DHCP message and apply any MTU value
  * the message contains */
-struct rt_head *
-dhcp_get_routes(struct interface *ifp)
+int
+dhcp_get_routes(struct rt_head *routes, struct interface *ifp)
 {
-	struct rt_head *routes;
-	uint16_t mtu;
 	const struct dhcp_state *state;
 
-	state = D_CSTATE(ifp);
-	routes = get_option_routes(ifp, state->new, state->new_len);
-	if ((mtu = dhcp_get_mtu(ifp)) != 0) {
-		struct rt *rt;
-
-		TAILQ_FOREACH(rt, routes, next) {
-			rt->mtu = mtu;
-		}
-	}
-	return routes;
+	if ((state = D_CSTATE(ifp)) == NULL || state->state != DHS_BOUND)
+		return 0;
+	return get_option_routes(routes, ifp, state->new, state->new_len);
 }
 
 /* Assumes DHCP options */
@@ -2621,6 +2628,7 @@ dhcp_drop(struct interface *ifp, const char *reason)
 #endif
 	dhcp_close(ifp);
 
+	state->state = DHS_INIT;
 	free(state->offer);
 	state->offer = NULL;
 	state->offer_len = 0;
@@ -3586,7 +3594,7 @@ dhcp_start1(void *arg)
 				state->new_len = state->offer_len;
 				state->addr = ia;
 				state->added |= STATE_ADDED | STATE_FAKE;
-				ipv4_buildroutes(ifp->ctx);
+				rt_build(ifp->ctx, AF_INET);
 			} else
 				logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
 		}
@@ -3771,7 +3779,7 @@ dhcp_handleifa(int cmd, struct ipv4_addr *ia)
 				dhcp_message_add_addr(state->new, i, ia->brd);
 	}
 	state->reason = "STATIC";
-	ipv4_buildroutes(ifp->ctx);
+	rt_build(ifp->ctx, AF_INET);
 	script_runreason(ifp, state->reason);
 	if (ifo->options & DHCPCD_INFORM) {
 		state->state = DHS_INFORM;

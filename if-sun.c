@@ -61,6 +61,8 @@
 #include "ipv4.h"
 #include "ipv6.h"
 #include "ipv6nd.h"
+#include "route.h"
+#include "sa.h"
 
 #ifndef ARP_MOD_NAME
 #  define ARP_MOD_NAME        "arp"
@@ -84,9 +86,7 @@
 		    (sa))->sin6_addr;					      \
 	} while (0)
 
-#ifndef CLLADDR
-#  define CLLADDR(s) (const void *)((s)->sdl_data + (s)->sdl_nlen)
-#endif
+#define COPYSA(dst, src) memcpy((dst), (src), salen((src)))
 
 #ifdef INET
 /* Instead of using DLPI directly, we use libdlpi which is
@@ -446,7 +446,6 @@ if_findsa(struct dhcpcd_ctx *ctx, const struct sockaddr *sa)
 	return NULL;
 }
 
-#ifdef INET
 static void
 if_finishrt(struct rt *rt)
 {
@@ -455,141 +454,79 @@ if_finishrt(struct rt *rt)
 	 * of the owning address.
 	 * dhcpcd has a blank gateway here to indicate a
 	 * subnet route. */
-	if (rt->gate.s_addr != ntohl(INADDR_ANY) &&
-	    ipv4_iffindaddr(UNCONST(rt->iface), &rt->gate, NULL))
-		rt->gate.s_addr = ntohl(INADDR_ANY);
+	if (!sa_is_unspecified(&rt->rt_gateway)) {
+		switch(rt->rt_gateway.sa_family) {
+#ifdef INET
+		case AF_INET:
+		{
+			struct in_addr *in;
+
+			in = &satosin(&rt->rt_gateway)->sin_addr;
+			if (ipv4_iffindaddr(rt->rt_ifp, in, NULL))
+				in->s_addr = INADDR_ANY;
+			break;
+		}
+#endif
+#ifdef INET6
+		case AF_INET6:
+		{
+			struct in6_addr *in6;
+
+			in6 = &satosin6(&rt->rt_gateway)->sin6_addr;
+			if (ipv6_iffindaddr(rt->rt_ifp, in6, 0))
+				*in6 = in6addr_any;
+			break;
+		}
+#endif
+		}
+	}
 
 	/* Solaris likes to set route MTU to match
 	 * interface MTU when adding routes.
 	 * This confuses dhcpcd as it expects MTU to be 0
 	 * when no explicit MTU has been set. */
-	if (rt->mtu == (unsigned int)if_getmtu(rt->iface))
-		rt->mtu = 0;
+	if (rt->rt_mtu == (unsigned int)if_getmtu(rt->rt_ifp))
+		rt->rt_mtu = 0;
 }
 
 static int
 if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 {
-	const struct sockaddr *sa, *rti_info[RTAX_MAX];
+	const struct sockaddr *rti_info[RTAX_MAX];
 
-	sa = (const void *)(rtm + 1);
-	if (sa->sa_family != AF_INET)
-		return -1;
 	if (~rtm->rtm_addrs & (RTA_DST | RTA_GATEWAY))
 		return -1;
 
-	get_addrs(rtm->rtm_addrs, sa, rti_info);
+	get_addrs(rtm->rtm_addrs, rtm + 1, rti_info);
 	memset(rt, 0, sizeof(*rt));
-	rt->flags = (unsigned int)rtm->rtm_flags;
-	COPYOUT(rt->dest, rti_info[RTAX_DST]);
+
+	rt->rt_flags = (unsigned int)rtm->rtm_flags;
+	COPYSA(&rt->rt_dest, rti_info[RTAX_DST]);
 	if (rtm->rtm_addrs & RTA_NETMASK)
-		COPYOUT(rt->mask, rti_info[RTAX_NETMASK]);
-	else
-		rt->mask.s_addr = INADDR_BROADCAST;
-	COPYOUT(rt->gate, rti_info[RTAX_GATEWAY]);
-	COPYOUT(rt->src, rti_info[RTAX_SRC]);
-	rt->mtu = (unsigned int)rtm->rtm_rmx.rmx_mtu;
+		COPYSA(&rt->rt_netmask, rti_info[RTAX_NETMASK]);
+	/* dhcpcd likes an unspecified gateway to indicate via the link. */
+	if (rt->rt_flags & RTF_GATEWAY &&
+	    rti_info[RTAX_GATEWAY]->sa_family != AF_LINK)
+		COPYSA(&rt->rt_gateway, rti_info[RTAX_GATEWAY]);
+	COPYSA(&rt->rt_ifa, rti_info[RTAX_SRC]);
+	rt->rt_mtu = (unsigned int)rtm->rtm_rmx.rmx_mtu;
 
 	if (rtm->rtm_index)
-		rt->iface = if_findindex(ctx->ifaces, rtm->rtm_index);
+		rt->rt_ifp = if_findindex(ctx->ifaces, rtm->rtm_index);
 	else if (rtm->rtm_addrs & RTA_IFP)
-		rt->iface = if_findsa(ctx, rti_info[RTAX_IFP]);
+		rt->rt_ifp = if_findsa(ctx, rti_info[RTAX_IFP]);
 	else if (rtm->rtm_addrs & RTA_GATEWAY)
-		rt->iface = if_findsa(ctx, rti_info[RTAX_GATEWAY]);
+		rt->rt_ifp = if_findsa(ctx, rti_info[RTAX_GATEWAY]);
+	else
+		rt->rt_ifp = if_findsa(ctx, rti_info[RTAX_DST]);
 
-	/* If we don't have an interface and it's a host route, it maybe
-	 * to a local ip via the loopback interface. */
-	if (rt->iface == NULL &&
-	    !(~rtm->rtm_flags & (RTF_HOST | RTF_GATEWAY)))
-	{
-		struct ipv4_addr *ia;
-
-		if ((ia = ipv4_findaddr(ctx, &rt->dest)))
-			rt->iface = ia->iface;
-	}
-
-	if (rt->iface == NULL) {
+	if (rt->rt_ifp == NULL) {
 		errno = ESRCH;
 		return -1;
 	}
 
-	if_finishrt(rt);
-
 	return 0;
 }
-#endif
-
-#ifdef INET6
-static void
-if_finishrt6(struct rt6 *rt)
-{
-
-	/* Solaris has a subnet route with the gateway
-	 * of the owning address.
-	 * dhcpcd has a blank gateway here to indicate a
-	 * subnet route. */
-	if (!IN6_IS_ADDR_UNSPECIFIED(&rt->gate) &&
-	    ipv6_iffindaddr(UNCONST(rt->iface), &rt->gate, 0))
-		rt->gate = in6addr_any;
-
-	/* Solarais likes to set route MTU to match
-	 * interface MTU when adding routes.
-	 * This confuses dhcpcd as it expects MTU to be 0
-	 * when no explicit MTU has been set. */
-	if (rt->mtu == (unsigned int)if_getmtu(rt->iface))
-		rt->mtu = 0;
-}
-
-static int
-if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, const struct rt_msghdr *rtm)
-{
-	const struct sockaddr *sa, *rti_info[RTAX_MAX];
-
-	sa = (const void *)(rtm + 1);
-	if (sa->sa_family != AF_INET6)
-		return -1;
-	if (~rtm->rtm_addrs & (RTA_DST | RTA_GATEWAY))
-		return -1;
-
-	get_addrs(rtm->rtm_addrs, sa, rti_info);
-	memset(rt, 0, sizeof(*rt));
-	rt->flags = (unsigned int)rtm->rtm_flags;
-	COPYOUT6(rt->dest, rti_info[RTAX_DST]);
-	if (rtm->rtm_addrs & RTA_NETMASK)
-		COPYOUT6(rt->mask, rti_info[RTAX_NETMASK]);
-	else
-		ipv6_mask(&rt->mask, 128);
-	COPYOUT6(rt->gate, rti_info[RTAX_GATEWAY]);
-	rt->mtu = (unsigned int)rtm->rtm_rmx.rmx_mtu;
-
-	if (rtm->rtm_index)
-		rt->iface = if_findindex(ctx->ifaces, rtm->rtm_index);
-	else if (rtm->rtm_addrs & RTA_IFP)
-		rt->iface = if_findsa(ctx, rti_info[RTAX_IFP]);
-	else if (rtm->rtm_addrs & RTA_GATEWAY)
-		rt->iface = if_findsa(ctx, rti_info[RTAX_GATEWAY]);
-
-	/* If we don't have an interface and it's a host route, it maybe
-	 * to a local ip via the loopback interface. */
-	if (rt->iface == NULL &&
-	    !(~rtm->rtm_flags & (RTF_HOST | RTF_GATEWAY)))
-	{
-		struct ipv6_addr *ia;
-
-		if ((ia = ipv6_findaddr(ctx, &rt->dest, 0)))
-			rt->iface = ia->iface;
-	}
-
-	if (rt->iface == NULL) {
-		errno = ESRCH;
-		return -1;
-	}
-
-	if_finishrt6(rt);
-
-	return 0;
-}
-#endif
 
 static int
 if_addrflags0(int fd, const char *ifname)
@@ -608,6 +545,7 @@ static void
 if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 {
 	const struct sockaddr *sa;
+	struct rt rt;
 
 	/* Ignore messages generated by us */
 	if (rtm->rtm_pid == getpid()) {
@@ -632,21 +570,8 @@ if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 
 	sa = (const void *)(rtm + 1);
 	switch (sa->sa_family) {
-#ifdef INET
-	case AF_INET:
-	{
-		struct rt rt;
-
-		if (if_copyrt(ctx, &rt, rtm) == 0)
-			ipv4_handlert(ctx, rtm->rtm_type, &rt, 0);
-		break;
-	}
-#endif
 #ifdef INET6
 	case AF_INET6:
-	{
-		struct rt6 rt6;
-
 		if (~rtm->rtm_addrs & (RTA_DST | RTA_GATEWAY))
 			break;
 		/*
@@ -670,54 +595,15 @@ if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 			ipv6nd_neighbour(ctx, &dst6,
 			    rtm->rtm_type != RTM_DELETE && sdl.sdl_alen ?
 			    IPV6ND_REACHABLE : 0);
-			break;
 		}
-
-		if (if_copyrt6(ctx, &rt6, rtm) == 0)
-			ipv6_handlert(ctx, rtm->rtm_type, &rt6);
 		break;
 	}
 #endif
+
+	if (if_copyrt(ctx, &rt, rtm) == 0) {
+		if_finishrt(&rt);
+		rt_recvrt(rtm->rtm_type, &rt);
 	}
-}
-
-static int
-sa_cmp(const struct sockaddr *x, const struct sockaddr *y)
-{
-
-	if (x->sa_family != y->sa_family)
-		return x->sa_family < y->sa_family ? -1 : 1;
-	switch (x->sa_family) {
-#ifdef INET
-	case AF_INET:
-	{
-		const struct sockaddr_in *xin, *yin;
-
-		xin = (const void *)x;
-		yin = (const void *)y;
-		if (xin->sin_addr.s_addr != yin->sin_addr.s_addr)
-			return xin->sin_addr.s_addr < yin->sin_addr.s_addr ?
-			    -1 : 1;
-		break;
-	}
-#endif
-#ifdef INET6
-	case AF_INET6:
-	{
-		const struct sockaddr_in6 *xin6, *yin6;
-
-		xin6 = (const void *)x;
-		yin6 = (const void *)y;
-		return memcmp(xin6->sin6_addr.s6_addr,
-		    yin6->sin6_addr.s6_addr,
-		    sizeof(xin6->sin6_addr.s6_addr));
-	}
-#endif
-	default:
-		assert(!"unknown sa_family");
-	}
-
-	return 0;
 }
 
 static void
@@ -917,104 +803,6 @@ if_octetstr(char *buf, const Octet_t *o, ssize_t len)
 }
 
 static int
-if_parsert(struct dhcpcd_ctx *ctx, unsigned int level, unsigned int name,
-    int (*walkrt)(struct dhcpcd_ctx *, char *, size_t))
-{
-	int			s, retval, code, flags;
-	uintptr_t		buf[512 / sizeof(uintptr_t)];
-	struct strbuf		ctlbuf, databuf;
-	struct T_optmgmt_req	*tor = (struct T_optmgmt_req *)buf;
-	struct T_optmgmt_ack	*toa = (struct T_optmgmt_ack *)buf;
-	struct T_error_ack	*tea = (struct T_error_ack *)buf;
-	struct opthdr		*req;
-
-	if ((s = open("/dev/arp", O_RDWR)) == -1)
-		return -1;
-
-	/* Assume we are erroring. */
-	retval = -1;
-
-	tor->PRIM_type = T_SVR4_OPTMGMT_REQ;
-	tor->OPT_offset = sizeof (struct T_optmgmt_req);
-	tor->OPT_length = sizeof (struct opthdr);
-	tor->MGMT_flags = T_CURRENT;
-
-	req = (struct opthdr *)&tor[1];
-	req->level = EXPER_IP_AND_ALL_IRES;
-	req->name = 0;
-	req->len = 1;
-
-	ctlbuf.buf = (char *)buf;
-	ctlbuf.len = tor->OPT_length + tor->OPT_offset;
-	if (putmsg(s, &ctlbuf, NULL, 0) == 1)
-		goto out;
-
-	req = (struct opthdr *)&toa[1];
-	ctlbuf.maxlen = sizeof(buf);
-
-	/* Create a reasonable buffer to start with */
-	databuf.maxlen = BUFSIZ * 2;
-	if ((databuf.buf = malloc(databuf.maxlen)) == NULL)
-		goto out;
-
-	for (;;) {
-		flags = 0;
-		if ((code = getmsg(s, &ctlbuf, 0, &flags)) == -1)
-			break;
-		if (code == 0 &&
-		    toa->PRIM_type == T_OPTMGMT_ACK &&
-		    toa->MGMT_flags == T_SUCCESS &&
-		    (size_t)ctlbuf.len >= sizeof(struct T_optmgmt_ack))
-		{
-			/* End of messages, so return success! */
-			retval = 0;
-			break;
-		}
-		if (tea->PRIM_type == T_ERROR_ACK) {
-			errno = tea->TLI_error == TSYSERR ?
-			    tea->UNIX_error : EPROTO;
-			break;
-		}
-		if (code != MOREDATA ||
-		    toa->PRIM_type != T_OPTMGMT_ACK ||
-		    toa->MGMT_flags != T_SUCCESS)
-		{
-			errno = ENOMSG;
-			break;
-		}
-
-		/* Try to ensure out buffer is big enough
-		 * for future messages as well. */
-		if ((size_t)databuf.maxlen < req->len) {
-			size_t newlen;
-
-			free(databuf.buf);
-			newlen = roundup(req->len, BUFSIZ);
-			if ((databuf.buf = malloc(newlen)) == NULL)
-				break;
-			databuf.maxlen = newlen;
-		}
-
-		flags = 0;
-		if (getmsg(s, NULL, &databuf, &flags) == -1)
-			break;
-
-		/* We always have to get the data before moving onto
-		 * the next item, so don't move this test higher up
-		 * to avoid the buffer allocation and getmsg calls. */
-		if (req->level == level && req->name == name) {
-			if (walkrt(ctx, databuf.buf, req->len) == -1)
-				break;
-		}
-	}
-
-	free(databuf.buf);
-out:
-	close(s);
-	return retval;
-}
-
-static int
 if_addaddr(int fd, const char *ifname,
     struct sockaddr_storage *addr, struct sockaddr_storage *mask)
 {
@@ -1194,85 +982,322 @@ if_plumb(int cmd, const struct dhcpcd_ctx *ctx, int af, const char *ifname)
 		return if_unplumbif(ctx, af, ifname);
 }
 
-static int
-if_rtmsg(unsigned char cmd, const struct interface *ifp,
-    int addrs, int flags,
-    const struct sockaddr *dst, const struct sockaddr *mask,
-    const struct sockaddr *gate, const struct sockaddr *src,
-    uint32_t mtu)
+int
+if_route(unsigned char cmd, const struct rt *rt)
 {
+	struct dhcpcd_ctx *ctx;
 	struct rtm
 	{
 		struct rt_msghdr hdr;
 		char buffer[sizeof(struct sockaddr_storage) * RTAX_MAX];
-	} rtm;
-	char *bp = rtm.buffer;
+	} rtmsg;
+	struct rt_msghdr *rtm;
+	char *bp = rtmsg.buffer;
 	size_t l;
 
 	/* WARNING: Solaris will not allow you to delete RTF_KERNEL routes.
 	 * This includes subnet/prefix routes. */
 
+	ctx = rt->rt_ifp->ctx;
 	if ((cmd == RTM_ADD || cmd == RTM_DELETE || cmd == RTM_CHANGE) &&
-	    ifp->ctx->options & DHCPCD_DAEMONISE &&
-	    !(ifp->ctx->options & DHCPCD_DAEMONISED))
-		ifp->ctx->options |= DHCPCD_RTM_PPID;
+	    ctx->options & DHCPCD_DAEMONISE &&
+	    !(ctx->options & DHCPCD_DAEMONISED))
+		ctx->options |= DHCPCD_RTM_PPID;
 
-#define ADDSA(sa) {							      \
+#define ADDSA(sa) do {							      \
 		l = RT_ROUNDUP(salen((sa)));				      \
 		memcpy(bp, (sa), l);					      \
 		bp += l;						      \
-	}
+	} while (/* CONSTCOND */ 0)
 
-	memset(&rtm, 0, sizeof(rtm));
-	rtm.hdr.rtm_version = RTM_VERSION;
-	rtm.hdr.rtm_type = cmd;
-	rtm.hdr.rtm_seq = ++ifp->ctx->seq;
-	rtm.hdr.rtm_flags = flags;
-	rtm.hdr.rtm_addrs = RTA_DST | RTA_GATEWAY | addrs;
+	memset(&rtmsg, 0, sizeof(rtmsg));
+	rtm = &rtmsg.hdr;
+	rtm->rtm_version = RTM_VERSION;
+	rtm->rtm_type = cmd;
+	rtm->rtm_seq = ++ctx->seq;
+	rtm->rtm_flags = rt->rt_flags;
+	rtm->rtm_addrs = RTA_DST | RTA_GATEWAY;
 
 	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
-		rtm.hdr.rtm_flags |= RTF_UP;
-		if (!(rtm.hdr.rtm_flags & RTF_REJECT) ||
-		    !(rtm.hdr.rtm_flags & RTF_GATEWAY))
-			rtm.hdr.rtm_addrs |= RTA_IFP;
-		if (mtu != 0) {
-			rtm.hdr.rtm_inits |= RTV_MTU;
-			rtm.hdr.rtm_rmx.rmx_mtu = mtu;
+		bool netmask_bcast = sa_is_allones(&rt->rt_netmask);
+
+		rtm->rtm_flags |= RTF_UP;
+		if (!(rtm->rtm_flags & RTF_REJECT) &&
+		    !sa_is_loopback(&rt->rt_gateway))
+		{
+			rtm->rtm_addrs |= RTA_IFP;
+			if (!sa_is_unspecified(&rt->rt_ifa))
+				rtm->rtm_addrs |= RTA_IFA;
+		}
+		if (netmask_bcast)
+			rtm->rtm_flags |= RTF_HOST;
+		else
+			rtm->rtm_flags |= RTF_GATEWAY;
+
+		/* Emulate the kernel by marking address generated
+		 * network routes non-static. */
+		if (!(rt->rt_dflags & RTDF_IFA_ROUTE))
+			rtm->rtm_flags |= RTF_STATIC;
+
+		if (rt->rt_mtu != 0) {
+			rtm->rtm_inits |= RTV_MTU;
+			rtm->rtm_rmx.rmx_mtu = rt->rt_mtu;
 		}
 	}
 
-	ADDSA(dst);
-	ADDSA(gate);
-	if (rtm.hdr.rtm_addrs & RTA_NETMASK)
-		ADDSA(mask);
+	ADDSA(&rt->rt_dest);
 
-	if (rtm.hdr.rtm_addrs & RTA_IFP) {
+	if (sa_is_unspecified(&rt->rt_gateway))
+		ADDSA(&rt->rt_ifa);
+	else
+		ADDSA(&rt->rt_gateway);
+
+	if (rtm->rtm_addrs & RTA_NETMASK)
+		ADDSA(&rt->rt_netmask);
+
+	if (rtm->rtm_addrs & RTA_IFP) {
 		struct sockaddr_dl sdl;
 
-		if_linkaddr(&sdl, ifp);
+		if_linkaddr(&sdl, rt->rt_ifp);
 		ADDSA((struct sockaddr *)&sdl);
 	}
 
 /* This no workie :/ */
-#if 0
+#if 1
 	/* route(1M) says RTA_IFA is accepted but ignored
 	 * it's unclear how RTA_SRC is different. */
-	if (rtm.hdr.rtm_addrs & RTA_IFA) {
-		rtm.hdr.rtm_addrs &= ~RTA_IFA;
-		rtm.hdr.rtm_addrs |= RTA_SRC;
+	if (rtm->rtm_addrs & RTA_IFA) {
+		rtm->rtm_addrs &= ~RTA_IFA;
+		rtm->rtm_addrs |= RTA_SRC;
 	}
-	if (rtm.hdr.rtm_addrs & RTA_SRC)
-		ADDSA(src);
+	if (rtm->rtm_addrs & RTA_SRC)
+		ADDSA(&rt->rt_ifa);
 #endif
 
 #undef ADDSA
 
-	rtm.hdr.rtm_msglen = (unsigned short)(bp - (char *)&rtm);
-	if (write(ifp->ctx->link_fd, &rtm, rtm.hdr.rtm_msglen) == -1)
+	rtm->rtm_msglen = (unsigned short)(bp - (char *)rtm);
+	if (write(ctx->link_fd, rtm, rtm->rtm_msglen) == -1)
 		return -1;
-	ifp->ctx->sseq = ifp->ctx->seq;
+	ctx->sseq = ctx->seq;
 	return 0;
 }
+
+#ifdef INET
+static int
+if_walkrt(struct dhcpcd_ctx *ctx, char *data, size_t len)
+{
+	mib2_ipRouteEntry_t *re, *e;
+	struct rt rt;
+	char ifname[IF_NAMESIZE];
+	struct in_addr in;
+
+	if (len % sizeof(*re) != 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	re = (mib2_ipRouteEntry_t *)data;
+	e = (mib2_ipRouteEntry_t *)(data + len);
+	do {
+		/* Skip route types we don't want. */
+		switch (re->ipRouteInfo.re_ire_type) {
+		case IRE_IF_CLONE:
+		case IRE_BROADCAST:
+		case IRE_MULTICAST:
+		case IRE_NOROUTE:
+		case IRE_LOCAL:
+			continue;
+		default:
+			break;
+		}
+		memset(&rt, 0, sizeof(rt));
+		rt.rt_dflags |= RTDF_INIT;
+		in.s_addr = re->ipRouteDest;
+		sa_in_init(&rt.rt_dest, &in);
+		in.s_addr = re->ipRouteMask;
+		sa_in_init(&rt.rt_netmask, &in);
+		in.s_addr = re->ipRouteNextHop;
+		sa_in_init(&rt.rt_gateway, &in);
+		rt.rt_flags = re->ipRouteInfo.re_flags;
+		in.s_addr = re->ipRouteInfo.re_src_addr;
+		sa_in_init(&rt.rt_ifa, &in);
+		rt.rt_mtu = re->ipRouteInfo.re_max_frag;
+
+		if_octetstr(ifname, &re->ipRouteIfIndex, sizeof(ifname));
+		rt.rt_ifp = if_find(ctx->ifaces, ifname);
+		if (rt.rt_ifp != NULL) {
+			if_finishrt(&rt);
+			rt_recvrt(RTM_ADD, &rt);
+		}
+	} while (++re < e);
+	return 0;
+}
+#endif
+
+#ifdef INET6
+static int
+if_walkrt6(struct dhcpcd_ctx *ctx, char *data, size_t len)
+{
+	mib2_ipv6RouteEntry_t *re, *e;
+	struct rt rt;
+	char ifname[IF_NAMESIZE];
+	struct in6_addr in6;
+
+	if (len % sizeof(*re) != 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	re = (mib2_ipv6RouteEntry_t *)data;
+	e = (mib2_ipv6RouteEntry_t *)(data + len);
+
+	do {
+		/* Skip route types we don't want. */
+		switch (re->ipv6RouteInfo.re_ire_type) {
+		case IRE_IF_CLONE:
+		case IRE_BROADCAST:
+		case IRE_MULTICAST:
+		case IRE_NOROUTE:
+		case IRE_LOCAL:
+			continue;
+		default:
+			break;
+		}
+		memset(&rt, 0, sizeof(rt));
+		rt.rt_dflags |= RTDF_INIT;
+		sa_in6_init(&rt.rt_dest, &re->ipv6RouteDest);
+		ipv6_mask(&in6, re->ipv6RoutePfxLength);
+		sa_in6_init(&rt.rt_netmask, &in6);
+		sa_in6_init(&rt.rt_gateway, &re->ipv6RouteNextHop);
+		rt.rt_mtu = re->ipv6RouteInfo.re_max_frag;
+
+		if_octetstr(ifname, &re->ipv6RouteIfIndex, sizeof(ifname));
+		rt.rt_ifp = if_find(ctx->ifaces, ifname);
+		if (rt.rt_ifp != NULL) {
+			if_finishrt(&rt);
+			rt_recvrt(RTM_ADD, &rt);
+		}
+	} while (++re < e);
+	return 0;
+}
+#endif
+
+static int
+if_parsert(struct dhcpcd_ctx *ctx, unsigned int level, unsigned int name,
+    int (*walkrt)(struct dhcpcd_ctx *, char *, size_t))
+{
+	int			s, retval, code, flags;
+	uintptr_t		buf[512 / sizeof(uintptr_t)];
+	struct strbuf		ctlbuf, databuf;
+	struct T_optmgmt_req	*tor = (struct T_optmgmt_req *)buf;
+	struct T_optmgmt_ack	*toa = (struct T_optmgmt_ack *)buf;
+	struct T_error_ack	*tea = (struct T_error_ack *)buf;
+	struct opthdr		*req;
+
+	if ((s = open("/dev/arp", O_RDWR)) == -1)
+		return -1;
+
+	/* Assume we are erroring. */
+	retval = -1;
+
+	tor->PRIM_type = T_SVR4_OPTMGMT_REQ;
+	tor->OPT_offset = sizeof (struct T_optmgmt_req);
+	tor->OPT_length = sizeof (struct opthdr);
+	tor->MGMT_flags = T_CURRENT;
+
+	req = (struct opthdr *)&tor[1];
+	req->level = EXPER_IP_AND_ALL_IRES;
+	req->name = 0;
+	req->len = 1;
+
+	ctlbuf.buf = (char *)buf;
+	ctlbuf.len = tor->OPT_length + tor->OPT_offset;
+	if (putmsg(s, &ctlbuf, NULL, 0) == 1)
+		goto out;
+
+	req = (struct opthdr *)&toa[1];
+	ctlbuf.maxlen = sizeof(buf);
+
+	/* Create a reasonable buffer to start with */
+	databuf.maxlen = BUFSIZ * 2;
+	if ((databuf.buf = malloc(databuf.maxlen)) == NULL)
+		goto out;
+
+	for (;;) {
+		flags = 0;
+		if ((code = getmsg(s, &ctlbuf, 0, &flags)) == -1)
+			break;
+		if (code == 0 &&
+		    toa->PRIM_type == T_OPTMGMT_ACK &&
+		    toa->MGMT_flags == T_SUCCESS &&
+		    (size_t)ctlbuf.len >= sizeof(struct T_optmgmt_ack))
+		{
+			/* End of messages, so return success! */
+			retval = 0;
+			break;
+		}
+		if (tea->PRIM_type == T_ERROR_ACK) {
+			errno = tea->TLI_error == TSYSERR ?
+			    tea->UNIX_error : EPROTO;
+			break;
+		}
+		if (code != MOREDATA ||
+		    toa->PRIM_type != T_OPTMGMT_ACK ||
+		    toa->MGMT_flags != T_SUCCESS)
+		{
+			errno = ENOMSG;
+			break;
+		}
+
+		/* Try to ensure out buffer is big enough
+		 * for future messages as well. */
+		if ((size_t)databuf.maxlen < req->len) {
+			size_t newlen;
+
+			free(databuf.buf);
+			newlen = roundup(req->len, BUFSIZ);
+			if ((databuf.buf = malloc(newlen)) == NULL)
+				break;
+			databuf.maxlen = newlen;
+		}
+
+		flags = 0;
+		if (getmsg(s, NULL, &databuf, &flags) == -1)
+			break;
+
+		/* We always have to get the data before moving onto
+		 * the next item, so don't move this test higher up
+		 * to avoid the buffer allocation and getmsg calls. */
+		if (req->level == level && req->name == name) {
+			if (walkrt(ctx, databuf.buf, req->len) == -1)
+				break;
+		}
+	}
+
+	free(databuf.buf);
+out:
+	close(s);
+	return retval;
+}
+
+
+int
+if_initrt(struct dhcpcd_ctx *ctx)
+{
+
+	rt_headclear(&ctx->kroutes);
+#ifdef INET
+	if (if_parsert(ctx, MIB2_IP,MIB2_IP_ROUTE, if_walkrt) == -1)
+		return -1;
+#endif
+#ifdef INET6
+	if (if_parsert(ctx, MIB2_IP6, MIB2_IP6_ROUTE, if_walkrt6) == -1)
+		return -1;
+#endif
+	return 0;
+}
+
 
 #ifdef INET
 const char *if_pfname = "DLPI";
@@ -1476,132 +1501,6 @@ if_addrflags(const struct interface *ifp, __unused const struct in_addr *addr,
 	return flags;
 }
 
-int
-if_route(unsigned char cmd, const struct rt *rt)
-{
-	struct sockaddr_in	dst = {
-		.sin_family = AF_INET,
-		.sin_addr = rt->dest
-	};
-	struct sockaddr_in	mask = {
-		.sin_family = AF_INET,
-		.sin_addr = rt->mask
-	};
-	struct sockaddr_in	gate = {
-		.sin_family = AF_INET,
-		.sin_addr = rt->gate
-	};
-	struct sockaddr_in	src = {
-		.sin_family = AF_INET,
-		.sin_addr = rt->src
-	};
-	struct sockaddr_in	*g;
-	int			addrs, flags;
-
-	addrs = 0;
-	flags = 0;
-
-	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
-		addrs |= RTA_GATEWAY | RTA_IFP;
-		/* Subnet routes are cloning or connected if supported.
-		 * All other routes are static. */
-		if (rt->gate.s_addr != ntohl(INADDR_ANY))
-			flags |= RTF_STATIC;
-		if (rt->src.s_addr != ntohl(INADDR_ANY))
-			addrs |= RTA_IFA;
-	}
-
-	if (rt->mask.s_addr == htonl(INADDR_BROADCAST) &&
-	    rt->gate.s_addr == htonl(INADDR_ANY))
-	{
-		flags |= RTF_HOST;
-	} else if (rt->gate.s_addr == htonl(INADDR_LOOPBACK) &&
-	    rt->mask.s_addr == htonl(INADDR_BROADCAST))
-	{
-		flags |= RTF_HOST | RTF_GATEWAY;
-		/* Going via lo0 so remove the interface flags */
-		addrs &= ~(RTA_IFA | RTA_IFP);
-	} else {
-		addrs |= RTA_NETMASK;
-		if (flags & RTF_STATIC)
-			flags |= RTF_GATEWAY;
-		if (rt->mask.s_addr == htonl(INADDR_BROADCAST))
-			flags |= RTF_HOST;
-	}
-
-	if ((flags & RTF_HOST && rt->gate.s_addr == htonl(INADDR_ANY)) ||
-	    !(flags & RTF_STATIC))
-		g = &src;
-	else
-		g = &gate;
-	return if_rtmsg(cmd, rt->iface, addrs, flags,
-	    (struct sockaddr *)&dst, (struct sockaddr *)&mask,
-	    (struct sockaddr *)g, (struct sockaddr *)&src, rt->mtu);
-}
-
-static int
-if_walkrt(struct dhcpcd_ctx *ctx, char *data, size_t len)
-{
-	mib2_ipRouteEntry_t *re, *e;
-	struct rt rt;
-	char ifname[IF_NAMESIZE];
-
-	if (len % sizeof(*re) != 0) {
-		errno = EINVAL;
-		return -1;
-	}
-
-	re = (mib2_ipRouteEntry_t *)data;
-	e = (mib2_ipRouteEntry_t *)(data + len);
-	do {
-		/* Skip route types we don't want. */
-		switch (re->ipRouteInfo.re_ire_type) {
-		case IRE_IF_CLONE:
-		case IRE_BROADCAST:
-		case IRE_MULTICAST:
-		case IRE_NOROUTE:
-		case IRE_LOCAL:
-			continue;
-		default:
-			break;
-		}
-		memset(&rt, 0, sizeof(rt));
-		rt.dest.s_addr = re->ipRouteDest;
-		rt.mask.s_addr = re->ipRouteMask;
-		rt.gate.s_addr = re->ipRouteNextHop;
-		rt.flags = re->ipRouteInfo.re_flags;
-		rt.src.s_addr = re->ipRouteInfo.re_src_addr;
-		rt.mtu = re->ipRouteInfo.re_max_frag;
-
-		if_octetstr(ifname, &re->ipRouteIfIndex, sizeof(ifname));
-		rt.iface = if_find(ctx->ifaces, ifname);
-		if (rt.iface != NULL) {
-			if_finishrt(&rt);
-			ipv4_handlert(ctx, RTM_ADD, &rt, 1);
-		} else {
-			char		destbuf[INET6_ADDRSTRLEN];
-			char		gatebuf[INET6_ADDRSTRLEN];
-			const char	*dest, *gate;
-
-			dest = inet_ntop(AF_INET, &rt.dest,
-			    destbuf, INET6_ADDRSTRLEN);
-			gate = inet_ntop(AF_INET, &rt.gate,
-			    gatebuf, INET6_ADDRSTRLEN);
-			logger(ctx, LOG_ERR,
-			    "no iface (%s) for route to %s via %s",
-			    ifname, dest, gate);
-		}
-	} while (++re < e);
-	return 0;
-}
-
-int
-if_initrt(struct dhcpcd_ctx *ctx)
-{
-
-	ipv4_freerts(ctx->ipv4_kroutes);
-	return if_parsert(ctx, MIB2_IP,MIB2_IP_ROUTE, if_walkrt);
-}
 #endif
 
 #ifdef INET6
@@ -1661,109 +1560,6 @@ if_getlifetime6(struct ipv6_addr *addr)
 	UNUSED(addr);
 	errno = ENOTSUP;
 	return -1;
-}
-
-int
-if_route6(unsigned char cmd, const struct rt6 *rt)
-{
-	struct sockaddr_in6	dst = {
-		.sin6_family = AF_INET6,
-		.sin6_addr = rt->dest
-	};
-	struct sockaddr_in6	mask = {
-		.sin6_family = AF_INET6,
-		.sin6_addr = rt->mask
-	};
-	struct sockaddr_in6	gate = {
-		.sin6_family = AF_INET6,
-		.sin6_addr = rt->gate
-	};
-	struct sockaddr_in6	src = {
-		.sin6_family = AF_INET6,
-		.sin6_addr = rt->src
-	};
-	struct sockaddr_in6	*g;
-	int			addrs, flags;
-
-	addrs = RTA_NETMASK;
-	flags = 0;
-
-	if (IN6_IS_ADDR_UNSPECIFIED(&rt->gate)) {
-		/* XXX FIXME: How to tell kernel route is subnet? */
-	} else
-		flags |= RTF_GATEWAY | RTF_STATIC;
-
-	if (IN6_IS_ADDR_UNSPECIFIED(&rt->gate))
-		g = &src;
-	else
-		g = &gate;
-
-	return if_rtmsg(cmd, rt->iface, addrs, flags,
-	    (struct sockaddr *)&dst, (struct sockaddr *)&mask,
-	    (struct sockaddr *)g, (struct sockaddr *)&src, rt->mtu);
-}
-
-static int
-if_walkrt6(struct dhcpcd_ctx *ctx, char *data, size_t len)
-{
-	mib2_ipv6RouteEntry_t *re, *e;
-	struct rt6 rt;
-	char ifname[IF_NAMESIZE];
-
-	if (len % sizeof(*re) != 0) {
-		errno = EINVAL;
-		return -1;
-	}
-
-	re = (mib2_ipv6RouteEntry_t *)data;
-	e = (mib2_ipv6RouteEntry_t *)(data + len);
-
-	do {
-		/* Skip route types we don't want. */
-		switch (re->ipv6RouteInfo.re_ire_type) {
-		case IRE_IF_CLONE:
-		case IRE_BROADCAST:
-		case IRE_MULTICAST:
-		case IRE_NOROUTE:
-		case IRE_LOCAL:
-			continue;
-		default:
-			break;
-		}
-		memset(&rt, 0, sizeof(rt));
-		rt.dest = re->ipv6RouteDest;
-		ipv6_mask(&rt.mask, re->ipv6RoutePfxLength);
-		rt.gate = re->ipv6RouteNextHop;
-		rt.mtu = re->ipv6RouteInfo.re_max_frag;
-
-		if_octetstr(ifname, &re->ipv6RouteIfIndex, sizeof(ifname));
-		rt.iface = if_find(ctx->ifaces, ifname);
-		if (rt.iface != NULL) {
-			if_finishrt6(&rt);
-			ipv6_handlert(ctx, RTM_ADD, &rt);
-		} else {
-			char destbuf[INET6_ADDRSTRLEN];
-			char gatebuf[INET6_ADDRSTRLEN];
-			const char *dest, *gate;
-
-			dest = inet_ntop(AF_INET6, &rt.dest,
-			    destbuf, INET6_ADDRSTRLEN);
-			gate = inet_ntop(AF_INET6, &rt.gate,
-			    gatebuf, INET6_ADDRSTRLEN);
-			logger(ctx, LOG_ERR,
-			    "no iface (%s) for route to %s via %s",
-			    ifname, dest, gate);
-		}
-	} while (++re < e);
-	return 0;
-}
-
-int
-if_initrt6(struct dhcpcd_ctx *ctx)
-{
-
-	ipv6_freerts(&ctx->ipv6->kroutes);
-	return if_parsert(ctx, MIB2_IP6, MIB2_IP6_ROUTE, if_walkrt6);
 }
 
 int
