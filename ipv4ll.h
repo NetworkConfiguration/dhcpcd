@@ -56,16 +56,14 @@ struct ipv4ll_state {
 	(IPV4LL_CSTATE((ifp)) && !IPV4LL_CSTATE((ifp))->down &&		       \
 	(IPV4LL_CSTATE((ifp))->addr != NULL))
 
-struct rt* ipv4ll_subnet_route(const struct interface *);
-struct rt* ipv4ll_default_route(const struct interface *);
+int ipv4ll_subnetroute(struct rt_head *, struct interface *);
+int ipv4ll_defaultroute(struct rt_head *,struct interface *);
 ssize_t ipv4ll_env(char **, const char *, const struct interface *);
 void ipv4ll_start(void *);
 void ipv4ll_claimed(void *);
 void ipv4ll_handle_failure(void *);
 #ifdef HAVE_ROUTE_METRIC
-int ipv4ll_handlert(struct dhcpcd_ctx *, int, const struct rt *);
-#else
-#define	ipv4ll_handlert(a, b, c)	(0)
+int ipv4ll_recvrt(int, const struct rt *);
 #endif
 
 #define	ipv4ll_free(ifp) ipv4ll_freedrop((ifp), 0);

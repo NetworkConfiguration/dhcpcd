@@ -30,6 +30,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -43,6 +44,7 @@
 #include "if-options.h"
 #include "ipv4.h"
 #include "ipv4ll.h"
+#include "sa.h"
 #include "script.h"
 
 #ifdef IPV4LL
@@ -84,50 +86,54 @@ ipv4ll_pickaddr(struct arp_state *astate)
 	return addr.s_addr;
 }
 
-struct rt *
-ipv4ll_subnet_route(const struct interface *ifp)
+int
+ipv4ll_subnetroute(struct rt_head *routes, struct interface *ifp)
 {
-	const struct ipv4ll_state *state;
+	struct ipv4ll_state *state;
 	struct rt *rt;
+	struct in_addr in;
 
 	assert(ifp != NULL);
-	if ((state = IPV4LL_CSTATE(ifp)) == NULL ||
+	if ((state = IPV4LL_STATE(ifp)) == NULL ||
 	    state->addr == NULL)
-		return NULL;
+		return 0;
 
-	if ((rt = calloc(1, sizeof(*rt))) == NULL) {
-		logger(ifp->ctx, LOG_ERR, "%s: malloc: %m", __func__);
-		return NULL;
-	}
-	rt->iface = ifp;
-	rt->dest.s_addr = state->addr->addr.s_addr & state->addr->mask.s_addr;
-	rt->mask.s_addr = state->addr->mask.s_addr;
-	rt->gate.s_addr = INADDR_ANY;
-	rt->src = state->addr->addr;
-	return rt;
+	if ((rt = rt_new(ifp)) == NULL)
+		return -1;
+
+	in.s_addr = state->addr->addr.s_addr & state->addr->mask.s_addr;
+	sa_in_init(&rt->rt_dest, &in);
+	in.s_addr = state->addr->mask.s_addr;
+	sa_in_init(&rt->rt_netmask, &in);
+	in.s_addr = INADDR_ANY;
+	sa_in_init(&rt->rt_gateway, &in);
+	sa_in_init(&rt->rt_ifa, &state->addr->addr);
+	TAILQ_INSERT_TAIL(routes, rt, rt_next);
+	return 1;
 }
 
-struct rt *
-ipv4ll_default_route(const struct interface *ifp)
+int
+ipv4ll_defaultroute(struct rt_head *routes, struct interface *ifp)
 {
-	const struct ipv4ll_state *state;
+	struct ipv4ll_state *state;
 	struct rt *rt;
+	struct in_addr in;
 
 	assert(ifp != NULL);
-	if ((state = IPV4LL_CSTATE(ifp)) == NULL ||
+	if ((state = IPV4LL_STATE(ifp)) == NULL ||
 	    state->addr == NULL)
-		return NULL;
+		return 0;
 
-	if ((rt = calloc(1, sizeof(*rt))) == NULL) {
-		logger(ifp->ctx, LOG_ERR, "%s: malloc: %m", __func__);
-		return NULL;
-	}
-	rt->iface = ifp;
-	rt->dest.s_addr = INADDR_ANY;
-	rt->mask.s_addr = INADDR_ANY;
-	rt->gate.s_addr = INADDR_ANY;
-	rt->src = state->addr->addr;
-	return rt;
+	if ((rt = rt_new(ifp)) == NULL)
+		return -1;
+
+	in.s_addr = INADDR_ANY;
+	sa_in_init(&rt->rt_dest, &in);
+	sa_in_init(&rt->rt_netmask, &in);
+	sa_in_init(&rt->rt_gateway, &in);
+	sa_in_init(&rt->rt_ifa, &state->addr->addr);
+	TAILQ_INSERT_TAIL(routes, rt, rt_next);
+	return 1;
 }
 
 ssize_t
@@ -206,8 +212,7 @@ test:
 		return;
 	}
 	timespecclear(&state->defend);
-	if_initrt(ifp->ctx);
-	ipv4_buildroutes(ifp->ctx);
+	rt_build(ifp->ctx, AF_INET);
 	arp_announce(astate);
 	script_runreason(ifp, "IPV4LL");
 	dhcpcd_daemonise(ifp->ctx);
@@ -466,7 +471,7 @@ ipv4ll_freedrop(struct interface *ifp, int drop)
 		ifp->if_data[IF_DATA_IPV4LL] = NULL;
 
 		if (dropped) {
-			ipv4_buildroutes(ifp->ctx);
+			rt_build(ifp->ctx, AF_INET);
 			script_runreason(ifp, "IPV4LL");
 		}
 	}
@@ -476,19 +481,25 @@ ipv4ll_freedrop(struct interface *ifp, int drop)
  * daemon would solve this issue easily. */
 #ifdef HAVE_ROUTE_METRIC
 int
-ipv4ll_handlert(struct dhcpcd_ctx *ctx, __unused int cmd, const struct rt *rt)
+ipv4ll_recvrt(__unused int cmd, const struct rt *rt)
 {
+	struct dhcpcd_ctx *ctx;
 	struct interface *ifp;
 
+	/* Ignore route init. */
+	if (rt->rt_dflags & RTDF_INIT)
+		return 0;
+
 	/* Only interested in default route changes. */
-	if (rt->dest.s_addr != INADDR_ANY)
+	if (sa_is_unspecified(&rt->rt_dest))
 		return 0;
 
 	/* If any interface is running IPv4LL, rebuild our routing table. */
+	ctx = rt->rt_ifp->ctx;
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 		if (IPV4LL_STATE_RUNNING(ifp)) {
-			if_initrt(ifp->ctx);
-			ipv4_buildroutes(ifp->ctx);
+			if_initrt(ctx);
+			rt_build(ctx, AF_INET);
 			break;
 		}
 	}

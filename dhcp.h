@@ -235,7 +235,7 @@ ssize_t decode_rfc3442(char *, size_t, const uint8_t *p, size_t);
 void dhcp_printoptions(const struct dhcpcd_ctx *,
     const struct dhcp_opt *, size_t);
 uint16_t dhcp_get_mtu(const struct interface *);
-struct rt_head *dhcp_get_routes(struct interface *);
+int dhcp_get_routes(struct rt_head *, struct interface *);
 ssize_t dhcp_env(char **, const char *, const struct bootp *, size_t,
     const struct interface *);
 

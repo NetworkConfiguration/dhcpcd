@@ -49,6 +49,7 @@
 #include "if.h"
 #include "ipv6.h"
 #include "ipv6nd.h"
+#include "route.h"
 #include "script.h"
 
 /* Debugging Router Solicitations is a lot of spam, so disable it */
@@ -356,7 +357,7 @@ ipv6nd_expire(struct interface *ifp, uint32_t seconds)
 	if (seconds)
 		ipv6nd_expirera(ifp);
 	else
-		ipv6_buildroutes(ifp->ctx);
+		rt_build(ifp->ctx, AF_INET6);
 }
 
 static void
@@ -369,7 +370,7 @@ ipv6nd_reachable(struct ra *rap, int flags)
 			    "%s: %s is reachable again",
 			    rap->iface->name, rap->sfrom);
 			rap->expired = 0;
-			ipv6_buildroutes(rap->iface->ctx);
+			rt_build(rap->iface->ctx, AF_INET6);
 			/* XXX Not really an RA */
 			script_runreason(rap->iface, "ROUTERADVERT");
 		}
@@ -379,7 +380,7 @@ ipv6nd_reachable(struct ra *rap, int flags)
 			    "%s: %s is unreachable, expiring it",
 			    rap->iface->name, rap->sfrom);
 			rap->expired = 1;
-			ipv6_buildroutes(rap->iface->ctx);
+			rt_build(rap->iface->ctx, AF_INET6);
 			/* XXX Not really an RA */
 			script_runreason(rap->iface, "ROUTERADVERT");
 		}
@@ -1104,9 +1105,9 @@ ipv6nd_handlera(struct dhcpcd_ctx *dctx, struct interface *ifp,
 	/* Find any freshly added routes, such as the subnet route.
 	 * We do this because we cannot rely on recieving the kernel
 	 * notification right now via our link socket. */
-	if_initrt6(ifp->ctx);
+	if_initrt(ifp->ctx);
 
-	ipv6_buildroutes(ifp->ctx);
+	rt_build(ifp->ctx, AF_INET6);
 	if (ipv6nd_scriptrun(rap))
 		return;
 
@@ -1432,7 +1433,7 @@ ipv6nd_expirera(void *arg)
 		eloop_timeout_add_tv(ifp->ctx->eloop,
 		    &next, ipv6nd_expirera, ifp);
 	if (expired) {
-		ipv6_buildroutes(ifp->ctx);
+		rt_build(ifp->ctx, AF_INET6);
 		script_runreason(ifp, "ROUTERADVERT");
 	}
 
@@ -1465,7 +1466,7 @@ ipv6nd_drop(struct interface *ifp)
 			TAILQ_REMOVE(&rtrs, rap, next);
 			ipv6nd_drop_ra(rap);
 		}
-		ipv6_buildroutes(ifp->ctx);
+		rt_build(ifp->ctx, AF_INET6);
 		if ((ifp->options->options & DHCPCD_NODROP) != DHCPCD_NODROP)
 			script_runreason(ifp, "ROUTERADVERT");
 	}
@@ -1538,7 +1539,7 @@ ipv6nd_handlena(struct dhcpcd_ctx *dctx, struct interface *ifp,
 		logger(ifp->ctx, LOG_INFO, "%s: %s not a router (%s)",
 		    ifp->name, taddr, ctx->sfrom);
 		rap->expired = 1;
-		ipv6_buildroutes(ifp->ctx);
+		rt_build(ifp->ctx,  AF_INET6);
 		script_runreason(ifp, "ROUTERADVERT");
 		return;
 	}
@@ -1548,7 +1549,7 @@ ipv6nd_handlena(struct dhcpcd_ctx *dctx, struct interface *ifp,
 			rap->expired = 0;
 			logger(ifp->ctx, LOG_INFO, "%s: %s reachable (%s)",
 			    ifp->name, taddr, ctx->sfrom);
-			ipv6_buildroutes(ifp->ctx);
+			rt_build(ifp->ctx, AF_INET6);
 			script_runreason(rap->iface, "ROUTERADVERT"); /* XXX */
 		}
 	}

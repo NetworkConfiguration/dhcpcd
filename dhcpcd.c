@@ -649,13 +649,9 @@ dhcpcd_initstate2(struct interface *ifp, unsigned long long options)
 	} else
 		ifo = ifp->options;
 
-	if (ifo->options & DHCPCD_IPV4 && ipv4_init(ifp->ctx) == -1) {
-		logger(ifp->ctx, LOG_ERR, "ipv4_init: %m");
-		ifo->options &= ~DHCPCD_IPV4;
-	}
 	if (ifo->options & DHCPCD_IPV6 && ipv6_init(ifp->ctx) == NULL) {
 		logger(ifp->ctx, LOG_ERR, "ipv6_init: %m");
-		ifo->options &= ~DHCPCD_IPV6RS;
+		ifo->options &= ~DHCPCD_IPV6;
 	}
 }
 
@@ -1885,6 +1881,8 @@ printpidfile:
 		}
 	}
 
+	rt_init(&ctx);
+
 	TAILQ_FOREACH(ifp, ctx.ifaces, next) {
 		if (ifp->active)
 			dhcpcd_initstate1(ifp, argc, argv, 0);
@@ -1958,6 +1956,8 @@ exit_failure:
 	i = EXIT_FAILURE;
 
 exit1:
+	if (control_stop(&ctx) == -1)
+		logger(&ctx, LOG_ERR, "control_stop: %m:");
 	/* Free memory and close fd's */
 	if (ctx.ifaces) {
 		while ((ifp = TAILQ_FIRST(ctx.ifaces))) {
@@ -1966,6 +1966,7 @@ exit1:
 		}
 		free(ctx.ifaces);
 	}
+	rt_dispose(&ctx);
 	free(ctx.duid);
 	if (ctx.link_fd != -1) {
 		eloop_event_delete(ctx.eloop, ctx.link_fd);
@@ -1974,11 +1975,8 @@ exit1:
 	if_closesockets(&ctx);
 	free_options(ifo);
 	free_globals(&ctx);
-	ipv4_ctxfree(&ctx);
 	ipv6_ctxfree(&ctx);
 	dev_stop(&ctx);
-	if (control_stop(&ctx) == -1)
-		logger(&ctx, LOG_ERR, "control_stop: %m:");
 	eloop_free(ctx.eloop);
 	free(ctx.iov[0].iov_base);
 

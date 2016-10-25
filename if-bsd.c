@@ -1,5 +1,5 @@
 /*
- * dhcpcd - DHCP client daemon
+ * BSD interface driver for dhcpcd
  * Copyright (c) 2006-2016 Roy Marples <roy@marples.name>
  * All rights reserved
 
@@ -57,6 +57,7 @@
 #  include <net80211/ieee80211_ioctl.h>
 #endif
 
+#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <fnmatch.h>
@@ -82,6 +83,8 @@
 #include "ipv4ll.h"
 #include "ipv6.h"
 #include "ipv6nd.h"
+#include "route.h"
+#include "sa.h"
 
 #include "bpf-filter.h"
 
@@ -91,20 +94,9 @@
 #define RT_ADVANCE(x, n) (x += RT_ROUNDUP((n)->sa_len))
 #endif
 
-#define COPYOUT(sin, sa) do {						      \
-	if ((sa) && ((sa)->sa_family == AF_INET || (sa)->sa_family == 255))   \
-		(sin) = ((const struct sockaddr_in *)(const void *)	      \
-		    (sa))->sin_addr;	      \
-	} while (0)
-
-#define COPYOUT6(sin, sa) do {						      \
-	if ((sa) && ((sa)->sa_family == AF_INET6 || (sa)->sa_family == 255))  \
-		(sin) = ((const struct sockaddr_in6 *)(const void *)	      \
-		    (sa))->sin6_addr;     \
-	} while (0)
-
-#ifndef CLLADDR
-#  define CLLADDR(s) (const void *)((s)->sdl_data + (s)->sdl_nlen)
+#ifdef INET6
+static void
+ifa_scope(struct sockaddr_in6 *, unsigned int);
 #endif
 
 struct priv {
@@ -359,29 +351,44 @@ if_findsa(struct dhcpcd_ctx *ctx, const struct sockaddr *sa)
 	return NULL;
 }
 
-static int
-if_rtmsg(unsigned char cmd, const struct interface *ifp,
-    int addrs, int flags,
-#ifdef RTP_CONNECTED
-    int priority,
-#endif
-    const struct sockaddr *dst, const struct sockaddr *mask,
-    const struct sockaddr *gate, const struct sockaddr *src,
-    uint32_t mtu)
+static void
+if_copysa(struct sockaddr *dst, const struct sockaddr *src)
 {
+
+	memcpy(dst, src, src->sa_len);
+#ifdef __KAME__
+	if (dst->sa_family == AF_INET6) {
+		struct in6_addr *in6;
+
+		in6 = &satosin6(dst)->sin6_addr;
+		if (IN6_IS_ADDR_LINKLOCAL(in6))
+			in6->s6_addr[2] = in6->s6_addr[3] = '\0';
+	}
+#endif
+}
+
+int
+if_route(unsigned char cmd, const struct rt *rt)
+{
+	struct dhcpcd_ctx *ctx;
 	struct rtm
 	{
 		struct rt_msghdr hdr;
 		char buffer[sizeof(struct sockaddr_storage) * RTAX_MAX];
-	} rtm;
-	char *bp = rtm.buffer;
+	} rtmsg;
+	struct rt_msghdr *rtm = &rtmsg.hdr;
+	char *bp = rtmsg.buffer;
 	size_t l;
 	struct sockaddr_dl sdl;
+	bool gateway_unspec;
+
+	assert(rt != NULL);
+	ctx = rt->rt_ifp->ctx;
 
 	if ((cmd == RTM_ADD || cmd == RTM_DELETE || cmd == RTM_CHANGE) &&
-	    ifp->ctx->options & DHCPCD_DAEMONISE &&
-	    !(ifp->ctx->options & DHCPCD_DAEMONISED))
-		ifp->ctx->options |= DHCPCD_RTM_PPID;
+	    ctx->options & DHCPCD_DAEMONISE &&
+	    !(ctx->options & DHCPCD_DAEMONISED))
+		ctx->options |= DHCPCD_RTM_PPID;
 
 #define ADDSA(sa) do {							      \
 		l = RT_ROUNDUP(((sa)->sa_len));				      \
@@ -389,62 +396,213 @@ if_rtmsg(unsigned char cmd, const struct interface *ifp,
 		bp += l;						      \
 	}  while (0 /* CONSTCOND */)
 
-	memset(&rtm, 0, sizeof(rtm));
-	rtm.hdr.rtm_version = RTM_VERSION;
-	rtm.hdr.rtm_type = cmd;
+	memset(rtm, 0, sizeof(*rtm));
+	rtm->rtm_version = RTM_VERSION;
+	rtm->rtm_type = cmd;
 #ifdef __OpenBSD__
-	rtm.hdr.rtm_pid = getpid();
+	rtm->rtm_pid = getpid();
 #endif
-	rtm.hdr.rtm_seq = ++ifp->ctx->seq;
-	rtm.hdr.rtm_flags = flags;
-	rtm.hdr.rtm_addrs = RTA_DST | addrs;
+	rtm->rtm_seq = ++ctx->seq;
+	rtm->rtm_flags = (int)rt->rt_flags;
+	rtm->rtm_addrs = RTA_DST;
 #ifdef RTF_PINNED
 	if (cmd != RTM_ADD)
-		rtm.hdr.rtm_flags |= RTF_PINNED;
-#endif
-#ifdef RTP_CONNECTED
-	rtm.hdr.rtm_priority = priority;
+		rtm->rtm_flags |= RTF_PINNED;
 #endif
 
+	gateway_unspec = sa_is_unspecified(&rt->rt_gateway);
+
 	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
-		rtm.hdr.rtm_flags |= RTF_UP;
-		rtm.hdr.rtm_addrs |= RTA_GATEWAY;
-		if (rtm.hdr.rtm_flags & (RTF_GATEWAY | RTF_REJECT))
-			/* Going via lo0 so remove the interface flags. */
-			rtm.hdr.rtm_addrs &= ~(RTA_IFP | RTA_IFA);
-		if (mtu != 0) {
-			rtm.hdr.rtm_inits |= RTV_MTU;
-			rtm.hdr.rtm_rmx.rmx_mtu = mtu;
+		bool netmask_bcast = sa_is_allones(&rt->rt_netmask);
+
+		rtm->rtm_flags |= RTF_UP;
+		rtm->rtm_addrs |= RTA_GATEWAY | RTA_IFP;
+		if (!(rtm->rtm_flags & RTF_REJECT) &&
+		    !sa_is_loopback(&rt->rt_gateway))
+		{
+			rtm->rtm_addrs |= RTA_IFP;
+			if (!sa_is_unspecified(&rt->rt_ifa))
+				rtm->rtm_addrs |= RTA_IFA;
+		}
+		if (netmask_bcast)
+			rtm->rtm_flags |= RTF_HOST;
+		/* Network routes are cloning or connected if supported.
+		 * All other routes are static. */
+		if (gateway_unspec) {
+#ifdef RTF_CLONING
+			rtm->rtm_flags |= RTF_CLONING;
+#endif
+#ifdef RTF_CONNECTED
+			rtm->rtm_flags |= RTF_CONNECTED;
+#endif
+#ifdef RTP_CONNECTED
+			rtm->rtm_priority = RTP_CONNECTED;
+#endif
+#ifdef RTF_CLONING
+			if (netmask_bcast) {
+				/*
+				 * We add a cloning network route for a single
+				 * host. Traffic to the host will generate a
+				 * cloned route and the hardware address will
+				 * resolve correctly.
+				 * It might be more correct to use RTF_HOST
+				 * instead of RTF_CLONING, and that does work,
+				 * but some OS generate an arp warning
+				 * diagnostic which we don't want to do.
+				 */
+				rtm->rtm_flags &= ~RTF_HOST;
+			}
+#endif
+		} else
+			rtm->rtm_flags |= RTF_GATEWAY;
+
+		/* Emulate the kernel by marking address generated
+		 * network routes non-static. */
+		if (!(rt->rt_dflags & RTDF_IFA_ROUTE))
+			rtm->rtm_flags |= RTF_STATIC;
+
+		if (rt->rt_mtu != 0) {
+			rtm->rtm_inits |= RTV_MTU;
+			rtm->rtm_rmx.rmx_mtu = rt->rt_mtu;
 		}
 	}
 
-	ADDSA(dst);
-	if_linkaddr(&sdl, ifp);
-	if (rtm.hdr.rtm_addrs & RTA_GATEWAY) {
-		if (gate == NULL)
-			ADDSA((struct sockaddr *)&sdl);
-		else
-			ADDSA(gate);
-	}
-	if (rtm.hdr.rtm_addrs & RTA_NETMASK)
-		ADDSA(mask);
+	if (!(rtm->rtm_flags & RTF_HOST))
+		rtm->rtm_addrs |= RTA_NETMASK;
 
-	if (rtm.hdr.rtm_addrs & RTA_IFP) {
-		rtm.hdr.rtm_index = (unsigned short)ifp->index;
+	if_linkaddr(&sdl, rt->rt_ifp);
+
+	ADDSA(&rt->rt_dest);
+
+	if (rtm->rtm_addrs & RTA_GATEWAY) {
+		if (gateway_unspec)
+			ADDSA((struct sockaddr *)&sdl);
+		else {
+			union sa_ss gateway;
+
+			if_copysa(&gateway.sa, &rt->rt_gateway);
+#ifdef INET6
+			if (gateway.sa.sa_family == AF_INET6)
+				ifa_scope(&gateway.sin6, rt->rt_ifp->index);
+#endif
+			ADDSA(&gateway.sa);
+		}
+	}
+
+	if (rtm->rtm_addrs & RTA_NETMASK)
+		ADDSA(&rt->rt_netmask);
+
+	if (rtm->rtm_addrs & RTA_IFP) {
+		rtm->rtm_index = (unsigned short)rt->rt_ifp->index;
 		ADDSA((struct sockaddr *)&sdl);
 	}
 
-	if (rtm.hdr.rtm_addrs & RTA_IFA)
-		ADDSA(src);
+	if (rtm->rtm_addrs & RTA_IFA)
+		ADDSA(&rt->rt_ifa);
 
 #undef ADDSA
 
-	rtm.hdr.rtm_msglen = (unsigned short)(bp - (char *)&rtm);
-	if (write(ifp->ctx->link_fd, &rtm, rtm.hdr.rtm_msglen) == -1)
+	rtm->rtm_msglen = (unsigned short)(bp - (char *)rtm);
+	if (write(ctx->link_fd, rtm, rtm->rtm_msglen) == -1)
 		return -1;
-	ifp->ctx->sseq = ifp->ctx->seq;
+	ctx->sseq = ctx->seq;
 	return 0;
 }
+
+static int
+if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
+{
+	const struct sockaddr *rti_info[RTAX_MAX];
+
+	if (~rtm->rtm_addrs & (RTA_DST | RTA_GATEWAY))
+		return -1;
+#ifdef RTF_CLONED
+	if (rtm->rtm_flags & RTF_CLONED)
+		return -1;
+#endif
+#ifdef RTF_LOCAL
+	if (rtm->rtm_flags & RTF_LOCAL)
+		return -1;
+#endif
+#ifdef RTF_BROADCAST
+	if (rtm->rtm_flags & RTF_BROADCAST)
+		return -1;
+#endif
+
+	get_addrs(rtm->rtm_addrs, rtm + 1, rti_info);
+	memset(rt, 0, sizeof(*rt));
+
+	rt->rt_flags = (unsigned int)rtm->rtm_flags;
+	if_copysa(&rt->rt_dest, rti_info[RTAX_DST]);
+	if (rtm->rtm_addrs & RTA_NETMASK) {
+		if_copysa(&rt->rt_netmask, rti_info[RTAX_NETMASK]);
+		if (rt->rt_netmask.sa_family == 255) /* Why? */
+			rt->rt_netmask.sa_family = rt->rt_dest.sa_family;
+	}
+	/* dhcpcd likes an unspecified gateway to indicate via the link. */
+	if (rt->rt_flags & RTF_GATEWAY &&
+	    rti_info[RTAX_GATEWAY]->sa_family != AF_LINK)
+		if_copysa(&rt->rt_gateway, rti_info[RTAX_GATEWAY]);
+	if_copysa(&rt->rt_ifa, rti_info[RTAX_IFA]);
+	rt->rt_mtu = (unsigned int)rtm->rtm_rmx.rmx_mtu;
+
+	if (rtm->rtm_index)
+		rt->rt_ifp = if_findindex(ctx->ifaces, rtm->rtm_index);
+	else if (rtm->rtm_addrs & RTA_IFP)
+		rt->rt_ifp = if_findsa(ctx, rti_info[RTAX_IFP]);
+	else if (rtm->rtm_addrs & RTA_GATEWAY)
+		rt->rt_ifp = if_findsa(ctx, rti_info[RTAX_GATEWAY]);
+	else
+		rt->rt_ifp = if_findsa(ctx, rti_info[RTAX_DST]);
+
+	if (rt->rt_ifp == NULL) {
+		errno = ESRCH;
+		return -1;
+	}
+	return 0;
+}
+
+int
+if_initrt(struct dhcpcd_ctx *ctx)
+{
+	struct rt_msghdr *rtm;
+	int mib[6];
+	size_t needed;
+	char *buf, *p, *end;
+	struct rt rt;
+
+	rt_headclear(&ctx->kroutes);
+
+	mib[0] = CTL_NET;
+	mib[1] = PF_ROUTE;
+	mib[2] = 0;
+	mib[3] = AF_UNSPEC;
+	mib[4] = NET_RT_DUMP;
+	mib[5] = 0;
+
+	if (sysctl(mib, 6, NULL, &needed, NULL, 0) == -1)
+		return -1;
+	if (needed == 0)
+		return 0;
+	if ((buf = malloc(needed)) == NULL)
+		return -1;
+	if (sysctl(mib, 6, buf, &needed, NULL, 0) == -1) {
+		free(buf);
+		return -1;
+	}
+
+	end = buf + needed;
+	for (p = buf; p < end; p += rtm->rtm_msglen) {
+		rtm = (void *)p;
+		if (if_copyrt(ctx, &rt, rtm) == 0) {
+			rt.rt_dflags |= RTDF_INIT;
+			rt_recvrt(RTM_ADD, &rt);
+		}
+	}
+	free(buf);
+	return 0;
+}
+
 #endif
 
 #ifdef INET
@@ -647,207 +805,7 @@ if_address(unsigned char cmd, const struct ipv4_addr *ia)
 	return r;
 }
 
-static int
-if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
-{
-	const struct sockaddr *sa, *rti_info[RTAX_MAX];
 
-	sa = (const void *)(rtm + 1);
-	if (sa->sa_family != AF_INET)
-		return -1;
-	if (~rtm->rtm_addrs & (RTA_DST | RTA_GATEWAY))
-		return -1;
-#ifdef RTF_CLONED
-	if (rtm->rtm_flags & RTF_CLONED)
-		return -1;
-#endif
-#ifdef RTF_LOCAL
-	if (rtm->rtm_flags & RTF_LOCAL)
-		return -1;
-#endif
-#ifdef RTF_BROADCAST
-	if (rtm->rtm_flags & RTF_BROADCAST)
-		return -1;
-#endif
-
-	get_addrs(rtm->rtm_addrs, sa, rti_info);
-	memset(rt, 0, sizeof(*rt));
-	rt->flags = (unsigned int)rtm->rtm_flags;
-	COPYOUT(rt->dest, rti_info[RTAX_DST]);
-	if (rtm->rtm_addrs & RTA_NETMASK)
-		COPYOUT(rt->mask, rti_info[RTAX_NETMASK]);
-	else
-		rt->mask.s_addr = INADDR_BROADCAST;
-	COPYOUT(rt->gate, rti_info[RTAX_GATEWAY]);
-	COPYOUT(rt->src, rti_info[RTAX_IFA]);
-	rt->mtu = (unsigned int)rtm->rtm_rmx.rmx_mtu;
-
-	if (rtm->rtm_index)
-		rt->iface = if_findindex(ctx->ifaces, rtm->rtm_index);
-	else if (rtm->rtm_addrs & RTA_IFP)
-		rt->iface = if_findsa(ctx, rti_info[RTAX_IFP]);
-	else if (rtm->rtm_addrs & RTA_GATEWAY)
-		rt->iface = if_findsa(ctx, rti_info[RTAX_GATEWAY]);
-
-	/* If we don't have an interface and it's a host route, it maybe
-	 * to a local ip via the loopback interface. */
-	if (rt->iface == NULL &&
-	    !(~rtm->rtm_flags & (RTF_HOST | RTF_GATEWAY)))
-	{
-		struct ipv4_addr *ia;
-
-		if ((ia = ipv4_findaddr(ctx, &rt->dest)))
-			rt->iface = ia->iface;
-	}
-
-	if (rt->iface == NULL) {
-		errno = ESRCH;
-		return -1;
-	}
-	return 0;
-}
-
-int
-if_route(unsigned char cmd, const struct rt *rt)
-{
-	struct sockaddr_in dst = {
-		.sin_family = AF_INET,
-		.sin_len = sizeof(dst),
-		.sin_addr = rt->dest
-	};
-	struct sockaddr_in mask = {
-		.sin_family = AF_INET,
-		.sin_len = sizeof(mask),
-		.sin_addr = rt->mask
-	};
-	struct sockaddr_in gate = {
-		.sin_family = AF_INET,
-		.sin_len = sizeof(gate),
-		.sin_addr = rt->gate
-	};
-	struct sockaddr_in src = {
-		.sin_family = AF_INET,
-		.sin_len = sizeof(src),
-		.sin_addr = rt->src
-	};
-	struct sockaddr_in *g;
-	int addrs, flags;
-#ifdef RTP_CONNECTED
-	int priority = 0;
-#endif
-
-	addrs = 0;
-	flags = (int)rt->flags;
-
-	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
-		addrs |= RTA_GATEWAY | RTA_IFP;
-		/* Subnet routes are cloning or connected if supported.
-		 * All other routes are static. */
-		if (rt->gate.s_addr == ntohl(INADDR_ANY)) {
-#ifdef RTF_CLONING
-			flags |= RTF_CLONING;
-#endif
-#ifdef RTF_CONNECTED
-			flags |= RTF_CONNECTED;
-#endif
-#ifdef RTP_CONNECTED
-			priority = RTP_CONNECTED;
-#endif
-		} else
-			flags |= RTF_STATIC;
-		if (rt->src.s_addr != ntohl(INADDR_ANY))
-			addrs |= RTA_IFA;
-	}
-
-	if (rt->mask.s_addr == htonl(INADDR_BROADCAST) &&
-	    rt->gate.s_addr == htonl(INADDR_ANY))
-	{
-#ifdef RTF_CLONING
-		/* We add a cloning network route for a single host.
-		 * Traffic to the host will generate a cloned route and the
-		 * hardware address will resolve correctly.
-		 * It might be more correct to use RTF_HOST instead of
-		 * RTF_CLONING, and that does work, but some OS generate
-		 * an arp warning diagnostic which we don't want to do. */
-		flags |= RTF_CLONING;
-		addrs |= RTA_NETMASK;
-#else
-		flags |= RTF_HOST;
-#endif
-	} else if (rt->gate.s_addr == htonl(INADDR_LOOPBACK) &&
-	    rt->mask.s_addr == htonl(INADDR_BROADCAST))
-	{
-		flags |= RTF_HOST | RTF_GATEWAY;
-		/* Going via lo0 so remove the interface flags */
-		addrs &= ~(RTA_IFA | RTA_IFP);
-	} else {
-		addrs |= RTA_NETMASK;
-		if (flags & RTF_STATIC)
-			flags |= RTF_GATEWAY;
-		if (rt->mask.s_addr == htonl(INADDR_BROADCAST))
-			flags |= RTF_HOST;
-	}
-
-	if ((flags & RTF_HOST && rt->gate.s_addr == htonl(INADDR_ANY)) ||
-#ifdef RTF_CLONING
-	   flags & RTF_CLONING ||
-#endif
-#ifdef RTF_CONNECTED
-	    flags & RTF_CONNECTED ||
-#endif
-#ifdef RTP_CONNECTED
-	    priority != 0 ||
-#endif
-	    !(flags & RTF_STATIC))
-		g = NULL;
-	else
-		g = &gate;
-	return if_rtmsg(cmd, rt->iface, addrs, flags,
-#ifdef RTP_CONNECTED
-	    priority,
-#endif
-	    (struct sockaddr *)&dst, (struct sockaddr *)&mask,
-	    (struct sockaddr *)g, (struct sockaddr *)&src, rt->mtu);
-}
-
-int
-if_initrt(struct dhcpcd_ctx *ctx)
-{
-	struct rt_msghdr *rtm;
-	int mib[6];
-	size_t needed;
-	char *buf, *p, *end;
-	struct rt rt;
-
-	ipv4_freerts(ctx->ipv4_kroutes);
-
-	mib[0] = CTL_NET;
-	mib[1] = PF_ROUTE;
-	mib[2] = 0;
-	mib[3] = AF_INET;
-	mib[4] = NET_RT_DUMP;
-	mib[5] = 0;
-
-	if (sysctl(mib, 6, NULL, &needed, NULL, 0) == -1)
-		return -1;
-	if (needed == 0)
-		return 0;
-	if ((buf = malloc(needed)) == NULL)
-		return -1;
-	if (sysctl(mib, 6, buf, &needed, NULL, 0) == -1) {
-		free(buf);
-		return -1;
-	}
-
-	end = buf + needed;
-	for (p = buf; p < end; p += rtm->rtm_msglen) {
-		rtm = (void *)p;
-		if (if_copyrt(ctx, &rt, rtm) == 0)
-			ipv4_handlert(ctx, RTM_ADD, &rt, 1);
-	}
-	free(buf);
-	return 0;
-}
 
 #if !(defined(HAVE_IFADDRS_ADDRFLAGS) && defined(HAVE_IFAM_ADDRFLAGS))
 int
@@ -896,15 +854,6 @@ ifa_scope(struct sockaddr_in6 *sin, unsigned int ifindex)
 		sin->sin6_scope_id = 0;
 #endif
 }
-
-#ifdef __KAME__
-#define DESCOPE(ia6) do {						      \
-	if (IN6_IS_ADDR_LINKLOCAL((ia6)))				      \
-		(ia6)->s6_addr[2] = (ia6)->s6_addr[3] = '\0';		      \
-	} while (/*CONSTCOND */0)
-#else
-#define DESCOPE(ia6)
-#endif
 
 int
 if_address6(unsigned char cmd, const struct ipv6_addr *ia)
@@ -1004,217 +953,6 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 
 	return ioctl(priv->pf_inet6_fd,
 	    cmd == RTM_DELADDR ? SIOCDIFADDR_IN6 : SIOCAIFADDR_IN6, &ifa);
-}
-
-static int
-if_copyrt6(struct dhcpcd_ctx *ctx, struct rt6 *rt, const struct rt_msghdr *rtm)
-{
-	const struct sockaddr *sa, *rti_info[RTAX_MAX];
-
-	sa = (const void *)(rtm + 1);
-	if (sa->sa_family != AF_INET6)
-		return -1;
-	if (~rtm->rtm_addrs & (RTA_DST | RTA_GATEWAY))
-		return -1;
-#ifdef RTF_CLONED
-	if (rtm->rtm_flags & (RTF_CLONED | RTF_HOST))
-		return -1;
-#else
-	if (rtm->rtm_flags & RTF_HOST)
-		return -1;
-#endif
-#ifdef RTF_LOCAL
-	if (rtm->rtm_flags & RTF_LOCAL)
-		return -1;
-#endif
-
-	get_addrs(rtm->rtm_addrs, sa, rti_info);
-	memset(rt, 0, sizeof(*rt));
-	rt->flags = (unsigned int)rtm->rtm_flags;
-	COPYOUT6(rt->dest, rti_info[RTAX_DST]);
-	DESCOPE(&rt->dest);
-	if (rtm->rtm_addrs & RTA_NETMASK) {
-		/*
-		 * We need to zero out the struct beyond sin6_len and
-		 * ensure it's valid.
-		 * I have no idea what the invalid data is for, could be
-		 * a kernel bug or actually used for something.
-		 * Either way it needs to be zeroed out.
-		 */
-		const struct sockaddr_in6 *sin6;
-		size_t e, i, final = 0, illegal = 0;
-		const unsigned char *p;
-
-		sin6 = (const void *)rti_info[RTAX_NETMASK];
-		rt->mask = sin6->sin6_addr;
-		e = sin6->sin6_len - offsetof(struct sockaddr_in6, sin6_addr);
-		if (e > sizeof(struct in6_addr))
-			e = sizeof(struct in6_addr);
-		for (p = (const unsigned char *)&sin6->sin6_addr, i = 0;
-		    i < e;
-		    p++)
-		{
-			if (final && *p) {
-				illegal = 1;
-				rt->mask.s6_addr[i++] = 0x00;
-				continue;
-			}
-			switch (*p & 0xff) {
-			case 0xff:
-				break;
-			case 0xfe:
-			case 0xfc:
-			case 0xf8:
-			case 0xf0:
-			case 0xe0:
-			case 0xc0:
-			case 0x80:
-				final = 1;
-				break;
-			default:
-				final = 1;
-				illegal = 1;
-				break;
-			}
-			if (!illegal)
-				rt->mask.s6_addr[i++] &= *p;
-			else
-				rt->mask.s6_addr[i++] = 0x00;
-		}
-		while (i < sizeof(rt->mask.s6_addr))
-			rt->mask.s6_addr[i++] = 0x00;
-	} else
-		ipv6_mask(&rt->mask, 128);
-	COPYOUT6(rt->gate, rti_info[RTAX_GATEWAY]);
-	DESCOPE(&rt->gate);
-	rt->mtu = (unsigned int)rtm->rtm_rmx.rmx_mtu;
-
-	if (rtm->rtm_index)
-		rt->iface = if_findindex(ctx->ifaces, rtm->rtm_index);
-	else if (rtm->rtm_addrs & RTA_IFP)
-		rt->iface = if_findsa(ctx, rti_info[RTAX_IFP]);
-	else if (rtm->rtm_addrs & RTA_GATEWAY)
-		rt->iface = if_findsa(ctx, rti_info[RTAX_GATEWAY]);
-
-	/* If we don't have an interface and it's a host route, it maybe
-	 * to a local ip via the loopback interface. */
-	if (rt->iface == NULL &&
-	    !(~rtm->rtm_flags & (RTF_HOST | RTF_GATEWAY)))
-	{
-		struct ipv6_addr *ia;
-
-		if ((ia = ipv6_findaddr(ctx, &rt->dest, 0)))
-			rt->iface = ia->iface;
-	}
-
-	if (rt->iface == NULL) {
-		errno = ESRCH;
-		return -1;
-	}
-	return 0;
-}
-
-int
-if_route6(unsigned char cmd, const struct rt6 *rt)
-{
-	struct sockaddr_in6 dst = {
-		.sin6_family = AF_INET6,
-		.sin6_len = sizeof(dst),
-		.sin6_addr = rt->dest
-	};
-	struct sockaddr_in6 mask = {
-		.sin6_family = AF_INET6,
-		.sin6_len = sizeof(mask),
-		.sin6_addr = rt->mask
-	};
-	struct sockaddr_in6 gate = {
-		.sin6_family = AF_INET6,
-		.sin6_len = sizeof(gate),
-		.sin6_addr = rt->gate
-	};
-	struct sockaddr_in6 src = {
-		.sin6_family = AF_INET6,
-		.sin6_len = sizeof(src),
-		.sin6_addr = rt->src
-	};
-	struct sockaddr_in6 *g;
-	int addrs, flags;
-#ifdef RTP_CONNECTED
-	int priority = 0;
-#endif
-
-	addrs = RTA_NETMASK;
-	flags = (int)rt->flags;
-#ifdef RTF_PINNED
-	if (cmd != RTM_ADD)
-		flags |= RTF_PINNED;
-#endif
-
-	if (IN6_IS_ADDR_UNSPECIFIED(&rt->gate)) {
-#ifdef RTF_CLONING
-		flags |= RTF_CLONING;
-#endif
-#ifdef RTF_CONNECTED
-		flags |= RTF_CONNECTED;
-#endif
-#ifdef RTP_CONNECTED
-		priority = RTP_CONNECTED;
-#endif
-	} else
-		flags |= RTF_GATEWAY | RTF_STATIC;
-
-	if (IN6_IS_ADDR_UNSPECIFIED(&rt->gate))
-		g = NULL;
-	else {
-		g = &gate;
-		ifa_scope(g, rt->iface->index);
-	}
-
-	return if_rtmsg(cmd, rt->iface, addrs, flags,
-#ifdef RTP_CONNECTED
-	    priority,
-#endif
-	    (struct sockaddr *)&dst, (struct sockaddr *)&mask,
-	    (struct sockaddr *)g, (struct sockaddr *)&src, rt->mtu);
-}
-
-int
-if_initrt6(struct dhcpcd_ctx *ctx)
-{
-	struct rt_msghdr *rtm;
-	int mib[6];
-	size_t needed;
-	char *buf, *p, *end;
-	struct rt6 rt;
-
-	ipv6_freerts(&ctx->ipv6->kroutes);
-
-	mib[0] = CTL_NET;
-	mib[1] = PF_ROUTE;
-	mib[2] = 0;
-	mib[3] = AF_INET6;
-	mib[4] = NET_RT_DUMP;
-	mib[5] = 0;
-
-	if (sysctl(mib, 6, NULL, &needed, NULL, 0) == -1)
-		return -1;
-	if (needed == 0)
-		return 0;
-	if ((buf = malloc(needed)) == NULL)
-		return -1;
-	if (sysctl(mib, 6, buf, &needed, NULL, 0) == -1) {
-		free(buf);
-		return -1;
-	}
-
-	end = buf + needed;
-	for (p = buf; p < end; p += rtm->rtm_msglen) {
-		rtm = (void *)p;
-		if (if_copyrt6(ctx, &rt, rtm) == 0)
-			ipv6_handlert(ctx, RTM_ADD, &rt);
-	}
-	free(buf);
-	return 0;
 }
 
 #if !(defined(HAVE_IFADDRS_ADDRFLAGS) && defined(HAVE_IFAM_ADDRFLAGS))
@@ -1351,60 +1089,36 @@ if_ownmsgpid(struct dhcpcd_ctx *ctx, pid_t pid, int seq)
 static void
 if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 {
-	const struct sockaddr *sa;
+	struct rt rt;
 
 	if (if_ownmsgpid(ctx, rtm->rtm_pid, rtm->rtm_seq))
 		return;
 
-	sa = (const void *)(rtm + 1);
-	switch (sa->sa_family) {
-#ifdef INET
-	case AF_INET:
-	{
-		struct rt rt;
+	if (if_copyrt(ctx, &rt, rtm) == -1)
+		return;
 
-		if (if_copyrt(ctx, &rt, rtm) == 0)
-			ipv4_handlert(ctx, rtm->rtm_type, &rt, 0);
-		break;
-	}
-#endif
 #ifdef INET6
-	case AF_INET6:
-	{
-		struct rt6 rt6;
+	/*
+	 * BSD announces host routes.
+	 * As such, we should be notified of reachability by its
+	 * existance with a hardware address.
+	 */
+	if (rt.rt_dest.sa_family == AF_INET6 && rt.rt_flags & RTF_HOST) {
+		struct sockaddr_in6 dest;
+		struct sockaddr_dl sdl;
 
-		if (~rtm->rtm_addrs & (RTA_DST | RTA_GATEWAY))
-			break;
-		/*
-		 * BSD announces host routes.
-		 * As such, we should be notified of reachability by its
-		 * existance with a hardware address.
-		 */
-		if (rtm->rtm_flags & (RTF_HOST)) {
-			const struct sockaddr *rti_info[RTAX_MAX];
-			struct in6_addr dst6;
-			struct sockaddr_dl sdl;
-
-			get_addrs(rtm->rtm_addrs, rtm + 1, rti_info);
-			COPYOUT6(dst6, rti_info[RTAX_DST]);
-			DESCOPE(&dst6);
-			if (rti_info[RTAX_GATEWAY]->sa_family == AF_LINK)
-				memcpy(&sdl, rti_info[RTAX_GATEWAY],
-				    sizeof(sdl));
-			else
-				sdl.sdl_alen = 0;
-			ipv6nd_neighbour(ctx, &dst6,
-			    rtm->rtm_type != RTM_DELETE && sdl.sdl_alen ?
-			    IPV6ND_REACHABLE : 0);
-			break;
-		}
-
-		if (if_copyrt6(ctx, &rt6, rtm) == 0)
-			ipv6_handlert(ctx, rtm->rtm_type, &rt6);
-		break;
+		memcpy(&dest, &rt.rt_dest, rt.rt_dest.sa_len);
+		if (rt.rt_gateway.sa_family == AF_LINK)
+			memcpy(&sdl, &rt.rt_gateway, rt.rt_gateway.sa_len);
+		else
+			sdl.sdl_alen = 0;
+		ipv6nd_neighbour(ctx, &dest.sin6_addr,
+		    rtm->rtm_type != RTM_DELETE && sdl.sdl_alen ?
+		    IPV6ND_REACHABLE : 0);
 	}
 #endif
-	}
+
+	rt_recvrt(rtm->rtm_type, &rt);
 }
 
 static void
@@ -1509,10 +1223,8 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 
 		sin6 = (const void *)rti_info[RTAX_IFA];
 		addr6 = sin6->sin6_addr;
-		DESCOPE(&addr6);
 		sin6 = (const void *)rti_info[RTAX_NETMASK];
 		mask6 = sin6->sin6_addr;
-		DESCOPE(&mask6);
 
 #ifndef HAVE_IFAM_ADDRFLAGS
 		if (ifam->ifam_type == RTM_DELADDR ||

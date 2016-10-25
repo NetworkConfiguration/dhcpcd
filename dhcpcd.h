@@ -113,6 +113,10 @@ struct dhcpcd_ctx {
 	size_t duid_len;
 	struct if_head *ifaces;
 
+	struct rt_head routes;	/* our routes */
+	struct rt_head kroutes;	/* all kernel routes */
+	struct rt_head froutes;	/* free routes for re-use */
+
 	int pf_inet_fd;
 #ifdef IFLR_ACTIVE
 	int pf_link_fd;
@@ -150,8 +154,6 @@ struct dhcpcd_ctx {
 #ifdef INET
 	struct dhcp_opt *dhcp_opts;
 	size_t dhcp_opts_len;
-	struct rt_head *ipv4_routes;
-	struct rt_head *ipv4_kroutes;
 
 	int udp_fd;
 
