@@ -146,7 +146,7 @@ clean:
 
 distclean: clean
 	rm -f .depend config.h config.mk config.log \
-		${DISTFILE} ${DISTFILEGZ} ${DISTFILESUM} ${DISTFILESIGN}
+		${DISTFILE} ${DISTFILEGZ} ${DISTINFO} ${DISTINFOSIGN}
 
 dist:
 	fossil tarball --name ${DISTPREFIX} ${FOSSILID} ${DISTFILEGZ}
