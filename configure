@@ -423,6 +423,9 @@ linux*)
 	echo "#include		<asm/types.h> /* fix broken headers */" >>$CONFIG_H
 	echo "#include		<sys/socket.h> /* fix broken headers */" >>$CONFIG_H
 	echo "#include		<linux/rtnetlink.h>" >>$CONFIG_H
+	# cksum does't support -a and netpgp is rare
+	echo "CKSUM=		sha256sum --tag" >>$CONFIG_MK
+	echo "PGP=		gpg2" >>$CONFIG_MK
 	;;
 qnx*)
 	echo "CPPFLAGS+=	-D__EXT" >>$CONFIG_MK
