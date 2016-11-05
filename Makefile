@@ -156,7 +156,7 @@ dist:
 distinfo: dist
 	${CKSUM} ${DISTFILE} >${DISTINFO}
 	#printf "SIZE (${DISTFILE}) = %s\n" $$(wc -c <${DISTFILE}) >>${DISTINFO}
-	${PGP} --sign --detach --armor --output=${DISTINFOSIGN} ${DISTINFO}
+	${PGP} --clearsign --output=${DISTINFOSIGN} ${DISTINFO}
 	chmod 644 ${DISTINFOSIGN}
 	ls -l ${DISTFILE} ${DISTINFO} ${DISTINFOSIGN}
 
