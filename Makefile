@@ -154,6 +154,7 @@ dist:
 	rm ${DISTFILEGZ}
 
 distinfo: dist
+	rm -f ${DISTINFO} ${DISTINFOSIGN}
 	${CKSUM} ${DISTFILE} >${DISTINFO}
 	#printf "SIZE (${DISTFILE}) = %s\n" $$(wc -c <${DISTFILE}) >>${DISTINFO}
 	${PGP} --clearsign --output=${DISTINFOSIGN} ${DISTINFO}
