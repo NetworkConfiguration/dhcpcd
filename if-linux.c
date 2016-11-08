@@ -1129,8 +1129,6 @@ if_route(unsigned char cmd, const struct rt *rt)
 	struct nlmr nlm;
 	bool gateway_unspec;
 
-	printf ("\nROUTE %s\n\n", cmd == RTM_DELETE ? "DELETE" : "ADD");
-
 	memset(&nlm, 0, sizeof(nlm));
 	nlm.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
 	switch (cmd) {
