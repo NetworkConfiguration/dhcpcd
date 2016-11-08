@@ -90,11 +90,15 @@ rt_desc(const char *cmd, const struct rt *rt)
 			logger(ctx, LOG_INFO, "%s: %s default route via %s",
 			    ifname, cmd, gateway);
 	} else if (gateway_unspec)
-		logger(ctx, LOG_INFO, "%s: %s route to %s/%d",
-		    ifname, cmd, dest, prefix);
+		logger(ctx, LOG_INFO, "%s: %s%s route to %s/%d",
+		    ifname, cmd,
+		    rt->rt_flags & RTF_REJECT ? " reject" : "",
+		    dest, prefix);
 	else
-		logger(ctx, LOG_INFO, "%s: %s route to %s/%d via %s",
-		    ifname, cmd, dest, prefix, gateway);
+		logger(ctx, LOG_INFO, "%s: %s%s route to %s/%d via %s",
+		    ifname, cmd,
+		    rt->rt_flags & RTF_REJECT ? " reject" : "",
+		    dest, prefix, gateway);
 }
 
 void
@@ -270,12 +274,15 @@ rt_add(struct rt *nrt, struct rt *ort)
 {
 	struct dhcpcd_ctx *ctx;
 	bool change;
+	unsigned long long options;
 
 	assert(nrt != NULL);
 	ctx = nrt->rt_ifp->ctx;
 
 	/* Don't set default routes if not asked to */
-	if (!(nrt->rt_ifp->options->options & DHCPCD_GATEWAY) &&
+	options = nrt->rt_ifp->options == NULL ?
+	    ctx->options : nrt->rt_ifp->options->options;
+	if (!(options & DHCPCD_GATEWAY) &&
 	    sa_is_unspecified(&nrt->rt_dest) &&
 	    sa_is_unspecified(&nrt->rt_netmask))
 		return false;
@@ -309,7 +316,7 @@ rt_add(struct rt *nrt, struct rt *ort)
 	    sa_cmp(&ort->rt_gateway, &nrt->rt_gateway) == 0)
 	{
 		if (ort->rt_mtu == nrt->rt_mtu)
-			return 0;
+			return true;
 		change = true;
 	}
 
