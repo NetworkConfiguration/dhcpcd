@@ -202,7 +202,8 @@ rt_find(struct rt_head *rts, const struct rt *f)
 	TAILQ_FOREACH(rt, rts, rt_next) {
 		if (sa_cmp(&rt->rt_dest, &f->rt_dest) == 0 &&
 #ifdef HAVE_ROUTE_METRIC
-		    rt->rt_ifp->metric == f->rt_ifp->metric &&
+		    (f->rt_ifp == NULL ||
+		    rt->rt_ifp->metric == f->rt_ifp->metric) &&
 #endif
 		    sa_cmp(&rt->rt_netmask, &f->rt_netmask) == 0)
 			return rt;
