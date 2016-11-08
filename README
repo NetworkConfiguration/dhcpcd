@@ -169,8 +169,19 @@ happen in a custom OS hook:
 
 Compatibility
 -------------
-dhcpcd-5.0 is only fully command line compatible with dhcpcd-4.0
-For compatibility with older versions, use dhcpcd-4.0
+dhcpcd-5 is only fully command line compatible with dhcpcd-4
+For compatibility with older versions, use dhcpcd-4
+
+
+Upgrading
+---------
+dhcpcd-7 defaults the database directory to /var/db/dhcpcd instead of /var/db
+and now stores dhcpcd.duid and dhcpcd.secret in there instead of /etc.
+of /etc.
+The Makefile _confinstall target will attempt to move the files correctly from
+the old locations to the new locations.
+Of course this won't work if dhcpcd-7 is packaged up, so packagers will need to
+install similar logic into their dhcpcd package.
 
 
 ChangeLog

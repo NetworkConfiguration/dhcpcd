@@ -182,7 +182,7 @@ done
 : ${LIBDIR:=$PREFIX/lib}
 : ${LIBEXECDIR:=$PREFIX/libexec}
 : ${STATEDIR:=/var}
-: ${DBDIR:=$STATEDIR/db}
+: ${DBDIR:=$STATEDIR/db/dhcpcd}
 : ${RUNDIR:=$STATEDIR/run}
 : ${MANDIR:=${PREFIX:-/usr}/share/man}
 : ${DATADIR:=${PREFIX:-/usr}/share}
