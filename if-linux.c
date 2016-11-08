@@ -1165,7 +1165,10 @@ if_route(unsigned char cmd, const struct rt *rt)
 			nlm.rt.rtm_scope = RT_SCOPE_LINK;
 		else
 			nlm.rt.rtm_scope = RT_SCOPE_UNIVERSE;
-		nlm.rt.rtm_type = RTN_UNICAST;
+		if (rt->rt_flags & RTF_REJECT)
+			nlm.rt.rtm_type = RTN_UNREACHABLE;
+		else
+			nlm.rt.rtm_type = RTN_UNICAST;
 	}
 
 #define ADDSA(type, sa)							\

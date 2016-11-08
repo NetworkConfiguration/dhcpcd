@@ -2161,7 +2161,10 @@ inet6_makeprefix(struct interface *ifp, const struct ra *rap,
 	sa_in6_init(&rt->rt_netmask, &netmask);
 	if (addr->flags & IPV6_AF_DELEGATEDPFX) {
 		rt->rt_flags |= RTF_REJECT;
+		/* Linux does not like a gateway for a reject route. */
+#ifndef __linux__
 		sa_in6_init(&rt->rt_gateway, &in6addr_loopback);
+#endif
 	} else
 		rt->rt_gateway.sa_family = AF_UNSPEC;
 	sa_in6_init(&rt->rt_ifa, &addr->addr);
