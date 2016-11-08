@@ -195,6 +195,8 @@ sa_toprefix(const struct sockaddr *sa)
 		int cidr;
 
 		sin = satocsin(sa);
+		if (sin->sin_addr.s_addr == INADDR_ANY)
+			return 0;
 		mask = (int)ntohl(sin->sin_addr.s_addr);
 		cidr = 33 - ffs(mask);		/* 33 - (1 .. 32) -> 32 .. 1 */
 		if (cidr < 32) {		/* more than 1 bit in mask */
