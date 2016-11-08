@@ -45,6 +45,10 @@
 #include "common.h"
 #include "sa.h"
 
+#ifndef NDEBUG
+static bool sa_inprefix;
+#endif
+
 socklen_t
 sa_addroffset(const struct sockaddr *sa)
 {
@@ -184,6 +188,7 @@ sa_is_loopback(const struct sockaddr *sa)
 int
 sa_toprefix(const struct sockaddr *sa)
 {
+	int prefix;
 
 	assert(sa != NULL);
 	switch(sa->sa_family) {
@@ -192,21 +197,22 @@ sa_toprefix(const struct sockaddr *sa)
 	{
 		const struct sockaddr_in *sin;
 		int mask;
-		int cidr;
 
 		sin = satocsin(sa);
-		if (sin->sin_addr.s_addr == INADDR_ANY)
-			return 0;
+		if (sin->sin_addr.s_addr == INADDR_ANY) {
+			prefix = 0;
+			break;
+		}
 		mask = (int)ntohl(sin->sin_addr.s_addr);
-		cidr = 33 - ffs(mask);		/* 33 - (1 .. 32) -> 32 .. 1 */
-		if (cidr < 32) {		/* more than 1 bit in mask */
+		prefix = 33 - ffs(mask);	/* 33 - (1 .. 32) -> 32 .. 1 */
+		if (prefix < 32) {		/* more than 1 bit in mask */
 			/* check for non-contig netmask */
-			if ((mask ^ (((1 << cidr) - 1) << (32 - cidr))) != 0) {
+			if ((mask ^ (((1 << prefix)-1) << (32 - prefix))) != 0){
 				errno = EINVAL;
 				return -1;	/* noncontig, no pfxlen */
 			}
 		}
-		return cidr;
+		break;
 	}
 #endif
 #ifdef INET6
@@ -243,20 +249,36 @@ sa_toprefix(const struct sockaddr *sa)
 					return 0;
 		}
 
-		return (uint8_t)(x * NBBY + y);
+		prefix = x * NBBY + y;
+		break;
 	}
 #endif
 	default:
 		errno = EAFNOSUPPORT;
 		return -1;
 	}
+
+#ifndef NDEBUG
+	/* Ensure the calculation is correct */
+	if (!sa_inprefix) {
+		union sa_ss ss;
+
+		sa_inprefix = true;
+		ss.sa.sa_family = sa->sa_family;
+		sa_fromprefix(&ss.sa, prefix);
+		assert(sa_cmp(sa, &ss.sa) == 0);
+		sa_inprefix = false;
+	}
+#endif
+
+	return prefix;
 }
 
 int
 sa_fromprefix(struct sockaddr *sa, int prefix)
 {
-	uint8_t *ap, a;
-	int max_prefix, i;
+	uint8_t *ap;
+	int max_prefix, bytes, bits, i;
 
 	switch (sa->sa_family) {
 #ifdef INET
@@ -274,14 +296,31 @@ sa_fromprefix(struct sockaddr *sa, int prefix)
 		return -1;
 	}
 
+	bytes = prefix / NBBY;
+	bits = prefix % NBBY;
+
 	ap = (uint8_t *)sa + sa_addroffset(sa);
-	for (i = 0; i < (prefix / NBBY); i++)
+	for (i = 0; i < bytes; i++)
 		*ap++ = 0xff;
-	a = 0xff;
-	a  = (uint8_t)(a << (8 - (prefix % NBBY)));
-	*ap = a;
-	for (i = 0; i < ((max_prefix - prefix) / NBBY); i++)
+	if (bits) {
+		uint8_t a;
+
+		a = 0xff;
+		a  = (uint8_t)(a << (8 - bits));
+		*ap++ = a;
+	}
+	bytes = (max_prefix - prefix) / NBBY;
+	for (i = 0; i < bytes; i++)
 		*ap++ = 0x00;
+
+#ifndef NDEBUG
+	/* Ensure the calculation is correct */
+	if (!sa_inprefix) {
+		sa_inprefix = true;
+		assert(sa_toprefix(sa) == prefix);
+		sa_inprefix = false;
+	}
+#endif
 	return 0;
 }
 

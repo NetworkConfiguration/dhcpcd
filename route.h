@@ -34,6 +34,7 @@
 #include <stdbool.h>
 
 #include "dhcpcd.h"
+#include "sa.h"
 
 /* Some systems have route metrics.
  * OpenBSD route priority is not this. */
@@ -48,12 +49,6 @@
 /* XXX dhcpcd doesn't really support this yet.
  * But that's generally OK if only dhcpcd is managing routes. */
 #endif
-
-union sa_ss {
-	struct sockaddr		sa;
-	struct sockaddr_in	sin;
-	struct sockaddr_in6	sin6;
-};
 
 struct rt {
 	TAILQ_ENTRY(rt)		rt_next;
