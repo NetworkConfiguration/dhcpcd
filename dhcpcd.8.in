@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd August 15, 2016
+.Dd November 8, 2016
 .Dt DHCPCD 8
 .Os
 .Sh NAME
@@ -751,10 +751,6 @@ knows which process to signal.
 .It Pa @SYSCONFDIR@/dhcpcd.conf
 Configuration file for dhcpcd.
 If you always use the same options, put them here.
-.It Pa @SYSCONFDIR@/dhcpcd.duid
-Text file that holds the DUID used to identify the host.
-.It Pa @SYSCONFDIR@/dhcpcd.secret
-Text file that holds a secret key known only to the host.
 .It Pa @SCRIPT@
 Bourne shell script that is run to configure or de-configure an interface.
 .It Pa @LIBDIR@/dhcpcd/dev
@@ -765,15 +761,19 @@ A directory containing bourne shell scripts that are run by the above script.
 Each script can be disabled by using the
 .Fl C , Fl Fl nohook
 option described above.
-.It Pa @DBDIR@/dhcpcd\- Ns Ar interface Ns Ar -ssid Ns .lease
+.It Pa @DBDIR@/duid
+Text file that holds the DUID used to identify the host.
+.It Pa @DBDIR@/secret
+Text file that holds a secret key known only to the host.
+.It Pa @DBDIR@/ Ns Ar interface Ns Ar -ssid Ns .lease
 The actual DHCP message sent by the server.
 We use this when reading the last
 lease and use the files mtime as when it was issued.
-.It Pa @DBDIR@/dhcpcd\- Ns Ar interface Ns Ar -ssid Ns .lease6
+.It Pa @DBDIR@/ Ns Ar interface Ns Ar -ssid Ns .lease6
 The actual DHCPv6 message sent by the server.
 We use this when reading the last
 lease and use the files mtime as when it was issued.
-.It Pa @DBDIR@/dhcpcd-rdm.monotonic
+.It Pa @DBDIR@/rdm_monotonic
 Stores the monotonic counter used in the
 .Ar replay
 field in Authentication Options.

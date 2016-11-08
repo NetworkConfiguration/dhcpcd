@@ -40,13 +40,13 @@
 # define DEVDIR			LIBDIR "/" PACKAGE "/dev"
 #endif
 #ifndef DUID
-# define DUID			SYSCONFDIR "/" PACKAGE ".duid"
+# define DUID			DBDIR "/duid"
 #endif
 #ifndef SECRET
-# define SECRET			SYSCONFDIR "/" PACKAGE ".secret"
+# define SECRET			DBDIR "/secret"
 #endif
 #ifndef LEASEFILE
-# define LEASEFILE		DBDIR "/" PACKAGE "-%s%s.lease"
+# define LEASEFILE		DBDIR "/%s%s.lease"
 #endif
 #ifndef LEASEFILE6
 # define LEASEFILE6		LEASEFILE "6"
@@ -61,7 +61,7 @@
 # define UNPRIVSOCKET		RUNDIR "/" PACKAGE ".unpriv.sock"
 #endif
 #ifndef RDM_MONOFILE
-# define RDM_MONOFILE		DBDIR "/" PACKAGE "-rdm.monotonic"
+# define RDM_MONOFILE		DBDIR "/rdm_monotonic"
 #endif
 
 #ifndef NO_SIGNALS
