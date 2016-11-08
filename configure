@@ -738,8 +738,7 @@ if [ -z "$GETLINE" ]; then
 int main(void) {
 	char *buf = NULL;
 	size_t n = 0;
-	getline(&buf, &n, stdin);
-	return 0;
+	return getline(&buf, &n, stdin) == -1 ? -1 : 0;
 }
 EOF
 	if $XCC _getline.c -o _getline 2>&3; then
