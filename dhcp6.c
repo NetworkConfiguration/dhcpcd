@@ -680,17 +680,14 @@ dhcp6_makemessage(struct interface *ifp)
 				continue;
 			if (ap->ia_type == D6_OPTION_IA_PD) {
 #ifndef SMALL
-				len += sizeof(o) + sizeof(o.len) +
-				    sizeof(u32) + sizeof(u32) +
-				    sizeof(ap->prefix);
+				len += sizeof(o) + sizeof(struct dhcp6_pd_addr);
 				if (ap->prefix_exclude_len)
 					len += sizeof(o) + 1 +
 					    (uint8_t)((ap->prefix_exclude_len -
 					    ap->prefix_len - 1) / NBBY) + 1;
 #endif
 			} else
-				len += sizeof(o) + sizeof(ap->addr) +
-				    sizeof(u32) + sizeof(u32);
+				len += sizeof(o) + sizeof(struct dhcp6_ia_addr);
 		}
 		/* FALLTHROUGH */
 	case DH6S_INIT:
