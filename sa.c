@@ -264,6 +264,7 @@ sa_toprefix(const struct sockaddr *sa)
 		union sa_ss ss;
 
 		sa_inprefix = true;
+		memset(&ss, 0, sizeof(ss));
 		ss.sa.sa_family = sa->sa_family;
 		sa_fromprefix(&ss.sa, prefix);
 		assert(sa_cmp(sa, &ss.sa) == 0);
@@ -285,7 +286,7 @@ sa_fromprefix(struct sockaddr *sa, int prefix)
 	case AF_INET:
 		max_prefix = 32;
 #ifdef HAVE_SA_LEN
-		sa->sa_len = sizeof(struct in_addr);
+		sa->sa_len = sizeof(struct sockaddr_in);
 #endif
 		break;
 #endif
@@ -293,7 +294,7 @@ sa_fromprefix(struct sockaddr *sa, int prefix)
 	case AF_INET6:
 		max_prefix = 128;
 #ifdef HAVE_SA_LEN
-		sa->sa_len = sizeof(struct in6_addr);
+		sa->sa_len = sizeof(struct sockaddr_in6);
 #endif
 		break;
 #endif
