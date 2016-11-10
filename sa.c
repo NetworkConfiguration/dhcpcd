@@ -284,11 +284,17 @@ sa_fromprefix(struct sockaddr *sa, int prefix)
 #ifdef INET
 	case AF_INET:
 		max_prefix = 32;
+#ifdef HAVE_SA_LEN
+		sa->sa_len = sizeof(struct in_addr);
+#endif
 		break;
 #endif
 #ifdef INET6
 	case AF_INET6:
 		max_prefix = 128;
+#ifdef HAVE_SA_LEN
+		sa->sa_len = sizeof(struct in6_addr);
+#endif
 		break;
 #endif
 	default:
