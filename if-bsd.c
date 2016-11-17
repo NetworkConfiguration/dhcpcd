@@ -355,6 +355,9 @@ static void
 if_copysa(struct sockaddr *dst, const struct sockaddr *src)
 {
 
+	assert(dst != NULL);
+	assert(src != NULL);
+
 	memcpy(dst, src, src->sa_len);
 #ifdef __KAME__
 	if (dst->sa_family == AF_INET6) {
@@ -543,7 +546,8 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 	if (rt->rt_flags & RTF_GATEWAY &&
 	    rti_info[RTAX_GATEWAY]->sa_family != AF_LINK)
 		if_copysa(&rt->rt_gateway, rti_info[RTAX_GATEWAY]);
-	if_copysa(&rt->rt_ifa, rti_info[RTAX_IFA]);
+	if (rtm->rtm_addrs & RTA_IFA)
+		if_copysa(&rt->rt_ifa, rti_info[RTAX_IFA]);
 	rt->rt_mtu = (unsigned int)rtm->rtm_rmx.rmx_mtu;
 
 	if (rtm->rtm_index)
