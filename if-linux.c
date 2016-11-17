@@ -70,8 +70,9 @@
 #ifdef HAVE_NL80211_H
 #include <linux/genetlink.h>
 #include <linux/nl80211.h>
-#endif
+#else
 int if_getssid_wext(const char *ifname, uint8_t *ssid);
+#endif
 
 /* Support older kernels */
 #ifndef IFLA_WIRELESS
@@ -1000,7 +1001,7 @@ nla_next(struct nlattr *nla, size_t *rem)
 	((rem) >= sizeof(struct nlattr) && \
 	(nla)->nla_len >= sizeof(struct nlattr) && \
 	(nla)->nla_len <= rem)
-#define NLA_DATA(nla) ((char *)(nla) + NLA_HDRLEN)
+#define NLA_DATA(nla) (void *)((char *)(nla) + NLA_HDRLEN)
 #define NLA_FOR_EACH_ATTR(pos, head, len, rem) \
 	for (pos = head, rem = len; \
 	     NLA_OK(pos, rem); \
@@ -1058,17 +1059,13 @@ nla_put_string(struct nlmsghdr *n, unsigned short maxlen,
 }
 
 static int
-gnl_parse(struct nlmsghdr *nlm, struct nlattr *tb[], int maxtype)
+nla_parse(struct nlattr *tb[], struct nlattr *head, size_t len, int maxtype)
 {
-	struct genlmsghdr *ghdr;
-	struct nlattr *head, *nla;
-	size_t len, rem;
+	struct nlattr *nla;
+	size_t rem;
 	int type;
 
 	memset(tb, 0, sizeof(*tb) * ((unsigned int)maxtype + 1));
-	ghdr = NLMSG_DATA(nlm);
-	head = (void *)((char *)ghdr + GENL_HDRLEN);
-	len = nlm->nlmsg_len - GENL_HDRLEN - NLMSG_HDRLEN;
 	NLA_FOR_EACH_ATTR(nla, head, len, rem) {
 		type = NLA_TYPE(nla);
 		if (type > maxtype)
@@ -1079,19 +1076,32 @@ gnl_parse(struct nlmsghdr *nlm, struct nlattr *tb[], int maxtype)
 }
 
 static int
+genl_parse(struct nlmsghdr *nlm, struct nlattr *tb[], int maxtype)
+{
+	struct genlmsghdr *ghdr;
+	struct nlattr *head;
+	size_t len;
+
+	ghdr = NLMSG_DATA(nlm);
+	head = (void *)((char *)ghdr + GENL_HDRLEN);
+	len = nlm->nlmsg_len - GENL_HDRLEN - NLMSG_HDRLEN;
+	return nla_parse(tb, head, len, maxtype);
+}
+
+static int
 _gnl_getfamily(__unused struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
     struct nlmsghdr *nlm)
 {
 	struct nlattr *tb[CTRL_ATTR_FAMILY_ID + 1];
 	uint16_t family;
 
-	if (gnl_parse(nlm, tb, CTRL_ATTR_FAMILY_ID) == -1)
+	if (genl_parse(nlm, tb, CTRL_ATTR_FAMILY_ID) == -1)
 		return -1;
 	if (tb[CTRL_ATTR_FAMILY_ID] == NULL) {
 		errno = ENOENT;
 		return -1;
 	}
-	family = *(uint16_t *)(void *)NLA_DATA(tb[CTRL_ATTR_FAMILY_ID]);
+	memcpy(&family, NLA_DATA(tb[CTRL_ATTR_FAMILY_ID]), sizeof(family));
 	return (int)family;
 }
 
@@ -1114,31 +1124,56 @@ gnl_getfamily(struct dhcpcd_ctx *ctx, const char *name)
 }
 
 static int
-_if_getssid(__unused struct dhcpcd_ctx *ctx, struct interface *ifp,
+_if_getssid_nl80211(__unused struct dhcpcd_ctx *ctx, struct interface *ifp,
     struct nlmsghdr *nlm)
 {
-	struct nlattr *tb[NL80211_ATTR_SSID + 1];
+	struct nlattr *tb[NL80211_ATTR_BSS + 1];
+	struct nlattr *bss[NL80211_BSS_STATUS + 1];
+	uint32_t status;
+	unsigned char *ie;
+	int ie_len;
 
-	if (gnl_parse(nlm, tb, NL80211_ATTR_SSID) == -1)
-		return -1;
+	if (genl_parse(nlm, tb, NL80211_ATTR_BSS) == -1)
+		return 0;
 
-	if (tb[NL80211_ATTR_SSID] == NULL) {
-		/* If the SSID is not found then it means that
-		 * we're not associated to an AP. */
-		ifp->ssid_len = 0;
-		goto out;
+	if (tb[NL80211_ATTR_BSS] == NULL)
+		return 0;
+
+	if (nla_parse(bss,
+	    NLA_DATA(tb[NL80211_ATTR_BSS]),
+	    NLA_LEN(tb[NL80211_ATTR_BSS]),
+	    NL80211_BSS_STATUS) == -1)
+	    	return 0;
+		
+	if (bss[NL80211_BSS_BSSID] == NULL || bss[NL80211_BSS_STATUS] == NULL)
+		return 0;
+
+	memcpy(&status, NLA_DATA(bss[NL80211_BSS_STATUS]), sizeof(status));
+	if (status != NL80211_BSS_STATUS_ASSOCIATED)
+		return 0;
+
+	if (bss[NL80211_BSS_INFORMATION_ELEMENTS] == NULL)
+		return 0;
+
+	ie = NLA_DATA(bss[NL80211_BSS_INFORMATION_ELEMENTS]);
+	ie_len = (int)NLA_LEN(bss[NL80211_BSS_INFORMATION_ELEMENTS]);
+	/* ie[0] is type, ie[1] is lenth, ie[2..] is data */
+	while (ie_len >= 2 && ie_len >= ie[1]) {
+		if (ie[0] == 0) {
+			/* SSID */
+			if (ie[1] > IF_SSIDLEN) {
+				errno = ENOBUFS;
+				return -1;
+			}
+			ifp->ssid_len = ie[1];
+			memcpy(ifp->ssid, ie + 2, ifp->ssid_len);
+			return (int)ifp->ssid_len;
+		}
+		ie_len -= ie[1] + 2;
+		ie += ie[1] + 2;
 	}
 
-	ifp->ssid_len = NLA_LEN(tb[NL80211_ATTR_SSID]);
-	if (ifp->ssid_len > IF_SSIDLEN) {
-		errno = ENOBUFS;
-		ifp->ssid_len = 0;
-		return -1;
-	}
-	memcpy(ifp->ssid, NLA_DATA(tb[NL80211_ATTR_SSID]), ifp->ssid_len);
-
-out:
-	return (int)ifp->ssid_len;
+	return 0;
 }
 
 static int
@@ -1151,15 +1186,28 @@ if_getssid_nl80211(struct interface *ifp)
 	family = gnl_getfamily(ifp->ctx, "nl80211");
 	if (family == -1)
 		return -1;
+
+	/* Is this a wireless interface? */
 	memset(&nlm, 0, sizeof(nlm));
 	nlm.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct genlmsghdr));
 	nlm.hdr.nlmsg_type = (unsigned short)family;
 	nlm.hdr.nlmsg_flags = NLM_F_REQUEST;
-	nlm.ghdr.cmd = NL80211_CMD_GET_INTERFACE;
+	nlm.ghdr.cmd = NL80211_CMD_GET_WIPHY;
+	nla_put_32(&nlm.hdr, sizeof(nlm), NL80211_ATTR_IFINDEX, ifp->index);
+	if (send_netlink(ifp->ctx, ifp, NETLINK_GENERIC, &nlm.hdr, NULL) == -1)
+		return -1;
+
+	/* We need to parse out the list of scan results and find the one
+	 * we are connected to. */
+	memset(&nlm, 0, sizeof(nlm));
+	nlm.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct genlmsghdr));
+	nlm.hdr.nlmsg_type = (unsigned short)family;
+	nlm.hdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
+	nlm.ghdr.cmd = NL80211_CMD_GET_SCAN;
 	nla_put_32(&nlm.hdr, sizeof(nlm), NL80211_ATTR_IFINDEX, ifp->index);
 
 	return send_netlink(ifp->ctx, ifp,
-	    NETLINK_GENERIC, &nlm.hdr, &_if_getssid);
+	    NETLINK_GENERIC, &nlm.hdr, &_if_getssid_nl80211);
 }
 #endif
 
@@ -1168,18 +1216,16 @@ if_getssid(struct interface *ifp)
 {
 	int r;
 
+#ifdef HAVE_NL80211_H
+	r = if_getssid_nl80211(ifp);
+	if (r == -1)
+		ifp->ssid_len = 0;
+#else
 	r = if_getssid_wext(ifp->name, ifp->ssid);
 	if (r != -1)
 		ifp->ssid_len = (unsigned int)r;
-	else {
-#ifdef HAVE_NL80211_H
-		r = if_getssid_nl80211(ifp);
-		if (r == -1)
-			ifp->ssid_len = 0;
-#else
-		ifp->ssid_len = 0;
 #endif
-	}
+
 	ifp->ssid[ifp->ssid_len] = '\0';
 	return r;
 }
