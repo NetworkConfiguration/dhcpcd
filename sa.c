@@ -392,6 +392,7 @@ sa_cmp(const struct sockaddr *sa1, const struct sockaddr *sa2)
 		offset = offsetof(struct sockaddr_in, sin_addr);
 #ifdef HAVE_SA_LEN
 		len -= offset;
+		len = MIN(len, sizeof(struct in_addr));
 #else
 		len = sizeof(struct in_addr);
 #endif
@@ -402,6 +403,7 @@ sa_cmp(const struct sockaddr *sa1, const struct sockaddr *sa2)
 		offset = offsetof(struct sockaddr_in6, sin6_addr);
 #ifdef HAVE_SA_LEN
 		len -= offset;
+		len = MIN(len, sizeof(struct in6_addr));
 #else
 		len = sizeof(struct in6_addr);
 #endif
