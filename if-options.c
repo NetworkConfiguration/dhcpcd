@@ -1920,7 +1920,10 @@ err_sla:
 		fp = strwhite(arg);
 		if (arg == NULL) {
 			ifo->auth.options |= DHCPCD_AUTH_SEND;
-			ifo->auth.algorithm = AUTH_ALG_HMAC_MD5;
+			if (ifo->auth.protocol == AUTH_PROTO_TOKEN)
+				ifo->auth.protocol = AUTH_ALG_NONE;
+			else
+				ifo->auth.algorithm = AUTH_ALG_HMAC_MD5;
 			ifo->auth.rdm = AUTH_RDM_MONOTONIC;
 			break;
 		}
