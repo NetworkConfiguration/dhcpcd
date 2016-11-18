@@ -425,7 +425,7 @@ rt_doroute(struct rt *rt)
 		if (rt->rt_dflags & RTDF_FAKE)
 			return true;
 		if (or->rt_dflags & RTDF_FAKE ||
-		    !rt_cmp(rt,or) ||
+		    !rt_cmp(rt, or) ||
 		    (rt->rt_ifa.sa_family != AF_UNSPEC &&
 		    sa_cmp(&or->rt_ifa, &rt->rt_ifa) != 0) ||
 		    or->rt_mtu != rt->rt_mtu)
@@ -436,13 +436,11 @@ rt_doroute(struct rt *rt)
 		TAILQ_REMOVE(&ctx->routes, or, rt_next);
 		rt_free(or);
 	} else {
-		if (rt->rt_dflags & RTDF_FAKE) {
-			if ((or = rt_find(&ctx->kroutes, rt)) == NULL)
-				return false;
-			if (!rt_cmp(rt, or))
-				return false;
-		} else {
-			if (!rt_add(rt, NULL))
+		or = rt_find(&ctx->kroutes, rt);
+		if ((or == NULL || !rt_cmp(rt, or)) &&
+		    !(rt->rt_dflags & RTDF_FAKE))
+		{
+			if (!rt_add(rt, or))
 				return false;
 		}
 	}
