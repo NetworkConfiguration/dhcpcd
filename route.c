@@ -436,11 +436,13 @@ rt_doroute(struct rt *rt)
 		TAILQ_REMOVE(&ctx->routes, or, rt_next);
 		rt_free(or);
 	} else {
-		or = rt_find(&ctx->kroutes, rt);
-		if ((or == NULL || !rt_cmp(rt, or)) &&
-		    !(rt->rt_dflags & RTDF_FAKE))
-		{
-			if (!rt_add(rt, or))
+		if (rt->rt_dflags & RTDF_FAKE) {
+			if ((or = rt_find(&ctx->kroutes, rt)) == NULL)
+				return false;
+			if (!rt_cmp(rt, or))
+				return false;
+		} else {
+			if (!rt_add(rt, NULL))
 				return false;
 		}
 	}
