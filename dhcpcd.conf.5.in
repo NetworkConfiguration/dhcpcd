@@ -79,9 +79,10 @@ Authenticate DHCP messages.
 See the Supported Authentication Protocols section.
 .It Ic authtoken Ar secretid Ar realm Ar expire Ar key
 Define a shared key for use in authentication.
-.Ar realm can be "" to for use with the
+.Ar realm
+can be "" to for use with the
 .Ar delayed
-prptocol.
+protocol.
 .Ar expire
 is the date the token expires and should be formatted "yyy-mm-dd HH:MM".
 You can use the keyword

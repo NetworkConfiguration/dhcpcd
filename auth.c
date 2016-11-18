@@ -520,6 +520,7 @@ dhcp_auth_encode(struct auth *auth, const struct token *t,
 	}
 
 	switch(auth->algorithm) {
+	case AUTH_ALG_NONE:
 	case AUTH_ALG_HMAC_MD5:
 		break;
 	default:
