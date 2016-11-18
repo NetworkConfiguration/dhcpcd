@@ -439,22 +439,21 @@ get_next_rdm_monotonic_counter(struct auth *auth)
 	return rdm;
 }
 
-#define JAN_1970       2208988800U    /* 1970 - 1900 in seconds */
+#define	NTP_EPOCH	2208988800U	/* 1970 - 1900 in seconds */
+#define	NTP_SCALE_FRAC	4294967295.0	/* max value of the fractional part */
 static uint64_t
 get_next_rdm_monotonic_clock(struct auth *auth)
 {
 	struct timespec ts;
-	uint32_t pack[2];
+	uint64_t secs, rdm;
 	double frac;
-	uint64_t rdm;
 
 	if (clock_gettime(CLOCK_REALTIME, &ts) != 0)
 		return ++auth->last_replay; /* report error? */
-	pack[0] = htonl((uint32_t)ts.tv_sec + JAN_1970);
-	frac = ((double)ts.tv_nsec / 1e9 * 0x100000000ULL);
-	pack[1] = htonl((uint32_t)frac);
 
-	memcpy(&rdm, &pack, sizeof(rdm));
+	secs = (uint64_t)ts.tv_sec + NTP_EPOCH;
+	frac = ((double)ts.tv_nsec / 1e9 * NTP_SCALE_FRAC);
+	rdm = (secs << 32) | (uint64_t)frac;
 	return rdm;
 }
 
