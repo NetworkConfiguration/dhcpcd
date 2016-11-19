@@ -127,22 +127,17 @@ static void ipv6_regentempaddr(void *);
 #define ipv6_regentempifid(a) {}
 #endif
 
-struct ipv6_ctx *
-ipv6_init(struct dhcpcd_ctx *dhcpcd_ctx)
+int
+ipv6_init(struct dhcpcd_ctx *ctx)
 {
-	struct ipv6_ctx *ctx;
 
-	if (dhcpcd_ctx->ipv6)
-		return dhcpcd_ctx->ipv6;
+	if (ctx->sndhdr.msg_iovlen == 1)
+		return 0;
 
-	ctx = calloc(1, sizeof(*ctx));
-	if (ctx == NULL)
-		return NULL;
-
-	ctx->ra_routers = malloc(sizeof(*ctx->ra_routers));
 	if (ctx->ra_routers == NULL) {
-		free(ctx);
-		return NULL;
+		ctx->ra_routers = malloc(sizeof(*ctx->ra_routers));
+		if (ctx->ra_routers == NULL)
+			return -1;
 	}
 	TAILQ_INIT(ctx->ra_routers);
 
@@ -153,18 +148,15 @@ ipv6_init(struct dhcpcd_ctx *dhcpcd_ctx)
 	ctx->sndhdr.msg_controllen = sizeof(ctx->sndbuf);
 	ctx->rcvhdr.msg_name = &ctx->from;
 	ctx->rcvhdr.msg_namelen = sizeof(ctx->from);
-	ctx->rcvhdr.msg_iov = dhcpcd_ctx->iov;
+	ctx->rcvhdr.msg_iov = ctx->iov;
 	ctx->rcvhdr.msg_iovlen = 1;
 	ctx->rcvhdr.msg_control = ctx->ctlbuf;
 	// controllen is set at recieve
 	//ctx->rcvhdr.msg_controllen = sizeof(ctx->rcvbuf);
 
 	ctx->nd_fd = -1;
-	ctx->dhcp_fd = -1;
-
-	dhcpcd_ctx->ipv6 = ctx;
-
-	return ctx;
+	ctx->dhcp6_fd = -1;
+	return 0;
 }
 
 static ssize_t
@@ -1657,7 +1649,7 @@ ipv6_freedrop(struct interface *ifp, int drop)
 
 	ipv6_freedrop_addrs(&state->addrs, drop ? 2 : 0, NULL);
 	if (drop) {
-		if (ifp->ctx->ipv6 != NULL) {
+		if (ifp->ctx->ra_routers != NULL) {
 			if_initrt(ifp->ctx, AF_INET6);
 			rt_build(ifp->ctx, AF_INET6);
 		}
@@ -1674,12 +1666,8 @@ void
 ipv6_ctxfree(struct dhcpcd_ctx *ctx)
 {
 
-	if (ctx->ipv6 == NULL)
-		return;
-
+	free(ctx->ra_routers);
 	free(ctx->secret);
-	free(ctx->ipv6->ra_routers);
-	free(ctx->ipv6);
 }
 
 int
@@ -2226,7 +2214,7 @@ inet6_raroutes(struct rt_head *routes, struct dhcpcd_ctx *ctx, int expired,
 	int n;
 
 	n = 0;
-	TAILQ_FOREACH(rap, ctx->ipv6->ra_routers, next) {
+	TAILQ_FOREACH(rap, ctx->ra_routers, next) {
 		if (rap->expired != expired)
 			continue;
 		if (rap->iface->options->options & DHCPCD_IPV6RA_OWN) {

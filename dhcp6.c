@@ -1038,7 +1038,7 @@ static int
 dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 {
 	struct dhcp6_state *state;
-	struct ipv6_ctx *ctx;
+	struct dhcpcd_ctx *ctx;
 	struct sockaddr_in6 dst;
 	struct cmsghdr *cm;
 	struct in6_pktinfo pi;
@@ -1183,7 +1183,7 @@ logsend:
 	}
 #endif
 
-	ctx = ifp->ctx->ipv6;
+	ctx = ifp->ctx;
 	dst.sin6_scope_id = ifp->index;
 	ctx->sndhdr.msg_name = (void *)&dst;
 	ctx->sndhdr.msg_iov[0].iov_base = state->send;
@@ -1200,7 +1200,7 @@ logsend:
 	pi.ipi6_ifindex = ifp->index;
 	memcpy(CMSG_DATA(cm), &pi, sizeof(pi));
 
-	if (sendmsg(ctx->dhcp_fd, &ctx->sndhdr, 0) == -1) {
+	if (sendmsg(ctx->dhcp6_fd, &ctx->sndhdr, 0) == -1) {
 		logger(ifp->ctx, LOG_ERR,
 		    "%s: %s: sendmsg: %m", ifp->name, __func__);
 		ifp->options->options &= ~DHCPCD_IPV6;
@@ -2729,8 +2729,7 @@ dhcp6_find_delegates(struct interface *ifp)
 static void
 dhcp6_handledata(void *arg)
 {
-	struct dhcpcd_ctx *dctx;
-	struct ipv6_ctx *ctx;
+	struct dhcpcd_ctx *ctx;
 	size_t i, len;
 	ssize_t bytes;
 	struct cmsghdr *cm;
@@ -2751,22 +2750,21 @@ dhcp6_handledata(void *arg)
 	uint16_t auth_len;
 #endif
 
-	dctx = arg;
-	ctx = dctx->ipv6;
+	ctx = arg;
 	ctx->rcvhdr.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo));
-	bytes = recvmsg_realloc(ctx->dhcp_fd, &ctx->rcvhdr, 0);
+	bytes = recvmsg_realloc(ctx->dhcp6_fd, &ctx->rcvhdr, 0);
 	if (bytes == -1) {
-		logger(dctx, LOG_ERR, "%s: recvmsg: %m", __func__);
-		close(ctx->dhcp_fd);
-		eloop_event_delete(dctx->eloop, ctx->dhcp_fd);
-		ctx->dhcp_fd = -1;
+		logger(ctx, LOG_ERR, "%s: recvmsg: %m", __func__);
+		close(ctx->dhcp6_fd);
+		eloop_event_delete(ctx->eloop, ctx->dhcp6_fd);
+		ctx->dhcp6_fd = -1;
 		return;
 	}
 	len = (size_t)bytes;
 	ctx->sfrom = inet_ntop(AF_INET6, &ctx->from.sin6_addr,
 	    ctx->ntopbuf, sizeof(ctx->ntopbuf));
 	if (len < sizeof(struct dhcp6_message)) {
-		logger(dctx, LOG_ERR,
+		logger(ctx, LOG_ERR,
 		    "DHCPv6 packet too short from %s", ctx->sfrom);
 		return;
 	}
@@ -2786,19 +2784,19 @@ dhcp6_handledata(void *arg)
 		}
 	}
 	if (pkt.ipi6_ifindex == 0) {
-		logger(dctx, LOG_ERR,
+		logger(ctx, LOG_ERR,
 		    "DHCPv6 reply did not contain index from %s", ctx->sfrom);
 		return;
 	}
 
-	TAILQ_FOREACH(ifp, dctx->ifaces, next) {
+	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 		if (ifp->active &&
 		    ifp->index == (unsigned int)pkt.ipi6_ifindex &&
 		    ifp->options->options & DHCPCD_DHCP6)
 			break;
 	}
 	if (ifp == NULL) {
-		logger(dctx, LOG_DEBUG,
+		logger(ctx, LOG_DEBUG,
 		    "DHCPv6 reply for unexpected interface from %s",
 		    ctx->sfrom);
 		return;
@@ -2827,7 +2825,7 @@ dhcp6_handledata(void *arg)
 	    r->xid[1] != state->send->xid[1] ||
 	    r->xid[2] != state->send->xid[2]))
 	{
-		logger(dctx, LOG_DEBUG,
+		logger(ctx, LOG_DEBUG,
 		    "%s: wrong xid 0x%02x%02x%02x"
 		    " (expecting 0x%02x%02x%02x) from %s",
 		    ifp->name,
@@ -2845,8 +2843,8 @@ dhcp6_handledata(void *arg)
 	}
 
 	o = dhcp6_findmoption(r, len, D6_OPTION_CLIENTID, &ol);
-	if (o == NULL || ol != dctx->duid_len ||
-	    memcmp(o, dctx->duid, ol) != 0)
+	if (o == NULL || ol != ctx->duid_len ||
+	    memcmp(o, ctx->duid, ol) != 0)
 	{
 		logger(ifp->ctx, LOG_DEBUG, "%s: incorrect client ID from %s",
 		    ifp->name, ctx->sfrom);
@@ -2854,8 +2852,8 @@ dhcp6_handledata(void *arg)
 	}
 
 	ifo = ifp->options;
-	for (i = 0, opt = dctx->dhcp6_opts;
-	    i < dctx->dhcp6_opts_len;
+	for (i = 0, opt = ctx->dhcp6_opts;
+	    i < ctx->dhcp6_opts_len;
 	    i++, opt++)
 	{
 		if (has_option_mask(ifo->requiremask6, opt->option) &&
@@ -3251,9 +3249,8 @@ dhcp6_handledata(void *arg)
 }
 
 static int
-dhcp6_open(struct dhcpcd_ctx *dctx)
+dhcp6_open(struct dhcpcd_ctx *ctx)
 {
-	struct ipv6_ctx *ctx;
 	struct sockaddr_in6 sa;
 	int n;
 
@@ -3264,37 +3261,36 @@ dhcp6_open(struct dhcpcd_ctx *dctx)
 	sa.sin6_len = sizeof(sa);
 #endif
 
-	ctx = dctx->ipv6;
 #define SOCK_FLAGS	SOCK_CLOEXEC | SOCK_NONBLOCK
-	ctx->dhcp_fd = xsocket(PF_INET6, SOCK_DGRAM | SOCK_FLAGS, IPPROTO_UDP);
+	ctx->dhcp6_fd = xsocket(PF_INET6, SOCK_DGRAM | SOCK_FLAGS, IPPROTO_UDP);
 #undef SOCK_FLAGS
-	if (ctx->dhcp_fd == -1)
+	if (ctx->dhcp6_fd == -1)
 		return -1;
 
 	n = 1;
-	if (setsockopt(ctx->dhcp_fd, SOL_SOCKET, SO_REUSEADDR,
+	if (setsockopt(ctx->dhcp6_fd, SOL_SOCKET, SO_REUSEADDR,
 	    &n, sizeof(n)) == -1)
 		goto errexit;
 
 	n = 1;
-	if (setsockopt(ctx->dhcp_fd, SOL_SOCKET, SO_BROADCAST,
+	if (setsockopt(ctx->dhcp6_fd, SOL_SOCKET, SO_BROADCAST,
 	    &n, sizeof(n)) == -1)
 		goto errexit;
 
 #ifdef SO_REUSEPORT
 	n = 1;
-	if (setsockopt(ctx->dhcp_fd, SOL_SOCKET, SO_REUSEPORT,
+	if (setsockopt(ctx->dhcp6_fd, SOL_SOCKET, SO_REUSEPORT,
 	    &n, sizeof(n)) == -1)
-		logger(dctx, LOG_WARNING, "setsockopt: SO_REUSEPORT: %m");
+		logger(ctx, LOG_WARNING, "setsockopt: SO_REUSEPORT: %m");
 #endif
 
-	if (!(dctx->options & DHCPCD_MASTER)) {
+	if (!(ctx->options & DHCPCD_MASTER)) {
 		/* Bind to the link-local address to allow more than one
 		 * DHCPv6 client to work. */
 		struct interface *ifp;
 		struct ipv6_addr *ia;
 
-		TAILQ_FOREACH(ifp, dctx->ifaces, next) {
+		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 			if (ifp->active)
 				break;
 		}
@@ -3304,20 +3300,20 @@ dhcp6_open(struct dhcpcd_ctx *dctx)
 		}
 	}
 
-	if (bind(ctx->dhcp_fd, (struct sockaddr *)&sa, sizeof(sa)) == -1)
+	if (bind(ctx->dhcp6_fd, (struct sockaddr *)&sa, sizeof(sa)) == -1)
 		goto errexit;
 
 	n = 1;
-	if (setsockopt(ctx->dhcp_fd, IPPROTO_IPV6, IPV6_RECVPKTINFO,
+	if (setsockopt(ctx->dhcp6_fd, IPPROTO_IPV6, IPV6_RECVPKTINFO,
 	    &n, sizeof(n)) == -1)
 		goto errexit;
 
-	eloop_event_add(dctx->eloop, ctx->dhcp_fd, dhcp6_handledata, dctx);
+	eloop_event_add(ctx->eloop, ctx->dhcp6_fd, dhcp6_handledata, ctx);
 	return 0;
 
 errexit:
-	close(ctx->dhcp_fd);
-	ctx->dhcp_fd = -1;
+	close(ctx->dhcp6_fd);
+	ctx->dhcp6_fd = -1;
 	return -1;
 }
 
@@ -3362,7 +3358,7 @@ dhcp6_start1(void *arg)
 	size_t i;
 	const struct dhcp_compat *dhc;
 
-	if (ifp->ctx->ipv6->dhcp_fd == -1 && dhcp6_open(ifp->ctx) == -1)
+	if (ifp->ctx->dhcp6_fd == -1 && dhcp6_open(ifp->ctx) == -1)
 		return;
 
 	state = D6_STATE(ifp);
@@ -3573,12 +3569,10 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 				break;
 		}
 	}
-	if (ifp == NULL && ctx->ipv6) {
-		if (ctx->ipv6->dhcp_fd != -1) {
-			eloop_event_delete(ctx->eloop, ctx->ipv6->dhcp_fd);
-			close(ctx->ipv6->dhcp_fd);
-			ctx->ipv6->dhcp_fd = -1;
-		}
+	if (ifp == NULL && ctx->dhcp6_fd != -1) {
+		eloop_event_delete(ctx->eloop, ctx->dhcp6_fd);
+		close(ctx->dhcp6_fd);
+		ctx->dhcp6_fd = -1;
 	}
 }
 
