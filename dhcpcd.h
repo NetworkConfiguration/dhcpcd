@@ -93,6 +93,28 @@ struct interface {
 };
 TAILQ_HEAD(if_head, interface);
 
+
+#ifdef INET6
+/* dhcpcd requires CMSG_SPACE to evaluate to a compile time constant. */
+#if defined(__QNX) || \
+	(defined(__NetBSD_Version__) && __NetBSD_Version__ < 600000000)
+#undef CMSG_SPACE
+#endif
+
+#ifndef ALIGNBYTES
+#define ALIGNBYTES (sizeof(int) - 1)
+#endif
+#ifndef ALIGN
+#define	ALIGN(p) (((unsigned int)(p) + ALIGNBYTES) & ~ALIGNBYTES)
+#endif
+#ifndef CMSG_SPACE
+#define	CMSG_SPACE(len)	(ALIGN(sizeof(struct cmsghdr)) + ALIGN(len))
+#endif
+
+#define IP6BUFLEN	(CMSG_SPACE(sizeof(struct in6_pktinfo)) + \
+			CMSG_SPACE(sizeof(int)))
+#endif
+
 struct dhcpcd_ctx {
 	char pidfile[sizeof(PIDFILE) + IF_NAMESIZE + 1];
 	const char *cffile;
@@ -167,11 +189,25 @@ struct dhcpcd_ctx {
 	uint8_t *secret;
 	size_t secret_len;
 
+	unsigned char ctlbuf[IP6BUFLEN];
+	struct sockaddr_in6 from;
+	struct msghdr sndhdr;
+	struct iovec sndiov[1];
+	unsigned char sndbuf[CMSG_SPACE(sizeof(struct in6_pktinfo))];
+	struct msghdr rcvhdr;
+	char ntopbuf[INET6_ADDRSTRLEN];
+	const char *sfrom;
+
+	int nd_fd;
+	struct ra_head *ra_routers;
+
+	int dhcp6_fd;
+
 	struct dhcp_opt *nd_opts;
 	size_t nd_opts_len;
 	struct dhcp_opt *dhcp6_opts;
 	size_t dhcp6_opts_len;
-	struct ipv6_ctx *ipv6;
+
 #ifndef __linux__
 	int ra_global;
 #endif

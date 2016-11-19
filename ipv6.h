@@ -226,43 +226,9 @@ struct ipv6_state {
 	((const struct ipv6_state *)(ifp)->if_data[IF_DATA_IPV6])
 #define IPV6_STATE_RUNNING(ifp) ipv6_staticdadcompleted((ifp))
 
-/* dhcpcd requires CMSG_SPACE to evaluate to a compile time constant. */
-#if defined(__QNX) || \
-	(defined(__NetBSD_Version__) && __NetBSD_Version__ < 600000000)
-#undef CMSG_SPACE
-#endif
-
-#ifndef ALIGNBYTES
-#define ALIGNBYTES (sizeof(int) - 1)
-#endif
-#ifndef ALIGN
-#define	ALIGN(p) (((unsigned int)(p) + ALIGNBYTES) & ~ALIGNBYTES)
-#endif
-#ifndef CMSG_SPACE
-#define	CMSG_SPACE(len)	(ALIGN(sizeof(struct cmsghdr)) + ALIGN(len))
-#endif
-
-#define IP6BUFLEN	(CMSG_SPACE(sizeof(struct in6_pktinfo)) + \
-			CMSG_SPACE(sizeof(int)))
-
 #ifdef INET6
-struct ipv6_ctx {
-	unsigned char ctlbuf[IP6BUFLEN];
-	struct sockaddr_in6 from;
-	struct msghdr sndhdr;
-	struct iovec sndiov[1];
-	unsigned char sndbuf[CMSG_SPACE(sizeof(struct in6_pktinfo))];
-	struct msghdr rcvhdr;
-	char ntopbuf[INET6_ADDRSTRLEN];
-	const char *sfrom;
 
-	int nd_fd;
-	struct ra_head *ra_routers;
-
-	int dhcp_fd;
-};
-
-struct ipv6_ctx *ipv6_init(struct dhcpcd_ctx *);
+int ipv6_init(struct dhcpcd_ctx *);
 int ipv6_makestableprivate(struct in6_addr *addr,
     const struct in6_addr *prefix, int prefix_len,
     const struct interface *ifp, int *dad_counter);

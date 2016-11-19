@@ -649,7 +649,7 @@ dhcpcd_initstate2(struct interface *ifp, unsigned long long options)
 	} else
 		ifo = ifp->options;
 
-	if (ifo->options & DHCPCD_IPV6 && ipv6_init(ifp->ctx) == NULL) {
+	if (ifo->options & DHCPCD_IPV6 && ipv6_init(ifp->ctx) == -1) {
 		logger(ifp->ctx, LOG_ERR, "ipv6_init: %m");
 		ifo->options &= ~DHCPCD_IPV6;
 	}
