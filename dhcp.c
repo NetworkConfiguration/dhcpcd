@@ -3410,7 +3410,7 @@ dhcp_init(struct interface *ifp)
 		state->raw_fd = -1;
 
 		/* Now is a good time to find IPv4 routes */
-		if_initrt(ifp->ctx);
+		if_initrt(ifp->ctx, AF_INET);
 	}
 
 	state->state = DHS_INIT;

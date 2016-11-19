@@ -567,7 +567,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 }
 
 int
-if_initrt(struct dhcpcd_ctx *ctx)
+if_initrt(struct dhcpcd_ctx *ctx, int af)
 {
 	struct rt_msghdr *rtm;
 	int mib[6];
@@ -575,12 +575,12 @@ if_initrt(struct dhcpcd_ctx *ctx)
 	char *buf, *p, *end;
 	struct rt rt;
 
-	rt_headclear(&ctx->kroutes);
+	rt_headclear(&ctx->kroutes, AF_UNSPEC);
 
 	mib[0] = CTL_NET;
 	mib[1] = PF_ROUTE;
 	mib[2] = 0;
-	mib[3] = AF_UNSPEC;
+	mib[3] = af;
 	mib[4] = NET_RT_DUMP;
 	mib[5] = 0;
 

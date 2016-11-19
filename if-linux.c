@@ -1270,18 +1270,18 @@ _if_initrt(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 }
 
 int
-if_initrt(struct dhcpcd_ctx *ctx)
+if_initrt(struct dhcpcd_ctx *ctx, int af)
 {
 	struct nlmr nlm;
 
-	rt_headclear(&ctx->kroutes);
+	rt_headclear(&ctx->kroutes, af);
 
 	memset(&nlm, 0, sizeof(nlm));
 	nlm.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
 	nlm.hdr.nlmsg_type = RTM_GETROUTE;
 	nlm.hdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_MATCH;
 	nlm.rt.rtm_table = RT_TABLE_MAIN;
-	nlm.rt.rtm_family = AF_UNSPEC;
+	nlm.rt.rtm_family = af;
 
 	return send_netlink(ctx, NULL, NETLINK_ROUTE, &nlm.hdr, &_if_initrt);
 }

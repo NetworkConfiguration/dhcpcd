@@ -1283,16 +1283,18 @@ out:
 
 
 int
-if_initrt(struct dhcpcd_ctx *ctx)
+if_initrt(struct dhcpcd_ctx *ctx, int af)
 {
 
-	rt_headclear(&ctx->kroutes);
+	rt_headclear(&ctx->kroutes, af);
 #ifdef INET
-	if (if_parsert(ctx, MIB2_IP,MIB2_IP_ROUTE, if_walkrt) == -1)
+	if ((af == AF_UNSPEC || af == AF_INET) &&
+	    if_parsert(ctx, MIB2_IP,MIB2_IP_ROUTE, if_walkrt) == -1)
 		return -1;
 #endif
 #ifdef INET6
-	if (if_parsert(ctx, MIB2_IP6, MIB2_IP6_ROUTE, if_walkrt6) == -1)
+	if ((af == AF_UNSPEC || af == AF_INET6) &&
+	    if_parsert(ctx, MIB2_IP6, MIB2_IP6_ROUTE, if_walkrt6) == -1)
 		return -1;
 #endif
 	return 0;

@@ -183,7 +183,7 @@ int if_addrflags(const struct interface *, const struct in_addr *,
     const char *);
 
 int if_route(unsigned char, const struct rt *rt);
-int if_initrt(struct dhcpcd_ctx *);
+int if_initrt(struct dhcpcd_ctx *, int);
 #endif
 
 #ifdef INET6

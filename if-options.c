@@ -2585,7 +2585,7 @@ free_options(struct if_options *ifo)
 				free(ifo->config[i++]);
 			free(ifo->config);
 		}
-		rt_headclear(&ifo->routes);
+		rt_headclear(&ifo->routes, AF_UNSPEC);
 		free(ifo->script);
 		free(ifo->arping);
 		free(ifo->blacklist);
