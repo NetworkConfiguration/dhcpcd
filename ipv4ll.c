@@ -498,7 +498,7 @@ ipv4ll_recvrt(__unused int cmd, const struct rt *rt)
 	ctx = rt->rt_ifp->ctx;
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 		if (IPV4LL_STATE_RUNNING(ifp)) {
-			if_initrt(ctx);
+			if_initrt(ctx, AF_INET);
 			rt_build(ctx, AF_INET);
 			break;
 		}

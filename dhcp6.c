@@ -2650,7 +2650,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 		if (k && !carrier_warned) {
 			ifd_state = D6_STATE(ifd);
 			ipv6_addaddrs(&ifd_state->addrs);
-			if_initrt(ifd->ctx);
+			if_initrt(ifd->ctx, AF_INET6);
 			rt_build(ifd->ctx, AF_INET6);
 			dhcp6_script_try_run(ifd, 1);
 		}
@@ -2717,7 +2717,7 @@ dhcp6_find_delegates(struct interface *ifp)
 		state = D6_STATE(ifp);
 		state->state = DH6S_DELEGATED;
 		ipv6_addaddrs(&state->addrs);
-		if_initrt(ifp->ctx);
+		if_initrt(ifp->ctx, AF_INET6);
 		rt_build(ifp->ctx, AF_INET6);
 		dhcp6_script_try_run(ifp, 1);
 	}
@@ -3233,7 +3233,7 @@ dhcp6_handledata(void *arg)
 		else if (state->expire == 0)
 			logger(ifp->ctx, has_new ? LOG_INFO : LOG_DEBUG,
 			    "%s: will expire", ifp->name);
-		if_initrt(ifp->ctx);
+		if_initrt(ifp->ctx, AF_INET6);
 		rt_build(ifp->ctx, AF_INET6);
 		dhcp6_writelease(ifp);
 #ifndef SMALL
