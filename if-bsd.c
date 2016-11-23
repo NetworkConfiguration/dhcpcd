@@ -1345,23 +1345,24 @@ inet6_sysctl(int code, int val, int action)
 #endif
 
 #ifdef IPV6_MANAGETEMPADDR
-#ifndef IPV6CTL_TEMPVLTIME
-#define get_inet6_sysctlbyname(code) inet6_sysctlbyname(code, 0, 0)
-#define set_inet6_sysctlbyname(code, val) inet6_sysctlbyname(code, val, 1)
+#if !defined(IPV6CTL_TEMPVLTIME)
 static int
-inet6_sysctlbyname(const char *name, int val, int action)
+get_sysctlbyname(const char *name)
 {
+#ifdef __OpenBSD__
+	/* OpenBSD seems to have it enabled by default .... */
+
+	UNUSED(name);
+	return -1;
+#else
+	int val;
 	size_t size;
 
 	size = sizeof(val);
-	if (action) {
-		if (sysctlbyname(name, NULL, 0, &val, size) == -1)
-			return -1;
-		return 0;
-	}
 	if (sysctlbyname(name, &val, &size, NULL, 0) == -1)
 		return -1;
 	return val;
+#endif
 }
 #endif
 
@@ -1373,7 +1374,7 @@ ip6_use_tempaddr(__unused const char *ifname)
 #ifdef IPV6CTL_USETEMPADDR
 	val = get_inet6_sysctl(IPV6CTL_USETEMPADDR);
 #else
-	val = get_inet6_sysctlbyname("net.inet6.ip6.use_tempaddr");
+	val = get_sysctlbyname("net.inet6.ip6.use_tempaddr");
 #endif
 	return val == -1 ? 0 : val;
 }
@@ -1386,7 +1387,7 @@ ip6_temp_preferred_lifetime(__unused const char *ifname)
 #ifdef IPV6CTL_TEMPPLTIME
 	val = get_inet6_sysctl(IPV6CTL_TEMPPLTIME);
 #else
-	val = get_inet6_sysctlbyname("net.inet6.ip6.temppltime");
+	val = get_sysctlbyname("net.inet6.ip6.temppltime");
 #endif
 	return val < 0 ? TEMP_PREFERRED_LIFETIME : val;
 }
@@ -1399,7 +1400,7 @@ ip6_temp_valid_lifetime(__unused const char *ifname)
 #ifdef IPV6CTL_TEMPVLTIME
 	val = get_inet6_sysctl(IPV6CTL_TEMPVLTIME);
 #else
-	val = get_inet6_sysctlbyname("net.inet6.ip6.tempvltime");
+	val = get_sysctlbyname("net.inet6.ip6.tempvltime");
 #endif
 	return val < 0 ? TEMP_VALID_LIFETIME : val;
 }
