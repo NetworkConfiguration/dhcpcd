@@ -419,11 +419,12 @@ if_route(unsigned char cmd, const struct rt *rt)
 		bool netmask_bcast = sa_is_allones(&rt->rt_netmask);
 
 		rtm->rtm_flags |= RTF_UP;
-		rtm->rtm_addrs |= RTA_GATEWAY | RTA_IFP;
+		rtm->rtm_addrs |= RTA_GATEWAY;
 		if (!(rtm->rtm_flags & RTF_REJECT) &&
 		    !sa_is_loopback(&rt->rt_gateway))
 		{
-			rtm->rtm_addrs |= RTA_IFP;
+			if (!gateway_unspec)
+				rtm->rtm_addrs |= RTA_IFP;
 			if (!sa_is_unspecified(&rt->rt_ifa))
 				rtm->rtm_addrs |= RTA_IFA;
 		}
