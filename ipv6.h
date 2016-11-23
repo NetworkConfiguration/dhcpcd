@@ -104,14 +104,8 @@
  * Some BSDs do not allow userland to set temporary addresses.
  * Linux-3.18 allows the marking of addresses from which to manage temp addrs.
  */
-#if defined(BSD)
-#  if !defined(IN6_IFF_TEMPORARY) && defined(IN6_IFF_PRIVACY)
-     /* OpenBSD just has to be different... */
-#    define IN6_IFF_TEMPORARY	IN6_IFF_PRIVACY
-#  endif
-#  if defined(IN6_IFF_TEMPORARY)
-#    define IPV6_MANAGETEMPADDR
-#  endif
+#if defined(BSD) && defined(IN6_IFF_TEMPORARY)
+#define IPV6_MANAGETEMPADDR
 #endif
 
 /*
