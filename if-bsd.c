@@ -576,7 +576,7 @@ if_initrt(struct dhcpcd_ctx *ctx, int af)
 	char *buf, *p, *end;
 	struct rt rt;
 
-	rt_headclear(&ctx->kroutes, AF_UNSPEC);
+	rt_headclear(&ctx->kroutes, af);
 
 	mib[0] = CTL_NET;
 	mib[1] = PF_ROUTE;
