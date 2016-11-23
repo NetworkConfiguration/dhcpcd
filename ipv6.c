@@ -583,7 +583,7 @@ ipv6_checkaddrflags(void *arg)
 		return;
 	}
 
-	if (!(ia->addr_flags & IN6_IFF_TENTATIVE)) {
+	if (!(flags & IN6_IFF_TENTATIVE)) {
 		/* Simulate the kernel announcing the new address. */
 		ipv6_handleifa(ia->iface->ctx, RTM_NEWADDR,
 		    ia->iface->ctx->ifaces, ia->iface->name,
