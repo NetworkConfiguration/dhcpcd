@@ -307,9 +307,10 @@ ipv6nd_sendrsprobe(void *arg)
 	if (sendmsg(ctx->nd_fd, &ctx->sndhdr, 0) == -1) {
 		logger(ifp->ctx, LOG_ERR,
 		    "%s: %s: sendmsg: %m", ifp->name, __func__);
-		ipv6nd_drop(ifp);
-		ifp->options->options &= ~(DHCPCD_IPV6 | DHCPCD_IPV6RS);
-		return;
+		/* Allow IPv6ND to continue .... at most a few errors
+		 * would be logged.
+		 * Generally the error is ENOBUFS when struggling to
+		 * associate with an access point. */
 	}
 
 	if (state->rsprobes++ < MAX_RTR_SOLICITATIONS)
