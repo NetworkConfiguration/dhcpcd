@@ -1281,7 +1281,7 @@ if_initrt(struct dhcpcd_ctx *ctx, int af)
 	nlm.hdr.nlmsg_type = RTM_GETROUTE;
 	nlm.hdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_MATCH;
 	nlm.rt.rtm_table = RT_TABLE_MAIN;
-	nlm.rt.rtm_family = af;
+	nlm.rt.rtm_family = (unsigned char)af;
 
 	return send_netlink(ctx, NULL, NETLINK_ROUTE, &nlm.hdr, &_if_initrt);
 }
