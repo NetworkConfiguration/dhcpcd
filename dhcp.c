@@ -1767,10 +1767,10 @@ send_message(struct interface *ifp, uint8_t type,
 	} else {
 		size_t ulen;
 
-		r = 0;
 		udp = dhcp_makeudppacket(&ulen, (uint8_t *)bootp, len, from,to);
 		if (udp == NULL) {
 			logger(ifp->ctx, LOG_ERR, "dhcp_makeudppacket: %m");
+			r = 0;
 		} else {
 			r = if_sendraw(ifp, state->raw_fd,
 			    ETHERTYPE_IP, (uint8_t *)udp, ulen);
@@ -1788,6 +1788,7 @@ send_message(struct interface *ifp, uint8_t type,
 			case ENETDOWN:
 			case ENETRESET:
 			case ENETUNREACH:
+			case ENOBUFS:
 				break;
 			default:
 				if (!(ifp->ctx->options & DHCPCD_TEST))

@@ -1203,9 +1203,10 @@ logsend:
 	if (sendmsg(ctx->dhcp6_fd, &ctx->sndhdr, 0) == -1) {
 		logger(ifp->ctx, LOG_ERR,
 		    "%s: %s: sendmsg: %m", ifp->name, __func__);
-		ifp->options->options &= ~DHCPCD_IPV6;
-		dhcp6_drop(ifp, "EXPIRE6");
-		return -1;
+		/* Allow DHCPv6 to continue .... the errors
+		 * would be rate limited by the protocol.
+		 * Generally the error is ENOBUFS when struggling to
+		 * associate with an access point. */
 	}
 
 	state->RTC++;
