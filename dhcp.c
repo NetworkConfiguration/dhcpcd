@@ -2624,7 +2624,7 @@ log_dhcp(int lvl, const char *msg,
     const struct in_addr *from, int ad)
 {
 	const char *tfrom;
-	char *a,  sname[sizeof(bootp->sname) * 4];
+	char *a, sname[sizeof(bootp->sname) * 4];
 	struct in_addr addr;
 	int r;
 	uint8_t overl;
@@ -2663,8 +2663,8 @@ log_dhcp(int lvl, const char *msg,
 	    DHO_OPTSOVERLOADED) == -1)
 		overl = 0;
 	if (bootp->sname[0] && r == 0 && !(overl & 2)) {
-		print_string(sname, sizeof(sname), OT_STRING,
-		    bootp->sname, strlen((const char *)bootp->sname));
+		print_string(sname, sizeof(sname), OT_STRING | OT_DOMAIN,
+		    bootp->sname, sizeof(bootp->sname));
 		if (a == NULL)
 			logger(ifp->ctx, lvl, "%s: %s %s %s `%s'",
 			    ifp->name, msg, tfrom, inet_ntoa(addr), sname);
