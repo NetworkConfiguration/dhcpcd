@@ -1204,14 +1204,13 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 #endif
 
 #ifndef HAVE_IFAM_ADDRFLAGS
-		if (ifam->ifam_type == RTM_DELADDR ||
-		    (addrflags = if_addrflags(ifp, &addr, NULL)) == -1)
-		{
-			if (ifam->ifam_type != RTM_DELADDR || errno != EEXIST)
-				logger(ctx, LOG_ERR,
-				    "%s: if_addrflags: %s: %m",
-				    ifp->name, inet_ntoa(addr));
-			addrflags = 0;
+		if (ifam->ifam_type == RTM_DELADDR)
+			addrflags = 0 ;
+		else if ((addrflags = if_addrflags(ifp, &addr, NULL)) == -1) {
+			logger(ctx, LOG_ERR,
+			    "%s: if_addrflags: %s: %m",
+			    ifp->name, inet_ntoa(addr));
+			break;
 		}
 #endif
 
@@ -1232,20 +1231,12 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 		mask6 = sin6->sin6_addr;
 
 #ifndef HAVE_IFAM_ADDRFLAGS
-		if (ifam->ifam_type == RTM_DELADDR ||
-		    (addrflags = if_addrflags6(ifp, &addr6, NULL)) == -1)
-		{
-#ifdef __FreeBSD__
-			/* For some reason FreeBSD does't set errno
-			 * if the interface has just departed. */
-			errno = 0;
-#endif
-			if (ifam->ifam_type != RTM_DELADDR ||
-			    (errno != EEXIST && errno != 0))
-				logger(ctx, LOG_ERR,
-				    "%s: if_addrflags6: %m",
-				    ifp->name);
-			addrflags = 0;
+		if (ifam->ifam_type == RTM_DELADDR)
+		    addrflags = 0;
+		else if ((addrflags = if_addrflags6(ifp, &addr6, NULL)) == -1) {
+			logger(ctx, LOG_ERR,
+			    "%s: if_addrflags6: %m", ifp->name);
+			break;
 		}
 #endif
 
