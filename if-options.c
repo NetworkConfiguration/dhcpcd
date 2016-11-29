@@ -2432,8 +2432,9 @@ read_config(struct dhcpcd_ctx *ctx,
 	/* Parse our options file */
 	fp = fopen(ctx->cffile, "r");
 	if (fp == NULL) {
-		if (strcmp(ctx->cffile, CONFIG))
-			logger(ctx, LOG_ERR, "fopen `%s': %m", ctx->cffile);
+		/* dhcpcd can continue without it, but no DNS options
+		 * would be requested ... */
+		logger(ctx, LOG_WARNING, "fopen `%s': %m", ctx->cffile);
 		free(buf);
 		return ifo;
 	}
