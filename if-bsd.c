@@ -1235,9 +1235,15 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 		if (ifam->ifam_type == RTM_DELADDR ||
 		    (addrflags = if_addrflags6(ifp, &addr6, NULL)) == -1)
 		{
-			if (ifam->ifam_type != RTM_DELADDR || errno != EEXIST)
+#ifdef __FreeBSD__
+			/* For some reason FreeBSD does't set errno
+			 * if the interface has just departed. */
+			errno = 0;
+#endif
+			if (ifam->ifam_type != RTM_DELADDR ||
+			    (errno != EEXIST && errno != 0))
 				logger(ctx, LOG_ERR,
-				    "%s: if_addrflags: %m",
+				    "%s: if_addrflags6: %m",
 				    ifp->name);
 			addrflags = 0;
 		}
