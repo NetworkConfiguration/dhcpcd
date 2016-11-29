@@ -212,6 +212,7 @@ test:
 		return;
 	}
 	timespecclear(&state->defend);
+	if_initrt(ifp->ctx, AF_INET);
 	rt_build(ifp->ctx, AF_INET);
 	arp_announce(astate);
 	script_runreason(ifp, "IPV4LL");
