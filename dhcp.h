@@ -209,7 +209,7 @@ struct dhcp_state {
 	unsigned char *clientid;
 	struct authstate auth;
 #ifdef ARPING
-	size_t arping_index;
+	ssize_t arping_index;
 #endif
 };
 

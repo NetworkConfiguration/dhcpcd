@@ -1238,7 +1238,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			if (parse_addr(ctx, &addr, NULL, arg) != 0)
 				return -1;
 			naddr = realloc(ifo->arping,
-			    sizeof(in_addr_t) * (ifo->arping_len + 1));
+			    sizeof(in_addr_t) * ((size_t)ifo->arping_len + 1));
 			if (naddr == NULL) {
 				logger(ctx, LOG_ERR, "%s: %m", __func__);
 				return -1;
