@@ -2023,7 +2023,7 @@ dhcp_arp_probed(struct arp_state *astate)
 		 * arping profile */
 		if (++state->arping_index < ifo->arping_len) {
 			astate->addr.s_addr =
-			    ifo->arping[state->arping_index - 1];
+			    ifo->arping[state->arping_index];
 			arp_probe(astate);
 			return;
 		}
@@ -2087,16 +2087,16 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 
 #ifdef ARPING
 	ifo = ifp->options;
-	if (state->arping_index &&
-	    state->arping_index <= ifo->arping_len &&
+	if (state->arping_index != -1 &&
+	    state->arping_index < ifo->arping_len &&
 	    amsg &&
-	    (amsg->sip.s_addr == ifo->arping[state->arping_index - 1] ||
+	    (amsg->sip.s_addr == ifo->arping[state->arping_index] ||
 	    (amsg->sip.s_addr == 0 &&
-	    amsg->tip.s_addr == ifo->arping[state->arping_index - 1])))
+	    amsg->tip.s_addr == ifo->arping[state->arping_index])))
 	{
 		char buf[HWADDR_LEN * 3];
 
-		astate->failed.s_addr = ifo->arping[state->arping_index - 1];
+		astate->failed.s_addr = ifo->arping[state->arping_index];
 		arp_report_conflicted(astate, amsg);
 		hwaddr_ntoa(amsg->sha, ifp->hwlen, buf, sizeof(buf));
 		if (dhcpcd_selectprofile(ifp, buf) == -1 &&
@@ -2596,6 +2596,9 @@ dhcp_drop(struct interface *ifp, const char *reason)
 		return;
 	}
 
+#ifdef ARPING
+	state->arping_index = -1;
+#endif
 	if (ifp->options->options & DHCPCD_RELEASE &&
 	    !(ifp->options->options & DHCPCD_INFORM))
 	{
@@ -3410,6 +3413,9 @@ dhcp_init(struct interface *ifp)
 		/* 0 is a valid fd, so init to -1 */
 		state->raw_fd = -1;
 
+#ifdef ARPING
+		state->arping_index = -1;
+#endif
 		/* Now is a good time to find IPv4 routes */
 		if_initrt(ifp->ctx, AF_INET);
 	}
@@ -3663,6 +3669,9 @@ void
 dhcp_start(struct interface *ifp)
 {
 	struct timespec tv;
+#ifdef ARPING
+	const struct dhcp_state *state;
+#endif
 
 	if (!(ifp->options->options & DHCPCD_IPV4))
 		return;
@@ -3706,6 +3715,15 @@ dhcp_start(struct interface *ifp)
 		return;
 	}
 
+#ifdef ARPING
+	/* If we have arpinged then we have already delayed. */
+	state = D_CSTATE(ifp);
+	if (state != NULL && state->arping_index != -1) {
+		dhcp_start1(ifp);
+		return;
+	}
+#endif
+
 	tv.tv_sec = DHCP_MIN_DELAY;
 	tv.tv_nsec = (suseconds_t)arc4random_uniform(
 	    (DHCP_MAX_DELAY - DHCP_MIN_DELAY) * NSEC_PER_SEC);
@@ -3720,6 +3738,13 @@ dhcp_start(struct interface *ifp)
 void
 dhcp_abort(struct interface *ifp)
 {
+#ifdef ARPING
+	struct dhcp_state *state;
+
+	state = D_STATE(ifp);
+	if (state != NULL)
+		state->arping_index = -1;
+#endif
 
 	eloop_timeout_delete(ifp->ctx->eloop, dhcp_start1, ifp);
 }

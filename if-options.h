@@ -197,7 +197,7 @@ struct if_options {
 	in_addr_t *blacklist;
 	size_t whitelist_len;
 	in_addr_t *whitelist;
-	size_t arping_len;
+	ssize_t arping_len;
 	in_addr_t *arping;
 	char *fallback;
 
