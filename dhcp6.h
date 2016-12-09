@@ -92,6 +92,7 @@
 #define D6_OPTION_PD_EXCLUDE		67
 #define D6_OPTION_SOL_MAX_RT		82
 #define D6_OPTION_INF_MAX_RT		83
+#define	D6_OPTION_MUDURL		112
 
 #define D6_FQDN_PTR	0x00
 #define D6_FQDN_BOTH	0x01

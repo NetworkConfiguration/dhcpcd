@@ -103,6 +103,7 @@
 #define O_INFORM6		O_BASE + 45
 #define O_LASTLEASE_EXTEND	O_BASE + 46
 #define O_INACTIVE		O_BASE + 47
+#define	O_MUDURL		O_BASE + 48
 
 const struct option cf_options[] = {
 	{"background",      no_argument,       NULL, 'b'},
@@ -203,6 +204,7 @@ const struct option cf_options[] = {
 	{"noup",            no_argument,       NULL, O_NOUP},
 	{"lastleaseextend", no_argument,       NULL, O_LASTLEASE_EXTEND},
 	{"inactive",        no_argument,       NULL, O_INACTIVE},
+	{"mudurl",          required_argument, NULL, O_MUDURL},
 	{NULL,              0,                 NULL, '\0'}
 };
 
@@ -2134,6 +2136,15 @@ err_sla:
 		break;
 	case O_INACTIVE:
 		ifo->options |= DHCPCD_INACTIVE;
+		break;
+	case O_MUDURL:
+   	        ARG_REQUIRED;
+		s = parse_string((char *)ifo->mudurl + 1, MUDURL_MAX_LEN, arg);
+		if (s == -1) {
+			logger(ctx, LOG_ERR, "mudurl: %m");
+			return -1;
+		}
+		*ifo->mudurl = (uint8_t)s;
 		break;
 	default:
 		return 0;

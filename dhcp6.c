@@ -634,6 +634,9 @@ dhcp6_makemessage(struct interface *ifp)
 			len += sizeof(o) + 1 + hl;
 		}
 
+		if (ifo->mudurl[0])
+			len += sizeof(o) + ifo->mudurl[0];
+
 		if ((ifo->auth.options & DHCPCD_AUTH_SENDREQUIRE) !=
 		    DHCPCD_AUTH_SENDREQUIRE)
 			len += sizeof(o); /* Reconfigure Accept */
@@ -900,6 +903,11 @@ dhcp6_makemessage(struct interface *ifp)
 			o.len = htons((uint16_t)(hl + 1));
 			memcpy(o_lenp, &o.len, sizeof(o.len));
 		}
+
+		if (ifo->mudurl[0])
+			COPYIN(D6_OPTION_MUDURL,
+			    ifo->mudurl + 1, ifo->mudurl[0]);
+		
 
 		if ((ifo->auth.options & DHCPCD_AUTH_SENDREQUIRE) !=
 		    DHCPCD_AUTH_SENDREQUIRE)
