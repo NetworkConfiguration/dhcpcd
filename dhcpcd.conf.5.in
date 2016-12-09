@@ -439,6 +439,11 @@ Metrics are used to prefer an interface over another one, lowest wins.
 will supply a default metric of 200 +
 .Xr if_nametoindex 3 .
 An extra 100 will be added for wireless interfaces.
+.It Ic mudurl Ar url 
+Specifies the URL for a manufacturer usage description (MUD).
+The description is used by upstream network devices to instantiate any
+desired access lists.
+See draft-ietf-opsawg-mud for more information.
 .It Ic noalias
 Any pre-existing IPv4 addresses existing address will be removed from the
 interface when adding a new IPv4 address.

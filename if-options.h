@@ -56,6 +56,7 @@
 #define CLIENTID_MAX_LEN	48
 #define USERCLASS_MAX_LEN	255
 #define VENDOR_MAX_LEN		255
+#define	MUDURL_MAX_LEN		255
 
 #define DHCPCD_ARP			(1ULL << 0)
 #define DHCPCD_RELEASE			(1ULL << 1)
@@ -192,6 +193,7 @@ struct if_options {
 	uint8_t clientid[CLIENTID_MAX_LEN + 2];
 	uint8_t userclass[USERCLASS_MAX_LEN + 2];
 	uint8_t vendor[VENDOR_MAX_LEN + 2];
+	uint8_t mudurl[MUDURL_MAX_LEN + 2];
 
 	size_t blacklist_len;
 	in_addr_t *blacklist;

@@ -922,6 +922,13 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 			p += ifo->vendorclassid[0] + 1;
 		}
 
+		if (ifo->mudurl[0]) {
+		       AREA_CHECK(ifo->mudurl[0]);
+		       *p++ = DHO_MUDURL;
+		       memcpy(p, ifo->mudurl, (size_t)ifo->mudurl[0] + 1);
+		       p += ifo->mudurl[0] + 1;
+		}
+
 		if (type != DHCP_INFORM) {
 			if (ifo->leasetime != 0) {
 				AREA_CHECK(4);

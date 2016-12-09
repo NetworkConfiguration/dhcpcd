@@ -115,6 +115,7 @@ enum DHO {
 	DHO_VIVCO                  = 124, /* RFC 3925 */
 	DHO_VIVSO                  = 125, /* RFC 3925 */
 	DHO_FORCERENEW_NONCE       = 145, /* RFC 6704 */
+	DHO_MUDURL                 = 161, /* draft-ietf-opsawg-mud */
 	DHO_SIXRD                  = 212, /* RFC 5969 */
 	DHO_MSCSR                  = 249, /* MS code for RFC 3442 */
 	DHO_END                    = 255
