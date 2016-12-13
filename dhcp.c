@@ -2024,7 +2024,7 @@ dhcp_arp_probed(struct arp_state *astate)
 	state = D_STATE(ifp);
 	ifo = ifp->options;
 #ifdef ARPING
-	if (state->arping_index < ifo->arping_len) {
+	if (ifo->arping_len && state->arping_index < ifo->arping_len) {
 		/* We didn't find a profile for this
 		 * address or hwaddr, so move to the next
 		 * arping profile */
@@ -3529,7 +3529,7 @@ dhcp_start1(void *arg)
 	state->offer_len = 0;
 
 #ifdef ARPING
-	if (state->arping_index < ifo->arping_len) {
+	if (ifo->arping_len && state->arping_index < ifo->arping_len) {
 		struct arp_state *astate;
 
 		astate = arp_new(ifp, NULL);
