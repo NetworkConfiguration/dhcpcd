@@ -614,12 +614,12 @@ static char *
 strskipwhite(const char *s)
 {
 
-	if (s == NULL)
+	if (s == NULL || *s == '\0')
 		return NULL;
 	while (*s == ' ' || *s == '\t') {
+		s++;
 		if (*s == '\0')
 			return NULL;
-		s++;
 	}
 	return UNCONST(s);
 }
@@ -1249,7 +1249,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		break;
 #ifdef INET
 	case O_ARPING:
-		while (arg && *arg != '\0') {
+		while (arg != NULL) {
 			fp = strwhite(arg);
 			if (fp)
 				*fp++ = '\0';
@@ -2389,7 +2389,7 @@ read_config(struct dhcpcd_ctx *ctx,
 			if (line)
 				line = strskipwhite(line);
 			/* Trim trailing whitespace */
-			if (line && *line) {
+			if (line) {
 				p = line + strlen(line) - 1;
 				while (p != line &&
 				    (*p == ' ' || *p == '\t') &&
@@ -2465,7 +2465,7 @@ read_config(struct dhcpcd_ctx *ctx,
 		if (line)
 			line = strskipwhite(line);
 		/* Trim trailing whitespace */
-		if (line && *line) {
+		if (line) {
 			p = line + strlen(line) - 1;
 			while (p != line &&
 			    (*p == ' ' || *p == '\t') &&
@@ -2482,15 +2482,20 @@ read_config(struct dhcpcd_ctx *ctx,
 			char **n;
 
 			new_block = 1;
-			if (ifname && line && strcmp(line, ifname) == 0)
+			if (line == NULL) {
+				/* No interface given */
+				skip = 1;
+				continue;
+			}
+			if (ifname && strcmp(line, ifname) == 0)
 				skip = 0;
 			else
 				skip = 1;
 			if (ifname)
 				continue;
 
-			n = realloc(ctx->ifcv,
-			    sizeof(char *) * ((size_t)ctx->ifcc + 1));
+			n = reallocarray(ctx->ifcv,
+			    (size_t)ctx->ifcc + 1, sizeof(char *));
 			if (n == NULL) {
 				logger(ctx, LOG_ERR, "%s: %m", __func__);
 				continue;
