@@ -536,8 +536,6 @@ then exits before doing any configuration.
 .It Fl w
 Wait for an address to be assigned before forking to the background.
 Does not take an argument, unlike the below option.
-.Fl fl waitip
-option.
 .It Fl Fl waitip Op 4 | 6
 Wait for an address to be assigned before forking to the background.
 4 means wait for an IPv4 address to be assigned.
