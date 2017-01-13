@@ -50,6 +50,11 @@
  * But that's generally OK if only dhcpcd is managing routes. */
 #endif
 
+/* OpenBSD defines this as a "convienience" ..... we work around it. */
+#ifdef __OpenBSD__
+#undef rt_mtu
+#endif
+
 struct rt {
 	TAILQ_ENTRY(rt)		rt_next;
 	union sa_ss		rt_ss_dest;
