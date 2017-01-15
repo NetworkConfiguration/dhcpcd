@@ -630,7 +630,7 @@ get_option_routes(struct rt_head *routes, struct interface *ifp,
 			p += 4;
 			/* RFC 2131 Section 5.8 states default route is
 			 * illegal */
-			if (sa_is_unspecified(&rt->rt_dest))
+			if (gateway.s_addr == INADDR_ANY)
 				continue;
 			if ((rt = rt_new(ifp)) == NULL)
 				return -1;
