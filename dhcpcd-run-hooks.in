@@ -285,11 +285,11 @@ detect_init()
 		_service_exists="/usr/sbin/service \$1 $status >/dev/null 2>&1"
 		_service_cmd="/usr/sbin/service \$1 \$2"
 	elif [ -x /bin/sv ]; then
-		_service_exists="/bin/sv status \1 >/dev/null 2>&1"
-		_service_cmd="/bin/sv \$1 \$2"
+		_service_exists="/bin/sv status \$1 >/dev/null 2>&1"
+		_service_cmd="/bin/sv \$2 \$1"
 	elif [ -x /usr/bin/sv ]; then
-		_service_exists="/usr/bin/sv status \1 >/dev/null 2>&1"
-		_service_cmd="/usr/bin/sv \$1 \$2"
+		_service_exists="/usr/bin/sv status \$1 >/dev/null 2>&1"
+		_service_cmd="/usr/bin/sv \$2 \$1"
 	elif [ -e /etc/slackware-version -a -d /etc/rc.d ]; then
 		_service_exists="[ -x /etc/rc.d/rc.\$1 ]"
 		_service_cmd="/etc/rc.d/rc.\$1 \$2"
