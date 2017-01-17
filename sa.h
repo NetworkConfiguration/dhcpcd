@@ -36,7 +36,7 @@ union sa_ss {
 	struct sockaddr_in6	sin6;
 };
 
-#ifndef __linux__
+#ifdef BSD
 #define HAVE_SA_LEN
 #endif
 
