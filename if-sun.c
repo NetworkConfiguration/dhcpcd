@@ -38,10 +38,6 @@
 
 #include <inet/ip.h>
 
-/* private interface we can hook into to get
- * a better getifaddrs(3). */
-#include <libsocket_priv.h>
-
 #include <net/if_dl.h>
 #include <net/if_types.h>
 
@@ -52,6 +48,11 @@
 #include <sys/pfmod.h>
 #include <sys/tihdr.h>
 #include <sys/utsname.h>
+
+/* Private libsocket interface we can hook into to get
+ * a better getifaddrs(3).
+ * From libsocket_priv.h, which is not always distributed so is here. */
+extern int getallifaddrs(sa_family_t, struct ifaddrs **, int64_t);
 
 #include "config.h"
 #include "common.h"
