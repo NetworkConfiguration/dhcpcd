@@ -39,6 +39,7 @@
 #  include <net/if_dl.h>
 #  include <net/if_types.h>
 #  include <netinet/in_var.h>
+#  undef AF_PACKET	/* Newer Illumos defines this */
 #endif
 #ifdef AF_PACKET
 #  include <netpacket/packet.h>
