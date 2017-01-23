@@ -92,7 +92,7 @@ dhcpcd successfully requested a lease from a DHCP server.
 .It Dv DELEGATED6
 dhcpcd assigned a delegated prefix to the interface.
 .It Dv IPV4LL
-dhcpcd obtaind an IPV4LL address, or one was removed.
+dhcpcd obtained an IPV4LL address, or one was removed.
 .It Dv STATIC
 dhcpcd has been configured with a static configuration which has not been
 obtained from a DHCP server.
