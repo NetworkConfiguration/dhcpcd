@@ -787,7 +787,7 @@ running on the
 .It Pa @RUNDIR@/dhcpcd.sock
 Control socket to the master daemon.
 .It Pa @RUNDIR@/dhcpcd.unpriv.sock
-Unpriviledged socket to the master daemon, only allows state retrieval.
+Unprivileged socket to the master daemon, only allows state retrieval.
 .It Pa @RUNDIR@/dhcpcd\- Ns Ar interface Ns .sock
 Control socket to per interface daemon.
 .El

@@ -376,7 +376,7 @@ interface eth0
 .It Ic ipv4only
 Only configure IPv4.
 .It Ic ipv6only
-Only confgiure IPv6.
+Only configure IPv6.
 .It Ic fqdn Op disable | ptr | both
 ptr just asks the DHCP server to update the PTR
 record of the host in DNS whereas both also updates the A record.
@@ -487,7 +487,7 @@ See
 .%T "RFC 3927"
 .Re
 .It Ic noipv6
-Don't attmept to configure an IPv6 address.
+Don't attempt to configure an IPv6 address.
 .It Ic noipv6rs
 Disable solicitation and receipt of IPv6 Router Advertisements.
 .It Ic nolink
@@ -757,7 +757,7 @@ with a prefix of
 Defines the Vendor-Identifying Vendor Options.
 The
 .Ar code
-is the IANA Enterprise Number which will unqiuely describe the encapsulated
+is the IANA Enterprise Number which will uniquely describe the encapsulated
 options.
 .Ar type
 is normally
@@ -828,8 +828,8 @@ A byte represented as a string of flags, most significant bit first.
 For example, using ABCDEFGH then A would equal 10000000, B 01000000,
 C 00100000, etc.
 If the bit is not set, the flag is not printed.
-A flag of 0 is not printed even if the bit postition is set.
-This is to allow reservation of the first bits while assinging the last bits.
+A flag of 0 is not printed even if the bit position is set.
+This is to allow reservation of the first bits while assigning the last bits.
 .It Ic int16
 A signed 16bit integer, 2 bytes.
 .It Ic uint16
@@ -882,7 +882,7 @@ and
 in it.
 .Nm dhcpcd
 will then look for a non-expired token with a matching realm and secretid.
-This token is used to authenicate all other messages.
+This token is used to authenticate all other messages.
 .It Ic delayed
 Same as above, but without a realm.
 .El
