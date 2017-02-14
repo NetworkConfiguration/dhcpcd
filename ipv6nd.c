@@ -741,6 +741,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	char buf[INET6_ADDRSTRLEN];
 	const char *cbp;
 	struct ra *rap;
+	struct in6_addr pi_prefix;
 	struct ipv6_addr *ap;
 	struct dhcp_opt *dho;
 	uint8_t new_rap, new_data;
@@ -935,8 +936,10 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 				    ifp->name);
 				continue;
 			}
-			if (IN6_IS_ADDR_MULTICAST(&pi.nd_opt_pi_prefix) ||
-			    IN6_IS_ADDR_LINKLOCAL(&pi.nd_opt_pi_prefix))
+			/* nd_opt_pi_prefix is not aligned. */
+			memcpy(&pi_prefix, &pi.nd_opt_pi_prefix, sizeof(pi_prefix));
+			if (IN6_IS_ADDR_MULTICAST(&pi_prefix) ||
+			    IN6_IS_ADDR_LINKLOCAL(&pi_prefix))
 			{
 				logger(ifp->ctx, new_data ? LOG_ERR : LOG_DEBUG,
 				    "%s: invalid prefix in RA", ifp->name);
@@ -951,8 +954,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 			}
 			TAILQ_FOREACH(ap, &rap->addrs, next)
 				if (ap->prefix_len ==pi.nd_opt_pi_prefix_len &&
-				    IN6_ARE_ADDR_EQUAL(&ap->prefix,
-				    &pi.nd_opt_pi_prefix))
+				    IN6_ARE_ADDR_EQUAL(&ap->prefix, &pi_prefix))
 					break;
 			if (ap == NULL) {
 				if (!(pi.nd_opt_pi_flags_reserved &
@@ -966,7 +968,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 				ap->iface = rap->iface;
 				ap->flags = IPV6_AF_NEW;
 				ap->prefix_len = pi.nd_opt_pi_prefix_len;
-				ap->prefix = pi.nd_opt_pi_prefix;
+				ap->prefix = pi_prefix;
 				if (pi.nd_opt_pi_flags_reserved &
 				    ND_OPT_PI_FLAG_AUTO &&
 				    ap->iface->options->options &
@@ -1475,6 +1477,7 @@ ipv6nd_handlena(struct dhcpcd_ctx *ctx, struct interface *ifp,
     struct icmp6_hdr *icp, size_t len, int hoplimit)
 {
 	struct nd_neighbor_advert *nd_na;
+	struct in6_addr nd_na_target;
 	struct ra *rap;
 	uint32_t is_router, is_solicited;
 	char buf[INET6_ADDRSTRLEN];
@@ -1507,7 +1510,9 @@ ipv6nd_handlena(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	taddr = inet_ntop(AF_INET6, &nd_na->nd_na_target,
 	    buf, INET6_ADDRSTRLEN);
 
-	if (IN6_IS_ADDR_MULTICAST(&nd_na->nd_na_target)) {
+	/* nd_na->nd_na_target is not aligned. */
+	memcpy(&nd_na_target, &nd_na->nd_na_target, sizeof(nd_na_target));
+	if (IN6_IS_ADDR_MULTICAST(&nd_na_target)) {
 		logger(ifp->ctx, LOG_ERR, "%s: NA multicast address %s (%s)",
 		    ifp->name, taddr, ctx->sfrom);
 		return;
@@ -1515,7 +1520,7 @@ ipv6nd_handlena(struct dhcpcd_ctx *ctx, struct interface *ifp,
 
 	TAILQ_FOREACH(rap, ctx->ra_routers, next) {
 		if (rap->iface == ifp &&
-		    IN6_ARE_ADDR_EQUAL(&rap->from, &nd_na->nd_na_target))
+		    IN6_ARE_ADDR_EQUAL(&rap->from, &nd_na_target))
 			break;
 	}
 	if (rap == NULL) {

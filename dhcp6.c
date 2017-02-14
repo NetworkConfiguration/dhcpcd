@@ -1919,6 +1919,7 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 	uint8_t nb, *pw;
 	uint16_t ol;
 	struct dhcp6_pd_addr pdp;
+	struct in6_addr pdp_prefix;
 
 	i = 0;
 	state = D6_STATE(ifp);
@@ -1949,8 +1950,10 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 		o += sizeof(pdp);
 		ol = (uint16_t)(ol - sizeof(pdp));
 
+		/* pdp.prefix is not aligned so copy it out. */
+		memcpy(&pdp_prefix, &pdp.prefix, sizeof(pdp_prefix));
 		TAILQ_FOREACH(a, &state->addrs, next) {
-			if (IN6_ARE_ADDR_EQUAL(&a->prefix, &pdp.prefix))
+			if (IN6_ARE_ADDR_EQUAL(&a->prefix, &pdp_prefix))
 				break;
 		}
 
@@ -1966,8 +1969,8 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			a->dadcallback = dhcp6_dadcallback;
 			a->ia_type = D6_OPTION_IA_PD;
 			memcpy(a->iaid, iaid, sizeof(a->iaid));
-			/* pdp.prefix is not aligned so copy it in. */
-			memcpy(&a->prefix, &pdp.prefix, sizeof(a->prefix));
+			/* pdp.prefix is not aligned so use copy. */
+			a->prefix = pdp_prefix;
 			a->prefix_len = pdp.prefix_len;
 			ia = inet_ntop(AF_INET6, &a->prefix,
 			    iabuf, sizeof(iabuf));
