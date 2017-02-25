@@ -132,7 +132,7 @@ arp_packet(struct interface *ifp, uint8_t *data, size_t len)
 	if (ar.ar_pln != sizeof(arm.sip.s_addr))
 		return;
 
-	/* Get pointers to the hardware addreses */
+	/* Get pointers to the hardware addresses */
 	hw_s = data + sizeof(ar);
 	hw_t = hw_s + ar.ar_hln + ar.ar_pln;
 	/* Ensure we got all the data */
@@ -156,6 +156,20 @@ arp_packet(struct interface *ifp, uint8_t *data, size_t len)
 	memcpy(&arm.sip.s_addr, hw_s + ar.ar_hln, ar.ar_pln);
 	memcpy(&arm.tha, hw_t, ar.ar_hln);
 	memcpy(&arm.tip.s_addr, hw_t + ar.ar_hln, ar.ar_pln);
+
+	/* Ignore ARP Unicast Poll, RFC 1122 */
+	if (arm.sip.s_addr == INADDR_ANY &&
+	    (arm.tha[0] != 0 || memcmp(arm.tha, arm.tha + 1, ar.ar_hln - 1)))
+	{
+#if 0
+		char buf[HWADDR_LEN * 3];
+
+		logger(ifp->ctx, LOG_DEBUG,
+		    "%s: ignoring ARP Unicast Poll from %s", ifp->name,
+		    hwaddr_ntoa(arm.tha, ar.ar_hln, buf, sizeof(buf)));
+#endif
+		return;
+	}
 
 	/* Run the conflicts */
 	state = ARP_CSTATE(ifp);
