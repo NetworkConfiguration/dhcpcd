@@ -56,6 +56,9 @@
 #define ARP_LEN								      \
 	(sizeof(struct arphdr) + (2 * sizeof(uint32_t)) + (2 * HWADDR_LEN))
 
+/* ARP debugging can be quite noisy. Enable this for more noise! */
+//#define	ARP_DEBUG
+
 /* Assert the correct structure size for on wire */
 __CTASSERT(sizeof(struct arphdr) == 8);
 
@@ -145,7 +148,7 @@ arp_packet(struct interface *ifp, uint8_t *data, size_t len)
 			break;
 	}
 	if (ifn) {
-#if 0
+#ifdef ARP_DEBUG
 		logger(ifp->ctx, LOG_DEBUG,
 		    "%s: ignoring ARP from self", ifp->name);
 #endif
@@ -161,7 +164,7 @@ arp_packet(struct interface *ifp, uint8_t *data, size_t len)
 	if (arm.sip.s_addr == INADDR_ANY &&
 	    (arm.tha[0] != 0 || memcmp(arm.tha, arm.tha + 1, ar.ar_hln - 1)))
 	{
-#if 0
+#ifdef ARP_DEBUG
 		char buf[HWADDR_LEN * 3];
 
 		logger(ifp->ctx, LOG_DEBUG,
