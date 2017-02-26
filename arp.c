@@ -162,7 +162,8 @@ arp_packet(struct interface *ifp, uint8_t *data, size_t len)
 
 	/* Ignore ARP Unicast Poll, RFC 1122 */
 	if (arm.sip.s_addr == INADDR_ANY &&
-	    (arm.tha[0] != 0 || memcmp(arm.tha, arm.tha + 1, ar.ar_hln - 1)))
+	    (arm.tha[0] != 0 ||
+	    memcmp(arm.tha, arm.tha + 1, (size_t)ar.ar_hln - 1)))
 	{
 #ifdef ARP_DEBUG
 		char buf[HWADDR_LEN * 3];
