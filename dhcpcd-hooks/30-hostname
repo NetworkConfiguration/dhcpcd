@@ -15,6 +15,10 @@
 # is always assigned.
 : ${hostname_fqdn:=true}
 
+# If we used to set the hostname, but relinquish control of it, we should
+# reset to the default value.
+: ${hostname_default=localhost}
+
 # Some systems don't have hostname(1)
 _hostname()
 {
@@ -58,7 +62,8 @@ need_hostname()
 	# Always load the hostname variable for future use
 	hostname="$(_hostname)"
 	case "$hostname" in
-	""|"(none)"|localhost|localhost.localdomain) return 0;;
+	""|"(none)"|localhost|localhost.localdomain|"$hostname_default")
+		return 0;;
 	esac
 
 	case "$force_hostname" in
@@ -142,6 +147,8 @@ set_hostname()
 		else
 			try_hostname "$new_host_name"
 		fi
+	elif [ -n "${hostname_default+x}" ]; then
+		try_hostname "$hostname_default"
 	fi
 }
 
