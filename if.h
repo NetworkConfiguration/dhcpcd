@@ -171,12 +171,19 @@ int if_handlelink(struct dhcpcd_ctx *);
 #endif
 
 #ifdef INET
+#ifdef __linux__
+#define	bpf_insn	sock_filter
+#endif
+struct bpf_insn;
 extern const char *if_pfname;
-int if_openraw(struct interface *, uint16_t);
+int if_openraw(struct interface *, uint16_t, int (*)(struct interface *, int));
 ssize_t if_sendraw(const struct interface *, int, uint16_t,
     const void *, size_t);
 ssize_t if_readraw(struct interface *, int, void *, size_t, int *);
 void if_closeraw(struct interface *, int);
+int if_bpf_attach(int, struct bpf_insn *, unsigned int);
+int bpf_arp(struct interface *, int);
+int bpf_bootp(struct interface *, int);
 
 int if_address(unsigned char, const struct ipv4_addr *);
 int if_addrflags(const struct interface *, const struct in_addr *,

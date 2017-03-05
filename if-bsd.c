@@ -86,8 +86,6 @@
 #include "route.h"
 #include "sa.h"
 
-#include "bpf-filter.h"
-
 #ifndef RT_ROUNDUP
 #define RT_ROUNDUP(a)							      \
 	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
@@ -621,7 +619,8 @@ if_closeraw(__unused struct interface *ifp, int fd)
 }
 
 int
-if_openraw(struct interface *ifp, uint16_t protocol)
+if_openraw(struct interface *ifp, __unused uint16_t protocol,
+    int (*filter)(struct interface *, int))
 {
 	struct ipv4_state *state;
 	int fd = -1;
@@ -629,7 +628,6 @@ if_openraw(struct interface *ifp, uint16_t protocol)
 	int ibuf_len = 0;
 	size_t buf_len;
 	struct bpf_version pv;
-	struct bpf_program pf;
 #ifdef BIOCIMMEDIATE
 	int flags;
 #endif
@@ -677,6 +675,9 @@ if_openraw(struct interface *ifp, uint16_t protocol)
 		goto eexit;
 	}
 
+	if (filter(ifp, fd) != 0)
+		goto eexit;
+
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
 	if (ioctl(fd, BIOCSETIF, &ifr) == -1)
@@ -700,18 +701,6 @@ if_openraw(struct interface *ifp, uint16_t protocol)
 	if (ioctl(fd, BIOCIMMEDIATE, &flags) == -1)
 		goto eexit;
 #endif
-
-	/* Install the filter. */
-	memset(&pf, 0, sizeof(pf));
-	if (protocol == ETHERTYPE_ARP) {
-		pf.bf_insns = UNCONST(arp_bpf_filter);
-		pf.bf_len = arp_bpf_filter_len;
-	} else {
-		pf.bf_insns = UNCONST(bootp_bpf_filter);
-		pf.bf_len = bootp_bpf_filter_len;
-	}
-	if (ioctl(fd, BIOCSETF, &pf) == -1)
-		goto eexit;
 
 	return fd;
 
@@ -783,6 +772,18 @@ next:
 		if (bytes != -1)
 			return bytes;
 	}
+}
+
+int
+if_bpf_attach(int s, struct bpf_insn *filter, unsigned int filter_len)
+{
+	struct bpf_program pf;
+
+	/* Install the filter. */
+	memset(&pf, 0, sizeof(pf));
+	pf.bf_insns = filter;
+	pf.bf_len = filter_len;
+	return ioctl(s, BIOCSETF, &pf);
 }
 
 int
