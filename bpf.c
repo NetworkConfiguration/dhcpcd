@@ -332,8 +332,22 @@ bpf_bootp(struct interface *ifp, int fd)
 	    ifp->hwlen <= sizeof(((struct bootp *)0)->chaddr))
 		bp--;
 
-	if (state->state != DHS_BOUND) {
-		/* Make sure the BOOTP packet is for us. */
+	/* Make sure the BOOTP packet is for us. */
+	if (state->state == DHS_BOUND) {
+		/* If bound, we only expect FORCERENEW messages
+		 * and they need to be unicast to us. */
+		BPF_SET_STMT(bp, BPF_LD + BPF_W + BPF_ABS,
+		             BPF_L2L + offsetof(struct bootp_pkt, ip.ip_dst));
+		bp++;
+		BPF_SET_JUMP(bp, BPF_JMP + BPF_JEQ + BPF_K,
+		             htonl(state->lease.addr.s_addr), 1, 0);
+		bp++;
+		BPF_SET_STMT(bp, BPF_RET + BPF_K, 0);
+		bp++;
+		bpf_len -= 3;
+	} else {
+		/* As we're not bound, we need to check xid to ensure
+		 * it's a reply to our transaction. */
 		BPF_SET_STMT(bp, BPF_LD + BPF_W + BPF_ABS,
 		             BPF_L2L + offsetof(struct bootp_pkt, bootp.xid));
 		bp++;
