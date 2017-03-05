@@ -228,7 +228,7 @@ arp_open(struct interface *ifp)
 
 	state = ARP_STATE(ifp);
 	if (state->fd == -1) {
-		state->fd = if_openraw(ifp, ETHERTYPE_ARP);
+		state->fd = if_openraw(ifp, ETHERTYPE_ARP, bpf_arp);
 		if (state->fd == -1) {
 			logger(ifp->ctx, LOG_ERR, "%s: %s: %m",
 			    __func__, ifp->name);
@@ -417,6 +417,9 @@ arp_new(struct interface *ifp, const struct in_addr *addr)
 		astate->addr = *addr;
 	state = ARP_STATE(ifp);
 	TAILQ_INSERT_TAIL(&state->arp_states, astate, next);
+
+	bpf_arp(ifp, state->fd);
+
 	return astate;
 }
 
@@ -449,7 +452,8 @@ arp_free(struct arp_state *astate)
 		arp_close(ifp);
 		free(state);
 		ifp->if_data[IF_DATA_ARP] = NULL;
-	}
+	} else
+		bpf_arp(ifp, state->fd);
 }
 
 static void

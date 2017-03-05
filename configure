@@ -457,7 +457,7 @@ esac
 if [ -z "$INET" -o "$INET" = yes ]; then
 	echo "Enabling INET support"
 	echo "CPPFLAGS+=	-DINET" >>$CONFIG_MK
-	echo "DHCPCD_SRCS+=	dhcp.c ipv4.c" >>$CONFIG_MK
+	echo "DHCPCD_SRCS+=	dhcp.c ipv4.c bpf.c" >>$CONFIG_MK
 	if [ -z "$ARP" -o "$ARP" = yes ]; then
 		echo "Enabling ARP support"
 		echo "CPPFLAGS+=	-DARP" >>$CONFIG_MK

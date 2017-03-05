@@ -31,6 +31,11 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
+#include <netinet/ip.h>
+#define __FAVOR_BSD /* Nasty glibc hack so we can use BSD semantics for UDP */
+#include <netinet/udp.h>
+#undef __FAVOR_BSD
+
 #include <limits.h>
 #include <stdint.h>
 
@@ -156,6 +161,13 @@ struct bootp {
 	uint8_t file[BOOTP_FILE_LEN];		/* boot file name */
 	uint8_t vend[BOOTP_VEND_LEN];		/* vendor specific area */
 	/* DHCP allows a variable length vendor area */
+};
+
+struct bootp_pkt
+{
+	struct ip ip;
+	struct udphdr udp;
+	struct bootp bootp;
 };
 
 struct dhcp_lease {

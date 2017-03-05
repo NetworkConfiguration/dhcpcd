@@ -116,13 +116,6 @@ static const char * const dhcp_params[] = {
 	NULL
 };
 
-struct udp_bootp_packet
-{
-	struct ip ip;
-	struct udphdr udp;
-	uint8_t bootp[];
-};
-
 static int dhcp_open(struct interface *);
 #ifdef ARP
 static void dhcp_arp_conflicted(struct arp_state *, const struct arp_msg *);
@@ -1528,20 +1521,24 @@ dhcp_fallback(void *arg)
 	dhcpcd_startinterface(iface);
 }
 
-static uint32_t
-dhcp_xid(const struct interface *ifp)
+static void
+dhcp_new_xid(struct interface *ifp)
 {
-	uint32_t xid;
+	struct dhcp_state *state;
 
+	state = D_STATE(ifp);
 	if (ifp->options->options & DHCPCD_XID_HWADDR &&
-	    ifp->hwlen >= sizeof(xid))
+	    ifp->hwlen >= sizeof(state->xid))
 		/* The lower bits are probably more unique on the network */
-		memcpy(&xid, (ifp->hwaddr + ifp->hwlen) - sizeof(xid),
-		    sizeof(xid));
+		memcpy(&state->xid,
+		    (ifp->hwaddr + ifp->hwlen) - sizeof(state->xid),
+		    sizeof(state->xid));
 	else
-		xid = arc4random();
+		state->xid = arc4random();
 
-	return xid;
+	/* As the XID changes, re-apply the filter. */
+	if (state->raw_fd != -1)
+		bpf_bootp(ifp, state->raw_fd);
 }
 
 void
@@ -1626,11 +1623,11 @@ checksum(const void *data, size_t len)
 	return (uint16_t)~htons((uint16_t)sum);
 }
 
-static struct udp_bootp_packet *
+static struct bootp_pkt *
 dhcp_makeudppacket(size_t *sz, const uint8_t *data, size_t length,
 	struct in_addr source, struct in_addr dest)
 {
-	struct udp_bootp_packet *udpp;
+	struct bootp_pkt *udpp;
 	struct ip *ip;
 	struct udphdr *udp;
 
@@ -1681,7 +1678,7 @@ send_message(struct interface *ifp, uint8_t type,
 	struct dhcp_state *state = D_STATE(ifp);
 	struct if_options *ifo = ifp->options;
 	struct bootp *bootp;
-	struct udp_bootp_packet *udp;
+	struct bootp_pkt *udp;
 	size_t len;
 	ssize_t r;
 	struct in_addr from, to;
@@ -1862,7 +1859,7 @@ dhcp_discover(void *arg)
 	struct if_options *ifo = ifp->options;
 
 	state->state = DHS_DISCOVER;
-	state->xid = dhcp_xid(ifp);
+	dhcp_new_xid(ifp);
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	if (ifo->fallback)
 		eloop_timeout_add_sec(ifp->ctx->eloop,
@@ -1980,7 +1977,7 @@ dhcp_startrenew(void *arg)
 	logger(ifp->ctx, LOG_DEBUG, "%s: renewing lease of %s",
 	    ifp->name, inet_ntoa(lease->addr));
 	state->state = DHS_RENEW;
-	state->xid = dhcp_xid(ifp);
+	dhcp_new_xid(ifp);
 	state->interval = 0;
 	send_renew(ifp);
 }
@@ -2291,6 +2288,8 @@ dhcp_bind(struct interface *ifp)
 		    ifp->name, lease->renewaltime, lease->rebindtime);
 	}
 	state->state = DHS_BOUND;
+	/* Re-apply the filter because we need to accept any XID anymore. */
+	bpf_bootp(ifp, state->raw_fd);
 	if (!state->lease.frominfo &&
 	    !(ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC)))
 		if (write_lease(ifp, state->new, state->new_len) == -1)
@@ -2503,7 +2502,7 @@ dhcp_inform(struct interface *ifp)
 	state->offer_len = dhcp_message_new(&state->offer,
 	    &ia->addr, &ia->mask);
 	if (state->offer_len) {
-		state->xid = dhcp_xid(ifp);
+		dhcp_new_xid(ifp);
 		get_lease(ifp, &state->lease, state->offer, state->offer_len);
 		send_inform(ifp);
 	}
@@ -2564,7 +2563,7 @@ dhcp_reboot(struct interface *ifp)
 
 	logger(ifp->ctx, LOG_INFO, "%s: rebinding lease of %s",
 	    ifp->name, inet_ntoa(state->lease.addr));
-	state->xid = dhcp_xid(ifp);
+	dhcp_new_xid(ifp);
 	state->lease.server.s_addr = 0;
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 
@@ -2622,7 +2621,7 @@ dhcp_drop(struct interface *ifp, const char *reason)
 		{
 			logger(ifp->ctx, LOG_INFO, "%s: releasing lease of %s",
 			    ifp->name, inet_ntoa(state->lease.addr));
-			state->xid = dhcp_xid(ifp);
+			dhcp_new_xid(ifp);
 			send_message(ifp, DHCP_RELEASE, NULL);
 #ifdef RELEASE_SLOW
 			/* Give the packet a chance to go */
@@ -2775,13 +2774,14 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 #define LOGDHCP(l, m) \
 	log_dhcp((l), (m), ifp, bootp, bootp_len, from, 1)
 
+	/* Handled in our BPF filter. */
+#if 0
 	if (bootp->op != BOOTREPLY) {
 		logger(ifp->ctx, LOG_DEBUG, "%s: op (%d) is not BOOTREPLY",
 		    ifp->name, bootp->op);
 		return;
 	}
 
-	/* Ensure packet is for us */
 	if (ifp->hwlen <= sizeof(bootp->chaddr) &&
 	    memcmp(bootp->chaddr, ifp->hwaddr, ifp->hwlen))
 	{
@@ -2793,6 +2793,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 		    buf, sizeof(buf)));
 		return;
 	}
+#endif
 
 	/* We may have found a BOOTP server */
 	if (get_option_uint8(ifp->ctx, &type,
@@ -2875,6 +2876,8 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 		return;
 	}
 
+	/* Handled in our BPF filter. */
+#if 0
 	/* Ensure it's the right transaction */
 	if (state->xid != ntohl(bootp->xid)) {
 		logger(ifp->ctx, LOG_DEBUG,
@@ -2883,6 +2886,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 		    inet_ntoa(*from));
 		return;
 	}
+#endif
 
 	if (state->state == DHS_PROBE) {
 		/* Ignore any DHCP messages whilst probing a lease to bind. */
@@ -3149,18 +3153,18 @@ rapidcommit:
 static void *
 get_udp_data(void *udp, size_t *len)
 {
-	struct udp_bootp_packet *p;
+	struct bootp_pkt *p;
 
-	p = (struct udp_bootp_packet *)udp;
+	p = (struct bootp_pkt *)udp;
 	*len = ntohs(p->ip.ip_len) - sizeof(p->ip) - sizeof(p->udp);
-	return (char *)udp + offsetof(struct udp_bootp_packet, bootp);
+	return (char *)udp + offsetof(struct bootp_pkt, bootp);
 }
 
 static int
 valid_udp_packet(void *data, size_t data_len, struct in_addr *from,
     int noudpcsum)
 {
-	struct udp_bootp_packet *p;
+	struct bootp_pkt *p;
 	uint16_t bytes;
 
 	if (data_len < sizeof(p->ip) + sizeof(p->udp)) {
@@ -3169,7 +3173,7 @@ valid_udp_packet(void *data, size_t data_len, struct in_addr *from,
 		errno = EINVAL;
 		return -1;
 	}
-	p = (struct udp_bootp_packet *)data;
+	p = (struct bootp_pkt *)data;
 	if (from)
 		from->s_addr = p->ip.ip_src.s_addr;
 	if (checksum(&p->ip, sizeof(p->ip)) != 0) {
@@ -3314,6 +3318,7 @@ dhcp_handleudp(void *arg)
 	}
 }
 
+
 static int
 dhcp_open(struct interface *ifp)
 {
@@ -3321,7 +3326,7 @@ dhcp_open(struct interface *ifp)
 
 	state = D_STATE(ifp);
 	if (state->raw_fd == -1) {
-		state->raw_fd = if_openraw(ifp, ETHERTYPE_IP);
+		state->raw_fd = if_openraw(ifp, ETHERTYPE_IP, bpf_bootp);
 		if (state->raw_fd == -1) {
 			if (errno == ENOENT) {
 				logger(ifp->ctx, LOG_ERR,
@@ -3816,7 +3821,7 @@ dhcp_handleifa(int cmd, struct ipv4_addr *ia)
 	script_runreason(ifp, state->reason);
 	if (ifo->options & DHCPCD_INFORM) {
 		state->state = DHS_INFORM;
-		state->xid = dhcp_xid(ifp);
+		dhcp_new_xid(ifp);
 		state->lease.server.s_addr = INADDR_ANY;
 		state->addr = ia;
 		dhcp_inform(ifp);

@@ -93,8 +93,6 @@ int if_getssid_wext(const char *ifname, uint8_t *ssid);
 #define BPF_ETHCOOK		-ETH_HLEN
 #define BPF_WHOLEPACKET	0x0fffffff /* work around buggy LPF filters */
 
-#include "bpf-filter.h"
-
 struct priv {
 	int route_fd;
 	uint32_t route_pid;
@@ -1298,7 +1296,8 @@ if_closeraw(__unused struct interface *ifp, int fd)
 }
 
 int
-if_openraw(struct interface *ifp, uint16_t protocol)
+if_openraw(struct interface *ifp, uint16_t protocol,
+    int (*filter)(struct interface *, int))
 {
 	int s;
 	union sockunion {
@@ -1306,7 +1305,6 @@ if_openraw(struct interface *ifp, uint16_t protocol)
 		struct sockaddr_ll sll;
 		struct sockaddr_storage ss;
 	} su;
-	struct sock_fprog pf;
 #ifdef PACKET_AUXDATA
 	int n;
 #endif
@@ -1316,17 +1314,9 @@ if_openraw(struct interface *ifp, uint16_t protocol)
 		return -1;
 #undef SF
 
-	/* Install the filter. */
-	memset(&pf, 0, sizeof(pf));
-	if (protocol == ETHERTYPE_ARP) {
-		pf.filter = UNCONST(arp_bpf_filter);
-		pf.len = arp_bpf_filter_len;
-	} else {
-		pf.filter = UNCONST(bootp_bpf_filter);
-		pf.len = bootp_bpf_filter_len;
-	}
-	if (setsockopt(s, SOL_SOCKET, SO_ATTACH_FILTER, &pf, sizeof(pf)) != 0)
+	if (filter(ifp, s) != 0)
 		goto eexit;
+
 #ifdef PACKET_AUXDATA
 	n = 1;
 	if (setsockopt(s, SOL_PACKET, PACKET_AUXDATA, &n, sizeof(n)) != 0) {
@@ -1423,6 +1413,18 @@ if_readraw(__unused struct interface *ifp, int fd,
 #endif
 	}
 	return bytes;
+}
+
+int
+if_bpf_attach(int s, struct bpf_insn *filter, unsigned int filter_len)
+{
+	struct sock_fprog pf;
+
+	/* Install the filter. */
+	memset(&pf, 0, sizeof(pf));
+	pf.filter = filter;
+	pf.len = (unsigned short)filter_len;
+	return setsockopt(s, SOL_SOCKET, SO_ATTACH_FILTER, &pf, sizeof(pf));
 }
 
 int
