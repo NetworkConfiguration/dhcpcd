@@ -55,6 +55,7 @@
 extern int getallifaddrs(sa_family_t, struct ifaddrs **, int64_t);
 
 #include "config.h"
+#include "bpf.h"
 #include "common.h"
 #include "dhcp.h"
 #include "if.h"
@@ -89,23 +90,7 @@ extern int getallifaddrs(sa_family_t, struct ifaddrs **, int64_t);
 
 #define COPYSA(dst, src) memcpy((dst), (src), salen((src)))
 
-#ifdef INET
-/* Instead of using DLPI directly, we use libdlpi which is
- * Solaris sepcific. */
-struct dl_if {
-	TAILQ_ENTRY(dl_if)	next;
-	struct interface	*iface;
-	int			fd;
-	dlpi_handle_t		dh;
-	uint8_t			broadcast[DLPI_PHYSADDR_MAX];
-};
-TAILQ_HEAD(dl_if_head, dl_if);
-#endif
-
 struct priv {
-#ifdef INET
-	struct dl_if_head dl_ifs;
-#endif
 #ifdef INET6
 	int pf_inet6_fd;
 #endif
@@ -133,9 +118,6 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 	if ((priv = malloc(sizeof(*priv))) == NULL)
 		return -1;
 	ctx->priv = priv;
-#ifdef INET
-	TAILQ_INIT(&priv->dl_ifs);
-#endif
 
 #ifdef INET6
 	priv->pf_inet6_fd = xsocket(PF_INET6, SOCK_DGRAM | SOCK_CLOEXEC, 0);
@@ -1303,162 +1285,22 @@ if_initrt(struct dhcpcd_ctx *ctx, int af)
 
 
 #ifdef INET
-const char *if_pfname = "DLPI";
-
-static struct dl_if *
-if_findraw(struct interface *ifp, int fd)
-{
-	struct dl_if		*di;
-	struct priv		*priv;
-
-	priv = (struct priv *)ifp->ctx->priv;
-	TAILQ_FOREACH(di, &priv->dl_ifs, next) {
-		if (di->fd == fd)
-			return di;
-	}
-	errno = ENXIO;
-	return NULL;
-}
-
-void
-if_closeraw(struct interface *ifp, int fd)
-{
-	struct dl_if		*di;
-
-	if ((di = if_findraw(ifp, fd)) != NULL) {
-		struct priv	*priv;
-
-		priv = (struct priv *)ifp->ctx->priv;
-		TAILQ_REMOVE(&priv->dl_ifs, di, next);
-		dlpi_close(di->dh);
-		free(di);
-	}
-}
-
-int
-if_openraw(struct interface *ifp, uint16_t protocol)
+/* XXX We should fix this to write via the BPF interface. */
+ssize_t
+bpf_send(const struct interface *ifp, __unused int fd, uint16_t protocol,
+    const void *data, size_t len)
 {
 	dlpi_handle_t		dh;
-	struct priv		*priv;
-	struct dl_if		*di;
-	dlpi_info_t		dlinfo;
-	struct packetfilt	pf;
-	ushort_t		*pfp;
-	struct strioctl		sioc;
+	dlpi_info_t		di;
+	int			r;
 
 	if (dlpi_open(ifp->name, &dh, 0) != DLPI_SUCCESS)
 		return -1;
-
-	/* We need to register pfmod, which is similar to BPF
-	 * so the kernel can filter out the packets we don't need. */
-	if (dlpi_info(dh, &dlinfo, 0) != DLPI_SUCCESS ||
-	    dlpi_bind(dh, protocol, NULL) != DLPI_SUCCESS ||
-	    (di = malloc(sizeof(*di))) == NULL)
-		goto failed1;
-
-	di->iface	= ifp;
-	di->dh		= dh;
-	di->fd		= dlpi_fd(dh);
-	memcpy(di->broadcast, dlinfo.di_bcastaddr, dlinfo.di_bcastaddrlen);
-	priv = (struct priv *)ifp->ctx->priv;
-
-	pf.Pf_Priority = 0;
-	pfp = pf.Pf_Filter;
-	/* pfmod operates on 16 bits, so divide offsets by 2.
-	 * When working on a 8 bits, mask off the bits not teested. */
-	switch (protocol) {
-	case ETHERTYPE_IP:
-		/* Filter fragments. */
-		*pfp++ = ENF_PUSHWORD + (offsetof(struct ip, ip_off) / 2);
-		*pfp++ = ENF_PUSHLIT | ENF_AND;
-		*pfp++ = htons(0x1fff | IP_MF);
-		*pfp++ = ENF_PUSHZERO | ENF_CAND;
-
-		/* Filter UDP. */
-		*pfp++ = ENF_PUSHWORD + (offsetof(struct ip, ip_p) / 2);
-		*pfp++ = ENF_PUSHFF00 | ENF_AND;
-		*pfp++ = ENF_PUSHLIT | ENF_CAND;
-		*pfp++ = htons(IPPROTO_UDP);
-
-		/* Filter BOOTPC. */
-		*pfp++ = ENF_PUSHWORD +
-		    ((sizeof(struct ip) +
-		    offsetof(struct udphdr, uh_dport)) / 2);
-		*pfp++ = ENF_PUSHLIT | ENF_CAND;
-		*pfp++ = htons(BOOTPC);
-		break;
-
-	case ETHERTYPE_ARP:
-		/* We are only interested in IP. */
-		*pfp++ = ENF_PUSHWORD + (offsetof(struct arphdr, ar_hrd) / 2);
-		*pfp++ = ENF_PUSHLIT | ENF_CAND;
-		*pfp++ = htons(ARPHRD_ETHER);
-
-		/* Must be REQUEST or REPLY. */
-		*pfp++ = ENF_PUSHWORD + (offsetof(struct arphdr, ar_op) / 2);
-		*pfp++ = ENF_PUSHLIT | ENF_CNAND;
-		*pfp++ = htons(ARPOP_REQUEST);
-		*pfp++ = ENF_PUSHWORD + (offsetof(struct arphdr, ar_op) / 2);
-		*pfp++ = ENF_PUSHLIT | ENF_CAND;
-		*pfp++ = htons(ARPOP_REPLY);
-		break;
-
-	default:
-		errno = EPROTOTYPE;
-		goto failed;
-	}
-	pf.Pf_FilterLen = pfp - pf.Pf_Filter;
-
-	sioc.ic_cmd	= PFIOCSETF;
-	sioc.ic_timout	= INFTIM;
-	sioc.ic_len	= sizeof(pf);
-	sioc.ic_dp	= (void *)&pf;
-
-	/* Install the filter and then flush the stream. */
-	if (ioctl(di->fd, I_PUSH, "pfmod") == -1 ||
-	    ioctl(di->fd, I_STR, &sioc) == -1 ||
-	    ioctl(di->fd, I_FLUSH, FLUSHR) == -1)
-		goto failed;
-
-	TAILQ_INSERT_TAIL(&priv->dl_ifs, di, next);
-	return di->fd;
-
-failed:
-	free(di);
-failed1:
+	if ((r = dlpi_info(dh, &di, 0)) == DLPI_SUCCESS &&
+	    (r = dlpi_bind(dh, protocol, NULL)) == DLPI_SUCCESS)
+		r = dlpi_send(dh, di.di_bcastaddr, ifp->hwlen, data, len, NULL);
 	dlpi_close(dh);
-	return -1;
-}
-
-ssize_t
-if_sendraw(const struct interface *cifp, int fd, __unused uint16_t protocol,
-    const void *data, size_t len)
-{
-	struct dl_if		*di;
-	int			r;
-	struct interface	*ifp = UNCONST(cifp);
-
-	if ((di = if_findraw(ifp, fd)) == NULL)
-		return -1;
-	r = dlpi_send(di->dh, di->broadcast, ifp->hwlen, data, len, NULL);
 	return r == DLPI_SUCCESS ? (ssize_t)len : -1;
-}
-
-ssize_t
-if_readraw(struct interface *ifp, int fd,
-    void *data, size_t len, int *flags)
-{
-	struct dl_if		*di;
-	int			r;
-	size_t			mlen;
-
-	if ((di = if_findraw(ifp, fd)) == NULL)
-		return -1;
-	*flags = RAW_EOF; /* We only ever read one packet. */
-	mlen = len;
-	*flags = RAW_EOF; /* We only ever read one packet. */
-	r = dlpi_recv(di->dh, NULL, NULL, data, &mlen, -1, NULL);
-	return r == DLPI_SUCCESS ? (ssize_t)mlen : -1;
 }
 
 int
