@@ -204,6 +204,14 @@ bpf_read(struct interface *ifp, int fd, void *data, size_t len, int *flags)
 	for (;;) {
 		if (state->buffer_len == 0) {
 			bytes = read(fd, state->buffer, state->buffer_size);
+#if defined(__sun)
+			/* After 2^31 bytes, the kernel offset overflows.
+			 * To work around this bug, lseek 0. */
+			if (bytes == -1 && errno == EINVAL) {
+				lseek(fd, 0, SEEK_SET);
+				continue;
+			}
+#endif
 			if (bytes == -1 || bytes == 0)
 				return bytes;
 			state->buffer_len = (size_t)bytes;
@@ -413,6 +421,7 @@ bpf_arp(struct interface *ifp, int fd)
 
 	if (fd == -1)
 		return 0;
+
 	bp = bpf;
 	/* Check frame header. */
 	switch(ifp->family) {
