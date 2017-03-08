@@ -213,7 +213,7 @@ struct dhcp_state {
 	uint32_t xid;
 	int socket;
 
-	int raw_fd;
+	int bpf_fd;
 	struct ipv4_addr *addr;
 	uint8_t added;
 

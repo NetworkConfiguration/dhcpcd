@@ -58,6 +58,7 @@
 #include <unistd.h>
 
 #include "config.h"
+#include "bpf.h"
 #include "common.h"
 #include "dev.h"
 #include "dhcp.h"
@@ -1286,19 +1287,15 @@ if_initrt(struct dhcpcd_ctx *ctx, int af)
 
 
 #ifdef INET
-const char *if_pfname = "Packet Socket";
-
-void
-if_closeraw(__unused struct interface *ifp, int fd)
-{
-
-	close(fd);
-}
+/* Linux is a special snowflake when it comes to BPF. */
+const char *bpf_name = "Packet Socket";
+#define	BPF_BUFFER_LEN		1500
 
 int
-if_openraw(struct interface *ifp, uint16_t protocol,
-    int (*filter)(struct interface *, int))
+bpf_open(struct interface *ifp, int (*filter)(struct interface *, int))
 {
+	struct ipv4_state *state = IPV4_STATE(ifp);
+/* Linux is a special snowflake for opening BPF. */
 	int s;
 	union sockunion {
 		struct sockaddr sa;
@@ -1310,9 +1307,20 @@ if_openraw(struct interface *ifp, uint16_t protocol,
 #endif
 
 #define SF	SOCK_CLOEXEC | SOCK_NONBLOCK
-	if ((s = xsocket(PF_PACKET, SOCK_DGRAM | SF, htons(protocol))) == -1)
+	if ((s = xsocket(PF_PACKET, SOCK_RAW | SF, htons(ETH_P_ALL))) == -1)
 		return -1;
 #undef SF
+
+	/* Allocate a suitably large buffer for a single packet. */
+	if (state->buffer_size < ETH_DATA_LEN) {
+		void *nb;
+
+		if ((nb = realloc(state->buffer, ETH_DATA_LEN)) == NULL)
+			goto eexit;
+		state->buffer = nb;
+		state->buffer_size = ETH_DATA_LEN;
+		state->buffer_len = state->buffer_pos = 0;
+	}
 
 	if (filter(ifp, s) != 0)
 		goto eexit;
@@ -1327,77 +1335,54 @@ if_openraw(struct interface *ifp, uint16_t protocol,
 
 	memset(&su, 0, sizeof(su));
 	su.sll.sll_family = PF_PACKET;
-	su.sll.sll_protocol = htons(protocol);
+	su.sll.sll_protocol = htons(ETH_P_ALL);
 	su.sll.sll_ifindex = (int)ifp->index;
 	if (bind(s, &su.sa, sizeof(su.sll)) == -1)
 		goto eexit;
 	return s;
 
 eexit:
+	free(state->buffer);
+	state->buffer = NULL;
 	close(s);
 	return -1;
 }
 
+/* BPF requires that we read the entire buffer.
+ * So we pass the buffer in the API so we can loop on >1 packet. */
 ssize_t
-if_sendraw(const struct interface *ifp, int fd, uint16_t protocol,
-    const void *data, size_t len)
+bpf_read(struct interface *ifp, int s, void *data, size_t len, int *flags)
 {
-	union sockunion {
-		struct sockaddr sa;
-		struct sockaddr_ll sll;
-		struct sockaddr_storage ss;
-	} su;
+	ssize_t bytes;
+	struct ipv4_state *state = IPV4_STATE(ifp);
 
-	memset(&su, 0, sizeof(su));
-	su.sll.sll_family = AF_PACKET;
-	su.sll.sll_protocol = htons(protocol);
-	su.sll.sll_ifindex = (int)ifp->index;
-	su.sll.sll_hatype = htons(ifp->family);
-	su.sll.sll_halen = (unsigned char)ifp->hwlen;
-	if (ifp->family == ARPHRD_INFINIBAND) {
-		/* sockaddr_ll is not big enough for IPoIB which is why
-		 * sockaddr_storage is included in the union.
-		 * Ugly as sin, but it works. */
-		/* coverity[buffer_size] */
-		/* coverity[overrun-buffer-arg] */
-		memcpy(&su.sll.sll_addr,
-		    &ipv4_bcast_addr, sizeof(ipv4_bcast_addr));
-	} else
-		memset(&su.sll.sll_addr, 0xff, ifp->hwlen);
-
-	return sendto(fd, data, len, 0, &su.sa, sizeof(su.sll));
-}
-
-ssize_t
-if_readraw(__unused struct interface *ifp, int fd,
-    void *data, size_t len, int *flags)
-{
 	struct iovec iov = {
-		.iov_base = data,
-		.iov_len = len,
+		.iov_base = state->buffer,
+		.iov_len = state->buffer_size
 	};
-	struct msghdr msg = {
-		.msg_iov = &iov,
-		.msg_iovlen = 1,
-	};
+	struct msghdr msg = { .msg_iov = &iov, .msg_iovlen = 1 };
 #ifdef PACKET_AUXDATA
 	unsigned char cmsgbuf[CMSG_LEN(sizeof(struct tpacket_auxdata))];
 	struct cmsghdr *cmsg;
 	struct tpacket_auxdata *aux;
 #endif
 
-	ssize_t bytes;
-
 #ifdef PACKET_AUXDATA
 	msg.msg_control = cmsgbuf;
 	msg.msg_controllen = sizeof(cmsgbuf);
 #endif
 
-	bytes = recvmsg(fd, &msg, 0);
+	bytes = recvmsg(s, &msg, 0);
 	if (bytes == -1)
 		return -1;
-	*flags = RAW_EOF; /* We only ever read one packet. */
+	*flags = BPF_EOF; /* We only ever read one packet. */
 	if (bytes) {
+		ssize_t fl = (ssize_t)bpf_frame_header_len(ifp);
+
+		bytes -= fl;
+		if ((size_t)bytes > len)
+			bytes = (ssize_t)len;
+		memcpy(data, state->buffer + fl, (size_t)bytes);
 #ifdef PACKET_AUXDATA
 		for (cmsg = CMSG_FIRSTHDR(&msg);
 		     cmsg;
@@ -1407,7 +1392,7 @@ if_readraw(__unused struct interface *ifp, int fd,
 			    cmsg->cmsg_type == PACKET_AUXDATA) {
 				aux = (void *)CMSG_DATA(cmsg);
 				if (aux->tp_status & TP_STATUS_CSUMNOTREADY)
-					*flags |= RAW_PARTIALCSUM;
+					*flags |= BPF_PARTIALCSUM;
 			}
 		}
 #endif
@@ -1416,7 +1401,7 @@ if_readraw(__unused struct interface *ifp, int fd,
 }
 
 int
-if_bpf_attach(int s, struct bpf_insn *filter, unsigned int filter_len)
+bpf_attach(int s, void *filter, unsigned int filter_len)
 {
 	struct sock_fprog pf;
 

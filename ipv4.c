@@ -533,10 +533,8 @@ ipv4_getstate(struct interface *ifp)
 			return NULL;
 		}
 		TAILQ_INIT(&state->addrs);
-#ifdef BSD
 		state->buffer_size = state->buffer_len = state->buffer_pos = 0;
 		state->buffer = NULL;
-#endif
 	}
 	return state;
 }
@@ -937,9 +935,7 @@ ipv4_free(struct interface *ifp)
 				TAILQ_REMOVE(&state->addrs, ia, next);
 				free(ia);
 			}
-#ifdef BSD
 			free(state->buffer);
-#endif
 			free(state);
 		}
 	}

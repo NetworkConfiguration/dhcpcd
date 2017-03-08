@@ -43,7 +43,7 @@
 #define ELOOP_QUEUE 5
 #include "config.h"
 #include "arp.h"
-#include "if.h"
+#include "bpf.h"
 #include "ipv4.h"
 #include "common.h"
 #include "dhcpcd.h"
@@ -98,7 +98,7 @@ arp_request(const struct interface *ifp, in_addr_t sip, in_addr_t tip)
 	APPEND(&tip, sizeof(tip));
 
 	state = ARP_CSTATE(ifp);
-	return if_sendraw(ifp, state->fd, ETHERTYPE_ARP, arp_buffer, len);
+	return bpf_send(ifp, state->fd, ETHERTYPE_ARP, arp_buffer, len);
 
 eexit:
 	errno = ENOBUFS;
@@ -119,11 +119,12 @@ arp_packet(struct interface *ifp, uint8_t *data, size_t len)
 	if (len < sizeof(ar))
 		return;
 	memcpy(&ar, data, sizeof(ar));
+
+	/* These checks are enforced in the BPF filter. */
+#if 0
 	/* Families must match */
 	if (ar.ar_hrd != htons(ifp->family))
 		return;
-#if 0
-	/* These checks are enforced in the BPF filter. */
 	/* Protocol must be IP. */
 	if (ar.ar_pro != htons(ETHERTYPE_IP))
 		continue;
@@ -131,9 +132,10 @@ arp_packet(struct interface *ifp, uint8_t *data, size_t len)
 	if (ar.ar_op != htons(ARPOP_REPLY) &&
 	    ar.ar_op != htons(ARPOP_REQUEST))
 		continue;
-#endif
+	/* Protocol length must match in_addr_t */
 	if (ar.ar_pln != sizeof(arm.sip.s_addr))
 		return;
+#endif
 
 	/* Get pointers to the hardware addresses */
 	hw_s = data + sizeof(ar);
@@ -190,7 +192,7 @@ arp_close(struct interface *ifp)
 
 	if ((state = ARP_STATE(ifp)) != NULL && state->fd != -1) {
 		eloop_event_delete(ifp->ctx->eloop, state->fd);
-		if_closeraw(ifp, state->fd);
+		bpf_close(state->fd);
 		state->fd = -1;
 	}
 }
@@ -209,11 +211,11 @@ arp_read(void *arg)
 	 * so we have to process the entire buffer. */
 	state = ARP_CSTATE(ifp);
 	flags = 0;
-	while (!(flags & RAW_EOF)) {
-		bytes = if_readraw(ifp, state->fd, buf, sizeof(buf), &flags);
+	while (!(flags & BPF_EOF)) {
+		bytes = bpf_read(ifp, state->fd, buf, sizeof(buf), &flags);
 		if (bytes == -1) {
 			logger(ifp->ctx, LOG_ERR,
-			    "%s: arp if_readrawpacket: %m", ifp->name);
+			    "%s: arp bpf_read: %m", ifp->name);
 			arp_close(ifp);
 			return;
 		}
@@ -228,7 +230,7 @@ arp_open(struct interface *ifp)
 
 	state = ARP_STATE(ifp);
 	if (state->fd == -1) {
-		state->fd = if_openraw(ifp, ETHERTYPE_ARP, bpf_arp);
+		state->fd = bpf_open(ifp, bpf_arp);
 		if (state->fd == -1) {
 			logger(ifp->ctx, LOG_ERR, "%s: %s: %m",
 			    __func__, ifp->name);
