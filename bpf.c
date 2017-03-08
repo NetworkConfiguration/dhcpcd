@@ -258,6 +258,8 @@ bpf_attach(int fd, void *filter, unsigned int filter_len)
 }
 #endif
 
+#ifndef __sun
+/* SunOS is special too - sending via BPF goes nowhere. */
 ssize_t
 bpf_send(const struct interface *ifp, int fd, uint16_t protocol,
     const void *data, size_t len)
@@ -282,6 +284,7 @@ bpf_send(const struct interface *ifp, int fd, uint16_t protocol,
 	iov[1].iov_len = len;
 	return writev(fd, iov, 2);
 }
+#endif
 
 static unsigned int
 bpf_cmp_hwaddr(struct bpf_insn *bpf, size_t bpf_len, size_t off,
