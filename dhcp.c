@@ -54,6 +54,7 @@
 #define ELOOP_QUEUE 2
 #include "config.h"
 #include "arp.h"
+#include "bpf.h"
 #include "common.h"
 #include "dhcp.h"
 #include "dhcpcd.h"
@@ -1537,8 +1538,8 @@ dhcp_new_xid(struct interface *ifp)
 		state->xid = arc4random();
 
 	/* As the XID changes, re-apply the filter. */
-	if (state->raw_fd != -1)
-		bpf_bootp(ifp, state->raw_fd);
+	if (state->bpf_fd != -1)
+		bpf_bootp(ifp, state->bpf_fd);
 }
 
 void
@@ -1549,10 +1550,10 @@ dhcp_close(struct interface *ifp)
 	if (state == NULL)
 		return;
 
-	if (state->raw_fd != -1) {
-		eloop_event_delete(ifp->ctx->eloop, state->raw_fd);
-		if_closeraw(ifp, state->raw_fd);
-		state->raw_fd = -1;
+	if (state->bpf_fd != -1) {
+		eloop_event_delete(ifp->ctx->eloop, state->bpf_fd);
+		bpf_close(state->bpf_fd);
+		state->bpf_fd = -1;
 	}
 
 	state->interval = 0;
@@ -1776,7 +1777,7 @@ send_message(struct interface *ifp, uint8_t type,
 			logger(ifp->ctx, LOG_ERR, "dhcp_makeudppacket: %m");
 			r = 0;
 		} else {
-			r = if_sendraw(ifp, state->raw_fd,
+			r = bpf_send(ifp, state->bpf_fd,
 			    ETHERTYPE_IP, (uint8_t *)udp, ulen);
 			free(udp);
 		}
@@ -2289,7 +2290,7 @@ dhcp_bind(struct interface *ifp)
 	}
 	state->state = DHS_BOUND;
 	/* Re-apply the filter because we need to accept any XID anymore. */
-	bpf_bootp(ifp, state->raw_fd);
+	bpf_bootp(ifp, state->bpf_fd);
 	if (!state->lease.frominfo &&
 	    !(ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC)))
 		if (write_lease(ifp, state->new, state->new_len) == -1)
@@ -3288,8 +3289,8 @@ dhcp_readpacket(void *arg)
 	 * This means we have no kernel call to just get one packet,
 	 * so we have to process the entire buffer. */
 	flags = 0;
-	while (!(flags & RAW_EOF)) {
-		bytes = if_readraw(ifp, state->raw_fd, buf,sizeof(buf), &flags);
+	while (!(flags & BPF_EOF)) {
+		bytes = bpf_read(ifp, state->bpf_fd, buf,sizeof(buf), &flags);
 		if (bytes == -1) {
 			logger(ifp->ctx, LOG_ERR,
 			    "%s: dhcp if_readrawpacket: %m", ifp->name);
@@ -3325,12 +3326,12 @@ dhcp_open(struct interface *ifp)
 	struct dhcp_state *state;
 
 	state = D_STATE(ifp);
-	if (state->raw_fd == -1) {
-		state->raw_fd = if_openraw(ifp, ETHERTYPE_IP, bpf_bootp);
-		if (state->raw_fd == -1) {
+	if (state->bpf_fd == -1) {
+		state->bpf_fd = bpf_open(ifp, bpf_bootp);
+		if (state->bpf_fd == -1) {
 			if (errno == ENOENT) {
 				logger(ifp->ctx, LOG_ERR,
-				    "%s not found", if_pfname);
+				    "%s not found", bpf_name);
 				/* May as well disable IPv4 entirely at
 				 * this point as we really need it. */
 				ifp->options->options &= ~DHCPCD_IPV4;
@@ -3340,7 +3341,7 @@ dhcp_open(struct interface *ifp)
 			return -1;
 		}
 		eloop_event_add(ifp->ctx->eloop,
-		    state->raw_fd, dhcp_readpacket, ifp);
+		    state->bpf_fd, dhcp_readpacket, ifp);
 	}
 	return 0;
 }
@@ -3353,7 +3354,7 @@ dhcp_dump(struct interface *ifp)
 	ifp->if_data[IF_DATA_DHCP] = state = calloc(1, sizeof(*state));
 	if (state == NULL)
 		goto eexit;
-	state->raw_fd = -1;
+	state->bpf_fd = -1;
 	dhcp_set_leasefile(state->leasefile, sizeof(state->leasefile),
 	    AF_INET, ifp);
 	state->new_len = read_lease(ifp, &state->new);
@@ -3423,7 +3424,7 @@ dhcp_init(struct interface *ifp)
 		if (state == NULL)
 			return -1;
 		/* 0 is a valid fd, so init to -1 */
-		state->raw_fd = -1;
+		state->bpf_fd = -1;
 
 #ifdef ARPING
 		state->arping_index = -1;
