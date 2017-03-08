@@ -43,6 +43,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <paths.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
