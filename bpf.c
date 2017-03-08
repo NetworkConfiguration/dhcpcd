@@ -316,8 +316,13 @@ bpf_cmp_hwaddr(struct bpf_insn *bpf, size_t bpf_len, size_t off,
 
 	/* Skip to positive finish. */
 	njmps++;
-	jt = equal ? (uint8_t)njmps : 0;
-	jf = equal ? 0 : (uint8_t)njmps;
+	if (equal) {
+		jt = (uint8_t)njmps;
+		jf = 0;
+	} else {
+		jt = 0;
+		jf = (uint8_t)njmps;
+	}
 
 	bp = bpf;
 	for (; hwaddr_len > 0;

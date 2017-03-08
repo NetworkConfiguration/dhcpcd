@@ -793,7 +793,8 @@ dhcp6_makemessage(struct interface *ifp)
 #define NEXTLEN (p + offsetof(struct dhcp6_option, len))
 
 	p = (uint8_t *)state->send + sizeof(*state->send);
-	COPYIN(D6_OPTION_CLIENTID, ifp->ctx->duid, ifp->ctx->duid_len);
+	COPYIN(D6_OPTION_CLIENTID, ifp->ctx->duid,
+	    (uint16_t)ifp->ctx->duid_len);
 
 	if (si != NULL)
 		COPYIN(D6_OPTION_SERVERID, si, si_len);
@@ -856,7 +857,8 @@ dhcp6_makemessage(struct interface *ifp)
 					if (u8)
 						*ep = (uint8_t)(*pp << u8);
 					n++;
-					COPYIN(D6_OPTION_PD_EXCLUDE, exb, n);
+					COPYIN(D6_OPTION_PD_EXCLUDE, exb,
+					    (uint16_t)n);
 					ia_na_len = (uint16_t)
 					    (ia_na_len + sizeof(o) + n);
 				}
