@@ -144,7 +144,7 @@ ipv4ll_env(char **env, const char *prefix, const struct interface *ifp)
 	struct in_addr netnum;
 
 	assert(ifp != NULL);
-	if ((state = IPV4LL_CSTATE(ifp)) == NULL)
+	if ((state = IPV4LL_CSTATE(ifp)) == NULL || state->addr == NULL)
 		return 0;
 
 	if (env == NULL)
