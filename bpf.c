@@ -417,7 +417,7 @@ static const struct bpf_insn bpf_arp_filter [] = {
 	BPF_STMT(BPF_RET + BPF_K, 0),
 };
 #define bpf_arp_filter_len	__arraycount(bpf_arp_filter)
-#define bpf_arp_extra		((ARP_ADDRS_MAX * 2) * 2) + 2
+#define bpf_arp_extra		(((ARP_ADDRS_MAX + 1) * 2) * 2) + 2
 
 int
 bpf_arp(struct interface *ifp, int fd)
@@ -472,6 +472,13 @@ bpf_arp(struct interface *ifp, int fd)
 			BPF_SET_STMT(bp, BPF_RET + BPF_K, BPF_WHOLEPACKET);
 			bp++;
 		}
+
+		/* If we didn't match sender, then we're only interested in
+		 * ARP probes to us, so check the null host sender. */
+		BPF_SET_JUMP(bp, BPF_JMP + BPF_JEQ + BPF_K, INADDR_ANY, 1, 0);
+		bp++;
+		BPF_SET_STMT(bp, BPF_RET + BPF_K, 0);
+		bp++;
 
 		/* Match target protocol address */
 		BPF_SET_STMT(bp, BPF_LD + BPF_W + BPF_IND,
