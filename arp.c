@@ -272,6 +272,10 @@ arp_probe(struct arp_state *astate)
 		logger(astate->iface->ctx, LOG_ERR,
 		    "%s: %s: %m", __func__, astate->iface->name);
 		return;
+	} else {
+		const struct iarp_state *state = ARP_CSTATE(astate->iface);
+
+		bpf_arp(astate->iface, state->fd);
 	}
 	astate->probes = 0;
 	logger(astate->iface->ctx, LOG_DEBUG, "%s: probing for %s",
