@@ -165,6 +165,9 @@ arp_packet(struct interface *ifp, uint8_t *data, size_t len)
 	/* Run the conflicts */
 	state = ARP_CSTATE(ifp);
 	TAILQ_FOREACH_SAFE(astate, &state->arp_states, next, astaten) {
+		if (arm.sip.s_addr != astate->addr.s_addr &&
+		    arm.tip.s_addr != astate->addr.s_addr)
+			continue;
 		if (astate->conflicted_cb)
 			astate->conflicted_cb(astate, &arm);
 	}
