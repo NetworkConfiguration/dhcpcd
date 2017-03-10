@@ -2095,9 +2095,7 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 	if (state->arping_index != -1 &&
 	    state->arping_index < ifo->arping_len &&
 	    amsg &&
-	    (amsg->sip.s_addr == ifo->arping[state->arping_index] ||
-	    (amsg->sip.s_addr == 0 &&
-	    amsg->tip.s_addr == ifo->arping[state->arping_index])))
+	    amsg->sip.s_addr == ifo->arping[state->arping_index])
 	{
 		char buf[HWADDR_LEN * 3];
 
@@ -2160,9 +2158,7 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 
 	/* Bound address */
 	if (amsg && state->addr &&
-	    (amsg->sip.s_addr == state->addr->addr.s_addr ||
-	    (amsg->sip.s_addr == 0 &&
-	    amsg->tip.s_addr == state->addr->addr.s_addr)))
+	    amsg->sip.s_addr == state->addr->addr.s_addr)
 	{
 		astate->failed = state->addr->addr;
 		arp_report_conflicted(astate, amsg);

@@ -244,7 +244,6 @@ ipv4ll_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 {
 	struct interface *ifp;
 	struct ipv4ll_state *state;
-	in_addr_t fail;
 
 	assert(astate != NULL);
 	assert(astate->iface != NULL);
@@ -252,23 +251,19 @@ ipv4ll_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 	state = IPV4LL_STATE(ifp);
 	assert(state != NULL);
 
-	fail = 0;
-	/* RFC 3927 2.2.1, Probe Conflict Detection */
+	/*
+	 * NULL amsg means kernel detected DAD.
+	 * We always fail on matching sip.
+	 * We only fail on matching tip and we haven't added that address yet.
+	 */
 	if (amsg == NULL ||
-	    (amsg->sip.s_addr == astate->addr.s_addr ||
-	    (amsg->sip.s_addr == 0 && amsg->tip.s_addr == astate->addr.s_addr)))
-		fail = astate->addr.s_addr;
-
-	/* RFC 3927 2.5, Conflict Defense */
-	if (state->addr != NULL &&
-	    IN_LINKLOCAL(ntohl(state->addr->addr.s_addr)) &&
-	    amsg && amsg->sip.s_addr == state->addr->addr.s_addr)
-		fail = state->addr->addr.s_addr;
-
-	if (fail == 0)
+	    amsg->sip.s_addr == astate->addr.s_addr ||
+	    (amsg->sip.s_addr == 0 && amsg->tip.s_addr == astate->addr.s_addr
+	     && ipv4_iffindaddr(ifp, &amsg->tip, NULL) == NULL))
+		astate->failed = astate->addr;
+	else
 		return;
 
-	astate->failed.s_addr = fail;
 	arp_report_conflicted(astate, amsg);
 
 	if (state->addr != NULL &&
