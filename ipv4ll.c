@@ -244,6 +244,9 @@ ipv4ll_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 {
 	struct interface *ifp;
 	struct ipv4ll_state *state;
+#ifdef IN_IFF_DUPLICATED
+	struct ipv4_addr *ia;
+#endif
 
 	assert(astate != NULL);
 	assert(astate->iface != NULL);
@@ -308,6 +311,12 @@ ipv4ll_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 		state->addr = NULL;
 		script_runreason(ifp, "IPV4LL");
 	}
+
+#ifdef IN_IFF_DUPLICATED
+	ia = ipv4_iffindaddr(ifp, &astate->addr, NULL);
+	if (ia != NULL && ia->addr_flags & IN_IFF_DUPLICATED)
+		ipv4_deladdr(ia, 1);
+#endif
 
 	arp_cancel(astate);
 	if (++state->conflicts == MAX_CONFLICTS)
