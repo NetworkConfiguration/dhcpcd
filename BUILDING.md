@@ -1,60 +1,58 @@
-dhcpcd - DHCP client daemon
-Copyright (c) 2006-2017 Roy Marples <roy@marples.name>
+# Building dhcpcd
 
+This attempts to document various ways of building dhcpcd for your
+platform.
 
-Installation
-------------
-./configure; make; make install
-man dhcpcd for command line options
-man dhcpcd.conf for configuration options
-man dhcpcd-run-hooks to learn how to hook scripts into dhcpcd events
+Building for distribution (ie making a dhcpcd source tarball) now requires
+gmake-4 or any BSD make.
 
-
-Notes
------
+## Size is an issue
 To compile small dhcpcd, maybe to be used for installation media where
-size is a concern, you can use the --small configure option to enable
+size is a concern, you can use the `--small` configure option to enable
 a reduced feature set within dhcpcd.
 Currently this just removes non important options out of
-dhcpcd-definitions.conf, the custom logger and
+`dhcpcd-definitions.conf`, the custom logger and
 support for DHCPv6 Prefix Delegation.
 Other features maybe dropped as and when required.
 dhcpcd can also be made smaller by removing the IPv4 or IPv6 stack:
-  *  --disable-inet
-  *  --disable-inet6
+  *  `--disable-inet`
+  *  `--disable-inet6`
 Or by removing the following features:
-  *  --disable-auth
-  *  --disable-arp
-  *  --disable-arping
-  *  --disable-ipv4ll
-  *  --disable-dhcp6
+  *  `--disable-auth`
+  *  `--disable-arp`
+  *  `--disable-arping`
+  *  `--disable-ipv4ll`
+  *  `--disable-dhcp6`
 
 You can also move the embedded extended configuration from the dhcpcd binary
 to an external file (LIBEXECDIR/dhcpcd-definitions.conf)
-	--disable-embedded
+  *  `--disable-embedded`
 If dhcpcd cannot load this file at runtime, dhcpcd will work but will not be
 able to decode any DHCP/DHCPv6 options that are not defined by the user
 in /etc/dhcpcd.conf. This does not really change the total on disk size.
 
+## Cross compiling
 If you're cross compiling you may need set the platform if OS is different
-from the host.
---target=sparc-sun-netbsd5.0
+from the host.  
+`--target=sparc-sun-netbsd5.0`
 
 If you're building for an MMU-less system where fork() does not work, you
-should ./configure --disable-fork.
-This also puts the --no-background flag on and stops the --background flag
+should `./configure --disable-fork`.
+This also puts the `--no-background` flag on and stops the `--background` flag
 from working.
 
+## Default directories
 You can change the default dirs with these knobs.
-For example, to satisfy FHS compliance you would do this:-
-./configure --libexecdir=/lib/dhcpcd dbdir=/var/lib/dhcpcd
+For example, to satisfy FHS compliance you would do this:
+`./configure --libexecdir=/lib/dhcpcd dbdir=/var/lib/dhcpcd`
 
+## Compile Issues
 We now default to using -std=c99. For 64-bit linux, this always works, but
 for 32-bit linux it requires either gnu99 or a patch to asm/types.h.
 Most distros patch linux headers so this should work fine.
 linux-2.6.24 finally ships with a working 32-bit header.
 If your linux headers are older, or your distro hasn't patched them you can
-set CSTD=gnu99 to work around this.
+set `CSTD=gnu99` to work around this.
 
 Some BSD systems do not allow the manipulation of automatically added subnet
 routes. You can find discussion here:
@@ -73,9 +71,9 @@ BSD systems where this has been fixed or is known to work are:
     patch submitted against FreeBSD-10.0
 
 Some BSD systems do not announce IPv6 address flag changes, such as
-IN6_IFF_TENTATIVE, IN6_IFF_DUPLICATED, etc. On these systems,
-dhcpcd will poll a freshly added address until either IN6_IFF_TENTATIVE is
-cleared or IN6_IFF_DUPLICATED is set and take action accordingly.
+`IN6_IFF_TENTATIVE`, `IN6_IFF_DUPLICATED`, etc. On these systems,
+dhcpcd will poll a freshly added address until either `IN6_IFF_TENTATIVE` is
+cleared or `IN6_IFF_DUPLICATED` is set and take action accordingly.
 BSD systems where this has been fixed or is known to work are:
     NetBSD-7.0
 
@@ -91,7 +89,7 @@ BSD systems where this has been fixed or is known to work are:
 
 Linux prior to 3.17 won't allow userland to manage IPv6 temporary addresses.
 Either upgrade or don't allow dhcpcd to manage the RA,
-so don't set either "ipv6ra_own" or "slaac private" in dhcpcd.conf if you
+so don't set either `ipv6ra_own` or `slaac private` in `dhcpcd.conf` if you
 want to have working IPv6 temporary addresses.
 SLAAC private addresses are just as private, just stable.
 
@@ -102,12 +100,15 @@ management and no automatic prefix route generation, both of which are
 obviously false. You will have to patch support either in the kernel or
 out of the headers (or dhcpcd itself) to have correct operation.
 
+## Init systems
 We try and detect how dhcpcd should interact with system services at runtime.
 If we cannot auto-detect how do to this, or it is wrong then
 you can change this by passing shell commands to --serviceexists,
 --servicecmd and optionally --servicestatus to ./configure or overriding
 the service variables in a hook.
 
+
+## /dev management
 Some systems have /dev management systems and some of these like to rename
 interfaces. As this system would listen in the same way as dhcpcd to new
 interface arrivals, dhcpcd needs to listen to the /dev management sytem
@@ -119,6 +120,7 @@ You can disable this with --without-dev, or without-udev.
 NOTE: in Gentoo at least, sys-fs/udev as provided by systemd leaks memory
 sys-fs/eudev, the fork of udev does not and as such is recommended.
 
+## select
 dhcpcd uses eloop.c, which is a portable main event loop with timeouts and
 signal handling. Unlike libevent and similar, it can be transplanted directly
 within the application - the only caveat outside of POSIX calls is that
@@ -128,64 +130,40 @@ eloop supports the following polling mechanisms, listed in order of preference:
 If signal handling is disabled (ie in RTEMS or other single process
 OS's) then eloop can use poll.
 You can decide which polling mechanism dhcpcd will select in eloop like so
-./configure --with-poll=[kqueue|epoll|pselect|pollts|ppoll]
+`./configure --with-poll=[kqueue|epoll|pselect|pollts|ppoll]`
 
+
+## Importing into another source control system
 To prepare dhcpcd for import into a platform source tree (like NetBSD)
 you can use the make import target to create /tmp/dhcpcd-$version and
 populate it with all the source files and hooks needed.
 In this instance, you may wish to disable some configured tests when
 the binary has to run on older versions which lack support, such as getline.
-./configure --without-getline
-
-Building for distribution (ie making a dhcpcd source tarball) now requires
-gmake-4 or any BSD make.
+`./configure --without-getline`
 
 
-Hooks
------
+## Hooks
 Not all the hooks in dhcpcd-hooks are installed by default.
-By default we install 01-test, 02-dump, 10-mtu, 20-resolv.conf and 30-hostname.
-The other hooks, 10-wpa_supplicant, 15-timezone, 29-lookup-hostname
-are installed to $(datadir)/dhcpcd/hooks by default and need to be
-copied to $(libexecdir)/dhcpcd-hooks for use.
+By default we install `01-test`, `02-dump`, `10-mtu`, `20-resolv.conf`
+and `30-hostname`.
+The other hooks, `10-wpa_supplicant`, `15-timezone` and `29-lookup-hostname`
+are installed to `$(datadir)/dhcpcd/hooks` by default and need to be
+copied to `$(libexecdir)/dhcpcd-hooks` for use.
 The configure program attempts to find hooks for systems you have installed.
 To add more simply
-./configure -with-hook=ntp.conf
+`./configure -with-hook=ntp.conf`
 
 Some system services expose the name of the service we are in,
-by default dhcpcd will pick RC_SVCNAME from the environment.
-You can override this in CPPFLAGS+= -DRC_SVCNAME="YOUR_SVCNAME".
-This is important because dhcpcd will scrub the environment aside from $PATH
+by default dhcpcd will pick `RC_SVCNAME` from the environment.
+You can override this in `CPPFLAGS+= -DRC_SVCNAME="YOUR_SVCNAME"`.
+This is important because dhcpcd will scrub the environment aside from `$PATH`
 before running hooks.
 This variable could be used to facilitate service re-entry so this chain could
 happen in a custom OS hook:
   dhcpcd service marked inactive && dhcpcd service starts
   dependant services are not started because dhcpcd is inactive (not stopped)
-  dhcpcd hook tests if $if_up = true and $af_waiting is empty or unset.
+  dhcpcd hook tests if `$if_up = true` and `$af_waiting` is empty or unset.
   if true, mark the dhcpcd service as started and then start dependencies
   if false and the dhcpcd service was previously started, mark as inactive and
      stop any dependant services.
 
-
-Compatibility
--------------
-dhcpcd-5 is only fully command line compatible with dhcpcd-4
-For compatibility with older versions, use dhcpcd-4
-
-
-Upgrading
----------
-dhcpcd-7 defaults the database directory to /var/db/dhcpcd instead of /var/db
-and now stores dhcpcd.duid and dhcpcd.secret in there instead of /etc.
-of /etc.
-The Makefile _confinstall target will attempt to move the files correctly from
-the old locations to the new locations.
-Of course this won't work if dhcpcd-7 is packaged up, so packagers will need to
-install similar logic into their dhcpcd package.
-
-
-ChangeLog
----------
-We no longer supply a ChangeLog.
-However, you're more than welcome to read the commit log at
-http://roy.marples.name/projects/dhcpcd/timeline/
