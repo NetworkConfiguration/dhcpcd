@@ -17,6 +17,7 @@ Other features maybe dropped as and when required.
 dhcpcd can also be made smaller by removing the IPv4 or IPv6 stack:
   *  `--disable-inet`
   *  `--disable-inet6`
+
 Or by removing the following features:
   *  `--disable-auth`
   *  `--disable-arp`
@@ -47,13 +48,21 @@ For example, to satisfy FHS compliance you would do this:
 `./configure --libexecdir=/lib/dhcpcd dbdir=/var/lib/dhcpcd`
 
 ## Compile Issues
-We now default to using -std=c99. For 64-bit linux, this always works, but
-for 32-bit linux it requires either gnu99 or a patch to asm/types.h.
+We now default to using `-std=c99`. For 64-bit linux, this always works, but
+for 32-bit linux it requires either gnu99 or a patch to `asm/types.h`.
 Most distros patch linux headers so this should work fine.
 linux-2.6.24 finally ships with a working 32-bit header.
 If your linux headers are older, or your distro hasn't patched them you can
 set `CSTD=gnu99` to work around this.
 
+ArchLinux presently sanitises all kernel headers to the latest version
+regardless of the version for your CPU. As such, Arch presently ships a
+3.12 kernel with 3.17 headers which claim that it supports temporary address
+management and no automatic prefix route generation, both of which are
+obviously false. You will have to patch support either in the kernel or
+out of the headers (or dhcpcd itself) to have correct operation.
+
+## OS specific issues
 Some BSD systems do not allow the manipulation of automatically added subnet
 routes. You can find discussion here:
     http://mail-index.netbsd.org/tech-net/2008/12/03/msg000896.html
@@ -93,32 +102,25 @@ so don't set either `ipv6ra_own` or `slaac private` in `dhcpcd.conf` if you
 want to have working IPv6 temporary addresses.
 SLAAC private addresses are just as private, just stable.
 
-ArchLinux presently sanitises all kernel headers to the latest version
-regardless of the version for your CPU. As such, Arch presently ships a
-3.12 kernel with 3.17 headers which claim that it supports temporary address
-management and no automatic prefix route generation, both of which are
-obviously false. You will have to patch support either in the kernel or
-out of the headers (or dhcpcd itself) to have correct operation.
-
 ## Init systems
 We try and detect how dhcpcd should interact with system services at runtime.
 If we cannot auto-detect how do to this, or it is wrong then
-you can change this by passing shell commands to --serviceexists,
---servicecmd and optionally --servicestatus to ./configure or overriding
+you can change this by passing shell commands to `--serviceexists`,
+`--servicecmd` and optionally `--servicestatus` to `./configure` or overriding
 the service variables in a hook.
 
 
 ## /dev management
-Some systems have /dev management systems and some of these like to rename
+Some systems have `/dev` management systems and some of these like to rename
 interfaces. As this system would listen in the same way as dhcpcd to new
-interface arrivals, dhcpcd needs to listen to the /dev management sytem
-instead of the kernel. However, if the /dev management system breaks, stops
+interface arrivals, dhcpcd needs to listen to the `/dev` management sytem
+instead of the kernel. However, if the `/dev` management system breaks, stops
 working, or changes to a new one, dhcpcd should still try and continue to work.
 To facilitate this, dhcpcd allows a plugin to load to instruct dhcpcd when it
 can use an interface. As of the time of writing only udev support is included.
-You can disable this with --without-dev, or without-udev.
-NOTE: in Gentoo at least, sys-fs/udev as provided by systemd leaks memory
-sys-fs/eudev, the fork of udev does not and as such is recommended.
+You can disable this with `--without-dev`, or `without-udev`.
+NOTE: in Gentoo at least, `sys-fs/udev` as provided by systemd leaks memory
+`sys-fs/eudev`, the fork of udev does not and as such is recommended.
 
 ## select
 dhcpcd uses eloop.c, which is a portable main event loop with timeouts and
