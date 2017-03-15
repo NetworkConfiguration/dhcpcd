@@ -15,16 +15,18 @@ FILES+=		15-timezone
 FILES+=		29-lookup-hostname
 FILES+=		${EGHOOKSCRIPTS}
 
+all: ${HOOKSCRIPTS} ${EGHOOKSCRIPTS}
+
 50-ypbind: 50-ypbind.in
 	${SED} \
 		-e 's:@YPDOMAIN_DIR@:${YPDOMAIN_DIR}:g' \
 		-e 's:@YPDOMAIN_SUFFIX@:${YPDOMAIN_SUFFIX}:g' \
 		50-ypbind.in > $@
 
-all: ${HOOKSCRIPTS} ${EGHOOKSCRIPTS}
-
 clean:
 	rm -f 50-ypbind
+
+depend:
 
 proginstall: ${HOOKSCRIPTS}
 	${INSTALL} -d ${DESTDIR}${SCRIPTSDIR}
