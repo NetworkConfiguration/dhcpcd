@@ -4,6 +4,7 @@ config.mk
 config.log
 
 # Ignore object files
+.depend
 *.o
 *.So
 *.so

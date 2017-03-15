@@ -3,16 +3,16 @@ include ${TOP}/iconfig.mk
 
 PROG=		test
 SRCS=		test.c
-SRCS+=		test_hmac_md5.c ../crypt/hmac_md5.c
+SRCS+=		test_hmac_md5.c ${TOP}/src/crypt/hmac_md5.c
 
 CFLAGS?=	-O2
 CSTD?=		c99
 CFLAGS+=	-std=${CSTD}
 
-CPPFLAGS+=	-I../crypt
+CPPFLAGS+=	-I${TOP}/src/crypt
 
-T_COMPAT_SRCS=	${COMPAT_SRCS:compat/%=../compat/%}
-T_MD5_SRC=	${MD5_SRC:crypt/%=../crypt/%}
+T_COMPAT_SRCS=	${COMPAT_SRCS:compat/%=${TOP}/src/compat/%}
+T_MD5_SRC=	${MD5_SRC:crypt/%=${TOP}/src/crypt/%}
 OBJS+=		${SRCS:.c=.o} ${T_COMPAT_SRCS:.c=.o} ${T_MD5_SRC:.c=.o}
 
 .c.o:

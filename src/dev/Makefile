@@ -1,10 +1,11 @@
-TOP?=	../
+TOP?=	../../
 include ${TOP}/Makefile.inc
 include ${TOP}/config.mk
 
 CFLAGS?=	-O2
 CSTD?=		c99
 CFLAGS+=	-std=${CSTD}
+CPPFLAGS+=	-I${TOP} -I${TOP}/src
 
 DEVDIR=		${LIBDIR}/dhcpcd/dev
 DSRC=		${DEV_PLUGINS:=.c}
