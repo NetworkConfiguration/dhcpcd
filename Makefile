@@ -1,4 +1,4 @@
-SUBDIRS=	src dhcpcd-hooks
+SUBDIRS=	src hooks
 
 VERSION!=	sed -n 's/\#define VERSION[[:space:]]*"\(.*\)".*/\1/p' src/defs.h
 
@@ -16,7 +16,7 @@ HOST_SH?=	/bin/sh
 
 CLEANFILES+=	*.tar.xz
 
-.PHONY:		import import-bsd test
+.PHONY:		hooks import import-bsd test
 
 .SUFFIXES:	.in
 
@@ -30,7 +30,7 @@ test:
 	cd $@; ${MAKE} $@; ./$@
 
 hooks:
-	cd dhcpcd-hooks; ${MAKE}; cd ..; done
+	cd $@; ${MAKE}
 
 eginstall:
 	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@; cd ..; done
