@@ -20,16 +20,9 @@ DHCPCD_DEFS?=	dhcpcd-definitions.conf
 
 OBJS+=		${SRCS:.c=.o} ${CRYPT_SRCS:.c=.o} ${COMPAT_SRCS:.c=.o}
 
-SCRIPT=		${LIBEXECDIR}/dhcpcd-run-hooks
-HOOKDIR=	${LIBEXECDIR}/dhcpcd-hooks
-
 MAN5=		dhcpcd.conf.5
-MAN8=		dhcpcd.8 dhcpcd-run-hooks.8
-CLEANFILES=	dhcpcd.conf.5 dhcpcd.8 dhcpcd-run-hooks.8
-
-SCRIPTS=	dhcpcd-run-hooks
-SCRIPTSDIR=	${LIBEXECDIR}
-CLEANFILES+=	dhcpcd-run-hooks
+MAN8=		dhcpcd.8
+CLEANFILES=	dhcpcd.conf.5 dhcpcd.8
 
 FILES=		dhcpcd.conf
 FILESDIR=	${SYSCONFDIR}
@@ -101,11 +94,7 @@ _proginstall: ${PROG}
 	${INSTALL} -m ${BINMODE} ${PROG} ${DESTDIR}${SBINDIR}
 	${INSTALL} -d ${DESTDIR}${DBDIR}
 
-_scriptsinstall: ${SCRIPTS}
-	${INSTALL} -d ${DESTDIR}${SCRIPTSDIR}
-	${INSTALL} -m ${BINMODE} ${SCRIPTS} ${DESTDIR}${SCRIPTSDIR}
-
-proginstall: _proginstall _scriptsinstall ${EMBEDDEDINSTALL}
+proginstall: _proginstall ${EMBEDDEDINSTALL}
 	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@; cd ..; done
 
 _maninstall: ${MAN5} ${MAN8}
@@ -146,9 +135,6 @@ _confinstall:
 			${DESTDIR}${DBDIR}/rdm_monotonic; \
 	fi
 	
-hooks:
-	cd dhcpcd-hooks; ${MAKE}; cd ..; done
-
 eginstall:
 	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@; cd ..; done
 
