@@ -2,6 +2,12 @@ TOP?=	../
 include ${TOP}/Makefile.inc
 include ${TOP}/iconfig.mk
 
+SCRIPT=		dhcpcd-run-hooks
+SCRIPTDIR=	${LIBEXECDIR}
+CLEANFILES=	dhcpcd-run-hooks
+MAN8=		dhcpcd-run-hooks.8
+CLEANFILES+=	dhcpcd-run-hooks.8
+
 SCRIPTSDIR=	${LIBEXECDIR}/dhcpcd-hooks
 SCRIPTS=	01-test 02-dump
 SCRIPTS+=	20-resolv.conf
@@ -15,20 +21,27 @@ FILES+=		15-timezone
 FILES+=		29-lookup-hostname
 FILES+=		${EGHOOKSCRIPTS}
 
-all: ${HOOKSCRIPTS} ${EGHOOKSCRIPTS}
+.SUFFIXES:	.in
 
-50-ypbind: 50-ypbind.in
-	${SED} \
+.in: Makefile ${TOP}/config.mk
+	${SED} ${SED_RUNDIR} ${SED_DBDIR} ${SED_LIBDIR} ${SED_HOOKDIR} \
+		${SED_SYS} ${SED_SCRIPT} ${SED_DATADIR} \
+		${SED_SERVICEEXISTS} ${SED_SERVICECMD} ${SED_SERVICESTATUS} \
+		${SED_STATUSARG} \
 		-e 's:@YPDOMAIN_DIR@:${YPDOMAIN_DIR}:g' \
 		-e 's:@YPDOMAIN_SUFFIX@:${YPDOMAIN_SUFFIX}:g' \
-		50-ypbind.in > $@
+		$< > $@
+
+all: ${SCRIPT} ${MAN8} ${SCRIPTS} ${EGHOOKSCRIPTS}
 
 clean:
-	rm -f 50-ypbind
+	rm -f ${CLEANFILES} 50-ypbind
 
 depend:
 
 proginstall: ${HOOKSCRIPTS}
+	${INSTALL} -d ${DESTDIR}${SCRIPTDIR}
+	${INSTALL} -m ${BINMODE} ${SCRIPT} ${DESTDIR}${SCRIPTDIR}
 	${INSTALL} -d ${DESTDIR}${SCRIPTSDIR}
 	${INSTALL} -m ${NONBINMODE} ${SCRIPTS} ${DESTDIR}${SCRIPTSDIR}
 	# We need to remove the old MTU change script if we at all can.
@@ -38,7 +51,11 @@ eginstall: ${EGHOOKSCRIPTS}
 	${INSTALL} -d ${DESTDIR}${FILESDIR}
 	${INSTALL} -m ${NONBINMODE} ${FILES} ${DESTDIR}${FILESDIR}
 
-install: proginstall eginstall
+maninstall: ${MAN8}
+	${INSTALL} -d ${DESTDIR}${MANDIR}/man8
+	${INSTALL} -m ${MANMODE} ${MAN8} ${DESTDIR}${MANDIR}/man8
+
+install: proginstall eginstall maninstall
 
 import: ${HOOKSCRIPTS}
 	${INSTALL} -d /tmp/${DISTPREFIX}/dhcpcd-hooks
