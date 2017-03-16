@@ -2,9 +2,13 @@ SUBDIRS=	src hooks
 
 VERSION!=	sed -n 's/\#define VERSION[[:space:]]*"\(.*\)".*/\1/p' src/defs.h
 
+DIST!=		if test -f .fslckout; then echo "dist-fossil"; \
+		elif test -d .git; then echo "dist-git"; \
+		else echo "dist-inst"; fi
 FOSSILID?=	current
+GITREF?=	HEAD
 
-DISTPREFIX?=	${PROG}-${VERSION}
+DISTPREFIX?=	dhcpcd-${VERSION}
 DISTFILEGZ?=	${DISTPREFIX}.tar.gz
 DISTFILE?=	${DISTPREFIX}.tar.xz
 DISTINFO=	${DISTFILE}.distinfo
@@ -45,10 +49,23 @@ distclean: clean
 	rm -f config.h config.mk config.log \
 		${DISTFILE} ${DISTFILEGZ} ${DISTINFO} ${DISTINFOSIGN}
 
-dist:
+
+dist-fossil:
 	fossil tarball --name ${DISTPREFIX} ${FOSSILID} ${DISTFILEGZ}
 	gunzip -c ${DISTFILEGZ} | xz >${DISTFILE}
 	rm ${DISTFILEGZ}
+
+dist-git:
+	git archive --prefix=${DISTPREFIX}/ ${GITREF} | xz >${DISTFILE}
+
+dist-inst:
+	mkdir /tmp/${DISTPREFIX}
+	cp -RPp * /tmp/${DISTPREFIX}
+	(cd /tmp/${DISTPREFIX}; make clean)
+	tar -cvjpf ${DISTFILE} -C /tmp ${DISTPREFIX}
+	rm -rf /tmp/${DISTPREFIX}
+
+dist: ${DIST}
 
 distinfo: dist
 	rm -f ${DISTINFO} ${DISTINFOSIGN}
