@@ -958,8 +958,15 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 	int addrflags;
 
 #ifdef HAVE_IFAM_PID
-	if (if_ownmsgpid(ctx, ifam->ifam_pid, 0))
-		return;
+	if (if_ownmsgpid(ctx, ifam->ifam_pid, 0)) {
+#ifdef HAVE_IFAM_ADDRFLAGS
+		/* If the kernel isn't doing DAD for the newly added
+		 * address we need to let it through. */
+		if (ifam->ifam_type != RTM_NEWADDR ||
+		    ifam->ifam_addrflags & IN_IFF_TENTATIVE)
+#endif
+			return;
+	}
 #endif
 
 	if ((ifp = if_findindex(ctx->ifaces, ifam->ifam_index)) == NULL)
