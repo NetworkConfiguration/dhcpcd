@@ -19,7 +19,8 @@ SRCS+=		${DHCPCD_SRCS}
 DHCPCD_DEFS?=	dhcpcd-definitions.conf
 
 PCOMPAT_SRCS=	${COMPAT_SRCS:compat/%=${TOP}/compat/%}
-OBJS+=		${SRCS:.c=.o} ${CRYPT_SRCS:.c=.o} ${PCOMPAT_SRCS:.c=.o}
+PCRYPT_SRCS=	${CRYPT_SRCS:compat/%=${TOP}/compat/%}
+OBJS+=		${SRCS:.c=.o} ${PCRYPT_SRCS:.c=.o} ${PCOMPAT_SRCS:.c=.o}
 
 MAN5=		dhcpcd.conf.5
 MAN8=		dhcpcd.8

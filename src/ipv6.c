@@ -72,14 +72,10 @@
 #  ifndef DEPGEN
 #    include <md5.h>
 #  endif
-#else
-#  include "md5.h"
 #endif
 
 #ifdef SHA2_H
 #  include SHA2_H
-#else
-#  include "sha256.h"
 #endif
 
 #ifndef SHA256_DIGEST_LENGTH
