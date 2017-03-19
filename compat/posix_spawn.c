@@ -37,7 +37,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "../common.h"
+#include "common.h"
 #include "posix_spawn.h"
 
 #ifndef _NSIG

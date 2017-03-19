@@ -43,8 +43,8 @@
 #include <unistd.h>
 
 #include <sys/file.h>	/* for flock(2) */
-#include "../config.h"
-#include "../defs.h"
+#include "config.h"
+#include "defs.h"
 
 static pid_t pidfile_pid;
 static char pidfile_path[PATH_MAX];

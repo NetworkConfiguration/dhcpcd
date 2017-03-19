@@ -28,15 +28,13 @@
 #include <inttypes.h>
 #include <string.h>
 
+#include "config.h"
 #include "crypt.h"
 
-#include "../config.h"
 #ifdef HAVE_MD5_H
 #  ifndef DEPGEN
 #    include <md5.h>
 #  endif
-#else
-#  include "md5.h"
 #endif
 
 #define HMAC_PAD_LEN	64

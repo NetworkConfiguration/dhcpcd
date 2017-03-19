@@ -19,7 +19,7 @@
 
 /* We need to include config.h so we pickup either the system arc4random
  * or our compat one. */
-#include "../config.h"
+#include "config.h"
 
 /*
  * Calculate a uniformly distributed random number less than upper_bound

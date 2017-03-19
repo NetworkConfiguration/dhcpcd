@@ -33,7 +33,7 @@
 #define COMPAT_BITOPS_H
 
 #include <stdint.h>
-#include "../common.h"
+#include "common.h"
 
 /*
  * Find First Set functions
