@@ -13,12 +13,13 @@ include ${TOP}/iconfig.mk
 
 CSTD?=		c99
 CFLAGS+=	-std=${CSTD}
-CPPFLAGS+=	-I${TOP} -I./crypt -I./
+CPPFLAGS+=	-I${TOP} -I${TOP}/src -I./crypt
 
 SRCS+=		${DHCPCD_SRCS}
 DHCPCD_DEFS?=	dhcpcd-definitions.conf
 
-OBJS+=		${SRCS:.c=.o} ${CRYPT_SRCS:.c=.o} ${COMPAT_SRCS:.c=.o}
+PCOMPAT_SRCS=	${COMPAT_SRCS:compat/%=${TOP}/compat/%}
+OBJS+=		${SRCS:.c=.o} ${CRYPT_SRCS:.c=.o} ${PCOMPAT_SRCS:.c=.o}
 
 MAN5=		dhcpcd.conf.5
 MAN8=		dhcpcd.8
