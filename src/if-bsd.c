@@ -957,23 +957,35 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 	const struct sockaddr *rti_info[RTAX_MAX];
 	int addrflags;
 
-#ifdef HAVE_IFAM_PID
-	if (if_ownmsgpid(ctx, ifam->ifam_pid, 0)) {
-#ifdef HAVE_IFAM_ADDRFLAGS
-		/* If the kernel isn't doing DAD for the newly added
-		 * address we need to let it through. */
-		if (ifam->ifam_type != RTM_NEWADDR ||
-		    ifam->ifam_addrflags & IN_IFF_TENTATIVE)
-#endif
-			return;
-	}
-#endif
-
 	if ((ifp = if_findindex(ctx->ifaces, ifam->ifam_index)) == NULL)
 		return;
 	get_addrs(ifam->ifam_addrs, ifam + 1, rti_info);
 	if (rti_info[RTAX_IFA] == NULL)
 		return;
+
+#ifdef HAVE_IFAM_PID
+	if (if_ownmsgpid(ctx, ifam->ifam_pid, 0)) {
+#ifdef HAVE_IFAM_ADDRFLAGS
+		/* If the kernel isn't doing DAD for the newly added
+		 * address we need to let it through. */
+		if (ifam->ifam_type != RTM_NEWADDR)
+			return;
+		switch (rti_info[RTAX_IFA]->sa_family) {
+		case AF_INET:
+			if (ifam->ifam_addrflags & IN_IFF_TENTATIVE)
+				return;
+			break;
+		case AF_INET6:
+			if (ifam->ifam_addrflags & IN6_IFF_TENTATIVE)
+				return;
+			break;
+		default:
+			return;
+		}
+#endif
+	}
+#endif
+
 #ifdef HAVE_IFAM_ADDRFLAGS
 	addrflags = ifam->ifam_addrflags;
 #endif
