@@ -25,6 +25,7 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/stat.h>
 #include <sys/utsname.h>
 
 #include <ctype.h>
@@ -1060,34 +1061,32 @@ dhcp_zero_index(struct dhcp_opt *opt)
 size_t
 dhcp_read_lease_fd(int fd, void **lease)
 {
-	uint8_t *buf, *nbuf;
-	size_t len, new_len;
-	ssize_t bytes;
-
-	if ((buf = malloc(BUFSIZ)) == NULL)
+	struct stat st;
+	size_t sz;
+	void *buf;
+	ssize_t len;
+	
+	if (fstat(fd, &st) != 0)
 		goto out;
-
-	len = 0;
-	for (;;) {
-		bytes = read(fd, buf + len, BUFSIZ);
-		if (bytes == -1)
-			break;
-		if (bytes < BUFSIZ) {
-			*lease = buf;
-			return len + (size_t)bytes;
-		}
-		new_len = len + (BUFSIZ * 2);
-		if (new_len > UINT32_MAX || new_len < len) {
-			errno = E2BIG;
-			break;
-		}
-		if ((nbuf = realloc(buf, new_len)) == NULL)
-			break;
-		buf = nbuf;
-		len += BUFSIZ;
+	if (!S_ISREG(st.st_mode)) {
+		errno = EINVAL;
+		goto out;
+	}
+	if (st.st_size > UINT32_MAX) {
+		errno = E2BIG;
+		goto out;
 	}
 
-	free(buf);
+	sz = (size_t)st.st_size;
+	if ((buf = malloc(sz)) == NULL)
+		goto out;
+	if ((len = read(fd, buf, sz)) == -1) {
+		free(buf);
+		goto out;
+	}
+	*lease = buf;
+	return (size_t)len;
+
 out:
 	*lease = NULL;
 	return 0;
