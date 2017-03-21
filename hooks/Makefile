@@ -1,5 +1,4 @@
 TOP?=	../
-include ${TOP}/Makefile.inc
 include ${TOP}/iconfig.mk
 
 SCRIPT=		dhcpcd-run-hooks
@@ -8,7 +7,7 @@ CLEANFILES=	dhcpcd-run-hooks
 MAN8=		dhcpcd-run-hooks.8
 CLEANFILES+=	dhcpcd-run-hooks.8
 
-SCRIPTSDIR=	${LIBEXECDIR}/dhcpcd-hooks
+SCRIPTSDIR=	${HOOKDIR}
 SCRIPTS=	01-test 02-dump
 SCRIPTS+=	20-resolv.conf
 SCRIPTS+=	30-hostname
@@ -61,3 +60,5 @@ import: ${HOOKSCRIPTS}
 	${INSTALL} -d /tmp/${DISTPREFIX}/dhcpcd-hooks
 	${INSTALL} -m ${NONBINMODE} ${SCRIPTS} /tmp/${DISTPREFIX}/dhcpcd-hooks
 	${INSTALL} -m ${NONBINMODE} ${FILES} /tmp/${DISTPREFIX}/dhcpcd-hooks
+
+include ${TOP}/Makefile.inc

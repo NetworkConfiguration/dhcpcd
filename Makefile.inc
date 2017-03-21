@@ -16,6 +16,9 @@ HOST_SH?=	/bin/sh
 CKSUM?=		cksum -a SHA256
 PGP?=		netpgp
 
+SCRIPT=		${LIBEXECDIR}/dhcpcd-run-hooks
+HOOKDIR=	${LIBEXECDIR}/dhcpcd-hooks
+
 SED_RUNDIR=		-e 's:@RUNDIR@:${RUNDIR}:g'
 SED_DBDIR=		-e 's:@DBDIR@:${DBDIR}:g'
 SED_LIBDIR=		-e 's:@LIBDIR@:${LIBDIR}:g'
