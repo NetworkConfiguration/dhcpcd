@@ -39,6 +39,7 @@ install:
 	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@; cd ..; done
 
 clean:
+	rm -rf cov-int
 	for x in ${SUBDIRS} test; do cd $$x; ${MAKE} $@; cd ..; done
 
 distclean: clean
