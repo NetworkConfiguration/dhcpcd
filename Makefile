@@ -13,10 +13,6 @@ DISTFILEGZ?=	${DISTPREFIX}.tar.gz
 DISTFILE?=	${DISTPREFIX}.tar.xz
 DISTINFO=	${DISTFILE}.distinfo
 DISTINFOSIGN=	${DISTINFO}.asc
-CKSUM?=		cksum -a SHA256
-PGP?=		netpgp
-
-HOST_SH?=	/bin/sh
 
 CLEANFILES+=	*.tar.xz
 

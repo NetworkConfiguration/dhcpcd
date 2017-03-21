@@ -10,6 +10,11 @@ CONFMODE?=	0644
 CC?=		cc
 INSTALL?=	install
 SED?=		sed
+HOST_SH?=	/bin/sh
+
+# This isn't very portable, but I generaly make releases from NetBSD
+CKSUM?=		cksum -a SHA256
+PGP?=		netpgp
 
 SED_RUNDIR=		-e 's:@RUNDIR@:${RUNDIR}:g'
 SED_DBDIR=		-e 's:@DBDIR@:${DBDIR}:g'

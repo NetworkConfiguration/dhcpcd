@@ -45,8 +45,6 @@ SED_SYS=		-e 's:@SYSCONFDIR@:${SYSCONFDIR}:g'
 
 DEPEND!=	test -e .depend && echo ".depend" || echo ""
 
-HOST_SH?=	/bin/sh
-
 CLEANFILES+=	*.tar.xz
 
 .PHONY:		import import-bsd dev test
