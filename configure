@@ -773,8 +773,8 @@ EOF
 	rm -f _strlcpy.c _strlcpy
 fi
 if [ "$STRLCPY" = no ]; then
-	echo "COMPAT_SRCS+=	compat/strlcpy.c" >>$CONFIG_MK
-	echo "#include		\"compat/strlcpy.h\"" >>$CONFIG_H
+	echo "#define strlcpy(dst, src, size)" \
+		" (size_t)snprintf((dst), (size), \"%s\", (src))" >>$CONFIG_H
 fi
 
 if [ -z "$PIDFILE_LOCK" ]; then
