@@ -35,8 +35,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <signal.h>
-/* We can't include spawn.h here because it may not exist.
- * config.h will pull it in, or our compat one. */
+#include <spawn.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -50,12 +49,6 @@
 #include "ipv4ll.h"
 #include "ipv6nd.h"
 #include "script.h"
-
-#ifdef HAVE_SPAWN_H
-#include <spawn.h>
-#else
-#include "compat/posix_spawn.h"
-#endif
 
 /* Allow the OS to define another script env var name */
 #ifndef RC_SVCNAME
