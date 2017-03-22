@@ -1,8 +1,10 @@
-/*
- * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2015 Roy Marples <roy@marples.name>
- * All rights reserved
+/*	$NetBSD: strtoi.c,v 1.2 2015/05/01 14:17:56 christos Exp $	*/
 
+/*-
+ * Copyright (c) 2005 The DragonFly Project.  All rights reserved.
+ * Copyright (c) 2003 Citrus Project,
+ * All rights reserved.
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -23,90 +25,42 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * Created by Kamil Rytarowski, based on ID:
+ * NetBSD: src/common/lib/libc/stdlib/strtoul.c,v 1.3 2008/08/20 19:58:34 oster Exp
  */
 
+#if HAVE_NBTOOL_CONFIG_H
+#include "nbtool_config.h"
+#endif
+
+#ifdef _LIBC
+#include "namespace.h"
+#endif
+
+#if defined(_KERNEL)
+#include <sys/param.h>
+#include <sys/types.h>
+#include <lib/libkern/libkern.h>
+#elif defined(_STANDALONE)
+#include <sys/param.h>
+#include <sys/types.h>
+#include <lib/libkern/libkern.h>
+#include <lib/libsa/stand.h>
+#else
+#include <stddef.h>
+#include <assert.h>
 #include <errno.h>
 #include <inttypes.h>
-#include <stdlib.h>
+#endif
 
-#include "strtoi.h"
+#define	_FUNCNAME	strtoi
+#define	__TYPE		intmax_t
+#define	__WRAPPED	strtoimax
 
-intmax_t
-strtoi(const char * __restrict nptr, char ** __restrict endptr, int base,
-    intmax_t lo, intmax_t hi, int *rstatus)
-{
-	int serrno;
-	intmax_t r;
-	char *ep;
-	int rep;
+#include "_strtoi.h"
 
-	if (endptr == NULL)
-		endptr = &ep;
-	if (rstatus == NULL)
-		rstatus = &rep;
-
-	serrno = errno;
-	errno = 0;
-	r = strtoimax(nptr, endptr, base);
-	*rstatus = errno;
-	errno = serrno;
-
-	if (*rstatus == 0) {
-		if (nptr == *endptr)
-			*rstatus = ECANCELED;
-		else if (**endptr != '\0')
-			*rstatus = ENOTSUP;
-	}
-
-	if (r < lo) {
-		if (*rstatus == 0)
-			*rstatus = ERANGE;
-		return lo;
-	}
-	if (r > hi) {
-		if (*rstatus == 0)
-			*rstatus = ERANGE;
-		return hi;
-	}
-	return r;
-}
-
-uintmax_t
-strtou(const char * __restrict nptr, char ** __restrict endptr, int base,
-    uintmax_t lo, uintmax_t hi, int *rstatus)
-{
-	int serrno;
-	uintmax_t r;
-	char *ep;
-	int rep;
-
-	if (endptr == NULL)
-		endptr = &ep;
-	if (rstatus == NULL)
-		rstatus = &rep;
-
-	serrno = errno;
-	errno = 0;
-	r = strtoumax(nptr, endptr, base);
-	*rstatus = errno;
-	errno = serrno;
-
-	if (*rstatus == 0) {
-		if (nptr == *endptr)
-			*rstatus = ECANCELED;
-		else if (**endptr != '\0')
-			*rstatus = ENOTSUP;
-	}
-
-	if (r < lo) {
-		if (*rstatus == 0)
-			*rstatus = ERANGE;
-		return lo;
-	}
-	if (r > hi) {
-		if (*rstatus == 0)
-			*rstatus = ERANGE;
-		return hi;
-	}
-	return r;
-}
+#ifdef _LIBC
+__weak_alias(strtoi, _strtoi)
+__weak_alias(strtoi_l, _strtoi_l)
+#endif
