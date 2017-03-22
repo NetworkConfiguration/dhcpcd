@@ -719,7 +719,7 @@ EOF
 	else
 		ARC4RANDOM_UNIFORM=no
 	fi
-	echo "$ARC4RANDOM"
+	echo "$ARC4RANDOM_UNIFORM"
 	rm -f _arc4random_uniform.c _arc4random_uniform
 fi
 if [ "$ARC4RANDOM_UNIFORM" = no ]; then
