@@ -54,6 +54,8 @@
 #include <inttypes.h>
 #endif
 
+#include "strtoi.h"
+
 #define	_FUNCNAME	strtoi
 #define	__TYPE		intmax_t
 #define	__WRAPPED	strtoimax
