@@ -516,8 +516,6 @@ rt_build(struct dhcpcd_ctx *ctx, int af)
 			    ctx->options;
 #ifdef INET6
 			if (!have_default &&
-			    (o & DHCPCD_IPV6RA_OWN_DEFAULT) &&
-			    !(o & DHCPCD_IPV6RA_OWN) &&
 			    rt->rt_dest.sa_family == AF_INET6 &&
 			    sa_is_unspecified(&rt->rt_dest))
 				have_default = true;

@@ -710,7 +710,6 @@ ipv6_addaddr1(struct ipv6_addr *ap, const struct timespec *now)
 	if (ap->flags & IPV6_AF_TEMPORARY &&
 	    ap->prefix_pltime &&
 	    ap->prefix_vltime &&
-	    ap->iface->options->options & DHCPCD_IPV6RA_OWN &&
 	    ip6_use_tempaddr(ap->iface->name))
 		eloop_timeout_add_sec(ap->iface->ctx->eloop,
 		    (time_t)ap->prefix_pltime - REGEN_ADVANCE,
@@ -1032,7 +1031,6 @@ ipv6_getstate(struct interface *ifp)
 
 		/* Regenerate new ids */
 		if (ifp->options &&
-		    ifp->options->options & DHCPCD_IPV6RA_OWN &&
 		    ip6_use_tempaddr(ifp->name))
 			ipv6_regentempifid(ifp);
 	}
@@ -1610,8 +1608,7 @@ ipv6_start(struct interface *ifp)
 
 	if (IPV6_CSTATE(ifp)) {
 		/* Regenerate new ids */
-		if (ifp->options->options & DHCPCD_IPV6RA_OWN &&
-		    ip6_use_tempaddr(ifp->name))
+		if (ip6_use_tempaddr(ifp->name))
 			ipv6_regentempifid(ifp);
 	}
 
@@ -2205,20 +2202,16 @@ inet6_raroutes(struct rt_head *routes, struct dhcpcd_ctx *ctx, int expired,
 	TAILQ_FOREACH(rap, ctx->ra_routers, next) {
 		if (rap->expired != expired)
 			continue;
-		if (rap->iface->options->options & DHCPCD_IPV6RA_OWN) {
-			TAILQ_FOREACH(addr, &rap->addrs, next) {
-				if (addr->prefix_vltime == 0)
-					continue;
-				rt = inet6_makeprefix(rap->iface, rap, addr);
-				if (rt) {
-					TAILQ_INSERT_TAIL(routes, rt, rt_next);
-					n++;
-				}
+		TAILQ_FOREACH(addr, &rap->addrs, next) {
+			if (addr->prefix_vltime == 0)
+				continue;
+			rt = inet6_makeprefix(rap->iface, rap, addr);
+			if (rt) {
+				TAILQ_INSERT_TAIL(routes, rt, rt_next);
+				n++;
 			}
 		}
-		if (rap->lifetime && rap->iface->options->options &
-		    (DHCPCD_IPV6RA_OWN | DHCPCD_IPV6RA_OWN_DEFAULT))
-		{
+		if (rap->lifetime) {
 			rt = inet6_makerouter(rap);
 			if (rt) {
 				TAILQ_INSERT_TAIL(routes, rt, rt_next);

@@ -1299,7 +1299,7 @@ set_ifxflags(int s, const struct interface *ifp, int own)
 #endif
 
 int
-if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
+if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp)
 {
 	struct priv *priv;
 	int s, ra;
@@ -1318,7 +1318,9 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 		flags = (int)nd.ndi.flags;
 
 #ifdef ND6_IFF_AUTO_LINKLOCAL
-		if (own && flags & ND6_IFF_AUTO_LINKLOCAL) {
+		if (!(ctx->options & DHCPCD_TEST) &&
+		    flags & ND6_IFF_AUTO_LINKLOCAL)
+		{
 			syslog(LOG_DEBUG,
 			    "%s: disabling Kernel IPv6 auto link-local support",
 			    ifp->name);
@@ -1334,14 +1336,17 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 #endif
 
 #ifdef ND6_IFF_ACCEPT_RTADV
-		if (own && flags & ND6_IFF_ACCEPT_RTADV) {
+		if (!(ctx->options & DHCPCD_TEST) &&
+		    flags & ND6_IFF_ACCEPT_RTADV)
+		{
 			syslog(LOG_DEBUG,
 			    "%s: disabling Kernel IPv6 RA support",
 			    ifp->name);
 			flags &= ~ND6_IFF_ACCEPT_RTADV;
 		}
 #ifdef ND6_IFF_OVERRIDE_RTADV
-		if (own && flags & ND6_IFF_OVERRIDE_RTADV)
+		if (!(ctx->options & DHCPCD_TEST) &&
+		    flags & ND6_IFF_OVERRIDE_RTADV)
 			flags &= ~ND6_IFF_OVERRIDE_RTADV;
 #endif
 #endif
@@ -1351,6 +1356,12 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 #endif
 
 		if (nd.ndi.flags != (uint32_t)flags) {
+			if (ctx->options & DHCPCD_TEST) {
+				syslog(LOG_WARNING,
+				    "%s: interface not IPv6 enabled",
+				    ifp->name);
+				return -1;
+			}
 			nd.ndi.flags = (uint32_t)flags;
 			if (ioctl(s, SIOCSIFINFO_FLAGS, &nd) == -1) {
 				syslog(LOG_ERR, "%s: SIOCSIFINFO_FLAGS: %m",
@@ -1401,7 +1412,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 		 * error as such so just log it and continue */
 		syslog(errno == ENOENT ? LOG_DEBUG : LOG_WARNING,
 		    "IPV6CTL_ACCEPT_RTADV: %m");
-	else if (ra != 0 && own) {
+	else if (ra != 0 && !(ctx->options & DHCPCD_TEST)) {
 		syslog(LOG_DEBUG, "disabling Kernel IPv6 RA support");
 		if (set_inet6_sysctl(IPV6CTL_ACCEPT_RTADV, 0) == -1) {
 			syslog(LOG_ERR, "IPV6CTL_ACCEPT_RTADV: %m");
@@ -1410,7 +1421,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 		ra = 0;
 #else
 	ra = 0;
-	if (own) {
+	if (!(ctx->options & DHCPCD_TEST)) {
 #endif
 		/* Flush the kernel knowledge of advertised routers
 		 * and prefixes so the kernel does not expire prefixes

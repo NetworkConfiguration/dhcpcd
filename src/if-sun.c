@@ -1409,7 +1409,7 @@ if_getlifetime6(struct ipv6_addr *addr)
 
 int
 if_checkipv6(__unused struct dhcpcd_ctx *ctx,
-    __unused const struct interface *ifp, int __unused own)
+    __unused const struct interface *ifp)
 {
 
 	return 0;
