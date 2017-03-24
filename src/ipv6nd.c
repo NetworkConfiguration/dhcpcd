@@ -39,6 +39,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #define ELOOP_QUEUE 3
@@ -267,7 +268,7 @@ ipv6nd_sendrsprobe(void *arg)
 	struct in6_pktinfo pi;
 
 	if (ipv6_linklocal(ifp) == NULL) {
-		logger(ifp->ctx, LOG_DEBUG,
+		syslog(LOG_DEBUG,
 		    "%s: delaying Router Solicitation for LL address",
 		    ifp->name);
 		ipv6_addlinklocalcallback(ifp, ipv6nd_sendrsprobe, ifp);
@@ -281,7 +282,7 @@ ipv6nd_sendrsprobe(void *arg)
 #endif
 	dst.sin6_scope_id = ifp->index;
 	if (inet_pton(AF_INET6, ALLROUTERS, &dst.sin6_addr) != 1) {
-		logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
+		syslog(LOG_ERR, "%s: %m", __func__);
 		return;
 	}
 
@@ -302,11 +303,10 @@ ipv6nd_sendrsprobe(void *arg)
 	pi.ipi6_ifindex = ifp->index;
 	memcpy(CMSG_DATA(cm), &pi, sizeof(pi));
 
-	logger(ifp->ctx, LOG_DEBUG,
+	syslog(LOG_DEBUG,
 	    "%s: sending Router Solicitation", ifp->name);
 	if (sendmsg(ctx->nd_fd, &ctx->sndhdr, 0) == -1) {
-		logger(ifp->ctx, LOG_ERR,
-		    "%s: %s: sendmsg: %m", ifp->name, __func__);
+		syslog(LOG_ERR, "%s: %s: sendmsg: %m", ifp->name, __func__);
 		/* Allow IPv6ND to continue .... at most a few errors
 		 * would be logged.
 		 * Generally the error is ENOBUFS when struggling to
@@ -317,8 +317,7 @@ ipv6nd_sendrsprobe(void *arg)
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    RTR_SOLICITATION_INTERVAL, ipv6nd_sendrsprobe, ifp);
 	else {
-		logger(ifp->ctx, LOG_WARNING,
-		    "%s: no IPv6 Routers available", ifp->name);
+		syslog(LOG_WARNING, "%s: no IPv6 Routers available", ifp->name);
 		ipv6nd_drop(ifp);
 		dhcp6_dropnondelegates(ifp);
 	}
@@ -365,8 +364,7 @@ ipv6nd_reachable(struct ra *rap, int flags)
 
 	if (flags & IPV6ND_REACHABLE) {
 		if (rap->lifetime && rap->expired) {
-			logger(rap->iface->ctx, LOG_INFO,
-			    "%s: %s is reachable again",
+			syslog(LOG_INFO, "%s: %s is reachable again",
 			    rap->iface->name, rap->sfrom);
 			rap->expired = 0;
 			rt_build(rap->iface->ctx, AF_INET6);
@@ -375,7 +373,7 @@ ipv6nd_reachable(struct ra *rap, int flags)
 		}
 	} else {
 		if (rap->lifetime && !rap->expired) {
-			logger(rap->iface->ctx, LOG_WARNING,
+			syslog(LOG_WARNING,
 			    "%s: %s is unreachable, expiring it",
 			    rap->iface->name, rap->sfrom);
 			rap->expired = 1;
@@ -515,8 +513,7 @@ rtpref(struct ra *rap)
 	case ND_RA_FLAG_RTPREF_LOW:
 		return (RTPREF_LOW);
 	default:
-		logger(rap->iface->ctx, LOG_ERR,
-		    "rtpref: impossible RA flag %x", rap->flags);
+		syslog(LOG_ERR, "rtpref: impossible RA flag %x", rap->flags);
 		return (RTPREF_INVALID);
 	}
 	/* NOTREACHED */
@@ -553,10 +550,11 @@ ipv6nd_scriptrun(struct ra *rap)
 		{
 			hasaddress = 1;
 			if (!(ap->flags & IPV6_AF_DADCOMPLETED) &&
-			    ipv6_iffindaddr(ap->iface, &ap->addr, IN6_IFF_TENTATIVE))
+			    ipv6_iffindaddr(ap->iface, &ap->addr,
+			    IN6_IFF_TENTATIVE))
 				ap->flags |= IPV6_AF_DADCOMPLETED;
 			if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0) {
-				logger(ap->iface->ctx, LOG_DEBUG,
+				syslog(LOG_DEBUG,
 				    "%s: waiting for Router Advertisement"
 				    " DAD to complete",
 				    rap->iface->name);
@@ -580,8 +578,7 @@ ipv6nd_scriptrun(struct ra *rap)
 #if 0
 	else if (options & DHCPCD_DAEMONISE &&
 	    !(options & DHCPCD_DAEMONISED) && new_data)
-		logger(rap->iface->ctx, LOG_WARNING,
-		    "%s: did not fork due to an absent"
+		syslog(LOG_WARNING, "%s: did not fork due to an absent"
 		    " RDNSS option in the RA",
 		    ifp->name);
 }
@@ -633,7 +630,7 @@ ipv6nd_dadcallback(void *arg)
 	ap->flags |= IPV6_AF_DADCOMPLETED;
 	if (ap->flags & IPV6_AF_DUPLICATED) {
 		ap->dadcounter++;
-		logger(ifp->ctx, LOG_WARNING, "%s: DAD detected %s",
+		syslog(LOG_WARNING, "%s: DAD detected %s",
 		    ifp->name, ap->saddr);
 
 		/* Try and make another stable private address.
@@ -642,23 +639,22 @@ ipv6nd_dadcallback(void *arg)
 		/* XXX Cache DAD counter per prefix/id/ssid? */
 		if (ifp->options->options & DHCPCD_SLAACPRIVATE) {
 			if (ap->dadcounter >= IDGEN_RETRIES) {
-				logger(ifp->ctx, LOG_ERR,
-				    "%s: unable to obtain a"
+				syslog(LOG_ERR, "%s: unable to obtain a"
 				    " stable private address",
 				    ifp->name);
 				goto try_script;
 			}
-			logger(ifp->ctx, LOG_INFO, "%s: deleting address %s",
-				ifp->name, ap->saddr);
+			syslog(LOG_INFO, "%s: deleting address %s",
+			    ifp->name, ap->saddr);
 			if (if_address6(RTM_DELADDR, ap) == -1 &&
 			    errno != EADDRNOTAVAIL && errno != ENXIO)
-				logger(ifp->ctx, LOG_ERR, "if_address6: %m");
+				syslog(LOG_ERR, "if_address6: %m");
 			dadcounter = ap->dadcounter;
 			if (ipv6_makestableprivate(&ap->addr,
 			    &ap->prefix, ap->prefix_len,
 			    ifp, &dadcounter) == -1)
 			{
-				logger(ifp->ctx, LOG_ERR,
+				syslog(LOG_ERR,
 				    "%s: ipv6_makestableprivate: %m",
 				    ifp->name);
 				return;
@@ -704,7 +700,7 @@ try_script:
 			}
 
 			if (wascompleted && found) {
-				logger(rap->iface->ctx, LOG_DEBUG,
+				syslog(LOG_DEBUG,
 				    "%s: Router Advertisement DAD completed",
 				    rap->iface->name);
 				if (ipv6nd_scriptrun(rap))
@@ -751,34 +747,32 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 
 	if (ifp == NULL) {
 #ifdef DEBUG_RS
-		logger(ctx, LOG_DEBUG,
-		    "RA for unexpected interface from %s", ctx->sfrom);
+		syslog(LOG_DEBUG, "RA for unexpected interface from %s",
+		    ctx->sfrom);
 #endif
 		return;
 	}
 
 	if (len < sizeof(struct nd_router_advert)) {
-		logger(ctx, LOG_ERR,
-		    "IPv6 RA packet too short from %s", ctx->sfrom);
+		syslog(LOG_ERR, "IPv6 RA packet too short from %s", ctx->sfrom);
 		return;
 	}
 
 	/* RFC 4861 7.1.2 */
 	if (hoplimit != 255) {
-		logger(ctx, LOG_ERR,
-		    "invalid hoplimit(%d) in RA from %s", hoplimit, ctx->sfrom);
+		syslog(LOG_ERR, "invalid hoplimit(%d) in RA from %s",
+		    hoplimit, ctx->sfrom);
 		return;
 	}
 
 	if (!IN6_IS_ADDR_LINKLOCAL(&ctx->from.sin6_addr)) {
-		logger(ctx, LOG_ERR,
-		    "RA from non local address %s", ctx->sfrom);
+		syslog(LOG_ERR, "RA from non local address %s", ctx->sfrom);
 		return;
 	}
 
 	if (!(ifp->options->options & DHCPCD_IPV6RS)) {
 #ifdef DEBUG_RS
-		logger(ifp->ctx, LOG_DEBUG, "%s: unexpected RA from %s",
+		syslog(LOG_DEBUG, "%s: unexpected RA from %s",
 		    ifp->name, ctx->sfrom);
 #endif
 		return;
@@ -787,16 +781,15 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	/* We could receive a RA before we sent a RS*/
 	if (ipv6_linklocal(ifp) == NULL) {
 #ifdef DEBUG_RS
-		logger(ifp->ctx, LOG_DEBUG,
-		    "%s: received RA from %s (no link-local)",
+		syslog(LOG_DEBUG, "%s: received RA from %s (no link-local)",
 		    ifp->name, ctx->sfrom);
 #endif
 		return;
 	}
 
 	if (ipv6_iffindaddr(ifp, &ctx->from.sin6_addr, IN6_IFF_TENTATIVE)) {
-		logger(ifp->ctx, LOG_DEBUG,
-		    "%s: ignoring RA from ourself %s", ifp->name, ctx->sfrom);
+		syslog(LOG_DEBUG, "%s: ignoring RA from ourself %s",
+		    ifp->name, ctx->sfrom);
 		return;
 	}
 
@@ -823,7 +816,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	if (rap == NULL) {
 		rap = calloc(1, sizeof(*rap));
 		if (rap == NULL) {
-			logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
+			syslog(LOG_ERR, "%s: %m", __func__);
 			return;
 		}
 		rap->iface = ifp;
@@ -836,7 +829,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	if (rap->data_len == 0) {
 		rap->data = malloc(len);
 		if (rap->data == NULL) {
-			logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
+			syslog(LOG_ERR, "%s: %m", __func__);
 			if (new_rap)
 				free(rap);
 			return;
@@ -849,7 +842,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	 * routers like to decrease the advertised valid and preferred times
 	 * in accordance with the own prefix times which would result in too
 	 * much needless log spam. */
-	logger(ifp->ctx, new_rap ? LOG_INFO : LOG_DEBUG,
+	syslog(new_rap ? LOG_INFO : LOG_DEBUG,
 	    "%s: Router Advertisement from %s",
 	    ifp->name, ctx->sfrom);
 
@@ -876,20 +869,18 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	p = ((uint8_t *)icp) + sizeof(struct nd_router_advert);
 	for (; len > 0; p += olen, len -= olen) {
 		if (len < sizeof(ndo)) {
-			logger(ifp->ctx, LOG_ERR,
-			    "%s: short option", ifp->name);
+			syslog(LOG_ERR, "%s: short option", ifp->name);
 			break;
 		}
 		memcpy(&ndo, p, sizeof(ndo));
 		olen = (size_t)ndo.nd_opt_len * 8;
 		if (olen == 0) {
-			logger(ifp->ctx, LOG_ERR,
-			    "%s: zero length option", ifp->name);
+			syslog(LOG_ERR, "%s: zero length option", ifp->name);
 			break;
 		}
 		if (olen > len) {
-			logger(ifp->ctx, LOG_ERR,
-			    "%s: option length exceeds message", ifp->name);
+			syslog(LOG_ERR, "%s: option length exceeds message",
+			    ifp->name);
 			break;
 		}
 
@@ -904,11 +895,11 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 					break;
 			}
 			if (dho != NULL)
-				logger(ifp->ctx, LOG_WARNING,
+				syslog(LOG_WARNING,
 				    "%s: reject RA (option %s) from %s",
 				    ifp->name, dho->var, ctx->sfrom);
 			else
-				logger(ifp->ctx, LOG_WARNING,
+				syslog(LOG_WARNING,
 				    "%s: reject RA (option %d) from %s",
 				    ifp->name, ndo.nd_opt_type, ctx->sfrom);
 			if (new_rap)
@@ -924,31 +915,32 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 		switch (ndo.nd_opt_type) {
 		case ND_OPT_PREFIX_INFORMATION:
 			if (ndo.nd_opt_len != 4) {
-				logger(ifp->ctx, new_data ? LOG_ERR : LOG_DEBUG,
+				syslog(new_data ? LOG_ERR : LOG_DEBUG,
 				    "%s: invalid option len for prefix",
 				    ifp->name);
 				continue;
 			}
 			memcpy(&pi, p, sizeof(pi));
 			if (pi.nd_opt_pi_prefix_len > 128) {
-				logger(ifp->ctx, new_data ? LOG_ERR : LOG_DEBUG,
+				syslog(new_data ? LOG_ERR : LOG_DEBUG,
 				    "%s: invalid prefix len",
 				    ifp->name);
 				continue;
 			}
 			/* nd_opt_pi_prefix is not aligned. */
-			memcpy(&pi_prefix, &pi.nd_opt_pi_prefix, sizeof(pi_prefix));
+			memcpy(&pi_prefix, &pi.nd_opt_pi_prefix,
+			    sizeof(pi_prefix));
 			if (IN6_IS_ADDR_MULTICAST(&pi_prefix) ||
 			    IN6_IS_ADDR_LINKLOCAL(&pi_prefix))
 			{
-				logger(ifp->ctx, new_data ? LOG_ERR : LOG_DEBUG,
+				syslog(new_data ? LOG_ERR : LOG_DEBUG,
 				    "%s: invalid prefix in RA", ifp->name);
 				continue;
 			}
 			if (ntohl(pi.nd_opt_pi_preferred_time) >
 			    ntohl(pi.nd_opt_pi_valid_time))
 			{
-				logger(ifp->ctx, new_data ? LOG_ERR : LOG_DEBUG,
+				syslog(new_data ? LOG_ERR : LOG_DEBUG,
 				    "%s: pltime > vltime", ifp->name);
 				continue;
 			}
@@ -1043,7 +1035,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 				if (new_ap && ap->prefix_pltime) {
 					if (ipv6_createtempaddr(ap,
 					    &ap->acquired) == NULL)
-						logger(ap->iface->ctx, LOG_ERR,
+						syslog(LOG_ERR,
 						    "ipv6_createtempaddr: %m");
 				}
 			}
@@ -1054,7 +1046,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 			memcpy(&mtu, p, sizeof(mtu));
 			mtu.nd_opt_mtu_mtu = ntohl(mtu.nd_opt_mtu_mtu);
 			if (mtu.nd_opt_mtu_mtu < IPV6_MMTU) {
-				logger(ifp->ctx, LOG_ERR, "%s: invalid MTU %d",
+				syslog(LOG_ERR, "%s: invalid MTU %d",
 				    ifp->name, mtu.nd_opt_mtu_mtu);
 				break;
 			}
@@ -1079,7 +1071,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 		if (has_option_mask(ifp->options->requiremasknd,
 		    dho->option))
 		{
-			logger(ifp->ctx, LOG_WARNING,
+			syslog(LOG_WARNING,
 			    "%s: reject RA (no option %s) from %s",
 			    ifp->name, dho->var, ctx->sfrom);
 			if (new_rap)
@@ -1125,16 +1117,14 @@ handle_flag:
 #endif
 	if (rap->flags & ND_RA_FLAG_MANAGED) {
 		if (new_data && dhcp6_start(ifp, DH6S_INIT) == -1)
-			logger(ifp->ctx, LOG_DHCP6,
-			    "dhcp6_start: %s: %m", ifp->name);
+			syslog(LOG_DHCP6, "dhcp6_start: %s: %m", ifp->name);
 	} else if (rap->flags & ND_RA_FLAG_OTHER) {
 		if (new_data && dhcp6_start(ifp, DH6S_INFORM) == -1)
-			logger(ifp->ctx, LOG_DHCP6,
-			    "dhcp6_start: %s: %m", ifp->name);
+			syslog(LOG_DHCP6, "dhcp6_start: %s: %m", ifp->name);
 	} else {
 		if (new_data)
-			logger(ifp->ctx, LOG_DEBUG,
-			    "%s: No DHCPv6 instruction in RA", ifp->name);
+			syslog(LOG_DEBUG, "%s: No DHCPv6 instruction in RA",
+			    ifp->name);
 nodhcp6:
 		if (ifp->ctx->options & DHCPCD_TEST) {
 			eloop_exit(ifp->ctx->eloop, EXIT_SUCCESS);
@@ -1239,16 +1229,14 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 			snprintf(ndprefix, sizeof(ndprefix),
 			    "nd%zu", i);
 		if (env)
-			setvar(rap->iface->ctx, &env[n], ndprefix,
-			    "from", rap->sfrom);
+			setvar(&env[n], ndprefix, "from", rap->sfrom);
 		n++;
 		if (env)
-			setvard(rap->iface->ctx, &env[n], ndprefix,
-			    "acquired", (size_t)rap->acquired.tv_sec);
+			setvard(&env[n], ndprefix, "acquired",
+			    (size_t)rap->acquired.tv_sec);
 		n++;
 		if (env)
-			setvard(rap->iface->ctx, &env[n], ndprefix,
-			    "now", (size_t)now.tv_sec);
+			setvard(&env[n], ndprefix, "now", (size_t)now.tv_sec);
 		n++;
 
 		/* Zero our indexes */
@@ -1316,8 +1304,7 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 			j++;
 			if (env) {
 				snprintf(abuf, sizeof(abuf), "addr%zu", j);
-				setvar(rap->iface->ctx, &env[n], ndprefix,
-				    abuf, ia->saddr);
+				setvar(&env[n], ndprefix, abuf, ia->saddr);
 			}
 			n++;
 		}
@@ -1368,7 +1355,7 @@ ipv6nd_expirera(void *arg)
 			if (rap->lifetime == 0 || timespeccmp(&now, &expire, >))
 			{
 				if (!rap->expired) {
-					logger(ifp->ctx, LOG_WARNING,
+					syslog(LOG_WARNING,
 					    "%s: %s: router expired",
 					    ifp->name, rap->sfrom);
 					rap->expired = expired = 1;
@@ -1395,13 +1382,13 @@ ipv6nd_expirera(void *arg)
 			timespecadd(&ia->acquired, &lt, &expire);
 			if (timespeccmp(&now, &expire, >)) {
 				if (ia->flags & IPV6_AF_ADDED) {
-					logger(ia->iface->ctx, LOG_WARNING,
+					syslog(LOG_WARNING,
 					    "%s: expired address %s",
 					    ia->iface->name, ia->saddr);
 					if (if_address6(RTM_DELADDR, ia)== -1 &&
 					    errno != EADDRNOTAVAIL &&
 					    errno != ENXIO)
-						logger(ia->iface->ctx, LOG_ERR,
+						syslog(LOG_ERR,
 						    "if_address6: %m");
 				}
 				ia->prefix_vltime = ia->prefix_pltime = 0;
@@ -1485,22 +1472,22 @@ ipv6nd_handlena(struct dhcpcd_ctx *ctx, struct interface *ifp,
 
 	if (ifp == NULL) {
 #ifdef DEBUG_NS
-		logger(ctx, LOG_DEBUG, "NA for unexpected interface from %s",
+		syslog(LOG_DEBUG, "NA for unexpected interface from %s",
 		    ctx->sfrom);
 #endif
 		return;
 	}
 
 	if ((size_t)len < sizeof(struct nd_neighbor_advert)) {
-		logger(ifp->ctx, LOG_ERR, "%s: IPv6 NA too short from %s",
+		syslog(LOG_ERR, "%s: IPv6 NA too short from %s",
 		    ifp->name, ctx->sfrom);
 		return;
 	}
 
 	/* RFC 4861 7.1.2 */
 	if (hoplimit != 255) {
-		logger(ctx, LOG_ERR,
-		    "invalid hoplimit(%d) in NA from %s", hoplimit, ctx->sfrom);
+		syslog(LOG_ERR, "invalid hoplimit(%d) in NA from %s",
+		    hoplimit, ctx->sfrom);
 		return;
 	}
 
@@ -1513,7 +1500,7 @@ ipv6nd_handlena(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	/* nd_na->nd_na_target is not aligned. */
 	memcpy(&nd_na_target, &nd_na->nd_na_target, sizeof(nd_na_target));
 	if (IN6_IS_ADDR_MULTICAST(&nd_na_target)) {
-		logger(ifp->ctx, LOG_ERR, "%s: NA multicast address %s (%s)",
+		syslog(LOG_ERR, "%s: NA multicast address %s (%s)",
 		    ifp->name, taddr, ctx->sfrom);
 		return;
 	}
@@ -1525,20 +1512,20 @@ ipv6nd_handlena(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	}
 	if (rap == NULL) {
 #ifdef DEBUG_NS
-		logger(ifp->ctx, LOG_DEBUG, "%s: unexpected NA from %s for %s",
+		syslog(LOG_DEBUG, "%s: unexpected NA from %s for %s",
 		    ifp->name, ctx->sfrom, taddr);
 #endif
 		return;
 	}
 
 #ifdef DEBUG_NS
-	logger(ifp->ctx, LOG_DEBUG, "%s: %sNA for %s from %s",
+	syslog(LOG_DEBUG, "%s: %sNA for %s from %s",
 	    ifp->name, is_solicited ? "solicited " : "", taddr, ctx->sfrom);
 #endif
 
 	/* Node is no longer a router, so remove it from consideration */
 	if (!is_router && !rap->expired) {
-		logger(ifp->ctx, LOG_INFO, "%s: %s not a router (%s)",
+		syslog(LOG_INFO, "%s: %s not a router (%s)",
 		    ifp->name, taddr, ctx->sfrom);
 		rap->expired = 1;
 		rt_build(ifp->ctx,  AF_INET6);
@@ -1549,7 +1536,7 @@ ipv6nd_handlena(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	if (is_solicited && is_router && rap->lifetime) {
 		if (rap->expired) {
 			rap->expired = 0;
-			logger(ifp->ctx, LOG_INFO, "%s: %s reachable (%s)",
+			syslog(LOG_INFO, "%s: %s reachable (%s)",
 			    ifp->name, taddr, ctx->sfrom);
 			rt_build(ifp->ctx, AF_INET6);
 			script_runreason(rap->iface, "ROUTERADVERT"); /* XXX */
@@ -1573,7 +1560,7 @@ ipv6nd_handledata(void *arg)
 	    CMSG_SPACE(sizeof(int));
 	len = recvmsg_realloc(ctx->nd_fd, &ctx->rcvhdr, 0);
 	if (len == -1) {
-		logger(ctx, LOG_ERR, "recvmsg: %m");
+		syslog(LOG_ERR, "recvmsg: %m");
 		eloop_event_delete(ctx->eloop, ctx->nd_fd);
 		close(ctx->nd_fd);
 		ctx->nd_fd = -1;
@@ -1582,7 +1569,7 @@ ipv6nd_handledata(void *arg)
 	ctx->sfrom = inet_ntop(AF_INET6, &ctx->from.sin6_addr,
 	    ctx->ntopbuf, INET6_ADDRSTRLEN);
 	if ((size_t)len < sizeof(struct icmp6_hdr)) {
-		logger(ctx, LOG_ERR, "IPv6 ICMP packet too short from %s",
+		syslog(LOG_ERR, "IPv6 ICMP packet too short from %s",
 		    ctx->sfrom);
 		return;
 	}
@@ -1608,8 +1595,7 @@ ipv6nd_handledata(void *arg)
 	}
 
 	if (pkt.ipi6_ifindex == 0) {
-		logger(ctx, LOG_ERR,
-		    "IPv6 RA/NA did not contain index from %s",
+		syslog(LOG_ERR, "IPv6 RA/NA did not contain index from %s",
 		    ctx->sfrom);
 		return;
 	}
@@ -1637,7 +1623,7 @@ ipv6nd_handledata(void *arg)
 		}
 	}
 
-	logger(ctx, LOG_ERR, "invalid IPv6 type %d or code %d from %s",
+	syslog(LOG_ERR, "invalid IPv6 type %d or code %d from %s",
 	    icp->icmp6_type, icp->icmp6_code, ctx->sfrom);
 }
 
@@ -1647,9 +1633,9 @@ ipv6nd_startrs1(void *arg)
 	struct interface *ifp = arg;
 	struct rs_state *state;
 
-	logger(ifp->ctx, LOG_INFO, "%s: soliciting an IPv6 router", ifp->name);
+	syslog(LOG_INFO, "%s: soliciting an IPv6 router", ifp->name);
 	if (ipv6nd_open(ifp->ctx) == -1) {
-		logger(ifp->ctx, LOG_ERR, "%s: ipv6nd_open: %m", __func__);
+		syslog(LOG_ERR, "%s: ipv6nd_open: %m", __func__);
 		return;
 	}
 
@@ -1658,7 +1644,7 @@ ipv6nd_startrs1(void *arg)
 		ifp->if_data[IF_DATA_IPV6ND] = calloc(1, sizeof(*state));
 		state = RS_STATE(ifp);
 		if (state == NULL) {
-			logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
+			syslog(LOG_ERR, "%s: %m", __func__);
 			return;
 		}
 	}
@@ -1667,8 +1653,7 @@ ipv6nd_startrs1(void *arg)
 	 * address could have changed. */
 	ipv6nd_makersprobe(ifp);
 	if (state->rs == NULL) {
-		logger(ifp->ctx, LOG_ERR,
-		    "%s: ipv6ns_makersprobe: %m", __func__);
+		syslog(LOG_ERR, "%s: ipv6ns_makersprobe: %m", __func__);
 		return;
 	}
 
@@ -1691,7 +1676,7 @@ ipv6nd_startrs(struct interface *ifp)
 	tv.tv_nsec = (suseconds_t)arc4random_uniform(
 	    MAX_RTR_SOLICITATION_DELAY * NSEC_PER_SEC);
 	timespecnorm(&tv);
-	logger(ifp->ctx, LOG_DEBUG,
+	syslog(LOG_DEBUG,
 	    "%s: delaying IPv6 router solicitation for %0.1f seconds",
 	    ifp->name, timespec_to_double(&tv));
 	eloop_timeout_add_tv(ifp->ctx->eloop, &tv, ipv6nd_startrs1, ifp);

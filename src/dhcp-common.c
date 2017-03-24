@@ -34,6 +34,7 @@
 #include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #include <arpa/nameser.h> /* after normal includes for sunos */
@@ -920,7 +921,7 @@ dhcp_envoption(struct dhcpcd_ctx *ctx, char **env, const char *prefix,
 			    prefix, opt, 1, od, ol, ifname))
 				return 1;
 			else
-				logger(ctx, LOG_ERR, "%s: %s %d: %m",
+				syslog(LOG_ERR, "%s: %s %d: %m",
 				    ifname, __func__, opt->option);
 		}
 		return 0;
@@ -931,7 +932,7 @@ dhcp_envoption(struct dhcpcd_ctx *ctx, char **env, const char *prefix,
 		if (opt->type & OT_INDEX) {
 			if (opt->index > 999) {
 				errno = ENOBUFS;
-				logger(ctx, LOG_ERR, "%s: %m", __func__);
+				syslog(LOG_ERR, "%s: %m", __func__);
 				return 0;
 			}
 		}
@@ -939,7 +940,7 @@ dhcp_envoption(struct dhcpcd_ctx *ctx, char **env, const char *prefix,
 		    (opt->type & OT_INDEX ? 3 : 0);
 		pfx = malloc(e);
 		if (pfx == NULL) {
-			logger(ctx, LOG_ERR, "%s: %m", __func__);
+			syslog(LOG_ERR, "%s: %m", __func__);
 			return 0;
 		}
 		if (opt->type & OT_INDEX)
@@ -957,7 +958,7 @@ dhcp_envoption(struct dhcpcd_ctx *ctx, char **env, const char *prefix,
 		eo = dhcp_optlen(eopt, ol);
 		if (eo == -1) {
 			if (env == NULL)
-				logger(ctx, LOG_ERR,
+				syslog(LOG_ERR,
 				    "%s: %s %d.%d/%zu: "
 				    "malformed embedded option",
 				    ifname, __func__, opt->option,
@@ -972,7 +973,7 @@ dhcp_envoption(struct dhcpcd_ctx *ctx, char **env, const char *prefix,
 			 * option which is optional. */
 			if (env == NULL &&
 			    (ol != 0 || !(eopt->type & OT_OPTIONAL)))
-				logger(ctx, LOG_ERR,
+				syslog(LOG_ERR,
 				    "%s: %s %d.%d/%zu: missing embedded option",
 				    ifname, __func__, opt->option,
 				    eopt->option, i);
@@ -987,7 +988,7 @@ dhcp_envoption(struct dhcpcd_ctx *ctx, char **env, const char *prefix,
 			    pfx, eopt, ov, od, (size_t)eo, ifname))
 				n++;
 			else if (env == NULL)
-				logger(ctx, LOG_ERR,
+				syslog(LOG_ERR,
 				    "%s: %s %d.%d/%zu: %m",
 				    ifname, __func__,
 				    opt->option, eopt->option, i);

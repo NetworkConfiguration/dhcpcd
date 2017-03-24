@@ -42,7 +42,7 @@
 
 /* Don't set any optional arguments here so we retain POSIX
  * compatibility with getopt */
-#define IF_OPTS "146bc:de:f:gh:i:j:kl:m:no:pqr:s:t:u:v:wxy:z:" \
+#define IF_OPTS "146bc:de:f:gh:i:kl:m:no:pqr:s:t:u:v:wxy:z:" \
 		"ABC:DEF:GHI:JKLMNO:PQ:S:TUVW:X:Z:"
 #define NOERR_IF_OPTS		":" IF_OPTS
 
@@ -77,7 +77,7 @@
 #define DHCPCD_HOSTNAME			(1ULL << 18)
 #define DHCPCD_CLIENTID			(1ULL << 19)
 #define DHCPCD_LINK			(1ULL << 20)
-#define DHCPCD_QUIET			(1ULL << 21)
+// unused				(1ULL << 21)
 #define DHCPCD_BACKGROUND		(1ULL << 22)
 #define DHCPCD_VENDORRAW		(1ULL << 23)
 #define DHCPCD_NOWAITIP			(1ULL << 24) /* To force daemonise */

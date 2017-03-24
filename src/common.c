@@ -53,185 +53,11 @@
 #include "dhcpcd.h"
 #include "if-options.h"
 
-#ifndef _PATH_DEVNULL
-#  define _PATH_DEVNULL "/dev/null"
-#endif
-
 /* Most route(4) messages are less than 256 bytes. */
 #define IOVEC_BUFSIZ	256
 
-#if USE_LOGFILE
-void
-logger_open(struct dhcpcd_ctx *ctx)
-{
-
-	if (ctx->logfile) {
-		int f = O_CREAT | O_APPEND | O_TRUNC;
-
-#ifdef O_CLOEXEC
-		f |= O_CLOEXEC;
-#endif
-		ctx->log_fd = open(ctx->logfile, O_WRONLY | f, 0644);
-		if (ctx->log_fd == -1)
-			warn("open: %s", ctx->logfile);
-#ifndef O_CLOEXEC
-		else {
-			if ((f = fcntl(ctx->log_fd, F_GETFD)) == -1 ||
-			    fcntl(ctx->log_fd, F_SETFD, f | FD_CLOEXEC) == -1)
-				warn("fcntl: %s", ctx->logfile);
-		}
-#endif
-	} else
-		openlog(PACKAGE, LOG_PID, LOG_DAEMON);
-}
-
-void
-logger_close(struct dhcpcd_ctx *ctx)
-{
-
-	if (ctx->log_fd != -1) {
-		close(ctx->log_fd);
-		ctx->log_fd = -1;
-	}
-	closelog();
-}
-
-/*
- * NetBSD's gcc has been modified to check for the non standard %m in printf
- * like functions and warn noisily about it that they should be marked as
- * syslog like instead.
- * This is all well and good, but our logger also goes via vfprintf and
- * when marked as a sysloglike funcion, gcc will then warn us that the
- * function should be printflike instead!
- * This creates an infinte loop of gcc warnings.
- * Until NetBSD solves this issue, we have to disable a gcc diagnostic
- * for our fully standards compliant code in the logger function.
- */
-#if defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ > 5))
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmissing-format-attribute"
-#endif
-void
-logger(struct dhcpcd_ctx *ctx, int pri, const char *fmt, ...)
-{
-	va_list va;
-	int serrno;
-#ifndef HAVE_PRINTF_M
-	char fmt_cpy[1024];
-#endif
-
-	/* If we're printing the pidfile, don't do anything. */
-	if (ctx != NULL && ctx->options & DHCPCD_PRINT_PIDFILE)
-		return;
-
-	serrno = errno;
-	va_start(va, fmt);
-
-#ifndef HAVE_PRINTF_M
-	/* Print strerrno(errno) in place of %m */
-	if (ctx == NULL || !(ctx->options & DHCPCD_QUIET) || ctx->log_fd != -1)
-	{
-		const char *p;
-		char *fp = fmt_cpy, *serr = NULL;
-		size_t fmt_left = sizeof(fmt_cpy) - 1, fmt_wrote;
-
-		for (p = fmt; *p != '\0'; p++) {
-			if (p[0] == '%' && p[1] == '%') {
-				if (fmt_left < 2)
-					break;
-				*fp++ = '%';
-				*fp++ = '%';
-				fmt_left -= 2;
-				p++;
-			} else if (p[0] == '%' && p[1] == 'm') {
-				if (serr == NULL) {
-					/* strerror_r isn't portable.
-					 * strerror_l isn't widely found
-					 * and also problematic to use.
-					 * Also, if strerror_l exists then
-					 * strerror could easily be made
-					 * treadsafe in the same libc.
-					 * dhcpcd is only threaded in RTEMS
-					 * where strerror is threadsafe,
-					 * so this should be fine. */
-					serr = strerror(serrno);
-				}
-				fmt_wrote = strlcpy(fp, serr, fmt_left);
-				if (fmt_wrote > fmt_left)
-					break;
-				fp += fmt_wrote;
-				fmt_left -= fmt_wrote;
-				p++;
-			} else {
-				*fp++ = *p;
-				--fmt_left;
-			}
-			if (fmt_left == 0)
-				break;
-		}
-		*fp++ = '\0';
-		fmt = fmt_cpy;
-	}
-#endif
-
-	if ((ctx == NULL || !(ctx->options & DHCPCD_QUIET)) &&
-	    (pri < LOG_DEBUG || (ctx && ctx->options & DHCPCD_DEBUG)))
-	{
-		va_list vac;
-
-		va_copy(vac, va);
-#ifdef HAVE_PRINTF_M
-		errno = serrno;
-#endif
-		vfprintf(stderr, fmt, vac);
-		fputc('\n', stderr);
-		va_end(vac);
-	}
-
-	/* Don't send to syslog if dumping leases or testing */
-	if (ctx && ctx->options & (DHCPCD_DUMPLEASE | DHCPCD_TEST))
-		goto out;
-
-	if (ctx && ctx->log_fd != -1) {
-		if (pri < LOG_DEBUG || (ctx->options & DHCPCD_DEBUG)) {
-			struct timeval tv;
-			char buf[32];
-
-			/* Write the time, syslog style. month day time - */
-			if (gettimeofday(&tv, NULL) != -1) {
-				time_t now;
-				struct tm tmnow;
-
-				tzset();
-				now = tv.tv_sec;
-				localtime_r(&now, &tmnow);
-				strftime(buf, sizeof(buf), "%b %d %T ", &tmnow);
-				dprintf(ctx->log_fd, "%s", buf);
-			}
-
-#ifdef HAVE_PRINTF_M
-			errno = serrno;
-#endif
-			vdprintf(ctx->log_fd, fmt, va);
-			dprintf(ctx->log_fd, "\n");
-		}
-	} else {
-#ifdef HAVE_PRINTF_M
-		errno = serrno;
-#endif
-		vsyslog(pri, fmt, va);
-	}
-out:
-	va_end(va);
-}
-#endif
-#if defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ > 5))
-#pragma GCC diagnostic pop
-#endif
-
 ssize_t
-setvar(struct dhcpcd_ctx *ctx,
-    char **e, const char *prefix, const char *var, const char *value)
+setvar(char **e, const char *prefix, const char *var, const char *value)
 {
 	size_t len = strlen(var) + strlen(value) + 3;
 
@@ -239,7 +65,7 @@ setvar(struct dhcpcd_ctx *ctx,
 		len += strlen(prefix) + 1;
 	*e = malloc(len);
 	if (*e == NULL) {
-		logger(ctx, LOG_ERR, "%s: %m", __func__);
+		syslog(LOG_ERR, "%s: %m", __func__);
 		return -1;
 	}
 	if (prefix)
@@ -250,36 +76,33 @@ setvar(struct dhcpcd_ctx *ctx,
 }
 
 ssize_t
-setvard(struct dhcpcd_ctx *ctx,
-    char **e, const char *prefix, const char *var, size_t value)
+setvard(char **e, const char *prefix, const char *var, size_t value)
 {
 
 	char buffer[32];
 
 	snprintf(buffer, sizeof(buffer), "%zu", value);
-	return setvar(ctx, e, prefix, var, buffer);
+	return setvar(e, prefix, var, buffer);
 }
 
 ssize_t
-addvar(struct dhcpcd_ctx *ctx,
-    char ***e, const char *prefix, const char *var, const char *value)
+addvar(char ***e, const char *prefix, const char *var, const char *value)
 {
 	ssize_t len;
 
-	len = setvar(ctx, *e, prefix, var, value);
+	len = setvar(*e, prefix, var, value);
 	if (len != -1)
 		(*e)++;
 	return (ssize_t)len;
 }
 
 ssize_t
-addvard(struct dhcpcd_ctx *ctx,
-    char ***e, const char *prefix, const char *var, size_t value)
+addvard(char ***e, const char *prefix, const char *var, size_t value)
 {
 	char buffer[32];
 
 	snprintf(buffer, sizeof(buffer), "%zu", value);
-	return addvar(ctx, e, prefix, var, buffer);
+	return addvar(e, prefix, var, buffer);
 }
 
 const char *

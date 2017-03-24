@@ -38,6 +38,7 @@
 #include <spawn.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #include "config.h"
@@ -118,14 +119,14 @@ exec_script(const struct dhcpcd_ctx *ctx, char *const *argv, char *const *env)
 
 #ifdef INET
 static char *
-make_var(struct dhcpcd_ctx *ctx, const char *prefix, const char *var)
+make_var(const char *prefix, const char *var)
 {
 	size_t len;
 	char *v;
 
 	len = strlen(prefix) + strlen(var) + 2;
 	if ((v = malloc(len)) == NULL) {
-		logger(ctx, LOG_ERR, "%s: %m", __func__);
+		syslog(LOG_ERR, "%s: %m", __func__);
 		return NULL;
 	}
 	snprintf(v, len, "%s_%s", prefix, var);
@@ -134,7 +135,7 @@ make_var(struct dhcpcd_ctx *ctx, const char *prefix, const char *var)
 
 
 static int
-append_config(struct dhcpcd_ctx *ctx, char ***env, size_t *len,
+append_config(char ***env, size_t *len,
     const char *prefix, const char *const *config)
 {
 	size_t i, j, e1;
@@ -155,7 +156,7 @@ append_config(struct dhcpcd_ctx *ctx, char ***env, size_t *len,
 			    strncmp(ne[j] + strlen(prefix) + 1,
 			    config[i], e1) == 0)
 			{
-				p = make_var(ctx, prefix, config[i]);
+				p = make_var(prefix, config[i]);
 				if (p == NULL) {
 					ret = -1;
 					break;
@@ -167,14 +168,14 @@ append_config(struct dhcpcd_ctx *ctx, char ***env, size_t *len,
 		}
 		if (j == *len) {
 			j++;
-			p = make_var(ctx, prefix, config[i]);
+			p = make_var(prefix, config[i]);
 			if (p == NULL) {
 				ret = -1;
 				break;
 			}
 			nep = realloc(ne, sizeof(char *) * (j + 1));
 			if (nep == NULL) {
-				logger(ctx, LOG_ERR, "%s: %m", __func__);
+				syslog(LOG_ERR, "%s: %m", __func__);
 				free(p);
 				ret = -1;
 				break;
@@ -439,7 +440,7 @@ make_env(const struct interface *ifp, const char *reason, char ***argv)
 				goto eexit;
 			elen += (size_t)n;
 		}
-		if (append_config(ifp->ctx, &env, &elen, "old",
+		if (append_config(&env, &elen, "old",
 		    (const char *const *)ifo->config) == -1)
 			goto eexit;
 	}
@@ -495,7 +496,7 @@ dumplease:
 				goto eexit;
 			elen += (size_t)n;
 		}
-		if (append_config(ifp->ctx, &env, &elen, "new",
+		if (append_config(&env, &elen, "new",
 		    (const char *const *)ifo->config) == -1)
 			goto eexit;
 	}
@@ -571,7 +572,7 @@ dumplease:
 	return (ssize_t)elen;
 
 eexit:
-	logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
+	syslog(LOG_ERR, "%s: %m", __func__);
 	if (env) {
 		nenv = env;
 		while (*nenv)
@@ -683,19 +684,18 @@ script_runreason(const struct interface *ifp, const char *reason)
 	/* Make our env */
 	elen = (size_t)make_env(ifp, reason, &env);
 	if (elen == (size_t)-1) {
-		logger(ifp->ctx, LOG_ERR, "%s: make_env: %m", ifp->name);
+		syslog(LOG_ERR, "%s: make_env: %m", ifp->name);
 		return -1;
 	}
 
 	if (ifp->options->script &&
 	    (ifp->options->script[0] == '\0' ||
 	    strcmp(ifp->options->script, "/dev/null") == 0))
-	    	goto send_listeners;
+		goto send_listeners;
 
 	argv[0] = ifp->options->script ? ifp->options->script : UNCONST(SCRIPT);
 	argv[1] = NULL;
-	logger(ifp->ctx, LOG_DEBUG, "%s: executing `%s' %s",
-	    ifp->name, argv[0], reason);
+	syslog(LOG_DEBUG, "%s: executing `%s' %s", ifp->name, argv[0], reason);
 
 	/* Resize for PATH and RC_SVCNAME */
 	svcname = getenv(RC_SVCNAME);
@@ -735,23 +735,22 @@ script_runreason(const struct interface *ifp, const char *reason)
 
 	pid = exec_script(ifp->ctx, argv, env);
 	if (pid == -1)
-		logger(ifp->ctx, LOG_ERR, "%s: %s: %m", __func__, argv[0]);
+		syslog(LOG_ERR, "%s: %s: %m", __func__, argv[0]);
 	else if (pid != 0) {
 		/* Wait for the script to finish */
 		while (waitpid(pid, &status, 0) == -1) {
 			if (errno != EINTR) {
-				logger(ifp->ctx, LOG_ERR, "waitpid: %m");
+				syslog(LOG_ERR, "waitpid: %m");
 				status = 0;
 				break;
 			}
 		}
 		if (WIFEXITED(status)) {
 			if (WEXITSTATUS(status))
-				logger(ifp->ctx, LOG_ERR,
-				    "%s: %s: WEXITSTATUS %d",
+				syslog(LOG_ERR, "%s: %s: WEXITSTATUS %d",
 				    __func__, argv[0], WEXITSTATUS(status));
 		} else if (WIFSIGNALED(status))
-			logger(ifp->ctx, LOG_ERR, "%s: %s: %s",
+			syslog(LOG_ERR, "%s: %s: %s",
 			    __func__, argv[0], strsignal(WTERMSIG(status)));
 	}
 
@@ -766,14 +765,13 @@ send_listeners:
 			elen = (size_t)arraytostr((const char *const *)env,
 			    &bigenv);
 			if ((ssize_t)elen == -1) {
-				logger(ifp->ctx, LOG_ERR, "%s: arraytostr: %m",
+				syslog(LOG_ERR, "%s: arraytostr: %m",
 				    ifp->name);
 				    break;
 			}
 		}
 		if (control_queue(fd, bigenv, elen, 1) == -1)
-			logger(ifp->ctx, LOG_ERR,
-			    "%s: control_queue: %m", __func__);
+			syslog(LOG_ERR, "%s: control_queue: %m", __func__);
 		else
 			status = 1;
 	}
@@ -787,7 +785,7 @@ out:
 		free(*ep++);
 	free(env);
 	if (elen == 0) {
-		logger(ifp->ctx, LOG_ERR, "%s: malloc: %m", __func__);
+		syslog(LOG_ERR, "%s: malloc: %m", __func__);
 		return -1;
 	}
 	return WEXITSTATUS(status);

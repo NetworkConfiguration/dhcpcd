@@ -42,6 +42,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -100,15 +101,13 @@ duid_get(uint8_t **d, const struct interface *ifp)
 			*d = data;
 			return len;
 		}
-		logger(ifp->ctx, LOG_ERR,
-		    "DUID too big (max %u): %s", DUID_LEN, DUID);
+		syslog(LOG_ERR, "DUID too big (max %u): %s", DUID_LEN, DUID);
 		/* Keep the buffer, will assign below. */
 	} else {
 		if (errno != ENOENT)
-			logger(ifp->ctx, LOG_ERR,
-			    "error reading DUID: %s: %m", DUID);
+			syslog(LOG_ERR, "error reading DUID: %s: %m", DUID);
 		if ((data = malloc(DUID_LEN)) == NULL) {
-			logger(ifp->ctx, LOG_ERR, "%s: malloc: %m", __func__);
+			syslog(LOG_ERR, "%s: malloc: %m", __func__);
 			return 0;
 		}
 	}
@@ -118,26 +117,26 @@ duid_get(uint8_t **d, const struct interface *ifp)
 
 	/* No file? OK, lets make one based on our interface */
 	if (ifp->family == ARPHRD_NETROM) {
-		logger(ifp->ctx, LOG_WARNING,
-		    "%s: is a NET/ROM pseudo interface", ifp->name);
+		syslog(LOG_WARNING, "%s: is a NET/ROM pseudo interface",
+		    ifp->name);
 		TAILQ_FOREACH(ifp2, ifp->ctx->ifaces, next) {
 			if (ifp2->family != ARPHRD_NETROM)
 				break;
 		}
 		if (ifp2) {
 			ifp = ifp2;
-			logger(ifp->ctx, LOG_WARNING,
+			syslog(LOG_WARNING,
 			    "picked interface %s to generate a DUID",
 			    ifp->name);
 		} else {
-			logger(ifp->ctx, LOG_WARNING,
+			syslog(LOG_WARNING,
 			    "no interfaces have a fixed hardware address");
 			return duid_make(data, ifp, DUID_LL);
 		}
 	}
 
 	if (!(fp = fopen(DUID, "w"))) {
-		logger(ifp->ctx, LOG_ERR, "error writing DUID: %s: %m", DUID);
+		syslog(LOG_ERR, "error writing DUID: %s: %m", DUID);
 		return duid_make(data, ifp, DUID_LL);
 	}
 	len = duid_make(data, ifp, DUID_LLT);
@@ -146,7 +145,7 @@ duid_get(uint8_t **d, const struct interface *ifp)
 		x = -1;
 	/* Failed to write the duid? scrub it, we cannot use it */
 	if (x < 1) {
-		logger(ifp->ctx, LOG_ERR, "error writing DUID: %s: %m", DUID);
+		syslog(LOG_ERR, "error writing DUID: %s: %m", DUID);
 		unlink(DUID);
 		return duid_make(data, ifp, DUID_LL);
 	}

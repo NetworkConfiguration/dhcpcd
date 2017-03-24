@@ -31,7 +31,6 @@
 #include <sys/param.h>
 #include <sys/time.h>
 #include <stdio.h>
-#include <syslog.h>
 
 #include "config.h"
 #include "defs.h"
@@ -175,42 +174,10 @@ void get_line_free(void);
 extern int clock_monotonic;
 int get_monotonic(struct timespec *);
 
-/* We could shave a few k off the binary size by just using the
- * syslog(3) interface.
- * However, this results in a ugly output on the command line
- * and relies on syslogd(8) starting before dhcpcd which is not
- * always the case. */
-#ifdef SMALL
-# undef USE_LOGFILE
-# define USE_LOGFILE 0
-#endif
-#ifndef USE_LOGFILE
-# define USE_LOGFILE 1
-#endif
-#if USE_LOGFILE
-void logger_open(struct dhcpcd_ctx *);
-#define logger_mask(ctx, lvl) setlogmask((lvl))
-void logger(struct dhcpcd_ctx *, int, const char *, ...) __sysloglike(3, 4);
-void logger_close(struct dhcpcd_ctx *);
-#else
-#define logger_open(ctx) openlog(PACKAGE, LOG_PERROR | LOG_PID, LOG_DAEMON)
-#define logger_mask(ctx, lvl) setlogmask((lvl))
-#define logger(ctx, pri, fmt, ...)			\
-	do {						\
-		UNUSED((ctx));				\
-		syslog((pri), (fmt), ##__VA_ARGS__);	\
-	} while (0 /*CONSTCOND */)
-#define logger_close(ctx) closelog()
-#endif
-
-ssize_t setvar(struct dhcpcd_ctx *,
-    char **, const char *, const char *, const char *);
-ssize_t setvard(struct dhcpcd_ctx *,
-    char **, const char *, const char *, size_t);
-ssize_t addvar(struct dhcpcd_ctx *,
-    char ***, const char *, const char *, const char *);
-ssize_t addvard(struct dhcpcd_ctx *,
-    char ***, const char *, const char *, size_t);
+ssize_t setvar(char **, const char *, const char *, const char *);
+ssize_t setvard(char **, const char *, const char *, size_t);
+ssize_t addvar(char ***, const char *, const char *, const char *);
+ssize_t addvard(char ***, const char *, const char *, size_t);
 
 const char *hwaddr_ntoa(const void *, size_t, char *, size_t);
 size_t hwaddr_aton(uint8_t *, const char *);

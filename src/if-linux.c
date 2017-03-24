@@ -54,6 +54,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -1067,8 +1068,8 @@ _if_getssid_nl80211(__unused struct dhcpcd_ctx *ctx, struct interface *ifp,
 	    NLA_DATA(tb[NL80211_ATTR_BSS]),
 	    NLA_LEN(tb[NL80211_ATTR_BSS]),
 	    NL80211_BSS_STATUS) == -1)
-	    	return 0;
-		
+		return 0;
+
 	if (bss[NL80211_BSS_BSSID] == NULL || bss[NL80211_BSS_STATUS] == NULL)
 		return 0;
 
@@ -1643,8 +1644,8 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 		ifname = "all";
 	else if (own) {
 		if (if_disable_autolinklocal(ctx, ifp->index) == -1)
-			logger(ctx, LOG_DEBUG,
-			    "%s: if_disable_autolinklocal: %m", ifp->name);
+			syslog(LOG_DEBUG, "%s: if_disable_autolinklocal: %m",
+			    ifp->name);
 	}
 	if (ifp)
 		ifname = ifp->name;
@@ -1653,11 +1654,11 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 	ra = check_proc_int(path);
 	if (ra != 1) {
 		if (!own)
-			logger(ctx, LOG_WARNING,
-			    "%s: IPv6 kernel autoconf disabled", ifname);
+			syslog(LOG_WARNING, "%s: IPv6 kernel autoconf disabled",
+			    ifname);
 	} else if (ra != -1 && own) {
 		if (write_path(path, "0") == -1) {
-			logger(ctx, LOG_ERR, "write_path: %s: %m", path);
+			syslog(LOG_ERR, "write_path: %s: %m", path);
 			return -1;
 		}
 	}
@@ -1667,13 +1668,12 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 	if (ra == -1)
 		/* The sysctl probably doesn't exist, but this isn't an
 		 * error as such so just log it and continue */
-		logger(ctx, errno == ENOENT ? LOG_DEBUG : LOG_WARNING,
-		    "%s: %m", path);
+		syslog(errno == ENOENT ? LOG_DEBUG:LOG_WARNING, "%s: %m", path);
 	else if (ra != 0 && own) {
-		logger(ctx, LOG_DEBUG, "%s: disabling kernel IPv6 RA support",
+		syslog(LOG_DEBUG, "%s: disabling kernel IPv6 RA support",
 		    ifname);
 		if (write_path(path, "0") == -1) {
-			logger(ctx, LOG_ERR, "write_path: %s: %m", path);
+			syslog(LOG_ERR, "write_path: %s: %m", path);
 			return ra;
 		}
 		return 0;
