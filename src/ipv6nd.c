@@ -1025,7 +1025,6 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 #ifdef IPV6_MANAGETEMPADDR
 			/* RFC4941 Section 3.3.3 */
 			if (ap->flags & IPV6_AF_AUTOCONF &&
-			    ap->iface->options->options & DHCPCD_IPV6RA_OWN &&
 			    ip6_use_tempaddr(ap->iface->name))
 			{
 				if (!new_ap) {
