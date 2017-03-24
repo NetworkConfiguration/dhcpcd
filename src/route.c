@@ -31,6 +31,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #include "config.h"
@@ -57,7 +58,6 @@ rt_desc(const char *cmd, const struct rt *rt)
 {
 	char dest[INET_MAX_ADDRSTRLEN], gateway[INET_MAX_ADDRSTRLEN];
 	int prefix;
-	struct dhcpcd_ctx *ctx;
 	const char *ifname;
 	bool gateway_unspec;
 
@@ -65,7 +65,6 @@ rt_desc(const char *cmd, const struct rt *rt)
 	assert(rt != NULL);
 	assert(rt->rt_ifp != NULL);
 
-	ctx = rt->rt_ifp->ctx;
 	ifname = rt->rt_ifp->name;
 	sa_addrtop(&rt->rt_dest, dest, sizeof(dest));
 	prefix = sa_toprefix(&rt->rt_netmask);
@@ -75,27 +74,27 @@ rt_desc(const char *cmd, const struct rt *rt)
 
 	if (rt->rt_flags & RTF_HOST) {
 		if (gateway_unspec)
-			logger(ctx, LOG_INFO, "%s: %s host route to %s",
+			syslog(LOG_INFO, "%s: %s host route to %s",
 			    ifname, cmd, dest);
 		else
-			logger(ctx, LOG_INFO, "%s: %s host route to %s via %s",
+			syslog(LOG_INFO, "%s: %s host route to %s via %s",
 			    ifname, cmd, dest, gateway);
 	} else if (sa_is_unspecified(&rt->rt_dest) &&
 		   sa_is_unspecified(&rt->rt_netmask))
 	{
 		if (gateway_unspec)
-			logger(ctx, LOG_INFO, "%s: %s default route",
+			syslog(LOG_INFO, "%s: %s default route",
 			    ifname, cmd);
 		else
-			logger(ctx, LOG_INFO, "%s: %s default route via %s",
+			syslog(LOG_INFO, "%s: %s default route via %s",
 			    ifname, cmd, gateway);
 	} else if (gateway_unspec)
-		logger(ctx, LOG_INFO, "%s: %s%s route to %s/%d",
+		syslog(LOG_INFO, "%s: %s%s route to %s/%d",
 		    ifname, cmd,
 		    rt->rt_flags & RTF_REJECT ? " reject" : "",
 		    dest, prefix);
 	else
-		logger(ctx, LOG_INFO, "%s: %s%s route to %s/%d via %s",
+		syslog(LOG_INFO, "%s: %s%s route to %s/%d via %s",
 		    ifname, cmd,
 		    rt->rt_flags & RTF_REJECT ? " reject" : "",
 		    dest, prefix, gateway);
@@ -157,7 +156,7 @@ rt_new(struct interface *ifp)
 	if ((rt = TAILQ_FIRST(&ctx->froutes)) != NULL)
 		TAILQ_REMOVE(&ctx->froutes, rt, rt_next);
 	else if ((rt = malloc(sizeof(*rt))) == NULL) {
-		logger(ctx, LOG_ERR, "%s: %m", __func__);
+		syslog(LOG_ERR, "%s: %m", __func__);
 		return NULL;
 	}
 	memset(rt, 0, sizeof(*rt));
@@ -337,7 +336,7 @@ rt_add(struct rt *nrt, struct rt *ort)
 		if (if_route(RTM_CHANGE, nrt) != -1)
 			return true;
 		if (errno != ESRCH)
-			logger(ctx, LOG_ERR, "if_route (CHG): %m");
+			syslog(LOG_ERR, "if_route (CHG): %m");
 	}
 
 #ifdef HAVE_ROUTE_METRIC
@@ -346,7 +345,7 @@ rt_add(struct rt *nrt, struct rt *ort)
 	if (if_route(RTM_ADD, nrt) != -1) {
 		if (ort != NULL) {
 			if (if_route(RTM_DELETE, ort) == -1 && errno != ESRCH)
-				logger(ctx, LOG_ERR, "if_route (DEL): %m");
+				syslog(LOG_ERR, "if_route (DEL): %m");
 			rt_kfree(ort);
 		}
 		return true;
@@ -365,7 +364,7 @@ rt_add(struct rt *nrt, struct rt *ort)
 #endif
 	if (ort != NULL) {
 		if (if_route(RTM_DELETE, ort) == -1 && errno != ESRCH)
-			logger(ctx, LOG_ERR, "if_route (DEL): %m");
+			syslog(LOG_ERR, "if_route (DEL): %m");
 		else
 			rt_kfree(ort);
 	}
@@ -385,7 +384,7 @@ rt_add(struct rt *nrt, struct rt *ort)
 #ifdef HAVE_ROUTE_METRIC
 logerr:
 #endif
-	logger(ctx, LOG_ERR, "if_route (ADD): %m");
+	syslog(LOG_ERR, "if_route (ADD): %m");
 	return false;
 }
 
@@ -397,8 +396,7 @@ rt_delete(struct rt *rt)
 	rt_desc("deleting", rt);
 	retval = if_route(RTM_DELETE, rt) == -1 ? false : true;
 	if (!retval && errno != ENOENT && errno != ESRCH)
-		logger(rt->rt_ifp->ctx, LOG_ERR,
-		    "%s: if_delroute: %m", rt->rt_ifp->name);
+		syslog(LOG_ERR, "%s: if_delroute: %m", rt->rt_ifp->name);
 	/* Remove the route from our kernel table so we can add a
 	 * IPv4LL default route if possible. */
 	else

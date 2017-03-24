@@ -55,6 +55,7 @@
 #include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #define ELOOP_QUEUE 7
@@ -169,7 +170,7 @@ ipv6_readsecret(struct dhcpcd_ctx *ctx)
 		return (ssize_t)ctx->secret_len;
 
 	if (errno != ENOENT)
-		logger(ctx, LOG_ERR, "error reading secret: %s: %m", SECRET);
+		syslog(LOG_ERR, "error reading secret: %s: %m", SECRET);
 
 	/* Chaining arc4random should be good enough.
 	 * RFC7217 section 5.1 states the key SHOULD be at least 128 bits.
@@ -177,7 +178,7 @@ ipv6_readsecret(struct dhcpcd_ctx *ctx)
 	 * 512 bits (64 bytes). */
 	if (ctx->secret_len < 64) {
 		if ((ctx->secret = malloc(64)) == NULL) {
-			logger(ctx, LOG_ERR, "%s: malloc: %m", __func__);
+			syslog(LOG_ERR, "%s: malloc: %m", __func__);
 			return -1;
 		}
 		ctx->secret_len = 64;
@@ -204,7 +205,7 @@ ipv6_readsecret(struct dhcpcd_ctx *ctx)
 		return (ssize_t)ctx->secret_len;
 
 eexit:
-	logger(ctx, LOG_ERR, "error writing secret: %s: %m", SECRET);
+	syslog(LOG_ERR, "error writing secret: %s: %m", SECRET);
 	if (fp != NULL)
 		fclose(fp);
 	unlink(SECRET);
@@ -557,8 +558,7 @@ ipv6_checkaddrflags(void *arg)
 	alias = NULL;
 #endif
 	if ((flags = if_addrflags6(ia->iface, &ia->addr, alias)) == -1) {
-		logger(ia->iface->ctx, LOG_ERR,
-		    "%s: if_addrflags6: %m", ia->iface->name);
+		syslog(LOG_ERR, "%s: if_addrflags6: %m", ia->iface->name);
 		return;
 	}
 
@@ -584,12 +584,11 @@ ipv6_deleteaddr(struct ipv6_addr *ia)
 	struct ipv6_state *state;
 	struct ipv6_addr *ap;
 
-	logger(ia->iface->ctx, LOG_INFO, "%s: deleting address %s",
-	    ia->iface->name, ia->saddr);
+	syslog(LOG_INFO, "%s: deleting address %s", ia->iface->name, ia->saddr);
 	if (if_address6(RTM_DELADDR, ia) == -1 &&
 	    errno != EADDRNOTAVAIL && errno != ESRCH &&
 	    errno != ENXIO && errno != ENODEV)
-		logger(ia->iface->ctx, LOG_ERR, "if_address6: %m");
+		syslog(LOG_ERR, "if_address6: %m");
 
 	/* NOREJECT is set if we delegated exactly the prefix to another
 	 * address.
@@ -635,7 +634,7 @@ ipv6_addaddr1(struct ipv6_addr *ap, const struct timespec *now)
 	    ipv6_iffindaddr(ap->iface, &ap->addr, IN6_IFF_NOTUSEABLE))
 		ap->flags |= IPV6_AF_DADCOMPLETED;
 
-	logger(ap->iface->ctx, ap->flags & IPV6_AF_NEW ? LOG_INFO : LOG_DEBUG,
+	syslog(ap->flags & IPV6_AF_NEW ? LOG_INFO : LOG_DEBUG,
 	    "%s: adding %saddress %s", ap->iface->name,
 #ifdef IPV6_AF_TEMPORARY
 	    ap->flags & IPV6_AF_TEMPORARY ? "temporary " : "",
@@ -645,19 +644,18 @@ ipv6_addaddr1(struct ipv6_addr *ap, const struct timespec *now)
 	    ap->saddr);
 	if (ap->prefix_pltime == ND6_INFINITE_LIFETIME &&
 	    ap->prefix_vltime == ND6_INFINITE_LIFETIME)
-		logger(ap->iface->ctx, LOG_DEBUG,
-		    "%s: pltime infinity, vltime infinity",
+		syslog(LOG_DEBUG, "%s: pltime infinity, vltime infinity",
 		    ap->iface->name);
 	else if (ap->prefix_pltime == ND6_INFINITE_LIFETIME)
-		logger(ap->iface->ctx, LOG_DEBUG,
+		syslog(LOG_DEBUG,
 		    "%s: pltime infinity, vltime %"PRIu32" seconds",
 		    ap->iface->name, ap->prefix_vltime);
 	else if (ap->prefix_vltime == ND6_INFINITE_LIFETIME)
-		logger(ap->iface->ctx, LOG_DEBUG,
+		syslog(LOG_DEBUG,
 		    "%s: pltime %"PRIu32"seconds, vltime infinity",
 		    ap->iface->name, ap->prefix_pltime);
 	else
-		logger(ap->iface->ctx, LOG_DEBUG,
+		syslog(LOG_DEBUG,
 		    "%s: pltime %"PRIu32" seconds, vltime %"PRIu32" seconds",
 		    ap->iface->name, ap->prefix_pltime, ap->prefix_vltime);
 
@@ -686,13 +684,13 @@ ipv6_addaddr1(struct ipv6_addr *ap, const struct timespec *now)
 			ap->prefix_vltime -= (uint32_t)n.tv_sec;
 
 #if 0
-		logger(ap->iface->ctx, LOG_DEBUG,
+		syslog(LOG_DEBUG,
 		    "%s: acquired %lld.%.9ld, now %lld.%.9ld, diff %lld.%.9ld",
 		    ap->iface->name,
 		    (long long)ap->acquired.tv_sec, ap->acquired.tv_nsec,
 		    (long long)now->tv_sec, now->tv_nsec,
 		    (long long)n.tv_sec, n.tv_nsec);
-		logger(ap->iface->ctx, LOG_DEBUG,
+		syslog(LOG_DEBUG,
 		    "%s: adj pltime %"PRIu32" seconds, "
 		    "vltime %"PRIu32" seconds",
 		    ap->iface->name, ap->prefix_pltime, ap->prefix_vltime);
@@ -700,7 +698,7 @@ ipv6_addaddr1(struct ipv6_addr *ap, const struct timespec *now)
 	}
 
 	if (if_address6(RTM_NEWADDR, ap) == -1) {
-		logger(ap->iface->ctx, LOG_ERR, "if_addaddress6: %m");
+		syslog(LOG_ERR, "if_addaddress6: %m");
 		/* Restore real pltime and vltime */
 		ap->prefix_pltime = pltime;
 		ap->prefix_vltime = vltime;
@@ -836,8 +834,7 @@ ipv6_addaddr(struct ipv6_addr *ia, const struct timespec *now)
 	if ((replaced = ipv6_aliasaddr(ia, &replaced_ia)) == -1)
 		return -1;
 	if (blank)
-		logger(ia->iface->ctx, LOG_DEBUG, "%s: aliased %s",
-		    ia->alias, ia->saddr);
+		syslog(LOG_DEBUG, "%s: aliased %s", ia->alias, ia->saddr);
 #endif
 
 	if ((r = ipv6_addaddr1(ia, now)) == 0) {
@@ -920,22 +917,21 @@ ipv6_addaddrs(struct ipv6_addrhead *addrs)
 			    &ap->addr, IPV6_AF_ADDED);
 			if (apf && apf->iface != ap->iface) {
 				if (apf->iface->metric <= ap->iface->metric) {
-					logger(apf->iface->ctx, LOG_INFO,
+					syslog(LOG_INFO,
 					    "%s: preferring %s on %s",
 					    ap->iface->name,
 					    ap->saddr,
 					    apf->iface->name);
 					continue;
 				}
-				logger(apf->iface->ctx, LOG_INFO,
+				syslog(LOG_INFO,
 				    "%s: preferring %s on %s",
 				    apf->iface->name,
 				    ap->saddr,
 				    ap->iface->name);
 				if (if_address6(RTM_DELADDR, apf) == -1 &&
 				    errno != EADDRNOTAVAIL && errno != ENXIO)
-					logger(apf->iface->ctx, LOG_ERR,
-					    "if_address6: %m");
+					syslog(LOG_ERR, "if_address6: %m");
 				apf->flags &=
 				    ~(IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED);
 			} else if (apf)
@@ -1028,7 +1024,7 @@ ipv6_getstate(struct interface *ifp)
 	        ifp->if_data[IF_DATA_IPV6] = calloc(1, sizeof(*state));
 		state = IPV6_STATE(ifp);
 		if (state == NULL) {
-			logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
+			syslog(LOG_ERR, "%s: %m", __func__);
 			return NULL;
 		}
 		TAILQ_INIT(&state->addrs);
@@ -1059,7 +1055,7 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 
 	dbp = inet_ntop(AF_INET6, &addr->s6_addr,
 	    dbuf, INET6_ADDRSTRLEN);
-	logger(ctx, LOG_INFO, "%s: cmd %d addr %s",
+	syslog(LOG_INFO, "%s: cmd %d addr %s",
 	    ifname, cmd, dbp);
 #endif
 
@@ -1090,8 +1086,7 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 			const char *cbp;
 
 			if ((ia = calloc(1, sizeof(*ia))) == NULL) {
-				logger(ctx, LOG_ERR,
-				    "%s: calloc: %m", __func__);
+				syslog(LOG_ERR, "%s: calloc: %m", __func__);
 				break;
 			}
 #ifdef ALIAS_ADDR
@@ -1268,7 +1263,7 @@ ipv6_addlinklocalcallback(struct interface *ifp,
 	if (cb == NULL) {
 		cb = malloc(sizeof(*cb));
 		if (cb == NULL) {
-			logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
+			syslog(LOG_ERR, "%s: %m", __func__);
 			return -1;
 		}
 		cb->callback = callback;
@@ -1396,8 +1391,7 @@ nextslaacprivate:
 				return -1;
 			}
 
-			logger(ap2->iface->ctx, LOG_WARNING,
-			    "%s: waiting for %s to complete",
+			syslog(LOG_WARNING, "%s: waiting for %s to complete",
 			    ap2->iface->name, ap2->saddr);
 			free(ap);
 			errno =	EEXIST;
@@ -1477,10 +1471,10 @@ ipv6_staticdadcallback(void *arg)
 	wascompleted = (ia->flags & IPV6_AF_DADCOMPLETED);
 	ia->flags |= IPV6_AF_DADCOMPLETED;
 	if (ia->flags & IPV6_AF_DUPLICATED)
-		logger(ia->iface->ctx, LOG_WARNING, "%s: DAD detected %s",
-		    ia->iface->name, ia->saddr);
+		syslog(LOG_WARNING, "%s: DAD detected %s", ia->iface->name,
+		    ia->saddr);
 	else if (!wascompleted) {
-		logger(ia->iface->ctx, LOG_DEBUG, "%s: IPv6 static DAD completed",
+		syslog(LOG_DEBUG, "%s: IPv6 static DAD completed",
 		    ia->iface->name);
 	}
 
@@ -1514,10 +1508,11 @@ ipv6_env(char **env, const char *prefix, const struct interface *ifp)
 
 	ep = env;
 	n = 0;
-	ia = ipv6_iffindaddr(UNCONST(ifp), &ifp->options->req_addr6, IN6_IFF_NOTUSEABLE);
+	ia = ipv6_iffindaddr(UNCONST(ifp), &ifp->options->req_addr6,
+	    IN6_IFF_NOTUSEABLE);
 	if (ia) {
 		if (env)
-			addvar(ifp->ctx, &ep, prefix, "ip6_address", ia->saddr);
+			addvar(&ep, prefix, "ip6_address", ia->saddr);
 		n++;
 	}
 
@@ -1685,8 +1680,7 @@ ipv6_handleifa_addrs(int cmd,
 		switch (cmd) {
 		case RTM_DELADDR:
 			if (ia->flags & IPV6_AF_ADDED) {
-				logger(ia->iface->ctx, LOG_INFO,
-				    "%s: deleted address %s",
+				syslog(LOG_INFO, "%s: deleted address %s",
 				    ia->iface->name, ia->saddr);
 				ia->flags &= ~IPV6_AF_ADDED;
 			}
@@ -1830,15 +1824,14 @@ ipv6_tempdadcallback(void *arg)
 		struct timespec tv;
 
 		if (++ia->dadcounter == TEMP_IDGEN_RETRIES) {
-			logger(ia->iface->ctx, LOG_ERR,
+			syslog(LOG_ERR,
 			    "%s: too many duplicate temporary addresses",
 			    ia->iface->name);
 			return;
 		}
 		clock_gettime(CLOCK_MONOTONIC, &tv);
 		if ((ia1 = ipv6_createtempaddr(ia, &tv)) == NULL)
-			logger(ia->iface->ctx, LOG_ERR,
-			    "ipv6_createtempaddr: %m");
+			syslog(LOG_ERR, "ipv6_createtempaddr: %m");
 		else
 			ia1->dadcounter = ia->dadcounter;
 		ipv6_deleteaddr(ia);
@@ -2057,14 +2050,13 @@ ipv6_regentempaddr(void *arg)
 	struct ipv6_addr *ia = arg, *ia1;
 	struct timespec tv;
 
-	logger(ia->iface->ctx, LOG_DEBUG, "%s: regen temp addr %s",
-	    ia->iface->name, ia->saddr);
+	syslog(LOG_DEBUG, "%s: regen temp addr %s", ia->iface->name, ia->saddr);
 	clock_gettime(CLOCK_MONOTONIC, &tv);
 	ia1 = ipv6_createtempaddr(ia, &tv);
 	if (ia1)
 		ipv6_addaddr(ia1, &tv);
 	else
-		logger(ia->iface->ctx, LOG_ERR, "ipv6_createtempaddr: %m");
+		syslog(LOG_ERR, "ipv6_createtempaddr: %m");
 }
 
 static void
@@ -2131,7 +2123,7 @@ inet6_makeprefix(struct interface *ifp, const struct ra *rap,
 				break;
 		}
 		if (lo0 == NULL)
-			logger(ifp->ctx, LOG_WARNING,
+			syslog(LOG_WARNING,
 			    "cannot find a loopback interface to reject via");
 		else
 			ifp = lo0;

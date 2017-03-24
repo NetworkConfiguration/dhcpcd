@@ -58,6 +58,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <unistd.h>
 #include <fcntl.h>
 
@@ -224,7 +225,7 @@ static void if_learnaddrs(struct dhcpcd_ctx *ctx, struct if_head *ifs,
 			    ifa->ifa_name);
 			if (addrflags == -1) {
 				if (errno != EEXIST)
-					logger(ctx, LOG_ERR,
+					syslog(LOG_ERR,
 					    "%s: if_addrflags: %s: %m",
 					    __func__,
 					    inet_ntoa(addr->sin_addr));
@@ -251,7 +252,7 @@ static void if_learnaddrs(struct dhcpcd_ctx *ctx, struct if_head *ifs,
 			    ifa->ifa_name);
 			if (addrflags == -1) {
 				if (errno != EEXIST)
-					logger(ctx, LOG_ERR,
+					syslog(LOG_ERR,
 					    "%s: if_addrflags6:  %m", __func__);
 				continue;
 			}
@@ -360,7 +361,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		}
 
 		if (if_vimaster(ctx, spec.devname) == 1) {
-			logger(ctx, argc ? LOG_ERR : LOG_DEBUG,
+			syslog(argc ? LOG_ERR : LOG_DEBUG,
 			    "%s: is a Virtual Interface Master, skipping",
 			    spec.devname);
 			continue;
@@ -368,7 +369,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 
 		ifp = calloc(1, sizeof(*ifp));
 		if (ifp == NULL) {
-			logger(ctx, LOG_ERR, "%s: %m", __func__);
+			syslog(LOG_ERR, "%s: %m", __func__);
 			break;
 		}
 		ifp->ctx = ctx;
@@ -412,7 +413,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 				    ctx->ifac == 0 && active &&
 				    !if_hasconf(ctx, ifp->name))
 				{
-					logger(ifp->ctx, LOG_DEBUG,
+					syslog(LOG_DEBUG,
 					    "%s: ignoring due to"
 					    " interface type and"
 					    " no config",
@@ -447,7 +448,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 				    !if_hasconf(ctx, ifp->name))
 					active = IF_INACTIVE;
 				if (active)
-					logger(ifp->ctx, LOG_WARNING,
+					syslog(LOG_WARNING,
 					    "%s: unsupported"
 					    " interface type %.2x",
 					    ifp->name, sdl->sdl_type);
@@ -493,7 +494,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 #ifndef AF_LINK
 			default:
 				if (active)
-					logger(ifp->ctx, LOG_WARNING,
+					syslog(LOG_WARNING,
 					    "%s: unsupported"
 					    " interface family %.2x",
 					    ifp->name, ifp->family);
@@ -505,8 +506,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		if (!(ctx->options & (DHCPCD_DUMPLEASE | DHCPCD_TEST))) {
 			/* Handle any platform init for the interface */
 			if (active != IF_INACTIVE && if_init(ifp) == -1) {
-				logger(ifp->ctx, LOG_ERR, "%s: if_init: %m",
-				    ifp->name);
+				syslog(LOG_ERR, "%s: if_init: %m", ifp->name);
 				if_free(ifp);
 				continue;
 			}
@@ -515,8 +515,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 			if (if_getmtu(ifp) < MTU_MIN && active &&
 			    if_setmtu(ifp, MTU_MIN) == -1)
 			{
-				logger(ifp->ctx, LOG_ERR,
-				    "%s: if_setmtu: %m", ifp->name);
+				syslog(LOG_ERR, "%s: if_setmtu: %m", ifp->name);
 				if_free(ifp);
 				continue;
 			}

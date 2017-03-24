@@ -48,6 +48,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 
 #include "common.h"
 #include "arp.h"
@@ -149,7 +150,7 @@ bpf_open(struct interface *ifp, int (*filter)(struct interface *, int))
 		goto eexit;
 	if (pv.bv_major != BPF_MAJOR_VERSION ||
 	    pv.bv_minor < BPF_MINOR_VERSION) {
-		logger(ifp->ctx, LOG_ERR, "BPF version mismatch - recompile");
+		syslog(LOG_ERR, "BPF version mismatch - recompile");
 		goto eexit;
 	}
 
@@ -464,7 +465,7 @@ bpf_arp(struct interface *ifp, int fd)
 		TAILQ_FOREACH(astate, &state->arp_states, next) {
 			if (++naddrs > ARP_ADDRS_MAX) {
 				errno = ENOBUFS;
-				logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
+				syslog(LOG_ERR, "%s: %m", __func__);
 				break;
 			}
 			BPF_SET_JUMP(bp, BPF_JMP + BPF_JEQ + BPF_K,
