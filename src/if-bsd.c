@@ -1270,17 +1270,10 @@ af_attach(int s, const struct interface *ifp, int af)
 
 #ifdef SIOCGIFXFLAGS
 static int
-set_ifxflags(int s, const struct interface *ifp, int own)
+set_ifxflags(int s, const struct interface *ifp)
 {
 	struct ifreq ifr;
 	int flags;
-
-#ifndef IFXF_NOINET6
-	/* No point in removing the no inet6 flag if it doesn't
-	 * exist and we're not owning inet6. */
-	if (! own)
-		return 0;
-#endif
 
 	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
 	if (ioctl(s, SIOCGIFXFLAGS, (void *)&ifr) == -1)
@@ -1289,10 +1282,14 @@ set_ifxflags(int s, const struct interface *ifp, int own)
 #ifdef IFXF_NOINET6
 	flags &= ~IFXF_NOINET6;
 #endif
-	if (own)
+	if (!(ifp->ctx->options & DHCPCD_TEST))
 		flags &= ~IFXF_AUTOCONF6;
 	if (ifr.ifr_flags == flags)
 		return 0;
+	if (ifp->ctx->options & DHCPCD_TEST) {
+		errno = EPERM;
+		return -1;
+	}
 	ifr.ifr_flags = flags;
 	return ioctl(s, SIOCSIFXFLAGS, (void *)&ifr);
 }
@@ -1381,7 +1378,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp)
 #endif
 
 #ifdef SIOCGIFXFLAGS
-		if (set_ifxflags(s, ifp, own) == -1) {
+		if (set_ifxflags(s, ifp) == -1) {
 			syslog(LOG_ERR, "%s: set_ifxflags: %m", ifp->name);
 			return -1;
 		}
