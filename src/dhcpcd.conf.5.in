@@ -406,14 +406,6 @@ RDNSS option and a valid prefix or no DHCPv6 instruction.
 Set this option so to make
 .Nm dhcpcd
 always fork on an RA.
-.It Ic ipv6ra_own
-Disables kernel IPv6 Router Advertisement processing so dhcpcd can manage
-addresses and routes.
-.It Ic ipv6ra_own_default
-Each time dhcpcd receives an IPv6 Router Adveristment, dhcpcd will manage
-the default route only.
-This allows dhcpcd to prefer an interface for outbound traffic based on metric
-and/or user selection rather than the kernel.
 .It Ic ipv6rs
 Enables IPv6 Router Advertisement solicitation.
 This is on by default, but is documented here in the case where it is disabled

@@ -1634,7 +1634,7 @@ if_disable_autolinklocal(struct dhcpcd_ctx *ctx, unsigned int ifindex)
 static const char *prefix = "/proc/sys/net/ipv6/conf";
 
 int
-if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
+if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp)
 {
 	const char *ifname;
 	int ra;
@@ -1642,7 +1642,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 
 	if (ifp == NULL)
 		ifname = "all";
-	else if (own) {
+	else if (!(ctx->options & DHCPCD_TEST)) {
 		if (if_disable_autolinklocal(ctx, ifp->index) == -1)
 			syslog(LOG_DEBUG, "%s: if_disable_autolinklocal: %m",
 			    ifp->name);
@@ -1653,10 +1653,10 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 	snprintf(path, sizeof(path), "%s/%s/autoconf", prefix, ifname);
 	ra = check_proc_int(path);
 	if (ra != 1) {
-		if (!own)
+		if (ctx->options & DHCPCD_TEST)
 			syslog(LOG_WARNING, "%s: IPv6 kernel autoconf disabled",
 			    ifname);
-	} else if (ra != -1 && own) {
+	} else if (ra != -1 && !(ctx->options & DHCPCD_TEST)) {
 		if (write_path(path, "0") == -1) {
 			syslog(LOG_ERR, "write_path: %s: %m", path);
 			return -1;
@@ -1669,7 +1669,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp, int own)
 		/* The sysctl probably doesn't exist, but this isn't an
 		 * error as such so just log it and continue */
 		syslog(errno == ENOENT ? LOG_DEBUG:LOG_WARNING, "%s: %m", path);
-	else if (ra != 0 && own) {
+	else if (ra != 0 && !(ctx->options & DHCPCD_TEST)) {
 		syslog(LOG_DEBUG, "%s: disabling kernel IPv6 RA support",
 		    ifname);
 		if (write_path(path, "0") == -1) {

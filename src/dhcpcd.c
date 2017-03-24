@@ -441,10 +441,6 @@ configure_interface1(struct interface *ifp)
 		ifo->options &=
 		    ~(DHCPCD_IPV6RS | DHCPCD_DHCP6 | DHCPCD_WAITIP6);
 
-	if (ifo->options & DHCPCD_SLAACPRIVATE &&
-	    !(ifp->ctx->options & (DHCPCD_DUMPLEASE | DHCPCD_TEST)))
-		ifo->options |= DHCPCD_IPV6RA_OWN;
-
 	/* We want to disable kernel interface RA as early as possible. */
 	if (ifo->options & DHCPCD_IPV6 &&
 	    !(ifp->ctx->options & DHCPCD_DUMPLEASE))
@@ -452,15 +448,10 @@ configure_interface1(struct interface *ifp)
 		/* If not doing any DHCP, disable the RDNSS requirement. */
 		if (!(ifo->options & (DHCPCD_DHCP | DHCPCD_DHCP6)))
 			ifo->options &= ~DHCPCD_IPV6RA_REQRDNSS;
-		ra_global = if_checkipv6(ifp->ctx, NULL,
-		    ifp->ctx->options & DHCPCD_IPV6RA_OWN ? 1 : 0);
-		ra_iface = if_checkipv6(ifp->ctx, ifp,
-		    ifp->options->options & DHCPCD_IPV6RA_OWN ? 1 : 0);
+		ra_global = if_checkipv6(ifp->ctx, NULL);
+		ra_iface = if_checkipv6(ifp->ctx, ifp);
 		if (ra_global == -1 || ra_iface == -1)
 			ifo->options &= ~DHCPCD_IPV6RS;
-		else if (ra_iface == 0 &&
-		    !(ifp->ctx->options & DHCPCD_TEST))
-			ifo->options |= DHCPCD_IPV6RA_OWN;
 	}
 
 	if (!(ifo->options & DHCPCD_IAID)) {
@@ -759,8 +750,7 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 			ipv6nd_expire(ifp, RTR_CARRIER_EXPIRE);
 #endif
 			/* RFC4941 Section 3.5 */
-			if (ifp->options->options & DHCPCD_IPV6RA_OWN)
-				ipv6_gentempifid(ifp);
+			ipv6_gentempifid(ifp);
 			dhcpcd_startinterface(ifp);
 		}
 	}

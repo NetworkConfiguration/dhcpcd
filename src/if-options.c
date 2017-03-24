@@ -64,8 +64,8 @@
 #define O_IPV6RS		O_BASE + 4
 #define O_NOIPV6RS		O_BASE + 5
 #define O_IPV6RA_FORK		O_BASE + 6
-#define O_IPV6RA_OWN		O_BASE + 7
-#define O_IPV6RA_OWN_D		O_BASE + 8
+// unused			O_BASE + 7
+// unused			O_BASE + 8
 #define O_NOALIAS		O_BASE + 9
 #define O_IA_NA			O_BASE + 10
 #define O_IA_TA			O_BASE + 11
@@ -167,8 +167,6 @@ const struct option cf_options[] = {
 	{"ipv6ra_autoconf", no_argument,       NULL, O_IPV6RA_AUTOCONF},
 	{"ipv6ra_noautoconf", no_argument,     NULL, O_IPV6RA_NOAUTOCONF},
 	{"ipv6ra_fork",     no_argument,       NULL, O_IPV6RA_FORK},
-	{"ipv6ra_own",      no_argument,       NULL, O_IPV6RA_OWN},
-	{"ipv6ra_own_default", no_argument,    NULL, O_IPV6RA_OWN_D},
 	{"ipv4",            no_argument,       NULL, O_IPV4},
 	{"noipv4",          no_argument,       NULL, O_NOIPV4},
 	{"ipv6",            no_argument,       NULL, O_IPV6},
@@ -1278,12 +1276,6 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		break;
 	case O_IPV6RA_FORK:
 		ifo->options &= ~DHCPCD_IPV6RA_REQRDNSS;
-		break;
-	case O_IPV6RA_OWN:
-		ifo->options |= DHCPCD_IPV6RA_OWN;
-		break;
-	case O_IPV6RA_OWN_D:
-		ifo->options |= DHCPCD_IPV6RA_OWN_DEFAULT;
 		break;
 	case O_IPV6RA_AUTOCONF:
 		ifo->options |= DHCPCD_IPV6RA_AUTOCONF;
