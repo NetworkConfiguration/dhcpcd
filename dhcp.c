@@ -3224,7 +3224,7 @@ dhcp_readpacket(void *arg)
 		}
 		dhcp_handlepacket(ifp, buf, (size_t)bytes, flags);
 		/* Check we still have a state after processing. */
-		if ((state = D_CSTATE(ifp)) == NULL || state->bpf_fd == -1)
+		if ((state = D_CSTATE(ifp)) == NULL || state->raw_fd == -1)
 			break;
 	}
 }
