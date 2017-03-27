@@ -204,6 +204,9 @@ arp_read(void *arg)
 			return;
 		}
 		arp_packet(ifp, buf, (size_t)bytes);
+		/* Check we still have a state after processing. */
+		if ((state = ARP_CSTATE(ifp)) == NULL || state->fd == -1)
+			break;
 	}
 }
 
