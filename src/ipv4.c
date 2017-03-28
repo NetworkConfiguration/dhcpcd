@@ -299,7 +299,6 @@ inet_dhcproutes(struct rt_head *routes, struct interface *ifp)
 	/* If configured, Install a gateway to the desintion
 	 * for P2P interfaces. */
 	if (ifp->flags & IFF_POINTOPOINT &&
-	    ifp->options->options & DHCPCD_GATEWAY &&
 	    has_option_mask(ifp->options->dstmask, DHO_ROUTER))
 	{
 		if ((rt = rt_new(ifp)) == NULL)
@@ -432,10 +431,8 @@ inet_getroutes(struct dhcpcd_ctx *ctx, struct rt_head *routes)
 			return false;
 		if (ipv4ll_subnetroute(routes, ifp) == -1)
 			return false;
-		if (ifp->options->options & DHCPCD_GATEWAY) {
-			if (inet_routerhostroute(routes, ifp) == -1)
-				return false;
-		}
+		if (inet_routerhostroute(routes, ifp) == -1)
+			return false;
 	}
 
 	/* If there is no default route, see if we can use an IPv4LL one. */
@@ -445,7 +442,6 @@ inet_getroutes(struct dhcpcd_ctx *ctx, struct rt_head *routes)
 	if (!have_default) {
 		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 			if (ifp->active &&
-			    ifp->options->options & DHCPCD_GATEWAY &&
 			    ipv4ll_defaultroute(routes, ifp) == 1)
 				break;
 		}
