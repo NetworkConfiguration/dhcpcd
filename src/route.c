@@ -277,18 +277,9 @@ rt_add(struct rt *nrt, struct rt *ort)
 {
 	struct dhcpcd_ctx *ctx;
 	bool change;
-	unsigned long long options;
 
 	assert(nrt != NULL);
 	ctx = nrt->rt_ifp->ctx;
-
-	/* Don't set default routes if not asked to */
-	options = nrt->rt_ifp->options == NULL ?
-	    ctx->options : nrt->rt_ifp->options->options;
-	if (!(options & DHCPCD_GATEWAY) &&
-	    sa_is_unspecified(&nrt->rt_dest) &&
-	    sa_is_unspecified(&nrt->rt_netmask))
-		return false;
 
 	rt_desc(ort == NULL ? "adding" : "changing", nrt);
 
