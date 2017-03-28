@@ -49,29 +49,19 @@
 
 #ifndef htonll
 #if (BYTE_ORDER == LITTLE_ENDIAN)
-static inline uint64_t
-htonll(uint64_t x)
-{
-
-	return (uint64_t)htonl((uint32_t)(x >> 32)) |
-	    (uint64_t)htonl((uint32_t)(x & 0xffffffff)) << 32;
-}
+#define	htonll(x)	((uint64_t)htonl((uint32_t)((x) >> 32)) | \
+			 (uint64_t)htonl((uint32_t)((x) & 0xffffffff)) << 32)
 #else	/* (BYTE_ORDER == LITTLE_ENDIAN) */
-#define htonll(x) (x)
+#define	htonll(x)	(x)
 #endif
 #endif  /* htonll */
 
 #ifndef ntohll
 #if (BYTE_ORDER == LITTLE_ENDIAN)
-static inline uint64_t
-ntohll(uint64_t x)
-{
-
-	return (uint64_t)ntohl((uint32_t)(x >> 32)) |
-	    (uint64_t)ntohl((uint32_t)(x & 0xffffffff)) << 32;
-}
+#define	ntohll(x)	((uint64_t)ntohl((uint32_t)((x) >> 32)) | \
+			 (uint64_t)ntohl((uint32_t)((x) & 0xffffffff)) << 32)
 #else	/* (BYTE_ORDER == LITTLE_ENDIAN) */
-#define ntohll(x) (x)
+#define	ntohll(x)	(x)
 #endif
 #endif  /* ntohll */
 
