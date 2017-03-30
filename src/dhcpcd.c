@@ -1163,15 +1163,19 @@ static void
 dhcpcd_ifrenew(struct interface *ifp)
 {
 
-#define DHCPCD_RARENEW (DHCPCD_IPV6 | DHCPCD_IPV6RS)
+	if (!ifp->active)
+		return;
+
 	if (ifp->options->options & DHCPCD_LINK &&
-	    ifp->carrier != LINK_DOWN)
-	{
-		dhcp_renew(ifp);
-		if ((ifp->options->options & DHCPCD_RARENEW) == DHCPCD_RARENEW)
-			ipv6nd_startrs(ifp);
-		dhcp6_renew(ifp);
-	}
+	    ifp->carrier == LINK_DOWN)
+		return;
+
+	syslog(LOG_INFO, "%s: renewing", ifp->name);
+	dhcp_renew(ifp);
+#define DHCPCD_RARENEW (DHCPCD_IPV6 | DHCPCD_IPV6RS)
+	if ((ifp->options->options & DHCPCD_RARENEW) == DHCPCD_RARENEW)
+		ipv6nd_startrs(ifp);
+	dhcp6_renew(ifp);
 }
 
 static void
