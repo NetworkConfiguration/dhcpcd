@@ -110,6 +110,7 @@ exec_script(const struct dhcpcd_ctx *ctx, char *const *argv, char *const *env)
 #endif
 	errno = 0;
 	r = posix_spawn(&pid, argv[0], NULL, &attr, argv, env);
+	posix_spawnattr_destroy(&attr);
 	if (r) {
 		errno = r;
 		return -1;
