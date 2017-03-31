@@ -266,7 +266,7 @@ rt_recvrt(int cmd, const struct rt *rt)
 		break;
 	}
 
-#ifdef HAVE_ROUTE_METRIC
+#if defined(INET) && defined(HAVE_ROUTE_METRIC)
 	if (rt->rt_dest.sa_family == AF_INET)
 		ipv4ll_recvrt(cmd, rt);
 #endif
