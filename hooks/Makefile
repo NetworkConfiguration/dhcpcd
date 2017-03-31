@@ -1,8 +1,8 @@
 TOP?=	../
 include ${TOP}/iconfig.mk
 
-SCRIPT=		dhcpcd-run-hooks
-SCRIPTDIR=	${LIBEXECDIR}
+PROG=		dhcpcd-run-hooks
+BINDIR=		${LIBEXECDIR}
 CLEANFILES=	dhcpcd-run-hooks
 MAN8=		dhcpcd-run-hooks.8
 CLEANFILES+=	dhcpcd-run-hooks.8
@@ -31,16 +31,16 @@ FILES+=		${EGHOOKSCRIPTS}
 		-e 's:@YPDOMAIN_SUFFIX@:${YPDOMAIN_SUFFIX}:g' \
 		$< > $@
 
-all: ${SCRIPT} ${MAN8} ${SCRIPTS} ${EGHOOKSCRIPTS}
+all: ${PROG} ${MAN8} ${SCRIPTS} ${EGHOOKSCRIPTS}
 
 clean:
 	rm -f ${CLEANFILES} 50-ypbind
 
 depend:
 
-proginstall: ${HOOKSCRIPTS}
-	${INSTALL} -d ${DESTDIR}${SCRIPTDIR}
-	${INSTALL} -m ${BINMODE} ${SCRIPT} ${DESTDIR}${SCRIPTDIR}
+proginstall: ${PROG} ${HOOKSCRIPTS}
+	${INSTALL} -d ${DESTDIR}${BINDIR}
+	${INSTALL} -m ${BINMODE} ${PROG} ${DESTDIR}${BINDIR}
 	${INSTALL} -d ${DESTDIR}${SCRIPTSDIR}
 	${INSTALL} -m ${NONBINMODE} ${SCRIPTS} ${DESTDIR}${SCRIPTSDIR}
 	# We need to remove the old MTU change script if we at all can.

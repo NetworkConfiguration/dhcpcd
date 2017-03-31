@@ -29,8 +29,6 @@ CLEANFILES=	dhcpcd.conf.5 dhcpcd.8
 FILES=		dhcpcd.conf
 FILESDIR=	${SYSCONFDIR}
 
-SUBDIRS=	${MKDIRS}
-
 DEPEND!=	test -e .depend && echo ".depend" || echo ""
 
 CLEANFILES+=	*.tar.xz
@@ -47,7 +45,6 @@ CLEANFILES+=	*.tar.xz
 		$< > $@
 
 all: ${TOP}/config.h ${PROG} ${SCRIPTS} ${MAN5} ${MAN8}
-	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@; cd ..; done
 
 dev:
 	cd dev && ${MAKE}
@@ -83,7 +80,6 @@ _proginstall: ${PROG}
 	${INSTALL} -d ${DESTDIR}${DBDIR}
 
 proginstall: _proginstall ${EMBEDDEDINSTALL}
-	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@; cd ..; done
 
 _maninstall: ${MAN5} ${MAN8}
 	${INSTALL} -d ${DESTDIR}${MANDIR}/man5
@@ -124,13 +120,11 @@ _confinstall:
 	fi
 	
 eginstall:
-	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@; cd ..; done
 
 install: proginstall _maninstall _confinstall eginstall
 
 clean:
 	rm -f ${OBJS} ${PROG} ${PROG}.core ${CLEANFILES}
-	for x in ${SUBDIRS}; do cd $$x; ${MAKE} $@; cd ..; done
 
 distclean: clean
 	rm -f .depend
