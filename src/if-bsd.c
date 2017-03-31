@@ -380,7 +380,6 @@ if_route(unsigned char cmd, const struct rt *rt)
 	} rtmsg;
 	struct rt_msghdr *rtm = &rtmsg.hdr;
 	char *bp = rtmsg.buffer;
-	size_t l;
 	struct sockaddr_dl sdl;
 	bool gateway_unspec;
 
@@ -393,12 +392,11 @@ if_route(unsigned char cmd, const struct rt *rt)
 		ctx->options |= DHCPCD_RTM_PPID;
 
 #define ADDSA(sa) do {							      \
-		l = RT_ROUNDUP(((sa)->sa_len));				      \
-		memcpy(bp, (sa), l);					      \
-		bp += l;						      \
+		memcpy(bp, (sa), (sa)->sa_len);				      \
+		bp += RT_ROUNDUP((sa)->sa_len);				      \
 	}  while (0 /* CONSTCOND */)
 
-	memset(rtm, 0, sizeof(*rtm));
+	memset(&rtmsg, 0, sizeof(rtmsg));
 	rtm->rtm_version = RTM_VERSION;
 	rtm->rtm_type = cmd;
 #ifdef __OpenBSD__
