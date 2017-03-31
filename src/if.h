@@ -170,13 +170,14 @@ int if_handlelink(struct dhcpcd_ctx *);
 # define SOCK_NONBLOCK	0x20000000
 #endif
 
+int if_route(unsigned char, const struct rt *rt);
+int if_initrt(struct dhcpcd_ctx *, int);
+
 #ifdef INET
 int if_address(unsigned char, const struct ipv4_addr *);
 int if_addrflags(const struct interface *, const struct in_addr *,
     const char *);
 
-int if_route(unsigned char, const struct rt *rt);
-int if_initrt(struct dhcpcd_ctx *, int);
 #endif
 
 #ifdef INET6
