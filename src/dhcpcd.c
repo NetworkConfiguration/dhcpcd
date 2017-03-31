@@ -406,10 +406,6 @@ static void
 configure_interface1(struct interface *ifp)
 {
 	struct if_options *ifo = ifp->options;
-	int ra_global, ra_iface;
-#ifdef INET6
-	size_t i;
-#endif
 
 	/* Do any platform specific configuration */
 	if_conf(ifp);
@@ -437,14 +433,17 @@ configure_interface1(struct interface *ifp)
 	if (!(ifo->options & DHCPCD_IPV4))
 		ifo->options &= ~(DHCPCD_DHCP | DHCPCD_IPV4LL | DHCPCD_WAITIP4);
 
+#ifdef INET6
 	if (!(ifo->options & DHCPCD_IPV6))
 		ifo->options &=
 		    ~(DHCPCD_IPV6RS | DHCPCD_DHCP6 | DHCPCD_WAITIP6);
 
 	/* We want to disable kernel interface RA as early as possible. */
-	if (ifo->options & DHCPCD_IPV6 &&
+	if (ifo->options & DHCPCD_IPV6RS &&
 	    !(ifp->ctx->options & DHCPCD_DUMPLEASE))
 	{
+		int ra_global, ra_iface;
+
 		/* If not doing any DHCP, disable the RDNSS requirement. */
 		if (!(ifo->options & (DHCPCD_DHCP | DHCPCD_DHCP6)))
 			ifo->options &= ~DHCPCD_IPV6RA_REQRDNSS;
@@ -453,6 +452,7 @@ configure_interface1(struct interface *ifp)
 		if (ra_global == -1 || ra_iface == -1)
 			ifo->options &= ~DHCPCD_IPV6RS;
 	}
+#endif
 
 	if (!(ifo->options & DHCPCD_IAID)) {
 		/*
@@ -528,6 +528,8 @@ configure_interface1(struct interface *ifp)
 			ifo->ia->sla_len = 0;
 		}
 	} else {
+		size_t i;
+
 		for (i = 0; i < ifo->ia_len; i++) {
 			if (!ifo->ia[i].iaid_set) {
 				memcpy(&ifo->ia[i].iaid, ifo->iaid,
