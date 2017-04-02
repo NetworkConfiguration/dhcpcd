@@ -259,7 +259,7 @@ This requires persistent storage and not all DHCP servers work with it so it
 is not enabled by default.
 .Nm
 generates the DUID and stores it in
-.Pa @DBDIR@/dhcpcd.duid .
+.Pa @DBDIR@/duid .
 This file should not be copied to other hosts.
 .It Fl d , Fl Fl debug
 Echo debug messages to the stderr and syslog.
