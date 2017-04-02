@@ -191,7 +191,7 @@ is generated, otherwise DUID-LL is generated (link local address).
 This, plus the IAID will be used as the
 .Ic clientid .
 The DUID-LLT generated will be held in
-.Pa @DBDIR@/dhcpcd.duid
+.Pa @DBDIR@/duid
 and should not be copied to other hosts.
 .It Ic iaid Ar iaid
 Set the Interface Association Identifier to
