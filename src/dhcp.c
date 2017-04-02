@@ -2824,7 +2824,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 		}
 #ifdef AUTH
 		if (auth == NULL) {
-			LOGDHCP(LOG_ERR, "unauthenticated force renew");
+			LOGDHCP(LOG_ERR, "unauthenticated Force Renew");
 			if (ifo->auth.options & DHCPCD_AUTH_REQUIRE)
 				return;
 		}
@@ -2843,7 +2843,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 			dhcp_inform(ifp);
 		}
 #else
-		LOGDHCP(LOG_ERR, "unauthenticated force renew");
+		LOGDHCP(LOG_ERR, "unauthenticated Force Renew");
 #endif
 		return;
 	}
