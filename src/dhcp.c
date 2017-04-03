@@ -3263,7 +3263,7 @@ dhcp_readpacket(void *arg)
 	while (!(flags & BPF_EOF)) {
 		bytes = bpf_read(ifp, state->bpf_fd, buf,sizeof(buf), &flags);
 		if (bytes == -1) {
-			syslog(LOG_ERR, "%s: dhcp if_readrawpacket: %m",
+			syslog(LOG_ERR, "%s: dhcp bpf_read: %m",
 			    ifp->name);
 			dhcp_close(ifp);
 			return;
