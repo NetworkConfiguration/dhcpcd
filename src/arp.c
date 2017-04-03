@@ -202,7 +202,7 @@ arp_read(void *arg)
 	while (!(flags & BPF_EOF)) {
 		bytes = bpf_read(ifp, state->fd, buf, sizeof(buf), &flags);
 		if (bytes == -1) {
-			syslog(LOG_ERR, "%s: arp bpf_read: %m", ifp->name);
+			syslog(LOG_ERR, "%s: %s: %m", __func__, ifp->name);
 			arp_close(ifp);
 			return;
 		}
