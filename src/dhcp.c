@@ -3261,10 +3261,9 @@ dhcp_readpacket(void *arg)
 	 * so we have to process the entire buffer. */
 	flags = 0;
 	while (!(flags & BPF_EOF)) {
-		bytes = bpf_read(ifp, state->bpf_fd, buf,sizeof(buf), &flags);
+		bytes = bpf_read(ifp, state->bpf_fd, buf, sizeof(buf), &flags);
 		if (bytes == -1) {
-			syslog(LOG_ERR, "%s: dhcp bpf_read: %m",
-			    ifp->name);
+			syslog(LOG_ERR, "%s: %s: %m", __func__, ifp->name);
 			dhcp_close(ifp);
 			return;
 		}
