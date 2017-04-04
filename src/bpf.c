@@ -222,8 +222,6 @@ bpf_read(struct interface *ifp, int fd, void *data, size_t len, int *flags)
 		bytes = -1;
 		memcpy(&packet, state->buffer + state->buffer_pos,
 		    sizeof(packet));
-		if (packet.bh_caplen != packet.bh_datalen)
-			goto next; /* Incomplete packet, drop. */
 		if (state->buffer_pos + packet.bh_caplen + packet.bh_hdrlen >
 		    state->buffer_len)
 			goto next; /* Packet beyond buffer, drop. */
