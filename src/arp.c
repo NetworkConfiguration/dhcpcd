@@ -180,7 +180,7 @@ arp_close(struct interface *ifp)
 
 	if ((state = ARP_STATE(ifp)) != NULL && state->fd != -1) {
 		eloop_event_delete(ifp->ctx->eloop, state->fd);
-		bpf_close(state->fd);
+		bpf_close(ifp, state->fd);
 		state->fd = -1;
 	}
 }

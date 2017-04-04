@@ -1547,7 +1547,7 @@ dhcp_close(struct interface *ifp)
 
 	if (state->bpf_fd != -1) {
 		eloop_event_delete(ifp->ctx->eloop, state->bpf_fd);
-		bpf_close(state->bpf_fd);
+		bpf_close(ifp, state->bpf_fd);
 		state->bpf_fd = -1;
 	}
 

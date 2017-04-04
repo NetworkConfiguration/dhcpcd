@@ -174,7 +174,6 @@ bpf_open(struct interface *ifp, int (*filter)(struct interface *, int))
 			goto eexit;
 		state->buffer = nb;
 		state->buffer_size = buf_len;
-		state->buffer_len = state->buffer_pos = 0;
 	}
 
 #ifdef BIOCIMMEDIATE
@@ -285,6 +284,16 @@ bpf_send(const struct interface *ifp, int fd, uint16_t protocol,
 	return writev(fd, iov, 2);
 }
 #endif
+
+int
+bpf_close(struct interface *ifp, int fd)
+{
+	struct ipv4_state *state = IPV4_STATE(ifp);
+
+	/* Rewind the buffer on closing. */
+	state->buffer_len = state->buffer_pos = 0;
+	return close(fd);
+}
 
 static unsigned int
 bpf_cmp_hwaddr(struct bpf_insn *bpf, size_t bpf_len, size_t off,
