@@ -426,6 +426,7 @@ bpf_arp(struct interface *ifp, int fd)
 	struct bpf_insn bpf[3+ bpf_arp_filter_len + bpf_arp_hw + bpf_arp_extra];
 	struct bpf_insn *bp;
 	struct iarp_state *state;
+	uint16_t arp_len;
 
 	if (fd == -1)
 		return 0;
@@ -436,6 +437,7 @@ bpf_arp(struct interface *ifp, int fd)
 	case ARPHRD_ETHER:
 		memcpy(bp, bpf_arp_ether, sizeof(bpf_arp_ether));
 		bp += bpf_arp_ether_len;
+		arp_len = sizeof(struct ether_header)+sizeof(struct ether_arp);
 		break;
 	default:
 		errno = EINVAL;
@@ -469,7 +471,7 @@ bpf_arp(struct interface *ifp, int fd)
 			BPF_SET_JUMP(bp, BPF_JMP + BPF_JEQ + BPF_K,
 			             htonl(astate->addr.s_addr), 0, 1);
 			bp++;
-			BPF_SET_STMT(bp, BPF_RET + BPF_K, BPF_WHOLEPACKET);
+			BPF_SET_STMT(bp, BPF_RET + BPF_K, arp_len);
 			bp++;
 		}
 
@@ -494,8 +496,7 @@ bpf_arp(struct interface *ifp, int fd)
 			BPF_SET_JUMP(bp, BPF_JMP + BPF_JEQ + BPF_K,
 			             htonl(astate->addr.s_addr), 0, 1);
 			bp++;
-			BPF_SET_STMT(bp, BPF_RET + BPF_K,
-			             BPF_WHOLEPACKET);
+			BPF_SET_STMT(bp, BPF_RET + BPF_K, arp_len);
 			bp++;
 		}
 
