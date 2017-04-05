@@ -120,6 +120,9 @@ int
 if_opensockets_os(struct dhcpcd_ctx *ctx)
 {
 	struct priv *priv;
+#ifdef ROUTE_MSGFILTER
+	unsigned int msgfilter;
+#endif
 
 	if ((priv = malloc(sizeof(*priv))) == NULL)
 		return -1;
@@ -137,6 +140,25 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 #define SOCK_FLAGS	(SOCK_CLOEXEC | SOCK_NONBLOCK)
 	ctx->link_fd = xsocket(PF_ROUTE, SOCK_RAW | SOCK_FLAGS, AF_UNSPEC);
 #undef SOCK_FLAGS
+
+#ifdef ROUTE_MSGFILTER
+	msgfilter = ROUTE_FILTER(RTM_IFINFO)
+#ifdef RTM_IFANNOUNCE
+	    | ROUTE_FILTER(RTM_IFANNOUNCE)
+#endif
+	    | ROUTE_FILTER(RTM_ADD)
+	    | ROUTE_FILTER(RTM_CHANGE)
+	    | ROUTE_FILTER(RTM_DELETE)
+#ifdef RTM_CHGADDR
+	    | ROUTE_FILTER(RTM_CHGADDR)
+#endif
+	    | ROUTE_FILTER(RTM_DELADDR)
+	    | ROUTE_FILTER(RTM_NEWADDR);
+	if (setsockopt(ctx->link_fd, PF_ROUTE, ROUTE_MSGFILTER,
+	    &msgfilter, sizeof(msgfilter)) == -1)
+		syslog(LOG_ERR, "ROUTE_MSGFILTER: %m");
+#endif
+
 	return ctx->link_fd == -1 ? -1 : 0;
 }
 
