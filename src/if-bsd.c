@@ -121,7 +121,18 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 {
 	struct priv *priv;
 #ifdef ROUTE_MSGFILTER
-	unsigned int msgfilter;
+	unsigned int msgfilter = ROUTE_FILTER(RTM_IFINFO)
+#ifdef RTM_IFANNOUNCE
+	    | ROUTE_FILTER(RTM_IFANNOUNCE)
+#endif
+	    | ROUTE_FILTER(RTM_ADD)
+	    | ROUTE_FILTER(RTM_CHANGE)
+	    | ROUTE_FILTER(RTM_DELETE)
+#ifdef RTM_CHGADDR
+	    | ROUTE_FILTER(RTM_CHGADDR)
+#endif
+	    | ROUTE_FILTER(RTM_DELADDR)
+	    | ROUTE_FILTER(RTM_NEWADDR);
 #endif
 
 	if ((priv = malloc(sizeof(*priv))) == NULL)
@@ -142,18 +153,6 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 #undef SOCK_FLAGS
 
 #ifdef ROUTE_MSGFILTER
-	msgfilter = ROUTE_FILTER(RTM_IFINFO)
-#ifdef RTM_IFANNOUNCE
-	    | ROUTE_FILTER(RTM_IFANNOUNCE)
-#endif
-	    | ROUTE_FILTER(RTM_ADD)
-	    | ROUTE_FILTER(RTM_CHANGE)
-	    | ROUTE_FILTER(RTM_DELETE)
-#ifdef RTM_CHGADDR
-	    | ROUTE_FILTER(RTM_CHGADDR)
-#endif
-	    | ROUTE_FILTER(RTM_DELADDR)
-	    | ROUTE_FILTER(RTM_NEWADDR);
 	if (setsockopt(ctx->link_fd, PF_ROUTE, ROUTE_MSGFILTER,
 	    &msgfilter, sizeof(msgfilter)) == -1)
 		syslog(LOG_ERR, "ROUTE_MSGFILTER: %m");
