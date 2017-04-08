@@ -265,7 +265,7 @@ add_environ(struct if_options *ifo, const char *value, int uniq)
 		syslog(LOG_ERR, "%s: %m", __func__);
 		return NULL;
 	}
-	newlist = realloc(lst, sizeof(char *) * (i + 2));
+	newlist = reallocarray(lst, i + 2, sizeof(char *));
 	if (newlist == NULL) {
 		syslog(LOG_ERR, "%s: %m", __func__);
 		free(n);
@@ -451,7 +451,7 @@ splitv(int *argc, char **argv, const char *arg)
 			free(o);
 			return v;
 		}
-		n = realloc(v, sizeof(char *) * ((size_t)(*argc) + 1));
+		n = reallocarray(v, (size_t)(*argc) + 1, sizeof(char *));
 		if (n == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);
 			free(o);
@@ -1138,7 +1138,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 				syslog(LOG_ERR, "%s: %m", __func__);
 				return -1;
 			}
-			nconf = realloc(ifo->config, sizeof(char *) * (dl + 2));
+			nconf = reallocarray(ifo->config, dl + 2, sizeof(char *));
 			if (nconf == NULL) {
 				syslog(LOG_ERR, "%s: %m", __func__);
 				free(p);
@@ -1154,8 +1154,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			return -1;
 		if (strchr(arg, '/') == NULL)
 			addr2.s_addr = INADDR_BROADCAST;
-		naddr = realloc(ifo->whitelist,
-		    sizeof(in_addr_t) * (ifo->whitelist_len + 2));
+		naddr = reallocarray(ifo->whitelist,
+		    ifo->whitelist_len + 2, sizeof(in_addr_t));
 		if (naddr == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);
 			return -1;
@@ -1169,8 +1169,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			return -1;
 		if (strchr(arg, '/') == NULL)
 			addr2.s_addr = INADDR_BROADCAST;
-		naddr = realloc(ifo->blacklist,
-		    sizeof(in_addr_t) * (ifo->blacklist_len + 2));
+		naddr = reallocarray(ifo->blacklist,
+		    ifo->blacklist_len + 2, sizeof(in_addr_t));
 		if (naddr == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);
 			return -1;
@@ -1215,8 +1215,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 				*fp++ = '\0';
 			if (parse_addr(&addr, NULL, arg) != 0)
 				return -1;
-			naddr = realloc(ifo->arping,
-			    sizeof(in_addr_t) * ((size_t)ifo->arping_len + 1));
+			naddr = reallocarray(ifo->arping,
+			    (size_t)ifo->arping_len + 1, sizeof(in_addr_t));
 			if (naddr == NULL) {
 				syslog(LOG_ERR, "%s: %m", __func__);
 				return -1;
@@ -1337,8 +1337,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			break;
 		}
 		if (ia == NULL) {
-			ia = realloc(ifo->ia,
-			    sizeof(*ifo->ia) * (ifo->ia_len + 1));
+			ia = reallocarray(ifo->ia,
+			    ifo->ia_len + 1, sizeof(*ifo->ia));
 			if (ia == NULL) {
 				syslog(LOG_ERR, "%s: %m", __func__);
 				return -1;
@@ -1393,8 +1393,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 				*fp++ = '\0';
 				fp = strskipwhite(fp);
 			}
-			sla = realloc(ia->sla,
-			    sizeof(*ia->sla) * (ia->sla_len + 1));
+			sla = reallocarray(ia->sla,
+			    ia->sla_len + 1, sizeof(*ia->sla));
 			if (sla == NULL) {
 				syslog(LOG_ERR, "%s: %m", __func__);
 				return -1;
@@ -1770,9 +1770,8 @@ err_sla:
 		} else
 			ndop = NULL;
 		if (ndop == NULL) {
-			if ((ndop = realloc(*dop,
-			    sizeof(**dop) * ((*dop_len) + 1))) == NULL)
-			{
+			ndop = reallocarray(*dop, *dop_len + 1, sizeof(**dop));
+			if (ndop == NULL) {
 				syslog(LOG_ERR, "%s: %m", __func__);
 				free(np);
 				return -1;
@@ -1840,8 +1839,8 @@ err_sla:
 			dl = 0;
 			np = NULL;
 		}
-		vivco = realloc(ifo->vivco, sizeof(*ifo->vivco) *
-		    (ifo->vivco_len + 1));
+		vivco = reallocarray(ifo->vivco,
+		    ifo->vivco_len + 1, sizeof(*ifo->vivco));
 		if (vivco == NULL) {
 			syslog(LOG_ERR, "%s: %m", __func__);
 			return -1;
