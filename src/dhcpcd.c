@@ -1660,10 +1660,16 @@ printpidfile:
 
 	/* Open our persistent sockets.
 	 * This is needed early for dumping leases on valid interfaces. */
-	if (if_opensockets(&ctx) == -1) {
-		syslog(LOG_ERR, "if_opensockets: %m");
-		goto exit_failure;
+#ifdef USE_SIGNALS
+	if (sig == 0) {
+#endif
+		if (if_opensockets(&ctx) == -1) {
+			syslog(LOG_ERR, "if_opensockets: %m");
+			goto exit_failure;
+		}
+#ifdef USE_SIGNALS
 	}
+#endif
 
 	if (ctx.options & DHCPCD_DUMPLEASE) {
 		if (optind != argc) {
