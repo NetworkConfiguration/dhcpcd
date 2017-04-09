@@ -34,11 +34,11 @@
 
 #include "logerr.h"
 
-#ifndef	LOGERR_FACILITY
-#define	LOGERR_FACILITY	LOG_DAEMON
+#ifndef	LOGERR_SYSLOG_FACILITY
+#define	LOGERR_SYSLOG_FACILITY	LOG_DAEMON
 #endif
-#ifndef	LOGERR_OPTS
-#define	LOGERR_OPTS	LOG_PID
+#ifndef	LOGERR_SYSLOG_OPTS
+#define	LOGERR_SYSLOG_OPTS	LOG_PID
 #endif
 
 struct logctx {
@@ -209,7 +209,7 @@ logopen(const char *path)
 {
 
 	if (path == NULL) {
-		openlog(NULL, LOGERR_OPTS, LOGERR_FACILITY);
+		openlog(NULL, LOGERR_SYSLOG_OPTS, LOGERR_SYSLOG_FACILITY);
 		return 1;
 	}
 
