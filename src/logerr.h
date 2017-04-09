@@ -26,7 +26,7 @@
  */
 
 #ifndef LOGERR_H
-#define LOERRG_H
+#define LOGERR_H
 
 #include <sys/param.h>
 
