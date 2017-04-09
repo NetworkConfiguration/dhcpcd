@@ -115,7 +115,7 @@ const struct option cf_options[] = {
 	{"reconfigure",     no_argument,       NULL, 'g'},
 	{"hostname",        optional_argument, NULL, 'h'},
 	{"vendorclassid",   optional_argument, NULL, 'i'},
-	{"logfile",         optional_argument, NULL, 'j'},
+	{"logfile",         required_argument, NULL, 'j'},
 	{"release",         no_argument,       NULL, 'k'},
 	{"leasetime",       required_argument, NULL, 'l'},
 	{"metric",          required_argument, NULL, 'm'},
