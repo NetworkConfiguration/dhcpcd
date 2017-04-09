@@ -54,7 +54,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -68,6 +67,7 @@
 #include "ipv4ll.h"
 #include "ipv6.h"
 #include "ipv6nd.h"
+#include "logerr.h"
 #include "route.h"
 #include "sa.h"
 
@@ -1644,8 +1644,8 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp)
 		ifname = "all";
 	else if (!(ctx->options & DHCPCD_TEST)) {
 		if (if_disable_autolinklocal(ctx, ifp->index) == -1)
-			syslog(LOG_DEBUG, "%s: if_disable_autolinklocal: %m",
-			    ifp->name);
+			logdebug("%s: if_disable_autolinklocal: %s",
+			    ifp->name, strerror(errno));
 	}
 	if (ifp)
 		ifname = ifp->name;
@@ -1654,26 +1654,26 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp)
 	ra = check_proc_int(path);
 	if (ra != 1) {
 		if (ctx->options & DHCPCD_TEST)
-			syslog(LOG_WARNING, "%s: IPv6 kernel autoconf disabled",
-			    ifname);
+			logwarnx("%s: IPv6 kernel autoconf disabled", ifname);
 	} else if (ra != -1 && !(ctx->options & DHCPCD_TEST)) {
 		if (write_path(path, "0") == -1) {
-			syslog(LOG_ERR, "write_path: %s: %m", path);
+			logerr("%s: %s", __func__, path);
 			return -1;
 		}
 	}
 
 	snprintf(path, sizeof(path), "%s/%s/accept_ra", prefix, ifname);
 	ra = check_proc_int(path);
-	if (ra == -1)
+	if (ra == -1) {
+		logfunc_t *logfunc = errno == ENOENT? logdebug : logwarnx;
+
 		/* The sysctl probably doesn't exist, but this isn't an
 		 * error as such so just log it and continue */
-		syslog(errno == ENOENT ? LOG_DEBUG:LOG_WARNING, "%s: %m", path);
-	else if (ra != 0 && !(ctx->options & DHCPCD_TEST)) {
-		syslog(LOG_DEBUG, "%s: disabling kernel IPv6 RA support",
-		    ifname);
+		logfunc("%s: %s", path, strerror(errno));
+	} else if (ra != 0 && !(ctx->options & DHCPCD_TEST)) {
+		logdebug("%s: disabling kernel IPv6 RA support", ifname);
 		if (write_path(path, "0") == -1) {
-			syslog(LOG_ERR, "write_path: %s: %m", path);
+			logerr("%s: %s", __func__, path);
 			return ra;
 		}
 		return 0;

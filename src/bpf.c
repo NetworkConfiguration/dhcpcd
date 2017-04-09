@@ -48,13 +48,13 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
 
 #include "common.h"
 #include "arp.h"
 #include "bpf.h"
 #include "dhcp.h"
 #include "if.h"
+#include "logerr.h"
 
 #define	ARP_ADDRS_MAX	3
 
@@ -150,7 +150,7 @@ bpf_open(struct interface *ifp, int (*filter)(struct interface *, int))
 		goto eexit;
 	if (pv.bv_major != BPF_MAJOR_VERSION ||
 	    pv.bv_minor < BPF_MINOR_VERSION) {
-		syslog(LOG_ERR, "BPF version mismatch - recompile");
+		logerrx("BPF version mismatch - recompile");
 		goto eexit;
 	}
 
@@ -474,7 +474,7 @@ bpf_arp(struct interface *ifp, int fd)
 		TAILQ_FOREACH(astate, &state->arp_states, next) {
 			if (++naddrs > ARP_ADDRS_MAX) {
 				errno = ENOBUFS;
-				syslog(LOG_ERR, "%s: %m", __func__);
+				logerr(__func__);
 				break;
 			}
 			BPF_SET_JUMP(bp, BPF_JMP + BPF_JEQ + BPF_K,
