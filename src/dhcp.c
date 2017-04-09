@@ -1528,8 +1528,10 @@ dhcp_new_xid(struct interface *ifp)
 		state->xid = arc4random();
 
 	/* As the XID changes, re-apply the filter. */
-	if (state->bpf_fd != -1)
-		bpf_bootp(ifp, state->bpf_fd);
+	if (state->bpf_fd != -1) {
+		if (bpf_bootp(ifp, state->bpf_fd) == -1)
+			logerr(__func__); /* try to continue */
+	}
 }
 
 void
@@ -2267,7 +2269,8 @@ dhcp_bind(struct interface *ifp)
 	}
 	state->state = DHS_BOUND;
 	/* Re-apply the filter because we need to accept any XID anymore. */
-	bpf_bootp(ifp, state->bpf_fd);
+	if (bpf_bootp(ifp, state->bpf_fd) == -1)
+		logerr(__func__); /* try to continue */
 	if (!state->lease.frominfo &&
 	    !(ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC)))
 		if (write_lease(ifp, state->new, state->new_len) == -1)
