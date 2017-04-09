@@ -274,7 +274,8 @@ arp_probe(struct arp_state *astate)
 	} else {
 		const struct iarp_state *state = ARP_CSTATE(astate->iface);
 
-		bpf_arp(astate->iface, state->fd);
+		if (bpf_arp(astate->iface, state->fd) == -1)
+			logerr(__func__);
 	}
 	astate->probes = 0;
 	logdebug("%s: probing for %s",
@@ -406,7 +407,8 @@ arp_new(struct interface *ifp, const struct in_addr *addr)
 	state = ARP_STATE(ifp);
 	TAILQ_INSERT_TAIL(&state->arp_states, astate, next);
 
-	bpf_arp(ifp, state->fd);
+	if (bpf_arp(ifp, state->fd) == -1)
+		logerr(__func__); /* try and continue */
 
 	return astate;
 }
@@ -441,7 +443,8 @@ arp_free(struct arp_state *astate)
 		free(state);
 		ifp->if_data[IF_DATA_ARP] = NULL;
 	} else
-		bpf_arp(ifp, state->fd);
+		if (bpf_arp(ifp, state->fd) == -1)
+			logerr(__func__);
 }
 
 static void
