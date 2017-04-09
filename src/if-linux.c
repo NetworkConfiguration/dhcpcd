@@ -739,7 +739,7 @@ link_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp,
 				return 0;
 			break;
 		case IFLA_IFNAME:
-			strlcpy(ifn, RTA_DATA(rta), sizeof(ifn));
+			strlcpy(ifn, (char *)RTA_DATA(rta), sizeof(ifn));
 			break;
 		case IFLA_ADDRESS:
 			hwaddr = rta;
