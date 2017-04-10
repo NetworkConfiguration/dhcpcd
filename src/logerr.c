@@ -221,7 +221,7 @@ logopen(const char *path)
 }
 
 void
-logclose()
+logclose(void)
 {
 
 	closelog();
