@@ -276,7 +276,7 @@ logerrx(const char *fmt, ...)
 	va_list args;
 
 	va_start(args, fmt);
-	vlogerrmessage(LOG_ERR, fmt, args);
+	vlogmessage(LOG_ERR, fmt, args);
 	va_end(args);
 }
 
