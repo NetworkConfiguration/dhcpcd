@@ -27,35 +27,88 @@
 
 #include <sys/time.h>
 #include <errno.h>
+#include <stdbool.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "logerr.h"
 
 #ifndef	LOGERR_SYSLOG_FACILITY
 #define	LOGERR_SYSLOG_FACILITY	LOG_DAEMON
 #endif
-#ifndef	LOGERR_SYSLOG_OPTS
-#define	LOGERR_SYSLOG_OPTS	LOG_PID
-#endif
+
+#define UNUSED(a)		(void)(a)
 
 struct logctx {
 	unsigned int	 log_opts;
+#ifndef SMALL
+	const char	*log_tag;
 	FILE		*log_file;
+#endif
 };
 
 static struct logctx _logctx = {
-	.log_opts = LOGERR_WLOG,
-	.log_file = NULL,
+	/* syslog style by default */
+	.log_opts = LOGERR_LOG | LOGERR_LOG_DATE |
+	            LOGERR_LOG_TAG | LOGERR_LOG_PID,
 };
 
-__printflike(2, 0) static void
-vlogprintf(FILE *stream, const char *fmt, va_list args)
+#if !defined(SMALL) && defined(__linux__)
+/* Poor man's getprogname(3). */
+static char *_logprog;
+static const char *
+getprogname(void)
+{
+	const char *p;
+
+	/* Use PATH_MAX + 1 to avoid truncation. */
+	if (_logprog == NULL) {
+		/* readlink(2) does not append a NULL byte,
+		 * so zero the buffer. */
+		if ((_logprog = calloc(1, PATH_MAX + 1)) == NULL)
+			return NULL;
+	}
+	if (readlink("/proc/self/exe", _logprog, PATH_MAX + 1) == -1)
+		return NULL;
+	if (_logprog[0] == '[')
+		return NULL;
+	p = strrchr(_logprog, '/');
+	if (p == NULL)
+		return _logprog;
+	return p + 1;
+}
+#endif
+
+__printflike(3, 0) static void
+vlogprintf_r(struct logctx *ctx, FILE *stream, const char *fmt, va_list args)
 {
 	va_list a;
+#ifndef SMALL
+	bool log_tag, log_pid;
+
+	log_tag = ((stream == stderr && ctx->log_opts & LOGERR_ERR_TAG) ||
+	    (stream != stderr && ctx->log_opts & LOGERR_LOG_TAG));
+	if (log_tag) {
+		if (ctx->log_tag == NULL)
+			ctx->log_tag = getprogname();
+		fprintf(stream, "%s", ctx->log_tag);
+	}
+
+	log_pid = ((stream == stderr && ctx->log_opts & LOGERR_ERR_PID) ||
+	    (stream != stderr && ctx->log_opts & LOGERR_LOG_PID));
+	if (log_pid)
+		fprintf(stream, "[%d]", getpid());
+
+	if (log_tag || log_pid)
+		fprintf(stream, ": ");
+#else
+	UNUSED(ctx);
+#endif
 
 	va_copy(a, args);
 	vfprintf(stream, fmt, a);
@@ -81,37 +134,45 @@ vlogprintf(FILE *stream, const char *fmt, va_list args)
 __printflike(2, 0) static void
 vlogmessage(int pri, const char *fmt, va_list args)
 {
+#ifndef SMALL
+	struct timeval tv;
+#endif
+	struct logctx *ctx = &_logctx;
 
 	if (pri <= LOG_ERR ||
-	    (!(_logctx.log_opts & LOGERR_QUIET) && pri <= LOG_INFO) ||
-	    (_logctx.log_opts & LOGERR_DEBUG && pri <= LOG_DEBUG))
-		vlogprintf(stderr, fmt, args);
+	    (!(ctx->log_opts & LOGERR_QUIET) && pri <= LOG_INFO) ||
+	    (ctx->log_opts & LOGERR_DEBUG && pri <= LOG_DEBUG))
+		vlogprintf_r(ctx, stderr, fmt, args);
 
-	if (!(_logctx.log_opts & LOGERR_WLOG))
+	if (!(ctx->log_opts & LOGERR_LOG))
 		return;
 
-	if (_logctx.log_file != NULL) {
-		struct timeval tv;
-
-		if (pri == LOG_DEBUG && !(_logctx.log_opts & LOGERR_DEBUG))
-			return;
-
-		/* Write the time, syslog style. month day time - */
-		if (gettimeofday(&tv, NULL) != -1) {
-			time_t now;
-			struct tm tmnow;
-			char buf[32];
-
-			now = tv.tv_sec;
-			tzset();
-			localtime_r(&now, &tmnow);
-			strftime(buf, sizeof(buf), "%b %d %T ", &tmnow);
-			fprintf(_logctx.log_file, "%s", buf);
-		}
-
-		vlogprintf(_logctx.log_file, fmt, args);
-	} else
+#ifdef SMALL
+	vsyslog(pri, fmt, args);
+#else
+	if (ctx->log_file == NULL) {
 		vsyslog(pri, fmt, args);
+		return;
+	}
+
+	if (pri == LOG_DEBUG && !(ctx->log_opts & LOGERR_DEBUG))
+		return;
+
+	/* Write the time, syslog style. month day time - */
+	if (ctx->log_opts & LOGERR_LOG_DATE && gettimeofday(&tv, NULL) != -1) {
+		time_t now;
+		struct tm tmnow;
+		char buf[32];
+
+		now = tv.tv_sec;
+		tzset();
+		localtime_r(&now, &tmnow);
+		strftime(buf, sizeof(buf), "%b %d %T ", &tmnow);
+		fprintf(ctx->log_file, "%s", buf);
+	}
+
+	vlogprintf_r(ctx, ctx->log_file, fmt, args);
+#endif
 }
 #if defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ > 5))
 #pragma GCC diagnostic pop
@@ -200,33 +261,64 @@ logerrx(const char *fmt, ...)
 void
 logsetopts(unsigned int opts)
 {
+	struct logctx *ctx = &_logctx;
 
-	_logctx.log_opts = opts;
+	ctx->log_opts = opts;
 	setlogmask(LOG_UPTO(opts & LOGERR_DEBUG ? LOG_DEBUG : LOG_INFO));
+}
+
+void
+logsettag(const char *tag)
+{
+#ifndef SMALL
+	struct logctx *ctx = &_logctx;
+
+	ctx->log_tag = tag;
+#else
+	UNUSED(tag);
+#endif
 }
 
 int
 logopen(const char *path)
 {
+	struct logctx *ctx = &_logctx;
 
 	if (path == NULL) {
-		openlog(NULL, LOGERR_SYSLOG_OPTS, LOGERR_SYSLOG_FACILITY);
+		int opts = 0;
+
+		if (ctx->log_opts & LOGERR_LOG_PID)
+			opts |= LOG_PID;
+		openlog(NULL, opts, LOGERR_SYSLOG_FACILITY);
 		return 1;
 	}
 
-	if ((_logctx.log_file = fopen(path, "w")) == NULL)
+#ifndef SMALL
+	if ((ctx->log_file = fopen(path, "w")) == NULL)
 		return -1;
-	setlinebuf(_logctx.log_file);
-	return fileno(_logctx.log_file);
+	setlinebuf(ctx->log_file);
+	return fileno(ctx->log_file);
+#else
+	errno = ENOTSUP;
+	return -1;
+#endif
 }
 
 void
 logclose(void)
 {
+#ifndef SMALL
+	struct logctx *ctx = &_logctx;
+#endif
 
 	closelog();
-	if (_logctx.log_file == NULL)
+#ifndef SMALL
+	if (ctx->log_file == NULL)
 		return;
-	fclose(_logctx.log_file);
-	_logctx.log_file = NULL;
+	fclose(ctx->log_file);
+	ctx->log_file = NULL;
+#endif
+#if !defined(SMALL) && defined(__linux__)
+	free(_logprog);
+#endif
 }
