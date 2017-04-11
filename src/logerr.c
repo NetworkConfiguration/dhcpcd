@@ -42,23 +42,28 @@
 #define	LOGERR_SYSLOG_FACILITY	LOG_DAEMON
 #endif
 
+#ifdef SMALL
+#undef LOGERR_TAG
+#endif
+
 #define UNUSED(a)		(void)(a)
 
 struct logctx {
 	unsigned int	 log_opts;
 #ifndef SMALL
-	const char	*log_tag;
 	FILE		*log_file;
+#ifdef LOGERR_TAG
+	const char	*log_tag;
+#endif
 #endif
 };
 
 static struct logctx _logctx = {
-	/* syslog style by default */
-	.log_opts = LOGERR_LOG | LOGERR_LOG_DATE |
-	            LOGERR_LOG_TAG | LOGERR_LOG_PID,
+	/* syslog style, but without the hostname or tag. */
+	.log_opts = LOGERR_LOG | LOGERR_LOG_DATE | LOGERR_LOG_PID,
 };
 
-#if !defined(SMALL) && defined(__linux__)
+#if defined(LOGERR_TAG) && defined(__linux__)
 /* Poor man's getprogname(3). */
 static char *_logprog;
 static const char *
@@ -84,13 +89,42 @@ getprogname(void)
 }
 #endif
 
+#ifndef SMALL
+/* Write the time, syslog style. month day time - */
+static void
+logprintdate(FILE *stream)
+{
+	struct timeval tv;
+	time_t now;
+	struct tm tmnow;
+	char buf[32];
+
+	if (gettimeofday(&tv, NULL) == -1)
+		return;
+
+	now = tv.tv_sec;
+	tzset();
+	localtime_r(&now, &tmnow);
+	strftime(buf, sizeof(buf), "%b %d %T ", &tmnow);
+	fprintf(stream, "%s", buf);
+}
+#endif
+
 __printflike(3, 0) static void
 vlogprintf_r(struct logctx *ctx, FILE *stream, const char *fmt, va_list args)
 {
 	va_list a;
 #ifndef SMALL
-	bool log_tag, log_pid;
+	bool log_pid;
+#ifdef LOGERR_TAG
+	bool log_tag;
+#endif
 
+	if ((stream == stderr && ctx->log_opts & LOGERR_ERR_DATE) ||
+	    (stream != stderr && ctx->log_opts & LOGERR_LOG_DATE))
+		logprintdate(stream);
+
+#ifdef LOGERR_TAG
 	log_tag = ((stream == stderr && ctx->log_opts & LOGERR_ERR_TAG) ||
 	    (stream != stderr && ctx->log_opts & LOGERR_LOG_TAG));
 	if (log_tag) {
@@ -98,13 +132,18 @@ vlogprintf_r(struct logctx *ctx, FILE *stream, const char *fmt, va_list args)
 			ctx->log_tag = getprogname();
 		fprintf(stream, "%s", ctx->log_tag);
 	}
+#endif
 
 	log_pid = ((stream == stderr && ctx->log_opts & LOGERR_ERR_PID) ||
 	    (stream != stderr && ctx->log_opts & LOGERR_LOG_PID));
 	if (log_pid)
 		fprintf(stream, "[%d]", getpid());
 
+#ifdef LOGERR_TAG
 	if (log_tag || log_pid)
+#else
+	if (log_pid)
+#endif
 		fprintf(stream, ": ");
 #else
 	UNUSED(ctx);
@@ -134,14 +173,12 @@ vlogprintf_r(struct logctx *ctx, FILE *stream, const char *fmt, va_list args)
 __printflike(2, 0) static void
 vlogmessage(int pri, const char *fmt, va_list args)
 {
-#ifndef SMALL
-	struct timeval tv;
-#endif
 	struct logctx *ctx = &_logctx;
 
-	if (pri <= LOG_ERR ||
+	if (ctx->log_opts & LOGERR_ERR &&
+	    (pri <= LOG_ERR ||
 	    (!(ctx->log_opts & LOGERR_QUIET) && pri <= LOG_INFO) ||
-	    (ctx->log_opts & LOGERR_DEBUG && pri <= LOG_DEBUG))
+	    (ctx->log_opts & LOGERR_DEBUG && pri <= LOG_DEBUG)))
 		vlogprintf_r(ctx, stderr, fmt, args);
 
 	if (!(ctx->log_opts & LOGERR_LOG))
@@ -154,23 +191,8 @@ vlogmessage(int pri, const char *fmt, va_list args)
 		vsyslog(pri, fmt, args);
 		return;
 	}
-
 	if (pri == LOG_DEBUG && !(ctx->log_opts & LOGERR_DEBUG))
 		return;
-
-	/* Write the time, syslog style. month day time - */
-	if (ctx->log_opts & LOGERR_LOG_DATE && gettimeofday(&tv, NULL) != -1) {
-		time_t now;
-		struct tm tmnow;
-		char buf[32];
-
-		now = tv.tv_sec;
-		tzset();
-		localtime_r(&now, &tmnow);
-		strftime(buf, sizeof(buf), "%b %d %T ", &tmnow);
-		fprintf(ctx->log_file, "%s", buf);
-	}
-
 	vlogprintf_r(ctx, ctx->log_file, fmt, args);
 #endif
 }
@@ -267,10 +289,11 @@ logsetopts(unsigned int opts)
 	setlogmask(LOG_UPTO(opts & LOGERR_DEBUG ? LOG_DEBUG : LOG_INFO));
 }
 
+#ifdef LOGERR_TAG
 void
 logsettag(const char *tag)
 {
-#ifndef SMALL
+#if !defined(SMALL)
 	struct logctx *ctx = &_logctx;
 
 	ctx->log_tag = tag;
@@ -278,6 +301,7 @@ logsettag(const char *tag)
 	UNUSED(tag);
 #endif
 }
+#endif
 
 int
 logopen(const char *path)
@@ -294,7 +318,7 @@ logopen(const char *path)
 	}
 
 #ifndef SMALL
-	if ((ctx->log_file = fopen(path, "w")) == NULL)
+	if ((ctx->log_file = fopen(path, "a")) == NULL)
 		return -1;
 	setlinebuf(ctx->log_file);
 	return fileno(ctx->log_file);
@@ -318,7 +342,7 @@ logclose(void)
 	fclose(ctx->log_file);
 	ctx->log_file = NULL;
 #endif
-#if !defined(SMALL) && defined(__linux__)
+#if defined(LOGERR_TAG) && defined(__linux__)
 	free(_logprog);
 #endif
 }

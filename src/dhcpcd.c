@@ -1461,8 +1461,7 @@ main(int argc, char **argv)
 #ifdef INET
 	ctx.udp_fd = -1;
 #endif
-	/* syslog style logging */
-	logopts = LOGERR_LOG|LOGERR_LOG_DATE|LOGERR_LOG_TAG|LOGERR_LOG_PID;
+	logopts = LOGERR_ERR|LOGERR_LOG|LOGERR_LOG_DATE|LOGERR_LOG_PID;
 	i = 0;
 	while ((opt = getopt_long(argc, argv,
 	    ctx.options & DHCPCD_PRINT_PIDFILE ? NOERR_IF_OPTS : IF_OPTS,

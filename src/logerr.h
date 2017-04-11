@@ -49,15 +49,24 @@ __printflike(1, 2) void logerr(const char *, ...);
 __printflike(1, 2) void logerrx(const char *, ...);
 
 void logsetopts(unsigned int);
-#define	LOGERR_LOG	(1U <<  1)
-#define	LOGERR_LOG_TAG	(1U <<  2)
-#define	LOGERR_LOG_PID	(1U <<  3)
-#define	LOGERR_LOG_DATE	(1U <<  4)
-#define	LOGERR_ERR_TAG	(1U << 11)
-#define	LOGERR_ERR_PID	(1U << 12)
-#define	LOGERR_DEBUG	(1U << 21)
-#define	LOGERR_QUIET	(1U << 22)
+#define	LOGERR_DEBUG	(1U << 6)
+#define	LOGERR_QUIET	(1U << 7)
+#define	LOGERR_LOG	(1U << 11)
+#define	LOGERR_LOG_DATE	(1U << 12)
+#define	LOGERR_LOG_HOST	(1U << 13)
+#define	LOGERR_LOG_TAG	(1U << 14)
+#define	LOGERR_LOG_PID	(1U << 15)
+#define	LOGERR_ERR	(1U << 21)
+#define	LOGERR_ERR_DATE	(1U << 22)
+#define	LOGERR_ERR_HOST	(1U << 23)
+#define	LOGERR_ERR_TAG	(1U << 24)
+#define	LOGERR_ERR_PID	(1U << 25)
+
+/* To build tag support or not. */
+//#define	LOGERR_TAG
+#if defined(LOGERR_TAG)
 void logsettag(const char *);
+#endif
 
 int logopen(const char *);
 void logclose(void);
