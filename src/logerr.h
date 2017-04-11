@@ -49,9 +49,15 @@ __printflike(1, 2) void logerr(const char *, ...);
 __printflike(1, 2) void logerrx(const char *, ...);
 
 void logsetopts(unsigned int);
-#define	LOGERR_WLOG	(1U << 1)
-#define	LOGERR_DEBUG	(1U << 2)
-#define	LOGERR_QUIET	(1U << 3)
+#define	LOGERR_LOG	(1U <<  1)
+#define	LOGERR_LOG_TAG	(1U <<  2)
+#define	LOGERR_LOG_PID	(1U <<  3)
+#define	LOGERR_LOG_DATE	(1U <<  4)
+#define	LOGERR_ERR_TAG	(1U << 11)
+#define	LOGERR_ERR_PID	(1U << 12)
+#define	LOGERR_DEBUG	(1U << 21)
+#define	LOGERR_QUIET	(1U << 22)
+void logsettag(const char *);
 
 int logopen(const char *);
 void logclose(void);
