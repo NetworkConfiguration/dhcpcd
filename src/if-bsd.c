@@ -120,19 +120,21 @@ int
 if_opensockets_os(struct dhcpcd_ctx *ctx)
 {
 	struct priv *priv;
-#ifdef ROUTE_MSGFILTER
-	unsigned int msgfilter = ROUTE_FILTER(RTM_IFINFO)
+#if defined(RO_MSGFILTER) || defined(ROUTE_MSGFILTER)
+	unsigned char msgfilter[] = {
+	    RTM_IFINFO,
 #ifdef RTM_IFANNOUNCE
-	    | ROUTE_FILTER(RTM_IFANNOUNCE)
+	    RTM_IFANNOUNCE,
 #endif
-	    | ROUTE_FILTER(RTM_ADD)
-	    | ROUTE_FILTER(RTM_CHANGE)
-	    | ROUTE_FILTER(RTM_DELETE)
+	    RTM_ADD, RTM_CHANGE, RTM_DELETE,
 #ifdef RTM_CHGADDR
-	    | ROUTE_FILTER(RTM_CHGADDR)
+	    RTM_CHGADDR,
 #endif
-	    | ROUTE_FILTER(RTM_DELADDR)
-	    | ROUTE_FILTER(RTM_NEWADDR);
+	    RTM_NEWADDR, RTM_DELADDR
+	};
+#ifdef ROUTE_MSGFILTER
+	unsigned int i, msgfilter_mask;
+#endif
 #endif
 
 	if ((priv = malloc(sizeof(*priv))) == NULL)
@@ -152,9 +154,17 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 	ctx->link_fd = xsocket(PF_ROUTE, SOCK_RAW | SOCK_FLAGS, AF_UNSPEC);
 #undef SOCK_FLAGS
 
-#ifdef ROUTE_MSGFILTER
-	if (setsockopt(ctx->link_fd, PF_ROUTE, ROUTE_MSGFILTER,
+#if defined(RO_MSGFILTER)
+	if (setsockopt(ctx->link_fd, PF_ROUTE, RO_MSGFILTER,
 	    &msgfilter, sizeof(msgfilter)) == -1)
+		logerr(__func__);
+#elif defined(ROUTE_MSGFILTER)
+	/* Convert the array into a bitmask. */
+	msgfilter_mask = 0;
+	for (i = 0; i < __arraycount(msgfilter); i++)
+		msgfilter_mask |= ROUTE_FILTER(msgfilter[i]);
+	if (setsockopt(ctx->link_fd, PF_ROUTE, ROUTE_MSGFILTER,
+	    &msgfilter_mask, sizeof(msgfilter_mask)) == -1)
 		logerr(__func__);
 #endif
 
