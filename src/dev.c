@@ -61,7 +61,7 @@ dev_stop1(struct dhcpcd_ctx *ctx, int stop)
 
 	if (ctx->dev) {
 		if (stop)
-			logdebug("dev: unloaded %s", ctx->dev->name);
+			logdebugx("dev: unloaded %s", ctx->dev->name);
 		eloop_event_delete(ctx->eloop, ctx->dev_fd);
 		ctx->dev->stop();
 		free(ctx->dev);
@@ -138,7 +138,7 @@ dev_start1(struct dhcpcd_ctx *ctx)
 
 	dp = opendir(DEVDIR);
 	if (dp == NULL) {
-		logdebug("dev: %s: %m", DEVDIR);
+		logdebug("dev: %s", DEVDIR);
 		return 0;
 	}
 

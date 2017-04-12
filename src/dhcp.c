@@ -600,7 +600,7 @@ get_option_routes(struct rt_head *routes, struct interface *ifp,
 		if (!(ifo->options & DHCPCD_CSR_WARNED) &&
 		    !(state->added & STATE_FAKE))
 		{
-			logdebug("%s: using %sClassless Static Routes",
+			logdebugx("%s: using %sClassless Static Routes",
 			    ifp->name, csr);
 			ifo->options |= DHCPCD_CSR_WARNED;
 		}
@@ -1128,7 +1128,7 @@ write_lease(const struct interface *ifp, const struct bootp *bootp, size_t len)
 	ssize_t bytes;
 	const struct dhcp_state *state = D_CSTATE(ifp);
 
-	logdebug("%s: writing lease `%s'", ifp->name, state->leasefile);
+	logdebugx("%s: writing lease `%s'", ifp->name, state->leasefile);
 
 	fd = open(state->leasefile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 	if (fd == -1)
@@ -1169,9 +1169,9 @@ read_lease(struct interface *ifp, struct bootp **bootp)
 		return 0;
 	}
 	if (state->leasefile[0] == '\0')
-		logdebug("reading standard input");
+		logdebugx("reading standard input");
 	else
-		logdebug("%s: reading lease `%s'",
+		logdebugx("%s: reading lease `%s'",
 		    ifp->name, state->leasefile);
 
 	bytes = dhcp_read_lease_fd(fd, (void **)&lease);
@@ -1210,15 +1210,15 @@ read_lease(struct interface *ifp, struct bootp **bootp)
 		if (dhcp_auth_validate(&state->auth, &ifp->options->auth,
 		    lease, bytes, 4, type, auth, auth_len) == NULL)
 		{
-			logdebug("%s: dhcp_auth_validate", ifp->name);
+			logerr("%s: authentication failed", ifp->name);
 			free(lease);
 			return 0;
 		}
 		if (state->auth.token)
-			logdebug("%s: validated using 0x%08" PRIu32,
+			logdebugx("%s: validated using 0x%08" PRIu32,
 			    ifp->name, state->auth.token->secretid);
 		else
-			logdebug("%s: accepted reconfigure key", ifp->name);
+			logdebugx("%s: accepted reconfigure key", ifp->name);
 	} else if ((ifp->options->auth.options & DHCPCD_AUTH_SENDREQUIRE) ==
 	    DHCPCD_AUTH_SENDREQUIRE)
 	{
@@ -1687,7 +1687,7 @@ send_message(struct interface *ifp, uint8_t type,
 		/* No carrier? Don't bother sending the packet. */
 		if (ifp->carrier == LINK_DOWN)
 			return;
-		logdebug("%s: sending %s with xid 0x%x",
+		logdebugx("%s: sending %s with xid 0x%x",
 		    ifp->name,
 		    ifo->options & DHCPCD_BOOTP ? "BOOTP" : get_dhcp_op(type),
 		    state->xid);
@@ -1707,7 +1707,7 @@ send_message(struct interface *ifp, uint8_t type,
 		 * However, we do need to advance the timeout. */
 		if (ifp->carrier == LINK_DOWN)
 			goto fail;
-		logdebug("%s: sending %s (xid 0x%x), next in %0.1f seconds",
+		logdebugx("%s: sending %s (xid 0x%x), next in %0.1f seconds",
 		    ifp->name,
 		    ifo->options & DHCPCD_BOOTP ? "BOOTP" : get_dhcp_op(type),
 		    state->xid,
@@ -1960,7 +1960,7 @@ dhcp_startrenew(void *arg)
 	eloop_timeout_delete(ifp->ctx->eloop, dhcp_startrenew, ifp);
 
 	lease = &state->lease;
-	logdebug("%s: renewing lease of %s", ifp->name,
+	logdebugx("%s: renewing lease of %s", ifp->name,
 	    inet_ntoa(lease->addr));
 	state->state = DHS_RENEW;
 	dhcp_new_xid(ifp);
@@ -1983,7 +1983,7 @@ dhcp_rebind(void *arg)
 	struct dhcp_lease *lease = &state->lease;
 
 	logwarnx("%s: failed to renew DHCP, rebinding", ifp->name);
-	logdebug("%s: expire in %"PRIu32" seconds",
+	logdebugx("%s: expire in %"PRIu32" seconds",
 	    ifp->name, lease->leasetime - lease->rebindtime);
 	state->state = DHS_REBIND;
 	eloop_timeout_delete(ifp->ctx->eloop, send_renew, ifp);
@@ -2031,7 +2031,7 @@ dhcp_arp_probed(struct arp_state *astate)
 	if (state->state == DHS_BOUND)
 		return;
 
-	logdebug("%s: DAD completed for %s",
+	logdebugx("%s: DAD completed for %s",
 	    ifp->name, inet_ntoa(astate->addr));
 	if (state->state != DHS_INFORM)
 		dhcp_bind(ifp);
@@ -2226,7 +2226,7 @@ dhcp_bind(struct interface *ifp)
 			if (state->addr &&
 			    lease->addr.s_addr == state->addr->addr.s_addr &&
 			    !(state->added & STATE_FAKE))
-				logdebug("%s: leased %s for %"PRIu32" seconds",
+				logdebugx("%s: leased %s for %"PRIu32" seconds",
 				    ifp->name, inet_ntoa(lease->addr),
 				    lease->leasetime);
 			else
@@ -2263,7 +2263,7 @@ dhcp_bind(struct interface *ifp)
 		    (time_t)lease->rebindtime, dhcp_rebind, ifp);
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    (time_t)lease->leasetime, dhcp_expire, ifp);
-		logdebug("%s: renew in %"PRIu32" seconds, rebind in %"PRIu32
+		logdebugx("%s: renew in %"PRIu32" seconds, rebind in %"PRIu32
 		    " seconds",
 		    ifp->name, lease->renewaltime, lease->rebindtime);
 	}
@@ -2751,7 +2751,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 	/* Handled in our BPF filter. */
 #if 0
 	if (bootp->op != BOOTREPLY) {
-		logdebug("%s: op (%d) is not BOOTREPLY",
+		logdebugx("%s: op (%d) is not BOOTREPLY",
 		    ifp->name, bootp->op);
 		return;
 	}
@@ -2761,7 +2761,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 	{
 		char buf[sizeof(bootp->chaddr) * 3];
 
-		logdebug("%s: xid 0x%x is for hwaddr %s",
+		logdebugx("%s: xid 0x%x is for hwaddr %s",
 		    ifp->name, ntohl(bootp->xid),
 		    hwaddr_ntoa(bootp->chaddr, sizeof(bootp->chaddr),
 		    buf, sizeof(buf)));
@@ -2774,7 +2774,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 	    bootp, bootp_len, DHO_MESSAGETYPE) == -1)
 		type = 0;
 	else if (ifo->options & DHCPCD_BOOTP) {
-		logdebug("%s: ignoring DHCP reply (expecting BOOTP)",
+		logdebugx("%s: ignoring DHCP reply (expecting BOOTP)",
 		    ifp->name);
 		return;
 	}
@@ -2788,13 +2788,11 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 		    (uint8_t *)bootp, bootp_len, 4, type,
 		    auth, auth_len) == NULL)
 		{
-			logdebug("%s: dhcp_auth_validate",
-			    ifp->name);
 			LOGDHCP0(logerrx, "authentication failed");
 			return;
 		}
 		if (state->auth.token)
-			logdebug("%s: validated using 0x%08" PRIu32,
+			logdebugx("%s: validated using 0x%08" PRIu32,
 			    ifp->name, state->auth.token->secretid);
 		else
 			loginfo("%s: accepted reconfigure key", ifp->name);
@@ -2822,7 +2820,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 				return;
 		}
 		if (state->state != DHS_BOUND && state->state != DHS_INFORM) {
-			LOGDHCP(logdebug, "not bound, ignoring Force Renew");
+			LOGDHCP(logdebugx, "not bound, ignoring Force Renew");
 			return;
 		}
 		LOGDHCP(loginfo, "Force Renew from");
@@ -2845,7 +2843,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 		/* Before we supported FORCERENEW we closed off the raw
 		 * port so we effectively ignored all messages.
 		 * As such we'll not log by default here. */
-		//LOGDHCP(logdebug, "bound, ignoring");
+		//LOGDHCP(logdebugx, "bound, ignoring");
 		return;
 	}
 
@@ -2853,7 +2851,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 #if 0
 	/* Ensure it's the right transaction */
 	if (state->xid != ntohl(bootp->xid)) {
-		logdebug("%s: wrong xid 0x%x (expecting 0x%x) from %s",
+		logdebugx("%s: wrong xid 0x%x (expecting 0x%x) from %s",
 		    ifp->name, ntohl(bootp->xid), state->xid,
 		    inet_ntoa(*from));
 		return;
@@ -2862,7 +2860,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 
 	if (state->state == DHS_PROBE) {
 		/* Ignore any DHCP messages whilst probing a lease to bind. */
-		LOGDHCP(logdebug, "probing, ignoring");
+		LOGDHCP(logdebugx, "probing, ignoring");
 		return;
 	}
 
@@ -3077,14 +3075,14 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 			    DHO_RAPIDCOMMIT, NULL))
 				state->state = DHS_REQUEST;
 			else {
-				LOGDHCP(logdebug, "ignoring ack of");
+				LOGDHCP(logdebugx, "ignoring ack of");
 				return;
 			}
 		}
 
 rapidcommit:
 		if (!(ifo->options & DHCPCD_INFORM))
-			LOGDHCP(logdebug, "acknowledged");
+			LOGDHCP(logdebugx, "acknowledged");
 		else
 		    ifo->options &= ~DHCPCD_STATIC;
 	}
@@ -3445,11 +3443,11 @@ dhcp_init(struct interface *ifp)
 		return 0;
 
 	if (ifo->options & DHCPCD_CLIENTID)
-		logdebug("%s: using ClientID %s", ifp->name,
+		logdebugx("%s: using ClientID %s", ifp->name,
 		    hwaddr_ntoa(state->clientid + 1, state->clientid[0],
 			buf, sizeof(buf)));
 	else if (ifp->hwlen)
-		logdebug("%s: using hwaddr %s", ifp->name,
+		logdebugx("%s: using hwaddr %s", ifp->name,
 		    hwaddr_ntoa(ifp->hwaddr, ifp->hwlen, buf, sizeof(buf)));
 	return 0;
 
@@ -3594,7 +3592,7 @@ dhcp_start1(void *arg)
 			if (now == -1 ||
 			    (time_t)state->lease.leasetime < now - st.st_mtime)
 			{
-				logdebug("%s: discarding expired lease",
+				logdebugx("%s: discarding expired lease",
 				    ifp->name);
 				free(state->offer);
 				state->offer = NULL;
@@ -3702,7 +3700,7 @@ dhcp_start(struct interface *ifp)
 	tv.tv_nsec = (suseconds_t)arc4random_uniform(
 	    (DHCP_MAX_DELAY - DHCP_MIN_DELAY) * NSEC_PER_SEC);
 	timespecnorm(&tv);
-	logdebug("%s: delaying IPv4 for %0.1f seconds",
+	logdebugx("%s: delaying IPv4 for %0.1f seconds",
 	    ifp->name, timespec_to_double(&tv));
 
 	eloop_timeout_add_tv(ifp->ctx->eloop, &tv, dhcp_start1, ifp);

@@ -1645,7 +1645,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp)
 	else if (!(ctx->options & DHCPCD_TEST)) {
 		if (if_disable_autolinklocal(ctx, ifp->index) == -1)
 			logdebug("%s: if_disable_autolinklocal: %s",
-			    ifp->name, strerror(errno));
+			    ifp->name);
 	}
 	if (ifp)
 		ifname = ifp->name;
@@ -1665,13 +1665,13 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp)
 	snprintf(path, sizeof(path), "%s/%s/accept_ra", prefix, ifname);
 	ra = check_proc_int(path);
 	if (ra == -1) {
-		logfunc_t *logfunc = errno == ENOENT? logdebug : logwarnx;
+		logfunc_t *logfunc = errno == ENOENT? logdebug : logwarn;
 
 		/* The sysctl probably doesn't exist, but this isn't an
 		 * error as such so just log it and continue */
-		logfunc("%s: %s", path, strerror(errno));
+		logfunc("%s", path);
 	} else if (ra != 0 && !(ctx->options & DHCPCD_TEST)) {
-		logdebug("%s: disabling kernel IPv6 RA support", ifname);
+		logdebugx("%s: disabling kernel IPv6 RA support", ifname);
 		if (write_path(path, "0") == -1) {
 			logerr("%s: %s", __func__, path);
 			return ra;

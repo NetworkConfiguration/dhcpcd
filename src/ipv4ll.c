@@ -202,7 +202,7 @@ ipv4ll_probed(struct arp_state *astate)
 #ifdef IN_IFF_NOTREADY
 	if (ia->addr_flags & IN_IFF_NOTREADY)
 		return;
-	logdebug("%s: DAD completed for %s",
+	logdebugx("%s: DAD completed for %s",
 	    ifp->name, inet_ntoa(astate->addr));
 #endif
 test:
@@ -297,7 +297,7 @@ ipv4ll_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 		    state->addr->addr.s_addr, state->addr->addr.s_addr) == -1)
 			logerr(__func__);
 		else {
-			logdebug("%s: defended IPv4LL address %s",
+			logdebugx("%s: defended IPv4LL address %s",
 			    ifp->name, state->addr->saddr);
 			state->defend = now;
 			return;

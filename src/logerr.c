@@ -226,6 +226,16 @@ logdebug(const char *fmt, ...)
 	va_list args;
 
 	va_start(args, fmt);
+	vlogerrmessage(LOG_DEBUG, fmt, args);
+	va_end(args);
+}
+
+void
+logdebugx(const char *fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
 	vlogmessage(LOG_DEBUG, fmt, args);
 	va_end(args);
 }

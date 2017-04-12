@@ -1346,7 +1346,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp)
 		if (!(ctx->options & DHCPCD_TEST) &&
 		    flags & ND6_IFF_AUTO_LINKLOCAL)
 		{
-			logdebug("%s: disabling Kernel IPv6 auto "
+			logdebugx("%s: disabling Kernel IPv6 auto "
 			    "link-local support",
 			    ifp->name);
 			flags &= ~ND6_IFF_AUTO_LINKLOCAL;
@@ -1364,7 +1364,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp)
 		if (!(ctx->options & DHCPCD_TEST) &&
 		    flags & ND6_IFF_ACCEPT_RTADV)
 		{
-			logdebug("%s: disabling Kernel IPv6 RA support",
+			logdebugx("%s: disabling Kernel IPv6 RA support",
 			    ifp->name);
 			flags &= ~ND6_IFF_ACCEPT_RTADV;
 		}
@@ -1435,7 +1435,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp)
 		else
 			logerr("IPV6CTL_ACCEPT_RTADV");
 	else if (ra != 0 && !(ctx->options & DHCPCD_TEST)) {
-		logdebug("disabling Kernel IPv6 RA support");
+		logdebugx("disabling Kernel IPv6 RA support");
 		if (set_inet6_sysctl(IPV6CTL_ACCEPT_RTADV, 0) == -1) {
 			logerr("IPV6CTL_ACCEPT_RTADV");
 			return ra;

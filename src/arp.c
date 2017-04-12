@@ -152,7 +152,7 @@ arp_packet(struct interface *ifp, uint8_t *data, size_t len)
 	}
 	if (ifn) {
 #ifdef ARP_DEBUG
-		logdebug("%s: ignoring ARP from self", ifp->name);
+		logdebugx("%s: ignoring ARP from self", ifp->name);
 #endif
 		return;
 	}
@@ -256,7 +256,7 @@ arp_probe1(void *arg)
 		tv.tv_nsec = 0;
 		eloop_timeout_add_tv(ifp->ctx->eloop, &tv, arp_probed, astate);
 	}
-	logdebug("%s: ARP probing %s (%d of %d), next in %0.1f seconds",
+	logdebugx("%s: ARP probing %s (%d of %d), next in %0.1f seconds",
 	    ifp->name, inet_ntoa(astate->addr),
 	    astate->probes ? astate->probes : PROBE_NUM, PROBE_NUM,
 	    timespec_to_double(&tv));
@@ -278,7 +278,7 @@ arp_probe(struct arp_state *astate)
 			logerr(__func__);
 	}
 	astate->probes = 0;
-	logdebug("%s: probing for %s",
+	logdebugx("%s: probing for %s",
 	    astate->iface->name, inet_ntoa(astate->addr));
 	arp_probe1(astate);
 }
@@ -311,12 +311,12 @@ arp_announce1(void *arg)
 	astate->claims++;
 #else
 	if (++astate->claims < ANNOUNCE_NUM)
-		logdebug("%s: ARP announcing %s (%d of %d), "
+		logdebugx("%s: ARP announcing %s (%d of %d), "
 		    "next in %d.0 seconds",
 		    ifp->name, inet_ntoa(astate->addr),
 		    astate->claims, ANNOUNCE_NUM, ANNOUNCE_WAIT);
 	else
-		logdebug("%s: ARP announcing %s (%d of %d)",
+		logdebugx("%s: ARP announcing %s (%d of %d)",
 		    ifp->name, inet_ntoa(astate->addr),
 		    astate->claims, ANNOUNCE_NUM);
 	if (arp_request(ifp, astate->addr.s_addr, astate->addr.s_addr) == -1)

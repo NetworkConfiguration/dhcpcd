@@ -268,7 +268,7 @@ ipv6nd_sendrsprobe(void *arg)
 	struct in6_pktinfo pi;
 
 	if (ipv6_linklocal(ifp) == NULL) {
-		logdebug("%s: delaying Router Solicitation for LL address",
+		logdebugx("%s: delaying Router Solicitation for LL address",
 		    ifp->name);
 		ipv6_addlinklocalcallback(ifp, ipv6nd_sendrsprobe, ifp);
 		return;
@@ -302,7 +302,7 @@ ipv6nd_sendrsprobe(void *arg)
 	pi.ipi6_ifindex = ifp->index;
 	memcpy(CMSG_DATA(cm), &pi, sizeof(pi));
 
-	logdebug("%s: sending Router Solicitation", ifp->name);
+	logdebugx("%s: sending Router Solicitation", ifp->name);
 	if (sendmsg(ctx->nd_fd, &ctx->sndhdr, 0) == -1) {
 		logerr(__func__);
 		/* Allow IPv6ND to continue .... at most a few errors
@@ -551,7 +551,7 @@ ipv6nd_scriptrun(struct ra *rap)
 			    IN6_IFF_TENTATIVE))
 				ap->flags |= IPV6_AF_DADCOMPLETED;
 			if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0) {
-				logdebug("%s: waiting for Router Advertisement"
+				logdebugx("%s: waiting for Router Advertisement"
 				    " DAD to complete",
 				    rap->iface->name);
 				return 0;
@@ -693,7 +693,7 @@ try_script:
 			}
 
 			if (wascompleted && found) {
-				logdebug("%s: Router Advertisement DAD "
+				logdebugx("%s: Router Advertisement DAD "
 				    "completed",
 				    rap->iface->name);
 				if (ipv6nd_scriptrun(rap))
@@ -741,7 +741,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 
 	if (ifp == NULL) {
 #ifdef DEBUG_RS
-		logdebug("RA for unexpected interface from %s",
+		logdebugx("RA for unexpected interface from %s",
 		    ctx->sfrom);
 #endif
 		return;
@@ -775,14 +775,14 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	/* We could receive a RA before we sent a RS*/
 	if (ipv6_linklocal(ifp) == NULL) {
 #ifdef DEBUG_RS
-		logdebug("%s: received RA from %s (no link-local)",
+		logdebugx("%s: received RA from %s (no link-local)",
 		    ifp->name, ctx->sfrom);
 #endif
 		return;
 	}
 
 	if (ipv6_iffindaddr(ifp, &ctx->from.sin6_addr, IN6_IFF_TENTATIVE)) {
-		logdebug("%s: ignoring RA from ourself %s",
+		logdebugx("%s: ignoring RA from ourself %s",
 		    ifp->name, ctx->sfrom);
 		return;
 	}
@@ -836,7 +836,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	 * routers like to decrease the advertised valid and preferred times
 	 * in accordance with the own prefix times which would result in too
 	 * much needless log spam. */
-	logfunc = new_rap ? loginfo : logdebug,
+	logfunc = new_rap ? loginfo : logdebugx,
 	logfunc("%s: Router Advertisement from %s",
 	    ifp->name, ctx->sfrom);
 
@@ -906,7 +906,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 
 		switch (ndo.nd_opt_type) {
 		case ND_OPT_PREFIX_INFORMATION:
-			logfunc = new_data ? logerrx : logdebug;
+			logfunc = new_data ? logerrx : logdebugx;
 			if (ndo.nd_opt_len != 4) {
 				logfunc("%s: invalid option len for prefix",
 				    ifp->name);
@@ -1110,7 +1110,7 @@ handle_flag:
 			LOG_DHCP6("dhcp6_start: %s", ifp->name);
 	} else {
 		if (new_data)
-			logdebug("%s: No DHCPv6 instruction in RA", ifp->name);
+			logdebugx("%s: No DHCPv6 instruction in RA", ifp->name);
 nodhcp6:
 		if (ifp->ctx->options & DHCPCD_TEST) {
 			eloop_exit(ifp->ctx->eloop, EXIT_SUCCESS);
@@ -1455,7 +1455,7 @@ ipv6nd_handlena(struct dhcpcd_ctx *ctx, struct interface *ifp,
 
 	if (ifp == NULL) {
 #ifdef DEBUG_NS
-		logdebug("NA for unexpected interface from %s",
+		logdebugx("NA for unexpected interface from %s",
 		    ctx->sfrom);
 #endif
 		return;
@@ -1495,14 +1495,14 @@ ipv6nd_handlena(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	}
 	if (rap == NULL) {
 #ifdef DEBUG_NS
-		logdebug("%s: unexpected NA from %s for %s",
+		logdebugx("%s: unexpected NA from %s for %s",
 		    ifp->name, ctx->sfrom, taddr);
 #endif
 		return;
 	}
 
 #ifdef DEBUG_NS
-	logdebug("%s: %sNA for %s from %s",
+	logdebugx("%s: %sNA for %s from %s",
 	    ifp->name, is_solicited ? "solicited " : "", taddr, ctx->sfrom);
 #endif
 
@@ -1657,7 +1657,7 @@ ipv6nd_startrs(struct interface *ifp)
 	tv.tv_nsec = (suseconds_t)arc4random_uniform(
 	    MAX_RTR_SOLICITATION_DELAY * NSEC_PER_SEC);
 	timespecnorm(&tv);
-	logdebug("%s: delaying IPv6 router solicitation for %0.1f seconds",
+	logdebugx("%s: delaying IPv6 router solicitation for %0.1f seconds",
 	    ifp->name, timespec_to_double(&tv));
 	eloop_timeout_add_tv(ifp->ctx->eloop, &tv, ipv6nd_startrs1, ifp);
 	return;

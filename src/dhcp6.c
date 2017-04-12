@@ -1085,7 +1085,7 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 	}
 
 	if (!callback)
-		logdebug("%s: %s %s with xid 0x%02x%02x%02x",
+		logdebugx("%s: %s %s with xid 0x%02x%02x%02x",
 		    ifp->name,
 		    broad_uni,
 		    dhcp6_get_op(state->send->type),
@@ -1152,7 +1152,7 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 
 logsend:
 		if (ifp->carrier != LINK_DOWN)
-			logdebug("%s: %s %s (xid 0x%02x%02x%02x),"
+			logdebugx("%s: %s %s (xid 0x%02x%02x%02x),"
 			    " next in %0.1f seconds",
 			    ifp->name,
 			    broad_uni,
@@ -1363,7 +1363,7 @@ dhcp6_dadcallback(void *arg)
 				}
 			}
 			if (!wascompleted) {
-				logdebug("%s: DHCPv6 DAD completed",
+				logdebugx("%s: DHCPv6 DAD completed",
 				    ifp->name);
 				script_runreason(ifp,
 				    ap->delegating_prefix ?
@@ -1723,7 +1723,7 @@ dhcp6_checkstatusok(const struct interface *ifp,
 	else
 		farg = m;
 	if ((opt = f(farg, len, D6_OPTION_STATUS_CODE, &opt_len)) == NULL) {
-		//logdebug("%s: no status", ifp->name);
+		//logdebugx("%s: no status", ifp->name);
 		return 0;
 	}
 
@@ -2099,7 +2099,7 @@ dhcp6_findia(struct interface *ifp, struct dhcp6_message *m, size_t l,
 		if (j == ifo->ia_len &&
 		    !(ifo->ia_len == 0 && ifp->ctx->options & DHCPCD_DUMPLEASE))
 		{
-			logdebug("%s: ignoring unrequested IAID %s",
+			logdebugx("%s: ignoring unrequested IAID %s",
 			    ifp->name,
 			    hwaddr_ntoa(ia.iaid, sizeof(ia.iaid),
 			    buf, sizeof(buf)));
@@ -2228,7 +2228,7 @@ dhcp6_writelease(const struct interface *ifp)
 	ssize_t bytes;
 
 	state = D6_CSTATE(ifp);
-	logdebug("%s: writing lease `%s'", ifp->name, state->leasefile);
+	logdebugx("%s: writing lease `%s'", ifp->name, state->leasefile);
 
 	fd = open(state->leasefile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 	if (fd == -1) {
@@ -2258,11 +2258,11 @@ dhcp6_readlease(struct interface *ifp, int validate)
 
 	state = D6_STATE(ifp);
 	if (state->leasefile[0] == '\0') {
-		logdebug("reading standard input");
+		logdebugx("reading standard input");
 		fd = fileno(stdin);
 		fd_opened = false;
 	} else {
-		logdebug("%s: reading lease `%s'", ifp->name, state->leasefile);
+		logdebugx("%s: reading lease `%s'", ifp->name, state->leasefile);
 		fd = open(state->leasefile, O_RDONLY);
 		if (fd != -1 && fstat(fd, &st) == -1) {
 			close(fd);
@@ -2307,7 +2307,7 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	    state->leasefile[0] != '\0')
 	{
 		if ((time_t)state->expire < now - st.st_mtime) {
-			logdebug("%s: discarding expired lease", ifp->name);
+			logdebugx("%s: discarding expired lease", ifp->name);
 			retval = 0;
 			goto ex;
 		}
@@ -2323,12 +2323,11 @@ auth:
 		    (uint8_t *)state->new, state->new_len, 6, state->new->type,
 		    o, ol) == NULL)
 		{
-			logdebug("%s: dhcp_auth_validate", __func__);
 			logerr("%s: authentication failed", ifp->name);
 			goto ex;
 		}
 		if (state->auth.token)
-			logdebug("%s: validated using 0x%08" PRIu32,
+			logdebugx("%s: validated using 0x%08" PRIu32,
 			    ifp->name, state->auth.token->secretid);
 		else
 			loginfo("%s: accepted reconfigure key", ifp->name);
@@ -2525,7 +2524,7 @@ dhcp6_script_try_run(struct interface *ifp, int delegated)
 		if (!delegated)
 			dhcpcd_daemonise(ifp->ctx);
 	} else
-		logdebug("%s: waiting for DHCPv6 DAD to complete", ifp->name);
+		logdebugx("%s: waiting for DHCPv6 DAD to complete", ifp->name);
 }
 
 #ifdef SMALL
@@ -2570,7 +2569,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 				if (ap->flags & IPV6_AF_NEW)
 					logfunc = loginfo;
 				else
-					logfunc = logdebug;
+					logfunc = logdebugx;
 				/* We only want to log this the once as we loop
 				 * through many interfaces first. */
 				ap->flags |= IPV6_AF_DELEGATEDLOG;
@@ -2587,7 +2586,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 					/* no SLA configured, so lets
 					 * automate it */
 					if (ifd->carrier != LINK_UP) {
-						logdebug(
+						logdebugx(
 						    "%s: has no carrier, cannot"
 						    " delegate addresses",
 						    ifd->name);
@@ -2603,7 +2602,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 					if (strcmp(ifd->name, sla->ifname))
 						continue;
 					if (ifd->carrier != LINK_UP) {
-						logdebug(
+						logdebugx(
 						    "%s: has no carrier, cannot"
 						    " delegate addresses",
 						    ifd->name);
@@ -2667,7 +2666,7 @@ dhcp6_find_delegates(struct interface *ifp)
 					if (strcmp(ifp->name, sla->ifname))
 						continue;
 					if (ipv6_linklocal(ifp) == NULL) {
-						logdebug(
+						logdebugx(
 						    "%s: delaying adding"
 						    " delegated addresses for"
 						    " LL address",
@@ -2768,7 +2767,7 @@ dhcp6_handledata(void *arg)
 			break;
 	}
 	if (ifp == NULL) {
-		logdebug("DHCPv6 reply for unexpected interface from %s",
+		logdebugx("DHCPv6 reply for unexpected interface from %s",
 		    ctx->sfrom);
 		return;
 	}
@@ -2786,7 +2785,7 @@ dhcp6_handledata(void *arg)
 	if (r->type != DHCP6_RECONFIGURE &&
 	    (state->state == DH6S_BOUND || state->state == DH6S_INFORMED))
 	{
-		logdebug("%s: DHCPv6 reply received but already bound",
+		logdebugx("%s: DHCPv6 reply received but already bound",
 		    ifp->name);
 		return;
 	}
@@ -2796,7 +2795,7 @@ dhcp6_handledata(void *arg)
 	    r->xid[1] != state->send->xid[1] ||
 	    r->xid[2] != state->send->xid[2]))
 	{
-		logdebug("%s: wrong xid 0x%02x%02x%02x"
+		logdebugx("%s: wrong xid 0x%02x%02x%02x"
 		    " (expecting 0x%02x%02x%02x) from %s",
 		    ifp->name,
 		    r->xid[0], r->xid[1], r->xid[2],
@@ -2807,7 +2806,7 @@ dhcp6_handledata(void *arg)
 	}
 
 	if (dhcp6_findmoption(r, len, D6_OPTION_SERVERID, NULL) == NULL) {
-		logdebug("%s: no DHCPv6 server ID from %s",
+		logdebugx("%s: no DHCPv6 server ID from %s",
 		    ifp->name, ctx->sfrom);
 		return;
 	}
@@ -2816,7 +2815,7 @@ dhcp6_handledata(void *arg)
 	if (o == NULL || ol != ctx->duid_len ||
 	    memcmp(o, ctx->duid, ol) != 0)
 	{
-		logdebug("%s: incorrect client ID from %s",
+		logdebugx("%s: incorrect client ID from %s",
 		    ifp->name, ctx->sfrom);
 		return;
 	}
@@ -2849,13 +2848,12 @@ dhcp6_handledata(void *arg)
 		if (dhcp_auth_validate(&state->auth, &ifo->auth,
 		    (uint8_t *)r, len, 6, r->type, auth, auth_len) == NULL)
 		{
-			logdebug("dhcp_auth_validate");
-			logerrx("%s: authentication failed from %s",
+			logerr("%s: authentication failed from %s",
 			    ifp->name, ctx->sfrom);
 			return;
 		}
 		if (state->auth.token)
-			logdebug("%s: validated using 0x%08" PRIu32,
+			logdebugx("%s: validated using 0x%08" PRIu32,
 			    ifp->name, state->auth.token->secretid);
 		else
 			loginfo("%s: accepted reconfigure key", ifp->name);
@@ -2948,7 +2946,7 @@ dhcp6_handledata(void *arg)
 			memcpy(&max_rt, o, sizeof(max_rt));
 			max_rt = ntohl(max_rt);
 			if (max_rt >= 60 && max_rt <= 86400) {
-				logdebug("%s: SOL_MAX_RT %llu -> %u",
+				logdebugx("%s: SOL_MAX_RT %llu -> %u",
 				    ifp->name,
 				    (unsigned long long)state->sol_max_rt,
 				    max_rt);
@@ -2964,7 +2962,7 @@ dhcp6_handledata(void *arg)
 			memcpy(&max_rt, o, sizeof(max_rt));
 			max_rt = ntohl(max_rt);
 			if (max_rt >= 60 && max_rt <= 86400) {
-				logdebug("%s: INF_MAX_RT %llu -> %u",
+				logdebugx("%s: INF_MAX_RT %llu -> %u",
 				    ifp->name,
 				    (unsigned long long)state->inf_max_rt,
 				    max_rt);
@@ -3070,7 +3068,7 @@ dhcp6_handledata(void *arg)
 			break;
 		}
 	}
-	lognewinfo = has_new ? loginfo : logdebug;
+	lognewinfo = has_new ? loginfo : logdebugx;
 	lognewinfo("%s: %s received from %s", ifp->name, op, ctx->sfrom);
 
 	state->reason = NULL;
@@ -3393,7 +3391,7 @@ gogogo:
 	dhcp_set_leasefile(state->leasefile, sizeof(state->leasefile),
 	    AF_INET6, ifp);
 	if (ipv6_linklocal(ifp) == NULL) {
-		logdebug("%s: delaying DHCPv6 soliciation for LL address",
+		logdebugx("%s: delaying DHCPv6 soliciation for LL address",
 		    ifp->name);
 		ipv6_addlinklocalcallback(ifp, dhcp6_start1, ifp);
 		return 0;
