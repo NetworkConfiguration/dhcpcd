@@ -1859,10 +1859,10 @@ dhcp_discover(void *arg)
 		    ifo->reboot, ipv4ll_start, ifp);
 #endif
 	if (ifo->options & DHCPCD_REQUEST)
-		loginfo("%s: soliciting a DHCP lease (requesting %s)",
+		loginfox("%s: soliciting a DHCP lease (requesting %s)",
 		    ifp->name, inet_ntoa(ifo->req_addr));
 	else
-		loginfo("%s: soliciting a %s lease",
+		loginfox("%s: soliciting a %s lease",
 		    ifp->name, ifo->options & DHCPCD_BOOTP ? "BOOTP" : "DHCP");
 	send_discover(ifp);
 }
@@ -2178,13 +2178,13 @@ dhcp_bind(struct interface *ifp)
 	}
 	get_lease(ifp, lease, state->new, state->new_len);
 	if (ifo->options & DHCPCD_STATIC) {
-		loginfo("%s: using static address %s/%d",
+		loginfox("%s: using static address %s/%d",
 		    ifp->name, inet_ntoa(lease->addr),
 		    inet_ntocidr(lease->mask));
 		lease->leasetime = ~0U;
 		state->reason = "STATIC";
 	} else if (ifo->options & DHCPCD_INFORM) {
-		loginfo("%s: received approval for %s",
+		loginfox("%s: received approval for %s",
 		    ifp->name, inet_ntoa(lease->addr));
 		lease->leasetime = ~0U;
 		state->reason = "INFORM";
@@ -2195,7 +2195,7 @@ dhcp_bind(struct interface *ifp)
 			lease->renewaltime =
 			    lease->rebindtime =
 			    lease->leasetime;
-			loginfo("%s: leased %s for infinity",
+			loginfox("%s: leased %s for infinity",
 			   ifp->name, inet_ntoa(lease->addr));
 		} else {
 			if (lease->leasetime < DHCP_MIN_LEASE) {
@@ -2230,7 +2230,7 @@ dhcp_bind(struct interface *ifp)
 				    ifp->name, inet_ntoa(lease->addr),
 				    lease->leasetime);
 			else
-				loginfo("%s: leased %s for %"PRIu32" seconds",
+				loginfox("%s: leased %s for %"PRIu32" seconds",
 				    ifp->name, inet_ntoa(lease->addr),
 				    lease->leasetime);
 		}
@@ -2285,7 +2285,7 @@ dhcp_lastlease(void *arg)
 	struct interface *ifp = arg;
 	struct dhcp_state *state = D_STATE(ifp);
 
-	loginfo("%s: timed out contacting a DHCP server, using last lease",
+	loginfox("%s: timed out contacting a DHCP server, using last lease",
 	    ifp->name);
 	dhcp_bind(ifp);
 	/* If we forked, stop here. */
@@ -2361,7 +2361,7 @@ dhcp_arp_address(struct interface *ifp)
 			/* Add the address now, let the kernel handle DAD. */
 			ipv4_addaddr(ifp, &l.addr, &l.mask, &l.brd);
 		} else
-			loginfo("%s: waiting for DAD on %s",
+			loginfox("%s: waiting for DAD on %s",
 			    ifp->name, inet_ntoa(addr));
 		return 0;
 	}
@@ -2370,7 +2370,7 @@ dhcp_arp_address(struct interface *ifp)
 		struct dhcp_lease l;
 
 		get_lease(ifp, &l, state->offer, state->offer_len);
-		loginfo("%s: probing address %s/%d",
+		loginfox("%s: probing address %s/%d",
 		    ifp->name, inet_ntoa(l.addr), inet_ntocidr(l.mask));
 		/* We need to handle DAD. */
 		arp_probe(astate);
@@ -2404,7 +2404,7 @@ dhcp_static(struct interface *ifp)
 	if (ifo->req_addr.s_addr == INADDR_ANY &&
 	    (ia = ipv4_iffindaddr(ifp, NULL, NULL)) == NULL)
 	{
-		loginfo("%s: waiting for 3rd party to "
+		loginfox("%s: waiting for 3rd party to "
 		    "configure IP address", ifp->name);
 		state->reason = "3RDPARTY";
 		script_runreason(ifp, state->reason);
@@ -2440,7 +2440,7 @@ dhcp_inform(struct interface *ifp)
 	if (ifo->req_addr.s_addr == INADDR_ANY) {
 		ia = ipv4_iffindaddr(ifp, NULL, NULL);
 		if (ia == NULL) {
-			loginfo("%s: waiting for 3rd party to "
+			loginfox("%s: waiting for 3rd party to "
 			    "configure IP address",
 			    ifp->name);
 			if (!(ifp->ctx->options & DHCPCD_TEST)) {
@@ -2515,7 +2515,7 @@ dhcp_reboot(struct interface *ifp)
 	state->interval = 0;
 
 	if (ifo->options & DHCPCD_LINK && ifp->carrier == LINK_DOWN) {
-		loginfo("%s: waiting for carrier", ifp->name);
+		loginfox("%s: waiting for carrier", ifp->name);
 		return;
 	}
 	if (ifo->options & DHCPCD_STATIC) {
@@ -2523,7 +2523,7 @@ dhcp_reboot(struct interface *ifp)
 		return;
 	}
 	if (ifo->options & DHCPCD_INFORM) {
-		loginfo("%s: informing address of %s",
+		loginfox("%s: informing address of %s",
 		    ifp->name, inet_ntoa(state->lease.addr));
 		dhcp_inform(ifp);
 		return;
@@ -2535,7 +2535,7 @@ dhcp_reboot(struct interface *ifp)
 	if (!IS_DHCP(state->offer))
 		return;
 
-	loginfo("%s: rebinding lease of %s",
+	loginfox("%s: rebinding lease of %s",
 	    ifp->name, inet_ntoa(state->lease.addr));
 	dhcp_new_xid(ifp);
 	state->lease.server.s_addr = 0;
@@ -2593,7 +2593,7 @@ dhcp_drop(struct interface *ifp, const char *reason)
 		    state->new != NULL &&
 		    state->lease.server.s_addr != INADDR_ANY)
 		{
-			loginfo("%s: releasing lease of %s",
+			loginfox("%s: releasing lease of %s",
 			    ifp->name, inet_ntoa(state->lease.addr));
 			dhcp_new_xid(ifp);
 			send_message(ifp, DHCP_RELEASE, NULL);
@@ -2795,7 +2795,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 			logdebugx("%s: validated using 0x%08" PRIu32,
 			    ifp->name, state->auth.token->secretid);
 		else
-			loginfo("%s: accepted reconfigure key", ifp->name);
+			loginfox("%s: accepted reconfigure key", ifp->name);
 	} else if (ifo->auth.options & DHCPCD_AUTH_SEND) {
 		if (ifo->auth.options & DHCPCD_AUTH_REQUIRE) {
 			LOGDHCP0(logerrx, "no authentication");
@@ -2823,7 +2823,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 			LOGDHCP(logdebugx, "not bound, ignoring Force Renew");
 			return;
 		}
-		LOGDHCP(loginfo, "Force Renew from");
+		LOGDHCP(loginfox, "Force Renew from");
 		/* The rebind and expire timings are still the same, we just
 		 * enter the renew state early */
 		if (state->state == DHS_BOUND)
@@ -3016,7 +3016,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 			goto rapidcommit;
 		}
 
-		LOGDHCP(loginfo, "offered");
+		LOGDHCP(loginfox, "offered");
 		if (state->offer_len < bootp_len) {
 			free(state->offer);
 			if ((state->offer = malloc(bootp_len)) == NULL) {
@@ -3735,7 +3735,7 @@ dhcp_handleifa(int cmd, struct ipv4_addr *ia)
 
 	if (cmd == RTM_DELADDR) {
 		if (state->addr == ia) {
-			loginfo("%s: deleted IP address %s",
+			loginfox("%s: deleted IP address %s",
 			    ifp->name, ia->saddr);
 			state->addr = NULL;
 			/* Don't clear the added state as we need

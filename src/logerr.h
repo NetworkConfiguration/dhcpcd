@@ -43,6 +43,7 @@ __printflike(1, 2) typedef void logfunc_t(const char *, ...);
 __printflike(1, 2) void logdebug(const char *, ...);
 __printflike(1, 2) void logdebugx(const char *, ...);
 __printflike(1, 2) void loginfo(const char *, ...);
+__printflike(1, 2) void loginfox(const char *, ...);
 __printflike(1, 2) void logwarn(const char *, ...);
 __printflike(1, 2) void logwarnx(const char *, ...);
 __printflike(1, 2) void logerr(const char *, ...);

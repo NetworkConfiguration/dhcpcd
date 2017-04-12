@@ -1440,7 +1440,7 @@ dhcp6_startdiscover(void *arg)
 #ifndef SMALL
 	dhcp6_delete_delegates(ifp);
 #endif
-	loginfo("%s: soliciting a DHCPv6 lease", ifp->name);
+	loginfox("%s: soliciting a DHCPv6 lease", ifp->name);
 	state = D6_STATE(ifp);
 	state->state = DH6S_DISCOVER;
 	state->RTC = 0;
@@ -1543,7 +1543,7 @@ dhcp6_startrebind(void *arg)
 	if (state->state == DH6S_RENEW)
 		logwarnx("%s: failed to renew DHCPv6, rebinding", ifp->name);
 	else
-		loginfo("%s: rebinding prior DHCPv6 lease", ifp->name);
+		loginfox("%s: rebinding prior DHCPv6 lease", ifp->name);
 	state->state = DH6S_REBIND;
 	state->RTC = 0;
 	state->MRC = 0;
@@ -1611,7 +1611,7 @@ dhcp6_startconfirm(struct interface *ifp)
 	state->MRT = CNF_MAX_RT;
 	state->MRC = 0;
 
-	loginfo("%s: confirming prior DHCPv6 lease", ifp->name);
+	loginfox("%s: confirming prior DHCPv6 lease", ifp->name);
 	if (dhcp6_makemessage(ifp) == -1) {
 		logerr("%s: %s", __func__, ifp->name);
 		return;
@@ -1630,7 +1630,7 @@ dhcp6_startinform(void *arg)
 	ifp = arg;
 	state = D6_STATE(ifp);
 	if (state->new == NULL || ifp->options->options & DHCPCD_DEBUG)
-		loginfo("%s: requesting DHCPv6 information", ifp->name);
+		loginfox("%s: requesting DHCPv6 information", ifp->name);
 	state->state = DH6S_INFORM;
 	state->RTC = 0;
 	state->IMD = INF_MAX_DELAY;
@@ -2330,7 +2330,7 @@ auth:
 			logdebugx("%s: validated using 0x%08" PRIu32,
 			    ifp->name, state->auth.token->secretid);
 		else
-			loginfo("%s: accepted reconfigure key", ifp->name);
+			loginfox("%s: accepted reconfigure key", ifp->name);
 	} else if ((ifp->options->auth.options & DHCPCD_AUTH_SENDREQUIRE) ==
 	    DHCPCD_AUTH_SENDREQUIRE)
 	{
@@ -2567,7 +2567,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 				logfunc_t *logfunc;
 
 				if (ap->flags & IPV6_AF_NEW)
-					logfunc = loginfo;
+					logfunc = loginfox;
 				else
 					logfunc = logdebugx;
 				/* We only want to log this the once as we loop
@@ -2684,7 +2684,7 @@ dhcp6_find_delegates(struct interface *ifp)
 	}
 
 	if (k) {
-		loginfo("%s: adding delegated prefixes", ifp->name);
+		loginfox("%s: adding delegated prefixes", ifp->name);
 		state = D6_STATE(ifp);
 		state->state = DH6S_DELEGATED;
 		ipv6_addaddrs(&state->addrs);
@@ -2856,7 +2856,7 @@ dhcp6_handledata(void *arg)
 			logdebugx("%s: validated using 0x%08" PRIu32,
 			    ifp->name, state->auth.token->secretid);
 		else
-			loginfo("%s: accepted reconfigure key", ifp->name);
+			loginfox("%s: accepted reconfigure key", ifp->name);
 	} else if (ifo->auth.options & DHCPCD_AUTH_SEND) {
 		if (ifo->auth.options & DHCPCD_AUTH_REQUIRE) {
 			logerr("%s: no authentication from %s",
@@ -2984,7 +2984,7 @@ dhcp6_handledata(void *arg)
 				return;
 #ifdef AUTH
 		}
-		loginfo("%s: %s from %s", ifp->name, op, ctx->sfrom);
+		loginfox("%s: %s from %s", ifp->name, op, ctx->sfrom);
 		o = dhcp6_findmoption(r, len, D6_OPTION_RECONF_MSG, &ol);
 		if (o == NULL) {
 			logerrx("%s: missing Reconfigure Message option",
@@ -3054,7 +3054,7 @@ dhcp6_handledata(void *arg)
 		}
 		if (ap == NULL)
 			ap = TAILQ_FIRST(&state->addrs);
-		loginfo("%s: ADV %s from %s", ifp->name, ap->saddr, ctx->sfrom);
+		loginfox("%s: ADV %s from %s", ifp->name, ap->saddr, ctx->sfrom);
 		if (ifp->ctx->options & DHCPCD_TEST)
 			break;
 		dhcp6_startrequest(ifp);
@@ -3068,7 +3068,7 @@ dhcp6_handledata(void *arg)
 			break;
 		}
 	}
-	lognewinfo = has_new ? loginfo : logdebugx;
+	lognewinfo = has_new ? loginfox : logdebugx;
 	lognewinfo("%s: %s received from %s", ifp->name, op, ctx->sfrom);
 
 	state->reason = NULL;
@@ -3285,7 +3285,7 @@ dhcp6_activateinterfaces(struct interface *ifp)
 				continue;
 			}
 			if (!ifd->active) {
-				loginfo("%s: activating for delegation",
+				loginfox("%s: activating for delegation",
 				    sla->ifname);
 				dhcpcd_activateinterface(ifd,
 				    DHCPCD_IPV6 | DHCPCD_DHCP6);

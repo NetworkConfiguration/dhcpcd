@@ -246,6 +246,16 @@ loginfo(const char *fmt, ...)
 	va_list args;
 
 	va_start(args, fmt);
+	vlogerrmessage(LOG_INFO, fmt, args);
+	va_end(args);
+}
+
+void
+loginfox(const char *fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
 	vlogmessage(LOG_INFO, fmt, args);
 	va_end(args);
 }
