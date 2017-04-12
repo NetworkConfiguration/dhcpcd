@@ -1966,6 +1966,7 @@ exit1:
 	if (ctx.options & DHCPCD_STARTED && !(ctx.options & DHCPCD_FORKED))
 		loginfox(PACKAGE " exited");
 	logclose();
+	free(ctx.logfile);
 #ifdef USE_SIGNALS
 	if (ctx.options & DHCPCD_FORKED)
 		_exit(i); /* so atexit won't remove our pidfile */
