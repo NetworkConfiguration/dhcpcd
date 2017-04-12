@@ -189,7 +189,7 @@ ipv4ll_probed(struct arp_state *astate)
 #ifdef IN_IFF_NOTREADY
 	if (ia == NULL || ia->addr_flags & IN_IFF_NOTREADY)
 #endif
-		loginfo("%s: using IPv4LL address %s",
+		loginfox("%s: using IPv4LL address %s",
 		  ifp->name, inet_ntoa(astate->addr));
 	if (ia == NULL) {
 		if (ifp->ctx->options & DHCPCD_TEST)
@@ -406,17 +406,17 @@ ipv4ll_start(void *arg)
 		astate->addr = ia->addr;
 #ifdef IN_IFF_TENTATIVE
 		if (ia->addr_flags & (IN_IFF_TENTATIVE | IN_IFF_DETACHED)) {
-			loginfo("%s: waiting for DAD to complete on %s",
+			loginfox("%s: waiting for DAD to complete on %s",
 			    ifp->name, inet_ntoa(ia->addr));
 			return;
 		}
-		loginfo("%s: using IPv4LL address %s", ifp->name, ia->saddr);
+		loginfox("%s: using IPv4LL address %s", ifp->name, ia->saddr);
 #endif
 		ipv4ll_probed(astate);
 		return;
 	}
 
-	loginfo("%s: probing for an IPv4LL address", ifp->name);
+	loginfox("%s: probing for an IPv4LL address", ifp->name);
 	astate->addr.s_addr = ipv4ll_pickaddr(astate);
 #ifdef IN_IFF_TENTATIVE
 	ipv4ll_probed(astate);

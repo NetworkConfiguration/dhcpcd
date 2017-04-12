@@ -749,13 +749,13 @@ ipv4_applyaddr(void *arg)
 		    nstate->addr->addr.s_addr == lease->addr.s_addr)
 		{
 			if (r == 0) {
-				loginfo("%s: preferring %s on %s",
+				loginfox("%s: preferring %s on %s",
 				    ifp->name,
 				    inet_ntoa(lease->addr),
 				    ifn->name);
 				return;
 			}
-			loginfo("%s: preferring %s on %s",
+			loginfox("%s: preferring %s on %s",
 			    ifn->name,
 			    inet_ntoa(lease->addr),
 			    ifp->name);

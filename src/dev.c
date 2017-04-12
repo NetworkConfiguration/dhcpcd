@@ -116,7 +116,7 @@ dev_start2(struct dhcpcd_ctx *ctx, const char *name)
 		dlclose(h);
 		return -1;
 	}
-	loginfo("dev: loaded %s", ctx->dev->name);
+	loginfox("dev: loaded %s", ctx->dev->name);
 	ctx->dev_handle = h;
 	return r;
 }

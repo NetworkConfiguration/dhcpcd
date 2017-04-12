@@ -584,7 +584,7 @@ ipv6_deleteaddr(struct ipv6_addr *ia)
 	struct ipv6_state *state;
 	struct ipv6_addr *ap;
 
-	loginfo("%s: deleting address %s", ia->iface->name, ia->saddr);
+	loginfox("%s: deleting address %s", ia->iface->name, ia->saddr);
 	if (if_address6(RTM_DELADDR, ia) == -1 &&
 	    errno != EADDRNOTAVAIL && errno != ESRCH &&
 	    errno != ENXIO && errno != ENODEV)
@@ -635,7 +635,7 @@ ipv6_addaddr1(struct ipv6_addr *ap, const struct timespec *now)
 	    ipv6_iffindaddr(ap->iface, &ap->addr, IN6_IFF_NOTUSEABLE))
 		ap->flags |= IPV6_AF_DADCOMPLETED;
 
-	logfunc = ap->flags & IPV6_AF_NEW ? loginfo : logdebugx;
+	logfunc = ap->flags & IPV6_AF_NEW ? loginfox : logdebugx;
 	logfunc("%s: adding %saddress %s", ap->iface->name,
 #ifdef IPV6_AF_TEMPORARY
 	    ap->flags & IPV6_AF_TEMPORARY ? "temporary " : "",
@@ -913,13 +913,13 @@ ipv6_addaddrs(struct ipv6_addrhead *addrs)
 			    &ap->addr, IPV6_AF_ADDED);
 			if (apf && apf->iface != ap->iface) {
 				if (apf->iface->metric <= ap->iface->metric) {
-					loginfo("%s: preferring %s on %s",
+					loginfox("%s: preferring %s on %s",
 					    ap->iface->name,
 					    ap->saddr,
 					    apf->iface->name);
 					continue;
 				}
-				loginfo("%s: preferring %s on %s",
+				loginfox("%s: preferring %s on %s",
 				    apf->iface->name,
 				    ap->saddr,
 				    ap->iface->name);
@@ -1048,7 +1048,7 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 
 	dbp = inet_ntop(AF_INET6, &addr->s6_addr,
 	    dbuf, INET6_ADDRSTRLEN);
-	loginfo("%s: cmd %d addr %s",
+	loginfox("%s: cmd %d addr %s",
 	    ifname, cmd, dbp);
 #endif
 
@@ -1672,7 +1672,7 @@ ipv6_handleifa_addrs(int cmd,
 		switch (cmd) {
 		case RTM_DELADDR:
 			if (ia->flags & IPV6_AF_ADDED) {
-				loginfo("%s: deleted address %s",
+				logwarnx("%s: deleted address %s",
 				    ia->iface->name, ia->saddr);
 				ia->flags &= ~IPV6_AF_ADDED;
 			}

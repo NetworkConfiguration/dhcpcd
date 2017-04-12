@@ -362,7 +362,7 @@ ipv6nd_reachable(struct ra *rap, int flags)
 
 	if (flags & IPV6ND_REACHABLE) {
 		if (rap->lifetime && rap->expired) {
-			loginfo("%s: %s is reachable again",
+			loginfox("%s: %s is reachable again",
 			    rap->iface->name, rap->sfrom);
 			rap->expired = 0;
 			rt_build(rap->iface->ctx, AF_INET6);
@@ -639,7 +639,7 @@ ipv6nd_dadcallback(void *arg)
 				    ifp->name);
 				goto try_script;
 			}
-			loginfo("%s: deleting address %s",
+			loginfox("%s: deleting address %s",
 			    ifp->name, ap->saddr);
 			if (if_address6(RTM_DELADDR, ap) == -1 &&
 			    errno != EADDRNOTAVAIL && errno != ENXIO)
@@ -836,7 +836,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	 * routers like to decrease the advertised valid and preferred times
 	 * in accordance with the own prefix times which would result in too
 	 * much needless log spam. */
-	logfunc = new_rap ? loginfo : logdebugx,
+	logfunc = new_rap ? loginfox : logdebugx,
 	logfunc("%s: Router Advertisement from %s",
 	    ifp->name, ctx->sfrom);
 
@@ -1508,7 +1508,7 @@ ipv6nd_handlena(struct dhcpcd_ctx *ctx, struct interface *ifp,
 
 	/* Node is no longer a router, so remove it from consideration */
 	if (!is_router && !rap->expired) {
-		loginfo("%s: %s not a router (%s)",
+		loginfox("%s: %s not a router (%s)",
 		    ifp->name, taddr, ctx->sfrom);
 		rap->expired = 1;
 		rt_build(ifp->ctx,  AF_INET6);
@@ -1519,7 +1519,7 @@ ipv6nd_handlena(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	if (is_solicited && is_router && rap->lifetime) {
 		if (rap->expired) {
 			rap->expired = 0;
-			loginfo("%s: %s reachable (%s)",
+			loginfox("%s: %s reachable (%s)",
 			    ifp->name, taddr, ctx->sfrom);
 			rt_build(ifp->ctx, AF_INET6);
 			script_runreason(rap->iface, "ROUTERADVERT"); /* XXX */
@@ -1614,7 +1614,7 @@ ipv6nd_startrs1(void *arg)
 	struct interface *ifp = arg;
 	struct rs_state *state;
 
-	loginfo("%s: soliciting an IPv6 router", ifp->name);
+	loginfox("%s: soliciting an IPv6 router", ifp->name);
 	if (ipv6nd_open(ifp->ctx) == -1) {
 		logerr(__func__);
 		return;

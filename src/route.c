@@ -74,27 +74,27 @@ rt_desc(const char *cmd, const struct rt *rt)
 
 	if (rt->rt_flags & RTF_HOST) {
 		if (gateway_unspec)
-			loginfo("%s: %s host route to %s",
+			loginfox("%s: %s host route to %s",
 			    ifname, cmd, dest);
 		else
-			loginfo("%s: %s host route to %s via %s",
+			loginfox("%s: %s host route to %s via %s",
 			    ifname, cmd, dest, gateway);
 	} else if (sa_is_unspecified(&rt->rt_dest) &&
 		   sa_is_unspecified(&rt->rt_netmask))
 	{
 		if (gateway_unspec)
-			loginfo("%s: %s default route",
+			loginfox("%s: %s default route",
 			    ifname, cmd);
 		else
-			loginfo("%s: %s default route via %s",
+			loginfox("%s: %s default route via %s",
 			    ifname, cmd, gateway);
 	} else if (gateway_unspec)
-		loginfo("%s: %s%s route to %s/%d",
+		loginfox("%s: %s%s route to %s/%d",
 		    ifname, cmd,
 		    rt->rt_flags & RTF_REJECT ? " reject" : "",
 		    dest, prefix);
 	else
-		loginfo("%s: %s%s route to %s/%d via %s",
+		loginfox("%s: %s%s route to %s/%d via %s",
 		    ifname, cmd,
 		    rt->rt_flags & RTF_REJECT ? " reject" : "",
 		    dest, prefix, gateway);
