@@ -1644,7 +1644,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp)
 		ifname = "all";
 	else if (!(ctx->options & DHCPCD_TEST)) {
 		if (if_disable_autolinklocal(ctx, ifp->index) == -1)
-			logdebug("%s: if_disable_autolinklocal: %s",
+			logdebug("%s: if_disable_autolinklocal",
 			    ifp->name);
 	}
 	if (ifp)
