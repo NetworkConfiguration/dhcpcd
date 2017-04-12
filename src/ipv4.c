@@ -461,7 +461,7 @@ ipv4_deladdr(struct ipv4_addr *addr, int keeparp)
 	UNUSED(keeparp);
 #endif
 
-	logdebug("%s: deleting IP address %s",
+	logdebugx("%s: deleting IP address %s",
 	    addr->iface->name, addr->saddr);
 
 	r = if_address(RTM_DELADDR, addr);
@@ -627,10 +627,10 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 		return NULL;
 	}
 	if (blank)
-		logdebug("%s: aliased %s", ia->alias, ia->saddr);
+		logdebugx("%s: aliased %s", ia->alias, ia->saddr);
 #endif
 
-	logdebug("%s: adding IP address %s broadcast %s",
+	logdebugx("%s: adding IP address %s broadcast %s",
 	    ifp->name, ia->saddr, inet_ntoa(*bcast));
 	if (if_address(RTM_NEWADDR, ia) == -1) {
 		if (errno != EEXIST)
@@ -780,7 +780,7 @@ ipv4_applyaddr(void *arg)
 	if (ia &&
 	    ia->mask.s_addr == lease->mask.s_addr &&
 	    ia->brd.s_addr == lease->brd.s_addr)
-		logdebug("%s: IP address %s already exists",
+		logdebugx("%s: IP address %s already exists",
 		    ifp->name, ia->saddr);
 	else {
 #if __linux__

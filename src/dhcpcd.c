@@ -258,14 +258,14 @@ dhcpcd_ipwaited(struct dhcpcd_ctx *ctx)
 
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 		if ((af = dhcpcd_ifafwaiting(ifp)) != AF_MAX) {
-			logdebug("%s: waiting for an %s address",
+			logdebugx("%s: waiting for an %s address",
 			    ifp->name, dhcpcd_af(af));
 			return 0;
 		}
 	}
 
 	if ((af = dhcpcd_afwaiting(ctx)) != AF_MAX) {
-		logdebug("waiting for an %s address",
+		logdebugx("waiting for an %s address",
 		    dhcpcd_af(af));
 		return 0;
 	}
@@ -303,7 +303,7 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 	if (ctx->options & DHCPCD_DAEMONISED ||
 	    !(ctx->options & DHCPCD_DAEMONISE))
 		return 0;
-	logdebug("forking to background");
+	logdebugx("forking to background");
 
 	/* Setup a signal pipe so parent knows when to exit. */
 	if (pipe(sidpipe) == -1) {
@@ -557,7 +557,7 @@ dhcpcd_selectprofile(struct interface *ifp, const char *profile)
 		pssid[0] = '\0';
 	ifo = read_config(ifp->ctx, ifp->name, pssid, profile);
 	if (ifo == NULL) {
-		logdebug("%s: no profile %s", ifp->name, profile);
+		logdebugx("%s: no profile %s", ifp->name, profile);
 		return -1;
 	}
 	if (profile != NULL) {
@@ -983,7 +983,7 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 			return -1;
 		}
 		if (ifp->active) {
-			logdebug("%s: interface departed", ifp->name);
+			logdebugx("%s: interface departed", ifp->name);
 			ifp->options->options |= DHCPCD_DEPARTED;
 			stop_interface(ifp);
 		}
@@ -1018,7 +1018,7 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 		iff = if_find(ctx->ifaces, ifp->name);
 		if (iff) {
 			if (iff->active)
-				logdebug("%s: interface updated", iff->name);
+				logdebugx("%s: interface updated", iff->name);
 			/* The flags and hwaddr could have changed */
 			iff->flags = ifp->flags;
 			iff->hwlen = ifp->hwlen;
@@ -1029,7 +1029,7 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 			TAILQ_INSERT_TAIL(ctx->ifaces, ifp, next);
 			if (!ifp->active)
 				continue;
-			logdebug("%s: interface added", ifp->name);
+			logdebugx("%s: interface added", ifp->name);
 			dhcpcd_initstate(ifp, 0);
 			run_preinit(ifp);
 			iff = ifp;
@@ -1722,7 +1722,7 @@ printpidfile:
 			len = control_send(&ctx, argc, argv);
 			control_close(&ctx);
 			if (len > 0) {
-				logdebug("send OK");
+				logdebugx("send OK");
 				goto exit_success;
 			} else {
 				logerr("%s: control_send", __func__);
@@ -1801,7 +1801,7 @@ printpidfile:
 	}
 #endif
 
-	logdebug(PACKAGE "-" VERSION " starting");
+	logdebugx(PACKAGE "-" VERSION " starting");
 	ctx.options |= DHCPCD_STARTED;
 #ifdef USE_SIGNALS
 	if (eloop_signal_set_cb(ctx.eloop,
@@ -1853,7 +1853,7 @@ printpidfile:
 			logfunc_t *logfunc;
 
 			logfunc = ctx.options & DHCPCD_INACTIVE ?
-			    logdebug : logerrx;
+			    logdebugx : logerrx;
 			logfunc("no valid interfaces found");
 		} else
 			goto exit_failure;
@@ -1902,7 +1902,7 @@ printpidfile:
 			logfunc_t *logfunc;
 
 			logfunc = ctx.options & DHCPCD_INACTIVE ?
-			    logdebug : logwarnx;
+			    logdebugx : logwarnx;
 			logfunc("no interfaces have a carrier");
 			if (dhcpcd_daemonise(&ctx))
 				goto exit_success;

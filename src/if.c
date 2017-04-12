@@ -359,14 +359,9 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 		}
 
 		if (if_vimaster(ctx, spec.devname) == 1) {
-			if (argc)
-				logerr("%s: is a Virtual Interface Master, "
-				    "skipping",
-				    spec.devname);
-			else
-				logdebug("%s: is a Virtual Interface Master, "
-				    "skipping",
-				    spec.devname);
+			logfunc_t *logfunc = argc != 0 ? logerrx : logdebugx;
+			logfunc("%s: is a Virtual Interface Master, skipping",
+			    spec.devname);
 			continue;
 		}
 
@@ -416,7 +411,7 @@ if_discover(struct dhcpcd_ctx *ctx, int argc, char * const *argv)
 				    ctx->ifac == 0 && active &&
 				    !if_hasconf(ctx, ifp->name))
 				{
-					logdebug("%s: ignoring due to"
+					logdebugx("%s: ignoring due to"
 					    " interface type and"
 					    " no config",
 					    ifp->name);

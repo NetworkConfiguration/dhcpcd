@@ -696,7 +696,7 @@ script_runreason(const struct interface *ifp, const char *reason)
 
 	argv[0] = ifp->options->script ? ifp->options->script : UNCONST(SCRIPT);
 	argv[1] = NULL;
-	logdebug("%s: executing `%s' %s", ifp->name, argv[0], reason);
+	logdebugx("%s: executing `%s' %s", ifp->name, argv[0], reason);
 
 	/* Resize for PATH and RC_SVCNAME */
 	svcname = getenv(RC_SVCNAME);

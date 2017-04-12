@@ -635,7 +635,7 @@ ipv6_addaddr1(struct ipv6_addr *ap, const struct timespec *now)
 	    ipv6_iffindaddr(ap->iface, &ap->addr, IN6_IFF_NOTUSEABLE))
 		ap->flags |= IPV6_AF_DADCOMPLETED;
 
-	logfunc = ap->flags & IPV6_AF_NEW ? loginfo : logdebug;
+	logfunc = ap->flags & IPV6_AF_NEW ? loginfo : logdebugx;
 	logfunc("%s: adding %saddress %s", ap->iface->name,
 #ifdef IPV6_AF_TEMPORARY
 	    ap->flags & IPV6_AF_TEMPORARY ? "temporary " : "",
@@ -645,16 +645,16 @@ ipv6_addaddr1(struct ipv6_addr *ap, const struct timespec *now)
 	    ap->saddr);
 	if (ap->prefix_pltime == ND6_INFINITE_LIFETIME &&
 	    ap->prefix_vltime == ND6_INFINITE_LIFETIME)
-		logdebug("%s: pltime infinity, vltime infinity",
+		logdebugx("%s: pltime infinity, vltime infinity",
 		    ap->iface->name);
 	else if (ap->prefix_pltime == ND6_INFINITE_LIFETIME)
-		logdebug("%s: pltime infinity, vltime %"PRIu32" seconds",
+		logdebugx("%s: pltime infinity, vltime %"PRIu32" seconds",
 		    ap->iface->name, ap->prefix_vltime);
 	else if (ap->prefix_vltime == ND6_INFINITE_LIFETIME)
-		logdebug("%s: pltime %"PRIu32"seconds, vltime infinity",
+		logdebugx("%s: pltime %"PRIu32"seconds, vltime infinity",
 		    ap->iface->name, ap->prefix_pltime);
 	else
-		logdebug("%s: pltime %"PRIu32" seconds, vltime %"PRIu32
+		logdebugx("%s: pltime %"PRIu32" seconds, vltime %"PRIu32
 		    " seconds",
 		    ap->iface->name, ap->prefix_pltime, ap->prefix_vltime);
 
@@ -683,12 +683,12 @@ ipv6_addaddr1(struct ipv6_addr *ap, const struct timespec *now)
 			ap->prefix_vltime -= (uint32_t)n.tv_sec;
 
 #if 0
-		logdebug("%s: acquired %lld.%.9ld, now %lld.%.9ld, diff %lld.%.9ld",
+		logdebugx("%s: acquired %lld.%.9ld, now %lld.%.9ld, diff %lld.%.9ld",
 		    ap->iface->name,
 		    (long long)ap->acquired.tv_sec, ap->acquired.tv_nsec,
 		    (long long)now->tv_sec, now->tv_nsec,
 		    (long long)n.tv_sec, n.tv_nsec);
-		logdebug("%s: adj pltime %"PRIu32" seconds, "
+		logdebugx("%s: adj pltime %"PRIu32" seconds, "
 		    "vltime %"PRIu32" seconds",
 		    ap->iface->name, ap->prefix_pltime, ap->prefix_vltime);
 #endif
@@ -830,7 +830,7 @@ ipv6_addaddr(struct ipv6_addr *ia, const struct timespec *now)
 	if ((replaced = ipv6_aliasaddr(ia, &replaced_ia)) == -1)
 		return -1;
 	if (blank)
-		logdebug("%s: aliased %s", ia->alias, ia->saddr);
+		logdebugx("%s: aliased %s", ia->alias, ia->saddr);
 #endif
 
 	if ((r = ipv6_addaddr1(ia, now)) == 0) {
@@ -1467,7 +1467,7 @@ ipv6_staticdadcallback(void *arg)
 		logwarnx("%s: DAD detected %s", ia->iface->name,
 		    ia->saddr);
 	else if (!wascompleted) {
-		logdebug("%s: IPv6 static DAD completed",
+		logdebugx("%s: IPv6 static DAD completed",
 		    ia->iface->name);
 	}
 
@@ -2041,7 +2041,7 @@ ipv6_regentempaddr(void *arg)
 	struct ipv6_addr *ia = arg, *ia1;
 	struct timespec tv;
 
-	logdebug("%s: regen temp addr %s", ia->iface->name, ia->saddr);
+	logdebugx("%s: regen temp addr %s", ia->iface->name, ia->saddr);
 	clock_gettime(CLOCK_MONOTONIC, &tv);
 	ia1 = ipv6_createtempaddr(ia, &tv);
 	if (ia1)
