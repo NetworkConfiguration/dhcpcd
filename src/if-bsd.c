@@ -953,6 +953,10 @@ if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 	if (if_ownmsgpid(ctx, rtm->rtm_pid, rtm->rtm_seq))
 		return;
 
+	/* Ignore errors. */
+	if (rtm->rtm_errno != 0)
+		return;
+
 	if (if_copyrt(ctx, &rt, rtm) == -1)
 		return;
 
