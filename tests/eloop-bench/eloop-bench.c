@@ -161,5 +161,7 @@ main(int argc, char **argv)
 		printf("%lld.%.9ld\n", (long long)ts->tv_sec, ts->tv_nsec);
 	}
 
+	eloop_free(e);
+	free(pipes);
 	exit(0);
 }
