@@ -19,7 +19,7 @@ by giving one of these CPPFLAGS to the Makefile:
   *  `HAVE_PPOLL`
 
 kqueue(2) is found on modern BSD kernels.
-epoll(2) is found on modern Linux and Solaris kernels.
+epoll(7) is found on modern Linux and Solaris kernels.
 These two *should* be the best performers.
 
 pselect(2) *should* be found on any POSIX libc.
