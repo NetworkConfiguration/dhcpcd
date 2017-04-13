@@ -121,7 +121,7 @@ main(int argc, char **argv)
 	if ((e = eloop_new()) == NULL)
 		err(EXIT_FAILURE, "eloop_init");
 
-	while ((c = getopt(argc, argv, "a:n:w:")) != -1) {
+	while ((c = getopt(argc, argv, "a:n:r:w:")) != -1) {
 		switch (c) {
 		case 'a':
 			nactive = (size_t)atoi(optarg);
