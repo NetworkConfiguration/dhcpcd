@@ -16,6 +16,7 @@ by giving one of these CPPFLAGS to the Makefile:
   *  HAVE_PSELECT
   *  HAVE_POLLTS
   *  HAVE_PPOLL
+Otherwise, eloop will try and work out wich mechanism to use.
 
 kqueue(2) is found on modern BSD kernels.
 epoll(2) is found on modern Linux and Solaris kernels.
@@ -44,14 +45,10 @@ At the end of run, the time taken in seconds and nanoseconds is printed.
 The following arguments can influence the benchmark:
 
   *  `-a active`
-     The number of active pipes.
-     (default 1)
+     The number of active pipes, default 1.
   *  `-n pipes`
-     The number of pipes to create and attach an eloop callback to.
-     (default (100)
+     The number of pipes to create and attach an eloop callback to, defalt 100.
   *  `-r runs`
-     The number of timed runs to make.
-     (default 25)
+     The number of timed runs to make, default 25.
   *  `-w writes`
-     The number of writes to make by the read callbacks.
-     (default 100)
+     The number of writes to make by the read callback, default 100.
