@@ -12,11 +12,11 @@ polling mechanisms. It's inspired by libevent/bench.
 eloop needs to be compiled for a specific polling mechanism.
 eloop will try and work out which one to use, but you can influence which one
 by giving one of these CPPFLAGS to the Makefile:
-  *  HAVE_KQUEUE
-  *  HAVE_EPOLL
-  *  HAVE_PSELECT
-  *  HAVE_POLLTS
-  *  HAVE_PPOLL
+  *  `HAVE_KQUEUE`
+  *  `HAVE_EPOLL`
+  *  `HAVE_PSELECT`
+  *  `HAVE_POLLTS`
+  *  `HAVE_PPOLL`
 
 kqueue(2) is found on modern BSD kernels.
 epoll(2) is found on modern Linux and Solaris kernels.
@@ -43,12 +43,11 @@ Once nwrites is 0, the timed run will end once the last write has been read.
 At the end of run, the time taken in seconds and nanoseconds is printed.
 
 The following arguments can influence the benchmark:
-
-  *  `-a active`
-     The number of active pipes, default 1.
-  *  `-n pipes`
-     The number of pipes to create and attach an eloop callback to, defalt 100.
-  *  `-r runs`
-     The number of timed runs to make, default 25.
-  *  `-w writes`
-     The number of writes to make by the read callback, default 100.
+  *  `-a active`  
+The number of active pipes, default 1.
+  *  `-n pipes`  
+The number of pipes to create and attach an eloop callback to, defalt 100.
+  *  `-r runs`  
+The number of timed runs to make, default 25.
+  *  `-w writes`  
+The number of writes to make by the read callback, default 100.
