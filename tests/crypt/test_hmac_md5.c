@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2014 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2017 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -27,6 +27,8 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "crypt/crypt.h"
 #include "test.h"
@@ -34,48 +36,69 @@
 /* RFC2202 MD5 implementation */
 
 static void
-print_hmac(uint8_t *hmac)
+print_hmac(FILE *stream, const uint8_t *hmac)
 {
 	int i;
 
-	printf("digest = 0x");
+	fprintf(stream, "digest = 0x");
 	for (i = 0; i < 16; i++)
-		printf("%02x", *hmac++);
-	printf("\n");
+		fprintf(stream, "%02x", *hmac++);
+	fprintf(stream, "\n");
+}
+
+static void
+test_hmac(const uint8_t *hmac, const uint8_t *tst)
+{
+	print_hmac(stdout, hmac);
+	if (memcmp(hmac, tst, 16) == 0)
+		return;
+	fprintf(stderr, "FAILED!\nExpected\t\t\t");
+	print_hmac(stderr, tst);
+	exit(EXIT_FAILURE);
 }
 
 static void
 hmac_md5_test1(void)
 {
-	uint8_t hmac[16];
 	const uint8_t text[] = "Hi There";
 	uint8_t key[16];
+	const uint8_t expect[16] = {
+	    0x92, 0x94, 0x72, 0x7a, 0x36, 0x38, 0xbb, 0x1c,
+	    0x13, 0xf4, 0x8e, 0xf8, 0x15, 0x8b, 0xfc, 0x9d,
+	};
+	uint8_t hmac[16];
 	int i;
 
 	printf ("HMAC MD5 Test 1:\t\t");
 	for (i = 0; i < 16; i++)
 		key[i] = 0x0b;
 	hmac_md5(text, 8, key, 16, hmac);
-	print_hmac(hmac);
-	printf("\t\texpected result:\t 0x9294727a3638bb1c13f48ef8158bfc9d\n");
+	test_hmac(hmac, expect);
 }
 
 static void
 hmac_md5_test2(void)
 {
-	uint8_t hmac[16];
 	const uint8_t text[] = "what do ya want for nothing?";
 	const uint8_t key[] = "Jefe";
+	const uint8_t expect[16] = {
+	    0x75, 0x0c, 0x78, 0x3e, 0x6a, 0xb0, 0xb5, 0x03,
+	    0xea, 0xa8, 0x6e, 0x31, 0x0a, 0x5d, 0xb7, 0x38,
+	};
+	uint8_t hmac[16];
 
 	printf("HMAC MD5 Test 2:\t\t");
 	hmac_md5(text, 28, key, 4, hmac);
-	print_hmac(hmac);
-	printf("\t\texpected result:\t 0x750c783e6ab0b503eaa863e10a5db738\n");
+	test_hmac(hmac, expect);
 }
 
 static void
 hmac_md5_test3(void)
 {
+	const uint8_t expect[16] = {
+	    0x56, 0xbe, 0x34, 0x52, 0x1d, 0x14, 0x4c, 0x88,
+	    0xdb, 0xb8, 0xc7, 0x33, 0xf0, 0xe8, 0xb3, 0xf6,
+	};
 	uint8_t hmac[16];
 	uint8_t text[50];
 	uint8_t key[16];
@@ -87,13 +110,16 @@ hmac_md5_test3(void)
 	for (i = 0; i < 16; i++)
 		key[i] = 0xaa;
 	hmac_md5(text, 50, key, 16, hmac);
-	print_hmac(hmac);
-	printf("\t\texpected result:\t 0x56be34521d144c88dbb8c733f0e8b3f6\n");
+	test_hmac(hmac, expect);
 }
 
 static void
 hmac_md5_test4(void)
 {
+	const uint8_t expect[16] = {
+	    0x69, 0x7e, 0xaf, 0x0a, 0xca, 0x3a, 0x3a, 0xea,
+	    0x3a, 0x75, 0x16, 0x47, 0x46, 0xff, 0xaa, 0x79,
+	};
 	uint8_t hmac[16];
 	uint8_t text[50];
 	uint8_t key[25];
@@ -105,15 +131,18 @@ hmac_md5_test4(void)
 	for (i = 0; i < 25; i++)
 		key[i] = (uint8_t)(i + 1);
 	hmac_md5(text, 50, key, 25, hmac);
-	print_hmac(hmac);
-	printf("\t\texpected result:\t 0x697eaf0aca3a3aea3a75164746ffaa79\n");
+	test_hmac(hmac, expect);
 }
 
 static void
 hmac_md5_test5(void)
 {
-	uint8_t hmac[16];
 	const uint8_t text[] = "Test With Truncation";
+	const uint8_t expect[] = {
+	    0x56, 0x46, 0x1e, 0xf2, 0x34, 0x2e, 0xdc, 0x00,
+	    0xf9, 0xba, 0xb9, 0x95, 0x69, 0x0e, 0xfd, 0x4c,
+	};
+	uint8_t hmac[16];
 	uint8_t key[16];
 	int i;
 
@@ -121,15 +150,18 @@ hmac_md5_test5(void)
 	for (i = 0; i < 16; i++)
 		key[i] = 0x0c;
 	hmac_md5(text, 20, key, 16, hmac);
-	print_hmac(hmac);
-	printf("\t\texpected result:\t 0x56461ef2342edc00f9bab995690efd4c\n");
+	test_hmac(hmac, expect);
 }
 
 static void
 hmac_md5_test6(void)
 {
-	uint8_t hmac[16];
 	const uint8_t text[] = "Test Using Larger Than Block-Size Key - Hash Key First";
+	const uint8_t expect[] = {
+	    0x6b, 0x1a, 0xb7, 0xfe, 0x4b, 0xd7, 0xbf, 0x8f,
+	    0x0b, 0x62, 0xe6, 0xce, 0x61, 0xb9, 0xd0, 0xcd,
+	};
+	uint8_t hmac[16];
 	uint8_t key[80];
 	int i;
 
@@ -137,15 +169,18 @@ hmac_md5_test6(void)
 	for (i = 0; i < 80; i++)
 		key[i] = 0xaa;
 	hmac_md5(text, 54, key, 80, hmac);
-	print_hmac(hmac);
-	printf("\t\texpected result:\t 0x6b1ab7fe4bd7bf8f0b62e6ce61b9d0cd\n");
+	test_hmac(hmac, expect);
 }
 
 static void
 hmac_md5_test7(void)
 {
-	uint8_t hmac[16];
 	const uint8_t text[] = "Test Using Larger Than Block-Size Key and Larger Than One Block-Size Data";
+	const uint8_t expect[] = {
+	    0x6f, 0x63, 0x0f, 0xad, 0x67, 0xcd, 0xa0, 0xee,
+	    0x1f, 0xb1, 0xf5, 0x62, 0xdb, 0x3a, 0xa5, 0x3e,
+	};
+	uint8_t hmac[16];
 	uint8_t key[80];
 	int i;
 
@@ -153,14 +188,13 @@ hmac_md5_test7(void)
 	for (i = 0; i < 80; i++)
 		key[i] = 0xaa;
 	hmac_md5(text, 73, key, 80, hmac);
-	print_hmac(hmac);
-	printf("\t\texpected result:\t 0x6f630fad67cda0ee1fb1f562db3aa53e\n");
+	test_hmac(hmac, expect);
 }
 
 int test_hmac_md5(void)
 {
 
-	printf ("Starting HMAC MD5 tests...\n\n");
+	printf ("Starting RFC2202 HMAC MD5 tests...\n\n");
 	hmac_md5_test1();
 	hmac_md5_test2();
 	hmac_md5_test3();
@@ -168,6 +202,6 @@ int test_hmac_md5(void)
 	hmac_md5_test5();
 	hmac_md5_test6();
 	hmac_md5_test7();
-	printf("\nConfirm above results visually against RFC 2202.\n");
+	printf("\nAll tests pass.\n");
 	return 0;
 }
