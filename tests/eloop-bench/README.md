@@ -7,16 +7,16 @@ allows the safe delivery of signals.
 As such, select(2) and poll(2) are not suitable.
 
 This is an eloop benchmark to test the performance of the various
-polling functions. It's inspired by libevent/bench.
+polling mechanisms. It's inspired by libevent/bench.
 
-eloop needs to be compiled for a specific function, and these can be chosen
+eloop needs to be compiled for a specific polling mechanism.
+eloop will try and work out which one to use, but you can influence which one
 by giving one of these CPPFLAGS to the Makefile:
   *  HAVE_KQUEUE
   *  HAVE_EPOLL
   *  HAVE_PSELECT
   *  HAVE_POLLTS
   *  HAVE_PPOLL
-Otherwise, eloop will try and work out wich mechanism to use.
 
 kqueue(2) is found on modern BSD kernels.
 epoll(2) is found on modern Linux and Solaris kernels.
