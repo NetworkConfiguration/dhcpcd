@@ -11,8 +11,8 @@ CFLAGS+=	-std=${CSTD}
 
 CPPFLAGS+=	-I${TOP} -I${TOP}/src
 
-T_COMPAT_SRCS=	${COMPAT_SRCS:compat/%=${TOP}/src/compat/%}
-T_MD5_SRC=	${MD5_SRC:crypt/%=${TOP}/src/crypt/%}
+T_COMPAT_SRCS=	${COMPAT_SRCS:compat/%=${TOP}/compat/%}
+T_MD5_SRC=	${MD5_SRC:crypt/%=${TOP}/compat/crypt/%}
 OBJS+=		${SRCS:.c=.o} ${T_COMPAT_SRCS:.c=.o} ${T_MD5_SRC:.c=.o}
 
 .c.o:
