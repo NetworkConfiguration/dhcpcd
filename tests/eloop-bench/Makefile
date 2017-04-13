@@ -9,7 +9,8 @@ CFLAGS?=	-O2
 CSTD?=		c99
 CFLAGS+=	-std=${CSTD}
 
-CPPFLAGS=	-I${TOP} -I${TOP}/src -I${TOP}/compat
+CPPFLAGS+=	-DNO_CONFIG_H
+CPPFLAGS+=	-I${TOP} -I${TOP}/src -I${TOP}/compat
 
 # Default is to let eloop decide
 #CPPFLAGS+=	-DHAVE_KQUEUE
@@ -18,7 +19,7 @@ CPPFLAGS=	-I${TOP} -I${TOP}/src -I${TOP}/compat
 #CPPFLAGS+=	-DHAVE_EPOLL
 #CPPFLAGS+=	-DHAVE_PPOLL
 
-OBJS+=		${SRCS:.c=.o}
+OBJS+=          ${SRCS:.c=.o}
 
 .c.o: Makefile
 	${CC} ${CFLAGS} ${CPPFLAGS} -c $< -o $@

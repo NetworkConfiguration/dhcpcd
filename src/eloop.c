@@ -40,7 +40,7 @@
 #include <unistd.h>
 
 /* config.h should define HAVE_KQUEUE, HAVE_EPOLL, etc. */
-#ifdef HAVE_CONFIG_H
+#if defined(HAVE_CONFIG_H) && !defined(NO_CONFIG_H)
 #include "config.h"
 #endif
 
@@ -52,8 +52,8 @@
 /* Assume BSD has a working sys/queue.h and kqueue(2) interface. */
 #define HAVE_SYS_QUEUE_H
 #define HAVE_KQUEUE
-#elif defined(__linux__)
-/* Assume Linux has a working epoll(3) interface. */
+#elif defined(__linux__) || defined(__sun)
+/* Assume Linux and Solaris have a working epoll(3) interface. */
 #define HAVE_EPOLL
 #else
 /* pselect(2) is a POSIX standard. */
