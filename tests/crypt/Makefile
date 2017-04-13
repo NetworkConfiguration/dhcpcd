@@ -12,7 +12,7 @@ CFLAGS+=	-std=${CSTD}
 CPPFLAGS+=	-I${TOP} -I${TOP}/src
 
 T_COMPAT_SRCS=	${COMPAT_SRCS:compat/%=${TOP}/compat/%}
-T_MD5_SRC=	${MD5_SRC:crypt/%=${TOP}/compat/crypt/%}
+T_MD5_SRC=	${MD5_SRC:compat/%=${TOP}/compat/%}
 OBJS+=		${SRCS:.c=.o} ${T_COMPAT_SRCS:.c=.o} ${T_MD5_SRC:.c=.o}
 
 .c.o:
@@ -26,8 +26,8 @@ clean:
 distclean: clean
 	rm -f .depend
 
-.depend: ${SRCS} ${T_COMPAT_SRCS} ${T_CRYPT_SRCS}
-	${CC} ${CPPFLAGS} -MM ${SRCS} ${T_COMPAT_SRCS} ${T_CRYPT_SRCS} > .depend
+.depend: ${SRCS} ${T_COMPAT_SRCS} ${T_MD5_SRC}
+	${CC} ${CPPFLAGS} -MM ${SRCS} ${T_COMPAT_SRCS} ${T_MD5_SRC} > .depend
 
 depend: .depend
 
