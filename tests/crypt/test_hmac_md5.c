@@ -28,7 +28,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#include "../crypt/crypt.h"
+#include "crypt/crypt.h"
 #include "test.h"
 
 /* RFC2202 MD5 implementation */
