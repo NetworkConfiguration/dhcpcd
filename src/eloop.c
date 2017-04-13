@@ -855,6 +855,7 @@ eloop_start(struct eloop *eloop, sigset_t *signals)
 
 	assert(eloop != NULL);
 
+	eloop->exitnow = 0;
 	for (;;) {
 		if (eloop->exitnow)
 			break;
