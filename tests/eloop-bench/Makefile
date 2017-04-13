@@ -10,7 +10,8 @@ CSTD?=		c99
 CFLAGS+=	-std=${CSTD}
 
 CPPFLAGS+=	-DNO_CONFIG_H
-CPPFLAGS+=	-I${TOP} -I${TOP}/src -I${TOP}/compat
+CPPFLAGS+=	-DQUEUE_H=../compat/queue.h
+CPPFLAGS+=	-I${TOP}/src
 
 # Default is to let eloop decide
 #CPPFLAGS+=	-DHAVE_KQUEUE
