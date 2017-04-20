@@ -1657,20 +1657,13 @@ printpidfile:
 		goto exit_failure;
 	}
 
-	/* Open our persistent sockets.
-	 * This is needed early for dumping leases on valid interfaces. */
-#ifdef USE_SIGNALS
-	if (sig == 0) {
-#endif
+	if (ctx.options & DHCPCD_DUMPLEASE) {
+		/* Open sockets so we can dump something about
+		 * valid interfaces. */
 		if (if_opensockets(&ctx) == -1) {
 			logerr("%s: if_opensockets", __func__);
 			goto exit_failure;
 		}
-#ifdef USE_SIGNALS
-	}
-#endif
-
-	if (ctx.options & DHCPCD_DUMPLEASE) {
 		if (optind != argc) {
 			/* We need to try and find the interface so we can load
 			 * the hardware address to compare automated IAID */
@@ -1817,6 +1810,12 @@ printpidfile:
 
 	logdebugx(PACKAGE "-" VERSION " starting");
 	ctx.options |= DHCPCD_STARTED;
+
+	if (if_opensockets(&ctx) == -1) {
+		logerr("%s: if_opensockets", __func__);
+		goto exit_failure;
+	}
+
 #ifdef USE_SIGNALS
 	if (eloop_signal_set_cb(ctx.eloop,
 	    dhcpcd_signals, dhcpcd_signals_len,
