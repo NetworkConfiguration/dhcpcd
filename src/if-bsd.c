@@ -787,7 +787,7 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 	 */
 
 #if !((defined(__NetBSD_Version__) && __NetBSD_Version__ >= 799003600) || \
-      (defined(__OpenBSD__)))
+      (defined(__OpenBSD__) && OpenBSD >= 201605))
 	if (cmd == RTM_NEWADDR && !(ia->flags & IPV6_AF_ADDED)) {
 		ifa.ifra_lifetime.ia6t_vltime = ND6_INFINITE_LIFETIME;
 		ifa.ifra_lifetime.ia6t_pltime = ND6_INFINITE_LIFETIME;
@@ -795,8 +795,8 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 	}
 #endif
 
-#if defined(__OpenBSD__)
-	/* BUT OpenBSD does not reset the address lifetime
+#if defined(__OpenBSD__) && OpenBSD <= 201705
+	/* BUT OpenBSD older than 6.2 does not reset the address lifetime
 	 * for subsequent calls...
 	 * Luckily dhcpcd will remove the lease when it expires so
 	 * just set an infinite lifetime, unless a temporary address. */
