@@ -1603,10 +1603,12 @@ printpidfile:
 		 *  instance for that interface. */
 		if (optind == argc - 1 && !(ctx.options & DHCPCD_MASTER)) {
 			const char *per;
+			const char *ifname;
 
-			if (strlen(argv[optind]) > IF_NAMESIZE) {
-				logerrx("%s: interface name too long",
-				    argv[optind]);
+			ifname = *ctx.ifv;
+			if (ifname == NULL || strlen(ifname) > IF_NAMESIZE) {
+				errno = ifname == NULL ? EINVAL : E2BIG;
+				logerr("%s: ", ifname);
 				goto exit_failure;
 			}
 			/* Allow a dhcpcd interface per address family */
@@ -1621,7 +1623,7 @@ printpidfile:
 				per = "";
 			}
 			snprintf(ctx.pidfile, sizeof(ctx.pidfile),
-			    PIDFILE, "-", argv[optind], per);
+			    PIDFILE, "-", ifname, per);
 		} else {
 			snprintf(ctx.pidfile, sizeof(ctx.pidfile),
 			    PIDFILE, "", "", "");
