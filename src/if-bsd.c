@@ -153,6 +153,8 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 #define SOCK_FLAGS	(SOCK_CLOEXEC | SOCK_NONBLOCK)
 	ctx->link_fd = xsocket(PF_ROUTE, SOCK_RAW | SOCK_FLAGS, AF_UNSPEC);
 #undef SOCK_FLAGS
+	if (ctx->link_fd == -1)
+		return -1;
 
 #if defined(RO_MSGFILTER)
 	if (setsockopt(ctx->link_fd, PF_ROUTE, RO_MSGFILTER,
@@ -168,7 +170,7 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 		logerr(__func__);
 #endif
 
-	return ctx->link_fd == -1 ? -1 : 0;
+	return 0;
 }
 
 void
