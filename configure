@@ -512,7 +512,7 @@ if ! $_CC; then
 	echo "$CC does not create executables" >&2
 	exit 1
 fi
-[ "$CC" != cc ] && echo "CC=	$CC" >>$CONFIG_MK
+[ "$CC" != cc ] && echo "CC=		$CC" >>$CONFIG_MK
 $CC --version | $SED -e '1!d'
 
 if [ -z "$EMBEDDED" -o "$EMBEDDED" = yes ]; then
