@@ -1510,6 +1510,7 @@ main(int argc, char **argv)
 #endif
 		case 'P':
 			ctx.options |= DHCPCD_PRINT_PIDFILE;
+			logopts &= ~(LOGERR_LOG | LOGERR_ERR);
 			break;
 		case 'T':
 			i = 1;
