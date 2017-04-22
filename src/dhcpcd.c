@@ -775,7 +775,7 @@ warn_iaid_conflict(struct interface *ifp, uint8_t *iaid)
 
 	/* This is only a problem if the interfaces are on the same network. */
 	if (ifn)
-		logerr("%s: IAID conflicts with one assigned to %s",
+		logerrx("%s: IAID conflicts with one assigned to %s",
 		    ifp->name, ifn->name);
 }
 
