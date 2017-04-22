@@ -48,6 +48,11 @@
 #include <netinet/in_var.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/nd6.h>
+#ifdef __NetBSD__
+#include <net/if_vlanvar.h> /* Needs netinet/if_ether.h */
+#else
+#include <net/if_vlan_var.h>
+#endif
 #ifdef __DragonFly__
 #  include <netproto/802_11/ieee80211_ioctl.h>
 #elif __APPLE__
@@ -196,12 +201,31 @@ if_linkaddr(struct sockaddr_dl *sdl, const struct interface *ifp)
 }
 #endif
 
+#if defined(SIOCG80211NWID) || defined(SIOCGETVLAN)
+static int if_direct_ioctl(int s, const char *ifname,
+    unsigned long cmd, void *data)
+{
+
+	strlcpy(data, ifname, IFNAMSIZ);
+	return ioctl(s, cmd, data);
+}
+
+static int if_indirect_ioctl(int s, const char *ifname,
+    unsigned long cmd, void *data)
+{
+	struct ifreq ifr;
+
+	memset(&ifr, 0, sizeof(ifr));
+	ifr.ifr_data = data;
+	return if_direct_ioctl(s, ifname, cmd, &ifr);
+}
+#endif
+
 static int
 if_getssid1(int s, const char *ifname, void *ssid)
 {
 	int retval = -1;
 #if defined(SIOCG80211NWID)
-	struct ifreq ifr;
 	struct ieee80211_nwid nwid;
 #elif defined(IEEE80211_IOC_SSID)
 	struct ieee80211req ireq;
@@ -209,11 +233,8 @@ if_getssid1(int s, const char *ifname, void *ssid)
 #endif
 
 #if defined(SIOCG80211NWID) /* NetBSD */
-	memset(&ifr, 0, sizeof(ifr));
-	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
 	memset(&nwid, 0, sizeof(nwid));
-	ifr.ifr_data = (void *)&nwid;
-	if (ioctl(s, SIOCG80211NWID, &ifr) == 0) {
+	if (if_indirect_ioctl(s, ifname, SIOCG80211NWID, &nwid) == 0) {
 		if (ssid == NULL)
 			retval = nwid.i_len;
 		else if (nwid.i_len > IF_SSIDLEN)
@@ -286,6 +307,31 @@ if_vimaster(const struct dhcpcd_ctx *ctx, const char *ifname)
 			return 1;
 	}
 	return 0;
+}
+
+unsigned short
+if_vlanid(const struct interface *ifp)
+{
+#ifdef SIOCGETVLAN
+	struct vlanreq vlr;
+
+	memset(&vlr, 0, sizeof(vlr));
+	if (if_indirect_ioctl(ifp->ctx->pf_inet_fd,
+	    ifp->name, SIOCGETVLAN, &vlr) != 0)
+		return 0; /* 0 means no VLANID */
+	return vlr.vlr_tag;
+#elif defined(SIOCGVNETID)
+	struct ifreq ifr;
+
+	memset(&ifr, 0, sizeof(ifr));
+	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
+	if (ioctl(ifp->ctx->pf_inet_fd, SIOCGVNETID, &ifr) != 0)
+		return 0; /* 0 means no VLANID */
+	return ifr.ifr_vnetid;
+#else
+	UNUSED(ifp);
+	return 0; /* 0 means no VLANID */
+#endif
 }
 
 static void

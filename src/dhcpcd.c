@@ -477,6 +477,10 @@ configure_interface1(struct interface *ifp)
 		 * between reboots without persitent storage,
 		 * generating the IAID from the MAC address is the only
 		 * logical default.
+		 * Saying that, if a VLANID has been specified then we
+		 * can use that. It's possible that different interfaces
+		 * can have the same VLANID, but this is no worse than
+		 * generating the IAID from the duplicate MAC address.
 		 *
 		 * dhclient uses the last 4 bytes of the MAC address.
 		 * dibbler uses an increamenting counter.
@@ -487,11 +491,18 @@ configure_interface1(struct interface *ifp)
 		 * dhcpcd-6.1.0 and earlier used the interface name,
 		 * falling back to interface index if name > 4.
 		 */
-		if (ifp->hwlen >= sizeof(ifo->iaid))
+		if (ifp->vlanid != 0) {
+			uint32_t vlanid;
+
+			/* Maximal VLANID is 4095, so prefix with 0xff
+			 * so we don't conflict with an interface index. */
+			vlanid = htonl(ifp->vlanid | 0xff000000);
+			memcpy(ifo->iaid, &vlanid, sizeof(vlanid));
+		} else if (ifp->hwlen >= sizeof(ifo->iaid)) {
 			memcpy(ifo->iaid,
 			    ifp->hwaddr + ifp->hwlen - sizeof(ifo->iaid),
 			    sizeof(ifo->iaid));
-		else {
+		} else {
 			uint32_t len;
 
 			len = (uint32_t)strlen(ifp->name);
@@ -503,7 +514,7 @@ configure_interface1(struct interface *ifp)
 			} else {
 				/* IAID is the same size as a uint32_t */
 				len = htonl(ifp->index);
-				memcpy(ifo->iaid, &len, sizeof(len));
+				memcpy(ifo->iaid, &len, sizeof(ifo->iaid));
 			}
 		}
 		ifo->options |= DHCPCD_IAID;

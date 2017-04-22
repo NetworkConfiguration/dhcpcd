@@ -199,7 +199,8 @@ Set the Interface Association Identifier to
 This option must be used in an
 .Ic interface
 block.
-This defaults to the last 4 bytes of the hardware address assigned to the
+This defaults to the VLANID (prefixed with 0xff) for the interface if set,
+otherwise the last 4 bytes of the hardware address assigned to the
 interface.
 Each instance of this should be unique within the scope of the client and
 .Nm dhcpcd
