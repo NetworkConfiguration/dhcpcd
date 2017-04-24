@@ -461,6 +461,9 @@ if_route(unsigned char cmd, const struct rt *rt)
 	char *bp = rtmsg.buffer;
 	struct sockaddr_dl sdl;
 	bool gateway_unspec;
+#ifdef RTA_LABEL
+	struct sockaddr_rtlabel label;
+#endif
 
 	assert(rt != NULL);
 	ctx = rt->rt_ifp->ctx;
@@ -496,6 +499,9 @@ if_route(unsigned char cmd, const struct rt *rt)
 
 		rtm->rtm_flags |= RTF_UP;
 		rtm->rtm_addrs |= RTA_GATEWAY;
+#ifdef RTA_LABEL
+		rtm->rtm_addrs |= RTA_LABEL;
+#endif
 		if (!(rtm->rtm_flags & RTF_REJECT) &&
 		    !sa_is_loopback(&rt->rt_gateway))
 		{
@@ -579,6 +585,23 @@ if_route(unsigned char cmd, const struct rt *rt)
 
 	if (rtm->rtm_addrs & RTA_IFA)
 		ADDSA(&rt->rt_ifa);
+
+#ifdef RTA_LABEL
+	if (rtm->rtm_addrs & RTA_LABEL) {
+		int len;
+
+		memset(&label, 0, sizeof(label));
+		label.sr_family = AF_UNSPEC;
+		label.sr_len = sizeof(label);
+		len = snprintf(label.sr_label, sizeof(label.sr_label),
+		    PACKAGE " %d", getpid());
+		/* Don't add the label if we failed to create it. */
+		if (len == -1 || (size_t)len > sizeof(label.sr_label))
+			rtm->rtm_addrs &= ~RTA_LABEL;
+		else
+			ADDSA((struct sockaddr *)&label);
+	}
+#endif
 
 #undef ADDSA
 
