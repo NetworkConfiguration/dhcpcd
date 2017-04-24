@@ -2416,7 +2416,7 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 	if (strcmp(ifp->name, prefix->iface->name) == 0) {
 		if (prefix->prefix_exclude_len == 0) {
 			/* Don't spam the log automatically */
-			if (sla)
+			if (sla != NULL)
 				logwarnx("%s: DHCPv6 server does not support "
 				    "OPTION_PD_EXCLUDE",
 				    ifp->name);
@@ -2428,14 +2428,14 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 	    sla, if_ia)) == -1)
 		return NULL;
 
-	if (fls64(sla->suffix) > 128 - pfxlen) {
+	if (sla != NULL && fls64(sla->suffix) > 128 - pfxlen) {
 		logerrx("%s: suffix %" PRIu64 " + prefix_len %d > 128",
 		    ifp->name, sla->suffix, pfxlen);
 		return NULL;
 	}
 
 	/* Add our suffix */
-	if (sla->suffix) {
+	if (sla != NULL && sla->suffix != 0) {
 		daddr = addr;
 		vl = be64dec(addr.s6_addr + 8);
 		vl |= sla->suffix;
