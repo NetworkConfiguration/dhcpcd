@@ -579,6 +579,18 @@ ipv6_checkaddrflags(void *arg)
 #endif
 
 static void
+ipv6_deletedaddr(struct ipv6_addr *ia)
+{
+
+	/* NOREJECT is set if we delegated exactly the prefix to another
+	 * address.
+	 * This can only be one address, so just clear the flag.
+	 * This should ensure the reject route will be restored. */
+	if (ia->delegating_prefix != NULL)
+		ia->delegating_prefix->flags &= ~IPV6_AF_NOREJECT;
+}
+
+static void
 ipv6_deleteaddr(struct ipv6_addr *ia)
 {
 	struct ipv6_state *state;
@@ -590,12 +602,7 @@ ipv6_deleteaddr(struct ipv6_addr *ia)
 	    errno != ENXIO && errno != ENODEV)
 		logerr(__func__);
 
-	/* NOREJECT is set if we delegated exactly the prefix to another
-	 * address.
-	 * This can only be one address, so just clear the flag.
-	 * This should ensure the reject route will be restored. */
-	if (ia->delegating_prefix != NULL)
-		ia->delegating_prefix->flags &= ~IPV6_AF_NOREJECT;
+	ipv6_deletedaddr(ia);
 
 	state = IPV6_STATE(ia->iface);
 	TAILQ_FOREACH(ap, &state->addrs, next) {
@@ -1675,6 +1682,11 @@ ipv6_handleifa_addrs(int cmd,
 				logwarnx("%s: deleted address %s",
 				    ia->iface->name, ia->saddr);
 				ia->flags &= ~IPV6_AF_ADDED;
+			}
+			if (ia->flags & IPV6_AF_DELEGATED) {
+				TAILQ_REMOVE(addrs, ia, next);
+				ipv6_deletedaddr(ia);
+				ipv6_freeaddr(ia);
 			}
 			break;
 		case RTM_NEWADDR:
