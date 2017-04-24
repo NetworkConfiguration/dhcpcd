@@ -2163,15 +2163,25 @@ dhcp6_findia(struct interface *ifp, struct dhcp6_message *m, size_t l,
 	}
 
 	TAILQ_FOREACH_SAFE(ap, &state->addrs, next, nap) {
-		if (ap->flags & IPV6_AF_STALE) {
-			eloop_q_timeout_delete(ifp->ctx->eloop, 0, NULL, ap);
-			if (ap->flags & IPV6_AF_REQUEST) {
-				ap->prefix_vltime = ap->prefix_pltime = 0;
-			} else {
-				TAILQ_REMOVE(&state->addrs, ap, next);
-				free(ap);
-			}
+		if (!(ap->flags & IPV6_AF_STALE))
+			continue;
+		if (ap->flags & IPV6_AF_REQUEST) {
+			ap->prefix_vltime = ap->prefix_pltime = 0;
+			eloop_q_timeout_delete(ifp->ctx->eloop,
+			    0, NULL, ap);
+			continue;
 		}
+		TAILQ_REMOVE(&state->addrs, ap, next);
+		if (ap->flags & IPV6_AF_DELEGATEDPFX) {
+			struct ipv6_addr *da;
+
+			/* Deprecate delegated addresses. */
+			TAILQ_FOREACH(da, &ap->pd_pfxs, pd_next) {
+				da->prefix_pltime = 0;
+			}
+			ipv6_addaddrs(&ap->pd_pfxs);
+		}
+		ipv6_freeaddr(ap);
 	}
 	if (i == 0 && e)
 		return -1;
