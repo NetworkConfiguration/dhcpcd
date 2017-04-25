@@ -3213,24 +3213,12 @@ dhcp6_open(struct dhcpcd_ctx *ctx)
 	ctx->dhcp6_fd = xsocket(PF_INET6, SOCK_DGRAM | SOCK_FLAGS, IPPROTO_UDP);
 #undef SOCK_FLAGS
 	if (ctx->dhcp6_fd == -1)
-		return -1;
-
-	n = 1;
-	if (setsockopt(ctx->dhcp6_fd, SOL_SOCKET, SO_REUSEADDR,
-	    &n, sizeof(n)) == -1)
 		goto errexit;
 
 	n = 1;
 	if (setsockopt(ctx->dhcp6_fd, SOL_SOCKET, SO_BROADCAST,
 	    &n, sizeof(n)) == -1)
 		goto errexit;
-
-#ifdef SO_REUSEPORT
-	n = 1;
-	if (setsockopt(ctx->dhcp6_fd, SOL_SOCKET, SO_REUSEPORT,
-	    &n, sizeof(n)) == -1)
-		logerr("SO_REUSEPORT");
-#endif
 
 	if (!(ctx->options & DHCPCD_MASTER)) {
 		/* Bind to the link-local address to allow more than one
@@ -3260,8 +3248,11 @@ dhcp6_open(struct dhcpcd_ctx *ctx)
 	return 0;
 
 errexit:
-	close(ctx->dhcp6_fd);
-	ctx->dhcp6_fd = -1;
+	logerr(__func__);
+	if (ctx->dhcp6_fd != -1) {
+		close(ctx->dhcp6_fd);
+		ctx->dhcp6_fd = -1;
+	}
 	return -1;
 }
 
