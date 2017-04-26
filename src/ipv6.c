@@ -642,6 +642,38 @@ ipv6_addaddr1(struct ipv6_addr *ap, const struct timespec *now)
 	    ipv6_iffindaddr(ap->iface, &ap->addr, IN6_IFF_NOTUSEABLE))
 		ap->flags |= IPV6_AF_DADCOMPLETED;
 
+	/* Adjust plftime and vltime based on acquired time */
+	pltime = ap->prefix_pltime;
+	vltime = ap->prefix_vltime;
+	if (timespecisset(&ap->acquired) &&
+	    (ap->prefix_pltime != ND6_INFINITE_LIFETIME ||
+	    ap->prefix_vltime != ND6_INFINITE_LIFETIME))
+	{
+		struct timespec n;
+
+		if (now == NULL) {
+			clock_gettime(CLOCK_MONOTONIC, &n);
+			now = &n;
+		}
+		timespecsub(now, &ap->acquired, &n);
+		if (ap->prefix_pltime != ND6_INFINITE_LIFETIME) {
+			ap->prefix_pltime -= (uint32_t)n.tv_sec;
+			/* This can happen when confirming a
+			 * deprecated but still valid lease. */
+			if (ap->prefix_pltime > pltime)
+				ap->prefix_pltime = 0;
+		}
+		if (ap->prefix_vltime != ND6_INFINITE_LIFETIME) {
+			ap->prefix_vltime -= (uint32_t)n.tv_sec;
+			/* This should never happen. */
+			if (ap->prefix_vltime > vltime) {
+				logerrx("%s: %s: lifetime overflow",
+				    ifp->name, ap->saddr);
+				ap->prefix_vltime = ap->prefix_pltime = 0;
+			}
+		}
+	}
+
 	logfunc = ap->flags & IPV6_AF_NEW ? loginfox : logdebugx;
 	logfunc("%s: adding %saddress %s", ap->iface->name,
 #ifdef IPV6_AF_TEMPORARY
@@ -665,41 +697,6 @@ ipv6_addaddr1(struct ipv6_addr *ap, const struct timespec *now)
 		    " seconds",
 		    ap->iface->name, ap->prefix_pltime, ap->prefix_vltime);
 
-	/* Adjust plftime and vltime based on acquired time */
-	pltime = ap->prefix_pltime;
-	vltime = ap->prefix_vltime;
-	if (timespecisset(&ap->acquired) &&
-	    (ap->prefix_pltime != ND6_INFINITE_LIFETIME ||
-	    ap->prefix_vltime != ND6_INFINITE_LIFETIME))
-	{
-		struct timespec n;
-
-		if (now == NULL) {
-			clock_gettime(CLOCK_MONOTONIC, &n);
-			now = &n;
-		}
-		timespecsub(now, &ap->acquired, &n);
-		if (ap->prefix_pltime != ND6_INFINITE_LIFETIME) {
-			ap->prefix_pltime -= (uint32_t)n.tv_sec;
-			/* This can happen when confirming a
-			 * deprecated but still valid lease. */
-			if (ap->prefix_pltime > pltime)
-				ap->prefix_pltime = 0;
-		}
-		if (ap->prefix_vltime != ND6_INFINITE_LIFETIME)
-			ap->prefix_vltime -= (uint32_t)n.tv_sec;
-
-#if 0
-		logdebugx("%s: acquired %lld.%.9ld, now %lld.%.9ld, diff %lld.%.9ld",
-		    ap->iface->name,
-		    (long long)ap->acquired.tv_sec, ap->acquired.tv_nsec,
-		    (long long)now->tv_sec, now->tv_nsec,
-		    (long long)n.tv_sec, n.tv_nsec);
-		logdebugx("%s: adj pltime %"PRIu32" seconds, "
-		    "vltime %"PRIu32" seconds",
-		    ap->iface->name, ap->prefix_pltime, ap->prefix_vltime);
-#endif
-	}
 
 	if (if_address6(RTM_NEWADDR, ap) == -1) {
 		logerr(__func__);
