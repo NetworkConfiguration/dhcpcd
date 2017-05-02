@@ -3419,40 +3419,20 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 	struct dhcp6_state *state;
 	struct dhcpcd_ctx *ctx;
 	unsigned long long options;
-#ifndef SMALL
-	int dropdele;
-#endif
 
-	/*
-	 * As the interface is going away from dhcpcd we need to
-	 * remove the delegated addresses, otherwise we lose track
-	 * of which interface is delegating as we remeber it by pointer.
-	 * So if we need to change this behaviour, we need to change
-	 * how we remember which interface delegated.
-	 *
-	 * XXX The below is no longer true due to the change of the
-	 * default IAID, but do PPP links have stable ethernet
-	 * addresses?
-	 *
-	 * To make it more interesting, on some OS's with PPP links
-	 * there is no guarantee the delegating interface will have
-	 * the same name or index so think very hard before changing
-	 * this.
-	 */
 	if (ifp->options)
 		options = ifp->options->options;
 	else
 		options = ifp->ctx->options;
-#ifndef SMALL
-	dropdele = (options & (DHCPCD_STOPPING | DHCPCD_RELEASE) &&
-	    (options & DHCPCD_NODROP) != DHCPCD_NODROP);
-#endif
 
 	if (ifp->ctx->eloop)
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 
 #ifndef SMALL
-	if (dropdele)
+	/* If we're dropping the lease, drop delegated addresses.
+	 * If, for whatever reason, we don't drop them in the future
+	 * then they should at least be marked as deprecated (pltime 0). */
+	if (drop && (options & DHCPCD_NODROP) != DHCPCD_NODROP)
 		dhcp6_delete_delegates(ifp);
 #endif
 
