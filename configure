@@ -380,6 +380,11 @@ EOF
 	sunos*);;
 	*)		echo "CFLAGS+=	-Wstrict-overflow" >>$CONFIG_MK;;
 	esac
+
+	# Turn on extra per compiler debugging
+	case "$CC" in
+	*gcc*)		echo "CFLAGS+=	-Wlogical-op" >>$CONFIG_MK;;
+	esac
 else
 	echo "CPPFLAGS+=	-DNDEBUG" >>$CONFIG_MK
 fi
