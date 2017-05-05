@@ -2039,7 +2039,7 @@ dhcp6_findia(struct interface *ifp, struct dhcp6_message *m, size_t l,
 	uint16_t nl;
 	uint8_t iaid[4];
 	char buf[sizeof(iaid) * 3];
-	struct ipv6_addr *ap, *nap;
+	struct ipv6_addr *ap;
 
 	if (l < sizeof(*m)) {
 		/* Should be impossible with guards at packet in
@@ -2162,30 +2162,58 @@ dhcp6_findia(struct interface *ifp, struct dhcp6_message *m, size_t l,
 		i++;
 	}
 
-	TAILQ_FOREACH_SAFE(ap, &state->addrs, next, nap) {
-		if (!(ap->flags & IPV6_AF_STALE))
-			continue;
-		if (ap->flags & IPV6_AF_REQUEST) {
-			ap->prefix_vltime = ap->prefix_pltime = 0;
-			eloop_q_timeout_delete(ifp->ctx->eloop,
-			    0, NULL, ap);
-			continue;
-		}
-		TAILQ_REMOVE(&state->addrs, ap, next);
-		if (ap->flags & IPV6_AF_DELEGATEDPFX) {
-			struct ipv6_addr *da;
-
-			/* Deprecate delegated addresses. */
-			TAILQ_FOREACH(da, &ap->pd_pfxs, pd_next) {
-				da->prefix_pltime = 0;
-			}
-			ipv6_addaddrs(&ap->pd_pfxs);
-		}
-		ipv6_freeaddr(ap);
-	}
 	if (i == 0 && e)
 		return -1;
 	return i;
+}
+
+static void
+dhcp6_deprecateaddrs(struct ipv6_addrhead *addrs)
+{
+	struct ipv6_addr *ia, *ian;
+
+	TAILQ_FOREACH_SAFE(ia, addrs, next, ian) {
+		if (ia->flags & IPV6_AF_STALE) {
+			if (ia->prefix_vltime != 0)
+				logdebugx("%s: %s: became stale",
+				    ia->iface->name, ia->saddr);
+			ia->prefix_pltime = 0;
+		} else if (ia->prefix_vltime == 0)
+			loginfox("%s: %s: no valid lifetime",
+			    ia->iface->name, ia->saddr);
+		else
+			continue;
+
+		/* If we delegated from this prefix, deprecate or remove
+		 * the delegations. */
+		if (ia->flags & IPV6_AF_DELEGATEDPFX) {
+			struct ipv6_addr *da;
+			bool touched = false;
+
+			TAILQ_FOREACH(da, &ia->pd_pfxs, pd_next) {
+				if (ia->prefix_vltime == 0) {
+					if (da->prefix_vltime != 0) {
+						da->prefix_vltime = 0;
+						touched = true;
+					}
+				} else if (da->prefix_pltime != 0) {
+					da->prefix_pltime = 0;
+					touched = true;
+				}
+			}
+			if (touched)
+				ipv6_addaddrs(&ia->pd_pfxs);
+		}
+
+		if (ia->flags & IPV6_AF_REQUEST) {
+			ia->prefix_vltime = ia->prefix_pltime = 0;
+			eloop_q_timeout_delete(ia->iface->ctx->eloop,
+			    0, NULL, ia);
+			continue;
+		}
+		TAILQ_REMOVE(addrs, ia, next);
+		ipv6_freeaddr(ia);
+	}
 }
 
 static int
@@ -3176,6 +3204,7 @@ dhcp6_handledata(void *arg)
 			eloop_timeout_add_sec(ifp->ctx->eloop,
 			    (time_t)state->expire, dhcp6_startexpire, ifp);
 
+		dhcp6_deprecateaddrs(&state->addrs);
 		ipv6_addaddrs(&state->addrs);
 
 		if (state->state == DH6S_INFORMED)
