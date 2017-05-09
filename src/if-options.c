@@ -93,7 +93,7 @@
 #define O_IPV6			O_BASE + 33
 #define O_CONTROLGRP		O_BASE + 34
 #define O_SLAAC			O_BASE + 35
-// unused			O_BASE + 36
+#define O_GATEWAY		O_BASE + 36
 #define O_NOUP			O_BASE + 37
 #define O_IPV6RA_AUTOCONF	O_BASE + 38
 #define O_IPV6RA_NOAUTOCONF	O_BASE + 39
@@ -196,6 +196,7 @@ const struct option cf_options[] = {
 	{"nodhcp6",         no_argument,       NULL, O_NODHCP6},
 	{"controlgroup",    required_argument, NULL, O_CONTROLGRP},
 	{"slaac",           required_argument, NULL, O_SLAAC},
+	{"gateway",         no_argument,       NULL, O_GATEWAY},
 	{"reject",          required_argument, NULL, O_REJECT},
 	{"bootp",           no_argument,       NULL, O_BOOTP},
 	{"nodelay",         no_argument,       NULL, O_NODELAY},
@@ -977,6 +978,9 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			logerrx("invalid value `%s' for FQDN", arg);
 			return -1;
 		}
+		break;
+	case 'G':
+		ifo->options &= ~DHCPCD_GATEWAY;
 		break;
 	case 'H':
 		ifo->options |= DHCPCD_XID_HWADDR;
@@ -2078,6 +2082,9 @@ err_sla:
 		ctx->control_group = grp->gr_gid;
 #endif
 		break;
+	case O_GATEWAY:
+		ifo->options |= DHCPCD_GATEWAY;
+		break;
 	case O_NOUP:
 		ifo->options &= ~DHCPCD_IF_UP;
 		break;
@@ -2257,7 +2264,7 @@ read_config(struct dhcpcd_ctx *ctx,
 	/* Seed our default options */
 	if ((ifo = default_config(ctx)) == NULL)
 		return NULL;
-	ifo->options |= DHCPCD_DAEMONISE;
+	ifo->options |= DHCPCD_DAEMONISE | DHCPCD_GATEWAY;
 #ifdef PLUGIN_DEV
 	ifo->options |= DHCPCD_DEV;
 #endif
