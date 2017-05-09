@@ -1353,7 +1353,11 @@ dhcp6_dadcallback(void *arg)
 		{
 			struct ipv6_addr *ap2;
 
+#ifdef SMALL
+			valid = true;
+#else
 			valid = (ap->delegating_prefix == NULL);
+#endif
 			TAILQ_FOREACH(ap2, &state->addrs, next) {
 				if (ap2->flags & IPV6_AF_ADDED &&
 				    !(ap2->flags & IPV6_AF_DADCOMPLETED))
@@ -1366,8 +1370,10 @@ dhcp6_dadcallback(void *arg)
 				logdebugx("%s: DHCPv6 DAD completed",
 				    ifp->name);
 				script_runreason(ifp,
-				    ap->delegating_prefix ?
-				    "DELEGATED6" : state->reason);
+#ifndef SMALL
+				    ap->delegating_prefix ? "DELEGATED6" :
+#endif
+				    state->reason);
 				if (valid)
 					dhcpcd_daemonise(ifp->ctx);
 			}
@@ -2184,6 +2190,7 @@ dhcp6_deprecateaddrs(struct ipv6_addrhead *addrs)
 		else
 			continue;
 
+#ifndef SMALL
 		/* If we delegated from this prefix, deprecate or remove
 		 * the delegations. */
 		if (ia->flags & IPV6_AF_DELEGATEDPFX) {
@@ -2204,6 +2211,7 @@ dhcp6_deprecateaddrs(struct ipv6_addrhead *addrs)
 			if (touched)
 				ipv6_addaddrs(&ia->pd_pfxs);
 		}
+#endif
 
 		if (ia->flags & IPV6_AF_REQUEST) {
 			ia->prefix_vltime = ia->prefix_pltime = 0;
@@ -2548,9 +2556,12 @@ dhcp6_script_try_run(struct interface *ifp, int delegated)
 			    ipv6_iffindaddr(ap->iface, &ap->addr,
 			                    IN6_IFF_TENTATIVE))
 				ap->flags |= IPV6_AF_DADCOMPLETED;
-			if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0 &&
-			    ((delegated && ap->delegating_prefix) ||
-			    (!delegated && !ap->delegating_prefix)))
+			if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0
+#ifndef SMALL
+			    && ((delegated && ap->delegating_prefix) ||
+			    (!delegated && !ap->delegating_prefix))
+#endif
+			    )
 			{
 				completed = 0;
 				break;
@@ -3583,9 +3594,11 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 	char *pfx;
 	uint32_t en;
 	const struct dhcpcd_ctx *ctx;
+#ifndef SMALL
 	const struct dhcp6_state *state;
 	const struct ipv6_addr *ap;
 	char *v, *val;
+#endif
 
 	n = 0;
 	if (m == NULL)
@@ -3686,6 +3699,7 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 	free(pfx);
 
 delegated:
+#ifndef SMALL
         /* Needed for Delegated Prefixes */
 	state = D6_CSTATE(ifp);
 	i = 0;
@@ -3717,6 +3731,7 @@ delegated:
         }
 	if (i)
 		n++;
+#endif
 
 	return (ssize_t)n;
 }
