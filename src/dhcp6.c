@@ -2594,7 +2594,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 	struct if_ia *ia;
 	struct if_sla *sla;
 	struct interface *ifd;
-	uint8_t carrier_warned, abrt;
+	bool carrier_warned;
 
 	ifo = ifp->options;
 	state = D6_STATE(ifp);
@@ -2608,7 +2608,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 		if (!ifd->active)
 			continue;
 		k = 0;
-		carrier_warned = abrt = 0;
+		carrier_warned = false;
 		TAILQ_FOREACH(ap, &state->addrs, next) {
 			if (!(ap->flags & IPV6_AF_DELEGATEDPFX))
 				continue;
@@ -2639,7 +2639,7 @@ dhcp6_delegate_prefix(struct interface *ifp)
 						    "%s: has no carrier, cannot"
 						    " delegate addresses",
 						    ifd->name);
-						carrier_warned = 1;
+						carrier_warned = true;
 						break;
 					}
 					if (dhcp6_ifdelegateaddr(ifd, ap,
@@ -2655,17 +2655,17 @@ dhcp6_delegate_prefix(struct interface *ifp)
 						    "%s: has no carrier, cannot"
 						    " delegate addresses",
 						    ifd->name);
-						carrier_warned = 1;
+						carrier_warned = true;
 						break;
 					}
 					if (dhcp6_ifdelegateaddr(ifd, ap,
 					    sla, ia))
 						k++;
 				}
-				if (carrier_warned ||abrt)
+				if (carrier_warned)
 					break;
 			}
-			if (carrier_warned || abrt)
+			if (carrier_warned)
 				break;
 		}
 		if (k && !carrier_warned) {
