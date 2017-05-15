@@ -1133,7 +1133,7 @@ reconf_reboot(struct dhcpcd_ctx *ctx, int action, int argc, char **argv, int oi)
 		}
 		if (oi != argc && i == argc)
 			continue;
-		if (ifp->active) {
+		if (ifp->active == IF_ACTIVE_USER) {
 			if (action)
 				if_reboot(ifp, argc, argv);
 			else
