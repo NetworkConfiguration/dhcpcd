@@ -3103,7 +3103,12 @@ dhcp6_handledata(void *arg)
 		}
 		if (ap == NULL)
 			ap = TAILQ_FIRST(&state->addrs);
-		loginfox("%s: ADV %s from %s", ifp->name, ap->saddr, ctx->sfrom);
+		if (ap == NULL)
+			loginfox("%s: ADV (no address) from %s",
+			    ifp->name, ctx->sfrom);
+		else
+			loginfox("%s: ADV %s from %s",
+			    ifp->name, ap->saddr, ctx->sfrom);
 		if (ifp->ctx->options & DHCPCD_TEST)
 			break;
 		dhcp6_startrequest(ifp);
