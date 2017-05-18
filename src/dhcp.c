@@ -697,7 +697,7 @@ dhcp_get_routes(struct rt_head *routes, struct interface *ifp)
 {
 	const struct dhcp_state *state;
 
-	if ((state = D_CSTATE(ifp)) == NULL || state->state != DHS_BOUND)
+	if ((state = D_CSTATE(ifp)) == NULL || !(state->added & STATE_ADDED))
 		return 0;
 	return get_option_routes(routes, ifp, state->new, state->new_len);
 }
