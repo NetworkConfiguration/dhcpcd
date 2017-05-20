@@ -1074,6 +1074,9 @@ dhcpcd_handlehwaddr(struct dhcpcd_ctx *ctx, const char *ifname,
 	if (ifp == NULL)
 		return;
 
+	if (!if_valid_hwaddr(hwaddr, hwlen))
+		hwlen = 0;
+
 	if (hwlen > sizeof(ifp->hwaddr)) {
 		errno = ENOBUFS;
 		logerr("%s: %s", __func__, ifp->name);
