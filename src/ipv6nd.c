@@ -237,11 +237,12 @@ ipv6nd_makersprobe(struct interface *ifp)
 {
 	struct rs_state *state;
 	struct nd_router_solicit *rs;
-	struct nd_opt_hdr *nd;
 
 	state = RS_STATE(ifp);
 	free(state->rs);
-	state->rslen = sizeof(*rs) + (size_t)ROUNDUP8(ifp->hwlen + 2);
+	state->rslen = sizeof(*rs);
+	if (ifp->hwlen != 0)
+		state->rslen += (size_t)ROUNDUP8(ifp->hwlen + 2);
 	state->rs = calloc(1, state->rslen);
 	if (state->rs == NULL)
 		return -1;
@@ -250,10 +251,15 @@ ipv6nd_makersprobe(struct interface *ifp)
 	rs->nd_rs_code = 0;
 	rs->nd_rs_cksum = 0;
 	rs->nd_rs_reserved = 0;
-	nd = (struct nd_opt_hdr *)(state->rs + sizeof(*rs));
-	nd->nd_opt_type = ND_OPT_SOURCE_LINKADDR;
-	nd->nd_opt_len = (uint8_t)((ROUNDUP8(ifp->hwlen + 2)) >> 3);
-	memcpy(nd + 1, ifp->hwaddr, ifp->hwlen);
+
+	if (ifp->hwlen != 0) {
+		struct nd_opt_hdr *nd;
+
+		nd = (struct nd_opt_hdr *)(state->rs + sizeof(*rs));
+		nd->nd_opt_type = ND_OPT_SOURCE_LINKADDR;
+		nd->nd_opt_len = (uint8_t)((ROUNDUP8(ifp->hwlen + 2)) >> 3);
+		memcpy(nd + 1, ifp->hwaddr, ifp->hwlen);
+	}
 	return 0;
 }
 
