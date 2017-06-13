@@ -548,7 +548,6 @@ dhcp6_makemessage(struct interface *ifp)
 	uint8_t *o_lenp;
 	struct if_options *ifo;
 	const struct dhcp_opt *opt, *opt2;
-	uint32_t u32;
 	const struct ipv6_addr *ap;
 	char hbuf[HOSTNAME_MAX_LEN + 1];
 	const char *hostname;
@@ -694,7 +693,7 @@ dhcp6_makemessage(struct interface *ifp)
 		}
 		/* FALLTHROUGH */
 	case DH6S_INIT:
-		len += ifo->ia_len * (sizeof(o) + (sizeof(u32) * 3));
+		len += ifo->ia_len * (sizeof(o) + (sizeof(uint32_t) * 3));
 		IA = 1;
 		break;
 	default:
@@ -820,7 +819,7 @@ dhcp6_makemessage(struct interface *ifp)
 			if (ap->prefix_vltime == 0 &&
 			    !(ap->flags & IPV6_AF_REQUEST))
 				continue;
-			if (memcmp(ifo->ia[l].iaid, ap->iaid, sizeof(u32)))
+			if (memcmp(ifo->ia[l].iaid, ap->iaid, sizeof(uint32_t)))
 				continue;
 			if (ap->ia_type == D6_OPTION_IA_PD) {
 #ifndef SMALL
@@ -2779,7 +2778,6 @@ dhcp6_handledata(void *arg)
 	const struct if_options *ifo;
 	struct ipv6_addr *ap;
 	bool valid_op, has_new;
-	uint32_t u32;
 	logfunc_t *lognewinfo;
 #ifdef AUTH
 	uint8_t *auth;
@@ -2943,7 +2941,7 @@ dhcp6_handledata(void *arg)
 			/* RFC4242 */
 			o = dhcp6_findmoption(r, len,
 					     D6_OPTION_INFO_REFRESH_TIME, &ol);
-			if (o == NULL || ol != sizeof(u32))
+			if (o == NULL || ol != sizeof(uint32_t))
 				state->renew = IRT_DEFAULT;
 			else {
 				memcpy(&state->renew, o, ol);
