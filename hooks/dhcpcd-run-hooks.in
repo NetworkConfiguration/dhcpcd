@@ -33,10 +33,10 @@ uniqify()
 	for i do
 		case " $result " in
 			*" $i "*);;
-			*) result="$result $i";;
+			*) result="$result${result:+ }$i";;
 		esac
 	done
-	echo "${result# *}"
+	echo "$result"
 }
 
 # List interface config files in a directory.
