@@ -241,7 +241,7 @@ next:
 			return bytes;
 	}
 
-	return bytes;
+	/* NOTREACHED */
 }
 
 int
