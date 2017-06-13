@@ -88,4 +88,4 @@ install similar logic into their dhcpcd package.
 We no longer supply a ChangeLog.
 However, you're more than welcome to read the
 [commit log](http://roy.marples.name/git/dhcpcd.git/log/) and
-[archived release annoucements](http://roy.marples.name/archives/dhcpcd-discuss/).
+[archived release announcements](http://roy.marples.name/archives/dhcpcd-discuss/).
