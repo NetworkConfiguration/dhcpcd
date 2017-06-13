@@ -733,8 +733,6 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	struct nd_opt_mtu mtu;
 	struct nd_opt_rdnss rdnss;
 	uint8_t *p;
-	char buf[INET6_ADDRSTRLEN];
-	const char *cbp;
 	struct ra *rap;
 	struct in6_addr pi_prefix;
 	struct ipv6_addr *ap;
@@ -943,48 +941,26 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 				    IN6_ARE_ADDR_EQUAL(&ap->prefix, &pi_prefix))
 					break;
 			if (ap == NULL) {
+				short flags;
+
 				if (!(pi.nd_opt_pi_flags_reserved &
 				    ND_OPT_PI_FLAG_AUTO) &&
 				    !(pi.nd_opt_pi_flags_reserved &
 				    ND_OPT_PI_FLAG_ONLINK))
 					continue;
-				ap = calloc(1, sizeof(*ap));
-				if (ap == NULL) {
-					logerr(__func__);
-					break;
-				}
-				ap->iface = rap->iface;
-				ap->flags = IPV6_AF_NEW;
-				ap->prefix_len = pi.nd_opt_pi_prefix_len;
-				ap->prefix = pi_prefix;
+
+				flags = IPV6_AF_RAPFX;
 				if (pi.nd_opt_pi_flags_reserved &
 				    ND_OPT_PI_FLAG_AUTO &&
-				    ap->iface->options->options &
+				    rap->iface->options->options &
 				    DHCPCD_IPV6RA_AUTOCONF)
-				{
-					ap->flags |= IPV6_AF_AUTOCONF;
-					ap->dadcounter =
-					    ipv6_makeaddr(&ap->addr, ifp,
-					    &ap->prefix,
-					    pi.nd_opt_pi_prefix_len);
-					if (ap->dadcounter == -1) {
-						free(ap);
-						break;
-					}
-					cbp = inet_ntop(AF_INET6,
-					    &ap->addr,
-					    buf, sizeof(buf));
-					if (cbp)
-						snprintf(ap->saddr,
-						    sizeof(ap->saddr),
-						    "%s/%d",
-						    cbp, ap->prefix_len);
-					else
-						ap->saddr[0] = '\0';
-				} else {
-					memset(&ap->addr, 0, sizeof(ap->addr));
-					ap->saddr[0] = '\0';
-				}
+					flags |= IPV6_AF_AUTOCONF;
+
+				ap = ipv6_newaddr(rap->iface,
+				    &pi_prefix, pi.nd_opt_pi_prefix_len, flags);
+				if (ap == NULL)
+					break;
+				ap->prefix = pi_prefix;
 				ap->dadcallback = ipv6nd_dadcallback;
 				ap->created = ap->acquired = rap->acquired;
 				TAILQ_INSERT_TAIL(&rap->addrs, ap, next);

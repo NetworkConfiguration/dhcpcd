@@ -1387,8 +1387,6 @@ dhcp6_addrequestedaddrs(struct interface *ifp)
 	size_t i;
 	struct if_ia *ia;
 	struct ipv6_addr *a;
-	char iabuf[INET6_ADDRSTRLEN];
-	const char *iap;
 
 	state = D6_STATE(ifp);
 	/* Add any requested prefixes / addresses */
@@ -1397,26 +1395,7 @@ dhcp6_addrequestedaddrs(struct interface *ifp)
 		if (!((ia->ia_type == D6_OPTION_IA_PD && ia->prefix_len) ||
 		    !IN6_IS_ADDR_UNSPECIFIED(&ia->addr)))
 			continue;
-		a = calloc(1, sizeof(*a));
-		if (a == NULL) {
-			logerr(__func__);
-			return;
-		}
-		a->flags = IPV6_AF_REQUEST;
-		a->iface = ifp;
-		a->dadcallback = dhcp6_dadcallback;
-		memcpy(&a->iaid, &ia->iaid, sizeof(a->iaid));
-		a->ia_type = ia->ia_type;
-		//a->prefix_pltime = 0;
-		//a->prefix_vltime = 0;
-
-		if (ia->ia_type == D6_OPTION_IA_PD) {
-			memcpy(&a->prefix, &ia->addr, sizeof(a->addr));
-			a->prefix_len = ia->prefix_len;
-			iap = inet_ntop(AF_INET6, &a->prefix,
-			    iabuf, sizeof(iabuf));
-		} else {
-			memcpy(&a->addr, &ia->addr, sizeof(a->addr));
+		a = ipv6_newaddr(ifp, &ia->addr,
 			/*
 			 * RFC 5942 Section 5
 			 * We cannot assume any prefix length, nor tie the
@@ -1424,13 +1403,13 @@ dhcp6_addrequestedaddrs(struct interface *ifp)
 			 * before the address.
 			 * As such we just give it a 128 prefix.
 			 */
-			a->prefix_len = 128;
-			ipv6_makeprefix(&a->prefix, &a->addr, a->prefix_len);
-			iap = inet_ntop(AF_INET6, &a->addr,
-			    iabuf, sizeof(iabuf));
-		}
-		snprintf(a->saddr, sizeof(a->saddr),
-		    "%s/%d", iap, a->prefix_len);
+		    ia->ia_type == D6_OPTION_IA_PD ? ia->prefix_len : 128,
+		    IPV6_AF_REQUEST);
+		if (a == NULL)
+			continue;
+		a->dadcallback = dhcp6_dadcallback;
+		memcpy(&a->iaid, &ia->iaid, sizeof(a->iaid));
+		a->ia_type = ia->ia_type;
 		TAILQ_INSERT_TAIL(&state->addrs, a, next);
 	}
 }
@@ -1810,8 +1789,6 @@ dhcp6_findna(struct interface *ifp, uint16_t ot, const uint8_t *iaid,
 	uint8_t *o, *nd;
 	uint16_t ol;
 	struct ipv6_addr *a;
-	char iabuf[INET6_ADDRSTRLEN];
-	const char *ias;
 	int i;
 	struct dhcp6_ia_addr ia;
 
@@ -1843,19 +1820,6 @@ dhcp6_findna(struct interface *ifp, uint16_t ot, const uint8_t *iaid,
 				break;
 		}
 		if (a == NULL) {
-			a = calloc(1, sizeof(*a));
-			if (a == NULL) {
-				logerr(__func__);
-				break;
-			}
-			a->iface = ifp;
-			a->flags = IPV6_AF_NEW | IPV6_AF_ONLINK;
-			a->dadcallback = dhcp6_dadcallback;
-			a->ia_type = ot;
-			memcpy(a->iaid, iaid, sizeof(a->iaid));
-			a->addr = ia.addr;
-			a->created = *acquired;
-
 			/*
 			 * RFC 5942 Section 5
 			 * We cannot assume any prefix length, nor tie the
@@ -1863,12 +1827,11 @@ dhcp6_findna(struct interface *ifp, uint16_t ot, const uint8_t *iaid,
 			 * before the address.
 			 * As such we just give it a 128 prefix.
 			 */
-			a->prefix_len = 128;
-			ipv6_makeprefix(&a->prefix, &a->addr, a->prefix_len);
-			ias = inet_ntop(AF_INET6, &a->addr,
-			    iabuf, sizeof(iabuf));
-			snprintf(a->saddr, sizeof(a->saddr),
-			    "%s/%d", ias, a->prefix_len);
+			a = ipv6_newaddr(ifp, &ia.addr, 128, IPV6_AF_ONLINK);
+			a->dadcallback = dhcp6_dadcallback;
+			a->ia_type = ot;
+			memcpy(a->iaid, iaid, sizeof(a->iaid));
+			a->created = *acquired;
 
 			TAILQ_INSERT_TAIL(&state->addrs, a, next);
 		} else {
@@ -1899,8 +1862,6 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 	struct dhcp6_state *state;
 	uint8_t *o, *nd;
 	struct ipv6_addr *a;
-	char iabuf[INET6_ADDRSTRLEN];
-	const char *ia;
 	int i;
 	uint8_t nb, *pw;
 	uint16_t ol;
@@ -1943,24 +1904,14 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 		}
 
 		if (a == NULL) {
-			a = calloc(1, sizeof(*a));
-			if (a == NULL) {
-				logerr(__func__);
+			a = ipv6_newaddr(ifp, &pdp_prefix, pdp.prefix_len,
+			    IPV6_AF_DELEGATEDPFX);
+			if (a == NULL)
 				break;
-			}
-			a->iface = ifp;
-			a->flags = IPV6_AF_NEW | IPV6_AF_DELEGATEDPFX;
 			a->created = *acquired;
 			a->dadcallback = dhcp6_dadcallback;
 			a->ia_type = D6_OPTION_IA_PD;
 			memcpy(a->iaid, iaid, sizeof(a->iaid));
-			/* pdp.prefix is not aligned so use copy. */
-			a->prefix = pdp_prefix;
-			a->prefix_len = pdp.prefix_len;
-			ia = inet_ntop(AF_INET6, &a->prefix,
-			    iabuf, sizeof(iabuf));
-			snprintf(a->saddr, sizeof(a->saddr),
-			    "%s/%d", ia, a->prefix_len);
 			TAILQ_INIT(&a->pd_pfxs);
 			TAILQ_INSERT_TAIL(&state->addrs, a, next);
 		} else {
@@ -2452,8 +2403,6 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 	struct dhcp6_state *state;
 	struct in6_addr addr, daddr;
 	struct ipv6_addr *ia;
-	char sabuf[INET6_ADDRSTRLEN];
-	const char *sa;
 	int pfxlen, dadcounter;
 	uint64_t vl;
 
@@ -2501,17 +2450,12 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 			break;
 	}
 	if (ia == NULL) {
-		ia = calloc(1, sizeof(*ia));
-		if (ia == NULL) {
-			logerr(__func__);
+		ia = ipv6_newaddr(ifp, &daddr, (uint8_t)pfxlen, IPV6_AF_ONLINK);
+		if (ia == NULL)
 			return NULL;
-		}
-		ia->iface = ifp;
-		ia->flags = IPV6_AF_NEW | IPV6_AF_ONLINK;
 		ia->dadcallback = dhcp6_dadcallback;
 		memcpy(&ia->iaid, &prefix->iaid, sizeof(ia->iaid));
 		ia->created = prefix->acquired;
-		ia->addr = daddr;
 
 		TAILQ_INSERT_TAIL(&state->addrs, ia, next);
 		TAILQ_INSERT_TAIL(&prefix->pd_pfxs, ia, pd_next);
@@ -2522,9 +2466,6 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 	ia->acquired = prefix->acquired;
 	ia->prefix_pltime = prefix->prefix_pltime;
 	ia->prefix_vltime = prefix->prefix_vltime;
-
-	sa = inet_ntop(AF_INET6, &ia->addr, sabuf, sizeof(sabuf));
-	snprintf(ia->saddr, sizeof(ia->saddr), "%s/%d", sa, ia->prefix_len);
 
 	/* If the prefix length hasn't changed,
 	 * don't install a reject route. */

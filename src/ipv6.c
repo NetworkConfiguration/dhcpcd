@@ -379,7 +379,7 @@ ipv6_makeaddr(struct in6_addr *addr, struct interface *ifp,
 	return 0;
 }
 
-int
+static int
 ipv6_makeprefix(struct in6_addr *prefix, const struct in6_addr *addr, int len)
 {
 	int bytes, bits;
@@ -1286,21 +1286,18 @@ ipv6_addlinklocalcallback(struct interface *ifp,
 static struct ipv6_addr *
 ipv6_newlinklocal(struct interface *ifp)
 {
-	struct ipv6_addr *ap;
+	struct ipv6_addr *ia;
+	struct in6_addr in6;
 
-	ap = calloc(1, sizeof(*ap));
-	if (ap != NULL) {
-		ap->iface = ifp;
-		ap->prefix.s6_addr32[0] = htonl(0xfe800000);
-		ap->prefix.s6_addr32[1] = 0;
-		ap->prefix_len = 64;
-		ap->dadcounter = 0;
-		ap->prefix_pltime = ND6_INFINITE_LIFETIME;
-		ap->prefix_vltime = ND6_INFINITE_LIFETIME;
-		ap->flags = IPV6_AF_NEW;
-		ap->addr_flags = IN6_IFF_TENTATIVE;
+	in6.s6_addr32[0] = htonl(0xfe800000);
+	in6.s6_addr32[1] = 0;
+	ia = ipv6_newaddr(ifp, &in6, 64, 0);
+	if (ia != NULL) {
+		ia->prefix_pltime = ND6_INFINITE_LIFETIME;
+		ia->prefix_vltime = ND6_INFINITE_LIFETIME;
+		ia->addr_flags = IN6_IFF_TENTATIVE;
 	}
-	return ap;
+	return ia;
 }
 
 static const uint8_t allzero[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -1445,31 +1442,56 @@ ipv6_tryaddlinklocal(struct interface *ifp)
 	return ipv6_addlinklocal(ifp);
 }
 
-static struct ipv6_addr *
-ipv6_newaddr(struct interface *ifp, struct in6_addr *addr, uint8_t prefix_len)
+struct ipv6_addr *
+ipv6_newaddr(struct interface *ifp, struct in6_addr *addr, uint8_t prefix_len,
+    short flags)
 {
 	struct ipv6_addr *ia;
 	char buf[INET6_ADDRSTRLEN];
 	const char *cbp;
 
-	if ((ia = calloc(1, sizeof(*ia))) == NULL)
-		return NULL;
+	ia = calloc(1, sizeof(*ia));
+	if (ia == NULL)
+		goto err;
+
 	ia->iface = ifp;
-	ia->flags = IPV6_AF_NEW;
+	ia->flags = IPV6_AF_NEW | flags;
 	ia->addr_flags = IN6_IFF_TENTATIVE;
-	ia->addr = *addr;
 	ia->prefix_len = prefix_len;
-	if (ipv6_makeprefix(&ia->prefix, &ia->addr, ia->prefix_len) == -1) {
-		free(ia);
-		return NULL;
+
+	if (ia->flags & IPV6_AF_AUTOCONF) {
+		ia->prefix = *addr;
+		ia->dadcounter = ipv6_makeaddr(&ia->addr, ifp,
+		                               &ia->prefix,
+					       ia->prefix_len);
+		if (ia->dadcounter == -1)
+			goto err;
+	} else if (ia->flags & IPV6_AF_RAPFX) {
+		ia->prefix = *addr;
+		return ia;
+	} else if (ia->flags & IPV6_AF_REQUEST && prefix_len != 128) {
+		ia->prefix = *addr;
+		cbp = inet_ntop(AF_INET6, &ia->prefix, buf, sizeof(buf));
+		goto paddr;
+	} else {
+		ia->addr = *addr;
+		if (ipv6_makeprefix(&ia->prefix,
+		                    &ia->addr, ia->prefix_len) == -1)
+			goto err;
 	}
+
 	cbp = inet_ntop(AF_INET6, &ia->addr, buf, sizeof(buf));
-	if (cbp)
-		snprintf(ia->saddr, sizeof(ia->saddr), "%s/%d",
-		    cbp, ia->prefix_len);
-	else
-		ia->saddr[0] = '\0';
+paddr:
+	if (cbp == NULL)
+		goto err;
+	snprintf(ia->saddr, sizeof(ia->saddr), "%s/%d", cbp, ia->prefix_len);
+
 	return ia;
+
+err:
+	logerr(__func__);
+	free(ia);
+	return NULL;
 }
 
 static void
@@ -1569,7 +1591,7 @@ ipv6_startstatic(struct interface *ifp)
 		struct ipv6_state *state;
 
 		ia = ipv6_newaddr(ifp, &ifp->options->req_addr6,
-		    ifp->options->req_prefix_len);
+		    ifp->options->req_prefix_len, 0);
 		if (ia == NULL)
 			return -1;
 		state = IPV6_STATE(ifp);
@@ -1865,8 +1887,6 @@ ipv6_createtempaddr(struct ipv6_addr *ia0, const struct timespec *now)
 	const struct ipv6_addr *ap;
 	struct ipv6_addr *ia;
 	uint32_t i, trylimit;
-	char buf[INET6_ADDRSTRLEN];
-	const char *cbp;
 
 	trylimit = TEMP_IDGEN_RETRIES;
 	state = IPV6_STATE(ia0->iface);
@@ -1913,17 +1933,11 @@ again:
 		}
 	}
 
-	if ((ia = calloc(1, sizeof(*ia))) == NULL)
-		return NULL;
-
-	ia->iface = ia0->iface;
-	ia->addr = addr;
+	ia = ipv6_newaddr(ia0->iface, &addr, ia0->prefix_len,
+	    IPV6_AF_AUTOCONF | IPV6_AF_TEMPORARY);
 	/* Must be made tentative, for our DaD to work */
 	ia->addr_flags = IN6_IFF_TENTATIVE;
 	ia->dadcallback = ipv6_tempdadcallback;
-	ia->flags = IPV6_AF_NEW | IPV6_AF_AUTOCONF | IPV6_AF_TEMPORARY;
-	ia->prefix = ia0->prefix;
-	ia->prefix_len = ia0->prefix_len;
 	ia->created = ia->acquired = now ? *now : ia0->acquired;
 
 	/* Ensure desync is still valid */
@@ -1942,11 +1956,6 @@ again:
 		free(ia);
 		return NULL;
 	}
-
-	cbp = inet_ntop(AF_INET6, &ia->addr, buf, sizeof(buf));
-	if (cbp)
-		snprintf(ia->saddr, sizeof(ia->saddr), "%s/%d",
-		    cbp, ia->prefix_len); else ia->saddr[0] = '\0';
 
 	TAILQ_INSERT_TAIL(&state->addrs, ia, next);
 	return ia;
