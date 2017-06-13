@@ -212,11 +212,11 @@ valid_domainname()
 		case "$label" in
 		-*|_*|*-|*_)		return 1;;
 		*[![:alnum:]_-]*)	return 1;;
+		"$name")		return 0;;
 		esac
-		[ "$name" = "${name#*.}" ] && break
 		name="${name#*.}"
 	done
-	return 0	
+	return 0
 }
 
 valid_domainname_list()
