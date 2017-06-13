@@ -229,16 +229,6 @@ valid_domainname_list()
 	return 0
 }
 
-# Check for a valid path
-valid_path()
-{
-
-	case "$@" in
-	*[![:alnum:]#%+-_:\.,@~\\/\[\]=\ ]*) return 1;;
-	esac
-	return 0
-}
-
 # With the advent of alternative init systems, it's possible to have
 # more than one installed. So we need to try and guess what one we're
 # using unless overriden by configure.
