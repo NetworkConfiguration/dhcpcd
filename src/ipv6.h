@@ -165,6 +165,7 @@ struct ipv6_addr {
 	char saddr[INET6_ADDRSTRLEN];
 	uint8_t iaid[4];
 	uint16_t ia_type;
+	int fd;
 
 #ifndef SMALL
 	struct ipv6_addr *delegating_prefix;
@@ -199,8 +200,9 @@ struct ipv6_addr {
 #define	IPV6_AF_REQUEST		0x0400
 #define	IPV6_AF_STATIC		0x0800
 #define IPV6_AF_DELEGATEDLOG	0x1000
+#define IPV6_AF_RAPFX		0x2000
 #ifdef IPV6_MANAGETEMPADDR
-#define	IPV6_AF_TEMPORARY	0X2000
+#define	IPV6_AF_TEMPORARY	0X4000
 #endif
 
 struct ll_callback {
@@ -236,7 +238,6 @@ int ipv6_makestableprivate(struct in6_addr *addr,
     const struct interface *ifp, int *dad_counter);
 int ipv6_makeaddr(struct in6_addr *, struct interface *,
     const struct in6_addr *, int);
-int ipv6_makeprefix(struct in6_addr *, const struct in6_addr *, int);
 int ipv6_mask(struct in6_addr *, int);
 uint8_t ipv6_prefixlen(const struct in6_addr *);
 int ipv6_userprefix( const struct in6_addr *, short prefix_len,
@@ -260,6 +261,8 @@ struct ipv6_addr *ipv6_findmaskaddr(struct dhcpcd_ctx *,
     const struct in6_addr *);
 #define ipv6_linklocal(ifp) ipv6_iffindaddr((ifp), NULL, IN6_IFF_NOTUSEABLE)
 int ipv6_addlinklocalcallback(struct interface *, void (*)(void *), void *);
+struct ipv6_addr *ipv6_newaddr(struct interface *, struct in6_addr *, uint8_t,
+    short);
 void ipv6_freeaddr(struct ipv6_addr *);
 void ipv6_freedrop(struct interface *, int);
 #define ipv6_free(ifp) ipv6_freedrop((ifp), 0)
