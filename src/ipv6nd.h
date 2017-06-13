@@ -63,10 +63,12 @@ struct rs_state {
 #define RS_STATE(a) ((struct rs_state *)(ifp)->if_data[IF_DATA_IPV6ND])
 #define RS_STATE_RUNNING(a) (ipv6nd_hasra((a)) && ipv6nd_dadcompleted((a)))
 
+#ifndef MAX_RTR_SOLICITATION_DELAY
 #define MAX_RTR_SOLICITATION_DELAY	1	/* seconds */
 #define MAX_UNICAST_SOLICIT		3	/* 3 transmissions */
 #define RTR_SOLICITATION_INTERVAL	4	/* seconds */
 #define MAX_RTR_SOLICITATIONS		3	/* times */
+#endif
 
 /* On carrier up, expire known routers after RTR_CARRIER_EXPIRE seconds. */
 #define RTR_CARRIER_EXPIRE		\
