@@ -315,23 +315,19 @@ ssize_t
 decode_rfc1035(char *out, size_t len, const uint8_t *p, size_t pl)
 {
 	const char *start;
-	size_t start_len, l, count;
+	size_t start_len, l, d_len, o_len;
 	const uint8_t *r, *q = p, *e;
 	int hops;
 	uint8_t ltype;
 
-	if (pl > NS_MAXCDNAME) {
-		errno = E2BIG;
-		return -1;
-	}
-
-	count = 0;
+	o_len = 0;
 	start = out;
 	start_len = len;
 	q = p;
 	e = p + pl;
 	while (q < e) {
 		r = NULL;
+		d_len = 0;
 		hops = 0;
 		/* Check we are inside our length again in-case
 		 * the name isn't fully qualified (ie, not terminated) */
@@ -370,14 +366,14 @@ decode_rfc1035(char *out, size_t len, const uint8_t *p, size_t pl)
 					errno = ERANGE;
 					return -1;
 				}
-				count += l + 1;
+				if (l > NS_MAXLABEL) {
+					errno = EINVAL;
+					return -1;
+				}
+				d_len += l + 1;
 				if (out) {
 					if (l + 1 > len) {
 						errno = ENOBUFS;
-						return -1;
-					}
-					if (l + 1 > NS_MAXLABEL) {
-						errno = EINVAL;
 						return -1;
 					}
 					memcpy(out, q, l);
@@ -389,6 +385,14 @@ decode_rfc1035(char *out, size_t len, const uint8_t *p, size_t pl)
 				q += l;
 			}
 		}
+
+		/* Don't count the trailing NUL */
+		if (d_len > NS_MAXDNAME + 1) {
+			errno = E2BIG;
+			return -1;
+		}
+		o_len += d_len;
+
 		/* change last dot to space */
 		if (out && out != start)
 			*(out - 1) = ' ';
@@ -404,14 +408,11 @@ decode_rfc1035(char *out, size_t len, const uint8_t *p, size_t pl)
 			*out = '\0';
 	}
 
-	if (count)
-		/* Don't count the trailing NUL */
-		count--;
-	if (count > NS_MAXDNAME) {
-		errno = E2BIG;
-		return -1;
-	}
-	return (ssize_t)count;
+	/* Remove the trailing NUL */
+	if (o_len != 0)
+		o_len--;
+
+	return (ssize_t)o_len;
 }
 
 /* Check for a valid domain name as per RFC1123 with the exception of
