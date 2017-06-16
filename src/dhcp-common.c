@@ -504,7 +504,7 @@ print_string(char *dst, size_t len, int type, const uint8_t *data, size_t dl)
 		if (type & OT_BINHEX) {
 			if (dst) {
 				if (len  == 0 || len == 1) {
-					errno = ENOSPC;
+					errno = ENOBUFS;
 					return -1;
 				}
 				*dst++ = hexchrs[(c & 0xF0) >> 4];
@@ -532,7 +532,7 @@ print_string(char *dst, size_t len, int type, const uint8_t *data, size_t dl)
 			if (c == '\\') {
 				if (dst) {
 					if (len  == 0 || len == 1) {
-						errno = ENOSPC;
+						errno = ENOBUFS;
 						return -1;
 					}
 					*dst++ = '\\'; *dst++ = '\\';
@@ -543,7 +543,7 @@ print_string(char *dst, size_t len, int type, const uint8_t *data, size_t dl)
 			}
 			if (dst) {
 				if (len < 5) {
-					errno = ENOSPC;
+					errno = ENOBUFS;
 					return -1;
 				}
 				*dst++ = '\\';
@@ -556,7 +556,7 @@ print_string(char *dst, size_t len, int type, const uint8_t *data, size_t dl)
 		} else {
 			if (dst) {
 				if (len == 0) {
-					errno = ENOSPC;
+					errno = ENOBUFS;
 					return -1;
 				}
 				*dst++ = (char)c;
@@ -569,7 +569,7 @@ print_string(char *dst, size_t len, int type, const uint8_t *data, size_t dl)
 	/* NULL */
 	if (dst) {
 		if (len == 0) {
-			errno = ENOSPC;
+			errno = ENOBUFS;
 			return -1;
 		}
 		*dst = '\0';
