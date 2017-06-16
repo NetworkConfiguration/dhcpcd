@@ -868,6 +868,7 @@ dhcp_envoption1(char **env, const char *prefix,
 	ssize_t len;
 	size_t e;
 	char *v, *val;
+	int r;
 
 	/* Ensure a valid length */
 	ol = (size_t)dhcp_optlen(opt, ol);
@@ -890,11 +891,18 @@ dhcp_envoption1(char **env, const char *prefix,
 	if (v == NULL)
 		return 0;
 	if (vname)
-		v += snprintf(val, e, "%s_%s=", prefix, opt->var);
+		r = snprintf(val, e, "%s_%s=", prefix, opt->var);
 	else
-		v += snprintf(val, e, "%s=", prefix);
-	if (len != 0)
-		print_option(v, (size_t)len + 1, opt, od, ol, ifname);
+		r = snprintf(val, e, "%s=", prefix);
+	if (r != -1 && len != 0) {
+		v += r;
+		if (print_option(v, (size_t)len + 1, opt, od, ol, ifname) == -1)
+			r = -1;
+	}
+	if (r == -1) {
+		free(val);
+		return 0;
+	}
 	return e;
 }
 
