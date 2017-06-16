@@ -415,8 +415,7 @@ decode_rfc1035(char *out, size_t len, const uint8_t *p, size_t pl)
 	return (ssize_t)o_len;
 }
 
-/* Check for a valid domain name as per RFC1123 with the exception of
- * allowing - and _ (but not at start or end) as they seem to be widely used. */
+/* Check for a valid name as per RFC952 and RFC1123 section 2.1 */
 static int
 valid_domainname(char *lbl, int type)
 {
