@@ -198,7 +198,8 @@ syslog()
 	fi
 }
 
-# Check for a valid domain name as per RFC2181 section 11
+# Check for a valid domain name as per RFC1123 with the exception of
+# allowing - and _ as they seem to be widely used.
 valid_domainname()
 {
 	local name="$1" label
@@ -208,7 +209,11 @@ valid_domainname()
 	while [ -n "$name" ]; do
 		label="${name%%.*}"
 		[ -z "$label" -o ${#label} -gt 63 ] && return 1
-		[ "$label" = "$name" ] && return 0
+		case "$label" in
+		-*|_*|*-|*_)		return 1;;
+		*[![:alnum:]_-]*)	return 1;;
+		"$name")		return 0;;
+		esac
 		name="${name#*.}"
 	done
 	return 0
