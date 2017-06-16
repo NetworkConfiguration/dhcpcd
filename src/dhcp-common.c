@@ -672,16 +672,13 @@ print_option(char *s, size_t len, const struct dhcp_opt *opt,
 	char *tmp;
 
 	if (opt->type & OT_RFC1035) {
-		sl = decode_rfc1035(NULL, 0, data, dl);
+		sl = decode_rfc1035(s, len, data, dl);
 		if (sl == 0 || sl == -1)
 			return sl;
-		l = (size_t)sl + 1;
-		tmp = malloc(l);
-		if (tmp == NULL)
-			return -1;
-		decode_rfc1035(tmp, l, data, dl);
-		sl = print_string(s, len, opt->type, (uint8_t *)tmp, l - 1);
-		free(tmp);
+		if (s != NULL) {
+			if (valid_domainname(s, opt->type) == -1)
+				return -1;
+		}
 		return sl;
 	}
 
