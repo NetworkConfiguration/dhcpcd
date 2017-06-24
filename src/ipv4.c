@@ -255,8 +255,11 @@ inet_dhcproutes(struct rt_head *routes, struct interface *ifp)
 	int n;
 
 	state = D_CSTATE(ifp);
-	if (state == NULL || state->state != DHS_BOUND)
+	if (state == NULL || state->state != DHS_BOUND || !state->added)
 		return 0;
+
+	/* An address does have to exist. */
+	assert(state->addr);
 
 	TAILQ_INIT(&nroutes);
 
