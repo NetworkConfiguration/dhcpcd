@@ -1289,8 +1289,8 @@ ipv6_newlinklocal(struct interface *ifp)
 	struct ipv6_addr *ia;
 	struct in6_addr in6;
 
+	memset(&in6, 0, sizeof(in6));
 	in6.s6_addr32[0] = htonl(0xfe800000);
-	in6.s6_addr32[1] = 0;
 	ia = ipv6_newaddr(ifp, &in6, 64, 0);
 	if (ia != NULL) {
 		ia->prefix_pltime = ND6_INFINITE_LIFETIME;
