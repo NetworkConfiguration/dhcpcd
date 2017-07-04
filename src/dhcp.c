@@ -1917,8 +1917,8 @@ dhcp_expire1(struct interface *ifp)
 	state->interval = 0;
 	if (!(ifp->options->options & DHCPCD_LINK) || ifp->carrier != LINK_DOWN)
 		dhcp_discover(ifp);
-
 }
+
 static void
 dhcp_expire(void *arg)
 {
