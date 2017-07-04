@@ -1734,7 +1734,7 @@ dhcp6_checkstatusok(const struct interface *ifp,
 	} else {
 		if ((sbuf = malloc((size_t)opt_len + 1)) == NULL) {
 			logerr(__func__);
-			return false;
+			return -1;
 		}
 		memcpy(sbuf, opt, opt_len);
 		sbuf[len] = '\0';
@@ -2877,11 +2877,11 @@ dhcp6_handledata(void *arg)
 	case DHCP6_REPLY:
 		switch(state->state) {
 		case DH6S_INFORM:
-			if (!dhcp6_checkstatusok(ifp, r, NULL, len))
+			if (dhcp6_checkstatusok(ifp, r, NULL, len) == -1)
 				return;
 			/* RFC4242 */
 			o = dhcp6_findmoption(r, len,
-					     D6_OPTION_INFO_REFRESH_TIME, &ol);
+					      D6_OPTION_INFO_REFRESH_TIME, &ol);
 			if (o == NULL || ol != sizeof(uint32_t))
 				state->renew = IRT_DEFAULT;
 			else {
