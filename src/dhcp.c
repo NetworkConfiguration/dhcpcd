@@ -1915,7 +1915,8 @@ dhcp_expire1(struct interface *ifp)
 	dhcp_drop(ifp, "EXPIRE");
 	unlink(state->leasefile);
 	state->interval = 0;
-	dhcp_discover(ifp);
+	if (!(ifp->options->options & DHCPCD_LINK) || ifp->carrier != LINK_DOWN)
+		dhcp_discover(ifp);
 
 }
 static void
