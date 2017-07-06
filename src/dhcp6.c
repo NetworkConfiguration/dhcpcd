@@ -3458,7 +3458,8 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 		    state->state != DH6S_DELEGATED)
 		{
 			if (ifp->carrier == LINK_UP &&
-			    state->state != DH6S_RELEASED)
+			    state->state != DH6S_RELEASED &&
+			    state->state != DH6S_INFORMED)
 			{
 				dhcp6_startrelease(ifp);
 				return;
