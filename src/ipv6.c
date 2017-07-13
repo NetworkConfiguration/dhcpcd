@@ -619,39 +619,42 @@ ipv6_deleteaddr(struct ipv6_addr *ia)
 }
 
 static int
-ipv6_addaddr1(struct ipv6_addr *ap, const struct timespec *now)
+ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 {
 	struct interface *ifp;
 	struct ipv6_state *state;
-	struct ipv6_addr *nap;
+	struct ipv6_addr *ia2;
 	uint32_t pltime, vltime;
 	__printflike(1, 2) void (*logfunc)(const char *, ...);
 
 	/* Ensure no other interface has this address */
-	TAILQ_FOREACH(ifp, ap->iface->ctx->ifaces, next) {
-		if (ifp == ap->iface)
+	TAILQ_FOREACH(ifp, ia->iface->ctx->ifaces, next) {
+		if (ifp == ia->iface)
 			continue;
 		state = IPV6_STATE(ifp);
 		if (state == NULL)
 			continue;
-		TAILQ_FOREACH(nap, &state->addrs, next) {
-			if (IN6_ARE_ADDR_EQUAL(&nap->addr, &ap->addr)) {
-				ipv6_deleteaddr(nap);
+		TAILQ_FOREACH(ia2, &state->addrs, next) {
+			if (IN6_ARE_ADDR_EQUAL(&ia2->addr, &ia->addr)) {
+				ipv6_deleteaddr(ia2);
 				break;
 			}
 		}
 	}
 
-	if (!(ap->flags & IPV6_AF_DADCOMPLETED) &&
-	    ipv6_iffindaddr(ap->iface, &ap->addr, IN6_IFF_NOTUSEABLE))
-		ap->flags |= IPV6_AF_DADCOMPLETED;
+	/* Remember the interface of the address. */
+	ifp = ia->iface;
+
+	if (!(ia->flags & IPV6_AF_DADCOMPLETED) &&
+	    ipv6_iffindaddr(ifp, &ia->addr, IN6_IFF_NOTUSEABLE))
+		ia->flags |= IPV6_AF_DADCOMPLETED;
 
 	/* Adjust plftime and vltime based on acquired time */
-	pltime = ap->prefix_pltime;
-	vltime = ap->prefix_vltime;
-	if (timespecisset(&ap->acquired) &&
-	    (ap->prefix_pltime != ND6_INFINITE_LIFETIME ||
-	    ap->prefix_vltime != ND6_INFINITE_LIFETIME))
+	pltime = ia->prefix_pltime;
+	vltime = ia->prefix_vltime;
+	if (timespecisset(&ia->acquired) &&
+	    (ia->prefix_pltime != ND6_INFINITE_LIFETIME ||
+	    ia->prefix_vltime != ND6_INFINITE_LIFETIME))
 	{
 		struct timespec n;
 
@@ -659,88 +662,88 @@ ipv6_addaddr1(struct ipv6_addr *ap, const struct timespec *now)
 			clock_gettime(CLOCK_MONOTONIC, &n);
 			now = &n;
 		}
-		timespecsub(now, &ap->acquired, &n);
-		if (ap->prefix_pltime != ND6_INFINITE_LIFETIME) {
-			ap->prefix_pltime -= (uint32_t)n.tv_sec;
+		timespecsub(now, &ia->acquired, &n);
+		if (ia->prefix_pltime != ND6_INFINITE_LIFETIME) {
+			ia->prefix_pltime -= (uint32_t)n.tv_sec;
 			/* This can happen when confirming a
 			 * deprecated but still valid lease. */
-			if (ap->prefix_pltime > pltime)
-				ap->prefix_pltime = 0;
+			if (ia->prefix_pltime > pltime)
+				ia->prefix_pltime = 0;
 		}
-		if (ap->prefix_vltime != ND6_INFINITE_LIFETIME) {
-			ap->prefix_vltime -= (uint32_t)n.tv_sec;
+		if (ia->prefix_vltime != ND6_INFINITE_LIFETIME) {
+			ia->prefix_vltime -= (uint32_t)n.tv_sec;
 			/* This should never happen. */
-			if (ap->prefix_vltime > vltime) {
+			if (ia->prefix_vltime > vltime) {
 				logerrx("%s: %s: lifetime overflow",
-				    ifp->name, ap->saddr);
-				ap->prefix_vltime = ap->prefix_pltime = 0;
+				    ifp->name, ia->saddr);
+				ia->prefix_vltime = ia->prefix_pltime = 0;
 			}
 		}
 	}
 
-	logfunc = ap->flags & IPV6_AF_NEW ? loginfox : logdebugx;
-	logfunc("%s: adding %saddress %s", ap->iface->name,
+	logfunc = ia->flags & IPV6_AF_NEW ? loginfox : logdebugx;
+	logfunc("%s: adding %saddress %s", ifp->name,
 #ifdef IPV6_AF_TEMPORARY
-	    ap->flags & IPV6_AF_TEMPORARY ? "temporary " : "",
+	    ia->flags & IPV6_AF_TEMPORARY ? "temporary " : "",
 #else
 	    "",
 #endif
-	    ap->saddr);
-	if (ap->prefix_pltime == ND6_INFINITE_LIFETIME &&
-	    ap->prefix_vltime == ND6_INFINITE_LIFETIME)
+	    ia->saddr);
+	if (ia->prefix_pltime == ND6_INFINITE_LIFETIME &&
+	    ia->prefix_vltime == ND6_INFINITE_LIFETIME)
 		logdebugx("%s: pltime infinity, vltime infinity",
-		    ap->iface->name);
-	else if (ap->prefix_pltime == ND6_INFINITE_LIFETIME)
+		    ifp->name);
+	else if (ia->prefix_pltime == ND6_INFINITE_LIFETIME)
 		logdebugx("%s: pltime infinity, vltime %"PRIu32" seconds",
-		    ap->iface->name, ap->prefix_vltime);
-	else if (ap->prefix_vltime == ND6_INFINITE_LIFETIME)
+		    ifp->name, ia->prefix_vltime);
+	else if (ia->prefix_vltime == ND6_INFINITE_LIFETIME)
 		logdebugx("%s: pltime %"PRIu32"seconds, vltime infinity",
-		    ap->iface->name, ap->prefix_pltime);
+		    ifp->name, ia->prefix_pltime);
 	else
 		logdebugx("%s: pltime %"PRIu32" seconds, vltime %"PRIu32
 		    " seconds",
-		    ap->iface->name, ap->prefix_pltime, ap->prefix_vltime);
+		    ifp->name, ia->prefix_pltime, ia->prefix_vltime);
 
 
-	if (if_address6(RTM_NEWADDR, ap) == -1) {
+	if (if_address6(RTM_NEWADDR, ia) == -1) {
 		logerr(__func__);
 		/* Restore real pltime and vltime */
-		ap->prefix_pltime = pltime;
-		ap->prefix_vltime = vltime;
+		ia->prefix_pltime = pltime;
+		ia->prefix_vltime = vltime;
 		return -1;
 	}
 
 #ifdef IPV6_MANAGETEMPADDR
 	/* RFC4941 Section 3.4 */
-	if (ap->flags & IPV6_AF_TEMPORARY &&
-	    ap->prefix_pltime &&
-	    ap->prefix_vltime &&
-	    ip6_use_tempaddr(ap->iface->name))
-		eloop_timeout_add_sec(ap->iface->ctx->eloop,
-		    (time_t)ap->prefix_pltime - REGEN_ADVANCE,
-		    ipv6_regentempaddr, ap);
+	if (ia->flags & IPV6_AF_TEMPORARY &&
+	    ia->prefix_pltime &&
+	    ia->prefix_vltime &&
+	    ip6_use_tempaddr(ifp->name))
+		eloop_timeout_add_sec(ifp->ctx->eloop,
+		    (time_t)ia->prefix_pltime - REGEN_ADVANCE,
+		    ipv6_regentempaddr, ia);
 #endif
 
 	/* Restore real pltime and vltime */
-	ap->prefix_pltime = pltime;
-	ap->prefix_vltime = vltime;
+	ia->prefix_pltime = pltime;
+	ia->prefix_vltime = vltime;
 
-	ap->flags &= ~IPV6_AF_NEW;
-	ap->flags |= IPV6_AF_ADDED;
+	ia->flags &= ~IPV6_AF_NEW;
+	ia->flags |= IPV6_AF_ADDED;
 #ifndef SMALL
-	if (ap->delegating_prefix != NULL)
-		ap->flags |= IPV6_AF_DELEGATED;
+	if (ia->delegating_prefix != NULL)
+		ia->flags |= IPV6_AF_DELEGATED;
 #endif
 
 #ifdef IPV6_POLLADDRFLAG
-	eloop_timeout_delete(ap->iface->ctx->eloop,
-		ipv6_checkaddrflags, ap);
-	if (!(ap->flags & IPV6_AF_DADCOMPLETED)) {
+	eloop_timeout_delete(ifp->ctx->eloop,
+		ipv6_checkaddrflags, ia);
+	if (!(ia->flags & IPV6_AF_DADCOMPLETED)) {
 		struct timespec tv;
 
 		ms_to_ts(&tv, RETRANS_TIMER / 2);
-		eloop_timeout_add_tv(ap->iface->ctx->eloop,
-		    &tv, ipv6_checkaddrflags, ap);
+		eloop_timeout_add_tv(ifp->ctx->eloop,
+		    &tv, ipv6_checkaddrflags, ia);
 	}
 #endif
 
@@ -750,18 +753,18 @@ ipv6_addaddr1(struct ipv6_addr *ap, const struct timespec *now)
 	 * Otherwise aliasing gets confused if we add another
 	 * address during DaD. */
 
-	state = IPV6_STATE(ap->iface);
-	TAILQ_FOREACH(nap, &state->addrs, next) {
-		if (IN6_ARE_ADDR_EQUAL(&nap->addr, &ap->addr))
+	state = IPV6_STATE(ifp);
+	TAILQ_FOREACH(ia2, &state->addrs, next) {
+		if (IN6_ARE_ADDR_EQUAL(&ia2->addr, &ia->addr))
 			break;
 	}
-	if (nap == NULL) {
-		if ((nap = malloc(sizeof(*nap))) == NULL) {
+	if (ia2 == NULL) {
+		if ((ia2 = malloc(sizeof(*ia2))) == NULL) {
 			logerr(__func__);
 			return 0; /* Well, we did add the address */
 		}
-		memcpy(nap, ap, sizeof(*nap));
-		TAILQ_INSERT_TAIL(&state->addrs, nap, next);
+		memcpy(ia2, ia, sizeof(*ia2));
+		TAILQ_INSERT_TAIL(&state->addrs, ia2, next);
 	}
 #endif
 
