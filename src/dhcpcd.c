@@ -719,8 +719,6 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 #ifdef NOCARRIER_PRESERVE_IP
 			arp_drop(ifp);
 			dhcp_abort(ifp);
-			if_sortinterfaces(ctx);
-			ipv4_preferanother(ifp);
 			ipv6nd_expire(ifp, 0);
 #else
 			dhcpcd_drop(ifp, 0);
