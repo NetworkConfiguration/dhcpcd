@@ -304,11 +304,6 @@ arp_announce1(void *arg)
 	struct arp_state *astate = arg;
 	struct interface *ifp = astate->iface;
 
-#ifdef KERNEL_RFC5227
-	/* We rely on the kernel announcing correctly.
-	 * As the timings are not random we can callback safely. */
-	astate->claims++;
-#else
 	if (++astate->claims < ANNOUNCE_NUM)
 		logdebugx("%s: ARP announcing %s (%d of %d), "
 		    "next in %d.0 seconds",
@@ -320,25 +315,78 @@ arp_announce1(void *arg)
 		    astate->claims, ANNOUNCE_NUM);
 	if (arp_request(ifp, astate->addr.s_addr, astate->addr.s_addr) == -1)
 		logerr(__func__);
-#endif
 	eloop_timeout_add_sec(ifp->ctx->eloop, ANNOUNCE_WAIT,
 	    astate->claims < ANNOUNCE_NUM ? arp_announce1 : arp_announced,
 	    astate);
 }
 
+/*
+ * XXX FIXME
+ * Kernels supporting RFC5227 will announce the address when it's
+ * added.
+ * dhcpcd should not announce when this happens, nor need to open
+ * a BPF socket for it.
+ * Also, an address might be added to a non preferred inteface when
+ * the same address exists on a preferred one so we need to instruct
+ * the kernel not to announce the address somehow.
+ */
+
 void
 arp_announce(struct arp_state *astate)
 {
+	struct iarp_state *state;
+	struct interface *ifp;
+	struct arp_state *a2;
+	int r;
 
-#ifndef KERNEL_RFC5227
 	if (arp_open(astate->iface) == -1) {
 		logerr(__func__);
 		return;
 	}
-#endif
+
+	/* Cancel any other ARP announcements for this address. */
+	TAILQ_FOREACH(ifp, astate->iface->ctx->ifaces, next) {
+		state = ARP_STATE(ifp);
+		if (state == NULL)
+			continue;
+		TAILQ_FOREACH(a2, &state->arp_states, next) {
+			if (astate == a2 ||
+			    a2->addr.s_addr != astate->addr.s_addr)
+				continue;
+			r = eloop_timeout_delete(a2->iface->ctx->eloop,
+			    a2->claims < ANNOUNCE_NUM
+			    ? arp_announce1 : arp_announced,
+			    a2);
+			if (r == -1)
+				logerr(__func__);
+			else if (r != 0)
+				logdebugx("%s: ARP announcement "
+				    "of %s cancelled",
+				    a2->iface->name,
+				    inet_ntoa(a2->addr));
+		}
+	}
 
 	astate->claims = 0;
 	arp_announce1(astate);
+}
+
+void
+arp_announceaddr(struct dhcpcd_ctx *ctx, struct in_addr *ia)
+{
+	struct interface *ifp;
+	struct arp_state *astate;
+
+	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+		if (ipv4_iffindaddr(ifp, ia, NULL))
+			break;
+	}
+	if (ifp == NULL)
+		return;
+
+	astate = arp_find(ifp, ia);
+	if (astate != NULL)
+		arp_announce(astate);
 }
 
 void

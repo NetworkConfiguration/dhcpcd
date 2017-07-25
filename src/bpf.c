@@ -166,7 +166,9 @@ bpf_open(struct interface *ifp, int (*filter)(struct interface *, int))
 	if (ioctl(fd, BIOCGBLEN, &ibuf_len) == -1)
 		goto eexit;
 	buf_len = (size_t)ibuf_len;
-	state = IPV4_STATE(ifp);
+	state = ipv4_getstate(ifp);
+	if (state == NULL)
+		goto eexit;
 	if (state->buffer_size != buf_len) {
 		void *nb;
 
@@ -589,6 +591,7 @@ static const struct bpf_insn bpf_bootp_filter[] = {
 	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, BOOTREPLY, 1, 0),
 	BPF_STMT(BPF_RET + BPF_K, 0),
 };
+
 #define BPF_BOOTP_FILTER_LEN	__arraycount(bpf_bootp_filter)
 #define BPF_BOOTP_CHADDR_LEN	((BOOTP_CHADDR_LEN / 4) * 3)
 #define	BPF_BOOTP_XID_LEN	4 /* BOUND check is 4 instructions */
@@ -599,7 +602,9 @@ static const struct bpf_insn bpf_bootp_filter[] = {
 int
 bpf_bootp(struct interface *ifp, int fd)
 {
+#if 0
 	const struct dhcp_state *state = D_CSTATE(ifp);
+#endif
 	struct bpf_insn bpf[BPF_BOOTP_LEN];
 	struct bpf_insn *bp;
 
@@ -622,6 +627,8 @@ bpf_bootp(struct interface *ifp, int fd)
 	memcpy(bp, bpf_bootp_filter, sizeof(bpf_bootp_filter));
 	bp += BPF_BOOTP_FILTER_LEN;
 
+	/* These checks won't work when same IP exists on other interfaces. */
+#if 0
 	if (ifp->hwlen <= sizeof(((struct bootp *)0)->chaddr))
 		bp += bpf_cmp_hwaddr(bp, BPF_BOOTP_CHADDR_LEN,
 		                     offsetof(struct bootp, chaddr),
@@ -654,6 +661,7 @@ bpf_bootp(struct interface *ifp, int fd)
 		BPF_SET_STMT(bp, BPF_RET + BPF_K, 0);
 		bp++;
 	}
+#endif
 
 	/* All passed, return the packet
 	 * (Frame length in M0, IP length in M2). */
