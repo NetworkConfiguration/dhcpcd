@@ -860,16 +860,19 @@ dhcpcd_startinterface(void *arg)
 		ifo->options &= ~DHCPCD_IPV6;
 	}
 	if (ifo->options & DHCPCD_IPV6) {
-		ipv6_startstatic(ifp);
+		if (ifp->active == IF_ACTIVE_USER) {
+			ipv6_startstatic(ifp);
 
-		if (ifo->options & DHCPCD_IPV6RS)
-			ipv6nd_startrs(ifp);
+			if (ifo->options & DHCPCD_IPV6RS)
+				ipv6nd_startrs(ifp);
+		}
 
 		if (ifo->options & DHCPCD_DHCP6)
 			dhcp6_find_delegates(ifp);
 
-		if (!(ifo->options & DHCPCD_IPV6RS) ||
-		    ifo->options & (DHCPCD_IA_FORCED | DHCPCD_INFORM6))
+		if ((!(ifo->options & DHCPCD_IPV6RS) ||
+		    ifo->options & (DHCPCD_IA_FORCED | DHCPCD_INFORM6)) &&
+		    ifp->active == IF_ACTIVE_USER)
 		{
 			ssize_t nolease;
 
@@ -899,7 +902,7 @@ dhcpcd_startinterface(void *arg)
 	}
 
 #ifdef INET
-	if (ifo->options & DHCPCD_IPV4) {
+	if (ifo->options & DHCPCD_IPV4 && ifp->active == IF_ACTIVE_USER) {
 		/* Ensure we have an IPv4 state before starting DHCP */
 		if (ipv4_getstate(ifp) != NULL)
 			dhcp_start(ifp);
