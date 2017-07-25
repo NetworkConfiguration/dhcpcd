@@ -594,7 +594,7 @@ ipv6_deletedaddr(struct ipv6_addr *ia)
 #endif
 }
 
-static void
+void
 ipv6_deleteaddr(struct ipv6_addr *ia)
 {
 	struct ipv6_state *state;
@@ -1447,7 +1447,7 @@ ipv6_tryaddlinklocal(struct interface *ifp)
 
 struct ipv6_addr *
 ipv6_newaddr(struct interface *ifp, struct in6_addr *addr, uint8_t prefix_len,
-    short flags)
+    int flags)
 {
 	struct ipv6_addr *ia;
 	char buf[INET6_ADDRSTRLEN];
