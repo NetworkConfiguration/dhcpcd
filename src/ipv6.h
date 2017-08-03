@@ -178,9 +178,6 @@ struct ipv6_addr {
 
 	void (*dadcallback)(void *);
 	int dadcounter;
-	uint8_t *ns;
-	size_t nslen;
-	int nsprobes;
 
 #ifdef ALIAS_ADDR
 	char alias[IF_NAMESIZE];

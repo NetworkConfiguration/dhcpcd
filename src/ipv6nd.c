@@ -992,7 +992,6 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 			    ntohl(pi.nd_opt_pi_valid_time);
 			ap->prefix_pltime =
 			    ntohl(pi.nd_opt_pi_preferred_time);
-			ap->nsprobes = 0;
 
 #ifdef IPV6_MANAGETEMPADDR
 			/* RFC4941 Section 3.3.3 */
