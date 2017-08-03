@@ -55,7 +55,7 @@ struct ra {
 TAILQ_HEAD(ra_head, ra);
 
 struct rs_state {
-	unsigned char *rs;
+	struct nd_router_solicit *rs;
 	size_t rslen;
 	int rsprobes;
 };

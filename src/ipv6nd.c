@@ -246,16 +246,16 @@ ipv6nd_makersprobe(struct interface *ifp)
 	state->rs = calloc(1, state->rslen);
 	if (state->rs == NULL)
 		return -1;
-	rs = (void *)state->rs;
+	rs = state->rs;
 	rs->nd_rs_type = ND_ROUTER_SOLICIT;
-	rs->nd_rs_code = 0;
-	rs->nd_rs_cksum = 0;
-	rs->nd_rs_reserved = 0;
+	//rs->nd_rs_code = 0;
+	//rs->nd_rs_cksum = 0;
+	//rs->nd_rs_reserved = 0;
 
 	if (ifp->hwlen != 0) {
 		struct nd_opt_hdr *nd;
 
-		nd = (struct nd_opt_hdr *)(state->rs + sizeof(*rs));
+		nd = (struct nd_opt_hdr *)(state->rs + 1);
 		nd->nd_opt_type = ND_OPT_SOURCE_LINKADDR;
 		nd->nd_opt_len = (uint8_t)((ROUNDUP8(ifp->hwlen + 2)) >> 3);
 		memcpy(nd + 1, ifp->hwaddr, ifp->hwlen);
