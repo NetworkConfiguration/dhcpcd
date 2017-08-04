@@ -618,7 +618,7 @@ ipv6nd_dadcompleted(const struct interface *ifp)
 static void
 ipv6nd_dadcallback(void *arg)
 {
-	struct ipv6_addr *ap = arg, *rapap;
+	struct ipv6_addr *ia = arg, *rapap;
 	struct interface *ifp;
 	struct ra *rap;
 	int wascompleted, found;
@@ -627,54 +627,54 @@ ipv6nd_dadcallback(void *arg)
 	const char *p;
 	int dadcounter;
 
-	ifp = ap->iface;
-	wascompleted = (ap->flags & IPV6_AF_DADCOMPLETED);
-	ap->flags |= IPV6_AF_DADCOMPLETED;
-	if (ap->flags & IPV6_AF_DUPLICATED) {
-		ap->dadcounter++;
-		logwarnx("%s: DAD detected %s", ifp->name, ap->saddr);
+	ifp = ia->iface;
+	wascompleted = (ia->flags & IPV6_AF_DADCOMPLETED);
+	ia->flags |= IPV6_AF_DADCOMPLETED;
+	if (ia->flags & IPV6_AF_DUPLICATED) {
+		ia->dadcounter++;
+		logwarnx("%s: DAD detected %s", ifp->name, ia->saddr);
 
 		/* Try and make another stable private address.
 		 * Because ap->dadcounter is always increamented,
 		 * a different address is generated. */
 		/* XXX Cache DAD counter per prefix/id/ssid? */
 		if (ifp->options->options & DHCPCD_SLAACPRIVATE) {
-			if (ap->dadcounter >= IDGEN_RETRIES) {
+			if (ia->dadcounter >= IDGEN_RETRIES) {
 				logerrx("%s: unable to obtain a"
 				    " stable private address",
 				    ifp->name);
 				goto try_script;
 			}
 			loginfox("%s: deleting address %s",
-			    ifp->name, ap->saddr);
-			if (if_address6(RTM_DELADDR, ap) == -1 &&
+			    ifp->name, ia->saddr);
+			if (if_address6(RTM_DELADDR, ia) == -1 &&
 			    errno != EADDRNOTAVAIL && errno != ENXIO)
 				logerr(__func__);
-			dadcounter = ap->dadcounter;
-			if (ipv6_makestableprivate(&ap->addr,
-			    &ap->prefix, ap->prefix_len,
+			dadcounter = ia->dadcounter;
+			if (ipv6_makestableprivate(&ia->addr,
+			    &ia->prefix, ia->prefix_len,
 			    ifp, &dadcounter) == -1)
 			{
 				logerr("ipv6_makestableprivate");
 				return;
 			}
-			ap->dadcounter = dadcounter;
-			ap->flags &= ~(IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED);
-			ap->flags |= IPV6_AF_NEW;
-			p = inet_ntop(AF_INET6, &ap->addr, buf, sizeof(buf));
+			ia->dadcounter = dadcounter;
+			ia->flags &= ~(IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED);
+			ia->flags |= IPV6_AF_NEW;
+			p = inet_ntop(AF_INET6, &ia->addr, buf, sizeof(buf));
 			if (p)
-				snprintf(ap->saddr,
-				    sizeof(ap->saddr),
+				snprintf(ia->saddr,
+				    sizeof(ia->saddr),
 				    "%s/%d",
-				    p, ap->prefix_len);
+				    p, ia->prefix_len);
 			else
-				ap->saddr[0] = '\0';
+				ia->saddr[0] = '\0';
 			tv.tv_sec = 0;
 			tv.tv_nsec = (suseconds_t)
 			    arc4random_uniform(IDGEN_DELAY * NSEC_PER_SEC);
 			timespecnorm(&tv);
 			eloop_timeout_add_tv(ifp->ctx->eloop, &tv,
-			    ipv6nd_addaddr, ap);
+			    ipv6nd_addaddr, ia);
 			return;
 		}
 	}
@@ -694,7 +694,7 @@ try_script:
 					wascompleted = 0;
 					break;
 				}
-				if (rapap == ap)
+				if (rapap == ia)
 					found = 1;
 			}
 
