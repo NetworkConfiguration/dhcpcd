@@ -955,23 +955,23 @@ ipv6_addaddrs(struct ipv6_addrhead *addrs)
 }
 
 void
-ipv6_freeaddr(struct ipv6_addr *ap)
+ipv6_freeaddr(struct ipv6_addr *ia)
 {
 #ifndef SMALL
-	struct ipv6_addr *ia;
+	struct ipv6_addr *iad;
 
 	/* Forget the reference */
-	if (ap->flags & IPV6_AF_DELEGATEDPFX) {
-		TAILQ_FOREACH(ia, &ap->pd_pfxs, pd_next) {
-			ia->delegating_prefix = NULL;
+	if (ia->flags & IPV6_AF_DELEGATEDPFX) {
+		TAILQ_FOREACH(iad, &ia->pd_pfxs, pd_next) {
+			iad->delegating_prefix = NULL;
 		}
-	} else if (ap->delegating_prefix != NULL) {
-		TAILQ_REMOVE(&ap->delegating_prefix->pd_pfxs, ap, pd_next);
+	} else if (ia->delegating_prefix != NULL) {
+		TAILQ_REMOVE(&ia->delegating_prefix->pd_pfxs, ia, pd_next);
 	}
 #endif
 
-	eloop_q_timeout_delete(ap->iface->ctx->eloop, 0, NULL, ap);
-	free(ap);
+	eloop_q_timeout_delete(ia->iface->ctx->eloop, 0, NULL, ia);
+	free(ia);
 }
 
 void

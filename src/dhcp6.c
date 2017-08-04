@@ -1340,34 +1340,34 @@ dhcp6_dadcompleted(const struct interface *ifp)
 static void
 dhcp6_dadcallback(void *arg)
 {
-	struct ipv6_addr *ap = arg;
+	struct ipv6_addr *ia = arg;
 	struct interface *ifp;
 	struct dhcp6_state *state;
 	int wascompleted, valid;
 
-	wascompleted = (ap->flags & IPV6_AF_DADCOMPLETED);
-	ap->flags |= IPV6_AF_DADCOMPLETED;
-	if (ap->flags & IPV6_AF_DUPLICATED)
+	wascompleted = (ia->flags & IPV6_AF_DADCOMPLETED);
+	ia->flags |= IPV6_AF_DADCOMPLETED;
+	if (ia->flags & IPV6_AF_DUPLICATED)
 		/* XXX FIXME
 		 * We should decline the address */
-		logwarnx("%s: DAD detected %s", ap->iface->name, ap->saddr);
+		logwarnx("%s: DAD detected %s", ia->iface->name, ia->saddr);
 
 	if (!wascompleted) {
-		ifp = ap->iface;
+		ifp = ia->iface;
 		state = D6_STATE(ifp);
 		if (state->state == DH6S_BOUND ||
 		    state->state == DH6S_DELEGATED)
 		{
-			struct ipv6_addr *ap2;
+			struct ipv6_addr *ia2;
 
 #ifdef SMALL
 			valid = true;
 #else
-			valid = (ap->delegating_prefix == NULL);
+			valid = (ia->delegating_prefix == NULL);
 #endif
-			TAILQ_FOREACH(ap2, &state->addrs, next) {
-				if (ap2->flags & IPV6_AF_ADDED &&
-				    !(ap2->flags & IPV6_AF_DADCOMPLETED))
+			TAILQ_FOREACH(ia2, &state->addrs, next) {
+				if (ia2->flags & IPV6_AF_ADDED &&
+				    !(ia2->flags & IPV6_AF_DADCOMPLETED))
 				{
 					wascompleted = 1;
 					break;
@@ -1378,7 +1378,7 @@ dhcp6_dadcallback(void *arg)
 				    ifp->name);
 				script_runreason(ifp,
 #ifndef SMALL
-				    ap->delegating_prefix ? "DELEGATED6" :
+				    ia->delegating_prefix ? "DELEGATED6" :
 #endif
 				    state->reason);
 				if (valid)
