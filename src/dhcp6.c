@@ -2909,19 +2909,19 @@ dhcp6_bind(struct interface *ifp, const char *op)
 		timespecsub(&now, &state->acquired, &diff);
 		if (state->renew && state->renew != ND6_INFINITE_LIFETIME) {
 			if (state->renew > diff.tv_sec)
-				state->renew -= diff.tv_sec;
+				state->renew -= (uint32_t)diff.tv_sec;
 			else
 				state->renew = 0;
 		}
 		if (state->rebind && state->rebind != ND6_INFINITE_LIFETIME) {
 			if (state->rebind > diff.tv_sec)
-				state->rebind -= diff.tv_sec;
+				state->rebind -= (uint32_t)diff.tv_sec;
 			else
 				state->rebind = 0;
 		}
 		if (state->expire && state->expire != ND6_INFINITE_LIFETIME) {
 			if (state->expire > diff.tv_sec)
-				state->expire -= diff.tv_sec;
+				state->expire -= (uint32_t)diff.tv_sec;
 			else {
 				if (!(ifp->options->options &
 				    DHCPCD_LASTLEASE_EXTEND))
