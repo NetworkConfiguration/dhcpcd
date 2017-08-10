@@ -1397,6 +1397,16 @@ set_ifxflags(int s, const struct interface *ifp)
 }
 #endif
 
+/* OpenBSD removed ND6 flags entirely, so we need to check for their
+ * existnance. */
+#if defined(ND6_IFF_AUTO_LINKLOCAL) || \
+    defined(ND6_IFF_PERFORMNUD) || \
+    defined(ND6_IFF_ACCEPT_RTADV) || \
+    defined(ND6_IFF_OVERRIDE_RTADV) || \
+    defined(ND6_IFF_IFDISABLED)
+#define	ND6_NDI_FLAGS
+#endif
+
 int
 if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp)
 {
@@ -1407,6 +1417,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp)
 	s = priv->pf_inet6_fd;
 
 	if (ifp) {
+#ifdef ND6_NDI_FLAGS
 		struct in6_ndireq nd;
 		int flags;
 
@@ -1415,6 +1426,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp)
 		if (ioctl(s, SIOCGIFINFO_IN6, &nd) == -1)
 			return -1;
 		flags = (int)nd.ndi.flags;
+#endif
 
 #ifdef ND6_IFF_AUTO_LINKLOCAL
 		if (!(ctx->options & DHCPCD_TEST) &&
@@ -1453,6 +1465,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp)
 		flags &= ~ND6_IFF_IFDISABLED;
 #endif
 
+#ifdef ND6_NDI_FLAGS
 		if (nd.ndi.flags != (uint32_t)flags) {
 			if (ctx->options & DHCPCD_TEST) {
 				logwarnx("%s: interface not IPv6 enabled",
@@ -1465,6 +1478,7 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp)
 				return -1;
 			}
 		}
+#endif
 
 		/* Enabling IPv6 by whatever means must be the
 		 * last action undertaken to ensure kernel RS and
