@@ -287,7 +287,6 @@ void ipv6_ctxfree(struct dhcpcd_ctx *);
 bool inet6_getroutes(struct dhcpcd_ctx *, struct rt_head *);
 
 #else
-#define ipv6_init(a) (NULL)
 #define ipv6_start(a) (-1)
 #define ipv6_startstatic(a)
 #define ipv6_staticdadcompleted(a) (0)

@@ -437,7 +437,7 @@ if_copysa(struct sockaddr *dst, const struct sockaddr *src)
 	assert(src != NULL);
 
 	memcpy(dst, src, src->sa_len);
-#ifdef __KAME__
+#if defined(INET6) && defined(__KAME__)
 	if (dst->sa_family == AF_INET6) {
 		struct in6_addr *in6;
 
