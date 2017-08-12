@@ -669,7 +669,9 @@ print_option(char *s, size_t len, const struct dhcp_opt *opt,
 	struct in_addr addr;
 	ssize_t bytes = 0, sl;
 	size_t l;
+#ifdef INET
 	char *tmp;
+#endif
 
 	if (opt->type & OT_RFC1035) {
 		sl = decode_rfc1035(s, len, data, dl);
