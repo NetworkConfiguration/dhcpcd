@@ -649,10 +649,12 @@ dhcpcd_initstate2(struct interface *ifp, unsigned long long options)
 	} else
 		ifo = ifp->options;
 
+#ifdef INET6
 	if (ifo->options & DHCPCD_IPV6 && ipv6_init(ifp->ctx) == -1) {
 		logerr(__func__);
 		ifo->options &= ~DHCPCD_IPV6;
 	}
+#endif
 }
 
 static void
