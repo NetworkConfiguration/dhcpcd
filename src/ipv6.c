@@ -1452,6 +1452,7 @@ ipv6_newaddr(struct interface *ifp, struct in6_addr *addr, uint8_t prefix_len,
 	struct ipv6_addr *ia;
 	char buf[INET6_ADDRSTRLEN];
 	const char *cbp;
+	bool tempaddr;
 
 	ia = calloc(1, sizeof(*ia));
 	if (ia == NULL)
@@ -1462,7 +1463,13 @@ ipv6_newaddr(struct interface *ifp, struct in6_addr *addr, uint8_t prefix_len,
 	ia->addr_flags = IN6_IFF_TENTATIVE;
 	ia->prefix_len = prefix_len;
 
-	if (ia->flags & IPV6_AF_AUTOCONF) {
+#ifdef IPV6_AF_TEMPORARY
+	tempaddr = ia->flags & IPV6_AF_TEMPORARY;
+#else
+	tempaddr = false;
+#endif
+
+	if (ia->flags & IPV6_AF_AUTOCONF && !tempaddr) {
 		ia->prefix = *addr;
 		ia->dadcounter = ipv6_makeaddr(&ia->addr, ifp,
 		                               &ia->prefix,
