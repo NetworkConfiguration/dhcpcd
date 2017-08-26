@@ -94,35 +94,11 @@
 #  undef IPV6_POLLADDRFLAG
 #endif
 
-/*
- * If dhcpcd handles RA processing instead of the kernel, the kernel needs
- * to either allow userland to set temporary addresses or mark an address
- * for the kernel to manage temporary addresses from.
- * If the kernel allows the former, a global #define is needed, otherwise
- * the address marking will be handled in the platform specific address handler.
- *
- * Some BSDs do not allow userland to set temporary addresses.
- * Linux-3.18 allows the marking of addresses from which to manage temp addrs.
- */
-#if defined(BSD) && defined(IN6_IFF_TEMPORARY)
-#define IPV6_MANAGETEMPADDR
-#endif
-
-/*
- * You could enable IPV6_MANAGETEMPADDR anyway and disable the platform
- * specific address marking to test dhcpcd's temporary address handling as well,
- * but this will not affect source address selection so is of very limited use.
- */
-#if 0
-/* Pretend we have an old Linux kernel. */
-#undef IFA_F_MANAGETEMPADDR
-/* Enable dhcpcd handling temporary addresses. */
-#define IPV6_MANAGETEMPADDR
-#endif
-
 #ifdef __linux__
    /* Match Linux defines to BSD */
-#  define IN6_IFF_TEMPORARY IFA_F_TEMPORARY
+#  ifdef IFA_F_TEMPORARY
+#    define IN6_IFF_TEMPORARY	IFA_F_TEMPORARY
+#  endif
 #  ifdef IFA_F_OPTIMISTIC
 #    define IN6_IFF_TENTATIVE	(IFA_F_TENTATIVE | IFA_F_OPTIMISTIC)
 #  else
@@ -148,6 +124,20 @@
 
 #define IN6_IFF_NOTUSEABLE \
 	(IN6_IFF_TENTATIVE | IN6_IFF_DUPLICATED | IN6_IFF_DETACHED)
+
+/*
+ * If dhcpcd handles RA processing instead of the kernel, the kernel needs
+ * to either allow userland to set temporary addresses or mark an address
+ * for the kernel to manage temporary addresses from.
+ * If the kernel allows the former, a global #define is needed, otherwise
+ * the address marking will be handled in the platform specific address handler.
+ *
+ * Some BSDs do not allow userland to set temporary addresses.
+ * Linux-3.18 allows the marking of addresses from which to manage temp addrs.
+ */
+#ifdef IN6_IFF_TEMPORARY
+#define	IPV6_MANAGETEMPADDR
+#endif
 
 TAILQ_HEAD(ipv6_addrhead, ipv6_addr);
 struct ipv6_addr {
