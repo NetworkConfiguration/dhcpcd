@@ -973,6 +973,11 @@ ipv6_freeaddr(struct ipv6_addr *ia)
 	}
 #endif
 
+	if (ia->dhcp6_fd != -1) {
+		close(ia->dhcp6_fd);
+		eloop_event_delete(ia->iface->ctx->eloop, ia->dhcp6_fd);
+	}
+
 	eloop_q_timeout_delete(ia->iface->ctx->eloop, 0, NULL, ia);
 	free(ia);
 }
@@ -1456,6 +1461,15 @@ ipv6_newaddr(struct interface *ifp, struct in6_addr *addr, uint8_t prefix_len,
 	char buf[INET6_ADDRSTRLEN];
 	const char *cbp;
 	bool tempaddr;
+	int addr_flags;
+
+	/* If adding a new DHCP / RA derived address, check current flags
+	 * from an existing address. */
+	ia = ipv6_iffindaddr(ifp, addr, 0);
+	if (ia != NULL)
+		addr_flags = ia->addr_flags;
+	else
+		addr_flags = IN6_IFF_TENTATIVE;
 
 	ia = calloc(1, sizeof(*ia));
 	if (ia == NULL)
@@ -1463,8 +1477,9 @@ ipv6_newaddr(struct interface *ifp, struct in6_addr *addr, uint8_t prefix_len,
 
 	ia->iface = ifp;
 	ia->flags = IPV6_AF_NEW | flags;
-	ia->addr_flags = IN6_IFF_TENTATIVE;
+	ia->addr_flags = addr_flags;
 	ia->prefix_len = prefix_len;
+	ia->dhcp6_fd = -1;
 
 #ifdef IPV6_AF_TEMPORARY
 	tempaddr = ia->flags & IPV6_AF_TEMPORARY;
