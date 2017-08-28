@@ -1831,7 +1831,7 @@ dhcp6_checkstatusok(const struct interface *ifp,
 
 const struct ipv6_addr *
 dhcp6_iffindaddr(const struct interface *ifp, const struct in6_addr *addr,
-    short flags)
+    unsigned int flags)
 {
 	const struct dhcp6_state *state;
 	const struct ipv6_addr *ap;
@@ -1847,7 +1847,7 @@ dhcp6_iffindaddr(const struct interface *ifp, const struct in6_addr *addr,
 
 struct ipv6_addr *
 dhcp6_findaddr(struct dhcpcd_ctx *ctx, const struct in6_addr *addr,
-    short flags)
+    unsigned int flags)
 {
 	struct interface *ifp;
 	struct ipv6_addr *ap;

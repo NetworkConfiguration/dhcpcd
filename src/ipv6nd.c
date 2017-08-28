@@ -404,7 +404,7 @@ ipv6nd_neighbour(struct dhcpcd_ctx *ctx, struct in6_addr *addr, int flags)
 
 const struct ipv6_addr *
 ipv6nd_iffindaddr(const struct interface *ifp, const struct in6_addr *addr,
-    short flags)
+    unsigned int flags)
 {
 	struct ra *rap;
 	struct ipv6_addr *ap;
@@ -425,7 +425,7 @@ ipv6nd_iffindaddr(const struct interface *ifp, const struct in6_addr *addr,
 
 struct ipv6_addr *
 ipv6nd_findaddr(struct dhcpcd_ctx *ctx, const struct in6_addr *addr,
-    short flags)
+    unsigned int flags)
 {
 	struct ra *rap;
 	struct ipv6_addr *ap;
@@ -941,7 +941,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 				    IN6_ARE_ADDR_EQUAL(&ap->prefix, &pi_prefix))
 					break;
 			if (ap == NULL) {
-				short flags;
+				unsigned int flags;
 
 				if (!(pi.nd_opt_pi_flags_reserved &
 				    ND_OPT_PI_FLAG_AUTO) &&

@@ -219,9 +219,9 @@ struct dhcp6_state {
 void dhcp6_printoptions(const struct dhcpcd_ctx *,
     const struct dhcp_opt *, size_t);
 const struct ipv6_addr *dhcp6_iffindaddr(const struct interface *ifp,
-    const struct in6_addr *addr, short flags);
+    const struct in6_addr *addr, unsigned int flags);
 struct ipv6_addr *dhcp6_findaddr(struct dhcpcd_ctx *, const struct in6_addr *,
-    short);
+    unsigned int);
 size_t dhcp6_find_delegates(struct interface *);
 int dhcp6_start(struct interface *, enum DH6S);
 void dhcp6_reboot(struct interface *);

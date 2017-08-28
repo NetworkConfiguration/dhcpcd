@@ -151,11 +151,10 @@ struct ipv6_addr {
 	struct timespec acquired;
 	struct in6_addr addr;
 	int addr_flags;
-	int flags;
+	unsigned int flags;
 	char saddr[INET6_ADDRSTRLEN];
 	uint8_t iaid[4];
 	uint16_t ia_type;
-	int fd;
 
 #ifndef SMALL
 	struct ipv6_addr *delegating_prefix;
@@ -174,23 +173,23 @@ struct ipv6_addr {
 #endif
 };
 
-#define	IPV6_AF_ONLINK		0x0001
-#define	IPV6_AF_NEW		0x0002
-#define	IPV6_AF_STALE		0x0004
-#define	IPV6_AF_ADDED		0x0008
-#define	IPV6_AF_AUTOCONF	0x0010
-#define	IPV6_AF_DUPLICATED	0x0020
-#define	IPV6_AF_DADCOMPLETED	0x0040
-#define	IPV6_AF_DELEGATED	0x0080
-#define	IPV6_AF_DELEGATEDPFX	0x0100
-#define	IPV6_AF_NOREJECT	0x0200
-#define	IPV6_AF_REQUEST		0x0400
-#define	IPV6_AF_STATIC		0x0800
-#define IPV6_AF_DELEGATEDLOG	0x1000
-#define IPV6_AF_RAPFX		0x2000
-#define IPV6_AF_EXTENDED	0x4000
+#define	IPV6_AF_ONLINK		(1U << 0)
+#define	IPV6_AF_NEW		(1U << 1)
+#define	IPV6_AF_STALE		(1U << 2)
+#define	IPV6_AF_ADDED		(1U << 3)
+#define	IPV6_AF_AUTOCONF	(1U << 4)
+#define	IPV6_AF_DUPLICATED	(1U << 5)
+#define	IPV6_AF_DADCOMPLETED	(1U << 6)
+#define	IPV6_AF_DELEGATED	(1U << 7)
+#define	IPV6_AF_DELEGATEDPFX	(1U << 8)
+#define	IPV6_AF_NOREJECT	(1U << 9)
+#define	IPV6_AF_REQUEST		(1U << 10)
+#define	IPV6_AF_STATIC		(1U << 11)
+#define	IPV6_AF_DELEGATEDLOG	(1U << 12)
+#define	IPV6_AF_RAPFX		(1U << 13)
+#define	IPV6_AF_EXTENDED	(1U << 14)
 #ifdef IPV6_MANAGETEMPADDR
-#define	IPV6_AF_TEMPORARY	0X8000
+#define	IPV6_AF_TEMPORARY	(1U << 15)
 #endif
 
 struct ll_callback {
@@ -243,15 +242,15 @@ struct ipv6_addr *ipv6_iffindaddr(struct interface *,
     const struct in6_addr *, int);
 int ipv6_hasaddr(const struct interface *);
 int ipv6_findaddrmatch(const struct ipv6_addr *, const struct in6_addr *,
-    short);
+    unsigned int);
 struct ipv6_addr *ipv6_findaddr(struct dhcpcd_ctx *,
-    const struct in6_addr *, short);
+    const struct in6_addr *, unsigned int);
 struct ipv6_addr *ipv6_findmaskaddr(struct dhcpcd_ctx *,
     const struct in6_addr *);
 #define ipv6_linklocal(ifp) ipv6_iffindaddr((ifp), NULL, IN6_IFF_NOTUSEABLE)
 int ipv6_addlinklocalcallback(struct interface *, void (*)(void *), void *);
 struct ipv6_addr *ipv6_newaddr(struct interface *, struct in6_addr *, uint8_t,
-    int);
+    unsigned int);
 void ipv6_freeaddr(struct ipv6_addr *);
 void ipv6_freedrop(struct interface *, int);
 #define ipv6_free(ifp) ipv6_freedrop((ifp), 0)
