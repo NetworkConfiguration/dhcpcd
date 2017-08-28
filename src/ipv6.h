@@ -155,6 +155,7 @@ struct ipv6_addr {
 	char saddr[INET6_ADDRSTRLEN];
 	uint8_t iaid[4];
 	uint16_t ia_type;
+	int dhcp6_fd;
 
 #ifndef SMALL
 	struct ipv6_addr *delegating_prefix;
