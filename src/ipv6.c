@@ -862,7 +862,7 @@ ipv6_addaddr(struct ipv6_addr *ia, const struct timespec *now)
 
 int
 ipv6_findaddrmatch(const struct ipv6_addr *addr, const struct in6_addr *match,
-    short flags)
+    unsigned int flags)
 {
 
 	if (match == NULL) {
@@ -879,7 +879,7 @@ ipv6_findaddrmatch(const struct ipv6_addr *addr, const struct in6_addr *match,
 }
 
 struct ipv6_addr *
-ipv6_findaddr(struct dhcpcd_ctx *ctx, const struct in6_addr *addr, short flags)
+ipv6_findaddr(struct dhcpcd_ctx *ctx, const struct in6_addr *addr, unsigned int flags)
 {
 	struct ipv6_addr *dap, *nap;
 
@@ -1447,7 +1447,7 @@ ipv6_tryaddlinklocal(struct interface *ifp)
 
 struct ipv6_addr *
 ipv6_newaddr(struct interface *ifp, struct in6_addr *addr, uint8_t prefix_len,
-    int flags)
+    unsigned int flags)
 {
 	struct ipv6_addr *ia;
 	char buf[INET6_ADDRSTRLEN];
