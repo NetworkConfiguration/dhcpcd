@@ -486,7 +486,7 @@ decode_rfc3361(const uint8_t *data, size_t dl)
 	switch (enc) {
 	case 0:
 		if ((r = decode_rfc1035(NULL, 0, data, dl)) > 0) {
-			l = (size_t)r;
+			l = (size_t)r + 1;
 			sip = malloc(l);
 			if (sip == NULL)
 				return 0;
