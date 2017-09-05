@@ -2862,7 +2862,6 @@ dhcp6_bind(struct interface *ifp, const char *op)
 			bool all_expired = true;
 
 			TAILQ_FOREACH(ia, &state->addrs, next) {
-				loginfox("%s %d", ia->saddr, ia->flags);
 				if (ia->flags & IPV6_AF_STALE)
 					continue;
 				if (ia->prefix_vltime <= state->renew)
