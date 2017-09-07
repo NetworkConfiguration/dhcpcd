@@ -906,6 +906,9 @@ ipv6_addaddrs(struct ipv6_addrhead *addrs)
 	i = 0;
 	timespecclear(&now);
 	TAILQ_FOREACH_SAFE(ap, addrs, next, apn) {
+		/* A delegated prefix is not an address. */
+		if (ap->flags & IPV6_AF_DELEGATEDPFX)
+			continue;
 		if (ap->prefix_vltime == 0) {
 			if (ap->flags & IPV6_AF_ADDED) {
 				ipv6_deleteaddr(ap);
