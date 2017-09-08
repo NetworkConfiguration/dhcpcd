@@ -1306,7 +1306,6 @@ ipv6_newlinklocal(struct interface *ifp)
 	if (ia != NULL) {
 		ia->prefix_pltime = ND6_INFINITE_LIFETIME;
 		ia->prefix_vltime = ND6_INFINITE_LIFETIME;
-		ia->addr_flags = IN6_IFF_TENTATIVE;
 	}
 	return ia;
 }
@@ -1497,7 +1496,9 @@ ipv6_newaddr(struct interface *ifp, struct in6_addr *addr, uint8_t prefix_len,
 	} else if (ia->flags & IPV6_AF_RAPFX) {
 		ia->prefix = *addr;
 		return ia;
-	} else if (ia->flags & IPV6_AF_REQUEST && prefix_len != 128) {
+	} else if (ia->flags & (IPV6_AF_REQUEST | IPV6_AF_DELEGATEDPFX) &&
+	           prefix_len != 128)
+	{
 		ia->prefix = *addr;
 		cbp = inet_ntop(AF_INET6, &ia->prefix, buf, sizeof(buf));
 		goto paddr;
