@@ -94,24 +94,6 @@
 #  undef IPV6_POLLADDRFLAG
 #endif
 
-#ifdef __linux__
-   /* Match Linux defines to BSD */
-#  ifdef IFA_F_TEMPORARY
-#    define IN6_IFF_TEMPORARY	IFA_F_TEMPORARY
-#  endif
-#  ifdef IFA_F_OPTIMISTIC
-#    define IN6_IFF_TENTATIVE	(IFA_F_TENTATIVE | IFA_F_OPTIMISTIC)
-#  else
-#    define IN6_IFF_TENTATIVE   (IFA_F_TENTATIVE | 0x04)
-#  endif
-#  ifdef IF_F_DADFAILED
-#    define IN6_IFF_DUPLICATED	IFA_F_DADFAILED
-#  else
-#    define IN6_IFF_DUPLICATED	0x08
-#  endif
-#  define IN6_IFF_DETACHED	0
-#endif
-
 #ifdef __sun
    /* Solaris lacks these defines.
     * While it supports DaD, to seems to only expose IFF_DUPLICATE
@@ -135,8 +117,26 @@
  * Some BSDs do not allow userland to set temporary addresses.
  * Linux-3.18 allows the marking of addresses from which to manage temp addrs.
  */
-#ifdef IN6_IFF_TEMPORARY
+#if defined(IN6_IFF_TEMPORARY) && !defined(__linux__)
 #define	IPV6_MANAGETEMPADDR
+#endif
+
+#ifdef __linux__
+   /* Match Linux defines to BSD */
+#  ifdef IFA_F_TEMPORARY
+#    define IN6_IFF_TEMPORARY	IFA_F_TEMPORARY
+#  endif
+#  ifdef IFA_F_OPTIMISTIC
+#    define IN6_IFF_TENTATIVE	(IFA_F_TENTATIVE | IFA_F_OPTIMISTIC)
+#  else
+#    define IN6_IFF_TENTATIVE   (IFA_F_TENTATIVE | 0x04)
+#  endif
+#  ifdef IF_F_DADFAILED
+#    define IN6_IFF_DUPLICATED	IFA_F_DADFAILED
+#  else
+#    define IN6_IFF_DUPLICATED	0x08
+#  endif
+#  define IN6_IFF_DETACHED	0
 #endif
 
 TAILQ_HEAD(ipv6_addrhead, ipv6_addr);
