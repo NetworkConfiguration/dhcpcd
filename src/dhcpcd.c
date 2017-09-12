@@ -1844,7 +1844,7 @@ printpidfile:
 	if (ctx.ifc == 1 && !(ctx.options & DHCPCD_BACKGROUND))
 		ctx.options |= DHCPCD_WAITIP;
 
-	/* Start handling kernel messages for interfaces, addreses and
+	/* Start handling kernel messages for interfaces, addresses and
 	 * routes. */
 	eloop_event_add(ctx.eloop, ctx.link_fd, dhcpcd_handlelink, &ctx);
 
