@@ -769,7 +769,7 @@ ifa_scope(struct sockaddr_in6 *sin, unsigned int ifindex)
 
 #ifdef __KAME__
 	/* KAME based systems want to store the scope inside the sin6_addr
-	 * for link local addreses */
+	 * for link local addresses */
 	if (IN6_IS_ADDR_LINKLOCAL(&sin->sin6_addr)) {
 		uint16_t scope = htons((uint16_t)ifindex);
 		memcpy(&sin->sin6_addr.s6_addr[2], &scope,
