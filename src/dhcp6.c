@@ -1349,10 +1349,11 @@ dhcp6_dadcallback(void *arg)
 
 	wascompleted = (ia->flags & IPV6_AF_DADCOMPLETED);
 	ia->flags |= IPV6_AF_DADCOMPLETED;
-	if (ia->flags & IPV6_AF_DUPLICATED)
+	if (ia->flags & IPV6_AF_DUPLICATED) {
 		/* XXX FIXME
 		 * We should decline the address */
 		logwarnx("%s: DAD detected %s", ia->iface->name, ia->saddr);
+	}
 
 	if (!wascompleted) {
 		ifp = ia->iface;
