@@ -1893,7 +1893,7 @@ dhcp_expire(void *arg)
 	dhcp_expire1(ifp);
 }
 
-#ifdef ARP
+#if defined(ARP) || defined(IN_IFF_DUPLICATED)
 static void
 dhcp_decline(struct interface *ifp)
 {
@@ -2086,9 +2086,11 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 			astate->failed = astate->addr;
 		arp_report_conflicted(astate, amsg);
 		unlink(state->leasefile);
+#ifdef ARP
 		if (!(ifp->options->options & DHCPCD_STATIC) &&
 		    !state->lease.frominfo)
 			dhcp_decline(ifp);
+#endif
 #ifdef IN_IFF_DUPLICATED
 		if ((ia = ipv4_iffindaddr(ifp, &astate->addr, NULL)) != NULL)
 			ipv4_deladdr(ia, 1);
@@ -2959,7 +2961,9 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 			case 0:
 				LOGDHCP(logwarnx, "IPv4LL disabled from");
 				ipv4ll_drop(ifp);
+#ifdef ARP
 				arp_drop(ifp);
+#endif
 				break;
 			case 1:
 				LOGDHCP(logwarnx, "IPv4LL enabled from");
@@ -3359,7 +3363,9 @@ dhcp_free(struct interface *ifp)
 	struct dhcpcd_ctx *ctx;
 
 	dhcp_close(ifp);
+#ifdef ARP
 	arp_drop(ifp);
+#endif
 	if (state) {
 		state->state = DHS_NONE;
 		free(state->old);
@@ -3747,10 +3753,10 @@ dhcp_start(struct interface *ifp)
 void
 dhcp_abort(struct interface *ifp)
 {
-#ifdef ARPING
 	struct dhcp_state *state;
 
 	state = D_STATE(ifp);
+#ifdef ARPING
 	if (state != NULL)
 		state->arping_index = -1;
 #endif

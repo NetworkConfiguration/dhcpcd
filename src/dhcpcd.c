@@ -368,7 +368,9 @@ dhcpcd_drop(struct interface *ifp, int stop)
 	ipv6_drop(ifp);
 	ipv4ll_drop(ifp);
 	dhcp_drop(ifp, stop ? "STOP" : "EXPIRE");
+#ifdef ARP
 	arp_drop(ifp);
+#endif
 }
 
 static void
@@ -719,7 +721,9 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 			ifp->carrier = LINK_DOWN;
 			script_runreason(ifp, "NOCARRIER");
 #ifdef NOCARRIER_PRESERVE_IP
+#ifdef ARP
 			arp_drop(ifp);
+#endif
 			dhcp_abort(ifp);
 			ipv6nd_expire(ifp, 0);
 #else
