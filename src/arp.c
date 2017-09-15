@@ -52,7 +52,7 @@
 #include "ipv4ll.h"
 #include "logerr.h"
 
-#if defined(ARP) && (!defined(KERNEL_RFC5227) || defined(ARPING))
+#if defined(ARP)
 #define ARP_LEN								      \
 	(sizeof(struct arphdr) + (2 * sizeof(uint32_t)) + (2 * HWADDR_LEN))
 
@@ -281,8 +281,6 @@ arp_probe(struct arp_state *astate)
 	    astate->iface->name, inet_ntoa(astate->addr));
 	arp_probe1(astate);
 }
-#else	/* !ARP */
-#define arp_close(ifp) {}
 #endif	/* ARP */
 
 static void
