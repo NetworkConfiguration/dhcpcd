@@ -297,6 +297,9 @@ bpf_close(struct interface *ifp, int fd)
 	return close(fd);
 }
 
+/* Normally this is needed by bootp.
+ * Once that uses this again, the ARP guard here can be removed. */
+#ifdef ARP
 static unsigned int
 bpf_cmp_hwaddr(struct bpf_insn *bpf, size_t bpf_len, size_t off,
     bool equal, uint8_t *hwaddr, size_t hwaddr_len)
@@ -380,6 +383,7 @@ bpf_cmp_hwaddr(struct bpf_insn *bpf, size_t bpf_len, size_t off,
 
 	return (unsigned int)(bp - bpf);
 }
+#endif
 
 #ifdef ARP
 
