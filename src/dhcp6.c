@@ -2892,6 +2892,7 @@ dhcp6_bind(struct interface *ifp, const char *op)
 	case DH6S_CONFIRM:
 		if (state->reason == NULL)
 			state->reason = "REBOOT6";
+		/* FALLTHROUGH */
 	case DH6S_TIMEDOUT:
 		if (state->reason == NULL)
 			state->reason = "TIMEOUT6";
