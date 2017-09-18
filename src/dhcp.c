@@ -2749,7 +2749,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 #endif
 
 	if (state->xid != ntohl(bootp->xid)) {
-		if (state->state != DHS_BOUND)
+		if (state->state != DHS_BOUND && state->state != DHS_NONE)
 			logdebugx("%s: wrong xid 0x%x (expecting 0x%x) from %s",
 			    ifp->name, ntohl(bootp->xid), state->xid,
 			    inet_ntoa(*from));
