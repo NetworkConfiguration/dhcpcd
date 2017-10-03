@@ -452,7 +452,7 @@ ipv6nd_removefreedrop_ra(struct ra *rap, int remove_ra, int drop_ra)
 
 	eloop_timeout_delete(rap->iface->ctx->eloop, NULL, rap->iface);
 	eloop_timeout_delete(rap->iface->ctx->eloop, NULL, rap);
-	if (remove_ra && !drop_ra)
+	if (remove_ra)
 		TAILQ_REMOVE(rap->iface->ctx->ra_routers, rap, next);
 	ipv6_freedrop_addrs(&rap->addrs, drop_ra, NULL);
 	free(rap->data);
@@ -1400,27 +1400,20 @@ ipv6nd_expirera(void *arg)
 void
 ipv6nd_drop(struct interface *ifp)
 {
-	struct ra *rap;
+	struct ra *rap, *ran;
 	uint8_t expired = 0;
-	TAILQ_HEAD(rahead, ra) rtrs;
 
 	if (ifp->ctx->ra_routers == NULL)
 		return;
 
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
-	TAILQ_INIT(&rtrs);
-	TAILQ_FOREACH(rap, ifp->ctx->ra_routers, next) {
+	TAILQ_FOREACH_SAFE(rap, ifp->ctx->ra_routers, next, ran) {
 		if (rap->iface == ifp) {
 			rap->expired = expired = 1;
-			TAILQ_REMOVE(ifp->ctx->ra_routers, rap, next);
-			TAILQ_INSERT_TAIL(&rtrs, rap, next);
+			ipv6nd_drop_ra(rap);
 		}
 	}
 	if (expired) {
-		while ((rap = TAILQ_FIRST(&rtrs))) {
-			TAILQ_REMOVE(&rtrs, rap, next);
-			ipv6nd_drop_ra(rap);
-		}
 		rt_build(ifp->ctx, AF_INET6);
 		if ((ifp->options->options & DHCPCD_NODROP) != DHCPCD_NODROP)
 			script_runreason(ifp, "ROUTERADVERT");
