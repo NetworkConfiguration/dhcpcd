@@ -158,6 +158,10 @@ static void ipv6nd_handledata(void *);
 #define IPV6_RECVPKTINFO IPV6_PKTINFO
 #endif
 
+/* Handy defines */
+#define ipv6nd_free_ra(ra) ipv6nd_freedrop_ra((ra),  0)
+#define ipv6nd_drop_ra(ra) ipv6nd_freedrop_ra((ra),  1)
+
 void
 ipv6nd_printoptions(const struct dhcpcd_ctx *ctx,
     const struct dhcp_opt *opts, size_t opts_len)
@@ -455,7 +459,7 @@ ipv6nd_removefreedrop_ra(struct ra *rap, int remove_ra, int drop_ra)
 	free(rap);
 }
 
-void
+static void
 ipv6nd_freedrop_ra(struct ra *rap, int drop)
 {
 
