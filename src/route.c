@@ -418,7 +418,7 @@ rt_cmp(const struct rt *r1, const struct rt *r2)
 #ifdef HAVE_ROUTE_METRIC
 	    r1->rt_metric == r2->rt_metric &&
 #endif
-	    sa_cmp(&r1->rt_gateway, &r1->rt_gateway) == 0);
+	    sa_cmp(&r1->rt_gateway, &r2->rt_gateway) == 0);
 }
 
 static bool
