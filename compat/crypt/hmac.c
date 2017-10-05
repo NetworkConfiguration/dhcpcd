@@ -34,10 +34,8 @@
 
 #include "config.h"
 
-#ifdef HAVE_MD5_H
-#  ifndef DEPGEN
-#    include <md5.h>
-#  endif
+#if defined(HAVE_MD5_H) && !defined(DEPGEN)
+#include <md5.h>
 #endif
 
 #ifdef SHA2_H
@@ -45,7 +43,7 @@
 #endif
 
 #ifndef __arraycount
-#  define __arraycount(__x)       (sizeof(__x) / sizeof(__x[0]))
+#define	__arraycount(__x)       (sizeof(__x) / sizeof(__x[0]))
 #endif
 
 #if 0
@@ -55,6 +53,13 @@
 #include <rmd160.h>
 #include <sha1.h>
 #include <sha2.h>
+#endif
+
+#ifndef MD5_BLOCK_LENGTH
+#define	MD5_BLOCK_LENGTH	64
+#endif
+#ifndef SHA256_BLOCK_LENGTH
+#define	SHA256_BLOCK_LENGTH	64
 #endif
 
 #define HMAC_SIZE	128
