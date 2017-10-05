@@ -476,13 +476,13 @@ rt_build(struct dhcpcd_ctx *ctx, int af)
 #ifdef INET
 	case AF_INET:
 		if (!inet_getroutes(ctx, &routes))
-			return;
+			goto getfail;
 		break;
 #endif
 #ifdef INET6
 	case AF_INET6:
 		if (!inet6_getroutes(ctx, &routes))
-			return;
+			goto getfail;
 		break;
 #endif
 	}
@@ -520,5 +520,7 @@ rt_build(struct dhcpcd_ctx *ctx, int af)
 
 	rt_headclear(&ctx->routes, af);
 	TAILQ_CONCAT(&ctx->routes, &added, rt_next);
+
+getfail:
 	rt_headclear(&routes, AF_UNSPEC);
 }
