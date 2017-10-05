@@ -490,7 +490,7 @@ if [ -z "$AUTH" -o "$AUTH" = yes ]; then
 	echo "SRCS+=		auth.c" >>$CONFIG_MK
 	echo "CRYPT_SRCS+=	\${HMAC_SRC}" >>$CONFIG_MK
 fi
-if [ -z "$INET6" -o "$INET6" = yes -o -z "$AUTH" -o "$AUTH" = yes -o ]; then
+if [ -z "$INET6" -o "$INET6" = yes -o -z "$AUTH" -o "$AUTH" = yes ]; then
 	echo "CRYPT_SRCS+=	\${MD5_SRC} \${SHA256_SRC}" >>$CONFIG_MK
 fi
 
