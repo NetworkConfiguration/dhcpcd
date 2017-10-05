@@ -11,7 +11,6 @@ CFLAGS+=	-std=${CSTD}
 
 CPPFLAGS+=	-I${TOP} -I${TOP}/src
 
-CRYPT_SRCS=	${HMAC_SRC} ${MD5_SRC}
 PCRYPT_SRCS=	${CRYPT_SRCS:compat/%=${TOP}/compat/%}
 OBJS+=		${SRCS:.c=.o} ${PCRYPT_SRCS:.c=.o}
 
