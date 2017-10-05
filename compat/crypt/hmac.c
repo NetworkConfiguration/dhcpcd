@@ -44,6 +44,10 @@
 #  include SHA2_H
 #endif
 
+#ifndef __arraycount
+#  define __arraycount(__x)       (sizeof(__x) / sizeof(__x[0]))
+#endif
+
 #if 0
 #include <md2.h>
 #include <md4.h>
