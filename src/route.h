@@ -77,6 +77,7 @@ struct rt {
 #define	RTDF_FAKE		0x04		/* Maybe us on lease reboot  */
 #define	RTDF_RA			0x08		/* Router Advertisement */
 #define	RTDF_DHCP		0x10		/* DHCP route */
+#define	RTDF_STATIC		0x20		/* Configured in dhcpcd */
 };
 TAILQ_HEAD(rt_head, rt);
 
