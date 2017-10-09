@@ -2136,10 +2136,8 @@ inet6_makeroute(struct interface *ifp, const struct ra *rap)
 #ifdef HAVE_ROUTE_METRIC
 	rt->rt_metric = ifp->metric;
 #endif
-	if (rap != NULL) {
+	if (rap != NULL)
 		rt->rt_mtu = rap->mtu;
-		rt->rt_dflags |= RTDF_RA;
-	}
 	return rt;
 }
 
@@ -2256,12 +2254,15 @@ inet6_raroutes(struct rt_head *routes, struct dhcpcd_ctx *ctx, int expired,
 			if (addr->prefix_vltime == 0)
 				continue;
 			rt = inet6_makeprefix(rap->iface, rap, addr);
-			if (rt)
+			if (rt) {
+				rt->rt_dflags |= RTDF_RA;
 				TAILQ_INSERT_TAIL(routes, rt, rt_next);
+			}
 		}
 		if (rap->lifetime) {
 			rt = inet6_makerouter(rap);
 			if (rt) {
+				rt->rt_dflags |= RTDF_RA;
 				TAILQ_INSERT_TAIL(routes, rt, rt_next);
 				if (have_default)
 					*have_default = true;
@@ -2285,8 +2286,10 @@ inet6_dhcproutes(struct rt_head *routes, struct dhcpcd_ctx *ctx,
 		if (d6_state && d6_state->state == dstate) {
 			TAILQ_FOREACH(addr, &d6_state->addrs, next) {
 				rt = inet6_makeprefix(ifp, NULL, addr);
-				if (rt)
+				if (rt) {
+					rt->rt_dflags |= RTDF_DHCP;
 					TAILQ_INSERT_TAIL(routes, rt, rt_next);
+				}
 			}
 		}
 	}
