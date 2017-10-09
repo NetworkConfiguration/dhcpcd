@@ -1221,6 +1221,11 @@ if_route(unsigned char cmd, const struct rt *rt)
 	} else {
 		/* Address generated routes are RTPROT_KERNEL,
 		 * otherwise RTPROT_BOOT */
+#ifdef RTPROT_RA
+		if (rt->rt_dflags & RTDF_RA)
+			nlm.rt.rtm_protocol = RTPROT_RA;
+		else
+#endif
 		if (rt->rt_dflags & RTDF_IFA_ROUTE)
 			nlm.rt.rtm_protocol = RTPROT_KERNEL;
 		else

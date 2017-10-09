@@ -2136,8 +2136,10 @@ inet6_makeroute(struct interface *ifp, const struct ra *rap)
 #ifdef HAVE_ROUTE_METRIC
 	rt->rt_metric = ifp->metric;
 #endif
-	if (rap != NULL)
+	if (rap != NULL) {
 		rt->rt_mtu = rap->mtu;
+		rt->rt_dflags |= RTDF_RA;
+	}
 	return rt;
 }
 
