@@ -428,7 +428,7 @@ decode_rfc3442_rt(struct rt_head *routes, struct interface *ifp,
 
 		if ((rt = rt_new(ifp)) == NULL)
 			return -1;
-		TAILQ_INSERT_TAIL(routes, rt, rt_next);
+		rt->rt_dflags |= RTDF_DHCP;
 
 		/* If we have ocets then we have a destination and netmask */
 		dest.s_addr = 0;
@@ -461,6 +461,8 @@ decode_rfc3442_rt(struct rt_head *routes, struct interface *ifp,
 		/* If CIDR is 32 then it's a host route. */
 		if (cidr == 32)
 			rt->rt_flags = RTF_HOST;
+
+		TAILQ_INSERT_TAIL(routes, rt, rt_next);
 		n++;
 	}
 	return n;
@@ -631,6 +633,7 @@ get_option_routes(struct rt_head *routes, struct interface *ifp,
 				continue;
 			if ((rt = rt_new(ifp)) == NULL)
 				return -1;
+			rt->rt_dflags |= RTDF_DHCP;
 
 			/* A host route is normally set by having the
 			 * gateway match the destination or assigned address */
@@ -663,6 +666,7 @@ get_option_routes(struct rt_head *routes, struct interface *ifp,
 		while (p < e) {
 			if ((rt = rt_new(ifp)) == NULL)
 				return -1;
+			rt->rt_dflags |= RTDF_DHCP;
 			memcpy(&gateway.s_addr, p, sizeof(gateway.s_addr));
 			p += 4;
 			sa_in_init(&rt->rt_dest, &dest);

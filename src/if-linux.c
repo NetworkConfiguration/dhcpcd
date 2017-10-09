@@ -1226,6 +1226,11 @@ if_route(unsigned char cmd, const struct rt *rt)
 			nlm.rt.rtm_protocol = RTPROT_RA;
 		else
 #endif
+#ifdef RTPROT_DHCP
+		if (rt->rt_dflags & RTDF_DHCP)
+			nlm.rt.rtm_protocol = RTPROT_DHCP;
+		else
+#endif
 		if (rt->rt_dflags & RTDF_IFA_ROUTE)
 			nlm.rt.rtm_protocol = RTPROT_KERNEL;
 		else

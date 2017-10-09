@@ -76,6 +76,7 @@ struct rt {
 #define	RTDF_IFA_ROUTE		0x02		/* Address generated route */
 #define	RTDF_FAKE		0x04		/* Maybe us on lease reboot  */
 #define	RTDF_RA			0x08		/* Router Advertisement */
+#define	RTDF_DHCP		0x10		/* DHCP route */
 };
 TAILQ_HEAD(rt_head, rt);
 
