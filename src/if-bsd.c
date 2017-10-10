@@ -1346,18 +1346,6 @@ ip6_temp_valid_lifetime(__unused const char *ifname)
 }
 #endif
 
-static int
-if_raflush(int s)
-{
-	char dummy[IFNAMSIZ + 8];
-
-	strlcpy(dummy, "lo0", sizeof(dummy));
-	if (ioctl(s, SIOCSRTRFLUSH_IN6, (void *)&dummy) == -1 ||
-	    ioctl(s, SIOCSPFXFLUSH_IN6, (void *)&dummy) == -1)
-		return -1;
-	return 0;
-}
-
 #ifdef SIOCIFAFATTACH
 static int
 af_attach(int s, const struct interface *ifp, int af)
@@ -1533,11 +1521,18 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp)
 	ra = 0;
 	if (!(ctx->options & DHCPCD_TEST)) {
 #endif
+#if defined(IPV6CTL_ACCEPT_RTADV) || defined(ND6_IFF_ACCEPT_RTADV)
 		/* Flush the kernel knowledge of advertised routers
 		 * and prefixes so the kernel does not expire prefixes
 		 * and default routes we are trying to own. */
-		if (if_raflush(s) == -1)
-			logwarn("if_raflush");
+		char dummy[IFNAMSIZ + 8];
+
+		strlcpy(dummy, "lo0", sizeof(dummy));
+		if (ioctl(s, SIOCSRTRFLUSH_IN6, (void *)&dummy) == -1)
+			logwarn("SIOCSRTRFLUSH_IN6");
+		if (ioctl(s, SIOCSPFXFLUSH_IN6, (void *)&dummy) == -1)
+			logwarn("SIOCSPFXFLUSH_IN6");
+#endif
 	}
 
 	ctx->ra_global = ra;
