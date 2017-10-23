@@ -373,16 +373,32 @@ void
 arp_announceaddr(struct dhcpcd_ctx *ctx, struct in_addr *ia)
 {
 	struct interface *ifp;
+	struct ipv4_addr *iaf;
 	struct arp_state *astate;
 
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-		if (ipv4_iffindaddr(ifp, ia, NULL))
+		iaf = ipv4_iffindaddr(ifp, ia, NULL);
+#ifdef IN_IFF_NOTUSEABLE
+		if (iaf && !(iaf->addr_flags & IN_IFF_NOTUSEABLE))
+#else
+		if (iaf)
+#endif
 			break;
 	}
 	if (ifp == NULL)
 		return;
 
 	astate = arp_find(ifp, ia);
+	if (astate != NULL)
+		arp_announce(astate);
+}
+
+void
+arp_ifannounceaddr(struct interface *ifp, struct in_addr *ia)
+{
+	struct arp_state *astate;
+
+	astate = arp_new(ifp, ia);
 	if (astate != NULL)
 		arp_announce(astate);
 }
