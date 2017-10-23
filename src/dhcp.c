@@ -2463,11 +2463,43 @@ dhcp_reboot_newopts(struct interface *ifp, unsigned long long oldopts)
 	}
 }
 
+#ifdef ARP
+static int
+dhcp_activeaddr(const struct interface *ifp, const struct in_addr *addr)
+{
+	const struct interface *ifp1;
+	const struct dhcp_state *state;
+
+	TAILQ_FOREACH(ifp1, ifp->ctx->ifaces, next) {
+		if (ifp1 == ifp)
+			continue;
+		if ((state = D_CSTATE(ifp1)) == NULL)
+			continue;
+		switch(state->state) {
+		case DHS_REBOOT:
+		case DHS_RENEW:
+		case DHS_REBIND:
+		case DHS_BOUND:
+		case DHS_INFORM:
+			break;
+		default:
+			continue;
+		}
+		if (state->lease.addr.s_addr == addr->s_addr)
+			return 1;
+	}
+	return 0;
+}
+#endif
+
 static void
 dhcp_reboot(struct interface *ifp)
 {
 	struct if_options *ifo;
 	struct dhcp_state *state = D_STATE(ifp);
+#ifdef ARP
+	struct ipv4_addr *ia;
+#endif
 
 	if (state == NULL || state->state == DHS_NONE)
 		return;
@@ -2498,6 +2530,20 @@ dhcp_reboot(struct interface *ifp)
 
 	loginfox("%s: rebinding lease of %s",
 	    ifp->name, inet_ntoa(state->lease.addr));
+
+#ifdef ARP
+	/* If the address exists on the interface and no other interface
+	 * is currently using it then announce it to ensure this
+	 * interface gets the reply. */
+	ia = ipv4_iffindaddr(ifp, &state->lease.addr, NULL);
+	if (ia != NULL &&
+#ifdef IN_IFF_NOTUSEABLE
+	    !(ia->addr_flags & IN_IFF_NOTUSEABLE) &&
+#endif
+	    dhcp_activeaddr(ifp, &state->lease.addr) == 0)
+		arp_ifannounceaddr(ifp, &state->lease.addr);
+#endif
+
 	dhcp_new_xid(ifp);
 	state->lease.server.s_addr = 0;
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
@@ -3287,51 +3333,30 @@ dhcp_handleudp(void *arg)
 	}
 }
 
-
 static int
-dhcp_openbpf1(struct interface *ifp, bool logerror)
+dhcp_openbpf(struct interface *ifp)
 {
 	struct dhcp_state *state;
 
 	state = D_STATE(ifp);
+	if (state->bpf_fd != -1)
+		return 0;
+
+	state->bpf_fd = bpf_open(ifp, bpf_bootp);
 	if (state->bpf_fd == -1) {
-		state->bpf_fd = bpf_open(ifp, bpf_bootp);
-		if (state->bpf_fd == -1) {
-			if (errno == ENOENT) {
-				logerrx("%s not found", bpf_name);
-				/* May as well disable IPv4 entirely at
-				 * this point as we really need it. */
-				ifp->options->options &= ~DHCPCD_IPV4;
-			} else if (logerror)
-				logerr("%s: %s", __func__, ifp->name);
-			return -1;
-		}
-		eloop_event_add(ifp->ctx->eloop,
-		    state->bpf_fd, dhcp_readpacket, ifp);
+		if (errno == ENOENT) {
+			logerrx("%s not found", bpf_name);
+			/* May as well disable IPv4 entirely at
+			 * this point as we really need it. */
+			ifp->options->options &= ~DHCPCD_IPV4;
+		} else
+			logerr("%s: %s", __func__, ifp->name);
+		return -1;
 	}
+
+	eloop_event_add(ifp->ctx->eloop,
+	    state->bpf_fd, dhcp_readpacket, ifp);
 	return 0;
-}
-
-/* This blows chunks.
- * Because we may (although unlikely) get the same IP address
- * across different interfaces we need to open a BPF socket
- * on ALL interfaces as thanks to ARP magic we might get the
- * DHCP reply on a different interface. */
-static int
-dhcp_openbpf(struct interface *ifp)
-{
-	struct interface *ifn;
-	int r, o;
-
-	r = -1;
-	TAILQ_FOREACH(ifn, ifp->ctx->ifaces, next) {
-		if (dhcp_initstate(ifn) == -1)
-			continue;
-		o = dhcp_openbpf1(ifn, ifn == ifp);
-		if (ifn == ifp)
-			r = o;
-	}
-	return r;
 }
 
 int
