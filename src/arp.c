@@ -186,6 +186,27 @@ arp_close(struct interface *ifp)
 }
 
 static void
+arp_tryfree(struct interface *ifp)
+{
+	struct iarp_state *state = ARP_STATE(ifp);
+
+	/* If there are no more ARP states, close the socket. */
+	if (TAILQ_FIRST(&state->arp_states) == NULL) {
+		arp_close(ifp);
+		if (state->bpf_flags & BPF_READING)
+			state->bpf_flags |= BPF_EOF | BPF_FREE;
+		else {
+			free(state);
+			ifp->if_data[IF_DATA_ARP] = NULL;
+		}
+	} else {
+		state->bpf_flags &= BPF_FREE;
+		if (bpf_arp(ifp, state->bpf_fd) == -1)
+			logerr(__func__);
+	}
+}
+
+static void
 arp_read(void *arg)
 {
 	struct interface *ifp = arg;
@@ -214,10 +235,8 @@ arp_read(void *arg)
 	}
 	if (state != NULL) {
 		state->bpf_flags &= ~BPF_READING;
-		if (state->bpf_flags & BPF_FREE) {
-			free(state);
-			ifp->if_data[IF_DATA_ARP] = NULL;
-		}
+		if (state->bpf_flags & BPF_FREE)
+			arp_tryfree(ifp);
 	}
 }
 
@@ -507,19 +526,7 @@ arp_free(struct arp_state *astate)
 	if (astate->free_cb)
 		astate->free_cb(astate);
 	free(astate);
-
-	/* If there are no more ARP states, close the socket. */
-	if (TAILQ_FIRST(&state->arp_states) == NULL) {
-		arp_close(ifp);
-		if (state->bpf_flags & BPF_READING)
-			state->bpf_flags |= BPF_EOF | BPF_FREE;
-		else {
-			free(state);
-			ifp->if_data[IF_DATA_ARP] = NULL;
-		}
-	} else
-		if (bpf_arp(ifp, state->bpf_fd) == -1)
-			logerr(__func__);
+	arp_tryfree(ifp);
 }
 
 static void
