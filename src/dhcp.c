@@ -3300,6 +3300,7 @@ dhcp_readpacket(void *arg)
 	 * This means we have no kernel call to just get one packet,
 	 * so we have to process the entire buffer. */
 	state->bpf_flags &= ~BPF_EOF;
+	state->bpf_flags |= BPF_READING;
 	while (!(state->bpf_flags & BPF_EOF)) {
 		bytes = bpf_read(ifp, state->bpf_fd, buf, sizeof(buf),
 				 &state->bpf_flags);
@@ -3308,13 +3309,15 @@ dhcp_readpacket(void *arg)
 				logerr("%s: %s", __func__, ifp->name);
 				dhcp_close(ifp);
 			}
-			return;
+			break;
 		}
 		dhcp_handlepacket(ifp, buf, (size_t)bytes);
 		/* Check we still have a state after processing. */
 		if ((state = D_STATE(ifp)) == NULL)
 			break;
 	}
+	if (state != NULL)
+		state->bpf_flags &= ~BPF_READING;
 }
 
 static void
