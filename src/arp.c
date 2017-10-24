@@ -198,18 +198,26 @@ arp_read(void *arg)
 	 * so we have to process the entire buffer. */
 	state = ARP_STATE(ifp);
 	state->bpf_flags &= ~BPF_EOF;
+	state->bpf_flags |= BPF_READING;
 	while (!(state->bpf_flags & BPF_EOF)) {
 		bytes = bpf_read(ifp, state->bpf_fd, buf, sizeof(buf),
 				 &state->bpf_flags);
 		if (bytes == -1) {
 			logerr("%s: %s", __func__, ifp->name);
 			arp_close(ifp);
-			return;
+			break;
 		}
 		arp_packet(ifp, buf, (size_t)bytes);
 		/* Check we still have a state after processing. */
 		if ((state = ARP_STATE(ifp)) == NULL)
 			break;
+	}
+	if (state != NULL) {
+		state->bpf_flags &= ~BPF_READING;
+		if (state->bpf_flags & BPF_FREE) {
+			free(state);
+			ifp->if_data[IF_DATA_ARP] = NULL;
+		}
 	}
 }
 
@@ -503,8 +511,12 @@ arp_free(struct arp_state *astate)
 	/* If there are no more ARP states, close the socket. */
 	if (TAILQ_FIRST(&state->arp_states) == NULL) {
 		arp_close(ifp);
-		free(state);
-		ifp->if_data[IF_DATA_ARP] = NULL;
+		if (state->bpf_flags & BPF_READING)
+			state->bpf_flags |= BPF_EOF | BPF_FREE;
+		else {
+			free(state);
+			ifp->if_data[IF_DATA_ARP] = NULL;
+		}
 	} else
 		if (bpf_arp(ifp, state->bpf_fd) == -1)
 			logerr(__func__);
