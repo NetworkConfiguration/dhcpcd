@@ -1385,7 +1385,8 @@ eexit:
 /* BPF requires that we read the entire buffer.
  * So we pass the buffer in the API so we can loop on >1 packet. */
 ssize_t
-bpf_read(struct interface *ifp, int s, void *data, size_t len, int *flags)
+bpf_read(struct interface *ifp, int s, void *data, size_t len,
+    unsigned int *flags)
 {
 	ssize_t bytes;
 	struct ipv4_state *state = IPV4_STATE(ifp);
@@ -1409,7 +1410,8 @@ bpf_read(struct interface *ifp, int s, void *data, size_t len, int *flags)
 	bytes = recvmsg(s, &msg, 0);
 	if (bytes == -1)
 		return -1;
-	*flags = BPF_EOF; /* We only ever read one packet. */
+	*flags |= BPF_EOF; /* We only ever read one packet. */
+	*flags &= ~BPF_PARTIALCSUM;
 	if (bytes) {
 		ssize_t fl = (ssize_t)bpf_frame_header_len(ifp);
 
