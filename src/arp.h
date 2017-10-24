@@ -76,7 +76,8 @@ struct arp_state {
 TAILQ_HEAD(arp_statehead, arp_state);
 
 struct iarp_state {
-	int fd;
+	int bpf_fd;
+	unsigned int bpf_flags;
 	struct arp_statehead arp_states;
 };
 

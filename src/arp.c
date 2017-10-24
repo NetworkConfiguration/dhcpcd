@@ -98,7 +98,7 @@ arp_request(const struct interface *ifp, in_addr_t sip, in_addr_t tip)
 	APPEND(&tip, sizeof(tip));
 
 	state = ARP_CSTATE(ifp);
-	return bpf_send(ifp, state->fd, ETHERTYPE_ARP, arp_buffer, len);
+	return bpf_send(ifp, state->bpf_fd, ETHERTYPE_ARP, arp_buffer, len);
 
 eexit:
 	errno = ENOBUFS;
@@ -177,10 +177,11 @@ arp_close(struct interface *ifp)
 {
 	struct iarp_state *state;
 
-	if ((state = ARP_STATE(ifp)) != NULL && state->fd != -1) {
-		eloop_event_delete(ifp->ctx->eloop, state->fd);
-		bpf_close(ifp, state->fd);
-		state->fd = -1;
+	if ((state = ARP_STATE(ifp)) != NULL && state->bpf_fd != -1) {
+		eloop_event_delete(ifp->ctx->eloop, state->bpf_fd);
+		bpf_close(ifp, state->bpf_fd);
+		state->bpf_fd = -1;
+		state->bpf_flags |= BPF_EOF;
 	}
 }
 
@@ -188,18 +189,18 @@ static void
 arp_read(void *arg)
 {
 	struct interface *ifp = arg;
-	const struct iarp_state *state;
+	struct iarp_state *state;
 	uint8_t buf[ARP_LEN];
-	int flags;
 	ssize_t bytes;
 
 	/* Some RAW mechanisms are generic file descriptors, not sockets.
 	 * This means we have no kernel call to just get one packet,
 	 * so we have to process the entire buffer. */
-	state = ARP_CSTATE(ifp);
-	flags = 0;
-	while (!(flags & BPF_EOF)) {
-		bytes = bpf_read(ifp, state->fd, buf, sizeof(buf), &flags);
+	state = ARP_STATE(ifp);
+	state->bpf_flags &= ~BPF_EOF;
+	while (!(state->bpf_flags & BPF_EOF)) {
+		bytes = bpf_read(ifp, state->bpf_fd, buf, sizeof(buf),
+				 &state->bpf_flags);
 		if (bytes == -1) {
 			logerr("%s: %s", __func__, ifp->name);
 			arp_close(ifp);
@@ -207,7 +208,7 @@ arp_read(void *arg)
 		}
 		arp_packet(ifp, buf, (size_t)bytes);
 		/* Check we still have a state after processing. */
-		if ((state = ARP_CSTATE(ifp)) == NULL || state->fd == -1)
+		if ((state = ARP_STATE(ifp)))
 			break;
 	}
 }
@@ -218,15 +219,15 @@ arp_open(struct interface *ifp)
 	struct iarp_state *state;
 
 	state = ARP_STATE(ifp);
-	if (state->fd == -1) {
-		state->fd = bpf_open(ifp, bpf_arp);
-		if (state->fd == -1) {
+	if (state->bpf_fd == -1) {
+		state->bpf_fd = bpf_open(ifp, bpf_arp);
+		if (state->bpf_fd == -1) {
 			logerr("%s: %s", __func__, ifp->name);
 			return -1;
 		}
-		eloop_event_add(ifp->ctx->eloop, state->fd, arp_read, ifp);
+		eloop_event_add(ifp->ctx->eloop, state->bpf_fd, arp_read, ifp);
 	}
-	return state->fd;
+	return state->bpf_fd;
 }
 
 static void
@@ -273,7 +274,7 @@ arp_probe(struct arp_state *astate)
 	} else {
 		const struct iarp_state *state = ARP_CSTATE(astate->iface);
 
-		if (bpf_arp(astate->iface, state->fd) == -1)
+		if (bpf_arp(astate->iface, state->bpf_fd) == -1)
 			logerr(__func__);
 	}
 	astate->probes = 0;
@@ -451,7 +452,8 @@ arp_new(struct interface *ifp, const struct in_addr *addr)
 			logerr(__func__);
 			return NULL;
 		}
-		state->fd = -1;
+		state->bpf_fd = -1;
+		state->bpf_flags = 0;
 		TAILQ_INIT(&state->arp_states);
 	} else {
 		if (addr && (astate = arp_find(ifp, addr)))
@@ -468,7 +470,7 @@ arp_new(struct interface *ifp, const struct in_addr *addr)
 	state = ARP_STATE(ifp);
 	TAILQ_INSERT_TAIL(&state->arp_states, astate, next);
 
-	if (bpf_arp(ifp, state->fd) == -1)
+	if (bpf_arp(ifp, state->bpf_fd) == -1)
 		logerr(__func__); /* try and continue */
 
 	return astate;
@@ -504,7 +506,7 @@ arp_free(struct arp_state *astate)
 		free(state);
 		ifp->if_data[IF_DATA_ARP] = NULL;
 	} else
-		if (bpf_arp(ifp, state->fd) == -1)
+		if (bpf_arp(ifp, state->bpf_fd) == -1)
 			logerr(__func__);
 }
 

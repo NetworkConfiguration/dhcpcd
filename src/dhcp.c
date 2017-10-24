@@ -1551,6 +1551,7 @@ dhcp_close(struct interface *ifp)
 		eloop_event_delete(ifp->ctx->eloop, state->bpf_fd);
 		bpf_close(ifp, state->bpf_fd);
 		state->bpf_fd = -1;
+		state->bpf_flags |= BPF_EOF;
 	}
 
 	state->interval = 0;
@@ -3236,14 +3237,15 @@ valid_udp_packet(void *data, size_t data_len, struct in_addr *from,
 }
 
 static void
-dhcp_handlepacket(struct interface *ifp, uint8_t *data, size_t len, int flags)
+dhcp_handlepacket(struct interface *ifp, uint8_t *data, size_t len)
 {
 	struct bootp *bootp;
 	struct in_addr from;
 	size_t udp_len;
 	const struct dhcp_state *state = D_CSTATE(ifp);
 
-	if (valid_udp_packet(data, len, &from, flags & RAW_PARTIALCSUM) == -1)
+	if (valid_udp_packet(data, len, &from,
+			     state->bpf_flags & RAW_PARTIALCSUM) == -1)
 	{
 		if (errno == EINVAL)
 			logerrx("%s: UDP checksum failure from %s",
@@ -3292,15 +3294,15 @@ dhcp_readpacket(void *arg)
 	struct interface *ifp = arg;
 	uint8_t buf[MTU_MAX];
 	ssize_t bytes;
-	int flags;
-	const struct dhcp_state *state = D_CSTATE(ifp);
+	struct dhcp_state *state = D_STATE(ifp);
 
 	/* Some RAW mechanisms are generic file descriptors, not sockets.
 	 * This means we have no kernel call to just get one packet,
 	 * so we have to process the entire buffer. */
-	flags = 0;
-	while (!(flags & BPF_EOF)) {
-		bytes = bpf_read(ifp, state->bpf_fd, buf, sizeof(buf), &flags);
+	state->bpf_flags &= ~BPF_EOF;
+	while (!(state->bpf_flags & BPF_EOF)) {
+		bytes = bpf_read(ifp, state->bpf_fd, buf, sizeof(buf),
+				 &state->bpf_flags);
 		if (bytes == -1) {
 			if (state->state != DHS_NONE) {
 				logerr("%s: %s", __func__, ifp->name);
@@ -3308,9 +3310,9 @@ dhcp_readpacket(void *arg)
 			}
 			return;
 		}
-		dhcp_handlepacket(ifp, buf, (size_t)bytes, flags);
+		dhcp_handlepacket(ifp, buf, (size_t)bytes);
 		/* Check we still have a state after processing. */
-		if ((state = D_CSTATE(ifp)) == NULL || state->bpf_fd == -1)
+		if ((state = D_STATE(ifp)) == NULL)
 			break;
 	}
 }
