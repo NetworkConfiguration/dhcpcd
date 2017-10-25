@@ -194,13 +194,12 @@ arp_tryfree(struct interface *ifp)
 	if (TAILQ_FIRST(&state->arp_states) == NULL) {
 		arp_close(ifp);
 		if (state->bpf_flags & BPF_READING)
-			state->bpf_flags |= BPF_EOF | BPF_FREE;
+			state->bpf_flags |= BPF_EOF;
 		else {
 			free(state);
 			ifp->if_data[IF_DATA_ARP] = NULL;
 		}
 	} else {
-		state->bpf_flags &= BPF_FREE;
 		if (bpf_arp(ifp, state->bpf_fd) == -1)
 			logerr(__func__);
 	}
@@ -235,8 +234,8 @@ arp_read(void *arg)
 	}
 	if (state != NULL) {
 		state->bpf_flags &= ~BPF_READING;
-		if (state->bpf_flags & BPF_FREE)
-			arp_tryfree(ifp);
+		/* Try and free the state if nothing left to do. */
+		arp_tryfree(ifp);
 	}
 }
 
