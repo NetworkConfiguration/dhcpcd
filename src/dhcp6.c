@@ -1358,11 +1358,6 @@ dhcp6_dadcallback(void *arg)
 	if (!wascompleted) {
 		ifp = ia->iface;
 
-		/* If not in master mode, we need to listen on each address
-		 * so we can receive unicast a message. */
-		if (ia->dhcp6_fd == -1 && !(ifp->ctx->options & DHCPCD_MASTER))
-			dhcp6_listen(ifp->ctx, ia);
-
 		state = D6_STATE(ifp);
 		if (state->state == DH6S_BOUND ||
 		    state->state == DH6S_DELEGATED)
@@ -1707,35 +1702,6 @@ dhcp6_leaseextend(struct interface *ifp)
 		/* Set infinite lifetimes. */
 		ia->prefix_pltime = ND6_INFINITE_LIFETIME;
 		ia->prefix_vltime = ND6_INFINITE_LIFETIME;
-	}
-}
-
-static void
-dhcp6_addaddrs(struct interface *ifp)
-{
-	struct dhcp6_state *state = D6_STATE(ifp);
-	struct ipv6_addr *ia;
-
-	ipv6_addaddrs(&state->addrs);
-
-	/* If not in master mode, we need to listen on each address
-	 * so we can receive unicast a message. */
-	if (ifp->ctx->options & DHCPCD_MASTER)
-		return;
-
-	state = D6_STATE(ifp);
-	TAILQ_FOREACH(ia, &state->addrs, next) {
-		if (ia->prefix_vltime == 0 ||
-		    ia->flags & IPV6_AF_STALE ||
-		    ia->addr_flags & IN6_IFF_NOTUSEABLE)
-			continue;
-		if (ia->dhcp6_fd != -1)
-			continue;
-		ia->dhcp6_fd = dhcp6_listen(ifp->ctx, ia);
-		if (ia->dhcp6_fd == -1)
-			continue;
-		eloop_event_add(ifp->ctx->eloop,
-		    ia->dhcp6_fd, dhcp6_recvaddr, ia);
 	}
 }
 
@@ -2736,7 +2702,10 @@ dhcp6_delegate_prefix(struct interface *ifp)
 				break;
 		}
 		if (k && !carrier_warned) {
-			dhcp6_addaddrs(ifd);
+			struct dhcp6_state *s = D6_STATE(ifd);
+
+			ipv6_addaddrs(&s->addrs);
+
 			/*
 			 * Can't add routes here because that will trigger
 			 * interface sorting which may break the current
@@ -3040,7 +3009,7 @@ dhcp6_bind(struct interface *ifp, const char *op)
 			eloop_timeout_add_sec(ifp->ctx->eloop,
 			    (time_t)state->expire, dhcp6_startdiscover, ifp);
 
-		dhcp6_addaddrs(ifp);
+		ipv6_addaddrs(&state->addrs);
 		dhcp6_deprecateaddrs(&state->addrs);
 
 		if (state->state == DH6S_INFORMED)
@@ -3481,10 +3450,13 @@ dhcp6_listen(struct dhcpcd_ctx *ctx, struct ipv6_addr *ia)
 #ifdef BSD
 	sa.sin6_len = sizeof(sa);
 #endif
+
 	if (ia != NULL) {
 		memcpy(&sa.sin6_addr, &ia->addr, sizeof(sa.sin6_addr));
 		sa.sin6_scope_id = ia->iface->index;
-	}
+	} else if (!(ctx->options & DHCPCD_MASTER))
+		/* This socket is only used for sending. */
+		return s;
 
 	if (bind(s, (struct sockaddr *)&sa, sizeof(sa)) == -1)
 		goto errexit;
@@ -3494,12 +3466,11 @@ dhcp6_listen(struct dhcpcd_ctx *ctx, struct ipv6_addr *ia)
 		if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVPKTINFO,
 		    &n, sizeof(n)) == -1)
 			goto errexit;
-	}
-
-	if (ia != NULL) {
+	} else {
 		ia->dhcp6_fd = s;
 		eloop_event_add(ctx->eloop, s, dhcp6_recvaddr, ia);
 	}
+
 	return s;
 
 errexit:
@@ -3512,28 +3483,13 @@ errexit:
 static int
 dhcp6_open(struct dhcpcd_ctx *ctx)
 {
-	struct ipv6_addr *ia = NULL;
-	int s;
 
-	if (!(ctx->options & DHCPCD_MASTER)) {
-		/* Bind to the link-local address to allow more than one
-		 * DHCPv6 client to work. */
-		struct interface *ifp;
+	/* Open an unbound socket to send from. */
+	ctx->dhcp6_fd = dhcp6_listen(ctx, NULL);
+	if (ctx->dhcp6_fd != -1 && (ctx->options & DHCPCD_MASTER))
+		eloop_event_add(ctx->eloop, ctx->dhcp6_fd, dhcp6_recvctx, ctx);
 
-		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-			if (!ifp->active)
-				continue;
-			ia = ipv6_linklocal(ifp);
-			if (ia != NULL)
-				break;
-		}
-	}
-	s = dhcp6_listen(ctx, ia);
-	ctx->dhcp6_fd = s;
-	if (s != -1 && ia == NULL)
-		eloop_event_add(ctx->eloop, s, dhcp6_recvctx, ctx);
-
-	return s;
+	return ctx->dhcp6_fd;
 }
 
 #ifndef SMALL
@@ -3808,6 +3764,14 @@ void
 dhcp6_handleifa(int cmd, struct ipv6_addr *ia)
 {
 	struct dhcp6_state *state;
+
+	/* If not running in master mode, listen to this address */
+	if (cmd == RTM_NEWADDR &&
+	    !(ia->addr_flags & IN6_IFF_NOTUSEABLE) &&
+	    ia->iface->active == IF_ACTIVE_USER &&
+	    !(ia->iface->ctx->options & DHCPCD_MASTER) &&
+	    ia->dhcp6_fd == -1)
+		dhcp6_listen(ia->iface->ctx, ia);
 
 	if ((state = D6_STATE(ia->iface)) != NULL)
 		ipv6_handleifa_addrs(cmd, &state->addrs, ia);

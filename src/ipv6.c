@@ -1103,26 +1103,10 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 		break;
 	case RTM_NEWADDR:
 		if (ia == NULL) {
-			char buf[INET6_ADDRSTRLEN];
-			const char *cbp;
-
-			if ((ia = calloc(1, sizeof(*ia))) == NULL) {
-				logerr(__func__);
-				break;
-			}
+			ia = ipv6_newaddr(ifp, addr, prefix_len, 0);
 #ifdef ALIAS_ADDR
 			strlcpy(ia->alias, ifname, sizeof(ia->alias));
 #endif
-			ia->iface = ifp;
-			ia->addr = *addr;
-			ia->prefix_len = prefix_len;
-			ipv6_makeprefix(&ia->prefix, &ia->addr,
-			    ia->prefix_len);
-			cbp = inet_ntop(AF_INET6, &addr->s6_addr,
-			    buf, sizeof(buf));
-			if (cbp)
-				snprintf(ia->saddr, sizeof(ia->saddr),
-				    "%s/%d", cbp, prefix_len);
 			if (if_getlifetime6(ia) == -1) {
 				/* No support or address vanished.
 				 * Either way, just set a deprecated
@@ -1190,10 +1174,8 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 	}
 
 	if (ia != NULL) {
-		if (!IN6_IS_ADDR_LINKLOCAL(&ia->addr)) {
-			ipv6nd_handleifa(cmd, ia);
-			dhcp6_handleifa(cmd, ia);
-		}
+		ipv6nd_handleifa(cmd, ia);
+		dhcp6_handleifa(cmd, ia);
 
 		/* Done with the ia now, so free it. */
 		if (cmd == RTM_DELADDR)
@@ -1453,8 +1435,8 @@ ipv6_tryaddlinklocal(struct interface *ifp)
 }
 
 struct ipv6_addr *
-ipv6_newaddr(struct interface *ifp, struct in6_addr *addr, uint8_t prefix_len,
-    unsigned int flags)
+ipv6_newaddr(struct interface *ifp, const struct in6_addr *addr,
+    uint8_t prefix_len, unsigned int flags)
 {
 	struct ipv6_addr *ia;
 	char buf[INET6_ADDRSTRLEN];
