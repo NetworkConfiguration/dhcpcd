@@ -28,10 +28,9 @@
 #ifndef BPF_HEADER
 #define BPF_HEADER
 
-#define	BPF_EOF			(1U << 0)
-#define	BPF_PARTIALCSUM		(1U << 1)
-#define	BPF_READING		(1U << 2)
-#define	BPF_FREE		(1U << 3)
+#define	BPF_READING		(1U << 0)
+#define	BPF_EOF			(1U << 1)
+#define	BPF_PARTIALCSUM		(1U << 2)
 
 #include "dhcpcd.h"
 
