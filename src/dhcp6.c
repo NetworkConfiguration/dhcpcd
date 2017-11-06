@@ -1086,8 +1086,6 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 	struct dhcp6_state *state;
 	struct dhcpcd_ctx *ctx;
 	struct sockaddr_in6 dst;
-	struct cmsghdr *cm;
-	struct in6_pktinfo pi;
 	struct timespec RTprev;
 	double rnd;
 	time_t ms;
@@ -1227,21 +1225,31 @@ logsend:
 #endif
 
 	ctx = ifp->ctx;
-	dst.sin6_scope_id = ifp->index;
 	ctx->sndhdr.msg_name = (void *)&dst;
 	ctx->sndhdr.msg_iov[0].iov_base = state->send;
 	ctx->sndhdr.msg_iov[0].iov_len = state->send_len;
 
 	/* Set the outbound interface */
-	cm = CMSG_FIRSTHDR(&ctx->sndhdr);
-	if (cm == NULL) /* unlikely */
-		return -1;
-	cm->cmsg_level = IPPROTO_IPV6;
-	cm->cmsg_type = IPV6_PKTINFO;
-	cm->cmsg_len = CMSG_LEN(sizeof(pi));
-	memset(&pi, 0, sizeof(pi));
-	pi.ipi6_ifindex = ifp->index;
-	memcpy(CMSG_DATA(cm), &pi, sizeof(pi));
+	if (IN6_ARE_ADDR_EQUAL(&dst.sin6_addr, &alldhcp)) {
+		struct cmsghdr *cm;
+		struct in6_pktinfo pi;
+
+		dst.sin6_scope_id = ifp->index;
+		cm = CMSG_FIRSTHDR(&ctx->sndhdr);
+		if (cm == NULL) /* unlikely */
+			return -1;
+		cm->cmsg_level = IPPROTO_IPV6;
+		cm->cmsg_type = IPV6_PKTINFO;
+		cm->cmsg_len = CMSG_LEN(sizeof(pi));
+		memset(&pi, 0, sizeof(pi));
+		pi.ipi6_ifindex = ifp->index;
+		memcpy(CMSG_DATA(cm), &pi, sizeof(pi));
+	} else {
+		/* Remove the control buffer as we're not dictating
+		 * which interface to use for outgoing messages. */
+		ctx->sndhdr.msg_control = NULL;
+		ctx->sndhdr.msg_controllen = 0;
+	}
 
 	if (sendmsg(ctx->dhcp6_fd, &ctx->sndhdr, 0) == -1) {
 		logerr("%s: %s: sendmsg", __func__, ifp->name);
@@ -1249,6 +1257,12 @@ logsend:
 		 * would be rate limited by the protocol.
 		 * Generally the error is ENOBUFS when struggling to
 		 * associate with an access point. */
+	}
+
+	/* Restore the control buffer assignment. */
+	if (!IN6_ARE_ADDR_EQUAL(&dst.sin6_addr, &alldhcp)) {
+		ctx->sndhdr.msg_control = ctx->sndbuf;
+		ctx->sndhdr.msg_controllen = sizeof(ctx->sndbuf);
 	}
 
 	state->RTC++;
@@ -3073,14 +3087,11 @@ dhcp6_bind(struct interface *ifp, const char *op)
 }
 
 static void
-dhcp6_recv(struct dhcpcd_ctx *ctx, struct ipv6_addr *ia)
+dhcp6_recvif(struct interface *ifp, struct dhcp6_message *r, size_t len)
 {
-	int s;
-	size_t i, len;
-	ssize_t bytes;
-	struct interface *ifp;
+	struct dhcpcd_ctx *ctx;
+	size_t i;
 	const char *op;
-	struct dhcp6_message *r;
 	struct dhcp6_state *state;
 	uint8_t *o;
 	uint16_t ol;
@@ -3092,67 +3103,7 @@ dhcp6_recv(struct dhcpcd_ctx *ctx, struct ipv6_addr *ia)
 	uint16_t auth_len;
 #endif
 
-	ctx->rcvhdr.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo));
-	s = ia != NULL ? ia->dhcp6_fd : ctx->dhcp6_fd;
-	bytes = recvmsg_realloc(s, &ctx->rcvhdr, 0);
-	if (bytes == -1) {
-		logerr("%s: recvmsg_realloc", __func__);
-		close(s);
-		eloop_event_delete(ctx->eloop, s);
-		if (ia != NULL)
-			ia->dhcp6_fd = -1;
-		else
-			ctx->dhcp6_fd = -1;
-		eloop_exit(ctx->eloop, 1);
-		return;
-	}
-	len = (size_t)bytes;
-	ctx->sfrom = inet_ntop(AF_INET6, &ctx->from.sin6_addr,
-	    ctx->ntopbuf, sizeof(ctx->ntopbuf));
-	if (len < sizeof(struct dhcp6_message)) {
-		logerrx("DHCPv6 packet too short from %s", ctx->sfrom);
-		return;
-	}
-
-	if (ia != NULL)
-		ifp = ia->iface;
-	else {
-		struct cmsghdr *cm;
-		struct in6_pktinfo pi;
-
-		pi.ipi6_ifindex = 0;
-		for (cm = (struct cmsghdr *)CMSG_FIRSTHDR(&ctx->rcvhdr);
-		    cm;
-		    cm = (struct cmsghdr *)CMSG_NXTHDR(&ctx->rcvhdr, cm))
-		{
-			if (cm->cmsg_level != IPPROTO_IPV6)
-				continue;
-			switch(cm->cmsg_type) {
-			case IPV6_PKTINFO:
-				if (cm->cmsg_len == CMSG_LEN(sizeof(pi)))
-					memcpy(&pi, CMSG_DATA(cm), sizeof(pi));
-				break;
-			}
-		}
-		if (pi.ipi6_ifindex == 0) {
-			logerrx("DHCPv6 reply did not contain index from %s",
-			    ctx->sfrom);
-			return;
-		}
-
-		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-			if (ifp->active &&
-			    ifp->index == (unsigned int)pi.ipi6_ifindex &&
-			    ifp->options->options & DHCPCD_DHCP6)
-				break;
-		}
-		if (ifp == NULL) {
-			logdebugx("DHCPv6 reply for unexpected interface from %s",
-			    ctx->sfrom);
-			return;
-		}
-	}
-
+	ctx = ifp->ctx;
 	state = D6_STATE(ifp);
 	if (state == NULL || state->send == NULL) {
 		logdebug("%s: DHCPv6 reply received but not running",
@@ -3160,7 +3111,6 @@ dhcp6_recv(struct dhcpcd_ctx *ctx, struct ipv6_addr *ia)
 		return;
 	}
 
-	r = (struct dhcp6_message *)ctx->rcvhdr.msg_iov[0].iov_base;
 	/* We're already bound and this message is for another machine */
 	/* XXX DELEGATED? */
 	if (r->type != DHCP6_RECONFIGURE &&
@@ -3171,32 +3121,8 @@ dhcp6_recv(struct dhcpcd_ctx *ctx, struct ipv6_addr *ia)
 		return;
 	}
 
-	if (r->type != DHCP6_RECONFIGURE &&
-	    (r->xid[0] != state->send->xid[0] ||
-	    r->xid[1] != state->send->xid[1] ||
-	    r->xid[2] != state->send->xid[2]))
-	{
-		logdebugx("%s: wrong xid 0x%02x%02x%02x"
-		    " (expecting 0x%02x%02x%02x) from %s",
-		    ifp->name,
-		    r->xid[0], r->xid[1], r->xid[2],
-		    state->send->xid[0], state->send->xid[1],
-		    state->send->xid[2],
-		    ctx->sfrom);
-		return;
-	}
-
 	if (dhcp6_findmoption(r, len, D6_OPTION_SERVERID, NULL) == NULL) {
 		logdebugx("%s: no DHCPv6 server ID from %s",
-		    ifp->name, ctx->sfrom);
-		return;
-	}
-
-	o = dhcp6_findmoption(r, len, D6_OPTION_CLIENTID, &ol);
-	if (o == NULL || ol != ctx->duid_len ||
-	    memcmp(o, ctx->duid, ol) != 0)
-	{
-		logdebugx("%s: incorrect client ID from %s",
 		    ifp->name, ctx->sfrom);
 		return;
 	}
@@ -3414,8 +3340,11 @@ dhcp6_recv(struct dhcpcd_ctx *ctx, struct ipv6_addr *ia)
 	memcpy(state->recv, r, len);
 	state->recv_len = len;
 
-	switch(r->type) {
+	switch (r->type) {
 	case DHCP6_ADVERTISE:
+	{
+		struct ipv6_addr *ia;
+
 		if (state->state == DH6S_REQUEST) /* rapid commit */
 			break;
 		TAILQ_FOREACH(ia, &state->addrs, next) {
@@ -3435,8 +3364,147 @@ dhcp6_recv(struct dhcpcd_ctx *ctx, struct ipv6_addr *ia)
 		dhcp6_startrequest(ifp);
 		return;
 	}
+	}
 
 	dhcp6_bind(ifp, op);
+}
+
+static void
+dhcp6_recv(struct dhcpcd_ctx *ctx, struct ipv6_addr *ia)
+{
+	int s;
+	size_t len;
+	ssize_t bytes;
+	struct interface *ifp;
+	struct dhcp6_message *r;
+	const struct dhcp6_state *state;
+	uint8_t *o;
+	uint16_t ol;
+
+	ctx->rcvhdr.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo));
+	s = ia != NULL ? ia->dhcp6_fd : ctx->dhcp6_fd;
+	bytes = recvmsg_realloc(s, &ctx->rcvhdr, 0);
+	if (bytes == -1) {
+		logerr("%s: recvmsg_realloc", __func__);
+		close(s);
+		eloop_event_delete(ctx->eloop, s);
+		if (ia != NULL)
+			ia->dhcp6_fd = -1;
+		else
+			ctx->dhcp6_fd = -1;
+		eloop_exit(ctx->eloop, 1);
+		return;
+	}
+	len = (size_t)bytes;
+	ctx->sfrom = inet_ntop(AF_INET6, &ctx->from.sin6_addr,
+	    ctx->ntopbuf, sizeof(ctx->ntopbuf));
+	if (len < sizeof(struct dhcp6_message)) {
+		logerrx("DHCPv6 packet too short from %s", ctx->sfrom);
+		return;
+	}
+
+	if (ia != NULL)
+		ifp = ia->iface;
+	else {
+		struct cmsghdr *cm;
+		struct in6_pktinfo pi;
+
+		pi.ipi6_ifindex = 0;
+		for (cm = (struct cmsghdr *)CMSG_FIRSTHDR(&ctx->rcvhdr);
+		    cm;
+		    cm = (struct cmsghdr *)CMSG_NXTHDR(&ctx->rcvhdr, cm))
+		{
+			if (cm->cmsg_level != IPPROTO_IPV6)
+				continue;
+			switch(cm->cmsg_type) {
+			case IPV6_PKTINFO:
+				if (cm->cmsg_len == CMSG_LEN(sizeof(pi)))
+					memcpy(&pi, CMSG_DATA(cm), sizeof(pi));
+				break;
+			}
+		}
+		if (pi.ipi6_ifindex == 0) {
+			logerrx("DHCPv6 reply did not contain index from %s",
+			    ctx->sfrom);
+			return;
+		}
+
+		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+			if (ifp->index == (unsigned int)pi.ipi6_ifindex)
+				break;
+		}
+		if (ifp == NULL) {
+			logerrx("DHCPv6 reply for unexpected interface from %s",
+			    ctx->sfrom);
+			return;
+		}
+	}
+
+	r = (struct dhcp6_message *)ctx->rcvhdr.msg_iov[0].iov_base;
+	o = dhcp6_findmoption(r, len, D6_OPTION_CLIENTID, &ol);
+	if (o == NULL || ol != ctx->duid_len ||
+	    memcmp(o, ctx->duid, ol) != 0)
+	{
+		logdebugx("%s: incorrect client ID from %s",
+		    ifp->name, ctx->sfrom);
+		return;
+	}
+
+	if (dhcp6_findmoption(r, len, D6_OPTION_SERVERID, NULL) == NULL) {
+		logdebugx("%s: no DHCPv6 server ID from %s",
+		    ifp->name, ctx->sfrom);
+		return;
+	}
+
+	if (r->type == DHCP6_RECONFIGURE) {
+		logdebugx("%s: RECONFIGURE recv from %s,"
+		    " sending to all interfaces",
+		    ifp->name, ctx->sfrom);
+		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+			if (D6_CSTATE(ifp) != NULL)
+				dhcp6_recvif(ifp, r, len);
+		}
+		return;
+	}
+
+	state = D6_CSTATE(ifp);
+	if (state == NULL ||
+	    r->xid[0] != state->send->xid[0] ||
+	    r->xid[1] != state->send->xid[1] ||
+	    r->xid[2] != state->send->xid[2])
+	{
+		struct interface *ifp1;
+		const struct dhcp6_state *state1;
+
+		/* Find an interface with a matching xid. */
+		TAILQ_FOREACH(ifp1, ctx->ifaces, next) {
+			state1 = D6_CSTATE(ifp1);
+			if (state1 == NULL || state1->send == NULL)
+				continue;
+			if (r->xid[0] == state1->send->xid[0] &&
+			    r->xid[1] == state1->send->xid[1] &&
+			    r->xid[2] == state1->send->xid[2])
+				break;
+		}
+
+		if (ifp1 == NULL) {
+			if (state != NULL)
+				logdebugx("%s: wrong xid 0x%02x%02x%02x"
+				    " (expecting 0x%02x%02x%02x) from %s",
+				    ifp->name,
+				    r->xid[0], r->xid[1], r->xid[2],
+				    state->send->xid[0],
+				    state->send->xid[1],
+				    state->send->xid[2],
+				    ctx->sfrom);
+			return;
+		}
+		logdebugx("%s: redirecting DHCP6 message to %s",
+		    ifp->name, ifp1->name);
+		ifp = ifp1;
+	}
+
+	dhcp6_recvif(ifp, r, len);
 }
 
 static void
@@ -3447,7 +3515,6 @@ dhcp6_recvaddr(void *arg)
 	dhcp6_recv(ia->iface->ctx, ia);
 }
 
-/* ARGSUSED */
 static void
 dhcp6_recvctx(void *arg)
 {
