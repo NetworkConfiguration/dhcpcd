@@ -1518,6 +1518,8 @@ static void
 dhcp_new_xid(struct interface *ifp)
 {
 	struct dhcp_state *state;
+	const struct interface *ifp1;
+	const struct dhcp_state *state1;
 
 	state = D_STATE(ifp);
 	if (ifp->options->options & DHCPCD_XID_HWADDR &&
@@ -1526,8 +1528,30 @@ dhcp_new_xid(struct interface *ifp)
 		memcpy(&state->xid,
 		    (ifp->hwaddr + ifp->hwlen) - sizeof(state->xid),
 		    sizeof(state->xid));
-	else
+	else {
+again:
 		state->xid = arc4random();
+	}
+
+	/* Ensure it's unique */
+	TAILQ_FOREACH(ifp1, ifp->ctx->ifaces, next) {
+		if (ifp == ifp1)
+			continue;
+		if ((state1 = D_CSTATE(ifp1)) == NULL)
+			continue;
+		if (state1->xid == state->xid)
+			break;
+	}
+	if (ifp1 != NULL) {
+		if (ifp->options->options & DHCPCD_XID_HWADDR &&
+		    ifp->hwlen >= sizeof(state->xid))
+		{
+			logerrx("%s: duplicate xid on %s",
+			    ifp->name, ifp1->name);
+			    return;
+		}
+		goto again;
+	}
 
 	/* We can't do this when sharing leases across interfaes */
 #if 0
