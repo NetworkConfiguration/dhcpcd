@@ -392,6 +392,8 @@ dhcp6_updateelapsed(struct interface *ifp, struct dhcp6_message *m, size_t len)
 static void
 dhcp6_newxid(const struct interface *ifp, struct dhcp6_message *m)
 {
+	const struct interface *ifp1;
+	const struct dhcp6_state *state1;
 	uint32_t xid;
 
 	if (ifp->options->options & DHCPCD_XID_HWADDR &&
@@ -399,12 +401,38 @@ dhcp6_newxid(const struct interface *ifp, struct dhcp6_message *m)
 		/* The lower bits are probably more unique on the network */
 		memcpy(&xid, (ifp->hwaddr + ifp->hwlen) - sizeof(xid),
 		    sizeof(xid));
-	else
+	else {
+again:
 		xid = arc4random();
+	}
 
 	m->xid[0] = (xid >> 16) & 0xff;
 	m->xid[1] = (xid >> 8) & 0xff;
 	m->xid[2] = xid & 0xff;
+
+	/* Ensure it's unique */
+	TAILQ_FOREACH(ifp1, ifp->ctx->ifaces, next) {
+		if (ifp == ifp1)
+			continue;
+		if ((state1 = D6_CSTATE(ifp1)) == NULL)
+			continue;
+		if (state1->send != NULL &&
+		    state1->send->xid[0] == m->xid[0] &&
+		    state1->send->xid[1] == m->xid[1] &&
+		    state1->send->xid[2] == m->xid[2])
+			break;
+	}
+
+	if (ifp1 != NULL) {
+		if (ifp->options->options & DHCPCD_XID_HWADDR &&
+		    ifp->hwlen >= sizeof(xid))
+		{
+			logerrx("%s: duplicate xid on %s",
+			    ifp->name, ifp1->name);
+			    return;
+		}
+		goto again;
+	}
 }
 
 #ifndef SMALL
