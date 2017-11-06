@@ -1376,8 +1376,10 @@ bpf_open(struct interface *ifp, int (*filter)(struct interface *, int))
 	return s;
 
 eexit:
-	free(state->buffer);
-	state->buffer = NULL;
+	if (state != NULL) {
+		free(state->buffer);
+		state->buffer = NULL;
+	}
 	close(s);
 	return -1;
 }
