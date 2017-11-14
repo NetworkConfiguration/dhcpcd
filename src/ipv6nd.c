@@ -336,6 +336,8 @@ ipv6nd_expire(struct interface *ifp, uint32_t seconds)
 {
 	struct ra *rap;
 	struct timespec now;
+	uint32_t vltime = seconds;
+	uint32_t pltime = seconds / 2;
 
 	if (ifp->ctx->ra_routers == NULL)
 		return;
@@ -347,13 +349,18 @@ ipv6nd_expire(struct interface *ifp, uint32_t seconds)
 			rap->acquired = now;
 			rap->expired = seconds ? 0 : 1;
 			if (seconds) {
-				struct ipv6_addr *ap;
+				struct ipv6_addr *ia;
 
 				rap->lifetime = seconds;
-				TAILQ_FOREACH(ap, &rap->addrs, next) {
-					if (ap->prefix_vltime) {
-						ap->prefix_vltime = seconds;
-						ap->prefix_pltime = seconds / 2;
+				TAILQ_FOREACH(ia, &rap->addrs, next) {
+					if (ia->prefix_pltime > pltime ||
+					    ia->prefix_vltime > vltime)
+					{
+						ia->acquired = now;
+						if (ia->prefix_pltime != 0)
+							ia->prefix_pltime =
+							    pltime;
+						ia->prefix_vltime = vltime;
 					}
 				}
 				ipv6_addaddrs(&rap->addrs);
