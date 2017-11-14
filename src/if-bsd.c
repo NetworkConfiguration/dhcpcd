@@ -1164,6 +1164,12 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 		}
 #endif
 
+#ifdef __KAME__
+		if (IN6_IS_ADDR_LINKLOCAL(&addr6))
+			/* Remove the scope from the address */
+			addr6.s6_addr[2] = addr6.s6_addr[3] = '\0';
+#endif
+
 		ipv6_handleifa(ctx, ifam->ifam_type, NULL,
 		    ifp->name, &addr6, ipv6_prefixlen(&mask6), addrflags);
 		break;
