@@ -3673,28 +3673,47 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 	struct dhcp6_state *state;
 
 	state = D6_STATE(ifp);
-	if (state) {
-		if (state->state == DH6S_INFORMED &&
-		    init_state == DH6S_INFORM)
-		{
-			dhcp6_startinform(ifp);
-			return 0;
-		}
-		if (init_state == DH6S_INIT &&
-		    ifp->options->options & DHCPCD_DHCP6 &&
-		    (state->state == DH6S_INFORM ||
-		    state->state == DH6S_INFORMED ||
-		    state->state == DH6S_DELEGATED))
-		{
-			/* Change from stateless to stateful */
+	if (state != NULL) {
+		switch (init_state) {
+		case DH6S_INIT:
+			/* This should only happen on OS's where we keep state
+			 * on carrier down, such as NetBSD-8. */
 			goto gogogo;
+		case DH6S_INFORM:
+			if (state->state == DH6S_INFORMED)
+				dhcp6_startinform(ifp);
+			break;
+		case DH6S_REQUEST:
+			if (ifp->options->options & DHCPCD_DHCP6 &&
+			    (state->state == DH6S_INFORM ||
+			     state->state == DH6S_INFORMED ||
+			     state->state == DH6S_DELEGATED))
+			{
+				/* Change from stateless to stateful */
+				init_state = DH6S_INIT;
+				goto gogogo;
+			}
+			break;
+		case DH6S_CONFIRM:
+			/* This should only happen on OS's where we keep state
+			 * on carrier down, such as NetBSD-8. */
+			init_state = DH6S_INIT;
+			goto gogogo;
+		default:
+			/* Not possible, but sushes some compiler warnings. */
+			break;
 		}
-		/* We're already running DHCP6 */
-		/* XXX: What if the managed flag vanishes from all RA? */
-#ifndef SMALL
-		dhcp6_activateinterfaces(ifp);
-#endif
 		return 0;
+	} else {
+		switch (init_state) {
+		case DH6S_CONFIRM:
+			/* No DHCPv6 config, no existing state
+			 * so nothing to do. */
+			return 0;
+		default:
+			init_state = DH6S_INIT;
+			break;
+		}
 	}
 
 	if (!(ifp->options->options & DHCPCD_DHCP6))

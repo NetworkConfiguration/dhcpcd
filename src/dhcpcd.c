@@ -871,37 +871,22 @@ dhcpcd_startinterface(void *arg)
 				ipv6nd_startrs(ifp);
 		}
 
-		if (ifo->options & DHCPCD_DHCP6)
+
+		if (ifo->options & DHCPCD_DHCP6) {
 			dhcp6_find_delegates(ifp);
 
-		if ((!(ifo->options & DHCPCD_IPV6RS) ||
-		    ifo->options & (DHCPCD_IA_FORCED | DHCPCD_INFORM6)) &&
-		    ifp->active == IF_ACTIVE_USER)
-		{
-			ssize_t nolease;
+			if (ifp->active == IF_ACTIVE_USER) {
+				enum DH6S d6_state;
 
-			if (ifo->options & DHCPCD_IA_FORCED)
-				nolease = dhcp6_start(ifp, DH6S_INIT);
-			else if (ifo->options & DHCPCD_INFORM6)
-				nolease = dhcp6_start(ifp, DH6S_INFORM);
-			else {
-				nolease = 0;
-				/* Enabling the below doesn't really make
-				 * sense as there is currently no standard
-				 * to push routes via DHCPv6.
-				 * (There is an expired working draft,
-				 * maybe abandoned?)
-				 * You can also get it to work by forcing
-				 * an IA as shown above. */
-#if 0
-				/* With no RS or delegates we might
-				 * as well try and solicit a DHCPv6 address */
-				if (nolease == 0)
-					nolease = dhcp6_start(ifp, DH6S_INIT);
-#endif
+				if (ifo->options & DHCPCD_IA_FORCED)
+					d6_state = DH6S_INIT;
+				else if (ifo->options & DHCPCD_INFORM6)
+					d6_state = DH6S_INFORM;
+				else
+					d6_state = DH6S_CONFIRM;
+				if (dhcp6_start(ifp, d6_state) == -1)
+					logerr("%s: dhcp6_start", ifp->name);
 			}
-			if (nolease == -1)
-			        logerr("%s: dhcp6_start", ifp->name);
 		}
 	}
 

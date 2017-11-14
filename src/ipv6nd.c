@@ -1095,7 +1095,7 @@ handle_flag:
 #define LOG_DHCP6	logdebug
 #endif
 	if (rap->flags & ND_RA_FLAG_MANAGED) {
-		if (new_data && dhcp6_start(ifp, DH6S_INIT) == -1)
+		if (new_data && dhcp6_start(ifp, DH6S_REQUEST) == -1)
 			LOG_DHCP6("dhcp6_start: %s", ifp->name);
 	} else if (rap->flags & ND_RA_FLAG_OTHER) {
 		if (new_data && dhcp6_start(ifp, DH6S_INFORM) == -1)
