@@ -1587,10 +1587,6 @@ dhcp_openudp(struct interface *ifp)
 	int s;
 	struct sockaddr_in sin;
 	int n;
-	struct dhcp_state *state;
-#ifdef SO_BINDTODEVICE
-	struct ifreq ifr;
-#endif
 
 	if ((s = xsocket(PF_INET, SOCK_DGRAM|SOCK_CLOEXEC, IPPROTO_UDP)) == -1)
 		return -1;
@@ -1598,20 +1594,12 @@ dhcp_openudp(struct interface *ifp)
 	n = 1;
 	if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &n, sizeof(n)) == -1)
 		goto eexit;
-#ifdef SO_BINDTODEVICE
-	if (ifp) {
-		memset(&ifr, 0, sizeof(ifr));
-		strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
-		if (setsockopt(s, SOL_SOCKET, SO_BINDTODEVICE, &ifr,
-		    sizeof(ifr)) == -1)
-		        goto eexit;
-	}
-#endif
 	memset(&sin, 0, sizeof(sin));
 	sin.sin_family = AF_INET;
 	sin.sin_port = htons(BOOTPC);
 	if (ifp) {
-		state = D_STATE(ifp);
+		struct dhcp_state *state = D_STATE(ifp);
+
 		if (state->addr)
 			sin.sin_addr.s_addr = state->addr->addr.s_addr;
 	}
@@ -1694,6 +1682,63 @@ dhcp_makeudppacket(size_t *sz, const uint8_t *data, size_t length,
 	return udpp;
 }
 
+static ssize_t
+dhcp_sendudp(struct interface *ifp, struct in_addr *to, void *data, size_t len)
+{
+	int s;
+	struct msghdr msg;
+	union {
+		struct sockaddr sa;
+		struct sockaddr_in sin;
+	} sto;
+	struct iovec iov[1];
+	ssize_t r;
+#ifdef IP_PKTINFO
+	uint8_t cmsg[CMSG_SPACE(sizeof(struct in_pktinfo))];
+	struct cmsghdr *cm;
+	struct in_pktinfo ipi;
+#endif
+
+	iov[0].iov_base = data;
+	iov[0].iov_len = len;
+
+	memset(&sto, 0, sizeof(sto));
+	sto.sin.sin_family = AF_INET;
+	sto.sin.sin_addr = *to;
+	sto.sin.sin_port = htons(BOOTPS);
+
+	memset(&msg, 0, sizeof(msg));
+	msg.msg_name = (void *)&sto.sa;
+	msg.msg_namelen = sizeof(sto);
+	msg.msg_iov = iov;
+	msg.msg_iovlen = 1;
+
+#ifdef IP_PKTINFO
+	/* Set the outbound interface */
+	msg.msg_control = cmsg;
+	msg.msg_controllen = sizeof(cmsg);
+
+	memset(&ipi, 0, sizeof(ipi));
+	ipi.ipi_ifindex = ifp->index;
+	cm = CMSG_FIRSTHDR(&msg);
+	if (cm == NULL) {
+		errno = ESRCH;
+		return -1;
+	}
+	cm->cmsg_level = IPPROTO_IP;
+	cm->cmsg_type = IP_PKTINFO;
+	cm->cmsg_len = CMSG_LEN(sizeof(ipi));
+	memcpy(CMSG_DATA(cm), &ipi, sizeof(ipi));
+#endif
+
+	s = dhcp_openudp(ifp);
+	if (s == -1)
+		return -1;
+	r = sendmsg(s, &msg, 0);
+	close(s);
+	return r;
+}
+
 static void
 send_message(struct interface *ifp, uint8_t type,
     void (*callback)(void *))
@@ -1738,9 +1783,6 @@ send_message(struct interface *ifp, uint8_t type,
 		    timespec_to_double(&tv));
 	}
 
-	if (dhcp_openbpf(ifp) == -1)
-		return;
-
 	r = make_message(&bootp, ifp, type);
 	if (r == -1)
 		goto fail;
@@ -1750,6 +1792,18 @@ send_message(struct interface *ifp, uint8_t type,
 		to.s_addr = state->lease.server.s_addr;
 	else
 		to.s_addr = INADDR_ANY;
+
+	/* If unicasting, try and void sending by BPF so we don't
+	 * use a L2 broadcast. */
+	if (to.s_addr != INADDR_ANY && to.s_addr != INADDR_BROADCAST) {
+		if (dhcp_sendudp(ifp, &to, bootp, len) != -1)
+			goto out;
+		logerr("%s: dhcp_sendudp", ifp->name);
+	}
+
+	if (dhcp_openbpf(ifp) == -1)
+		goto out;
+
 	udp = dhcp_makeudppacket(&ulen, (uint8_t *)bootp, len, from, to);
 	if (udp == NULL) {
 		logerr("%s: dhcp_makeudppacket", ifp->name);
@@ -1780,6 +1834,8 @@ send_message(struct interface *ifp, uint8_t type,
 			callback = NULL;
 		}
 	}
+
+out:
 	free(bootp);
 
 fail:
