@@ -777,7 +777,8 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 	    (type == DHCP_INFORM || type == DHCP_RELEASE ||
 	    (type == DHCP_REQUEST &&
 	    state->addr->mask.s_addr == lease->mask.s_addr &&
-	    (state->new == NULL || IS_DHCP(state->new)))))
+	    (state->new == NULL || IS_DHCP(state->new)) &&
+	    !(state->added & STATE_FAKE))))
 		bootp->ciaddr = state->addr->addr.s_addr;
 
 	bootp->op = BOOTREQUEST;
@@ -845,6 +846,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 		if (type == DHCP_DECLINE ||
 		    (type == DHCP_REQUEST &&
 		    (state->addr == NULL ||
+		    state->added & STATE_FAKE ||
 		    lease->addr.s_addr != state->addr->addr.s_addr)))
 		{
 			PUT_ADDR(DHO_IPADDRESS, &lease->addr);
@@ -2028,7 +2030,7 @@ dhcp_rebind(void *arg)
 	    ifp->name, lease->leasetime - lease->rebindtime);
 	state->state = DHS_REBIND;
 	eloop_timeout_delete(ifp->ctx->eloop, send_renew, ifp);
-	state->lease.server.s_addr = 0;
+	state->lease.server.s_addr = INADDR_ANY;
 	state->interval = 0;
 	ifp->options->options &= ~(DHCPCD_CSR_WARNED |
 	    DHCPCD_ROUTER_HOST_ROUTE_WARNED);
@@ -2626,7 +2628,7 @@ dhcp_reboot(struct interface *ifp)
 #endif
 
 	dhcp_new_xid(ifp);
-	state->lease.server.s_addr = 0;
+	state->lease.server.s_addr = INADDR_ANY;
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 
 #ifdef IPV4LL
