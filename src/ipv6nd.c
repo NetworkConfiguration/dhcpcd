@@ -286,7 +286,7 @@ ipv6nd_sendrsprobe(void *arg)
 
 	memset(&dst, 0, sizeof(dst));
 	dst.sin6_family = AF_INET6;
-#ifdef SIN6_LEN
+#ifdef HAVE_SA_LEN
 	dst.sin6_len = sizeof(dst);
 #endif
 	dst.sin6_scope_id = ifp->index;
