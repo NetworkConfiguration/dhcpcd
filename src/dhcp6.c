@@ -1099,7 +1099,7 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 	memset(&dst, 0, sizeof(dst));
 	dst.sin6_family = AF_INET6;
 	dst.sin6_port = htons(DHCP6_SERVER_PORT);
-#ifdef SIN6_LEN
+#ifdef HAVE_SA_LEN
 	dst.sin6_len = sizeof(dst);
 #endif
 

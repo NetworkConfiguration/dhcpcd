@@ -1689,10 +1689,7 @@ dhcp_sendudp(struct interface *ifp, struct in_addr *to, void *data, size_t len)
 {
 	int s;
 	struct msghdr msg;
-	union {
-		struct sockaddr sa;
-		struct sockaddr_in sin;
-	} sto;
+	struct sockaddr_in sin;
 	struct iovec iov[1];
 	ssize_t r;
 #ifdef IP_PKTINFO
@@ -1704,14 +1701,17 @@ dhcp_sendudp(struct interface *ifp, struct in_addr *to, void *data, size_t len)
 	iov[0].iov_base = data;
 	iov[0].iov_len = len;
 
-	memset(&sto, 0, sizeof(sto));
-	sto.sin.sin_family = AF_INET;
-	sto.sin.sin_addr = *to;
-	sto.sin.sin_port = htons(BOOTPS);
+	memset(&sin, 0, sizeof(sin));
+	sin.sin_family = AF_INET;
+	sin.sin_addr = *to;
+	sin.sin_port = htons(BOOTPS);
+#ifdef HAVE_SA_LEN
+	sin.sin_len = sizeof(sin);
+#endif
 
 	memset(&msg, 0, sizeof(msg));
-	msg.msg_name = (void *)&sto.sa;
-	msg.msg_namelen = sizeof(sto);
+	msg.msg_name = (void *)&sin;
+	msg.msg_namelen = sizeof(sin);
 	msg.msg_iov = iov;
 	msg.msg_iovlen = 1;
 
