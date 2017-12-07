@@ -3879,16 +3879,18 @@ void
 dhcp6_handleifa(int cmd, struct ipv6_addr *ia)
 {
 	struct dhcp6_state *state;
+	struct interface *ifp = ia->iface;
 
 	/* If not running in master mode, listen to this address */
 	if (cmd == RTM_NEWADDR &&
 	    !(ia->addr_flags & IN6_IFF_NOTUSEABLE) &&
-	    ia->iface->active == IF_ACTIVE_USER &&
-	    !(ia->iface->ctx->options & DHCPCD_MASTER) &&
+	    ifp->active == IF_ACTIVE_USER &&
+	    !(ifp->ctx->options & DHCPCD_MASTER) &&
+	    ifp->options->options & DHCPCD_DHCP6 &&
 	    ia->dhcp6_fd == -1)
 		dhcp6_listen(ia->iface->ctx, ia);
 
-	if ((state = D6_STATE(ia->iface)) != NULL)
+	if ((state = D6_STATE(ifp)) != NULL)
 		ipv6_handleifa_addrs(cmd, &state->addrs, ia);
 }
 
