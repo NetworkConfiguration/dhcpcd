@@ -2405,6 +2405,7 @@ dhcp6_readlease(struct interface *ifp, int validate)
 		return -1;
 	retval = -1;
 	lease = NULL;
+	free(state->new);
 	state->new_len = dhcp_read_lease_fd(fd, (void **)&lease);
 	state->new = lease;
 	if (fd_opened)
@@ -3676,8 +3677,6 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 	if (state != NULL) {
 		switch (init_state) {
 		case DH6S_INIT:
-			/* This should only happen on OS's where we keep state
-			 * on carrier down, such as NetBSD-8. */
 			goto gogogo;
 		case DH6S_INFORM:
 			if (state->state == DH6S_INFORMED)
@@ -3695,8 +3694,6 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 			}
 			break;
 		case DH6S_CONFIRM:
-			/* This should only happen on OS's where we keep state
-			 * on carrier down, such as NetBSD-8. */
 			init_state = DH6S_INIT;
 			goto gogogo;
 		default:
