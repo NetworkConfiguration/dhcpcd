@@ -2385,7 +2385,6 @@ dhcp_arp_address(struct interface *ifp)
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 
 	state = D_STATE(ifp);
-	state->state = DHS_PROBE;
 	addr.s_addr = state->offer->yiaddr == INADDR_ANY ?
 	    state->offer->ciaddr : state->offer->yiaddr;
 	/* If the interface already has the address configured
@@ -2398,6 +2397,7 @@ dhcp_arp_address(struct interface *ifp)
 
 #ifdef IN_IFF_TENTATIVE
 	if (ia == NULL || ia->addr_flags & IN_IFF_NOTUSEABLE) {
+		state->state = DHS_PROBE;
 		if (ia == NULL) {
 			struct dhcp_lease l;
 
@@ -2413,6 +2413,7 @@ dhcp_arp_address(struct interface *ifp)
 	if (ifp->options->options & DHCPCD_ARP && ia == NULL) {
 		struct dhcp_lease l;
 
+		state->state = DHS_PROBE;
 		get_lease(ifp, &l, state->offer, state->offer_len);
 		loginfox("%s: probing address %s/%d",
 		    ifp->name, inet_ntoa(l.addr), inet_ntocidr(l.mask));
