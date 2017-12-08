@@ -2051,7 +2051,7 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			a->flags &= ~(IPV6_AF_STALE |
 			              IPV6_AF_EXTENDED |
 			              IPV6_AF_REQUEST);
-			if (a->prefix_vltime != ntohl(pdp.vltime))
+			if (a->prefix_vltime != pdp.vltime)
 				a->flags |= IPV6_AF_NEW;
 		}
 
