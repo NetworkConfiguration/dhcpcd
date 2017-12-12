@@ -438,7 +438,7 @@ configure_interface1(struct interface *ifp)
 		    ~(DHCPCD_IPV6RS | DHCPCD_DHCP6 | DHCPCD_WAITIP6);
 
 	/* We want to disable kernel interface RA as early as possible. */
-	if (ifo->options & DHCPCD_IPV6RS &&
+	if (ifp->active == IF_ACTIVE_USER &&
 	    !(ifp->ctx->options & DHCPCD_DUMPLEASE))
 	{
 		int ra_global, ra_iface;
