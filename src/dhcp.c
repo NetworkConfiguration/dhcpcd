@@ -2076,7 +2076,7 @@ dhcp_arp_probed(struct arp_state *astate)
 
 	logdebugx("%s: DAD completed for %s",
 	    ifp->name, inet_ntoa(astate->addr));
-	if (state->state != DHS_INFORM)
+	if (!(ifo->options & DHCPCD_INFORM))
 		dhcp_bind(ifp);
 #ifndef IN_IFF_TENTATIVE
 	else {
