@@ -149,7 +149,7 @@ main(int argc, char **argv)
 	if (nactive > npipes)
 		nactive = npipes;
 
-	pipes = malloc(sizeof(*p) * npipes);
+	pipes = calloc(npipes, sizeof(*p));
 	if (pipes == NULL)
 		err(EXIT_FAILURE, "malloc");
 
