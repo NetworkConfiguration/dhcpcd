@@ -575,6 +575,7 @@ eloop_q_timeout_delete(struct eloop *eloop, int queue,
 
 	assert(eloop != NULL);
 
+        //Piers: Delete timeout if it matches OR is called with NULL
 	TAILQ_FOREACH_SAFE(t, &eloop->timeouts, next, tt) {
 		if ((queue == 0 || t->queue == queue) &&
 		    t->arg == arg &&

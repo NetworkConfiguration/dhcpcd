@@ -115,6 +115,7 @@
 #define DHCPCD_INITIAL_DELAY		(1ULL << 58)
 #define DHCPCD_PRINT_PIDFILE		(1ULL << 59)
 #define DHCPCD_ONESHOT			(1ULL << 60)
+#define DHCPCD_DNA			(1ULL << 61)
 
 #define DHCPCD_NODROP	(DHCPCD_EXITING | DHCPCD_PERSISTENT)
 
@@ -195,7 +196,7 @@ struct if_options {
 	in_addr_t *blacklist;
 	size_t whitelist_len;
 	in_addr_t *whitelist;
-	size_t arping_len;
+	ssize_t arping_len;
 	in_addr_t *arping;
 	char *fallback;
 
@@ -215,6 +216,11 @@ struct if_options {
 	size_t vivso_override_len;
 
 	struct auth auth;
+
+	int dna_ord;
+	int dna_dum;
+	int dna_pran;
+	char* dna_gurl;
 };
 
 struct if_options *default_config(struct dhcpcd_ctx *);

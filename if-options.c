@@ -101,6 +101,11 @@
 #define O_NODELAY		O_BASE + 44
 #define O_INFORM6		O_BASE + 45
 #define O_LASTLEASE_EXTEND	O_BASE + 46
+#define O_DNA           	O_BASE + 47
+#define O_DNA_ORD           	O_BASE + 48
+#define O_DNA_DUM           	O_BASE + 49
+#define O_DNA_PRAN           	O_BASE + 50
+#define O_DNA_GURL           	O_BASE + 51
 
 const struct option cf_options[] = {
 	{"background",      no_argument,       NULL, 'b'},
@@ -200,6 +205,11 @@ const struct option cf_options[] = {
 	{"nodelay",         no_argument,       NULL, O_NODELAY},
 	{"noup",            no_argument,       NULL, O_NOUP},
 	{"lastleaseextend", no_argument,       NULL, O_LASTLEASE_EXTEND},
+	{"dna",             no_argument,       NULL, O_DNA},
+	{"dna_random",      required_argument, NULL, O_DNA_ORD},
+	{"dna_dummy",       required_argument, NULL, O_DNA_DUM},
+	{"dna_preanalysis", required_argument, NULL, O_DNA_PRAN},
+	{"dna_geourl",      required_argument, NULL, O_DNA_GURL},
 	{NULL,              0,                 NULL, '\0'}
 };
 
@@ -933,7 +943,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		if (ifname == NULL)
 			ctx->ifav = splitv(ctx, &ctx->ifac, ctx->ifav, arg);
 		break;
-	case 'A':
+	case 'A': /* noarp */
 		ifo->options &= ~DHCPCD_ARP;
 		/* IPv4LL requires ARP */
 		ifo->options &= ~DHCPCD_IPV4LL;
@@ -1252,7 +1262,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			if (parse_addr(ctx, &addr, NULL, arg) != 0)
 				return -1;
 			naddr = realloc(ifo->arping,
-			    sizeof(in_addr_t) * (ifo->arping_len + 1));
+			    sizeof(in_addr_t) * ((size_t)ifo->arping_len + 1));
 			if (naddr == NULL) {
 				logger(ctx, LOG_ERR, "%s: %m", __func__);
 				return -1;
@@ -2133,6 +2143,42 @@ err_sla:
 	case O_LASTLEASE_EXTEND:
 		ifo->options |= DHCPCD_LASTLEASE | DHCPCD_LASTLEASE_EXTEND;
 		break;
+	case O_DNA:
+		ifo->options |= DHCPCD_DNA;
+		break;
+	case O_DNA_ORD:
+		ARG_REQUIRED;
+		ifo->dna_ord = (int)strtoi(arg, NULL, 0, 0, INT32_MAX, &e);
+		if (e) {
+			logger(ctx, LOG_ERR, "failed to convert DNA order %s", arg);
+			return -1;
+		}
+		break;
+	case O_DNA_DUM:
+		ARG_REQUIRED;
+		ifo->dna_dum = (int)strtoi(arg, NULL, 0, -1, INT32_MAX, &e);
+		if (e) {
+			logger(ctx, LOG_ERR, "failed to convert DNA dummy %s", arg);
+			return -1;
+		}
+		break;
+	case O_DNA_PRAN:
+		ARG_REQUIRED;
+		ifo->dna_pran = (int)strtoi(arg, NULL, 0, 0, INT32_MAX, &e);
+		if (e) {
+			logger(ctx, LOG_ERR, "failed to convert DNA preanalysis %s", arg);
+			return -1;
+		}
+		break;
+	case O_DNA_GURL:
+		ARG_REQUIRED;
+		ifo->dna_gurl = (char*)malloc(strlen(arg)*sizeof(char));
+		if (ifo->dna_gurl == NULL) {
+			logger(ctx, LOG_ERR, "%s: Failed Malloc for GeoURL %m", __func__);
+			return -1;
+		}
+                strcpy(ifo->dna_gurl, arg);
+		break;
 	default:
 		return 0;
 	}
@@ -2420,6 +2466,7 @@ read_config(struct dhcpcd_ctx *ctx,
 
 	/* Parse our options file */
 	fp = fopen(ctx->cffile, "r");
+        logger(ctx, LOG_DEBUG, "Using Config file: %s", ctx->cffile);
 	if (fp == NULL) {
 		if (strcmp(ctx->cffile, CONFIG))
 			logger(ctx, LOG_ERR, "fopen `%s': %m", ctx->cffile);

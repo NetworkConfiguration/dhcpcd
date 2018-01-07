@@ -957,7 +957,7 @@ failed1:
 
 ssize_t
 if_sendraw(const struct interface *cifp, int fd, __unused uint16_t protocol,
-    const void *data, size_t len)
+    const void *data, size_t len, const unsigned char *hwaddr)
 {
 	struct dl_if		*di;
 	int			r;
@@ -971,7 +971,7 @@ if_sendraw(const struct interface *cifp, int fd, __unused uint16_t protocol,
 
 ssize_t
 if_readraw(struct interface *ifp, int fd,
-    void *data, size_t len, int *flags)
+    void *data, size_t len, int *flags, unsigned char *hwaddr)
 {
 	struct dl_if		*di;
 	int			r;

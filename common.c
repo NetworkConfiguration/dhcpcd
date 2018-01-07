@@ -185,6 +185,13 @@ logger(struct dhcpcd_ctx *ctx, int pri, const char *fmt, ...)
 	if (ctx && ctx->options & (DHCPCD_DUMPLEASE | DHCPCD_TEST))
 		goto out;
 
+		if (pri < LOG_DEBUG || (ctx->options & DHCPCD_DEBUG)) {
+			struct timeval tv;
+			if (gettimeofday(&tv, NULL) != -1) {
+				fprintf(stdout, "%ld.%ld:", tv.tv_sec,tv.tv_usec);
+			}
+                }
+
 	if (ctx && ctx->log_fd != -1) {
 		if (pri < LOG_DEBUG || (ctx->options & DHCPCD_DEBUG)) {
 			struct timeval tv;

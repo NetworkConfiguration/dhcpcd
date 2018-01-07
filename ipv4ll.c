@@ -244,6 +244,12 @@ ipv4ll_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 	ifp = astate->iface;
 	state = IPV4LL_STATE(ifp);
 	assert(state != NULL);
+	if (state->addr == NULL) {
+            logger(ifp->ctx, LOG_WARNING,
+                "%s: IPv4LL %d No addr configured",
+                ifp->name, DEFEND_INTERVAL);
+            return;
+        }
 	assert(state->addr != NULL);
 
 	fail = 0;
@@ -283,7 +289,7 @@ ipv4ll_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 			    "%s: IPv4LL %d second defence failed for %s",
 			    ifp->name, DEFEND_INTERVAL, state->addr->saddr);
 		else if (arp_request(ifp,
-		    state->addr->addr.s_addr, state->addr->addr.s_addr) == -1)
+		    state->addr->addr.s_addr, state->addr->addr.s_addr, NULL) == -1)
 			logger(ifp->ctx, LOG_ERR,
 			    "%s: arp_request: %m", __func__);
 		else {
@@ -369,7 +375,7 @@ ipv4ll_start(void *arg)
 		setstate(ifp->ctx->randomstate);
 	}
 
-	if ((astate = arp_new(ifp, NULL)) == NULL)
+	if ((astate = arp_new(ifp, NULL, NULL, NULL)) == NULL)
 		return;
 
 	state->arp = astate;

@@ -56,7 +56,7 @@
 	(sizeof(struct arphdr) + (2 * sizeof(uint32_t)) + (2 * HWADDR_LEN))
 
 ssize_t
-arp_request(const struct interface *ifp, in_addr_t sip, in_addr_t tip)
+arp_request(const struct interface *ifp, in_addr_t sip, in_addr_t tip, const unsigned char *hwaddr)
 {
 	uint8_t arp_buffer[ARP_LEN];
 	struct arphdr ar;
@@ -85,13 +85,13 @@ arp_request(const struct interface *ifp, in_addr_t sip, in_addr_t tip)
 #define ZERO(l)		CHECK(memset, 0, l)
 
 	APPEND(&ar, sizeof(ar));
-	APPEND(ifp->hwaddr, ifp->hwlen);
-	APPEND(&sip, sizeof(sip));
-	ZERO(ifp->hwlen);
-	APPEND(&tip, sizeof(tip));
+	APPEND(ifp->hwaddr, ifp->hwlen); // Piers: Sender HW address (SHA)
+	APPEND(&sip, sizeof(sip));  // Sender Protocol (IP) address (SPA)
+	ZERO(ifp->hwlen);           // Target HW addr (THA) [0: Ignored in Request]
+	APPEND(&tip, sizeof(tip));  // Target Protocol (IP) addr (TPA)
 
 	state = ARP_CSTATE(ifp);
-	return if_sendraw(ifp, state->fd, ETHERTYPE_ARP, arp_buffer, len);
+	return if_sendraw(ifp, state->fd, ETHERTYPE_ARP, arp_buffer, len, hwaddr);
 
 eexit:
 	errno = ENOBUFS;
@@ -134,7 +134,7 @@ arp_packet(void *arg)
 
 	state = ARP_STATE(ifp);
 	flags = 0;
-	bytes = if_readraw(ifp, state->fd, buf, sizeof(buf), &flags);
+	bytes = if_readraw(ifp, state->fd, buf, sizeof(buf), &flags, NULL);
 	if (bytes == -1) {
 		logger(ifp->ctx, LOG_ERR,
 		    "%s: arp if_readrawpacket: %m", ifp->name);
@@ -174,7 +174,7 @@ arp_packet(void *arg)
 			break;
 	}
 	if (ifn) {
-#if 0
+#if 1
 		logger(ifp->ctx, LOG_DEBUG,
 		    "%s: ignoring ARP from self", ifp->name);
 #endif
@@ -188,9 +188,12 @@ arp_packet(void *arg)
 
 	/* Run the conflicts */
 	TAILQ_FOREACH_SAFE(astate, &state->arp_states, next, astaten) {
+		char hwaddr_buf[HWADDR_LEN * 3];
+//		logger(ifp->ctx, LOG_DEBUG, "%s: arp_packet() Looping sip: %s SHA: %s ", ifp->name, inet_ntoa(arm.sip), hwaddr_ntoa(hw_s, ar.ar_hln, hwaddr_buf, sizeof(hwaddr_buf)));
 		if (astate->conflicted_cb)
 			astate->conflicted_cb(astate, &arm);
 	}
+//	logger(ifp->ctx, LOG_DEBUG, "%s: arp_packet() Looped", ifp->name);
 }
 
 int
@@ -241,7 +244,7 @@ arp_announce1(void *arg)
 		    "%s: ARP announcing %s (%d of %d)",
 		    ifp->name, inet_ntoa(astate->addr),
 		    astate->claims, ANNOUNCE_NUM);
-	if (arp_request(ifp, astate->addr.s_addr, astate->addr.s_addr) == -1)
+	if (arp_request(ifp, astate->addr.s_addr, astate->addr.s_addr, NULL) == -1)
 		logger(ifp->ctx, LOG_ERR, "send_arp: %m");
 	eloop_timeout_add_sec(ifp->ctx->eloop, ANNOUNCE_WAIT,
 	    astate->claims < ANNOUNCE_NUM ? arp_announce1 : arp_announced,
@@ -266,7 +269,8 @@ arp_probed(void *arg)
 {
 	struct arp_state *astate = arg;
 
-	astate->probed_cb(astate);
+        if (astate->probed_cb)
+	    astate->probed_cb(astate);
 }
 
 static void
@@ -287,13 +291,24 @@ arp_probe1(void *arg)
 		tv.tv_nsec = 0;
 		eloop_timeout_add_tv(ifp->ctx->eloop, &tv, arp_probed, astate);
 	}
-	logger(ifp->ctx, LOG_DEBUG,
-	    "%s: ARP probing %s (%d of %d), next in %0.1f seconds",
-	    ifp->name, inet_ntoa(astate->addr),
-	    astate->probes ? astate->probes : PROBE_NUM, PROBE_NUM,
-	    timespec_to_double(&tv));
-	if (arp_request(ifp, 0, astate->addr.s_addr) == -1)
-		logger(ifp->ctx, LOG_ERR, "send_arp: %m");
+	if (astate->tipaddr.s_addr) {
+            logger(ifp->ctx, LOG_DEBUG,
+                "%s: DNA probing %s (%d of %d), next in %0.1f seconds",
+                ifp->name, inet_ntoa(astate->addr),
+                astate->probes ? astate->probes : PROBE_NUM, PROBE_NUM,
+                timespec_to_double(&tv));
+	    if (arp_request(ifp, astate->addr.s_addr, astate->tipaddr.s_addr,
+                        astate->hwaddr) == -1)
+		logger(ifp->ctx, LOG_ERR, "send_dna: %m");
+        } else {
+            logger(ifp->ctx, LOG_DEBUG,
+                "%s: ARP probing %s (%d of %d), next in %0.1f seconds",
+                ifp->name, inet_ntoa(astate->addr),
+                astate->probes ? astate->probes : PROBE_NUM, PROBE_NUM,
+                timespec_to_double(&tv));
+            if (arp_request(ifp, 0, astate->addr.s_addr, NULL) == -1)
+                logger(ifp->ctx, LOG_ERR, "send_arp: %m");
+        }
 }
 
 void
@@ -329,7 +344,7 @@ out:
 }
 
 struct arp_state *
-arp_new(struct interface *ifp, const struct in_addr *addr)
+arp_new(struct interface *ifp, const struct in_addr *addr, const unsigned char *hwaddr, const struct in_addr *tipaddr)
 {
 	struct iarp_state *state;
 	struct arp_state *astate;
@@ -344,7 +359,7 @@ arp_new(struct interface *ifp, const struct in_addr *addr)
 		state->fd = -1;
 		TAILQ_INIT(&state->arp_states);
 	} else {
-		if (addr && (astate = arp_find(ifp, addr)))
+		if (addr && (astate = arp_find(ifp, addr)) && !tipaddr)
 			return astate;
 	}
 
@@ -355,6 +370,10 @@ arp_new(struct interface *ifp, const struct in_addr *addr)
 	astate->iface = ifp;
 	if (addr)
 		astate->addr = *addr;
+	if (tipaddr)
+		astate->tipaddr = *tipaddr;
+	if (hwaddr)
+		memcpy(astate->hwaddr, hwaddr, ifp->hwlen);
 	state = ARP_STATE(ifp);
 	TAILQ_INSERT_TAIL(&state->arp_states, astate, next);
 	return astate;
@@ -391,6 +410,24 @@ arp_free(struct arp_state *astate)
 			if_closeraw(ifp, state->fd);
 			free(state);
 			ifp->if_data[IF_DATA_ARP] = NULL;
+		}
+	}
+}
+
+void
+arp_free_dna_but1(struct interface *ifp, struct bootp *bootp)
+{
+	struct iarp_state *state;
+
+	if ((state = ARP_STATE(ifp)) != NULL) {
+		struct arp_state *p, *n;
+
+		TAILQ_FOREACH_SAFE(p, &state->arp_states, next, n) {
+			if (p->dna_lease)
+			    if (p->dna_lease->bootp != bootp && p->tipaddr.s_addr) {
+                                free(p->dna_lease->bootp);
+				arp_free(p);
+                        }
 		}
 	}
 }

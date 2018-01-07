@@ -474,7 +474,7 @@ eexit:
 
 ssize_t
 if_sendraw(__unused const struct interface *ifp, int fd, uint16_t protocol,
-    const void *data, size_t len)
+    const void *data, size_t len, const unsigned char *hwaddr)
 {
 	struct iovec iov[2];
 	struct ether_header hw;
@@ -492,7 +492,7 @@ if_sendraw(__unused const struct interface *ifp, int fd, uint16_t protocol,
 /* BPF requires that we read the entire buffer.
  * So we pass the buffer in the API so we can loop on >1 packet. */
 ssize_t
-if_readraw(struct interface *ifp, int fd, void *data, size_t len, int *flags)
+if_readraw(struct interface *ifp, int fd, void *data, size_t len, int *flags, unsigned char *hwaddr)
 {
 	struct bpf_hdr packet;
 	ssize_t bytes;

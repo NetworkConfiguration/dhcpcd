@@ -97,7 +97,7 @@ enum DHO {
 	DHO_LEASETIME              = 51,
 	DHO_OPTSOVERLOADED         = 52,
 	DHO_MESSAGETYPE            = 53,
-	DHO_SERVERID               = 54,
+	DHO_SERVERID               = 54, /* RFC 2132: Piers */
 	DHO_PARAMETERREQUESTLIST   = 55,
 	DHO_MESSAGE                = 56,
 	DHO_MAXMESSAGESIZE         = 57,
@@ -160,8 +160,8 @@ struct bootp {
 	uint16_t flags;		/* such as broadcast flag */
 	uint32_t ciaddr;	/* (previously allocated) client IP */
 	uint32_t yiaddr;	/* 'your' client IP address */
-	uint32_t siaddr;	/* should be zero in client's messages */
-	uint32_t giaddr;	/* should be zero in client's messages */
+	uint32_t siaddr;	/* Server IP(should be zero in client's messages)*/
+	uint32_t giaddr;	/* Relay IP (should be zero in client's messages)*/
 	uint8_t chaddr[BOOTP_CHADDR_LEN];	/* client's hardware address */
 	uint8_t sname[BOOTP_SNAME_LEN];		/* server host name */
 	uint8_t file[BOOTP_FILE_LEN];		/* boot file name */
@@ -179,6 +179,9 @@ struct dhcp_lease {
 	struct in_addr server;
 	uint8_t frominfo;
 	uint32_t cookie;
+        unsigned char hwaddr[HWADDR_LEN]; //Piers MAC addr of DHCP server
+        struct bootp *bootp;
+        size_t bootp_len;
 };
 
 enum DHS {
@@ -194,6 +197,12 @@ enum DHS {
 	DHS_RENEW_REQUESTED,
 	DHS_RELEASE
 };
+
+/*struct dna_lease {
+        struct bootp *lease;
+        size_t lease_len;
+	unsigned char shaddr[HWADDR_LEN];	* +Piers:server's hardware address */
+//};
 
 struct dhcp_state {
 	enum DHS state;
@@ -212,15 +221,20 @@ struct dhcp_state {
 	uint32_t xid;
 	int socket;
 
+        /*Piers: DNA Leases */
+	struct dhcp_lease *dna_leases;
+	size_t dna_lease_len;
+	struct bootp *dna_matched_lease;
+
 	int raw_fd;
 	struct ipv4_addr *addr;
 	uint8_t added;
 
-	char leasefile[sizeof(LEASEFILE) + IF_NAMESIZE + (IF_SSIDLEN * 4)];
+	char leasefile[sizeof(LEASEFILE) + IF_NAMESIZE + (IF_SSIDLEN * 4) + BOOTP_CHADDR_LEN];
 	struct timespec started;
 	unsigned char *clientid;
 	struct authstate auth;
-	size_t arping_index;
+	ssize_t arping_index;
 };
 
 #define D_STATE(ifp)							       \
@@ -230,6 +244,7 @@ struct dhcp_state {
 #define D_STATE_RUNNING(ifp)						       \
 	(D_CSTATE((ifp)) && D_CSTATE((ifp))->new && D_CSTATE((ifp))->reason)
 
+/* Check for the DHCP 'magic cookie' */
 #define IS_DHCP(b)	((b)->vend[0] == 0x63 &&	\
 			 (b)->vend[1] == 0x82 &&	\
 			 (b)->vend[2] == 0x53 &&	\

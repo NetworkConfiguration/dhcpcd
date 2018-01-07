@@ -86,7 +86,7 @@ int if_getssid_wext(const char *ifname, uint8_t *ssid);
 
 #define bpf_insn		sock_filter
 #define BPF_SKIPTYPE
-#define BPF_ETHCOOK		-ETH_HLEN
+//#define BPF_ETHCOOK		-ETH_HLEN
 #define BPF_WHOLEPACKET	0x0fffffff /* work around buggy LPF filters */
 
 #include "bpf-filter.h"
@@ -1235,12 +1235,13 @@ if_openraw(struct interface *ifp, uint16_t protocol)
 		struct sockaddr_storage ss;
 	} su;
 	struct sock_fprog pf;
+
 #ifdef PACKET_AUXDATA
 	int n;
 #endif
 
 #define SF	SOCK_CLOEXEC | SOCK_NONBLOCK
-	if ((s = xsocket(PF_PACKET, SOCK_DGRAM | SF, htons(protocol))) == -1)
+	if ((s = xsocket(PF_PACKET, SOCK_RAW | SF , htons(protocol))) == -1)
 		return -1;
 #undef SF
 
@@ -1278,13 +1279,26 @@ eexit:
 
 ssize_t
 if_sendraw(const struct interface *ifp, int fd, uint16_t protocol,
-    const void *data, size_t len)
+    const void *data, size_t len, const unsigned char *hwaddr)
 {
 	union sockunion {
 		struct sockaddr sa;
 		struct sockaddr_ll sll;
 		struct sockaddr_storage ss;
 	} su;
+        struct ether_header ehdr;
+	struct iovec iov[2] = {{
+		.iov_base = &ehdr,
+		.iov_len = sizeof(ehdr),
+	},{
+		.iov_base = (void*)data,
+		.iov_len = len,
+	}};
+	struct msghdr msg = {
+		.msg_iov = iov,
+		.msg_iovlen = 2,
+	};
+
 
 	memset(&su, 0, sizeof(su));
 	su.sll.sll_family = AF_PACKET;
@@ -1298,26 +1312,39 @@ if_sendraw(const struct interface *ifp, int fd, uint16_t protocol,
 		 * Ugly as sin, but it works. */
 		/* coverity[buffer_size] */
 		/* coverity[overrun-buffer-arg] */
+                //Piers: Set dest_addr as broadcast address
 		memcpy(&su.sll.sll_addr,
 		    &ipv4_bcast_addr, sizeof(ipv4_bcast_addr));
 	} else
+            if (!hwaddr) // TODO: Handle IPoIB
 		memset(&su.sll.sll_addr, 0xff, ifp->hwlen);
+            else
+		memcpy(&su.sll.sll_addr, hwaddr, ifp->hwlen);
 
-	return sendto(fd, data, len, 0, &su.sa, sizeof(su.sll));
+	memcpy(&ehdr.ether_dhost, &su.sll.sll_addr, ifp->hwlen);
+	memcpy(&ehdr.ether_shost, ifp->hwaddr, ifp->hwlen);
+	ehdr.ether_type=htons(protocol);
+	return sendmsg(fd, &msg, 0);
 }
 
 ssize_t
 if_readraw(__unused struct interface *ifp, int fd,
-    void *data, size_t len, int *flags)
+    void *data, size_t len, int *flags, unsigned char *hwaddr)
 {
-	struct iovec iov = {
+        struct ether_header ehdr;
+	struct iovec iov[2] = {{
+		.iov_base = &ehdr,
+		.iov_len = sizeof(ehdr),
+	},{
 		.iov_base = data,
 		.iov_len = len,
-	};
+	}};
 	struct msghdr msg = {
-		.msg_iov = &iov,
-		.msg_iovlen = 1,
+		.msg_iov = iov,
+		.msg_iovlen = 2,
 	};
+
+
 #ifdef PACKET_AUXDATA
 	unsigned char cmsgbuf[CMSG_LEN(sizeof(struct tpacket_auxdata))];
 	struct cmsghdr *cmsg;
@@ -1350,6 +1377,17 @@ if_readraw(__unused struct interface *ifp, int fd,
 		}
 #endif
 	}
+
+/*        printf("bytes recv:%lu; ether_dhost",bytes);
+        for (int i=0; i<ETH_ALEN; i++)
+            printf(":%02x",ehdr.ether_dhost[i]);
+        printf(", ether_shost");
+        for (int i=0; i<ETH_ALEN; i++)
+            printf(":%02x",ehdr.ether_shost[i]);
+        printf("\n");*/
+
+        if (hwaddr)
+            memcpy(hwaddr, ehdr.ether_shost, ETH_ALEN);
 	return bytes;
 }
 

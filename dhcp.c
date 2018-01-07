@@ -50,6 +50,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <glob.h> //Piers: dna_file
 
 #define ELOOP_QUEUE 2
 #include "config.h"
@@ -119,6 +120,9 @@ struct udp_bootp_packet
 
 static int dhcp_open(struct interface *);
 static void dhcp_arp_conflicted(struct arp_state *, const struct arp_msg *);
+void dhcp_dna_addresses(struct interface *);
+
+static void dhcp_reboot(struct interface *);
 
 void
 dhcp_printoptions(const struct dhcpcd_ctx *ctx,
@@ -1109,17 +1113,543 @@ write_lease(const struct interface *ifp, const struct bootp *bootp, size_t len)
 	int fd;
 	ssize_t bytes;
 	const struct dhcp_state *state = D_CSTATE(ifp);
+        char *dna_fname, *hwaddr_str;
+        const char *file_ext=".lease";
+	const struct dhcp_lease *lease = &state->lease;
+	struct if_options *ifo = ifp->options;
 
 	logger(ifp->ctx, LOG_DEBUG, "%s: writing lease `%s'",
 	    ifp->name, state->leasefile);
 
+        // Piers: Only writes one lease as O_TRUNC sets file len to zero
 	fd = open(state->leasefile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 	if (fd == -1)
 		return -1;
 	bytes = write(fd, bootp, len);
 	close(fd);
+
+        if (ifo->options & DHCPCD_DNA) {
+                dna_fname=malloc(strlen(state->leasefile)+2*(size_t)ifp->hwlen+2);
+                strncpy(dna_fname, state->leasefile,
+                        strlen(state->leasefile)-strlen(file_ext));
+                hwaddr_str=&dna_fname[strlen(state->leasefile)-strlen(file_ext)+1];
+                hwaddr_str[-1]='-';
+                for (int i=0; i<ifp->hwlen; i++)
+                    sprintf(&hwaddr_str[i*2],"%02x",lease->hwaddr[i]);
+                hwaddr_str[ifp->hwlen*2]='\0';
+                strcat(dna_fname,file_ext);
+
+                logger(ifp->ctx, LOG_DEBUG, "%s: writing DNA lease:'%s'",
+                    ifp->name, dna_fname);
+                fd = open(dna_fname, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                if (fd == -1)
+                        return -1;
+                bytes = write(fd, bootp, len);
+                close(fd);
+                free(dna_fname);
+        }
 	return bytes;
 }
+
+/*int globerr(const char *epath, int eerrno)
+{
+        printf("epath: %s, eerrno: %d\n", epath , eerrno);
+        return 0;
+}*/
+static void
+get_lease(struct interface *, struct dhcp_lease *, const struct bootp *, size_t);
+
+int
+dhcp_dna_dummy_addr(struct interface *ifp, struct dhcp_lease **dna_leases)
+{
+        struct dhcp_state *state = D_STATE(ifp);
+	struct dhcp_lease *lease;
+	uint32_t rand;
+
+        if (ifp->options->dna_dum == -1) {
+            /* Auto mode */
+            ifp->options->dna_dum = state->dna_lease_len/2;
+        }
+        for (int i=0; i< ifp->options->dna_dum; i++) {
+		char buf[HWADDR_LEN * 3];
+
+                if ((*dna_leases = realloc(*dna_leases, sizeof(struct dhcp_lease)*
+                                (state->dna_lease_len + 1))) == NULL) {
+                        logger(ifp->ctx, LOG_ERR, "%s: realloc: %m", __func__);
+                        return 0;
+                }
+                lease = &(*dna_leases)[state->dna_lease_len];
+
+                *lease = lease[-1];
+                lease->bootp = malloc(lease[-1].bootp_len);
+                memcpy(lease->bootp, lease[-1].bootp, lease[-1].bootp_len);
+		rand = arc4random();
+                lease->hwaddr[3]=(unsigned char)rand;
+                rand>>=8;
+                lease->hwaddr[4]=(unsigned char)rand;
+                rand>>=8;
+                lease->hwaddr[5]=(unsigned char)rand;
+
+                state->dna_lease_len++;
+
+		logger(ifp->ctx, LOG_DEBUG, "%s: Dummy MAC is hwaddr %s",
+		    ifp->name, hwaddr_ntoa(lease->hwaddr, ifp->hwlen,
+		    buf, sizeof(buf)));
+        }
+}
+
+static size_t
+read_dna_leases(struct interface *ifp, struct dhcp_lease **dna_leases)
+{
+        size_t i;
+        int    j, fd;
+	size_t bytes;
+	uint8_t *bootp;
+	struct dhcp_state *state = D_STATE(ifp);
+        glob_t globbuf;
+        char *globstr, *chaddr_str_start;
+        char *mac_glob;
+        const char *mac_byte_glob="[A-Fa-f0-9][A-Fa-f0-9]";
+        const char *file_ext=".lease";
+	struct stat st;
+	struct dhcp_lease lease;
+
+        state->dna_lease_len=0;
+        mac_glob=malloc(ifp->hwlen*sizeof(char)*strlen(mac_byte_glob)+2);
+        if (mac_glob == NULL) {
+                // Note %m results in printing of errno
+		logger(ifp->ctx, LOG_ERR, "%s: malloc: %m", __func__);
+                return 0;
+        }
+        mac_glob[0]='-';
+        mac_glob[1]='\0';
+        for (i=0; i < ifp->hwlen; i++)
+            strcat(mac_glob,mac_byte_glob);
+
+        globstr=malloc(strlen(state->leasefile)+strlen(mac_glob)+1);
+        if (globstr == NULL) {
+                // Note %m results in printing of errno
+		logger(ifp->ctx, LOG_ERR, "%s: malloc: %m", __func__);
+                return 0;
+        }
+        strncpy(globstr, state->leasefile, strlen(state->leasefile)-strlen(file_ext));
+        globstr[strlen(state->leasefile)-strlen(file_ext)]='\0';
+        strcat(globstr, mac_glob);
+        strcat(globstr, file_ext);
+        if ((j=glob(globstr, 0, NULL, &globbuf))) {
+                if (j==GLOB_NOMATCH)
+                        logger(ifp->ctx, LOG_DEBUG, "%s: No DNA leases found",
+                        ifp->name);
+                else
+                        logger(ifp->ctx, LOG_DEBUG, "%s: No DNA leases found (Err:%d)",
+                                ifp->name, j);
+                free(mac_glob);
+                return 0;
+        }
+	logger(ifp->ctx, LOG_DEBUG, "%s: Number of DNA lease files found: %lu",
+                ifp->name,globbuf.gl_pathc);
+        for (i=0;  i < globbuf.gl_pathc; i++) {
+	        logger(ifp->ctx, LOG_DEBUG, "%s: DNA lease[%ld]: %s",
+                        ifp->name, i, globbuf.gl_pathv[i]);
+		fd = open(globbuf.gl_pathv[i], O_RDONLY);
+                if (fd == -1) {
+	            logger(ifp->ctx, LOG_DEBUG, "%s: Skipping Bad DNA lease[%lu]: %s",
+                            ifp->name, i, globbuf.gl_pathv[i]);
+                    continue;
+                }
+	        bytes = dhcp_read_lease_fd(fd, &bootp);
+                close(fd);
+                if (bytes == 0) {
+                        free(bootp);
+                        logger(ifp->ctx, LOG_ERR, "%s: dhcp_read_lease_fd", __func__);
+                        continue;
+                }
+
+                /* Ensure the packet is at least BOOTP sized
+                 * with a vendor area of 4 octets
+                 * (it should be more, and our read packet enforces this so this
+                 * code should not be needed, but of course people could
+                 * scribble whatever in the stored lease file. */
+                if (bytes < offsetof(struct bootp, vend) + 4) {
+                        free(bootp);
+                        logger(ifp->ctx, LOG_ERR, "%s: truncated bootp", __func__);
+                        continue;
+                }
+
+		get_lease(ifp, &lease, (const struct bootp *)bootp, bytes);
+
+                if (lease.leasetime != ~0U &&
+		    stat(globbuf.gl_pathv[i], &st) == 0)
+		{
+			time_t now;
+	                uint32_t l;
+
+			/* Offset lease times and check expiry */
+			now = time(NULL);
+			if (now == -1 ||
+			    (time_t)lease.leasetime < now - st.st_mtime)
+			{
+				logger(ifp->ctx, LOG_DEBUG,
+				    "%s: deleting expired DNA lease", ifp->name);
+		                unlink(globbuf.gl_pathv[i]);
+				free(bootp);
+                                continue;
+			} else {
+				l = (uint32_t)(now - st.st_mtime);
+				lease.leasetime -= l;
+				lease.renewaltime -= l;
+				lease.rebindtime -= l;
+			}
+		}
+
+                if (*dna_leases == NULL) {
+                        if ((*dna_leases = malloc(sizeof(struct dhcp_lease))) == NULL) {
+                                logger(ifp->ctx, LOG_ERR, "%s: malloc: %m", __func__);
+                                return 0;
+                        }
+                } else {
+                        if ((*dna_leases = realloc(*dna_leases, sizeof(struct
+                                        dhcp_lease)*(state->dna_lease_len+1))) == NULL) {
+                                logger(ifp->ctx, LOG_ERR, "%s: realloc: %m", __func__);
+                                return 0;
+                        }
+                }
+                (*dna_leases)[state->dna_lease_len]=lease;
+                chaddr_str_start=globbuf.gl_pathv[i]+strlen(globbuf.gl_pathv[i])-ifp->hwlen*2-strlen(file_ext);
+                (*dna_leases)[state->dna_lease_len].bootp_len = bytes;
+                char c[3];
+                c[2]='\0';
+                for (j=0; j<ifp->hwlen*2; j+=2) {
+                    c[0]=chaddr_str_start[j];
+                    c[1]=chaddr_str_start[j+1];
+                    (*dna_leases)[state->dna_lease_len].hwaddr[j/2] =
+                                (uint8_t)strtol(c, NULL, 16);
+	            //logger(ifp->ctx, LOG_DEBUG, "%s: Converted DNA lease[%d]: %s: %d", ifp->name,i, c, (uint8_t)strtol(c, NULL, 16));
+                }
+                (*dna_leases)[state->dna_lease_len++].bootp = (struct bootp *)bootp;
+        }
+	logger(ifp->ctx, LOG_DEBUG, "%s: DNA valid leases: %lu", ifp->name,
+                state->dna_lease_len);
+        if (state->dna_lease_len && ifp->options->dna_dum)
+            dhcp_dna_dummy_addr(ifp, dna_leases);
+        free(mac_glob);
+        globfree(&globbuf);
+        free(globstr);
+	logger(ifp->ctx, LOG_DEBUG, "%s: DNA active leases: %lu", ifp->name,
+                state->dna_lease_len);
+        return state->dna_lease_len;
+}
+
+/* in[]  ---> Input Array
+   istart & iend ---> Staring and Ending indexes in in[]
+   combotmp[] ---> Temporary array to store current combination
+   cindex  ---> Current index in combo[]
+   r --->       Requested Number of elements per combination
+   out          Output array of combinations
+   out_num      Number elements in output array */
+void combinationUtil(int in[], int combotmp[], int istart, int iend,
+                     int cindex, int r, int **out, int *out_num)
+{
+    // Current combination is ready to be stored
+    if (cindex == r)
+    {
+        if (*out==NULL)
+                *out=malloc(sizeof(int)*r);
+        else
+                *out=realloc(*out, (*out_num+1)*sizeof(int)*r);
+        if (out == NULL) {
+            // Note %m results in printing of errno
+            //logger(ifp->ctx, LOG_ERR, "%s: {m/re}alloc: %m", __func__);
+            return;
+        }
+        for (int j=0; j<r; j++) {
+                (*out)[*out_num*r+j]=combotmp[j];
+                printf("%d ", combotmp[j]);
+        }
+        printf("\n");
+        (*out_num)++;
+        return;
+    }
+
+    // replace cindex with all possible elements. The condition
+    // "iend-i+1 >= r-cindex" makes sure that including one element
+    // at cindex will make a combination with remaining elements
+    // at remaining positions
+    for (int i=istart; i<=iend && iend-i+1 >= r-cindex; i++)
+    {
+        combotmp[cindex] = in[i];
+        combinationUtil(in, combotmp, i+1, iend, cindex+1, r, out, out_num);
+    }
+}
+
+#include <curl/curl.h>
+#include <string.h>
+
+struct MemoryStruct {
+  char *memory;
+  size_t size;
+};
+
+static size_t
+WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
+{
+    size_t realsize = size * nmemb;
+    struct MemoryStruct *mem = (struct MemoryStruct *)userp;
+
+    mem->memory = realloc(mem->memory, mem->size + realsize + 1);
+    if(mem->memory == NULL) {
+        /* out of memory! */
+        printf("not enough memory (realloc returned NULL)\n");
+        return 0;
+    }
+
+    memcpy(&(mem->memory[mem->size]), contents, realsize);
+    mem->size += realsize;
+    mem->memory[mem->size] = 0;
+
+    return realsize;
+}
+
+int query_geo_macs(struct interface *ifp, int combonum, int *combomap, char **dna_macs, int *geolocated) {
+    CURL *curlhandle;
+    CURLcode res;
+    struct MemoryStruct chunk;
+    char* jsonObj = "{\"considerIp\": \"false\",\"wifiAccessPoints\": [\
+        { \"macAddress\": \"%s\"},{ \"macAddress\": \"%s\"}]}";
+    char dynObj[strlen(jsonObj)+2*(5*2+5)];
+    struct curl_slist *headers = NULL;
+    int i, numlocated=0;
+
+    chunk.memory = malloc(1);  /* will be grown as needed by the realloc above */
+    if (chunk.memory == NULL) {
+            //logger(ifp->ctx, LOG_ERR, "%s: realloc: %m", __func__);
+            printf("%s: realloc: %m", __func__);
+            return -1;
+    }
+
+    curl_global_init(CURL_GLOBAL_ALL);
+    curlhandle = curl_easy_init();
+    if (curlhandle == NULL) {
+        return -1;
+    }
+    /* send all data to this function  */
+    curl_easy_setopt(curlhandle, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+
+    /* we pass our 'chunk' struct to the callback function */
+    curl_easy_setopt(curlhandle, CURLOPT_WRITEDATA, (void *)&chunk);
+
+    headers = curl_slist_append(headers, "Accept: application/json");
+    headers = curl_slist_append(headers, "Content-Type: application/json");
+    headers = curl_slist_append(headers, "charsets: utf-8");
+
+    curl_easy_setopt(curlhandle, CURLOPT_URL, ifp->options->dna_gurl);
+
+    curl_easy_setopt(curlhandle, CURLOPT_CUSTOMREQUEST, "POST");
+    curl_easy_setopt(curlhandle, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curlhandle, CURLOPT_POSTFIELDS, dynObj);
+    curl_easy_setopt(curlhandle, CURLOPT_USERAGENT, "libcurl/1.1");
+
+    printf("GEO Checking %d leases with geolocation provider: %s\n",combonum, ifp->options->dna_gurl);
+    for (i=0; i<combonum; i++) {
+
+        sprintf(dynObj, jsonObj, dna_macs[combomap[i*2]], dna_macs[combomap[i*2+1]]);
+
+        printf("MAC Check #%d:%s\n",i, dynObj);
+
+        chunk.size = 0;    /* set the data chunk size to zero */
+        res = curl_easy_perform(curlhandle);
+
+        /* check for errors */
+        if (res != CURLE_OK) {
+            fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+        } else {
+            printf("Curl recieved %lu bytes:\n", (long)chunk.size);
+            printf("%s\n", chunk.memory);
+            if (!strcasestr(chunk.memory,"error")) {
+                geolocated[numlocated++]=i;
+            }
+        }
+    }
+    free(chunk.memory);
+    curl_easy_cleanup(curlhandle);
+    curl_global_cleanup();
+    return numlocated;
+}
+
+void check_dna_geo(struct interface *ifp)
+{
+        //size_t i;
+        int    i, j, fd;
+	size_t bytes;
+	uint8_t *bootp;
+	struct dhcp_state *state = D_STATE(ifp);
+        glob_t globbuf;
+        char *globstr, *chaddr_str_start;
+        char *mac_glob;
+        const char *mac_byte_glob="[A-Fa-f0-9][A-Fa-f0-9]";
+        const char *file_ext=".lease";
+	struct stat st;
+        int dna_mac_len, k;
+        char **dna_macs;
+
+        mac_glob=malloc(ifp->hwlen*sizeof(char)*strlen(mac_byte_glob)+2);
+        if (mac_glob == NULL) {
+                // Note %m results in printing of errno
+		logger(ifp->ctx, LOG_ERR, "%s: malloc: %m", __func__);
+                return;
+        }
+        mac_glob[0]='-';
+        mac_glob[1]='\0';
+        for (i=0; i < ifp->hwlen; i++)
+            strcat(mac_glob,mac_byte_glob);
+
+        globstr=malloc(strlen(state->leasefile)+strlen(mac_glob)+1);
+        if (globstr == NULL) {
+                // Note %m results in printing of errno
+		logger(ifp->ctx, LOG_ERR, "%s: malloc: %m", __func__);
+                return;
+        }
+        strncpy(globstr, state->leasefile, strlen(state->leasefile)-strlen(file_ext));
+        globstr[strlen(state->leasefile)-strlen(file_ext)]='\0';
+        strcat(globstr, mac_glob);
+        strcat(globstr, file_ext);
+        //printf("DNA Globstr:'%s (strlen:%lu, sizeof:%lu')\n",globstr, strlen(globstr), sizeof(globstr));
+        if ((j=glob(globstr, GLOB_NOSORT, NULL, &globbuf))) {
+                if (j==GLOB_NOMATCH)
+                        logger(ifp->ctx, LOG_DEBUG, "%s: No DNA leases found",
+                        ifp->name);
+                else
+                        logger(ifp->ctx, LOG_DEBUG, "%s: No DNA leases found (Err:%d)",
+                                ifp->name, j);
+                free(mac_glob);
+                return;
+        }
+	logger(ifp->ctx, LOG_DEBUG, "%s: DNA leases: %lu",
+                ifp->name, globbuf.gl_pathc);
+
+        unsigned long remaining = globbuf.gl_pathc;
+
+        dna_mac_len = ifp->hwlen*2+6;
+        if ((dna_macs = malloc(globbuf.gl_pathc*sizeof(char*))) == NULL) {
+                logger(ifp->ctx, LOG_ERR, "%s: malloc: %m", __func__);
+                return;
+        }
+        if ((dna_macs[0] = malloc(globbuf.gl_pathc*dna_mac_len*sizeof(char))) == NULL) {
+                logger(ifp->ctx, LOG_ERR, "%s: malloc: %m", __func__);
+                return;
+        }
+        // Explicitly set pointer values http://www.c-faq.com/aryptr/dynmuldimary.html
+        for (i=1; i< globbuf.gl_pathc; i++)
+                dna_macs[i]=dna_macs[0]+i*dna_mac_len;
+
+        // Extract DNA MACs
+        for (i=0; i < globbuf.gl_pathc; i++) {
+	        logger(ifp->ctx, LOG_DEBUG, "%s: DNA lease[%d]: %s",
+                        ifp->name, i, globbuf.gl_pathv[i]);
+
+                chaddr_str_start=globbuf.gl_pathv[i]+strlen(globbuf.gl_pathv[i])-ifp->hwlen*2-strlen(file_ext);
+                k=0;
+                for (j=0; j<ifp->hwlen*2; j+=2) {
+                        memcpy(dna_macs[i]+k,&chaddr_str_start[j],2);
+                        dna_macs[i][k+2]=':';
+                        k+=3;
+                }
+                dna_macs[i][k-1]='\0';
+	        logger(ifp->ctx, LOG_DEBUG, "%s: Extracted DNA lease[%d]: %s", ifp->name,i, dna_macs[i]);
+        }
+
+        if (globbuf.gl_pathc > 1) {
+                int tmp[2], c, matches=0;
+                int combonum=0;
+                int *combomap=NULL;
+                int *in=NULL;
+                int numlocated;
+
+                in = malloc(sizeof(int)*globbuf.gl_pathc);
+                // Set in array to containing an index of the existing MACs
+                for (i=0; i < globbuf.gl_pathc; i++)
+                    in[i]=i;
+
+                printf("Generating Combos*******************\n");
+
+                // Recursively generate all combinations
+                combinationUtil(in, tmp, 0, globbuf.gl_pathc-1, 0, 2, &combomap, &combonum);
+                int dna_mac_rm[combonum];
+                int *geolocated = malloc(combonum*sizeof(int));  /* will be grown as needed by the realloc above */
+                if (geolocated == NULL) {
+                        //logger(ifp->ctx, LOG_ERR, "%s: realloc: %m", __func__);
+                        printf("%s: realloc: %m", __func__);
+                        return;
+                }
+                printf("Querying Combos*******************\n");
+                numlocated = query_geo_macs(ifp, combonum, combomap, dna_macs, geolocated);
+                printf("Matched Combos:%d\n", numlocated);
+
+                // reset in array for count mutually matching MACs
+                for (i=0; i < globbuf.gl_pathc; i++)
+                    in[i]=0;
+                // Find any mutual matching MACs
+                for (i=0; i < numlocated; i++) {
+                    for (j=i+1; j < numlocated; j++) {
+                        if ((c=combomap[geolocated[i]*2]) ==
+                                combomap[geolocated[j]*2])
+                            in[c]++;
+                        if (c==combomap[geolocated[j]*2+1])
+                            in[c]++;
+                        if ((c=combomap[geolocated[i]*2+1]) ==
+                                combomap[geolocated[j]*2])
+                            in[c]++;
+                        if (c==combomap[geolocated[j]*2+1])
+                            in[c]++;
+                    }
+                }
+                for (i=0; i < globbuf.gl_pathc; i++) {
+                    printf("Checking Mutual Matching MACs[%d]:%d\n", i, in[i]);
+                    if (in[i]) {
+                        matches++;
+                        logger(ifp->ctx, LOG_DEBUG,
+                            "%s: deleting GEOmatched Mutual DNA lease:[%d] %s", ifp->name, i, globbuf.gl_pathv[i]);
+                        unlink(globbuf.gl_pathv[i]);
+                        remaining--;
+                    }
+                }
+                printf("Total seperate Mutual Matching MACs:%d\n", matches);
+                int already_mutual_matched=0;
+                for (i=0; i < globbuf.gl_pathc; i++) {
+                    for (j=0; j< numlocated; j++) {
+                        if (in[i]) {
+                            if (i == combomap[geolocated[j]*2])
+                                already_mutual_matched++;
+                            if (i == combomap[geolocated[j]*2+1])
+                                already_mutual_matched++;
+                        }
+                    }
+                }
+                if (already_mutual_matched != numlocated) {
+                    for (i=0; i< numlocated; i++) {
+                        // Random choice as to which lease is deleted: one needs to go..
+                        if (arc4random() > 0x3FFFFFFF) {
+                            c=combomap[geolocated[i]*2];
+                            unlink(globbuf.gl_pathv[c]);
+                            remaining--;
+                            logger(ifp->ctx, LOG_DEBUG,
+                                "%s: deleting GEOmatched DNA lease:[%d] %s", ifp->name, c,globbuf.gl_pathv[c]);
+                        } else {
+                            c=combomap[geolocated[i]*2+1];
+                            unlink(globbuf.gl_pathv[c]);
+                            remaining--;
+                            logger(ifp->ctx, LOG_DEBUG,
+                                "%s: deleting GEOmatched DNA lease:[%d] %s", ifp->name, c,globbuf.gl_pathv[c]);
+                        }
+                    }
+                }
+        }
+        free(mac_glob);
+        globfree(&globbuf);
+        free(globstr);
+	logger(ifp->ctx, LOG_DEBUG, "%s: Remaining DNA active leases - after GEOmatch test: %lu", ifp->name, remaining);
+}
+
 
 static size_t
 read_lease(struct interface *ifp, struct bootp **bootp)
@@ -1753,7 +2283,7 @@ send_message(struct interface *ifp, uint8_t type,
 			logger(ifp->ctx, LOG_ERR, "dhcp_makeudppacket: %m");
 		} else {
 			r = if_sendraw(ifp, state->raw_fd,
-			    ETHERTYPE_IP, (uint8_t *)udp, ulen);
+			    ETHERTYPE_IP, (uint8_t *)udp, ulen, NULL);
 			free(udp);
 		}
 		/* If we failed to send a raw packet this normally means
@@ -1870,7 +2400,7 @@ dhcp_leaseextend(struct interface *ifp)
 	if (ifp->options->options & DHCPCD_ARP) {
 		struct arp_state *astate;
 
-		if ((astate = arp_new(ifp, NULL)) == NULL)
+		if ((astate = arp_new(ifp, NULL, NULL, NULL)) == NULL)
 			return -1;
 
 		if (arp_open(ifp) == -1)
@@ -1979,19 +2509,25 @@ dhcp_arp_probed(struct arp_state *astate)
 {
 	struct dhcp_state *state;
 	struct if_options *ifo;
+        struct interface *ifp;
 
+
+        ifp = astate->iface;
 	state = D_STATE(astate->iface);
 	ifo = astate->iface->options;
-	if (state->arping_index < ifo->arping_len) {
+        if (state->arping_index != -1 &&
+	    state->arping_index < ifo->arping_len) {
 		/* We didn't find a profile for this
 		 * address or hwaddr, so move to the next
 		 * arping profile */
 		if (++state->arping_index < ifo->arping_len) {
 			astate->addr.s_addr =
-			    ifo->arping[state->arping_index - 1];
+			    ifo->arping[state->arping_index];
 			arp_probe(astate);
+		        return;
 		}
-		dhcpcd_startinterface(astate->iface);
+                arp_free(astate);
+		dhcpcd_startinterface(ifp);
 		return;
 	}
 
@@ -2032,6 +2568,84 @@ dhcp_arp_probed(struct arp_state *astate)
 }
 
 static void
+dhcp_dna_probed(struct arp_state *astate)
+{
+	logger(astate->iface->ctx, LOG_DEBUG, "%s: DNA timed out for %s",
+	    astate->iface->name, inet_ntoa(astate->addr));
+        arp_free(astate);
+}
+
+
+static void
+dhcp_dna_response(struct arp_state *astate, const struct arp_msg *amsg)
+{
+	struct interface *ifp;
+	struct dhcp_state *state;
+        char *sip_str=strdup(inet_ntoa(amsg->sip));
+
+	ifp = astate->iface;
+	state = D_STATE(ifp);
+
+        if (!memcmp(amsg->sha, astate->hwaddr, ifp->hwlen)) {
+                logger(astate->iface->ctx, LOG_DEBUG,
+                    "%s: DNA MATCHING response received for astate:%s, Sender IP:%s",
+                        astate->iface->name, inet_ntoa(astate->addr), sip_str);
+                if (state->state == DHS_INIT || state->state == DHS_DISCOVER) {
+                        struct ipv4_addr *ia;
+                        state->offer= astate->dna_lease->bootp;
+                        state->offer_len = astate->dna_lease->bootp_len;
+                        state->dna_matched_lease = astate->dna_lease->bootp;
+                        state->lease = *astate->dna_lease;
+                        state->lease.frominfo = 1;
+                        if (state->new == NULL &&
+                            (ia = ipv4_iffindaddr(ifp,
+                            &state->lease.addr, &state->lease.mask)) != NULL)
+                        {
+                                /* We still have the IP address from the
+                                 * last lease. Fake add the address and
+                                 * routes from it so the lease
+                                 * can be cleaned up. */
+                                state->new = malloc(state->offer_len);
+                                if (state->new) {
+                                        memcpy(state->new,
+                                            state->offer, state->offer_len);
+                                        state->new_len = state->offer_len;
+                                        state->addr = ia;
+                                        state->added |= STATE_ADDED | STATE_FAKE;
+                                        ipv4_buildroutes(ifp->ctx);
+                                } else
+                                        logger(ifp->ctx, LOG_ERR, "%s: %m",
+                                            __func__);
+                        }
+                        logger(astate->iface->ctx, LOG_DEBUG,
+                            "%s: DNA initiated reboot Sender IP:%s",
+                            astate->iface->name, sip_str);
+                        dhcp_reboot(ifp);
+                } else {
+                        logger(astate->iface->ctx, LOG_DEBUG,
+                            "%s: DNA reboot NOT initiated as state is:%d",
+                            astate->iface->name, state->state);
+                }
+                arp_free(astate);
+                free(sip_str);
+                return;
+        } else {
+                logger(astate->iface->ctx, LOG_DEBUG,
+                    "%s: DNA Non-Matching response received for astate:%s, Sender IP:%s",
+                     astate->iface->name, inet_ntoa(astate->addr), sip_str);
+                if (state->state == DHS_BOUND) {
+                        logger(astate->iface->ctx, LOG_DEBUG,
+                          "%s: DHCP Bound so DNA terminated for astate:%s, Sender IP:%s",
+                            astate->iface->name, inet_ntoa(astate->addr), sip_str);
+                        arp_free_dna_but1(astate->iface, NULL);
+                        free(state->dna_leases);
+                        state->dna_leases=NULL;
+                }
+        }
+        free(sip_str);
+}
+
+static void
 dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 {
 	struct interface *ifp;
@@ -2041,17 +2655,18 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 	ifp = astate->iface;
 	ifo = ifp->options;
 	state = D_STATE(ifp);
-	if (state->arping_index &&
-	    state->arping_index <= ifo->arping_len &&
+        /* Piers: This if is only entered if any ARPING entries are configured */
+	if (state->arping_index != -1 &&
+	    state->arping_index < ifo->arping_len &&
 	    amsg &&
-	    (amsg->sip.s_addr == ifo->arping[state->arping_index - 1] ||
+	    (amsg->sip.s_addr == ifo->arping[state->arping_index] ||
 	    (amsg->sip.s_addr == 0 &&
-	    amsg->tip.s_addr == ifo->arping[state->arping_index - 1])))
+	    amsg->tip.s_addr == ifo->arping[state->arping_index])))
 	{
 		char buf[HWADDR_LEN * 3];
 
-		astate->failed.s_addr = ifo->arping[state->arping_index - 1];
-		arp_report_conflicted(astate, amsg);
+		astate->failed.s_addr = ifo->arping[state->arping_index];
+		arp_report_conflicted(astate, amsg); //Just log it
 		hwaddr_ntoa(amsg->sha, ifp->hwlen, buf, sizeof(buf));
 		if (dhcpcd_selectprofile(ifp, buf) == -1 &&
 		    dhcpcd_selectprofile(ifp,
@@ -2231,13 +2846,15 @@ dhcp_bind(struct interface *ifp)
 		    ifp->name, lease->renewaltime, lease->rebindtime);
 	}
 	state->state = DHS_BOUND;
-	if (!state->lease.frominfo &&
-	    !(ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC)))
+	if ( !state->lease.frominfo &&
+                !(ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC)))
 		if (write_lease(ifp, state->new, state->new_len) == -1)
 			logger(ifp->ctx, LOG_ERR,
 			    "%s: write_lease: %m", __func__);
 
 	ipv4_applyaddr(ifp);
+        if (ifp->options->dna_pran)
+                check_dna_geo(ifp);
 }
 
 static void
@@ -2292,6 +2909,72 @@ dhcp_message_new(struct bootp **bootp,
 	return sizeof(**bootp);
 }
 
+#define O_RANDOM 1
+
+void dhcp_dna_order(size_t *map, size_t maplen, int order);
+
+void
+dhcp_dna_order(size_t *map, size_t maplen, int order)
+{
+       size_t i, r, t;
+
+       for (i=0; i < maplen; i++)
+                map[i]=i;
+
+       if (order == O_RANDOM) {
+                /* Randomise order using Fisher–Yates Durstenfeld shuffle */
+                for (i=maplen-1; i>0; i--) {
+                    r = (size_t)arc4random_uniform(i);
+                    t = map[i];
+                    map[i]= map[r];
+                    map[r]= t;
+                }
+        //        printf("DNA Random map[%lu]:",maplen);
+        } else {
+        //        printf("DNA NON-Random map[%lu]:",maplen);
+        }
+/*        for (i=0; i < maplen; i++)
+            printf("%lu, ",map[i]);
+        printf("\n");*/
+}
+
+void
+dhcp_dna_addresses(struct interface *ifp)
+{
+        size_t i, *map;
+        struct dhcp_lease dlease;
+        struct in_addr saddr, yaddr;
+        struct arp_state *astate;
+	struct dhcp_state *state = D_STATE(ifp);
+
+        if (!state->dna_lease_len) return;
+
+	//eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
+
+        map=malloc(state->dna_lease_len*sizeof(size_t));
+        if (map == NULL) {
+                logger(ifp->ctx, LOG_ERR, "%s: %m", __func__);
+                return;
+        }
+        dhcp_dna_order(map, state->dna_lease_len, ifp->options->dna_ord);
+
+        for (i=0; i < state->dna_lease_len; i++) {
+                dlease = state->dna_leases[map[i]];
+		saddr.s_addr = dlease.bootp->siaddr;
+		yaddr.s_addr = dlease.bootp->yiaddr;
+		astate = arp_new(ifp, &yaddr, dlease.hwaddr, &saddr);
+		if (astate) {
+                        // probed_cb is called after no response
+			astate->probed_cb = dhcp_dna_probed;
+                        // 'conflicted_cb' called when response is received
+			astate->conflicted_cb = dhcp_dna_response;
+			astate->dna_lease = &state->dna_leases[map[i]];
+			arp_probe(astate);
+		}
+        }
+        free(map);
+}
+
 static int
 dhcp_arp_address(struct interface *ifp)
 {
@@ -2308,11 +2991,38 @@ dhcp_arp_address(struct interface *ifp)
 	    state->offer->ciaddr : state->offer->yiaddr;
 	/* If the interface already has the address configured
 	 * then we can't ARP for duplicate detection. */
-	ia = ipv4_findaddr(ifp->ctx, &addr);
+        ia = ipv4_findaddr(ifp->ctx, &addr);
+
+	if (ifp->options->options & DHCPCD_DNA) {
+                if (state->dna_lease_len) {
+                        arp_close(ifp);
+                        if (state->dna_matched_lease != NULL) {
+                                if (state->dna_matched_lease->yiaddr ==
+                                    state->offer->yiaddr ) {
+                                        state->dna_matched_lease = NULL;
+                                        logger(ifp->ctx, LOG_INFO,
+                                            "%s: Skip DAD as DNA address Match:%s",
+                                             ifp->name, inet_ntoa(addr));
+                                        state->dna_lease_len=0;
+                                        arp_free_dna_but1(ifp, state->dna_matched_lease);
+                                        free(state->dna_leases);
+                                        state->dna_leases=NULL;
+                                        return 1;
+                                }
+                        } else {
+                                logger(ifp->ctx, LOG_INFO,
+                                    "%s: DNA cancelled as no address match", ifp->name);
+                        }
+                        arp_free_dna_but1(ifp, NULL);
+                        free(state->dna_leases);
+                        state->dna_leases=NULL;
+                        state->dna_lease_len=0;
+                }
+        }
 
 #ifdef IN_IFF_TENTATIVE
 	if (ia == NULL || ia->addr_flags & IN_IFF_NOTUSEABLE) {
-		if ((astate = arp_new(ifp, &addr)) != NULL) {
+		if ((astate = arp_new(ifp, &addr, NULL, NULL)) != NULL) {
 			astate->probed_cb = dhcp_arp_probed;
 			astate->conflicted_cb = dhcp_arp_conflicted;
 		}
@@ -2334,7 +3044,7 @@ dhcp_arp_address(struct interface *ifp)
 		get_lease(ifp, &l, state->offer, state->offer_len);
 		logger(ifp->ctx, LOG_INFO, "%s: probing address %s/%d",
 		    ifp->name, inet_ntoa(l.addr), inet_ntocidr(l.mask));
-		if ((astate = arp_new(ifp, &addr)) != NULL) {
+		if ((astate = arp_new(ifp, &addr, NULL, NULL)) != NULL) {
 			astate->probed_cb = dhcp_arp_probed;
 			astate->conflicted_cb = dhcp_arp_conflicted;
 			/* We need to handle DAD. */
@@ -2499,7 +3209,8 @@ dhcp_reboot(struct interface *ifp)
 
 	logger(ifp->ctx, LOG_INFO, "%s: rebinding lease of %s",
 	    ifp->name, inet_ntoa(state->lease.addr));
-	state->xid = dhcp_xid(ifp);
+	if (!state->xid)
+	    state->xid = dhcp_xid(ifp);
 	state->lease.server.s_addr = 0;
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 
@@ -2536,6 +3247,9 @@ dhcp_drop(struct interface *ifp, const char *reason)
 		return;
 	}
 
+#ifdef ARPING
+	state->arping_index = -1;
+#endif
 	if (ifp->options->options & DHCPCD_RELEASE &&
 	    !(ifp->options->options & DHCPCD_INFORM))
 	{
@@ -2679,7 +3393,7 @@ log_dhcp(int lvl, const char *msg,
 
 static void
 dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
-    const struct in_addr *from)
+    const struct in_addr *from, const unsigned char *hwaddr)
 {
 	struct dhcp_state *state = D_STATE(ifp);
 	struct if_options *ifo = ifp->options;
@@ -2725,7 +3439,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 		type = 0;
 	else if (ifo->options & DHCPCD_BOOTP) {
 		logger(ifp->ctx, LOG_DEBUG,
-		    "%s: ignoring DHCP reply (excpecting BOOTP)",
+		    "%s: ignoring DHCP reply (expecting BOOTP)",
 		    ifp->name);
 		return;
 	}
@@ -2757,6 +3471,8 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 		}
 		LOGDHCP0(LOG_WARNING, "no authentication");
 	}
+        // Piers; Copy DHCP server hwaddr into lease
+        memcpy(lease->hwaddr, hwaddr, ifp->hwlen);
 
 	/* RFC 3203 */
 	if (type == DHCP_FORCERENEW) {
@@ -3133,11 +3849,12 @@ dhcp_handlepacket(void *arg)
 	struct in_addr from;
 	int i, flags;
 	const struct dhcp_state *state = D_CSTATE(ifp);
+        unsigned char hwaddr[ETH_ALEN];
 
 	/* Need this API due to BPF */
 	flags = 0;
 	bootp = NULL;
-	bytes = (size_t)if_readraw(ifp, state->raw_fd,buf, sizeof(buf), &flags);
+	bytes = (size_t)if_readraw(ifp, state->raw_fd, buf, sizeof(buf), &flags, hwaddr);
 	if ((ssize_t)bytes == -1) {
 		logger(ifp->ctx, LOG_ERR,
 		    "%s: dhcp if_readrawpacket: %m", ifp->name);
@@ -3189,7 +3906,7 @@ dhcp_handlepacket(void *arg)
 	while (bytes < offsetof(struct bootp, vend) + 4)
 		bootp[bytes++] = '\0';
 
-	dhcp_handledhcp(ifp, (struct bootp *)bootp, bytes, &from);
+	dhcp_handledhcp(ifp, (struct bootp *)bootp, bytes, &from, hwaddr);
 }
 
 static void
@@ -3315,6 +4032,9 @@ dhcp_init(struct interface *ifp)
 			return -1;
 		/* 0 is a valid fd, so init to -1 */
 		state->raw_fd = -1;
+#ifdef ARPING
+                state->arping_index = -1;
+#endif
 
 		/* Now is a good time to find IPv4 routes */
 		if_initrt(ifp->ctx);
@@ -3392,45 +4112,11 @@ dhcp_start1(void *arg)
 	uint32_t l;
 	int nolease;
 
-	if (!(ifo->options & DHCPCD_IPV4))
-		return;
-
-	/* Listen on *.*.*.*:bootpc so that the kernel never sends an
-	 * ICMP port unreachable message back to the DHCP server */
-	if (ifp->ctx->udp_fd == -1) {
-		ifp->ctx->udp_fd = dhcp_openudp(NULL);
-		if (ifp->ctx->udp_fd == -1) {
-			/* Don't log an error if some other process
-			 * is handling this. */
-			if (errno != EADDRINUSE)
-				logger(ifp->ctx, LOG_ERR,
-				    "%s: dhcp_openudp: %m", __func__);
-		} else
-			eloop_event_add(ifp->ctx->eloop,
-			    ifp->ctx->udp_fd, dhcp_handleudp, ifp->ctx);
-	}
-
-	if (dhcp_init(ifp) == -1) {
-		logger(ifp->ctx, LOG_ERR, "%s: dhcp_init: %m", ifp->name);
-		return;
-	}
-
 	state = D_STATE(ifp);
 	clock_gettime(CLOCK_MONOTONIC, &state->started);
 	free(state->offer);
 	state->offer = NULL;
 
-	if (state->arping_index < ifo->arping_len) {
-		struct arp_state *astate;
-
-		astate = arp_new(ifp, NULL);
-		if (astate) {
-			astate->probed_cb = dhcp_arp_probed;
-			astate->conflicted_cb = dhcp_arp_conflicted;
-			dhcp_arp_probed(astate);
-		}
-		return;
-	}
 
 	if (ifo->options & DHCPCD_STATIC) {
 		dhcp_static(ifp);
@@ -3478,9 +4164,11 @@ dhcp_start1(void *arg)
 			}
 		}
 	}
+
 	if (state->offer) {
 		struct ipv4_addr *ia;
 
+                //Piers: Copy lease from file (state->offer) to state->lease
 		get_lease(ifp, &state->lease, state->offer, state->offer_len);
 		state->lease.frominfo = 1;
 		if (state->new == NULL &&
@@ -3554,7 +4242,8 @@ dhcp_start1(void *arg)
 	}
 
 	if (state->offer == NULL || !IS_DHCP(state->offer))
-		dhcp_discover(ifp);
+		//eloop_timeout_add_tv(ifp->ctx->eloop, &tv, callback, dhcp_discover,ifp);
+                dhcp_discover(ifp);
 	else
 		dhcp_reboot(ifp);
 }
@@ -3563,6 +4252,7 @@ void
 dhcp_start(struct interface *ifp)
 {
 	struct timespec tv;
+	struct dhcp_state *state;
 
 	if (!(ifp->options->options & DHCPCD_IPV4))
 		return;
@@ -3606,6 +4296,56 @@ dhcp_start(struct interface *ifp)
 		return;
 	}
 
+	if (!(ifp->options->options & DHCPCD_IPV4))
+		return;
+
+	/* Listen on *.*.*.*:bootpc so that the kernel never sends an
+	 * ICMP port unreachable message back to the DHCP server */
+	if (ifp->ctx->udp_fd == -1) {
+		ifp->ctx->udp_fd = dhcp_openudp(NULL);
+		if (ifp->ctx->udp_fd == -1) {
+			/* Don't log an error if some other process
+			 * is handling this. */
+			if (errno != EADDRINUSE)
+				logger(ifp->ctx, LOG_ERR,
+				    "%s: dhcp_openudp: %m", __func__);
+		} else
+			eloop_event_add(ifp->ctx->eloop,
+			    ifp->ctx->udp_fd, dhcp_handleudp, ifp->ctx);
+	}
+
+	if (dhcp_init(ifp) == -1) {
+		logger(ifp->ctx, LOG_ERR, "%s: dhcp_init: %m", ifp->name);
+		return;
+	}
+
+	state = D_STATE(ifp);
+	free(state->offer);
+	state->offer = NULL;
+
+        if (state->arping_index != -1 &&
+	    state->arping_index < ifp->options->arping_len) {
+		struct arp_state *astate;
+
+		astate = arp_new(ifp, NULL, NULL, NULL);
+		if (astate) {
+			astate->probed_cb = dhcp_arp_probed;
+			astate->conflicted_cb = dhcp_arp_conflicted;
+			dhcp_arp_probed(astate);
+		}
+		return;
+	}
+
+        /* Initiate DNA */
+	//logger(ifp->ctx, LOG_DEBUG, "%s: DNA Check", ifp->name);
+        if (ifp->options->options & DHCPCD_DNA) {
+		logger(ifp->ctx, LOG_DEBUG, "%s: DNA Option Present", ifp->name);
+                state->dna_lease_len = read_dna_leases(ifp, &state->dna_leases);
+                if (state->dna_leases) {
+                        dhcp_dna_addresses(ifp);
+                }
+        }
+
 	tv.tv_sec = DHCP_MIN_DELAY;
 	tv.tv_nsec = (suseconds_t)arc4random_uniform(
 	    (DHCP_MAX_DELAY - DHCP_MIN_DELAY) * NSEC_PER_SEC);
@@ -3620,6 +4360,13 @@ dhcp_start(struct interface *ifp)
 void
 dhcp_abort(struct interface *ifp)
 {
+#ifdef ARPING
+	struct dhcp_state *state;
+
+	state = D_STATE(ifp);
+	if (state != NULL)
+		state->arping_index = -1;
+#endif
 
 	eloop_timeout_delete(ifp->ctx->eloop, dhcp_start1, ifp);
 }

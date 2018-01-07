@@ -142,8 +142,8 @@ int if_handlelink(struct dhcpcd_ctx *);
 extern const char *if_pfname;
 int if_openraw(struct interface *, uint16_t);
 ssize_t if_sendraw(const struct interface *, int, uint16_t,
-    const void *, size_t);
-ssize_t if_readraw(struct interface *, int, void *, size_t, int *);
+    const void *, size_t, const unsigned char *);
+ssize_t if_readraw(struct interface *, int, void *, size_t, int *, unsigned char *);
 void if_closeraw(struct interface *, int);
 
 int if_address(unsigned char, const struct ipv4_addr *);

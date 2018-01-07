@@ -42,13 +42,14 @@
 
 #include "dhcpcd.h"
 #include "if.h"
+#include "dhcp.h"
 
 struct arp_msg {
 	uint16_t op;
-	unsigned char sha[HWADDR_LEN];
-	struct in_addr sip;
-	unsigned char tha[HWADDR_LEN];
-	struct in_addr tip;
+	unsigned char sha[HWADDR_LEN];  // Sender HW addr/MAC (SHA)
+	struct in_addr sip;             // Sender Protocol (IP) address (SPA)
+	unsigned char tha[HWADDR_LEN];  // Target HW addr (THA) [0: Ignored in Request]
+	struct in_addr tip;             // Target Protocol (IP) addr (TPA)
 };
 
 struct arp_state {
@@ -61,6 +62,10 @@ struct arp_state {
 	void (*free_cb)(struct arp_state *);
 
 	struct in_addr addr;
+	struct in_addr tipaddr;
+	unsigned char hwaddr[HWADDR_LEN]; //Piers: DNA
+        struct dhcp_lease *dna_lease;
+
 	int probes;
 	int claims;
 	struct in_addr failed;
@@ -78,15 +83,18 @@ struct iarp_state {
 	((const struct iarp_state *)(ifp)->if_data[IF_DATA_ARP])
 
 #ifdef INET
+struct bootp;
 int arp_open(struct interface *);
-ssize_t arp_request(const struct interface *, in_addr_t, in_addr_t);
+ssize_t arp_request(const struct interface *, in_addr_t, in_addr_t, const unsigned char *hwaddr);
 void arp_report_conflicted(const struct arp_state *, const struct arp_msg *);
 void arp_announce(struct arp_state *);
 void arp_probe(struct arp_state *);
-struct arp_state *arp_new(struct interface *, const struct in_addr *);
+void dna_probe(struct arp_state *);
+struct arp_state *arp_new(struct interface *, const struct in_addr *, const unsigned char *, const struct in_addr *);
 void arp_cancel(struct arp_state *);
 void arp_free(struct arp_state *);
 void arp_free_but(struct arp_state *);
+void arp_free_dna_but1(struct interface *, struct bootp *);
 struct arp_state *arp_find(struct interface *, const struct in_addr *);
 void arp_close(struct interface *);
 
