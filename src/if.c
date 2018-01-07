@@ -540,15 +540,6 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 				if_free(ifp);
 				continue;
 			}
-
-			/* Ensure that the MTU is big enough for DHCP */
-			if (if_getmtu(ifp) < MTU_MIN && active &&
-			    if_setmtu(ifp, MTU_MIN) == -1)
-			{
-				logerr("%s: if_setmtu", ifp->name);
-				if_free(ifp);
-				continue;
-			}
 		}
 
 		ifp->vlanid = if_vlanid(ifp);
