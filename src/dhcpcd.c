@@ -977,7 +977,7 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 	struct dhcpcd_ctx *ctx;
 	struct ifaddrs *ifaddrs;
 	struct if_head *ifs;
-	struct interface *ifp, *iff, *ifn;
+	struct interface *ifp, *iff;
 	const char * const argv[] = { ifname };
 	int i;
 
@@ -1004,56 +1004,36 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 		logerr(__func__);
 		return -1;
 	}
-	TAILQ_FOREACH_SAFE(ifp, ifs, next, ifn) {
-		if (strcmp(ifp->name, ifname) != 0)
-			continue;
-
-		/* If running off an interface list, check it's in it. */
-		if (ctx->ifc || ctx->options & DHCPCD_INACTIVE) {
-			for (i = 0; i < ctx->ifc; i++)
-				if (strcmp(ctx->ifv[i], ifname) == 0)
-					break;
-			if (i >= ctx->ifc) {
-				ifp->active = IF_INACTIVE;
-				ifp->carrier = LINK_UNKNOWN;
-			}
-		}
-
-		i = 0;
-		/* Check if we already have the interface */
-		iff = if_find(ctx->ifaces, ifp->name);
-		if (iff) {
-			if (iff->active)
-				logdebugx("%s: interface updated", iff->name);
-			/* The flags and hwaddr could have changed */
-			iff->flags = ifp->flags;
-			iff->hwlen = ifp->hwlen;
-			if (ifp->hwlen != 0)
-				memcpy(iff->hwaddr, ifp->hwaddr, iff->hwlen);
-		} else {
-			TAILQ_REMOVE(ifs, ifp, next);
-			TAILQ_INSERT_TAIL(ctx->ifaces, ifp, next);
-			if (!ifp->active)
-				continue;
+	ifp = if_find(ifs, ifname);
+	if (ifp == NULL) {
+		/* This can happen if an interface is quickly added
+		 * and then removed. */
+		errno = ENOENT;
+		return -1;
+	}
+	/* Check if we already have the interface */
+	iff = if_find(ctx->ifaces, ifp->name);
+	if (iff != NULL) {
+		if (iff->active)
+			logdebugx("%s: interface updated", iff->name);
+		/* The flags and hwaddr could have changed */
+		iff->flags = ifp->flags;
+		iff->hwlen = ifp->hwlen;
+		if (ifp->hwlen != 0)
+			memcpy(iff->hwaddr, ifp->hwaddr, iff->hwlen);
+	} else {
+		TAILQ_REMOVE(ifs, ifp, next);
+		TAILQ_INSERT_TAIL(ctx->ifaces, ifp, next);
+		if (ifp->active) {
 			logdebugx("%s: interface added", ifp->name);
 			dhcpcd_initstate(ifp, 0);
 			run_preinit(ifp);
-			iff = ifp;
 		}
-		if (action > 0 && iff->active)
-			dhcpcd_prestartinterface(iff);
+		iff = ifp;
 	}
-
 	if_learnaddrs(ctx, ifs, &ifaddrs);
-
-	/* Now we have learned addresses, start the interface */
-	TAILQ_FOREACH_SAFE(ifp, ifs, next, ifn) {
-		if (strcmp(ifp->name, ifname) != 0)
-			continue;
-		iff = if_find(ctx->ifaces, ifp->name);
-		if (action > 0 && iff->active)
-			dhcpcd_prestartinterface(iff);
-	}
+	if (action > 0 && iff->active)
+		dhcpcd_prestartinterface(iff);
 
 	/* Free our discovered list */
 	while ((ifp = TAILQ_FIRST(ifs))) {
@@ -1062,9 +1042,7 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 	}
 	free(ifs);
 
-	if (i == -1)
-		errno = ENOENT;
-	return i;
+	return 1;
 }
 
 void
