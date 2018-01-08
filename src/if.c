@@ -533,7 +533,9 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 			}
 		}
 
-		if (!(ctx->options & (DHCPCD_DUMPLEASE | DHCPCD_TEST))) {
+		if (active &&
+		    !(ctx->options & (DHCPCD_DUMPLEASE | DHCPCD_TEST)))
+		{
 			/* Handle any platform init for the interface */
 			if (active != IF_INACTIVE && if_init(ifp) == -1) {
 				logerr("%s: if_init", ifp->name);
