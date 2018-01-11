@@ -712,8 +712,10 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 	eloop_timeout_delete(ifp->ctx->eloop, dhcpcd_pollup, ifp);
 
 	if (carrier == LINK_UNKNOWN) {
-		if (errno != ENOTTY) /* For example a PPP link on BSD */
+		if (errno != ENOTTY && errno != ENXIO) {
+			/* Don't log an error if interface departed */
 			logerr("%s: %s", ifp->name, __func__);
+		}
 	} else if (carrier == LINK_DOWN || (ifp->flags & IFF_UP) == 0) {
 		if (ifp->carrier != LINK_DOWN) {
 			if (ifp->carrier == LINK_UP)
