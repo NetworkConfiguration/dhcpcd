@@ -18,6 +18,7 @@ _detected_init=false
 # Ensure that all arguments are unique
 uniqify()
 {
+	result=
 	for i do
 		case " $result " in
 			*" $i "*);;
@@ -33,6 +34,7 @@ uniqify()
 # Otherwise we just use what we have.
 list_interfaces()
 {
+	ifaces=
 	for i in $interface_order; do
 		for x in "$1"/$i.*; do
 			[ -f "$x" ] && ifaces="$ifaces${ifaces:+ }${x##*/}"
