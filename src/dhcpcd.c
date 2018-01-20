@@ -981,7 +981,6 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 	struct if_head *ifs;
 	struct interface *ifp, *iff;
 	const char * const argv[] = { ifname };
-	int i;
 
 	ctx = arg;
 	if (action == -1) {
@@ -1000,7 +999,6 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 		return 0;
 	}
 
-	i = -1;
 	ifs = if_discover(ctx, &ifaddrs, -1, UNCONST(argv));
 	if (ifs == NULL) {
 		logerr(__func__);
