@@ -1414,11 +1414,9 @@ if_getlifetime6(struct ipv6_addr *addr)
 	return -1;
 }
 
-int
-if_checkipv6(__unused struct dhcpcd_ctx *ctx,
-    __unused const struct interface *ifp)
+void
+if_setup_inet6(__unused const struct interface *ifp)
 {
 
-	return 0;
 }
 #endif
