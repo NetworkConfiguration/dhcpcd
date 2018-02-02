@@ -187,7 +187,7 @@ int if_addrflags(const struct interface *, const struct in_addr *,
 #endif
 
 #ifdef INET6
-int if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *);
+void if_setup_inet6(const struct interface *);
 #ifdef IPV6_MANAGETEMPADDR
 int ip6_use_tempaddr(const char *ifname);
 int ip6_temp_preferred_lifetime(const char *ifname);

@@ -1680,33 +1680,33 @@ if_disable_autolinklocal(struct dhcpcd_ctx *ctx, unsigned int ifindex)
 
 static const char *prefix = "/proc/sys/net/ipv6/conf";
 
-int
-if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp)
+void
+if_setup_inet6(const struct interface *ifp)
 {
 	const char *ifname;
 	int ra;
 	char path[256];
 
-	if (ifp == NULL)
-		ifname = "all";
-	else if (!(ctx->options & DHCPCD_TEST)) {
-		if (if_disable_autolinklocal(ctx, ifp->index) == -1)
-			logdebug("%s: if_disable_autolinklocal",
-			    ifp->name);
-	}
-	if (ifp)
-		ifname = ifp->name;
+	/* Unlike the kernel,
+	 * dhcpcd make make a stable private address. */
+	if (if_disable_autolinklocal(ifp->ctx, ifp->index) == -1)
+		logdebug("%s: if_disable_autolinklocal", ifp->name);
+
+	/*
+	 * If dhcpcd is doing RS, disable RA support
+	 * in the kernel. Otherwise, leave it alone.
+	 * Logically it should be disabled regardless as dhcpcd can
+	 * do it better and the user saying no RS means no RS even the kernel,
+	 * but some crazy people want the kernel to do it still.
+	 */
+	if (!(ifp->options->options & DHCPCD_IPV6RS))
+		return;
 
 	snprintf(path, sizeof(path), "%s/%s/autoconf", prefix, ifname);
 	ra = check_proc_int(path);
-	if (ra != 1) {
-		if (ctx->options & DHCPCD_TEST)
-			logwarnx("%s: IPv6 kernel autoconf disabled", ifname);
-	} else if (ra != -1 && !(ctx->options & DHCPCD_TEST)) {
-		if (write_path(path, "0") == -1) {
+	if (ra != 1 && ra != -1) {
+		if (write_path(path, "0") == -1)
 			logerr("%s: %s", __func__, path);
-			return -1;
-		}
 	}
 
 	snprintf(path, sizeof(path), "%s/%s/accept_ra", prefix, ifname);
@@ -1717,16 +1717,10 @@ if_checkipv6(struct dhcpcd_ctx *ctx, const struct interface *ifp)
 		/* The sysctl probably doesn't exist, but this isn't an
 		 * error as such so just log it and continue */
 		logfunc("%s", path);
-	} else if (ra != 0 && !(ctx->options & DHCPCD_TEST)) {
-		logdebugx("%s: disabling kernel IPv6 RA support", ifname);
-		if (write_path(path, "0") == -1) {
+	} else if (ra != 0) {
+		if (write_path(path, "0") == -1)
 			logerr("%s: %s", __func__, path);
-			return ra;
-		}
-		return 0;
 	}
-
-	return ra;
 }
 
 #ifdef IPV6_MANAGETEMPADDR
