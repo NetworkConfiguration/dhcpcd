@@ -437,19 +437,15 @@ configure_interface1(struct interface *ifp)
 		ifo->options &=
 		    ~(DHCPCD_IPV6RS | DHCPCD_DHCP6 | DHCPCD_WAITIP6);
 
-	/* We want to disable kernel interface RA as early as possible. */
+	/* We want to setup INET6 on the interface as soon as possible. */
 	if (ifp->active == IF_ACTIVE_USER &&
-	    !(ifp->ctx->options & DHCPCD_DUMPLEASE))
+	    ifo->options & DHCPCD_IPV6 &&
+	    !(ifp->ctx->options & (DHCPCD_DUMPLEASE | DHCPCD_TEST)))
 	{
-		int ra_global, ra_iface;
-
 		/* If not doing any DHCP, disable the RDNSS requirement. */
 		if (!(ifo->options & (DHCPCD_DHCP | DHCPCD_DHCP6)))
 			ifo->options &= ~DHCPCD_IPV6RA_REQRDNSS;
-		ra_global = if_checkipv6(ifp->ctx, NULL);
-		ra_iface = if_checkipv6(ifp->ctx, ifp);
-		if (ra_global == -1 || ra_iface == -1)
-			ifo->options &= ~DHCPCD_IPV6RS;
+		if_setup_inet6(ifp);
 	}
 #endif
 
