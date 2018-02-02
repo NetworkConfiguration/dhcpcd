@@ -1248,7 +1248,8 @@ if_machinearch(char *str, size_t len)
 }
 
 #ifdef INET6
-#if defined(IPV6CTL_ACCEPT_RTADV)
+#if (defined(IPV6CTL_ACCEPT_RTADV) && !defined(ND6_IFF_ACCEPT_RTADV)) || \
+    defined(IPV6CTL_USETEMPADDR) || defined(IPV6CTL_TEMPVLTIME)
 #define get_inet6_sysctl(code) inet6_sysctl(code, 0, 0)
 #define set_inet6_sysctl(code, val) inet6_sysctl(code, val, 1)
 static int
