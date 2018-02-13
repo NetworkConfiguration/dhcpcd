@@ -3653,6 +3653,7 @@ dhcp_start1(void *arg)
 
 	state = D_STATE(ifp);
 	clock_gettime(CLOCK_MONOTONIC, &state->started);
+	state->interval = 0;
 	free(state->offer);
 	state->offer = NULL;
 	state->offer_len = 0;
