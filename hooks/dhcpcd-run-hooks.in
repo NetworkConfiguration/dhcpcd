@@ -346,6 +346,6 @@ do
 		esac
 	done
 	if [ -f "$hook" ]; then
-		. "$hook"
+		( . "$hook" )
 	fi
 done
