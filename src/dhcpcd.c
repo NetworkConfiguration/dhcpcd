@@ -1861,7 +1861,7 @@ printpidfile:
 		} else
 			goto exit_failure;
 		if (!(ctx.options & DHCPCD_LINK)) {
-			logerr("aborting as link detection is disabled");
+			logerrx("aborting as link detection is disabled");
 			goto exit_failure;
 		}
 	}
