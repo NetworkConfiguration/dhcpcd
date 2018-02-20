@@ -1683,7 +1683,6 @@ static const char *prefix = "/proc/sys/net/ipv6/conf";
 void
 if_setup_inet6(const struct interface *ifp)
 {
-	const char *ifname;
 	int ra;
 	char path[256];
 
@@ -1702,14 +1701,14 @@ if_setup_inet6(const struct interface *ifp)
 	if (!(ifp->options->options & DHCPCD_IPV6RS))
 		return;
 
-	snprintf(path, sizeof(path), "%s/%s/autoconf", prefix, ifname);
+	snprintf(path, sizeof(path), "%s/%s/autoconf", prefix, ifp->name);
 	ra = check_proc_int(path);
 	if (ra != 1 && ra != -1) {
 		if (write_path(path, "0") == -1)
 			logerr("%s: %s", __func__, path);
 	}
 
-	snprintf(path, sizeof(path), "%s/%s/accept_ra", prefix, ifname);
+	snprintf(path, sizeof(path), "%s/%s/accept_ra", prefix, ifp->name);
 	ra = check_proc_int(path);
 	if (ra == -1) {
 		logfunc_t *logfunc = errno == ENOENT? logdebug : logwarn;
