@@ -1686,17 +1686,13 @@ if_setup_inet6(const struct interface *ifp)
 	int ra;
 	char path[256];
 
-	/* Unlike the kernel,
-	 * dhcpcd make make a stable private address. */
+	/* The kernel cannot make stable private addresses. */
 	if (if_disable_autolinklocal(ifp->ctx, ifp->index) == -1)
 		logdebug("%s: if_disable_autolinklocal", ifp->name);
 
 	/*
-	 * If dhcpcd is doing RS, disable RA support
-	 * in the kernel. Otherwise, leave it alone.
-	 * Logically it should be disabled regardless as dhcpcd can
-	 * do it better and the user saying no RS means no RS even the kernel,
-	 * but some crazy people want the kernel to do it still.
+	 * If not doing autoconf, don't disable the kernel from doing it.
+	 * If we need to, we should have another option actively disable it.
 	 */
 	if (!(ifp->options->options & DHCPCD_IPV6RS))
 		return;
