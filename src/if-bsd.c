@@ -1360,11 +1360,8 @@ set_ifxflags(int s, const struct interface *ifp)
 	flags &= ~IFXF_NOINET6;
 #endif
 	/*
-	 * If dhcpcd is doing RS, disable RA support
-	 * in the kernel. Otherwise, leave it alone.
-	 * Logically it should be disabled regardless as dhcpcd can
-	 * do it better and the user saying no RS means no RS even the kernel,
-	 * but some crazy people want the kernel to do it still.
+	 * If not doing autoconf, don't disable the kernel from doing it.
+	 * If we need to, we should have another option actively disable it.
 	 */
 	if (ifp->options->options & DHCPCD_IPV6RS)
 		flags &= ~IFXF_AUTOCONF6;
@@ -1423,11 +1420,8 @@ if_setup_inet6(const struct interface *ifp)
 #endif
 
 	/*
-	 * If dhcpcd is doing RS, disable RA support
-	 * in the kernel. Otherwise, leave it alone.
-	 * Logically it should be disabled regardless as dhcpcd can
-	 * do it better and the user saying no RS means no RS even the kernel,
-	 * but some crazy people want the kernel to do it still.
+	 * If not doing autoconf, don't disable the kernel from doing it.
+	 * If we need to, we should have another option actively disable it.
 	 */
 #ifdef ND6_IFF_ACCEPT_RTADV
 	if (ifp->options->options & DHCPCD_IPV6RS)
