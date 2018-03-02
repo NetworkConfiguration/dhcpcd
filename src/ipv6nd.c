@@ -1313,7 +1313,7 @@ ipv6nd_expirera(void *arg)
 	struct interface *ifp;
 	struct ra *rap, *ran;
 	struct timespec now, lt, expire, next;
-	uint8_t expired, valid, validone;
+	uint8_t expired, anyvalid, valid, validone;
 	struct ipv6_addr *ia;
 
 	ifp = arg;
@@ -1321,11 +1321,11 @@ ipv6nd_expirera(void *arg)
 	expired = 0;
 	timespecclear(&next);
 
-	validone = 0;
+	anyvalid = 0;
 	TAILQ_FOREACH_SAFE(rap, ifp->ctx->ra_routers, next, ran) {
 		if (rap->iface != ifp)
 			continue;
-		valid = 0;
+		valid = validone = 0;
 		if (rap->lifetime) {
 			lt.tv_sec = (time_t)rap->lifetime;
 			lt.tv_nsec = 0;
@@ -1351,9 +1351,12 @@ ipv6nd_expirera(void *arg)
 		 * the kernel can expire, so we need to handle it ourself.
 		 * Also, some OS don't support address lifetimes (Solaris). */
 		TAILQ_FOREACH(ia, &rap->addrs, next) {
-			if (ia->prefix_vltime == ND6_INFINITE_LIFETIME ||
-			    ia->prefix_vltime == 0)
+			if (ia->prefix_vltime == 0)
 				continue;
+			if (ia->prefix_vltime == ND6_INFINITE_LIFETIME) {
+				validone = 1;
+				continue;
+			}
 			lt.tv_sec = (time_t)ia->prefix_vltime;
 			lt.tv_nsec = 0;
 			timespecadd(&ia->acquired, &lt, &expire);
@@ -1375,6 +1378,7 @@ ipv6nd_expirera(void *arg)
 				if (!timespecisset(&next) ||
 				    timespeccmp(&next, &lt, >))
 					next = lt;
+				validone = 1;
 			}
 		}
 
@@ -1385,10 +1389,10 @@ ipv6nd_expirera(void *arg)
 
 		/* No valid lifetimes are left on the RA, so we might
 		 * as well punt it. */
-		if (!valid && TAILQ_FIRST(&rap->addrs) == NULL)
+		if (!valid && !validone)
 			ipv6nd_free_ra(rap);
 		else
-			validone = 1;
+			anyvalid = 1;
 	}
 
 	if (timespecisset(&next))
@@ -1400,7 +1404,7 @@ ipv6nd_expirera(void *arg)
 	}
 
 	/* No valid routers? Kill any DHCPv6. */
-	if (!validone)
+	if (!anyvalid)
 		dhcp6_dropnondelegates(ifp);
 }
 
