@@ -3858,18 +3858,11 @@ dhcp6_free(struct interface *ifp)
 void
 dhcp6_dropnondelegates(struct interface *ifp)
 {
-#ifndef SMALL
-	struct dhcp6_state *state;
-	struct ipv6_addr *ia;
 
-	if ((state = D6_STATE(ifp)) == NULL)
-		return;
-	TAILQ_FOREACH(ia, &state->addrs, next) {
-		if (ia->flags & (IPV6_AF_DELEGATED | IPV6_AF_DELEGATEDPFX))
-			return;
-	}
+#ifndef SMALL
+	if (dhcp6_hasprefixdelegation(ifp) == 0)
 #endif
-	dhcp6_drop(ifp, "EXPIRE6");
+		dhcp6_drop(ifp, "EXPIRE6");
 }
 
 void
