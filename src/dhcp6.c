@@ -3871,7 +3871,7 @@ dhcp6_dropnondelegates(struct interface *ifp)
 }
 
 void
-dhcp6_handleifa(int cmd, struct ipv6_addr *ia)
+dhcp6_handleifa(int cmd, struct ipv6_addr *ia, pid_t pid)
 {
 	struct dhcp6_state *state;
 	struct interface *ifp = ia->iface;
@@ -3886,7 +3886,7 @@ dhcp6_handleifa(int cmd, struct ipv6_addr *ia)
 		dhcp6_listen(ia->iface->ctx, ia);
 
 	if ((state = D6_STATE(ifp)) != NULL)
-		ipv6_handleifa_addrs(cmd, &state->addrs, ia);
+		ipv6_handleifa_addrs(cmd, &state->addrs, ia, pid);
 }
 
 ssize_t

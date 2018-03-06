@@ -1291,7 +1291,7 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 }
 
 void
-ipv6nd_handleifa(int cmd, struct ipv6_addr *addr)
+ipv6nd_handleifa(int cmd, struct ipv6_addr *addr, pid_t pid)
 {
 	struct ra *rap;
 
@@ -1303,7 +1303,7 @@ ipv6nd_handleifa(int cmd, struct ipv6_addr *addr)
 	TAILQ_FOREACH(rap, addr->iface->ctx->ra_routers, next) {
 		if (rap->iface != addr->iface)
 			continue;
-		ipv6_handleifa_addrs(cmd, &rap->addrs, addr);
+		ipv6_handleifa_addrs(cmd, &rap->addrs, addr, pid);
 	}
 }
 

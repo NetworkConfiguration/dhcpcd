@@ -684,7 +684,7 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 		ipv4_handleifa(ctx,
 		    ifam->ifam_type == RTM_CHGADDR ?
 		    RTM_NEWADDR : ifam->ifam_type,
-		    NULL, ifalias, &addr, &mask, &bcast, flags);
+		    NULL, ifalias, &addr, &mask, &bcast, flags, 0);
 		break;
 	}
 #endif
@@ -712,7 +712,7 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 		ipv6_handleifa(ctx,
 		    ifam->ifam_type == RTM_CHGADDR ?
 		    RTM_NEWADDR : ifam->ifam_type,
-		    NULL, ifalias, &addr6, ipv6_prefixlen(&mask6), flags);
+		    NULL, ifalias, &addr6, ipv6_prefixlen(&mask6), flags, 0);
 		break;
 	}
 #endif

@@ -1040,6 +1040,7 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 	struct interface *ifp;
 	const struct sockaddr *rti_info[RTAX_MAX];
 	int addrflags;
+	pid_t pid;
 
 	if ((ifp = if_findindex(ctx->ifaces, ifam->ifam_index)) == NULL)
 		return;
@@ -1068,6 +1069,9 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 		}
 #endif
 	}
+	pid = ifam->ifam_pid;
+#else
+	pid = 0;
 #endif
 
 #ifdef HAVE_IFAM_ADDRFLAGS
@@ -1140,7 +1144,7 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 #endif
 
 		ipv4_handleifa(ctx, ifam->ifam_type, NULL, ifp->name,
-		    &addr, &mask, &bcast, addrflags);
+		    &addr, &mask, &bcast, addrflags, pid);
 		break;
 	}
 #endif
@@ -1171,7 +1175,7 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 #endif
 
 		ipv6_handleifa(ctx, ifam->ifam_type, NULL,
-		    ifp->name, &addr6, ipv6_prefixlen(&mask6), addrflags);
+		    ifp->name, &addr6, ipv6_prefixlen(&mask6), addrflags, pid);
 		break;
 	}
 #endif

@@ -237,8 +237,9 @@ void ipv6_deleteaddr(struct ipv6_addr *);
 void ipv6_freedrop_addrs(struct ipv6_addrhead *, int,
     const struct interface *);
 void ipv6_handleifa(struct dhcpcd_ctx *ctx, int, struct if_head *,
-    const char *, const struct in6_addr *, uint8_t, int);
-int ipv6_handleifa_addrs(int, struct ipv6_addrhead *, const struct ipv6_addr *);
+    const char *, const struct in6_addr *, uint8_t, int, pid_t);
+int ipv6_handleifa_addrs(int, struct ipv6_addrhead *, const struct ipv6_addr *,
+    pid_t);
 struct ipv6_addr *ipv6_iffindaddr(struct interface *,
     const struct in6_addr *, int);
 int ipv6_hasaddr(const struct interface *);
