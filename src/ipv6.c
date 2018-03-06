@@ -566,7 +566,7 @@ ipv6_checkaddrflags(void *arg)
 		/* Simulate the kernel announcing the new address. */
 		ipv6_handleifa(ia->iface->ctx, RTM_NEWADDR,
 		    ia->iface->ctx->ifaces, ia->iface->name,
-		    &ia->addr, ia->prefix_len, flags);
+		    &ia->addr, ia->prefix_len, flags, 0);
 	} else {
 		/* Still tentative? Check again in a bit. */
 		struct timespec tv;
@@ -1063,7 +1063,7 @@ ipv6_getstate(struct interface *ifp)
 void
 ipv6_handleifa(struct dhcpcd_ctx *ctx,
     int cmd, struct if_head *ifs, const char *ifname,
-    const struct in6_addr *addr, uint8_t prefix_len, int addrflags)
+    const struct in6_addr *addr, uint8_t prefix_len, int addrflags, pid_t pid)
 {
 	struct interface *ifp;
 	struct ipv6_state *state;
@@ -1174,8 +1174,8 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 	}
 
 	if (ia != NULL) {
-		ipv6nd_handleifa(cmd, ia);
-		dhcp6_handleifa(cmd, ia);
+		ipv6nd_handleifa(cmd, ia, pid);
+		dhcp6_handleifa(cmd, ia, pid);
 
 		/* Done with the ia now, so free it. */
 		if (cmd == RTM_DELADDR)
@@ -1705,7 +1705,7 @@ ipv6_ctxfree(struct dhcpcd_ctx *ctx)
 
 int
 ipv6_handleifa_addrs(int cmd,
-    struct ipv6_addrhead *addrs, const struct ipv6_addr *addr)
+    struct ipv6_addrhead *addrs, const struct ipv6_addr *addr, pid_t pid)
 {
 	struct ipv6_addr *ia, *ian;
 	uint8_t found, alldadcompleted;
@@ -1722,8 +1722,8 @@ ipv6_handleifa_addrs(int cmd,
 		switch (cmd) {
 		case RTM_DELADDR:
 			if (ia->flags & IPV6_AF_ADDED) {
-				logwarnx("%s: deleted address %s",
-				    ia->iface->name, ia->saddr);
+				logwarnx("%s: pid %d deleted address %s",
+				    ia->iface->name, pid, ia->saddr);
 				ia->flags &= ~IPV6_AF_ADDED;
 			}
 			if (ia->flags & IPV6_AF_DELEGATED) {

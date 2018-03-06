@@ -765,7 +765,7 @@ void
 ipv4_handleifa(struct dhcpcd_ctx *ctx,
     int cmd, struct if_head *ifs, const char *ifname,
     const struct in_addr *addr, const struct in_addr *mask,
-    const struct in_addr *brd, const int addrflags)
+    const struct in_addr *brd, int addrflags, pid_t pid)
 {
 	struct interface *ifp;
 	struct ipv4_state *state;
@@ -831,7 +831,7 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 #ifdef ARP
 		arp_handleifa(cmd, ia);
 #endif
-		dhcp_handleifa(cmd, ia);
+		dhcp_handleifa(cmd, ia, pid);
 	}
 
 	if (cmd == RTM_DELADDR)

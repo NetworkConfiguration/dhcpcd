@@ -131,7 +131,7 @@ struct ipv4_addr *ipv4_findmaskaddr(struct dhcpcd_ctx *,
     const struct in_addr *);
 void ipv4_handleifa(struct dhcpcd_ctx *, int, struct if_head *, const char *,
     const struct in_addr *, const struct in_addr *, const struct in_addr *,
-    int);
+    int, pid_t);
 
 void ipv4_free(struct interface *);
 #else

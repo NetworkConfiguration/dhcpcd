@@ -234,7 +234,7 @@ if_learnaddrs(struct dhcpcd_ctx *ctx, struct if_head *ifs,
 #endif
 			ipv4_handleifa(ctx, RTM_NEWADDR, ifs, ifa->ifa_name,
 				&addr->sin_addr, &net->sin_addr,
-				brd ? &brd->sin_addr : NULL, addrflags);
+				brd ? &brd->sin_addr : NULL, addrflags, 0);
 			break;
 #endif
 #ifdef INET6
@@ -258,7 +258,7 @@ if_learnaddrs(struct dhcpcd_ctx *ctx, struct if_head *ifs,
 #endif
 			ipv6_handleifa(ctx, RTM_NEWADDR, ifs,
 			    ifa->ifa_name, &sin6->sin6_addr,
-			    ipv6_prefixlen(&net6->sin6_addr), addrflags);
+			    ipv6_prefixlen(&net6->sin6_addr), addrflags, 0);
 			break;
 #endif
 		}
