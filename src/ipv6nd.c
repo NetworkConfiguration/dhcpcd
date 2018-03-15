@@ -377,25 +377,26 @@ static void
 ipv6nd_reachable(struct ra *rap, int flags)
 {
 
+	if (rap->lifetime == 0)
+		return;
+
 	if (flags & IPV6ND_REACHABLE) {
-		if (rap->lifetime && rap->expired) {
-			loginfox("%s: %s is reachable again",
-			    rap->iface->name, rap->sfrom);
-			rap->expired = 0;
-			rt_build(rap->iface->ctx, AF_INET6);
-			/* XXX Not really an RA */
-			script_runreason(rap->iface, "ROUTERADVERT");
-		}
+		if (rap->expired == 0)
+			return;
+		loginfox("%s: %s is reachable again",
+		    rap->iface->name, rap->sfrom);
+		rap->expired = 0;
 	} else {
-		if (rap->lifetime && !rap->expired) {
-			logwarnx("%s: %s is unreachable, expiring it",
-			    rap->iface->name, rap->sfrom);
-			rap->expired = 1;
-			rt_build(rap->iface->ctx, AF_INET6);
-			/* XXX Not really an RA */
-			script_runreason(rap->iface, "ROUTERADVERT");
-		}
+		if (rap->expired != 0)
+			return;
+		logwarnx("%s: %s is unreachable, expiring it",
+		    rap->iface->name, rap->sfrom);
+		rap->expired = 1;
 	}
+
+	rt_build(rap->iface->ctx, AF_INET6);
+	/* XXX Not really an RA */
+	script_runreason(rap->iface, "ROUTERADVERT");
 }
 
 void
@@ -1505,15 +1506,8 @@ ipv6nd_handlena(struct dhcpcd_ctx *ctx, struct interface *ifp,
 		return;
 	}
 
-	if (is_solicited && is_router && rap->lifetime) {
-		if (rap->expired) {
-			rap->expired = 0;
-			loginfox("%s: %s reachable (%s)",
-			    ifp->name, taddr, ctx->sfrom);
-			rt_build(ifp->ctx, AF_INET6);
-			script_runreason(rap->iface, "ROUTERADVERT"); /* XXX */
-		}
-	}
+	if (is_solicited && is_router && rap->lifetime)
+		ipv6nd_reachable(rap, IPV6ND_REACHABLE);
 }
 
 static void
