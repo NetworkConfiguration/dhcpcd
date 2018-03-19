@@ -1033,7 +1033,7 @@ dhcpcd_handlelink(void *arg)
 	struct dhcpcd_ctx *ctx = arg;
 
 	if (if_handlelink(ctx) == -1) {
-		if (errno == ENOBUFS) {
+		if (errno == ENOBUFS || errno == ENOMEM) {
 			dhcpcd_linkoverflow(ctx);
 			return;
 		}
