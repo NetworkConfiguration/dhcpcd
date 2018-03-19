@@ -870,7 +870,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 		rap->expired = 0;
 	rap->hasdns = 0;
 
-	ipv6_settempstale(ifp);
+	ipv6_markaddrsstale(ifp, IPV6_AF_TEMPORARY);
 	TAILQ_FOREACH(ap, &rap->addrs, next) {
 		ap->flags |= IPV6_AF_STALE;
 	}

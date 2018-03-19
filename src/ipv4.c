@@ -762,6 +762,39 @@ ipv4_applyaddr(void *arg)
 }
 
 void
+ipv4_markaddrsstale(struct interface *ifp)
+{
+	struct ipv4_state *state;
+	struct ipv4_addr *ia;
+
+	state = IPV4_STATE(ifp);
+	if (state == NULL)
+		return;
+
+	TAILQ_FOREACH(ia, &state->addrs, next) {
+		ia->flags |= IPV4_AF_STALE;
+	}
+}
+
+void
+ipv4_deletestaleaddrs(struct interface *ifp)
+{
+	struct ipv4_state *state;
+	struct ipv4_addr *ia, *ia1;
+
+	state = IPV4_STATE(ifp);
+	if (state == NULL)
+		return;
+
+	TAILQ_FOREACH_SAFE(ia, &state->addrs, next, ia1) {
+		if (ia->flags & IPV4_AF_STALE)
+			ipv4_handleifa(ifp->ctx, RTM_DELADDR,
+			    ifp->ctx->ifaces, ifp->name,
+			    &ia->addr, &ia->mask, &ia->brd, 0, 0);
+	}
+}
+
+void
 ipv4_handleifa(struct dhcpcd_ctx *ctx,
     int cmd, struct if_head *ifs, const char *ifname,
     const struct in_addr *addr, const struct in_addr *mask,
@@ -796,6 +829,7 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 			ia->iface = ifp;
 			ia->addr = *addr;
 			ia->mask = *mask;
+			ia->flags = 0;
 			ia_is_new = true;
 #ifdef ALIAS_ADDR
 			strlcpy(ia->alias, ifname, sizeof(ia->alias));
@@ -817,6 +851,7 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 		else
 			ia->brd.s_addr = INADDR_ANY;
 		ia->addr_flags = addrflags;
+		ia->flags &= ~IPV4_AF_STALE;
 		break;
 	case RTM_DELADDR:
 		if (ia == NULL)
