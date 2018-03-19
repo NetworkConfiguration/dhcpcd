@@ -1973,40 +1973,6 @@ again:
 	return ia;
 }
 
-void
-ipv6_markaddrsstale(struct interface *ifp, unsigned int flags)
-{
-	struct ipv6_state *state;
-	struct ipv6_addr *ia;
-
-	state = IPV6_STATE(ifp);
-	if (state == NULL)
-		return;
-
-	TAILQ_FOREACH(ia, &state->addrs, next) {
-		if (flags == 0 || ia->flags & flags)
-			ia->flags |= IPV6_AF_STALE;
-	}
-}
-
-void
-ipv6_deletestaleaddrs(struct interface *ifp)
-{
-	struct ipv6_state *state;
-	struct ipv6_addr *ia, *ia1;
-
-	state = IPV6_STATE(ifp);
-	if (state == NULL)
-		return;
-
-	TAILQ_FOREACH_SAFE(ia, &state->addrs, next, ia1) {
-		if (ia->flags & IPV6_AF_STALE)
-			ipv6_handleifa(ifp->ctx, RTM_DELADDR,
-			    ifp->ctx->ifaces, ifp->name,
-			    &ia->addr, ia->prefix_len, 0, 0);
-	}
-}
-
 struct ipv6_addr *
 ipv6_settemptime(struct ipv6_addr *ia, int flags)
 {
@@ -2127,6 +2093,40 @@ ipv6_regentempifid(void *arg)
 	ipv6_regen_desync(ifp, 1);
 }
 #endif /* IPV6_MANAGETEMPADDR */
+
+void
+ipv6_markaddrsstale(struct interface *ifp, unsigned int flags)
+{
+	struct ipv6_state *state;
+	struct ipv6_addr *ia;
+
+	state = IPV6_STATE(ifp);
+	if (state == NULL)
+		return;
+
+	TAILQ_FOREACH(ia, &state->addrs, next) {
+		if (flags == 0 || ia->flags & flags)
+			ia->flags |= IPV6_AF_STALE;
+	}
+}
+
+void
+ipv6_deletestaleaddrs(struct interface *ifp)
+{
+	struct ipv6_state *state;
+	struct ipv6_addr *ia, *ia1;
+
+	state = IPV6_STATE(ifp);
+	if (state == NULL)
+		return;
+
+	TAILQ_FOREACH_SAFE(ia, &state->addrs, next, ia1) {
+		if (ia->flags & IPV6_AF_STALE)
+			ipv6_handleifa(ifp->ctx, RTM_DELADDR,
+			    ifp->ctx->ifaces, ifp->name,
+			    &ia->addr, ia->prefix_len, 0, 0);
+	}
+}
 
 
 static struct rt *
