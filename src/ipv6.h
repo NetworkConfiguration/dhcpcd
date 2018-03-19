@@ -231,6 +231,8 @@ uint8_t ipv6_prefixlen(const struct in6_addr *);
 int ipv6_userprefix( const struct in6_addr *, short prefix_len,
     uint64_t user_number, struct in6_addr *result, short result_len);
 void ipv6_checkaddrflags(void *);
+void ipv6_markaddrsstale(struct interface *, unsigned int);
+void ipv6_deletestaleaddrs(struct interface *);
 int ipv6_addaddr(struct ipv6_addr *, const struct timespec *);
 ssize_t ipv6_addaddrs(struct ipv6_addrhead *addrs);
 void ipv6_deleteaddr(struct ipv6_addr *);
@@ -260,7 +262,6 @@ void ipv6_freedrop(struct interface *, int);
 
 #ifdef IPV6_MANAGETEMPADDR
 void ipv6_gentempifid(struct interface *);
-void ipv6_settempstale(struct interface *);
 struct ipv6_addr *ipv6_createtempaddr(struct ipv6_addr *,
     const struct timespec *);
 struct ipv6_addr *ipv6_settemptime(struct ipv6_addr *, int);

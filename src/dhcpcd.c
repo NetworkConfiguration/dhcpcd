@@ -955,20 +955,6 @@ dhcpcd_activateinterface(struct interface *ifp, unsigned long long options)
 	}
 }
 
-static void
-dhcpcd_handlelink(void *arg)
-{
-	struct dhcpcd_ctx *ctx;
-
-	ctx = arg;
-	if (if_handlelink(ctx) == -1) {
-		logerr(__func__);
-		eloop_event_delete(ctx->eloop, ctx->link_fd);
-		close(ctx->link_fd);
-		ctx->link_fd = -1;
-	}
-}
-
 int
 dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 {
@@ -1039,6 +1025,83 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 	free(ifs);
 
 	return 1;
+}
+
+static void
+dhcpcd_handlelink(void *arg)
+{
+	struct dhcpcd_ctx *ctx = arg;
+
+	if (if_handlelink(ctx) == -1) {
+		if (errno == ENOBUFS) {
+			dhcpcd_linkoverflow(ctx);
+			return;
+		}
+		logerr(__func__);
+	}
+}
+
+static void
+dhcpcd_checkcarrier(void *arg)
+{
+	struct interface *ifp = arg;
+
+	dhcpcd_handlecarrier(ifp->ctx, LINK_UNKNOWN, ifp->flags, ifp->name);
+}
+
+void
+dhcpcd_linkoverflow(struct dhcpcd_ctx *ctx)
+{
+	struct if_head *ifaces;
+	struct ifaddrs *ifaddrs;
+	struct interface *ifp, *ifn, *ifp1;
+
+	loginfox("route socket overflowed - learning interface state");
+
+	/* Close the existing socket and open a new one.
+	 * This is easier than draining the kernel buffer of an
+	 * in-determinate size. */
+	eloop_event_delete(ctx->eloop, ctx->link_fd);
+	close(ctx->link_fd);
+	if_closesockets_os(ctx);
+	if (if_opensockets_os(ctx) == -1) {
+		logerr("%s: if_opensockets", __func__);
+		eloop_exit(ctx->eloop, EXIT_FAILURE);
+		return;
+	}
+	eloop_event_add(ctx->eloop, ctx->link_fd, dhcpcd_handlelink, ctx);
+
+	/* Work out the current interfaces. */
+	ifaces = if_discover(ctx, &ifaddrs, ctx->ifc, ctx->ifv);
+
+	/* Punt departed interfaces */
+	TAILQ_FOREACH_SAFE(ifp, ctx->ifaces, next, ifn) {
+		if (if_find(ifaces, ifp->name) != NULL)
+			continue;
+		dhcpcd_handleinterface(ctx, -1, ifp->name);
+	}
+
+	/* Add new interfaces */
+	TAILQ_FOREACH_SAFE(ifp, ifaces, next, ifn) {
+		ifp1 = if_find(ctx->ifaces, ifp->name);
+		if (ifp1 != NULL) {
+			/* If the interface already exists,
+			 * check carrier state. */
+			eloop_timeout_add_sec(ctx->eloop, 0,
+			    dhcpcd_checkcarrier, ifp1);
+			continue;
+		}
+		TAILQ_REMOVE(ifaces, ifp, next);
+		TAILQ_INSERT_TAIL(ctx->ifaces, ifp, next);
+		if (ifp->active)
+			eloop_timeout_add_sec(ctx->eloop, 0,
+			    dhcpcd_prestartinterface, ifp);
+	}
+
+	/* Update address state. */
+	if_markaddrsstale(ctx->ifaces);
+	if_learnaddrs(ctx, ctx->ifaces, &ifaddrs);
+	if_deletestaleaddrs(ctx->ifaces);
 }
 
 void

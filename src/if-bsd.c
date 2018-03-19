@@ -1210,6 +1210,11 @@ if_dispatch(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 	case RTM_NEWADDR:
 		if_ifa(ctx, (const void *)rtm);
 		break;
+#ifdef RTM_DESYNC
+	case RTM_DESYNC:
+		dhcpcd_linkoverflow(ctx);
+		break;
+#endif
 	}
 }
 
@@ -1223,7 +1228,8 @@ if_handlelink(struct dhcpcd_ctx *ctx)
 	msg.msg_iov = ctx->iov;
 	msg.msg_iovlen = 1;
 
-	if ((len = recvmsg_realloc(ctx->link_fd, &msg, 0)) == -1)
+	len = recvmsg_realloc(ctx->link_fd, &msg, 0);
+	if (len == -1)
 		return -1;
 	if (len != 0)
 		if_dispatch(ctx, ctx->iov[0].iov_base);
@@ -1480,9 +1486,11 @@ if_setup_inet6(const struct interface *ifp)
 		char ifname[IFNAMSIZ + 8];
 
 		strlcpy(ifname, ifp->name, sizeof(ifname));
-		if (ioctl(s, SIOCSRTRFLUSH_IN6, (void *)&ifname) == -1)
+		if (ioctl(s, SIOCSRTRFLUSH_IN6, (void *)&ifname) == -1 &&
+		    errno != ENOTSUP)
 			logwarn("SIOCSRTRFLUSH_IN6");
-		if (ioctl(s, SIOCSPFXFLUSH_IN6, (void *)&ifname) == -1)
+		if (ioctl(s, SIOCSPFXFLUSH_IN6, (void *)&ifname) == -1 &&
+		    errno != ENOTSUP)
 			logwarn("SIOCSPFXFLUSH_IN6");
 	}
 #endif

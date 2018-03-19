@@ -191,6 +191,21 @@ if_hasconf(struct dhcpcd_ctx *ctx, const char *ifname)
 }
 
 void
+if_markaddrsstale(struct if_head *ifs)
+{
+	struct interface *ifp;
+
+	TAILQ_FOREACH(ifp, ifs, next) {
+#ifdef INET
+		ipv4_markaddrsstale(ifp);
+#endif
+#ifdef INET6
+		ipv6_markaddrsstale(ifp, 0);
+#endif
+	}
+}
+
+void
 if_learnaddrs(struct dhcpcd_ctx *ctx, struct if_head *ifs,
     struct ifaddrs **ifaddrs)
 {
@@ -266,6 +281,21 @@ if_learnaddrs(struct dhcpcd_ctx *ctx, struct if_head *ifs,
 
 	freeifaddrs(*ifaddrs);
 	*ifaddrs = NULL;
+}
+
+void
+if_deletestaleaddrs(struct if_head *ifs)
+{
+	struct interface *ifp;
+
+	TAILQ_FOREACH(ifp, ifs, next) {
+#ifdef INET
+		ipv4_deletestaleaddrs(ifp);
+#endif
+#ifdef INET6
+		ipv6_deletestaleaddrs(ifp);
+#endif
+	}
 }
 
 bool

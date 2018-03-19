@@ -1134,6 +1134,7 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 			TAILQ_INSERT_TAIL(&state->addrs, ia, next);
 		}
 		ia->addr_flags = addrflags;
+		ia->flags &= ~IPV6_AF_STALE;
 #ifdef IPV6_MANAGETEMPADDR
 		if (ia->addr_flags & IN6_IFF_TEMPORARY)
 			ia->flags |= IPV6_AF_TEMPORARY;
@@ -1973,15 +1974,36 @@ again:
 }
 
 void
-ipv6_settempstale(struct interface *ifp)
+ipv6_markaddrsstale(struct interface *ifp, unsigned int flags)
 {
 	struct ipv6_state *state;
 	struct ipv6_addr *ia;
 
 	state = IPV6_STATE(ifp);
+	if (state == NULL)
+		return;
+
 	TAILQ_FOREACH(ia, &state->addrs, next) {
-		if (ia->flags & IPV6_AF_TEMPORARY)
+		if (flags == 0 || ia->flags & flags)
 			ia->flags |= IPV6_AF_STALE;
+	}
+}
+
+void
+ipv6_deletestaleaddrs(struct interface *ifp)
+{
+	struct ipv6_state *state;
+	struct ipv6_addr *ia, *ia1;
+
+	state = IPV6_STATE(ifp);
+	if (state == NULL)
+		return;
+
+	TAILQ_FOREACH_SAFE(ia, &state->addrs, next, ia1) {
+		if (ia->flags & IPV6_AF_STALE)
+			ipv6_handleifa(ifp->ctx, RTM_DELADDR,
+			    ifp->ctx->ifaces, ifp->name,
+			    &ia->addr, ia->prefix_len, 0, 0);
 	}
 }
 
