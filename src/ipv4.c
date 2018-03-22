@@ -589,6 +589,7 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 {
 	struct ipv4_state *state;
 	struct ipv4_addr *ia;
+	bool is_new = false;
 #ifdef ALIAS_ADDR
 	int replaced, blank;
 	struct ipv4_addr *replaced_ia;
@@ -607,18 +608,23 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 		}
 	}
 
-	if ((ia = malloc(sizeof(*ia))) == NULL) {
-		logerr(__func__);
-		return NULL;
+	ia = ipv4_iffindaddr(ifp, addr, NULL);
+	if (ia == NULL) {
+		ia = malloc(sizeof(*ia));
+		if (ia == NULL) {
+			logerr(__func__);
+			return NULL;
+		}
+		ia->iface = ifp;
+		ia->addr = *addr;
+#ifdef IN_IFF_TENTATIVE
+		ia->addr_flags = IN_IFF_TENTATIVE;
+#endif
+		is_new = true;
 	}
 
-	ia->iface = ifp;
-	ia->addr = *addr;
 	ia->mask = *mask;
 	ia->brd = *bcast;
-#ifdef IN_IFF_TENTATIVE
-	ia->addr_flags = IN_IFF_TENTATIVE;
-#endif
 	snprintf(ia->saddr, sizeof(ia->saddr), "%s/%d",
 	    inet_ntoa(*addr), inet_ntocidr(*mask));
 
@@ -650,7 +656,8 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 	}
 #endif
 
-	TAILQ_INSERT_TAIL(&state->addrs, ia, next);
+	if (is_new)
+		TAILQ_INSERT_TAIL(&state->addrs, ia, next);
 	return ia;
 }
 
@@ -787,10 +794,11 @@ ipv4_deletestaleaddrs(struct interface *ifp)
 		return;
 
 	TAILQ_FOREACH_SAFE(ia, &state->addrs, next, ia1) {
-		if (ia->flags & IPV4_AF_STALE)
-			ipv4_handleifa(ifp->ctx, RTM_DELADDR,
-			    ifp->ctx->ifaces, ifp->name,
-			    &ia->addr, &ia->mask, &ia->brd, 0, 0);
+		if (!(ia->flags & IPV4_AF_STALE))
+			continue;
+		ipv4_handleifa(ifp->ctx, RTM_DELADDR,
+		    ifp->ctx->ifaces, ifp->name,
+		    &ia->addr, &ia->mask, &ia->brd, 0, getpid());
 	}
 }
 
@@ -804,6 +812,12 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 	struct ipv4_state *state;
 	struct ipv4_addr *ia;
 	bool ia_is_new;
+
+#if 0
+	logdebugx("%s: %s %s/%d %d", ifname,
+	    cmd == RTM_NEWADDR ? "RTM_NEWADDR" : cmd == RTM_DELADDR ? "RTM_DELADDR" : "???",
+	    inet_ntoa(*addr), inet_ntocidr(*mask), addrflags);
+#endif
 
 	if (ifs == NULL)
 		ifs = ctx->ifaces;

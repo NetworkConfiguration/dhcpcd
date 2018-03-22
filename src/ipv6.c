@@ -2124,7 +2124,7 @@ ipv6_deletestaleaddrs(struct interface *ifp)
 		if (ia->flags & IPV6_AF_STALE)
 			ipv6_handleifa(ifp->ctx, RTM_DELADDR,
 			    ifp->ctx->ifaces, ifp->name,
-			    &ia->addr, ia->prefix_len, 0, 0);
+			    &ia->addr, ia->prefix_len, 0, getpid());
 	}
 }
 
