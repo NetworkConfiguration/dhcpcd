@@ -3912,7 +3912,7 @@ dhcp_handleifa(int cmd, struct ipv4_addr *ia, pid_t pid)
 			/* Don't clear the added state as we need
 			 * to drop the lease. */
 			dhcp_drop(ifp, "EXPIRE");
-			dhcp_reboot(ifp);
+			dhcp_start1(ifp);
 		}
 		return;
 	}
