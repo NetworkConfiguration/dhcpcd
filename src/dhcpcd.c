@@ -1056,7 +1056,7 @@ dhcpcd_linkoverflow(struct dhcpcd_ctx *ctx)
 	struct ifaddrs *ifaddrs;
 	struct interface *ifp, *ifn, *ifp1;
 
-	loginfox("route socket overflowed - learning interface state");
+	logerrx("route socket overflowed - learning interface state");
 
 	/* Close the existing socket and open a new one.
 	 * This is easier than draining the kernel buffer of an
