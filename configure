@@ -1285,7 +1285,7 @@ EOF
 fi
 if [ "$HMAC" = no ]; then
 	echo "#include		\"compat/crypt/hmac.h\"" >>$CONFIG_H
-	echo "HMAC_SRC=		compat/crypt/hmac.c" >>$CONFIG_MK
+	echo "HMAC_SRC=	compat/crypt/hmac.c" >>$CONFIG_MK
 else
 	# echo "#define	HAVE_HMAC_H" >>$CONFIG_H
 	echo "HMAC_SRC=" >>$CONFIG_MK
@@ -1350,6 +1350,9 @@ if [ "$DEV" = yes ]; then
 	echo "DHCPCD_SRCS+=	dev.c" >>$CONFIG_MK
 	echo "CPPFLAGS+=	-DPLUGIN_DEV" >>$CONFIG_MK
 	echo "MKDIRS+=	dev" >>$CONFIG_MK
+
+	# So the plugins have access to logerr
+	echo "LDFLAGS+=	-Wl,-export-dynamic" >>$CONFIG_MK
 
 	printf "Testing for dlopen ... "
 	cat <<EOF >_dlopen.c
