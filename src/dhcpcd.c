@@ -995,6 +995,7 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 	}
 	/* Check if we already have the interface */
 	iff = if_find(ctx->ifaces, ifp->name);
+
 	if (iff != NULL) {
 		if (iff->active)
 			logdebugx("%s: interface updated", iff->name);
@@ -1013,9 +1014,12 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 		}
 		iff = ifp;
 	}
-	if_learnaddrs(ctx, ifs, &ifaddrs);
-	if (action > 0 && iff->active)
-		dhcpcd_prestartinterface(iff);
+
+	if (action > 0) {
+		if_learnaddrs(ctx, ifs, &ifaddrs);
+		if (iff->active)
+			dhcpcd_prestartinterface(iff);
+	}
 
 	/* Free our discovered list */
 	while ((ifp = TAILQ_FIRST(ifs))) {
