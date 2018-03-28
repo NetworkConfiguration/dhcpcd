@@ -101,17 +101,13 @@ rt_desc(const char *cmd, const struct rt *rt)
 }
 
 void
-rt_headclear(struct rt_head *rts, int af)
+rt_headclear0(struct dhcpcd_ctx *ctx, struct rt_head *rts, int af)
 {
 	struct rt *rt, *rtn;
-	struct dhcpcd_ctx *ctx;
 
 	if (rts == NULL)
 		return;
-
-	if ((rt = TAILQ_FIRST(rts)) == NULL)
-		return;
-	ctx = rt->rt_ifp->ctx;
+	assert(ctx != NULL);
 	assert(&ctx->froutes != rts);
 
 	TAILQ_FOREACH_SAFE(rt, rts, rt_next, rtn) {
@@ -122,6 +118,16 @@ rt_headclear(struct rt_head *rts, int af)
 		TAILQ_REMOVE(rts, rt, rt_next);
 		TAILQ_INSERT_TAIL(&ctx->froutes, rt, rt_next);
 	}
+}
+
+void
+rt_headclear(struct rt_head *rts, int af)
+{
+	struct rt *rt;
+
+	if (rts == NULL || (rt = TAILQ_FIRST(rts)) == NULL)
+		return;
+	rt_headclear0(rt->rt_ifp->ctx, rts, af);
 }
 
 static void
