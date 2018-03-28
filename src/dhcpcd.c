@@ -2022,6 +2022,7 @@ exit1:
 		}
 		free(ctx.ifaces);
 	}
+	free_options(&ctx, ifo);
 	rt_dispose(&ctx);
 	free(ctx.duid);
 	if (ctx.link_fd != -1) {
@@ -2029,7 +2030,6 @@ exit1:
 		close(ctx.link_fd);
 	}
 	if_closesockets(&ctx);
-	free_options(&ctx, ifo);
 	free_globals(&ctx);
 	ipv6_ctxfree(&ctx);
 	dev_stop(&ctx);
