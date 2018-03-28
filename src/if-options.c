@@ -2354,7 +2354,7 @@ read_config(struct dhcpcd_ctx *ctx,
 		buf = malloc(buflen);
 		if (buf == NULL) {
 			logerr(__func__);
-			free_options(ifo);
+			free_options(ctx, ifo);
 			return NULL;
 		}
 		ldop = edop = NULL;
@@ -2368,7 +2368,7 @@ read_config(struct dhcpcd_ctx *ctx,
 				if (nbuf == NULL) {
 					logerr(__func__);
 					free(buf);
-					free_options(ifo);
+					free_options(ctx, ifo);
 					return NULL;
 				}
 				buf = nbuf;
@@ -2532,7 +2532,7 @@ read_config(struct dhcpcd_ctx *ctx,
 	free(buf);
 
 	if (profile && !have_profile) {
-		free_options(ifo);
+		free_options(ctx, ifo);
 		errno = ENOENT;
 		return NULL;
 	}
@@ -2577,7 +2577,7 @@ add_options(struct dhcpcd_ctx *ctx, const char *ifname,
 }
 
 void
-free_options(struct if_options *ifo)
+free_options(struct dhcpcd_ctx *ctx, struct if_options *ifo)
 {
 	size_t i;
 	struct dhcp_opt *opt;
@@ -2599,7 +2599,7 @@ free_options(struct if_options *ifo)
 				free(ifo->config[i++]);
 			free(ifo->config);
 		}
-		rt_headclear(&ifo->routes, AF_UNSPEC);
+		rt_headclear0(ctx, &ifo->routes, AF_UNSPEC);
 		free(ifo->script);
 		free(ifo->arping);
 		free(ifo->blacklist);

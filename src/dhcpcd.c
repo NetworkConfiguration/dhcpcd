@@ -577,7 +577,7 @@ dhcpcd_selectprofile(struct interface *ifp, const char *profile)
 	} else
 		*ifp->profile = '\0';
 
-	free_options(ifp->options);
+	free_options(ifp->ctx, ifp->options);
 	ifp->options = ifo;
 	if (profile) {
 		add_options(ifp->ctx, ifp->name, ifp->options,
@@ -1165,7 +1165,7 @@ reload_config(struct dhcpcd_ctx *ctx)
 	if (ctx->options & DHCPCD_DAEMONISED)
 		ifo->options |= DHCPCD_DAEMONISED;
 	ctx->options = ifo->options;
-	free_options(ifo);
+	free_options(ctx, ifo);
 }
 
 static void
@@ -1523,6 +1523,8 @@ main(int argc, char **argv)
 #ifdef INET
 	ctx.udp_fd = -1;
 #endif
+	rt_init(&ctx);
+
 	logopts = LOGERR_ERR|LOGERR_LOG|LOGERR_LOG_DATE|LOGERR_LOG_PID;
 	i = 0;
 	while ((opt = getopt_long(argc, argv,
@@ -1617,7 +1619,7 @@ main(int argc, char **argv)
 	if (i == 2) {
 		printf("Interface options:\n");
 		if (optind == argc - 1) {
-			free_options(ifo);
+			free_options(&ctx, ifo);
 			ifo = read_config(&ctx, argv[optind], NULL, NULL);
 			if (ifo == NULL)
 				goto exit_failure;
@@ -1933,8 +1935,6 @@ printpidfile:
 		}
 	}
 
-	rt_init(&ctx);
-
 	TAILQ_FOREACH(ifp, ctx.ifaces, next) {
 		if (ifp->active)
 			dhcpcd_initstate1(ifp, argc, argv, 0);
@@ -1985,7 +1985,7 @@ printpidfile:
 			    handle_exit_timeout, &ctx);
 		}
 	}
-	free_options(ifo);
+	free_options(&ctx, ifo);
 	ifo = NULL;
 
 	if_sortinterfaces(&ctx);
@@ -2029,7 +2029,7 @@ exit1:
 		close(ctx.link_fd);
 	}
 	if_closesockets(&ctx);
-	free_options(ifo);
+	free_options(&ctx, ifo);
 	free_globals(&ctx);
 	ipv6_ctxfree(&ctx);
 	dev_stop(&ctx);
