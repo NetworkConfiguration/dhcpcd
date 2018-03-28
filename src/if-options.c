@@ -1086,14 +1086,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		    strncmp(arg, "ms_classless_static_routes=",
 		        strlen("ms_classless_static_routes=")) == 0)
 		{
-			struct interface *ifp;
 			struct in_addr addr3;
 
-			ifp = if_find(ctx->ifaces, ifname);
-			if (ifp == NULL) {
-				logerrx("static routes require an interface");
-				return -1;
-			}
 			fp = np = strwhite(p);
 			if (np == NULL) {
 				logerrx("all routes need a gateway");
@@ -1107,7 +1101,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 				*fp = ' ';
 				return -1;
 			}
-			if ((rt = rt_new(ifp)) == NULL) {
+			if ((rt = rt_new0(ctx)) == NULL) {
 				*fp = ' ';
 				return -1;
 			}
@@ -1117,16 +1111,9 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			TAILQ_INSERT_TAIL(&ifo->routes, rt, rt_next);
 			*fp = ' ';
 		} else if (strncmp(arg, "routers=", strlen("routers=")) == 0) {
-			struct interface *ifp;
-
-			ifp = if_find(ctx->ifaces, ifname);
-			if (ifp == NULL) {
-				logerrx("static routes require an interface");
-				return -1;
-			}
 			if (parse_addr(&addr, NULL, p) == -1)
 				return -1;
-			if ((rt = rt_new(ifp)) == NULL)
+			if ((rt = rt_new0(ctx)) == NULL)
 				return -1;
 			addr2.s_addr = INADDR_ANY;
 			sa_in_init(&rt->rt_dest, &addr2);
