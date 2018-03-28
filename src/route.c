@@ -146,13 +146,11 @@ rt_dispose(struct dhcpcd_ctx *ctx)
 }
 
 struct rt *
-rt_new(struct interface *ifp)
+rt_new0(struct dhcpcd_ctx *ctx)
 {
 	struct rt *rt;
-	struct dhcpcd_ctx *ctx;
 
-	assert(ifp != NULL);
-	ctx = ifp->ctx;
+	assert(ctx != NULL);
 	if ((rt = TAILQ_FIRST(&ctx->froutes)) != NULL)
 		TAILQ_REMOVE(&ctx->froutes, rt, rt_next);
 	else if ((rt = malloc(sizeof(*rt))) == NULL) {
@@ -160,10 +158,30 @@ rt_new(struct interface *ifp)
 		return NULL;
 	}
 	memset(rt, 0, sizeof(*rt));
+	return rt;
+}
+
+void
+rt_setif(struct rt *rt, struct interface *ifp)
+{
+
+	assert(rt != NULL);
+	assert(ifp != NULL);
 	rt->rt_ifp = ifp;
 #ifdef HAVE_ROUTE_METRIC
 	rt->rt_metric = ifp->metric;
 #endif
+}
+
+struct rt *
+rt_new(struct interface *ifp)
+{
+	struct rt *rt;
+
+	assert(ifp != NULL);
+	if ((rt = rt_new0(ifp->ctx)) == NULL)
+		return NULL;
+	rt_setif(rt, ifp);
 	return rt;
 }
 

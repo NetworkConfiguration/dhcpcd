@@ -88,6 +88,8 @@ void rt_free(struct rt *);
 void rt_freeif(struct interface *);
 void rt_headclear(struct rt_head *, int);
 void rt_headfreeif(struct rt_head *);
+struct rt * rt_new0(struct dhcpcd_ctx *);
+void rt_setif(struct rt *, struct interface *);
 struct rt * rt_new(struct interface *);
 void rt_recvrt(int, const struct rt *);
 void rt_build(struct dhcpcd_ctx *, int);

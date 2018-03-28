@@ -289,10 +289,11 @@ inet_dhcproutes(struct rt_head *routes, struct interface *ifp)
 		TAILQ_FOREACH(r, &ifp->options->routes, rt_next) {
 			if (sa_is_unspecified(&r->rt_gateway))
 				break;
-			if ((rt = rt_new(ifp)) == NULL)
+			if ((rt = rt_new0(ifp->ctx)) == NULL)
 				return -1;
-			rt->rt_dflags = RTDF_STATIC;
 			memcpy(rt, r, sizeof(*rt));
+			rt_setif(rt, ifp);
+			rt->rt_dflags = RTDF_STATIC;
 			TAILQ_INSERT_TAIL(&nroutes, rt, rt_next);
 		}
 	} else {
