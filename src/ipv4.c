@@ -408,6 +408,7 @@ inet_routerhostroute(struct rt_head *routes, struct interface *ifp)
 		}
 		if ((rth = rt_new(ifp)) == NULL)
 			return -1;
+		rth->rt_flags |= RTF_HOST;
 		sa_in_init(&rth->rt_dest, &gateway->sin_addr);
 		in.s_addr = INADDR_BROADCAST;
 		sa_in_init(&rth->rt_netmask, &in);
