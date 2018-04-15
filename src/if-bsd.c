@@ -499,7 +499,8 @@ if_route(unsigned char cmd, const struct rt *rt)
 		if (!(rtm->rtm_flags & RTF_REJECT) &&
 		    !sa_is_loopback(&rt->rt_gateway))
 		{
-			rtm->rtm_addrs |= RTA_IFP;
+			if (!gateway_unspec)
+				rtm->rtm_addrs |= RTA_IFP;
 			if (!sa_is_unspecified(&rt->rt_ifa))
 				rtm->rtm_addrs |= RTA_IFA;
 		}
