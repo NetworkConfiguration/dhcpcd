@@ -496,9 +496,6 @@ if_route(unsigned char cmd, const struct rt *rt)
 
 		rtm->rtm_flags |= RTF_UP;
 		rtm->rtm_addrs |= RTA_GATEWAY;
-#ifdef RTA_LABEL
-		rtm->rtm_addrs |= RTA_LABEL;
-#endif
 		if (!(rtm->rtm_flags & RTF_REJECT) &&
 		    !sa_is_loopback(&rt->rt_gateway))
 		{
