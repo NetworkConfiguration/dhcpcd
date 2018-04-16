@@ -753,7 +753,10 @@ link_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	}
 
 	if (nlm->nlmsg_type == RTM_DELLINK) {
-		dhcpcd_handleinterface(ctx, -1, ifn);
+		/* If are listening to a dev manager, let that remove
+		 * the interface rather than the kernel. */
+		if (dev_listening(ctx) < 1)
+			dhcpcd_handleinterface(ctx, -1, ifn);
 		return 0;
 	}
 
