@@ -194,6 +194,48 @@ dhcp6_printoptions(const struct dhcpcd_ctx *ctx,
 }
 
 static size_t
+dhcp6_makeuser(void *data, const struct interface *ifp)
+{
+	const struct if_options *ifo = ifp->options;
+	struct dhcp6_option o;
+	uint8_t *p;
+	const uint8_t *up, *ue;
+	uint16_t ulen, unlen;
+	size_t olen;
+
+	/* Convert the DHCPv4 user class option to DHCPv6 */
+	up = ifo->userclass;
+	ulen = *up++;
+	if (ulen == 0)
+		return 0;
+
+	p = data;
+	olen = 0;
+	if (p != NULL)
+		p += sizeof(o);
+
+	ue = up + ulen;
+	for (; up < ue; up += ulen) {
+		ulen = *up++;
+		olen += sizeof(ulen) + ulen;
+		if (data == NULL)
+			continue;
+		unlen = htons(ulen);
+		memcpy(p, &unlen, sizeof(unlen));
+		p += sizeof(unlen);
+		memcpy(p, up, ulen);
+		p += ulen;
+	}
+	if (data != NULL) {
+		o.code = htons(D6_OPTION_USER_CLASS);
+		o.len = htons(olen);
+		memcpy(data, &o, sizeof(o));
+	}
+
+	return sizeof(o) + olen;
+}
+
+static size_t
 dhcp6_makevendor(void *data, const struct interface *ifp)
 {
 	const struct if_options *ifo;
@@ -677,6 +719,8 @@ dhcp6_makemessage(struct interface *ifp)
 	len += sizeof(*state->send);
 	len += sizeof(o) + ifp->ctx->duid_len;
 	len += sizeof(o) + sizeof(uint16_t); /* elapsed */
+	if (!has_option_mask(ifo->nomask6, D6_OPTION_USER_CLASS))
+		len += dhcp6_makeuser(NULL, ifp);
 	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_CLASS))
 		len += dhcp6_makevendor(NULL, ifp);
 
@@ -844,6 +888,8 @@ dhcp6_makemessage(struct interface *ifp)
 	si_len = 0;
 	COPYIN(D6_OPTION_ELAPSED, &si_len, sizeof(si_len));
 
+	if (!has_option_mask(ifo->nomask6, D6_OPTION_USER_CLASS))
+		p += dhcp6_makeuser(p, ifp);
 	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_CLASS))
 		p += dhcp6_makevendor(p, ifp);
 
