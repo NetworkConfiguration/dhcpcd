@@ -228,7 +228,7 @@ dhcp6_makeuser(void *data, const struct interface *ifp)
 	}
 	if (data != NULL) {
 		o.code = htons(D6_OPTION_USER_CLASS);
-		o.len = htons(olen);
+		o.len = htons((uint16_t)olen);
 		memcpy(data, &o, sizeof(o));
 	}
 
