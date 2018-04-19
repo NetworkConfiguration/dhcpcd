@@ -287,7 +287,7 @@ dhcp6_makevendor(void *data, const struct interface *ifp)
 			{
 				hvlen = htons((uint16_t)vivco->len);
 				memcpy(p, &hvlen, sizeof(hvlen));
-				p += sizeof(len);
+				p += sizeof(hvlen);
 				memcpy(p, vivco->data, vivco->len);
 				p += vivco->len;
 			}

@@ -1850,6 +1850,7 @@ err_sla:
 			logerrx("invalid code: %s", arg);
 			return -1;
 		}
+		fp = strskipwhite(fp);
 		if (fp) {
 			s = parse_string(NULL, 0, fp);
 			if (s == -1) {
