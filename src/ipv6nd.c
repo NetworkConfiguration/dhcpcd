@@ -764,25 +764,25 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	}
 
 	if (len < sizeof(struct nd_router_advert)) {
-		logerr("IPv6 RA packet too short from %s", ctx->sfrom);
+		logerrx("IPv6 RA packet too short from %s", ctx->sfrom);
 		return;
 	}
 
 	/* RFC 4861 7.1.2 */
 	if (hoplimit != 255) {
-		logerr("invalid hoplimit(%d) in RA from %s",
+		logerrx("invalid hoplimit(%d) in RA from %s",
 		    hoplimit, ctx->sfrom);
 		return;
 	}
 
 	if (!IN6_IS_ADDR_LINKLOCAL(&ctx->from.sin6_addr)) {
-		logerr("RA from non local address %s", ctx->sfrom);
+		logerrx("RA from non local address %s", ctx->sfrom);
 		return;
 	}
 
 	if (!(ifp->options->options & DHCPCD_IPV6RS)) {
 #ifdef DEBUG_RS
-		logerr("%s: unexpected RA from %s",
+		logerrx("%s: unexpected RA from %s",
 		    ifp->name, ctx->sfrom);
 #endif
 		return;
