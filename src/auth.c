@@ -478,8 +478,9 @@ dhcp_auth_encode(struct auth *auth, const struct token *t,
 	uint64_t rdm;
 	uint8_t hmac_code[HMAC_LENGTH];
 	time_t now;
-	uint8_t hops, *p, info, *m, *data;
+	uint8_t hops, *p, *m, *data;
 	uint32_t giaddr, secretid;
+	bool auth_info;
 
 	if (auth->protocol == 0 && t == NULL) {
 		TAILQ_FOREACH(t, &auth->tokens, next) {
@@ -532,9 +533,9 @@ dhcp_auth_encode(struct auth *auth, const struct token *t,
 	/* DISCOVER or INFORM messages don't write auth info */
 	if ((mp == 4 && (mt == DHCP_DISCOVER || mt == DHCP_INFORM)) ||
 	    (mp == 6 && (mt == DHCP6_SOLICIT || mt == DHCP6_INFORMATION_REQ)))
-		info = 0;
+		auth_info = false;
 	else
-		info = 1;
+		auth_info = true;
 
 	/* Work out the auth area size.
 	 * We only need to do this for DISCOVER messages */
@@ -545,11 +546,11 @@ dhcp_auth_encode(struct auth *auth, const struct token *t,
 			dlen += t->key_len;
 			break;
 		case AUTH_PROTO_DELAYEDREALM:
-			if (info && t)
+			if (auth_info && t)
 				dlen += t->realm_len;
 			/* FALLTHROUGH */
 		case AUTH_PROTO_DELAYED:
-			if (info && t)
+			if (auth_info && t)
 				dlen += sizeof(t->secretid) + sizeof(hmac_code);
 			break;
 		}
@@ -572,18 +573,32 @@ dhcp_auth_encode(struct auth *auth, const struct token *t,
 	/* Write out our option */
 	*data++ = auth->protocol;
 	*data++ = auth->algorithm;
-	*data++ = auth->rdm;
-	switch (auth->rdm) {
-	case AUTH_RDM_MONOTONIC:
-		rdm = get_next_rdm_monotonic(auth);
-		break;
-	default:
-		/* This block appeases gcc, clang doesn't need it */
-		rdm = get_next_rdm_monotonic(auth);
-		break;
+	/*
+	 * RFC 3315 21.4.4.1 says that SOLICIT in DELAYED authentication
+	 * should not set RDM or it's data.
+	 * An expired draft draft-ietf-dhc-dhcpv6-clarify-auth-01 suggets
+	 * this should not be set for INFORMATION REQ messages as well,
+	 * which is probably a good idea because both states start from zero.
+	 */
+	if (auth_info ||
+	    !(auth->protocol & (AUTH_PROTO_DELAYED | AUTH_PROTO_DELAYEDREALM)))
+	{
+		*data++ = auth->rdm;
+		switch (auth->rdm) {
+		case AUTH_RDM_MONOTONIC:
+			rdm = get_next_rdm_monotonic(auth);
+			break;
+		default:
+			/* This block appeases gcc, clang doesn't need it */
+			rdm = get_next_rdm_monotonic(auth);
+			break;
+		}
+		rdm = htonll(rdm);
+		memcpy(data, &rdm, 8);
+	} else {
+		*data++ = 0;		/* rdm */
+		memset(data, 0, 8);	/* replay detection data */
 	}
-	rdm = htonll(rdm);
-	memcpy(data, &rdm, 8);
 	data += 8;
 	dlen -= 1 + 1 + 1 + 8;
 
@@ -603,7 +618,7 @@ dhcp_auth_encode(struct auth *auth, const struct token *t,
 	}
 
 	/* DISCOVER or INFORM messages don't write auth info */
-	if (!info)
+	if (!auth_info)
 		return (ssize_t)dlen;
 
 	/* Loading a saved lease without an authentication option */
