@@ -151,7 +151,24 @@ dhcp_auth_validate(struct authstate *state, const struct auth *auth,
 
 	memcpy(&replay, d, sizeof(replay));
 	replay = ntohll(replay);
-	if (state->token) {
+	/*
+	 * Test for a replay attack.
+	 *
+	 * NOTE: Some servers always send a replay data value of zero.
+	 * This is strictly compliant with RFC 3315 and 3318 which say:
+	 * "If the RDM field contains 0x00, the replay detection field MUST be
+	 *    set to the value of a monotonically increasing counter."
+	 * An example of a monotonically increasing sequence is:
+	 * 1, 2, 2, 2, 2, 2, 2
+	 * Errata 3474 updates RFC 3318 to say:
+	 * "If the RDM field contains 0x00, the replay detection field MUST be
+	 *    set to the value of a strictly increasing counter."
+	 *
+	 * Taking the above into account, dhcpcd will only test for
+	 * strictly speaking replay attacks if it receives any non zero
+	 * replay data to validate against.
+	 */
+	if (state->token && state->replay != 0) {
 		if (state->replay == (replay ^ 0x8000000000000000ULL)) {
 			/* We don't know if the singular point is increasing
 			 * or decreasing. */
