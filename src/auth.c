@@ -191,7 +191,7 @@ dhcp_auth_validate(struct authstate *state, const struct auth *auth,
 	 * Rest of data is MAC. */
 	switch (protocol) {
 	case AUTH_PROTO_TOKEN:
-		secretid = 0;
+		secretid = auth->token_rcv_secretid;
 		break;
 	case AUTH_PROTO_DELAYED:
 		if (dlen < sizeof(secretid) + sizeof(hmac_code)) {
@@ -199,6 +199,7 @@ dhcp_auth_validate(struct authstate *state, const struct auth *auth,
 			return NULL;
 		}
 		memcpy(&secretid, d, sizeof(secretid));
+		secretid = ntohl(secretid);
 		d += sizeof(secretid);
 		dlen -= sizeof(secretid);
 		break;
@@ -214,6 +215,7 @@ dhcp_auth_validate(struct authstate *state, const struct auth *auth,
 			dlen -= realm_len;
 		}
 		memcpy(&secretid, d, sizeof(secretid));
+		secretid = ntohl(secretid);
 		d += sizeof(secretid);
 		dlen -= sizeof(secretid);
 		break;
@@ -283,7 +285,6 @@ dhcp_auth_validate(struct authstate *state, const struct auth *auth,
 	}
 
 	/* Find a token for the realm and secret */
-	secretid = ntohl(secretid);
 	TAILQ_FOREACH(t, &auth->tokens, next) {
 		if (t->secretid == secretid &&
 		    t->realm_len == realm_len &&
@@ -499,11 +500,12 @@ dhcp_auth_encode(struct auth *auth, const struct token *t,
 	uint32_t giaddr, secretid;
 	bool auth_info;
 
-	if (auth->protocol == 0 && t == NULL) {
+	/* Ignore the token argument given to us - always send using the
+	 * configured token. */
+	if (auth->protocol == AUTH_PROTO_TOKEN) {
 		TAILQ_FOREACH(t, &auth->tokens, next) {
-			if (t->secretid == 0 &&
-			    t->realm_len == 0)
-			break;
+			if (t->secretid == auth->token_snd_secretid)
+				break;
 		}
 		if (t == NULL) {
 			errno = EINVAL;
