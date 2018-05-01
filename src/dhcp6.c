@@ -3456,13 +3456,6 @@ dhcp6_recv(struct dhcpcd_ctx *ctx, struct ipv6_addr *ia)
 	bytes = recvmsg_realloc(s, &ctx->rcvhdr, 0);
 	if (bytes == -1) {
 		logerr("%s: recvmsg_realloc", __func__);
-		close(s);
-		eloop_event_delete(ctx->eloop, s);
-		if (ia != NULL)
-			ia->dhcp6_fd = -1;
-		else
-			ctx->dhcp6_fd = -1;
-		eloop_exit(ctx->eloop, 1);
 		return;
 	}
 	len = (size_t)bytes;
