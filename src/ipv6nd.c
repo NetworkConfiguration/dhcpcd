@@ -1529,9 +1529,6 @@ ipv6nd_handledata(void *arg)
 	len = recvmsg_realloc(ctx->nd_fd, &ctx->rcvhdr, 0);
 	if (len == -1) {
 		logerr(__func__);
-		eloop_event_delete(ctx->eloop, ctx->nd_fd);
-		close(ctx->nd_fd);
-		ctx->nd_fd = -1;
 		return;
 	}
 	ctx->sfrom = inet_ntop(AF_INET6, &ctx->from.sin6_addr,
