@@ -750,6 +750,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	struct ipv6_addr *ap;
 	struct dhcp_opt *dho;
 	uint8_t new_rap, new_data;
+	uint32_t old_lifetime;
 	__printflike(1, 2) void (*logfunc)(const char *, ...);
 #ifdef IPV6_MANAGETEMPADDR
 	uint8_t new_ap;
@@ -858,7 +859,11 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 
 	clock_gettime(CLOCK_MONOTONIC, &rap->acquired);
 	rap->flags = nd_ra->nd_ra_flags_reserved;
+	old_lifetime = rap->lifetime;
 	rap->lifetime = ntohs(nd_ra->nd_ra_router_lifetime);
+	if (!new_rap && rap->lifetime == 0 && old_lifetime != 0)
+		logwarnx("%s: %s: no longer a default router",
+		    ifp->name, rap->sfrom);
 	if (nd_ra->nd_ra_reachable) {
 		rap->reachable = ntohl(nd_ra->nd_ra_reachable);
 		if (rap->reachable > MAX_REACHABLE_TIME)
