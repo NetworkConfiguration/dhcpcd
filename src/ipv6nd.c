@@ -749,7 +749,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	struct in6_addr pi_prefix;
 	struct ipv6_addr *ap;
 	struct dhcp_opt *dho;
-	uint8_t new_rap, new_data;
+	bool new_rap, new_data;
 	uint32_t old_lifetime;
 	__printflike(1, 2) void (*logfunc)(const char *, ...);
 #ifdef IPV6_MANAGETEMPADDR
@@ -821,9 +821,9 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 			free(rap->data);
 			rap->data_len = 0;
 		}
-		new_data = 1;
+		new_data = true;
 	} else
-		new_data = 0;
+		new_data = false;
 	if (rap == NULL) {
 		rap = calloc(1, sizeof(*rap));
 		if (rap == NULL) {
@@ -834,9 +834,9 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 		rap->from = ctx->from.sin6_addr;
 		strlcpy(rap->sfrom, ctx->sfrom, sizeof(rap->sfrom));
 		TAILQ_INIT(&rap->addrs);
-		new_rap = 1;
+		new_rap = true;
 	} else
-		new_rap = 0;
+		new_rap = false;
 	if (rap->data_len == 0) {
 		rap->data = malloc(len);
 		if (rap->data == NULL) {
