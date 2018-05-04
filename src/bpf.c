@@ -108,7 +108,7 @@ bpf_open(struct interface *ifp, int (*filter)(struct interface *, int))
 	size_t buf_len;
 	struct bpf_version pv;
 #ifdef BIOCIMMEDIATE
-	int flags;
+	unsigned int flags;
 #endif
 #ifndef O_CLOEXEC
 	int fd_opts;
