@@ -3334,7 +3334,7 @@ dhcp_handlepacket(struct interface *ifp, uint8_t *data, size_t len)
 			     state->bpf_flags & RAW_PARTIALCSUM) == -1)
 	{
 		if (errno == EINVAL)
-			logerrx("%s: UDP checksum failure from %s",
+			logerrx("%s: checksum failure from %s",
 			  ifp->name, inet_ntoa(from));
 		else
 			logerr("%s: invalid UDP packet from %s",
