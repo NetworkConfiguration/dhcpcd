@@ -411,7 +411,7 @@ static const struct bpf_insn bpf_arp_ether [] = {
 	/* Make sure the hardware length matches. */
 	BPF_STMT(BPF_LD + BPF_B + BPF_IND, offsetof(struct arphdr, ar_hln)),
 	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K,
-	         sizeof((struct ether_arp *)0)->arp_sha, 1, 0),
+	         sizeof(((struct ether_arp *)0)->arp_sha), 1, 0),
 	BPF_STMT(BPF_RET + BPF_K, 0),
 };
 #define bpf_arp_ether_len	__arraycount(bpf_arp_ether)
