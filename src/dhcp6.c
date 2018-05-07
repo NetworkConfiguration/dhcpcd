@@ -2195,6 +2195,7 @@ dhcp6_findia(struct interface *ifp, struct dhcp6_message *m, size_t l,
 	uint8_t iaid[4];
 	char buf[sizeof(iaid) * 3];
 	struct ipv6_addr *ap;
+	struct if_ia *ifia;
 
 	if (l < sizeof(*m)) {
 		/* Should be impossible with guards at packet in
@@ -2248,21 +2249,15 @@ dhcp6_findia(struct interface *ifp, struct dhcp6_message *m, size_t l,
 		o.len = (uint16_t)(o.len - nl);
 
 		for (j = 0; j < ifo->ia_len; j++) {
-			if (memcmp(&ifo->ia[j].iaid, ia.iaid,
-			    sizeof(ia.iaid)) == 0)
+			ifia = &ifo->ia[j];
+			if (ifia->ia_type == o.code &&
+			    memcmp(ifia->iaid, ia.iaid, sizeof(ia.iaid)) == 0)
 				break;
 		}
 		if (j == ifo->ia_len &&
 		    !(ifo->ia_len == 0 && ifp->ctx->options & DHCPCD_DUMPLEASE))
 		{
 			logdebugx("%s: ignoring unrequested IAID %s",
-			    ifp->name,
-			    hwaddr_ntoa(ia.iaid, sizeof(ia.iaid),
-			    buf, sizeof(buf)));
-			continue;
-		}
-		if ( j < ifo->ia_len && ifo->ia[j].ia_type != o.code) {
-			logerrx("%s: IAID %s: option type mismatch",
 			    ifp->name,
 			    hwaddr_ntoa(ia.iaid, sizeof(ia.iaid),
 			    buf, sizeof(buf)));
