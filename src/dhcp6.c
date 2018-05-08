@@ -98,6 +98,11 @@ struct dhcp6_ia_na {
 };
 __CTASSERT(sizeof(struct dhcp6_ia_na) == 12);
 
+struct dhcp6_ia_ta {
+	uint8_t iaid[4];
+};
+__CTASSERT(sizeof(struct dhcp6_ia_ta) == 4);
+
 struct dhcp6_ia_addr {
 	struct in6_addr addr;
 	uint32_t pltime;
@@ -629,6 +634,7 @@ dhcp6_makemessage(struct interface *ifp)
 	int fqdn;
 	struct dhcp6_ia_na ia_na;
 	uint16_t ia_na_len;
+	struct if_ia *ifia;
 #ifdef AUTH
 	uint16_t auth_len;
 #endif
@@ -899,19 +905,29 @@ dhcp6_makemessage(struct interface *ifp)
 		COPYIN1(D6_OPTION_RAPID_COMMIT, 0);
 
 	for (l = 0; IA && l < ifo->ia_len; l++) {
+		ifia = &ifo->ia[l];
 		o_lenp = NEXTLEN;
-		ia_na_len = sizeof(ia_na);
-		memcpy(ia_na.iaid, ifo->ia[l].iaid, sizeof(ia_na.iaid));
+		/* TA structure is the same as the others,
+		 * it just lacks the T1 and T2 timers.
+		 * These happen to be at the end of the struct,
+		 * so we just don't copy them in. */
+		if (ifia->ia_type == D6_OPTION_IA_TA)
+			ia_na_len = sizeof(struct dhcp6_ia_ta);
+		else
+			ia_na_len = sizeof(ia_na);
+		memcpy(ia_na.iaid, ifia->iaid, sizeof(ia_na.iaid));
 		ia_na.t1 = 0;
 		ia_na.t2 = 0;
-		COPYIN(ifo->ia[l].ia_type, &ia_na, sizeof(ia_na));
+		COPYIN(ifia->ia_type, &ia_na, ia_na_len);
 		TAILQ_FOREACH(ap, &state->addrs, next) {
 			if (ap->flags & IPV6_AF_STALE)
 				continue;
 			if (ap->prefix_vltime == 0 &&
 			    !(ap->flags & IPV6_AF_REQUEST))
 				continue;
-			if (memcmp(ifo->ia[l].iaid, ap->iaid, sizeof(uint32_t)))
+			if (ap->ia_type != ifia->ia_type)
+				continue;
+			if (memcmp(ap->iaid, ifia->iaid, sizeof(ap->iaid)))
 				continue;
 			if (ap->ia_type == D6_OPTION_IA_PD) {
 #ifndef SMALL
