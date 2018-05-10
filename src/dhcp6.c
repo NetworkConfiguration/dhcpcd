@@ -484,20 +484,18 @@ again:
 
 #ifndef SMALL
 static const struct if_sla *
-dhcp6_findselfsla(struct interface *ifp, const uint8_t *iaid)
+dhcp6_findselfsla(struct interface *ifp)
 {
 	size_t i, j;
+	struct if_ia *ia;
 
 	for (i = 0; i < ifp->options->ia_len; i++) {
-		if (iaid == NULL ||
-		    memcmp(&ifp->options->ia[i].iaid, iaid,
-		    sizeof(ifp->options->ia[i].iaid)) == 0)
-		{
-			for (j = 0; j < ifp->options->ia[i].sla_len; j++) {
-				if (strcmp(ifp->options->ia[i].sla[j].ifname,
-				    ifp->name) == 0)
-					return &ifp->options->ia[i].sla[j];
-			}
+		ia = &ifp->options->ia[i];
+		if (ia->ia_type != D6_OPTION_IA_PD)
+			continue;
+		for (j = 0; j < ia->sla_len; j++) {
+			if (strcmp(ia->sla[j].ifname, ifp->name) == 0)
+				return &ia->sla[j];
 		}
 	}
 	return NULL;
@@ -699,7 +697,7 @@ dhcp6_makemessage(struct interface *ifp)
 				len += sizeof(o.len);
 			}
 		}
-		if (dhcp6_findselfsla(ifp, NULL)) {
+		if (dhcp6_findselfsla(ifp)) {
 			n_options++;
 			len += sizeof(o.len);
 		}
@@ -1076,7 +1074,7 @@ dhcp6_makemessage(struct interface *ifp)
 					    (o.len + sizeof(o.code));
 				}
 			}
-			if (dhcp6_findselfsla(ifp, NULL)) {
+			if (dhcp6_findselfsla(ifp)) {
 				o.code = htons(D6_OPTION_PD_EXCLUDE);
 				memcpy(p, &o.code, sizeof(o.code));
 				p += sizeof(o.code);
@@ -2790,6 +2788,8 @@ dhcp6_delegate_prefix(struct interface *ifp)
 			}
 			for (i = 0; i < ifo->ia_len; i++) {
 				ia = &ifo->ia[i];
+				if (ia->ia_type != D6_OPTION_IA_PD)
+					continue;
 				if (memcmp(ia->iaid, ap->iaid,
 				    sizeof(ia->iaid)))
 					continue;
@@ -2886,6 +2886,8 @@ dhcp6_find_delegates(struct interface *ifp)
 				continue;
 			for (i = 0; i < ifo->ia_len; i++) {
 				ia = &ifo->ia[i];
+				if (ia->ia_type != D6_OPTION_IA_PD)
+					continue;
 				if (memcmp(ia->iaid, ap->iaid,
 				    sizeof(ia->iaid)))
 					continue;
@@ -3663,6 +3665,8 @@ dhcp6_activateinterfaces(struct interface *ifp)
 
 	for (i = 0; i < ifp->options->ia_len; i++) {
 		ia = &ifp->options->ia[i];
+		if (ia->ia_type != D6_OPTION_IA_PD)
+			continue;
 		for (j = 0; j < ia->sla_len; j++) {
 			sla = &ia->sla[j];
 			ifd = if_find(ifp->ctx->ifaces, sla->ifname);
@@ -3719,7 +3723,7 @@ dhcp6_start1(void *arg)
 
 #ifndef SMALL
 	/* Rapid commit won't work with Prefix Delegation Exclusion */
-	if (dhcp6_findselfsla(ifp, NULL))
+	if (dhcp6_findselfsla(ifp))
 		del_option_mask(ifo->requestmask6, D6_OPTION_RAPID_COMMIT);
 #endif
 
