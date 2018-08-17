@@ -1157,8 +1157,8 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 		if (ifam->ifam_type == RTM_DELADDR)
 			addrflags = 0 ;
 		else if ((addrflags = if_addrflags(ifp, &addr, NULL)) == -1) {
-			logerr("%s: if_addrflags: %s",
-			    ifp->name, inet_ntoa(addr));
+			if (errno != EADDRNOTAVAIL)
+				logerr("%s: if_addrflags", __func__);
 			break;
 		}
 #endif
@@ -1183,7 +1183,8 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 		if (ifam->ifam_type == RTM_DELADDR)
 		    addrflags = 0;
 		else if ((addrflags = if_addrflags6(ifp, &addr6, NULL)) == -1) {
-			logerr("%s: if_addrflags6", ifp->name);
+			if (errno != EADDRNOTAVAIL)
+				logerr("%s: if_addrflags6", __func__);
 			break;
 		}
 #endif
