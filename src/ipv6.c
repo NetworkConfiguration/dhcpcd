@@ -567,7 +567,8 @@ ipv6_checkaddrflags(void *arg)
 	alias = NULL;
 #endif
 	if ((flags = if_addrflags6(ia->iface, &ia->addr, alias)) == -1) {
-		logerr("%s: if_addrflags6", ia->iface->name);
+		if (errno != EEXIST && errno != EADDRNOTAVAIL)
+			logerr("%s: if_addrflags6", __func__);
 		return;
 	}
 
