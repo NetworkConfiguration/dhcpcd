@@ -430,7 +430,7 @@ ipv6_mask(struct in6_addr *mask, int len)
 	bits = len % NBBY;
 	for (i = 0; i < bytes; i++)
 		mask->s6_addr[i] = 0xff;
-	if (bits) {
+	if (bits != 0) {
 		/* Coverify false positive.
 		 * bytelen cannot be 16 if bitlen is non zero */
 		/* coverity[overrun-local] */
