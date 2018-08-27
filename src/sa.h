@@ -64,5 +64,6 @@ const char *sa_addrtop(const struct sockaddr *, char *, socklen_t);
 int sa_cmp(const struct sockaddr *, const struct sockaddr *);
 void sa_in_init(struct sockaddr *, const struct in_addr *);
 void sa_in6_init(struct sockaddr *, const struct in6_addr *);
+void sa_cpy(struct sockaddr *, const struct sockaddr *);
 
 #endif

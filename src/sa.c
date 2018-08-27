@@ -371,8 +371,12 @@ sa_cmp(const struct sockaddr *sa1, const struct sockaddr *sa2)
 {
 	socklen_t offset, len;
 
-	assert(sa1 != NULL);
-	assert(sa2 != NULL);
+	if (sa == NULL && sa == NULL)
+		return 0;
+	if (sa1 == NULL && sa2 != NULL)
+		return -1;
+	if (sa1 != NULL && sa2 == NULL)
+		return 1;
 
 	/* Treat AF_UNSPEC as the unspecified address. */
 	if ((sa1->sa_family == AF_UNSPEC || sa2->sa_family == AF_UNSPEC) &&
@@ -456,3 +460,31 @@ sa_in6_init(struct sockaddr *sa, const struct in6_addr *addr)
 	    sizeof(sin6->sin6_addr.s6_addr));
 }
 #endif
+
+void
+sa_cpy(struct sockaddr *src, const struct sockaddr *dst)
+{
+#ifdef HAVE_SA_LEN
+	if (src->sa_len == 0)
+		memset(src, 0, sizeof(*src));
+	else
+		memcpy(src, dst, src->sa_len);
+#else
+	size_t sa_len;
+
+	switch (dst->sa_family) {
+	case AF_INET:
+		sa_len = sizeof(struct sockaddr_in);
+		break;
+	case AF_INET6:
+		sa_len = sizeof(struct sockaddr_in6);
+		break;
+	default:
+		sa_len = 0;
+	}
+	if (sa_len == 0)
+		memset(src, 0, sizeof(*src));
+	else
+		memcpy(src, dst, sa_len);
+#endif
+}
