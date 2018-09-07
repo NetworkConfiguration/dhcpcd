@@ -3542,7 +3542,8 @@ dhcp6_recv(struct dhcpcd_ctx *ctx, struct ipv6_addr *ia)
 		    " sending to all interfaces",
 		    ifp->name, ctx->sfrom);
 		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-			if (D6_CSTATE(ifp) != NULL)
+			state = D6_CSTATE(ifp);
+			if (state != NULL && state->send != NULL)
 				dhcp6_recvif(ifp, r, len);
 		}
 		return;
