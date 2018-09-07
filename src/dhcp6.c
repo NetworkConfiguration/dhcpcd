@@ -3538,7 +3538,7 @@ dhcp6_recv(struct dhcpcd_ctx *ctx, struct ipv6_addr *ia)
 	}
 
 	if (r->type == DHCP6_RECONFIGURE) {
-		logdebugx("%s: RECONFIGURE recv from %s,"
+		logdebugx("%s: RECONFIGURE6 recv from %s,"
 		    " sending to all interfaces",
 		    ifp->name, ctx->sfrom);
 		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
