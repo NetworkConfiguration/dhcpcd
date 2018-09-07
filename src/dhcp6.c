@@ -3194,7 +3194,7 @@ dhcp6_recvif(struct interface *ifp, struct dhcp6_message *r, size_t len)
 	ctx = ifp->ctx;
 	state = D6_STATE(ifp);
 	if (state == NULL || state->send == NULL) {
-		logdebug("%s: DHCPv6 reply received but not running",
+		logdebugx("%s: DHCPv6 reply received but not running",
 		    ifp->name);
 		return;
 	}
