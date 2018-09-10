@@ -3315,10 +3315,9 @@ dhcp6_recvif(struct interface *ifp, struct dhcp6_message *r, size_t len)
 				 * The currently held lease is still valid
 				 * until a new one is found.
 				 */
-				if (state->state != DH6S_DISCOVER) {
+				if (state->state != DH6S_DISCOVER)
 					dhcp6_startdiscover(ifp);
-					return;
-				}
+				return;
 			}
 			if (state->state == DH6S_DISCOVER)
 				state->state = DH6S_REQUEST;
