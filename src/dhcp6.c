@@ -3299,15 +3299,26 @@ dhcp6_recvif(struct interface *ifp, struct dhcp6_message *r, size_t len)
 			if (dhcp6_validatelease(ifp, r, len,
 			    ctx->sfrom, NULL) == -1)
 			{
-#ifndef SMALL
-				/* PD doesn't use CONFIRM, so REBIND could
-				 * throw up an invalid prefix if we
-				 * changed link */
-				if (state->state == DH6S_REBIND &&
-				    dhcp6_hasprefixdelegation(ifp))
+				/*
+				 * If we can't use the lease, fallback to
+				 * DISCOVER and try and get a new one.
+				 *
+				 * This is needed become some servers
+				 * renumber the prefix or address
+				 * and deny the current one before it expires
+				 * rather than sending it back with a zero
+				 * lifetime along with the new prefix or
+				 * address to use.
+				 * This behavior is wrong, but moving to the
+				 * DISCOVER phase works around it.
+				 *
+				 * The currently held lease is still valid
+				 * until a new one is found.
+				 */
+				if (state->state != DH6S_DISCOVER) {
 					dhcp6_startdiscover(ifp);
-#endif
-				return;
+					return;
+				}
 			}
 			if (state->state == DH6S_DISCOVER)
 				state->state = DH6S_REQUEST;
