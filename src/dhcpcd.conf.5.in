@@ -110,7 +110,7 @@ then it means that
 .Nm dhcpcd
 could not find the correct authentication token in your configuration.
 .It Ic background
-Fork to background immediately.
+Fork to the background immediately.
 This is useful for startup scripts which don't disable link messages for
 carrier status.
 .It Ic blacklist Ar address Ns Op /cidr
