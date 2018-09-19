@@ -88,7 +88,7 @@ duid_machineuuid(char *uuid, size_t uuid_len)
 	}
 	len = strlen(uuid) + 1;
 	fclose(fp);
-	r = 0;
+	r = len == 1 ? -1 : 0;
 #else
 	r = -1;
 	errno = ENOSYS;
