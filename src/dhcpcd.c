@@ -451,6 +451,10 @@ configure_interface1(struct interface *ifp)
 		ifo->options &=
 		    ~(DHCPCD_IPV6RS | DHCPCD_DHCP6 | DHCPCD_WAITIP6);
 
+	if (!(ifo->options & DHCPCD_IPV6RS))
+		ifo->options &=
+		    ~(DHCPCD_IPV6RA_AUTOCONF | DHCPCD_IPV6RA_REQRDNSS);
+
 	/* We want to setup INET6 on the interface as soon as possible. */
 	if (ifp->active == IF_ACTIVE_USER &&
 	    ifo->options & DHCPCD_IPV6 &&
