@@ -1393,8 +1393,20 @@ set_ifxflags(int s, const struct interface *ifp)
 	/*
 	 * If not doing autoconf, don't disable the kernel from doing it.
 	 * If we need to, we should have another option actively disable it.
+	 *
+	 * OpenBSD moved from kernel based SLAAC to userland via slaacd(8).
+	 * It has a similar featureset to dhcpcd such as stable private
+	 * addresses, but lacks the ability to handle DNS inside the RA
+	 * which is a serious shortfall in this day and age.
+	 * Appease their user base by working alongside slaacd(8) if
+	 * dhcpcd is instructed not to do auto configuration of addresses.
 	 */
-	if (ifp->options->options & DHCPCD_IPV6RS)
+#if defined(ND6_IFF_ACCEPT_RTADV)
+#define	BSD_AUTOCONF	DHCPCD_IPV6RS
+#else
+#define	BSD_AUTOCONF	DHCPCD_IPV6RA_AUTOCONF
+#endif
+	if (ifp->options->options & BSD_AUTOCONF)
 		flags &= ~IFXF_AUTOCONF6;
 	if (ifr.ifr_flags == flags)
 		return 0;
