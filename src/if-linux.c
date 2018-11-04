@@ -294,6 +294,9 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 	struct priv *priv;
 	struct sockaddr_nl snl;
 	socklen_t len;
+#ifdef NETLINK_BROADCAST_ERROR
+	int on = 1;
+#endif
 
 	/* Open the link socket first so it gets pid() for the socket.
 	 * Then open our persistent route socket so we get a unique
@@ -311,6 +314,10 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 	ctx->link_fd = _open_link_socket(&snl, NETLINK_ROUTE);
 	if (ctx->link_fd == -1)
 		return -1;
+#ifdef NETLINK_BROADCAST_ERROR
+	setsockopt(ctx->link_fd, SOL_NETLINK, NETLINK_BROADCAST_ERROR,
+	    &on, sizeof(on));
+#endif
 
 	if ((priv = calloc(1, sizeof(*priv))) == NULL)
 		return -1;
