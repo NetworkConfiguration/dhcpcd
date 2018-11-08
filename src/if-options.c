@@ -2010,7 +2010,7 @@ err_sla:
 		arg = fp;
 		fp = strend(arg);
 		if (fp == NULL) {
-			logerrx("authtoken requies an an expiry date");
+			logerrx("authtoken requies an expiry date");
 			free(token->realm);
 			free(token);
 			return -1;
