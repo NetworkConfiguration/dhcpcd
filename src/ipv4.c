@@ -880,6 +880,9 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 	case RTM_DELADDR:
 		if (ia == NULL)
 			return;
+		if (mask->s_addr != INADDR_ANY &&
+		    mask->s_addr != ia->mask.s_addr)
+			return;
 		TAILQ_REMOVE(&state->addrs, ia, next);
 		break;
 	default:

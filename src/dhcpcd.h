@@ -166,13 +166,6 @@ struct dhcpcd_ctx {
 
 	char *randomstate; /* original state */
 
-	/* Used to track the last routing message,
-	 * so we can ignore messages the parent process sent
-	 * but the child receives when forking.
-	 * getppid(2) is unreliable because we detach. */
-	pid_t ppid;	/* parent pid */
-	int pseq;	/* last seq in parent */
-
 #ifdef INET
 	struct dhcp_opt *dhcp_opts;
 	size_t dhcp_opts_len;
