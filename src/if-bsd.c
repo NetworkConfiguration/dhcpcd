@@ -797,6 +797,10 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 	if (ia->autoconf)
 		ifa.ifra_flags |= IN6_IFF_AUTOCONF;
 #endif
+#if defined(__FreeBSD__) || defined(__DragonFly__)
+	if (ia->addr_flags & IN6_IFF_TENTATIVE)
+		ifa.ifra_flags |= IN6_IFF_TENTATIVE;
+#endif
 #ifdef IPV6_MANGETEMPADDR
 	if (ia->flags & IPV6_AF_TEMPORARY)
 		ifa.ifra_flags |= IN6_IFF_TEMPORARY;
