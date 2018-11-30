@@ -314,13 +314,6 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 		return 0;
 	}
 
-	/* Store the pid and routing message seq number so we can identify
-	 * the last message successfully sent to the kernel.
-	 * This allows us to ignore all messages we sent after forking
-	 * and detaching. */
-	ctx->ppid = getpid();
-	ctx->pseq = ctx->sseq;
-
 	switch (pid = fork()) {
 	case -1:
 		logerr("%s: fork", __func__);

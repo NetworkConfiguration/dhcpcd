@@ -854,7 +854,6 @@ send_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp,
 		struct priv *priv;
 
 		priv = (struct priv *)ctx->priv;
-		ctx->sseq = ctx->seq;
 		r = get_netlink(ctx, priv->sndrcv_iov, ifp, s, 0, callback);
 	} else
 		r = -1;
