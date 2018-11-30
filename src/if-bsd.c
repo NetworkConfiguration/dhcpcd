@@ -515,7 +515,7 @@ if_route(unsigned char cmd, const struct rt *rt)
 		{
 			rtm->rtm_index = (unsigned short)rt->rt_ifp->index;
 #ifdef __OpenBSD__
-			if (!gateway_unspec && rt->rt_dest.sa_family==AF_INET6)
+			if (!gateway_unspec || rt->rt_dest.sa_family!=AF_INET6)
 #endif
 			rtm->rtm_addrs |= RTA_IFP;
 			if (!sa_is_unspecified(&rt->rt_ifa))
