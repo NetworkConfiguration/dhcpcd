@@ -1507,13 +1507,14 @@ if_setup_inet6(const struct interface *ifp)
 	 * and prefixes so the kernel does not expire prefixes
 	 * and default routes we are trying to own. */
 	if (ifp->options->options & DHCPCD_IPV6RS) {
-		char ifname[IFNAMSIZ + 8];
+		struct in6_ifreq ifr;
 
-		strlcpy(ifname, ifp->name, sizeof(ifname));
-		if (ioctl(s, SIOCSRTRFLUSH_IN6, (void *)&ifname) == -1 &&
+		memset(&ifr, 0, sizeof(ifr));
+		strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
+		if (ioctl(s, SIOCSRTRFLUSH_IN6, &ifr) == -1 &&
 		    errno != ENOTSUP)
 			logwarn("SIOCSRTRFLUSH_IN6");
-		if (ioctl(s, SIOCSPFXFLUSH_IN6, (void *)&ifname) == -1 &&
+		if (ioctl(s, SIOCSPFXFLUSH_IN6, &ifr) == -1 &&
 		    errno != ENOTSUP)
 			logwarn("SIOCSPFXFLUSH_IN6");
 	}
