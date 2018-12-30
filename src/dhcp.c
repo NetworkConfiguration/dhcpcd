@@ -2631,6 +2631,7 @@ dhcp_reboot(struct interface *ifp)
 	 * interface gets the reply. */
 	ia = ipv4_iffindaddr(ifp, &state->lease.addr, NULL);
 	if (ia != NULL &&
+	    !(ifp->ctx->options & DHCPCD_TEST) &&
 #ifdef IN_IFF_NOTUSEABLE
 	    !(ia->addr_flags & IN_IFF_NOTUSEABLE) &&
 #endif
