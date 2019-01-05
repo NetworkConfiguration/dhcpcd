@@ -44,7 +44,8 @@
 #  endif
 #endif
 
-#define ALLROUTERS "ff02::2"
+#define	ALLNODES		"ff02::1"
+#define	ALLROUTERS		"ff02::2"
 
 #define EUI64_GBIT		0x01
 #define EUI64_UBIT		0x02
@@ -168,6 +169,10 @@ struct ipv6_addr {
 
 	void (*dadcallback)(void *);
 	int dadcounter;
+
+	struct nd_neighbor_advert *na;
+	size_t na_len;
+	int na_count;
 
 #ifdef ALIAS_ADDR
 	char alias[IF_NAMESIZE];

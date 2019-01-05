@@ -1516,6 +1516,7 @@ dhcp6_dadcallback(void *arg)
 				if (valid)
 					dhcpcd_daemonise(ifp->ctx);
 			}
+			ipv6nd_advertise(ia);
 		}
 	}
 }
@@ -3950,6 +3951,21 @@ dhcp6_dropnondelegates(struct interface *ifp)
 
 	loginfox("%s: dropping DHCPv6 due to no valid routers", ifp->name);
 	dhcp6_drop(ifp, "EXPIRE6");
+}
+
+void
+dhcp6_abort(struct interface *ifp)
+{
+	struct dhcp6_state *state;
+	struct ipv6_addr *ia;
+
+	eloop_timeout_delete(ifp->ctx->eloop, dhcp6_start1, ifp);
+	state = D6_STATE(ifp);
+	if (state == NULL)
+		return;
+	TAILQ_FOREACH(ia, &state->addrs, next) {
+		ipv6nd_advertise(ia);
+	}
 }
 
 void
