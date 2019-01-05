@@ -1756,4 +1756,18 @@ ip6_temp_valid_lifetime(const char *ifname)
 	return val < 0 ? TEMP_VALID_LIFETIME : val;
 }
 #endif /* IPV6_MANAGETEMPADDR */
+
+int
+ip6_forwarding(const char *ifname)
+{
+	char path[256];
+	int val;
+
+	if (ifname == NULL)
+		ifname = "all";
+	snprintf(path, sizeof(path), "%s/%s/forwarding", prefix, ifname);
+	val = check_proc_int(path);
+	return val == -1 ? 0 : val;
+}
+
 #endif /* INET6 */
