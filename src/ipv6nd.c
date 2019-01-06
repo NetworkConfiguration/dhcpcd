@@ -1096,12 +1096,6 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 			if (ap == NULL) {
 				unsigned int flags;
 
-				if (!(pi.nd_opt_pi_flags_reserved &
-				    ND_OPT_PI_FLAG_AUTO) &&
-				    !(pi.nd_opt_pi_flags_reserved &
-				    ND_OPT_PI_FLAG_ONLINK))
-					continue;
-
 				flags = IPV6_AF_RAPFX;
 				if (pi.nd_opt_pi_flags_reserved &
 				    ND_OPT_PI_FLAG_AUTO &&
@@ -1114,7 +1108,8 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 				if (ap == NULL)
 					break;
 				ap->prefix = pi_prefix;
-				ap->dadcallback = ipv6nd_dadcallback;
+				if (flags & IPV6_AF_AUTOCONF)
+					ap->dadcallback = ipv6nd_dadcallback;
 				ap->created = ap->acquired = rap->acquired;
 				TAILQ_INSERT_TAIL(&rap->addrs, ap, next);
 
@@ -1124,7 +1119,8 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx, struct interface *ifp,
 				 * temporary address also exists then
 				 * extend the existing one rather than
 				 * create a new one */
-				if (ipv6_iffindaddr(ifp, &ap->addr,
+				if (flags & IPV6_AF_AUTOCONF &&
+				    ipv6_iffindaddr(ifp, &ap->addr,
 				    IN6_IFF_NOTUSEABLE) &&
 				    ipv6_settemptime(ap, 0))
 					new_ap = 0;
