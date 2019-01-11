@@ -98,7 +98,7 @@ for x do
 	--servicestatus) SERVICESTATUS=$var;;
 	--small) SMALL=yes;;
 	--statusarg) STATUSARG=$var;;
-	--infodir|--includedir) ;; # ignore autotools
+	--infodir) ;; # ignore autotools
 	--disable-maintainer-mode|--disable-dependency-tracking) ;;
 	--disable-silent-rules) ;;
 	-V|--version)
