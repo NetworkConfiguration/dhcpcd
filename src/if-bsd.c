@@ -1114,22 +1114,21 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 			 * This makes this call very heavy weight, but we
 			 * really need to know if the message is late or not.
 			 */
+			const struct sockaddr *sa;
 			struct ifaddrs *ifaddrs = NULL, *ifa;
-			struct in_addr *a;
 
-			getifaddrs(&ifa);
+			sa = rti_info[RTAX_IFA];
+			getifaddrs(&ifaddrs);
 			for (ifa = ifaddrs; ifa; ifa = ifa->ifa_next) {
-				if (ifa->ifa_addr == NULL ||
-				    ifa->ifa_addr->sa_family != AF_INET)
+				if (ifa->ifa_addr == NULL)
 					continue;
-				a = (void *)ifa->ifa_addr;
-				if (a->s_addr == addr.s_addr &&
+				if (sa_cmp(ifa->ifa_addr, sa) == 0 &&
 				    strcmp(ifa->ifa_name, ifp->name) == 0)
 					break;
 			}
-			freeifaddrs(ifa);
+			freeifaddrs(ifaddrs);
 			if (ifa != NULL)
-				break;
+				return;
 #endif
 		}
 
