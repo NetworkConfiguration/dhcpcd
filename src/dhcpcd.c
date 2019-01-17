@@ -752,11 +752,9 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 #endif
 			if (ifp->wireless) {
 				uint8_t ossid[IF_SSIDLEN];
-#ifdef NOCARRIER_PRESERVE_IP
 				size_t olen;
 
 				olen = ifp->ssid_len;
-#endif
 				memcpy(ossid, ifp->ssid, ifp->ssid_len);
 				if_getssid(ifp);
 
