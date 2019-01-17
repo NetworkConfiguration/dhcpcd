@@ -759,12 +759,16 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 #endif
 				memcpy(ossid, ifp->ssid, ifp->ssid_len);
 				if_getssid(ifp);
-#ifdef NOCARRIER_PRESERVE_IP
+
 				/* If we changed SSID network, drop leases */
 				if (ifp->ssid_len != olen ||
 				    memcmp(ifp->ssid, ossid, ifp->ssid_len))
+				{
+#ifdef NOCARRIER_PRESERVE_IP
 					dhcpcd_drop(ifp, 0);
 #endif
+					ipv4ll_reset(ifp);
+				}
 			}
 			dhcpcd_initstate(ifp, 0);
 			script_runreason(ifp, "CARRIER");
