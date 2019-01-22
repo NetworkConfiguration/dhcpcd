@@ -170,16 +170,6 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 	    &n, sizeof(n)) == -1)
 		logerr("%s: SO_USELOOPBACK", __func__);
 
-#ifdef SO_RERROR
-	/* Tell recvmsg(2) to return ENOBUFS if the receiving socket overflows
-	 * from too many route(4) messages so we can re-sync our state
-	 * with reality. */
-	n = 1;
-	if (setsockopt(ctx->link_fd, SOL_SOCKET, SO_RERROR,
-	    &n, sizeof(n)) == -1)
-		logerr("%s: SO_RERROR", __func__);
-#endif
-
 #if defined(RO_MSGFILTER)
 	if (setsockopt(ctx->link_fd, PF_ROUTE, RO_MSGFILTER,
 	    &msgfilter, sizeof(msgfilter)) == -1)
