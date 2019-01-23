@@ -198,8 +198,10 @@ struct dhcpcd_ctx {
 
 	struct dhcp_opt *nd_opts;
 	size_t nd_opts_len;
+#ifdef DHCP6
 	struct dhcp_opt *dhcp6_opts;
 	size_t dhcp6_opts_len;
+#endif
 
 #ifndef __linux__
 	int ra_global;

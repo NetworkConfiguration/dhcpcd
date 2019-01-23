@@ -85,7 +85,9 @@ if_free(struct interface *ifp)
 	dhcp_free(ifp);
 	ipv4_free(ifp);
 #endif
+#ifdef DHCP6
 	dhcp6_free(ifp);
+#endif
 	ipv6nd_free(ifp);
 	ipv6_free(ifp);
 	rt_freeif(ifp);
@@ -740,10 +742,12 @@ if_cmp(const struct interface *si, const struct interface *ti)
 		return -1;
 	if (!RS_STATE_RUNNING(si) && RS_STATE_RUNNING(ti))
 		return 1;
+#ifdef DHCP6
 	if (D6_STATE_RUNNING(si) && !D6_STATE_RUNNING(ti))
 		return -1;
 	if (!D6_STATE_RUNNING(si) && D6_STATE_RUNNING(ti))
 		return 1;
+#endif
 
 #ifdef INET
 	/* Special attention needed here due to states and IPv4LL. */

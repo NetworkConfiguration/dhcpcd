@@ -52,6 +52,7 @@ const char dhcpcd_copyright[] = "Copyright (c) 2006-2019 Roy Marples";
 #include "common.h"
 #include "control.h"
 #include "dev.h"
+#include "dhcp-common.h"
 #include "dhcpcd.h"
 #include "dhcp6.h"
 #include "duid.h"
@@ -151,6 +152,7 @@ free_globals(struct dhcpcd_ctx *ctx)
 		free(ctx->nd_opts);
 		ctx->nd_opts = NULL;
 	}
+#ifdef DHCP6
 	if (ctx->dhcp6_opts) {
 		for (opt = ctx->dhcp6_opts;
 		    ctx->dhcp6_opts_len > 0;
@@ -159,6 +161,7 @@ free_globals(struct dhcpcd_ctx *ctx)
 		free(ctx->dhcp6_opts);
 		ctx->dhcp6_opts = NULL;
 	}
+#endif
 #endif
 	if (ctx->vivso) {
 		for (opt = ctx->vivso;
@@ -536,7 +539,7 @@ configure_interface1(struct interface *ifp)
 		ifo->options |= DHCPCD_IAID;
 	}
 
-#ifdef INET6
+#ifdef DHCP6
 	if (ifo->ia_len == 0 && ifo->options & DHCPCD_IPV6 &&
 	    ifp->name[0] != '\0')
 	{
@@ -744,7 +747,9 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 			dhcp_abort(ifp);
 #endif
 			ipv6nd_expire(ifp, 0);
+#ifdef DHCP6
 			dhcp6_abort(ifp);
+#endif
 #else
 			dhcpcd_drop(ifp, 0);
 #endif
@@ -906,7 +911,7 @@ dhcpcd_startinterface(void *arg)
 				ipv6nd_startrs(ifp);
 		}
 
-
+#ifdef DHCP6
 		if (ifo->options & DHCPCD_DHCP6) {
 			dhcp6_find_delegates(ifp);
 
@@ -923,6 +928,7 @@ dhcpcd_startinterface(void *arg)
 					logerr("%s: dhcp6_start", ifp->name);
 			}
 		}
+#endif
 	}
 
 #ifdef INET
@@ -1185,7 +1191,9 @@ if_reboot(struct interface *ifp, int argc, char **argv)
 #ifdef INET
 	dhcp_reboot_newopts(ifp, oldopts);
 #endif
+#ifdef DHCP6
 	dhcp6_reboot(ifp);
+#endif
 	dhcpcd_prestartinterface(ifp);
 }
 
@@ -1271,7 +1279,9 @@ dhcpcd_ifrenew(struct interface *ifp)
 #define DHCPCD_RARENEW (DHCPCD_IPV6 | DHCPCD_IPV6RS)
 	if ((ifp->options->options & DHCPCD_RARENEW) == DHCPCD_RARENEW)
 		ipv6nd_startrs(ifp);
+#ifdef DHCP6
 	dhcp6_renew(ifp);
+#endif
 }
 
 static void
@@ -1365,8 +1375,10 @@ dhcpcd_getinterfaces(void *arg)
 			len++;
 		if (RS_STATE_RUNNING(ifp))
 			len++;
+#ifdef DHCP6
 		if (D6_STATE_RUNNING(ifp))
 			len++;
+#endif
 	}
 	if (write(fd->fd, &len, sizeof(len)) != sizeof(len))
 		return;
@@ -1685,9 +1697,11 @@ main(int argc, char **argv)
 			printf("\nND options:\n");
 			ipv6nd_printoptions(&ctx,
 			    ifo->nd_override, ifo->nd_override_len);
+#ifdef DHCP6
 			printf("\nDHCPv6 options:\n");
 			dhcp6_printoptions(&ctx,
 			    ifo->dhcp6_override, ifo->dhcp6_override_len);
+#endif
 		}
 #endif
 		goto exit_success;
@@ -1823,8 +1837,13 @@ printpidfile:
 #endif
 		}
 		if (family == 0 || family == AF_INET6) {
+#ifdef DHCP6
 			if (dhcp6_dump(ifp) == -1)
 				i = -1;
+#else
+			if (family == AF_INET6)
+				logerrx("No DHCP6 support");
+#endif
 		}
 		if (i == -1)
 			goto exit_failure;
