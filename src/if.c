@@ -88,8 +88,10 @@ if_free(struct interface *ifp)
 #ifdef DHCP6
 	dhcp6_free(ifp);
 #endif
+#ifdef INET6
 	ipv6nd_free(ifp);
 	ipv6_free(ifp);
+#endif
 	rt_freeif(ifp);
 	free_options(ifp->ctx, ifp->options);
 	free(ifp);
@@ -738,10 +740,12 @@ if_cmp(const struct interface *si, const struct interface *ti)
 	if (!D_STATE_RUNNING(si) && D_STATE_RUNNING(ti))
 		return 1;
 #endif
+#ifdef INET6
 	if (RS_STATE_RUNNING(si) && !RS_STATE_RUNNING(ti))
 		return -1;
 	if (!RS_STATE_RUNNING(si) && RS_STATE_RUNNING(ti))
 		return 1;
+#endif
 #ifdef DHCP6
 	if (D6_STATE_RUNNING(si) && !D6_STATE_RUNNING(ti))
 		return -1;
