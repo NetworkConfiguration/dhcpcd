@@ -210,13 +210,18 @@ dhcpcd_ifafwaiting(const struct interface *ifp)
 		return AF_MAX;
 
 	opts = ifp->options->options;
+#ifdef INET
 	if (opts & DHCPCD_WAITIP4 && !ipv4_hasaddr(ifp))
 		return AF_INET;
+#endif
 	if (opts & DHCPCD_WAITIP6 && !ipv6_hasaddr(ifp))
 		return AF_INET6;
 	if (opts & DHCPCD_WAITIP &&
 	    !(opts & (DHCPCD_WAITIP4 | DHCPCD_WAITIP6)) &&
-	    !ipv4_hasaddr(ifp) && !ipv6_hasaddr(ifp))
+#ifdef INET
+	    !ipv4_hasaddr(ifp) &&
+#endif
+	    !ipv6_hasaddr(ifp))
 		return AF_UNSPEC;
 	return AF_MAX;
 }
@@ -233,9 +238,11 @@ dhcpcd_afwaiting(const struct dhcpcd_ctx *ctx)
 
 	opts = ctx->options;
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+#ifdef INET
 		if (opts & (DHCPCD_WAITIP | DHCPCD_WAITIP4) &&
 		    ipv4_hasaddr(ifp))
 			opts &= ~(DHCPCD_WAITIP | DHCPCD_WAITIP4);
+#endif
 		if (opts & (DHCPCD_WAITIP | DHCPCD_WAITIP6) &&
 		    ipv6_hasaddr(ifp))
 			opts &= ~(DHCPCD_WAITIP | DHCPCD_WAITIP6);
@@ -1216,8 +1223,10 @@ reconf_reboot(struct dhcpcd_ctx *ctx, int action, int argc, char **argv, int oi)
 		if (ifp->active == IF_ACTIVE_USER) {
 			if (action)
 				if_reboot(ifp, argc, argv);
+#ifdef INET
 			else
 				ipv4_applyaddr(ifp);
+#endif
 		} else if (i != argc) {
 			ifp->active = IF_ACTIVE_USER;
 			dhcpcd_initstate1(ifp, argc, argv, 0);
