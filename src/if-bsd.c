@@ -197,7 +197,6 @@ if_closesockets_os(struct dhcpcd_ctx *ctx)
 		close(priv->pf_inet6_fd);
 }
 
-#if defined(INET) || defined(INET6)
 static void
 if_linkaddr(struct sockaddr_dl *sdl, const struct interface *ifp)
 {
@@ -208,7 +207,6 @@ if_linkaddr(struct sockaddr_dl *sdl, const struct interface *ifp)
 	sdl->sdl_nlen = sdl->sdl_alen = sdl->sdl_slen = 0;
 	sdl->sdl_index = (unsigned short)ifp->index;
 }
-#endif
 
 #if defined(SIOCG80211NWID) || defined(SIOCGETVLAN)
 static int if_direct_ioctl(int s, const char *ifname,
@@ -359,7 +357,6 @@ get_addrs(int type, const void *data, const struct sockaddr **sa)
 	}
 }
 
-#if defined(INET) || defined(INET6)
 static struct interface *
 if_findsdl(struct dhcpcd_ctx *ctx, const struct sockaddr_dl *sdl)
 {
@@ -687,8 +684,6 @@ if_initrt(struct dhcpcd_ctx *ctx, int af)
 	free(buf);
 	return 0;
 }
-
-#endif
 
 #ifdef INET
 int
