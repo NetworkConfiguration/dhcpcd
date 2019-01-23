@@ -81,8 +81,10 @@ if_free(struct interface *ifp)
 #ifdef IPV4LL
 	ipv4ll_free(ifp);
 #endif
+#ifdef INET
 	dhcp_free(ifp);
 	ipv4_free(ifp);
+#endif
 	dhcp6_free(ifp);
 	ipv6nd_free(ifp);
 	ipv6_free(ifp);
@@ -728,11 +730,12 @@ if_cmp(const struct interface *si, const struct interface *ti)
 		return -1;
 	if (si->carrier < ti->carrier)
 		return 1;
-
+#ifdef INET
 	if (D_STATE_RUNNING(si) && !D_STATE_RUNNING(ti))
 		return -1;
 	if (!D_STATE_RUNNING(si) && D_STATE_RUNNING(ti))
 		return 1;
+#endif
 	if (RS_STATE_RUNNING(si) && !RS_STATE_RUNNING(ti))
 		return -1;
 	if (!RS_STATE_RUNNING(si) && RS_STATE_RUNNING(ti))
