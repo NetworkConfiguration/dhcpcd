@@ -1340,8 +1340,10 @@ dhcpcd_getinterfaces(void *arg)
 		len++;
 		if (D_STATE_RUNNING(ifp))
 			len++;
+#ifdef IPV4LL
 		if (IPV4LL_STATE_RUNNING(ifp))
 			len++;
+#endif
 		if (IPV6_STATE_RUNNING(ifp))
 			len++;
 		if (RS_STATE_RUNNING(ifp))

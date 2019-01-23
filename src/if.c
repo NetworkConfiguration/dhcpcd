@@ -78,7 +78,9 @@ if_free(struct interface *ifp)
 
 	if (ifp == NULL)
 		return;
+#ifdef IPV4LL
 	ipv4ll_free(ifp);
+#endif
 	dhcp_free(ifp);
 	ipv4_free(ifp);
 	dhcp6_free(ifp);
