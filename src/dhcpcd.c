@@ -733,7 +733,9 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 #ifdef ARP
 			arp_drop(ifp);
 #endif
+#ifdef INET
 			dhcp_abort(ifp);
+#endif
 			ipv6nd_expire(ifp, 0);
 			dhcp6_abort(ifp);
 #else
@@ -1173,7 +1175,9 @@ if_reboot(struct interface *ifp, int argc, char **argv)
 	oldopts = ifp->options->options;
 	script_runreason(ifp, "RECONFIGURE");
 	dhcpcd_initstate1(ifp, argc, argv, 0);
+#ifdef INET
 	dhcp_reboot_newopts(ifp, oldopts);
+#endif
 	dhcp6_reboot(ifp);
 	dhcpcd_prestartinterface(ifp);
 }
@@ -1252,7 +1256,9 @@ dhcpcd_ifrenew(struct interface *ifp)
 	    ifp->carrier == LINK_DOWN)
 		return;
 
+#ifdef INET
 	dhcp_renew(ifp);
+#endif
 #define DHCPCD_RARENEW (DHCPCD_IPV6 | DHCPCD_IPV6RS)
 	if ((ifp->options->options & DHCPCD_RARENEW) == DHCPCD_RARENEW)
 		ipv6nd_startrs(ifp);
@@ -1338,8 +1344,10 @@ dhcpcd_getinterfaces(void *arg)
 		if (!ifp->active)
 			continue;
 		len++;
+#ifdef INET
 		if (D_STATE_RUNNING(ifp))
 			len++;
+#endif
 #ifdef IPV4LL
 		if (IPV4LL_STATE_RUNNING(ifp))
 			len++;
@@ -1797,8 +1805,13 @@ printpidfile:
 		configure_interface(ifp, ctx.argc, ctx.argv, 0);
 		i = 0;
 		if (family == 0 || family == AF_INET) {
+#ifdef INET
 			if (dhcp_dump(ifp) == -1)
 				i = -1;
+#else
+			if (family == AF_INET)
+				logerrx("No INET support");
+#endif
 		}
 		if (family == 0 || family == AF_INET6) {
 			if (dhcp6_dump(ifp) == -1)
