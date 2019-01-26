@@ -155,9 +155,13 @@ if_carrier(struct interface *ifp)
 	strlcpy(ifmr.ifm_name, ifp->name, sizeof(ifmr.ifm_name));
 	if (ioctl(ifp->ctx->pf_inet_fd, SIOCGIFMEDIA, &ifmr) != -1 &&
 	    ifmr.ifm_status & IFM_AVALID)
+	{
+		ifp->media_valid = true;
 		r = (ifmr.ifm_status & IFM_ACTIVE) ? LINK_UP : LINK_DOWN;
-	else
+	} else {
+		ifp->media_valid = false;
 		r = ifr.ifr_flags & IFF_RUNNING ? LINK_UP : LINK_UNKNOWN;
+	}
 #else
 	r = ifr.ifr_flags & IFF_RUNNING ? LINK_UP : LINK_DOWN;
 #endif
@@ -592,7 +596,7 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 		 * we can work them out. */
 		ifp->metric = 200 + ifp->index;
 		if (if_getssid(ifp) != -1) {
-			ifp->wireless = 1;
+			ifp->wireless = true;
 			ifp->metric += 100;
 		}
 #endif
