@@ -86,7 +86,7 @@ struct interface {
 	int carrier;
 	bool media_valid;
 	bool wireless;
-	uint8_t ssid[IF_SSIDLEN + 1]; /* NULL terminated */
+	uint8_t ssid[IF_SSIDLEN];
 	unsigned int ssid_len;
 
 	char profile[PROFILE_LEN];
