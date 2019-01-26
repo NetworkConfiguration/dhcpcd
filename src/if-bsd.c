@@ -946,16 +946,22 @@ if_ifinfo(struct dhcpcd_ctx *ctx, const struct if_msghdr *ifm)
 	if ((ifp = if_findindex(ctx->ifaces, ifm->ifm_index)) == NULL)
 		return;
 
-	/* If we get LINK_STATE_UNKNOWN here, it means the interface
-	 * doesn't support reporting carrier state.
-	 * As such, we need to rely on IFF_UP.
-	 * Even if LINK_STATE_UP is reported, we also need IFF_UP as well
-	 * so for dhcpcd they are equivalent and we only need to check
-	 * LINK_STATE_DOWN. */
-	if (ifm->ifm_data.ifi_link_state == LINK_STATE_DOWN)
-		link_state = LINK_DOWN;
-	else
+	switch (ifm->ifm_data.ifi_link_state) {
+	case LINK_STATE_UNKNOWN:
+		if (ifp->media_valid) {
+			link_state = LINK_DOWN;
+			break;
+		}
+		/* Interface does not report media state, so we have
+		 * to rely on IFF_UP. */
+		/* FALLTHROUGH */
+	case LINK_STATE_UP:
 		link_state = ifm->ifm_flags & IFF_UP ? LINK_UP : LINK_DOWN;
+		break;
+	default:
+		link_state = LINK_DOWN;
+		break;
+	}
 
 	dhcpcd_handlecarrier(ctx, link_state,
 	    (unsigned int)ifm->ifm_flags, ifp->name);
