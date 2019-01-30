@@ -755,24 +755,30 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 		if (ifp->carrier != LINK_DOWN) {
 			if (ifp->carrier == LINK_UP)
 				loginfox("%s: carrier lost", ifp->name);
-			ifp->carrier = LINK_DOWN;
+#ifdef NOCARRIER_PRESERVE_IP
+			if (ifp->flags & IFF_UP)
+				ifp->carrier = LINK_DOWN_IFFUP;
+			else
+#endif
+				ifp->carrier = LINK_DOWN;
 			script_runreason(ifp, "NOCARRIER");
 #ifdef NOCARRIER_PRESERVE_IP
+			if (ifp->flags & IFF_UP) {
 #ifdef ARP
-			arp_drop(ifp);
+				arp_drop(ifp);
 #endif
 #ifdef INET
-			dhcp_abort(ifp);
+				dhcp_abort(ifp);
 #endif
 #ifdef INET6
-			ipv6nd_expire(ifp, 0);
+				ipv6nd_expire(ifp, 0);
 #endif
 #ifdef DHCP6
-			dhcp6_abort(ifp);
+				dhcp6_abort(ifp);
 #endif
-#else
-			dhcpcd_drop(ifp, 0);
+			} else
 #endif
+				dhcpcd_drop(ifp, 0);
 		}
 	} else if (carrier == LINK_UP && ifp->flags & IFF_UP) {
 		if (ifp->carrier != LINK_UP) {
