@@ -649,6 +649,7 @@ send_interface(struct fd_list *fd, const struct interface *ifp)
 		reason = "CARRIER";
 		break;
 	case LINK_DOWN:
+	case LINK_DOWN_IFFUP:
 		reason = "NOCARRIER";
 		break;
 	default:
