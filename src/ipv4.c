@@ -706,15 +706,12 @@ ipv4_applyaddr(void *arg)
 		    (DHCPCD_EXITING | DHCPCD_PERSISTENT))
 		{
 			if (state->added) {
-				struct in_addr addr;
-
-				addr = lease->addr;
 				delete_address(ifp);
 				rt_build(ifp->ctx, AF_INET);
 #ifdef ARP
 				/* Announce the preferred address to
 				 * kick ARP caches. */
-				arp_announceaddr(ifp->ctx, &addr);
+				arp_announceaddr(ifp->ctx, &lease->addr);
 #endif
 			}
 			script_runreason(ifp, state->reason);
