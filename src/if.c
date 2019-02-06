@@ -474,7 +474,7 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 			case IFT_PPP: /* FALLTHROUGH */
 #endif
 #ifdef IFT_PROPVIRTUAL
-			case IFT_PROPVIRTUAL: /* FALLTHROUGH */
+			case IFT_PROPVIRTUAL:
 #endif
 #if defined(IFT_BRIDGE) || defined(IFT_PPP) || defined(IFT_PROPVIRTUAL)
 				/* Don't allow unless explicit */
@@ -488,6 +488,7 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 					    ifp->name);
 					active = IF_INACTIVE;
 				}
+				__fallthrough; /* Appease gcc-7 */
 				/* FALLTHROUGH */
 #endif
 #ifdef IFT_L2VLAN

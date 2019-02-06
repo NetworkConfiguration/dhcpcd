@@ -1422,9 +1422,13 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			ia->sla = NULL;
 #endif
 		}
+
+#ifdef SMALL
+		break;
+#else
 		if (ia->ia_type != D6_OPTION_IA_PD)
 			break;
-#ifndef SMALL
+
 		for (p = fp; p; p = fp) {
 			fp = strwhite(p);
 			if (fp) {
