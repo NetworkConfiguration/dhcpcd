@@ -3416,6 +3416,8 @@ dhcp6_recvif(struct interface *ifp, struct dhcp6_message *r, size_t len)
 			break;
 		}
 		return;
+#else
+		break;
 #endif
 	default:
 		logerrx("%s: invalid DHCP6 type %s (%d)",
