@@ -115,9 +115,6 @@
 #endif
 
 #if __GNUC__ > 2 || defined(__INTEL_COMPILER)
-# ifndef __fallthrough
-#  define __fallthrough __attribute__((fallthrough))
-# endif
 # ifndef __packed
 #  define __packed __attribute__((__packed__))
 # endif
@@ -125,14 +122,19 @@
 #  define __unused __attribute__((__unused__))
 # endif
 #else
-# ifndef __fallthrough
-#  define __fallthrough
-# endif
 # ifndef __packed
 #  define __packed
 # endif
 # ifndef __unused
 #  define __unused
+# endif
+#endif
+
+#ifndef __fallthrough
+# if __GNUC__ >= 7
+#  define __fallthrough [[fallthrough]]
+# else
+#  define __fallthrough
 # endif
 #endif
 
