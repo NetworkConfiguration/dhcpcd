@@ -1095,7 +1095,7 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 			ifra.ifra_addr.sin_len = sizeof(ifra.ifra_addr);
 			ifra.ifra_addr.sin_addr = addr;
 			if (ioctl(ctx->pf_inet_fd, SIOCGIFALIAS, &ifra) == -1) {
-				if (errno != EADDRNOTAVAIL)
+				if (errno != ENXIO && errno != EADDRNOTAVAIL)
 					logerr("%s: SIOCGIFALIAS", __func__);
 				if (ifam->ifam_type != RTM_DELADDR)
 					break;
