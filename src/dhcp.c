@@ -447,7 +447,7 @@ decode_rfc3442_rt(struct rt_head *routes, struct interface *ifp,
 		memcpy(&gateway.s_addr, p, 4);
 		p += 4;
 
-		/* A host route is normally set by having the
+		/* An on-link host route is normally set by having the
 		 * gateway match the destination or assigned address */
 		if (gateway.s_addr == dest.s_addr ||
 		    (gateway.s_addr == bootp->yiaddr ||
@@ -455,16 +455,13 @@ decode_rfc3442_rt(struct rt_head *routes, struct interface *ifp,
 		{
 			gateway.s_addr = INADDR_ANY;
 			netmask.s_addr = INADDR_BROADCAST;
-			rt->rt_flags = RTF_HOST;
 		}
+		if (netmask.s_addr == INADDR_BROADCAST)
+			rt->rt_flags = RTF_HOST;
 
 		sa_in_init(&rt->rt_dest, &dest);
 		sa_in_init(&rt->rt_netmask, &netmask);
 		sa_in_init(&rt->rt_gateway, &gateway);
-
-		/* If CIDR is 32 then it's a host route. */
-		if (cidr == 32)
-			rt->rt_flags = RTF_HOST;
 
 		TAILQ_INSERT_TAIL(routes, rt, rt_next);
 		n++;
@@ -638,7 +635,7 @@ get_option_routes(struct rt_head *routes, struct interface *ifp,
 			if ((rt = rt_new(ifp)) == NULL)
 				return -1;
 
-			/* A host route is normally set by having the
+			/* A on-link host route is normally set by having the
 			 * gateway match the destination or assigned address */
 			if (gateway.s_addr == dest.s_addr ||
 			     (gateway.s_addr == bootp->yiaddr ||
@@ -646,12 +643,15 @@ get_option_routes(struct rt_head *routes, struct interface *ifp,
 			{
 				gateway.s_addr = INADDR_ANY;
 				netmask.s_addr = INADDR_BROADCAST;
-				rt->rt_flags = RTF_HOST;
 			} else
 				netmask.s_addr = route_netmask(dest.s_addr);
+			if (netmask.s_addr == INADDR_BROADCAST)
+				rt->rt_flags = RTF_HOST;
+
 			sa_in_init(&rt->rt_dest, &dest);
 			sa_in_init(&rt->rt_netmask, &netmask);
 			sa_in_init(&rt->rt_gateway, &gateway);
+
 			TAILQ_INSERT_TAIL(routes, rt, rt_next);
 			n++;
 		}
