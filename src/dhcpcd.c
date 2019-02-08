@@ -54,6 +54,7 @@ const char dhcpcd_copyright[] = "Copyright (c) 2006-2019 Roy Marples";
 #include "dev.h"
 #include "dhcp-common.h"
 #include "dhcpcd.h"
+#include "dhcp.h"
 #include "dhcp6.h"
 #include "duid.h"
 #include "eloop.h"
