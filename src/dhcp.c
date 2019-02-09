@@ -86,11 +86,6 @@
 #define IPDEFTTL 64 /* RFC1340 */
 #endif
 
-/* NetBSD-7 has an incomplete IP_PKTINFO implementation. */
-#if defined(__NetBSD_Version__) && __NetBSD_Version__ < 800000000
-#undef IP_PKTINFO
-#endif
-
 /* Assert the correct structure size for on wire */
 __CTASSERT(sizeof(struct ip)		== 20);
 __CTASSERT(sizeof(struct udphdr)	== 8);
@@ -1700,11 +1695,6 @@ dhcp_sendudp(struct interface *ifp, struct in_addr *to, void *data, size_t len)
 	struct sockaddr_in sin;
 	struct iovec iov[1];
 	ssize_t r;
-#ifdef IP_PKTINFO
-	uint8_t cmsg[CMSG_SPACE(sizeof(struct in_pktinfo))];
-	struct cmsghdr *cm;
-	struct in_pktinfo ipi;
-#endif
 
 	iov[0].iov_base = data;
 	iov[0].iov_len = len;
@@ -1722,24 +1712,6 @@ dhcp_sendudp(struct interface *ifp, struct in_addr *to, void *data, size_t len)
 	msg.msg_namelen = sizeof(sin);
 	msg.msg_iov = iov;
 	msg.msg_iovlen = 1;
-
-#ifdef IP_PKTINFO
-	/* Set the outbound interface */
-	msg.msg_control = cmsg;
-	msg.msg_controllen = sizeof(cmsg);
-
-	memset(&ipi, 0, sizeof(ipi));
-	ipi.ipi_ifindex = ifp->index;
-	cm = CMSG_FIRSTHDR(&msg);
-	if (cm == NULL) {
-		errno = ESRCH;
-		return -1;
-	}
-	cm->cmsg_level = IPPROTO_IP;
-	cm->cmsg_type = IP_PKTINFO;
-	cm->cmsg_len = CMSG_LEN(sizeof(ipi));
-	memcpy(CMSG_DATA(cm), &ipi, sizeof(ipi));
-#endif
 
 	s = dhcp_openudp(ifp);
 	if (s == -1)
