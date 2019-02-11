@@ -92,6 +92,11 @@ int if_getssid_wext(const char *ifname, uint8_t *ssid);
 #define IFF_LOWER_UP	0x10000		/* driver signals L1 up		*/
 #endif
 
+/* Buggy CentOS and RedHat */
+#ifndef SOL_NETLINK
+#define	SOL_NETLINK	270
+#endif
+
 #define bpf_insn		sock_filter
 #define BPF_SKIPTYPE
 #define BPF_ETHCOOK		-ETH_HLEN
