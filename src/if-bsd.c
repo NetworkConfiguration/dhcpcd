@@ -1229,18 +1229,19 @@ if_dispatch(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 int
 if_handlelink(struct dhcpcd_ctx *ctx)
 {
-	struct msghdr msg;
+	union {
+		struct rt_msghdr rtmsg;
+		unsigned char buf[2048];
+	} u;
+	struct iovec iov = { .iov_base = u.buf, .iov_len = sizeof(u) };
+	struct msghdr msg = { .msg_iov = &iov, .msg_iovlen = 1 };
 	ssize_t len;
 
-	memset(&msg, 0, sizeof(msg));
-	msg.msg_iov = ctx->iov;
-	msg.msg_iovlen = 1;
-
-	len = recvmsg_realloc(ctx->link_fd, &msg, 0);
+	len = recvmsg(ctx->link_fd, &msg, 0);
 	if (len == -1)
 		return -1;
 	if (len != 0)
-		if_dispatch(ctx, ctx->iov[0].iov_base);
+		if_dispatch(ctx, &u.rtmsg);
 	return 0;
 }
 

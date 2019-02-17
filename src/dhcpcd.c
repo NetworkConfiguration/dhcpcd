@@ -2143,7 +2143,6 @@ exit1:
 #endif
 	dev_stop(&ctx);
 	eloop_free(ctx.eloop);
-	free(ctx.iov[0].iov_base);
 
 	if (ctx.options & DHCPCD_STARTED && !(ctx.options & DHCPCD_FORKED))
 		loginfox(PACKAGE " exited");

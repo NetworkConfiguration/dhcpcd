@@ -129,28 +129,13 @@ int
 ipv6_init(struct dhcpcd_ctx *ctx)
 {
 
-	if (ctx->sndhdr.msg_iovlen == 1)
+	if (ctx->ra_routers != NULL)
 		return 0;
 
-	if (ctx->ra_routers == NULL) {
-		ctx->ra_routers = malloc(sizeof(*ctx->ra_routers));
-		if (ctx->ra_routers == NULL)
-			return -1;
-	}
+	ctx->ra_routers = malloc(sizeof(*ctx->ra_routers));
+	if (ctx->ra_routers == NULL)
+		return -1;
 	TAILQ_INIT(ctx->ra_routers);
-
-	ctx->sndhdr.msg_namelen = sizeof(struct sockaddr_in6);
-	ctx->sndhdr.msg_iov = ctx->sndiov;
-	ctx->sndhdr.msg_iovlen = 1;
-	ctx->sndhdr.msg_control = ctx->sndbuf;
-	ctx->sndhdr.msg_controllen = sizeof(ctx->sndbuf);
-	ctx->rcvhdr.msg_name = &ctx->from;
-	ctx->rcvhdr.msg_namelen = sizeof(ctx->from);
-	ctx->rcvhdr.msg_iov = ctx->iov;
-	ctx->rcvhdr.msg_iovlen = 1;
-	ctx->rcvhdr.msg_control = ctx->ctlbuf;
-	// controllen is set at recieve
-	//ctx->rcvhdr.msg_controllen = sizeof(ctx->rcvbuf);
 
 	ctx->nd_fd = -1;
 	ctx->dhcp6_fd = -1;
