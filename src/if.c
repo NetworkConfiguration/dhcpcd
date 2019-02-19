@@ -109,12 +109,6 @@ if_opensockets(struct dhcpcd_ctx *ctx)
 	if (ctx->pf_inet_fd == -1)
 		return -1;
 
-#ifdef IFLR_ACTIVE
-	ctx->pf_link_fd = xsocket(PF_LINK, SOCK_DGRAM | SOCK_CLOEXEC, 0);
-	if (ctx->pf_link_fd == -1)
-		return -1;
-#endif
-
 	return 0;
 }
 
@@ -124,10 +118,6 @@ if_closesockets(struct dhcpcd_ctx *ctx)
 
 	if (ctx->pf_inet_fd != -1)
 		close(ctx->pf_inet_fd);
-#ifdef IFLR_ACTIVE
-	if (ctx->pf_link_fd != -1)
-		close(ctx->pf_link_fd);
-#endif
 
 	if (ctx->priv) {
 		if_closesockets_os(ctx);
@@ -342,12 +332,10 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 	struct ifreq ifr;
 #endif
 #ifdef IFLR_ACTIVE
-	struct if_laddrreq iflr;
+	struct if_laddrreq iflr = { .flags = IFLR_PREFIX };
+	int link_fd;
 #endif
 
-#ifdef IFLR_ACTIVE
-	memset(&iflr, 0, sizeof(iflr));
-#endif
 #elif AF_PACKET
 	const struct sockaddr_ll *sll;
 #endif
@@ -356,11 +344,21 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 		logerr(__func__);
 		return NULL;
 	}
-	TAILQ_INIT(ifs);
 	if (getifaddrs(ifaddrs) == -1) {
 		logerr(__func__);
-		goto out;
+		free(ifs);
+		return NULL;
 	}
+	TAILQ_INIT(ifs);
+
+#ifdef IFLR_ACTIVE
+	link_fd = xsocket(PF_LINK, SOCK_DGRAM | SOCK_CLOEXEC, 0);
+	if (link_fd == -1) {
+		logerr(__func__);
+		free(ifs);
+		return NULL;
+	}
+#endif
 
 	for (ifa = *ifaddrs; ifa; ifa = ifa->ifa_next) {
 		if (ifa->ifa_addr != NULL) {
@@ -457,7 +455,7 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 			    MIN(ifa->ifa_addr->sa_len, sizeof(iflr.addr)));
 			iflr.flags = IFLR_PREFIX;
 			iflr.prefixlen = (unsigned int)sdl->sdl_alen * NBBY;
-			if (ioctl(ctx->pf_link_fd, SIOCGLIFADDR, &iflr) == -1 ||
+			if (ioctl(link_fd, SIOCGLIFADDR, &iflr) == -1 ||
 			    !(iflr.flags & IFLR_ACTIVE))
 			{
 				if_free(ifp);
@@ -610,7 +608,9 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 		TAILQ_INSERT_TAIL(ifs, ifp, next);
 	}
 
-out:
+#ifdef IFLR_ACTIVE
+	close(link_fd);
+#endif
 	return ifs;
 }
 
