@@ -3498,36 +3498,9 @@ dhcp6_recv(struct dhcpcd_ctx *ctx, struct ipv6_addr *ia)
 	if (ia != NULL)
 		ifp = ia->iface;
 	else {
-		struct cmsghdr *cm;
-		struct in6_pktinfo pi;
-
-		pi.ipi6_ifindex = 0;
-		for (cm = (struct cmsghdr *)CMSG_FIRSTHDR(&msg);
-		    cm;
-		    cm = (struct cmsghdr *)CMSG_NXTHDR(&msg, cm))
-		{
-			if (cm->cmsg_level != IPPROTO_IPV6)
-				continue;
-			switch(cm->cmsg_type) {
-			case IPV6_PKTINFO:
-				if (cm->cmsg_len == CMSG_LEN(sizeof(pi)))
-					memcpy(&pi, CMSG_DATA(cm), sizeof(pi));
-				break;
-			}
-		}
-		if (pi.ipi6_ifindex == 0) {
-			logerrx("DHCPv6 reply did not contain index from %s",
-			    sfrom);
-			return;
-		}
-
-		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-			if (ifp->index == (unsigned int)pi.ipi6_ifindex)
-				break;
-		}
+		ifp = if_findifpfromcmsg(ctx, &msg, NULL);
 		if (ifp == NULL) {
-			logerrx("DHCPv6 reply for unexpected interface from %s",
-			    sfrom);
+			logerr(__func__);
 			return;
 		}
 	}

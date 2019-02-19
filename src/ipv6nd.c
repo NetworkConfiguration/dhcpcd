@@ -1672,10 +1672,8 @@ ipv6nd_handledata(void *arg)
 	    .msg_control = ctl, .msg_controllen = sizeof(ctl),
 	};
 	ssize_t len;
-	struct cmsghdr *cm;
 	char sfrom[INET6_ADDRSTRLEN];
-	int hoplimit;
-	struct in6_pktinfo pkt;
+	int hoplimit = 0;
 	struct icmp6_hdr *icp;
 	struct interface *ifp;
 
@@ -1691,41 +1689,15 @@ ipv6nd_handledata(void *arg)
 		return;
 	}
 
-	pkt.ipi6_ifindex = 0;
-	hoplimit = 0;
-	for (cm = (struct cmsghdr *)CMSG_FIRSTHDR(&msg);
-	     cm;
-	     cm = (struct cmsghdr *)CMSG_NXTHDR(&msg, cm))
-	{
-		if (cm->cmsg_level != IPPROTO_IPV6)
-			continue;
-		switch(cm->cmsg_type) {
-		case IPV6_PKTINFO:
-			if (cm->cmsg_len == CMSG_LEN(sizeof(pkt)))
-				memcpy(&pkt, CMSG_DATA(cm), sizeof(pkt));
-			break;
-		case IPV6_HOPLIMIT:
-			if (cm->cmsg_len == CMSG_LEN(sizeof(int)))
-				memcpy(&hoplimit, CMSG_DATA(cm), sizeof(int));
-			break;
-		}
-	}
-
-	if (pkt.ipi6_ifindex == 0) {
-		logerrx("IPv6 RA/NA did not contain index from %s", sfrom);
+	ifp = if_findifpfromcmsg(ctx, &msg, &hoplimit);
+	if (ifp == NULL) {
+		logerr(__func__);
 		return;
 	}
 
-	/* Find the receiving interface */
-	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-		if (ifp->index == (unsigned int)pkt.ipi6_ifindex)
-			break;
-	}
-
 	/* Don't do anything if the user hasn't configured it. */
-	if (ifp != NULL &&
-	    (ifp->active != IF_ACTIVE_USER ||
-	    !(ifp->options->options & DHCPCD_IPV6)))
+	if (ifp->active != IF_ACTIVE_USER ||
+	    !(ifp->options->options & DHCPCD_IPV6))
 		return;
 
 	icp = (struct icmp6_hdr *)buf;

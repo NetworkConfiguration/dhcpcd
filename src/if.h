@@ -209,5 +209,7 @@ int if_getlifetime6(struct ipv6_addr *);
 #endif
 
 int if_machinearch(char *, size_t);
+struct interface *if_findifpfromcmsg(struct dhcpcd_ctx *,
+    struct msghdr *, int *);
 int xsocket(int, int, int);
 #endif
