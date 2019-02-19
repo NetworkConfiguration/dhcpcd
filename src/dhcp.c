@@ -2062,11 +2062,6 @@ dhcp_arp_probed(struct arp_state *astate)
 			return;
 		}
 		arp_free(astate);
-#ifdef KERNEL_RFC5227
-		/* As arping is finished, close the ARP socket.
-		 * The kernel will handle ACD from here. */
-		arp_close(ifp);
-#endif
 		dhcpcd_startinterface(ifp);
 		return;
 	}
@@ -2144,11 +2139,6 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 			return;
 		}
 		arp_free(astate);
-#ifdef KERNEL_RFC5227
-		/* As arping is finished, close the ARP socket.
-		 * The kernel will handle ACD from here. */
-		arp_close(ifp);
-#endif
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 		dhcpcd_startinterface(ifp);
 		return;
@@ -2208,8 +2198,10 @@ static void
 dhcp_arp_announced(struct arp_state *state)
 {
 
-	/* Free the ARP state as we currently don't care about ACD for DHCP. */
+// TODO: DHCP addresses handle ACD?
+//#ifdef KERNEL_RFC5227
 	arp_free(state);
+//#endif
 }
 #endif
 
