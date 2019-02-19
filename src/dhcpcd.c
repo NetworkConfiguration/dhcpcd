@@ -1607,9 +1607,6 @@ main(int argc, char **argv)
 	ctx.cffile = CONFIG;
 	ctx.control_fd = ctx.control_unpriv_fd = ctx.link_fd = -1;
 	ctx.pf_inet_fd = -1;
-#ifdef IFLR_ACTIVE
-	ctx.pf_link_fd = -1;
-#endif
 
 	TAILQ_INIT(&ctx.control_fds);
 #ifdef PLUGIN_DEV

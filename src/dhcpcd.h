@@ -142,9 +142,6 @@ struct dhcpcd_ctx {
 	struct rt_head froutes;	/* free routes for re-use */
 
 	int pf_inet_fd;
-#ifdef IFLR_ACTIVE
-	int pf_link_fd;
-#endif
 	void *priv;
 	int link_fd;
 	int seq;	/* route message sequence no */
