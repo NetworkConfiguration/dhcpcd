@@ -2203,6 +2203,14 @@ dhcp_arp_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
 		return;
 	}
 }
+
+static void
+dhcp_arp_announced(struct arp_state *state)
+{
+
+	/* Free the ARP state as we currently don't care about ACD for DHCP. */
+	arp_free(state);
+}
 #endif
 
 void
@@ -2395,6 +2403,20 @@ dhcp_message_new(struct bootp **bootp,
 }
 
 #ifdef ARP
+static struct arp_state *
+dhcp_arp_new(struct interface *ifp, struct in_addr *addr)
+{
+	struct arp_state *astate;
+	astate = arp_new(ifp, addr);
+	if (astate == NULL)
+		return NULL;
+
+	astate->probed_cb = dhcp_arp_probed;
+	astate->conflicted_cb = dhcp_arp_conflicted;
+	astate->announced_cb = dhcp_arp_announced;
+	return astate;
+}
+
 static int
 dhcp_arp_address(struct interface *ifp)
 {
@@ -2411,10 +2433,9 @@ dhcp_arp_address(struct interface *ifp)
 	/* If the interface already has the address configured
 	 * then we can't ARP for duplicate detection. */
 	ia = ipv4_iffindaddr(ifp, &addr, NULL);
-	if ((astate = arp_new(ifp, &addr)) == NULL)
+	astate = dhcp_arp_new(ifp, &addr);
+	if (astate == NULL)
 		return -1;
-	astate->probed_cb = dhcp_arp_probed;
-	astate->conflicted_cb = dhcp_arp_conflicted;
 
 #ifdef IN_IFF_TENTATIVE
 	if (ia == NULL || ia->addr_flags & IN_IFF_NOTUSEABLE) {
@@ -3747,12 +3768,9 @@ dhcp_start1(void *arg)
 	if (ifo->arping_len && state->arping_index < ifo->arping_len) {
 		struct arp_state *astate;
 
-		astate = arp_new(ifp, NULL);
-		if (astate) {
-			astate->probed_cb = dhcp_arp_probed;
-			astate->conflicted_cb = dhcp_arp_conflicted;
+		astate = dhcp_arp_new(ifp, NULL);
+		if (astate)
 			dhcp_arp_probed(astate);
-		}
 		return;
 	}
 #endif
