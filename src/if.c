@@ -807,7 +807,7 @@ if_findifpfromcmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg, int *hoplimit)
 	struct cmsghdr *cm;
 	unsigned int ifindex = 0;
 	struct interface *ifp;
-#ifdef INET
+#if defined(INET) && defined(IP_PKTINFO)
 	struct in_pktinfo ipi;
 #endif
 #ifdef INET6
@@ -820,7 +820,7 @@ if_findifpfromcmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg, int *hoplimit)
 	     cm;
 	     cm = (struct cmsghdr *)CMSG_NXTHDR(msg, cm))
 	{
-#ifdef INET
+#if defined(INET) && defined(IP_PKTINFO)
 		if (cm->cmsg_level == IPPROTO_IP) {
 			switch(cm->cmsg_type) {
 			case IP_PKTINFO:
