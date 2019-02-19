@@ -801,6 +801,68 @@ if_sortinterfaces(struct dhcpcd_ctx *ctx)
 	TAILQ_CONCAT(ctx->ifaces, &sorted, next);
 }
 
+struct interface *
+if_findifpfromcmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg, int *hoplimit)
+{
+	struct cmsghdr *cm;
+	unsigned int ifindex = 0;
+	struct interface *ifp;
+#ifdef INET
+	struct in_pktinfo ipi;
+#endif
+#ifdef INET6
+	struct in6_pktinfo ipi6;
+#else
+	UNUSED(hoplimit);
+#endif
+
+	for (cm = (struct cmsghdr *)CMSG_FIRSTHDR(msg);
+	     cm;
+	     cm = (struct cmsghdr *)CMSG_NXTHDR(msg, cm))
+	{
+#ifdef INET
+		if (cm->cmsg_level == IPPROTO_IP) {
+			switch(cm->cmsg_type) {
+			case IP_PKTINFO:
+				if (cm->cmsg_len != CMSG_LEN(sizeof(ipi)))
+					continue;
+				memcpy(&ipi, CMSG_DATA(cm), sizeof(ipi));
+				ifindex = (unsigned int)ipi.ipi_ifindex;
+				break;
+			}
+		}
+#endif
+#ifdef INET6
+		if (cm->cmsg_level == IPPROTO_IPV6) {
+			switch(cm->cmsg_type) {
+			case IPV6_PKTINFO:
+				if (cm->cmsg_len != CMSG_LEN(sizeof(ipi6)))
+					continue;
+				memcpy(&ipi6, CMSG_DATA(cm), sizeof(ipi6));
+				ifindex = (unsigned int)ipi6.ipi6_ifindex;
+				break;
+			case IPV6_HOPLIMIT:
+				if (cm->cmsg_len != CMSG_LEN(sizeof(int)))
+					continue;
+				if (hoplimit == NULL)
+					break;
+				memcpy(hoplimit, CMSG_DATA(cm), sizeof(int));
+				break;
+			}
+		}
+#endif
+	}
+
+	/* Find the receiving interface */
+	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+		if (ifp->index == ifindex)
+			break;
+	}
+	if (ifp == NULL)
+		errno = ESRCH;
+	return ifp;
+}
+
 int
 xsocket(int domain, int type, int protocol)
 {
