@@ -137,9 +137,9 @@ struct dhcpcd_ctx {
 	size_t duid_len;
 	struct if_head *ifaces;
 
-	struct rt_head routes;	/* our routes */
-	struct rt_head kroutes;	/* all kernel routes */
-	struct rt_head froutes;	/* free routes for re-use */
+	rb_tree_t routes;	/* our routes */
+	rb_tree_t kroutes;	/* all kernel routes */
+	rb_tree_t froutes;	/* free routes for re-use */
 
 	int pf_inet_fd;
 	void *priv;

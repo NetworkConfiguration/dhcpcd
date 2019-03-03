@@ -2208,7 +2208,7 @@ inet6_makerouter(struct ra *rap)
 	    IN6_ARE_ADDR_EQUAL(&((rtp)->mask), &in6addr_any))
 
 static int
-inet6_staticroutes(struct rt_head *routes, struct dhcpcd_ctx *ctx)
+inet6_staticroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 {
 	struct interface *ifp;
 	struct ipv6_state *state;
@@ -2224,7 +2224,7 @@ inet6_staticroutes(struct rt_head *routes, struct dhcpcd_ctx *ctx)
 			{
 				rt = inet6_makeprefix(ifp, NULL, ia);
 				if (rt)
-					TAILQ_INSERT_TAIL(routes, rt, rt_next);
+					rb_tree_insert_node(routes, rt);
 			}
 		}
 	}
@@ -2232,7 +2232,7 @@ inet6_staticroutes(struct rt_head *routes, struct dhcpcd_ctx *ctx)
 }
 
 static int
-inet6_raroutes(struct rt_head *routes, struct dhcpcd_ctx *ctx, int expired,
+inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx, int expired,
     bool *have_default)
 {
 	struct rt *rt;
@@ -2248,14 +2248,14 @@ inet6_raroutes(struct rt_head *routes, struct dhcpcd_ctx *ctx, int expired,
 			rt = inet6_makeprefix(rap->iface, rap, addr);
 			if (rt) {
 				rt->rt_dflags |= RTDF_RA;
-				TAILQ_INSERT_TAIL(routes, rt, rt_next);
+				rb_tree_insert_node(routes, rt);
 			}
 		}
 		if (rap->lifetime) {
 			rt = inet6_makerouter(rap);
 			if (rt) {
 				rt->rt_dflags |= RTDF_RA;
-				TAILQ_INSERT_TAIL(routes, rt, rt_next);
+				rb_tree_insert_node(routes, rt);
 				if (have_default)
 					*have_default = true;
 			}
@@ -2266,7 +2266,7 @@ inet6_raroutes(struct rt_head *routes, struct dhcpcd_ctx *ctx, int expired,
 
 #ifdef DHCP6
 static int
-inet6_dhcproutes(struct rt_head *routes, struct dhcpcd_ctx *ctx,
+inet6_dhcproutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx,
     enum DH6S dstate)
 {
 	struct interface *ifp;
@@ -2279,10 +2279,10 @@ inet6_dhcproutes(struct rt_head *routes, struct dhcpcd_ctx *ctx,
 		if (d6_state && d6_state->state == dstate) {
 			TAILQ_FOREACH(addr, &d6_state->addrs, next) {
 				rt = inet6_makeprefix(ifp, NULL, addr);
-				if (rt) {
-					rt->rt_dflags |= RTDF_DHCP;
-					TAILQ_INSERT_TAIL(routes, rt, rt_next);
-				}
+				if (rt == NULL)
+					continue;
+				rt->rt_dflags |= RTDF_DHCP;
+				rb_tree_insert_node(routes, rt);
 			}
 		}
 	}
@@ -2291,7 +2291,7 @@ inet6_dhcproutes(struct rt_head *routes, struct dhcpcd_ctx *ctx,
 #endif
 
 bool
-inet6_getroutes(struct dhcpcd_ctx *ctx, struct rt_head *routes)
+inet6_getroutes(struct dhcpcd_ctx *ctx, rb_tree_t *routes)
 {
 	bool have_default;
 
