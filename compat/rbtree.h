@@ -39,7 +39,11 @@
 #include <inttypes.h>
 #endif
 #include "queue.h"
+#if !defined(__linux__) && !defined(__QNX__) && !defined(__sun)
+#include <sys/endian.h>
+#else
 #include "endian.h"
+#endif
 
 __BEGIN_DECLS
 
