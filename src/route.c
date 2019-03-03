@@ -71,7 +71,10 @@ rt_compare(__unused void *context, const void *node1, const void *node2)
 		return c;
 
 	/* Finally by interface metric. */
-	if (rt1->rt_ifp != NULL && rt2->rt_ifp != NULL)
+	if (rt1->rt_ifp == NULL || rt2->rt_ifp == NULL)
+		/* option or freed route */
+		c = rt1 == rt2 ? 0 : rt1 < rt2 ? -1 : 1;
+	else
 		c = (int)(rt1->rt_ifp->metric - rt2->rt_ifp->metric);
 
 	return c;
