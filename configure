@@ -421,8 +421,8 @@ freebsd*|kfreebsd*)
 	case "$OS" in
 	kfreebsd*)	echo "#include		<inttypes.h>" >>$CONFIG_H;
 	esac
-	echo "#include		<net/if.h>" >>$CONFIG_H
-	echo "#include		<net/if_var.h>" >>$CONFIG_H
+	echo "#include			<net/if.h>" >>$CONFIG_H
+	echo "#include			<net/if_var.h>" >>$CONFIG_H
 	;;
 netbsd*)
 	# reallocarray(3) is guarded by _OPENBSD_SOURCE
