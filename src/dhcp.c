@@ -402,7 +402,7 @@ decode_rfc3442(char *out, size_t len, const uint8_t *p, size_t pl)
 }
 
 static int
-decode_rfc3442_rt(struct rt_head *routes, struct interface *ifp,
+decode_rfc3442_rt(rb_tree_t *routes, struct interface *ifp,
     const uint8_t *data, size_t dl, const struct bootp *bootp)
 {
 	const uint8_t *p = data;
@@ -465,8 +465,7 @@ decode_rfc3442_rt(struct rt_head *routes, struct interface *ifp,
 		sa_in_init(&rt->rt_dest, &dest);
 		sa_in_init(&rt->rt_netmask, &netmask);
 		sa_in_init(&rt->rt_gateway, &gateway);
-
-		TAILQ_INSERT_TAIL(routes, rt, rt_next);
+		rb_tree_insert_node(routes, rt);
 		n++;
 	}
 	return n;
@@ -579,7 +578,7 @@ route_netmask(uint32_t ip_in)
  * If we have a CSR then we only use that.
  * Otherwise we add static routes and then routers. */
 static int
-get_option_routes(struct rt_head *routes, struct interface *ifp,
+get_option_routes(rb_tree_t *routes, struct interface *ifp,
     const struct bootp *bootp, size_t bootp_len)
 {
 	struct if_options *ifo = ifp->options;
@@ -654,8 +653,7 @@ get_option_routes(struct rt_head *routes, struct interface *ifp,
 			sa_in_init(&rt->rt_dest, &dest);
 			sa_in_init(&rt->rt_netmask, &netmask);
 			sa_in_init(&rt->rt_gateway, &gateway);
-
-			TAILQ_INSERT_TAIL(routes, rt, rt_next);
+			rb_tree_insert_node(routes, rt);
 			n++;
 		}
 	}
@@ -677,7 +675,7 @@ get_option_routes(struct rt_head *routes, struct interface *ifp,
 			sa_in_init(&rt->rt_dest, &dest);
 			sa_in_init(&rt->rt_netmask, &netmask);
 			sa_in_init(&rt->rt_gateway, &gateway);
-			TAILQ_INSERT_TAIL(routes, rt, rt_next);
+			rb_tree_insert_node(routes, rt);
 			n++;
 		}
 	}
@@ -705,7 +703,7 @@ dhcp_get_mtu(const struct interface *ifp)
 /* Grab our routers from the DHCP message and apply any MTU value
  * the message contains */
 int
-dhcp_get_routes(struct rt_head *routes, struct interface *ifp)
+dhcp_get_routes(rb_tree_t *routes, struct interface *ifp)
 {
 	const struct dhcp_state *state;
 
