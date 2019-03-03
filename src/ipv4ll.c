@@ -87,7 +87,7 @@ ipv4ll_pickaddr(struct arp_state *astate)
 }
 
 int
-ipv4ll_subnetroute(struct rt_head *routes, struct interface *ifp)
+ipv4ll_subnetroute(rb_tree_t *routes, struct interface *ifp)
 {
 	struct ipv4ll_state *state;
 	struct rt *rt;
@@ -108,12 +108,12 @@ ipv4ll_subnetroute(struct rt_head *routes, struct interface *ifp)
 	in.s_addr = INADDR_ANY;
 	sa_in_init(&rt->rt_gateway, &in);
 	sa_in_init(&rt->rt_ifa, &state->addr->addr);
-	TAILQ_INSERT_TAIL(routes, rt, rt_next);
+	rb_tree_insert_node(routes, rt);
 	return 1;
 }
 
 int
-ipv4ll_defaultroute(struct rt_head *routes, struct interface *ifp)
+ipv4ll_defaultroute(rb_tree_t *routes, struct interface *ifp)
 {
 	struct ipv4ll_state *state;
 	struct rt *rt;
@@ -132,7 +132,7 @@ ipv4ll_defaultroute(struct rt_head *routes, struct interface *ifp)
 	sa_in_init(&rt->rt_netmask, &in);
 	sa_in_init(&rt->rt_gateway, &in);
 	sa_in_init(&rt->rt_ifa, &state->addr->addr);
-	TAILQ_INSERT_TAIL(routes, rt, rt_next);
+	rb_tree_insert_node(routes, rt);
 	return 1;
 }
 
