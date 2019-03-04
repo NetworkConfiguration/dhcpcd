@@ -61,8 +61,26 @@
         (N) = (S))
 #endif
 
+/*
+ * On some systems, host routes have no need for a netmask.
+ * However DHCP specifies host routes using an all-ones netmask.
+ * This handy function allows easy comparison when the two
+ * differ.
+ */
 static int
-rt_compare(__unused void *context, const void *node1, const void *node2)
+rt_cmp_netmask(const struct rt *rt1, const struct rt *rt2)
+{
+
+	if (rt1->rt_flags & RTF_HOST && rt2->rt_flags & RTF_HOST)
+		return 0;
+	return sa_cmp(&rt1->rt_netmask, &rt2->rt_netmask);
+}
+
+static bool rt_compare_os;
+#define NODE_CMP(a, b) ((a) == (b) ? 0 : (a) < (b) ? -1 : 1)
+
+static int
+rt_compare(void *context, const void *node1, const void *node2)
 {
 	const struct rt *rt1 = node1, *rt2 = node2;
 	bool rt1u, rt2u;
@@ -82,23 +100,52 @@ rt_compare(__unused void *context, const void *node1, const void *node2)
 	c = sa_cmp(&rt1->rt_dest, &rt2->rt_dest);
 	if (c != 0)
 		return c;
-	c = sa_cmp(&rt1->rt_netmask, &rt2->rt_netmask);
+	c = rt_cmp_netmask(rt1, rt2);
 	if (c != 0)
 		return c;
 
-	/* Finally by interface metric. */
+#ifndef HAVE_ROUTE_METRIC
+	if (context == &rt_compare_os) {
+#ifdef ROUTE_PER_GATEWAY
+		c = NODE_CMP(rt1, rt2);
+#endif
+		return c;
+	}
+#else
+	UNUSED(context);
+#endif
 	if (rt1->rt_ifp == NULL || rt2->rt_ifp == NULL)
-		/* option or freed route */
-		c = rt1 == rt2 ? 0 : rt1 < rt2 ? -1 : 1;
+		c = 0;
 	else
 		c = (int)(rt1->rt_ifp->metric - rt2->rt_ifp->metric);
 
 	return c;
 }
 
-const rb_tree_ops_t rt_rb_tree_ops = {
+static const rb_tree_ops_t rt_compare_os_ops = {
 	.rbto_compare_nodes = rt_compare,
 	.rbto_compare_key = rt_compare,
+	.rbto_node_offset = offsetof(struct rt, rt_tree),
+	.rbto_context = &rt_compare_os
+};
+
+const rb_tree_ops_t rt_compare_list_ops = {
+	.rbto_compare_nodes = rt_compare,
+	.rbto_compare_key = rt_compare,
+	.rbto_node_offset = offsetof(struct rt, rt_tree),
+	.rbto_context = NULL
+};
+
+static int
+rt_compare_free(__unused void *context, const void *node1, const void *node2)
+{
+
+	return NODE_CMP(node1, node2);
+}
+
+static const rb_tree_ops_t rt_compare_free_ops = {
+	.rbto_compare_nodes = rt_compare_free,
+	.rbto_compare_key = rt_compare_free,
 	.rbto_node_offset = offsetof(struct rt, rt_tree),
 	.rbto_context = NULL
 };
@@ -107,24 +154,9 @@ void
 rt_init(struct dhcpcd_ctx *ctx)
 {
 
-	rb_tree_init(&ctx->routes, &rt_rb_tree_ops);
-	rb_tree_init(&ctx->kroutes, &rt_rb_tree_ops);
-	rb_tree_init(&ctx->froutes, &rt_rb_tree_ops);
-}
-
-/*
- * On some systems, host routes have no need for a netmask.
- * However DHCP specifies host routes using an all-ones netmask.
- * This handy function allows easy comparison when the two
- * differ.
- */
-static int
-rt_cmp_netmask(const struct rt *rt1, const struct rt *rt2)
-{
-
-	if (rt1->rt_flags & RTF_HOST && rt2->rt_flags & RTF_HOST)
-		return 0;
-	return sa_cmp(&rt1->rt_netmask, &rt2->rt_netmask);
+	rb_tree_init(&ctx->routes, &rt_compare_os_ops);
+	rb_tree_init(&ctx->kroutes, &rt_compare_os_ops);
+	rb_tree_init(&ctx->froutes, &rt_compare_free_ops);
 }
 
 static void
@@ -300,25 +332,6 @@ rt_freeif(struct interface *ifp)
 	}
 }
 
-struct rt *
-rt_find(rb_tree_t *rts, const struct rt *f)
-{
-	struct rt *rt;
-
-	assert(rts != NULL);
-	assert(f != NULL);
-	RB_TREE_FOREACH(rt, rts) {
-		if (sa_cmp(&rt->rt_dest, &f->rt_dest) == 0 &&
-#ifdef HAVE_ROUTE_METRIC
-		    (f->rt_ifp == NULL ||
-		    rt->rt_ifp->metric == f->rt_ifp->metric) &&
-#endif
-		    rt_cmp_netmask(f, rt) == 0)
-			return rt;
-	}
-	return NULL;
-}
-
 static void
 rt_kfree(struct rt *rt)
 {
@@ -327,10 +340,11 @@ rt_kfree(struct rt *rt)
 
 	assert(rt != NULL);
 	ctx = rt->rt_ifp->ctx;
-	if ((f = rt_find(&ctx->kroutes, rt)) != NULL) {
-		rb_tree_remove_node(&ctx->kroutes, f);
-		rt_free(f);
-	}
+	f = rb_tree_find_node(&ctx->kroutes, rt);
+	if (f == NULL)
+		return;
+	rb_tree_remove_node(&ctx->kroutes, f);
+	rt_free(f);
 }
 
 /* If something other than dhcpcd removes a route,
@@ -346,7 +360,7 @@ rt_recvrt(int cmd, const struct rt *rt)
 	assert(rt->rt_ifp->ctx != NULL);
 
 	ctx = rt->rt_ifp->ctx;
-	f = rt_find(&ctx->kroutes, rt);
+	f = rb_tree_find_node(&ctx->kroutes, rt);
 
 	switch(cmd) {
 	case RTM_DELETE:
@@ -354,7 +368,8 @@ rt_recvrt(int cmd, const struct rt *rt)
 			rb_tree_remove_node(&ctx->kroutes, f);
 			rt_free(f);
 		}
-		if ((f = rt_find(&ctx->routes, rt)) != NULL) {
+		f = rb_tree_find_node(&ctx->routes, rt);
+		if (f != NULL) {
 			rb_tree_remove_node(&ctx->routes, f);
 			rt_desc("deleted", f);
 			rt_free(f);
@@ -404,7 +419,7 @@ rt_add(struct rt *nrt, struct rt *ort)
 
 	change = false;
 	if (ort == NULL) {
-		ort = rt_find(&ctx->kroutes, nrt);
+		ort = rb_tree_find_node(&ctx->kroutes, nrt);
 		if (ort != NULL &&
 		    ((ort->rt_flags & RTF_REJECT &&
 		      nrt->rt_flags & RTF_REJECT) ||
@@ -533,7 +548,8 @@ rt_doroute(struct rt *rt)
 
 	ctx = rt->rt_ifp->ctx;
 	/* Do we already manage it? */
-	if ((or = rt_find(&ctx->routes, rt))) {
+	or = rb_tree_find_node(&ctx->routes, rt);
+	if (or != NULL) {
 		if (rt->rt_dflags & RTDF_FAKE)
 			return true;
 		if (or->rt_dflags & RTDF_FAKE ||
@@ -549,7 +565,8 @@ rt_doroute(struct rt *rt)
 		rt_free(or);
 	} else {
 		if (rt->rt_dflags & RTDF_FAKE) {
-			if ((or = rt_find(&ctx->kroutes, rt)) == NULL)
+			or = rb_tree_find_node(&ctx->kroutes, rt);
+			if (or == NULL)
 				return false;
 			if (!rt_cmp(rt, or))
 				return false;
@@ -569,12 +586,8 @@ rt_build(struct dhcpcd_ctx *ctx, int af)
 	struct rt *rt, *rtn;
 	unsigned long long o;
 
-	/* We need to have the interfaces in the correct order to ensure
-	 * our routes are managed correctly. */
-	if_sortinterfaces(ctx);
-
-	rb_tree_init(&routes, &rt_rb_tree_ops);
-	rb_tree_init(&added, &rt_rb_tree_ops);
+	rb_tree_init(&routes, &rt_compare_list_ops);
+	rb_tree_init(&added, &rt_compare_os_ops);
 
 	switch (af) {
 #ifdef INET
@@ -596,7 +609,7 @@ rt_build(struct dhcpcd_ctx *ctx, int af)
 		    rt->rt_gateway.sa_family != af)
 			continue;
 		/* Is this route already in our table? */
-		if ((rt_find(&added, rt)) != NULL)
+		if (rb_tree_find_node(&added, rt) != NULL)
 			continue;
 		if (rt_doroute(rt)) {
 			rb_tree_remove_node(&routes, rt);
@@ -609,7 +622,7 @@ rt_build(struct dhcpcd_ctx *ctx, int af)
 		rb_tree_remove_node(&ctx->routes, rt);
 		if (rt->rt_dest.sa_family == af &&
 		    rt->rt_gateway.sa_family == af &&
-		    rt_find(&added, rt) == NULL)
+		    rb_tree_find_node(&added, rt) == NULL)
 		{
 			o = rt->rt_ifp->options ?
 			    rt->rt_ifp->options->options :
@@ -622,7 +635,7 @@ rt_build(struct dhcpcd_ctx *ctx, int af)
 		rt_free(rt);
 	}
 
-	/* XXX This can be optimised if */
+	/* XXX This needs to be optimised. */
 	while ((rt = RB_TREE_MIN(&added)) != NULL) {
 		rb_tree_remove_node(&added, rt);
 		rb_tree_insert_node(&ctx->routes, rt);

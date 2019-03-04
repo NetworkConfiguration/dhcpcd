@@ -263,7 +263,7 @@ inet_dhcproutes(rb_tree_t *routes, struct interface *ifp)
 	/* An address does have to exist. */
 	assert(state->addr);
 
-	rb_tree_init(&nroutes, &rt_rb_tree_ops);
+	rb_tree_init(&nroutes, &rt_compare_list_ops);
 
 	/* First, add a subnet route. */
 	if (!(ifp->flags & IFF_POINTOPOINT) &&
@@ -451,7 +451,7 @@ inet_getroutes(struct dhcpcd_ctx *ctx, rb_tree_t *routes)
 	/* If there is no default route, see if we can use an IPv4LL one. */
 	memset(&def, 0, sizeof(def));
 	def.rt_dest.sa_family = AF_INET;
-	have_default = (rt_find(routes, &def) != NULL);
+	have_default = (rb_tree_find_node(routes, &def) != NULL);
 	if (!have_default) {
 		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 			if (ifp->active &&

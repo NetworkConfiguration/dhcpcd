@@ -2279,7 +2279,7 @@ default_config(struct dhcpcd_ctx *ctx)
 	ifo->reboot = DEFAULT_REBOOT;
 	ifo->metric = -1;
 	ifo->auth.options |= DHCPCD_AUTH_REQUIRE;
-	rb_tree_init(&ifo->routes, &rt_rb_tree_ops);
+	rb_tree_init(&ifo->routes, &rt_compare_list_ops);
 #ifdef AUTH
 	TAILQ_INIT(&ifo->auth.tokens);
 #endif
