@@ -61,8 +61,8 @@ typedef struct rb_node {
 	 * rb_node will have an alignment of 4 or 8 bytes.
 	 */
 	uintptr_t rb_info;
-#define	RB_FLAG_POSITION	0x2
-#define	RB_FLAG_RED		0x1
+#define	RB_FLAG_POSITION	0x2U
+#define	RB_FLAG_RED		0x1U
 #define	RB_FLAG_MASK		(RB_FLAG_POSITION|RB_FLAG_RED)
 #define	RB_FATHER(rb) \
     ((struct rb_node *)((rb)->rb_info & ~RB_FLAG_MASK))
