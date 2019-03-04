@@ -68,7 +68,7 @@ __weak_alias(rb_tree_depths, _rb_tree_depths)
 //#endif
 
 #if !defined(__predict_false)
-#if __GNUC_PREREQ__(2, 96) || defined(__lint__)
+#if __GNUC__ > 2
 #define	__predict_true(exp)	__builtin_expect((exp) != 0, 1)
 #define	__predict_false(exp)	__builtin_expect((exp) != 0, 0)
 #else
