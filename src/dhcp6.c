@@ -2825,20 +2825,6 @@ dhcp6_delegate_prefix(struct interface *ifp)
 			struct dhcp6_state *s = D6_STATE(ifd);
 
 			ipv6_addaddrs(&s->addrs);
-
-			/*
-			 * Can't add routes here because that will trigger
-			 * interface sorting which may break the current
-			 * enumeration.
-			 * This doesn't really matter thanks to DaD because
-			 * calling the script will be delayed and routes
-			 * will get re-built if needed first.
-			 * This only cause minor confusion when dhcpcd is
-			 * restarted and confirms a lease where prior delegation
-			 * has already been assigned, because it will log it
-			 * added routes after the script has run.
-			 * The routes should still be there and fine though.
-			 */
 			dhcp6_script_try_run(ifd, 1);
 		}
 	}

@@ -2092,7 +2092,6 @@ printpidfile:
 	free_options(&ctx, ifo);
 	ifo = NULL;
 
-	if_sortinterfaces(&ctx);
 	TAILQ_FOREACH(ifp, ctx.ifaces, next) {
 		if (ifp->active)
 			eloop_timeout_add_sec(ctx.eloop, 0,
