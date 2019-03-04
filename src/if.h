@@ -122,7 +122,6 @@ void if_deletestaleaddrs(struct if_head *);
 struct interface *if_find(struct if_head *, const char *);
 struct interface *if_findindex(struct if_head *, unsigned int);
 struct interface *if_loopback(struct dhcpcd_ctx *);
-void if_sortinterfaces(struct dhcpcd_ctx *);
 void if_free(struct interface *);
 int if_domtu(const struct interface *, short int);
 #define if_getmtu(ifp) if_domtu((ifp), 0)
