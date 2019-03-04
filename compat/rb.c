@@ -67,7 +67,15 @@ __weak_alias(rb_tree_depths, _rb_tree_depths)
 //#include <sys/rbtree.h>
 //#endif
 
-#define __predict_false(tst) (tst)
+#if !defined(__predict_false)
+#if __GNUC_PREREQ__(2, 96) || defined(__lint__))
+#define	__predict_true(exp)	__builtin_expect((exp) != 0, 1)
+#define	__predict_false(exp)	__builtin_expect((exp) != 0, 0)
+#else
+#define	__predict_true(exp)	(exp)
+#define	__predict_false(exp)	(exp)
+#endif
+#endif
 
 static void rb_tree_insert_rebalance(struct rb_tree *, struct rb_node *);
 static void rb_tree_removal_rebalance(struct rb_tree *, struct rb_node *,
