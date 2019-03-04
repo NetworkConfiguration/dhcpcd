@@ -342,6 +342,9 @@ rt_recvrt(int cmd, const struct rt *rt)
 	struct rt *f;
 
 	assert(rt != NULL);
+	assert(rt->rt_ifp != NULL);
+	assert(rt->rt_ifp->ctx != NULL);
+
 	ctx = rt->rt_ifp->ctx;
 	f = rt_find(&ctx->kroutes, rt);
 
