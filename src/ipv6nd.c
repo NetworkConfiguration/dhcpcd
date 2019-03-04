@@ -403,7 +403,6 @@ ipv6nd_advertise(struct ipv6_addr *ia)
 		return;
 
 	ctx = ia->iface->ctx;
-	if_sortinterfaces(ctx);
 	/* Find the most preferred address to advertise. */
 	iaf = NULL;
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
@@ -424,7 +423,8 @@ ipv6nd_advertise(struct ipv6_addr *ia)
 			    iap->addr_flags & IN6_IFF_NOTUSEABLE)
 				continue;
 
-			if (iaf == NULL)
+			if (iaf == NULL ||
+			    iaf->iface->metric > iap->iface->metric)
 				iaf = iap;
 		}
 	}
