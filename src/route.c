@@ -77,7 +77,6 @@ rt_cmp_netmask(const struct rt *rt1, const struct rt *rt2)
 }
 
 static bool rt_compare_os;
-#define NODE_CMP(a, b) ((a) == (b) ? 0 : (a) < (b) ? -1 : 1)
 
 static int
 rt_compare(void *context, const void *node1, const void *node2)
@@ -105,12 +104,8 @@ rt_compare(void *context, const void *node1, const void *node2)
 		return c;
 
 #ifndef HAVE_ROUTE_METRIC
-	if (context == &rt_compare_os) {
-#ifdef ROUTE_PER_GATEWAY
-		c = NODE_CMP(rt1, rt2);
-#endif
+	if (context == &rt_compare_os)
 		return c;
-	}
 #else
 	UNUSED(context);
 #endif
@@ -140,7 +135,7 @@ static int
 rt_compare_free(__unused void *context, const void *node1, const void *node2)
 {
 
-	return NODE_CMP(node1, node2);
+	return node1 == node2 ? 0 : node1 < node2 ? -1 : 1;
 }
 
 static const rb_tree_ops_t rt_compare_free_ops = {
@@ -305,7 +300,6 @@ rt_free(struct rt *rt)
 	assert(rt->rt_ifp->ctx != NULL);
 
 	ctx = rt->rt_ifp->ctx;
-	rt->rt_ifp = NULL;
 	rb_tree_insert_node(&ctx->froutes, rt);
 }
 
