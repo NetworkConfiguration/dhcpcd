@@ -130,6 +130,16 @@
 # endif
 #endif
 
+#ifndef __predict_false
+# if __GNUC__ > 2
+#  define	__predict_true(exp)	__builtin_expect((exp) != 0, 1)
+#  define	__predict_false(exp)	__builtin_expect((exp) != 0, 0)
+#else
+#  define	__predict_true(exp)	(exp)
+#  define	__predict_false(exp)	(exp)
+# endif
+#endif
+
 #ifndef __fallthrough
 # if __GNUC__ >= 7
 #  define __fallthrough __attribute__((fallthrough))

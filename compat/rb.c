@@ -39,10 +39,10 @@
 #else
 #define KASSERT(s)	do { } while (/*CONSTCOND*/ 0)
 #endif
-// __RCSID("$NetBSD: rb.c,v 1.13 2014/08/22 17:19:48 matt Exp $");
+//__RCSID("$NetBSD: rb.c,v 1.13 2014/08/22 17:19:48 matt Exp $");
 #else
 #include <lib/libkern/libkern.h>
-// __KERNEL_RCSID(0, "$NetBSD: rb.c,v 1.13 2014/08/22 17:19:48 matt Exp $");
+__KERNEL_RCSID(0, "$NetBSD: rb.c,v 1.13 2014/08/22 17:19:48 matt Exp $");
 #endif
 
 #ifdef _LIBC
@@ -61,21 +61,13 @@ __weak_alias(rb_tree_depths, _rb_tree_depths)
 #include "namespace.h"
 #endif
 
-//#ifdef RBTEST
+#ifdef RBTEST
 #include "rbtree.h"
-//#else
-//#include <sys/rbtree.h>
-//#endif
-
-#if !defined(__predict_false)
-#if __GNUC__ > 2
-#define	__predict_true(exp)	__builtin_expect((exp) != 0, 1)
-#define	__predict_false(exp)	__builtin_expect((exp) != 0, 0)
 #else
-#define	__predict_true(exp)	(exp)
-#define	__predict_false(exp)	(exp)
+#include <sys/rbtree.h>
 #endif
-#endif
+
+#include "common.h"
 
 static void rb_tree_insert_rebalance(struct rb_tree *, struct rb_node *);
 static void rb_tree_removal_rebalance(struct rb_tree *, struct rb_node *,
@@ -333,6 +325,10 @@ rb_tree_reparent_nodes(struct rb_tree *rbt, struct rb_node *old_father,
 	struct rb_node * const old_child = old_father->rb_nodes[which];
 	struct rb_node * const new_father = old_child;
 	struct rb_node * const new_child = old_father;
+
+#if !defined(_KERNEL) && !defined(_STANDALONE) && !defined(RBDEBUG)
+	UNUSED(rbt);
+#endif
 
 	KASSERT(which == RB_DIR_LEFT || which == RB_DIR_RIGHT);
 

@@ -965,6 +965,7 @@ EOF
 	rm -f _rbtree.c _rbtree
 fi
 if [ "$RBTREE" = no ]; then
+	echo "CPPFLAGS+=	-DRBTEST" >>$CONFIG_MK
 	echo "COMPAT_SRCS+=	compat/rb.c" >>$CONFIG_MK
 	echo "#include			\"compat/rbtree.h\"" >>$CONFIG_H
 else
