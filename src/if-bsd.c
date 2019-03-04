@@ -469,6 +469,8 @@ if_route(unsigned char cmd, const struct rt *rt)
 	bool gateway_unspec;
 
 	assert(rt != NULL);
+	assert(rt->rt_ifp != NULL);
+	assert(rt->rt_ifp->ctx != NULL);
 	ctx = rt->rt_ifp->ctx;
 
 #define ADDSA(sa) do {							      \
