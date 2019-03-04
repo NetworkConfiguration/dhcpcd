@@ -108,7 +108,10 @@ ipv4ll_subnetroute(rb_tree_t *routes, struct interface *ifp)
 	in.s_addr = INADDR_ANY;
 	sa_in_init(&rt->rt_gateway, &in);
 	sa_in_init(&rt->rt_ifa, &state->addr->addr);
-	rb_tree_insert_node(routes, rt);
+	if (rb_tree_insert_node(routes, rt) != rt) {
+		rt_free(rt);
+		return 0;
+	}
 	return 1;
 }
 
@@ -132,7 +135,10 @@ ipv4ll_defaultroute(rb_tree_t *routes, struct interface *ifp)
 	sa_in_init(&rt->rt_netmask, &in);
 	sa_in_init(&rt->rt_gateway, &in);
 	sa_in_init(&rt->rt_ifa, &state->addr->addr);
-	rb_tree_insert_node(routes, rt);
+	if (rb_tree_insert_node(routes, rt) != rt) {
+		rt_free(rt);
+		return 0;
+	}
 	return 1;
 }
 

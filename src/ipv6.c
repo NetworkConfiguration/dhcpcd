@@ -2223,8 +2223,8 @@ inet6_staticroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 			    (IPV6_AF_ADDED | IPV6_AF_STATIC))
 			{
 				rt = inet6_makeprefix(ifp, NULL, ia);
-				if (rt)
-					rb_tree_insert_node(routes, rt);
+				if (rt && rb_tree_insert_node(routes, rt) != rt)
+					rt_free(rt);
 			}
 		}
 	}
@@ -2248,15 +2248,17 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx, int expired,
 			rt = inet6_makeprefix(rap->iface, rap, addr);
 			if (rt) {
 				rt->rt_dflags |= RTDF_RA;
-				rb_tree_insert_node(routes, rt);
+				if (rb_tree_insert_node(routes, rt) != rt)
+					rt_free(rt);
 			}
 		}
 		if (rap->lifetime) {
 			rt = inet6_makerouter(rap);
 			if (rt) {
 				rt->rt_dflags |= RTDF_RA;
-				rb_tree_insert_node(routes, rt);
-				if (have_default)
+				if (rb_tree_insert_node(routes, rt) != rt)
+					rt_free(rt);
+				else if (have_default)
 					*have_default = true;
 			}
 		}
@@ -2282,7 +2284,8 @@ inet6_dhcproutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx,
 				if (rt == NULL)
 					continue;
 				rt->rt_dflags |= RTDF_DHCP;
-				rb_tree_insert_node(routes, rt);
+				if (rb_tree_insert_node(routes, rt) != rt)
+					rt_free(rt);
 			}
 		}
 	}

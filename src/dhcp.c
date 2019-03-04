@@ -465,8 +465,10 @@ decode_rfc3442_rt(rb_tree_t *routes, struct interface *ifp,
 		sa_in_init(&rt->rt_dest, &dest);
 		sa_in_init(&rt->rt_netmask, &netmask);
 		sa_in_init(&rt->rt_gateway, &gateway);
-		rb_tree_insert_node(routes, rt);
-		n++;
+		if (rb_tree_insert_node(routes, rt) != rt)
+			rt_free(rt);
+		else
+			n++;
 	}
 	return n;
 }
@@ -653,8 +655,10 @@ get_option_routes(rb_tree_t *routes, struct interface *ifp,
 			sa_in_init(&rt->rt_dest, &dest);
 			sa_in_init(&rt->rt_netmask, &netmask);
 			sa_in_init(&rt->rt_gateway, &gateway);
-			rb_tree_insert_node(routes, rt);
-			n++;
+			if (rb_tree_insert_node(routes, rt) != rt)
+				rt_free(rt);
+			else
+				n++;
 		}
 	}
 
@@ -675,8 +679,10 @@ get_option_routes(rb_tree_t *routes, struct interface *ifp,
 			sa_in_init(&rt->rt_dest, &dest);
 			sa_in_init(&rt->rt_netmask, &netmask);
 			sa_in_init(&rt->rt_gateway, &gateway);
-			rb_tree_insert_node(routes, rt);
-			n++;
+			if (rb_tree_insert_node(routes, rt) != rt)
+				rt_free(rt);
+			else
+				n++;
 		}
 	}
 

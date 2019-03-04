@@ -354,10 +354,10 @@ rt_recvrt(int cmd, const struct rt *rt)
 	assert(rt->rt_ifp->ctx != NULL);
 
 	ctx = rt->rt_ifp->ctx;
-	f = rb_tree_find_node(&ctx->kroutes, rt);
 
 	switch(cmd) {
 	case RTM_DELETE:
+		f = rb_tree_find_node(&ctx->kroutes, rt);
 		if (f != NULL) {
 			rb_tree_remove_node(&ctx->kroutes, f);
 			rt_free(f);
@@ -370,12 +370,11 @@ rt_recvrt(int cmd, const struct rt *rt)
 		}
 		break;
 	case RTM_ADD:
-		if (f != NULL)
-			break;
 		if ((f = rt_new(rt->rt_ifp)) == NULL)
 			break;
 		memcpy(f, rt, sizeof(*f));
-		rb_tree_insert_node(&ctx->kroutes, f);
+		if (rb_tree_insert_node(&ctx->kroutes, f) != f)
+			rt_free(f);
 		break;
 	}
 
@@ -607,7 +606,11 @@ rt_build(struct dhcpcd_ctx *ctx, int af)
 			continue;
 		if (rt_doroute(rt)) {
 			rb_tree_remove_node(&routes, rt);
-			rb_tree_insert_node(&added, rt);
+			if (rb_tree_insert_node(&added, rt) != rt) {
+				errno = EEXIST;
+				logerr(__func__);
+				rt_free(rt);
+			}
 		}
 	}
 
@@ -632,7 +635,11 @@ rt_build(struct dhcpcd_ctx *ctx, int af)
 	/* XXX This needs to be optimised. */
 	while ((rt = RB_TREE_MIN(&added)) != NULL) {
 		rb_tree_remove_node(&added, rt);
-		rb_tree_insert_node(&ctx->routes, rt);
+		if (rb_tree_insert_node(&ctx->routes, rt) != rt) {
+			errno = EEXIST;
+			logerr(__func__);
+			rt_free(rt);
+		}
 	}
 
 getfail:
