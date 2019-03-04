@@ -84,11 +84,10 @@ struct rt {
 	rb_node_t		rt_tree;
 };
 
-extern const rb_tree_ops_t rt_rb_tree_ops;
+extern const rb_tree_ops_t rt_compare_list_ops;
 
 void rt_init(struct dhcpcd_ctx *);
 void rt_dispose(struct dhcpcd_ctx *);
-struct rt * rt_find(rb_tree_t *, const struct rt *);
 void rt_free(struct rt *);
 void rt_freeif(struct interface *);
 void rt_headclear0(struct dhcpcd_ctx *, rb_tree_t *, int);
