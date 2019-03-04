@@ -283,7 +283,8 @@ inet_dhcproutes(rb_tree_t *routes, struct interface *ifp)
 		//in.s_addr = INADDR_ANY;
 		//sa_in_init(&rt->rt_gateway, &in);
 		rt->rt_gateway.sa_family = AF_UNSPEC;
-		rb_tree_insert_node(&nroutes, rt);
+		if (rb_tree_insert_node(&nroutes, rt) != rt)
+			rt_free(rt);
 	}
 
 	/* If any set routes, grab them, otherwise DHCP routes. */
@@ -296,7 +297,8 @@ inet_dhcproutes(rb_tree_t *routes, struct interface *ifp)
 			memcpy(rt, r, sizeof(*rt));
 			rt_setif(rt, ifp);
 			rt->rt_dflags = RTDF_STATIC;
-			rb_tree_insert_node(&nroutes, rt);
+			if (rb_tree_insert_node(&nroutes, rt) != rt)
+				rt_free(rt);
 		}
 	} else {
 		if (dhcp_get_routes(&nroutes, ifp) == -1)
@@ -315,7 +317,8 @@ inet_dhcproutes(rb_tree_t *routes, struct interface *ifp)
 		sa_in_init(&rt->rt_netmask, &in);
 		sa_in_init(&rt->rt_gateway, &state->addr->brd);
 		sa_in_init(&rt->rt_ifa, &state->addr->addr);
-		rb_tree_insert_node(&nroutes, rt);
+		if (rb_tree_insert_node(&nroutes, rt) != rt)
+			rt_free(rt);
 	}
 
 	/* Copy our address as the source address and set mtu */
@@ -327,8 +330,10 @@ inet_dhcproutes(rb_tree_t *routes, struct interface *ifp)
 		if (!(rt->rt_dflags & RTDF_STATIC))
 			rt->rt_dflags |= RTDF_DHCP;
 		sa_in_init(&rt->rt_ifa, &state->addr->addr);
-		rb_tree_insert_node(routes, rt);
-		n++;
+		if (rb_tree_insert_node(routes, rt) != rt)
+			rt_free(rt);
+		else
+			n++;
 	}
 
 	return n;
@@ -420,7 +425,8 @@ inet_routerhostroute(rb_tree_t *routes, struct interface *ifp)
 		sa_in_init(&rth->rt_gateway, &in);
 		rth->rt_mtu = dhcp_get_mtu(ifp);
 		sa_in_init(&rth->rt_ifa, &state->addr->addr);
-		rb_tree_insert_node(routes, rth);
+		if (rb_tree_insert_node(routes, rth) != rth)
+			rt_free(rth);
 	}
 	return 0;
 }

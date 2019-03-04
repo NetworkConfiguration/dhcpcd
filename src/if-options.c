@@ -1110,7 +1110,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			sa_in_init(&rt->rt_dest, &addr);
 			sa_in_init(&rt->rt_netmask, &addr2);
 			sa_in_init(&rt->rt_gateway, &addr3);
-			rb_tree_insert_node(&ifo->routes, rt);
+			if (rb_tree_insert_node(&ifo->routes, rt) != rt)
+				rt_free(rt);
 			*fp = ' ';
 		} else if (strncmp(arg, "routers=", strlen("routers=")) == 0) {
 			if (parse_addr(&addr, NULL, p) == -1)
@@ -1121,7 +1122,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			sa_in_init(&rt->rt_dest, &addr2);
 			sa_in_init(&rt->rt_netmask, &addr2);
 			sa_in_init(&rt->rt_gateway, &addr);
-			rb_tree_insert_node(&ifo->routes, rt);
+			if (rb_tree_insert_node(&ifo->routes, rt) != rt)
+				rt_free(rt);
 		} else if (strncmp(arg, "interface_mtu=",
 		    strlen("interface_mtu=")) == 0 ||
 		    strncmp(arg, "mtu=", strlen("mtu=")) == 0)
