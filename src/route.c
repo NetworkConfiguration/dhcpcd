@@ -45,6 +45,22 @@
 #include "route.h"
 #include "sa.h"
 
+/* Needed for NetBSD-6, 7 and 8. */
+#ifndef RB_TREE_FOREACH_SAFE
+#ifndef RB_TREE_PREV
+#define RB_TREE_NEXT(T, N) rb_tree_iterate((T), (N), RB_DIR_RIGHT)
+#define RB_TREE_PREV(T, N) rb_tree_iterate((T), (N), RB_DIR_LEFT)
+#endif
+#define RB_TREE_FOREACH_SAFE(N, T, S) \
+    for ((N) = RB_TREE_MIN(T); \
+        (N) && ((S) = RB_TREE_NEXT((T), (N)), 1); \
+        (N) = (S))
+#define RB_TREE_FOREACH_REVERSE_SAFE(N, T, S) \
+    for ((N) = RB_TREE_MAX(T); \
+        (N) && ((S) = RB_TREE_PREV((T), (N)), 1); \
+        (N) = (S))
+#endif
+
 static int
 rt_compare(__unused void *context, const void *node1, const void *node2)
 {
