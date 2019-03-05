@@ -61,6 +61,11 @@
         (N) = (S))
 #endif
 
+#ifdef RT_FREE_ROUTE_TABLE
+static size_t nroutes;
+static size_t froutes;
+#endif
+
 /*
  * On some systems, host routes have no need for a netmask.
  * However DHCP specifies host routes using an all-ones netmask.
@@ -253,6 +258,8 @@ rt_dispose(struct dhcpcd_ctx *ctx)
 	rt_headfree(&ctx->routes);
 #ifdef RT_FREE_ROUTE_TABLE
 	rt_headfree(&ctx->froutes);
+	logdebugx("free route list used %zu times", froutes);
+	logdebugx("new routes from free list %zu", nroutes);
 #endif
 }
 
@@ -263,9 +270,10 @@ rt_new0(struct dhcpcd_ctx *ctx)
 
 	assert(ctx != NULL);
 #ifdef RT_FREE_ROUTE_TABLE
-	if ((rt = RB_TREE_MIN(&ctx->froutes)) != NULL)
+	if ((rt = RB_TREE_MIN(&ctx->froutes)) != NULL) {
 		rb_tree_remove_node(&ctx->froutes, rt);
-	else
+		nroutes++;
+	} else
 #endif
 	if ((rt = malloc(sizeof(*rt))) == NULL) {
 		logerr(__func__);
@@ -311,6 +319,7 @@ rt_free(struct rt *rt)
 
 	ctx = rt->rt_ifp->ctx;
 	rb_tree_insert_node(&ctx->froutes, rt);
+	froutes++;
 #else
 	free(rt);
 #endif
