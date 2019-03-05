@@ -444,7 +444,7 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 		if (ort != NULL) {
 			if (if_route(RTM_DELETE, ort) == -1 && errno != ESRCH)
 				logerr("if_route (DEL)");
-			rt_kfree(ort);
+			memcpy(ort, nrt, sizeof(*ort));
 		}
 		return true;
 	}

@@ -1314,7 +1314,6 @@ if_initrt(struct dhcpcd_ctx *ctx, rb_tree_t *kroutes, int af)
 	    .rt.rtm_family = (unsigned char)af,
 	};
 
-	rt_headclear(&ctx->kroutes, af);
 	return send_netlink(ctx, kroutes, NETLINK_ROUTE, &nlm.hdr, &_if_initrt);
 }
 
