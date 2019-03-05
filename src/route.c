@@ -61,9 +61,11 @@
         (N) = (S))
 #endif
 
-#ifdef RT_FREE_ROUTE_TABLE
+#ifdef RT_FREE_ROUTE_TABLE_STATS
+static size_t croutes;
 static size_t nroutes;
 static size_t froutes;
+static size_t mroutes;
 #endif
 
 /*
@@ -258,8 +260,11 @@ rt_dispose(struct dhcpcd_ctx *ctx)
 	rt_headfree(&ctx->routes);
 #ifdef RT_FREE_ROUTE_TABLE
 	rt_headfree(&ctx->froutes);
+#ifdef RT_FREE_ROUTE_TABLE_STATS
 	logdebugx("free route list used %zu times", froutes);
-	logdebugx("new routes from free list %zu", nroutes);
+	logdebugx("new routes from route free list %zu", nroutes);
+	logdebugx("maximum route free list size %zu", mroutes);
+#endif
 #endif
 }
 
@@ -272,7 +277,10 @@ rt_new0(struct dhcpcd_ctx *ctx)
 #ifdef RT_FREE_ROUTE_TABLE
 	if ((rt = RB_TREE_MIN(&ctx->froutes)) != NULL) {
 		rb_tree_remove_node(&ctx->froutes, rt);
+#ifdef RT_FREE_ROUTE_TABLE_STATS
+		croutes--;
 		nroutes++;
+#endif
 	} else
 #endif
 	if ((rt = malloc(sizeof(*rt))) == NULL) {
@@ -319,7 +327,12 @@ rt_free(struct rt *rt)
 
 	ctx = rt->rt_ifp->ctx;
 	rb_tree_insert_node(&ctx->froutes, rt);
+#ifdef RT_FREE_ROUTE_TABLE_STATS
+	croutes++;
 	froutes++;
+	if (croutes > mroutes)
+		mroutes = croutes;
+#endif
 #else
 	free(rt);
 #endif
