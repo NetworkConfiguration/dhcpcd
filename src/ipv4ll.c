@@ -218,7 +218,6 @@ test:
 		return;
 	}
 	timespecclear(&state->defend);
-	if_initrt(ifp->ctx, AF_INET);
 	rt_build(ifp->ctx, AF_INET);
 	arp_announce(astate);
 	script_runreason(ifp, "IPV4LL");
@@ -526,10 +525,6 @@ ipv4ll_recvrt(__unused int cmd, const struct rt *rt)
 	struct dhcpcd_ctx *ctx;
 	struct interface *ifp;
 
-	/* Ignore route init. */
-	if (rt->rt_dflags & RTDF_INIT)
-		return 0;
-
 	/* Only interested in default route changes. */
 	if (sa_is_unspecified(&rt->rt_dest))
 		return 0;
@@ -538,7 +533,6 @@ ipv4ll_recvrt(__unused int cmd, const struct rt *rt)
 	ctx = rt->rt_ifp->ctx;
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 		if (IPV4LL_STATE_RUNNING(ifp)) {
-			if_initrt(ctx, AF_INET);
 			rt_build(ctx, AF_INET);
 			break;
 		}

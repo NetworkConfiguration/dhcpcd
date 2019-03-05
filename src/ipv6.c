@@ -1604,7 +1604,6 @@ ipv6_startstatic(struct interface *ifp)
 	ia->prefix_pltime = ND6_INFINITE_LIFETIME;
 	ia->dadcallback = ipv6_staticdadcallback;
 	ipv6_addaddr(ia, NULL);
-	if_initrt(ifp->ctx, AF_INET6);
 	rt_build(ifp->ctx, AF_INET6);
 	if (run_script)
 		script_runreason(ifp, "STATIC6");
@@ -1646,8 +1645,6 @@ ipv6_start(struct interface *ifp)
 			ipv6_regentempifid(ifp);
 	}
 
-	/* Load existing routes */
-	if_initrt(ifp->ctx, AF_INET6);
 	return 0;
 }
 
@@ -1671,10 +1668,8 @@ ipv6_freedrop(struct interface *ifp, int drop)
 
 	ipv6_freedrop_addrs(&state->addrs, drop ? 2 : 0, NULL);
 	if (drop) {
-		if (ifp->ctx->ra_routers != NULL) {
-			if_initrt(ifp->ctx, AF_INET6);
+		if (ifp->ctx->ra_routers != NULL)
 			rt_build(ifp->ctx, AF_INET6);
-		}
 	} else {
 		/* Because we need to cache the addresses we don't control,
 		 * we only free the state on when NOT dropping addresses. */

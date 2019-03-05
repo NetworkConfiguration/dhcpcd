@@ -178,7 +178,7 @@ int if_handlelink(struct dhcpcd_ctx *);
 #endif
 
 int if_route(unsigned char, const struct rt *rt);
-int if_initrt(struct dhcpcd_ctx *, int);
+int if_initrt(struct dhcpcd_ctx *, rb_tree_t *, int);
 
 #ifdef INET
 int if_address(unsigned char, const struct ipv4_addr *);

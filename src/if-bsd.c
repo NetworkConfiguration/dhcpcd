@@ -657,15 +657,13 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 }
 
 int
-if_initrt(struct dhcpcd_ctx *ctx, int af)
+if_initrt(struct dhcpcd_ctx *ctx, rb_tree_t *kroutes, int af)
 {
 	struct rt_msghdr *rtm;
 	int mib[6];
 	size_t needed;
 	char *buf, *p, *end;
-	struct rt rt;
-
-	rt_headclear(&ctx->kroutes, af);
+	struct rt rt, *rtn;
 
 	mib[0] = CTL_NET;
 	mib[1] = PF_ROUTE;
@@ -688,10 +686,15 @@ if_initrt(struct dhcpcd_ctx *ctx, int af)
 	end = buf + needed;
 	for (p = buf; p < end; p += rtm->rtm_msglen) {
 		rtm = (void *)p;
-		if (if_copyrt(ctx, &rt, rtm) == 0) {
-			rt.rt_dflags |= RTDF_INIT;
-			rt_recvrt(RTM_ADD, &rt);
+		if (if_copyrt(ctx, &rt, rtm) != 0)
+			continue;
+		if ((rtn = rt_new(rt.rt_ifp)) == NULL) {
+			logerr(__func__);
+			break;
 		}
+		memcpy(rtn, &rt, sizeof(*rtn));
+		if (rb_tree_insert_node(kroutes, rtn) != rtn)
+			rt_free(rtn);
 	}
 	free(buf);
 	return 0;

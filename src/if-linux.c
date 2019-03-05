@@ -351,8 +351,8 @@ if_closesockets_os(struct dhcpcd_ctx *ctx)
 
 static int
 get_netlink(struct dhcpcd_ctx *ctx, struct iovec *iov,
-    struct interface *ifp, int fd, int flags,
-    int (*callback)(struct dhcpcd_ctx *, struct interface *, struct nlmsghdr *))
+    void *arg, int fd, int flags,
+    int (*callback)(struct dhcpcd_ctx *, void *, struct nlmsghdr *))
 {
 	struct sockaddr_nl nladdr = { .nl_pid = 0 };
 	struct msghdr msg = {
@@ -406,7 +406,7 @@ recv_again:
 			again = 0;
 			break;
 		}
-		if (callback && (r = callback(ctx, ifp, nlm)) != 0)
+		if (callback && (r = callback(ctx, arg, nlm)) != 0)
 			break;
 	}
 
@@ -822,9 +822,9 @@ if_handlelink(struct dhcpcd_ctx *ctx)
 }
 
 static int
-send_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp,
+send_netlink(struct dhcpcd_ctx *ctx, void *arg,
     int protocol, struct nlmsghdr *hdr,
-    int (*callback)(struct dhcpcd_ctx *, struct interface *, struct nlmsghdr *))
+    int (*callback)(struct dhcpcd_ctx *, void *, struct nlmsghdr *))
 {
 	int s, r;
 	struct sockaddr_nl snl = { .nl_family = AF_NETLINK };
@@ -854,7 +854,7 @@ send_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp,
 			.iov_len = sizeof(buf),
 		};
 
-		r = get_netlink(ctx, &riov, ifp, s, 0, callback);
+		r = get_netlink(ctx, &riov, arg, s, 0, callback);
 	} else
 		r = -1;
 	if (protocol != NETLINK_ROUTE)
@@ -1031,7 +1031,7 @@ genl_parse(struct nlmsghdr *nlm, struct nlattr *tb[], int maxtype)
 }
 
 static int
-_gnl_getfamily(__unused struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
+_gnl_getfamily(__unused struct dhcpcd_ctx *ctx, __unused void *arg,
     struct nlmsghdr *nlm)
 {
 	struct nlattr *tb[CTRL_ATTR_FAMILY_ID + 1];
@@ -1066,9 +1066,10 @@ gnl_getfamily(struct dhcpcd_ctx *ctx, const char *name)
 }
 
 static int
-_if_getssid_nl80211(__unused struct dhcpcd_ctx *ctx, struct interface *ifp,
+_if_getssid_nl80211(__unused struct dhcpcd_ctx *ctx, void *arg,
     struct nlmsghdr *nlm)
 {
+	struct interface *ifp = arg;
 	struct nlattr *tb[NL80211_ATTR_BSS + 1];
 	struct nlattr *bss[NL80211_BSS_STATUS + 1];
 	uint32_t status;
@@ -1284,20 +1285,26 @@ if_route(unsigned char cmd, const struct rt *rt)
 }
 
 static int
-_if_initrt(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
+_if_initrt(struct dhcpcd_ctx *ctx, void *arg,
     struct nlmsghdr *nlm)
 {
-	struct rt rt;
+	struct rt rt, *rtn;
+	rb_tree_t *kroutes = arg;
 
-	if (if_copyrt(ctx, &rt, nlm) == 0) {
-		rt.rt_dflags |= RTDF_INIT;
-		rt_recvrt(RTM_ADD, &rt);
+	if (if_copyrt(ctx, &rt, nlm) != 0)
+		return 0;
+	if ((rtn = rt_new(rt.rt_ifp)) == NULL) {
+		logerr(__func__);
+		return 0;
 	}
+	memcpy(rtn, &rt, sizeof(*rtn));
+	if (rb_tree_insert_node(kroutes, rtn) != rtn)
+		rt_free(rtn);
 	return 0;
 }
 
 int
-if_initrt(struct dhcpcd_ctx *ctx, int af)
+if_initrt(struct dhcpcd_ctx *ctx, rb_tree_t *kroutes, int af)
 {
 	struct nlmr nlm = {
 	    .hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg)),
@@ -1308,7 +1315,7 @@ if_initrt(struct dhcpcd_ctx *ctx, int af)
 	};
 
 	rt_headclear(&ctx->kroutes, af);
-	return send_netlink(ctx, NULL, NETLINK_ROUTE, &nlm.hdr, &_if_initrt);
+	return send_netlink(ctx, kroutes, NETLINK_ROUTE, &nlm.hdr, &_if_initrt);
 }
 
 

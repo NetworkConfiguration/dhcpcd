@@ -2830,7 +2830,6 @@ dhcp6_delegate_prefix(struct interface *ifp)
 	}
 
 	/* Now all addresses have been added, rebuild the routing table. */
-	if_initrt(ifp->ctx, AF_INET6);
 	rt_build(ifp->ctx, AF_INET6);
 }
 
@@ -2895,7 +2894,6 @@ dhcp6_find_delegates(struct interface *ifp)
 		state = D6_STATE(ifp);
 		state->state = DH6S_DELEGATED;
 		ipv6_addaddrs(&state->addrs);
-		if_initrt(ifp->ctx, AF_INET6);
 		rt_build(ifp->ctx, AF_INET6);
 		dhcp6_script_try_run(ifp, 1);
 	}
@@ -3133,7 +3131,6 @@ dhcp6_bind(struct interface *ifp, const char *op, const char *sfrom)
 		else
 			lognewinfo("%s: expire in %"PRIu32" seconds",
 			    ifp->name, state->expire);
-		if_initrt(ifp->ctx, AF_INET6);
 		rt_build(ifp->ctx, AF_INET6);
 		if (!timed_out)
 			dhcp6_writelease(ifp);

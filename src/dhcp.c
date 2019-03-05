@@ -3648,15 +3648,9 @@ dhcp_init(struct interface *ifp)
 	const struct if_options *ifo;
 	uint8_t len;
 	char buf[(sizeof(ifo->clientid) - 1) * 3];
-	int r;
 
-	r = dhcp_initstate(ifp);
-	if (r == -1)
+	if (dhcp_initstate(ifp) == -1)
 		return -1;
-	else if (r == 1) {
-		/* Now is a good time to find IPv4 routes */
-		if_initrt(ifp->ctx, AF_INET);
-	}
 
 	state = D_STATE(ifp);
 	state->state = DHS_INIT;
