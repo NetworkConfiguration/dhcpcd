@@ -767,10 +767,6 @@ ipv4_applyaddr(void *arg)
 	state->addr = ia;
 	state->added = STATE_ADDED;
 
-	/* Find any freshly added routes, such as the subnet route.
-	 * We do this because we cannot rely on recieving the kernel
-	 * notification right now via our link socket. */
-	if_initrt(ifp->ctx, AF_INET);
 	rt_build(ifp->ctx, AF_INET);
 
 #ifdef ARP

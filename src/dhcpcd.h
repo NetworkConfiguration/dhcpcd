@@ -138,8 +138,9 @@ struct dhcpcd_ctx {
 	struct if_head *ifaces;
 
 	rb_tree_t routes;	/* our routes */
-	rb_tree_t kroutes;	/* all kernel routes */
+#ifdef RT_FREE_ROUTE_TABLE
 	rb_tree_t froutes;	/* free routes for re-use */
+#endif
 
 	int pf_inet_fd;
 	void *priv;

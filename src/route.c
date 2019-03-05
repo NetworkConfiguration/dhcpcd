@@ -131,6 +131,7 @@ const rb_tree_ops_t rt_compare_list_ops = {
 	.rbto_context = NULL
 };
 
+#ifdef RT_FREE_ROUTE_TABLE
 static int
 rt_compare_free(__unused void *context, const void *node1, const void *node2)
 {
@@ -144,14 +145,16 @@ static const rb_tree_ops_t rt_compare_free_ops = {
 	.rbto_node_offset = offsetof(struct rt, rt_tree),
 	.rbto_context = NULL
 };
+#endif
 
 void
 rt_init(struct dhcpcd_ctx *ctx)
 {
 
 	rb_tree_init(&ctx->routes, &rt_compare_os_ops);
-	rb_tree_init(&ctx->kroutes, &rt_compare_os_ops);
+#ifdef RT_FREE_ROUTE_TABLE
 	rb_tree_init(&ctx->froutes, &rt_compare_free_ops);
+#endif
 }
 
 static void
@@ -207,7 +210,9 @@ rt_headclear0(struct dhcpcd_ctx *ctx, rb_tree_t *rts, int af)
 	if (rts == NULL)
 		return;
 	assert(ctx != NULL);
+#ifdef RT_FREE_ROUTE_TABLE
 	assert(&ctx->froutes != rts);
+#endif
 
 	RB_TREE_FOREACH_SAFE(rt, rts, rtn) {
 		if (af != AF_UNSPEC &&
@@ -246,8 +251,9 @@ rt_dispose(struct dhcpcd_ctx *ctx)
 
 	assert(ctx != NULL);
 	rt_headfree(&ctx->routes);
-	rt_headfree(&ctx->kroutes);
+#ifdef RT_FREE_ROUTE_TABLE
 	rt_headfree(&ctx->froutes);
+#endif
 }
 
 struct rt *
@@ -256,9 +262,12 @@ rt_new0(struct dhcpcd_ctx *ctx)
 	struct rt *rt;
 
 	assert(ctx != NULL);
+#ifdef RT_FREE_ROUTE_TABLE
 	if ((rt = RB_TREE_MIN(&ctx->froutes)) != NULL)
 		rb_tree_remove_node(&ctx->froutes, rt);
-	else if ((rt = malloc(sizeof(*rt))) == NULL) {
+	else
+#endif
+	if ((rt = malloc(sizeof(*rt))) == NULL) {
 		logerr(__func__);
 		return NULL;
 	}
@@ -293,6 +302,7 @@ rt_new(struct interface *ifp)
 void
 rt_free(struct rt *rt)
 {
+#ifdef RT_FREE_ROUTE_TABLE
 	struct dhcpcd_ctx *ctx;
 
 	assert(rt != NULL);
@@ -301,6 +311,9 @@ rt_free(struct rt *rt)
 
 	ctx = rt->rt_ifp->ctx;
 	rb_tree_insert_node(&ctx->froutes, rt);
+#else
+	free(rt);
+#endif
 }
 
 void
@@ -318,27 +331,6 @@ rt_freeif(struct interface *ifp)
 			rt_free(rt);
 		}
 	}
-	RB_TREE_FOREACH_SAFE(rt, &ctx->kroutes, rtn) {
-		if (rt->rt_ifp == ifp) {
-			rb_tree_remove_node(&ctx->kroutes, rt);
-			rt_free(rt);
-		}
-	}
-}
-
-static void
-rt_kfree(struct rt *rt)
-{
-	struct dhcpcd_ctx *ctx;
-	struct rt *f;
-
-	assert(rt != NULL);
-	ctx = rt->rt_ifp->ctx;
-	f = rb_tree_find_node(&ctx->kroutes, rt);
-	if (f == NULL)
-		return;
-	rb_tree_remove_node(&ctx->kroutes, f);
-	rt_free(f);
 }
 
 /* If something other than dhcpcd removes a route,
@@ -357,24 +349,12 @@ rt_recvrt(int cmd, const struct rt *rt)
 
 	switch(cmd) {
 	case RTM_DELETE:
-		f = rb_tree_find_node(&ctx->kroutes, rt);
-		if (f != NULL) {
-			rb_tree_remove_node(&ctx->kroutes, f);
-			rt_free(f);
-		}
 		f = rb_tree_find_node(&ctx->routes, rt);
 		if (f != NULL) {
 			rb_tree_remove_node(&ctx->routes, f);
 			rt_desc("deleted", f);
 			rt_free(f);
 		}
-		break;
-	case RTM_ADD:
-		if ((f = rt_new(rt->rt_ifp)) == NULL)
-			break;
-		memcpy(f, rt, sizeof(*f));
-		if (rb_tree_insert_node(&ctx->kroutes, f) != f)
-			rt_free(f);
 		break;
 	}
 
@@ -385,7 +365,7 @@ rt_recvrt(int cmd, const struct rt *rt)
 }
 
 static bool
-rt_add(struct rt *nrt, struct rt *ort)
+rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 {
 	struct dhcpcd_ctx *ctx;
 	bool change;
@@ -412,7 +392,7 @@ rt_add(struct rt *nrt, struct rt *ort)
 
 	change = false;
 	if (ort == NULL) {
-		ort = rb_tree_find_node(&ctx->kroutes, nrt);
+		ort = rb_tree_find_node(kroutes, nrt);
 		if (ort != NULL &&
 		    ((ort->rt_flags & RTF_REJECT &&
 		      nrt->rt_flags & RTF_REJECT) ||
@@ -483,8 +463,6 @@ rt_add(struct rt *nrt, struct rt *ort)
 	if (ort != NULL) {
 		if (if_route(RTM_DELETE, ort) == -1 && errno != ESRCH)
 			logerr("if_route (DEL)");
-		else
-			rt_kfree(ort);
 	}
 #ifdef ROUTE_PER_GATEWAY
 	/* The OS allows many routes to the same dest with different gateways.
@@ -497,8 +475,11 @@ rt_add(struct rt *nrt, struct rt *ort)
 		}
 	}
 #endif
-	if (if_route(RTM_ADD, nrt) != -1)
+	if (if_route(RTM_ADD, nrt) != -1) {
+		if (ort != NULL)
+			memcpy(ort, nrt, sizeof(*ort));
 		return true;
+	}
 #ifdef HAVE_ROUTE_METRIC
 logerr:
 #endif
@@ -515,10 +496,6 @@ rt_delete(struct rt *rt)
 	retval = if_route(RTM_DELETE, rt) == -1 ? false : true;
 	if (!retval && errno != ENOENT && errno != ESRCH)
 		logerr(__func__);
-	/* Remove the route from our kernel table so we can add a
-	 * IPv4LL default route if possible. */
-	else
-		rt_kfree(rt);
 	return retval;
 }
 
@@ -534,7 +511,7 @@ rt_cmp(const struct rt *r1, const struct rt *r2)
 }
 
 static bool
-rt_doroute(struct rt *rt)
+rt_doroute(rb_tree_t *kroutes, struct rt *rt)
 {
 	struct dhcpcd_ctx *ctx;
 	struct rt *or;
@@ -551,20 +528,20 @@ rt_doroute(struct rt *rt)
 		    sa_cmp(&or->rt_ifa, &rt->rt_ifa) != 0) ||
 		    or->rt_mtu != rt->rt_mtu)
 		{
-			if (!rt_add(rt, or))
+			if (!rt_add(kroutes, rt, or))
 				return false;
 		}
 		rb_tree_remove_node(&ctx->routes, or);
 		rt_free(or);
 	} else {
 		if (rt->rt_dflags & RTDF_FAKE) {
-			or = rb_tree_find_node(&ctx->kroutes, rt);
+			or = rb_tree_find_node(kroutes, rt);
 			if (or == NULL)
 				return false;
 			if (!rt_cmp(rt, or))
 				return false;
 		} else {
-			if (!rt_add(rt, NULL))
+			if (!rt_add(kroutes, rt, NULL))
 				return false;
 		}
 	}
@@ -575,10 +552,11 @@ rt_doroute(struct rt *rt)
 void
 rt_build(struct dhcpcd_ctx *ctx, int af)
 {
-	rb_tree_t routes, added;
+	rb_tree_t kroutes, routes, added;
 	struct rt *rt, *rtn;
 	unsigned long long o;
 
+	rb_tree_init(&kroutes, &rt_compare_os_ops);
 	rb_tree_init(&routes, &rt_compare_list_ops);
 	rb_tree_init(&added, &rt_compare_os_ops);
 
@@ -597,6 +575,8 @@ rt_build(struct dhcpcd_ctx *ctx, int af)
 #endif
 	}
 
+	if_initrt(ctx, &kroutes, af);
+
 	RB_TREE_FOREACH_SAFE(rt, &routes, rtn) {
 		if (rt->rt_dest.sa_family != af &&
 		    rt->rt_gateway.sa_family != af)
@@ -604,7 +584,7 @@ rt_build(struct dhcpcd_ctx *ctx, int af)
 		/* Is this route already in our table? */
 		if (rb_tree_find_node(&added, rt) != NULL)
 			continue;
-		if (rt_doroute(rt)) {
+		if (rt_doroute(&kroutes, rt)) {
 			rb_tree_remove_node(&routes, rt);
 			if (rb_tree_insert_node(&added, rt) != rt) {
 				errno = EEXIST;
@@ -642,6 +622,8 @@ rt_build(struct dhcpcd_ctx *ctx, int af)
 		}
 	}
 
+
 getfail:
 	rt_headclear(&routes, AF_UNSPEC);
+	rt_headclear(&kroutes, AF_UNSPEC);
 }
