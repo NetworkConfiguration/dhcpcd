@@ -40,6 +40,17 @@
 #include "dhcpcd.h"
 #include "sa.h"
 
+/*
+ * Enable the route free list by default as
+ * memory usage is still reported as low/unchanged even
+ * when dealing with millions of routes.
+ */
+#if !defined(RT_FREE_ROUTE_TABLE)
+#define RT_FREE_ROUTE_TABLE
+#elif RT_FREE_ROUTE_TABLE == 0
+#undef RT_FREE_ROUTE_TABLE
+#endif
+
 /* Some systems have route metrics.
  * OpenBSD route priority is not this. */
 #ifndef HAVE_ROUTE_METRIC
