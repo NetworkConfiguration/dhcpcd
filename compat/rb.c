@@ -29,6 +29,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "common.h"
+
 #if !defined(_KERNEL) && !defined(_STANDALONE)
 #include <sys/types.h>
 #include <stddef.h>
@@ -39,7 +41,7 @@
 #else
 #define KASSERT(s)	do { } while (/*CONSTCOND*/ 0)
 #endif
-//__RCSID("$NetBSD: rb.c,v 1.13 2014/08/22 17:19:48 matt Exp $");
+__RCSID("$NetBSD: rb.c,v 1.13 2014/08/22 17:19:48 matt Exp $");
 #else
 #include <lib/libkern/libkern.h>
 __KERNEL_RCSID(0, "$NetBSD: rb.c,v 1.13 2014/08/22 17:19:48 matt Exp $");
@@ -66,8 +68,6 @@ __weak_alias(rb_tree_depths, _rb_tree_depths)
 #else
 #include <sys/rbtree.h>
 #endif
-
-#include "common.h"
 
 static void rb_tree_insert_rebalance(struct rb_tree *, struct rb_node *);
 static void rb_tree_removal_rebalance(struct rb_tree *, struct rb_node *,
