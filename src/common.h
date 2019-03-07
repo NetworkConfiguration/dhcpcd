@@ -40,6 +40,12 @@
 #define HOSTNAME_MAX_LEN	250	/* 255 - 3 (FQDN) - 2 (DNS enc) */
 #endif
 
+#ifndef __BIT
+#define __BIT(__n)	\
+    (((uintmax_t)(__n) >= NBBY * sizeof(uintmax_t)) ? 0 : \
+    ((uintmax_t)1 << (uintmax_t)((__n) & (NBBY * sizeof(uintmax_t) - 1))))
+#endif
+
 #ifndef MIN
 #define MIN(a,b)		((/*CONSTCOND*/(a)<(b))?(a):(b))
 #define MAX(a,b)		((/*CONSTCOND*/(a)>(b))?(a):(b))
