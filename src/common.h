@@ -131,7 +131,9 @@
 #endif
 
 /* Needed for rbtree(3) compat */
+#ifndef __RCSID
 #define __RCSID(a)
+#endif
 #ifndef __predict_false
 # if __GNUC__ > 2
 #  define	__predict_true(exp)	__builtin_expect((exp) != 0, 1)
