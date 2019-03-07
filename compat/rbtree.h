@@ -1,4 +1,4 @@
-/*	$NetBSD: rbtree.h,v 1.2 2012/02/17 08:20:55 yamt Exp $	*/
+/*	$NetBSD: rbtree.h,v 1.4 2019/03/07 12:07:42 roy Exp $	*/
 
 /*-
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
