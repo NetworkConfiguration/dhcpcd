@@ -91,6 +91,7 @@ rt_compare(void *context, const void *node1, const void *node2)
 	const struct rt *rt1 = node1, *rt2 = node2;
 	bool rt1u, rt2u;
 	int c;
+	struct interface *ifp1, *ifp2;
 
 	/* Default routes come last. */
 	rt1u = !(rt1->rt_flags & RTF_HOST) &&
@@ -110,18 +111,25 @@ rt_compare(void *context, const void *node1, const void *node2)
 	if (c != 0)
 		return c;
 
+	/* All other checks are by interface. */
+	if (rt1->rt_ifp == NULL || rt2->rt_ifp == NULL)
+		return 0;
+	ifp1 = rt1->rt_ifp;
+	ifp2 = rt2->rt_ifp;
+
+	/* Prefer interfaces with a carrier */
+	c = ifp1->carrier - ifp2->carrier;
+	if (c != 0)
+		return -c;
+
 #ifndef HAVE_ROUTE_METRIC
 	if (context == &rt_compare_os)
-		return c;
+		return 0;
 #else
 	UNUSED(context);
 #endif
-	if (rt1->rt_ifp == NULL || rt2->rt_ifp == NULL)
-		c = 0;
-	else
-		c = (int)(rt1->rt_ifp->metric - rt2->rt_ifp->metric);
-
-	return c;
+	/* Lower metric interfaces come first */
+	return (int)(ifp1->metric - ifp2->metric);
 }
 
 static const rb_tree_ops_t rt_compare_os_ops = {
