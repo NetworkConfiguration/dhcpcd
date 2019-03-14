@@ -1128,6 +1128,22 @@ dhcpcd_checkcarrier(void *arg)
 	dhcpcd_handlecarrier(ifp->ctx, LINK_UNKNOWN, ifp->flags, ifp->name);
 }
 
+#ifndef SMALL
+static void
+dhcpcd_setlinkrcvbuf(struct dhcpcd_ctx *ctx)
+{
+	socklen_t socklen;
+
+	if (ctx->link_rcvbuf == 0)
+		return;
+
+	socklen = sizeof(ctx->link_rcvbuf);
+	if (setsockopt(ctx->link_fd, SOL_SOCKET,
+	    SO_RCVBUF, &ctx->link_rcvbuf, socklen) == -1)
+		logerr(__func__);
+}
+#endif
+
 void
 dhcpcd_linkoverflow(struct dhcpcd_ctx *ctx)
 {
@@ -1148,6 +1164,9 @@ dhcpcd_linkoverflow(struct dhcpcd_ctx *ctx)
 		eloop_exit(ctx->eloop, EXIT_FAILURE);
 		return;
 	}
+#ifndef SMALL
+	dhcpcd_setlinkrcvbuf(ctx);
+#endif
 	eloop_event_add(ctx->eloop, ctx->link_fd, dhcpcd_handlelink, ctx);
 
 	/* Work out the current interfaces. */
@@ -1993,6 +2012,9 @@ printpidfile:
 		logerr("%s: if_opensockets", __func__);
 		goto exit_failure;
 	}
+#ifndef SMALL
+	dhcpcd_setlinkrcvbuf(&ctx);
+#endif
 
 	/* When running dhcpcd against a single interface, we need to retain
 	 * the old behaviour of waiting for an IP address */

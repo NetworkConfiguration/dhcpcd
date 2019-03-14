@@ -64,7 +64,7 @@
 #define O_IPV6RS		O_BASE + 4
 #define O_NOIPV6RS		O_BASE + 5
 #define O_IPV6RA_FORK		O_BASE + 6
-// unused			O_BASE + 7
+#define O_LINK_RCVBUF		O_BASE + 7
 // unused			O_BASE + 8
 #define O_NOALIAS		O_BASE + 9
 #define O_IA_NA			O_BASE + 10
@@ -204,6 +204,7 @@ const struct option cf_options[] = {
 	{"lastleaseextend", no_argument,       NULL, O_LASTLEASE_EXTEND},
 	{"inactive",        no_argument,       NULL, O_INACTIVE},
 	{"mudurl",          required_argument, NULL, O_MUDURL},
+	{"link_rcvbuf",     required_argument, NULL, O_LINK_RCVBUF},
 	{NULL,              0,                 NULL, '\0'}
 };
 
@@ -2172,6 +2173,16 @@ err_sla:
 			return -1;
 		}
 		*ifo->mudurl = (uint8_t)s;
+		break;
+	case O_LINK_RCVBUF:
+#ifndef SMALL
+		ARG_REQUIRED;
+		ctx->link_rcvbuf = (int)strtoi(arg, NULL, 0, 0, INT32_MAX, &e);
+		if (e) {
+			logerrx("failed to convert link_rcvbuf %s", arg);
+			return -1;
+		}
+#endif
 		break;
 	default:
 		return 0;
