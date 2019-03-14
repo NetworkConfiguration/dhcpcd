@@ -145,6 +145,9 @@ struct dhcpcd_ctx {
 	int pf_inet_fd;
 	void *priv;
 	int link_fd;
+#ifndef SMALL
+	int link_rcvbuf;
+#endif
 	int seq;	/* route message sequence no */
 	int sseq;	/* successful seq no sent */
 
