@@ -709,6 +709,10 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	case 'c':
 		ARG_REQUIRED;
 		free(ifo->script);
+		if (*arg == '\0' || strcmp(arg, "/dev/null") == 0) {
+			ifo->script = NULL;
+			break;
+		}
 		ifo->script = strdup(arg);
 		if (ifo->script == NULL)
 			logerr(__func__);
