@@ -797,8 +797,7 @@ dhcp6_makemessage(struct interface *ifp)
 		m = state->new;
 		ml = state->new_len;
 	}
-	unicast = NULL;
-	/* Depending on state, get the unicast address */
+
 	switch(state->state) {
 	case DH6S_INIT: /* FALLTHROUGH */
 	case DH6S_DISCOVER:
@@ -806,7 +805,6 @@ dhcp6_makemessage(struct interface *ifp)
 		break;
 	case DH6S_REQUEST:
 		type = DHCP6_REQUEST;
-		unicast = dhcp6_findmoption(m, ml, D6_OPTION_UNICAST, &uni_len);
 		break;
 	case DH6S_CONFIRM:
 		type = DHCP6_CONFIRM;
@@ -816,18 +814,31 @@ dhcp6_makemessage(struct interface *ifp)
 		break;
 	case DH6S_RENEW:
 		type = DHCP6_RENEW;
-		unicast = dhcp6_findmoption(m, ml, D6_OPTION_UNICAST, &uni_len);
 		break;
 	case DH6S_INFORM:
 		type = DHCP6_INFORMATION_REQ;
 		break;
 	case DH6S_RELEASE:
 		type = DHCP6_RELEASE;
-		unicast = dhcp6_findmoption(m, ml, D6_OPTION_UNICAST, &uni_len);
 		break;
 	default:
 		errno = EINVAL;
 		return -1;
+	}
+
+	switch(state->state) {
+	case DH6S_REQUEST: /* FALLTHROUGH */
+	case DH6S_RENEW:   /* FALLTHROUGH */
+	case DH6S_RELEASE:
+		if (has_option_mask(ifo->nomask6, D6_OPTION_UNICAST)) {
+			unicast = NULL;
+			break;
+		}
+		unicast = dhcp6_findmoption(m, ml, D6_OPTION_UNICAST, &uni_len);
+		break;
+	default:
+		unicast = NULL;
+		break;
 	}
 
 	/* In non master mode we listen and send from fixed addresses.
