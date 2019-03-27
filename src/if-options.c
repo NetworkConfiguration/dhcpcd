@@ -709,13 +709,23 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	case 'c':
 		ARG_REQUIRED;
 		free(ifo->script);
-		if (*arg == '\0' || strcmp(arg, "/dev/null") == 0) {
+		s = parse_string(NULL, 0, arg);
+		if (s == 0) {
 			ifo->script = NULL;
 			break;
 		}
-		ifo->script = strdup(arg);
-		if (ifo->script == NULL)
+		dl = (size_t)s;
+		if (s == -1 || (ifo->script = malloc(dl)) == NULL) {
 			logerr(__func__);
+			return -1;
+		}
+		parse_string(ifo->script, dl, arg);
+		if (ifo->script[0] == '\0' ||
+		    strcmp(ifo->script, "/dev/null") == 0)
+		{
+			free(ifo->script);
+			ifo->script = NULL;
+		}
 		break;
 	case 'd':
 		ifo->options |= DHCPCD_DEBUG;
