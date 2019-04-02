@@ -582,7 +582,7 @@ if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 
 	if (if_copyrt(ctx, &rt, rtm) == 0) {
 		if_finishrt(&rt);
-		rt_recvrt(rtm->rtm_type, &rt);
+		rt_recvrt(rtm->rtm_type, &rt, rtm->rtm_pid);
 	}
 }
 
@@ -1104,7 +1104,7 @@ if_walkrt(struct dhcpcd_ctx *ctx, char *data, size_t len)
 		rt.rt_ifp = if_find(ctx->ifaces, ifname);
 		if (rt.rt_ifp != NULL) {
 			if_finishrt(&rt);
-			rt_recvrt(RTM_ADD, &rt);
+			rt_recvrt(RTM_ADD, &rt, 0);
 		}
 	} while (++re < e);
 	return 0;
@@ -1152,7 +1152,7 @@ if_walkrt6(struct dhcpcd_ctx *ctx, char *data, size_t len)
 		rt.rt_ifp = if_find(ctx->ifaces, ifname);
 		if (rt.rt_ifp != NULL) {
 			if_finishrt(&rt);
-			rt_recvrt(RTM_ADD, &rt);
+			rt_recvrt(RTM_ADD, &rt, 0);
 		}
 	} while (++re < e);
 	return 0;
