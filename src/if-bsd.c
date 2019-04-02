@@ -688,7 +688,7 @@ if_initrt(struct dhcpcd_ctx *ctx, int af)
 		rtm = (void *)p;
 		if (if_copyrt(ctx, &rt, rtm) == 0) {
 			rt.rt_dflags |= RTDF_INIT;
-			rt_recvrt(RTM_ADD, &rt);
+			rt_recvrt(RTM_ADD, &rt, rtm->rtm_pid);
 		}
 	}
 	free(buf);
@@ -1010,7 +1010,7 @@ if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 	}
 #endif
 
-	rt_recvrt(rtm->rtm_type, &rt);
+	rt_recvrt(rtm->rtm_type, &rt, rtm->rtm_pid);
 }
 
 static void
