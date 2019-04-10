@@ -1913,13 +1913,16 @@ static int
 dhcp6_checkstatusok(const struct interface *ifp,
     struct dhcp6_message *m, uint8_t *p, size_t len)
 {
+	struct dhcp6_state *state;
 	uint8_t *opt;
 	uint16_t opt_len, code;
 	size_t mlen;
 	void * (*f)(void *, size_t, uint16_t, uint16_t *), *farg;
 	char buf[32], *sbuf;
 	const char *status;
+	logfunc_t *logfunc;
 
+	state = D6_STATE(ifp);
 	f = p ? dhcp6_findoption : dhcp6_findmoption;
 	if (p)
 		farg = p;
@@ -1927,6 +1930,7 @@ dhcp6_checkstatusok(const struct interface *ifp,
 		farg = m;
 	if ((opt = f(farg, len, D6_OPTION_STATUS_CODE, &opt_len)) == NULL) {
 		//logdebugx("%s: no status", ifp->name);
+		state->lerror = 0;
 		return 0;
 	}
 
@@ -1936,8 +1940,10 @@ dhcp6_checkstatusok(const struct interface *ifp,
 	}
 	memcpy(&code, opt, sizeof(code));
 	code = ntohs(code);
-	if (code == D6_STATUS_OK)
+	if (code == D6_STATUS_OK) {
+		state->lerror = 0;
 		return 1;
+	}
 
 	/* Anything after the code is a message. */
 	opt += sizeof(code);
@@ -1960,8 +1966,13 @@ dhcp6_checkstatusok(const struct interface *ifp,
 		status = sbuf;
 	}
 
-	logerrx("%s: DHCPv6 REPLY: %s", ifp->name, status);
+	if (state->lerror == code || state->state == DH6S_INIT)
+		logfunc = logdebugx;
+	else
+		logfunc = logerrx;
+	logfunc("%s: DHCPv6 REPLY: %s", ifp->name, status);
 	free(sbuf);
+	state->lerror = code;
 	return -1;
 }
 
@@ -3794,6 +3805,7 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 
 gogogo:
 	state->state = init_state;
+	state->lerror = 0;
 	dhcp_set_leasefile(state->leasefile, sizeof(state->leasefile),
 	    AF_INET6, ifp);
 	if (ipv6_linklocal(ifp) == NULL) {
@@ -3813,18 +3825,20 @@ dhcp6_reboot(struct interface *ifp)
 	struct dhcp6_state *state;
 
 	state = D6_STATE(ifp);
-	if (state) {
-		switch (state->state) {
-		case DH6S_BOUND:
-			dhcp6_startrebind(ifp);
-			break;
-		case DH6S_INFORMED:
-			dhcp6_startinform(ifp);
-			break;
-		default:
-			dhcp6_startdiscover(ifp);
-			break;
-		}
+	if (state == NULL)
+		return;
+
+	state->lerror = 0;
+	switch (state->state) {
+	case DH6S_BOUND:
+		dhcp6_startrebind(ifp);
+		break;
+	case DH6S_INFORMED:
+		dhcp6_startinform(ifp);
+		break;
+	default:
+		dhcp6_startdiscover(ifp);
+		break;
 	}
 }
 
