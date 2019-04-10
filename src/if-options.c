@@ -207,6 +207,8 @@ const struct option cf_options[] = {
 	{NULL,              0,                 NULL, '\0'}
 };
 
+static const char *default_script = SCRIPT;
+
 static char *
 add_environ(struct if_options *ifo, const char *value, int uniq)
 {
@@ -708,7 +710,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		break;
 	case 'c':
 		ARG_REQUIRED;
-		free(ifo->script);
+		if (ifo->script != default_script)
+			free(ifo->script);
 		s = parse_string(NULL, 0, arg);
 		if (s == 0) {
 			ifo->script = NULL;
@@ -716,6 +719,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		}
 		dl = (size_t)s;
 		if (s == -1 || (ifo->script = malloc(dl)) == NULL) {
+			ifo->script = NULL;
 			logerr(__func__);
 			return -1;
 		}
@@ -2291,6 +2295,7 @@ default_config(struct dhcpcd_ctx *ctx)
 	ifo->options |= DHCPCD_IF_UP | DHCPCD_LINK | DHCPCD_INITIAL_DELAY;
 	ifo->timeout = DEFAULT_TIMEOUT;
 	ifo->reboot = DEFAULT_REBOOT;
+	ifo->script = UNCONST(default_script);
 	ifo->metric = -1;
 	ifo->auth.options |= DHCPCD_AUTH_REQUIRE;
 	TAILQ_INIT(&ifo->routes);
@@ -2640,7 +2645,8 @@ free_options(struct dhcpcd_ctx *ctx, struct if_options *ifo)
 			free(ifo->config);
 		}
 		rt_headclear0(ctx, &ifo->routes, AF_UNSPEC);
-		free(ifo->script);
+		if (ifo->script != default_script)
+			free(ifo->script);
 		free(ifo->arping);
 		free(ifo->blacklist);
 		free(ifo->fallback);

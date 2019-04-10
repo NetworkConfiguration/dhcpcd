@@ -718,7 +718,7 @@ script_runreason(const struct interface *ifp, const char *reason)
 	if (ifp->options->script == NULL)
 		goto send_listeners;
 
-	argv[0] = ifp->options->script ? ifp->options->script : UNCONST(SCRIPT);
+	argv[0] = ifp->options->script;
 	argv[1] = NULL;
 	logdebugx("%s: executing `%s' %s", ifp->name, argv[0], reason);
 
