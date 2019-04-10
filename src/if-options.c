@@ -210,10 +210,9 @@ const struct option cf_options[] = {
 static const char *default_script = SCRIPT;
 
 static char *
-add_environ(struct if_options *ifo, const char *value, int uniq)
+add_environ(char ***array, const char *value, int uniq)
 {
-	char **newlist;
-	char **lst = ifo->environ;
+	char **newlist, **list = *array;
 	size_t i = 0, l, lv;
 	char *match = NULL, *p, *n;
 
@@ -231,8 +230,8 @@ add_environ(struct if_options *ifo, const char *value, int uniq)
 	*p++ = '\0';
 	l = strlen(match);
 
-	while (lst && lst[i]) {
-		if (match && strncmp(lst[i], match, l) == 0) {
+	while (list && list[i]) {
+		if (match && strncmp(list[i], match, l) == 0) {
 			if (uniq) {
 				n = strdup(value);
 				if (n == NULL) {
@@ -240,25 +239,25 @@ add_environ(struct if_options *ifo, const char *value, int uniq)
 					free(match);
 					return NULL;
 				}
-				free(lst[i]);
-				lst[i] = n;
+				free(list[i]);
+				list[i] = n;
 			} else {
 				/* Append a space and the value to it */
-				l = strlen(lst[i]);
+				l = strlen(list[i]);
 				lv = strlen(p);
-				n = realloc(lst[i], l + lv + 2);
+				n = realloc(list[i], l + lv + 2);
 				if (n == NULL) {
 					logerr(__func__);
 					free(match);
 					return NULL;
 				}
-				lst[i] = n;
-				lst[i][l] = ' ';
-				memcpy(lst[i] + l + 1, p, lv);
-				lst[i][l + lv + 1] = '\0';
+				list[i] = n;
+				list[i][l] = ' ';
+				memcpy(list[i] + l + 1, p, lv);
+				list[i][l + lv + 1] = '\0';
 			}
 			free(match);
-			return lst[i];
+			return list[i];
 		}
 		i++;
 	}
@@ -269,7 +268,7 @@ add_environ(struct if_options *ifo, const char *value, int uniq)
 		logerr(__func__);
 		return NULL;
 	}
-	newlist = reallocarray(lst, i + 2, sizeof(char *));
+	newlist = reallocarray(list, i + 2, sizeof(char *));
 	if (newlist == NULL) {
 		logerr(__func__);
 		free(n);
@@ -277,7 +276,7 @@ add_environ(struct if_options *ifo, const char *value, int uniq)
 	}
 	newlist[i] = n;
 	newlist[i + 1] = NULL;
-	ifo->environ = newlist;
+	*array = newlist;
 	return newlist[i];
 }
 
@@ -656,7 +655,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 	int e, i, t;
 	long l;
 	unsigned long u;
-	char *p = NULL, *bp, *fp, *np, **nconf;
+	char *p = NULL, *bp, *fp, *np;
 	ssize_t s;
 	struct in_addr addr, addr2;
 	in_addr_t *naddr;
@@ -736,7 +735,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		break;
 	case 'e':
 		ARG_REQUIRED;
-		add_environ(ifo, arg, 1);
+		add_environ(&ifo->environ, arg, 1);
 		break;
 	case 'h':
 		if (!arg) {
@@ -987,7 +986,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			return -1;
 		}
 		snprintf(p, dl, "skip_hooks=%s", arg);
-		add_environ(ifo, p, 0);
+		add_environ(&ifo->environ, p, 0);
 		free(p);
 		break;
 	case 'D':
@@ -1130,6 +1129,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			sa_in_init(&rt->rt_gateway, &addr3);
 			TAILQ_INSERT_TAIL(&ifo->routes, rt, rt_next);
 			*fp = ' ';
+			add_environ(&ifo->config, arg, 0);
 		} else if (strncmp(arg, "routers=", strlen("routers=")) == 0) {
 			if (parse_addr(&addr, NULL, p) == -1)
 				return -1;
@@ -1140,6 +1140,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			sa_in_init(&rt->rt_netmask, &addr2);
 			sa_in_init(&rt->rt_gateway, &addr);
 			TAILQ_INSERT_TAIL(&ifo->routes, rt, rt_next);
+			add_environ(&ifo->config, arg, 0);
 		} else if (strncmp(arg, "interface_mtu=",
 		    strlen("interface_mtu=")) == 0 ||
 		    strncmp(arg, "mtu=", strlen("mtu=")) == 0)
@@ -1167,40 +1168,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 				} else
 					ifo->req_prefix_len = 128;
 			}
-		} else {
-			dl = 0;
-			if (ifo->config != NULL) {
-				while (ifo->config[dl] != NULL) {
-					if (strncmp(ifo->config[dl], arg,
-						(size_t)(p - arg)) == 0)
-					{
-						p = strdup(arg);
-						if (p == NULL) {
-							logerr(__func__);
-							return -1;
-						}
-						free(ifo->config[dl]);
-						ifo->config[dl] = p;
-						return 1;
-					}
-					dl++;
-				}
-			}
-			p = strdup(arg);
-			if (p == NULL) {
-				logerr(__func__);
-				return -1;
-			}
-			nconf = reallocarray(ifo->config, dl+2, sizeof(char *));
-			if (nconf == NULL) {
-				logerr(__func__);
-				free(p);
-				return -1;
-			}
-			ifo->config = nconf;
-			ifo->config[dl] = p;
-			ifo->config[dl + 1] = NULL;
-		}
+		} else
+			add_environ(&ifo->config, arg, 1);
 		break;
 	case 'W':
 		if (parse_addr(&addr, &addr2, arg) != 0)
