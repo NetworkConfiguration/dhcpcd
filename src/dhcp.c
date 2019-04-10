@@ -2464,7 +2464,8 @@ static void
 dhcp_arp_bind(struct interface *ifp)
 {
 
-	if (dhcp_arp_address(ifp) == 1)
+	if (ifp->ctx->options & DHCPCD_TEST ||
+	    dhcp_arp_address(ifp) == 1)
 		dhcp_bind(ifp);
 }
 #endif
