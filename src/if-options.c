@@ -280,22 +280,27 @@ add_environ(char ***array, const char *value, int uniq)
 	return newlist[i];
 }
 
-#define parse_string(buf, len, arg) parse_string_hwaddr(buf, len, arg, 0)
+#define PARSE_STRING		0
+#define PARSE_STRING_NULL	1
+#define PARSE_HWADDR		2
+#define parse_string(a, b, c) parse_str((a), (b), (c), PARSE_STRING)
+#define parse_hwaddr(a, b, c) parse_str((a), (b), (c), PARSE_HWADDR)
 static ssize_t
-parse_string_hwaddr(char *sbuf, size_t slen, const char *str, int clid)
+parse_str(char *sbuf, size_t slen, const char *str, int flags)
 {
 	size_t l;
-	const char *p;
-	int i, punt_last = 0;
+	const char *p, *end;
+	int i;
 	char c[4], cmd;
 
+	end = str + strlen(str);
 	/* If surrounded by quotes then it's a string */
 	if (*str == '"') {
-		str++;
-		l = strlen(str);
-		p = str + l - 1;
-		if (*p == '"')
-			punt_last = 1;
+		p = end - 1;
+		if (*p == '"') {
+			str++;
+			end = p;
+		}
 	} else {
 		l = (size_t)hwaddr_aton(NULL, str);
 		if ((ssize_t) l != -1 && l > 1) {
@@ -312,13 +317,13 @@ parse_string_hwaddr(char *sbuf, size_t slen, const char *str, int clid)
 	l = 0;
 	/* If processing a string on the clientid, first byte should be
 	 * 0 to indicate a non hardware type */
-	if (clid && *str) {
+	if (flags == PARSE_HWADDR && *str) {
 		if (sbuf)
 			*sbuf++ = 0;
 		l++;
 	}
 	c[3] = '\0';
-	while (*str) {
+	while (str < end) {
 		if (++l > slen && sbuf) {
 			errno = ENOBUFS;
 			return -1;
@@ -386,12 +391,7 @@ parse_string_hwaddr(char *sbuf, size_t slen, const char *str, int clid)
 			str++;
 		}
 	}
-	if (punt_last) {
-		if (sbuf)
-			--sbuf;
-		l--;
-	}
-	if (sbuf)
+	if (flags == PARSE_STRING_NULL && sbuf)
 		*sbuf = '\0';
 	return (ssize_t)l;
 }
@@ -713,7 +713,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		ARG_REQUIRED;
 		if (ifo->script != default_script)
 			free(ifo->script);
-		s = parse_string(NULL, 0, arg);
+		s = parse_str(NULL, 0, arg, PARSE_STRING_NULL);
 		if (s == 0) {
 			ifo->script = NULL;
 			break;
@@ -724,7 +724,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			logerr(__func__);
 			return -1;
 		}
-		parse_string(ifo->script, dl, arg);
+		parse_str(ifo->script, dl, arg, PARSE_STRING_NULL);
 		if (ifo->script[0] == '\0' ||
 		    strcmp(ifo->script, "/dev/null") == 0)
 		{
@@ -1025,8 +1025,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		/* Strings have a type of 0 */;
 		ifo->clientid[1] = 0;
 		if (arg)
-			s = parse_string_hwaddr((char *)ifo->clientid + 1,
-			    CLIENTID_MAX_LEN, arg, 1);
+			s = parse_hwaddr((char *)ifo->clientid + 1,
+			    CLIENTID_MAX_LEN, arg);
 		else
 			s = 0;
 		if (s == -1) {
