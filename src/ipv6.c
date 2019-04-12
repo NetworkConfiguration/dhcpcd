@@ -624,6 +624,10 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 	uint32_t pltime, vltime;
 	bool vltime_was_zero;
 	__printflike(1, 2) void (*logfunc)(const char *, ...);
+#ifdef __sun
+	struct ipv6_state *state;
+	struct ipv6_addr *ia2;
+#endif
 
 	/* Remember the interface of the address. */
 	ifp = ia->iface;
