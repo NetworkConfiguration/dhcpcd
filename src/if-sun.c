@@ -63,6 +63,7 @@ extern int getallifaddrs(sa_family_t, struct ifaddrs **, int64_t);
 #include "ipv4.h"
 #include "ipv6.h"
 #include "ipv6nd.h"
+#include "logerr.h"
 #include "route.h"
 #include "sa.h"
 
@@ -1404,5 +1405,12 @@ void
 if_setup_inet6(__unused const struct interface *ifp)
 {
 
+}
+
+int
+ip6_forwarding(__unused const char *ifname)
+{
+
+	return 1;
 }
 #endif
