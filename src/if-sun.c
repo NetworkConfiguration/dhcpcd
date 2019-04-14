@@ -30,6 +30,7 @@
 #include <fcntl.h>
 #include <ifaddrs.h>
 #include <libdlpi.h>
+#include <kstat.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <stropts.h>
@@ -45,6 +46,7 @@
 #include <netinet/udp.h>
 
 #include <sys/ioctl.h>
+#include <sys/mac.h>
 #include <sys/pfmod.h>
 #include <sys/tihdr.h>
 #include <sys/utsname.h>
@@ -160,6 +162,63 @@ if_closesockets_os(struct dhcpcd_ctx *ctx)
 
 	/* each interface should have closed itself */
 	free(ctx->priv);
+}
+
+int
+if_carrier_os(struct interface *ifp)
+{
+	kstat_ctl_t		*kcp;
+	kstat_t			*ksp;
+	kstat_named_t		*knp;
+	link_state_t		linkstate;
+
+	kcp = kstat_open();
+	if (kcp == NULL)
+		goto err;
+	ksp = kstat_lookup(kcp, UNCONST("link"), 0, ifp->name);
+	if (ksp == NULL)
+		goto err;
+	if (kstat_read(kcp, ksp, NULL) == -1)
+		goto err;
+	knp = kstat_data_lookup(ksp, UNCONST("link_state"));
+	if (knp == NULL)
+		goto err;
+	if (knp->data_type != KSTAT_DATA_UINT32)
+		goto err;
+	linkstate = (link_state_t)knp->value.ui32;
+	kstat_close(kcp);
+
+	switch (linkstate) {
+	case LINK_STATE_UP:
+		ifp->flags |= IFF_UP;
+		return LINK_UP;
+	case LINK_STATE_DOWN:
+		return LINK_DOWN;
+	default:
+		return LINK_UNKNOWN;
+	}
+
+err:
+	if (kcp != NULL)
+		kstat_close(kcp);
+	return LINK_UNKNOWN;
+}
+
+int
+if_mtu_os(const struct interface *ifp)
+{
+	dlpi_handle_t		dh;
+	dlpi_info_t		dlinfo;
+	int			mtu;
+
+	if (dlpi_open(ifp->name, &dh, 0) != DLPI_SUCCESS)
+		return -1;
+	if (dlpi_info(dh, &dlinfo, 0) == DLPI_SUCCESS)
+		mtu = dlinfo.di_max_sdu;
+	else
+		mtu = -1;
+	dlpi_close(dh);
+	return mtu;
 }
 
 int
@@ -723,15 +782,18 @@ if_ifinfo(struct dhcpcd_ctx *ctx, const struct if_msghdr *ifm)
 {
 	struct interface *ifp;
 	int state;
+	unsigned int flags;
 
 	if ((ifp = if_findindex(ctx->ifaces, ifm->ifm_index)) == NULL)
 		return;
-	if (ifm->ifm_flags & IFF_OFFLINE || !(ifm->ifm_flags & IFF_UP))
+	flags = (unsigned int)ifm->ifm_flags;
+	if (ifm->ifm_flags & IFF_OFFLINE)
 		state = LINK_DOWN;
-	else
+	else {
 		state = LINK_UP;
-	dhcpcd_handlecarrier(ctx, state,
-	    (unsigned int)ifm->ifm_flags, ifp->name);
+		flags |= IFF_UP;
+	}
+	dhcpcd_handlecarrier(ctx, state, flags, ifp->name);
 }
 
 static void
@@ -819,6 +881,7 @@ if_addaddr(int fd, const char *ifname,
 		if (ioctl(fd, SIOCSLIFFLAGS, &lifr) == -1)
 			return -1;
 	}
+
 	return 0;
 }
 
@@ -847,15 +910,20 @@ if_plumblif(int cmd, const struct dhcpcd_ctx *ctx, int af, const char *ifname)
 static int
 if_plumbif(const struct dhcpcd_ctx *ctx, int af, const char *ifname)
 {
-	dlpi_handle_t		dh;
-	int			fd, af_fd, mux_fd, retval;
+	dlpi_handle_t		dh, dh_arp = NULL;
+	int			fd, af_fd, mux_fd, arp_fd = -1, mux_id, retval;
+	uint64_t		flags;
 	struct lifreq		lifr;
 	const char		*udp_dev;
+	struct strioctl		ioc;
+	struct if_spec		spec;
 
-	memset(&lifr, 0, sizeof(lifr));
+	if (if_nametospec(ifname, &spec) == -1)
+		return -1;
+
 	switch (af) {
 	case AF_INET:
-		lifr.lifr_flags = IFF_IPV4;
+		flags = IFF_IPV4;
 		af_fd = ctx->pf_inet_fd;
 		udp_dev = UDP_DEV_NAME;
 		break;
@@ -864,7 +932,7 @@ if_plumbif(const struct dhcpcd_ctx *ctx, int af, const char *ifname)
 		struct priv *priv;
 
 		/* We will take care of setting the link local address. */
-		lifr.lifr_flags = IFF_IPV6 | IFF_NOLINKLOCAL;
+		flags = IFF_IPV6 | IFF_NOLINKLOCAL;
 		priv = (struct priv *)ctx->priv;
 		af_fd = priv->pf_inet6_fd;
 		udp_dev = UDP6_DEV_NAME;
@@ -885,13 +953,17 @@ if_plumbif(const struct dhcpcd_ctx *ctx, int af, const char *ifname)
 	mux_fd = -1;
 	if (ioctl(fd, I_PUSH, IP_MOD_NAME) == -1)
 		goto out;
+	memset(&lifr, 0, sizeof(lifr));
 	strlcpy(lifr.lifr_name, ifname, sizeof(lifr.lifr_name));
+	lifr.lifr_ppa = spec.ppa;
+	lifr.lifr_flags = flags;
 	if (ioctl(fd, SIOCSLIFNAME, &lifr) == -1)
 		goto out;
 
 	/* Get full flags. */
 	if (ioctl(af_fd, SIOCGLIFFLAGS, &lifr) == -1)
 		goto out;
+	flags = lifr.lifr_flags;
 
 	/* Open UDP as a multiplexor to PLINK the interface stream.
 	 * UDP is used because STREAMS will not let you PLINK a driver
@@ -903,20 +975,50 @@ if_plumbif(const struct dhcpcd_ctx *ctx, int af, const char *ifname)
 		;
 	if (errno != EINVAL)
 		goto out;
-
-	if (lifr.lifr_flags & IFF_IPV4 && !(lifr.lifr_flags & IFF_NOARP)) {
-		if (ioctl(mux_fd, I_PUSH, ARP_MOD_NAME) == -1)
-			goto out;
-	}
-
-	/* PLINK the interface stream so it persists. */
-	if (ioctl(mux_fd, I_PLINK, fd) == -1)
+	if(ioctl(mux_fd, I_PUSH, ARP_MOD_NAME) == -1)
 		goto out;
 
+	if (flags & (IFF_NOARP | IFF_IPV6)) {
+		/* PLINK the interface stream so it persists. */
+		if (ioctl(mux_fd, I_PLINK, fd) == -1)
+			goto out;
+		goto done;
+	}
+
+	if (dlpi_open(ifname, &dh_arp, DLPI_NOATTACH) != DLPI_SUCCESS)
+		goto out;
+	arp_fd = dlpi_fd(dh_arp);
+	if (ioctl(arp_fd, I_PUSH, ARP_MOD_NAME) == -1)
+		goto out;
+
+	memset(&lifr, 0, sizeof(lifr));
+	strlcpy(lifr.lifr_name, ifname, sizeof(lifr.lifr_name));
+	lifr.lifr_ppa = spec.ppa;
+	lifr.lifr_flags = flags;
+	memset(&ioc, 0, sizeof(ioc));
+	ioc.ic_cmd = SIOCSLIFNAME;
+	ioc.ic_dp = (char *)&lifr;
+	ioc.ic_len = sizeof(lifr);
+	if (ioctl(arp_fd, I_STR, &ioc) == -1)
+		goto out;
+
+	/* PLINK the interface stream so it persists. */
+	mux_id = ioctl(mux_fd, I_PLINK, fd);
+	if (mux_id == -1)
+		goto out;
+	if (ioctl(mux_fd, I_PLINK, arp_fd) == -1) {
+		ioctl(mux_fd, I_PUNLINK, mux_id);
+		goto out;
+	}
+
+done:
+	logerrx("plumb %d %d %d", mux_fd, fd, arp_fd);
 	retval = 0;
 
 out:
 	dlpi_close(dh);
+	if (dh_arp != NULL)
+		dlpi_close(dh_arp);
 	if (mux_fd != -1)
 		close(mux_fd);
 	return retval;
