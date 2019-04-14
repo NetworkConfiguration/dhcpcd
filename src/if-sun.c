@@ -1012,7 +1012,6 @@ if_plumbif(const struct dhcpcd_ctx *ctx, int af, const char *ifname)
 	}
 
 done:
-	logerrx("plumb %d %d %d", mux_fd, fd, arp_fd);
 	retval = 0;
 
 out:
@@ -1263,8 +1262,11 @@ if_walkrt(struct dhcpcd_ctx *ctx, char *data, size_t len)
 			 * This sucks, so we need to call RTM_GET to
 			 * work out the interface. */
 			if (if_route_get(ctx, &rt) == NULL) {
-				logerr(__func__);
-				continue;
+				rt.rt_ifp = if_loopback(ctx);
+				if (rt.rt_ifp == NULL) {
+					logerr(__func__);
+					continue;
+				}
 			}
 			if_finishrt(ctx, &rt);
 		}
@@ -1319,8 +1321,11 @@ if_walkrt6(struct dhcpcd_ctx *ctx, char *data, size_t len)
 			 * This sucks, so we need to call RTM_GET to
 			 * work out the interface. */
 			if (if_route_get(ctx, &rt) == NULL) {
-				logerr(__func__);
-				continue;
+				rt.rt_ifp = if_loopback(ctx);
+				if (rt.rt_ifp == NULL) {
+					logerr(__func__);
+					continue;
+				}
 			}
 			if_finishrt(ctx, &rt);
 		}
