@@ -1489,6 +1489,9 @@ if_address(unsigned char cmd, const struct ipv4_addr *ia)
 		return -1;
 	}
 
+	/* We need to update the index now */
+	ia->iface->index = if_nametoindex(ia->alias);
+
 	sin_addr = (struct sockaddr_in *)&ss_addr;
 	sin_addr->sin_family = AF_INET;
 	sin_addr->sin_addr = ia->addr;
