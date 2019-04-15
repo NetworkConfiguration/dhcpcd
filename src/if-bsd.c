@@ -107,6 +107,12 @@ struct priv {
 	int pf_inet6_fd;
 };
 
+struct rtm
+{
+	struct rt_msghdr hdr;
+	char buffer[sizeof(struct sockaddr_storage) * RTAX_MAX];
+};
+
 int
 if_init(__unused struct interface *iface)
 {
@@ -462,11 +468,7 @@ int
 if_route(unsigned char cmd, const struct rt *rt)
 {
 	struct dhcpcd_ctx *ctx;
-	struct rtm
-	{
-		struct rt_msghdr hdr;
-		char buffer[sizeof(struct sockaddr_storage) * RTAX_MAX];
-	} rtmsg;
+	struct rtm rtmsg;
 	struct rt_msghdr *rtm = &rtmsg.hdr;
 	char *bp = rtmsg.buffer;
 	struct sockaddr_dl sdl;
@@ -1258,11 +1260,8 @@ if_dispatch(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 int
 if_handlelink(struct dhcpcd_ctx *ctx)
 {
-	union {
-		struct rt_msghdr rtmsg;
-		unsigned char buf[2048];
-	} u;
-	struct iovec iov = { .iov_base = u.buf, .iov_len = sizeof(u) };
+	struct rtm rtm;
+	struct iovec iov = { .iov_base = &rtm, .iov_len = sizeof(rtm) };
 	struct msghdr msg = { .msg_iov = &iov, .msg_iovlen = 1 };
 	ssize_t len;
 
@@ -1270,7 +1269,7 @@ if_handlelink(struct dhcpcd_ctx *ctx)
 	if (len == -1)
 		return -1;
 	if (len != 0)
-		if_dispatch(ctx, &u.rtmsg);
+		if_dispatch(ctx, &rtm.hdr);
 	return 0;
 }
 
