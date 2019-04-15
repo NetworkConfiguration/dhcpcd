@@ -99,6 +99,12 @@ struct priv {
 #endif
 };
 
+struct rtm
+{
+	struct rt_msghdr hdr;
+	char buffer[sizeof(struct sockaddr_storage) * RTAX_MAX];
+};
+
 int
 if_init(__unused struct interface *ifp)
 {
@@ -508,53 +514,105 @@ if_findsa(struct dhcpcd_ctx *ctx, const struct sockaddr *sa)
 }
 
 static void
-if_finishrt(struct dhcpcd_ctx *ctx, struct rt *rt)
+if_route0(struct dhcpcd_ctx *ctx, struct rtm *rtmsg,
+    unsigned char cmd, const struct rt *rt)
 {
-	int mtu;
+	struct rt_msghdr *rtm;
+	char *bp = rtmsg->buffer;
+	size_t l;
 
-	/* Solaris has a subnet route with the gateway
-	 * of the owning address.
-	 * dhcpcd has a blank gateway here to indicate a
-	 * subnet route. */
-	if (!sa_is_unspecified(&rt->rt_dest) &&
-	    !sa_is_unspecified(&rt->rt_gateway))
-	{
-		switch(rt->rt_gateway.sa_family) {
-#ifdef INET
-		case AF_INET:
+	/* WARNING: Solaris will not allow you to delete RTF_KERNEL routes.
+	 * This includes subnet/prefix routes. */
+
+#define ADDSA(sa) do {							      \
+		l = RT_ROUNDUP(salen((sa)));				      \
+		memcpy(bp, (sa), l);					      \
+		bp += l;						      \
+	} while (/* CONSTCOND */ 0)
+
+	memset(rtmsg, 0, sizeof(*rtmsg));
+	rtm = &rtmsg->hdr;
+	rtm->rtm_version = RTM_VERSION;
+	rtm->rtm_type = cmd;
+	rtm->rtm_seq = ++ctx->seq;
+	rtm->rtm_flags = rt->rt_flags;
+	rtm->rtm_addrs = RTA_DST | RTA_GATEWAY;
+
+	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
+		bool netmask_bcast = sa_is_allones(&rt->rt_netmask);
+
+		rtm->rtm_flags |= RTF_UP;
+		if (!(rtm->rtm_flags & RTF_REJECT) &&
+		    !sa_is_loopback(&rt->rt_gateway) &&
+		    /* Solaris doesn't like interfaces on default routes. */
+		    !sa_is_unspecified(&rt->rt_dest))
 		{
-			struct in_addr *in;
-
-			in = &satosin(&rt->rt_gateway)->sin_addr;
-			if (ipv4_findaddr(ctx, in))
-				in->s_addr = INADDR_ANY;
-			break;
-		}
+			rtm->rtm_addrs |= RTA_IFP;
+#if 0
+			if (!sa_is_unspecified(&rt->rt_ifa))
+				rtm->rtm_addrs |= RTA_IFA;
 #endif
-#ifdef INET6
-		case AF_INET6:
-		{
-			struct in6_addr *in6;
-
-			in6 = &satosin6(&rt->rt_gateway)->sin6_addr;
-			if (ipv6_findaddr(ctx, in6, 0))
-				*in6 = in6addr_any;
-			break;
 		}
-#endif
+
+		if (netmask_bcast)
+			rtm->rtm_flags |= RTF_HOST;
+		else
+			rtm->rtm_flags |= RTF_GATEWAY;
+
+		/* Emulate the kernel by marking address generated
+		 * network routes non-static. */
+		if (!(rt->rt_dflags & RTDF_IFA_ROUTE))
+			rtm->rtm_flags |= RTF_STATIC;
+
+		if (rt->rt_mtu != 0) {
+			rtm->rtm_inits |= RTV_MTU;
+			rtm->rtm_rmx.rmx_mtu = rt->rt_mtu;
 		}
 	}
 
-	if (rt->rt_ifp == NULL)
-		return;
+	if (!(rtm->rtm_flags & RTF_HOST))
+		rtm->rtm_addrs |= RTA_NETMASK;
 
-	/* Solaris likes to set route MTU to match
-	 * interface MTU when adding routes.
-	 * This confuses dhcpcd as it expects MTU to be 0
-	 * when no explicit MTU has been set. */
-	mtu = if_getmtu(rt->rt_ifp);
-	if (rt->rt_mtu == (unsigned int)mtu)
-		rt->rt_mtu = 0;
+	ADDSA(&rt->rt_dest);
+
+	if (sa_is_unspecified(&rt->rt_gateway))
+		ADDSA(&rt->rt_ifa);
+	else
+		ADDSA(&rt->rt_gateway);
+
+	if (rtm->rtm_addrs & RTA_NETMASK)
+		ADDSA(&rt->rt_netmask);
+
+	if (rtm->rtm_addrs & RTA_IFP) {
+		struct sockaddr_dl sdl;
+
+		if_linkaddr(&sdl, rt->rt_ifp);
+		ADDSA((struct sockaddr *)&sdl);
+	}
+
+	if (rtm->rtm_addrs & RTA_IFA) {
+		ADDSA(&rt->rt_ifa);
+		rtm->rtm_addrs |= RTA_SRC;
+	}
+	if (rtm->rtm_addrs & RTA_SRC)
+		ADDSA(&rt->rt_ifa);
+
+#undef ADDSA
+
+	rtm->rtm_msglen = (unsigned short)(bp - (char *)rtm);
+}
+
+int
+if_route(unsigned char cmd, const struct rt *rt)
+{
+	struct rtm rtm;
+	struct dhcpcd_ctx *ctx = rt->rt_ifp->ctx;
+
+	if_route0(ctx, &rtm, cmd, rt);
+
+	if (write(ctx->link_fd, &rtm, rtm.hdr.rtm_msglen) == -1)
+		return -1;
+	return 0;
 }
 
 static int
@@ -595,6 +653,98 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 	}
 
 	return 0;
+}
+
+static struct rt *
+if_route_get(struct dhcpcd_ctx *ctx, struct rt *rt)
+{
+	struct rtm rtm;
+	int s;
+	struct iovec iov = { .iov_base = &rtm, .iov_len = sizeof(rtm) };
+	struct msghdr msg = { .msg_iov = &iov, .msg_iovlen = 1 };
+	ssize_t len;
+	struct rt *rtw = rt;
+
+	if_route0(ctx, &rtm, RTM_GET, rt);
+	rt = NULL;
+	s = socket(PF_ROUTE, SOCK_RAW | SOCK_CLOEXEC, 0);
+	if (s == -1)
+		return NULL;
+	if (write(s, &rtm, rtm.hdr.rtm_msglen) == -1)
+		goto out;
+	if ((len = recvmsg(s, &msg, 0)) == -1)
+		goto out;
+	if ((size_t)len < sizeof(rtm.hdr) || len < rtm.hdr.rtm_msglen) {
+		errno = EINVAL;
+		goto out;
+	}
+	if (if_copyrt(ctx, rtw, &rtm.hdr) == -1)
+		goto out;
+	rt = rtw;
+
+out:
+	close(s);
+	return rt;
+}
+
+static void
+if_finishrt(struct dhcpcd_ctx *ctx, struct rt *rt)
+{
+	int mtu;
+
+	/* Solaris has a subnet route with the gateway
+	 * of the owning address.
+	 * dhcpcd has a blank gateway here to indicate a
+	 * subnet route. */
+	if (!sa_is_unspecified(&rt->rt_dest) &&
+	    !sa_is_unspecified(&rt->rt_gateway))
+	{
+		switch(rt->rt_gateway.sa_family) {
+#ifdef INET
+		case AF_INET:
+		{
+			struct in_addr *in;
+
+			in = &satosin(&rt->rt_gateway)->sin_addr;
+			if (ipv4_findaddr(ctx, in))
+				in->s_addr = INADDR_ANY;
+			break;
+		}
+#endif
+#ifdef INET6
+		case AF_INET6:
+		{
+			struct in6_addr *in6;
+
+			in6 = &satosin6(&rt->rt_gateway)->sin6_addr;
+			if (ipv6_findaddr(ctx, in6, 0))
+				*in6 = in6addr_any;
+			break;
+		}
+#endif
+		}
+	}
+
+	/* Solaris doesn't set interfaces for some routes.
+	 * This sucks, so we need to call RTM_GET to
+	 * work out the interface. */
+	if (rt->rt_ifp == NULL) {
+		if (if_route_get(ctx, rt) == NULL) {
+			rt->rt_ifp = if_loopback(ctx);
+			if (rt->rt_ifp == NULL) {
+				logerr(__func__);
+				return;
+			}
+		}
+	}
+
+	/* Solaris likes to set route MTU to match
+	 * interface MTU when adding routes.
+	 * This confuses dhcpcd as it expects MTU to be 0
+	 * when no explicit MTU has been set. */
+	mtu = if_getmtu(rt->rt_ifp);
+	if (rt->rt_mtu == (unsigned int)mtu)
+		rt->rt_mtu = 0;
 }
 
 static int
@@ -823,18 +973,15 @@ if_dispatch(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 int
 if_handlelink(struct dhcpcd_ctx *ctx)
 {
-	union {
-		struct rt_msghdr rtmsg;
-		unsigned char buf[2048];
-	} u;
-	struct iovec iov = { .iov_base = u.buf, .iov_len = sizeof(u) };
+	struct rtm rtm;
+	struct iovec iov = { .iov_base = &rtm, .iov_len = sizeof(rtm) };
 	struct msghdr msg = { .msg_iov = &iov, .msg_iovlen = 1 };
 	ssize_t len;
 
 	if ((len = recvmsg(ctx->link_fd, &msg, 0)) == -1)
 		return -1;
 	if (len != 0)
-		if_dispatch(ctx, &u.rtmsg);
+		if_dispatch(ctx, &rtm.hdr);
 	return 0;
 }
 
@@ -1073,146 +1220,6 @@ if_plumb(int cmd, const struct dhcpcd_ctx *ctx, int af, const char *ifname)
 		return if_unplumbif(ctx, af, ifname);
 }
 
-struct rtm
-{
-	struct rt_msghdr hdr;
-	char buffer[sizeof(struct sockaddr_storage) * RTAX_MAX];
-};
-
-static void
-if_route0(struct dhcpcd_ctx *ctx, struct rtm *rtmsg,
-    unsigned char cmd, const struct rt *rt)
-{
-	struct rt_msghdr *rtm;
-	char *bp = rtmsg->buffer;
-	size_t l;
-
-	/* WARNING: Solaris will not allow you to delete RTF_KERNEL routes.
-	 * This includes subnet/prefix routes. */
-
-#define ADDSA(sa) do {							      \
-		l = RT_ROUNDUP(salen((sa)));				      \
-		memcpy(bp, (sa), l);					      \
-		bp += l;						      \
-	} while (/* CONSTCOND */ 0)
-
-	memset(rtmsg, 0, sizeof(*rtmsg));
-	rtm = &rtmsg->hdr;
-	rtm->rtm_version = RTM_VERSION;
-	rtm->rtm_type = cmd;
-	rtm->rtm_seq = ++ctx->seq;
-	rtm->rtm_flags = rt->rt_flags;
-	rtm->rtm_addrs = RTA_DST | RTA_GATEWAY;
-
-	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
-		bool netmask_bcast = sa_is_allones(&rt->rt_netmask);
-
-		rtm->rtm_flags |= RTF_UP;
-		if (!(rtm->rtm_flags & RTF_REJECT) &&
-		    !sa_is_loopback(&rt->rt_gateway) &&
-		    /* Solaris doesn't like interfaces on default routes. */
-		    !sa_is_unspecified(&rt->rt_dest))
-		{
-			rtm->rtm_addrs |= RTA_IFP;
-#if 0
-			if (!sa_is_unspecified(&rt->rt_ifa))
-				rtm->rtm_addrs |= RTA_IFA;
-#endif
-		}
-
-		if (netmask_bcast)
-			rtm->rtm_flags |= RTF_HOST;
-		else
-			rtm->rtm_flags |= RTF_GATEWAY;
-
-		/* Emulate the kernel by marking address generated
-		 * network routes non-static. */
-		if (!(rt->rt_dflags & RTDF_IFA_ROUTE))
-			rtm->rtm_flags |= RTF_STATIC;
-
-		if (rt->rt_mtu != 0) {
-			rtm->rtm_inits |= RTV_MTU;
-			rtm->rtm_rmx.rmx_mtu = rt->rt_mtu;
-		}
-	}
-
-	if (!(rtm->rtm_flags & RTF_HOST))
-		rtm->rtm_addrs |= RTA_NETMASK;
-
-	ADDSA(&rt->rt_dest);
-
-	if (sa_is_unspecified(&rt->rt_gateway))
-		ADDSA(&rt->rt_ifa);
-	else
-		ADDSA(&rt->rt_gateway);
-
-	if (rtm->rtm_addrs & RTA_NETMASK)
-		ADDSA(&rt->rt_netmask);
-
-	if (rtm->rtm_addrs & RTA_IFP) {
-		struct sockaddr_dl sdl;
-
-		if_linkaddr(&sdl, rt->rt_ifp);
-		ADDSA((struct sockaddr *)&sdl);
-	}
-
-	if (rtm->rtm_addrs & RTA_IFA) {
-		ADDSA(&rt->rt_ifa);
-		rtm->rtm_addrs |= RTA_SRC;
-	}
-	if (rtm->rtm_addrs & RTA_SRC)
-		ADDSA(&rt->rt_ifa);
-
-#undef ADDSA
-
-	rtm->rtm_msglen = (unsigned short)(bp - (char *)rtm);
-}
-
-int
-if_route(unsigned char cmd, const struct rt *rt)
-{
-	struct rtm rtm;
-	struct dhcpcd_ctx *ctx = rt->rt_ifp->ctx;
-
-	if_route0(ctx, &rtm, cmd, rt);
-
-	if (write(ctx->link_fd, &rtm, rtm.hdr.rtm_msglen) == -1)
-		return -1;
-	return 0;
-}
-
-static struct rt *
-if_route_get(struct dhcpcd_ctx *ctx, struct rt *rt)
-{
-	struct rtm rtm;
-	int s;
-	struct iovec iov = { .iov_base = &rtm, .iov_len = sizeof(rtm) };
-	struct msghdr msg = { .msg_iov = &iov, .msg_iovlen = 1 };
-	ssize_t len;
-	struct rt *rtw = rt;
-
-	if_route0(ctx, &rtm, RTM_GET, rt);
-	rt = NULL;
-	s = socket(PF_ROUTE, SOCK_RAW | SOCK_CLOEXEC, 0);
-	if (s == -1)
-		return NULL;
-	if (write(s, &rtm, rtm.hdr.rtm_msglen) == -1)
-		goto out;
-	if ((len = recvmsg(s, &msg, 0)) == -1)
-		goto out;
-	if ((size_t)len < sizeof(rtm.hdr) || len < rtm.hdr.rtm_msglen) {
-		errno = EINVAL;
-		goto out;
-	}
-	if (if_copyrt(ctx, rtw, &rtm.hdr) == -1)
-		goto out;
-	rt = rtw;
-
-out:
-	close(s);
-	return rt;
-}
-
 #ifdef INET
 static int
 if_walkrt(struct dhcpcd_ctx *ctx, char *data, size_t len)
@@ -1241,6 +1248,7 @@ if_walkrt(struct dhcpcd_ctx *ctx, char *data, size_t len)
 		default:
 			break;
 		}
+
 		memset(&rt, 0, sizeof(rt));
 		rt.rt_dflags |= RTDF_INIT;
 		in.s_addr = re->ipRouteDest;
@@ -1253,23 +1261,9 @@ if_walkrt(struct dhcpcd_ctx *ctx, char *data, size_t len)
 		in.s_addr = re->ipRouteInfo.re_src_addr;
 		sa_in_init(&rt.rt_ifa, &in);
 		rt.rt_mtu = re->ipRouteInfo.re_max_frag;
-
 		if_octetstr(ifname, &re->ipRouteIfIndex, sizeof(ifname));
 		rt.rt_ifp = if_find(ctx->ifaces, ifname);
 		if_finishrt(ctx, &rt);
-		if (rt.rt_ifp == NULL) {
-			/* Solris doesn't set interfaces for some routes.
-			 * This sucks, so we need to call RTM_GET to
-			 * work out the interface. */
-			if (if_route_get(ctx, &rt) == NULL) {
-				rt.rt_ifp = if_loopback(ctx);
-				if (rt.rt_ifp == NULL) {
-					logerr(__func__);
-					continue;
-				}
-			}
-			if_finishrt(ctx, &rt);
-		}
 		rt_recvrt(RTM_ADD, &rt, 0);
 	} while (++re < e);
 	return 0;
@@ -1305,6 +1299,7 @@ if_walkrt6(struct dhcpcd_ctx *ctx, char *data, size_t len)
 		default:
 			break;
 		}
+
 		memset(&rt, 0, sizeof(rt));
 		rt.rt_dflags |= RTDF_INIT;
 		sa_in6_init(&rt.rt_dest, &re->ipv6RouteDest);
@@ -1312,23 +1307,10 @@ if_walkrt6(struct dhcpcd_ctx *ctx, char *data, size_t len)
 		sa_in6_init(&rt.rt_netmask, &in6);
 		sa_in6_init(&rt.rt_gateway, &re->ipv6RouteNextHop);
 		rt.rt_mtu = re->ipv6RouteInfo.re_max_frag;
-
 		if_octetstr(ifname, &re->ipv6RouteIfIndex, sizeof(ifname));
 		rt.rt_ifp = if_find(ctx->ifaces, ifname);
 		if_finishrt(ctx, &rt);
-		if (rt.rt_ifp == NULL) {
-			/* Solris doesn't set interfaces for some routes.
-			 * This sucks, so we need to call RTM_GET to
-			 * work out the interface. */
-			if (if_route_get(ctx, &rt) == NULL) {
-				rt.rt_ifp = if_loopback(ctx);
-				if (rt.rt_ifp == NULL) {
-					logerr(__func__);
-					continue;
-				}
-			}
-			if_finishrt(ctx, &rt);
-		}
+		rt_recvrt(RTM_ADD, &rt, 0);
 	} while (++re < e);
 	return 0;
 }
