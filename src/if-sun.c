@@ -1222,10 +1222,10 @@ if_plumb(int cmd, const struct dhcpcd_ctx *ctx, int af, const char *ifname)
 
 #ifdef INET
 static int
-if_walkrt(struct dhcpcd_ctx *ctx, char *data, size_t len)
+if_walkrt(struct dhcpcd_ctx *ctx, rb_tree_t *routes, char *data, size_t len)
 {
 	mib2_ipRouteEntry_t *re, *e;
-	struct rt rt;
+	struct rt rt, *rtn;
 	char ifname[IF_NAMESIZE];
 	struct in_addr in;
 
@@ -1250,7 +1250,6 @@ if_walkrt(struct dhcpcd_ctx *ctx, char *data, size_t len)
 		}
 
 		memset(&rt, 0, sizeof(rt));
-		rt.rt_dflags |= RTDF_INIT;
 		in.s_addr = re->ipRouteDest;
 		sa_in_init(&rt.rt_dest, &in);
 		in.s_addr = re->ipRouteMask;
@@ -1264,7 +1263,13 @@ if_walkrt(struct dhcpcd_ctx *ctx, char *data, size_t len)
 		if_octetstr(ifname, &re->ipRouteIfIndex, sizeof(ifname));
 		rt.rt_ifp = if_find(ctx->ifaces, ifname);
 		if_finishrt(ctx, &rt);
-		rt_recvrt(RTM_ADD, &rt, 0);
+		if ((rtn = rt_new(rt.rt_ifp)) == NULL) {
+			logerr(__func__);
+			break;
+		}
+		memcpy(rtn, &rt, sizeof(*rtn));
+		if (rb_tree_insert_node(routes, rtn) != rtn)
+			rt_free(rtn);
 	} while (++re < e);
 	return 0;
 }
@@ -1272,10 +1277,10 @@ if_walkrt(struct dhcpcd_ctx *ctx, char *data, size_t len)
 
 #ifdef INET6
 static int
-if_walkrt6(struct dhcpcd_ctx *ctx, char *data, size_t len)
+if_walkrt6(struct dhcpcd_ctx *ctx, rb_tree_t *routes, char *data, size_t len)
 {
 	mib2_ipv6RouteEntry_t *re, *e;
-	struct rt rt;
+	struct rt rt, *rtn;
 	char ifname[IF_NAMESIZE];
 	struct in6_addr in6;
 
@@ -1301,7 +1306,6 @@ if_walkrt6(struct dhcpcd_ctx *ctx, char *data, size_t len)
 		}
 
 		memset(&rt, 0, sizeof(rt));
-		rt.rt_dflags |= RTDF_INIT;
 		sa_in6_init(&rt.rt_dest, &re->ipv6RouteDest);
 		ipv6_mask(&in6, re->ipv6RoutePfxLength);
 		sa_in6_init(&rt.rt_netmask, &in6);
@@ -1310,15 +1314,22 @@ if_walkrt6(struct dhcpcd_ctx *ctx, char *data, size_t len)
 		if_octetstr(ifname, &re->ipv6RouteIfIndex, sizeof(ifname));
 		rt.rt_ifp = if_find(ctx->ifaces, ifname);
 		if_finishrt(ctx, &rt);
-		rt_recvrt(RTM_ADD, &rt, 0);
+		if ((rtn = rt_new(rt.rt_ifp)) == NULL) {
+			logerr(__func__);
+			break;
+		}
+		memcpy(rtn, &rt, sizeof(*rtn));
+		if (rb_tree_insert_node(routes, rtn) != rtn)
+			rt_free(rtn);
 	} while (++re < e);
 	return 0;
 }
 #endif
 
 static int
-if_parsert(struct dhcpcd_ctx *ctx, unsigned int level, unsigned int name,
-    int (*walkrt)(struct dhcpcd_ctx *, char *, size_t))
+if_parsert(struct dhcpcd_ctx *ctx, rb_tree_t *routes,
+    unsigned int level, unsigned int name,
+    int (*walkrt)(struct dhcpcd_ctx *, rb_tree_t *, char *, size_t))
 {
 	int			s, retval, code, flags;
 	uintptr_t		buf[512 / sizeof(uintptr_t)];
@@ -1403,7 +1414,7 @@ if_parsert(struct dhcpcd_ctx *ctx, unsigned int level, unsigned int name,
 		 * the next item, so don't move this test higher up
 		 * to avoid the buffer allocation and getmsg calls. */
 		if (req->level == level && req->name == name) {
-			if (walkrt(ctx, databuf.buf, req->len) == -1)
+			if (walkrt(ctx, routes, databuf.buf, req->len) == -1)
 				break;
 		}
 	}
@@ -1416,18 +1427,17 @@ out:
 
 
 int
-if_initrt(struct dhcpcd_ctx *ctx, int af)
+if_initrt(struct dhcpcd_ctx *ctx, rb_tree_t *routes, int af)
 {
 
-	rt_headclear(&ctx->kroutes, af);
 #ifdef INET
 	if ((af == AF_UNSPEC || af == AF_INET) &&
-	    if_parsert(ctx, MIB2_IP,MIB2_IP_ROUTE, if_walkrt) == -1)
+	    if_parsert(ctx, routes, MIB2_IP,MIB2_IP_ROUTE, if_walkrt) == -1)
 		return -1;
 #endif
 #ifdef INET6
 	if ((af == AF_UNSPEC || af == AF_INET6) &&
-	    if_parsert(ctx, MIB2_IP6, MIB2_IP6_ROUTE, if_walkrt6) == -1)
+	    if_parsert(ctx, routes, MIB2_IP6, MIB2_IP6_ROUTE, if_walkrt6) == -1)
 		return -1;
 #endif
 	return 0;
