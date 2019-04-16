@@ -2468,7 +2468,8 @@ static void
 dhcp_arp_bind(struct interface *ifp)
 {
 
-	if (dhcp_arp_address(ifp) == 1)
+	if (ifp->ctx->options & DHCPCD_TEST ||
+	    dhcp_arp_address(ifp) == 1)
 		dhcp_bind(ifp);
 }
 #endif
@@ -3215,6 +3216,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 			state->reason = "TEST";
 			script_runreason(ifp, state->reason);
 			eloop_exit(ifp->ctx->eloop, EXIT_SUCCESS);
+			state->bpf_flags |= BPF_EOF;
 			return;
 		}
 		eloop_timeout_delete(ifp->ctx->eloop, send_discover, ifp);

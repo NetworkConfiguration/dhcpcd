@@ -136,9 +136,15 @@ if_carrier(struct interface *ifp)
 
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
-	if (ioctl(ifp->ctx->pf_inet_fd, SIOCGIFFLAGS, &ifr) == -1)
+	r = ioctl(ifp->ctx->pf_inet_fd, SIOCGIFFLAGS, &ifr);
+	if (r != -1)
+		ifp->flags = (unsigned int)ifr.ifr_flags;
+
+#ifdef __sun
+	return if_carrier_os(ifp);
+#else
+	if (r == -1)
 		return LINK_UNKNOWN;
-	ifp->flags = (unsigned int)ifr.ifr_flags;
 
 #ifdef SIOCGIFMEDIA
 	memset(&ifmr, 0, sizeof(ifmr));
@@ -155,6 +161,7 @@ if_carrier(struct interface *ifp)
 #else
 	r = ifr.ifr_flags & IFF_RUNNING ? LINK_UP : LINK_DOWN;
 #endif
+#endif /* __sun */
 	return r;
 }
 
@@ -711,6 +718,11 @@ if_domtu(const struct interface *ifp, short int mtu)
 	int r;
 	struct ifreq ifr;
 
+#ifdef __sun
+	if (mtu == 0)
+		return if_mtu_os(ifp);
+#endif
+
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
 	ifr.ifr_mtu = mtu;
@@ -719,6 +731,17 @@ if_domtu(const struct interface *ifp, short int mtu)
 		return -1;
 	return ifr.ifr_mtu;
 }
+
+#ifdef ALIAS_ADDR
+int
+if_makealias(char *alias, size_t alias_len, const char *ifname, int lun)
+{
+
+	if (lun == 0)
+		return strlcpy(alias, ifname, alias_len);
+	return snprintf(alias, alias_len, "%s:%u", ifname, lun);
+}
+#endif
 
 struct interface *
 if_findifpfromcmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg, int *hoplimit)
