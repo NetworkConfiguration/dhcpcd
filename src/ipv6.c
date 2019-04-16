@@ -763,13 +763,13 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 }
 
 #ifdef ALIAS_ADDR
-/* Find the next logical aliase address we can use. */
+/* Find the next logical alias address we can use. */
 static int
 ipv6_aliasaddr(struct ipv6_addr *ia, struct ipv6_addr **repl)
 {
 	struct ipv6_state *state;
 	struct ipv6_addr *iap;
-	unsigned int unit;
+	unsigned int lun;
 	char alias[IF_NAMESIZE];
 
 	if (ia->alias[0] != '\0')
@@ -788,12 +788,14 @@ ipv6_aliasaddr(struct ipv6_addr *ia, struct ipv6_addr **repl)
 		}
 	}
 
-	unit = 0;
+	lun = 0;
 find_unit:
-	if (unit == 0)
-		strlcpy(alias, ia->iface->name, sizeof(alias));
-	else
-		snprintf(alias, sizeof(alias), "%s:%u", ia->iface->name, unit);
+	if (if_makealias(alias, IF_NAMESIZE, ia->iface->name, lun) >=
+	    IF_NAMESIZE)
+	{
+		errno = ENOMEM;
+		return -1;
+	}
 	TAILQ_FOREACH(iap, &state->addrs, next) {
 		if (iap->alias[0] == '\0')
 			continue;
@@ -809,11 +811,11 @@ find_unit:
 	}
 
 	if (iap != NULL) {
-		if (unit == UINT_MAX) {
+		if (lun == UINT_MAX) {
 			errno = ERANGE;
 			return -1;
 		}
-		unit++;
+		lun++;
 		goto find_unit;
 	}
 
