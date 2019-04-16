@@ -519,15 +519,15 @@ if_route0(struct dhcpcd_ctx *ctx, struct rtm *rtmsg,
 {
 	struct rt_msghdr *rtm;
 	char *bp = rtmsg->buffer;
-	size_t l;
+	socklen_t sl;
 
 	/* WARNING: Solaris will not allow you to delete RTF_KERNEL routes.
 	 * This includes subnet/prefix routes. */
 
-#define ADDSA(sa) do {							      \
-		l = RT_ROUNDUP(salen((sa)));				      \
-		memcpy(bp, (sa), l);					      \
-		bp += l;						      \
+#define ADDSA(sa) do {							\
+		sl = salen((sa));					\
+		memcpy(bp, (sa), sl);					\
+		bp += RT_ROUNDUP(sl);					\
 	} while (/* CONSTCOND */ 0)
 
 	memset(rtmsg, 0, sizeof(*rtmsg));
