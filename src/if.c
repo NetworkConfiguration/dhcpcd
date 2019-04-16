@@ -784,6 +784,17 @@ if_cmp(const struct interface *si, const struct interface *ti)
 	return 0;
 }
 
+#ifdef ALIAS_ADDR
+int
+if_makealias(char *alias, size_t alias_len, const char *ifname, int lun)
+{
+
+	if (lun == 0)
+		return strlcpy(alias, ifname, alias_len);
+	return snprintf(alias, alias_len, "%s:%u", ifname, lun);
+}
+#endif
+
 /* Sort the interfaces into a preferred order - best first, worst last. */
 void
 if_sortinterfaces(struct dhcpcd_ctx *ctx)
