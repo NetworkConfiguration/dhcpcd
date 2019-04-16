@@ -32,10 +32,6 @@
 #include <sys/time.h>
 #include <stdio.h>
 
-#include "config.h"
-#include "defs.h"
-#include "dhcpcd.h"
-
 #ifndef HOSTNAME_MAX_LEN
 #define HOSTNAME_MAX_LEN	250	/* 255 - 3 (FQDN) - 2 (DNS enc) */
 #endif
@@ -143,6 +139,15 @@
 #  define	__predict_false(exp)	(exp)
 # endif
 #endif
+#ifndef __BEGIN_DECLS
+# if defined(__cplusplus)
+#  define	__BEGIN_DECLS		extern "C" {
+#  define	__END_DECLS		};
+# else /* __BEGIN_DECLS */
+#  define	__BEGIN_DECLS
+#  define	__END_DECLS
+# endif /* __BEGIN_DECLS */
+#endif /* __BEGIN_DECLS */
 
 #ifndef __fallthrough
 # if __GNUC__ >= 7

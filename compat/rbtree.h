@@ -32,6 +32,8 @@
 #ifndef _SYS_RBTREE_H_
 #define	_SYS_RBTREE_H_
 
+#include "common.h"
+
 #if defined(_KERNEL) || defined(_STANDALONE)
 #include <sys/types.h>
 #else
