@@ -128,6 +128,13 @@ int if_domtu(const struct interface *, short int);
 #define if_setmtu(ifp, mtu) if_domtu((ifp), (mtu))
 int if_carrier(struct interface *);
 
+#ifdef ALIAS_ADDR
+int if_makealias(char *, size_t, const char *, int);
+#endif
+
+int if_carrier_os(struct interface *);
+int if_mtu_os(const struct interface *);
+
 /*
  * Helper to decode an interface name of bge0:1 to
  * devname = bge0, drvname = bge0, ppa = 0, lun = 1.

@@ -550,7 +550,7 @@ link_route(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 		return 0;
 
 	if (if_copyrt(ctx, &rt, nlm) == 0)
-		rt_recvrt(cmd, &rt);
+		rt_recvrt(cmd, &rt, (pid_t)nlm->nlmsg_pid);
 
 	return 0;
 }

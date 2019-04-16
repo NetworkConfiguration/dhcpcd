@@ -366,7 +366,7 @@ rt_freeif(struct interface *ifp)
 /* If something other than dhcpcd removes a route,
  * we need to remove it from our internal table. */
 void
-rt_recvrt(int cmd, const struct rt *rt)
+rt_recvrt(int cmd, const struct rt *rt, pid_t pid)
 {
 	struct dhcpcd_ctx *ctx;
 	struct rt *f;
@@ -381,8 +381,11 @@ rt_recvrt(int cmd, const struct rt *rt)
 	case RTM_DELETE:
 		f = rb_tree_find_node(&ctx->routes, rt);
 		if (f != NULL) {
+			char buf[32];
+
 			rb_tree_remove_node(&ctx->routes, f);
-			rt_desc("deleted", f);
+			snprintf(buf, sizeof(buf), "pid %d deleted", pid);
+			rt_desc(buf, f);
 			rt_free(f);
 		}
 		break;
