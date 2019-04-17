@@ -29,6 +29,7 @@
 #define SA_H
 
 #include <sys/socket.h>
+#include <netinet/in.h>
 
 union sa_ss {
 	struct sockaddr		sa;
