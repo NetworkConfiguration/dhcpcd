@@ -450,6 +450,8 @@ inet_getroutes(struct dhcpcd_ctx *ctx, struct rt_head *routes)
 	memset(&def, 0, sizeof(def));
 	def.rt_dest.sa_family = AF_INET;
 	have_default = (rt_find(routes, &def) != NULL);
+	if (!have_default)
+		have_default = (rt_find(&ctx->kroutes, &def) != NULL);
 	if (!have_default) {
 		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 			if (ifp->active &&
