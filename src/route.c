@@ -585,18 +585,19 @@ rt_doroute(rb_tree_t *kroutes, struct rt *rt)
 void
 rt_build(struct dhcpcd_ctx *ctx, int af)
 {
-	rb_tree_t kroutes, routes, added;
+	rb_tree_t routes, added, kroutes;
 	struct rt *rt, *rtn;
 	unsigned long long o;
 
-	rb_tree_init(&kroutes, &rt_compare_os_ops);
 	rb_tree_init(&routes, &rt_compare_list_ops);
 	rb_tree_init(&added, &rt_compare_os_ops);
+	rb_tree_init(&kroutes, &rt_compare_os_ops);
+	if_initrt(ctx, &kroutes, af);
 
 	switch (af) {
 #ifdef INET
 	case AF_INET:
-		if (!inet_getroutes(ctx, &routes))
+		if (!inet_getroutes(ctx, &routes, &kroutes))
 			goto getfail;
 		break;
 #endif
@@ -607,8 +608,6 @@ rt_build(struct dhcpcd_ctx *ctx, int af)
 		break;
 #endif
 	}
-
-	if_initrt(ctx, &kroutes, af);
 
 	RB_TREE_FOREACH_SAFE(rt, &routes, rtn) {
 		if (rt->rt_dest.sa_family != af &&
