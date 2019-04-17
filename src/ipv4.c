@@ -432,7 +432,7 @@ inet_routerhostroute(rb_tree_t *routes, struct interface *ifp)
 }
 
 bool
-inet_getroutes(struct dhcpcd_ctx *ctx, rb_tree_t *routes)
+inet_getroutes(struct dhcpcd_ctx *ctx, rb_tree_t *routes, rb_tree_t *kroutes)
 {
 	struct interface *ifp;
 #ifdef IPV4LL
@@ -457,7 +457,11 @@ inet_getroutes(struct dhcpcd_ctx *ctx, rb_tree_t *routes)
 	/* If there is no default route, see if we can use an IPv4LL one. */
 	memset(&def, 0, sizeof(def));
 	def.rt_dest.sa_family = AF_INET;
+	def.rt_netmask.sa_family = AF_INET;
 	have_default = (rb_tree_find_node(routes, &def) != NULL);
+	if (!have_default)
+		have_default = (rb_tree_find_node(kroutes, &def) != NULL);
+
 	if (!have_default) {
 		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 			if (ifp->active &&
@@ -465,6 +469,8 @@ inet_getroutes(struct dhcpcd_ctx *ctx, rb_tree_t *routes)
 				break;
 		}
 	}
+#else
+	UNUSED(kroutes);
 #endif
 
 	return true;
