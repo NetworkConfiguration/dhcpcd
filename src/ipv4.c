@@ -468,11 +468,6 @@ ipv4_deladdr(struct ipv4_addr *addr, int keeparp)
 	int r;
 	struct ipv4_state *state;
 	struct ipv4_addr *ap;
-#ifdef ARP
-	struct arp_state *astate;
-#else
-	UNUSED(keeparp);
-#endif
 
 	logdebugx("%s: deleting IP address %s",
 	    addr->iface->name, addr->saddr);
@@ -484,8 +479,8 @@ ipv4_deladdr(struct ipv4_addr *addr, int keeparp)
 		logerr("%s: %s", addr->iface->name, __func__);
 
 #ifdef ARP
-	if (!keeparp && (astate = arp_find(addr->iface, &addr->addr)) != NULL)
-		arp_free(astate);
+	if (!keeparp)
+		arp_freeaddr(addr->iface, &addr->addr);
 #endif
 
 	state = IPV4_STATE(addr->iface);
@@ -523,6 +518,7 @@ delete_address(struct interface *ifp)
 	    ifo->options & DHCPCD_INFORM ||
 	    (ifo->options & DHCPCD_STATIC && ifo->req_addr.s_addr == 0))
 		return 0;
+	arp_freeaddr(ifp, &state->addr->addr);
 	r = ipv4_deladdr(state->addr, 0);
 	return r;
 }
@@ -897,10 +893,10 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 	}
 
 	if (addr->s_addr != INADDR_ANY && addr->s_addr != INADDR_BROADCAST) {
-#ifdef ARP
-		arp_handleifa(cmd, ia);
-#endif
 		dhcp_handleifa(cmd, ia, pid);
+#ifdef IPV4LL
+		ipv4ll_handleifa(cmd, ia, pid);
+#endif
 	}
 
 	if (cmd == RTM_DELADDR)
