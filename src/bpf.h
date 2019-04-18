@@ -37,6 +37,7 @@
 
 extern const char *bpf_name;
 size_t bpf_frame_header_len(const struct interface *);
+int bpf_frame_bcast(const struct interface *, const char *frame);
 int bpf_open(struct interface *, int (*)(struct interface *, int));
 int bpf_close(struct interface *, int);
 int bpf_attach(int, void *, unsigned int);
