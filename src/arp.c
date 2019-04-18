@@ -239,12 +239,14 @@ arp_packet(struct interface *ifp, uint8_t *data, size_t len)
 	memcpy(&arm.tha, hw_t, ar.ar_hln);
 	memcpy(&arm.tip.s_addr, hw_t + ar.ar_hln, ar.ar_pln);
 
-	/* Match the ARP probe to our states */
+	/* Match the ARP probe to our states.
+	 * Ignore Unicast Poll, RFC1122. */
 	state = ARP_CSTATE(ifp);
 	TAILQ_FOREACH_SAFE(astate, &state->arp_states, next, astaten) {
 		if (IN_ARE_ADDR_EQUAL(&arm.sip, &astate->addr) ||
 		    (IN_IS_ADDR_UNSPECIFIED(&arm.sip) &&
-		    IN_ARE_ADDR_EQUAL(&arm.tip, &astate->addr)))
+		    IN_ARE_ADDR_EQUAL(&arm.tip, &astate->addr) &&
+		    state->bpf_flags & BPF_BCAST))
 			arp_found(astate, &arm);
 	}
 }
