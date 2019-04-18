@@ -1412,6 +1412,10 @@ bpf_read(struct interface *ifp, int s, void *data, size_t len,
 	if (bytes) {
 		ssize_t fl = (ssize_t)bpf_frame_header_len(ifp);
 
+		if (bpf_frame_bcast(ifp, state->buffer) == 0)
+			*flags |= BPF_BCAST;
+		else
+			*flags &= ~BPF_BCAST;
 		bytes -= fl;
 		if ((size_t)bytes > len)
 			bytes = (ssize_t)len;

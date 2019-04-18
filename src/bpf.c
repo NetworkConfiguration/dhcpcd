@@ -95,7 +95,7 @@ bpf_frame_header_len(const struct interface *ifp)
 static const uint8_t etherbroadcastaddr[] =
     { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
-static int
+int
 bpf_frame_bcast(const struct interface *ifp, const char *frame)
 {
 
