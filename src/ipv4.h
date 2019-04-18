@@ -72,6 +72,9 @@
         (IN_IFF_TENTATIVE | IN_IFF_DUPLICATED | IN_IFF_DETACHED)
 #endif
 
+#define IN_ARE_ADDR_EQUAL(a, b)		((a)->s_addr == (b)->s_addr)
+#define IN_IS_ADDR_UNSPECIFIED(a)	((a)->s_addr == INADDR_ANY)
+
 struct ipv4_addr {
 	TAILQ_ENTRY(ipv4_addr) next;
 	struct in_addr addr;
