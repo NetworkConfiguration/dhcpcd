@@ -216,6 +216,12 @@ get_option(struct dhcpcd_ctx *ctx,
 		}
 		l = *p++;
 
+		/* Check we can read the option data, if present */
+		if (p + l > e) {
+			errno = EINVAL;
+			return NULL;
+		}
+
 		if (o == DHO_OPTSOVERLOADED) {
 			/* Ensure we only get this option once by setting
 			 * the last bit as well as the value.
@@ -250,10 +256,6 @@ get_option(struct dhcpcd_ctx *ctx,
 				bp += ol;
 			}
 			ol = l;
-			if (p + ol >= e) {
-				errno = EINVAL;
-				return NULL;
-			}
 			op = p;
 			bl += ol;
 		}
