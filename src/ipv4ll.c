@@ -173,7 +173,7 @@ ipv4ll_env(char **env, const char *prefix, const struct interface *ifp)
 }
 
 static void
-ipv4ll_announced(struct arp_state *astate)
+ipv4ll_announced_arp(struct arp_state *astate)
 {
 	struct ipv4ll_state *state = IPV4LL_STATE(astate->iface);
 
@@ -198,7 +198,9 @@ ipv4ll_not_found(struct interface *ifp)
 {
 	struct ipv4ll_state *state;
 	struct ipv4_addr *ia;
+#ifdef KERNEL_RFC5227
 	struct arp_state *astate;
+#endif
 
 	state = IPV4LL_STATE(ifp);
 	assert(state != NULL);
@@ -235,12 +237,12 @@ test:
 #ifdef KERNEL_RFC5227
 	astate = arp_new(ifp, &ia->addr);
 	if (astate != NULL) {
-		astate->announced_cb = ipv4ll_announced;
+		astate->announced_cb = ipv4ll_announced_arp;
 		astate->free_cb = ipv4ll_arpfree;
 		arp_announce(astate);
 	}
 #else
-	arp_annnounce(state->arp);
+	arp_announce(state->arp);
 #endif
 	script_runreason(ifp, "IPV4LL");
 	dhcpcd_daemonise(ifp->ctx);
@@ -291,7 +293,6 @@ ipv4ll_not_found_arp(struct arp_state *astate)
 {
 	struct interface *ifp;
 	struct ipv4ll_state *state;
-	struct ipv4_addr *ia;
 
 	assert(astate != NULL);
 	assert(astate->iface != NULL);
@@ -300,7 +301,7 @@ ipv4ll_not_found_arp(struct arp_state *astate)
 	state = IPV4LL_STATE(ifp);
 	assert(state != NULL);
 	assert(state->arp == astate);
-	ipv4ll_not_found_arp(state);
+	ipv4ll_not_found_arp(astate);
 }
 
 static void
@@ -316,10 +317,10 @@ ipv4ll_found_arp(struct arp_state *astate, __unused const struct arp_msg *amsg)
 static void
 ipv4ll_defend_failed_arp(struct arp_state *astate)
 {
-	struct ipv4ll_state *state = IPV4LL_STATE(astate->ifp);
+	struct ipv4ll_state *state = IPV4LL_STATE(astate->iface);
 
 	assert(state->arp == astate);
-	ipv4ll_defend_failed1(astate->iface);
+	ipv4ll_defend_failed(astate->iface);
 }
 #endif
 

@@ -2034,7 +2034,7 @@ dhcp_finish_dad(struct interface *ifp, struct in_addr *ia)
 		state->new = state->offer;
 		state->new_len = state->offer_len;
 		get_lease(ifp, &state->lease, state->new, state->new_len);
-		ipv4_applyaddr(astate->iface);
+		ipv4_applyaddr(ifp);
 		state->new = bootp;
 		state->new_len = len;
 	}
@@ -2114,6 +2114,7 @@ dhcp_arp_not_found(struct arp_state *astate)
 static void
 dhcp_arp_found(struct arp_state *astate, const struct arp_msg *amsg)
 {
+	struct in_addr addr;
 #ifdef ARPING
 	struct interface *ifp;
 	struct dhcp_state *state;
@@ -2147,7 +2148,9 @@ dhcp_arp_found(struct arp_state *astate, const struct arp_msg *amsg)
 	}
 #endif
 
-	dhcp_addr_duplicated(astate->iface, &astate->addr);
+	addr = astate->addr;
+	arp_free(astate);
+	dhcp_addr_duplicated(astate->iface, &addr);
 }
 
 #ifdef KERNEL_RFC5227
