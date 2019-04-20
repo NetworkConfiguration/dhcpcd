@@ -268,6 +268,7 @@ static boolean_t
 if_newaddr(const char *ifname, void *arg)
 {
 	struct linkwalk		*lw = arg;
+	int error;
 	struct ifaddrs		*ifa;
 	dlpi_handle_t		dh;
 	dlpi_info_t		dlinfo;
@@ -276,7 +277,10 @@ if_newaddr(const char *ifname, void *arg)
 	struct sockaddr_dl	*sdl;
 
 	ifa = NULL;
-	if (dlpi_open(ifname, &dh, 0) != DLPI_SUCCESS)
+	error = dlpi_open(ifname, &dh, 0);
+	if (error == DLPI_ENOLINK) /* Just vanished or in global zone */
+		return B_FALSE;
+	if (error != DLPI_SUCCESS)
 		goto failed1;
 	if (dlpi_info(dh, &dlinfo, 0) != DLPI_SUCCESS)
 		goto failed;
@@ -317,7 +321,7 @@ if_newaddr(const char *ifname, void *arg)
 	ifa->ifa_next = lw->lw_ifa;
 	lw->lw_ifa = ifa;
 	dlpi_close(dh);
-	return (B_FALSE);
+	return B_FALSE;
 
 failed:
 	dlpi_close(dh);
@@ -328,7 +332,7 @@ failed:
 	}
 failed1:
 	lw->lw_error = errno;
-	return (B_TRUE);
+	return B_TRUE;
 }
 
 /* Creates an empty sockaddr_dl for lo0. */
