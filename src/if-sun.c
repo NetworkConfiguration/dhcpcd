@@ -547,15 +547,16 @@ if_route0(struct dhcpcd_ctx *ctx, struct rtm *rtmsg,
 
 		rtm->rtm_flags |= RTF_UP;
 		if (!(rtm->rtm_flags & RTF_REJECT) &&
-		    !sa_is_loopback(&rt->rt_gateway) &&
-		    /* Solaris doesn't like interfaces on default routes. */
-		    !sa_is_unspecified(&rt->rt_dest))
+		    !sa_is_loopback(&rt->rt_gateway))
 		{
 			rtm->rtm_addrs |= RTA_IFP;
-#if 0
+			/* RTA_IFA is currently ignored by the kernel.
+			 * RTA_SRC and RTF_SETSRC look like what we want,
+			 * but they don't work with RTF_GATEWAY.
+			 * We set RTA_IFA just in the hope that the
+			 * kernel will one day support this. */
 			if (!sa_is_unspecified(&rt->rt_ifa))
 				rtm->rtm_addrs |= RTA_IFA;
-#endif
 		}
 
 		if (netmask_bcast)
@@ -594,14 +595,13 @@ if_route0(struct dhcpcd_ctx *ctx, struct rtm *rtmsg,
 		ADDSA((struct sockaddr *)&sdl);
 	}
 
-	if (rtm->rtm_addrs & RTA_IFA) {
-		ADDSA(&rt->rt_ifa);
-		rtm->rtm_addrs |= RTA_SRC;
-	}
-	if (rtm->rtm_addrs & RTA_SRC)
+	if (rtm->rtm_addrs & RTA_IFA)
 		ADDSA(&rt->rt_ifa);
 
-#undef ADDSA
+#if 0
+	if (rtm->rtm_addrs & RTA_SRC)
+		ADDSA(&rt->rt_ifa);
+#endif
 
 	rtm->rtm_msglen = (unsigned short)(bp - (char *)rtm);
 }
