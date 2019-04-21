@@ -74,9 +74,8 @@ extern int getallifaddrs(sa_family_t, struct ifaddrs **, int64_t);
 #endif
 
 #ifndef RT_ROUNDUP
-#define RT_ROUNDUP(a)							      \
-	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
-#define RT_ADVANCE(x, n) (x += RT_ROUNDUP(salen(n)))
+#define RT_ROUNDUP(a)                                                        \
+       ((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
 #endif
 
 #define COPYOUT(sin, sa) do {						      \
@@ -427,14 +426,16 @@ get_addrs(int type, const void *data, const struct sockaddr **sa)
 {
 	const char *cp;
 	int i;
+	const struct sockaddr **sap;
 
 	cp = data;
 	for (i = 0; i < RTAX_MAX; i++) {
+		sap = &sa[i];
 		if (type & (1 << i)) {
-			sa[i] = (const struct sockaddr *)cp;
-			RT_ADVANCE(cp, sa[i]);
+			*sap = (const struct sockaddr *)cp;
+			cp += salen(*sap);
 		} else
-			sa[i] = NULL;
+			*sap = NULL;
 	}
 	return 0;
 }
@@ -751,15 +752,19 @@ if_finishrt(struct dhcpcd_ctx *ctx, struct rt *rt)
 		rt->rt_mtu = 0;
 }
 
-static int
-if_addrflags0(int fd, const char *ifname)
+static uint64_t
+if_addrflags0(int fd, const char *ifname, const struct sockaddr *sa)
 {
 	struct lifreq		lifr;
 
 	memset(&lifr, 0, sizeof(lifr));
 	strlcpy(lifr.lifr_name, ifname, sizeof(lifr.lifr_name));
 	if (ioctl(fd, SIOCGLIFFLAGS, &lifr) == -1)
-		return -1;
+		return 0;
+	if (ioctl(fd, SIOCGLIFADDR, &lifr) == -1)
+		return 0;
+	if (sa_cmp(sa, (struct sockaddr *)&lifr.lifr_addr) != 0)
+		return 0;
 
 	return lifr.lifr_flags;
 }
@@ -808,13 +813,41 @@ if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 	}
 }
 
+static bool
+if_getalias(struct interface *ifp, const struct sockaddr *sa, char *alias)
+{
+	struct ifaddrs		*ifaddrs, *ifa;
+	struct interface	*ifpx;
+	bool			found;
+
+	ifaddrs = NULL;
+	if (getallifaddrs(sa->sa_family, &ifaddrs, 0) == -1)
+		return false;
+	found = false;
+	for (ifa = ifaddrs; ifa != NULL; ifa = ifa->ifa_next) {
+		if (ifa->ifa_addr == NULL)
+			continue;
+		if (sa_cmp(sa, ifa->ifa_addr) != 0)
+			continue;
+		/* Check it's for the right interace. */
+		ifpx = if_find(ifp->ctx->ifaces, ifa->ifa_name);
+		if (ifp == ifpx) {
+			strlcpy(alias, ifa->ifa_name, IF_NAMESIZE);
+			found = true;
+			break;
+		}
+	}
+	freeifaddrs(ifaddrs);
+	return found;
+}
+
 static void
 if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 {
 	struct interface	*ifp;
 	const struct sockaddr	*sa, *rti_info[RTAX_MAX];
 	int			flags;
-	const char		*ifalias;
+	char			ifalias[IF_NAMESIZE];
 
 	/* XXX We have no way of knowing who generated these
 	 * messages wich truely sucks because we want to
@@ -823,6 +856,7 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 		return;
 	sa = (const void *)(ifam + 1);
 	get_addrs(ifam->ifam_addrs, sa, rti_info);
+
 	if ((sa = rti_info[RTAX_IFA]) == NULL)
 		return;
 
@@ -839,31 +873,8 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 	 *   ifam_alias
 	 *   ifam_pid
 	 */
-
-	ifalias = ifp->name;
-	if (ifam->ifam_type != RTM_DELADDR && sa->sa_family != AF_LINK) {
-		struct ifaddrs	*ifaddrs, *ifa;
-
-		ifaddrs = NULL;
-		if (getallifaddrs(sa->sa_family, &ifaddrs, 0) == -1)
-			return;
-		for (ifa = ifaddrs; ifa != NULL; ifa = ifa->ifa_next) {
-			if (ifa->ifa_addr != NULL) {
-				if (sa_cmp(sa, ifa->ifa_addr) == 0) {
-					/* Check it's for the right interace. */
-					struct interface	*ifpx;
-
-					ifpx = if_find(ctx->ifaces,
-					    ifa->ifa_name);
-					if (ifp == ifpx) {
-						ifalias = ifa->ifa_name;
-						break;
-					}
-				}
-			}
-		}
-		freeifaddrs(ifaddrs);
-	}
+	if (ifam->ifam_type != RTM_DELADDR && !if_getalias(ifp, sa, ifalias))
+		return;
 
 	switch (sa->sa_family) {
 	case AF_LINK:
@@ -886,12 +897,20 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 		COPYOUT(mask, rti_info[RTAX_NETMASK]);
 		COPYOUT(bcast, rti_info[RTAX_BRD]);
 
-		if (ifam->ifam_type != RTM_DELADDR) {
-			flags = if_addrflags0(ctx->pf_inet_fd, ifalias);
-			if (flags == -1)
-				break;
-		} else
-			flags = 0;
+		if (ifam->ifam_type == RTM_DELADDR) {
+			struct ipv4_addr *ia;
+
+			ia = ipv4_iffindaddr(ifp, &addr, &mask);
+			if (ia == NULL)
+				return;
+			strlcpy(ifalias, ia->alias, sizeof(ifalias));
+		}
+		flags = if_addrflags(ifp, &addr, ifalias);
+		if (ifam->ifam_type == RTM_DELADDR) {
+			if (flags != -1)
+				return;
+		} else if (flags == -1)
+			return;
 
 		ipv4_handleifa(ctx,
 		    ifam->ifam_type == RTM_CHGADDR ?
@@ -911,15 +930,20 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 		sin6 = (const void *)rti_info[RTAX_NETMASK];
 		mask6 = sin6->sin6_addr;
 
-		if (ifam->ifam_type != RTM_DELADDR) {
-			const struct priv	 *priv;
+		if (ifam->ifam_type == RTM_DELADDR) {
+			struct ipv6_addr	*ia;
 
-			priv = (struct priv *)ctx->priv;
-			flags = if_addrflags0(priv->pf_inet6_fd, ifalias);
-			if (flags == -1)
-				break;
-		} else
-			flags = 0;
+			ia = ipv6_iffindaddr(ifp, &addr6, 0);
+			if (ia == NULL)
+				return;
+			strlcpy(ifalias, ia->alias, sizeof(ifalias));
+		}
+		flags = if_addrflags6(ifp, &addr6, ifalias);
+		if (ifam->ifam_type == RTM_DELADDR) {
+			if (flags != -1)
+				return;
+		} else if (flags == -1)
+			return;
 
 		ipv6_handleifa(ctx,
 		    ifam->ifam_type == RTM_CHGADDR ?
@@ -1490,13 +1514,16 @@ if_address(unsigned char cmd, const struct ipv4_addr *ia)
 }
 
 int
-if_addrflags(const struct interface *ifp, __unused const struct in_addr *addr,
+if_addrflags(const struct interface *ifp, const struct in_addr *addr,
     const char *alias)
 {
-	int		flags, aflags;
+	union sa_ss	ss;
+	uint64_t	aflags;
+	int		flags;
 
-	aflags = if_addrflags0(ifp->ctx->pf_inet_fd, alias);
-	if (aflags == -1)
+	sa_in_init(&ss.sa, addr);
+	aflags = if_addrflags0(ifp->ctx->pf_inet_fd, alias, &ss.sa);
+	if (aflags == 0)
 		return -1;
 	flags = 0;
 	if (aflags & IFF_DUPLICATE)
@@ -1542,14 +1569,19 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 }
 
 int
-if_addrflags6(const struct interface *ifp, __unused const struct in6_addr *addr,
+if_addrflags6(const struct interface *ifp, const struct in6_addr *addr,
     const char *alias)
 {
 	struct priv		*priv;
-	int			aflags, flags;
+	union sa_ss		ss;
+	uint64_t		aflags;
+	int			flags;
 
 	priv = (struct priv *)ifp->ctx->priv;
-	aflags = if_addrflags0(priv->pf_inet6_fd, alias);
+	sa_in6_init(&ss.sa, addr);
+	aflags = if_addrflags0(priv->pf_inet6_fd, alias, &ss.sa);
+	if (aflags == 0)
+		return -1;
 	flags = 0;
 	if (aflags & IFF_DUPLICATE)
 		flags |= IN6_IFF_DUPLICATED;
