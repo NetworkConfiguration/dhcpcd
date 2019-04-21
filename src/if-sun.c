@@ -1310,6 +1310,7 @@ if_walkrt6(struct dhcpcd_ctx *ctx, char *data, size_t len)
 		ipv6_mask(&in6, re->ipv6RoutePfxLength);
 		sa_in6_init(&rt.rt_netmask, &in6);
 		sa_in6_init(&rt.rt_gateway, &re->ipv6RouteNextHop);
+		sa_in6_init(&rt.rt_ifa, &re->ipv6RouteInfo.re_src_addr);
 		rt.rt_mtu = re->ipv6RouteInfo.re_max_frag;
 		if_octetstr(ifname, &re->ipv6RouteIfIndex, sizeof(ifname));
 		rt.rt_ifp = if_find(ctx->ifaces, ifname);
