@@ -75,7 +75,8 @@ extern int getallifaddrs(sa_family_t, struct ifaddrs **, int64_t);
 
 #ifndef RT_ROUNDUP
 #define RT_ROUNDUP(a)                                                        \
-       ((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
+       ((a) > 0 ? (1 + (((a) - 1) | (sizeof(int32_t) - 1))) : sizeof(int32_t))
+#define RT_ADVANCE(x, n) ((x) += RT_ROUNDUP(salen((n))))
 #endif
 
 #define COPYOUT(sin, sa) do {						      \
@@ -433,7 +434,7 @@ get_addrs(int type, const void *data, const struct sockaddr **sa)
 		sap = &sa[i];
 		if (type & (1 << i)) {
 			*sap = (const struct sockaddr *)cp;
-			cp += salen(*sap);
+			RT_ADVANCE(cp, *sap);
 		} else
 			*sap = NULL;
 	}
