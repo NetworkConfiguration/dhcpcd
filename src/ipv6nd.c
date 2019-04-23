@@ -242,6 +242,7 @@ ipv6nd_open(struct interface *ifp)
 	    .ipv6mr_interface = ifp->index
 	};
 	struct rs_state *state = RS_STATE(ifp);
+	uint_t ifindex = ifp->index;
 
 	if (state->nd_fd != -1)
 		return state->nd_fd;
@@ -249,6 +250,13 @@ ipv6nd_open(struct interface *ifp)
 	s = ipv6nd_open0();
 	if (s == -1)
 		return -1;
+
+	if (setsockopt(s, IPPROTO_IPV6, IPV6_BOUND_IF,
+	    &ifindex, sizeof(ifindex)) == -1)
+	{
+		close(s);
+		return -1;
+	}
 
 	if (setsockopt(s, IPPROTO_IPV6, IPV6_JOIN_GROUP,
 	    &mreq, sizeof(mreq)) == -1)
