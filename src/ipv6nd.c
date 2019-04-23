@@ -196,7 +196,7 @@ ipv6nd_printoptions(const struct dhcpcd_ctx *ctx,
 }
 
 static int
-ipv6nd_open0()
+ipv6nd_open0(void)
 {
 	int s, on;
 	struct icmp6_filter filt;
