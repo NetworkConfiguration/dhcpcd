@@ -265,10 +265,14 @@ ipv6nd_open(struct interface *ifp)
 static int
 ipv6nd_open(struct dhcpcd_ctx *ctx)
 {
-	int on;
+	int s, on;
 
 	if (ctx->nd_fd != -1)
 		return ctx->nd_fd;
+
+	s = ipv6nd_open0();
+	if (s == -1)
+		return -1;
 
 	on = 1;
 	if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVPKTINFO,
@@ -1809,7 +1813,9 @@ ipv6nd_startrs1(void *arg)
 			logerr(__func__);
 			return;
 		}
+#ifdef __sun
 		state->nd_fd = -1;
+#endif
 	}
 
 #ifdef __sun
