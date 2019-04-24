@@ -526,6 +526,7 @@ if_route0(struct dhcpcd_ctx *ctx, struct rtm *rtmsg,
 	struct rt_msghdr *rtm;
 	char *bp = rtmsg->buffer;
 	socklen_t sl;
+	bool gateway_unspec;
 
 	/* WARNING: Solaris will not allow you to delete RTF_KERNEL routes.
 	 * This includes subnet/prefix routes. */
@@ -543,6 +544,8 @@ if_route0(struct dhcpcd_ctx *ctx, struct rtm *rtmsg,
 	rtm->rtm_seq = ++ctx->seq;
 	rtm->rtm_flags = rt->rt_flags;
 	rtm->rtm_addrs = RTA_DST | RTA_GATEWAY;
+
+	gateway_unspec = sa_is_unspecified(&rt->rt_gateway);
 
 	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
 		bool netmask_bcast = sa_is_allones(&rt->rt_netmask);
@@ -563,7 +566,7 @@ if_route0(struct dhcpcd_ctx *ctx, struct rtm *rtmsg,
 
 		if (netmask_bcast)
 			rtm->rtm_flags |= RTF_HOST;
-		else
+		else if (!gateway_unspec)
 			rtm->rtm_flags |= RTF_GATEWAY;
 
 		/* Emulate the kernel by marking address generated
@@ -582,7 +585,7 @@ if_route0(struct dhcpcd_ctx *ctx, struct rtm *rtmsg,
 
 	ADDSA(&rt->rt_dest);
 
-	if (sa_is_unspecified(&rt->rt_gateway))
+	if (gateway_unspec)
 		ADDSA(&rt->rt_ifa);
 	else
 		ADDSA(&rt->rt_gateway);
