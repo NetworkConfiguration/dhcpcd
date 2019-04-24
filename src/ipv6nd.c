@@ -332,7 +332,11 @@ ipv6nd_sendrsprobe(void *arg)
 {
 	struct interface *ifp = arg;
 	struct rs_state *state = RS_STATE(ifp);
-	struct sockaddr_in6 dst = { .sin6_family = AF_INET6 };
+	struct sockaddr_in6 dst = {
+		.sin6_family = AF_INET6,
+		.sin6_addr = IN6ADDR_LINKLOCAL_ALLROUTERS_INIT,
+		.sin6_scope_id = ifp->index,
+	};
 	struct iovec iov = { .iov_base = state->rs, .iov_len = state->rslen };
 	unsigned char ctl[CMSG_SPACE(sizeof(struct in6_pktinfo))] = { 0 };
 	struct msghdr msg = {
@@ -354,11 +358,6 @@ ipv6nd_sendrsprobe(void *arg)
 #ifdef HAVE_SA_LEN
 	dst.sin6_len = sizeof(dst);
 #endif
-	dst.sin6_scope_id = ifp->index;
-	if (inet_pton(AF_INET6, ALLROUTERS, &dst.sin6_addr) != 1) {
-		logerr(__func__);
-		return;
-	}
 
 	/* Set the outbound interface */
 	cm = CMSG_FIRSTHDR(&msg);
@@ -403,6 +402,7 @@ ipv6nd_sendadvertisement(void *arg)
 	struct dhcpcd_ctx *ctx = ifp->ctx;
 	struct sockaddr_in6 dst = {
 	    .sin6_family = AF_INET6,
+	    .sin6_addr = IN6ADDR_LINKLOCAL_ALLNODES_INIT,
 	    .sin6_scope_id = ifp->index,
 	};
 	struct iovec iov = { .iov_base = ia->na, .iov_len = ia->na_len };
@@ -423,10 +423,6 @@ ipv6nd_sendadvertisement(void *arg)
 #ifdef SIN6_LEN
 	dst.sin6_len = sizeof(dst);
 #endif
-	if (inet_pton(AF_INET6, ALLNODES, &dst.sin6_addr) != 1) {
-		logerr(__func__);
-		return;
-	}
 
 	/* Set the outbound interface. */
 	cm = CMSG_FIRSTHDR(&msg);
