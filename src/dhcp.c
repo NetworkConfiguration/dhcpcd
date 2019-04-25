@@ -2077,7 +2077,7 @@ dhcp_arp_probed(struct arp_state *astate)
 	    ifp->name, inet_ntoa(astate->addr));
 	if (!(ifo->options & DHCPCD_INFORM))
 		dhcp_bind(ifp);
-#ifndef IN_IFF_TENTATIVE
+#ifndef IN_IFF_DUPLICATED
 	else {
 		struct bootp *bootp;
 		size_t len;
@@ -2431,7 +2431,7 @@ dhcp_arp_address(struct interface *ifp)
 	if (astate == NULL)
 		return -1;
 
-#ifdef IN_IFF_TENTATIVE
+#ifdef IN_IFF_NOTUSEABLE
 	if (ia == NULL || ia->addr_flags & IN_IFF_NOTUSEABLE) {
 		state->state = DHS_PROBE;
 		if (ia == NULL) {
