@@ -845,6 +845,21 @@ if_getalias(struct interface *ifp, const struct sockaddr *sa, char *alias)
 	return found;
 }
 
+static int
+if_getbrdaddr(struct dhcpcd_ctx *ctx, const char *ifname, struct in_addr *brd)
+{
+	struct lifreq lifr = { 0 };
+	int r;
+
+	memset(&lifr, 0, sizeof(lifr));
+	strlcpy(lifr.lifr_name, ifname, sizeof(lifr.lifr_name));
+	errno = 0;
+	r = ioctl(ctx->pf_inet_fd, SIOCGLIFBRDADDR, &lifr, sizeof(lifr));
+	if (r != -1)
+		COPYOUT(*brd, (struct sockaddr *)&lifr.lifr_broadaddr);
+	return r;
+}
+
 static void
 if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 {
@@ -908,6 +923,11 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 			if (ia == NULL)
 				return;
 			strlcpy(ifalias, ia->alias, sizeof(ifalias));
+		} else if (bcast.s_addr == INADDR_ANY) {
+			/* Work around a bug where broadcast
+			 * address is not correctly reported. */
+			if (if_getbrdaddr(ctx, ifalias, &bcast) == -1)
+				return;
 		}
 		flags = if_addrflags(ifp, &addr, ifalias);
 		if (ifam->ifam_type == RTM_DELADDR) {
@@ -1035,7 +1055,8 @@ if_octetstr(char *buf, const Octet_t *o, ssize_t len)
 
 static int
 if_addaddr(int fd, const char *ifname,
-    struct sockaddr_storage *addr, struct sockaddr_storage *mask)
+    struct sockaddr_storage *addr, struct sockaddr_storage *mask,
+    struct sockaddr_storage *brd)
 {
 	struct lifreq		lifr;
 
@@ -1051,6 +1072,13 @@ if_addaddr(int fd, const char *ifname,
 	lifr.lifr_addr = *addr;
 	if (ioctl(fd, SIOCSLIFADDR, &lifr) == -1)
 		return -1;
+
+	/* Then assign the broadcast address. */
+	if (brd != NULL) {
+		lifr.lifr_broadaddr = *brd;
+		if (ioctl(fd, SIOCSLIFBRDADDR, &lifr) == -1)
+			return -1;
+	}
 
 	/* Now bring it up. */
 	if (ioctl(fd, SIOCGLIFFLAGS, &lifr) == -1)
@@ -1205,15 +1233,11 @@ out:
 static int
 if_unplumbif(const struct dhcpcd_ctx *ctx, int af, const char *ifname)
 {
-	struct sockaddr_storage		addr, mask;
+	struct sockaddr_storage		addr = { .ss_family = af };
 	int				fd;
 
 	/* For the time being, don't unplumb the interface, just
 	 * set the address to zero. */
-	memset(&addr, 0, sizeof(addr));
-	addr.ss_family = af;
-	memset(&mask, 0, sizeof(mask));
-	mask.ss_family = af;
 	switch (af) {
 #ifdef INET
 	case AF_INET:
@@ -1234,7 +1258,8 @@ if_unplumbif(const struct dhcpcd_ctx *ctx, int af, const char *ifname)
 		errno = EAFNOSUPPORT;
 		return -1;
 	}
-	return if_addaddr(fd, ifname, &addr, &mask);
+	return if_addaddr(fd, ifname, &addr, &addr,
+	    af == AF_INET ? &addr : NULL);
 }
 
 static int
@@ -1489,8 +1514,10 @@ bpf_send(const struct interface *ifp, __unused int fd, uint16_t protocol,
 int
 if_address(unsigned char cmd, const struct ipv4_addr *ia)
 {
-	struct sockaddr_storage	ss_addr, ss_mask;
-	struct sockaddr_in	*sin_addr, *sin_mask;
+	union {
+		struct sockaddr		sa;
+		struct sockaddr_storage ss;
+	} addr, mask, brd;
 
 	/* Either remove the alias or ensure it exists. */
 	if (if_plumb(cmd, ia->iface->ctx, AF_INET, ia->alias) == -1)
@@ -1507,14 +1534,11 @@ if_address(unsigned char cmd, const struct ipv4_addr *ia)
 	/* We need to update the index now */
 	ia->iface->index = if_nametoindex(ia->alias);
 
-	sin_addr = (struct sockaddr_in *)&ss_addr;
-	sin_addr->sin_family = AF_INET;
-	sin_addr->sin_addr = ia->addr;
-	sin_mask = (struct sockaddr_in *)&ss_mask;
-	sin_mask->sin_family = AF_INET;
-	sin_mask->sin_addr = ia->mask;
-	return if_addaddr(ia->iface->ctx->pf_inet_fd,
-	    ia->alias, &ss_addr, &ss_mask);
+	sa_in_init(&addr.sa, &ia->addr);
+	sa_in_init(&mask.sa, &ia->mask);
+	sa_in_init(&brd.sa, &ia->brd);
+	return if_addaddr(ia->iface->ctx->pf_inet_fd, ia->alias,
+	    &addr.ss, &mask.ss, &brd.ss);
 }
 
 int
@@ -1541,9 +1565,12 @@ if_addrflags(const struct interface *ifp, const struct in_addr *addr,
 int
 if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 {
-	struct sockaddr_storage	ss_addr, ss_mask;
-	struct sockaddr_in6	*sin6_addr, *sin6_mask;
-	struct priv		*priv;
+	union {
+		struct sockaddr		sa;
+		struct sockaddr_in6	sin6;
+		struct sockaddr_storage ss;
+	} addr, mask;
+	const struct priv		*priv;
 	int			r;
 
 	/* Either remove the alias or ensure it exists. */
@@ -1558,15 +1585,11 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 		return -1;
 	}
 
-	priv = (struct priv *)ia->iface->ctx->priv;
-	sin6_addr = (struct sockaddr_in6 *)&ss_addr;
-	sin6_addr->sin6_family = AF_INET6;
-	sin6_addr->sin6_addr = ia->addr;
-	sin6_mask = (struct sockaddr_in6 *)&ss_mask;
-	sin6_mask->sin6_family = AF_INET6;
-	ipv6_mask(&sin6_mask->sin6_addr, ia->prefix_len);
-	r = if_addaddr(priv->pf_inet6_fd,
-	    ia->alias, &ss_addr, &ss_mask);
+	sa_in6_init(&addr.sa, &ia->addr);
+	mask.sin6.sin6_family = AF_INET6;
+	ipv6_mask(&mask.sin6.sin6_addr, ia->prefix_len);
+	priv = (const struct priv *)ia->iface->ctx->priv;
+	r = if_addaddr(priv->pf_inet6_fd, ia->alias, &addr.ss, &mask.ss, NULL);
 	if (r == -1 && errno == EEXIST)
 		return 0;
 	return r;
