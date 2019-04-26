@@ -398,7 +398,7 @@ ipv4ll_start1(struct interface *ifp, struct arp_state *astate)
 		ia = ipv4_iffindlladdr(ifp);
 
 	repick = false;
-#ifdef IN_IFF_TENTATIVE
+#ifdef IN_IFF_DUPLICATED
 	if (ia != NULL && ia->addr_flags & IN_IFF_DUPLICATED) {
 		state->pickedaddr = ia->addr; /* So it's not picked again. */
 		repick = true;
@@ -419,6 +419,8 @@ ipv4ll_start1(struct interface *ifp, struct arp_state *astate)
 			    ifp->name, inet_ntoa(ia->addr));
 			return;
 		}
+#endif
+#ifdef IN_IFF_DUPLICATED
 		loginfox("%s: using IPv4LL address %s", ifp->name, ia->saddr);
 #endif
 		ipv4ll_not_found(ifp);
@@ -431,7 +433,7 @@ ipv4ll_start1(struct interface *ifp, struct arp_state *astate)
 #ifndef KERNEL_RFC5227
 	astate->addr = state->pickedaddr;
 #endif
-#ifdef IN_IFF_TENTATIVE
+#ifdef IN_IFF_DUPLICATED
 	ipv4ll_not_found(ifp);
 #else
 	arp_probe(astate);
