@@ -431,7 +431,6 @@ ipv6nd_sendadvertisement(void *arg)
 	cm->cmsg_type = IPV6_PKTINFO;
 	cm->cmsg_len = CMSG_LEN(sizeof(pi));
 	memcpy(CMSG_DATA(cm), &pi, sizeof(pi));
-
 	logdebugx("%s: sending NA for %s", ifp->name, ia->saddr);
 #ifdef __sun
 	s = state->nd_fd;
@@ -439,7 +438,13 @@ ipv6nd_sendadvertisement(void *arg)
 	s = ctx->nd_fd;
 #endif
 	if (sendmsg(s, &msg, 0) == -1)
+#ifdef __OpenBSD__
+/* This isn't too critical as they don't support IPv6 address sharing */
+#warning Cannot send NA messages on OpenBSD
+		logdebug(__func__);
+#else
 		logerr(__func__);
+#endif
 
 	if (++ia->na_count < MAX_NEIGHBOR_ADVERTISEMENT) {
 		eloop_timeout_add_sec(ctx->eloop,
