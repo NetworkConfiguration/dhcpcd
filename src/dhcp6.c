@@ -3035,7 +3035,7 @@ dhcp6_bind(struct interface *ifp, const char *op, const char *sfrom)
 				 * unless those values in those fields are 0.
 				 */
 				logwarnx("%s: ignoring T1 %"PRIu32
-				    " to due address expiry",
+				    " due to address expiry",
 				    ifp->name, state->renew);
 				state->renew = state->rebind = 0;
 			}

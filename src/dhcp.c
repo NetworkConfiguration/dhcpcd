@@ -2026,7 +2026,7 @@ dhcp_finish_dad(struct interface *ifp, struct in_addr *ia)
 	logdebugx("%s: DAD completed for %s", ifp->name, inet_ntoa(*ia));
 	if (!(ifp->options->options & DHCPCD_INFORM))
 		dhcp_bind(ifp);
-#ifndef IN_IFF_TENTATIVE
+#ifndef IN_IFF_DUPLICATED
 	else {
 		struct bootp *bootp;
 		size_t len;
@@ -2393,7 +2393,7 @@ dhcp_arp_address(struct interface *ifp)
 	/* If the interface already has the address configured
 	 * then we can't ARP for duplicate detection. */
 	ia = ipv4_iffindaddr(ifp, &addr, NULL);
-#ifdef IN_IFF_TENTATIVE
+#ifdef IN_IFF_NOTUSEABLE
 	if (ia == NULL || ia->addr_flags & IN_IFF_NOTUSEABLE) {
 		state->state = DHS_PROBE;
 		if (ia == NULL) {
