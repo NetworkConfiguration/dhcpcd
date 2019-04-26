@@ -160,12 +160,6 @@ static void ipv6nd_handledata(void *);
 #define IPV6_RECVPKTINFO IPV6_PKTINFO
 #endif
 
-#ifdef __sun
-struct in6_addr all_nodes_mcast = { .s6_addr = {
-    0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01 } };
-#endif
-
 /* Handy defines */
 #define ipv6nd_free_ra(ra) ipv6nd_freedrop_ra((ra),  0)
 #define ipv6nd_drop_ra(ra) ipv6nd_freedrop_ra((ra),  1)
@@ -238,7 +232,7 @@ ipv6nd_open(struct interface *ifp)
 {
 	int s;
 	struct ipv6_mreq mreq = {
-	    .ipv6mr_multiaddr = all_nodes_mcast,
+	    .ipv6mr_multiaddr = IN6ADDR_LINKLOCAL_ALLNODES_INIT,
 	    .ipv6mr_interface = ifp->index
 	};
 	struct rs_state *state = RS_STATE(ifp);
