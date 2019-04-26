@@ -51,13 +51,19 @@ SED_SYS=		-e 's:@SYSCONFDIR@:${SYSCONFDIR}:g'
 DEPEND!=	test -e .depend && echo ".depend" || echo ""
 VERSION!=	sed -n 's/\#define VERSION[[:space:]]*"\(.*\)".*/\1/p' defs.h
 
-FOSSILID?=	dhcpcd-6
+DIST!=		if test -f .fslckout; then echo "dist-fossil"; \
+		elif test -d .git; then echo "dist-git"; \
+		else echo "dist-inst"; fi
+FOSSILID?=	current
+GITREF?=	HEAD
 
-DISTPREFIX?=	${PROG}-${VERSION}
+DISTSUFFIX=
+DISTPREFIX?=	dhcpcd-${VERSION}${DISTSUFFIX}
 DISTFILEGZ?=	${DISTPREFIX}.tar.gz
 DISTFILE?=	${DISTPREFIX}.tar.xz
 DISTINFO=	${DISTFILE}.distinfo
 DISTINFOSIGN=	${DISTINFO}.asc
+
 CKSUM?=		cksum -a SHA256
 PGP?=		netpgp
 
@@ -148,10 +154,22 @@ distclean: clean
 	rm -f .depend config.h config.mk config.log \
 		${DISTFILE} ${DISTFILEGZ} ${DISTINFO} ${DISTINFOSIGN}
 
-dist:
+dist-fossil:
 	fossil tarball --name ${DISTPREFIX} ${FOSSILID} ${DISTFILEGZ}
 	gunzip -c ${DISTFILEGZ} | xz >${DISTFILE}
 	rm ${DISTFILEGZ}
+
+dist-git:
+	git archive --prefix=${DISTPREFIX}/ ${GITREF} | xz >${DISTFILE}
+
+dist-inst:
+	mkdir /tmp/${DISTPREFIX}
+	cp -RPp * /tmp/${DISTPREFIX}
+	(cd /tmp/${DISTPREFIX}; make clean)
+	tar -cvjpf ${DISTFILE} -C /tmp ${DISTPREFIX}
+	rm -rf /tmp/${DISTPREFIX}
+
+dist: ${DIST}
 
 distinfo: dist
 	rm -f ${DISTINFO} ${DISTINFOSIGN}
