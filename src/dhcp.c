@@ -3506,7 +3506,7 @@ dhcp_readudp(struct dhcpcd_ctx *ctx, struct interface *ifp)
 		}
 	}
 
-	dhcp_handlebootp(ifp, (struct bootp *)buf, (size_t)bytes,
+	dhcp_handlebootp(ifp, (struct bootp *)(void *)buf, (size_t)bytes,
 	    &from.sin_addr);
 #endif
 }
