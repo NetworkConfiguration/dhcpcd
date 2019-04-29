@@ -3499,6 +3499,11 @@ dhcp_readudp(struct dhcpcd_ctx *ctx, struct interface *ifp)
 			logerr(__func__);
 			return;
 		}
+		if (D_CSTATE(ifp) == NULL) {
+			logdebugx("%s: received BOOTP for inactive interface",
+			    ifp->name);
+			return;
+		}
 	}
 
 	dhcp_handlebootp(ifp, (struct bootp *)buf, (size_t)bytes,
