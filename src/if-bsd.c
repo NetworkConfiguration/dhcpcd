@@ -1022,7 +1022,7 @@ if_ifinfo(struct dhcpcd_ctx *ctx, const struct if_msghdr *ifm)
 		 * However whilst some drivers report an active link
 		 * via SIOCGIFMEDIA, they don't bother to announce it
 		 * via a routing message. */
-		if (ifp->wireless) /* Wireless need to work correctly. */
+		if (ifp->wireless) /* Wireless needs to work correctly. */
 			link_state = LINK_DOWN;
 		else
 			link_state = if_carrier_flags(ifp, flags);
