@@ -84,6 +84,9 @@ const int dhcpcd_signals[] = {
 const size_t dhcpcd_signals_len = __arraycount(dhcpcd_signals);
 #endif
 
+#define IF_UPANDRUNNING(a) \
+	(((a)->flags & (IFF_UP | IFF_RUNNING)) == (IFF_UP | IFF_RUNNING))
+
 static void
 usage(void)
 {
@@ -714,8 +717,7 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 	} else
 		ifp->flags = flags;
 	if (carrier == LINK_UNKNOWN)
-		carrier = (ifp->flags & (IFF_UP | IFF_RUNNING)) ==
-		    (IFF_UP & IFF_RUNNING) ? LINK_UP : LINK_DOWN;
+		carrier = IF_UPANDRUNNING(ifp) ? LINK_UP : LINK_DOWN;
 
 	if (carrier == LINK_DOWN || (ifp->flags & IFF_UP) == 0) {
 		if (ifp->carrier != LINK_DOWN) {
@@ -832,7 +834,6 @@ dhcpcd_startinterface(void *arg)
 	struct if_options *ifo = ifp->options;
 	char buf[DUID_LEN * 3];
 	int carrier;
-	struct timespec tv;
 
 	if (ifo->options & DHCPCD_LINK) {
 		switch (ifp->carrier) {
@@ -844,14 +845,22 @@ dhcpcd_startinterface(void *arg)
 		case LINK_UNKNOWN:
 			/* No media state available.
 			 * Loop until both IFF_UP and IFF_RUNNING are set */
-			if ((carrier = if_carrier(ifp)) == LINK_UNKNOWN) {
-				tv.tv_sec = 0;
-				tv.tv_nsec = IF_POLL_UP * NSEC_PER_MSEC;
-				eloop_timeout_add_tv(ifp->ctx->eloop,
-				    &tv, dhcpcd_startinterface, ifp);
-			} else
-				dhcpcd_handlecarrier(ifp->ctx, carrier,
-				    ifp->flags, ifp->name);
+			carrier = if_carrier(ifp);
+			if (carrier == LINK_UNKNOWN) {
+				if (IF_UPANDRUNNING(ifp))
+					carrier = LINK_UP;
+				else {
+					struct timespec tv;
+
+					tv.tv_sec = 0;
+					tv.tv_nsec = IF_POLL_UP * NSEC_PER_MSEC;
+					eloop_timeout_add_tv(ifp->ctx->eloop,
+					    &tv, dhcpcd_startinterface, ifp);
+					return;
+				}
+			}
+			dhcpcd_handlecarrier(ifp->ctx, carrier,
+			    ifp->flags, ifp->name);
 			return;
 		}
 	}
