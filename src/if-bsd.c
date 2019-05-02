@@ -203,26 +203,17 @@ if_closesockets_os(struct dhcpcd_ctx *ctx)
 		close(priv->pf_inet6_fd);
 }
 
-static int
-if_carrier_flags(struct interface *ifp, unsigned int flags)
+int
+if_carrier(struct interface *ifp)
 {
 	struct ifmediareq ifmr = { .ifm_status = 0 };
 
 	strlcpy(ifmr.ifm_name, ifp->name, sizeof(ifmr.ifm_name));
 	if (ioctl(ifp->ctx->pf_inet_fd, SIOCGIFMEDIA, &ifmr) == -1 ||
 	    !(ifmr.ifm_status & IFM_AVALID))
-		return flags & IFF_RUNNING ? LINK_UP : LINK_UNKNOWN;
+		return LINK_UNKNOWN;
 
 	return (ifmr.ifm_status & IFM_ACTIVE) ? LINK_UP : LINK_DOWN;
-}
-
-int
-if_carrier(struct interface *ifp)
-{
-
-	if (if_getflags(ifp) == -1)
-		return LINK_UNKNOWN;
-	return if_carrier_flags(ifp, ifp->flags);
 }
 
 static void
@@ -1009,33 +1000,24 @@ if_ifinfo(struct dhcpcd_ctx *ctx, const struct if_msghdr *ifm)
 {
 	struct interface *ifp;
 	int link_state;
-	unsigned int flags;
 
 	if ((ifp = if_findindex(ctx->ifaces, ifm->ifm_index)) == NULL)
 		return;
 
-	flags = (unsigned int)ifm->ifm_flags;
 	switch (ifm->ifm_data.ifi_link_state) {
 	case LINK_STATE_UNKNOWN:
-		/* In theory this is only set when an interface is first
-		 * initiaised.
-		 * However whilst some drivers report an active link
-		 * via SIOCGIFMEDIA, they don't bother to announce it
-		 * via a routing message. */
-		if (ifp->wireless) /* Wireless needs to work correctly. */
-			link_state = LINK_DOWN;
-		else
-			link_state = if_carrier_flags(ifp, flags);
+		link_state = LINK_UNKNOWN;
 		break;
 	case LINK_STATE_UP:
-		link_state = ifm->ifm_flags & IFF_UP ? LINK_UP : LINK_DOWN;
+		link_state = LINK_UP;
 		break;
 	default:
 		link_state = LINK_DOWN;
 		break;
 	}
 
-	dhcpcd_handlecarrier(ctx, link_state, flags, ifp->name);
+	dhcpcd_handlecarrier(ctx, link_state,
+	    (unsigned int)ifm->ifm_flags, ifp->name);
 }
 
 static void
