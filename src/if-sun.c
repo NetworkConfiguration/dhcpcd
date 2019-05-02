@@ -171,12 +171,15 @@ if_closesockets_os(struct dhcpcd_ctx *ctx)
 }
 
 int
-if_carrier_os(struct interface *ifp)
+if_carrier(struct interface *ifp)
 {
 	kstat_ctl_t		*kcp;
 	kstat_t			*ksp;
 	kstat_named_t		*knp;
 	link_state_t		linkstate;
+
+	if (if_getflags(ifp) == -1)
+		return LINK_UNKNOWN;
 
 	kcp = kstat_open();
 	if (kcp == NULL)
