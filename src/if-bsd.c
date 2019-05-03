@@ -360,20 +360,28 @@ if_vlanid(const struct interface *ifp)
 #endif
 }
 
-static void
-get_addrs(int type, const void *data, const struct sockaddr **sa)
+static int
+get_addrs(int type, const void *data, size_t data_len,
+    const struct sockaddr **sa)
 {
-	const char *cp;
+	const char *cp, *ep;
 	int i;
 
 	cp = data;
+	ep = cp + data_len;
 	for (i = 0; i < RTAX_MAX; i++) {
 		if (type & (1 << i)) {
+			if (cp >= ep) {
+				errno = EINVAL;
+				return -1;
+			}
 			sa[i] = (const struct sockaddr *)cp;
 			RT_ADVANCE(cp, sa[i]);
 		} else
 			sa[i] = NULL;
 	}
+
+	return 0;
 }
 
 static struct interface *
@@ -647,7 +655,9 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 	}
 #endif
 
-	get_addrs(rtm->rtm_addrs, rtm + 1, rti_info);
+	if (get_addrs(rtm->rtm_addrs, rtm + 1,
+		      rtm->rtm_msglen - sizeof(*rtm), rti_info) == -1)
+		return -1;
 	memset(rt, 0, sizeof(*rt));
 
 	rt->rt_flags = (unsigned int)rtm->rtm_flags;
@@ -713,13 +723,17 @@ if_initrt(struct dhcpcd_ctx *ctx, int af)
 	end = buf + needed;
 	for (p = buf; p < end; p += rtm->rtm_msglen) {
 		rtm = (void *)p;
+		if (p + rtm->rtm_msglen >= end) {
+			errno = EINVAL;
+			break;
+		}
 		if (if_copyrt(ctx, &rt, rtm) == 0) {
 			rt.rt_dflags |= RTDF_INIT;
 			rt_recvrt(RTM_ADD, &rt, rtm->rtm_pid);
 		}
 	}
 	free(buf);
-	return 0;
+	return p == end ? 0 : -1;
 }
 
 #ifdef INET
@@ -981,28 +995,38 @@ if_getlifetime6(struct ipv6_addr *ia)
 }
 #endif
 
-static void
+static int
 if_announce(struct dhcpcd_ctx *ctx, const struct if_announcemsghdr *ifan)
 {
 
+	if (ifan->ifan_msglen < sizeof(*ifan)) {
+		errno = EINVAL;
+		return -1;
+	}
+
 	switch(ifan->ifan_what) {
 	case IFAN_ARRIVAL:
-		dhcpcd_handleinterface(ctx, 1, ifan->ifan_name);
-		break;
+		return dhcpcd_handleinterface(ctx, 1, ifan->ifan_name);
 	case IFAN_DEPARTURE:
-		dhcpcd_handleinterface(ctx, -1, ifan->ifan_name);
-		break;
+		return dhcpcd_handleinterface(ctx, -1, ifan->ifan_name);
 	}
+
+	return 0;
 }
 
-static void
+static int
 if_ifinfo(struct dhcpcd_ctx *ctx, const struct if_msghdr *ifm)
 {
 	struct interface *ifp;
 	int link_state;
 
+	if (ifm->ifm_msglen < sizeof(*ifm)) {
+		errno = EINVAL;
+		return -1;
+	}
+
 	if ((ifp = if_findindex(ctx->ifaces, ifm->ifm_index)) == NULL)
-		return;
+		return 0;
 
 	switch (ifm->ifm_data.ifi_link_state) {
 	case LINK_STATE_UNKNOWN:
@@ -1018,19 +1042,25 @@ if_ifinfo(struct dhcpcd_ctx *ctx, const struct if_msghdr *ifm)
 
 	dhcpcd_handlecarrier(ctx, link_state,
 	    (unsigned int)ifm->ifm_flags, ifp->name);
+	return 0;
 }
 
-static void
+static int
 if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 {
 	struct rt rt;
 
+	if (rtm->rtm_msglen < sizeof(*rtm)) {
+		errno = EINVAL;
+		return -1;
+	}
+
 	/* Ignore errors. */
 	if (rtm->rtm_errno != 0)
-		return;
+		return 0;
 
 	if (if_copyrt(ctx, &rt, rtm) == -1)
-		return;
+		return -1;
 
 #ifdef INET6
 	/*
@@ -1054,9 +1084,10 @@ if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 #endif
 
 	rt_recvrt(rtm->rtm_type, &rt, rtm->rtm_pid);
+	return 0;
 }
 
-static void
+static int
 if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 {
 	struct interface *ifp;
@@ -1064,11 +1095,18 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 	int addrflags;
 	pid_t pid;
 
+	if (ifam->ifam_msglen < sizeof(*ifam)) {
+		errno = EINVAL;
+		return -1;
+	}
+
 	if ((ifp = if_findindex(ctx->ifaces, ifam->ifam_index)) == NULL)
-		return;
-	get_addrs(ifam->ifam_addrs, ifam + 1, rti_info);
+		return 0;
+	if (get_addrs(ifam->ifam_addrs, ifam + 1,
+		      ifam->ifam_msglen - sizeof(*ifam), rti_info) == -1)
+		return -1;
 	if (rti_info[RTAX_IFA] == NULL)
-		return;
+		return 0;
 
 #ifdef HAVE_IFAM_PID
 	pid = ifam->ifam_pid;
@@ -1168,7 +1206,7 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 			}
 			freeifaddrs(ifaddrs);
 			if (ifa != NULL)
-				return;
+				return 0;
 #endif
 		}
 
@@ -1231,40 +1269,37 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 	}
 #endif
 	}
+
+	return 0;
 }
 
-static void
+static int
 if_dispatch(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 {
 
 	if (rtm->rtm_version != RTM_VERSION)
-		return;
+		return 0;
 
 	switch(rtm->rtm_type) {
 #ifdef RTM_IFANNOUNCE
 	case RTM_IFANNOUNCE:
-		if_announce(ctx, (const void *)rtm);
-		break;
+		return if_announce(ctx, (const void *)rtm);
 #endif
 	case RTM_IFINFO:
-		if_ifinfo(ctx, (const void *)rtm);
-		break;
+		return if_ifinfo(ctx, (const void *)rtm);
 	case RTM_ADD:		/* FALLTHROUGH */
 	case RTM_CHANGE:	/* FALLTHROUGH */
 	case RTM_DELETE:
-		if_rtm(ctx, (const void *)rtm);
-		break;
+		return if_rtm(ctx, (const void *)rtm);
 #ifdef RTM_CHGADDR
 	case RTM_CHGADDR:	/* FALLTHROUGH */
 #endif
 	case RTM_DELADDR:	/* FALLTHROUGH */
 	case RTM_NEWADDR:
-		if_ifa(ctx, (const void *)rtm);
-		break;
+		return if_ifa(ctx, (const void *)rtm);
 #ifdef RTM_DESYNC
 	case RTM_DESYNC:
-		dhcpcd_linkoverflow(ctx);
-		break;
+		return dhcpcd_linkoverflow(ctx);
 #endif
 	}
 }
@@ -1280,9 +1315,13 @@ if_handlelink(struct dhcpcd_ctx *ctx)
 	len = recvmsg(ctx->link_fd, &msg, 0);
 	if (len == -1)
 		return -1;
-	if (len != 0)
-		if_dispatch(ctx, &rtm.hdr);
-	return 0;
+	if (len == 0)
+		return 0;
+	if (len < rtm.hdr.rtm_msglen) {
+		errno = EINVAL;
+		return -1;
+	}
+	return if_dispatch(ctx, &rtm.hdr);
 }
 
 #ifndef SYS_NMLN	/* OSX */
