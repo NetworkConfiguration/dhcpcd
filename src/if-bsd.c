@@ -655,6 +655,9 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 	}
 #endif
 
+	/* We have already checked that at least one address must be
+	 * present after the rtm structure. */
+	/* coverity[ptr_arith] */
 	if (get_addrs(rtm->rtm_addrs, rtm + 1,
 		      rtm->rtm_msglen - sizeof(*rtm), rti_info) == -1)
 		return -1;
@@ -1099,14 +1102,17 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 		errno = EINVAL;
 		return -1;
 	}
-
+	if (~ifam->ifam_addrs & RTA_IFA)
+		return 0;
 	if ((ifp = if_findindex(ctx->ifaces, ifam->ifam_index)) == NULL)
 		return 0;
+
+	/* We have already checked that at least one address must be
+	 * present after the ifam structure. */
+	/* coverity[ptr_arith] */
 	if (get_addrs(ifam->ifam_addrs, ifam + 1,
 		      ifam->ifam_msglen - sizeof(*ifam), rti_info) == -1)
 		return -1;
-	if (rti_info[RTAX_IFA] == NULL)
-		return 0;
 
 #ifdef HAVE_IFAM_PID
 	pid = ifam->ifam_pid;
@@ -1302,6 +1308,8 @@ if_dispatch(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 		return dhcpcd_linkoverflow(ctx);
 #endif
 	}
+
+	return 0;
 }
 
 int
