@@ -426,21 +426,26 @@ if_linkaddr(struct sockaddr_dl *sdl, const struct interface *ifp)
 }
 
 static int
-get_addrs(int type, const void *data, const struct sockaddr **sa)
+get_addrs(int type, const void *data, size_t data_len,
+    const struct sockaddr **sa)
 {
-	const char *cp;
+	const char *cp, *ep;
 	int i;
-	const struct sockaddr **sap;
 
 	cp = data;
+	ep = cp + data_len;
 	for (i = 0; i < RTAX_MAX; i++) {
-		sap = &sa[i];
 		if (type & (1 << i)) {
-			*sap = (const struct sockaddr *)cp;
-			RT_ADVANCE(cp, *sap);
+			if (cp >= ep) {
+				errno = EINVAL;
+				return -1;
+			}
+			sa[i] = (const struct sockaddr *)cp;
+			RT_ADVANCE(cp, sa[i]);
 		} else
-			*sap = NULL;
+			sa[i] = NULL;
 	}
+
 	return 0;
 }
 
@@ -635,7 +640,13 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 	if (~rtm->rtm_addrs & (RTA_DST | RTA_GATEWAY))
 		return -1;
 
-	get_addrs(rtm->rtm_addrs, rtm + 1, rti_info);
+	/* We have already checked that at least one address must be
+	 * present after the rtm structure. */
+	/* coverity[ptr_arith] */
+	if (get_addrs(rtm->rtm_addrs, rtm + 1,
+		      rtm->rtm_msglen - sizeof(*rtm), rti_info) == -1)
+		return -1;
+
 	memset(rt, 0, sizeof(*rt));
 
 	rt->rt_flags = (unsigned int)rtm->rtm_flags;
@@ -776,11 +787,16 @@ if_addrflags0(int fd, const char *ifname, const struct sockaddr *sa)
 	return lifr.lifr_flags;
 }
 
-static void
+static int
 if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 {
 	const struct sockaddr *sa;
 	struct rt rt;
+
+	if (rtm->rtm_msglen < sizeof(*rtm) + sizeof(*sa)) {
+		errno = EINVAL;
+		return -1;
+	}
 
 	sa = (const void *)(rtm + 1);
 	switch (sa->sa_family) {
@@ -799,7 +815,9 @@ if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 			struct in6_addr dst6;
 			struct sockaddr_dl sdl;
 
-			get_addrs(rtm->rtm_addrs, sa, rti_info);
+			if (get_addrs(rtm->rtm_addrs, sa,
+			    rtm->rtm_msglen - sizeof(*rtm), rti_info) == -1)
+				return -1;
 			COPYOUT6(dst6, rti_info[RTAX_DST]);
 			if (rti_info[RTAX_GATEWAY]->sa_family == AF_LINK)
 				memcpy(&sdl, rti_info[RTAX_GATEWAY],
@@ -814,10 +832,12 @@ if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 	}
 #endif
 
-	if (if_copyrt(ctx, &rt, rtm) == 0) {
-		if_finishrt(ctx, &rt);
-		rt_recvrt(rtm->rtm_type, &rt, rtm->rtm_pid);
-	}
+	if (if_copyrt(ctx, &rt, rtm) == -1)
+		return -1;
+
+	if_finishrt(ctx, &rt);
+	rt_recvrt(rtm->rtm_type, &rt, rtm->rtm_pid);
+	return 0;
 }
 
 static bool
@@ -863,7 +883,7 @@ if_getbrdaddr(struct dhcpcd_ctx *ctx, const char *ifname, struct in_addr *brd)
 	return r;
 }
 
-static void
+static int
 if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 {
 	struct interface	*ifp;
@@ -871,16 +891,26 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 	int			flags;
 	char			ifalias[IF_NAMESIZE];
 
+	if (ifam->ifam_msglen < sizeof(*ifam)) {
+		errno = EINVAL;
+		return -1;
+	}
+	if (~ifam->ifam_addrs & RTA_IFA)
+		return 0;
+
+	/* We have already checked that at least one address must be
+	 * present after the ifam structure. */
+	/* coverity[ptr_arith] */
+	if (get_addrs(ifam->ifam_addrs, ifam + 1,
+		      ifam->ifam_msglen - sizeof(*ifam), rti_info) == -1)
+		return -1;
+	sa = rti_info[RTAX_IFA];
+
 	/* XXX We have no way of knowing who generated these
 	 * messages wich truely sucks because we want to
 	 * avoid listening to our own delete messages. */
 	if ((ifp = if_findindex(ctx->ifaces, ifam->ifam_index)) == NULL)
-		return;
-	sa = (const void *)(ifam + 1);
-	get_addrs(ifam->ifam_addrs, sa, rti_info);
-
-	if ((sa = rti_info[RTAX_IFA]) == NULL)
-		return;
+		return 0;
 
 	/*
 	 * ifa_msghdr does not supply the alias, just the interface index.
@@ -896,7 +926,7 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 	 *   ifam_pid
 	 */
 	if (ifam->ifam_type != RTM_DELADDR && !if_getalias(ifp, sa, ifalias))
-		return;
+		return 0;
 
 	switch (sa->sa_family) {
 	case AF_LINK:
@@ -924,20 +954,20 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 
 			ia = ipv4_iffindaddr(ifp, &addr, &mask);
 			if (ia == NULL)
-				return;
+				return 0;
 			strlcpy(ifalias, ia->alias, sizeof(ifalias));
 		} else if (bcast.s_addr == INADDR_ANY) {
 			/* Work around a bug where broadcast
 			 * address is not correctly reported. */
 			if (if_getbrdaddr(ctx, ifalias, &bcast) == -1)
-				return;
+				return 0;
 		}
 		flags = if_addrflags(ifp, &addr, ifalias);
 		if (ifam->ifam_type == RTM_DELADDR) {
 			if (flags != -1)
-				return;
+				return 0;
 		} else if (flags == -1)
-			return;
+			return 0;
 
 		ipv4_handleifa(ctx,
 		    ifam->ifam_type == RTM_CHGADDR ?
@@ -962,15 +992,15 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 
 			ia = ipv6_iffindaddr(ifp, &addr6, 0);
 			if (ia == NULL)
-				return;
+				return 0;
 			strlcpy(ifalias, ia->alias, sizeof(ifalias));
 		}
 		flags = if_addrflags6(ifp, &addr6, ifalias);
 		if (ifam->ifam_type == RTM_DELADDR) {
 			if (flags != -1)
-				return;
+				return 0;
 		} else if (flags == -1)
-			return;
+			return 0;
 
 		ipv6_handleifa(ctx,
 		    ifam->ifam_type == RTM_CHGADDR ?
@@ -980,17 +1010,24 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 	}
 #endif
 	}
+
+	return 0;
 }
 
-static void
+static int
 if_ifinfo(struct dhcpcd_ctx *ctx, const struct if_msghdr *ifm)
 {
 	struct interface *ifp;
 	int state;
 	unsigned int flags;
 
+	if (ifm->ifm_msglen < sizeof(*ifm)) {
+		errno = EINVAL;
+		return -1;
+	}
+
 	if ((ifp = if_findindex(ctx->ifaces, ifm->ifm_index)) == NULL)
-		return;
+		return 0;
 	flags = (unsigned int)ifm->ifm_flags;
 	if (ifm->ifm_flags & IFF_OFFLINE)
 		state = LINK_DOWN;
@@ -999,30 +1036,30 @@ if_ifinfo(struct dhcpcd_ctx *ctx, const struct if_msghdr *ifm)
 		flags |= IFF_UP;
 	}
 	dhcpcd_handlecarrier(ctx, state, flags, ifp->name);
+	return 0;
 }
 
-static void
+static int
 if_dispatch(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 {
 
 	if (rtm->rtm_version != RTM_VERSION)
-		return;
+		return 0;
 
 	switch(rtm->rtm_type) {
 	case RTM_IFINFO:
-		if_ifinfo(ctx, (const void *)rtm);
-		break;
+		return if_ifinfo(ctx, (const void *)rtm);
 	case RTM_ADD:		/* FALLTHROUGH */
 	case RTM_CHANGE:	/* FALLTHROUGH */
 	case RTM_DELETE:
-		if_rtm(ctx, (const void *)rtm);
-		break;
+		return if_rtm(ctx, (const void *)rtm);
 	case RTM_CHGADDR:	/* FALLTHROUGH */
 	case RTM_DELADDR:	/* FALLTHROUGH */
 	case RTM_NEWADDR:
-		if_ifa(ctx, (const void *)rtm);
-		break;
+		return if_ifa(ctx, (const void *)rtm);
 	}
+
+	return 0;
 }
 
 int
@@ -1035,9 +1072,15 @@ if_handlelink(struct dhcpcd_ctx *ctx)
 
 	if ((len = recvmsg(ctx->link_fd, &msg, 0)) == -1)
 		return -1;
-	if (len != 0)
-		if_dispatch(ctx, &rtm.hdr);
-	return 0;
+	if (len == -1)
+		return -1;
+	if (len == 0)
+		return 0;
+	if (len < rtm.hdr.rtm_msglen) {
+		errno = EINVAL;
+		return -1;
+	}
+	return if_dispatch(ctx, &rtm.hdr);
 }
 
 static void
