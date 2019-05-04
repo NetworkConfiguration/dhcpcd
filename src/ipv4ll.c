@@ -47,7 +47,6 @@
 #include "sa.h"
 #include "script.h"
 
-#ifdef IPV4LL
 static const struct in_addr inaddr_llmask = {
 	.s_addr = HTONL(LINKLOCAL_MASK)
 };
@@ -55,18 +54,21 @@ static const struct in_addr inaddr_llbcast = {
 	.s_addr = HTONL(LINKLOCAL_BCAST)
 };
 
+static void ipv4ll_start1(struct interface *, struct arp_state *);
+
 static in_addr_t
-ipv4ll_pickaddr(struct arp_state *astate)
+ipv4ll_pickaddr(struct interface *ifp)
 {
 	struct in_addr addr;
-	struct ipv4ll_state *istate;
+	struct ipv4ll_state *state;
 
-	istate = IPV4LL_STATE(astate->iface);
-	setstate(istate->randomstate);
+	state = IPV4LL_STATE(ifp);
+	setstate(state->randomstate);
 
 	do {
 		long r;
 
+again:
 		/* RFC 3927 Section 2.1 states that the first 256 and
 		 * last 256 addresses are reserved for future use.
 		 * See ipv4ll_start for why we don't use arc4random. */
@@ -76,13 +78,13 @@ ipv4ll_pickaddr(struct arp_state *astate)
 		    ((uint32_t)(r % 0xFD00) + 0x0100));
 
 		/* No point using a failed address */
-		if (addr.s_addr == astate->failed.s_addr)
-			continue;
+		if (IN_ARE_ADDR_EQUAL(&addr, &state->pickedaddr))
+			goto again;
 		/* Ensure we don't have the address on another interface */
-	} while (ipv4_findaddr(astate->iface->ctx, &addr) != NULL);
+	} while (ipv4_findaddr(ifp->ctx, &addr) != NULL);
 
 	/* Restore the original random state */
-	setstate(istate->arp->iface->ctx->randomstate);
+	setstate(ifp->ctx->randomstate);
 	return addr.s_addr;
 }
 
@@ -177,159 +179,14 @@ ipv4ll_env(char **env, const char *prefix, const struct interface *ifp)
 }
 
 static void
-ipv4ll_probed(struct arp_state *astate)
-{
-	struct interface *ifp;
-	struct ipv4ll_state *state;
-	struct ipv4_addr *ia;
-
-	assert(astate != NULL);
-	assert(astate->iface != NULL);
-
-	ifp = astate->iface;
-	state = IPV4LL_STATE(ifp);
-	assert(state != NULL);
-
-	ia = ipv4_iffindaddr(ifp, &astate->addr, &inaddr_llmask);
-#ifdef IN_IFF_NOTREADY
-	if (ia == NULL || ia->addr_flags & IN_IFF_NOTREADY)
-#endif
-		loginfox("%s: using IPv4LL address %s",
-		  ifp->name, inet_ntoa(astate->addr));
-	if (ia == NULL) {
-		if (ifp->ctx->options & DHCPCD_TEST)
-			goto test;
-		ia = ipv4_addaddr(ifp, &astate->addr,
-		    &inaddr_llmask, &inaddr_llbcast);
-	}
-	if (ia == NULL)
-		return;
-#ifdef IN_IFF_NOTREADY
-	if (ia->addr_flags & IN_IFF_NOTREADY)
-		return;
-	logdebugx("%s: DAD completed for %s",
-	    ifp->name, inet_ntoa(astate->addr));
-#endif
-test:
-	state->addr = ia;
-	if (ifp->ctx->options & DHCPCD_TEST) {
-		script_runreason(ifp, "TEST");
-		eloop_exit(ifp->ctx->eloop, EXIT_SUCCESS);
-		return;
-	}
-	timespecclear(&state->defend);
-	rt_build(ifp->ctx, AF_INET);
-	arp_announce(astate);
-	script_runreason(ifp, "IPV4LL");
-	dhcpcd_daemonise(ifp->ctx);
-}
-
-static void
-ipv4ll_announced(struct arp_state *astate)
+ipv4ll_announced_arp(struct arp_state *astate)
 {
 	struct ipv4ll_state *state = IPV4LL_STATE(astate->iface);
 
 	state->conflicts = 0;
-	/* Need to keep the arp state so we can defend our IP. */
-}
-
-static void
-ipv4ll_probe(void *arg)
-{
-
-#ifdef IN_IFF_TENTATIVE
-	ipv4ll_probed(arg);
-#else
-	arp_probe(arg);
-#endif
-}
-
-static void
-ipv4ll_conflicted(struct arp_state *astate, const struct arp_msg *amsg)
-{
-	struct interface *ifp;
-	struct ipv4ll_state *state;
-#ifdef IN_IFF_DUPLICATED
-	struct ipv4_addr *ia;
-#endif
-
-	assert(astate != NULL);
-	assert(astate->iface != NULL);
-	ifp = astate->iface;
-	state = IPV4LL_STATE(ifp);
-	assert(state != NULL);
-
-	/*
-	 * NULL amsg means kernel detected DAD.
-	 * We always fail on matching sip.
-	 * We only fail on matching tip and we haven't added that address yet.
-	 */
-	if (amsg == NULL ||
-	    amsg->sip.s_addr == astate->addr.s_addr ||
-	    (amsg->sip.s_addr == 0 && amsg->tip.s_addr == astate->addr.s_addr
-	     && ipv4_iffindaddr(ifp, &amsg->tip, NULL) == NULL))
-		astate->failed = astate->addr;
-	else
-		return;
-
-	arp_report_conflicted(astate, amsg);
-
-	if (state->addr != NULL &&
-	    astate->failed.s_addr == state->addr->addr.s_addr)
-	{
 #ifdef KERNEL_RFC5227
-		logwarnx("%s: IPv4LL defence failed for %s",
-		    ifp->name, state->addr->saddr);
-#else
-		struct timespec now, defend;
-
-		/* RFC 3927 Section 2.5 says a defence should
-		 * broadcast an ARP announcement.
-		 * Because the kernel will also unicast a reply to the
-		 * hardware address which requested the IP address
-		 * the other IPv4LL client will receieve two ARP
-		 * messages.
-		 * If another conflict happens within DEFEND_INTERVAL
-		 * then we must drop our address and negotiate a new one. */
-		defend.tv_sec = state->defend.tv_sec + DEFEND_INTERVAL;
-		defend.tv_nsec = state->defend.tv_nsec;
-		clock_gettime(CLOCK_MONOTONIC, &now);
-		if (timespeccmp(&defend, &now, >))
-			logwarnx("%s: IPv4LL %d second defence failed for %s",
-			    ifp->name, DEFEND_INTERVAL, state->addr->saddr);
-		else if (arp_request(ifp,
-		    state->addr->addr.s_addr, state->addr->addr.s_addr) == -1)
-			logerr(__func__);
-		else {
-			logdebugx("%s: defended IPv4LL address %s",
-			    ifp->name, state->addr->saddr);
-			state->defend = now;
-			return;
-		}
+	arp_free(astate);
 #endif
-		ipv4_deladdr(state->addr, 1);
-		state->down = 1;
-		state->addr = NULL;
-		rt_build(ifp->ctx, AF_INET);
-		script_runreason(ifp, "IPV4LL");
-	}
-
-#ifdef IN_IFF_DUPLICATED
-	ia = ipv4_iffindaddr(ifp, &astate->addr, NULL);
-	if (ia != NULL && ia->addr_flags & IN_IFF_DUPLICATED)
-		ipv4_deladdr(ia, 1);
-#endif
-
-	arp_cancel(astate);
-	if (++state->conflicts == MAX_CONFLICTS)
-		logerr("%s: failed to acquire an IPv4LL address",
-		    ifp->name);
-	state->pickedaddr.s_addr = ipv4ll_pickaddr(astate);
-	astate->addr = state->pickedaddr;
-	eloop_timeout_add_sec(ifp->ctx->eloop,
-		state->conflicts >= MAX_CONFLICTS ?
-		RATE_LIMIT_INTERVAL : PROBE_WAIT,
-		ipv4ll_probe, astate);
 }
 
 static void
@@ -342,16 +199,144 @@ ipv4ll_arpfree(struct arp_state *astate)
 		state->arp = NULL;
 }
 
-void
-ipv4ll_start(void *arg)
+static void
+ipv4ll_not_found(struct interface *ifp)
+{
+	struct ipv4ll_state *state;
+	struct ipv4_addr *ia;
+#ifdef KERNEL_RFC5227
+	struct arp_state *astate;
+#endif
+
+	state = IPV4LL_STATE(ifp);
+	assert(state != NULL);
+
+	ia = ipv4_iffindaddr(ifp, &state->pickedaddr, &inaddr_llmask);
+#ifdef IN_IFF_NOTREADY
+	if (ia == NULL || ia->addr_flags & IN_IFF_NOTREADY)
+#endif
+		loginfox("%s: using IPv4LL address %s",
+		  ifp->name, inet_ntoa(state->pickedaddr));
+	if (ia == NULL) {
+		if (ifp->ctx->options & DHCPCD_TEST)
+			goto test;
+		ia = ipv4_addaddr(ifp, &state->pickedaddr,
+		    &inaddr_llmask, &inaddr_llbcast);
+	}
+	if (ia == NULL)
+		return;
+#ifdef IN_IFF_NOTREADY
+	if (ia->addr_flags & IN_IFF_NOTREADY)
+		return;
+	logdebugx("%s: DAD completed for %s", ifp->name, ia->saddr);
+#endif
+test:
+	state->addr = ia;
+	state->down = false;
+	if (ifp->ctx->options & DHCPCD_TEST) {
+		script_runreason(ifp, "TEST");
+		eloop_exit(ifp->ctx->eloop, EXIT_SUCCESS);
+		return;
+	}
+	rt_build(ifp->ctx, AF_INET);
+#ifdef KERNEL_RFC5227
+	astate = arp_new(ifp, &ia->addr);
+	if (astate != NULL) {
+		astate->announced_cb = ipv4ll_announced_arp;
+		astate->free_cb = ipv4ll_arpfree;
+		arp_announce(astate);
+	}
+#else
+	arp_announce(state->arp);
+#endif
+	script_runreason(ifp, "IPV4LL");
+	dhcpcd_daemonise(ifp->ctx);
+}
+
+static void
+ipv4ll_startifp(void *arg)
+{
+	struct interface *ifp = arg;
+	struct ipv4ll_state *state;
+
+	state = IPV4LL_STATE(ifp);
+	ipv4ll_start1(ifp, state->arp);
+}
+
+static void
+ipv4ll_found(struct interface *ifp)
+{
+	struct ipv4ll_state *state = IPV4LL_STATE(ifp);
+
+	arp_cancel(state->arp);
+	if (++state->conflicts == MAX_CONFLICTS)
+		logerr("%s: failed to acquire an IPv4LL address",
+		    ifp->name);
+	eloop_timeout_add_sec(ifp->ctx->eloop,
+	    state->conflicts >= MAX_CONFLICTS ?
+	    RATE_LIMIT_INTERVAL : PROBE_WAIT,
+	    ipv4ll_startifp, ifp);
+}
+
+static void
+ipv4ll_defend_failed(struct interface *ifp)
+{
+	struct ipv4ll_state *state = IPV4LL_STATE(ifp);
+
+	ipv4_deladdr(state->addr, 1);
+	state->down = true;
+	state->addr = NULL;
+	if_initrt(ifp->ctx, AF_INET);
+	rt_build(ifp->ctx, AF_INET);
+	script_runreason(ifp, "IPV4LL");
+	ipv4ll_start1(ifp, state->arp);
+}
+
+#ifndef KERNEL_RFC5227
+static void
+ipv4ll_not_found_arp(struct arp_state *astate)
 {
 	struct interface *ifp;
 	struct ipv4ll_state *state;
-	struct arp_state *astate;
-	struct ipv4_addr *ia;
 
-	assert(arg != NULL);
-	ifp = arg;
+	assert(astate != NULL);
+	assert(astate->iface != NULL);
+
+	ifp = astate->iface;
+	state = IPV4LL_STATE(ifp);
+	assert(state != NULL);
+	assert(state->arp == astate);
+	ipv4ll_not_found_arp(astate);
+}
+
+static void
+ipv4ll_found_arp(struct arp_state *astate, __unused const struct arp_msg *amsg)
+{
+	struct interface *ifp = astate->iface;
+	struct ipv4ll_state *state = IPV4LL_STATE(ifp);
+
+	assert(state->arp == astate);
+	ipv4ll_found(ifp);
+}
+
+static void
+ipv4ll_defend_failed_arp(struct arp_state *astate)
+{
+	struct ipv4ll_state *state = IPV4LL_STATE(astate->iface);
+
+	assert(state->arp == astate);
+	ipv4ll_defend_failed(astate->iface);
+}
+#endif
+
+static void
+ipv4ll_start1(struct interface *ifp, struct arp_state *astate)
+{
+	struct ipv4ll_state *state;
+	struct ipv4_addr *ia;
+	bool repick;
+
+	assert(ifp != NULL);
 	if ((state = IPV4LL_STATE(ifp)) == NULL) {
 		ifp->if_data[IF_DATA_IPV4LL] = calloc(1, sizeof(*state));
 		if ((state = IPV4LL_STATE(ifp)) == NULL) {
@@ -387,16 +372,25 @@ ipv4ll_start(void *arg)
 		state->seeded = true;
 	}
 
-	if (state->arp != NULL)
-		return;
-	if ((astate = arp_new(ifp, NULL)) == NULL)
-		return;
+#ifndef KERNEL_RFC5227
+	if (astate == NULL) {
+		if (state->arp != NULL)
+			return;
+		if ((astate = arp_new(ifp, NULL)) == NULL)
+			return;
+		astate->found_cb = ipv4ll_found_arp;
+		astate->not_found_cb = ipv4ll_not_found_arp;
+		astate->announced_cb = ipv4ll_announced_arp;
+		astate->defend_failed_cb = ipv4ll_defend_failed_arp;
+		astate->free_cb = ipv4ll_arpfree;
+		state->arp = astate;
+	} else
+		assert(state->arp == astate);
+#else
+	UNUSED(astate);
+#endif
 
-	state->arp = astate;
-	astate->probed_cb = ipv4ll_probed;
-	astate->announced_cb = ipv4ll_announced;
-	astate->conflicted_cb = ipv4ll_conflicted;
-	astate->free_cb = ipv4ll_arpfree;
+	state->down = true;
 
 	/* Find the previosuly used address. */
 	if (state->pickedaddr.s_addr != INADDR_ANY)
@@ -408,36 +402,54 @@ ipv4ll_start(void *arg)
 	if (ia == NULL)
 		ia = ipv4_iffindlladdr(ifp);
 
-#ifdef IN_IFF_TENTATIVE
+	repick = false;
+#ifdef IN_IFF_DUPLICATED
 	if (ia != NULL && ia->addr_flags & IN_IFF_DUPLICATED) {
+		state->pickedaddr = ia->addr; /* So it's not picked again. */
+		repick = true;
 		ipv4_deladdr(ia, 0);
 		ia = NULL;
 	}
 #endif
 
+	state->addr = ia;
 	if (ia != NULL) {
-		state->pickedaddr = astate->addr = ia->addr;
+		state->pickedaddr = ia->addr;
+#ifndef KERNEL_RFC5227
+		astate->addr = ia->addr;
+#endif
 #ifdef IN_IFF_TENTATIVE
 		if (ia->addr_flags & (IN_IFF_TENTATIVE | IN_IFF_DETACHED)) {
 			loginfox("%s: waiting for DAD to complete on %s",
 			    ifp->name, inet_ntoa(ia->addr));
 			return;
 		}
+#endif
+#ifdef IN_IFF_DUPLICATED
 		loginfox("%s: using IPv4LL address %s", ifp->name, ia->saddr);
 #endif
-		ipv4ll_probed(astate);
+		ipv4ll_not_found(ifp);
 		return;
 	}
 
 	loginfox("%s: probing for an IPv4LL address", ifp->name);
-	if (state->pickedaddr.s_addr == INADDR_ANY)
-		state->pickedaddr.s_addr = ipv4ll_pickaddr(astate);
+	if (repick || state->pickedaddr.s_addr == INADDR_ANY)
+		state->pickedaddr.s_addr = ipv4ll_pickaddr(ifp);
+#ifndef KERNEL_RFC5227
 	astate->addr = state->pickedaddr;
-#ifdef IN_IFF_TENTATIVE
-	ipv4ll_probed(astate);
+#endif
+#ifdef IN_IFF_DUPLICATED
+	ipv4ll_not_found(ifp);
 #else
 	arp_probe(astate);
 #endif
+}
+
+void
+ipv4ll_start(void *arg)
+{
+
+	ipv4ll_start1(arg, NULL);
 }
 
 static void
@@ -451,7 +463,6 @@ ipv4ll_freearp(struct interface *ifp)
 
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, state->arp);
 	arp_free(state->arp);
-	state->arp = NULL;
 }
 
 void
@@ -465,9 +476,7 @@ ipv4ll_drop(struct interface *ifp)
 
 	ipv4ll_freearp(ifp);
 
-#ifndef IN_IFF_TENATIVE
 	if ((ifp->options->options & DHCPCD_NODROP) == DHCPCD_NODROP)
-#endif
 		return;
 
 	state = IPV4LL_STATE(ifp);
@@ -542,4 +551,34 @@ ipv4ll_recvrt(__unused int cmd, const struct rt *rt)
 	return 0;
 }
 #endif
+
+void
+ipv4ll_handleifa(int cmd, struct ipv4_addr *ia, pid_t pid)
+{
+	struct interface *ifp;
+	struct ipv4ll_state *state;
+
+	ifp = ia->iface;
+	state = IPV4LL_STATE(ifp);
+	if (state == NULL || state->addr == NULL ||
+	    !IN_ARE_ADDR_EQUAL(&state->addr->addr, &ia->addr))
+		return;
+
+	if (cmd == RTM_DELADDR) {
+		loginfox("%s: pid %d deleted IP address %s",
+		    ifp->name, pid, ia->saddr);
+		ipv4ll_defend_failed(ifp);
+	}
+
+#ifdef IN_IFF_DUPLICATED
+	if (cmd != RTM_NEWADDR)
+		return;
+	if (!(ia->addr_flags & IN_IFF_NOTUSEABLE))
+		ipv4ll_not_found(ifp);
+	else if (ia->addr_flags & IN_IFF_DUPLICATED) {
+		logerrx("%s: DAD detected %s", ifp->name, ia->saddr);
+		ipv4_deladdr(state->addr, 1);
+		ipv4ll_found(ifp);
+	}
 #endif
+}
