@@ -85,7 +85,6 @@ struct interface {
 	unsigned short vlanid;
 	unsigned int metric;
 	int carrier;
-	bool media_valid;
 	bool wireless;
 	uint8_t ssid[IF_SSIDLEN];
 	unsigned int ssid_len;
@@ -184,7 +183,9 @@ struct dhcpcd_ctx {
 	uint8_t *secret;
 	size_t secret_len;
 
+#ifndef __sun
 	int nd_fd;
+#endif
 	struct ra_head *ra_routers;
 
 	int dhcp6_fd;

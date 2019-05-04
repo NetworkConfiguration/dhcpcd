@@ -349,6 +349,15 @@ if_closesockets_os(struct dhcpcd_ctx *ctx)
 	}
 }
 
+int
+if_carrier(struct interface *ifp)
+{
+
+	if (if_getflags(ifp) == -1)
+		return LINK_UNKNOWN;
+	return ifp->flags & IFF_RUNNING ? LINK_UP : LINK_DOWN;
+}
+
 static int
 get_netlink(struct dhcpcd_ctx *ctx, struct iovec *iov,
     void *arg, int fd, int flags,
@@ -1418,6 +1427,10 @@ bpf_read(struct interface *ifp, int s, void *data, size_t len,
 	if (bytes) {
 		ssize_t fl = (ssize_t)bpf_frame_header_len(ifp);
 
+		if (bpf_frame_bcast(ifp, state->buffer) == 0)
+			*flags |= BPF_BCAST;
+		else
+			*flags &= ~BPF_BCAST;
 		bytes -= fl;
 		if ((size_t)bytes > len)
 			bytes = (ssize_t)len;

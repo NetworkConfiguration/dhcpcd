@@ -62,15 +62,17 @@
     * While it supports DaD, to seems to only expose IFF_DUPLICATE
     * so we have no way of knowing if it's tentative or not.
     * I don't even know if Solaris has any special treatment for tentative. */
-#  define IN_IFF_TENTATIVE	0
 #  define IN_IFF_DUPLICATED	0x02
-#  define IN_IFF_DETACHED	0
+#  define IN_IFF_NOTUSEABLE	IN_IFF_DUPLICATED
 #endif
 
 #ifdef IN_IFF_TENTATIVE
 #define IN_IFF_NOTUSEABLE \
         (IN_IFF_TENTATIVE | IN_IFF_DUPLICATED | IN_IFF_DETACHED)
 #endif
+
+#define IN_ARE_ADDR_EQUAL(a, b)		((a)->s_addr == (b)->s_addr)
+#define IN_IS_ADDR_UNSPECIFIED(a)	((a)->s_addr == INADDR_ANY)
 
 struct ipv4_addr {
 	TAILQ_ENTRY(ipv4_addr) next;
