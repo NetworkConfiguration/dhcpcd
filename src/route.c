@@ -401,7 +401,7 @@ static bool
 rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 {
 	struct dhcpcd_ctx *ctx;
-	bool change;
+	bool change, kroute, result;
 
 	assert(nrt != NULL);
 	ctx = nrt->rt_ifp->ctx;
@@ -423,7 +423,7 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 
 	rt_desc(ort == NULL ? "adding" : "changing", nrt);
 
-	change = false;
+	change = kroute = result = false;
 	if (ort == NULL) {
 		ort = rb_tree_find_node(kroutes, nrt);
 		if (ort != NULL &&
@@ -438,6 +438,7 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 			if (ort->rt_mtu == nrt->rt_mtu)
 				return true;
 			change = true;
+			kroute = true;
 		}
 	} else if (ort->rt_dflags & RTDF_FAKE &&
 	    !(nrt->rt_dflags & RTDF_FAKE) &&
@@ -464,8 +465,10 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 #endif
 
 	if (change) {
-		if (if_route(RTM_CHANGE, nrt) != -1)
-			return true;
+		if (if_route(RTM_CHANGE, nrt) != -1) {
+			result = true;
+			goto out;
+		}
 		if (errno != ESRCH)
 			logerr("if_route (CHG)");
 	}
@@ -477,9 +480,9 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 		if (ort != NULL) {
 			if (if_route(RTM_DELETE, ort) == -1 && errno != ESRCH)
 				logerr("if_route (DEL)");
-			memcpy(ort, nrt, sizeof(*ort));
 		}
-		return true;
+		result = true;
+		goto out;
 	}
 
 	/* If the kernel claims the route exists we need to rip out the
@@ -496,6 +499,8 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 	if (ort != NULL) {
 		if (if_route(RTM_DELETE, ort) == -1 && errno != ESRCH)
 			logerr("if_route (DEL)");
+		else
+			kroute = false;
 	}
 #ifdef ROUTE_PER_GATEWAY
 	/* The OS allows many routes to the same dest with different gateways.
@@ -508,16 +513,23 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 		}
 	}
 #endif
+
 	if (if_route(RTM_ADD, nrt) != -1) {
-		if (ort != NULL)
-			memcpy(ort, nrt, sizeof(*ort));
-		return true;
+		result = true;
+		goto out;
 	}
+
 #ifdef HAVE_ROUTE_METRIC
 logerr:
 #endif
 	logerr("if_route (ADD)");
-	return false;
+
+out:
+	if (kroute) {
+		rb_tree_remove_node(kroutes, ort);
+		rt_free(ort);
+	}
+	return result;
 }
 
 static bool
