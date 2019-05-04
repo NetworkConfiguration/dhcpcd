@@ -2187,14 +2187,14 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			continue;
 		}
 
+		ol--;
 		/* Check option length matches prefix length. */
 		if (((*o - a->prefix_len - 1) / NBBY) + 1 != ol) {
 			logerrx("%s: PD Exclude length mismatch", ifp->name);
 			continue;
 		}
-
 		a->prefix_exclude_len = *o++;
-		ol--;
+
 		memcpy(&a->prefix_exclude, &a->prefix,
 		    sizeof(a->prefix_exclude));
 		nb = a->prefix_len % NBBY;
