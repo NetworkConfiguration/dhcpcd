@@ -1305,7 +1305,8 @@ if_dispatch(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 		return if_ifa(ctx, (const void *)rtm);
 #ifdef RTM_DESYNC
 	case RTM_DESYNC:
-		return dhcpcd_linkoverflow(ctx);
+		dhcpcd_linkoverflow(ctx);
+		return 0;
 #endif
 	}
 
