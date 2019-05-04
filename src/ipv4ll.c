@@ -286,7 +286,6 @@ ipv4ll_defend_failed(struct interface *ifp)
 	ipv4_deladdr(state->addr, 1);
 	state->down = true;
 	state->addr = NULL;
-	if_initrt(ifp->ctx, AF_INET);
 	rt_build(ifp->ctx, AF_INET);
 	script_runreason(ifp, "IPV4LL");
 	ipv4ll_start1(ifp, state->arp);
