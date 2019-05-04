@@ -637,7 +637,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 {
 	const struct sockaddr *rti_info[RTAX_MAX];
 
-	if (~rtm->rtm_addrs & (RTA_DST | RTA_GATEWAY))
+	if (~rtm->rtm_addrs & RTA_DST)
 		return -1;
 
 	/* We have already checked that at least one address must be
@@ -654,7 +654,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 	if (rtm->rtm_addrs & RTA_NETMASK)
 		COPYSA(&rt->rt_netmask, rti_info[RTAX_NETMASK]);
 	/* dhcpcd likes an unspecified gateway to indicate via the link. */
-	if (rt->rt_flags & RTF_GATEWAY &&
+	if (rtm->rtm_addrs & RTA_GATEWAY &&
 	    rti_info[RTAX_GATEWAY]->sa_family != AF_LINK)
 		COPYSA(&rt->rt_gateway, rti_info[RTAX_GATEWAY]);
 	if (rtm->rtm_addrs & RTA_SRC)
@@ -710,7 +710,7 @@ out:
 	return rt;
 }
 
-static void
+static int
 if_finishrt(struct dhcpcd_ctx *ctx, struct rt *rt)
 {
 	int mtu;
@@ -754,10 +754,8 @@ if_finishrt(struct dhcpcd_ctx *ctx, struct rt *rt)
 	if (rt->rt_ifp == NULL) {
 		if (if_route_get(ctx, rt) == NULL) {
 			rt->rt_ifp = if_loopback(ctx);
-			if (rt->rt_ifp == NULL) {
-				logerr(__func__);
-				return;
-			}
+			if (rt->rt_ifp == NULL)
+				return - 1;
 		}
 	}
 
@@ -766,8 +764,12 @@ if_finishrt(struct dhcpcd_ctx *ctx, struct rt *rt)
 	 * This confuses dhcpcd as it expects MTU to be 0
 	 * when no explicit MTU has been set. */
 	mtu = if_getmtu(rt->rt_ifp);
+	if (mtu == -1)
+		return -1;
 	if (rt->rt_mtu == (unsigned int)mtu)
 		rt->rt_mtu = 0;
+
+	return 0;
 }
 
 static uint64_t
@@ -832,10 +834,10 @@ if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 	}
 #endif
 
-	if (if_copyrt(ctx, &rt, rtm) == -1)
+	if (if_copyrt(ctx, &rt, rtm) == -1 && errno != ESRCH)
 		return -1;
-
-	if_finishrt(ctx, &rt);
+	if (if_finishrt(ctx, &rt) == -1)
+		return -1;
 	rt_recvrt(rtm->rtm_type, &rt, rtm->rtm_pid);
 	return 0;
 }
@@ -1366,8 +1368,10 @@ if_walkrt(struct dhcpcd_ctx *ctx, char *data, size_t len)
 		rt.rt_mtu = re->ipRouteInfo.re_max_frag;
 		if_octetstr(ifname, &re->ipRouteIfIndex, sizeof(ifname));
 		rt.rt_ifp = if_find(ctx->ifaces, ifname);
-		if_finishrt(ctx, &rt);
-		rt_recvrt(RTM_ADD, &rt, 0);
+		if (if_finishrt(ctx, &rt) == -1)
+			logerr(__func__);
+		else
+			rt_recvrt(RTM_ADD, &rt, 0);
 	} while (++re < e);
 	return 0;
 }
@@ -1413,8 +1417,10 @@ if_walkrt6(struct dhcpcd_ctx *ctx, char *data, size_t len)
 		rt.rt_mtu = re->ipv6RouteInfo.re_max_frag;
 		if_octetstr(ifname, &re->ipv6RouteIfIndex, sizeof(ifname));
 		rt.rt_ifp = if_find(ctx->ifaces, ifname);
-		if_finishrt(ctx, &rt);
-		rt_recvrt(RTM_ADD, &rt, 0);
+		if (if_finishrt(ctx, &rt) == -1)
+			logerr(__func__);
+		else
+			rt_recvrt(RTM_ADD, &rt, 0);
 	} while (++re < e);
 	return 0;
 }
