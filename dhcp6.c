@@ -1992,22 +1992,14 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 		}
 
 		/* Check option length matches prefix length. */
+		ol--;
 		if (((*op - a->prefix_len - 1) / NBBY) + 1 != ol) {
 			logger(ifp->ctx, LOG_ERR,
 			    "%s: PD Exclude length mismatch", ifp->name);
 			continue;
 		}
-
 		a->prefix_exclude_len = *op++;
-		ol--;
-		if (((a->prefix_exclude_len - a->prefix_len - 1) / NBBY) + 1
-		    != ol)
-		{
-			logger(ifp->ctx, LOG_ERR,
-			    "%s: PD Exclude length mismatch", ifp->name);
-			a->prefix_exclude_len = 0;
-			continue;
-		}
+
 		u8 = a->prefix_len % NBBY;
 		memcpy(&a->prefix_exclude, &a->prefix,
 		    sizeof(a->prefix_exclude));
