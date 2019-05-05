@@ -714,9 +714,9 @@ link_neigh(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 #endif
 
 static int
-link_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp,
-    struct nlmsghdr *nlm)
+link_netlink(struct dhcpcd_ctx *ctx, void *arg, struct nlmsghdr *nlm)
 {
+	struct interface *ifp = arg;
 	int r;
 	size_t len;
 	struct rtattr *rta, *hwaddr;
