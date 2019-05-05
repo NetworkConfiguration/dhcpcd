@@ -68,6 +68,32 @@ static size_t froutes;
 static size_t mroutes;
 #endif
 
+static void
+rt_maskedaddr(struct sockaddr *dst,
+	const struct sockaddr *addr, const struct sockaddr *netmask)
+{
+	const char *addrp = addr->sa_data, *netmaskp = netmask->sa_data;
+	char *dstp = dst->sa_data;
+	const char *addre = (char *)dst + sa_len(addr);
+	const char *netmaske = (char *)dst + MIN(sa_len(addr), sa_len(netmask));
+
+	dst->sa_family = addr->sa_family;
+#ifdef HAVE_SA_LEN
+	dst->sa_len = addr->sa_len;
+#endif
+
+	if (sa_is_unspecified(netmask)) {
+		if (addre > dstp)
+			memcpy(dstp, addrp, (size_t)(addre - dstp));
+		return;
+	}
+
+	while (dstp < netmaske)
+		*dstp++ = *addrp++ & *netmaskp++;
+	if (dstp < addre)
+		memset(dstp, 0, (size_t)(addre - dstp));
+}
+
 /*
  * On some systems, host routes have no need for a netmask.
  * However DHCP specifies host routes using an all-ones netmask.
@@ -90,6 +116,8 @@ rt_compare(void *context, const void *node1, const void *node2)
 {
 	const struct rt *rt1 = node1, *rt2 = node2;
 	bool rt1u, rt2u;
+	union sa_ss ma1 = { .sa.sa_family = AF_UNSPEC };
+	union sa_ss ma2 = { .sa.sa_family = AF_UNSPEC };
 	int c;
 	struct interface *ifp1, *ifp2;
 
@@ -103,13 +131,19 @@ rt_compare(void *context, const void *node1, const void *node2)
 	if (rt1u != rt2u)
 		return rt1u ? 1 : -1;
 
-	/* Sort by destination and netmask. */
-	c = sa_cmp(&rt1->rt_dest, &rt2->rt_dest);
+	/* Sort by masked destination. */
+	rt_maskedaddr(&ma1.sa, &rt1->rt_dest, &rt1->rt_netmask);
+	rt_maskedaddr(&ma2.sa, &rt2->rt_dest, &rt2->rt_netmask);
+	c = sa_cmp(&ma1.sa, &ma2.sa);
 	if (c != 0)
 		return c;
-	c = rt_cmp_netmask(rt1, rt2);
-	if (c != 0)
-		return c;
+
+#ifndef HAVE_ROUTE_METRIC
+	if (context == &rt_compare_os)
+		return 0;
+#else
+	UNUSED(context);
+#endif
 
 	/* All other checks are by interface. */
 	if (rt1->rt_ifp == NULL || rt2->rt_ifp == NULL)
@@ -122,12 +156,6 @@ rt_compare(void *context, const void *node1, const void *node2)
 	if (c != 0)
 		return -c;
 
-#ifndef HAVE_ROUTE_METRIC
-	if (context == &rt_compare_os)
-		return 0;
-#else
-	UNUSED(context);
-#endif
 	/* Lower metric interfaces come first */
 	return (int)(ifp1->metric - ifp2->metric);
 }
