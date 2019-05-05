@@ -93,6 +93,30 @@ sa_addrlen(const struct sockaddr *sa)
 	}
 }
 
+#ifndef HAVE_SA_LEN
+static int
+sa_len(const struct sockaddr *sa)
+{
+
+	switch (sa->sa_family) {
+#ifdef AF_LINK
+	case AF_LINK:
+		return sizeof(struct sockaddr_dl);
+#endif
+#ifdef AF_PACKET
+	case AF_PACKET:
+		return sizeof(struct sockaddr_ll);
+#endif
+	case AF_INET:
+		return sizeof(struct sockaddr_in);
+	case AF_INET6:
+		return sizeof(struct sockaddr_in6);
+	default:
+		return sizeof(struct sockaddr);
+	}
+}
+#endif
+
 bool
 sa_is_unspecified(const struct sockaddr *sa)
 {

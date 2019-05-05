@@ -55,6 +55,11 @@ union sa_ss {
 
 socklen_t sa_addroffset(const struct sockaddr *sa);
 socklen_t sa_addrlen(const struct sockaddr *sa);
+#ifdef HAVE_SA_LEN
+#define	sa_len(sa)	((sa)->sa_len)
+#else
+socklen_t sa_len(const struct sockaddr *sa);
+#endif
 bool sa_is_unspecified(const struct sockaddr *);
 bool sa_is_allones(const struct sockaddr *);
 bool sa_is_loopback(const struct sockaddr *);
