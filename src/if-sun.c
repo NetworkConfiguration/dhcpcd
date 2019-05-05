@@ -76,7 +76,7 @@ extern int getallifaddrs(sa_family_t, struct ifaddrs **, int64_t);
 #ifndef RT_ROUNDUP
 #define RT_ROUNDUP(a)                                                        \
        ((a) > 0 ? (1 + (((a) - 1) | (sizeof(int32_t) - 1))) : sizeof(int32_t))
-#define RT_ADVANCE(x, n) ((x) += RT_ROUNDUP(salen((n))))
+#define RT_ADVANCE(x, n) ((x) += RT_ROUNDUP(sa_len((n))))
 #endif
 
 #define COPYOUT(sin, sa) do {						      \
@@ -91,7 +91,7 @@ extern int getallifaddrs(sa_family_t, struct ifaddrs **, int64_t);
 		    (sa))->sin6_addr;					      \
 	} while (0)
 
-#define COPYSA(dst, src) memcpy((dst), (src), salen((src)))
+#define COPYSA(dst, src) memcpy((dst), (src), sa_len((src)))
 
 struct priv {
 #ifdef INET6
@@ -399,22 +399,6 @@ if_getifaddrs(struct ifaddrs **ifap)
 	return 0;
 }
 
-static int
-salen(const struct sockaddr *sa)
-{
-
-	switch (sa->sa_family) {
-	case AF_LINK:
-		return sizeof(struct sockaddr_dl);
-	case AF_INET:
-		return sizeof(struct sockaddr_in);
-	case AF_INET6:
-		return sizeof(struct sockaddr_in6);
-	default:
-		return sizeof(struct sockaddr);
-	}
-}
-
 static void
 if_linkaddr(struct sockaddr_dl *sdl, const struct interface *ifp)
 {
@@ -540,7 +524,7 @@ if_route0(struct dhcpcd_ctx *ctx, struct rtm *rtmsg,
 	 * This includes subnet/prefix routes. */
 
 #define ADDSA(sa) do {							\
-		sl = salen((sa));					\
+		sl = sa_len((sa));					\
 		memcpy(bp, (sa), sl);					\
 		bp += RT_ROUNDUP(sl);					\
 	} while (/* CONSTCOND */ 0)
