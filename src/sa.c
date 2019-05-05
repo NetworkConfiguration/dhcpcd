@@ -364,6 +364,13 @@ sa_addrtop(const struct sockaddr *sa, char *buf, socklen_t len)
 	const void *addr;
 
 	assert(buf != NULL);
+	assert(len > 0);
+
+	if (sa->sa_family == 0) {
+		*buf = '\0';
+		return NULL;
+	}
+
 #ifdef AF_LINK
 #ifndef CLLADDR
 #define CLLADDR(sdl) (const void *)((sdl)->sdl_data + (sdl)->sdl_nlen)
