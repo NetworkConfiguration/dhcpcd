@@ -94,7 +94,7 @@ sa_addrlen(const struct sockaddr *sa)
 }
 
 #ifndef HAVE_SA_LEN
-static int
+socklen_t
 sa_len(const struct sockaddr *sa)
 {
 
