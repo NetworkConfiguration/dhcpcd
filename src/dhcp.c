@@ -469,7 +469,7 @@ decode_rfc3442_rt(rb_tree_t *routes, struct interface *ifp,
 		sa_in_init(&rt->rt_netmask, &netmask);
 		sa_in_init(&rt->rt_gateway, &gateway);
 		if (rt_proto_add(routes, rt))
-			n++;
+			n = 1;
 	}
 	return n;
 }

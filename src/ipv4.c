@@ -333,7 +333,7 @@ inet_dhcproutes(rb_tree_t *routes, struct interface *ifp, bool *have_default)
 		}
 		if (rt_is_default(rt))
 			*have_default = true;
-		n++;
+		n = 1;
 	}
 
 	return n;
