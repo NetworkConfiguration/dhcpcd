@@ -2226,8 +2226,8 @@ inet6_staticroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 			    (IPV6_AF_ADDED | IPV6_AF_STATIC))
 			{
 				rt = inet6_makeprefix(ifp, NULL, ia);
-				if (rt && rb_tree_insert_node(routes, rt) != rt)
-					rt_free(rt);
+				if (rt)
+					rt_proto_add(routes, rt);
 			}
 		}
 	}
@@ -2251,17 +2251,14 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx, int expired,
 			rt = inet6_makeprefix(rap->iface, rap, addr);
 			if (rt) {
 				rt->rt_dflags |= RTDF_RA;
-				if (rb_tree_insert_node(routes, rt) != rt)
-					rt_free(rt);
+				rt_proto_add(routes, rt);
 			}
 		}
 		if (rap->lifetime) {
 			rt = inet6_makerouter(rap);
 			if (rt) {
 				rt->rt_dflags |= RTDF_RA;
-				if (rb_tree_insert_node(routes, rt) != rt)
-					rt_free(rt);
-				else if (have_default)
+				if (rt_proto_add(routes, rt) && have_default)
 					*have_default = true;
 			}
 		}
@@ -2287,8 +2284,7 @@ inet6_dhcproutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx,
 				if (rt == NULL)
 					continue;
 				rt->rt_dflags |= RTDF_DHCP;
-				if (rb_tree_insert_node(routes, rt) != rt)
-					rt_free(rt);
+				rt_proto_add(routes, rt);
 			}
 		}
 	}
@@ -2313,7 +2309,7 @@ inet6_getroutes(struct dhcpcd_ctx *ctx, rb_tree_t *routes)
 #ifdef DHCP6
 	/* We have no way of knowing if prefixes added by DHCP are reachable
 	 * or not, so we have to assume they are.
-	 * Add bound before delegated so we can prefer interfaces better */
+	 * Add bound before delegated so we can prefer interfaces better. */
 	if (inet6_dhcproutes(routes, ctx, DH6S_BOUND) == -1)
 		return false;
 	if (inet6_dhcproutes(routes, ctx, DH6S_DELEGATED) == -1)

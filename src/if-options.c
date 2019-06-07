@@ -1129,9 +1129,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			sa_in_init(&rt->rt_dest, &addr);
 			sa_in_init(&rt->rt_netmask, &addr2);
 			sa_in_init(&rt->rt_gateway, &addr3);
-			if (rb_tree_insert_node(&ifo->routes, rt) != rt)
-				rt_free(rt);
-			else
+			if (rt_proto_add_ctx(&ifo->routes, rt, ctx))
 				add_environ(&ifo->config, arg, 0);
 		} else if (strncmp(arg, "routers=", strlen("routers=")) == 0) {
 			if (parse_addr(&addr, NULL, p) == -1)
@@ -1142,9 +1140,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			sa_in_init(&rt->rt_dest, &addr2);
 			sa_in_init(&rt->rt_netmask, &addr2);
 			sa_in_init(&rt->rt_gateway, &addr);
-			if (rb_tree_insert_node(&ifo->routes, rt) != rt)
-				rt_free(rt);
-			else
+			if (rt_proto_add_ctx(&ifo->routes, rt, ctx))
 				add_environ(&ifo->config, arg, 0);
 		} else if (strncmp(arg, "interface_mtu=",
 		    strlen("interface_mtu=")) == 0 ||
@@ -2282,7 +2278,7 @@ default_config(struct dhcpcd_ctx *ctx)
 	ifo->script = UNCONST(default_script);
 	ifo->metric = -1;
 	ifo->auth.options |= DHCPCD_AUTH_REQUIRE;
-	rb_tree_init(&ifo->routes, &rt_compare_list_ops);
+	rb_tree_init(&ifo->routes, &rt_compare_proto_ops);
 #ifdef AUTH
 	TAILQ_INIT(&ifo->auth.tokens);
 #endif
@@ -2339,6 +2335,9 @@ read_config(struct dhcpcd_ctx *ctx,
 
 	buf = NULL;
 	buflen = 0;
+
+	/* Reset route order */
+	ctx->rt_order = 0;
 
 	/* Parse our embedded options file */
 	if (ifname == NULL && !(ctx->options & DHCPCD_PRINT_PIDFILE)) {

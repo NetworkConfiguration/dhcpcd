@@ -118,7 +118,7 @@ int inet_cidrtoaddr(int, struct in_addr *);
 uint32_t ipv4_getnetmask(uint32_t);
 int ipv4_hasaddr(const struct interface *);
 
-bool inet_getroutes(struct dhcpcd_ctx *, rb_tree_t *, rb_tree_t *);
+bool inet_getroutes(struct dhcpcd_ctx *, rb_tree_t *);
 
 #define STATE_ADDED		0x01
 #define STATE_FAKE		0x02
