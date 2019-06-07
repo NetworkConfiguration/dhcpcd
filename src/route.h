@@ -46,9 +46,9 @@
  * when dealing with millions of routes.
  */
 #if !defined(RT_FREE_ROUTE_TABLE)
-#define RT_FREE_ROUTE_TABLE
+#define	RT_FREE_ROUTE_TABLE 1
 #elif RT_FREE_ROUTE_TABLE == 0
-#undef RT_FREE_ROUTE_TABLE
+#undef	RT_FREE_ROUTE_TABLE
 #endif
 
 /* Some systems have route metrics.
