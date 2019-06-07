@@ -247,7 +247,7 @@ ipv4_ifcmp(const struct interface *si, const struct interface *ti)
 }
 
 static int
-inet_dhcproutes(rb_tree_t *routes, struct interface *ifp)
+inet_dhcproutes(rb_tree_t *routes, struct interface *ifp, bool *have_default)
 {
 	const struct dhcp_state *state;
 	rb_tree_t nroutes;
@@ -263,7 +263,7 @@ inet_dhcproutes(rb_tree_t *routes, struct interface *ifp)
 	/* An address does have to exist. */
 	assert(state->addr);
 
-	rb_tree_init(&nroutes, &rt_compare_list_ops);
+	rb_tree_init(&nroutes, &rt_compare_proto_ops);
 
 	/* First, add a subnet route. */
 	if (!(ifp->flags & IFF_POINTOPOINT) &&
@@ -283,8 +283,7 @@ inet_dhcproutes(rb_tree_t *routes, struct interface *ifp)
 		//in.s_addr = INADDR_ANY;
 		//sa_in_init(&rt->rt_gateway, &in);
 		rt->rt_gateway.sa_family = AF_UNSPEC;
-		if (rb_tree_insert_node(&nroutes, rt) != rt)
-			rt_free(rt);
+		rt_proto_add(&nroutes, rt);
 	}
 
 	/* If any set routes, grab them, otherwise DHCP routes. */
@@ -297,15 +296,14 @@ inet_dhcproutes(rb_tree_t *routes, struct interface *ifp)
 			memcpy(rt, r, sizeof(*rt));
 			rt_setif(rt, ifp);
 			rt->rt_dflags = RTDF_STATIC;
-			if (rb_tree_insert_node(&nroutes, rt) != rt)
-				rt_free(rt);
+			rt_proto_add(&nroutes, rt);
 		}
 	} else {
 		if (dhcp_get_routes(&nroutes, ifp) == -1)
 			return -1;
 	}
 
-	/* If configured, Install a gateway to the desintion
+	/* If configured, install a gateway to the desintion
 	 * for P2P interfaces. */
 	if (ifp->flags & IFF_POINTOPOINT &&
 	    has_option_mask(ifp->options->dstmask, DHO_ROUTER))
@@ -317,8 +315,7 @@ inet_dhcproutes(rb_tree_t *routes, struct interface *ifp)
 		sa_in_init(&rt->rt_netmask, &in);
 		sa_in_init(&rt->rt_gateway, &state->addr->brd);
 		sa_in_init(&rt->rt_ifa, &state->addr->addr);
-		if (rb_tree_insert_node(&nroutes, rt) != rt)
-			rt_free(rt);
+		rt_proto_add(&nroutes, rt);
 	}
 
 	/* Copy our address as the source address and set mtu */
@@ -330,10 +327,13 @@ inet_dhcproutes(rb_tree_t *routes, struct interface *ifp)
 		if (!(rt->rt_dflags & RTDF_STATIC))
 			rt->rt_dflags |= RTDF_DHCP;
 		sa_in_init(&rt->rt_ifa, &state->addr->addr);
-		if (rb_tree_insert_node(routes, rt) != rt)
+		if (rb_tree_insert_node(routes, rt) != rt) {
 			rt_free(rt);
-		else
-			n++;
+			continue;
+		}
+		if (rt_is_default(rt))
+			*have_default = true;
+		n++;
 	}
 
 	return n;
@@ -425,25 +425,23 @@ inet_routerhostroute(rb_tree_t *routes, struct interface *ifp)
 		sa_in_init(&rth->rt_gateway, &in);
 		rth->rt_mtu = dhcp_get_mtu(ifp);
 		sa_in_init(&rth->rt_ifa, &state->addr->addr);
-		if (rb_tree_insert_node(routes, rth) != rth)
-			rt_free(rth);
+		rt_proto_add(routes, rt);
 	}
 	return 0;
 }
 
 bool
-inet_getroutes(struct dhcpcd_ctx *ctx, rb_tree_t *routes, rb_tree_t *kroutes)
+inet_getroutes(struct dhcpcd_ctx *ctx, rb_tree_t *routes)
 {
 	struct interface *ifp;
 #ifdef IPV4LL
-	struct rt def;
-	bool have_default;
+	bool have_default = false;
 #endif
 
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 		if (!ifp->active)
 			continue;
-		if (inet_dhcproutes(routes, ifp) == -1)
+		if (inet_dhcproutes(routes, ifp, &have_default) == -1)
 			return false;
 #ifdef IPV4LL
 		if (ipv4ll_subnetroute(routes, ifp) == -1)
@@ -455,22 +453,14 @@ inet_getroutes(struct dhcpcd_ctx *ctx, rb_tree_t *routes, rb_tree_t *kroutes)
 
 #ifdef IPV4LL
 	/* If there is no default route, see if we can use an IPv4LL one. */
-	memset(&def, 0, sizeof(def));
-	def.rt_dest.sa_family = AF_INET;
-	def.rt_netmask.sa_family = AF_INET;
-	have_default = (rb_tree_find_node(routes, &def) != NULL);
-	if (!have_default)
-		have_default = (rb_tree_find_node(kroutes, &def) != NULL);
+	if (have_default)
+		return true;
 
-	if (!have_default) {
-		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-			if (ifp->active &&
-			    ipv4ll_defaultroute(routes, ifp) == 1)
-				break;
-		}
+	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+		if (ifp->active &&
+		    ipv4ll_defaultroute(routes, ifp) == 1)
+			break;
 	}
-#else
-	UNUSED(kroutes);
 #endif
 
 	return true;

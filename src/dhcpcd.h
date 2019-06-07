@@ -140,6 +140,7 @@ struct dhcpcd_ctx {
 #ifdef RT_FREE_ROUTE_TABLE
 	rb_tree_t froutes;	/* free routes for re-use */
 #endif
+	size_t rt_order;	/* route order storage */
 
 	int pf_inet_fd;
 	void *priv;

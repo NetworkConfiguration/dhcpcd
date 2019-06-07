@@ -94,6 +94,17 @@ rt_maskedaddr(struct sockaddr *dst,
 		memset(dstp, 0, (size_t)(addre - dstp));
 }
 
+int
+rt_cmp_dest(const struct rt *rt1, const struct rt *rt2)
+{
+	union sa_ss ma1 = { .sa.sa_family = AF_UNSPEC };
+	union sa_ss ma2 = { .sa.sa_family = AF_UNSPEC };
+
+	rt_maskedaddr(&ma1.sa, &rt1->rt_dest, &rt1->rt_netmask);
+	rt_maskedaddr(&ma2.sa, &rt2->rt_dest, &rt2->rt_netmask);
+	return sa_cmp(&ma1.sa, &ma2.sa);
+}
+
 /*
  * On some systems, host routes have no need for a netmask.
  * However DHCP specifies host routes using an all-ones netmask.
@@ -109,67 +120,63 @@ rt_cmp_netmask(const struct rt *rt1, const struct rt *rt2)
 	return sa_cmp(&rt1->rt_netmask, &rt2->rt_netmask);
 }
 
-static bool rt_compare_os;
-
 static int
-rt_compare(void *context, const void *node1, const void *node2)
+rt_compare_os(__unused void *context, const void *node1, const void *node2)
 {
 	const struct rt *rt1 = node1, *rt2 = node2;
-	bool rt1u, rt2u;
-	union sa_ss ma1 = { .sa.sa_family = AF_UNSPEC };
-	union sa_ss ma2 = { .sa.sa_family = AF_UNSPEC };
 	int c;
-	struct interface *ifp1, *ifp2;
-
-	/* Default routes come last. */
-	rt1u = !(rt1->rt_flags & RTF_HOST) &&
-	    sa_is_unspecified(&rt1->rt_dest) &&
-	    sa_is_unspecified(&rt1->rt_netmask);
-	rt2u = !(rt2->rt_flags & RTF_HOST) &&
-	    sa_is_unspecified(&rt2->rt_dest) &&
-	    sa_is_unspecified(&rt2->rt_netmask);
-	if (rt1u != rt2u)
-		return rt1u ? 1 : -1;
 
 	/* Sort by masked destination. */
-	rt_maskedaddr(&ma1.sa, &rt1->rt_dest, &rt1->rt_netmask);
-	rt_maskedaddr(&ma2.sa, &rt2->rt_dest, &rt2->rt_netmask);
-	c = sa_cmp(&ma1.sa, &ma2.sa);
+	c = rt_cmp_dest(rt1, rt2);
 	if (c != 0)
 		return c;
 
-#ifndef HAVE_ROUTE_METRIC
-	if (context == &rt_compare_os)
-		return 0;
-#else
-	UNUSED(context);
+#ifdef HAVE_ROUTE_METRIC
+	c = (int)(rt1->rt_ifp->metric - rt2->rt_ifp->metric);
 #endif
+	return c;
+}
 
-	/* All other checks are by interface. */
-	if (rt1->rt_ifp == NULL || rt2->rt_ifp == NULL)
-		return 0;
+static int
+rt_compare_proto(__unused void *context, const void *node1, const void *node2)
+{
+	const struct rt *rt1 = node1, *rt2 = node2;
+	int c;
+	struct interface *ifp1, *ifp2;
+
+	assert(rt1->rt_ifp != NULL);
+	assert(rt2->rt_ifp != NULL);
 	ifp1 = rt1->rt_ifp;
 	ifp2 = rt2->rt_ifp;
 
-	/* Prefer interfaces with a carrier */
+	/* Prefer interfaces with a carrier. */
 	c = ifp1->carrier - ifp2->carrier;
 	if (c != 0)
 		return -c;
 
-	/* Lower metric interfaces come first */
-	return (int)(ifp1->metric - ifp2->metric);
+	/* Lower metric interfaces come first. */
+	c = (int)(ifp1->metric - ifp2->metric);
+	if (c != 0)
+		return c;
+
+	/* Finally the order in which the route was given to us. */
+	if (rt1->rt_order > rt2->rt_order)
+		return 1;
+	if (rt1->rt_order < rt2->rt_order)
+		return -1;
+	return 0;
 }
 
 static const rb_tree_ops_t rt_compare_os_ops = {
-	.rbto_compare_nodes = rt_compare,
-	.rbto_compare_key = rt_compare,
+	.rbto_compare_nodes = rt_compare_os,
+	.rbto_compare_key = rt_compare_os,
 	.rbto_node_offset = offsetof(struct rt, rt_tree),
-	.rbto_context = &rt_compare_os
+	.rbto_context = NULL
 };
 
-const rb_tree_ops_t rt_compare_list_ops = {
-	.rbto_compare_nodes = rt_compare,
-	.rbto_compare_key = rt_compare,
+const rb_tree_ops_t rt_compare_proto_ops = {
+	.rbto_compare_nodes = rt_compare_proto,
+	.rbto_compare_key = rt_compare_proto,
 	.rbto_node_offset = offsetof(struct rt, rt_tree),
 	.rbto_context = NULL
 };
@@ -200,6 +207,14 @@ rt_init(struct dhcpcd_ctx *ctx)
 #endif
 }
 
+bool
+rt_is_default(const struct rt *rt)
+{
+
+	return sa_is_unspecified(&rt->rt_dest) &&
+	    sa_is_unspecified(&rt->rt_netmask);
+}
+
 static void
 rt_desc(const char *cmd, const struct rt *rt)
 {
@@ -224,9 +239,7 @@ rt_desc(const char *cmd, const struct rt *rt)
 		else
 			loginfox("%s: %s host route to %s via %s",
 			    ifname, cmd, dest, gateway);
-	} else if (sa_is_unspecified(&rt->rt_dest) &&
-		   sa_is_unspecified(&rt->rt_netmask))
-	{
+	} else if (rt_is_default(rt)) {
 		if (gateway_unspec)
 			loginfox("%s: %s default route",
 			    ifname, cmd);
@@ -349,6 +362,26 @@ rt_new(struct interface *ifp)
 		return NULL;
 	rt_setif(rt, ifp);
 	return rt;
+}
+
+struct rt *
+rt_proto_add_ctx(rb_tree_t *tree, struct rt *rt, struct dhcpcd_ctx *ctx)
+{
+
+	rt->rt_order = ctx->rt_order++;
+	if (rb_tree_insert_node(tree, rt) == rt)
+		return rt;
+
+	rt_free(rt);
+	return NULL;
+}
+
+struct rt *
+rt_proto_add(rb_tree_t *tree, struct rt *rt)
+{
+
+	assert (rt->rt_ifp != NULL);
+	return rt_proto_add_ctx(tree, rt, rt->rt_ifp->ctx);
 }
 
 void
@@ -629,15 +662,16 @@ rt_build(struct dhcpcd_ctx *ctx, int af)
 	struct rt *rt, *rtn;
 	unsigned long long o;
 
-	rb_tree_init(&routes, &rt_compare_list_ops);
+	rb_tree_init(&routes, &rt_compare_proto_ops);
 	rb_tree_init(&added, &rt_compare_os_ops);
 	rb_tree_init(&kroutes, &rt_compare_os_ops);
 	if_initrt(ctx, &kroutes, af);
+	ctx->rt_order = 0;
 
 	switch (af) {
 #ifdef INET
 	case AF_INET:
-		if (!inet_getroutes(ctx, &routes, &kroutes))
+		if (!inet_getroutes(ctx, &routes))
 			goto getfail;
 		break;
 #endif
