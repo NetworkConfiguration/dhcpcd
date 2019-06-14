@@ -512,22 +512,27 @@ arp_ifannounceaddr(struct interface *ifp, const struct in_addr *ia)
 void
 arp_announceaddr(struct dhcpcd_ctx *ctx, const struct in_addr *ia)
 {
-	struct interface *ifp;
-	struct ipv4_addr *iaf;
+	struct interface *ifp, *iff = NULL;
+	struct ipv4_addr *iap;
 
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-		iaf = ipv4_iffindaddr(ifp, ia, NULL);
+		if (!ifp->active || ifp->carrier <= LINK_DOWN)
+			continue;
+		iap = ipv4_iffindaddr(ifp, ia, NULL);
+		if (iap == NULL)
+			continue;
 #ifdef IN_IFF_NOTUSEABLE
-		if (iaf && !(iaf->addr_flags & IN_IFF_NOTUSEABLE))
-#else
-		if (iaf)
+		if (!(iap->addr_flags & IN_IFF_NOTUSEABLE))
+			continue;
 #endif
-			break;
+		if (iff != NULL && iff->metric < ifp->metric)
+			continue;
+		iff = ifp;
 	}
-	if (ifp == NULL)
+	if (iff == NULL)
 		return;
 
-	arp_ifannounceaddr(ifp, ia);
+	arp_ifannounceaddr(iff, ia);
 }
 
 struct arp_state *
