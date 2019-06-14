@@ -105,6 +105,9 @@ __CTASSERT(sizeof(struct nd_opt_rdnss) == 8);
 #define RTPREF_RESERVED	(-2)
 #define RTPREF_INVALID	(-3)	/* internal */
 
+#define	EXPIRED_MAX	5	/* Remember 5 expired routers to avoid
+				   logspam. */
+
 #define MIN_RANDOM_FACTOR	500				/* millisecs */
 #define MAX_RANDOM_FACTOR	1500				/* millisecs */
 #define MIN_RANDOM_FACTOR_U	MIN_RANDOM_FACTOR * 1000	/* usecs */
@@ -1228,6 +1231,10 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 			break;
 
 		case ND_OPT_MTU:
+			if (len < sizeof(mtu)) {
+				logerrx("%s: short MTU option", ifp->name);
+				break;
+			}
 			memcpy(&mtu, p, sizeof(mtu));
 			mtu.nd_opt_mtu_mtu = ntohl(mtu.nd_opt_mtu_mtu);
 			if (mtu.nd_opt_mtu_mtu < IPV6_MMTU) {
@@ -1239,6 +1246,10 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 			break;
 
 		case ND_OPT_RDNSS:
+			if (len < sizeof(rdnss)) {
+				logerrx("%s: short RDNSS option", ifp->name);
+				break;
+			}
 			memcpy(&rdnss, p, sizeof(rdnss));
 			if (rdnss.nd_opt_rdnss_lifetime &&
 			    rdnss.nd_opt_rdnss_len > 1)
@@ -1480,11 +1491,12 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 		 * from the prefix information options as well. */
 		j = 0;
 		TAILQ_FOREACH(ia, &rap->addrs, next) {
-			if (!(ia->flags & IPV6_AF_AUTOCONF)
+			if (!(ia->flags & IPV6_AF_AUTOCONF) ||
 #ifdef IPV6_AF_TEMPORARY
-			    || ia->flags & IPV6_AF_TEMPORARY
+			    ia->flags & IPV6_AF_TEMPORARY ||
 #endif
-			    )
+			    !(ia->flags & IPV6_AF_ADDED) ||
+			    ia->prefix_vltime == 0)
 				continue;
 			j++;
 			if (env) {
@@ -1522,6 +1534,16 @@ ipv6nd_expirera(void *arg)
 	struct timespec now, lt, expire, next;
 	bool expired, valid, validone;
 	struct ipv6_addr *ia;
+	size_t len, olen;
+	uint8_t *p;
+	struct nd_opt_hdr ndo;
+#if 0
+	struct nd_opt_prefix_info pi;
+#endif
+	struct nd_opt_dnssl dnssl;
+	struct nd_opt_rdnss rdnss;
+	uint32_t ltime;
+	size_t nexpired = 0;
 
 	ifp = arg;
 	clock_gettime(CLOCK_MONOTONIC, &now);
@@ -1536,8 +1558,7 @@ ipv6nd_expirera(void *arg)
 			lt.tv_sec = (time_t)rap->lifetime;
 			lt.tv_nsec = 0;
 			timespecadd(&rap->acquired, &lt, &expire);
-			if (rap->lifetime == 0 || timespeccmp(&now, &expire, >))
-			{
+			if (timespeccmp(&now, &expire, >)) {
 				if (!rap->expired) {
 					logwarnx("%s: %s: router expired",
 					    ifp->name, rap->sfrom);
@@ -1588,14 +1609,79 @@ ipv6nd_expirera(void *arg)
 			}
 		}
 
-		/* XXX FixMe!
-		 * We need to extract the lifetime from each option and check
-		 * if that has expired or not.
-		 * If it has, zero the option out in the returned data. */
+		/* Work out expiry for ND options */
+		len = rap->data_len - sizeof(struct nd_router_advert);
+		for (p = rap->data + sizeof(struct nd_router_advert);
+		    len >= sizeof(ndo);
+		    p += olen, len -= olen)
+		{
+			memcpy(&ndo, p, sizeof(ndo));
+			olen = (size_t)(ndo.nd_opt_len * 8);
+			if (olen > len) {
+				errno =	EINVAL;
+				break;
+			}
 
-		/* No valid lifetimes are left on the RA, so we might
-		 * as well punt it. */
-		if (!valid && !validone)
+			if (has_option_mask(rap->iface->options->nomasknd,
+			    ndo.nd_opt_type))
+				continue;
+
+			switch (ndo.nd_opt_type) {
+			/* Prefix info is already checked in the above loop. */
+#if 0
+			case ND_OPT_PREFIX_INFORMATION:
+				if (len < sizeof(pi))
+					break;
+				memcpy(&pi, p, sizeof(pi));
+				ltime = pi.nd_opt_pi_valid_time;
+				break;
+#endif
+			case ND_OPT_DNSSL:
+				if (len < sizeof(dnssl))
+					break;
+				memcpy(&dnssl, p, sizeof(dnssl));
+				ltime = dnssl.nd_opt_dnssl_lifetime;
+				break;
+			case ND_OPT_RDNSS:
+				if (len < sizeof(rdnss))
+					break;
+				memcpy(&rdnss, p, sizeof(rdnss));
+				ltime = rdnss.nd_opt_rdnss_lifetime;
+				break;
+			default:
+				continue;
+			}
+
+			if (ltime == 0)
+				continue;
+			if (ltime == ND6_INFINITE_LIFETIME) {
+				validone = true;
+				continue;
+			}
+
+			lt.tv_sec = (time_t)ntohl(ltime);
+			lt.tv_nsec = 0;
+			timespecadd(&rap->acquired, &lt, &expire);
+			if (timespeccmp(&now, &expire, >)) {
+				expired = true;
+				continue;
+			}
+
+			timespecsub(&expire, &now, &lt);
+			if (!timespecisset(&next) ||
+			    timespeccmp(&next, &lt, >))
+			{
+				next = lt;
+				validone = true;
+			}
+		}
+
+		if (valid || validone)
+			continue;
+
+		/* Router has expired. Let's not keep a lot of them.
+		 * We should work out if all the options have expired .... */
+		if (++nexpired > EXPIRED_MAX)
 			ipv6nd_free_ra(rap);
 	}
 
@@ -1603,6 +1689,7 @@ ipv6nd_expirera(void *arg)
 		eloop_timeout_add_tv(ifp->ctx->eloop,
 		    &next, ipv6nd_expirera, ifp);
 	if (expired) {
+		logwarnx("%s: part of Router Advertisement expired", ifp->name);
 		rt_build(ifp->ctx, AF_INET6);
 		script_runreason(ifp, "ROUTERADVERT");
 	}
