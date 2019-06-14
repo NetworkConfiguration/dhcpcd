@@ -526,46 +526,34 @@ ipv6nd_advertise(struct ipv6_addr *ia)
 	ipv6nd_sendadvertisement(iaf);
 }
 
-void
-ipv6nd_expire(struct interface *ifp, uint32_t seconds)
+static void
+ipv6nd_expire(void *arg)
 {
+	struct interface *ifp = arg;
 	struct ra *rap;
-	struct timespec now;
-	uint32_t vltime = seconds;
-	uint32_t pltime = seconds / 2;
+	struct ipv6_addr *ia;
+	struct timespec now = { .tv_sec = 1 };
 
 	if (ifp->ctx->ra_routers == NULL)
 		return;
 
-	clock_gettime(CLOCK_MONOTONIC, &now);
-
 	TAILQ_FOREACH(rap, ifp->ctx->ra_routers, next) {
-		if (rap->iface == ifp) {
-			rap->acquired = now;
-			rap->expired = seconds ? 0 : 1;
-			if (seconds) {
-				struct ipv6_addr *ia;
-
-				rap->lifetime = seconds;
-				TAILQ_FOREACH(ia, &rap->addrs, next) {
-					if (ia->prefix_pltime > pltime ||
-					    ia->prefix_vltime > vltime)
-					{
-						ia->acquired = now;
-						if (ia->prefix_pltime != 0)
-							ia->prefix_pltime =
-							    pltime;
-						ia->prefix_vltime = vltime;
-					}
-				}
-				ipv6_addaddrs(&rap->addrs);
-			}
+		if (rap->iface == ifp)
+			continue;
+		rap->acquired = now;
+		TAILQ_FOREACH(ia, &rap->addrs, next) {
+			ia->acquired = now;
 		}
 	}
-	if (seconds)
-		ipv6nd_expirera(ifp);
-	else
-		rt_build(ifp->ctx, AF_INET6);
+	ipv6nd_expirera(ifp);
+}
+
+void
+ipv6nd_startexpire(struct interface *ifp)
+{
+
+	eloop_timeout_add_sec(ifp->ctx->eloop, RTR_CARRIER_EXPIRE,
+	    ipv6nd_expire, ifp);
 }
 
 static void

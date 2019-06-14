@@ -782,7 +782,7 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 			/* Set any IPv6 Routers we remembered to expire
 			 * faster than they would normally as we
 			 * maybe on a new network. */
-			ipv6nd_expire(ifp, RTR_CARRIER_EXPIRE);
+			ipv6nd_startexpire(ifp);
 #endif
 			/* RFC4941 Section 3.5 */
 			ipv6_gentempifid(ifp);
