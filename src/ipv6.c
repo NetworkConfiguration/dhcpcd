@@ -2235,15 +2235,14 @@ inet6_staticroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 }
 
 static int
-inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx, int expired,
-    bool *have_default)
+inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 {
 	struct rt *rt;
 	struct ra *rap;
 	const struct ipv6_addr *addr;
 
 	TAILQ_FOREACH(rap, ctx->ra_routers, next) {
-		if (rap->expired != expired)
+		if (rap->expired)
 			continue;
 		TAILQ_FOREACH(addr, &rap->addrs, next) {
 			if (addr->prefix_vltime == 0)
@@ -2254,14 +2253,13 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx, int expired,
 				rt_proto_add(routes, rt);
 			}
 		}
-		if (rap->lifetime) {
-			rt = inet6_makerouter(rap);
-			if (rt) {
-				rt->rt_dflags |= RTDF_RA;
-				if (rt_proto_add(routes, rt) && have_default)
-					*have_default = true;
-			}
-		}
+		if (rap->lifetime == 0)
+			continue;
+		rt = inet6_makerouter(rap);
+		if (rt == NULL)
+			continue;
+		rt->rt_dflags |= RTDF_RA;
+		rt_proto_add(routes, rt);
 	}
 	return 0;
 }
@@ -2295,15 +2293,13 @@ inet6_dhcproutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx,
 bool
 inet6_getroutes(struct dhcpcd_ctx *ctx, rb_tree_t *routes)
 {
-	bool have_default;
 
 	/* Should static take priority? */
 	if (inet6_staticroutes(routes, ctx) == -1)
 		return false;
 
 	/* First add reachable routers and their prefixes */
-	have_default = false;
-	if (inet6_raroutes(routes, ctx, 0, &have_default) == -1)
+	if (inet6_raroutes(routes, ctx) == -1)
 		return false;
 
 #ifdef DHCP6
@@ -2314,22 +2310,6 @@ inet6_getroutes(struct dhcpcd_ctx *ctx, rb_tree_t *routes)
 		return false;
 	if (inet6_dhcproutes(routes, ctx, DH6S_DELEGATED) == -1)
 		return false;
-#endif
-
-#ifdef HAVE_ROUTE_METRIC
-	/* If we have an unreachable router, we really do need to remove the
-	 * route to it beause it could be a lower metric than a reachable
-	 * router. Of course, we should at least have some routers if all
-	 * are unreachable. */
-	if (!have_default) {
-#endif
-	/* Add our non-reachable routers and prefixes
-	 * Unsure if this is needed, but it's a close match to kernel
-	 * behaviour */
-		if (inet6_raroutes(routes, ctx, 1, NULL) == -1)
-			return false;
-#ifdef HAVE_ROUTE_METRIC
-	}
 #endif
 
 	return true;
