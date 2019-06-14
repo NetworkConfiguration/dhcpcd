@@ -738,9 +738,6 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 #ifdef INET
 				dhcp_abort(ifp);
 #endif
-#ifdef INET6
-				ipv6nd_expire(ifp, 0);
-#endif
 #ifdef DHCP6
 				dhcp6_abort(ifp);
 #endif
