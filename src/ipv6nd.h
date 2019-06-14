@@ -107,7 +107,7 @@ int ipv6nd_hasradhcp(const struct interface *);
 void ipv6nd_handleifa(int, struct ipv6_addr *, pid_t);
 int ipv6nd_dadcompleted(const struct interface *);
 void ipv6nd_advertise(struct ipv6_addr *);
-void ipv6nd_expire(struct interface *, uint32_t);
+void ipv6nd_startexpire(struct interface *);
 void ipv6nd_drop(struct interface *);
 void ipv6nd_neighbour(struct dhcpcd_ctx *, struct in6_addr *, int);
 #endif /* INET6 */
