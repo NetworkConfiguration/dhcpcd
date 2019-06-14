@@ -3918,21 +3918,6 @@ dhcp6_free(struct interface *ifp)
 }
 
 void
-dhcp6_dropnondelegates(struct interface *ifp)
-{
-
-#ifndef SMALL
-	if (dhcp6_hasprefixdelegation(ifp))
-		return;
-#endif
-	if (D6_CSTATE(ifp) == NULL)
-		return;
-
-	loginfox("%s: dropping DHCPv6 due to no valid routers", ifp->name);
-	dhcp6_drop(ifp, "EXPIRE6");
-}
-
-void
 dhcp6_abort(struct interface *ifp)
 {
 	struct dhcp6_state *state;
