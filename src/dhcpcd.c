@@ -2133,5 +2133,11 @@ exit1:
 	if (ctx.options & DHCPCD_FORKED)
 		_exit(i); /* so atexit won't remove our pidfile */
 #endif
+#ifdef HAVE_OPEN_MEMSTREAM
+	if (ctx.script_fp)
+		fclose(ctx.script_fp);
+#endif
+	free(ctx.script_buf);
+	free(ctx.script_env);
 	return i;
 }

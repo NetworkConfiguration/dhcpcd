@@ -15,6 +15,7 @@ ARC4RANDOM=
 CLOSEFROM=
 RBTREE=
 CONSTTIME_MEMEQUAL=
+OPEN_MEMSTREAM=
 STRLCPY=
 UDEV=
 OS=
@@ -741,29 +742,25 @@ if [ "$ARC4RANDOM_UNIFORM" = no ]; then
 	echo "#include			\"compat/arc4random_uniform.h\"" >>$CONFIG_H
 fi
 
-
-if [ -z "$STRLCPY" ]; then
-	printf "Testing for strlcpy ... "
-	cat <<EOF >_strlcpy.c
-#include <string.h>
+if [ -z "$OPEN_MEMSTREAM" ]; then
+	printf "Testing for open_memstream ... "
+	cat <<EOF >_open_memstream.c
+#include <stdio.h>
 int main(void) {
-	const char s1[] = "foo";
-	char s2[10];
-	strlcpy(s2, s1, sizeof(s2));
+	open_memstream(NULL, NULL);
 	return 0;
 }
 EOF
-	if $XCC _strlcpy.c -o _strlcpy 2>&3; then
-		STRLCPY=yes
+	if $XCC _open_memstream.c -o _open_memstream 2>&3; then
+		OPEN_MEMSTREAM=yes
 	else
-		STRLCPY=no
+		OPEN_MEMSTREAM=no
 	fi
-	echo "$STRLCPY"
-	rm -f _strlcpy.c _strlcpy
+	echo "$OPEN_MEMSTREAM"
+	rm -f _open_memstream.c _open_memstream
 fi
-if [ "$STRLCPY" = no ]; then
-	echo "COMPAT_SRCS+=	compat/strlcpy.c" >>$CONFIG_MK
-	echo "#include			\"compat/strlcpy.h\"" >>$CONFIG_H
+if [ "$OPEN_MEMSTREAM" = yes ]; then
+	echo "#define	HAVE_OPEN_MEMSTREAM" >>$CONFIG_H
 fi
 
 if [ -z "$PIDFILE_LOCK" ]; then
@@ -822,6 +819,30 @@ EOF
 fi
 if [ "$SETPROCTITLE" = yes ]; then
 	echo "#define	HAVE_SETPROCTITLE" >>$CONFIG_H
+fi
+
+if [ -z "$STRLCPY" ]; then
+	printf "Testing for strlcpy ... "
+	cat <<EOF >_strlcpy.c
+#include <string.h>
+int main(void) {
+	const char s1[] = "foo";
+	char s2[10];
+	strlcpy(s2, s1, sizeof(s2));
+	return 0;
+}
+EOF
+	if $XCC _strlcpy.c -o _strlcpy 2>&3; then
+		STRLCPY=yes
+	else
+		STRLCPY=no
+	fi
+	echo "$STRLCPY"
+	rm -f _strlcpy.c _strlcpy
+fi
+if [ "$STRLCPY" = no ]; then
+	echo "COMPAT_SRCS+=	compat/strlcpy.c" >>$CONFIG_MK
+	echo "#include			\"compat/strlcpy.h\"" >>$CONFIG_H
 fi
 
 if [ -z "$STRTOI" ]; then

@@ -3952,7 +3952,7 @@ dhcp6_handleifa(int cmd, struct ipv6_addr *ia, pid_t pid)
 }
 
 ssize_t
-dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
+dhcp6_env(FILE *fp, const char *prefix, const struct interface *ifp,
     const struct dhcp6_message *m, size_t len)
 {
 	const struct if_options *ifo;
@@ -3966,7 +3966,6 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 #ifndef SMALL
 	const struct dhcp6_state *state;
 	const struct ipv6_addr *ap;
-	char *v, *val;
 #endif
 
 	n = 0;
@@ -3984,28 +3983,20 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 	ctx = ifp->ctx;
 
 	/* Zero our indexes */
-	if (env) {
-		for (i = 0, opt = ctx->dhcp6_opts;
-		    i < ctx->dhcp6_opts_len;
-		    i++, opt++)
-			dhcp_zero_index(opt);
-		for (i = 0, opt = ifp->options->dhcp6_override;
-		    i < ifp->options->dhcp6_override_len;
-		    i++, opt++)
-			dhcp_zero_index(opt);
-		for (i = 0, opt = ctx->vivso;
-		    i < ctx->vivso_len;
-		    i++, opt++)
-			dhcp_zero_index(opt);
-		i = strlen(prefix) + strlen("_dhcp6") + 1;
-		pfx = malloc(i);
-		if (pfx == NULL) {
-			logerr(__func__);
-			return -1;
-		}
-		snprintf(pfx, i, "%s_dhcp6", prefix);
-	} else
-		pfx = NULL;
+	for (i = 0, opt = ctx->dhcp6_opts;
+	    i < ctx->dhcp6_opts_len;
+	    i++, opt++)
+		dhcp_zero_index(opt);
+	for (i = 0, opt = ifp->options->dhcp6_override;
+	    i < ifp->options->dhcp6_override_len;
+	    i++, opt++)
+		dhcp_zero_index(opt);
+	for (i = 0, opt = ctx->vivso;
+	    i < ctx->vivso_len;
+	    i++, opt++)
+		dhcp_zero_index(opt);
+	if (asprintf(&pfx, "%s_dhcp6", prefix) == -1)
+		return -1;
 
 	/* Unlike DHCP, DHCPv6 options *may* occur more than once.
 	 * There is also no provision for option concatenation unlike DHCP. */
@@ -4051,15 +4042,13 @@ dhcp6_env(char **env, const char *prefix, const struct interface *ifp,
 				opt = NULL;
 		}
 		if (opt) {
-			n += dhcp_envoption(ifp->ctx,
-			    env == NULL ? NULL : &env[n],
-			    pfx, ifp->name,
+			dhcp_envoption(ifp->ctx,
+			    fp, pfx, ifp->name,
 			    opt, dhcp6_getoption, p, o.len);
 		}
 		if (vo) {
-			n += dhcp_envoption(ifp->ctx,
-			    env == NULL ? NULL : &env[n],
-			    pfx, ifp->name,
+			dhcp_envoption(ifp->ctx,
+			    fp, pfx, ifp->name,
 			    vo, dhcp6_getoption,
 			    p + sizeof(en),
 			    o.len - sizeof(en));
@@ -4071,38 +4060,29 @@ delegated:
 #ifndef SMALL
         /* Needed for Delegated Prefixes */
 	state = D6_CSTATE(ifp);
-	i = 0;
 	TAILQ_FOREACH(ap, &state->addrs, next) {
-		if (ap->delegating_prefix) {
-			i += strlen(ap->saddr) + 1;
-		}
+		if (ap->delegating_prefix)
+			break;
 	}
-	if (env && i) {
-		i += strlen(prefix) + strlen("_delegated_dhcp6_prefix=");
-                v = val = env[n] = malloc(i);
-		if (v == NULL) {
-			logerr(__func__);
+	if (ap == NULL)
+		return 1;
+	if (fprintf(fp, "%s_delegated_dhcp6_prefix=", prefix) == -1)
+		return -1;
+	TAILQ_FOREACH(ap, &state->addrs, next) {
+		if (ap->delegating_prefix == NULL)
+			continue;
+		if (ap != TAILQ_FIRST(&state->addrs)) {
+			if (fputc(' ', fp) == EOF)
+				return -1;
+		}
+		if (fprintf(fp, "%s", ap->saddr) == -1)
 			return -1;
-		}
-		v += snprintf(val, i, "%s_delegated_dhcp6_prefix=", prefix);
-		TAILQ_FOREACH(ap, &state->addrs, next) {
-			if (ap->delegating_prefix) {
-				/* Can't use stpcpy(3) due to "security" */
-				const char *sap = ap->saddr;
-
-				do
-					*v++ = *sap;
-				while (*++sap != '\0');
-				*v++ = ' ';
-			}
-		}
-		*--v = '\0';
         }
-	if (i)
-		n++;
+	if (fputc('\0', fp) == EOF)
+		return -1;
 #endif
 
-	return (ssize_t)n;
+	return 1;
 }
 
 int
