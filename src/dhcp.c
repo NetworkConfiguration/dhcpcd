@@ -656,9 +656,7 @@ get_option_routes(rb_tree_t *routes, struct interface *ifp,
 			sa_in_init(&rt->rt_dest, &dest);
 			sa_in_init(&rt->rt_netmask, &netmask);
 			sa_in_init(&rt->rt_gateway, &gateway);
-			if (rb_tree_insert_node(routes, rt) != rt)
-				rt_free(rt);
-			else
+			if (rt_proto_add(routes, rt))
 				n++;
 		}
 	}
@@ -668,7 +666,7 @@ get_option_routes(rb_tree_t *routes, struct interface *ifp,
 		p = get_option(ifp->ctx, bootp, bootp_len, DHO_ROUTER, &len);
 	else
 		p = NULL;
-	if (p) {
+	if (p && len % 4 == 0) {
 		e = p + len;
 		dest.s_addr = INADDR_ANY;
 		netmask.s_addr = INADDR_ANY;
@@ -680,9 +678,7 @@ get_option_routes(rb_tree_t *routes, struct interface *ifp,
 			sa_in_init(&rt->rt_dest, &dest);
 			sa_in_init(&rt->rt_netmask, &netmask);
 			sa_in_init(&rt->rt_gateway, &gateway);
-			if (rb_tree_insert_node(routes, rt) != rt)
-				rt_free(rt);
-			else
+			if (rt_proto_add(routes, rt))
 				n++;
 		}
 	}
