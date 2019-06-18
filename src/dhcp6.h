@@ -228,7 +228,7 @@ size_t dhcp6_find_delegates(struct interface *);
 int dhcp6_start(struct interface *, enum DH6S);
 void dhcp6_reboot(struct interface *);
 void dhcp6_renew(struct interface *);
-ssize_t dhcp6_env(char **, const char *, const struct interface *,
+ssize_t dhcp6_env(FILE *, const char *, const struct interface *,
     const struct dhcp6_message *, size_t);
 void dhcp6_free(struct interface *);
 void dhcp6_handleifa(int, struct ipv6_addr *, pid_t);

@@ -59,7 +59,7 @@ struct ipv4ll_state {
 
 int ipv4ll_subnetroute(rb_tree_t *, struct interface *);
 int ipv4ll_defaultroute(rb_tree_t *,struct interface *);
-ssize_t ipv4ll_env(char **, const char *, const struct interface *);
+ssize_t ipv4ll_env(FILE *, const char *, const struct interface *);
 void ipv4ll_start(void *);
 void ipv4ll_claimed(void *);
 void ipv4ll_handle_failure(void *);

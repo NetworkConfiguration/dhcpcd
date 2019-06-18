@@ -30,6 +30,7 @@
 
 #include "control.h"
 
+__printflike(2, 3) int efprintf(FILE *, const char *, ...);
 void if_printoptions(void);
 int send_interface(struct fd_list *, const struct interface *);
 int script_runreason(const struct interface *, const char *);
