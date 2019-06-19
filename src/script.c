@@ -378,25 +378,16 @@ make_env(const struct interface *ifp, const char *reason)
 		if (efprintf(fp, "profile=%s", ifp->profile) == -1)
 			goto eexit;
 	}
-#if 0
 	if (ifp->wireless) {
-		static const char *pfx = "ifssid=";
-		size_t pfx_len;
-		ssize_t psl;
+		char pssid[IF_SSIDLEN * 4];
 
-		pfx_len = strlen(pfx);
-		psl = print_string(NULL, 0, OT_ESCSTRING,
-		    (const uint8_t *)ifp->ssid, ifp->ssid_len);
-		if (psl != -1) {
-			EMALLOC(elen, pfx_len + (size_t)psl + 1);
-			memcpy(env[elen], pfx, pfx_len);
-			print_string(env[elen] + pfx_len, (size_t)psl + 1,
-			    OT_ESCSTRING,
-			    (const uint8_t *)ifp->ssid, ifp->ssid_len);
-			elen++;
+		if (print_string(pssid, sizeof(pssid), OT_ESCSTRING,
+		    ifp->ssid, ifp->ssid_len) != -1)
+		{
+			if (efprintf(fp, "ifssid=%s", pssid) == -1)
+				goto eexit;
 		}
 	}
-#endif
 #ifdef INET
 	if (protocol == PROTO_DHCP && state && state->old) {
 		if (dhcp_env(fp, "old", ifp,
