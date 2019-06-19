@@ -491,7 +491,7 @@ dumplease:
 			nenv++;
 	}
 	if (ctx->script_envlen < nenv) {
-		env = reallocarray(ctx->script_env, nenv, sizeof(*env));
+		env = reallocarray(ctx->script_env, nenv + 1, sizeof(*env));
 		if (env == NULL)
 			goto eexit;
 		ctx->script_env = env;
@@ -500,7 +500,7 @@ dumplease:
 	bufp = buf;
 	envp = ctx->script_env;
 	*envp++ = bufp++;
-	envp--; /* Avoid setting the last \0 to an invalid pointer */
+	endp--; /* Avoid setting the last \0 to an invalid pointer */
 	for (; bufp < endp; bufp++) {
 		if (*bufp == '\0')
 			*envp++ = bufp + 1;
