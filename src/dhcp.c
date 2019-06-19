@@ -1290,12 +1290,11 @@ dhcp_env(FILE *fenv, const char *prefix, const struct interface *ifp,
 	struct in_addr net;
 	struct in_addr brd;
 	struct dhcp_opt *opt, *vo;
-	size_t e, i, pl;
+	size_t i, pl;
 	char safe[(BOOTP_FILE_LEN * 4) + 1];
 	uint8_t overl = 0;
 	uint32_t en;
 
-	e = 0;
 	ifo = ifp->options;
 	if (get_option_uint8(ifp->ctx, &overl, bootp, bootp_len,
 	    DHO_OPTSOVERLOADED) == -1)
