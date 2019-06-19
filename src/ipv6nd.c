@@ -1607,13 +1607,13 @@ ipv6nd_expirera(void *arg)
 #endif
 			case ND_OPT_DNSSL:
 				if (len < sizeof(dnssl))
-					break;
+					continue;
 				memcpy(&dnssl, p, sizeof(dnssl));
 				ltime = dnssl.nd_opt_dnssl_lifetime;
 				break;
 			case ND_OPT_RDNSS:
 				if (len < sizeof(rdnss))
-					break;
+					continue;
 				memcpy(&rdnss, p, sizeof(rdnss));
 				ltime = rdnss.nd_opt_rdnss_lifetime;
 				break;
