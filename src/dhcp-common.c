@@ -627,7 +627,7 @@ print_option(FILE *fp, const char *prefix, const struct dhcp_opt *opt,
 	uint32_t u32;
 	int32_t s32;
 	struct in_addr addr;
-	ssize_t bytes = 0, sl;
+	ssize_t sl;
 	size_t l;
 
 	/* Ensure a valid length */
@@ -679,7 +679,6 @@ print_option(FILE *fp, const char *prefix, const struct dhcp_opt *opt,
 	if (opt->type & OT_BITFLAG) {
 		/* bitflags are a string, MSB first, such as ABCDEFGH
 		 * where A is 10000000, B is 01000000, etc. */
-		bytes = 0;
 		for (l = 0, sl = sizeof(opt->bitflags) - 1;
 		    l < sizeof(opt->bitflags);
 		    l++, sl--)

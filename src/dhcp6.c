@@ -3959,7 +3959,7 @@ dhcp6_env(FILE *fp, const char *prefix, const struct interface *ifp,
 	struct dhcp_opt *opt, *vo;
 	const uint8_t *p;
 	struct dhcp6_option o;
-	size_t i, n;
+	size_t i;
 	char *pfx;
 	uint32_t en;
 	const struct dhcpcd_ctx *ctx;
@@ -3968,7 +3968,6 @@ dhcp6_env(FILE *fp, const char *prefix, const struct interface *ifp,
 	const struct ipv6_addr *ap;
 #endif
 
-	n = 0;
 	if (m == NULL)
 		goto delegated;
 
