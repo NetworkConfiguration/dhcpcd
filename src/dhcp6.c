@@ -3783,6 +3783,8 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 			/* No DHCPv6 config, no existing state
 			 * so nothing to do. */
 			return 0;
+		case DH6S_INFORM:
+			break;
 		default:
 			init_state = DH6S_INIT;
 			break;
