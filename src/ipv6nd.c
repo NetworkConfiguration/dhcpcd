@@ -1385,11 +1385,11 @@ ipv6nd_getoption(struct dhcpcd_ctx *ctx,
 }
 
 ssize_t
-ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
+ipv6nd_env(FILE *fp, const struct interface *ifp)
 {
 	size_t i, j, n, len, olen;
 	struct ra *rap;
-	char ndprefix[32], abuf[24];
+	char ndprefix[32];
 	struct dhcp_opt *opt;
 	uint8_t *p;
 	struct nd_opt_hdr ndo;
@@ -1402,34 +1402,24 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 		if (rap->iface != ifp)
 			continue;
 		i++;
-		if (prefix != NULL)
-			snprintf(ndprefix, sizeof(ndprefix),
-			    "%s_nd%zu", prefix, i);
-		else
-			snprintf(ndprefix, sizeof(ndprefix),
-			    "nd%zu", i);
-		if (env)
-			setvar(&env[n], ndprefix, "from", rap->sfrom);
-		n++;
-		if (env)
-			setvard(&env[n], ndprefix, "acquired",
-			    (size_t)rap->acquired.tv_sec);
-		n++;
-		if (env)
-			setvard(&env[n], ndprefix, "now", (size_t)now.tv_sec);
-		n++;
+		snprintf(ndprefix, sizeof(ndprefix), "nd%zu", i);
+		if (efprintf(fp, "%s_from=%s", ndprefix, rap->sfrom) == -1)
+			return -1;
+		if (efprintf(fp, "%s_acquired=%ld", ndprefix,
+		    rap->acquired.tv_sec) == -1)
+			return -1;
+		if (efprintf(fp, "%s_now=%ld", ndprefix, now.tv_sec) == -1)
+			return -1;
 
 		/* Zero our indexes */
-		if (env) {
-			for (j = 0, opt = rap->iface->ctx->nd_opts;
-			    j < rap->iface->ctx->nd_opts_len;
-			    j++, opt++)
-				dhcp_zero_index(opt);
-			for (j = 0, opt = rap->iface->options->nd_override;
-			    j < rap->iface->options->nd_override_len;
-			    j++, opt++)
-				dhcp_zero_index(opt);
-		}
+		for (j = 0, opt = rap->iface->ctx->nd_opts;
+		    j < rap->iface->ctx->nd_opts_len;
+		    j++, opt++)
+			dhcp_zero_index(opt);
+		for (j = 0, opt = rap->iface->options->nd_override;
+		    j < rap->iface->options->nd_override_len;
+		    j++, opt++)
+			dhcp_zero_index(opt);
 
 		/* Unlike DHCP, ND6 options *may* occur more than once.
 		 * There is also no provision for option concatenation
@@ -1462,13 +1452,12 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 				if (j == rap->iface->ctx->nd_opts_len)
 					opt = NULL;
 			}
-			if (opt) {
-				n += dhcp_envoption(rap->iface->ctx,
-				    env == NULL ? NULL : &env[n],
-				    ndprefix, rap->iface->name,
-				    opt, ipv6nd_getoption,
-				    p + sizeof(ndo), olen - sizeof(ndo));
-			}
+			if (opt == NULL)
+				continue;
+			dhcp_envoption(rap->iface->ctx, fp,
+			    ndprefix, rap->iface->name,
+			    opt, ipv6nd_getoption,
+			    p + sizeof(ndo), olen - sizeof(ndo));
 		}
 
 		/* We need to output the addresses we actually made
@@ -1482,15 +1471,12 @@ ipv6nd_env(char **env, const char *prefix, const struct interface *ifp)
 			    !(ia->flags & IPV6_AF_ADDED) ||
 			    ia->prefix_vltime == 0)
 				continue;
-			j++;
-			if (env) {
-				snprintf(abuf, sizeof(abuf), "addr%zu", j);
-				setvar(&env[n], ndprefix, abuf, ia->saddr);
-			}
-			n++;
+			if (efprintf(fp, "%s_addr%zu=%s",
+			    ndprefix, j++, ia->saddr) == -1)
+				return -1;
 		}
 	}
-	return (ssize_t)n;
+	return 1;
 }
 
 void
@@ -1622,13 +1608,13 @@ ipv6nd_expirera(void *arg)
 #endif
 			case ND_OPT_DNSSL:
 				if (len < sizeof(dnssl))
-					break;
+					continue;
 				memcpy(&dnssl, p, sizeof(dnssl));
 				ltime = dnssl.nd_opt_dnssl_lifetime;
 				break;
 			case ND_OPT_RDNSS:
 				if (len < sizeof(rdnss))
-					break;
+					continue;
 				memcpy(&rdnss, p, sizeof(rdnss));
 				ltime = rdnss.nd_opt_rdnss_lifetime;
 				break;

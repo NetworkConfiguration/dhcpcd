@@ -31,6 +31,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -138,7 +139,7 @@ ipv4ll_defaultroute(rb_tree_t *routes, struct interface *ifp)
 }
 
 ssize_t
-ipv4ll_env(char **env, const char *prefix, const struct interface *ifp)
+ipv4ll_env(FILE *fp, const char *prefix, const struct interface *ifp)
 {
 	const struct ipv4ll_state *state;
 	const char *pf = prefix == NULL ? "" : "_";
@@ -148,24 +149,21 @@ ipv4ll_env(char **env, const char *prefix, const struct interface *ifp)
 	if ((state = IPV4LL_CSTATE(ifp)) == NULL || state->addr == NULL)
 		return 0;
 
-	if (env == NULL)
-		return 5;
-
 	/* Emulate a DHCP environment */
-	if (asprintf(&env[0], "%s%sip_address=%s",
+	if (efprintf(fp, "%s%sip_address=%s",
 	    prefix, pf, inet_ntoa(state->addr->addr)) == -1)
 		return -1;
-	if (asprintf(&env[1], "%s%ssubnet_mask=%s",
+	if (efprintf(fp, "%s%ssubnet_mask=%s",
 	    prefix, pf, inet_ntoa(state->addr->mask)) == -1)
 		return -1;
-	if (asprintf(&env[2], "%s%ssubnet_cidr=%d",
+	if (efprintf(fp, "%s%ssubnet_cidr=%d",
 	    prefix, pf, inet_ntocidr(state->addr->mask)) == -1)
 		return -1;
-	if (asprintf(&env[3], "%s%sbroadcast_address=%s",
+	if (efprintf(fp, "%s%sbroadcast_address=%s",
 	    prefix, pf, inet_ntoa(state->addr->brd)) == -1)
 		return -1;
 	netnum.s_addr = state->addr->addr.s_addr & state->addr->mask.s_addr;
-	if (asprintf(&env[4], "%s%snetwork_number=%s",
+	if (efprintf(fp, "%s%snetwork_number=%s",
 	    prefix, pf, inet_ntoa(netnum)) == -1)
 		return -1;
 	return 5;
