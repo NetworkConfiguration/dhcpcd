@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: BSD-2-Clause */
 /*
  * Socket Address handling for dhcpcd
  * Copyright (c) 2015-2019 Roy Marples <roy@marples.name>
