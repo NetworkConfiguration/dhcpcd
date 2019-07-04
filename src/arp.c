@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: BSD-2-Clause */
 /*
  * dhcpcd - ARP handler
  * Copyright (c) 2006-2019 Roy Marples <roy@marples.name>
