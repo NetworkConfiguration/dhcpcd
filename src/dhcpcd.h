@@ -157,6 +157,14 @@ struct dhcpcd_ctx {
 #endif
 	struct eloop *eloop;
 
+#ifdef HAVE_OPEN_MEMSTREAM
+	FILE *script_fp;
+#endif
+	char *script_buf;
+	size_t script_buflen;
+	char **script_env;
+	size_t script_envlen;
+
 	int control_fd;
 	int control_unpriv_fd;
 	struct fd_list_head control_fds;

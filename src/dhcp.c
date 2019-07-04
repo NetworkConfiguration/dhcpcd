@@ -48,6 +48,7 @@
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -341,23 +342,25 @@ get_option_uint8(struct dhcpcd_ctx *ctx,
 }
 
 ssize_t
-decode_rfc3442(char *out, size_t len, const uint8_t *p, size_t pl)
+print_rfc3442(FILE *fp, const uint8_t *data, size_t data_len)
 {
-	const uint8_t *e;
-	size_t bytes = 0, ocets;
-	int b;
+	const uint8_t *p = data, *e;
+	size_t ocets;
 	uint8_t cidr;
 	struct in_addr addr;
-	char *o = out;
 
 	/* Minimum is 5 -first is CIDR and a router length of 4 */
-	if (pl < 5) {
+	if (data_len < 5) {
 		errno = EINVAL;
 		return -1;
 	}
 
-	e = p + pl;
+	e = p + data_len;
 	while (p < e) {
+		if (p != data) {
+			if (fputc(' ', fp) == EOF)
+				return -1;
+		}
 		cidr = *p++;
 		if (cidr > 32) {
 			errno = EINVAL;
@@ -368,41 +371,25 @@ decode_rfc3442(char *out, size_t len, const uint8_t *p, size_t pl)
 			errno = ERANGE;
 			return -1;
 		}
-		if (!out) {
-			p += 4 + ocets;
-			bytes += ((4 * 4) * 2) + 4;
-			continue;
-		}
-		if ((((4 * 4) * 2) + 4) > len) {
-			errno = ENOBUFS;
-			return -1;
-		}
-		if (o != out) {
-			*o++ = ' ';
-			len--;
-		}
 		/* If we have ocets then we have a destination and netmask */
+		addr.s_addr = 0;
 		if (ocets > 0) {
-			addr.s_addr = 0;
 			memcpy(&addr.s_addr, p, ocets);
-			b = snprintf(o, len, "%s/%d", inet_ntoa(addr), cidr);
 			p += ocets;
-		} else
-			b = snprintf(o, len, "0.0.0.0/0");
-		o += b;
-		len -= (size_t)b;
+		}
+		if (fprintf(fp, "%s/%d", inet_ntoa(addr), cidr) == -1)
+			return -1;
 
 		/* Finally, snag the router */
 		memcpy(&addr.s_addr, p, 4);
 		p += 4;
-		b = snprintf(o, len, " %s", inet_ntoa(addr));
-		o += b;
-		len -= (size_t)b;
+		if (fprintf(fp, " %s", inet_ntoa(addr)) == -1)
+			return -1;
 	}
 
-	if (out)
-		return o - out;
-	return (ssize_t)bytes;
+	if (fputc('\0', fp) == EOF)
+		return -1;
+	return 1;
 }
 
 static int
@@ -475,15 +462,12 @@ decode_rfc3442_rt(rb_tree_t *routes, struct interface *ifp,
 	return n;
 }
 
-char *
-decode_rfc3361(const uint8_t *data, size_t dl)
+ssize_t
+print_rfc3361(FILE *fp, const uint8_t *data, size_t dl)
 {
 	uint8_t enc;
-	size_t l;
-	ssize_t r;
-	char *sip = NULL;
+	char sip[NS_MAXDNAME];
 	struct in_addr addr;
-	char *p;
 
 	if (dl < 2) {
 		errno = EINVAL;
@@ -494,13 +478,10 @@ decode_rfc3361(const uint8_t *data, size_t dl)
 	dl--;
 	switch (enc) {
 	case 0:
-		if ((r = decode_rfc1035(NULL, 0, data, dl)) > 0) {
-			l = (size_t)r + 1;
-			sip = malloc(l);
-			if (sip == NULL)
-				return 0;
-			decode_rfc1035(sip, l, data, dl);
-		}
+		if (decode_rfc1035(sip, sizeof(sip), data, dl) == -1)
+			return -1;
+		if (efprintf(fp, "%s", sip) == -1)
+			return -1;
 		break;
 	case 1:
 		if (dl == 0 || dl % 4 != 0) {
@@ -508,25 +489,27 @@ decode_rfc3361(const uint8_t *data, size_t dl)
 			break;
 		}
 		addr.s_addr = INADDR_BROADCAST;
-		l = ((dl / sizeof(addr.s_addr)) * ((4 * 4) + 1)) + 1;
-		sip = p = malloc(l);
-		if (sip == NULL)
-			return 0;
-		while (dl != 0) {
+		for (;
+		    dl != 0;
+		    data += sizeof(addr.s_addr), dl -= sizeof(addr.s_addr))
+		{
 			memcpy(&addr.s_addr, data, sizeof(addr.s_addr));
-			data += sizeof(addr.s_addr);
-			p += snprintf(p, l - (size_t)(p - sip),
-			    "%s ", inet_ntoa(addr));
-			dl -= sizeof(addr.s_addr);
+			if (fprintf(fp, "%s", inet_ntoa(addr)) == -1)
+				return -1;
+			if (dl != 0) {
+				if (fputc(' ', fp) == EOF)
+					return -1;
+			}
 		}
-		*--p = '\0';
+		if (fputc('\0', fp) == EOF)
+			return -1;
 		break;
 	default:
 		errno = EINVAL;
 		return 0;
 	}
 
-	return sip;
+	return 1;
 }
 
 static char *
@@ -1299,9 +1282,8 @@ dhcp_getoption(struct dhcpcd_ctx *ctx,
 }
 
 ssize_t
-dhcp_env(char **env, const char *prefix,
-    const struct bootp *bootp, size_t bootp_len,
-    const struct interface *ifp)
+dhcp_env(FILE *fenv, const char *prefix, const struct interface *ifp,
+    const struct bootp *bootp, size_t bootp_len)
 {
 	const struct if_options *ifo;
 	const uint8_t *p;
@@ -1309,109 +1291,73 @@ dhcp_env(char **env, const char *prefix,
 	struct in_addr net;
 	struct in_addr brd;
 	struct dhcp_opt *opt, *vo;
-	size_t e, i, pl;
-	char **ep;
-	char cidr[4], safe[(BOOTP_FILE_LEN * 4) + 1];
+	size_t i, pl;
+	char safe[(BOOTP_FILE_LEN * 4) + 1];
 	uint8_t overl = 0;
 	uint32_t en;
 
-	e = 0;
 	ifo = ifp->options;
 	if (get_option_uint8(ifp->ctx, &overl, bootp, bootp_len,
 	    DHO_OPTSOVERLOADED) == -1)
 		overl = 0;
 
-	if (env == NULL) {
-		if (bootp->yiaddr || bootp->ciaddr)
-			e += 5;
-		if (*bootp->file && !(overl & 1))
-			e++;
-		if (*bootp->sname && !(overl & 2))
-			e++;
-		for (i = 0, opt = ifp->ctx->dhcp_opts;
-		    i < ifp->ctx->dhcp_opts_len;
-		    i++, opt++)
-		{
-			if (has_option_mask(ifo->nomask, opt->option))
-				continue;
-			if (dhcp_getoverride(ifo, opt->option))
-				continue;
-			p = get_option(ifp->ctx, bootp, bootp_len,
-			    opt->option, &pl);
-			if (!p)
-				continue;
-			e += dhcp_envoption(ifp->ctx, NULL, NULL, ifp->name,
-			    opt, dhcp_getoption, p, pl);
-		}
-		for (i = 0, opt = ifo->dhcp_override;
-		    i < ifo->dhcp_override_len;
-		    i++, opt++)
-		{
-			if (has_option_mask(ifo->nomask, opt->option))
-				continue;
-			p = get_option(ifp->ctx, bootp, bootp_len,
-			    opt->option, &pl);
-			if (!p)
-				continue;
-			e += dhcp_envoption(ifp->ctx, NULL, NULL, ifp->name,
-			    opt, dhcp_getoption, p, pl);
-		}
-		return (ssize_t)e;
-	}
-
-	ep = env;
 	if (bootp->yiaddr || bootp->ciaddr) {
 		/* Set some useful variables that we derive from the DHCP
 		 * message but are not necessarily in the options */
 		addr.s_addr = bootp->yiaddr ? bootp->yiaddr : bootp->ciaddr;
-		addvar(&ep, prefix, "ip_address", inet_ntoa(addr));
+		if (efprintf(fenv, "%s_ip_address=%s",
+		    prefix, inet_ntoa(addr)) == -1)
+			return -1;
 		if (get_option_addr(ifp->ctx, &net,
-		    bootp, bootp_len, DHO_SUBNETMASK) == -1)
-		{
+		    bootp, bootp_len, DHO_SUBNETMASK) == -1) {
 			net.s_addr = ipv4_getnetmask(addr.s_addr);
-			addvar(&ep, prefix,
-			    "subnet_mask", inet_ntoa(net));
+			if (efprintf(fenv, "%s_subnet_mask=%s",
+			    prefix, inet_ntoa(net)) == -1)
+				return -1;
 		}
-		snprintf(cidr, sizeof(cidr), "%d", inet_ntocidr(net));
-		addvar(&ep, prefix, "subnet_cidr", cidr);
+		if (efprintf(fenv, "%s_subnet_cidr=%d",
+		    prefix, inet_ntocidr(net))== -1)
+			return -1;
 		if (get_option_addr(ifp->ctx, &brd,
 		    bootp, bootp_len, DHO_BROADCAST) == -1)
 		{
 			brd.s_addr = addr.s_addr | ~net.s_addr;
-			addvar(&ep, prefix,
-			    "broadcast_address", inet_ntoa(brd));
+			if (efprintf(fenv, "%s_broadcast_address=%s",
+			    prefix, inet_ntoa(brd)) == -1)
+				return -1;
 		}
 		addr.s_addr = bootp->yiaddr & net.s_addr;
-		addvar(&ep, prefix,
-		    "network_number", inet_ntoa(addr));
+		if (efprintf(fenv, "%s_network_number=%s",
+		    prefix, inet_ntoa(addr)) == -1)
+			return -1;
 	}
 
 	if (*bootp->file && !(overl & 1)) {
 		print_string(safe, sizeof(safe), OT_STRING,
 		    bootp->file, sizeof(bootp->file));
-		addvar(&ep, prefix, "filename", safe);
+		if (efprintf(fenv, "%s_filename=%s", prefix, safe) == -1)
+			return -1;
 	}
 	if (*bootp->sname && !(overl & 2)) {
 		print_string(safe, sizeof(safe), OT_STRING | OT_DOMAIN,
 		    bootp->sname, sizeof(bootp->sname));
-		addvar(&ep, prefix, "server_name", safe);
+		if (efprintf(fenv, "%s_server_name=%s", prefix, safe) == -1)
+			return -1;
 	}
 
 	/* Zero our indexes */
-	if (env) {
-		for (i = 0, opt = ifp->ctx->dhcp_opts;
-		    i < ifp->ctx->dhcp_opts_len;
-		    i++, opt++)
-			dhcp_zero_index(opt);
-		for (i = 0, opt = ifp->options->dhcp_override;
-		    i < ifp->options->dhcp_override_len;
-		    i++, opt++)
-			dhcp_zero_index(opt);
-		for (i = 0, opt = ifp->ctx->vivso;
-		    i < ifp->ctx->vivso_len;
-		    i++, opt++)
-			dhcp_zero_index(opt);
-	}
+	for (i = 0, opt = ifp->ctx->dhcp_opts;
+	    i < ifp->ctx->dhcp_opts_len;
+	    i++, opt++)
+		dhcp_zero_index(opt);
+	for (i = 0, opt = ifp->options->dhcp_override;
+	    i < ifp->options->dhcp_override_len;
+	    i++, opt++)
+		dhcp_zero_index(opt);
+	for (i = 0, opt = ifp->ctx->vivso;
+	    i < ifp->ctx->vivso_len;
+	    i++, opt++)
+		dhcp_zero_index(opt);
 
 	for (i = 0, opt = ifp->ctx->dhcp_opts;
 	    i < ifp->ctx->dhcp_opts_len;
@@ -1424,7 +1370,7 @@ dhcp_env(char **env, const char *prefix,
 		p = get_option(ifp->ctx, bootp, bootp_len, opt->option, &pl);
 		if (p == NULL)
 			continue;
-		ep += dhcp_envoption(ifp->ctx, ep, prefix, ifp->name,
+		dhcp_envoption(ifp->ctx, fenv, prefix, ifp->name,
 		    opt, dhcp_getoption, p, pl);
 
 		if (opt->option != DHO_VIVSO || pl <= (int)sizeof(uint32_t))
@@ -1437,7 +1383,7 @@ dhcp_env(char **env, const char *prefix,
 		/* Skip over en + total size */
 		p += sizeof(en) + 1;
 		pl -= sizeof(en) + 1;
-		ep += dhcp_envoption(ifp->ctx, ep, prefix, ifp->name,
+		dhcp_envoption(ifp->ctx, fenv, prefix, ifp->name,
 		    vo, dhcp_getoption, p, pl);
 	}
 
@@ -1450,11 +1396,11 @@ dhcp_env(char **env, const char *prefix,
 		p = get_option(ifp->ctx, bootp, bootp_len, opt->option, &pl);
 		if (p == NULL)
 			continue;
-		ep += dhcp_envoption(ifp->ctx, ep, prefix, ifp->name,
+		dhcp_envoption(ifp->ctx, fenv, prefix, ifp->name,
 		    opt, dhcp_getoption, p, pl);
 	}
 
-	return ep - env;
+	return 1;
 }
 
 static void

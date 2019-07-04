@@ -194,11 +194,6 @@ void get_line_free(void);
 extern int clock_monotonic;
 int get_monotonic(struct timespec *);
 
-ssize_t setvar(char **, const char *, const char *, const char *);
-ssize_t setvard(char **, const char *, const char *, size_t);
-ssize_t addvar(char ***, const char *, const char *, const char *);
-ssize_t addvard(char ***, const char *, const char *, size_t);
-
 const char *hwaddr_ntoa(const void *, size_t, char *, size_t);
 size_t hwaddr_aton(uint8_t *, const char *);
 size_t read_hwaddr_aton(uint8_t **, const char *);

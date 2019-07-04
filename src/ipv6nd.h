@@ -96,7 +96,7 @@ struct rs_state {
 void ipv6nd_printoptions(const struct dhcpcd_ctx *,
     const struct dhcp_opt *, size_t);
 void ipv6nd_startrs(struct interface *);
-ssize_t ipv6nd_env(char **, const char *, const struct interface *);
+ssize_t ipv6nd_env(FILE *, const struct interface *);
 const struct ipv6_addr *ipv6nd_iffindaddr(const struct interface *ifp,
     const struct in6_addr *addr, unsigned int flags);
 struct ipv6_addr *ipv6nd_findaddr(struct dhcpcd_ctx *,

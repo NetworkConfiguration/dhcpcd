@@ -1541,23 +1541,17 @@ ipv6_staticdadcallback(void *arg)
 }
 
 ssize_t
-ipv6_env(char **env, const char *prefix, const struct interface *ifp)
+ipv6_env(FILE *fp, const char *prefix, const struct interface *ifp)
 {
-	char **ep;
-	ssize_t n;
 	struct ipv6_addr *ia;
 
-	ep = env;
-	n = 0;
 	ia = ipv6_iffindaddr(UNCONST(ifp), &ifp->options->req_addr6,
 	    IN6_IFF_NOTUSEABLE);
-	if (ia) {
-		if (env)
-			addvar(&ep, prefix, "ip6_address", ia->saddr);
-		n++;
-	}
-
-	return n;
+	if (ia == NULL)
+		return 0;
+	if (efprintf(fp, "%s_ip6_address=%s", prefix, ia->saddr) == -1)
+		return -1;
+	return 1;
 }
 
 int
