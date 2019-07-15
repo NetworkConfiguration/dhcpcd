@@ -685,8 +685,10 @@ rt_build(struct dhcpcd_ctx *ctx, int af)
 	}
 
 	RB_TREE_FOREACH_SAFE(rt, &routes, rtn) {
-		if (rt->rt_dest.sa_family != af &&
-		    rt->rt_gateway.sa_family != af)
+		if ((rt->rt_dest.sa_family != af &&
+		    rt->rt_dest.sa_family != AF_UNSPEC) ||
+		    (rt->rt_gateway.sa_family != af &&
+		    rt->rt_gateway.sa_family != AF_UNSPEC))
 			continue;
 		/* Is this route already in our table? */
 		if (rb_tree_find_node(&added, rt) != NULL)
@@ -702,12 +704,14 @@ rt_build(struct dhcpcd_ctx *ctx, int af)
 	}
 
 	/* Remove old routes we used to manage. */
-	while ((rt = RB_TREE_MAX(&ctx->routes)) != NULL) {
+	RB_TREE_FOREACH_REVERSE_SAFE(rt, &ctx->routes, rtn) {
+		if ((rt->rt_dest.sa_family != af &&
+		    rt->rt_dest.sa_family != AF_UNSPEC) ||
+		    (rt->rt_gateway.sa_family != af &&
+		    rt->rt_gateway.sa_family != AF_UNSPEC))
+			continue;
 		rb_tree_remove_node(&ctx->routes, rt);
-		if (rt->rt_dest.sa_family == af &&
-		    rt->rt_gateway.sa_family == af &&
-		    rb_tree_find_node(&added, rt) == NULL)
-		{
+		if (rb_tree_find_node(&added, rt) == NULL) {
 			o = rt->rt_ifp->options ?
 			    rt->rt_ifp->options->options :
 			    ctx->options;
