@@ -615,13 +615,9 @@ arp_drop(struct interface *ifp)
 	struct iarp_state *state;
 	struct arp_state *astate;
 
-	state = ARP_STATE(ifp);
-	if (state == NULL)
-		return;
-
-	while ((astate = TAILQ_FIRST(&state->arp_states)) != NULL) {
+	while ((state = ARP_STATE(ifp)) != NULL &&
+	    (astate = TAILQ_FIRST(&state->arp_states)) != NULL)
 		arp_free(astate);
-	}
 
 	/* No need to close because the last free will close */
 }
