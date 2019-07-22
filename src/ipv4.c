@@ -685,7 +685,7 @@ ipv4_daddaddr(struct interface *ifp, const struct dhcp_lease *lease)
 	struct ipv4_addr *ia;
 
 	ia = ipv4_addaddr(ifp, &lease->addr, &lease->mask, &lease->brd,
-	    lease->leasetime, lease->renewaltime);
+	    lease->leasetime, lease->rebindtime);
 	if (ia == NULL)
 		return -1;
 
