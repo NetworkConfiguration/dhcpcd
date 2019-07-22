@@ -1405,10 +1405,11 @@ ipv6nd_env(FILE *fp, const struct interface *ifp)
 		snprintf(ndprefix, sizeof(ndprefix), "nd%zu", i);
 		if (efprintf(fp, "%s_from=%s", ndprefix, rap->sfrom) == -1)
 			return -1;
-		if (efprintf(fp, "%s_acquired=%ld", ndprefix,
-		    rap->acquired.tv_sec) == -1)
+		if (efprintf(fp, "%s_acquired=%lld", ndprefix,
+		    (long long)rap->acquired.tv_sec) == -1)
 			return -1;
-		if (efprintf(fp, "%s_now=%ld", ndprefix, now.tv_sec) == -1)
+		if (efprintf(fp, "%s_now=%lld", ndprefix,
+		    (long long)now.tv_sec) == -1)
 			return -1;
 
 		/* Zero our indexes */
