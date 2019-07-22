@@ -583,10 +583,14 @@ dhcp6_delegateaddr(struct in6_addr *addr, struct interface *ifp,
 
 #define BIT(n) (1UL << (n))
 #define BIT_MASK(len) (BIT(len) - 1)
-		if (ia->sla_max == 0)
+		if (ia->sla_max == 0) {
 			/* Work out the real sla_max from our bits used */
-			ia->sla_max = (uint32_t)BIT_MASK(asla.prefix_len -
-			    prefix->prefix_len);
+			bits = asla.prefix_len - prefix->prefix_len;
+			/* Make static analysis happy.
+			 * Bits cannot be bigger than 32 thanks to fls32. */
+			assert(bits <= 32);
+			ia->sla_max = (uint32_t)BIT_MASK(bits);
+		}
 	}
 
 	if (ipv6_userprefix(&prefix->prefix, prefix->prefix_len,
