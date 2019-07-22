@@ -685,7 +685,7 @@ ipv4_daddaddr(struct interface *ifp, const struct dhcp_lease *lease)
 	struct ipv4_addr *ia;
 
 	ia = ipv4_addaddr(ifp, &lease->addr, &lease->mask, &lease->brd,
-	    lease->leasetime, lease->leasetime);
+	    lease->leasetime, lease->renewaltime);
 	if (ia == NULL)
 		return -1;
 
@@ -703,7 +703,6 @@ ipv4_applyaddr(void *arg)
 	struct dhcp_lease *lease;
 	struct if_options *ifo = ifp->options;
 	struct ipv4_addr *ia;
-	int r;
 
 	if (state == NULL)
 		return;
@@ -728,25 +727,16 @@ ipv4_applyaddr(void *arg)
 		return;
 	}
 
+#if __linux__
 	/* If the netmask or broadcast is different, re-add the addresss */
 	ia = ipv4_iffindaddr(ifp, &lease->addr, NULL);
-	if (ia &&
-	    ia->mask.s_addr == lease->mask.s_addr &&
-	    ia->brd.s_addr == lease->brd.s_addr)
-		logdebugx("%s: IP address %s already exists",
-		    ifp->name, ia->saddr);
-	else {
-#if __linux__
-		/* Linux does not change netmask/broadcast address
-		 * for re-added addresses, so we need to delete the old one
-		 * first. */
-		if (ia != NULL)
-			ipv4_deladdr(ia, 0);
+	if (ia != NULL &&
+	    (ia->mask.s_addr != lease->mask.s_addr ||
+	    ia->brd.s_addr != lease->brd.s_addr))
+		ipv4_deladdr(ia, 0);
 #endif
-		r = ipv4_daddaddr(ifp, lease);
-		if (r == -1 && errno != EEXIST)
-			return;
-	}
+	if (ipv4_daddaddr(ifp, lease) == -1 && errno != EEXIST)
+		return;
 
 	ia = ipv4_iffindaddr(ifp, &lease->addr, NULL);
 	if (ia == NULL) {
