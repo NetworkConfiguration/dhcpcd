@@ -2347,7 +2347,7 @@ dhcp_arp_address(struct interface *ifp)
 			get_lease(ifp, &l, state->offer, state->offer_len);
 			/* Add the address now, let the kernel handle DAD. */
 			ipv4_addaddr(ifp, &l.addr, &l.mask, &l.brd,
-			    l.leasetime, l.leastime);
+			    l.leasetime, l.leasetime);
 		} else
 			loginfox("%s: waiting for DAD on %s",
 			    ifp->name, inet_ntoa(addr));
