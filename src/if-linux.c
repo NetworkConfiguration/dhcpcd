@@ -1466,13 +1466,12 @@ bpf_attach(int s, void *filter, unsigned int filter_len)
 }
 
 int
-if_address(unsigned char cmd, const struct ipv4_addr *addr)
+if_address(unsigned char cmd, const struct ipv4_addr *ia)
 {
 	struct nlma nlm;
+	struct ifa_cacheinfo cinfo;
 	int retval = 0;
-#if defined(IFA_F_NOPREFIXROUTE)
 	uint32_t flags = 0;
-#endif
 
 	memset(&nlm, 0, sizeof(nlm));
 	nlm.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifaddrmsg));
@@ -1480,29 +1479,39 @@ if_address(unsigned char cmd, const struct ipv4_addr *addr)
 	nlm.hdr.nlmsg_type = cmd;
 	if (cmd == RTM_NEWADDR)
 		nlm.hdr.nlmsg_flags |= NLM_F_CREATE | NLM_F_REPLACE;
-	nlm.ifa.ifa_index = addr->iface->index;
+	nlm.ifa.ifa_index = ia->iface->index;
 	nlm.ifa.ifa_family = AF_INET;
-	nlm.ifa.ifa_prefixlen = inet_ntocidr(addr->mask);
+
+	nlm.ifa.ifa_prefixlen = inet_ntocidr(ia->mask);
+
 #if 0
 	/* This creates the aliased interface */
 	add_attr_l(&nlm.hdr, sizeof(nlm), IFA_LABEL,
-	    addr->iface->alias,
-	    (unsigned short)(strlen(addr->iface->alias) + 1));
+	    ia->iface->alias,
+	    (unsigned short)(strlen(ia->iface->alias) + 1));
 #endif
+
 	add_attr_l(&nlm.hdr, sizeof(nlm), IFA_LOCAL,
-	    &addr->addr.s_addr, sizeof(addr->addr.s_addr));
-	if (cmd == RTM_NEWADDR)
-		add_attr_l(&nlm.hdr, sizeof(nlm), IFA_BROADCAST,
-		    &addr->brd.s_addr, sizeof(addr->brd.s_addr));
+	    &ia->addr.s_addr, sizeof(ia->addr.s_addr));
 
+	if (cmd == RTM_NEWADDR) {
 #ifdef IFA_F_NOPREFIXROUTE
-	if (nlm.ifa.ifa_prefixlen < 32)
-		flags |= IFA_F_NOPREFIXROUTE;
-	if (flags)
-		add_attr_32(&nlm.hdr, sizeof(nlm), IFA_FLAGS, flags);
+		if (nlm.ifa.ifa_prefixlen < 32)
+			flags |= IFA_F_NOPREFIXROUTE;
 #endif
+		add_attr_32(&nlm.hdr, sizeof(nlm), IFA_FLAGS, flags);
 
-	if (send_netlink(addr->iface->ctx, NULL,
+		add_attr_l(&nlm.hdr, sizeof(nlm), IFA_BROADCAST,
+		    &ia->brd.s_addr, sizeof(ia->brd.s_addr));
+
+		memset(&cinfo, 0, sizeof(cinfo));
+		cinfo.ifa_prefered = ia->pltime;
+		cinfo.ifa_valid = ia->vltime;
+		add_attr_l(&nlm.hdr, sizeof(nlm), IFA_CACHEINFO,
+		    &cinfo, sizeof(cinfo));
+	}
+
+	if (send_netlink(ia->iface->ctx, NULL,
 	    NETLINK_ROUTE, &nlm.hdr, NULL) == -1)
 		retval = -1;
 	return retval;
@@ -1524,11 +1533,7 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 {
 	struct nlma nlm;
 	struct ifa_cacheinfo cinfo;
-/* IFA_FLAGS is not a define, but is was added at the same time
- * IFA_F_NOPREFIXROUTE was do use that. */
-#if defined(IFA_F_NOPREFIXROUTE) || defined(IFA_F_MANAGETEMPADDR)
 	uint32_t flags = 0;
-#endif
 
 	memset(&nlm, 0, sizeof(nlm));
 	nlm.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifaddrmsg));
@@ -1538,22 +1543,10 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 		nlm.hdr.nlmsg_flags |= NLM_F_CREATE | NLM_F_REPLACE;
 	nlm.ifa.ifa_index = ia->iface->index;
 	nlm.ifa.ifa_family = AF_INET6;
-#ifdef IPV6_MANAGETEMPADDR
-	if (ia->flags & IPV6_AF_TEMPORARY) {
-		/* Currently the kernel filters out these flags */
-#ifdef IFA_F_NOPREFIXROUTE
-		flags |= IFA_F_TEMPORARY;
-#else
-		nlm.ifa.ifa_flags |= IFA_F_TEMPORARY;
-#endif
-	}
-#elif IFA_F_MANAGETEMPADDR
-	if (ia->flags & IPV6_AF_AUTOCONF)
-		flags |= IFA_F_MANAGETEMPADDR;
-#endif
 
 	/* Add as /128 if no IFA_F_NOPREFIXROUTE ? */
 	nlm.ifa.ifa_prefixlen = ia->prefix_len;
+
 #if 0
 	/* This creates the aliased interface */
 	add_attr_l(&nlm.hdr, sizeof(nlm), IFA_LABEL,
@@ -1563,21 +1556,31 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 	    &ia->addr.s6_addr, sizeof(ia->addr.s6_addr));
 
 	if (cmd == RTM_NEWADDR) {
+#ifdef IPV6_MANAGETEMPADDR
+		if (ia->flags & IPV6_AF_TEMPORARY) {
+			/* Currently the kernel filters out these flags */
+#ifdef IFA_F_NOPREFIXROUTE
+			flags |= IFA_F_TEMPORARY;
+#else
+			nlm.ifa.ifa_flags |= IFA_F_TEMPORARY;
+#endif
+		}
+#elif IFA_F_MANAGETEMPADDR
+		if (ia->flags & IPV6_AF_AUTOCONF)
+			flags |= IFA_F_MANAGETEMPADDR;
+#endif
+#ifdef IFA_F_NOPREFIXROUTE
+		if (!IN6_IS_ADDR_LINKLOCAL(&ia->addr))
+			flags |= IFA_F_NOPREFIXROUTE;
+#endif
+		add_attr_32(&nlm.hdr, sizeof(nlm), IFA_FLAGS, flags);
+
 		memset(&cinfo, 0, sizeof(cinfo));
 		cinfo.ifa_prefered = ia->prefix_pltime;
 		cinfo.ifa_valid = ia->prefix_vltime;
 		add_attr_l(&nlm.hdr, sizeof(nlm), IFA_CACHEINFO,
 		    &cinfo, sizeof(cinfo));
 	}
-
-#ifdef IFA_F_NOPREFIXROUTE
-	if (!IN6_IS_ADDR_LINKLOCAL(&ia->addr))
-		flags |= IFA_F_NOPREFIXROUTE;
-#endif
-#if defined(IFA_F_NOPREFIXROUTE) || defined(IFA_F_MANAGETEMPADDR)
-	if (flags)
-		add_attr_32(&nlm.hdr, sizeof(nlm), IFA_FLAGS, flags);
-#endif
 
 	return send_netlink(ia->iface->ctx, NULL,
 	    NETLINK_ROUTE, &nlm.hdr, NULL);

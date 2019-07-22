@@ -40,6 +40,7 @@
 #include "config.h"
 #include "arp.h"
 #include "common.h"
+#include "dhcp.h"
 #include "eloop.h"
 #include "if.h"
 #include "if-options.h"
@@ -212,7 +213,8 @@ ipv4ll_not_found(struct interface *ifp)
 		if (ifp->ctx->options & DHCPCD_TEST)
 			goto test;
 		ia = ipv4_addaddr(ifp, &state->pickedaddr,
-		    &inaddr_llmask, &inaddr_llbcast);
+		    &inaddr_llmask, &inaddr_llbcast,
+		    DHCP_INFINITE_LIFETIME, DHCP_INFINITE_LIFETIME);
 	}
 	if (ia == NULL)
 		return;
