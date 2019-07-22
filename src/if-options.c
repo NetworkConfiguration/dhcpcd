@@ -1868,6 +1868,7 @@ err_sla:
 		    ifo->vivco_len + 1, sizeof(*ifo->vivco));
 		if (vivco == NULL) {
 			logerr( __func__);
+			fre(np);
 			return -1;
 		}
 		ifo->vivco = vivco;
