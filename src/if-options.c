@@ -719,9 +719,6 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		if (s == 0) {
 			ifo->script = NULL;
 			break;
-		} else if (s == -1) {
-			logerr("%s: script", __func__);
-			return -1;
 		}
 		dl = (size_t)s;
 		if (s == -1 || (ifo->script = malloc(dl)) == NULL) {
@@ -729,8 +726,9 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			logerr(__func__);
 			return -1;
 		}
-		parse_str(ifo->script, dl, arg, PARSE_STRING_NULL);
-		if (ifo->script[0] == '\0' ||
+		s = parse_str(ifo->script, dl, arg, PARSE_STRING_NULL);
+		if (s == -1 ||
+		    ifo->script[0] == '\0' ||
 		    strcmp(ifo->script, "/dev/null") == 0)
 		{
 			free(ifo->script);
