@@ -599,7 +599,8 @@ find_lun:
 
 struct ipv4_addr *
 ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
-    const struct in_addr *mask, const struct in_addr *bcast)
+    const struct in_addr *mask, const struct in_addr *bcast,
+    uint32_t vltime, uint32_t pltime)
 {
 	struct ipv4_state *state;
 	struct ipv4_addr *ia;
@@ -639,6 +640,8 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 
 	ia->mask = *mask;
 	ia->brd = *bcast;
+	ia->vltime = vltime;
+	ia->pltime = pltime;
 	snprintf(ia->saddr, sizeof(ia->saddr), "%s/%d",
 	    inet_ntoa(*addr), inet_ntocidr(*mask));
 
@@ -681,7 +684,8 @@ ipv4_daddaddr(struct interface *ifp, const struct dhcp_lease *lease)
 	struct dhcp_state *state;
 	struct ipv4_addr *ia;
 
-	ia = ipv4_addaddr(ifp, &lease->addr, &lease->mask, &lease->brd);
+	ia = ipv4_addaddr(ifp, &lease->addr, &lease->mask, &lease->brd,
+	    lease->leasetime, lease->leasetime);
 	if (ia == NULL)
 		return -1;
 

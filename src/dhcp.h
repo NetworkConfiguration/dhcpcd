@@ -183,6 +183,10 @@ struct dhcp_lease {
 	uint32_t cookie;
 };
 
+#ifndef DHCP_INFINITE_LIFETIME
+#  define DHCP_INFINITE_LIFETIME	(~0U)
+#endif
+
 enum DHS {
 	DHS_NONE,
 	DHS_INIT,

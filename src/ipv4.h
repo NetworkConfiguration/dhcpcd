@@ -83,6 +83,8 @@ struct ipv4_addr {
 	struct interface *iface;
 	int addr_flags;
 	unsigned int flags;
+	uint32_t vltime;
+	uint32_t pltime;
 	char saddr[INET_ADDRSTRLEN + 3];
 #ifdef ALIAS_ADDR
 	char alias[IF_NAMESIZE];
@@ -126,7 +128,8 @@ bool inet_getroutes(struct dhcpcd_ctx *, rb_tree_t *);
 
 int ipv4_deladdr(struct ipv4_addr *, int);
 struct ipv4_addr *ipv4_addaddr(struct interface *,
-    const struct in_addr *, const struct in_addr *, const struct in_addr *);
+    const struct in_addr *, const struct in_addr *, const struct in_addr *,
+    uint32_t, uint32_t);
 void ipv4_applyaddr(void *);
 
 struct ipv4_addr *ipv4_iffindaddr(struct interface *,

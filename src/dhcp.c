@@ -1443,7 +1443,7 @@ get_lease(struct interface *ifp,
 	}
 	if (get_option_uint32(ctx, &lease->leasetime,
 	    bootp, len, DHO_LEASETIME) != 0)
-		lease->leasetime = ~0U; /* Default to infinite lease */
+		lease->leasetime = DHCP_INFINITE_LIFETIME;
 	if (get_option_uint32(ctx, &lease->renewaltime,
 	    bootp, len, DHO_RENEWALTIME) != 0)
 		lease->renewaltime = 0;
@@ -2135,17 +2135,17 @@ dhcp_bind(struct interface *ifp)
 		loginfox("%s: using static address %s/%d",
 		    ifp->name, inet_ntoa(lease->addr),
 		    inet_ntocidr(lease->mask));
-		lease->leasetime = ~0U;
+		lease->leasetime = DHCP_INFINITE_LIFETIME;
 		state->reason = "STATIC";
 	} else if (ifo->options & DHCPCD_INFORM) {
 		loginfox("%s: received approval for %s",
 		    ifp->name, inet_ntoa(lease->addr));
-		lease->leasetime = ~0U;
+		lease->leasetime = DHCP_INFINITE_LIFETIME;
 		state->reason = "INFORM";
 	} else {
 		if (lease->frominfo)
 			state->reason = "TIMEOUT";
-		if (lease->leasetime == ~0U) {
+		if (lease->leasetime == DHCP_INFINITE_LIFETIME) {
 			lease->renewaltime =
 			    lease->rebindtime =
 			    lease->leasetime;
@@ -2208,7 +2208,7 @@ dhcp_bind(struct interface *ifp)
 		else
 			state->reason = "BOUND";
 	}
-	if (lease->leasetime == ~0U)
+	if (lease->leasetime == DHCP_INFINITE_LIFETIME)
 		lease->renewaltime = lease->rebindtime = lease->leasetime;
 	else {
 		eloop_timeout_add_sec(ctx->eloop,
@@ -2346,7 +2346,8 @@ dhcp_arp_address(struct interface *ifp)
 
 			get_lease(ifp, &l, state->offer, state->offer_len);
 			/* Add the address now, let the kernel handle DAD. */
-			ipv4_addaddr(ifp, &l.addr, &l.mask, &l.brd);
+			ipv4_addaddr(ifp, &l.addr, &l.mask, &l.brd,
+			    l.leasetime, l.leastime);
 		} else
 			loginfox("%s: waiting for DAD on %s",
 			    ifp->name, inet_ntoa(addr));
@@ -3759,7 +3760,7 @@ dhcp_start1(void *arg)
 			state->offer = NULL;
 			state->offer_len = 0;
 		} else if (!(ifo->options & DHCPCD_LASTLEASE_EXTEND) &&
-		    state->lease.leasetime != ~0U &&
+		    state->lease.leasetime != DHCP_INFINITE_LIFETIME &&
 		    stat(state->leasefile, &st) == 0)
 		{
 			time_t now;
