@@ -719,6 +719,9 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		if (s == 0) {
 			ifo->script = NULL;
 			break;
+		} else if (s == -1) {
+			logerr("%s: script", __func__);
+			return -1;
 		}
 		dl = (size_t)s;
 		if (s == -1 || (ifo->script = malloc(dl)) == NULL) {
@@ -1868,7 +1871,7 @@ err_sla:
 		    ifo->vivco_len + 1, sizeof(*ifo->vivco));
 		if (vivco == NULL) {
 			logerr( __func__);
-			fre(np);
+			free(np);
 			return -1;
 		}
 		ifo->vivco = vivco;
