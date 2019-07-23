@@ -1263,10 +1263,16 @@ if_route(unsigned char cmd, const struct rt *rt)
 	    (const char *)(sa) + sa_addroffset((sa)),			\
 	    (unsigned short)sa_addrlen((sa)));
 	nlm.rt.rtm_dst_len = (unsigned char)sa_toprefix(&rt->rt_netmask);
+	/* rt->rt_dest and rt->gateway are unions where sockaddr_in6
+	 * is the biggest member. However, we access them as the
+	 * generic sockaddr and coverity thinks this will overrun. */
+	/* coverity[overrun-buffer-arg] */
 	ADDSA(RTA_DST, &rt->rt_dest);
 	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
-		if (!gateway_unspec)
+		if (!gateway_unspec) {
+			/* coverity[overrun-buffer-arg] */
 			ADDSA(RTA_GATEWAY, &rt->rt_gateway);
+		}
 		/* Cannot add tentative source addresses.
 		 * We don't know this here, so just skip INET6 ifa's.*/
 		if (!sa_is_unspecified(&rt->rt_ifa) &&
