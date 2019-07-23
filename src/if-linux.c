@@ -320,8 +320,9 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 	if (ctx->link_fd == -1)
 		return -1;
 #ifdef NETLINK_BROADCAST_ERROR
-	setsockopt(ctx->link_fd, SOL_NETLINK, NETLINK_BROADCAST_ERROR,
-	    &on, sizeof(on));
+	if (setsockopt(ctx->link_fd, SOL_NETLINK, NETLINK_BROADCAST_ERROR,
+	    &on, sizeof(on)) == -1)
+		return -1;
 #endif
 
 	if ((priv = calloc(1, sizeof(*priv))) == NULL)
