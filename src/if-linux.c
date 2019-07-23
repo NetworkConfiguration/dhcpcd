@@ -322,7 +322,7 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 #ifdef NETLINK_BROADCAST_ERROR
 	if (setsockopt(ctx->link_fd, SOL_NETLINK, NETLINK_BROADCAST_ERROR,
 	    &on, sizeof(on)) == -1)
-		return -1;
+		logerr("%s: NETLINK_BROADCAST_ERROR", __func__);
 #endif
 
 	if ((priv = calloc(1, sizeof(*priv))) == NULL)
