@@ -1135,6 +1135,10 @@ dhcpcd_linkoverflow(struct dhcpcd_ctx *ctx)
 
 	/* Work out the current interfaces. */
 	ifaces = if_discover(ctx, &ifaddrs, ctx->ifc, ctx->ifv);
+	if (ifaces == NULL) {
+		logerr(__func__);
+		return;
+	}
 
 	/* Punt departed interfaces */
 	TAILQ_FOREACH_SAFE(ifp, ctx->ifaces, next, ifn) {
@@ -1144,21 +1148,23 @@ dhcpcd_linkoverflow(struct dhcpcd_ctx *ctx)
 	}
 
 	/* Add new interfaces */
-	TAILQ_FOREACH_SAFE(ifp, ifaces, next, ifn) {
+	while ((ifp = TAILQ_FIRST(ifaces)) != NULL ) {
+		TAILQ_REMOVE(ifaces, ifp, next);
 		ifp1 = if_find(ctx->ifaces, ifp->name);
 		if (ifp1 != NULL) {
 			/* If the interface already exists,
 			 * check carrier state. */
 			eloop_timeout_add_sec(ctx->eloop, 0,
 			    dhcpcd_checkcarrier, ifp1);
+			if_free(ifp);
 			continue;
 		}
-		TAILQ_REMOVE(ifaces, ifp, next);
 		TAILQ_INSERT_TAIL(ctx->ifaces, ifp, next);
 		if (ifp->active)
 			eloop_timeout_add_sec(ctx->eloop, 0,
 			    dhcpcd_prestartinterface, ifp);
 	}
+	free(ifaces);
 
 	/* Update address state. */
 	if_markaddrsstale(ctx->ifaces);
