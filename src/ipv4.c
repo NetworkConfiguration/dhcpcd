@@ -346,16 +346,19 @@ inet_dhcproutes(rb_tree_t *routes, struct interface *ifp, bool *have_default)
 static int
 inet_routerhostroute(rb_tree_t *routes, struct interface *ifp)
 {
-	struct rt *rt, *rth;
+	struct rt *rt, *rth, *rtp;
 	struct sockaddr_in *dest, *netmask, *gateway;
 	const char *cp, *cp2, *cp3, *cplim;
 	struct if_options *ifo;
 	const struct dhcp_state *state;
 	struct in_addr in;
+	rb_tree_t troutes;
 
 	/* Don't add a host route for these interfaces. */
 	if (ifp->flags & (IFF_LOOPBACK | IFF_POINTOPOINT))
 		return 0;
+
+	rb_tree_init(&troutes, &rt_compare_proto_ops);
 
 	RB_TREE_FOREACH(rt, routes) {
 		if (rt->rt_dest.sa_family != AF_INET)
@@ -417,6 +420,7 @@ inet_routerhostroute(rb_tree_t *routes, struct interface *ifp)
 			    ifp->name,
 			    sa_addrtop(&rt->rt_gateway, buf, sizeof(buf)));
 		}
+
 		if ((rth = rt_new(ifp)) == NULL)
 			return -1;
 		rth->rt_flags |= RTF_HOST;
@@ -427,7 +431,20 @@ inet_routerhostroute(rb_tree_t *routes, struct interface *ifp)
 		sa_in_init(&rth->rt_gateway, &in);
 		rth->rt_mtu = dhcp_get_mtu(ifp);
 		sa_in_init(&rth->rt_ifa, &state->addr->addr);
-		rt_proto_add(routes, rt);
+
+		/* We need to insert the host route just before the router. */
+		while ((rtp = RB_TREE_MAX(routes)) != NULL) {
+			rb_tree_remove_node(routes, rtp);
+			rt_proto_add(&troutes, rtp);
+			if (rtp == rt)
+				break;
+		}
+		rt_proto_add(routes, rth);
+		/* troutes is now reversed, so add backwards again. */
+		while ((rtp = RB_TREE_MAX(&troutes)) != NULL) {
+			rb_tree_remove_node(&troutes, rtp);
+			rt_proto_add(routes, rtp);
+		}
 	}
 	return 0;
 }
