@@ -1001,6 +1001,7 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 	struct if_head *ifs;
 	struct interface *ifp, *iff;
 	const char * const argv[] = { ifname };
+	int e;
 
 	ctx = arg;
 	if (action == -1) {
@@ -1024,13 +1025,17 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 		logerr(__func__);
 		return -1;
 	}
+
 	ifp = if_find(ifs, ifname);
 	if (ifp == NULL) {
 		/* This can happen if an interface is quickly added
 		 * and then removed. */
 		errno = ENOENT;
-		return -1;
+		e = -1;
+		goto out;
 	}
+	e = 1;
+
 	/* Check if we already have the interface */
 	iff = if_find(ctx->ifaces, ifp->name);
 
@@ -1059,6 +1064,7 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 			dhcpcd_prestartinterface(iff);
 	}
 
+out:
 	/* Free our discovered list */
 	while ((ifp = TAILQ_FIRST(ifs))) {
 		TAILQ_REMOVE(ifs, ifp, next);
@@ -1066,7 +1072,7 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 	}
 	free(ifs);
 
-	return 1;
+	return e;
 }
 
 static void
