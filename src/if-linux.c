@@ -494,6 +494,8 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 
 			sa->sa_family = rtm->rtm_family;
 			salen = sa_addrlen(sa);
+			/* sa is a union where sockaddr_in6 is the biggest. */
+			/* coverity[overrun-buffer-arg] */
 			memcpy((char *)sa + sa_addroffset(sa), RTA_DATA(rta),
 			    MIN(salen, RTA_PAYLOAD(rta)));
 		}
