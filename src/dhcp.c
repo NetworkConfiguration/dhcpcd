@@ -2097,7 +2097,7 @@ dhcp_arp_found(struct arp_state *astate, const struct arp_msg *amsg)
 
 	addr = astate->addr;
 	arp_free(astate);
-	dhcp_addr_duplicated(astate->iface, &addr);
+	dhcp_addr_duplicated(ifp, &addr);
 }
 
 #ifdef KERNEL_RFC5227
