@@ -1335,6 +1335,9 @@ if_handlelink(struct dhcpcd_ctx *ctx)
 		errno = EINVAL;
 		return -1;
 	}
+	/* We generally treat rtm.hdr has an array so we can easily
+	 * access the following data. */
+	/* coverity[callee_ptr_arith] */
 	return if_dispatch(ctx, &rtm.hdr);
 }
 
