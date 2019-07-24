@@ -127,7 +127,7 @@ static const char * const dhcp_params[] = {
 
 static int dhcp_openbpf(struct interface *);
 static void dhcp_start1(void *);
-#ifdef ARP
+#if defined(ARP) && (!defined(KERNEL_RFC5227) || defined(ARPING))
 static void dhcp_arp_found(struct arp_state *, const struct arp_msg *);
 #endif
 static void dhcp_handledhcp(struct interface *, struct bootp *, size_t,
@@ -2029,7 +2029,7 @@ dhcp_addr_duplicated(struct interface *ifp, struct in_addr *ia)
 }
 #endif
 
-#ifdef ARP
+#if defined(ARP) && (!defined(KERNEL_RFC5227) || defined(ARPING))
 static void
 dhcp_arp_not_found(struct arp_state *astate)
 {
@@ -2309,6 +2309,7 @@ dhcp_arp_defend_failed(struct arp_state *astate)
 }
 #endif
 
+#if !defined(KERNEL_RFC5227) || defined(ARPING)
 static struct arp_state *
 dhcp_arp_new(struct interface *ifp, struct in_addr *addr)
 {
@@ -2327,6 +2328,7 @@ dhcp_arp_new(struct interface *ifp, struct in_addr *addr)
 #endif
 	return astate;
 }
+#endif
 
 static int
 dhcp_arp_address(struct interface *ifp)
