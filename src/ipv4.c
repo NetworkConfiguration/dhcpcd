@@ -453,9 +453,7 @@ bool
 inet_getroutes(struct dhcpcd_ctx *ctx, rb_tree_t *routes)
 {
 	struct interface *ifp;
-#ifdef IPV4LL
 	bool have_default = false;
-#endif
 
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
 		if (!ifp->active)
