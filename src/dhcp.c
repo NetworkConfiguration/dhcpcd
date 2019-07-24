@@ -1958,6 +1958,7 @@ dhcp_rebind(void *arg)
 	send_rebind(ifp);
 }
 
+#if defined(ARP) || defined(IN_IFF_DUPLICATED)
 static void
 dhcp_finish_dad(struct interface *ifp, struct in_addr *ia)
 {
@@ -2026,6 +2027,7 @@ dhcp_addr_duplicated(struct interface *ifp, struct in_addr *ia)
 	eloop_timeout_add_sec(ifp->ctx->eloop,
 	    DHCP_RAND_MAX, dhcp_discover, ifp);
 }
+#endif
 
 #ifdef ARP
 static void
