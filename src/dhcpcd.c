@@ -1210,9 +1210,11 @@ dhcpcd_handlehwaddr(struct dhcpcd_ctx *ctx, const char *ifname,
 static void
 if_reboot(struct interface *ifp, int argc, char **argv)
 {
+#ifdef INET
 	unsigned long long oldopts;
 
 	oldopts = ifp->options->options;
+#endif
 	script_runreason(ifp, "RECONFIGURE");
 	dhcpcd_initstate1(ifp, argc, argv, 0);
 #ifdef INET
