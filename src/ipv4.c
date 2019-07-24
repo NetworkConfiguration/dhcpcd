@@ -502,6 +502,8 @@ ipv4_deladdr(struct ipv4_addr *addr, int keeparp)
 #ifdef ARP
 	if (!keeparp)
 		arp_freeaddr(addr->iface, &addr->addr);
+#else
+	UNUSED(keeparp);
 #endif
 
 	state = IPV4_STATE(addr->iface);
@@ -539,7 +541,9 @@ delete_address(struct interface *ifp)
 	    ifo->options & DHCPCD_INFORM ||
 	    (ifo->options & DHCPCD_STATIC && ifo->req_addr.s_addr == 0))
 		return 0;
+#ifdef ARP
 	arp_freeaddr(ifp, &state->addr->addr);
+#endif
 	r = ipv4_deladdr(state->addr, 0);
 	return r;
 }

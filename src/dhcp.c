@@ -2032,13 +2032,15 @@ static void
 dhcp_arp_not_found(struct arp_state *astate)
 {
 	struct interface *ifp;
+#ifdef ARPING
 	struct dhcp_state *state;
 	struct if_options *ifo;
+#endif
 
 	ifp = astate->iface;
+#ifdef ARPING
 	state = D_STATE(ifp);
 	ifo = ifp->options;
-#ifdef ARPING
 	if (ifo->arping_len && state->arping_index < ifo->arping_len) {
 		/* We didn't find a profile for this
 		 * address or hwaddr, so move to the next
@@ -2062,12 +2064,11 @@ static void
 dhcp_arp_found(struct arp_state *astate, const struct arp_msg *amsg)
 {
 	struct in_addr addr;
+	struct interface *ifp = astate->iface;
 #ifdef ARPING
-	struct interface *ifp;
 	struct dhcp_state *state;
 	struct if_options *ifo;
 
-	ifp = astate->iface;
 	state = D_STATE(ifp);
 
 	ifo = ifp->options;
@@ -2093,6 +2094,8 @@ dhcp_arp_found(struct arp_state *astate, const struct arp_msg *amsg)
 		dhcpcd_startinterface(ifp);
 		return;
 	}
+#else
+	UNUSED(amsg);
 #endif
 
 	addr = astate->addr;
