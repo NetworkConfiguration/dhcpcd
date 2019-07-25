@@ -628,7 +628,7 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 	struct interface *ifp;
 	uint32_t pltime, vltime;
 	__printflike(1, 2) void (*logfunc)(const char *, ...);
-#ifndef SMALL
+#ifdef ND6_ADVERTISE
 	bool vltime_was_zero;
 #endif
 #ifdef __sun
@@ -698,7 +698,7 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 		    " seconds",
 		    ifp->name, ia->prefix_pltime, ia->prefix_vltime);
 
-#ifndef SMALL
+#ifdef ND6_ADVERTISE
 	vltime_was_zero = ia->prefix_vltime == 0;
 #endif
 	if (if_address6(RTM_NEWADDR, ia) == -1) {
