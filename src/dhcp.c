@@ -3393,6 +3393,7 @@ dhcp_readudp(struct dhcpcd_ctx *ctx, struct interface *ifp)
 #ifdef IP_PKTINFO
 	unsigned char ctl[CMSG_SPACE(sizeof(struct in_pktinfo))] = { 0 };
 	char sfrom[INET_ADDRSTRLEN];
+	const struct dhcp_state *state;
 #endif
 	struct msghdr msg = {
 	    .msg_name = &from, .msg_namelen = sizeof(from),
@@ -3405,8 +3406,7 @@ dhcp_readudp(struct dhcpcd_ctx *ctx, struct interface *ifp)
 	ssize_t bytes;
 
 	if (ifp != NULL) {
-		const struct dhcp_state *state = D_CSTATE(ifp);
-
+		state = D_CSTATE(ifp);
 		s = state->udp_fd;
 	} else
 		s = ctx->udp_fd;
@@ -3426,11 +3426,17 @@ dhcp_readudp(struct dhcpcd_ctx *ctx, struct interface *ifp)
 			logerr(__func__);
 			return;
 		}
-		if (D_CSTATE(ifp) == NULL) {
+		state = D_CSTATE(ifp);
+		if (state == NULL) {
 			logdebugx("%s: received BOOTP for inactive interface",
 			    ifp->name);
 			return;
 		}
+	}
+
+	if (state->bpf_fd != -1) {
+		/* Avoid a duplicate read if BPF is open for the interface. */
+		return;
 	}
 
 	dhcp_handlebootp(ifp, (struct bootp *)(void *)buf, (size_t)bytes,
