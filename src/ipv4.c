@@ -768,7 +768,7 @@ ipv4_applyaddr(void *arg)
 			return;
 #endif
 	}
-#if IP_LIFETIME
+#ifdef IP_LIFETIME
 	if (ipv4_daddaddr(ifp, lease) == -1 && errno != EEXIST)
 		return;
 #endif
