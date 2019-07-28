@@ -756,14 +756,23 @@ ipv4_applyaddr(void *arg)
 	 * If IP addresses do not have lifetimes, there is a very real chance
 	 * that re-adding them will scrub the subnet route temporarily
 	 * which is a bad thing, so avoid it. */
-	if (ia == NULL &&
-	    (ia->mask.s_addr != lease->mask.s_addr ||
-	    ia->brd.s_addr != lease->brd.s_addr))
+	if (ia != NULL &&
+	    ia->mask.s_addr == lease->mask.s_addr &&
+	    ia->brd.s_addr == lease->brd.s_addr)
 	{
+#ifndef IP_LIFETIME
+		logdebugx("%s: IP address %s already exists",
+		    ifp->name, ia->saddr);
+#endif
+	} else {
 #ifdef __linux__
+		/* Linux does not change netmask/broadcast address
+		 * for re-added addresses, so we need to delete the old one
+		 * first. */
 		if (ia != NULL)
 			ipv4_deladdr(ia, 0);
-#elif !defined(IP_LIFETIME)
+#endif
+#ifndef IP_LIFETIME
 		if (ipv4_daddaddr(ifp, lease) == -1 && errno != EEXIST)
 			return;
 #endif
