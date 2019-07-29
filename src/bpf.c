@@ -93,7 +93,7 @@ bpf_frame_header_len(const struct interface *ifp)
 	}
 }
 
-static const uint8_t etherbroadcastaddr[] =
+static const uint8_t etherbcastaddr[] =
     { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
 int
@@ -104,7 +104,7 @@ bpf_frame_bcast(const struct interface *ifp, const char *frame)
 	case ARPHRD_ETHER:
 		return memcmp(frame +
 		    offsetof(struct ether_header, ether_dhost),
-		    etherbroadcastaddr, sizeof(etherbroadcastaddr));
+		    etherbcastaddr, sizeof(etherbcastaddr));
 	default:
 		return -1;
 	}
