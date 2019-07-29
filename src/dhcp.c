@@ -3384,6 +3384,7 @@ dhcp_readpacket(void *arg)
 static void
 dhcp_readudp(struct dhcpcd_ctx *ctx, struct interface *ifp)
 {
+	const struct dhcp_state *state;
 	struct sockaddr_in from;
 	unsigned char buf[10 * 1024]; /* Maximum MTU */
 	struct iovec iov = {
@@ -3393,7 +3394,6 @@ dhcp_readudp(struct dhcpcd_ctx *ctx, struct interface *ifp)
 #ifdef IP_PKTINFO
 	unsigned char ctl[CMSG_SPACE(sizeof(struct in_pktinfo))] = { 0 };
 	char sfrom[INET_ADDRSTRLEN];
-	const struct dhcp_state *state;
 #endif
 	struct msghdr msg = {
 	    .msg_name = &from, .msg_namelen = sizeof(from),
