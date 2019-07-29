@@ -543,7 +543,7 @@ if_route(unsigned char cmd, const struct rt *rt)
  * try to encourage someone to fix that by logging a waring during compile.
  */
 #if defined(__FreeBSD__) || defined(__OpenBSD__)
-#warning OS does not allow IPv6 address sharing
+#warning kernel does not allow IPv6 address sharing
 			if (!gateway_unspec || rt->rt_dest.sa_family!=AF_INET6)
 #endif
 			rtm->rtm_addrs |= RTA_IFP;
