@@ -521,6 +521,8 @@ ipv6nd_advertise(struct ipv6_addr *ia)
 	eloop_timeout_delete(ctx->eloop, ipv6nd_sendadvertisement, iaf);
 	ipv6nd_sendadvertisement(iaf);
 }
+#elif !defined(SMALL)
+#warning kernel does not support userland sending ND6 advertisements
 #endif /* ND6_ADVERTISE */
 
 static void
