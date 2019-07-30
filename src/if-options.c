@@ -2612,6 +2612,7 @@ free_options(struct dhcpcd_ctx *ctx, struct if_options *ifo)
 {
 	size_t i;
 #ifdef RT_FREE_ROUTE_TABLE
+	struct interface *ifp;
 	struct rt *rt;
 #endif
 	struct dhcp_opt *opt;
@@ -2640,9 +2641,12 @@ free_options(struct dhcpcd_ctx *ctx, struct if_options *ifo)
 	/* Stupidly, we don't know the interface when creating the options.
 	 * As such, make sure each route has one so they can goto the
 	 * free list. */
-	RB_TREE_FOREACH(rt, &ifo->routes) {
-		if (rt->rt_ifp == NULL)
-			rt->rt_ifp = TAILQ_FIRST(ctx->ifaces);
+	ifp = ctx->ifaces != NULL ? TAILQ_FIRST(ctx->ifaces) : NULL;
+	if (ifp != NULL) {
+		RB_TREE_FOREACH(rt, &ifo->routes) {
+			if (rt->rt_ifp == NULL)
+				rt->rt_ifp = ifp;
+		}
 	}
 #endif
 	rt_headclear0(ctx, &ifo->routes, AF_UNSPEC);
