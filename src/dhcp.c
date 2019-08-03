@@ -3279,7 +3279,7 @@ valid_udp_packet(void *packet, size_t plen, struct in_addr *from,
 
 	/* UDP checksum is based on a pseudo IP header alongside
 	 * the UDP header and payload. */
-	udp = (struct udphdr *)((char *)ip + ip_hlen);
+	udp = (struct udphdr *)(void *)((char *)ip + ip_hlen);
 	if (udp->uh_sum == 0)
 		return 0;
 
