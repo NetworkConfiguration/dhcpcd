@@ -1314,6 +1314,8 @@ if_dispatch(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 #ifdef RTM_DESYNC
 	case RTM_DESYNC:
 		dhcpcd_linkoverflow(ctx);
+#elif !defined(SO_RERROR)
+#warning cannot detect route socket overflow within kernel
 #endif
 	}
 
