@@ -1326,11 +1326,9 @@ int
 if_handlelink(struct dhcpcd_ctx *ctx)
 {
 	struct rtm rtm;
-	struct iovec iov = { .iov_base = &rtm, .iov_len = sizeof(rtm) };
-	struct msghdr msg = { .msg_iov = &iov, .msg_iovlen = 1 };
 	ssize_t len;
 
-	len = recvmsg(ctx->link_fd, &msg, 0);
+	len = read(ctx->link_fd, &rtm, sizeof(rtm));
 	if (len == -1)
 		return -1;
 	if (len == 0)
