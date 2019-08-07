@@ -191,6 +191,8 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 	if (setsockopt(ctx->link_fd, PF_ROUTE, ROUTE_MSGFILTER,
 	    &msgfilter_mask, sizeof(msgfilter_mask)) == -1)
 		logerr(__func__);
+#else
+#warn kernel does not support route message filtering
 #endif
 
 	return 0;
