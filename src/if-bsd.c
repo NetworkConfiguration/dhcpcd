@@ -192,7 +192,7 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 	    &msgfilter_mask, sizeof(msgfilter_mask)) == -1)
 		logerr(__func__);
 #else
-#warn kernel does not support route message filtering
+#warning kernel does not support route message filtering
 #endif
 
 	return 0;
