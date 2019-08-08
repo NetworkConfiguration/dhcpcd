@@ -178,7 +178,7 @@ make_env(const struct interface *ifp, const char *reason)
 {
 	struct dhcpcd_ctx *ctx = ifp->ctx;
 	FILE *fp;
-	char **env, **envp, *buf, *bufp, *endp, *path;
+	char **env, **envp, *bufp, *endp, *path;
 	size_t nenv;
 	long buf_pos, i;
 	int protocol = PROTO_LINK;
@@ -459,20 +459,18 @@ dumplease:
 		logerr(__func__);
 		goto eexit;
 	}
-#ifdef HAVE_OPEN_MEMSTREAM
-	buf = ctx->script_buf;
-#else
+
+#ifndef HAVE_OPEN_MEMSTREAM
 	size_t buf_len = (size_t)buf_pos;
 	if (ctx->script_buflen < buf_len) {
-		buf = realloc(ctx->script_buf, buf_len);
+		char *buf = realloc(ctx->script_buf, buf_len);
 		if (buf == NULL)
 			goto eexit;
 		ctx->script_buf = buf;
 		ctx->script_buflen = buf_len;
 	}
-	buf = ctx->script_buf;
 	rewind(fp);
-	if (fread(buf, sizeof(char), buf_len, fp) != buf_len)
+	if (fread(ctx->script_buf, sizeof(char), buf_len, fp) != buf_len)
 		goto eexit;
 	fclose(fp);
 	fp = NULL;
@@ -481,8 +479,8 @@ dumplease:
 	/* Count the terminated env strings.
 	 * Assert that the terminations are correct. */
 	nenv = 0;
-	endp = buf + buf_pos;
-	for (bufp = buf; bufp < endp; bufp++) {
+	endp = ctx->script_buf + buf_pos;
+	for (bufp = ctx->script_buf; bufp < endp; bufp++) {
 		if (*bufp == '\0') {
 #ifndef NDEBUG
 			if (bufp + 1 < endp)
@@ -500,7 +498,8 @@ dumplease:
 		ctx->script_env = env;
 		ctx->script_envlen = nenv;
 	}
-	bufp = buf;
+
+	bufp = ctx->script_buf;
 	envp = ctx->script_env;
 	*envp++ = bufp++;
 	endp--; /* Avoid setting the last \0 to an invalid pointer */
