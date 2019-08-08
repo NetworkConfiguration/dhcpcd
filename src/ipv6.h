@@ -153,9 +153,12 @@
  * ND6 Advertising is only used for IP address sharing to prefer
  * the address on a specific interface.
  * This just fails to work on OpenBSD and causes erroneous duplicate
- * address messages on BSD's other then NetBSD.
+ * address messages on BSD's other then DragonFly and NetBSD.
  */
-#if !defined(SMALL) && (defined(__NetBSD__) || defined(__linux__))
+#if !defined(SMALL) && \
+    ((defined(__DragonFly_version) && __DragonFly_version >= 500703) || \
+    (defined(__NetBSD_Version__) && __NetBSD_Version__ >= 899002800) || \
+    defined(__linux__))
 #  define ND6_ADVERTISE
 #endif
 
