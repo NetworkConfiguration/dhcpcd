@@ -33,6 +33,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+#include <assert.h>
 #include <ctype.h>
 #include <errno.h>
 #include <signal.h>
@@ -477,12 +478,21 @@ dumplease:
 	fp = NULL;
 #endif
 
+	/* Count the terminated env strings.
+	 * Assert that the terminations are correct. */
 	nenv = 0;
 	endp = buf + buf_pos;
 	for (bufp = buf; bufp < endp; bufp++) {
-		if (*bufp == '\0')
+		if (*bufp == '\0') {
+#ifndef NDEBUG
+			if (bufp + 1 < endp)
+				assert(*(bufp + 1) != '\0');
+#endif
 			nenv++;
+		}
 	}
+	assert(*--bufp == '\0');
+
 	if (ctx->script_envlen < nenv) {
 		env = reallocarray(ctx->script_env, nenv + 1, sizeof(*env));
 		if (env == NULL)
