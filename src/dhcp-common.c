@@ -645,14 +645,16 @@ print_option(FILE *fp, const char *prefix, const struct dhcp_opt *opt,
 	if (fputc('=', fp) == EOF)
 		return -1;
 	if (dl == 0)
-		return 1;
+		goto out;
 
 	if (opt->type & OT_RFC1035) {
 		char domain[NS_MAXDNAME];
 
 		sl = decode_rfc1035(domain, sizeof(domain), data, dl);
-		if (sl == 0 || sl == -1)
-			return sl;
+		if (sl == -1)
+			return -1;
+		if (sl == 0)
+			goto out;
 		if (valid_domainname(domain, opt->type) == -1)
 			return -1;
 		return efprintf(fp, "%s", domain);
@@ -693,9 +695,7 @@ print_option(FILE *fp, const char *prefix, const struct dhcp_opt *opt,
 					return -1;
 			}
 		}
-		if (fputc('\0', fp) == EOF)
-			return -1;
-		return 1;
+		goto out;
 	}
 
 	t = data;
@@ -760,6 +760,7 @@ print_option(FILE *fp, const char *prefix, const struct dhcp_opt *opt,
 		}
 	}
 
+out:
 	if (fputc('\0', fp) == EOF)
 		return -1;
 	return 1;
