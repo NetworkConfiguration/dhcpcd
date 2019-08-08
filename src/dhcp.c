@@ -1647,6 +1647,8 @@ dhcp_makeudppacket(size_t *sz, const uint8_t *data, size_t length,
 	ip->ip_ttl = IPDEFTTL;
 	ip->ip_len = htons((uint16_t)(sizeof(*ip) + sizeof(*udp) + length));
 	ip->ip_sum = in_cksum(ip, sizeof(*ip), NULL);
+	if (ip->ip_sum == 0)
+		ip->ip_sum = 0xffff; /* RFC 768 */
 
 	*sz = sizeof(*ip) + sizeof(*udp) + length;
 	return udpp;
