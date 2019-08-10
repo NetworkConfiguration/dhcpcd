@@ -173,7 +173,7 @@ efprintf(FILE *fp, const char *fmt, ...)
 	return r;
 }
 
-static ssize_t
+static long
 make_env(const struct interface *ifp, const char *reason)
 {
 	struct dhcpcd_ctx *ctx = ifp->ctx;
@@ -509,7 +509,7 @@ dumplease:
 	}
 	*envp = NULL;
 
-	return (ssize_t)nenv;
+	return buf_pos - 1;
 
 eexit:
 	logerr(__func__);
@@ -525,10 +525,12 @@ send_interface1(struct fd_list *fd, const struct interface *ifp,
     const char *reason)
 {
 	struct dhcpcd_ctx *ctx = ifp->ctx;
+	long len;
 
-	if (make_env(ifp, reason) == -1)
+	len = make_env(ifp, reason);
+	if (len == -1)
 		return -1;
-	return control_queue(fd, ctx->script_buf, ctx->script_buflen, 1);
+	return control_queue(fd, ctx->script_buf,  (size_t)len, 1);
 }
 
 int
