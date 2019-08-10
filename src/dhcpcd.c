@@ -1440,10 +1440,10 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 	 * write callback on the fd */
 	if (strcmp(*argv, "--version") == 0) {
 		return control_queue(fd, UNCONST(VERSION),
-		    strlen(VERSION) + 1, 0);
+		    strlen(VERSION) + 1, false);
 	} else if (strcmp(*argv, "--getconfigfile") == 0) {
 		return control_queue(fd, UNCONST(fd->ctx->cffile),
-		    strlen(fd->ctx->cffile) + 1, 0);
+		    strlen(fd->ctx->cffile) + 1, false);
 	} else if (strcmp(*argv, "--getinterfaces") == 0) {
 		eloop_event_add_w(fd->ctx->eloop, fd->fd,
 		    dhcpcd_getinterfaces, fd);
