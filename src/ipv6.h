@@ -100,7 +100,8 @@
 #endif
 
 /* This was fixed in NetBSD */
-#if defined(__NetBSD_Version__) && __NetBSD_Version__ >= 699002000
+#if (defined(__DragonFly_version) && __DragonFly_version >= 500704) || \
+    (defined(__NetBSD_Version__) && __NetBSD_Version__ >= 699002000)
 #  undef IPV6_POLLADDRFLAG
 #endif
 
