@@ -489,7 +489,7 @@ dumplease:
 			nenv++;
 		}
 	}
-	assert(*--bufp == '\0');
+	assert(*(bufp - 1) == '\0');
 
 	if (ctx->script_envlen < nenv) {
 		env = reallocarray(ctx->script_env, nenv + 1, sizeof(*env));
