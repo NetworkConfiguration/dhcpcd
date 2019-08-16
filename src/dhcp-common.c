@@ -622,13 +622,14 @@ print_option(FILE *fp, const char *prefix, const struct dhcp_opt *opt,
     int vname,
     const uint8_t *data, size_t dl, const char *ifname)
 {
+	fpos_t fp_pos;
 	const uint8_t *e, *t;
 	uint16_t u16;
 	int16_t s16;
 	uint32_t u32;
 	int32_t s32;
 	struct in_addr addr;
-	ssize_t sl, ret;
+	ssize_t sl;
 	size_t l;
 
 	/* Ensure a valid length */
@@ -636,8 +637,10 @@ print_option(FILE *fp, const char *prefix, const struct dhcp_opt *opt,
 	if ((ssize_t)dl == -1)
 		return 0;
 
-	if (fprintf(fp, "%s", prefix) == -1)
+	if (fgetpos(fp, &fp_pos) == -1)
 		return -1;
+	if (fprintf(fp, "%s", prefix) == -1)
+		goto err;
 
 	/* We printed something, so always goto err from now-on
 	 * to terminate the string. */
@@ -764,17 +767,13 @@ print_option(FILE *fp, const char *prefix, const struct dhcp_opt *opt,
 	}
 
 done:
-	ret = 1;
-	goto out;
-
-err:
-	ret = -1;
-	goto out;
-
-out:
 	if (fputc('\0', fp) == EOF)
 		return -1;
-	return ret;
+	return 1;
+
+err:
+	(void)fsetpos(fp, &fp_pos);
+	return -1;
 }
 
 int
