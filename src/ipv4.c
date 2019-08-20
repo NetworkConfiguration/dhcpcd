@@ -742,7 +742,8 @@ ipv4_applyaddr(void *arg)
 #ifdef ARP
 				/* Announce the preferred address to
 				 * kick ARP caches. */
-				arp_announceaddr(ifp->ctx, &lease->addr);
+				if (!(ifp->flags & IFF_NOARP))
+					arp_announceaddr(ifp->ctx,&lease->addr);
 #endif
 			}
 			script_runreason(ifp, state->reason);
@@ -804,7 +805,8 @@ ipv4_applyaddr(void *arg)
 	rt_build(ifp->ctx, AF_INET);
 
 #ifdef ARP
-	arp_announceaddr(ifp->ctx, &state->addr->addr);
+	if (!(ifp->flags & IFF_NOARP))
+		arp_announceaddr(ifp->ctx, &state->addr->addr);
 #endif
 
 	if (state->state == DHS_BOUND) {

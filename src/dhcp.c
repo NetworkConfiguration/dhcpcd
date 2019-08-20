@@ -2365,7 +2365,10 @@ dhcp_arp_address(struct interface *ifp)
 		return 0;
 	}
 #else
-	if (ifp->options->options & DHCPCD_ARP && ia == NULL) {
+	if (!(ifp->flags & IFF_NOARP) &&
+	    ifp->options->options & DHCPCD_ARP &&
+	    ia == NULL)
+	{
 		struct arp_state *astate;
 		struct dhcp_lease l;
 
