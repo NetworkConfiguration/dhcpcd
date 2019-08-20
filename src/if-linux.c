@@ -1465,12 +1465,12 @@ bpf_read(struct interface *ifp, int s, void *data, size_t len,
 int
 bpf_attach(int s, void *filter, unsigned int filter_len)
 {
-	struct sock_fprog pf;
+	struct sock_fprog pf = {
+		.filter = filter,
+		.len = filter_len,
+	};
 
 	/* Install the filter. */
-	memset(&pf, 0, sizeof(pf));
-	pf.filter = filter;
-	pf.len = (unsigned short)filter_len;
 	return setsockopt(s, SOL_SOCKET, SO_ATTACH_FILTER, &pf, sizeof(pf));
 }
 
