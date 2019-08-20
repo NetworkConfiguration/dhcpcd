@@ -307,16 +307,15 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 	struct if_spec spec;
 #ifdef AF_LINK
 	const struct sockaddr_dl *sdl;
-#ifdef SIOCGIFPRIORITY
-	struct ifreq ifr;
-#endif
 #ifdef IFLR_ACTIVE
 	struct if_laddrreq iflr = { .flags = IFLR_PREFIX };
 	int link_fd;
 #endif
-
 #elif AF_PACKET
 	const struct sockaddr_ll *sll;
+#endif
+#if defined(SIOCGIFPRIORITY) || defined(SIOCGIFHWADDR)
+	struct ifreq ifr;
 #endif
 
 	if ((ifs = malloc(sizeof(*ifs))) == NULL) {
@@ -512,10 +511,18 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 				memcpy(ifp->hwaddr, sll->sll_addr, ifp->hwlen);
 #endif
 		}
-#ifdef __linux__
-		/* PPP addresses on Linux don't have hardware addresses */
-		else
-			ifp->index = if_nametoindex(ifp->name);
+#ifdef SIOCGIFHWADDR
+		else {
+			memset(&ifr, 0, sizeof(ifr));
+			strlcpy(ifr.ifr_name, ifa->ifa_name,
+			    sizeof(ifr.ifr_name));
+			if (ioctl(ctx->pf_inet_fd, SIOCGIFHWADDR, &ifr) == -1)
+				logerr("%s: SIOCGIFHWADDR", ifa->ifa_name);
+			ifp->family = ifr.ifr_hwaddr.sa_family;
+			if (ioctl(ctx->pf_inet_fd, SIOCGIFINDEX, &ifr) == -1)
+				logerr("%s: SIOCGIFINDEX", ifa->ifa_name);
+			ifp->index = (unsigned int)ifr.ifr_ifindex;
+		}
 #endif
 
 		/* Ensure hardware address is valid. */
@@ -528,9 +535,6 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 			    ctx->ifac == 0 && !if_hasconf(ctx, ifp->name))
 				active = IF_INACTIVE;
 			switch (ifp->family) {
-#ifdef ARPHRD_NETROM
-			case ARPHRD_NETROM:
-#endif
 			case ARPHRD_IEEE1394:
 			case ARPHRD_INFINIBAND:
 #ifdef ARPHRD_LOOPBACK
@@ -538,6 +542,9 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 #endif
 #ifdef ARPHRD_PPP
 			case ARPHRD_PPP:
+#endif
+#ifdef ARPHRD_NONE
+			case ARPHRD_NONE:
 #endif
 				/* We don't warn for supported families */
 				break;
