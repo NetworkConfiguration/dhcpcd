@@ -513,6 +513,9 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 		}
 #ifdef SIOCGIFHWADDR
 		else {
+			/* This is a huge bug in getifaddrs(3) as there
+			 * is no reason why this can't be returned in
+			 * ifa_addr. */
 			memset(&ifr, 0, sizeof(ifr));
 			strlcpy(ifr.ifr_name, ifa->ifa_name,
 			    sizeof(ifr.ifr_name));
