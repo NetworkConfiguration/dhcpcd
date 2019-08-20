@@ -528,6 +528,9 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 			    ctx->ifac == 0 && !if_hasconf(ctx, ifp->name))
 				active = IF_INACTIVE;
 			switch (ifp->family) {
+#ifdef ARPHRD_NETROM
+			case ARPHRD_NETROM:
+#endif
 			case ARPHRD_IEEE1394:
 			case ARPHRD_INFINIBAND:
 #ifdef ARPHRD_LOOPBACK
