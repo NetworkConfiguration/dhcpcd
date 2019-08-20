@@ -662,11 +662,8 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 	}
 #endif
 
-	/* We have already checked that at least one address must be
-	 * present after the rtm structure. */
-	/* coverity[ptr_arith] */
-	if (get_addrs(rtm->rtm_addrs, rtm + 1,
-		      rtm->rtm_msglen - sizeof(*rtm), rti_info) == -1)
+	if (get_addrs(rtm->rtm_addrs, (const char *)rtm + sizeof(*rtm),
+	              rtm->rtm_msglen - sizeof(*rtm), rti_info) == -1)
 		return -1;
 	memset(rt, 0, sizeof(*rt));
 
@@ -1117,10 +1114,7 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 	if ((ifp = if_findindex(ctx->ifaces, ifam->ifam_index)) == NULL)
 		return 0;
 
-	/* We have already checked that at least one address must be
-	 * present after the ifam structure. */
-	/* coverity[ptr_arith] */
-	if (get_addrs(ifam->ifam_addrs, ifam + 1,
+	if (get_addrs(ifam->ifam_addrs, (const char *)ifam + sizeof(*ifam),
 		      ifam->ifam_msglen - sizeof(*ifam), rti_info) == -1)
 		return -1;
 
@@ -1324,6 +1318,7 @@ if_dispatch(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 	return 0;
 }
 
+__CTASSERT(offsetof(struct rt_msghdr, rtm_msglen) == 0);
 int
 if_handlelink(struct dhcpcd_ctx *ctx)
 {
@@ -1335,13 +1330,21 @@ if_handlelink(struct dhcpcd_ctx *ctx)
 		return -1;
 	if (len == 0)
 		return 0;
-	if (len < rtm.hdr.rtm_msglen) {
+	if ((size_t)len < sizeof(rtm.hdr.rtm_msglen) ||
+	    len != rtm.hdr.rtm_msglen)
+	{
 		errno = EINVAL;
 		return -1;
 	}
-	/* We generally treat rtm.hdr has an array so we can easily
-	 * access the following data. */
-	/* coverity[callee_ptr_arith] */
+	/*
+	 * Coverity thinks that the data could be tainted from here.
+	 * I have no idea how because the length of the data we read
+	 * is guarded by len and checked to match rtm_msglen.
+	 * The issue seems to be related to extracting the addresses
+	 * at the end of the header, but seems to have no issues with the
+	 * equivalent call in if_initrt.
+	 */
+	/* coverity[tainted-data] */
 	return if_dispatch(ctx, &rtm.hdr);
 }
 
