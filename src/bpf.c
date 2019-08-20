@@ -558,6 +558,11 @@ bpf_arp(struct interface *ifp, int fd)
 #define	BPF_M_UDP	3
 #define	BPF_M_UDPLEN	4
 
+static const struct bpf_insn bpf_bootp_netrom[] = {
+	BPF_STMT(BPF_ST, BPF_M_FHLEN),
+};
+#define BPF_BOOTP_NETROM_LEN	__arraycount(bpf_bootp_netrom)
+
 static const struct bpf_insn bpf_bootp_ether[] = {
 	/* Make sure this is an IP packet. */
 	BPF_STMT(BPF_LD + BPF_H + BPF_ABS,
@@ -665,6 +670,12 @@ bpf_bootp(struct interface *ifp, int fd)
 	bp = bpf;
 	/* Check frame header. */
 	switch(ifp->family) {
+#ifdef ARPHRD_NETROM
+	case ARPHRD_NETROM:
+		memcpy(bp, bpf_bootp_netrom, sizeof(bpf_bootp_netrom));
+		bp += BPF_BOOTP_NETROM_LEN;
+		break;
+#endif
 	case ARPHRD_ETHER:
 		memcpy(bp, bpf_bootp_ether, sizeof(bpf_bootp_ether));
 		bp += BPF_BOOTP_ETHER_LEN;
