@@ -2062,7 +2062,7 @@ err_sla:
 		ifo->auth.options &= ~DHCPCD_AUTH_REQUIRE;
 		break;
 	case O_DHCP:
-		ifo->options |= DHCPCD_DHCP | DHCPCD_IPV4;
+		ifo->options |= DHCPCD_DHCP | DHCPCD_WANTDHCP | DHCPCD_IPV4;
 		break;
 	case O_NODHCP:
 		ifo->options &= ~DHCPCD_DHCP;
