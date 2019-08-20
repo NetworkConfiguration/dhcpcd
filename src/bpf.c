@@ -558,10 +558,14 @@ bpf_arp(struct interface *ifp, int fd)
 #define	BPF_M_UDP	3
 #define	BPF_M_UDPLEN	4
 
+#ifdef ARPHRD_NETROM
 static const struct bpf_insn bpf_bootp_netrom[] = {
+	/* Set the frame header length to zero. */
+	BPF_STMT(BPF_LD + BPF_IMM, 0),
 	BPF_STMT(BPF_ST, BPF_M_FHLEN),
 };
 #define BPF_BOOTP_NETROM_LEN	__arraycount(bpf_bootp_netrom)
+#endif
 
 static const struct bpf_insn bpf_bootp_ether[] = {
 	/* Make sure this is an IP packet. */
