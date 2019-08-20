@@ -3724,12 +3724,6 @@ dhcp_start1(void *arg)
 		return;
 	}
 
-	if (ifp->hwlen == 0 && ifo->clientid[0] == '\0') {
-		logwarnx("%s: needs a clientid to configure", ifp->name);
-		dhcp_drop(ifp, "FAIL");
-		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
-		return;
-	}
 	/* We don't want to read the old lease if we NAK an old test */
 	nolease = state->offer && ifp->ctx->options & DHCPCD_TEST;
 	if (!nolease && ifo->options & DHCPCD_DHCP) {
