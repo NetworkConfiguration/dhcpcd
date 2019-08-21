@@ -3342,12 +3342,6 @@ dhcp_handlepacket(struct interface *ifp, uint8_t *data, size_t len)
 			  ifp->name, inet_ntoa(from));
 		return;
 	}
-	if (ifp->flags & IFF_POINTOPOINT &&
-	    (state->addr == NULL || state->addr->brd.s_addr != from.s_addr))
-	{
-		logwarnx("%s: server %s is not destination",
-		    ifp->name, inet_ntoa(from));
-	}
 
 	/*
 	 * DHCP has a variable option area rather than a fixed vendor area.
