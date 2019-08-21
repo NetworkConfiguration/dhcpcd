@@ -268,13 +268,12 @@ inet_dhcproutes(rb_tree_t *routes, struct interface *ifp, bool *have_default)
 	rb_tree_init(&nroutes, &rt_compare_proto_ops);
 
 	/* First, add a subnet route. */
-	if (!(ifp->flags & IFF_POINTOPOINT) &&
+	if (state->addr->mask.s_addr != INADDR_ANY
 #ifndef BSD
 	    /* BSD adds a route in this instance */
-	    state->addr->mask.s_addr != INADDR_BROADCAST &&
+	    && state->addr->mask.s_addr != INADDR_BROADCAST
 #endif
-	    state->addr->mask.s_addr != INADDR_ANY)
-	{
+	) {
 		if ((rt = rt_new(ifp)) == NULL)
 			return -1;
 		rt->rt_dflags |= RTDF_IFA_ROUTE;
