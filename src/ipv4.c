@@ -680,8 +680,10 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 		logdebugx("%s: aliased %s", ia->alias, ia->saddr);
 #endif
 
-	logdebugx("%s: adding IP address %s broadcast %s",
-	    ifp->name, ia->saddr, inet_ntoa(*bcast));
+	logdebugx("%s: adding IP address %s %s %s",
+	    ifp->name, ia->saddr,
+	    ifp->flags & IFF_POINTOPOINT ? "destination" : "broadcast",
+	    inet_ntoa(*bcast));
 	if (if_address(RTM_NEWADDR, ia) == -1) {
 		if (errno != EEXIST)
 			logerr("%s: if_addaddress",
