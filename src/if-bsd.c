@@ -1344,7 +1344,7 @@ if_handlelink(struct dhcpcd_ctx *ctx)
 	 * at the end of the header, but seems to have no issues with the
 	 * equivalent call in if_initrt.
 	 */
-	/* coverity[tainted-data] */
+	/* coverity[tainted_data] */
 	return if_dispatch(ctx, &rtm.hdr);
 }
 
