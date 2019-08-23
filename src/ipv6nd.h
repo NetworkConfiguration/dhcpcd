@@ -51,8 +51,9 @@ struct ra {
 	uint32_t retrans;
 	uint32_t mtu;
 	struct ipv6_addrhead addrs;
-	uint8_t hasdns;
-	uint8_t expired;
+	bool hasdns;
+	bool expired;
+	bool isreachable;
 };
 
 TAILQ_HEAD(ra_head, ra);
