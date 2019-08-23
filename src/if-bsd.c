@@ -674,9 +674,15 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 		if (rt->rt_netmask.sa_family == 255) /* Why? */
 			rt->rt_netmask.sa_family = rt->rt_dest.sa_family;
 	}
-	/* dhcpcd likes an unspecified gateway to indicate via the link. */
-	if (rt->rt_flags & RTF_GATEWAY &&
-	    rti_info[RTAX_GATEWAY]->sa_family != AF_LINK)
+	/* dhcpcd likes an unspecified gateway to indicate via the link.
+	 * However we need to know if gateway was a link with an address. */
+	if (rti_info[RTAX_GATEWAY]->sa_family == AF_LINK) {
+		const struct sockaddr_dl *sdl;
+
+		sdl = (const struct sockaddr_dl*)rti_info[RTAX_GATEWAY];
+		if (sdl->sdl_alen != 0)
+			rt->rt_dflags |= RTDF_GATELINK;
+	} else if (rtm->rtm_flags & RTF_GATEWAY)
 		if_copysa(&rt->rt_gateway, rti_info[RTAX_GATEWAY]);
 	if (rtm->rtm_addrs & RTA_IFA)
 		if_copysa(&rt->rt_ifa, rti_info[RTAX_IFA]);
@@ -1077,20 +1083,13 @@ if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 	 * BSD announces host routes.
 	 * As such, we should be notified of reachability by its
 	 * existance with a hardware address.
+	 * Ensure we don't call this for an incomplete state.
 	 */
-	if (rt.rt_dest.sa_family == AF_INET6 && rt.rt_flags & RTF_HOST) {
-		struct sockaddr_in6 dest;
-		struct sockaddr_dl sdl;
-
-		memcpy(&dest, &rt.rt_dest, rt.rt_dest.sa_len);
-		if (rt.rt_gateway.sa_family == AF_LINK)
-			memcpy(&sdl, &rt.rt_gateway, rt.rt_gateway.sa_len);
-		else
-			sdl.sdl_alen = 0;
-		ipv6nd_neighbour(ctx, &dest.sin6_addr,
-		    rtm->rtm_type != RTM_DELETE && sdl.sdl_alen ?
-		    IPV6ND_REACHABLE : 0);
-	}
+	if (rt.rt_dest.sa_family == AF_INET6 &&
+	    rt.rt_flags & RTF_HOST &&
+	    (rtm->rtm_type == RTM_DELETE || rt.rt_dflags & RTDF_GATELINK))
+		ipv6nd_neighbour(ctx, &rt.rt_ss_dest.sin6.sin6_addr,
+		    rtm->rtm_type != RTM_DELETE ? IPV6ND_REACHABLE : 0);
 #endif
 
 	rt_recvrt(rtm->rtm_type, &rt, rtm->rtm_pid);
