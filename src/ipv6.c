@@ -1060,6 +1060,28 @@ ipv6_getstate(struct interface *ifp)
 	return state;
 }
 
+struct ipv6_addr *
+ipv6_ifanyglobal(struct interface *ifp)
+{
+	struct ipv6_state *state;
+	struct ipv6_addr *ia;
+
+	if (ifp->carrier == LINK_DOWN)
+		return NULL;
+
+	state = IPV6_STATE(ifp);
+	if (state == NULL)
+		return NULL;
+
+	TAILQ_FOREACH(ia, &state->addrs, next) {
+		if (IN6_IS_ADDR_LINKLOCAL(&ia->addr))
+			continue;
+		if (!(ia->addr_flags & IN6_IFF_NOTUSEABLE))
+			break;
+	}
+	return ia;
+}
+
 void
 ipv6_handleifa(struct dhcpcd_ctx *ctx,
     int cmd, struct if_head *ifs, const char *ifname,
@@ -1069,6 +1091,7 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 	struct ipv6_state *state;
 	struct ipv6_addr *ia;
 	struct ll_callback *cb;
+	bool anyglobal;
 
 #if 0
 	char dbuf[INET6_ADDRSTRLEN];
@@ -1088,6 +1111,7 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 		return;
 	if ((state = ipv6_getstate(ifp)) == NULL)
 		return;
+	anyglobal = ipv6_ifanyglobal(ifp) != NULL;
 
 	TAILQ_FOREACH(ia, &state->addrs, next) {
 		if (IN6_ARE_ADDR_EQUAL(&ia->addr, addr))
@@ -1187,6 +1211,7 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 	if (ia == NULL)
 		return;
 
+	ctx->options &= ~DHCPCD_RTBUILD;
 	ipv6nd_handleifa(cmd, ia, pid);
 #ifdef DHCP6
 	dhcp6_handleifa(cmd, ia, pid);
@@ -1198,6 +1223,14 @@ out:
 		ipv6_freeaddr(ia);
 	else if (!(ia->addr_flags & IN6_IFF_NOTUSEABLE))
 		ia->flags |= IPV6_AF_DADCOMPLETED;
+
+	/* If we've not already called rt_build via the IPv6ND
+	 * or DHCP6 handlers and the existance of any useable
+	 * global address on the interface has changed,
+	 * call rt_build to add/remove the default route. */
+	if (!(ctx->options & DHCPCD_RTBUILD) &&
+	    (ipv6_ifanyglobal(ifp) != NULL) != anyglobal)
+		rt_build(ctx, AF_INET6);
 }
 
 int
@@ -2272,6 +2305,8 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 			}
 		}
 		if (rap->lifetime == 0)
+			continue;
+		if (ipv6_ifanyglobal(rap->iface) == NULL)
 			continue;
 		rt = inet6_makerouter(rap);
 		if (rt == NULL)
