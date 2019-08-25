@@ -954,7 +954,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 	struct in6_addr pi_prefix;
 	struct ipv6_addr *ap;
 	struct dhcp_opt *dho;
-	bool new_rap, new_data;
+	bool new_rap, new_data, has_address;
 	uint32_t old_lifetime;
 	__printflike(1, 2) void (*logfunc)(const char *, ...);
 #ifdef IPV6_MANAGETEMPADDR
@@ -1055,7 +1055,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 	 * routers like to decrease the advertised valid and preferred times
 	 * in accordance with the own prefix times which would result in too
 	 * much needless log spam. */
-	logfunc = new_rap || !rap->isreachable ? loginfox : logdebugx,
+	logfunc = new_data || !rap->isreachable ? loginfox : logdebugx,
 	logfunc("%s: Router Advertisement from %s", ifp->name, rap->sfrom);
 
 	clock_gettime(CLOCK_MONOTONIC, &rap->acquired);
@@ -1078,6 +1078,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 	rap->expired = false;
 	rap->hasdns = false;
 	rap->isreachable = true;
+	has_address = false;
 
 #ifdef IPV6_AF_TEMPORARY
 	ipv6_markaddrsstale(ifp, IPV6_AF_TEMPORARY);
@@ -1211,6 +1212,9 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 			    ntohl(pi.nd_opt_pi_valid_time);
 			ap->prefix_pltime =
 			    ntohl(pi.nd_opt_pi_preferred_time);
+			if (ap->prefix_vltime != 0 &&
+			    ap->flags & IPV6_AF_AUTOCONF)
+				has_address = true;
 
 #ifdef IPV6_MANAGETEMPADDR
 			/* RFC4941 Section 3.3.3 */
@@ -1277,6 +1281,10 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 		}
 	}
 
+	if (new_data && !has_address && rap->lifetime && !ipv6_ifanyglobal(ifp))
+		logwarnx("%s: no global addresses for default route",
+		    ifp->name);
+
 	if (new_rap)
 		add_router(ifp->ctx, rap);
 
@@ -1327,20 +1335,21 @@ nodhcp6:
 	ipv6nd_expirera(ifp);
 }
 
-int
-ipv6nd_hasra(const struct interface *ifp)
+bool
+ipv6nd_hasralifetime(const struct interface *ifp, bool lifetime)
 {
 	const struct ra *rap;
 
 	if (ifp->ctx->ra_routers) {
 		TAILQ_FOREACH(rap, ifp->ctx->ra_routers, next)
-			if (rap->iface == ifp && !rap->expired)
-				return 1;
+			if (rap->iface == ifp && !rap->expired &&
+			    (!lifetime ||rap->lifetime))
+				return true;
 	}
-	return 0;
+	return false;
 }
 
-int
+bool
 ipv6nd_hasradhcp(const struct interface *ifp)
 {
 	const struct ra *rap;
@@ -1349,11 +1358,11 @@ ipv6nd_hasradhcp(const struct interface *ifp)
 		TAILQ_FOREACH(rap, ifp->ctx->ra_routers, next) {
 			if (rap->iface == ifp &&
 			    !rap->expired &&
-			    (rap->flags & (ND_RA_FLAG_MANAGED | ND_RA_FLAG_OTHER)))
-				return 1;
+			    (rap->flags &(ND_RA_FLAG_MANAGED|ND_RA_FLAG_OTHER)))
+				return true;
 		}
 	}
-	return 0;
+	return false;
 }
 
 static const uint8_t *
