@@ -2271,7 +2271,7 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 				rt_proto_add(routes, rt);
 			}
 		}
-		if (rap->lifetime == 0 || !rap->isreachable)
+		if (rap->lifetime == 0)
 			continue;
 		rt = inet6_makerouter(rap);
 		if (rt == NULL)

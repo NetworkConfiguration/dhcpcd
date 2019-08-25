@@ -127,7 +127,6 @@ __CTASSERT(sizeof(struct nd_opt_rdnss) == 8);
 //
 
 static void ipv6nd_handledata(void *);
-static void ipv6nd_startrs1(void *);
 
 /*
  * Android ships buggy ICMP6 filter headers.
@@ -576,10 +575,6 @@ ipv6nd_reachable(struct ra *rap, int flags)
 		    rap->iface->name, rap->sfrom);
 		rap->isreachable = false;
 	}
-
-	rt_build(rap->iface->ctx, AF_INET6);
-	/* XXX Not really an RA */
-	script_runreason(rap->iface, "ROUTERADVERT");
 }
 
 void
@@ -608,7 +603,7 @@ ipv6nd_neighbour(struct dhcpcd_ctx *ctx, struct in6_addr *addr, int flags)
 	}
 
 	if (rapr == NULL)
-		ipv6nd_startrs1(rap->iface);
+		ipv6nd_startrs(rap->iface);
 }
 
 const struct ipv6_addr *
@@ -1426,9 +1421,6 @@ ipv6nd_env(FILE *fp, const struct interface *ifp)
 			return -1;
 		if (efprintf(fp, "%s_now=%lld", ndprefix,
 		    (long long)now.tv_sec) == -1)
-			return -1;
-		if (efprintf(fp, "%s_isreachable=%s", ndprefix,
-		    rap->isreachable ? "true" : "false") == -1)
 			return -1;
 
 		/* Zero our indexes */
