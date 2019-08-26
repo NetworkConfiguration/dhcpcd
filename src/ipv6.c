@@ -1076,7 +1076,10 @@ ipv6_ifanyglobal(struct interface *ifp)
 	TAILQ_FOREACH(ia, &state->addrs, next) {
 		if (IN6_IS_ADDR_LINKLOCAL(&ia->addr))
 			continue;
-		if (!(ia->addr_flags & IN6_IFF_NOTUSEABLE))
+		/* Let's be optimistic.
+		 * Any decent OS won't forward or accept traffic
+		 * from/to tentative or detached addresses. */
+		if (!(ia->addr_flags & IN6_IFF_DUPLICATED))
 			break;
 	}
 	return ia;
