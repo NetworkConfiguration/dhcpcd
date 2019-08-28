@@ -134,16 +134,17 @@ You can decide which polling mechanism dhcpcd will select in eloop like so
 
 
 ## Importing into another source control system
-To prepare dhcpcd for import into a platform source tree (like NetBSD)
-you can use the make import target to create /tmp/dhcpcd-$version and
-populate it with all the source files and hooks needed.
+To import the full sources, use the import target.
+To import only the needed sources and documentation, use the import-src
+target.
+Both targets support DESTDIR to set the installation directory,
+if unset it defaults to `/tmp/dhcpcd-$VERSION`
+Example: `make DESTDIR=/usr/src/contrib/dhcpcd import-src`
+
 In this instance, you may wish to disable some configured tests when
 the binary has to run on older versions which lack support, such as getline.
 `./configure --without-getline`
 
-There is also the import-src target which installs just the needed source
-files in a specific directory (like DragonFly).
-`make DESTDIR=/usr/src/contrib/dhcpcd import-src`
 
 ## Hooks
 Not all the hooks in dhcpcd-hooks are installed by default.
