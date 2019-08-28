@@ -91,10 +91,16 @@ import: dist
 	${INSTALL} -d /tmp/${DISTPREFIX}
 	tar xvJpf ${DISTFILE} -C /tmp
 
+_import-src:
+	rm -rf ${DESTDIR}/*
+	${INSTALL} -d ${DESTDIR}
+	cp LICENSE README.md ${DESTDIR};
+	for x in ${SUBDIRS}; do cd $$x; ${MAKE} DESTDIR=${DESTDIR} $@ || exit $$?; cd ..; done
+	@${ECHO}
+	@${ECHO} "============================================================="
+	@${ECHO} "dhcpcd-${VERSION} imported to ${DESTDIR}"
+
 import-src:
-	rm -rf /tmp/${DISTPREFIX}
-	${INSTALL} -d /tmp/${DISTPREFIX}
-	cp LICENSE README.md /tmp/${DISTPREFIX}
-	for x in ${SUBDIRS}; do cd $$x; ${MAKE} DESTDIR=/tmp/${DISTPREFIX} $@ || exit $$?; cd ..; done
+	${MAKE} _import-src DESTDIR=`if [ -n "${DESTDIR}" ]; then echo "${DESTDIR}"; else  echo /tmp/${DISTPREFIX}; fi`
 
 include Makefile.inc

@@ -61,7 +61,7 @@ import: ${HOOKSCRIPTS}
 	${INSTALL} -m ${NONBINMODE} ${SCRIPTS} /tmp/${DISTPREFIX}/dhcpcd-hooks
 	${INSTALL} -m ${NONBINMODE} ${FILES} /tmp/${DISTPREFIX}/dhcpcd-hooks
 
-import-src:
+_import-src:
 	${INSTALL} -d ${DESTDIR}/hooks
 	cp dhcpcd-run-hooks.in dhcpcd-run-hooks.8.in [0-9]* ${DESTDIR}/hooks
 	rm ${DESTDIR}/hooks/50-dhcpcd-compat

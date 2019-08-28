@@ -135,7 +135,7 @@ clean:
 distclean: clean
 	rm -f .depend
 
-import-src: ${SRCS}
+_import-src: ${SRCS}
 	${INSTALL} -d ${DESTDIR}/src
 	touch if-bsd.h if-linux.h if-sun.h
 	cp defs.h ${SRCS} ${SRCS:.c=.h} dev.h ${MAN5}.in ${MAN8}.in ${DESTDIR}/src
