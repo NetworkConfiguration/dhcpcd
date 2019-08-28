@@ -938,6 +938,30 @@ EOF
 	echo "$TAILQ_FOREACH_SAFE"
 	rm -f _queue.c _queue
 fi
+if [ "$TAILQ_FOREACH_SAFE" = no ] && [ -z "$TAILQ_FOREACH_MUTABLE" ]; then
+	printf "Testing for TAILQ_FOREACH_MUTABLE ... "
+	cat <<EOF >_queue.c
+#include <sys/queue.h>
+int main(void) {
+#ifndef TAILQ_FOREACH_MUTABLE
+#error TAILQ_FOREACH_MUTABLE
+#endif
+	return 0;
+}
+EOF
+	if $XCC _queue.c -o _queue 2>&3; then
+		TAILQ_FOREACH_MUTABLE=yes
+		TAILQ_FOREACH_SAFE=yes
+		TAILQ_FOREACH=yes
+		echo "#define	TAILQ_FOREACH_SAFE	TAILQ_FOREACH_MUTABLE" \
+			>> $CONFIG_H
+	else
+		TAILQ_FOREACH_MUTABLE=no
+	fi
+	echo "$TAILQ_FOREACH_MUTABLE"
+	rm -f _queue.c _queue
+fi
+
 
 if [ -z "$TAILQ_CONCAT" ]; then
 	printf "Testing for TAILQ_CONCAT ..."
