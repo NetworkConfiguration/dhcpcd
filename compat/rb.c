@@ -29,7 +29,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "common.h"
+#include "config.h"
 
 #if !defined(_KERNEL) && !defined(_STANDALONE)
 #include <sys/types.h>

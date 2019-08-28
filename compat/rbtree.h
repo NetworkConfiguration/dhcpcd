@@ -32,7 +32,7 @@
 #ifndef _SYS_RBTREE_H_
 #define	_SYS_RBTREE_H_
 
-#include "common.h"
+#include "config.h"
 
 #if defined(_KERNEL) || defined(_STANDALONE)
 #include <sys/types.h>
@@ -40,7 +40,11 @@
 #include <stdbool.h>
 #include <inttypes.h>
 #endif
+#ifdef HAVE_SYS_QUEUE_H
+#include <sys/queue.h>
+#else
 #include "queue.h"
+#endif
 #if !defined(__linux__) && !defined(__QNX__) && !defined(__sun)
 #include <sys/endian.h>
 #else
