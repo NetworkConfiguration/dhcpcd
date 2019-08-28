@@ -179,25 +179,6 @@ done
 : ${WC:=wc}
 
 : ${FORK:=yes}
-: ${SYSCONFDIR:=$PREFIX/etc}
-: ${SBINDIR:=$PREFIX/sbin}
-: ${LIBDIR:=$PREFIX/lib}
-: ${LIBEXECDIR:=$PREFIX/libexec}
-: ${STATEDIR:=/var}
-: ${DBDIR:=$STATEDIR/db/dhcpcd}
-: ${RUNDIR:=$STATEDIR/run}
-: ${MANDIR:=${PREFIX:-/usr}/share/man}
-: ${DATADIR:=${PREFIX:-/usr}/share}
-
-eval SYSCONFDIR="$SYSCONFDIR"
-eval LIBDIR="$LIBDIR"
-eval LIBEXECDIR="$LIBEXECDIR"
-eval STATEDIR="$STATEDIR"
-eval DBDIR="$DBDIR"
-eval RUNDIR="$RUNDIR"
-eval MANDIR="$MANDIR"
-eval DATADIR="$DATADIR"
-
 _which()
 {
 	x="$(which "$1" 2>/dev/null)"
@@ -252,6 +233,10 @@ if [ -z "$OS" ]; then
 	esac
 	# Special case
 	case "$OS" in
+	dragonfly*)
+		# This means /usr HAS to be mounted not via dhcpcd
+		: ${LIBEXECDIR:=${PREFIX:-/usr}/libexec}
+		;;
 	gnu*) OS=hurd;; # No HURD support as yet
 	esac
 fi
@@ -261,6 +246,26 @@ rm -f $CONFIG_H $CONFIG_MK
 echo "# $OS" >$CONFIG_MK
 echo "/* $OS */" >$CONFIG_H
 
+: ${SYSCONFDIR:=$PREFIX/etc}
+: ${SBINDIR:=$PREFIX/sbin}
+: ${LIBDIR:=$PREFIX/lib}
+: ${LIBEXECDIR:=$PREFIX/libexec}
+: ${STATEDIR:=/var}
+: ${DBDIR:=$STATEDIR/db/dhcpcd}
+: ${RUNDIR:=$STATEDIR/run}
+: ${MANDIR:=${PREFIX:-/usr}/share/man}
+: ${DATADIR:=${PREFIX:-/usr}/share}
+
+eval SYSCONFDIR="$SYSCONFDIR"
+eval LIBDIR="$LIBDIR"
+eval LIBEXECDIR="$LIBEXECDIR"
+eval STATEDIR="$STATEDIR"
+eval DBDIR="$DBDIR"
+eval RUNDIR="$RUNDIR"
+eval MANDIR="$MANDIR"
+eval DATADIR="$DATADIR"
+
+echo "#ifndef	SYSCONFDIR" >>$CONFIG_H
 for x in SYSCONFDIR SBINDIR LIBDIR LIBEXECDIR DBDIR RUNDIR; do
 	eval v=\$$x
 	# Make files look nice for import
@@ -272,6 +277,8 @@ for x in SYSCONFDIR SBINDIR LIBDIR LIBEXECDIR DBDIR RUNDIR; do
 	[ $l -gt 2 ] && t="	"
 	echo "#define	$x$t		\"$v\"" >>$CONFIG_H
 done
+echo "#endif" >>$CONFIG_H
+
 echo "LIBDIR=		$LIBDIR" >>$CONFIG_MK
 echo "MANDIR=		$MANDIR" >>$CONFIG_MK
 echo "DATADIR=	$DATADIR" >>$CONFIG_MK
