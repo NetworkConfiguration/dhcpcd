@@ -771,6 +771,7 @@ If you always use the same options, put them here.
 .It Pa @SCRIPT@
 Bourne shell script that is run to configure or de-configure an interface.
 .It Pa @LIBDIR@/dhcpcd/dev
+Linux
 .Pa /dev
 management modules.
 .It Pa @HOOKDIR@
