@@ -504,10 +504,18 @@ if [ -z "$AUTH" -o "$AUTH" = yes ]; then
 	echo "Enabling Authentication"
 	echo "CPPFLAGS+=	-DAUTH" >>$CONFIG_MK
 	echo "SRCS+=		auth.c" >>$CONFIG_MK
-	echo "CRYPT_SRCS+=	\${HMAC_SRC}" >>$CONFIG_MK
+	if [ -n "$HMAC_SRC" ]; then
+		echo "CRYPT_SRCS+=	\${HMAC_SRC}" >>$CONFIG_MK
+	fi
 fi
-if [ -z "$INET6" -o "$INET6" = yes -o -z "$AUTH" -o "$AUTH" = yes ]; then
-	echo "CRYPT_SRCS+=	\${MD5_SRC} \${SHA256_SRC}" >>$CONFIG_MK
+if [ -z "$INET6" ] || [ "$INET6" = yes ] || \
+    [ -z "$AUTH" ] || [ "$AUTH" = yes ]; then
+	if [ -n "$MD5_SRC" ]; then
+		echo "CRYPT_SRCS+=	\${MD5_SRC}" >>$CONFIG_MK
+	fi
+	if [ -n "$SHA256_SRC" ]; then
+		echo "CRYPT_SRCS+=	\${SHA256_SRC}" >>$CONFIG_MK
+	fi
 fi
 
 echo "Using compiler .. $CC"
