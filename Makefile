@@ -91,4 +91,10 @@ import: dist
 	${INSTALL} -d /tmp/${DISTPREFIX}
 	tar xvJpf ${DISTFILE} -C /tmp
 
+import-src:
+	rm -rf /tmp/${DISTPREFIX}
+	${INSTALL} -d /tmp/${DISTPREFIX}
+	cp LICENSE README.md /tmp/${DISTPREFIX}
+	for x in ${SUBDIRS}; do cd $$x; ${MAKE} DESTDIR=/tmp/${DISTPREFIX} $@ || exit $$?; cd ..; done
+
 include Makefile.inc

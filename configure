@@ -1217,6 +1217,14 @@ if [ "$FLS64" = yes ]; then
 	echo "#define	HAVE_SYS_BITOPS_H" >>$CONFIG_H
 fi
 
+# Workaround for DragonFlyBSD import
+if [ "$OS" = dragonfly ]; then
+	echo "#ifdef	USE_PRIVATECRYPTO" >>$CONFIG_H
+	echo "#define	HAVE_MD5_H" >>$CONFIG_H
+	echo "#define	SHA2_H	<sha256.h>" >>$CONFIG_H
+	echo "#else" >>$CONFIG_H
+fi
+
 if [ -z "$MD5" ]; then
 	MD5_LIB=
 	printf "Testing for MD5Init ... "
@@ -1352,6 +1360,9 @@ else
 	fi
 	[ -n "$SHA2_LIB" ] && echo "LDADD+=		$SHA2_LIB" >>$CONFIG_MK
 fi
+
+# Workarond for DragonFlyBSD import
+[ "$OS" = dragonfly ] && echo "#endif" >>$CONFIG_H
 
 if [ -z "$HMAC" ]; then
 	HMAC_LIB=
