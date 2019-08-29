@@ -217,7 +217,6 @@ ipv6nd_open0(void)
 		goto eexit;
 
 	ICMP6_FILTER_SETBLOCKALL(&filt);
-	ICMP6_FILTER_SETPASS(ND_NEIGHBOR_ADVERT, &filt);
 	ICMP6_FILTER_SETPASS(ND_ROUTER_ADVERT, &filt);
 	if (setsockopt(s, IPPROTO_ICMPV6, ICMP6_FILTER,
 	    &filt, sizeof(filt)) == -1)
@@ -555,28 +554,6 @@ ipv6nd_startexpire(struct interface *ifp)
 	    ipv6nd_expire, ifp);
 }
 
-static void
-ipv6nd_reachable(struct ra *rap, int flags)
-{
-
-	if (rap->expired)
-		return;
-
-	if (flags & IPV6ND_REACHABLE) {
-		if (rap->isreachable)
-			return;
-		loginfox("%s: %s is reachable again",
-		    rap->iface->name, rap->sfrom);
-		rap->isreachable = true;
-	} else {
-		if (!rap->isreachable)
-			return;
-		logwarnx("%s: %s is unreachable",
-		    rap->iface->name, rap->sfrom);
-		rap->isreachable = false;
-	}
-}
-
 void
 ipv6nd_neighbour(struct dhcpcd_ctx *ctx, struct in6_addr *addr, int flags)
 {
@@ -586,13 +563,31 @@ ipv6nd_neighbour(struct dhcpcd_ctx *ctx, struct in6_addr *addr, int flags)
 		return;
 
 	TAILQ_FOREACH(rap, ctx->ra_routers, next) {
-		if (IN6_ARE_ADDR_EQUAL(&rap->from, addr)) {
-			ipv6nd_reachable(rap, flags);
+		if (IN6_ARE_ADDR_EQUAL(&rap->from, addr))
 			break;
-		}
 	}
-	if (rap == NULL || flags & IPV6ND_REACHABLE)
+
+	if (rap == NULL || rap->expired)
 		return;
+
+	if (!(flags & IPV6ND_ROUTER) && rap->lifetime != 0) {
+		loginfox("%s: %s is no longer a router",
+		    rap->iface->name, rap->sfrom);
+		rap->lifetime = 0;
+	} else if (flags & IPV6ND_REACHABLE) {
+		if (rap->isreachable)
+			return;
+		loginfox("%s: %s is reachable again",
+		    rap->iface->name, rap->sfrom);
+		rap->isreachable = true;
+		return;
+	} else {
+		if (!rap->isreachable)
+			return;
+		logwarnx("%s: %s is unreachable",
+		    rap->iface->name, rap->sfrom);
+		rap->isreachable = false;
+	}
 
 	/* If we have no reachable default routers, try and solicit one. */
 	TAILQ_FOREACH(rapr, ctx->ra_routers, next) {
@@ -1710,83 +1705,6 @@ ipv6nd_drop(struct interface *ifp)
 }
 
 static void
-ipv6nd_handlena(struct dhcpcd_ctx *ctx, const char *sfrom,
-    struct interface *ifp, struct icmp6_hdr *icp, size_t len, int hoplimit)
-{
-	struct nd_neighbor_advert *nd_na;
-	struct in6_addr nd_na_target;
-	struct ra *rap;
-	uint32_t is_router, is_solicited;
-	char buf[INET6_ADDRSTRLEN];
-	const char *taddr;
-
-	if (ifp == NULL) {
-#ifdef DEBUG_NS
-		logdebugx("NA for unexpected interface from %s", sfrom);
-#endif
-		return;
-	}
-
-	if ((size_t)len < sizeof(struct nd_neighbor_advert)) {
-		logerrx("%s: IPv6 NA too short from %s", ifp->name, sfrom);
-		return;
-	}
-
-	/* RFC 4861 7.1.2 */
-	if (hoplimit != 255) {
-		logerrx("invalid hoplimit(%d) in NA from %s",
-		    hoplimit, sfrom);
-		return;
-	}
-
-	nd_na = (struct nd_neighbor_advert *)icp;
-	is_router = nd_na->nd_na_flags_reserved & ND_NA_FLAG_ROUTER;
-	is_solicited = nd_na->nd_na_flags_reserved & ND_NA_FLAG_SOLICITED;
-	taddr = inet_ntop(AF_INET6, &nd_na->nd_na_target,
-	    buf, INET6_ADDRSTRLEN);
-
-	/* nd_na->nd_na_target is not aligned. */
-	memcpy(&nd_na_target, &nd_na->nd_na_target, sizeof(nd_na_target));
-	if (IN6_IS_ADDR_MULTICAST(&nd_na_target)) {
-		logerrx("%s: NA multicast address %s (%s)",
-		    ifp->name, taddr, sfrom);
-		return;
-	}
-
-	TAILQ_FOREACH(rap, ctx->ra_routers, next) {
-		if (rap->iface == ifp &&
-		    IN6_ARE_ADDR_EQUAL(&rap->from, &nd_na_target))
-			break;
-	}
-	if (rap == NULL) {
-#ifdef DEBUG_NS
-		logdebugx("%s: unexpected NA from %s for %s",
-		    ifp->name, sfrom, taddr);
-#endif
-		return;
-	}
-
-#ifdef DEBUG_NS
-	logdebugx("%s: %sNA for %s from %s",
-	    ifp->name, is_solicited ? "solicited " : "", taddr, sfrom);
-#endif
-
-	/* Node is no longer a router, so remove it from consideration */
-	if (!is_router && !rap->expired) {
-		loginfox("%s: %s not a router (%s)",
-		    ifp->name, taddr, sfrom);
-		rap->expired = true;
-		rap->lifetime = 0;
-		rt_build(ifp->ctx,  AF_INET6);
-		script_runreason(ifp, "ROUTERADVERT");
-		return;
-	}
-
-	if (is_solicited && is_router && rap->lifetime)
-		ipv6nd_reachable(rap, IPV6ND_REACHABLE);
-}
-
-static void
 ipv6nd_handledata(void *arg)
 {
 	struct dhcpcd_ctx *ctx;
@@ -1849,10 +1767,6 @@ ipv6nd_handledata(void *arg)
 	icp = (struct icmp6_hdr *)buf;
 	if (icp->icmp6_code == 0) {
 		switch(icp->icmp6_type) {
-			case ND_NEIGHBOR_ADVERT:
-				ipv6nd_handlena(ctx, sfrom,
-				    ifp, icp, (size_t)len, hoplimit);
-				return;
 			case ND_ROUTER_ADVERT:
 				ipv6nd_handlera(ctx, &from, sfrom,
 				    ifp, icp, (size_t)len, hoplimit);
