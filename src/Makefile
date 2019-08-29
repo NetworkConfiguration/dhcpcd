@@ -143,10 +143,10 @@ _import-src: ${SRCS}
 	rm -f ${DESTDIR}/src/if-bsd.h ${DESTDIR}/src/if-linux.h ${DESTDIR}/src/if-sun.h
 	if [ -n "${COMPAT_SRCS}" ]; then \
 		${INSTALL} -d ${DESTDIR}/compat; \
-		touch ../compat/rb.h ../compat/strtou.h; \
 		cd ..; \
+		touch compat/rb.h compat/strtou.h; \
 		cp ${COMPAT_SRCS} ${COMPAT_SRCS:.c=.h} ${DESTDIR}/compat; \
-		rm ../compat/rb.h ../compat/strtou.h; \
+		rm compat/rb.h compat/strtou.h; \
 		rm -f ${DESTDIR}/compat/rb.h ${DESTDIR}/compat/strtou.h; \
 	fi
 	if ! grep HAVE_SYS_BITOPS_H ../config.h; then \
