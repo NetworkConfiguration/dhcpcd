@@ -1593,7 +1593,7 @@ in_cksum(const void *data, size_t len, uint32_t *isum)
 		sum += *word++;
 
 	if (len == 1)
-		sum += htons(*(const uint8_t *)word << 8);
+		sum += htons((uint16_t)(*(const uint8_t *)word << 8));
 
 	if (isum != NULL)
 		*isum = sum;
