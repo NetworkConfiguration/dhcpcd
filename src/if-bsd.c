@@ -679,7 +679,8 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 	if (rti_info[RTAX_GATEWAY]->sa_family == AF_LINK) {
 		const struct sockaddr_dl *sdl;
 
-		sdl = (const struct sockaddr_dl*)rti_info[RTAX_GATEWAY];
+		sdl = (const struct sockaddr_dl*)
+			(const void *)rti_info[RTAX_GATEWAY];
 		if (sdl->sdl_alen != 0)
 			rt->rt_dflags |= RTDF_GATELINK;
 	} else if (rtm->rtm_flags & RTF_GATEWAY)
