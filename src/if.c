@@ -72,6 +72,12 @@
 #include "ipv6nd.h"
 #include "logerr.h"
 
+#ifdef __sun
+/* It has the ioctl, but the member is missing from the struct?
+ * No matter, our getifaddrs foo in if-sun.c will DTRT. */
+#undef SIOCGIFHWADDR
+#endif
+
 void
 if_free(struct interface *ifp)
 {

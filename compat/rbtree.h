@@ -33,6 +33,7 @@
 #define	_SYS_RBTREE_H_
 
 #include "config.h"
+#include "common.h"
 
 #if defined(_KERNEL) || defined(_STANDALONE)
 #include <sys/types.h>
