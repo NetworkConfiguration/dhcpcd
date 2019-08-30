@@ -2295,6 +2295,9 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 	struct ra *rap;
 	const struct ipv6_addr *addr;
 
+	if (ctx->ra_routers == NULL)
+		return 0;
+
 	TAILQ_FOREACH(rap, ctx->ra_routers, next) {
 		if (rap->expired)
 			continue;
