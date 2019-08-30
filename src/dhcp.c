@@ -1584,7 +1584,7 @@ eexit:
 }
 
 static uint16_t
-in_cksum(void *data, size_t len, uint32_t *isum)
+in_cksum(const void *data, size_t len, uint32_t *isum)
 {
 	const uint16_t *word = data;
 	uint32_t sum = isum != NULL ? *isum : 0;
@@ -1593,7 +1593,7 @@ in_cksum(void *data, size_t len, uint32_t *isum)
 		sum += *word++;
 
 	if (len == 1)
-		sum += *(const uint8_t *)word;
+		sum += htons(*(const uint8_t *)word << 8);
 
 	if (isum != NULL)
 		*isum = sum;
@@ -3293,7 +3293,8 @@ valid_udp_packet(void *packet, size_t plen, struct in_addr *from,
 	pseudo_ip.ip_len = udp->uh_ulen;
 	csum = 0;
 	in_cksum(&pseudo_ip, sizeof(pseudo_ip), &csum);
-	if (in_cksum(udp, ntohs(udp->uh_ulen), &csum) != uh_sum) {
+	csum = in_cksum(udp, ntohs(udp->uh_ulen), &csum);
+	if (csum != uh_sum) {
 		errno = EINVAL;
 		return -1;
 	}
