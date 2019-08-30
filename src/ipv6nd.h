@@ -91,9 +91,6 @@ struct rs_state {
 #define	RETRANS_TIMER			1000	/* milliseconds */
 #define	DELAY_FIRST_PROBE_TIME		5	/* seconds */
 
-#define	IPV6ND_REACHABLE		(1 << 0)
-#define	IPV6ND_ROUTER			(1 << 1)
-
 void ipv6nd_printoptions(const struct dhcpcd_ctx *,
     const struct dhcp_opt *, size_t);
 void ipv6nd_startrs(struct interface *);
@@ -112,7 +109,7 @@ int ipv6nd_dadcompleted(const struct interface *);
 void ipv6nd_advertise(struct ipv6_addr *);
 void ipv6nd_startexpire(struct interface *);
 void ipv6nd_drop(struct interface *);
-void ipv6nd_neighbour(struct dhcpcd_ctx *, struct in6_addr *, int);
+void ipv6nd_neighbour(struct dhcpcd_ctx *, struct in6_addr *, bool);
 #endif /* INET6 */
 
 #endif /* IPV6ND_H */
