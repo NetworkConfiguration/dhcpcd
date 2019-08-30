@@ -554,8 +554,21 @@ ipv6nd_startexpire(struct interface *ifp)
 	    ipv6nd_expire, ifp);
 }
 
+/*
+ * Neighbour reachability.
+ *
+ * RFC 4681 6.2.5 says when a node is no longer a router it MUST
+ * send a RA with a zero lifetime.
+ * All OS's I know of set the NA router flag if they are a router
+ * or not and disregard that they are actively advertising or
+ * shutting down. If the interface is disabled, it cant't send a NA at all.
+ *
+ * As such we CANNOT rely on the NA Router flag and MUST use
+ * unreachability or receive a RA with a lifetime of zero to remove
+ * the node as a default router.
+ */
 void
-ipv6nd_neighbour(struct dhcpcd_ctx *ctx, struct in6_addr *addr, int flags)
+ipv6nd_neighbour(struct dhcpcd_ctx *ctx, struct in6_addr *addr, bool reachable)
 {
 	struct ra *rap, *rapr;
 
@@ -570,11 +583,7 @@ ipv6nd_neighbour(struct dhcpcd_ctx *ctx, struct in6_addr *addr, int flags)
 	if (rap == NULL || rap->expired)
 		return;
 
-	if (!(flags & IPV6ND_ROUTER) && rap->lifetime != 0) {
-		loginfox("%s: %s is no longer a router",
-		    rap->iface->name, rap->sfrom);
-		rap->lifetime = 0;
-	} else if (flags & IPV6ND_REACHABLE) {
+	if (reachable) {
 		if (rap->isreachable)
 			return;
 		loginfox("%s: %s is reachable again",

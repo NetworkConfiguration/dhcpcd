@@ -812,8 +812,7 @@ if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 			else
 				sdl.sdl_alen = 0;
 			ipv6nd_neighbour(ctx, &dst6,
-			    rtm->rtm_type != RTM_DELETE && sdl.sdl_alen ?
-			    IPV6ND_REACHABLE : 0);
+			    rtm->rtm_type != RTM_DELETE && sdl.sdl_alen);
 		}
 		break;
 	}

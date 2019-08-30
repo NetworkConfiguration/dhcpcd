@@ -1083,20 +1083,17 @@ if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 	 * BSD announces host routes.
 	 * As such, we should be notified of reachability by its
 	 * existance with a hardware address.
-	 * Ensure we don't call this for an incomplete state.
+	 * Ensure we don't call this for a newly incomplete state.
 	 */
 	if (rt.rt_dest.sa_family == AF_INET6 &&
 	    rt.rt_flags & RTF_HOST &&
 	    !(rtm->rtm_type == RTM_ADD && !(rt.rt_dflags & RTDF_GATELINK)))
 	{
-		int flags = 0;
+		bool reachable;
 
-		if (rt.rt_dflags & RTDF_GATELINK)
-			flags |= IPV6ND_ROUTER;
-		if (rtm->rtm_type != RTM_DELETE)
-			flags |= IPV6ND_REACHABLE;
-
-		ipv6nd_neighbour(ctx, &rt.rt_ss_dest.sin6.sin6_addr, flags);
+		reachable = rtm->rtm_type != RTM_DELETE &&
+		    rt.rt_dflags & RTDF_GATELINK;
+		ipv6nd_neighbour(ctx, &rt.rt_ss_dest.sin6.sin6_addr, reachable);
 	}
 #endif
 
