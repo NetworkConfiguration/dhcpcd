@@ -696,7 +696,7 @@ link_neigh(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 		reachable = (nlm->nlmsg_type == RTM_NEWNEIGH &&
 		    r->ndm_state &
 		    (NUD_REACHABLE | NUD_STALE | NUD_DELAY | NUD_PROBE |
-		     NUD_PERMANENT))
+		     NUD_PERMANENT));
 		memset(&addr6, 0, sizeof(addr6));
 		while (RTA_OK(rta, len)) {
 			switch (rta->rta_type) {
