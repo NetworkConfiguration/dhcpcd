@@ -1231,7 +1231,8 @@ out:
 	 * or DHCP6 handlers and the existance of any useable
 	 * global address on the interface has changed,
 	 * call rt_build to add/remove the default route. */
-	if (!(ctx->options & DHCPCD_RTBUILD) &&
+	if (ifp->active && ifp->options->options & DHCPCD_IPV6 &&
+	    !(ctx->options & DHCPCD_RTBUILD) &&
 	    (ipv6_ifanyglobal(ifp) != NULL) != anyglobal)
 		rt_build(ctx, AF_INET6);
 }
@@ -2294,9 +2295,6 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 	struct rt *rt;
 	struct ra *rap;
 	const struct ipv6_addr *addr;
-
-	if (ctx->ra_routers == NULL)
-		return 0;
 
 	TAILQ_FOREACH(rap, ctx->ra_routers, next) {
 		if (rap->expired)
