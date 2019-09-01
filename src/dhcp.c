@@ -1178,7 +1178,6 @@ read_lease(struct interface *ifp, struct bootp **bootp)
 		close(fd);
 	if (bytes == 0) {
 		free(lease);
-		logerr("%s: dhcp_read_lease_fd", __func__);
 		return 0;
 	}
 
