@@ -2517,15 +2517,18 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	lease = NULL;
 	free(state->new);
 	state->new_len = dhcp_read_lease_fd(fd, (void **)&lease);
-	state->new = lease;
+	state->new = state->new_len != 0 ? lease : NULL;
 	if (fd_opened)
 		close(fd);
-	if (state->new_len == 0)
-		goto ex;
 
 	if (ifp->ctx->options & DHCPCD_DUMPLEASE ||
 	    state->leasefile[0] == '\0')
 		return 0;
+
+	if (state->new_len == 0) {
+		retval = 0;
+		goto ex;
+	}
 
 	/* If not validating IA's and if they have expired,
 	 * skip to the auth check. */
@@ -2586,12 +2589,10 @@ auth:
 
 ex:
 	dhcp6_freedrop_addrs(ifp, 0, NULL);
+	unlink(state->leasefile);
 	free(state->new);
 	state->new = NULL;
 	state->new_len = 0;
-	if (!(ifp->ctx->options & DHCPCD_DUMPLEASE) &&
-	    state->leasefile[0] != '\0')
-		unlink(state->leasefile);
 	return retval;
 }
 
