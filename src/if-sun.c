@@ -622,13 +622,12 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 {
 	const struct sockaddr *rti_info[RTAX_MAX];
 
-	if (~rtm->rtm_addrs & RTA_DST)
+	if (~rtm->rtm_addrs & RTA_DST) {
+		errno = EINVAL;
 		return -1;
+	}
 
-	/* We have already checked that at least one address must be
-	 * present after the rtm structure. */
-	/* coverity[ptr_arith] */
-	if (get_addrs(rtm->rtm_addrs, rtm + 1,
+	if (get_addrs(rtm->rtm_addrs, (const char *)rtm + sizeof(*rtm),
 		      rtm->rtm_msglen - sizeof(*rtm), rti_info) == -1)
 		return -1;
 
@@ -638,10 +637,21 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 	COPYSA(&rt->rt_dest, rti_info[RTAX_DST]);
 	if (rtm->rtm_addrs & RTA_NETMASK)
 		COPYSA(&rt->rt_netmask, rti_info[RTAX_NETMASK]);
-	/* dhcpcd likes an unspecified gateway to indicate via the link. */
-	if (rtm->rtm_addrs & RTA_GATEWAY &&
-	    rti_info[RTAX_GATEWAY]->sa_family != AF_LINK)
-		COPYSA(&rt->rt_gateway, rti_info[RTAX_GATEWAY]);
+
+	/* dhcpcd likes an unspecified gateway to indicate via the link.
+	 * However we need to know if gateway was a link with an address. */
+	if (rtm->rtm_addrs & RTA_GATEWAY) {
+		if (rti_info[RTAX_GATEWAY]->sa_family == AF_LINK) {
+			const struct sockaddr_dl *sdl;
+
+			sdl = (const struct sockaddr_dl*)
+			    (const void *)rti_info[RTAX_GATEWAY];
+			if (sdl->sdl_alen != 0)
+				rt->rt_dflags |= RTDF_GATELINK;
+		} else if (rtm->rtm_flags & RTF_GATEWAY)
+			COPYSA(&rt->rt_gateway, rti_info[RTAX_GATEWAY]);
+	}
+
 	if (rtm->rtm_addrs & RTA_SRC)
 		COPYSA(&rt->rt_ifa, rti_info[RTAX_SRC]);
 	rt->rt_mtu = (unsigned int)rtm->rtm_rmx.rmx_mtu;
@@ -654,6 +664,9 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 		rt->rt_ifp = if_findsa(ctx, rti_info[RTAX_GATEWAY]);
 	else
 		rt->rt_ifp = if_findsa(ctx, rti_info[RTAX_DST]);
+
+	if (rt->rt_ifp == NULL && rtm->rtm_type == RTM_MISS)
+		rt->rt_ifp = if_loopback(ctx);
 
 	if (rt->rt_ifp == NULL) {
 		errno = ESRCH;
@@ -785,41 +798,29 @@ if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 		return -1;
 	}
 
-	sa = (const void *)(rtm + 1);
-	switch (sa->sa_family) {
-#ifdef INET6
-	case AF_INET6:
-		if (~rtm->rtm_addrs & (RTA_DST | RTA_GATEWAY))
-			break;
-		/*
-		 * BSD announces host routes.
-		 * But does this work on Solaris?
-		 * As such, we should be notified of reachability by its
-		 * existance with a hardware address.
-		 */
-		if (rtm->rtm_flags & (RTF_HOST)) {
-			const struct sockaddr *rti_info[RTAX_MAX];
-			struct in6_addr dst6;
-			struct sockaddr_dl sdl;
+	if (if_copyrt(ctx, &rt, rtm) == -1 && errno != ESRCH)
+		return -1;
 
-			if (get_addrs(rtm->rtm_addrs, sa,
-			    rtm->rtm_msglen - sizeof(*rtm), rti_info) == -1)
-				return -1;
-			COPYOUT6(dst6, rti_info[RTAX_DST]);
-			if (rti_info[RTAX_GATEWAY]->sa_family == AF_LINK)
-				memcpy(&sdl, rti_info[RTAX_GATEWAY],
-				    sizeof(sdl));
-			else
-				sdl.sdl_alen = 0;
-			ipv6nd_neighbour(ctx, &dst6,
-			    rtm->rtm_type != RTM_DELETE && sdl.sdl_alen);
-		}
-		break;
+#ifdef INET6
+	/*
+	 * BSD announces host routes.
+	 * As such, we should be notified of reachability by its
+	 * existance with a hardware address.
+	 * Ensure we don't call this for a newly incomplete state.
+	 */
+	if (rt.rt_dest.sa_family == AF_INET6 &&
+	    (rt.rt_flags & RTF_HOST || rtm->rtm_type == RTM_MISS) &&
+	    !(rtm->rtm_type == RTM_ADD && !(rt.rt_dflags & RTDF_GATELINK)))
+	{
+		bool reachable;
+
+		reachable = (rtm->rtm_type == RTM_ADD ||
+		    rtm->rtm_type == RTM_CHANGE) &&
+		    rt.rt_dflags & RTDF_GATELINK;
+		ipv6nd_neighbour(ctx, &rt.rt_ss_dest.sin6.sin6_addr, reachable);
 	}
 #endif
 
-	if (if_copyrt(ctx, &rt, rtm) == -1 && errno != ESRCH)
-		return -1;
 	if (if_finishrt(ctx, &rt) == -1)
 		return -1;
 	rt_recvrt(rtm->rtm_type, &rt, rtm->rtm_pid);
@@ -884,10 +885,7 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 	if (~ifam->ifam_addrs & RTA_IFA)
 		return 0;
 
-	/* We have already checked that at least one address must be
-	 * present after the ifam structure. */
-	/* coverity[ptr_arith] */
-	if (get_addrs(ifam->ifam_addrs, ifam + 1,
+	if (get_addrs(ifam->ifam_addrs, (const char *)ifam + sizeof(*ifam),
 		      ifam->ifam_msglen - sizeof(*ifam), rti_info) == -1)
 		return -1;
 	sa = rti_info[RTAX_IFA];
@@ -1037,7 +1035,8 @@ if_dispatch(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 		return if_ifinfo(ctx, (const void *)rtm);
 	case RTM_ADD:		/* FALLTHROUGH */
 	case RTM_CHANGE:	/* FALLTHROUGH */
-	case RTM_DELETE:
+	case RTM_DELETE:	/* FALLTHROUGH */
+	case RTM_MISS:
 		return if_rtm(ctx, (const void *)rtm);
 	case RTM_CHGADDR:	/* FALLTHROUGH */
 	case RTM_DELADDR:	/* FALLTHROUGH */
@@ -1052,20 +1051,28 @@ int
 if_handlelink(struct dhcpcd_ctx *ctx)
 {
 	struct rtm rtm;
-	struct iovec iov = { .iov_base = &rtm, .iov_len = sizeof(rtm) };
-	struct msghdr msg = { .msg_iov = &iov, .msg_iovlen = 1 };
 	ssize_t len;
 
-	if ((len = recvmsg(ctx->link_fd, &msg, 0)) == -1)
-		return -1;
+	len = read(ctx->link_fd, &rtm, sizeof(rtm));
 	if (len == -1)
 		return -1;
 	if (len == 0)
 		return 0;
-	if (len < rtm.hdr.rtm_msglen) {
+	if ((size_t)len < sizeof(rtm.hdr.rtm_msglen) ||
+	    len != rtm.hdr.rtm_msglen)
+	{
 		errno = EINVAL;
 		return -1;
 	}
+	/*
+	 * Coverity thinks that the data could be tainted from here.
+	 * I have no idea how because the length of the data we read
+	 * is guarded by len and checked to match rtm_msglen.
+	 * The issue seems to be related to extracting the addresses
+	 * at the end of the header, but seems to have no issues with the
+	 * equivalent call in if_initrt.
+	 */
+	/* coverity[tainted_data] */
 	return if_dispatch(ctx, &rtm.hdr);
 }
 
