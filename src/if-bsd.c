@@ -707,6 +707,9 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 	else
 		rt->rt_ifp = if_findsa(ctx, rti_info[RTAX_DST]);
 
+	if (rt->rt_ifp == NULL && rtm->rtm_type == RTM_MISS)
+		rt->rt_ifp = if_find(ctx->ifaces, "lo0");
+
 	if (rt->rt_ifp == NULL) {
 		errno = ESRCH;
 		return -1;
