@@ -110,9 +110,9 @@
     * While it supports DaD, to seems to only expose IFF_DUPLICATE
     * so we have no way of knowing if it's tentative or not.
     * I don't even know if Solaris has any special treatment for tentative. */
-#  define IN6_IFF_TENTATIVE	0
+#  define IN6_IFF_TENTATIVE	0x02
 #  define IN6_IFF_DUPLICATED	0x04
-#  define IN6_IFF_DETACHED	0
+#  define IN6_IFF_DETACHED	0x00
 #endif
 
 #define IN6_IFF_NOTUSEABLE \
