@@ -106,9 +106,26 @@ struct rtm
 	char buffer[sizeof(struct sockaddr_storage) * RTAX_MAX];
 };
 
+static int if_plumb(int, const struct dhcpcd_ctx *, int, const char *);
+
 int
-if_init(__unused struct interface *ifp)
+if_init(struct interface *ifp)
 {
+
+#ifdef INET
+	if (if_plumb(RTM_NEWADDR, ifp->ctx, AF_INET, ifp->name) == -1 &&
+	    errno != EEXIST)
+		return -1;
+#endif
+
+#ifdef INET6
+	if (if_plumb(RTM_NEWADDR, ifp->ctx, AF_INET6, ifp->name) == -1 &&
+	    errno != EEXIST)
+		return -1;
+#endif
+
+	if (ifp->index == 0)
+		ifp->index = if_nametoindex(ifp->name);
 
 	return 0;
 }
@@ -1575,7 +1592,8 @@ if_address(unsigned char cmd, const struct ipv4_addr *ia)
 	} addr, mask, brd;
 
 	/* Either remove the alias or ensure it exists. */
-	if (if_plumb(cmd, ia->iface->ctx, AF_INET, ia->alias) == -1)
+	if (if_plumb(cmd, ia->iface->ctx, AF_INET, ia->alias) == -1 &&
+	    errno != EEXIST)
 		return -1;
 
 	if (cmd == RTM_DELADDR)
@@ -1629,7 +1647,8 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 	int			r;
 
 	/* Either remove the alias or ensure it exists. */
-	if (if_plumb(cmd, ia->iface->ctx, AF_INET6, ia->alias) == -1)
+	if (if_plumb(cmd, ia->iface->ctx, AF_INET6, ia->alias) == -1 &&
+	    errno != EEXIST)
 		return -1;
 
 	if (cmd == RTM_DELADDR)
