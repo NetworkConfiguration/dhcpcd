@@ -1102,8 +1102,8 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 
 	dbp = inet_ntop(AF_INET6, &addr->s6_addr,
 	    dbuf, INET6_ADDRSTRLEN);
-	loginfox("%s: cmd %d addr %s",
-	    ifname, cmd, dbp);
+	loginfox("%s: cmd %d addr %s addrflags %d",
+	    ifname, cmd, dbp, addrflags);
 #endif
 
 	if (ifs == NULL)

@@ -787,21 +787,23 @@ if_finishrt(struct dhcpcd_ctx *ctx, struct rt *rt)
 	return 0;
 }
 
-static uint64_t
-if_addrflags0(int fd, const char *ifname, const struct sockaddr *sa)
+static int
+if_addrflags0(int fd, int af, const char *ifname)
 {
 	struct lifreq		lifr;
+	int flags;
 
 	memset(&lifr, 0, sizeof(lifr));
 	strlcpy(lifr.lifr_name, ifname, sizeof(lifr.lifr_name));
 	if (ioctl(fd, SIOCGLIFFLAGS, &lifr) == -1)
-		return 0;
-	if (ioctl(fd, SIOCGLIFADDR, &lifr) == -1)
-		return 0;
-	if (sa_cmp(sa, (struct sockaddr *)&lifr.lifr_addr) != 0)
-		return 0;
+		return -1;
 
-	return lifr.lifr_flags;
+	flags = 0;
+	if (lifr.lifr_flags & IFF_DUPLICATE)
+		flags |= af == AF_INET6 ? IN6_IFF_DUPLICATED:IN_IFF_DUPLICATED;
+	else if (!(lifr.lifr_flags & IFF_UP))
+		flags |= af == AF_INET6 ? IN6_IFF_TENTATIVE:IN_IFF_TENTATIVE;
+	return flags;
 }
 
 static int
@@ -963,7 +965,7 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 			if (if_getbrdaddr(ctx, ifalias, &bcast) == -1)
 				return 0;
 		}
-		flags = if_addrflags(ifp, &addr, ifalias);
+		flags = if_addrflags(ifp, NULL, ifalias);
 		if (ifam->ifam_type == RTM_DELADDR) {
 			if (flags != -1)
 				return 0;
@@ -996,7 +998,7 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 				return 0;
 			strlcpy(ifalias, ia->alias, sizeof(ifalias));
 		}
-		flags = if_addrflags6(ifp, &addr6, ifalias);
+		flags = if_addrflags6(ifp, NULL, ifalias);
 		if (ifam->ifam_type == RTM_DELADDR) {
 			if (flags != -1)
 				return 0;
@@ -1615,21 +1617,11 @@ if_address(unsigned char cmd, const struct ipv4_addr *ia)
 }
 
 int
-if_addrflags(const struct interface *ifp, const struct in_addr *addr,
+if_addrflags(const struct interface *ifp, __unused const struct in_addr * ia,
     const char *alias)
 {
-	union sa_ss	ss;
-	uint64_t	aflags;
-	int		flags;
 
-	sa_in_init(&ss.sa, addr);
-	aflags = if_addrflags0(ifp->ctx->pf_inet_fd, alias, &ss.sa);
-	if (aflags == 0)
-		return -1;
-	flags = 0;
-	if (aflags & IFF_DUPLICATE)
-		flags |= IN_IFF_DUPLICATED;
-	return flags;
+	return if_addrflags0(ifp->ctx->pf_inet_fd, AF_INET, alias);
 }
 
 #endif
@@ -1670,23 +1662,13 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 }
 
 int
-if_addrflags6(const struct interface *ifp, const struct in6_addr *addr,
+if_addrflags6(const struct interface *ifp, __unused const struct in6_addr *ia,
     const char *alias)
 {
 	struct priv		*priv;
-	union sa_ss		ss;
-	uint64_t		aflags;
-	int			flags;
 
 	priv = (struct priv *)ifp->ctx->priv;
-	sa_in6_init(&ss.sa, addr);
-	aflags = if_addrflags0(priv->pf_inet6_fd, alias, &ss.sa);
-	if (aflags == 0)
-		return -1;
-	flags = 0;
-	if (aflags & IFF_DUPLICATE)
-		flags |= IN6_IFF_DUPLICATED;
-	return flags;
+	return if_addrflags0(priv->pf_inet6_fd, AF_INET6, alias);
 }
 
 int
