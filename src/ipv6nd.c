@@ -459,6 +459,11 @@ ipv6nd_advertise(struct ipv6_addr *ia)
 	if (IN6_IS_ADDR_MULTICAST(&ia->addr))
 		return;
 
+#ifdef __sun
+	if (!(ia->flags & IPV6_AF_AUTOCONF) && ia->flags & IPV6_AF_RAPFX)
+		return;
+#endif
+
 	ctx = ia->iface->ctx;
 	/* Find the most preferred address to advertise. */
 	iaf = NULL;
