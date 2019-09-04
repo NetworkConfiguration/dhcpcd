@@ -1117,7 +1117,6 @@ if_setflags(int fd, const char *ifname, uint64_t flags)
 	struct lifreq		lifr = { .lifr_addrlen = 0 };
 
 	strlcpy(lifr.lifr_name, ifname, sizeof(lifr.lifr_name));
-	/* Now bring it up. */
 	if (ioctl(fd, SIOCGLIFFLAGS, &lifr) == -1)
 		return -1;
 	if ((lifr.lifr_flags & flags) != flags) {
