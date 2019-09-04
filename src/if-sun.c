@@ -1625,8 +1625,13 @@ if_address(unsigned char cmd, const struct ipv4_addr *ia)
 	/* We need to update the index now */
 	ia->iface->index = if_nametoindex(ia->alias);
 
+	/* Disabled for now - for some reason dhcpcd cannot setup
+	 * the subnet route correctly even though it looks
+	 * identical in netstat output. */
+#if 0
 	if (if_setflags(fd, ia->alias, IFF_NOLOCAL) == -1)
 		return -1;
+#endif
 
 	sa_in_init(&addr.sa, &ia->addr);
 	sa_in_init(&mask.sa, &ia->mask);
