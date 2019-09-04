@@ -139,6 +139,7 @@ _import-src: ${SRCS}
 	${INSTALL} -d ${DESTDIR}/src
 	touch if-bsd.h if-linux.h if-sun.h
 	cp defs.h ${SRCS} ${SRCS:.c=.h} dev.h ${MAN5}.in ${MAN8}.in ${DESTDIR}/src
+	cp dhcpcd.conf ${DESTDIR}/src
 	rm if-bsd.h if-linux.h if-sun.h
 	rm -f ${DESTDIR}/src/if-bsd.h ${DESTDIR}/src/if-linux.h ${DESTDIR}/src/if-sun.h
 	if [ -n "${COMPAT_SRCS}" ]; then \
