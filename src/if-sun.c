@@ -1112,19 +1112,42 @@ if_octetstr(char *buf, const Octet_t *o, ssize_t len)
 }
 
 static int
+if_setflags(int fd, const char *ifname, uint64_t flags)
+{
+	struct lifreq		lifr = { .lifr_addrlen = 0 };
+
+	strlcpy(lifr.lifr_name, ifname, sizeof(lifr.lifr_name));
+	/* Now bring it up. */
+	if (ioctl(fd, SIOCGLIFFLAGS, &lifr) == -1)
+		return -1;
+	if ((lifr.lifr_flags & flags) != flags) {
+		lifr.lifr_flags |= flags;
+		if (ioctl(fd, SIOCSLIFFLAGS, &lifr) == -1)
+			return -1;
+	}
+	return 0;
+}
+
+static int
 if_addaddr(int fd, const char *ifname,
     struct sockaddr_storage *addr, struct sockaddr_storage *mask,
-    struct sockaddr_storage *brd)
+    struct sockaddr_storage *brd, uint8_t plen)
 {
-	struct lifreq		lifr;
+	struct lifreq		lifr = { .lifr_addrlen = plen };
 
-	memset(&lifr, 0, sizeof(lifr));
 	strlcpy(lifr.lifr_name, ifname, sizeof(lifr.lifr_name));
 
 	/* First assign the netmask. */
 	lifr.lifr_addr = *mask;
-	if (ioctl(fd, SIOCSLIFNETMASK, &lifr) == -1)
-		return -1;
+	if (addr == NULL) {
+		lifr.lifr_addrlen = plen;
+		if (ioctl(fd, SIOCSLIFSUBNET, &lifr) == -1)
+			return -1;
+		goto up;
+	} else {
+		if (ioctl(fd, SIOCSLIFNETMASK, &lifr) == -1)
+			return -1;
+	}
 
 	/* Then assign the address. */
 	lifr.lifr_addr = *addr;
@@ -1138,16 +1161,8 @@ if_addaddr(int fd, const char *ifname,
 			return -1;
 	}
 
-	/* Now bring it up. */
-	if (ioctl(fd, SIOCGLIFFLAGS, &lifr) == -1)
-		return -1;
-	if (!(lifr.lifr_flags & IFF_UP)) {
-		lifr.lifr_flags |= IFF_UP;
-		if (ioctl(fd, SIOCSLIFFLAGS, &lifr) == -1)
-			return -1;
-	}
-
-	return 0;
+up:
+	return if_setflags(fd, ifname, IFF_UP);
 }
 
 static int
@@ -1317,7 +1332,7 @@ if_unplumbif(const struct dhcpcd_ctx *ctx, int af, const char *ifname)
 		return -1;
 	}
 	return if_addaddr(fd, ifname, &addr, &addr,
-	    af == AF_INET ? &addr : NULL);
+	    af == AF_INET ? &addr : NULL, 0);
 }
 
 static int
@@ -1592,6 +1607,7 @@ if_address(unsigned char cmd, const struct ipv4_addr *ia)
 		struct sockaddr		sa;
 		struct sockaddr_storage ss;
 	} addr, mask, brd;
+	int fd = ia->iface->ctx->pf_inet_fd;
 
 	/* Either remove the alias or ensure it exists. */
 	if (if_plumb(cmd, ia->iface->ctx, AF_INET, ia->alias) == -1 &&
@@ -1609,11 +1625,13 @@ if_address(unsigned char cmd, const struct ipv4_addr *ia)
 	/* We need to update the index now */
 	ia->iface->index = if_nametoindex(ia->alias);
 
+	if (if_setflags(fd, ia->alias, IFF_NOLOCAL) == -1)
+		return -1;
+
 	sa_in_init(&addr.sa, &ia->addr);
 	sa_in_init(&mask.sa, &ia->mask);
 	sa_in_init(&brd.sa, &ia->brd);
-	return if_addaddr(ia->iface->ctx->pf_inet_fd, ia->alias,
-	    &addr.ss, &mask.ss, &brd.ss);
+	return if_addaddr(fd, ia->alias, &addr.ss, &mask.ss, &brd.ss, 0);
 }
 
 int
@@ -1651,11 +1669,24 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 		return -1;
 	}
 
-	sa_in6_init(&addr.sa, &ia->addr);
-	mask.sin6.sin6_family = AF_INET6;
-	ipv6_mask(&mask.sin6.sin6_addr, ia->prefix_len);
 	priv = (const struct priv *)ia->iface->ctx->priv;
-	r = if_addaddr(priv->pf_inet6_fd, ia->alias, &addr.ss, &mask.ss, NULL);
+
+	if (!IN6_IS_ADDR_LINKLOCAL(&ia->addr)) {
+		if (if_setflags(priv->pf_inet6_fd, ia->alias, IFF_NOLOCAL) ==-1)
+			return -1;
+	}
+
+	if (!(ia->flags & IPV6_AF_AUTOCONF) && ia->flags & IPV6_AF_RAPFX) {
+		sa_in6_init(&mask.sa, &ia->prefix);
+		r = if_addaddr(priv->pf_inet6_fd,
+		    ia->alias, NULL, &mask.ss, NULL, ia->prefix_len);
+	} else {
+		sa_in6_init(&addr.sa, &ia->addr);
+		mask.sin6.sin6_family = AF_INET6;
+		ipv6_mask(&mask.sin6.sin6_addr, ia->prefix_len);
+		r = if_addaddr(priv->pf_inet6_fd,
+		    ia->alias, &addr.ss, &mask.ss, NULL, ia->prefix_len);
+	}
 	if (r == -1 && errno == EEXIST)
 		return 0;
 	return r;
