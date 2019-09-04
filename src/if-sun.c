@@ -383,18 +383,6 @@ if_ifa_lo0(void)
 	return ifa;
 }
 
-static int
-if_getsubnet(int fd, const char *ifname, void *subnet, size_t subnet_len)
-{
-	struct lifreq		lifr = { .lifr_addrlen = 0 };
-
-	strlcpy(lifr.lifr_name, ifname, sizeof(lifr.lifr_name));
-	if (ioctl(fd, SIOCGLIFSUBNET, &lifr) == -1)
-		return -1;
-	memcpy(subnet, &lifr.lifr_addr, MIN(subnet_len,sizeof(lifr.lifr_addr)));
-	return 0;
-}
-
 /* getifaddrs(3) does not support AF_LINK, strips aliases and won't
  * report addresses that are not UP.
  * As such it's just totally useless, so we need to roll our own. */
@@ -403,10 +391,6 @@ if_getifaddrs(struct ifaddrs **ifap)
 {
 	struct linkwalk		lw;
 	struct ifaddrs		*ifa;
-#ifdef INET6
-	struct sockaddr_in6	*sin6;
-	int			fd;
-#endif
 
 	/* Private libc function which we should not have to call
 	 * to get non UP addresses. */
@@ -430,37 +414,6 @@ if_getifaddrs(struct ifaddrs **ifap)
 	ifa->ifa_next = lw.lw_ifa;
 
 	*ifap = ifa;
-
-#ifdef INET6
-	/* Walk the tree and fetch subnet */
-	fd = socket(PF_INET6, SOCK_DGRAM, 0);
-	if (fd == -1)
-		return 0;
-	for (; ifa != NULL; ifa = ifa->ifa_next) {
-		if (ifa->ifa_addr->sa_family != AF_INET6)
-			continue;
-		if (ifa->ifa_flags & IFF_POINTOPOINT)
-			continue;
-
-		sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
-		if (!IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr))
-			continue;
-
-		/* Total hack */
-		assert(ifa->ifa_dstaddr == NULL);
-		ifa->ifa_dstaddr = malloc(sizeof(struct sockaddr_in6));
-		if (ifa->ifa_dstaddr == NULL)
-			continue;
-		if (if_getsubnet(fd, ifa->ifa_name,
-		    ifa->ifa_dstaddr, sizeof(struct sockaddr_in6) == -1))
-		{
-			free(ifa->ifa_dstaddr);
-			ifa->ifa_dstaddr = NULL;
-		}
-	}
-	close(fd);
-#endif
-
 	return 0;
 }
 
@@ -1031,7 +984,6 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 	{
 		struct in6_addr			addr6, mask6;
 		const struct sockaddr_in6	*sin6;
-		struct sockaddr_in6		subnet;
 
 		sin6 = (const void *)rti_info[RTAX_IFA];
 		addr6 = sin6->sin6_addr;
@@ -1052,19 +1004,6 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 				return 0;
 		} else if (flags == -1)
 			return 0;
-
-		if (IN6_IS_ADDR_UNSPECIFIED(&addr6)) {
-			int fd, r;
-
-			fd = socket(PF_INET6, SOCK_DGRAM, 0);
-			if (fd == -1)
-				return -1;
-			r = if_getsubnet(fd, ifalias, &subnet, sizeof(subnet));
-			close(fd);
-			if (r == -1)
-				return -1;
-			addr6 = subnet.sin6_addr;
-		}
 
 		ipv6_handleifa(ctx,
 		    ifam->ifam_type == RTM_CHGADDR ?
@@ -1226,6 +1165,38 @@ up:
 }
 
 static int
+if_getaf_fd(const struct dhcpcd_ctx *ctx, int af)
+{
+
+	if (af == AF_INET)
+		return ctx->pf_inet_fd;
+	if (af == AF_INET6) {
+		struct priv	*priv;
+
+		priv = (struct priv *)ctx->priv;
+		return priv->pf_inet6_fd;
+	}
+
+	errno = EAFNOSUPPORT;
+	return -1;
+}
+
+int
+if_getsubnet(struct dhcpcd_ctx *ctx, const char *ifname, int af,
+    void *subnet, size_t subnet_len)
+{
+	struct lifreq		lifr = { .lifr_addrlen = 0 };
+	int fd;
+
+	fd = if_getaf_fd(ctx, af);
+	strlcpy(lifr.lifr_name, ifname, sizeof(lifr.lifr_name));
+	if (ioctl(fd, SIOCGLIFSUBNET, &lifr) == -1)
+		return -1;
+	memcpy(subnet, &lifr.lifr_addr, MIN(subnet_len,sizeof(lifr.lifr_addr)));
+	return 0;
+}
+
+static int
 if_plumblif(int cmd, const struct dhcpcd_ctx *ctx, int af, const char *ifname)
 {
 	struct lifreq		lifr;
@@ -1234,14 +1205,7 @@ if_plumblif(int cmd, const struct dhcpcd_ctx *ctx, int af, const char *ifname)
 	memset(&lifr, 0, sizeof(lifr));
 	strlcpy(lifr.lifr_name, ifname, sizeof(lifr.lifr_name));
 	lifr.lifr_addr.ss_family = af;
-	if (af == AF_INET)
-		s = ctx->pf_inet_fd;
-	else {
-		struct priv	*priv;
-
-		priv = (struct priv *)ctx->priv;
-		s = priv->pf_inet6_fd;
-	}
+	s = if_getaf_fd(ctx, af);
 	return ioctl(s,
 	    cmd == RTM_NEWADDR ? SIOCLIFADDIF : SIOCLIFREMOVEIF,
 	    &lifr) == -1 && errno != EEXIST ? -1 : 0;
@@ -1261,23 +1225,18 @@ if_plumbif(const struct dhcpcd_ctx *ctx, int af, const char *ifname)
 	if (if_nametospec(ifname, &spec) == -1)
 		return -1;
 
+	af_fd = if_getaf_fd(ctx, af);
+
 	switch (af) {
 	case AF_INET:
 		flags = IFF_IPV4;
-		af_fd = ctx->pf_inet_fd;
 		udp_dev = UDP_DEV_NAME;
 		break;
 	case AF_INET6:
-	{
-		struct priv *priv;
-
 		/* We will take care of setting the link local address. */
 		flags = IFF_IPV6 | IFF_NOLINKLOCAL;
-		priv = (struct priv *)ctx->priv;
-		af_fd = priv->pf_inet6_fd;
 		udp_dev = UDP6_DEV_NAME;
 		break;
-	}
 	default:
 		errno = EPROTONOSUPPORT;
 		return -1;
@@ -1371,26 +1330,7 @@ if_unplumbif(const struct dhcpcd_ctx *ctx, int af, const char *ifname)
 
 	/* For the time being, don't unplumb the interface, just
 	 * set the address to zero. */
-	switch (af) {
-#ifdef INET
-	case AF_INET:
-		fd = ctx->pf_inet_fd;
-		break;
-#endif
-#ifdef INET6
-	case AF_INET6:
-	{
-		struct priv		*priv;
-
-		priv = (struct priv *)ctx->priv;
-		fd = priv->pf_inet6_fd;
-		break;
-	}
-#endif
-	default:
-		errno = EAFNOSUPPORT;
-		return -1;
-	}
+	fd = if_getaf_fd(ctx, af);
 	return if_addaddr(fd, ifname, &addr, &addr,
 	    af == AF_INET ? &addr : NULL, 0);
 }
@@ -1713,8 +1653,7 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 		struct sockaddr_in6	sin6;
 		struct sockaddr_storage ss;
 	} addr, mask;
-	const struct priv		*priv;
-	int			r;
+	int			fd, r;
 
 	/* Either remove the alias or ensure it exists. */
 	if (if_plumb(cmd, ia->iface->ctx, AF_INET6, ia->alias) == -1 &&
@@ -1729,23 +1668,23 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 		return -1;
 	}
 
-	priv = (const struct priv *)ia->iface->ctx->priv;
+	fd = if_getaf_fd(ia->iface->ctx, AF_INET6);
 
 	if (!IN6_IS_ADDR_LINKLOCAL(&ia->addr)) {
-		if (if_setflags(priv->pf_inet6_fd, ia->alias, IFF_NOLOCAL) ==-1)
+		if (if_setflags(fd, ia->alias, IFF_NOLOCAL) ==-1)
 			return -1;
 	}
 
 	if (!(ia->flags & IPV6_AF_AUTOCONF) && ia->flags & IPV6_AF_RAPFX) {
 		sa_in6_init(&mask.sa, &ia->prefix);
-		r = if_addaddr(priv->pf_inet6_fd,
-		    ia->alias, NULL, &mask.ss, NULL, ia->prefix_len);
+		r = if_addaddr(fd, ia->alias,
+		    NULL, &mask.ss, NULL, ia->prefix_len);
 	} else {
 		sa_in6_init(&addr.sa, &ia->addr);
 		mask.sin6.sin6_family = AF_INET6;
 		ipv6_mask(&mask.sin6.sin6_addr, ia->prefix_len);
-		r = if_addaddr(priv->pf_inet6_fd,
-		    ia->alias, &addr.ss, &mask.ss, NULL, ia->prefix_len);
+		r = if_addaddr(fd, ia->alias,
+		    &addr.ss, &mask.ss, NULL, ia->prefix_len);
 	}
 	if (r == -1 && errno == EEXIST)
 		return 0;
@@ -1756,10 +1695,10 @@ int
 if_addrflags6(const struct interface *ifp, __unused const struct in6_addr *ia,
     const char *alias)
 {
-	struct priv		*priv;
+	int			fd;
 
-	priv = (struct priv *)ifp->ctx->priv;
-	return if_addrflags0(priv->pf_inet6_fd, AF_INET6, alias);
+	fd = if_getaf_fd(ifp->ctx, AF_INET6);
+	return if_addrflags0(fd, AF_INET6, alias);
 }
 
 int
