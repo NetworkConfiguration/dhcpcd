@@ -775,7 +775,9 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 #endif
 
 #ifdef ND6_ADVERTISE
+#ifdef __sun
 advertise:
+#endif
 	/* Re-advertise the preferred address to be safe. */
 	if (!vltime_was_zero)
 		ipv6nd_advertise(ia);
