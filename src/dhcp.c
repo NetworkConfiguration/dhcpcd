@@ -1176,10 +1176,8 @@ read_lease(struct interface *ifp, struct bootp **bootp)
 	bytes = dhcp_read_lease_fd(fd, (void **)&lease);
 	if (fd_opened)
 		close(fd);
-	if (bytes == 0) {
-		free(lease);
+	if (bytes == 0)
 		return 0;
-	}
 
 	/* Ensure the packet is at lease BOOTP sized
 	 * with a vendor area of 4 octets

@@ -2488,7 +2488,6 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	struct dhcp6_state *state;
 	struct stat st;
 	int fd;
-	struct dhcp6_message *lease;
 	time_t now;
 	int retval;
 	bool fd_opened;
@@ -2514,10 +2513,8 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	if (fd == -1)
 		return -1;
 	retval = -1;
-	lease = NULL;
 	free(state->new);
-	state->new_len = dhcp_read_lease_fd(fd, (void **)&lease);
-	state->new = state->new_len != 0 ? lease : NULL;
+	state->new_len = dhcp_read_lease_fd(fd, (void **)&state->new);
 	if (fd_opened)
 		close(fd);
 
