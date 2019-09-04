@@ -439,12 +439,15 @@ if_getifaddrs(struct ifaddrs **ifap)
 	for (; ifa != NULL; ifa = ifa->ifa_next) {
 		if (ifa->ifa_addr->sa_family != AF_INET6)
 			continue;
+		if (ifa->ifa_flags & IFF_POINTOPOINT)
+			continue;
 
 		sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
 		if (!IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr))
 			continue;
 
 		/* Total hack */
+		assert(ifa->ifa_dstaddr == NULL);
 		ifa->ifa_dstaddr = malloc(sizeof(struct sockaddr_in6));
 		if (ifa->ifa_dstaddr == NULL)
 			continue;
