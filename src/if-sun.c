@@ -383,6 +383,18 @@ if_ifa_lo0(void)
 	return ifa;
 }
 
+static int
+if_getsubnet(int fd, const char *ifname, void *subnet, size_t subnet_len)
+{
+	struct lifreq		lifr = { .lifr_addrlen = 0 };
+
+	strlcpy(lifr.lifr_name, ifname, sizeof(lifr.lifr_name));
+	if (ioctl(fd, SIOCGLIFSUBNET, &lifr) == -1)
+		return -1;
+	memcpy(subnet, &lifr.lifr_addr, MIN(subnet_len,sizeof(lifr.lifr_addr)));
+	return 0;
+}
+
 /* getifaddrs(3) does not support AF_LINK, strips aliases and won't
  * report addresses that are not UP.
  * As such it's just totally useless, so we need to roll our own. */
@@ -391,6 +403,10 @@ if_getifaddrs(struct ifaddrs **ifap)
 {
 	struct linkwalk		lw;
 	struct ifaddrs		*ifa;
+#ifdef INET6
+	struct sockaddr_in6	*sin6;
+	int			fd;
+#endif
 
 	/* Private libc function which we should not have to call
 	 * to get non UP addresses. */
@@ -414,6 +430,30 @@ if_getifaddrs(struct ifaddrs **ifap)
 	ifa->ifa_next = lw.lw_ifa;
 
 	*ifap = ifa;
+
+#ifdef INET6
+	/* Walk the tree and fetch subnet */
+	fd = socket(PF_INET6, SOCK_DGRAM, 0);
+	if (fd == -1)
+		return 0;
+	for (; ifa != NULL; ifa = ifa->ifa_next) {
+		if (ifa->ifa_addr->sa_family != AF_INET6)
+			continue;
+
+		sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
+		if (!IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr))
+			continue;
+
+		/* Total hack */
+		ifa->ifa_dstaddr = malloc(sizeof(struct sockaddr_storage));
+		if (ifa->ifa_dstaddr == NULL)
+			continue;
+		if_getsubnet(fd, ifa->ifa_name,
+		    ifa->ifa_dstaddr, sizeof(struct sockaddr_storage));
+	}
+	close(fd);
+#endif
+
 	return 0;
 }
 
@@ -984,6 +1024,7 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 	{
 		struct in6_addr			addr6, mask6;
 		const struct sockaddr_in6	*sin6;
+		struct sockaddr_in6		subnet;
 
 		sin6 = (const void *)rti_info[RTAX_IFA];
 		addr6 = sin6->sin6_addr;
@@ -1004,6 +1045,19 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 				return 0;
 		} else if (flags == -1)
 			return 0;
+
+		if (IN6_IS_ADDR_UNSPECIFIED(&addr6)) {
+			int fd, r;
+
+			fd = socket(PF_INET6, SOCK_DGRAM, 0);
+			if (fd == -1)
+				return -1;
+			r = if_getsubnet(fd, ifalias, &subnet, sizeof(subnet));
+			close(fd);
+			if (r == -1)
+				return -1;
+			addr6 = subnet.sin6_addr;
+		}
 
 		ipv6_handleifa(ctx,
 		    ifam->ifam_type == RTM_CHGADDR ?
