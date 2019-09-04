@@ -2490,19 +2490,20 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	int fd;
 	time_t now;
 	int retval;
-	bool fd_opened;
+	bool read_stdin, fd_opened;
 #ifdef AUTH
 	uint8_t *o;
 	uint16_t ol;
 #endif
 
 	state = D6_STATE(ifp);
-	if (state->leasefile[0] == '\0') {
+	read_stdin = state->leasefile[0] == '\0';
+	if (read_stdin) {
 		logdebugx("reading standard input");
 		fd = fileno(stdin);
 		fd_opened = false;
 	} else {
-		logdebugx("%s: reading lease `%s'", ifp->name, state->leasefile);
+		logdebugx("%s: reading lease `%s'", ifp->name,state->leasefile);
 		fd = open(state->leasefile, O_RDONLY);
 		if (fd != -1 && fstat(fd, &st) == -1) {
 			close(fd);
@@ -2518,8 +2519,7 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	if (fd_opened)
 		close(fd);
 
-	if (ifp->ctx->options & DHCPCD_DUMPLEASE ||
-	    state->leasefile[0] == '\0')
+	if (ifp->ctx->options & DHCPCD_DUMPLEASE || read_stdin)
 		return 0;
 
 	if (state->new_len == 0) {
@@ -2546,14 +2546,12 @@ dhcp6_readlease(struct interface *ifp, int validate)
 		goto ex;
 
 	if (state->expire != ND6_INFINITE_LIFETIME &&
-	    state->leasefile[0] != '\0')
+	    (time_t)state->expire < now - st.st_mtime &&
+	    !(ifp->options->options & DHCPCD_LASTLEASE_EXTEND))
 	{
-		if ((time_t)state->expire < now - st.st_mtime &&
-		    !(ifp->options->options & DHCPCD_LASTLEASE_EXTEND)) {
-			logdebugx("%s: discarding expired lease", ifp->name);
-			retval = 0;
-			goto ex;
-		}
+		logdebugx("%s: discarding expired lease", ifp->name);
+		retval = 0;
+		goto ex;
 	}
 
 auth:
