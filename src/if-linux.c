@@ -1464,7 +1464,7 @@ bpf_attach(int s, void *filter, unsigned int filter_len)
 {
 	struct sock_fprog pf = {
 		.filter = filter,
-		.len = filter_len,
+		.len = (unsigned short)filter_len,
 	};
 
 	/* Install the filter. */
