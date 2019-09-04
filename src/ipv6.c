@@ -1535,7 +1535,13 @@ ipv6_newaddr(struct interface *ifp, const struct in6_addr *addr,
 			goto err;
 	} else if (ia->flags & IPV6_AF_RAPFX) {
 		ia->prefix = *addr;
+#ifdef __sun
+		ia->addr = *addr;
+		cbp = inet_ntop(AF_INET6, &ia->addr, buf, sizeof(buf));
+		goto paddr;
+#else
 		return ia;
+#endif
 	} else if (ia->flags & (IPV6_AF_REQUEST | IPV6_AF_DELEGATEDPFX) &&
 	           prefix_len != 128)
 	{
