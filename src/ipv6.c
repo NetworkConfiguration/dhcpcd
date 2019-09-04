@@ -1100,6 +1100,21 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 	struct ll_callback *cb;
 	bool anyglobal;
 
+#ifdef __sun
+	struct sockaddr_in6 subnet;
+
+	/* Solaris on-link route is an unspecified address! */
+	if (IN6_IS_ADDR_UNSPECIFIED(addr)) {
+		if (if_getsubnet(ctx, ifname, AF_INET6,
+		    &subnet, sizeof(subnet)) == -1)
+		{
+			logerr(__func__);
+			return;
+		}
+		addr = &subnet.sin6_addr;
+	}
+#endif
+
 #if 0
 	char dbuf[INET6_ADDRSTRLEN];
 	const char *dbp;
