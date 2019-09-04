@@ -629,7 +629,7 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 	uint32_t pltime, vltime;
 	__printflike(1, 2) void (*logfunc)(const char *, ...);
 #ifdef ND6_ADVERTISE
-	bool vltime_was_zero;
+	bool vltime_was_zero = ia->prefix_vltime == 0;
 #endif
 #ifdef __sun
 	struct ipv6_state *state;
@@ -641,7 +641,11 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 	if (ia->flags & IPV6_AF_DADCOMPLETED) {
 		logdebugx("%s: IP address %s already exists",
 		    ia->iface->name, ia->saddr);
+#ifdef ND6_ADVERTISE
+		goto advertise;
+#else
 		return 0;
+#endif
 	}
 #endif
 
@@ -707,9 +711,6 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 		    " seconds",
 		    ifp->name, ia->prefix_pltime, ia->prefix_vltime);
 
-#ifdef ND6_ADVERTISE
-	vltime_was_zero = ia->prefix_vltime == 0;
-#endif
 	if (if_address6(RTM_NEWADDR, ia) == -1) {
 		logerr(__func__);
 		/* Restore real pltime and vltime */
@@ -774,6 +775,7 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 #endif
 
 #ifdef ND6_ADVERTISE
+advertise:
 	/* Re-advertise the preferred address to be safe. */
 	if (!vltime_was_zero)
 		ipv6nd_advertise(ia);

@@ -159,7 +159,7 @@
 #if !defined(SMALL) && \
     ((defined(__DragonFly_version) && __DragonFly_version >= 500703) || \
     (defined(__NetBSD_Version__) && __NetBSD_Version__ >= 899002800) || \
-    defined(__linux__))
+    defined(__linux__) || defined(__sun))
 #  define ND6_ADVERTISE
 #endif
 
