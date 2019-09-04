@@ -459,8 +459,6 @@ qnx*)
 	echo "DHCPCD_SRCS+=	if-bsd.c" >>$CONFIG_MK
 	;;
 sunos*)
-	echo "WARNING!!! Solaris support is at early development stage!" >&2
-	echo "so don't expect it to work just yet, patches welcome" >&2
 	echo "CPPFLAGS+=	-D_XPG4_2 -D__EXTENSIONS__ -DBSD_COMP" \
 	    >>$CONFIG_MK
 	echo "DHCPCD_SRCS+=	if-sun.c" >>$CONFIG_MK
