@@ -445,11 +445,15 @@ if_getifaddrs(struct ifaddrs **ifap)
 			continue;
 
 		/* Total hack */
-		ifa->ifa_dstaddr = malloc(sizeof(struct sockaddr_storage));
+		ifa->ifa_dstaddr = malloc(sizeof(struct sockaddr_in6));
 		if (ifa->ifa_dstaddr == NULL)
 			continue;
-		if_getsubnet(fd, ifa->ifa_name,
-		    ifa->ifa_dstaddr, sizeof(struct sockaddr_storage));
+		if (if_getsubnet(fd, ifa->ifa_name,
+		    ifa->ifa_dstaddr, sizeof(struct sockaddr_in6) == -1))
+		{
+			free(ifa->ifa_dstaddr);
+			ifa->ifa_dstaddr = NULL;
+		}
 	}
 	close(fd);
 #endif
