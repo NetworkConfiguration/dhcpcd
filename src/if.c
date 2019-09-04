@@ -241,6 +241,11 @@ if_learnaddrs(struct dhcpcd_ctx *ctx, struct if_head *ifs,
 		case AF_INET6:
 			sin6 = (void *)ifa->ifa_addr;
 			net6 = (void *)ifa->ifa_netmask;
+#ifdef __sun
+			/* Total hack. See if-sun.c */
+			if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr))
+				sin6 = (void *)ifa->ifa_dstaddr;
+#endif
 #ifdef __KAME__
 			if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr))
 				/* Remove the scope from the address */
