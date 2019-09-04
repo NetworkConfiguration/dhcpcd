@@ -1625,14 +1625,6 @@ if_address(unsigned char cmd, const struct ipv4_addr *ia)
 	/* We need to update the index now */
 	ia->iface->index = if_nametoindex(ia->alias);
 
-	/* Disabled for now - for some reason dhcpcd cannot setup
-	 * the subnet route correctly even though it looks
-	 * identical in netstat output. */
-#if 0
-	if (if_setflags(fd, ia->alias, IFF_NOLOCAL) == -1)
-		return -1;
-#endif
-
 	sa_in_init(&addr.sa, &ia->addr);
 	sa_in_init(&mask.sa, &ia->mask);
 	sa_in_init(&brd.sa, &ia->brd);
@@ -1675,12 +1667,9 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 
 	fd = if_getaf_fd(ia->iface->ctx, AF_INET6);
 
-	if (!IN6_IS_ADDR_LINKLOCAL(&ia->addr)) {
+	if (!(ia->flags & IPV6_AF_AUTOCONF) && ia->flags & IPV6_AF_RAPFX) {
 		if (if_setflags(fd, ia->alias, IFF_NOLOCAL) ==-1)
 			return -1;
-	}
-
-	if (!(ia->flags & IPV6_AF_AUTOCONF) && ia->flags & IPV6_AF_RAPFX) {
 		sa_in6_init(&mask.sa, &ia->prefix);
 		r = if_addaddr(fd, ia->alias,
 		    NULL, &mask.ss, NULL, ia->prefix_len);
