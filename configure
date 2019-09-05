@@ -1215,7 +1215,7 @@ fi
 if [ "$OS" = dragonfly ]; then
 	echo "#ifdef	USE_PRIVATECRYPTO" >>$CONFIG_H
 	echo "#define	HAVE_MD5_H" >>$CONFIG_H
-	echo "#define	SHA2_H	<sha256.h>" >>$CONFIG_H
+	echo "#define	SHA2_H			<openssl/sha.h>" >>$CONFIG_H
 	echo "#else" >>$CONFIG_H
 fi
 
