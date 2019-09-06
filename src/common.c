@@ -26,28 +26,10 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/param.h>
-#include <sys/time.h>
-#ifdef __sun
-#include <sys/sysmacros.h>
-#endif
-
-#include <assert.h>
 #include <ctype.h>
-#include <err.h>
 #include <errno.h>
-#include <fcntl.h>
-#include <limits.h>
-#ifdef BSD
-#  include <paths.h>
-#endif
-#include <stdarg.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include <unistd.h>
 
 #include "common.h"
 #include "dhcpcd.h"
