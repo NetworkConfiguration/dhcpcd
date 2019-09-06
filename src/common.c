@@ -26,6 +26,8 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/statvfs.h>
+
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
@@ -134,4 +136,19 @@ read_hwaddr_aton(uint8_t **data, const char *path)
 	}
 	fclose(fp);
 	return len;
+}
+
+int
+is_root_local(void)
+{
+#ifdef ST_LOCAL
+	struct statvfs vfs;
+
+	if (statvfs("/", &vfs) == -1)
+		return -1;
+	return vfs.f_flag & ST_LOCAL ? 1 : 0;
+#else
+	errno = ENOTSUP;
+	return -1;
+#endif
 }
