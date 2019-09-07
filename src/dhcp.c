@@ -3250,7 +3250,7 @@ valid_udp_packet(void *packet, size_t plen, struct in_addr *from,
 		.ip_dst = ip->ip_dst
 	};
 	size_t ip_hlen;
-	uint16_t ip_len, uh_sum;
+	uint16_t ip_len, udp_len, uh_sum;
 	struct udphdr *udp;
 	uint32_t csum;
 
@@ -3265,6 +3265,10 @@ valid_udp_packet(void *packet, size_t plen, struct in_addr *from,
 		from->s_addr = ip->ip_src.s_addr;
 
 	ip_hlen = (size_t)ip->ip_hl * 4;
+	if (ip_hlen > plen) {
+		errno = ENOBUFS;
+		return -1;
+	}
 	if (in_cksum(ip, ip_hlen, NULL) != 0) {
 		errno = EINVAL;
 		return -1;
@@ -3291,12 +3295,18 @@ valid_udp_packet(void *packet, size_t plen, struct in_addr *from,
 	if (udp->uh_sum == 0)
 		return 0;
 
+	udp_len = ntohs(udp->uh_ulen);
+	if (udp_len > plen - ip_hlen) {
+		errno = ENOBUFS;
+		return -1;
+	}
+
 	uh_sum = udp->uh_sum;
 	udp->uh_sum = 0;
 	pseudo_ip.ip_len = udp->uh_ulen;
 	csum = 0;
 	in_cksum(&pseudo_ip, sizeof(pseudo_ip), &csum);
-	csum = in_cksum(udp, ntohs(udp->uh_ulen), &csum);
+	csum = in_cksum(udp, udp_len, &csum);
 	if (csum != uh_sum) {
 		errno = EINVAL;
 		return -1;
