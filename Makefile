@@ -50,6 +50,8 @@ clean:
 distclean: clean
 	rm -f config.h config.mk config.log \
 		${DISTFILE} ${DISTFILEGZ} ${DISTINFO} ${DISTINFOSIGN}
+	rm -f *.diff *.patch *.orig *.rej
+	for x in ${SUBDIRS} tests; do cd $$x; ${MAKE} $@ || exit $$?; cd ..; done
 
 dist-git:
 	git archive --prefix=${DISTPREFIX}/ ${GITREF} | xz >${DISTFILE}

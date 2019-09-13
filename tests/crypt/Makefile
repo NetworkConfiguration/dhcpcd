@@ -24,6 +24,7 @@ clean:
 
 distclean: clean
 	rm -f .depend
+	rm -f *.diff *.patch *.orig *.rej
 
 .depend: ${SRCS} ${PCRYPT_SRCS}
 	${CC} ${CPPFLAGS} -MM ${SRCS} ${PCRYPT_SRCS}

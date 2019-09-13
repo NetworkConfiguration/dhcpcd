@@ -36,6 +36,9 @@ all: ${PROG} ${MAN8} ${SCRIPTS} ${EGHOOKSCRIPTS}
 clean:
 	rm -f ${CLEANFILES} 50-ypbind
 
+distclean: clean
+	rm -f *.diff *.patch *.orig *.rej
+
 depend:
 
 proginstall: ${PROG} ${HOOKSCRIPTS}
