@@ -3338,12 +3338,13 @@ dhcp_handlepacket(struct interface *ifp, uint8_t *data, size_t len)
 	const struct dhcp_state *state = D_CSTATE(ifp);
 
 	if (valid_udp_packet(data, len, &from, state->bpf_flags) == -1) {
+		const char *errstr;
+
 		if (errno == EINVAL)
-			logerrx("%s: checksum failure from %s",
-			  ifp->name, inet_ntoa(from));
+			errstr = "checksum failure";
 		else
-			logerr("%s: invalid UDP packet from %s",
-			  ifp->name, inet_ntoa(from));
+			errstr = "invalid UDP packet";
+		logerrx("%s: %s from %s", errstr, ifp->name, inet_ntoa(from));
 		return;
 	}
 
