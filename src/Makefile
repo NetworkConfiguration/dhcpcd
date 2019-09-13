@@ -134,6 +134,7 @@ clean:
 
 distclean: clean
 	rm -f .depend
+	rm -f *.diff *.patch *.orig *.rej
 
 _import-src: ${SRCS}
 	${INSTALL} -d ${DESTDIR}/src
