@@ -24,6 +24,12 @@ hooks/50-ypbind
 # Ignore distribution
 dhcpcd*.xz*
 
+# Ignore patch files
+*.diff
+*.patch
+*.orig
+*.rej
+
 # Ignore swap files
 *.swp
 
