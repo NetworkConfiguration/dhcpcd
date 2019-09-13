@@ -25,8 +25,14 @@
  * SUCH DAMAGE.
  */
 
+#ifdef SMALL
+#define INITDEFINES	@INITDEFINES_SMALL@
+#define INITDEFINENDS	@INITDEFINENDS_SMALL@
+#define INITDEFINE6S	@INITDEFINE6S_SMALL@
+#else
 #define INITDEFINES	@INITDEFINES@
 #define INITDEFINENDS	@INITDEFINENDS@
 #define INITDEFINE6S	@INITDEFINE6S@
+#endif
 
 extern const char * const dhcpcd_embedded_conf[];

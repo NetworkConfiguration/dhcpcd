@@ -4,9 +4,20 @@ set -e
 : ${TOOL_CAT:=cat}
 : ${TOOL_SED:=sed}
 CONF=${1:-dhcpcd-definitions.conf}
-C=${2:-dhcpcd-embedded.c.in}
+CONF_SMALL=${2:-dhcpcd-definitions.conf}
+C=${3:-dhcpcd-embedded.c.in}
 
 $TOOL_CAT $C
+echo "#ifdef SMALL"
+$TOOL_SED \
+	-e 's/#.*$//' \
+	-e '/^$/d' \
+	-e 's/^/"/g' \
+	-e 's/$/\",/g' \
+	-e 's/ [ ]*/ /g' \
+	-e 's/	[	]*/ /g' \
+	$CONF_SMALL
+echo "#else"
 $TOOL_SED \
 	-e 's/#.*$//' \
 	-e '/^$/d' \
@@ -15,4 +26,5 @@ $TOOL_SED \
 	-e 's/ [ ]*/ /g' \
 	-e 's/	[	]*/ /g' \
 	$CONF
+echo "#endif"
 printf "%s\n%s\n" "NULL" "};"

@@ -16,7 +16,8 @@ CFLAGS+=	-std=${CSTD}
 CPPFLAGS+=	-I${TOP} -I${TOP}/src -I./crypt
 
 SRCS+=		${DHCPCD_SRCS}
-DHCPCD_DEFS?=	dhcpcd-definitions.conf
+DHCPCD_DEF?=	dhcpcd-definitions.conf
+DHCPCD_DEFS=	dhcpcd-definitions.conf dhcpcd-definitions-small.conf
 
 PCOMPAT_SRCS=	${COMPAT_SRCS:compat/%=${TOP}/compat/%}
 PCRYPT_SRCS=	${CRYPT_SRCS:compat/%=${TOP}/compat/%}
@@ -74,9 +75,9 @@ ${PROG}: ${DEPEND} ${OBJS}
 lint:
 	${LINT} -Suz ${CPPFLAGS} ${SRCS} ${PCRYPT_SRCS} ${PCOMPAT_SRCS}
 
-_embeddedinstall: ${DHCPCD_DEFS}
+_embeddedinstall: ${DHCPCD_DEF}
 	${INSTALL} -d ${DESTDIR}${LIBEXECDIR}
-	${INSTALL} -m ${CONFMODE} ${DHCPCD_DEFS} ${DESTDIR}${LIBEXECDIR}
+	${INSTALL} -m ${CONFMODE} ${DHCPCD_DEF} ${DESTDIR}${LIBEXECDIR}
 
 _proginstall: ${PROG}
 	${INSTALL} -d ${DESTDIR}${SBINDIR}
