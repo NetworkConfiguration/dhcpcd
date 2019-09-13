@@ -71,7 +71,7 @@ for x do
 	--libexecdir) LIBEXECDIR=$var;;
 	--statedir|--localstatedir) STATEDIR=$var;;
 	--dbdir) DBDIR=$var;;
-	--rundir) RUNDIR=$var;;
+	--rundir|--runstatedir) RUNDIR=$var;;
 	--mandir) MANDIR=$var;;
 	--datadir) DATADIR=$var;;
 	--with-ccopts|CFLAGS) CFLAGS=$var;;
@@ -344,7 +344,7 @@ else
 	ALLOW_USR_LIBS=true
 fi
 case "$OS" in
-linux*|sunos*|kfreebsd*) ;;
+linux*|solaris*|sunos*|kfreebsd*) ;;
 *)
 	# There might be more than one ...
 	for LDELFN in /libexec/ld-elf.so.[0-9]*; do
@@ -385,7 +385,8 @@ CFLAGS+=	-Wpointer-sign -Wmissing-noreturn
 EOF
 	case "$OS" in
 	mirbsd*|openbsd*);; # OpenBSD has many redundant decs in system headers
-	bitrig*|sunos*)	echo "CFLAGS+=	-Wredundant-decls" >>$CONFIG_MK
+	bitrig*|solaris*|sunos*)
+			echo "CFLAGS+=	-Wredundant-decls" >>$CONFIG_MK
 			;; # Bitrig spouts many conversion errors with htons
 			   # sunos has many as well
 	*)		echo "CFLAGS+=	-Wredundant-decls" >>$CONFIG_MK
@@ -394,7 +395,7 @@ EOF
 	esac
 
 	case "$OS" in
-	sunos*);;
+	solaris*|sunos*);;
 	*)		echo "CFLAGS+=	-Wstrict-overflow" >>$CONFIG_MK;;
 	esac
 
@@ -458,7 +459,7 @@ qnx*)
 	echo "CPPFLAGS+=	-D__EXT" >>$CONFIG_MK
 	echo "DHCPCD_SRCS+=	if-bsd.c" >>$CONFIG_MK
 	;;
-sunos*)
+solaris*|sunos*)
 	echo "CPPFLAGS+=	-D_XPG4_2 -D__EXTENSIONS__ -DBSD_COMP" \
 	    >>$CONFIG_MK
 	echo "DHCPCD_SRCS+=	if-sun.c" >>$CONFIG_MK
