@@ -3354,7 +3354,7 @@ dhcp_handlepacket(struct interface *ifp, uint8_t *data, size_t len)
 			errstr = "checksum failure";
 		else
 			errstr = "invalid UDP packet";
-		logerrx("%s: %s from %s", errstr, ifp->name, inet_ntoa(from));
+		logerrx("%s: %s from %s", ifp->name, errstr, inet_ntoa(from));
 		return;
 	}
 
