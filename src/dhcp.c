@@ -1738,15 +1738,32 @@ send_message(struct interface *ifp, uint8_t type,
 	if (r == -1)
 		goto fail;
 	len = (size_t)r;
-	from.s_addr = bootp->ciaddr;
-	if (from.s_addr != INADDR_ANY)
+
+	if (ipv4_iffindaddr(ifp, &state->lease.addr, NULL) != NULL)
+		from.s_addr = state->lease.addr.s_addr;
+	else
+		from.s_addr = INADDR_ANY;
+	if (from.s_addr != INADDR_ANY &&
+	    state->lease.server.s_addr != INADDR_ANY)
 		to.s_addr = state->lease.server.s_addr;
 	else
-		to.s_addr = INADDR_ANY;
+		to.s_addr = INADDR_BROADCAST;
 
-	/* If unicasting, try and avoid sending by BPF so we don't
-	 * use a L2 broadcast. */
-	if (to.s_addr != INADDR_ANY && to.s_addr != INADDR_BROADCAST) {
+	/*
+	 * If not listening on the unspecified address we can
+	 * only receive broadcast messages via BPF.
+	 * Sockets bound to an address cannot receive broadcast messages
+	 * even if they are setup to send them.
+	 * Broadcasting from UDP is only an optimisation for rebinding
+	 * and on BSD, at least, is reliant on the subnet route being
+	 * correctly configured to recieve the unicast reply.
+	 * As such, we always broadcast and receive the reply to it via BPF.
+	 * This also guarantees we have a DHCP server attached to the
+	 * interface we want to configure because we can't dictate the
+	 * interface via IP_PKTINFO unlike for IPv6.
+	 */
+	if (to.s_addr != INADDR_BROADCAST)
+	{
 		if (dhcp_sendudp(ifp, &to, bootp, len) != -1)
 			goto out;
 		logerr("%s: dhcp_sendudp", ifp->name);
