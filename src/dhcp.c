@@ -2959,10 +2959,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 	}
 
 	if (state->state == DHS_BOUND) {
-		/* Before we supported FORCERENEW we closed off the raw
-		 * port so we effectively ignored all messages.
-		 * As such we'll not log by default here. */
-		//LOGDHCP(logdebugx, "bound, ignoring");
+		LOGDHCP(logdebugx, "bound, ignoring");
 		return;
 	}
 
