@@ -98,11 +98,6 @@ int if_getssid_wext(const char *ifname, uint8_t *ssid);
 #define	SOL_NETLINK	270
 #endif
 
-#define bpf_insn		sock_filter
-#define BPF_SKIPTYPE
-#define BPF_ETHCOOK		-ETH_HLEN
-#define BPF_WHOLEPACKET	0x0fffffff /* work around buggy LPF filters */
-
 struct priv {
 	int route_fd;
 	uint32_t route_pid;
