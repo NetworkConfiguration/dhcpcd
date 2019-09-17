@@ -3370,7 +3370,7 @@ dhcp_handlepacket(struct interface *ifp, uint8_t *data, size_t len)
 }
 
 static void
-dhcp_readpacket(void *arg)
+dhcp_readbpf(void *arg)
 {
 	struct interface *ifp = arg;
 	uint8_t buf[MTU_MAX];
@@ -3505,7 +3505,7 @@ dhcp_openbpf(struct interface *ifp)
 	}
 
 	eloop_event_add(ifp->ctx->eloop,
-	    state->bpf_fd, dhcp_readpacket, ifp);
+	    state->bpf_fd, dhcp_readbpf, ifp);
 	return 0;
 }
 
