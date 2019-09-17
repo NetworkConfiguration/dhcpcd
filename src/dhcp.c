@@ -3354,7 +3354,7 @@ dhcp_handlebootp(struct interface *ifp, struct bootp *bootp, size_t len,
 }
 
 static void
-dhcp_handlepacket(struct interface *ifp, uint8_t *data, size_t len)
+dhcp_handlebpf(struct interface *ifp, uint8_t *data, size_t len)
 {
 	struct bootp *bootp;
 	struct in_addr from;
@@ -3406,7 +3406,7 @@ dhcp_readbpf(void *arg)
 			}
 			break;
 		}
-		dhcp_handlepacket(ifp, buf, (size_t)bytes);
+		dhcp_handlebpf(ifp, buf, (size_t)bytes);
 		/* Check we still have a state after processing. */
 		if ((state = D_STATE(ifp)) == NULL)
 			break;
