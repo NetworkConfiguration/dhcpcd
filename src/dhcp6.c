@@ -680,27 +680,21 @@ dhcp6_makemessage(struct interface *ifp)
 					break;
 			}
 			if (n < ifo->dhcp6_override_len)
-			    continue;
-			if (!(opt->type & OT_NOREQ) &&
-			    (opt->type & OT_REQUEST ||
-			    has_option_mask(ifo->requestmask6, opt->option)))
-			{
-				n_options++;
-				len += sizeof(o.len);
-			}
+				continue;
+			if (!DHC_REQOPT(opt, ifo->requestmask6, ifo->nomask6))
+				continue;
+			n_options++;
+			len += sizeof(o.len);
 		}
 #ifndef SMALL
 		for (l = 0, opt = ifo->dhcp6_override;
 		    l < ifo->dhcp6_override_len;
 		    l++, opt++)
 		{
-			if (!(opt->type & OT_NOREQ) &&
-			    (opt->type & OT_REQUEST ||
-			    has_option_mask(ifo->requestmask6, opt->option)))
-			{
-				n_options++;
-				len += sizeof(o.len);
-			}
+			if (!DHC_REQOPT(opt, ifo->requestmask6, ifo->nomask6))
+				continue;
+			n_options++;
+			len += sizeof(o.len);
 		}
 		if (dhcp6_findselfsla(ifp)) {
 			n_options++;
@@ -1060,34 +1054,26 @@ dhcp6_makemessage(struct interface *ifp)
 				if (n < ifo->dhcp6_override_len)
 				    continue;
 #endif
-				if (!(opt->type & OT_NOREQ) &&
-				    (opt->type & OT_REQUEST ||
-				    has_option_mask(ifo->requestmask6,
-				        opt->option)))
-				{
-					o.code = htons((uint16_t)opt->option);
-					memcpy(p, &o.code, sizeof(o.code));
-					p += sizeof(o.code);
-					o.len = (uint16_t)
-					    (o.len + sizeof(o.code));
-				}
+				if (!DHC_REQOPT(opt, ifo->requestmask6,
+				    ifo->nomask6))
+					continue;
+				o.code = htons((uint16_t)opt->option);
+				memcpy(p, &o.code, sizeof(o.code));
+				p += sizeof(o.code);
+				o.len = (uint16_t)(o.len + sizeof(o.code));
 			}
 #ifndef SMALL
 			for (l = 0, opt = ifo->dhcp6_override;
 			    l < ifo->dhcp6_override_len;
 			    l++, opt++)
 			{
-				if (!(opt->type & OT_NOREQ) &&
-				    (opt->type & OT_REQUEST ||
-				    has_option_mask(ifo->requestmask6,
-				        opt->option)))
-				{
-					o.code = htons((uint16_t)opt->option);
-					memcpy(p, &o.code, sizeof(o.code));
-					p += sizeof(o.code);
-					o.len = (uint16_t)
-					    (o.len + sizeof(o.code));
-				}
+				if (!DHC_REQOPT(opt, ifo->requestmask6,
+				    ifo->nomask6))
+					continue;
+				o.code = htons((uint16_t)opt->option);
+				memcpy(p, &o.code, sizeof(o.code));
+				p += sizeof(o.code);
+				o.len = (uint16_t)(o.len + sizeof(o.code));
 			}
 			if (dhcp6_findselfsla(ifp)) {
 				o.code = htons(D6_OPTION_PD_EXCLUDE);

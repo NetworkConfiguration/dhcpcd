@@ -1032,10 +1032,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 		    i < ifp->ctx->dhcp_opts_len;
 		    i++, opt++)
 		{
-			if (!(opt->type & OT_REQUEST ||
-			    has_option_mask(ifo->requestmask, opt->option)))
-				continue;
-			if (opt->type & OT_NOREQ)
+			if (!DHC_REQOPT(opt, ifo->requestmask, ifo->nomask))
 				continue;
 			if (type == DHCP_INFORM &&
 			    (opt->option == DHO_RENEWALTIME ||
@@ -1054,10 +1051,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 					break;
 			if (lp < p)
 				continue;
-			if (!(opt->type & OT_REQUEST ||
-			    has_option_mask(ifo->requestmask, opt->option)))
-				continue;
-			if (opt->type & OT_NOREQ)
+			if (!DHC_REQOPT(opt, ifo->requestmask, ifo->nomask))
 				continue;
 			if (type == DHCP_INFORM &&
 			    (opt->option == DHO_RENEWALTIME ||
