@@ -988,7 +988,8 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 
 #ifdef AUTH
 		if ((ifo->auth.options & DHCPCD_AUTH_SENDREQUIRE) !=
-		    DHCPCD_AUTH_SENDREQUIRE)
+		    DHCPCD_AUTH_SENDREQUIRE &&
+		    !has_option_mask(ifo->nomask, DHO_FORCERENEW_NONCE))
 		{
 			/* We support HMAC-MD5 */
 			AREA_CHECK(1);
