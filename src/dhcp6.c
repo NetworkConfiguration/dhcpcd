@@ -1031,7 +1031,8 @@ dhcp6_makemessage(struct interface *ifp)
 
 #ifdef AUTH
 		if ((ifo->auth.options & DHCPCD_AUTH_SENDREQUIRE) !=
-		    DHCPCD_AUTH_SENDREQUIRE)
+		    DHCPCD_AUTH_SENDREQUIRE &&
+		    !has_option_mask(ifo->nomask6, D6_OPTION_RECONF_ACCEPT))
 			COPYIN1(D6_OPTION_RECONF_ACCEPT, 0);
 #endif
 
