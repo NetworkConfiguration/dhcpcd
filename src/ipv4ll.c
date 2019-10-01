@@ -261,10 +261,12 @@ ipv4ll_found(struct interface *ifp)
 {
 	struct ipv4ll_state *state = IPV4LL_STATE(ifp);
 
-	arp_cancel(state->arp);
+	if (state->arp != NULL)
+		arp_cancel(state->arp);
 	if (++state->conflicts == MAX_CONFLICTS)
 		logerrx("%s: failed to acquire an IPv4LL address",
 		    ifp->name);
+	state->pickedaddr.s_addr = INADDR_ANY;
 	eloop_timeout_add_sec(ifp->ctx->eloop,
 	    state->conflicts >= MAX_CONFLICTS ?
 	    RATE_LIMIT_INTERVAL : PROBE_WAIT,
@@ -308,7 +310,6 @@ ipv4ll_found_arp(struct arp_state *astate, __unused const struct arp_msg *amsg)
 	struct ipv4ll_state *state = IPV4LL_STATE(ifp);
 
 	assert(state->arp == astate);
-	state->pickedaddr.s_addr = INADDR_ANY;
 	ipv4ll_found(ifp);
 }
 
@@ -575,7 +576,7 @@ ipv4ll_handleifa(int cmd, struct ipv4_addr *ia, pid_t pid)
 		ipv4ll_not_found(ifp);
 	else if (ia->addr_flags & IN_IFF_DUPLICATED) {
 		logerrx("%s: DAD detected %s", ifp->name, ia->saddr);
-		ipv4_deladdr(state->addr, 1);
+		ipv4_deladdr(ia, 1);
 		ipv4ll_found(ifp);
 	}
 #endif
