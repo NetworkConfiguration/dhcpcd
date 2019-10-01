@@ -581,6 +581,9 @@ static const struct bpf_insn bpf_bootp_ether[] = {
 };
 #define BPF_BOOTP_ETHER_LEN	__arraycount(bpf_bootp_ether)
 
+#define BOOTP_MIN_SIZE		sizeof(struct ip) + sizeof(struct udphdr) + \
+				sizeof(struct bootp)
+
 static const struct bpf_insn bpf_bootp_filter[] = {
 	/* Make sure it's an IPv4 packet. */
 	BPF_STMT(BPF_LD + BPF_B + BPF_IND, 0),
@@ -607,8 +610,11 @@ static const struct bpf_insn bpf_bootp_filter[] = {
 	BPF_JUMP(BPF_JMP + BPF_JSET + BPF_K, 0x1fff, 0, 1),
 	BPF_STMT(BPF_RET + BPF_K, 0),
 
-	/* Store IP length. */
+	/* Ensure IP length is big enough to hold the UDP + BOOTP payload and
+	 * store IP length in memory. */
 	BPF_STMT(BPF_LD + BPF_H + BPF_IND, offsetof(struct ip, ip_len)),
+	BPF_JUMP(BPF_JMP + BPF_JGE + BPF_K, BOOTP_MIN_SIZE, 1, 0),
+	BPF_STMT(BPF_RET + BPF_K, 0),
 	BPF_STMT(BPF_ST, BPF_M_IPLEN),
 
 	/* Advance to the UDP header. */
