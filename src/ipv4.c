@@ -145,7 +145,7 @@ ipv4_iffindlladdr(struct interface *ifp)
 	state = IPV4_STATE(ifp);
 	if (state) {
 		TAILQ_FOREACH(ap, &state->addrs, next) {
-			if (IN_LINKLOCAL(htonl(ap->addr.s_addr)))
+			if (IN_LINKLOCAL(ntohl(ap->addr.s_addr)))
 				return ap;
 		}
 	}
@@ -938,7 +938,7 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 	if (addr->s_addr != INADDR_ANY && addr->s_addr != INADDR_BROADCAST) {
 		/* If the handler deletes the address, the other might crash.
 		 * So only call one handler based on the address type. */
-		if (IN_LINKLOCAL(addr->s_addr))
+		if (IN_LINKLOCAL(ntohl(addr->s_addr)))
 #ifdef IPV4LL
 			ipv4ll_handleifa(cmd, ia, pid);
 #else
