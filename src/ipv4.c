@@ -936,10 +936,14 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 	}
 
 	if (addr->s_addr != INADDR_ANY && addr->s_addr != INADDR_BROADCAST) {
-		dhcp_handleifa(cmd, ia, pid);
+		if (IN_LINKLOCAL(addr->s_addr))
 #ifdef IPV4LL
-		ipv4ll_handleifa(cmd, ia, pid);
+			ipv4ll_handleifa(cmd, ia, pid);
+#else
+			;
 #endif
+		else
+			dhcp_handleifa(cmd, ia, pid);
 	}
 
 	if (cmd == RTM_DELADDR)
