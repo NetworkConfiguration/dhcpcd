@@ -2864,14 +2864,18 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 #define LOGDHCP(l, m) \
 	log_dhcp((l), (m), ifp, bootp, bootp_len, from, 1)
 
+#define IS_STATE_ACTIVE(s) ((s)-state != DHS_NONE && \
+	(s)->state != DHS_INIT && (s)->state != DHS_BOUND)
+
 	if (bootp->op != BOOTREPLY) {
-		logdebugx("%s: op (%d) is not BOOTREPLY",
-		    ifp->name, bootp->op);
+		if (IS_STATE_ACTIVE(state))
+			logdebugx("%s: op (%d) is not BOOTREPLY",
+			    ifp->name, bootp->op);
 		return;
 	}
 
 	if (state->xid != ntohl(bootp->xid)) {
-		if (state->state != DHS_BOUND && state->state != DHS_NONE)
+		if (IS_STATE_ACTIVE(state))
 			logdebugx("%s: wrong xid 0x%x (expecting 0x%x) from %s",
 			    ifp->name, ntohl(bootp->xid), state->xid,
 			    inet_ntoa(*from));
@@ -2882,12 +2886,14 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 	if (ifp->hwlen <= sizeof(bootp->chaddr) &&
 	    memcmp(bootp->chaddr, ifp->hwaddr, ifp->hwlen))
 	{
-		char buf[sizeof(bootp->chaddr) * 3];
+		if (IS_STATE_ACTIVE(state)) {
+			char buf[sizeof(bootp->chaddr) * 3];
 
-		logdebugx("%s: xid 0x%x is for hwaddr %s",
-		    ifp->name, ntohl(bootp->xid),
-		    hwaddr_ntoa(bootp->chaddr, sizeof(bootp->chaddr),
-		    buf, sizeof(buf)));
+			logdebugx("%s: xid 0x%x is for hwaddr %s",
+			    ifp->name, ntohl(bootp->xid),
+			    hwaddr_ntoa(bootp->chaddr, sizeof(bootp->chaddr),
+				    buf, sizeof(buf)));
+		}
 		dhcp_redirect_dhcp(ifp, bootp, bootp_len, from);
 		return;
 	}
