@@ -2017,6 +2017,8 @@ static void
 dhcp_addr_duplicated(struct interface *ifp, struct in_addr *ia)
 {
 	struct dhcp_state *state = D_STATE(ifp);
+	unsigned long long opts = ifp->options->options;
+	struct dhcpcd_ctx *ctx = ifp->ctx;
 #ifdef IN_IFF_DUPLICATED
 	struct ipv4_addr *iap;
 #endif
@@ -2028,13 +2030,20 @@ dhcp_addr_duplicated(struct interface *ifp, struct in_addr *ia)
 	/* RFC 2131 3.1.5, Client-server interaction */
 	logerrx("%s: DAD detected %s", ifp->name, inet_ntoa(*ia));
 	unlink(state->leasefile);
-	if (!(ifp->options->options & DHCPCD_STATIC) && !state->lease.frominfo)
+	if (!(opts & DHCPCD_STATIC) && !state->lease.frominfo)
 		dhcp_decline(ifp);
 #ifdef IN_IFF_DUPLICATED
 	if ((iap = ipv4_iffindaddr(ifp, ia, NULL)) != NULL)
 		ipv4_deladdr(iap, 0);
 #endif
-	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
+	eloop_timeout_delete(ctx->eloop, NULL, ifp);
+	if (opts & (DHCPCD_STATIC | DHCPCD_INFORM)) {
+		state->reason = "EXPIRE";
+		script_runreason(ifp, state->reason);
+		if (!(ctx->options & DHCPCD_MASTER))
+			eloop_exit(ifp->ctx->eloop, EXIT_FAILURE);
+		return;
+	}
 	eloop_timeout_add_sec(ifp->ctx->eloop,
 	    DHCP_RAND_MAX, dhcp_discover, ifp);
 }
@@ -2374,7 +2383,9 @@ dhcp_arp_address(struct interface *ifp)
 			/* Add the address now, let the kernel handle DAD. */
 			ipv4_addaddr(ifp, &l.addr, &l.mask, &l.brd,
 			    l.leasetime, l.rebindtime);
-		} else
+		} else if (ia->addr_flags & IN_IFF_DUPLICATED)
+			dhcp_addr_duplicated(ifp, &ia->addr);
+		else
 			loginfox("%s: waiting for DAD on %s",
 			    ifp->name, inet_ntoa(addr));
 		return 0;
