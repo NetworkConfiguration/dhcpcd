@@ -263,7 +263,7 @@ ipv4ll_found(struct interface *ifp)
 
 	arp_cancel(state->arp);
 	if (++state->conflicts == MAX_CONFLICTS)
-		logerr("%s: failed to acquire an IPv4LL address",
+		logerrx("%s: failed to acquire an IPv4LL address",
 		    ifp->name);
 	eloop_timeout_add_sec(ifp->ctx->eloop,
 	    state->conflicts >= MAX_CONFLICTS ?
@@ -308,6 +308,7 @@ ipv4ll_found_arp(struct arp_state *astate, __unused const struct arp_msg *amsg)
 	struct ipv4ll_state *state = IPV4LL_STATE(ifp);
 
 	assert(state->arp == astate);
+	state->pickedaddr.s_addr = INADDR_ANY;
 	ipv4ll_found(ifp);
 }
 
