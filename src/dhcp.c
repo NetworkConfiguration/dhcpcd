@@ -2013,19 +2013,20 @@ dhcp_finish_dad(struct interface *ifp, struct in_addr *ia)
 }
 
 
-static void
+static bool
 dhcp_addr_duplicated(struct interface *ifp, struct in_addr *ia)
 {
 	struct dhcp_state *state = D_STATE(ifp);
 	unsigned long long opts = ifp->options->options;
 	struct dhcpcd_ctx *ctx = ifp->ctx;
+	bool deleted = false;
 #ifdef IN_IFF_DUPLICATED
 	struct ipv4_addr *iap;
 #endif
 
 	if ((state->offer == NULL || state->offer->yiaddr != ia->s_addr) &&
 	    !IN_ARE_ADDR_EQUAL(ia, &state->lease.addr))
-		return;
+		return deleted;
 
 	/* RFC 2131 3.1.5, Client-server interaction */
 	logerrx("%s: DAD detected %s", ifp->name, inet_ntoa(*ia));
@@ -2033,8 +2034,10 @@ dhcp_addr_duplicated(struct interface *ifp, struct in_addr *ia)
 	if (!(opts & DHCPCD_STATIC) && !state->lease.frominfo)
 		dhcp_decline(ifp);
 #ifdef IN_IFF_DUPLICATED
-	if ((iap = ipv4_iffindaddr(ifp, ia, NULL)) != NULL)
+	if ((iap = ipv4_iffindaddr(ifp, ia, NULL)) != NULL) {
 		ipv4_deladdr(iap, 0);
+		deleted = true;
+	}
 #endif
 	eloop_timeout_delete(ctx->eloop, NULL, ifp);
 	if (opts & (DHCPCD_STATIC | DHCPCD_INFORM)) {
@@ -2042,10 +2045,11 @@ dhcp_addr_duplicated(struct interface *ifp, struct in_addr *ia)
 		script_runreason(ifp, state->reason);
 		if (!(ctx->options & DHCPCD_MASTER))
 			eloop_exit(ifp->ctx->eloop, EXIT_FAILURE);
-		return;
+		return deleted;
 	}
 	eloop_timeout_add_sec(ifp->ctx->eloop,
 	    DHCP_RAND_MAX, dhcp_discover, ifp);
+	return deleted;
 }
 #endif
 
@@ -3963,7 +3967,7 @@ dhcp_abort(struct interface *ifp)
 	}
 }
 
-void
+struct ipv4_addr *
 dhcp_handleifa(int cmd, struct ipv4_addr *ia, pid_t pid)
 {
 	struct interface *ifp;
@@ -3974,7 +3978,7 @@ dhcp_handleifa(int cmd, struct ipv4_addr *ia, pid_t pid)
 	ifp = ia->iface;
 	state = D_STATE(ifp);
 	if (state == NULL || state->state == DHS_NONE)
-		return;
+		return ia;
 
 	if (cmd == RTM_DELADDR) {
 		if (state->addr == ia) {
@@ -3985,37 +3989,37 @@ dhcp_handleifa(int cmd, struct ipv4_addr *ia, pid_t pid)
 			 * to drop the lease. */
 			dhcp_drop(ifp, "EXPIRE");
 			dhcp_start1(ifp);
+			return NULL;
 		}
-		return;
 	}
 
 	if (cmd != RTM_NEWADDR)
-		return;
+		return ia;
 
 #ifdef IN_IFF_NOTUSEABLE
 	if (!(ia->addr_flags & IN_IFF_NOTUSEABLE))
 		dhcp_finish_dad(ifp, &ia->addr);
 	else if (ia->addr_flags & IN_IFF_DUPLICATED)
-		dhcp_addr_duplicated(ifp, &ia->addr);
+		return dhcp_addr_duplicated(ifp, &ia->addr) ? NULL : ia;
 #endif
 
 	ifo = ifp->options;
 	if (ifo->options & DHCPCD_INFORM) {
 		if (state->state != DHS_INFORM)
 			dhcp_inform(ifp);
-		return;
+		return ia;
 	}
 
 	if (!(ifo->options & DHCPCD_STATIC))
-		return;
+		return ia;
 	if (ifo->req_addr.s_addr != INADDR_ANY)
-		return;
+		return ia;
 
 	free(state->old);
 	state->old = state->new;
 	state->new_len = dhcp_message_new(&state->new, &ia->addr, &ia->mask);
 	if (state->new == NULL)
-		return;
+		return ia;
 	if (ifp->flags & IFF_POINTOPOINT) {
 		for (i = 1; i < 255; i++)
 			if (i != DHO_ROUTER && has_option_mask(ifo->dstmask,i))
@@ -4031,4 +4035,6 @@ dhcp_handleifa(int cmd, struct ipv4_addr *ia, pid_t pid)
 		state->addr = ia;
 		dhcp_inform(ifp);
 	}
+
+	return ia;
 }
