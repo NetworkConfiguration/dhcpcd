@@ -2043,7 +2043,8 @@ dhcp_addr_duplicated(struct interface *ifp, struct in_addr *ia)
 	if (opts & (DHCPCD_STATIC | DHCPCD_INFORM)) {
 		state->reason = "EXPIRE";
 		script_runreason(ifp, state->reason);
-		if (!(ctx->options & DHCPCD_MASTER))
+#define NOT_ONLY_SELF (DHCPCD_MASTER | DHCPCD_IPV6RS | DHCPCD_DHCP6)
+		if (!(ctx->options & NOT_ONLY_SELF))
 			eloop_exit(ifp->ctx->eloop, EXIT_FAILURE);
 		return deleted;
 	}
