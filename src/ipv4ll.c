@@ -546,7 +546,7 @@ ipv4ll_recvrt(__unused int cmd, const struct rt *rt)
 }
 #endif
 
-void
+struct ipv4_addr *
 ipv4ll_handleifa(int cmd, struct ipv4_addr *ia, pid_t pid)
 {
 	struct interface *ifp;
@@ -555,7 +555,7 @@ ipv4ll_handleifa(int cmd, struct ipv4_addr *ia, pid_t pid)
 	ifp = ia->iface;
 	state = IPV4LL_STATE(ifp);
 	if (state == NULL)
-		return;
+		return ia;
 
 	if (cmd == RTM_DELADDR &&
 	    state->addr != NULL &&
@@ -564,20 +564,23 @@ ipv4ll_handleifa(int cmd, struct ipv4_addr *ia, pid_t pid)
 		loginfox("%s: pid %d deleted IP address %s",
 		    ifp->name, pid, ia->saddr);
 		ipv4ll_defend_failed(ifp);
-		return;
+		return ia;
 	}
 
 #ifdef IN_IFF_DUPLICATED
 	if (cmd != RTM_NEWADDR)
-		return;
+		return ia;
 	if (!IN_ARE_ADDR_EQUAL(&state->pickedaddr, &ia->addr))
-		return;
+		return ia;
 	if (!(ia->addr_flags & IN_IFF_NOTUSEABLE))
 		ipv4ll_not_found(ifp);
 	else if (ia->addr_flags & IN_IFF_DUPLICATED) {
 		logerrx("%s: DAD detected %s", ifp->name, ia->saddr);
 		ipv4_deladdr(ia, 1);
 		ipv4ll_found(ifp);
+		return NULL;
 	}
 #endif
+
+	return ia;
 }

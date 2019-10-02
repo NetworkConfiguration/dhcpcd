@@ -936,19 +936,14 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 	}
 
 	if (addr->s_addr != INADDR_ANY && addr->s_addr != INADDR_BROADCAST) {
-		/* If the handler deletes the address, the other might crash.
-		 * So only call one handler based on the address type. */
-		if (IN_LINKLOCAL(ntohl(addr->s_addr)))
+		ia = dhcp_handleifa(cmd, ia, pid);
 #ifdef IPV4LL
+		if (ia != NULL)
 			ipv4ll_handleifa(cmd, ia, pid);
-#else
-			;
 #endif
-		else
-			dhcp_handleifa(cmd, ia, pid);
 	}
 
-	if (cmd == RTM_DELADDR)
+	if (cmd == RTM_DELADDR && ia != NULL)
 		free(ia);
 }
 
