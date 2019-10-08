@@ -425,6 +425,7 @@ arp_announce1(void *arg)
 {
 	struct arp_state *astate = arg;
 	struct interface *ifp = astate->iface;
+	struct ipv4_addr *ia;
 
 	if (++astate->claims < ANNOUNCE_NUM)
 		logdebugx("%s: ARP announcing %s (%d of %d), "
@@ -435,23 +436,25 @@ arp_announce1(void *arg)
 		logdebugx("%s: ARP announcing %s (%d of %d)",
 		    ifp->name, inet_ntoa(astate->addr),
 		    astate->claims, ANNOUNCE_NUM);
+
+	/* The kernel will send a Gratuitous ARP for newly added addresses.
+	 * So we can avoid sending the same. */
+	ia = ipv4_iffindaddr(ifp, &astate->addr, NULL);
+	if (astate->claims == 1 && ia != NULL && ia->flags & IPV4_AF_NEW)
+		goto skip_request;
+
 	if (arp_request(ifp, &astate->addr, &astate->addr) == -1)
 		logerr(__func__);
+
+skip_request:
+	/* No longer a new address. */
+	if (ia != NULL)
+		ia->flags |= ~IPV4_AF_NEW;
+
 	eloop_timeout_add_sec(ifp->ctx->eloop, ANNOUNCE_WAIT,
 	    astate->claims < ANNOUNCE_NUM ? arp_announce1 : arp_announced,
 	    astate);
 }
-
-/*
- * XXX FIXME
- * Kernels supporting RFC5227 will announce the address when it's
- * added.
- * dhcpcd should not announce when this happens, nor need to open
- * a BPF socket for it.
- * Also, an address might be added to a non preferred inteface when
- * the same address exists on a preferred one so we need to instruct
- * the kernel not to announce the address somehow.
- */
 
 void
 arp_announce(struct arp_state *astate)
@@ -497,6 +500,9 @@ void
 arp_ifannounceaddr(struct interface *ifp, const struct in_addr *ia)
 {
 	struct arp_state *astate;
+
+	if (ifp->flags & IFF_NOARP)
+		return;
 
 	astate = arp_find(ifp, ia);
 	if (astate == NULL) {

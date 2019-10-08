@@ -622,7 +622,6 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 {
 	struct ipv4_state *state;
 	struct ipv4_addr *ia;
-	bool is_new = false;
 #ifdef ALIAS_ADDR
 	int replaced, blank;
 	struct ipv4_addr *replaced_ia;
@@ -653,8 +652,9 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 #ifdef IN_IFF_TENTATIVE
 		ia->addr_flags = IN_IFF_TENTATIVE;
 #endif
-		is_new = true;
-	}
+		ia->flags = IPV4_AF_NEW;
+	} else
+		ia->flags |= ~IPV4_AF_NEW;
 
 	ia->mask = *mask;
 	ia->brd = *bcast;
@@ -698,7 +698,7 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 	}
 #endif
 
-	if (is_new)
+	if (ia->flags & IPV4_AF_NEW)
 		TAILQ_INSERT_TAIL(&state->addrs, ia, next);
 	return ia;
 }
@@ -743,8 +743,7 @@ ipv4_applyaddr(void *arg)
 #ifdef ARP
 				/* Announce the preferred address to
 				 * kick ARP caches. */
-				if (!(ifp->flags & IFF_NOARP))
-					arp_announceaddr(ifp->ctx,&lease->addr);
+				arp_announceaddr(ifp->ctx,&lease->addr);
 #endif
 			}
 			script_runreason(ifp, state->reason);
@@ -806,8 +805,7 @@ ipv4_applyaddr(void *arg)
 	rt_build(ifp->ctx, AF_INET);
 
 #ifdef ARP
-	if (!(ifp->flags & IFF_NOARP))
-		arp_announceaddr(ifp->ctx, &state->addr->addr);
+	arp_announceaddr(ifp->ctx, &state->addr->addr);
 #endif
 
 	if (state->state == DHS_BOUND) {
