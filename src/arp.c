@@ -134,7 +134,7 @@ static void
 arp_found(struct arp_state *astate, const struct arp_msg *amsg)
 {
 	struct interface *ifp;
-	struct ivp4_addr *ia;
+	struct ipv4_addr *ia;
 #ifndef KERNEL_RFC5227
 	struct timespec now, defend;
 #endif
@@ -142,15 +142,8 @@ arp_found(struct arp_state *astate, const struct arp_msg *amsg)
 	arp_report_conflicted(astate, amsg);
 	ifp = astate->iface;
 
-#ifdef GCC_PRAGMA_GCC
-#pragma GCC diagnostic push /* GCC is clearly wrong about this warning. */
-#pragma GCC diagnostic ignored "-Wincompatible-pointer-types"
-#endif
 	/* If we haven't added the address we're doing a probe. */
 	ia = ipv4_iffindaddr(ifp, &astate->addr, NULL);
-#ifdef GCC_PRAGMA_GCC
-#pragma GCC diagnostic pop
-#endif
 	if (ia == NULL) {
 		if (astate->found_cb != NULL)
 			astate->found_cb(astate, amsg);

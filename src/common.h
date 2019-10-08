@@ -190,11 +190,6 @@
 # endif
 #endif
 
-/* Older GCC does not support pragma GCC. */
-#if defined(__GNUC__) && __GNUC__ > 4
-#define GCC_PRAGMA_GCC
-#endif
-
 void get_line_free(void);
 extern int clock_monotonic;
 int get_monotonic(struct timespec *);
