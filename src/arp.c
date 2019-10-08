@@ -326,10 +326,8 @@ arp_open(struct interface *ifp)
 	state = ARP_STATE(ifp);
 	if (state->bpf_fd == -1) {
 		state->bpf_fd = bpf_open(ifp, bpf_arp);
-		if (state->bpf_fd == -1) {
-			logerr("%s: %s", __func__, ifp->name);
+		if (state->bpf_fd == -1)
 			return -1;
-		}
 		eloop_event_add(ifp->ctx->eloop, state->bpf_fd, arp_read, ifp);
 	}
 	return state->bpf_fd;
