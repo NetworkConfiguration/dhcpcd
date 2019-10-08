@@ -438,15 +438,20 @@ arp_announce1(void *arg)
 		    astate->claims, ANNOUNCE_NUM);
 
 	/* The kernel will send a Gratuitous ARP for newly added addresses.
-	 * So we can avoid sending the same. */
+	 * So we can avoid sending the same.
+	 * Linux is special and doesn't send one. */
 	ia = ipv4_iffindaddr(ifp, &astate->addr, NULL);
+#ifndef __linux__
 	if (astate->claims == 1 && ia != NULL && ia->flags & IPV4_AF_NEW)
 		goto skip_request;
+#endif
 
 	if (arp_request(ifp, &astate->addr, &astate->addr) == -1)
 		logerr(__func__);
 
+#ifndef __linux__
 skip_request:
+#endif
 	/* No longer a new address. */
 	if (ia != NULL)
 		ia->flags |= ~IPV4_AF_NEW;
