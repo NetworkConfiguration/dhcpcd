@@ -419,7 +419,7 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 		 * Don't allow some reserved interface names unless explicit. */
 		if (IF_NOCONF) {
 			if (ifa->ifa_flags & (IFF_LOOPBACK | IFF_POINTOPOINT) ||
-			    if_ignore(spec.drvname))
+			    if_ignore(ctx, spec.devname))
 				active = IF_INACTIVE;
 		}
 
