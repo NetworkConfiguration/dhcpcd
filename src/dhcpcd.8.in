@@ -204,7 +204,7 @@ metric.
 See options below for controlling which interfaces we allow and deny through
 the use of patterns.
 .Pp
-Non-ethernet interfaces and virtual ethernet interfaces
+Non-ethernet interfaces and some virtual ethernet interfaces
 such as TAP and bridge are ignored by default,
 as is the FireWire interface.
 To work with these devices they either need to be specified on the command line,
