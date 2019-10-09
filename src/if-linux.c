@@ -32,10 +32,12 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/param.h>
+#include <sys/stat.h>
 
 #include <linux/if_addr.h>
 #include <linux/if_link.h>
 #include <linux/if_packet.h>
+#include <linux/if_tun.h>
 #include <linux/if_vlan.h>
 #include <linux/filter.h>
 #include <linux/netlink.h>
@@ -117,7 +119,9 @@ static const uint8_t ipv4_bcast_addr[] = {
 
 #define PROC_INET6	"/proc/net/if_inet6"
 #define PROC_PROMOTE	"/proc/sys/net/ipv4/conf/%s/promote_secondaries"
+#define SYS_BRIDGE	"/sys/class/net/%s/bridge"
 #define SYS_LAYER2	"/sys/class/net/%s/device/layer2"
+#define SYS_TUNTAP	"/sys/class/net/%s/tun_flags"
 
 static const char *mproc =
 #if defined(__alpha__)
@@ -200,6 +204,20 @@ check_proc_int(const char *path)
 	return i;
 }
 
+static int
+check_proc_hex(const char *path, unsigned int *value)
+{
+	FILE *fp;
+	int i;
+
+	fp = fopen(path, "r");
+	if (fp == NULL)
+		return -1;
+	i = fscanf(fp, "%x", value) == 1 ? 0 : -1;
+	fclose(fp);
+	return i;
+}
+
 static ssize_t
 write_path(const char *path, const char *val)
 {
@@ -252,11 +270,36 @@ if_conf(struct interface *ifp)
 	return 0;
 }
 
-/* XXX work out TAP interfaces? */
+static bool
+if_bridge(const char *ifname)
+{
+	char path[sizeof(SYS_BRIDGE) + IF_NAMESIZE];
+	struct stat sb;
+
+	snprintf(path, sizeof(path), SYS_BRIDGE, ifname);
+	if (stat(path, &sb) == 0 && S_ISDIR(sb.st_mode))
+		return true;
+	return false;
+}
+
+static bool
+if_tap(const char *ifname)
+{
+	char path[sizeof(SYS_TUNTAP) + IF_NAMESIZE];
+	unsigned int n;
+
+	snprintf(path, sizeof(path), SYS_TUNTAP, ifname);
+	if (check_proc_hex(path, &n) == -1)
+		return false;
+	return n & IFF_TAP;
+}
+
 bool
-if_ignore(__unused struct dhcpcd_ctx *ctx, __unused const char *ifname)
+if_ignore(__unused struct dhcpcd_ctx *ctx, const char *ifname)
 {
 
+	if (if_tap(ifname) || if_bridge(ifname))
+		return true;
 	return false;
 }
 
