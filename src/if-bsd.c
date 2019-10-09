@@ -103,8 +103,9 @@
 
 /* Ignore these interface names which look like ethernet but are virtual. */
 static const char * const ifnames_ignore[] = {
-	"tap",
+	"bridge",
 	"fwe",		/* Firewire */
+	"tap",
 	NULL
 };
 
@@ -242,6 +243,10 @@ if_ignore(struct dhcpcd_ctx *ctx, const char *ifname)
 	struct ifgroupreq ifgr = { .ifgr_len = 0 };
 	struct ifg_req *ifg;
 	size_t ifg_len;
+
+	/* Sadly it is possible to remove the device name
+	 * from the interface groups, but hopefully this
+	 * will be very unlikely.... */
 
 	strlcpy(ifgr.ifgr_name, ifname, sizeof(ifgr.ifgr_name));
 	if (ioctl(ctx->pf_inet_fd, SIOCGIFGROUP, &ifgr) == -1 ||
