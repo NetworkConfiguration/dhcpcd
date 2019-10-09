@@ -104,6 +104,7 @@
 /* Ignore these interface names which look like ethernet but are virtual. */
 static const char * const ifnames_ignore[] = {
 	"tap",
+	"fwe",		/* Firewire */
 	NULL
 };
 
