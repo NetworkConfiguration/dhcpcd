@@ -405,18 +405,22 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 			continue;
 #endif
 
-		/* Don't allow loopback or pointopoint unless explicit */
-		if (ifa->ifa_flags & (IFF_LOOPBACK | IFF_POINTOPOINT)) {
-			if ((argc == 0 || argc == -1) &&
-			    ctx->ifac == 0 && !if_hasconf(ctx, spec.devname))
-				active = IF_INACTIVE;
-		}
-
 		if (if_vimaster(ctx, spec.devname) == 1) {
 			logfunc_t *logfunc = argc != 0 ? logerrx : logdebugx;
 			logfunc("%s: is a Virtual Interface Master, skipping",
 			    spec.devname);
 			continue;
+		}
+
+#define	IF_NOCONF	((argc == 0 || argc == -1) && ctx->ifac == 0 && \
+			 !if_hasconf(ctx, spec.devname))
+
+		/* Don't allow loopback or pointopoint unless explicit.
+		 * Don't allow some reserved interface names unless explicit. */
+		if (IF_NOCONF) {
+			if (ifa->ifa_flags & (IFF_LOOPBACK | IFF_POINTOPOINT) ||
+			    if_ignore(spec.drvname))
+				active = IF_INACTIVE;
 		}
 
 		ifp = calloc(1, sizeof(*ifp));
@@ -495,9 +499,7 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 #endif
 			default:
 				/* Don't allow unless explicit */
-				if ((argc == 0 || argc == -1) &&
-				    ctx->ifac == 0 &&
-				    !if_hasconf(ctx, ifp->name))
+				if (IF_NOCONF)
 					active = IF_INACTIVE;
 				if (active)
 					logwarnx("%s: unsupported"

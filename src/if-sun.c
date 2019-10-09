@@ -249,12 +249,19 @@ if_mtu_os(const struct interface *ifp)
 }
 
 int
-if_getssid(struct interface *ifp)
+if_getssid(__unused struct interface *ifp)
 {
 
-	UNUSED(ifp);
 	errno = ENOTSUP;
 	return -1;
+}
+
+/* XXX work out TAP interfaces? */
+bool
+if_ignore(__unused const char *drvname)
+{
+
+	return false;
 }
 
 unsigned short

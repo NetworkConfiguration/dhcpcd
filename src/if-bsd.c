@@ -101,6 +101,12 @@
 #define RT_ADVANCE(x, n) (x += RT_ROUNDUP((n)->sa_len))
 #endif
 
+/* Ignore these interface names which look like ethernet but are virtual. */
+static const char * const ifnames_ignore[] = {
+	"tap",
+	NULL
+};
+
 #ifdef INET6
 static void ifa_setscope(struct sockaddr_in6 *, unsigned int);
 static unsigned int ifa_getscope(const struct sockaddr_in6 *);
@@ -206,6 +212,18 @@ if_closesockets_os(struct dhcpcd_ctx *ctx)
 	priv = (struct priv *)ctx->priv;
 	if (priv->pf_inet6_fd != -1)
 		close(priv->pf_inet6_fd);
+}
+
+bool
+if_ignore(const char *drvname)
+{
+	const char * const *p;
+
+	for (p = ifnames_ignore; *p; p++) {
+		if (strcmp(*p, drvname) == 0)
+			return true;
+	}
+	return false;
 }
 
 int
