@@ -254,7 +254,7 @@ if_conf(struct interface *ifp)
 
 /* XXX work out TAP interfaces? */
 bool
-if_ignore(__unused const char *drvname)
+if_ignore(__unused struct dhcpcd_ctx *ctx, __unused const char *ifname)
 {
 
 	return false;

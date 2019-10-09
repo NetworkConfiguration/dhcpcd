@@ -214,8 +214,8 @@ if_closesockets_os(struct dhcpcd_ctx *ctx)
 		close(priv->pf_inet6_fd);
 }
 
-bool
-if_ignore(const char *drvname)
+static bool
+if_ignore1(const char *drvname)
 {
 	const char * const *p;
 
@@ -223,6 +223,45 @@ if_ignore(const char *drvname)
 		if (strcmp(*p, drvname) == 0)
 			return true;
 	}
+	return false;
+}
+
+bool
+if_ignore(struct dhcpcd_ctx *ctx, const char *ifname)
+{
+	struct if_spec spec;
+
+	if (if_nametospec(ifname, &spec) != 0)
+		return false;
+
+	if (if_ignore1(spec.drvname))
+		return true;
+
+#ifdef SIOCGIFGROUP
+	struct ifgroupreq ifgr = { .ifgr_len = 0 };
+	struct ifg_req *ifg;
+	size_t ifg_len;
+
+	strlcpy(ifgr.ifgr_name, ifname, sizeof(ifgr.ifgr_name));
+	if (ioctl(ctx->pf_inet_fd, SIOCGIFGROUP, &ifgr) == -1 ||
+	    (ifgr.ifgr_groups = malloc(ifgr.ifgr_len)) == NULL ||
+	    ioctl(ctx->pf_inet_fd, SIOCGIFGROUP, &ifgr) == -1)
+	{
+		logerr(__func__);
+		return false;
+	}
+
+	for (ifg = ifgr.ifgr_groups, ifg_len = ifgr.ifgr_len;
+	     ifg && ifg_len >= sizeof(*ifg);
+	     ifg++, ifg_len -= sizeof(*ifg))
+	{
+		if (if_ignore1(ifg->ifgrq_group))
+			return true;
+	}
+#else
+	UNUSED(ctx);
+#endif
+
 	return false;
 }
 
