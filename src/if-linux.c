@@ -252,6 +252,14 @@ if_conf(struct interface *ifp)
 	return 0;
 }
 
+/* XXX work out TAP interfaces? */
+bool
+if_ignore(__unused const char *drvname)
+{
+
+	return false;
+}
+
 /* XXX work out Virtal Interface Masters */
 int
 if_vimaster(__unused const struct dhcpcd_ctx *ctx, __unused const char *ifname)
