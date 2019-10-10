@@ -532,13 +532,6 @@ dhcp6_delegateaddr(struct in6_addr *addr, struct interface *ifp,
 		asla.prefix_len = 0;
 		asla.sla_set = 0;
 		sla = &asla;
-	} else if (sla->sla == 0 && sla->prefix_len == 0) {
-		/* An SLA of 0 was set with no prefix length specified.
-		 * This means we delegate the whole prefix. */
-		asla.sla = sla->sla;
-		asla.prefix_len = prefix->prefix_len;
-		asla.sla_set = 0;
-		sla = &asla;
 	} else if (sla->prefix_len == 0) {
 		/* An SLA was given, but prefix length was not.
 		 * We need to work out a suitable prefix length for
