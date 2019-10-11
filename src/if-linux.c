@@ -1383,45 +1383,55 @@ if_initrt(struct dhcpcd_ctx *ctx, rb_tree_t *kroutes, int af)
 #ifdef INET
 /* Linux is a special snowflake when it comes to BPF. */
 const char *bpf_name = "Packet Socket";
-#define	BPF_BUFFER_LEN		1500
 
+/* Linux is a special snowflake for opening BPF. */
 int
 bpf_open(struct interface *ifp, int (*filter)(struct interface *, int))
 {
 	struct ipv4_state *state;
-/* Linux is a special snowflake for opening BPF. */
 	int s;
 	union sockunion {
 		struct sockaddr sa;
 		struct sockaddr_ll sll;
 		struct sockaddr_storage ss;
-	} su;
+	} su = {
+		.sll.sll_family = PF_PACKET,
+		.sll.sll_protocol = htons(ETH_P_ALL),
+		.sll.sll_ifindex = (int)ifp->index,
+	};
 #ifdef PACKET_AUXDATA
 	int n;
 #endif
+
+	/* Allocate a suitably large buffer for a single packet. */
+	state = ipv4_getstate(ifp);
+	if (state == NULL)
+		return -1;
+	if (state->buffer_size < ETH_DATA_LEN) {
+		void *nb;
+
+		if ((nb = realloc(state->buffer, ETH_DATA_LEN)) == NULL)
+			return -1;
+		state->buffer = nb;
+		state->buffer_size = ETH_DATA_LEN;
+		state->buffer_len = state->buffer_pos = 0;
+	}
+
 
 #define SF	SOCK_CLOEXEC | SOCK_NONBLOCK
 	if ((s = xsocket(PF_PACKET, SOCK_RAW | SF, htons(ETH_P_ALL))) == -1)
 		return -1;
 #undef SF
 
-	/* Allocate a suitably large buffer for a single packet. */
-	state = ipv4_getstate(ifp);
-	if (state == NULL)
+	/* We cannot validate the correct interface,
+	 * so we MUST set this first. */
+	if (bind(s, &su.sa, sizeof(su.sll)) == -1)
 		goto eexit;
-	if (state->buffer_size < ETH_DATA_LEN) {
-		void *nb;
-
-		if ((nb = realloc(state->buffer, ETH_DATA_LEN)) == NULL)
-			goto eexit;
-		state->buffer = nb;
-		state->buffer_size = ETH_DATA_LEN;
-		state->buffer_len = state->buffer_pos = 0;
-	}
 
 	if (filter(ifp, s) != 0)
 		goto eexit;
 
+	/* In the ideal world, this would be set before the bind and filter. */
 #ifdef PACKET_AUXDATA
 	n = 1;
 	if (setsockopt(s, SOL_PACKET, PACKET_AUXDATA, &n, sizeof(n)) != 0) {
@@ -1430,19 +1440,18 @@ bpf_open(struct interface *ifp, int (*filter)(struct interface *, int))
 	}
 #endif
 
-	memset(&su, 0, sizeof(su));
-	su.sll.sll_family = PF_PACKET;
-	su.sll.sll_protocol = htons(ETH_P_ALL);
-	su.sll.sll_ifindex = (int)ifp->index;
-	if (bind(s, &su.sa, sizeof(su.sll)) == -1)
-		goto eexit;
+	/*
+	 * At this point we could have received packets for the wrong
+	 * interface or which don't pass the filter.
+	 * Linux should flush upon setting the filter like every other OS.
+	 * There is no way of flushing them from userland.
+	 * As such, consumers need to inspect each packet to ensure it's valid.
+	 * Or to put it another way, don't trust the Linux BPF filter.
+	*/
+
 	return s;
 
 eexit:
-	if (state != NULL) {
-		free(state->buffer);
-		state->buffer = NULL;
-	}
 	close(s);
 	return -1;
 }

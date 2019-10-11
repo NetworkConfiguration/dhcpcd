@@ -3270,9 +3270,40 @@ get_udp_data(void *packet, size_t *len)
 	return p;
 }
 
-static int
-valid_udp_packet(void *packet, size_t plen, struct in_addr *from,
-	unsigned int flags)
+static bool
+is_packet_udp_bootp(void *packet, size_t plen)
+{
+	struct ip *ip = packet;
+	size_t ip_hlen;
+	struct udphdr *udp;
+
+	if (sizeof(*ip) > plen)
+		return false;
+
+	if (ip->ip_v != IPVERSION || ip->ip_p != IPPROTO_UDP)
+		return false;
+
+	/* Sanity. */
+	if (ntohs(ip->ip_len) != plen)
+		return false;
+
+	ip_hlen = (size_t)ip->ip_hl * 4;
+	/* Check we have a UDP header and BOOTP. */
+	if (ip_hlen + sizeof(*udp) + offsetof(struct bootp, vend) > plen)
+		return false;
+
+	/* Check it's to and from the right ports. */
+	udp = (struct udphdr *)(void *)((char *)ip + ip_hlen);
+	if (udp->uh_dport != htons(BOOTPC) || udp->uh_sport != htons(BOOTPS))
+		return false;
+
+	return true;
+}
+
+/* Lengths have already been checked. */
+static bool
+checksums_valid(void *packet,
+    struct in_addr *from, unsigned int flags)
 {
 	struct ip *ip = packet;
 	struct ip pseudo_ip = {
@@ -3281,69 +3312,34 @@ valid_udp_packet(void *packet, size_t plen, struct in_addr *from,
 		.ip_dst = ip->ip_dst
 	};
 	size_t ip_hlen;
-	uint16_t ip_len, udp_len, uh_sum;
+	uint16_t udp_len, uh_sum;
 	struct udphdr *udp;
 	uint32_t csum;
-
-	if (plen < sizeof(*ip)) {
-		if (from != NULL)
-			from->s_addr = INADDR_ANY;
-		errno = ERANGE;
-		return -1;
-	}
 
 	if (from != NULL)
 		from->s_addr = ip->ip_src.s_addr;
 
-	/* Check we have the IP header */
 	ip_hlen = (size_t)ip->ip_hl * 4;
-	if (ip_hlen > plen) {
-		errno = ENOBUFS;
-		return -1;
-	}
+	if (in_cksum(ip, ip_hlen, NULL) != 0)
+		return false;
 
-	if (in_cksum(ip, ip_hlen, NULL) != 0) {
-		errno = EINVAL;
-		return -1;
-	}
+	if (flags & BPF_PARTIALCSUM)
+		return 0;
 
-	/* Check we have a payload */
-	ip_len = ntohs(ip->ip_len);
-	if (ip_len <= ip_hlen + sizeof(*udp)) {
-		errno = ERANGE;
-		return -1;
-	}
-	/* Check IP doesn't go beyond the payload */
-	if (ip_len > plen) {
-		errno = ENOBUFS;
-		return -1;
-	}
-
-	/* Check UDP doesn't go beyond the payload */
 	udp = (struct udphdr *)(void *)((char *)ip + ip_hlen);
-	udp_len = ntohs(udp->uh_ulen);
-	if (udp_len > plen - ip_hlen) {
-		errno =  ENOBUFS;
-		return -1;
-	}
-
-	if (udp->uh_sum == 0 || flags & BPF_PARTIALCSUM)
+	if (udp->uh_sum == 0)
 		return 0;
 
 	/* UDP checksum is based on a pseudo IP header alongside
 	 * the UDP header and payload. */
+	udp_len = ntohs(udp->uh_ulen);
 	uh_sum = udp->uh_sum;
 	udp->uh_sum = 0;
 	pseudo_ip.ip_len = udp->uh_ulen;
 	csum = 0;
 	in_cksum(&pseudo_ip, sizeof(pseudo_ip), &csum);
 	csum = in_cksum(udp, udp_len, &csum);
-	if (csum != uh_sum) {
-		errno = EINVAL;
-		return -1;
-	}
-
-	return 0;
+	return csum == uh_sum;
 }
 
 static void
@@ -3352,13 +3348,12 @@ dhcp_handlebootp(struct interface *ifp, struct bootp *bootp, size_t len,
 {
 	size_t v;
 
-	/* udp_len must be correct because the values are checked in
-	 * valid_udp_packet(). */
 	if (len < offsetof(struct bootp, vend)) {
 		logerrx("%s: truncated packet (%zu) from %s",
 		    ifp->name, len, inet_ntoa(*from));
 		return;
 	}
+
 	/* To make our IS_DHCP macro easy, ensure the vendor
 	 * area has at least 4 octets. */
 	v = len - offsetof(struct bootp, vend);
@@ -3378,14 +3373,17 @@ dhcp_handlebpf(struct interface *ifp, uint8_t *data, size_t len)
 	size_t udp_len;
 	const struct dhcp_state *state = D_CSTATE(ifp);
 
-	if (valid_udp_packet(data, len, &from, state->bpf_flags) == -1) {
-		const char *errstr;
+	/* Validate filter. */
+	if (!is_packet_udp_bootp(data, len)) {
+#ifdef BPF_DEBUG
+		logerrx("%s: DHCP BPF validation failure", ifp->name);
+#endif
+		return;
+	}
 
-		if (errno == EINVAL)
-			errstr = "checksum failure";
-		else
-			errstr = "invalid UDP packet";
-		logerrx("%s: %s from %s", ifp->name, errstr, inet_ntoa(from));
+	if (!checksums_valid(data, &from, state->bpf_flags)) {
+		logerrx("%s: checksum failure from %s",
+		    ifp->name, inet_ntoa(from));
 		return;
 	}
 
