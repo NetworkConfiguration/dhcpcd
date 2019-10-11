@@ -129,7 +129,6 @@ arp_report_conflicted(const struct arp_state *astate,
 	    inet_ntoa(astate->addr));
 }
 
-
 static void
 arp_found(struct arp_state *astate, const struct arp_msg *amsg)
 {
@@ -179,6 +178,35 @@ arp_found(struct arp_state *astate, const struct arp_msg *amsg)
 		astate->defend_failed_cb(astate);
 }
 
+static bool
+arp_validate(const struct interface *ifp, struct arphdr *arp)
+{
+
+	/* Families must match */
+	if (arp->ar_hrd != htons(ifp->family))
+		return false;
+
+	/* Protocol must be IP. */
+	if (arp->ar_pro != htons(ETHERTYPE_IP))
+		return false;
+
+	/* lladdr length matches */
+	if (arp->ar_hln != ifp->hwlen)
+		return false;
+
+	/* Protocol length must match in_addr_t */
+	if (arp->ar_pln != sizeof(in_addr_t))
+		return false;
+
+	/* Only these types are recognised */
+	if (arp->ar_op != htons(ARPOP_REPLY) &&
+	    arp->ar_op != htons(ARPOP_REQUEST))
+		return false;
+
+	return true;
+}
+
+
 static void
 arp_packet(struct interface *ifp, uint8_t *data, size_t len)
 {
@@ -194,25 +222,12 @@ arp_packet(struct interface *ifp, uint8_t *data, size_t len)
 		return;
 	memcpy(&ar, data, sizeof(ar));
 
-	/* These checks are enforced in the BPF filter. */
-#if 0
-	/* Families must match */
-	if (ar.ar_hrd != htons(ifp->family))
-		return;
-	/* Protocol must be IP. */
-	if (ar.ar_pro != htons(ETHERTYPE_IP))
-		continue;
-	/* lladdr length matches */
-	if (ar.ar_hln != ifp->hwlen)
-		continue;
-	/* Protocol length must match in_addr_t */
-	if (ar.ar_pln != sizeof(arm.sip.s_addr))
-		return;
-	/* Only these types are recognised */
-	if (ar.ar_op != htons(ARPOP_REPLY) &&
-	    ar.ar_op != htons(ARPOP_REQUEST))
-		continue;
+	if (!arp_validate(ifp, &ar)) {
+#ifdef BPF_DEBUG
+		logerrx("%s: ARP BPF validation failure", ifp->name);
 #endif
+		return;
+	}
 
 	/* Get pointers to the hardware addresses */
 	hw_s = data + sizeof(ar);
