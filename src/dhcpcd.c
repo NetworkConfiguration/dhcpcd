@@ -2026,7 +2026,7 @@ printpidfile:
 	ctx.options |= DHCPCD_STARTED;
 
 #ifdef SETPROCTITLE_H
-	setproctitle_init(&ctx, argc, argv);
+	setproctitle_init(argc, argv);
 #endif
 	setproctitle("%s%s%s",
 	    ctx.options & DHCPCD_MASTER ? "[master]" : argv[optind],
