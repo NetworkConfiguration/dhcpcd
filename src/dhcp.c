@@ -3273,7 +3273,7 @@ is_packet_udp_bootp(void *packet, size_t plen)
 {
 	struct ip *ip = packet;
 	size_t ip_hlen;
-	struct udphdr *udp;
+	struct udphdr udp;
 
 	if (plen < sizeof(*ip))
 		return false;
@@ -3290,18 +3290,18 @@ is_packet_udp_bootp(void *packet, size_t plen)
 		return false;
 
 	/* Check we have a UDP header and BOOTP. */
-	if (ip_hlen + sizeof(*udp) + offsetof(struct bootp, vend) > plen)
+	if (ip_hlen + sizeof(udp) + offsetof(struct bootp, vend) > plen)
 		return false;
 
 	/* Sanity. */
-	udp = (struct udphdr *)(void *)((char *)ip + ip_hlen);
-	if (ntohs(udp->uh_ulen) < sizeof(*udp))
+	memcpy(&udp, (char *)ip + ip_hlen, sizeof(udp));
+	if (ntohs(udp.uh_ulen) < sizeof(udp))
 		return false;
-	if (ip_hlen + ntohs(udp->uh_ulen) > plen)
+	if (ip_hlen + ntohs(udp.uh_ulen) > plen)
 		return false;
 
 	/* Check it's to and from the right ports. */
-	if (udp->uh_dport != htons(BOOTPC) || udp->uh_sport != htons(BOOTPS))
+	if (udp.uh_dport != htons(BOOTPC) || udp.uh_sport != htons(BOOTPS))
 		return false;
 
 	return true;
@@ -3320,7 +3320,8 @@ checksums_valid(void *packet,
 	};
 	size_t ip_hlen;
 	uint16_t udp_len, uh_sum;
-	struct udphdr *udp;
+	struct udphdr udp;
+	char *udpp, *uh_sump;
 	uint32_t csum;
 
 	if (from != NULL)
@@ -3333,19 +3334,28 @@ checksums_valid(void *packet,
 	if (flags & BPF_PARTIALCSUM)
 		return true;
 
-	udp = (struct udphdr *)(void *)((char *)ip + ip_hlen);
-	if (udp->uh_sum == 0)
+	udpp = (char *)ip + ip_hlen;
+	memcpy(&udp, udpp, sizeof(udp));
+	if (udp.uh_sum == 0)
 		return true;
 
 	/* UDP checksum is based on a pseudo IP header alongside
 	 * the UDP header and payload. */
-	udp_len = ntohs(udp->uh_ulen);
-	uh_sum = udp->uh_sum;
-	udp->uh_sum = 0;
-	pseudo_ip.ip_len = udp->uh_ulen;
+	udp_len = ntohs(udp.uh_ulen);
+	uh_sum = udp.uh_sum;
+
+	/* Need to zero the UDP sum in the packet for the checksum to work. */
+	uh_sump = udpp + offsetof(struct udphdr, uh_sum);
+	memset(uh_sump, 0, sizeof(udp.uh_sum));
+
+	pseudo_ip.ip_len = udp.uh_ulen;
 	csum = 0;
 	in_cksum(&pseudo_ip, sizeof(pseudo_ip), &csum);
-	csum = in_cksum(udp, udp_len, &csum);
+	csum = in_cksum(udpp, udp_len, &csum);
+
+	/* Put the checksum back. */
+	memcpy(uh_sump, &uh_sum, sizeof(udp.uh_sum));
+
 	return csum == uh_sum;
 }
 
