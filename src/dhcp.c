@@ -3282,7 +3282,7 @@ is_packet_udp_bootp(void *packet, size_t plen)
 		return false;
 
 	/* Sanity. */
-	if (ntohs(ip->ip_len) != plen)
+	if (ntohs(ip->ip_len) > plen)
 		return false;
 
 	ip_hlen = (size_t)ip->ip_hl * 4;
@@ -3297,7 +3297,7 @@ is_packet_udp_bootp(void *packet, size_t plen)
 	udp = (struct udphdr *)(void *)((char *)ip + ip_hlen);
 	if (ntohs(udp->uh_ulen) < sizeof(*udp))
 		return false;
-	if (ip_hlen + ntohs(udp->uh_ulen) != plen)
+	if (ip_hlen + ntohs(udp->uh_ulen) > plen)
 		return false;
 
 	/* Check it's to and from the right ports. */
