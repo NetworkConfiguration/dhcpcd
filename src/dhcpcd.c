@@ -2153,6 +2153,9 @@ exit1:
 		loginfox(PACKAGE " exited");
 	logclose();
 	free(ctx.logfile);
+#ifdef SETPROCTITLE_H
+	setproctitle_free();
+#endif
 #ifdef USE_SIGNALS
 	if (ctx.options & DHCPCD_FORKED)
 		_exit(i); /* so atexit won't remove our pidfile */
