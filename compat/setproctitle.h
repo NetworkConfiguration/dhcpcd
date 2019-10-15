@@ -28,6 +28,8 @@
 #ifndef SETPROCTITLE_H
 #define SETPROCTITLE_H
 
+#include "dhcpcd.h"
+
 #ifndef __printflike
 #if __GNUC__ > 2 || defined(__INTEL_COMPILER)
 #define	__printflike(a, b) __attribute__((format(printf, a, b)))
@@ -36,7 +38,7 @@
 #endif
 #endif /* !__printflike */
 
-int setproctitle_init(int, char **);
+int setproctitle_init(struct dhcpcd_ctx *ctx, int, char **);
 void setproctitle_free(void);
 __printflike(1, 2) void setproctitle(const char *, ...);
 #endif
