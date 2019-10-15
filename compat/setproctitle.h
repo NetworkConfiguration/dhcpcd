@@ -33,4 +33,5 @@
 #endif /* !__printflike */
 
 __printflike(1, 2) int setproctitle(const char *, ...);
+void setproctitle_free(void);
 #endif

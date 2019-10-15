@@ -24,9 +24,12 @@
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE 1
 #endif
+#ifdef __linux__
 #include <sys/prctl.h>
 #include <sys/syscall.h>
+#endif
 
+#include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -38,33 +41,40 @@
 
 #define prctl_arg(x) ((unsigned long)x)
 
-/*
- * Sets the process title to the specified title. Note that this may fail if
- * the kernel doesn't support PR_SET_MM_MAP (kernels <3.18).
- */
+static char *setproctitle_argv;
+
 int setproctitle(const char *fmt, ...)
 {
-	char title[1024], *tp, *progname;
+	const char *progname;
+	char title[1024], *tp;
+	size_t tl, n;
 	va_list args;
-	int fd, i;
-	char *buf_ptr, *tmp_proctitle;
-	char buf[BUFSIZ];
-	int ret = 0;
-	ssize_t bytes_read = 0;
-	size_t len;
-	static char *proctitle = NULL;
+	int ret;
 
 #if 0
 	progname = getprogname();
 #else
 	progname = "dhcpcd";
 #endif
-	tp = title;
-	tp += snprintf(title, sizeof(title), "%s: ", progname);
 
+	tp = title;
+	tl = sizeof(title);
+	n = strlcpy(tp, progname, tl);
+	tp += n;
+	tl -= n;
+	n = strlcpy(tp, ": ", tl);
+	tp += n;
+	tl -= n;
 	va_start(args, fmt);
-	vsnprintf(tp, sizeof(title) - strlen(progname), fmt, args);
+	vsnprintf(tp, tl, fmt, args);
 	va_end(args);
+
+#ifdef __linux__
+	int fd, i;
+	char *buf_ptr, *tmp_proctitle;
+	char buf[BUFSIZ];
+	ssize_t bytes_read;
+	size_t len;
 
 	/*
 	 * We don't really need to know all of this stuff, but unfortunately
@@ -120,13 +130,13 @@ int setproctitle(const char *fmt, ...)
 	 * want to have room for it. */
 	len = strlen(title) + 1;
 
-	tmp_proctitle = realloc(proctitle, len);
+	tmp_proctitle = realloc(setproctitle_argv, len);
 	if (!tmp_proctitle)
 		return -1;
 
-	proctitle = tmp_proctitle;
+	setproctitle_argv = tmp_proctitle;
 
-	arg_start = (unsigned long)proctitle;
+	arg_start = (unsigned long)setproctitle_argv;
 	arg_end = arg_start + len;
 
 	brk_val = syscall(__NR_brk, 0);
@@ -152,5 +162,18 @@ int setproctitle(const char *fmt, ...)
 		    prctl_arg(sizeof(prctl_map)), prctl_arg(0));
 	if (ret == 0)
 		(void)strlcpy((char *)arg_start, title, len);
+#else
+	/* Solaris doesn't work with the ARGV stamping approach.
+	 * Is there any other way? */
+	ret = -1;
+	errno = ENOTSUP;
+#endif
 	return ret;
+}
+
+void
+setproctitle_free(void)
+{
+
+	free(setproctitle_argv);
 }
