@@ -1549,6 +1549,47 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 	return 0;
 }
 
+static int
+dhcpcd_saveargv(struct dhcpcd_ctx *ctx, int argc, char **argv)
+{
+#ifdef SETPROCTITLE_H
+	int i;
+
+	ctx->argv = reallocarray(ctx->argv, (size_t)argc + 1, sizeof(char *));
+	if (ctx->argv == NULL) {
+		logerr(__func__);
+		return -1;
+	}
+
+	ctx->argc = argc;
+	for (i = 0; i < argc; i++) {
+		if ((ctx->argv[i] = strdup(argv[i])) == NULL) {
+			logerr(__func__);
+			return -1;
+		}
+	}
+
+	ctx->argv[i] = NULL;
+#else
+	ctx->argv = argv;
+	ctx->argc = argc;
+#endif
+	return 0;
+
+}
+
+static void
+dhcpcd_freeargv(struct dhcpcd_ctx *ctx)
+{
+#ifdef SETPROCTITLE_H
+	int i;
+
+	for (i = 0; i < ctx->argc; i++)
+		free(ctx->argv[i]);
+	free(ctx->argv);
+#endif
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1691,8 +1732,8 @@ main(int argc, char **argv)
 	logsetopts(logopts);
 	logopen(ctx.logfile);
 
-	ctx.argv = argv;
-	ctx.argc = argc;
+	if (dhcpcd_saveargv(&ctx, argc, argv) == -1)
+		goto exit_failure;
 	ctx.ifc = argc - optind;
 	ctx.ifv = argv + optind;
 
@@ -1702,7 +1743,7 @@ main(int argc, char **argv)
 			goto printpidfile;
 		goto exit_failure;
 	}
-	opt = add_options(&ctx, NULL, ifo, argc, argv);
+	opt = add_options(&ctx, NULL, ifo, ctx.argc, ctx.argv);
 	if (opt != 1) {
 		if (ctx.options & DHCPCD_PRINT_PIDFILE)
 			goto printpidfile;
@@ -1717,7 +1758,7 @@ main(int argc, char **argv)
 			ifo = read_config(&ctx, argv[optind], NULL, NULL);
 			if (ifo == NULL)
 				goto exit_failure;
-			add_options(&ctx, NULL, ifo, argc, argv);
+			add_options(&ctx, NULL, ifo, ctx.argc, ctx.argv);
 		}
 		if_printoptions();
 #ifdef INET
@@ -1840,7 +1881,7 @@ printpidfile:
 			logerr("%s: if_discover", __func__);
 			goto exit_failure;
 		}
-		ifp = if_find(ctx.ifaces, argv[optind]);
+		ifp = if_find(ctx.ifaces, ctx.argv[optind]);
 		if (ifp == NULL) {
 			ifp = calloc(1, sizeof(*ifp));
 			if (ifp == NULL) {
@@ -1848,7 +1889,7 @@ printpidfile:
 				goto exit_failure;
 			}
 			if (optind != argc)
-				strlcpy(ctx.pidfile, argv[optind],
+				strlcpy(ctx.pidfile, ctx.argv[optind],
 				    sizeof(ctx.pidfile));
 			ifp->ctx = &ctx;
 			TAILQ_INSERT_HEAD(ctx.ifaces, ifp, next);
@@ -1984,6 +2025,9 @@ printpidfile:
 	logdebugx(PACKAGE "-" VERSION " starting");
 	ctx.options |= DHCPCD_STARTED;
 
+#ifdef SETPROCTITLE_H
+	setproctitle_init(argc, argv);
+#endif
 	setproctitle("%s%s%s",
 	    ctx.options & DHCPCD_MASTER ? "[master]" : argv[optind],
 	    ctx.options & DHCPCD_IPV4 ? " [ip4]" : "",
@@ -2044,7 +2088,7 @@ printpidfile:
 
 	TAILQ_FOREACH(ifp, ctx.ifaces, next) {
 		if (ifp->active)
-			dhcpcd_initstate1(ifp, argc, argv, 0);
+			dhcpcd_initstate1(ifp, ctx.argc, ctx.argv, 0);
 	}
 	if_learnaddrs(&ctx, ctx.ifaces, &ifaddrs);
 
@@ -2153,6 +2197,10 @@ exit1:
 		loginfox(PACKAGE " exited");
 	logclose();
 	free(ctx.logfile);
+	dhcpcd_freeargv(&ctx);
+#ifdef SETPROCTITLE_H
+	setproctitle_free();
+#endif
 #ifdef USE_SIGNALS
 	if (ctx.options & DHCPCD_FORKED)
 		_exit(i); /* so atexit won't remove our pidfile */
