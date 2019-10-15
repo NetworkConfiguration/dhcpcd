@@ -1,136 +1,156 @@
 /*
- * Copyright (C) 2002-2019 Igor Sysoev
- * Copyright (C) 2011-2019 Nginx, Inc.
- * All rights reserved.
+ * lxc: linux Container library
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
+ * (C) Copyright IBM Corp. 2007, 2008
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
+ * Authors:
+ * Daniel Lezcano <daniel.lezcano at free.fr>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE 1
+#endif
+#include <sys/prctl.h>
+#include <sys/syscall.h>
+
+#include <fcntl.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "config.h"
 
-#ifdef __sun
-#define SETPROCTITLE_PAD	' '
-#else
-#define	SETPROCTITLE_PAD	'\0'
-#endif
+#define prctl_arg(x) ((unsigned long)x)
 
-static int setproctitle_argc;
-static char *setproctitle_argv_last;
-static char **setproctitle_argv;
-static char *setproctitle_buf;
-
-int
-setproctitle_init(int argc, char **argv)
+/*
+ * Sets the process title to the specified title. Note that this may fail if
+ * the kernel doesn't support PR_SET_MM_MAP (kernels <3.18).
+ */
+int setproctitle(const char *fmt, ...)
 {
-	size_t i, len;
-	char *p;
-
-	len = 0;
-	for (i = 0; environ[i] != NULL; i++)
-		 len += strlen(environ[i]) + 1;
-	if ((setproctitle_buf = malloc(len)) == NULL)
-		return -1;
-
-	setproctitle_argc = argc;
-	setproctitle_argv = argv;
-	setproctitle_argv_last = setproctitle_argv[0];
-	for (i = 0; setproctitle_argv[i] != NULL; i++) {
-		if (setproctitle_argv_last == setproctitle_argv[i])
-			setproctitle_argv_last = setproctitle_argv[i] +
-			    strlen(setproctitle_argv[i]) + 1;
-	}
-
-	p = setproctitle_buf;
-	for (i = 0; environ[i] != NULL; i++) {
-		if (setproctitle_argv_last != environ[i])
-			continue;
-		len = strlen(environ[i]) + 1;
-		setproctitle_argv_last = environ[i] + len;
-		strlcpy(p, environ[i], len);
-		environ[i] = p;
-		p += len;
-	}
-
-	setproctitle_argv_last--;
-	return 0;
-}
-
-void
-setproctitle_free(void)
-{
-
-	free(setproctitle_buf);
-}
-
-void
-setproctitle(const char *fmt, ...)
-{
-	const char *progname;
-	char *p;
-	int n;
+	char title[1024], *tp, *progname;
 	va_list args;
+	int fd, i;
+	char *buf_ptr, *tmp_proctitle;
+	char buf[BUFSIZ];
+	int ret = 0;
+	ssize_t bytes_read = 0;
+	size_t len;
+	static char *proctitle = NULL;
+
 #if 0
 	progname = getprogname();
 #else
 	progname = "dhcpcd";
 #endif
-
-	setproctitle_argv[1] = NULL;
-#define	LAST_SIZE	(size_t)(setproctitle_argv_last - p)
-
-	p = setproctitle_argv[0];
-	n = snprintf(p, LAST_SIZE, "%s: ", progname);
-	if (n == -1)
-		return;
-	p += n;
+	tp = title;
+	tp += snprintf(title, sizeof(title), "%s: ", progname);
 
 	va_start(args, fmt);
-	n = vsnprintf(p, LAST_SIZE, fmt, args);
+	vsnprintf(tp, sizeof(title) - strlen(progname), fmt, args);
 	va_end(args);
-	if (n == -1)
-		return;
-	p += n;
 
-#ifdef __sun
-	size_t len;
-	int i;
+	/*
+	 * We don't really need to know all of this stuff, but unfortunately
+	 * PR_SET_MM_MAP requires us to set it all at once, so we have to
+	 * figure it out anyway.
+	 */
+	unsigned long start_data, end_data, start_brk, start_code, end_code,
+	    start_stack, arg_start, arg_end, env_start, env_end;
+	long brk_val;
+	struct prctl_mm_map prctl_map;
 
-	len = 0;
-	for (i = 0; i < setproctitle_argc; i++)
-		len += strlen(setproctitle_argv[i]) + 1;
+	fd = open("/proc/self/stat", O_RDONLY);
+	if (fd == -1)
+		return -1;
+	bytes_read = read(fd, buf, sizeof(buf) - 1);
+	close(fd);
+	if (bytes_read == -1)
+		return -1;
 
-	if (len > (size_t)(p - setproctitle_argv[0])) {
-		p += strlcpy(p, " (", LAST_SIZE);
-		for (i = 0; i < setproctitle_argc; i++) {
-			p += strlcpy(p, setproctitle_argv[i], LAST_SIZE);
-			p += strlcpy(p, " ", LAST_SIZE);
-		}
+	buf[bytes_read] = '\0';
+
+	/* Skip the first 25 fields, column 26-28 are start_code, end_code,
+	 * and start_stack */
+	buf_ptr = strchr(buf, ' ');
+	for (i = 0; i < 24; i++) {
+		if (!buf_ptr)
+			return -1;
+		buf_ptr = strchr(buf_ptr + 1, ' ');
 	}
-#endif
+	if (!buf_ptr)
+		return -1;
 
-	if (setproctitle_argv_last - p > 0)
-		memset(p, SETPROCTITLE_PAD, LAST_SIZE);
+	i = sscanf(buf_ptr, "%lu %lu %lu", &start_code, &end_code, &start_stack);
+	if (i != 3)
+		return -1;
+
+	/* Skip the next 19 fields, column 45-51 are start_data to arg_end */
+	for (i = 0; i < 19; i++) {
+		if (!buf_ptr)
+			return -1;
+		buf_ptr = strchr(buf_ptr + 1, ' ');
+	}
+
+	if (!buf_ptr)
+		return -1;
+
+	i = sscanf(buf_ptr, "%lu %lu %lu %*u %*u %lu %lu", &start_data,
+		   &end_data, &start_brk, &env_start, &env_end);
+	if (i != 5)
+		return -1;
+
+	/* Include the null byte here, because in the calculations below we
+	 * want to have room for it. */
+	len = strlen(title) + 1;
+
+	tmp_proctitle = realloc(proctitle, len);
+	if (!tmp_proctitle)
+		return -1;
+
+	proctitle = tmp_proctitle;
+
+	arg_start = (unsigned long)proctitle;
+	arg_end = arg_start + len;
+
+	brk_val = syscall(__NR_brk, 0);
+
+	prctl_map = (struct prctl_mm_map){
+	    .start_code = start_code,
+	    .end_code = end_code,
+	    .start_stack = start_stack,
+	    .start_data = start_data,
+	    .end_data = end_data,
+	    .start_brk = start_brk,
+	    .brk = (unsigned long long)brk_val,
+	    .arg_start = arg_start,
+	    .arg_end = arg_end,
+	    .env_start = env_start,
+	    .env_end = env_end,
+	    .auxv = NULL,
+	    .auxv_size = 0,
+	    .exe_fd = (unsigned int)-1,
+	};
+
+	ret = prctl(PR_SET_MM, prctl_arg(PR_SET_MM_MAP), prctl_arg(&prctl_map),
+		    prctl_arg(sizeof(prctl_map)), prctl_arg(0));
+	if (ret == 0)
+		(void)strlcpy((char *)arg_start, title, len);
+	return ret;
 }
