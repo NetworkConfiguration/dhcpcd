@@ -164,8 +164,6 @@ dhcp_printoptions(const struct dhcpcd_ctx *ctx,
 	}
 }
 
-#define get_option_raw(ctx, bootp, bootp_len, opt)	\
-	get_option((ctx), (bootp), (bootp_len), NULL)
 static const uint8_t *
 get_option(struct dhcpcd_ctx *ctx,
     const struct bootp *bootp, size_t bootp_len,
@@ -3277,7 +3275,7 @@ is_packet_udp_bootp(void *packet, size_t plen)
 	size_t ip_hlen;
 	struct udphdr *udp;
 
-	if (sizeof(*ip) > plen)
+	if (plen < sizeof(*ip))
 		return false;
 
 	if (ip->ip_v != IPVERSION || ip->ip_p != IPPROTO_UDP)
@@ -3288,12 +3286,21 @@ is_packet_udp_bootp(void *packet, size_t plen)
 		return false;
 
 	ip_hlen = (size_t)ip->ip_hl * 4;
+	if (ip_hlen < sizeof(*ip))
+		return false;
+
 	/* Check we have a UDP header and BOOTP. */
 	if (ip_hlen + sizeof(*udp) + offsetof(struct bootp, vend) > plen)
 		return false;
 
-	/* Check it's to and from the right ports. */
+	/* Sanity. */
 	udp = (struct udphdr *)(void *)((char *)ip + ip_hlen);
+	if (ntohs(udp->uh_ulen) < sizeof(*udp))
+		return false;
+	if (ip_hlen + ntohs(udp->uh_ulen) != plen)
+		return false;
+
+	/* Check it's to and from the right ports. */
 	if (udp->uh_dport != htons(BOOTPC) || udp->uh_sport != htons(BOOTPS))
 		return false;
 
@@ -3324,11 +3331,11 @@ checksums_valid(void *packet,
 		return false;
 
 	if (flags & BPF_PARTIALCSUM)
-		return 0;
+		return true;
 
 	udp = (struct udphdr *)(void *)((char *)ip + ip_hlen);
 	if (udp->uh_sum == 0)
-		return 0;
+		return true;
 
 	/* UDP checksum is based on a pseudo IP header alongside
 	 * the UDP header and payload. */
