@@ -30,24 +30,28 @@
 #include <string.h>
 
 #include "config.h"
+#include "dhcpcd.h"
 
 #ifdef __sun
 #define SETPROCTITLE_PAD	' '
+extern const char **environ;
 #else
 #define	SETPROCTITLE_PAD	'\0'
 #endif
 
+static struct dhcpcd_ctx *setproctitle_ctx;
 static int setproctitle_argc;
-static char *setproctitle_argv_last;
+static const char *setproctitle_argv_last;
 static char **setproctitle_argv;
 static char *setproctitle_buf;
 
 int
-setproctitle_init(int argc, char **argv)
+setproctitle_init(struct dhcpcd_ctx *ctx, int argc, char **argv)
 {
 	size_t i, len;
 	char *p;
 
+	setproctitle_ctx = ctx;
 	len = 0;
 	for (i = 0; environ[i] != NULL; i++)
 		 len += strlen(environ[i]) + 1;
@@ -119,16 +123,20 @@ setproctitle(const char *fmt, ...)
 	int i;
 
 	len = 0;
-	for (i = 0; i < setproctitle_argc; i++)
-		len += strlen(setproctitle_argv[i]) + 1;
+	for (i = 0; i < setproctitle_ctx->argc; i++) {
+		len += strlen(setproctitle_ctx->argv[i]) + 1;
+	}
 
 	if (len > (size_t)(p - setproctitle_argv[0])) {
 		p += strlcpy(p, " (", LAST_SIZE);
 		for (i = 0; i < setproctitle_argc; i++) {
-			p += strlcpy(p, setproctitle_argv[i], LAST_SIZE);
+			p += strlcpy(p, setproctitle_ctx->argv[i], LAST_SIZE);
 			p += strlcpy(p, " ", LAST_SIZE);
 		}
 	}
+
+	if (*(p - 1) == ' ')
+		*(p - 1) = ')';
 #endif
 
 	if (setproctitle_argv_last - p > 0)
