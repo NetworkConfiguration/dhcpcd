@@ -90,7 +90,7 @@ arc4_getword(struct arc4_stream *as)
 {
 	int val;
 
-	val = arc4_getbyte(as) << 24;
+	val = (int)((unsigned int)arc4_getbyte(as) << 24);
 	val |= arc4_getbyte(as) << 16;
 	val |= arc4_getbyte(as) << 8;
 	val |= arc4_getbyte(as);
