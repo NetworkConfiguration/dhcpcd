@@ -805,6 +805,7 @@ if [ -z "$SETPROCTITLE" ]; then
 	printf "Testing for setproctitle ... "
 	cat << EOF >_setproctitle.c
 #include <stdlib.h>
+#include <unistd.h>
 int main(void) {
 	setproctitle("foo");
 	return 0;
