@@ -3315,7 +3315,7 @@ checksums_valid(void *packet,
 	struct ip *ip = packet;
 	union pip {
 		struct ip ip;
-		uint16_t w[sizeof(struct ip)];
+		uint16_t w[sizeof(struct ip) / 2];
 	} pip = {
 		.ip.ip_p = IPPROTO_UDP,
 		.ip.ip_src = ip->ip_src,
