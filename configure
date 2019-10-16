@@ -139,6 +139,7 @@ Fine tuning of the installation directories:
   --bindir=DIR            user executables [PREFIX/bin]
   --sbindir=DIR           system admin executables [PREFIX/sbin]
   --libexecdir=DIR        program executables [PREFIX/libexec]
+  --dbdir=DIR             database [STATEDIR/db/dhcpcd]
   --sysconfdir=DIR        read-only single-machine data [PREFIX/etc]
   --localstatedir=DIR     modifiable single-machine data [/var]
   --libdir=DIR            object code libraries [PREFIX/lib]
