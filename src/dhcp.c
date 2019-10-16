@@ -3350,7 +3350,7 @@ checksums_valid(void *packet,
 	uh_sump = udpp + offsetof(struct udphdr, uh_sum);
 	memset(uh_sump, 0, sizeof(udp.uh_sum));
 
-	/* Checksum psuedo header and then UDP + payload. */
+	/* Checksum pseudo header and then UDP + payload. */
 	in_cksum(pip.w, sizeof(pip.w), &csum);
 	csum = in_cksum(udpp, ntohs(udp.uh_ulen), &csum);
 
