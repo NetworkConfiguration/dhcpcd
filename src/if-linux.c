@@ -46,10 +46,18 @@
 
 #include <arpa/inet.h>
 #include <net/if.h>
-#include <netinet/if_ether.h>
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
 #include <net/route.h>
+
+/* musl has its own definition of struct ethhdr, so only include
+ * netinet/if_ether.h on systems with GLIBC.  For the ARPHRD constants,
+ * we must include linux/if_arp.h instead. */
+#if defined(__GLIBC__)
+#include <netinet/if_ether.h>
+#else
+#include <linux/if_arp.h>
+#endif
 
 #include <errno.h>
 #include <fcntl.h>
