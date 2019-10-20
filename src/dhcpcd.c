@@ -186,6 +186,12 @@ handle_exit_timeout(void *arg)
 	ctx = arg;
 	logerrx("timed out");
 	if (!(ctx->options & DHCPCD_MASTER)) {
+		struct interface *ifp;
+
+		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+			if (ifp->active == IF_ACTIVE_USER)
+				script_runreason(ifp, "STOPPED");
+		}
 		eloop_exit(ctx->eloop, EXIT_FAILURE);
 		return;
 	}
