@@ -687,7 +687,8 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 		if (errno != EEXIST)
 			logerr("%s: if_addaddress",
 			    __func__);
-		free(ia);
+		if (ia->flags & IPV4_AF_NEW)
+			free(ia);
 		return NULL;
 	}
 
