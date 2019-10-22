@@ -634,6 +634,7 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 #endif
 #ifdef INET6
 	struct in6_addr addr6;
+	int flags;
 #endif
 
 	if (nlm->nlmsg_type != RTM_DELADDR && nlm->nlmsg_type != RTM_NEWADDR)
@@ -682,6 +683,8 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 			}
 			rta = RTA_NEXT(rta, len);
 		}
+
+		/* XXX how to validate command for address? */
 		ipv4_handleifa(ctx, nlm->nlmsg_type, NULL, ifp->name,
 		    &addr, &net, &brd, ifa->ifa_flags, (pid_t)nlm->nlmsg_pid);
 		break;
@@ -698,6 +701,18 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 			}
 			rta = RTA_NEXT(rta, len);
 		}
+
+		/* Validate RTM_DELADDR really means address deleted
+		 * and anything else really means address exists. */
+		flags = if_addrflags6(ifp, &addr6, NULL);
+		if (nlm->nlmsg_type == RTM_DELADDR) {
+			if (flags != -1)
+				break;
+		} else {
+			if (flags == -1)
+				break;
+		}
+
 		ipv6_handleifa(ctx, nlm->nlmsg_type, NULL, ifp->name,
 		    &addr6, ifa->ifa_prefixlen, ifa->ifa_flags,
 		    (pid_t)nlm->nlmsg_pid);
