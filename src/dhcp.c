@@ -4008,7 +4008,7 @@ dhcp_handleifa(int cmd, struct ipv4_addr *ia, pid_t pid)
 			 * to drop the lease. */
 			dhcp_drop(ifp, "EXPIRE");
 			dhcp_start1(ifp);
-			return NULL;
+			return ia;
 		}
 	}
 
