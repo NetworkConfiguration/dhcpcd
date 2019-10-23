@@ -125,6 +125,8 @@ static const uint8_t ipv4_bcast_addr[] = {
 };
 #endif
 
+static int if_addressexists(struct interface *, struct in_addr *);
+
 #define PROC_INET6	"/proc/net/if_inet6"
 #define PROC_PROMOTE	"/proc/sys/net/ipv4/conf/%s/promote_secondaries"
 #define SYS_BRIDGE	"/sys/class/net/%s/bridge"
@@ -445,7 +447,7 @@ recv_again:
 		return 0;
 
 	r = 0;
-	again = 0;	/* Appease static analysis */
+	again = 0;
 	for (nlm = iov->iov_base;
 	     nlm && NLMSG_OK(nlm, (size_t)len);
 	     nlm = NLMSG_NEXT(nlm, len))
@@ -684,7 +686,16 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 			rta = RTA_NEXT(rta, len);
 		}
 
-		/* XXX how to validate command for address? */
+		/* Validate RTM_DELADDR really means address deleted
+		 * and anything else really means address exists. */
+		if (if_addressexists(ifp, &addr) == 1) {
+			if (nlm->nlmsg_type == RTM_DELADDR)
+				break;
+		} else {
+			if (nlm->nlmsg_type != RTM_DELADDR)
+				break;
+		}
+
 		ipv4_handleifa(ctx, nlm->nlmsg_type, NULL, ifp->name,
 		    &addr, &net, &brd, ifa->ifa_flags, (pid_t)nlm->nlmsg_pid);
 		break;
@@ -906,6 +917,7 @@ send_netlink(struct dhcpcd_ctx *ctx, void *arg,
     int (*callback)(struct dhcpcd_ctx *, void *, struct nlmsghdr *))
 {
 	int s, r;
+	bool privsock;
 	struct sockaddr_nl snl = { .nl_family = AF_NETLINK };
 	struct iovec iov = { .iov_base = hdr, .iov_len = hdr->nlmsg_len };
 	struct msghdr msg = {
@@ -913,7 +925,8 @@ send_netlink(struct dhcpcd_ctx *ctx, void *arg,
 	    .msg_iov = &iov, .msg_iovlen = 1
 	};
 
-	if (protocol == NETLINK_ROUTE) {
+	privsock = (protocol == NETLINK_ROUTE && hdr->nlmsg_type != RTM_GETADDR);
+	if (privsock) {
 		struct priv *priv;
 
 		priv = (struct priv *)ctx->priv;
@@ -921,6 +934,16 @@ send_netlink(struct dhcpcd_ctx *ctx, void *arg,
 	} else {
 		if ((s = _open_link_socket(&snl, protocol)) == -1)
 			return -1;
+
+#ifdef NETLINK_GET_STRICT_CHK
+		if (hdr->nlmsg_type == RTM_GETADDR) {
+			int on = 1;
+
+			if (setsockopt(s, SOL_NETLINK, NETLINK_GET_STRICT_CHK,
+			    &on, sizeof(on)) == -1)
+				logerr("%s: NETLINK_GET_STRICT_CHK", __func__);
+		}
+#endif
 	}
 
 	/* Request a reply */
@@ -936,7 +959,7 @@ send_netlink(struct dhcpcd_ctx *ctx, void *arg,
 		r = get_netlink(ctx, &riov, arg, s, 0, callback);
 	} else
 		r = -1;
-	if (protocol != NETLINK_ROUTE)
+	if (!privsock)
 		close(s);
 	return r;
 }
@@ -1258,6 +1281,60 @@ struct nlma
 	struct ifaddrmsg ifa;
 	char buffer[64];
 };
+
+#ifdef INET
+struct ifiaddr
+{
+	unsigned int ifa_ifindex;
+	struct in_addr ifa_addr;
+};
+
+static int
+_if_addressexists(__unused struct dhcpcd_ctx *ctx,
+    void *arg, struct nlmsghdr *nlm)
+{
+	struct ifiaddr *ia = arg;
+	in_addr_t this_addr;
+	size_t len;
+	struct rtattr *rta;
+	struct ifaddrmsg *ifa;
+
+	ifa = NLMSG_DATA(nlm);
+	if (ifa->ifa_index != ia->ifa_ifindex || ifa->ifa_family != AF_INET)
+		return 0;
+	rta = (struct rtattr *)IFA_RTA(ifa);
+	len = NLMSG_PAYLOAD(nlm, sizeof(*ifa));
+	while (RTA_OK(rta, len)) {
+		switch (rta->rta_type) {
+		case IFA_LOCAL:
+			memcpy(&this_addr, RTA_DATA(rta), sizeof(this_addr));
+			return this_addr == ia->ifa_addr.s_addr ? 1 : 0;
+		}
+		rta = RTA_NEXT(rta, len);
+	}
+	return 0;
+}
+
+static int
+if_addressexists(struct interface *ifp, struct in_addr *addr)
+{
+	struct ifiaddr ia = {
+		.ifa_ifindex = ifp->index,
+		.ifa_addr = *addr,
+	};
+	struct nlma nlm = {
+	    .hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifaddrmsg)),
+	    .hdr.nlmsg_type = RTM_GETADDR,
+	    .hdr.nlmsg_flags = NLM_F_DUMP | NLM_F_REQUEST,
+	    .ifa.ifa_family = AF_INET,
+	    .ifa.ifa_index = ifp->index,
+	};
+
+	return send_netlink(ifp->ctx, &ia, NETLINK_ROUTE, &nlm.hdr,
+	    &_if_addressexists);
+}
+#endif
+
 
 struct nlmr
 {
