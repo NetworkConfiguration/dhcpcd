@@ -942,7 +942,7 @@ ipv4_handleifa(struct dhcpcd_ctx *ctx,
 #endif
 	}
 
-	if (cmd == RTM_DELADDR && ia != NULL)
+	if (cmd == RTM_DELADDR)
 		free(ia);
 }
 
