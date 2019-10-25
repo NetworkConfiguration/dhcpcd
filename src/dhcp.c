@@ -3532,7 +3532,17 @@ dhcp_handleifudp(void *arg)
 	struct interface *ifp = arg;
 
 	dhcp_readudp(ifp->ctx, ifp);
+}
 
+static int
+dhcp_open(struct dhcpcd_ctx *ctx)
+{
+
+	if (ctx->udp_fd != -1 || (ctx->udp_fd = dhcp_openudp(NULL)) == -1)
+		return ctx->udp_fd;
+
+	eloop_event_add(ctx->eloop, ctx->udp_fd, dhcp_handleudp, ctx);
+	return ctx->udp_fd;
 }
 
 static int
@@ -3743,16 +3753,13 @@ dhcp_start1(void *arg)
 	 * ICMP port unreachable message back to the DHCP server.
 	 * Only do this in master mode so we don't swallow messages
 	 * for dhcpcd running on another interface. */
-	if (ctx->udp_fd == -1 && ctx->options & DHCPCD_MASTER) {
-		ctx->udp_fd = dhcp_openudp(NULL);
-		if (ctx->udp_fd == -1) {
+	if (ctx->options & DHCPCD_MASTER) {
+		if (dhcp_open(ctx) == -1) {
 			/* Don't log an error if some other process
 			 * is handling this. */
 			if (errno != EADDRINUSE)
-				logerr("%s: dhcp_openudp", __func__);
-		} else
-			eloop_event_add(ctx->eloop,
-			    ctx->udp_fd, dhcp_handleudp, ctx);
+				logerr("%s: dhcp_open", __func__);
+		}
 	}
 
 	if (dhcp_init(ifp) == -1) {
