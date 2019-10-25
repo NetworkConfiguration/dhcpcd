@@ -3686,6 +3686,18 @@ dhcp6_activateinterfaces(struct interface *ifp)
 }
 #endif
 
+static int
+dhcp6_open(struct dhcpcd_ctx *ctx)
+{
+
+	if (ctx->dhcp6_fd != -1 ||
+	    (ctx->dhcp6_fd = dhcp6_listen(ctx, NULL)) == -1)
+		return ctx->dhcp6_fd;
+
+	eloop_event_add(ctx->eloop, ctx->dhcp6_fd, dhcp6_recvctx, ctx);
+	return ctx->dhcp6_fd;
+}
+
 static void
 dhcp6_start1(void *arg)
 {
@@ -3696,11 +3708,9 @@ dhcp6_start1(void *arg)
 	size_t i;
 	const struct dhcp_compat *dhc;
 
-	if (ctx->dhcp6_fd == -1 && ctx->options & DHCPCD_MASTER) {
-		ctx->dhcp6_fd = dhcp6_listen(ctx, NULL);
-		if (ctx->dhcp6_fd == -1)
+	if (ctx->options & DHCPCD_MASTER) {
+		if (dhcp6_open(ctx) == -1)
 			return;
-		eloop_event_add(ctx->eloop, ctx->dhcp6_fd, dhcp6_recvctx, ctx);
 	}
 
 	state = D6_STATE(ifp);
