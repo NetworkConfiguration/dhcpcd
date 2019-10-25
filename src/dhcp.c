@@ -3451,6 +3451,35 @@ dhcp_readbpf(void *arg)
 }
 
 static void
+dhcp_recvmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg)
+{
+	struct sockaddr_in *from = (struct sockaddr_in *)msg->msg_name;
+	struct iovec *iov = &msg->msg_iov[0];
+	struct interface *ifp;
+	const struct dhcp_state *state;
+
+	ifp = if_findifpfromcmsg(ctx, msg, NULL);
+	if (ifp == NULL) {
+		logerr(__func__);
+		return;
+	}
+	state = D_CSTATE(ifp);
+	if (state == NULL) {
+		logdebugx("%s: received BOOTP for inactive interface",
+		    ifp->name);
+		return;
+	}
+
+	if (state->bpf_fd != -1) {
+		/* Avoid a duplicate read if BPF is open for the interface. */
+		return;
+	}
+
+	dhcp_handlebootp(ifp, (struct bootp *)iov->iov_base, iov->iov_len,
+	    &from->sin_addr);
+}
+
+static void
 dhcp_readudp(struct dhcpcd_ctx *ctx, struct interface *ifp)
 {
 	const struct dhcp_state *state;
@@ -3485,27 +3514,8 @@ dhcp_readudp(struct dhcpcd_ctx *ctx, struct interface *ifp)
 		return;
 	}
 
-	if (ifp == NULL) {
-		ifp = if_findifpfromcmsg(ctx, &msg, NULL);
-		if (ifp == NULL) {
-			logerr(__func__);
-			return;
-		}
-		state = D_CSTATE(ifp);
-		if (state == NULL) {
-			logdebugx("%s: received BOOTP for inactive interface",
-			    ifp->name);
-			return;
-		}
-	}
-
-	if (state->bpf_fd != -1) {
-		/* Avoid a duplicate read if BPF is open for the interface. */
-		return;
-	}
-
-	dhcp_handlebootp(ifp, (struct bootp *)(void *)buf, (size_t)bytes,
-	    &from.sin_addr);
+	iov.iov_len = (size_t)bytes;
+	dhcp_recvmsg(ctx, &msg);
 }
 
 static void

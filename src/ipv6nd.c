@@ -1719,6 +1719,51 @@ ipv6nd_drop(struct interface *ifp)
 }
 
 static void
+ipv6nd_recvmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg)
+{
+	struct sockaddr_in6 *from = (struct sockaddr_in6 *)msg->msg_name;
+	char sfrom[INET6_ADDRSTRLEN];
+	int hoplimit = 0;
+	struct icmp6_hdr *icp;
+	struct interface *ifp;
+	size_t len = msg->msg_iov[0].iov_len;
+
+	inet_ntop(AF_INET6, &from->sin6_addr, sfrom, sizeof(sfrom));
+	if ((size_t)len < sizeof(struct icmp6_hdr)) {
+		logerrx("IPv6 ICMP packet too short from %s", sfrom);
+		return;
+	}
+
+#ifdef __sun
+	if_findifpfromcmsg(ctx, msg, &hoplimit);
+#else
+	ifp = if_findifpfromcmsg(ctx, msg, &hoplimit);
+	if (ifp == NULL) {
+		logerr(__func__);
+		return;
+	}
+#endif
+
+	/* Don't do anything if the user hasn't configured it. */
+	if (ifp->active != IF_ACTIVE_USER ||
+	    !(ifp->options->options & DHCPCD_IPV6))
+		return;
+
+	icp = (struct icmp6_hdr *)msg->msg_iov[0].iov_base;
+	if (icp->icmp6_code == 0) {
+		switch(icp->icmp6_type) {
+			case ND_ROUTER_ADVERT:
+				ipv6nd_handlera(ctx, from, sfrom,
+				    ifp, icp, (size_t)len, hoplimit);
+				return;
+		}
+	}
+
+	logerrx("invalid IPv6 type %d or code %d from %s",
+	    icp->icmp6_type, icp->icmp6_code, sfrom);
+}
+
+static void
 ipv6nd_handledata(void *arg)
 {
 	struct dhcpcd_ctx *ctx;
@@ -1736,10 +1781,6 @@ ipv6nd_handledata(void *arg)
 	    .msg_control = ctl, .msg_controllen = sizeof(ctl),
 	};
 	ssize_t len;
-	char sfrom[INET6_ADDRSTRLEN];
-	int hoplimit = 0;
-	struct icmp6_hdr *icp;
-	struct interface *ifp;
 
 #ifdef __sun
 	struct rs_state *state;
@@ -1757,39 +1798,9 @@ ipv6nd_handledata(void *arg)
 		logerr(__func__);
 		return;
 	}
-	inet_ntop(AF_INET6, &from.sin6_addr, sfrom, sizeof(sfrom));
-	if ((size_t)len < sizeof(struct icmp6_hdr)) {
-		logerrx("IPv6 ICMP packet too short from %s", sfrom);
-		return;
-	}
 
-#ifdef __sun
-	if_findifpfromcmsg(ctx, &msg, &hoplimit);
-#else
-	ifp = if_findifpfromcmsg(ctx, &msg, &hoplimit);
-	if (ifp == NULL) {
-		logerr(__func__);
-		return;
-	}
-#endif
-
-	/* Don't do anything if the user hasn't configured it. */
-	if (ifp->active != IF_ACTIVE_USER ||
-	    !(ifp->options->options & DHCPCD_IPV6))
-		return;
-
-	icp = (struct icmp6_hdr *)buf;
-	if (icp->icmp6_code == 0) {
-		switch(icp->icmp6_type) {
-			case ND_ROUTER_ADVERT:
-				ipv6nd_handlera(ctx, &from, sfrom,
-				    ifp, icp, (size_t)len, hoplimit);
-				return;
-		}
-	}
-
-	logerrx("invalid IPv6 type %d or code %d from %s",
-	    icp->icmp6_type, icp->icmp6_code, sfrom);
+	iov.iov_len = (size_t)len;
+	ipv6nd_recvmsg(ctx, &msg);
 }
 
 static void
