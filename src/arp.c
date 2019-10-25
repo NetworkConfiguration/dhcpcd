@@ -206,7 +206,6 @@ arp_validate(const struct interface *ifp, struct arphdr *arp)
 	return true;
 }
 
-
 static void
 arp_packet(struct interface *ifp, uint8_t *data, size_t len)
 {
