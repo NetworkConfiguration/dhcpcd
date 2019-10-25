@@ -136,9 +136,7 @@ static void dhcp_arp_found(struct arp_state *, const struct arp_msg *);
 #endif
 static void dhcp_handledhcp(struct interface *, struct bootp *, size_t,
     const struct in_addr *);
-#ifdef IP_PKTINFO
 static void dhcp_handleifudp(void *);
-#endif
 static int dhcp_initstate(struct interface *);
 
 void
