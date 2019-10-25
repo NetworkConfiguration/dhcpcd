@@ -41,6 +41,10 @@
 #include <netinet/udp.h>
 #undef __FAVOR_BSD
 
+#ifdef AF_LINK
+#  include <net/if_dl.h>
+#endif
+
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
@@ -1550,7 +1554,10 @@ dhcp_openudp(struct interface *ifp)
 	n = 1;
 	if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &n, sizeof(n)) == -1)
 		goto eexit;
-#ifdef IP_RECVPKTINFO
+#ifdef IP_RECVIF
+	if (setsockopt(s, IPPROTO_IP, IP_RECVIF, &n, sizeof(n)) == -1)
+		goto eexit;
+#else
 	if (setsockopt(s, IPPROTO_IP, IP_RECVPKTINFO, &n, sizeof(n)) == -1)
 		goto eexit;
 #endif
@@ -1647,39 +1654,36 @@ dhcp_makeudppacket(size_t *sz, const uint8_t *data, size_t length,
 static ssize_t
 dhcp_sendudp(struct interface *ifp, struct in_addr *to, void *data, size_t len)
 {
-	int s;
-	struct msghdr msg;
-	struct sockaddr_in sin;
-	struct iovec iov[1];
+	struct sockaddr_in sin = {
+		.sin_family = AF_INET,
+		.sin_addr = *to,
+		.sin_port = htons(BOOTPS),
+#ifdef HAVE_SA_LEN
+		.sin_len = sizeof(sin),
+#endif
+	};
+	struct iovec iov[] = {
+		{ .iov_base = data, .iov_len = len }
+	};
+	struct msghdr msg = {
+		.msg_name = (void *)&sin,
+		.msg_namelen = sizeof(sin),
+		.msg_iov = iov,
+		.msg_iovlen = 1,
+	};
 	struct dhcp_state *state = D_STATE(ifp);
 	ssize_t r;
+	int fd;
 
-	iov[0].iov_base = data;
-	iov[0].iov_len = len;
-
-	memset(&sin, 0, sizeof(sin));
-	sin.sin_family = AF_INET;
-	sin.sin_addr = *to;
-	sin.sin_port = htons(BOOTPS);
-#ifdef HAVE_SA_LEN
-	sin.sin_len = sizeof(sin);
-#endif
-
-	memset(&msg, 0, sizeof(msg));
-	msg.msg_name = (void *)&sin;
-	msg.msg_namelen = sizeof(sin);
-	msg.msg_iov = iov;
-	msg.msg_iovlen = 1;
-
-	s = state->udp_fd;
-	if (s == -1) {
-		s = dhcp_openudp(ifp);
-		if (s == -1)
+	fd = state->udp_fd;
+	if (fd == -1) {
+		fd = dhcp_openudp(ifp);
+		if (fd == -1)
 			return -1;
 	}
-	r = sendmsg(s, &msg, 0);
+	r = sendmsg(fd, &msg, 0);
 	if (state->udp_fd == -1)
-		close(s);
+		close(fd);
 	return r;
 }
 
@@ -1780,7 +1784,7 @@ send_message(struct interface *ifp, uint8_t type,
 	 * As such we remove it from consideration without actually
 	 * stopping the interface. */
 	if (r == -1) {
-		logerr("%s: if_sendraw", ifp->name);
+		logerr("%s: bpf_send", ifp->name);
 		switch(errno) {
 		case ENETDOWN:
 		case ENETRESET:
@@ -2257,7 +2261,6 @@ dhcp_bind(struct interface *ifp)
 
 	ipv4_applyaddr(ifp);
 
-#ifdef IP_PKTINFO
 	/* Close the BPF filter as we can now receive DHCP messages
 	 * on a UDP socket. */
 	if (state->udp_fd == -1 ||
@@ -2280,7 +2283,6 @@ dhcp_bind(struct interface *ifp)
 				    state->udp_fd, dhcp_handleifudp, ifp);
 		}
 	}
-#endif
 }
 
 static void
@@ -3460,16 +3462,15 @@ dhcp_readudp(struct dhcpcd_ctx *ctx, struct interface *ifp)
 		.iov_base = buf,
 		.iov_len = sizeof(buf),
 	};
-#ifdef IP_PKTINFO
+#ifdef IP_RECVIF
+	unsigned char ctl[CMSG_SPACE(sizeof(struct sockaddr_dl))] = { 0 };
+#else
 	unsigned char ctl[CMSG_SPACE(sizeof(struct in_pktinfo))] = { 0 };
-	char sfrom[INET_ADDRSTRLEN];
 #endif
 	struct msghdr msg = {
 	    .msg_name = &from, .msg_namelen = sizeof(from),
 	    .msg_iov = &iov, .msg_iovlen = 1,
-#ifdef IP_PKTINFO
 	    .msg_control = ctl, .msg_controllen = sizeof(ctl),
-#endif
 	};
 	int s;
 	ssize_t bytes;
@@ -3485,9 +3486,6 @@ dhcp_readudp(struct dhcpcd_ctx *ctx, struct interface *ifp)
 		logerr(__func__);
 		return;
 	}
-
-#ifdef IP_PKTINFO
-	inet_ntop(AF_INET, &from.sin_addr, sfrom, sizeof(sfrom));
 
 	if (ifp == NULL) {
 		ifp = if_findifpfromcmsg(ctx, &msg, NULL);
@@ -3510,7 +3508,6 @@ dhcp_readudp(struct dhcpcd_ctx *ctx, struct interface *ifp)
 
 	dhcp_handlebootp(ifp, (struct bootp *)(void *)buf, (size_t)bytes,
 	    &from.sin_addr);
-#endif
 }
 
 static void
@@ -3521,7 +3518,6 @@ dhcp_handleudp(void *arg)
 	dhcp_readudp(ctx, NULL);
 }
 
-#ifdef IP_PKTINFO
 static void
 dhcp_handleifudp(void *arg)
 {
@@ -3530,7 +3526,6 @@ dhcp_handleifudp(void *arg)
 	dhcp_readudp(ifp->ctx, ifp);
 
 }
-#endif
 
 static int
 dhcp_openbpf(struct interface *ifp)
