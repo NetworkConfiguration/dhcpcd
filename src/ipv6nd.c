@@ -275,7 +275,7 @@ ipv6nd_open(struct interface *ifp)
 static int
 ipv6nd_open(struct dhcpcd_ctx *ctx)
 {
-	int fd, on;
+	int fd;
 
 	if (ctx->nd_fd != -1)
 		return ctx->nd_fd;
