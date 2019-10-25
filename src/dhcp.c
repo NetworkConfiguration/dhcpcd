@@ -2261,26 +2261,25 @@ dhcp_bind(struct interface *ifp)
 
 	/* Close the BPF filter as we can now receive DHCP messages
 	 * on a UDP socket. */
-	if (state->udp_fd == -1 ||
-	    (state->old != NULL && state->old->yiaddr != state->new->yiaddr))
-	{
-		dhcp_close(ifp);
-		/* If not in master mode, open an address specific socket. */
-		if (ctx->udp_fd == -1) {
-			state->udp_fd = dhcp_openudp(ifp);
-			if (state->udp_fd == -1) {
-				logerr(__func__);
-				/* Address sharing without master mode is
-				 * not supported. It's also possible another
-				 * DHCP client could be running which is
-				 * even worse.
-				 * We still need to work, so re-open BPF. */
-				dhcp_openbpf(ifp);
-			} else
-				eloop_event_add(ctx->eloop,
-				    state->udp_fd, dhcp_handleifudp, ifp);
-		}
+	if (!(state->udp_fd == -1 ||
+	    (state->old != NULL && state->old->yiaddr != state->new->yiaddr)))
+		return;
+	dhcp_close(ifp);
+
+	/* If not in master mode, open an address specific socket. */
+	if (ctx->udp_fd != -1)
+		return;
+	state->udp_fd = dhcp_openudp(ifp);
+	if (state->udp_fd == -1) {
+		logerr(__func__);
+		/* Address sharing without master mode is not supported.
+		 * It's also possible another DHCP client could be running,
+		 * which is even worse.
+		 * We still need to work, so re-open BPF. */
+		dhcp_openbpf(ifp);
+		return;
 	}
+	eloop_event_add(ctx->eloop, state->udp_fd, dhcp_handleifudp, ifp);
 }
 
 static void
