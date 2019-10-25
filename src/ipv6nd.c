@@ -196,36 +196,41 @@ ipv6nd_printoptions(const struct dhcpcd_ctx *ctx,
 static int
 ipv6nd_open0(void)
 {
-	int s, on;
+	int fd, on;
 	struct icmp6_filter filt;
 
 #define SOCK_FLAGS	SOCK_CLOEXEC | SOCK_NONBLOCK
-	s = xsocket(PF_INET6, SOCK_RAW | SOCK_FLAGS, IPPROTO_ICMPV6);
+	fd = xsocket(PF_INET6, SOCK_RAW | SOCK_FLAGS, IPPROTO_ICMPV6);
 #undef SOCK_FLAGS
-	if (s == -1)
+	if (fd == -1)
 		return -1;
 
 	/* RFC4861 4.1 */
 	on = 255;
-	if (setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS,
+	if (setsockopt(fd, IPPROTO_IPV6, IPV6_MULTICAST_HOPS,
 	    &on, sizeof(on)) == -1)
 		goto eexit;
 
 	on = 1;
-	if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVHOPLIMIT,
+	if (setsockopt(fd, IPPROTO_IPV6, IPV6_RECVPKTINFO,
+	    &on, sizeof(on)) == -1)
+		goto eexit;
+
+	on = 1;
+	if (setsockopt(fd, IPPROTO_IPV6, IPV6_RECVHOPLIMIT,
 	    &on, sizeof(on)) == -1)
 		goto eexit;
 
 	ICMP6_FILTER_SETBLOCKALL(&filt);
 	ICMP6_FILTER_SETPASS(ND_ROUTER_ADVERT, &filt);
-	if (setsockopt(s, IPPROTO_ICMPV6, ICMP6_FILTER,
+	if (setsockopt(fd, IPPROTO_ICMPV6, ICMP6_FILTER,
 	    &filt, sizeof(filt)) == -1)
 		goto eexit;
 
-	return s;
+	return fd;
 
 eexit:
-	close(s);
+	close(fd);
 	return -1;
 }
 
@@ -233,7 +238,7 @@ eexit:
 static int
 ipv6nd_open(struct interface *ifp)
 {
-	int s;
+	int fd;
 	struct ipv6_mreq mreq = {
 	    .ipv6mr_multiaddr = IN6ADDR_LINKLOCAL_ALLNODES_INIT,
 	    .ipv6mr_interface = ifp->index
@@ -244,52 +249,44 @@ ipv6nd_open(struct interface *ifp)
 	if (state->nd_fd != -1)
 		return state->nd_fd;
 
-	s = ipv6nd_open0();
-	if (s == -1)
+	fd = ipv6nd_open0();
+	if (fd == -1)
 		return -1;
 
-	if (setsockopt(s, IPPROTO_IPV6, IPV6_BOUND_IF,
+	if (setsockopt(fd, IPPROTO_IPV6, IPV6_BOUND_IF,
 	    &ifindex, sizeof(ifindex)) == -1)
 	{
-		close(s);
+		close(fd);
 		return -1;
 	}
 
-	if (setsockopt(s, IPPROTO_IPV6, IPV6_JOIN_GROUP,
+	if (setsockopt(fd, IPPROTO_IPV6, IPV6_JOIN_GROUP,
 	    &mreq, sizeof(mreq)) == -1)
 	{
-		close(s);
+		close(fd);
 		return -1;
 	}
 
-	state->nd_fd = s;
-	eloop_event_add(ifp->ctx->eloop, s, ipv6nd_handledata, ifp);
-	return s;
+	state->nd_fd = fd;
+	eloop_event_add(ifp->ctx->eloop, fd, ipv6nd_handledata, ifp);
+	return fd;
 }
 #else
 static int
 ipv6nd_open(struct dhcpcd_ctx *ctx)
 {
-	int s, on;
+	int fd, on;
 
 	if (ctx->nd_fd != -1)
 		return ctx->nd_fd;
 
-	s = ipv6nd_open0();
-	if (s == -1)
+	fd = ipv6nd_open0();
+	if (fd == -1)
 		return -1;
 
-	on = 1;
-	if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVPKTINFO,
-	    &on, sizeof(on)) == -1)
-	{
-		close(s);
-		return -1;
-	}
-
-	ctx->nd_fd = s;
-	eloop_event_add(ctx->eloop, s, ipv6nd_handledata, ctx);
-	return s;
+	ctx->nd_fd = fd;
+	eloop_event_add(ctx->eloop, fd, ipv6nd_handledata, ctx);
+	return fd;
 }
 #endif
 
@@ -1734,15 +1731,11 @@ ipv6nd_recvmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg)
 		return;
 	}
 
-#ifdef __sun
-	if_findifpfromcmsg(ctx, msg, &hoplimit);
-#else
 	ifp = if_findifpfromcmsg(ctx, msg, &hoplimit);
 	if (ifp == NULL) {
 		logerr(__func__);
 		return;
 	}
-#endif
 
 	/* Don't do anything if the user hasn't configured it. */
 	if (ifp->active != IF_ACTIVE_USER ||
@@ -1767,7 +1760,7 @@ static void
 ipv6nd_handledata(void *arg)
 {
 	struct dhcpcd_ctx *ctx;
-	int s;
+	int fd;
 	struct sockaddr_in6 from;
 	unsigned char buf[64 * 1024]; /* Maximum ICMPv6 size */
 	struct iovec iov = {
@@ -1783,17 +1776,18 @@ ipv6nd_handledata(void *arg)
 	ssize_t len;
 
 #ifdef __sun
+	struct interface *ifp;
 	struct rs_state *state;
 
 	ifp = arg;
 	state = RS_STATE(ifp);
 	ctx = ifp->ctx;
-	s = state->nd_fd;
+	fd = state->nd_fd;
 #else
 	ctx = arg;
-	s = ctx->nd_fd;
+	fd = ctx->nd_fd;
 #endif
-	len = recvmsg(s, &msg, 0);
+	len = recvmsg(fd, &msg, 0);
 	if (len == -1) {
 		logerr(__func__);
 		return;
