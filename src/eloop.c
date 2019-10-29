@@ -522,7 +522,7 @@ eloop_q_timeout_add_tv(struct eloop *eloop, int queue,
 	}
 
 	/* Remove existing timeout if present. */
-	TAILQ_FOREACH(t, &eloop->timeouts, next) {
+	TAILQ_FOREACH_SAFE(t, &eloop->timeouts, next, tt) {
 		if (t->callback == callback && t->arg == arg) {
 			TAILQ_REMOVE(&eloop->timeouts, t, next);
 			break;

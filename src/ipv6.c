@@ -597,7 +597,7 @@ void
 ipv6_deleteaddr(struct ipv6_addr *ia)
 {
 	struct ipv6_state *state;
-	struct ipv6_addr *ap;
+	struct ipv6_addr *ap, *ian;
 
 	loginfox("%s: deleting address %s", ia->iface->name, ia->saddr);
 	if (if_address6(RTM_DELADDR, ia) == -1 &&
@@ -608,7 +608,7 @@ ipv6_deleteaddr(struct ipv6_addr *ia)
 	ipv6_deletedaddr(ia);
 
 	state = IPV6_STATE(ia->iface);
-	TAILQ_FOREACH(ap, &state->addrs, next) {
+	TAILQ_FOREACH_SAFE(ap, &state->addrs, next, ian) {
 		if (IN6_ARE_ADDR_EQUAL(&ap->addr, &ia->addr)) {
 			TAILQ_REMOVE(&state->addrs, ap, next);
 			ipv6_freeaddr(ap);

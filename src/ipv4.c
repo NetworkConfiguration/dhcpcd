@@ -487,7 +487,7 @@ ipv4_deladdr(struct ipv4_addr *addr, int keeparp)
 {
 	int r;
 	struct ipv4_state *state;
-	struct ipv4_addr *ap;
+	struct ipv4_addr *ap, *ian;
 
 	logdebugx("%s: deleting IP address %s",
 	    addr->iface->name, addr->saddr);
@@ -506,7 +506,7 @@ ipv4_deladdr(struct ipv4_addr *addr, int keeparp)
 #endif
 
 	state = IPV4_STATE(addr->iface);
-	TAILQ_FOREACH(ap, &state->addrs, next) {
+	TAILQ_FOREACH_SAFE(ap, &state->addrs, next, ian) {
 		if (IPV4_MASK_EQ(ap, addr)) {
 			struct dhcp_state *dstate;
 
