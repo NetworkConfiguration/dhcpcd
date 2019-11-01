@@ -875,7 +875,8 @@ eloop_free(struct eloop *eloop)
 {
 
 #if defined(HAVE_KQUEUE) || defined(HAVE_EPOLL)
-	close(eloop->poll_fd);
+	if (eloop != NULL)
+		close(eloop->poll_fd);
 #endif
 	eloop_clear(eloop);
 	free(eloop);
