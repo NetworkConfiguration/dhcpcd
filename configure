@@ -375,6 +375,10 @@ fi
 if [ -n "$DEBUG" -a "$DEBUG" != no -a "$DEBUG" != false ]; then
 	echo "Adding debugging CFLAGS"
 	cat <<EOF >>$CONFIG_MK
+# Enforce address sanitization
+CFLAGS+=	-fsanitize=address
+LDFLAGS+=	-fsanitize=address
+
 CFLAGS+=	-g -Wall -Wextra
 CFLAGS+=	-Wmissing-prototypes -Wmissing-declarations
 CFLAGS+=	-Wmissing-format-attribute -Wnested-externs
