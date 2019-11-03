@@ -2133,6 +2133,7 @@ exit1:
 			if_free(ifp);
 		}
 		free(ctx.ifaces);
+		ctx.ifaces = NULL;
 	}
 	free_options(&ctx, ifo);
 #ifdef HAVE_OPEN_MEMSTREAM
