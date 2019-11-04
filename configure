@@ -383,8 +383,8 @@ EOF
 	if $CC -fsanitize=address _test.c -o _test 2>&3; then
 		echo "yes"
 		echo "# Compiler supports address sanitisation" >>$CONFIG_MK
-		echo "CFLAGS+=		-fsanitize=address" >>$CONFIG_MK
-		echo "LDFLAGS+=		-fsanitize=address" >>$CONFIG_MK
+		echo "CFLAGS+=	-fsanitize=address" >>$CONFIG_MK
+		echo "LDFLAGS+=	-fsanitize=address" >>$CONFIG_MK
 	else
 		echo "no"
 	fi
