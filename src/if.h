@@ -195,6 +195,7 @@ int if_addrflags(const struct interface *, const struct in_addr *,
 #endif
 
 #ifdef INET6
+void if_disable_rtadv(void);
 void if_setup_inet6(const struct interface *);
 #ifdef IPV6_MANAGETEMPADDR
 int ip6_use_tempaddr(const char *ifname);

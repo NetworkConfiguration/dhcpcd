@@ -1620,6 +1620,22 @@ set_ifxflags(int s, const struct interface *ifp)
 #endif
 
 void
+if_disable_rtadv(void)
+{
+#if defined(IPV6CTL_ACCEPT_RTADV) && !defined(ND6_IFF_ACCEPT_RTADV)
+	int ra = get_inet6_sysctl(IPV6CTL_ACCEPT_RTADV);
+
+	if (ra == -1) {
+		if (errno != ENOENT)
+			logerr("IPV6CTL_ACCEPT_RTADV");
+	else if (ra != 0)
+		if (set_inet6_sysctl(IPV6CTL_ACCEPT_RTADV, 0) == -1)
+			logerr("IPV6CTL_ACCEPT_RTADV");
+	}
+#endif
+}
+
+void
 if_setup_inet6(const struct interface *ifp)
 {
 	struct priv *priv;
@@ -1688,21 +1704,6 @@ if_setup_inet6(const struct interface *ifp)
 #ifdef SIOCGIFXFLAGS
 	if (set_ifxflags(s, ifp) == -1)
 		logerr("%s: set_ifxflags", ifp->name);
-#endif
-
-#if defined(IPV6CTL_ACCEPT_RTADV) && !defined(ND6_IFF_ACCEPT_RTADV)
-	/* If we cannot control ra per interface, disable it globally. */
-	if (ifp->options->options & DHCPCD_IPV6RS) {
-		int ra = get_inet6_sysctl(IPV6CTL_ACCEPT_RTADV);
-
-		if (ra == -1) {
-			if (errno != ENOENT)
-				logerr("IPV6CTL_ACCEPT_RTADV");
-		else if (ra != 0)
-			if (set_inet6_sysctl(IPV6CTL_ACCEPT_RTADV, 0) == -1)
-				logerr("IPV6CTL_ACCEPT_RTADV");
-		}
-	}
 #endif
 
 #if defined(IPV6CTL_ACCEPT_RTADV) || defined(ND6_IFF_ACCEPT_RTADV)
