@@ -1995,6 +1995,12 @@ printpidfile:
 	    ctx.options & DHCPCD_IPV4 ? " [ip4]" : "",
 	    ctx.options & DHCPCD_IPV6 ? " [ip6]" : "");
 
+#ifdef BSD
+	/* Disable the kernel RTADV sysctl as early as possible. */
+	if (ctx.options & DHCPCD_IPV6 && ctx.options & DHCPCD_IPV6RS)
+		if_disable_rtadv();
+#endif
+
 	if (if_opensockets(&ctx) == -1) {
 		logerr("%s: if_opensockets", __func__);
 		goto exit_failure;
