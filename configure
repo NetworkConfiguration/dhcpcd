@@ -373,12 +373,24 @@ if [ -z "$DEBUG" -a -d .git ]; then
 	DEBUG=yes
 fi
 if [ -n "$DEBUG" -a "$DEBUG" != no -a "$DEBUG" != false ]; then
+	printf "Testing compiler supports address sanitisation ..."
+	cat <<EOF >_test.c
+int main(void) {
+	return 0;
+}
+EOF
+	if $CC -fsanitize=address _test.c -o _test 2>&3; then
+		echo "yes"
+		echo "# Compiler supports address sanitisation" >>$CONFIG_MK
+		echo "CFLAGS+=		-fsanitize=address" >>$CONFIG_MK
+		echo "LDFLAGS+=		-fsanitize=address" >>$CONFIG_MK
+	else
+		echo "no"
+	fi
+	rm -rf _test.c _test
+
 	echo "Adding debugging CFLAGS"
 	cat <<EOF >>$CONFIG_MK
-# Enforce address sanitization
-CFLAGS+=	-fsanitize=address
-LDFLAGS+=	-fsanitize=address
-
 CFLAGS+=	-g -Wall -Wextra
 CFLAGS+=	-Wmissing-prototypes -Wmissing-declarations
 CFLAGS+=	-Wmissing-format-attribute -Wnested-externs
