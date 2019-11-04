@@ -373,6 +373,7 @@ if [ -z "$DEBUG" -a -d .git ]; then
 	DEBUG=yes
 fi
 if [ -n "$DEBUG" -a "$DEBUG" != no -a "$DEBUG" != false ]; then
+	echo "Adding debugging CFLAGS"
 	printf "Testing compiler supports address sanitisation ..."
 	cat <<EOF >_test.c
 int main(void) {
@@ -389,7 +390,6 @@ EOF
 	fi
 	rm -rf _test.c _test
 
-	echo "Adding debugging CFLAGS"
 	cat <<EOF >>$CONFIG_MK
 CFLAGS+=	-g -Wall -Wextra
 CFLAGS+=	-Wmissing-prototypes -Wmissing-declarations
