@@ -2608,6 +2608,11 @@ dhcp_reboot(struct interface *ifp)
 	    ifp->name, inet_ntoa(state->lease.addr));
 
 #ifdef ARP
+#ifndef KERNEL_RFC5227
+	/* Create the DHCP ARP state so we can defend it. */
+	(void)dhcp_arp_new(ifp, &state->lease.addr);
+#endif
+
 	/* If the address exists on the interface and no other interface
 	 * is currently using it then announce it to ensure this
 	 * interface gets the reply. */
