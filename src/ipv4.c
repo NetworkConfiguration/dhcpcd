@@ -654,7 +654,7 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 #endif
 		ia->flags = IPV4_AF_NEW;
 	} else
-		ia->flags |= ~IPV4_AF_NEW;
+		ia->flags &= ~IPV4_AF_NEW;
 
 	ia->mask = *mask;
 	ia->brd = *bcast;
@@ -952,15 +952,13 @@ ipv4_free(struct interface *ifp)
 	struct ipv4_state *state;
 	struct ipv4_addr *ia;
 
-	if (ifp) {
-		state = IPV4_STATE(ifp);
-		if (state) {
-		        while ((ia = TAILQ_FIRST(&state->addrs))) {
-				TAILQ_REMOVE(&state->addrs, ia, next);
-				free(ia);
-			}
-			free(state->buffer);
-			free(state);
-		}
+	if (ifp == NULL || (state = IPV4_STATE(ifp)) == NULL)
+		return;
+
+	while ((ia = TAILQ_FIRST(&state->addrs))) {
+		TAILQ_REMOVE(&state->addrs, ia, next);
+		free(ia);
 	}
+	free(state->buffer);
+	free(state);
 }
