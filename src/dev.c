@@ -97,8 +97,7 @@ dev_start2(struct dhcpcd_ctx *ctx, const char *name)
 		logerrx("dlopen: %s", dlerror());
 		return -1;
 	}
-	fptr = (void (*)(struct dev *, const struct dev_dhcpcd *))
-	    dlsym(h, "dev_init");
+	fptr = dlsym(h, "dev_init");
 	if (fptr == NULL) {
 		logerrx("dlsym: %s", dlerror());
 		dlclose(h);
