@@ -335,7 +335,7 @@ if_vlanid(const struct interface *ifp)
 }
 
 static int
-_open_link_socket(struct sockaddr_nl *nl, int protocol)
+if_linksocket(struct sockaddr_nl *nl, int protocol)
 {
 	int fd;
 
@@ -372,7 +372,7 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 	snl.nl_groups |= RTMGRP_IPV6_ROUTE | RTMGRP_IPV6_IFADDR | RTMGRP_NEIGH;
 #endif
 
-	ctx->link_fd = _open_link_socket(&snl, NETLINK_ROUTE);
+	ctx->link_fd = if_linksocket(&snl, NETLINK_ROUTE);
 	if (ctx->link_fd == -1)
 		return -1;
 #ifdef NETLINK_BROADCAST_ERROR
@@ -386,7 +386,7 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 
 	ctx->priv = priv;
 	memset(&snl, 0, sizeof(snl));
-	priv->route_fd = _open_link_socket(&snl, NETLINK_ROUTE);
+	priv->route_fd = if_linksocket(&snl, NETLINK_ROUTE);
 	if (priv->route_fd == -1)
 		return -1;
 	len = sizeof(snl);
@@ -922,7 +922,7 @@ if_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct nlmsghdr *hdr,
 	    .msg_iov = &iov, .msg_iovlen = 1
 	};
 
-	if ((s = _open_link_socket(&snl, protocol)) == -1)
+	if ((s = if_linksocket(&snl, protocol)) == -1)
 		return -1;
 
 #ifdef NETLINK_GET_STRICT_CHK
