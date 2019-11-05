@@ -1506,7 +1506,10 @@ if [ "$DEV" = yes ]; then
 #include <dlfcn.h>
 #include <stdlib.h>
 int main(void) {
-	dlopen(NULL, 0);
+	void *h = dlopen("/foo/bar", 0);
+	void (*s)(char *) = dlsym(h, "deadbeef");
+	s(dlerror());
+	dlclose(h);
 	return 0;
 }
 EOF
