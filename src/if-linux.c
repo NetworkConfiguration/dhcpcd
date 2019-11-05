@@ -229,7 +229,7 @@ check_proc_hex(const char *path, unsigned int *value)
 }
 
 static ssize_t
-write_path(const char *path, const char *val)
+if_writepathstr(const char *path, const char *val)
 {
 	FILE *fp;
 	ssize_t r;
@@ -261,7 +261,7 @@ if_init(struct interface *ifp)
 		return errno == ENOENT ? 0 : -1;
 	if (n == 1)
 		return 0;
-	return write_path(path, "1") == -1 ? -1 : 0;
+	return if_writepathstr(path, "1") == -1 ? -1 : 0;
 }
 
 int
@@ -417,7 +417,7 @@ if_carrier(struct interface *ifp)
 }
 
 static int
-get_netlink(struct dhcpcd_ctx *ctx, struct iovec *iov,
+if_getnetlink(struct dhcpcd_ctx *ctx, struct iovec *iov,
     void *arg, int fd, int flags,
     int (*callback)(struct dhcpcd_ctx *, void *, struct nlmsghdr *))
 {
@@ -907,17 +907,16 @@ if_handlelink(struct dhcpcd_ctx *ctx)
 		.iov_len = sizeof(buf),
 	};
 
-	return get_netlink(ctx, &iov, NULL,
+	return if_getnetlink(ctx, &iov, NULL,
 	    ctx->link_fd, MSG_DONTWAIT, &link_netlink);
 }
 
 static int
-send_netlink(struct dhcpcd_ctx *ctx, void *arg,
+if_sendnetlink(struct dhcpcd_ctx *ctx, void *arg,
     int protocol, struct nlmsghdr *hdr,
     int (*callback)(struct dhcpcd_ctx *, void *, struct nlmsghdr *))
 {
 	int s, r;
-	bool privsock;
 	struct sockaddr_nl snl = { .nl_family = AF_NETLINK };
 	struct iovec iov = { .iov_base = hdr, .iov_len = hdr->nlmsg_len };
 	struct msghdr msg = {
@@ -925,26 +924,18 @@ send_netlink(struct dhcpcd_ctx *ctx, void *arg,
 	    .msg_iov = &iov, .msg_iovlen = 1
 	};
 
-	privsock = (protocol == NETLINK_ROUTE && hdr->nlmsg_type != RTM_GETADDR);
-	if (privsock) {
-		struct priv *priv;
-
-		priv = (struct priv *)ctx->priv;
-		s = priv->route_fd;
-	} else {
-		if ((s = _open_link_socket(&snl, protocol)) == -1)
-			return -1;
+	if ((s = _open_link_socket(&snl, protocol)) == -1)
+		return -1;
 
 #ifdef NETLINK_GET_STRICT_CHK
-		if (hdr->nlmsg_type == RTM_GETADDR) {
-			int on = 1;
+	if (hdr->nlmsg_type == RTM_GETADDR) {
+		int on = 1;
 
-			if (setsockopt(s, SOL_NETLINK, NETLINK_GET_STRICT_CHK,
-			    &on, sizeof(on)) == -1)
-				logerr("%s: NETLINK_GET_STRICT_CHK", __func__);
-		}
-#endif
+		if (setsockopt(s, SOL_NETLINK, NETLINK_GET_STRICT_CHK,
+		    &on, sizeof(on)) == -1)
+			logerr("%s: NETLINK_GET_STRICT_CHK", __func__);
 	}
+#endif
 
 	/* Request a reply */
 	hdr->nlmsg_flags |= NLM_F_ACK;
@@ -956,11 +947,10 @@ send_netlink(struct dhcpcd_ctx *ctx, void *arg,
 			.iov_len = sizeof(buf),
 		};
 
-		r = get_netlink(ctx, &riov, arg, s, 0, callback);
+		r = if_getnetlink(ctx, &riov, arg, s, 0, callback);
 	} else
 		r = -1;
-	if (!privsock)
-		close(s);
+	close(s);
 	return r;
 }
 
@@ -1163,7 +1153,7 @@ gnl_getfamily(struct dhcpcd_ctx *ctx, const char *name)
 	if (nla_put_string(&nlm.hdr, sizeof(nlm),
 	    CTRL_ATTR_FAMILY_NAME, name) == -1)
 		return -1;
-	return send_netlink(ctx, NULL, NETLINK_GENERIC, &nlm.hdr,
+	return if_sendnetlink(ctx, NULL, NETLINK_GENERIC, &nlm.hdr,
 	    &_gnl_getfamily);
 }
 
@@ -1239,7 +1229,7 @@ if_getssid_nl80211(struct interface *ifp)
 	nlm.hdr.nlmsg_flags = NLM_F_REQUEST;
 	nlm.ghdr.cmd = NL80211_CMD_GET_WIPHY;
 	nla_put_32(&nlm.hdr, sizeof(nlm), NL80211_ATTR_IFINDEX, ifp->index);
-	if (send_netlink(ifp->ctx, ifp, NETLINK_GENERIC, &nlm.hdr, NULL) == -1)
+	if (if_sendnetlink(ifp->ctx, ifp, NETLINK_GENERIC, &nlm.hdr, NULL) == -1)
 		return -1;
 
 	/* We need to parse out the list of scan results and find the one
@@ -1251,7 +1241,7 @@ if_getssid_nl80211(struct interface *ifp)
 	nlm.ghdr.cmd = NL80211_CMD_GET_SCAN;
 	nla_put_32(&nlm.hdr, sizeof(nlm), NL80211_ATTR_IFINDEX, ifp->index);
 
-	return send_netlink(ifp->ctx, ifp,
+	return if_sendnetlink(ifp->ctx, ifp,
 	    NETLINK_GENERIC, &nlm.hdr, &_if_getssid_nl80211);
 }
 #endif
@@ -1330,7 +1320,7 @@ if_addressexists(struct interface *ifp, struct in_addr *addr)
 	    .ifa.ifa_index = ifp->index,
 	};
 
-	return send_netlink(ifp->ctx, &ia, NETLINK_ROUTE, &nlm.hdr,
+	return if_sendnetlink(ifp->ctx, &ia, NETLINK_ROUTE, &nlm.hdr,
 	    &_if_addressexists);
 }
 #endif
@@ -1442,7 +1432,7 @@ if_route(unsigned char cmd, const struct rt *rt)
 		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_PRIORITY,
 		    rt->rt_metric);
 
-	return send_netlink(rt->rt_ifp->ctx, NULL,
+	return if_sendnetlink(rt->rt_ifp->ctx, NULL,
 	    NETLINK_ROUTE, &nlm.hdr, NULL);
 }
 
@@ -1476,7 +1466,7 @@ if_initrt(struct dhcpcd_ctx *ctx, rb_tree_t *kroutes, int af)
 	    .rt.rtm_family = (unsigned char)af,
 	};
 
-	return send_netlink(ctx, kroutes, NETLINK_ROUTE, &nlm.hdr, &_if_initrt);
+	return if_sendnetlink(ctx, kroutes, NETLINK_ROUTE, &nlm.hdr, &_if_initrt);
 }
 
 
@@ -1674,7 +1664,7 @@ if_address(unsigned char cmd, const struct ipv4_addr *ia)
 		    &cinfo, sizeof(cinfo));
 	}
 
-	if (send_netlink(ia->iface->ctx, NULL,
+	if (if_sendnetlink(ia->iface->ctx, NULL,
 	    NETLINK_ROUTE, &nlm.hdr, NULL) == -1)
 		retval = -1;
 	return retval;
@@ -1749,7 +1739,7 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 		    &cinfo, sizeof(cinfo));
 	}
 
-	return send_netlink(ia->iface->ctx, NULL,
+	return if_sendnetlink(ia->iface->ctx, NULL,
 	    NETLINK_ROUTE, &nlm.hdr, NULL);
 }
 
@@ -1854,7 +1844,7 @@ if_disable_autolinklocal(struct dhcpcd_ctx *ctx, unsigned int ifindex)
 	add_attr_nest_end(&nlm.hdr, afs6);
 	add_attr_nest_end(&nlm.hdr, afs);
 
-	return send_netlink(ctx, NULL, NETLINK_ROUTE, &nlm.hdr, NULL);
+	return if_sendnetlink(ctx, NULL, NETLINK_ROUTE, &nlm.hdr, NULL);
 #else
 	UNUSED(ctx);
 	UNUSED(ifindex);
@@ -1885,7 +1875,7 @@ if_setup_inet6(const struct interface *ifp)
 	snprintf(path, sizeof(path), "%s/%s/autoconf", prefix, ifp->name);
 	ra = check_proc_int(path);
 	if (ra != 1 && ra != -1) {
-		if (write_path(path, "0") == -1)
+		if (if_writepathstr(path, "0") == -1)
 			logerr("%s: %s", __func__, path);
 	}
 
@@ -1898,7 +1888,7 @@ if_setup_inet6(const struct interface *ifp)
 		 * error as such so just log it and continue */
 		logfunc("%s", path);
 	} else if (ra != 0) {
-		if (write_path(path, "0") == -1)
+		if (if_writepathstr(path, "0") == -1)
 			logerr("%s: %s", __func__, path);
 	}
 }
