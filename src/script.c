@@ -88,7 +88,7 @@ if_printoptions(void)
 static int
 script_exec(const struct dhcpcd_ctx *ctx, char *const *argv, char *const *env)
 {
-	pid_t pid;
+	pid_t pid = 0;
 	posix_spawnattr_t attr;
 	int r;
 #ifdef USE_SIGNALS
