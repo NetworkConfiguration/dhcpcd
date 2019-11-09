@@ -1490,7 +1490,7 @@ if_applyra(const struct ra *rap)
 	struct in6_ndireq ndi = { .ndi.chlim = 0 };
 	struct priv *priv = rap->iface->ctx->priv;
 
-	strncpy(ndi.ifname, rap->iface->name, sizeof(ndi.ifname));
+	strlcpy(ndi.ifname, rap->iface->name, sizeof(ndi.ifname));
 	if (ioctl(priv->pf_inet6_fd, SIOCGIFINFO_IN6, &ndi) == -1)
 		return -1;
 
