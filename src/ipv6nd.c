@@ -581,9 +581,6 @@ ipv6nd_sortrouters(struct dhcpcd_ctx *ctx)
 	struct ra_head sorted_routers = TAILQ_HEAD_INITIALIZER(sorted_routers);
 	struct ra *ra1, *ra2;
 
-	/* Pop the first router off */
-	ra1 = TAILQ_FIRST(ctx->ra_routers);
-	TAILQ_REMOVE(ctx->ra_routers, ra1, next);
 	while ((ra1 = TAILQ_FIRST(ctx->ra_routers)) != NULL) {
 		TAILQ_REMOVE(ctx->ra_routers, ra1, next);
 		TAILQ_FOREACH(ra2, &sorted_routers, next) {
@@ -608,6 +605,25 @@ ipv6nd_sortrouters(struct dhcpcd_ctx *ctx)
 	}
 
 	TAILQ_CONCAT(ctx->ra_routers, &sorted_routers, next);
+}
+
+static void
+ipv6nd_applyra(struct dhcpcd_ctx *ctx, struct interface *ifp)
+{
+	struct ra *rap;
+	struct rs_state *state = RS_STATE(ifp);
+
+	TAILQ_FOREACH(rap, ctx->ra_routers, next) {
+		if (rap->iface == ifp)
+			break;
+	}
+
+	if (rap == NULL)
+		return;
+
+	state->retrans = rap->retrans;
+	if (if_applyra(rap) == -1)
+		logerr(__func__);
 }
 
 /*
@@ -645,6 +661,7 @@ ipv6nd_neighbour(struct dhcpcd_ctx *ctx, struct in6_addr *addr, bool reachable)
 
 	/* See if we can install a reachable default router. */
 	ipv6nd_sortrouters(ctx);
+	ipv6nd_applyra(ctx, rap->iface);
 	rt_build(ctx, AF_INET6);
 
 	/* If we have no reachable default routers, try and solicit one. */
@@ -1082,16 +1099,20 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 	if (!new_rap && rap->lifetime == 0 && old_lifetime != 0)
 		logwarnx("%s: %s: no longer a default router",
 		    ifp->name, rap->sfrom);
-	if (nd_ra->nd_ra_reachable) {
+	if (nd_ra->nd_ra_curhoplimit != 0)
+		rap->hoplimit = nd_ra->nd_ra_curhoplimit;
+	else
+		rap->hoplimit = IPV6_DEFHLIM;
+	if (nd_ra->nd_ra_reachable != 0) {
 		rap->reachable = ntohl(nd_ra->nd_ra_reachable);
 		if (rap->reachable > MAX_REACHABLE_TIME)
 			rap->reachable = 0;
-	}
-	if (nd_ra->nd_ra_retransmit) {
-		struct rs_state *state = RS_STATE(ifp);
-
-		state->retrans = rap->retrans = ntohl(nd_ra->nd_ra_retransmit);
-	}
+	} else
+		rap->reachable = REACHABLE_TIME;
+	if (nd_ra->nd_ra_retransmit != 0)
+		rap->retrans = ntohl(nd_ra->nd_ra_retransmit);
+	else
+		rap->retrans = RETRANS_TIMER;
 	rap->expired = false;
 	rap->hasdns = false;
 	rap->isreachable = true;
@@ -1311,6 +1332,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 		script_runreason(ifp, "TEST");
 		goto handle_flag;
 	}
+	ipv6nd_applyra(ifp->ctx, ifp);
 	ipv6_addaddrs(&rap->addrs);
 #ifdef IPV6_MANAGETEMPADDR
 	ipv6_addtempaddrs(ifp, &rap->acquired);

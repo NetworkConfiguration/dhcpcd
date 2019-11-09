@@ -229,7 +229,7 @@ check_proc_hex(const char *path, unsigned int *value)
 }
 
 static ssize_t
-if_writepathstr(const char *path, const char *val)
+if_writepathuint(const char *path, unsigned int val)
 {
 	FILE *fp;
 	ssize_t r;
@@ -237,7 +237,7 @@ if_writepathstr(const char *path, const char *val)
 	fp = fopen(path, "w");
 	if (fp == NULL)
 		return -1;
-	r = fprintf(fp, "%s\n", val);
+	r = fprintf(fp, "%u\n", val);
 	fclose(fp);
 	return r;
 }
@@ -261,7 +261,7 @@ if_init(struct interface *ifp)
 		return errno == ENOENT ? 0 : -1;
 	if (n == 1)
 		return 0;
-	return if_writepathstr(path, "1") == -1 ? -1 : 0;
+	return if_writepathuint(path, 1) == -1 ? -1 : 0;
 }
 
 int
@@ -1875,7 +1875,7 @@ if_setup_inet6(const struct interface *ifp)
 	snprintf(path, sizeof(path), "%s/%s/autoconf", prefix, ifp->name);
 	ra = check_proc_int(path);
 	if (ra != 1 && ra != -1) {
-		if (if_writepathstr(path, "0") == -1)
+		if (if_writepathuint(path, 0) == -1)
 			logerr("%s: %s", __func__, path);
 	}
 
@@ -1888,9 +1888,27 @@ if_setup_inet6(const struct interface *ifp)
 		 * error as such so just log it and continue */
 		logfunc("%s", path);
 	} else if (ra != 0) {
-		if (if_writepathstr(path, "0") == -1)
+		if (if_writepathuint(path, 0) == -1)
 			logerr("%s: %s", __func__, path);
 	}
+}
+
+int
+if_applyra(const struct ra *rap)
+{
+	int error = 0;
+
+	snprintf(path, sizeof(path), "%s/%s/hop_limit", prefix, ifp->name);
+	if (if_writepathuint(path, rap->hoplimit) == -1)
+		error = -1;
+	snprintf(path, sizeof(path), "%s/%s/retrans_time", prefix, ifp->name);
+	if (if_writepathuint(path, rap->retrans) == -1)
+		error = -1;
+	snprintf(path, sizeof(path), "%s/%s/base_reachable_time", prefix,
+	    ifp->name);
+	if (if_writepathuint(path, rap->reachable) == -1)
+		error = -1;
+	return error;
 }
 
 #ifdef IPV6_MANAGETEMPADDR
