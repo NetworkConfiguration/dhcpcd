@@ -1711,6 +1711,20 @@ if_getlifetime6(struct ipv6_addr *addr)
 	return -1;
 }
 
+int
+if_applyra(const struct ra *rap)
+{
+	struct lifreq		lifr = {
+		.lifr_ifinfo.lir_maxhops = rap->hoplimit,
+		.lifr_ifinfo.lir_reachtime = rap->reachable,
+		.lifr_ifinfo.lir_reachretrans = rap->retrans,
+	};
+
+	strlcpy(lifr.lifr_ifname, rap->iface->name, sizeof(lifr.lifr_ifname));
+	if (ioctl(rap->iface->ctx->pf_inet_fd, SIOCSLIFLNKINFO, &lifr) == -1)
+		return -1;
+}
+
 void
 if_setup_inet6(__unused const struct interface *ifp)
 {

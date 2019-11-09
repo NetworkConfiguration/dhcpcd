@@ -1484,6 +1484,22 @@ inet6_sysctl(int code, int val, int action)
 }
 #endif
 
+int
+if_applyra(const struct ra *rap)
+{
+	struct in6_ndireq ndi = { .ndi.chlim = 0 };
+	struct priv *priv = rap->iface->ctx->priv;
+
+	strncpy(ndi.ifname, rap->iface->name, sizeof(ndi.ifname));
+	if (ioctl(priv->pf_inet6_fd, SIOCGIFINFO_IN6, &ndi) == -1)
+		return -1;
+
+	ndi.ndi.chlim = rap->hoplimit;
+	ndi.ndi.retrans = rap->retrans;
+	ndi.ndi.basereachable = rap->reachable;
+	return ioctl(priv->pf_inet6_fd, SIOCSIFINFO_IN6, &ndi);
+}
+
 #ifdef IPV6_MANAGETEMPADDR
 #ifndef IPV6CTL_TEMPVLTIME
 #define get_inet6_sysctlbyname(code) inet6_sysctlbyname(code, 0, 0)

@@ -50,6 +50,7 @@ struct ra {
 	uint32_t reachable;
 	uint32_t retrans;
 	uint32_t mtu;
+	uint8_t hoplimit;
 	struct ipv6_addrhead addrs;
 	bool hasdns;
 	bool expired;
