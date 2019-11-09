@@ -556,6 +556,60 @@ ipv6nd_startexpire(struct interface *ifp)
 	    ipv6nd_expire, ifp);
 }
 
+static int
+ipv6nd_rtpref(struct ra *rap)
+{
+
+	switch (rap->flags & ND_RA_FLAG_RTPREF_MASK) {
+	case ND_RA_FLAG_RTPREF_HIGH:
+		return RTPREF_HIGH;
+	case ND_RA_FLAG_RTPREF_MEDIUM:
+	case ND_RA_FLAG_RTPREF_RSV:
+		return RTPREF_MEDIUM;
+	case ND_RA_FLAG_RTPREF_LOW:
+		return RTPREF_LOW;
+	default:
+		logerrx("%s: impossible RA flag %x", __func__, rap->flags);
+		return RTPREF_INVALID;
+	}
+	/* NOTREACHED */
+}
+
+static void
+ipv6nd_sortrouters(struct dhcpcd_ctx *ctx)
+{
+	struct ra_head sorted_routers = TAILQ_HEAD_INITIALIZER(sorted_routers);
+	struct ra *ra1, *ra2;
+
+	/* Pop the first router off */
+	ra1 = TAILQ_FIRST(ctx->ra_routers);
+	TAILQ_REMOVE(ctx->ra_routers, ra1, next);
+	while ((ra1 = TAILQ_FIRST(ctx->ra_routers)) != NULL) {
+		TAILQ_REMOVE(ctx->ra_routers, ra1, next);
+		TAILQ_FOREACH(ra2, &sorted_routers, next) {
+			if (ra1->iface->metric < ra2->iface->metric)
+				continue;
+			if (ra1->expired && !ra2->expired)
+				continue;
+			if (ra1->lifetime == 0 && ra2->lifetime != 0)
+				continue;
+			if (!ra1->isreachable && ra2->reachable)
+				continue;
+			if (ipv6nd_rtpref(ra1) < ipv6nd_rtpref(ra2))
+				continue;
+			/* All things being equal, prefer older routers. */
+			if (timespeccmp(&ra1->acquired, &ra2->acquired, >=))
+				continue;
+			TAILQ_INSERT_BEFORE(ra2, ra1, next);
+			break;
+		}
+		if (ra2 == NULL)
+			TAILQ_INSERT_TAIL(&sorted_routers, ra1, next);
+	}
+
+	TAILQ_CONCAT(ctx->ra_routers, &sorted_routers, next);
+}
+
 /*
  * Neighbour reachability.
  *
@@ -582,23 +636,16 @@ ipv6nd_neighbour(struct dhcpcd_ctx *ctx, struct in6_addr *addr, bool reachable)
 			break;
 	}
 
-	if (rap == NULL || rap->expired)
+	if (rap == NULL || rap->expired || rap->reachable == reachable)
 		return;
 
-	if (reachable) {
-		if (rap->isreachable)
-			return;
-		loginfox("%s: %s is reachable again",
-		    rap->iface->name, rap->sfrom);
-		rap->isreachable = true;
-		return;
-	} else {
-		if (!rap->isreachable)
-			return;
-		logwarnx("%s: %s is unreachable",
-		    rap->iface->name, rap->sfrom);
-		rap->isreachable = false;
-	}
+	rap->isreachable = reachable;
+	loginfox("%s: %s is %s", rap->iface->name, rap->sfrom,
+	    reachable ? "reachable again" : "unreachable");
+
+	/* See if we can install a reachable default router. */
+	ipv6nd_sortrouters(ctx);
+	rt_build(ctx, AF_INET6);
 
 	/* If we have no reachable default routers, try and solicit one. */
 	TAILQ_FOREACH(rapr, ctx->ra_routers, next) {
@@ -717,42 +764,6 @@ ipv6nd_free(struct interface *ifp)
 #endif
 
 	return n;
-}
-
-static int
-rtpref(struct ra *rap)
-{
-
-	switch (rap->flags & ND_RA_FLAG_RTPREF_MASK) {
-	case ND_RA_FLAG_RTPREF_HIGH:
-		return (RTPREF_HIGH);
-	case ND_RA_FLAG_RTPREF_MEDIUM:
-	case ND_RA_FLAG_RTPREF_RSV:
-		return (RTPREF_MEDIUM);
-	case ND_RA_FLAG_RTPREF_LOW:
-		return (RTPREF_LOW);
-	default:
-		logerrx("rtpref: impossible RA flag %x", rap->flags);
-		return (RTPREF_INVALID);
-	}
-	/* NOTREACHED */
-}
-
-static void
-add_router(struct dhcpcd_ctx *ctx, struct ra *router)
-{
-	struct ra *rap;
-
-	TAILQ_FOREACH(rap, ctx->ra_routers, next) {
-		if (router->iface->metric < rap->iface->metric ||
-		    (router->iface->metric == rap->iface->metric &&
-		    rtpref(router) > rtpref(rap)))
-		{
-			TAILQ_INSERT_BEFORE(rap, router, next);
-			return;
-		}
-	}
-	TAILQ_INSERT_TAIL(ctx->ra_routers, router, next);
 }
 
 static int
@@ -1292,7 +1303,9 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 		    ifp->name);
 
 	if (new_rap)
-		add_router(ifp->ctx, rap);
+		TAILQ_INSERT_TAIL(ctx->ra_routers, rap, next);
+	if (new_data)
+		ipv6nd_sortrouters(ifp->ctx);
 
 	if (ifp->ctx->options & DHCPCD_TEST) {
 		script_runreason(ifp, "TEST");
