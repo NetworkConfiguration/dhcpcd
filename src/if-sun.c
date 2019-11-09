@@ -1720,9 +1720,8 @@ if_applyra(const struct ra *rap)
 		.lifr_ifinfo.lir_reachretrans = rap->retrans,
 	};
 
-	strlcpy(lifr.lifr_ifname, rap->iface->name, sizeof(lifr.lifr_ifname));
-	if (ioctl(rap->iface->ctx->pf_inet_fd, SIOCSLIFLNKINFO, &lifr) == -1)
-		return -1;
+	strlcpy(lifr.lifr_name, rap->iface->name, sizeof(lifr.lifr_name));
+	return ioctl(rap->iface->ctx->pf_inet_fd, SIOCSLIFLNKINFO, &lifr);
 }
 
 void
