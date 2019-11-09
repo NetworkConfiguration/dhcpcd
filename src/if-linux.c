@@ -1853,7 +1853,8 @@ if_disable_autolinklocal(struct dhcpcd_ctx *ctx, unsigned int ifindex)
 #endif
 }
 
-static const char *prefix = "/proc/sys/net/ipv6/conf";
+static const char *p_conf = "/proc/sys/net/ipv6/conf";
+static const char *p_neigh = "/proc/sys/net/ipv6/neigh";
 
 void
 if_setup_inet6(const struct interface *ifp)
@@ -1872,14 +1873,14 @@ if_setup_inet6(const struct interface *ifp)
 	if (!(ifp->options->options & DHCPCD_IPV6RS))
 		return;
 
-	snprintf(path, sizeof(path), "%s/%s/autoconf", prefix, ifp->name);
+	snprintf(path, sizeof(path), "%s/%s/autoconf", p_conf, ifp->name);
 	ra = check_proc_int(path);
 	if (ra != 1 && ra != -1) {
 		if (if_writepathuint(path, 0) == -1)
 			logerr("%s: %s", __func__, path);
 	}
 
-	snprintf(path, sizeof(path), "%s/%s/accept_ra", prefix, ifp->name);
+	snprintf(path, sizeof(path), "%s/%s/accept_ra", p_conf, ifp->name);
 	ra = check_proc_int(path);
 	if (ra == -1) {
 		logfunc_t *logfunc = errno == ENOENT? logdebug : logwarn;
@@ -1896,16 +1897,18 @@ if_setup_inet6(const struct interface *ifp)
 int
 if_applyra(const struct ra *rap)
 {
+	char path[256];
+	const char *ifname = rap->iface->name;
 	int error = 0;
 
-	snprintf(path, sizeof(path), "%s/%s/hop_limit", prefix, ifp->name);
+	snprintf(path, sizeof(path), "%s/%s/hop_limit", p_conf, ifname);
 	if (if_writepathuint(path, rap->hoplimit) == -1)
 		error = -1;
-	snprintf(path, sizeof(path), "%s/%s/retrans_time", prefix, ifp->name);
+	snprintf(path, sizeof(path), "%s/%s/retrans_time", p_neigh, ifname);
 	if (if_writepathuint(path, rap->retrans) == -1)
 		error = -1;
-	snprintf(path, sizeof(path), "%s/%s/base_reachable_time", prefix,
-	    ifp->name);
+	snprintf(path, sizeof(path), "%s/%s/base_reachable_time",
+	    p_neigh, ifname);
 	if (if_writepathuint(path, rap->reachable) == -1)
 		error = -1;
 	return error;
@@ -1920,7 +1923,7 @@ ip6_use_tempaddr(const char *ifname)
 
 	if (ifname == NULL)
 		ifname = "all";
-	snprintf(path, sizeof(path), "%s/%s/use_tempaddr", prefix, ifname);
+	snprintf(path, sizeof(path), "%s/%s/use_tempaddr", p_conf, ifname);
 	val = check_proc_int(path);
 	return val == -1 ? 0 : val;
 }
@@ -1933,7 +1936,7 @@ ip6_temp_preferred_lifetime(const char *ifname)
 
 	if (ifname == NULL)
 		ifname = "all";
-	snprintf(path, sizeof(path), "%s/%s/temp_prefered_lft", prefix,
+	snprintf(path, sizeof(path), "%s/%s/temp_prefered_lft", p_conf,
 	    ifname);
 	val = check_proc_int(path);
 	return val < 0 ? TEMP_PREFERRED_LIFETIME : val;
@@ -1947,7 +1950,7 @@ ip6_temp_valid_lifetime(const char *ifname)
 
 	if (ifname == NULL)
 		ifname = "all";
-	snprintf(path, sizeof(path), "%s/%s/temp_valid_lft", prefix, ifname);
+	snprintf(path, sizeof(path), "%s/%s/temp_valid_lft", p_conf, ifname);
 	val = check_proc_int(path);
 	return val < 0 ? TEMP_VALID_LIFETIME : val;
 }
@@ -1961,7 +1964,7 @@ ip6_forwarding(const char *ifname)
 
 	if (ifname == NULL)
 		ifname = "all";
-	snprintf(path, sizeof(path), "%s/%s/forwarding", prefix, ifname);
+	snprintf(path, sizeof(path), "%s/%s/forwarding", p_conf, ifname);
 	val = check_proc_int(path);
 	return val == -1 ? 0 : val;
 }
