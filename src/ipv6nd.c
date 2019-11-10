@@ -990,6 +990,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 	struct dhcp_opt *dho;
 	bool new_rap, new_data, has_address;
 	uint32_t old_lifetime;
+	int ifmtu;
 	__printflike(1, 2) void (*logfunc)(const char *, ...);
 #ifdef IPV6_MANAGETEMPADDR
 	uint8_t new_ap;
@@ -1274,22 +1275,30 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 
 		case ND_OPT_MTU:
 			if (len < sizeof(mtu)) {
-				logerrx("%s: short MTU option", ifp->name);
+				logfunc("%s: short MTU option", ifp->name);
 				break;
 			}
 			memcpy(&mtu, p, sizeof(mtu));
 			mtu.nd_opt_mtu_mtu = ntohl(mtu.nd_opt_mtu_mtu);
 			if (mtu.nd_opt_mtu_mtu < IPV6_MMTU) {
-				logerrx("%s: invalid MTU %d",
+				logfunc("%s: invalid MTU %d",
 				    ifp->name, mtu.nd_opt_mtu_mtu);
 				break;
 			}
-			rap->mtu = mtu.nd_opt_mtu_mtu;
+			ifmtu = if_getmtu(ifp);
+			if (ifmtu == -1)
+				logerr("if_getmtu");
+			else if (mtu.nd_opt_mtu_mtu > (uint32_t)ifmtu) {
+				logfunc("%s: advertised MTU %d"
+				    " is greater than link MTU %d",
+				    ifp->name, mtu.nd_opt_mtu_mtu, ifmtu);
+				rap->mtu = (uint32_t)ifmtu;
+			} else
+				rap->mtu = mtu.nd_opt_mtu_mtu;
 			break;
-
 		case ND_OPT_RDNSS:
 			if (len < sizeof(rdnss)) {
-				logerrx("%s: short RDNSS option", ifp->name);
+				logfunc("%s: short RDNSS option", ifp->name);
 				break;
 			}
 			memcpy(&rdnss, p, sizeof(rdnss));
