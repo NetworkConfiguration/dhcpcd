@@ -664,6 +664,9 @@ ipv6nd_neighbour(struct dhcpcd_ctx *ctx, struct in6_addr *addr, bool reachable)
 	ipv6nd_applyra(ctx, rap->iface);
 	rt_build(ctx, AF_INET6);
 
+	if (reachable)
+		return;
+
 	/* If we have no reachable default routers, try and solicit one. */
 	TAILQ_FOREACH(rapr, ctx->ra_routers, next) {
 		if (rap == rapr || rap->iface != rapr->iface)
