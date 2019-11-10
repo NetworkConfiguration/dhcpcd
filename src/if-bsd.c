@@ -1490,15 +1490,29 @@ if_applyra(const struct ra *rap)
 #ifdef SIOCSIFINFO_IN6
 	struct in6_ndireq ndi = { .ndi.chlim = 0 };
 	struct priv *priv = rap->iface->ctx->priv;
+	int error;
 
 	strlcpy(ndi.ifname, rap->iface->name, sizeof(ndi.ifname));
 	if (ioctl(priv->pf_inet6_fd, SIOCGIFINFO_IN6, &ndi) == -1)
 		return -1;
 
+	ndi.ndi.linkmtu = rap->mtu;
 	ndi.ndi.chlim = rap->hoplimit;
 	ndi.ndi.retrans = rap->retrans;
 	ndi.ndi.basereachable = rap->reachable;
-	return ioctl(priv->pf_inet6_fd, SIOCSIFINFO_IN6, &ndi);
+	error = ioctl(priv->pf_inet6_fd, SIOCSIFINFO_IN6, &ndi);
+	if (error == -1 && errno == EINVAL) {
+		/*
+		 * Very likely that this is caused by a dodgy MTU
+		 * setting specific to the interface.
+		 * Let's set it to "unspecified" and try again.
+		 * Doesn't really matter as we fix the MTU against the
+		 * routes we add as not all OS support SIOCSIFINFO_IN6.
+		 */
+		ndi.ndi.linkmtu = 0;
+		error = ioctl(priv->pf_inet6_fd, SIOCSIFINFO_IN6, &ndi);
+	}
+	return error;
 #else
 #warning OS does not allow setting of RA bits hoplimit, retrans or reachable
 	UNUSED(rap);
