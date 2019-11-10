@@ -1121,6 +1121,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 	rap->hasdns = false;
 	rap->isreachable = true;
 	has_address = false;
+	rap->mtu = 0;
 
 #ifdef IPV6_AF_TEMPORARY
 	ipv6_markaddrsstale(ifp, IPV6_AF_TEMPORARY);
