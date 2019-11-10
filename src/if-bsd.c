@@ -1130,6 +1130,10 @@ if_ifinfo(struct dhcpcd_ctx *ctx, const struct if_msghdr *ifm)
 	case LINK_STATE_UNKNOWN:
 		link_state = LINK_UNKNOWN;
 		break;
+#ifdef LINK_STATE_FULL_DUPLEX
+	case LINK_STATE_HALF_DUPLEX:	/* FALLTHROUGH */
+	case LINK_STATE_FULL_DUPLEX:	/* FALLTHROUGH */
+#endif
 	case LINK_STATE_UP:
 		link_state = LINK_UP;
 		break;
