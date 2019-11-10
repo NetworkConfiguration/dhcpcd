@@ -1487,6 +1487,7 @@ inet6_sysctl(int code, int val, int action)
 int
 if_applyra(const struct ra *rap)
 {
+#ifdef SIOCSIFINFO_IN6
 	struct in6_ndireq ndi = { .ndi.chlim = 0 };
 	struct priv *priv = rap->iface->ctx->priv;
 
@@ -1498,6 +1499,11 @@ if_applyra(const struct ra *rap)
 	ndi.ndi.retrans = rap->retrans;
 	ndi.ndi.basereachable = rap->reachable;
 	return ioctl(priv->pf_inet6_fd, SIOCSIFINFO_IN6, &ndi);
+#else
+#warning OS does not allow setting of RA bits hoplimit, retrans or reachable
+	UNUSED(rap);
+	return 0;
+#endif
 }
 
 #ifdef IPV6_MANAGETEMPADDR
