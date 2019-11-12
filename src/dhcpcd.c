@@ -708,6 +708,21 @@ dhcpcd_initstate(struct interface *ifp, unsigned long long options)
 	dhcpcd_initstate1(ifp, ifp->ctx->argc, ifp->ctx->argv, options);
 }
 
+static void
+dhcpcd_reportssid(struct interface *ifp)
+{
+	char pssid[IF_SSIDLEN * 4];
+
+	if (print_string(pssid, sizeof(pssid), OT_ESCSTRING,
+	    ifp->ssid, ifp->ssid_len) == -1)
+	{
+		logerr(__func__);
+		return;
+	}
+
+	loginfox("%s: connected to Access Point `%s'", ifp->name, pssid);
+}
+
 void
 dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
     const char *ifname)
@@ -779,6 +794,7 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 				if (ifp->ssid_len != olen ||
 				    memcmp(ifp->ssid, ossid, ifp->ssid_len))
 				{
+					dhcpcd_reportssid(ifp);
 #ifdef NOCARRIER_PRESERVE_IP
 					dhcpcd_drop(ifp, 0);
 #endif
@@ -976,7 +992,8 @@ run_preinit(struct interface *ifp)
 		return;
 
 	script_runreason(ifp, "PREINIT");
-
+	if (ifp->wireless)
+		dhcpcd_reportssid(ifp);
 	if (ifp->options->options & DHCPCD_LINK && ifp->carrier != LINK_UNKNOWN)
 		script_runreason(ifp,
 		    ifp->carrier == LINK_UP ? "CARRIER" : "NOCARRIER");
