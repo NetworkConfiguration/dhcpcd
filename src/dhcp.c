@@ -1751,7 +1751,7 @@ send_message(struct interface *ifp, uint8_t type,
 	 * even if they are setup to send them.
 	 * Broadcasting from UDP is only an optimisation for rebinding
 	 * and on BSD, at least, is reliant on the subnet route being
-	 * correctly configured to recieve the unicast reply.
+	 * correctly configured to receive the unicast reply.
 	 * As such, we always broadcast and receive the reply to it via BPF.
 	 * This also guarantees we have a DHCP server attached to the
 	 * interface we want to configure because we can't dictate the
