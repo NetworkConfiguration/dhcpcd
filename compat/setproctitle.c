@@ -69,7 +69,7 @@ int setproctitle(const char *fmt, ...)
 	vsnprintf(tp, tl, fmt, args);
 	va_end(args);
 
-#ifdef __linux__
+#if defined(__linux__) && defined(PR_SET_MM_MAP)
 	int fd, i;
 	char *buf_ptr, *tmp_proctitle;
 	char buf[BUFSIZ];
