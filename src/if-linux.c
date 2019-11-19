@@ -1917,7 +1917,6 @@ if_applyra(const struct ra *rap)
 	snprintf(path, sizeof(path), "%s/%s/base_reachable_time_ms",
 	    p_neigh, ifname);
 	if (if_writepathuint(path, rap->reachable * 1000) == -1) {
-		logerr("XX");
 		snprintf(path, sizeof(path), "%s/%s/base_reachable_time",
 		    p_neigh, ifname);
 		if (if_writepathuint(path, rap->reachable) == -1)
