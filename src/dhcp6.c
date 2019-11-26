@@ -171,7 +171,7 @@ static const char * const dhcp6_statuses[] = {
 
 static void dhcp6_bind(struct interface *, const char *, const char *);
 static void dhcp6_failinform(void *);
-static int dhcp6_listen(struct dhcpcd_ctx *, struct ipv6_addr *);
+static int dhcp6_openudp(unsigned int, struct in6_addr *);
 static void dhcp6_recvaddr(void *);
 
 void
@@ -3606,7 +3606,7 @@ dhcp6_recvctx(void *arg)
 }
 
 static int
-dhcp6_listen(struct dhcpcd_ctx *ctx, struct ipv6_addr *ia)
+dhcp6_openudp(unsigned int ifindex, struct in6_addr *ia)
 {
 	struct sockaddr_in6 sa;
 	int n, s;
@@ -3629,8 +3629,8 @@ dhcp6_listen(struct dhcpcd_ctx *ctx, struct ipv6_addr *ia)
 #endif
 
 	if (ia != NULL) {
-		memcpy(&sa.sin6_addr, &ia->addr, sizeof(sa.sin6_addr));
-		sa.sin6_scope_id = ia->iface->index;
+		memcpy(&sa.sin6_addr, ia, sizeof(sa.sin6_addr));
+		sa.sin6_scope_id = ifindex;
 	}
 
 	if (bind(s, (struct sockaddr *)&sa, sizeof(sa)) == -1)
@@ -3639,11 +3639,6 @@ dhcp6_listen(struct dhcpcd_ctx *ctx, struct ipv6_addr *ia)
 	n = 1;
 	if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVPKTINFO, &n, sizeof(n)) == -1)
 		goto errexit;
-
-	if (ia != NULL) {
-		ia->dhcp6_fd = s;
-		eloop_event_add(ctx->eloop, s, dhcp6_recvaddr, ia);
-	}
 
 	return s;
 
@@ -3690,11 +3685,8 @@ static int
 dhcp6_open(struct dhcpcd_ctx *ctx)
 {
 
-	if (ctx->dhcp6_fd != -1 ||
-	    (ctx->dhcp6_fd = dhcp6_listen(ctx, NULL)) == -1)
-		return ctx->dhcp6_fd;
-
-	eloop_event_add(ctx->eloop, ctx->dhcp6_fd, dhcp6_recvctx, ctx);
+	if (ctx->dhcp6_fd == -1)
+		ctx->dhcp6_fd = dhcp6_openudp(0, NULL);
 	return ctx->dhcp6_fd;
 }
 
@@ -3711,6 +3703,7 @@ dhcp6_start1(void *arg)
 	if (ctx->options & DHCPCD_MASTER) {
 		if (dhcp6_open(ctx) == -1)
 			return;
+		eloop_event_add(ctx->eloop, ctx->dhcp6_fd, dhcp6_recvctx, ctx);
 	}
 
 	state = D6_STATE(ifp);
@@ -3974,7 +3967,13 @@ dhcp6_handleifa(int cmd, struct ipv6_addr *ia, pid_t pid)
 	    !(ifp->ctx->options & DHCPCD_MASTER) &&
 	    ifp->options->options & DHCPCD_DHCP6 &&
 	    ia->dhcp6_fd == -1)
-		dhcp6_listen(ia->iface->ctx, ia);
+	{
+		ia->dhcp6_fd = dhcp6_openudp(ia->iface->index, &ia->addr);
+		if (ia->dhcp6_fd != -1)
+			eloop_event_add(ia->iface->ctx->eloop, ia->dhcp6_fd,
+			    dhcp6_recvaddr, ia);
+	}
+
 
 	if ((state = D6_STATE(ifp)) != NULL)
 		ipv6_handleifa_addrs(cmd, &state->addrs, ia, pid);
