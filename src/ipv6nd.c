@@ -367,7 +367,7 @@ ipv6nd_sendrsprobe(void *arg)
 	logdebugx("%s: sending Router Solicitation", ifp->name);
 #ifdef PRIVSEP
 	if (ifp->ctx->options & DHCPCD_PRIVSEP) {
-		if (ps_inet_sendmsg(ifp->ctx, PS_ND, &msg) == -1)
+		if (ps_inet_sendnd(ifp, &msg) == -1)
 			logerr(__func__);
 		goto sent;
 	}
@@ -439,7 +439,7 @@ ipv6nd_sendadvertisement(void *arg)
 
 #ifdef PRIVSEP
 	if (ifp->ctx->options & DHCPCD_PRIVSEP) {
-		if (ps_inet_sendmsg(ifp->ctx, PS_ND, &msg) == -1)
+		if (ps_inet_sendnd(ifp, &msg) == -1)
 			logerr(__func__);
 		goto sent;
 	}
