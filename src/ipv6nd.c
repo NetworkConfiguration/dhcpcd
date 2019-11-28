@@ -236,7 +236,7 @@ eexit:
 }
 
 #ifdef __sun
-static int
+int
 ipv6nd_open(struct interface *ifp)
 {
 	int fd;

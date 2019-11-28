@@ -4002,8 +4002,9 @@ dhcp6_handleifa(int cmd, struct ipv6_addr *ia, pid_t pid)
 		if (ifp->ctx->options & DHCPCD_PRIVSEP) {
 			if (ps_inet_opendhcp6(ia) == -1)
 				logerr(__func__);
-		} else {
+		} else
 #endif
+		{
 			if (ia->dhcp6_fd == -1)
 				ia->dhcp6_fd = dhcp6_openudp(ia->iface->index,
 				    &ia->addr);
