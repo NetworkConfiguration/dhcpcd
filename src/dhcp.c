@@ -1671,7 +1671,7 @@ dhcp_sendudp(struct interface *ifp, struct in_addr *to, void *data, size_t len)
 
 	fd = state->udp_fd;
 	if (fd == -1) {
-		fd = dhcp_openudp(state->addr != NULL ?&state->addr->addr:NULL);
+		fd = dhcp_openudp(&state->addr->addr);
 		if (fd == -1)
 			return -1;
 	}
@@ -2255,18 +2255,17 @@ dhcp_bind(struct interface *ifp)
 		if (write_lease(ifp, state->new, state->new_len) == -1)
 			logerr(__func__);
 
-	ipv4_applyaddr(ifp);
-
 	/* Close the BPF filter as we can now receive DHCP messages
 	 * on a UDP socket. */
-	if (!(state->udp_fd == -1 ||
-	    (state->old != NULL && state->old->yiaddr != state->new->yiaddr)))
-		return;
-	dhcp_close(ifp);
+	if (ctx->options & DHCPCD_MASTER ||
+	    state->old == NULL ||
+	    state->old->yiaddr != state->new->yiaddr)
+		dhcp_close(ifp);
 
+	ipv4_applyaddr(ifp);
 
 	/* If not in master mode, open an address specific socket. */
-	if (ctx->udp_fd != -1)
+	if (ctx->options & DHCPCD_MASTER)
 		return;
 	state->udp_fd = dhcp_openudp(&state->addr->addr);
 	if (state->udp_fd == -1) {
@@ -3539,17 +3538,6 @@ dhcp_handleifudp(void *arg)
 }
 
 static int
-dhcp_open(struct dhcpcd_ctx *ctx)
-{
-
-	if (ctx->udp_fd != -1 || (ctx->udp_fd = dhcp_openudp(NULL)) == -1)
-		return ctx->udp_fd;
-
-	eloop_event_add(ctx->eloop, ctx->udp_fd, dhcp_handleudp, ctx);
-	return ctx->udp_fd;
-}
-
-static int
 dhcp_openbpf(struct interface *ifp)
 {
 	struct dhcp_state *state;
@@ -3757,13 +3745,14 @@ dhcp_start1(void *arg)
 	 * ICMP port unreachable message back to the DHCP server.
 	 * Only do this in master mode so we don't swallow messages
 	 * for dhcpcd running on another interface. */
-	if (ctx->options & DHCPCD_MASTER) {
-		if (dhcp_open(ctx) == -1) {
-			/* Don't log an error if some other process
-			 * is handling this. */
-			if (errno != EADDRINUSE)
-				logerr("%s: dhcp_open", __func__);
+	if (ctx->options & DHCPCD_MASTER && ctx->udp_fd == -1) {
+		ctx->udp_fd = dhcp_openudp(NULL);
+		if (ctx->udp_fd == -1) {
+			logerr(__func__);
+			return;
 		}
+
+		eloop_event_add(ctx->eloop, ctx->udp_fd, dhcp_handleudp, ctx);
 	}
 
 	if (dhcp_init(ifp) == -1) {
