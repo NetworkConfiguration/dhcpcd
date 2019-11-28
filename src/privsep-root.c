@@ -206,6 +206,9 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 
 	assert(msg->msg_iovlen == 1);
 
+	/* Reset errno */
+	errno = 0;
+
 	switch (psm->ps_cmd) {
 	case PS_IOCTL:
 		err = ps_root_doioctl(psm->ps_flags, data, len);
