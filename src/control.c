@@ -207,7 +207,7 @@ make_sock(struct sockaddr_un *sa, const char *ifname, int unpriv)
 		strlcpy(sa->sun_path, UNPRIVSOCKET, sizeof(sa->sun_path));
 	else {
 		snprintf(sa->sun_path, sizeof(sa->sun_path), CONTROLSOCKET,
-		    ifname ? "-" : "", ifname ? ifname : "");
+		    ifname ? ifname : "", ifname ? "." : "");
 	}
 	return fd;
 }
