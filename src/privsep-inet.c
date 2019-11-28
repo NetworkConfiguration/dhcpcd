@@ -274,7 +274,7 @@ ps_inet_stop(struct dhcpcd_ctx *ctx)
 }
 
 ssize_t
-ps_inet_sendmsg(struct dhcpcd_ctx *ctx, uint8_t cmd, struct msghdr *msg)
+ps_inet_sendmsg(struct dhcpcd_ctx *ctx, uint8_t cmd, const struct msghdr *msg)
 {
 
 	return ps_sendmsg(ctx, ctx->ps_inet_fd, cmd, 0, msg);
