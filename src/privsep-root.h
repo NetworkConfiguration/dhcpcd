@@ -35,7 +35,7 @@ int ps_root_stop(struct dhcpcd_ctx *ctx);
 ssize_t ps_root_readerror(struct dhcpcd_ctx *);
 ssize_t ps_root_ioctl(struct dhcpcd_ctx *, unsigned long, void *, size_t);
 ssize_t ps_root_os(struct ps_msghdr *, struct msghdr *);
-#ifdef BSD
+#if defined(BSD) || defined(__sun)
 ssize_t ps_root_route(struct dhcpcd_ctx *, void *, size_t);
 ssize_t ps_root_ioctl6(struct dhcpcd_ctx *, unsigned long, void *, size_t);
 #endif

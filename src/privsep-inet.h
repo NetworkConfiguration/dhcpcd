@@ -44,9 +44,11 @@ ssize_t ps_inet_sendbootp(struct ipv4_addr *, const struct msghdr *);
 
 #ifdef INET6
 struct ipv6_addr;
-ssize_t ps_inet_opennd(struct ipv6_addr *);
-ssize_t ps_inet_closend(struct ipv6_addr *);
-ssize_t ps_inet_sendnd(struct ipv6_addr *, const struct msghdr *);
+#ifdef __sun
+ssize_t ps_inet_opennd(struct interface *);
+ssize_t ps_inet_closend(struct interface *);
+#endif
+ssize_t ps_inet_sendnd(struct interface *, const struct msghdr *);
 #ifdef DHCP6
 ssize_t ps_inet_opendhcp6(struct ipv6_addr *);
 ssize_t ps_inet_closedhcp6(struct ipv6_addr *);

@@ -59,10 +59,19 @@ ps_inet_recvbootp(void *arg)
 static void
 ps_inet_recvra(void *arg)
 {
+#ifdef __sun
+	struct interface *ifp = arg;
+	struct rs_state *state = RS_STATE(ifp);
+	struct dhcpcd_ctx *ctx = ifp->ctx;
+
+	if (ps_recvmsg(ctx, state->nd_fd, PS_ND, ctx->ps_inet_fd) == -1)
+		logerr(__func__);
+#else
 	struct dhcpcd_ctx *ctx = arg;
 
 	if (ps_recvmsg(ctx, ctx->nd_fd, PS_ND, ctx->ps_inet_fd) == -1)
 		logerr(__func__);
+#endif
 }
 #endif
 
@@ -107,7 +116,7 @@ ps_inet_startcb(void *arg)
 		ret++;
 	}
 #endif
-#if defined(INET6) && !defined(_sun)
+#if defined(INET6) && !defined(__sun)
 	if (ctx->options & DHCPCD_IPV6) {
 		if (ipv6nd_open(ctx) == -1) {
 			logerr("%s: ipv6nd_open", __func__);
@@ -168,7 +177,7 @@ ps_inet_recvmsg_cb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		s = ctx->udp_fd;
 		break;
 #endif
-#ifdef INET6
+#if defined(INET6) && !defined(__sun)
 	case PS_ND:
 		s = ctx->nd_fd;
 		break;
@@ -306,6 +315,42 @@ ps_inet_listenin(void *arg)
 	}
 
 	logdebugx("spawned listener %s on PID %d", buf, getpid());
+	return 0;
+}
+#endif
+
+#if defined(INET6) && defined(__sun)
+static void
+ps_inet_recvin6nd(void *arg)
+{
+	struct ps_process *psp = arg;
+
+	if (ps_recvmsg(psp->psp_ctx, psp->psp_work_fd,
+	    PS_ND, psp->psp_ctx->ps_data_fd) == -1)
+		logerr(__func__);
+}
+
+static int
+ps_inet_listennd(void *arg)
+{
+	struct ps_process *psp = arg;
+
+	setproctitle("[ND network proxy]");
+
+	psp->psp_work_fd = ipv6nd_open(&psp->psp_ifp);
+	if (psp->psp_work_fd == -1) {
+		logerr(__func__);
+		return -1;
+	}
+
+	if (eloop_event_add(psp->psp_ctx->eloop, psp->psp_work_fd,
+	    ps_inet_recvin6nd, psp) == -1)
+	{
+		logerr(__func__);
+		return -1;
+	}
+
+	logdebugx("spawned ND listener on PID %d", getpid());
 	return 0;
 }
 #endif
@@ -489,7 +534,7 @@ ps_inet_sendbootp(struct ipv4_addr *ia, const struct msghdr *msg)
 static ssize_t
 ps_inet_ifp_docmd(struct interface *ifp, uint8_t cmd, const struct msghdr *msg)
 {
-	struct dhcpcd_ctx *ctx = ia->iface->ctx;
+	struct dhcpcd_ctx *ctx = ifp->ctx;
 	struct ps_msghdr psm = {
 		.ps_cmd = cmd,
 		.ps_id = {
@@ -512,7 +557,7 @@ ssize_t
 ps_inet_closend(struct interface *ifp)
 {
 
-	return ps_inet_ifp_docmd(ia, PS_ND | PS_STOP, NULL);
+	return ps_inet_ifp_docmd(ifp, PS_ND | PS_STOP, NULL);
 }
 
 ssize_t
@@ -521,7 +566,14 @@ ps_inet_sendnd(struct interface *ifp, const struct msghdr *msg)
 
 	return ps_inet_ifp_docmd(ifp, PS_ND, msg);
 }
-#endif /* __sun */
+#else
+ssize_t
+ps_inet_sendnd(struct interface *ifp, const struct msghdr *msg)
+{
+
+	return ps_inet_sendmsg(ifp->ctx, PS_ND, msg);
+}
+#endif
 
 #ifdef DHCP6
 static ssize_t

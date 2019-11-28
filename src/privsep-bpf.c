@@ -31,6 +31,7 @@
 
 /* Need these headers just for if_ether on some OS. */
 #ifndef __NetBSD__
+#include <net/if.h>
 #include <net/if_arp.h>
 #include <netinet/in.h>
 #endif
