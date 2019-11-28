@@ -45,8 +45,6 @@ ps_root_doioctl6(unsigned long req, void *data, size_t len)
 		err = ioctl(s, req, data, len);
 	else
 		err = -1;
-	if (err == -1)
-		logerr(__func__);
 	if (s != -1)
 		close(s);
 	return err;
@@ -63,8 +61,6 @@ ps_root_doroute(void *data, size_t len)
 		err = write(s, data, len);
 	else
 		err = -1;
-	if (err == -1)
-		logerr(__func__);
 	if (s != -1)
 		close(s);
 	return err;
