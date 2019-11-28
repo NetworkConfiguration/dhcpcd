@@ -393,7 +393,7 @@ EOF
 	rm -rf _test.c _test
 
 	cat <<EOF >>$CONFIG_MK
-CFLAGS+=	-g -Wall -Wextra
+CFLAGS+=	-g -Wall -Wextra -Wundef
 CFLAGS+=	-Wmissing-prototypes -Wmissing-declarations
 CFLAGS+=	-Wmissing-format-attribute -Wnested-externs
 CFLAGS+=	-Winline -Wcast-align -Wcast-qual -Wpointer-arith
