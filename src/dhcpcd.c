@@ -1640,6 +1640,12 @@ main(int argc, char **argv)
 #ifdef INET
 	ctx.udp_fd = -1;
 #endif
+#ifdef INET6
+	ctx.nd_fd = -1;
+#endif
+#ifdef DHCP6
+	ctx.dhcp6_fd = -1;
+#endif
 	rt_init(&ctx);
 
 	logopts = LOGERR_ERR|LOGERR_LOG|LOGERR_LOG_DATE|LOGERR_LOG_PID;
@@ -1807,7 +1813,7 @@ printpidfile:
 				per = "";
 			}
 			snprintf(ctx.pidfile, sizeof(ctx.pidfile),
-			    PIDFILE, "-", ifname, per);
+			    PIDFILE, ifname, per, ".");
 		} else {
 			snprintf(ctx.pidfile, sizeof(ctx.pidfile),
 			    PIDFILE, "", "", "");
@@ -1982,7 +1988,8 @@ printpidfile:
 
 		if ((pid = pidfile_lock(ctx.pidfile)) != 0) {
 			if (pid == -1)
-				logerr("%s: pidfile_lock", __func__);
+				logerr("%s: pidfile_lock: %s",
+				    __func__, ctx.pidfile);
 			else
 				logerrx(PACKAGE
 				    " already running on pid %d (%s)",
