@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: BSD-2-Clause */
+/* stSPDX-License-Identifier: BSD-2-Clause */
 /*
  * dhcpcd - DHCP client daemon
  * Copyright (c) 2006-2019 Roy Marples <roy@marples.name>
@@ -47,11 +47,13 @@
 #include "common.h"
 #include "dhcp.h"
 #include "dhcp6.h"
+#include "eloop.h"
 #include "if.h"
 #include "if-options.h"
 #include "ipv4ll.h"
 #include "ipv6nd.h"
 #include "logerr.h"
+#include "privsep.h"
 #include "script.h"
 
 /* Allow the OS to define another script env var name */
@@ -85,7 +87,7 @@ if_printoptions(void)
 		printf(" -  %s\n", *p);
 }
 
-static int
+pid_t
 script_exec(const struct dhcpcd_ctx *ctx, char *const *argv, char *const *env)
 {
 	pid_t pid = 0;
@@ -173,7 +175,7 @@ efprintf(FILE *fp, const char *fmt, ...)
 	return r;
 }
 
-static char **
+char **
 script_buftoenv(struct dhcpcd_ctx *ctx, char *buf, size_t len)
 {
 	char **env, **envp, *bufp, *endp;
@@ -630,6 +632,15 @@ script_runreason(const struct interface *ifp, const char *reason)
 	argv[0] = ifp->options->script;
 	argv[1] = NULL;
 	logdebugx("%s: executing `%s' %s", ifp->name, argv[0], reason);
+
+#ifdef PRIVSEP
+	if (ctx->options & DHCPCD_PRIVSEP) {
+		if (ps_root_script(ifp,
+		    ctx->script_buf, ctx->script_buflen) == -1)
+			logerr(__func__);
+		goto send_listeners;
+	}
+#endif
 
 	pid = script_exec(ctx, argv, ctx->script_env);
 	if (pid == -1)

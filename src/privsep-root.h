@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /*
- * dhcpcd - DHCP client daemon
+ * Priviledge Seperation for dhcpcd
  * Copyright (c) 2006-2019 Roy Marples <roy@marples.name>
- *
+ * All rights reserved
+
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -25,57 +26,23 @@
  * SUCH DAMAGE.
  */
 
-#ifndef CONFIG_H
-#define CONFIG_H
+#ifndef PRIVSEP_ROOT_H
+#define PRIVSEP_ROOT_H
 
-#define PACKAGE			"dhcpcd"
-#define VERSION			"8.99.0"
+pid_t ps_root_start(struct dhcpcd_ctx *ctx);
+int ps_root_stop(struct dhcpcd_ctx *ctx);
 
-#ifndef DHCPCD_USER
-# define DHCPCD_USER		"_" PACKAGE
+ssize_t ps_root_readerror(struct dhcpcd_ctx *);
+ssize_t ps_root_ioctl(struct dhcpcd_ctx *, unsigned long, void *, size_t);
+ssize_t ps_root_os(struct ps_msghdr *, struct msghdr *);
+#ifdef BSD
+ssize_t ps_root_route(struct dhcpcd_ctx *, void *, size_t);
+ssize_t ps_root_ioctl6(struct dhcpcd_ctx *, unsigned long, void *, size_t);
 #endif
-
-#ifndef CONFIG
-# define CONFIG			SYSCONFDIR "/" PACKAGE ".conf"
+#ifdef __linux__
+ssize_t ps_root_sendnetlink(struct dhcpcd_ctx *, int, struct msghdr *);
+ssize_t ps_root_writepathuint(struct dhcpcd_ctx *, const char *, unsigned int);
 #endif
-#ifndef SCRIPT
-# define SCRIPT			LIBEXECDIR "/" PACKAGE "-run-hooks"
-#endif
-#ifndef DEVDIR
-# define DEVDIR			LIBDIR "/" PACKAGE "/dev"
-#endif
-#ifndef DUID
-# define DUID			DBDIR "/duid"
-#endif
-#ifndef SECRET
-# define SECRET			DBDIR "/secret"
-#endif
-#ifndef LEASEFILE
-# define LEASEFILE		DBDIR "/%s%s.lease"
-#endif
-#ifndef LEASEFILE6
-# define LEASEFILE6		LEASEFILE "6"
-#endif
-#ifndef PIDFILE
-# define PIDFILE		RUNDIR "/%s%s%spid"
-#endif
-#ifndef CONTROLSOCKET
-# define CONTROLSOCKET		RUNDIR "/%s%ssock"
-#endif
-#ifndef UNPRIVSOCKET
-# define UNPRIVSOCKET		RUNDIR "/unpriv.sock"
-#endif
-#ifndef RDM_MONOFILE
-# define RDM_MONOFILE		DBDIR "/rdm_monotonic"
-#endif
-
-#ifndef NO_SIGNALS
-#  define USE_SIGNALS
-#endif
-#ifndef USE_SIGNALS
-#  ifndef THERE_IS_NO_FORK
-#    define THERE_IS_NO_FORK
-#  endif
-#endif
+ssize_t ps_root_script(const struct interface *, const void *, size_t);
 
 #endif

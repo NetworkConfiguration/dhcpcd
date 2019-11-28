@@ -30,6 +30,11 @@ If dhcpcd cannot load this file at runtime, dhcpcd will work but will not be
 able to decode any DHCP/DHCPv6 options that are not defined by the user
 in /etc/dhcpcd.conf. This does not really change the total on disk size.
 
+## Priviledge Separation
+To enable this, use the `--enable-privsep` configure option.
+It's not enabled by default because it's an experimental feature and
+requires adding a user (default `_dhcpcd`) to the system.
+
 ## Cross compiling
 If you're cross compiling you may need set the platform if OS is different
 from the host.  
@@ -170,4 +175,3 @@ happen in a custom OS hook:
   if true, mark the dhcpcd service as started and then start dependencies
   if false and the dhcpcd service was previously started, mark as inactive and
      stop any dependant services.
-

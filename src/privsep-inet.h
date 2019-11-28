@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /*
- * dhcpcd - DHCP client daemon
+ * Priviledge Seperation for dhcpcd
  * Copyright (c) 2006-2019 Roy Marples <roy@marples.name>
- *
+ * All rights reserved
+
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -25,57 +26,31 @@
  * SUCH DAMAGE.
  */
 
-#ifndef CONFIG_H
-#define CONFIG_H
+#ifndef PRIVSEP_INET_H
+#define PRIVSEP_INET_H
 
-#define PACKAGE			"dhcpcd"
-#define VERSION			"8.99.0"
+pid_t ps_inet_start(struct dhcpcd_ctx *);
+int ps_inet_stop(struct dhcpcd_ctx *);
+ssize_t ps_inet_sendmsg(struct dhcpcd_ctx *, uint8_t, struct msghdr *);
+ssize_t ps_inet_cmd(struct dhcpcd_ctx *, struct ps_msghdr *, struct msghdr *);
+ssize_t ps_inet_dispatch(void *, struct ps_msghdr *, struct msghdr *);
 
-#ifndef DHCPCD_USER
-# define DHCPCD_USER		"_" PACKAGE
-#endif
-
-#ifndef CONFIG
-# define CONFIG			SYSCONFDIR "/" PACKAGE ".conf"
-#endif
-#ifndef SCRIPT
-# define SCRIPT			LIBEXECDIR "/" PACKAGE "-run-hooks"
-#endif
-#ifndef DEVDIR
-# define DEVDIR			LIBDIR "/" PACKAGE "/dev"
-#endif
-#ifndef DUID
-# define DUID			DBDIR "/duid"
-#endif
-#ifndef SECRET
-# define SECRET			DBDIR "/secret"
-#endif
-#ifndef LEASEFILE
-# define LEASEFILE		DBDIR "/%s%s.lease"
-#endif
-#ifndef LEASEFILE6
-# define LEASEFILE6		LEASEFILE "6"
-#endif
-#ifndef PIDFILE
-# define PIDFILE		RUNDIR "/%s%s%spid"
-#endif
-#ifndef CONTROLSOCKET
-# define CONTROLSOCKET		RUNDIR "/%s%ssock"
-#endif
-#ifndef UNPRIVSOCKET
-# define UNPRIVSOCKET		RUNDIR "/unpriv.sock"
-#endif
-#ifndef RDM_MONOFILE
-# define RDM_MONOFILE		DBDIR "/rdm_monotonic"
+#ifdef INET
+struct ipv4_addr;
+ssize_t ps_inet_openbootp(struct ipv4_addr *);
+ssize_t ps_inet_closebootp(struct ipv4_addr *);
+ssize_t ps_inet_sendbootp(struct ipv4_addr *, const struct msghdr *);
 #endif
 
-#ifndef NO_SIGNALS
-#  define USE_SIGNALS
-#endif
-#ifndef USE_SIGNALS
-#  ifndef THERE_IS_NO_FORK
-#    define THERE_IS_NO_FORK
-#  endif
-#endif
-
+#ifdef INET6
+struct ipv6_addr;
+ssize_t ps_inet_opennd(struct ipv6_addr *);
+ssize_t ps_inet_closend(struct ipv6_addr *);
+ssize_t ps_inet_sendnd(struct ipv6_addr *, const struct msghdr *);
+#ifdef DHCP6
+ssize_t ps_inet_opendhcp6(struct ipv6_addr *);
+ssize_t ps_inet_closedhcp6(struct ipv6_addr *);
+ssize_t ps_inet_senddhcp6(struct ipv6_addr *, const struct msghdr *);
+#endif /* DHCP6 */
+#endif /* INET6 */
 #endif

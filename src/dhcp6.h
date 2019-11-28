@@ -220,6 +220,8 @@ struct dhcp6_state {
 	(D6_CSTATE((ifp)) &&						       \
 	D6_CSTATE((ifp))->reason && dhcp6_dadcompleted((ifp)))
 
+int dhcp6_openudp(unsigned int, struct in6_addr *);
+void dhcp6_recvmsg(struct dhcpcd_ctx *, struct msghdr *, struct ipv6_addr *);
 void dhcp6_printoptions(const struct dhcpcd_ctx *,
     const struct dhcp_opt *, size_t);
 const struct ipv6_addr *dhcp6_iffindaddr(const struct interface *ifp,

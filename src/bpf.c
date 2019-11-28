@@ -489,6 +489,15 @@ bpf_arp(struct interface *ifp, int fd)
 	bp += bpf_cmp_hwaddr(bp, BPF_CMP_HWADDR_LEN, sizeof(struct arphdr),
 	                     false, ifp->hwaddr, ifp->hwlen);
 
+#ifdef PRIVSEP
+	if (ifp->ctx->options & DHCPCD_PRIVSEP) {
+		/* No mech to notify of ARP states, so just accept all ARP. */
+		BPF_SET_STMT(bp, BPF_RET + BPF_K, arp_len);
+		bp++;
+		return bpf_attach(fd, bpf, (unsigned int)(bp - bpf));
+	}
+#endif
+
 	state = ARP_STATE(ifp);
 	if (TAILQ_FIRST(&state->arp_states)) {
 		struct arp_state *astate;

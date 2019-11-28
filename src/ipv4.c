@@ -49,6 +49,7 @@
 #include "common.h"
 #include "dhcpcd.h"
 #include "dhcp.h"
+#include "eloop.h"
 #include "if.h"
 #include "if-options.h"
 #include "ipv4.h"

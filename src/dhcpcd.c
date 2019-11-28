@@ -66,6 +66,7 @@ const char dhcpcd_copyright[] = "Copyright (c) 2006-2019 Roy Marples";
 #include "ipv6.h"
 #include "ipv6nd.h"
 #include "logerr.h"
+#include "privsep.h"
 #include "script.h"
 
 #ifdef HAVE_UTIL_H
@@ -1254,6 +1255,8 @@ reload_config(struct dhcpcd_ctx *ctx)
 		ifo->options |= DHCPCD_MASTER;
 	if (ctx->options & DHCPCD_DAEMONISED)
 		ifo->options |= DHCPCD_DAEMONISED;
+	if (ctx->options & DHCPCD_PRIVSEP)
+		ifo->options |= DHCPCD_PRIVSEP;
 	ctx->options = ifo->options;
 	free_options(ctx, ifo);
 }
@@ -1607,6 +1610,9 @@ main(int argc, char **argv)
 #ifdef AUTH
 			" AUTH"
 #endif
+#ifdef PRIVSEP
+			" PRIVSEP"
+#endif
 			"\n");
 			return EXIT_SUCCESS;
 		}
@@ -1631,6 +1637,10 @@ main(int argc, char **argv)
 #endif
 #ifdef DHCP6
 	ctx.dhcp6_fd = -1;
+#endif
+#ifdef PRIVSEP
+	ctx.ps_root_fd = ctx.ps_data_fd = -1;
+	TAILQ_INIT(&ctx.ps_processes);
 #endif
 	rt_init(&ctx);
 
@@ -2011,6 +2021,18 @@ printpidfile:
 		if_disable_rtadv();
 #endif
 
+#ifdef PRIVSEP
+	if (!(ctx.options & DHCPCD_TEST)) {
+		switch(ps_start(&ctx)) {
+		case -1:
+			logerr("ps_start");
+			goto exit_failure;
+		case 0:
+			goto run_loop;
+		}
+	}
+#endif
+
 	if (if_opensockets(&ctx) == -1) {
 		logerr("%s: if_opensockets", __func__);
 		goto exit_failure;
@@ -2123,6 +2145,9 @@ printpidfile:
 			    dhcpcd_prestartinterface, ifp);
 	}
 
+#ifdef PRIVSEP
+run_loop:
+#endif
 	i = eloop_start(ctx.eloop, &ctx.sigset);
 	if (i < 0) {
 		logerr("%s: eloop_start", __func__);
@@ -2138,6 +2163,9 @@ exit_failure:
 	i = EXIT_FAILURE;
 
 exit1:
+#ifdef PRIVSEP
+	ps_stop(&ctx);
+#endif
 	if (ifaddrs != NULL)
 		freeifaddrs(ifaddrs);
 	if (control_stop(&ctx) == -1)

@@ -581,7 +581,10 @@ static void
 ipv6_deletedaddr(struct ipv6_addr *ia)
 {
 
-#ifdef SMALL
+#ifdef PRIVSEP
+	if (!(ia->iface->ctx->options & DHCPCD_MASTER))
+		ps_inet_closedhcp6(ia);
+#elif defined(SMALL)
 	UNUSED(ia);
 #else
 	/* NOREJECT is set if we delegated exactly the prefix to another
@@ -1803,9 +1806,9 @@ ipv6_handleifa_addrs(int cmd,
 				    ia->iface->name, pid, ia->saddr);
 				ia->flags &= ~IPV6_AF_ADDED;
 			}
+			ipv6_deletedaddr(ia);
 			if (ia->flags & IPV6_AF_DELEGATED) {
 				TAILQ_REMOVE(addrs, ia, next);
-				ipv6_deletedaddr(ia);
 				ipv6_freeaddr(ia);
 			}
 			break;

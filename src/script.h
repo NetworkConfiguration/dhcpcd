@@ -33,6 +33,8 @@
 
 __printflike(2, 3) int efprintf(FILE *, const char *, ...);
 void if_printoptions(void);
+char ** script_buftoenv(struct dhcpcd_ctx *, char *, size_t);
+pid_t script_exec(const struct dhcpcd_ctx *, char *const *, char *const *);
 int send_interface(struct fd_list *, const struct interface *);
 int script_runreason(const struct interface *, const char *);
 

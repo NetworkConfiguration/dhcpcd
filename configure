@@ -11,6 +11,7 @@ ARP=
 ARPING=
 IPV4LL=
 INET6=
+PRIVSEP=
 ARC4RANDOM=
 CLOSEFROM=
 RBTREE=
@@ -65,6 +66,8 @@ for x do
 	--enable-embedded) EMBEDDED=yes;;
 	--disable-auth) AUTH=no;;
 	--enable-auth) AUTH=yes;;
+	--disable-privsep) PRIVSEP=no;;
+	--enable-privsep) PRIVSEP=yes;;
 	--prefix) PREFIX=$var;;
 	--sysconfdir) SYSCONFDIR=$var;;
 	--bindir|--sbindir) SBINDIR=$var;;
@@ -522,6 +525,22 @@ if [ -z "$AUTH" -o "$AUTH" = yes ]; then
 	echo "Enabling Authentication"
 	echo "CPPFLAGS+=	-DAUTH" >>$CONFIG_MK
 	echo "SRCS+=		auth.c" >>$CONFIG_MK
+fi
+
+if [ "$PRIVSEP" = yes ]; then
+	echo "Enabling Priviledge Separation"
+	echo "WARNING: This is an experimental feature"
+	echo "CPPFLAGS+=	-DPRIVSEP" >>$CONFIG_MK
+	echo "DHCPCD_SRCS+=	privsep.c privsep-root.c privsep-inet.c" \
+		>>$CONFIG_MK
+	if [ -z "$INET" ] || [ "$INET" = yes ]; then
+		echo "DHCPCD_SRCS+=	privsep-bpf.c" >>$CONFIG_MK
+	fi
+	case "$OS" in
+	linux*)		 echo "DHCPCD_SRCS+=	privsep-linux.c" >>$CONFIG_MK;;
+	solaris*|sunos*) echo "DHCPCD_SRCS+=	privsep-sun.c" >>$CONFIG_MK;;
+	*)		 echo "DHCPCD_SRCS+=	privsep-bsd.c" >>$CONFIG_MK;;
+	esac
 fi
 
 echo "Using compiler .. $CC"

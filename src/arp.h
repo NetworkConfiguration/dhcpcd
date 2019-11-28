@@ -90,6 +90,7 @@ struct iarp_state {
 	((const struct iarp_state *)(ifp)->if_data[IF_DATA_ARP])
 
 #ifdef ARP
+void arp_packet(struct interface *, uint8_t *, size_t);
 struct arp_state *arp_new(struct interface *, const struct in_addr *);
 void arp_probe(struct arp_state *);
 void arp_announce(struct arp_state *);

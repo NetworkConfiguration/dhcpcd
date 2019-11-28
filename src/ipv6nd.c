@@ -53,6 +53,7 @@
 #include "ipv6.h"
 #include "ipv6nd.h"
 #include "logerr.h"
+#include "privsep.h"
 #include "route.h"
 #include "script.h"
 
@@ -272,7 +273,7 @@ ipv6nd_open(struct interface *ifp)
 	return fd;
 }
 #else
-static int
+int
 ipv6nd_open(struct dhcpcd_ctx *ctx)
 {
 	int fd;
@@ -285,7 +286,8 @@ ipv6nd_open(struct dhcpcd_ctx *ctx)
 		return -1;
 
 	ctx->nd_fd = fd;
-	eloop_event_add(ctx->eloop, fd, ipv6nd_handledata, ctx);
+	if (!(ctx->options & DHCPCD_PRIVSEP))
+		eloop_event_add(ctx->eloop, fd, ipv6nd_handledata, ctx);
 	return fd;
 }
 #endif
@@ -363,6 +365,13 @@ ipv6nd_sendrsprobe(void *arg)
 	memcpy(CMSG_DATA(cm), &pi, sizeof(pi));
 
 	logdebugx("%s: sending Router Solicitation", ifp->name);
+#ifdef PRIVSEP
+	if (ifp->ctx->options & DHCPCD_PRIVSEP) {
+		if (ps_inet_sendmsg(ifp->ctx, PS_ND, &msg) == -1)
+			logerr(__func__);
+		goto sent;
+	}
+#endif
 #ifdef __sun
 	s = state->nd_fd;
 #else
@@ -376,6 +385,9 @@ ipv6nd_sendrsprobe(void *arg)
 		 * associate with an access point. */
 	}
 
+#ifdef PRIVSEP
+sent:
+#endif
 	if (state->rsprobes++ < MAX_RTR_SOLICITATIONS)
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    RTR_SOLICITATION_INTERVAL, ipv6nd_sendrsprobe, ifp);
@@ -424,6 +436,14 @@ ipv6nd_sendadvertisement(void *arg)
 	cm->cmsg_len = CMSG_LEN(sizeof(pi));
 	memcpy(CMSG_DATA(cm), &pi, sizeof(pi));
 	logdebugx("%s: sending NA for %s", ifp->name, ia->saddr);
+
+#ifdef PRIVSEP
+	if (ifp->ctx->options & DHCPCD_PRIVSEP) {
+		if (ps_inet_sendmsg(ifp->ctx, PS_ND, &msg) == -1)
+			logerr(__func__);
+		goto sent;
+	}
+#endif
 #ifdef __sun
 	s = state->nd_fd;
 #else
@@ -432,6 +452,9 @@ ipv6nd_sendadvertisement(void *arg)
 	if (sendmsg(s, &msg, 0) == -1)
 		logerr(__func__);
 
+#ifdef PRIVSEP
+sent:
+#endif
 	if (++ia->na_count < MAX_NEIGHBOR_ADVERTISEMENT) {
 		eloop_timeout_add_sec(ctx->eloop,
 		    state->retrans / 1000, ipv6nd_sendadvertisement, ia);
@@ -1763,7 +1786,7 @@ ipv6nd_drop(struct interface *ifp)
 	}
 }
 
-static void
+void
 ipv6nd_recvmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg)
 {
 	struct sockaddr_in6 *from = (struct sockaddr_in6 *)msg->msg_name;
@@ -1865,17 +1888,19 @@ ipv6nd_startrs1(void *arg)
 #endif
 	}
 
+	if (!(ifp->ctx->options & DHCPCD_PRIVSEP)) {
 #ifdef __sun
-	if (ipv6nd_open(ifp) == -1) {
-		logerr(__func__);
-		return;
-	}
+		if (ipv6nd_open(ifp) == -1) {
+			logerr(__func__);
+			return;
+		}
 #else
-	if (ipv6nd_open(ifp->ctx) == -1) {
-		logerr(__func__);
-		return;
-	}
+		if (ipv6nd_open(ifp->ctx) == -1) {
+			logerr(__func__);
+			return;
+		}
 #endif
+	}
 
 	/* Always make a new probe as the underlying hardware
 	 * address could have changed. */

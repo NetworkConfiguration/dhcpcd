@@ -65,7 +65,6 @@
 #include "dhcpcd.h"
 #include "ipv4.h"
 #include "ipv6.h"
-#include "ipv6nd.h"
 #include "route.h"
 
 #define EUI64_ADDR_LEN			8
@@ -111,6 +110,7 @@ int if_getifaddrs(struct ifaddrs **);
 int if_getsubnet(struct dhcpcd_ctx *, const char *, int, void *, size_t);
 #endif
 
+int if_ioctl(struct dhcpcd_ctx *, unsigned long, void *, size_t);
 int if_getflags(struct interface *ifp);
 int if_setflag(struct interface *ifp, short flag);
 #define if_up(ifp) if_setflag((ifp), (IFF_UP | IFF_RUNNING))
@@ -207,6 +207,9 @@ int ip6_temp_valid_lifetime(const char *ifname);
 #endif
 int ip6_forwarding(const char *ifname);
 
+struct ra;
+struct ipv6_addr;
+
 int if_applyra(const struct ra *);
 int if_address6(unsigned char, const struct ipv6_addr *);
 int if_addrflags6(const struct interface *, const struct in6_addr *,
@@ -221,4 +224,10 @@ int if_machinearch(char *, size_t);
 struct interface *if_findifpfromcmsg(struct dhcpcd_ctx *,
     struct msghdr *, int *);
 int xsocket(int, int, int);
+
+#ifdef __linux__
+int if_linksocket(struct sockaddr_nl *, int);
+int if_getnetlink(struct dhcpcd_ctx *, struct iovec *, int, int,
+    int (*)(struct dhcpcd_ctx *, void *, struct nlmsghdr *), void *);
+#endif
 #endif
