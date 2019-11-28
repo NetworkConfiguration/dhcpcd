@@ -71,7 +71,8 @@ for x do
 	--libexecdir) LIBEXECDIR=$var;;
 	--statedir|--localstatedir) STATEDIR=$var;;
 	--dbdir) DBDIR=$var;;
-	--rundir|--runstatedir) RUNDIR=$var;;
+	--rundir) RUNDIR=$var;;
+	--runstatedir) RUNSTATEDIR=$var;;
 	--mandir) MANDIR=$var;;
 	--datadir) DATADIR=$var;;
 	--with-ccopts|CFLAGS) CFLAGS=$var;;
@@ -253,7 +254,8 @@ echo "/* $OS */" >$CONFIG_H
 : ${LIBEXECDIR:=$PREFIX/libexec}
 : ${STATEDIR:=/var}
 : ${DBDIR:=$STATEDIR/db/dhcpcd}
-: ${RUNDIR:=$STATEDIR/run}
+: ${RUNSTATEDIR:=$STATEDIR/run}
+: ${RUNDIR:=$RUNSTATEDIR/dhcpcd}
 : ${MANDIR:=${PREFIX:-/usr}/share/man}
 : ${DATADIR:=${PREFIX:-/usr}/share}
 
@@ -506,7 +508,7 @@ if [ -z "$INET" -o "$INET" = yes ]; then
 		echo "DHCPCD_SRCS+=	ipv4ll.c" >>$CONFIG_MK
 	fi
 fi
-if [ -z "$INET6" -o "$INET6" = yes ]; then
+if [ -z "$INET6" ] || [ "$INET6" = yes ]; then
 	echo "Enabling INET6 support"
 	echo "CPPFLAGS+=	-DINET6" >>$CONFIG_MK
 	echo "DHCPCD_SRCS+=	ipv6.c ipv6nd.c" >>$CONFIG_MK
