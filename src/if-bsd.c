@@ -90,6 +90,7 @@
 #include "ipv6.h"
 #include "ipv6nd.h"
 #include "logerr.h"
+#include "privsep.h"
 #include "route.h"
 #include "sa.h"
 
@@ -690,6 +691,14 @@ if_route(unsigned char cmd, const struct rt *rt)
 #undef ADDSA
 
 	rtm->rtm_msglen = (unsigned short)(bp - (char *)rtm);
+
+#ifdef PRIVSEP
+	if (ctx->options & DHCPCD_PRIVSEP) {
+		if (ps_root_route(ctx, rtm, rtm->rtm_msglen) == -1)
+			return -1;
+		return 0;
+	}
+#endif
 	if (write(ctx->link_fd, rtm, rtm->rtm_msglen) == -1)
 		return -1;
 	return 0;
@@ -838,6 +847,7 @@ if_address(unsigned char cmd, const struct ipv4_addr *ia)
 {
 	int r;
 	struct in_aliasreq ifra;
+	struct dhcpcd_ctx *ctx = ia->iface->ctx;
 
 	memset(&ifra, 0, sizeof(ifra));
 	strlcpy(ifra.ifra_name, ia->iface->name, sizeof(ifra.ifra_name));
@@ -853,8 +863,8 @@ if_address(unsigned char cmd, const struct ipv4_addr *ia)
 		ADDADDR(&ifra.ifra_broadaddr, &ia->brd);
 #undef ADDADDR
 
-	r = ioctl(ia->iface->ctx->pf_inet_fd,
-	    cmd == RTM_DELADDR ? SIOCDIFADDR : SIOCAIFADDR, &ifra);
+	r = if_ioctl(ctx,
+	    cmd == RTM_DELADDR ? SIOCDIFADDR : SIOCAIFADDR, &ifra,sizeof(ifra));
 	return r;
 }
 
@@ -925,14 +935,26 @@ ifa_getscope(const struct sockaddr_in6 *sin)
 #endif
 }
 
+static int
+if_ioctl6(struct dhcpcd_ctx *ctx, unsigned long req, void *data, size_t len)
+{
+	struct priv *priv;
+
+#ifdef PRIVSEP
+	if (ctx->options & DHCPCD_PRIVSEP)
+		return (int)ps_root_ioctl6(ctx, req, data, len);
+#endif
+
+	priv = ctx->priv;
+	return ioctl(priv->pf_inet6_fd, req, data, len);
+}
+
 int
 if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 {
 	struct in6_aliasreq ifa;
 	struct in6_addr mask;
-	struct priv *priv;
-
-	priv = (struct priv *)ia->iface->ctx->priv;
+	struct dhcpcd_ctx *ctx = ia->iface->ctx;
 
 	memset(&ifa, 0, sizeof(ifa));
 	strlcpy(ifa.ifra_name, ia->iface->name, sizeof(ifa.ifra_name));
@@ -1004,7 +1026,7 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 	if (cmd == RTM_NEWADDR && !(ia->flags & IPV6_AF_ADDED)) {
 		ifa.ifra_lifetime.ia6t_vltime = ND6_INFINITE_LIFETIME;
 		ifa.ifra_lifetime.ia6t_pltime = ND6_INFINITE_LIFETIME;
-		(void)ioctl(priv->pf_inet6_fd, SIOCAIFADDR_IN6, &ifa);
+		(void)if_ioctl6(ctx, SIOCAIFADDR_IN6, &ifa, sizeof(ifa));
 	}
 #endif
 
@@ -1025,8 +1047,9 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 	ifa.ifra_lifetime.ia6t_pltime = ia->prefix_pltime;
 #endif
 
-	return ioctl(priv->pf_inet6_fd,
-	    cmd == RTM_DELADDR ? SIOCDIFADDR_IN6 : SIOCAIFADDR_IN6, &ifa);
+	return if_ioctl6(ctx,
+	    cmd == RTM_DELADDR ? SIOCDIFADDR_IN6 : SIOCAIFADDR_IN6,
+	    &ifa, sizeof(ifa));
 }
 
 int
@@ -1158,6 +1181,13 @@ if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 	/* Ignore errors. */
 	if (rtm->rtm_errno != 0)
 		return 0;
+
+#ifdef PRIVSEP
+	/* Ignore messages from the route process.
+	 * We'll get the result of them regardless. */
+	if (rtm->rtm_pid == ctx->ps_root_pid)
+		return 0;
+#endif
 
 	if (if_copyrt(ctx, &rt, rtm) == -1)
 		return errno == ENOTSUP ? 0 : -1;
@@ -1491,18 +1521,18 @@ if_applyra(const struct ra *rap)
 {
 #ifdef SIOCSIFINFO_IN6
 	struct in6_ndireq ndi = { .ndi.chlim = 0 };
-	struct priv *priv = rap->iface->ctx->priv;
+	struct dhcpcd_ctx *ctx = rap->iface->ctx;
 	int error;
 
 	strlcpy(ndi.ifname, rap->iface->name, sizeof(ndi.ifname));
-	if (ioctl(priv->pf_inet6_fd, SIOCGIFINFO_IN6, &ndi) == -1)
+	if (if_ioctl6(ctx, SIOCGIFINFO_IN6, &ndi, sizeof(ndi)) == -1)
 		return -1;
 
 	ndi.ndi.linkmtu = rap->mtu;
 	ndi.ndi.chlim = rap->hoplimit;
 	ndi.ndi.retrans = rap->retrans;
 	ndi.ndi.basereachable = rap->reachable;
-	error = ioctl(priv->pf_inet6_fd, SIOCSIFINFO_IN6, &ndi);
+	error = if_ioctl6(ctx, SIOCSIFINFO_IN6, &ndi, sizeof(ndi));
 	if (error == -1 && errno == EINVAL) {
 		/*
 		 * Very likely that this is caused by a dodgy MTU
@@ -1512,7 +1542,7 @@ if_applyra(const struct ra *rap)
 		 * routes we add as not all OS support SIOCSIFINFO_IN6.
 		 */
 		ndi.ndi.linkmtu = 0;
-		error = ioctl(priv->pf_inet6_fd, SIOCSIFINFO_IN6, &ndi);
+		error = if_ioctl6(ctx, SIOCSIFINFO_IN6, &ndi, sizeof(ndi));
 	}
 	return error;
 #else
@@ -1598,25 +1628,26 @@ ip6_forwarding(__unused const char *ifname)
 
 #ifdef SIOCIFAFATTACH
 static int
-af_attach(int s, const struct interface *ifp, int af)
+if_af_attach(const struct interface *ifp, int af)
 {
 	struct if_afreq ifar;
 
 	strlcpy(ifar.ifar_name, ifp->name, sizeof(ifar.ifar_name));
 	ifar.ifar_af = af;
-	return ioctl(s, SIOCIFAFATTACH, (void *)&ifar);
+	return if_ioctl6(ifp->ctx, SIOCIFAFATTACH, &ifar, sizeof(ifar));
 }
 #endif
 
 #ifdef SIOCGIFXFLAGS
 static int
-set_ifxflags(int s, const struct interface *ifp)
+if_set_ifxflags(const struct interface *ifp)
 {
 	struct ifreq ifr;
 	int flags;
+	struct priv *priv = ifp->ctx->priv;
 
 	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
-	if (ioctl(s, SIOCGIFXFLAGS, (void *)&ifr) == -1)
+	if (ioctl(priv->pf_inet6_fd, SIOCGIFXFLAGS, &ifr) == -1)
 		return -1;
 	flags = ifr.ifr_flags;
 #ifdef IFXF_NOINET6
@@ -1643,7 +1674,7 @@ set_ifxflags(int s, const struct interface *ifp)
 	if (ifr.ifr_flags == flags)
 		return 0;
 	ifr.ifr_flags = flags;
-	return ioctl(s, SIOCSIFXFLAGS, (void *)&ifr);
+	return if_ioctl6(ifp->ctx, SIOCSIFXFLAGS, &ifr, sizeof(ifr));
 }
 #endif
 
@@ -1726,7 +1757,8 @@ if_setup_inet6(const struct interface *ifp)
 #ifdef ND6_NDI_FLAGS
 	if (nd.ndi.flags != (uint32_t)flags) {
 		nd.ndi.flags = (uint32_t)flags;
-		if (ioctl(s, SIOCSIFINFO_FLAGS, &nd) == -1)
+		if (if_ioctl6(ifp->ctx, SIOCSIFINFO_FLAGS,
+		    &nd, sizeof(nd)) == -1)
 			logerr("%s: SIOCSIFINFO_FLAGS", ifp->name);
 	}
 #endif
@@ -1735,12 +1767,12 @@ if_setup_inet6(const struct interface *ifp)
 	 * last action undertaken to ensure kernel RS and
 	 * LLADDR auto configuration are disabled where applicable. */
 #ifdef SIOCIFAFATTACH
-	if (af_attach(s, ifp, AF_INET6) == -1)
-		logerr("%s: af_attach", ifp->name);
+	if (if_af_attach(ifp, AF_INET6) == -1)
+		logerr("%s: if_af_attach", ifp->name);
 #endif
 
 #ifdef SIOCGIFXFLAGS
-	if (set_ifxflags(s, ifp) == -1)
+	if (if_set_ifxflags(ifp) == -1)
 		logerr("%s: set_ifxflags", ifp->name);
 #endif
 
@@ -1753,10 +1785,12 @@ if_setup_inet6(const struct interface *ifp)
 
 		memset(&ifr, 0, sizeof(ifr));
 		strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
-		if (ioctl(s, SIOCSRTRFLUSH_IN6, &ifr) == -1 &&
+		if (if_ioctl6(ifp->ctx, SIOCSRTRFLUSH_IN6,
+		    &ifr, sizeof(ifr)) == -1 &&
 		    errno != ENOTSUP)
 			logwarn("SIOCSRTRFLUSH_IN6");
-		if (ioctl(s, SIOCSPFXFLUSH_IN6, &ifr) == -1 &&
+		if (if_ioctl6(ifp->ctx, SIOCSPFXFLUSH_IN6,
+		    &ifr, sizeof(ifr)) == -1 &&
 		    errno != ENOTSUP)
 			logwarn("SIOCSPFXFLUSH_IN6");
 	}

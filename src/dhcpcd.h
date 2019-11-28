@@ -32,6 +32,8 @@
 #include <sys/socket.h>
 #include <net/if.h>
 
+#include <stdio.h>
+
 #include "config.h"
 #ifdef HAVE_SYS_QUEUE_H
 #include <sys/queue.h>
@@ -96,6 +98,7 @@ struct interface {
 };
 TAILQ_HEAD(if_head, interface);
 
+#include "privsep.h"
 
 #ifdef INET6
 /* dhcpcd requires CMSG_SPACE to evaluate to a compile time constant. */
@@ -176,6 +179,16 @@ struct dhcpcd_ctx {
 	size_t vivso_len;
 
 	char *randomstate; /* original state */
+
+#ifdef PRIVSEP
+	char *ps_user;		/* Username to drop privs to */
+	pid_t ps_root_pid;
+	int ps_root_fd;		/* Privileged Actioneer commands */
+	int ps_data_fd;		/* Data from root spawned processes */
+	struct ps_process_head ps_processes;	/* List of spawned processes */
+	pid_t ps_inet_pid;
+	int ps_inet_fd;		/* Network Proxy commands and data */
+#endif
 
 #ifdef INET
 	struct dhcp_opt *dhcp_opts;

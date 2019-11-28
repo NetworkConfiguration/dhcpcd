@@ -56,6 +56,7 @@
 #include "if-options.h"
 #include "ipv6nd.h"
 #include "logerr.h"
+#include "privsep.h"
 #include "script.h"
 
 #ifdef HAVE_SYS_BITOPS_H
@@ -171,7 +172,6 @@ static const char * const dhcp6_statuses[] = {
 
 static void dhcp6_bind(struct interface *, const char *, const char *);
 static void dhcp6_failinform(void *);
-static int dhcp6_openudp(unsigned int, struct in6_addr *);
 static void dhcp6_recvaddr(void *);
 
 void
@@ -1321,6 +1321,38 @@ logsend:
 		memcpy(CMSG_DATA(cm), &pi, sizeof(pi));
 	}
 
+#ifdef PRIVSEP
+	if (ifp->ctx->options & DHCPCD_PRIVSEP) {
+		struct ipv6_addr *ia;
+
+		if (IN6_ARE_ADDR_EQUAL(&dst.sin6_addr, &alldhcp))
+			ia = lla;
+		else {
+			/* Find an IA to send from */
+			TAILQ_FOREACH(ia, &state->addrs, next) {
+				if (ia->flags & IPV6_AF_STALE)
+					continue;
+				if (ia->addr_flags & IN6_IFF_NOTUSEABLE)
+					continue;
+				if (ia->ia_type == D6_OPTION_IA_PD)
+					continue;
+				break;
+			}
+		}
+		if (ia == NULL) {
+			if (lla == NULL) {
+				logerrx("%s: no address to send from",
+				    ifp->name);
+				return -1;
+			}
+			ia = lla;
+		}
+		if (ps_inet_senddhcp6(ia, &msg) == -1)
+			logerr(__func__);
+		goto sent;
+	}
+#endif
+
 	if (ctx->dhcp6_fd != -1)
 		s = ctx->dhcp6_fd;
 	else if (lla != NULL && lla->dhcp6_fd != -1)
@@ -1338,6 +1370,9 @@ logsend:
 		 * associate with an access point. */
 	}
 
+#ifdef PRIVSEP
+sent:
+#endif
 	state->RTC++;
 	if (callback) {
 		if (state->MRC == 0 || state->RTC < state->MRC)
@@ -3464,7 +3499,7 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom,
 	dhcp6_bind(ifp, op, sfrom);
 }
 
-static void
+void
 dhcp6_recvmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg, struct ipv6_addr *ia)
 {
 	struct sockaddr_in6 *from = msg->msg_name;
@@ -3605,7 +3640,7 @@ dhcp6_recvctx(void *arg)
 	dhcp6_recv(ctx, NULL);
 }
 
-static int
+int
 dhcp6_openudp(unsigned int ifindex, struct in6_addr *ia)
 {
 	struct sockaddr_in6 sa;
@@ -3691,7 +3726,9 @@ dhcp6_start1(void *arg)
 	size_t i;
 	const struct dhcp_compat *dhc;
 
-	if (ctx->options & DHCPCD_MASTER && ctx->dhcp6_fd == -1) {
+	if ((ctx->options & (DHCPCD_MASTER|DHCPCD_PRIVSEP)) == DHCPCD_MASTER &&
+	    ctx->dhcp6_fd == -1)
+	{
 		ctx->dhcp6_fd = dhcp6_openudp(0, NULL);
 		if (ctx->dhcp6_fd == -1) {
 			logerr(__func__);
@@ -3959,13 +3996,21 @@ dhcp6_handleifa(int cmd, struct ipv6_addr *ia, pid_t pid)
 	    !(ia->addr_flags & IN6_IFF_NOTUSEABLE) &&
 	    ifp->active == IF_ACTIVE_USER &&
 	    !(ifp->ctx->options & DHCPCD_MASTER) &&
-	    ifp->options->options & DHCPCD_DHCP6 &&
-	    ia->dhcp6_fd == -1)
+	    ifp->options->options & DHCPCD_DHCP6)
 	{
-		ia->dhcp6_fd = dhcp6_openudp(ia->iface->index, &ia->addr);
-		if (ia->dhcp6_fd != -1)
-			eloop_event_add(ia->iface->ctx->eloop, ia->dhcp6_fd,
-			    dhcp6_recvaddr, ia);
+#ifdef PRIVSEP
+		if (ifp->ctx->options & DHCPCD_PRIVSEP) {
+			if (ps_inet_opendhcp6(ia) == -1)
+				logerr(__func__);
+		} else {
+#endif
+			if (ia->dhcp6_fd == -1)
+				ia->dhcp6_fd = dhcp6_openudp(ia->iface->index,
+				    &ia->addr);
+			if (ia->dhcp6_fd != -1)
+				eloop_event_add(ia->iface->ctx->eloop,
+				ia->dhcp6_fd, dhcp6_recvaddr, ia);
+		}
 	}
 
 

@@ -53,6 +53,7 @@
 #include "if-options.h"
 #include "ipv4ll.h"
 #include "logerr.h"
+#include "privsep.h"
 
 #if defined(ARP)
 #define ARP_LEN								      \
@@ -103,6 +104,10 @@ arp_request(const struct interface *ifp,
 	ZERO(ifp->hwlen);
 	APPEND(&tip->s_addr, sizeof(tip->s_addr));
 
+#ifdef PRIVSEP
+	if (ifp->ctx->options & DHCPCD_PRIVSEP)
+		return ps_bpf_sendarp(ifp, arp_buffer, len);
+#endif
 	state = ARP_CSTATE(ifp);
 	return bpf_send(ifp, state->bpf_fd, ETHERTYPE_ARP, arp_buffer, len);
 
@@ -206,7 +211,7 @@ arp_validate(const struct interface *ifp, struct arphdr *arp)
 	return true;
 }
 
-static void
+void
 arp_packet(struct interface *ifp, uint8_t *data, size_t len)
 {
 	const struct interface *ifn;
@@ -269,9 +274,18 @@ arp_close(struct interface *ifp)
 {
 	struct iarp_state *state;
 
-	if ((state = ARP_STATE(ifp)) == NULL || state->bpf_fd == -1)
+	if ((state = ARP_STATE(ifp)) == NULL)
 		return;
 
+#ifdef PRIVSEP
+	if (ifp->ctx->options & DHCPCD_PRIVSEP) {
+		if (ps_bpf_closearp(ifp) == -1)
+			logerr(__func__);
+	}
+#endif
+
+	if (state->bpf_fd == -1)
+		return;
 	eloop_event_delete(ifp->ctx->eloop, state->bpf_fd);
 	bpf_close(ifp, state->bpf_fd);
 	state->bpf_fd = -1;
@@ -292,7 +306,14 @@ arp_tryfree(struct iarp_state *state)
 			free(state);
 			ifp->if_data[IF_DATA_ARP] = NULL;
 		}
-	} else {
+#ifdef PRIVSEP
+	} else if (ifp->ctx->options & DHCPCD_PRIVSEP) {
+#if 0
+		if (privsep_arp_bpf(state) == -1)
+			logerr(__func__);
+#endif
+#endif
+	} else if (state->bpf_fd != -1) {
 		if (bpf_arp(ifp, state->bpf_fd) == -1)
 			logerr(__func__);
 	}
@@ -335,6 +356,11 @@ static int
 arp_open(struct interface *ifp)
 {
 	struct iarp_state *state;
+
+#ifdef PRIVSEP
+	if (ifp->ctx->options & DHCPCD_PRIVSEP)
+		return ps_bpf_openarp(ifp) == -1 ? -1 : 0;
+#endif
 
 	state = ARP_STATE(ifp);
 	if (state->bpf_fd == -1) {
@@ -588,8 +614,18 @@ arp_new(struct interface *ifp, const struct in_addr *addr)
 	state = ARP_STATE(ifp);
 	TAILQ_INSERT_TAIL(&state->arp_states, astate, next);
 
-	if (bpf_arp(ifp, state->bpf_fd) == -1)
-		logerr(__func__); /* try and continue */
+#ifdef PRIVSEP
+	if (ifp->ctx->options & DHCPCD_PRIVSEP) {
+#if 0
+		if (privsep_arp_bpf(state) == -1)
+			logerr(__func__);
+#endif
+	} else
+#endif
+	if (state->bpf_fd != -1) {
+		if (bpf_arp(ifp, state->bpf_fd) == -1)
+			logerr(__func__); /* try and continue */
+	}
 
 	return astate;
 }

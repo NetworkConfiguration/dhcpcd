@@ -71,6 +71,7 @@
 #include "ipv4ll.h"
 #include "ipv6nd.h"
 #include "logerr.h"
+#include "privsep.h"
 
 #ifdef __sun
 /* It has the ioctl, but the member is missing from the struct?
@@ -132,6 +133,17 @@ if_closesockets(struct dhcpcd_ctx *ctx)
 }
 
 int
+if_ioctl(struct dhcpcd_ctx *ctx, unsigned long req, void *data, size_t len)
+{
+
+#ifdef PRIVSEP
+	if (ctx->options & DHCPCD_PRIVSEP)
+		return (int)ps_root_ioctl(ctx, req, data, len);
+#endif
+	return ioctl(ctx->pf_inet_fd, req, data, len);
+}
+
+int
 if_getflags(struct interface *ifp)
 {
 	struct ifreq ifr = { .ifr_flags = 0 };
@@ -158,7 +170,7 @@ if_setflag(struct interface *ifp, short flag)
 
 	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
 	ifr.ifr_flags = f | flag;
-	if (ioctl(ifp->ctx->pf_inet_fd, SIOCSIFFLAGS, &ifr) == -1)
+	if (if_ioctl(ifp->ctx, SIOCSIFFLAGS, &ifr, sizeof(ifr)) == -1)
 		return -1;
 
 	ifp->flags = (unsigned int)ifr.ifr_flags;
@@ -717,7 +729,10 @@ if_domtu(const struct interface *ifp, short int mtu)
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
 	ifr.ifr_mtu = mtu;
-	r = ioctl(ifp->ctx->pf_inet_fd, mtu ? SIOCSIFMTU : SIOCGIFMTU, &ifr);
+	if (mtu != 0)
+		r = if_ioctl(ifp->ctx, SIOCSIFMTU, &ifr, sizeof(ifr));
+	else
+		r = ioctl(ifp->ctx->pf_inet_fd, SIOCGIFMTU, &ifr);
 	if (r == -1)
 		return -1;
 	return ifr.ifr_mtu;

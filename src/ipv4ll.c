@@ -239,6 +239,8 @@ test:
 #ifdef KERNEL_RFC5227
 	if (!new_addr) {
 		astate = arp_new(ifp, &ia->addr);
+		if (ifp->ctx->options & DHCPCD_FORKED)
+			return;
 		if (astate != NULL) {
 			astate->announced_cb = ipv4ll_announced_arp;
 			astate->free_cb = ipv4ll_arpfree;

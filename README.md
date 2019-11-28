@@ -91,7 +91,11 @@ dhcpcd-7 defaults the database directory to `/var/db/dhcpcd` instead of
 in /etc.
 The Makefile `_confinstall` target will attempt to move the files correctly from
 the old locations to the new locations.
-Of course this won't work if dhcpcd-7 is packaged up, so packagers will need to
+
+dhcpcd-9 defaults the run directory to `/var/run/dhcpcd` instead of
+`/var/run` and the prefix of dhcpcd has been removed from the files.
+
+Of course this won't work if dhcpcd is packaged up, so packagers will need to
 install similar logic into their dhcpcd package.
 
 ## ChangeLog

@@ -71,6 +71,7 @@
 #include "ipv4.h"
 #include "ipv4ll.h"
 #include "logerr.h"
+#include "privsep.h"
 #include "sa.h"
 #include "script.h"
 
@@ -1524,6 +1525,13 @@ dhcp_close(struct interface *ifp)
 	if (state == NULL)
 		return;
 
+#ifdef PRIVSEP
+	if (ifp->ctx->options & DHCPCD_PRIVSEP) {
+		ps_bpf_closebootp(ifp);
+		ps_inet_closebootp(state->addr);
+	}
+#endif
+
 	if (state->bpf_fd != -1) {
 		eloop_event_delete(ifp->ctx->eloop, state->bpf_fd);
 		bpf_close(ifp, state->bpf_fd);
@@ -1539,7 +1547,7 @@ dhcp_close(struct interface *ifp)
 	state->interval = 0;
 }
 
-static int
+int
 dhcp_openudp(struct in_addr *ia)
 {
 	int s;
@@ -1669,6 +1677,10 @@ dhcp_sendudp(struct interface *ifp, struct in_addr *to, void *data, size_t len)
 	ssize_t r;
 	int fd;
 
+#ifdef PRIVSEP
+	if (ifp->ctx->options & DHCPCD_PRIVSEP)
+		return ps_inet_sendbootp(state->addr, &msg);
+#endif
 	fd = state->udp_fd;
 	if (fd == -1) {
 		fd = dhcp_openudp(&state->addr->addr);
@@ -1769,6 +1781,11 @@ send_message(struct interface *ifp, uint8_t type,
 	if (udp == NULL) {
 		logerr("%s: dhcp_makeudppacket", ifp->name);
 		r = 0;
+#ifdef PRIVSEP
+	} else if (ifp->ctx->options & DHCPCD_PRIVSEP) {
+		r = ps_bpf_sendbootp(ifp, udp, ulen);
+		free(udp);
+#endif
 	} else {
 		r = bpf_send(ifp, state->bpf_fd,
 		    ETHERTYPE_IP, (uint8_t *)udp, ulen);
@@ -2145,6 +2162,7 @@ dhcp_bind(struct interface *ifp)
 	struct dhcp_state *state = D_STATE(ifp);
 	struct if_options *ifo = ifp->options;
 	struct dhcp_lease *lease = &state->lease;
+	bool wasfake;
 
 	state->reason = NULL;
 	/* If we don't have an offer, we are re-binding a lease on preference,
@@ -2257,16 +2275,28 @@ dhcp_bind(struct interface *ifp)
 
 	/* Close the BPF filter as we can now receive DHCP messages
 	 * on a UDP socket. */
+	wasfake = state->added & STATE_FAKE;
 	if (ctx->options & DHCPCD_MASTER ||
 	    state->old == NULL ||
-	    state->old->yiaddr != state->new->yiaddr)
+	    state->old->yiaddr != state->new->yiaddr || wasfake)
 		dhcp_close(ifp);
 
 	ipv4_applyaddr(ifp);
 
 	/* If not in master mode, open an address specific socket. */
-	if (ctx->options & DHCPCD_MASTER)
+	if (ctx->options & DHCPCD_MASTER ||
+	    state->old == NULL ||
+	    (state->old->yiaddr == state->new->yiaddr && !wasfake))
 		return;
+
+#ifdef PRIVSEP
+	if (ctx->options & DHCPCD_PRIVSEP) {
+		if (ps_inet_openbootp(state->addr) == -1)
+		    logerr(__func__);
+		return;
+	}
+#endif
+
 	state->udp_fd = dhcp_openudp(&state->addr->addr);
 	if (state->udp_fd == -1) {
 		logerr(__func__);
@@ -2622,7 +2652,11 @@ dhcp_reboot(struct interface *ifp)
 	    !(ia->addr_flags & IN_IFF_NOTUSEABLE) &&
 #endif
 	    dhcp_activeaddr(ifp, &state->lease.addr) == 0)
+	{
 		arp_ifannounceaddr(ifp, &state->lease.addr);
+		if (ifp->ctx->options & DHCPCD_FORKED)
+			return;
+	}
 #endif
 
 	dhcp_new_xid(ifp);
@@ -3388,13 +3422,26 @@ dhcp_handlebootp(struct interface *ifp, struct bootp *bootp, size_t len,
 	dhcp_handledhcp(ifp, bootp, len, from);
 }
 
-static void
+void
 dhcp_packet(struct interface *ifp, uint8_t *data, size_t len)
 {
 	struct bootp *bootp;
 	struct in_addr from;
 	size_t udp_len;
 	const struct dhcp_state *state = D_CSTATE(ifp);
+
+#ifdef PRIVSEP
+	/* Ignore double reads */
+	if (ifp->ctx->options & DHCPCD_PRIVSEP) {
+		switch (state->state) {
+		case DHS_BOUND: /* FALLTHROUGH */
+		case DHS_RENEW:
+			return;
+		default:
+			break;
+		}
+	}
+#endif
 
 	/* Validate filter. */
 	if (!is_packet_udp_bootp(data, len)) {
@@ -3453,7 +3500,7 @@ dhcp_readbpf(void *arg)
 		state->bpf_flags &= ~BPF_READING;
 }
 
-static void
+void
 dhcp_recvmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg)
 {
 	struct sockaddr_in *from = (struct sockaddr_in *)msg->msg_name;
@@ -3477,6 +3524,19 @@ dhcp_recvmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg)
 		/* Avoid a duplicate read if BPF is open for the interface. */
 		return;
 	}
+#ifdef PRIVSEP
+	if (ctx->options & DHCPCD_PRIVSEP) {
+		switch (state->state) {
+		case DHS_BOUND: /* FALLTHROUGH */
+		case DHS_RENEW:
+			break;
+		default:
+			/* Any other state we ignore it or will receive
+			 * via BPF. */
+			return;
+		}
+	}
+#endif
 
 	dhcp_handlebootp(ifp, (struct bootp *)iov->iov_base, iov->iov_len,
 	    &from->sin_addr);
@@ -3543,6 +3603,17 @@ dhcp_openbpf(struct interface *ifp)
 	struct dhcp_state *state;
 
 	state = D_STATE(ifp);
+
+#ifdef PRIVSEP
+	if (ifp->ctx->options & DHCPCD_PRIVSEP) {
+		if (ps_bpf_openbootp(ifp) == -1) {
+			logerr(__func__);
+			return -1;
+		}
+		return 0;
+	}
+#endif
+
 	if (state->bpf_fd != -1)
 		return 0;
 
@@ -3745,13 +3816,14 @@ dhcp_start1(void *arg)
 	 * ICMP port unreachable message back to the DHCP server.
 	 * Only do this in master mode so we don't swallow messages
 	 * for dhcpcd running on another interface. */
-	if (ctx->options & DHCPCD_MASTER && ctx->udp_fd == -1) {
+	if ((ctx->options & (DHCPCD_MASTER|DHCPCD_PRIVSEP)) == DHCPCD_MASTER
+	    && ctx->udp_fd == -1)
+	{
 		ctx->udp_fd = dhcp_openudp(NULL);
 		if (ctx->udp_fd == -1) {
 			logerr(__func__);
 			return;
 		}
-
 		eloop_event_add(ctx->eloop, ctx->udp_fd, dhcp_handleudp, ctx);
 	}
 
@@ -4006,6 +4078,7 @@ dhcp_handleifa(int cmd, struct ipv4_addr *ia, pid_t pid)
 		if (state->addr == ia) {
 			loginfox("%s: pid %d deleted IP address %s",
 			    ifp->name, pid, ia->saddr);
+			dhcp_close(ifp);
 			state->addr = NULL;
 			/* Don't clear the added state as we need
 			 * to drop the lease. */

@@ -81,6 +81,7 @@
 #include "ipv6.h"
 #include "ipv6nd.h"
 #include "logerr.h"
+#include "privsep.h"
 #include "route.h"
 #include "sa.h"
 
@@ -229,10 +230,15 @@ check_proc_hex(const char *path, unsigned int *value)
 }
 
 static ssize_t
-if_writepathuint(const char *path, unsigned int val)
+if_writepathuint(struct dhcpcd_ctx *ctx, const char *path, unsigned int val)
 {
 	FILE *fp;
 	ssize_t r;
+
+#ifdef PRIVSEP
+	if (ctx->options & DHCPCD_PRIVSEP)
+		return ps_root_writepathuint(ctx, path, val);
+#endif
 
 	fp = fopen(path, "w");
 	if (fp == NULL)
@@ -261,7 +267,7 @@ if_init(struct interface *ifp)
 		return errno == ENOENT ? 0 : -1;
 	if (n == 1)
 		return 0;
-	return if_writepathuint(path, 1) == -1 ? -1 : 0;
+	return if_writepathuint(ifp->ctx, path, 1) == -1 ? -1 : 0;
 }
 
 int
@@ -334,7 +340,7 @@ if_vlanid(const struct interface *ifp)
 	return (unsigned short)v.u.VID;
 }
 
-static int
+int
 if_linksocket(struct sockaddr_nl *nl, int protocol)
 {
 	int fd;
@@ -416,7 +422,7 @@ if_carrier(struct interface *ifp)
 	return ifp->flags & IFF_RUNNING ? LINK_UP : LINK_DOWN;
 }
 
-static int
+int
 if_getnetlink(struct dhcpcd_ctx *ctx, struct iovec *iov, int fd, int flags,
     int (*cb)(struct dhcpcd_ctx *, void *, struct nlmsghdr *), void *cbarg)
 {
@@ -910,6 +916,25 @@ if_handlelink(struct dhcpcd_ctx *ctx)
 	    &link_netlink, NULL);
 }
 
+static bool
+if_netlinkpriv(int protocol, struct nlmsghdr *nlm)
+{
+
+	if (protocol != NETLINK_ROUTE)
+		return false;
+
+	switch(nlm->nlmsg_type) {
+	case RTM_NEWADDR:	/* FALLTHROUGH */
+	case RTM_DELADDR:	/* FALLTHROUGH */
+	case RTM_NEWROUTE:	/* FALLTHROUGH */
+	case RTM_DELROUTE:	/* FALLTHROUGH */
+	case RTM_NEWLINK:
+		return true;
+	default:
+		return false;
+	}
+}
+
 static int
 if_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct nlmsghdr *hdr,
     int (*cb)(struct dhcpcd_ctx *, void *, struct nlmsghdr *), void *cbarg)
@@ -921,6 +946,15 @@ if_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct nlmsghdr *hdr,
 	    .msg_name = &snl, .msg_namelen = sizeof(snl),
 	    .msg_iov = &iov, .msg_iovlen = 1
 	};
+
+	/* Request a reply */
+	hdr->nlmsg_flags |= NLM_F_ACK;
+	hdr->nlmsg_seq = (uint32_t)++ctx->seq;
+
+#ifdef PRIVSEP
+	if (ctx->options & DHCPCD_PRIVSEP && if_netlinkpriv(protocol, hdr))
+		return (int)ps_root_sendnetlink(ctx, protocol, &msg);
+#endif
 
 	if ((s = if_linksocket(&snl, protocol)) == -1)
 		return -1;
@@ -935,9 +969,6 @@ if_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct nlmsghdr *hdr,
 	}
 #endif
 
-	/* Request a reply */
-	hdr->nlmsg_flags |= NLM_F_ACK;
-	hdr->nlmsg_seq = (uint32_t)++ctx->seq;
 	if (sendmsg(s, &msg, 0) != -1) {
 		unsigned char buf[16 * 1024];
 		struct iovec riov = {
@@ -1876,7 +1907,7 @@ if_setup_inet6(const struct interface *ifp)
 	snprintf(path, sizeof(path), "%s/%s/autoconf", p_conf, ifp->name);
 	ra = check_proc_int(path);
 	if (ra != 1 && ra != -1) {
-		if (if_writepathuint(path, 0) == -1)
+		if (if_writepathuint(ifp->ctx, path, 0) == -1)
 			logerr("%s: %s", __func__, path);
 	}
 
@@ -1889,7 +1920,7 @@ if_setup_inet6(const struct interface *ifp)
 		 * error as such so just log it and continue */
 		logfunc("%s", path);
 	} else if (ra != 0) {
-		if (if_writepathuint(path, 0) == -1)
+		if (if_writepathuint(ifp->ctx, path, 0) == -1)
 			logerr("%s: %s", __func__, path);
 	}
 }
@@ -1899,27 +1930,28 @@ if_applyra(const struct ra *rap)
 {
 	char path[256];
 	const char *ifname = rap->iface->name;
+	struct dhcpcd_ctx *ctx = rap->iface->ctx;
 	int error = 0;
 
 	snprintf(path, sizeof(path), "%s/%s/hop_limit", p_conf, ifname);
-	if (if_writepathuint(path, rap->hoplimit) == -1)
+	if (if_writepathuint(ctx, path, rap->hoplimit) == -1)
 		error = -1;
 
 	snprintf(path, sizeof(path), "%s/%s/retrans_time_ms", p_neigh, ifname);
-	if (if_writepathuint(path, rap->retrans * 1000) == -1) {
+	if (if_writepathuint(ctx, path, rap->retrans * 1000) == -1) {
 		snprintf(path, sizeof(path), "%s/%s/retrans_time",
 		    p_neigh, ifname);
 		/* Jiffies */
-		if (if_writepathuint(path, rap->retrans * 100) == -1)
+		if (if_writepathuint(ctx, path, rap->retrans * 100) == -1)
 			error = -1;
 	}
 
 	snprintf(path, sizeof(path), "%s/%s/base_reachable_time_ms",
 	    p_neigh, ifname);
-	if (if_writepathuint(path, rap->reachable * 1000) == -1) {
+	if (if_writepathuint(ctx, path, rap->reachable * 1000) == -1) {
 		snprintf(path, sizeof(path), "%s/%s/base_reachable_time",
 		    p_neigh, ifname);
-		if (if_writepathuint(path, rap->reachable) == -1)
+		if (if_writepathuint(ctx, path, rap->reachable) == -1)
 			error = -1;
 	}
 	return error;
