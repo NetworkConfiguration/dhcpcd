@@ -1632,7 +1632,7 @@ main(int argc, char **argv)
 #ifdef INET
 	ctx.udp_fd = -1;
 #endif
-#ifdef INET6
+#if defined(INET6) && !defined(__sun)
 	ctx.nd_fd = -1;
 #endif
 #ifdef DHCP6
