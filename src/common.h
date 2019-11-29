@@ -190,6 +190,7 @@
 # endif
 #endif
 
+int close_std(void);
 void get_line_free(void);
 extern int clock_monotonic;
 int get_monotonic(struct timespec *);
