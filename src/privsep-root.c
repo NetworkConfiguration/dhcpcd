@@ -53,25 +53,59 @@ struct psr_error
 	char psr_pad[sizeof(ssize_t) - sizeof(int)];
 };
 
+struct psr_ctx {
+	struct dhcpcd_ctx *psr_ctx;
+	struct psr_error psr_error;
+};
+
+static void
+ps_root_readerrorsig(__unused int sig, void *arg)
+{
+	struct dhcpcd_ctx *ctx = arg;
+
+	eloop_exit(ctx->ps_eloop, EXIT_FAILURE);
+}
+
+static void
+ps_root_readerrorcb(void *arg)
+{
+	struct psr_ctx *psr_ctx = arg;
+	struct dhcpcd_ctx *ctx = psr_ctx->psr_ctx;
+	struct psr_error *psr_error = &psr_ctx->psr_error;
+	ssize_t len;
+	int exit_code = EXIT_FAILURE;
+
+	len = read(ctx->ps_root_fd, psr_error, sizeof(*psr_error));
+	if (len == 0 || len == -1) {
+		logerr(__func__);
+		psr_error->psr_result = -1;
+		psr_error->psr_errno = errno;
+	} else if ((size_t)len < sizeof(*psr_error)) {
+		logerrx("%s: psr_error truncated", __func__);
+		psr_error->psr_result = -1;
+		psr_error->psr_errno = EINVAL;
+	} else
+		exit_code = EXIT_SUCCESS;
+
+	eloop_exit(ctx->ps_eloop, exit_code);
+}
+
 ssize_t
 ps_root_readerror(struct dhcpcd_ctx *ctx)
 {
-	struct psr_error psr;
-	ssize_t len;
+	struct psr_ctx psr_ctx = { .psr_ctx = ctx };
 
-	/* ps_root_fd should be a blocking socket. */
-	len = read(ctx->ps_root_fd, &psr, sizeof(psr));
-	if (len == 0 || len == -1) {
+	if (eloop_event_add(ctx->ps_eloop, ctx->ps_root_fd,
+	    ps_root_readerrorcb, &psr_ctx) == -1)
+	{
 		logerr(__func__);
-		return len;
-	}
-	if ((size_t)len < sizeof(psr)) {
-		logerrx("%s: psr_error truncated", __func__);
 		return -1;
 	}
 
-	errno = psr.psr_errno;
-	return psr.psr_result;
+	eloop_start(ctx->ps_eloop, &ctx->sigset);
+
+	errno = psr_ctx.psr_error.psr_errno;
+	return psr_ctx.psr_error.psr_result;
 }
 
 static ssize_t
@@ -230,7 +264,8 @@ ps_root_recvmsg(void *arg)
 {
 	struct dhcpcd_ctx *ctx = arg;
 
-	if (ps_recvpsmsg(ctx, ctx->ps_root_fd, ps_root_recvmsgcb, ctx) == -1)
+	if (ps_recvpsmsg(ctx, ctx->ps_root_fd, ps_root_recvmsgcb, ctx) == -1 &&
+	    errno != ECONNRESET)
 		logerr(__func__);
 }
 
@@ -241,7 +276,6 @@ ps_root_startcb(void *arg)
 
 	setproctitle("[privileged actioneer]");
 	ctx->ps_root_pid = getpid();
-
 	return 0;
 }
 
@@ -301,12 +335,27 @@ ps_root_start(struct dhcpcd_ctx *ctx)
 	if (pid == 0) {
 		ctx->ps_data_fd = fd[1];
 		close(fd[0]);
-	} else if (pid != -1) {
-		ctx->ps_data_fd = fd[0];
-		close(fd[1]);
-		if (eloop_event_add(ctx->eloop, ctx->ps_data_fd,
-		    ps_root_dispatch, ctx) == -1)
-			logerr(__func__);
+		return 0;
+	} else if (pid == -1)
+		return -1;
+
+	ctx->ps_data_fd = fd[0];
+	close(fd[1]);
+	if (eloop_event_add(ctx->eloop, ctx->ps_data_fd,
+	    ps_root_dispatch, ctx) == -1)
+		logerr(__func__);
+
+	if ((ctx->ps_eloop = eloop_new()) == NULL) {
+		logerr(__func__);
+		return -1;
+	}
+
+	if (eloop_signal_set_cb(ctx->ps_eloop,
+	    dhcpcd_signals, dhcpcd_signals_len,
+	    ps_root_readerrorsig, ctx) == -1)
+	{
+		logerr(__func__);
+		return -1;
 	}
 	return pid;
 }
