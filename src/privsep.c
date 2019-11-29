@@ -150,9 +150,25 @@ create_sp:
 	}
 
 	ctx->options |= DHCPCD_UNPRIV | DHCPCD_FORKED;
+	if (ctx->fork_fd != -1) {
+		close(ctx->fork_fd);
+		ctx->fork_fd = -1;
+	}
 	control_close(ctx);
 	pidfile_clean();
 	eloop_clear(ctx->eloop);
+
+	/* We are not root */
+	if (priv_fd != &ctx->ps_root_fd) {
+		ps_freeprocesses(ctx, recv_ctx);
+		close(ctx->ps_root_fd);
+		ctx->ps_root_fd = -1;
+	}
+
+	if (priv_fd != &ctx->ps_inet_fd) {
+		close(ctx->ps_inet_fd);
+		ctx->ps_inet_fd = -1;
+	}
 
 	if (eloop_signal_set_cb(ctx->eloop,
 	    dhcpcd_signals, dhcpcd_signals_len, signal_cb, ctx) == -1)
@@ -171,20 +187,13 @@ create_sp:
 		goto errexit;
 	}
 
-	/* We are not root */
-	if (priv_fd != &ctx->ps_root_fd) {
-		ps_freeprocesses(ctx, recv_ctx);
-		close(ctx->ps_root_fd);
-		ctx->ps_root_fd = -1;
-	}
-
-	if (priv_fd != &ctx->ps_inet_fd) {
-		close(ctx->ps_inet_fd);
-		ctx->ps_inet_fd = -1;
-	}
-
 	if (callback(recv_ctx) == -1)
 		goto errexit;
+
+#if 0
+	/* XXX Why does this cause processes to exit? */
+	close_std();
+#endif
 
 	if (pw == NULL)
 		return 0;

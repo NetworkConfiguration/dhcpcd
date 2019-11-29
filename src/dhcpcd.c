@@ -34,13 +34,13 @@ const char dhcpcd_copyright[] = "Copyright (c) 2006-2019 Roy Marples";
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/uio.h>
+#include <sys/wait.h>
 
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
 #include <limits.h>
-#include <paths.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -317,7 +317,7 @@ dhcpcd_ipwaited(struct dhcpcd_ctx *ctx)
 }
 
 /* Returns the pid of the child, otherwise 0. */
-pid_t
+void
 dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 {
 #ifdef THERE_IS_NO_FORK
@@ -325,73 +325,35 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 	errno = ENOSYS;
 	return 0;
 #else
-	pid_t pid, lpid;
-	char buf = '\0';
-	int sidpipe[2], fd;
+	int i;
 
 	if (ctx->options & DHCPCD_DAEMONISE &&
 	    !(ctx->options & (DHCPCD_DAEMONISED | DHCPCD_NOWAITIP)))
 	{
 		if (!dhcpcd_ipwaited(ctx))
-			return 0;
+			return;
 	}
 
 	if (ctx->options & DHCPCD_ONESHOT) {
 		loginfox("exiting due to oneshot");
 		eloop_exit(ctx->eloop, EXIT_SUCCESS);
-		return 0;
+		return;
 	}
 
 	eloop_timeout_delete(ctx->eloop, handle_exit_timeout, ctx);
 	if (ctx->options & DHCPCD_DAEMONISED ||
 	    !(ctx->options & DHCPCD_DAEMONISE))
-		return 0;
-	logdebugx("forking to background");
+		return;
 
-	/* Setup a signal pipe so parent knows when to exit. */
-	if (pipe(sidpipe) == -1) {
-		logerr("%s: pipe", __func__);
-		return 0;
-	}
-
-	switch (pid = fork()) {
-	case -1:
-		logerr("%s: fork", __func__);
-		return 0;
-	case 0:
-		if ((lpid = pidfile_lock(ctx->pidfile)) != 0)
-			logerr("%s: pidfile_lock %d", __func__, lpid);
-		setsid();
-		/* Notify parent it's safe to exit as we've detached. */
-		close(sidpipe[0]);
-		if (write(sidpipe[1], &buf, 1) == -1)
-			logerr("%s: write", __func__);
-		close(sidpipe[1]);
-		/* Some polling methods don't survive after forking,
-		 * so ensure we can requeue all our events. */
-		if (eloop_requeue(ctx->eloop) == -1) {
-			logerr("%s: eloop_requeue", __func__);
-			eloop_exit(ctx->eloop, EXIT_FAILURE);
-		}
-		if ((fd = open(_PATH_DEVNULL, O_RDWR, 0)) != -1) {
-			dup2(fd, STDIN_FILENO);
-			dup2(fd, STDOUT_FILENO);
-			dup2(fd, STDERR_FILENO);
-			close(fd);
-		}
-		ctx->options |= DHCPCD_DAEMONISED;
-		return 0;
-	default:
-		/* Wait for child to detach */
-		close(sidpipe[1]);
-		if (read(sidpipe[0], &buf, 1) == -1)
-			logerr("%s: read", __func__);
-		close(sidpipe[0]);
-		loginfox("forked to background, child pid %d", pid);
-		ctx->options |= DHCPCD_FORKED;
-		eloop_exit(ctx->eloop, EXIT_SUCCESS);
-		return pid;
-	}
+	i = EXIT_SUCCESS;
+	if (write(ctx->fork_fd, &i, sizeof(i)) == -1)
+		logerr("write");
+	ctx->options |= DHCPCD_DAEMONISED;
+	loginfox("forked to background, child pid %d", getpid());
+	eloop_event_delete(ctx->eloop, ctx->fork_fd);
+	close(ctx->fork_fd);
+	ctx->fork_fd = -1;
+	close_std();
 #endif
 }
 
@@ -1351,6 +1313,19 @@ dhcpcd_signal_cb(int sig, void *arg)
 	unsigned long long opts;
 	int exit_code;
 
+	if (ctx->options & DHCPCD_FORKED) {
+		pid_t pid = pidfile_read(ctx->pidfile);
+		if (pid == -1)
+			logerr("%s: pidfile_read",__func__);
+		else if (pid == 0)
+			logerr("%s: pid cannot be zero", __func__);
+		else if (kill(pid, sig) == -1)
+			logerr("%s: kill", __func__);
+		eloop_exit(ctx->eloop,
+		    sig == SIGTERM ? EXIT_SUCCESS : EXIT_FAILURE);
+		return;
+	}
+
 	opts = 0;
 	exit_code = EXIT_FAILURE;
 	switch (sig) {
@@ -1561,6 +1536,21 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 	return 0;
 }
 
+static void
+dhcpcd_fork_cb(void *arg)
+{
+	struct dhcpcd_ctx *ctx = arg;
+	int exit_code = EXIT_FAILURE;
+	ssize_t len;
+
+	len = read(ctx->fork_fd, &exit_code, sizeof(exit_code));
+	if (len == -1)
+		logerr(__func__);
+	else if ((size_t)len < sizeof(exit_code))
+		logerr("%s: truncated read", __func__);
+	eloop_exit(ctx->eloop, exit_code);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1575,6 +1565,7 @@ main(int argc, char **argv)
 	ssize_t len;
 #if defined(USE_SIGNALS) || !defined(THERE_IS_NO_FORK)
 	pid_t pid;
+	int sigpipe[2];
 #endif
 #ifdef USE_SIGNALS
 	int sig = 0;
@@ -1626,6 +1617,9 @@ main(int argc, char **argv)
 	ctx.pf_inet_fd = -1;
 
 	TAILQ_INIT(&ctx.control_fds);
+#ifdef USE_SIGNALS
+	ctx.fork_fd = -1;
+#endif
 #ifdef PLUGIN_DEV
 	ctx.dev_fd = -1;
 #endif
@@ -1993,22 +1987,63 @@ printpidfile:
 			goto exit_failure;
 		}
 	}
+#endif
 
-	if (ctx.options & DHCPCD_MASTER) {
-		if (control_start(&ctx, NULL) == -1)
-			logerr("%s: control_start", __func__);
+	logdebugx(PACKAGE "-" VERSION " starting");
+
+#ifdef USE_SIGNALS
+	if (pipe(sigpipe) == -1) {
+		logerr("pipe");
+		goto exit_failure;
 	}
-#else
+	switch (pid = fork()) {
+	case -1:
+		logerr("fork");
+		goto exit_failure;
+	case 0:
+		ctx.fork_fd = sigpipe[1];
+		if (setsid() == -1) {
+			logerr("%s: setsid", __func__);
+			goto exit_failure;
+		}
+		/* Ensure we can never get a controlling terminal */
+		switch (pid = fork()) {
+		case -1:
+			logerr("fork");
+			goto exit_failure;
+		case 0:
+			eloop_requeue(ctx.eloop);
+			break;
+		default:
+			ctx.options |= DHCPCD_FORKED; /* A lie */
+			i = EXIT_SUCCESS;
+			goto exit1;
+		}
+		break;
+	default:
+		waitpid(pid, &i, 0);
+		ctx.options |= DHCPCD_FORKED; /* A lie */
+		ctx.fork_fd = sigpipe[0];
+		setproctitle("[launcher]");
+		eloop_event_add(ctx.eloop, ctx.fork_fd, dhcpcd_fork_cb, &ctx);
+		goto run_loop;
+	}
+
+	/* We have now forked, setsid, forked once more.
+	 * From this point on, we are the controlling daemon. */
+	ctx.options |= DHCPCD_STARTED;
+	if ((pid = pidfile_lock(ctx.pidfile)) != 0) {
+		logerr("%s: pidfile_lock %d", __func__, pid);
+		goto exit_failure;
+	}
+#endif
+
 	if (control_start(&ctx,
 	    ctx.options & DHCPCD_MASTER ? NULL : argv[optind]) == -1)
 	{
 		logerr("%s: control_start", __func__);
 		goto exit_failure;
 	}
-#endif
-
-	logdebugx(PACKAGE "-" VERSION " starting");
-	ctx.options |= DHCPCD_STARTED;
 
 	setproctitle("%s%s%s",
 	    ctx.options & DHCPCD_MASTER ? "[master]" : argv[optind],
@@ -2022,15 +2057,12 @@ printpidfile:
 #endif
 
 #ifdef PRIVSEP
-	if (!(ctx.options & DHCPCD_TEST)) {
-		switch(ps_start(&ctx)) {
-		case -1:
-			logerr("ps_start");
-			goto exit_failure;
-		case 0:
-			goto run_loop;
-		}
+	if (ps_start(&ctx) == -1) {
+		logerr("ps_start");
+		goto exit_failure;
 	}
+	if (ctx.options & DHCPCD_FORKED)
+		goto run_loop;
 #endif
 
 	if (if_opensockets(&ctx) == -1) {
@@ -2092,8 +2124,8 @@ printpidfile:
 	}
 	if_learnaddrs(&ctx, ctx.ifaces, &ifaddrs);
 
-	if (ctx.options & DHCPCD_BACKGROUND && dhcpcd_daemonise(&ctx))
-		goto exit_success;
+	if (ctx.options & DHCPCD_BACKGROUND)
+		dhcpcd_daemonise(&ctx);
 
 	opt = 0;
 	TAILQ_FOREACH(ifp, ctx.ifaces, next) {
@@ -2126,8 +2158,7 @@ printpidfile:
 			logfunc = ctx.options & DHCPCD_INACTIVE ?
 			    logdebugx : logwarnx;
 			logfunc("no interfaces have a carrier");
-			if (dhcpcd_daemonise(&ctx))
-				goto exit_success;
+			dhcpcd_daemonise(&ctx);
 		} else if (t > 0 &&
 		    /* Test mode removes the daemonise bit, so check for both */
 		    ctx.options & (DHCPCD_DAEMONISE | DHCPCD_TEST))
@@ -2145,9 +2176,7 @@ printpidfile:
 			    dhcpcd_prestartinterface, ifp);
 	}
 
-#ifdef PRIVSEP
 run_loop:
-#endif
 	i = eloop_start(ctx.eloop, &ctx.sigset);
 	if (i < 0) {
 		logerr("%s: eloop_start", __func__);
@@ -2213,6 +2242,12 @@ exit1:
 #ifdef USE_SIGNALS
 	if (ctx.options & DHCPCD_FORKED)
 		_exit(i); /* so atexit won't remove our pidfile */
+	else if (ctx.options & DHCPCD_STARTED) {
+		/* Try to detach from the launch process. */
+		if (ctx.fork_fd != -1 &&
+		    write(ctx.fork_fd, &i, sizeof(i)) == -1)
+			logerr("%s: write", __func__);
+	}
 #endif
 	return i;
 }
