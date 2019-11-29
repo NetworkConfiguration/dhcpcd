@@ -233,7 +233,7 @@ ps_dostop(struct dhcpcd_ctx *ctx, pid_t *pid, int *fd)
 	if (ps_sendcmd(ctx, *fd, PS_STOP, 0, NULL, 0) == -1 &&
 	    errno != ECONNRESET)
 		logerr(__func__);
-	if (shutdown(*fd, SHUT_RDWR) == -1)
+	if (shutdown(*fd, SHUT_RDWR) == -1 && errno != ENOTCONN)
 		logerr(__func__);
 	close(*fd);
 	*fd = -1;
