@@ -60,26 +60,29 @@ ps_root_dosendnetlink(int protocol, struct msghdr *msg)
 static ssize_t
 ps_root_dowritepathuint(const void *data, size_t len)
 {
-	const char *path = data, *valp = data, *end;
+	const char *path = data;
 	FILE *fp;
 	ssize_t r;
+	size_t plen;
 	unsigned int val;
 
-	for (end = path + len; valp < end; val++) {
-		if (*valp == '\0') {
-			valp++;
-			break;
-		}
-	}
-	if (valp == end) {
+	if (len < sizeof(plen)) {
 		errno = EINVAL;
 		return -1;
 	}
 
+	memcpy(&plen, path, sizeof(plen));
+	path += sizeof(plen);
+	if (sizeof(plen) + plen + sizeof(val) > len) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	memcpy(&val, path + plen, sizeof(val));
+
 	fp = fopen(path, "w");
 	if (fp == NULL)
 		return -1;
-	val = (unsigned int)*valp;
 	r = fprintf(fp, "%u\n", val);
 	fclose(fp);
 	return r;
@@ -119,15 +122,18 @@ ps_root_writepathuint(struct dhcpcd_ctx *ctx, const char *path,
 {
 	char buf[PS_BUFLEN];
 	size_t plen = strlen(path) + 1;
-	size_t len = plen + sizeof(val);
+	size_t len = sizeof(plen) + plen + sizeof(val);
+
+	return 0;
 
 	if (len > sizeof(buf)) {
 		errno = ENOBUFS;
 		return -1;
 	}
 
-	memcpy(buf, path, plen);
-	memcpy(buf + plen, &val, sizeof(val));
+	memcpy(buf, &plen, sizeof(plen));
+	memcpy(buf + sizeof(plen), path, plen);
+	memcpy(buf + sizeof(plen) + plen, &val, sizeof(val));
 
 	return ps_sendcmd(ctx, ctx->ps_root_fd, PS_WRITEPATHUINT, 0, buf, len);
 }
