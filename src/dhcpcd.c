@@ -1345,7 +1345,7 @@ dhcpcd_renew(struct dhcpcd_ctx *ctx)
 #ifdef USE_SIGNALS
 #define sigmsg "received %s, %s"
 static void
-signal_cb(int sig, void *arg)
+dhcpcd_signal_cb(int sig, void *arg)
 {
 	struct dhcpcd_ctx *ctx = arg;
 	unsigned long long opts;
@@ -1834,7 +1834,7 @@ printpidfile:
 	/* Save signal mask, block and redirect signals to our handler */
 	if (eloop_signal_set_cb(ctx.eloop,
 	    dhcpcd_signals, dhcpcd_signals_len,
-	    signal_cb, &ctx) == -1)
+	    dhcpcd_signal_cb, &ctx) == -1)
 	{
 		logerr("%s: eloop_signal_set_cb", __func__);
 		goto exit_failure;
