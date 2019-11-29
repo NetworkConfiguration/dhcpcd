@@ -314,7 +314,9 @@ ps_inet_listenin(void *arg)
 		return -1;
 	}
 
+#ifdef PRIVSEP_DEBUG
 	logdebugx("spawned listener %s on PID %d", buf, getpid());
+#endif
 	return 0;
 }
 #endif
