@@ -809,10 +809,10 @@ ipv6nd_free(struct interface *ifp)
 	return n;
 }
 
-static int
+static void
 ipv6nd_scriptrun(struct ra *rap)
 {
-	int hasdns, hasaddress, pid;
+	int hasdns, hasaddress;
 	struct ipv6_addr *ap;
 
 	hasaddress = 0;
@@ -830,7 +830,7 @@ ipv6nd_scriptrun(struct ra *rap)
 				logdebugx("%s: waiting for Router Advertisement"
 				    " DAD to complete",
 				    rap->iface->name);
-				return 0;
+				return;
 			}
 		}
 	}
@@ -843,19 +843,16 @@ ipv6nd_scriptrun(struct ra *rap)
 	}
 
 	script_runreason(rap->iface, "ROUTERADVERT");
-	pid = 0;
 	if (hasdns && (hasaddress ||
 	    !(rap->flags & (ND_RA_FLAG_MANAGED | ND_RA_FLAG_OTHER))))
-		pid = dhcpcd_daemonise(rap->iface->ctx);
+		dhcpcd_daemonise(rap->iface->ctx);
 #if 0
 	else if (options & DHCPCD_DAEMONISE &&
 	    !(options & DHCPCD_DAEMONISED) && new_data)
 		logwarnx("%s: did not fork due to an absent"
 		    " RDNSS option in the RA",
 		    ifp->name);
-}
 #endif
-	return pid;
 }
 
 static void
@@ -972,8 +969,7 @@ try_script:
 				logdebugx("%s: Router Advertisement DAD "
 				    "completed",
 				    rap->iface->name);
-				if (ipv6nd_scriptrun(rap))
-					return;
+				ipv6nd_scriptrun(rap);
 			}
 		}
 #ifdef ND6_ADVERTISE
@@ -1375,8 +1371,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 #endif
 
 	rt_build(ifp->ctx, AF_INET6);
-	if (ipv6nd_scriptrun(rap))
-		return;
+	ipv6nd_scriptrun(rap);
 
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, rap); /* reachable timer */

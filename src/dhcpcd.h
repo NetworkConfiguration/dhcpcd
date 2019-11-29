@@ -123,6 +123,7 @@ TAILQ_HEAD(if_head, interface);
 
 struct dhcpcd_ctx {
 	char pidfile[sizeof(PIDFILE) + IF_NAMESIZE + 1];
+	int fork_fd;	/* FD for the fork init signal pipe */
 	const char *cffile;
 	unsigned long long options;
 	char *logfile;
@@ -241,7 +242,7 @@ extern const size_t dhcpcd_signals_len;
 
 int dhcpcd_ifafwaiting(const struct interface *);
 int dhcpcd_afwaiting(const struct dhcpcd_ctx *);
-pid_t dhcpcd_daemonise(struct dhcpcd_ctx *);
+void dhcpcd_daemonise(struct dhcpcd_ctx *);
 
 void dhcpcd_linkoverflow(struct dhcpcd_ctx *);
 int dhcpcd_handleargs(struct dhcpcd_ctx *, struct fd_list *, int, char **);
