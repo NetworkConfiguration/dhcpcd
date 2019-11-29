@@ -2002,6 +2002,7 @@ printpidfile:
 		goto exit_failure;
 	case 0:
 		ctx.fork_fd = sigpipe[1];
+		close(sigpipe[0]);
 		if (setsid() == -1) {
 			logerr("%s: setsid", __func__);
 			goto exit_failure;
@@ -2024,6 +2025,7 @@ printpidfile:
 		waitpid(pid, &i, 0);
 		ctx.options |= DHCPCD_FORKED; /* A lie */
 		ctx.fork_fd = sigpipe[0];
+		close(sigpipe[1]);
 		setproctitle("[launcher]");
 		eloop_event_add(ctx.eloop, ctx.fork_fd, dhcpcd_fork_cb, &ctx);
 		goto run_loop;
