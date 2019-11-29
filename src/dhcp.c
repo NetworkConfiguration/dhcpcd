@@ -1528,7 +1528,8 @@ dhcp_close(struct interface *ifp)
 #ifdef PRIVSEP
 	if (ifp->ctx->options & DHCPCD_PRIVSEP) {
 		ps_bpf_closebootp(ifp);
-		ps_inet_closebootp(state->addr);
+		if (state->addr != NULL)
+			ps_inet_closebootp(state->addr);
 	}
 #endif
 
