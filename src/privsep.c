@@ -121,11 +121,7 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 	}
 
 create_sp:
-	stype = SOCK_CLOEXEC;
-	/* ps_root_fd needs to be a blocking socket so we can read
-	 * the result of the command sent. */
-	if (priv_fd != &ctx->ps_root_fd)
-		stype |= SOCK_NONBLOCK;
+	stype = SOCK_CLOEXEC | SOCK_NONBLOCK;
 	if (socketpair(AF_UNIX, SOCK_DGRAM | stype, 0, fd) == -1) {
 		logerr("socketpair");
 		return -1;
@@ -312,10 +308,10 @@ ps_stop(struct dhcpcd_ctx *ctx)
 	if (ctx->options & DHCPCD_FORKED || ctx->eloop == NULL)
 		return 0;
 
-	r = ps_root_stop(ctx);
+	r = ps_inet_stop(ctx);
 	if (r != 0)
 		ret = r;
-	r = ps_inet_stop(ctx);
+	r = ps_root_stop(ctx);
 	if (r != 0)
 		ret = r;
 

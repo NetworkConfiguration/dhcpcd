@@ -185,6 +185,7 @@ struct dhcpcd_ctx {
 	pid_t ps_root_pid;
 	int ps_root_fd;		/* Privileged Actioneer commands */
 	int ps_data_fd;		/* Data from root spawned processes */
+	struct eloop *ps_eloop;	/* eloop for polling root data */
 	struct ps_process_head ps_processes;	/* List of spawned processes */
 	pid_t ps_inet_pid;
 	int ps_inet_fd;		/* Network Proxy commands and data */

@@ -2198,6 +2198,9 @@ exit1:
 	ipv6_ctxfree(&ctx);
 #endif
 	dev_stop(&ctx);
+#ifdef PRIVSEP
+	eloop_free(ctx.ps_eloop);
+#endif
 	eloop_free(ctx.eloop);
 
 	if (ctx.options & DHCPCD_STARTED && !(ctx.options & DHCPCD_FORKED))
