@@ -272,13 +272,14 @@ arp_packet(struct interface *ifp, uint8_t *data, size_t len)
 static void
 arp_close(struct interface *ifp)
 {
+	struct dhcpcd_ctx *ctx = ifp->ctx;
 	struct iarp_state *state;
 
 	if ((state = ARP_STATE(ifp)) == NULL)
 		return;
 
 #ifdef PRIVSEP
-	if (ifp->ctx->options & DHCPCD_PRIVSEP) {
+	if ((ctx->options & (DHCPCD_PRIVSEP|DHCPCD_FORKED)) == DHCPCD_PRIVSEP) {
 		if (ps_bpf_closearp(ifp) == -1)
 			logerr(__func__);
 	}
@@ -286,7 +287,7 @@ arp_close(struct interface *ifp)
 
 	if (state->bpf_fd == -1)
 		return;
-	eloop_event_delete(ifp->ctx->eloop, state->bpf_fd);
+	eloop_event_delete(ctx->eloop, state->bpf_fd);
 	bpf_close(ifp, state->bpf_fd);
 	state->bpf_fd = -1;
 	state->bpf_flags |= BPF_EOF;
