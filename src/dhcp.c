@@ -1520,13 +1520,14 @@ again:
 void
 dhcp_close(struct interface *ifp)
 {
+	struct dhcpcd_ctx *ctx = ifp->ctx;
 	struct dhcp_state *state = D_STATE(ifp);
 
 	if (state == NULL)
 		return;
 
 #ifdef PRIVSEP
-	if (ifp->ctx->options & DHCPCD_PRIVSEP) {
+	if ((ctx->options & (DHCPCD_PRIVSEP|DHCPCD_FORKED)) == DHCPCD_PRIVSEP) {
 		ps_bpf_closebootp(ifp);
 		if (state->addr != NULL)
 			ps_inet_closebootp(state->addr);
@@ -1534,13 +1535,13 @@ dhcp_close(struct interface *ifp)
 #endif
 
 	if (state->bpf_fd != -1) {
-		eloop_event_delete(ifp->ctx->eloop, state->bpf_fd);
+		eloop_event_delete(ctx->eloop, state->bpf_fd);
 		bpf_close(ifp, state->bpf_fd);
 		state->bpf_fd = -1;
 		state->bpf_flags |= BPF_EOF;
 	}
 	if (state->udp_fd != -1) {
-		eloop_event_delete(ifp->ctx->eloop, state->udp_fd);
+		eloop_event_delete(ctx->eloop, state->udp_fd);
 		close(state->udp_fd);
 		state->udp_fd = -1;
 	}
