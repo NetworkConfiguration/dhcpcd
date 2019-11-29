@@ -89,6 +89,8 @@ For compatibility with older versions, use dhcpcd-4
 dhcpcd-7 defaults the database directory to `/var/db/dhcpcd` instead of
 `/var/db` and now stores dhcpcd.duid and dhcpcd.secret in there instead of
 in /etc.
+dhcpcd-9 requires this directory and contents to be writeable by the
+unpriviledged user (default _dhcpcd).
 The Makefile `_confinstall` target will attempt to move the files correctly from
 the old locations to the new locations.
 
