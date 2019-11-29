@@ -47,7 +47,7 @@
 #define	PS_ROUTE		0x13	/* Also used for NETLINK */
 #define	PS_WRITEPATHUINT	0x14
 
-#define PS_START		0x40
+#define	PS_START		0x40
 #define	PS_STOP			0x80
 
 /* Max INET message size + meta data for IPC */
