@@ -527,9 +527,16 @@ if [ -z "$AUTH" -o "$AUTH" = yes ]; then
 	echo "SRCS+=		auth.c" >>$CONFIG_MK
 fi
 
+if [ -z "$PRIVSEP" ]; then
+	# priviledge separation works fine .... except on Solaris
+	case "$OS" in
+	solaris*|sunos*)	PRIVSEP=no;;
+	*)			PRIVSEP=yes;;
+	esac
+fi
+
 if [ "$PRIVSEP" = yes ]; then
 	echo "Enabling Priviledge Separation"
-	echo "WARNING: This is an experimental feature"
 	echo "CPPFLAGS+=	-DPRIVSEP" >>$CONFIG_MK
 	echo "DHCPCD_SRCS+=	privsep.c privsep-root.c privsep-inet.c" \
 		>>$CONFIG_MK
