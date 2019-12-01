@@ -1321,8 +1321,6 @@ dhcpcd_signal_cb(int sig, void *arg)
 			logerr("%s: pid cannot be zero", __func__);
 		else if (kill(pid, sig) == -1)
 			logerr("%s: kill", __func__);
-		eloop_exit(ctx->eloop,
-		    sig == SIGTERM ? EXIT_SUCCESS : EXIT_FAILURE);
 		return;
 	}
 
@@ -2059,7 +2057,7 @@ printpidfile:
 #endif
 
 #ifdef PRIVSEP
-	if (ps_start(&ctx) == -1) {
+	if (ps_start(&ctx) == -1 && errno != 0) {
 		logerr("ps_start");
 		goto exit_failure;
 	}
