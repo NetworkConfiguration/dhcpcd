@@ -345,11 +345,11 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 	    !(ctx->options & DHCPCD_DAEMONISE))
 		return;
 
+	loginfox("forked to background, child pid %d", getpid());
 	i = EXIT_SUCCESS;
 	if (write(ctx->fork_fd, &i, sizeof(i)) == -1)
 		logerr("write");
 	ctx->options |= DHCPCD_DAEMONISED;
-	loginfox("forked to background, child pid %d", getpid());
 	eloop_event_delete(ctx->eloop, ctx->fork_fd);
 	close(ctx->fork_fd);
 	ctx->fork_fd = -1;
