@@ -12,6 +12,7 @@ ARPING=
 IPV4LL=
 INET6=
 PRIVSEP=
+PRIVSEP_USER=_dhcpcd
 ARC4RANDOM=
 CLOSEFROM=
 RBTREE=
@@ -68,6 +69,7 @@ for x do
 	--enable-auth) AUTH=yes;;
 	--disable-privsep) PRIVSEP=no;;
 	--enable-privsep) PRIVSEP=yes;;
+	--privsepuser) PRIVSEP_USER=$var;;
 	--prefix) PREFIX=$var;;
 	--sysconfdir) SYSCONFDIR=$var;;
 	--bindir|--sbindir) SBINDIR=$var;;
@@ -538,6 +540,9 @@ fi
 if [ "$PRIVSEP" = yes ]; then
 	echo "Enabling Priviledge Separation"
 	echo "CPPFLAGS+=	-DPRIVSEP" >>$CONFIG_MK
+	echo "#ifndef PRIVSEP_USER" >>$CONFIG_H
+	echo "#define PRIVSEP_USER		 \"$PRIVSEP_USER\"" >>$CONFIG_H
+	echo "#endif" >>$CONFIG_H
 	echo "DHCPCD_SRCS+=	privsep.c privsep-root.c privsep-inet.c" \
 		>>$CONFIG_MK
 	if [ -z "$INET" ] || [ "$INET" = yes ]; then
@@ -573,6 +578,7 @@ if $XCC _test.c -o _test >/dev/null 2>&3; then
 fi
 rm -f _test.c _test
 if ! $_CC; then
+	echo $XCC
 	echo "$CC does not create executables" >&2
 	exit 1
 fi
@@ -1685,6 +1691,9 @@ echo "   DATADIR =		$DATADIR"
 echo "   HOOKSCRIPTS =	$HOOKS"
 echo "   EGHOOKSCRIPTS =	$EGHOOKS"
 echo "   STATUSARG = 		$STATUSARG"
+if [ "$PRIVSEP" = yes ]; then
+	echo "   PRIVSEPUSER =	$PRIVSEP_USER"
+fi
 echo
 
 rm -f dhcpcd tests/test

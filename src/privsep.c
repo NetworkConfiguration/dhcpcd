@@ -82,11 +82,11 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 	/* Even if we're not dropping privs, we need to ensure that the unpriv
 	 * user exists so the processes that do need it startup just fine. */
 	errno = 0;
-	if ((pw = getpwnam(DHCPCD_USER)) == NULL) {
+	if ((pw = getpwnam(PRIVSEP_USER)) == NULL) {
 		ctx->options &= ~DHCPCD_PRIVSEP;
 		if (errno == 0) {
 			if (ctx == recv_ctx) /* Only log the once. */
-				logerrx("no such user %s", DHCPCD_USER);
+				logerrx("no such user %s", PRIVSEP_USER);
 		} else
 			logerr("getpwnam");
 		return -1;

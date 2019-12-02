@@ -31,8 +31,8 @@
 #define PACKAGE			"dhcpcd"
 #define VERSION			"8.99.0"
 
-#ifndef DHCPCD_USER
-# define DHCPCD_USER		"_" PACKAGE
+#ifndef PRIVSEP_USER
+# define PRIVSEP_USER		"_" PACKAGE
 #endif
 
 #ifndef CONFIG
