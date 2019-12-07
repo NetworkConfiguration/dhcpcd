@@ -485,7 +485,7 @@ print_rfc3361(FILE *fp, const uint8_t *data, size_t dl)
 			return -1;
 		break;
 	case 1:
-		if (dl == 0 || dl % 4 != 0) {
+		if (dl % 4 != 0) {
 			errno = EINVAL;
 			break;
 		}
