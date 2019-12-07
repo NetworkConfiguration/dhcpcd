@@ -274,7 +274,10 @@ make_env(const struct interface *ifp, const char *reason)
 	d6_state = D6_CSTATE(ifp);
 #endif
 	if (strcmp(reason, "TEST") == 0) {
-		if (1 == 2) {}
+		if (1 == 2) {
+			/* This space left intentionally blank
+			 * as all the below statements are optional. */
+		}
 #ifdef INET6
 #ifdef DHCP6
 		else if (d6_state && d6_state->new)
