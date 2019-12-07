@@ -178,7 +178,7 @@ ps_bpf_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg)
 
 	ifp = &psp->psp_ifp;
 	assert(msg->msg_iovlen == 1);
-	assert(iov->iov_len = sizeof(*ifp));
+	assert(iov->iov_len == sizeof(*ifp));
 	memcpy(ifp, iov->iov_base, sizeof(*ifp));
 	ifp->ctx = psp->psp_ctx;
 	ifp->options = NULL;
