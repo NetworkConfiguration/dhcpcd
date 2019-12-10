@@ -286,7 +286,7 @@ ipv6nd_open(struct dhcpcd_ctx *ctx)
 		return -1;
 
 	ctx->nd_fd = fd;
-	if (!(ctx->options & DHCPCD_PRIVSEP))
+	if (!(IN_PRIVSEP(ctx)))
 		eloop_event_add(ctx->eloop, fd, ipv6nd_handledata, ctx);
 	return fd;
 }
@@ -366,7 +366,7 @@ ipv6nd_sendrsprobe(void *arg)
 
 	logdebugx("%s: sending Router Solicitation", ifp->name);
 #ifdef PRIVSEP
-	if (ifp->ctx->options & DHCPCD_PRIVSEP) {
+	if (IN_PRIVSEP(ifp->ctx)) {
 		if (ps_inet_sendnd(ifp, &msg) == -1)
 			logerr(__func__);
 		goto sent;
@@ -438,7 +438,7 @@ ipv6nd_sendadvertisement(void *arg)
 	logdebugx("%s: sending NA for %s", ifp->name, ia->saddr);
 
 #ifdef PRIVSEP
-	if (ifp->ctx->options & DHCPCD_PRIVSEP) {
+	if (IN_PRIVSEP(ifp->ctx)) {
 		if (ps_inet_sendnd(ifp, &msg) == -1)
 			logerr(__func__);
 		goto sent;
@@ -1883,7 +1883,7 @@ ipv6nd_startrs1(void *arg)
 #endif
 	}
 
-	if (!(ifp->ctx->options & DHCPCD_PRIVSEP)) {
+	if (!(IN_PRIVSEP(ifp->ctx))) {
 #ifdef __sun
 		if (ipv6nd_open(ifp) == -1) {
 			logerr(__func__);

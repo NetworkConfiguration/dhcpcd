@@ -1322,7 +1322,7 @@ logsend:
 	}
 
 #ifdef PRIVSEP
-	if (ifp->ctx->options & DHCPCD_PRIVSEP) {
+	if (IN_PRIVSEP(ifp->ctx)) {
 		struct ipv6_addr *ia;
 
 		if (IN6_ARE_ADDR_EQUAL(&dst.sin6_addr, &alldhcp))
@@ -3999,7 +3999,7 @@ dhcp6_handleifa(int cmd, struct ipv6_addr *ia, pid_t pid)
 	    ifp->options->options & DHCPCD_DHCP6)
 	{
 #ifdef PRIVSEP
-		if (ifp->ctx->options & DHCPCD_PRIVSEP) {
+		if (IN_PRIVSEP_SE(ifp->ctx)) {
 			if (ps_inet_opendhcp6(ia) == -1)
 				logerr(__func__);
 		} else
