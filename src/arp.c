@@ -260,6 +260,8 @@ arp_packet(struct interface *ifp, uint8_t *data, size_t len)
 	/* Match the ARP probe to our states.
 	 * Ignore Unicast Poll, RFC1122. */
 	state = ARP_CSTATE(ifp);
+	if (state == NULL)
+		return;
 	TAILQ_FOREACH_SAFE(astate, &state->arp_states, next, astaten) {
 		if (IN_ARE_ADDR_EQUAL(&arm.sip, &astate->addr) ||
 		    (IN_IS_ADDR_UNSPECIFIED(&arm.sip) &&
@@ -275,15 +277,17 @@ arp_close(struct interface *ifp)
 	struct dhcpcd_ctx *ctx = ifp->ctx;
 	struct iarp_state *state;
 
-	if ((state = ARP_STATE(ifp)) == NULL)
-		return;
-
 #ifdef PRIVSEP
-	if ((ctx->options & (DHCPCD_PRIVSEP|DHCPCD_FORKED)) == DHCPCD_PRIVSEP) {
-		if (ps_bpf_closearp(ifp) == -1)
+	if (IN_PRIVSEP(ctx)) {
+		if (IN_PRIVSEP_SE(ctx) &&
+		    ps_bpf_closearp(ifp) == -1)
 			logerr(__func__);
+		return;
 	}
 #endif
+
+	if ((state = ARP_STATE(ifp)) == NULL)
+		return;
 
 	if (state->bpf_fd == -1)
 		return;
@@ -307,13 +311,6 @@ arp_tryfree(struct iarp_state *state)
 			free(state);
 			ifp->if_data[IF_DATA_ARP] = NULL;
 		}
-#ifdef PRIVSEP
-	} else if (ifp->ctx->options & DHCPCD_PRIVSEP) {
-#if 0
-		if (privsep_arp_bpf(state) == -1)
-			logerr(__func__);
-#endif
-#endif
 	} else if (state->bpf_fd != -1) {
 		if (bpf_arp(ifp, state->bpf_fd) == -1)
 			logerr(__func__);
@@ -359,7 +356,7 @@ arp_open(struct interface *ifp)
 	struct iarp_state *state;
 
 #ifdef PRIVSEP
-	if (ifp->ctx->options & DHCPCD_PRIVSEP)
+	if (IN_PRIVSEP_SE(ifp->ctx))
 		return ps_bpf_openarp(ifp) == -1 ? -1 : 0;
 #endif
 
@@ -412,15 +409,6 @@ void
 arp_probe(struct arp_state *astate)
 {
 
-	if (arp_open(astate->iface) == -1) {
-		logerr(__func__);
-		return;
-	} else {
-		const struct iarp_state *state = ARP_CSTATE(astate->iface);
-
-		if (bpf_arp(astate->iface, state->bpf_fd) == -1)
-			logerr(__func__);
-	}
 	astate->probes = 0;
 	logdebugx("%s: probing for %s",
 	    astate->iface->name, inet_ntoa(astate->addr));
@@ -428,7 +416,7 @@ arp_probe(struct arp_state *astate)
 }
 #endif	/* ARP */
 
-static struct arp_state *
+struct arp_state *
 arp_find(struct interface *ifp, const struct in_addr *addr)
 {
 	struct iarp_state *state;
@@ -507,7 +495,8 @@ arp_announce(struct arp_state *astate)
 	struct arp_state *a2;
 	int r;
 
-	if (arp_open(astate->iface) == -1) {
+	if (!(IN_PRIVSEP(astate->iface->ctx)) && arp_open(astate->iface) == -1)
+	{
 		logerr(__func__);
 		return;
 	}
@@ -583,6 +572,38 @@ arp_announceaddr(struct dhcpcd_ctx *ctx, const struct in_addr *ia)
 	arp_ifannounceaddr(iff, ia);
 }
 
+void
+arp_change(struct arp_state *astate, const struct in_addr *addr)
+{
+	struct interface *ifp = astate->iface;
+	struct iarp_state *state = ARP_STATE(ifp);
+
+#ifdef PRIVSEP
+	if (!IN_IS_ADDR_UNSPECIFIED(&astate->addr) &&
+	    IN_PRIVSEP_SE(ifp->ctx))
+	{
+		if (ps_bpf_deladdr(ifp, &astate->addr) == -1)
+			logerr(__func__);
+	}
+#endif
+
+	if (addr != NULL)
+		astate->addr = *addr;
+	else
+		astate->addr.s_addr = INADDR_ANY;
+
+#ifdef PRIVSEP
+	if (addr != NULL && IN_PRIVSEP_SE(ifp->ctx)) {
+		if (ps_bpf_addaddr(ifp, addr) == -1)
+			logerr(__func__);
+	} else
+#endif
+	if (state->bpf_fd != -1) {
+		if (bpf_arp(ifp, state->bpf_fd) == -1)
+			logerr(__func__); /* try and continue */
+	}
+}
+
 struct arp_state *
 arp_new(struct interface *ifp, const struct in_addr *addr)
 {
@@ -590,6 +611,13 @@ arp_new(struct interface *ifp, const struct in_addr *addr)
 	struct arp_state *astate;
 
 	if ((state = ARP_STATE(ifp)) == NULL) {
+#ifdef PRIVSEP
+		/* We need to ensure ARP is spawned so we can add to it. */
+		if (IN_PRIVSEP_SE(ifp->ctx) && arp_open(ifp) == -1) {
+			logerr(__func__);
+			return NULL;
+		}
+#endif
 	        ifp->if_data[IF_DATA_ARP] = malloc(sizeof(*state));
 		state = ARP_STATE(ifp);
 		if (state == NULL) {
@@ -610,24 +638,9 @@ arp_new(struct interface *ifp, const struct in_addr *addr)
 		return NULL;
 	}
 	astate->iface = ifp;
-	if (addr)
-		astate->addr = *addr;
 	state = ARP_STATE(ifp);
 	TAILQ_INSERT_TAIL(&state->arp_states, astate, next);
-
-#ifdef PRIVSEP
-	if (ifp->ctx->options & DHCPCD_PRIVSEP) {
-#if 0
-		if (privsep_arp_bpf(state) == -1)
-			logerr(__func__);
-#endif
-	} else
-#endif
-	if (state->bpf_fd != -1) {
-		if (bpf_arp(ifp, state->bpf_fd) == -1)
-			logerr(__func__); /* try and continue */
-	}
-
+	arp_change(astate, addr);
 	return astate;
 }
 
@@ -649,6 +662,7 @@ arp_free(struct arp_state *astate)
 
 	ifp = astate->iface;
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, astate);
+	arp_change(astate, NULL);
 	state =	ARP_STATE(ifp);
 	TAILQ_REMOVE(&state->arp_states, astate, next);
 	if (astate->free_cb)

@@ -1538,14 +1538,18 @@ static void
 dhcpcd_fork_cb(void *arg)
 {
 	struct dhcpcd_ctx *ctx = arg;
-	int exit_code = EXIT_FAILURE;
+	int exit_code;
 	ssize_t len;
 
 	len = read(ctx->fork_fd, &exit_code, sizeof(exit_code));
-	if (len == -1)
+	if (len == -1) {
 		logerr(__func__);
-	else if ((size_t)len < sizeof(exit_code))
-		logerr("%s: truncated read", __func__);
+		exit_code = EXIT_FAILURE;
+	} else if ((size_t)len < sizeof(exit_code)) {
+		logerrx("%s: truncated read %zd (expected %zu)",
+		    __func__, len, sizeof(exit_code));
+		exit_code = EXIT_FAILURE;
+	}
 	eloop_exit(ctx->eloop, exit_code);
 }
 

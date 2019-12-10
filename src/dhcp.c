@@ -1527,7 +1527,7 @@ dhcp_close(struct interface *ifp)
 		return;
 
 #ifdef PRIVSEP
-	if ((ctx->options & (DHCPCD_PRIVSEP|DHCPCD_FORKED)) == DHCPCD_PRIVSEP) {
+	if (IN_PRIVSEP_SE(ctx)) {
 		ps_bpf_closebootp(ifp);
 		if (state->addr != NULL)
 			ps_inet_closebootp(state->addr);
@@ -2090,8 +2090,11 @@ dhcp_arp_not_found(struct arp_state *astate)
 		 * address or hwaddr, so move to the next
 		 * arping profile */
 		if (++state->arping_index < ifo->arping_len) {
-			astate->addr.s_addr =
-			    ifo->arping[state->arping_index];
+			struct in_addr addr = {
+				.s_addr = ifo->arping[state->arping_index]
+			};
+
+			arp_change(astate, &addr);
 			arp_probe(astate);
 			return;
 		}
@@ -2292,7 +2295,7 @@ dhcp_bind(struct interface *ifp)
 		return;
 
 #ifdef PRIVSEP
-	if (ctx->options & DHCPCD_PRIVSEP) {
+	if (IN_PRIVSEP_SE(ctx)) {
 		if (ps_inet_openbootp(state->addr) == -1)
 		    logerr(__func__);
 		return;
@@ -3434,7 +3437,7 @@ dhcp_packet(struct interface *ifp, uint8_t *data, size_t len)
 
 #ifdef PRIVSEP
 	/* Ignore double reads */
-	if (ifp->ctx->options & DHCPCD_PRIVSEP) {
+	if (IN_PRIVSEP(ifp->ctx)) {
 		switch (state->state) {
 		case DHS_BOUND: /* FALLTHROUGH */
 		case DHS_RENEW:
@@ -3527,7 +3530,7 @@ dhcp_recvmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg)
 		return;
 	}
 #ifdef PRIVSEP
-	if (ctx->options & DHCPCD_PRIVSEP) {
+	if (IN_PRIVSEP(ctx)) {
 		switch (state->state) {
 		case DHS_BOUND: /* FALLTHROUGH */
 		case DHS_RENEW:
@@ -3607,7 +3610,7 @@ dhcp_openbpf(struct interface *ifp)
 	state = D_STATE(ifp);
 
 #ifdef PRIVSEP
-	if (ifp->ctx->options & DHCPCD_PRIVSEP) {
+	if (IN_PRIVSEP_SE(ifp->ctx)) {
 		if (ps_bpf_openbootp(ifp) == -1) {
 			logerr(__func__);
 			return -1;

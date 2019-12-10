@@ -116,6 +116,10 @@ ps_root_writeerror(struct dhcpcd_ctx *ctx, ssize_t result)
 		.psr_errno = errno,
 	};
 
+#ifdef PRIVSEP_DEBUG
+	logdebugx("%s: result %zd errno %d", __func__, result, errno);
+#endif
+
 	return write(ctx->ps_root_fd, &psr, sizeof(psr));
 }
 
@@ -194,14 +198,16 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 	size_t len = iov->iov_len;
 	ssize_t err;
 
-	cmd = (uint8_t)(psm->ps_cmd & ~(PS_START | PS_STOP));
+	cmd = (uint8_t)(psm->ps_cmd & ~(PS_START | PS_STOP | PS_DELETE));
 	psp = ps_findprocess(ctx, &psm->ps_id);
 
 #ifdef PRIVSEP_DEBUG
 	logerrx("%s: IN cmd %x, psp %p", __func__, psm->ps_cmd, psp);
 #endif
 
-	if (!(psm->ps_cmd & PS_START) && psp != NULL) {
+	if ((!(psm->ps_cmd & PS_START) || cmd == PS_BPF_ARP_ADDR) &&
+	    psp != NULL)
+	{
 		if (psm->ps_cmd & PS_STOP) {
 			int ret = ps_dostop(ctx, &psp->psp_pid, &psp->psp_fd);
 
@@ -211,7 +217,7 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		return ps_sendpsmmsg(ctx, psp->psp_fd, psm, msg);
 	}
 
-	if (psm->ps_cmd & PS_STOP && psp == NULL)
+	if (psm->ps_cmd & (PS_STOP | PS_DELETE) && psp == NULL)
 		return 0;
 
 	/* All these should just be PS_START */

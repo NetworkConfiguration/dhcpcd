@@ -464,6 +464,8 @@ bpf_arp(struct interface *ifp, int fd)
 	struct bpf_insn *bp;
 	struct iarp_state *state;
 	uint16_t arp_len;
+	struct arp_state *astate;
+	size_t naddrs;
 
 	if (fd == -1)
 		return 0;
@@ -489,67 +491,60 @@ bpf_arp(struct interface *ifp, int fd)
 	bp += bpf_cmp_hwaddr(bp, BPF_CMP_HWADDR_LEN, sizeof(struct arphdr),
 	                     false, ifp->hwaddr, ifp->hwlen);
 
-#ifdef PRIVSEP
-	if (ifp->ctx->options & DHCPCD_PRIVSEP) {
-		/* No mech to notify of ARP states, so just accept all ARP. */
+	state = ARP_STATE(ifp);
+	/* privsep may not have an initial state yet. */
+	if (state == NULL || TAILQ_FIRST(&state->arp_states) == NULL)
+		goto noaddrs;
+
+	/* Match sender protocol address */
+	BPF_SET_STMT(bp, BPF_LD + BPF_W + BPF_IND,
+	             sizeof(struct arphdr) + ifp->hwlen);
+	bp++;
+	naddrs = 0;
+	TAILQ_FOREACH(astate, &state->arp_states, next) {
+		if (IN_IS_ADDR_UNSPECIFIED(&astate->addr))
+			continue;
+		if (++naddrs > ARP_ADDRS_MAX) {
+			errno = ENOBUFS;
+			logerr(__func__);
+			break;
+		}
+		BPF_SET_JUMP(bp, BPF_JMP + BPF_JEQ + BPF_K,
+		             htonl(astate->addr.s_addr), 0, 1);
+		bp++;
 		BPF_SET_STMT(bp, BPF_RET + BPF_K, arp_len);
 		bp++;
-		return bpf_attach(fd, bpf, (unsigned int)(bp - bpf));
 	}
-#endif
 
-	state = ARP_STATE(ifp);
-	if (TAILQ_FIRST(&state->arp_states)) {
-		struct arp_state *astate;
-		size_t naddrs;
+	/* If we didn't match sender, then we're only interested in
+	 * ARP probes to us, so check the null host sender. */
+	BPF_SET_JUMP(bp, BPF_JMP + BPF_JEQ + BPF_K, INADDR_ANY, 1, 0);
+	bp++;
+	BPF_SET_STMT(bp, BPF_RET + BPF_K, 0);
+	bp++;
 
-		/* Match sender protocol address */
-		BPF_SET_STMT(bp, BPF_LD + BPF_W + BPF_IND,
-		             sizeof(struct arphdr) + ifp->hwlen);
-		bp++;
-		naddrs = 0;
-		TAILQ_FOREACH(astate, &state->arp_states, next) {
-			if (++naddrs > ARP_ADDRS_MAX) {
-				errno = ENOBUFS;
-				logerr(__func__);
-				break;
-			}
-			BPF_SET_JUMP(bp, BPF_JMP + BPF_JEQ + BPF_K,
-			             htonl(astate->addr.s_addr), 0, 1);
-			bp++;
-			BPF_SET_STMT(bp, BPF_RET + BPF_K, arp_len);
-			bp++;
+	/* Match target protocol address */
+	BPF_SET_STMT(bp, BPF_LD + BPF_W + BPF_IND,
+	             (sizeof(struct arphdr)
+		     + (size_t)(ifp->hwlen * 2) + sizeof(in_addr_t)));
+	bp++;
+	naddrs = 0;
+	TAILQ_FOREACH(astate, &state->arp_states, next) {
+		if (++naddrs > ARP_ADDRS_MAX) {
+			/* Already logged error above. */
+			break;
 		}
-
-		/* If we didn't match sender, then we're only interested in
-		 * ARP probes to us, so check the null host sender. */
-		BPF_SET_JUMP(bp, BPF_JMP + BPF_JEQ + BPF_K, INADDR_ANY, 1, 0);
+		BPF_SET_JUMP(bp, BPF_JMP + BPF_JEQ + BPF_K,
+		             htonl(astate->addr.s_addr), 0, 1);
 		bp++;
-		BPF_SET_STMT(bp, BPF_RET + BPF_K, 0);
-		bp++;
-
-		/* Match target protocol address */
-		BPF_SET_STMT(bp, BPF_LD + BPF_W + BPF_IND,
-		             (sizeof(struct arphdr)
-			     + (size_t)(ifp->hwlen * 2) + sizeof(in_addr_t)));
-		bp++;
-		naddrs = 0;
-		TAILQ_FOREACH(astate, &state->arp_states, next) {
-			if (++naddrs > ARP_ADDRS_MAX) {
-				/* Already logged error above. */
-				break;
-			}
-			BPF_SET_JUMP(bp, BPF_JMP + BPF_JEQ + BPF_K,
-			             htonl(astate->addr.s_addr), 0, 1);
-			bp++;
-			BPF_SET_STMT(bp, BPF_RET + BPF_K, arp_len);
-			bp++;
-		}
-
-		/* Return nothing, no protocol address match. */
-		BPF_SET_STMT(bp, BPF_RET + BPF_K, 0);
+		BPF_SET_STMT(bp, BPF_RET + BPF_K, arp_len);
 		bp++;
 	}
+
+noaddrs:
+	/* Return nothing, no protocol address match. */
+	BPF_SET_STMT(bp, BPF_RET + BPF_K, 0);
+	bp++;
 
 	return bpf_attach(fd, bpf, (unsigned int)(bp - bpf));
 }

@@ -85,10 +85,48 @@ ps_bpf_recvbpf(void *arg)
 }
 
 static ssize_t
-ps_bpf_recvmsgcb(void *arg, __unused struct ps_msghdr *psm, struct msghdr *msg)
+ps_bpf_arp_addr(uint8_t cmd, struct ps_process *psp, struct msghdr *msg)
+{
+	struct interface *ifp = &psp->psp_ifp;
+	struct iovec *iov = msg->msg_iov;
+	struct in_addr addr;
+	struct arp_state *astate;
+
+	if (psp == NULL) {
+		errno = ESRCH;
+		return -1;
+	}
+
+	assert(msg->msg_iovlen == 1);
+	assert(iov->iov_len = sizeof(addr));
+	memcpy(&addr, iov->iov_base, sizeof(addr));
+	if (cmd & PS_START) {
+		astate = arp_new(ifp, &addr);
+		if (astate == NULL)
+			return -1;
+	} else if (cmd & PS_DELETE) {
+		astate = arp_find(ifp, &addr);
+		if (astate == NULL) {
+			errno = ESRCH;
+			return -1;
+		}
+		arp_free(astate);
+	} else {
+		errno = EINVAL;
+		return -1;
+	}
+
+	return bpf_arp(ifp, psp->psp_work_fd);
+}
+
+static ssize_t
+ps_bpf_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 {
 	struct ps_process *psp = arg;
 	struct iovec *iov = msg->msg_iov;
+
+	if (psm->ps_cmd & (PS_START | PS_DELETE))
+		return ps_bpf_arp_addr(psm->ps_cmd, psp, msg);
 
 	return bpf_send(&psp->psp_ifp, psp->psp_work_fd, psp->psp_proto,
 	    iov->iov_base, iov->iov_len);
@@ -261,9 +299,13 @@ ps_bpf_send(const struct interface *ifp, uint8_t cmd,
 		.ps_cmd = cmd,
 		.ps_id = {
 			.psi_ifindex = ifp->index,
-			.psi_cmd = (uint8_t)(cmd & ~(PS_START | PS_STOP)),
+			.psi_cmd = (uint8_t)(cmd &
+			    ~(PS_START | PS_STOP | PS_DELETE)),
 		},
 	};
+
+	if (psm.ps_id.psi_cmd == PS_BPF_ARP_ADDR)
+		psm.ps_id.psi_cmd = PS_BPF_ARP;
 
 	return ps_sendpsmdata(ctx, ctx->ps_root_fd, &psm, data, len);
 }
@@ -274,6 +316,20 @@ ps_bpf_openarp(const struct interface *ifp)
 {
 
 	return ps_bpf_send(ifp, PS_BPF_ARP | PS_START, ifp, sizeof(*ifp));
+}
+
+ssize_t
+ps_bpf_addaddr(const struct interface *ifp, const struct in_addr *addr)
+{
+
+	return ps_bpf_send(ifp, PS_BPF_ARP_ADDR | PS_START, addr, sizeof(*addr));
+}
+
+ssize_t
+ps_bpf_deladdr(const struct interface *ifp, const struct in_addr *addr)
+{
+
+	return ps_bpf_send(ifp, PS_BPF_ARP_ADDR | PS_DELETE, addr, sizeof(*addr));
 }
 
 ssize_t
