@@ -40,6 +40,7 @@
 #define	PS_DHCP6		0x03
 #define	PS_BPF_BOOTP		0x04
 #define	PS_BPF_ARP		0x05
+#define	PS_BPF_ARP_ADDR		0x06
 
 #define	PS_IOCTL		0x10
 #define	PS_SCRIPT		0x11
@@ -47,6 +48,7 @@
 #define	PS_ROUTE		0x13	/* Also used for NETLINK */
 #define	PS_WRITEPATHUINT	0x14
 
+#define	PS_DELETE		0x20
 #define	PS_START		0x40
 #define	PS_STOP			0x80
 
@@ -56,6 +58,12 @@
 				 sizeof(struct msghdr) +	\
 				 CMSG_SPACE(sizeof(struct in6_pktinfo) + \
 				            sizeof(int)))
+
+/* Handy macro to work out if in the privsep engine or not. */
+#define	IN_PRIVSEP(ctx)	\
+	((ctx)->options & DHCPCD_PRIVSEP)
+#define	IN_PRIVSEP_SE(ctx)	\
+	(((ctx)->options & (DHCPCD_PRIVSEP | DHCPCD_FORKED)) == DHCPCD_PRIVSEP)
 
 #include "config.h"
 #include "arp.h"

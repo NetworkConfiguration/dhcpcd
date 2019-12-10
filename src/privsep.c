@@ -650,6 +650,7 @@ ps_newprocess(struct dhcpcd_ctx *ctx, struct ps_id *psid)
 		return NULL;
 	psp->psp_ctx = ctx;
 	memcpy(&psp->psp_id, psid, sizeof(psp->psp_id));
+	psp->psp_work_fd = -1;
 	TAILQ_INSERT_TAIL(&ctx->ps_processes, psp, next);
 	return psp;
 }
