@@ -162,11 +162,13 @@ create_sp:
 	/* We are not root */
 	if (priv_fd != &ctx->ps_root_fd) {
 		ps_freeprocesses(ctx, recv_ctx);
-		close(ctx->ps_root_fd);
-		ctx->ps_root_fd = -1;
+		if (ctx->ps_root_fd != -1) {
+			close(ctx->ps_root_fd);
+			ctx->ps_root_fd = -1;
+		}
 	}
 
-	if (priv_fd != &ctx->ps_inet_fd) {
+	if (priv_fd != &ctx->ps_inet_fd && ctx->ps_inet_fd != -1) {
 		close(ctx->ps_inet_fd);
 		ctx->ps_inet_fd = -1;
 	}
