@@ -98,7 +98,7 @@ ps_bpf_arp_addr(uint8_t cmd, struct ps_process *psp, struct msghdr *msg)
 	}
 
 	assert(msg->msg_iovlen == 1);
-	assert(iov->iov_len = sizeof(addr));
+	assert(iov->iov_len == sizeof(addr));
 	memcpy(&addr, iov->iov_base, sizeof(addr));
 	if (cmd & PS_START) {
 		astate = arp_new(ifp, &addr);
