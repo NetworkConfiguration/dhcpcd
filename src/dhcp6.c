@@ -3021,7 +3021,10 @@ dhcp6_bind(struct interface *ifp, const char *op, const char *sfrom)
 			TAILQ_FOREACH(ia, &state->addrs, next) {
 				if (ia->flags & IPV6_AF_STALE)
 					continue;
-				if (ia->prefix_vltime <= state->renew)
+				if (ia->prefix_vltime != 0
+				    && !(state->renew == ND6_INFINITE_LIFETIME
+				    && ia->prefix_vltime == ND6_INFINITE_LIFETIME)
+				    && ia->prefix_vltime <= state->renew)
 					logwarnx(
 					    "%s: %s will expire before renewal",
 					    ifp->name, ia->saddr);
@@ -3165,6 +3168,8 @@ dhcp6_bind(struct interface *ifp, const char *op, const char *sfrom)
 		if (state->state == DH6S_INFORMED)
 			lognewinfo("%s: refresh in %"PRIu32" seconds",
 			    ifp->name, state->renew);
+		else if (state->renew == ND6_INFINITE_LIFETIME)
+			lognewinfo("%s: leased for infinity", ifp->name);
 		else if (state->renew || state->rebind)
 			lognewinfo("%s: renew in %"PRIu32", "
 			    "rebind in %"PRIu32", "
