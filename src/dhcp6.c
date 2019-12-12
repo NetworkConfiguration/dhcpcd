@@ -3023,8 +3023,9 @@ dhcp6_bind(struct interface *ifp, const char *op, const char *sfrom)
 			TAILQ_FOREACH(ia, &state->addrs, next) {
 				if (ia->flags & IPV6_AF_STALE)
 					continue;
-				if (!(state->renew == ND6_INFINITE_LIFETIME &&
-				    ia->prefix_vltime == ND6_INFINITE_LIFETIME)
+				if (!(state->renew == ND6_INFINITE_LIFETIME
+				    && ia->prefix_vltime == ND6_INFINITE_LIFETIME)
+				    && ia->prefix_vltime != 0
 				    && ia->prefix_vltime <= state->renew)
 					logwarnx(
 					    "%s: %s will expire before renewal",
