@@ -2145,13 +2145,10 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			a->dadcallback = dhcp6_dadcallback;
 			a->ia_type = D6_OPTION_IA_PD;
 			memcpy(a->iaid, iaid, sizeof(a->iaid));
-			TAILQ_INIT(&a->pd_pfxs);
 			TAILQ_INSERT_TAIL(&state->addrs, a, next);
 		} else {
-			if (!(a->flags & IPV6_AF_DELEGATEDPFX)) {
+			if (!(a->flags & IPV6_AF_DELEGATEDPFX))
 				a->flags |= IPV6_AF_NEW | IPV6_AF_DELEGATEDPFX;
-				TAILQ_INIT(&a->pd_pfxs);
-			}
 			a->flags &= ~(IPV6_AF_STALE |
 			              IPV6_AF_EXTENDED |
 			              IPV6_AF_REQUEST);

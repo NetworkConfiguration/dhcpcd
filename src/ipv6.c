@@ -921,8 +921,17 @@ ipv6_addaddrs(struct ipv6_addrhead *addrs)
 			if (ap->flags & IPV6_AF_REQUEST) {
 				ap->flags &= ~IPV6_AF_ADDED;
 			} else {
-				TAILQ_REMOVE(addrs, ap, next);
-				ipv6_freeaddr(ap);
+#ifndef SMALL
+				if (ap->delegating_prefix != NULL &&
+				    addrs == &ap->delegating_prefix->pd_pfxs) {
+					TAILQ_REMOVE(addrs, ap, pd_next);
+					ap->delegating_prefix = NULL;
+				} else
+#endif
+				{
+					TAILQ_REMOVE(addrs, ap, next);
+					ipv6_freeaddr(ap);
+				}
 			}
 		} else if (!(ap->flags & IPV6_AF_STALE) &&
 		    !IN6_IS_ADDR_UNSPECIFIED(&ap->addr))
@@ -1458,6 +1467,10 @@ ipv6_newaddr(struct interface *ifp, const struct in6_addr *addr,
 	ia->addr_flags = addr_flags;
 	ia->prefix_len = prefix_len;
 	ia->dhcp6_fd = -1;
+
+#ifndef SMALL
+	TAILQ_INIT(&ia->pd_pfxs);
+#endif
 
 #ifdef IPV6_AF_TEMPORARY
 	tempaddr = ia->flags & IPV6_AF_TEMPORARY;
