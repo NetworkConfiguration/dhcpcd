@@ -109,6 +109,24 @@ int if_getssid_wext(const char *ifname, uint8_t *ssid);
 #define	SOL_NETLINK	270
 #endif
 
+/* Someone should fix kernel headers for clang alignment warnings . */
+#undef IFA_RTA
+#define IFA_RTA(r)  ((struct rtattr *)(void *)(((char *)(r)) \
+	+ NLMSG_ALIGN(sizeof(struct ifaddrmsg))))
+#undef IFLA_RTA
+#define IFLA_RTA(r)  ((struct rtattr *)(void *)(((char *)(r)) \
+	+ NLMSG_ALIGN(sizeof(struct ifinfomsg))))
+#undef NLMSG_NEXT
+#define NLMSG_NEXT(nlh, len)	 ((len) -= NLMSG_ALIGN((nlh)->nlmsg_len), \
+	(struct nlmsghdr *)(void *)(((char *)(nlh)) \
+	+ NLMSG_ALIGN((nlh)->nlmsg_len)))
+#undef RTM_RTA
+#define RTM_RTA(r) (void *)(((char *)(r)) + NLMSG_ALIGN(sizeof(struct rtmsg)))
+#undef RTA_NEXT
+#define RTA_NEXT(rta, attrlen)	((attrlen) -= RTA_ALIGN((rta)->rta_len), \
+	(struct rtattr *)(void *)(((char *)(rta)) \
+	+ RTA_ALIGN((rta)->rta_len)))
+
 struct priv {
 	int route_fd;
 	uint32_t route_pid;
