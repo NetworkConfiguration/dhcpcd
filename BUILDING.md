@@ -66,7 +66,7 @@ obviously false. You will have to patch support either in the kernel or
 out of the headers (or dhcpcd itself) to have correct operation.
 
 Linux netlink headers cause a sign conversion error.
-I [submitted a patch](https://sourceware.org/bugzilla/show_bug.cgi?id=22489),
+I [submitted a patch](https://lkml.org/lkml/2019/12/17/680),
 but as yet it's not upstreamed.
 
 GLIBC ships an icmp6.h header which will result in signedness warnings.
