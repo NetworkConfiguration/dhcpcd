@@ -3635,6 +3635,42 @@ dhcp6_recv(struct dhcpcd_ctx *ctx, struct ipv6_addr *ia)
 		ifp = ifp1;
 	}
 
+#if 0
+	/*
+	 * Handy code to inject raw DHCPv6 packets over responses
+	 * from our server.
+	 * This allows me to take a 3rd party wireshark trace and
+	 * replay it in my code.
+	 */
+	static int replyn = 0;
+	char fname[PATH_MAX], tbuf[64 * 1024];
+	int fd;
+	ssize_t tlen;
+	uint8_t *si1, *si2;
+	uint16_t si_len1, si_len2;
+
+	snprintf(fname, sizeof(fname),
+	    "/tmp/dhcp6.reply%d.raw", replyn++);
+	fd = open(fname, O_RDONLY, 0);
+	if (fd == -1) {
+		logerr("%s: open `%s'", __func__, fname);
+		return;
+	}
+	tlen = read(fd, tbuf, sizeof(tbuf));
+	if (tlen == -1)
+		logerr("%s: read `%s'", __func__, fname);
+	close(fd);
+
+	/* Copy across ServerID so we can work with our own server. */
+	si1 = dhcp6_findmoption(r, len, D6_OPTION_SERVERID, &si_len1);
+	si2 = dhcp6_findmoption(tbuf, (size_t)tlen,
+	    D6_OPTION_SERVERID, &si_len2);
+	if (si1 != NULL && si2 != NULL && si_len1 == si_len2)
+		memcpy(si2, si1, si_len2);
+	r = (struct dhcp6_message *)tbuf;
+	len = (size_t)tlen;
+#endif
+
 	dhcp6_recvif(ifp, sfrom, r, len);
 }
 
