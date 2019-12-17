@@ -2395,9 +2395,7 @@ static void
 dhcp6_deprecateaddrs(struct ipv6_addrhead *addrs)
 {
 	struct ipv6_addr *ia, *ian;
-	struct timespec now;
 
-	timespecclear(&now);
 	TAILQ_FOREACH_SAFE(ia, addrs, next, ian) {
 		if (ia->flags & IPV6_AF_EXTENDED)
 			;
