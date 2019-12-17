@@ -65,6 +65,14 @@ management and no automatic prefix route generation, both of which are
 obviously false. You will have to patch support either in the kernel or
 out of the headers (or dhcpcd itself) to have correct operation.
 
+Linux netlink headers cause a sign conversion error.
+I [submitted a patch](https://sourceware.org/bugzilla/show_bug.cgi?id=22489),
+but as yet it's not upstreamed.
+
+GLIBC ships an icmp6.h header which will result in signedness warnings.
+Their [bug #22489](https://sourceware.org/bugzilla/show_bug.cgi?id=22489)
+will solve this once it's actually applied.
+
 ## OS specific issues
 Some BSD systems do not allow the manipulation of automatically added subnet
 routes. You can find discussion here:
