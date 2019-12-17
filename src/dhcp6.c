@@ -2373,11 +2373,53 @@ dhcp6_findia(struct interface *ifp, struct dhcp6_message *m, size_t l,
 	return i;
 }
 
+#ifndef SMALL
+static void
+dhcp6_deprecatedele(struct ipv6_addr *ia)
+{
+	struct ipv6_addr *da, *dan, *dda;
+	struct timespec now;
+	struct dhcp6_state *state;
+
+	timespecclear(&now);
+	TAILQ_FOREACH_SAFE(da, &ia->pd_pfxs, pd_next, dan) {
+		if (ia->prefix_vltime == 0) {
+			if (da->prefix_vltime != 0)
+				da->prefix_vltime = 0;
+			else
+				continue;
+		} else if (da->prefix_pltime != 0)
+			da->prefix_pltime = 0;
+		else
+			continue;
+
+		if (ipv6_doaddr(da, &now) != -1)
+			continue;
+
+		/* Delegation deleted, forget it. */
+		TAILQ_REMOVE(&ia->pd_pfxs, da, pd_next);
+
+		/* Delete it from the interface. */
+		state = D6_STATE(da->iface);
+		TAILQ_FOREACH(dda, &state->addrs, next) {
+			if (IN6_ARE_ADDR_EQUAL(&dda->addr, &da->addr))
+				break;
+		}
+		if (dda != NULL) {
+			TAILQ_REMOVE(&state->addrs, dda, next);
+			ipv6_freeaddr(dda);
+		}
+	}
+}
+#endif
+
 static void
 dhcp6_deprecateaddrs(struct ipv6_addrhead *addrs)
 {
 	struct ipv6_addr *ia, *ian;
+	struct timespec now;
 
+	timespecclear(&now);
 	TAILQ_FOREACH_SAFE(ia, addrs, next, ian) {
 		if (ia->flags & IPV6_AF_EXTENDED)
 			;
@@ -2395,24 +2437,8 @@ dhcp6_deprecateaddrs(struct ipv6_addrhead *addrs)
 #ifndef SMALL
 		/* If we delegated from this prefix, deprecate or remove
 		 * the delegations. */
-		if (ia->flags & IPV6_AF_DELEGATEDPFX) {
-			struct ipv6_addr *da;
-			bool touched = false;
-
-			TAILQ_FOREACH(da, &ia->pd_pfxs, pd_next) {
-				if (ia->prefix_vltime == 0) {
-					if (da->prefix_vltime != 0) {
-						da->prefix_vltime = 0;
-						touched = true;
-					}
-				} else if (da->prefix_pltime != 0) {
-					da->prefix_pltime = 0;
-					touched = true;
-				}
-			}
-			if (touched)
-				ipv6_addaddrs(&ia->pd_pfxs);
-		}
+		if (ia->flags & IPV6_AF_DELEGATEDPFX)
+			dhcp6_deprecatedele(ia);
 #endif
 
 		if (ia->flags & IPV6_AF_REQUEST) {
