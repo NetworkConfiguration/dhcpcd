@@ -510,7 +510,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 	if (rtm->rtm_type == RTN_UNREACHABLE)
 		rt->rt_flags |= RTF_REJECT;
 
-	rta = (struct rtattr *)RTM_RTA(rtm);
+	rta = RTM_RTA(rtm);
 	len = RTM_PAYLOAD(nlm);
 	while (RTA_OK(rta, len)) {
 		sa = NULL;
@@ -664,7 +664,7 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 		 * so it's not really an error */
 		return 1;
 	}
-	rta = (struct rtattr *)IFA_RTA(ifa);
+	rta = IFA_RTA(ifa);
 	len = NLMSG_PAYLOAD(nlm, sizeof(*ifa));
 	switch (ifa->ifa_family) {
 #ifdef INET
@@ -772,7 +772,7 @@ link_neigh(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 		return -1;
 
 	r = NLMSG_DATA(nlm);
-	rta = (struct rtattr *)RTM_RTA(r);
+	rta = RTM_RTA(r);
 	len = RTM_PAYLOAD(nlm);
         if (r->ndm_family == AF_INET6) {
 		bool reachable;
@@ -1322,7 +1322,7 @@ _if_addressexists(__unused struct dhcpcd_ctx *ctx,
 	ifa = NLMSG_DATA(nlm);
 	if (ifa->ifa_index != ia->ifa_ifindex || ifa->ifa_family != AF_INET)
 		return 0;
-	rta = (struct rtattr *)IFA_RTA(ifa);
+	rta = IFA_RTA(ifa);
 	len = NLMSG_PAYLOAD(nlm, sizeof(*ifa));
 	while (RTA_OK(rta, len)) {
 		switch (rta->rta_type) {
