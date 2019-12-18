@@ -506,7 +506,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 
 	rta = (struct rtattr *)RTM_RTA(rtm);
 	len = RTM_PAYLOAD(nlm);
-	while (RTA_OK(rta, len)) {
+	for (; RTA_OK(rta, len); rta = RTA_NEXT(rta, len)) {
 		sa = NULL;
 		switch (rta->rta_type) {
 		case RTA_DST:
@@ -532,13 +532,12 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 
 			l2 = rta->rta_len;
 			r2 = (struct rtattr *)RTA_DATA(rta);
-			while (RTA_OK(r2, l2)) {
+			for (; RTA_OK(r2, l2); r2 = RTA_NEXT(r2, l2)) {
 				switch (r2->rta_type) {
 				case RTAX_MTU:
 					rt->rt_mtu = *(unsigned int *)RTA_DATA(r2);
 					break;
 				}
-				r2 = RTA_NEXT(r2, l2);
 			}
 			break;
 		}
@@ -554,8 +553,6 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 			memcpy((char *)sa + sa_addroffset(sa), RTA_DATA(rta),
 			    MIN(salen, RTA_PAYLOAD(rta)));
 		}
-
-		rta = RTA_NEXT(rta, len);
 	}
 
 	/* If no RTA_DST set the unspecified address for the family. */
@@ -665,7 +662,7 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 	case AF_INET:
 		addr.s_addr = brd.s_addr = INADDR_ANY;
 		inet_cidrtoaddr(ifa->ifa_prefixlen, &net);
-		while (RTA_OK(rta, len)) {
+		for (; RTA_OK(rta, len); rta = RTA_NEXT(rta, len)) {
 			switch (rta->rta_type) {
 			case IFA_ADDRESS:
 				if (ifp->flags & IFF_POINTOPOINT) {
@@ -682,7 +679,6 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 				    sizeof(addr.s_addr));
 				break;
 			}
-			rta = RTA_NEXT(rta, len);
 		}
 
 		/* Validate RTM_DELADDR really means address deleted
@@ -702,14 +698,13 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 #ifdef INET6
 	case AF_INET6:
 		memset(&addr6, 0, sizeof(addr6));
-		while (RTA_OK(rta, len)) {
+		for (; RTA_OK(rta, len); rta = RTA_NEXT(rta, len)) {
 			switch (rta->rta_type) {
 			case IFA_ADDRESS:
 				memcpy(&addr6.s6_addr, RTA_DATA(rta),
 				       sizeof(addr6.s6_addr));
 				break;
 			}
-			rta = RTA_NEXT(rta, len);
 		}
 
 		/* Validate RTM_DELADDR really means address deleted
@@ -777,14 +772,13 @@ link_neigh(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 		    (NUD_REACHABLE | NUD_STALE | NUD_DELAY | NUD_PROBE |
 		     NUD_PERMANENT));
 		memset(&addr6, 0, sizeof(addr6));
-		while (RTA_OK(rta, len)) {
+		for (; RTA_OK(rta, len); rta = RTA_NEXT(rta, len)) {
 			switch (rta->rta_type) {
 			case NDA_DST:
 				memcpy(&addr6.s6_addr, RTA_DATA(rta),
 				       sizeof(addr6.s6_addr));
 				break;
 			}
-			rta = RTA_NEXT(rta, len);
 		}
 		ipv6nd_neighbour(ctx, &addr6, reachable);
 	}
@@ -830,7 +824,7 @@ link_netlink(struct dhcpcd_ctx *ctx, void *arg, struct nlmsghdr *nlm)
 	*ifn = '\0';
 	hwaddr = NULL;
 
-	while (RTA_OK(rta, len)) {
+	for (; RTA_OK(rta, len); rta = RTA_NEXT(rta, len)) {
 		switch (rta->rta_type) {
 		case IFLA_WIRELESS:
 			/* Ignore wireless messages */
@@ -845,7 +839,6 @@ link_netlink(struct dhcpcd_ctx *ctx, void *arg, struct nlmsghdr *nlm)
 			hwaddr = rta;
 			break;
 		}
-		rta = RTA_NEXT(rta, len);
 	}
 
 	if (nlm->nlmsg_type == RTM_DELLINK) {
@@ -1293,13 +1286,12 @@ _if_addressexists(__unused struct dhcpcd_ctx *ctx,
 		return 0;
 	rta = (struct rtattr *)IFA_RTA(ifa);
 	len = NLMSG_PAYLOAD(nlm, sizeof(*ifa));
-	while (RTA_OK(rta, len)) {
+	for (; RTA_OK(rta, len); rta = RTA_NEXT(rta, len)) {
 		switch (rta->rta_type) {
 		case IFA_LOCAL:
 			memcpy(&this_addr, RTA_DATA(rta), sizeof(this_addr));
 			return this_addr == ia->ifa_addr.s_addr ? 1 : 0;
 		}
-		rta = RTA_NEXT(rta, len);
 	}
 	return 0;
 }
