@@ -173,6 +173,11 @@ get_option(struct dhcpcd_ctx *ctx,
 	const uint8_t *op;
 	size_t bl;
 
+	if (bootp == NULL || bootp_len < DHCP_MIN_LEN) {
+		errno = EINVAL;
+		return NULL;
+	}
+
 	/* Check we have the magic cookie */
 	if (!IS_DHCP(bootp)) {
 		errno = ENOTSUP;
@@ -1204,7 +1209,7 @@ read_lease(struct interface *ifp, struct bootp **bootp)
 	 * (it should be more, and our read packet enforces this so this
 	 * code should not be needed, but of course people could
 	 * scribble whatever in the stored lease file. */
-	if (bytes < offsetof(struct bootp, vend) + 4) {
+	if (bytes < DHCP_MIN_LEN) {
 		free(lease);
 		logerrx("%s: %s: truncated lease", ifp->name, __func__);
 		return 0;
