@@ -417,7 +417,10 @@ inet_routerhostroute(struct rt_head *routes, struct interface *ifp)
 		in.s_addr = INADDR_ANY;
 		sa_in_init(&rth->rt_gateway, &in);
 		rth->rt_mtu = dhcp_get_mtu(ifp);
-		sa_in_init(&rth->rt_ifa, &state->addr->addr);
+		if (state->addr != NULL)
+			sa_in_init(&rth->rt_ifa, &state->addr->addr);
+		else
+			rth->rt_ifa.sa_family = AF_UNSPEC;
 		TAILQ_INSERT_BEFORE(rt, rth, rt_next);
 	}
 	return 0;
