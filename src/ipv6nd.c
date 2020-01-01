@@ -1594,7 +1594,7 @@ ipv6nd_expirera(void *arg)
 {
 	struct interface *ifp;
 	struct ra *rap, *ran;
-	struct timespec now, lt, expire, next;
+	struct timespec now, expire;
 	bool expired, valid;
 	struct ipv6_addr *ia;
 	size_t len, olen;
@@ -1605,23 +1605,20 @@ ipv6nd_expirera(void *arg)
 #endif
 	struct nd_opt_dnssl dnssl;
 	struct nd_opt_rdnss rdnss;
-	uint32_t ltime;
+	unsigned int next = 0, ltime;
 	size_t nexpired = 0;
 
 	ifp = arg;
 	clock_gettime(CLOCK_MONOTONIC, &now);
 	expired = false;
-	timespecclear(&next);
 
 	TAILQ_FOREACH_SAFE(rap, ifp->ctx->ra_routers, next, ran) {
 		if (rap->iface != ifp || rap->expired)
 			continue;
 		valid = false;
 		if (rap->lifetime) {
-			lt.tv_sec = (time_t)rap->lifetime;
-			lt.tv_nsec = 0;
-			timespecadd(&rap->acquired, &lt, &expire);
-			if (timespeccmp(&now, &expire, >)) {
+			timespecsub(&now, &rap->acquired, &expire);
+			if (expire.tv_sec > rap->lifetime) {
 				if (!rap->expired) {
 					logwarnx("%s: %s: router expired",
 					    ifp->name, rap->sfrom);
@@ -1630,10 +1627,10 @@ ipv6nd_expirera(void *arg)
 				}
 			} else {
 				valid = true;
-				timespecsub(&expire, &now, &lt);
-				if (!timespecisset(&next) ||
-				    timespeccmp(&next, &lt, >))
-					next = lt;
+				ltime = (unsigned int)
+				    (rap->lifetime - expire.tv_sec);
+				if (next == 0 || ltime < next)
+					next = ltime;
 			}
 		}
 
@@ -1647,10 +1644,8 @@ ipv6nd_expirera(void *arg)
 				valid = true;
 				continue;
 			}
-			lt.tv_sec = (time_t)ia->prefix_vltime;
-			lt.tv_nsec = 0;
-			timespecadd(&ia->acquired, &lt, &expire);
-			if (timespeccmp(&now, &expire, >)) {
+			timespecsub(&now, &ia->acquired, &expire);
+			if (expire.tv_sec > ia->prefix_vltime) {
 				if (ia->flags & IPV6_AF_ADDED) {
 					logwarnx("%s: expired address %s",
 					    ia->iface->name, ia->saddr);
@@ -1664,15 +1659,16 @@ ipv6nd_expirera(void *arg)
 				    ~(IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED);
 				expired = true;
 			} else {
-				timespecsub(&expire, &now, &lt);
-				if (!timespecisset(&next) ||
-				    timespeccmp(&next, &lt, >))
-					next = lt;
 				valid = true;
+				ltime = (unsigned int)
+				    (ia->prefix_vltime - expire.tv_sec);
+				if (next == 0 || ltime < next)
+					next = ltime;
 			}
 		}
 
 		/* Work out expiry for ND options */
+		timespecsub(&now, &rap->acquired, &expire);
 		len = rap->data_len - sizeof(struct nd_router_advert);
 		for (p = rap->data + sizeof(struct nd_router_advert);
 		    len >= sizeof(ndo);
@@ -1722,21 +1718,16 @@ ipv6nd_expirera(void *arg)
 				continue;
 			}
 
-			lt.tv_sec = (time_t)ntohl(ltime);
-			lt.tv_nsec = 0;
-			timespecadd(&rap->acquired, &lt, &expire);
-			if (timespeccmp(&now, &expire, >)) {
+			ltime = ntohl(ltime);
+			if (expire.tv_sec > ltime) {
 				expired = true;
 				continue;
 			}
 
-			timespecsub(&expire, &now, &lt);
-			if (!timespecisset(&next) ||
-			    timespeccmp(&next, &lt, >))
-			{
-				next = lt;
-				valid = true;
-			}
+			valid = true;
+			ltime = (unsigned int)(ltime - expire.tv_sec);
+			if (next == 0 || ltime < next)
+				next = ltime;
 		}
 
 		if (valid)
@@ -1748,9 +1739,9 @@ ipv6nd_expirera(void *arg)
 			ipv6nd_free_ra(rap);
 	}
 
-	if (timespecisset(&next))
-		eloop_timeout_add_tv(ifp->ctx->eloop,
-		    &next, ipv6nd_expirera, ifp);
+	if (next != 0)
+		eloop_timeout_add_sec(ifp->ctx->eloop,
+		    next, ipv6nd_expirera, ifp);
 	if (expired) {
 		logwarnx("%s: part of Router Advertisement expired", ifp->name);
 		rt_build(ifp->ctx, AF_INET6);

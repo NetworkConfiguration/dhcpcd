@@ -234,7 +234,7 @@ struct ipv6_state {
 	struct ll_callback_head ll_callbacks;
 
 #ifdef IPV6_MANAGETEMPADDR
-	time_t desync_factor;
+	uint32_t desync_factor;
 	uint8_t randomseed0[8]; /* upper 64 bits of MD5 digest */
 	uint8_t randomseed1[8]; /* lower 64 bits */
 	uint8_t randomid[8];

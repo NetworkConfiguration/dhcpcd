@@ -175,8 +175,8 @@ struct if_options {
 	uint8_t nomask6[(UINT16_MAX + 1) / NBBY];
 	uint8_t rejectmask6[(UINT16_MAX + 1) / NBBY];
 	uint32_t leasetime;
-	time_t timeout;
-	time_t reboot;
+	uint32_t timeout;
+	uint32_t reboot;
 	unsigned long long options;
 
 	struct in_addr req_addr;

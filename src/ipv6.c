@@ -729,7 +729,7 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 	    ia->prefix_vltime &&
 	    ip6_use_tempaddr(ifp->name))
 		eloop_timeout_add_sec(ifp->ctx->eloop,
-		    (time_t)ia->prefix_pltime - REGEN_ADVANCE,
+		    ia->prefix_pltime - REGEN_ADVANCE,
 		    ipv6_regentempaddr, ia);
 #endif
 
@@ -1879,7 +1879,7 @@ static void
 ipv6_regen_desync(struct interface *ifp, int force)
 {
 	struct ipv6_state *state;
-	time_t max;
+	unsigned int max, pref;
 
 	state = IPV6_STATE(ifp);
 
@@ -1887,15 +1887,14 @@ ipv6_regen_desync(struct interface *ifp, int force)
 	 * greater than TEMP_VALID_LIFETIME - REGEN_ADVANCE.
 	 * I believe this is an error and it should be never be greateter than
 	 * TEMP_PREFERRED_LIFETIME - REGEN_ADVANCE. */
-	max = ip6_temp_preferred_lifetime(ifp->name) - REGEN_ADVANCE;
+	pref = (unsigned int)ip6_temp_preferred_lifetime(ifp->name);
+	max = pref - REGEN_ADVANCE;
 	if (state->desync_factor && !force && state->desync_factor < max)
 		return;
 	if (state->desync_factor == 0)
 		state->desync_factor =
-		    (time_t)arc4random_uniform(MIN(MAX_DESYNC_FACTOR,
-		    (uint32_t)max));
-	max = ip6_temp_preferred_lifetime(ifp->name) -
-	    state->desync_factor - REGEN_ADVANCE;
+		    arc4random_uniform(MIN(MAX_DESYNC_FACTOR, max));
+	max = pref - state->desync_factor - REGEN_ADVANCE;
 	eloop_timeout_add_sec(ifp->ctx->eloop, max, ipv6_regentempifid, ifp);
 }
 
@@ -2050,8 +2049,8 @@ again:
 	ipv6_regen_desync(ia->iface, 0);
 
 	/* RFC4941 Section 3.3.4 */
-	i = (uint32_t)(ip6_temp_preferred_lifetime(ia0->iface->name) -
-	    state->desync_factor);
+	i = (uint32_t)ip6_temp_preferred_lifetime(ia0->iface->name) -
+	    state->desync_factor;
 	ia->prefix_pltime = MIN(ia0->prefix_pltime, i);
 	i = (uint32_t)ip6_temp_valid_lifetime(ia0->iface->name);
 	ia->prefix_vltime = MIN(ia0->prefix_vltime, i);
@@ -2080,7 +2079,7 @@ ipv6_settemptime(struct ipv6_addr *ia, int flags)
 		    ap->prefix_pltime &&
 		    IN6_ARE_ADDR_EQUAL(&ia->prefix, &ap->prefix))
 		{
-			time_t max, ext;
+			unsigned int max, ext;
 
 			if (flags == 0) {
 				if (ap->prefix_pltime -
@@ -2109,10 +2108,11 @@ ipv6_settemptime(struct ipv6_addr *ia, int flags)
 			/* RFC4941 Section 3.3.2
 			 * Extend temporary times, but ensure that they
 			 * never last beyond the system limit. */
-			ext = ia->acquired.tv_sec + (time_t)ia->prefix_pltime;
-			max = ap->created.tv_sec +
+			ext = (unsigned int)ia->acquired.tv_sec
+			    + ia->prefix_pltime;
+			max = (unsigned int)(ap->created.tv_sec +
 			    ip6_temp_preferred_lifetime(ap->iface->name) -
-			    state->desync_factor;
+			    state->desync_factor);
 			if (ext < max)
 				ap->prefix_pltime = ia->prefix_pltime;
 			else
@@ -2120,9 +2120,10 @@ ipv6_settemptime(struct ipv6_addr *ia, int flags)
 				    (uint32_t)(max - ia->acquired.tv_sec);
 
 valid:
-			ext = ia->acquired.tv_sec + (time_t)ia->prefix_vltime;
-			max = ap->created.tv_sec +
-			    ip6_temp_valid_lifetime(ap->iface->name);
+			ext = (unsigned int)ia->acquired.tv_sec +
+			    ia->prefix_vltime;
+			max = (unsigned int)(ap->created.tv_sec +
+			    ip6_temp_valid_lifetime(ap->iface->name));
 			if (ext < max)
 				ap->prefix_vltime = ia->prefix_vltime;
 			else
