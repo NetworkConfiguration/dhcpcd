@@ -1562,8 +1562,7 @@ main(int argc, char **argv)
 	struct interface *ifp;
 	uint16_t family = 0;
 	int opt, oi = 0, i;
-	unsigned int logopts;
-	time_t t;
+	unsigned int logopts, t;
 	ssize_t len;
 #if defined(USE_SIGNALS) || !defined(THERE_IS_NO_FORK)
 	pid_t pid;

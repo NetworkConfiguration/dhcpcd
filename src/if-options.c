@@ -874,7 +874,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		break;
 	case 't':
 		ARG_REQUIRED;
-		ifo->timeout = (time_t)strtoi(arg, NULL, 0, 0, INT32_MAX, &e);
+		ifo->timeout = (uint32_t)strtou(arg, NULL, 0, 0, UINT32_MAX, &e);
 		if (e) {
 			logerrx("failed to convert timeout %s", arg);
 			return -1;
@@ -967,7 +967,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		break;
 	case 'y':
 		ARG_REQUIRED;
-		ifo->reboot = (time_t)strtoi(arg, NULL, 0, 0, UINT32_MAX, &e);
+		ifo->reboot = (uint32_t)strtou(arg, NULL, 0, 0, UINT32_MAX, &e);
 		if (e) {
 			logerr("failed to convert reboot %s", arg);
 			return -1;

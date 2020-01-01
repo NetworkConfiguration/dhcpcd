@@ -98,6 +98,7 @@
 #ifndef MSEC_PER_SEC
 #define MSEC_PER_SEC	1000L
 #define NSEC_PER_MSEC	1000000L
+#define NSEC_PER_SEC	1000000000L
 #endif
 
 #if defined(HAVE_KQUEUE)
@@ -167,7 +168,9 @@ struct eloop_event {
 
 struct eloop_timeout {
 	TAILQ_ENTRY(eloop_timeout) next;
-	struct timespec when;
+	struct timespec created;
+	unsigned int seconds;
+	long nseconds;
 	void (*callback)(void *);
 	void *arg;
 	int queue;
@@ -200,6 +203,16 @@ struct eloop {
 	int exitnow;
 	int exitcode;
 };
+
+/*
+ * time_t is a signed integer of an unspecified
+ * size. To adjust for time_t wrapping, we need
+ * to work the maximum signed value and use that
+ * as a maximum.
+ */
+#ifndef TIME_MAX
+#define TIME_MAX (time_t)((1ULL << (sizeof(time_t) * NBBY - 1)) - 1)
+#endif
 
 #ifdef HAVE_REALLOCARRAY
 #define	eloop_realloca	reallocarray
@@ -502,24 +515,23 @@ remove:
 	return 1;
 }
 
-int
-eloop_q_timeout_add_tv(struct eloop *eloop, int queue,
-    const struct timespec *when, void (*callback)(void *), void *arg)
+/*
+ * This implementation should cope with UINT_MAX seconds on a system
+ * where time_t is INT32_MAX. It should also cope with the monotonic timer
+ * wrapping, although this is highly unlikely.
+ * unsigned int should match or be greater than any on wire specified timeout.
+ */
+static int
+eloop_q_timeout_add(struct eloop *eloop, int queue,
+    unsigned int seconds, long nseconds, void (*callback)(void *), void *arg)
 {
-	struct timespec now, w;
+	struct timespec diff;
 	struct eloop_timeout *t, *tt = NULL;
+	unsigned int cseconds;
+	long cnseconds;
 
 	assert(eloop != NULL);
-	assert(when != NULL);
 	assert(callback != NULL);
-
-	clock_gettime(CLOCK_MONOTONIC, &now);
-	timespecadd(&now, when, &w);
-	/* Check for time_t overflow. */
-	if (timespeccmp(&w, &now, <)) {
-		errno = ERANGE;
-		return -1;
-	}
 
 	/* Remove existing timeout if present. */
 	TAILQ_FOREACH(t, &eloop->timeouts, next) {
@@ -539,7 +551,9 @@ eloop_q_timeout_add_tv(struct eloop *eloop, int queue,
 		}
 	}
 
-	t->when = w;
+	clock_gettime(CLOCK_MONOTONIC, &t->created);
+	t->seconds = seconds;
+	t->nseconds = nseconds;
 	t->callback = callback;
 	t->arg = arg;
 	t->queue = queue;
@@ -547,7 +561,23 @@ eloop_q_timeout_add_tv(struct eloop *eloop, int queue,
 	/* The timeout list should be in chronological order,
 	 * soonest first. */
 	TAILQ_FOREACH(tt, &eloop->timeouts, next) {
-		if (timespeccmp(&t->when, &tt->when, <)) {
+		/* Check for a wrapped timer. */
+		if (timespeccmp(&t->created, &tt->created, >))
+			timespecsub(&t->created, &tt->created, &diff);
+		else {
+			diff.tv_sec = (TIME_MAX - tt->created.tv_sec)
+			    + t->created.tv_sec;
+			diff.tv_nsec = t->created.tv_nsec - tt->created.tv_nsec;
+			if (diff.tv_nsec < 0) {
+				diff.tv_sec--;
+				diff.tv_nsec += NSEC_PER_SEC;
+			}
+		}
+		cseconds = (unsigned int)(tt->seconds - diff.tv_sec);
+		cnseconds = tt->nseconds - diff.tv_nsec;
+		if (seconds < cseconds ||
+		    (seconds == cseconds && nseconds < cnseconds))
+		{
 			TAILQ_INSERT_BEFORE(tt, t, next);
 			return 0;
 		}
@@ -557,25 +587,42 @@ eloop_q_timeout_add_tv(struct eloop *eloop, int queue,
 }
 
 int
-eloop_q_timeout_add_sec(struct eloop *eloop, int queue, time_t when,
+eloop_q_timeout_add_tv(struct eloop *eloop, int queue,
+    const struct timespec *when, void (*callback)(void *), void *arg)
+{
+
+	if (when->tv_sec > UINT_MAX) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	return eloop_q_timeout_add(eloop, queue,
+	    (unsigned int)when->tv_sec, when->tv_sec, callback, arg);
+}
+
+int
+eloop_q_timeout_add_sec(struct eloop *eloop, int queue, unsigned int seconds,
     void (*callback)(void *), void *arg)
 {
-	struct timespec tv;
 
-	tv.tv_sec = when;
-	tv.tv_nsec = 0;
-	return eloop_q_timeout_add_tv(eloop, queue, &tv, callback, arg);
+	return eloop_q_timeout_add(eloop, queue, seconds, 0, callback, arg);
 }
 
 int
 eloop_q_timeout_add_msec(struct eloop *eloop, int queue, long when,
     void (*callback)(void *), void *arg)
 {
-	struct timespec tv;
+	long seconds, nseconds;
 
-	tv.tv_sec = when / MSEC_PER_SEC;
-	tv.tv_nsec = (when % MSEC_PER_SEC) * NSEC_PER_MSEC;
-	return eloop_q_timeout_add_tv(eloop, queue, &tv, callback, arg);
+	seconds = when / MSEC_PER_SEC;
+	if (seconds > UINT_MAX) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	nseconds = (when % MSEC_PER_SEC) * NSEC_PER_MSEC;
+	return eloop_q_timeout_add(eloop, queue,
+		(unsigned int)seconds, nseconds, callback, arg);
 }
 
 #if !defined(HAVE_KQUEUE)
@@ -914,34 +961,83 @@ eloop_start(struct eloop *eloop, sigset_t *signals)
 			t0(eloop->timeout0_arg);
 			continue;
 		}
-		if ((t = TAILQ_FIRST(&eloop->timeouts))) {
-			clock_gettime(CLOCK_MONOTONIC, &now);
-			if (timespeccmp(&now, &t->when, >)) {
-				TAILQ_REMOVE(&eloop->timeouts, t, next);
-				t->callback(t->arg);
-				TAILQ_INSERT_TAIL(&eloop->free_timeouts, t, next);
-				continue;
-			}
-			timespecsub(&t->when, &now, &ts);
-			tsp = &ts;
-		} else
-			/* No timeouts, so wait forever. */
-			tsp = NULL;
 
-		if (tsp == NULL && eloop->events_len == 0)
+		t = TAILQ_FIRST(&eloop->timeouts);
+		if (t == NULL && eloop->events_len == 0)
 			break;
 
+		if (t != NULL) {
+			unsigned int seconds;
+			long nseconds;
+
+			clock_gettime(CLOCK_MONOTONIC, &now);
+			if (timespeccmp(&now, &t->created, >))
+				timespecsub(&now, &t->created, &ts);
+			else {
+				ts.tv_sec = (TIME_MAX - t->created.tv_sec)
+				    + now.tv_sec;
+				ts.tv_nsec = now.tv_nsec - t->created.tv_nsec;
+				if (ts.tv_nsec < 0) {
+					ts.tv_sec--;
+					ts.tv_nsec += NSEC_PER_SEC;
+				}
+			}
+			if (ts.tv_sec > t->seconds ||
+			    (ts.tv_sec == t->seconds &&
+			    ts.tv_nsec > t->nseconds))
+			{
+				TAILQ_REMOVE(&eloop->timeouts, t, next);
+				t->callback(t->arg);
+				TAILQ_INSERT_TAIL(&eloop->free_timeouts,
+				    t, next);
+				continue;
+			}
+
+			seconds = (unsigned int)(t->seconds - ts.tv_sec);
+			nseconds = t->nseconds - ts.tv_nsec;
+			if (nseconds < 0) {
+				seconds--;
+				nseconds += NSEC_PER_SEC;
+			}
+
+			/* If t->seconds is greater than time_t we need
+			 * to reduce it AND adjust t->created to compenstate.
+			 * This does reduce the accuracy of the timer slightly,
+			 * but we have little choice. */
+			if (t->seconds > (unsigned int)TIME_MAX) {
+				t->created = now;
+				t->seconds -= (unsigned int)ts.tv_sec;
+				t->nseconds -= ts.tv_nsec;
+				if (t->nseconds < 0) {
+					t->seconds--;
+					t->nseconds += NSEC_PER_SEC;
+				}
+			}
+
+			if (seconds > INT_MAX) {
+				ts.tv_sec = (time_t)INT_MAX;
+				ts.tv_nsec = 0;
+			} else {
+				ts.tv_sec = (time_t)seconds;
+				ts.tv_nsec = nseconds;
+			}
+			tsp = &ts;
+
 #ifndef HAVE_KQUEUE
-		if (tsp == NULL)
-			timeout = -1;
-		else if (tsp->tv_sec > INT_MAX / 1000 ||
-		    (tsp->tv_sec == INT_MAX / 1000 &&
-		    (tsp->tv_nsec + 999999) / 1000000 > INT_MAX % 1000000))
-			timeout = INT_MAX;
-		else
-			timeout = (int)(tsp->tv_sec * 1000 +
-			    (tsp->tv_nsec + 999999) / 1000000);
+			if (seconds > INT_MAX / 1000 ||
+			    seconds == INT_MAX / 1000 &&
+			    ((nseconds + 999999) / 1000000 > INT_MAX % 1000000))
+				timeout = INT_MAX;
+			else
+				timeout = (int)(seconds * 1000 +
+				    (nseconds + 999999) / 1000000);
 #endif
+		} else {
+			tsp = NULL;
+#ifndef HAVE_KQUEUE
+			timeout = -1;
+#endif
+		}
 
 #if defined(HAVE_KQUEUE)
 		n = kevent(eloop->poll_fd, NULL, 0, &ke, 1, tsp);
@@ -964,59 +1060,46 @@ eloop_start(struct eloop *eloop, sigset_t *signals)
 				continue;
 			return -errno;
 		}
+		if (n == 0)
+			continue;
 
 		/* Process any triggered events.
 		 * We go back to the start after calling each callback incase
 		 * the current event or next event is removed. */
 #if defined(HAVE_KQUEUE)
-		if (n) {
-			if (ke.filter == EVFILT_SIGNAL) {
-				eloop->signal_cb((int)ke.ident,
-				    eloop->signal_cb_ctx);
-				continue;
-			}
+		if (ke.filter == EVFILT_SIGNAL) {
+			eloop->signal_cb((int)ke.ident,
+			    eloop->signal_cb_ctx);
+		} else {
 			e = (struct eloop_event *)ke.udata;
-			if (ke.filter == EVFILT_WRITE) {
+			if (ke.filter == EVFILT_WRITE && e->write_cb != NULL)
 				e->write_cb(e->write_cb_arg);
-				continue;
-			} else if (ke.filter == EVFILT_READ) {
+			else if (ke.filter == EVFILT_READ && e->read_cb != NULL)
 				e->read_cb(e->read_cb_arg);
-				continue;
-			}
 		}
 #elif defined(HAVE_EPOLL)
-		if (n) {
-			e = (struct eloop_event *)epe.data.ptr;
-			if (epe.events & EPOLLOUT && e->write_cb != NULL) {
-				e->write_cb(e->write_cb_arg);
-				continue;
-			}
-			if (epe.events &
-			    (EPOLLIN | EPOLLERR | EPOLLHUP) &&
-			    e->read_cb != NULL)
-			{
-				e->read_cb(e->read_cb_arg);
-				continue;
-			}
-		}
+		e = (struct eloop_event *)epe.data.ptr;
+		if (epe.events & EPOLLOUT && e->write_cb != NULL)
+			e->write_cb(e->write_cb_arg);
+		else if (epe.events & (EPOLLIN | EPOLLERR | EPOLLHUP) &&
+		    e->read_cb != NULL)
+			e->read_cb(e->read_cb_arg);
 #elif defined(HAVE_POLL)
-		if (n > 0) {
-			size_t i;
+		size_t i;
 
-			for (i = 0; i < eloop->events_len; i++) {
-				if (eloop->fds[i].revents & POLLOUT) {
-					e = eloop->event_fds[eloop->fds[i].fd];
-					if (e->write_cb != NULL) {
-						e->write_cb(e->write_cb_arg);
-						break;
-					}
+		for (i = 0; i < eloop->events_len; i++) {
+			if (eloop->fds[i].revents & POLLOUT) {
+				e = eloop->event_fds[eloop->fds[i].fd];
+				if (e->write_cb != NULL) {
+					e->write_cb(e->write_cb_arg);
+					break;
 				}
-				if (eloop->fds[i].revents) {
-					e = eloop->event_fds[eloop->fds[i].fd];
-					if (e->read_cb != NULL) {
-						e->read_cb(e->read_cb_arg);
-						break;
-					}
+			}
+			if (eloop->fds[i].revents) {
+				e = eloop->event_fds[eloop->fds[i].fd];
+				if (e->read_cb != NULL) {
+					e->read_cb(e->read_cb_arg);
+					break;
 				}
 			}
 		}

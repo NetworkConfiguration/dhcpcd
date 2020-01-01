@@ -94,7 +94,7 @@ int eloop_event_delete_write(struct eloop *, int, int);
 int eloop_q_timeout_add_tv(struct eloop *, int,
     const struct timespec *, void (*)(void *), void *);
 int eloop_q_timeout_add_sec(struct eloop *, int,
-    time_t, void (*)(void *), void *);
+    unsigned int, void (*)(void *), void *);
 int eloop_q_timeout_add_msec(struct eloop *, int,
     long, void (*)(void *), void *);
 int eloop_q_timeout_delete(struct eloop *, int, void (*)(void *), void *);

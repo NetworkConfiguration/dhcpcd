@@ -3172,18 +3172,18 @@ dhcp6_bind(struct interface *ifp, const char *op, const char *sfrom)
 
 		if (state->renew && state->renew != ND6_INFINITE_LIFETIME)
 			eloop_timeout_add_sec(ifp->ctx->eloop,
-			    (time_t)state->renew,
+			    state->renew,
 			    state->state == DH6S_INFORMED ?
 			    dhcp6_startinform : dhcp6_startrenew, ifp);
 		if (state->rebind && state->rebind != ND6_INFINITE_LIFETIME)
 			eloop_timeout_add_sec(ifp->ctx->eloop,
-			    (time_t)state->rebind, dhcp6_startrebind, ifp);
+			    state->rebind, dhcp6_startrebind, ifp);
 		if (state->expire != ND6_INFINITE_LIFETIME)
 			eloop_timeout_add_sec(ifp->ctx->eloop,
-			    (time_t)state->expire, dhcp6_startexpire, ifp);
+			    state->expire, dhcp6_startexpire, ifp);
 		else if (timed_out)
 			eloop_timeout_add_sec(ifp->ctx->eloop,
-			    (time_t)state->expire, dhcp6_startdiscover, ifp);
+			    state->expire, dhcp6_startdiscover, ifp);
 
 		ipv6_addaddrs(&state->addrs);
 		dhcp6_deprecateaddrs(&state->addrs);

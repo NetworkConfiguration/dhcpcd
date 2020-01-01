@@ -216,8 +216,8 @@ struct dhcp_state {
 	size_t old_len;
 	struct dhcp_lease lease;
 	const char *reason;
-	time_t interval;
-	time_t nakoff;
+	int interval;
+	unsigned int nakoff;
 	uint32_t xid;
 	int socket;
 

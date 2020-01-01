@@ -2268,11 +2268,11 @@ dhcp_bind(struct interface *ifp)
 		lease->renewaltime = lease->rebindtime = lease->leasetime;
 	else {
 		eloop_timeout_add_sec(ctx->eloop,
-		    (time_t)lease->renewaltime, dhcp_startrenew, ifp);
+		    lease->renewaltime, dhcp_startrenew, ifp);
 		eloop_timeout_add_sec(ctx->eloop,
-		    (time_t)lease->rebindtime, dhcp_rebind, ifp);
+		    lease->rebindtime, dhcp_rebind, ifp);
 		eloop_timeout_add_sec(ctx->eloop,
-		    (time_t)lease->leasetime, dhcp_expire, ifp);
+		    lease->leasetime, dhcp_expire, ifp);
 		logdebugx("%s: renew in %"PRIu32" seconds, rebind in %"PRIu32
 		    " seconds",
 		    ifp->name, lease->renewaltime, lease->rebindtime);
