@@ -1898,22 +1898,14 @@ if_applyra(const struct ra *rap)
 		error = -1;
 
 	snprintf(path, sizeof(path), "%s/%s/retrans_time_ms", p_neigh, ifname);
-	if (if_writepathuint(path, rap->retrans * 1000) == -1) {
-		snprintf(path, sizeof(path), "%s/%s/retrans_time",
-		    p_neigh, ifname);
-		/* Jiffies */
-		if (if_writepathuint(path, rap->retrans * 100) == -1)
-			error = -1;
-	}
+	if (if_writepathuint(path, rap->retrans) == -1)
+		error = -1;
 
 	snprintf(path, sizeof(path), "%s/%s/base_reachable_time_ms",
 	    p_neigh, ifname);
-	if (if_writepathuint(path, rap->reachable * 1000) == -1) {
-		snprintf(path, sizeof(path), "%s/%s/base_reachable_time",
-		    p_neigh, ifname);
-		if (if_writepathuint(path, rap->reachable) == -1)
-			error = -1;
-	}
+	if (if_writepathuint(path, rap->reachable) == -1)
+		error = -1;
+
 	return error;
 }
 
