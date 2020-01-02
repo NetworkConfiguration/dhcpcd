@@ -412,6 +412,11 @@ arp_probe(struct arp_state *astate)
 	astate->probes = 0;
 	logdebugx("%s: probing for %s",
 	    astate->iface->name, inet_ntoa(astate->addr));
+	if (!(IN_PRIVSEP(astate->iface->ctx)) && arp_open(astate->iface) == -1)
+	{
+		logerr(__func__);
+		return;
+	}
 	arp_probe1(astate);
 }
 #endif	/* ARP */
