@@ -890,7 +890,6 @@ ipv6nd_dadcallback(void *arg)
 	struct interface *ifp;
 	struct ra *rap;
 	int wascompleted, found;
-	struct timespec tv;
 	char buf[INET6_ADDRSTRLEN];
 	const char *p;
 	int dadcounter;
@@ -907,6 +906,8 @@ ipv6nd_dadcallback(void *arg)
 		 * a different address is generated. */
 		/* XXX Cache DAD counter per prefix/id/ssid? */
 		if (ifp->options->options & DHCPCD_SLAACPRIVATE) {
+			unsigned int delay;
+
 			if (ia->dadcounter >= IDGEN_RETRIES) {
 				logerrx("%s: unable to obtain a"
 				    " stable private address",
@@ -937,11 +938,8 @@ ipv6nd_dadcallback(void *arg)
 				    p, ia->prefix_len);
 			else
 				ia->saddr[0] = '\0';
-			tv.tv_sec = 0;
-			tv.tv_nsec = (suseconds_t)
-			    arc4random_uniform(IDGEN_DELAY * NSEC_PER_SEC);
-			timespecnorm(&tv);
-			eloop_timeout_add_tv(ifp->ctx->eloop, &tv,
+			delay = arc4random_uniform(IDGEN_DELAY * MSEC_PER_SEC);
+			eloop_timeout_add_msec(ifp->ctx->eloop, delay,
 			    ipv6nd_addaddr, ia);
 			return;
 		}
@@ -1907,7 +1905,7 @@ ipv6nd_startrs1(void *arg)
 void
 ipv6nd_startrs(struct interface *ifp)
 {
-	struct timespec tv;
+	unsigned int delay;
 
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	if (!(ifp->options->options & DHCPCD_INITIAL_DELAY)) {
@@ -1915,12 +1913,9 @@ ipv6nd_startrs(struct interface *ifp)
 		return;
 	}
 
-	tv.tv_sec = 0;
-	tv.tv_nsec = (suseconds_t)arc4random_uniform(
-	    MAX_RTR_SOLICITATION_DELAY * NSEC_PER_SEC);
-	timespecnorm(&tv);
+	delay = arc4random_uniform(MAX_RTR_SOLICITATION_DELAY * MSEC_PER_SEC);
 	logdebugx("%s: delaying IPv6 router solicitation for %0.1f seconds",
-	    ifp->name, timespec_to_double(&tv));
-	eloop_timeout_add_tv(ifp->ctx->eloop, &tv, ipv6nd_startrs1, ifp);
+	    ifp->name, (float)delay / MSEC_PER_SEC);
+	eloop_timeout_add_msec(ifp->ctx->eloop, delay, ipv6nd_startrs1, ifp);
 	return;
 }
