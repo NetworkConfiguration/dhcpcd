@@ -1714,7 +1714,7 @@ send_message(struct interface *ifp, uint8_t type,
 	struct in_addr from, to;
 	unsigned int RT;
 
-	if (!callback) {
+	if (callback == NULL) {
 		/* No carrier? Don't bother sending the packet. */
 		if (ifp->carrier <= LINK_DOWN)
 			return;
@@ -1722,6 +1722,7 @@ send_message(struct interface *ifp, uint8_t type,
 		    ifp->name,
 		    ifo->options & DHCPCD_BOOTP ? "BOOTP" : get_dhcp_op(type),
 		    state->xid);
+		RT = 0; /* bogus gcc warning */
 	} else {
 		if (state->interval == 0)
 			state->interval = 4;
@@ -1825,7 +1826,7 @@ out:
 fail:
 	/* Even if we fail to send a packet we should continue as we are
 	 * as our failure timeouts will change out codepath when needed. */
-	if (callback)
+	if (callback != NULL)
 		eloop_timeout_add_msec(ifp->ctx->eloop, RT, callback, ifp);
 }
 
