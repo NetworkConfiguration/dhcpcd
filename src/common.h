@@ -65,31 +65,6 @@
 #define timespecisset(tsp)      ((tsp)->tv_sec || (tsp)->tv_nsec)
 #endif
 
-#define timespec_to_double(tv)						     \
-	((double)(tv)->tv_sec + (double)((tv)->tv_nsec) / 1000000000.0)
-#define timespecnorm(tv) do {						     \
-	while ((tv)->tv_nsec >=  NSEC_PER_SEC) {			     \
-		(tv)->tv_sec++;						     \
-		(tv)->tv_nsec -= NSEC_PER_SEC;				     \
-	}								     \
-} while (0 /* CONSTCOND */);
-#define ts_to_ms(ms, tv) do {						     \
-	ms = (tv)->tv_sec * MSEC_PER_SEC;				     \
-	ms += (tv)->tv_nsec / NSEC_PER_MSEC;				     \
-} while (0 /* CONSTCOND */);
-#define ms_to_ts(tv, ms) do {						     \
-	(tv)->tv_sec = ms / MSEC_PER_SEC;				     \
-	(tv)->tv_nsec = (suseconds_t)(ms - ((tv)->tv_sec * MSEC_PER_SEC))    \
-	    * NSEC_PER_MSEC;						     \
-} while (0 /* CONSTCOND */);
-
-#ifndef TIMEVAL_TO_TIMESPEC
-#define	TIMEVAL_TO_TIMESPEC(tv, ts) do {				\
-	(ts)->tv_sec = (tv)->tv_sec;					\
-	(ts)->tv_nsec = (tv)->tv_usec * USEC_PER_NSEC;			\
-} while (0 /* CONSTCOND */)
-#endif
-
 #if __GNUC__ > 2 || defined(__INTEL_COMPILER)
 # ifndef __packed
 #  define __packed __attribute__((__packed__))
