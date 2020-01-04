@@ -51,10 +51,7 @@
 #define ROUNDUP4(a)		(1 + (((a) - 1) |  3))
 #define ROUNDUP8(a)		(1 + (((a) - 1) |  7))
 
-#define USEC_PER_SEC		1000000L
-#define USEC_PER_NSEC		1000L
 #define NSEC_PER_SEC		1000000000L
-#define NSEC_PER_MSEC		1000000L
 #define MSEC_PER_SEC		1000
 #define CSEC_PER_SEC		100L
 #define NSEC_PER_CSEC		10000000L
