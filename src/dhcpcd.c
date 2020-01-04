@@ -824,12 +824,9 @@ dhcpcd_startinterface(void *arg)
 				if (IF_UPANDRUNNING(ifp))
 					carrier = LINK_UP;
 				else {
-					struct timespec tv;
-
-					tv.tv_sec = 0;
-					tv.tv_nsec = IF_POLL_UP * NSEC_PER_MSEC;
-					eloop_timeout_add_tv(ifp->ctx->eloop,
-					    &tv, dhcpcd_startinterface, ifp);
+					eloop_timeout_add_msec(ifp->ctx->eloop,
+					    IF_POLL_UP * MSEC_PER_SEC,
+					    dhcpcd_startinterface, ifp);
 					return;
 				}
 			}
