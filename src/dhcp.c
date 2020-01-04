@@ -1712,7 +1712,7 @@ send_message(struct interface *ifp, uint8_t type,
 	size_t len, ulen;
 	ssize_t r;
 	struct in_addr from, to;
-	struct timespec tv;
+	unsigned int RT;
 
 	if (!callback) {
 		/* No carrier? Don't bother sending the packet. */
@@ -1730,10 +1730,8 @@ send_message(struct interface *ifp, uint8_t type,
 			if (state->interval > 64)
 				state->interval = 64;
 		}
-		tv.tv_sec = state->interval + DHCP_RAND_MIN;
-		tv.tv_nsec = (suseconds_t)arc4random_uniform(
-		    (DHCP_RAND_MAX - DHCP_RAND_MIN) * NSEC_PER_SEC);
-		timespecnorm(&tv);
+		RT = (state->interval * MSEC_PER_SEC) +
+		    (arc4random_uniform(MSEC_PER_SEC * 2) - MSEC_PER_SEC);
 		/* No carrier? Don't bother sending the packet.
 		 * However, we do need to advance the timeout. */
 		if (ifp->carrier <= LINK_DOWN)
@@ -1742,7 +1740,7 @@ send_message(struct interface *ifp, uint8_t type,
 		    ifp->name,
 		    ifo->options & DHCPCD_BOOTP ? "BOOTP" : get_dhcp_op(type),
 		    state->xid,
-		    timespec_to_double(&tv));
+		    (float)RT / MSEC_PER_SEC);
 	}
 
 	r = make_message(&bootp, ifp, type);
@@ -1828,7 +1826,7 @@ fail:
 	/* Even if we fail to send a packet we should continue as we are
 	 * as our failure timeouts will change out codepath when needed. */
 	if (callback)
-		eloop_timeout_add_tv(ifp->ctx->eloop, &tv, callback, ifp);
+		eloop_timeout_add_msec(ifp->ctx->eloop, RT, callback, ifp);
 }
 
 static void
@@ -3985,7 +3983,7 @@ dhcp_start1(void *arg)
 void
 dhcp_start(struct interface *ifp)
 {
-	struct timespec tv;
+	unsigned int delay;
 #ifdef ARPING
 	const struct dhcp_state *state;
 #endif
@@ -4040,15 +4038,12 @@ dhcp_start(struct interface *ifp)
 		return;
 	}
 #endif
-
-	tv.tv_sec = DHCP_MIN_DELAY;
-	tv.tv_nsec = (suseconds_t)arc4random_uniform(
-	    (DHCP_MAX_DELAY - DHCP_MIN_DELAY) * NSEC_PER_SEC);
-	timespecnorm(&tv);
+	delay = MSEC_PER_SEC +
+		(arc4random_uniform(MSEC_PER_SEC * 2) - MSEC_PER_SEC);
 	logdebugx("%s: delaying IPv4 for %0.1f seconds",
-	    ifp->name, timespec_to_double(&tv));
+	    ifp->name, (float)delay / MSEC_PER_SEC);
 
-	eloop_timeout_add_tv(ifp->ctx->eloop, &tv, dhcp_start1, ifp);
+	eloop_timeout_add_msec(ifp->ctx->eloop, delay, dhcp_start1, ifp);
 }
 
 void
