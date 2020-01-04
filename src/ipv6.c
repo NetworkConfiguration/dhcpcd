@@ -568,11 +568,8 @@ ipv6_checkaddrflags(void *arg)
 		    &ia->addr, ia->prefix_len, flags, 0);
 	} else {
 		/* Still tentative? Check again in a bit. */
-		struct timespec tv;
-
-		ms_to_ts(&tv, RETRANS_TIMER / 2);
-		eloop_timeout_add_tv(ia->iface->ctx->eloop, &tv,
-		    ipv6_checkaddrflags, ia);
+		eloop_timeout_add_msec(ia->iface->ctx->eloop,
+		    RETRANS_TIMER / 2, ipv6_checkaddrflags, ia);
 	}
 }
 #endif
@@ -746,11 +743,8 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 	eloop_timeout_delete(ifp->ctx->eloop,
 		ipv6_checkaddrflags, ia);
 	if (!(ia->flags & IPV6_AF_DADCOMPLETED)) {
-		struct timespec tv;
-
-		ms_to_ts(&tv, RETRANS_TIMER / 2);
-		eloop_timeout_add_tv(ifp->ctx->eloop,
-		    &tv, ipv6_checkaddrflags, ia);
+		eloop_timeout_add_msec(ifp->ctx->eloop,
+		    RETRANS_TIMER / 2, ipv6_checkaddrflags, ia);
 	}
 #endif
 
@@ -1208,12 +1202,9 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 		if (IN6_IS_ADDR_LINKLOCAL(&ia->addr) || ia->dadcallback) {
 #ifdef IPV6_POLLADDRFLAG
 			if (ia->addr_flags & IN6_IFF_TENTATIVE) {
-				struct timespec tv;
-
-				ms_to_ts(&tv, RETRANS_TIMER / 2);
-				eloop_timeout_add_tv(
+				eloop_timeout_add_msec(
 				    ia->iface->ctx->eloop,
-				    &tv, ipv6_checkaddrflags, ia);
+				    RETRANS_TIMER / 2, ipv6_checkaddrflags, ia);
 				break;
 			}
 #endif
@@ -1510,12 +1501,9 @@ ipv6_tryaddlinklocal(struct interface *ifp)
 	if (ia != NULL) {
 #ifdef IPV6_POLLADDRFLAG
 		if (ia->addr_flags & IN6_IFF_TENTATIVE) {
-			struct timespec tv;
-
-			ms_to_ts(&tv, RETRANS_TIMER / 2);
-			eloop_timeout_add_tv(
+			eloop_timeout_add_msec(
 			    ia->iface->ctx->eloop,
-			    &tv, ipv6_checkaddrflags, ia);
+			    RETRANS_TIMER / 2, ipv6_checkaddrflags, ia);
 		}
 #endif
 		return 0;
