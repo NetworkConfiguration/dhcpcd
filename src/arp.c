@@ -383,23 +383,21 @@ arp_probe1(void *arg)
 {
 	struct arp_state *astate = arg;
 	struct interface *ifp = astate->iface;
-	struct timespec tv;
+	unsigned int delay;
 
 	if (++astate->probes < PROBE_NUM) {
-		tv.tv_sec = PROBE_MIN;
-		tv.tv_nsec = (suseconds_t)arc4random_uniform(
-		    (PROBE_MAX - PROBE_MIN) * NSEC_PER_SEC);
-		timespecnorm(&tv);
-		eloop_timeout_add_tv(ifp->ctx->eloop, &tv, arp_probe1, astate);
+		delay = (PROBE_MIN * MSEC_PER_SEC) +
+		    (arc4random_uniform(
+		    (PROBE_MAX - PROBE_MIN) * MSEC_PER_SEC));
+		eloop_timeout_add_msec(ifp->ctx->eloop, delay, arp_probe1, astate);
 	} else {
-		tv.tv_sec = ANNOUNCE_WAIT;
-		tv.tv_nsec = 0;
-		eloop_timeout_add_tv(ifp->ctx->eloop, &tv, arp_probed, astate);
+		delay = ANNOUNCE_WAIT *	MSEC_PER_SEC;
+		eloop_timeout_add_msec(ifp->ctx->eloop, delay, arp_probed, astate);
 	}
 	logdebugx("%s: ARP probing %s (%d of %d), next in %0.1f seconds",
 	    ifp->name, inet_ntoa(astate->addr),
 	    astate->probes ? astate->probes : PROBE_NUM, PROBE_NUM,
-	    timespec_to_double(&tv));
+	    (float)delay / MSEC_PER_SEC);
 	if (arp_request(ifp, NULL, &astate->addr) == -1)
 		logerr(__func__);
 }
