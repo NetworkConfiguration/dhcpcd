@@ -1594,7 +1594,8 @@ ipv6nd_expirera(void *arg)
 {
 	struct interface *ifp;
 	struct ra *rap, *ran;
-	struct timespec now, expire;
+	struct timespec now;
+	uint32_t elapsed;
 	bool expired, valid;
 	struct ipv6_addr *ia;
 	size_t len, olen;
@@ -1617,8 +1618,9 @@ ipv6nd_expirera(void *arg)
 			continue;
 		valid = false;
 		if (rap->lifetime) {
-			timespecsub(&now, &rap->acquired, &expire);
-			if (expire.tv_sec > rap->lifetime) {
+			elapsed = (uint32_t)eloop_timespec_diff(&now,
+			    &rap->acquired, NULL);
+			if (elapsed > rap->lifetime) {
 				if (!rap->expired) {
 					logwarnx("%s: %s: router expired",
 					    ifp->name, rap->sfrom);
@@ -1627,8 +1629,7 @@ ipv6nd_expirera(void *arg)
 				}
 			} else {
 				valid = true;
-				ltime = (unsigned int)
-				    (rap->lifetime - expire.tv_sec);
+				ltime = rap->lifetime - elapsed;
 				if (next == 0 || ltime < next)
 					next = ltime;
 			}
@@ -1644,8 +1645,9 @@ ipv6nd_expirera(void *arg)
 				valid = true;
 				continue;
 			}
-			timespecsub(&now, &ia->acquired, &expire);
-			if (expire.tv_sec > ia->prefix_vltime) {
+			elapsed = (uint32_t)eloop_timespec_diff(&now,
+			    &ia->acquired, NULL);
+			if (elapsed > ia->prefix_vltime) {
 				if (ia->flags & IPV6_AF_ADDED) {
 					logwarnx("%s: expired address %s",
 					    ia->iface->name, ia->saddr);
@@ -1660,15 +1662,15 @@ ipv6nd_expirera(void *arg)
 				expired = true;
 			} else {
 				valid = true;
-				ltime = (unsigned int)
-				    (ia->prefix_vltime - expire.tv_sec);
+				ltime = ia->prefix_vltime - elapsed;
 				if (next == 0 || ltime < next)
 					next = ltime;
 			}
 		}
 
 		/* Work out expiry for ND options */
-		timespecsub(&now, &rap->acquired, &expire);
+		elapsed = (uint32_t)eloop_timespec_diff(&now,
+		    &rap->acquired, NULL);
 		len = rap->data_len - sizeof(struct nd_router_advert);
 		for (p = rap->data + sizeof(struct nd_router_advert);
 		    len >= sizeof(ndo);
@@ -1719,13 +1721,13 @@ ipv6nd_expirera(void *arg)
 			}
 
 			ltime = ntohl(ltime);
-			if (expire.tv_sec > ltime) {
+			if (elapsed > ltime) {
 				expired = true;
 				continue;
 			}
 
 			valid = true;
-			ltime = (unsigned int)(ltime - expire.tv_sec);
+			ltime -= elapsed;
 			if (next == 0 || ltime < next)
 				next = ltime;
 		}

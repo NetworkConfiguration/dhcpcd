@@ -798,13 +798,14 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 
 	if (type != DHCP_DECLINE && type != DHCP_RELEASE) {
 		struct timespec tv;
+		unsigned long long secs;
 
 		clock_gettime(CLOCK_MONOTONIC, &tv);
-		timespecsub(&tv, &state->started, &tv);
-		if (tv.tv_sec < 0 || tv.tv_sec > (time_t)UINT16_MAX)
+		secs = eloop_timespec_diff(&tv, &state->started, NULL);
+		if (secs > UINT16_MAX)
 			bootp->secs = htons((uint16_t)UINT16_MAX);
 		else
-			bootp->secs = htons((uint16_t)tv.tv_sec);
+			bootp->secs = htons((uint16_t)secs);
 	}
 
 	bootp->xid = htonl(state->xid);

@@ -401,7 +401,7 @@ dhcp6_updateelapsed(struct interface *ifp, struct dhcp6_message *m, size_t len)
 	uint16_t opt_len;
 	struct dhcp6_state *state;
 	struct timespec tv;
-	time_t hsec;
+	unsigned long long hsec;
 	uint16_t sec;
 
 	opt = dhcp6_findmoption(m, len, D6_OPTION_ELAPSED, &opt_len);
@@ -420,14 +420,17 @@ dhcp6_updateelapsed(struct interface *ifp, struct dhcp6_message *m, size_t len)
 		state->started = tv;
 		hsec = 0;
 	} else {
-		timespecsub(&tv, &state->started, &tv);
+		unsigned long long secs;
+		unsigned int nsecs;
+
+		secs = eloop_timespec_diff(&tv, &state->started, &nsecs);
 		/* Elapsed time is measured in centiseconds.
 		 * We need to be sure it will not potentially overflow. */
-		if (tv.tv_sec >= (UINT16_MAX / CSEC_PER_SEC) + 1)
+		if (secs >= (UINT16_MAX / CSEC_PER_SEC) + 1)
 			hsec = UINT16_MAX;
 		else {
-			hsec = (tv.tv_sec * CSEC_PER_SEC) +
-			    (tv.tv_nsec / NSEC_PER_CSEC);
+			hsec = (secs * CSEC_PER_SEC) +
+			    (nsecs / NSEC_PER_CSEC);
 			if (hsec > UINT16_MAX)
 				hsec = UINT16_MAX;
 		}
@@ -3085,27 +3088,26 @@ dhcp6_bind(struct interface *ifp, const char *op, const char *sfrom)
 
 	clock_gettime(CLOCK_MONOTONIC, &now);
 	if (state->state == DH6S_TIMEDOUT || state->state == DH6S_ITIMEDOUT) {
-		struct timespec diff;
-		uint32_t diffsec;
+		uint32_t elapsed;
 
 		/* Reduce timers */
-		timespecsub(&now, &state->acquired, &diff);
-		diffsec = (uint32_t)diff.tv_sec;
+		elapsed = (uint32_t)eloop_timespec_diff(&now,
+		    &state->acquired, NULL);
 		if (state->renew && state->renew != ND6_INFINITE_LIFETIME) {
-			if (state->renew > diffsec)
-				state->renew -= diffsec;
+			if (state->renew > elapsed)
+				state->renew -= elapsed;
 			else
 				state->renew = 0;
 		}
 		if (state->rebind && state->rebind != ND6_INFINITE_LIFETIME) {
-			if (state->rebind > diffsec)
-				state->rebind -= diffsec;
+			if (state->rebind > elapsed)
+				state->rebind -= elapsed;
 			else
 				state->rebind = 0;
 		}
 		if (state->expire && state->expire != ND6_INFINITE_LIFETIME) {
-			if (state->expire > diffsec)
-				state->expire -= diffsec;
+			if (state->expire > elapsed)
+				state->expire -= elapsed;
 			else {
 				if (!(ifp->options->options &
 				    DHCPCD_LASTLEASE_EXTEND))

@@ -666,28 +666,26 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 	    (ia->prefix_pltime != ND6_INFINITE_LIFETIME ||
 	    ia->prefix_vltime != ND6_INFINITE_LIFETIME))
 	{
+		uint32_t elapsed;
 		struct timespec n;
 
 		if (now == NULL) {
 			clock_gettime(CLOCK_MONOTONIC, &n);
 			now = &n;
 		}
-		timespecsub(now, &ia->acquired, &n);
+		elapsed = (uint32_t)eloop_timespec_diff(now, &ia->acquired,
+		    NULL);
 		if (ia->prefix_pltime != ND6_INFINITE_LIFETIME) {
-			ia->prefix_pltime -= (uint32_t)n.tv_sec;
-			/* This can happen when confirming a
-			 * deprecated but still valid lease. */
-			if (ia->prefix_pltime > pltime)
+			if (elapsed > ia->prefix_pltime)
 				ia->prefix_pltime = 0;
+			else
+				ia->prefix_pltime -= elapsed;
 		}
 		if (ia->prefix_vltime != ND6_INFINITE_LIFETIME) {
-			ia->prefix_vltime -= (uint32_t)n.tv_sec;
-			/* This should never happen. */
-			if (ia->prefix_vltime > vltime) {
-				logerrx("%s: %s: lifetime overflow",
-				    ifp->name, ia->saddr);
-				ia->prefix_vltime = ia->prefix_pltime = 0;
-			}
+			if (elapsed > ia->prefix_vltime)
+				ia->prefix_vltime = 0;
+			else
+				ia->prefix_vltime -= elapsed;
 		}
 	}
 
