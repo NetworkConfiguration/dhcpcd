@@ -151,8 +151,10 @@
 #define IRT_DEFAULT		86400
 #define IRT_MINIMUM		600
 
-#define DHCP6_RAND_MIN		-100
-#define DHCP6_RAND_MAX		100
+/* These should give -.1 to .1 randomness */
+#define	DHCP6_RAND_MIN		-100
+#define	DHCP6_RAND_MAX		100
+#define	DHCP6_RAND_DIV		1000.0f
 
 enum DH6S {
 	DH6S_INIT,
@@ -177,16 +179,18 @@ struct dhcp6_state {
 	enum DH6S state;
 	struct timespec started;
 
-	/* Message retransmission timings */
-	struct timespec RT;
+	/* Message retransmission timings in seconds */
 	unsigned int IMD;
 	unsigned int RTC;
-	time_t IRT;
+	unsigned int IRT;
 	unsigned int MRC;
-	time_t MRT;
+	unsigned int MRT;
 	void (*MRCcallback)(void *);
-	time_t sol_max_rt;
-	time_t inf_max_rt;
+	unsigned int sol_max_rt;
+	unsigned int inf_max_rt;
+	unsigned int RT;	/* retransmission timer in milliseconds
+				 * maximal RT is 1 day + RAND,
+				 * so should be enough */
 
 	struct dhcp6_message *send;
 	size_t send_len;

@@ -1162,10 +1162,7 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 	    .sin6_family = AF_INET6,
 	    .sin6_port = htons(DHCP6_SERVER_PORT),
 	};
-	struct timespec RTprev;
-	double rnd;
-	time_t ms;
-	uint8_t neg;
+	unsigned int RT;
 	const char *broad_uni;
 	const struct in6_addr alldhcp = IN6ADDR_LINKLOCAL_ALLDHCP_INIT;
 	struct ipv6_addr *lla;
@@ -1214,60 +1211,33 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 		    !(ifp->options->options & DHCPCD_INITIAL_DELAY))
 			state->IMD = 0;
 		if (state->IMD) {
+			state->RT = state->IMD * MSEC_PER_SEC;
 			/* Some buggy PPP servers close the link too early
 			 * after sending an invalid status in their reply
 			 * which means this host won't see it.
 			 * 1 second grace seems to be the sweet spot. */
 			if (ifp->flags & IFF_POINTOPOINT)
-				state->RT.tv_sec = 1;
-			else
-				state->RT.tv_sec = 0;
-			state->RT.tv_nsec = (suseconds_t)arc4random_uniform(
-			    (uint32_t)(state->IMD * NSEC_PER_SEC));
-			timespecnorm(&state->RT);
+				state->RT += MSEC_PER_SEC;
 			broad_uni = "delaying";
-			goto logsend;
-		}
-		if (state->RTC == 0) {
-			RTprev.tv_sec = state->IRT;
-			RTprev.tv_nsec = 0;
-			state->RT.tv_sec = RTprev.tv_sec;
-			state->RT.tv_nsec = 0;
-		} else {
-			RTprev = state->RT;
-			timespecadd(&state->RT, &state->RT, &state->RT);
+		} else if (state->RTC == 0)
+			state->RT = state->IRT * MSEC_PER_SEC;
+
+		if (state->MRT != 0) {
+			unsigned int mrt = state->MRT * MSEC_PER_SEC;
+
+			if (state->RT > mrt)
+				state->RT = mrt;
 		}
 
-		rnd = DHCP6_RAND_MIN;
-		rnd += (suseconds_t)arc4random_uniform(
-		    DHCP6_RAND_MAX - DHCP6_RAND_MIN);
-		rnd /= MSEC_PER_SEC;
-		neg = (rnd < 0.0);
-		if (neg)
-			rnd = -rnd;
-		ts_to_ms(ms, &RTprev);
-		ms = (time_t)((double)ms * rnd);
-		ms_to_ts(&RTprev, ms);
-		if (neg)
-			timespecsub(&state->RT, &RTprev, &state->RT);
-		else
-			timespecadd(&state->RT, &RTprev, &state->RT);
+		/* Add -.1 to .1 * RT randomness as per RFC8415 section 15 */
+		uint32_t lru = arc4random_uniform(
+		    state->RTC == 0 ? DHCP6_RAND_MAX
+		    : DHCP6_RAND_MAX - DHCP6_RAND_MIN);
+		int lr = (int)lru - (state->RTC == 0 ? 0 : DHCP6_RAND_MAX);
+		RT = state->RT
+		    + (unsigned int)((float)state->RT
+		    * ((float)lr / DHCP6_RAND_DIV));
 
-		if (state->MRT != 0 && state->RT.tv_sec > state->MRT) {
-			RTprev.tv_sec = state->MRT;
-			RTprev.tv_nsec = 0;
-			state->RT.tv_sec = state->MRT;
-			state->RT.tv_nsec = 0;
-			ts_to_ms(ms, &RTprev);
-			ms = (time_t)((double)ms * rnd);
-			ms_to_ts(&RTprev, ms);
-			if (neg)
-				timespecsub(&state->RT, &RTprev, &state->RT);
-			else
-				timespecadd(&state->RT, &RTprev, &state->RT);
-		}
-
-logsend:
 		if (ifp->carrier > LINK_DOWN)
 			logdebugx("%s: %s %s (xid 0x%02x%02x%02x),"
 			    " next in %0.1f seconds",
@@ -1277,17 +1247,12 @@ logsend:
 			    state->send->xid[0],
 			    state->send->xid[1],
 			    state->send->xid[2],
-			    timespec_to_double(&state->RT));
-
-		/* This sometimes happens when we delegate to this interface
-		 * AND run DHCPv6 on it normally. */
-		assert(timespec_to_double(&state->RT) != 0);
+			    (float)RT / MSEC_PER_SEC);
 
 		/* Wait the initial delay */
 		if (state->IMD != 0) {
 			state->IMD = 0;
-			eloop_timeout_add_tv(ctx->eloop,
-			    &state->RT, callback, ifp);
+			eloop_timeout_add_msec(ctx->eloop, RT, callback, ifp);
 			return 0;
 		}
 	}
@@ -1376,14 +1341,17 @@ logsend:
 #ifdef PRIVSEP
 sent:
 #endif
+	state->RT = RT * 2;
+	if (state->RT < RT) /* Check overflow */
+		state->RT = RT;
 	state->RTC++;
 	if (callback) {
 		if (state->MRC == 0 || state->RTC < state->MRC)
-			eloop_timeout_add_tv(ctx->eloop,
-			    &state->RT, callback, ifp);
+			eloop_timeout_add_msec(ctx->eloop,
+			    RT, callback, ifp);
 		else if (state->MRC != 0 && state->MRCcallback)
-			eloop_timeout_add_tv(ctx->eloop,
-			    &state->RT, state->MRCcallback, ifp);
+			eloop_timeout_add_msec(ctx->eloop,
+			    RT, state->MRCcallback, ifp);
 		else
 			logwarnx("%s: sent %d times with no reply",
 			    ifp->name, state->RTC);

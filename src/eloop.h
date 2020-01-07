@@ -98,7 +98,7 @@ int eloop_q_timeout_add_tv(struct eloop *, int,
 int eloop_q_timeout_add_sec(struct eloop *, int,
     unsigned int, void (*)(void *), void *);
 int eloop_q_timeout_add_msec(struct eloop *, int,
-    long, void (*)(void *), void *);
+    unsigned long, void (*)(void *), void *);
 int eloop_q_timeout_delete(struct eloop *, int, void (*)(void *), void *);
 
 int eloop_signal_set_cb(struct eloop *, const int *, size_t,

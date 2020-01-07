@@ -96,7 +96,7 @@
 #endif
 
 #ifndef MSEC_PER_SEC
-#define MSEC_PER_SEC	1000L
+#define MSEC_PER_SEC	1000
 #define NSEC_PER_MSEC	1000000L
 #define NSEC_PER_SEC	1000000000U
 #endif
@@ -671,10 +671,10 @@ eloop_q_timeout_add_sec(struct eloop *eloop, int queue, unsigned int seconds,
 }
 
 int
-eloop_q_timeout_add_msec(struct eloop *eloop, int queue, long when,
+eloop_q_timeout_add_msec(struct eloop *eloop, int queue, unsigned long when,
     void (*callback)(void *), void *arg)
 {
-	long seconds, nseconds;
+	unsigned long seconds, nseconds;
 
 	seconds = when / MSEC_PER_SEC;
 	if (seconds > UINT_MAX) {
