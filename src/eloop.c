@@ -1000,13 +1000,15 @@ eloop_start(struct eloop *eloop, sigset_t *signals)
 	int n;
 	struct eloop_event *e;
 	struct eloop_timeout *t;
-	struct timespec ts, *tsp;
 	void (*t0)(void *);
 #if defined(HAVE_KQUEUE)
 	struct kevent ke;
 	UNUSED(signals);
 #elif defined(HAVE_EPOLL)
 	struct epoll_event epe;
+#endif
+#if defined(HAVE_KQUEUE) || defined(HAVE_POLL)
+	struct timespec ts, *tsp;
 #endif
 #ifndef HAVE_KQUEUE
 	int timeout;
@@ -1041,6 +1043,7 @@ eloop_start(struct eloop *eloop, sigset_t *signals)
 		}
 
 		if (t != NULL) {
+#if defined(HAVE_KQUEUE) || defined(HAVE_POLL)
 			if (t->seconds > INT_MAX) {
 				ts.tv_sec = (time_t)INT_MAX;
 				ts.tv_nsec = 0;
@@ -1049,18 +1052,22 @@ eloop_start(struct eloop *eloop, sigset_t *signals)
 				ts.tv_nsec = t->nseconds;
 			}
 			tsp = &ts;
+#endif
 
 #ifndef HAVE_KQUEUE
 			if (t->seconds > INT_MAX / 1000 ||
-			    t->seconds == INT_MAX / 1000 &&
-			    ((t->nseconds + 999999) / 1000000 > INT_MAX % 1000000))
+			    (t->seconds == INT_MAX / 1000 &&
+			    ((t->nseconds + 999999) / 1000000
+			    > INT_MAX % 1000000)))
 				timeout = INT_MAX;
 			else
 				timeout = (int)(t->seconds * 1000 +
 				    (t->nseconds + 999999) / 1000000);
 #endif
 		} else {
+#if defined(HAVE_KQUEUE) || defined(HAVE_POLL)
 			tsp = NULL;
+#endif
 #ifndef HAVE_KQUEUE
 			timeout = -1;
 #endif
