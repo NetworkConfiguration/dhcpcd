@@ -140,7 +140,7 @@ arp_found(struct arp_state *astate, const struct arp_msg *amsg)
 	struct interface *ifp;
 	struct ipv4_addr *ia;
 #ifndef KERNEL_RFC5227
-	struct timespec now, defend;
+	struct timespec now;
 #endif
 
 	arp_report_conflicted(astate, amsg);
@@ -163,10 +163,9 @@ arp_found(struct arp_state *astate, const struct arp_msg *amsg)
 	 * messages.
 	 * If another conflict happens within DEFEND_INTERVAL
 	 * then we must drop our address and negotiate a new one. */
-	defend.tv_sec = astate->defend.tv_sec + DEFEND_INTERVAL;
-	defend.tv_nsec = astate->defend.tv_nsec;
 	clock_gettime(CLOCK_MONOTONIC, &now);
-	if (timespeccmp(&defend, &now, >))
+	if (timespecisset(&astate->defend) &&
+	    eloop_timespec_diff(&astate->defend, &now, NULL) < DEFEND_INTERVAL)
 		logwarnx("%s: %d second defence failed for %s",
 		    ifp->name, DEFEND_INTERVAL, inet_ntoa(astate->addr));
 	else if (arp_request(ifp, &astate->addr, &astate->addr) == -1)
