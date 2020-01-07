@@ -70,6 +70,8 @@
 /* Forward declare eloop - the content should be invisible to the outside */
 struct eloop;
 
+unsigned long long eloop_timespec_diff(const struct timespec *tsp,
+    const struct timespec *usp, unsigned int *nsp);
 int eloop_event_add_rw(struct eloop *, int,
     void (*)(void *), void *,
     void (*)(void *), void *);
