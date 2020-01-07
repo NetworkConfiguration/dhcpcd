@@ -618,8 +618,9 @@ ipv6nd_sortrouters(struct dhcpcd_ctx *ctx)
 			if (ipv6nd_rtpref(ra1) < ipv6nd_rtpref(ra2))
 				continue;
 			/* All things being equal, prefer older routers. */
-			if (timespeccmp(&ra1->acquired, &ra2->acquired, >=))
-				continue;
+			/* We don't need to check time, becase newer
+			 * routers are always added to the tail and then
+			 * sorted. */
 			TAILQ_INSERT_BEFORE(ra2, ra1, next);
 			break;
 		}
