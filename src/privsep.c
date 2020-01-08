@@ -86,8 +86,11 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 	if ((pw = getpwnam(PRIVSEP_USER)) == NULL) {
 		ctx->options &= ~DHCPCD_PRIVSEP;
 		if (errno == 0) {
-			if (ctx == recv_ctx) /* Only log the once. */
+			if (ctx == recv_ctx) { /* Only log the once. */
 				logerrx("no such user %s", PRIVSEP_USER);
+				/* Just incase logerrx caused an error... */
+				errno = 0;
+			}
 		} else
 			logerr("getpwnam");
 		return -1;
