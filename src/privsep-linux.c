@@ -137,5 +137,8 @@ ps_root_writepathuint(struct dhcpcd_ctx *ctx, const char *path,
 	p += plen;
 	memcpy(p, &val, sizeof(val));
 
-	return ps_sendcmd(ctx, ctx->ps_root_fd, PS_WRITEPATHUINT, 0, buf, len);
+	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_WRITEPATHUINT,
+	    0, buf, len) == -1)
+		return -1;
+	return ps_root_readerror(ctx);
 }
