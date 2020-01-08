@@ -3366,7 +3366,7 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom,
 				    ifp->name,
 				    (unsigned long long)state->sol_max_rt,
 				    max_rt);
-				state->sol_max_rt = (time_t)max_rt;
+				state->sol_max_rt = max_rt;
 			} else
 				logerr("%s: invalid SOL_MAX_RT %u",
 				    ifp->name, max_rt);
@@ -3382,7 +3382,7 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom,
 				    ifp->name,
 				    (unsigned long long)state->inf_max_rt,
 				    max_rt);
-				state->inf_max_rt = (time_t)max_rt;
+				state->inf_max_rt = max_rt;
 			} else
 				logerrx("%s: invalid INF_MAX_RT %u",
 				    ifp->name, max_rt);
