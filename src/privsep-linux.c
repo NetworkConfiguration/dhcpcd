@@ -124,8 +124,6 @@ ps_root_writepathuint(struct dhcpcd_ctx *ctx, const char *path,
 	size_t plen = strlen(path) + 1;
 	size_t len = sizeof(plen) + plen + sizeof(val);
 
-	return 0;
-
 	if (len > sizeof(buf)) {
 		errno = ENOBUFS;
 		return -1;
