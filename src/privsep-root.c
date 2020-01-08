@@ -46,6 +46,8 @@
 #include "privsep.h"
 #include "script.h"
 
+__CTASSERT(sizeof(ioctl_request_t) <= sizeof(unsigned long));
+
 struct psr_error
 {
 	ssize_t psr_result;
@@ -130,7 +132,16 @@ ps_root_doioctl(unsigned long req, void *data, size_t len)
 
 	s = socket(PF_INET, SOCK_DGRAM, 0);
 	if (s != -1)
+#ifdef IOCTL_REQUEST_TYPE
+	{
+		ioctl_request_t reqt;
+
+		memcpy(&reqt, &req, sizeof(reqt));
+		err = ioctl(s, reqt, data, len);
+	}
+#else
 		err = ioctl(s, req, data, len);
+#endif
 	else
 		err = -1;
 	if (s != -1)
@@ -410,9 +421,18 @@ ps_root_script(const struct interface *ifp, const void *data, size_t len)
 }
 
 ssize_t
-ps_root_ioctl(struct dhcpcd_ctx *ctx, unsigned long req, void *data, size_t len)
+ps_root_ioctl(struct dhcpcd_ctx *ctx, ioctl_request_t req, void *data,
+    size_t len)
 {
+#ifdef IOCTL_REQUEST_TYPE
+	unsigned long ulreq = 0;
+
+	memcpy(&ulreq, &req, sizeof(req));
+	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_IOCTL, ulreq, data, len) == -1)
+		return -1;
+#else
 	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_IOCTL, req, data, len) == -1)
 		return -1;
+#endif
 	return ps_root_readerror(ctx);
 }
