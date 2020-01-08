@@ -256,6 +256,8 @@ if_writepathuint(struct dhcpcd_ctx *ctx, const char *path, unsigned int val)
 #ifdef PRIVSEP
 	if (ctx->options & DHCPCD_PRIVSEP)
 		return ps_root_writepathuint(ctx, path, val);
+#else
+	UNUSED(ctx);
 #endif
 
 	fp = fopen(path, "w");
@@ -927,6 +929,7 @@ if_handlelink(struct dhcpcd_ctx *ctx)
 	    &link_netlink, NULL);
 }
 
+#ifdef PRIVSEP
 static bool
 if_netlinkpriv(int protocol, struct nlmsghdr *nlm)
 {
@@ -945,6 +948,7 @@ if_netlinkpriv(int protocol, struct nlmsghdr *nlm)
 		return false;
 	}
 }
+#endif
 
 static int
 if_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct nlmsghdr *hdr,
