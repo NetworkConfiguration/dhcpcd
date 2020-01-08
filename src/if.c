@@ -133,7 +133,7 @@ if_closesockets(struct dhcpcd_ctx *ctx)
 }
 
 int
-if_ioctl(struct dhcpcd_ctx *ctx, unsigned long req, void *data, size_t len)
+if_ioctl(struct dhcpcd_ctx *ctx, ioctl_request_t req, void *data, size_t len)
 {
 
 #ifdef PRIVSEP

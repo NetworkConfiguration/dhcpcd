@@ -549,7 +549,7 @@ if [ "$PRIVSEP" = yes ]; then
 			fi
 		done
 	fi
-	: ${PRIVSEP_USER:= _dhcpcd}
+	: ${PRIVSEP_USER:=_dhcpcd}
 
 	echo "CPPFLAGS+=	-DPRIVSEP" >>$CONFIG_MK
 	echo "#ifndef PRIVSEP_USER" >>$CONFIG_H
@@ -736,6 +736,27 @@ else
 fi
 rm -f _clock_gettime.c _clock_gettime
 $abort && exit 1
+
+printf "Testing ioctl request type ... "
+cat <<EOF >_ioctl.c
+#include <sys/ioctl.h>
+int main(void) {
+	unsigned long req = 0;
+	return ioctl(3, req, &req);
+}
+EOF
+if $XCC _ioctl.c -o _ioctl 2>&3; then
+	IOCTL_REQ="unsigned long"
+else
+	IOCTL_REQ="int"
+fi
+echo "$IOCTL_REQ"
+# Our default is unsigned long
+# We can still define it, but it makes the code path slightly bigger
+if [ "$IOCTL_REQ" != "unsigned long" ]; then
+	echo "#define	IOCTL_REQUEST_TYPE	$IOCTL_REQ" >>$CONFIG_H
+fi
+rm -f _ioctl.c _ioctl
 
 printf "Testing for inet_ntoa ... "
 cat <<EOF >_inet_ntoa.c

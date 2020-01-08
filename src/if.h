@@ -62,6 +62,16 @@
 #endif
 
 #include "config.h"
+
+/* POSIX defines ioctl request as an int, which Solaris and musl use.
+ * Everyone else use an unsigned long, which happens to be the bigger one
+ * so we use that in our on wire API. */
+#ifdef IOCTL_REQUEST_TYPE
+typedef IOCTL_REQUEST_TYPE	ioctl_request_t;
+#else
+typedef unsigned long		ioctl_request_t;
+#endif
+
 #include "dhcpcd.h"
 #include "ipv4.h"
 #include "ipv6.h"
@@ -110,7 +120,7 @@ int if_getifaddrs(struct ifaddrs **);
 int if_getsubnet(struct dhcpcd_ctx *, const char *, int, void *, size_t);
 #endif
 
-int if_ioctl(struct dhcpcd_ctx *, unsigned long, void *, size_t);
+int if_ioctl(struct dhcpcd_ctx *, ioctl_request_t, void *, size_t);
 int if_getflags(struct interface *ifp);
 int if_setflag(struct interface *ifp, short flag);
 #define if_up(ifp) if_setflag((ifp), (IFF_UP | IFF_RUNNING))
