@@ -48,6 +48,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <grp.h>
+#include <stddef.h>	/* For offsetof, struct padding debug */
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
@@ -479,6 +480,31 @@ ps_sendmsg(struct dhcpcd_ctx *ctx, int fd, uint8_t cmd, unsigned long flags,
 		.ps_controllen = (socklen_t)msg->msg_controllen,
 		.ps_datalen = msg->msg_iov[0].iov_len,
 	};
+
+#if 0	/* For debugging structure padding. */
+	logerrx("psa.addr %lu %zu", offsetof(struct ps_addr, psa_family), sizeof(psm.ps_id.psi_addr.psa_family));
+	logerrx("psa.pad %lu %zu", offsetof(struct ps_addr, psa_pad), sizeof(psm.ps_id.psi_addr.psa_pad));
+	logerrx("psa.psa_u %lu %zu", offsetof(struct ps_addr, psa_u), sizeof(psm.ps_id.psi_addr.psa_u));
+	logerrx("psa %zu", sizeof(psm.ps_id.psi_addr));
+
+	logerrx("psi.addr %lu %zu", offsetof(struct ps_id, psi_addr), sizeof(psm.ps_id.psi_addr));
+	logerrx("psi.index %lu %zu", offsetof(struct ps_id, psi_ifindex), sizeof(psm.ps_id.psi_ifindex));
+	logerrx("psi.cmd %lu %zu", offsetof(struct ps_id, psi_cmd), sizeof(psm.ps_id.psi_cmd));
+	logerrx("psi.pad %lu %zu", offsetof(struct ps_id, psi_pad), sizeof(psm.ps_id.psi_pad));
+	logerrx("psi %zu", sizeof(struct ps_id));
+
+	logerrx("ps_cmd %lu", offsetof(struct ps_msghdr, ps_cmd));
+	logerrx("ps_pad %lu %zu", offsetof(struct ps_msghdr, ps_pad), sizeof(psm.ps_pad));
+	logerrx("ps_flags %lu %zu", offsetof(struct ps_msghdr, ps_flags), sizeof(psm.ps_flags));
+
+	logerrx("ps_id %lu %zu", offsetof(struct ps_msghdr, ps_id), sizeof(psm.ps_id));
+
+	logerrx("ps_namelen %lu %zu", offsetof(struct ps_msghdr, ps_namelen), sizeof(psm.ps_namelen));
+	logerrx("ps_controllen %lu %zu", offsetof(struct ps_msghdr, ps_controllen), sizeof(psm.ps_controllen));
+	logerrx("ps_pad2 %lu %zu", offsetof(struct ps_msghdr, ps_pad2), sizeof(psm.ps_pad2));
+	logerrx("ps_datalen %lu %zu", offsetof(struct ps_msghdr, ps_datalen), sizeof(psm.ps_datalen));
+	logerrx("psm %zu", sizeof(psm));
+#endif
 
 	return ps_sendpsmmsg(ctx, fd, &psm, msg);
 }

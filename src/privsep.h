@@ -72,6 +72,7 @@
 
 struct ps_addr {
 	sa_family_t psa_family;
+	uint8_t psa_pad[2];
 	union {
 		struct in_addr psau_in_addr;
 		struct in6_addr psau_in6_addr;
@@ -85,6 +86,23 @@ struct ps_id {
 	struct ps_addr psi_addr;
 	unsigned int psi_ifindex;
 	uint8_t psi_cmd;
+	uint8_t psi_pad[3];
+};
+
+struct ps_msghdr {
+	uint8_t ps_cmd;
+	uint8_t ps_pad[sizeof(unsigned long) - 1];
+	unsigned long ps_flags;
+	struct ps_id ps_id;
+	socklen_t ps_namelen;
+	socklen_t ps_controllen;
+	uint8_t ps_pad2[sizeof(size_t) - sizeof(socklen_t)];
+	size_t ps_datalen;
+};
+
+struct ps_msg {
+	struct ps_msghdr psm_hdr;
+	uint8_t psm_data[PS_BUFLEN];
 };
 
 struct ps_process {
@@ -105,21 +123,6 @@ struct ps_process {
 #endif
 };
 TAILQ_HEAD(ps_process_head, ps_process);
-
-struct ps_msghdr {
-	uint8_t ps_cmd;
-	uint8_t ps_pad[sizeof(unsigned long) - 1];
-	unsigned long ps_flags;
-	struct ps_id ps_id;
-	size_t ps_datalen;
-	socklen_t ps_namelen;
-	socklen_t ps_controllen;
-};
-
-struct ps_msg {
-	struct ps_msghdr psm_hdr;
-	uint8_t psm_data[PS_BUFLEN];
-};
 
 #include "privsep-inet.h"
 #include "privsep-root.h"
