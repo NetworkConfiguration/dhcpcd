@@ -29,6 +29,7 @@
 #include <sys/ioctl.h>
 
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -61,10 +62,10 @@ static ssize_t
 ps_root_dowritepathuint(const void *data, size_t len)
 {
 	const char *path = data;
-	FILE *fp;
-	ssize_t r;
 	size_t plen;
 	unsigned int val;
+	int fd;
+	ssize_t r;
 
 	if (len < sizeof(plen)) {
 		errno = EINVAL;
@@ -80,11 +81,12 @@ ps_root_dowritepathuint(const void *data, size_t len)
 
 	memcpy(&val, path + plen, sizeof(val));
 
-	fp = fopen(path, "w");
-	if (fp == NULL)
+	fd = open(path, O_WRONLY);
+	if (fd == -1)
 		return -1;
-	r = fprintf(fp, "%u\n", val);
-	fclose(fp);
+	r = dprintf(fd, "%u", val);
+	close(fd);
+
 	return r;
 }
 
@@ -120,7 +122,7 @@ ssize_t
 ps_root_writepathuint(struct dhcpcd_ctx *ctx, const char *path,
     unsigned int val)
 {
-	char buf[PS_BUFLEN];
+	char buf[PS_BUFLEN], *p = buf;
 	size_t plen = strlen(path) + 1;
 	size_t len = sizeof(plen) + plen + sizeof(val);
 
@@ -129,9 +131,11 @@ ps_root_writepathuint(struct dhcpcd_ctx *ctx, const char *path,
 		return -1;
 	}
 
-	memcpy(buf, &plen, sizeof(plen));
-	memcpy(buf + sizeof(plen), path, plen);
-	memcpy(buf + sizeof(plen) + plen, &val, sizeof(val));
+	memcpy(p, &plen, sizeof(plen));
+	p += sizeof(plen);
+	memcpy(p, path, plen);
+	p += plen;
+	memcpy(p, &val, sizeof(val));
 
 	return ps_sendcmd(ctx, ctx->ps_root_fd, PS_WRITEPATHUINT, 0, buf, len);
 }
