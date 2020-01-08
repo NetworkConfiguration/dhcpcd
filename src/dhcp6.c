@@ -1341,11 +1341,11 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 #ifdef PRIVSEP
 sent:
 #endif
-	state->RT = RT * 2;
-	if (state->RT < RT) /* Check overflow */
-		state->RT = RT;
 	state->RTC++;
 	if (callback) {
+		state->RT = RT * 2;
+		if (state->RT < RT) /* Check overflow */
+			state->RT = RT;
 		if (state->MRC == 0 || state->RTC < state->MRC)
 			eloop_timeout_add_msec(ctx->eloop,
 			    RT, callback, ifp);
