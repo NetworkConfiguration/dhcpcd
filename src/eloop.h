@@ -31,6 +31,13 @@
 
 #include <time.h>
 
+/* Handy macros to create subsecond timeouts */
+#define	CSEC_PER_SEC		100
+#define	MSEC_PER_SEC		1000
+#define	NSEC_PER_CSEC		10000000
+#define	NSEC_PER_MSEC		1000000
+#define	NSEC_PER_SEC		1000000000
+
 /* eloop queues are really only for deleting timeouts registered
  * for a function or object.
  * The idea being that one interface has different timeouts for

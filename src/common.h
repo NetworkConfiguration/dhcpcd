@@ -51,11 +51,6 @@
 #define ROUNDUP4(a)		(1 + (((a) - 1) |  3))
 #define ROUNDUP8(a)		(1 + (((a) - 1) |  7))
 
-#define NSEC_PER_SEC		1000000000L
-#define MSEC_PER_SEC		1000
-#define CSEC_PER_SEC		100L
-#define NSEC_PER_CSEC		10000000L
-
 /* Some systems don't define timespec macros */
 #ifndef timespecclear
 #define timespecclear(tsp)      (tsp)->tv_sec = (time_t)((tsp)->tv_nsec = 0L)

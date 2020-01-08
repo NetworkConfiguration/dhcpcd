@@ -95,12 +95,6 @@
 #endif
 #endif
 
-#ifndef MSEC_PER_SEC
-#define MSEC_PER_SEC	1000
-#define NSEC_PER_MSEC	1000000L
-#define NSEC_PER_SEC	1000000000U
-#endif
-
 #if defined(HAVE_KQUEUE)
 #include <sys/event.h>
 #include <fcntl.h>
