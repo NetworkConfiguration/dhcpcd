@@ -2172,7 +2172,7 @@ dhcp_bind(struct interface *ifp)
 	struct dhcp_state *state = D_STATE(ifp);
 	struct if_options *ifo = ifp->options;
 	struct dhcp_lease *lease = &state->lease;
-	bool wasfake;
+	uint8_t old_state;
 
 	state->reason = NULL;
 	/* If we don't have an offer, we are re-binding a lease on preference,
@@ -2285,18 +2285,19 @@ dhcp_bind(struct interface *ifp)
 
 	/* Close the BPF filter as we can now receive DHCP messages
 	 * on a UDP socket. */
-	wasfake = state->added & STATE_FAKE;
+	old_state = state->added;
 	if (ctx->options & DHCPCD_MASTER ||
 	    state->old == NULL ||
-	    state->old->yiaddr != state->new->yiaddr || wasfake)
+	    state->old->yiaddr != state->new->yiaddr || old_state & STATE_FAKE)
 		dhcp_close(ifp);
 
 	ipv4_applyaddr(ifp);
 
 	/* If not in master mode, open an address specific socket. */
 	if (ctx->options & DHCPCD_MASTER ||
-	    state->old == NULL ||
-	    (state->old->yiaddr == state->new->yiaddr && !wasfake))
+	    (state->old != NULL &&
+	    state->old->yiaddr == state->new->yiaddr &&
+	    old_state & STATE_ADDED && !(old_state & STATE_FAKE)))
 		return;
 
 #ifdef PRIVSEP
