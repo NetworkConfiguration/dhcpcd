@@ -72,7 +72,7 @@
 
 struct ps_addr {
 	sa_family_t psa_family;
-	uint8_t psa_pad[2];
+	uint8_t psa_pad[4 - sizeof(sa_family_t)];
 	union {
 		struct in_addr psau_in_addr;
 		struct in6_addr psau_in6_addr;
