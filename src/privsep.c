@@ -94,6 +94,8 @@ ps_init(struct dhcpcd_ctx *ctx)
 		logerr("chown `%s'", DBDIR);
 	if (chown(RUNDIR, pw->pw_uid, gid) == -1)
 		logerr("chown `%s'", RUNDIR);
+
+	ctx->options |= DHCPCD_PRIVSEP;
 	return 0;
 }
 
@@ -142,7 +144,6 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 		*priv_pid = pid;
 		*priv_fd = fd[0];
 		close(fd[1]);
-		ctx->options |= DHCPCD_PRIVSEP;
 		if (recv_unpriv_msg != NULL &&
 		    eloop_event_add(ctx->eloop, *priv_fd,
 		    recv_unpriv_msg, recv_ctx) == -1)
@@ -153,7 +154,7 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 		return pid;
 	}
 
-	ctx->options |= DHCPCD_PRIVSEP | DHCPCD_UNPRIV | DHCPCD_FORKED;
+	ctx->options |= DHCPCD_UNPRIV | DHCPCD_FORKED;
 	if (ctx->fork_fd != -1) {
 		close(ctx->fork_fd);
 		ctx->fork_fd = -1;
