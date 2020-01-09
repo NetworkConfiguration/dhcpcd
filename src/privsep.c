@@ -68,6 +68,35 @@
 #include <util.h>
 #endif
 
+int
+ps_init(struct dhcpcd_ctx *ctx)
+{
+	struct passwd *pw;
+	gid_t gid = (gid_t)-1;
+
+	errno = 0;
+	if ((pw = getpwnam(PRIVSEP_USER)) == NULL) {
+		ctx->options &= ~DHCPCD_PRIVSEP;
+		if (errno == 0) {
+			logerrx("no such user %s", PRIVSEP_USER);
+			/* Just incase logerrx caused an error... */
+			errno = 0;
+		} else
+			logerr("getpwnam");
+		return -1;
+	}
+
+
+	/* Change ownership of stuff we need to drop at exit. */
+	if (chown(ctx->pidfile, pw->pw_uid, gid) == -1)
+		logerr("chown `%s'", ctx->pidfile);
+	if (chown(DBDIR, pw->pw_uid, gid) == -1)
+		logerr("chown `%s'", DBDIR);
+	if (chown(RUNDIR, pw->pw_uid, gid) == -1)
+		logerr("chown `%s'", RUNDIR);
+	return 0;
+}
+
 pid_t
 ps_dostart(struct dhcpcd_ctx *ctx,
     pid_t *priv_pid, int *priv_fd,
@@ -80,51 +109,21 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 	int fd[2];
 	pid_t pid;
 
-	/* Even if we're not dropping privs, we need to ensure that the unpriv
-	 * user exists so the processes that do need it startup just fine. */
-	errno = 0;
-	if ((pw = getpwnam(PRIVSEP_USER)) == NULL) {
-		ctx->options &= ~DHCPCD_PRIVSEP;
-		if (errno == 0) {
-			if (ctx == recv_ctx) { /* Only log the once. */
+	if (flags & PSF_DROPPRIVS) {
+		errno = 0;
+		if ((pw = getpwnam(PRIVSEP_USER)) == NULL) {
+			if (errno == 0)
 				logerrx("no such user %s", PRIVSEP_USER);
-				/* Just incase logerrx caused an error... */
-				errno = 0;
-			}
-		} else
-			logerr("getpwnam");
-		return -1;
-	}
-
-	if (!(flags & PSF_DROPPRIVS)) {
-		pw = NULL;
-		goto create_sp;
-	}
-
-	if (priv_pid == NULL) {
-		gid_t gid = (gid_t)-1;
-
-		/* Main process - change ownership of stuff we need to
-		 * drop at exit. */
-		if (pw != NULL) {
-			if (chown(ctx->pidfile, pw->pw_uid, gid) == -1)
-				logerr("chown `%s'", ctx->pidfile);
-			if (chown(DBDIR, pw->pw_uid, gid) == -1)
-				logerr("chown `%s'", DBDIR);
-			if (chown(RUNDIR, pw->pw_uid, gid) == -1)
-				logerr("chown `%s'", RUNDIR);
-			if (ctx->options & DHCPCD_MASTER) {
-				if (chown(ctx->control_sock,
-				    pw->pw_uid, gid) == -1)
-					logerr("chown `%s'", ctx->control_sock);
-				if (chown(UNPRIVSOCKET, pw->pw_uid, gid) == -1)
-					logerr("chown `%s'", UNPRIVSOCKET);
-			}
+			else
+				logerr("getpwnam");
+			return -1;
 		}
-		goto dropprivs;
-	}
+	} else
+		pw = NULL;
 
-create_sp:
+	if (priv_fd == NULL)
+		goto dropprivs;
+
 	stype = SOCK_CLOEXEC | SOCK_NONBLOCK;
 	if (socketpair(AF_UNIX, SOCK_DGRAM | stype, 0, fd) == -1) {
 		logerr("socketpair");
@@ -159,7 +158,6 @@ create_sp:
 		close(ctx->fork_fd);
 		ctx->fork_fd = -1;
 	}
-	control_close(ctx);
 	pidfile_clean();
 	eloop_clear(ctx->eloop);
 

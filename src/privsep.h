@@ -130,6 +130,7 @@ TAILQ_HEAD(ps_process_head, ps_process);
 #include "privsep-bpf.h"
 #endif
 
+int ps_init(struct dhcpcd_ctx *);
 int ps_start(struct dhcpcd_ctx *);
 int ps_stop(struct dhcpcd_ctx *);
 

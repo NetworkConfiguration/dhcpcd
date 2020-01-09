@@ -71,6 +71,5 @@ int control_stop(struct dhcpcd_ctx *);
 int control_open(const char *);
 ssize_t control_send(struct dhcpcd_ctx *, int, char * const *);
 int control_queue(struct fd_list *, void *, size_t, bool);
-void control_close(struct dhcpcd_ctx *ctx);
 
 #endif

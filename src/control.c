@@ -269,25 +269,22 @@ control_stop(struct dhcpcd_ctx *ctx)
 	int retval = 0;
 	struct fd_list *l;
 
-	if (ctx->options & DHCPCD_FORKED)
-		goto freeit;
-
-	if (ctx->control_fd == -1)
-		return 0;
-
-	control_close(ctx);
-	if (unlink(ctx->control_sock) == -1)
-		retval = -1;
+	if (ctx->control_fd != -1) {
+		eloop_event_delete(ctx->eloop, ctx->control_fd);
+		close(ctx->control_fd);
+		ctx->control_fd = -1;
+		if (unlink(ctx->control_sock) == -1 && errno != ENOENT)
+			retval = -1;
+	}
 
 	if (ctx->control_unpriv_fd != -1) {
 		eloop_event_delete(ctx->eloop, ctx->control_unpriv_fd);
 		close(ctx->control_unpriv_fd);
 		ctx->control_unpriv_fd = -1;
-		if (unlink(UNPRIVSOCKET) == -1)
+		if (unlink(UNPRIVSOCKET) == -1 && errno != ENOENT)
 			retval = -1;
 	}
 
-freeit:
 	while ((l = TAILQ_FIRST(&ctx->control_fds))) {
 		TAILQ_REMOVE(&ctx->control_fds, l, next);
 		eloop_event_delete(ctx->eloop, l->fd);
@@ -447,15 +444,4 @@ queue:
 	TAILQ_INSERT_TAIL(&fd->queue, d, next);
 	eloop_event_add_w(fd->ctx->eloop, fd->fd, control_writeone, fd);
 	return 0;
-}
-
-void
-control_close(struct dhcpcd_ctx *ctx)
-{
-
-	if (ctx->control_fd != -1) {
-		eloop_event_delete(ctx->eloop, ctx->control_fd);
-		close(ctx->control_fd);
-		ctx->control_fd = -1;
-	}
 }

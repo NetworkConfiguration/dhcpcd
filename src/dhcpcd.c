@@ -1917,7 +1917,6 @@ printpidfile:
 		if (ctx.control_fd != -1) {
 			loginfox("sending commands to master dhcpcd process");
 			len = control_send(&ctx, argc, argv);
-			control_close(&ctx);
 			if (len > 0) {
 				logdebugx("send OK");
 				goto exit_success;
@@ -1989,6 +1988,13 @@ printpidfile:
 
 	logdebugx(PACKAGE "-" VERSION " starting");
 
+#ifdef PRIVSEP
+	if (ps_init(&ctx) == -1 && errno != 0) {
+		logerr("ps_init");
+		goto exit_failure;
+	}
+#endif
+
 #ifdef USE_SIGNALS
 	if (pipe(sigpipe) == -1) {
 		logerr("pipe");
@@ -2038,6 +2044,21 @@ printpidfile:
 	}
 #endif
 
+#ifdef BSD
+	/* Disable the kernel RTADV sysctl as early as possible. */
+	if (ctx.options & DHCPCD_IPV6 && ctx.options & DHCPCD_IPV6RS)
+		if_disable_rtadv();
+#endif
+
+#ifdef PRIVSEP
+	if (ctx.options & DHCPCD_PRIVSEP && ps_start(&ctx) == -1) {
+		logerr("ps_start");
+		goto exit_failure;
+	}
+	if (ctx.options & DHCPCD_FORKED)
+		goto run_loop;
+#endif
+
 	if (control_start(&ctx,
 	    ctx.options & DHCPCD_MASTER ? NULL : argv[optind]) == -1)
 	{
@@ -2049,21 +2070,6 @@ printpidfile:
 	    ctx.options & DHCPCD_MASTER ? "[master]" : argv[optind],
 	    ctx.options & DHCPCD_IPV4 ? " [ip4]" : "",
 	    ctx.options & DHCPCD_IPV6 ? " [ip6]" : "");
-
-#ifdef BSD
-	/* Disable the kernel RTADV sysctl as early as possible. */
-	if (ctx.options & DHCPCD_IPV6 && ctx.options & DHCPCD_IPV6RS)
-		if_disable_rtadv();
-#endif
-
-#ifdef PRIVSEP
-	if (ps_start(&ctx) == -1 && errno != 0) {
-		logerr("ps_start");
-		goto exit_failure;
-	}
-	if (ctx.options & DHCPCD_FORKED)
-		goto run_loop;
-#endif
 
 	if (if_opensockets(&ctx) == -1) {
 		logerr("%s: if_opensockets", __func__);
