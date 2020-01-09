@@ -485,7 +485,7 @@ ps_sendmsg(struct dhcpcd_ctx *ctx, int fd, uint8_t cmd, unsigned long flags,
 	};
 
 #if 0	/* For debugging structure padding. */
-	logerrx("psa.addr %lu %zu", offsetof(struct ps_addr, psa_family), sizeof(psm.ps_id.psi_addr.psa_family));
+	logerrx("psa.family %lu %zu", offsetof(struct ps_addr, psa_family), sizeof(psm.ps_id.psi_addr.psa_family));
 	logerrx("psa.pad %lu %zu", offsetof(struct ps_addr, psa_pad), sizeof(psm.ps_id.psi_addr.psa_pad));
 	logerrx("psa.psa_u %lu %zu", offsetof(struct ps_addr, psa_u), sizeof(psm.ps_id.psi_addr.psa_u));
 	logerrx("psa %zu", sizeof(psm.ps_id.psi_addr));
