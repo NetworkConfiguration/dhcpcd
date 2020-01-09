@@ -1910,6 +1910,7 @@ printpidfile:
 	    !(ctx.options & DHCPCD_TEST))
 	{
 #endif
+		ctx.options |= DHCPCD_FORKED; /* avoid socket unlink */
 		if (!(ctx.options & DHCPCD_MASTER))
 			ctx.control_fd = control_open(argv[optind]);
 		if (ctx.control_fd == -1)
@@ -1928,6 +1929,7 @@ printpidfile:
 			if (errno != ENOENT)
 				logerr("%s: control_open", __func__);
 		}
+		ctx.options &= ~DHCPCD_FORKED;
 #ifdef USE_SIGNALS
 	}
 #endif

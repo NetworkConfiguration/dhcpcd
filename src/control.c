@@ -269,6 +269,9 @@ control_stop(struct dhcpcd_ctx *ctx)
 	int retval = 0;
 	struct fd_list *l;
 
+	if (ctx->options & DHCPCD_FORKED)
+		return 0;
+
 	if (ctx->control_fd != -1) {
 		eloop_event_delete(ctx->eloop, ctx->control_fd);
 		close(ctx->control_fd);
