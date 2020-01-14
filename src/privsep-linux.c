@@ -48,14 +48,20 @@ ps_root_dosendnetlink(int protocol, struct msghdr *msg)
 		.iov_base = buf,
 		.iov_len = sizeof(buf),
 	};
+	ssize_t retval;
 
 	if ((s = if_linksocket(&snl, protocol)) == -1)
 		return -1;
 
-	if (sendmsg(s, msg, 0) == -1)
-		return -1;
+	if (sendmsg(s, msg, 0) == -1) {
+		retval = -1;
+		goto out;
+	}
 
-	return if_getnetlink(NULL, &riov, s, 0, NULL, NULL);
+	retval = if_getnetlink(NULL, &riov, s, 0, NULL, NULL);
+out:
+	close(s);
+	return retval;
 }
 
 static ssize_t
