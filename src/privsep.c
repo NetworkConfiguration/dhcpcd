@@ -347,8 +347,14 @@ ps_freeprocess(struct ps_process *psp)
 #endif
 
 	TAILQ_REMOVE(&psp->psp_ctx->ps_processes, psp, next);
-	if (psp->psp_fd != -1)
+	if (psp->psp_fd != -1) {
+		eloop_event_delete(psp->psp_ctx->eloop, psp->psp_fd);
 		close(psp->psp_fd);
+	}
+	if (psp->psp_work_fd != -1) {
+		eloop_event_delete(psp->psp_ctx->eloop, psp->psp_work_fd);
+		close(psp->psp_work_fd);
+	}
 	free(psp);
 }
 
