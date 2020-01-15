@@ -782,12 +782,9 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 
 	bootp->op = BOOTREQUEST;
 	bootp->htype = (uint8_t)ifp->family;
-	switch (ifp->family) {
-	case ARPHRD_ETHER:
-	case ARPHRD_IEEE802:
+	if (ifp->hwlen != 0 && ifp->hwlen < sizeof(bootp->chaddr)) {
 		bootp->hlen = (uint8_t)ifp->hwlen;
 		memcpy(&bootp->chaddr, &ifp->hwaddr, ifp->hwlen);
-		break;
 	}
 
 	if (ifo->options & DHCPCD_BROADCAST &&
@@ -820,10 +817,6 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 	memcpy(p, &ul, sizeof(ul));
 	p += sizeof(ul);
 
-	*p++ = DHO_MESSAGETYPE;
-	*p++ = 1;
-	*p++ = type;
-
 #define AREA_LEFT	(size_t)(e - p)
 #define AREA_FIT(s)	if ((s) > AREA_LEFT) goto toobig
 #define AREA_CHECK(s)	if ((s) + 2UL > AREA_LEFT) goto toobig
@@ -835,13 +828,10 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 	p += 4;				\
 } while (0 /* CONSTCOND */)
 
-	if (state->clientid) {
-		AREA_CHECK(state->clientid[0]);
-		*p++ = DHO_CLIENTID;
-		memcpy(p, state->clientid, (size_t)state->clientid[0] + 1);
-		p += state->clientid[0] + 1;
-	}
+	/* Options are listed in numerical order as per RFC 7844 Section 3.1
+	 * XXX: They should be randomised. */
 
+	bool putip = false;
 	if (lease->addr.s_addr && lease->cookie == htonl(MAGIC_COOKIE)) {
 		if (type == DHCP_DECLINE ||
 		    (type == DHCP_REQUEST &&
@@ -849,12 +839,18 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 		    state->added & STATE_FAKE ||
 		    lease->addr.s_addr != state->addr->addr.s_addr)))
 		{
+			putip = true;
 			PUT_ADDR(DHO_IPADDRESS, &lease->addr);
-			if (lease->server.s_addr)
-				PUT_ADDR(DHO_SERVERID, &lease->server);
 		}
+	}
 
-		if (type == DHCP_RELEASE) {
+	AREA_CHECK(3);
+	*p++ = DHO_MESSAGETYPE;
+	*p++ = 1;
+	*p++ = type;
+
+	if (lease->addr.s_addr && lease->cookie == htonl(MAGIC_COOKIE)) {
+		if (type == DHCP_RELEASE || putip) {
 			if (lease->server.s_addr)
 				PUT_ADDR(DHO_SERVERID, &lease->server);
 		}
@@ -870,63 +866,23 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 		}
 	}
 
-	if (type == DHCP_DISCOVER &&
-	    !(ifp->ctx->options & DHCPCD_TEST) &&
-	    has_option_mask(ifo->requestmask, DHO_RAPIDCOMMIT))
-	{
-		/* RFC 4039 Section 3 */
-		AREA_CHECK(0);
-		*p++ = DHO_RAPIDCOMMIT;
-		*p++ = 0;
+#define	DHCP_DIR(type) ((type) == DHCP_DISCOVER || (type) == DHCP_INFORM || \
+    (type) == DHCP_REQUEST)
+
+	if (DHCP_DIR(type)) {
+		/* vendor is already encoded correctly, so just add it */
+		if (ifo->vendor[0]) {
+			AREA_CHECK(ifo->vendor[0]);
+			*p++ = DHO_VENDOR;
+			memcpy(p, ifo->vendor, (size_t)ifo->vendor[0] + 1);
+			p += ifo->vendor[0] + 1;
+		}
 	}
 
 	if (type == DHCP_DISCOVER && ifo->options & DHCPCD_REQUEST)
 		PUT_ADDR(DHO_IPADDRESS, &ifo->req_addr);
 
-	/* RFC 2563 Auto Configure */
-	if (type == DHCP_DISCOVER && ifo->options & DHCPCD_IPV4LL) {
-		AREA_CHECK(1);
-		*p++ = DHO_AUTOCONFIGURE;
-		*p++ = 1;
-		*p++ = 1;
-	}
-
-	if (type == DHCP_DISCOVER ||
-	    type == DHCP_INFORM ||
-	    type == DHCP_REQUEST)
-	{
-		if (mtu != -1) {
-			AREA_CHECK(2);
-			*p++ = DHO_MAXMESSAGESIZE;
-			*p++ = 2;
-			sz = htons((uint16_t)(mtu - IP_UDP_SIZE));
-			memcpy(p, &sz, 2);
-			p += 2;
-		}
-
-		if (ifo->userclass[0]) {
-			AREA_CHECK(ifo->userclass[0]);
-			*p++ = DHO_USERCLASS;
-			memcpy(p, ifo->userclass,
-			    (size_t)ifo->userclass[0] + 1);
-			p += ifo->userclass[0] + 1;
-		}
-
-		if (ifo->vendorclassid[0]) {
-			AREA_CHECK(ifo->vendorclassid[0]);
-			*p++ = DHO_VENDORCLASSID;
-			memcpy(p, ifo->vendorclassid,
-			    (size_t)ifo->vendorclassid[0] + 1);
-			p += ifo->vendorclassid[0] + 1;
-		}
-
-		if (ifo->mudurl[0]) {
-		       AREA_CHECK(ifo->mudurl[0]);
-		       *p++ = DHO_MUDURL;
-		       memcpy(p, ifo->mudurl, (size_t)ifo->mudurl[0] + 1);
-		       p += ifo->mudurl[0] + 1;
-		}
-
+	if (DHCP_DIR(type)) {
 		if (type != DHCP_INFORM) {
 			if (ifo->leasetime != 0) {
 				AREA_CHECK(4);
@@ -938,6 +894,94 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 			}
 		}
 
+		AREA_CHECK(0);
+		*p++ = DHO_PARAMETERREQUESTLIST;
+		n_params = p;
+		*p++ = 0;
+		for (i = 0, opt = ifp->ctx->dhcp_opts;
+		    i < ifp->ctx->dhcp_opts_len;
+		    i++, opt++)
+		{
+			if (!DHC_REQOPT(opt, ifo->requestmask, ifo->nomask))
+				continue;
+			if (type == DHCP_INFORM &&
+			    (opt->option == DHO_RENEWALTIME ||
+				opt->option == DHO_REBINDTIME))
+				continue;
+			AREA_FIT(1);
+			*p++ = (uint8_t)opt->option;
+		}
+		for (i = 0, opt = ifo->dhcp_override;
+		    i < ifo->dhcp_override_len;
+		    i++, opt++)
+		{
+			/* Check if added above */
+			for (lp = n_params + 1; lp < p; lp++)
+				if (*lp == (uint8_t)opt->option)
+					break;
+			if (lp < p)
+				continue;
+			if (!DHC_REQOPT(opt, ifo->requestmask, ifo->nomask))
+				continue;
+			if (type == DHCP_INFORM &&
+			    (opt->option == DHO_RENEWALTIME ||
+				opt->option == DHO_REBINDTIME))
+				continue;
+			AREA_FIT(1);
+			*p++ = (uint8_t)opt->option;
+		}
+		*n_params = (uint8_t)(p - n_params - 1);
+
+		if (mtu != -1 &&
+		    !(has_option_mask(ifo->nomask, DHO_MAXMESSAGESIZE)))
+		{
+			AREA_CHECK(2);
+			*p++ = DHO_MAXMESSAGESIZE;
+			*p++ = 2;
+			sz = htons((uint16_t)(mtu - IP_UDP_SIZE));
+			memcpy(p, &sz, 2);
+			p += 2;
+		}
+
+		if (ifo->userclass[0] &&
+		    !has_option_mask(ifo->nomask, DHO_USERCLASS))
+		{
+			AREA_CHECK(ifo->userclass[0]);
+			*p++ = DHO_USERCLASS;
+			memcpy(p, ifo->userclass,
+			    (size_t)ifo->userclass[0] + 1);
+			p += ifo->userclass[0] + 1;
+		}
+	}
+
+	if (state->clientid) {
+		AREA_CHECK(state->clientid[0]);
+		*p++ = DHO_CLIENTID;
+		memcpy(p, state->clientid, (size_t)state->clientid[0] + 1);
+		p += state->clientid[0] + 1;
+	}
+
+	if (DHCP_DIR(type) &&
+	    !has_option_mask(ifo->nomask, DHO_VENDORCLASSID) &&
+	    ifo->vendorclassid[0])
+	{
+		AREA_CHECK(ifo->vendorclassid[0]);
+		*p++ = DHO_VENDORCLASSID;
+		memcpy(p, ifo->vendorclassid, (size_t)ifo->vendorclassid[0]+1);
+		p += ifo->vendorclassid[0] + 1;
+	}
+
+	if (type == DHCP_DISCOVER &&
+	    !(ifp->ctx->options & DHCPCD_TEST) &&
+	    DHC_REQ(ifo->requestmask, ifo->nomask, DHO_RAPIDCOMMIT))
+	{
+		/* RFC 4039 Section 3 */
+		AREA_CHECK(0);
+		*p++ = DHO_RAPIDCOMMIT;
+		*p++ = 0;
+	}
+
+	if (DHCP_DIR(type)) {
 		hostname = dhcp_get_hostname(hbuf, sizeof(hbuf), ifo);
 
 		/*
@@ -984,91 +1028,6 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 			memcpy(p, hostname, len);
 			p += len;
 		}
-
-		/* vendor is already encoded correctly, so just add it */
-		if (ifo->vendor[0]) {
-			AREA_CHECK(ifo->vendor[0]);
-			*p++ = DHO_VENDOR;
-			memcpy(p, ifo->vendor, (size_t)ifo->vendor[0] + 1);
-			p += ifo->vendor[0] + 1;
-		}
-
-#ifdef AUTH
-		if ((ifo->auth.options & DHCPCD_AUTH_SENDREQUIRE) !=
-		    DHCPCD_AUTH_SENDREQUIRE &&
-		    !has_option_mask(ifo->nomask, DHO_FORCERENEW_NONCE))
-		{
-			/* We support HMAC-MD5 */
-			AREA_CHECK(1);
-			*p++ = DHO_FORCERENEW_NONCE;
-			*p++ = 1;
-			*p++ = AUTH_ALG_HMAC_MD5;
-		}
-#endif
-
-		if (ifo->vivco_len) {
-			AREA_CHECK(sizeof(ul));
-			*p++ = DHO_VIVCO;
-			lp = p++;
-			*lp = sizeof(ul);
-			ul = htonl(ifo->vivco_en);
-			memcpy(p, &ul, sizeof(ul));
-			p += sizeof(ul);
-			for (i = 0, vivco = ifo->vivco;
-			    i < ifo->vivco_len;
-			    i++, vivco++)
-			{
-				AREA_FIT(vivco->len);
-				if (vivco->len + 2 + *lp > 255) {
-					logerrx("%s: VIVCO option too big",
-					    ifp->name);
-					free(bootp);
-					return -1;
-				}
-				*p++ = (uint8_t)vivco->len;
-				memcpy(p, vivco->data, vivco->len);
-				p += vivco->len;
-				*lp = (uint8_t)(*lp + vivco->len + 1);
-			}
-		}
-
-		AREA_CHECK(0);
-		*p++ = DHO_PARAMETERREQUESTLIST;
-		n_params = p;
-		*p++ = 0;
-		for (i = 0, opt = ifp->ctx->dhcp_opts;
-		    i < ifp->ctx->dhcp_opts_len;
-		    i++, opt++)
-		{
-			if (!DHC_REQOPT(opt, ifo->requestmask, ifo->nomask))
-				continue;
-			if (type == DHCP_INFORM &&
-			    (opt->option == DHO_RENEWALTIME ||
-				opt->option == DHO_REBINDTIME))
-				continue;
-			AREA_FIT(1);
-			*p++ = (uint8_t)opt->option;
-		}
-		for (i = 0, opt = ifo->dhcp_override;
-		    i < ifo->dhcp_override_len;
-		    i++, opt++)
-		{
-			/* Check if added above */
-			for (lp = n_params + 1; lp < p; lp++)
-				if (*lp == (uint8_t)opt->option)
-					break;
-			if (lp < p)
-				continue;
-			if (!DHC_REQOPT(opt, ifo->requestmask, ifo->nomask))
-				continue;
-			if (type == DHCP_INFORM &&
-			    (opt->option == DHO_RENEWALTIME ||
-				opt->option == DHO_REBINDTIME))
-				continue;
-			AREA_FIT(1);
-			*p++ = (uint8_t)opt->option;
-		}
-		*n_params = (uint8_t)(p - n_params - 1);
 	}
 
 #ifdef AUTH
@@ -1094,6 +1053,66 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 		}
 	}
 #endif
+
+	/* RFC 2563 Auto Configure */
+	if (type == DHCP_DISCOVER && ifo->options & DHCPCD_IPV4LL &&
+	    !(has_option_mask(ifo->nomask, DHO_AUTOCONFIGURE)))
+	{
+		AREA_CHECK(1);
+		*p++ = DHO_AUTOCONFIGURE;
+		*p++ = 1;
+		*p++ = 1;
+	}
+
+	if (DHCP_DIR(type)) {
+		if (ifo->mudurl[0]) {
+		       AREA_CHECK(ifo->mudurl[0]);
+		       *p++ = DHO_MUDURL;
+		       memcpy(p, ifo->mudurl, (size_t)ifo->mudurl[0] + 1);
+		       p += ifo->mudurl[0] + 1;
+		}
+
+		if (ifo->vivco_len &&
+		    !has_option_mask(ifo->nomask, DHO_VIVCO))
+		{
+			AREA_CHECK(sizeof(ul));
+			*p++ = DHO_VIVCO;
+			lp = p++;
+			*lp = sizeof(ul);
+			ul = htonl(ifo->vivco_en);
+			memcpy(p, &ul, sizeof(ul));
+			p += sizeof(ul);
+			for (i = 0, vivco = ifo->vivco;
+			    i < ifo->vivco_len;
+			    i++, vivco++)
+			{
+				AREA_FIT(vivco->len);
+				if (vivco->len + 2 + *lp > 255) {
+					logerrx("%s: VIVCO option too big",
+					    ifp->name);
+					free(bootp);
+					return -1;
+				}
+				*p++ = (uint8_t)vivco->len;
+				memcpy(p, vivco->data, vivco->len);
+				p += vivco->len;
+				*lp = (uint8_t)(*lp + vivco->len + 1);
+			}
+		}
+
+#ifdef AUTH
+		if ((ifo->auth.options & DHCPCD_AUTH_SENDREQUIRE) !=
+		    DHCPCD_AUTH_SENDREQUIRE &&
+		    !has_option_mask(ifo->nomask, DHO_FORCERENEW_NONCE))
+		{
+			/* We support HMAC-MD5 */
+			AREA_CHECK(1);
+			*p++ = DHO_FORCERENEW_NONCE;
+			*p++ = 1;
+			*p++ = AUTH_ALG_HMAC_MD5;
+		}
+#endif
+	}
 
 	*p++ = DHO_END;
 	len = (size_t)(p - (uint8_t *)bootp);
@@ -3762,7 +3781,22 @@ dhcp_init(struct interface *ifp)
 	free(state->clientid);
 	state->clientid = NULL;
 
-	if (*ifo->clientid) {
+	if (ifo->options & DHCPCD_ANONYMOUS) {
+		uint8_t duid[DUID_LEN];
+		uint8_t duid_len;
+
+		duid_len = (uint8_t)duid_make(duid, ifp, DUID_LL);
+		if (duid_len != 0) {
+			state->clientid = malloc((size_t)duid_len + 6);
+			if (state->clientid == NULL)
+				goto eexit;
+			state->clientid[0] =(uint8_t)(duid_len + 5);
+			state->clientid[1] = 255; /* RFC 4361 */
+			memcpy(state->clientid + 2, ifo->iaid, 4);
+			memset(state->clientid + 2, 0, 4); /* IAID */
+			memcpy(state->clientid + 6, duid, duid_len);
+		}
+	} else if (*ifo->clientid) {
 		state->clientid = malloc((size_t)(ifo->clientid[0] + 1));
 		if (state->clientid == NULL)
 			goto eexit;
@@ -3976,7 +4010,9 @@ dhcp_start1(void *arg)
 	}
 #endif
 
-	if (state->offer == NULL || !IS_DHCP(state->offer))
+	if (state->offer == NULL ||
+	    !IS_DHCP(state->offer) ||
+	    ifo->options & DHCPCD_ANONYMOUS)
 		dhcp_discover(ifp);
 	else
 		dhcp_reboot(ifp);

@@ -44,9 +44,10 @@
 
 #define	PS_IOCTL		0x10
 #define	PS_SCRIPT		0x11
-#define	PS_IOCTL6		0x12
-#define	PS_ROUTE		0x13	/* Also used for NETLINK */
-#define	PS_WRITEPATHUINT	0x14
+#define	PS_IOCTLLINK		0x12
+#define	PS_IOCTL6		0x13
+#define	PS_ROUTE		0x14	/* Also used for NETLINK */
+#define	PS_WRITEPATHUINT	0x15
 
 #define	PS_DELETE		0x20
 #define	PS_START		0x40

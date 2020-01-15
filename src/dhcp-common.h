@@ -81,6 +81,9 @@
 #define	OT_BITFLAG		(1 << 27)
 #define	OT_RESERVED		(1 << 28)
 
+#define	DHC_REQ(r, n, o) \
+	(has_option_mask((r), (o)) && !has_option_mask((n), (o)))
+
 #define DHC_REQOPT(o, r, n)						  \
 	(!((o)->type & OT_NOREQ) &&					  \
 	 ((o)->type & OT_REQUEST || has_option_mask((r), (o)->option)) && \

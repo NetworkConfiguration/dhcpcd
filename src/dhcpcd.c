@@ -494,7 +494,9 @@ configure_interface1(struct interface *ifp)
 			 * so we don't conflict with an interface index. */
 			vlanid = htonl(ifp->vlanid | 0xff000000);
 			memcpy(ifo->iaid, &vlanid, sizeof(vlanid));
-		} else if (ifp->hwlen >= sizeof(ifo->iaid)) {
+		} else if (ifo->options & DHCPCD_ANONYMOUS)
+			memset(ifo->iaid, 0, sizeof(ifo->iaid));
+		else if (ifp->hwlen >= sizeof(ifo->iaid)) {
 			memcpy(ifo->iaid,
 			    ifp->hwaddr + ifp->hwlen - sizeof(ifo->iaid),
 			    sizeof(ifo->iaid));
@@ -700,14 +702,17 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 			if (ifp->carrier == LINK_UP)
 				loginfox("%s: carrier lost", ifp->name);
 #ifdef NOCARRIER_PRESERVE_IP
-			if (ifp->flags & IFF_UP)
+			if (ifp->flags & IFF_UP &&
+			    !(ifp->options->options & DHCPCD_ANONYMOUS))
 				ifp->carrier = LINK_DOWN_IFFUP;
 			else
 #endif
 				ifp->carrier = LINK_DOWN;
 			script_runreason(ifp, "NOCARRIER");
 #ifdef NOCARRIER_PRESERVE_IP
-			if (ifp->flags & IFF_UP) {
+			if (ifp->flags & IFF_UP &&
+			    !(ifp->options->options & DHCPCD_ANONYMOUS))
+			{
 #ifdef ARP
 				arp_drop(ifp);
 #endif
@@ -720,6 +725,12 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 			} else
 #endif
 				dhcpcd_drop(ifp, 0);
+			if (ifp->options->options & DHCPCD_ANONYMOUS) {
+				if_down(ifp);
+				if (if_randomisemac(ifp) == -1 && errno != ENXIO)
+					logerr(__func__);
+				if_up(ifp);
+			}
 		}
 	} else if (carrier == LINK_UP && ifp->flags & IFF_UP) {
 		if (ifp->carrier != LINK_UP) {
@@ -924,8 +935,14 @@ dhcpcd_prestartinterface(void *arg)
 
 	if ((!(ifp->ctx->options & DHCPCD_MASTER) ||
 	    ifp->options->options & DHCPCD_IF_UP) &&
-	    if_up(ifp) == -1)
-		logerr("%s: %s", __func__, ifp->name);
+	    ifp->carrier != LINK_UP)
+	{
+		if (ifp->options->options & DHCPCD_ANONYMOUS &&
+		    if_randomisemac(ifp) == -1)
+			logerr(__func__);
+		if (if_up(ifp) == -1)
+			logerr(__func__);
+	}
 
 	dhcpcd_startinterface(ifp);
 }
@@ -1312,9 +1329,10 @@ dhcpcd_signal_cb(int sig, void *arg)
 
 	if (ctx->options & DHCPCD_FORKED) {
 		pid_t pid = pidfile_read(ctx->pidfile);
-		if (pid == -1)
-			logerr("%s: pidfile_read",__func__);
-		else if (pid == 0)
+		if (pid == -1) {
+			if (errno != ENOENT)
+				logerr("%s: pidfile_read",__func__);
+		} else if (pid == 0)
 			logerr("%s: pid cannot be zero", __func__);
 		else if (kill(pid, sig) == -1)
 			logerr("%s: kill", __func__);

@@ -66,7 +66,7 @@
 #define O_NOIPV6RS		O_BASE + 5
 #define O_IPV6RA_FORK		O_BASE + 6
 #define O_LINK_RCVBUF		O_BASE + 7
-// unused			O_BASE + 8
+#define O_ANONYMOUS		O_BASE + 8
 #define O_NOALIAS		O_BASE + 9
 #define O_IA_NA			O_BASE + 10
 #define O_IA_TA			O_BASE + 11
@@ -161,6 +161,7 @@ const struct option cf_options[] = {
 	{"oneshot",         no_argument,       NULL, '1'},
 	{"ipv4only",        no_argument,       NULL, '4'},
 	{"ipv6only",        no_argument,       NULL, '6'},
+	{"anonymous",       no_argument,       NULL, O_ANONYMOUS},
 	{"arping",          required_argument, NULL, O_ARPING},
 	{"destination",     required_argument, NULL, O_DESTINATION},
 	{"fallback",        required_argument, NULL, O_FALLBACK},
@@ -1238,6 +1239,33 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		break;
 	case O_NOIPV6:
 		ifo->options &= ~DHCPCD_IPV6;
+		break;
+	case O_ANONYMOUS:
+		ifo->options |= DHCPCD_ANONYMOUS;
+		ifo->options &= ~DHCPCD_HOSTNAME;
+		ifo->fqdn = FQDN_DISABLE;
+
+		/* Block everything */
+		memset(ifo->nomask, 0xff, sizeof(ifo->nomask));
+		memset(ifo->nomask6, 0xff, sizeof(ifo->nomask6));
+
+		/* Allow the bare minimum through */
+		del_option_mask(ifo->nomask, DHO_SUBNETMASK);
+		del_option_mask(ifo->nomask, DHO_CSR);
+		del_option_mask(ifo->nomask, DHO_ROUTER);
+		del_option_mask(ifo->nomask, DHO_DNSSERVER);
+		del_option_mask(ifo->nomask, DHO_BROADCAST);
+		del_option_mask(ifo->nomask, DHO_STATICROUTE);
+		del_option_mask(ifo->nomask, DHO_SERVERID);
+		del_option_mask(ifo->nomask, DHO_RENEWALTIME);
+		del_option_mask(ifo->nomask, DHO_REBINDTIME);
+		del_option_mask(ifo->nomask, DHO_DNSSEARCH);
+
+		del_option_mask(ifo->nomask6, D6_OPTION_DNS_SERVERS);
+		del_option_mask(ifo->nomask6, D6_OPTION_DOMAIN_LIST);
+		del_option_mask(ifo->nomask6, D6_OPTION_SOL_MAX_RT);
+		del_option_mask(ifo->nomask6, D6_OPTION_INF_MAX_RT);
+
 		break;
 #ifdef INET
 	case O_ARPING:
