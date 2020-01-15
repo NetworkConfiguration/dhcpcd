@@ -935,7 +935,7 @@ dhcpcd_prestartinterface(void *arg)
 
 	if ((!(ifp->ctx->options & DHCPCD_MASTER) ||
 	    ifp->options->options & DHCPCD_IF_UP) &&
-	    ifp->carrier != LINK_UP)
+	    !(ifp->flags & IFF_UP))
 	{
 		if (ifp->options->options & DHCPCD_ANONYMOUS &&
 		    if_randomisemac(ifp) == -1)
