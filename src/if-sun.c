@@ -189,6 +189,14 @@ if_closesockets_os(struct dhcpcd_ctx *ctx)
 }
 
 int
+if_setmac(struct interface *ifp, void *mac, uint8_t maclen)
+{
+
+	errno = ENOTSUP;
+	return -1;
+}
+
+int
 if_carrier(struct interface *ifp)
 {
 	kstat_ctl_t		*kcp;
