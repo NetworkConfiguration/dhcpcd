@@ -434,6 +434,23 @@ if_closesockets_os(struct dhcpcd_ctx *ctx)
 }
 
 int
+if_setmac(struct interface *ifp, void *mac, uint8_t maclen)
+{
+	struct ifreq ifr = {
+		.ifr_hwaddr.sa_family = ifp->family,
+	};
+
+	if (ifp->hwlen != maclen || maclen > sizeof(ifr.ifr_hwaddr.sa_data)) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
+	memcpy(ifr.ifr_hwaddr.sa_data, mac, maclen);
+	return if_ioctl(ifp->ctx, SIOCSIFHWADDR, &ifr, sizeof(ifr));
+}
+
+int
 if_carrier(struct interface *ifp)
 {
 
