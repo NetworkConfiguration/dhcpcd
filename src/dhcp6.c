@@ -637,6 +637,8 @@ dhcp6_makemessage(struct interface *ifp)
 #ifdef AUTH
 	uint16_t auth_len;
 #endif
+	uint8_t duid[DUID_LEN];
+	size_t duid_len = 0;
 
 	state = D6_STATE(ifp);
 	if (state->send) {
@@ -705,19 +707,29 @@ dhcp6_makemessage(struct interface *ifp)
 			len += sizeof(o) + 1 + hl;
 		}
 
-		if (ifo->mudurl[0])
+		if (!has_option_mask(ifo->nomask6, D6_OPTION_MUDURL) &&
+		    ifo->mudurl[0])
 			len += sizeof(o) + ifo->mudurl[0];
 
 #ifdef AUTH
 		if ((ifo->auth.options & DHCPCD_AUTH_SENDREQUIRE) !=
-		    DHCPCD_AUTH_SENDREQUIRE)
+		    DHCPCD_AUTH_SENDREQUIRE &&
+		    DHC_REQ(ifo->requestmask6, ifo->nomask6,
+		    D6_OPTION_RECONF_ACCEPT))
 			len += sizeof(o); /* Reconfigure Accept */
 #endif
 	}
 
 	len += sizeof(*state->send);
-	len += sizeof(o) + ifp->ctx->duid_len;
 	len += sizeof(o) + sizeof(uint16_t); /* elapsed */
+
+	if (ifo->options & DHCPCD_ANONYMOUS) {
+		duid_len = duid_make(duid, ifp, DUID_LL);
+		len += sizeof(o) + duid_len;
+	} else {
+		len += sizeof(o) + ifp->ctx->duid_len;
+	}
+
 	if (!has_option_mask(ifo->nomask6, D6_OPTION_USER_CLASS))
 		len += dhcp6_makeuser(NULL, ifp);
 	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_CLASS))
@@ -755,8 +767,9 @@ dhcp6_makemessage(struct interface *ifp)
 		TAILQ_FOREACH(ap, &state->addrs, next) {
 			if (ap->flags & IPV6_AF_STALE)
 				continue;
-			if (ap->prefix_vltime == 0 &&
-			    !(ap->flags & IPV6_AF_REQUEST))
+			if (!(ap->flags & IPV6_AF_REQUEST) &&
+			    (ap->prefix_vltime == 0 ||
+			    state->state == DH6S_DISCOVER))
 				continue;
 			if (ap->ia_type == D6_OPTION_IA_PD) {
 #ifndef SMALL
@@ -785,7 +798,7 @@ dhcp6_makemessage(struct interface *ifp)
 
 	if (state->state == DH6S_DISCOVER &&
 	    !(ifp->ctx->options & DHCPCD_TEST) &&
-	    has_option_mask(ifo->requestmask6, D6_OPTION_RAPID_COMMIT))
+	    DHC_REQ(ifo->requestmask6, ifo->nomask6, D6_OPTION_RAPID_COMMIT))
 		len += sizeof(o);
 
 	if (m == NULL) {
@@ -884,34 +897,28 @@ dhcp6_makemessage(struct interface *ifp)
 	memcpy(p, &o, sizeof(o));		\
 	p += sizeof(o);				\
 }
-#define COPYIN(_code, _data, _len)	{	\
+#define COPYIN(_code, _data, _len)	do {	\
 	COPYIN1((_code), (_len));		\
 	if ((_len) != 0) {			\
 		memcpy(p, (_data), (_len));	\
 		p += (_len);			\
 	}					\
-}
+} while (0 /* CONSTCOND */)
 #define NEXTLEN (p + offsetof(struct dhcp6_option, len))
 
+	/* Options are listed in numerical order as per RFC 7844 Section 4.1
+	 * XXX: They should be randomised. */
+
 	p = (uint8_t *)state->send + sizeof(*state->send);
-	COPYIN(D6_OPTION_CLIENTID, ifp->ctx->duid,
-	    (uint16_t)ifp->ctx->duid_len);
+	if (ifo->options & DHCPCD_ANONYMOUS)
+		COPYIN(D6_OPTION_CLIENTID, duid,
+		    (uint16_t)duid_len);
+	else
+		COPYIN(D6_OPTION_CLIENTID, ifp->ctx->duid,
+		    (uint16_t)ifp->ctx->duid_len);
 
 	if (si != NULL)
 		COPYIN(D6_OPTION_SERVERID, si, si_len);
-
-	si_len = 0;
-	COPYIN(D6_OPTION_ELAPSED, &si_len, sizeof(si_len));
-
-	if (!has_option_mask(ifo->nomask6, D6_OPTION_USER_CLASS))
-		p += dhcp6_makeuser(p, ifp);
-	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_CLASS))
-		p += dhcp6_makevendor(p, ifp);
-
-	if (state->state == DH6S_DISCOVER &&
-	    !(ifp->ctx->options & DHCPCD_TEST) &&
-	    has_option_mask(ifo->requestmask6, D6_OPTION_RAPID_COMMIT))
-		COPYIN1(D6_OPTION_RAPID_COMMIT, 0);
 
 	for (l = 0; IA && l < ifo->ia_len; l++) {
 		ifia = &ifo->ia[l];
@@ -931,8 +938,9 @@ dhcp6_makemessage(struct interface *ifp)
 		TAILQ_FOREACH(ap, &state->addrs, next) {
 			if (ap->flags & IPV6_AF_STALE)
 				continue;
-			if (ap->prefix_vltime == 0 &&
-			    !(ap->flags & IPV6_AF_REQUEST))
+			if (!(ap->flags & IPV6_AF_REQUEST) &&
+			    (ap->prefix_vltime == 0 ||
+			    state->state == DH6S_DISCOVER))
 				continue;
 			if (ap->ia_type != ifia->ia_type)
 				continue;
@@ -995,6 +1003,68 @@ dhcp6_makemessage(struct interface *ifp)
 		memcpy(o_lenp, &ia_na_len, sizeof(ia_na_len));
 	}
 
+	if (state->send->type != DHCP6_RELEASE && n_options) {
+		o_lenp = NEXTLEN;
+		o.len = 0;
+		COPYIN1(D6_OPTION_ORO, 0);
+		for (l = 0, opt = ifp->ctx->dhcp6_opts;
+		    l < ifp->ctx->dhcp6_opts_len;
+		    l++, opt++)
+		{
+#ifndef SMALL
+			for (n = 0, opt2 = ifo->dhcp6_override;
+			    n < ifo->dhcp6_override_len;
+			    n++, opt2++)
+			{
+				if (opt->option == opt2->option)
+					break;
+			}
+			if (n < ifo->dhcp6_override_len)
+			    continue;
+#endif
+			if (!DHC_REQOPT(opt, ifo->requestmask6, ifo->nomask6))
+				continue;
+			o.code = htons((uint16_t)opt->option);
+			memcpy(p, &o.code, sizeof(o.code));
+			p += sizeof(o.code);
+			o.len = (uint16_t)(o.len + sizeof(o.code));
+		}
+#ifndef SMALL
+		for (l = 0, opt = ifo->dhcp6_override;
+		    l < ifo->dhcp6_override_len;
+		    l++, opt++)
+		{
+			if (!DHC_REQOPT(opt, ifo->requestmask6, ifo->nomask6))
+				continue;
+			o.code = htons((uint16_t)opt->option);
+			memcpy(p, &o.code, sizeof(o.code));
+			p += sizeof(o.code);
+			o.len = (uint16_t)(o.len + sizeof(o.code));
+		}
+		if (dhcp6_findselfsla(ifp)) {
+			o.code = htons(D6_OPTION_PD_EXCLUDE);
+			memcpy(p, &o.code, sizeof(o.code));
+			p += sizeof(o.code);
+			o.len = (uint16_t)(o.len + sizeof(o.code));
+		}
+#endif
+		o.len = htons(o.len);
+		memcpy(o_lenp, &o.len, sizeof(o.len));
+	}
+
+	si_len = 0;
+	COPYIN(D6_OPTION_ELAPSED, &si_len, sizeof(si_len));
+
+	if (state->state == DH6S_DISCOVER &&
+	    !(ifp->ctx->options & DHCPCD_TEST) &&
+	    DHC_REQ(ifo->requestmask6, ifo->nomask6, D6_OPTION_RAPID_COMMIT))
+		COPYIN1(D6_OPTION_RAPID_COMMIT, 0);
+
+	if (!has_option_mask(ifo->nomask6, D6_OPTION_USER_CLASS))
+		p += dhcp6_makeuser(p, ifp);
+	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_CLASS))
+		p += dhcp6_makevendor(p, ifp);
+
 	if (state->send->type != DHCP6_RELEASE) {
 		if (fqdn != FQDN_DISABLE) {
 			o_lenp = NEXTLEN;
@@ -1021,67 +1091,19 @@ dhcp6_makemessage(struct interface *ifp)
 			memcpy(o_lenp, &o.len, sizeof(o.len));
 		}
 
-		if (ifo->mudurl[0])
+		if (!has_option_mask(ifo->nomask6, D6_OPTION_MUDURL &&
+		    ifo->mudurl[0]))
 			COPYIN(D6_OPTION_MUDURL,
 			    ifo->mudurl + 1, ifo->mudurl[0]);
 
 #ifdef AUTH
 		if ((ifo->auth.options & DHCPCD_AUTH_SENDREQUIRE) !=
 		    DHCPCD_AUTH_SENDREQUIRE &&
-		    !has_option_mask(ifo->nomask6, D6_OPTION_RECONF_ACCEPT))
+		    DHC_REQ(ifo->requestmask6, ifo->nomask6,
+		    D6_OPTION_RECONF_ACCEPT))
 			COPYIN1(D6_OPTION_RECONF_ACCEPT, 0);
 #endif
 
-		if (n_options) {
-			o_lenp = NEXTLEN;
-			o.len = 0;
-			COPYIN1(D6_OPTION_ORO, 0);
-			for (l = 0, opt = ifp->ctx->dhcp6_opts;
-			    l < ifp->ctx->dhcp6_opts_len;
-			    l++, opt++)
-			{
-#ifndef SMALL
-				for (n = 0, opt2 = ifo->dhcp6_override;
-				    n < ifo->dhcp6_override_len;
-				    n++, opt2++)
-				{
-					if (opt->option == opt2->option)
-						break;
-				}
-				if (n < ifo->dhcp6_override_len)
-				    continue;
-#endif
-				if (!DHC_REQOPT(opt, ifo->requestmask6,
-				    ifo->nomask6))
-					continue;
-				o.code = htons((uint16_t)opt->option);
-				memcpy(p, &o.code, sizeof(o.code));
-				p += sizeof(o.code);
-				o.len = (uint16_t)(o.len + sizeof(o.code));
-			}
-#ifndef SMALL
-			for (l = 0, opt = ifo->dhcp6_override;
-			    l < ifo->dhcp6_override_len;
-			    l++, opt++)
-			{
-				if (!DHC_REQOPT(opt, ifo->requestmask6,
-				    ifo->nomask6))
-					continue;
-				o.code = htons((uint16_t)opt->option);
-				memcpy(p, &o.code, sizeof(o.code));
-				p += sizeof(o.code);
-				o.len = (uint16_t)(o.len + sizeof(o.code));
-			}
-			if (dhcp6_findselfsla(ifp)) {
-				o.code = htons(D6_OPTION_PD_EXCLUDE);
-				memcpy(p, &o.code, sizeof(o.code));
-				p += sizeof(o.code);
-				o.len = (uint16_t)(o.len + sizeof(o.code));
-			}
-#endif
-			o.len = htons(o.len);
-			memcpy(o_lenp, &o.len, sizeof(o.len));
-		}
 	}
 
 #ifdef AUTH
@@ -2631,7 +2653,9 @@ dhcp6_startinit(struct interface *ifp)
 		if (r == -1) {
 			if (errno != ENOENT)
 				logerr("%s: %s", __func__, state->leasefile);
-		} else if (r != 0) {
+		} else if (r != 0 &&
+		    !(ifp->options->options & DHCPCD_ANONYMOUS))
+		{
 			/* RFC 3633 section 12.1 */
 #ifndef SMALL
 			if (dhcp6_hasprefixdelegation(ifp))
@@ -3520,10 +3544,18 @@ dhcp6_recvmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg, struct ipv6_addr *ia)
 	}
 
 	r = (struct dhcp6_message *)msg->msg_iov[0].iov_base;
+
+	uint8_t duid[DUID_LEN], *dp;
+	size_t duid_len;
 	o = dhcp6_findmoption(r, len, D6_OPTION_CLIENTID, &ol);
-	if (o == NULL || ol != ctx->duid_len ||
-	    memcmp(o, ctx->duid, ol) != 0)
-	{
+	if (ifp->options->options & DHCPCD_ANONYMOUS) {
+		duid_len = duid_make(duid, ifp, DUID_LL);
+		dp = duid;
+	} else {
+		duid_len = ctx->duid_len;
+		dp = ctx->duid;
+	}
+	if (o == NULL || ol != duid_len || memcmp(o, dp, ol) != 0) {
 		logdebugx("%s: incorrect client ID from %s",
 		    ifp->name, sfrom);
 		return;
@@ -3774,12 +3806,11 @@ dhcp6_start1(void *arg)
 	}
 	if (i == sizeof(ifo->requestmask6)) {
 		for (dhc = dhcp_compats; dhc->dhcp_opt; dhc++) {
-			if (has_option_mask(ifo->requestmask, dhc->dhcp_opt))
+			if (DHC_REQ(ifo->requestmask, ifo->nomask, dhc->dhcp_opt))
 				add_option_mask(ifo->requestmask6,
 				    dhc->dhcp6_opt);
 		}
-		if (ifo->fqdn != FQDN_DISABLE ||
-		    ifo->options & DHCPCD_HOSTNAME)
+		if (ifo->fqdn != FQDN_DISABLE || ifo->options & DHCPCD_HOSTNAME)
 			add_option_mask(ifo->requestmask6, D6_OPTION_FQDN);
 	}
 

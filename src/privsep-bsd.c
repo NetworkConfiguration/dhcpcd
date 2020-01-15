@@ -36,11 +36,11 @@
 #include "privsep.h"
 
 static ssize_t
-ps_root_doioctl6(unsigned long req, void *data, size_t len)
+ps_root_doioctldom(int domain, unsigned long req, void *data, size_t len)
 {
 	int s, err;
 
-	s = socket(PF_INET6, SOCK_DGRAM, 0);
+	s = socket(domain, SOCK_DGRAM, 0);
 	if (s != -1)
 		err = ioctl(s, req, data, len);
 	else
@@ -74,8 +74,10 @@ ps_root_os(struct ps_msghdr *psm, struct msghdr *msg)
 	size_t len = iov->iov_len;
 
 	switch (psm->ps_cmd) {
+	case PS_IOCTLLINK:
+		return ps_root_doioctldom(PF_LINK, psm->ps_flags, data, len);
 	case PS_IOCTL6:
-		return ps_root_doioctl6(psm->ps_flags, data, len);
+		return ps_root_doioctldom(PF_INET6, psm->ps_flags, data, len);
 	case PS_ROUTE:
 		return ps_root_doroute(data, len);
 	default:
@@ -84,14 +86,29 @@ ps_root_os(struct ps_msghdr *psm, struct msghdr *msg)
 	}
 }
 
+static ssize_t
+ps_root_ioctldom(struct dhcpcd_ctx *ctx, uint8_t domain, unsigned long request,
+    void *data, size_t len)
+{
+
+	if (ps_sendcmd(ctx, ctx->ps_root_fd, domain,
+	    request, data, len) == -1)
+		return -1;
+	return ps_root_readerror(ctx);
+}
+
+ssize_t
+ps_root_ioctllink(struct dhcpcd_ctx *ctx, unsigned long request, void *data, size_t len)
+{
+
+	return ps_root_ioctldom(ctx, PS_IOCTLLINK, request, data, len);
+}
+
 ssize_t
 ps_root_ioctl6(struct dhcpcd_ctx *ctx, unsigned long request, void *data, size_t len)
 {
 
-	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_IOCTL6,
-	    request, data, len) == -1)
-		return -1;
-	return ps_root_readerror(ctx);
+	return ps_root_ioctldom(ctx, PS_IOCTL6, request, data, len);
 }
 
 ssize_t

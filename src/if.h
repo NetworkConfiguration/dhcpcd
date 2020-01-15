@@ -121,9 +121,10 @@ int if_getsubnet(struct dhcpcd_ctx *, const char *, int, void *, size_t);
 #endif
 
 int if_ioctl(struct dhcpcd_ctx *, ioctl_request_t, void *, size_t);
-int if_getflags(struct interface *ifp);
-int if_setflag(struct interface *ifp, short flag);
-#define if_up(ifp) if_setflag((ifp), (IFF_UP | IFF_RUNNING))
+int if_getflags(struct interface *);
+int if_setflag(struct interface *, short, short);
+#define if_up(ifp) if_setflag((ifp), (IFF_UP | IFF_RUNNING), 0)
+#define if_down(ifp) if_setflag((ifp), 0, IFF_UP);
 bool if_valid_hwaddr(const uint8_t *, size_t);
 struct if_head *if_discover(struct dhcpcd_ctx *, struct ifaddrs **,
     int, char * const *);
@@ -171,6 +172,8 @@ int if_opensockets_os(struct dhcpcd_ctx *);
 void if_closesockets(struct dhcpcd_ctx *);
 void if_closesockets_os(struct dhcpcd_ctx *);
 int if_handlelink(struct dhcpcd_ctx *);
+int if_randomisemac(struct interface *);
+int if_setmac(struct interface *ifp, void *, uint8_t);
 
 /* dhcpcd uses the same routing flags as BSD.
  * If the platform doesn't use these flags,

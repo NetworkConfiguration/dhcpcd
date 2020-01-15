@@ -24,7 +24,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd January 3, 2020
+.Dd January 15, 2020
 .Dt DHCPCD.CONF 5
 .Os
 .Sh NAME
@@ -59,6 +59,26 @@ When discovering interfaces, the interface name must not match
 .Ar pattern
 which is a space or comma separated list of patterns passed to
 .Xr fnmatch 3 .
+.It Ic anonymous
+Enables Anonymity Profiles for DHCP, RFC 7844.
+This implementation forces a hardware address randomisaton when
+the interface link is down and that ClientID's are only LL.
+Any DUID is ignored.
+All non essential options are then masked at this point,
+but they could be unmasked by explicitly requesting the option
+.Sy after
+the
+.Ic anonymous
+option is processed.
+As such, the
+.Ic anonymous
+option
+.Sy should
+be the last option in the configuration unless you really want to
+send something which could identify you.
+.Nm dhcpcd
+will not try and reboot an old lease, it will go straight into
+DISCOVER/SOLICIT.
 .It Ic arping Ar address Op address
 .Nm dhcpcd
 will arping each address in order before attempting DHCP.

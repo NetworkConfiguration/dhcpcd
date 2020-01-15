@@ -39,6 +39,7 @@ ssize_t ps_root_ioctl(struct dhcpcd_ctx *, ioctl_request_t, void *, size_t);
 ssize_t ps_root_os(struct ps_msghdr *, struct msghdr *);
 #if defined(BSD) || defined(__sun)
 ssize_t ps_root_route(struct dhcpcd_ctx *, void *, size_t);
+ssize_t ps_root_ioctllink(struct dhcpcd_ctx *, unsigned long, void *, size_t);
 ssize_t ps_root_ioctl6(struct dhcpcd_ctx *, unsigned long, void *, size_t);
 #endif
 #ifdef __linux__

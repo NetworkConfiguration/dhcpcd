@@ -213,6 +213,55 @@ if_closesockets_os(struct dhcpcd_ctx *ctx)
 	priv = (struct priv *)ctx->priv;
 	if (priv->pf_inet6_fd != -1)
 		close(priv->pf_inet6_fd);
+	free(priv);
+	ctx->priv = NULL;
+}
+
+static int
+if_ioctllink(struct dhcpcd_ctx *ctx, unsigned long req, void *data, size_t len)
+{
+	int s;
+	int retval;
+
+#ifdef PRIVSEP
+	if (ctx->options & DHCPCD_PRIVSEP)
+		return (int)ps_root_ioctllink(ctx, req, data, len);
+#else
+	UNUSED(ctx);
+#endif
+
+	s = socket(PF_LINK, SOCK_DGRAM, 0);
+	if (s == -1)
+		return -1;
+	retval = ioctl(s, req, data, len);
+	close(s);
+	return retval;
+}
+
+int
+if_setmac(struct interface *ifp, void *mac, uint8_t maclen)
+{
+	struct if_laddrreq iflr = { .flags = IFLR_ACTIVE };
+	struct sockaddr_dl *sdl = satosdl(&iflr.addr);
+	int retval;
+
+	if (ifp->hwlen != maclen) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	strlcpy(iflr.iflr_name, ifp->name, sizeof(iflr.iflr_name));
+	sdl->sdl_family = AF_LINK;
+	sdl->sdl_len = sizeof(*sdl);
+	sdl->sdl_alen = maclen;
+	memcpy(LLADDR(sdl), mac, maclen);
+	retval = if_ioctllink(ifp->ctx, SIOCALIFADDR, &iflr, sizeof(iflr));
+
+	/* Try and remove the old address */
+	memcpy(LLADDR(sdl), ifp->hwaddr, ifp->hwlen);
+	if_ioctllink(ifp->ctx, SIOCDLIFADDR, &iflr, sizeof(iflr));
+
+	return retval;
 }
 
 static bool

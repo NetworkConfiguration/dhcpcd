@@ -156,7 +156,7 @@ if_getflags(struct interface *ifp)
 }
 
 int
-if_setflag(struct interface *ifp, short flag)
+if_setflag(struct interface *ifp, short setflag, short unsetflag)
 {
 	struct ifreq ifr = { .ifr_flags = 0 };
 	short f;
@@ -165,16 +165,57 @@ if_setflag(struct interface *ifp, short flag)
 		return -1;
 
 	f = (short)ifp->flags;
-	if ((f & flag) == flag)
+	if ((f & setflag) == setflag && (f & unsetflag) == 0)
 		return 0;
 
 	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
-	ifr.ifr_flags = f | flag;
+	ifr.ifr_flags |= setflag;
+	ifr.ifr_flags &= (short)~unsetflag;
 	if (if_ioctl(ifp->ctx, SIOCSIFFLAGS, &ifr, sizeof(ifr)) == -1)
 		return -1;
 
 	ifp->flags = (unsigned int)ifr.ifr_flags;
 	return 0;
+}
+
+int
+if_randomisemac(struct interface *ifp)
+{
+	uint32_t randnum;
+	size_t hwlen = ifp->hwlen, rlen = 0;
+	uint8_t buf[hwlen], *bp = buf, *rp = (uint8_t *)&randnum;
+	char sbuf[hwlen * 3];
+	int retval;
+
+	if (hwlen == 0) {
+		errno = ENOTSUP;
+		return -1;
+	}
+
+	for (; hwlen != 0; hwlen--) {
+		if (rlen == 0) {
+			randnum = arc4random();
+			rp = (uint8_t *)&randnum;
+			rlen = sizeof(randnum);
+		}
+		if (bp == buf) {
+			/* First octet is special. We need to preserve
+			 * bit 8 (unicast/multicast) and set
+			 * bit 7 (locally administered address) */
+			*bp = *rp++ & 0xFC;
+			*bp++ |= 2;
+		} else
+			*bp++ = *rp++;
+		rlen--;
+	}
+
+	logdebugx("%s: hardware address randomised to %s",
+	    ifp->name,
+	    hwaddr_ntoa(buf, sizeof(buf), sbuf, sizeof(sbuf)));
+	retval = if_setmac(ifp, buf, ifp->hwlen);
+	if (retval == 0)
+		memcpy(ifp->hwaddr, buf, sizeof(ifp->hwaddr));
+	return retval;
 }
 
 static int
