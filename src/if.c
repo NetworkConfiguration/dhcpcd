@@ -198,23 +198,20 @@ if_randomisemac(struct interface *ifp)
 			rp = (uint8_t *)&randnum;
 			rlen = sizeof(randnum);
 		}
-		if (bp == buf) {
-			/* First octet is special. We need to preserve
-			 * bit 8 (unicast/multicast) and set
-			 * bit 7 (locally administered address) */
-			*bp = *rp++ & 0xFC;
-			*bp++ |= 2;
-		} else
-			*bp++ = *rp++;
+		*bp++ = *rp++;
 		rlen--;
 	}
+
+	/* Unicast address and locally administered. */
+	buf[0] &= 0xFC;
+	buf[0] |= 0x02;
 
 	logdebugx("%s: hardware address randomised to %s",
 	    ifp->name,
 	    hwaddr_ntoa(buf, sizeof(buf), sbuf, sizeof(sbuf)));
 	retval = if_setmac(ifp, buf, ifp->hwlen);
 	if (retval == 0)
-		memcpy(ifp->hwaddr, buf, sizeof(ifp->hwaddr));
+		memcpy(ifp->hwaddr, buf, ifp->hwlen);
 	return retval;
 }
 
