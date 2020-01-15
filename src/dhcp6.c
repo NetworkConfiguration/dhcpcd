@@ -1091,8 +1091,8 @@ dhcp6_makemessage(struct interface *ifp)
 			memcpy(o_lenp, &o.len, sizeof(o.len));
 		}
 
-		if (!has_option_mask(ifo->nomask6, D6_OPTION_MUDURL &&
-		    ifo->mudurl[0]))
+		if (!has_option_mask(ifo->nomask6, D6_OPTION_MUDURL) &&
+		    ifo->mudurl[0])
 			COPYIN(D6_OPTION_MUDURL,
 			    ifo->mudurl + 1, ifo->mudurl[0]);
 
