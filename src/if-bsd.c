@@ -217,6 +217,7 @@ if_closesockets_os(struct dhcpcd_ctx *ctx)
 	ctx->priv = NULL;
 }
 
+#ifdef SIOCALIFADDR /*NetBSD */
 static int
 if_ioctllink(struct dhcpcd_ctx *ctx, unsigned long req, void *data, size_t len)
 {
@@ -237,18 +238,21 @@ if_ioctllink(struct dhcpcd_ctx *ctx, unsigned long req, void *data, size_t len)
 	close(s);
 	return retval;
 }
+#endif
 
 int
 if_setmac(struct interface *ifp, void *mac, uint8_t maclen)
 {
-	struct if_laddrreq iflr = { .flags = IFLR_ACTIVE };
-	struct sockaddr_dl *sdl = satosdl(&iflr.addr);
-	int retval;
 
 	if (ifp->hwlen != maclen) {
 		errno = EINVAL;
 		return -1;
 	}
+
+#ifdef SIOCALIFADDR /*NetBSD */
+	struct if_laddrreq iflr = { .flags = IFLR_ACTIVE };
+	struct sockaddr_dl *sdl = satosdl(&iflr.addr);
+	int retval;
 
 	strlcpy(iflr.iflr_name, ifp->name, sizeof(iflr.iflr_name));
 	sdl->sdl_family = AF_LINK;
@@ -262,6 +266,16 @@ if_setmac(struct interface *ifp, void *mac, uint8_t maclen)
 	if_ioctllink(ifp->ctx, SIOCDLIFADDR, &iflr, sizeof(iflr));
 
 	return retval;
+#else
+	struct ifreq ifr = {
+		.ifr_addr.sa_family = AF_LINK,
+		.ifr_addr.sa_len = maclen,
+	};
+
+	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
+	memcpy(ifr.ifr_addr.sa_data, mac, maclen);
+	return if_ioctl(ifp->ctx, SIOCSIFLLADDR, &ifr, sizeof(ifr));
+#endif
 }
 
 static bool
