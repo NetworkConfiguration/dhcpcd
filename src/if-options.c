@@ -1254,6 +1254,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		del_option_mask(ifo->nomask, DHO_CSR);
 		del_option_mask(ifo->nomask, DHO_ROUTER);
 		del_option_mask(ifo->nomask, DHO_DNSSERVER);
+		del_option_mask(ifo->nomask, DHO_DNSDOMAIN);
 		del_option_mask(ifo->nomask, DHO_BROADCAST);
 		del_option_mask(ifo->nomask, DHO_STATICROUTE);
 		del_option_mask(ifo->nomask, DHO_SERVERID);
