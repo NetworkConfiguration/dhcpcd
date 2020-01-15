@@ -792,6 +792,8 @@ warn_iaid_conflict(struct interface *ifp, uint16_t ia_type, uint8_t *iaid)
 	TAILQ_FOREACH(ifn, ifp->ctx->ifaces, next) {
 		if (ifn == ifp || !ifn->active)
 			continue;
+		if (ifn->options->options & DHCPCD_ANONYMOUS)
+			continue;
 		if (ia_type == 0 &&
 		    memcmp(ifn->options->iaid, iaid,
 		    sizeof(ifn->options->iaid)) == 0)
@@ -847,7 +849,14 @@ dhcpcd_startinterface(void *arg)
 		}
 	}
 
-	if (ifo->options & (DHCPCD_DUID | DHCPCD_IPV6)) {
+	if (ifo->options & (DHCPCD_DUID | DHCPCD_IPV6) &&
+	    !(ifo->options & DHCPCD_ANONYMOUS))
+	{
+#ifdef INET6
+		size_t i;
+		struct if_ia *ia;
+#endif
+
 		/* Report client DUID */
 		if (ifp->ctx->duid == NULL) {
 			if (duid_init(ifp) == 0)
@@ -857,13 +866,6 @@ dhcpcd_startinterface(void *arg)
 			    ifp->ctx->duid_len,
 			    buf, sizeof(buf)));
 		}
-	}
-
-	if (ifo->options & (DHCPCD_DUID | DHCPCD_IPV6)) {
-#ifdef INET6
-		size_t i;
-		struct if_ia *ia;
-#endif
 
 		/* Report IAIDs */
 		loginfox("%s: IAID %s", ifp->name,
