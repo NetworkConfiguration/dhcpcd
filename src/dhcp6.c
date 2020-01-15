@@ -1220,7 +1220,7 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 		broad_uni = "unicasting";
 	}
 
-	if (!callback)
+	if (!callback) {
 		logdebugx("%s: %s %s with xid 0x%02x%02x%02x",
 		    ifp->name,
 		    broad_uni,
@@ -1228,7 +1228,8 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 		    state->send->xid[0],
 		    state->send->xid[1],
 		    state->send->xid[2]);
-	else {
+		RT = 0;
+	} else {
 		if (state->IMD &&
 		    !(ifp->options->options & DHCPCD_INITIAL_DELAY))
 			state->IMD = 0;
