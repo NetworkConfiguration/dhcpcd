@@ -1840,7 +1840,7 @@ printpidfile:
 	}
 
 #ifdef USE_SIGNALS
-	/* Ingore SIGPIPE, prefer EPIPE. */
+	/* Ignore SIGPIPE, prefer EPIPE. */
 	signal(SIGPIPE, SIG_IGN);
 
 	/* Save signal mask, block and redirect signals to our handler */
