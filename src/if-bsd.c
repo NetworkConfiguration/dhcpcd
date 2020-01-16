@@ -1250,10 +1250,14 @@ if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 	if (ctx->ps_root_pid != 0) {
 		if (rtm->rtm_pid == ctx->ps_root_pid)
 			return 0;
-	} else
+	}
 #endif
-		if (rtm->rtm_pid == getpid())
-			return 0;
+
+#if 0
+	/* Not needed because we turn off SO_USELOOPBACK. */
+	if (rtm->rtm_pid == getpid())
+		return 0;
+#endif
 
 	if (if_copyrt(ctx, &rt, rtm) == -1)
 		return errno == ENOTSUP ? 0 : -1;
@@ -1303,6 +1307,8 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 			return 0;
 	} else
 #endif
+		/* address management is done via ioctl, so SO_USELOOPBACK
+		 * has no effect, so we do need to check the pid. */
 		if (ifam->ifam_pid == getpid())
 			return 0;
 	pid = ifam->ifam_pid;
