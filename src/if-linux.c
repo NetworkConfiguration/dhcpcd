@@ -653,6 +653,11 @@ link_route(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 	}
 
 	/* Ignore messages we sent. */
+#ifdef PRIVSEP
+	if (ctx->ps_root_pid != 0 &&
+	    nlm->nlmsg_pid == (uint32_t)ctx->ps_root_pid)
+		return 0;
+#endif
 	priv = (struct priv *)ctx->priv;
 	if (nlm->nlmsg_pid == priv->route_pid)
 		return 0;
@@ -688,6 +693,11 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 	}
 
 	/* Ignore messages we sent. */
+#ifdef PRIVSEP
+	if (ctx->ps_root_pid != 0 &&
+	    nlm->nlmsg_pid == (uint32_t)ctx->ps_root_pid)
+		return 0;
+#endif
 	priv = (struct priv*)ctx->priv;
 	if (nlm->nlmsg_pid == priv->route_pid)
 		return 0;
@@ -978,6 +988,9 @@ if_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct nlmsghdr *hdr,
 	    .msg_name = &snl, .msg_namelen = sizeof(snl),
 	    .msg_iov = &iov, .msg_iovlen = 1
 	};
+	bool use_rfd;
+
+	use_rfd = (protocol == NETLINK_ROUTE && hdr->nlmsg_type != RTM_GETADDR);
 
 	/* Request a reply */
 	hdr->nlmsg_flags |= NLM_F_ACK;
@@ -988,18 +1001,23 @@ if_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct nlmsghdr *hdr,
 		return (int)ps_root_sendnetlink(ctx, protocol, &msg);
 #endif
 
-	if ((s = if_linksocket(&snl, protocol)) == -1)
-		return -1;
+	if (use_rfd) {
+		struct priv *priv = (struct priv *)ctx->priv;
 
+		s = priv->route_fd;
+	} else {
+		if ((s = if_linksocket(&snl, protocol)) == -1)
+			return -1;
 #ifdef NETLINK_GET_STRICT_CHK
-	if (hdr->nlmsg_type == RTM_GETADDR) {
-		int on = 1;
+		if (hdr->nlmsg_type == RTM_GETADDR) {
+			int on = 1;
 
-		if (setsockopt(s, SOL_NETLINK, NETLINK_GET_STRICT_CHK,
-		    &on, sizeof(on)) == -1)
-			logerr("%s: NETLINK_GET_STRICT_CHK", __func__);
-	}
+			if (setsockopt(s, SOL_NETLINK, NETLINK_GET_STRICT_CHK,
+			    &on, sizeof(on)) == -1)
+				logerr("%s: NETLINK_GET_STRICT_CHK", __func__);
+		}
 #endif
+	}
 
 	if (sendmsg(s, &msg, 0) != -1) {
 		unsigned char buf[16 * 1024];
@@ -1011,7 +1029,9 @@ if_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct nlmsghdr *hdr,
 		r = if_getnetlink(ctx, &riov, s, 0, cb, cbarg);
 	} else
 		r = -1;
-	close(s);
+
+	if (!use_rfd)
+		close(s);
 	return r;
 }
 
@@ -1385,7 +1405,6 @@ if_addressexists(struct interface *ifp, struct in_addr *addr)
 	    &_if_addressexists, &ia);
 }
 #endif
-
 
 struct nlmr
 {
