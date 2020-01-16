@@ -81,7 +81,6 @@ const int dhcpcd_signals[] = {
 	SIGHUP,
 	SIGUSR1,
 	SIGUSR2,
-	SIGPIPE
 };
 const size_t dhcpcd_signals_len = __arraycount(dhcpcd_signals);
 #endif
@@ -1374,9 +1373,6 @@ dhcpcd_signal_cb(int sig, void *arg)
 		if (logopen(ctx->logfile) == -1)
 			logerr(__func__);
 		return;
-	case SIGPIPE:
-		logwarnx("received SIGPIPE");
-		return;
 	default:
 		logerrx("received signal %d but don't know what to do with it",
 		    sig);
@@ -1842,7 +1838,11 @@ printpidfile:
 		logerr("%s: eloop_init", __func__);
 		goto exit_failure;
 	}
+
 #ifdef USE_SIGNALS
+	/* Ingore SIGPIPE, prefer EPIPE. */
+	signal(SIGPIPE, SIG_IGN);
+
 	/* Save signal mask, block and redirect signals to our handler */
 	if (eloop_signal_set_cb(ctx.eloop,
 	    dhcpcd_signals, dhcpcd_signals_len,
