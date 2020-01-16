@@ -1245,12 +1245,15 @@ if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 	if (rtm->rtm_errno != 0)
 		return 0;
 
+	/* Ignore messages from ourself. */
 #ifdef PRIVSEP
-	/* Ignore messages from the route process.
-	 * We'll get the result of them regardless. */
-	if (rtm->rtm_pid == ctx->ps_root_pid)
-		return 0;
+	if (ctx->ps_root_pid != 0) {
+		if (rtm->rtm_pid == ctx->ps_root_pid)
+			return 0;
+	} else
 #endif
+		if (rtm->rtm_pid == getpid())
+			return 0;
 
 	if (if_copyrt(ctx, &rt, rtm) == -1)
 		return errno == ENOTSUP ? 0 : -1;
@@ -1292,6 +1295,21 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 		errno = EINVAL;
 		return -1;
 	}
+
+#ifdef HAVE_IFAM_PID
+#ifdef PRIVSEP
+	if (ctx->ps_root_pid != 0) {
+		if (ifam->ifam_pid == ctx->ps_root_pid)
+			return 0;
+	} else
+#endif
+		if (ifam->ifam_pid == getpid())
+			return 0;
+	pid = ifam->ifam_pid;
+#else
+	pid = 0;
+#endif
+
 	if (~ifam->ifam_addrs & RTA_IFA)
 		return 0;
 	if ((ifp = if_findindex(ctx->ifaces, ifam->ifam_index)) == NULL)
@@ -1300,12 +1318,6 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 	if (get_addrs(ifam->ifam_addrs, (const char *)ifam + sizeof(*ifam),
 		      ifam->ifam_msglen - sizeof(*ifam), rti_info) == -1)
 		return -1;
-
-#ifdef HAVE_IFAM_PID
-	pid = ifam->ifam_pid;
-#else
-	pid = 0;
-#endif
 
 #ifdef HAVE_IFAM_ADDRFLAGS
 	addrflags = ifam->ifam_addrflags;
