@@ -108,6 +108,11 @@
 #  undef IPV6_POLLADDRFLAG
 #endif
 
+/* Of course OpenBSD has their own special name. */
+#if !defined(IN6_IFF_TEMPORARY) && defined(IN6_IFF_PRIVACY)
+#define	IN6_IFF_TEMPORARY IN6_IFF_PRIVACY
+#endif
+
 #ifdef __sun
    /* Solaris lacks these defines.
     * While it supports DaD, to seems to only expose IFF_DUPLICATE
