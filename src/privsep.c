@@ -212,6 +212,8 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 
 	if (chroot(pw->pw_dir) == -1)
 		logerr("%s: chroot `%s'", __func__, pw->pw_dir);
+	if (chdir("/") == -1)
+		logerr("%s: chdir `/'", __func__);
 
 dropprivs:
 	if (setgroups(1, &pw->pw_gid) == -1 ||
