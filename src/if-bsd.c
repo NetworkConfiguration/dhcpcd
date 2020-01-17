@@ -1634,7 +1634,7 @@ if_applyra(const struct ra *rap)
 }
 
 #ifdef IPV6_MANAGETEMPADDR
-#if defined(IPV6CTL_TEMPVLTIME) && !defined(__OpenBSD__)
+#if !defined(IPV6CTL_TEMPVLTIME) && !defined(__OpenBSD__)
 #define get_inet6_sysctlbyname(code) inet6_sysctlbyname(code, 0, 0)
 #define set_inet6_sysctlbyname(code, val) inet6_sysctlbyname(code, val, 1)
 static int
