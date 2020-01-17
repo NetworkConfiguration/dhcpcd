@@ -1649,8 +1649,11 @@ ipv6nd_expirera(void *arg)
 			    &ia->acquired, NULL);
 			if (elapsed > ia->prefix_vltime) {
 				if (ia->flags & IPV6_AF_ADDED) {
-					logwarnx("%s: expired address %s",
-					    ia->iface->name, ia->saddr);
+					logwarnx("%s: expired %s %s",
+					    ia->iface->name,
+					    ia->flags & IPV6_AF_AUTOCONF ?
+					    "address" : "prefix",
+					    ia->saddr);
 					if (if_address6(RTM_DELADDR, ia)== -1 &&
 					    errno != EADDRNOTAVAIL &&
 					    errno != ENXIO)
