@@ -642,7 +642,7 @@ eloop_q_timeout_add_tv(struct eloop *eloop, int queue,
     const struct timespec *when, void (*callback)(void *), void *arg)
 {
 
-	if (when->tv_sec < 0 || when->tv_sec > UINT_MAX) {
+	if (when->tv_sec < 0 || (unsigned long)when->tv_sec > UINT_MAX) {
 		errno = EINVAL;
 		return -1;
 	}
