@@ -1713,7 +1713,8 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 #endif
 		}
 #elif IFA_F_MANAGETEMPADDR
-		if (ia->flags & IPV6_AF_AUTOCONF)
+		if (ia->flags & IPV6_AF_AUTOCONF &&
+		    ipv6_ifidlen(ia->iface) + ia->prefix_len == 128)
 			flags |= IFA_F_MANAGETEMPADDR;
 #endif
 #ifdef IFA_F_NOPREFIXROUTE
