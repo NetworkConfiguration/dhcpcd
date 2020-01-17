@@ -905,7 +905,9 @@ ipv6nd_dadcallback(void *arg)
 		 * Because ap->dadcounter is always increamented,
 		 * a different address is generated. */
 		/* XXX Cache DAD counter per prefix/id/ssid? */
-		if (ifp->options->options & DHCPCD_SLAACPRIVATE) {
+		if (ifp->options->options & DHCPCD_SLAACPRIVATE &&
+		    IA6_CANAUTOCONF(ia))
+		{
 			unsigned int delay;
 
 			if (ia->dadcounter >= IDGEN_RETRIES) {
@@ -1281,7 +1283,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 			/* RFC4941 Section 3.3.3 */
 			if (ap->flags & IPV6_AF_AUTOCONF &&
 			    ip6_use_tempaddr(ap->iface->name) &&
-			    ipv6_ifidlen(ap->iface) + ap->prefix_len == 128)
+			    IA6_CANAUTOCONF(ap))
 			{
 				if (!new_ap) {
 					if (ipv6_settemptime(ap, 1) == NULL)

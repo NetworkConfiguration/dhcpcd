@@ -69,6 +69,8 @@
 
 /* Interface identifier length. Prefix + this == 128 for autoconf */
 #define ipv6_ifidlen(ifp)	64
+#define	IA6_CANAUTOCONF(ia)	\
+	((ia)->prefix_len + ipv6_ifidlen((ia)->iface) == 128)
 
 #ifndef IN6_ARE_MASKED_ADDR_EQUAL
 #define IN6_ARE_MASKED_ADDR_EQUAL(d, a, m)	(	\
