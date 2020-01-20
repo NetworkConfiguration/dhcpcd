@@ -692,15 +692,18 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 		return -1;
 	}
 
-	/* Ignore messages we sent. */
+	/* Ignore address deletions from ourself.
+	 * We need to process address flag changes though. */
+	if (nlm->nlmsg_type == RTM_DELADDR) {
 #ifdef PRIVSEP
-	if (ctx->ps_root_pid != 0 &&
-	    nlm->nlmsg_pid == (uint32_t)ctx->ps_root_pid)
-		return 0;
+		if (ctx->ps_root_pid != 0 &&
+		    nlm->nlmsg_pid == (uint32_t)ctx->ps_root_pid)
+			return 0;
 #endif
-	priv = (struct priv*)ctx->priv;
-	if (nlm->nlmsg_pid == priv->route_pid)
-		return 0;
+		priv = (struct priv*)ctx->priv;
+		if (nlm->nlmsg_pid == priv->route_pid)
+			return 0;
+	}
 
 	ifa = NLMSG_DATA(nlm);
 	if ((ifp = if_findindex(ctx->ifaces, ifa->ifa_index)) == NULL) {

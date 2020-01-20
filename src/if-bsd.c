@@ -1299,16 +1299,21 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 	}
 
 #ifdef HAVE_IFAM_PID
+	/* Ignore address deletions from ourself.
+	 * We need to process address flag changes though. */
+	if (ifam->ifam_type == RTM_DELADDR) {
 #ifdef PRIVSEP
-	if (ctx->ps_root_pid != 0) {
-		if (ifam->ifam_pid == ctx->ps_root_pid)
-			return 0;
-	} else
+		if (ctx->ps_root_pid != 0) {
+			if (ifam->ifam_pid == ctx->ps_root_pid)
+				return 0;
+		} else
 #endif
-		/* address management is done via ioctl, so SO_USELOOPBACK
-		 * has no effect, so we do need to check the pid. */
-		if (ifam->ifam_pid == getpid())
-			return 0;
+			/* address management is done via ioctl,
+			 * so SO_USELOOPBACK has no effect,
+			 * so we do need to check the pid. */
+			if (ifam->ifam_pid == getpid())
+				return 0;
+	}
 	pid = ifam->ifam_pid;
 #else
 	pid = 0;
