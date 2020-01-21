@@ -43,11 +43,16 @@
 #define	PS_BPF_ARP_ADDR		0x06
 
 #define	PS_IOCTL		0x10
-#define	PS_SCRIPT		0x11
-#define	PS_IOCTLLINK		0x12
-#define	PS_IOCTL6		0x13
-#define	PS_ROUTE		0x14	/* Also used for NETLINK */
-#define	PS_WRITEPATHUINT	0x15
+#define	PS_ROUTE		0x11	/* Also used for NETLINK */
+#define	PS_SCRIPT		0x12
+#define	PS_UNLINK		0x13
+
+/* BSD Commands */
+#define	PS_IOCTLLINK		0x14
+#define	PS_IOCTL6		0x15
+
+/* Linux commands */
+#define	PS_WRITEPATHUINT	0x16
 
 #define	PS_DELETE		0x20
 #define	PS_START		0x40
@@ -132,6 +137,7 @@ TAILQ_HEAD(ps_process_head, ps_process);
 #endif
 
 int ps_init(struct dhcpcd_ctx *);
+int ps_dropprivs(struct dhcpcd_ctx *);
 int ps_start(struct dhcpcd_ctx *);
 int ps_stop(struct dhcpcd_ctx *);
 
@@ -153,7 +159,7 @@ pid_t ps_dostart(struct dhcpcd_ctx * ctx,
     pid_t *priv_pid, int *priv_fd,
     void (*recv_msg)(void *), void (*recv_unpriv_msg),
     void *recv_ctx, int (*callback)(void *), void (*)(int, void *),
-    unsigned int flags);
+    unsigned int);
 int ps_dostop(struct dhcpcd_ctx *ctx, pid_t *pid, int *fd);
 
 struct ps_process *ps_findprocess(struct dhcpcd_ctx *, struct ps_id *);

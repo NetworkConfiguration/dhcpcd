@@ -2091,6 +2091,13 @@ printpidfile:
 		goto exit_failure;
 	}
 
+#ifdef PRIVSEP
+	if (ctx.options & DHCPCD_PRIVSEP && ps_dropprivs(&ctx) == -1) {
+		logerr("ps_dropprivs");
+		goto exit_failure;
+	}
+#endif
+
 	setproctitle("%s%s%s",
 	    ctx.options & DHCPCD_MASTER ? "[master]" : argv[optind],
 	    ctx.options & DHCPCD_IPV4 ? " [ip4]" : "",
@@ -2223,13 +2230,13 @@ exit_failure:
 	i = EXIT_FAILURE;
 
 exit1:
+	if (control_stop(&ctx) == -1)
+		logerr("%s: control_stop", __func__);
 #ifdef PRIVSEP
 	ps_stop(&ctx);
 #endif
 	if (ifaddrs != NULL)
 		freeifaddrs(ifaddrs);
-	if (control_stop(&ctx) == -1)
-		logerr("%s: control_stop", __func__);
 	/* Free memory and close fd's */
 	if (ctx.ifaces) {
 		while ((ifp = TAILQ_FIRST(ctx.ifaces))) {

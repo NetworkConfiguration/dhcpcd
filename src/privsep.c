@@ -72,7 +72,6 @@ int
 ps_init(struct dhcpcd_ctx *ctx)
 {
 	struct passwd *pw;
-	gid_t gid = (gid_t)-1;
 
 	errno = 0;
 	if ((pw = getpwnam(PRIVSEP_USER)) == NULL) {
@@ -86,16 +85,39 @@ ps_init(struct dhcpcd_ctx *ctx)
 		return -1;
 	}
 
-
-	/* Change ownership of stuff we need to drop at exit. */
-	if (chown(ctx->pidfile, pw->pw_uid, gid) == -1)
-		logerr("chown `%s'", ctx->pidfile);
-	if (chown(DBDIR, pw->pw_uid, gid) == -1)
-		logerr("chown `%s'", DBDIR);
-	if (chown(RUNDIR, pw->pw_uid, gid) == -1)
-		logerr("chown `%s'", RUNDIR);
-
 	ctx->options |= DHCPCD_PRIVSEP;
+	return 0;
+}
+
+int
+ps_dropprivs(struct dhcpcd_ctx *ctx)
+{
+	struct passwd *pw;
+
+	if ((pw = getpwnam(PRIVSEP_USER)) == NULL) {
+		if (errno == 0)
+			logerrx("no such user %s", PRIVSEP_USER);
+		else
+			logerr("getpwnam");
+		return -1;
+	}
+
+	if (!(ctx->options & DHCPCD_FORKED))
+		logdebugx("chrooting to `%s'", pw->pw_dir);
+
+	if (chroot(pw->pw_dir) == -1)
+		logerr("%s: chroot `%s'", __func__, pw->pw_dir);
+	if (chdir("/") == -1)
+		logerr("%s: chdir `/'", __func__);
+
+	if (setgroups(1, &pw->pw_gid) == -1 ||
+	     setgid(pw->pw_gid) == -1 ||
+	     setuid(pw->pw_uid) == -1)
+	{
+		logerr("failed to drop privileges");
+		return -1;
+	}
+
 	return 0;
 }
 
@@ -106,25 +128,9 @@ ps_dostart(struct dhcpcd_ctx *ctx,
     void *recv_ctx, int (*callback)(void *), void (*signal_cb)(int, void *),
     unsigned int flags)
 {
-	struct passwd *pw;
 	int stype;
 	int fd[2];
 	pid_t pid;
-
-	if (flags & PSF_DROPPRIVS) {
-		errno = 0;
-		if ((pw = getpwnam(PRIVSEP_USER)) == NULL) {
-			if (errno == 0)
-				logerrx("no such user %s", PRIVSEP_USER);
-			else
-				logerr("getpwnam");
-			return -1;
-		}
-	} else
-		pw = NULL;
-
-	if (priv_fd == NULL)
-		goto dropprivs;
 
 	stype = SOCK_CLOEXEC | SOCK_NONBLOCK;
 	if (socketpair(AF_UNIX, SOCK_DGRAM | stype, 0, fd) == -1) {
@@ -199,25 +205,8 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 	freopen(_PATH_DEVNULL, "w", stdout);
 	freopen(_PATH_DEVNULL, "w", stderr);
 
-	if (pw == NULL)
-		return 0;
-
-	if (!(flags & PSF_DROPPRIVS)) {
-		if (chdir(pw->pw_dir) == -1)
-			logerr("%s: chdir `%s'", __func__, pw->pw_dir);
-		return 0;
-	}
-
-	if (chroot(pw->pw_dir) == -1)
-		logerr("%s: chroot `%s'", __func__, pw->pw_dir);
-	if (chdir("/") == -1)
-		logerr("%s: chdir `/'", __func__);
-
-dropprivs:
-	if (setgroups(1, &pw->pw_gid) == -1 ||
-	    setgid(pw->pw_gid) == -1 ||
-	    setuid(pw->pw_uid) == -1)
-		logerr("failed to drop privileges");
+	if (flags & PSF_DROPPRIVS)
+		ps_dropprivs(ctx);
 
 	return 0;
 
@@ -294,7 +283,7 @@ ps_start(struct dhcpcd_ctx *ctx)
 	/* No point in spawning the generic network listener if we're
 	 * not going to use it. */
 	if (!(ctx->options & (DHCPCD_MASTER | DHCPCD_IPV6RS)))
-		goto dropprivs;
+		goto started;
 
 	switch (pid = ps_inet_start(ctx)) {
 	case -1:
@@ -307,11 +296,7 @@ ps_start(struct dhcpcd_ctx *ctx)
 		logdebugx("spawned network proxy on PID %d", pid);
 	}
 
-dropprivs:
-	/* Drop privs now. */
-	ps_dostart(ctx, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	    PSF_DROPPRIVS);
-
+started:
 	return 1;
 }
 
@@ -320,12 +305,19 @@ ps_stop(struct dhcpcd_ctx *ctx)
 {
 	int r, ret = 0;
 
-	if (ctx->options & DHCPCD_FORKED || ctx->eloop == NULL)
+	if (!(ctx->options & DHCPCD_PRIVSEP) ||
+	    ctx->options & DHCPCD_FORKED ||
+	    ctx->eloop == NULL)
 		return 0;
 
 	r = ps_inet_stop(ctx);
 	if (r != 0)
 		ret = r;
+
+	/* We've been chrooted, so we need to tell the
+	 * priviledged actioneer to remove the pidfile. */
+	ps_root_unlink(ctx, ctx->pidfile);
+
 	r = ps_root_stop(ctx);
 	if (r != 0)
 		ret = r;
