@@ -57,11 +57,6 @@
 #include "privsep.h"
 #include "script.h"
 
-/* Allow the OS to define another script env var name */
-#ifndef RC_SVCNAME
-#define RC_SVCNAME "RC_SVCNAME"
-#endif
-
 #define DEFAULT_PATH	"/usr/bin:/usr/sbin:/bin:/sbin"
 
 static const char * const if_params[] = {
