@@ -561,7 +561,7 @@ ipv6nd_expire(void *arg)
 		return;
 
 	TAILQ_FOREACH(rap, ifp->ctx->ra_routers, next) {
-		if (rap->iface == ifp)
+		if (rap->iface != ifp)
 			continue;
 		rap->acquired = now;
 		TAILQ_FOREACH(ia, &rap->addrs, next) {
