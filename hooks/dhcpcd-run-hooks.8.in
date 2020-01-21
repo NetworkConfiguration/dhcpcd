@@ -147,9 +147,7 @@ script to process them.
 .Sh ENVIRONMENT
 .Nm dhcpcd
 will clear the environment variables aside from
-.Ev $PATH
-and
-.Ev $RC_SVCNAME .
+.Ev $PATH .
 The following variables will then be set, along with any protocol supplied
 ones.
 .Bl -tag -width xnew_delegated_dhcp6_prefix

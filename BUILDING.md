@@ -170,17 +170,3 @@ If running privilege separation and on Linux then the `00-linux` hook is
 **mandatory**.
 If you choose not to run it, then you are responsible for setting up the
 needed mount points: `/dev`, `/proc`, `/sys`, `/run/udev`
-
-Some system services expose the name of the service we are in,
-by default dhcpcd will pick `RC_SVCNAME` from the environment.
-You can override this in `CPPFLAGS+= -DRC_SVCNAME="YOUR_SVCNAME"`.
-This is important because dhcpcd will scrub the environment aside from `$PATH`
-before running hooks.
-This variable could be used to facilitate service re-entry so this chain could
-happen in a custom OS hook:
-  dhcpcd service marked inactive && dhcpcd service starts
-  dependant services are not started because dhcpcd is inactive (not stopped)
-  dhcpcd hook tests if `$if_up = true` and `$af_waiting` is empty or unset.
-  if true, mark the dhcpcd service as started and then start dependencies
-  if false and the dhcpcd service was previously started, mark as inactive and
-     stop any dependant services.
