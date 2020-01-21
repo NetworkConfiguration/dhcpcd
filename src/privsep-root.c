@@ -28,11 +28,15 @@
 
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 
 #include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <pwd.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
@@ -199,7 +203,94 @@ ps_root_run_script(struct dhcpcd_ctx *ctx, const void *data, size_t len)
 }
 
 static ssize_t
-ps_root_dounlink(void *data, size_t len)
+ps_root_docopy(const char *dir, const char *file)
+{
+
+	char path[PATH_MAX], buf[BUFSIZ], *slash;
+	struct stat from_sb, to_sb;
+	int from_fd, to_fd;
+	ssize_t rcount, wcount, total;
+#ifdef BSD
+	struct timespec ts[2];
+#else
+	struct timeval ts[2];
+#endif
+
+	if (snprintf(path, sizeof(path), "%s/%s", dir, file) == -1)
+		return -1;
+	if (stat(file, &from_sb) == -1)
+		return -1;
+	if (stat(path, &to_sb) == 0) {
+#ifdef BSD
+		if (timespeccmp(&from_sb.st_mtimespec, &to_sb.st_mtimespec, ==))
+			return 0;
+#else
+		if (from_sb.st_mtime == to_sb.st_mtime)
+			return 0;
+#endif
+	} else {
+		/* Ensure directory exists */
+		slash = strrchr(path, '/');
+		if (slash != NULL) {
+			*slash = '\0';
+			ps_mkdir(path);
+			*slash = '/';
+		}
+	}
+
+	if (unlink(path) == -1 && errno != ENOENT)
+		return -1;
+	if ((from_fd = open(file, O_RDONLY, 0)) == -1)
+		return -1;
+	if ((to_fd = open(path, O_WRONLY | O_TRUNC | O_CREAT, 0555)) == -1)
+		return -1;
+
+	total = 0;
+	while ((rcount = read(from_fd, buf, sizeof(buf))) > 0) {
+		wcount = write(to_fd, buf, (size_t)rcount);
+		if (wcount != rcount) {
+			total = -1;
+			break;
+		}
+		total += wcount;
+	}
+
+#ifdef BSD
+	ts[0] = from_sb.st_atimespec;
+	ts[1] = from_sb.st_mtimespec;
+	if (futimens(to_fd, ts) == -1)
+		total = -1;
+#else
+	tv[0].tv_sec = from_sb.st_atime;
+	tv[0].tv_usec = 0;
+	tv[1].tv_sec = from_sb.st_mtime;
+	tv[1].tv_usec = 0;
+	if (futimes(to_fd, ts) == -1)
+		total = -1;
+#endif
+	close(from_fd);
+	close(to_fd);
+
+	return total;
+}
+
+static ssize_t
+ps_root_docopy1(const char *file)
+{
+	struct passwd *pw;
+
+	errno = 0;
+	if ((pw = getpwnam(PRIVSEP_USER)) == NULL) {
+		if (errno == 0)
+			errno = ENOENT;
+		return -1;
+	}
+
+	return ps_root_docopy(pw->pw_dir, file);
+}
+
+static ssize_t
+ps_root_dofileop(void *data, size_t len, uint8_t op)
 {
 	char *path = data;
 	size_t plen;
@@ -216,7 +307,15 @@ ps_root_dounlink(void *data, size_t len)
 		return -1;
 	}
 
-	return (ssize_t)unlink(path);
+	switch(op) {
+	case PS_COPY:
+		return ps_root_docopy1(path);
+	case PS_UNLINK:
+		return (ssize_t)unlink(path);
+	default:
+		errno = ENOTSUP;
+		return -1;
+	}
 }
 
 static ssize_t
@@ -288,8 +387,9 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 	case PS_SCRIPT:
 		err = ps_root_run_script(ctx, data, len);
 		break;
+	case PS_COPY:	/* FALLTHROUGH */
 	case PS_UNLINK:
-		err = ps_root_dounlink(data, len);
+		err = ps_root_dofileop(data, len, psm->ps_cmd);
 		break;
 	default:
 		err = ps_root_os(psm, msg);
@@ -461,8 +561,8 @@ ps_root_ioctl(struct dhcpcd_ctx *ctx, ioctl_request_t req, void *data,
 	return ps_root_readerror(ctx);
 }
 
-ssize_t
-ps_root_unlink(struct dhcpcd_ctx *ctx, const char *path)
+static ssize_t
+ps_root_fileop(struct dhcpcd_ctx *ctx, const char *path, uint8_t op)
 {
 	char buf[PATH_MAX], *p = buf;
 	size_t plen = strlen(path) + 1;
@@ -477,7 +577,22 @@ ps_root_unlink(struct dhcpcd_ctx *ctx, const char *path)
 	p += sizeof(plen);
 	memcpy(p, path, plen);
 
-	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_UNLINK, 0, buf, len) == -1)
+	if (ps_sendcmd(ctx, ctx->ps_root_fd, op, 0, buf, len) == -1)
 		return -1;
 	return ps_root_readerror(ctx);
+}
+
+
+ssize_t
+ps_root_copychroot(struct dhcpcd_ctx *ctx, const char *path)
+{
+
+	return ps_root_fileop(ctx, path, PS_COPY);
+}
+
+ssize_t
+ps_root_unlink(struct dhcpcd_ctx *ctx, const char *path)
+{
+
+	return ps_root_fileop(ctx, path, PS_UNLINK);
 }

@@ -46,13 +46,14 @@
 #define	PS_ROUTE		0x11	/* Also used for NETLINK */
 #define	PS_SCRIPT		0x12
 #define	PS_UNLINK		0x13
+#define	PS_COPY			0x14
 
 /* BSD Commands */
-#define	PS_IOCTLLINK		0x14
-#define	PS_IOCTL6		0x15
+#define	PS_IOCTLLINK		0x15
+#define	PS_IOCTL6		0x16
 
 /* Linux commands */
-#define	PS_WRITEPATHUINT	0x16
+#define	PS_WRITEPATHUINT	0x17
 
 #define	PS_DELETE		0x20
 #define	PS_START		0x40
@@ -136,6 +137,7 @@ TAILQ_HEAD(ps_process_head, ps_process);
 #include "privsep-bpf.h"
 #endif
 
+int ps_mkdir(char *);
 int ps_init(struct dhcpcd_ctx *);
 int ps_dropprivs(struct dhcpcd_ctx *);
 int ps_start(struct dhcpcd_ctx *);
