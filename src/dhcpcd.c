@@ -2018,6 +2018,7 @@ printpidfile:
 		logerr("ps_init");
 		goto exit_failure;
 	}
+	script_runchroot(&ctx, ifo->script);
 #endif
 
 #ifdef USE_SIGNALS
@@ -2091,6 +2092,12 @@ printpidfile:
 		goto exit_failure;
 	}
 
+	/* Start any dev listening plugin which may want to
+	 * change the interface name provided by the kernel */
+	if ((ctx.options & (DHCPCD_MASTER | DHCPCD_DEV)) ==
+	    (DHCPCD_MASTER | DHCPCD_DEV))
+		dev_start(&ctx);
+
 #ifdef PRIVSEP
 	if (ctx.options & DHCPCD_PRIVSEP && ps_dropprivs(&ctx) == -1) {
 		logerr("ps_dropprivs");
@@ -2119,12 +2126,6 @@ printpidfile:
 	/* Start handling kernel messages for interfaces, addresses and
 	 * routes. */
 	eloop_event_add(ctx.eloop, ctx.link_fd, dhcpcd_handlelink, &ctx);
-
-	/* Start any dev listening plugin which may want to
-	 * change the interface name provided by the kernel */
-	if ((ctx.options & (DHCPCD_MASTER | DHCPCD_DEV)) ==
-	    (DHCPCD_MASTER | DHCPCD_DEV))
-		dev_start(&ctx);
 
 	ctx.ifaces = if_discover(&ctx, &ifaddrs, ctx.ifc, ctx.ifv);
 	if (ctx.ifaces == NULL) {
