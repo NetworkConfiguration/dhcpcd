@@ -30,8 +30,6 @@
 
 #include <ctype.h>
 #include <errno.h>
-#include <fcntl.h>
-#include <paths.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -39,27 +37,6 @@
 #include "dhcpcd.h"
 #include "if-options.h"
 #include "logerr.h"
-
-/* Most route(4) messages are less than 256 bytes. */
-#define IOVEC_BUFSIZ	256
-
-int
-close_std(void)
-{
-	int fd, error = 0;
-
-	if ((fd = open(_PATH_DEVNULL, O_RDWR, 0)) == -1)
-		return -1;
-
-	if (dup2(fd, STDIN_FILENO) == -1)
-		error = -1;
-	if (dup2(fd, STDOUT_FILENO) == -1)
-		error = -1;
-	if (dup2(fd, STDERR_FILENO) == -1)
-		error = -1;
-	close(fd);
-	return error;
-}
 
 const char *
 hwaddr_ntoa(const void *hwaddr, size_t hwlen, char *buf, size_t buflen)

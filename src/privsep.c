@@ -47,7 +47,7 @@
 #include <pwd.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <grp.h>
+#include <paths.h>
 #include <stddef.h>	/* For offsetof, struct padding debug */
 #include <signal.h>
 #include <stdlib.h>
@@ -196,10 +196,8 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 	if (callback(recv_ctx) == -1)
 		goto errexit;
 
-#if 0
-	/* XXX Why does this cause processes to exit? */
-	close_std();
-#endif
+	freopen(_PATH_DEVNULL, "w", stdout);
+	freopen(_PATH_DEVNULL, "w", stderr);
 
 	if (pw == NULL)
 		return 0;
@@ -217,8 +215,8 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 
 dropprivs:
 	if (setgroups(1, &pw->pw_gid) == -1 ||
-	     setgid(pw->pw_gid) == -1 ||
-	     setuid(pw->pw_uid) == -1)
+	    setgid(pw->pw_gid) == -1 ||
+	    setuid(pw->pw_uid) == -1)
 		logerr("failed to drop privileges");
 
 	return 0;
