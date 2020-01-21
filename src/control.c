@@ -263,6 +263,24 @@ control_start(struct dhcpcd_ctx *ctx, const char *ifname)
 	return ctx->control_fd;
 }
 
+static int
+control_unlink(struct dhcpcd_ctx *ctx, const char *file)
+{
+	int retval = 0;
+
+	errno = 0;
+#ifdef PRIVSEP
+	if (ctx->options & DHCPCD_PRIVSEP)
+		retval = (int)ps_root_unlink(ctx, file);
+	else
+#else
+		UNUSED(ctx);
+#endif
+		retval = unlink(file);
+
+	return retval == -1 && errno != ENOENT ? -1 : 0;
+}
+
 int
 control_stop(struct dhcpcd_ctx *ctx)
 {
@@ -276,7 +294,7 @@ control_stop(struct dhcpcd_ctx *ctx)
 		eloop_event_delete(ctx->eloop, ctx->control_fd);
 		close(ctx->control_fd);
 		ctx->control_fd = -1;
-		if (unlink(ctx->control_sock) == -1 && errno != ENOENT)
+		if (control_unlink(ctx, ctx->control_sock) == -1)
 			retval = -1;
 	}
 
@@ -284,7 +302,7 @@ control_stop(struct dhcpcd_ctx *ctx)
 		eloop_event_delete(ctx->eloop, ctx->control_unpriv_fd);
 		close(ctx->control_unpriv_fd);
 		ctx->control_unpriv_fd = -1;
-		if (unlink(UNPRIVSOCKET) == -1 && errno != ENOENT)
+		if (control_unlink(ctx, UNPRIVSOCKET) == -1)
 			retval = -1;
 	}
 

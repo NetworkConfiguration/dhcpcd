@@ -199,6 +199,27 @@ ps_root_run_script(struct dhcpcd_ctx *ctx, const void *data, size_t len)
 }
 
 static ssize_t
+ps_root_dounlink(void *data, size_t len)
+{
+	char *path = data;
+	size_t plen;
+
+	if (len < sizeof(plen)) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	memcpy(&plen, path, sizeof(plen));
+	path += sizeof(plen);
+	if (sizeof(plen) + plen > len) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	return (ssize_t)unlink(path);
+}
+
+static ssize_t
 ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 {
 	struct dhcpcd_ctx *ctx = arg;
@@ -266,6 +287,9 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		break;
 	case PS_SCRIPT:
 		err = ps_root_run_script(ctx, data, len);
+		break;
+	case PS_UNLINK:
+		err = ps_root_dounlink(data, len);
 		break;
 	default:
 		err = ps_root_os(psm, msg);
@@ -434,5 +458,26 @@ ps_root_ioctl(struct dhcpcd_ctx *ctx, ioctl_request_t req, void *data,
 	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_IOCTL, req, data, len) == -1)
 		return -1;
 #endif
+	return ps_root_readerror(ctx);
+}
+
+ssize_t
+ps_root_unlink(struct dhcpcd_ctx *ctx, const char *path)
+{
+	char buf[PATH_MAX], *p = buf;
+	size_t plen = strlen(path) + 1;
+	size_t len = sizeof(plen) + plen;
+
+	if (len > sizeof(buf)) {
+		errno = ENOBUFS;
+		return -1;
+	}
+
+	memcpy(p, &plen, sizeof(plen));
+	p += sizeof(plen);
+	memcpy(p, path, plen);
+
+	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_UNLINK, 0, buf, len) == -1)
+		return -1;
 	return ps_root_readerror(ctx);
 }
