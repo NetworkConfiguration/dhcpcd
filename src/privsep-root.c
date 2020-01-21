@@ -203,7 +203,7 @@ ps_root_run_script(struct dhcpcd_ctx *ctx, const void *data, size_t len)
 }
 
 static ssize_t
-ps_root_docopy(const char *dir, const char *file)
+ps_root_docopy(struct dhcpcd_ctx *ctx, const char *file)
 {
 
 	char path[PATH_MAX], buf[BUFSIZ], *slash;
@@ -216,7 +216,8 @@ ps_root_docopy(const char *dir, const char *file)
 	struct timeval ts[2];
 #endif
 
-	if (snprintf(path, sizeof(path), "%s/%s", dir, file) == -1)
+	if (snprintf(path, sizeof(path), "%s/%s",
+	    ctx->ps_user->pw_dir, file) == -1)
 		return -1;
 	if (stat(file, &from_sb) == -1)
 		return -1;
@@ -275,22 +276,7 @@ ps_root_docopy(const char *dir, const char *file)
 }
 
 static ssize_t
-ps_root_docopy1(const char *file)
-{
-	struct passwd *pw;
-
-	errno = 0;
-	if ((pw = getpwnam(PRIVSEP_USER)) == NULL) {
-		if (errno == 0)
-			errno = ENOENT;
-		return -1;
-	}
-
-	return ps_root_docopy(pw->pw_dir, file);
-}
-
-static ssize_t
-ps_root_dofileop(void *data, size_t len, uint8_t op)
+ps_root_dofileop(struct dhcpcd_ctx *ctx, void *data, size_t len, uint8_t op)
 {
 	char *path = data;
 	size_t plen;
@@ -309,7 +295,7 @@ ps_root_dofileop(void *data, size_t len, uint8_t op)
 
 	switch(op) {
 	case PS_COPY:
-		return ps_root_docopy1(path);
+		return ps_root_docopy(ctx, path);
 	case PS_UNLINK:
 		return (ssize_t)unlink(path);
 	default:
@@ -389,7 +375,7 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		break;
 	case PS_COPY:	/* FALLTHROUGH */
 	case PS_UNLINK:
-		err = ps_root_dofileop(data, len, psm->ps_cmd);
+		err = ps_root_dofileop(ctx, data, len, psm->ps_cmd);
 		break;
 	default:
 		err = ps_root_os(psm, msg);
