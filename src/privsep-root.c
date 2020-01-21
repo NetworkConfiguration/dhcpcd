@@ -202,6 +202,10 @@ ps_root_run_script(struct dhcpcd_ctx *ctx, const void *data, size_t len)
 	return status;
 }
 
+#if defined(__linux__) && !defined(st_mtimespec)
+#define	st_atimespec  st_atim
+#define	st_mtimespec  st_mtim
+#endif
 static ssize_t
 ps_root_docopy(struct dhcpcd_ctx *ctx, const char *file)
 {
@@ -210,10 +214,10 @@ ps_root_docopy(struct dhcpcd_ctx *ctx, const char *file)
 	struct stat from_sb, to_sb;
 	int from_fd, to_fd;
 	ssize_t rcount, wcount, total;
-#ifdef BSD
+#if defined(BSD) || defined(__linux__)
 	struct timespec ts[2];
 #else
-	struct timeval ts[2];
+	struct timeval tv[2];
 #endif
 
 	if (snprintf(path, sizeof(path), "%s/%s",
@@ -222,8 +226,9 @@ ps_root_docopy(struct dhcpcd_ctx *ctx, const char *file)
 	if (stat(file, &from_sb) == -1)
 		return -1;
 	if (stat(path, &to_sb) == 0) {
-#ifdef BSD
-		if (timespeccmp(&from_sb.st_mtimespec, &to_sb.st_mtimespec, ==))
+#if defined(BSD) || defined(__linux__)
+		if (from_sb.st_mtimespec.tv_sec == to_sb.st_mtimespec.tv_sec &&
+		    from_sb.st_mtimespec.tv_nsec == to_sb.st_mtimespec.tv_nsec)
 			return 0;
 #else
 		if (from_sb.st_mtime == to_sb.st_mtime)
@@ -256,7 +261,7 @@ ps_root_docopy(struct dhcpcd_ctx *ctx, const char *file)
 		total += wcount;
 	}
 
-#ifdef BSD
+#if defined(BSD) || defined(__linux__)
 	ts[0] = from_sb.st_atimespec;
 	ts[1] = from_sb.st_mtimespec;
 	if (futimens(to_fd, ts) == -1)
@@ -266,7 +271,7 @@ ps_root_docopy(struct dhcpcd_ctx *ctx, const char *file)
 	tv[0].tv_usec = 0;
 	tv[1].tv_sec = from_sb.st_mtime;
 	tv[1].tv_usec = 0;
-	if (futimes(to_fd, ts) == -1)
+	if (futimes(to_fd, tv) == -1)
 		total = -1;
 #endif
 	close(from_fd);
