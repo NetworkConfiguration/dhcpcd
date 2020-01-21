@@ -121,6 +121,8 @@ TAILQ_HEAD(if_head, interface);
 			CMSG_SPACE(sizeof(int)))
 #endif
 
+struct passwd;
+
 struct dhcpcd_ctx {
 	char pidfile[sizeof(PIDFILE) + IF_NAMESIZE + 1];
 	int fork_fd;	/* FD for the fork init signal pipe */
@@ -182,7 +184,7 @@ struct dhcpcd_ctx {
 	char *randomstate; /* original state */
 
 #ifdef PRIVSEP
-	char *ps_user;		/* Username to drop privs to */
+	struct passwd *ps_user;	/* struct passwd for privsep user */
 	pid_t ps_root_pid;
 	int ps_root_fd;		/* Privileged Actioneer commands */
 	int ps_data_fd;		/* Data from root spawned processes */

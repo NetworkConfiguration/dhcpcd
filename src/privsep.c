@@ -93,11 +93,11 @@ ps_mkdir(char *path)
 int
 ps_init(struct dhcpcd_ctx *ctx)
 {
-	struct passwd *pw;
 	char path[PATH_MAX];
+	struct passwd *pw = ctx->ps_user;
 
 	errno = 0;
-	if ((pw = getpwnam(PRIVSEP_USER)) == NULL) {
+	if ((ctx->ps_user = pw = getpwnam(PRIVSEP_USER)) == NULL) {
 		ctx->options &= ~DHCPCD_PRIVSEP;
 		if (errno == 0) {
 			logerrx("no such user %s", PRIVSEP_USER);
@@ -122,15 +122,7 @@ ps_init(struct dhcpcd_ctx *ctx)
 int
 ps_dropprivs(struct dhcpcd_ctx *ctx)
 {
-	struct passwd *pw;
-
-	if ((pw = getpwnam(PRIVSEP_USER)) == NULL) {
-		if (errno == 0)
-			logerrx("no such user %s", PRIVSEP_USER);
-		else
-			logerr("getpwnam");
-		return -1;
-	}
+	struct passwd *pw = ctx->ps_user;
 
 	if (!(ctx->options & DHCPCD_FORKED))
 		logdebugx("chrooting to `%s'", pw->pw_dir);
