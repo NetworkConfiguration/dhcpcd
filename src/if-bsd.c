@@ -1267,11 +1267,13 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 				logerr("%s: SIOCGIFALIAS", __func__);
 			if (ifam->ifam_type != RTM_DELADDR)
 				break;
-		}
+		} else {
+			if (ifam->ifam_type == RTM_DELADDR)
+				break;
 #if defined(__NetBSD_Version__) && __NetBSD_Version__ < 800000000
-		else
 			bcast = ifra.ifra_broadaddr.sin_addr;
 #endif
+		}
 #else
 #warning No SIOCGIFALIAS support
 		/*
@@ -1330,16 +1332,15 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 		 * dhcpcd to drop any lease to which it belongs.
 		 * Also check an added address was really added.
 		 */
-		if (ifam->ifam_type == RTM_DELADDR) {
-			flags = if_addrflags6(ifp, &addr6, NULL);
-			if (flags != -1)
-				break;
-			flags = 0;
-		} else if ((flags = if_addrflags6(ifp, &addr6, NULL)) == -1) {
+		flags = if_addrflags6(ifp, &addr6, NULL);
+		if (flags == -1) {
 			if (errno != EADDRNOTAVAIL)
 				logerr("%s: if_addrflags6", __func__);
+			if (ifam->ifam_type != RTM_DELADDR)
+				break;
+			flags = 0;
+		} else if (ifam->ifam_type == RTM_DELADDR)
 			break;
-		}
 
 #ifdef __KAME__
 		if (IN6_IS_ADDR_LINKLOCAL(&addr6))
