@@ -135,11 +135,6 @@
 # endif
 #endif
 
-int close_std(void);
-void get_line_free(void);
-extern int clock_monotonic;
-int get_monotonic(struct timespec *);
-
 const char *hwaddr_ntoa(const void *, size_t, char *, size_t);
 size_t hwaddr_aton(uint8_t *, const char *);
 size_t read_hwaddr_aton(uint8_t **, const char *);

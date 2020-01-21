@@ -41,6 +41,7 @@ const char dhcpcd_copyright[] = "Copyright (c) 2006-2020 Roy Marples";
 #include <fcntl.h>
 #include <getopt.h>
 #include <limits.h>
+#include <paths.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -352,7 +353,8 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 	eloop_event_delete(ctx->eloop, ctx->fork_fd);
 	close(ctx->fork_fd);
 	ctx->fork_fd = -1;
-	close_std();
+	freopen(_PATH_DEVNULL, "w", stdout);
+	freopen(_PATH_DEVNULL, "w", stderr);
 #endif
 }
 
@@ -611,7 +613,7 @@ configure_interface(struct interface *ifp, int argc, char **argv,
 
 	/* If the mtime has changed drop any old lease */
 	if (old != 0 && ifp->options->mtime != old) {
-		logwarnx("%s: confile file changed, expiring leases",
+		logwarnx("%s: config file changed, expiring leases",
 		    ifp->name);
 		dhcpcd_drop(ifp, 0);
 	}
@@ -2009,6 +2011,7 @@ printpidfile:
 #endif
 
 	logdebugx(PACKAGE "-" VERSION " starting");
+	freopen(_PATH_DEVNULL, "r", stdin);
 
 #ifdef PRIVSEP
 	if (ps_init(&ctx) == -1 && errno != 0) {
