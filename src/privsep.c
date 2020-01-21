@@ -36,6 +36,7 @@
  */
 
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 
@@ -69,9 +70,31 @@
 #endif
 
 int
+ps_mkdir(char *path)
+{
+	char *slash;
+	bool done;
+
+	slash = path;
+	for (;;) {
+		slash += strspn(slash, "/");
+		slash += strcspn(slash, "/");
+		done = (*slash == '\0');
+		*slash = '\0';
+		if (mkdir(path, 0755) == -1 && errno != EEXIST)
+			return -1;
+		if (done)
+			break;
+		*slash = '/';
+	}
+	return 0;
+}
+
+int
 ps_init(struct dhcpcd_ctx *ctx)
 {
 	struct passwd *pw;
+	char path[PATH_MAX];
 
 	errno = 0;
 	if ((pw = getpwnam(PRIVSEP_USER)) == NULL) {
@@ -84,6 +107,13 @@ ps_init(struct dhcpcd_ctx *ctx)
 			logerr("getpwnam");
 		return -1;
 	}
+
+	/* Create the database directory. */
+	if (snprintf(path, sizeof(path), "%s%s", pw->pw_dir, DBDIR) == -1 ||
+	    ps_mkdir(path) == -1 ||
+	    chown(path, pw->pw_uid, pw->pw_gid) == -1 ||
+	    chmod(path, 0755) == -1)
+		logerr("%s: %s", __func__, path);
 
 	ctx->options |= DHCPCD_PRIVSEP;
 	return 0;

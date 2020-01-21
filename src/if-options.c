@@ -2520,6 +2520,11 @@ read_config(struct dhcpcd_ctx *ctx,
 	}
 
 	/* Parse our options file */
+#ifdef PRIVSEP
+	if (ctx->options & DHCPCD_PRIVSEP &&
+	    ps_root_copychroot(ctx, ctx->cffile) == -1)
+		logwarn("%s: ps_root_copychroot `%s'", __func__, ctx->cffile);
+#endif
 	fp = fopen(ctx->cffile, "r");
 	if (fp == NULL) {
 		/* dhcpcd can continue without it, but no DNS options
