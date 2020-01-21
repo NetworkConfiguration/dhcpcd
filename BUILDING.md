@@ -22,6 +22,7 @@ Or by removing the following features:
   *  `--disable-arping`
   *  `--disable-ipv4ll`
   *  `--disable-dhcp6`
+  *  `--disable-privsep`
 
 You can also move the embedded extended configuration from the dhcpcd binary
 to an external file (LIBEXECDIR/dhcpcd-definitions.conf)
@@ -29,11 +30,6 @@ to an external file (LIBEXECDIR/dhcpcd-definitions.conf)
 If dhcpcd cannot load this file at runtime, dhcpcd will work but will not be
 able to decode any DHCP/DHCPv6 options that are not defined by the user
 in /etc/dhcpcd.conf. This does not really change the total on disk size.
-
-## Priviledge Separation
-To enable this, use the `--enable-privsep` configure option.
-It's not enabled by default because it's an experimental feature and
-requires adding a user (default `_dhcpcd`) to the system.
 
 ## Cross compiling
 If you're cross compiling you may need set the platform if OS is different
@@ -169,6 +165,11 @@ copied to `$(libexecdir)/dhcpcd-hooks` for use.
 The configure program attempts to find hooks for systems you have installed.
 To add more simply
 `./configure -with-hook=ntp.conf`
+
+If running privilege separation and on Linux then the `00-linux` hook is
+**mandatory**.
+If you choose not to run it, then you are responsible for setting up the
+needed mount points: `/dev`, `/proc`, `/sys`, `/run/udev`
 
 Some system services expose the name of the service we are in,
 by default dhcpcd will pick `RC_SVCNAME` from the environment.
