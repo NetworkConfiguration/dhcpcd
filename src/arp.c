@@ -165,7 +165,7 @@ arp_found(struct arp_state *astate, const struct arp_msg *amsg)
 	 * then we must drop our address and negotiate a new one. */
 	clock_gettime(CLOCK_MONOTONIC, &now);
 	if (timespecisset(&astate->defend) &&
-	    eloop_timespec_diff(&astate->defend, &now, NULL) < DEFEND_INTERVAL)
+	    eloop_timespec_diff(&now, &astate->defend, NULL) < DEFEND_INTERVAL)
 		logwarnx("%s: %d second defence failed for %s",
 		    ifp->name, DEFEND_INTERVAL, inet_ntoa(astate->addr));
 	else if (arp_request(ifp, &astate->addr, &astate->addr) == -1)
