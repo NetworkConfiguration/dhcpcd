@@ -49,10 +49,11 @@
 #endif
 
 #include <assert.h>
-#include <pwd.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <grp.h>
 #include <paths.h>
+#include <pwd.h>
 #include <stddef.h>	/* For offsetof, struct padding debug */
 #include <signal.h>
 #include <stdlib.h>
