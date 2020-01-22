@@ -2454,23 +2454,25 @@ dhcp_arp_address(struct interface *ifp)
 	}
 #else
 	if (!(ifp->flags & IFF_NOARP) &&
-	    ifp->options->options & DHCPCD_ARP &&
-	    ia == NULL)
+	    ifp->options->options & DHCPCD_ARP)
 	{
 		struct arp_state *astate;
 		struct dhcp_lease l;
 
+		/* Even if the address exists, we need to defend it. */
 		astate = dhcp_arp_new(ifp, &addr);
 		if (astate == NULL)
 			return -1;
 
-		state->state = DHS_PROBE;
-		get_lease(ifp, &l, state->offer, state->offer_len);
-		loginfox("%s: probing address %s/%d",
-		    ifp->name, inet_ntoa(l.addr), inet_ntocidr(l.mask));
-		/* We need to handle DAD. */
-		arp_probe(astate);
-		return 0;
+		if (ia == NULL) {
+			state->state = DHS_PROBE;
+			get_lease(ifp, &l, state->offer, state->offer_len);
+			loginfox("%s: probing address %s/%d",
+			    ifp->name, inet_ntoa(l.addr), inet_ntocidr(l.mask));
+			/* We need to handle DAD. */
+			arp_probe(astate);
+			return 0;
+		}
 	}
 #endif
 
