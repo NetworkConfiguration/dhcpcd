@@ -1304,7 +1304,7 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 #endif
 
 #ifdef HAVE_IFAM_ADDRFLAGS
-		flags = ifam->ifam_flags;
+		flags = ifam->ifam_addrflags;
 #else
 		flags = 0;
 #endif
