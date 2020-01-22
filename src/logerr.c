@@ -207,18 +207,14 @@ vlogmessage(int pri, const char *fmt, va_list args)
 	if (!(ctx->log_opts & LOGERR_LOG))
 		return len;
 
-#ifdef SMALL
+#ifndef SMALL
+	if (ctx->log_file != NULL &&
+	    (pri != LOG_DEBUG || (ctx->log_opts & LOGERR_DEBUG)))
+		len = vlogprintf_r(ctx, ctx->log_file, fmt, args);
+#endif
+
 	vsyslog(pri, fmt, args);
 	return len;
-#else
-	if (ctx->log_file == NULL) {
-		vsyslog(pri, fmt, args);
-		return len;
-	}
-	if (pri == LOG_DEBUG && !(ctx->log_opts & LOGERR_DEBUG))
-		return len;
-	return vlogprintf_r(ctx, ctx->log_file, fmt, args);
-#endif
 }
 #if defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ > 5))
 #pragma GCC diagnostic pop

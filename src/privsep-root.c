@@ -206,8 +206,8 @@ ps_root_run_script(struct dhcpcd_ctx *ctx, const void *data, size_t len)
 #define	st_atimespec  st_atim
 #define	st_mtimespec  st_mtim
 #endif
-static ssize_t
-ps_root_docopy(struct dhcpcd_ctx *ctx, const char *file)
+ssize_t
+ps_root_docopychroot(struct dhcpcd_ctx *ctx, const char *file)
 {
 
 	char path[PATH_MAX], buf[BUFSIZ], *slash;
@@ -300,7 +300,7 @@ ps_root_dofileop(struct dhcpcd_ctx *ctx, void *data, size_t len, uint8_t op)
 
 	switch(op) {
 	case PS_COPY:
-		return ps_root_docopy(ctx, path);
+		return ps_root_docopychroot(ctx, path);
 	case PS_UNLINK:
 		return (ssize_t)unlink(path);
 	default:
