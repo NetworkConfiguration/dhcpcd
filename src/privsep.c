@@ -119,6 +119,10 @@ ps_init(struct dhcpcd_ctx *ctx)
 	    chmod(path, 0755) == -1)
 		logerr("%s: %s", __func__, path);
 
+	/* Ensure we have a localtime to correctly format dates. */
+	if (ps_root_docopychroot(ctx, "/etc/localtime") == -1 && errno!=ENOENT)
+		logerr("%s: %s", __func__, "/etc/localtime");
+
 	ctx->options |= DHCPCD_PRIVSEP;
 	return 0;
 }

@@ -345,7 +345,8 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 	    !(ctx->options & DHCPCD_DAEMONISE))
 		return;
 
-	loginfox("forked to background, child pid %d", getpid());
+	/* Don't use loginfo because this makes no sense in a log. */
+	fprintf(stderr, "forked to background, child pid %d\n", getpid());
 	i = EXIT_SUCCESS;
 	if (write(ctx->fork_fd, &i, sizeof(i)) == -1)
 		logerr("write");
@@ -1371,6 +1372,7 @@ dhcpcd_signal_cb(int sig, void *arg)
 		return;
 	case SIGUSR2:
 		loginfox(sigmsg, "SIGUSR2", "reopening log");
+		/* XXX This may not work that well in a chroot */
 		logclose();
 		if (logopen(ctx->logfile) == -1)
 			logerr(__func__);
