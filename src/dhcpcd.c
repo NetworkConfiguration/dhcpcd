@@ -728,10 +728,14 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 #endif
 				dhcpcd_drop(ifp, 0);
 			if (ifp->options->options & DHCPCD_ANONYMOUS) {
-				if_down(ifp);
+				bool was_up = ifp->flags & IFF_UP;
+
+				if (was_up)
+					if_down(ifp);
 				if (if_randomisemac(ifp) == -1 && errno != ENXIO)
 					logerr(__func__);
-				if_up(ifp);
+				if (was_up)
+					if_up(ifp);
 			}
 		}
 	} else if (carrier == LINK_UP && ifp->flags & IFF_UP) {
