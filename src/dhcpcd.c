@@ -1116,11 +1116,23 @@ dhcpcd_setlinkrcvbuf(struct dhcpcd_ctx *ctx)
 void
 dhcpcd_linkoverflow(struct dhcpcd_ctx *ctx)
 {
+	socklen_t socklen;
+	int rcvbuflen;
 	struct if_head *ifaces;
 	struct ifaddrs *ifaddrs;
 	struct interface *ifp, *ifn, *ifp1;
 
-	logerrx("route socket overflowed - learning interface state");
+	socklen = sizeof(rcvbuflen);
+	if (getsockopt(ctx->link_fd, SOL_SOCKET,
+	    SO_RCVBUF, &rcvbuflen, &socklen) == -1)
+		rcvbuflen = 0;
+#ifdef __linux__
+	else
+		rcvbuflen /= 2;
+#endif
+
+	logerrx("route socket overflowed (rcvbuflen %d)"
+	    " - learning interface state", rcvbuflen);
 
 	/* Close the existing socket and open a new one.
 	 * This is easier than draining the kernel buffer of an
