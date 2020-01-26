@@ -183,12 +183,16 @@ if_randomisemac(struct interface *ifp)
 {
 	uint32_t randnum;
 	size_t hwlen = ifp->hwlen, rlen = 0;
-	uint8_t buf[hwlen], *bp = buf, *rp = (uint8_t *)&randnum;
-	char sbuf[hwlen * 3];
+	uint8_t buf[HWADDR_LEN], *bp = buf, *rp = (uint8_t *)&randnum;
+	char sbuf[HWADDR_LEN * 3];
 	int retval;
 
 	if (hwlen == 0) {
 		errno = ENOTSUP;
+		return -1;
+	}
+	if (hwlen > sizeof(buf)) {
+		errno = ENOBUFS;
 		return -1;
 	}
 
