@@ -2898,6 +2898,8 @@ dhcp_redirect_dhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 
 	xid = ntohl(bootp->xid);
 	TAILQ_FOREACH(ifn, ifp->ctx->ifaces, next) {
+		if (ifn == ifp)
+			continue;
 		state = D_CSTATE(ifn);
 		if (state == NULL || state->state == DHS_NONE)
 			continue;
@@ -3548,8 +3550,9 @@ dhcp_recvmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg)
 	}
 	state = D_CSTATE(ifp);
 	if (state == NULL) {
-		logdebugx("%s: received BOOTP for inactive interface",
-		    ifp->name);
+		/* Try re-directing it to another interface. */
+		dhcp_redirect_dhcp(ifp, (struct bootp *)iov->iov_base,
+		    iov->iov_len, &from->sin_addr);
 		return;
 	}
 
