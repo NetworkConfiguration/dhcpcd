@@ -1106,6 +1106,9 @@ dhcpcd_setlinkrcvbuf(struct dhcpcd_ctx *ctx)
 	if (ctx->link_rcvbuf == 0)
 		return;
 
+	logdebugx("setting route socket receive buffer size to %d bytes",
+	    ctx->link_rcvbuf);
+
 	socklen = sizeof(ctx->link_rcvbuf);
 	if (setsockopt(ctx->link_fd, SOL_SOCKET,
 	    SO_RCVBUF, &ctx->link_rcvbuf, socklen) == -1)
