@@ -94,11 +94,13 @@ unpriviledged user (default _dhcpcd).
 The Makefile `_confinstall` target will attempt to move the files correctly from
 the old locations to the new locations.
 
-dhcpcd-9 defaults the run directory to `/var/run/dhcpcd` instead of
-`/var/run` and the prefix of dhcpcd has been removed from the files.
-
 Of course this won't work if dhcpcd is packaged up, so packagers will need to
 install similar logic into their dhcpcd package.
+
+dhcpcd-9 defaults the run directory to `/var/run/dhcpcd` instead of
+`/var/run` and the prefix of dhcpcd has been removed from the files.
+dhcpcd-9 may also run in a chroot, `/var/chroot/dhcpcd` so all the files
+could be relative to that.
 
 ## ChangeLog
 We no longer supply a ChangeLog.
