@@ -465,7 +465,7 @@ make_env(struct dhcpcd_ctx *ctx, const struct interface *ifp,
 dumplease:
 #ifdef INET
 #ifdef IPV4LL
-	if (protocol == PROTO_IPV4LL) {
+	if (protocol == PROTO_IPV4LL && istate) {
 		if (ipv4ll_env(fp, istate->down ? "old" : "new", ifp) == -1)
 			goto eexit;
 	}
