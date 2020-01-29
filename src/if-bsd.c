@@ -1448,7 +1448,7 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 		 */
 		flags = if_addrflags6(ifp, &addr6, NULL);
 		if (flags == -1) {
-			if (errno != EADDRNOTAVAIL)
+			if (errno != ENXIO && errno != EADDRNOTAVAIL)
 				logerr("%s: if_addrflags6", __func__);
 			if (ifam->ifam_type != RTM_DELADDR)
 				break;
