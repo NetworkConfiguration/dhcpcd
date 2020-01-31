@@ -109,6 +109,8 @@ arp_request(const struct interface *ifp,
 		return ps_bpf_sendarp(ifp, arp_buffer, len);
 #endif
 	state = ARP_CSTATE(ifp);
+	/* Note that well formed ethernet will add extra padding
+	 * to ensure that the packet is at least 60 bytes (64 including FCS). */
 	return bpf_send(ifp, state->bpf_fd, ETHERTYPE_ARP, arp_buffer, len);
 
 eexit:
