@@ -1043,7 +1043,7 @@ eloop_start(struct eloop *eloop, sigset_t *signals)
 				ts.tv_nsec = 0;
 			} else {
 				ts.tv_sec = (time_t)t->seconds;
-				ts.tv_nsec = t->nseconds;
+				ts.tv_nsec = (long)t->nseconds;
 			}
 			tsp = &ts;
 #endif
