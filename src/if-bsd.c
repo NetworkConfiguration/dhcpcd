@@ -1585,71 +1585,23 @@ inet6_sysctl(int code, int val, int action)
 }
 #endif
 
-#if defined(SIOCSIFINFO_IN6) || defined(SIOCSIFINFO_FLAGS)
-static uint32_t
-if_if6flags(const struct interface *ifp, uint32_t oflags)
-{
-	int flags = (int)oflags;
-
-#ifdef ND6_IFF_AUTO_LINKLOCAL
-	/* Unlike the kernel,
-	 * dhcpcd make make a stable private address. */
-	flags &= ~ND6_IFF_AUTO_LINKLOCAL;
-#endif
-
-#ifdef ND6_IFF_IFDISABLED
-	/* Ensure the interface is not disabled. */
-	flags &= ~ND6_IFF_IFDISABLED;
-#endif
-
-#ifdef ND6_IFF_PERFORMNUD
-	/* NUD is kind of essential. */
-	flags |= ND6_IFF_PERFORMNUD;
-#endif
-
-	/*
-	 * If not doing autoconf, don't disable the kernel from doing it.
-	 * If we need to, we should have another option actively disable it.
-	 */
-#ifdef ND6_IFF_ACCEPT_RTADV
-	if (ifp->options->options & DHCPCD_IPV6RS)
-		flags &= ~ND6_IFF_ACCEPT_RTADV;
-#ifdef ND6_IFF_OVERRIDE_RTADV
-	if (ifp->options->options & DHCPCD_IPV6RS)
-		flags |= ND6_IFF_OVERRIDE_RTADV;
-#endif
-#endif
-
-	return (uint32_t)flags;
-}
-#endif
-
 int
 if_applyra(const struct ra *rap)
 {
 #ifdef SIOCSIFINFO_IN6
-	struct in6_ndireq nd;
+	struct in6_ndireq ndi = { .ndi.chlim = 0 };
 	struct dhcpcd_ctx *ctx = rap->iface->ctx;
 	int error;
 
-	memset(&nd, 0, sizeof(nd));
-	strlcpy(nd.ifname, rap->iface->name, sizeof(nd.ifname));
-	if (if_ioctl6(ctx, SIOCGIFINFO_IN6, &nd, sizeof(nd)) == -1)
+	strlcpy(ndi.ifname, rap->iface->name, sizeof(ndi.ifname));
+	if (if_ioctl6(ctx, SIOCGIFINFO_IN6, &ndi, sizeof(ndi)) == -1)
 		return -1;
 
-	nd.ndi.linkmtu = rap->mtu;
-	nd.ndi.chlim = rap->hoplimit;
-	nd.ndi.retrans = rap->retrans;
-	nd.ndi.basereachable = rap->reachable;
-	/*
-	 * Under privsep, flags are returned as zero - no idea why.
-	 * SIOCSIFINFO_IN6 will replace the flags anyway so force them
-	 * to our idea again.
-	 */
-	if (nd.ndi.flags == 0)
-		nd.ndi.flags = if_if6flags(rap->iface, nd.ndi.flags);
-
-	error = if_ioctl6(ctx, SIOCSIFINFO_IN6, &nd, sizeof(nd));
+	ndi.ndi.linkmtu = rap->mtu;
+	ndi.ndi.chlim = rap->hoplimit;
+	ndi.ndi.retrans = rap->retrans;
+	ndi.ndi.basereachable = rap->reachable;
+	error = if_ioctl6(ctx, SIOCSIFINFO_IN6, &ndi, sizeof(ndi));
 	if (error == -1 && errno == EINVAL) {
 		/*
 		 * Very likely that this is caused by a dodgy MTU
@@ -1658,8 +1610,8 @@ if_applyra(const struct ra *rap)
 		 * Doesn't really matter as we fix the MTU against the
 		 * routes we add as not all OS support SIOCSIFINFO_IN6.
 		 */
-		nd.ndi.linkmtu = 0;
-		error = if_ioctl6(ctx, SIOCSIFINFO_IN6, &nd, sizeof(nd));
+		ndi.ndi.linkmtu = 0;
+		error = if_ioctl6(ctx, SIOCSIFINFO_IN6, &ndi, sizeof(ndi));
 	}
 	return error;
 #else
@@ -1863,7 +1815,7 @@ if_setup_inet6(const struct interface *ifp)
 	int s;
 #ifdef ND6_NDI_FLAGS
 	struct in6_ndireq nd;
-	uint32_t flags;
+	int flags;
 #endif
 
 	priv = (struct priv *)ifp->ctx->priv;
@@ -1873,12 +1825,42 @@ if_setup_inet6(const struct interface *ifp)
 	memset(&nd, 0, sizeof(nd));
 	strlcpy(nd.ifname, ifp->name, sizeof(nd.ifname));
 	if (ioctl(s, SIOCGIFINFO_IN6, &nd) == -1)
-		logerr("%s: SIOCGIFINFO_IN6", ifp->name);
+		logerr("%s: SIOCGIFINFO_FLAGS", ifp->name);
+	flags = (int)nd.ndi.flags;
+#endif
 
-	flags = if_if6flags(ifp, nd.ndi.flags);
+#ifdef ND6_IFF_AUTO_LINKLOCAL
+	/* Unlike the kernel,
+	 * dhcpcd make make a stable private address. */
+	flags &= ~ND6_IFF_AUTO_LINKLOCAL;
+#endif
 
-	if (nd.ndi.flags != flags) {
-		nd.ndi.flags = flags;
+#ifdef ND6_IFF_PERFORMNUD
+	/* NUD is kind of essential. */
+	flags |= ND6_IFF_PERFORMNUD;
+#endif
+
+#ifdef ND6_IFF_IFDISABLED
+	/* Ensure the interface is not disabled. */
+	flags &= ~ND6_IFF_IFDISABLED;
+#endif
+
+	/*
+	 * If not doing autoconf, don't disable the kernel from doing it.
+	 * If we need to, we should have another option actively disable it.
+	 */
+#ifdef ND6_IFF_ACCEPT_RTADV
+	if (ifp->options->options & DHCPCD_IPV6RS)
+		flags &= ~ND6_IFF_ACCEPT_RTADV;
+#ifdef ND6_IFF_OVERRIDE_RTADV
+	if (ifp->options->options & DHCPCD_IPV6RS)
+		flags |= ND6_IFF_OVERRIDE_RTADV;
+#endif
+#endif
+
+#ifdef ND6_NDI_FLAGS
+	if (nd.ndi.flags != (uint32_t)flags) {
+		nd.ndi.flags = (uint32_t)flags;
 		if (if_ioctl6(ifp->ctx, SIOCSIFINFO_FLAGS,
 		    &nd, sizeof(nd)) == -1)
 			logerr("%s: SIOCSIFINFO_FLAGS", ifp->name);
