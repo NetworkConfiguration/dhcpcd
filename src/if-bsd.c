@@ -1589,19 +1589,20 @@ int
 if_applyra(const struct ra *rap)
 {
 #ifdef SIOCSIFINFO_IN6
-	struct in6_ndireq ndi = { .ndi.chlim = 0 };
+	struct in6_ndireq nd = { .ndi.chlim = 0 };
 	struct dhcpcd_ctx *ctx = rap->iface->ctx;
+	struct priv *priv = ctx->priv;
 	int error;
 
-	strlcpy(ndi.ifname, rap->iface->name, sizeof(ndi.ifname));
-	if (if_ioctl6(ctx, SIOCGIFINFO_IN6, &ndi, sizeof(ndi)) == -1)
+	strlcpy(nd.ifname, rap->iface->name, sizeof(nd.ifname));
+	if (ioctl(priv->pf_inet6_fd, SIOCGIFINFO_IN6, &nd, sizeof(nd)) == -1)
 		return -1;
 
-	ndi.ndi.linkmtu = rap->mtu;
-	ndi.ndi.chlim = rap->hoplimit;
-	ndi.ndi.retrans = rap->retrans;
-	ndi.ndi.basereachable = rap->reachable;
-	error = if_ioctl6(ctx, SIOCSIFINFO_IN6, &ndi, sizeof(ndi));
+	nd.ndi.linkmtu = rap->mtu;
+	nd.ndi.chlim = rap->hoplimit;
+	nd.ndi.retrans = rap->retrans;
+	nd.ndi.basereachable = rap->reachable;
+	error = if_ioctl6(ctx, SIOCSIFINFO_IN6, &nd, sizeof(nd));
 	if (error == -1 && errno == EINVAL) {
 		/*
 		 * Very likely that this is caused by a dodgy MTU
@@ -1610,8 +1611,8 @@ if_applyra(const struct ra *rap)
 		 * Doesn't really matter as we fix the MTU against the
 		 * routes we add as not all OS support SIOCSIFINFO_IN6.
 		 */
-		ndi.ndi.linkmtu = 0;
-		error = if_ioctl6(ctx, SIOCSIFINFO_IN6, &ndi, sizeof(ndi));
+		nd.ndi.linkmtu = 0;
+		error = if_ioctl6(ctx, SIOCSIFINFO_IN6, &nd, sizeof(nd));
 	}
 	return error;
 #else
