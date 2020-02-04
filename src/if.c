@@ -612,11 +612,12 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 	return ifs;
 }
 
-/* Decode bge0:1 as dev = bge, ppa = 0 and lun = 1 */
+/* Decode bge0:1 as dev = bge, ppa = 0 and lun = 1
+ * Special case XEN where : could be i (NetBSD) or . (Linux) */
 int
 if_nametospec(const char *ifname, struct if_spec *spec)
 {
-	char *ep;
+	char *ep, *pp;
 	int e;
 
 	if (ifname == NULL || *ifname == '\0' ||
@@ -629,6 +630,8 @@ if_nametospec(const char *ifname, struct if_spec *spec)
 		return -1;
 	}
 	ep = strchr(spec->drvname, ':');
+	if (ep == NULL)
+		ep = strchr(spec->drvname, '.');
 	if (ep) {
 		spec->lun = (int)strtoi(ep + 1, NULL, 10, 0, INT_MAX, &e);
 		if (e != 0) {
@@ -641,16 +644,19 @@ if_nametospec(const char *ifname, struct if_spec *spec)
 		ep = spec->drvname + strlen(spec->drvname) - 1;
 	}
 	strlcpy(spec->devname, spec->drvname, sizeof(spec->devname));
-	while (ep > spec->drvname && isdigit((int)*ep))
-		ep--;
-	if (*ep++ == ':') {
-		errno = EINVAL;
-		return -1;
+	for (ep = spec->drvname; *ep != '\0' && !isdigit((int)*ep); ep++) {
+		if (*ep == ':') {
+			errno = EINVAL;
+			return -1;
+		}
 	}
-	spec->ppa = (int)strtoi(ep, NULL, 10, 0, INT_MAX, &e);
-	if (e != 0)
-		spec->ppa = -1;
+	spec->ppa = (int)strtoi(ep, &pp, 10, 0, INT_MAX, &e);
 	*ep = '\0';
+	if (pp != NULL && *pp == 'i' && spec->lun == -1) {
+		spec->lun = (int)strtoi(pp + 1, NULL, 10, 0, INT_MAX, &e);
+		if (e)
+			spec->lun = -1;
+	}
 
 	return 0;
 }
