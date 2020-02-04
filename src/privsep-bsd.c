@@ -98,14 +98,16 @@ ps_root_ioctldom(struct dhcpcd_ctx *ctx, uint8_t domain, unsigned long request,
 }
 
 ssize_t
-ps_root_ioctllink(struct dhcpcd_ctx *ctx, unsigned long request, void *data, size_t len)
+ps_root_ioctllink(struct dhcpcd_ctx *ctx, unsigned long request,
+    void *data,size_t len)
 {
 
 	return ps_root_ioctldom(ctx, PS_IOCTLLINK, request, data, len);
 }
 
 ssize_t
-ps_root_ioctl6(struct dhcpcd_ctx *ctx, unsigned long request, void *data, size_t len)
+ps_root_ioctl6(struct dhcpcd_ctx *ctx, unsigned long request,
+    void *data, size_t len)
 {
 
 	return ps_root_ioctldom(ctx, PS_IOCTL6, request, data, len);
