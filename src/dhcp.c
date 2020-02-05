@@ -3464,6 +3464,7 @@ dhcp_packet(struct interface *ifp, uint8_t *data, size_t len)
 	struct in_addr from;
 	size_t udp_len;
 	const struct dhcp_state *state = D_CSTATE(ifp);
+	size_t fl = bpf_frame_header_len(ifp);
 
 #ifdef PRIVSEP
 	/* Ignore double reads */
@@ -3477,6 +3478,17 @@ dhcp_packet(struct interface *ifp, uint8_t *data, size_t len)
 		}
 	}
 #endif
+
+	/* Trim frame header */
+	if (fl != 0) {
+		if (len < fl) {
+			logerrx("%s: %s: short frame header",
+			    __func__, ifp->name);
+			return;
+		}
+		data += fl;
+		len -= fl;
+	}
 
 	/* Validate filter. */
 	if (!is_packet_udp_bootp(data, len)) {
@@ -3510,7 +3522,6 @@ dhcp_readbpf(void *arg)
 	uint8_t buf[FRAMELEN_MAX];
 	ssize_t bytes;
 	struct dhcp_state *state = D_STATE(ifp);
-	ssize_t fl = (ssize_t)bpf_frame_header_len(ifp);
 
 	/* Some RAW mechanisms are generic file descriptors, not sockets.
 	 * This means we have no kernel call to just get one packet,
@@ -3527,12 +3538,7 @@ dhcp_readbpf(void *arg)
 			}
 			break;
 		}
-		if (bytes < fl) {
-			logerrx("%s: %s: short frame header",
-			    __func__, ifp->name);
-			break;
-		}
-		dhcp_packet(ifp, buf + fl, (size_t)(bytes - fl));
+		dhcp_packet(ifp, buf, (size_t)bytes);
 		/* Check we still have a state after processing. */
 		if ((state = D_STATE(ifp)) == NULL)
 			break;
