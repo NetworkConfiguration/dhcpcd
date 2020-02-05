@@ -92,7 +92,8 @@ typedef unsigned long		ioctl_request_t;
 
 /* Maximum frame length.
  * Support jumbo frames and some extra. */
-#define	FRAMELEN_MAX			10240
+#define	FRAMEHDRLEN_MAX			14	/* only ethernet support */
+#define	FRAMELEN_MAX			(FRAMEHDRLEN_MAX + 9216)
 
 /* Work out if we have a private address or not
  * 10/8
