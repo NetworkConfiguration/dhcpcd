@@ -59,7 +59,7 @@ ps_bpf_recvbpf(void *arg)
 {
 	struct ps_process *psp = arg;
 	unsigned int flags;
-	uint8_t buf[MTU_MAX];
+	uint8_t buf[FRAMELEN_MAX];
 	ssize_t len;
 	struct ps_msghdr psm = {
 		.ps_id = psp->psp_id,

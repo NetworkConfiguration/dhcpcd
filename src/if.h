@@ -90,6 +90,10 @@ typedef unsigned long		ioctl_request_t;
 #  define ARPHRD_INFINIBAND		32
 #endif
 
+/* Maximum frame length.
+ * Support jumbo frames and some extra. */
+#define	FRAMELEN_MAX			10240
+
 /* Work out if we have a private address or not
  * 10/8
  * 172.16/12

@@ -3507,7 +3507,7 @@ static void
 dhcp_readbpf(void *arg)
 {
 	struct interface *ifp = arg;
-	uint8_t buf[MTU_MAX];
+	uint8_t buf[FRAMELEN_MAX];
 	ssize_t bytes;
 	struct dhcp_state *state = D_STATE(ifp);
 	ssize_t fl = (ssize_t)bpf_frame_header_len(ifp);
