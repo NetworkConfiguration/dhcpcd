@@ -55,8 +55,9 @@
 #include "logerr.h"
 
 #if defined(ARP)
-#define ARP_LEN								      \
-	(sizeof(struct arphdr) + (2 * sizeof(uint32_t)) + (2 * HWADDR_LEN))
+#define ARP_LEN								\
+	(FRAMEHDRLEN_MAX +						\
+	 sizeof(struct arphdr) + (2 * sizeof(uint32_t)) + (2 * HWADDR_LEN))
 
 /* ARP debugging can be quite noisy. Enable this for more noise! */
 //#define	ARP_DEBUG

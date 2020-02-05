@@ -81,6 +81,11 @@
 #  define ARPHRD_INFINIBAND		32
 #endif
 
+/* Maximum frame length.
+ * Support jumbo frames and some extra. */
+#define	FRAMEHDRLEN_MAX			14	/* only ethernet support */
+#define	FRAMELEN_MAX			(FRAMEHDRLEN_MAX + 9216)
+
 /* Work out if we have a private address or not
  * 10/8
  * 172.16/12
