@@ -3435,6 +3435,7 @@ dhcp_readbpf(void *arg)
 	uint8_t buf[MTU_MAX];
 	ssize_t bytes;
 	struct dhcp_state *state = D_STATE(ifp);
+	ssize_t fl = (ssize_t)bpf_frame_header_len(ifp);
 
 	/* Some RAW mechanisms are generic file descriptors, not sockets.
 	 * This means we have no kernel call to just get one packet,
@@ -3451,7 +3452,12 @@ dhcp_readbpf(void *arg)
 			}
 			break;
 		}
-		dhcp_packet(ifp, buf, (size_t)bytes);
+		if (bytes < fl) {
+			logerrx("%s: %s: short frame header",
+			    __func__, ifp->name);
+			break;
+		}
+		dhcp_packet(ifp, buf + fl, (size_t)(bytes - fl));
 		/* Check we still have a state after processing. */
 		if ((state = D_STATE(ifp)) == NULL)
 			break;
