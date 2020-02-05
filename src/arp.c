@@ -122,7 +122,8 @@ static void
 arp_report_conflicted(const struct arp_state *astate,
     const struct arp_msg *amsg)
 {
-	char buf[HWADDR_LEN * 3];
+	char abuf[HWADDR_LEN * 3];
+	char fbuf[HWADDR_LEN * 3];
 
 	if (amsg == NULL) {
 		logerrx("%s: DAD detected %s",
@@ -130,9 +131,16 @@ arp_report_conflicted(const struct arp_state *astate,
 		return;
 	}
 
-	logerrx("%s: hardware address %s claims %s",
-	    astate->iface->name,
-	    hwaddr_ntoa(amsg->sha, astate->iface->hwlen, buf, sizeof(buf)),
+	hwaddr_ntoa(amsg->sha, astate->iface->hwlen, abuf, sizeof(abuf));
+	if (bpf_frame_header_len(astate->iface) == 0) {
+		logerrx("%s: %s claims %s",
+		    astate->iface->name, abuf, inet_ntoa(astate->addr));
+		return;
+	}
+
+	logerrx("%s: %s(%s) claims %s",
+	    astate->iface->name, abuf,
+	    hwaddr_ntoa(amsg->fsha, astate->iface->hwlen, fbuf, sizeof(fbuf)),
 	    inet_ntoa(astate->addr));
 }
 
@@ -215,12 +223,26 @@ arp_validate(const struct interface *ifp, struct arphdr *arp)
 void
 arp_packet(struct interface *ifp, uint8_t *data, size_t len)
 {
+	size_t fl = bpf_frame_header_len(ifp), falen;
 	const struct interface *ifn;
 	struct arphdr ar;
 	struct arp_msg arm;
 	const struct iarp_state *state;
 	struct arp_state *astate, *astaten;
 	uint8_t *hw_s, *hw_t;
+
+	/* Copy the frame header source and destination out */
+	memset(&arm, 0, sizeof(arm));
+	hw_s = bpf_frame_header_src(ifp, data, &falen);
+	if (hw_s != NULL && falen <= sizeof(arm.fsha))
+		memcpy(arm.fsha, hw_s, falen);
+	hw_t = bpf_frame_header_dst(ifp, data, &falen);
+	if (hw_t != NULL && falen <= sizeof(arm.ftha))
+		memcpy(arm.ftha, hw_t, falen);
+
+	/* Skip past the frame header */
+	data += fl;
+	len -= fl;
 
 	/* We must have a full ARP header */
 	if (len < sizeof(ar))

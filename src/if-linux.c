@@ -1661,16 +1661,13 @@ bpf_read(struct interface *ifp, int s, void *data, size_t len,
 	*flags |= BPF_EOF; /* We only ever read one packet. */
 	*flags &= ~BPF_PARTIALCSUM;
 	if (bytes) {
-		ssize_t fl = (ssize_t)bpf_frame_header_len(ifp);
-
 		if (bpf_frame_bcast(ifp, state->buffer) == 0)
 			*flags |= BPF_BCAST;
 		else
 			*flags &= ~BPF_BCAST;
-		bytes -= fl;
 		if ((size_t)bytes > len)
 			bytes = (ssize_t)len;
-		memcpy(data, state->buffer + fl, (size_t)bytes);
+		memcpy(data, state->buffer, (size_t)bytes);
 #ifdef PACKET_AUXDATA
 		for (cmsg = CMSG_FIRSTHDR(&msg);
 		     cmsg;
