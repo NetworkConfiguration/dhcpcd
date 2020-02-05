@@ -54,6 +54,7 @@
 #include <errno.h>
 #include <ifaddrs.h>
 #include <inttypes.h>
+#include <fcntl.h>
 #include <fnmatch.h>
 #include <stddef.h>
 #include <stdio.h>
