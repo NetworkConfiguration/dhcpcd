@@ -379,10 +379,8 @@ ipv6nd_sendrsprobe(void *arg)
 	if (state->rsprobes++ < MAX_RTR_SOLICITATIONS)
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    RTR_SOLICITATION_INTERVAL, ipv6nd_sendrsprobe, ifp);
-	else {
+	else
 		logwarnx("%s: no IPv6 Routers available", ifp->name);
-		ipv6nd_drop(ifp);
-	}
 }
 
 #ifdef ND6_ADVERTISE
@@ -531,19 +529,13 @@ ipv6nd_expire(void *arg)
 {
 	struct interface *ifp = arg;
 	struct ra *rap;
-	struct ipv6_addr *ia;
-	struct timespec now = { .tv_sec = 1 };
 
 	if (ifp->ctx->ra_routers == NULL)
 		return;
 
 	TAILQ_FOREACH(rap, ifp->ctx->ra_routers, next) {
-		if (rap->iface == ifp)
-			continue;
-		rap->acquired = now;
-		TAILQ_FOREACH(ia, &rap->addrs, next) {
-			ia->acquired = now;
-		}
+		if (rap->iface == ifp && rap->willexpire)
+			rap->doexpire = true;
 	}
 	ipv6nd_expirera(ifp);
 }
@@ -551,9 +543,17 @@ ipv6nd_expire(void *arg)
 void
 ipv6nd_startexpire(struct interface *ifp)
 {
+	struct ra *rap;
 
-	eloop_timeout_add_sec(ifp->ctx->eloop, RTR_CARRIER_EXPIRE,
-	    ipv6nd_expire, ifp);
+	if (ifp->ctx->ra_routers == NULL)
+		return;
+
+	TAILQ_FOREACH(rap, ifp->ctx->ra_routers, next) {
+		if (rap->iface == ifp)
+			rap->willexpire = true;
+	}
+	eloop_q_timeout_add_sec(ifp->ctx->eloop, ELOOP_IPV6RA_EXPIRE,
+	    RTR_CARRIER_EXPIRE, ipv6nd_expire, ifp);
 }
 
 static int
@@ -584,9 +584,11 @@ ipv6nd_sortrouters(struct dhcpcd_ctx *ctx)
 	while ((ra1 = TAILQ_FIRST(ctx->ra_routers)) != NULL) {
 		TAILQ_REMOVE(ctx->ra_routers, ra1, next);
 		TAILQ_FOREACH(ra2, &sorted_routers, next) {
-			if (ra1->iface->metric < ra2->iface->metric)
+			if (ra1->iface->metric > ra2->iface->metric)
 				continue;
 			if (ra1->expired && !ra2->expired)
+				continue;
+			if (ra1->willexpire && !ra2->willexpire)
 				continue;
 			if (ra1->lifetime == 0 && ra2->lifetime != 0)
 				continue;
@@ -1117,7 +1119,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 		rap->retrans = ntohl(nd_ra->nd_ra_retransmit);
 	else
 		rap->retrans = RETRANS_TIMER;
-	rap->expired = false;
+	rap->expired = rap->willexpire = rap->doexpire = false;
 	rap->hasdns = false;
 	rap->isreachable = true;
 	has_address = false;
@@ -1397,7 +1399,8 @@ ipv6nd_hasralifetime(const struct interface *ifp, bool lifetime)
 
 	if (ifp->ctx->ra_routers) {
 		TAILQ_FOREACH(rap, ifp->ctx->ra_routers, next)
-			if (rap->iface == ifp && !rap->expired &&
+			if (rap->iface == ifp &&
+			    !rap->expired &&
 			    (!lifetime ||rap->lifetime))
 				return true;
 	}
@@ -1405,15 +1408,16 @@ ipv6nd_hasralifetime(const struct interface *ifp, bool lifetime)
 }
 
 bool
-ipv6nd_hasradhcp(const struct interface *ifp)
+ipv6nd_hasradhcp(const struct interface *ifp, bool managed)
 {
 	const struct ra *rap;
 
 	if (ifp->ctx->ra_routers) {
 		TAILQ_FOREACH(rap, ifp->ctx->ra_routers, next) {
 			if (rap->iface == ifp &&
-			    !rap->expired &&
-			    (rap->flags &(ND_RA_FLAG_MANAGED|ND_RA_FLAG_OTHER)))
+			    !rap->expired && !rap->willexpire &&
+			    ((managed && rap->flags & ND_RA_FLAG_MANAGED) ||
+			    (!managed && rap->flags & ND_RA_FLAG_OTHER)))
 				return true;
 		}
 	}
@@ -1604,7 +1608,7 @@ ipv6nd_expirera(void *arg)
 			lt.tv_sec = (time_t)rap->lifetime;
 			lt.tv_nsec = 0;
 			timespecadd(&rap->acquired, &lt, &expire);
-			if (timespeccmp(&now, &expire, >)) {
+			if (timespeccmp(&now, &expire, >) || rap->doexpire) {
 				if (!rap->expired) {
 					logwarnx("%s: %s: router expired",
 					    ifp->name, rap->sfrom);
@@ -1626,14 +1630,16 @@ ipv6nd_expirera(void *arg)
 		TAILQ_FOREACH(ia, &rap->addrs, next) {
 			if (ia->prefix_vltime == 0)
 				continue;
-			if (ia->prefix_vltime == ND6_INFINITE_LIFETIME) {
+			if (ia->prefix_vltime == ND6_INFINITE_LIFETIME &&
+			    !rap->doexpire)
+			{
 				valid = true;
 				continue;
 			}
 			lt.tv_sec = (time_t)ia->prefix_vltime;
 			lt.tv_nsec = 0;
 			timespecadd(&ia->acquired, &lt, &expire);
-			if (timespeccmp(&now, &expire, >)) {
+			if (timespeccmp(&now, &expire, >) || rap->doexpire) {
 				if (ia->flags & IPV6_AF_ADDED) {
 					logwarnx("%s: expired address %s",
 					    ia->iface->name, ia->saddr);
@@ -1700,6 +1706,10 @@ ipv6nd_expirera(void *arg)
 
 			if (ltime == 0)
 				continue;
+			if (rap->doexpire) {
+				expired = true;
+				continue;
+			}
 			if (ltime == ND6_INFINITE_LIFETIME) {
 				valid = true;
 				continue;
@@ -1735,7 +1745,8 @@ ipv6nd_expirera(void *arg)
 		eloop_timeout_add_tv(ifp->ctx->eloop,
 		    &next, ipv6nd_expirera, ifp);
 	if (expired) {
-		logwarnx("%s: part of Router Advertisement expired", ifp->name);
+		logwarnx("%s: part of a Router Advertisement expired",
+		    ifp->name);
 		rt_build(ifp->ctx, AF_INET6);
 		script_runreason(ifp, "ROUTERADVERT");
 	}
