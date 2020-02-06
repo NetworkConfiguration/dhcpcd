@@ -400,7 +400,7 @@ stop_interface(struct interface *ifp)
 		script_runreason(ifp, "STOPPED");
 
 	/* Delete all timeouts for the interfaces */
-	eloop_q_timeout_delete(ctx->eloop, 0, NULL, ifp);
+	eloop_q_timeout_delete(ctx->eloop, ELOOP_QUEUE_ALL, NULL, ifp);
 
 	/* De-activate the interface */
 	ifp->active = IF_INACTIVE;
