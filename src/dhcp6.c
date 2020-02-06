@@ -3961,7 +3961,7 @@ dhcp6_abort(struct interface *ifp)
 	eloop_timeout_delete(ifp->ctx->eloop, dhcp6_sendinform, ifp);
 	switch (state->state) {
 	case DH6S_DISCOVER:	/* FALLTHROUGH */
-	case DH6S_REQUEST:
+	case DH6S_REQUEST:	/* FALLTHROUGH */
 	case DH6S_INFORM:
 		state->state = DH6S_INIT;
 		break;
