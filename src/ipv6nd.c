@@ -1115,6 +1115,8 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 	 * routers like to decrease the advertised valid and preferred times
 	 * in accordance with the own prefix times which would result in too
 	 * much needless log spam. */
+	if (rap->willexpire)
+		new_data = true;
 	logfunc = new_data || !rap->isreachable ? loginfox : logdebugx,
 	logfunc("%s: Router Advertisement from %s", ifp->name, rap->sfrom);
 
