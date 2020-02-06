@@ -1613,6 +1613,20 @@ dhcp6_startinform(void *arg)
 	    INF_MAX_RD, dhcp6_failinform, ifp);
 }
 
+static bool
+dhcp6_startdiscoinform(struct interface *ifp)
+{
+	unsigned long long opts = ifp->options->options;
+
+	if (opts & DHCPCD_IA_FORCED || ipv6nd_hasradhcp(ifp, true))
+		dhcp6_startdiscover(ifp);
+	else if (opts & DHCPCD_INFORM6 || ipv6nd_hasradhcp(ifp, false))
+		dhcp6_startinform(ifp);
+	else
+		return false;
+	return true;
+}
+
 static void
 dhcp6_leaseextend(struct interface *ifp)
 {
@@ -1660,13 +1674,7 @@ dhcp6_fail(struct interface* ifp)
 		unlink(state->leasefile);
 	}
 
-	if (ifp->options->options & DHCPCD_IA_FORCED ||
-	    ipv6nd_hasradhcp(ifp, true))
-		dhcp6_startdiscover(ifp);
-	else if (ifp->options->options & DHCPCD_INFORM6 ||
-	    ipv6nd_hasradhcp(ifp, false))
-		dhcp6_startinform(ifp);
-	else {
+	if (!dhcp6_startdiscoinform(ifp)) {
 		logwarnx("%s: no advertising IPv6 router wants DHCP",ifp->name);
 		state->state = DH6S_INIT;
 		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
@@ -2611,7 +2619,7 @@ dhcp6_startinit(struct interface *ifp)
 	{
 		r = dhcp6_readlease(ifp, 1);
 		if (r == -1) {
-			if (errno != ENOENT)
+			if (errno != ENOENT && errno != ESRCH)
 				logerr("%s: %s", __func__, state->leasefile);
 		} else if (r != 0) {
 			/* RFC 3633 section 12.1 */
@@ -2624,7 +2632,7 @@ dhcp6_startinit(struct interface *ifp)
 			return;
 		}
 	}
-	dhcp6_startdiscover(ifp);
+	dhcp6_startdiscoinform(ifp);
 }
 
 #ifndef SMALL
@@ -3231,7 +3239,7 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom,
 		case DH6S_CONFIRM:
 			if (dhcp6_validatelease(ifp, r, len, sfrom, NULL) == -1)
 			{
-				dhcp6_startdiscover(ifp);
+				dhcp6_startdiscoinform(ifp);
 				return;
 			}
 			break;
@@ -3270,7 +3278,7 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom,
 				 * until a new one is found.
 				 */
 				if (state->state != DH6S_DISCOVER)
-					dhcp6_startdiscover(ifp);
+					dhcp6_startdiscoinform(ifp);
 				return;
 			}
 			/* RFC8415 18.2.10.1 */
@@ -3747,12 +3755,17 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 		case DH6S_INIT:
 			goto gogogo;
 		case DH6S_INFORM:
-			if (state->state == DH6S_INFORMED)
+			if (state->state == DH6S_INIT ||
+			    state->state == DH6S_INFORMED ||
+			    (state->state == DH6S_DISCOVER &&
+			    !(ifp->options->options & DHCPCD_IA_FORCED) &&
+			    !ipv6nd_hasradhcp(ifp, true)))
 				dhcp6_startinform(ifp);
 			break;
 		case DH6S_REQUEST:
 			if (ifp->options->options & DHCPCD_DHCP6 &&
-			    (state->state == DH6S_INFORM ||
+			    (state->state == DH6S_INIT ||
+			     state->state == DH6S_INFORM ||
 			     state->state == DH6S_INFORMED ||
 			     state->state == DH6S_DELEGATED))
 			{
@@ -3801,8 +3814,7 @@ gogogo:
 	dhcp_set_leasefile(state->leasefile, sizeof(state->leasefile),
 	    AF_INET6, ifp);
 	if (ipv6_linklocal(ifp) == NULL) {
-		logdebugx("%s: delaying DHCPv6 soliciation for LL address",
-		    ifp->name);
+		logdebugx("%s: delaying DHCPv6 for LL address", ifp->name);
 		ipv6_addlinklocalcallback(ifp, dhcp6_start1, ifp);
 		return 0;
 	}
@@ -3825,11 +3837,8 @@ dhcp6_reboot(struct interface *ifp)
 	case DH6S_BOUND:
 		dhcp6_startrebind(ifp);
 		break;
-	case DH6S_INFORMED:
-		dhcp6_startinform(ifp);
-		break;
 	default:
-		dhcp6_startdiscover(ifp);
+		dhcp6_startdiscoinform(ifp);
 		break;
 	}
 }
@@ -3945,6 +3954,20 @@ dhcp6_abort(struct interface *ifp)
 		ipv6nd_advertise(ia);
 	}
 #endif
+
+	eloop_timeout_delete(ifp->ctx->eloop, dhcp6_startdiscover, ifp);
+	eloop_timeout_delete(ifp->ctx->eloop, dhcp6_senddiscover, ifp);
+	eloop_timeout_delete(ifp->ctx->eloop, dhcp6_startinform, ifp);
+	eloop_timeout_delete(ifp->ctx->eloop, dhcp6_sendinform, ifp);
+	switch (state->state) {
+	case DH6S_DISCOVER:	/* FALLTHROUGH */
+	case DH6S_REQUEST:
+	case DH6S_INFORM:
+		state->state = DH6S_INIT;
+		break;
+	default:
+		break;
+	}
 }
 
 void
