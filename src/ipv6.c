@@ -1539,9 +1539,10 @@ ipv6_newaddr(struct interface *ifp, const struct in6_addr *addr,
 	/* If adding a new DHCP / RA derived address, check current flags
 	 * from an existing address. */
 	ia = ipv6_iffindaddr(ifp, addr, 0);
-	if (ia != NULL)
+	if (ia != NULL) {
 		addr_flags = ia->addr_flags;
-	else
+		flags |= IPV6_AF_ADDED;
+	} else
 		addr_flags = IN6_IFF_TENTATIVE;
 
 	ia = calloc(1, sizeof(*ia));
