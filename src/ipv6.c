@@ -59,7 +59,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define ELOOP_QUEUE 7
+#define ELOOP_QUEUE	ELOOP_IPV6
 #include "common.h"
 #include "if.h"
 #include "dhcpcd.h"
@@ -932,7 +932,7 @@ ipv6_doaddr(struct ipv6_addr *ia, struct timespec *now)
 		if (ia->flags & IPV6_AF_ADDED)
 			ipv6_deleteaddr(ia);
 		eloop_q_timeout_delete(ia->iface->ctx->eloop,
-		    0, NULL, ia);
+		    ELOOP_QUEUE_ALL, NULL, ia);
 		if (ia->flags & IPV6_AF_REQUEST) {
 			ia->flags &= ~IPV6_AF_ADDED;
 			return 0;
@@ -974,6 +974,7 @@ ipv6_addaddrs(struct ipv6_addrhead *iaddrs)
 void
 ipv6_freeaddr(struct ipv6_addr *ia)
 {
+	struct eloop *eloop = ia->iface->ctx->eloop;
 #ifndef SMALL
 	struct ipv6_addr *iad;
 
@@ -989,10 +990,10 @@ ipv6_freeaddr(struct ipv6_addr *ia)
 
 	if (ia->dhcp6_fd != -1) {
 		close(ia->dhcp6_fd);
-		eloop_event_delete(ia->iface->ctx->eloop, ia->dhcp6_fd);
+		eloop_event_delete(eloop, ia->dhcp6_fd);
 	}
 
-	eloop_q_timeout_delete(ia->iface->ctx->eloop, 0, NULL, ia);
+	eloop_q_timeout_delete(eloop, ELOOP_QUEUE_ALL, NULL, ia);
 	free(ia->na);
 	free(ia);
 }

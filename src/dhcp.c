@@ -57,7 +57,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define ELOOP_QUEUE 2
+#define ELOOP_QUEUE	ELOOP_DHCP
 #include "config.h"
 #include "arp.h"
 #include "bpf.h"

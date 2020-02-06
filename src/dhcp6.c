@@ -45,7 +45,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#define ELOOP_QUEUE 4
+#define ELOOP_QUEUE	ELOOP_DHCP6
 #include "config.h"
 #include "common.h"
 #include "dhcp.h"

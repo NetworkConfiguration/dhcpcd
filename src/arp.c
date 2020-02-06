@@ -41,7 +41,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define ELOOP_QUEUE 5
+#define ELOOP_QUEUE	ELOOP_ARP
 #include "config.h"
 #include "arp.h"
 #include "bpf.h"

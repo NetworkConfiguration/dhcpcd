@@ -43,7 +43,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define ELOOP_QUEUE 3
+#define ELOOP_QUEUE	ELOOP_IPV6ND
 #include "common.h"
 #include "dhcpcd.h"
 #include "dhcp-common.h"
