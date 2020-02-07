@@ -1016,7 +1016,7 @@ if_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct nlmsghdr *hdr,
 			int on = 1;
 
 			if (setsockopt(s, SOL_NETLINK, NETLINK_GET_STRICT_CHK,
-			    &on, sizeof(on)) == -1)
+			    &on, sizeof(on)) == -1 && errno != ENOPROTOOPT)
 				logerr("%s: NETLINK_GET_STRICT_CHK", __func__);
 		}
 #endif
