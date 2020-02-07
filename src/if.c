@@ -213,7 +213,7 @@ if_randomisemac(struct interface *ifp)
 
 	logdebugx("%s: hardware address randomised to %s",
 	    ifp->name,
-	    hwaddr_ntoa(buf, sizeof(buf), sbuf, sizeof(sbuf)));
+	    hwaddr_ntoa(buf, ifp->hwlen, sbuf, sizeof(sbuf)));
 	retval = if_setmac(ifp, buf, ifp->hwlen);
 	if (retval == 0)
 		memcpy(ifp->hwaddr, buf, ifp->hwlen);

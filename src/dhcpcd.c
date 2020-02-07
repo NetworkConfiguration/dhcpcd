@@ -940,9 +940,19 @@ static void
 dhcpcd_prestartinterface(void *arg)
 {
 	struct interface *ifp = arg;
+	bool anondown;
+
+	if (ifp->carrier == LINK_DOWN &&
+	    ifp->options->options & DHCPCD_ANONYMOUS &&
+	    ifp->flags & IFF_UP)
+	{
+		if_down(ifp);
+		anondown = true;
+	} else
+		anondown = false;
 
 	if ((!(ifp->ctx->options & DHCPCD_MASTER) ||
-	    ifp->options->options & DHCPCD_IF_UP) &&
+	    ifp->options->options & DHCPCD_IF_UP || anondown) &&
 	    !(ifp->flags & IFF_UP))
 	{
 		if (ifp->options->options & DHCPCD_ANONYMOUS &&
