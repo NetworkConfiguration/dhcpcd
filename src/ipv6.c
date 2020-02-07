@@ -380,25 +380,14 @@ ipv6_makeaddr(struct in6_addr *addr, struct interface *ifp,
 static int
 ipv6_makeprefix(struct in6_addr *prefix, const struct in6_addr *addr, int len)
 {
-	int bytes, bits;
+	struct in6_addr mask;
+	size_t i;
 
-	if (len < 0 || len > 128) {
-		errno = EINVAL;
+	if (ipv6_mask(&mask, len) == -1)
 		return -1;
-	}
-
-	bytes = len / NBBY;
-	bits = len % NBBY;
-	memcpy(&prefix->s6_addr, &addr->s6_addr, (size_t)bytes);
-	if (bits != 0) {
-		/* Coverify false positive.
-		 * bytelen cannot be 16 if bitlen is non zero */
-		/* coverity[overrun-local] */
-		prefix->s6_addr[bytes] =
-		    (uint8_t)(prefix->s6_addr[bytes] >> (NBBY - bits));
-	}
-	memset((char *)prefix->s6_addr + bytes, 0,
-	    sizeof(prefix->s6_addr) - (size_t)bytes);
+	*prefix = *addr;
+	for (i = 0; i < sizeof(prefix->s6_addr); i++)
+		prefix->s6_addr[i] &= mask.s6_addr[i];
 	return 0;
 }
 
