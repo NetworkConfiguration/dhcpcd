@@ -218,7 +218,7 @@ if_closesockets_os(struct dhcpcd_ctx *ctx)
 	ctx->priv = NULL;
 }
 
-#ifdef SIOCALIFADDR /*NetBSD */
+#if defined(SIOCALIFADDR) && defined(IFLR_ACTIVE) /*NetBSD */
 static int
 if_ioctllink(struct dhcpcd_ctx *ctx, unsigned long req, void *data, size_t len)
 {
@@ -250,7 +250,7 @@ if_setmac(struct interface *ifp, void *mac, uint8_t maclen)
 		return -1;
 	}
 
-#ifdef SIOCALIFADDR /*NetBSD */
+#if defined(SIOCALIFADDR) && defined(IFLR_ACTIVE) /*NetBSD */
 	struct if_laddrreq iflr = { .flags = IFLR_ACTIVE };
 	struct sockaddr_dl *sdl = satosdl(&iflr.addr);
 	int retval;
