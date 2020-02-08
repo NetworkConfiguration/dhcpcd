@@ -183,6 +183,13 @@ struct dhcpcd_ctx {
 
 	char *randomstate; /* original state */
 
+	/* For filtering RTM_MISS messages per router */
+#ifdef BSD
+	uint8_t *rt_missfilter;
+	size_t rt_missfilterlen;
+	size_t rt_missfiltersize;
+#endif
+
 #ifdef PRIVSEP
 	struct passwd *ps_user;	/* struct passwd for privsep user */
 	pid_t ps_root_pid;

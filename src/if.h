@@ -206,6 +206,9 @@ int if_setmac(struct interface *ifp, void *, uint8_t);
 int if_route(unsigned char, const struct rt *rt);
 int if_initrt(struct dhcpcd_ctx *, rb_tree_t *, int);
 
+int if_missfilter(struct interface *, struct sockaddr *);
+int if_missfilter_apply(struct dhcpcd_ctx *);
+
 #ifdef INET
 int if_address(unsigned char, const struct ipv4_addr *);
 int if_addrflags(const struct interface *, const struct in_addr *,

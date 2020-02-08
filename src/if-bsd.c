@@ -1509,6 +1509,78 @@ if_dispatch(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 	return 0;
 }
 
+static int
+if_missfilter0(struct dhcpcd_ctx *ctx, struct interface *ifp,
+    struct sockaddr *sa)
+{
+	size_t salen = (size_t)RT_ROUNDUP(sa->sa_len);
+	size_t newlen = ctx->rt_missfilterlen + salen;
+	size_t diff = salen - (sa->sa_len);
+	uint8_t *cp;
+
+	if (ctx->rt_missfiltersize < newlen) {
+		void *n = realloc(ctx->rt_missfilter, newlen);
+		if (n == NULL)
+			return -1;
+		ctx->rt_missfilter = n;
+		ctx->rt_missfiltersize = newlen;
+	}
+
+#ifdef INET6
+	if (sa->sa_family == AF_INET6) {
+		struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)sa;
+
+		ifa_setscope(sin6, ifp->index);
+	}
+#endif
+
+	cp = ctx->rt_missfilter + ctx->rt_missfilterlen;
+	memcpy(cp, sa, sa->sa_len);
+	if (diff != 0)
+		memset(cp + sa->sa_len, 0, diff);
+	ctx->rt_missfilterlen += salen;
+
+#ifdef INET6
+	if (sa->sa_family == AF_INET6) {
+		struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)sa;
+
+		ifa_setscope(sin6, 0);
+	}
+#endif
+
+	return 0;
+}
+
+int
+if_missfilter(struct interface *ifp, struct sockaddr *sa)
+{
+
+	return if_missfilter0(ifp->ctx, ifp, sa);
+}
+
+int
+if_missfilter_apply(struct dhcpcd_ctx *ctx)
+{
+#ifdef RO_MISSFILTER
+	if (ctx->rt_missfilterlen == 0) {
+		struct sockaddr sa = {
+		    .sa_family = AF_UNSPEC,
+		    .sa_len = sizeof(sa),
+		};
+
+		if (if_missfilter0(ctx, NULL, &sa) == -1)
+			return -1;
+	}
+
+	return setsockopt(ctx->link_fd, PF_ROUTE, RO_MISSFILTER,
+	    ctx->rt_missfilter, (socklen_t)ctx->rt_missfilterlen);
+#else
+#warning kernel does not support RTM_MISS DST filtering
+	errno = ENOTSUP;
+	return -1;
+#endif
+}
+
 __CTASSERT(offsetof(struct rt_msghdr, rtm_msglen) == 0);
 int
 if_handlelink(struct dhcpcd_ctx *ctx)
