@@ -690,22 +690,26 @@ rt_build(struct dhcpcd_ctx *ctx, int af)
 	ctx->rt_order = 0;
 	ctx->options |= DHCPCD_RTBUILD;
 
-	switch (af) {
 #ifdef INET
-	case AF_INET:
-		if (!inet_getroutes(ctx, &routes))
-			goto getfail;
-		break;
+	if (!inet_getroutes(ctx, &routes))
+		goto getfail;
 #endif
 #ifdef INET6
-	case AF_INET6:
-		if (!inet6_getroutes(ctx, &routes))
-			goto getfail;
-		break;
+	if (!inet6_getroutes(ctx, &routes))
+		goto getfail;
 #endif
-	}
+
+#ifdef BSD
+	/* Rewind the miss filter */
+	ctx->rt_missfilterlen = 0;
+#endif
 
 	RB_TREE_FOREACH_SAFE(rt, &routes, rtn) {
+#ifdef BSD
+		if (rt_is_default(rt) &&
+		    if_missfilter(rt->rt_ifp, &rt->rt_gateway) == -1)
+			logerr("if_missfilter");
+#endif
 		if ((rt->rt_dest.sa_family != af &&
 		    rt->rt_dest.sa_family != AF_UNSPEC) ||
 		    (rt->rt_gateway.sa_family != af &&
@@ -723,6 +727,11 @@ rt_build(struct dhcpcd_ctx *ctx, int af)
 			}
 		}
 	}
+
+#ifdef BSD
+	if (if_missfilter_apply(ctx) == -1)
+		logerr("if_missfilter_apply");
+#endif
 
 	/* Remove old routes we used to manage. */
 	RB_TREE_FOREACH_REVERSE_SAFE(rt, &ctx->routes, rtn) {
