@@ -768,6 +768,29 @@ if_route(unsigned char cmd, const struct rt *rt)
 	return 0;
 }
 
+static bool
+if_realroute(const struct rt_msghdr *rtm)
+{
+
+#ifdef RTF_CLONED
+	if (rtm->rtm_flags & RTF_CLONED)
+		return false;
+#endif
+#ifdef RTF_WASCLONED
+	if (rtm->rtm_flags & RTF_WASCLONED)
+		return false;
+#endif
+#ifdef RTF_LOCAL
+	if (rtm->rtm_flags & RTF_LOCAL)
+		return false;
+#endif
+#ifdef RTF_BROADCAST
+	if (rtm->rtm_flags & RTF_BROADCAST)
+		return false;
+#endif
+	return true;
+}
+
 static int
 if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 {
@@ -781,30 +804,6 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 		errno = EINVAL;
 		return -1;
 	}
-#ifdef RTF_CLONED
-	if (rtm->rtm_flags & RTF_CLONED) {
-		errno = ENOTSUP;
-		return -1;
-	}
-#endif
-#ifdef RTF_WASCLONED
-	if (rtm->rtm_flags & RTF_WASCLONED) {
-		errno = ENOTSUP;
-		return -1;
-	}
-#endif
-#ifdef RTF_LOCAL
-	if (rtm->rtm_flags & RTF_LOCAL) {
-		errno = ENOTSUP;
-		return -1;
-	}
-#endif
-#ifdef RTF_BROADCAST
-	if (rtm->rtm_flags & RTF_BROADCAST) {
-		errno = ENOTSUP;
-		return -1;
-	}
-#endif
 
 	if (get_addrs(rtm->rtm_addrs, (const char *)rtm + sizeof(*rtm),
 	              rtm->rtm_msglen - sizeof(*rtm), rti_info) == -1)
@@ -891,6 +890,8 @@ if_initrt(struct dhcpcd_ctx *ctx, rb_tree_t *kroutes, int af)
 			errno = EINVAL;
 			break;
 		}
+		if (!if_realroute(rtm))
+			continue;
 		if (if_copyrt(ctx, &rt, rtm) != 0)
 			continue;
 		if ((rtn = rt_new(rt.rt_ifp)) == NULL) {
@@ -1252,12 +1253,6 @@ if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 	}
 #endif
 
-#if 0
-	/* Not needed because we turn off SO_USELOOPBACK. */
-	if (rtm->rtm_pid == getpid())
-		return 0;
-#endif
-
 	if (if_copyrt(ctx, &rt, rtm) == -1)
 		return errno == ENOTSUP ? 0 : -1;
 
@@ -1281,7 +1276,7 @@ if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 	}
 #endif
 
-	if (rtm->rtm_type != RTM_MISS)
+	if (rtm->rtm_type != RTM_MISS && if_realroute(rtm))
 		rt_recvrt(rtm->rtm_type, &rt, rtm->rtm_pid);
 	return 0;
 }
