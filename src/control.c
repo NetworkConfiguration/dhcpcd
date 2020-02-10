@@ -255,7 +255,7 @@ control_start(struct dhcpcd_ctx *ctx, const char *ifname)
 	eloop_event_add(ctx->eloop, fd, control_handle, ctx);
 
 	if (ifname == NULL && (fd = control_start1(ctx, NULL, S_UNPRIV)) != -1){
-		/* We must be in master mode, so create an unpriviledged socket
+		/* We must be in master mode, so create an unprivileged socket
 		 * to allow normal users to learn the status of dhcpcd. */
 		ctx->control_unpriv_fd = fd;
 		eloop_event_add(ctx->eloop, fd, control_handle_unpriv, ctx);

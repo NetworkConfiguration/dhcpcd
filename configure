@@ -530,7 +530,7 @@ if [ -z "$AUTH" -o "$AUTH" = yes ]; then
 fi
 
 if [ -z "$PRIVSEP" ]; then
-	# priviledge separation works fine .... except on Solaris
+	# privilege separation works fine .... except on Solaris
 	case "$OS" in
 	solaris*|sunos*)	PRIVSEP=no;;
 	*)			PRIVSEP=yes;;

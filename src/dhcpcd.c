@@ -1489,7 +1489,7 @@ dhcpcd_handleargs(struct dhcpcd_ctx *ctx, struct fd_list *fd,
 		return 0;
 	}
 
-	/* Only priviledged users can control dhcpcd via the socket. */
+	/* Only privileged users can control dhcpcd via the socket. */
 	if (fd->flags & FD_UNPRIV) {
 		errno = EPERM;
 		return -1;
