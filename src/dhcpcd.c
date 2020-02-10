@@ -2045,11 +2045,13 @@ printpidfile:
 	freopen(_PATH_DEVNULL, "r", stdin);
 
 #ifdef PRIVSEP
-	if (ps_init(&ctx) == -1 && errno != 0) {
-		logerr("ps_init");
-		goto exit_failure;
-	}
-	script_runchroot(&ctx, ifo->script);
+	if (ps_init(&ctx) == -1) {
+		if (errno != 0) {
+			logerr("ps_init");
+			goto exit_failure;
+		}
+	} else
+		script_runchroot(&ctx, ifo->script);
 #endif
 
 #ifdef USE_SIGNALS
