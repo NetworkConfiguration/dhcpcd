@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /*
- * Priviledge Separation for dhcpcd
+ * Privilege Separation for dhcpcd
  * Copyright (c) 2006-2020 Roy Marples <roy@marples.name>
  * All rights reserved
 
@@ -346,7 +346,7 @@ ps_stop(struct dhcpcd_ctx *ctx)
 		ret = r;
 
 	/* We've been chrooted, so we need to tell the
-	 * priviledged actioneer to remove the pidfile. */
+	 * privileged actioneer to remove the pidfile. */
 	ps_root_unlink(ctx, ctx->pidfile);
 
 	r = ps_root_stop(ctx);

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /*
- * Priviledge Separation for dhcpcd, BSD driver
+ * Privilege Separation for dhcpcd, BSD driver
  * Copyright (c) 2006-2020 Roy Marples <roy@marples.name>
  * All rights reserved
 
