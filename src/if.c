@@ -30,6 +30,7 @@
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <syslog.h>
 
 #include "config.h"
 
@@ -462,8 +463,9 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 #endif
 
 		if (if_vimaster(ctx, spec.devname) == 1) {
-			logfunc_t *logfunc = argc != 0 ? logerrx : logdebugx;
-			logfunc("%s: is a Virtual Interface Master, skipping",
+			int loglevel = argc != 0 ? LOG_ERR : LOG_DEBUG;
+			logmessage(loglevel,
+			    "%s: is a Virtual Interface Master, skipping",
 			    spec.devname);
 			continue;
 		}

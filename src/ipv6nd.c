@@ -42,6 +42,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <syslog.h>
 
 #define ELOOP_QUEUE	ELOOP_IPV6ND
 #include "common.h"
@@ -1016,7 +1017,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 	bool new_rap, new_data, has_address;
 	uint32_t old_lifetime;
 	int ifmtu;
-	__printflike(1, 2) void (*logfunc)(const char *, ...);
+	int loglevel;
 #ifdef IPV6_MANAGETEMPADDR
 	uint8_t new_ap;
 #endif
@@ -1117,8 +1118,9 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 	 * much needless log spam. */
 	if (rap->willexpire)
 		new_data = true;
-	logfunc = new_data || !rap->isreachable ? loginfox : logdebugx,
-	logfunc("%s: Router Advertisement from %s", ifp->name, rap->sfrom);
+	loglevel = new_data || !rap->isreachable ? LOG_INFO : LOG_DEBUG,
+	logmessage(loglevel, "%s: Router Advertisement from %s",
+	    ifp->name, rap->sfrom);
 
 	clock_gettime(CLOCK_MONOTONIC, &rap->acquired);
 	rap->flags = nd_ra->nd_ra_flags_reserved;
@@ -1201,15 +1203,15 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 
 		switch (ndo.nd_opt_type) {
 		case ND_OPT_PREFIX_INFORMATION:
-			logfunc = new_data ? logerrx : logdebugx;
+			loglevel = new_data ? LOG_ERR : LOG_DEBUG;
 			if (ndo.nd_opt_len != 4) {
-				logfunc("%s: invalid option len for prefix",
+				logmessage(loglevel, "%s: invalid option len for prefix",
 				    ifp->name);
 				continue;
 			}
 			memcpy(&pi, p, sizeof(pi));
 			if (pi.nd_opt_pi_prefix_len > 128) {
-				logfunc("%s: invalid prefix len", ifp->name);
+				logmessage(loglevel, "%s: invalid prefix len", ifp->name);
 				continue;
 			}
 			/* nd_opt_pi_prefix is not aligned. */
@@ -1218,13 +1220,13 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 			if (IN6_IS_ADDR_MULTICAST(&pi_prefix) ||
 			    IN6_IS_ADDR_LINKLOCAL(&pi_prefix))
 			{
-				logfunc("%s: invalid prefix in RA", ifp->name);
+				logmessage(loglevel, "%s: invalid prefix in RA", ifp->name);
 				continue;
 			}
 			if (ntohl(pi.nd_opt_pi_preferred_time) >
 			    ntohl(pi.nd_opt_pi_valid_time))
 			{
-				logfunc("%s: pltime > vltime", ifp->name);
+				logmessage(loglevel, "%s: pltime > vltime", ifp->name);
 				continue;
 			}
 			TAILQ_FOREACH(ap, &rap->addrs, next)
@@ -1304,13 +1306,13 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 
 		case ND_OPT_MTU:
 			if (len < sizeof(mtu)) {
-				logfunc("%s: short MTU option", ifp->name);
+				logmessage(loglevel, "%s: short MTU option", ifp->name);
 				break;
 			}
 			memcpy(&mtu, p, sizeof(mtu));
 			mtu.nd_opt_mtu_mtu = ntohl(mtu.nd_opt_mtu_mtu);
 			if (mtu.nd_opt_mtu_mtu < IPV6_MMTU) {
-				logfunc("%s: invalid MTU %d",
+				logmessage(loglevel, "%s: invalid MTU %d",
 				    ifp->name, mtu.nd_opt_mtu_mtu);
 				break;
 			}
@@ -1318,7 +1320,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 			if (ifmtu == -1)
 				logerr("if_getmtu");
 			else if (mtu.nd_opt_mtu_mtu > (uint32_t)ifmtu) {
-				logfunc("%s: advertised MTU %d"
+				logmessage(loglevel, "%s: advertised MTU %d"
 				    " is greater than link MTU %d",
 				    ifp->name, mtu.nd_opt_mtu_mtu, ifmtu);
 				rap->mtu = (uint32_t)ifmtu;
@@ -1327,7 +1329,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 			break;
 		case ND_OPT_RDNSS:
 			if (len < sizeof(rdnss)) {
-				logfunc("%s: short RDNSS option", ifp->name);
+				logmessage(loglevel, "%s: short RDNSS option", ifp->name);
 				break;
 			}
 			memcpy(&rdnss, p, sizeof(rdnss));

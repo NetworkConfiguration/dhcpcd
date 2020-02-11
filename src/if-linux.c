@@ -1964,11 +1964,10 @@ if_setup_inet6(const struct interface *ifp)
 	snprintf(path, sizeof(path), "%s/%s/accept_ra", p_conf, ifp->name);
 	ra = check_proc_int(path);
 	if (ra == -1) {
-		logfunc_t *logfunc = errno == ENOENT? logdebug : logwarn;
-
 		/* The sysctl probably doesn't exist, but this isn't an
 		 * error as such so just log it and continue */
-		logfunc("%s", path);
+		if (errno != ENOENT)
+			logerr("%s: %s", __func__, path);
 	} else if (ra != 0) {
 		if (if_writepathuint(ifp->ctx, path, 0) == -1)
 			logerr("%s: %s", __func__, path);
