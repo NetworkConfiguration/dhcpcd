@@ -44,6 +44,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <syslog.h>
 
 #define ELOOP_QUEUE	ELOOP_DHCP6
 #include "config.h"
@@ -1903,7 +1904,7 @@ dhcp6_checkstatusok(const struct interface *ifp,
 	void * (*f)(void *, size_t, uint16_t, uint16_t *), *farg;
 	char buf[32], *sbuf;
 	const char *status;
-	logfunc_t *logfunc;
+	int loglevel;
 
 	state = D6_STATE(ifp);
 	f = p ? dhcp6_findoption : dhcp6_findmoption;
@@ -1952,10 +1953,10 @@ dhcp6_checkstatusok(const struct interface *ifp,
 	}
 
 	if (state->lerror == code || state->state == DH6S_INIT)
-		logfunc = logdebugx;
+		loglevel = LOG_DEBUG;
 	else
-		logfunc = logerrx;
-	logfunc("%s: DHCPv6 REPLY: %s", ifp->name, status);
+		loglevel = LOG_ERR;
+	logmessage(loglevel, "%s: DHCPv6 REPLY: %s", ifp->name, status);
 	free(sbuf);
 	state->lerror = code;
 	errno = 0;
@@ -2793,16 +2794,16 @@ dhcp6_delegate_prefix(struct interface *ifp)
 			if (!(ap->flags & IPV6_AF_DELEGATEDPFX))
 				continue;
 			if (!(ap->flags & IPV6_AF_DELEGATEDLOG)) {
-				logfunc_t *logfunc;
+				int loglevel;
 
 				if (ap->flags & IPV6_AF_NEW)
-					logfunc = loginfox;
+					loglevel = LOG_INFO;
 				else
-					logfunc = logdebugx;
+					loglevel = LOG_DEBUG;
 				/* We only want to log this the once as we loop
 				 * through many interfaces first. */
 				ap->flags |= IPV6_AF_DELEGATEDLOG;
-				logfunc("%s: delegated prefix %s",
+				logmessage(loglevel, "%s: delegated prefix %s",
 				    ifp->name, ap->saddr);
 				ap->flags &= ~IPV6_AF_NEW;
 			}
@@ -2936,7 +2937,7 @@ dhcp6_bind(struct interface *ifp, const char *op, const char *sfrom)
 	struct dhcp6_state *state = D6_STATE(ifp);
 	bool timedout = (op == NULL), has_new = false, confirmed;
 	struct ipv6_addr *ia;
-	logfunc_t *lognewinfo;
+	int loglevel;
 	struct timespec now;
 
 	TAILQ_FOREACH(ia, &state->addrs, next) {
@@ -2945,9 +2946,10 @@ dhcp6_bind(struct interface *ifp, const char *op, const char *sfrom)
 			break;
 		}
 	}
-	lognewinfo = has_new ? loginfox : logdebugx;
+	loglevel = has_new ? LOG_INFO : LOG_DEBUG;
 	if (!timedout) {
-		lognewinfo("%s: %s received from %s", ifp->name, op, sfrom);
+		logmessage(loglevel, "%s: %s received from %s",
+		    ifp->name, op, sfrom);
 		/* If we delegated from an unconfirmed lease we MUST drop
 		 * them now. Hopefully we have new delegations. */
 		if (state->reason != NULL &&
@@ -3107,20 +3109,21 @@ dhcp6_bind(struct interface *ifp, const char *op, const char *sfrom)
 			dhcp6_deprecateaddrs(&state->addrs);
 
 		if (state->state == DH6S_INFORMED)
-			lognewinfo("%s: refresh in %"PRIu32" seconds",
+			logmessage(loglevel, "%s: refresh in %"PRIu32" seconds",
 			    ifp->name, state->renew);
 		else if (state->renew == ND6_INFINITE_LIFETIME)
-			lognewinfo("%s: leased for infinity", ifp->name);
+			logmessage(loglevel, "%s: leased for infinity",
+			    ifp->name);
 		else if (state->renew || state->rebind)
-			lognewinfo("%s: renew in %"PRIu32", "
+			logmessage(loglevel, "%s: renew in %"PRIu32", "
 			    "rebind in %"PRIu32", "
 			    "expire in %"PRIu32" seconds",
 			    ifp->name,
 			    state->renew, state->rebind, state->expire);
 		else if (state->expire == 0)
-			lognewinfo("%s: will expire", ifp->name);
+			logmessage(loglevel, "%s: will expire", ifp->name);
 		else
-			lognewinfo("%s: expire in %"PRIu32" seconds",
+			logmessage(loglevel, "%s: expire in %"PRIu32" seconds",
 			    ifp->name, state->expire);
 		rt_build(ifp->ctx, AF_INET6);
 		if (!confirmed && !timedout)

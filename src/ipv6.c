@@ -36,6 +36,7 @@
 #include <net/route.h>
 #include <netinet/in.h>
 #include <netinet/if_ether.h>
+#include <syslog.h>
 
 #include "config.h"
 
@@ -616,7 +617,7 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 {
 	struct interface *ifp;
 	uint32_t pltime, vltime;
-	__printflike(1, 2) void (*logfunc)(const char *, ...);
+	int loglevel;
 #ifdef ND6_ADVERTISE
 	bool vltime_was_zero = ia->prefix_vltime == 0;
 #endif
@@ -677,8 +678,8 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 		}
 	}
 
-	logfunc = ia->flags & IPV6_AF_NEW ? loginfox : logdebugx;
-	logfunc("%s: adding %saddress %s", ifp->name,
+	loglevel = ia->flags & IPV6_AF_NEW ? LOG_INFO : LOG_DEBUG;
+	logmessage(loglevel, "%s: adding %saddress %s", ifp->name,
 #ifdef IPV6_AF_TEMPORARY
 	    ia->flags & IPV6_AF_TEMPORARY ? "temporary " : "",
 #else
