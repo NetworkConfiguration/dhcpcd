@@ -220,7 +220,7 @@ vlogmessage(int pri, const char *fmt, va_list args)
 #pragma GCC diagnostic pop
 #endif
 
-__printflike(2, 3) static void
+__printflike(2, 3) void
 logmessage(int pri, const char *fmt, ...)
 {
 	va_list args;
@@ -240,8 +240,18 @@ vlogerrmessage(int pri, const char *fmt, va_list args)
 	logmessage(pri, "%s: %s", buf, strerror(_errno));
 }
 
+__printflike(2, 3) void
+logerrmessage(int pri, const char *fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
+	vlogerrmessage(pri, fmt, args);
+	va_end(args);
+}
+
 void
-logdebug(const char *fmt, ...)
+log_debug(const char *fmt, ...)
 {
 	va_list args;
 
@@ -251,7 +261,7 @@ logdebug(const char *fmt, ...)
 }
 
 void
-logdebugx(const char *fmt, ...)
+log_debugx(const char *fmt, ...)
 {
 	va_list args;
 
@@ -261,7 +271,7 @@ logdebugx(const char *fmt, ...)
 }
 
 void
-loginfo(const char *fmt, ...)
+log_info(const char *fmt, ...)
 {
 	va_list args;
 
@@ -271,7 +281,7 @@ loginfo(const char *fmt, ...)
 }
 
 void
-loginfox(const char *fmt, ...)
+log_infox(const char *fmt, ...)
 {
 	va_list args;
 
@@ -281,7 +291,7 @@ loginfox(const char *fmt, ...)
 }
 
 void
-logwarn(const char *fmt, ...)
+log_warn(const char *fmt, ...)
 {
 	va_list args;
 
@@ -291,7 +301,7 @@ logwarn(const char *fmt, ...)
 }
 
 void
-logwarnx(const char *fmt, ...)
+log_warnx(const char *fmt, ...)
 {
 	va_list args;
 
@@ -301,7 +311,7 @@ logwarnx(const char *fmt, ...)
 }
 
 void
-logerr(const char *fmt, ...)
+log_err(const char *fmt, ...)
 {
 	va_list args;
 
@@ -311,7 +321,7 @@ logerr(const char *fmt, ...)
 }
 
 void
-logerrx(const char *fmt, ...)
+log_errx(const char *fmt, ...)
 {
 	va_list args;
 

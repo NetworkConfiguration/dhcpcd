@@ -48,6 +48,7 @@ const char dhcpcd_copyright[] = "Copyright (c) 2006-2020 Roy Marples";
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
+#include <syslog.h>
 
 #include "config.h"
 #include "arp.h"
@@ -2177,11 +2178,11 @@ printpidfile:
 	}
 	if (ifp == NULL) {
 		if (ctx.ifc == 0) {
-			logfunc_t *logfunc;
+			int loglevel;
 
-			logfunc = ctx.options & DHCPCD_INACTIVE ?
-			    logdebugx : logerrx;
-			logfunc("no valid interfaces found");
+			loglevel = ctx.options & DHCPCD_INACTIVE ?
+			    LOG_DEBUG : LOG_ERR;
+			logmessage(loglevel, "no valid interfaces found");
 		} else
 			goto exit_failure;
 		if (!(ctx.options & DHCPCD_LINK)) {
@@ -2225,11 +2226,11 @@ printpidfile:
 		    ctx.options & DHCPCD_LINK &&
 		    !(ctx.options & DHCPCD_WAITIP))
 		{
-			logfunc_t *logfunc;
+			int loglevel;
 
-			logfunc = ctx.options & DHCPCD_INACTIVE ?
-			    logdebugx : logwarnx;
-			logfunc("no interfaces have a carrier");
+			loglevel = ctx.options & DHCPCD_INACTIVE ?
+			    LOG_DEBUG : LOG_WARNING;
+			logmessage(loglevel, "no interfaces have a carrier");
 			dhcpcd_daemonise(&ctx);
 		} else if (t > 0 &&
 		    /* Test mode removes the daemonise bit, so check for both */
