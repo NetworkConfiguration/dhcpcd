@@ -36,7 +36,6 @@
 #include <net/route.h>
 #include <netinet/in.h>
 #include <netinet/if_ether.h>
-#include <syslog.h>
 
 #include "config.h"
 
@@ -58,6 +57,7 @@
 #include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #define ELOOP_QUEUE	ELOOP_IPV6

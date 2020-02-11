@@ -41,8 +41,8 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <syslog.h>
+#include <unistd.h>
 
 #define ELOOP_QUEUE	ELOOP_IPV6ND
 #include "common.h"
