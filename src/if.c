@@ -283,8 +283,15 @@ if_learnaddrs(struct dhcpcd_ctx *ctx, struct if_head *ifs,
 			addrflags = if_addrflags(ifp, &addr->sin_addr,
 			    ifa->ifa_name);
 			if (addrflags == -1) {
-				if (errno != EEXIST && errno != EADDRNOTAVAIL)
-					logerr("%s: if_addrflags", __func__);
+				if (errno != EEXIST && errno != EADDRNOTAVAIL) {
+					char dbuf[INET_ADDRSTRLEN];
+					const char *dbp;
+
+					dbp = inet_ntop(AF_INET, &addr->sin_addr,
+					    dbuf, sizeof(dbuf));
+					logerr("%s: if_addrflags: %s%%%s",
+					    __func__, dbp, ifp->name);
+				}
 				continue;
 			}
 #endif
@@ -308,8 +315,15 @@ if_learnaddrs(struct dhcpcd_ctx *ctx, struct if_head *ifs,
 			addrflags = if_addrflags6(ifp, &sin6->sin6_addr,
 			    ifa->ifa_name);
 			if (addrflags == -1) {
-				if (errno != EEXIST && errno != EADDRNOTAVAIL)
-					logerr("%s: if_addrflags6", __func__);
+				if (errno != EEXIST && errno != EADDRNOTAVAIL) {
+					char dbuf[INET6_ADDRSTRLEN];
+					const char *dbp;
+
+					dbp = inet_ntop(AF_INET6, &sin6->sin6_addr,
+					    dbuf, sizeof(dbuf));
+					logerr("%s: if_addrflags6: %s%%%s",
+					    __func__, dbp, ifp->name);
+				}
 				continue;
 			}
 #endif
