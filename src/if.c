@@ -683,8 +683,14 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 	return ifs;
 }
 
-/* Decode bge0:1 as dev = bge, ppa = 0 and lun = 1
- * Special case XEN where : could be i (NetBSD) or . (Linux) */
+/*
+ * eth0.100:2 OR eth0i100:2 (seems to be NetBSD xvif(4) only)
+ *
+ * drvname == eth
+ * devname == eth0.100 OR eth0i100
+ * ppa = 0
+ * lun = 2
+ */
 int
 if_nametospec(const char *ifname, struct if_spec *spec)
 {
@@ -729,11 +735,12 @@ if_nametospec(const char *ifname, struct if_spec *spec)
 	 * . is used for VLAN style names
 	 * i is used on NetBSD for xvif interfaces
 	 */
-	if (pp != NULL && (*pp == '.' || *pp == 'i') && spec->lun == -1) {
-		spec->lun = (int)strtoi(pp + 1, NULL, 10, 0, INT_MAX, &e);
+	if (pp != NULL && (*pp == '.' || *pp == 'i')) {
+		spec->vlid = (int)strtoi(pp + 1, NULL, 10, 0, INT_MAX, &e);
 		if (e)
-			spec->lun = -1;
-	}
+			spec->vlid = -1;
+	} else
+		spec->vlid = -1;
 
 	return 0;
 }
