@@ -700,9 +700,9 @@ if_nametospec(const char *ifname, struct if_spec *spec)
 		errno = EINVAL;
 		return -1;
 	}
+
+	/* :N is an alias */
 	ep = strchr(spec->drvname, ':');
-	if (ep == NULL)
-		ep = strchr(spec->drvname, '.');
 	if (ep) {
 		spec->lun = (int)strtoi(ep + 1, NULL, 10, 0, INT_MAX, &e);
 		if (e != 0) {
@@ -714,6 +714,7 @@ if_nametospec(const char *ifname, struct if_spec *spec)
 		spec->lun = -1;
 		ep = spec->drvname + strlen(spec->drvname) - 1;
 	}
+
 	strlcpy(spec->devname, spec->drvname, sizeof(spec->devname));
 	for (ep = spec->drvname; *ep != '\0' && !isdigit((int)*ep); ep++) {
 		if (*ep == ':') {
@@ -723,7 +724,12 @@ if_nametospec(const char *ifname, struct if_spec *spec)
 	}
 	spec->ppa = (int)strtoi(ep, &pp, 10, 0, INT_MAX, &e);
 	*ep = '\0';
-	if (pp != NULL && *pp == 'i' && spec->lun == -1) {
+
+	/*
+	 * . is used for VLAN style names
+	 * i is used on NetBSD for xvif interfaces
+	 */
+	if (pp != NULL && (*pp == '.' || *pp == 'i') && spec->lun == -1) {
 		spec->lun = (int)strtoi(pp + 1, NULL, 10, 0, INT_MAX, &e);
 		if (e)
 			spec->lun = -1;
