@@ -150,6 +150,7 @@ struct if_spec {
 	char devname[IF_NAMESIZE];
 	char drvname[IF_NAMESIZE];
 	int ppa;
+	int vlid;
 	int lun;
 };
 int if_nametospec(const char *, struct if_spec *);
