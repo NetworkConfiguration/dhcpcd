@@ -2981,11 +2981,13 @@ dhcp6_bind(struct interface *ifp, const char *op, const char *sfrom)
 	if (!timedout) {
 		logmessage(loglevel, "%s: %s received from %s",
 		    ifp->name, op, sfrom);
+#ifndef SMALL
 		/* If we delegated from an unconfirmed lease we MUST drop
 		 * them now. Hopefully we have new delegations. */
 		if (state->reason != NULL &&
 		    strcmp(state->reason, "TIMEOUT6") == 0)
 			dhcp6_delete_delegates(ifp);
+#endif
 		state->reason = NULL;
 	} else
 		state->reason = "TIMEOUT6";
@@ -3982,16 +3984,17 @@ dhcp6_free(struct interface *ifp)
 void
 dhcp6_abort(struct interface *ifp)
 {
-#ifdef ND6_ADVERTISE
 	struct dhcp6_state *state;
+#ifdef ND6_ADVERTISE
 	struct ipv6_addr *ia;
 #endif
 
 	eloop_timeout_delete(ifp->ctx->eloop, dhcp6_start1, ifp);
-#ifdef ND6_ADVERTISE
 	state = D6_STATE(ifp);
 	if (state == NULL)
 		return;
+
+#ifdef ND6_ADVERTISE
 	TAILQ_FOREACH(ia, &state->addrs, next) {
 		ipv6nd_advertise(ia);
 	}
@@ -4001,6 +4004,7 @@ dhcp6_abort(struct interface *ifp)
 	eloop_timeout_delete(ifp->ctx->eloop, dhcp6_senddiscover, ifp);
 	eloop_timeout_delete(ifp->ctx->eloop, dhcp6_startinform, ifp);
 	eloop_timeout_delete(ifp->ctx->eloop, dhcp6_sendinform, ifp);
+
 	switch (state->state) {
 	case DH6S_DISCOVER:	/* FALLTHROUGH */
 	case DH6S_REQUEST:	/* FALLTHROUGH */
