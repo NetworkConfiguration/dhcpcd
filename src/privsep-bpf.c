@@ -85,6 +85,7 @@ ps_bpf_recvbpf(void *arg)
 	}
 }
 
+#ifdef ARP
 static ssize_t
 ps_bpf_arp_addr(uint8_t cmd, struct ps_process *psp, struct msghdr *msg)
 {
@@ -119,6 +120,7 @@ ps_bpf_arp_addr(uint8_t cmd, struct ps_process *psp, struct msghdr *msg)
 
 	return bpf_arp(ifp, psp->psp_work_fd);
 }
+#endif
 
 static ssize_t
 ps_bpf_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
@@ -126,8 +128,10 @@ ps_bpf_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 	struct ps_process *psp = arg;
 	struct iovec *iov = msg->msg_iov;
 
+#ifdef ARP
 	if (psm->ps_cmd & (PS_START | PS_DELETE))
 		return ps_bpf_arp_addr(psm->ps_cmd, psp, msg);
+#endif
 
 	return bpf_send(&psp->psp_ifp, psp->psp_work_fd, psp->psp_proto,
 	    iov->iov_base, iov->iov_len);
