@@ -106,6 +106,7 @@
 #define O_LASTLEASE_EXTEND	O_BASE + 46
 #define O_INACTIVE		O_BASE + 47
 #define	O_MUDURL		O_BASE + 48
+#define	O_MSUSERCLASS		O_BASE + 49
 
 const struct option cf_options[] = {
 	{"background",      no_argument,       NULL, 'b'},
@@ -129,6 +130,9 @@ const struct option cf_options[] = {
 	{"inform6",         optional_argument, NULL, O_INFORM6},
 	{"timeout",         required_argument, NULL, 't'},
 	{"userclass",       required_argument, NULL, 'u'},
+#ifndef SMALL
+	{"msuserclass",     required_argument, NULL, O_MSUSERCLASS},
+#endif
 	{"vendor",          required_argument, NULL, 'v'},
 	{"waitip",          optional_argument, NULL, 'w'},
 	{"exit",            no_argument,       NULL, 'x'},
@@ -894,6 +898,19 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			ifo->userclass[0] = (uint8_t)(ifo->userclass[0] + s +1);
 		}
 		break;
+#ifndef SMALL
+	case O_MSUSERCLASS:
+		/* Some Microsoft DHCP servers expect userclass to be an
+		 * opaque blob. This is not RFC 3004 compliant. */
+		s = parse_string((char *)ifo->userclass + 1,
+		    sizeof(ifo->userclass) - 1, arg);
+		if (s == -1) {
+			logerr("msuserclass");
+			return -1;
+		}
+		ifo->userclass[0] = (uint8_t)s;
+		break;
+#endif
 	case 'v':
 		ARG_REQUIRED;
 		p = strchr(arg, ',');
