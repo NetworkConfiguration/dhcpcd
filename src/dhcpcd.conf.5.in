@@ -24,7 +24,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd January 22, 2020
+.Dd February 19, 2020
 .Dt DHCPCD.CONF 5
 .Os
 .Sh NAME
@@ -690,8 +690,17 @@ If using IPv4LL then
 start the IPv4LL process after the timeout and then wait a little longer
 before really timing out.
 .It Ic userclass Ar string
-Tag the DHCPv4 messages with the userclass.
+Tag the DHCPv4 message with the userclass.
 You can specify more than one.
+.It Ic msuserclass Ar string
+Tag the DHCPv4 mesasge with the Microsoft userclass.
+Unlike the
+.Ic userclass
+option, this one can only be added once.
+It should only be used for Microsoft DHCP servers and the
+.Ic vendorclassid
+should be set to "MSFT 98" or "MSFT 5.0".
+This option is not RFC compliant.
 .It Ic vendor Ar code , Ns Ar value
 Add an encapsulated vendor option.
 .Ar code
