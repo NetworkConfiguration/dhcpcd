@@ -330,6 +330,14 @@ log_errx(const char *fmt, ...)
 	va_end(args);
 }
 
+unsigned int
+loggetopts(void)
+{
+	struct logctx *ctx = &_logctx;
+
+	return ctx->log_opts;
+}
+
 void
 logsetopts(unsigned int opts)
 {

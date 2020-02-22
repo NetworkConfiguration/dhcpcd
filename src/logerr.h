@@ -76,6 +76,7 @@ __printflike(2, 3) void logerrmessage(int pri, const char *fmt, ...);
 #define logerr(...)	log_err(__VA_ARGS__)
 #define logerrx(...)	log_errx(__VA_ARGS__)
 
+unsigned int loggetopts(void);
 void logsetopts(unsigned int);
 #define	LOGERR_DEBUG	(1U << 6)
 #define	LOGERR_QUIET	(1U << 7)
