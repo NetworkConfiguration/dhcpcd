@@ -3556,6 +3556,15 @@ dhcp_recvmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg)
 	struct interface *ifp;
 	const struct dhcp_state *state;
 
+#ifdef PRIVSEP
+	/* Unlikely, but appeases sanitizers. */
+	if (iov->iov_len > FRAMELEN_MAX) {
+		errno = ENOBUFS;
+		logerr(__func__);
+		return;
+	}
+#endif
+
 	ifp = if_findifpfromcmsg(ctx, msg, NULL);
 	if (ifp == NULL) {
 		logerr(__func__);
