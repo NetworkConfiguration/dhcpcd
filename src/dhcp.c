@@ -3447,6 +3447,13 @@ dhcp_handlebootp(struct interface *ifp, struct bootp *bootp, size_t len,
 		return;
 	}
 
+	/* Unlikely, but appeases sanitizers. */
+	if (len > FRAMELEN_MAX) {
+		logerrx("%s: packet exceeded frame length (%zu) from %s",
+		    ifp->name, len, inet_ntoa(*from));
+		return;
+	}
+
 	/* To make our IS_DHCP macro easy, ensure the vendor
 	 * area has at least 4 octets. */
 	v = len - offsetof(struct bootp, vend);
@@ -3555,15 +3562,6 @@ dhcp_recvmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg)
 	struct iovec *iov = &msg->msg_iov[0];
 	struct interface *ifp;
 	const struct dhcp_state *state;
-
-#ifdef PRIVSEP
-	/* Unlikely, but appeases sanitizers. */
-	if (iov->iov_len > FRAMELEN_MAX) {
-		errno = ENOBUFS;
-		logerr(__func__);
-		return;
-	}
-#endif
 
 	ifp = if_findifpfromcmsg(ctx, msg, NULL);
 	if (ifp == NULL) {
