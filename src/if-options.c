@@ -2026,52 +2026,43 @@ err_sla:
 			return -1;
 		}
 		*fp++ = '\0';
-		token = malloc(sizeof(*token));
+		token = calloc(1, sizeof(*token));
 		if (token == NULL) {
 			logerr(__func__);
-			free(token);
 			return -1;
 		}
 		if (parse_uint32(&token->secretid, arg) == -1) {
 			logerrx("%s: not a number", arg);
-			free(token);
-			return -1;
+			goto invalid_token;
 		}
 		arg = fp;
 		fp = strend(arg);
 		if (fp == NULL) {
 			logerrx("authtoken requies an a key");
-			free(token);
-			return -1;
+			goto invalid_token;
 		}
 		*fp++ = '\0';
 		s = parse_string(NULL, 0, arg);
 		if (s == -1) {
 			logerr("realm_len");
-			free(token);
-			return -1;
+			goto invalid_token;
 		}
 		if (s) {
 			token->realm_len = (size_t)s;
 			token->realm = malloc(token->realm_len);
 			if (token->realm == NULL) {
 				logerr(__func__);
-				free(token);
-				return -1;
+				goto invalid_token;
 			}
 			parse_string((char *)token->realm, token->realm_len,
 			    arg);
 		} else {
-			token->realm_len = 0;
-			token->realm = NULL;
 		}
 		arg = fp;
 		fp = strend(arg);
 		if (fp == NULL) {
 			logerrx("authtoken requies an expiry date");
-			free(token->realm);
-			free(token);
-			return -1;
+			goto invalid_token;
 		}
 		*fp++ = '\0';
 		if (*arg == '"') {
@@ -2088,15 +2079,11 @@ err_sla:
 			memset(&tm, 0, sizeof(tm));
 			if (strptime(arg, "%Y-%m-%d %H:%M", &tm) == NULL) {
 				logerrx("%s: invalid date time", arg);
-				free(token->realm);
-				free(token);
-				return -1;
+				goto invalid_token;
 			}
 			if ((token->expire = mktime(&tm)) == (time_t)-1) {
 				logerr("%s: mktime", __func__);
-				free(token->realm);
-				free(token);
-				return -1;
+				goto invalid_token;
 			}
 		}
 		arg = fp;
@@ -2106,12 +2093,14 @@ err_sla:
 				logerr("token_len");
 			else
 				logerrx("authtoken needs a key");
-			free(token->realm);
-			free(token);
-			return -1;
+			goto invalid_token;
 		}
 		token->key_len = (size_t)s;
 		token->key = malloc(token->key_len);
+		if (token->key == NULL) {
+			logerr(__func__);
+			goto invalid_token;
+		}
 		parse_string((char *)token->key, token->key_len, arg);
 		TAILQ_INSERT_TAIL(&ifo->auth.tokens, token, next);
 #else
@@ -2119,6 +2108,11 @@ err_sla:
 		return -1;
 #endif
 		break;
+
+invalid_token:
+		free(token->realm);
+		free(token);
+		return -1;
 	case O_AUTHNOTREQUIRED:
 		ifo->auth.options &= ~DHCPCD_AUTH_REQUIRE;
 		break;
