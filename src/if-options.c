@@ -2047,7 +2047,7 @@ err_sla:
 			logerr("realm_len");
 			goto invalid_token;
 		}
-		if (s) {
+		if (s != 0) {
 			token->realm_len = (size_t)s;
 			token->realm = malloc(token->realm_len);
 			if (token->realm == NULL) {
@@ -2056,7 +2056,6 @@ err_sla:
 			}
 			parse_string((char *)token->realm, token->realm_len,
 			    arg);
-		} else {
 		}
 		arg = fp;
 		fp = strend(arg);
