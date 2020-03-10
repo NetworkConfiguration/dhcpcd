@@ -1359,6 +1359,13 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 		}
 	}
 
+	TAILQ_FOREACH(ia, &rap->addrs, next) {
+		if (!(ia->flags & IPV6_AF_STALE) || ia->prefix_pltime == 0)
+			continue;
+		logdebugx("%s: %s: became stale", ifp->name, ia->saddr);
+		ia->prefix_pltime = 0;
+	}
+
 	if (new_data && !has_address && rap->lifetime && !ipv6_anyglobal(ifp))
 		logwarnx("%s: no global addresses for default route",
 		    ifp->name);
