@@ -1012,14 +1012,14 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 	uint8_t *p;
 	struct ra *rap;
 	struct in6_addr pi_prefix;
-	struct ipv6_addr *ap;
+	struct ipv6_addr *ia;
 	struct dhcp_opt *dho;
 	bool new_rap, new_data, has_address;
 	uint32_t old_lifetime;
 	int ifmtu;
 	int loglevel;
 #ifdef IPV6_MANAGETEMPADDR
-	uint8_t new_ap;
+	bool new_ia;
 #endif
 
 	if (ifp == NULL) {
@@ -1152,8 +1152,8 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 #ifdef IPV6_AF_TEMPORARY
 	ipv6_markaddrsstale(ifp, IPV6_AF_TEMPORARY);
 #endif
-	TAILQ_FOREACH(ap, &rap->addrs, next) {
-		ap->flags |= IPV6_AF_STALE;
+	TAILQ_FOREACH(ia, &rap->addrs, next) {
+		ia->flags |= IPV6_AF_STALE;
 	}
 
 	len -= sizeof(struct nd_router_advert);
@@ -1229,11 +1229,11 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 				logmessage(loglevel, "%s: pltime > vltime", ifp->name);
 				continue;
 			}
-			TAILQ_FOREACH(ap, &rap->addrs, next)
-				if (ap->prefix_len ==pi.nd_opt_pi_prefix_len &&
-				    IN6_ARE_ADDR_EQUAL(&ap->prefix, &pi_prefix))
+			TAILQ_FOREACH(ia, &rap->addrs, next)
+				if (ia->prefix_len == pi.nd_opt_pi_prefix_len &&
+				    IN6_ARE_ADDR_EQUAL(&ia->prefix, &pi_prefix))
 					break;
-			if (ap == NULL) {
+			if (ia == NULL) {
 				unsigned int flags;
 
 				flags = IPV6_AF_RAPFX;
@@ -1243,15 +1243,15 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 				    DHCPCD_IPV6RA_AUTOCONF)
 					flags |= IPV6_AF_AUTOCONF;
 
-				ap = ipv6_newaddr(rap->iface,
+				ia = ipv6_newaddr(rap->iface,
 				    &pi_prefix, pi.nd_opt_pi_prefix_len, flags);
-				if (ap == NULL)
+				if (ia == NULL)
 					break;
-				ap->prefix = pi_prefix;
+				ia->prefix = pi_prefix;
 				if (flags & IPV6_AF_AUTOCONF)
-					ap->dadcallback = ipv6nd_dadcallback;
-				ap->created = ap->acquired = rap->acquired;
-				TAILQ_INSERT_TAIL(&rap->addrs, ap, next);
+					ia->dadcallback = ipv6nd_dadcallback;
+				ia->created = ia->acquired = rap->acquired;
+				TAILQ_INSERT_TAIL(&rap->addrs, ia, next);
 
 #ifdef IPV6_MANAGETEMPADDR
 				/* New address to dhcpcd RA handling.
@@ -1260,44 +1260,44 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 				 * extend the existing one rather than
 				 * create a new one */
 				if (flags & IPV6_AF_AUTOCONF &&
-				    ipv6_iffindaddr(ifp, &ap->addr,
+				    ipv6_iffindaddr(ifp, &ia->addr,
 				    IN6_IFF_NOTUSEABLE) &&
-				    ipv6_settemptime(ap, 0))
-					new_ap = 0;
+				    ipv6_settemptime(ia, 0))
+					new_ia = false;
 				else
-					new_ap = 1;
+					new_ia = true;
 #endif
 			} else {
 #ifdef IPV6_MANAGETEMPADDR
-				new_ap = 0;
+				new_ia = false;
 #endif
-				ap->flags &= ~IPV6_AF_STALE;
-				ap->acquired = rap->acquired;
+				ia->flags &= ~IPV6_AF_STALE;
+				ia->acquired = rap->acquired;
 			}
 			if (pi.nd_opt_pi_flags_reserved &
 			    ND_OPT_PI_FLAG_ONLINK)
-				ap->flags |= IPV6_AF_ONLINK;
-			ap->prefix_vltime =
+				ia->flags |= IPV6_AF_ONLINK;
+			ia->prefix_vltime =
 			    ntohl(pi.nd_opt_pi_valid_time);
-			ap->prefix_pltime =
+			ia->prefix_pltime =
 			    ntohl(pi.nd_opt_pi_preferred_time);
-			if (ap->prefix_vltime != 0 &&
-			    ap->flags & IPV6_AF_AUTOCONF)
+			if (ia->prefix_vltime != 0 &&
+			    ia->flags & IPV6_AF_AUTOCONF)
 				has_address = true;
 
 #ifdef IPV6_MANAGETEMPADDR
 			/* RFC4941 Section 3.3.3 */
-			if (ap->flags & IPV6_AF_AUTOCONF &&
-			    ip6_use_tempaddr(ap->iface->name) &&
-			    IA6_CANAUTOCONF(ap))
+			if (ia->flags & IPV6_AF_AUTOCONF &&
+			    ip6_use_tempaddr(ia->iface->name) &&
+			    IA6_CANAUTOCONF(ia))
 			{
-				if (!new_ap) {
-					if (ipv6_settemptime(ap, 1) == NULL)
-						new_ap = 1;
+				if (!new_ia) {
+					if (ipv6_settemptime(ia, 1) == NULL)
+						new_ia = true;
 				}
-				if (new_ap && ap->prefix_pltime) {
-					if (ipv6_createtempaddr(ap,
-					    &ap->acquired) == NULL)
+				if (new_ia && ia->prefix_pltime) {
+					if (ipv6_createtempaddr(ia,
+					    &ia->acquired) == NULL)
 						logerr("ipv6_createtempaddr");
 				}
 			}
