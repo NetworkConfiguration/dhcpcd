@@ -595,7 +595,7 @@ ipv6nd_sortrouters(struct dhcpcd_ctx *ctx)
 				continue;
 			if (!ra1->isreachable && ra2->reachable)
 				continue;
-			if (ipv6nd_rtpref(ra1) < ipv6nd_rtpref(ra2))
+			if (ipv6nd_rtpref(ra1) <= ipv6nd_rtpref(ra2))
 				continue;
 			/* All things being equal, prefer older routers. */
 			if (timespeccmp(&ra1->acquired, &ra2->acquired, >=))
