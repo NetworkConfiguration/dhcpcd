@@ -2028,9 +2028,6 @@ printpidfile:
 		/* Ensure we have the needed directories */
 		if (mkdir(RUNDIR, 0755) == -1 && errno != EEXIST)
 			logerr("%s: mkdir `%s'", __func__, RUNDIR);
-		if (mkdir(DBDIR, 0755) == -1 && errno != EEXIST)
-			logerr("%s: mkdir `%s'", __func__, DBDIR);
-
 		if ((pid = pidfile_lock(ctx.pidfile)) != 0) {
 			if (pid == -1)
 				logerr("%s: pidfile_lock: %s",
@@ -2111,6 +2108,13 @@ printpidfile:
 	if (ctx.options & DHCPCD_IPV6 && ctx.options & DHCPCD_IPV6RS)
 		if_disable_rtadv();
 #endif
+
+	/* If we're not running in privsep, we need to create the DB
+	 * directory here. */
+	if (!(ctx.options & DHCPCD_PRIVSEP)) {
+		if (mkdir(DBDIR, 0755) == -1 && errno != EEXIST)
+			logerr("%s: mkdir `%s'", __func__, DBDIR);
+	}
 
 #ifdef PRIVSEP
 	if (ctx.options & DHCPCD_PRIVSEP && ps_start(&ctx) == -1) {
