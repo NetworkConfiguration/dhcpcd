@@ -1522,11 +1522,8 @@ if_missfilter0(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	}
 
 #ifdef INET6
-	if (sa->sa_family == AF_INET6) {
-		struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)sa;
-
-		ifa_setscope(sin6, ifp->index);
-	}
+	if (sa->sa_family == AF_INET6)
+		ifa_setscope(satosin6(sa), ifp->index);
 #endif
 
 	cp = ctx->rt_missfilter + ctx->rt_missfilterlen;
@@ -1536,11 +1533,8 @@ if_missfilter0(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	ctx->rt_missfilterlen += salen;
 
 #ifdef INET6
-	if (sa->sa_family == AF_INET6) {
-		struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)sa;
-
-		ifa_setscope(sin6, 0);
-	}
+	if (sa->sa_family == AF_INET6)
+		ifa_setscope(satosin6(sa), 0);
 #endif
 
 	return 0;
