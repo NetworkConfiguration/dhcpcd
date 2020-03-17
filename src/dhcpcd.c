@@ -2173,9 +2173,11 @@ printpidfile:
 		goto exit_failure;
 	}
 	for (i = 0; i < ctx.ifc; i++) {
-		if ((ifp = if_find(ctx.ifaces, ctx.ifv[i])) == NULL ||
-		    !ifp->active)
-			logerrx("%s: interface not found or invalid",
+		if ((ifp = if_find(ctx.ifaces, ctx.ifv[i])) == NULL)
+			logerrx("%s: interface not found",
+			    ctx.ifv[i]);
+		else if (!ifp->active)
+			logerrx("%s: interface has an invalid configuration",
 			    ctx.ifv[i]);
 	}
 	TAILQ_FOREACH(ifp, ctx.ifaces, next) {
