@@ -2102,15 +2102,14 @@ err_sla:
 		}
 		parse_string((char *)token->key, token->key_len, arg);
 		TAILQ_INSERT_TAIL(&ifo->auth.tokens, token, next);
-#else
-		logerrx("no authentication support");
-		return -1;
-#endif
 		break;
 
 invalid_token:
 		free(token->realm);
 		free(token);
+#else
+		logerrx("no authentication support");
+#endif
 		return -1;
 	case O_AUTHNOTREQUIRED:
 		ifo->auth.options &= ~DHCPCD_AUTH_REQUIRE;
