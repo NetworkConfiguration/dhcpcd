@@ -4182,26 +4182,4 @@ delegated:
 
 	return 1;
 }
-
-int
-dhcp6_dump(struct interface *ifp)
-{
-	struct dhcp6_state *state;
-
-	ifp->if_data[IF_DATA_DHCP6] = state = calloc(1, sizeof(*state));
-	if (state == NULL) {
-		logerr(__func__);
-		return -1;
-	}
-	TAILQ_INIT(&state->addrs);
-	dhcp_set_leasefile(state->leasefile, sizeof(state->leasefile),
-	    AF_INET6, ifp);
-	if (dhcp6_readlease(ifp, 0) == -1) {
-		logerr("%s: %s", __func__,
-		    *ifp->name ? ifp->name : state->leasefile);
-		return -1;
-	}
-	state->reason = "DUMP6";
-	return script_runreason(ifp, state->reason);
-}
 #endif

@@ -3690,31 +3690,6 @@ dhcp_openbpf(struct interface *ifp)
 	return 0;
 }
 
-int
-dhcp_dump(struct interface *ifp)
-{
-	struct dhcp_state *state;
-
-	ifp->if_data[IF_DATA_DHCP] = state = calloc(1, sizeof(*state));
-	if (state == NULL)
-		goto eexit;
-	state->bpf_fd = -1;
-	dhcp_set_leasefile(state->leasefile, sizeof(state->leasefile),
-	    AF_INET, ifp);
-	state->new_len = read_lease(ifp, &state->new);
-	if (state->new == NULL) {
-		logerr("%s: %s",
-		    *ifp->name ? ifp->name : state->leasefile, __func__);
-		return -1;
-	}
-	state->reason = "DUMP";
-	return script_runreason(ifp, state->reason);
-
-eexit:
-	logerr(__func__);
-	return -1;
-}
-
 void
 dhcp_free(struct interface *ifp)
 {

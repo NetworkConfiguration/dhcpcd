@@ -535,7 +535,7 @@ make:
 	if (script_buftoenv(ctx, ctx->script_buf, (size_t)buf_pos) == NULL)
 		goto eexit;
 
-	return buf_pos - 1;
+	return buf_pos;
 
 eexit:
 	logerr(__func__);
@@ -556,13 +556,12 @@ send_interface1(struct fd_list *fd, const struct interface *ifp,
 	len = make_env(ifp->ctx, ifp, reason);
 	if (len == -1)
 		return -1;
-	return control_queue(fd, ctx->script_buf,  (size_t)len, 1);
+	return control_queue(fd, ctx->script_buf, (size_t)len, 1);
 }
 
 int
-send_interface(struct fd_list *fd, const struct interface *ifp)
+send_interface(struct fd_list *fd, const struct interface *ifp, int af)
 {
-	const char *reason;
 	int retval = 0;
 #ifdef INET
 	const struct dhcp_state *d;
@@ -571,50 +570,78 @@ send_interface(struct fd_list *fd, const struct interface *ifp)
 	const struct dhcp6_state *d6;
 #endif
 
-	switch (ifp->carrier) {
-	case LINK_UP:
-		reason = "CARRIER";
-		break;
-	case LINK_DOWN:
-	case LINK_DOWN_IFFUP:
-		reason = "NOCARRIER";
-		break;
-	default:
-		reason = "UNKNOWN";
-		break;
+	if (af == AF_UNSPEC || af == AF_LINK) {
+		const char *reason;
+
+		switch (ifp->carrier) {
+		case LINK_UP:
+			reason = "CARRIER";
+			break;
+		case LINK_DOWN:
+		case LINK_DOWN_IFFUP:
+			reason = "NOCARRIER";
+			break;
+		default:
+			reason = "UNKNOWN";
+			break;
+		}
+		if (fd != NULL) {
+			if (send_interface1(fd, ifp, reason) == -1)
+				retval = -1;
+		} else
+			retval++;
 	}
-	if (send_interface1(fd, ifp, reason) == -1)
-		retval = -1;
+
 #ifdef INET
-	if (D_STATE_RUNNING(ifp)) {
-		d = D_CSTATE(ifp);
-		if (send_interface1(fd, ifp, d->reason) == -1)
-			retval = -1;
-	}
+	if (af == AF_UNSPEC || af == AF_INET) {
+		if (D_STATE_RUNNING(ifp)) {
+			d = D_CSTATE(ifp);
+			if (fd != NULL) {
+				if (send_interface1(fd, ifp, d->reason) == -1)
+					retval = -1;
+			} else
+				retval++;
+		}
 #ifdef IPV4LL
-	if (IPV4LL_STATE_RUNNING(ifp)) {
-		if (send_interface1(fd, ifp, "IPV4LL") == -1)
-			retval = -1;
-	}
+		if (IPV4LL_STATE_RUNNING(ifp)) {
+			if (fd != NULL) {
+				if (send_interface1(fd, ifp, "IPV4LL") == -1)
+					retval = -1;
+			} else
+				retval++;
+		}
 #endif
+	}
 #endif
 
 #ifdef INET6
-	if (IPV6_STATE_RUNNING(ifp)) {
-		if (send_interface1(fd, ifp, "STATIC6") == -1)
-			retval = -1;
-	}
-	if (RS_STATE_RUNNING(ifp)) {
-		if (send_interface1(fd, ifp, "ROUTERADVERT") == -1)
-			retval = -1;
-	}
+	if (af == AF_UNSPEC || af == AF_INET6) {
+		if (IPV6_STATE_RUNNING(ifp)) {
+			if (fd != NULL) {
+				if (send_interface1(fd, ifp, "STATIC6") == -1)
+					retval = -1;
+			} else
+				retval++;
+		}
+		if (RS_STATE_RUNNING(ifp)) {
+			if (fd != NULL) {
+				if (send_interface1(fd, ifp,
+				    "ROUTERADVERT") == -1)
+					retval = -1;
+			} else
+				retval++;
+		}
 #ifdef DHCP6
-	if (D6_STATE_RUNNING(ifp)) {
-		d6 = D6_CSTATE(ifp);
-		if (send_interface1(fd, ifp, d6->reason) == -1)
-			retval = -1;
-	}
+		if (D6_STATE_RUNNING(ifp)) {
+			d6 = D6_CSTATE(ifp);
+			if (fd != NULL) {
+				if (send_interface1(fd, ifp, d6->reason) == -1)
+					retval = -1;
+			} else
+				retval++;
+		}
 #endif
+	}
 #endif
 
 	return retval;
