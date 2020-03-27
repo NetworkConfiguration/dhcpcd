@@ -1691,6 +1691,8 @@ again3:
 			dp++;
 		}
 		fflush(stdout);
+		if (nifaces != 1)
+			putchar('\n');
 	}
 
 out:
