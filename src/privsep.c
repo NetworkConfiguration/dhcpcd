@@ -233,8 +233,10 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 	if (callback(recv_ctx) == -1)
 		goto errexit;
 
-	freopen(_PATH_DEVNULL, "w", stdout);
-	freopen(_PATH_DEVNULL, "w", stderr);
+	if (!(ctx->options & (DHCPCD_TEST | DHCPCD_DEBUG))) {
+		freopen(_PATH_DEVNULL, "w", stdout);
+		freopen(_PATH_DEVNULL, "w", stderr);
+	}
 
 	if (flags & PSF_DROPPRIVS)
 		ps_dropprivs(ctx);
