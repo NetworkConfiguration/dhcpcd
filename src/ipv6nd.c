@@ -1582,7 +1582,7 @@ ipv6nd_env(FILE *fp, const struct interface *ifp)
 			    ia->prefix_vltime == 0)
 				continue;
 			if (efprintf(fp, "%s_addr%zu=%s",
-			    ndprefix, j++, ia->saddr) == -1)
+			    ndprefix, ++j, ia->saddr) == -1)
 				return -1;
 		}
 	}
