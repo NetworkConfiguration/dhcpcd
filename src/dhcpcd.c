@@ -1679,6 +1679,8 @@ again3:
 				} else if (dp[1] == 'd' &&
 				    isdigit((unsigned char)dp[2]))
 					print = true;
+				else
+					print = false;
 			} else
 				print = false;
 			while (dp < de && *dp != '\0') {
@@ -2018,9 +2020,11 @@ printpidfile:
 #endif
 		ctx.options |= DHCPCD_FORKED; /* avoid socket unlink */
 		if (!(ctx.options & DHCPCD_MASTER))
-			ctx.control_fd = control_open(argv[optind]);
+			ctx.control_fd = control_open(argv[optind],
+			    ctx.options & DHCPCD_DUMPLEASE);
 		if (ctx.control_fd == -1)
-			ctx.control_fd = control_open(NULL);
+			ctx.control_fd = control_open(NULL,
+			    ctx.options & DHCPCD_DUMPLEASE);
 		if (ctx.control_fd != -1) {
 			if (!(ctx.options & DHCPCD_DUMPLEASE))
 				loginfox("sending commands to dhcpcd process");
