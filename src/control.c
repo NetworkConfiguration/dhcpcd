@@ -193,7 +193,7 @@ control_handle_unpriv(void *arg)
 }
 
 static int
-make_sock(struct sockaddr_un *sa, const char *ifname, int unpriv)
+make_sock(struct sockaddr_un *sa, const char *ifname, bool unpriv)
 {
 	int fd;
 
@@ -318,12 +318,12 @@ control_stop(struct dhcpcd_ctx *ctx)
 }
 
 int
-control_open(const char *ifname)
+control_open(const char *ifname, bool unpriv)
 {
 	struct sockaddr_un sa;
 	int fd;
 
-	if ((fd = make_sock(&sa, ifname, 0)) != -1) {
+	if ((fd = make_sock(&sa, ifname, unpriv)) != -1) {
 		socklen_t len;
 
 		len = (socklen_t)SUN_LEN(&sa);
