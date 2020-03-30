@@ -69,7 +69,11 @@ _import-src:
 	${INSTALL} -d ${DESTDIR}/hooks
 	cp dhcpcd-run-hooks.in dhcpcd-run-hooks.8.in [0-9]* ${DESTDIR}/hooks
 	rm ${DESTDIR}/hooks/50-dhcpcd-compat
-	if [ `uname` = Linux ]; then rm ${DESTDIR}/hooks/50-ypbind.in; \
-		else rm ${DESTDIR}/hooks/50-yp.conf; fi
+	if [ `uname` = Linux ]; then \
+		rm ${DESTDIR}/hooks/50-ypbind.in; \
+	else \
+		rm ${DESTDIR}/hooks/00-linux; \
+		rm ${DESTDIR}/hooks/50-yp.conf; \
+	fi
 
 include ${TOP}/Makefile.inc
