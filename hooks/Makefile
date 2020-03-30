@@ -12,6 +12,7 @@ SCRIPTS=	01-test
 SCRIPTS+=	20-resolv.conf
 SCRIPTS+=	30-hostname
 SCRIPTS+=	${HOOKSCRIPTS}
+CLEANFILES+=	30-hostname
 
 # Some hooks should not be installed by default
 FILESDIR=	${DATADIR}/dhcpcd/hooks
