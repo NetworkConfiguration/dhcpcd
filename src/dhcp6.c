@@ -2503,10 +2503,8 @@ dhcp6_writelease(const struct interface *ifp)
 	logdebugx("%s: writing lease `%s'", ifp->name, state->leasefile);
 
 	fd = open(state->leasefile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-	if (fd == -1) {
-		logerr(__func__);
+	if (fd == -1)
 		return -1;
-	}
 	bytes = write(fd, state->new, state->new_len);
 	close(fd);
 	return bytes;
@@ -3162,7 +3160,8 @@ dhcp6_bind(struct interface *ifp, const char *op, const char *sfrom)
 			    ifp->name, state->expire);
 		rt_build(ifp->ctx, AF_INET6);
 		if (!confirmed && !timedout)
-			dhcp6_writelease(ifp);
+			if (dhcp6_writelease(ifp) == -1)
+				logerr("dhcp6_writelease: %s",state->leasefile);
 #ifndef SMALL
 		dhcp6_delegate_prefix(ifp);
 #endif
