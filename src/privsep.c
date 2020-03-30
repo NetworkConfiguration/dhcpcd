@@ -113,6 +113,13 @@ ps_init(struct dhcpcd_ctx *ctx)
 		return -1;
 	}
 
+	/* If we pickup the _dhcp user refuse the default directory */
+	if (strcmp(pw->pw_dir, "/var/empty") == 0) {
+		logerrx("refusing chroot: %s: %s", PRIVSEP_USER, pw->pw_dir);
+		errno = 0;
+		return -1;
+	}
+
 	/* Create the database directory. */
 	if (snprintf(path, sizeof(path), "%s%s", pw->pw_dir, DBDIR) == -1 ||
 	    ps_mkdir(path) == -1 ||
