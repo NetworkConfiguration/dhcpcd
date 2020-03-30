@@ -43,7 +43,7 @@ distclean: clean
 
 depend:
 
-proginstall: ${PROG} ${HOOKSCRIPTS}
+proginstall: ${PROG} ${SCRIPTS}
 	${INSTALL} -d ${DESTDIR}${BINDIR}
 	${INSTALL} -m ${BINMODE} ${PROG} ${DESTDIR}${BINDIR}
 	${INSTALL} -d ${DESTDIR}${SCRIPTSDIR}
@@ -51,7 +51,7 @@ proginstall: ${PROG} ${HOOKSCRIPTS}
 	# We need to remove the old MTU change script if we at all can.
 	rm -f ${DESTDIR}${SCRIPTSDIR}/10-mtu
 
-eginstall: ${EGHOOKSCRIPTS}
+eginstall: ${FILES}
 	${INSTALL} -d ${DESTDIR}${FILESDIR}
 	${INSTALL} -m ${NONBINMODE} ${FILES} ${DESTDIR}${FILESDIR}
 
@@ -61,7 +61,7 @@ maninstall: ${MAN8}
 
 install: proginstall eginstall maninstall
 
-import: ${HOOKSCRIPTS}
+import: ${SCRIPTS} ${FILES}
 	${INSTALL} -d /tmp/${DISTPREFIX}/dhcpcd-hooks
 	${INSTALL} -m ${NONBINMODE} ${SCRIPTS} /tmp/${DISTPREFIX}/dhcpcd-hooks
 	${INSTALL} -m ${NONBINMODE} ${FILES} /tmp/${DISTPREFIX}/dhcpcd-hooks
