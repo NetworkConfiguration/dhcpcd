@@ -8,7 +8,7 @@ MAN8=		dhcpcd-run-hooks.8
 CLEANFILES+=	dhcpcd-run-hooks.8
 
 SCRIPTSDIR=	${HOOKDIR}
-SCRIPTS=	01-test 02-dump
+SCRIPTS=	01-test
 SCRIPTS+=	20-resolv.conf
 SCRIPTS+=	30-hostname
 SCRIPTS+=	${HOOKSCRIPTS}
