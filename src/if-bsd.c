@@ -1565,6 +1565,7 @@ if_missfilter_apply(struct dhcpcd_ctx *ctx)
 	    ctx->rt_missfilter, (socklen_t)ctx->rt_missfilterlen);
 #else
 #warning kernel does not support RTM_MISS DST filtering
+	UNUSED(ctx);
 	errno = ENOTSUP;
 	return -1;
 #endif
