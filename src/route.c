@@ -729,7 +729,7 @@ rt_build(struct dhcpcd_ctx *ctx, int af)
 	}
 
 #ifdef BSD
-	if (if_missfilter_apply(ctx) == -1)
+	if (if_missfilter_apply(ctx) == -1 && errno != ENOTSUP)
 		logerr("if_missfilter_apply");
 #endif
 
