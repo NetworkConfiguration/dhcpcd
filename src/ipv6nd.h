@@ -112,6 +112,8 @@ const struct ipv6_addr *ipv6nd_iffindaddr(const struct interface *ifp,
     const struct in6_addr *addr, unsigned int flags);
 struct ipv6_addr *ipv6nd_findaddr(struct dhcpcd_ctx *,
     const struct in6_addr *, unsigned int);
+struct ipv6_addr *ipv6nd_iffindprefix(struct interface *,
+    const struct in6_addr *, uint8_t);
 ssize_t ipv6nd_free(struct interface *);
 void ipv6nd_expirera(void *arg);
 bool ipv6nd_hasralifetime(const struct interface *, bool);
