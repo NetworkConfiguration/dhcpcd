@@ -87,6 +87,7 @@ for x do
 	PKG_CONFIG) PKG_CONFIG=$var;;
 	--with-hook) HOOKSCRIPTS="$HOOKSCRIPTS${HOOKSCRIPTS:+ }$var";;
 	--with-hooks|HOOKSCRIPTS) HOOKSCRIPTS=$var; HOOKSET=true;;
+	--with-default-hostname) _DEFAULT_HOSTNAME=$var;;
 	--build) BUILD=$var;;
 	--host) HOST=$var; HOSTCC=$var-;;
 	--target) TARGET=$var;;
@@ -493,6 +494,16 @@ solaris*|sunos*)
 	echo "DHCPCD_SRCS+=	if-bsd.c" >>$CONFIG_MK
 	;;
 esac
+
+if [ -n "${_DEFAULT_HOSTNAME+x}" ]; then
+	DEFAULT_HOSTNAME="${_DEFAULT_HOSTNAME}"
+else
+	case "$OS" in
+	*|linux*)	DEFAULT_HOSTNAME="(none)";;
+	*)	DEFAULT_HOSTNAME="";;
+	esac
+fi
+echo "DEFAULT_HOSTNAME=		$DEFAULT_HOSTNAME" >>$CONFIG_MK
 
 if [ -z "$INET" -o "$INET" = yes ]; then
 	echo "Enabling INET support"

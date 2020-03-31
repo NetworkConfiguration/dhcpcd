@@ -17,7 +17,7 @@
 
 # If we used to set the hostname, but relinquish control of it, we should
 # reset to the default value.
-: ${hostname_default=}
+: ${hostname_default=@DEFAULT_HOSTNAME@}
 
 # Some systems don't have hostname(1)
 _hostname()
@@ -54,7 +54,7 @@ _hostname()
 is_default_hostname()
 {
 	case "$1" in
-	""|"(none)"|localhost|localhost.localdomain|"$hostname_default")
+	""|"$hostname_default"|localhost|localhost.localdomain)
 		return 0;;
 	esac
 	return 1
