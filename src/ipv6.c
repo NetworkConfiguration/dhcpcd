@@ -1509,17 +1509,26 @@ struct ipv6_addr *
 ipv6_newaddr(struct interface *ifp, const struct in6_addr *addr,
     uint8_t prefix_len, unsigned int flags)
 {
-	struct ipv6_addr *ia;
+	struct ipv6_addr *ia, *iaf;
 	char buf[INET6_ADDRSTRLEN];
 	const char *cbp;
 	bool tempaddr;
 	int addr_flags;
 
+#ifdef IPV6_AF_TEMPORARY
+	tempaddr = flags & IPV6_AF_TEMPORARY;
+#else
+	tempaddr = false;
+#endif
+
 	/* If adding a new DHCP / RA derived address, check current flags
 	 * from an existing address. */
-	ia = ipv6_iffindaddr(ifp, addr, 0);
-	if (ia != NULL) {
-		addr_flags = ia->addr_flags;
+	if (flags & IPV6_AF_AUTOCONF)
+		iaf = ipv6nd_iffindprefix(ifp, addr, prefix_len);
+	else
+		iaf = ipv6_iffindaddr(ifp, addr, 0);
+	if (iaf != NULL) {
+		addr_flags = iaf->addr_flags;
 		flags |= IPV6_AF_ADDED;
 	} else
 		addr_flags = IN6_IFF_TENTATIVE;
@@ -1540,21 +1549,19 @@ ipv6_newaddr(struct interface *ifp, const struct in6_addr *addr,
 	TAILQ_INIT(&ia->pd_pfxs);
 #endif
 
-#ifdef IPV6_AF_TEMPORARY
-	tempaddr = ia->flags & IPV6_AF_TEMPORARY;
-#else
-	tempaddr = false;
-#endif
-
 	if (prefix_len == 128)
 		goto makepfx;
 	else if (ia->flags & IPV6_AF_AUTOCONF && !tempaddr) {
 		ia->prefix = *addr;
-		ia->dadcounter = ipv6_makeaddr(&ia->addr, ifp,
-		                               &ia->prefix,
-					       ia->prefix_len);
-		if (ia->dadcounter == -1)
-			goto err;
+		if (iaf != NULL)
+			memcpy(&ia->addr, &iaf->addr, sizeof(ia->addr));
+		else {
+			ia->dadcounter = ipv6_makeaddr(&ia->addr, ifp,
+			                               &ia->prefix,
+						       ia->prefix_len);
+			if (ia->dadcounter == -1)
+				goto err;
+		}
 	} else if (ia->flags & IPV6_AF_RAPFX) {
 		ia->prefix = *addr;
 #ifdef __sun

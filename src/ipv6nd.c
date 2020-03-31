@@ -746,6 +746,40 @@ ipv6nd_findaddr(struct dhcpcd_ctx *ctx, const struct in6_addr *addr,
 	return NULL;
 }
 
+static struct ipv6_addr *
+ipv6nd_rapfindprefix(struct ra *rap,
+    const struct in6_addr *pfx, uint8_t pfxlen)
+{
+	struct ipv6_addr *ia;
+
+	TAILQ_FOREACH(ia, &rap->addrs, next) {
+		if (ia->prefix_vltime == 0)
+			continue;
+		if (ia->prefix_len == pfxlen &&
+		    IN6_ARE_ADDR_EQUAL(&ia->prefix, pfx))
+			break;
+	}
+	return ia;
+}
+
+struct ipv6_addr *
+ipv6nd_iffindprefix(struct interface *ifp,
+    const struct in6_addr *pfx, uint8_t pfxlen)
+{
+	struct ra *rap;
+	struct ipv6_addr *ia;
+
+	ia = NULL;
+	TAILQ_FOREACH(rap, ifp->ctx->ra_routers, next) {
+		if (rap->iface != ifp)
+			continue;
+		ia = ipv6nd_rapfindprefix(rap, pfx, pfxlen);
+		if (ia != NULL)
+			break;
+	}
+	return ia;
+}
+
 static void
 ipv6nd_removefreedrop_ra(struct ra *rap, int remove_ra, int drop_ra)
 {
@@ -1229,10 +1263,8 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 				logmessage(loglevel, "%s: pltime > vltime", ifp->name);
 				continue;
 			}
-			TAILQ_FOREACH(ia, &rap->addrs, next)
-				if (ia->prefix_len == pi.nd_opt_pi_prefix_len &&
-				    IN6_ARE_ADDR_EQUAL(&ia->prefix, &pi_prefix))
-					break;
+			ia = ipv6nd_rapfindprefix(rap,
+			    &pi_prefix, pi.nd_opt_pi_prefix_len);
 			if (ia == NULL) {
 				unsigned int flags;
 
