@@ -34,6 +34,7 @@ EMBEDDED=
 AUTH=
 POLL=
 SMALL=
+SANITIZE=no
 STATUSARG=
 
 DHCPCD_DEFS=dhcpcd-definitions.conf
@@ -104,6 +105,7 @@ for x do
 	--with-udev) DEV=yes; UDEV=yes;;
 	--without-udev) UDEV=no;;
 	--with-poll) POLL="$var";;
+	--sanitize) SANITIZEADDRESS="yes";;
 	--serviceexists) SERVICEEXISTS=$var;;
 	--servicecmd) SERVICECMD=$var;;
 	--servicestatus) SERVICESTATUS=$var;;
@@ -382,21 +384,6 @@ if [ -z "$DEBUG" -a -d .git ]; then
 fi
 if [ -n "$DEBUG" -a "$DEBUG" != no -a "$DEBUG" != false ]; then
 	echo "Adding debugging CFLAGS"
-	printf "Testing compiler supports address sanitisation ..."
-	cat <<EOF >_test.c
-int main(void) {
-	return 0;
-}
-EOF
-	if $CC -fsanitize=address _test.c -o _test 2>&3; then
-		echo "yes"
-		echo "# Compiler supports address sanitisation" >>$CONFIG_MK
-		echo "CFLAGS+=	-fsanitize=address" >>$CONFIG_MK
-		echo "LDFLAGS+=	-fsanitize=address" >>$CONFIG_MK
-	else
-		echo "no"
-	fi
-	rm -rf _test.c _test
 
 	cat <<EOF >>$CONFIG_MK
 CFLAGS+=	-g -Wall -Wextra -Wundef
@@ -408,6 +395,7 @@ CFLAGS+=	-Wcast-qual -Wwrite-strings
 CFLAGS+=	-Wformat=2
 CFLAGS+=	-Wpointer-sign -Wmissing-noreturn
 EOF
+
 	case "$OS" in
 	mirbsd*|openbsd*);; # OpenBSD has many redundant decs in system headers
 	bitrig*|solaris*|sunos*)
@@ -428,6 +416,23 @@ EOF
 	case "$CC" in
 	*gcc*)		echo "CFLAGS+=	-Wlogical-op" >>$CONFIG_MK;;
 	esac
+
+	if [ "$SANITIZEADDRESS" = yes ]; then
+		printf "Testing compiler supports address sanitisation ..."
+	cat <<EOF >_test.c
+int main(void) {
+	return 0;
+}
+EOF
+		if $CC -fsanitize=address _test.c -o _test 2>&3; then
+			echo "yes"
+			echo "CFLAGS+=	-fsanitize=address" >>$CONFIG_MK
+			echo "LDFLAGS+=	-fsanitize=address" >>$CONFIG_MK
+		else
+			echo "no"
+		fi
+		rm -rf _test.c _test
+	fi
 else
 	echo "CPPFLAGS+=	-DNDEBUG" >>$CONFIG_MK
 fi
