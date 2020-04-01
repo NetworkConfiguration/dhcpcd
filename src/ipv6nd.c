@@ -1016,6 +1016,30 @@ try_script:
 	}
 }
 
+static struct ipv6_addr *
+ipv6nd_findmarkstale(struct ra *rap, struct ipv6_addr *ia, bool mark)
+{
+	struct dhcpcd_ctx *ctx = ia->iface->ctx;
+	struct ra *rap2;
+	struct ipv6_addr *ia2;
+
+	TAILQ_FOREACH(rap2, ctx->ra_routers, next) {
+		if (rap2 == rap ||
+		    rap2->iface != rap->iface ||
+		    rap2->expired)
+			continue;
+		TAILQ_FOREACH(ia2, &rap2->addrs, next) {
+			if (!IN6_ARE_ADDR_EQUAL(&ia->prefix, &ia2->prefix))
+				continue;
+			if (!(ia2->flags & IPV6_AF_STALE))
+				return ia2;
+			if (mark)
+				ia2->prefix_pltime = 0;
+		}
+	}
+	return NULL;
+}
+
 #ifndef DHCP6
 /* If DHCPv6 is compiled out, supply a shim to provide an error message
  * if IPv6RA requests DHCPv6. */
@@ -1044,9 +1068,9 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 	struct nd_opt_mtu mtu;
 	struct nd_opt_rdnss rdnss;
 	uint8_t *p;
-	struct ra *rap, *rap2;
+	struct ra *rap;
 	struct in6_addr pi_prefix;
-	struct ipv6_addr *ia, *ia2;
+	struct ipv6_addr *ia;
 	struct dhcp_opt *dho;
 	bool new_rap, new_data, has_address;
 	uint32_t old_lifetime;
@@ -1394,23 +1418,9 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 	TAILQ_FOREACH(ia, &rap->addrs, next) {
 		if (!(ia->flags & IPV6_AF_STALE) || ia->prefix_pltime == 0)
 			continue;
-		TAILQ_FOREACH(rap2, ctx->ra_routers, next) {
-			if (rap2->iface != rap->iface || rap2->expired)
-				continue;
-			/* Other routers may have zeroed the address so it
-			 * won't be stale for them. */
-			TAILQ_FOREACH(ia2, &rap2->addrs, next) {
-				if (IN6_ARE_ADDR_EQUAL(&ia->prefix,
-				    &ia2->prefix) &&
-				    ia->prefix_pltime != 0 &&
-				    ia->prefix_vltime != 0)
-					break;
-			}
-			if (ia2 != NULL)
-				break;
-		}
-		if (rap2 != NULL && ia2 != NULL)
+		if (ipv6nd_findmarkstale(rap, ia, false) != NULL)
 			continue;
+		ipv6nd_findmarkstale(rap, ia, true);
 		logdebugx("%s: %s: became stale", ifp->name, ia->saddr);
 		ia->prefix_pltime = 0;
 	}
