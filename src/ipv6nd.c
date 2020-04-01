@@ -1422,6 +1422,9 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 			continue;
 		ipv6nd_findmarkstale(rap, ia, true);
 		logdebugx("%s: %s: became stale", ifp->name, ia->saddr);
+		/* Technically this violates RFC 4861 6.3.4,
+		 * but we need a mechanism to tell the kernel to
+		 * try and prefer other addresses. */
 		ia->prefix_pltime = 0;
 	}
 
