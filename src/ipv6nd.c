@@ -1395,8 +1395,10 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 		if (!(ia->flags & IPV6_AF_STALE) || ia->prefix_pltime == 0)
 			continue;
 		TAILQ_FOREACH(rap2, ctx->ra_routers, next) {
-			if (rap2->expired)
+			if (rap2->iface != rap->iface || rap2->expired)
 				continue;
+			/* Other routers may have zeroed the address so it
+			 * won't be stale for them. */
 			TAILQ_FOREACH(ia2, &rap2->addrs, next) {
 				if (IN6_ARE_ADDR_EQUAL(&ia->prefix,
 				    &ia2->prefix) &&
