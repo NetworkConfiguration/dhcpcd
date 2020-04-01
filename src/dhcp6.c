@@ -2416,6 +2416,9 @@ dhcp6_deprecateaddrs(struct ipv6_addrhead *addrs)
 			if (ia->prefix_vltime != 0)
 				logdebugx("%s: %s: became stale",
 				    ia->iface->name, ia->saddr);
+			/* Technically this violates RFC 8415 18.2.10.1,
+			 * but we need a mechanism to tell the kernel to
+			 * try and prefer other addresses. */
 			ia->prefix_pltime = 0;
 		} else if (ia->prefix_vltime == 0)
 			loginfox("%s: %s: no valid lifetime",
