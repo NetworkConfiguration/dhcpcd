@@ -1524,6 +1524,8 @@ if_missfilter0(struct dhcpcd_ctx *ctx, struct interface *ifp,
 #ifdef INET6
 	if (sa->sa_family == AF_INET6)
 		ifa_setscope(satosin6(sa), ifp->index);
+#else
+	UNUSED(ifp);
 #endif
 
 	cp = ctx->rt_missfilter + ctx->rt_missfilterlen;
