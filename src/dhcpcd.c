@@ -2169,7 +2169,7 @@ printpidfile:
 	}
 #endif
 
-#ifdef BSD
+#if defined(BSD) && defined(INET6)
 	/* Disable the kernel RTADV sysctl as early as possible. */
 	if (ctx.options & DHCPCD_IPV6 && ctx.options & DHCPCD_IPV6RS)
 		if_disable_rtadv();

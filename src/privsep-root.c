@@ -435,8 +435,10 @@ ps_root_dispatchcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 	struct dhcpcd_ctx *ctx = arg;
 	ssize_t err;
 
+#ifdef INET
 	err = ps_bpf_dispatch(ctx, psm, msg);
 	if (err == -1 && errno == ENOTSUP)
+#endif
 		err = ps_inet_dispatch(ctx, psm, msg);
 	return err;
 }
