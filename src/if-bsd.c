@@ -1730,14 +1730,14 @@ int
 ip6_temp_preferred_lifetime(__unused const char *ifname)
 {
 
-	return ND6_PRIV_PREFERRED_LIFETIME;
+	return TEMP_PREFERRED_LIFETIME;
 }
 
 int
 ip6_temp_valid_lifetime(__unused const char *ifname)
 {
 
-	return ND6_PRIV_VALID_LIFETIME;
+	return TEMP_VALID_LIFETIME;
 }
 
 #else /* __OpenBSD__ */
