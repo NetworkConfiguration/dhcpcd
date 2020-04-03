@@ -820,13 +820,11 @@ link_neigh(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 	rta = RTM_RTA(r);
 	len = RTM_PAYLOAD(nlm);
         if (r->ndm_family == AF_INET6) {
-		bool reachable;
+		bool unreachable;
 		struct in6_addr addr6;
 
-		reachable = (nlm->nlmsg_type == RTM_NEWNEIGH &&
-		    r->ndm_state &
-		    (NUD_REACHABLE | NUD_STALE | NUD_DELAY | NUD_PROBE |
-		     NUD_PERMANENT));
+		unreachable = (nlm->nlmsg_type == RTM_NEWNEIGH &&
+		    r->ndm_state & NUD_FAILED);
 		memset(&addr6, 0, sizeof(addr6));
 		for (; RTA_OK(rta, len); rta = RTA_NEXT(rta, len)) {
 			switch (rta->rta_type) {
@@ -836,7 +834,7 @@ link_neigh(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 				break;
 			}
 		}
-		ipv6nd_neighbour(ctx, &addr6, reachable);
+		ipv6nd_neighbour(ctx, &addr6, !unreachable);
 	}
 
 	return 0;
