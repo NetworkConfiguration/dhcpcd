@@ -556,16 +556,26 @@ fi
 if [ "$PRIVSEP" = yes ]; then
 	echo "Enabling Privilege Separation"
 
-	# Try and work out a user
+	# Try and work out system user
 	if [ -z "$PRIVSEP_USER" ]; then
-		for x in _dhcpcd _dhcp; do
-			if id "$x" 2>/dev/null >&2; then
+		printf "Detecting a suitable user for dhcpcd ... "
+		for x in _dhcpcd _dhcp dhcpcd; do
+			home=$(getent passwd $x 2>/dev/null | cut -d: -f6)
+			case "$home" in
+			/var/empty|"") ;;
+			*)
 				PRIVSEP_USER="$x"
-				break
-			fi
+				break;;
+			esac
 		done
 	fi
-	: ${PRIVSEP_USER:=_dhcpcd}
+	if [ -n "$PRIVSEP_USER" ]; then
+		echo "$PRIVSEP_USER"
+	else
+		PRIVSEP_USER=dhcpcd
+		echo
+		echo "No suitable user found for Priviledge Separation!"
+	fi
 
 	echo "CPPFLAGS+=	-DPRIVSEP" >>$CONFIG_MK
 	echo "#ifndef PRIVSEP_USER" >>$CONFIG_H
