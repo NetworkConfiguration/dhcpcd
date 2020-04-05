@@ -555,7 +555,18 @@ fi
 
 if [ "$PRIVSEP" = yes ]; then
 	echo "Enabling Privilege Separation"
+
+	# Try and work out a user
+	if [ -z "$PRIVSEP_USER" ]; then
+		for x in _dhcpcd _dhcp; do
+			if id "$x" 2>/dev/null >&2; then
+				PRIVSEP_USER="$x"
+				break
+			fi
+		done
+	fi
 	: ${PRIVSEP_USER:=_dhcpcd}
+
 	echo "CPPFLAGS+=	-DPRIVSEP" >>$CONFIG_MK
 	echo "#ifndef PRIVSEP_USER" >>$CONFIG_H
 	echo "#define PRIVSEP_USER		 \"$PRIVSEP_USER\"" >>$CONFIG_H
