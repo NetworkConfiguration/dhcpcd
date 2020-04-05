@@ -115,6 +115,7 @@ ps_init(struct dhcpcd_ctx *ctx)
 
 	/* If we pickup the _dhcp user refuse the default directory */
 	if (strcmp(pw->pw_dir, "/var/empty") == 0) {
+		ctx->options &= ~DHCPCD_PRIVSEP;
 		logerrx("refusing chroot: %s: %s", PRIVSEP_USER, pw->pw_dir);
 		errno = 0;
 		return -1;

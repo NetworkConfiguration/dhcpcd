@@ -2130,12 +2130,7 @@ printpidfile:
 	freopen(_PATH_DEVNULL, "r", stdin);
 
 #ifdef PRIVSEP
-	if (ps_init(&ctx) == -1) {
-		if (errno != 0) {
-			logerr("ps_init");
-			goto exit_failure;
-		}
-	} else
+	if (ps_init(&ctx) == 0)
 		script_runchroot(&ctx, ifo->script);
 #endif
 
