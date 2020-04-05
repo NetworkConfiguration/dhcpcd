@@ -97,32 +97,6 @@ _confinstall:
 	# Install a new default config if not present
 	test -e ${DESTDIR}${SYSCONFDIR}/dhcpcd.conf || \
 		${INSTALL} -m ${CONFMODE} dhcpcd.conf ${DESTDIR}${SYSCONFDIR}
-	# Attempt to move files from sysconfig to dbdir
-	if [ ! -e ${DESTDIR}${DBDIR}/duid -a \
-	    -e ${DESTDIR}${SYSCONFDIR}/dhcpcd.duid ]; \
-	then \
-		mv ${DESTDIR}${SYSCONFDIR}/dhcpcd.duid \
-			${DESTDIR}${DBDIR}/duid; \
-	fi
-	if [ ! -e ${DESTDIR}${DBDIR}/secret -a \
-	    -e ${DESTDIR}${SYSCONFDIR}/dhcpcd.secret ]; \
-	then \
-		mv ${DESTDIR}${SYSCONFDIR}/dhcpcd.secret \
-			${DESTDIR}${DBDIR}/secret; \
-	fi
-	# Move leases to new location
-	for lease in ${DESTDIR}${DBDIR}/../dhcpcd-*.lease*; do \
-		[ -f "$$lease" ] || continue; \
-		newlease=$$(basename "$$lease" | ${SED} -e "s/dhcpcd-//"); \
-		mv "$$lease" ${DESTDIR}${DBDIR}/"$$newlease"; \
-	done
-	# Move RDM monotonic to new location
-	if [ ! -e ${DESTDIR}${DBDIR}/rdm_monotonic -a \
-	    -e ${DESTDIR}${DBDIR}/../dhcpcd-rdm.monotonic ]; \
-	then \
-		mv ${DESTDIR}${DBDIR}/../dhcpcd-rdm.monotonic \
-			${DESTDIR}${DBDIR}/rdm_monotonic; \
-	fi
 	
 eginstall:
 
