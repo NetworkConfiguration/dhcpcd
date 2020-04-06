@@ -227,7 +227,9 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 		logerr("%s: eloop_signal_set_cb", __func__);
 		goto errexit;
 	}
-	if (eloop_signal_mask(ctx->eloop, &ctx->sigset) == -1) {
+
+	/* ctx->sigset aready has the initial sigmask set in main() */
+	if (eloop_signal_mask(ctx->eloop, NULL) == -1) {
 		logerr("%s: eloop_signal_mask", __func__);
 		goto errexit;
 	}
