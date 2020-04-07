@@ -1037,7 +1037,7 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 	if (ia->addr_flags & IN6_IFF_TENTATIVE)
 		ifa.ifra_flags |= IN6_IFF_TENTATIVE;
 #endif
-#ifdef IPV6_MANGETEMPADDR
+#ifdef IPV6_MANAGETEMPADDR
 	if (ia->flags & IPV6_AF_TEMPORARY)
 		ifa.ifra_flags |= IN6_IFF_TEMPORARY;
 #endif
