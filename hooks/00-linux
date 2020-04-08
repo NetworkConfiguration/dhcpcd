@@ -1,7 +1,13 @@
 # setup chroot mounts
 
 if [ "$reason" = CHROOT ] && [ -n "$chroot" ]; then
-	for d in /dev /proc /sys /run/udev; do
+	# Special case /dev/log
+	if [ -h /dev/log ]; then
+		devlogdir=$(dirname $(readlink /dev/log))
+	else
+		devlogdir=
+	fi
+	for d in /dev /proc /sys /run/udev $devlogdir; do
 		[ -d "$d" ] || continue
 		if ! mountpoint -q "$chroot$d"; then
 			mkdir -p "$chroot$d"
