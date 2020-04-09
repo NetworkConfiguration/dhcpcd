@@ -349,8 +349,11 @@ rt_new0(struct dhcpcd_ctx *ctx)
 #endif
 	} else
 #endif
-	if ((rt = calloc(1, sizeof(*rt))) == NULL)
+	if ((rt = malloc(sizeof(*rt))) == NULL) {
 		logerr(__func__);
+		return NULL;
+	}
+	memset(rt, 0, sizeof(*rt));
 	return rt;
 }
 
