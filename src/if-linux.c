@@ -34,6 +34,7 @@
 #include <sys/param.h>
 #include <sys/stat.h>
 
+#include <linux/icmpv6.h>
 #include <linux/if_addr.h>
 #include <linux/if_link.h>
 #include <linux/if_packet.h>
@@ -1062,6 +1063,14 @@ add_attr_l(struct nlmsghdr *n, unsigned short maxlen, unsigned short type,
 }
 
 static int
+add_attr_8(struct nlmsghdr *n, unsigned short maxlen, unsigned short type,
+    uint8_t data)
+{
+
+	return add_attr_l(n, maxlen, type, &data, sizeof(data));
+}
+
+static int
 add_attr_32(struct nlmsghdr *n, unsigned short maxlen, unsigned short type,
     uint32_t data)
 {
@@ -1504,6 +1513,26 @@ if_route(unsigned char cmd, const struct rt *rt)
 			    RTA_DATA(metrics),
 			    (unsigned short)RTA_PAYLOAD(metrics));
 		}
+
+		if (rt->rt_dflags & RTDF_RA) {
+			uint8_t pref;
+
+			switch(rt->rt_pref) {
+			case RTPREF_LOW:
+				pref = ICMPV6_ROUTER_PREF_LOW;
+				break;
+			case RTPREF_MEDIUM:
+				pref = ICMPV6_ROUTER_PREF_MEDIUM;
+				break;
+			case RTPREF_HIGH:
+				pref = ICMPV6_ROUTER_PREF_HIGH;
+				break;
+			default:
+				pref = ICMPV6_ROUTER_PREF_INVALID;
+				break;
+			}
+			add_attr_8(&nlm.hdr, sizeof(nlm), RTA_PREF, pref);
+		}
 	}
 
 	if (!sa_is_loopback(&rt->rt_gateway))
@@ -1877,14 +1906,6 @@ struct nlml
 	struct ifinfomsg i;
 	char buffer[32];
 };
-
-static int
-add_attr_8(struct nlmsghdr *n, unsigned short maxlen, unsigned short type,
-    uint8_t data)
-{
-
-	return add_attr_l(n, maxlen, type, &data, sizeof(data));
-}
 
 static struct rtattr *
 add_attr_nest(struct nlmsghdr *n, unsigned short maxlen, unsigned short type)

@@ -2253,6 +2253,9 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 			rt = inet6_makeprefix(rap->iface, rap, addr);
 			if (rt) {
 				rt->rt_dflags |= RTDF_RA;
+#ifdef HAVE_ROUTE_PREF
+				rt->rt_pref = ipv6nd_rtpref(rap);
+#endif
 				rt_proto_add(routes, rt);
 			}
 		}
@@ -2264,6 +2267,9 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 		if (rt == NULL)
 			continue;
 		rt->rt_dflags |= RTDF_RA;
+#ifdef HAVE_ROUTE_PREF
+		rt->rt_pref = ipv6nd_rtpref(rap);
+#endif
 		rt_proto_add(routes, rt);
 	}
 	return 0;
