@@ -336,6 +336,7 @@ ipv6_makestableprivate(struct in6_addr *addr,
 	return r;
 }
 
+#ifdef IPV6_AF_TEMPORARY
 static int
 ipv6_maketemporaryaddress(struct in6_addr *addr,
     const struct in6_addr *prefix, int prefix_len,
@@ -362,6 +363,7 @@ again:
 		goto again;
 	return 0;
 }
+#endif
 
 int
 ipv6_makeaddr(struct in6_addr *addr, struct interface *ifp,
