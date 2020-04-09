@@ -1907,6 +1907,7 @@ struct nlml
 	char buffer[32];
 };
 
+#ifdef HAVE_IN6_ADDR_GEN_MODE_NONE
 static struct rtattr *
 add_attr_nest(struct nlmsghdr *n, unsigned short maxlen, unsigned short type)
 {
@@ -1923,6 +1924,7 @@ add_attr_nest_end(struct nlmsghdr *n, struct rtattr *nest)
 
 	nest->rta_len = (unsigned short)((char *)NLMSG_TAIL(n) - (char *)nest);
 }
+#endif
 
 static int
 if_disable_autolinklocal(struct dhcpcd_ctx *ctx, unsigned int ifindex)
