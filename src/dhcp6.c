@@ -2708,7 +2708,7 @@ dhcp6_ifdelegateaddr(struct interface *ifp, struct ipv6_addr *prefix,
 		vl |= sla->suffix;
 		be64enc(daddr.s6_addr + 8, vl);
 	} else {
-		dadcounter = ipv6_makeaddr(&daddr, ifp, &addr, pfxlen);
+		dadcounter = ipv6_makeaddr(&daddr, ifp, &addr, pfxlen, 0);
 		if (dadcounter == -1) {
 			logerrx("%s: error adding slaac to prefix_len %d",
 			    ifp->name, pfxlen);
