@@ -2128,7 +2128,7 @@ printpidfile:
 	}
 #endif
 
-	logdebugx(PACKAGE "-" VERSION " starting");
+	loginfox(PACKAGE "-" VERSION " starting");
 	freopen(_PATH_DEVNULL, "r", stdin);
 
 #ifdef PRIVSEP
