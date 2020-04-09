@@ -781,8 +781,10 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 			 * maybe on a new network. */
 			ipv6nd_startexpire(ifp);
 #endif
+#ifdef IPV6_MANAGETEMPADDR
 			/* RFC4941 Section 3.5 */
 			ipv6_regentempaddrs(ifp);
+#endif
 #endif
 			dhcpcd_startinterface(ifp);
 		}
