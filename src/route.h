@@ -61,7 +61,10 @@
 #endif
 
 #ifdef __linux__
-# define HAVE_ROUTE_PREF
+# include <linux/version.h> /* RTA_PREF is only an enum.... */
+# if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0)
+#  define HAVE_ROUTE_PREF
+# endif
 #endif
 
 #if defined(__OpenBSD__) || defined (__sun)
