@@ -300,9 +300,6 @@ struct ipv6_addr *ipv6_createtempaddr(struct ipv6_addr *,
 struct ipv6_addr *ipv6_settemptime(struct ipv6_addr *, int);
 void ipv6_addtempaddrs(struct interface *, const struct timespec *);
 void ipv6_regentempaddrs(void *);
-#else
-#define ipv6_gentempifid(a) {}
-#define ipv6_settempstale(a) {}
 #endif
 
 int ipv6_start(struct interface *);
