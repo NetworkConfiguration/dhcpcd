@@ -782,7 +782,7 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 			ipv6nd_startexpire(ifp);
 #endif
 			/* RFC4941 Section 3.5 */
-			ipv6_gentempifid(ifp);
+			ipv6_regentempaddrs(ifp);
 #endif
 			dhcpcd_startinterface(ifp);
 		}
