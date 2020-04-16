@@ -2073,10 +2073,13 @@ ipv6_regentempaddrs(void *arg)
 	struct ipv6_state *state;
 	struct ipv6_addr *ia;
 
+	state = IPV6_STATE(ifp);
+	if (state == NULL)
+		return;
+
 	ipv6_regen_desync(ifp, true);
 
 	clock_gettime(CLOCK_MONOTONIC, &tv);
-	state = IPV6_STATE(ifp);
 	TAILQ_FOREACH(ia, &state->addrs, next) {
 		if (ia->flags & IPV6_AF_TEMPORARY &&
 		    !(ia->flags & IPV6_AF_STALE))
