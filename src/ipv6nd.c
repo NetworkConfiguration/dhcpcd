@@ -1338,7 +1338,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 #ifdef IPV6_MANAGETEMPADDR
 			/* RFC4941 Section 3.3.3 */
 			if (ia->flags & IPV6_AF_AUTOCONF &&
-			    ip6_use_tempaddr(ia->iface->name) &&
+			    ia->iface->options->options & DHCPCD_SLAACTEMP &&
 			    IA6_CANAUTOCONF(ia))
 			{
 				if (!new_ia) {
