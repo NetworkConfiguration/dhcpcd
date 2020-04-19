@@ -1946,7 +1946,7 @@ if_setup_inet6(const struct interface *ifp)
 		logerr("%s: set_ifxflags", ifp->name);
 #endif
 
-#if defined(IPV6CTL_ACCEPT_RTADV) || defined(ND6_IFF_ACCEPT_RTADV)
+#ifdef SIOCSRTRFLUSH_IN6
 	/* Flush the kernel knowledge of advertised routers
 	 * and prefixes so the kernel does not expire prefixes
 	 * and default routes we are trying to own. */
@@ -1957,12 +1957,14 @@ if_setup_inet6(const struct interface *ifp)
 		strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
 		if (if_ioctl6(ifp->ctx, SIOCSRTRFLUSH_IN6,
 		    &ifr, sizeof(ifr)) == -1 &&
-		    errno != ENOTSUP)
-			logwarn("SIOCSRTRFLUSH_IN6");
+		    errno != ENOTSUP && errno != ENOTTY)
+			logwarn("SIOCSRTRFLUSH_IN6 %d", errno);
+#ifdef SIOCSPFXFLUSH_IN6
 		if (if_ioctl6(ifp->ctx, SIOCSPFXFLUSH_IN6,
 		    &ifr, sizeof(ifr)) == -1 &&
-		    errno != ENOTSUP)
+		    errno != ENOTSUP && errno != ENOTTY)
 			logwarn("SIOCSPFXFLUSH_IN6");
+#endif
 	}
 #endif
 }
