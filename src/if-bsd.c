@@ -1626,7 +1626,6 @@ if_machinearch(char *str, size_t len)
 
 #ifdef INET6
 #if (defined(IPV6CTL_ACCEPT_RTADV) && !defined(ND6_IFF_ACCEPT_RTADV)) || \
-    defined(IPV6CTL_USETEMPADDR) || defined(IPV6CTL_TEMPVLTIME) || \
     defined(IPV6CTL_FORWARDING)
 #define get_inet6_sysctl(code) inet6_sysctl(code, 0, 0)
 #define set_inet6_sysctl(code, val) inet6_sysctl(code, val, 1)
@@ -1687,8 +1686,7 @@ if_applyra(const struct ra *rap)
 #endif
 }
 
-#ifdef IPV6_MANAGETEMPADDR
-#if !defined(IPV6CTL_TEMPVLTIME) && !defined(__OpenBSD__)
+#ifndef IPV6CTL_FORWARDING
 #define get_inet6_sysctlbyname(code) inet6_sysctlbyname(code, 0, 0)
 #define set_inet6_sysctlbyname(code, val) inet6_sysctlbyname(code, val, 1)
 static int
@@ -1706,81 +1704,6 @@ inet6_sysctlbyname(const char *name, int val, int action)
 		return -1;
 	return val;
 }
-#endif
-
-#ifdef __OpenBSD__
-int
-ip6_use_tempaddr(const char *ifname)
-{
-	int s, r;
-	struct ifreq ifr;
-
-	s = socket(PF_INET6, SOCK_DGRAM, 0); /* XXX Not efficient */
-	if (s == -1)
-		return -1;
-	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
-	r = ioctl(s, SIOCGIFXFLAGS, &ifr);
-	close(s);
-	if (r == -1)
-		return -1;
-	return ifr.ifr_flags & IFXF_INET6_NOPRIVACY ? 0 : 1;
-}
-
-int
-ip6_temp_preferred_lifetime(__unused const char *ifname)
-{
-
-	return TEMP_PREFERRED_LIFETIME;
-}
-
-int
-ip6_temp_valid_lifetime(__unused const char *ifname)
-{
-
-	return TEMP_VALID_LIFETIME;
-}
-
-#else /* __OpenBSD__ */
-
-int
-ip6_use_tempaddr(__unused const char *ifname)
-{
-	int val;
-
-#ifdef IPV6CTL_USETEMPADDR
-	val = get_inet6_sysctl(IPV6CTL_USETEMPADDR);
-#else
-	val = get_inet6_sysctlbyname("net.inet6.ip6.use_tempaddr");
-#endif
-	return val == -1 ? 0 : val;
-}
-
-int
-ip6_temp_preferred_lifetime(__unused const char *ifname)
-{
-	int val;
-
-#ifdef IPV6CTL_TEMPPLTIME
-	val = get_inet6_sysctl(IPV6CTL_TEMPPLTIME);
-#else
-	val = get_inet6_sysctlbyname("net.inet6.ip6.temppltime");
-#endif
-	return val < 0 ? TEMP_PREFERRED_LIFETIME : val;
-}
-
-int
-ip6_temp_valid_lifetime(__unused const char *ifname)
-{
-	int val;
-
-#ifdef IPV6CTL_TEMPVLTIME
-	val = get_inet6_sysctl(IPV6CTL_TEMPVLTIME);
-#else
-	val = get_inet6_sysctlbyname("net.inet6.ip6.tempvltime");
-#endif
-	return val < 0 ? TEMP_VALID_LIFETIME : val;
-}
-#endif /* !__OpenBSD__ */
 #endif
 
 int

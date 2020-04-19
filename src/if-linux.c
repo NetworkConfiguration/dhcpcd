@@ -2019,48 +2019,6 @@ if_applyra(const struct ra *rap)
 	return error;
 }
 
-#ifdef IPV6_MANAGETEMPADDR
-int
-ip6_use_tempaddr(const char *ifname)
-{
-	char path[256];
-	int val;
-
-	if (ifname == NULL)
-		ifname = "all";
-	snprintf(path, sizeof(path), "%s/%s/use_tempaddr", p_conf, ifname);
-	val = check_proc_int(path);
-	return val == -1 ? 0 : val;
-}
-
-int
-ip6_temp_preferred_lifetime(const char *ifname)
-{
-	char path[256];
-	int val;
-
-	if (ifname == NULL)
-		ifname = "all";
-	snprintf(path, sizeof(path), "%s/%s/temp_prefered_lft", p_conf,
-	    ifname);
-	val = check_proc_int(path);
-	return val < 0 ? TEMP_PREFERRED_LIFETIME : val;
-}
-
-int
-ip6_temp_valid_lifetime(const char *ifname)
-{
-	char path[256];
-	int val;
-
-	if (ifname == NULL)
-		ifname = "all";
-	snprintf(path, sizeof(path), "%s/%s/temp_valid_lft", p_conf, ifname);
-	val = check_proc_int(path);
-	return val < 0 ? TEMP_VALID_LIFETIME : val;
-}
-#endif /* IPV6_MANAGETEMPADDR */
-
 int
 ip6_forwarding(const char *ifname)
 {
