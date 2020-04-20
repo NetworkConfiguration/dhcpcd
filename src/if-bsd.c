@@ -1015,27 +1015,20 @@ if_ioctl6(struct dhcpcd_ctx *ctx, unsigned long req, void *data, size_t len)
 int
 if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 {
-	struct in6_aliasreq ifa;
+	struct in6_aliasreq ifa = { .ifra_flags = 0 };
 	struct in6_addr mask;
 	struct dhcpcd_ctx *ctx = ia->iface->ctx;
 
-	memset(&ifa, 0, sizeof(ifa));
 	strlcpy(ifa.ifra_name, ia->iface->name, sizeof(ifa.ifra_name));
-	/*
-	 * We should not set IN6_IFF_TENTATIVE as the kernel should be
-	 * able to work out if it's a new address or not.
-	 *
-	 * We should set IN6_IFF_AUTOCONF, but the kernel won't let us.
-	 * This is probably a safety measure, but still it's not entirely right
-	 * either.
-	 */
-#if 0
-	if (ia->autoconf)
-		ifa.ifra_flags |= IN6_IFF_AUTOCONF;
-#endif
 #if defined(__FreeBSD__) || defined(__DragonFly__)
+	/* This is a bug - the kernel should work this out. */
 	if (ia->addr_flags & IN6_IFF_TENTATIVE)
 		ifa.ifra_flags |= IN6_IFF_TENTATIVE;
+#endif
+// #if (defined(__NetBSD__) && __NetBSD_Version__ >= 999005700) ||
+#if    (defined(__OpenBSD__) && OpenBSD >= 201605)
+	if (ia->flags & IPV6_AF_AUTOCONF)
+		ifa.ifra_flags |= IN6_IFF_AUTOCONF;
 #endif
 #ifdef IPV6_MANAGETEMPADDR
 	if (ia->flags & IPV6_AF_TEMPORARY)
