@@ -3494,8 +3494,9 @@ dhcp_packet(struct interface *ifp, uint8_t *data, size_t len)
 			    __func__, ifp->name);
 			return;
 		}
-		data += fl;
 		len -= fl;
+		/* Move the data to avoid alignment errors. */
+		memmove(data, data + fl, len);
 	}
 
 	/* Validate filter. */
