@@ -3453,12 +3453,16 @@ dhcp_readbpf(void *arg)
 			}
 			break;
 		}
-		if (bytes < fl) {
-			logerrx("%s: %s: short frame header",
-			    __func__, ifp->name);
-			break;
+		if (fl != 0) {
+			if (bytes < fl) {
+				logerrx("%s: %s: short frame header",
+				    __func__, ifp->name);
+				break;
+			}
+			bytes -= fl;
+			memmove(buf, buf + fl, (size_t)bytes);
 		}
-		dhcp_packet(ifp, buf + fl, (size_t)(bytes - fl));
+		dhcp_packet(ifp, buf, (size_t)bytes);
 		/* Check we still have a state after processing. */
 		if ((state = D_STATE(ifp)) == NULL)
 			break;
