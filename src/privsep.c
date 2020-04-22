@@ -327,7 +327,7 @@ ps_start(struct dhcpcd_ctx *ctx)
 
 	/* No point in spawning the generic network listener if we're
 	 * not going to use it. */
-	if (!(ctx->options & (DHCPCD_MASTER | DHCPCD_IPV6RS)))
+	if (!(ctx->options & (DHCPCD_MASTER | DHCPCD_IPV6)))
 		goto started;
 
 	switch (pid = ps_inet_start(ctx)) {
