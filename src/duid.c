@@ -130,7 +130,7 @@ duid_make(void *d, const struct interface *ifp, uint16_t type)
 	u16 = htons(type);
 	memcpy(p, &u16, sizeof(u16));
 	p += sizeof(u16);
-	u16 = htons(ifp->family);
+	u16 = htons(ifp->hwtype);
 	memcpy(p, &u16, sizeof(u16));
 	p += sizeof(u16);
 	if (type == DUID_LLT) {

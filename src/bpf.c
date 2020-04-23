@@ -85,7 +85,7 @@ size_t
 bpf_frame_header_len(const struct interface *ifp)
 {
 
-	switch (ifp->family) {
+	switch (ifp->hwtype) {
 	case ARPHRD_ETHER:
 		return sizeof(struct ether_header);
 	default:
@@ -98,7 +98,7 @@ bpf_frame_header_src(const struct interface *ifp, void *fh, size_t *len)
 {
 	uint8_t *f = fh;
 
-	switch (ifp->family) {
+	switch (ifp->hwtype) {
 	case ARPHRD_ETHER:
 		*len = sizeof(((struct ether_header *)0)->ether_shost);
 		return f + offsetof(struct ether_header, ether_shost);
@@ -114,7 +114,7 @@ bpf_frame_header_dst(const struct interface *ifp, void *fh, size_t *len)
 {
 	uint8_t *f = fh;
 
-	switch (ifp->family) {
+	switch (ifp->hwtype) {
 	case ARPHRD_ETHER:
 		*len = sizeof(((struct ether_header *)0)->ether_dhost);
 		return f + offsetof(struct ether_header, ether_dhost);
@@ -132,7 +132,7 @@ int
 bpf_frame_bcast(const struct interface *ifp, const char *frame)
 {
 
-	switch (ifp->family) {
+	switch (ifp->hwtype) {
 	case ARPHRD_ETHER:
 		return memcmp(frame +
 		    offsetof(struct ether_header, ether_dhost),
@@ -322,7 +322,7 @@ bpf_send(const struct interface *ifp, int fd, uint16_t protocol,
 	struct iovec iov[2];
 	struct ether_header eh;
 
-	switch(ifp->family) {
+	switch(ifp->hwtype) {
 	case ARPHRD_ETHER:
 		memset(&eh.ether_dhost, 0xff, sizeof(eh.ether_dhost));
 		memcpy(&eh.ether_shost, ifp->hwaddr, sizeof(eh.ether_shost));
@@ -451,7 +451,7 @@ static const struct bpf_insn bpf_arp_ether [] = {
 	/* Load frame header length into X */
 	BPF_STMT(BPF_LDX + BPF_W + BPF_IMM, sizeof(struct ether_header)),
 
-	/* Make sure the hardware family matches. */
+	/* Make sure the hardware type matches. */
 	BPF_STMT(BPF_LD + BPF_H + BPF_IND, offsetof(struct arphdr, ar_hrd)),
 	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, ARPHRD_ETHER, 1, 0),
 	BPF_STMT(BPF_RET + BPF_K, 0),
@@ -503,7 +503,7 @@ bpf_arp(struct interface *ifp, int fd)
 
 	bp = bpf;
 	/* Check frame header. */
-	switch(ifp->family) {
+	switch(ifp->hwtype) {
 	case ARPHRD_ETHER:
 		memcpy(bp, bpf_arp_ether, sizeof(bpf_arp_ether));
 		bp += BPF_ARP_ETHER_LEN;
@@ -653,7 +653,7 @@ bpf_bootp(struct interface *ifp, int fd)
 
 	bp = bpf;
 	/* Check frame header. */
-	switch(ifp->family) {
+	switch(ifp->hwtype) {
 #ifdef ARPHRD_NONE
 	case ARPHRD_NONE:
 		memcpy(bp, bpf_bootp_none, sizeof(bpf_bootp_none));

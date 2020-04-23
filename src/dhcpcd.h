@@ -82,7 +82,7 @@ struct interface {
 	unsigned int index;
 	unsigned int active;
 	unsigned int flags;
-	sa_family_t family;
+	uint16_t hwtype; /* ARPHRD_ETHER for example */
 	unsigned char hwaddr[HWADDR_LEN];
 	uint8_t hwlen;
 	unsigned short vlanid;

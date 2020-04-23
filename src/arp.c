@@ -76,7 +76,7 @@ arp_request(const struct interface *ifp,
 	uint8_t *p;
 	const struct iarp_state *state;
 
-	ar.ar_hrd = htons(ifp->family);
+	ar.ar_hrd = htons(ifp->hwtype);
 	ar.ar_pro = htons(ETHERTYPE_IP);
 	ar.ar_hln = ifp->hwlen;
 	ar.ar_pln = sizeof(tip->s_addr);
@@ -197,8 +197,8 @@ static bool
 arp_validate(const struct interface *ifp, struct arphdr *arp)
 {
 
-	/* Families must match */
-	if (arp->ar_hrd != htons(ifp->family))
+	/* Address type must match */
+	if (arp->ar_hrd != htons(ifp->hwtype))
 		return false;
 
 	/* Protocol must be IP. */
