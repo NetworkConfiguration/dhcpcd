@@ -257,8 +257,7 @@ void dhcpcd_linkoverflow(struct dhcpcd_ctx *);
 int dhcpcd_handleargs(struct dhcpcd_ctx *, struct fd_list *, int, char **);
 void dhcpcd_handlecarrier(struct dhcpcd_ctx *, int, unsigned int, const char *);
 int dhcpcd_handleinterface(void *, int, const char *);
-void dhcpcd_handlehwaddr(struct dhcpcd_ctx *, const char *,
-    const void *, uint8_t);
+void dhcpcd_handlehwaddr(struct interface *, uint16_t, const void *, uint8_t);
 void dhcpcd_dropinterface(struct interface *, const char *);
 int dhcpcd_selectprofile(struct interface *, const char *);
 

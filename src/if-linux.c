@@ -931,12 +931,13 @@ link_netlink(struct dhcpcd_ctx *ctx, void *arg, struct nlmsghdr *nlm)
 	}
 
 	/* Re-read hardware address and friends */
-	if (!(ifi->ifi_flags & IFF_UP) && hwaddr) {
-		uint8_t l;
+	if (!(ifi->ifi_flags & IFF_UP)) {
+		void *hwa = hwaddr != NULL ? RTA_DATA(hwaddr) : NULL;
+		uint8_t hwl = l2addr_len(ifi->ifi_type);
 
-		l = l2addr_len(ifi->ifi_type);
-		if (hwaddr->rta_len == RTA_LENGTH(l))
-			dhcpcd_handlehwaddr(ctx, ifn, RTA_DATA(hwaddr), l);
+		if (hwaddr != NULL && hwaddr->rta_len != RTA_LENGTH(hwl))
+			hwa = NULL;
+		dhcpcd_handlehwaddr(ifp, ifi->ifi_type, hwa, hwl);
 	}
 
 	dhcpcd_handlecarrier(ctx,
