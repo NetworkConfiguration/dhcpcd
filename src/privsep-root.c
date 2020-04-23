@@ -406,7 +406,13 @@ ps_root_startcb(void *arg)
 {
 	struct dhcpcd_ctx *ctx = arg;
 
-	setproctitle("[privileged actioneer]");
+	if (ctx->options & DHCPCD_MASTER)
+		setproctitle("[privileged actioneer]");
+	else
+		setproctitle("[privileged actioneer] %s%s%s",
+		    ctx->ifv[0],
+		    ctx->options & DHCPCD_IPV4 ? " [ip4]" : "",
+		    ctx->options & DHCPCD_IPV6 ? " [ip6]" : "");
 	ctx->ps_root_pid = getpid();
 	return 0;
 }

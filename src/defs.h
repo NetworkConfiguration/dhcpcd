@@ -60,7 +60,7 @@
 # define PIDFILE		RUNDIR "/%s%s%spid"
 #endif
 #ifndef CONTROLSOCKET
-# define CONTROLSOCKET		RUNDIR "/%s%ssock"
+# define CONTROLSOCKET		RUNDIR "/%s%s%ssock"
 #endif
 #ifndef UNPRIVSOCKET
 # define UNPRIVSOCKET		RUNDIR "/unpriv.sock"
