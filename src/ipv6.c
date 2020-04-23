@@ -1406,7 +1406,7 @@ ipv6_addlinklocal(struct interface *ifp)
 
 	/* Check sanity before malloc */
 	if (!(ifp->options->options & DHCPCD_SLAACPRIVATE)) {
-		switch (ifp->family) {
+		switch (ifp->hwtype) {
 		case ARPHRD_ETHER:
 			/* Check for a valid hardware address */
 			if (ifp->hwlen != 6 && ifp->hwlen != 8) {
@@ -1446,7 +1446,7 @@ nextslaacprivate:
 		ap->dadcounter = dadcounter;
 	} else {
 		memcpy(ap->addr.s6_addr, ap->prefix.s6_addr, 8);
-		switch (ifp->family) {
+		switch (ifp->hwtype) {
 		case ARPHRD_ETHER:
 			if (ifp->hwlen == 6) {
 				ap->addr.s6_addr[ 8] = ifp->hwaddr[0];

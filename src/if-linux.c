@@ -438,7 +438,7 @@ int
 if_setmac(struct interface *ifp, void *mac, uint8_t maclen)
 {
 	struct ifreq ifr = {
-		.ifr_hwaddr.sa_family = ifp->family,
+		.ifr_hwaddr.sa_family = ifp->hwtype,
 	};
 
 	if (ifp->hwlen != maclen || maclen > sizeof(ifr.ifr_hwaddr.sa_data)) {

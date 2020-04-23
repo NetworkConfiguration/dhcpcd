@@ -485,13 +485,9 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 		if_noconf = ((argc == 0 || argc == -1) && ctx->ifac == 0 &&
 		    !if_hasconf(ctx, spec.devname));
 
-		/* Don't allow loopback or pointopoint unless explicit.
-		 * Don't allow some reserved interface names unless explicit. */
-		if (if_noconf) {
-			if (ifa->ifa_flags & (IFF_LOOPBACK | IFF_POINTOPOINT) ||
-			    if_ignore(ctx, spec.devname))
-				active = IF_INACTIVE;
-		}
+		/* Don't allow some reserved interface names unless explicit. */
+		if (if_noconf && if_ignore(ctx, spec.devname))
+			active = IF_INACTIVE;
 
 		ifp = calloc(1, sizeof(*ifp));
 		if (ifp == NULL) {
@@ -533,6 +529,7 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 #ifdef IFT_TUNNEL
 			case IFT_TUNNEL: /* FALLTHROUGH */
 #endif
+			case IFT_LOOP: /* FALLTHROUGH */
 			case IFT_PPP:
 				/* Don't allow unless explicit */
 				if (if_noconf) {
@@ -551,16 +548,16 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 			case IFT_L3IPVLAN: /* FALLTHROUGH */
 #endif
 			case IFT_ETHER:
-				ifp->family = ARPHRD_ETHER;
+				ifp->hwtype = ARPHRD_ETHER;
 				break;
 #ifdef IFT_IEEE1394
 			case IFT_IEEE1394:
-				ifp->family = ARPHRD_IEEE1394;
+				ifp->hwtype = ARPHRD_IEEE1394;
 				break;
 #endif
 #ifdef IFT_INFINIBAND
 			case IFT_INFINIBAND:
-				ifp->family = ARPHRD_INFINIBAND;
+				ifp->hwtype = ARPHRD_INFINIBAND;
 				break;
 #endif
 			default:
@@ -572,7 +569,7 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 					    " interface type 0x%.2x",
 					    ifp->name, sdl->sdl_type);
 				/* Pretend it's ethernet */
-				ifp->family = ARPHRD_ETHER;
+				ifp->hwtype = ARPHRD_ETHER;
 				break;
 			}
 			ifp->hwlen = sdl->sdl_alen;
@@ -580,63 +577,35 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 #elif AF_PACKET
 			sll = (const void *)ifa->ifa_addr;
 			ifp->index = (unsigned int)sll->sll_ifindex;
-			ifp->family = sll->sll_hatype;
+			ifp->hwtype = sll->sll_hatype;
 			ifp->hwlen = sll->sll_halen;
 			if (ifp->hwlen != 0)
 				memcpy(ifp->hwaddr, sll->sll_addr, ifp->hwlen);
-#endif
-		}
-#ifdef SIOCGIFHWADDR
-		else {
-			/* This is a huge bug in getifaddrs(3) as there
-			 * is no reason why this can't be returned in
-			 * ifa_addr. */
-			memset(&ifr, 0, sizeof(ifr));
-			strlcpy(ifr.ifr_name, ifa->ifa_name,
-			    sizeof(ifr.ifr_name));
-			if (ioctl(ctx->pf_inet_fd, SIOCGIFHWADDR, &ifr) == -1)
-				logerr("%s: SIOCGIFHWADDR", ifa->ifa_name);
-			ifp->family = ifr.ifr_hwaddr.sa_family;
-			if (ioctl(ctx->pf_inet_fd, SIOCGIFINDEX, &ifr) == -1)
-				logerr("%s: SIOCGIFINDEX", ifa->ifa_name);
-			ifp->index = (unsigned int)ifr.ifr_ifindex;
-		}
-#endif
 
-		/* Ensure hardware address is valid. */
-		if (!if_valid_hwaddr(ifp->hwaddr, ifp->hwlen))
-			ifp->hwlen = 0;
-
-		/* We only work on ethernet by default */
-		if (ifp->family != ARPHRD_ETHER) {
-			if ((argc == 0 || argc == -1) &&
-			    ctx->ifac == 0 && !if_hasconf(ctx, ifp->name))
-				active = IF_INACTIVE;
-			switch (ifp->family) {
-			case ARPHRD_IEEE1394:
-			case ARPHRD_INFINIBAND:
-#ifdef ARPHRD_LOOPBACK
-			case ARPHRD_LOOPBACK:
-#endif
-#ifdef ARPHRD_PPP
-			case ARPHRD_PPP:
-#endif
-#ifdef ARPHRD_NONE
-			case ARPHRD_NONE:
-#endif
-				/* We don't warn for supported families */
+			switch(ifp->hwtype) {
+			case ARPHRD_ETHER:	/* FALLTHROUGH */
+			case ARPHRD_IEEE1394:	/* FALLTHROUGH */
+			case ARPHRD_INFINIBAND:	/* FALLTHROUGH */
+			case ARPHRD_NONE:	/* FALLTHROUGH */
 				break;
-
-/* IFT already checked */
-#ifndef AF_LINK
+			case ARPHRD_LOOPBACK:
+			case ARPHRD_PPP:
+				if (if_noconf) {
+					logdebugx("%s: ignoring due to"
+					    " interface type and"
+					    " no config",
+					    ifp->name);
+					active = IF_INACTIVE;
+				}
+				break;
 			default:
 				if (active)
 					logwarnx("%s: unsupported"
-					    " interface family 0x%.2x",
-					    ifp->name, ifp->family);
+					    " interface type 0x%.2x",
+					    ifp->name, ifp->hwtype);
 				break;
-#endif
 			}
+#endif
 		}
 
 		if (!(ctx->options & (DHCPCD_DUMPLEASE | DHCPCD_TEST))) {

@@ -782,7 +782,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 		bootp->ciaddr = state->addr->addr.s_addr;
 
 	bootp->op = BOOTREQUEST;
-	bootp->htype = (uint8_t)ifp->family;
+	bootp->htype = (uint8_t)ifp->hwtype;
 	if (ifp->hwlen != 0 && ifp->hwlen < sizeof(bootp->chaddr)) {
 		bootp->hlen = (uint8_t)ifp->hwlen;
 		memcpy(&bootp->chaddr, &ifp->hwaddr, ifp->hwlen);
@@ -3823,7 +3823,7 @@ dhcp_init(struct interface *ifp)
 			if (state->clientid == NULL)
 				goto eexit;
 			state->clientid[0] = len;
-			state->clientid[1] = (uint8_t)ifp->family;
+			state->clientid[1] = (uint8_t)ifp->hwtype;
 			memcpy(state->clientid + 2, ifp->hwaddr,
 			    ifp->hwlen);
 		}
@@ -4043,7 +4043,7 @@ dhcp_start(struct interface *ifp)
 
 	/* If we haven't specified a ClientID and our hardware address
 	 * length is greater than BOOTP CHADDR then we enforce a ClientID
-	 * of the hardware address family and the hardware address.
+	 * of the hardware address type and the hardware address.
 	 * If there is no hardware address and no ClientID set,
 	 * force a DUID based ClientID. */
 	if (ifp->hwlen > 16)
@@ -4053,7 +4053,7 @@ dhcp_start(struct interface *ifp)
 
 	/* Firewire and InfiniBand interfaces require ClientID and
 	 * the broadcast option being set. */
-	switch (ifp->family) {
+	switch (ifp->hwtype) {
 	case ARPHRD_IEEE1394:	/* FALLTHROUGH */
 	case ARPHRD_INFINIBAND:
 		ifp->options->options |= DHCPCD_CLIENTID | DHCPCD_BROADCAST;
