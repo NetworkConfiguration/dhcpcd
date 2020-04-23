@@ -1330,7 +1330,8 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 			break;
 #endif
 		memcpy(&sdl, rti_info[RTAX_IFA], rti_info[RTAX_IFA]->sa_len);
-		dhcpcd_handlehwaddr(ctx, ifp->name, CLLADDR(&sdl),sdl.sdl_alen);
+		dhcpcd_handlehwaddr(ifp, ifp->hwtype,
+		    CLLADDR(&sdl), sdl.sdl_alen);
 		break;
 	}
 #ifdef INET

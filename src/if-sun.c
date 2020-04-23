@@ -955,7 +955,8 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 		    ifam->ifam_type != RTM_NEWADDR)
 			break;
 		memcpy(&sdl, rti_info[RTAX_IFA], sizeof(sdl));
-		dhcpcd_handlehwaddr(ctx, ifp->name, CLLADDR(&sdl),sdl.sdl_alen);
+		dhcpcd_handlehwaddr(ifp, ifp->hwtype,
+		    CLLADDR(&sdl), sdl.sdl_alen);
 		break;
 	}
 #ifdef INET

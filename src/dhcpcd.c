@@ -1208,17 +1208,12 @@ dhcpcd_linkoverflow(struct dhcpcd_ctx *ctx)
 }
 
 void
-dhcpcd_handlehwaddr(struct dhcpcd_ctx *ctx, const char *ifname,
-    const void *hwaddr, uint8_t hwlen)
+dhcpcd_handlehwaddr(struct interface *ifp,
+    uint16_t hwtype, const void *hwaddr, uint8_t hwlen)
 {
-	struct interface *ifp;
 	char buf[sizeof(ifp->hwaddr) * 3];
 
-	ifp = if_find(ctx->ifaces, ifname);
-	if (ifp == NULL)
-		return;
-
-	if (!if_valid_hwaddr(hwaddr, hwlen))
+	if (hwaddr == NULL || !if_valid_hwaddr(hwaddr, hwlen))
 		hwlen = 0;
 
 	if (hwlen > sizeof(ifp->hwaddr)) {
@@ -1227,7 +1222,14 @@ dhcpcd_handlehwaddr(struct dhcpcd_ctx *ctx, const char *ifname,
 		return;
 	}
 
-	if (ifp->hwlen == hwlen && memcmp(ifp->hwaddr, hwaddr, hwlen) == 0)
+	if (ifp->hwtype != hwtype) {
+		loginfox("%s: hardware address type changed from %d to %d",
+		    ifp->name, ifp->hwtype, hwtype);
+		ifp->hwtype = hwtype;
+	}
+
+	if (ifp->hwlen == hwlen &&
+	    (hwlen == 0 || memcmp(ifp->hwaddr, hwaddr, hwlen) == 0))
 		return;
 
 	loginfox("%s: new hardware address: %s", ifp->name,
