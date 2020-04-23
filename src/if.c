@@ -75,12 +75,6 @@
 #include "logerr.h"
 #include "privsep.h"
 
-#ifdef __sun
-/* It has the ioctl, but the member is missing from the struct?
- * No matter, our getifaddrs foo in if-sun.c will DTRT. */
-#undef SIOCGIFHWADDR
-#endif
-
 void
 if_free(struct interface *ifp)
 {
@@ -390,7 +384,7 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 #elif AF_PACKET
 	const struct sockaddr_ll *sll;
 #endif
-#if defined(SIOCGIFPRIORITY) || defined(SIOCGIFHWADDR)
+#if defined(SIOCGIFPRIORITY)
 	struct ifreq ifr;
 #endif
 
