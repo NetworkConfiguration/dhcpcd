@@ -1751,7 +1751,7 @@ main(int argc, char **argv)
 	struct ifaddrs *ifaddrs = NULL;
 	struct if_options *ifo;
 	struct interface *ifp;
-	uint16_t family = 0;
+	uint16_t family = AF_UNSPEC;
 	int opt, oi = 0, i;
 	unsigned int logopts, t;
 	ssize_t len;
@@ -2034,52 +2034,6 @@ printpidfile:
 		goto exit_failure;
 	}
 
-	/* Test against siga instead of sig to avoid gcc
-	 * warning about a bogus potential signed overflow.
-	 * The end result will be the same. */
-	if ((siga == NULL || i == 4 || ctx.ifc != 0) &&
-	    !(ctx.options & DHCPCD_TEST))
-	{
-#endif
-		ctx.options |= DHCPCD_FORKED; /* avoid socket unlink */
-		if (!(ctx.options & DHCPCD_MASTER))
-			ctx.control_fd = control_open(argv[optind],
-			    ctx.options & DHCPCD_DUMPLEASE);
-		if (ctx.control_fd == -1)
-			ctx.control_fd = control_open(NULL,
-			    ctx.options & DHCPCD_DUMPLEASE);
-		if (ctx.control_fd != -1) {
-			if (!(ctx.options & DHCPCD_DUMPLEASE))
-				loginfox("sending commands to dhcpcd process");
-			len = control_send(&ctx, argc, argv);
-			if (len > 0)
-				logdebugx("send OK");
-			else {
-				logerr("%s: control_send", __func__);
-				goto exit_failure;
-			}
-			if (ctx.options & DHCPCD_DUMPLEASE) {
-				if (dhcpcd_readdump(&ctx) == -1) {
-					logerr("%s: dhcpcd_readdump", __func__);
-					goto exit_failure;
-				}
-			}
-			goto exit_success;
-		} else {
-			if (errno != ENOENT)
-				logerr("%s: control_open", __func__);
-			if (ctx.options & DHCPCD_DUMPLEASE) {
-				if (errno == ENOENT)
-					logerrx("dhcpcd is not running");
-				goto exit_failure;
-			}
-		}
-		ctx.options &= ~DHCPCD_FORKED;
-#ifdef USE_SIGNALS
-	}
-#endif
-
-#ifdef USE_SIGNALS
 	if (sig != 0) {
 		pid = pidfile_read(ctx.pidfile);
 		if (pid != 0 && pid != -1)
@@ -2112,6 +2066,49 @@ printpidfile:
 			goto exit_failure;
 		}
 	}
+#endif
+
+	/* Test against siga instead of sig to avoid gcc
+	 * warning about a bogus potential signed overflow.
+	 * The end result will be the same. */
+	if ((siga == NULL || i == 4 || ctx.ifc != 0) &&
+	    !(ctx.options & DHCPCD_TEST))
+	{
+		ctx.options |= DHCPCD_FORKED; /* avoid socket unlink */
+		if (!(ctx.options & DHCPCD_MASTER))
+			ctx.control_fd = control_open(argv[optind], family,
+			    ctx.options & DHCPCD_DUMPLEASE);
+		if (ctx.control_fd == -1)
+			ctx.control_fd = control_open(NULL, AF_UNSPEC,
+			    ctx.options & DHCPCD_DUMPLEASE);
+		if (ctx.control_fd != -1) {
+			if (!(ctx.options & DHCPCD_DUMPLEASE))
+				loginfox("sending commands to dhcpcd process");
+			len = control_send(&ctx, argc, argv);
+			if (len > 0)
+				logdebugx("send OK");
+			else {
+				logerr("%s: control_send", __func__);
+				goto exit_failure;
+			}
+			if (ctx.options & DHCPCD_DUMPLEASE) {
+				if (dhcpcd_readdump(&ctx) == -1) {
+					logerr("%s: dhcpcd_readdump", __func__);
+					goto exit_failure;
+				}
+			}
+			goto exit_success;
+		} else {
+			if (errno != ENOENT)
+				logerr("%s: control_open", __func__);
+			if (ctx.options & DHCPCD_DUMPLEASE) {
+				if (errno == ENOENT)
+					logerrx("dhcpcd is not running");
+				goto exit_failure;
+			}
+		}
+		ctx.options &= ~DHCPCD_FORKED;
+	}
 
 	if (!(ctx.options & DHCPCD_TEST)) {
 		/* Ensure we have the needed directories */
@@ -2128,7 +2125,6 @@ printpidfile:
 			goto exit_failure;
 		}
 	}
-#endif
 
 	loginfox(PACKAGE "-" VERSION " starting");
 	freopen(_PATH_DEVNULL, "r", stdin);
@@ -2211,7 +2207,7 @@ printpidfile:
 
 	if (!(ctx.options & DHCPCD_TEST) &&
 	    control_start(&ctx,
-	    ctx.options & DHCPCD_MASTER ? NULL : argv[optind]) == -1)
+	    ctx.options & DHCPCD_MASTER ? NULL : argv[optind], family) == -1)
 	{
 		logerr("%s: control_start", __func__);
 		goto exit_failure;

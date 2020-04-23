@@ -93,7 +93,13 @@ ps_inet_startcb(void *arg)
 	struct dhcpcd_ctx *ctx = arg;
 	int ret = 0;
 
-	setproctitle("[network proxy]");
+	if (ctx->options & DHCPCD_MASTER)
+		setproctitle("[network proxy]");
+	else
+		setproctitle("[network proxy] %s%s%s",
+		    ctx->ifv[0],
+		    ctx->options & DHCPCD_IPV4 ? " [ip4]" : "",
+		    ctx->options & DHCPCD_IPV6 ? " [ip6]" : "");
 
 	/* This end is the main engine, so it's useless for us. */
 	close(ctx->ps_data_fd);
