@@ -1751,7 +1751,7 @@ main(int argc, char **argv)
 	struct ifaddrs *ifaddrs = NULL;
 	struct if_options *ifo;
 	struct interface *ifp;
-	uint16_t family = AF_UNSPEC;
+	sa_family_t family = AF_UNSPEC;
 	int opt, oi = 0, i;
 	unsigned int logopts, t;
 	ssize_t len;
