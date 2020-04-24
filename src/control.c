@@ -193,7 +193,7 @@ control_handle_unpriv(void *arg)
 }
 
 static int
-make_sock(struct sockaddr_un *sa, const char *ifname, uint16_t family,
+make_sock(struct sockaddr_un *sa, const char *ifname, sa_family_t family,
     bool unpriv)
 {
 	int fd;
@@ -230,7 +230,7 @@ make_sock(struct sockaddr_un *sa, const char *ifname, uint16_t family,
 #define S_UNPRIV (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)
 
 static int
-control_start1(struct dhcpcd_ctx *ctx, const char *ifname, uint16_t family,
+control_start1(struct dhcpcd_ctx *ctx, const char *ifname, sa_family_t family,
     mode_t fmode)
 {
 	struct sockaddr_un sa;
@@ -261,7 +261,7 @@ control_start1(struct dhcpcd_ctx *ctx, const char *ifname, uint16_t family,
 }
 
 int
-control_start(struct dhcpcd_ctx *ctx, const char *ifname, uint16_t family)
+control_start(struct dhcpcd_ctx *ctx, const char *ifname, sa_family_t family)
 {
 	int fd;
 
@@ -337,7 +337,7 @@ control_stop(struct dhcpcd_ctx *ctx)
 }
 
 int
-control_open(const char *ifname, uint16_t family, bool unpriv)
+control_open(const char *ifname, sa_family_t family, bool unpriv)
 {
 	struct sockaddr_un sa;
 	int fd;
