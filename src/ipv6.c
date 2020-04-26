@@ -1635,7 +1635,7 @@ ipv6_staticdadcallback(void *arg)
 
 	wascompleted = (ia->flags & IPV6_AF_DADCOMPLETED);
 	ia->flags |= IPV6_AF_DADCOMPLETED;
-	if (ia->flags & IPV6_AF_DUPLICATED)
+	if (ia->addr_flags & IN6_IFF_DUPLICATED)
 		logwarnx("%s: DAD detected %s", ia->iface->name,
 		    ia->saddr);
 	else if (!wascompleted) {
@@ -1838,16 +1838,13 @@ ipv6_handleifa_addrs(int cmd,
 			}
 			break;
 		case RTM_NEWADDR:
+			ia->addr_flags = addr->addr_flags;
 			/* Safety - ignore tentative announcements */
-			if (addr->addr_flags &
+			if (ia->addr_flags &
 			    (IN6_IFF_DETACHED | IN6_IFF_TENTATIVE))
 				break;
 			if ((ia->flags & IPV6_AF_DADCOMPLETED) == 0) {
 				found++;
-				if (addr->addr_flags & IN6_IFF_DUPLICATED)
-					ia->flags |= IPV6_AF_DUPLICATED;
-				else
-					ia->flags &= ~IPV6_AF_DUPLICATED;
 				if (ia->dadcallback)
 					ia->dadcallback(ia);
 				/* We need to set this here in-case the
@@ -1890,7 +1887,7 @@ ipv6_tempdadcallback(void *arg)
 {
 	struct ipv6_addr *ia = arg;
 
-	if (ia->flags & IPV6_AF_DUPLICATED) {
+	if (ia->addr_flags & IN6_IFF_DUPLICATED) {
 		struct ipv6_addr *ia1;
 		struct timespec tv;
 
