@@ -1673,14 +1673,17 @@ bpf_read(struct interface *ifp, int s, void *data, size_t len,
 	};
 	struct msghdr msg = { .msg_iov = &iov, .msg_iovlen = 1 };
 #ifdef PACKET_AUXDATA
-	unsigned char cmsgbuf[CMSG_LEN(sizeof(struct tpacket_auxdata))] = { 0 };
+	union {
+		struct cmsghdr hdr;
+		uint8_t buf[CMSG_SPACE(sizeof(struct tpacket_auxdata))];
+	} cmsgbuf = { .buf = { 0 } };
 	struct cmsghdr *cmsg;
 	struct tpacket_auxdata *aux;
 #endif
 
 #ifdef PACKET_AUXDATA
-	msg.msg_control = cmsgbuf;
-	msg.msg_controllen = sizeof(cmsgbuf);
+	msg.msg_control = cmsgbuf.buf;
+	msg.msg_controllen = sizeof(cmsgbuf.buf);
 #endif
 
 	bytes = recvmsg(s, &msg, 0);
