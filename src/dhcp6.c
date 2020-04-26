@@ -26,8 +26,6 @@
  * SUCH DAMAGE.
  */
 
-/* TODO: We should decline dupliate addresses detected */
-
 #include <sys/stat.h>
 #include <sys/utsname.h>
 
@@ -139,6 +137,7 @@ static const struct dhcp6_op dhcp6_ops[] = {
 	{ DHCP6_INFORMATION_REQ, "INFORM6" },
 	{ DHCP6_RELEASE, "RELEASE6" },
 	{ DHCP6_RECONFIGURE, "RECONFIGURE6" },
+	{ DHCP6_DECLINE, "DECLINE6" },
 	{ 0, NULL }
 };
 
@@ -174,12 +173,19 @@ static const char * const dhcp6_statuses[] = {
 static void dhcp6_bind(struct interface *, const char *, const char *);
 static void dhcp6_failinform(void *);
 static void dhcp6_recvaddr(void *);
+static void dhcp6_startdecline(struct interface *);
 
 #ifdef SMALL
 #define dhcp6_hasprefixdelegation(a)	(0)
 #else
 static int dhcp6_hasprefixdelegation(struct interface *);
 #endif
+
+#define DECLINE_IA(ia) \
+	((ia)->addr_flags & IN6_IFF_DUPLICATED && \
+	(ia)->ia_type != 0 && (ia)->ia_type != D6_OPTION_IA_PD && \
+	!((ia)->flags & IPV6_AF_STALE) && \
+	(ia)->prefix_vltime != 0)
 
 void
 dhcp6_printoptions(const struct dhcpcd_ctx *ctx,
@@ -672,7 +678,7 @@ dhcp6_makemessage(struct interface *ifp)
 	len = 0;
 	si = NULL;
 	hl = 0; /* Appease gcc */
-	if (state->state != DH6S_RELEASE) {
+	if (state->state != DH6S_RELEASE && state->state != DH6S_DECLINE) {
 		for (l = 0, opt = ifp->ctx->dhcp6_opts;
 		    l < ifp->ctx->dhcp6_opts_len;
 		    l++, opt++)
@@ -750,6 +756,8 @@ dhcp6_makemessage(struct interface *ifp)
 		m = state->recv;
 		ml = state->recv_len;
 		/* FALLTHROUGH */
+	case DH6S_DECLINE:
+		/* FALLTHROUGH */
 	case DH6S_RELEASE:
 		/* FALLTHROUGH */
 	case DH6S_RENEW:
@@ -777,6 +785,8 @@ dhcp6_makemessage(struct interface *ifp)
 			if (!(ap->flags & IPV6_AF_REQUEST) &&
 			    (ap->prefix_vltime == 0 ||
 			    state->state == DH6S_DISCOVER))
+				continue;
+			if (DECLINE_IA(ap) && state->state != DH6S_DECLINE)
 				continue;
 			if (ap->ia_type == D6_OPTION_IA_PD) {
 #ifndef SMALL
@@ -835,6 +845,9 @@ dhcp6_makemessage(struct interface *ifp)
 		break;
 	case DH6S_RELEASE:
 		type = DHCP6_RELEASE;
+		break;
+	case DH6S_DECLINE:
+		type = DHCP6_DECLINE;
 		break;
 	default:
 		errno = EINVAL;
@@ -949,6 +962,8 @@ dhcp6_makemessage(struct interface *ifp)
 			    (ap->prefix_vltime == 0 ||
 			    state->state == DH6S_DISCOVER))
 				continue;
+			if (DECLINE_IA(ap) && state->state != DH6S_DECLINE)
+				continue;
 			if (ap->ia_type != ifia->ia_type)
 				continue;
 			if (memcmp(ap->iaid, ifia->iaid, sizeof(ap->iaid)))
@@ -1010,7 +1025,10 @@ dhcp6_makemessage(struct interface *ifp)
 		memcpy(o_lenp, &ia_na_len, sizeof(ia_na_len));
 	}
 
-	if (state->send->type != DHCP6_RELEASE && n_options) {
+	if (state->send->type != DHCP6_RELEASE &&
+	    state->send->type != DHCP6_DECLINE &&
+	    n_options)
+	{
 		o_lenp = NEXTLEN;
 		o.len = 0;
 		COPYIN1(D6_OPTION_ORO, 0);
@@ -1072,7 +1090,9 @@ dhcp6_makemessage(struct interface *ifp)
 	if (!has_option_mask(ifo->nomask6, D6_OPTION_VENDOR_CLASS))
 		p += dhcp6_makevendor(p, ifp);
 
-	if (state->send->type != DHCP6_RELEASE) {
+	if (state->send->type != DHCP6_RELEASE &&
+	    state->send->type != DHCP6_DECLINE)
+	{
 		if (fqdn != FQDN_DISABLE) {
 			o_lenp = NEXTLEN;
 			COPYIN1(D6_OPTION_FQDN, 0);
@@ -1432,6 +1452,13 @@ dhcp6_sendconfirm(void *arg)
 }
 
 static void
+dhcp6_senddecline(void *arg)
+{
+
+	dhcp6_sendmessage(arg, dhcp6_senddecline);
+}
+
+static void
 dhcp6_sendrelease(void *arg)
 {
 
@@ -1496,54 +1523,60 @@ dhcp6_dadcallback(void *arg)
 	struct ipv6_addr *ia = arg;
 	struct interface *ifp;
 	struct dhcp6_state *state;
-	int wascompleted, valid;
+	struct ipv6_addr *ia2;
+	bool completed, valid, oneduplicated;
 
-	wascompleted = (ia->flags & IPV6_AF_DADCOMPLETED);
+	completed = (ia->flags & IPV6_AF_DADCOMPLETED);
 	ia->flags |= IPV6_AF_DADCOMPLETED;
-	if (ia->flags & IPV6_AF_DUPLICATED) {
-		/* XXX FIXME
-		 * We should decline the address */
+	if (ia->addr_flags & IN6_IFF_DUPLICATED)
 		logwarnx("%s: DAD detected %s", ia->iface->name, ia->saddr);
-	}
 
-	if (!wascompleted) {
-		ifp = ia->iface;
+#ifdef ND6_ADVERTISE
+	else
+		ipv6nd_advertise(ia);
+#endif
+	if (completed)
+		return;
 
-		state = D6_STATE(ifp);
-		if (state->state == DH6S_BOUND ||
-		    state->state == DH6S_DELEGATED)
-		{
-			struct ipv6_addr *ia2;
+	ifp = ia->iface;
+	state = D6_STATE(ifp);
+	if (state->state != DH6S_BOUND && state->state != DH6S_DELEGATED)
+		return;
 
 #ifdef SMALL
-			valid = true;
+	valid = true;
 #else
-			valid = (ia->delegating_prefix == NULL);
+	valid = (ia->delegating_prefix == NULL);
 #endif
-			TAILQ_FOREACH(ia2, &state->addrs, next) {
-				if (ia2->flags & IPV6_AF_ADDED &&
-				    !(ia2->flags & IPV6_AF_DADCOMPLETED))
-				{
-					wascompleted = 1;
-					break;
-				}
-			}
-			if (!wascompleted) {
-				logdebugx("%s: DHCPv6 DAD completed",
-				    ifp->name);
-				script_runreason(ifp,
-#ifndef SMALL
-				    ia->delegating_prefix ? "DELEGATED6" :
-#endif
-				    state->reason);
-				if (valid)
-					dhcpcd_daemonise(ifp->ctx);
-			}
-#ifdef ND6_ADVERTISE
-			ipv6nd_advertise(ia);
-#endif
+	completed = true;
+	oneduplicated = false;
+	TAILQ_FOREACH(ia2, &state->addrs, next) {
+		if (ia2->flags & IPV6_AF_ADDED &&
+		    !(ia2->flags & IPV6_AF_DADCOMPLETED))
+		{
+			completed = false;
+			break;
 		}
+		if (DECLINE_IA(ia))
+			oneduplicated = true;
 	}
+	if (!completed)
+		return;
+
+	logdebugx("%s: DHCPv6 DAD completed", ifp->name);
+
+	if (oneduplicated && state->state == DH6S_BOUND) {
+		dhcp6_startdecline(ifp);
+		return;
+	}
+
+	script_runreason(ifp,
+#ifndef SMALL
+	    ia->delegating_prefix ? "DELEGATED6" :
+#endif
+	    state->reason);
+	if (valid)
+		dhcpcd_daemonise(ifp->ctx);
 }
 
 static void
@@ -1682,7 +1715,7 @@ dhcp6_leaseextend(struct interface *ifp)
 }
 
 static void
-dhcp6_fail(struct interface* ifp)
+dhcp6_fail(struct interface *ifp)
 {
 	struct dhcp6_state *state = D6_STATE(ifp);
 
@@ -1867,8 +1900,18 @@ static void
 dhcp6_startconfirm(struct interface *ifp)
 {
 	struct dhcp6_state *state;
+	struct ipv6_addr *ia;
 
 	state = D6_STATE(ifp);
+
+	TAILQ_FOREACH(ia, &state->addrs, next) {
+		if (!DECLINE_IA(ia))
+			continue;
+		logerrx("%s: prior DHCPv6 has a duplicated address", ifp->name);
+		dhcp6_startdecline(ifp);
+		return;
+	}
+
 	state->state = DH6S_CONFIRM;
 	state->RTC = 0;
 	state->IMD = CNF_MAX_DELAY;
@@ -1877,6 +1920,7 @@ dhcp6_startconfirm(struct interface *ifp)
 	state->MRC = CNF_MAX_RC;
 
 	loginfox("%s: confirming prior DHCPv6 lease", ifp->name);
+
 	if (dhcp6_makemessage(ifp) == -1) {
 		logerr("%s: %s", __func__, ifp->name);
 		return;
@@ -1896,6 +1940,36 @@ dhcp6_startexpire(void *arg)
 
 	logerrx("%s: DHCPv6 lease expired", ifp->name);
 	dhcp6_fail(ifp);
+}
+
+static void
+dhcp6_faildecline(void *arg)
+{
+	struct interface *ifp = arg;
+
+	logerrx("%s: failed to decline duplicated DHCPv6 addresses", ifp->name);
+	dhcp6_fail(ifp);
+}
+
+static void
+dhcp6_startdecline(struct interface *ifp)
+{
+	struct dhcp6_state *state;
+
+	state = D6_STATE(ifp);
+	loginfox("%s: declining failed DHCPv6 addresses", ifp->name);
+	state->state = DH6S_DECLINE;
+	state->RTC = 0;
+	state->IMD = 0;
+	state->IRT = DEC_TIMEOUT;
+	state->MRT = 0;
+	state->MRC = DEC_MAX_RC;
+	state->MRCcallback = dhcp6_faildecline;
+
+	if (dhcp6_makemessage(ifp) == -1)
+		logerr("%s: %s", __func__, ifp->name);
+	else
+		dhcp6_senddecline(ifp);
 }
 
 static void
@@ -3350,6 +3424,13 @@ dhcp6_recvif(struct interface *ifp, const char *sfrom,
 			if (state->state == DH6S_DISCOVER)
 				state->state = DH6S_REQUEST;
 			break;
+		case DH6S_DECLINE:
+			/* This isnt really a failure, but an
+			 * acknowledgement of one. */
+			loginfox("%s: %s acknowledged DECLINE6",
+			    ifp->name, sfrom);
+			dhcp6_fail(ifp);
+			return;
 		default:
 			valid_op = false;
 			break;

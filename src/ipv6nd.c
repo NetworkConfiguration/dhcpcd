@@ -927,7 +927,7 @@ ipv6nd_dadcallback(void *arg)
 	ifp = ia->iface;
 	wascompleted = (ia->flags & IPV6_AF_DADCOMPLETED);
 	ia->flags |= IPV6_AF_DADCOMPLETED;
-	if (ia->flags & IPV6_AF_DUPLICATED) {
+	if (ia->addr_flags & IN6_IFF_DUPLICATED) {
 		ia->dadcounter++;
 		logwarnx("%s: DAD detected %s", ifp->name, ia->saddr);
 

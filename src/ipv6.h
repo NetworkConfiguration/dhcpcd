@@ -216,18 +216,17 @@ struct ipv6_addr {
 #define	IPV6_AF_STALE		(1U << 2)
 #define	IPV6_AF_ADDED		(1U << 3)
 #define	IPV6_AF_AUTOCONF	(1U << 4)
-#define	IPV6_AF_DUPLICATED	(1U << 5)
-#define	IPV6_AF_DADCOMPLETED	(1U << 6)
-#define	IPV6_AF_DELEGATED	(1U << 7)
-#define	IPV6_AF_DELEGATEDPFX	(1U << 8)
-#define	IPV6_AF_NOREJECT	(1U << 9)
-#define	IPV6_AF_REQUEST		(1U << 10)
-#define	IPV6_AF_STATIC		(1U << 11)
-#define	IPV6_AF_DELEGATEDLOG	(1U << 12)
-#define	IPV6_AF_RAPFX		(1U << 13)
-#define	IPV6_AF_EXTENDED	(1U << 14)
+#define	IPV6_AF_DADCOMPLETED	(1U << 5)
+#define	IPV6_AF_DELEGATED	(1U << 6)
+#define	IPV6_AF_DELEGATEDPFX	(1U << 7)
+#define	IPV6_AF_NOREJECT	(1U << 8)
+#define	IPV6_AF_REQUEST		(1U << 9)
+#define	IPV6_AF_STATIC		(1U << 10)
+#define	IPV6_AF_DELEGATEDLOG	(1U << 11)
+#define	IPV6_AF_RAPFX		(1U << 12)
+#define	IPV6_AF_EXTENDED	(1U << 13)
 #ifdef IPV6_MANAGETEMPADDR
-#define	IPV6_AF_TEMPORARY	(1U << 15)
+#define	IPV6_AF_TEMPORARY	(1U << 14)
 #endif
 
 struct ll_callback {
