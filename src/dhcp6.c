@@ -1219,7 +1219,10 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 	struct iovec iov = {
 	    .iov_base = state->send, .iov_len = state->send_len,
 	};
-	unsigned char ctl[CMSG_SPACE(sizeof(struct in6_pktinfo))] = { 0 };
+	union {
+		struct cmsghdr hdr;
+		uint8_t buf[CMSG_SPACE(sizeof(struct in6_pktinfo))];
+	} cmsgbuf = { .buf = { 0 } };
 	struct msghdr msg = {
 	    .msg_name = &dst, .msg_namelen = sizeof(dst),
 	    .msg_iov = &iov, .msg_iovlen = 1,
@@ -1328,8 +1331,8 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 		struct in6_pktinfo pi = { .ipi6_ifindex = ifp->index };
 
 		dst.sin6_scope_id = ifp->index;
-		msg.msg_control = ctl;
-		msg.msg_controllen = sizeof(ctl);
+		msg.msg_control = cmsgbuf.buf;
+		msg.msg_controllen = sizeof(cmsgbuf.buf);
 		cm = CMSG_FIRSTHDR(&msg);
 		if (cm == NULL) /* unlikely */
 			return -1;

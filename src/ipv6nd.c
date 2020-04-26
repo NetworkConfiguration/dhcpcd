@@ -328,11 +328,14 @@ ipv6nd_sendrsprobe(void *arg)
 		.sin6_scope_id = ifp->index,
 	};
 	struct iovec iov = { .iov_base = state->rs, .iov_len = state->rslen };
-	unsigned char ctl[CMSG_SPACE(sizeof(struct in6_pktinfo))] = { 0 };
+	union {
+		struct cmsghdr hdr;
+		uint8_t buf[CMSG_SPACE(sizeof(struct in6_pktinfo))];
+	} cmsgbuf = { .buf = { 0 } };
 	struct msghdr msg = {
 	    .msg_name = &dst, .msg_namelen = sizeof(dst),
 	    .msg_iov = &iov, .msg_iovlen = 1,
-	    .msg_control = ctl, .msg_controllen = sizeof(ctl),
+	    .msg_control = cmsgbuf.buf, .msg_controllen = sizeof(cmsgbuf.buf),
 	};
 	struct cmsghdr *cm;
 	struct in6_pktinfo pi = { .ipi6_ifindex = ifp->index };
@@ -402,11 +405,14 @@ ipv6nd_sendadvertisement(void *arg)
 	    .sin6_scope_id = ifp->index,
 	};
 	struct iovec iov = { .iov_base = ia->na, .iov_len = ia->na_len };
-	unsigned char ctl[CMSG_SPACE(sizeof(struct in6_pktinfo))] = { 0 };
+	union {
+		struct cmsghdr hdr;
+		uint8_t buf[CMSG_SPACE(sizeof(struct in6_pktinfo))];
+	} cmsgbuf = { .buf = { 0 } };
 	struct msghdr msg = {
 	    .msg_name = &dst, .msg_namelen = sizeof(dst),
 	    .msg_iov = &iov, .msg_iovlen = 1,
-	    .msg_control = ctl, .msg_controllen = sizeof(ctl),
+	    .msg_control = cmsgbuf.buf, .msg_controllen = sizeof(cmsgbuf.buf),
 	};
 	struct cmsghdr *cm;
 	struct in6_pktinfo pi = { .ipi6_ifindex = ifp->index };
