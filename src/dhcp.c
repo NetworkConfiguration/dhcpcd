@@ -2772,6 +2772,10 @@ dhcp_drop(struct interface *ifp, const char *reason)
 	dhcp_auth_reset(&state->auth);
 #endif
 
+	/* Close DHCP ports so a changed interface family is picked
+	 * up by a new BPF state. */
+	dhcp_close(ifp);
+
 	state->state = DHS_NONE;
 	free(state->offer);
 	state->offer = NULL;
