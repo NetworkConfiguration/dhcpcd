@@ -1813,8 +1813,7 @@ if_setup_inet6(const struct interface *ifp)
 #endif
 
 #ifdef ND6_IFF_AUTO_LINKLOCAL
-	/* Unlike the kernel,
-	 * dhcpcd make make a stable private address. */
+	/* Unlike the kernel, dhcpcd make make a stable private address. */
 	flags &= ~ND6_IFF_AUTO_LINKLOCAL;
 #endif
 
