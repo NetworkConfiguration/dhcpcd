@@ -647,7 +647,7 @@ ipv6nd_applyra(struct interface *ifp)
 	};
 
 	TAILQ_FOREACH(rap, ifp->ctx->ra_routers, next) {
-		if (rap->iface == ifp && rap->lifetime != 0)
+		if (rap->iface == ifp && !rap->expired)
 			break;
 	}
 
@@ -1707,7 +1707,7 @@ ipv6nd_expirera(void *arg)
 		if (rap->lifetime) {
 			elapsed = (uint32_t)eloop_timespec_diff(&now,
 			    &rap->acquired, NULL);
-			if (elapsed > rap->lifetime || rap->doexpire) {
+			if (elapsed >= rap->lifetime || rap->doexpire) {
 				if (!rap->expired) {
 					logwarnx("%s: %s: router expired",
 					    ifp->name, rap->sfrom);
@@ -1736,7 +1736,7 @@ ipv6nd_expirera(void *arg)
 			}
 			elapsed = (uint32_t)eloop_timespec_diff(&now,
 			    &ia->acquired, NULL);
-			if (elapsed > ia->prefix_vltime || rap->doexpire) {
+			if (elapsed >= ia->prefix_vltime || rap->doexpire) {
 				if (ia->flags & IPV6_AF_ADDED) {
 					logwarnx("%s: expired %s %s",
 					    ia->iface->name,
@@ -1817,7 +1817,7 @@ ipv6nd_expirera(void *arg)
 			}
 
 			ltime = ntohl(ltime);
-			if (elapsed > ltime) {
+			if (elapsed >= ltime) {
 				expired = true;
 				continue;
 			}
