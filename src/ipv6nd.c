@@ -634,18 +634,26 @@ ipv6nd_sortrouters(struct dhcpcd_ctx *ctx)
 }
 
 static void
-ipv6nd_applyra(struct dhcpcd_ctx *ctx, struct interface *ifp)
+ipv6nd_applyra(struct interface *ifp)
 {
 	struct ra *rap;
 	struct rs_state *state = RS_STATE(ifp);
 
-	TAILQ_FOREACH(rap, ctx->ra_routers, next) {
-		if (rap->iface == ifp)
+	struct ra defra = {
+		.iface = ifp,
+		.hoplimit = IPV6_DEFHLIM ,
+		.reachable = REACHABLE_TIME,
+		.retrans = RETRANS_TIMER,
+	};
+
+	TAILQ_FOREACH(rap, ifp->ctx->ra_routers, next) {
+		if (rap->iface == ifp && rap->lifetime != 0)
 			break;
 	}
 
+	/* If we have no Router Advertisement, then set default values. */
 	if (rap == NULL)
-		return;
+		rap = &defra;
 
 	state->retrans = rap->retrans;
 	if (if_applyra(rap) == -1 && errno != ENOENT)
@@ -687,7 +695,7 @@ ipv6nd_neighbour(struct dhcpcd_ctx *ctx, struct in6_addr *addr, bool reachable)
 
 	/* See if we can install a reachable default router. */
 	ipv6nd_sortrouters(ctx);
-	ipv6nd_applyra(ctx, rap->iface);
+	ipv6nd_applyra(rap->iface);
 	rt_build(ctx, AF_INET6);
 
 	if (reachable)
@@ -1441,7 +1449,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 		script_runreason(ifp, "TEST");
 		goto handle_flag;
 	}
-	ipv6nd_applyra(ifp->ctx, ifp);
+	ipv6nd_applyra(ifp);
 	ipv6_addaddrs(&rap->addrs);
 #ifdef IPV6_MANAGETEMPADDR
 	ipv6_addtempaddrs(ifp, &rap->acquired);
@@ -1835,6 +1843,8 @@ ipv6nd_expirera(void *arg)
 	if (expired) {
 		logwarnx("%s: part of a Router Advertisement expired",
 		    ifp->name);
+		ipv6nd_sortrouters(ifp->ctx);
+		ipv6nd_applyra(ifp);
 		rt_build(ifp->ctx, AF_INET6);
 		script_runreason(ifp, "ROUTERADVERT");
 	}
@@ -1857,6 +1867,7 @@ ipv6nd_drop(struct interface *ifp)
 		}
 	}
 	if (expired) {
+		ipv6nd_applyra(ifp);
 		rt_build(ifp->ctx, AF_INET6);
 		if ((ifp->options->options & DHCPCD_NODROP) != DHCPCD_NODROP)
 			script_runreason(ifp, "ROUTERADVERT");
