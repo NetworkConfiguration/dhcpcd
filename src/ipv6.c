@@ -2073,10 +2073,22 @@ ipv6_regentempaddrs(void *arg)
 	ipv6_regen_desync(ifp, true);
 
 	clock_gettime(CLOCK_MONOTONIC, &tv);
+
+	/* Mark addresses for regen so we don't infinite loop. */
 	TAILQ_FOREACH(ia, &state->addrs, next) {
 		if (ia->flags & IPV6_AF_TEMPORARY &&
 		    !(ia->flags & IPV6_AF_STALE))
+			ia->flags |= IPV6_AF_REGEN;
+		else
+			ia->flags &= ~IPV6_AF_REGEN;
+	}
+
+	/* Now regen temp addrs */
+	TAILQ_FOREACH(ia, &state->addrs, next) {
+		if (ia->flags & IPV6_AF_REGEN) {
 			ipv6_regentempaddr0(ia, &tv);
+			ia->flags &= ~IPV6_AF_REGEN;
+		}
 	}
 }
 #endif /* IPV6_MANAGETEMPADDR */

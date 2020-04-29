@@ -225,8 +225,9 @@ struct ipv6_addr {
 #define	IPV6_AF_DELEGATEDLOG	(1U << 11)
 #define	IPV6_AF_RAPFX		(1U << 12)
 #define	IPV6_AF_EXTENDED	(1U << 13)
+#define	IPV6_AF_REGEN		(1U << 14)
 #ifdef IPV6_MANAGETEMPADDR
-#define	IPV6_AF_TEMPORARY	(1U << 14)
+#define	IPV6_AF_TEMPORARY	(1U << 15)
 #endif
 
 struct ll_callback {
