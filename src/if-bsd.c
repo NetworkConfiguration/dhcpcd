@@ -1476,19 +1476,31 @@ int
 if_applyra(const struct ra *rap)
 {
 #ifdef SIOCSIFINFO_IN6
-	struct in6_ndireq ndi = { .ndi.chlim = 0 };
-	struct priv *priv = rap->iface->ctx->priv;
+	struct in6_ndireq nd = { .ndi.chlim = 0 };
+	struct dhcpcd_ctx *ctx = rap->iface->ctx;
+	struct priv *priv = ctx->priv;
 	int error;
 
-	strlcpy(ndi.ifname, rap->iface->name, sizeof(ndi.ifname));
-	if (ioctl(priv->pf_inet6_fd, SIOCGIFINFO_IN6, &ndi) == -1)
+	strlcpy(nd.ifname, rap->iface->name, sizeof(nd.ifname));
+
+#ifdef IPV6CTL_ACCEPT_RTADV
+	/*
+	 * NetBSD changed SIOCSIFINFO_IN6 to NOT set flags when kernel
+	 * RA was removed, however both FreeBSD and DragonFlyBSD still do.
+	 * linkmtu was also removed.
+	 * Hopefully this guard will still work if either remove kernel RA.
+	 */
+	if (ioctl(priv->pf_inet6_fd, SIOCGIFINFO_IN6, &nd, sizeof(nd)) == -1)
 		return -1;
 
-	ndi.ndi.linkmtu = rap->mtu;
-	ndi.ndi.chlim = rap->hoplimit;
-	ndi.ndi.retrans = rap->retrans;
-	ndi.ndi.basereachable = rap->reachable;
-	error = ioctl(priv->pf_inet6_fd, SIOCSIFINFO_IN6, &ndi);
+	nd.ndi.linkmtu = rap->mtu;
+#endif
+
+	nd.ndi.chlim = rap->hoplimit;
+	nd.ndi.retrans = rap->retrans;
+	nd.ndi.basereachable = rap->reachable;
+	error = ioctl(priv->pf_inet6_fd, SIOCSIFINFO_IN6, &nd, sizeof(nd));
+#ifdef IPV6CTL_ACCEPT_RTADV
 	if (error == -1 && errno == EINVAL) {
 		/*
 		 * Very likely that this is caused by a dodgy MTU
@@ -1500,6 +1512,7 @@ if_applyra(const struct ra *rap)
 		ndi.ndi.linkmtu = 0;
 		error = ioctl(priv->pf_inet6_fd, SIOCSIFINFO_IN6, &ndi);
 	}
+#endif
 	return error;
 #else
 #warning OS does not allow setting of RA bits hoplimit, retrans or reachable
