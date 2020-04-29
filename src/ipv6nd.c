@@ -638,7 +638,6 @@ ipv6nd_applyra(struct interface *ifp)
 {
 	struct ra *rap;
 	struct rs_state *state = RS_STATE(ifp);
-
 	struct ra defra = {
 		.iface = ifp,
 		.hoplimit = IPV6_DEFHLIM ,
@@ -647,12 +646,12 @@ ipv6nd_applyra(struct interface *ifp)
 	};
 
 	TAILQ_FOREACH(rap, ifp->ctx->ra_routers, next) {
-		if (rap->iface == ifp && !rap->expired)
+		if (rap->iface == ifp)
 			break;
 	}
 
 	/* If we have no Router Advertisement, then set default values. */
-	if (rap == NULL)
+	if (rap == NULL || rap->expired || rap->willexpire)
 		rap = &defra;
 
 	state->retrans = rap->retrans;
@@ -1130,6 +1129,21 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 		    ifp->name, sfrom);
 		return;
 	}
+
+#ifdef NOCARRIER_PRESERVE_IP
+	/*
+	 * Because we preserve RA's and expire them quickly after
+	 * carrier up, it's important to reset the kernels notion of
+	 * reachable timers back to default values before applying
+	 * new RA values.
+	 */
+	TAILQ_FOREACH(rap, ctx->ra_routers, next) {
+		if (ifp == rap->iface)
+			break;
+	}
+	if (rap != NULL && rap->willexpire)
+		ipv6nd_applyra(ifp);
+#endif
 
 	TAILQ_FOREACH(rap, ctx->ra_routers, next) {
 		if (ifp == rap->iface &&
