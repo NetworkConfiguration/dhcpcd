@@ -2007,18 +2007,25 @@ if_applyra(const struct ra *rap)
 	struct dhcpcd_ctx *ctx = rap->iface->ctx;
 	int error = 0;
 
-	snprintf(path, sizeof(path), "%s/%s/hop_limit", p_conf, ifname);
-	if (if_writepathuint(ctx, path, rap->hoplimit) == -1)
-		error = -1;
+	if (rap->hoplimit != 0) {
+		snprintf(path, sizeof(path), "%s/%s/hop_limit", p_conf, ifname);
+		if (if_writepathuint(ctx, path, rap->hoplimit) == -1)
+			error = -1;
+	}
 
-	snprintf(path, sizeof(path), "%s/%s/retrans_time_ms", p_neigh, ifname);
-	if (if_writepathuint(ctx, path, rap->retrans) == -1)
-		error = -1;
+	if (rap->retrans != 0) {
+		snprintf(path, sizeof(path), "%s/%s/retrans_time_ms",
+		    p_neigh, ifname);
+		if (if_writepathuint(ctx, path, rap->retrans) == -1)
+			error = -1;
+	}
 
-	snprintf(path, sizeof(path), "%s/%s/base_reachable_time_ms",
-	    p_neigh, ifname);
-	if (if_writepathuint(ctx, path, rap->reachable) == -1)
-		error = -1;
+	if (rap->reachable != 0) {
+		snprintf(path, sizeof(path), "%s/%s/base_reachable_time_ms",
+		    p_neigh, ifname);
+		if (if_writepathuint(ctx, path, rap->reachable) == -1)
+			error = -1;
+	}
 
 	return error;
 }
