@@ -220,8 +220,7 @@ ps_root_docopychroot(struct dhcpcd_ctx *ctx, const char *file)
 	struct timeval tv[2];
 #endif
 
-	if (snprintf(path, sizeof(path), "%s/%s",
-	    ctx->ps_user->pw_dir, file) == -1)
+	if (snprintf(path, sizeof(path), "%s/%s", ctx->ps_chroot, file) == -1)
 		return -1;
 	if (stat(file, &from_sb) == -1)
 		return -1;

@@ -1141,8 +1141,10 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 		if (ifp == rap->iface)
 			break;
 	}
-	if (rap != NULL && rap->willexpire)
+	if (rap != NULL && rap->willexpire) {
+		logerrx("settng def RA");
 		ipv6nd_applyra(ifp);
+	}
 #endif
 
 	TAILQ_FOREACH(rap, ctx->ra_routers, next) {

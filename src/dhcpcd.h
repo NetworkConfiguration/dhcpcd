@@ -192,6 +192,7 @@ struct dhcpcd_ctx {
 
 #ifdef PRIVSEP
 	struct passwd *ps_user;	/* struct passwd for privsep user */
+	const char *ps_chroot;
 	pid_t ps_root_pid;
 	int ps_root_fd;		/* Privileged Actioneer commands */
 	int ps_data_fd;		/* Data from root spawned processes */

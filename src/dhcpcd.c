@@ -1891,6 +1891,11 @@ main(int argc, char **argv)
 		case 'V':
 			i = 2;
 			break;
+#ifdef PRIVSEP
+		case O_CHROOT:
+			ctx.ps_chroot = optarg;
+			break;
+#endif
 		case '?':
 			if (ctx.options & DHCPCD_PRINT_PIDFILE)
 				continue;
