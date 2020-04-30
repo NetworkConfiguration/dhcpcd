@@ -578,6 +578,7 @@ if [ "$PRIVSEP" = yes ]; then
 	fi
 
 	echo "CPPFLAGS+=	-DPRIVSEP" >>$CONFIG_MK
+	echo "PRIVSEP_USER?=	$PRIVSEP_USER" >>$CONFIG_MK
 	echo "#ifndef PRIVSEP_USER" >>$CONFIG_H
 	echo "#define PRIVSEP_USER		 \"$PRIVSEP_USER\"" >>$CONFIG_H
 	echo "#endif" >>$CONFIG_H

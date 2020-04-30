@@ -99,7 +99,7 @@ int
 ps_init(struct dhcpcd_ctx *ctx)
 {
 	char path[PATH_MAX];
-	struct passwd *pw = ctx->ps_user;
+	struct passwd *pw;
 
 	errno = 0;
 	if ((ctx->ps_user = pw = getpwnam(PRIVSEP_USER)) == NULL) {
@@ -113,16 +113,22 @@ ps_init(struct dhcpcd_ctx *ctx)
 		return -1;
 	}
 
+	if (ctx->ps_chroot == NULL)
+		ctx->ps_chroot = pw->pw_dir;
+
 	/* If we pickup the _dhcp user refuse the default directory */
-	if (strcmp(pw->pw_dir, "/var/empty") == 0) {
+	if (*ctx->ps_chroot != '/' ||
+	    strcmp(ctx->ps_chroot, "/var/empty") == 0)
+	{
 		ctx->options &= ~DHCPCD_PRIVSEP;
-		logerrx("refusing chroot: %s: %s", PRIVSEP_USER, pw->pw_dir);
+		logerrx("refusing chroot: %s: %s",
+		    PRIVSEP_USER, ctx->ps_chroot);
 		errno = 0;
 		return -1;
 	}
 
 	/* Create the database directory. */
-	if (snprintf(path, sizeof(path), "%s%s", pw->pw_dir, DBDIR) == -1 ||
+	if (snprintf(path, sizeof(path), "%s%s", ctx->ps_chroot, DBDIR) == -1 ||
 	    ps_mkdir(path) == -1 ||
 	    chown(path, pw->pw_uid, pw->pw_gid) == -1 ||
 	    chmod(path, 0755) == -1)
@@ -142,10 +148,10 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 	struct passwd *pw = ctx->ps_user;
 
 	if (!(ctx->options & DHCPCD_FORKED))
-		logdebugx("chrooting to `%s'", pw->pw_dir);
+		logdebugx("chrooting to `%s'", ctx->ps_chroot);
 
-	if (chroot(pw->pw_dir) == -1)
-		logerr("%s: chroot `%s'", __func__, pw->pw_dir);
+	if (chroot(ctx->ps_chroot) == -1)
+		logerr("%s: chroot `%s'", __func__, ctx->ps_chroot);
 	if (chdir("/") == -1)
 		logerr("%s: chdir `/'", __func__);
 
