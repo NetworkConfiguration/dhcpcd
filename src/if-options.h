@@ -177,9 +177,9 @@
 #define O_INFORM6		O_BASE + 45
 #define O_LASTLEASE_EXTEND	O_BASE + 46
 #define O_INACTIVE		O_BASE + 47
-#define	O_MUDURL		O_BASE + 48
-#define	O_MSUSERCLASS		O_BASE + 49
-#define	O_CHROOT		O_BASE + 50
+#define O_MUDURL		O_BASE + 48
+#define O_MSUSERCLASS		O_BASE + 49
+#define O_CHROOT		O_BASE + 50
 
 extern const struct option cf_options[];
 
