@@ -1826,6 +1826,9 @@ main(int argc, char **argv)
 #endif
 #ifdef PRIVSEP
 	ctx.ps_root_fd = ctx.ps_data_fd = -1;
+#ifdef PRIVSEP_CHROOT
+	ctx.ps_chroot = PRIVSEP_CHROOT;
+#endif
 	TAILQ_INIT(&ctx.ps_processes);
 #endif
 	rt_init(&ctx);
