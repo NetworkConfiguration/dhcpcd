@@ -252,8 +252,8 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 	if (!(ctx->options & DHCPCD_DEBUG) &&
 	   (!(ctx->options & DHCPCD_TEST) || loggetopts() & LOGERR_QUIET))
 	{
-		freopen(_PATH_DEVNULL, "w", stdout);
-		freopen(_PATH_DEVNULL, "w", stderr);
+		(void)freopen(_PATH_DEVNULL, "w", stdout);
+		(void)freopen(_PATH_DEVNULL, "w", stderr);
 	}
 
 	if (flags & PSF_DROPPRIVS)
