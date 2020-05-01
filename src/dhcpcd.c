@@ -357,8 +357,8 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 	eloop_event_delete(ctx->eloop, ctx->fork_fd);
 	close(ctx->fork_fd);
 	ctx->fork_fd = -1;
-	freopen(_PATH_DEVNULL, "w", stdout);
-	freopen(_PATH_DEVNULL, "w", stderr);
+	(void)freopen(_PATH_DEVNULL, "w", stdout);
+	(void)freopen(_PATH_DEVNULL, "w", stderr);
 #endif
 }
 
