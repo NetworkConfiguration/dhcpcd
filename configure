@@ -1766,6 +1766,10 @@ echo "   EGHOOKSCRIPTS =	$EGHOOKS"
 echo "   STATUSARG = 		$STATUSARG"
 if [ "$PRIVSEP" = yes ]; then
 	echo "   PRIVSEPUSER =	$PRIVSEP_USER"
+	if [ -z "$PRIVSEP_CHROOT" ]; then
+		PRIVSEP_CHROOT="(home directory of $PRIVSEP_USER)"
+	fi
+	echo "   CHROOTDIR =		$PRIVSEP_CHROOT"
 fi
 echo
 
