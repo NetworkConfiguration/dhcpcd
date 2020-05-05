@@ -267,8 +267,10 @@ instead of the default
 .Xr chroot 3
 to the
 .Ar chroot
-directory rather than the privilege separation users home directory.
-The privilege sepatation user is @PRIVSEP_USER@.
+directory rather than the
+@CHDIR^@privilege separation users home directory.@CHDIR$@
+@CHDIR@
+The privilege separation user is @PRIVSEP_USER@.
 .It Fl D , Fl Fl duid
 Use a DHCP Unique Identifier.
 If a system UUID is available, that will be used to create a DUID-UUID,

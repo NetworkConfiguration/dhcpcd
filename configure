@@ -583,6 +583,7 @@ if [ "$PRIVSEP" = yes ]; then
 	echo "PRIVSEP_USER?=	$PRIVSEP_USER" >>$CONFIG_MK
 	if [ -n "$PRIVSEP_CHROOT" ]; then
 		echo "PRIVSEP_CHROOT=	$PRIVSEP_CHROOT" >>$CONFIG_MK
+		echo "SED_CHROOT=	-e 's:@CHDIR^@.*@CHDIR\$\$@:default of:g' -e 's:@CHDIR@:.Pa \${PRIVSEP_CHROOT} .:g'" >>$CONFIG_MK
 	fi
 	echo "#ifndef PRIVSEP_USER" >>$CONFIG_H
 	echo "#define PRIVSEP_USER		 \"$PRIVSEP_USER\"" >>$CONFIG_H
