@@ -2095,7 +2095,7 @@ invalid_token:
 			logerr(__func__);
 			return -1;
 		}
-		while ((i = getgrnam_r(arg, &grpbuf, p, (size_t)l, &grp)) ==
+		while ((i = getgrnam_r(arg, &grpbuf, p, dl, &grp)) ==
 		    ERANGE)
 		{
 			size_t nl = dl * 2;
