@@ -3721,10 +3721,12 @@ static void
 dhcp6_recv(struct dhcpcd_ctx *ctx, struct ipv6_addr *ia)
 {
 	struct sockaddr_in6 from;
-	unsigned char buf[64 * 1024]; /* Maximum UDP message size */
+	union {
+		struct dhcp6_message dhcp6;
+		uint8_t buf[64 * 1024]; /* Maximum UDP message size */
+	} iovbuf;
 	struct iovec iov = {
-		.iov_base = buf,
-		.iov_len = sizeof(buf),
+		.iov_base = iovbuf.buf, .iov_len = sizeof(iovbuf.buf),
 	};
 	union {
 		struct cmsghdr hdr;

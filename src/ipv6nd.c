@@ -1937,10 +1937,12 @@ ipv6nd_handledata(void *arg)
 	struct dhcpcd_ctx *ctx;
 	int fd;
 	struct sockaddr_in6 from;
-	unsigned char buf[64 * 1024]; /* Maximum ICMPv6 size */
+	union {
+		struct icmp6_hdr hdr;
+		uint8_t buf[64 * 1024]; /* Maximum ICMPv6 size */
+	} iovbuf;
 	struct iovec iov = {
-		.iov_base = buf,
-		.iov_len = sizeof(buf),
+		.iov_base = iovbuf.buf, .iov_len = sizeof(iovbuf.buf),
 	};
 	union {
 		struct cmsghdr hdr;

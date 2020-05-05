@@ -3599,7 +3599,7 @@ dhcp_recvmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg)
 	}
 #endif
 
-	dhcp_handlebootp(ifp, (struct bootp *)iov->iov_base, iov->iov_len,
+	dhcp_handlebootp(ifp, iov->iov_base, iov->iov_len,
 	    &from->sin_addr);
 }
 
@@ -3608,10 +3608,13 @@ dhcp_readudp(struct dhcpcd_ctx *ctx, struct interface *ifp)
 {
 	const struct dhcp_state *state;
 	struct sockaddr_in from;
-	unsigned char buf[10 * 1024]; /* Maximum MTU */
+	union {
+		struct bootp bootp;
+		uint8_t buf[10 * 1024]; /* Maximum MTU */
+	} iovbuf;
 	struct iovec iov = {
-		.iov_base = buf,
-		.iov_len = sizeof(buf),
+		.iov_base = iovbuf.buf,
+		.iov_len = sizeof(iovbuf.buf),
 	};
 	union {
 		struct cmsghdr hdr;
@@ -3624,7 +3627,7 @@ dhcp_readudp(struct dhcpcd_ctx *ctx, struct interface *ifp)
 	struct msghdr msg = {
 	    .msg_name = &from, .msg_namelen = sizeof(from),
 	    .msg_iov = &iov, .msg_iovlen = 1,
-	    .msg_control = buf, .msg_controllen = sizeof(cmsgbuf.buf),
+	    .msg_control = cmsgbuf.buf, .msg_controllen = sizeof(cmsgbuf.buf),
 	};
 	int s;
 	ssize_t bytes;
