@@ -2120,7 +2120,8 @@ invalid_token:
 			return -1;
 		}
 		if (grp == NULL) {
-			logerrx("controlgroup: %s: not found", arg);
+			if (!ctx->control_group)
+				logerrx("controlgroup: %s: not found", arg);
 			free(p);
 			return -1;
 		}
@@ -2129,7 +2130,8 @@ invalid_token:
 #else
 		grp = getgrnam(arg);
 		if (grp == NULL) {
-			logerrx("controlgroup: %s: not found", arg);
+			if (!ctx->control_group)
+				logerrx("controlgroup: %s: not found", arg);
 			return -1;
 		}
 		ctx->control_group = grp->gr_gid;
