@@ -269,7 +269,8 @@ to the
 .Ar chroot
 directory rather than the
 @CHDIR^@privilege separation users home directory.@CHDIR$@
-@CHDIR@
+@CHDIR1@
+@CHDIR2@
 The privilege separation user is @PRIVSEP_USER@.
 .It Fl D , Fl Fl duid
 Use a DHCP Unique Identifier.

@@ -1896,7 +1896,15 @@ main(int argc, char **argv)
 			break;
 #ifdef PRIVSEP
 		case O_CHROOT:
-			ctx.ps_chroot = optarg;
+#ifdef PRIVSEP_CHROOT
+			if (*optarg == '\0' ||
+			    (((optarg[0] == '"' && optarg[1] == '"') ||
+			      (optarg[0] == '\'' && optarg[1] == '\'')) &&
+			     optarg[2] == '\0'))
+				ctx.ps_chroot = NULL;
+			else
+#endif
+				ctx.ps_chroot = optarg;
 			break;
 #endif
 		case '?':

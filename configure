@@ -583,7 +583,11 @@ if [ "$PRIVSEP" = yes ]; then
 	echo "PRIVSEP_USER?=	$PRIVSEP_USER" >>$CONFIG_MK
 	if [ -n "$PRIVSEP_CHROOT" ]; then
 		echo "PRIVSEP_CHROOT=	$PRIVSEP_CHROOT" >>$CONFIG_MK
-		echo "SED_CHROOT=	-e 's:@CHDIR^@.*@CHDIR\$\$@:default of:g' -e 's:@CHDIR@:.Pa \${PRIVSEP_CHROOT} .:g'" >>$CONFIG_MK
+		cat <<EOF >>$CONFIG_MK
+SED_CHROOT=	-e 's:@CHDIR^@.*@CHDIR\$\$@:default of:g' \\
+	-e 's:@CHDIR1@:.Pa \${PRIVSEP_CHROOT} .:g' \\
+	-e 's:@CHDIR2@:A blank string chroots to the privileged separation users home directory.:g'
+EOF
 	fi
 	echo "#ifndef PRIVSEP_USER" >>$CONFIG_H
 	echo "#define PRIVSEP_USER		 \"$PRIVSEP_USER\"" >>$CONFIG_H
