@@ -279,13 +279,6 @@ ps_inet_stop(struct dhcpcd_ctx *ctx)
 	return ps_dostop(ctx, &ctx->ps_inet_pid, &ctx->ps_inet_fd);
 }
 
-ssize_t
-ps_inet_sendmsg(struct dhcpcd_ctx *ctx, uint8_t cmd, const struct msghdr *msg)
-{
-
-	return ps_sendmsg(ctx, ctx->ps_inet_fd, cmd, 0, msg);
-}
-
 #ifdef INET
 static void
 ps_inet_recvinbootp(void *arg)
@@ -579,7 +572,7 @@ ssize_t
 ps_inet_sendnd(struct interface *ifp, const struct msghdr *msg)
 {
 
-	return ps_inet_sendmsg(ifp->ctx, PS_ND, msg);
+	return ps_sendmsg(ifp->ctx, ifp->ctx->ps_inet_fd, PS_ND, 0, msg);
 }
 #endif
 
