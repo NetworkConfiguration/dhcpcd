@@ -33,6 +33,7 @@
 
 /* Start flags */
 #define	PSF_DROPPRIVS		0x01
+#define	PSF_CAP_ENTER		0x02
 
 /* Commands */
 #define	PS_BOOTP		0x01
@@ -139,7 +140,7 @@ TAILQ_HEAD(ps_process_head, ps_process);
 
 int ps_mkdir(char *);
 int ps_init(struct dhcpcd_ctx *);
-int ps_dropprivs(struct dhcpcd_ctx *);
+int ps_dropprivs(struct dhcpcd_ctx *, unsigned int);
 int ps_start(struct dhcpcd_ctx *);
 int ps_stop(struct dhcpcd_ctx *);
 

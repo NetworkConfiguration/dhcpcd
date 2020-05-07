@@ -70,6 +70,9 @@
 #include "logerr.h"
 #include "privsep.h"
 
+#ifdef HAVE_CAPSICUM
+#include <sys/capsicum.h>
+#endif
 #ifdef HAVE_UTIL_H
 #include <util.h>
 #endif
@@ -143,7 +146,7 @@ ps_init(struct dhcpcd_ctx *ctx)
 }
 
 int
-ps_dropprivs(struct dhcpcd_ctx *ctx)
+ps_dropprivs(struct dhcpcd_ctx *ctx, unsigned int flags)
 {
 	struct passwd *pw = ctx->ps_user;
 
@@ -163,6 +166,14 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 		return -1;
 	}
 
+#ifdef HAVE_CAPSICUM
+	if (flags & PSF_CAP_ENTER) {
+		if (cap_enter() == -1 && errno != ENOSYS) {
+			logerr("%s: cap_enter", __func__);
+			return -1;
+		}
+	}
+#endif
 	return 0;
 }
 
@@ -176,6 +187,11 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 	int stype;
 	int fd[2];
 	pid_t pid;
+#ifdef HAVE_CAPSICUM
+	cap_rights_t rights;
+
+	cap_rights_init(&rights, CAP_READ, CAP_WRITE, CAP_EVENT, CAP_SHUTDOWN);
+#endif
 
 	stype = SOCK_CLOEXEC | SOCK_NONBLOCK;
 	if (socketpair(AF_UNIX, SOCK_DGRAM | stype, 0, fd) == -1) {
@@ -195,8 +211,17 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 		*priv_pid = pid;
 		*priv_fd = fd[0];
 		close(fd[1]);
-		if (recv_unpriv_msg != NULL &&
-		    eloop_event_add(ctx->eloop, *priv_fd,
+		if (recv_unpriv_msg == NULL)
+			;
+#ifdef HAVE_CAPSICUM
+		else if (cap_rights_limit(*priv_fd, &rights) == -1
+		    && errno != ENOSYS)
+		{
+			logerr("%s: cap_rights_limit", __func__);
+			return -1;
+		}
+#endif
+		else if (eloop_event_add(ctx->eloop, *priv_fd,
 		    recv_unpriv_msg, recv_ctx) == -1)
 		{
 			logerr("%s: eloop_event_add", __func__);
@@ -240,6 +265,11 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 		goto errexit;
 	}
 
+#ifdef HAVE_CAPSICUM
+	if (cap_rights_limit(*priv_fd, &rights) == -1 && errno != ENOSYS)
+		goto errexit;
+#endif
+
 	if (eloop_event_add(ctx->eloop, *priv_fd, recv_msg, recv_ctx) == -1)
 	{
 		logerr("%s: eloop_event_add", __func__);
@@ -257,7 +287,7 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 	}
 
 	if (flags & PSF_DROPPRIVS)
-		ps_dropprivs(ctx);
+		ps_dropprivs(ctx, flags);
 
 	return 0;
 

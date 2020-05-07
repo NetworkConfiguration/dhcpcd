@@ -2236,9 +2236,16 @@ printpidfile:
 		dev_start(&ctx);
 
 #ifdef PRIVSEP
-	if (ctx.options & DHCPCD_PRIVSEP && ps_dropprivs(&ctx) == -1) {
-		logerr("ps_dropprivs");
-		goto exit_failure;
+	if (ctx.options & DHCPCD_PRIVSEP) {
+		/*
+		 * PSF_CAP_ENTER is not set because the following functions
+		 * won't work in it:
+		 * getifaddrs(3), gethostname(3), uname(3).
+		 */
+		if (ps_dropprivs(&ctx, 0) == -1) {
+			logerr("ps_dropprivs");
+			goto exit_failure;
+		}
 	}
 #endif
 
