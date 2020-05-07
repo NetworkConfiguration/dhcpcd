@@ -54,6 +54,10 @@
 #include "logerr.h"
 #include "privsep.h"
 
+#ifdef HAVE_CAPSICUM
+#include <sys/capsicum.h>
+#endif
+
 static void
 ps_bpf_recvbpf(void *arg)
 {
@@ -152,6 +156,13 @@ ps_bpf_start_bpf(void *arg)
 {
 	struct ps_process *psp = arg;
 	struct dhcpcd_ctx *ctx = psp->psp_ctx;
+#ifdef HAVE_CAPSICUM
+	cap_rights_t rights;
+
+	/* We need CAP_IOCTL so we can change the BPF filter when we
+	 * need to. */
+	cap_rights_init(&rights, CAP_READ, CAP_WRITE, CAP_EVENT, CAP_IOCTL);
+#endif
 
 	setproctitle("[BPF %s] %s", psp->psp_protostr, psp->psp_ifname);
 
@@ -160,6 +171,11 @@ ps_bpf_start_bpf(void *arg)
 	psp->psp_work_fd = bpf_open(&psp->psp_ifp, psp->psp_filter);
 	if (psp->psp_work_fd == -1)
 		logerr("%s: bpf_open",__func__);
+#ifdef HAVE_CAPSICUM
+	else if (cap_rights_limit(psp->psp_work_fd, &rights) == -1 &&
+	    errno != ENOSYS)
+		logerr("%s: cap_rights_limit", __func__);
+#endif
 	else if (eloop_event_add(ctx->eloop,
 	    psp->psp_work_fd, ps_bpf_recvbpf, psp) == -1)
 		logerr("%s: eloop_event_add", __func__);
@@ -252,7 +268,8 @@ ps_bpf_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg)
 	start = ps_dostart(ctx,
 	    &psp->psp_pid, &psp->psp_fd,
 	    ps_bpf_recvmsg, NULL, psp,
-	    ps_bpf_start_bpf, ps_bpf_signal_bpfcb, PSF_DROPPRIVS);
+	    ps_bpf_start_bpf, ps_bpf_signal_bpfcb,
+	    PSF_DROPPRIVS | PSF_CAP_ENTER);
 	switch (start) {
 	case -1:
 		ps_freeprocess(psp);

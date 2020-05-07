@@ -45,6 +45,13 @@
 #include "logerr.h"
 #include "privsep.h"
 
+#ifdef HAVE_CAPSICUM
+/* We never call ps_dostart with PSF_CAP_ENTER because
+ * our sockets require the use of CAP_CONNECT which does not
+ * work in capabilities mode according to rights(4). */
+#include <sys/capsicum.h>
+#endif
+
 #ifdef INET
 static void
 ps_inet_recvbootp(void *arg)
@@ -92,6 +99,11 @@ ps_inet_startcb(void *arg)
 {
 	struct dhcpcd_ctx *ctx = arg;
 	int ret = 0;
+#ifdef HAVE_CAPSICUM
+	cap_rights_t rights;
+
+	cap_rights_init(&rights, CAP_RECV, CAP_CONNECT, CAP_SEND, CAP_EVENT);
+#endif
 
 	if (ctx->options & DHCPCD_MASTER)
 		setproctitle("[network proxy]");
@@ -114,6 +126,15 @@ ps_inet_startcb(void *arg)
 		ctx->udp_fd = dhcp_openudp(NULL);
 		if (ctx->udp_fd == -1)
 			logerr("%s: dhcp_open", __func__);
+#ifdef HAVE_CAPSICUM
+		else if (cap_rights_limit(ctx->udp_fd, &rights) == -1
+		    && errno != ENOSYS)
+		{
+			logerr("%s: cap_rights_limit", __func__);
+			close(ctx->udp_fd);
+			ctx->udp_fd = -1;
+		}
+#endif
 		else if (eloop_event_add(ctx->eloop, ctx->udp_fd,
 		    ps_inet_recvbootp, ctx) == -1)
 		{
@@ -128,6 +149,15 @@ ps_inet_startcb(void *arg)
 	if (ctx->options & DHCPCD_IPV6) {
 		if (ipv6nd_open(ctx) == -1)
 			logerr("%s: ipv6nd_open", __func__);
+#ifdef HAVE_CAPSICUM
+		else if (cap_rights_limit(ctx->nd_fd, &rights) == -1
+		    && errno != ENOSYS)
+		{
+			logerr("%s: cap_rights_limit", __func__);
+			close(ctx->nd_fd);
+			ctx->nd_fd = -1;
+		}
+#endif
 		else if (eloop_event_add(ctx->eloop, ctx->nd_fd,
 		    ps_inet_recvra, ctx) == -1)
 		{
@@ -145,6 +175,15 @@ ps_inet_startcb(void *arg)
 		ctx->dhcp6_fd = dhcp6_openudp(0, NULL);
 		if (ctx->dhcp6_fd == -1)
 			logerr("%s: dhcp6_open", __func__);
+#ifdef HAVE_CAPSICUM
+		else if (cap_rights_limit(ctx->dhcp6_fd, &rights) == -1
+		    && errno != ENOSYS)
+		{
+			logerr("%s: cap_rights_limit", __func__);
+			close(ctx->dhcp6_fd);
+			ctx->dhcp6_fd = -1;
+		}
+#endif
 		else if (eloop_event_add(ctx->eloop, ctx->dhcp6_fd,
 		    ps_inet_recvdhcp6, ctx) == -1)
 		{
@@ -296,6 +335,11 @@ ps_inet_listenin(void *arg)
 	struct ps_process *psp = arg;
 	struct in_addr *ia = &psp->psp_id.psi_addr.psa_in_addr;
 	char buf[INET_ADDRSTRLEN];
+#ifdef HAVE_CAPSICUM
+	cap_rights_t rights;
+
+	cap_rights_init(&rights, CAP_RECV, CAP_CONNECT, CAP_SEND, CAP_EVENT);
+#endif
 
 	inet_ntop(AF_INET, ia, buf, sizeof(buf));
 	setproctitle("[network proxy] %s", buf);
@@ -306,6 +350,15 @@ ps_inet_listenin(void *arg)
 		return -1;
 	}
 
+#ifdef HAVE_CAPSICUM
+	if (cap_rights_limit(psp->psp_work_fd, &rights) == -1 &&
+	    errno != ENOSYS)
+	{
+		logerr("%s: cap_rights_limit", __func__);
+		return -1;
+	}
+#endif
+
 	if (eloop_event_add(psp->psp_ctx->eloop, psp->psp_work_fd,
 	    ps_inet_recvinbootp, psp) == -1)
 	{
@@ -313,9 +366,7 @@ ps_inet_listenin(void *arg)
 		return -1;
 	}
 
-#ifdef PRIVSEP_DEBUG
 	logdebugx("spawned listener %s on PID %d", buf, getpid());
-#endif
 	return 0;
 }
 #endif
@@ -335,6 +386,11 @@ static int
 ps_inet_listennd(void *arg)
 {
 	struct ps_process *psp = arg;
+#ifdef HAVE_CAPSICUM
+	cap_rights_t rights;
+
+	cap_rights_init(&rights, CAP_RECV, CAP_CONNECT, CAP_SEND, CAP_EVENT);
+#endif
 
 	setproctitle("[ND network proxy]");
 
@@ -343,6 +399,15 @@ ps_inet_listennd(void *arg)
 		logerr(__func__);
 		return -1;
 	}
+
+#ifdef HAVE_CAPSICUM
+	if (cap_rights_limit(psp->psp_work_fd, &rights) == -1 &&
+	    errno != ENOSYS)
+	{
+		logerr("%s: cap_rights_limit", __func__);
+		return -1;
+	}
+#endif
 
 	if (eloop_event_add(psp->psp_ctx->eloop, psp->psp_work_fd,
 	    ps_inet_recvin6nd, psp) == -1)
@@ -373,6 +438,11 @@ ps_inet_listenin6(void *arg)
 	struct ps_process *psp = arg;
 	struct in6_addr *ia = &psp->psp_id.psi_addr.psa_in6_addr;
 	char buf[INET6_ADDRSTRLEN];
+#ifdef HAVE_CAPSICUM
+	cap_rights_t rights;
+
+	cap_rights_init(&rights, CAP_RECV, CAP_CONNECT, CAP_SEND, CAP_EVENT);
+#endif
 
 	inet_ntop(AF_INET6, ia, buf, sizeof(buf));
 	setproctitle("[network proxy] %s", buf);
@@ -382,6 +452,15 @@ ps_inet_listenin6(void *arg)
 		logerr(__func__);
 		return -1;
 	}
+
+#ifdef HAVE_CAPSICUM
+	if (cap_rights_limit(psp->psp_work_fd, &rights) == -1 &&
+	    errno != ENOSYS)
+	{
+		logerr("%s: cap_rights_limit", __func__);
+		return -1;
+	}
+#endif
 
 	if (eloop_event_add(psp->psp_ctx->eloop, psp->psp_work_fd,
 	    ps_inet_recvin6dhcp6, psp) == -1)

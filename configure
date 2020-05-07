@@ -648,6 +648,23 @@ else
 	echo "EMBEDDEDINSTALL=	_embeddedinstall" >>$CONFIG_MK
 fi
 
+if [ "$PRIVSEP" = yes ]; then
+	printf "Testing for capsicum ... "
+	cat <<EOF >_capsicum.c
+#include <sys/capsicum.h>
+int main(void) {
+	return cap_enter();
+}
+EOF
+	if $XCC _capsicum.c -o _capsicum 2>&3; then
+		echo "yes"
+		echo "#define	HAVE_CAPSICUM" >>$CONFIG_H
+	else
+		echo "no"
+	fi
+	rm -f _capsicum.c _capsicum
+fi
+
 if [ "$OS" = linux ]; then
 	printf "Testing for nl80211 ... "
 	cat <<EOF >_nl80211.c
