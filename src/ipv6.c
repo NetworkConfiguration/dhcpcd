@@ -1532,6 +1532,44 @@ ipv6_tryaddlinklocal(struct interface *ifp)
 	return ipv6_addlinklocal(ifp);
 }
 
+void
+ipv6_setscope(struct sockaddr_in6 *sin, unsigned int ifindex)
+{
+
+#ifdef __KAME__
+	/* KAME based systems want to store the scope inside the sin6_addr
+	 * for link local addresses */
+	if (IN6_IS_ADDR_LINKLOCAL(&sin->sin6_addr)) {
+		uint16_t scope = htons((uint16_t)ifindex);
+		memcpy(&sin->sin6_addr.s6_addr[2], &scope,
+		    sizeof(scope));
+	}
+	sin->sin6_scope_id = 0;
+#else
+	if (IN6_IS_ADDR_LINKLOCAL(&sin->sin6_addr))
+		sin->sin6_scope_id = ifindex;
+	else
+		sin->sin6_scope_id = 0;
+#endif
+}
+
+unsigned int
+ipv6_getscope(const struct sockaddr_in6 *sin)
+{
+#ifdef __KAME__
+	uint16_t scope;
+#endif
+
+	if (!IN6_IS_ADDR_LINKLOCAL(&sin->sin6_addr))
+		return 0;
+#ifdef __KAME__
+	memcpy(&scope, &sin->sin6_addr.s6_addr[2], sizeof(scope));
+	return (unsigned int)ntohs(scope);
+#else
+	return (unsigned int)sin->sin6_scope_id;
+#endif
+}
+
 struct ipv6_addr *
 ipv6_newaddr(struct interface *ifp, const struct in6_addr *addr,
     uint8_t prefix_len, unsigned int flags)

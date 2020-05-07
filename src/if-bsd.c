@@ -109,11 +109,6 @@ static const char * const ifnames_ignore[] = {
 	NULL
 };
 
-#ifdef INET6
-static void ifa_setscope(struct sockaddr_in6 *, unsigned int);
-static unsigned int ifa_getscope(const struct sockaddr_in6 *);
-#endif
-
 struct priv {
 	int pf_inet6_fd;
 };
@@ -580,7 +575,7 @@ if_findsa(struct dhcpcd_ctx *ctx, const struct sockaddr *sa)
 		struct ipv6_addr *ia;
 
 		sin = (const void *)sa;
-		scope = ifa_getscope(sin);
+		scope = ipv6_getscope(sin);
 		if (scope != 0)
 			return if_findindex(ctx->ifaces, scope);
 		if ((ia = ipv6_findmaskaddr(ctx, &sin->sin6_addr)))
@@ -737,7 +732,7 @@ if_route(unsigned char cmd, const struct rt *rt)
 			if_copysa(&gateway.sa, &rt->rt_gateway);
 #ifdef INET6
 			if (gateway.sa.sa_family == AF_INET6)
-				ifa_setscope(&gateway.sin6, rt->rt_ifp->index);
+				ipv6_setscope(&gateway.sin6, rt->rt_ifp->index);
 #endif
 			ADDSA(&gateway.sa);
 		}
@@ -960,44 +955,6 @@ if_addrflags(const struct interface *ifp, const struct in_addr *addr,
 #endif /* INET */
 
 #ifdef INET6
-static void
-ifa_setscope(struct sockaddr_in6 *sin, unsigned int ifindex)
-{
-
-#ifdef __KAME__
-	/* KAME based systems want to store the scope inside the sin6_addr
-	 * for link local addresses */
-	if (IN6_IS_ADDR_LINKLOCAL(&sin->sin6_addr)) {
-		uint16_t scope = htons((uint16_t)ifindex);
-		memcpy(&sin->sin6_addr.s6_addr[2], &scope,
-		    sizeof(scope));
-	}
-	sin->sin6_scope_id = 0;
-#else
-	if (IN6_IS_ADDR_LINKLOCAL(&sin->sin6_addr))
-		sin->sin6_scope_id = ifindex;
-	else
-		sin->sin6_scope_id = 0;
-#endif
-}
-
-static unsigned int
-ifa_getscope(const struct sockaddr_in6 *sin)
-{
-#ifdef __KAME__
-	uint16_t scope;
-#endif
-
-	if (!IN6_IS_ADDR_LINKLOCAL(&sin->sin6_addr))
-		return 0;
-#ifdef __KAME__
-	memcpy(&scope, &sin->sin6_addr.s6_addr[2], sizeof(scope));
-	return (unsigned int)ntohs(scope);
-#else
-	return (unsigned int)sin->sin6_scope_id;
-#endif
-}
-
 static int
 if_ioctl6(struct dhcpcd_ctx *ctx, unsigned long req, void *data, size_t len)
 {
@@ -1042,7 +999,7 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 	}
 
 	ADDADDR(&ifa.ifra_addr, &ia->addr);
-	ifa_setscope(&ifa.ifra_addr, ia->iface->index);
+	ipv6_setscope(&ifa.ifra_addr, ia->iface->index);
 	ipv6_mask(&mask, ia->prefix_len);
 	ADDADDR(&ifa.ifra_prefixmask, &mask);
 
@@ -1120,7 +1077,7 @@ if_addrflags6(const struct interface *ifp, const struct in6_addr *addr,
 	strlcpy(ifr6.ifr_name, ifp->name, sizeof(ifr6.ifr_name));
 	ifr6.ifr_addr.sin6_family = AF_INET6;
 	ifr6.ifr_addr.sin6_addr = *addr;
-	ifa_setscope(&ifr6.ifr_addr, ifp->index);
+	ipv6_setscope(&ifr6.ifr_addr, ifp->index);
 	priv = (struct priv *)ifp->ctx->priv;
 	if (ioctl(priv->pf_inet6_fd, SIOCGIFAFLAG_IN6, &ifr6) != -1)
 		flags = ifr6.ifr_ifru.ifru_flags6;
@@ -1141,7 +1098,7 @@ if_getlifetime6(struct ipv6_addr *ia)
 	strlcpy(ifr6.ifr_name, ia->iface->name, sizeof(ifr6.ifr_name));
 	ifr6.ifr_addr.sin6_family = AF_INET6;
 	ifr6.ifr_addr.sin6_addr = ia->addr;
-	ifa_setscope(&ifr6.ifr_addr, ia->iface->index);
+	ipv6_setscope(&ifr6.ifr_addr, ia->iface->index);
 	priv = (struct priv *)ia->iface->ctx->priv;
 	if (ioctl(priv->pf_inet6_fd, SIOCGIFALIFETIME_IN6, &ifr6) == -1)
 		return -1;
@@ -1517,7 +1474,7 @@ if_missfilter0(struct dhcpcd_ctx *ctx, struct interface *ifp,
 
 #ifdef INET6
 	if (sa->sa_family == AF_INET6)
-		ifa_setscope(satosin6(sa), ifp->index);
+		ipv6_setscope(satosin6(sa), ifp->index);
 #else
 	UNUSED(ifp);
 #endif
@@ -1530,7 +1487,7 @@ if_missfilter0(struct dhcpcd_ctx *ctx, struct interface *ifp,
 
 #ifdef INET6
 	if (sa->sa_family == AF_INET6)
-		ifa_setscope(satosin6(sa), 0);
+		ipv6_setscope(satosin6(sa), 0);
 #endif
 
 	return 0;

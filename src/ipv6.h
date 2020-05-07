@@ -287,8 +287,10 @@ struct ipv6_addr *ipv6_findmaskaddr(struct dhcpcd_ctx *,
     const struct in6_addr *);
 #define ipv6_linklocal(ifp) ipv6_iffindaddr((ifp), NULL, IN6_IFF_NOTUSEABLE)
 int ipv6_addlinklocalcallback(struct interface *, void (*)(void *), void *);
-struct ipv6_addr *ipv6_newaddr(struct interface *, const struct in6_addr *, uint8_t,
-    unsigned int);
+void ipv6_setscope(struct sockaddr_in6 *, unsigned int);
+unsigned int ipv6_getscope(const struct sockaddr_in6 *);
+struct ipv6_addr *ipv6_newaddr(struct interface *, const struct in6_addr *,
+    uint8_t, unsigned int);
 void ipv6_freeaddr(struct ipv6_addr *);
 void ipv6_freedrop(struct interface *, int);
 #define ipv6_free(ifp) ipv6_freedrop((ifp), 0)

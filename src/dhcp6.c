@@ -3223,12 +3223,14 @@ dhcp6_bind(struct interface *ifp, const char *op, const char *sfrom)
 			state->state = DH6S_BOUND;
 		state->failed = false;
 
-		if (state->renew && state->renew != ND6_INFINITE_LIFETIME)
+		if ((state->renew != 0 || state->rebind != 0) &&
+		    state->renew != ND6_INFINITE_LIFETIME)
 			eloop_timeout_add_sec(ifp->ctx->eloop,
 			    state->renew,
 			    state->state == DH6S_INFORMED ?
 			    dhcp6_startinform : dhcp6_startrenew, ifp);
-		if (state->rebind && state->rebind != ND6_INFINITE_LIFETIME)
+		if ((state->rebind != 0 || state->expire != 0) &&
+		    state->rebind != ND6_INFINITE_LIFETIME)
 			eloop_timeout_add_sec(ifp->ctx->eloop,
 			    state->rebind, dhcp6_startrebind, ifp);
 		if (state->expire != ND6_INFINITE_LIFETIME)
@@ -3792,7 +3794,7 @@ dhcp6_openudp(unsigned int ifindex, struct in6_addr *ia)
 
 	if (ia != NULL) {
 		memcpy(&sa.sin6_addr, ia, sizeof(sa.sin6_addr));
-		sa.sin6_scope_id = ifindex;
+		ipv6_setscope(&sa, ifindex);
 	}
 
 	if (bind(s, (struct sockaddr *)&sa, sizeof(sa)) == -1)
