@@ -393,7 +393,7 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 		return NULL;
 	}
 	if (getifaddrs(ifaddrs) == -1) {
-		logerr(__func__);
+		logerr("getifaddrs");
 		free(ifs);
 		return NULL;
 	}
