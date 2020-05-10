@@ -366,7 +366,7 @@ static int if_indirect_ioctl(struct dhcpcd_ctx *ctx,
 #else
 	struct ifreq ifr = { .ifr_flags = 0 };
 
-	strlcpy(data, ifname, IFNAMSIZ);
+	strlcpy(ifr.ifr_name, ifname, IFNAMSIZ);
 	ifr.ifr_data = data;
 	UNUSED(len);
 	return ioctl(ctx->pf_inet_fd, cmd, &ifr);
@@ -448,9 +448,8 @@ int
 if_vimaster(struct dhcpcd_ctx *ctx, const char *ifname)
 {
 	int r;
-	struct ifmediareq ifmr;
+	struct ifmediareq ifmr = { .ifm_active = 0 };
 
-	memset(&ifmr, 0, sizeof(ifmr));
 	strlcpy(ifmr.ifm_name, ifname, sizeof(ifmr.ifm_name));
 	r = ioctl(ctx->pf_inet_fd, SIOCGIFMEDIA, &ifmr);
 	if (r == -1)
