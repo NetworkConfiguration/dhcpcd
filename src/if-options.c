@@ -2095,7 +2095,7 @@ invalid_token:
 			logerr(__func__);
 			return -1;
 		}
-		while ((i = getgrnam_r(arg, &grpbuf, p, (size_t)l, &grp)) ==
+		while ((i = getgrnam_r(arg, &grpbuf, p, dl, &grp)) ==
 		    ERANGE)
 		{
 			size_t nl = dl * 2;
@@ -2120,7 +2120,8 @@ invalid_token:
 			return -1;
 		}
 		if (grp == NULL) {
-			logerrx("controlgroup: %s: not found", arg);
+			if (!ctx->control_group)
+				logerrx("controlgroup: %s: not found", arg);
 			free(p);
 			return -1;
 		}
@@ -2129,7 +2130,8 @@ invalid_token:
 #else
 		grp = getgrnam(arg);
 		if (grp == NULL) {
-			logerrx("controlgroup: %s: not found", arg);
+			if (!ctx->control_group)
+				logerrx("controlgroup: %s: not found", arg);
 			return -1;
 		}
 		ctx->control_group = grp->gr_gid;
