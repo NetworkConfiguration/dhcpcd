@@ -524,7 +524,11 @@ ipv6nd_advertise(struct ipv6_addr *ia)
 
 	na->nd_na_type = ND_NEIGHBOR_ADVERT;
 	na->nd_na_flags_reserved = ND_NA_FLAG_OVERRIDE;
+#ifdef HAVE_PLEDGE
+	if (ps_root_ip6_forwarding(ctx) == 1)
+#else
 	if (ip6_forwarding(ifp->name) == 1)
+#endif
 		na->nd_na_flags_reserved |= ND_NA_FLAG_ROUTER;
 	na->nd_na_target = ia->addr;
 

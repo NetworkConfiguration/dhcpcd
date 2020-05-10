@@ -298,6 +298,9 @@ if_ignore(struct dhcpcd_ctx *ctx, const char *ifname)
 		return true;
 
 #ifdef SIOCGIFGROUP
+#ifdef HAVE_PLEDGE
+#warning Fix SIOCGIFGROUP for to remove inet pledge requirement
+#endif
 	struct ifgroupreq ifgr = { .ifgr_len = 0 };
 	struct ifg_req *ifg;
 	size_t ifg_len;
@@ -354,27 +357,25 @@ if_linkaddr(struct sockaddr_dl *sdl, const struct interface *ifp)
 }
 
 #if defined(SIOCG80211NWID) || defined(SIOCGETVLAN)
-static int if_direct_ioctl(int s, const char *ifname,
-    unsigned long cmd, void *data)
+static int if_indirect_ioctl(struct dhcpcd_ctx *ctx,
+    const char *ifname, unsigned long cmd, void *data, size_t len)
 {
+
+#ifdef HAVE_PLEDGE
+	return (int)ps_root_indirectioctl(ctx, cmd, ifname, data, len);
+#else
+	struct ifreq ifr = { .ifr_flags = 0 };
 
 	strlcpy(data, ifname, IFNAMSIZ);
-	return ioctl(s, cmd, data);
-}
-
-static int if_indirect_ioctl(int s, const char *ifname,
-    unsigned long cmd, void *data)
-{
-	struct ifreq ifr;
-
-	memset(&ifr, 0, sizeof(ifr));
 	ifr.ifr_data = data;
-	return if_direct_ioctl(s, ifname, cmd, &ifr);
+	UNUSED(len);
+	return ioctl(ctx->pf_inet_fd, cmd, &ifr);
+#endif
 }
 #endif
 
 static int
-if_getssid1(int s, const char *ifname, void *ssid)
+if_getssid1(struct dhcpcd_ctx *ctx, const char *ifname, void *ssid)
 {
 	int retval = -1;
 #if defined(SIOCG80211NWID)
@@ -386,7 +387,9 @@ if_getssid1(int s, const char *ifname, void *ssid)
 
 #if defined(SIOCG80211NWID) /* NetBSD */
 	memset(&nwid, 0, sizeof(nwid));
-	if (if_indirect_ioctl(s, ifname, SIOCG80211NWID, &nwid) == 0) {
+	if (if_indirect_ioctl(ctx, ifname, SIOCG80211NWID,
+	    &nwid, sizeof(nwid)) == 0)
+	{
 		if (ssid == NULL)
 			retval = nwid.i_len;
 		else if (nwid.i_len > IF_SSIDLEN)
@@ -403,7 +406,7 @@ if_getssid1(int s, const char *ifname, void *ssid)
 	ireq.i_val = -1;
 	memset(nwid, 0, sizeof(nwid));
 	ireq.i_data = &nwid;
-	if (ioctl(s, SIOCG80211, &ireq) == 0) {
+	if (ioctl(ctx->pf_inet_fd, SIOCG80211, &ireq) == 0) {
 		if (ssid == NULL)
 			retval = ireq.i_len;
 		else if (ireq.i_len > IF_SSIDLEN)
@@ -425,7 +428,7 @@ if_getssid(struct interface *ifp)
 {
 	int r;
 
-	r = if_getssid1(ifp->ctx->pf_inet_fd, ifp->name, ifp->ssid);
+	r = if_getssid1(ifp->ctx, ifp->name, ifp->ssid);
 	if (r != -1)
 		ifp->ssid_len = (unsigned int)r;
 	else
@@ -442,7 +445,7 @@ if_getssid(struct interface *ifp)
  * returning the SSID gives an error.
  */
 int
-if_vimaster(const struct dhcpcd_ctx *ctx, const char *ifname)
+if_vimaster(struct dhcpcd_ctx *ctx, const char *ifname)
 {
 	int r;
 	struct ifmediareq ifmr;
@@ -455,7 +458,7 @@ if_vimaster(const struct dhcpcd_ctx *ctx, const char *ifname)
 	if (ifmr.ifm_status & IFM_AVALID &&
 	    IFM_TYPE(ifmr.ifm_active) == IFM_IEEE80211)
 	{
-		if (if_getssid1(ctx->pf_inet_fd, ifname, NULL) == -1)
+		if (if_getssid1(ctx, ifname, NULL) == -1)
 			return 1;
 	}
 	return 0;
@@ -465,17 +468,15 @@ unsigned short
 if_vlanid(const struct interface *ifp)
 {
 #ifdef SIOCGETVLAN
-	struct vlanreq vlr;
+	struct vlanreq vlr = { .vlr_tag = 0 };
 
-	memset(&vlr, 0, sizeof(vlr));
-	if (if_indirect_ioctl(ifp->ctx->pf_inet_fd,
-	    ifp->name, SIOCGETVLAN, &vlr) != 0)
+	if (if_indirect_ioctl(ifp->ctx, ifp->name, SIOCGETVLAN,
+	    &vlr, sizeof(vlr)) != 0)
 		return 0; /* 0 means no VLANID */
 	return vlr.vlr_tag;
 #elif defined(SIOCGVNETID)
-	struct ifreq ifr;
+	struct ifreq ifr = { .ifr_vnetid = 0 };
 
-	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
 	if (ioctl(ifp->ctx->pf_inet_fd, SIOCGVNETID, &ifr) != 0)
 		return 0; /* 0 means no VLANID */
@@ -1569,6 +1570,7 @@ if_machinearch(char *str, size_t len)
 	char march[SYS_NMLN];
 	size_t marchlen = sizeof(march);
 
+return -1;
 	if (sysctl(mib, sizeof(mib) / sizeof(mib[0]),
 	    march, &marchlen, NULL, 0) != 0)
 		return -1;

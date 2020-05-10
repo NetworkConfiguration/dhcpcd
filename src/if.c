@@ -617,7 +617,7 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 		/* Respect the interface priority */
 		memset(&ifr, 0, sizeof(ifr));
 		strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
-		if (ioctl(ctx->pf_inet_fd, SIOCGIFPRIORITY, &ifr) == 0)
+		if (pioctl(ctx, SIOCGIFPRIORITY, &ifr, sizeof(ifr)) == 0)
 			ifp->metric = (unsigned int)ifr.ifr_metric;
 		if_getssid(ifp);
 #else
@@ -771,7 +771,8 @@ if_domtu(const struct interface *ifp, short int mtu)
 	if (mtu != 0)
 		r = if_ioctl(ifp->ctx, SIOCSIFMTU, &ifr, sizeof(ifr));
 	else
-		r = ioctl(ifp->ctx->pf_inet_fd, SIOCGIFMTU, &ifr);
+		r = pioctl(ifp->ctx, SIOCGIFMTU, &ifr, sizeof(ifr));
+
 	if (r == -1)
 		return -1;
 	return ifr.ifr_mtu;

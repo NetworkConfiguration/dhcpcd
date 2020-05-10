@@ -308,7 +308,8 @@ ps_inet_start(struct dhcpcd_ctx *ctx)
 
 	return ps_dostart(ctx, &ctx->ps_inet_pid, &ctx->ps_inet_fd,
 	    ps_inet_recvmsg, ps_inet_dodispatch, ctx,
-	    ps_inet_startcb, ps_inet_signalcb, PSF_DROPPRIVS);
+	    ps_inet_startcb, ps_inet_signalcb,
+	    PSF_DROPPRIVS | PSF_PLEDGE);
 }
 
 int
@@ -553,7 +554,8 @@ ps_inet_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm,
 	start = ps_dostart(ctx,
 	    &psp->psp_pid, &psp->psp_fd,
 	    ps_inet_recvmsgpsp, NULL, psp,
-	    start_func, ps_inet_signalcb, PSF_DROPPRIVS);
+	    start_func, ps_inet_signalcb,
+	    PSF_DROPPRIVS | PSF_PLEDGE);
 	switch (start) {
 	case -1:
 		ps_freeprocess(psp);

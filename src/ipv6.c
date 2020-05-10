@@ -69,6 +69,7 @@
 #include "ipv6.h"
 #include "ipv6nd.h"
 #include "logerr.h"
+#include "privsep.h"
 #include "sa.h"
 #include "script.h"
 
@@ -1094,10 +1095,25 @@ ipv6_anyglobal(struct interface *sifp)
 	struct interface *ifp;
 	struct ipv6_state *state;
 	struct ipv6_addr *ia;
+#ifdef BSD
+	bool forwarding;
+
+#ifdef HAVE_PLEDGE
+	forwarding = ps_root_ip6forwarding(sifp->ctx) == 1;
+#else
+	forwarding = ip6_forwarding(NULL) == 1;
+#endif
+#endif
+
 
 	TAILQ_FOREACH(ifp, sifp->ctx->ifaces, next) {
+#ifdef BSD
+		if (ifp != sifp && !forwarding)
+			continue;
+#else
 		if (ifp != sifp && ip6_forwarding(ifp->name) != 1)
 			continue;
+#endif
 
 		state = IPV6_STATE(ifp);
 		if (state == NULL)

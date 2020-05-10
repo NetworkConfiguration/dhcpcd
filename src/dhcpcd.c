@@ -1152,6 +1152,7 @@ dhcpcd_linkoverflow(struct dhcpcd_ctx *ctx)
 	logerrx("route socket overflowed (rcvbuflen %d)"
 	    " - learning interface state", rcvbuflen);
 
+#ifndef HAVE_PLEDGE
 	/* Close the existing socket and open a new one.
 	 * This is easier than draining the kernel buffer of an
 	 * in-determinate size. */
@@ -1163,6 +1164,8 @@ dhcpcd_linkoverflow(struct dhcpcd_ctx *ctx)
 		eloop_exit(ctx->eloop, EXIT_FAILURE);
 		return;
 	}
+#endif
+
 #ifndef SMALL
 	dhcpcd_setlinkrcvbuf(ctx);
 #endif
@@ -2235,20 +2238,6 @@ printpidfile:
 	    (DHCPCD_MASTER | DHCPCD_DEV))
 		dev_start(&ctx);
 
-#ifdef PRIVSEP
-	if (ctx.options & DHCPCD_PRIVSEP) {
-		/*
-		 * PSF_CAP_ENTER is not set because the following functions
-		 * won't work in it:
-		 * getifaddrs(3), gethostname(3), uname(3).
-		 */
-		if (ps_dropprivs(&ctx, 0) == -1) {
-			logerr("ps_dropprivs");
-			goto exit_failure;
-		}
-	}
-#endif
-
 	setproctitle("%s%s%s",
 	    ctx.options & DHCPCD_MASTER ? "[master]" : argv[optind],
 	    ctx.options & DHCPCD_IPV4 ? " [ip4]" : "",
@@ -2260,6 +2249,20 @@ printpidfile:
 	}
 #ifndef SMALL
 	dhcpcd_setlinkrcvbuf(&ctx);
+#endif
+
+#ifdef PRIVSEP
+	if (ctx.options & DHCPCD_PRIVSEP) {
+		/*
+		 * PSF_CAP_ENTER is not set because the following functions
+		 * won't work in it:
+		 * getifaddrs(3), gethostname(3), uname(3).
+		 */
+		if (ps_dropprivs(&ctx, PSF_PLEDGE) == -1) {
+			logerr("ps_dropprivs");
+			goto exit_failure;
+		}
+	}
 #endif
 
 	/* When running dhcpcd against a single interface, we need to retain

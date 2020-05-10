@@ -34,6 +34,7 @@
 /* Start flags */
 #define	PSF_DROPPRIVS		0x01
 #define	PSF_CAP_ENTER		0x02
+#define	PSF_PLEDGE		0x04
 
 /* Commands */
 #define	PS_BOOTP		0x01
@@ -53,9 +54,10 @@
 #define	PS_IOCTLLINK		0x15
 #define	PS_IOCTL6		0x16
 #define	PS_IOCTLINDIRECT	0x17
+#define	PS_IP6FORWARDING	0x18
 
 /* Linux commands */
-#define	PS_WRITEPATHUINT	0x18
+#define	PS_WRITEPATHUINT	0x19
 
 #define	PS_DELETE		0x20
 #define	PS_START		0x40
