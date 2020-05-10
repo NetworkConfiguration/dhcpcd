@@ -173,6 +173,8 @@ ps_dropprivs(struct dhcpcd_ctx *ctx, unsigned int flags)
 			return -1;
 		}
 	}
+#else
+	UNUSED(flags);
 #endif
 	return 0;
 }
