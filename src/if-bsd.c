@@ -299,7 +299,7 @@ if_ignore(struct dhcpcd_ctx *ctx, const char *ifname)
 
 #ifdef SIOCGIFGROUP
 #ifdef HAVE_PLEDGE
-#warning Fix SIOCGIFGROUP for to remove inet pledge requirement
+#warning Fix SIOCGIFGROUP to use privsep to remove inet pledge requirement
 #endif
 	struct ifgroupreq ifgr = { .ifgr_len = 0 };
 	struct ifg_req *ifg;
