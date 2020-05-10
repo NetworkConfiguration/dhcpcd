@@ -44,6 +44,8 @@ ssize_t ps_root_os(struct ps_msghdr *, struct msghdr *);
 ssize_t ps_root_route(struct dhcpcd_ctx *, void *, size_t);
 ssize_t ps_root_ioctllink(struct dhcpcd_ctx *, unsigned long, void *, size_t);
 ssize_t ps_root_ioctl6(struct dhcpcd_ctx *, unsigned long, void *, size_t);
+ssize_t ps_root_indirectioctl(struct dhcpcd_ctx *, unsigned long, const char *,
+    void *, size_t);
 #endif
 #ifdef __linux__
 ssize_t ps_root_sendnetlink(struct dhcpcd_ctx *, int, struct msghdr *);

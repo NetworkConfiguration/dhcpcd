@@ -52,9 +52,10 @@
 /* BSD Commands */
 #define	PS_IOCTLLINK		0x15
 #define	PS_IOCTL6		0x16
+#define	PS_IOCTLINDIRECT	0x17
 
 /* Linux commands */
-#define	PS_WRITEPATHUINT	0x17
+#define	PS_WRITEPATHUINT	0x18
 
 #define	PS_DELETE		0x20
 #define	PS_START		0x40
