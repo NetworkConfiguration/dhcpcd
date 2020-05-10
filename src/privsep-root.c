@@ -62,6 +62,8 @@ struct psr_error
 struct psr_ctx {
 	struct dhcpcd_ctx *psr_ctx;
 	struct psr_error psr_error;
+	size_t psr_datalen;
+	void *psr_data;
 };
 
 static void
@@ -78,10 +80,15 @@ ps_root_readerrorcb(void *arg)
 	struct psr_ctx *psr_ctx = arg;
 	struct dhcpcd_ctx *ctx = psr_ctx->psr_ctx;
 	struct psr_error *psr_error = &psr_ctx->psr_error;
+	struct iovec iov[] = {
+		{ .iov_base = psr_error, .iov_len = sizeof(*psr_error) },
+		{ .iov_base = psr_ctx->psr_data,
+		  .iov_len = psr_ctx->psr_datalen },
+	};
 	ssize_t len;
 	int exit_code = EXIT_FAILURE;
 
-	len = read(ctx->ps_root_fd, psr_error, sizeof(*psr_error));
+	len = readv(ctx->ps_root_fd, iov, __arraycount(iov));
 	if (len == 0 || len == -1) {
 		logerr(__func__);
 		psr_error->psr_result = -1;
@@ -97,9 +104,12 @@ ps_root_readerrorcb(void *arg)
 }
 
 ssize_t
-ps_root_readerror(struct dhcpcd_ctx *ctx)
+ps_root_readerror(struct dhcpcd_ctx *ctx, void *data, size_t len)
 {
-	struct psr_ctx psr_ctx = { .psr_ctx = ctx };
+	struct psr_ctx psr_ctx = {
+	    .psr_ctx = ctx,
+	    .psr_data = data, .psr_datalen = len,
+	};
 
 	if (eloop_event_add(ctx->ps_eloop, ctx->ps_root_fd,
 	    ps_root_readerrorcb, &psr_ctx) == -1)
@@ -115,18 +125,23 @@ ps_root_readerror(struct dhcpcd_ctx *ctx)
 }
 
 static ssize_t
-ps_root_writeerror(struct dhcpcd_ctx *ctx, ssize_t result)
+ps_root_writeerror(struct dhcpcd_ctx *ctx, ssize_t result,
+    void *data, size_t len)
 {
 	struct psr_error psr = {
 		.psr_result = result,
 		.psr_errno = errno,
+	};
+	struct iovec iov[] = {
+		{ .iov_base = &psr, .iov_len = sizeof(psr) },
+		{ .iov_base = data, .iov_len = len },
 	};
 
 #ifdef PRIVSEP_DEBUG
 	logdebugx("%s: result %zd errno %d", __func__, result, errno);
 #endif
 
-	return write(ctx->ps_root_fd, &psr, sizeof(psr));
+	return writev(ctx->ps_root_fd, iov, __arraycount(iov));
 }
 
 static ssize_t
@@ -386,7 +401,7 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		break;
 	}
 
-	return ps_root_writeerror(ctx, err);
+	return ps_root_writeerror(ctx, err, data, len);
 }
 
 /* Receive from state engine, do an action. */
@@ -539,7 +554,7 @@ ps_root_script(const struct interface *ifp, const void *data, size_t len)
 	    buf, slen + len) == -1)
 		return -1;
 
-	return ps_root_readerror(ifp->ctx);
+	return ps_root_readerror(ifp->ctx, NULL, 0);
 }
 
 ssize_t
@@ -556,7 +571,7 @@ ps_root_ioctl(struct dhcpcd_ctx *ctx, ioctl_request_t req, void *data,
 	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_IOCTL, req, data, len) == -1)
 		return -1;
 #endif
-	return ps_root_readerror(ctx);
+	return ps_root_readerror(ctx, data, len);
 }
 
 static ssize_t
@@ -577,7 +592,7 @@ ps_root_fileop(struct dhcpcd_ctx *ctx, const char *path, uint8_t op)
 
 	if (ps_sendcmd(ctx, ctx->ps_root_fd, op, 0, buf, len) == -1)
 		return -1;
-	return ps_root_readerror(ctx);
+	return ps_root_readerror(ctx, NULL, 0);
 }
 
 

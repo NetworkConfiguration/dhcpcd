@@ -94,7 +94,7 @@ ps_root_ioctldom(struct dhcpcd_ctx *ctx, uint8_t domain, unsigned long request,
 	if (ps_sendcmd(ctx, ctx->ps_root_fd, domain,
 	    request, data, len) == -1)
 		return -1;
-	return ps_root_readerror(ctx);
+	return ps_root_readerror(ctx, data, len);
 }
 
 ssize_t
@@ -119,5 +119,5 @@ ps_root_route(struct dhcpcd_ctx *ctx, void *data, size_t len)
 
 	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_ROUTE, 0, data, len) == -1)
 		return -1;
-	return ps_root_readerror(ctx);
+	return ps_root_readerror(ctx, data, len);
 }

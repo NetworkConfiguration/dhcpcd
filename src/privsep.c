@@ -490,7 +490,6 @@ ps_unrollmsg(struct msghdr *msg, struct ps_msghdr *psm,
 	return 0;
 }
 
-
 ssize_t
 ps_sendpsmmsg(struct dhcpcd_ctx *ctx, int fd,
     struct ps_msghdr *psm, const struct msghdr *msg)

@@ -34,7 +34,7 @@
 pid_t ps_root_start(struct dhcpcd_ctx *ctx);
 int ps_root_stop(struct dhcpcd_ctx *ctx);
 
-ssize_t ps_root_readerror(struct dhcpcd_ctx *);
+ssize_t ps_root_readerror(struct dhcpcd_ctx *, void *, size_t);
 ssize_t ps_root_docopychroot(struct dhcpcd_ctx *, const char *);
 ssize_t ps_root_copychroot(struct dhcpcd_ctx *, const char *);
 ssize_t ps_root_ioctl(struct dhcpcd_ctx *, ioctl_request_t, void *, size_t);
