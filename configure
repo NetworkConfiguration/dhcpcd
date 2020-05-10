@@ -663,6 +663,21 @@ EOF
 		echo "no"
 	fi
 	rm -f _capsicum.c _capsicum
+
+	printf "Testing for pledge ... "
+        cat <<EOF >_pledge.c
+#include <unistd.h>
+int main(void) {
+        return pledge("stdio", NULL);
+}
+EOF
+        if $XCC _pledge.c -o _pledge 2>&3; then
+                echo "yes"
+                echo "#define   HAVE_PLEDGE" >>$CONFIG_H
+        else
+                echo "no"
+        fi
+        rm -f _pledge.c _pledge
 fi
 
 if [ "$OS" = linux ]; then

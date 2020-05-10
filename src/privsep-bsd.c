@@ -49,6 +49,7 @@ ps_root_doioctldom(int domain, unsigned long req, void *data, size_t len)
 	return err;
 }
 
+#ifdef HAVE_PLEDGE
 static ssize_t
 ps_root_doindirectioctl(unsigned long req, void *data, size_t len)
 {
@@ -68,6 +69,7 @@ ps_root_doindirectioctl(unsigned long req, void *data, size_t len)
 		memmove(data, ifr.ifr_data, len - IFNAMSIZ);
 	return err;
 }
+#endif
 
 static ssize_t
 ps_root_doroute(void *data, size_t len)
@@ -97,8 +99,12 @@ ps_root_os(struct ps_msghdr *psm, struct msghdr *msg)
 		return ps_root_doioctldom(PF_LINK, psm->ps_flags, data, len);
 	case PS_IOCTL6:
 		return ps_root_doioctldom(PF_INET6, psm->ps_flags, data, len);
+#ifdef HAVE_PLEDGE
 	case PS_IOCTLINDIRECT:
 		return ps_root_doindirectioctl(psm->ps_flags, data, len);
+	case PS_IP6FORWARDING:
+		return ip6_forwarding(NULL);
+#endif
 	case PS_ROUTE:
 		return ps_root_doroute(data, len);
 	default:
@@ -134,6 +140,7 @@ ps_root_ioctl6(struct dhcpcd_ctx *ctx, unsigned long request,
 	return ps_root_ioctldom(ctx, PS_IOCTL6, request, data, len);
 }
 
+#ifdef HAVE_PLEDGE
 ssize_t
 ps_root_indirectioctl(struct dhcpcd_ctx *ctx, unsigned long request,
     const char *ifname, void *data, size_t len)
@@ -147,6 +154,17 @@ ps_root_indirectioctl(struct dhcpcd_ctx *ctx, unsigned long request,
 		return -1;
 	return ps_root_readerror(ctx, data, len);
 }
+
+ssize_t
+ps_root_ip6forwarding(struct dhcpcd_ctx *ctx)
+{
+
+	if (ps_sendcmd(ctx, ctx->ps_root_fd,
+	    PS_IP6FORWARDING, 0, NULL, 0) == -1)
+		return -1;
+	return ps_root_readerror(ctx, NULL, 0);
+}
+#endif
 
 ssize_t
 ps_root_route(struct dhcpcd_ctx *ctx, void *data, size_t len)

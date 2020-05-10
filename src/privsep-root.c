@@ -380,7 +380,7 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		break;
 	}
 
-	assert(msg->msg_iovlen == 1);
+	assert(msg->msg_iovlen == 0 || msg->msg_iovlen == 1);
 
 	/* Reset errno */
 	errno = 0;

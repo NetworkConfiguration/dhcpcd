@@ -176,6 +176,24 @@ ps_dropprivs(struct dhcpcd_ctx *ctx, unsigned int flags)
 #else
 	UNUSED(flags);
 #endif
+
+#ifdef HAVE_PLEDGE
+	if (flags & PSF_PLEDGE) {
+		const char *promises;
+
+		if (ctx->options & DHCPCD_UNPRIV)
+			promises = "stdio dns bpf";
+		else
+			/* SIOCGIFGROUP requries inet
+			 * lease files and foo require rpath, wpath and cpath */
+			promises = "stdio dns inet route rpath wpath cpath";
+                if (pledge(promises, NULL) == -1) {
+                        logerr("%s: pledge", __func__);
+                        return -1;
+                }
+	}
+#endif
+
 	return 0;
 }
 

@@ -126,6 +126,11 @@ int if_getsubnet(struct dhcpcd_ctx *, const char *, int, void *, size_t);
 #endif
 
 int if_ioctl(struct dhcpcd_ctx *, ioctl_request_t, void *, size_t);
+#ifdef HAVE_PLEDGE
+#define	pioctl(ctx, req, data, len) if_ioctl((ctx), (req), (data), (len))
+#else
+#define	pioctl(ctx, req, data, len) ioctl((ctx)->pf_inet_fd, (req),(data),(len))
+#endif
 int if_getflags(struct interface *);
 int if_setflag(struct interface *, short, short);
 #define if_up(ifp) if_setflag((ifp), (IFF_UP | IFF_RUNNING), 0)
@@ -171,7 +176,7 @@ int if_conf(struct interface *);
 int if_init(struct interface *);
 int if_getssid(struct interface *);
 bool if_ignore(struct dhcpcd_ctx *, const char *);
-int if_vimaster(const struct dhcpcd_ctx *ctx, const char *);
+int if_vimaster(struct dhcpcd_ctx *ctx, const char *);
 unsigned short if_vlanid(const struct interface *);
 int if_opensockets(struct dhcpcd_ctx *);
 int if_opensockets_os(struct dhcpcd_ctx *);
