@@ -121,7 +121,7 @@ ps_root_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct msghdr *msg)
 	if (ps_sendmsg(ctx, ctx->ps_root_fd, PS_ROUTE,
 	    (unsigned long)protocol, msg) == -1)
 		return -1;
-	return ps_root_readerror(ctx);
+	return ps_root_readerror(ctx, NULL, 0);
 }
 
 ssize_t
@@ -146,5 +146,5 @@ ps_root_writepathuint(struct dhcpcd_ctx *ctx, const char *path,
 	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_WRITEPATHUINT,
 	    0, buf, len) == -1)
 		return -1;
-	return ps_root_readerror(ctx);
+	return ps_root_readerror(ctx, NULL, 0);
 }
