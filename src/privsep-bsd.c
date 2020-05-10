@@ -29,6 +29,7 @@
 #include <sys/ioctl.h>
 
 #include <errno.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "dhcpcd.h"
@@ -41,12 +42,30 @@ ps_root_doioctldom(int domain, unsigned long req, void *data, size_t len)
 	int s, err;
 
 	s = socket(domain, SOCK_DGRAM, 0);
-	if (s != -1)
-		err = ioctl(s, req, data, len);
-	else
-		err = -1;
-	if (s != -1)
-		close(s);
+	if (s == -1)
+		return -1;
+	err = ioctl(s, req, data, len);
+	close(s);
+	return err;
+}
+
+static ssize_t
+ps_root_doindirectioctl(unsigned long req, void *data, size_t len)
+{
+	char *p = data;
+	struct ifreq ifr = { .ifr_flags = 0 };
+	ssize_t err;
+
+	if (len < IFNAMSIZ) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	strlcpy(ifr.ifr_name, p, IFNAMSIZ);
+	ifr.ifr_data = p + IFNAMSIZ;
+	err = ps_root_doioctldom(PF_INET, req, &ifr, sizeof(ifr));
+	if (err != -1)
+		memmove(data, ifr.ifr_data, len - IFNAMSIZ);
 	return err;
 }
 
@@ -78,6 +97,8 @@ ps_root_os(struct ps_msghdr *psm, struct msghdr *msg)
 		return ps_root_doioctldom(PF_LINK, psm->ps_flags, data, len);
 	case PS_IOCTL6:
 		return ps_root_doioctldom(PF_INET6, psm->ps_flags, data, len);
+	case PS_IOCTLINDIRECT:
+		return ps_root_doindirectioctl(psm->ps_flags, data, len);
 	case PS_ROUTE:
 		return ps_root_doroute(data, len);
 	default:
@@ -111,6 +132,20 @@ ps_root_ioctl6(struct dhcpcd_ctx *ctx, unsigned long request,
 {
 
 	return ps_root_ioctldom(ctx, PS_IOCTL6, request, data, len);
+}
+
+ssize_t
+ps_root_indirectioctl(struct dhcpcd_ctx *ctx, unsigned long request,
+    const char *ifname, void *data, size_t len)
+{
+	char buf[PS_BUFLEN];
+
+	strlcpy(buf, ifname, IFNAMSIZ);
+	memcpy(buf + IFNAMSIZ, data, len);
+	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_IOCTLINDIRECT,
+	    request, buf, IFNAMSIZ + len) == -1)
+		return -1;
+	return ps_root_readerror(ctx, data, len);
 }
 
 ssize_t
