@@ -2263,11 +2263,13 @@ printpidfile:
 
 #ifdef PRIVSEP
 	if (ctx.options & DHCPCD_PRIVSEP) {
-
 		/*
-		 * PSF_CAP_ENTER is not set because the following functions
-		 * won't work in it:
-		 * getifaddrs(3), gethostname(3), uname(3).
+		 * PSF_CAP_ENTER is not set because getifaddrs(3) won't
+		 * work in it. This is a huge challenge because it's the
+		 * only portable interface to work stuff out and it's
+		 * non trivial to IPC for privsep.
+		 * gethostname(3) can be trivially done.
+		 * There could be more blockers, it's as far as I've got.
 		 */
 		if (ps_dropprivs(&ctx, PSF_PLEDGE) == -1) {
 			logerr("ps_dropprivs");
