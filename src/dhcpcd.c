@@ -2268,7 +2268,6 @@ printpidfile:
 		 * work in it. This is a huge challenge because it's the
 		 * only portable interface to work stuff out and it's
 		 * non trivial to IPC for privsep.
-		 * gethostname(3) can be trivially done.
 		 * There could be more blockers, it's as far as I've got.
 		 */
 		if (ps_dropprivs(&ctx, PSF_PLEDGE) == -1) {
