@@ -202,8 +202,8 @@ make_option_mask(const struct dhcp_opt *dopts, size_t dopts_len,
 			continue;
 		if (strncmp(token, "dhcp6_", 6) == 0)
 			token += 6;
-		if (strncmp(token, "nd6_", 4) == 0)
-			token += 4;
+		if (strncmp(token, "nd_", 3) == 0)
+			token += 3;
 		match = 0;
 		for (i = 0, opt = odopts; i < odopts_len; i++, opt++) {
 			if (opt->var == NULL || opt->option == 0)
