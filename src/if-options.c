@@ -2271,9 +2271,9 @@ get_line(char ** __restrict buf, ssize_t * __restrict buflen)
 
 	do {
 		p = *buf;
-		c = memchr(*buf, '\n', *buflen);
+		c = memchr(*buf, '\n', (size_t)*buflen);
 		if (c == NULL) {
-			c = memchr(*buf, '\0', *buflen);
+			c = memchr(*buf, '\0', (size_t)*buflen);
 			if (c == NULL)
 				return NULL;
 			*buflen = c - *buf;
@@ -2342,7 +2342,7 @@ read_config(struct dhcpcd_ctx *ctx,
 	char buf[UDPLEN_MAX], *bp; /* 64k max config file size */
 	char *line, *option, *p;
 	ssize_t buflen;
-	ssize_t vlen;
+	size_t vlen;
 	int skip, have_profile, new_block, had_block;
 #if !defined(INET) || !defined(INET6)
 	size_t i;
@@ -2415,7 +2415,8 @@ read_config(struct dhcpcd_ctx *ctx,
 			buf[buflen] = '\0';
 		}
 #else
-		buflen = strlcpy(buf, dhcpcd_embedded_conf, sizeof(buf));
+		buflen = (ssize_t)strlcpy(buf, dhcpcd_embedded_conf,
+		    sizeof(buf));
 		if ((size_t)buflen >= sizeof(buf)) {
 			logerrx("%s: embedded config too big", __func__);
 			return ifo;

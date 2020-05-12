@@ -37,7 +37,7 @@ int ps_root_stop(struct dhcpcd_ctx *ctx);
 ssize_t ps_root_readerror(struct dhcpcd_ctx *, void *, size_t);
 ssize_t ps_root_ioctl(struct dhcpcd_ctx *, ioctl_request_t, void *, size_t);
 ssize_t ps_root_unlink(struct dhcpcd_ctx *, const char *);
-int ps_root_filemtime(struct dhcpcd_ctx *, const char *, time_t *);
+ssize_t ps_root_filemtime(struct dhcpcd_ctx *, const char *, time_t *);
 ssize_t ps_root_readfile(struct dhcpcd_ctx *, const char *, void *, size_t);
 ssize_t ps_root_writefile(struct dhcpcd_ctx *, const char *, mode_t,
     const void *, size_t);

@@ -228,7 +228,7 @@ ps_root_dowritefile(mode_t mode, void *data, size_t len)
 		return -1;
 	}
 	nc++;
-	return writefile(file, mode, nc, len - (nc - file));
+	return writefile(file, mode, nc, len - (size_t)(nc - file));
 }
 
 static ssize_t
@@ -317,7 +317,7 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		}
 		break;
 	case PS_WRITEFILE:
-		err = ps_root_dowritefile(psm->ps_flags, data, len);
+		err = ps_root_dowritefile((mode_t)psm->ps_flags, data, len);
 		break;
 	case PS_FILEMTIME:
 		err = filemtime(data, &mtime);
@@ -547,7 +547,7 @@ ps_root_writefile(struct dhcpcd_ctx *ctx, const char *file, mode_t mode,
 	return ps_root_readerror(ctx, NULL, 0);
 }
 
-int
+ssize_t
 ps_root_filemtime(struct dhcpcd_ctx *ctx, const char *file, time_t *time)
 {
 
