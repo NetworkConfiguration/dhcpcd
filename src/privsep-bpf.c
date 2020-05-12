@@ -91,7 +91,7 @@ ps_bpf_recvbpf(void *arg)
 
 #ifdef ARP
 static ssize_t
-ps_bpf_arp_addr(uint8_t cmd, struct ps_process *psp, struct msghdr *msg)
+ps_bpf_arp_addr(uint16_t cmd, struct ps_process *psp, struct msghdr *msg)
 {
 	struct interface *ifp = &psp->psp_ifp;
 	struct iovec *iov = msg->msg_iov;
@@ -197,7 +197,7 @@ ps_bpf_signal_bpfcb(int sig, void *arg)
 ssize_t
 ps_bpf_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg)
 {
-	uint8_t cmd;
+	uint16_t cmd;
 	struct ps_process *psp;
 	pid_t start;
 	struct iovec *iov = msg->msg_iov;
@@ -205,7 +205,7 @@ ps_bpf_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg)
 	struct ipv4_state *istate;
 	unsigned int flags = PSF_DROPPRIVS | PSF_CAP_ENTER;
 
-	cmd = (uint8_t)(psm->ps_cmd & ~(PS_START | PS_STOP));
+	cmd = (uint16_t)(psm->ps_cmd & ~(PS_START | PS_STOP));
 	psp = ps_findprocess(ctx, &psm->ps_id);
 
 #ifdef PRIVSEP_DEBUG
@@ -261,7 +261,7 @@ ps_bpf_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg)
 		 * Pledge is currently useless for BPF ARP because we cannot
 		 * change the filter:
 		 * http://openbsd-archive.7691.n7.nabble.com/ \
-		 * 	  pledge-bpf-32bit-arch-unbreak-td299901.html
+		 *	  pledge-bpf-32bit-arch-unbreak-td299901.html
 		 */
 		break;
 #endif
@@ -321,7 +321,7 @@ ps_bpf_dispatch(struct dhcpcd_ctx *ctx,
 }
 
 static ssize_t
-ps_bpf_send(const struct interface *ifp, uint8_t cmd,
+ps_bpf_send(const struct interface *ifp, uint16_t cmd,
     const void *data, size_t len)
 {
 	struct dhcpcd_ctx *ctx = ifp->ctx;

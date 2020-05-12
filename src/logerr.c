@@ -104,7 +104,6 @@ logprintdate(FILE *stream)
 		return -1;
 
 	now = tv.tv_sec;
-	tzset();
 	if (localtime_r(&now, &tmnow) == NULL)
 		return -1;
 	if (strftime(buf, sizeof(buf), "%b %d %T ", &tmnow) == 0)
@@ -365,6 +364,9 @@ int
 logopen(const char *path)
 {
 	struct logctx *ctx = &_logctx;
+
+	/* Cache timezone */
+	tzset();
 
 	if (path == NULL) {
 		int opts = 0;

@@ -33,4 +33,4 @@
 
 #include <unistd.h>
 
-const char * const dhcpcd_embedded_conf[] = {
+const char dhcpcd_embedded_conf[] =

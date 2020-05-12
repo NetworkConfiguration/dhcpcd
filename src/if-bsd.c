@@ -1555,7 +1555,7 @@ if_handlelink(struct dhcpcd_ctx *ctx)
 }
 
 #ifndef SYS_NMLN	/* OSX */
-#  define SYS_NMLN 256
+#  define SYS_NMLN __SYS_NAMELEN
 #endif
 #ifndef HW_MACHINE_ARCH
 #  ifdef HW_MODEL	/* OpenBSD */
@@ -1566,14 +1566,8 @@ int
 if_machinearch(char *str, size_t len)
 {
 	int mib[2] = { CTL_HW, HW_MACHINE_ARCH };
-	char march[SYS_NMLN];
-	size_t marchlen = sizeof(march);
 
-return -1;
-	if (sysctl(mib, sizeof(mib) / sizeof(mib[0]),
-	    march, &marchlen, NULL, 0) != 0)
-		return -1;
-	return snprintf(str, len, ":%s", march);
+	return sysctl(mib, sizeof(mib) / sizeof(mib[0]), str, &len, NULL, 0);
 }
 
 #ifdef INET6

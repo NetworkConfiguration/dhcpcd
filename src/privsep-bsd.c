@@ -114,7 +114,7 @@ ps_root_os(struct ps_msghdr *psm, struct msghdr *msg)
 }
 
 static ssize_t
-ps_root_ioctldom(struct dhcpcd_ctx *ctx, uint8_t domain, unsigned long request,
+ps_root_ioctldom(struct dhcpcd_ctx *ctx, uint16_t domain, unsigned long request,
     void *data, size_t len)
 {
 
@@ -126,7 +126,7 @@ ps_root_ioctldom(struct dhcpcd_ctx *ctx, uint8_t domain, unsigned long request,
 
 ssize_t
 ps_root_ioctllink(struct dhcpcd_ctx *ctx, unsigned long request,
-    void *data,size_t len)
+    void *data, size_t len)
 {
 
 	return ps_root_ioctldom(ctx, PS_IOCTLLINK, request, data, len);

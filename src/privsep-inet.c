@@ -498,12 +498,12 @@ ssize_t
 ps_inet_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm,
     __unused struct msghdr *msg)
 {
-	uint8_t cmd;
+	uint16_t cmd;
 	struct ps_process *psp;
 	int (*start_func)(void *);
 	pid_t start;
 
-	cmd = (uint8_t)(psm->ps_cmd & ~(PS_START | PS_STOP));
+	cmd = (uint16_t)(psm->ps_cmd & ~(PS_START | PS_STOP));
 	psp = ps_findprocess(ctx, &psm->ps_id);
 
 #ifdef PRIVSEP_DEBUG
@@ -570,7 +570,7 @@ ps_inet_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm,
 
 #ifdef INET
 static ssize_t
-ps_inet_in_docmd(struct ipv4_addr *ia, uint8_t cmd, const struct msghdr *msg)
+ps_inet_in_docmd(struct ipv4_addr *ia, uint16_t cmd, const struct msghdr *msg)
 {
 	assert(ia != NULL);
 	struct dhcpcd_ctx *ctx = ia->iface->ctx;
@@ -614,7 +614,7 @@ ps_inet_sendbootp(struct ipv4_addr *ia, const struct msghdr *msg)
 #ifdef INET6
 #ifdef __sun
 static ssize_t
-ps_inet_ifp_docmd(struct interface *ifp, uint8_t cmd, const struct msghdr *msg)
+ps_inet_ifp_docmd(struct interface *ifp, uint16_t cmd, const struct msghdr *msg)
 {
 	struct dhcpcd_ctx *ctx = ifp->ctx;
 	struct ps_msghdr psm = {
@@ -659,7 +659,7 @@ ps_inet_sendnd(struct interface *ifp, const struct msghdr *msg)
 
 #ifdef DHCP6
 static ssize_t
-ps_inet_in6_docmd(struct ipv6_addr *ia, uint8_t cmd, const struct msghdr *msg)
+ps_inet_in6_docmd(struct ipv6_addr *ia, uint16_t cmd, const struct msghdr *msg)
 {
 	struct dhcpcd_ctx *ctx = ia->iface->ctx;
 	struct ps_msghdr psm = {
