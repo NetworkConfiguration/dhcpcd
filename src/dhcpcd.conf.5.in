@@ -792,7 +792,7 @@ with a name of
 exported to
 .Xr dhcpcd-run-hooks 8 ,
 with a prefix of
-.Va _nd .
+.Va nd_ .
 .It Ic define6 Ar code Ar type Ar variable
 Defines the DHCPv6 option
 .Ar code
@@ -803,7 +803,7 @@ with a name of
 exported to
 .Xr dhcpcd-run-hooks 8 ,
 with a prefix of
-.Va _dhcp6 .
+.Va dhcp6_ .
 .It Ic vendopt Ar code Ar type Ar variable
 Defines the Vendor-Identifying Vendor Options.
 The
