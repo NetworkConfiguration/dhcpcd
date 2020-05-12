@@ -158,7 +158,6 @@ const struct option cf_options[] = {
 	{"inactive",        no_argument,       NULL, O_INACTIVE},
 	{"mudurl",          required_argument, NULL, O_MUDURL},
 	{"link_rcvbuf",     required_argument, NULL, O_LINK_RCVBUF},
-	{"chroot",          required_argument, NULL, O_CHROOT},
 	{NULL,              0,                 NULL, '\0'}
 };
 
@@ -660,7 +659,6 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 #define ARG_REQUIRED if (arg == NULL) goto arg_required
 
 	switch(opt) {
-	case O_CHROOT: /* FALLTHROUGH */
 	case 'f': /* FALLTHROUGH */
 	case 'g': /* FALLTHROUGH */
 	case 'n': /* FALLTHROUGH */

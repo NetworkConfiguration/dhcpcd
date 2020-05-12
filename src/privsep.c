@@ -81,6 +81,7 @@ int
 ps_init(struct dhcpcd_ctx *ctx)
 {
 	struct passwd *pw;
+	struct stat st;
 
 	errno = 0;
 	if ((ctx->ps_user = pw = getpwnam(PRIVSEP_USER)) == NULL) {
@@ -94,14 +95,10 @@ ps_init(struct dhcpcd_ctx *ctx)
 		return -1;
 	}
 
-	if (ctx->ps_chroot == NULL)
-		ctx->ps_chroot = pw->pw_dir;
-
-	/* If we pickup the _dhcp user refuse the default directory */
-	if (*ctx->ps_chroot != '/') {
+	if (stat(pw->pw_dir, &st) == -1 || !S_ISDIR(st.st_mode)) {
 		ctx->options &= ~DHCPCD_PRIVSEP;
 		logerrx("refusing chroot: %s: %s",
-		    PRIVSEP_USER, ctx->ps_chroot);
+		    PRIVSEP_USER, pw->pw_dir);
 		errno = 0;
 		return -1;
 	}
@@ -116,9 +113,9 @@ ps_dropprivs(struct dhcpcd_ctx *ctx, unsigned int flags)
 	struct passwd *pw = ctx->ps_user;
 
 	if (!(ctx->options & DHCPCD_FORKED))
-		logdebugx("chrooting to `%s'", ctx->ps_chroot);
-	if (chroot(ctx->ps_chroot) == -1)
-		logerr("%s: chroot `%s'", __func__, ctx->ps_chroot);
+		logdebugx("chrooting to `%s'", pw->pw_dir);
+	if (chroot(pw->pw_dir) == -1)
+		logerr("%s: chroot `%s'", __func__, pw->pw_dir);
 	if (chdir("/") == -1)
 		logerr("%s: chdir `/'", __func__);
 

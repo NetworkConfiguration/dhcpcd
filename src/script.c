@@ -270,8 +270,8 @@ make_env(struct dhcpcd_ctx *ctx, const struct interface *ifp,
 		goto eexit;
 
 #ifdef PRIVSEP
-	if (ctx->options & DHCPCD_PRIVSEP && ctx->ps_chroot != NULL) {
-		if (efprintf(fp, "chroot=%s", ctx->ps_chroot) == -1)
+	if (ctx->options & DHCPCD_PRIVSEP && ctx->ps_user != NULL) {
+		if (efprintf(fp, "chroot=%s", ctx->ps_user->pw_dir) == -1)
 			goto eexit;
 	}
 	if (strcmp(reason, "CHROOT") == 0)
