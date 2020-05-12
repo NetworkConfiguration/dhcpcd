@@ -1149,7 +1149,6 @@ read_lease(struct interface *ifp, struct bootp **bootp)
 		uint8_t buf[FRAMELEN_MAX];
 	} buf;
 	struct dhcp_state *state = D_STATE(ifp);
-	struct bootp *lease;
 	ssize_t sbytes;
 	size_t bytes;
 	uint8_t type;
@@ -1201,7 +1200,7 @@ read_lease(struct interface *ifp, struct bootp **bootp)
 	    DHO_AUTHENTICATION, &auth_len);
 	if (auth) {
 		if (dhcp_auth_validate(&state->auth, &ifp->options->auth,
-		    lease, bytes, 4, type, auth, auth_len) == NULL)
+		    &buf.bootp, bytes, 4, type, auth, auth_len) == NULL)
 		{
 			logerr("%s: authentication failed", ifp->name);
 			return 0;
