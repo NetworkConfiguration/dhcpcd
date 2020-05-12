@@ -561,12 +561,10 @@ if [ "$PRIVSEP" = yes ]; then
 		printf "Detecting a suitable user for dhcpcd ... "
 		for x in _dhcpcd _dhcp dhcpcd; do
 			home=$(getent passwd $x 2>/dev/null | cut -d: -f6)
-			case "$home" in
-			/var/empty|"") ;;
-			*)
+			if [ -d "$home" ]; then
 				PRIVSEP_USER="$x"
-				break;;
-			esac
+				break
+			fi
 		done
 	fi
 	if [ -n "$PRIVSEP_USER" ]; then
@@ -1788,10 +1786,6 @@ echo "   EGHOOKSCRIPTS =	$EGHOOKS"
 echo "   STATUSARG = 		$STATUSARG"
 if [ "$PRIVSEP" = yes ]; then
 	echo "   PRIVSEPUSER =	$PRIVSEP_USER"
-	if [ -z "$PRIVSEP_CHROOT" ]; then
-		PRIVSEP_CHROOT="(home directory of $PRIVSEP_USER)"
-	fi
-	echo "   CHROOTDIR =		$PRIVSEP_CHROOT"
 fi
 echo
 
