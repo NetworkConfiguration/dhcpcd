@@ -983,7 +983,7 @@ dhcp_filemtime(struct dhcpcd_ctx *ctx, const char *file, time_t *time)
 #ifdef PRIVSEP
 	if (ctx->options & DHCPCD_PRIVSEP &&
 	    !(ctx->options & DHCPCD_PRIVSEPROOT))
-		return ps_root_filemtime(ctx, file, time);
+		return (int)ps_root_filemtime(ctx, file, time);
 #else
 	UNUSED(ctx);
 #endif
@@ -998,7 +998,7 @@ dhcp_unlink(struct dhcpcd_ctx *ctx, const char *file)
 #ifdef PRIVSEP
 	if (ctx->options & DHCPCD_PRIVSEP &&
 	    !(ctx->options & DHCPCD_PRIVSEPROOT))
-		return ps_root_unlink(ctx, file);
+		return (int)ps_root_unlink(ctx, file);
 #else
 	UNUSED(ctx);
 #endif

@@ -1150,7 +1150,8 @@ read_lease(struct interface *ifp, struct bootp **bootp)
 	} buf;
 	struct dhcp_state *state = D_STATE(ifp);
 	struct bootp *lease;
-	ssize_t bytes;
+	ssize_t sbytes;
+	size_t bytes;
 	uint8_t type;
 #ifdef AUTH
 	const uint8_t *auth;
@@ -1162,25 +1163,26 @@ read_lease(struct interface *ifp, struct bootp **bootp)
 
 	if (state->leasefile[0] == '\0') {
 		logdebugx("reading standard input");
-		bytes = read(fileno(stdin), buf.buf, sizeof(buf.buf));
+		sbytes = read(fileno(stdin), buf.buf, sizeof(buf.buf));
 	} else {
 		logdebugx("%s: reading lease `%s'",
 		    ifp->name, state->leasefile);
-		bytes = dhcp_readfile(ifp->ctx, state->leasefile,
+		sbytes = dhcp_readfile(ifp->ctx, state->leasefile,
 		    buf.buf, sizeof(buf.buf));
 	}
-	if (bytes == -1) {
+	if (sbytes == -1) {
 		if (errno != ENOENT)
 			logerr("%s: %s", ifp->name, state->leasefile);
 		return 0;
 	}
+	bytes = (size_t)sbytes;
 
 	/* Ensure the packet is at lease BOOTP sized
 	 * with a vendor area of 4 octets
 	 * (it should be more, and our read packet enforces this so this
 	 * code should not be needed, but of course people could
 	 * scribble whatever in the stored lease file. */
-	if ((size_t)bytes < DHCP_MIN_LEN) {
+	if (bytes < DHCP_MIN_LEN) {
 		logerrx("%s: %s: truncated lease", ifp->name, __func__);
 		return 0;
 	}
@@ -1224,7 +1226,7 @@ out:
 		return 0;
 	}
 	memcpy(*bootp, buf.buf, bytes);
-	return (size_t)bytes;
+	return bytes;
 }
 
 static const struct dhcp_opt *

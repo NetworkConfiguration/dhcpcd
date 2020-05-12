@@ -2632,7 +2632,7 @@ dhcp6_readlease(struct interface *ifp, int validate)
 	state->acquired.tv_sec -= now - mtime;
 
 	/* Check to see if the lease is still valid */
-	fd = dhcp6_validatelease(ifp, &buf.dhcp6, bytes, NULL,
+	fd = dhcp6_validatelease(ifp, &buf.dhcp6, (size_t)bytes, NULL,
 	    &state->acquired);
 	if (fd == -1)
 		goto ex;
@@ -2649,10 +2649,10 @@ dhcp6_readlease(struct interface *ifp, int validate)
 auth:
 #ifdef AUTH
 	/* Authenticate the message */
-	o = dhcp6_findmoption(&buf.dhcp6, bytes, D6_OPTION_AUTH, &ol);
+	o = dhcp6_findmoption(&buf.dhcp6, (size_t)bytes, D6_OPTION_AUTH, &ol);
 	if (o) {
 		if (dhcp_auth_validate(&state->auth, &ifp->options->auth,
-		    buf.buf, bytes, 6, buf.dhcp6.type, o, ol) == NULL)
+		    buf.buf, (size_t)bytes, 6, buf.dhcp6.type, o, ol) == NULL)
 		{
 			logerr("%s: authentication failed", ifp->name);
 			bytes = 0;
@@ -2673,14 +2673,14 @@ auth:
 
 out:
 	free(state->new);
-	state->new = malloc(bytes);
+	state->new = malloc((size_t)bytes);
 	if (state->new == NULL) {
 		logerr(__func__);
 		goto ex;
 	}
 
-	memcpy(state->new, buf.buf, bytes);
-	state->new_len = bytes;
+	memcpy(state->new, buf.buf, (size_t)bytes);
+	state->new_len = (size_t)bytes;
 	return bytes;
 
 ex:
