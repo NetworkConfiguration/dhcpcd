@@ -342,7 +342,7 @@ if_ignore(__unused struct dhcpcd_ctx *ctx, const char *ifname)
 
 /* XXX work out Virtal Interface Masters */
 int
-if_vimaster(__unused const struct dhcpcd_ctx *ctx, __unused const char *ifname)
+if_vimaster(__unused struct dhcpcd_ctx *ctx, __unused const char *ifname)
 {
 
 	return 0;
