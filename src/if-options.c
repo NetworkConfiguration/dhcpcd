@@ -2407,10 +2407,10 @@ read_config(struct dhcpcd_ctx *ctx,
 			logerr("%s: %s", __func__, EMBEDDED_CONFIG);
 			return ifo;
 		}
-		if (buf[buflen] != '\0') {
+		if (buf[buflen - 1] != '\0') {
 			if (buflen < sizeof(buf) - 1)
 				bulen++;
-			buf[buflen] = '\0';
+			buf[buflen - 1] = '\0';
 		}
 #else
 		buflen = (ssize_t)strlcpy(buf, dhcpcd_embedded_conf,
@@ -2489,10 +2489,10 @@ read_config(struct dhcpcd_ctx *ctx,
 		logerr("%s: %s", __func__, ctx->cffile);
 		return ifo;
 	}
-	if (buf[buflen] != '\0') {
+	if (buf[buflen - 1] != '\0') {
 		if ((size_t)buflen < sizeof(buf) - 1)
 			buflen++;
-		buf[buflen] = '\0';
+		buf[buflen - 1] = '\0';
 	}
 	dhcp_filemtime(ctx, ctx->cffile, &ifo->mtime);
 
