@@ -150,10 +150,6 @@ Both targets support DESTDIR to set the installation directory,
 if unset it defaults to `/tmp/dhcpcd-$VERSION`
 Example: `make DESTDIR=/usr/src/contrib/dhcpcd import-src`
 
-In this instance, you may wish to disable some configured tests when
-the binary has to run on older versions which lack support, such as getline.
-`./configure --without-getline`
-
 
 ## Hooks
 Not all the hooks in dhcpcd-hooks are installed by default.
