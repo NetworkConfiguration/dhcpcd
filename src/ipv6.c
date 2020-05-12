@@ -147,18 +147,17 @@ ipv6_init(struct dhcpcd_ctx *ctx)
 static ssize_t
 ipv6_readsecret(struct dhcpcd_ctx *ctx)
 {
-	FILE *fp;
 	char line[1024];
 	unsigned char *p;
 	size_t len;
 	uint32_t r;
-	int x;
 
-	if ((ctx->secret_len = read_hwaddr_aton(&ctx->secret, SECRET)) != 0)
+	ctx->secret_len = dhcp_read_hwaddr_aton(ctx, &ctx->secret, SECRET);
+	if (ctx->secret_len != 0)
 		return (ssize_t)ctx->secret_len;
 
 	if (errno != ENOENT)
-		logerr("%s: %s", __func__, SECRET);
+		logerr("%s: cannot read secret", __func__);
 
 	/* Chaining arc4random should be good enough.
 	 * RFC7217 section 5.1 states the key SHOULD be at least 128 bits.
@@ -178,27 +177,18 @@ ipv6_readsecret(struct dhcpcd_ctx *ctx)
 		p += sizeof(r);
 	}
 
-	/* Ensure that only the dhcpcd user can read the secret.
-	 * Write permission is also denied as changing it would remove
-	 * it's stability. */
-	if ((fp = fopen(SECRET, "w")) == NULL ||
-	    chmod(SECRET, S_IRUSR) == -1)
-		goto eexit;
-	x = fprintf(fp, "%s\n",
-	    hwaddr_ntoa(ctx->secret, ctx->secret_len, line, sizeof(line)));
-	if (fclose(fp) == EOF)
-		x = -1;
-	fp = NULL;
-	if (x > 0)
-		return (ssize_t)ctx->secret_len;
-
-eexit:
-	logerr("%s: %s", __func__, SECRET);
-	if (fp != NULL)
-		fclose(fp);
-	unlink(SECRET);
-	ctx->secret_len = 0;
-	return -1;
+	hwaddr_ntoa(ctx->secret, ctx->secret_len, line, sizeof(line));
+	len = strlen(line);
+	if (len < sizeof(line) - 2) {
+		line[len++] = '\n';
+		line[len] = '\0';
+	}
+	if (dhcp_writefile(ctx, SECRET, S_IRUSR, line, len) == -1) {
+		logerr("%s: cannot write secret", __func__);
+		ctx->secret_len = 0;
+		return -1;
+	}
+	return (ssize_t)ctx->secret_len;
 }
 
 /* http://www.iana.org/assignments/ipv6-interface-ids/ipv6-interface-ids.xhtml

@@ -26,17 +26,18 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/stat.h>
 #include <sys/statvfs.h>
 
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "common.h"
 #include "dhcpcd.h"
 #include "if-options.h"
-#include "logerr.h"
 
 const char *
 hwaddr_ntoa(const void *hwaddr, size_t hwlen, char *buf, size_t buflen)
@@ -103,36 +104,58 @@ hwaddr_aton(uint8_t *buffer, const char *addr)
 	return len;
 }
 
-size_t
-read_hwaddr_aton(uint8_t **data, const char *path)
+ssize_t
+readfile(const char *file, void *data, size_t len)
 {
-	FILE *fp;
-	char *buf;
-	size_t buf_len, len;
+	int fd;
+	struct stat st;
+	ssize_t bytes = -1;
 
-	if ((fp = fopen(path, "r")) == NULL)
-		return 0;
+	fd = open(file, O_RDONLY);
+	if (fd == -1)
+		return -1;
 
-	buf = NULL;
-	buf_len = len = 0;
-	*data = NULL;
-	while (getline(&buf, &buf_len, fp) != -1) {
-		if ((len = hwaddr_aton(NULL, buf)) != 0) {
-			if (buf_len >= len)
-				*data = (uint8_t *)buf;
-			else {
-				if ((*data = malloc(len)) == NULL)
-					len = 0;
-			}
-			if (len != 0)
-				(void)hwaddr_aton(*data, buf);
-			if (buf_len < len)
-				free(buf);
-			break;
-		}
+	if (fstat(fd, &st) != 0)
+		goto out;
+	if (!S_ISREG(st.st_mode)) {
+		errno = EINVAL;
+		goto out;
 	}
-	fclose(fp);
-	return len;
+	if ((size_t)st.st_size > len) {
+		errno = E2BIG;
+		goto out;
+	}
+	bytes = read(fd, data, len);
+
+out:
+	if (fd != -1)
+		close(fd);
+	return bytes;
+}
+
+ssize_t
+writefile(const char *file, mode_t mode, const void *data, size_t len)
+{
+	int fd;
+	ssize_t bytes;
+
+	fd = open(file, O_WRONLY | O_CREAT | O_TRUNC, mode);
+	if (fd == -1)
+		return -1;
+	bytes = write(fd, data, len);
+	close(fd);
+	return bytes;
+}
+
+int
+filemtime(const char *file, time_t *time)
+{
+	struct stat st;
+
+	if (stat(file, &st) == -1)
+		return -1;
+	*time = st.st_mtime;
+	return 0;
 }
 
 int

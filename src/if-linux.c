@@ -211,7 +211,7 @@ if_machinearch(char *str, size_t len)
 		    fscanf(fp, "%255s", buf) == 1)
 		{
 		        fclose(fp);
-			return snprintf(str, len, ":%s", buf);
+			return snprintf(str, len, "%s", buf);
 		}
 	}
 	fclose(fp);

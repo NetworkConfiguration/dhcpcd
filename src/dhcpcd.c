@@ -357,8 +357,17 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 	eloop_event_delete(ctx->eloop, ctx->fork_fd);
 	close(ctx->fork_fd);
 	ctx->fork_fd = -1;
-	(void)freopen(_PATH_DEVNULL, "w", stdout);
-	(void)freopen(_PATH_DEVNULL, "w", stderr);
+#ifdef PRIVSEP
+	if (ctx->options & DHCPCD_PRIVSEP) {
+		/* Aside from Linux, we don't have access to /dev/null */
+		fclose(stdout);
+		fclose(stderr);
+	} else
+#endif
+	{
+		(void)freopen(_PATH_DEVNULL, "w", stdout);
+		(void)freopen(_PATH_DEVNULL, "w", stderr);
+	}
 #endif
 }
 
@@ -825,12 +834,27 @@ warn_iaid_conflict(struct interface *ifp, uint16_t ia_type, uint8_t *iaid)
 		    ifp->name, ifn->name);
 }
 
+static void
+dhcpcd_initduid(struct dhcpcd_ctx *ctx, struct interface *ifp)
+{
+	char buf[DUID_LEN * 3];
+
+	if (ctx->duid != NULL)
+		return;
+
+	duid_init(ctx, ifp);
+	if (ctx->duid == NULL)
+		return;
+
+	loginfox("DUID %s",
+	    hwaddr_ntoa(ctx->duid, ctx->duid_len, buf, sizeof(buf)));
+}
+
 void
 dhcpcd_startinterface(void *arg)
 {
 	struct interface *ifp = arg;
 	struct if_options *ifo = ifp->options;
-	char buf[DUID_LEN * 3];
 	int carrier;
 
 	if (ifo->options & DHCPCD_LINK) {
@@ -863,26 +887,21 @@ dhcpcd_startinterface(void *arg)
 	if (ifo->options & (DHCPCD_DUID | DHCPCD_IPV6) &&
 	    !(ifo->options & DHCPCD_ANONYMOUS))
 	{
+		char buf[sizeof(ifo->iaid) * 3];
 #ifdef INET6
 		size_t i;
 		struct if_ia *ia;
 #endif
 
-		/* Report client DUID */
-		if (ifp->ctx->duid == NULL) {
-			if (duid_init(ifp) == 0)
-				return;
-			loginfox("DUID %s",
-			    hwaddr_ntoa(ifp->ctx->duid,
-			    ifp->ctx->duid_len,
-			    buf, sizeof(buf)));
-		}
+		/* Try and init DUID from the interface hardware address */
+		dhcpcd_initduid(ifp->ctx, ifp);
 
 		/* Report IAIDs */
 		loginfox("%s: IAID %s", ifp->name,
 		    hwaddr_ntoa(ifo->iaid, sizeof(ifo->iaid),
 		    buf, sizeof(buf)));
 		warn_iaid_conflict(ifp, 0, ifo->iaid);
+
 #ifdef INET6
 		for (i = 0; i < ifo->ia_len; i++) {
 			ia = &ifo->ia[i];
@@ -2251,8 +2270,16 @@ printpidfile:
 	dhcpcd_setlinkrcvbuf(&ctx);
 #endif
 
+	/* Try and create DUID from the machine UUID. */
+	dhcpcd_initduid(&ctx, NULL);
+
+	/* Cache the default vendor option. */
+	if (dhcp_vendor(ctx.vendor, sizeof(ctx.vendor)) == -1)
+		logerrx("dhcp_vendor");
+
 #ifdef PRIVSEP
 	if (ctx.options & DHCPCD_PRIVSEP) {
+
 		/*
 		 * PSF_CAP_ENTER is not set because the following functions
 		 * won't work in it:

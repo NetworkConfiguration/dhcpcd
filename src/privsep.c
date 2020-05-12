@@ -78,30 +78,8 @@
 #endif
 
 int
-ps_mkdir(char *path)
-{
-	char *slash;
-	bool done;
-
-	slash = path;
-	for (;;) {
-		slash += strspn(slash, "/");
-		slash += strcspn(slash, "/");
-		done = (*slash == '\0');
-		*slash = '\0';
-		if (mkdir(path, 0755) == -1 && errno != EEXIST)
-			return -1;
-		if (done)
-			break;
-		*slash = '/';
-	}
-	return 0;
-}
-
-int
 ps_init(struct dhcpcd_ctx *ctx)
 {
-	char path[PATH_MAX];
 	struct passwd *pw;
 
 	errno = 0;
@@ -120,26 +98,13 @@ ps_init(struct dhcpcd_ctx *ctx)
 		ctx->ps_chroot = pw->pw_dir;
 
 	/* If we pickup the _dhcp user refuse the default directory */
-	if (*ctx->ps_chroot != '/' ||
-	    strcmp(ctx->ps_chroot, "/var/empty") == 0)
-	{
+	if (*ctx->ps_chroot != '/') {
 		ctx->options &= ~DHCPCD_PRIVSEP;
 		logerrx("refusing chroot: %s: %s",
 		    PRIVSEP_USER, ctx->ps_chroot);
 		errno = 0;
 		return -1;
 	}
-
-	/* Create the database directory. */
-	if (snprintf(path, sizeof(path), "%s%s", ctx->ps_chroot, DBDIR) == -1 ||
-	    ps_mkdir(path) == -1 ||
-	    chown(path, pw->pw_uid, pw->pw_gid) == -1 ||
-	    chmod(path, 0755) == -1)
-		logerr("%s: %s", __func__, path);
-
-	/* Ensure we have a localtime to correctly format dates. */
-	if (ps_root_docopychroot(ctx, "/etc/localtime") == -1 && errno!=ENOENT)
-		logerr("%s: %s", __func__, "/etc/localtime");
 
 	ctx->options |= DHCPCD_PRIVSEP;
 	return 0;
@@ -152,7 +117,6 @@ ps_dropprivs(struct dhcpcd_ctx *ctx, unsigned int flags)
 
 	if (!(ctx->options & DHCPCD_FORKED))
 		logdebugx("chrooting to `%s'", ctx->ps_chroot);
-
 	if (chroot(ctx->ps_chroot) == -1)
 		logerr("%s: chroot `%s'", __func__, ctx->ps_chroot);
 	if (chdir("/") == -1)
@@ -184,9 +148,8 @@ ps_dropprivs(struct dhcpcd_ctx *ctx, unsigned int flags)
 		if (ctx->options & DHCPCD_UNPRIV)
 			promises = "stdio dns bpf";
 		else
-			/* SIOCGIFGROUP requries inet
-			 * lease files and foo require rpath, wpath and cpath */
-			promises = "stdio dns inet route rpath wpath cpath";
+			/* SIOCGIFGROUP requires inet */
+			promises = "stdio dns inet route";
                 if (pledge(promises, NULL) == -1) {
                         logerr("%s: pledge", __func__);
                         return -1;
@@ -568,7 +531,7 @@ ps_sendpsmdata(struct dhcpcd_ctx *ctx, int fd,
 
 
 ssize_t
-ps_sendmsg(struct dhcpcd_ctx *ctx, int fd, uint8_t cmd, unsigned long flags,
+ps_sendmsg(struct dhcpcd_ctx *ctx, int fd, uint16_t cmd, unsigned long flags,
     const struct msghdr *msg)
 {
 	assert(msg->msg_iovlen == 1);
@@ -610,7 +573,7 @@ ps_sendmsg(struct dhcpcd_ctx *ctx, int fd, uint8_t cmd, unsigned long flags,
 }
 
 ssize_t
-ps_sendcmd(struct dhcpcd_ctx *ctx, int fd, uint8_t cmd, unsigned long flags,
+ps_sendcmd(struct dhcpcd_ctx *ctx, int fd, uint16_t cmd, unsigned long flags,
     const void *data, size_t len)
 {
 	struct ps_msghdr psm = {
@@ -628,7 +591,7 @@ ps_sendcmd(struct dhcpcd_ctx *ctx, int fd, uint8_t cmd, unsigned long flags,
 }
 
 static ssize_t
-ps_sendcmdmsg(int fd, uint8_t cmd, const struct msghdr *msg)
+ps_sendcmdmsg(int fd, uint16_t cmd, const struct msghdr *msg)
 {
 	struct ps_msghdr psm = { .ps_cmd = cmd };
 	uint8_t data[PS_BUFLEN], *p = data;
@@ -671,7 +634,7 @@ nobufs:
 }
 
 ssize_t
-ps_recvmsg(struct dhcpcd_ctx *ctx, int rfd, uint8_t cmd, int wfd)
+ps_recvmsg(struct dhcpcd_ctx *ctx, int rfd, uint16_t cmd, int wfd)
 {
 	struct sockaddr_storage ss = { .ss_family = AF_UNSPEC };
 	uint8_t controlbuf[sizeof(struct sockaddr_storage)] = { 0 };

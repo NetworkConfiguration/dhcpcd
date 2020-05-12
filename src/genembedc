@@ -13,7 +13,7 @@ $TOOL_SED \
 	-e 's/#.*$//' \
 	-e '/^$/d' \
 	-e 's/^/"/g' \
-	-e 's/$/\",/g' \
+	-e 's/$/\\n\"/g' \
 	-e 's/ [ ]*/ /g' \
 	-e 's/	[	]*/ /g' \
 	$CONF_SMALL
@@ -22,9 +22,9 @@ $TOOL_SED \
 	-e 's/#.*$//' \
 	-e '/^$/d' \
 	-e 's/^/"/g' \
-	-e 's/$/\",/g' \
+	-e 's/$/\\n"/g' \
 	-e 's/ [ ]*/ /g' \
 	-e 's/	[	]*/ /g' \
 	$CONF
 echo "#endif"
-printf "%s\n%s\n" "NULL" "};"
+printf "%s\n%s\n" '"\0";'

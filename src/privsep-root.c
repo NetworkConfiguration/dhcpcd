@@ -217,124 +217,35 @@ ps_root_run_script(struct dhcpcd_ctx *ctx, const void *data, size_t len)
 	return status;
 }
 
-#if defined(__linux__) && !defined(st_mtimespec)
-#define	st_atimespec  st_atim
-#define	st_mtimespec  st_mtim
-#endif
-ssize_t
-ps_root_docopychroot(struct dhcpcd_ctx *ctx, const char *file)
-{
-
-	char path[PATH_MAX], buf[BUFSIZ], *slash;
-	struct stat from_sb, to_sb;
-	int from_fd, to_fd;
-	ssize_t rcount, wcount, total;
-#if defined(BSD) || defined(__linux__)
-	struct timespec ts[2];
-#else
-	struct timeval tv[2];
-#endif
-
-	if (snprintf(path, sizeof(path), "%s/%s", ctx->ps_chroot, file) == -1)
-		return -1;
-	if (stat(file, &from_sb) == -1)
-		return -1;
-	if (stat(path, &to_sb) == 0) {
-#if defined(BSD) || defined(__linux__)
-		if (from_sb.st_mtimespec.tv_sec == to_sb.st_mtimespec.tv_sec &&
-		    from_sb.st_mtimespec.tv_nsec == to_sb.st_mtimespec.tv_nsec)
-			return 0;
-#else
-		if (from_sb.st_mtime == to_sb.st_mtime)
-			return 0;
-#endif
-	} else {
-		/* Ensure directory exists */
-		slash = strrchr(path, '/');
-		if (slash != NULL) {
-			*slash = '\0';
-			ps_mkdir(path);
-			*slash = '/';
-		}
-	}
-
-	if (unlink(path) == -1 && errno != ENOENT)
-		return -1;
-	if ((from_fd = open(file, O_RDONLY, 0)) == -1)
-		return -1;
-	if ((to_fd = open(path, O_WRONLY | O_TRUNC | O_CREAT, 0555)) == -1)
-		return -1;
-
-	total = 0;
-	while ((rcount = read(from_fd, buf, sizeof(buf))) > 0) {
-		wcount = write(to_fd, buf, (size_t)rcount);
-		if (wcount != rcount) {
-			total = -1;
-			break;
-		}
-		total += wcount;
-	}
-
-#if defined(BSD) || defined(__linux__)
-	ts[0] = from_sb.st_atimespec;
-	ts[1] = from_sb.st_mtimespec;
-	if (futimens(to_fd, ts) == -1)
-		total = -1;
-#else
-	tv[0].tv_sec = from_sb.st_atime;
-	tv[0].tv_usec = 0;
-	tv[1].tv_sec = from_sb.st_mtime;
-	tv[1].tv_usec = 0;
-	if (futimes(to_fd, tv) == -1)
-		total = -1;
-#endif
-	close(from_fd);
-	close(to_fd);
-
-	return total;
-}
-
 static ssize_t
-ps_root_dofileop(struct dhcpcd_ctx *ctx, void *data, size_t len, uint8_t op)
+ps_root_dowritefile(mode_t mode, void *data, size_t len)
 {
-	char *path = data;
-	size_t plen;
+	char *file = data, *nc;
 
-	if (len < sizeof(plen)) {
+	nc = memchr(file, '\0', len);
+	if (nc == NULL) {
 		errno = EINVAL;
 		return -1;
 	}
-
-	memcpy(&plen, path, sizeof(plen));
-	path += sizeof(plen);
-	if (sizeof(plen) + plen > len) {
-		errno = EINVAL;
-		return -1;
-	}
-
-	switch(op) {
-	case PS_COPY:
-		return ps_root_docopychroot(ctx, path);
-	case PS_UNLINK:
-		return (ssize_t)unlink(path);
-	default:
-		errno = ENOTSUP;
-		return -1;
-	}
+	nc++;
+	return writefile(file, mode, nc, len - (nc - file));
 }
 
 static ssize_t
 ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 {
 	struct dhcpcd_ctx *ctx = arg;
-	uint8_t cmd;
+	uint16_t cmd;
 	struct ps_process *psp;
 	struct iovec *iov = msg->msg_iov;
 	void *data = iov->iov_base;
 	size_t len = iov->iov_len;
+	uint8_t buf[PS_BUFLEN];
+	time_t mtime;
 	ssize_t err;
+	bool retdata = false;
 
-	cmd = (uint8_t)(psm->ps_cmd & ~(PS_START | PS_STOP | PS_DELETE));
+	cmd = (uint16_t)(psm->ps_cmd & ~(PS_START | PS_STOP | PS_DELETE));
 	psp = ps_findprocess(ctx, &psm->ps_id);
 
 #ifdef PRIVSEP_DEBUG
@@ -388,20 +299,40 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 	switch (psm->ps_cmd) {
 	case PS_IOCTL:
 		err = ps_root_doioctl(psm->ps_flags, data, len);
+		retdata = true;
 		break;
 	case PS_SCRIPT:
 		err = ps_root_run_script(ctx, data, len);
 		break;
-	case PS_COPY:	/* FALLTHROUGH */
 	case PS_UNLINK:
-		err = ps_root_dofileop(ctx, data, len, psm->ps_cmd);
+		err = unlink(data);
+		break;
+	case PS_READFILE:
+		errno = 0;
+		err = readfile(data, buf, sizeof(buf));
+		if (err != -1) {
+			data = buf;
+			len = (size_t)err;
+			retdata = true;
+		}
+		break;
+	case PS_WRITEFILE:
+		err = ps_root_dowritefile(psm->ps_flags, data, len);
+		break;
+	case PS_FILEMTIME:
+		err = filemtime(data, &mtime);
+		if (err != -1) {
+			data = &mtime;
+			len = sizeof(mtime);
+			retdata = true;
+		}
 		break;
 	default:
 		err = ps_root_os(psm, msg);
 		break;
 	}
 
-	return ps_root_writeerror(ctx, err, data, len);
+	return ps_root_writeerror(ctx, err, data, retdata ? len : 0);
 }
 
 /* Receive from state engine, do an action. */
@@ -428,6 +359,7 @@ ps_root_startcb(void *arg)
 		    ctx->options & DHCPCD_IPV4 ? " [ip4]" : "",
 		    ctx->options & DHCPCD_IPV6 ? " [ip6]" : "");
 	ctx->ps_root_pid = getpid();
+	ctx->options |= DHCPCD_PRIVSEPROOT;
 	return 0;
 }
 
@@ -574,38 +506,53 @@ ps_root_ioctl(struct dhcpcd_ctx *ctx, ioctl_request_t req, void *data,
 	return ps_root_readerror(ctx, data, len);
 }
 
-static ssize_t
-ps_root_fileop(struct dhcpcd_ctx *ctx, const char *path, uint8_t op)
+ssize_t
+ps_root_unlink(struct dhcpcd_ctx *ctx, const char *file)
 {
-	char buf[PATH_MAX], *p = buf;
-	size_t plen = strlen(path) + 1;
-	size_t len = sizeof(plen) + plen;
 
-	if (len > sizeof(buf)) {
-		errno = ENOBUFS;
-		return -1;
-	}
-
-	memcpy(p, &plen, sizeof(plen));
-	p += sizeof(plen);
-	memcpy(p, path, plen);
-
-	if (ps_sendcmd(ctx, ctx->ps_root_fd, op, 0, buf, len) == -1)
+	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_UNLINK, 0,
+	    file, strlen(file) + 1) == -1)
 		return -1;
 	return ps_root_readerror(ctx, NULL, 0);
 }
 
-
 ssize_t
-ps_root_copychroot(struct dhcpcd_ctx *ctx, const char *path)
+ps_root_readfile(struct dhcpcd_ctx *ctx, const char *file,
+    void *data, size_t len)
 {
-
-	return ps_root_fileop(ctx, path, PS_COPY);
+	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_READFILE, 0,
+	    file, strlen(file) + 1) == -1)
+		return -1;
+	return ps_root_readerror(ctx, data, len);
 }
 
 ssize_t
-ps_root_unlink(struct dhcpcd_ctx *ctx, const char *path)
+ps_root_writefile(struct dhcpcd_ctx *ctx, const char *file, mode_t mode,
+    const void *data, size_t len)
+{
+	char buf[PS_BUFLEN];
+	size_t flen;
+
+	flen = strlcpy(buf, file, sizeof(buf));
+	flen += 1;
+	if (flen > sizeof(buf) || flen + len > sizeof(buf)) {
+		errno = ENOBUFS;
+		return -1;
+	}
+	memcpy(buf + flen, data, len);
+
+	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_WRITEFILE, mode,
+	    buf, flen + len) == -1)
+		return -1;
+	return ps_root_readerror(ctx, NULL, 0);
+}
+
+int
+ps_root_filemtime(struct dhcpcd_ctx *ctx, const char *file, time_t *time)
 {
 
-	return ps_root_fileop(ctx, path, PS_UNLINK);
+	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_FILEMTIME, 0,
+	    file, strlen(file) + 1) == -1)
+		return -1;
+	return ps_root_readerror(ctx, time, sizeof(*time));
 }

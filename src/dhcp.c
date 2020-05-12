@@ -28,7 +28,6 @@
 
 #include <sys/param.h>
 #include <sys/socket.h>
-#include <sys/stat.h>
 
 #include <arpa/inet.h>
 #include <net/if.h>
@@ -1142,31 +1141,16 @@ toobig:
 	return -1;
 }
 
-static ssize_t
-write_lease(const struct interface *ifp, const struct bootp *bootp, size_t len)
-{
-	int fd;
-	ssize_t bytes;
-	const struct dhcp_state *state = D_CSTATE(ifp);
-
-	logdebugx("%s: writing lease `%s'", ifp->name, state->leasefile);
-
-	fd = open(state->leasefile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-	if (fd == -1)
-		return -1;
-	bytes = write(fd, bootp, len);
-	close(fd);
-	return bytes;
-}
-
 static size_t
 read_lease(struct interface *ifp, struct bootp **bootp)
 {
-	int fd;
-	bool fd_opened;
+	union {
+		struct bootp bootp;
+		uint8_t buf[FRAMELEN_MAX];
+	} buf;
 	struct dhcp_state *state = D_STATE(ifp);
 	struct bootp *lease;
-	size_t bytes;
+	ssize_t bytes;
 	uint8_t type;
 #ifdef AUTH
 	const uint8_t *auth;
@@ -1177,37 +1161,26 @@ read_lease(struct interface *ifp, struct bootp **bootp)
 	*bootp = NULL;
 
 	if (state->leasefile[0] == '\0') {
-		fd = fileno(stdin);
-		fd_opened = false;
-	} else {
-		fd = open(state->leasefile, O_RDONLY);
-		fd_opened = true;
-	}
-	if (fd == -1) {
-		if (errno != ENOENT)
-			logerr("%s: open `%s'",
-			    ifp->name, state->leasefile);
-		return 0;
-	}
-	if (state->leasefile[0] == '\0')
 		logdebugx("reading standard input");
-	else
+		bytes = read(fileno(stdin), buf.buf, sizeof(buf.buf));
+	} else {
 		logdebugx("%s: reading lease `%s'",
 		    ifp->name, state->leasefile);
-
-	bytes = dhcp_read_lease_fd(fd, (void **)&lease);
-	if (fd_opened)
-		close(fd);
-	if (bytes == 0)
+		bytes = dhcp_readfile(ifp->ctx, state->leasefile,
+		    buf.buf, sizeof(buf.buf));
+	}
+	if (bytes == -1) {
+		if (errno != ENOENT)
+			logerr("%s: %s", ifp->name, state->leasefile);
 		return 0;
+	}
 
 	/* Ensure the packet is at lease BOOTP sized
 	 * with a vendor area of 4 octets
 	 * (it should be more, and our read packet enforces this so this
 	 * code should not be needed, but of course people could
 	 * scribble whatever in the stored lease file. */
-	if (bytes < DHCP_MIN_LEN) {
-		free(lease);
+	if ((size_t)bytes < DHCP_MIN_LEN) {
 		logerrx("%s: %s: truncated lease", ifp->name, __func__);
 		return 0;
 	}
@@ -1216,20 +1189,19 @@ read_lease(struct interface *ifp, struct bootp **bootp)
 		goto out;
 
 	/* We may have found a BOOTP server */
-	if (get_option_uint8(ifp->ctx, &type, (struct bootp *)lease, bytes,
+	if (get_option_uint8(ifp->ctx, &type, &buf.bootp, bytes,
 	    DHO_MESSAGETYPE) == -1)
 		type = 0;
 
 #ifdef AUTH
 	/* Authenticate the message */
-	auth = get_option(ifp->ctx, (struct bootp *)lease, bytes,
+	auth = get_option(ifp->ctx, &buf.bootp, bytes,
 	    DHO_AUTHENTICATION, &auth_len);
 	if (auth) {
 		if (dhcp_auth_validate(&state->auth, &ifp->options->auth,
 		    lease, bytes, 4, type, auth, auth_len) == NULL)
 		{
 			logerr("%s: authentication failed", ifp->name);
-			free(lease);
 			return 0;
 		}
 		if (state->auth.token)
@@ -1241,14 +1213,18 @@ read_lease(struct interface *ifp, struct bootp **bootp)
 	    DHCPCD_AUTH_SENDREQUIRE)
 	{
 		logerrx("%s: authentication now required", ifp->name);
-		free(lease);
 		return 0;
 	}
 #endif
 
 out:
-	*bootp = (struct bootp *)lease;
-	return bytes;
+	*bootp = malloc(bytes);
+	if (*bootp == NULL) {
+		logerr(__func__);
+		return 0;
+	}
+	memcpy(*bootp, buf.buf, bytes);
+	return (size_t)bytes;
 }
 
 static const struct dhcp_opt *
@@ -1929,7 +1905,7 @@ dhcp_expire1(struct interface *ifp)
 
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	dhcp_drop(ifp, "EXPIRE");
-	unlink(state->leasefile);
+	dhcp_unlink(ifp->ctx, state->leasefile);
 	state->interval = 0;
 	if (!(ifp->options->options & DHCPCD_LINK) || ifp->carrier > LINK_DOWN)
 		dhcp_discover(ifp);
@@ -2072,7 +2048,7 @@ dhcp_addr_duplicated(struct interface *ifp, struct in_addr *ia)
 
 	/* RFC 2131 3.1.5, Client-server interaction */
 	logerrx("%s: DAD detected %s", ifp->name, inet_ntoa(*ia));
-	unlink(state->leasefile);
+	dhcp_unlink(ifp->ctx, state->leasefile);
 	if (!(opts & DHCPCD_STATIC) && !state->lease.frominfo)
 		dhcp_decline(ifp);
 #ifdef IN_IFF_DUPLICATED
@@ -2299,9 +2275,13 @@ dhcp_bind(struct interface *ifp)
 	}
 	state->state = DHS_BOUND;
 	if (!state->lease.frominfo &&
-	    !(ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC)))
-		if (write_lease(ifp, state->new, state->new_len) == -1)
-			logerr("write_lease: %s", state->leasefile);
+	    !(ifo->options & (DHCPCD_INFORM | DHCPCD_STATIC))) {
+		logdebugx("%s: writing lease `%s'",
+		    ifp->name, state->leasefile);
+		if (dhcp_writefile(ifp->ctx, state->leasefile, 0640,
+		    state->new, state->new_len) == -1)
+			logerr("dhcp_writefile: %s", state->leasefile);
+	}
 
 	/* Close the BPF filter as we can now receive DHCP messages
 	 * on a UDP socket. */
@@ -2749,7 +2729,7 @@ dhcp_drop(struct interface *ifp, const char *reason)
 			return;
 		state->state = DHS_RELEASE;
 
-		unlink(state->leasefile);
+		dhcp_unlink(ifp->ctx, state->leasefile);
 		if (ifp->carrier > LINK_DOWN &&
 		    state->new != NULL &&
 		    state->lease.server.s_addr != INADDR_ANY)
@@ -3114,7 +3094,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 			return;
 		if (!(ifp->ctx->options & DHCPCD_TEST)) {
 			dhcp_drop(ifp, "NAK");
-			unlink(state->leasefile);
+			dhcp_unlink(ifp->ctx, state->leasefile);
 		}
 
 		/* If we constantly get NAKS then we should slowly back off */
@@ -3788,7 +3768,7 @@ dhcp_init(struct interface *ifp)
 	/* We need to drop the leasefile so that dhcp_start
 	 * doesn't load it. */
 	if (ifo->options & DHCPCD_REQUEST)
-		unlink(state->leasefile);
+		dhcp_unlink(ifp->ctx, state->leasefile);
 
 	free(state->clientid);
 	state->clientid = NULL;
@@ -3862,7 +3842,6 @@ dhcp_start1(void *arg)
 	struct dhcpcd_ctx *ctx = ifp->ctx;
 	struct if_options *ifo = ifp->options;
 	struct dhcp_state *state;
-	struct stat st;
 	uint32_t l;
 	int nolease;
 
@@ -3947,6 +3926,7 @@ dhcp_start1(void *arg)
 	}
 	if (state->offer) {
 		struct ipv4_addr *ia;
+		time_t mtime;
 
 		get_lease(ifp, &state->lease, state->offer, state->offer_len);
 		state->lease.frominfo = 1;
@@ -3974,14 +3954,14 @@ dhcp_start1(void *arg)
 			state->offer_len = 0;
 		} else if (!(ifo->options & DHCPCD_LASTLEASE_EXTEND) &&
 		    state->lease.leasetime != DHCP_INFINITE_LIFETIME &&
-		    stat(state->leasefile, &st) == 0)
+		    dhcp_filemtime(ifp->ctx, state->leasefile, &mtime) == 0)
 		{
 			time_t now;
 
 			/* Offset lease times and check expiry */
 			now = time(NULL);
 			if (now == -1 ||
-			    (time_t)state->lease.leasetime < now - st.st_mtime)
+			    (time_t)state->lease.leasetime < now - mtime)
 			{
 				logdebugx("%s: discarding expired lease",
 				    ifp->name);
@@ -4006,7 +3986,7 @@ dhcp_start1(void *arg)
 					dhcp_drop(ifp, "EXPIRE");
 #endif
 			} else {
-				l = (uint32_t)(now - st.st_mtime);
+				l = (uint32_t)(now - mtime);
 				state->lease.leasetime -= l;
 				state->lease.renewaltime -= l;
 				state->lease.rebindtime -= l;

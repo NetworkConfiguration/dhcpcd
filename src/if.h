@@ -95,6 +95,8 @@ typedef unsigned long		ioctl_request_t;
 #define	FRAMEHDRLEN_MAX			14	/* only ethernet support */
 #define	FRAMELEN_MAX			(FRAMEHDRLEN_MAX + 9216)
 
+#define UDPLEN_MAX			64 * 1024
+
 /* Work out if we have a private address or not
  * 10/8
  * 172.16/12

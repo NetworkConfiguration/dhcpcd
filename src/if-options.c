@@ -27,7 +27,6 @@
  */
 
 #include <sys/param.h>
-#include <sys/stat.h>
 #include <sys/types.h>
 
 #include <arpa/inet.h>
@@ -2265,25 +2264,31 @@ finish_config(struct if_options *ifo)
  * We strip leading space and avoid comment lines, making the code that calls
  * us smaller. */
 static char *
-get_line(char ** __restrict buf, size_t * __restrict buflen,
-    FILE * __restrict fp)
+get_line(char ** __restrict buf, ssize_t * __restrict buflen)
 {
 	char *p, *c;
-	ssize_t bytes;
-	int quoted;
+	bool quoted;
 
 	do {
-		bytes = getline(buf, buflen, fp);
-		if (bytes == -1)
-			return NULL;
-		for (p = *buf; *p == ' ' || *p == '\t'; p++)
+		p = *buf;
+		c = memchr(*buf, '\n', *buflen);
+		if (c == NULL) {
+			c = memchr(*buf, '\0', *buflen);
+			if (c == NULL)
+				return NULL;
+			*buflen = c - *buf;
+			*buf = NULL;
+		} else {
+			*c++ = '\0';
+			*buflen -= c - *buf;
+			*buf = c;
+		}
+		for (; *p == ' ' || *p == '\t'; p++)
 			;
 	} while (*p == '\0' || *p == '\n' || *p == '#' || *p == ';');
-	if ((*buf)[--bytes] == '\n')
-		(*buf)[bytes] = '\0';
 
 	/* Strip embedded comments unless in a quoted string or escaped */
-	quoted = 0;
+	quoted = false;
 	for (c = p; *c != '\0'; c++) {
 		if (*c == '\\') {
 			c++; /* escaped */
@@ -2334,16 +2339,11 @@ read_config(struct dhcpcd_ctx *ctx,
     const char *ifname, const char *ssid, const char *profile)
 {
 	struct if_options *ifo;
-	FILE *fp;
-	struct stat sb;
-	char *line, *buf, *option, *p;
-	size_t buflen;
+	char buf[UDPLEN_MAX], *bp; /* 64k max config file size */
+	char *line, *option, *p;
+	ssize_t buflen;
 	ssize_t vlen;
 	int skip, have_profile, new_block, had_block;
-#ifndef EMBEDDED_CONFIG
-	const char * const *e;
-	size_t ol;
-#endif
 #if !defined(INET) || !defined(INET6)
 	size_t i;
 	struct dhcp_opt *opt;
@@ -2366,12 +2366,9 @@ read_config(struct dhcpcd_ctx *ctx,
 	ifo->options |= DHCPCD_DHCP6;
 #endif
 
-	vlen = dhcp_vendor((char *)ifo->vendorclassid + 1,
-	            sizeof(ifo->vendorclassid) - 1);
-	ifo->vendorclassid[0] = (uint8_t)(vlen == -1 ? 0 : vlen);
-
-	buf = NULL;
-	buflen = 0;
+	vlen = strlcpy((char *)ifo->vendorclassid + 1, ctx->vendor,
+	    sizeof(ifo->vendorclassid) - 1);
+	ifo->vendorclassid[0] = (uint8_t)(vlen > 255 ? 0 : vlen);
 
 	/* Reset route order */
 	ctx->rt_order = 0;
@@ -2407,38 +2404,26 @@ read_config(struct dhcpcd_ctx *ctx,
 
 		/* Now load our embedded config */
 #ifdef EMBEDDED_CONFIG
-		fp = fopen(EMBEDDED_CONFIG, "r");
-		if (fp == NULL)
-			logerr("%s: fopen `%s'", __func__, EMBEDDED_CONFIG);
-
-		while (fp && (line = get_line(&buf, &buflen, fp))) {
-#else
-		buflen = 80;
-		buf = malloc(buflen);
-		if (buf == NULL) {
-			logerr(__func__);
-			free_options(ctx, ifo);
-			return NULL;
+		buflen = dhcp_readfile(ctx, EMBEDDED_CONFIG, buf, sizeof(buf));
+		if (buflen == -1) {
+			logerr("%s: %s", __func__, EMBEDDED_CONFIG);
+			return ifo;
 		}
-		ldop = edop = NULL;
-		for (e = dhcpcd_embedded_conf; *e; e++) {
-			ol = strlen(*e) + 1;
-			if (ol > buflen) {
-				char *nbuf;
-
-				buflen = ol;
-				nbuf = realloc(buf, buflen);
-				if (nbuf == NULL) {
-					logerr(__func__);
-					free(buf);
-					free_options(ctx, ifo);
-					return NULL;
-				}
-				buf = nbuf;
-			}
-			memcpy(buf, *e, ol);
-			line = buf;
+		if (buf[buflen] != '\0') {
+			if (buflen < sizeof(buf) - 1)
+				bulen++;
+			buf[buflen] = '\0';
+		}
+#else
+		buflen = strlcpy(buf, dhcpcd_embedded_conf, sizeof(buf));
+		if ((size_t)buflen >= sizeof(buf)) {
+			logerrx("%s: embedded config too big", __func__);
+			return ifo;
+		}
+		/* Our embedded config is NULL terminated */
 #endif
+		bp = buf;
+		while ((line = get_line(&bp, &buflen)) != NULL) {
 			option = strsep(&line, " \t");
 			if (line)
 				line = strskipwhite(line);
@@ -2452,13 +2437,8 @@ read_config(struct dhcpcd_ctx *ctx,
 			}
 			parse_config_line(ctx, NULL, ifo, option, line,
 			    &ldop, &edop);
-
 		}
 
-#ifdef EMBEDDED_CONFIG
-		if (fp)
-			fclose(fp);
-#endif
 #ifdef INET
 		ctx->dhcp_opts = ifo->dhcp_override;
 		ctx->dhcp_opts_len = ifo->dhcp_override_len;
@@ -2503,26 +2483,25 @@ read_config(struct dhcpcd_ctx *ctx,
 	}
 
 	/* Parse our options file */
-#ifdef PRIVSEP
-	if (ctx->options & DHCPCD_PRIVSEP &&
-	    ps_root_copychroot(ctx, ctx->cffile) == -1)
-		logwarn("%s: ps_root_copychroot `%s'", __func__, ctx->cffile);
-#endif
-	fp = fopen(ctx->cffile, "r");
-	if (fp == NULL) {
+	buflen = dhcp_readfile(ctx, ctx->cffile, buf, sizeof(buf));
+	if (buflen == -1) {
 		/* dhcpcd can continue without it, but no DNS options
 		 * would be requested ... */
-		logwarn("%s: fopen `%s'", __func__, ctx->cffile);
-		free(buf);
+		logerr("%s: %s", __func__, ctx->cffile);
 		return ifo;
 	}
-	if (stat(ctx->cffile, &sb) == 0)
-		ifo->mtime = sb.st_mtime;
+	if (buf[buflen] != '\0') {
+		if ((size_t)buflen < sizeof(buf) - 1)
+			buflen++;
+		buf[buflen] = '\0';
+	}
+	dhcp_filemtime(ctx, ctx->cffile, &ifo->mtime);
 
 	ldop = edop = NULL;
 	skip = have_profile = new_block = 0;
 	had_block = ifname == NULL ? 1 : 0;
-	while ((line = get_line(&buf, &buflen, fp))) {
+	bp = buf;
+	while ((line = get_line(&bp, &buflen)) != NULL) {
 		option = strsep(&line, " \t");
 		if (line)
 			line = strskipwhite(line);
@@ -2596,10 +2575,9 @@ read_config(struct dhcpcd_ctx *ctx,
 			continue;
 		if (skip)
 			continue;
+
 		parse_config_line(ctx, ifname, ifo, option, line, &ldop, &edop);
 	}
-	fclose(fp);
-	free(buf);
 
 	if (profile && !have_profile) {
 		free_options(ctx, ifo);

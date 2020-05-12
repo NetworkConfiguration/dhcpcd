@@ -26,7 +26,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/stat.h>
 #include <sys/utsname.h>
 
 #include <netinet/in.h>
@@ -258,9 +257,8 @@ static size_t
 dhcp6_makevendor(void *data, const struct interface *ifp)
 {
 	const struct if_options *ifo;
-	size_t len, i;
+	size_t len, vlen, i;
 	uint8_t *p;
-	ssize_t vlen;
 	const struct vivco *vivco;
 	char vendor[VENDORCLASSID_MAX_LEN];
 	struct dhcp6_option o;
@@ -274,11 +272,8 @@ dhcp6_makevendor(void *data, const struct interface *ifp)
 			len += sizeof(uint16_t) + vivco->len;
 		vlen = 0; /* silence bogus gcc warning */
 	} else {
-		vlen = dhcp_vendor(vendor, sizeof(vendor));
-		if (vlen == -1)
-			vlen = 0;
-		else
-			len += sizeof(uint16_t) + (size_t)vlen;
+		vlen = strlcpy(vendor, ifp->ctx->vendor, sizeof(vendor));
+		len += sizeof(uint16_t) + vlen;
 	}
 
 	if (len > UINT16_MAX) {
@@ -1748,7 +1743,7 @@ dhcp6_fail(struct interface *ifp)
 		state->new_len = 0;
 		if (state->old != NULL)
 			script_runreason(ifp, "EXPIRE6");
-		unlink(state->leasefile);
+		dhcp_unlink(ifp->ctx, state->leasefile);
 	}
 
 	if (!dhcp6_startdiscoinform(ifp)) {
@@ -2590,106 +2585,77 @@ dhcp6_validatelease(struct interface *ifp,
 }
 
 static ssize_t
-dhcp6_writelease(const struct interface *ifp)
-{
-	const struct dhcp6_state *state;
-	int fd;
-	ssize_t bytes;
-
-	state = D6_CSTATE(ifp);
-	logdebugx("%s: writing lease `%s'", ifp->name, state->leasefile);
-
-	fd = open(state->leasefile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-	if (fd == -1)
-		return -1;
-	bytes = write(fd, state->new, state->new_len);
-	close(fd);
-	return bytes;
-}
-
-static int
 dhcp6_readlease(struct interface *ifp, int validate)
 {
+	union {
+		struct dhcp6_message dhcp6;
+		uint8_t buf[UDPLEN_MAX];
+	} buf;
 	struct dhcp6_state *state;
-	struct stat st;
+	ssize_t bytes;
 	int fd;
-	time_t now;
-	int retval;
-	bool read_stdin, fd_opened;
+	time_t mtime, now;
 #ifdef AUTH
 	uint8_t *o;
 	uint16_t ol;
 #endif
 
 	state = D6_STATE(ifp);
-	read_stdin = state->leasefile[0] == '\0';
-	if (read_stdin) {
+	if (state->leasefile[0] == '\0') {
 		logdebugx("reading standard input");
-		fd = fileno(stdin);
-		fd_opened = false;
+		bytes = read(fileno(stdin), buf.buf, sizeof(buf.buf));
 	} else {
-		logdebugx("%s: reading lease `%s'", ifp->name,state->leasefile);
-		fd = open(state->leasefile, O_RDONLY);
-		if (fd != -1 && fstat(fd, &st) == -1) {
-			close(fd);
-			fd = -1;
-		}
-		fd_opened = true;
+		logdebugx("%s: reading lease `%s'",
+		    ifp->name, state->leasefile);
+		bytes = dhcp_readfile(ifp->ctx, state->leasefile,
+		    buf.buf, sizeof(buf.buf));
 	}
-	if (fd == -1)
-		return -1;
-	retval = -1;
-	free(state->new);
-	state->new_len = dhcp_read_lease_fd(fd, (void **)&state->new);
-	if (fd_opened)
-		close(fd);
-
-	if (ifp->ctx->options & DHCPCD_DUMPLEASE || read_stdin)
-		return 0;
-
-	if (state->new_len == 0) {
-		retval = 0;
+	if (bytes == -1)
 		goto ex;
-	}
+
+	if (ifp->ctx->options & DHCPCD_DUMPLEASE || state->leasefile[0] == '\0')
+		goto out;
+
+	if (bytes == 0)
+		goto ex;
 
 	/* If not validating IA's and if they have expired,
 	 * skip to the auth check. */
-	if (!validate) {
-		fd = 0;
+	if (!validate)
 		goto auth;
-	}
 
+	if (dhcp_filemtime(ifp->ctx, state->leasefile, &mtime) == -1)
+		goto ex;
 	clock_gettime(CLOCK_MONOTONIC, &state->acquired);
 	if ((now = time(NULL)) == -1)
 		goto ex;
-	state->acquired.tv_sec -= now - st.st_mtime;
+	state->acquired.tv_sec -= now - mtime;
 
 	/* Check to see if the lease is still valid */
-	fd = dhcp6_validatelease(ifp, state->new, state->new_len, NULL,
+	fd = dhcp6_validatelease(ifp, &buf.dhcp6, bytes, NULL,
 	    &state->acquired);
 	if (fd == -1)
 		goto ex;
 
 	if (state->expire != ND6_INFINITE_LIFETIME &&
-	    (time_t)state->expire < now - st.st_mtime &&
+	    (time_t)state->expire < now - mtime &&
 	    !(ifp->options->options & DHCPCD_LASTLEASE_EXTEND))
 	{
 		logdebugx("%s: discarding expired lease", ifp->name);
-		retval = 0;
+		bytes = 0;
 		goto ex;
 	}
 
 auth:
-	retval = 0;
 #ifdef AUTH
 	/* Authenticate the message */
-	o = dhcp6_findmoption(state->new, state->new_len, D6_OPTION_AUTH, &ol);
+	o = dhcp6_findmoption(&buf.dhcp6, bytes, D6_OPTION_AUTH, &ol);
 	if (o) {
 		if (dhcp_auth_validate(&state->auth, &ifp->options->auth,
-		    (uint8_t *)state->new, state->new_len, 6, state->new->type,
-		    o, ol) == NULL)
+		    buf.buf, bytes, 6, buf.dhcp6.type, o, ol) == NULL)
 		{
 			logerr("%s: authentication failed", ifp->name);
+			bytes = 0;
 			goto ex;
 		}
 		if (state->auth.token)
@@ -2705,22 +2671,32 @@ auth:
 	}
 #endif
 
-	return fd;
+out:
+	free(state->new);
+	state->new = malloc(bytes);
+	if (state->new == NULL) {
+		logerr(__func__);
+		goto ex;
+	}
+
+	memcpy(state->new, buf.buf, bytes);
+	state->new_len = bytes;
+	return bytes;
 
 ex:
 	dhcp6_freedrop_addrs(ifp, 0, NULL);
-	unlink(state->leasefile);
+	dhcp_unlink(ifp->ctx, state->leasefile);
 	free(state->new);
 	state->new = NULL;
 	state->new_len = 0;
-	return retval;
+	return bytes == 0 ? 0 : -1;
 }
 
 static void
 dhcp6_startinit(struct interface *ifp)
 {
 	struct dhcp6_state *state;
-	int r;
+	ssize_t r;
 	uint8_t has_ta, has_non_ta;
 	size_t i;
 
@@ -3259,9 +3235,13 @@ dhcp6_bind(struct interface *ifp, const char *op, const char *sfrom)
 			logmessage(loglevel, "%s: expire in %"PRIu32" seconds",
 			    ifp->name, state->expire);
 		rt_build(ifp->ctx, AF_INET6);
-		if (!confirmed && !timedout)
-			if (dhcp6_writelease(ifp) == -1)
-				logerr("dhcp6_writelease: %s",state->leasefile);
+		if (!confirmed && !timedout) {
+			logdebugx("%s: writing lease `%s'",
+			    ifp->name, state->leasefile);
+			if (dhcp_writefile(ifp->ctx, state->leasefile, 0640,
+			    state->new, state->new_len) == -1)
+				logerr("dhcp_writefile: %s",state->leasefile);
+		}
 #ifndef SMALL
 		dhcp6_delegate_prefix(ifp);
 #endif
@@ -3688,7 +3668,7 @@ dhcp6_recvmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg, struct ipv6_addr *ia)
 	 * replay it in my code.
 	 */
 	static int replyn = 0;
-	char fname[PATH_MAX], tbuf[64 * 1024];
+	char fname[PATH_MAX], tbuf[UDPLEN_MAX];
 	int fd;
 	ssize_t tlen;
 	uint8_t *si1, *si2;
@@ -3725,7 +3705,7 @@ dhcp6_recv(struct dhcpcd_ctx *ctx, struct ipv6_addr *ia)
 	struct sockaddr_in6 from;
 	union {
 		struct dhcp6_message dhcp6;
-		uint8_t buf[64 * 1024]; /* Maximum UDP message size */
+		uint8_t buf[UDPLEN_MAX]; /* Maximum UDP message size */
 	} iovbuf;
 	struct iovec iov = {
 		.iov_base = iovbuf.buf, .iov_len = sizeof(iovbuf.buf),
@@ -4044,7 +4024,7 @@ dhcp6_freedrop(struct interface *ifp, int drop, const char *reason)
 				dhcp6_startrelease(ifp);
 				return;
 			}
-			unlink(state->leasefile);
+			dhcp_unlink(ifp->ctx, state->leasefile);
 		}
 		dhcp6_freedrop_addrs(ifp, drop, NULL);
 		free(state->old);
