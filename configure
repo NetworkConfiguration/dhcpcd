@@ -13,7 +13,6 @@ IPV4LL=
 INET6=
 PRIVSEP=
 PRIVSEP_USER=
-PRIVSEP_CHROOT=
 ARC4RANDOM=
 CLOSEFROM=
 RBTREE=
@@ -72,7 +71,6 @@ for x do
 	--disable-privsep) PRIVSEP=no;;
 	--enable-privsep) PRIVSEP=yes;;
 	--privsepuser) PRIVSEP_USER=$var;;
-	--chrootdir) PRIVSEP_CHROOT=$var;;
 	--prefix) PREFIX=$var;;
 	--sysconfdir) SYSCONFDIR=$var;;
 	--bindir|--sbindir) SBINDIR=$var;;
@@ -581,22 +579,9 @@ if [ "$PRIVSEP" = yes ]; then
 
 	echo "CPPFLAGS+=	-DPRIVSEP" >>$CONFIG_MK
 	echo "PRIVSEP_USER?=	$PRIVSEP_USER" >>$CONFIG_MK
-	if [ -n "$PRIVSEP_CHROOT" ]; then
-		echo "PRIVSEP_CHROOT=	$PRIVSEP_CHROOT" >>$CONFIG_MK
-		cat <<EOF >>$CONFIG_MK
-SED_CHROOT=	-e 's:@CHDIR^@.*@CHDIR\$\$@:default of:g' \\
-	-e 's:@CHDIR1@:.Pa \${PRIVSEP_CHROOT} .:g' \\
-	-e 's:@CHDIR2@:A blank string chroots to the privileged separation users home directory.:g'
-EOF
-	fi
 	echo "#ifndef PRIVSEP_USER" >>$CONFIG_H
 	echo "#define PRIVSEP_USER		 \"$PRIVSEP_USER\"" >>$CONFIG_H
 	echo "#endif" >>$CONFIG_H
-	if [ -n "$PRIVSEP_CHROOT" ]; then
-		echo "#ifndef PRIVSEP_CHROOT" >>$CONFIG_H
-		echo "#define PRIVSEP_CHROOT	\"$PRIVSEP_CHROOT\"" >>$CONFIG_H
-		echo "#endif" >>$CONFIG_H
-	fi
 	echo "DHCPCD_SRCS+=	privsep.c privsep-root.c privsep-inet.c" \
 		>>$CONFIG_MK
 	if [ -z "$INET" ] || [ "$INET" = yes ]; then

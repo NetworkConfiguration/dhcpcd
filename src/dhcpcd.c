@@ -1848,9 +1848,6 @@ main(int argc, char **argv)
 #endif
 #ifdef PRIVSEP
 	ctx.ps_root_fd = ctx.ps_data_fd = -1;
-#ifdef PRIVSEP_CHROOT
-	ctx.ps_chroot = PRIVSEP_CHROOT;
-#endif
 	TAILQ_INIT(&ctx.ps_processes);
 #endif
 	rt_init(&ctx);
@@ -1916,19 +1913,6 @@ main(int argc, char **argv)
 		case 'V':
 			i = 2;
 			break;
-#ifdef PRIVSEP
-		case O_CHROOT:
-#ifdef PRIVSEP_CHROOT
-			if (*optarg == '\0' ||
-			    (((optarg[0] == '"' && optarg[1] == '"') ||
-			      (optarg[0] == '\'' && optarg[1] == '\'')) &&
-			     optarg[2] == '\0'))
-				ctx.ps_chroot = NULL;
-			else
-#endif
-				ctx.ps_chroot = optarg;
-			break;
-#endif
 		case '?':
 			if (ctx.options & DHCPCD_PRINT_PIDFILE)
 				continue;
