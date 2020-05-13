@@ -304,6 +304,18 @@ ps_dostop(struct dhcpcd_ctx *ctx, pid_t *pid, int *fd)
 		logerr(__func__);
 #endif
 	status = 0;
+
+#ifdef HAVE_CAPSICUM
+	unsigned int cap_mode = 0;
+	int cap_err = cap_getmode(&cap_mode);
+
+	if (cap_err == -1) {
+		if (errno != ENOSYS)
+			logerr("%s: cap_getmode", __func__);
+	} else if (cap_mode != 0)
+		goto nowait;
+#endif
+
 	/* Wait for the process to finish */
 	while (waitpid(*pid, &status, 0) == -1) {
 		if (errno != EINTR) {
@@ -316,6 +328,9 @@ ps_dostop(struct dhcpcd_ctx *ctx, pid_t *pid, int *fd)
 			logerr("%s: waitpid ", __func__);
 #endif
 	}
+#ifdef HAVE_CAPSICUM
+nowait:
+#endif
 	*pid = 0;
 
 #ifdef PRIVSEP_DEBUG
