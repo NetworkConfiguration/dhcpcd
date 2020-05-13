@@ -476,7 +476,6 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 #ifdef HAVE_CAPSICUM
 	case PS_GETIFADDRS:
 		err = ps_root_dogetifaddrs(&rdata, &rlen);
-		logerrx("dogetif %zd %p %zu", err, rdata, rlen);
 		free_rdata = true;
 		break;
 #endif
