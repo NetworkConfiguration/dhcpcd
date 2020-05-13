@@ -49,6 +49,22 @@ ps_root_doioctldom(int domain, unsigned long req, void *data, size_t len)
 	return err;
 }
 
+static ssize_t
+ps_root_doroute(void *data, size_t len)
+{
+	int s;
+	ssize_t err;
+
+	s = socket(PF_ROUTE, SOCK_RAW, 0);
+	if (s != -1)
+		err = write(s, data, len);
+	else
+		err = -1;
+	if (s != -1)
+		close(s);
+	return err;
+}
+
 #ifdef HAVE_PLEDGE
 static ssize_t
 ps_root_doindirectioctl(unsigned long req, void *data, size_t len)
@@ -71,22 +87,6 @@ ps_root_doindirectioctl(unsigned long req, void *data, size_t len)
 }
 #endif
 
-static ssize_t
-ps_root_doroute(void *data, size_t len)
-{
-	int s;
-	ssize_t err;
-
-	s = socket(PF_ROUTE, SOCK_RAW, 0);
-	if (s != -1)
-		err = write(s, data, len);
-	else
-		err = -1;
-	if (s != -1)
-		close(s);
-	return err;
-}
-
 ssize_t
 ps_root_os(struct ps_msghdr *psm, struct msghdr *msg)
 {
@@ -99,14 +99,14 @@ ps_root_os(struct ps_msghdr *psm, struct msghdr *msg)
 		return ps_root_doioctldom(PF_LINK, psm->ps_flags, data, len);
 	case PS_IOCTL6:
 		return ps_root_doioctldom(PF_INET6, psm->ps_flags, data, len);
+	case PS_ROUTE:
+		return ps_root_doroute(data, len);
 #ifdef HAVE_PLEDGE
 	case PS_IOCTLINDIRECT:
 		return ps_root_doindirectioctl(psm->ps_flags, data, len);
 	case PS_IP6FORWARDING:
 		return ip6_forwarding(NULL);
 #endif
-	case PS_ROUTE:
-		return ps_root_doroute(data, len);
 	default:
 		errno = ENOTSUP;
 		return -1;
@@ -140,6 +140,15 @@ ps_root_ioctl6(struct dhcpcd_ctx *ctx, unsigned long request,
 	return ps_root_ioctldom(ctx, PS_IOCTL6, request, data, len);
 }
 
+ssize_t
+ps_root_route(struct dhcpcd_ctx *ctx, void *data, size_t len)
+{
+
+	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_ROUTE, 0, data, len) == -1)
+		return -1;
+	return ps_root_readerror(ctx, data, len);
+}
+
 #ifdef HAVE_PLEDGE
 ssize_t
 ps_root_indirectioctl(struct dhcpcd_ctx *ctx, unsigned long request,
@@ -165,12 +174,3 @@ ps_root_ip6forwarding(struct dhcpcd_ctx *ctx)
 	return ps_root_readerror(ctx, NULL, 0);
 }
 #endif
-
-ssize_t
-ps_root_route(struct dhcpcd_ctx *ctx, void *data, size_t len)
-{
-
-	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_ROUTE, 0, data, len) == -1)
-		return -1;
-	return ps_root_readerror(ctx, data, len);
-}
