@@ -58,6 +58,7 @@
 #define	PS_IOCTL6		0x0102
 #define	PS_IOCTLINDIRECT	0x0103
 #define	PS_IP6FORWARDING	0x0104
+#define	PS_GETIFADDRS		0x0105
 
 /* Linux commands */
 #define	PS_WRITEPATHUINT	0x0201

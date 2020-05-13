@@ -392,12 +392,22 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 		logerr(__func__);
 		return NULL;
 	}
+	TAILQ_INIT(ifs);
+
+#ifdef HAVE_CAPSICUM
+	if (ctx->options & DHCPCD_PRIVSEP) {
+		if (ps_root_getifaddrs(ctx, ifaddrs) == -1) {
+			logerr("ps_root_getifaddrs");
+			free(ifs);
+			return NULL;
+		}
+	} else
+#endif
 	if (getifaddrs(ifaddrs) == -1) {
 		logerr("getifaddrs");
 		free(ifs);
 		return NULL;
 	}
-	TAILQ_INIT(ifs);
 
 #ifdef IFLR_ACTIVE
 	link_fd = xsocket(PF_LINK, SOCK_DGRAM | SOCK_CLOEXEC, 0);

@@ -48,6 +48,7 @@
 #include "if.h"
 #include "logerr.h"
 #include "privsep.h"
+#include "sa.h"
 #include "script.h"
 
 __CTASSERT(sizeof(ioctl_request_t) <= sizeof(unsigned long));
@@ -57,6 +58,7 @@ struct psr_error
 	ssize_t psr_result;
 	int psr_errno;
 	char psr_pad[sizeof(ssize_t) - sizeof(int)];
+	size_t psr_datalen;
 };
 
 struct psr_ctx {
@@ -88,18 +90,21 @@ ps_root_readerrorcb(void *arg)
 	ssize_t len;
 	int exit_code = EXIT_FAILURE;
 
-	len = readv(ctx->ps_root_fd, iov, __arraycount(iov));
-	if (len == 0 || len == -1) {
-		logerr(__func__);
-		psr_error->psr_result = -1;
-		psr_error->psr_errno = errno;
-	} else if ((size_t)len < sizeof(*psr_error)) {
-		logerrx("%s: psr_error truncated", __func__);
-		psr_error->psr_result = -1;
-		psr_error->psr_errno = EINVAL;
-	} else
-		exit_code = EXIT_SUCCESS;
+#define PSR_ERROR(e)				\
+	do {					\
+		psr_error->psr_result = -1;	\
+		psr_error->psr_errno = (e);	\
+		goto out;			\
+	} while (0 /* CONSTCOND */)
 
+	len = readv(ctx->ps_root_fd, iov, __arraycount(iov));
+	if (len == -1)
+		PSR_ERROR(errno);
+	else if ((size_t)len < sizeof(*psr_error))
+		PSR_ERROR(EINVAL);
+	exit_code = EXIT_SUCCESS;
+
+out:
 	eloop_exit(ctx->ps_eloop, exit_code);
 }
 
@@ -113,16 +118,73 @@ ps_root_readerror(struct dhcpcd_ctx *ctx, void *data, size_t len)
 
 	if (eloop_event_add(ctx->ps_eloop, ctx->ps_root_fd,
 	    ps_root_readerrorcb, &psr_ctx) == -1)
-	{
-		logerr(__func__);
 		return -1;
-	}
 
 	eloop_start(ctx->ps_eloop, &ctx->sigset);
 
 	errno = psr_ctx.psr_error.psr_errno;
 	return psr_ctx.psr_error.psr_result;
 }
+
+#ifdef HAVE_CAPSICUM
+static void
+ps_root_mreaderrorcb(void *arg)
+{
+	struct psr_ctx *psr_ctx = arg;
+	struct dhcpcd_ctx *ctx = psr_ctx->psr_ctx;
+	struct psr_error *psr_error = &psr_ctx->psr_error;
+	struct iovec iov[] = {
+		{ .iov_base = psr_error, .iov_len = sizeof(*psr_error) },
+		{ .iov_base = NULL, .iov_len = 0 },
+	};
+	ssize_t len;
+	int exit_code = EXIT_FAILURE;
+
+	len = recv(ctx->ps_root_fd, psr_error, sizeof(*psr_error), MSG_PEEK);
+	if (len == -1)
+		PSR_ERROR(errno);
+	else if ((size_t)len < sizeof(*psr_error))
+		PSR_ERROR(EINVAL);
+
+	if (psr_error->psr_datalen != 0) {
+		psr_ctx->psr_data = malloc(psr_error->psr_datalen);
+		if (psr_ctx->psr_data == NULL)
+			PSR_ERROR(errno);
+		psr_ctx->psr_datalen = psr_error->psr_datalen;
+		iov[1].iov_base = psr_ctx->psr_data;
+		iov[1].iov_len = psr_ctx->psr_datalen;
+	}
+
+	len = readv(ctx->ps_root_fd, iov, __arraycount(iov));
+	if (len == -1)
+		PSR_ERROR(errno);
+	else if ((size_t)len != sizeof(*psr_error) + psr_ctx->psr_datalen)
+		PSR_ERROR(EINVAL);
+	exit_code = EXIT_SUCCESS;
+
+out:
+	eloop_exit(ctx->ps_eloop, exit_code);
+}
+
+ssize_t
+ps_root_mreaderror(struct dhcpcd_ctx *ctx, void **data, size_t *len)
+{
+	struct psr_ctx psr_ctx = {
+	    .psr_ctx = ctx,
+	};
+
+	if (eloop_event_add(ctx->ps_eloop, ctx->ps_root_fd,
+	    ps_root_mreaderrorcb, &psr_ctx) == -1)
+		return -1;
+
+	eloop_start(ctx->ps_eloop, &ctx->sigset);
+
+	errno = psr_ctx.psr_error.psr_errno;
+	*data = psr_ctx.psr_data;
+	*len = psr_ctx.psr_datalen;
+	return psr_ctx.psr_error.psr_result;
+}
+#endif
 
 static ssize_t
 ps_root_writeerror(struct dhcpcd_ctx *ctx, ssize_t result,
@@ -131,6 +193,7 @@ ps_root_writeerror(struct dhcpcd_ctx *ctx, ssize_t result,
 	struct psr_error psr = {
 		.psr_result = result,
 		.psr_errno = errno,
+		.psr_datalen = len,
 	};
 	struct iovec iov[] = {
 		{ .iov_base = &psr, .iov_len = sizeof(psr) },
@@ -231,6 +294,89 @@ ps_root_dowritefile(mode_t mode, void *data, size_t len)
 	return writefile(file, mode, nc, len - (size_t)(nc - file));
 }
 
+#ifdef HAVE_CAPSICUM
+#define	IFA_NADDRS	3
+static ssize_t
+ps_root_dogetifaddrs(void **rdata, size_t *rlen)
+{
+	struct ifaddrs *ifaddrs, *ifa;
+	size_t len;
+	uint8_t *buf, *sap;
+	void *ifdata;
+
+	if (getifaddrs(&ifaddrs) == -1)
+		return -1;
+	if (ifaddrs == NULL) {
+		*rdata = NULL;
+		*rlen = 0;
+		return 0;
+	}
+
+	/* Work out the buffer length required.
+	 * Ensure everything is aligned correctly, which does
+	 * create a larger buffer than what is needed to send,
+	 * but makes creating the same structure in the client
+	 * much easier. */
+	len = 0;
+	for (ifa = ifaddrs; ifa != NULL; ifa = ifa->ifa_next) {
+		len += ALIGN(sizeof(*ifa));
+		len += ALIGN(IFNAMSIZ);
+		len += ALIGN(sizeof(*sap) * IFA_NADDRS);
+		if (ifa->ifa_addr != NULL)
+			len += ALIGN(sa_len(ifa->ifa_addr));
+		if (ifa->ifa_netmask != NULL)
+			len += ALIGN(sa_len(ifa->ifa_netmask));
+		if (ifa->ifa_broadaddr != NULL)
+			len += ALIGN(sa_len(ifa->ifa_broadaddr));
+	}
+
+	/* Use calloc to set everything to zero.
+	 * This satisfies memory sanitizers because don't write
+	 * where we don't need to. */
+	buf = calloc(1, len);
+	if (buf == NULL) {
+		freeifaddrs(ifaddrs);
+		return -1;
+	}
+	*rdata = buf;
+	*rlen = len;
+
+	for (ifa = ifaddrs; ifa != NULL; ifa = ifa->ifa_next) {
+		/* Don't carry ifa_data. */
+		ifdata = ifa->ifa_data;
+		ifa->ifa_data = NULL;
+		memcpy(buf, ifa, sizeof(*ifa));
+		buf += ALIGN(sizeof(*ifa));
+		ifa->ifa_data = ifdata;
+
+		strlcpy((char *)buf, ifa->ifa_name, IFNAMSIZ);
+		buf += ALIGN(IFNAMSIZ);
+		sap = buf;
+		buf += ALIGN(sizeof(*sap) * IFA_NADDRS);
+
+#define	COPYINSA(addr)					\
+	do {						\
+		*sap = sa_len((addr));			\
+		if (*sap != 0) {			\
+			memcpy(buf, (addr), *sap);	\
+			buf += ALIGN(*sap);		\
+		}					\
+		sap++;					\
+	} while (0 /*CONSTCOND */)
+
+		if (ifa->ifa_addr != NULL)
+			COPYINSA(ifa->ifa_addr);
+		if (ifa->ifa_netmask != NULL)
+			COPYINSA(ifa->ifa_netmask);
+		if (ifa->ifa_broadaddr != NULL)
+			COPYINSA(ifa->ifa_broadaddr);
+	}
+
+	freeifaddrs(ifaddrs);
+	return 0;
+}
+#endif
+
 static ssize_t
 ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 {
@@ -238,12 +384,12 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 	uint16_t cmd;
 	struct ps_process *psp;
 	struct iovec *iov = msg->msg_iov;
-	void *data = iov->iov_base;
-	size_t len = iov->iov_len;
+	void *data = iov->iov_base, *rdata = NULL;
+	size_t len = iov->iov_len, rlen = 0;
 	uint8_t buf[PS_BUFLEN];
 	time_t mtime;
 	ssize_t err;
-	bool retdata = false;
+	bool free_rdata= false;
 
 	cmd = (uint16_t)(psm->ps_cmd & ~(PS_START | PS_STOP | PS_DELETE));
 	psp = ps_findprocess(ctx, &psm->ps_id);
@@ -299,7 +445,10 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 	switch (psm->ps_cmd) {
 	case PS_IOCTL:
 		err = ps_root_doioctl(psm->ps_flags, data, len);
-		retdata = true;
+		if (err != -1) {
+			rdata = data;
+			rlen = len;
+		}
 		break;
 	case PS_SCRIPT:
 		err = ps_root_run_script(ctx, data, len);
@@ -308,12 +457,10 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		err = unlink(data);
 		break;
 	case PS_READFILE:
-		errno = 0;
 		err = readfile(data, buf, sizeof(buf));
 		if (err != -1) {
-			data = buf;
-			len = (size_t)err;
-			retdata = true;
+			rdata = buf;
+			rlen = (size_t)err;
 		}
 		break;
 	case PS_WRITEFILE:
@@ -322,17 +469,26 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 	case PS_FILEMTIME:
 		err = filemtime(data, &mtime);
 		if (err != -1) {
-			data = &mtime;
-			len = sizeof(mtime);
-			retdata = true;
+			rdata = &mtime;
+			rlen = sizeof(mtime);
 		}
 		break;
+#ifdef HAVE_CAPSICUM
+	case PS_GETIFADDRS:
+		err = ps_root_dogetifaddrs(&rdata, &rlen);
+		logerrx("dogetif %zd %p %zu", err, rdata, rlen);
+		free_rdata = true;
+		break;
+#endif
 	default:
 		err = ps_root_os(psm, msg);
 		break;
 	}
 
-	return ps_root_writeerror(ctx, err, data, retdata ? len : 0);
+	err = ps_root_writeerror(ctx, err, rlen != 0 ? rdata : 0, rlen);
+	if (free_rdata)
+		free(rdata);
+	return err;
 }
 
 /* Receive from state engine, do an action. */
@@ -556,3 +712,70 @@ ps_root_filemtime(struct dhcpcd_ctx *ctx, const char *file, time_t *time)
 		return -1;
 	return ps_root_readerror(ctx, time, sizeof(*time));
 }
+
+#ifdef HAVE_CAPSICUM
+int
+ps_root_getifaddrs(struct dhcpcd_ctx *ctx, struct ifaddrs **ifahead)
+{
+	struct ifaddrs *ifa;
+	void *buf = NULL;
+	char *bp;
+	unsigned char *sap;
+	size_t len;
+	ssize_t err;
+
+	if (ps_sendcmd(ctx, ctx->ps_root_fd,
+	    PS_GETIFADDRS, 0, NULL, 0) == -1)
+		return -1;
+	err = ps_root_mreaderror(ctx, &buf, &len);
+
+	if (err == -1)
+		return -1;
+
+	/* Should be impossible - lo0 will always exist. */
+	if (len == 0) {
+		*ifahead = NULL;
+		return 0;
+	}
+
+	bp = buf;
+	*ifahead = (struct ifaddrs *)(void *)bp;
+	for (ifa = *ifahead; len != 0; ifa = ifa->ifa_next) {
+		if (len < ALIGN(sizeof(*ifa)) +
+		    ALIGN(IFNAMSIZ) + ALIGN(sizeof(*sap) * IFA_NADDRS))
+			goto err;
+		bp += ALIGN(sizeof(*ifa));
+		ifa->ifa_name = bp;
+		bp += ALIGN(IFNAMSIZ);
+		sap = (unsigned char *)bp;
+		bp += ALIGN(sizeof(*sap) * IFA_NADDRS);
+		len -= ALIGN(sizeof(*ifa)) +
+		    ALIGN(IFNAMSIZ) + ALIGN(sizeof(*sap) * IFA_NADDRS);
+
+#define	COPYOUTSA(addr)						\
+	do {							\
+		if (len < *sap)					\
+			goto err;				\
+		if (*sap != 0) {				\
+			(addr) = (struct sockaddr *)bp;		\
+			bp += ALIGN(*sap);			\
+			len -= ALIGN(*sap);			\
+		}						\
+		sap++;						\
+	} while (0 /* CONSTCOND */)
+
+		COPYOUTSA(ifa->ifa_addr);
+		COPYOUTSA(ifa->ifa_netmask);
+		COPYOUTSA(ifa->ifa_broadaddr);
+		ifa->ifa_next = (struct ifaddrs *)(void *)bp;
+	}
+	ifa->ifa_next = NULL;
+	return 0;
+
+err:
+	free(buf);
+	*ifahead = NULL;
+	errno = EINVAL;
+	return -1;
+}
+#endif
