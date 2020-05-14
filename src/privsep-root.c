@@ -302,6 +302,7 @@ ps_root_dogetifaddrs(void **rdata, size_t *rlen)
 	struct ifaddrs *ifaddrs, *ifa;
 	size_t len;
 	uint8_t *buf, *sap;
+	socklen_t salen;
 	void *ifdata;
 
 	if (getifaddrs(&ifaddrs) == -1)
@@ -321,7 +322,7 @@ ps_root_dogetifaddrs(void **rdata, size_t *rlen)
 	for (ifa = ifaddrs; ifa != NULL; ifa = ifa->ifa_next) {
 		len += ALIGN(sizeof(*ifa));
 		len += ALIGN(IFNAMSIZ);
-		len += ALIGN(sizeof(*sap) * IFA_NADDRS);
+		len += ALIGN(sizeof(salen) * IFA_NADDRS);
 		if (ifa->ifa_addr != NULL)
 			len += ALIGN(sa_len(ifa->ifa_addr));
 		if (ifa->ifa_netmask != NULL)
@@ -352,16 +353,17 @@ ps_root_dogetifaddrs(void **rdata, size_t *rlen)
 		strlcpy((char *)buf, ifa->ifa_name, IFNAMSIZ);
 		buf += ALIGN(IFNAMSIZ);
 		sap = buf;
-		buf += ALIGN(sizeof(*sap) * IFA_NADDRS);
+		buf += ALIGN(sizeof(salen) * IFA_NADDRS);
 
-#define	COPYINSA(addr)					\
-	do {						\
-		*sap = sa_len((addr));			\
-		if (*sap != 0) {			\
-			memcpy(buf, (addr), *sap);	\
-			buf += ALIGN(*sap);		\
-		}					\
-		sap++;					\
+#define	COPYINSA(addr)						\
+	do {							\
+		salen = sa_len((addr));				\
+		if (salen != 0) {				\
+			memcpy(sap, &salen, sizeof(salen));	\
+			memcpy(buf, (addr), salen);		\
+			buf += ALIGN(salen);			\
+		}						\
+		sap += sizeof(salen);				\
 	} while (0 /*CONSTCOND */)
 
 		if (ifa->ifa_addr != NULL)
@@ -718,8 +720,8 @@ ps_root_getifaddrs(struct dhcpcd_ctx *ctx, struct ifaddrs **ifahead)
 {
 	struct ifaddrs *ifa;
 	void *buf = NULL;
-	char *bp;
-	unsigned char *sap;
+	char *bp, *sap;
+	socklen_t salen;
 	size_t len;
 	ssize_t err;
 
@@ -741,26 +743,27 @@ ps_root_getifaddrs(struct dhcpcd_ctx *ctx, struct ifaddrs **ifahead)
 	*ifahead = (struct ifaddrs *)(void *)bp;
 	for (ifa = *ifahead; len != 0; ifa = ifa->ifa_next) {
 		if (len < ALIGN(sizeof(*ifa)) +
-		    ALIGN(IFNAMSIZ) + ALIGN(sizeof(*sap) * IFA_NADDRS))
+		    ALIGN(IFNAMSIZ) + ALIGN(sizeof(salen) * IFA_NADDRS))
 			goto err;
 		bp += ALIGN(sizeof(*ifa));
 		ifa->ifa_name = bp;
 		bp += ALIGN(IFNAMSIZ);
-		sap = (unsigned char *)bp;
-		bp += ALIGN(sizeof(*sap) * IFA_NADDRS);
+		sap = bp;
+		bp += ALIGN(sizeof(salen) * IFA_NADDRS);
 		len -= ALIGN(sizeof(*ifa)) +
-		    ALIGN(IFNAMSIZ) + ALIGN(sizeof(*sap) * IFA_NADDRS);
+		    ALIGN(IFNAMSIZ) + ALIGN(sizeof(salen) * IFA_NADDRS);
 
 #define	COPYOUTSA(addr)						\
 	do {							\
-		if (len < *sap)					\
+		memcpy(&salen, sap, sizeof(salen));		\
+		if (len < salen)				\
 			goto err;				\
-		if (*sap != 0) {				\
+		if (salen != 0) {				\
 			(addr) = (struct sockaddr *)bp;		\
-			bp += ALIGN(*sap);			\
-			len -= ALIGN(*sap);			\
+			bp += ALIGN(salen);			\
+			len -= ALIGN(salen);			\
 		}						\
-		sap++;						\
+		sap += sizeof(salen);				\
 	} while (0 /* CONSTCOND */)
 
 		COPYOUTSA(ifa->ifa_addr);
