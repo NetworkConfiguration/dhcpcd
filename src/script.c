@@ -108,6 +108,8 @@ script_exec(char *const *argv, char *const *env)
 	posix_spawnattr_setsigmask(&attr, &defsigs);
 	for (i = 0; i < dhcpcd_signals_len; i++)
 		sigaddset(&defsigs, dhcpcd_signals[i]);
+	for (i = 0; i < dhcpcd_signals_ignore_len; i++)
+		sigaddset(&defsigs, dhcpcd_signals_ignore[i]);
 	posix_spawnattr_setsigdefault(&attr, &defsigs);
 #endif
 	errno = 0;

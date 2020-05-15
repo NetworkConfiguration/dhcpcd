@@ -248,6 +248,8 @@ struct dhcpcd_ctx {
 #ifdef USE_SIGNALS
 extern const int dhcpcd_signals[];
 extern const size_t dhcpcd_signals_len;
+extern const int dhcpcd_signals_ignore[];
+extern const size_t dhcpcd_signals_ignore_len;
 #endif
 
 int dhcpcd_ifafwaiting(const struct interface *);

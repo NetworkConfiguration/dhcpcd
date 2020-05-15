@@ -85,6 +85,11 @@ const int dhcpcd_signals[] = {
 	SIGUSR2,
 };
 const size_t dhcpcd_signals_len = __arraycount(dhcpcd_signals);
+
+const int dhcpcd_signals_ignore[] = {
+	SIGPIPE,
+};
+const size_t dhcpcd_signals_ignore_len = __arraycount(dhcpcd_signals_ignore);
 #endif
 
 #define IF_UPANDRUNNING(a) \
@@ -1784,6 +1789,7 @@ main(int argc, char **argv)
 #ifdef USE_SIGNALS
 	int sig = 0;
 	const char *siga = NULL;
+	size_t si;
 #endif
 
 	/* Test for --help and --version */
@@ -2040,8 +2046,8 @@ printpidfile:
 	}
 
 #ifdef USE_SIGNALS
-	/* Ignore SIGPIPE, prefer EPIPE. */
-	signal(SIGPIPE, SIG_IGN);
+	for (si = 0; si < dhcpcd_signals_ignore_len; si++)
+		signal(dhcpcd_signals_ignore[i], SIG_IGN);
 
 	/* Save signal mask, block and redirect signals to our handler */
 	if (eloop_signal_set_cb(ctx.eloop,
