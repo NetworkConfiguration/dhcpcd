@@ -2092,11 +2092,6 @@ dhcp_arp_not_found(struct arp_state *astate)
 		 * address or hwaddr, so move to the next
 		 * arping profile */
 		if (++state->arping_index < ifo->arping_len) {
-			struct in_addr addr = {
-				.s_addr = ifo->arping[state->arping_index]
-			};
-
-			arp_change(astate, &addr);
 			arp_probe(astate);
 			return;
 		}
