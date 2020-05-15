@@ -303,14 +303,22 @@ next:
 int
 bpf_attach(int fd, void *filter, unsigned int filter_len)
 {
-	struct bpf_program pf;
+	struct bpf_program pf = { .bf_insns = filter, .bf_len = filter_len };
 
 	/* Install the filter. */
-	memset(&pf, 0, sizeof(pf));
-	pf.bf_insns = filter;
-	pf.bf_len = filter_len;
 	return ioctl(fd, BIOCSETF, &pf);
 }
+
+#ifdef BIOCSETWF
+static int
+bpf_wattach(int fd, void *filter, unsigned int filter_len)
+{
+	struct bpf_program pf = { .bf_insns = filter, .bf_len = filter_len };
+
+	/* Install the filter. */
+	return ioctl(fd, BIOCSETWF, &pf);
+}
+#endif
 #endif
 
 #ifndef __sun
@@ -488,8 +496,8 @@ static const struct bpf_insn bpf_arp_filter [] = {
 #define BPF_ARP_LEN		BPF_ARP_ETHER_LEN + BPF_ARP_FILTER_LEN + \
 				BPF_CMP_HWADDR_LEN + BPF_ARP_ADDRS_LEN
 
-int
-bpf_arp(struct interface *ifp, int fd)
+static int
+bpf_arp_rw(struct interface *ifp, int fd, bool read)
 {
 	struct bpf_insn bpf[BPF_ARP_LEN];
 	struct bpf_insn *bp;
@@ -517,6 +525,18 @@ bpf_arp(struct interface *ifp, int fd)
 	/* Copy in the main filter. */
 	memcpy(bp, bpf_arp_filter, sizeof(bpf_arp_filter));
 	bp += BPF_ARP_FILTER_LEN;
+
+#ifdef BIOCSETWF
+	if (!read) {
+		/* All passed, return the packet. */
+		BPF_SET_STMT(bp, BPF_RET + BPF_K, BPF_WHOLEPACKET);
+		bp++;
+
+		return bpf_wattach(fd, bpf, (unsigned int)(bp - bpf));
+	}
+#else
+	UNUSED(read);
+#endif
 
 	/* Ensure it's not from us. */
 	bp += bpf_cmp_hwaddr(bp, BPF_CMP_HWADDR_LEN, sizeof(struct arphdr),
@@ -579,6 +599,19 @@ noaddrs:
 
 	return bpf_attach(fd, bpf, (unsigned int)(bp - bpf));
 }
+
+int
+bpf_arp(struct interface *ifp, int fd)
+{
+
+#ifdef BIOCSETWF
+	if (bpf_arp_rw(ifp, fd, false) == -1)
+		return -1;
+#endif
+
+	return bpf_arp_rw(ifp, fd, true);
+}
+
 #endif
 
 #ifdef ARPHRD_NONE
@@ -602,7 +635,7 @@ static const struct bpf_insn bpf_bootp_ether[] = {
 #define BOOTP_MIN_SIZE		sizeof(struct ip) + sizeof(struct udphdr) + \
 				sizeof(struct bootp)
 
-static const struct bpf_insn bpf_bootp_filter[] = {
+static const struct bpf_insn bpf_bootp_base[] = {
 	/* Make sure it's an IPv4 packet. */
 	BPF_STMT(BPF_LD + BPF_B + BPF_IND, 0),
 	BPF_STMT(BPF_ALU + BPF_AND + BPF_K, 0xf0),
@@ -625,22 +658,36 @@ static const struct bpf_insn bpf_bootp_filter[] = {
 	BPF_STMT(BPF_ALU + BPF_MUL + BPF_K, 4),
 	BPF_STMT(BPF_ALU + BPF_ADD + BPF_X, 0),
 	BPF_STMT(BPF_MISC + BPF_TAX, 0),
+};
+#define BPF_BOOTP_BASE_LEN	__arraycount(bpf_bootp_base)
 
+static const struct bpf_insn bpf_bootp_read[] = {
 	/* Make sure it's from and to the right port. */
 	BPF_STMT(BPF_LD + BPF_W + BPF_IND, 0),
 	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, (BOOTPS << 16) + BOOTPC, 1, 0),
 	BPF_STMT(BPF_RET + BPF_K, 0),
 };
+#define BPF_BOOTP_READ_LEN	__arraycount(bpf_bootp_read)
 
-#define BPF_BOOTP_FILTER_LEN	__arraycount(bpf_bootp_filter)
+#ifdef BIOCSETWF
+static const struct bpf_insn bpf_bootp_write[] = {
+	/* Make sure it's from and to the right port. */
+	BPF_STMT(BPF_LD + BPF_W + BPF_IND, 0),
+	BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, (BOOTPC << 16) + BOOTPS, 1, 0),
+	BPF_STMT(BPF_RET + BPF_K, 0),
+};
+#define BPF_BOOTP_WRITE_LEN	__arraycount(bpf_bootp_write)
+#endif
+
 #define BPF_BOOTP_CHADDR_LEN	((BOOTP_CHADDR_LEN / 4) * 3)
 #define	BPF_BOOTP_XID_LEN	4 /* BOUND check is 4 instructions */
 
-#define BPF_BOOTP_LEN		BPF_BOOTP_ETHER_LEN + BPF_BOOTP_FILTER_LEN \
-				+ BPF_BOOTP_XID_LEN + BPF_BOOTP_CHADDR_LEN + 4
+#define BPF_BOOTP_LEN		BPF_BOOTP_ETHER_LEN + \
+				BPF_BOOTP_BASE_LEN + BPF_BOOTP_READ_LEN + \
+				BPF_BOOTP_XID_LEN + BPF_BOOTP_CHADDR_LEN + 4
 
-int
-bpf_bootp(struct interface *ifp, int fd)
+static int
+bpf_bootp_rw(struct interface *ifp, int fd, bool read)
 {
 #if 0
 	const struct dhcp_state *state = D_CSTATE(ifp);
@@ -670,8 +717,26 @@ bpf_bootp(struct interface *ifp, int fd)
 	}
 
 	/* Copy in the main filter. */
-	memcpy(bp, bpf_bootp_filter, sizeof(bpf_bootp_filter));
-	bp += BPF_BOOTP_FILTER_LEN;
+	memcpy(bp, bpf_bootp_base, sizeof(bpf_bootp_base));
+	bp += BPF_BOOTP_BASE_LEN;
+
+#ifdef BIOCSETWF
+	if (!read) {
+		memcpy(bp, bpf_bootp_write, sizeof(bpf_bootp_write));
+		bp += BPF_BOOTP_WRITE_LEN;
+
+		/* All passed, return the packet. */
+		BPF_SET_STMT(bp, BPF_RET + BPF_K, BPF_WHOLEPACKET);
+		bp++;
+
+		return bpf_wattach(fd, bpf, (unsigned int)(bp - bpf));
+	}
+#else
+	UNUSED(read);
+#endif
+
+	memcpy(bp, bpf_bootp_read, sizeof(bpf_bootp_read));
+	bp += BPF_BOOTP_READ_LEN;
 
 	/* These checks won't work when same IP exists on other interfaces. */
 #if 0
@@ -714,4 +779,19 @@ bpf_bootp(struct interface *ifp, int fd)
 	bp++;
 
 	return bpf_attach(fd, bpf, (unsigned int)(bp - bpf));
+}
+
+int
+bpf_bootp(struct interface *ifp, int fd)
+{
+
+#ifdef BIOCSETWF
+	if (bpf_bootp_rw(ifp, fd, true) == -1 ||
+	    bpf_bootp_rw(ifp, fd, false) == -1 ||
+	    ioctl(fd, BIOCLOCK) == -1)
+		return -1;
+	return 0;
+#else
+	return bpf_bootp_rw(ifp, fd, true);
+#endif
 }

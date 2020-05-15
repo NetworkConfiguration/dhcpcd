@@ -2269,10 +2269,22 @@ printpidfile:
 
 #ifdef PRIVSEP
 	if (ctx.options & DHCPCD_PRIVSEP) {
-		if (ps_dropprivs(&ctx, PSF_CAP_ENTER | PSF_PLEDGE) == -1) {
+		if (ps_dropprivs(&ctx) == -1) {
 			logerr("ps_dropprivs");
 			goto exit_failure;
 		}
+#ifdef HAVE_CAPSICUM
+		if (cap_enter() == -1 && errno != ENOSYS) {
+			logerr("%s: cap_enter", __func__);
+			goto exit_failure;
+		}
+#endif
+#ifdef HAVE_PLEDGE
+		if (pledge("stdio inet route dns", NULL) == -1) {
+			logerr("%s: pledge", __func__);
+			goto exit_failure;
+		}
+#endif
 	}
 #endif
 

@@ -108,7 +108,7 @@ ps_init(struct dhcpcd_ctx *ctx)
 }
 
 int
-ps_dropprivs(struct dhcpcd_ctx *ctx, unsigned int flags)
+ps_dropprivs(struct dhcpcd_ctx *ctx)
 {
 	struct passwd *pw = ctx->ps_user;
 
@@ -126,33 +126,6 @@ ps_dropprivs(struct dhcpcd_ctx *ctx, unsigned int flags)
 		logerr("failed to drop privileges");
 		return -1;
 	}
-
-#ifdef HAVE_CAPSICUM
-	if (flags & PSF_CAP_ENTER) {
-		if (cap_enter() == -1 && errno != ENOSYS) {
-			logerr("%s: cap_enter", __func__);
-			return -1;
-		}
-	}
-#else
-	UNUSED(flags);
-#endif
-
-#ifdef HAVE_PLEDGE
-	if (flags & PSF_PLEDGE) {
-		const char *promises;
-
-		if (ctx->options & DHCPCD_UNPRIV)
-			promises = "stdio dns bpf";
-		else
-			/* SIOCGIFGROUP requires inet */
-			promises = "stdio dns inet route";
-                if (pledge(promises, NULL) == -1) {
-                        logerr("%s: pledge", __func__);
-                        return -1;
-                }
-	}
-#endif
 
 	return 0;
 }
@@ -267,7 +240,7 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 	}
 
 	if (flags & PSF_DROPPRIVS)
-		ps_dropprivs(ctx, flags);
+		ps_dropprivs(ctx);
 
 	return 0;
 
