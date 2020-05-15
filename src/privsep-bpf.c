@@ -203,7 +203,6 @@ ps_bpf_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg)
 	struct iovec *iov = msg->msg_iov;
 	struct interface *ifp;
 	struct ipv4_state *istate;
-	unsigned int flags = PSF_DROPPRIVS | PSF_CAP_ENTER;
 
 	cmd = (uint16_t)(psm->ps_cmd & ~(PS_START | PS_STOP));
 	psp = ps_findprocess(ctx, &psm->ps_id);
@@ -257,19 +256,12 @@ ps_bpf_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg)
 		psp->psp_proto = ETHERTYPE_ARP;
 		psp->psp_protostr = "ARP";
 		psp->psp_filter = bpf_arp;
-		/*
-		 * Pledge is currently useless for BPF ARP because we cannot
-		 * change the filter:
-		 * http://openbsd-archive.7691.n7.nabble.com/ \
-		 *	  pledge-bpf-32bit-arch-unbreak-td299901.html
-		 */
 		break;
 #endif
 	case PS_BPF_BOOTP:
 		psp->psp_proto = ETHERTYPE_IP;
 		psp->psp_protostr = "BOOTP";
 		psp->psp_filter = bpf_bootp;
-		flags |= PSF_PLEDGE;
 		break;
 	}
 
@@ -277,12 +269,21 @@ ps_bpf_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg)
 	    &psp->psp_pid, &psp->psp_fd,
 	    ps_bpf_recvmsg, NULL, psp,
 	    ps_bpf_start_bpf, ps_bpf_signal_bpfcb,
-	    flags);
+	    PSF_DROPPRIVS);
 	switch (start) {
 	case -1:
 		ps_freeprocess(psp);
 		return -1;
 	case 0:
+#ifdef HAVE_CAPSICUM
+	if (cap_enter() == -1 && errno != ENOSYS)
+		logerr("%s: cap_enter", __func__);
+#endif
+#ifdef HAVE_PLEDGE
+	/* Cant change BPF fitler for ARP yet. */
+	if (cmd != PS_BPF_ARP && pledge("stdio", NULL) == -1)
+		logerr("%s: pledge", __func__);
+#endif
 		break;
 	default:
 #ifdef PRIVSEP_DEBUG

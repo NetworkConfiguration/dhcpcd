@@ -46,9 +46,6 @@
 #include "privsep.h"
 
 #ifdef HAVE_CAPSICUM
-/* We never call ps_dostart with PSF_CAP_ENTER because
- * our sockets require the use of CAP_CONNECT which does not
- * work in capabilities mode according to rights(4). */
 #include <sys/capsicum.h>
 #endif
 
@@ -305,11 +302,25 @@ ps_inet_dodispatch(void *arg)
 pid_t
 ps_inet_start(struct dhcpcd_ctx *ctx)
 {
+	pid_t pid;
 
-	return ps_dostart(ctx, &ctx->ps_inet_pid, &ctx->ps_inet_fd,
+	pid = ps_dostart(ctx, &ctx->ps_inet_pid, &ctx->ps_inet_fd,
 	    ps_inet_recvmsg, ps_inet_dodispatch, ctx,
 	    ps_inet_startcb, ps_inet_signalcb,
-	    PSF_DROPPRIVS | PSF_PLEDGE);
+	    PSF_DROPPRIVS);
+
+#ifdef HAVE_CAPSICUM
+#if 0		/* This breaks sendmsg() */
+	if (cap_enter() == -1 && errno != ENOSYS)
+		logerr("%s: cap_enter", __func__);
+#endif
+#endif
+#ifdef HAVE_PLEDGE
+	if (pid == 0 && pledge("stdio inet", NULL) == -1)
+		logerr("%s: pledge", __func__);
+#endif
+
+	return pid;
 }
 
 int
@@ -555,12 +566,22 @@ ps_inet_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm,
 	    &psp->psp_pid, &psp->psp_fd,
 	    ps_inet_recvmsgpsp, NULL, psp,
 	    start_func, ps_inet_signalcb,
-	    PSF_DROPPRIVS | PSF_PLEDGE);
+	    PSF_DROPPRIVS);
 	switch (start) {
 	case -1:
 		ps_freeprocess(psp);
 		return -1;
 	case 0:
+#ifdef HAVE_CAPSICUM
+#if 0		/* This breaks sendmsg() */
+		if (cap_enter() == -1 && errno != ENOSYS)
+			logerr("%s: cap_enter", __func__);
+#endif
+#endif
+#ifdef HAVE_PLEDGE
+		if (pledge("stdio inet", NULL) == -1)
+			logerr("%s: pledge", __func__);
+#endif
 		break;
 	default:
 		break;
