@@ -2230,7 +2230,7 @@ dhcp_bind(struct interface *ifp)
 				    "rebind time, forcing to %"PRIu32" seconds",
 				    ifp->name, lease->renewaltime);
 			}
-			if (state->addr &&
+			if (state->state == DHS_RENEW && state->addr &&
 			    lease->addr.s_addr == state->addr->addr.s_addr &&
 			    !(state->added & STATE_FAKE))
 				logdebugx("%s: leased %s for %"PRIu32" seconds",

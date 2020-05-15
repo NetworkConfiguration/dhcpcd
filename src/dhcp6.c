@@ -3051,7 +3051,7 @@ dhcp6_bind(struct interface *ifp, const char *op, const char *sfrom)
 			break;
 		}
 	}
-	loglevel = has_new ? LOG_INFO : LOG_DEBUG;
+	loglevel = has_new || state->state != DH6S_RENEW ? LOG_INFO : LOG_DEBUG;
 	if (!timedout) {
 		logmessage(loglevel, "%s: %s received from %s",
 		    ifp->name, op, sfrom);
