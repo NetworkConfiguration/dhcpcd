@@ -359,95 +359,6 @@ bpf_close(struct interface *ifp, int fd)
 	return close(fd);
 }
 
-/* Normally this is needed by bootp.
- * Once that uses this again, the ARP guard here can be removed. */
-#ifdef ARP
-#define BPF_CMP_HWADDR_LEN	((((HWADDR_LEN / 4) + 2) * 2) + 1)
-static unsigned int
-bpf_cmp_hwaddr(struct bpf_insn *bpf, size_t bpf_len, size_t off,
-    bool equal, uint8_t *hwaddr, size_t hwaddr_len)
-{
-	struct bpf_insn *bp;
-	size_t maclen, nlft, njmps;
-	uint32_t mac32;
-	uint16_t mac16;
-	uint8_t jt, jf;
-
-	/* Calc the number of jumps */
-	if ((hwaddr_len / 4) >= 128) {
-		errno = EINVAL;
-		return 0;
-	}
-	njmps = (hwaddr_len / 4) * 2; /* 2 instructions per check */
-	/* We jump after the 1st check. */
-	if (njmps)
-		njmps -= 2;
-	nlft = hwaddr_len % 4;
-	if (nlft) {
-		njmps += (nlft / 2) * 2;
-		nlft = nlft % 2;
-		if (nlft)
-			njmps += 2;
-
-	}
-
-	/* Skip to positive finish. */
-	njmps++;
-	if (equal) {
-		jt = (uint8_t)njmps;
-		jf = 0;
-	} else {
-		jt = 0;
-		jf = (uint8_t)njmps;
-	}
-
-	bp = bpf;
-	for (; hwaddr_len > 0;
-	     hwaddr += maclen, hwaddr_len -= maclen, off += maclen)
-	{
-		if (bpf_len < 3) {
-			errno = ENOBUFS;
-			return 0;
-		}
-		bpf_len -= 3;
-
-		if (hwaddr_len >= 4) {
-			maclen = sizeof(mac32);
-			memcpy(&mac32, hwaddr, maclen);
-			BPF_SET_STMT(bp, BPF_LD + BPF_W + BPF_IND, off);
-			bp++;
-			BPF_SET_JUMP(bp, BPF_JMP + BPF_JEQ + BPF_K,
-			             htonl(mac32), jt, jf);
-		} else if (hwaddr_len >= 2) {
-			maclen = sizeof(mac16);
-			memcpy(&mac16, hwaddr, maclen);
-			BPF_SET_STMT(bp, BPF_LD + BPF_H + BPF_IND, off);
-			bp++;
-			BPF_SET_JUMP(bp, BPF_JMP + BPF_JEQ + BPF_K,
-			             htons(mac16), jt, jf);
-		} else {
-			maclen = sizeof(*hwaddr);
-			BPF_SET_STMT(bp, BPF_LD + BPF_B + BPF_IND, off);
-			bp++;
-			BPF_SET_JUMP(bp, BPF_JMP + BPF_JEQ + BPF_K,
-			             *hwaddr, jt, jf);
-		}
-		if (jt)
-			jt = (uint8_t)(jt - 2);
-		if (jf)
-			jf = (uint8_t)(jf - 2);
-		bp++;
-	}
-
-	/* Last step is always return failure.
-	 * Next step is a positive finish. */
-	BPF_SET_STMT(bp, BPF_RET + BPF_K, 0);
-	bp++;
-
-	return (unsigned int)(bp - bpf);
-}
-#endif
-
 #ifdef ARP
 static const struct bpf_insn bpf_arp_ether [] = {
 	/* Check this is an ARP packet. */
@@ -493,18 +404,14 @@ static const struct bpf_insn bpf_arp_filter [] = {
 #define BPF_ARP_ADDRS_LEN	1 + (ARP_ADDRS_MAX * 2) + 3 + \
 				(ARP_ADDRS_MAX * 2) + 1
 
-#define BPF_ARP_LEN		BPF_ARP_ETHER_LEN + BPF_ARP_FILTER_LEN + \
-				BPF_CMP_HWADDR_LEN + BPF_ARP_ADDRS_LEN
+#define BPF_ARP_LEN		BPF_ARP_ETHER_LEN + BPF_ARP_FILTER_LEN
 
-static int
-bpf_arp_rw(struct interface *ifp, int fd, bool read)
+int
+bpf_arp(struct interface *ifp, int fd)
 {
-	struct bpf_insn bpf[BPF_ARP_LEN];
+	struct bpf_insn bpf[BPF_ARP_LEN + 1];
 	struct bpf_insn *bp;
-	struct iarp_state *state;
 	uint16_t arp_len;
-	struct arp_state *astate;
-	size_t naddrs;
 
 	if (fd == -1)
 		return 0;
@@ -526,92 +433,21 @@ bpf_arp_rw(struct interface *ifp, int fd, bool read)
 	memcpy(bp, bpf_arp_filter, sizeof(bpf_arp_filter));
 	bp += BPF_ARP_FILTER_LEN;
 
-#ifdef BIOCSETWF
-	if (!read) {
-		/* All passed, return the packet. */
-		BPF_SET_STMT(bp, BPF_RET + BPF_K, BPF_WHOLEPACKET);
-		bp++;
-
-		return bpf_wattach(fd, bpf, (unsigned int)(bp - bpf));
-	}
-#else
-	UNUSED(read);
-#endif
-
-	/* Ensure it's not from us. */
-	bp += bpf_cmp_hwaddr(bp, BPF_CMP_HWADDR_LEN, sizeof(struct arphdr),
-	                     false, ifp->hwaddr, ifp->hwlen);
-
-	state = ARP_STATE(ifp);
-	/* privsep may not have an initial state yet. */
-	if (state == NULL || TAILQ_FIRST(&state->arp_states) == NULL)
-		goto noaddrs;
-
-	/* Match sender protocol address */
-	BPF_SET_STMT(bp, BPF_LD + BPF_W + BPF_IND,
-	             sizeof(struct arphdr) + ifp->hwlen);
-	bp++;
-	naddrs = 0;
-	TAILQ_FOREACH(astate, &state->arp_states, next) {
-		if (IN_IS_ADDR_UNSPECIFIED(&astate->addr))
-			continue;
-		if (++naddrs > ARP_ADDRS_MAX) {
-			errno = ENOBUFS;
-			logerr(__func__);
-			break;
-		}
-		BPF_SET_JUMP(bp, BPF_JMP + BPF_JEQ + BPF_K,
-		             htonl(astate->addr.s_addr), 0, 1);
-		bp++;
-		BPF_SET_STMT(bp, BPF_RET + BPF_K, arp_len);
-		bp++;
-	}
-
-	/* If we didn't match sender, then we're only interested in
-	 * ARP probes to us, so check the null host sender. */
-	BPF_SET_JUMP(bp, BPF_JMP + BPF_JEQ + BPF_K, INADDR_ANY, 1, 0);
-	bp++;
-	BPF_SET_STMT(bp, BPF_RET + BPF_K, 0);
+	/* Past the filer so return the packet. */
+	BPF_SET_STMT(bp, BPF_RET + BPF_K, arp_len);
 	bp++;
 
-	/* Match target protocol address */
-	BPF_SET_STMT(bp, BPF_LD + BPF_W + BPF_IND,
-	             (sizeof(struct arphdr)
-		     + (size_t)(ifp->hwlen * 2) + sizeof(in_addr_t)));
-	bp++;
-	naddrs = 0;
-	TAILQ_FOREACH(astate, &state->arp_states, next) {
-		if (++naddrs > ARP_ADDRS_MAX) {
-			/* Already logged error above. */
-			break;
-		}
-		BPF_SET_JUMP(bp, BPF_JMP + BPF_JEQ + BPF_K,
-		             htonl(astate->addr.s_addr), 0, 1);
-		bp++;
-		BPF_SET_STMT(bp, BPF_RET + BPF_K, arp_len);
-		bp++;
-	}
-
-noaddrs:
-	/* Return nothing, no protocol address match. */
-	BPF_SET_STMT(bp, BPF_RET + BPF_K, 0);
-	bp++;
-
-	return bpf_attach(fd, bpf, (unsigned int)(bp - bpf));
-}
-
-int
-bpf_arp(struct interface *ifp, int fd)
-{
+	if (bpf_attach(fd, bpf, (unsigned int)(bp - bpf)) == -1)
+		return -1;
 
 #ifdef BIOCSETWF
-	if (bpf_arp_rw(ifp, fd, false) == -1)
+	if (bpf_wattach(fd, bpf, (unsigned int)(bp - bpf)) == -1 ||
+	    ioctl(fd, BIOCLOCK) == -1)
 		return -1;
 #endif
 
-	return bpf_arp_rw(ifp, fd, true);
+	return 0;
 }
-
 #endif
 
 #ifdef ARPHRD_NONE
@@ -689,10 +525,7 @@ static const struct bpf_insn bpf_bootp_write[] = {
 static int
 bpf_bootp_rw(struct interface *ifp, int fd, bool read)
 {
-#if 0
-	const struct dhcp_state *state = D_CSTATE(ifp);
-#endif
-	struct bpf_insn bpf[BPF_BOOTP_LEN];
+	struct bpf_insn bpf[BPF_BOOTP_LEN + 1];
 	struct bpf_insn *bp;
 
 	if (fd == -1)
@@ -737,42 +570,6 @@ bpf_bootp_rw(struct interface *ifp, int fd, bool read)
 
 	memcpy(bp, bpf_bootp_read, sizeof(bpf_bootp_read));
 	bp += BPF_BOOTP_READ_LEN;
-
-	/* These checks won't work when same IP exists on other interfaces. */
-#if 0
-	if (ifp->hwlen <= sizeof(((struct bootp *)0)->chaddr))
-		bp += bpf_cmp_hwaddr(bp, BPF_BOOTP_CHADDR_LEN,
-		                     offsetof(struct bootp, chaddr),
-				     true, ifp->hwaddr, ifp->hwlen);
-
-	/* Make sure the BOOTP packet is for us. */
-	if (state->state == DHS_BOUND) {
-		/* If bound, we only expect FORCERENEW messages
-		 * and they need to be unicast to us.
-		 * Move back to the IP header in M0 and check dst. */
-		BPF_SET_STMT(bp, BPF_LDX + BPF_W + BPF_MEM, 0);
-		bp++;
-		BPF_SET_STMT(bp, BPF_LD + BPF_W + BPF_IND,
-		             offsetof(struct ip, ip_dst));
-		bp++;
-		BPF_SET_JUMP(bp, BPF_JMP + BPF_JEQ + BPF_K,
-		             htonl(state->lease.addr.s_addr), 1, 0);
-		bp++;
-		BPF_SET_STMT(bp, BPF_RET + BPF_K, 0);
-		bp++;
-	} else {
-		/* As we're not bound, we need to check xid to ensure
-		 * it's a reply to our transaction. */
-		BPF_SET_STMT(bp, BPF_LD + BPF_W + BPF_IND,
-		             offsetof(struct bootp, xid));
-		bp++;
-		BPF_SET_JUMP(bp, BPF_JMP + BPF_JEQ + BPF_K,
-		             state->xid, 1, 0);
-		bp++;
-		BPF_SET_STMT(bp, BPF_RET + BPF_K, 0);
-		bp++;
-	}
-#endif
 
 	/* All passed, return the packet. */
 	BPF_SET_STMT(bp, BPF_RET + BPF_K, BPF_WHOLEPACKET);

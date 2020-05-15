@@ -90,6 +90,7 @@ ps_bpf_recvbpf(void *arg)
 }
 
 #ifdef ARP
+#if !defined(HAVE_CAPSICUM) && !defined(HAVE_PLEDGE)
 static ssize_t
 ps_bpf_arp_addr(uint16_t cmd, struct ps_process *psp, struct msghdr *msg)
 {
@@ -125,6 +126,7 @@ ps_bpf_arp_addr(uint16_t cmd, struct ps_process *psp, struct msghdr *msg)
 	return bpf_arp(ifp, psp->psp_work_fd);
 }
 #endif
+#endif
 
 static ssize_t
 ps_bpf_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
@@ -134,7 +136,11 @@ ps_bpf_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 
 #ifdef ARP
 	if (psm->ps_cmd & (PS_START | PS_DELETE))
+#if !defined(HAVE_CAPSICUM) && !defined(HAVE_PLEDGE)
 		return ps_bpf_arp_addr(psm->ps_cmd, psp, msg);
+#else
+		return 0;
+#endif
 #endif
 
 	return bpf_send(&psp->psp_ifp, psp->psp_work_fd, psp->psp_proto,
@@ -276,13 +282,12 @@ ps_bpf_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg)
 		return -1;
 	case 0:
 #ifdef HAVE_CAPSICUM
-	if (cap_enter() == -1 && errno != ENOSYS)
-		logerr("%s: cap_enter", __func__);
+		if (cap_enter() == -1 && errno != ENOSYS)
+			logerr("%s: cap_enter", __func__);
 #endif
 #ifdef HAVE_PLEDGE
-	/* Cant change BPF fitler for ARP yet. */
-	if (cmd != PS_BPF_ARP && pledge("stdio", NULL) == -1)
-		logerr("%s: pledge", __func__);
+		if (pledge("stdio", NULL) == -1)
+			logerr("%s: pledge", __func__);
 #endif
 		break;
 	default:

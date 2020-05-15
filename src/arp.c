@@ -601,38 +601,6 @@ arp_announceaddr(struct dhcpcd_ctx *ctx, const struct in_addr *ia)
 	arp_ifannounceaddr(iff, ia);
 }
 
-void
-arp_change(struct arp_state *astate, const struct in_addr *addr)
-{
-	struct interface *ifp = astate->iface;
-	struct iarp_state *state = ARP_STATE(ifp);
-
-#ifdef PRIVSEP
-	if (!IN_IS_ADDR_UNSPECIFIED(&astate->addr) &&
-	    IN_PRIVSEP_SE(ifp->ctx))
-	{
-		if (ps_bpf_deladdr(ifp, &astate->addr) == -1)
-			logerr(__func__);
-	}
-#endif
-
-	if (addr != NULL)
-		astate->addr = *addr;
-	else
-		astate->addr.s_addr = INADDR_ANY;
-
-#ifdef PRIVSEP
-	if (addr != NULL && IN_PRIVSEP_SE(ifp->ctx)) {
-		if (ps_bpf_addaddr(ifp, addr) == -1)
-			logerr(__func__);
-	} else
-#endif
-	if (state->bpf_fd != -1) {
-		if (bpf_arp(ifp, state->bpf_fd) == -1)
-			logerr(__func__); /* try and continue */
-	}
-}
-
 struct arp_state *
 arp_new(struct interface *ifp, const struct in_addr *addr)
 {
@@ -669,7 +637,10 @@ arp_new(struct interface *ifp, const struct in_addr *addr)
 	astate->iface = ifp;
 	state = ARP_STATE(ifp);
 	TAILQ_INSERT_TAIL(&state->arp_states, astate, next);
-	arp_change(astate, addr);
+	if (state->bpf_fd != -1) {
+		if (bpf_arp(ifp, state->bpf_fd) == -1)
+			logerr(__func__); /* try and continue */
+	}
 	return astate;
 }
 
@@ -691,7 +662,6 @@ arp_free(struct arp_state *astate)
 
 	ifp = astate->iface;
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, astate);
-	arp_change(astate, NULL);
 	state =	ARP_STATE(ifp);
 	TAILQ_REMOVE(&state->arp_states, astate, next);
 	if (astate->free_cb)

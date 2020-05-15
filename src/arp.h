@@ -95,7 +95,6 @@ struct iarp_state {
 #ifdef ARP
 void arp_packet(struct interface *, uint8_t *, size_t);
 struct arp_state *arp_new(struct interface *, const struct in_addr *);
-void arp_change(struct arp_state *, const struct in_addr *);
 void arp_probe(struct arp_state *);
 void arp_announce(struct arp_state *);
 void arp_announceaddr(struct dhcpcd_ctx *, const struct in_addr *);
