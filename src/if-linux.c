@@ -1725,7 +1725,17 @@ bpf_attach(int s, void *filter, unsigned int filter_len)
 	};
 
 	/* Install the filter. */
-	return setsockopt(s, SOL_SOCKET, SO_ATTACH_FILTER, &pf, sizeof(pf));
+	if (setsockopt(s, SOL_SOCKET, SO_ATTACH_FILTER, &pf, sizeof(pf)) == -1)
+		return -1;
+
+#ifdef SO_LOCK_FILTER
+	int on = 1;
+
+	if (setsockopt(s, SOL_SOCKET, SO_LOCK_FILTER, &on, sizeof(on)) == -1)
+		return -1;
+#endif
+
+	return 0;
 }
 
 int
