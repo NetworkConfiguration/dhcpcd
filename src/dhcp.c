@@ -2072,7 +2072,14 @@ dhcp_addr_duplicated(struct interface *ifp, struct in_addr *ia)
 #endif
 
 #ifdef ARP
-#ifndef KERNEL_RFC5227
+#ifdef KERNEL_RFC5227
+static void
+dhcp_arp_announced(struct arp_state *state)
+{
+
+	arp_free(state);
+}
+#else
 static void
 dhcp_arp_defend_failed(struct arp_state *astate)
 {
@@ -2200,14 +2207,6 @@ dhcp_arp_found(struct arp_state *astate, const struct arp_msg *amsg)
 }
 #endif
 
-#ifdef KERNEL_RFC5227
-static void
-dhcp_arp_announced(struct arp_state *state)
-{
-
-	arp_free(state);
-}
-#endif /* KERNEL_RFC5227 */
 #endif /* ARP */
 
 void

@@ -162,8 +162,13 @@ bpf_open(const struct interface *ifp,
 	int fd_opts;
 #endif
 
+	bpf = calloc(1, sizeof(*bpf));
+	if (bpf == NULL)
+		return NULL;
+	bpf->bpf_ifp = ifp;
+
 #ifdef _PATH_BPF
-	fd = open(_PATH_BPF, O_RDWR | O_NONBLOCK
+	bpf->bpf_fd = open(_PATH_BPF, O_RDWR | O_NONBLOCK
 #ifdef O_CLOEXEC
 		| O_CLOEXEC
 #endif
@@ -171,11 +176,6 @@ bpf_open(const struct interface *ifp,
 #else
 	char device[32];
 	int n = 0;
-
-	bpf = calloc(1, sizeof(*bpf));
-	if (bpf == NULL)
-		return NULL;
-	bpf->bpf_ifp = ifp;
 
 	do {
 		snprintf(device, sizeof(device), "/dev/bpf%d", n++);

@@ -175,7 +175,7 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 #ifdef SO_RERROR
 	n = 1;
 	if (setsockopt(ctx->link_fd, SOL_SOCKET, SO_RERROR, &n,sizeof(n)) == -1)
-		goto errexit;
+		logerr("%s: SO_RERROR", __func__);
 #endif
 
 	/* Ignore our own route(4) messages.
