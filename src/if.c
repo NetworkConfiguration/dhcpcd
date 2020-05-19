@@ -884,9 +884,6 @@ xsocket(int domain, int type, int protocol)
 #if !defined(HAVE_SOCK_CLOEXEC) || !defined(HAVE_SOCK_NONBLOCK)
 	int xflags, xtype = type;
 #endif
-#ifdef SO_RERROR
-	int on;
-#endif
 
 #ifndef HAVE_SOCK_CLOEXEC
 	if (xtype & SOCK_CLOEXEC)
