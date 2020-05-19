@@ -55,7 +55,7 @@ ps_inet_recvbootp(void *arg)
 {
 	struct dhcpcd_ctx *ctx = arg;
 
-	if (ps_recvmsg(ctx, ctx->udp_fd, PS_BOOTP, ctx->ps_inet_fd) == -1)
+	if (ps_recvmsg(ctx, ctx->udp_rfd, PS_BOOTP, ctx->ps_inet_fd) == -1)
 		logerr(__func__);
 }
 #endif
@@ -86,7 +86,7 @@ ps_inet_recvdhcp6(void *arg)
 {
 	struct dhcpcd_ctx *ctx = arg;
 
-	if (ps_recvmsg(ctx, ctx->dhcp6_fd, PS_DHCP6, ctx->ps_inet_fd) == -1)
+	if (ps_recvmsg(ctx, ctx->dhcp6_rfd, PS_DHCP6, ctx->ps_inet_fd) == -1)
 		logerr(__func__);
 }
 #endif
@@ -99,7 +99,7 @@ ps_inet_startcb(void *arg)
 #ifdef HAVE_CAPSICUM
 	cap_rights_t rights;
 
-	cap_rights_init(&rights, CAP_RECV, CAP_CONNECT, CAP_SEND, CAP_EVENT);
+	cap_rights_init(&rights, CAP_RECV, CAP_EVENT);
 #endif
 
 	if (ctx->options & DHCPCD_MASTER)
@@ -120,31 +120,32 @@ ps_inet_startcb(void *arg)
 	if ((ctx->options & (DHCPCD_IPV4 | DHCPCD_MASTER)) ==
 	    (DHCPCD_IPV4 | DHCPCD_MASTER))
 	{
-		ctx->udp_fd = dhcp_openudp(NULL);
-		if (ctx->udp_fd == -1)
+		ctx->udp_rfd = dhcp_openudp(NULL);
+		if (ctx->udp_rfd == -1)
 			logerr("%s: dhcp_open", __func__);
 #ifdef HAVE_CAPSICUM
-		else if (cap_rights_limit(ctx->udp_fd, &rights) == -1
+		else if (cap_rights_limit(ctx->udp_rfd, &rights) == -1
 		    && errno != ENOSYS)
 		{
 			logerr("%s: cap_rights_limit", __func__);
-			close(ctx->udp_fd);
-			ctx->udp_fd = -1;
+			close(ctx->udp_rfd);
+			ctx->udp_rfd = -1;
 		}
 #endif
-		else if (eloop_event_add(ctx->eloop, ctx->udp_fd,
+		else if (eloop_event_add(ctx->eloop, ctx->udp_rfd,
 		    ps_inet_recvbootp, ctx) == -1)
 		{
 			logerr("%s: eloop_event_add DHCP", __func__);
-			close(ctx->udp_fd);
-			ctx->udp_fd = -1;
+			close(ctx->udp_rfd);
+			ctx->udp_rfd = -1;
 		} else
 			ret++;
 	}
 #endif
 #if defined(INET6) && !defined(__sun)
 	if (ctx->options & DHCPCD_IPV6) {
-		if (ipv6nd_open(ctx) == -1)
+		ctx->nd_fd = ipv6nd_open(true);
+		if (ctx->nd_fd == -1)
 			logerr("%s: ipv6nd_open", __func__);
 #ifdef HAVE_CAPSICUM
 		else if (cap_rights_limit(ctx->nd_fd, &rights) == -1
@@ -169,24 +170,24 @@ ps_inet_startcb(void *arg)
 	if ((ctx->options & (DHCPCD_DHCP6 | DHCPCD_MASTER)) ==
 	    (DHCPCD_DHCP6 | DHCPCD_MASTER))
 	{
-		ctx->dhcp6_fd = dhcp6_openudp(0, NULL);
-		if (ctx->dhcp6_fd == -1)
+		ctx->dhcp6_rfd = dhcp6_openudp(0, NULL);
+		if (ctx->dhcp6_rfd == -1)
 			logerr("%s: dhcp6_open", __func__);
 #ifdef HAVE_CAPSICUM
-		else if (cap_rights_limit(ctx->dhcp6_fd, &rights) == -1
+		else if (cap_rights_limit(ctx->dhcp6_rfd, &rights) == -1
 		    && errno != ENOSYS)
 		{
 			logerr("%s: cap_rights_limit", __func__);
-			close(ctx->dhcp6_fd);
-			ctx->dhcp6_fd = -1;
+			close(ctx->dhcp6_rfd);
+			ctx->dhcp6_rfd = -1;
 		}
 #endif
-		else if (eloop_event_add(ctx->eloop, ctx->dhcp6_fd,
+		else if (eloop_event_add(ctx->eloop, ctx->dhcp6_rfd,
 		    ps_inet_recvdhcp6, ctx) == -1)
 		{
 			logerr("%s: eloop_event_add DHCP6", __func__);
-			close(ctx->dhcp6_fd);
-			ctx->dhcp6_fd = -1;
+			close(ctx->dhcp6_rfd);
+			ctx->dhcp6_rfd = -1;
 		} else
 			ret++;
 	}
@@ -200,23 +201,22 @@ ps_inet_startcb(void *arg)
 }
 
 static ssize_t
-ps_inet_recvmsg_cb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
+ps_inet_sendmsg(struct dhcpcd_ctx *ctx,
+    struct ps_msghdr *psm, struct msghdr *msg)
 {
-	struct dhcpcd_ctx *ctx = arg;
 	struct ps_process *psp;
 	int s;
 
 	psp = ps_findprocess(ctx, &psm->ps_id);
 	if (psp != NULL) {
 		s = psp->psp_work_fd;
-		logerrx("psp found fd %d", s);
 		goto dosend;
 	}
 
 	switch (psm->ps_cmd) {
 #ifdef INET
 	case PS_BOOTP:
-		s = ctx->udp_fd;
+		s = ctx->udp_wfd;
 		break;
 #endif
 #if defined(INET6) && !defined(__sun)
@@ -226,7 +226,7 @@ ps_inet_recvmsg_cb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 #endif
 #ifdef DHCP6
 	case PS_DHCP6:
-		s = ctx->dhcp6_fd;
+		s = ctx->dhcp6_wfd;
 		break;
 #endif
 	default:
@@ -235,17 +235,16 @@ ps_inet_recvmsg_cb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 	}
 
 dosend:
-
 	return sendmsg(s, msg, 0);
 }
 
-/* Receive from state engine, send message on wire. */
 static void
 ps_inet_recvmsg(void *arg)
 {
 	struct dhcpcd_ctx *ctx = arg;
 
-	if (ps_recvpsmsg(ctx, ctx->ps_inet_fd, ps_inet_recvmsg_cb, ctx) == -1)
+	/* Receive shutdown */
+	if (ps_recvpsmsg(ctx, ctx->ps_inet_fd, NULL, NULL) == -1)
 		logerr(__func__);
 }
 
@@ -310,10 +309,8 @@ ps_inet_start(struct dhcpcd_ctx *ctx)
 	    PSF_DROPPRIVS);
 
 #ifdef HAVE_CAPSICUM
-#if 0		/* This breaks sendmsg() */
-	if (cap_enter() == -1 && errno != ENOSYS)
+	if (pid == 0 && cap_enter() == -1 && errno != ENOSYS)
 		logerr("%s: cap_enter", __func__);
-#endif
 #endif
 #ifdef HAVE_PLEDGE
 	if (pid == 0 && pledge("stdio inet", NULL) == -1)
@@ -350,7 +347,7 @@ ps_inet_listenin(void *arg)
 #ifdef HAVE_CAPSICUM
 	cap_rights_t rights;
 
-	cap_rights_init(&rights, CAP_RECV, CAP_CONNECT, CAP_SEND, CAP_EVENT);
+	cap_rights_init(&rights, CAP_RECV, CAP_EVENT);
 #endif
 
 	inet_ntop(AF_INET, ia, buf, sizeof(buf));
@@ -401,7 +398,7 @@ ps_inet_listennd(void *arg)
 #ifdef HAVE_CAPSICUM
 	cap_rights_t rights;
 
-	cap_rights_init(&rights, CAP_RECV, CAP_CONNECT, CAP_SEND, CAP_EVENT);
+	cap_rights_init(&rights, CAP_RECV, CAP_EVENT);
 #endif
 
 	setproctitle("[ND network proxy]");
@@ -453,7 +450,7 @@ ps_inet_listenin6(void *arg)
 #ifdef HAVE_CAPSICUM
 	cap_rights_t rights;
 
-	cap_rights_init(&rights, CAP_RECV, CAP_CONNECT, CAP_SEND, CAP_EVENT);
+	cap_rights_init(&rights, CAP_RECV, CAP_EVENT);
 #endif
 
 	inet_ntop(AF_INET6, ia, buf, sizeof(buf));
@@ -486,28 +483,18 @@ ps_inet_listenin6(void *arg)
 }
 #endif
 
-static ssize_t
-ps_inet_recvmsgpsp_cb(void *arg, __unused struct ps_msghdr *psm,
-    struct msghdr *msg)
-{
-	struct ps_process *psp = arg;
-
-	return sendmsg(psp->psp_work_fd, msg, 0);
-}
-
 static void
 ps_inet_recvmsgpsp(void *arg)
 {
 	struct ps_process *psp = arg;
 
-	if (ps_recvpsmsg(psp->psp_ctx, psp->psp_fd,
-	    ps_inet_recvmsgpsp_cb, psp) == -1)
+	/* Receive shutdown. */
+	if (ps_recvpsmsg(psp->psp_ctx, psp->psp_fd, NULL, NULL) == -1)
 		logerr(__func__);
 }
 
 ssize_t
-ps_inet_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm,
-    __unused struct msghdr *msg)
+ps_inet_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg)
 {
 	uint16_t cmd;
 	struct ps_process *psp;
@@ -515,6 +502,9 @@ ps_inet_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm,
 	pid_t start;
 
 	cmd = (uint16_t)(psm->ps_cmd & ~(PS_START | PS_STOP));
+	if (cmd == psm->ps_cmd)
+		return ps_inet_sendmsg(ctx, psm, msg);
+
 	psp = ps_findprocess(ctx, &psm->ps_id);
 
 #ifdef PRIVSEP_DEBUG
@@ -573,10 +563,8 @@ ps_inet_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm,
 		return -1;
 	case 0:
 #ifdef HAVE_CAPSICUM
-#if 0		/* This breaks sendmsg() */
 		if (cap_enter() == -1 && errno != ENOSYS)
 			logerr("%s: cap_enter", __func__);
-#endif
 #endif
 #ifdef HAVE_PLEDGE
 		if (pledge("stdio inet", NULL) == -1)
@@ -622,13 +610,10 @@ ps_inet_closebootp(struct ipv4_addr *ia)
 }
 
 ssize_t
-ps_inet_sendbootp(struct ipv4_addr *ia, const struct msghdr *msg)
+ps_inet_sendbootp(struct interface *ifp, const struct msghdr *msg)
 {
-	struct dhcpcd_ctx *ctx = ia->iface->ctx;
 
-	if (ctx->options & DHCPCD_MASTER)
-		return ps_sendmsg(ctx, ctx->ps_inet_fd, PS_BOOTP, 0, msg);
-	return ps_inet_in_docmd(ia, PS_BOOTP, msg);
+	return ps_sendmsg(ifp->ctx, ifp->ctx->ps_root_fd, PS_BOOTP, 0, msg);
 }
 #endif /* INET */
 
@@ -674,7 +659,7 @@ ssize_t
 ps_inet_sendnd(struct interface *ifp, const struct msghdr *msg)
 {
 
-	return ps_sendmsg(ifp->ctx, ifp->ctx->ps_inet_fd, PS_ND, 0, msg);
+	return ps_sendmsg(ifp->ctx, ifp->ctx->ps_root_fd, PS_ND, 0, msg);
 }
 #endif
 
@@ -710,13 +695,10 @@ ps_inet_closedhcp6(struct ipv6_addr *ia)
 }
 
 ssize_t
-ps_inet_senddhcp6(struct ipv6_addr *ia, const struct msghdr *msg)
+ps_inet_senddhcp6(struct interface *ifp, const struct msghdr *msg)
 {
-	struct dhcpcd_ctx *ctx = ia->iface->ctx;
 
-	if (ctx->options & DHCPCD_MASTER)
-		return ps_sendmsg(ctx, ctx->ps_inet_fd, PS_DHCP6, 0, msg);
-	return ps_inet_in6_docmd(ia, PS_DHCP6, msg);
+	return ps_sendmsg(ifp->ctx, ifp->ctx->ps_root_fd, PS_DHCP6, 0, msg);
 }
 #endif /* DHCP6 */
 #endif /* INET6 */

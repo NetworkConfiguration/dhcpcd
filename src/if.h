@@ -210,6 +210,9 @@ int if_setmac(struct interface *ifp, void *, uint8_t);
 #else
 # define SOCK_NONBLOCK	0x20000000
 #endif
+#ifndef SOCK_CXNB
+#define	SOCK_CXNB	SOCK_CLOEXEC | SOCK_NONBLOCK
+#endif
 
 int if_route(unsigned char, const struct rt *rt);
 int if_initrt(struct dhcpcd_ctx *, rb_tree_t *, int);

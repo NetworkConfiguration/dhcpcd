@@ -198,10 +198,8 @@ make_sock(struct sockaddr_un *sa, const char *ifname, sa_family_t family,
 {
 	int fd;
 
-#define SOCK_FLAGS	SOCK_CLOEXEC | SOCK_NONBLOCK
-	if ((fd = xsocket(AF_UNIX, SOCK_STREAM | SOCK_FLAGS, 0)) == -1)
+	if ((fd = xsocket(AF_UNIX, SOCK_STREAM | SOCK_CXNB, 0)) == -1)
 		return -1;
-#undef SOCK_FLAGS
 	memset(sa, 0, sizeof(*sa));
 	sa->sun_family = AF_UNIX;
 	if (unpriv)

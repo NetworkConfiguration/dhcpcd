@@ -140,7 +140,10 @@ ipv6_init(struct dhcpcd_ctx *ctx)
 #ifndef __sun
 	ctx->nd_fd = -1;
 #endif
-	ctx->dhcp6_fd = -1;
+#ifdef DHCP6
+	ctx->dhcp6_rfd = -1;
+	ctx->dhcp6_wfd = -1;
+#endif
 	return 0;
 }
 
