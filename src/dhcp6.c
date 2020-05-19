@@ -1209,7 +1209,12 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 	bool broadcast = true;
 	struct sockaddr_in6 dst = {
 	    .sin6_family = AF_INET6,
+	    /* Setting the port on Linux gives EINVAL when sending.
+	     * This looks like a kernel bug as the equivalent works
+	     * fine with the DHCP counterpart. */
+#ifndef __linux__
 	    .sin6_port = htons(DHCP6_SERVER_PORT),
+#endif
 	};
 	struct udphdr udp = {
 	    .uh_sport = htons(DHCP6_CLIENT_PORT),
