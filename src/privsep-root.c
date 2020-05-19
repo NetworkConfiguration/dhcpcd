@@ -38,14 +38,17 @@
 #include <fcntl.h>
 #include <pwd.h>
 #include <signal.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
 #include "common.h"
 #include "dhcpcd.h"
+#include "dhcp6.h"
 #include "eloop.h"
 #include "if.h"
+#include "ipv6nd.h"
 #include "logerr.h"
 #include "privsep.h"
 #include "sa.h"
@@ -393,16 +396,14 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 	ssize_t err;
 	bool free_rdata= false;
 
-	cmd = (uint16_t)(psm->ps_cmd & ~(PS_START | PS_STOP | PS_DELETE));
+	cmd = (uint16_t)(psm->ps_cmd & ~(PS_START | PS_STOP));
 	psp = ps_findprocess(ctx, &psm->ps_id);
 
 #ifdef PRIVSEP_DEBUG
 	logerrx("%s: IN cmd %x, psp %p", __func__, psm->ps_cmd, psp);
 #endif
 
-	if ((!(psm->ps_cmd & PS_START) || cmd == PS_BPF_ARP_ADDR) &&
-	    psp != NULL)
-	{
+	if (psp != NULL) {
 		if (psm->ps_cmd & PS_STOP) {
 			int ret = ps_dostop(ctx, &psp->psp_pid, &psp->psp_fd);
 
@@ -412,7 +413,7 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		return ps_sendpsmmsg(ctx, psp->psp_fd, psm, msg);
 	}
 
-	if (psm->ps_cmd & (PS_STOP | PS_DELETE) && psp == NULL)
+	if (psm->ps_cmd & PS_STOP && psp == NULL)
 		return 0;
 
 	/* All these should just be PS_START */
@@ -517,6 +518,27 @@ ps_root_startcb(void *arg)
 		    ctx->options & DHCPCD_IPV6 ? " [ip6]" : "");
 	ctx->ps_root_pid = getpid();
 	ctx->options |= DHCPCD_PRIVSEPROOT;
+
+	/* Open network sockets for sending.
+	 * This is a small bit wasteful for non sandboxed OS's
+	 * but makes life very easy for unicasting DHCPv6 in non master
+	 * mode as we no longer care about address selection. */
+#ifdef INET
+	ctx->udp_wfd = xsocket(PF_INET, SOCK_RAW | SOCK_CXNB, IPPROTO_UDP);
+	if (ctx->udp_wfd == -1)
+		return -1;
+#endif
+#ifdef INET6
+	ctx->nd_fd = ipv6nd_open(false);
+	if (ctx->nd_fd == -1)
+		return -1;
+#endif
+#ifdef DHCP6
+	ctx->dhcp6_wfd = dhcp6_openraw();
+	if (ctx->dhcp6_wfd == -1)
+		return -1;
+#endif
+
 	return 0;
 }
 
@@ -567,7 +589,6 @@ ps_root_start(struct dhcpcd_ctx *ctx)
 	int fd[2];
 	pid_t pid;
 
-#define	SOCK_CXNB	SOCK_CLOEXEC | SOCK_NONBLOCK
 	if (socketpair(AF_UNIX, SOCK_DGRAM | SOCK_CXNB, 0, fd) == -1)
 		return -1;
 
@@ -586,20 +607,16 @@ ps_root_start(struct dhcpcd_ctx *ctx)
 	close(fd[1]);
 	if (eloop_event_add(ctx->eloop, ctx->ps_data_fd,
 	    ps_root_dispatch, ctx) == -1)
-		logerr(__func__);
-
-	if ((ctx->ps_eloop = eloop_new()) == NULL) {
-		logerr(__func__);
 		return -1;
-	}
+
+	if ((ctx->ps_eloop = eloop_new()) == NULL)
+		return -1;
 
 	if (eloop_signal_set_cb(ctx->ps_eloop,
 	    dhcpcd_signals, dhcpcd_signals_len,
 	    ps_root_readerrorsig, ctx) == -1)
-	{
-		logerr(__func__);
 		return -1;
-	}
+
 	return pid;
 }
 

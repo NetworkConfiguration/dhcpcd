@@ -394,7 +394,7 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 	}
 	TAILQ_INIT(ifs);
 
-#ifdef HAVE_CAPSICUM
+#if defined(PRIVSEP) && defined(HAVE_CAPSICUM)
 	if (ctx->options & DHCPCD_PRIVSEP) {
 		if (ps_root_getifaddrs(ctx, ifaddrs) == -1) {
 			logerr("ps_root_getifaddrs");
@@ -909,13 +909,6 @@ xsocket(int domain, int type, int protocol)
 	if ((xtype & SOCK_NONBLOCK) && ((xflags = fcntl(s, F_GETFL)) == -1 ||
 	    fcntl(s, F_SETFL, xflags | O_NONBLOCK) == -1))
 		goto out;
-#endif
-
-#ifdef SO_RERROR
-	/* Tell recvmsg(2) to return ENOBUFS if the receiving socket overflows. */
-	on = 1;
-	if (setsockopt(s, SOL_SOCKET, SO_RERROR, &on, sizeof(on)) == -1)
-		logerr("%s: SO_RERROR", __func__);
 #endif
 
 	return s;

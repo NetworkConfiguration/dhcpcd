@@ -40,7 +40,6 @@
 #define	PS_DHCP6		0x0003
 #define	PS_BPF_BOOTP		0x0004
 #define	PS_BPF_ARP		0x0005
-#define	PS_BPF_ARP_ADDR		0x0006
 
 /* Generic commands */
 #define	PS_IOCTL		0x0010
@@ -62,7 +61,6 @@
 #define	PS_WRITEPATHUINT	0x0201
 
 /* Process commands */
-#define	PS_DELETE		0x2000
 #define	PS_START		0x4000
 #define	PS_STOP			0x8000
 
@@ -119,6 +117,7 @@ struct ps_msg {
 	uint8_t psm_data[PS_BUFLEN];
 };
 
+struct bpf;
 struct ps_process {
 	TAILQ_ENTRY(ps_process) next;
 	struct dhcpcd_ctx *psp_ctx;
@@ -132,8 +131,9 @@ struct ps_process {
 	const char *psp_protostr;
 
 #ifdef INET
-	int (*psp_filter)(struct interface *, int);
+	int (*psp_filter)(const struct bpf *, const struct in_addr *);
 	struct interface psp_ifp; /* Move BPF gubbins elsewhere */
+	struct bpf *psp_bpf;
 #endif
 };
 TAILQ_HEAD(ps_process_head, ps_process);

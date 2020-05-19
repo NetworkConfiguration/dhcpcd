@@ -188,17 +188,17 @@ ipv6nd_printoptions(const struct dhcpcd_ctx *ctx,
 	}
 }
 
-static int
-ipv6nd_open0(void)
+int
+ipv6nd_open(bool recv)
 {
 	int fd, on;
 	struct icmp6_filter filt;
 
-#define SOCK_FLAGS	SOCK_CLOEXEC | SOCK_NONBLOCK
-	fd = xsocket(PF_INET6, SOCK_RAW | SOCK_FLAGS, IPPROTO_ICMPV6);
-#undef SOCK_FLAGS
+	fd = xsocket(PF_INET6, SOCK_RAW | SOCK_CXNB, IPPROTO_ICMPV6);
 	if (fd == -1)
 		return -1;
+
+	ICMP6_FILTER_SETBLOCKALL(&filt);
 
 	/* RFC4861 4.1 */
 	on = 255;
@@ -206,18 +206,27 @@ ipv6nd_open0(void)
 	    &on, sizeof(on)) == -1)
 		goto eexit;
 
-	on = 1;
-	if (setsockopt(fd, IPPROTO_IPV6, IPV6_RECVPKTINFO,
-	    &on, sizeof(on)) == -1)
-		goto eexit;
+	if (recv) {
+		on = 1;
+		if (setsockopt(fd, IPPROTO_IPV6, IPV6_RECVPKTINFO,
+		    &on, sizeof(on)) == -1)
+			goto eexit;
 
-	on = 1;
-	if (setsockopt(fd, IPPROTO_IPV6, IPV6_RECVHOPLIMIT,
-	    &on, sizeof(on)) == -1)
-		goto eexit;
+		on = 1;
+		if (setsockopt(fd, IPPROTO_IPV6, IPV6_RECVHOPLIMIT,
+		    &on, sizeof(on)) == -1)
+			goto eexit;
 
-	ICMP6_FILTER_SETBLOCKALL(&filt);
-	ICMP6_FILTER_SETPASS(ND_ROUTER_ADVERT, &filt);
+		ICMP6_FILTER_SETPASS(ND_ROUTER_ADVERT, &filt);
+
+#ifdef SO_RERROR
+		on = 1;
+		if (setsockopt(fd, SOL_SOCKET, SO_RERROR,
+		    &on, sizeof(on)) == -1)
+			goto eexit;
+#endif
+	}
+
 	if (setsockopt(fd, IPPROTO_ICMPV6, ICMP6_FILTER,
 	    &filt, sizeof(filt)) == -1)
 		goto eexit;
@@ -231,7 +240,7 @@ eexit:
 
 #ifdef __sun
 int
-ipv6nd_open(struct interface *ifp)
+ipv6nd_openif(struct interface *ifp)
 {
 	int fd;
 	struct ipv6_mreq mreq = {
@@ -244,7 +253,7 @@ ipv6nd_open(struct interface *ifp)
 	if (state->nd_fd != -1)
 		return state->nd_fd;
 
-	fd = ipv6nd_open0();
+	fd = ipv6nd_open0(true);
 	if (fd == -1)
 		return -1;
 
@@ -264,24 +273,6 @@ ipv6nd_open(struct interface *ifp)
 
 	state->nd_fd = fd;
 	eloop_event_add(ifp->ctx->eloop, fd, ipv6nd_handledata, ifp);
-	return fd;
-}
-#else
-int
-ipv6nd_open(struct dhcpcd_ctx *ctx)
-{
-	int fd;
-
-	if (ctx->nd_fd != -1)
-		return ctx->nd_fd;
-
-	fd = ipv6nd_open0();
-	if (fd == -1)
-		return -1;
-
-	ctx->nd_fd = fd;
-	if (!(IN_PRIVSEP(ctx)))
-		eloop_event_add(ctx->eloop, fd, ipv6nd_handledata, ctx);
 	return fd;
 }
 #endif
@@ -340,6 +331,7 @@ ipv6nd_sendrsprobe(void *arg)
 	struct cmsghdr *cm;
 	struct in6_pktinfo pi = { .ipi6_ifindex = ifp->index };
 	int s;
+	struct dhcpcd_ctx *ctx = ifp->ctx;
 
 	if (ipv6_linklocal(ifp) == NULL) {
 		logdebugx("%s: delaying Router Solicitation for LL address",
@@ -372,6 +364,14 @@ ipv6nd_sendrsprobe(void *arg)
 #ifdef __sun
 	s = state->nd_fd;
 #else
+	if (ctx->nd_fd == -1) {
+		ctx->nd_fd = ipv6nd_open(true);
+		if (ctx->nd_fd == -1) {
+			logerr(__func__);
+			return;
+		}
+		eloop_event_add(ctx->eloop, ctx->nd_fd, ipv6nd_handledata, ctx);
+	}
 	s = ifp->ctx->nd_fd;
 #endif
 	if (sendmsg(s, &msg, 0) == -1) {
@@ -1999,20 +1999,6 @@ ipv6nd_startrs1(void *arg)
 		}
 #ifdef __sun
 		state->nd_fd = -1;
-#endif
-	}
-
-	if (!(IN_PRIVSEP(ifp->ctx))) {
-#ifdef __sun
-		if (ipv6nd_open(ifp) == -1) {
-			logerr(__func__);
-			return;
-		}
-#else
-		if (ipv6nd_open(ifp->ctx) == -1) {
-			logerr(__func__);
-			return;
-		}
 #endif
 	}
 

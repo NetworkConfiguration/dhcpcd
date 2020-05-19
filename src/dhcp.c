@@ -1443,6 +1443,7 @@ get_lease(struct interface *ifp,
 	if (get_option_uint32(ctx, &lease->renewaltime,
 	    bootp, len, DHO_RENEWALTIME) != 0)
 		lease->renewaltime = 0;
+	lease->renewaltime = 5;
 	if (get_option_uint32(ctx, &lease->rebindtime,
 	    bootp, len, DHO_REBINDTIME) != 0)
 		lease->rebindtime = 0;
@@ -1537,16 +1538,15 @@ dhcp_close(struct interface *ifp)
 	}
 #endif
 
-	if (state->bpf_fd != -1) {
-		eloop_event_delete(ctx->eloop, state->bpf_fd);
-		bpf_close(ifp, state->bpf_fd);
-		state->bpf_fd = -1;
-		state->bpf_flags |= BPF_EOF;
+	if (state->bpf != NULL) {
+		eloop_event_delete(ctx->eloop, state->bpf->bpf_fd);
+		bpf_close(state->bpf);
+		state->bpf = NULL;
 	}
-	if (state->udp_fd != -1) {
-		eloop_event_delete(ctx->eloop, state->udp_fd);
-		close(state->udp_fd);
-		state->udp_fd = -1;
+	if (state->udp_rfd != -1) {
+		eloop_event_delete(ctx->eloop, state->udp_rfd);
+		close(state->udp_rfd);
+		state->udp_rfd = -1;
 	}
 
 	state->interval = 0;
@@ -1559,7 +1559,7 @@ dhcp_openudp(struct in_addr *ia)
 	struct sockaddr_in sin;
 	int n;
 
-	if ((s = xsocket(PF_INET, SOCK_DGRAM|SOCK_CLOEXEC, IPPROTO_UDP)) == -1)
+	if ((s = xsocket(PF_INET, SOCK_DGRAM | SOCK_CXNB, IPPROTO_UDP)) == -1)
 		return -1;
 
 	n = 1;
@@ -1572,6 +1572,11 @@ dhcp_openudp(struct in_addr *ia)
 	if (setsockopt(s, IPPROTO_IP, IP_RECVPKTINFO, &n, sizeof(n)) == -1)
 		goto errexit;
 #endif
+#ifdef SO_RERROR
+	if (setsockopt(s, SOL_SOCKET, SO_RERROR, &n, sizeof(n)) == -1)
+		goto errexit;
+#endif
+
 	memset(&sin, 0, sizeof(sin));
 	sin.sin_family = AF_INET;
 	sin.sin_port = htons(BOOTPC);
@@ -1669,33 +1674,28 @@ dhcp_sendudp(struct interface *ifp, struct in_addr *to, void *data, size_t len)
 		.sin_len = sizeof(sin),
 #endif
 	};
+	struct udphdr udp = {
+	    .uh_sport = htons(BOOTPC),
+	    .uh_dport = htons(BOOTPS),
+	    .uh_ulen = htons(sizeof(udp) + len),
+	};
 	struct iovec iov[] = {
-		{ .iov_base = data, .iov_len = len }
+	    { .iov_base = &udp, .iov_len = sizeof(udp), },
+	    { .iov_base = data, .iov_len = len, },
 	};
 	struct msghdr msg = {
 		.msg_name = (void *)&sin,
 		.msg_namelen = sizeof(sin),
 		.msg_iov = iov,
-		.msg_iovlen = 1,
+		.msg_iovlen = __arraycount(iov),
 	};
-	struct dhcp_state *state = D_STATE(ifp);
-	ssize_t r;
-	int fd;
+	struct dhcpcd_ctx *ctx = ifp->ctx;
 
 #ifdef PRIVSEP
-	if (ifp->ctx->options & DHCPCD_PRIVSEP)
-		return ps_inet_sendbootp(state->addr, &msg);
+	if (ctx->options & DHCPCD_PRIVSEP)
+		return ps_inet_sendbootp(ifp, &msg);
 #endif
-	fd = state->udp_fd;
-	if (fd == -1) {
-		fd = dhcp_openudp(&state->addr->addr);
-		if (fd == -1)
-			return -1;
-	}
-	r = sendmsg(fd, &msg, 0);
-	if (state->udp_fd == -1)
-		close(fd);
-	return r;
+	return sendmsg(ctx->udp_wfd, &msg, 0);
 }
 
 static void
@@ -1771,8 +1771,7 @@ send_message(struct interface *ifp, uint8_t type,
 	 * interface we want to configure because we can't dictate the
 	 * interface via IP_PKTINFO unlike for IPv6.
 	 */
-	if (to.s_addr != INADDR_BROADCAST)
-	{
+	if (to.s_addr != INADDR_BROADCAST) {
 		if (dhcp_sendudp(ifp, &to, bootp, len) != -1)
 			goto out;
 		logerr("%s: dhcp_sendudp", ifp->name);
@@ -1791,8 +1790,7 @@ send_message(struct interface *ifp, uint8_t type,
 		free(udp);
 #endif
 	} else {
-		r = bpf_send(ifp, state->bpf_fd,
-		    ETHERTYPE_IP, (uint8_t *)udp, ulen);
+		r = bpf_send(state->bpf, ETHERTYPE_IP, udp, ulen);
 		free(udp);
 	}
 	/* If we failed to send a raw packet this normally means
@@ -2073,30 +2071,84 @@ dhcp_addr_duplicated(struct interface *ifp, struct in_addr *ia)
 }
 #endif
 
-#if defined(ARP) && (!defined(KERNEL_RFC5227) || defined(ARPING))
+#ifdef ARP
+#ifndef KERNEL_RFC5227
+static void
+dhcp_arp_defend_failed(struct arp_state *astate)
+{
+	struct interface *ifp = astate->iface;
+
+	dhcp_drop(ifp, "EXPIRED");
+	dhcp_start1(ifp);
+}
+#endif
+
+#if !defined(KERNEL_RFC5227) || defined(ARPING)
+static void dhcp_arp_not_found(struct arp_state *);
+
+static struct arp_state *
+dhcp_arp_new(struct interface *ifp, struct in_addr *addr)
+{
+	struct arp_state *astate;
+
+	astate = arp_new(ifp, addr);
+	if (astate == NULL)
+		return NULL;
+
+	astate->found_cb = dhcp_arp_found;
+	astate->not_found_cb = dhcp_arp_not_found;
+#ifdef KERNEL_RFC5227
+	astate->announced_cb = dhcp_arp_announced;
+#else
+	astate->announced_cb = NULL;
+	astate->defend_failed_cb = dhcp_arp_defend_failed;
+#endif
+	return astate;
+}
+#endif
+
+#ifdef ARPING
+static int
+dhcp_arping(struct interface *ifp)
+{
+	struct dhcp_state *state;
+	struct if_options *ifo;
+	struct arp_state *astate;
+	struct in_addr addr;
+
+	state = D_STATE(ifp);
+	ifo = ifp->options;
+
+	if (ifo->arping_len == 0 || state->arping_index > ifo->arping_len)
+		return 0;
+
+	if (state->arping_index + 1 == ifo->arping_len) {
+		state->arping_index++;
+		dhcpcd_startinterface(ifp);
+		return 1;
+	}
+
+	addr.s_addr = ifo->arping[++state->arping_index];
+	astate = dhcp_arp_new(ifp, &addr);
+	if (astate == NULL) {
+		logerr(__func__);
+		return -1;
+	}
+	arp_probe(astate);
+	return 1;
+}
+#endif
+
+#if !defined(KERNEL_RFC5227) || defined(ARPING)
 static void
 dhcp_arp_not_found(struct arp_state *astate)
 {
 	struct interface *ifp;
-#ifdef ARPING
-	struct dhcp_state *state;
-	struct if_options *ifo;
-#endif
 
 	ifp = astate->iface;
 #ifdef ARPING
-	state = D_STATE(ifp);
-	ifo = ifp->options;
-	if (ifo->arping_len && state->arping_index < ifo->arping_len) {
-		/* We didn't find a profile for this
-		 * address or hwaddr, so move to the next
-		 * arping profile */
-		if (++state->arping_index < ifo->arping_len) {
-			arp_probe(astate);
-			return;
-		}
+	if (dhcp_arping(ifp) == 1) {
 		arp_free(astate);
-		dhcpcd_startinterface(ifp);
 		return;
 	}
 #endif
@@ -2146,6 +2198,7 @@ dhcp_arp_found(struct arp_state *astate, const struct arp_msg *amsg)
 	arp_free(astate);
 	dhcp_addr_duplicated(ifp, &addr);
 }
+#endif
 
 #ifdef KERNEL_RFC5227
 static void
@@ -2304,8 +2357,8 @@ dhcp_bind(struct interface *ifp)
 	}
 #endif
 
-	state->udp_fd = dhcp_openudp(&state->addr->addr);
-	if (state->udp_fd == -1) {
+	state->udp_rfd = dhcp_openudp(&state->addr->addr);
+	if (state->udp_rfd == -1) {
 		logerr(__func__);
 		/* Address sharing without master mode is not supported.
 		 * It's also possible another DHCP client could be running,
@@ -2314,7 +2367,7 @@ dhcp_bind(struct interface *ifp)
 		dhcp_openbpf(ifp);
 		return;
 	}
-	eloop_event_add(ctx->eloop, state->udp_fd, dhcp_handleifudp, ifp);
+	eloop_event_add(ctx->eloop, state->udp_rfd, dhcp_handleifudp, ifp);
 }
 
 static void
@@ -2360,41 +2413,6 @@ dhcp_message_new(struct bootp **bootp,
 	*p = DHO_END;
 	return sizeof(**bootp);
 }
-
-#ifdef ARP
-#ifndef KERNEL_RFC5227
-static void
-dhcp_arp_defend_failed(struct arp_state *astate)
-{
-	struct interface *ifp = astate->iface;
-
-	dhcp_drop(ifp, "EXPIRED");
-	dhcp_start1(ifp);
-}
-#endif
-
-#if !defined(KERNEL_RFC5227) || defined(ARPING)
-static struct arp_state *
-dhcp_arp_new(struct interface *ifp, struct in_addr *addr)
-{
-	struct arp_state *astate;
-
-	astate = arp_new(ifp, addr);
-	if (astate == NULL)
-		return NULL;
-
-	astate->found_cb = dhcp_arp_found;
-	astate->not_found_cb = dhcp_arp_not_found;
-#ifdef KERNEL_RFC5227
-	astate->announced_cb = dhcp_arp_announced;
-#else
-	astate->announced_cb = NULL;
-	astate->defend_failed_cb = dhcp_arp_defend_failed;
-#endif
-	return astate;
-}
-#endif
-#endif /* ARP */
 
 #if defined(ARP) || defined(KERNEL_RFC5227)
 static int
@@ -3231,7 +3249,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 			state->reason = "TEST";
 			script_runreason(ifp, state->reason);
 			eloop_exit(ifp->ctx->eloop, EXIT_SUCCESS);
-			state->bpf_flags |= BPF_EOF;
+			state->bpf->bpf_flags |= BPF_EOF;
 			return;
 		}
 		eloop_timeout_delete(ifp->ctx->eloop, send_discover, ifp);
@@ -3446,15 +3464,15 @@ dhcp_handlebootp(struct interface *ifp, struct bootp *bootp, size_t len,
 }
 
 void
-dhcp_packet(struct interface *ifp, uint8_t *data, size_t len)
+dhcp_packet(struct interface *ifp, uint8_t *data, size_t len, uint8_t bpf_flags)
 {
 	struct bootp *bootp;
 	struct in_addr from;
 	size_t udp_len;
-	const struct dhcp_state *state = D_CSTATE(ifp);
 	size_t fl = bpf_frame_header_len(ifp);
-
 #ifdef PRIVSEP
+	const struct dhcp_state *state = D_CSTATE(ifp);
+
 	/* Ignore double reads */
 	if (IN_PRIVSEP(ifp->ctx)) {
 		switch (state->state) {
@@ -3470,8 +3488,8 @@ dhcp_packet(struct interface *ifp, uint8_t *data, size_t len)
 	/* Trim frame header */
 	if (fl != 0) {
 		if (len < fl) {
-			logerrx("%s: %s: short frame header",
-			    __func__, ifp->name);
+			logerrx("%s: %s: short frame header %zu",
+			    __func__, ifp->name, len);
 			return;
 		}
 		len -= fl;
@@ -3487,7 +3505,7 @@ dhcp_packet(struct interface *ifp, uint8_t *data, size_t len)
 		return;
 	}
 
-	if (!checksums_valid(data, &from, state->bpf_flags)) {
+	if (!checksums_valid(data, &from, bpf_flags)) {
 		logerrx("%s: checksum failure from %s",
 		    ifp->name, inet_ntoa(from));
 		return;
@@ -3511,15 +3529,11 @@ dhcp_readbpf(void *arg)
 	uint8_t buf[FRAMELEN_MAX];
 	ssize_t bytes;
 	struct dhcp_state *state = D_STATE(ifp);
+	struct bpf *bpf = state->bpf;
 
-	/* Some RAW mechanisms are generic file descriptors, not sockets.
-	 * This means we have no kernel call to just get one packet,
-	 * so we have to process the entire buffer. */
-	state->bpf_flags &= ~BPF_EOF;
-	state->bpf_flags |= BPF_READING;
-	while (!(state->bpf_flags & BPF_EOF)) {
-		bytes = bpf_read(ifp, state->bpf_fd, buf, sizeof(buf),
-				 &state->bpf_flags);
+	bpf->bpf_flags &= ~BPF_EOF;
+	while (!(bpf->bpf_flags & BPF_EOF)) {
+		bytes = bpf_read(bpf, buf, sizeof(buf));
 		if (bytes == -1) {
 			if (state->state != DHS_NONE) {
 				logerr("%s: %s", __func__, ifp->name);
@@ -3527,13 +3541,13 @@ dhcp_readbpf(void *arg)
 			}
 			break;
 		}
-		dhcp_packet(ifp, buf, (size_t)bytes);
+		dhcp_packet(ifp, buf, (size_t)bytes, bpf->bpf_flags);
 		/* Check we still have a state after processing. */
 		if ((state = D_STATE(ifp)) == NULL)
 			break;
+		if ((bpf = state->bpf) == NULL)
+			break;
 	}
-	if (state != NULL)
-		state->bpf_flags &= ~BPF_READING;
 }
 
 void
@@ -3557,7 +3571,7 @@ dhcp_recvmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg)
 		return;
 	}
 
-	if (state->bpf_fd != -1) {
+	if (state->bpf != NULL) {
 		/* Avoid a duplicate read if BPF is open for the interface. */
 		return;
 	}
@@ -3610,9 +3624,9 @@ dhcp_readudp(struct dhcpcd_ctx *ctx, struct interface *ifp)
 
 	if (ifp != NULL) {
 		state = D_CSTATE(ifp);
-		s = state->udp_fd;
+		s = state->udp_rfd;
 	} else
-		s = ctx->udp_fd;
+		s = ctx->udp_rfd;
 
 	bytes = recvmsg(s, &msg, 0);
 	if (bytes == -1) {
@@ -3657,11 +3671,11 @@ dhcp_openbpf(struct interface *ifp)
 	}
 #endif
 
-	if (state->bpf_fd != -1)
+	if (state->bpf != NULL)
 		return 0;
 
-	state->bpf_fd = bpf_open(ifp, bpf_bootp);
-	if (state->bpf_fd == -1) {
+	state->bpf = bpf_open(ifp, bpf_bootp, NULL);
+	if (state->bpf == NULL) {
 		if (errno == ENOENT) {
 			logerrx("%s not found", bpf_name);
 			/* May as well disable IPv4 entirely at
@@ -3673,7 +3687,7 @@ dhcp_openbpf(struct interface *ifp)
 	}
 
 	eloop_event_add(ifp->ctx->eloop,
-	    state->bpf_fd, dhcp_readbpf, ifp);
+	    state->bpf->bpf_fd, dhcp_readbpf, ifp);
 	return 0;
 }
 
@@ -3707,10 +3721,14 @@ dhcp_free(struct interface *ifp)
 		}
 	}
 	if (ifp == NULL) {
-		if (ctx->udp_fd != -1) {
-			eloop_event_delete(ctx->eloop, ctx->udp_fd);
-			close(ctx->udp_fd);
-			ctx->udp_fd = -1;
+		if (ctx->udp_rfd != -1) {
+			eloop_event_delete(ctx->eloop, ctx->udp_rfd);
+			close(ctx->udp_rfd);
+			ctx->udp_rfd = -1;
+		}
+		if (ctx->udp_wfd != -1) {
+			close(ctx->udp_wfd);
+			ctx->udp_wfd = -1;
 		}
 
 		free(ctx->opt_buffer);
@@ -3734,8 +3752,7 @@ dhcp_initstate(struct interface *ifp)
 
 	state->state = DHS_NONE;
 	/* 0 is a valid fd, so init to -1 */
-	state->bpf_fd = -1;
-	state->udp_fd = -1;
+	state->udp_rfd = -1;
 #ifdef ARPING
 	state->arping_index = -1;
 #endif
@@ -3849,14 +3866,21 @@ dhcp_start1(void *arg)
 	 * Only do this in master mode so we don't swallow messages
 	 * for dhcpcd running on another interface. */
 	if ((ctx->options & (DHCPCD_MASTER|DHCPCD_PRIVSEP)) == DHCPCD_MASTER
-	    && ctx->udp_fd == -1)
+	    && ctx->udp_rfd == -1)
 	{
-		ctx->udp_fd = dhcp_openudp(NULL);
-		if (ctx->udp_fd == -1) {
+		ctx->udp_rfd = dhcp_openudp(NULL);
+		if (ctx->udp_rfd == -1) {
 			logerr(__func__);
 			return;
 		}
-		eloop_event_add(ctx->eloop, ctx->udp_fd, dhcp_handleudp, ctx);
+		eloop_event_add(ctx->eloop, ctx->udp_rfd, dhcp_handleudp, ctx);
+	}
+	if (!IN_PRIVSEP(ctx) && ctx->udp_wfd == -1) {
+		ctx->udp_wfd = xsocket(PF_INET, SOCK_RAW|SOCK_CXNB,IPPROTO_UDP);
+		if (ctx->udp_wfd == -1) {
+			logerr(__func__);
+			return;
+		}
 	}
 
 	if (dhcp_init(ifp) == -1) {
@@ -3873,11 +3897,7 @@ dhcp_start1(void *arg)
 
 #ifdef ARPING
 	if (ifo->arping_len && state->arping_index < ifo->arping_len) {
-		struct arp_state *astate;
-
-		astate = dhcp_arp_new(ifp, NULL);
-		if (astate)
-			dhcp_arp_not_found(astate);
+		dhcp_arping(ifp);
 		return;
 	}
 #endif

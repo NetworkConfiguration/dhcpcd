@@ -41,6 +41,7 @@
 #define RATE_LIMIT_INTERVAL	60
 #define DEFEND_INTERVAL		10
 
+#include "bpf.h"
 #include "dhcpcd.h"
 #include "if.h"
 
@@ -66,24 +67,22 @@ struct arp_msg {
 struct arp_state {
 	TAILQ_ENTRY(arp_state) next;
 	struct interface *iface;
+	struct in_addr addr;
+	struct bpf *bpf;
+
+	int probes;
+	int claims;
+	struct timespec defend;
 
 	void (*found_cb)(struct arp_state *, const struct arp_msg *);
 	void (*not_found_cb)(struct arp_state *);
 	void (*announced_cb)(struct arp_state *);
 	void (*defend_failed_cb)(struct arp_state *);
 	void (*free_cb)(struct arp_state *);
-
-	struct in_addr addr;
-	int probes;
-	int claims;
-	struct timespec defend;
 };
 TAILQ_HEAD(arp_statehead, arp_state);
 
 struct iarp_state {
-	struct interface *ifp;
-	int bpf_fd;
-	unsigned int bpf_flags;
 	struct arp_statehead arp_states;
 };
 
@@ -93,7 +92,7 @@ struct iarp_state {
 	((const struct iarp_state *)(ifp)->if_data[IF_DATA_ARP])
 
 #ifdef ARP
-void arp_packet(struct interface *, uint8_t *, size_t);
+void arp_packet(struct interface *, uint8_t *, size_t, uint8_t);
 struct arp_state *arp_new(struct interface *, const struct in_addr *);
 void arp_probe(struct arp_state *);
 void arp_announce(struct arp_state *);

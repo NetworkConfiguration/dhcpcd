@@ -322,6 +322,7 @@ ps_start(struct dhcpcd_ctx *ctx)
 
 	switch (pid = ps_root_start(ctx)) {
 	case -1:
+		logerr("ps_root_start");
 		return -1;
 	case 0:
 		return 0;
@@ -378,14 +379,6 @@ ps_stop(struct dhcpcd_ctx *ctx)
 void
 ps_freeprocess(struct ps_process *psp)
 {
-#ifdef INET
-	struct ipv4_state *istate = IPV4_STATE(&psp->psp_ifp);
-
-	if (istate != NULL) {
-		free(istate->buffer);
-		free(istate);
-	}
-#endif
 
 	TAILQ_REMOVE(&psp->psp_ctx->ps_processes, psp, next);
 	if (psp->psp_fd != -1) {
@@ -396,6 +389,10 @@ ps_freeprocess(struct ps_process *psp)
 		eloop_event_delete(psp->psp_ctx->eloop, psp->psp_work_fd);
 		close(psp->psp_work_fd);
 	}
+#ifdef INET
+	if (psp->psp_bpf != NULL)
+		bpf_close(psp->psp_bpf);
+#endif
 	free(psp);
 }
 
@@ -460,21 +457,20 @@ ssize_t
 ps_sendpsmmsg(struct dhcpcd_ctx *ctx, int fd,
     struct ps_msghdr *psm, const struct msghdr *msg)
 {
-	assert(msg == NULL || msg->msg_iovlen == 1);
-
 	struct iovec iov[] = {
 		{ .iov_base = UNCONST(psm), .iov_len = sizeof(*psm) },
 		{ .iov_base = NULL, },	/* name */
 		{ .iov_base = NULL, },	/* control */
-		{ .iov_base = NULL, },	/* payload */
+		{ .iov_base = NULL, },	/* payload 1 */
+		{ .iov_base = NULL, },	/* payload 2 */
+		{ .iov_base = NULL, },	/* payload 3 */
 	};
-	int iovlen = __arraycount(iov);
+	int iovlen;
 	ssize_t len;
 
 	if (msg != NULL) {
 		struct iovec *iovp = &iov[1];
-
-		assert(msg->msg_iovlen == 1);
+		size_t i;
 
 		psm->ps_namelen = msg->msg_namelen;
 		psm->ps_controllen = (socklen_t)msg->msg_controllen;
@@ -484,10 +480,18 @@ ps_sendpsmmsg(struct dhcpcd_ctx *ctx, int fd,
 		iovp++;
 		iovp->iov_base = msg->msg_control;
 		iovp->iov_len = msg->msg_controllen;
-		iovp++;
-		iovp->iov_base = msg->msg_iov[0].iov_base;
-		iovp->iov_len = msg->msg_iov[0].iov_len;
-		iovlen = __arraycount(iov);
+		iovlen = 3;
+
+		for (i = 0; i < (size_t)msg->msg_iovlen; i++) {
+			if ((size_t)iovlen + i > __arraycount(iov)) {
+				errno =	ENOBUFS;
+				return -1;
+			}
+			iovp++;
+			iovp->iov_base = msg->msg_iov[i].iov_base;
+			iovp->iov_len = msg->msg_iov[i].iov_len;
+		}
+		iovlen += i;
 	} else
 		iovlen = 1;
 
@@ -519,15 +523,16 @@ ssize_t
 ps_sendmsg(struct dhcpcd_ctx *ctx, int fd, uint16_t cmd, unsigned long flags,
     const struct msghdr *msg)
 {
-	assert(msg->msg_iovlen == 1);
-
 	struct ps_msghdr psm = {
 		.ps_cmd = cmd,
 		.ps_flags = flags,
 		.ps_namelen = msg->msg_namelen,
 		.ps_controllen = (socklen_t)msg->msg_controllen,
-		.ps_datalen = msg->msg_iov[0].iov_len,
 	};
+	size_t i;
+
+	for (i = 0; i < (size_t)msg->msg_iovlen; i++)
+		psm.ps_datalen += msg->msg_iov[i].iov_len;
 
 #if 0	/* For debugging structure padding. */
 	logerrx("psa.family %lu %zu", offsetof(struct ps_addr, psa_family), sizeof(psm.ps_id.psi_addr.psa_family));
@@ -698,6 +703,9 @@ ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd,
 
 	if (ps_unrollmsg(&msg, &psm.psm_hdr, psm.psm_data, dlen) == -1)
 		return -1;
+
+	if (callback == NULL)
+		return 0;
 
 	errno = 0;
 	return callback(cbctx, &psm.psm_hdr, &msg);

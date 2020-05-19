@@ -62,26 +62,28 @@ static void
 ps_bpf_recvbpf(void *arg)
 {
 	struct ps_process *psp = arg;
-	unsigned int flags;
-	uint8_t buf[FRAMELEN_MAX];
+	struct bpf *bpf = psp->psp_bpf;
+	uint8_t buf[sizeof(bpf->bpf_flags) + FRAMELEN_MAX];
 	ssize_t len;
 	struct ps_msghdr psm = {
 		.ps_id = psp->psp_id,
 		.ps_cmd = psp->psp_id.psi_cmd,
 	};
 
+	bpf->bpf_flags &= ~BPF_EOF;
 	/* A BPF read can read more than one filtered packet at time.
 	 * This mechanism allows us to read each packet from the buffer. */
-	flags = 0;
-	while (!(flags & BPF_EOF)) {
-		len = bpf_read(&psp->psp_ifp, psp->psp_work_fd,
-		    buf, sizeof(buf), &flags);
+	while (!(bpf->bpf_flags & BPF_EOF)) {
+		len = bpf_read(bpf,
+		    buf + sizeof(bpf->bpf_flags),
+		    sizeof(buf) - sizeof(bpf->bpf_flags));
 		if (len == -1)
 			logerr(__func__);
 		if (len == -1 || len == 0)
 			break;
+		memcpy(buf, &bpf->bpf_flags, sizeof(bpf->bpf_flags));
 		len = ps_sendpsmdata(psp->psp_ctx, psp->psp_ctx->ps_data_fd,
-		    &psm, buf, (size_t)len);
+		    &psm, buf, (size_t)len + sizeof(bpf->bpf_flags));
 		if (len == -1 && errno != ECONNRESET)
 			logerr(__func__);
 		if (len == -1 || len == 0)
@@ -89,61 +91,13 @@ ps_bpf_recvbpf(void *arg)
 	}
 }
 
-#ifdef ARP
-#if !defined(HAVE_CAPSICUM) && !defined(HAVE_PLEDGE)
 static ssize_t
-ps_bpf_arp_addr(uint16_t cmd, struct ps_process *psp, struct msghdr *msg)
-{
-	struct interface *ifp = &psp->psp_ifp;
-	struct iovec *iov = msg->msg_iov;
-	struct in_addr addr;
-	struct arp_state *astate;
-
-	if (psp == NULL) {
-		errno = ESRCH;
-		return -1;
-	}
-
-	assert(msg->msg_iovlen == 1);
-	assert(iov->iov_len == sizeof(addr));
-	memcpy(&addr, iov->iov_base, sizeof(addr));
-	if (cmd & PS_START) {
-		astate = arp_new(ifp, &addr);
-		if (astate == NULL)
-			return -1;
-	} else if (cmd & PS_DELETE) {
-		astate = arp_find(ifp, &addr);
-		if (astate == NULL) {
-			errno = ESRCH;
-			return -1;
-		}
-		arp_free(astate);
-	} else {
-		errno = EINVAL;
-		return -1;
-	}
-
-	return bpf_arp(ifp, psp->psp_work_fd);
-}
-#endif
-#endif
-
-static ssize_t
-ps_bpf_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
+ps_bpf_recvmsgcb(void *arg, __unused struct ps_msghdr *psm, struct msghdr *msg)
 {
 	struct ps_process *psp = arg;
 	struct iovec *iov = msg->msg_iov;
 
-#ifdef ARP
-	if (psm->ps_cmd & (PS_START | PS_DELETE))
-#if !defined(HAVE_CAPSICUM) && !defined(HAVE_PLEDGE)
-		return ps_bpf_arp_addr(psm->ps_cmd, psp, msg);
-#else
-		return 0;
-#endif
-#endif
-
-	return bpf_send(&psp->psp_ifp, psp->psp_work_fd, psp->psp_proto,
+	return bpf_send(psp->psp_bpf, psp->psp_proto,
 	    iov->iov_base, iov->iov_len);
 }
 
@@ -162,6 +116,8 @@ ps_bpf_start_bpf(void *arg)
 {
 	struct ps_process *psp = arg;
 	struct dhcpcd_ctx *ctx = psp->psp_ctx;
+	char *addr;
+	struct in_addr *ia = &psp->psp_id.psi_addr.psa_in_addr;
 #ifdef HAVE_CAPSICUM
 	cap_rights_t rights;
 
@@ -170,23 +126,30 @@ ps_bpf_start_bpf(void *arg)
 	cap_rights_init(&rights, CAP_READ, CAP_WRITE, CAP_EVENT, CAP_IOCTL);
 #endif
 
-	setproctitle("[BPF %s] %s", psp->psp_protostr, psp->psp_ifname);
-
+	if (ia->s_addr == INADDR_ANY) {
+		ia = NULL;
+		addr = NULL;
+	} else
+		addr = inet_ntoa(*ia);
+	setproctitle("[BPF %s] %s%s%s", psp->psp_protostr, psp->psp_ifname,
+	    addr != NULL ? " " : "", addr != NULL ? addr : "");
 	ps_freeprocesses(ctx, psp);
 
-	psp->psp_work_fd = bpf_open(&psp->psp_ifp, psp->psp_filter);
-	if (psp->psp_work_fd == -1)
+	psp->psp_bpf = bpf_open(&psp->psp_ifp, psp->psp_filter, ia);
+	if (psp->psp_bpf == NULL)
 		logerr("%s: bpf_open",__func__);
 #ifdef HAVE_CAPSICUM
-	else if (cap_rights_limit(psp->psp_work_fd, &rights) == -1 &&
+	else if (cap_rights_limit(psp->psp_bpf->bpf_fd, &rights) == -1 &&
 	    errno != ENOSYS)
 		logerr("%s: cap_rights_limit", __func__);
 #endif
 	else if (eloop_event_add(ctx->eloop,
-	    psp->psp_work_fd, ps_bpf_recvbpf, psp) == -1)
+	    psp->psp_bpf->bpf_fd, ps_bpf_recvbpf, psp) == -1)
 		logerr("%s: eloop_event_add", __func__);
-	else
+	else {
+		psp->psp_work_fd = psp->psp_bpf->bpf_fd;
 		return 0;
+	}
 
 	eloop_exit(ctx->eloop, EXIT_FAILURE);
 	return -1;
@@ -306,17 +269,24 @@ ps_bpf_dispatch(struct dhcpcd_ctx *ctx,
 {
 	struct iovec *iov = msg->msg_iov;
 	struct interface *ifp;
+	uint8_t bpf_flags, *bpf;
+	size_t bpf_len;
 
 	ifp = if_findindex(ctx->ifaces, psm->ps_id.psi_ifindex);
+	bpf = iov->iov_base;
+	bpf_len = iov->iov_len;
+	memcpy(&bpf_flags, bpf, sizeof(bpf_flags));
+	bpf += sizeof(bpf_flags);
+	bpf_len -= sizeof(bpf_flags);
 
 	switch (psm->ps_cmd) {
 #ifdef ARP
 	case PS_BPF_ARP:
-		arp_packet(ifp, iov->iov_base, iov->iov_len);
+		arp_packet(ifp, bpf, bpf_len, bpf_flags);
 		break;
 #endif
 	case PS_BPF_BOOTP:
-		dhcp_packet(ifp, iov->iov_base, iov->iov_len);
+		dhcp_packet(ifp, bpf, bpf_len, bpf_flags);
 		break;
 	default:
 		errno = ENOTSUP;
@@ -327,59 +297,48 @@ ps_bpf_dispatch(struct dhcpcd_ctx *ctx,
 }
 
 static ssize_t
-ps_bpf_send(const struct interface *ifp, uint16_t cmd,
-    const void *data, size_t len)
+ps_bpf_send(const struct interface *ifp, const struct in_addr *ia,
+    uint16_t cmd, const void *data, size_t len)
 {
 	struct dhcpcd_ctx *ctx = ifp->ctx;
 	struct ps_msghdr psm = {
 		.ps_cmd = cmd,
 		.ps_id = {
 			.psi_ifindex = ifp->index,
-			.psi_cmd = (uint8_t)(cmd &
-			    ~(PS_START | PS_STOP | PS_DELETE)),
+			.psi_cmd = (uint8_t)(cmd & ~(PS_START | PS_STOP)),
 		},
 	};
 
-	if (psm.ps_id.psi_cmd == PS_BPF_ARP_ADDR)
-		psm.ps_id.psi_cmd = PS_BPF_ARP;
+	if (ia != NULL)
+		psm.ps_id.psi_addr.psa_in_addr = *ia;
 
 	return ps_sendpsmdata(ctx, ctx->ps_root_fd, &psm, data, len);
 }
 
 #ifdef ARP
 ssize_t
-ps_bpf_openarp(const struct interface *ifp)
+ps_bpf_openarp(const struct interface *ifp, const struct in_addr *ia)
 {
 
-	return ps_bpf_send(ifp, PS_BPF_ARP | PS_START, ifp, sizeof(*ifp));
+	assert(ia != NULL);
+	return ps_bpf_send(ifp, ia, PS_BPF_ARP | PS_START,
+	    ifp, sizeof(*ifp));
 }
 
 ssize_t
-ps_bpf_addaddr(const struct interface *ifp, const struct in_addr *addr)
+ps_bpf_closearp(const struct interface *ifp, const struct in_addr *ia)
 {
 
-	return ps_bpf_send(ifp, PS_BPF_ARP_ADDR | PS_START, addr, sizeof(*addr));
+	return ps_bpf_send(ifp, ia, PS_BPF_ARP | PS_STOP, NULL, 0);
 }
 
 ssize_t
-ps_bpf_deladdr(const struct interface *ifp, const struct in_addr *addr)
+ps_bpf_sendarp(const struct interface *ifp, const struct in_addr *ia,
+    const void *data, size_t len)
 {
 
-	return ps_bpf_send(ifp, PS_BPF_ARP_ADDR | PS_DELETE, addr, sizeof(*addr));
-}
-
-ssize_t
-ps_bpf_closearp(const struct interface *ifp)
-{
-
-	return ps_bpf_send(ifp, PS_BPF_ARP | PS_STOP, NULL, 0);
-}
-
-ssize_t
-ps_bpf_sendarp(const struct interface *ifp, const void *data, size_t len)
-{
-
-	return ps_bpf_send(ifp, PS_BPF_ARP, data, len);
+	assert(ia != NULL);
+	return ps_bpf_send(ifp, ia, PS_BPF_ARP, data, len);
 }
 #endif
 
@@ -387,19 +346,20 @@ ssize_t
 ps_bpf_openbootp(const struct interface *ifp)
 {
 
-	return ps_bpf_send(ifp, PS_BPF_BOOTP | PS_START, ifp, sizeof(*ifp));
+	return ps_bpf_send(ifp, NULL, PS_BPF_BOOTP | PS_START,
+	    ifp, sizeof(*ifp));
 }
 
 ssize_t
 ps_bpf_closebootp(const struct interface *ifp)
 {
 
-	return ps_bpf_send(ifp, PS_BPF_BOOTP | PS_STOP, NULL, 0);
+	return ps_bpf_send(ifp, NULL, PS_BPF_BOOTP | PS_STOP, NULL, 0);
 }
 
 ssize_t
 ps_bpf_sendbootp(const struct interface *ifp, const void *data, size_t len)
 {
 
-	return ps_bpf_send(ifp, PS_BPF_BOOTP, data, len);
+	return ps_bpf_send(ifp, NULL, PS_BPF_BOOTP, data, len);
 }

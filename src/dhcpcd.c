@@ -71,6 +71,9 @@ const char dhcpcd_copyright[] = "Copyright (c) 2006-2020 Roy Marples";
 #include "privsep.h"
 #include "script.h"
 
+#ifdef HAVE_CAPSICUM
+#include <sys/capsicum.h>
+#endif
 #ifdef HAVE_UTIL_H
 #include <util.h>
 #endif
@@ -379,6 +382,7 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 static void
 dhcpcd_drop(struct interface *ifp, int stop)
 {
+	return;
 
 #ifdef DHCP6
 	dhcp6_drop(ifp, stop ? NULL : "EXPIRE6");
@@ -1844,13 +1848,15 @@ main(int argc, char **argv)
 	ctx.dev_fd = -1;
 #endif
 #ifdef INET
-	ctx.udp_fd = -1;
+	ctx.udp_rfd = -1;
+	ctx.udp_wfd = -1;
 #endif
 #if defined(INET6) && !defined(__sun)
 	ctx.nd_fd = -1;
 #endif
 #ifdef DHCP6
-	ctx.dhcp6_fd = -1;
+	ctx.dhcp6_rfd = -1;
+	ctx.dhcp6_wfd = -1;
 #endif
 #ifdef PRIVSEP
 	ctx.ps_root_fd = ctx.ps_data_fd = -1;

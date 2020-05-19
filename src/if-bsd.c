@@ -168,11 +168,15 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 	priv->pf_inet6_fd = -1;
 #endif
 
-#define SOCK_FLAGS	(SOCK_CLOEXEC | SOCK_NONBLOCK)
-	ctx->link_fd = xsocket(PF_ROUTE, SOCK_RAW | SOCK_FLAGS, AF_UNSPEC);
-#undef SOCK_FLAGS
+	ctx->link_fd = xsocket(PF_ROUTE, SOCK_RAW | SOCK_CXNB, AF_UNSPEC);
 	if (ctx->link_fd == -1)
 		return -1;
+
+#ifdef SO_RERROR
+	n = 1;
+	if (setsockopt(ctx->link_fd, SOL_SOCKET, SO_RERROR, &n,sizeof(n)) == -1)
+		goto errexit;
+#endif
 
 	/* Ignore our own route(4) messages.
 	 * Sadly there is no way of doing this for route(4) messages

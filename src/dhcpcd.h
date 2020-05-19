@@ -206,7 +206,8 @@ struct dhcpcd_ctx {
 	struct dhcp_opt *dhcp_opts;
 	size_t dhcp_opts_len;
 
-	int udp_fd;
+	int udp_rfd;
+	int udp_wfd;
 
 	/* Our aggregate option buffer.
 	 * We ONLY use this when options are split, which for most purposes is
@@ -223,11 +224,11 @@ struct dhcpcd_ctx {
 #endif
 	struct ra_head *ra_routers;
 
-	int dhcp6_fd;
-
 	struct dhcp_opt *nd_opts;
 	size_t nd_opts_len;
 #ifdef DHCP6
+	int dhcp6_rfd;
+	int dhcp6_wfd;
 	struct dhcp_opt *dhcp6_opts;
 	size_t dhcp6_opts_len;
 #endif
