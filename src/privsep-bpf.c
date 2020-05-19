@@ -171,7 +171,6 @@ ps_bpf_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg)
 	pid_t start;
 	struct iovec *iov = msg->msg_iov;
 	struct interface *ifp;
-	struct ipv4_state *istate;
 
 	cmd = (uint16_t)(psm->ps_cmd & ~(PS_START | PS_STOP));
 	psp = ps_findprocess(ctx, &psm->ps_id);
@@ -211,11 +210,6 @@ ps_bpf_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg)
 	ifp->ctx = psp->psp_ctx;
 	ifp->options = NULL;
 	memset(ifp->if_data, 0, sizeof(ifp->if_data));
-
-	if ((istate = ipv4_getstate(ifp)) == NULL) {
-		ps_freeprocess(psp);
-		return -1;
-	}
 
 	memcpy(psp->psp_ifname, ifp->name, sizeof(psp->psp_ifname));
 
