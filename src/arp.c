@@ -222,7 +222,8 @@ arp_validate(const struct interface *ifp, struct arphdr *arp)
 }
 
 void
-arp_packet(struct interface *ifp, uint8_t *data, size_t len, uint8_t bpf_flags)
+arp_packet(struct interface *ifp, uint8_t *data, size_t len,
+    unsigned int bpf_flags)
 {
 	size_t fl = bpf_frame_header_len(ifp), falen;
 	const struct interface *ifn;

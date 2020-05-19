@@ -29,9 +29,9 @@
 #ifndef BPF_HEADER
 #define BPF_HEADER
 
-#define	BPF_EOF			0x01
-#define	BPF_PARTIALCSUM		0x02
-#define	BPF_BCAST		0x04
+#define	BPF_EOF			0x01U
+#define	BPF_PARTIALCSUM		0x02U
+#define	BPF_BCAST		0x04U
 
 /*
  * Even though we program the BPF filter should we trust it?
@@ -57,7 +57,7 @@
 struct bpf {
 	const struct interface *bpf_ifp;
 	int bpf_fd;
-	uint8_t bpf_flags;
+	unsigned int bpf_flags;
 	void *bpf_buffer;
 	size_t bpf_size;
 	size_t bpf_len;

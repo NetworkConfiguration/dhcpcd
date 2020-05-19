@@ -1214,7 +1214,7 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 	struct udphdr udp = {
 	    .uh_sport = htons(DHCP6_CLIENT_PORT),
 	    .uh_dport = htons(DHCP6_SERVER_PORT),
-	    .uh_ulen = htons(sizeof(udp) + state->send_len),
+	    .uh_ulen = htons((uint16_t)(sizeof(udp) + state->send_len)),
 	};
 	struct iovec iov[] = {
 	    { .iov_base = &udp, .iov_len = sizeof(udp), },

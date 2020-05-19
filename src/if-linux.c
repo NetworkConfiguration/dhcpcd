@@ -1587,11 +1587,12 @@ if_initrt(struct dhcpcd_ctx *ctx, rb_tree_t *kroutes, int af)
 const char *bpf_name = "Packet Socket";
 
 /* Linux is a special snowflake for opening BPF. */
-int
-bpf_open(struct interface *ifp, int (*filter)(struct interface *, int))
+struct bpf *
+bpf_open(const struct interface *ifp,
+    int (*filter)(const struct bpf *, const struct in_addr *),
+    const struct in_addr *ia)
 {
-	struct ipv4_state *state;
-	int s;
+	struct bpf *bpf;
 	union sockunion {
 		struct sockaddr sa;
 		struct sockaddr_ll sll;
@@ -1605,38 +1606,34 @@ bpf_open(struct interface *ifp, int (*filter)(struct interface *, int))
 	int n;
 #endif
 
+	bpf = calloc(1, sizeof(*bpf));
+	if (bpf == NULL)
+		return NULL;
+	bpf->bpf_ifp = ifp;
+
 	/* Allocate a suitably large buffer for a single packet. */
-	state = ipv4_getstate(ifp);
-	if (state == NULL)
-		return -1;
-	if (state->buffer_size < ETH_DATA_LEN) {
-		void *nb;
+	bpf->bpf_size = ETH_DATA_LEN;
+	bpf->bpf_buffer = malloc(bpf->bpf_size);
+	if (bpf->bpf_buffer == NULL)
+		goto eexit;
 
-		if ((nb = realloc(state->buffer, ETH_DATA_LEN)) == NULL)
-			return -1;
-		state->buffer = nb;
-		state->buffer_size = ETH_DATA_LEN;
-		state->buffer_len = state->buffer_pos = 0;
-	}
-
-
-#define SF	SOCK_CLOEXEC | SOCK_NONBLOCK
-	if ((s = xsocket(PF_PACKET, SOCK_RAW | SF, htons(ETH_P_ALL))) == -1)
-		return -1;
-#undef SF
+	bpf->bpf_fd = xsocket(PF_PACKET, SOCK_RAW|SOCK_CXNB,htons(ETH_P_ALL));
+	if (bpf->bpf_fd == -1)
+		goto eexit;
 
 	/* We cannot validate the correct interface,
 	 * so we MUST set this first. */
-	if (bind(s, &su.sa, sizeof(su.sll)) == -1)
+	if (bind(bpf->bpf_fd, &su.sa, sizeof(su.sll)) == -1)
 		goto eexit;
 
-	if (filter(ifp, s) != 0)
+	if (filter(bpf, ia) != 0)
 		goto eexit;
 
 	/* In the ideal world, this would be set before the bind and filter. */
 #ifdef PACKET_AUXDATA
 	n = 1;
-	if (setsockopt(s, SOL_PACKET, PACKET_AUXDATA, &n, sizeof(n)) != 0) {
+	if (setsockopt(bpf->bpf_fd, SOL_PACKET, PACKET_AUXDATA,
+	    &n, sizeof(n)) != 0) {
 		if (errno != ENOPROTOOPT)
 			goto eexit;
 	}
@@ -1651,25 +1648,25 @@ bpf_open(struct interface *ifp, int (*filter)(struct interface *, int))
 	 * Or to put it another way, don't trust the Linux BPF filter.
 	*/
 
-	return s;
+	return bpf;
 
 eexit:
-	close(s);
-	return -1;
+	if (bpf->bpf_fd != -1)
+		close(bpf->bpf_fd);
+	free(bpf->bpf_buffer);
+	free(bpf);
+	return NULL;
 }
 
 /* BPF requires that we read the entire buffer.
  * So we pass the buffer in the API so we can loop on >1 packet. */
 ssize_t
-bpf_read(struct interface *ifp, int s, void *data, size_t len,
-    unsigned int *flags)
+bpf_read(struct bpf *bpf, void *data, size_t len)
 {
 	ssize_t bytes;
-	struct ipv4_state *state = IPV4_STATE(ifp);
-
 	struct iovec iov = {
-		.iov_base = state->buffer,
-		.iov_len = state->buffer_size
+		.iov_base = bpf->bpf_buffer,
+		.iov_len = bpf->bpf_size,
 	};
 	struct msghdr msg = { .msg_iov = &iov, .msg_iovlen = 1 };
 #ifdef PACKET_AUXDATA
@@ -1686,19 +1683,19 @@ bpf_read(struct interface *ifp, int s, void *data, size_t len,
 	msg.msg_controllen = sizeof(cmsgbuf.buf);
 #endif
 
-	bytes = recvmsg(s, &msg, 0);
+	bytes = recvmsg(bpf->bpf_fd, &msg, 0);
 	if (bytes == -1)
 		return -1;
-	*flags |= BPF_EOF; /* We only ever read one packet. */
-	*flags &= ~BPF_PARTIALCSUM;
+	bpf->bpf_flags |= BPF_EOF; /* We only ever read one packet. */
+	bpf->bpf_flags &= ~BPF_PARTIALCSUM;
 	if (bytes) {
-		if (bpf_frame_bcast(ifp, state->buffer) == 0)
-			*flags |= BPF_BCAST;
+		if (bpf_frame_bcast(bpf->bpf_ifp, bpf->bpf_buffer) == 0)
+			bpf->bpf_flags |= BPF_BCAST;
 		else
-			*flags &= ~BPF_BCAST;
+			bpf->bpf_flags &= ~BPF_BCAST;
 		if ((size_t)bytes > len)
 			bytes = (ssize_t)len;
-		memcpy(data, state->buffer, (size_t)bytes);
+		memcpy(data, bpf->bpf_buffer, (size_t)bytes);
 #ifdef PACKET_AUXDATA
 		for (cmsg = CMSG_FIRSTHDR(&msg);
 		     cmsg;
@@ -1708,7 +1705,7 @@ bpf_read(struct interface *ifp, int s, void *data, size_t len,
 			    cmsg->cmsg_type == PACKET_AUXDATA) {
 				aux = (void *)CMSG_DATA(cmsg);
 				if (aux->tp_status & TP_STATUS_CSUMNOTREADY)
-					*flags |= BPF_PARTIALCSUM;
+					bpf->bpf_flags |= BPF_PARTIALCSUM;
 			}
 		}
 #endif

@@ -1676,7 +1676,7 @@ dhcp_sendudp(struct interface *ifp, struct in_addr *to, void *data, size_t len)
 	struct udphdr udp = {
 	    .uh_sport = htons(BOOTPC),
 	    .uh_dport = htons(BOOTPS),
-	    .uh_ulen = htons(sizeof(udp) + len),
+	    .uh_ulen = htons((uint16_t)(sizeof(udp) + len)),
 	};
 	struct iovec iov[] = {
 	    { .iov_base = &udp, .iov_len = sizeof(udp), },
@@ -3462,7 +3462,8 @@ dhcp_handlebootp(struct interface *ifp, struct bootp *bootp, size_t len,
 }
 
 void
-dhcp_packet(struct interface *ifp, uint8_t *data, size_t len, uint8_t bpf_flags)
+dhcp_packet(struct interface *ifp, uint8_t *data, size_t len,
+    unsigned int bpf_flags)
 {
 	struct bootp *bootp;
 	struct in_addr from;
