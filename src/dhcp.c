@@ -1443,7 +1443,6 @@ get_lease(struct interface *ifp,
 	if (get_option_uint32(ctx, &lease->renewaltime,
 	    bootp, len, DHO_RENEWALTIME) != 0)
 		lease->renewaltime = 0;
-	lease->renewaltime = 5;
 	if (get_option_uint32(ctx, &lease->rebindtime,
 	    bootp, len, DHO_REBINDTIME) != 0)
 		lease->rebindtime = 0;
