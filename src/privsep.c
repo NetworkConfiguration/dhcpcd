@@ -470,7 +470,7 @@ ps_sendpsmmsg(struct dhcpcd_ctx *ctx, int fd,
 
 	if (msg != NULL) {
 		struct iovec *iovp = &iov[1];
-		size_t i;
+		int i;
 
 		psm->ps_namelen = msg->msg_namelen;
 		psm->ps_controllen = (socklen_t)msg->msg_controllen;
@@ -482,8 +482,8 @@ ps_sendpsmmsg(struct dhcpcd_ctx *ctx, int fd,
 		iovp->iov_len = msg->msg_controllen;
 		iovlen = 3;
 
-		for (i = 0; i < (size_t)msg->msg_iovlen; i++) {
-			if ((size_t)iovlen + i > __arraycount(iov)) {
+		for (i = 0; i < (int)msg->msg_iovlen; i++) {
+			if ((size_t)(iovlen + i) > __arraycount(iov)) {
 				errno =	ENOBUFS;
 				return -1;
 			}

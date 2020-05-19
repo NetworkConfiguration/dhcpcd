@@ -269,8 +269,9 @@ ps_bpf_dispatch(struct dhcpcd_ctx *ctx,
 {
 	struct iovec *iov = msg->msg_iov;
 	struct interface *ifp;
-	uint8_t bpf_flags, *bpf;
+	uint8_t *bpf;
 	size_t bpf_len;
+	unsigned int bpf_flags;
 
 	ifp = if_findindex(ctx->ifaces, psm->ps_id.psi_ifindex);
 	bpf = iov->iov_base;
