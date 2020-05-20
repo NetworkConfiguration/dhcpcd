@@ -478,25 +478,26 @@ arp_announce(struct arp_state *astate)
 	arp_announce1(astate);
 }
 
-void
+struct arp_state *
 arp_ifannounceaddr(struct interface *ifp, const struct in_addr *ia)
 {
 	struct arp_state *astate;
 
 	if (ifp->flags & IFF_NOARP)
-		return;
+		return NULL;
 
 	astate = arp_find(ifp, ia);
 	if (astate == NULL) {
 		astate = arp_new(ifp, ia);
 		if (astate == NULL)
-			return;
+			return NULL;
 		astate->announced_cb = arp_free;
 	}
 	arp_announce(astate);
+	return astate;
 }
 
-void
+struct arp_state *
 arp_announceaddr(struct dhcpcd_ctx *ctx, const struct in_addr *ia)
 {
 	struct interface *ifp, *iff = NULL;
@@ -517,9 +518,9 @@ arp_announceaddr(struct dhcpcd_ctx *ctx, const struct in_addr *ia)
 		iff = ifp;
 	}
 	if (iff == NULL)
-		return;
+		return NULL;
 
-	arp_ifannounceaddr(iff, ia);
+	return arp_ifannounceaddr(iff, ia);
 }
 
 struct arp_state *
