@@ -747,8 +747,6 @@ ipv4_applyaddr(void *arg)
 				/* Announce the preferred address to
 				 * kick ARP caches. */
 				arp_announceaddr(ifp->ctx,&lease->addr);
-				if (ifp->ctx->options & DHCPCD_FORKED)
-					return;
 #endif
 			}
 			script_runreason(ifp, state->reason);
@@ -811,8 +809,6 @@ ipv4_applyaddr(void *arg)
 
 #ifdef ARP
 	arp_announceaddr(ifp->ctx, &state->addr->addr);
-	if (ifp->ctx->options & DHCPCD_FORKED)
-		return;
 #endif
 
 	if (state->state == DHS_BOUND) {

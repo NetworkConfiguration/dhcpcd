@@ -1238,11 +1238,8 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 			}
 #endif
 
-			if (ia->dadcallback) {
+			if (ia->dadcallback)
 				ia->dadcallback(ia);
-				if (ctx->options & DHCPCD_FORKED)
-					goto out;
-			}
 
 			if (IN6_IS_ADDR_LINKLOCAL(&ia->addr) &&
 			    !(ia->addr_flags & IN6_IFF_NOTUSEABLE))
@@ -1257,8 +1254,6 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 					    cb, next);
 					cb->callback(cb->arg);
 					free(cb);
-					if (ctx->options & DHCPCD_FORKED)
-						goto out;
 				}
 			}
 		}
@@ -1274,7 +1269,6 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 	dhcp6_handleifa(cmd, ia, pid);
 #endif
 
-out:
 	/* Done with the ia now, so free it. */
 	if (cmd == RTM_DELADDR)
 		ipv6_freeaddr(ia);

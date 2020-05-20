@@ -2010,16 +2010,10 @@ dhcp_finish_dad(struct interface *ifp, struct in_addr *ia)
 		state->new_len = state->offer_len;
 		get_lease(ifp, &state->lease, state->new, state->new_len);
 		ipv4_applyaddr(ifp);
-		if (ifp->ctx->options & DHCPCD_FORKED)
-			return;
 		state->new = bootp;
 		state->new_len = len;
 	}
 #endif
-
-	/* If we forked, stop here. */
-	if (ifp->ctx->options & DHCPCD_FORKED)
-		return;
 
 #ifdef IPV4LL
 	/* Stop IPv4LL now we have a working DHCP address */
@@ -2341,8 +2335,6 @@ dhcp_bind(struct interface *ifp)
 		dhcp_close(ifp);
 
 	ipv4_applyaddr(ifp);
-	if (ifp->ctx->options & DHCPCD_FORKED)
-		return;
 
 	/* If not in master mode, open an address specific socket. */
 	if (ctx->options & DHCPCD_MASTER ||
@@ -2381,9 +2373,6 @@ dhcp_lastlease(void *arg)
 	loginfox("%s: timed out contacting a DHCP server, using last lease",
 	    ifp->name);
 	dhcp_bind(ifp);
-	/* If we forked, stop here. */
-	if (ifp->ctx->options & DHCPCD_FORKED)
-		return;
 	state->interval = 0;
 	dhcp_discover(ifp);
 }
@@ -2682,11 +2671,7 @@ dhcp_reboot(struct interface *ifp)
 	    !(ia->addr_flags & IN_IFF_NOTUSEABLE) &&
 #endif
 	    dhcp_activeaddr(ifp, &state->lease.addr) == 0)
-	{
 		arp_ifannounceaddr(ifp, &state->lease.addr);
-		if (ifp->ctx->options & DHCPCD_FORKED)
-			return;
-	}
 #endif
 
 	dhcp_new_xid(ifp);
