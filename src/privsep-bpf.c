@@ -92,10 +92,27 @@ ps_bpf_recvbpf(void *arg)
 }
 
 static ssize_t
-ps_bpf_recvmsgcb(void *arg, __unused struct ps_msghdr *psm, struct msghdr *msg)
+ps_bpf_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 {
 	struct ps_process *psp = arg;
 	struct iovec *iov = msg->msg_iov;
+
+#ifdef PRIVSEP_DEBUG
+	logerrx("%s: IN cmd %x, psp %p", __func__, psm->ps_cmd, psp);
+#endif
+
+	switch(psm->ps_cmd) {
+#ifdef ARP
+	case PS_BPF_ARP:	/* FALLTHROUGH */
+#endif
+	case PS_BPF_BOOTP:
+		break;
+	default:
+		/* IPC failure, we should not be processing any commands
+		 * at this point!/ */
+		errno = EINVAL;
+		return -1;
+	}
 
 	return bpf_send(psp->psp_bpf, psp->psp_proto,
 	    iov->iov_base, iov->iov_len);
@@ -106,13 +123,6 @@ ps_bpf_recvmsg(void *arg)
 {
 	struct ps_process *psp = arg;
 
-	/*
-	 * OpenBSD-6.6 at least will return EPERM here for every
-	 * BOOTP sent except for the first one.
-	 * However with wih EPERM, the BOOTP message is *still* sent.
-	 * This means the BPF write filter isn't working as it should.
-	 * On FreeBSD it works fine.
-	 */
 	if (ps_recvpsmsg(psp->psp_ctx, psp->psp_fd,
 	    ps_bpf_recvmsgcb, arg) == -1)
 		logerr(__func__);
