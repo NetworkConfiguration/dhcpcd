@@ -134,12 +134,12 @@ arp_report_conflicted(const struct arp_state *astate,
 
 	hwaddr_ntoa(amsg->sha, astate->iface->hwlen, abuf, sizeof(abuf));
 	if (bpf_frame_header_len(astate->iface) == 0) {
-		logerrx("%s: %s claims %s",
+		logwarnx("%s: %s claims %s",
 		    astate->iface->name, abuf, inet_ntoa(astate->addr));
 		return;
 	}
 
-	logerrx("%s: %s(%s) claims %s",
+	logwarnx("%s: %s(%s) claims %s",
 	    astate->iface->name, abuf,
 	    hwaddr_ntoa(amsg->fsha, astate->iface->hwlen, fbuf, sizeof(fbuf)),
 	    inet_ntoa(astate->addr));
