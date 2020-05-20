@@ -1091,10 +1091,12 @@ ipv6_anyglobal(struct interface *sifp)
 #ifdef BSD
 	bool forwarding;
 
-#ifdef HAVE_PLEDGE
-	forwarding = ps_root_ip6forwarding(sifp->ctx) == 1;
+#if defined(PRIVSEP) && defined(HAVE_PLEDGE)
+	if (IN_PRIVSEP(sifp->ctx))
+		forwarding = ps_root_ip6forwarding(sifp->ctx) == 1;
+	else
 #else
-	forwarding = ip6_forwarding(NULL) == 1;
+		forwarding = ip6_forwarding(NULL) == 1;
 #endif
 #endif
 
