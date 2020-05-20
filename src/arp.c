@@ -509,7 +509,7 @@ arp_announceaddr(struct dhcpcd_ctx *ctx, const struct in_addr *ia)
 		if (iap == NULL)
 			continue;
 #ifdef IN_IFF_NOTUSEABLE
-		if (!(iap->addr_flags & IN_IFF_NOTUSEABLE))
+		if (iap->addr_flags & IN_IFF_NOTUSEABLE)
 			continue;
 #endif
 		if (iff != NULL && iff->metric < ifp->metric)

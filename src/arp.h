@@ -47,7 +47,8 @@
 
 #ifdef IN_IFF_DUPLICATED
 /* NetBSD gained RFC 5227 support in the kernel.
- * This means dhcpcd doesn't need ARP except for ARPing support. */
+ * This means dhcpcd doesn't need ARP except for ARPing support
+ * and ARP announcing an address. */
 #if defined(__NetBSD_Version__) && __NetBSD_Version__ >= 799003900
 #define KERNEL_RFC5227
 #endif
