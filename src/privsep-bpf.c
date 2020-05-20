@@ -106,6 +106,13 @@ ps_bpf_recvmsg(void *arg)
 {
 	struct ps_process *psp = arg;
 
+	/*
+	 * OpenBSD-6.6 at least will return EPERM here for every
+	 * BOOTP sent except for the first one.
+	 * However with wih EPERM, the BOOTP message is *still* sent.
+	 * This means the BPF write filter isn't working as it should.
+	 * On FreeBSD it works fine.
+	 */
 	if (ps_recvpsmsg(psp->psp_ctx, psp->psp_fd,
 	    ps_bpf_recvmsgcb, arg) == -1)
 		logerr(__func__);
