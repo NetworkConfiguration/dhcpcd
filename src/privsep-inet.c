@@ -313,7 +313,7 @@ ps_inet_start(struct dhcpcd_ctx *ctx)
 		logerr("%s: cap_enter", __func__);
 #endif
 #ifdef HAVE_PLEDGE
-	if (pid == 0 && pledge("stdio inet", NULL) == -1)
+	if (pid == 0 && pledge("stdio", NULL) == -1)
 		logerr("%s: pledge", __func__);
 #endif
 
@@ -567,7 +567,7 @@ ps_inet_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg)
 			logerr("%s: cap_enter", __func__);
 #endif
 #ifdef HAVE_PLEDGE
-		if (pledge("stdio inet", NULL) == -1)
+		if (pledge("stdio", NULL) == -1)
 			logerr("%s: pledge", __func__);
 #endif
 		break;
