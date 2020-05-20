@@ -443,7 +443,7 @@ skip_request:
 	    astate);
 }
 
-void
+static void
 arp_announce(struct arp_state *astate)
 {
 	struct iarp_state *state;
@@ -483,7 +483,7 @@ arp_ifannounceaddr(struct interface *ifp, const struct in_addr *ia)
 {
 	struct arp_state *astate;
 
-	if (ifp->flags & IFF_NOARP)
+	if (ifp->flags & IFF_NOARP || !(ifp->options->options & DHCPCD_ARP))
 		return NULL;
 
 	astate = arp_find(ifp, ia);
