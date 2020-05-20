@@ -409,8 +409,10 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 
 			ps_freeprocess(psp);
 			return ret;
-		}
-		return ps_sendpsmmsg(ctx, psp->psp_fd, psm, msg);
+		} else if (!(psm->ps_cmd & PS_START))
+			return ps_sendpsmmsg(ctx, psp->psp_fd, psm, msg);
+		/* Process has already started .... */
+		return 0;
 	}
 
 	if (psm->ps_cmd & PS_STOP && psp == NULL)
