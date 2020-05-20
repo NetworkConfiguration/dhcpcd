@@ -364,17 +364,18 @@ if_linkaddr(struct sockaddr_dl *sdl, const struct interface *ifp)
 static int if_indirect_ioctl(struct dhcpcd_ctx *ctx,
     const char *ifname, unsigned long cmd, void *data, size_t len)
 {
-
-#ifdef HAVE_PLEDGE
-	return (int)ps_root_indirectioctl(ctx, cmd, ifname, data, len);
-#else
 	struct ifreq ifr = { .ifr_flags = 0 };
+
+#if defined(PRIVSEP) && defined(HAVE_PLEDGE)
+	if (IN_PRIVSEP(ctx))
+		return (int)ps_root_indirectioctl(ctx, cmd, ifname, data, len);
+#else
+	UNUSED(len);
+#endif
 
 	strlcpy(ifr.ifr_name, ifname, IFNAMSIZ);
 	ifr.ifr_data = data;
-	UNUSED(len);
 	return ioctl(ctx->pf_inet_fd, cmd, &ifr);
-#endif
 }
 #endif
 
