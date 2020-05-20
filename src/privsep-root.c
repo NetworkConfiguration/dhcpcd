@@ -215,6 +215,27 @@ ps_root_doioctl(unsigned long req, void *data, size_t len)
 {
 	int s, err;
 
+	/* Only allow these ioctls */
+	switch(req) {
+#ifdef SIOCAIFADDR
+	case SIOCAIFADDR:	/* FALLTHROUGH */
+	case SIOCDIFADDR:	/* FALLTHROUGH */
+#endif
+#ifdef SIOCSIFHWADDR
+	case SIOCSIFHWADDR:	/* FALLTHROUGH */
+#endif
+#ifdef SIOCGIFPRIORITY
+	case SIOCGIFPRIORITY:	/* FALLTHROUGH */
+#endif
+	case SIOCSIFFLAGS:	/* FALLTHROUGH */
+	case SIOCGIFMTU:	/* FALLTHROUGH */
+	case SIOCSIFMTU:
+		break;
+	default:
+		errno = EPERM;
+		return -1;
+	}
+
 	s = socket(PF_INET, SOCK_DGRAM, 0);
 	if (s != -1)
 #ifdef IOCTL_REQUEST_TYPE
