@@ -2010,6 +2010,8 @@ dhcp_finish_dad(struct interface *ifp, struct in_addr *ia)
 		state->new_len = state->offer_len;
 		get_lease(ifp, &state->lease, state->new, state->new_len);
 		ipv4_applyaddr(ifp);
+		if (ifp->ctx->options & DHCPCD_FORKED)
+			return;
 		state->new = bootp;
 		state->new_len = len;
 	}
@@ -2339,6 +2341,8 @@ dhcp_bind(struct interface *ifp)
 		dhcp_close(ifp);
 
 	ipv4_applyaddr(ifp);
+	if (ifp->ctx->options & DHCPCD_FORKED)
+		return;
 
 	/* If not in master mode, open an address specific socket. */
 	if (ctx->options & DHCPCD_MASTER ||
@@ -4107,7 +4111,8 @@ dhcp_abort(struct interface *ifp)
 	if (state != NULL && state->added) {
 		rt_build(ifp->ctx, AF_INET);
 #ifdef ARP
-		arp_announceaddr(ifp->ctx, &state->addr->addr);
+		if (ifp->options->options & DHCPCD_ARP)
+			arp_announceaddr(ifp->ctx, &state->addr->addr);
 #endif
 	}
 }
