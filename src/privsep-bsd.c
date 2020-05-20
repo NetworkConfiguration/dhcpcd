@@ -28,6 +28,12 @@
 
 #include <sys/ioctl.h>
 
+/* Need these for filtering the ioctls */
+#include <net/if.h>
+#include <netinet/in.h>
+#include <netinet6/in6_var.h>
+#include <netinet6/nd6.h>
+
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
@@ -40,6 +46,38 @@ static ssize_t
 ps_root_doioctldom(int domain, unsigned long req, void *data, size_t len)
 {
 	int s, err;
+
+	/* Only allow these ioctls */
+	switch(req) {
+#ifdef SIOCIFAFATTACH
+	case SIOCIFAFATTACH:	/* FALLTHROUGH */
+#endif
+#ifdef SIOCSIFXFLAGS
+	case SIOCSIFXFLAGS:	/* FALLTHROUGH */
+#endif
+#ifdef SIOCSIFINFO_FLAGS
+	case SIOCSIFINFO_FLAGS:	/* FALLTHROUGH */
+#endif
+#ifdef SIOCSRTRFLUSH_IN6
+	case SIOCSRTRFLUSH_IN6:	/* FALLTHROUGH */
+	case SIOCSPFXFLUSH_IN6: /* FALLTHROUGH */
+#endif
+#if defined(SIOCALIFADDR) && defined(IFLR_ACTIVE)
+	case SIOCALIFADDR:	/* FALLTHROUGH */
+	case SIOCDLIFADDR:	/* FALLTHROUGH */
+#else
+	case SIOCSIFLLADDR:	/* FALLTHROUGH */
+#endif
+#ifdef SIOCSIFINFO_IN6
+	case SIOCSIFINFO_IN6:	/* FALLTHROUGH */
+#endif
+	case SIOCAIFADDR_IN6:	/* FALLTHROUGH */
+	case SIOCDIFADDR_IN6:	/* FALLTHROUGH */
+		break;
+	default:
+		errno = EPERM;
+		return -1;
+	}
 
 	s = socket(domain, SOCK_DGRAM, 0);
 	if (s == -1)
@@ -72,6 +110,15 @@ ps_root_doindirectioctl(unsigned long req, void *data, size_t len)
 	char *p = data;
 	struct ifreq ifr = { .ifr_flags = 0 };
 	ssize_t err;
+
+	switch(req) {
+	case SIOCG80211NWID:	/* FALLTHROUGH */
+	case SIOCGETVLAN:
+		break;
+	default:
+		errno =	EPERM;
+		return -1;
+	}
 
 	if (len < IFNAMSIZ) {
 		errno = EINVAL;
