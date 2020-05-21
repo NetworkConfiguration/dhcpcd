@@ -1900,7 +1900,14 @@ main(int argc, char **argv)
 			i = 4;
 			break;
 		case 'q':
-			logopts |= LOGERR_QUIET;
+			/* -qq disables console output entirely.
+			 * This is important for SystemD because it logs
+			 * both console AND syslog to the same log
+			 * resulting in untold confusion. */
+			if (logopts & LOGERR_QUIET)
+				logopts &= ~LOGERR_ERR;
+			else
+				logopts |= LOGERR_QUIET;
 			break;
 		case 'x':
 			sig = SIGTERM;
