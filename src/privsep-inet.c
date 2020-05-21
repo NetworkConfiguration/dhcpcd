@@ -29,6 +29,9 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
+#include <netinet/in.h>
+#include <netinet/icmp6.h>
+
 #include <assert.h>
 #include <errno.h>
 #include <signal.h>
@@ -201,7 +204,7 @@ ps_inet_startcb(void *arg)
 }
 
 static bool
-ps_inet_udpports(struct msghdr *msg, uint16_t sport, uint16_t dport)
+ps_inet_validudp(struct msghdr *msg, uint16_t sport, uint16_t dport)
 {
 	struct udphdr udp;
 	struct iovec *iov = msg->msg_iov;
@@ -219,6 +222,32 @@ ps_inet_udpports(struct msghdr *msg, uint16_t sport, uint16_t dport)
 	return true;
 }
 
+#ifdef INET6
+static bool
+ps_inet_validnd(struct msghdr *msg)
+{
+	struct icmp6_hdr icmp6;
+	struct iovec *iov = msg->msg_iov;
+
+	if (msg->msg_iovlen == 0 || iov->iov_len < sizeof(icmp6)) {
+		errno = EINVAL;
+		return false;
+	}
+
+	memcpy(&icmp6, iov->iov_base, sizeof(icmp6));
+	switch(icmp6.icmp6_type) {
+	case ND_ROUTER_SOLICIT:
+	case ND_NEIGHBOR_ADVERT:
+		break;
+	default:
+		errno = EPERM;
+		return false;
+	}
+
+	return true;
+}
+#endif
+
 static ssize_t
 ps_inet_sendmsg(struct dhcpcd_ctx *ctx,
     struct ps_msghdr *psm, struct msghdr *msg)
@@ -235,19 +264,21 @@ ps_inet_sendmsg(struct dhcpcd_ctx *ctx,
 	switch (psm->ps_cmd) {
 #ifdef INET
 	case PS_BOOTP:
-		if (!ps_inet_udpports(msg, BOOTPC, BOOTPS))
+		if (!ps_inet_validudp(msg, BOOTPC, BOOTPS))
 			return -1;
 		s = ctx->udp_wfd;
 		break;
 #endif
 #if defined(INET6) && !defined(__sun)
 	case PS_ND:
+		if (!ps_inet_validnd(msg))
+			return -1;
 		s = ctx->nd_fd;
 		break;
 #endif
 #ifdef DHCP6
 	case PS_DHCP6:
-		if (!ps_inet_udpports(msg, DHCP6_CLIENT_PORT,DHCP6_SERVER_PORT))
+		if (!ps_inet_validudp(msg, DHCP6_CLIENT_PORT,DHCP6_SERVER_PORT))
 			return -1;
 		s = ctx->dhcp6_wfd;
 		break;
