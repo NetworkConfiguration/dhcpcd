@@ -161,8 +161,6 @@ const struct option cf_options[] = {
 	{NULL,              0,                 NULL, '\0'}
 };
 
-static const char *default_script = SCRIPT;
-
 static char *
 add_environ(char ***array, const char *value, int uniq)
 {
@@ -675,26 +673,32 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		break;
 	case 'c':
 		ARG_REQUIRED;
-		if (ifo->script != default_script)
-			free(ifo->script);
+		if (ifname != NULL) {
+			logerrx("%s: per interface scripts"
+			    " are no longer supported",
+			    ifname);
+			return -1;
+		}
+		if (ctx->script != dhcpcd_default_script)
+			free(ctx->script);
 		s = parse_nstring(NULL, 0, arg);
 		if (s == 0) {
-			ifo->script = NULL;
+			ctx->script = NULL;
 			break;
 		}
 		dl = (size_t)s;
-		if (s == -1 || (ifo->script = malloc(dl)) == NULL) {
-			ifo->script = NULL;
+		if (s == -1 || (ctx->script = malloc(dl)) == NULL) {
+			ctx->script = NULL;
 			logerr(__func__);
 			return -1;
 		}
-		s = parse_nstring(ifo->script, dl, arg);
+		s = parse_nstring(ctx->script, dl, arg);
 		if (s == -1 ||
-		    ifo->script[0] == '\0' ||
-		    strcmp(ifo->script, "/dev/null") == 0)
+		    ctx->script[0] == '\0' ||
+		    strcmp(ctx->script, "/dev/null") == 0)
 		{
-			free(ifo->script);
-			ifo->script = NULL;
+			free(ctx->script);
+			ctx->script = NULL;
 		}
 		break;
 	case 'd':
@@ -2315,7 +2319,6 @@ default_config(struct dhcpcd_ctx *ctx)
 	ifo->options |= DHCPCD_IF_UP | DHCPCD_LINK | DHCPCD_INITIAL_DELAY;
 	ifo->timeout = DEFAULT_TIMEOUT;
 	ifo->reboot = DEFAULT_REBOOT;
-	ifo->script = UNCONST(default_script);
 	ifo->metric = -1;
 	ifo->auth.options |= DHCPCD_AUTH_REQUIRE;
 	rb_tree_init(&ifo->routes, &rt_compare_list_ops);
@@ -2667,8 +2670,6 @@ free_options(struct dhcpcd_ctx *ctx, struct if_options *ifo)
 #endif
 	rt_headclear0(ctx, &ifo->routes, AF_UNSPEC);
 
-	if (ifo->script != default_script)
-		free(ifo->script);
 	free(ifo->arping);
 	free(ifo->blacklist);
 	free(ifo->fallback);

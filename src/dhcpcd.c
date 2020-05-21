@@ -98,6 +98,8 @@ const size_t dhcpcd_signals_ignore_len = __arraycount(dhcpcd_signals_ignore);
 #define IF_UPANDRUNNING(a) \
 	(((a)->flags & (IFF_UP | IFF_RUNNING)) == (IFF_UP | IFF_RUNNING))
 
+const char *dhcpcd_default_script = SCRIPT;
+
 static void
 usage(void)
 {
@@ -1837,6 +1839,7 @@ main(int argc, char **argv)
 
 	ifo = NULL;
 	ctx.cffile = CONFIG;
+	ctx.script = UNCONST(dhcpcd_default_script);
 	ctx.control_fd = ctx.control_unpriv_fd = ctx.link_fd = -1;
 	ctx.pf_inet_fd = -1;
 
@@ -2172,7 +2175,7 @@ printpidfile:
 
 #ifdef PRIVSEP
 	if (ps_init(&ctx) == 0)
-		script_runchroot(&ctx, ifo->script);
+		script_runchroot(&ctx);
 #endif
 
 #ifdef USE_SIGNALS
@@ -2456,6 +2459,8 @@ exit1:
 	eloop_free(ctx.ps_eloop);
 #endif
 	eloop_free(ctx.eloop);
+	if (ctx.script != dhcpcd_default_script)
+		free(ctx.script);
 	if (ctx.options & DHCPCD_STARTED && !(ctx.options & DHCPCD_FORKED))
 		loginfox(PACKAGE " exited");
 	logclose();

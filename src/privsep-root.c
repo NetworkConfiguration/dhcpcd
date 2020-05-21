@@ -259,33 +259,12 @@ static ssize_t
 ps_root_run_script(struct dhcpcd_ctx *ctx, const void *data, size_t len)
 {
 	const char *envbuf = data;
-	char * const argv[] = { UNCONST(data), NULL };
+	char * const argv[] = { ctx->script, NULL };
 	pid_t pid;
 	int status;
 
-#ifdef PRIVSEP_DEBUG
-	logdebugx("%s: IN %zu", __func__, len);
-#endif
-
 	if (len == 0)
 		return 0;
-
-	/* Script is the first one, find the environment buffer. */
-	while (*envbuf != '\0') {
-		if (len == 0)
-			return EINVAL;
-		envbuf++;
-		len--;
-	}
-
-	if (len != 0) {
-		envbuf++;
-		len--;
-	}
-
-#ifdef PRIVSEP_DEBUG
-	logdebugx("%s: run script: %s", __func__, argv[0]);
-#endif
 
 	if (script_buftoenv(ctx, UNCONST(envbuf), len) == NULL)
 		return -1;
@@ -678,39 +657,12 @@ ps_root_stop(struct dhcpcd_ctx *ctx)
 }
 
 ssize_t
-ps_root_script(const struct interface *ifp, const void *data, size_t len)
+ps_root_script(struct dhcpcd_ctx *ctx, const void *data, size_t len)
 {
-	char buf[PS_BUFLEN], *p = buf;
-	size_t blen = PS_BUFLEN, slen = strlen(ifp->options->script) + 1;
 
-#ifdef PRIVSEP_DEBUG
-	logdebugx("%s: sending script: %zu %s len %zu",
-	    __func__, slen, ifp->options->script, len);
-#endif
-
-	if (slen > blen) {
-		errno = ENOBUFS;
+	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_SCRIPT, 0, data, len) == -1)
 		return -1;
-	}
-	memcpy(p, ifp->options->script, slen);
-	p += slen;
-	blen -= slen;
-
-	if (len > blen) {
-		errno = ENOBUFS;
-		return -1;
-	}
-	memcpy(p, data, len);
-
-#ifdef PRIVSEP_DEBUG
-	logdebugx("%s: sending script data: %zu", __func__, slen + len);
-#endif
-
-	if (ps_sendcmd(ifp->ctx, ifp->ctx->ps_root_fd, PS_SCRIPT, 0,
-	    buf, slen + len) == -1)
-		return -1;
-
-	return ps_root_readerror(ifp->ctx, NULL, 0);
+	return ps_root_readerror(ctx, NULL, 0);
 }
 
 ssize_t

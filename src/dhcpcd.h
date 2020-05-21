@@ -164,6 +164,7 @@ struct dhcpcd_ctx {
 #endif
 	struct eloop *eloop;
 
+	char *script;
 #ifdef HAVE_OPEN_MEMSTREAM
 	FILE *script_fp;
 #endif
@@ -252,6 +253,8 @@ extern const size_t dhcpcd_signals_len;
 extern const int dhcpcd_signals_ignore[];
 extern const size_t dhcpcd_signals_ignore_len;
 #endif
+
+extern const char *dhcpcd_default_script;
 
 int dhcpcd_ifafwaiting(const struct interface *);
 int dhcpcd_afwaiting(const struct dhcpcd_ctx *);
