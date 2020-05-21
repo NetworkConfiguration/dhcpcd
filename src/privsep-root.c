@@ -304,8 +304,25 @@ ps_root_run_script(struct dhcpcd_ctx *ctx, const void *data, size_t len)
 	return status;
 }
 
+static bool
+ps_root_validpath(const struct dhcpcd_ctx *ctx, uint16_t cmd, const char *path)
+{
+
+	if (cmd == PS_READFILE) {
+		if (strcmp(ctx->cffile, path) == 0)
+			return true;
+	}
+	if (strncmp(DBDIR, path, strlen(DBDIR)) == 0)
+		return true;
+	if (strncmp(RUNDIR, path, strlen(RUNDIR)) == 0)
+		return true;
+	errno = EPERM;
+	return false;
+}
+
 static ssize_t
-ps_root_dowritefile(mode_t mode, void *data, size_t len)
+ps_root_dowritefile(const struct dhcpcd_ctx *ctx,
+    mode_t mode, void *data, size_t len)
 {
 	char *file = data, *nc;
 
@@ -314,6 +331,8 @@ ps_root_dowritefile(mode_t mode, void *data, size_t len)
 		errno = EINVAL;
 		return -1;
 	}
+	if (!ps_root_validpath(ctx, PS_WRITEFILE, file))
+		return -1;
 	nc++;
 	return writefile(file, mode, nc, len - (size_t)(nc - file));
 }
@@ -480,9 +499,17 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		err = ps_root_run_script(ctx, data, len);
 		break;
 	case PS_UNLINK:
+		if (!ps_root_validpath(ctx, psm->ps_cmd, data)) {
+			err = -1;
+			break;
+		}
 		err = unlink(data);
 		break;
 	case PS_READFILE:
+		if (!ps_root_validpath(ctx, psm->ps_cmd, data)) {
+			err = -1;
+			break;
+		}
 		err = readfile(data, buf, sizeof(buf));
 		if (err != -1) {
 			rdata = buf;
@@ -490,7 +517,8 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		}
 		break;
 	case PS_WRITEFILE:
-		err = ps_root_dowritefile((mode_t)psm->ps_flags, data, len);
+		err = ps_root_dowritefile(ctx, (mode_t)psm->ps_flags,
+		    data, len);
 		break;
 	case PS_FILEMTIME:
 		err = filemtime(data, &mtime);
