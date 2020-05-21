@@ -1901,7 +1901,7 @@ main(int argc, char **argv)
 			break;
 		case 'q':
 			/* -qq disables console output entirely.
-			 * This is important for SystemD because it logs
+			 * This is important for systemd because it logs
 			 * both console AND syslog to the same log
 			 * resulting in untold confusion. */
 			if (logopts & LOGERR_QUIET)
