@@ -434,7 +434,7 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 	uint8_t buf[PS_BUFLEN];
 	time_t mtime;
 	ssize_t err;
-	bool free_rdata= false;
+	bool free_rdata = false;
 
 	cmd = (uint16_t)(psm->ps_cmd & ~(PS_START | PS_STOP));
 	psp = ps_findprocess(ctx, &psm->ps_id);
@@ -458,7 +458,6 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 	if (psm->ps_cmd & PS_STOP && psp == NULL)
 		return 0;
 
-	/* All these should just be PS_START */
 	switch (cmd) {
 #ifdef INET
 #ifdef ARP

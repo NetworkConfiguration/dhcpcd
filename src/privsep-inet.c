@@ -200,6 +200,25 @@ ps_inet_startcb(void *arg)
 	return ret;
 }
 
+static bool
+ps_inet_udpports(struct msghdr *msg, uint16_t sport, uint16_t dport)
+{
+	struct udphdr udp;
+	struct iovec *iov = msg->msg_iov;
+
+	if (msg->msg_iovlen == 0 || iov->iov_len < sizeof(udp)) {
+		errno = EINVAL;
+		return false;
+	}
+
+	memcpy(&udp, iov->iov_base, sizeof(udp));
+	if (udp.uh_sport != htons(sport) || udp.uh_dport != htons(dport)) {
+		errno = EPERM;
+		return false;
+	}
+	return true;
+}
+
 static ssize_t
 ps_inet_sendmsg(struct dhcpcd_ctx *ctx,
     struct ps_msghdr *psm, struct msghdr *msg)
@@ -216,6 +235,8 @@ ps_inet_sendmsg(struct dhcpcd_ctx *ctx,
 	switch (psm->ps_cmd) {
 #ifdef INET
 	case PS_BOOTP:
+		if (!ps_inet_udpports(msg, BOOTPC, BOOTPS))
+			return -1;
 		s = ctx->udp_wfd;
 		break;
 #endif
@@ -226,6 +247,8 @@ ps_inet_sendmsg(struct dhcpcd_ctx *ctx,
 #endif
 #ifdef DHCP6
 	case PS_DHCP6:
+		if (!ps_inet_udpports(msg, DHCP6_CLIENT_PORT,DHCP6_SERVER_PORT))
+			return -1;
 		s = ctx->dhcp6_wfd;
 		break;
 #endif
