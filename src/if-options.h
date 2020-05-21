@@ -243,7 +243,6 @@ struct if_options {
 	char **config;
 
 	char **environ;
-	char *script;
 
 	char hostname[HOSTNAME_MAX_LEN + 1]; /* We don't store the length */
 	uint8_t fqdn;

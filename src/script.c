@@ -691,7 +691,7 @@ script_runreason(const struct interface *ifp, const char *reason)
 	int status = 0;
 	struct fd_list *fd;
 
-	if (ifp->options->script == NULL &&
+	if (ctx->script == NULL &&
 	    TAILQ_FIRST(&ifp->ctx->control_fds) == NULL)
 		return 0;
 
@@ -701,16 +701,16 @@ script_runreason(const struct interface *ifp, const char *reason)
 		return -1;
 	}
 
-	if (ifp->options->script == NULL)
+	if (ctx->script == NULL)
 		goto send_listeners;
 
-	argv[0] = ifp->options->script;
+	argv[0] = ctx->script;
 	argv[1] = NULL;
 	logdebugx("%s: executing `%s' %s", ifp->name, argv[0], reason);
 
 #ifdef PRIVSEP
 	if (ctx->options & DHCPCD_PRIVSEP) {
-		if (ps_root_script(ifp,
+		if (ps_root_script(ctx,
 		    ctx->script_buf, ctx->script_buflen) == -1)
 			logerr(__func__);
 		goto send_listeners;
@@ -737,7 +737,7 @@ send_listeners:
 
 #ifdef PRIVSEP
 int
-script_runchroot(struct dhcpcd_ctx *ctx, char *script)
+script_runchroot(struct dhcpcd_ctx *ctx)
 {
 	char *argv[2];
 
@@ -747,7 +747,7 @@ script_runchroot(struct dhcpcd_ctx *ctx, char *script)
 		return -1;
 	}
 
-	argv[0] = script;
+	argv[0] = ctx->script;
 	argv[1] = NULL;
 	logdebugx("executing `%s' %s", argv[0], "CHROOT");
 
