@@ -502,7 +502,7 @@ print_rfc3361(FILE *fp, const uint8_t *data, size_t dl)
 			memcpy(&addr.s_addr, data, sizeof(addr.s_addr));
 			if (fprintf(fp, "%s", inet_ntoa(addr)) == -1)
 				return -1;
-			if (dl != 0) {
+			if (dl != sizeof(addr.s_addr)) {
 				if (fputc(' ', fp) == EOF)
 					return -1;
 			}
