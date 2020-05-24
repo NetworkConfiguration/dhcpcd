@@ -2174,8 +2174,7 @@ printpidfile:
 	freopen(_PATH_DEVNULL, "r", stdin);
 
 #ifdef PRIVSEP
-	if (ps_init(&ctx) == 0)
-		script_runchroot(&ctx);
+	ps_init(&ctx);
 #endif
 
 #ifdef USE_SIGNALS

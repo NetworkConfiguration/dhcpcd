@@ -734,23 +734,3 @@ send_listeners:
 
 	return status;
 }
-
-#ifdef PRIVSEP
-int
-script_runchroot(struct dhcpcd_ctx *ctx)
-{
-	char *argv[2];
-
-	/* Make our env */
-	if (make_env(ctx, NULL, "CHROOT") == -1) {
-		logerr(__func__);
-		return -1;
-	}
-
-	argv[0] = ctx->script;
-	argv[1] = NULL;
-	logdebugx("executing `%s' %s", argv[0], "CHROOT");
-
-	return script_run(ctx, argv);
-}
-#endif
