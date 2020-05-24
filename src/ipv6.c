@@ -1106,6 +1106,13 @@ ipv6_anyglobal(struct interface *sifp)
 		if (ifp != sifp && !forwarding)
 			continue;
 #else
+#if defined(PRIVSEP) && defined(__linux__)
+	if (IN_PRIVSEP(sifp->ctx)) {
+		if (ifp != sifp &&
+		    ps_root_ip6forwarding(sifp->ctx, ifp->name) != 1)
+			continue;
+	} else
+#endif
 		if (ifp != sifp && ip6_forwarding(ifp->name) != 1)
 			continue;
 #endif

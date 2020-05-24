@@ -37,6 +37,7 @@ int ps_root_stop(struct dhcpcd_ctx *ctx);
 ssize_t ps_root_readerror(struct dhcpcd_ctx *, void *, size_t);
 ssize_t ps_root_mreaderror(struct dhcpcd_ctx *, void **, size_t *);
 ssize_t ps_root_ioctl(struct dhcpcd_ctx *, ioctl_request_t, void *, size_t);
+ssize_t ps_root_ip6forwarding(struct dhcpcd_ctx *, const char *);
 ssize_t ps_root_unlink(struct dhcpcd_ctx *, const char *);
 ssize_t ps_root_filemtime(struct dhcpcd_ctx *, const char *, time_t *);
 ssize_t ps_root_readfile(struct dhcpcd_ctx *, const char *, void *, size_t);
@@ -52,7 +53,6 @@ ssize_t ps_root_ioctllink(struct dhcpcd_ctx *, unsigned long, void *, size_t);
 ssize_t ps_root_ioctl6(struct dhcpcd_ctx *, unsigned long, void *, size_t);
 ssize_t ps_root_indirectioctl(struct dhcpcd_ctx *, unsigned long, const char *,
     void *, size_t);
-ssize_t ps_root_ip6forwarding(struct dhcpcd_ctx *);
 #endif
 #ifdef __linux__
 ssize_t ps_root_sendnetlink(struct dhcpcd_ctx *, int, struct msghdr *);

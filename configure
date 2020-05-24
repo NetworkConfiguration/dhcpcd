@@ -1766,9 +1766,6 @@ if cd hooks; then
 	done
 	cd ..
 fi
-if [ "$OS" = linux ]; then
-	HOOKS="$HOOKS${HOOKS:+ }00-linux"
-fi
 echo "HOOKSCRIPTS=	$HOOKS" >>$CONFIG_MK
 echo "EGHOOKSCRIPTS=	$EGHOOKS" >>$CONFIG_MK
 

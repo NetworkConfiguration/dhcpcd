@@ -161,9 +161,3 @@ copied to `$(libexecdir)/dhcpcd-hooks` for use.
 The configure program attempts to find hooks for systems you have installed.
 To add more simply
 `./configure -with-hook=ntp.conf`
-
-If running privilege separation and on Linux then the `00-linux` hook is
-**mandatory**.
-If you choose not to run it, then you are responsible for setting up the
-needed mount points: `/dev`, `/proc`, `/sys`, `/run/udev`
-as well as sorting out `/dev/log` if it points to something outside of `/dev`.
