@@ -109,28 +109,17 @@ ssize_t
 readfile(const char *file, void *data, size_t len)
 {
 	int fd;
-	struct stat st;
-	ssize_t bytes = -1;
+	ssize_t bytes;
 
 	fd = open(file, O_RDONLY);
 	if (fd == -1)
 		return -1;
-
-	if (fstat(fd, &st) != 0)
-		goto out;
-	if (!S_ISREG(st.st_mode)) {
-		errno = EINVAL;
-		goto out;
-	}
-	if ((size_t)st.st_size > len) {
-		errno = E2BIG;
-		goto out;
-	}
 	bytes = read(fd, data, len);
-
-out:
-	if (fd != -1)
-		close(fd);
+	close(fd);
+	if ((size_t)bytes == len) {
+		errno = ENOBUFS;
+		return -1;
+	}
 	return bytes;
 }
 

@@ -64,50 +64,13 @@ out:
 	return retval;
 }
 
-static ssize_t
-ps_root_dowritepathuint(const void *data, size_t len)
-{
-	const char *path = data;
-	size_t plen;
-	unsigned int val;
-	int fd;
-	ssize_t r;
-
-	if (len < sizeof(plen)) {
-		errno = EINVAL;
-		return -1;
-	}
-
-	memcpy(&plen, path, sizeof(plen));
-	path += sizeof(plen);
-	if (sizeof(plen) + plen + sizeof(val) > len) {
-		errno = EINVAL;
-		return -1;
-	}
-
-	memcpy(&val, path + plen, sizeof(val));
-
-	fd = open(path, O_WRONLY);
-	if (fd == -1)
-		return -1;
-	r = dprintf(fd, "%u", val);
-	close(fd);
-
-	return r;
-}
-
 ssize_t
 ps_root_os(struct ps_msghdr *psm, struct msghdr *msg)
 {
-	struct iovec *iov = msg->msg_iov;
-	void *data = iov->iov_base;
-	size_t len = iov->iov_len;
 
 	switch (psm->ps_cmd) {
 	case PS_ROUTE:
 		return ps_root_dosendnetlink((int)psm->ps_flags, msg);
-	case PS_WRITEPATHUINT:
-		return ps_root_dowritepathuint(data, len);
 	default:
 		errno = ENOTSUP;
 		return -1;
@@ -120,31 +83,6 @@ ps_root_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct msghdr *msg)
 
 	if (ps_sendmsg(ctx, ctx->ps_root_fd, PS_ROUTE,
 	    (unsigned long)protocol, msg) == -1)
-		return -1;
-	return ps_root_readerror(ctx, NULL, 0);
-}
-
-ssize_t
-ps_root_writepathuint(struct dhcpcd_ctx *ctx, const char *path,
-    unsigned int val)
-{
-	char buf[PS_BUFLEN], *p = buf;
-	size_t plen = strlen(path) + 1;
-	size_t len = sizeof(plen) + plen + sizeof(val);
-
-	if (len > sizeof(buf)) {
-		errno = ENOBUFS;
-		return -1;
-	}
-
-	memcpy(p, &plen, sizeof(plen));
-	p += sizeof(plen);
-	memcpy(p, path, plen);
-	p += plen;
-	memcpy(p, &val, sizeof(val));
-
-	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_WRITEPATHUINT,
-	    0, buf, len) == -1)
 		return -1;
 	return ps_root_readerror(ctx, NULL, 0);
 }

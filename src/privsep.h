@@ -57,9 +57,6 @@
 #define	PS_IP6FORWARDING	0x0104
 #define	PS_GETIFADDRS		0x0105
 
-/* Linux commands */
-#define	PS_WRITEPATHUINT	0x0201
-
 /* Process commands */
 #define	PS_START		0x4000
 #define	PS_STOP			0x8000

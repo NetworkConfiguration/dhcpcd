@@ -295,6 +295,14 @@ ps_root_validpath(const struct dhcpcd_ctx *ctx, uint16_t cmd, const char *path)
 		return true;
 	if (strncmp(RUNDIR, path, strlen(RUNDIR)) == 0)
 		return true;
+
+#ifdef __linux__
+	if (strncmp("/proc/net/", path, strlen("/proc/net/")) == 0 ||
+	    strncmp("/proc/sys/net/", path, strlen("/proc/sys/net/")) == 0 ||
+	    strncmp("/sys/class/net/", path, strlen("/sys/class/net/")) == 0)
+		return true;
+#endif
+
 	errno = EPERM;
 	return false;
 }
@@ -310,6 +318,7 @@ ps_root_dowritefile(const struct dhcpcd_ctx *ctx,
 		errno = EINVAL;
 		return -1;
 	}
+
 	if (!ps_root_validpath(ctx, PS_WRITEFILE, file))
 		return -1;
 	nc++;
@@ -510,6 +519,11 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		err = ps_root_dogetifaddrs(&rdata, &rlen);
 		free_rdata = true;
 		break;
+#endif
+#if defined(__linux__) || defined(HAVE_PLEDGE)
+	case PS_IP6FORWARDING:
+		 err = ip6_forwarding(data);
+		 break;
 #endif
 	default:
 		err = ps_root_os(psm, msg);
@@ -798,5 +812,17 @@ err:
 	*ifahead = NULL;
 	errno = EINVAL;
 	return -1;
+}
+#endif
+
+#if defined(__linux__) || defined(HAVE_PLEDGE)
+ssize_t
+ps_root_ip6forwarding(struct dhcpcd_ctx *ctx, const char *ifname)
+{
+
+	if (ps_sendcmd(ctx, ctx->ps_root_fd,
+	    PS_IP6FORWARDING, 0, ifname, strlen(ifname) + 1) == -1)
+		return -1;
+	return ps_root_readerror(ctx, NULL, 0);
 }
 #endif

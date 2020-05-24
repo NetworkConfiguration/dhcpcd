@@ -151,8 +151,6 @@ ps_root_os(struct ps_msghdr *psm, struct msghdr *msg)
 #ifdef HAVE_PLEDGE
 	case PS_IOCTLINDIRECT:
 		return ps_root_doindirectioctl(psm->ps_flags, data, len);
-	case PS_IP6FORWARDING:
-		return ip6_forwarding(NULL);
 #endif
 	default:
 		errno = ENOTSUP;
@@ -209,15 +207,5 @@ ps_root_indirectioctl(struct dhcpcd_ctx *ctx, unsigned long request,
 	    request, buf, IFNAMSIZ + len) == -1)
 		return -1;
 	return ps_root_readerror(ctx, data, len);
-}
-
-ssize_t
-ps_root_ip6forwarding(struct dhcpcd_ctx *ctx)
-{
-
-	if (ps_sendcmd(ctx, ctx->ps_root_fd,
-	    PS_IP6FORWARDING, 0, NULL, 0) == -1)
-		return -1;
-	return ps_root_readerror(ctx, NULL, 0);
 }
 #endif

@@ -149,7 +149,7 @@ static int if_addressexists(struct interface *, struct in_addr *);
 
 #define PROC_INET6	"/proc/net/if_inet6"
 #define PROC_PROMOTE	"/proc/sys/net/ipv4/conf/%s/promote_secondaries"
-#define SYS_BRIDGE	"/sys/class/net/%s/bridge"
+#define SYS_BRIDGE	"/sys/class/net/%s/bridge/bridge_id"
 #define SYS_LAYER2	"/sys/class/net/%s/device/layer2"
 #define SYS_TUNTAP	"/sys/class/net/%s/tun_flags"
 
@@ -220,53 +220,44 @@ if_machinearch(char *str, size_t len)
 }
 
 static int
-check_proc_int(const char *path)
+check_proc_int(struct dhcpcd_ctx *ctx, const char *path)
 {
-	FILE *fp;
-	int i;
+	char buf[64];
+	int error, i;
 
-	fp = fopen(path, "r");
-	if (fp == NULL)
+	if (dhcp_readfile(ctx, path, buf, sizeof(buf)) == -1)
 		return -1;
-	if (fscanf(fp, "%d", &i) != 1)
-		i = -1;
-	fclose(fp);
+	i = (int)strtoi(buf, NULL, 0, INT_MIN, INT_MAX, &error);
+	if (error != 0 && error != ENOTSUP) {
+		errno = error;
+		return -1;
+	}
 	return i;
 }
 
 static int
-check_proc_hex(const char *path, unsigned int *value)
+check_proc_uint(struct dhcpcd_ctx *ctx, const char *path, unsigned int *u)
 {
-	FILE *fp;
-	int i;
+	char buf[64];
+	int error;
 
-	fp = fopen(path, "r");
-	if (fp == NULL)
+	if (dhcp_readfile(ctx, path, buf, sizeof(buf)) == -1)
 		return -1;
-	i = fscanf(fp, "%x", value) == 1 ? 0 : -1;
-	fclose(fp);
-	return i;
+	*u = (unsigned int)strtou(buf, NULL, 0, 0, UINT_MAX, &error);
+	if (error != 0 && error != ENOTSUP) {
+		errno = error;
+		return error;
+	}
+	return 0;
 }
 
 static ssize_t
 if_writepathuint(struct dhcpcd_ctx *ctx, const char *path, unsigned int val)
 {
-	FILE *fp;
-	ssize_t r;
+	char buf[64];
 
-#ifdef PRIVSEP
-	if (ctx->options & DHCPCD_PRIVSEP)
-		return ps_root_writepathuint(ctx, path, val);
-#else
-	UNUSED(ctx);
-#endif
-
-	fp = fopen(path, "w");
-	if (fp == NULL)
-		return -1;
-	r = fprintf(fp, "%u\n", val);
-	fclose(fp);
-	return r;
+	snprintf(buf, sizeof(buf), "%u\n", val);
+	return dhcp_writefile(ctx, path, 0664, buf, sizeof(buf));
 }
 
 int
@@ -283,7 +274,7 @@ if_init(struct interface *ifp)
 	 * This matches the behaviour of BSD which makes coding dhcpcd
 	 * a little easier as there's just one behaviour. */
 	snprintf(path, sizeof(path), PROC_PROMOTE, ifp->name);
-	n = check_proc_int(path);
+	n = check_proc_int(ifp->ctx, path);
 	if (n == -1)
 		return errno == ENOENT ? 0 : -1;
 	if (n == 1)
@@ -299,7 +290,7 @@ if_conf(struct interface *ifp)
 
 	/* Some qeth setups require the use of the broadcast flag. */
 	snprintf(path, sizeof(path), SYS_LAYER2, ifp->name);
-	n = check_proc_int(path);
+	n = check_proc_int(ifp->ctx, path);
 	if (n == -1)
 		return errno == ENOENT ? 0 : -1;
 	if (n == 0)
@@ -308,34 +299,33 @@ if_conf(struct interface *ifp)
 }
 
 static bool
-if_bridge(const char *ifname)
+if_bridge(struct dhcpcd_ctx *ctx, const char *ifname)
 {
-	char path[sizeof(SYS_BRIDGE) + IF_NAMESIZE];
-	struct stat sb;
+	char path[sizeof(SYS_BRIDGE) + IF_NAMESIZE], buf[64];
 
 	snprintf(path, sizeof(path), SYS_BRIDGE, ifname);
-	if (stat(path, &sb) == 0 && S_ISDIR(sb.st_mode))
-		return true;
-	return false;
+	if (dhcp_readfile(ctx, path, buf, sizeof(buf)) == -1)
+		return false;
+	return true;
 }
 
 static bool
-if_tap(const char *ifname)
+if_tap(struct dhcpcd_ctx *ctx, const char *ifname)
 {
 	char path[sizeof(SYS_TUNTAP) + IF_NAMESIZE];
-	unsigned int n;
+	unsigned int u;
 
 	snprintf(path, sizeof(path), SYS_TUNTAP, ifname);
-	if (check_proc_hex(path, &n) == -1)
+	if (check_proc_uint(ctx, path, &u) == -1)
 		return false;
-	return n & IFF_TAP;
+	return u & IFF_TAP;
 }
 
 bool
-if_ignore(__unused struct dhcpcd_ctx *ctx, const char *ifname)
+if_ignore(struct dhcpcd_ctx *ctx, const char *ifname)
 {
 
-	if (if_tap(ifname) || if_bridge(ifname))
+	if (if_tap(ctx, ifname) || if_bridge(ctx, ifname))
 		return true;
 	return false;
 }
@@ -1866,14 +1856,19 @@ int
 if_addrflags6(const struct interface *ifp, const struct in6_addr *addr,
     __unused const char *alias)
 {
-	FILE *fp;
+	char buf[PS_BUFLEN], *bp = buf, *line;
+	ssize_t buflen;
 	char *p, ifaddress[33], address[33], name[IF_NAMESIZE + 1];
 	unsigned int ifindex;
 	int prefix, scope, flags, i;
 
-	fp = fopen(PROC_INET6, "r");
-	if (fp == NULL)
+	buflen = dhcp_readfile(ifp->ctx, PROC_INET6, buf, sizeof(buf));
+	if (buflen == -1)
 		return -1;
+	if ((size_t)buflen == sizeof(buf)) {
+		errno = ENOBUFS;
+		return -1;
+	}
 
 	p = ifaddress;
 	for (i = 0; i < (int)sizeof(addr->s6_addr); i++) {
@@ -1881,23 +1876,20 @@ if_addrflags6(const struct interface *ifp, const struct in6_addr *addr,
 	}
 	*p = '\0';
 
-	while (fscanf(fp, "%32[a-f0-9] %x %x %x %x %"TOSTRING(IF_NAMESIZE)"s\n",
-	    address, &ifindex, &prefix, &scope, &flags, name) == 6)
-	{
-		if (strlen(address) != 32) {
-			fclose(fp);
+	while ((line = get_line(&bp, &buflen)) != NULL) {
+		if (sscanf(line,
+		    "%32[a-f0-9] %x %x %x %x %"TOSTRING(IF_NAMESIZE)"s\n",
+		    address, &ifindex, &prefix, &scope, &flags, name) != 6 ||
+		    strlen(address) != 32)
+		{
 			errno = EINVAL;
 			return -1;
 		}
 		if (strcmp(name, ifp->name) == 0 &&
 		    strcmp(ifaddress, address) == 0)
-		{
-			fclose(fp);
 			return flags;
-		}
 	}
 
-	fclose(fp);
 	errno = ESRCH;
 	return -1;
 }
@@ -1972,11 +1964,12 @@ static const char *p_neigh = "/proc/sys/net/ipv6/neigh";
 void
 if_setup_inet6(const struct interface *ifp)
 {
+	struct dhcpcd_ctx *ctx = ifp->ctx;
 	int ra;
 	char path[256];
 
 	/* The kernel cannot make stable private addresses. */
-	if (if_disable_autolinklocal(ifp->ctx, ifp->index) == -1)
+	if (if_disable_autolinklocal(ctx, ifp->index) == -1 && errno != ENODEV)
 		logdebug("%s: if_disable_autolinklocal", ifp->name);
 
 	/*
@@ -1987,21 +1980,21 @@ if_setup_inet6(const struct interface *ifp)
 		return;
 
 	snprintf(path, sizeof(path), "%s/%s/autoconf", p_conf, ifp->name);
-	ra = check_proc_int(path);
+	ra = check_proc_int(ctx, path);
 	if (ra != 1 && ra != -1) {
-		if (if_writepathuint(ifp->ctx, path, 0) == -1)
+		if (if_writepathuint(ctx, path, 0) == -1)
 			logerr("%s: %s", __func__, path);
 	}
 
 	snprintf(path, sizeof(path), "%s/%s/accept_ra", p_conf, ifp->name);
-	ra = check_proc_int(path);
+	ra = check_proc_int(ctx, path);
 	if (ra == -1) {
 		/* The sysctl probably doesn't exist, but this isn't an
 		 * error as such so just log it and continue */
 		if (errno != ENOENT)
 			logerr("%s: %s", __func__, path);
 	} else if (ra != 0) {
-		if (if_writepathuint(ifp->ctx, path, 0) == -1)
+		if (if_writepathuint(ctx, path, 0) == -1)
 			logerr("%s: %s", __func__, path);
 	}
 }
@@ -2040,14 +2033,18 @@ if_applyra(const struct ra *rap)
 int
 ip6_forwarding(const char *ifname)
 {
-	char path[256];
-	int val;
+	char path[256], buf[64];
+	int error, i;
 
 	if (ifname == NULL)
 		ifname = "all";
 	snprintf(path, sizeof(path), "%s/%s/forwarding", p_conf, ifname);
-	val = check_proc_int(path);
-	return val == -1 ? 0 : val;
+	if (readfile(path, buf, sizeof(buf)) == -1)
+		return 0;
+	i = (int)strtoi(buf, NULL, 0, INT_MIN, INT_MAX, &error);
+	if (error != 0)
+		return -1;
+	return error != 0 ? 0 : i;
 }
 
 #endif /* INET6 */
