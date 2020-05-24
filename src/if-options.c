@@ -2261,51 +2261,6 @@ finish_config(struct if_options *ifo)
 		    ~(DHCPCD_IPV6RA_AUTOCONF | DHCPCD_IPV6RA_REQRDNSS);
 }
 
-/* Handy routine to read very long lines in text files.
- * This means we read the whole line and avoid any nasty buffer overflows.
- * We strip leading space and avoid comment lines, making the code that calls
- * us smaller. */
-static char *
-get_line(char ** __restrict buf, ssize_t * __restrict buflen)
-{
-	char *p, *c;
-	bool quoted;
-
-	do {
-		p = *buf;
-		c = memchr(*buf, '\n', (size_t)*buflen);
-		if (c == NULL) {
-			c = memchr(*buf, '\0', (size_t)*buflen);
-			if (c == NULL)
-				return NULL;
-			*buflen = c - *buf;
-			*buf = NULL;
-		} else {
-			*c++ = '\0';
-			*buflen -= c - *buf;
-			*buf = c;
-		}
-		for (; *p == ' ' || *p == '\t'; p++)
-			;
-	} while (*p == '\0' || *p == '\n' || *p == '#' || *p == ';');
-
-	/* Strip embedded comments unless in a quoted string or escaped */
-	quoted = false;
-	for (c = p; *c != '\0'; c++) {
-		if (*c == '\\') {
-			c++; /* escaped */
-			continue;
-		}
-		if (*c == '"')
-			quoted = !quoted;
-		else if (*c == '#' && !quoted) {
-			*c = '\0';
-			break;
-		}
-	}
-	return p;
-}
-
 struct if_options *
 default_config(struct dhcpcd_ctx *ctx)
 {
