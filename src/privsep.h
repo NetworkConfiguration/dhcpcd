@@ -57,6 +57,16 @@
 #define	PS_IP6FORWARDING	0x0104
 #define	PS_GETIFADDRS		0x0105
 
+/* Dev Commands */
+#define	PS_DEV_LISTENING	0x0201
+#define	PS_DEV_INITTED		0x0202
+#define	PS_DEV_IFCMD		0x0203
+
+/* Dev Interface Commands (via flags) */
+#define	PS_DEV_IFADDED		0x0001
+#define	PS_DEV_IFREMOVED	0x0002
+#define	PS_DEV_IFUPDATED	0x0003
+
 /* Process commands */
 #define	PS_START		0x4000
 #define	PS_STOP			0x8000
