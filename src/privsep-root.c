@@ -288,6 +288,11 @@ static bool
 ps_root_validpath(const struct dhcpcd_ctx *ctx, uint16_t cmd, const char *path)
 {
 
+	/* Avoid a previous directory attack to avoid /proc/../
+	 * dhcpcd should never use a path with double dots. */
+	if (strstr(path, "..") != NULL)
+		return false;
+
 	if (cmd == PS_READFILE) {
 		if (strcmp(ctx->cffile, path) == 0)
 			return true;
