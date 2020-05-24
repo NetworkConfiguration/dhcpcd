@@ -1729,7 +1729,7 @@ again3:
 		}
 		dp = buf;
 		de = dp + dlen;
-		if (*(dp - 1) != '\0') {
+		if (*(de - 1) != '\0') {
 			errno = EINVAL;
 			error = -1;
 			goto out;
