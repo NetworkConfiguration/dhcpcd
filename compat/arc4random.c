@@ -37,6 +37,7 @@ struct arc4_stream {
 	uint8_t s[256];
 	size_t count;
 	pid_t stir_pid;
+	int fd;
 };
 
 #define S(n) (n)
@@ -46,7 +47,7 @@ struct arc4_stream {
 #define S256 S64(0), S64(64), S64(128), S64(192)
 
 static struct arc4_stream rs = { .i = 0xff, .j = 0, .s = { S256 },
-                    .count = 0, .stir_pid = 0 };
+                    .count = 0, .stir_pid = 0, .fd = -1 };
 
 #undef S
 #undef S4
@@ -103,7 +104,6 @@ arc4_getword(struct arc4_stream *as)
 static void
 arc4_stir(struct arc4_stream *as)
 {
-	int fd;
 	struct {
 		struct timeval tv;
 		unsigned int rnd[(128 - sizeof(struct timeval)) /
@@ -112,13 +112,28 @@ arc4_stir(struct arc4_stream *as)
 	size_t n;
 
 	gettimeofday(&rdat.tv, NULL);
-	fd = open("/dev/urandom", O_RDONLY);
-	if (fd != -1) {
+	if (as->fd == -1) {
+#ifndef O_CLOEXEC
+		int fd_opts;
+#endif
+
+		as->fd = open("/dev/urandom", O_RDONLY | O_NONBLOCK
+#ifdef O_CLOEXEC
+		| O_CLOEXEC
+#endif
+		);
+#ifndef O_CLOEXEC
+		if (as->fd != -1 &&
+		    (fd_opts = fcntl(as->fd, F_GETFD)))
+			fcntl(as->fd, F_SETFD, fd_opts | FD_CLOEXEC);
+#endif
+	}
+
+	if (as->fd != -1) {
 		/* If there is an error reading, just use what is
 		 * on the stack. */
 		/* coverity[check_return] */
-		(void)read(fd, rdat.rnd, sizeof(rdat.rnd));
-		close(fd);
+		(void)read(as->fd, rdat.rnd, sizeof(rdat.rnd));
 	}
 
 	/* fd < 0?  Ah, what the heck. We'll just take

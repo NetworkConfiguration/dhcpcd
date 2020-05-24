@@ -321,6 +321,12 @@ ps_start(struct dhcpcd_ctx *ctx)
 
 	TAILQ_INIT(&ctx->ps_processes);
 
+#ifdef ARC4RANDOM_H
+	/* Seed the random number generator early incase it needs /dev/urandom
+	 * which won't be available in the chroot. */
+	arc4random();
+#endif
+
 	switch (pid = ps_root_start(ctx)) {
 	case -1:
 		logerr("ps_root_start");
