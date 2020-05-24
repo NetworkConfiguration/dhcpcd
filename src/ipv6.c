@@ -1093,11 +1093,10 @@ ipv6_anyglobal(struct interface *sifp)
 
 #if defined(PRIVSEP) && defined(HAVE_PLEDGE)
 	if (IN_PRIVSEP(sifp->ctx))
-		forwarding = ps_root_ip6forwarding(sifp->ctx) == 1;
+		forwarding = ps_root_ip6forwarding(sifp->ctx, NULL) == 1;
 	else
-#else
-		forwarding = ip6_forwarding(NULL) == 1;
 #endif
+		forwarding = ip6_forwarding(NULL) == 1;
 #endif
 
 

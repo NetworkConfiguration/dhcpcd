@@ -33,6 +33,12 @@
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/nd6.h>
+#ifdef __DragonFly__
+#  include <netproto/802_11/ieee80211_ioctl.h>
+#else
+#  include <net80211/ieee80211.h>
+#  include <net80211/ieee80211_ioctl.h>
+#endif
 
 #include <errno.h>
 #include <string.h>

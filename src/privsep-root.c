@@ -901,8 +901,8 @@ ssize_t
 ps_root_ip6forwarding(struct dhcpcd_ctx *ctx, const char *ifname)
 {
 
-	if (ps_sendcmd(ctx, ctx->ps_root_fd,
-	    PS_IP6FORWARDING, 0, ifname, strlen(ifname) + 1) == -1)
+	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_IP6FORWARDING, 0,
+	    ifname, ifname != NULL ? strlen(ifname) + 1 : 0) == -1)
 		return -1;
 	return ps_root_readerror(ctx, NULL, 0);
 }
