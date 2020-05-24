@@ -81,7 +81,7 @@ ps_bpf_recvbpf(void *arg)
 			break;
 		psm.ps_flags = bpf->bpf_flags;
 		len = ps_sendpsmdata(psp->psp_ctx, psp->psp_ctx->ps_data_fd,
-		    &psm, buf, (size_t)len + sizeof(bpf->bpf_flags));
+		    &psm, buf, (size_t)len);
 		if (len == -1 && errno != ECONNRESET)
 			logerr(__func__);
 		if (len == -1 || len == 0)

@@ -255,9 +255,12 @@ static ssize_t
 if_writepathuint(struct dhcpcd_ctx *ctx, const char *path, unsigned int val)
 {
 	char buf[64];
+	int len;
 
-	snprintf(buf, sizeof(buf), "%u\n", val);
-	return dhcp_writefile(ctx, path, 0664, buf, sizeof(buf));
+	len = snprintf(buf, sizeof(buf), "%u\n", val);
+	if (len == -1)
+		return -1;
+	return dhcp_writefile(ctx, path, 0664, buf, (size_t)len);
 }
 
 int
