@@ -63,7 +63,7 @@ ps_bpf_recvbpf(void *arg)
 {
 	struct ps_process *psp = arg;
 	struct bpf *bpf = psp->psp_bpf;
-	uint8_t buf[sizeof(bpf->bpf_flags) + FRAMELEN_MAX];
+	uint8_t buf[FRAMELEN_MAX];
 	ssize_t len;
 	struct ps_msghdr psm = {
 		.ps_id = psp->psp_id,
@@ -74,14 +74,12 @@ ps_bpf_recvbpf(void *arg)
 	/* A BPF read can read more than one filtered packet at time.
 	 * This mechanism allows us to read each packet from the buffer. */
 	while (!(bpf->bpf_flags & BPF_EOF)) {
-		len = bpf_read(bpf,
-		    buf + sizeof(bpf->bpf_flags),
-		    sizeof(buf) - sizeof(bpf->bpf_flags));
+		len = bpf_read(bpf, buf, sizeof(buf));
 		if (len == -1)
 			logerr(__func__);
 		if (len == -1 || len == 0)
 			break;
-		memcpy(buf, &bpf->bpf_flags, sizeof(bpf->bpf_flags));
+		psm.ps_flags = bpf->bpf_flags;
 		len = ps_sendpsmdata(psp->psp_ctx, psp->psp_ctx->ps_data_fd,
 		    &psm, buf, (size_t)len + sizeof(bpf->bpf_flags));
 		if (len == -1 && errno != ECONNRESET)
@@ -282,23 +280,19 @@ ps_bpf_dispatch(struct dhcpcd_ctx *ctx,
 	struct interface *ifp;
 	uint8_t *bpf;
 	size_t bpf_len;
-	unsigned int bpf_flags;
 
 	ifp = if_findindex(ctx->ifaces, psm->ps_id.psi_ifindex);
 	bpf = iov->iov_base;
 	bpf_len = iov->iov_len;
-	memcpy(&bpf_flags, bpf, sizeof(bpf_flags));
-	bpf += sizeof(bpf_flags);
-	bpf_len -= sizeof(bpf_flags);
 
 	switch (psm->ps_cmd) {
 #ifdef ARP
 	case PS_BPF_ARP:
-		arp_packet(ifp, bpf, bpf_len, bpf_flags);
+		arp_packet(ifp, bpf, bpf_len, (unsigned int)psm->ps_flags);
 		break;
 #endif
 	case PS_BPF_BOOTP:
-		dhcp_packet(ifp, bpf, bpf_len, bpf_flags);
+		dhcp_packet(ifp, bpf, bpf_len, (unsigned int)psm->ps_flags);
 		break;
 	default:
 		errno = ENOTSUP;
