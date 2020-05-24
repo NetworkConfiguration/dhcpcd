@@ -556,6 +556,7 @@ ps_root_recvmsg(void *arg)
 		logerr(__func__);
 }
 
+#ifdef PLUGIN_DEV
 static int
 ps_root_handleinterface(void *arg, int action, const char *ifname)
 {
@@ -576,6 +577,7 @@ ps_root_handleinterface(void *arg, int action, const char *ifname)
 	return (int)ps_sendcmd(ctx, ctx->ps_data_fd, PS_DEV_IFCMD, flag,
 	    ifname, strlen(ifname) + 1);
 }
+#endif
 
 static int
 ps_root_startcb(void *arg)
@@ -612,11 +614,13 @@ ps_root_startcb(void *arg)
 		return -1;
 #endif
 
+#ifdef PLUGIN_DEV
 	/* Start any dev listening plugin which may want to
 	 * change the interface name provided by the kernel */
 	if ((ctx->options & (DHCPCD_MASTER | DHCPCD_DEV)) ==
 	    (DHCPCD_MASTER | DHCPCD_DEV))
 		dev_start(ctx, ps_root_handleinterface);
+#endif
 
 	return 0;
 }

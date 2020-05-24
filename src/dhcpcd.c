@@ -2256,12 +2256,14 @@ printpidfile:
 		goto exit_failure;
 	}
 
+#ifdef PLUGIN_DEV
 	/* Start any dev listening plugin which may want to
 	 * change the interface name provided by the kernel */
 	if (!IN_PRIVSEP(&ctx) &&
 	    (ctx.options & (DHCPCD_MASTER | DHCPCD_DEV)) ==
 	    (DHCPCD_MASTER | DHCPCD_DEV))
 		dev_start(&ctx, dhcpcd_handleinterface);
+#endif
 
 	setproctitle("%s%s%s",
 	    ctx.options & DHCPCD_MASTER ? "[master]" : argv[optind],
@@ -2454,7 +2456,9 @@ exit1:
 #ifdef INET6
 	ipv6_ctxfree(&ctx);
 #endif
+#ifdef PLUGIN_DEV
 	dev_stop(&ctx);
+#endif
 #ifdef PRIVSEP
 	eloop_free(ctx.ps_eloop);
 #endif

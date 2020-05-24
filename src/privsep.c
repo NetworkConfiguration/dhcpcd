@@ -697,7 +697,9 @@ ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd,
 		logdebugx("process %d stopping", getpid());
 #endif
 		ps_free(ctx);
+#ifdef PLUGIN_DEV
 		dev_stop(ctx);
+#endif
 		eloop_exit(ctx->eloop, len != -1 ? EXIT_SUCCESS : EXIT_FAILURE);
 		return len;
 	}
