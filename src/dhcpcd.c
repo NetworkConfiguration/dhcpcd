@@ -384,7 +384,6 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 static void
 dhcpcd_drop(struct interface *ifp, int stop)
 {
-	return;
 
 #ifdef DHCP6
 	dhcp6_drop(ifp, stop ? NULL : "EXPIRE6");
@@ -1347,13 +1346,13 @@ stop_all_interfaces(struct dhcpcd_ctx *ctx, unsigned long long opts)
 	ctx->options |= DHCPCD_EXITING;
 	/* Drop the last interface first */
 	TAILQ_FOREACH_REVERSE(ifp, ctx->ifaces, if_head, next) {
-		if (ifp->active) {
-			ifp->options->options |= opts;
-			if (ifp->options->options & DHCPCD_RELEASE)
-				ifp->options->options &= ~DHCPCD_PERSISTENT;
-			ifp->options->options |= DHCPCD_EXITING;
-			stop_interface(ifp);
-		}
+		if (!ifp->active)
+			continue;
+		ifp->options->options |= opts;
+		if (ifp->options->options & DHCPCD_RELEASE)
+			ifp->options->options &= ~DHCPCD_PERSISTENT;
+		ifp->options->options |= DHCPCD_EXITING;
+		stop_interface(ifp);
 	}
 }
 
