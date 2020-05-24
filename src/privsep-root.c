@@ -44,6 +44,7 @@
 #include <unistd.h>
 
 #include "common.h"
+#include "dev.h"
 #include "dhcpcd.h"
 #include "dhcp6.h"
 #include "eloop.h"
@@ -525,6 +526,14 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		 err = ip6_forwarding(data);
 		 break;
 #endif
+#ifdef PLUGIN_DEV
+	case PS_DEV_INITTED:
+		err = dev_initialized(ctx, data);
+		break;
+	case PS_DEV_LISTENING:
+		err = dev_listening(ctx);
+		break;
+#endif
 	default:
 		err = ps_root_os(psm, msg);
 		break;
@@ -545,6 +554,27 @@ ps_root_recvmsg(void *arg)
 	if (ps_recvpsmsg(ctx, ctx->ps_root_fd, ps_root_recvmsgcb, ctx) == -1 &&
 	    errno != ECONNRESET)
 		logerr(__func__);
+}
+
+static int
+ps_root_handleinterface(void *arg, int action, const char *ifname)
+{
+	struct dhcpcd_ctx *ctx = arg;
+	unsigned long flag;
+
+	if (action == 1)
+		flag = PS_DEV_IFADDED;
+	else if (action == -1)
+		flag = PS_DEV_IFREMOVED;
+	else if (action == 0)
+		flag = PS_DEV_IFUPDATED;
+	else {
+		errno = EINVAL;
+		return -1;
+	}
+
+	return (int)ps_sendcmd(ctx, ctx->ps_data_fd, PS_DEV_IFCMD, flag,
+	    ifname, strlen(ifname) + 1);
 }
 
 static int
@@ -582,6 +612,12 @@ ps_root_startcb(void *arg)
 		return -1;
 #endif
 
+	/* Start any dev listening plugin which may want to
+	 * change the interface name provided by the kernel */
+	if ((ctx->options & (DHCPCD_MASTER | DHCPCD_DEV)) ==
+	    (DHCPCD_MASTER | DHCPCD_DEV))
+		dev_start(ctx, ps_root_handleinterface);
+
 	return 0;
 }
 
@@ -603,17 +639,58 @@ ps_root_signalcb(int sig, void *arg)
 	eloop_exit(ctx->eloop, sig == SIGTERM ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
+int (*handle_interface)(void *, int, const char *);
+
+#ifdef PLUGIN_DEV
+static ssize_t
+ps_root_devcb(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg)
+{
+	int action;
+	struct iovec *iov = msg->msg_iov;
+
+	if (msg->msg_iovlen != 1) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	switch(psm->ps_flags) {
+	case PS_DEV_IFADDED:
+		action = 1;
+		break;
+	case PS_DEV_IFREMOVED:
+		action = -1;
+		break;
+	case PS_DEV_IFUPDATED:
+		action = 0;
+		break;
+	default:
+		errno = EINVAL;
+		return -1;
+	}
+
+	return dhcpcd_handleinterface(ctx, action, iov->iov_base);
+}
+#endif
+
 static ssize_t
 ps_root_dispatchcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 {
 	struct dhcpcd_ctx *ctx = arg;
 	ssize_t err;
 
-#ifdef INET
-	err = ps_bpf_dispatch(ctx, psm, msg);
-	if (err == -1 && errno == ENOTSUP)
+	switch(psm->ps_cmd) {
+#ifdef PLUGIN_DEV
+	case PS_DEV_IFCMD:
+		err = ps_root_devcb(ctx, psm, msg);
+		break;
 #endif
-		err = ps_inet_dispatch(ctx, psm, msg);
+	default:
+		err = ps_bpf_dispatch(ctx, psm, msg);
+#ifdef INET
+		if (err == -1 && errno == ENOTSUP)
+#endif
+			err = ps_inet_dispatch(ctx, psm, msg);
+	}
 	return err;
 }
 
@@ -824,5 +901,26 @@ ps_root_ip6forwarding(struct dhcpcd_ctx *ctx, const char *ifname)
 	    PS_IP6FORWARDING, 0, ifname, strlen(ifname) + 1) == -1)
 		return -1;
 	return ps_root_readerror(ctx, NULL, 0);
+}
+#endif
+
+#ifdef PLUGIN_DEV
+int
+ps_root_dev_initialized(struct dhcpcd_ctx *ctx, const char *ifname)
+{
+
+	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_DEV_INITTED, 0,
+	    ifname, strlen(ifname) + 1)== -1)
+		return -1;
+	return (int)ps_root_readerror(ctx, NULL, 0);
+}
+
+int
+ps_root_dev_listening(struct dhcpcd_ctx * ctx)
+{
+
+	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_DEV_LISTENING, 0, NULL, 0)== -1)
+		return -1;
+	return (int)ps_root_readerror(ctx, NULL, 0);
 }
 #endif

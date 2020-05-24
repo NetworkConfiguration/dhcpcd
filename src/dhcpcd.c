@@ -2258,9 +2258,10 @@ printpidfile:
 
 	/* Start any dev listening plugin which may want to
 	 * change the interface name provided by the kernel */
-	if ((ctx.options & (DHCPCD_MASTER | DHCPCD_DEV)) ==
+	if (!IN_PRIVSEP(&ctx) &&
+	    (ctx.options & (DHCPCD_MASTER | DHCPCD_DEV)) ==
 	    (DHCPCD_MASTER | DHCPCD_DEV))
-		dev_start(&ctx);
+		dev_start(&ctx, dhcpcd_handleinterface);
 
 	setproctitle("%s%s%s",
 	    ctx.options & DHCPCD_MASTER ? "[master]" : argv[optind],

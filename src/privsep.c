@@ -63,6 +63,7 @@
 #include "arp.h"
 #include "common.h"
 #include "control.h"
+#include "dev.h"
 #include "dhcp.h"
 #include "dhcp6.h"
 #include "eloop.h"
@@ -696,6 +697,7 @@ ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd,
 		logdebugx("process %d stopping", getpid());
 #endif
 		ps_free(ctx);
+		dev_stop(ctx);
 		eloop_exit(ctx->eloop, len != -1 ? EXIT_SUCCESS : EXIT_FAILURE);
 		return len;
 	}
