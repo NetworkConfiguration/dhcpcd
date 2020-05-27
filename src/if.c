@@ -381,7 +381,7 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 	struct if_laddrreq iflr = { .flags = IFLR_PREFIX };
 	int link_fd;
 #endif
-#elif AF_PACKET
+#elif defined(AF_PACKET)
 	const struct sockaddr_ll *sll;
 #endif
 #if defined(SIOCGIFPRIORITY)
@@ -423,7 +423,7 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 #ifdef AF_LINK
 			if (ifa->ifa_addr->sa_family != AF_LINK)
 				continue;
-#elif AF_PACKET
+#elif defined(AF_PACKET)
 			if (ifa->ifa_addr->sa_family != AF_PACKET)
 				continue;
 #endif
@@ -578,7 +578,7 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 			}
 			ifp->hwlen = sdl->sdl_alen;
 			memcpy(ifp->hwaddr, CLLADDR(sdl), ifp->hwlen);
-#elif AF_PACKET
+#elif defined(AF_PACKET)
 			sll = (const void *)ifa->ifa_addr;
 			ifp->index = (unsigned int)sll->sll_ifindex;
 			ifp->hwtype = sll->sll_hatype;
