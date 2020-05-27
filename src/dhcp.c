@@ -3375,9 +3375,11 @@ checksums_valid(void *packet,
 		struct ip ip;
 		uint16_t w[sizeof(struct ip) / 2];
 	} pip = {
-		.ip.ip_p = IPPROTO_UDP,
-		.ip.ip_src = ip->ip_src,
-		.ip.ip_dst = ip->ip_dst,
+		.ip = {
+			.ip_p = IPPROTO_UDP,
+			.ip_src = ip->ip_src,
+			.ip_dst = ip->ip_dst,
+		}
 	};
 	size_t ip_hlen;
 	struct udphdr udp;
