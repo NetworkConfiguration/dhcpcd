@@ -288,7 +288,7 @@ sa_toprefix(const struct sockaddr *sa)
 #ifndef NDEBUG
 	/* Ensure the calculation is correct */
 	if (!sa_inprefix) {
-		union sa_ss ss = { .sa.sa_family = sa->sa_family };
+		union sa_ss ss = { .sa = { .sa_family = sa->sa_family } };
 
 		sa_inprefix = true;
 		sa_fromprefix(&ss.sa, prefix);
