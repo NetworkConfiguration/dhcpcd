@@ -903,6 +903,8 @@ EOF
 fi
 if [ "$OPEN_MEMSTREAM" = yes ]; then
 	echo "#define	HAVE_OPEN_MEMSTREAM" >>$CONFIG_H
+elif [ "$PRIVSEP" = yes ]; then
+	echo "WARNING: Ensure that /tmp exists in the privsep users chroot"
 fi
 
 if [ -z "$PIDFILE_LOCK" ]; then

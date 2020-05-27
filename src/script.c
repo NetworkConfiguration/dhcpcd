@@ -252,8 +252,10 @@ make_env(struct dhcpcd_ctx *ctx, const struct interface *ifp,
 
 	fp = NULL;
 	tmpfd = mkstemp(tmpfile);
-	if (tmpfd == -1)
-		goto eexit;
+	if (tmpfd == -1) {
+		logerr("%s: mkstemp", __func__);
+		return -1;
+	}
 	unlink(tmpfile);
 	fp = fdopen(tmpfd, "w+");
 	if (fp == NULL) {
