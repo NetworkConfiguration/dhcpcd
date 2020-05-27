@@ -262,21 +262,22 @@ dhcp6_makevendor(void *data, const struct interface *ifp)
 	size_t len, vlen, i;
 	uint8_t *p;
 	const struct vivco *vivco;
-	char vendor[VENDORCLASSID_MAX_LEN];
 	struct dhcp6_option o;
 
 	ifo = ifp->options;
 	len = sizeof(uint32_t); /* IANA PEN */
 	if (ifo->vivco_en) {
+		vlen = 0;
 		for (i = 0, vivco = ifo->vivco;
 		    i < ifo->vivco_len;
 		    i++, vivco++)
-			len += sizeof(uint16_t) + vivco->len;
-		vlen = 0; /* silence bogus gcc warning */
-	} else {
-		vlen = strlcpy(vendor, ifp->ctx->vendor, sizeof(vendor));
+			vlen += sizeof(uint16_t) + vivco->len;
+		len += vlen;
+	} else if (ifo->vendorclassid[0] != '\0') {
+		vlen = (size_t)ifo->vendorclassid[0];
 		len += sizeof(uint16_t) + vlen;
-	}
+	} else
+		return 0;
 
 	if (len > UINT16_MAX) {
 		logerrx("%s: DHCPv6 Vendor Class too big", ifp->name);
@@ -307,11 +308,11 @@ dhcp6_makevendor(void *data, const struct interface *ifp)
 				memcpy(p, vivco->data, vivco->len);
 				p += vivco->len;
 			}
-		} else if (vlen) {
+		} else if (ifo->vendorclassid[0] != '\0') {
 			hvlen = htons((uint16_t)vlen);
 			memcpy(p, &hvlen, sizeof(hvlen));
 			p += sizeof(hvlen);
-			memcpy(p, vendor, (size_t)vlen);
+			memcpy(p, ifo->vendorclassid + 1, (size_t)vlen);
 		}
 	}
 
