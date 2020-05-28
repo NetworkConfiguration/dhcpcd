@@ -274,7 +274,9 @@ dhcp6_makevendor(void *data, const struct interface *ifp)
 			vlen += sizeof(uint16_t) + vivco->len;
 		len += vlen;
 	} else if (ifo->vendorclassid[0] != '\0') {
-		vlen = (size_t)ifo->vendorclassid[0];
+		/* dhcpcd owns DHCPCD_IANA_PEN.
+		 * If you need your own string, get your own IANA PEN. */
+		vlen = strlen(ifp->ctx->vendor);
 		len += sizeof(uint16_t) + vlen;
 	} else
 		return 0;
@@ -312,7 +314,7 @@ dhcp6_makevendor(void *data, const struct interface *ifp)
 			hvlen = htons((uint16_t)vlen);
 			memcpy(p, &hvlen, sizeof(hvlen));
 			p += sizeof(hvlen);
-			memcpy(p, ifo->vendorclassid + 1, (size_t)vlen);
+			memcpy(p, ifp->ctx->vendor, vlen);
 		}
 	}
 
