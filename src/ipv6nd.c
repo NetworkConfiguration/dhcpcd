@@ -364,6 +364,12 @@ ipv6nd_sendrsprobe(void *arg)
 	}
 #endif
 #ifdef __sun
+	if (state->nd_fd == -1) {
+		if (ipv6nd_openif(ifp) == -1) {
+			logerr(__func__);
+			return;
+		}
+	}
 	s = state->nd_fd;
 #else
 	if (ctx->nd_fd == -1) {
