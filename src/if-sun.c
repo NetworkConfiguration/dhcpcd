@@ -1600,9 +1600,9 @@ if_initrt(struct dhcpcd_ctx *ctx, rb_tree_t *routes, int af)
 #ifdef INET
 /* XXX We should fix this to write via the BPF interface. */
 ssize_t
-bpf_send(const struct interface *ifp, __unused int fd, uint16_t protocol,
-    const void *data, size_t len)
+bpf_send(const struct bpf *bpf, uint16_t protocol, const void *data, size_t len)
 {
+	const struct interface *ifp = bpf->bpf_ifp;
 	dlpi_handle_t		dh;
 	dlpi_info_t		di;
 	int			r;
