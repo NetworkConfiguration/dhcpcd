@@ -693,15 +693,27 @@ if_nametospec(const char *ifname, struct if_spec *spec)
 	}
 
 	strlcpy(spec->devname, spec->drvname, sizeof(spec->devname));
+#ifdef __sun
+	/* Solaris has numbers in the driver name, such as e1000g */
+	while (ep > spec->drvname && isdigit((int)*ep))
+		ep--;
+	if (*ep++ == ':') {
+		errno = EINVAL;
+		return -1;
+	}
+#else
+	/* BSD and Linux no not have numbers in the driver name */
 	for (ep = spec->drvname; *ep != '\0' && !isdigit((int)*ep); ep++) {
 		if (*ep == ':') {
 			errno = EINVAL;
 			return -1;
 		}
 	}
+#endif
 	spec->ppa = (int)strtoi(ep, &pp, 10, 0, INT_MAX, &e);
 	*ep = '\0';
 
+#ifndef __sun
 	/*
 	 * . is used for VLAN style names
 	 * i is used on NetBSD for xvif interfaces
@@ -711,6 +723,7 @@ if_nametospec(const char *ifname, struct if_spec *spec)
 		if (e)
 			spec->vlid = -1;
 	} else
+#endif
 		spec->vlid = -1;
 
 	return 0;
