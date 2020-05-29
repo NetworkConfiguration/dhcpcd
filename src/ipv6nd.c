@@ -253,7 +253,7 @@ ipv6nd_openif(struct interface *ifp)
 	if (state->nd_fd != -1)
 		return state->nd_fd;
 
-	fd = ipv6nd_open0(true);
+	fd = ipv6nd_open(true);
 	if (fd == -1)
 		return -1;
 
@@ -331,7 +331,9 @@ ipv6nd_sendrsprobe(void *arg)
 	struct cmsghdr *cm;
 	struct in6_pktinfo pi = { .ipi6_ifindex = ifp->index };
 	int s;
+#ifndef __sun
 	struct dhcpcd_ctx *ctx = ifp->ctx;
+#endif
 
 	if (ipv6_linklocal(ifp) == NULL) {
 		logdebugx("%s: delaying Router Solicitation for LL address",

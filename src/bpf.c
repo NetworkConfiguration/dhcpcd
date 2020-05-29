@@ -251,7 +251,7 @@ bpf_read(struct bpf *bpf, void *data, size_t len)
 			/* After 2^31 bytes, the kernel offset overflows.
 			 * To work around this bug, lseek 0. */
 			if (bytes == -1 && errno == EINVAL) {
-				lseek(fd, 0, SEEK_SET);
+				lseek(bpf->bpf_fd, 0, SEEK_SET);
 				continue;
 			}
 #endif
