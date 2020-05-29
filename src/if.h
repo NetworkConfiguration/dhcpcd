@@ -119,6 +119,11 @@ typedef unsigned long		ioctl_request_t;
  * but then ignores it. */
 #undef RTF_CLONING
 
+/* This interface is busted on DilOS at least.
+ * It used to work, but lukily Solaris can fall back to
+ * IP_PKTINFO. */
+#undef IP_RECVIF
+
 /* Solaris getifaddrs is very un-suitable for dhcpcd.
  * See if-sun.c for details why. */
 struct ifaddrs;
