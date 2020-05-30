@@ -50,7 +50,7 @@ ps_root_dosendnetlink(int protocol, struct msghdr *msg)
 	};
 	ssize_t retval;
 
-	if ((s = if_linksocket(&snl, protocol)) == -1)
+	if ((s = if_linksocket(&snl, protocol, 0)) == -1)
 		return -1;
 
 	if (sendmsg(s, msg, 0) == -1) {
