@@ -686,10 +686,15 @@ if_nametospec(const char *ifname, struct if_spec *spec)
 			errno = e;
 			return -1;
 		}
-		*ep-- = '\0';
+		*ep = '\0';
+#ifdef __sun
+		ep--;
+#endif
 	} else {
 		spec->lun = -1;
+#ifdef __sun
 		ep = spec->drvname + strlen(spec->drvname) - 1;
+#endif
 	}
 
 	strlcpy(spec->devname, spec->drvname, sizeof(spec->devname));

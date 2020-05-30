@@ -3753,7 +3753,7 @@ static int
 dhcp_init(struct interface *ifp)
 {
 	struct dhcp_state *state;
-	const struct if_options *ifo;
+	struct if_options *ifo;
 	uint8_t len;
 	char buf[(sizeof(ifo->clientid) - 1) * 3];
 
@@ -3824,7 +3824,7 @@ dhcp_init(struct interface *ifp)
 		 * at device start. */
 		return 0;
 
-	if (ifo->options & DHCPCD_CLIENTID)
+	if (ifo->options & DHCPCD_CLIENTID && state->clientid != NULL)
 		logdebugx("%s: using ClientID %s", ifp->name,
 		    hwaddr_ntoa(state->clientid + 1, state->clientid[0],
 			buf, sizeof(buf)));
