@@ -46,7 +46,7 @@ hwaddr_ntoa(const void *hwaddr, size_t hwlen, char *buf, size_t buflen)
 	const unsigned char *hp, *ep;
 	char *p;
 
-	if (buf == NULL)
+	if (buf == NULL || hwlen == 0)
 		return NULL;
 
 	if (hwlen * 3 > buflen) {

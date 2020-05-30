@@ -3743,13 +3743,17 @@ dhcp6_openraw(void)
 
 	v = 1;
 	if (setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &v, sizeof(v)) == -1)
-		return -1;
+		goto errexit;
 
 	v = offsetof(struct udphdr, uh_sum);
 	if (setsockopt(fd, IPPROTO_IPV6, IPV6_CHECKSUM, &v, sizeof(v)) == -1)
-		return -1;
+		goto errexit;
 
 	return fd;
+
+errexit:
+	close(fd);
+	return -1;
 }
 
 int
