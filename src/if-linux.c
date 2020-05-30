@@ -891,9 +891,11 @@ link_netlink(struct dhcpcd_ctx *ctx, void *arg, struct nlmsghdr *nlm)
 	}
 
 	if (nlm->nlmsg_type == RTM_DELLINK) {
+#ifdef PLUGIN_DEV
 		/* If are listening to a dev manager, let that remove
 		 * the interface rather than the kernel. */
 		if (dev_listening(ctx) < 1)
+#endif
 			dhcpcd_handleinterface(ctx, -1, ifn);
 		return 0;
 	}
@@ -910,9 +912,11 @@ link_netlink(struct dhcpcd_ctx *ctx, void *arg, struct nlmsghdr *nlm)
 	/* Check for a new interface */
 	ifp = if_findindex(ctx->ifaces, (unsigned int)ifi->ifi_index);
 	if (ifp == NULL) {
+#ifdef PLUGIN_DEV
 		/* If are listening to a dev manager, let that announce
 		 * the interface rather than the kernel. */
 		if (dev_listening(ctx) < 1)
+#endif
 			dhcpcd_handleinterface(ctx, 1, ifn);
 		return 0;
 	}
