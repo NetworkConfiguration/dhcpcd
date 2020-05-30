@@ -1165,6 +1165,9 @@ dhcpcd_linkoverflow(struct dhcpcd_ctx *ctx)
 {
 	socklen_t socklen;
 	int rcvbuflen;
+	char buf[2048];
+	ssize_t rlen;
+	size_t rcnt;
 	struct if_head *ifaces;
 	struct ifaddrs *ifaddrs;
 	struct interface *ifp, *ifn, *ifp1;
@@ -1181,24 +1184,18 @@ dhcpcd_linkoverflow(struct dhcpcd_ctx *ctx)
 	logerrx("route socket overflowed (rcvbuflen %d)"
 	    " - learning interface state", rcvbuflen);
 
-#ifndef HAVE_PLEDGE
-	/* Close the existing socket and open a new one.
-	 * This is easier than draining the kernel buffer of an
-	 * in-determinate size. */
-	eloop_event_delete(ctx->eloop, ctx->link_fd);
-	close(ctx->link_fd);
-	if_closesockets_os(ctx);
-	if (if_opensockets_os(ctx) == -1) {
-		logerr("%s: if_opensockets", __func__);
-		eloop_exit(ctx->eloop, EXIT_FAILURE);
-		return;
-	}
-#endif
-
-#ifndef SMALL
-	dhcpcd_setlinkrcvbuf(ctx);
-#endif
-	eloop_event_add(ctx->eloop, ctx->link_fd, dhcpcd_handlelink, ctx);
+	/* Drain the socket.
+	 * We cannot open a new one due to privsep. */
+	rcnt = 0;
+	do {
+		rlen = read(ctx->link_fd, buf, sizeof(buf));
+		if (++rcnt == 100) {
+			logwarnx("drained %zu messages", rcnt);
+			rcnt = 0;
+		}
+	} while (rlen != -1 || errno == ENOBUFS || errno == ENOMEM);
+	if (rcnt != 100)
+		logwarnx("drained %zu messages", rcnt);
 
 	/* Work out the current interfaces. */
 	ifaces = if_discover(ctx, &ifaddrs, ctx->ifc, ctx->ifv);
