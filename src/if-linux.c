@@ -2046,8 +2046,8 @@ ip6_forwarding(const char *ifname)
 		return 0;
 	i = (int)strtoi(buf, NULL, 0, INT_MIN, INT_MAX, &error);
 	if (error != 0)
-		return -1;
-	return error != 0 ? 0 : i;
+		return 0;
+	return i;
 }
 
 #endif /* INET6 */

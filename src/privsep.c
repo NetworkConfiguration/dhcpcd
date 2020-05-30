@@ -248,7 +248,7 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 errexit:
 	/* Failure to start root or inet processes is fatal. */
 	if (priv_fd == &ctx->ps_root_fd || priv_fd == &ctx->ps_inet_fd)
-		ps_sendcmd(ctx, *priv_fd, PS_STOP, 0, NULL, 0);
+		(void)ps_sendcmd(ctx, *priv_fd, PS_STOP, 0, NULL, 0);
 	shutdown(*priv_fd, SHUT_RDWR);
 	*priv_fd = -1;
 	return -1;
