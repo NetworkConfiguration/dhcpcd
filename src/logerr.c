@@ -237,6 +237,7 @@ vlogerrmessage(int pri, const char *fmt, va_list args)
 
 	vsnprintf(buf, sizeof(buf), fmt, args);
 	logmessage(pri, "%s: %s", buf, strerror(_errno));
+	errno = _errno;
 }
 
 __printflike(2, 3) void
