@@ -1189,12 +1189,10 @@ dhcpcd_linkoverflow(struct dhcpcd_ctx *ctx)
 	rcnt = 0;
 	do {
 		rlen = read(ctx->link_fd, buf, sizeof(buf));
-		if (++rcnt == 100) {
+		if (++rcnt % 1000 == 0)
 			logwarnx("drained %zu messages", rcnt);
-			rcnt = 0;
-		}
 	} while (rlen != -1 || errno == ENOBUFS || errno == ENOMEM);
-	if (rcnt != 100)
+	if (rcnt % 1000 != 0)
 		logwarnx("drained %zu messages", rcnt);
 
 	/* Work out the current interfaces. */
