@@ -160,6 +160,8 @@ get_line(char ** __restrict buf, ssize_t * __restrict buflen)
 
 	do {
 		p = *buf;
+		if (*buf == NULL)
+			return NULL;
 		c = memchr(*buf, '\n', (size_t)*buflen);
 		if (c == NULL) {
 			c = memchr(*buf, '\0', (size_t)*buflen);

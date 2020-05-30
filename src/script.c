@@ -719,7 +719,7 @@ script_runreason(const struct interface *ifp, const char *reason)
 	}
 #endif
 
-	status = script_run(ctx, argv);
+	script_run(ctx, argv);
 
 send_listeners:
 	/* Send to our listeners */

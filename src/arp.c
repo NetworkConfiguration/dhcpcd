@@ -538,7 +538,7 @@ arp_new(struct interface *ifp, const struct in_addr *addr)
 		}
 		TAILQ_INIT(&state->arp_states);
 	} else {
-		if (addr && (astate = arp_find(ifp, addr)))
+		if ((astate = arp_find(ifp, addr)) != NULL)
 			return astate;
 	}
 

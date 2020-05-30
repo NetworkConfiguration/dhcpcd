@@ -1267,7 +1267,8 @@ dhcpcd_handlehwaddr(struct interface *ifp,
 	loginfox("%s: new hardware address: %s", ifp->name,
 	    hwaddr_ntoa(hwaddr, hwlen, buf, sizeof(buf)));
 	ifp->hwlen = hwlen;
-	memcpy(ifp->hwaddr, hwaddr, hwlen);
+	if (hwaddr != NULL)
+		memcpy(ifp->hwaddr, hwaddr, hwlen);
 }
 
 static void
@@ -2062,7 +2063,7 @@ printpidfile:
 
 #ifdef USE_SIGNALS
 	for (si = 0; si < dhcpcd_signals_ignore_len; si++)
-		signal(dhcpcd_signals_ignore[i], SIG_IGN);
+		signal(dhcpcd_signals_ignore[si], SIG_IGN);
 
 	/* Save signal mask, block and redirect signals to our handler */
 	if (eloop_signal_set_cb(ctx.eloop,
