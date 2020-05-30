@@ -594,6 +594,7 @@ static void
 ipv6_deletedaddr(struct ipv6_addr *ia)
 {
 
+#ifdef DHCP6
 #ifdef PRIVSEP
 	if (!(ia->iface->ctx->options & DHCPCD_MASTER))
 		ps_inet_closedhcp6(ia);
@@ -606,6 +607,9 @@ ipv6_deletedaddr(struct ipv6_addr *ia)
 	 * This should ensure the reject route will be restored. */
 	if (ia->delegating_prefix != NULL)
 		ia->delegating_prefix->flags &= ~IPV6_AF_NOREJECT;
+#endif
+#else
+	UNUSED(ia);
 #endif
 }
 

@@ -526,7 +526,7 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		free_rdata = true;
 		break;
 #endif
-#if defined(__linux__) || defined(HAVE_PLEDGE)
+#if defined(INET6) && (defined(__linux__) || defined(HAVE_PLEDGE))
 	case PS_IP6FORWARDING:
 		 err = ip6_forwarding(data);
 		 break;
@@ -694,8 +694,8 @@ ps_root_dispatchcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		break;
 #endif
 	default:
-		err = ps_bpf_dispatch(ctx, psm, msg);
 #ifdef INET
+		err = ps_bpf_dispatch(ctx, psm, msg);
 		if (err == -1 && errno == ENOTSUP)
 #endif
 			err = ps_inet_dispatch(ctx, psm, msg);

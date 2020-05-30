@@ -1242,7 +1242,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		del_option_mask(ifo->nomask, DHO_DNSSEARCH);
 #endif
 
-#ifdef INET6
+#ifdef DHCP6
 		del_option_mask(ifo->nomask6, D6_OPTION_DNS_SERVERS);
 		del_option_mask(ifo->nomask6, D6_OPTION_DOMAIN_LIST);
 		del_option_mask(ifo->nomask6, D6_OPTION_SOL_MAX_RT);
