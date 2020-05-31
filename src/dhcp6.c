@@ -1483,7 +1483,7 @@ void dhcp6_renew(struct interface *ifp)
 	dhcp6_startrenew(ifp);
 }
 
-int
+bool
 dhcp6_dadcompleted(const struct interface *ifp)
 {
 	const struct dhcp6_state *state;
@@ -1493,9 +1493,9 @@ dhcp6_dadcompleted(const struct interface *ifp)
 	TAILQ_FOREACH(ap, &state->addrs, next) {
 		if (ap->flags & IPV6_AF_ADDED &&
 		    !(ap->flags & IPV6_AF_DADCOMPLETED))
-			return 0;
+			return false;
 	}
-	return 1;
+	return true;
 }
 
 static void
@@ -4291,5 +4291,26 @@ delegated:
 #endif
 
 	return 1;
+}
+#endif
+
+#ifndef SMALL
+int
+dhcp6_dump(struct interface *ifp)
+{
+	struct dhcp6_state *state;
+
+	ifp->if_data[IF_DATA_DHCP6] = state = calloc(1, sizeof(*state));
+	if (state == NULL) {
+		logerr(__func__);
+		return -1;
+	}
+	TAILQ_INIT(&state->addrs);
+	if (dhcp6_readlease(ifp, 0) == -1) {
+		logerr("dhcp6_readlease");
+		return -1;
+	}
+	state->reason = "DUMP6";
+	return script_runreason(ifp, state->reason);
 }
 #endif
