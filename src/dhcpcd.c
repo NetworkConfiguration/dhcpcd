@@ -29,6 +29,7 @@
 const char dhcpcd_copyright[] = "Copyright (c) 2006-2020 Roy Marples";
 
 #include <sys/file.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -1663,20 +1664,13 @@ dumperr:
 	return 0;
 }
 
-static const char *dumpskip[] = {
-	"PATH=",
-	"pid=",
-	"chroot=",
-};
-
 static int
 dhcpcd_readdump(struct dhcpcd_ctx *ctx)
 {
 	int error = 0;
-	size_t nifaces, buflen = 0, dlen, i;
+	size_t nifaces, buflen = 0, dlen;
 	ssize_t len;
-	char *buf = NULL, *dp, *de;
-	const char *skip;
+	char *buf = NULL;
 
 again1:
 	len = read(ctx->control_fd, &nifaces, sizeof(nifaces));
@@ -1723,26 +1717,7 @@ again3:
 			error = -1;
 			goto out;
 		}
-		dp = buf;
-		de = dp + dlen;
-		if (*(de - 1) != '\0') {
-			errno = EINVAL;
-			error = -1;
-			goto out;
-		}
-		while (dp < de) {
-			for (i = 0; i < __arraycount(dumpskip); i++) {
-				skip = dumpskip[i];
-				if (strncmp(dp, skip, strlen(skip)) == 0)
-					break;
-			}
-			if (i == __arraycount(dumpskip)) {
-				if (strncmp(dp, "new_", 4) == 0)
-					dp += 4;
-				printf("%s\n", dp);
-			}
-			dp += strlen(dp) + 1;
-		}
+		script_dump(buf, dlen);
 		fflush(stdout);
 		if (nifaces != 1)
 			putchar('\n');
@@ -2104,6 +2079,45 @@ printpidfile:
 			logerrx("pid %d failed to exit", pid);
 			goto exit_failure;
 		}
+	}
+#endif
+
+#ifndef SMALL
+	if (ctx.options & DHCPCD_DUMPLEASE &&
+	    ioctl(fileno(stdin), FIONREAD, &i, sizeof(i)) == 0 &&
+	    i > 0)
+	{
+		ifp = calloc(1, sizeof(*ifp));
+		if (ifp == NULL) {
+			logerr(__func__);
+			goto exit_failure;
+		}
+		ifp->ctx = &ctx;
+		ifp->options = ifo;
+		switch (family) {
+		case AF_INET:
+#ifdef INET
+			if (dhcp_dump(ifp) == -1)
+				goto exit_failure;
+			break;
+#else
+			logerrx("No DHCP support");
+			goto exit_failure
+#endif
+		case AF_INET6:
+#ifdef DHCP6
+			if (dhcp6_dump(ifp) == -1)
+				goto exit_failure;
+			break;
+#else
+			logerrx("No DHCP6 support");
+			goto exit_failure
+#endif
+		default:
+			logerrx("Family not specified. Please use -4 or -6.");
+			goto exit_failure;
+		}
+		goto exit_success;
 	}
 #endif
 

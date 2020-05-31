@@ -4176,3 +4176,24 @@ dhcp_handleifa(int cmd, struct ipv4_addr *ia, pid_t pid)
 
 	return ia;
 }
+
+#ifndef SMALL
+int
+dhcp_dump(struct interface *ifp)
+{
+	struct dhcp_state *state;
+
+	ifp->if_data[IF_DATA_DHCP] = state = calloc(1, sizeof(*state));
+	if (state == NULL) {
+		logerr(__func__);
+		return -1;
+	}
+	state->new_len = read_lease(ifp, &state->new);
+	if (state->new == NULL) {
+		logerr("read_lease");
+		return -1;
+	}
+	state->reason = "DUMP";
+	return script_runreason(ifp, state->reason);
+}
+#endif
