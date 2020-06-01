@@ -131,6 +131,20 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 	return 0;
 }
 
+static int
+ps_setbuf(int fd)
+{
+	socklen_t len = (socklen_t)sizeof(struct ps_msg);
+
+	if (setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &len, sizeof(len)) == -1 ||
+	    setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &len, sizeof(len)) == -1)
+	{
+		logerr(__func__);
+		return -1;
+	}
+	return 0;
+}
+
 pid_t
 ps_dostart(struct dhcpcd_ctx *ctx,
     pid_t *priv_pid, int *priv_fd,
@@ -160,6 +174,7 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 	case 0:
 		*priv_fd = fd[1];
 		close(fd[0]);
+		ps_setbuf(*priv_fd);
 		break;
 	default:
 		*priv_pid = pid;
@@ -181,6 +196,7 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 			logerr("%s: eloop_event_add", __func__);
 			return -1;
 		}
+		ps_setbuf(*priv_fd);
 		return pid;
 	}
 
