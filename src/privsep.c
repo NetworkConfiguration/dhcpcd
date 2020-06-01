@@ -132,12 +132,33 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 }
 
 static int
+ps_setbuf0(int fd, int ctl, int minlen)
+{
+	int len;
+	socklen_t slen;
+
+	slen = sizeof(len);
+	if (getsockopt(fd, SOL_SOCKET, ctl, &len, &slen) == -1)
+		return -1;
+
+#ifdef __linux__
+	len /= 2;
+#endif
+	if (len >= minlen)
+		return 0;
+
+	return setsockopt(fd, SOL_SOCKET, ctl, &minlen, sizeof(minlen));
+}
+
+static int
 ps_setbuf(int fd)
 {
-	socklen_t len = (socklen_t)sizeof(struct ps_msg);
+	/* Ensure we can receive a fully sized privsep message.
+	 * Double the send buffer. */
+	int minlen = (int)sizeof(struct ps_msg);
 
-	if (setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &len, sizeof(len)) == -1 ||
-	    setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &len, sizeof(len)) == -1)
+	if (ps_setbuf0(fd, SO_RCVBUF, minlen) == -1 ||
+	    ps_setbuf0(fd, SO_SNDBUF, minlen * 2) == -1)
 	{
 		logerr(__func__);
 		return -1;
