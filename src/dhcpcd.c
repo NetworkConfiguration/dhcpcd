@@ -2102,7 +2102,7 @@ printpidfile:
 			break;
 #else
 			logerrx("No DHCP support");
-			goto exit_failure
+			goto exit_failure;
 #endif
 		case AF_INET6:
 #ifdef DHCP6
@@ -2111,7 +2111,7 @@ printpidfile:
 			break;
 #else
 			logerrx("No DHCP6 support");
-			goto exit_failure
+			goto exit_failure;
 #endif
 		default:
 			logerrx("Family not specified. Please use -4 or -6.");
