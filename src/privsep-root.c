@@ -607,19 +607,26 @@ ps_root_startcb(void *arg)
 	 * but makes life very easy for unicasting DHCPv6 in non master
 	 * mode as we no longer care about address selection. */
 #ifdef INET
-	ctx->udp_wfd = xsocket(PF_INET, SOCK_RAW | SOCK_CXNB, IPPROTO_UDP);
-	if (ctx->udp_wfd == -1)
-		return -1;
+	if (ctx->options & DHCPCD_IPV4) {
+		ctx->udp_wfd = xsocket(PF_INET,
+		    SOCK_RAW | SOCK_CXNB, IPPROTO_UDP);
+		if (ctx->udp_wfd == -1)
+			logerr("%s: dhcp_openraw", __func__);
+	}
 #endif
 #ifdef INET6
-	ctx->nd_fd = ipv6nd_open(false);
-	if (ctx->nd_fd == -1)
-		return -1;
+	if (ctx->options & DHCPCD_IPV6) {
+		ctx->nd_fd = ipv6nd_open(false);
+		if (ctx->udp_wfd == -1)
+			logerr("%s: ipv6nd_open", __func__);
+	}
 #endif
 #ifdef DHCP6
-	ctx->dhcp6_wfd = dhcp6_openraw();
-	if (ctx->dhcp6_wfd == -1)
-		return -1;
+	if (ctx->options & DHCPCD_IPV6) {
+		ctx->dhcp6_wfd = dhcp6_openraw();
+		if (ctx->udp_wfd == -1)
+			logerr("%s: dhcp6_openraw", __func__);
+	}
 #endif
 
 #ifdef PLUGIN_DEV
