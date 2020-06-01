@@ -336,11 +336,11 @@ ps_root_dowritefile(const struct dhcpcd_ctx *ctx,
 static ssize_t
 ps_root_dogetifaddrs(void **rdata, size_t *rlen)
 {
-	struct ifaddrs *ifaddrs, *ifa;
+	struct ifaddrs *ifaddrs, *ifa, *ifa_next;
 	size_t len;
 	uint8_t *buf, *sap;
 	socklen_t salen;
-	void *ifdata;
+	void *ifa_data;
 
 	if (getifaddrs(&ifaddrs) == -1)
 		return -1;
@@ -380,12 +380,15 @@ ps_root_dogetifaddrs(void **rdata, size_t *rlen)
 	*rlen = len;
 
 	for (ifa = ifaddrs; ifa != NULL; ifa = ifa->ifa_next) {
-		/* Don't carry ifa_data. */
-		ifdata = ifa->ifa_data;
+		/* Don't carry ifa_data or ifa_next. */
+		ifa_data = ifa->ifa_data;
+		ifa_next = ifa->ifa_next;
 		ifa->ifa_data = NULL;
+		ifa->ifa_next = NULL;
 		memcpy(buf, ifa, sizeof(*ifa));
 		buf += ALIGN(sizeof(*ifa));
-		ifa->ifa_data = ifdata;
+		ifa->ifa_data = ifa_data;
+		ifa->ifa_next = ifa_next;
 
 		strlcpy((char *)buf, ifa->ifa_name, IFNAMSIZ);
 		buf += ALIGN(IFNAMSIZ);
