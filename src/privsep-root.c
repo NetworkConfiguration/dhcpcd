@@ -124,6 +124,7 @@ ps_root_readerror(struct dhcpcd_ctx *ctx, void *data, size_t len)
 	    ps_root_readerrorcb, &psr_ctx) == -1)
 		return -1;
 
+	eloop_enter(ctx->ps_eloop);
 	eloop_start(ctx->ps_eloop, &ctx->sigset);
 
 	errno = psr_ctx.psr_error.psr_errno;
@@ -181,6 +182,7 @@ ps_root_mreaderror(struct dhcpcd_ctx *ctx, void **data, size_t *len)
 	    ps_root_mreaderrorcb, &psr_ctx) == -1)
 		return -1;
 
+	eloop_enter(ctx->ps_eloop);
 	eloop_start(ctx->ps_eloop, &ctx->sigset);
 
 	errno = psr_ctx.psr_error.psr_errno;
@@ -446,9 +448,21 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 
 			ps_freeprocess(psp);
 			return ret;
-		} else if (!(psm->ps_cmd & PS_START))
-			return ps_sendpsmmsg(ctx, psp->psp_fd, psm, msg);
-		/* Process has already started .... */
+		} else if (psm->ps_cmd & PS_START) {
+			/* Process has already started .... */
+			return 0;
+		}
+
+		err = ps_sendpsmmsg(ctx, psp->psp_fd, psm, msg);
+		if (err == -1) {
+			logerr("%s: failed to send message to pid %d",
+			    __func__, psp->psp_pid);
+			shutdown(psp->psp_fd, SHUT_RDWR);
+			close(psp->psp_fd);
+			psp->psp_fd = -1;
+			ps_dostop(ctx, &psp->psp_pid, &psp->psp_fd);
+			ps_freeprocess(psp);
+		}
 		return 0;
 	}
 
