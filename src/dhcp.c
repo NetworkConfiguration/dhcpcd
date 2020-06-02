@@ -2747,6 +2747,18 @@ dhcp_drop(struct interface *ifp, const char *reason)
 #endif
 		}
 	}
+#ifdef AUTH
+	else if (state->auth.reconf != NULL) {
+		/*
+		 * Drop the lease as the token may only be present
+		 * in the initial reply message and not subsequent
+		 * renewals.
+		 * If dhcpcd is restarted, the token is lost.
+		 * XXX persist this in another file?
+		 */
+		dhcp_unlink(ifp->ctx, state->leasefile);
+	}
+#endif
 
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 #ifdef AUTH
