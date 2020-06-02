@@ -92,6 +92,7 @@ int eloop_requeue(struct eloop *);
 void eloop_clear(struct eloop *);
 void eloop_free(struct eloop *);
 void eloop_exit(struct eloop *, int);
+void eloop_enter(struct eloop *);
 int eloop_start(struct eloop *, sigset_t *);
 
 #endif

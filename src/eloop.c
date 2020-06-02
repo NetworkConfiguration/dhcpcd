@@ -727,6 +727,13 @@ eloop_exit(struct eloop *eloop, int code)
 	eloop->exitnow = 1;
 }
 
+void
+eloop_enter(struct eloop *eloop)
+{
+
+	eloop->exitnow = 0;
+}
+
 #if defined(HAVE_KQUEUE) || defined(HAVE_EPOLL)
 static int
 eloop_open(struct eloop *eloop)
@@ -1010,7 +1017,6 @@ eloop_start(struct eloop *eloop, sigset_t *signals)
 
 	assert(eloop != NULL);
 
-	eloop->exitnow = 0;
 	for (;;) {
 		if (eloop->exitnow)
 			break;

@@ -288,6 +288,7 @@ errexit:
 		(void)ps_sendcmd(ctx, *priv_fd, PS_STOP, 0, NULL, 0);
 	shutdown(*priv_fd, SHUT_RDWR);
 	*priv_fd = -1;
+	eloop_exit(ctx->eloop, EXIT_FAILURE);
 	return -1;
 }
 
@@ -301,6 +302,9 @@ ps_dostop(struct dhcpcd_ctx *ctx, pid_t *pid, int *fd)
 #endif
 	if (*pid == 0)
 		return 0;
+	if (*fd == -1)
+		goto wait;
+
 	eloop_event_delete(ctx->eloop, *fd);
 	if (ps_sendcmd(ctx, *fd, PS_STOP, 0, NULL, 0) == -1 &&
 	    errno != ECONNRESET)
@@ -309,11 +313,8 @@ ps_dostop(struct dhcpcd_ctx *ctx, pid_t *pid, int *fd)
 		logerr(__func__);
 	close(*fd);
 	*fd = -1;
-	/* We won't have permission for all processes .... */
-#if 0
-	if (kill(*pid, SIGTERM) == -1)
-		logerr(__func__);
-#endif
+
+wait:
 	status = 0;
 
 #ifdef HAVE_CAPSICUM
@@ -544,7 +545,8 @@ ps_sendpsmmsg(struct dhcpcd_ctx *ctx, int fd,
 #ifdef PRIVSEP_DEBUG
 	logdebugx("%s: %zd", __func__, len);
 #endif
-	if ((len == -1 || len == 0) && ctx->options & DHCPCD_FORKED)
+	if ((len == -1 || len == 0) && ctx->options & DHCPCD_FORKED &&
+	    !(ctx->options & DHCPCD_PRIVSEPROOT))
 		eloop_exit(ctx->eloop, len == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 	return len;
 }
@@ -687,8 +689,12 @@ ps_recvmsg(struct dhcpcd_ctx *ctx, int rfd, uint16_t cmd, int wfd)
 #ifdef PRIVSEP_DEBUG
 	logdebugx("%s: recv fd %d, %zd bytes", __func__, rfd, len);
 #endif
-	if ((len == -1 || len == 0) && ctx->options & DHCPCD_FORKED) {
-		eloop_exit(ctx->eloop, len == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
+
+	if (len == -1 || len == 0) {
+		if (ctx->options & DHCPCD_FORKED &&
+		    !(ctx->options & DHCPCD_PRIVSEPROOT))
+			eloop_exit(ctx->eloop,
+			    len == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 		return len;
 	}
 
@@ -697,7 +703,8 @@ ps_recvmsg(struct dhcpcd_ctx *ctx, int rfd, uint16_t cmd, int wfd)
 #ifdef PRIVSEP_DEBUG
 	logdebugx("%s: send fd %d, %zu bytes", __func__, wfd, len);
 #endif
-	if ((len == -1 || len == 0) && ctx->options & DHCPCD_FORKED)
+	if ((len == -1 || len == 0) && ctx->options & DHCPCD_FORKED &&
+	    !(ctx->options & DHCPCD_PRIVSEPROOT))
 		eloop_exit(ctx->eloop, len == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 	return len;
 }
