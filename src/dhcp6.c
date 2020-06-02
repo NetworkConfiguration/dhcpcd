@@ -881,7 +881,7 @@ dhcp6_makemessage(struct interface *ifp)
 #ifdef AUTH
 	auth_len = 0;
 	if (ifo->auth.options & DHCPCD_AUTH_SEND) {
-		ssize_t alen = dhcp_auth_encode(&ifo->auth,
+		ssize_t alen = dhcp_auth_encode(ifp->ctx, &ifo->auth,
 		    state->auth.token, NULL, 0, 6, type, NULL, 0);
 		if (alen != -1 && alen > UINT16_MAX) {
 			errno = ERANGE;
@@ -1196,9 +1196,9 @@ dhcp6_update_auth(struct interface *ifp, struct dhcp6_message *m, size_t len)
 		return -1;
 
 	state = D6_STATE(ifp);
-	return dhcp_auth_encode(&ifp->options->auth, state->auth.token,
-	    (uint8_t *)state->send, state->send_len,
-	    6, state->send->type, opt, opt_len);
+	return dhcp_auth_encode(ifp->ctx, &ifp->options->auth,
+	    state->auth.token, (uint8_t *)state->send, state->send_len, 6,
+	    state->send->type, opt, opt_len);
 }
 #endif
 

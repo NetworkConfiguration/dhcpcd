@@ -43,6 +43,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "auth.h"
 #include "common.h"
 #include "dev.h"
 #include "dhcpcd.h"
@@ -333,6 +334,19 @@ ps_root_dowritefile(const struct dhcpcd_ctx *ctx,
 	return writefile(file, mode, nc, len - (size_t)(nc - file));
 }
 
+#ifdef AUTH
+static ssize_t
+ps_root_monordm(uint64_t *rdm, size_t len)
+{
+
+	if (len != sizeof(*rdm)) {
+		errno = EINVAL;
+		return -1;
+	}
+	return auth_get_rdm_monotonic(rdm);
+}
+#endif
+
 #ifdef HAVE_CAPSICUM
 #define	IFA_NADDRS	3
 static ssize_t
@@ -537,6 +551,15 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 			rlen = sizeof(mtime);
 		}
 		break;
+#ifdef AUTH
+	case PS_AUTH_MONORDM:
+		err = ps_root_monordm(data, len);
+		if (err != -1) {
+			rdata = data;
+			rlen = len;
+		}
+		break;
+#endif
 #ifdef HAVE_CAPSICUM
 	case PS_GETIFADDRS:
 		err = ps_root_dogetifaddrs(&rdata, &rlen);
@@ -934,6 +957,18 @@ ps_root_ip6forwarding(struct dhcpcd_ctx *ctx, const char *ifname)
 	    ifname, ifname != NULL ? strlen(ifname) + 1 : 0) == -1)
 		return -1;
 	return ps_root_readerror(ctx, NULL, 0);
+}
+#endif
+
+#ifdef AUTH
+int
+ps_root_getauthrdm(struct dhcpcd_ctx *ctx, uint64_t *rdm)
+{
+
+	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_AUTH_MONORDM, 0,
+	    rdm, sizeof(rdm))== -1)
+		return -1;
+	return (int)ps_root_readerror(ctx, rdm, sizeof(*rdm));
 }
 #endif
 
