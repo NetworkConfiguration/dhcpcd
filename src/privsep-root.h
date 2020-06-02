@@ -44,6 +44,7 @@ ssize_t ps_root_readfile(struct dhcpcd_ctx *, const char *, void *, size_t);
 ssize_t ps_root_writefile(struct dhcpcd_ctx *, const char *, mode_t,
     const void *, size_t);
 ssize_t ps_root_script(struct dhcpcd_ctx *, const void *, size_t);
+int ps_root_getauthrdm(struct dhcpcd_ctx *, uint64_t *);
 int ps_root_getifaddrs(struct dhcpcd_ctx *, struct ifaddrs **);
 
 ssize_t ps_root_os(struct ps_msghdr *, struct msghdr *);
