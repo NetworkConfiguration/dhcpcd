@@ -129,18 +129,6 @@ You can disable this with `--without-dev`, or `without-udev`.
 NOTE: in Gentoo at least, `sys-fs/udev` as provided by systemd leaks memory
 `sys-fs/eudev`, the fork of udev does not and as such is recommended.
 
-## select
-dhcpcd uses eloop.c, which is a portable main event loop with timeouts and
-signal handling. Unlike libevent and similar, it can be transplanted directly
-within the application - the only caveat outside of POSIX calls is that
-you provide queue.h based on a recent BSD (glibc sys/queue.h is not enough).
-eloop supports the following polling mechanisms, listed in order of preference:
-	kqueue, epoll, pollts, ppoll and pselect.
-If signal handling is disabled (ie in RTEMS or other single process
-OS's) then eloop can use poll.
-You can decide which polling mechanism dhcpcd will select in eloop like so
-`./configure --with-poll=[kqueue|epoll|pselect|pollts|ppoll]`
-
 
 ## Importing into another source control system
 To import the full sources, use the import target.
@@ -153,8 +141,7 @@ Example: `make DESTDIR=/usr/src/contrib/dhcpcd import-src`
 
 ## Hooks
 Not all the hooks in dhcpcd-hooks are installed by default.
-By default we install `01-test`, `02-dump`, `10-mtu`, `20-resolv.conf`
-and `30-hostname`.
+By default we install `01-test`, `20-resolv.conf`and `30-hostname`.
 The other hooks, `10-wpa_supplicant`, `15-timezone` and `29-lookup-hostname`
 are installed to `$(datadir)/dhcpcd/hooks` by default and need to be
 copied to `$(libexecdir)/dhcpcd-hooks` for use.
