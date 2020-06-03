@@ -243,12 +243,8 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 		ctx->ps_inet_fd = -1;
 	}
 
-	if (eloop_signal_set_cb(ctx->eloop,
-	    dhcpcd_signals, dhcpcd_signals_len, signal_cb, ctx) == -1)
-	{
-		logerr("%s: eloop_signal_set_cb", __func__);
-		goto errexit;
-	}
+	eloop_signal_set_cb(ctx->eloop,
+	    dhcpcd_signals, dhcpcd_signals_len, signal_cb, ctx);
 
 	/* ctx->sigset aready has the initial sigmask set in main() */
 	if (eloop_signal_mask(ctx->eloop, NULL) == -1) {

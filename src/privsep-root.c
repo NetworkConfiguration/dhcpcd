@@ -788,10 +788,9 @@ ps_root_start(struct dhcpcd_ctx *ctx)
 	if ((ctx->ps_eloop = eloop_new()) == NULL)
 		return -1;
 
-	if (eloop_signal_set_cb(ctx->ps_eloop,
+	eloop_signal_set_cb(ctx->ps_eloop,
 	    dhcpcd_signals, dhcpcd_signals_len,
-	    ps_root_readerrorsig, ctx) == -1)
-		return -1;
+	    ps_root_readerrorsig, ctx);
 
 	return pid;
 }

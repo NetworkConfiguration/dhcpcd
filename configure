@@ -1211,65 +1211,42 @@ fi
 echo "#define	HAVE_REALLOCARRAY" >>$CONFIG_H
 
 if [ -z "$POLL" ]; then
-	printf "Testing for kqueue1 ... "
-	cat <<EOF >_kqueue.c
-#include <sys/types.h>
-#include <sys/event.h>
+	printf "Testing for ppoll ... "
+	cat <<EOF >_ppoll.c
+#include <poll.h>
+#include <stddef.h>
 int main(void) {
-	return kqueue1(0);
+	struct pollfd fds;
+	return ppoll(&fds, 1, NULL, NULL);
 }
 EOF
-	if $XCC _kqueue.c -o _kqueue 2>&3; then
-		POLL=kqueue1
- 		echo "yes"
- 	else
- 		echo "no"
- 	fi
-	rm -f _kqueue.c _kqueue
-fi
-if [ -z "$POLL" ]; then
-	printf "Testing for kqueue ... "
-	cat <<EOF >_kqueue.c
-#include <sys/types.h>
-#include <sys/event.h>
-int main(void) {
-	return kqueue();
-}
-EOF
-	if $XCC _kqueue.c -o _kqueue 2>&3; then
-		POLL=kqueue
- 		echo "yes"
- 	else
- 		echo "no"
- 	fi
-	rm -f _kqueue.c _kqueue
-fi
-if [ -z "$POLL" ]; then
-	printf "Testing for epoll ... "
-	cat <<EOF >_epoll.c
-#ifdef __linux__
-#include <linux/version.h>
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 37)
-#error kernel has buggy epoll_wait timeout
-#endif
-#endif
-
-#include <sys/epoll.h>
-#include <unistd.h>
-int main(void) {
-	epoll_create1(EPOLL_CLOEXEC);
-	epoll_pwait(-1, NULL, 0, 0, NULL);
-	return 0;
-}
-EOF
-	if $XCC _epoll.c -o _epoll 2>&3; then
-		POLL=epoll
-		echo "#define	HAVE_EPOLL" >>$CONFIG_MK
+	if $XCC _ppoll.c -o _ppoll 2>&3; then
+		POLL=ppoll
+		echo "#define	HAVE_PPOLL" >>$CONFIG_MK
 		echo "yes"
 	else
 		echo "no"
 	fi
-	rm -f _epoll.c _epoll
+	rm -f _ppoll.c _ppoll
+fi
+if [ -z "$POLL" ]; then
+	printf "Testing for pollts ... "
+	cat <<EOF >_pollts.c
+#include <poll.h>
+#include <stddef.h>
+int main(void) {
+	struct pollfd fds;
+	return pollts(&fds, 1, NULL, NULL);
+}
+EOF
+	if $XCC _pollts.c -o _pollts 2>&3; then
+		POLL=pollts
+		echo "#define	HAVE_PPOLL" >>$CONFIG_MK
+		echo "yes"
+	else
+		echo "no"
+	fi
+	rm -f _pollts.c _pollts
 fi
 if [ -z "$POLL" ]; then
 	printf "Testing for pselect ... "
@@ -1290,21 +1267,11 @@ EOF
 	rm -f _pselect.c _pselect
 fi
 case "$POLL" in
-kqueue1)
-	echo "#define	HAVE_KQUEUE" >>$CONFIG_H
-	echo "#define	HAVE_KQUEUE1" >>$CONFIG_H
-	;;
-kqueue)
-	echo "#define	HAVE_KQUEUE" >>$CONFIG_H
-	;;
-epoll)
-	echo "#define	HAVE_EPOLL" >>$CONFIG_H
+ppoll)
+	echo "#define	HAVE_PPOLL" >>$CONFIG_H
 	;;
 pollts)
 	echo "#define	HAVE_POLLTS" >>$CONFIG_H
-	;;
-ppoll)
-	echo "#define	HAVE_PPOLL" >>$CONFIG_H
 	;;
 pselect)
 	echo "#define	HAVE_PSELECT" >>$CONFIG_H
