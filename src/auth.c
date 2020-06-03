@@ -483,6 +483,9 @@ get_next_rdm_monotonic_clock(struct auth *auth)
 static uint64_t
 get_next_rdm_monotonic(struct dhcpcd_ctx *ctx, struct auth *auth)
 {
+#ifndef PRIVSEP
+	UNUSED(ctx);
+#endif
 
 	if (auth->options & DHCPCD_AUTH_RDM_COUNTER) {
 		uint64_t rdm;
