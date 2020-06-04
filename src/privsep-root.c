@@ -596,8 +596,7 @@ ps_root_recvmsg(void *arg)
 {
 	struct dhcpcd_ctx *ctx = arg;
 
-	if (ps_recvpsmsg(ctx, ctx->ps_root_fd, ps_root_recvmsgcb, ctx) == -1 &&
-	    errno != ECONNRESET)
+	if (ps_recvpsmsg(ctx, ctx->ps_root_fd, ps_root_recvmsgcb, ctx) == -1)
 		logerr(__func__);
 }
 
