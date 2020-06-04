@@ -291,61 +291,28 @@ errexit:
 int
 ps_dostop(struct dhcpcd_ctx *ctx, pid_t *pid, int *fd)
 {
-	int status;
+	int err = 0;
 
 #ifdef PRIVSEP_DEBUG
 	logdebugx("%s: pid %d fd %d", __func__, *pid, *fd);
 #endif
-	if (*pid == 0)
-		return 0;
-	if (*fd == -1)
-		goto wait;
 
-	eloop_event_delete(ctx->eloop, *fd);
-	if (ps_sendcmd(ctx, *fd, PS_STOP, 0, NULL, 0) == -1 &&
-	    errno != ECONNRESET)
-		logerr(__func__);
-	if (shutdown(*fd, SHUT_RDWR) == -1 && errno != ENOTCONN)
-		logerr(__func__);
-	close(*fd);
-	*fd = -1;
-
-wait:
-	status = 0;
-
-#ifdef HAVE_CAPSICUM
-	unsigned int cap_mode = 0;
-	int cap_err = cap_getmode(&cap_mode);
-
-	if (cap_err == -1) {
-		if (errno != ENOSYS)
-			logerr("%s: cap_getmode", __func__);
-	} else if (cap_mode != 0)
-		goto nowait;
-#endif
-
-	/* Wait for the process to finish */
-	while (waitpid(*pid, &status, 0) == -1) {
-		if (errno != EINTR) {
-			logerr("%s: waitpid", __func__);
-			status = 0;
-			break;
+	if (*fd != -1) {
+		eloop_event_delete(ctx->eloop, *fd);
+		if (ps_sendcmd(ctx, *fd, PS_STOP, 0, NULL, 0) == -1 ||
+		    shutdown(*fd, SHUT_RDWR) == -1)
+		{
+			logerr(__func__);
+			err = -1;
 		}
-#ifdef PRIVSEP_DEBUG
-		else
-			logerr("%s: waitpid ", __func__);
-#endif
+		close(*fd);
+		*fd = -1;
 	}
-#ifdef HAVE_CAPSICUM
-nowait:
-#endif
+
+	/* Don't wait for the process as it may not respond to the shutdown
+	 * request. We'll reap the process on receipt of SIGCHLD. */
 	*pid = 0;
-
-#ifdef PRIVSEP_DEBUG
-	logdebugx("%s: status %d", __func__, status);
-#endif
-
-	return status;
+	return err;
 }
 
 int

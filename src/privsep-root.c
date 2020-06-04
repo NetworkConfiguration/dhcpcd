@@ -686,6 +686,13 @@ ps_root_signalcb(int sig, void *arg)
 	if (sig == SIGINT)
 		return;
 
+	/* Reap children */
+	if (sig == SIGCHLD) {
+		while (waitpid(-1, NULL, WNOHANG) > 0)
+			;
+		return;
+	}
+
 	logerrx("process %d unexpectedly terminating on signal %d",
 	    getpid(), sig);
 	if (ctx->ps_root_pid == getpid()) {
