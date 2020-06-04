@@ -689,8 +689,6 @@ ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd,
 	logdebugx("%s: %zd", __func__, len);
 #endif
 
-	if (len == -1 && (errno == ECONNRESET || errno == EBADF))
-		len = 0;
 	if (len == -1 || len == 0)
 		stop = true;
 	else {
