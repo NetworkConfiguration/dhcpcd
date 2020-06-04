@@ -65,7 +65,8 @@ out:
 }
 
 ssize_t
-ps_root_os(struct ps_msghdr *psm, struct msghdr *msg)
+ps_root_os(struct ps_msghdr *psm, struct msghdr *msg,
+    void **rdata, size_t *rlen)
 {
 
 	switch (psm->ps_cmd) {

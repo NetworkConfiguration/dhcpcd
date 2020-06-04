@@ -74,21 +74,29 @@ ps_root_doroute(void *data, size_t len)
 }
 
 ssize_t
-ps_root_os(struct ps_msghdr *psm, struct msghdr *msg)
+ps_root_os(struct ps_msghdr *psm, struct msghdr *msg,
+    void **rdata, size_t *rlen)
 {
 	struct iovec *iov = msg->msg_iov;
 	void *data = iov->iov_base;
 	size_t len = iov->iov_len;
+	ssize_t err;
 
 	switch (psm->ps_cmd) {
 	case PS_IOCTL6:
-		return ps_root_doioctl6(psm->ps_flags, data, len);
+		err = ps_root_doioctl6(psm->ps_flags, data, len);
 	case PS_ROUTE:
 		return ps_root_doroute(data, len);
 	default:
 		errno = ENOTSUP;
 		return -1;
 	}
+
+	if (err != -1) {
+		*rdata = data;
+		*rlen = len;
+	}
+	return err;
 }
 
 ssize_t
