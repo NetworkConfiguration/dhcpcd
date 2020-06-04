@@ -2366,8 +2366,8 @@ read_config(struct dhcpcd_ctx *ctx,
 			return ifo;
 		}
 		if (buf[buflen - 1] != '\0') {
-			if (buflen < sizeof(buf) - 1)
-				bulen++;
+			if ((size_t)buflen < sizeof(buf) - 1)
+				buflen++;
 			buf[buflen - 1] = '\0';
 		}
 #else

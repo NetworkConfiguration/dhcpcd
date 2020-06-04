@@ -297,6 +297,10 @@ ps_root_validpath(const struct dhcpcd_ctx *ctx, uint16_t cmd, const char *path)
 		return false;
 
 	if (cmd == PS_READFILE) {
+#ifdef EMBEDDED_CONFIG
+		if (strcmp(ctx->cffile, EMBEDDED_CONFIG) == 0)
+			return true;
+#endif
 		if (strcmp(ctx->cffile, path) == 0)
 			return true;
 	}
