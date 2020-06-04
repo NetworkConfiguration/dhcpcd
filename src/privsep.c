@@ -201,6 +201,7 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 		*priv_pid = pid;
 		*priv_fd = fd[0];
 		close(fd[1]);
+		ps_setbuf(*priv_fd);
 		if (recv_unpriv_msg == NULL)
 			;
 #ifdef HAVE_CAPSICUM
@@ -217,7 +218,6 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 			logerr("%s: eloop_event_add", __func__);
 			return -1;
 		}
-		ps_setbuf(*priv_fd);
 		return pid;
 	}
 
