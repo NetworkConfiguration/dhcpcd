@@ -87,6 +87,7 @@ const int dhcpcd_signals[] = {
 	SIGHUP,
 	SIGUSR1,
 	SIGUSR2,
+	SIGCHLD,
 };
 const size_t dhcpcd_signals_len = __arraycount(dhcpcd_signals);
 
@@ -1399,7 +1400,7 @@ dhcpcd_signal_cb(int sig, void *arg)
 	unsigned long long opts;
 	int exit_code;
 
-	if (ctx->options & DHCPCD_FORKED) {
+	if (sig != SIGCHLD && ctx->options & DHCPCD_FORKED) {
 		pid_t pid = pidfile_read(ctx->pidfile);
 		if (pid == -1) {
 			if (errno != ENOENT)
@@ -1444,6 +1445,10 @@ dhcpcd_signal_cb(int sig, void *arg)
 		logclose();
 		if (logopen(ctx->logfile) == -1)
 			logerr(__func__);
+		return;
+	case SIGCHLD:
+		while (waitpid(-1, NULL, WNOHANG) > 0)
+			;
 		return;
 	default:
 		logerrx("received signal %d but don't know what to do with it",
@@ -2215,7 +2220,6 @@ printpidfile:
 		}
 		break;
 	default:
-		waitpid(pid, &i, 0);
 		ctx.options |= DHCPCD_FORKED; /* A lie */
 		ctx.fork_fd = sigpipe[0];
 		close(sigpipe[1]);
