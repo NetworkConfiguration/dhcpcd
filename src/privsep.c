@@ -113,7 +113,7 @@ int
 ps_dropprivs(struct dhcpcd_ctx *ctx)
 {
 	struct passwd *pw = ctx->ps_user;
-#ifndef HAVE_PLEDGE
+#if !defined(HAVE_PLEDGE)
 	struct rlimit rzero = { .rlim_cur = 0, .rlim_max = 0 };
 #endif
 
@@ -132,18 +132,22 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 		return -1;
 	}
 
-#ifndef HAVE_PLEDGE
+#ifdef HAVE_PLEDGE
+	/* None of these resource limits work with pledge. */
+#else
 	/* Prohibit new files, sockets, etc */
 	if (setrlimit(RLIMIT_NOFILE, &rzero) == -1) {
 		logerr("setrlimit RLIMIT_NOFILE");
 		return -1;
 	}
 
+#ifndef HAVE_CAPSICUM /* Seems to break our IPC. */
 	/* Prohibit large files */
 	if (setrlimit(RLIMIT_FSIZE, &rzero) == -1) {
 		logerr("setrlimit RLIMIT_FSIZE");
 		return -1;
 	}
+#endif
 
 #ifdef RLIMIT_NPROC
 	/* Prohibit forks */
