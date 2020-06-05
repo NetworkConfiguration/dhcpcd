@@ -151,6 +151,9 @@ struct dhcpcd_ctx {
 	size_t rt_order;	/* route order storage */
 
 	int pf_inet_fd;
+#ifdef PF_LINK
+	int pf_link_fd;
+#endif
 	void *priv;
 	int link_fd;
 #ifndef SMALL
