@@ -127,8 +127,10 @@ if_closesockets(struct dhcpcd_ctx *ctx)
 
 	if (ctx->pf_inet_fd != -1)
 		close(ctx->pf_inet_fd);
+#ifdef PF_LINK
 	if (ctx->pf_link_fd != -1)
 		close(ctx->pf_link_fd);
+#endif
 
 	if (ctx->priv) {
 		if_closesockets_os(ctx);

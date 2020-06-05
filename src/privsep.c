@@ -113,7 +113,7 @@ int
 ps_dropprivs(struct dhcpcd_ctx *ctx)
 {
 	struct passwd *pw = ctx->ps_user;
-#if !defined(HAVE_PLEDGE)
+#if !defined(HAVE_PLEDGE) && !defined(__linux__)
 	struct rlimit rzero = { .rlim_cur = 0, .rlim_max = 0 };
 #endif
 
@@ -132,7 +132,7 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 		return -1;
 	}
 
-#ifdef HAVE_PLEDGE
+#if defined(HAVE_PLEDGE) || defined(__linux__)
 	/* None of these resource limits work with pledge. */
 #else
 	/* Prohibit new files, sockets, etc */
