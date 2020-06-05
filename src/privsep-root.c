@@ -132,7 +132,7 @@ ps_root_readerror(struct dhcpcd_ctx *ctx, void *data, size_t len)
 	return psr_ctx.psr_error.psr_result;
 }
 
-#ifdef HAVE_CAPSICUM
+#ifdef PRIVSEP_GETIFADDRS
 static void
 ps_root_mreaderrorcb(void *arg)
 {
@@ -351,7 +351,7 @@ ps_root_monordm(uint64_t *rdm, size_t len)
 }
 #endif
 
-#ifdef HAVE_CAPSICUM
+#ifdef PRIVSEP_GETIFADDRS
 #define	IFA_NADDRS	3
 static ssize_t
 ps_root_dogetifaddrs(void **rdata, size_t *rlen)
@@ -564,7 +564,7 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		}
 		break;
 #endif
-#ifdef HAVE_CAPSICUM
+#ifdef PRIVSEP_GETIFADDRS
 	case PS_GETIFADDRS:
 		err = ps_root_dogetifaddrs(&rdata, &rlen);
 		free_rdata = true;
@@ -889,7 +889,7 @@ ps_root_filemtime(struct dhcpcd_ctx *ctx, const char *file, time_t *time)
 	return ps_root_readerror(ctx, time, sizeof(*time));
 }
 
-#ifdef HAVE_CAPSICUM
+#ifdef PRIVSEP_GETIFADDRS
 int
 ps_root_getifaddrs(struct dhcpcd_ctx *ctx, struct ifaddrs **ifahead)
 {
@@ -916,7 +916,7 @@ ps_root_getifaddrs(struct dhcpcd_ctx *ctx, struct ifaddrs **ifahead)
 
 	bp = buf;
 	*ifahead = (struct ifaddrs *)(void *)bp;
-	for (ifa = *ifahead; len != 0; ifa = ifa->ifa_next) {
+	for (ifa = *ifahead; ifa != NULL; ifa = ifa->ifa_next) {
 		if (len < ALIGN(sizeof(*ifa)) +
 		    ALIGN(IFNAMSIZ) + ALIGN(sizeof(salen) * IFA_NADDRS))
 			goto err;
@@ -944,9 +944,11 @@ ps_root_getifaddrs(struct dhcpcd_ctx *ctx, struct ifaddrs **ifahead)
 		COPYOUTSA(ifa->ifa_addr);
 		COPYOUTSA(ifa->ifa_netmask);
 		COPYOUTSA(ifa->ifa_broadaddr);
-		ifa->ifa_next = (struct ifaddrs *)(void *)bp;
+		if (len != 0)
+			ifa->ifa_next = (struct ifaddrs *)(void *)bp;
+		else
+			ifa->ifa_next = NULL;
 	}
-	ifa->ifa_next = NULL;
 	return 0;
 
 err:
