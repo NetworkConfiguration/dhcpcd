@@ -107,7 +107,7 @@ if_opensockets(struct dhcpcd_ctx *ctx)
 	if (if_opensockets_os(ctx) == -1)
 		return -1;
 
-#ifdef PF_LINK
+#ifdef IFLR_ACTIVE
 	ctx->pf_link_fd = xsocket(PF_LINK, SOCK_DGRAM | SOCK_CLOEXEC, 0);
 	if (ctx->pf_link_fd == -1)
 		return -1;
