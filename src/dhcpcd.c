@@ -2309,7 +2309,7 @@ printpidfile:
 		}
 #endif
 #ifdef HAVE_PLEDGE
-		if (pledge("stdio inet route dns", NULL) == -1) {
+		if (pledge("stdio route", NULL) == -1) {
 			logerr("%s: pledge", __func__);
 			goto exit_failure;
 		}
