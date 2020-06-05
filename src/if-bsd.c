@@ -1364,7 +1364,18 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 		struct ifaddrs *ifaddrs = NULL, *ifa;
 
 		sa = rti_info[RTAX_IFA];
-		getifaddrs(&ifaddrs);
+#ifdef PRIVSEP_GETIFADDRS
+		if (IN_PRIVSEP(ctx)) {
+			if (ps_root_getifaddrs(ctx, &ifaddrs) == -1) {
+				logerr("ps_root_getifaddrs");
+				break;
+			}
+		} else
+#endif
+		if (getifaddrs(&ifaddrs) == -1) {
+			logerr("getifaddrs");
+			break;
+		}
 		for (ifa = ifaddrs; ifa; ifa = ifa->ifa_next) {
 			if (ifa->ifa_addr == NULL)
 				continue;
@@ -1372,6 +1383,11 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 			    strcmp(ifa->ifa_name, ifp->name) == 0)
 				break;
 		}
+#ifdef PRIVSEP_GETIFADDRS
+		if (IN_PRIVSEP(ctx))
+			free(ifaddrs);
+		else
+#endif
 		freeifaddrs(ifaddrs);
 		if (ifam->ifam_type == RTM_DELADDR) {
 			if (ifa != NULL)
