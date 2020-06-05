@@ -403,7 +403,7 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 	}
 	TAILQ_INIT(ifs);
 
-#if defined(PRIVSEP) && defined(HAVE_CAPSICUM)
+#ifdef PRIVSEP_GETIFADDRS
 	if (ctx->options & DHCPCD_PRIVSEP) {
 		if (ps_root_getifaddrs(ctx, ifaddrs) == -1) {
 			logerr("ps_root_getifaddrs");
