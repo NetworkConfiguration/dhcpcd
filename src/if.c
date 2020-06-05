@@ -111,6 +111,10 @@ if_opensockets(struct dhcpcd_ctx *ctx)
 	ctx->pf_link_fd = xsocket(PF_LINK, SOCK_DGRAM | SOCK_CLOEXEC, 0);
 	if (ctx->pf_link_fd == -1)
 		return -1;
+#ifdef HAVE_CAPSICUM
+	if (ps_rights_limit_ioctl(ctx->pf_link_fd) == -1)
+		return -1;
+#endif
 #endif
 
 	/* We use this socket for some operations without INET. */

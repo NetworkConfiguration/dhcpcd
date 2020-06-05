@@ -2198,6 +2198,12 @@ printpidfile:
 		logerr("pipe");
 		goto exit_failure;
 	}
+#ifdef HAVE_CAPSICUM
+	if (ps_rights_limit_fdpair(sigpipe) == -1) {
+		logerr("ps_rights_limit_fdpair");
+		goto exit_failure;
+	}
+#endif
 	switch (pid = fork()) {
 	case -1:
 		logerr("fork");
@@ -2300,24 +2306,8 @@ printpidfile:
 		logerrx("dhcp_vendor");
 
 #ifdef PRIVSEP
-	if (ctx.options & DHCPCD_PRIVSEP) {
-		if (ps_dropprivs(&ctx) == -1) {
-			logerr("ps_dropprivs");
-			goto exit_failure;
-		}
-#ifdef HAVE_CAPSICUM
-		if (cap_enter() == -1 && errno != ENOSYS) {
-			logerr("%s: cap_enter", __func__);
-			goto exit_failure;
-		}
-#endif
-#ifdef HAVE_PLEDGE
-		if (pledge("stdio route", NULL) == -1) {
-			logerr("%s: pledge", __func__);
-			goto exit_failure;
-		}
-#endif
-	}
+	if (IN_PRIVSEP(&ctx) && ps_mastersandbox(&ctx) == -1)
+		goto exit_failure;
 #endif
 
 	/* When running dhcpcd against a single interface, we need to retain

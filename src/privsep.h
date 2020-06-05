@@ -86,6 +86,11 @@
 #define	IN_PRIVSEP_SE(ctx)	\
 	(((ctx)->options & (DHCPCD_PRIVSEP | DHCPCD_FORKED)) == DHCPCD_PRIVSEP)
 
+
+#if defined(PRIVSEP) && defined(HAVE_CAPSICUM)
+#define PRIVSEP_RIGHTS
+#endif
+
 #include "config.h"
 #include "arp.h"
 #include "dhcp.h"
@@ -157,6 +162,7 @@ int ps_init(struct dhcpcd_ctx *);
 int ps_dropprivs(struct dhcpcd_ctx *);
 int ps_start(struct dhcpcd_ctx *);
 int ps_stop(struct dhcpcd_ctx *);
+int ps_mastersandbox(struct dhcpcd_ctx *);
 
 int ps_unrollmsg(struct msghdr *, struct ps_msghdr *, const void *, size_t);
 ssize_t ps_sendpsmmsg(struct dhcpcd_ctx *, int,
@@ -172,6 +178,14 @@ ssize_t ps_recvpsmsg(struct dhcpcd_ctx *, int,
     ssize_t (*callback)(void *, struct ps_msghdr *, struct msghdr *), void *);
 
 /* Internal privsep functions. */
+int ps_setbuf_fdpair(int []);
+#ifdef PRIVSEP_RIGHTS
+int ps_rights_limit_ioctl(int);
+int ps_rights_limit_fd_fctnl(int);
+int ps_rights_limit_fd_rdonly(int);
+int ps_rights_limit_fd(int);
+int ps_rights_limit_fdpair(int []);
+#endif
 pid_t ps_dostart(struct dhcpcd_ctx * ctx,
     pid_t *priv_pid, int *priv_fd,
     void (*recv_msg)(void *), void (*recv_unpriv_msg),

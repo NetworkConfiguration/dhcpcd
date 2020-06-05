@@ -113,9 +113,6 @@ int
 ps_dropprivs(struct dhcpcd_ctx *ctx)
 {
 	struct passwd *pw = ctx->ps_user;
-#if !defined(HAVE_PLEDGE)
-	struct rlimit rzero = { .rlim_cur = 0, .rlim_max = 0 };
-#endif
 
 	if (!(ctx->options & DHCPCD_FORKED))
 		logdebugx("chrooting to `%s' as %s", pw->pw_dir, pw->pw_name);
@@ -132,9 +129,14 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 		return -1;
 	}
 
-#if defined(HAVE_PLEDGE)
-	/* None of these resource limits work with pledge. */
+#if defined(HAVE_CAPSICUM) || defined(HAVE_PLEDGE)
+	/* Resource limits are not needed for these sandboxes */
 #else
+	struct rlimit rzero = { .rlim_cur = 0, .rlim_max = 0 };
+
+	/* We can't use RLIMIT_NOFILE because that breaks our control socket.
+	 * XXX Offload to a new process? */
+#if 0
 #ifndef __linux__ /* breaks ppoll */
 	/* Prohibit new files, sockets, etc */
 	if (setrlimit(RLIMIT_NOFILE, &rzero) == -1) {
@@ -142,14 +144,13 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 		return -1;
 	}
 #endif
+#endif
 
-#ifndef HAVE_CAPSICUM /* breaks sending over our IPC */
 	/* Prohibit large files */
 	if (setrlimit(RLIMIT_FSIZE, &rzero) == -1) {
 		logerr("setrlimit RLIMIT_FSIZE");
 		return -1;
 	}
-#endif
 
 #ifdef RLIMIT_NPROC
 	/* Prohibit forks */
@@ -198,6 +199,71 @@ ps_setbuf(int fd)
 	return 0;
 }
 
+int
+ps_setbuf_fdpair(int fd[])
+{
+
+	if (ps_setbuf(fd[0]) == -1 || ps_setbuf(fd[1]) == -1)
+		return -1;
+	return 0;
+}
+
+#ifdef PRIVSEP_RIGHTS
+int
+ps_rights_limit_ioctl(int fd)
+{
+	cap_rights_t rights;
+
+	cap_rights_init(&rights, CAP_IOCTL);
+	if (cap_rights_limit(fd, &rights) == -1 && errno != ENOSYS)
+		return -1;
+	return 0;
+}
+
+int
+ps_rights_limit_fd_fctnl(int fd)
+{
+	cap_rights_t rights;
+
+	cap_rights_init(&rights, CAP_READ, CAP_WRITE, CAP_EVENT,
+	    CAP_ACCEPT, CAP_FCNTL);
+	if (cap_rights_limit(fd, &rights) == -1 && errno != ENOSYS)
+		return -1;
+	return 0;
+}
+
+int
+ps_rights_limit_fd(int fd)
+{
+	cap_rights_t rights;
+
+	cap_rights_init(&rights, CAP_READ, CAP_WRITE, CAP_EVENT, CAP_SHUTDOWN);
+	if (cap_rights_limit(fd, &rights) == -1 && errno != ENOSYS)
+		return -1;
+	return 0;
+}
+
+int
+ps_rights_limit_fd_rdonly(int fd)
+{
+	cap_rights_t rights;
+
+	cap_rights_init(&rights, CAP_READ, CAP_EVENT);
+	if (cap_rights_limit(fd, &rights) == -1 && errno != ENOSYS)
+		return -1;
+	return 0;
+}
+
+int
+ps_rights_limit_fdpair(int fd[])
+{
+
+	if (ps_rights_limit_fd(fd[0]) == -1 || ps_rights_limit_fd(fd[1]) == -1)
+		return -1;
+	return 0;
+}
+#endif
+
 pid_t
 ps_dostart(struct dhcpcd_ctx *ctx,
     pid_t *priv_pid, int *priv_fd,
@@ -208,17 +274,22 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 	int stype;
 	int fd[2];
 	pid_t pid;
-#ifdef HAVE_CAPSICUM
-	cap_rights_t rights;
-
-	cap_rights_init(&rights, CAP_READ, CAP_WRITE, CAP_EVENT, CAP_SHUTDOWN);
-#endif
 
 	stype = SOCK_CLOEXEC | SOCK_NONBLOCK;
 	if (socketpair(AF_UNIX, SOCK_DGRAM | stype, 0, fd) == -1) {
-		logerr("socketpair");
+		logerr("%s: socketpair", __func__);
 		return -1;
 	}
+	if (ps_setbuf_fdpair(fd) == -1) {
+		logerr("%s: ps_setbuf_fdpair", __func__);
+		return -1;
+	}
+#ifdef PRIVSEP_RIGHTS
+	if (ps_rights_limit_fdpair(fd) == -1) {
+		logerr("%s: ps_rights_limit_fdpair", __func__);
+		return -1;
+	}
+#endif
 
 	switch (pid = fork()) {
 	case -1:
@@ -227,23 +298,13 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 	case 0:
 		*priv_fd = fd[1];
 		close(fd[0]);
-		ps_setbuf(*priv_fd);
 		break;
 	default:
 		*priv_pid = pid;
 		*priv_fd = fd[0];
 		close(fd[1]);
-		ps_setbuf(*priv_fd);
 		if (recv_unpriv_msg == NULL)
 			;
-#ifdef HAVE_CAPSICUM
-		else if (cap_rights_limit(*priv_fd, &rights) == -1
-		    && errno != ENOSYS)
-		{
-			logerr("%s: cap_rights_limit", __func__);
-			return -1;
-		}
-#endif
 		else if (eloop_event_add(ctx->eloop, *priv_fd,
 		    recv_unpriv_msg, recv_ctx) == -1)
 		{
@@ -283,11 +344,6 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 		logerr("%s: eloop_signal_mask", __func__);
 		goto errexit;
 	}
-
-#ifdef HAVE_CAPSICUM
-	if (cap_rights_limit(*priv_fd, &rights) == -1 && errno != ENOSYS)
-		goto errexit;
-#endif
 
 	if (eloop_event_add(ctx->eloop, *priv_fd, recv_msg, recv_ctx) == -1)
 	{
@@ -389,6 +445,40 @@ started:
 #endif
 
 	return 1;
+}
+
+int
+ps_mastersandbox(struct dhcpcd_ctx *ctx)
+{
+
+	if (ps_dropprivs(ctx) == -1) {
+		logerr("%s: ps_dropprivs", __func__);
+		return -1;
+	}
+
+#ifdef PRIVSEP_RIGHTS
+	if ((ps_rights_limit_ioctl(ctx->pf_inet_fd) == -1 ||
+	     ps_rights_limit_fd(ctx->link_fd) == -1) &&
+	    errno != ENOSYS)
+	{
+		logerr("%s: cap_rights_limit", __func__);
+		return -1;
+	}
+#endif
+#ifdef HAVE_CAPSICUM
+	if (cap_enter() == -1 && errno != ENOSYS) {
+		logerr("%s: cap_enter", __func__);
+		return -1;
+	}
+#endif
+#ifdef HAVE_PLEDGE
+	if (pledge("stdio route", NULL) == -1) {
+		logerr("%s: pledge", __func__);
+		return -1;
+	}
+#endif
+
+	return 0;
 }
 
 int
