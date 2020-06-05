@@ -337,7 +337,12 @@ if_learnaddrs(struct dhcpcd_ctx *ctx, struct if_head *ifs,
 		}
 	}
 
-	freeifaddrs(*ifaddrs);
+#ifdef PRIVSEP_GETIFADDRS
+	if (IN_PRIVSEP(ctx))
+		free(*ifaddrs);
+	else
+#endif
+		freeifaddrs(*ifaddrs);
 	*ifaddrs = NULL;
 }
 
