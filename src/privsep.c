@@ -39,6 +39,7 @@
  * this in a script or something.
  */
 
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -112,6 +113,7 @@ int
 ps_dropprivs(struct dhcpcd_ctx *ctx)
 {
 	struct passwd *pw = ctx->ps_user;
+	struct rlimit rzero = { .rlim_cur = 0, .rlim_max = 0 };
 
 	if (!(ctx->options & DHCPCD_FORKED))
 		logdebugx("chrooting to `%s' as %s", pw->pw_dir, pw->pw_name);
@@ -127,6 +129,26 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 		logerr("failed to drop privileges");
 		return -1;
 	}
+
+	/* Prohibit new files, sockets, etc */
+	if (setrlimit(RLIMIT_NOFILE, &rzero) == -1) {
+		logerr("setrlimit RLIMIT_NOFILE");
+		return -1;
+	}
+
+	/* Prohibit large files */
+	if (setrlimit(RLIMIT_FSIZE, &rzero) == -1) {
+		logerr("setrlimit RLIMIT_FSIZE");
+		return -1;
+	}
+
+#ifdef RLIMIT_NPROC
+	/* Prohibit forks */
+	if (setrlimit(RLIMIT_NPROC, &rzero) == -1) {
+		logerr("setrlimit RLIMIT_NPROC");
+		return -1;
+	}
+#endif
 
 	return 0;
 }
