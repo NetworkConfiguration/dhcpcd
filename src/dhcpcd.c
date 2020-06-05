@@ -2438,11 +2438,17 @@ exit_failure:
 exit1:
 	if (control_stop(&ctx) == -1)
 		logerr("%s: control_stop", __func__);
+	if (ifaddrs != NULL) {
+#ifdef PRIVSEP_GETIFADDRS
+		if (IN_PRIVSEP(&ctx))
+			free(ifaddrs);
+		else
+#endif
+			freeifaddrs(ifaddrs);
+	}
 #ifdef PRIVSEP
 	ps_stop(&ctx);
 #endif
-	if (ifaddrs != NULL)
-		freeifaddrs(ifaddrs);
 	/* Free memory and close fd's */
 	if (ctx.ifaces) {
 		while ((ifp = TAILQ_FIRST(ctx.ifaces))) {
