@@ -777,6 +777,12 @@ ps_root_start(struct dhcpcd_ctx *ctx)
 
 	if (socketpair(AF_UNIX, SOCK_DGRAM | SOCK_CXNB, 0, fd) == -1)
 		return -1;
+	if (ps_setbuf_fdpair(fd) == -1)
+		return -1;
+#ifdef PRIVSEP_RIGHTS
+	if (ps_rights_limit_fdpair(fd) == -1)
+		return -1;
+#endif
 
 	pid = ps_dostart(ctx, &ctx->ps_root_pid, &ctx->ps_root_fd,
 	    ps_root_recvmsg, NULL, ctx,

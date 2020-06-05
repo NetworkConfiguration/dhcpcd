@@ -46,6 +46,7 @@
 #include "eloop.h"
 #include "if.h"
 #include "logerr.h"
+#include "privsep.h"
 
 #ifndef SUN_LEN
 #define SUN_LEN(su) \
@@ -252,6 +253,14 @@ control_start1(struct dhcpcd_ctx *ctx, const char *ifname, sa_family_t family,
 		return -1;
 	}
 
+#ifdef PRIVSEP_RIGHTS
+	if (IN_PRIVSEP(ctx) && ps_rights_limit_fd_fctnl(fd) == -1) {
+		close(fd);
+		unlink(sa.sun_path);
+		return -1;
+	}
+#endif
+
 	if ((fmode & S_UNPRIV) != S_UNPRIV)
 		strlcpy(ctx->control_sock, sa.sun_path,
 		    sizeof(ctx->control_sock));
@@ -287,7 +296,7 @@ control_unlink(struct dhcpcd_ctx *ctx, const char *file)
 
 	errno = 0;
 #ifdef PRIVSEP
-	if (ctx->options & DHCPCD_PRIVSEP)
+	if (IN_PRIVSEP(ctx))
 		retval = (int)ps_root_unlink(ctx, file);
 	else
 #else
