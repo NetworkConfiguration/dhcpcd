@@ -292,6 +292,38 @@ if_ignore1(const char *drvname)
 	return false;
 }
 
+#ifdef SIOCGIFGROUP
+int
+if_ignoregroup(int s, const char *ifname)
+{
+	struct ifgroupreq ifgr = { .ifgr_len = 0 };
+	struct ifg_req *ifg;
+	size_t ifg_len;
+
+	/* Sadly it is possible to remove the device name
+	 * from the interface groups, but hopefully this
+	 * will be very unlikely.... */
+
+	strlcpy(ifgr.ifgr_name, ifname, sizeof(ifgr.ifgr_name));
+	if (ioctl(s, SIOCGIFGROUP, &ifgr) == -1 ||
+	    (ifgr.ifgr_groups = malloc(ifgr.ifgr_len)) == NULL ||
+	    ioctl(s, SIOCGIFGROUP, &ifgr) == -1)
+	{
+		logerr(__func__);
+		return -1;
+	}
+
+	for (ifg = ifgr.ifgr_groups, ifg_len = ifgr.ifgr_len;
+	     ifg && ifg_len >= sizeof(*ifg);
+	     ifg++, ifg_len -= sizeof(*ifg))
+	{
+		if (if_ignore1(ifg->ifgrq_group))
+			return 1;
+	}
+	return 0;
+}
+#endif
+
 bool
 if_ignore(struct dhcpcd_ctx *ctx, const char *ifname)
 {
@@ -304,38 +336,17 @@ if_ignore(struct dhcpcd_ctx *ctx, const char *ifname)
 		return true;
 
 #ifdef SIOCGIFGROUP
-#ifdef HAVE_PLEDGE
-#warning Fix SIOCGIFGROUP to use privsep to remove inet pledge requirement
+#if defined(PRIVSEP) && defined(HAVE_PLEDGE)
+	if (IN_PRIVSEP(ctx))
+		return ps_root_ifignoregroup(ctx, ifname) == 1 ? true : false;
 #endif
-	struct ifgroupreq ifgr = { .ifgr_len = 0 };
-	struct ifg_req *ifg;
-	size_t ifg_len;
-
-	/* Sadly it is possible to remove the device name
-	 * from the interface groups, but hopefully this
-	 * will be very unlikely.... */
-
-	strlcpy(ifgr.ifgr_name, ifname, sizeof(ifgr.ifgr_name));
-	if (ioctl(ctx->pf_inet_fd, SIOCGIFGROUP, &ifgr) == -1 ||
-	    (ifgr.ifgr_groups = malloc(ifgr.ifgr_len)) == NULL ||
-	    ioctl(ctx->pf_inet_fd, SIOCGIFGROUP, &ifgr) == -1)
-	{
-		logerr(__func__);
-		return false;
-	}
-
-	for (ifg = ifgr.ifgr_groups, ifg_len = ifgr.ifgr_len;
-	     ifg && ifg_len >= sizeof(*ifg);
-	     ifg++, ifg_len -= sizeof(*ifg))
-	{
-		if (if_ignore1(ifg->ifgrq_group))
-			return true;
-	}
+	else
+		return if_ignoregroup(ctx->pf_inet_fd, ifname) == 1 ?
+		    true : false;
 #else
 	UNUSED(ctx);
-#endif
-
 	return false;
+#endif
 }
 
 int
