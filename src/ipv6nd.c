@@ -1100,7 +1100,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 	bool new_ia;
 #endif
 
-	if (ifp == NULL) {
+	if (ifp == NULL || RS_STATE(ifp) == NULL) {
 #ifdef DEBUG_RS
 		logdebugx("RA for unexpected interface from %s", sfrom);
 #endif
