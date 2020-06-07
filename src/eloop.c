@@ -326,8 +326,8 @@ eloop_event_add_rw(struct eloop *eloop, int fd,
 			e = malloc(sizeof(*e));
 			if (e == NULL)
 				return -1;
-			TAILQ_INSERT_HEAD(&eloop->events, e, next);
 		}
+		TAILQ_INSERT_HEAD(&eloop->events, e, next);
 		e->fd = fd;
 		eloop->nevents++;
 	}
