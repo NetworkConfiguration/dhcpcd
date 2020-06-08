@@ -88,6 +88,10 @@
 #endif
 #endif
 
+#ifdef ELOOP_DEBUG
+#include <stdio.h>
+#endif
+
 /*
  * time_t is a signed integer of an unspecified size.
  * To adjust for time_t wrapping, we need to work the maximum signed
@@ -277,6 +281,10 @@ eloop_event_setup_fds(struct eloop *eloop)
 
 	pfd = eloop->fds;
 	TAILQ_FOREACH(e, &eloop->events, next) {
+#ifdef ELOOP_DEBUG
+		fprintf(stderr, "%s(%d) fd=%d, rcb=%p, wcb=%p\n",
+		    __func__, getpid(), e->fd, e->read_cb, e->write_cb);
+#endif
 		e->pollfd = pfd;
 		pfd->fd = e->fd;
 		pfd->events = 0;
@@ -332,10 +340,14 @@ eloop_event_add_rw(struct eloop *eloop, int fd,
 		eloop->nevents++;
 	}
 
-	e->read_cb = read_cb;
-	e->read_cb_arg = read_cb_arg;
-	e->write_cb = write_cb;
-	e->write_cb_arg = write_cb_arg;
+	if (read_cb) {
+		e->read_cb = read_cb;
+		e->read_cb_arg = read_cb_arg;
+	}
+	if (write_cb) {
+		e->write_cb = write_cb;
+		e->write_cb_arg = write_cb_arg;
+	}
 
 	eloop_event_setup_fds(eloop);
 	return 0;
@@ -374,8 +386,6 @@ eloop_event_delete_write(struct eloop *eloop, int fd, int write_only)
 	}
 
 	if (write_only) {
-		if (e->write_cb == NULL)
-			return 0;
 		if (e->read_cb == NULL)
 			goto remove;
 		e->write_cb = NULL;
