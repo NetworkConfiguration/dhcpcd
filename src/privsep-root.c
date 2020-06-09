@@ -659,14 +659,14 @@ ps_root_startcb(void *arg)
 #ifdef INET6
 	if (ctx->options & DHCPCD_IPV6) {
 		ctx->nd_fd = ipv6nd_open(false);
-		if (ctx->udp_wfd == -1)
+		if (ctx->nd_fd == -1)
 			logerr("%s: ipv6nd_open", __func__);
 	}
 #endif
 #ifdef DHCP6
 	if (ctx->options & DHCPCD_IPV6) {
 		ctx->dhcp6_wfd = dhcp6_openraw();
-		if (ctx->udp_wfd == -1)
+		if (ctx->dhcp6_wfd == -1)
 			logerr("%s: dhcp6_openraw", __func__);
 	}
 #endif
