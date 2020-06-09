@@ -73,7 +73,6 @@ _import-src:
 	if [ `uname` = Linux ]; then \
 		rm ${DESTDIR}/hooks/50-ypbind.in; \
 	else \
-		rm ${DESTDIR}/hooks/00-linux; \
 		rm ${DESTDIR}/hooks/50-yp.conf; \
 	fi
 
