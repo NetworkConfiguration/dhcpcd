@@ -336,8 +336,13 @@ eloop_event_add_rw(struct eloop *eloop, int fd,
 				return -1;
 		}
 		TAILQ_INSERT_HEAD(&eloop->events, e, next);
-		e->fd = fd;
 		eloop->nevents++;
+		e->fd = fd;
+		e->read_cb = read_cb;
+		e->read_cb_arg = read_cb_arg;
+		e->write_cb = write_cb;
+		e->write_cb_arg = write_cb_arg;
+		goto setup;
 	}
 
 	if (read_cb) {
@@ -349,6 +354,7 @@ eloop_event_add_rw(struct eloop *eloop, int fd,
 		e->write_cb_arg = write_cb_arg;
 	}
 
+setup:
 	eloop_event_setup_fds(eloop);
 	return 0;
 }
