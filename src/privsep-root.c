@@ -151,6 +151,8 @@ ps_root_mreaderrorcb(void *arg)
 		PSR_ERROR(errno);
 	else if ((size_t)len < sizeof(*psr_error))
 		PSR_ERROR(EINVAL);
+	else if (psr_error->psr_datalen > SSIZE_MAX)
+		PSR_ERROR(ENOBUFS);
 
 	if (psr_error->psr_datalen != 0) {
 		psr_ctx->psr_data = malloc(psr_error->psr_datalen);
