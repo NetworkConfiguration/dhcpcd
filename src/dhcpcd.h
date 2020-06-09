@@ -144,6 +144,11 @@ struct dhcpcd_ctx {
 	size_t duid_len;
 	struct if_head *ifaces;
 
+	char *ctl_buf;
+	size_t ctl_buflen;
+	size_t ctl_bufpos;
+	size_t ctl_extra;
+
 	rb_tree_t routes;	/* our routes */
 #ifdef RT_FREE_ROUTE_TABLE
 	rb_tree_t froutes;	/* free routes for re-use */
@@ -204,6 +209,13 @@ struct dhcpcd_ctx {
 	struct ps_process_head ps_processes;	/* List of spawned processes */
 	pid_t ps_inet_pid;
 	int ps_inet_fd;		/* Network Proxy commands and data */
+#ifdef PRIVSEP_CONTROLLER
+	pid_t ps_control_pid;
+	int ps_control_fd;
+	int ps_control_data_fd;
+	struct fd_list *ps_control;
+	struct fd_list *ps_control_client;
+#endif
 #endif
 
 #ifdef INET

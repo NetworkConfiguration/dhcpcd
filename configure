@@ -580,16 +580,18 @@ if [ "$PRIVSEP" = yes ]; then
 	echo "#ifndef PRIVSEP_USER" >>$CONFIG_H
 	echo "#define PRIVSEP_USER		 \"$PRIVSEP_USER\"" >>$CONFIG_H
 	echo "#endif" >>$CONFIG_H
-	echo "DHCPCD_SRCS+=	privsep.c privsep-root.c privsep-inet.c" \
+	echo "PRIVSEP_SRCS=	privsep.c privsep-root.c privsep-inet.c" \
 		>>$CONFIG_MK
 	if [ -z "$INET" ] || [ "$INET" = yes ]; then
-		echo "DHCPCD_SRCS+=	privsep-bpf.c" >>$CONFIG_MK
+		echo "PRIVSEP_SRCS+=	privsep-bpf.c" >>$CONFIG_MK
 	fi
 	case "$OS" in
-	linux*)		 echo "DHCPCD_SRCS+=	privsep-linux.c" >>$CONFIG_MK;;
-	solaris*|sunos*) echo "DHCPCD_SRCS+=	privsep-sun.c" >>$CONFIG_MK;;
-	*)		 echo "DHCPCD_SRCS+=	privsep-bsd.c" >>$CONFIG_MK;;
+	linux*)		 echo "PRIVSEP_SRCS+=	privsep-linux.c" >>$CONFIG_MK;;
+	solaris*|sunos*) echo "PRIVSEP_SRCS+=	privsep-sun.c" >>$CONFIG_MK;;
+	*)		 echo "PRIVSEP_SRCS+=	privsep-bsd.c" >>$CONFIG_MK;;
 	esac
+else
+	echo "PRIVSEP_SRCS=" >>$CONFIG_MK
 fi
 
 echo "Using compiler .. $CC"
@@ -622,16 +624,8 @@ fi
 [ "$CC" != cc ] && echo "CC=		$CC" >>$CONFIG_MK
 $CC --version | $SED -e '1!d'
 
-if [ -z "$EMBEDDED" -o "$EMBEDDED" = yes ]; then
-	echo "$DHCPCD_DEFS will be embedded in dhcpcd itself"
-	echo "DHCPCD_SRCS+=	dhcpcd-embedded.c" >>$CONFIG_MK
-else
-	echo "$DHCPCD_DEFS will be installed to $LIBEXECDIR"
-	echo "CPPFLAGS+=	-DEMBEDDED_CONFIG=\\\"$LIBEXECDIR/dhcpcd-definitions.conf\\\"" >>$CONFIG_MK
-	echo "EMBEDDEDINSTALL=	_embeddedinstall" >>$CONFIG_MK
-fi
-
 if [ "$PRIVSEP" = yes ]; then
+	PRIVSEP_CONTROLLER=true
 	printf "Testing for capsicum ... "
 	cat <<EOF >_capsicum.c
 #include <sys/capsicum.h>
@@ -642,6 +636,7 @@ EOF
 	if $XCC _capsicum.c -o _capsicum 2>&3; then
 		echo "yes"
 		echo "#define	HAVE_CAPSICUM" >>$CONFIG_H
+		PRIVSEP_CONTROLLER=false
 	else
 		echo "no"
 	fi
@@ -657,10 +652,25 @@ EOF
         if $XCC _pledge.c -o _pledge 2>&3; then
                 echo "yes"
                 echo "#define   HAVE_PLEDGE" >>$CONFIG_H
+		PRIVSEP_CONTROLLER=false
         else
                 echo "no"
         fi
         rm -f _pledge.c _pledge
+
+	if $PRIVSEP_CONTROLLER; then
+		echo "#define	PRIVSEP_CONTROLLER" >>$CONFIG_H
+		echo "PRIVSEP_SRCS+=	privsep-control.c" >>$CONFIG_MK
+	fi
+fi
+
+if [ -z "$EMBEDDED" -o "$EMBEDDED" = yes ]; then
+	echo "$DHCPCD_DEFS will be embedded in dhcpcd itself"
+	echo "DHCPCD_SRCS+=	dhcpcd-embedded.c" >>$CONFIG_MK
+else
+	echo "$DHCPCD_DEFS will be installed to $LIBEXECDIR"
+	echo "CPPFLAGS+=	-DEMBEDDED_CONFIG=\\\"$LIBEXECDIR/dhcpcd-definitions.conf\\\"" >>$CONFIG_MK
+	echo "EMBEDDEDINSTALL=	_embeddedinstall" >>$CONFIG_MK
 fi
 
 if [ "$OS" = linux ]; then

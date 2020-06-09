@@ -15,7 +15,7 @@ CSTD?=		c99
 CFLAGS+=	-std=${CSTD}
 CPPFLAGS+=	-I${TOP} -I${TOP}/src -I./crypt
 
-SRCS+=		${DHCPCD_SRCS}
+SRCS+=		${DHCPCD_SRCS} ${PRIVSEP_SRCS}
 DHCPCD_DEF?=	dhcpcd-definitions.conf
 DHCPCD_DEFS=	dhcpcd-definitions.conf dhcpcd-definitions-small.conf
 

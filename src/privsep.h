@@ -50,6 +50,8 @@
 #define	PS_WRITEFILE		0x0015
 #define	PS_FILEMTIME		0x0016
 #define	PS_AUTH_MONORDM		0x0017
+#define	PS_CTL			0x0018
+#define	PS_CTL_EOF		0x0019
 
 /* BSD Commands */
 #define	PS_IOCTLLINK		0x0101
@@ -68,6 +70,10 @@
 #define	PS_DEV_IFADDED		0x0001
 #define	PS_DEV_IFREMOVED	0x0002
 #define	PS_DEV_IFUPDATED	0x0003
+
+/* Control Type (via flags) */
+#define	PS_CTL_PRIV		0x0301
+#define	PS_CTL_UNPRIV		0x0302
 
 /* Process commands */
 #define	PS_START		0x4000
@@ -156,6 +162,9 @@ TAILQ_HEAD(ps_process_head, ps_process);
 #include "privsep-root.h"
 #ifdef INET
 #include "privsep-bpf.h"
+#endif
+#ifdef PRIVSEP_CONTROLLER
+#include "privsep-control.h"
 #endif
 
 int ps_init(struct dhcpcd_ctx *);
