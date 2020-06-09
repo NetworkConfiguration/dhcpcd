@@ -50,6 +50,7 @@
 #define UNUSED(a)		(void)(a)
 
 struct logctx {
+	char		 log_buf[BUFSIZ];
 	unsigned int	 log_opts;
 #ifndef SMALL
 	FILE		*log_file;
@@ -368,6 +369,9 @@ logopen(const char *path)
 
 	/* Cache timezone */
 	tzset();
+
+	if (setvbuf(stderr, ctx->log_buf, _IOLBF, sizeof(ctx->log_buf)) == -1)
+		fprintf(stderr, "%s: %s\n", __func__, strerror(errno));
 
 	if (path == NULL) {
 		int opts = 0;
