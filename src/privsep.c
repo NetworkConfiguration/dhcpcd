@@ -39,6 +39,7 @@
  * this in a script or something.
  */
 
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -128,11 +129,57 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 		return -1;
 	}
 
-#ifdef PRIVSEP_CONTROLLER
-	if (ps_ctl_limitresources(ctx) == -1)
+	struct rlimit rzero = { .rlim_cur = 0, .rlim_max = 0 };
+
+#if defined(HAVE_CAPSICUM) || defined(HAVE_PLEDGE)
+	/* These sandbox technologies do not work well with
+	 * resource limits. */
+#else
+	if (ctx->ps_control_pid != getpid()) {
+		/* Prohibit new files, sockets, etc */
+#if defined(__linux__) || defined(__sun)
+		/*
+		 * If poll(2) is called with nfds > RLIMIT_NOFILE
+		 * then it returns EINVAL.
+		 * This blows.
+		 * Do the best we can and limit to what we need.
+		 * An attacker could potentially close a file and
+		 * open a new one still, but that cannot be helped.
+		 */
+		unsigned long maxfd;
+		maxfd = (unsigned long)eloop_event_count(ctx->eloop);
+		if (IN_PRIVSEP_SE(ctx))
+			maxfd++; /* XXX why? */
+
+		struct rlimit rmaxfd = {
+		    .rlim_cur = (unsigned long)maxfd,
+		    .rlim_max = (unsigned long)maxfd
+		};
+		if (setrlimit(RLIMIT_NOFILE, &rmaxfd) == -1) {
+			logerr("setrlimit RLIMIT_NOFILE");
+			return -1;
+		}
+#else
+		if (setrlimit(RLIMIT_NOFILE, &rzero) == -1) {
+			logerr("setrlimit RLIMIT_NOFILE");
+			return -1;
+		}
+#endif
+	}
+
+	/* Prohibit large files */
+	if (setrlimit(RLIMIT_FSIZE, &rzero) == -1) {
+		logerr("setrlimit RLIMIT_FSIZE");
 		return -1;
-#elif !defined(HAVE_CAPSIUM) && !defined(HAVE_PLEDGE)
-#warning No sandbox support
+	}
+
+#ifdef RLIMIT_NPROC
+	/* Prohibit forks */
+	if (setrlimit(RLIMIT_NPROC, &rzero) == -1) {
+		logerr("setrlimit RLIMIT_NPROC");
+		return -1;
+	}
+#endif
 #endif
 
 	return 0;

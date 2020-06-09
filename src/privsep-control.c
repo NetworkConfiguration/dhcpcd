@@ -26,8 +26,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/resource.h>
-
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,34 +35,6 @@
 #include "eloop.h"
 #include "logerr.h"
 #include "privsep.h"
-
-int
-ps_ctl_limitresources(struct dhcpcd_ctx *ctx)
-{
-	struct rlimit rzero = { .rlim_cur = 0, .rlim_max = 0 };
-
-	if (ctx->ps_control_pid != getpid()) {
-		/* Prohibit new files, sockets, etc */
-		if (setrlimit(RLIMIT_NOFILE, &rzero) == -1) {
-			logerr("setrlimit RLIMIT_NOFILE");
-			return -1;
-		}
-	}
-
-	/* Prohibit large files */
-	if (setrlimit(RLIMIT_FSIZE, &rzero) == -1) {
-		logerr("setrlimit RLIMIT_FSIZE");
-		return -1;
-	}
-
-	/* Prohibit forks */
-	if (setrlimit(RLIMIT_NPROC, &rzero) == -1) {
-		logerr("setrlimit RLIMIT_NPROC");
-		return -1;
-	}
-
-	return 0;
-}
 
 static int
 ps_ctl_startcb(void *arg)

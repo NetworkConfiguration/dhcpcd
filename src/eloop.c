@@ -297,6 +297,13 @@ eloop_event_setup_fds(struct eloop *eloop)
 	}
 }
 
+size_t
+eloop_event_count(const struct eloop *eloop)
+{
+
+	return eloop->nevents;
+}
+
 int
 eloop_event_add_rw(struct eloop *eloop, int fd,
     void (*read_cb)(void *), void *read_cb_arg,

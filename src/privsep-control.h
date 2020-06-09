@@ -32,7 +32,6 @@
 #define IN_PRIVSEP_CONTROLLER(ctx) \
     (IN_PRIVSEP((ctx)) && (ctx)->ps_control_pid == getpid())
 
-int ps_ctl_limitresources(struct dhcpcd_ctx *);
 pid_t ps_ctl_start(struct dhcpcd_ctx *);
 int ps_ctl_stop(struct dhcpcd_ctx *);
 ssize_t ps_ctl_handleargs(struct fd_list *, char *, size_t);
