@@ -2321,6 +2321,10 @@ printpidfile:
 	if (dhcp_vendor(ctx.vendor, sizeof(ctx.vendor)) == -1)
 		logerrx("dhcp_vendor");
 
+	/* Start handling kernel messages for interfaces, addresses and
+	 * routes. */
+	eloop_event_add(ctx.eloop, ctx.link_fd, dhcpcd_handlelink, &ctx);
+
 #ifdef PRIVSEP
 	if (IN_PRIVSEP(&ctx) && ps_mastersandbox(&ctx) == -1)
 		goto exit_failure;
@@ -2330,10 +2334,6 @@ printpidfile:
 	 * the old behaviour of waiting for an IP address */
 	if (ctx.ifc == 1 && !(ctx.options & DHCPCD_BACKGROUND))
 		ctx.options |= DHCPCD_WAITIP;
-
-	/* Start handling kernel messages for interfaces, addresses and
-	 * routes. */
-	eloop_event_add(ctx.eloop, ctx.link_fd, dhcpcd_handlelink, &ctx);
 
 	ctx.ifaces = if_discover(&ctx, &ifaddrs, ctx.ifc, ctx.ifv);
 	if (ctx.ifaces == NULL) {

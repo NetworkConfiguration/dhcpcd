@@ -62,9 +62,9 @@
 #define	PS_IFIGNOREGRP		0x0106
 
 /* Dev Commands */
-#define	PS_DEV_LISTENING	0x0201
-#define	PS_DEV_INITTED		0x0202
-#define	PS_DEV_IFCMD		0x0203
+#define	PS_DEV_LISTENING	0x1001
+#define	PS_DEV_INITTED		0x1002
+#define	PS_DEV_IFCMD		0x1003
 
 /* Dev Interface Commands (via flags) */
 #define	PS_DEV_IFADDED		0x0001
@@ -72,8 +72,8 @@
 #define	PS_DEV_IFUPDATED	0x0003
 
 /* Control Type (via flags) */
-#define	PS_CTL_PRIV		0x0301
-#define	PS_CTL_UNPRIV		0x0302
+#define	PS_CTL_PRIV		0x0004
+#define	PS_CTL_UNPRIV		0x0005
 
 /* Process commands */
 #define	PS_START		0x4000

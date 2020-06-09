@@ -64,7 +64,6 @@ ssize_t ps_root_ifignoregroup(struct dhcpcd_ctx *, const char *);
 #endif
 #ifdef __linux__
 ssize_t ps_root_sendnetlink(struct dhcpcd_ctx *, int, struct msghdr *);
-ssize_t ps_root_writepathuint(struct dhcpcd_ctx *, const char *, unsigned int);
 #endif
 
 #ifdef PLUGIN_DEV
