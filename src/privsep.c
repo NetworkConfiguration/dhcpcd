@@ -39,7 +39,6 @@
  * this in a script or something.
  */
 
-#include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -129,36 +128,11 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 		return -1;
 	}
 
-#if defined(HAVE_CAPSICUM) || defined(HAVE_PLEDGE)
-	/* Resource limits are not needed for these sandboxes */
-#else
-	struct rlimit rzero = { .rlim_cur = 0, .rlim_max = 0 };
-
-	/* We can't use RLIMIT_NOFILE because that breaks our control socket.
-	 * XXX Offload to a new process? */
-#if 0
-#ifndef __linux__ /* breaks ppoll */
-	/* Prohibit new files, sockets, etc */
-	if (setrlimit(RLIMIT_NOFILE, &rzero) == -1) {
-		logerr("setrlimit RLIMIT_NOFILE");
+#ifdef PRIVSEP_CONTROLLER
+	if (ps_ctl_limitresources(ctx) == -1)
 		return -1;
-	}
-#endif
-#endif
-
-	/* Prohibit large files */
-	if (setrlimit(RLIMIT_FSIZE, &rzero) == -1) {
-		logerr("setrlimit RLIMIT_FSIZE");
-		return -1;
-	}
-
-#ifdef RLIMIT_NPROC
-	/* Prohibit forks */
-	if (setrlimit(RLIMIT_NPROC, &rzero) == -1) {
-		logerr("setrlimit RLIMIT_NPROC");
-		return -1;
-	}
-#endif
+#elif !defined(HAVE_CAPSIUM) && !defined(HAVE_PLEDGE)
+#warning No sandbox support
 #endif
 
 	return 0;
@@ -437,6 +411,18 @@ ps_start(struct dhcpcd_ctx *ctx)
 	}
 
 started:
+#ifdef PRIVSEP_CONTROLLER
+	if (!(ctx->options & DHCPCD_TEST)) {
+		switch (pid = ps_ctl_start(ctx)) {
+		case -1:
+			return -1;
+		case 0:
+			return 0;
+		default:
+			logdebugx("spawned controller on PID %d", pid);
+		}
+	}
+#endif
 
 #ifdef ARC4RANDOM_H
 	/* Seed the random number generator early incase it needs /dev/urandom
@@ -490,6 +476,12 @@ ps_stop(struct dhcpcd_ctx *ctx)
 	    ctx->options & DHCPCD_FORKED ||
 	    ctx->eloop == NULL)
 		return 0;
+
+#ifdef PRIVSEP_CONTROLLER
+	r = ps_ctl_stop(ctx);
+	if (r != 0)
+		ret = r;
+#endif
 
 	r = ps_inet_stop(ctx);
 	if (r != 0)
