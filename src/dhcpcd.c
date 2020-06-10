@@ -943,9 +943,12 @@ dhcpcd_startinterface(void *arg)
 		}
 
 #ifdef DHCP6
-		if (ifo->options & DHCPCD_DHCP6) {
+		/* DHCPv6 could be turned off, but the interface
+		 * is still delegated to. */
+		if (ifp->active)
 			dhcp6_find_delegates(ifp);
 
+		if (ifo->options & DHCPCD_DHCP6) {
 			if (ifp->active == IF_ACTIVE_USER) {
 				enum DH6S d6_state;
 
