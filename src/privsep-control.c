@@ -255,7 +255,9 @@ ps_ctl_start(struct dhcpcd_ctx *ctx)
 	    ps_ctl_startcb, ps_ctl_signalcb,
 	    PSF_DROPPRIVS);
 
-	if (pid != 0) {
+	if (pid == -1)
+		return -1;
+	else if (pid != 0) {
 		ctx->ps_control_data_fd = data_fd[1];
 		close(data_fd[0]);
 		ctx->ps_control = control_new(ctx,
@@ -264,8 +266,7 @@ ps_ctl_start(struct dhcpcd_ctx *ctx)
 			return -1;
 		close(listen_fd[0]);
 		return pid;
-	} else if (pid == -1)
-		return -1;
+	}
 
 	ctx->ps_control_data_fd = data_fd[0];
 	close(data_fd[1]);
