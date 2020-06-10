@@ -1513,6 +1513,7 @@ if_route(unsigned char cmd, const struct rt *rt)
 			    (unsigned short)RTA_PAYLOAD(metrics));
 		}
 
+#ifdef HAVE_ROUTE_PREF
 		if (rt->rt_dflags & RTDF_RA) {
 			uint8_t pref;
 
@@ -1532,6 +1533,7 @@ if_route(unsigned char cmd, const struct rt *rt)
 			}
 			add_attr_8(&nlm.hdr, sizeof(nlm), RTA_PREF, pref);
 		}
+#endif
 	}
 
 	if (!sa_is_loopback(&rt->rt_gateway))
