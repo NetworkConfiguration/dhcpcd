@@ -169,7 +169,6 @@ ps_ctl_dispatch(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		control_recvdata(fd, iov->iov_base, iov->iov_len);
 		break;
 	case PS_CTL_EOF:
-		fd = ctx->ps_control_client;
 		control_free(ctx->ps_control_client);
 		break;
 	default:
