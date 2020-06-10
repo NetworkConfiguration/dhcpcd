@@ -1659,6 +1659,8 @@ dhcpcd_readdump2(void *arg)
 		return;
 	}
 
+	if (ctx->ctl_buf[ctx->ctl_buflen - 1] != '\0') /* unlikely */
+		ctx->ctl_buf[ctx->ctl_buflen - 1] = '\0';
 	script_dump(ctx->ctl_buf, ctx->ctl_buflen);
 	fflush(stdout);
 	if (--ctx->ctl_extra != 0) {
