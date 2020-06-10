@@ -31,6 +31,8 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 
+#include <fcntl.h> /* Needs to be here for old Linux */
+
 #include "config.h"
 
 #include <net/if.h>
@@ -54,7 +56,6 @@
 #include <errno.h>
 #include <ifaddrs.h>
 #include <inttypes.h>
-#include <fcntl.h>
 #include <fnmatch.h>
 #include <stddef.h>
 #include <stdio.h>
