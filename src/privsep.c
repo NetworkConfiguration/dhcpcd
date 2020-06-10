@@ -129,9 +129,8 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 		return -1;
 	}
 
-#if defined(HAVE_CAPSICUM) || defined(HAVE_PLEDGE)
-	/* These sandbox technologies do not work well with
-	 * resource limits. */
+#if defined(HAVE_PLEDGE)
+	/* Pledge does not seem to work well with resource limits. */
 #else
 	struct rlimit rzero = { .rlim_cur = 0, .rlim_max = 0 };
 
@@ -167,11 +166,13 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 #endif
 	}
 
+#ifndef HAVE_CAPSICUM
 	/* Prohibit large files */
 	if (setrlimit(RLIMIT_FSIZE, &rzero) == -1) {
 		logerr("setrlimit RLIMIT_FSIZE");
 		return -1;
 	}
+#endif
 
 #ifdef RLIMIT_NPROC
 	/* Prohibit forks */
