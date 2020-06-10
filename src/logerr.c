@@ -370,8 +370,7 @@ logopen(const char *path)
 	/* Cache timezone */
 	tzset();
 
-	if (setvbuf(stderr, ctx->log_buf, _IOLBF, sizeof(ctx->log_buf)) == -1)
-		fprintf(stderr, "%s: %s\n", __func__, strerror(errno));
+	(void)setvbuf(stderr, ctx->log_buf, _IOLBF, sizeof(ctx->log_buf));
 
 	if (path == NULL) {
 		int opts = 0;
