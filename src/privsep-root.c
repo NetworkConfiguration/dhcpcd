@@ -985,7 +985,7 @@ ps_root_getauthrdm(struct dhcpcd_ctx *ctx, uint64_t *rdm)
 {
 
 	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_AUTH_MONORDM, 0,
-	    rdm, sizeof(rdm))== -1)
+	    rdm, sizeof(*rdm))== -1)
 		return -1;
 	return (int)ps_root_readerror(ctx, rdm, sizeof(*rdm));
 }
