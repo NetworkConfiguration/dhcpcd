@@ -480,7 +480,6 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 			shutdown(psp->psp_fd, SHUT_RDWR);
 			close(psp->psp_fd);
 			psp->psp_fd = -1;
-			ps_dostop(ctx, &psp->psp_pid, &psp->psp_fd);
 			ps_freeprocess(psp);
 		}
 		return 0;
