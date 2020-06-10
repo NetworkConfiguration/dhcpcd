@@ -209,13 +209,11 @@ struct dhcpcd_ctx {
 	struct ps_process_head ps_processes;	/* List of spawned processes */
 	pid_t ps_inet_pid;
 	int ps_inet_fd;		/* Network Proxy commands and data */
-#ifdef PRIVSEP_CONTROLLER
 	pid_t ps_control_pid;
-	int ps_control_fd;
-	int ps_control_data_fd;
-	struct fd_list *ps_control;
-	struct fd_list *ps_control_client;
-#endif
+	int ps_control_fd;	/* Control Proxy - generic listener */
+	int ps_control_data_fd;	/* Control Proxy - data query */
+	struct fd_list *ps_control;		/* Queue for the above */
+	struct fd_list *ps_control_client;	/* Queue for the above */
 #endif
 
 #ifdef INET
