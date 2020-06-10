@@ -36,6 +36,10 @@
 #include "logerr.h"
 #include "privsep.h"
 
+#ifdef HAVE_CAPSICUM
+#include <sys/capsicum.h>
+#endif
+
 static int
 ps_ctl_startcb(void *arg)
 {
