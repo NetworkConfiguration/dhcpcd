@@ -545,6 +545,15 @@ if [ -z "$AUTH" -o "$AUTH" = yes ]; then
 	echo "SRCS+=		auth.c" >>$CONFIG_MK
 fi
 
+if [ -z "$EMBEDDED" -o "$EMBEDDED" = yes ]; then
+	echo "$DHCPCD_DEFS will be embedded in dhcpcd itself"
+	echo "DHCPCD_SRCS+=	dhcpcd-embedded.c" >>$CONFIG_MK
+else
+	echo "$DHCPCD_DEFS will be installed to $LIBEXECDIR"
+	echo "CPPFLAGS+=	-DEMBEDDED_CONFIG=\\\"$LIBEXECDIR/dhcpcd-definitions.conf\\\"" >>$CONFIG_MK
+	echo "EMBEDDEDINSTALL=	_embeddedinstall" >>$CONFIG_MK
+fi
+
 if [ -z "$PRIVSEP" ]; then
 	# privilege separation works fine .... except on Solaris
 	case "$OS" in
@@ -580,8 +589,8 @@ if [ "$PRIVSEP" = yes ]; then
 	echo "#ifndef PRIVSEP_USER" >>$CONFIG_H
 	echo "#define PRIVSEP_USER		 \"$PRIVSEP_USER\"" >>$CONFIG_H
 	echo "#endif" >>$CONFIG_H
-	echo "PRIVSEP_SRCS=	privsep.c privsep-root.c privsep-inet.c" \
-		>>$CONFIG_MK
+	echo "PRIVSEP_SRCS=	privsep.c privsep-root.c" >>$CONFIG_MK
+	echo "PRIVSEP_SRCS+=	privsep-control.c privsep-inet.c" >>$CONFIG_MK
 	if [ -z "$INET" ] || [ "$INET" = yes ]; then
 		echo "PRIVSEP_SRCS+=	privsep-bpf.c" >>$CONFIG_MK
 	fi
@@ -625,7 +634,6 @@ fi
 $CC --version | $SED -e '1!d'
 
 if [ "$PRIVSEP" = yes ]; then
-	PRIVSEP_CONTROLLER=true
 	printf "Testing for capsicum ... "
 	cat <<EOF >_capsicum.c
 #include <sys/capsicum.h>
@@ -636,7 +644,6 @@ EOF
 	if $XCC _capsicum.c -o _capsicum 2>&3; then
 		echo "yes"
 		echo "#define	HAVE_CAPSICUM" >>$CONFIG_H
-		PRIVSEP_CONTROLLER=false
 	else
 		echo "no"
 	fi
@@ -651,26 +658,11 @@ int main(void) {
 EOF
         if $XCC _pledge.c -o _pledge 2>&3; then
                 echo "yes"
-                echo "#define   HAVE_PLEDGE" >>$CONFIG_H
-		PRIVSEP_CONTROLLER=false
+                echo "#define	HAVE_PLEDGE" >>$CONFIG_H
         else
                 echo "no"
         fi
         rm -f _pledge.c _pledge
-
-	if $PRIVSEP_CONTROLLER; then
-		echo "#define	PRIVSEP_CONTROLLER" >>$CONFIG_H
-		echo "PRIVSEP_SRCS+=	privsep-control.c" >>$CONFIG_MK
-	fi
-fi
-
-if [ -z "$EMBEDDED" -o "$EMBEDDED" = yes ]; then
-	echo "$DHCPCD_DEFS will be embedded in dhcpcd itself"
-	echo "DHCPCD_SRCS+=	dhcpcd-embedded.c" >>$CONFIG_MK
-else
-	echo "$DHCPCD_DEFS will be installed to $LIBEXECDIR"
-	echo "CPPFLAGS+=	-DEMBEDDED_CONFIG=\\\"$LIBEXECDIR/dhcpcd-definitions.conf\\\"" >>$CONFIG_MK
-	echo "EMBEDDEDINSTALL=	_embeddedinstall" >>$CONFIG_MK
 fi
 
 if [ "$OS" = linux ]; then

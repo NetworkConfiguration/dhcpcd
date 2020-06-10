@@ -158,13 +158,11 @@ struct ps_process {
 };
 TAILQ_HEAD(ps_process_head, ps_process);
 
+#include "privsep-control.h"
 #include "privsep-inet.h"
 #include "privsep-root.h"
 #ifdef INET
 #include "privsep-bpf.h"
-#endif
-#ifdef PRIVSEP_CONTROLLER
-#include "privsep-control.h"
 #endif
 
 int ps_init(struct dhcpcd_ctx *);

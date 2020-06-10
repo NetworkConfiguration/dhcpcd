@@ -79,7 +79,7 @@ void
 control_free(struct fd_list *fd)
 {
 
-#ifdef PRIVSEP_CONTROLLER
+#ifdef PRIVSEP
 	if (fd->ctx->ps_control_client == fd)
 		fd->ctx->ps_control_client = NULL;
 #endif
@@ -94,7 +94,7 @@ void
 control_delete(struct fd_list *fd)
 {
 
-#ifdef PRIVSEP_CONTROLLER
+#ifdef PRIVSEP
 	if (IN_PRIVSEP_SE(fd->ctx))
 		return;
 #endif
@@ -120,7 +120,7 @@ control_handle_data(void *arg)
 		return;
 	}
 
-#ifdef PRIVSEP_CONTROLLER
+#ifdef PRIVSEP
 	if (IN_PRIVSEP(fd->ctx)) {
 		ssize_t err;
 
@@ -236,7 +236,7 @@ control_handle1(struct dhcpcd_ctx *ctx, int lfd, unsigned int fd_flags)
 	    fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
 		goto error;
 
-#ifdef PRIVSEP_CONTROLLER
+#ifdef PRIVSEP
 	if (IN_PRIVSEP(ctx) && !IN_PRIVSEP_SE(ctx))
 		;
 	else
@@ -357,7 +357,7 @@ control_start(struct dhcpcd_ctx *ctx, const char *ifname, sa_family_t family)
 {
 	int fd;
 
-#ifdef PRIVSEP_CONTROLLER
+#ifdef PRIVSEP
 	if (IN_PRIVSEP_SE(ctx)) {
 		make_path(ctx->control_sock, sizeof(ctx->control_sock),
 		    ifname, family);
@@ -410,7 +410,7 @@ control_stop(struct dhcpcd_ctx *ctx)
 		control_free(l);
 	}
 
-#ifdef PRIVSEP_CONTROLLER
+#ifdef PRIVSEP
 	if (IN_PRIVSEP_SE(ctx)) {
 		if (ps_root_unlink(ctx, ctx->control_sock) == -1)
 			retval = -1;
@@ -525,7 +525,7 @@ control_writeone(void *arg)
 		return;
 
 	eloop_event_remove_writecb(fd->ctx->eloop, fd->fd);
-#ifdef PRIVSEP_CONTROLLER
+#ifdef PRIVSEP
 	if (IN_PRIVSEP_SE(fd->ctx) && !(fd->flags & FD_LISTEN)) {
 		if (ps_ctl_sendeof(fd) == -1)
 			logerr(__func__);

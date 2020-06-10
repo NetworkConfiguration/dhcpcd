@@ -129,12 +129,12 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 		return -1;
 	}
 
-	struct rlimit rzero = { .rlim_cur = 0, .rlim_max = 0 };
-
 #if defined(HAVE_CAPSICUM) || defined(HAVE_PLEDGE)
 	/* These sandbox technologies do not work well with
 	 * resource limits. */
 #else
+	struct rlimit rzero = { .rlim_cur = 0, .rlim_max = 0 };
+
 	if (ctx->ps_control_pid != getpid()) {
 		/* Prohibit new files, sockets, etc */
 #if defined(__linux__) || defined(__sun)
@@ -444,7 +444,7 @@ ps_start(struct dhcpcd_ctx *ctx)
 	/* No point in spawning the generic network listener if we're
 	 * not going to use it. */
 	if (!(ctx->options & (DHCPCD_MASTER | DHCPCD_IPV6)))
-		goto started;
+		goto started_net;
 
 	switch (pid = ps_inet_start(ctx)) {
 	case -1:
@@ -457,8 +457,7 @@ ps_start(struct dhcpcd_ctx *ctx)
 		logdebugx("spawned network proxy on PID %d", pid);
 	}
 
-started:
-#ifdef PRIVSEP_CONTROLLER
+started_net:
 	if (!(ctx->options & DHCPCD_TEST)) {
 		switch (pid = ps_ctl_start(ctx)) {
 		case -1:
@@ -466,10 +465,9 @@ started:
 		case 0:
 			return 0;
 		default:
-			logdebugx("spawned controller on PID %d", pid);
+			logdebugx("spawned controller proxy on PID %d", pid);
 		}
 	}
-#endif
 
 #ifdef ARC4RANDOM_H
 	/* Seed the random number generator early incase it needs /dev/urandom
@@ -524,11 +522,9 @@ ps_stop(struct dhcpcd_ctx *ctx)
 	    ctx->eloop == NULL)
 		return 0;
 
-#ifdef PRIVSEP_CONTROLLER
 	r = ps_ctl_stop(ctx);
 	if (r != 0)
 		ret = r;
-#endif
 
 	r = ps_inet_stop(ctx);
 	if (r != 0)

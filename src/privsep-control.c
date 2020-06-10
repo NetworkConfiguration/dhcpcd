@@ -277,6 +277,15 @@ ps_ctl_start(struct dhcpcd_ctx *ctx)
 	if (eloop_event_add(ctx->eloop, ctx->ps_control->fd,
 	    ps_ctl_listen, ctx) == -1)
 		return -1;
+
+#ifdef HAVE_CAPSICUM
+	if (cap_enter() == -1 && errno != ENOSYS)
+		logerr("%s: cap_enter", __func__);
+#endif
+#ifdef HAVE_PLEDGE
+	if (pledge("stdio inet", NULL) == -1)
+		logerr("%s: pledge", __func__);
+#endif
 	return 0;
 }
 
