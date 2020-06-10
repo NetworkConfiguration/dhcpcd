@@ -401,17 +401,16 @@ ps_dostop(struct dhcpcd_ctx *ctx, pid_t *pid, int *fd)
 	int err = 0;
 
 #ifdef PRIVSEP_DEBUG
-	logdebugx("%s: pid %d fd %d", __func__, *pid, *fd);
+	logdebugx("%s: pid=%d fd=%d", __func__, *pid, *fd);
 #endif
 
 	if (*fd != -1) {
 		eloop_event_delete(ctx->eloop, *fd);
-		if (ps_sendcmd(ctx, *fd, PS_STOP, 0, NULL, 0) == -1 ||
-		    shutdown(*fd, SHUT_RDWR) == -1)
-		{
+		if (ps_sendcmd(ctx, *fd, PS_STOP, 0, NULL, 0) == -1) {
 			logerr(__func__);
 			err = -1;
 		}
+		(void)shutdown(*fd, SHUT_RDWR);
 		close(*fd);
 		*fd = -1;
 	}
