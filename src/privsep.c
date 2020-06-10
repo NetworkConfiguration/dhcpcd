@@ -129,14 +129,11 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 		return -1;
 	}
 
-#if defined(HAVE_PLEDGE)
-	/* Pledge does not seem to work well with resource limits. */
-#else
 	struct rlimit rzero = { .rlim_cur = 0, .rlim_max = 0 };
 
 	if (ctx->ps_control_pid != getpid()) {
 		/* Prohibit new files, sockets, etc */
-#if defined(__linux__) || defined(__sun)
+#if defined(__linux__) || defined(__sun) || defined(__OpenBSD__)
 		/*
 		 * If poll(2) is called with nfds > RLIMIT_NOFILE
 		 * then it returns EINVAL.
@@ -166,7 +163,7 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 #endif
 	}
 
-#ifndef HAVE_CAPSICUM
+#if !defined(HAVE_CAPSICUM) && !defined(HAVE_PLEDGE)
 	/* Prohibit large files */
 	if (setrlimit(RLIMIT_FSIZE, &rzero) == -1) {
 		logerr("setrlimit RLIMIT_FSIZE");
@@ -180,7 +177,6 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 		logerr("setrlimit RLIMIT_NPROC");
 		return -1;
 	}
-#endif
 #endif
 
 	return 0;
