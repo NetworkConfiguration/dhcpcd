@@ -1686,6 +1686,10 @@ dhcpcd_readdump1(void *arg)
 			errno = EINVAL;
 		goto err;
 	}
+	if (ctx->ctl_buflen > SSIZE_MAX) {
+		errno = ENOBUFS;
+		goto err;
+	}
 
 	free(ctx->ctl_buf);
 	ctx->ctl_buf = malloc(ctx->ctl_buflen);
