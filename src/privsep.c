@@ -163,19 +163,14 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 #endif
 	}
 
-#if !defined(HAVE_CAPSICUM) && !defined(HAVE_PLEDGE)
-	/*
-	 * Prohibit large files
-	 * Cannot offload this to the privilged actioneer because
-	 * only the master process has access to it.
-	 */
+	/* Prohibit writing to files.
+	 * Obviously this won't work if we are using a logfile. */
 	if (ctx->logfile == NULL) {
 		if (setrlimit(RLIMIT_FSIZE, &rzero) == -1) {
 			logerr("setrlimit RLIMIT_FSIZE");
 			return -1;
 		}
 	}
-#endif
 
 #ifdef RLIMIT_NPROC
 	/* Prohibit forks */
