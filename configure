@@ -1529,15 +1529,31 @@ if [ -z "$INET6" ] || [ "$INET6" = yes ] || \
 	fi
 fi
 
-if [ "$DEV" != no -a "$UDEV" != no ]; then
+if [ "$DEV" != no ] && [ "$UDEV" != no ]; then
 	printf "Checking for libudev ... "
 	if type "$PKG_CONFIG" >/dev/null 2>&1; then
 		LIBUDEV_CFLAGS=$("$PKG_CONFIG" --cflags libudev 2>&3)
 		LIBUDEV_LIBS=$("$PKG_CONFIG" --libs libudev 2>&3)
 	fi
+	if [ -n "$LIBUDEV_LIBS" ] && [ "$UDEV" = yes ]; then
+		echo "yes"
+	elif [ -n "$LIBUDEV_LIBS" ]; then
+		case "$OS" in
+		linux*)	echo "yes";;
+		*)	echo "yes (disabled)"
+			# FreeBSD libudev fails to return a udev device
+			# with udev_device_new_from_subsystem_sysname
+			# which breaks our test for device initialisation
+			LIBUDEV_CFLAGS=
+			LIBUDEV_LIBS=
+			;;
+		esac
+	else
+		echo "no"
+	fi
 fi
-if [ "$DEV" != no -a "$UDEV" != no -a -n "$LIBUDEV_LIBS" ]; then
-	echo "yes"
+
+if [ "$DEV" != no ] && [ "$UDEV" != no ] && [ -n "$LIBUDEV_LIBS" ]; then
 	[ -z "$DEV" ] && DEV=yes
 	echo "DEV_PLUGINS+=	udev" >>$CONFIG_MK
 	if [ -n "$LIBUDEV_CFLAGS" ]; then
@@ -1580,12 +1596,9 @@ EOF
 		echo "no"
 	fi
 	rm -f _udev.c _udev
-elif [ "$DEV" != no -a "$UDEV" != no ]; then
-	echo "no"
-	if [ -n "$UDEV" ]; then
-		echo "udev has been explicitly requested ... aborting" >&2
-		exit 1
-	fi
+elif [ "$DEV" != no ] && [ "$UDEV" != no ] && [ -n "$UDEV" ]; then
+	echo "udev has been explicitly requested ... aborting" >&2
+	exit 1
 fi
 
 if [ "$DEV" = yes ]; then
