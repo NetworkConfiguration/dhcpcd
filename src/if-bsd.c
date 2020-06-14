@@ -1004,8 +1004,7 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 	if (ia->addr_flags & IN6_IFF_TENTATIVE)
 		ifa.ifra_flags |= IN6_IFF_TENTATIVE;
 #endif
-// #if (defined(__NetBSD__) && __NetBSD_Version__ >= 999005700) ||
-#if    (defined(__OpenBSD__) && OpenBSD >= 201605)
+#if !defined(IPV6CTL_ACCEPT_RTADV) && !defined(ND6_IFF_ACCEPT_RTADV)
 	if (ia->flags & IPV6_AF_AUTOCONF)
 		ifa.ifra_flags |= IN6_IFF_AUTOCONF;
 #endif
