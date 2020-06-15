@@ -727,9 +727,7 @@ if_route(unsigned char cmd, const struct rt *rt)
 		} else
 			rtm->rtm_flags |= RTF_GATEWAY;
 
-		/* Emulate the kernel by marking address generated
-		 * network routes non-static. */
-		if (!(rt->rt_dflags & RTDF_IFA_ROUTE))
+		if (rt->rt_dflags & RTDF_STATIC)
 			rtm->rtm_flags |= RTF_STATIC;
 
 		if (rt->rt_mtu != 0) {
