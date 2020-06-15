@@ -1727,6 +1727,7 @@ dhcp6_fail(struct interface *ifp)
 		if (state->old != NULL)
 			script_runreason(ifp, "EXPIRE6");
 		dhcp_unlink(ifp->ctx, state->leasefile);
+		dhcp6_addrequestedaddrs(ifp);
 	}
 
 	if (!dhcp6_startdiscoinform(ifp)) {
@@ -2672,6 +2673,7 @@ ex:
 	free(state->new);
 	state->new = NULL;
 	state->new_len = 0;
+	dhcp6_addrequestedaddrs(ifp);
 	return bytes == 0 ? 0 : -1;
 }
 
