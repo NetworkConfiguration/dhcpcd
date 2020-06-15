@@ -64,6 +64,9 @@
 #ifndef ND_RA_FLAG_HOME_AGENT
 #define	ND_RA_FLAG_HOME_AGENT	0x20	/* Home Agent flag in RA */
 #endif
+#ifndef ND_RA_FLAG_PROXY
+#define	ND_RA_FLAG_PROXY	0x04	/* Proxy */
+#endif
 #ifndef ND_OPT_PI_FLAG_ROUTER
 #define	ND_OPT_PI_FLAG_ROUTER	0x20	/* Router flag in PI */
 #endif
@@ -1642,12 +1645,12 @@ ipv6nd_env(FILE *fp, const struct interface *ifp)
 		if (efprintf(fp, "%s_hoplimit=%u", ndprefix, rap->hoplimit) == -1)
 			return -1;
 		pref = ipv6nd_rtpref(rap);
-		if (efprintf(fp, "%s_flags=%s%s%s%s", ndprefix,
+		if (efprintf(fp, "%s_flags=%s%s%s%s%s", ndprefix,
 		    rap->flags & ND_RA_FLAG_MANAGED    ? "M" : "",
 		    rap->flags & ND_RA_FLAG_OTHER      ? "O" : "",
 		    rap->flags & ND_RA_FLAG_HOME_AGENT ? "H" : "",
-		    pref == RTPREF_HIGH ? "h" : pref == RTPREF_LOW ? "l" : ""
-		    ) == -1)
+		    pref == RTPREF_HIGH ? "h" : pref == RTPREF_LOW ? "l" : "",
+		    rap->flags & ND_RA_FLAG_PROXY      ? "P" : "") == -1)
 			return -1;
 		if (efprintf(fp, "%s_lifetime=%u", ndprefix, rap->lifetime) == -1)
 			return -1;
