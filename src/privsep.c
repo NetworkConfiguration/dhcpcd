@@ -148,36 +148,28 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 			maxfd++; /* XXX why? */
 
 		struct rlimit rmaxfd = {
-		    .rlim_cur = (unsigned long)maxfd,
-		    .rlim_max = (unsigned long)maxfd
+		    .rlim_cur = maxfd,
+		    .rlim_max = maxfd
 		};
-		if (setrlimit(RLIMIT_NOFILE, &rmaxfd) == -1) {
+		if (setrlimit(RLIMIT_NOFILE, &rmaxfd) == -1)
 			logerr("setrlimit RLIMIT_NOFILE");
-			return -1;
-		}
 #else
-		if (setrlimit(RLIMIT_NOFILE, &rzero) == -1) {
+		if (setrlimit(RLIMIT_NOFILE, &rzero) == -1)
 			logerr("setrlimit RLIMIT_NOFILE");
-			return -1;
-		}
 #endif
 	}
 
 	/* Prohibit writing to files.
 	 * Obviously this won't work if we are using a logfile. */
 	if (ctx->logfile == NULL) {
-		if (setrlimit(RLIMIT_FSIZE, &rzero) == -1) {
+		if (setrlimit(RLIMIT_FSIZE, &rzero) == -1)
 			logerr("setrlimit RLIMIT_FSIZE");
-			return -1;
-		}
 	}
 
 #ifdef RLIMIT_NPROC
 	/* Prohibit forks */
-	if (setrlimit(RLIMIT_NPROC, &rzero) == -1) {
+	if (setrlimit(RLIMIT_NPROC, &rzero) == -1)
 		logerr("setrlimit RLIMIT_NPROC");
-		return -1;
-	}
 #endif
 
 	return 0;
