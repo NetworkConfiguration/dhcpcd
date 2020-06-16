@@ -1002,7 +1002,10 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 	if (ia->addr_flags & IN6_IFF_TENTATIVE)
 		ifa.ifra_flags |= IN6_IFF_TENTATIVE;
 #endif
-#if !defined(IPV6CTL_ACCEPT_RTADV) && !defined(ND6_IFF_ACCEPT_RTADV)
+#if (defined(__NetBSD__) || defined(__OpenBSD__)) && \
+    (defined(IPV6CTL_ACCEPT_RTADV) || defined(ND6_IFF_ACCEPT_RTADV))
+	/* These kernels don't accept userland setting IN6_IFF_AUTOCONF */
+#else
 	if (ia->flags & IPV6_AF_AUTOCONF)
 		ifa.ifra_flags |= IN6_IFF_AUTOCONF;
 #endif
