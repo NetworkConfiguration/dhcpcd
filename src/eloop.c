@@ -92,7 +92,7 @@
 #include <stdio.h>
 #endif
 
-#define ELOOP_NSIGNALS		5 /* Allow a backlog of signals */
+#define ELOOP_NSIGNALS	5 /* Allow a backlog of signals */
 
 /*
  * time_t is a signed integer of an unspecified size.
