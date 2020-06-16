@@ -92,7 +92,13 @@
 #include <stdio.h>
 #endif
 
-#define ELOOP_NSIGNALS	5 /* Allow a backlog of signals */
+/*
+ * Allow a backlog of signals.
+ * If you use many eloops in the same process, they should all
+ * use the same signal handler or have the signal handler unset.
+ * Otherwise the signal might not behave as expected.
+ */
+#define ELOOP_NSIGNALS	5
 
 /*
  * time_t is a signed integer of an unspecified size.
