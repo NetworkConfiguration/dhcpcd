@@ -74,14 +74,6 @@ struct psr_ctx {
 };
 
 static void
-ps_root_readerrorsig(__unused int sig, void *arg)
-{
-	struct dhcpcd_ctx *ctx = arg;
-
-	eloop_exit(ctx->ps_eloop, EXIT_FAILURE);
-}
-
-static void
 ps_root_readerrorcb(void *arg)
 {
 	struct psr_ctx *psr_ctx = arg;
@@ -808,7 +800,7 @@ ps_root_start(struct dhcpcd_ctx *ctx)
 
 	eloop_signal_set_cb(ctx->ps_eloop,
 	    dhcpcd_signals, dhcpcd_signals_len,
-	    ps_root_readerrorsig, ctx);
+	    ps_root_signalcb, ctx);
 
 	return pid;
 }
