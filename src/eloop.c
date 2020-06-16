@@ -579,8 +579,10 @@ eloop_signal3(int sig, __unused siginfo_t *siginfo, __unused void *arg)
 {
 
 	if (_eloop_nsig == __arraycount(_eloop_sig)) {
-		fprintf(stderr, "%s: signal storm, discarding signal %d",
+#ifdef ELOOP_DEBUG
+		fprintf(stderr, "%s: signal storm, discarding signal %d\n",
 		    __func__, sig);
+#endif
 		return;
 	}
 
