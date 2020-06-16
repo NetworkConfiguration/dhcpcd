@@ -686,23 +686,24 @@ ps_root_signalcb(int sig, void *arg)
 {
 	struct dhcpcd_ctx *ctx = arg;
 
-	/* Ignore SIGINT, respect PS_STOP command or SIGTERM. */
-	if (sig == SIGINT)
+	/* Ignore dhcpcd signals, but reap children */
+	switch (sig) {
+	case SIGINT:
+	case SIGALRM:
+	case SIGHUP:
+	case SIGUSR1:
+	case SIGUSR2:
 		return;
-
-	/* Reap children */
-	if (sig == SIGCHLD) {
+	case SIGCHLD:
 		while (waitpid(-1, NULL, WNOHANG) > 0)
 			;
 		return;
 	}
 
-	logerrx("process %d unexpectedly terminating on signal %d",
-	    getpid(), sig);
-	if (ctx->ps_root_pid == getpid()) {
-		shutdown(ctx->ps_root_fd, SHUT_RDWR);
-		shutdown(ctx->ps_data_fd, SHUT_RDWR);
-	}
+	logerrx("%s: process %d unexpectedly terminating on signal %d",
+	    __func__, getpid(), sig);
+	shutdown(ctx->ps_root_fd, SHUT_RDWR);
+	shutdown(ctx->ps_data_fd, SHUT_RDWR);
 	eloop_exit(ctx->eloop, sig == SIGTERM ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 

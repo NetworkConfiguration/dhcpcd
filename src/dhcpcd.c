@@ -1409,6 +1409,9 @@ dhcpcd_signal_cb(int sig, void *arg)
 	}
 
 	if (sig != SIGCHLD && ctx->options & DHCPCD_FORKED) {
+		if (sig == SIGHUP)
+			return;
+
 		pid_t pid = pidfile_read(ctx->pidfile);
 		if (pid == -1) {
 			if (errno != ENOENT)
