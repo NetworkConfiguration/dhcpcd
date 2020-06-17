@@ -1339,7 +1339,9 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 				continue;
 			}
 
-			flags = 0;
+			flags = IPV6_AF_RAPFX;
+			/* If no flags are set, that means the prefix is
+			 * available via the router. */
 			if (pi.nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_ONLINK)
 				flags |= IPV6_AF_ONLINK;
 			if (pi.nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_AUTO &&
@@ -1348,20 +1350,12 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 				flags |= IPV6_AF_AUTOCONF;
 			if (pi.nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_ROUTER)
 				flags |= IPV6_AF_ROUTER;
-			if (flags == 0) {
-				logmessage(loglevel,
-				    "%s: prefix information option"
-				    " with unknown flags",
-				    ifp->name);
-				continue;
-			}
 
 			ia = ipv6nd_rapfindprefix(rap,
 			    &pi_prefix, pi.nd_opt_pi_prefix_len);
 			if (ia == NULL) {
 				ia = ipv6_newaddr(rap->iface,
-				    &pi_prefix, pi.nd_opt_pi_prefix_len,
-				    flags | IPV6_AF_RAPFX);
+				    &pi_prefix, pi.nd_opt_pi_prefix_len, flags);
 				if (ia == NULL)
 					break;
 				ia->prefix = pi_prefix;
