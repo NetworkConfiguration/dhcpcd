@@ -1299,7 +1299,9 @@ reload_config(struct dhcpcd_ctx *ctx)
 	if ((ifo = read_config(ctx, NULL, NULL, NULL)) == NULL)
 		return;
 	add_options(ctx, NULL, ifo, ctx->argc, ctx->argv);
-	/* We need to preserve these two options. */
+	/* We need to preserve these options. */
+	if (ctx->options & DHCPCD_STARTED)
+		ifo->options |= DHCPCD_STARTED;
 	if (ctx->options & DHCPCD_MASTER)
 		ifo->options |= DHCPCD_MASTER;
 	if (ctx->options & DHCPCD_DAEMONISED)
