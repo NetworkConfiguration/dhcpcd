@@ -88,6 +88,8 @@ for x do
 	PKG_CONFIG) PKG_CONFIG=$var;;
 	--with-hook) HOOKSCRIPTS="$HOOKSCRIPTS${HOOKSCRIPTS:+ }$var";;
 	--with-hooks|HOOKSCRIPTS) HOOKSCRIPTS=$var; HOOKSET=true;;
+	--with-eghook) EGHOOKSCRIPTS="$EGHOOKSCRIPTS${EGHOOKSCRIPTS+ }$var";;
+	--with-hooks|EGHOOKSCRIPTS) EGHOOKSCRIPTS=$var; EGHOOKSET=true;;
 	--with-default-hostname) _DEFAULT_HOSTNAME=$var;;
 	--build) BUILD=$var;;
 	--host) HOST=$var; HOSTCC=$var-;;
@@ -1712,16 +1714,24 @@ if ! $HOOKSET; then
 	fi
 fi
 
+find_hook()
+{
+	for h in [0-9][0-9]"-$x" [0-9][0-9]"-$x.in" \
+	    [0-9][0-9]"-$x.sh" [0-9][0-9]"-$x.sh.in" \
+	    [0-9][0-9]"-$x.conf" [0-9][0-9]"-$x.conf.in"
+	do
+		[ -e "$h" ] && break
+	done
+	[ -e "$h" ] || return 1
+	echo "${h%%.in}"
+	return 0
+}
+
 if cd hooks; then
 	for x in $HOOKSCRIPTS; do
 		printf "Finding hook $x ... "
-		for h in [0-9][0-9]"-$x" \
-		    [0-9][0-9]"-$x.sh" \
-		    [0-9][0-9]"-$x.conf"
-		do
-			[ -e "$h" ] && break
-		done
-		if [ ! -e "$h" ]; then
+		h=$(find_hook "$x")
+		if [ -z "$h" ]; then
 			echo "no"
 		else
 			echo "$h"
@@ -1733,13 +1743,8 @@ if cd hooks; then
 	done
 	for x in $EGHOOKSCRIPTS; do
 		printf "Finding example hook $x ... "
-		for h in [0-9][0-9]"-$x" \
-		    [0-9][0-9]"-$x.sh" \
-		    [0-9][0-9]"-$x.conf"
-		do
-			[ -e "$h" ] && break
-		done
-		if [ ! -e "$h" ]; then
+		h=$(find_hook "$x")
+		if [ -z "$h" ]; then
 			echo "no"
 		else
 			echo "$h"
