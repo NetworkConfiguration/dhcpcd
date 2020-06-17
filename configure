@@ -89,7 +89,7 @@ for x do
 	--with-hook) HOOKSCRIPTS="$HOOKSCRIPTS${HOOKSCRIPTS:+ }$var";;
 	--with-hooks|HOOKSCRIPTS) HOOKSCRIPTS=$var; HOOKSET=true;;
 	--with-eghook) EGHOOKSCRIPTS="$EGHOOKSCRIPTS${EGHOOKSCRIPTS+ }$var";;
-	--with-hooks|EGHOOKSCRIPTS) EGHOOKSCRIPTS=$var; EGHOOKSET=true;;
+	--with-eghooks|EGHOOKSCRIPTS) EGHOOKSCRIPTS=$var; EGHOOKSET=true;;
 	--with-default-hostname) _DEFAULT_HOSTNAME=$var;;
 	--build) BUILD=$var;;
 	--host) HOST=$var; HOSTCC=$var-;;
