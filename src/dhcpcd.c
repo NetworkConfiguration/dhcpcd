@@ -867,7 +867,6 @@ dhcpcd_startinterface(void *arg)
 {
 	struct interface *ifp = arg;
 	struct if_options *ifo = ifp->options;
-	int carrier;
 
 	if (ifo->options & DHCPCD_LINK) {
 		switch (ifp->carrier) {
@@ -879,19 +878,7 @@ dhcpcd_startinterface(void *arg)
 		case LINK_UNKNOWN:
 			/* No media state available.
 			 * Loop until both IFF_UP and IFF_RUNNING are set */
-			carrier = if_carrier(ifp);
-			if (carrier == LINK_UNKNOWN) {
-				if (IF_UPANDRUNNING(ifp))
-					carrier = LINK_UP;
-				else {
-					eloop_timeout_add_msec(ifp->ctx->eloop,
-					    IF_POLL_UP * MSEC_PER_SEC,
-					    dhcpcd_startinterface, ifp);
-					return;
-				}
-			}
-			dhcpcd_handlecarrier(ifp->ctx, carrier,
-			    ifp->flags, ifp->name);
+			if_pollinit(ifp);
 			return;
 		}
 	}
@@ -979,7 +966,11 @@ static void
 dhcpcd_prestartinterface(void *arg)
 {
 	struct interface *ifp = arg;
+	struct dhcpcd_ctx *ctx = ifp->ctx;
 	bool anondown;
+
+	if (ifp->options->poll != 0)
+		if_pollinit(ifp);
 
 	if (ifp->carrier == LINK_DOWN &&
 	    ifp->options->options & DHCPCD_ANONYMOUS &&
@@ -990,7 +981,7 @@ dhcpcd_prestartinterface(void *arg)
 	} else
 		anondown = false;
 
-	if ((!(ifp->ctx->options & DHCPCD_MASTER) ||
+	if ((!(ctx->options & DHCPCD_MASTER) ||
 	    ifp->options->options & DHCPCD_IF_UP || anondown) &&
 	    !(ifp->flags & IFF_UP))
 	{

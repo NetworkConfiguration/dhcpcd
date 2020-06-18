@@ -158,6 +158,7 @@ const struct option cf_options[] = {
 	{"inactive",        no_argument,       NULL, O_INACTIVE},
 	{"mudurl",          required_argument, NULL, O_MUDURL},
 	{"link_rcvbuf",     required_argument, NULL, O_LINK_RCVBUF},
+	{"poll",            optional_argument, NULL, O_POLL},
 	{NULL,              0,                 NULL, '\0'}
 };
 
@@ -2191,6 +2192,18 @@ invalid_token:
 			return -1;
 		}
 #endif
+		break;
+	case O_POLL:
+		if (arg == NULL) {
+			ifo->poll = IF_POLL_UP;
+			break;
+		}
+		ifo->poll = (unsigned long)
+		    strtou(arg, NULL, 0, 0, ULONG_MAX, &e);
+		if (e) {
+			logerrx("failed to convert poll %s", arg);
+			return -1;
+		}
 		break;
 	default:
 		return 0;
