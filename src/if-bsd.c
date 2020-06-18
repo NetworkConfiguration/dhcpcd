@@ -358,6 +358,10 @@ if_carrier(struct interface *ifp)
 {
 	struct ifmediareq ifmr = { .ifm_status = 0 };
 
+	/* Not really needed, but the other OS update flags here also */
+	if (if_getflags(ifp) == -1)
+		return LINK_UNKNOWN;
+
 	strlcpy(ifmr.ifm_name, ifp->name, sizeof(ifmr.ifm_name));
 	if (ioctl(ifp->ctx->pf_inet_fd, SIOCGIFMEDIA, &ifmr) == -1 ||
 	    !(ifmr.ifm_status & IFM_AVALID))
