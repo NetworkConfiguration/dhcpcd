@@ -878,7 +878,8 @@ dhcpcd_startinterface(void *arg)
 		case LINK_UNKNOWN:
 			/* No media state available.
 			 * Loop until both IFF_UP and IFF_RUNNING are set */
-			if_pollinit(ifp);
+			if (ifo->poll == 0)
+				if_pollinit(ifp);
 			return;
 		}
 	}
@@ -969,9 +970,6 @@ dhcpcd_prestartinterface(void *arg)
 	struct dhcpcd_ctx *ctx = ifp->ctx;
 	bool anondown;
 
-	if (ifp->options->poll != 0)
-		if_pollinit(ifp);
-
 	if (ifp->carrier == LINK_DOWN &&
 	    ifp->options->options & DHCPCD_ANONYMOUS &&
 	    ifp->flags & IFF_UP)
@@ -991,6 +989,9 @@ dhcpcd_prestartinterface(void *arg)
 		if (if_up(ifp) == -1)
 			logerr(__func__);
 	}
+
+	if (ifp->options->poll != 0)
+		if_pollinit(ifp);
 
 	dhcpcd_startinterface(ifp);
 }
