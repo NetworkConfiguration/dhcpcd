@@ -31,6 +31,7 @@
 
 #include <sys/param.h>
 #include <sys/time.h>
+#include <sys/types.h>
 #include <stdint.h>
 #include <stdio.h>
 
