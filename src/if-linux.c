@@ -156,7 +156,7 @@ static int if_addressexists(struct interface *, struct in_addr *);
 static const char *mproc =
 #if defined(__alpha__)
 	"system type"
-#elif defined(__arm__)
+#elif defined(__arm__) || defined(__aarch64__)
 	"Hardware"
 #elif defined(__avr32__)
 	"cpu family"
