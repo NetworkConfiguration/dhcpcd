@@ -615,6 +615,8 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 				}
 				break;
 			default:
+				if (if_noconf)
+					active = IF_INACTIVE;
 				if (active)
 					logwarnx("%s: unsupported"
 					    " interface type 0x%.2x",
