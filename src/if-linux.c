@@ -1598,9 +1598,11 @@ bpf_open(const struct interface *ifp,
 		struct sockaddr_ll sll;
 		struct sockaddr_storage ss;
 	} su = {
-		.sll.sll_family = PF_PACKET,
-		.sll.sll_protocol = htons(ETH_P_ALL),
-		.sll.sll_ifindex = (int)ifp->index,
+		.sll = {
+			.sll_family = PF_PACKET,
+			.sll_protocol = htons(ETH_P_ALL),
+			.sll_ifindex = (int)ifp->index,
+		}
 	};
 #ifdef PACKET_AUXDATA
 	int n;
