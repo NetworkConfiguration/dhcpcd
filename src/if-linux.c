@@ -523,8 +523,12 @@ recv_again:
 			terminated = true;
 			break;
 		}
-		if (cb != NULL &&
-		   (nlm->nlmsg_seq == (uint32_t)ctx->seq || fd == ctx->link_fd))
+		if (cb == NULL)
+			continue;
+		if (nlm->nlmsg_seq != (uint32_t)ctx->seq && fd != ctx->link_fd)
+			logwarnx("%s: received sequence %u, expecting %d",
+			    __func__, nlm->nlmsg_seq, ctx->seq);
+		else
 			r = cb(ctx, cbarg, nlm);
 	}
 
@@ -1013,6 +1017,8 @@ if_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct nlmsghdr *hdr,
 	/* Request a reply */
 	hdr->nlmsg_flags |= NLM_F_ACK;
 	hdr->nlmsg_seq = (uint32_t)++ctx->seq;
+	if ((unsigned int)ctx->seq > UINT32_MAX)
+		ctx->seq = 0;
 
 #ifdef PRIVSEP
 	if (ctx->options & DHCPCD_PRIVSEP && if_netlinkpriv(protocol, hdr))
