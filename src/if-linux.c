@@ -1980,8 +1980,11 @@ if_setup_inet6(const struct interface *ifp)
 	int ra;
 	char path[256];
 
-	/* The kernel cannot make stable private addresses. */
-	if (if_disable_autolinklocal(ctx, ifp->index) == -1 && errno != ENODEV)
+	/* The kernel cannot make stable private addresses.
+	 * However, a lot of distros ship newer kernel headers than
+	 * the kernel itself so sweep that error under the table. */
+	if (if_disable_autolinklocal(ctx, ifp->index) == -1 &&
+	    errno != ENODEV && errno != ENOTSUP && errno != EINVAL)
 		logdebug("%s: if_disable_autolinklocal", ifp->name);
 
 	/*
