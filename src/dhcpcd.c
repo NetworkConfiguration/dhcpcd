@@ -1858,9 +1858,7 @@ main(int argc, char **argv)
 #endif
 #ifdef PRIVSEP
 	ctx.ps_root_fd = ctx.ps_data_fd = -1;
-#ifdef PRIVSEP_COMTROLLER
-	ctx.ps_ctl_fd = -1;
-#endif
+	ctx.ps_inet_fd = ctx.ps_control_fd = -1;
 	TAILQ_INIT(&ctx.ps_processes);
 #endif
 	rt_init(&ctx);
