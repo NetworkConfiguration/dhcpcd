@@ -2325,7 +2325,7 @@ printpidfile:
 
 	/* Cache the default vendor option. */
 	if (dhcp_vendor(ctx.vendor, sizeof(ctx.vendor)) == -1)
-		logerrx("dhcp_vendor");
+		logerr("dhcp_vendor");
 
 	/* Start handling kernel messages for interfaces, addresses and
 	 * routes. */
