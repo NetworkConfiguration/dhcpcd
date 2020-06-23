@@ -110,7 +110,19 @@ int if_getssid_wext(const char *ifname, uint8_t *ssid);
 #define	SOL_NETLINK	270
 #endif
 
-/* Someone should fix kernel headers for clang alignment warnings . */
+/*
+ * Someone should fix kernel headers for clang alignment warnings.
+ * But this is unlikely.
+ * https://www.spinics.net/lists/netdev/msg646934.html
+ */
+
+#undef NLA_ALIGNTO
+#undef NLA_ALIGN
+#undef NLA_HDRLEN
+#define NLA_ALIGNTO		4U
+#define NLA_ALIGN(len)		(((len) + NLA_ALIGNTO - 1) & ~(NLA_ALIGNTO - 1))
+#define NLA_HDRLEN		((int) NLA_ALIGN(sizeof(struct nlattr)))
+
 #undef IFA_RTA
 #define IFA_RTA(r)  ((struct rtattr *)(void *)(((char *)(r)) \
 	+ NLMSG_ALIGN(sizeof(struct ifaddrmsg))))
