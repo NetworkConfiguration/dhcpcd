@@ -55,6 +55,10 @@
 #include "logerr.h"
 #include "sa.h"
 
+#define	IN_CONFIG_BLOCK(ifo)	((ifo)->options & DHCPCD_FORKED)
+#define	SET_CONFIG_BLOCK(ifo)	((ifo)->options |= DHCPCD_FORKED)
+#define	CLEAR_CONFIG_BLOCK(ifo)	((ifo)->options &= ~DHCPCD_FORKED)
+
 const struct option cf_options[] = {
 	{"background",      no_argument,       NULL, 'b'},
 	{"script",          required_argument, NULL, 'c'},
@@ -674,7 +678,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		break;
 	case 'c':
 		ARG_REQUIRED;
-		if (!(ifo->options & DHCPCD_MASTER)) {
+		if (IN_CONFIG_BLOCK(ifo)) {
 			logerrx("%s: per interface scripts"
 			    " are no longer supported",
 			    ifname);
@@ -744,7 +748,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		ARG_REQUIRED;
 		/* per interface logging is not supported
 		 * don't want to overide the commandline */
-		if (ifo->options & DHCPCD_MASTER && ctx->logfile == NULL) {
+		if (!IN_CONFIG_BLOCK(ifo) && ctx->logfile == NULL) {
 			logclose();
 			ctx->logfile = strdup(arg);
 			logopen(ctx->logfile);
@@ -947,7 +951,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		break;
 	case 'z':
 		ARG_REQUIRED;
-		if (ifo->options & DHCPCD_MASTER)
+		if (!IN_CONFIG_BLOCK(ifo))
 			ctx->ifav = splitv(&ctx->ifac, ctx->ifav, arg);
 		break;
 	case 'A':
@@ -1193,7 +1197,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		break;
 	case 'Z':
 		ARG_REQUIRED;
-		if (ifo->options & DHCPCD_MASTER)
+		if (!IN_CONFIG_BLOCK(ifo))
 			ctx->ifdv = splitv(&ctx->ifdc, ctx->ifdv, arg);
 		break;
 	case '1':
@@ -1297,7 +1301,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 #endif
 	case O_IAID:
 		ARG_REQUIRED;
-		if (ifo->options & DHCPCD_MASTER) {
+		if (!IN_CONFIG_BLOCK(ifo)) {
 			logerrx("IAID must belong in an interface block");
 			return -1;
 		}
@@ -1339,7 +1343,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			logwarnx("%s: IA_PD not compiled in", ifname);
 			return -1;
 #else
-			if (ifo->options & DHCPCD_MASTER) {
+			if (!IN_CONFIG_BLOCK(ifo)) {
 				logerrx("IA PD must belong in an "
 				    "interface block");
 				return -1;
@@ -1347,7 +1351,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			i = D6_OPTION_IA_PD;
 #endif
 		}
-		if (ifo->options & DHCPCD_MASTER && arg) {
+		if (!IN_CONFIG_BLOCK(ifo) && arg) {
 			logerrx("IA with IAID must belong in an "
 			    "interface block");
 			return -1;
@@ -2335,8 +2339,7 @@ read_config(struct dhcpcd_ctx *ctx,
 	ifo->options |= DHCPCD_DHCP6;
 #endif
 
-	/* Set master to indicate global options */
-	ifo->options |= DHCPCD_MASTER;
+	CLEAR_CONFIG_BLOCK(ifo);
 
 	vlen = strlcpy((char *)ifo->vendorclassid + 1, ctx->vendor,
 	    sizeof(ifo->vendorclassid) - 1);
@@ -2490,9 +2493,7 @@ read_config(struct dhcpcd_ctx *ctx,
 			had_block = 1;
 			new_block = 0;
 			ifo->options &= ~DHCPCD_WAITOPTS;
-
-			/* Unset master to indicate non-global options */
-			ifo->options &= ~DHCPCD_MASTER;
+			SET_CONFIG_BLOCK(ifo);
 		}
 
 		/* Start of an interface block, skip if not ours */
@@ -2564,6 +2565,7 @@ read_config(struct dhcpcd_ctx *ctx,
 
 	if (!had_block)
 		ifo->options &= ~DHCPCD_WAITOPTS;
+	CLEAR_CONFIG_BLOCK(ifo);
 	finish_config(ifo);
 	return ifo;
 }
