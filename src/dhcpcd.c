@@ -370,15 +370,15 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 	close(ctx->fork_fd);
 	ctx->fork_fd = -1;
 #ifdef PRIVSEP
-	if (ctx->options & DHCPCD_PRIVSEP) {
-		/* Aside from Linux, we don't have access to /dev/null */
+	if (IN_PRIVSEP(ctx)) {
 		fclose(stdout);
 		fclose(stderr);
 	} else
 #endif
 	{
-		(void)freopen(_PATH_DEVNULL, "w", stdout);
-		(void)freopen(_PATH_DEVNULL, "w", stderr);
+		if (freopen(_PATH_DEVNULL, "w", stdout) == NULL ||
+		    freopen(_PATH_DEVNULL, "w", stderr) == NULL)
+			logerr("%s: freopen", __func__);
 	}
 #endif
 }
@@ -2205,7 +2205,8 @@ printpidfile:
 	}
 
 	loginfox(PACKAGE "-" VERSION " starting");
-	freopen(_PATH_DEVNULL, "r", stdin);
+	if (freopen(_PATH_DEVNULL, "r", stdin) == NULL)
+		logerr("%s: freopen", __func__);
 
 #ifdef PRIVSEP
 	ps_init(&ctx);

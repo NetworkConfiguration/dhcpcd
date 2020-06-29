@@ -368,8 +368,9 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 	if (!(ctx->options & DHCPCD_DEBUG) &&
 	   (!(ctx->options & DHCPCD_TEST) || loggetopts() & LOGERR_QUIET))
 	{
-		(void)freopen(_PATH_DEVNULL, "w", stdout);
-		(void)freopen(_PATH_DEVNULL, "w", stderr);
+		if (freopen(_PATH_DEVNULL, "w", stdout) == NULL ||
+		    freopen(_PATH_DEVNULL, "w", stderr) == NULL)
+			logerr("%s: freopen", __func__);
 	}
 
 	if (flags & PSF_DROPPRIVS)
