@@ -371,9 +371,10 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 	close(ctx->fork_fd);
 	ctx->fork_fd = -1;
 
-	if (isatty(STDERR_FILENO)) {
+	if (isatty(loggeterrfd())) {
 		logopts &= ~LOGERR_ERR;
 		logsetopts(logopts);
+		logseterrfd(-1);
 	}
 #endif
 }
@@ -2201,7 +2202,8 @@ printpidfile:
 
 	loginfox(PACKAGE "-" VERSION " starting");
 	if (freopen(_PATH_DEVNULL, "r", stdin) == NULL)
-		logerr("%s: freopen", __func__);
+		logerr("%s: freopen stdin", __func__);
+
 
 #ifdef PRIVSEP
 	ps_init(&ctx);
@@ -2259,6 +2261,22 @@ printpidfile:
 		goto exit_failure;
 	}
 #endif
+
+	if (isatty(STDOUT_FILENO) &&
+	    freopen(_PATH_DEVNULL, "r", stdout) == NULL)
+		logerr("%s: freopen stdout", __func__);
+	if (isatty(STDERR_FILENO)) {
+		int fd = dup(STDERR_FILENO);
+
+		if (fd == -1)
+			logerr("%s: dup", __func__);
+		else if (logseterrfd(fd) == -1)
+			logerr("%s: logseterrfd", __func__);
+		else if (freopen(_PATH_DEVNULL, "r", stderr) == NULL) {
+			logseterrfd(-1);
+			logerr("%s: freopen stderr", __func__);
+		}
+	}
 
 #if defined(BSD) && defined(INET6)
 	/* Disable the kernel RTADV sysctl as early as possible. */
