@@ -339,6 +339,7 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 	return 0;
 #else
 	int i;
+	unsigned int logopts = loggetopts();
 
 	if (ctx->options & DHCPCD_DAEMONISE &&
 	    !(ctx->options & (DHCPCD_DAEMONISED | DHCPCD_NOWAITIP)))
@@ -359,7 +360,7 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 		return;
 
 	/* Don't use loginfo because this makes no sense in a log. */
-	if (!(loggetopts() & LOGERR_QUIET))
+	if (!(logopts & LOGERR_QUIET))
 		(void)fprintf(stderr, "forked to background, child pid %d\n",
 		    getpid());
 	i = EXIT_SUCCESS;
@@ -369,16 +370,10 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 	eloop_event_delete(ctx->eloop, ctx->fork_fd);
 	close(ctx->fork_fd);
 	ctx->fork_fd = -1;
-#ifdef PRIVSEP
-	if (IN_PRIVSEP(ctx)) {
-		fclose(stdout);
-		fclose(stderr);
-	} else
-#endif
-	{
-		if (freopen(_PATH_DEVNULL, "w", stdout) == NULL ||
-		    freopen(_PATH_DEVNULL, "w", stderr) == NULL)
-			logerr("%s: freopen", __func__);
+
+	if (isatty(STDERR_FILENO)) {
+		logopts &= ~LOGERR_ERR;
+		logsetopts(logopts);
 	}
 #endif
 }
