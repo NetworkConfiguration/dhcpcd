@@ -160,8 +160,9 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 	}
 
 	/* Prohibit writing to files.
-	 * Obviously this won't work if we are using a logfile. */
-	if (ctx->logfile == NULL) {
+	 * Obviously this won't work if we are using a logfile
+	 * or redirecting stderr to a file. */
+	if (ctx->logfile == NULL && isatty(loggeterrfd())) {
 		if (setrlimit(RLIMIT_FSIZE, &rzero) == -1)
 			logerr("setrlimit RLIMIT_FSIZE");
 	}
@@ -364,14 +365,6 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 
 	if (callback(recv_ctx) == -1)
 		goto errexit;
-
-	if (!(ctx->options & DHCPCD_DEBUG) &&
-	   (!(ctx->options & DHCPCD_TEST) || loggetopts() & LOGERR_QUIET))
-	{
-		if (freopen(_PATH_DEVNULL, "w", stdout) == NULL ||
-		    freopen(_PATH_DEVNULL, "w", stderr) == NULL)
-			logerr("%s: freopen", __func__);
-	}
 
 	if (flags & PSF_DROPPRIVS)
 		ps_dropprivs(ctx);
