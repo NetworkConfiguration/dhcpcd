@@ -2262,6 +2262,12 @@ printpidfile:
 	}
 #endif
 
+#if defined(BSD) && defined(INET6)
+	/* Disable the kernel RTADV sysctl as early as possible. */
+	if (ctx.options & DHCPCD_IPV6 && ctx.options & DHCPCD_IPV6RS)
+		if_disable_rtadv();
+#endif
+
 	if (isatty(STDOUT_FILENO) &&
 	    freopen(_PATH_DEVNULL, "r", stdout) == NULL)
 		logerr("%s: freopen stdout", __func__);
@@ -2277,12 +2283,6 @@ printpidfile:
 			logerr("%s: freopen stderr", __func__);
 		}
 	}
-
-#if defined(BSD) && defined(INET6)
-	/* Disable the kernel RTADV sysctl as early as possible. */
-	if (ctx.options & DHCPCD_IPV6 && ctx.options & DHCPCD_IPV6RS)
-		if_disable_rtadv();
-#endif
 
 	/* If we're not running in privsep, we need to create the DB
 	 * directory here. */
