@@ -93,7 +93,7 @@ import:
 	${MAKE} _import DESTDIR=`if [ -n "${DESTDIR}" ]; then echo "${DESTDIR}"; else  echo /tmp/${DISTPREFIX}; fi`
 
 
-_import-src:
+_import-src: clean
 	rm -rf ${DESTDIR}/*
 	${INSTALL} -d ${DESTDIR}
 	cp LICENSE README.md ${DESTDIR};
