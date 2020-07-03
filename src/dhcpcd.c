@@ -2186,7 +2186,7 @@ printpidfile:
 
 	if (!(ctx.options & DHCPCD_TEST)) {
 		/* Ensure we have the needed directories */
-		if (mkdir(DBDIR, 0755) == -1 && errno != EEXIST)
+		if (mkdir(DBDIR, 0750) == -1 && errno != EEXIST)
 			logerr("%s: mkdir `%s'", __func__, DBDIR);
 		if (mkdir(RUNDIR, 0755) == -1 && errno != EEXIST)
 			logerr("%s: mkdir `%s'", __func__, RUNDIR);
