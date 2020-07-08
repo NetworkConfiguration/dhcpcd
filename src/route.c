@@ -170,9 +170,9 @@ rt_compare_proto(void *context, const void *node1, const void *node2)
 
 #ifdef INET
 	/* IPv4LL routes always come last */
-	if (rt1->rt_flags & RTDF_IPV4LL && !(rt2->rt_flags & RTDF_IPV4LL))
+	if (rt1->rt_dflags & RTDF_IPV4LL && !(rt2->rt_dflags & RTDF_IPV4LL))
 		return -1;
-	else if (!(rt1->rt_flags & RTDF_IPV4LL) && rt2->rt_flags & RTDF_IPV4LL)
+	else if (!(rt1->rt_dflags & RTDF_IPV4LL) && rt2->rt_dflags & RTDF_IPV4LL)
 		return 1;
 #endif
 
