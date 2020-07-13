@@ -336,7 +336,7 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 #ifdef THERE_IS_NO_FORK
 	eloop_timeout_delete(ctx->eloop, handle_exit_timeout, ctx);
 	errno = ENOSYS;
-	return 0;
+	return;
 #else
 	int i;
 	unsigned int logopts = loggetopts();
@@ -2211,7 +2211,7 @@ printpidfile:
 	ps_init(&ctx);
 #endif
 
-#ifdef USE_SIGNALS
+#if defined(USE_SIGNALS) && !defined(THERE_IS_NO_FORK)
 	if (pipe(sigpipe) == -1) {
 		logerr("pipe");
 		goto exit_failure;
