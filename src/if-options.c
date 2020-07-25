@@ -59,6 +59,8 @@
 #define	SET_CONFIG_BLOCK(ifo)	((ifo)->options |= DHCPCD_FORKED)
 #define	CLEAR_CONFIG_BLOCK(ifo)	((ifo)->options &= ~DHCPCD_FORKED)
 
+static unsigned long long default_options;
+
 const struct option cf_options[] = {
 	{"background",      no_argument,       NULL, 'b'},
 	{"script",          required_argument, NULL, 'c'},
@@ -2332,18 +2334,30 @@ read_config(struct dhcpcd_ctx *ctx,
 	/* Seed our default options */
 	if ((ifo = default_config(ctx)) == NULL)
 		return NULL;
-	ifo->options |= DHCPCD_DAEMONISE | DHCPCD_GATEWAY;
-#ifdef PLUGIN_DEV
-	ifo->options |= DHCPCD_DEV;
-#endif
+	if (default_options == 0) {
+		default_options |= DHCPCD_DAEMONISE | DHCPCD_GATEWAY;
 #ifdef INET
-	ifo->options |= DHCPCD_IPV4 | DHCPCD_ARP | DHCPCD_DHCP | DHCPCD_IPV4LL;
+		skip = socket(PF_INET, SOCK_DGRAM, 0);
+		if (skip != -1) {
+			close(skip);
+			default_options |= DHCPCD_IPV4 | DHCPCD_ARP |
+			    DHCPCD_DHCP | DHCPCD_IPV4LL;
+		}
 #endif
 #ifdef INET6
-	ifo->options |= DHCPCD_IPV6 | DHCPCD_IPV6RS;
-	ifo->options |= DHCPCD_IPV6RA_AUTOCONF | DHCPCD_IPV6RA_REQRDNSS;
-	ifo->options |= DHCPCD_DHCP6;
+		skip = socket(PF_INET6, SOCK_DGRAM, 0);
+		if (skip != -1) {
+			close(skip);
+			default_options |= DHCPCD_IPV6 | DHCPCD_IPV6RS |
+			    DHCPCD_IPV6RA_AUTOCONF | DHCPCD_IPV6RA_REQRDNSS |
+			    DHCPCD_DHCP6;
+		}
 #endif
+#ifdef PLUGIN_DEV
+		default_options |= DHCPCD_DEV;
+#endif
+	}
+	ifo->options |= default_options;
 
 	CLEAR_CONFIG_BLOCK(ifo);
 
