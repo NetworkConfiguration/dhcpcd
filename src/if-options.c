@@ -2090,6 +2090,12 @@ invalid_token:
 		break;
 	case O_CONTROLGRP:
 		ARG_REQUIRED;
+#ifdef PRIVSEP
+		/* Control group is already set by this point.
+		 * We don't need to pledge getpw either with this. */
+		if (IN_PRIVSEP(ctx))
+			break;
+#endif
 #ifdef _REENTRANT
 		l = sysconf(_SC_GETGR_R_SIZE_MAX);
 		if (l == -1)
