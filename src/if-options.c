@@ -1023,6 +1023,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		}
 		ifo->options |= DHCPCD_CLIENTID;
 		ifo->clientid[0] = (uint8_t)s;
+		ifo->options &= ~DHCPCD_DUID;
 		break;
 	case 'J':
 		ifo->options |= DHCPCD_BROADCAST;
