@@ -1207,13 +1207,23 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		ifo->options |= DHCPCD_ONESHOT;
 		break;
 	case '4':
+#ifdef INET
 		ifo->options &= ~DHCPCD_IPV6;
 		ifo->options |= DHCPCD_IPV4;
 		break;
+#else
+		logerrx("INET has been compiled out");
+		return -1;
+#endif
 	case '6':
+#ifdef INET6
 		ifo->options &= ~DHCPCD_IPV4;
 		ifo->options |= DHCPCD_IPV6;
 		break;
+#else
+		logerrx("INET6 has been compiled out");
+		return -1;
+#endif
 	case O_IPV4:
 		ifo->options |= DHCPCD_IPV4;
 		break;
