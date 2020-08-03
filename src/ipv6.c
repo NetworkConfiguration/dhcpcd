@@ -1092,33 +1092,22 @@ ipv6_anyglobal(struct interface *sifp)
 	struct interface *ifp;
 	struct ipv6_state *state;
 	struct ipv6_addr *ia;
-#ifdef BSD
 	bool forwarding;
 
-#if defined(PRIVSEP) && defined(HAVE_PLEDGE)
+	/* BSD forwarding is either on or off.
+	 * Linux forwarding is technically the same as it's
+	 * configured by the "all" interface.
+	 * Per interface only affects IsRouter of NA messages. */
+#if defined(PRIVSEP) && (defined(HAVE_PLEDGE) || defined(__linux__))
 	if (IN_PRIVSEP(sifp->ctx))
-		forwarding = ps_root_ip6forwarding(sifp->ctx, NULL) == 1;
+		forwarding = ps_root_ip6forwarding(sifp->ctx, "all") != 0;
 	else
 #endif
-		forwarding = ip6_forwarding(NULL) == 1;
-#endif
-
+		forwarding = ip6_forwarding("all") != 0;
 
 	TAILQ_FOREACH(ifp, sifp->ctx->ifaces, next) {
-#ifdef BSD
 		if (ifp != sifp && !forwarding)
 			continue;
-#else
-#if defined(PRIVSEP) && defined(__linux__)
-	if (IN_PRIVSEP(sifp->ctx)) {
-		if (ifp != sifp &&
-		    ps_root_ip6forwarding(sifp->ctx, ifp->name) != 1)
-			continue;
-	} else
-#endif
-		if (ifp != sifp && ip6_forwarding(ifp->name) != 1)
-			continue;
-#endif
 
 		state = IPV6_STATE(ifp);
 		if (state == NULL)
