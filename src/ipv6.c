@@ -1100,10 +1100,10 @@ ipv6_anyglobal(struct interface *sifp)
 	 * Per interface only affects IsRouter of NA messages. */
 #if defined(PRIVSEP) && (defined(HAVE_PLEDGE) || defined(__linux__))
 	if (IN_PRIVSEP(sifp->ctx))
-		forwarding = ps_root_ip6forwarding(sifp->ctx, "all") != 0;
+		forwarding = ps_root_ip6forwarding(sifp->ctx, NULL) != 0;
 	else
 #endif
-		forwarding = ip6_forwarding("all") != 0;
+		forwarding = ip6_forwarding(NULL) != 0;
 
 	TAILQ_FOREACH(ifp, sifp->ctx->ifaces, next) {
 		if (ifp != sifp && !forwarding)
