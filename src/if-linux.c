@@ -2090,7 +2090,7 @@ ip6_forwarding(const char *ifname)
 	if (readfile(path, buf, sizeof(buf)) == -1)
 		return 0;
 	i = (int)strtoi(buf, NULL, 0, INT_MIN, INT_MAX, &error);
-	if (error != 0)
+	if (error != 0 && error != ENOTSUP)
 		return 0;
 	return i;
 }
