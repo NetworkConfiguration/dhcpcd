@@ -635,7 +635,7 @@ ps_root_startcb(void *arg)
 	ctx->ps_root_pid = getpid();
 	ctx->options |= DHCPCD_PRIVSEPROOT;
 
-	/* Open network sockets for sending only.
+	/* Open network sockets for sending.
 	 * This is a small bit wasteful for non sandboxed OS's
 	 * but makes life very easy for unicasting DHCPv6 in non master
 	 * mode as we no longer care about address selection. */
@@ -645,8 +645,6 @@ ps_root_startcb(void *arg)
 		    SOCK_RAW | SOCK_CXNB, IPPROTO_UDP);
 		if (ctx->udp_wfd == -1)
 			logerr("%s: dhcp_openraw", __func__);
-		else if (shutdown(ctx->udp_wfd, SHUT_RD) == -1)
-			logerr("%s: shutdown dhcp", __func__);
 	}
 #endif
 #ifdef INET6
@@ -654,8 +652,6 @@ ps_root_startcb(void *arg)
 		ctx->nd_fd = ipv6nd_open(false);
 		if (ctx->nd_fd == -1)
 			logerr("%s: ipv6nd_open", __func__);
-		else if (shutdown(ctx->nd_fd, SHUT_RD) == -1)
-			logerr("%s: shutdown nd", __func__);
 	}
 #endif
 #ifdef DHCP6
@@ -663,8 +659,6 @@ ps_root_startcb(void *arg)
 		ctx->dhcp6_wfd = dhcp6_openraw();
 		if (ctx->dhcp6_wfd == -1)
 			logerr("%s: dhcp6_openraw", __func__);
-		else if (shutdown(ctx->dhcp6_wfd, SHUT_RD) == -1)
-			logerr("%s: shutdown dhcp6", __func__);
 	}
 #endif
 
