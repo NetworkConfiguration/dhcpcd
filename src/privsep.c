@@ -645,12 +645,12 @@ ps_sendpsmmsg(struct dhcpcd_ctx *ctx, int fd,
 		iovlen = 1;
 
 	len = writev(fd, iov, iovlen);
-#ifdef PRIVSEP_DEBUG
-	logdebugx("%s: %zd", __func__, len);
-#endif
-	if ((len == -1 || len == 0) && ctx->options & DHCPCD_FORKED &&
-	    !(ctx->options & DHCPCD_PRIVSEPROOT))
-		eloop_exit(ctx->eloop, len == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
+	if (len == -1) {
+		logerr(__func__);
+		if (ctx->options & DHCPCD_FORKED &&
+		    !(ctx->options & DHCPCD_PRIVSEPROOT))
+			eloop_exit(ctx->eloop, EXIT_FAILURE);
+	}
 	return len;
 }
 
@@ -789,10 +789,9 @@ ps_recvmsg(struct dhcpcd_ctx *ctx, int rfd, uint16_t cmd, int wfd)
 	};
 
 	ssize_t len = recvmsg(rfd, &msg, 0);
-#ifdef PRIVSEP_DEBUG
-	logdebugx("%s: recv fd %d, %zd bytes", __func__, rfd, len);
-#endif
 
+	if (len == -1)
+		logerr("%s: recvmsg", __func__);
 	if (len == -1 || len == 0) {
 		if (ctx->options & DHCPCD_FORKED &&
 		    !(ctx->options & DHCPCD_PRIVSEPROOT))
@@ -803,12 +802,12 @@ ps_recvmsg(struct dhcpcd_ctx *ctx, int rfd, uint16_t cmd, int wfd)
 
 	iov[0].iov_len = (size_t)len;
 	len = ps_sendcmdmsg(wfd, cmd, &msg);
-#ifdef PRIVSEP_DEBUG
-	logdebugx("%s: send fd %d, %zu bytes", __func__, wfd, len);
-#endif
-	if ((len == -1 || len == 0) && ctx->options & DHCPCD_FORKED &&
-	    !(ctx->options & DHCPCD_PRIVSEPROOT))
-		eloop_exit(ctx->eloop, len == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
+	if (len == -1) {
+		logerr("ps_sendcmdmsg");
+		if (ctx->options & DHCPCD_FORKED &&
+		    !(ctx->options & DHCPCD_PRIVSEPROOT))
+			eloop_exit(ctx->eloop, EXIT_FAILURE);
+	}
 	return len;
 }
 
