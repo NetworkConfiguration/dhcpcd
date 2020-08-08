@@ -361,8 +361,8 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 
 	/* Don't use loginfo because this makes no sense in a log. */
 	if (!(logopts & LOGERR_QUIET))
-		(void)fprintf(stderr, "forked to background, child pid %d\n",
-		    getpid());
+		(void)dprintf(loggeterrfd(),
+		    "forked to background, child pid %d\n", getpid());
 	i = EXIT_SUCCESS;
 	if (write(ctx->fork_fd, &i, sizeof(i)) == -1)
 		logerr("write");
