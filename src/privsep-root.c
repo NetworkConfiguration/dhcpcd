@@ -645,7 +645,7 @@ ps_root_startcb(void *arg)
 	 * Reading from it just to drain it is a waste of CPU time. */
 #ifdef INET
 	if (ctx->options & DHCPCD_IPV4) {
-		int buflen = 0;
+		int buflen = 1;
 
 		ctx->udp_wfd = xsocket(PF_INET,
 		    SOCK_RAW | SOCK_CXNB, IPPROTO_UDP);
@@ -658,7 +658,7 @@ ps_root_startcb(void *arg)
 #endif
 #ifdef INET6
 	if (ctx->options & DHCPCD_IPV6) {
-		int buflen = 0;
+		int buflen = 1;
 
 		ctx->nd_fd = ipv6nd_open(false);
 		if (ctx->nd_fd == -1)
@@ -670,7 +670,7 @@ ps_root_startcb(void *arg)
 #endif
 #ifdef DHCP6
 	if (ctx->options & DHCPCD_IPV6) {
-		int buflen = 0;
+		int buflen = 1;
 
 		ctx->dhcp6_wfd = dhcp6_openraw();
 		if (ctx->dhcp6_wfd == -1)
