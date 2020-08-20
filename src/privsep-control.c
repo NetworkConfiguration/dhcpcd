@@ -27,7 +27,6 @@
  */
 
 #include <errno.h>
-#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -93,18 +92,6 @@ ps_ctl_recvmsg(void *arg)
 
 	if (ps_recvpsmsg(ctx, ctx->ps_control_fd, ps_ctl_recvmsgcb, ctx) == -1)
 		logerr(__func__);
-}
-
-static void
-ps_ctl_signalcb(int sig, void *arg)
-{
-	struct dhcpcd_ctx *ctx = arg;
-
-	if (sig != SIGTERM)
-		return;
-
-	shutdown(ctx->ps_control_fd, SHUT_RDWR);
-	eloop_exit(ctx->eloop, EXIT_SUCCESS);
 }
 
 ssize_t
@@ -251,7 +238,7 @@ ps_ctl_start(struct dhcpcd_ctx *ctx)
 
 	pid = ps_dostart(ctx, &ctx->ps_control_pid, &ctx->ps_control_fd,
 	    ps_ctl_recvmsg, ps_ctl_dodispatch, ctx,
-	    ps_ctl_startcb, ps_ctl_signalcb,
+	    ps_ctl_startcb, NULL,
 	    PSF_DROPPRIVS);
 
 	if (pid == -1)

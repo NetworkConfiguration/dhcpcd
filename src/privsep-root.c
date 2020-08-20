@@ -693,22 +693,14 @@ ps_root_startcb(void *arg)
 }
 
 static void
-ps_root_signalcb(int sig, void *arg)
+ps_root_signalcb(int sig, __unused void *arg)
 {
-	struct dhcpcd_ctx *ctx = arg;
 
 	if (sig == SIGCHLD) {
 		while (waitpid(-1, NULL, WNOHANG) > 0)
 			;
 		return;
 	}
-
-	if (sig != SIGTERM)
-		return;
-
-	shutdown(ctx->ps_root_fd, SHUT_RDWR);
-	shutdown(ctx->ps_data_fd, SHUT_RDWR);
-	eloop_exit(ctx->eloop, EXIT_SUCCESS);
 }
 
 int (*handle_interface)(void *, int, const char *);

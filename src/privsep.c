@@ -34,6 +34,7 @@
  * Spawn an unpriv process to send/receive common network data.
  * Then drop all privs and start running.
  * Every process aside from the privileged actioneer is chrooted.
+ * All privsep processes ignore signals - only the master process accepts them.
  *
  * dhcpcd will maintain the config file in the chroot, no need to handle
  * this in a script or something.
