@@ -777,7 +777,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 	    (type == DHCP_REQUEST &&
 	    state->addr->mask.s_addr == lease->mask.s_addr &&
 	    (state->new == NULL || IS_DHCP(state->new)) &&
-	    !(state->added & STATE_FAKE))))
+	    !(state->added & (STATE_FAKE | STATE_EXPIRED)))))
 		bootp->ciaddr = state->addr->addr.s_addr;
 
 	bootp->op = BOOTREQUEST;
@@ -1745,7 +1745,7 @@ send_message(struct interface *ifp, uint8_t type,
 		goto fail;
 	len = (size_t)r;
 
-	if (!(state->added & STATE_FAKE) &&
+	if (!(state->added & (STATE_FAKE | STATE_EXPIRED)) &&
 	    state->addr != NULL &&
 	    ipv4_iffindaddr(ifp, &state->lease.addr, NULL) != NULL)
 		from.s_addr = state->lease.addr.s_addr;
@@ -1915,7 +1915,10 @@ dhcp_expire(void *arg)
 	struct interface *ifp = arg;
 
 	if (ifp->options->options & DHCPCD_LASTLEASE_EXTEND) {
+		struct dhcp_state *state = D_STATE(ifp);
+
 		logwarnx("%s: DHCP lease expired, extending lease", ifp->name);
+		state->added |= STATE_EXPIRED;
 		return;
 	}
 
