@@ -336,7 +336,7 @@ gottoken:
 	}
 
 	free(mm);
-	if (consttime_memequal(d, &hmac, dlen)) {
+	if (!consttime_memequal(d, &hmac, dlen)) {
 		errno = EPERM;
 		return NULL;
 	}
