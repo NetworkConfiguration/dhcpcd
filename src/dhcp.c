@@ -1869,13 +1869,15 @@ dhcp_discover(void *arg)
 	state->state = DHS_DISCOVER;
 	dhcp_new_xid(ifp);
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
-	if (ifo->fallback)
-		eloop_timeout_add_sec(ifp->ctx->eloop,
-		    ifo->reboot, dhcp_fallback, ifp);
-#ifdef IPV4LL
-	else if (ifo->options & DHCPCD_IPV4LL)
-		eloop_timeout_add_sec(ifp->ctx->eloop,
-		    ifo->reboot, ipv4ll_start, ifp);
+	if (!(state->added & STATE_EXPIRED)) {
+		if (ifo->fallback)
+			eloop_timeout_add_sec(ifp->ctx->eloop,
+			    ifo->reboot, dhcp_fallback, ifp);
+	#ifdef IPV4LL
+		else if (ifo->options & DHCPCD_IPV4LL)
+			eloop_timeout_add_sec(ifp->ctx->eloop,
+			    ifo->reboot, ipv4ll_start, ifp);
+	}
 #endif
 	if (ifo->options & DHCPCD_REQUEST)
 		loginfox("%s: soliciting a DHCP lease (requesting %s)",
@@ -1897,33 +1899,21 @@ dhcp_request(void *arg)
 }
 
 static void
-dhcp_expire1(struct interface *ifp)
-{
-	struct dhcp_state *state = D_STATE(ifp);
-
-	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
-	dhcp_drop(ifp, "EXPIRE");
-	dhcp_unlink(ifp->ctx, state->leasefile);
-	state->interval = 0;
-	if (!(ifp->options->options & DHCPCD_LINK) || ifp->carrier > LINK_DOWN)
-		dhcp_discover(ifp);
-}
-
-static void
 dhcp_expire(void *arg)
 {
 	struct interface *ifp = arg;
+	struct dhcp_state *state = D_STATE(ifp);
 
 	if (ifp->options->options & DHCPCD_LASTLEASE_EXTEND) {
-		struct dhcp_state *state = D_STATE(ifp);
-
 		logwarnx("%s: DHCP lease expired, extending lease", ifp->name);
 		state->added |= STATE_EXPIRED;
-		return;
+	} else {
+		logerrx("%s: DHCP lease expired", ifp->name);
+		dhcp_drop(ifp, "EXPIRE");
+		dhcp_unlink(ifp->ctx, state->leasefile);
 	}
-
-	logerrx("%s: DHCP lease expired", ifp->name);
-	dhcp_expire1(ifp);
+	state->interval = 0;
+	dhcp_discover(ifp);
 }
 
 #if defined(ARP) || defined(IN_IFF_DUPLICATED)
