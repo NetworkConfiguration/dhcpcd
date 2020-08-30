@@ -836,7 +836,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 		if (type == DHCP_DECLINE ||
 		    (type == DHCP_REQUEST &&
 		    (state->addr == NULL ||
-		    state->added & STATE_FAKE ||
+		    state->added & (STATE_FAKE | STATE_EXPIRED) ||
 		    lease->addr.s_addr != state->addr->addr.s_addr)))
 		{
 			putip = true;
@@ -2367,19 +2367,6 @@ dhcp_bind(struct interface *ifp)
 	eloop_event_add(ctx->eloop, state->udp_rfd, dhcp_handleifudp, ifp);
 }
 
-static void
-dhcp_lastlease(void *arg)
-{
-	struct interface *ifp = arg;
-	struct dhcp_state *state = D_STATE(ifp);
-
-	loginfox("%s: timed out contacting a DHCP server, using last lease",
-	    ifp->name);
-	dhcp_bind(ifp);
-	state->interval = 0;
-	dhcp_discover(ifp);
-}
-
 static size_t
 dhcp_message_new(struct bootp **bootp,
     const struct in_addr *addr, const struct in_addr *mask)
@@ -2477,6 +2464,26 @@ dhcp_arp_bind(struct interface *ifp)
 		dhcp_bind(ifp);
 }
 #endif
+
+static void
+dhcp_lastlease(void *arg)
+{
+	struct interface *ifp = arg;
+	struct dhcp_state *state = D_STATE(ifp);
+
+	loginfox("%s: timed out contacting a DHCP server, using last lease",
+	    ifp->name);
+#if defined(ARP) || defined(KERNEL_RFC5227)
+	dhcp_arp_bind(ifp);
+#else
+	dhcp_bind(ifp);
+#endif
+	/* Set expired here because dhcp_bind() -> ipv4_addaddr() will reset
+	 * state */
+	state->added |= STATE_EXPIRED;
+	state->interval = 0;
+	dhcp_discover(ifp);
+}
 
 static void
 dhcp_static(struct interface *ifp)
