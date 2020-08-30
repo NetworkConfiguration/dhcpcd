@@ -2284,7 +2284,9 @@ dhcp_bind(struct interface *ifp)
 		return;
 	}
 	if (state->reason == NULL) {
-		if (state->old && !(state->added & STATE_FAKE)) {
+		if (state->old &&
+		    !(state->added & (STATE_FAKE | STATE_EXPIRED)))
+		{
 			if (state->old->yiaddr == state->new->yiaddr &&
 			    lease->server.s_addr &&
 			    state->state != DHS_REBIND)
