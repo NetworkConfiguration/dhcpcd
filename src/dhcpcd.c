@@ -1158,7 +1158,6 @@ dhcpcd_initprestartinterface(void *arg)
 {
 	struct interface *ifp = arg;
 
-	dhcpcd_initstate(ifp, 0);
 	run_preinit(ifp);
 	dhcpcd_prestartinterface(ifp);
 }
@@ -1225,9 +1224,11 @@ dhcpcd_linkoverflow(struct dhcpcd_ctx *ctx)
 			continue;
 		}
 		TAILQ_INSERT_TAIL(ctx->ifaces, ifp, next);
-		if (ifp->active)
+		if (ifp->active) {
+			dhcpcd_initstate(ifp, 0);
 			eloop_timeout_add_sec(ctx->eloop, 0,
 			    dhcpcd_initprestartinterface, ifp);
+		}
 	}
 	free(ifaces);
 
