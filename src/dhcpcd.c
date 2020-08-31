@@ -1154,7 +1154,7 @@ dhcpcd_setlinkrcvbuf(struct dhcpcd_ctx *ctx)
 #endif
 
 static void
-dhcpcd_initprestartinterface(void *arg)
+dhcpcd_runprestartinterface(void *arg)
 {
 	struct interface *ifp = arg;
 
@@ -1227,7 +1227,7 @@ dhcpcd_linkoverflow(struct dhcpcd_ctx *ctx)
 		if (ifp->active) {
 			dhcpcd_initstate(ifp, 0);
 			eloop_timeout_add_sec(ctx->eloop, 0,
-			    dhcpcd_initprestartinterface, ifp);
+			    dhcpcd_runprestartinterface, ifp);
 		}
 	}
 	free(ifaces);
