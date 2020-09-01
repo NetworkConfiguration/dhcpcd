@@ -629,6 +629,11 @@ ipv4_addaddr(struct interface *ifp, const struct in_addr *addr,
 	struct ipv4_addr *replaced_ia;
 #endif
 
+	if (ifp->options->options & DHCPCD_LASTLEASE_EXTEND) {
+		/* We don't want the kernel to expire the address. */
+		vltime = pltime = DHCP_INFINITE_LIFETIME;
+	}
+
 	if ((state = ipv4_getstate(ifp)) == NULL) {
 		logerr(__func__);
 		return NULL;
@@ -711,18 +716,9 @@ ipv4_daddaddr(struct interface *ifp, const struct dhcp_lease *lease)
 {
 	struct dhcp_state *state;
 	struct ipv4_addr *ia;
-	uint32_t vltime, pltime;
-
-	if (ifp->options->options & DHCPCD_LASTLEASE_EXTEND) {
-		/* We don't want the kernel to expire the address. */
-		vltime = pltime = DHCP_INFINITE_LIFETIME;
-	} else {
-		vltime = lease->leasetime;
-		pltime = lease->rebindtime;
-	}
 
 	ia = ipv4_addaddr(ifp, &lease->addr, &lease->mask, &lease->brd,
-	    vltime, pltime);
+	    lease->leasetime, lease->rebindtime);
 	if (ia == NULL)
 		return -1;
 
