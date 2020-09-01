@@ -679,6 +679,14 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 	/* Adjust plftime and vltime based on acquired time */
 	pltime = ia->prefix_pltime;
 	vltime = ia->prefix_vltime;
+
+	if (ifp->options->options & DHCPCD_LASTLEASE_EXTEND) {
+		/* We don't want the kernel to expire the address.
+		 * The saved times will be re-applied to the ia
+		 * before exiting this function. */
+		ia->prefix_vltime = ia->prefix_pltime = ND6_INFINITE_LIFETIME;
+	}
+
 	if (timespecisset(&ia->acquired) &&
 	    (ia->prefix_pltime != ND6_INFINITE_LIFETIME ||
 	    ia->prefix_vltime != ND6_INFINITE_LIFETIME))
