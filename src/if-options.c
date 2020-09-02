@@ -761,6 +761,10 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		break;
 	case 'l':
 		ARG_REQUIRED;
+		if (strcmp(arg, "-1") == 0) {
+			ifo->leasetime = DHCP_INFINITE_LIFETIME;
+			break;
+		}
 		ifo->leasetime = (uint32_t)strtou(arg, NULL,
 		    0, 0, UINT32_MAX, &e);
 		if (e) {
