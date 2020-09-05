@@ -284,12 +284,10 @@ ps_dostart(struct dhcpcd_ctx *ctx,
     void *recv_ctx, int (*callback)(void *), void (*signal_cb)(int, void *),
     unsigned int flags)
 {
-	int stype;
 	int fd[2];
 	pid_t pid;
 
-	stype = SOCK_CLOEXEC | SOCK_NONBLOCK;
-	if (socketpair(AF_UNIX, SOCK_DGRAM | stype, 0, fd) == -1) {
+	if (xsocketpair(AF_UNIX, SOCK_DGRAM | SOCK_CXNB, 0, fd) == -1) {
 		logerr("%s: socketpair", __func__);
 		return -1;
 	}
@@ -297,12 +295,6 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 		logerr("%s: ps_setbuf_fdpair", __func__);
 		return -1;
 	}
-#ifdef PRIVSEP_RIGHTS
-	if (ps_rights_limit_fdpair(fd) == -1) {
-		logerr("%s: ps_rights_limit_fdpair", __func__);
-		return -1;
-	}
-#endif
 
 	switch (pid = fork()) {
 	case -1:

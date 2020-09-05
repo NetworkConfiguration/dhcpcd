@@ -225,16 +225,10 @@ ps_ctl_start(struct dhcpcd_ctx *ctx)
 	int data_fd[2], listen_fd[2];
 	pid_t pid;
 
-	if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CXNB, 0, data_fd) == -1)
+	if (xsocketpair(AF_UNIX, SOCK_STREAM | SOCK_CXNB, 0, data_fd) == -1)
 		return -1;
-	if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CXNB, 0, listen_fd) == -1)
+	if (xsocketpair(AF_UNIX, SOCK_STREAM | SOCK_CXNB, 0, listen_fd) == -1)
 		return -1;
-#ifdef PRIVSEP_RIGHTS
-	if (ps_rights_limit_fdpair(data_fd) == -1)
-		return -1;
-	if (ps_rights_limit_fdpair(listen_fd) == -1)
-		return -1;
-#endif
 
 	pid = ps_dostart(ctx, &ctx->ps_control_pid, &ctx->ps_control_fd,
 	    ps_ctl_recvmsg, ps_ctl_dodispatch, ctx,
