@@ -295,6 +295,12 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 		logerr("%s: ps_setbuf_fdpair", __func__);
 		return -1;
 	}
+#ifdef PRIVSEP_RIGHTS
+	if (ps_rights_limit_fdpair(fd) == -1) {
+		logerr("%s: ps_rights_limit_fdpair", __func__);
+		return -1;
+	}
+#endif
 
 	switch (pid = fork()) {
 	case -1:

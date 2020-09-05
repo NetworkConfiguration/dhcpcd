@@ -1016,10 +1016,6 @@ xsocketpair(int domain, int type, int protocol, int fd[2])
 	if ((s = socketpair(domain, type, protocol, fd)) == -1)
 		return -1;
 
-#ifdef PRIVSEP_RIGHTS
-	if (ps_rights_limit_fdpair(fd) == -1)
-		goto out;
-#endif
 #ifndef HAVE_SOCK_CLOEXEC
 	if ((xtype & SOCK_CLOEXEC) && ((xflags = fcntl(fd[0], F_GETFD)) == -1 ||
 	    fcntl(fd[0], F_SETFD, xflags | FD_CLOEXEC) == -1))
@@ -1039,8 +1035,7 @@ xsocketpair(int domain, int type, int protocol, int fd[2])
 
 	return s;
 
-#if defined(PRIVSEP_RIGHTS) || \
-	!defined(HAVE_SOCK_CLOEXEC) || !defined(HAVE_SOCK_NONBLOCK)
+#if !defined(HAVE_SOCK_CLOEXEC) || !defined(HAVE_SOCK_NONBLOCK)
 out:
 	close(fd[0]);
 	close(fd[1]);
