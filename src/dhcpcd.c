@@ -1776,6 +1776,23 @@ dhcpcd_fork_cb(void *arg)
 	eloop_exit(ctx->eloop, exit_code);
 }
 
+static void
+dhcpcd_stderr_cb(void *arg)
+{
+	struct dhcpcd_ctx *ctx = arg;
+	char log[BUFSIZ];
+	ssize_t len;
+
+	len = read(ctx->stderr_fd, log, sizeof(log));
+	if (len == -1) {
+		logerr(__func__);
+		return;
+	}
+
+	log[len] = '\0';
+	fprintf(stderr, "%s", log);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1789,7 +1806,7 @@ main(int argc, char **argv)
 	ssize_t len;
 #if defined(USE_SIGNALS) || !defined(THERE_IS_NO_FORK)
 	pid_t pid;
-	int sigpipe[2];
+	int fork_fd[2], stderr_fd[2];
 #endif
 #ifdef USE_SIGNALS
 	int sig = 0;
@@ -2223,12 +2240,16 @@ printpidfile:
 #endif
 
 #if defined(USE_SIGNALS) && !defined(THERE_IS_NO_FORK)
-	if (pipe(sigpipe) == -1) {
-		logerr("pipe");
+	if (xsocketpair(AF_UNIX, SOCK_DGRAM | SOCK_CXNB, 0, fork_fd) == -1 ||
+	    xsocketpair(AF_UNIX, SOCK_DGRAM | SOCK_CXNB, 0, stderr_fd) == -1)
+	{
+		logerr("socketpair");
 		goto exit_failure;
 	}
 #ifdef HAVE_CAPSICUM
-	if (ps_rights_limit_fdpair(sigpipe) == -1) {
+	if (ps_rights_limit_fdpair(fork_fd) == -1 ||
+	    ps_rights_limit_fdpair(stderr_fd) == 1)
+	{
 		logerr("ps_rights_limit_fdpair");
 		goto exit_failure;
 	}
@@ -2238,8 +2259,13 @@ printpidfile:
 		logerr("fork");
 		goto exit_failure;
 	case 0:
-		ctx.fork_fd = sigpipe[1];
-		close(sigpipe[0]);
+		ctx.fork_fd = fork_fd[1];
+		close(fork_fd[0]);
+		logseterrfd(stderr_fd[1]);
+		close(stderr_fd[0]);
+		if (freopen(_PATH_DEVNULL, "w", stdout) == NULL ||
+		    freopen(_PATH_DEVNULL, "w", stderr) == NULL)
+			logerr("freopen");
 		if (setsid() == -1) {
 			logerr("%s: setsid", __func__);
 			goto exit_failure;
@@ -2259,10 +2285,13 @@ printpidfile:
 		break;
 	default:
 		ctx.options |= DHCPCD_FORKED; /* A lie */
-		ctx.fork_fd = sigpipe[0];
-		close(sigpipe[1]);
+		ctx.fork_fd = fork_fd[0];
+		close(fork_fd[1]);
+		ctx.stderr_fd = stderr_fd[0];
+		close(stderr_fd[1]);
 		setproctitle("[launcher]");
 		eloop_event_add(ctx.eloop, ctx.fork_fd, dhcpcd_fork_cb, &ctx);
+		eloop_event_add(ctx.eloop, ctx.stderr_fd, dhcpcd_stderr_cb, &ctx);
 		goto run_loop;
 	}
 
@@ -2280,22 +2309,6 @@ printpidfile:
 	if (ctx.options & DHCPCD_IPV6 && ctx.options & DHCPCD_IPV6RS)
 		if_disable_rtadv();
 #endif
-
-	if (isatty(STDOUT_FILENO) &&
-	    freopen(_PATH_DEVNULL, "r", stdout) == NULL)
-		logerr("%s: freopen stdout", __func__);
-	if (isatty(STDERR_FILENO)) {
-		int fd = dup(STDERR_FILENO);
-
-		if (fd == -1)
-			logerr("%s: dup", __func__);
-		else if (logseterrfd(fd) == -1)
-			logerr("%s: logseterrfd", __func__);
-		else if (freopen(_PATH_DEVNULL, "r", stderr) == NULL) {
-			logseterrfd(-1);
-			logerr("%s: freopen stderr", __func__);
-		}
-	}
 
 #ifdef PRIVSEP
 	if (IN_PRIVSEP(&ctx) && ps_start(&ctx) == -1) {

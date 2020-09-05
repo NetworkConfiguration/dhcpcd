@@ -118,6 +118,7 @@ struct dhcpcd_ctx {
 	char pidfile[sizeof(PIDFILE) + IF_NAMESIZE + 1];
 	char vendor[256];
 	int fork_fd;	/* FD for the fork init signal pipe */
+	int stderr_fd;	/* FD for logging to stderr */
 	const char *cffile;
 	unsigned long long options;
 	char *logfile;
