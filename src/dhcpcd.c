@@ -2246,14 +2246,6 @@ printpidfile:
 		logerr("socketpair");
 		goto exit_failure;
 	}
-#ifdef HAVE_CAPSICUM
-	if (ps_rights_limit_fdpair(fork_fd) == -1 ||
-	    ps_rights_limit_fdpair(stderr_fd) == 1)
-	{
-		logerr("ps_rights_limit_fdpair");
-		goto exit_failure;
-	}
-#endif
 	switch (pid = fork()) {
 	case -1:
 		logerr("fork");
@@ -2263,6 +2255,14 @@ printpidfile:
 		close(fork_fd[0]);
 		logseterrfd(stderr_fd[1]);
 		close(stderr_fd[0]);
+#ifdef PRIVSEP_RIGHTS
+		if (ps_rights_limit_fd(fork_fd[1]) == -1 ||
+		    ps_rights_limit_fd(stderr_fd[1]) == 1)
+		{
+			logerr("ps_rights_limit_fdpair");
+			goto exit_failure;
+		}
+#endif
 		if (freopen(_PATH_DEVNULL, "w", stdout) == NULL ||
 		    freopen(_PATH_DEVNULL, "w", stderr) == NULL)
 			logerr("freopen");
@@ -2289,6 +2289,14 @@ printpidfile:
 		close(fork_fd[1]);
 		ctx.stderr_fd = stderr_fd[0];
 		close(stderr_fd[1]);
+#ifdef PRIVSEP_RIGHTS
+		if (ps_rights_limit_fd(fork_fd[0]) == -1 ||
+		    ps_rights_limit_fd(stderr_fd[0]) == 1)
+		{
+			logerr("ps_rights_limit_fdpair");
+			goto exit_failure;
+		}
+#endif
 		setproctitle("[launcher]");
 		eloop_event_add(ctx.eloop, ctx.fork_fd, dhcpcd_fork_cb, &ctx);
 		eloop_event_add(ctx.eloop, ctx.stderr_fd, dhcpcd_stderr_cb, &ctx);
