@@ -390,6 +390,7 @@ logseterrfd(int fd)
 		return 0;
 	}
 	ctx->log_err = fdopen(fd, "a");
+	setlinebuf(ctx->log_err);
 	return ctx->log_err == NULL ? -1 : 0;
 }
 
