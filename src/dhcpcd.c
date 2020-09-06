@@ -2198,6 +2198,14 @@ printpidfile:
 			ctx.control_fd = control_open(NULL, AF_UNSPEC,
 			    ctx.options & DHCPCD_DUMPLEASE);
 		if (ctx.control_fd != -1) {
+#ifdef PRIVSEP
+			ctx.options &= ~DHCPCD_FORKED;
+			if (IN_PRIVSEP(&ctx) && ps_mastersandbox(&ctx) == -1) {
+				ctx.options |= DHCPCD_FORKED;
+				goto exit_failure;
+			}
+			ctx.options |= DHCPCD_FORKED;
+#endif
 			if (!(ctx.options & DHCPCD_DUMPLEASE))
 				loginfox("sending commands to dhcpcd process");
 			len = control_send(&ctx, argc, argv);

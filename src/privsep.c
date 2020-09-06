@@ -124,9 +124,10 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 	if (chdir("/") == -1)
 		logerr("%s: chdir `/'", __func__);
 
-	if (setgroups(1, &pw->pw_gid) == -1 ||
+	if ((setgroups(1, &pw->pw_gid) == -1 ||
 	     setgid(pw->pw_gid) == -1 ||
-	     setuid(pw->pw_uid) == -1)
+	     setuid(pw->pw_uid) == -1) &&
+	     (errno != EPERM || ctx->options & DHCPCD_FORKED))
 	{
 		logerr("failed to drop privileges");
 		return -1;
