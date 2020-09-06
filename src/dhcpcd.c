@@ -2135,11 +2135,20 @@ printpidfile:
 	}
 #endif
 
+#ifdef PRIVSEP
+	ps_init(&ctx);
+#endif
+
 #ifndef SMALL
 	if (ctx.options & DHCPCD_DUMPLEASE &&
 	    ioctl(fileno(stdin), FIONREAD, &i, sizeof(i)) == 0 &&
 	    i > 0)
 	{
+		ctx.options |= DHCPCD_FORKED; /* pretend child process */
+#ifdef PRIVSEP
+		if (IN_PRIVSEP(&ctx) && ps_mastersandbox(&ctx) == -1)
+			goto exit_failure;
+#endif
 		ifp = calloc(1, sizeof(*ifp));
 		if (ifp == NULL) {
 			logerr(__func__);
@@ -2240,11 +2249,6 @@ printpidfile:
 	loginfox(PACKAGE "-" VERSION " starting");
 	if (freopen(_PATH_DEVNULL, "r", stdin) == NULL)
 		logerr("%s: freopen stdin", __func__);
-
-
-#ifdef PRIVSEP
-	ps_init(&ctx);
-#endif
 
 #if defined(USE_SIGNALS) && !defined(THERE_IS_NO_FORK)
 	if (xsocketpair(AF_UNIX, SOCK_DGRAM | SOCK_CXNB, 0, fork_fd) == -1 ||
