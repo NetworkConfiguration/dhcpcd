@@ -480,8 +480,9 @@ ps_mastersandbox(struct dhcpcd_ctx *ctx)
 	}
 
 #ifdef PRIVSEP_RIGHTS
-	if (ps_rights_limit_ioctl(ctx->pf_inet_fd) == -1 ||
-	     ps_rights_limit_fd(ctx->link_fd) == -1 ||
+	if ((ctx->pf_inet_fd != -1 &&
+	    ps_rights_limit_ioctl(ctx->pf_inet_fd) == -1) ||
+	    (ctx->link_fd != -1 && ps_rights_limit_fd(ctx->link_fd) == -1) ||
 	     ps_rights_limit_stdio() == -1)
 	{
 		logerr("%s: cap_rights_limit", __func__);
