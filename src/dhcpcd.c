@@ -2261,17 +2261,20 @@ printpidfile:
 		ctx.fork_fd = fork_fd[1];
 		close(fork_fd[0]);
 #ifdef PRIVSEP_RIGHTS
-		if (ps_rights_limit_fd(fork_fd[1]) == -1 ||
-		    ps_rights_limit_fd(stderr_fd[1]) == 1)
-		{
+		if (ps_rights_limit_fd(fork_fd[1]) == -1) {
 			logerr("ps_rights_limit_fdpair");
 			goto exit_failure;
 		}
 #endif
-		/* Redirect stderr to the stderr socketpair.
+		/*
+		 * Redirect stderr to the stderr socketpair.
 		 * Redirect stdout as well.
 		 * dhcpcd doesn't output via stdout, but something in
-		 * a called script might. */
+		 * a called script might.
+		 *
+		 * Do NOT rights limit this fd as it will affect scripts.
+		 * For example, cmp reports insufficient caps on FreeBSD.
+		 */
 		if (dup2(stderr_fd[1], STDERR_FILENO) == -1 ||
 		    dup2(stderr_fd[1], STDOUT_FILENO) == -1)
 			logerr("dup2");
@@ -2310,7 +2313,8 @@ printpidfile:
 #endif
 		setproctitle("[launcher]");
 		eloop_event_add(ctx.eloop, ctx.fork_fd, dhcpcd_fork_cb, &ctx);
-		eloop_event_add(ctx.eloop, ctx.stderr_fd, dhcpcd_stderr_cb, &ctx);
+		eloop_event_add(ctx.eloop, ctx.stderr_fd, dhcpcd_stderr_cb,
+		    &ctx);
 		goto run_loop;
 	}
 
