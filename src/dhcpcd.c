@@ -1792,7 +1792,8 @@ dhcpcd_stderr_cb(void *arg)
 
 	len = read(ctx->stderr_fd, log, sizeof(log));
 	if (len == -1) {
-		logerr(__func__);
+		if (errno != ECONNRESET)
+			logerr(__func__);
 		return;
 	}
 
