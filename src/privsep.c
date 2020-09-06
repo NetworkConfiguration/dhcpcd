@@ -112,7 +112,7 @@ ps_init(struct dhcpcd_ctx *ctx)
 	return 0;
 }
 
-int
+static int
 ps_dropprivs(struct dhcpcd_ctx *ctx)
 {
 	struct passwd *pw = ctx->ps_user;
