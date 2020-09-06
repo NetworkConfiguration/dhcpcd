@@ -361,7 +361,7 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 
 	/* Don't use loginfo because this makes no sense in a log. */
 	if (!(logopts & LOGERR_QUIET))
-		(void)dprintf(loggeterrfd(),
+		(void)fprintf(stderr,
 		    "forked to background, child pid %d\n", getpid());
 	i = EXIT_SUCCESS;
 	if (write(ctx->fork_fd, &i, sizeof(i)) == -1)
@@ -371,11 +371,18 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 	close(ctx->fork_fd);
 	ctx->fork_fd = -1;
 
-	if (isatty(loggeterrfd())) {
-		logopts &= ~LOGERR_ERR;
-		logsetopts(logopts);
-		logseterrfd(-1);
-	}
+	/*
+	 * Stop writing to stderr.
+	 * On the happy path, only the master process writes to stderr,
+	 * so this just stops wasting fprintf calls to nowhere.
+	 * All other calls - ie errors in privsep processes or script output,
+	 * will error when printing.
+	 * If we *really* want to fix that, then we need to suck
+	 * stderr/stdout in the master process and either disacrd it or pass
+	 * it to the launcher process and then to stderr.
+	 */
+	logopts &= ~LOGERR_ERR;
+	logsetopts(logopts);
 #endif
 }
 
@@ -2253,8 +2260,6 @@ printpidfile:
 	case 0:
 		ctx.fork_fd = fork_fd[1];
 		close(fork_fd[0]);
-		logseterrfd(stderr_fd[1]);
-		close(stderr_fd[0]);
 #ifdef PRIVSEP_RIGHTS
 		if (ps_rights_limit_fd(fork_fd[1]) == -1 ||
 		    ps_rights_limit_fd(stderr_fd[1]) == 1)
@@ -2263,9 +2268,15 @@ printpidfile:
 			goto exit_failure;
 		}
 #endif
-		if (freopen(_PATH_DEVNULL, "w", stdout) == NULL ||
-		    freopen(_PATH_DEVNULL, "w", stderr) == NULL)
-			logerr("freopen");
+		/* Redirect stderr to the stderr socketpair.
+		 * Redirect stdout as well.
+		 * dhcpcd doesn't output via stdout, but something in
+		 * a called script might. */
+		if (dup2(stderr_fd[1], STDERR_FILENO) == -1 ||
+		    dup2(stderr_fd[1], STDOUT_FILENO) == -1)
+			logerr("dup2");
+		close(stderr_fd[0]);
+		close(stderr_fd[1]);
 		if (setsid() == -1) {
 			logerr("%s: setsid", __func__);
 			goto exit_failure;
