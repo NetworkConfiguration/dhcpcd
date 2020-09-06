@@ -163,7 +163,7 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 	/* Prohibit writing to files.
 	 * Obviously this won't work if we are using a logfile
 	 * or redirecting stderr to a file. */
-	if (ctx->logfile == NULL && isatty(loggeterrfd())) {
+	if (ctx->logfile == NULL) {
 		if (setrlimit(RLIMIT_FSIZE, &rzero) == -1)
 			logerr("setrlimit RLIMIT_FSIZE");
 	}
