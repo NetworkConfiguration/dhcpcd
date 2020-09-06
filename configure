@@ -1227,7 +1227,6 @@ int main(void) {
 EOF
 	if $XCC _ppoll.c -o _ppoll 2>&3; then
 		POLL=ppoll
-		echo "#define	HAVE_PPOLL" >>$CONFIG_MK
 		echo "yes"
 	else
 		echo "no"
@@ -1246,7 +1245,6 @@ int main(void) {
 EOF
 	if $XCC _pollts.c -o _pollts 2>&3; then
 		POLL=pollts
-		echo "#define	HAVE_PPOLL" >>$CONFIG_MK
 		echo "yes"
 	else
 		echo "no"
