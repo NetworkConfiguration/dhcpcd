@@ -75,6 +75,8 @@
 
 #ifdef HAVE_CAPSICUM
 #include <sys/capsicum.h>
+#include <capsicum_helpers.h>
+#define ps_rights_limit_stdio caph_limit_stdio
 #endif
 #ifdef HAVE_UTIL_H
 #include <util.h>
@@ -340,6 +342,14 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 			close(ctx->ps_root_fd);
 			ctx->ps_root_fd = -1;
 		}
+
+#ifdef PRIVSEP_RIGHTS
+		/* We cannot limit the root process in any way. */
+		if (ps_rights_limit_stdio() == -1) {
+			logerr("ps_rights_limit_stdio");
+			goto errexit;
+		}
+#endif
 	}
 
 	if (priv_fd != &ctx->ps_inet_fd && ctx->ps_inet_fd != -1) {
@@ -470,9 +480,9 @@ ps_mastersandbox(struct dhcpcd_ctx *ctx)
 	}
 
 #ifdef PRIVSEP_RIGHTS
-	if ((ps_rights_limit_ioctl(ctx->pf_inet_fd) == -1 ||
-	     ps_rights_limit_fd(ctx->link_fd) == -1) &&
-	    errno != ENOSYS)
+	if (ps_rights_limit_ioctl(ctx->pf_inet_fd) == -1 ||
+	     ps_rights_limit_fd(ctx->link_fd) == -1 ||
+	     ps_rights_limit_stdio() == -1)
 	{
 		logerr("%s: cap_rights_limit", __func__);
 		return -1;
