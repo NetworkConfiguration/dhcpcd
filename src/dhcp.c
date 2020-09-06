@@ -1873,12 +1873,12 @@ dhcp_discover(void *arg)
 		if (ifo->fallback)
 			eloop_timeout_add_sec(ifp->ctx->eloop,
 			    ifo->reboot, dhcp_fallback, ifp);
-	#ifdef IPV4LL
+#ifdef IPV4LL
 		else if (ifo->options & DHCPCD_IPV4LL)
 			eloop_timeout_add_sec(ifp->ctx->eloop,
 			    ifo->reboot, ipv4ll_start, ifp);
-	}
 #endif
+	}
 	if (ifo->options & DHCPCD_REQUEST)
 		loginfox("%s: soliciting a DHCP lease (requesting %s)",
 		    ifp->name, inet_ntoa(ifo->req_addr));
