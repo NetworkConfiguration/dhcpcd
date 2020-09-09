@@ -700,7 +700,7 @@ dhcpcd_reportssid(struct interface *ifp)
 		return;
 	}
 
-	loginfox("%s: connected to Access Point `%s'", ifp->name, pssid);
+	loginfox("%s: connected to Access Point '%s'", ifp->name, pssid);
 }
 
 void
@@ -2080,7 +2080,7 @@ printpidfile:
 	}
 
 	if (chdir("/") == -1)
-		logerr("%s: chdir `/'", __func__);
+		logerr("%s: chdir '/'", __func__);
 
 	/* Freeing allocated addresses from dumping leases can trigger
 	 * eloop removals as well, so init here. */
@@ -2240,9 +2240,9 @@ printpidfile:
 	if (!(ctx.options & DHCPCD_TEST)) {
 		/* Ensure we have the needed directories */
 		if (mkdir(DBDIR, 0750) == -1 && errno != EEXIST)
-			logerr("%s: mkdir `%s'", __func__, DBDIR);
+			logerr("%s: mkdir '%s'", __func__, DBDIR);
 		if (mkdir(RUNDIR, 0755) == -1 && errno != EEXIST)
-			logerr("%s: mkdir `%s'", __func__, RUNDIR);
+			logerr("%s: mkdir '%s'", __func__, RUNDIR);
 		if ((pid = pidfile_lock(ctx.pidfile)) != 0) {
 			if (pid == -1)
 				logerr("%s: pidfile_lock: %s",

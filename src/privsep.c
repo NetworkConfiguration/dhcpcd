@@ -118,11 +118,11 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 	struct passwd *pw = ctx->ps_user;
 
 	if (!(ctx->options & DHCPCD_FORKED))
-		logdebugx("chrooting to `%s' as %s", pw->pw_dir, pw->pw_name);
+		logdebugx("chrooting to '%s' as %s", pw->pw_dir, pw->pw_name);
 	if (chroot(pw->pw_dir) == -1)
-		logerr("%s: chroot `%s'", __func__, pw->pw_dir);
+		logerr("%s: chroot '%s'", __func__, pw->pw_dir);
 	if (chdir("/") == -1)
-		logerr("%s: chdir `/'", __func__);
+		logerr("%s: chdir '/'", __func__);
 
 	if ((setgroups(1, &pw->pw_gid) == -1 ||
 	     setgid(pw->pw_gid) == -1 ||
