@@ -2336,6 +2336,10 @@ printpidfile:
 	ctx.options |= DHCPCD_STARTED;
 	if ((pid = pidfile_lock(ctx.pidfile)) != 0) {
 		logerr("%s: pidfile_lock %d", __func__, pid);
+#ifdef PRIVSEP
+		/* privsep has not started ... */
+		ctx.options &= ~DHCPCD_PRIVSEP;
+#endif
 		goto exit_failure;
 	}
 #endif
