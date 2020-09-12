@@ -76,7 +76,6 @@
 #ifdef HAVE_CAPSICUM
 #include <sys/capsicum.h>
 #include <capsicum_helpers.h>
-#define ps_rights_limit_stdio caph_limit_stdio
 #endif
 #ifdef HAVE_UTIL_H
 #include <util.h>
@@ -278,6 +277,25 @@ ps_rights_limit_fdpair(int fd[])
 		return -1;
 	return 0;
 }
+
+static int
+ps_rights_limit_stdio(struct dhcpcd_ctx *ctx)
+{
+	const int iebadf = CAPH_IGNORE_EBADF;
+	int error = 0;
+
+	if (ctx->stdin_valid &&
+	    caph_limit_stream(STDIN_FILENO, CAPH_READ | iebadf) == -1)
+		error = -1;
+	if (ctx->stdout_valid &&
+	    caph_limit_stream(STDOUT_FILENO, CAPH_WRITE | iebadf) == -1)
+		error = -1;
+	if (ctx->stderr_valid &&
+	    caph_limit_stream(STDERR_FILENO, CAPH_WRITE | iebadf) == -1)
+		error = -1;
+
+	return error;
+}
 #endif
 
 pid_t
@@ -346,7 +364,7 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 
 #ifdef PRIVSEP_RIGHTS
 		/* We cannot limit the root process in any way. */
-		if (ps_rights_limit_stdio() == -1) {
+		if (ps_rights_limit_stdio(ctx) == -1) {
 			logerr("ps_rights_limit_stdio");
 			goto errexit;
 		}
@@ -484,7 +502,7 @@ ps_mastersandbox(struct dhcpcd_ctx *ctx)
 	if ((ctx->pf_inet_fd != -1 &&
 	    ps_rights_limit_ioctl(ctx->pf_inet_fd) == -1) ||
 	    (ctx->link_fd != -1 && ps_rights_limit_fd(ctx->link_fd) == -1) ||
-	     ps_rights_limit_stdio() == -1)
+	     ps_rights_limit_stdio(ctx) == -1)
 	{
 		logerr("%s: cap_rights_limit", __func__);
 		return -1;
