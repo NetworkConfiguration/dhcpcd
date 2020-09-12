@@ -360,7 +360,7 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 		return;
 
 	/* Don't use loginfo because this makes no sense in a log. */
-	if (!(logopts & LOGERR_QUIET))
+	if (!(logopts & LOGERR_QUIET) && ctx->stderr_valid)
 		(void)fprintf(stderr,
 		    "forked to background, child pid %d\n", getpid());
 	i = EXIT_SUCCESS;
@@ -1893,9 +1893,16 @@ main(int argc, char **argv)
 	ctx.ps_inet_fd = ctx.ps_control_fd = -1;
 	TAILQ_INIT(&ctx.ps_processes);
 #endif
-	rt_init(&ctx);
 
-	logopts = LOGERR_ERR|LOGERR_LOG|LOGERR_LOG_DATE|LOGERR_LOG_PID;
+	/* Check our streams for validity */
+	ctx.stdin_valid =  fcntl(STDIN_FILENO,  F_GETFD) != -1;
+	ctx.stdout_valid = fcntl(STDOUT_FILENO, F_GETFD) != -1;
+	ctx.stderr_valid = fcntl(STDERR_FILENO, F_GETFD) != -1;
+
+	logopts = LOGERR_LOG | LOGERR_LOG_DATE | LOGERR_LOG_PID;
+	if (ctx.stderr_valid)
+		logopts |= LOGERR_ERR;
+
 	i = 0;
 	while ((opt = getopt_long(argc, argv,
 	    ctx.options & DHCPCD_PRINT_PIDFILE ? NOERR_IF_OPTS : IF_OPTS,
@@ -1978,6 +1985,8 @@ main(int argc, char **argv)
 	ctx.argc = argc;
 	ctx.ifc = argc - optind;
 	ctx.ifv = argv + optind;
+
+	rt_init(&ctx);
 
 	ifo = read_config(&ctx, NULL, NULL, NULL);
 	if (ifo == NULL) {
@@ -2256,12 +2265,13 @@ printpidfile:
 	}
 
 	loginfox(PACKAGE "-" VERSION " starting");
-	if (freopen(_PATH_DEVNULL, "r", stdin) == NULL)
-		logerr("%s: freopen stdin", __func__);
+	if (ctx.stdin_valid && freopen(_PATH_DEVNULL, "w", stdin) == NULL)
+		logwarn("freopen stdin");
 
 #if defined(USE_SIGNALS) && !defined(THERE_IS_NO_FORK)
 	if (xsocketpair(AF_UNIX, SOCK_DGRAM | SOCK_CXNB, 0, fork_fd) == -1 ||
-	    xsocketpair(AF_UNIX, SOCK_DGRAM | SOCK_CXNB, 0, stderr_fd) == -1)
+	    (ctx.stderr_valid &&
+	    xsocketpair(AF_UNIX, SOCK_DGRAM | SOCK_CXNB, 0, stderr_fd) == -1))
 	{
 		logerr("socketpair");
 		goto exit_failure;
@@ -2284,15 +2294,18 @@ printpidfile:
 		 * Redirect stdout as well.
 		 * dhcpcd doesn't output via stdout, but something in
 		 * a called script might.
-		 *
-		 * Do NOT rights limit this fd as it will affect scripts.
-		 * For example, cmp reports insufficient caps on FreeBSD.
 		 */
-		if (dup2(stderr_fd[1], STDERR_FILENO) == -1 ||
-		    dup2(stderr_fd[1], STDOUT_FILENO) == -1)
-			logerr("dup2");
-		close(stderr_fd[0]);
-		close(stderr_fd[1]);
+		if (ctx.stderr_valid) {
+			if (dup2(stderr_fd[1], STDERR_FILENO) == -1 ||
+			    (ctx.stdout_valid &&
+			    dup2(stderr_fd[1], STDOUT_FILENO) == -1))
+				logerr("dup2");
+			close(stderr_fd[0]);
+			close(stderr_fd[1]);
+		} else if (ctx.stdout_valid) {
+			if (freopen(_PATH_DEVNULL, "w", stdout) == NULL)
+				logerr("freopen stdout");
+		}
 		if (setsid() == -1) {
 			logerr("%s: setsid", __func__);
 			goto exit_failure;
@@ -2312,10 +2325,9 @@ printpidfile:
 		break;
 	default:
 		ctx.options |= DHCPCD_FORKED; /* A lie */
+		setproctitle("[launcher]");
 		ctx.fork_fd = fork_fd[0];
 		close(fork_fd[1]);
-		ctx.stderr_fd = stderr_fd[0];
-		close(stderr_fd[1]);
 #ifdef PRIVSEP_RIGHTS
 		if (ps_rights_limit_fd(fork_fd[0]) == -1 ||
 		    ps_rights_limit_fd(stderr_fd[0]) == 1)
@@ -2324,10 +2336,21 @@ printpidfile:
 			goto exit_failure;
 		}
 #endif
-		setproctitle("[launcher]");
 		eloop_event_add(ctx.eloop, ctx.fork_fd, dhcpcd_fork_cb, &ctx);
-		eloop_event_add(ctx.eloop, ctx.stderr_fd, dhcpcd_stderr_cb,
-		    &ctx);
+
+		if (ctx.stderr_valid) {
+			ctx.stderr_fd = stderr_fd[0];
+			close(stderr_fd[1]);
+#ifdef PRIVSEP_RIGHTS
+			if (ps_rights_limit_fd(stderr_fd[0]) == 1) {
+				logerr("ps_rights_limit_fdpair");
+				goto exit_failure;
+			}
+#endif
+			if (ctx.stderr_valid)
+				eloop_event_add(ctx.eloop, ctx.stderr_fd,
+				    dhcpcd_stderr_cb, &ctx);
+		}
 		goto run_loop;
 	}
 
