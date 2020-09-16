@@ -49,6 +49,7 @@
 #include "dhcp.h"
 #include "dhcp6.h"
 #include "dhcpcd-embedded.h"
+#include "duid.h"
 #include "if.h"
 #include "if-options.h"
 #include "ipv4.h"
@@ -94,7 +95,7 @@ const struct option cf_options[] = {
 	{"noarp",           no_argument,       NULL, 'A'},
 	{"nobackground",    no_argument,       NULL, 'B'},
 	{"nohook",          required_argument, NULL, 'C'},
-	{"duid",            no_argument,       NULL, 'D'},
+	{"duid",            optional_argument, NULL, 'D'},
 	{"lastlease",       no_argument,       NULL, 'E'},
 	{"fqdn",            optional_argument, NULL, 'F'},
 	{"nogateway",       no_argument,       NULL, 'G'},
@@ -985,6 +986,20 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		break;
 	case 'D':
 		ifo->options |= DHCPCD_CLIENTID | DHCPCD_DUID;
+		if (ifname != NULL) /* duid type only a global option */
+			break;
+		if (arg == NULL)
+			ctx->duid_type = DUID_DEFAULT;
+		else if (strcmp(arg, "ll") == 0)
+			ctx->duid_type = DUID_LL;
+		else if (strcmp(arg, "llt") == 0)
+			ctx->duid_type = DUID_LLT;
+		else if (strcmp(arg, "uuid") == 0)
+			ctx->duid_type = DUID_UUID;
+		else {
+			logwarnx("%s: invalid duid type", arg);
+			ctx->duid_type = DUID_DEFAULT;
+		}
 		break;
 	case 'E':
 		ifo->options |= DHCPCD_LASTLEASE;
