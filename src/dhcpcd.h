@@ -135,6 +135,7 @@ struct dhcpcd_ctx {
 	char **ifv;	/* listed interfaces */
 	int ifcc;	/* configured interfaces */
 	char **ifcv;	/* configured interfaces */
+	uint8_t duid_type;
 	unsigned char *duid;
 	size_t duid_len;
 	struct if_head *ifaces;
