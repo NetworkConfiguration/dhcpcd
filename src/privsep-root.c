@@ -570,7 +570,7 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 #endif
 #ifdef PLUGIN_DEV
 	case PS_DEV_INITTED:
-		err = dev_initialized(ctx, data);
+		err = dev_initialised(ctx, data);
 		break;
 	case PS_DEV_LISTENING:
 		err = dev_listening(ctx);
@@ -989,7 +989,7 @@ ps_root_getauthrdm(struct dhcpcd_ctx *ctx, uint64_t *rdm)
 
 #ifdef PLUGIN_DEV
 int
-ps_root_dev_initialized(struct dhcpcd_ctx *ctx, const char *ifname)
+ps_root_dev_initialised(struct dhcpcd_ctx *ctx, const char *ifname)
 {
 
 	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_DEV_INITTED, 0,

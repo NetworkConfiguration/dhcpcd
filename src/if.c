@@ -519,8 +519,11 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 
 #ifdef PLUGIN_DEV
 		/* Ensure that the interface name has settled */
-		if (!dev_initialized(ctx, spec.devname))
+		if (!dev_initialised(ctx, spec.devname)) {
+			logdebugx("%s: waiting for interface to initialise",
+			    spec.devname);
 			continue;
+		}
 #endif
 
 		if (if_vimaster(ctx, spec.devname) == 1) {

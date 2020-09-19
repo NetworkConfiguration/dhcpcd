@@ -254,6 +254,10 @@ struct dhcpcd_ctx {
 	struct dev *dev;
 	void *dev_handle;
 #endif
+
+#ifdef __linux__
+	char netns[PATH_MAX];
+#endif
 };
 
 #ifdef USE_SIGNALS

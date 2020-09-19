@@ -39,6 +39,7 @@
 
 #include "../common.h"
 #include "../dev.h"
+#include "../if.h"
 #include "../logerr.h"
 
 static const char udev_name[] = "udev";
@@ -55,7 +56,7 @@ udev_listening(void)
 }
 
 static int
-udev_initialized(const char *ifname)
+udev_initialised(const char *ifname)
 {
 	struct udev_device *device;
 	int r;
@@ -120,7 +121,13 @@ udev_stop(void)
 static int
 udev_start(void)
 {
+	char netns[PATH_MAX];
 	int fd;
+
+	if (if_getnetworknamespace(netns, sizeof(netns)) != NULL) {
+		logdebugx("udev does not work in a network namespace");
+		return -1;
+	}
 
 	if (udev) {
 		logerrx("udev: already started");
@@ -167,7 +174,7 @@ dev_init(struct dev *dev, const struct dev_dhcpcd *dev_dhcpcd)
 {
 
 	dev->name = udev_name;
-	dev->initialized = udev_initialized;
+	dev->initialised = udev_initialised;
 	dev->listening = udev_listening;
 	dev->handle_device = udev_handle_device;
 	dev->stop = udev_stop;
