@@ -243,6 +243,22 @@ static struct sock_filter ps_seccomp_filter[] = {
 #ifdef __NR_uname
 	SECCOMP_ALLOW(__NR_uname),
 #endif
+
+	/* Avoid unconfined dmesg warnings.
+	 * XXX Why do we need these? */
+#ifdef __NR_exit_group
+	SECCOMP_ALLOW(__NR_exit_group),
+#endif
+#ifdef __NR_ftruncate
+	SECCOMP_ALLOW(__NR_ftruncate),
+#endif
+#ifdef __NR_munmap
+	SECCOMP_ALLOW(__NR_munmap),
+#endif
+#ifdef __NR_unlink
+	SECCOMP_ALLOW(__NR_unlink),
+#endif
+
 	/* Deny everything else */
 	BPF_STMT(BPF_RET + BPF_K, SECCOMP_FILTER_FAIL),
 };
