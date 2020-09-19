@@ -363,7 +363,7 @@ if_vlanid(const struct interface *ifp)
 	memset(&v, 0, sizeof(v));
 	strlcpy(v.device1, ifp->name, sizeof(v.device1));
 	v.cmd = GET_VLAN_VID_CMD;
-	if (ioctl(ifp->ctx->pf_inet_fd, SIOCSIFVLAN, &v) != 0)
+	if (ioctl(ifp->ctx->pf_inet_fd, SIOCGIFVLAN, &v) != 0)
 		return 0; /* 0 means no VLANID */
 	return (unsigned short)v.u.VID;
 }
