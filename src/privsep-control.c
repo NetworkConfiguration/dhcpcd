@@ -263,7 +263,7 @@ ps_ctl_start(struct dhcpcd_ctx *ctx)
 	    ps_ctl_listen, ctx) == -1)
 		return -1;
 
-	ps_entersandbox("stdio inet");
+	ps_entersandbox("stdio inet", NULL);
 	return 0;
 }
 

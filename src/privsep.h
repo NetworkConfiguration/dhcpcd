@@ -174,7 +174,7 @@ TAILQ_HEAD(ps_process_head, ps_process);
 int ps_init(struct dhcpcd_ctx *);
 int ps_start(struct dhcpcd_ctx *);
 int ps_stop(struct dhcpcd_ctx *);
-int ps_entersandbox(const char *);
+int ps_entersandbox(const char *, const char **);
 int ps_mastersandbox(struct dhcpcd_ctx *);
 
 int ps_unrollmsg(struct msghdr *, struct ps_msghdr *, const void *, size_t);
