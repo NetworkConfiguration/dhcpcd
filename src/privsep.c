@@ -493,27 +493,27 @@ int
 ps_entersandbox(const char *_pledge, const char **sandbox)
 {
 
-#ifdef HAVE_CAPSICUM
+#if !defined(HAVE_PLEDGE)
+	UNUSED(_pledge);
+#endif
+
+#if defined(HAVE_CAPSICUM)
 	if (sandbox != NULL)
 		*sandbox = "capsicum";
 	return cap_enter();
-#endif
-#ifdef HAVE_PLEDGE
+#elif defined(HAVE_PLEDGE)
 	if (sandbox != NULL)
 		*sandbox = "pledge";
 	return pledge(_pledge, NULL);
-#else
-	UNUSED(_pledge);
-#endif
-#ifdef HAVE_SECCOMP
+#elif defined(HAVE_SECCOMP)
 	if (sandbox != NULL)
 		*sandbox = "seccomp";
 	return ps_seccomp_enter();
-#endif
-
+#else
 	if (sandbox != NULL)
-		*sandbox = NULL;
+		*sandbox = "posix resource limited";
 	return 0;
+#endif
 }
 
 int
@@ -545,8 +545,8 @@ ps_mastersandbox(struct dhcpcd_ctx *ctx)
 		}
 		logerr("%s: %s", __func__, sandbox);
 		return -1;
-	} else if (sandbox != NULL)
-		loginfox("sandbox: %s", sandbox);
+	} else
+		logdebugx("sandbox: %s", sandbox);
 	return 0;
 }
 
