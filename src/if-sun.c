@@ -109,6 +109,12 @@ struct rtm
 static int if_plumb(int, const struct dhcpcd_ctx *, int, const char *);
 
 int
+os_init(void)
+{
+	return 0;
+}
+
+int
 if_init(struct interface *ifp)
 {
 

@@ -145,7 +145,6 @@ struct priv {
 	int route_fd;
 	int generic_fd;
 	uint32_t route_pid;
-	char netns[PATH_MAX];
 };
 
 /* We need this to send a broadcast for InfiniBand.
@@ -416,6 +415,18 @@ if_getnetworknamespace(char *buf, size_t len)
 }
 
 int
+os_init(void)
+{
+	char netns[PATH_MAX], *p;
+
+	p = if_getnetworknamespace(netns, sizeof(netns));
+	if (p != NULL)
+		loginfox("network namespace: %s", p);
+
+	return 0;
+}
+
+int
 if_opensockets_os(struct dhcpcd_ctx *ctx)
 {
 	struct priv *priv;
@@ -464,9 +475,6 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 	priv->generic_fd = if_linksocket(&snl, NETLINK_GENERIC, 0);
 	if (priv->generic_fd == -1)
 		return -1;
-
-	if (if_getnetworknamespace(ctx->netns, sizeof(ctx->netns)) != NULL)
-		logdebugx("network namespace: %s", ctx->netns);
 
 	return 0;
 }

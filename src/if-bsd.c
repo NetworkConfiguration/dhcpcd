@@ -122,6 +122,12 @@ struct rtm
 };
 
 int
+os_init(void)
+{
+	return 0;
+}
+
+int
 if_init(__unused struct interface *iface)
 {
 	/* BSD promotes secondary address by default */
