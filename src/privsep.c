@@ -507,6 +507,12 @@ ps_entersandbox(const char *_pledge)
 #else
 	UNUSED(_pledge);
 #endif
+#ifdef HAVE_SECCOMP
+	if (ps_seccomp_enter() == -1) {
+		logerr("%s: ps_seccomp_enter", __func__);
+		return -1;
+	}
+#endif
 
 	return 0;
 }

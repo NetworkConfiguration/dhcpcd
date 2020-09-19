@@ -96,6 +96,13 @@
 #define PRIVSEP_RIGHTS
 #endif
 
+#ifdef __linux__
+# include <linux/version.h>
+# if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 5, 0)
+#  define HAVE_SECCOMP
+# endif
+#endif
+
 #include "config.h"
 #include "arp.h"
 #include "dhcp.h"
@@ -192,6 +199,10 @@ int ps_rights_limit_fd_fctnl(int);
 int ps_rights_limit_fd_rdonly(int);
 int ps_rights_limit_fd(int);
 int ps_rights_limit_fdpair(int []);
+#endif
+
+#ifdef HAVE_SECCOMP
+int ps_seccomp_enter(void);
 #endif
 
 pid_t ps_dostart(struct dhcpcd_ctx * ctx,
