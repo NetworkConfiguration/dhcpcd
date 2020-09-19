@@ -256,9 +256,12 @@ int
 ps_seccomp_enter(void)
 {
 
-	if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) == -1)
-		return errno == EINVAL ? 0 : -1;
-	if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &ps_seccomp_prog) == -1)
-		return errno == EINVAL ? 0 : -1;
+	if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) == -1 ||
+	    prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &ps_seccomp_prog) == -1)
+	{
+		if (errno == EINVAL)
+			errno = ENOSYS;
+		return -1;
+	}
 	return 0;
 }

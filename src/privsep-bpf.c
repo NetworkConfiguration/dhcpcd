@@ -240,7 +240,7 @@ ps_bpf_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg)
 		ps_freeprocess(psp);
 		return -1;
 	case 0:
-		ps_entersandbox("stdio");
+		ps_entersandbox("stdio", NULL);
 		break;
 	default:
 #ifdef PRIVSEP_DEBUG

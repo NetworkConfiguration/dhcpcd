@@ -334,7 +334,7 @@ ps_inet_start(struct dhcpcd_ctx *ctx)
 	    PSF_DROPPRIVS);
 
 	if (pid == 0)
-		ps_entersandbox("stdio");
+		ps_entersandbox("stdio", NULL);
 
 	return pid;
 }
@@ -560,7 +560,7 @@ ps_inet_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg)
 		ps_freeprocess(psp);
 		return -1;
 	case 0:
-		ps_entersandbox("stdio");
+		ps_entersandbox("stdio", NULL);
 		break;
 	default:
 		break;

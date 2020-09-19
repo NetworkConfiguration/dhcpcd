@@ -490,36 +490,36 @@ started_net:
 }
 
 int
-ps_entersandbox(const char *_pledge)
+ps_entersandbox(const char *_pledge, const char **sandbox)
 {
 
 #ifdef HAVE_CAPSICUM
-	if (cap_enter() == -1 && errno != ENOSYS) {
-		logerr("%s: cap_enter", __func__);
-		return -1;
-	}
+	if (sandbox != NULL)
+		*sandbox = "capsicum";
+	return cap_enter();
 #endif
 #ifdef HAVE_PLEDGE
-	if (pledge(_pledge, NULL) == -1) {
-		logerr("%s: pledge", __func__);
-		return -1;
-	}
+	if (sandbox != NULL)
+		*sandbox = "pledge";
+	return pledge(_pledge, NULL);
 #else
 	UNUSED(_pledge);
 #endif
 #ifdef HAVE_SECCOMP
-	if (ps_seccomp_enter() == -1) {
-		logerr("%s: ps_seccomp_enter", __func__);
-		return -1;
-	}
+	if (sandbox != NULL)
+		*sandbox = "seccomp";
+	return ps_seccomp_enter();
 #endif
 
+	if (sandbox != NULL)
+		*sandbox = NULL;
 	return 0;
 }
 
 int
 ps_mastersandbox(struct dhcpcd_ctx *ctx)
 {
+	const char *sandbox = NULL;
 
 	if (ps_dropprivs(ctx) == -1) {
 		logerr("%s: ps_dropprivs", __func__);
@@ -537,7 +537,17 @@ ps_mastersandbox(struct dhcpcd_ctx *ctx)
 	}
 #endif
 
-	return ps_entersandbox("stdio route");
+	if (ps_entersandbox("stdio route", &sandbox) == -1) {
+		if (errno == ENOSYS) {
+			if (sandbox != NULL)
+				logwarnx("sandbox unavailable: %s", sandbox);
+			return 0;
+		}
+		logerr("%s: %s", __func__, sandbox);
+		return -1;
+	} else if (sandbox != NULL)
+		loginfox("sandbox: %s", sandbox);
+	return 0;
 }
 
 int
