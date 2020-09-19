@@ -39,18 +39,18 @@
 #include "logerr.h"
 
 int
-dev_initialized(struct dhcpcd_ctx *ctx, const char *ifname)
+dev_initialised(struct dhcpcd_ctx *ctx, const char *ifname)
 {
 
 #ifdef PRIVSEP
 	if (ctx->options & DHCPCD_PRIVSEP &&
 	    !(ctx->options & DHCPCD_PRIVSEPROOT))
-		return ps_root_dev_initialized(ctx, ifname);
+		return ps_root_dev_initialised(ctx, ifname);
 #endif
 
 	if (ctx->dev == NULL)
 		return 1;
-	return ctx->dev->initialized(ifname);
+	return ctx->dev->initialised(ifname);
 }
 
 int

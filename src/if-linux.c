@@ -60,6 +60,7 @@
 #include <linux/if_arp.h>
 #endif
 
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <ctype.h>
@@ -144,6 +145,7 @@ struct priv {
 	int route_fd;
 	int generic_fd;
 	uint32_t route_pid;
+	char netns[PATH_MAX];
 };
 
 /* We need this to send a broadcast for InfiniBand.
@@ -383,6 +385,36 @@ if_linksocket(struct sockaddr_nl *nl, int protocol, int flags)
 	return fd;
 }
 
+char *
+if_getnetworknamespace(char *buf, size_t len)
+{
+	struct stat sb_self, sb_netns;
+	DIR *dir;
+	struct dirent *de;
+	char file[PATH_MAX], *bufp = NULL;
+
+	if (stat("/proc/self/ns/net", &sb_self) == -1)
+		return NULL;
+
+	dir = opendir("/var/run/netns");
+	if (dir == NULL)
+		return NULL;
+
+	while ((de = readdir(dir)) != NULL) {
+		snprintf(file, sizeof(file), "/var/run/netns/%s", de->d_name);
+		if (stat(file, &sb_netns) == -1)
+			continue;
+		if (sb_self.st_dev != sb_netns.st_dev &&
+		    sb_self.st_ino != sb_netns.st_ino)
+			continue;
+		strlcpy(buf, de->d_name, len);
+		bufp = buf;
+		break;
+	}
+	closedir(dir);
+	return bufp;
+}
+
 int
 if_opensockets_os(struct dhcpcd_ctx *ctx)
 {
@@ -432,6 +464,9 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 	priv->generic_fd = if_linksocket(&snl, NETLINK_GENERIC, 0);
 	if (priv->generic_fd == -1)
 		return -1;
+
+	if (if_getnetworknamespace(ctx->netns, sizeof(ctx->netns)) != NULL)
+		logdebugx("network namespace: %s", ctx->netns);
 
 	return 0;
 }
@@ -1613,7 +1648,6 @@ if_initrt(struct dhcpcd_ctx *ctx, rb_tree_t *kroutes, int af)
 	return if_sendnetlink(ctx, NETLINK_ROUTE, &nlm.hdr,
 	    &_if_initrt, kroutes);
 }
-
 
 #ifdef INET
 /* Linux is a special snowflake when it comes to BPF. */

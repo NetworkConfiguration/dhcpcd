@@ -191,6 +191,7 @@ int if_ignoregroup(int, const char *);
 bool if_ignore(struct dhcpcd_ctx *, const char *);
 int if_vimaster(struct dhcpcd_ctx *ctx, const char *);
 unsigned short if_vlanid(const struct interface *);
+char * if_getnetworknamespace(char *, size_t);
 int if_opensockets(struct dhcpcd_ctx *);
 int if_opensockets_os(struct dhcpcd_ctx *);
 void if_closesockets(struct dhcpcd_ctx *);
