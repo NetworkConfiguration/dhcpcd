@@ -490,6 +490,28 @@ started_net:
 }
 
 int
+ps_entersandbox(const char *_pledge)
+{
+
+#ifdef HAVE_CAPSICUM
+	if (cap_enter() == -1 && errno != ENOSYS) {
+		logerr("%s: cap_enter", __func__);
+		return -1;
+	}
+#endif
+#ifdef HAVE_PLEDGE
+	if (pledge(_pledge, NULL) == -1) {
+		logerr("%s: pledge", __func__);
+		return -1;
+	}
+#else
+	UNUSED(_pledge);
+#endif
+
+	return 0;
+}
+
+int
 ps_mastersandbox(struct dhcpcd_ctx *ctx)
 {
 
@@ -508,20 +530,8 @@ ps_mastersandbox(struct dhcpcd_ctx *ctx)
 		return -1;
 	}
 #endif
-#ifdef HAVE_CAPSICUM
-	if (cap_enter() == -1 && errno != ENOSYS) {
-		logerr("%s: cap_enter", __func__);
-		return -1;
-	}
-#endif
-#ifdef HAVE_PLEDGE
-	if (pledge("stdio route", NULL) == -1) {
-		logerr("%s: pledge", __func__);
-		return -1;
-	}
-#endif
 
-	return 0;
+	return ps_entersandbox("stdio route");
 }
 
 int

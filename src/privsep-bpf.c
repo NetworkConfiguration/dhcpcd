@@ -53,10 +53,6 @@
 #include "logerr.h"
 #include "privsep.h"
 
-#ifdef HAVE_CAPSICUM
-#include <sys/capsicum.h>
-#endif
-
 static void
 ps_bpf_recvbpf(void *arg)
 {
@@ -244,14 +240,7 @@ ps_bpf_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg)
 		ps_freeprocess(psp);
 		return -1;
 	case 0:
-#ifdef HAVE_CAPSICUM
-		if (cap_enter() == -1 && errno != ENOSYS)
-			logerr("%s: cap_enter", __func__);
-#endif
-#ifdef HAVE_PLEDGE
-		if (pledge("stdio", NULL) == -1)
-			logerr("%s: pledge", __func__);
-#endif
+		ps_entersandbox("stdio");
 		break;
 	default:
 #ifdef PRIVSEP_DEBUG
