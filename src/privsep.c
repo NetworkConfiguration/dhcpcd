@@ -118,7 +118,8 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 
 	if (!(ctx->options & DHCPCD_FORKED))
 		logdebugx("chrooting to `%s' as %s", pw->pw_dir, pw->pw_name);
-	if (chroot(pw->pw_dir) == -1)
+	if (chroot(pw->pw_dir) == -1 &&
+	    (errno != EPERM || ctx->options & DHCPCD_FORKED))
 		logerr("%s: chroot `%s'", __func__, pw->pw_dir);
 	if (chdir("/") == -1)
 		logerr("%s: chdir `/'", __func__);
@@ -517,11 +518,18 @@ ps_entersandbox(const char *_pledge, const char **sandbox)
 }
 
 int
-ps_mastersandbox(struct dhcpcd_ctx *ctx)
+ps_mastersandbox(struct dhcpcd_ctx *ctx, const char *_pledge)
 {
 	const char *sandbox = NULL;
+	bool forked;
+	int dropped;
 
-	if (ps_dropprivs(ctx) == -1) {
+	forked = ctx->options & DHCPCD_FORKED;
+	ctx->options &= ~DHCPCD_FORKED;
+	dropped = ps_dropprivs(ctx);
+	if (forked)
+		ctx->options |= DHCPCD_FORKED;
+	if (dropped == -1) {
 		logerr("%s: ps_dropprivs", __func__);
 		return -1;
 	}
@@ -537,7 +545,9 @@ ps_mastersandbox(struct dhcpcd_ctx *ctx)
 	}
 #endif
 
-	if (ps_entersandbox("stdio route", &sandbox) == -1) {
+	if (_pledge == NULL)
+		_pledge = "stdio";
+	if (ps_entersandbox(_pledge, &sandbox) == -1) {
 		if (errno == ENOSYS) {
 			if (sandbox != NULL)
 				logwarnx("sandbox unavailable: %s", sandbox);

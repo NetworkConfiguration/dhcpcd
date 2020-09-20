@@ -1417,16 +1417,7 @@ dhcpcd_signal_cb(int sig, void *arg)
 	}
 
 	if (sig != SIGCHLD && ctx->options & DHCPCD_FORKED) {
-		if (sig == SIGHUP)
-			return;
-
-		pid_t pid = pidfile_read(ctx->pidfile);
-		if (pid == -1) {
-			if (errno != ENOENT)
-				logerr("%s: pidfile_read",__func__);
-		} else if (pid == 0)
-			logerr("%s: pid cannot be zero", __func__);
-		else if (kill(pid, sig) == -1)
+		if (sig != SIGHUP && kill(ctx->fork_pid, sig) == -1)
 			logerr("%s: kill", __func__);
 		return;
 	}
@@ -1769,9 +1760,16 @@ dhcpcd_fork_cb(void *arg)
 {
 	struct dhcpcd_ctx *ctx = arg;
 	int exit_code;
+	bool do_exit;
 	ssize_t len;
 
-	len = read(ctx->fork_fd, &exit_code, sizeof(exit_code));
+	if (ctx->fork_pid == 0) {
+		do_exit = false;
+		len = read(ctx->fork_fd, &ctx->fork_pid, sizeof(ctx->fork_pid));
+	} else {
+		do_exit = true;
+		len = read(ctx->fork_fd, &exit_code, sizeof(exit_code));
+	}
 	if (len == -1) {
 		logerr(__func__);
 		exit_code = EXIT_FAILURE;
@@ -1780,7 +1778,8 @@ dhcpcd_fork_cb(void *arg)
 		    __func__, len, sizeof(exit_code));
 		exit_code = EXIT_FAILURE;
 	}
-	eloop_exit(ctx->eloop, exit_code);
+	if (do_exit)
+		eloop_exit(ctx->eloop, exit_code);
 }
 
 static void
@@ -2156,7 +2155,7 @@ printpidfile:
 	{
 		ctx.options |= DHCPCD_FORKED; /* pretend child process */
 #ifdef PRIVSEP
-		if (IN_PRIVSEP(&ctx) && ps_mastersandbox(&ctx) == -1)
+		if (IN_PRIVSEP(&ctx) && ps_mastersandbox(&ctx, NULL) == -1)
 			goto exit_failure;
 #endif
 		ifp = calloc(1, sizeof(*ifp));
@@ -2208,12 +2207,9 @@ printpidfile:
 			    ctx.options & DHCPCD_DUMPLEASE);
 		if (ctx.control_fd != -1) {
 #ifdef PRIVSEP
-			ctx.options &= ~DHCPCD_FORKED;
-			if (IN_PRIVSEP(&ctx) && ps_mastersandbox(&ctx) == -1) {
-				ctx.options |= DHCPCD_FORKED;
+			if (IN_PRIVSEP(&ctx) &&
+			    ps_mastersandbox(&ctx, NULL) == -1)
 				goto exit_failure;
-			}
-			ctx.options |= DHCPCD_FORKED;
 #endif
 			if (!(ctx.options & DHCPCD_DUMPLEASE))
 				loginfox("sending commands to dhcpcd process");
@@ -2316,6 +2312,9 @@ printpidfile:
 			logerr("fork");
 			goto exit_failure;
 		case 0:
+			/* Inform the launcher of our pid as it's chrooted */
+			pid = getpid();
+			write(ctx.fork_fd, &pid, sizeof(pid));
 			break;
 		default:
 			ctx.options |= DHCPCD_FORKED; /* A lie */
@@ -2324,8 +2323,8 @@ printpidfile:
 		}
 		break;
 	default:
-		ctx.options |= DHCPCD_FORKED; /* A lie */
 		setproctitle("[launcher]");
+		ctx.options |= DHCPCD_FORKED; /* A lie */
 		ctx.fork_fd = fork_fd[0];
 		close(fork_fd[1]);
 #ifdef PRIVSEP_RIGHTS
@@ -2351,6 +2350,11 @@ printpidfile:
 				eloop_event_add(ctx.eloop, ctx.stderr_fd,
 				    dhcpcd_stderr_cb, &ctx);
 		}
+#ifdef PRIVSEP
+		if (IN_PRIVSEP(&ctx) &&
+		    ps_mastersandbox(&ctx, "stdio proc") == -1)
+			goto exit_failure;
+#endif
 		goto run_loop;
 	}
 
@@ -2428,7 +2432,7 @@ printpidfile:
 	eloop_event_add(ctx.eloop, ctx.link_fd, dhcpcd_handlelink, &ctx);
 
 #ifdef PRIVSEP
-	if (IN_PRIVSEP(&ctx) && ps_mastersandbox(&ctx) == -1)
+	if (IN_PRIVSEP(&ctx) && ps_mastersandbox(&ctx, "stdio route") == -1)
 		goto exit_failure;
 #endif
 

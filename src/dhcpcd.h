@@ -122,6 +122,7 @@ struct dhcpcd_ctx {
 	bool stderr_valid;
 	int stderr_fd;	/* FD for logging to stderr */
 	int fork_fd;	/* FD for the fork init signal pipe */
+	pid_t fork_pid;
 	const char *cffile;
 	unsigned long long options;
 	char *logfile;
