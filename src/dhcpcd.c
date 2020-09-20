@@ -2552,6 +2552,9 @@ exit1:
 #endif
 			freeifaddrs(ifaddrs);
 	}
+	/* ps_stop will clear DHCPCD_PRIVSEP but we need to
+	 * remember it to avoid attemping to remove the pidfile */
+	oi = ctx.options & DHCPCD_PRIVSEP ? 1 : 0;
 #ifdef PRIVSEP
 	ps_stop(&ctx);
 #endif
@@ -2600,14 +2603,14 @@ exit1:
 	setproctitle_free();
 #endif
 #ifdef USE_SIGNALS
-	if (ctx.options & DHCPCD_FORKED)
-		_exit(i); /* so atexit won't remove our pidfile */
-	else if (ctx.options & DHCPCD_STARTED) {
+	if (ctx.options & DHCPCD_STARTED) {
 		/* Try to detach from the launch process. */
 		if (ctx.fork_fd != -1 &&
 		    write(ctx.fork_fd, &i, sizeof(i)) == -1)
 			logerr("%s: write", __func__);
 	}
+	if (ctx.options & DHCPCD_FORKED || oi != 0)
+		_exit(i); /* so atexit won't remove our pidfile */
 #endif
 	return i;
 }
