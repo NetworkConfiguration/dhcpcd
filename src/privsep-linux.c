@@ -217,6 +217,9 @@ static struct sock_filter ps_seccomp_filter[] = {
 #ifdef __NR_close
 	SECCOMP_ALLOW(__NR_close),
 #endif
+#ifdef __NR_exit_group
+	SECCOMP_ALLOW(__NR_exit_group),
+#endif
 #ifdef __NR_fcntl
 	SECCOMP_ALLOW(__NR_fcntl),
 #endif
@@ -234,6 +237,9 @@ static struct sock_filter ps_seccomp_filter[] = {
 	SECCOMP_ALLOW_ARG(__NR_ioctl, 1, SIOCGIFVLAN),
 	/* SECCOMP BPF is newer than nl80211 so we don't need SIOCGIWESSID
 	 * which lives in the impossible to include linux/wireless.h header */
+#endif
+#ifdef __NR_munmap
+	SECCOMP_ALLOW(__NR_munmap),
 #endif
 #ifdef __NR_ppoll
 	SECCOMP_ALLOW(__NR_ppoll),
@@ -276,21 +282,6 @@ static struct sock_filter ps_seccomp_filter[] = {
 #endif
 #ifdef __NR_uname
 	SECCOMP_ALLOW(__NR_uname),
-#endif
-
-	/* Avoid unconfined dmesg warnings.
-	 * XXX Why do we need these? */
-#ifdef __NR_exit_group
-	SECCOMP_ALLOW(__NR_exit_group),
-#endif
-#ifdef __NR_ftruncate
-	SECCOMP_ALLOW(__NR_ftruncate),
-#endif
-#ifdef __NR_munmap
-	SECCOMP_ALLOW(__NR_munmap),
-#endif
-#ifdef __NR_unlink
-	SECCOMP_ALLOW(__NR_unlink),
 #endif
 
 	/* Deny everything else */
