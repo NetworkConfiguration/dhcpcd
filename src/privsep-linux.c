@@ -127,6 +127,8 @@ ps_root_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct msghdr *msg)
 
 #define SECCOMP_FILTER_FAIL	SECCOMP_RET_KILL
 
+/* I personally find this quite nutty.
+ * Why can a system header not define a default for this? */
 #if defined(__i386__)
 #  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_I386
 #elif defined(__x86_64__)
@@ -135,9 +137,23 @@ ps_root_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct msghdr *msg)
 #  ifndef EM_ARM
 #    define EM_ARM 40
 #  endif
-#  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_ARM
+#  if (BYTE_ORDER == LITTLE_ENDIAN)
+#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_ARM
+#  else
+#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_ARMEB
+#  endif
 #elif defined(__aarch64__)
 #  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_AARCH64
+#elif defined(__alpha__)
+#  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_ALPHA
+#elif defined(__hppa__)
+#  if defined(__LP64__)
+#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_PARISC64
+#  else
+#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_PARISC
+#  endif
+#elif defined(__ia64__)
+#  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_IA64
 #elif defined(__mips__)
 #  if defined(__MIPSEL__)
 #    if defined(__LP64__)
@@ -154,6 +170,12 @@ ps_root_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct msghdr *msg)
 #  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_PPC64
 #elif defined(__powerpc__)
 #  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_PPC
+#elif defined(__riscv)
+#  if defined(__LP64__)
+#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_RISCV64
+#  else
+#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_RISCV32
+#  endif
 #elif defined(__s390x__)
 #  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_S390X
 #elif defined(__s390__)
