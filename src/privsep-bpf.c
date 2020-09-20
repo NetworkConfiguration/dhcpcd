@@ -53,6 +53,10 @@
 #include "logerr.h"
 #include "privsep.h"
 
+#ifdef HAVE_CAPSICUM
+#include <sys/capsicum.h>
+#endif
+
 static void
 ps_bpf_recvbpf(void *arg)
 {
