@@ -177,6 +177,9 @@ static struct sock_filter ps_seccomp_filter[] = {
 	/* Allow syscalls */
 	BPF_STMT(BPF_LD + BPF_W + BPF_ABS,
 		offsetof(struct seccomp_data, nr)),
+#ifdef __NR_accept
+	SECCOMP_ALLOW(__NR_accept),
+#endif
 #ifdef __NR_brk
 	SECCOMP_ALLOW(__NR_brk),
 #endif
@@ -191,6 +194,12 @@ static struct sock_filter ps_seccomp_filter[] = {
 #endif
 #ifdef __NR_close
 	SECCOMP_ALLOW(__NR_close),
+#endif
+#ifdef __NR_fcntl
+	SECCOMP_ALLOW(__NR_fcntl),
+#endif
+#ifdef __NR_fstat
+	SECCOMP_ALLOW(__NR_fstat),
 #endif
 #ifdef __NR_getpid
 	SECCOMP_ALLOW(__NR_getpid),
@@ -233,6 +242,9 @@ static struct sock_filter ps_seccomp_filter[] = {
 #endif
 #ifdef __NR_shutdown
 	SECCOMP_ALLOW(__NR_shutdown),
+#endif
+#ifdef __NR_wait4
+	SECCOMP_ALLOW(__NR_wait4),
 #endif
 #ifdef __NR_write
 	SECCOMP_ALLOW(__NR_write),
