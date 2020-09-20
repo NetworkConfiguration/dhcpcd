@@ -1417,8 +1417,9 @@ dhcpcd_signal_cb(int sig, void *arg)
 	}
 
 	if (sig != SIGCHLD && ctx->options & DHCPCD_FORKED) {
-		if (sig != SIGHUP && kill(ctx->fork_pid, sig) == -1)
-			logerr("%s: kill", __func__);
+		if (sig != SIGHUP &&
+		    write(ctx->fork_fd, &sig, sizeof(sig)) == -1)
+			logerr("%s: write", __func__);
 		return;
 	}
 
@@ -1760,16 +1761,9 @@ dhcpcd_fork_cb(void *arg)
 {
 	struct dhcpcd_ctx *ctx = arg;
 	int exit_code;
-	bool do_exit;
 	ssize_t len;
 
-	if (ctx->fork_pid == 0) {
-		do_exit = false;
-		len = read(ctx->fork_fd, &ctx->fork_pid, sizeof(ctx->fork_pid));
-	} else {
-		do_exit = true;
-		len = read(ctx->fork_fd, &exit_code, sizeof(exit_code));
-	}
+	len = read(ctx->fork_fd, &exit_code, sizeof(exit_code));
 	if (len == -1) {
 		logerr(__func__);
 		exit_code = EXIT_FAILURE;
@@ -1778,8 +1772,10 @@ dhcpcd_fork_cb(void *arg)
 		    __func__, len, sizeof(exit_code));
 		exit_code = EXIT_FAILURE;
 	}
-	if (do_exit)
+	if (ctx->options & DHCPCD_FORKED)
 		eloop_exit(ctx->eloop, exit_code);
+	else
+		dhcpcd_signal_cb(exit_code, ctx);
 }
 
 static void
@@ -2285,6 +2281,8 @@ printpidfile:
 			goto exit_failure;
 		}
 #endif
+		eloop_event_add(ctx.eloop, ctx.fork_fd, dhcpcd_fork_cb, &ctx);
+
 		/*
 		 * Redirect stderr to the stderr socketpair.
 		 * Redirect stdout as well.
@@ -2312,9 +2310,6 @@ printpidfile:
 			logerr("fork");
 			goto exit_failure;
 		case 0:
-			/* Inform the launcher of our pid as it's chrooted */
-			pid = getpid();
-			write(ctx.fork_fd, &pid, sizeof(pid));
 			break;
 		default:
 			ctx.options |= DHCPCD_FORKED; /* A lie */
@@ -2324,7 +2319,7 @@ printpidfile:
 		break;
 	default:
 		setproctitle("[launcher]");
-		ctx.options |= DHCPCD_FORKED; /* A lie */
+		ctx.options |= DHCPCD_FORKED;
 		ctx.fork_fd = fork_fd[0];
 		close(fork_fd[1]);
 #ifdef PRIVSEP_RIGHTS
@@ -2351,8 +2346,7 @@ printpidfile:
 				    dhcpcd_stderr_cb, &ctx);
 		}
 #ifdef PRIVSEP
-		if (IN_PRIVSEP(&ctx) &&
-		    ps_mastersandbox(&ctx, "stdio proc") == -1)
+		if (IN_PRIVSEP(&ctx) && ps_mastersandbox(&ctx, NULL) == -1)
 			goto exit_failure;
 #endif
 		goto run_loop;
