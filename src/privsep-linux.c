@@ -238,6 +238,9 @@ static struct sock_filter ps_seccomp_filter[] = {
 	/* SECCOMP BPF is newer than nl80211 so we don't need SIOCGIWESSID
 	 * which lives in the impossible to include linux/wireless.h header */
 #endif
+#ifdef __NR_mmap
+	SECCOMP_ALLOW(__NR_mmap),
+#endif
 #ifdef __NR_munmap
 	SECCOMP_ALLOW(__NR_munmap),
 #endif
