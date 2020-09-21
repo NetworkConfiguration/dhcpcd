@@ -684,10 +684,7 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 #endif
 
 		ifp->active = active;
-		if (ifp->active)
-			ifp->carrier = if_carrier(ifp);
-		else
-			ifp->carrier = LINK_UNKNOWN;
+		ifp->carrier = if_carrier(ifp);
 		TAILQ_INSERT_TAIL(ifs, ifp, next);
 	}
 

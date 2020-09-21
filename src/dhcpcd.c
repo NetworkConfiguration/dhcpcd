@@ -711,8 +711,7 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 
 	ifp = if_find(ctx->ifaces, ifname);
 	if (ifp == NULL ||
-	    ifp->options == NULL || !(ifp->options->options & DHCPCD_LINK) ||
-	    !ifp->active)
+	    ifp->options == NULL || !(ifp->options->options & DHCPCD_LINK))
 		return;
 
 	if (carrier == LINK_UNKNOWN) {
@@ -728,8 +727,6 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 
 	if (carrier == LINK_DOWN || (ifp->flags & IFF_UP) == 0) {
 		if (ifp->carrier != LINK_DOWN) {
-			if (ifp->carrier == LINK_UP)
-				loginfox("%s: carrier lost", ifp->name);
 #ifdef NOCARRIER_PRESERVE_IP
 			if (ifp->flags & IFF_UP &&
 			    !(ifp->options->options & DHCPCD_ANONYMOUS))
@@ -737,6 +734,10 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 			else
 #endif
 				ifp->carrier = LINK_DOWN;
+			if (!ifp->active)
+				return;
+			if (ifp->carrier == LINK_UP)
+				loginfox("%s: carrier lost", ifp->name);
 			script_runreason(ifp, "NOCARRIER");
 #ifdef NOCARRIER_PRESERVE_IP
 			if (ifp->flags & IFF_UP &&
@@ -767,8 +768,9 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 		}
 	} else if (carrier == LINK_UP && ifp->flags & IFF_UP) {
 		if (ifp->carrier != LINK_UP) {
-			loginfox("%s: carrier acquired", ifp->name);
 			ifp->carrier = LINK_UP;
+			if (ifp->active)
+				loginfox("%s: carrier acquired", ifp->name);
 #if !defined(__linux__) && !defined(__NetBSD__)
 			/* BSD does not emit RTM_NEWADDR or RTM_CHGADDR when the
 			 * hardware address changes so we have to go
@@ -784,8 +786,9 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 				if_getssid(ifp);
 
 				/* If we changed SSID network, drop leases */
-				if (ifp->ssid_len != olen ||
-				    memcmp(ifp->ssid, ossid, ifp->ssid_len))
+				if ((ifp->ssid_len != olen ||
+				    memcmp(ifp->ssid, ossid, ifp->ssid_len)) &&
+				    ifp->active)
 				{
 					dhcpcd_reportssid(ifp);
 #ifdef NOCARRIER_PRESERVE_IP
@@ -796,6 +799,8 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 #endif
 				}
 			}
+			if (!ifp->active)
+				return;
 			dhcpcd_initstate(ifp, 0);
 			script_runreason(ifp, "CARRIER");
 #ifdef INET6
