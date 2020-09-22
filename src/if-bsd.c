@@ -359,8 +359,8 @@ if_ignore(struct dhcpcd_ctx *ctx, const char *ifname)
 #endif
 }
 
-int
-if_carrier(struct interface *ifp)
+static int
+if_carrier0(struct interface *ifp)
 {
 	struct ifmediareq ifmr = { .ifm_status = 0 };
 
@@ -379,9 +379,33 @@ if_carrier(struct interface *ifp)
 }
 
 int
+if_carrier(struct interface *ifp)
+{
+	int carrier = if_carrier0(ifp);
+	struct ifdatareq ifdr = { .ifdr_data.ifi_link_state = 0 };
+	struct if_data *ifdata;
+
+	if (carrier != LINK_UNKNOWN)
+		return carrier;
+
+	strlcpy(ifdr.ifdr_name, ifp->name, sizeof(ifdr.ifdr_name));
+	if (ioctl(ifp->ctx->pf_inet_fd, SIOCGIFDATA, &ifdr) == -1)
+		return LINK_UNKNOWN;
+
+	ifdata = &ifdr.ifdr_data;
+	switch (ifdata->ifi_link_state) {
+	case LINK_STATE_DOWN:
+		return LINK_DOWN;
+	case LINK_STATE_UP:
+		return LINK_UP;
+	}
+	return LINK_UNKNOWN;
+}
+
+int
 if_carrier_ifadata(struct interface *ifp, void *ifadata)
 {
-	int carrier = if_carrier(ifp);
+	int carrier = if_carrier0(ifp);
 	struct if_data *ifdata;
 
 	if (carrier != LINK_UNKNOWN || ifadata == NULL)
