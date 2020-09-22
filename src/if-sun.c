@@ -246,6 +246,13 @@ err:
 }
 
 int
+if_carrier_ifadata(struct interface *ifp, __unused void *ifadata)
+{
+
+	return if_carrier(ifp);
+}
+
+int
 if_mtu_os(const struct interface *ifp)
 {
 	dlpi_handle_t		dh;

@@ -518,6 +518,13 @@ if_carrier(struct interface *ifp)
 }
 
 int
+if_carrier_ifadata(struct interface *ifp, __unused void *ifadata)
+{
+
+	return if_carrier(ifp);
+}
+
+int
 if_getnetlink(struct dhcpcd_ctx *ctx, struct iovec *iov, int fd, int flags,
     int (*cb)(struct dhcpcd_ctx *, void *, struct nlmsghdr *), void *cbarg)
 {

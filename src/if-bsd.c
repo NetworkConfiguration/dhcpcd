@@ -369,11 +369,32 @@ if_carrier(struct interface *ifp)
 		return LINK_UNKNOWN;
 
 	strlcpy(ifmr.ifm_name, ifp->name, sizeof(ifmr.ifm_name));
-	if (ioctl(ifp->ctx->pf_inet_fd, SIOCGIFMEDIA, &ifmr) == -1 ||
-	    !(ifmr.ifm_status & IFM_AVALID))
+	if (ioctl(ifp->ctx->pf_inet_fd, SIOCGIFMEDIA, &ifmr) == -1)
+		return LINK_UNKNOWN;
+
+	if (!(ifmr.ifm_status & IFM_AVALID))
 		return LINK_UNKNOWN;
 
 	return (ifmr.ifm_status & IFM_ACTIVE) ? LINK_UP : LINK_DOWN;
+}
+
+int
+if_carrier_ifadata(struct interface *ifp, void *ifadata)
+{
+	int carrier = if_carrier(ifp);
+	struct if_data *ifdata;
+
+	if (carrier != LINK_UNKNOWN || ifadata == NULL)
+		return carrier;
+
+	ifdata = ifadata;
+	switch (ifdata->ifi_link_state) {
+	case LINK_STATE_DOWN:
+		return LINK_DOWN;
+	case LINK_STATE_UP:
+		return LINK_UP;
+	}
+	return LINK_UNKNOWN;
 }
 
 static void
