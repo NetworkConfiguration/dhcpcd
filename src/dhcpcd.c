@@ -727,6 +727,8 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 
 	if (carrier == LINK_DOWN || (ifp->flags & IFF_UP) == 0) {
 		if (ifp->carrier != LINK_DOWN) {
+			int oldcarrier = ifp->carrier;
+
 #ifdef NOCARRIER_PRESERVE_IP
 			if (ifp->flags & IFF_UP &&
 			    !(ifp->options->options & DHCPCD_ANONYMOUS))
@@ -736,7 +738,7 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 				ifp->carrier = LINK_DOWN;
 			if (!ifp->active)
 				return;
-			if (ifp->carrier == LINK_UP)
+			if (oldcarrier == LINK_UP)
 				loginfox("%s: carrier lost", ifp->name);
 			script_runreason(ifp, "NOCARRIER");
 #ifdef NOCARRIER_PRESERVE_IP
