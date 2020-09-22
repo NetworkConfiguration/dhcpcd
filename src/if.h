@@ -160,6 +160,7 @@ int if_domtu(const struct interface *, short int);
 #define if_getmtu(ifp) if_domtu((ifp), 0)
 #define if_setmtu(ifp, mtu) if_domtu((ifp), (mtu))
 int if_carrier(struct interface *);
+int if_carrier_ifadata(struct interface *, void *);
 int if_pollinit(struct interface *ifp);
 
 #ifdef ALIAS_ADDR
