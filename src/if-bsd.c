@@ -389,9 +389,6 @@ if_carrier(struct interface *ifp)
 	if (carrier != LINK_UNKNOWN)
 		return carrier;
 
-	struct ifdatareq ifdr = { .ifdr_data.ifi_link_state = 0 };
-	struct if_data *ifdata;
-
 	strlcpy(ifdr.ifdr_name, ifp->name, sizeof(ifdr.ifdr_name));
 	if (ioctl(ifp->ctx->pf_inet_fd, SIOCGIFDATA, &ifdr) == -1)
 		return LINK_UNKNOWN;
