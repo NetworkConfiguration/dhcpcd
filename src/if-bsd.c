@@ -402,6 +402,7 @@ if_carrier(struct interface *ifp)
 	}
 	return LINK_UNKNOWN;
 #else
+#warning no SIOCGIFDATA - not all interfaces support SIOCGIFMEDIA
 	return carrier;
 #endif
 }
