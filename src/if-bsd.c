@@ -382,18 +382,28 @@ int
 if_carrier(struct interface *ifp)
 {
 	int carrier = if_carrier0(ifp);
-#ifdef SIOCGIFDATA
-	struct ifdatareq ifdr = { .ifdr_data.ifi_link_state = 0 };
-	struct if_data *ifdata;
 
+#ifdef SIOCGIFDATA
 	if (carrier != LINK_UNKNOWN)
 		return carrier;
+
+#ifdef __DragonFly__
+	struct if_data ifd = { .ifi_link_state = 0 };
+	struct ifreq ifr = { .ifr_data = &ifd };
+	struct if_data *ifdata = &ifd;
+
+	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
+	if (ioctl(ifp->ctx->pf_inet_fd, SIOCGIFDATA, &ifr) == -1)
+		return LINK_UNKNOWN;
+#else
+	struct ifdatareq ifdr = { .ifdr_data.ifi_link_state = 0 };
+	struct if_data *ifdata = &ifdr.ifdr_data;
 
 	strlcpy(ifdr.ifdr_name, ifp->name, sizeof(ifdr.ifdr_name));
 	if (ioctl(ifp->ctx->pf_inet_fd, SIOCGIFDATA, &ifdr) == -1)
 		return LINK_UNKNOWN;
+#endif
 
-	ifdata = &ifdr.ifdr_data;
 	switch (ifdata->ifi_link_state) {
 	case LINK_STATE_DOWN:
 		return LINK_DOWN;
