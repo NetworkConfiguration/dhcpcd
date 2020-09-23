@@ -399,7 +399,7 @@ if_check_arphrd(struct interface *ifp, unsigned int active, bool if_noconf)
 		break;
 	case ARPHRD_LOOPBACK:
 	case ARPHRD_PPP:
-		if (if_noconf) {
+		if (if_noconf && active) {
 			logdebugx("%s: ignoring due to interface type and"
 			    " no config",
 			    ifp->name);
@@ -538,8 +538,11 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 		    !if_hasconf(ctx, spec.devname));
 
 		/* Don't allow some reserved interface names unless explicit. */
-		if (if_noconf && if_ignore(ctx, spec.devname))
+		if (if_noconf && if_ignore(ctx, spec.devname)) {
+			logdebugx("%s: ignoring due to interface type and"
+			    " no config", spec.devname);
 			active = IF_INACTIVE;
+		}
 
 		ifp = calloc(1, sizeof(*ifp));
 		if (ifp == NULL) {
@@ -584,7 +587,7 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 			case IFT_LOOP: /* FALLTHROUGH */
 			case IFT_PPP:
 				/* Don't allow unless explicit */
-				if (if_noconf) {
+				if (if_noconf && active) {
 					logdebugx("%s: ignoring due to"
 					    " interface type and"
 					    " no config",
