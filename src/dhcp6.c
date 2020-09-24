@@ -147,7 +147,7 @@ struct dhcp_compat {
 	uint16_t dhcp6_opt;
 };
 
-const struct dhcp_compat dhcp_compats[] = {
+static const struct dhcp_compat dhcp_compats[] = {
 	{ DHO_DNSSERVER,	D6_OPTION_DNS_SERVERS },
 	{ DHO_HOSTNAME,		D6_OPTION_FQDN },
 	{ DHO_DNSDOMAIN,	D6_OPTION_FQDN },
