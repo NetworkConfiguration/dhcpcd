@@ -359,6 +359,23 @@ if_ignore(struct dhcpcd_ctx *ctx, const char *ifname)
 #endif
 }
 
+static int if_indirect_ioctl(struct dhcpcd_ctx *ctx,
+    const char *ifname, unsigned long cmd, void *data, size_t len)
+{
+	struct ifreq ifr = { .ifr_flags = 0 };
+
+#if defined(PRIVSEP) && defined(HAVE_PLEDGE)
+	if (IN_PRIVSEP(ctx))
+		return (int)ps_root_indirectioctl(ctx, cmd, ifname, data, len);
+#else
+	UNUSED(len);
+#endif
+
+	strlcpy(ifr.ifr_name, ifname, IFNAMSIZ);
+	ifr.ifr_data = data;
+	return ioctl(ctx->pf_inet_fd, cmd, &ifr);
+}
+
 static int
 if_carrier0(struct interface *ifp)
 {
@@ -387,26 +404,29 @@ if_carrier(struct interface *ifp)
 	if (carrier != LINK_UNKNOWN)
 		return carrier;
 
-#ifdef __DragonFly__
-	struct if_data ifd = { .ifi_link_state = 0 };
-	struct ifreq ifr = { .ifr_data = &ifd };
-	struct if_data *ifdata = &ifd;
-
-	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
-	if (ioctl(ifp->ctx->pf_inet_fd, SIOCGIFDATA, &ifr) == -1)
-		return LINK_UNKNOWN;
-#else
+#ifdef __NetBSD__
 	struct ifdatareq ifdr = { .ifdr_data.ifi_link_state = 0 };
 	struct if_data *ifdata = &ifdr.ifdr_data;
 
 	strlcpy(ifdr.ifdr_name, ifp->name, sizeof(ifdr.ifdr_name));
 	if (ioctl(ifp->ctx->pf_inet_fd, SIOCGIFDATA, &ifdr) == -1)
 		return LINK_UNKNOWN;
+#else
+	struct if_data ifd = { .ifi_link_state = 0 };
+	struct if_data *ifdata = &ifd;
+
+	if (if_indirect_ioctl(ifp->ctx, ifp->name, SIOCGIFDATA,
+	    &ifd, sizeof(ifd)) == -1)
+		return LINK_UNKNOWN;
 #endif
 
 	switch (ifdata->ifi_link_state) {
 	case LINK_STATE_DOWN:
 		return LINK_DOWN;
+#ifdef LINK_STATE_HALF_DUPLEX
+	case LINK_STATE_HALF_DUPLEX:
+	case LINK_STATE_FULL_DUPLEX:
+#endif
 	case LINK_STATE_UP:
 		return LINK_UP;
 	}
@@ -420,7 +440,7 @@ if_carrier(struct interface *ifp)
 int
 if_carrier_ifadata(struct interface *ifp, void *ifadata)
 {
-	int carrier = if_carrier0(ifp);
+	int carrier = if_carrier(ifp);
 	struct if_data *ifdata;
 
 	if (carrier != LINK_UNKNOWN || ifadata == NULL)
@@ -446,25 +466,6 @@ if_linkaddr(struct sockaddr_dl *sdl, const struct interface *ifp)
 	sdl->sdl_nlen = sdl->sdl_alen = sdl->sdl_slen = 0;
 	sdl->sdl_index = (unsigned short)ifp->index;
 }
-
-#if defined(SIOCG80211NWID) || defined(SIOCGETVLAN)
-static int if_indirect_ioctl(struct dhcpcd_ctx *ctx,
-    const char *ifname, unsigned long cmd, void *data, size_t len)
-{
-	struct ifreq ifr = { .ifr_flags = 0 };
-
-#if defined(PRIVSEP) && defined(HAVE_PLEDGE)
-	if (IN_PRIVSEP(ctx))
-		return (int)ps_root_indirectioctl(ctx, cmd, ifname, data, len);
-#else
-	UNUSED(len);
-#endif
-
-	strlcpy(ifr.ifr_name, ifname, IFNAMSIZ);
-	ifr.ifr_data = data;
-	return ioctl(ctx->pf_inet_fd, cmd, &ifr);
-}
-#endif
 
 static int
 if_getssid1(struct dhcpcd_ctx *ctx, const char *ifname, void *ssid)

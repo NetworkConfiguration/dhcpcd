@@ -55,6 +55,9 @@ ps_root_doioctldom(int domain, unsigned long req, void *data, size_t len)
 
 	/* Only allow these ioctls */
 	switch(req) {
+#ifdef SIOCGIFDATA
+	case SIOCGIFDATA:	/* FALLTHROUGH */
+#endif
 #ifdef SIOCG80211NWID
 	case SIOCG80211NWID:	/* FALLTHROUGH */
 #endif
