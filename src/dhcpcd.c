@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  */
 
-const char dhcpcd_copyright[] = "Copyright (c) 2006-2020 Roy Marples";
+static const char dhcpcd_copyright[] = "Copyright (c) 2006-2020 Roy Marples";
 
 #include <sys/file.h>
 #include <sys/ioctl.h>
