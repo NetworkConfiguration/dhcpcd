@@ -364,7 +364,7 @@ static int if_indirect_ioctl(struct dhcpcd_ctx *ctx,
 {
 	struct ifreq ifr = { .ifr_flags = 0 };
 
-#if defined(PRIVSEP) && defined(HAVE_PLEDGE)
+#if defined(PRIVSEP) && (defined(HAVE_CAPSICUM) || defined(HAVE_PLEDGE))
 	if (IN_PRIVSEP(ctx))
 		return (int)ps_root_indirectioctl(ctx, cmd, ifname, data, len);
 #else
@@ -440,7 +440,7 @@ if_carrier(struct interface *ifp)
 int
 if_carrier_ifadata(struct interface *ifp, void *ifadata)
 {
-	int carrier = if_carrier(ifp);
+	int carrier = if_carrier0(ifp);
 	struct if_data *ifdata;
 
 	if (carrier != LINK_UNKNOWN || ifadata == NULL)
