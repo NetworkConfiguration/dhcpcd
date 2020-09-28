@@ -432,8 +432,6 @@ stop_interface(struct interface *ifp)
 	/* De-activate the interface */
 	ifp->active = IF_INACTIVE;
 	ifp->options->options &= ~DHCPCD_STOPPING;
-	/* Set the link state to unknown as we're no longer tracking it. */
-	ifp->carrier = LINK_UNKNOWN;
 
 	if (!(ctx->options & (DHCPCD_MASTER | DHCPCD_TEST)))
 		eloop_exit(ctx->eloop, EXIT_FAILURE);
@@ -704,42 +702,32 @@ dhcpcd_reportssid(struct interface *ifp)
 }
 
 void
-dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
-    const char *ifname)
+dhcpcd_handlecarrier(struct interface *ifp, int carrier, unsigned int flags)
 {
-	struct interface *ifp;
+	bool nolink = ifp->options == NULL ||
+	    !(ifp->options->options & DHCPCD_LINK);
 
-	ifp = if_find(ctx->ifaces, ifname);
-	if (ifp == NULL ||
-	    ifp->options == NULL || !(ifp->options->options & DHCPCD_LINK))
-		return;
-
+	ifp->flags = flags;
 	if (carrier == LINK_UNKNOWN) {
-		if (ifp->wireless) {
+		if (ifp->wireless)
 			carrier = LINK_DOWN;
-			ifp->flags = flags;
-		} else
-			carrier = if_carrier(ifp);
-	} else
-		ifp->flags = flags;
-	if (carrier == LINK_UNKNOWN)
-		carrier = IF_UPANDRUNNING(ifp) ? LINK_UP : LINK_DOWN;
+		else
+			carrier = IF_UPANDRUNNING(ifp) ? LINK_UP : LINK_DOWN;
+	}
 
 	if (carrier == LINK_DOWN || (ifp->flags & IFF_UP) == 0) {
 		if (ifp->carrier != LINK_DOWN) {
-			int oldcarrier = ifp->carrier;
-
 #ifdef NOCARRIER_PRESERVE_IP
 			if (ifp->flags & IFF_UP &&
-			    !(ifp->options->options & DHCPCD_ANONYMOUS))
+			    (ifp->options == NULL ||
+			    !(ifp->options->options & DHCPCD_ANONYMOUS)))
 				ifp->carrier = LINK_DOWN_IFFUP;
 			else
 #endif
 				ifp->carrier = LINK_DOWN;
-			if (!ifp->active)
+			if (!ifp->active || nolink)
 				return;
-			if (oldcarrier == LINK_UP)
-				loginfox("%s: carrier lost", ifp->name);
+			loginfox("%s: carrier lost", ifp->name);
 			script_runreason(ifp, "NOCARRIER");
 #ifdef NOCARRIER_PRESERVE_IP
 			if (ifp->flags & IFF_UP &&
@@ -801,7 +789,7 @@ dhcpcd_handlecarrier(struct dhcpcd_ctx *ctx, int carrier, unsigned int flags,
 #endif
 				}
 			}
-			if (!ifp->active)
+			if (!ifp->active || nolink)
 				return;
 			dhcpcd_initstate(ifp, 0);
 			script_runreason(ifp, "CARRIER");
@@ -878,20 +866,11 @@ dhcpcd_startinterface(void *arg)
 	struct interface *ifp = arg;
 	struct if_options *ifo = ifp->options;
 
-	if (ifo->options & DHCPCD_LINK) {
-		switch (ifp->carrier) {
-		case LINK_UP:
-			break;
-		case LINK_DOWN:
-			loginfox("%s: waiting for carrier", ifp->name);
-			return;
-		case LINK_UNKNOWN:
-			/* No media state available.
-			 * Loop until both IFF_UP and IFF_RUNNING are set */
-			if (ifo->poll == 0)
-				if_pollinit(ifp);
-			return;
-		}
+	if (ifo->options & DHCPCD_LINK && (ifp->carrier == LINK_DOWN ||
+	    (ifp->carrier == LINK_UNKNOWN && !IF_UPANDRUNNING(ifp))))
+	{
+		loginfox("%s: waiting for carrier", ifp->name);
+		return;
 	}
 
 	if (ifo->options & (DHCPCD_DUID | DHCPCD_IPV6) &&
@@ -999,9 +978,6 @@ dhcpcd_prestartinterface(void *arg)
 		if (if_up(ifp) == -1)
 			logerr(__func__);
 	}
-
-	if (ifp->options->poll != 0)
-		if_pollinit(ifp);
 
 	dhcpcd_startinterface(ifp);
 }
@@ -1138,14 +1114,14 @@ dhcpcd_handlelink(void *arg)
 static void
 dhcpcd_checkcarrier(void *arg)
 {
-	struct interface *ifp = arg;
-	int carrier;
+	struct interface *ifp0 = arg, *ifp;
 
-	/* Check carrier here rather than setting LINK_UNKNOWN.
-	 * This is because we force LINK_UNKNOWN as down for wireless which
-	 * we do not want when dealing with a route socket overflow. */
-	carrier = if_carrier(ifp);
-	dhcpcd_handlecarrier(ifp->ctx, carrier, ifp->flags, ifp->name);
+	ifp = if_find(ifp0->ctx->ifaces, ifp0->name);
+	if (ifp == NULL || ifp->carrier == ifp0->carrier)
+		return;
+
+	dhcpcd_handlecarrier(ifp, ifp0->carrier, ifp0->flags);
+	if_free(ifp0);
 }
 
 #ifndef SMALL
@@ -1231,10 +1207,10 @@ dhcpcd_linkoverflow(struct dhcpcd_ctx *ctx)
 		ifp1 = if_find(ctx->ifaces, ifp->name);
 		if (ifp1 != NULL) {
 			/* If the interface already exists,
-			 * check carrier state. */
+			 * check carrier state.
+			 * dhcpcd_checkcarrier will free ifp. */
 			eloop_timeout_add_sec(ctx->eloop, 0,
-			    dhcpcd_checkcarrier, ifp1);
-			if_free(ifp);
+			    dhcpcd_checkcarrier, ifp);
 			continue;
 		}
 		TAILQ_INSERT_TAIL(ctx->ifaces, ifp, next);

@@ -271,7 +271,7 @@ void dhcpcd_daemonise(struct dhcpcd_ctx *);
 
 void dhcpcd_linkoverflow(struct dhcpcd_ctx *);
 int dhcpcd_handleargs(struct dhcpcd_ctx *, struct fd_list *, int, char **);
-void dhcpcd_handlecarrier(struct dhcpcd_ctx *, int, unsigned int, const char *);
+void dhcpcd_handlecarrier(struct interface *, int, unsigned int);
 int dhcpcd_handleinterface(void *, int, const char *);
 void dhcpcd_handlehwaddr(struct interface *, uint16_t, const void *, uint8_t);
 void dhcpcd_dropinterface(struct interface *, const char *);

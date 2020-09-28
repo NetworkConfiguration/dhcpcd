@@ -185,7 +185,11 @@ if_setflag(struct interface *ifp, short setflag, short unsetflag)
 	    if_ioctl(ifp->ctx, SIOCSIFFLAGS, &ifr, sizeof(ifr)) == -1)
 		return -1;
 
-	ifp->flags = (unsigned int)ifr.ifr_flags;
+	/*
+	 * Do NOT set ifp->flags here.
+	 * We need to listen for flag updates from the kernel as they
+	 * need to sync with carrier.
+	 */
 	return 0;
 }
 
@@ -687,35 +691,11 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 #endif
 
 		ifp->active = active;
-		ifp->carrier = if_carrier_ifadata(ifp, ifa->ifa_data);
+		ifp->carrier = if_carrier(ifp, ifa->ifa_data);
 		TAILQ_INSERT_TAIL(ifs, ifp, next);
 	}
 
 	return ifs;
-}
-
-static void
-if_poll(void *arg)
-{
-	struct interface *ifp = arg;
-	unsigned int flags = ifp->flags;
-	int carrier;
-
-	carrier = if_carrier(ifp); /* if_carrier will update ifp->flags */
-	if (ifp->carrier != carrier || ifp->flags != flags)
-		dhcpcd_handlecarrier(ifp->ctx, carrier, ifp->flags, ifp->name);
-
-	if (ifp->options->poll != 0 || ifp->carrier != LINK_UP)
-		if_pollinit(ifp);
-}
-
-int
-if_pollinit(struct interface *ifp)
-{
-	unsigned long msec;
-
-	msec = ifp->options->poll != 0 ? ifp->options->poll : IF_POLL_UP;
-	return eloop_timeout_add_msec(ifp->ctx->eloop, msec, if_poll, ifp);
 }
 
 /*

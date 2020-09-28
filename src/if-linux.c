@@ -509,19 +509,10 @@ if_setmac(struct interface *ifp, void *mac, uint8_t maclen)
 }
 
 int
-if_carrier(struct interface *ifp)
+if_carrier(struct interface *ifp, __unused const void *ifadata)
 {
 
-	if (if_getflags(ifp) == -1)
-		return LINK_UNKNOWN;
 	return ifp->flags & IFF_RUNNING ? LINK_UP : LINK_DOWN;
-}
-
-int
-if_carrier_ifadata(struct interface *ifp, __unused void *ifadata)
-{
-
-	return if_carrier(ifp);
 }
 
 int
@@ -1018,9 +1009,9 @@ link_netlink(struct dhcpcd_ctx *ctx, void *arg, struct nlmsghdr *nlm)
 		dhcpcd_handlehwaddr(ifp, ifi->ifi_type, hwa, hwl);
 	}
 
-	dhcpcd_handlecarrier(ctx,
+	dhcpcd_handlecarrier(ifp,
 	    ifi->ifi_flags & IFF_RUNNING ? LINK_UP : LINK_DOWN,
-	    ifi->ifi_flags, ifn);
+	    ifi->ifi_flags);
 	return 0;
 }
 
