@@ -3477,6 +3477,9 @@ dhcp_packet(struct interface *ifp, uint8_t *data, size_t len,
 #ifdef PRIVSEP
 	const struct dhcp_state *state = D_CSTATE(ifp);
 
+	if (state == NULL)
+		return;
+
 	/* Ignore double reads */
 	if (IN_PRIVSEP(ifp->ctx)) {
 		switch (state->state) {
