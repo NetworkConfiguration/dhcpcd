@@ -266,6 +266,10 @@ ps_bpf_dispatch(struct dhcpcd_ctx *ctx,
 	size_t bpf_len;
 
 	ifp = if_findindex(ctx->ifaces, psm->ps_id.psi_ifindex);
+	/* interface may have departed .... */
+	if (ifp == NULL)
+		return -1;
+
 	bpf = iov->iov_base;
 	bpf_len = iov->iov_len;
 
