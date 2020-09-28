@@ -377,84 +377,23 @@ static int if_indirect_ioctl(struct dhcpcd_ctx *ctx,
 	return ioctl(ctx->pf_inet_fd, cmd, &ifr);
 }
 
-static int
-if_carrier0(struct interface *ifp)
-{
-	struct ifmediareq ifmr = { .ifm_status = 0 };
-
-	/* Not really needed, but the other OS update flags here also */
-	if (if_getflags(ifp) == -1)
-		return LINK_UNKNOWN;
-
-	strlcpy(ifmr.ifm_name, ifp->name, sizeof(ifmr.ifm_name));
-	if (ioctl(ifp->ctx->pf_inet_fd, SIOCGIFMEDIA, &ifmr) == -1)
-		return LINK_UNKNOWN;
-
-	if (!(ifmr.ifm_status & IFM_AVALID))
-		return LINK_UNKNOWN;
-
-	return (ifmr.ifm_status & IFM_ACTIVE) ? LINK_UP : LINK_DOWN;
-}
-
 int
-if_carrier(struct interface *ifp)
+if_carrier(__unused struct interface *ifp, const void *ifadata)
 {
-	int carrier = if_carrier0(ifp);
+	const struct if_data *ifi = ifadata;
 
-#ifdef SIOCGIFDATA
-	if (carrier != LINK_UNKNOWN)
-		return carrier;
+	/*
+	 * Every BSD returns this and it is the sole source of truth.
+	 * Not all BSD's support SIOCGIFDATA and not all interfaces
+	 * support SIOCGIFMEDIA.
+	 */
+	assert(ifadata != NULL);
 
-#ifdef __NetBSD__
-	struct ifdatareq ifdr = { .ifdr_data.ifi_link_state = 0 };
-	struct if_data *ifdata = &ifdr.ifdr_data;
-
-	strlcpy(ifdr.ifdr_name, ifp->name, sizeof(ifdr.ifdr_name));
-	if (ioctl(ifp->ctx->pf_inet_fd, SIOCGIFDATA, &ifdr) == -1)
-		return LINK_UNKNOWN;
-#else
-	struct if_data ifd = { .ifi_link_state = 0 };
-	struct if_data *ifdata = &ifd;
-
-	if (if_indirect_ioctl(ifp->ctx, ifp->name, SIOCGIFDATA,
-	    &ifd, sizeof(ifd)) == -1)
-		return LINK_UNKNOWN;
-#endif
-
-	switch (ifdata->ifi_link_state) {
-	case LINK_STATE_DOWN:
-		return LINK_DOWN;
-#ifdef LINK_STATE_HALF_DUPLEX
-	case LINK_STATE_HALF_DUPLEX:
-	case LINK_STATE_FULL_DUPLEX:
-#endif
-	case LINK_STATE_UP:
+	if (ifi->ifi_link_state >= LINK_STATE_UP)
 		return LINK_UP;
-	}
-	return LINK_UNKNOWN;
-#else
-#warning no SIOCGIFDATA - not all interfaces support SIOCGIFMEDIA
-	return carrier;
-#endif
-}
-
-int
-if_carrier_ifadata(struct interface *ifp, void *ifadata)
-{
-	int carrier = if_carrier0(ifp);
-	struct if_data *ifdata;
-
-	if (carrier != LINK_UNKNOWN || ifadata == NULL)
-		return carrier;
-
-	ifdata = ifadata;
-	switch (ifdata->ifi_link_state) {
-	case LINK_STATE_DOWN:
-		return LINK_DOWN;
-	case LINK_STATE_UP:
-		return LINK_UP;
-	}
-	return LINK_UNKNOWN;
+	if (ifi->ifi_link_state == LINK_STATE_UNKNOWN)
+		return LINK_UNKNOWN;
+	return LINK_DOWN;
 }
 
 static void
@@ -1254,24 +1193,8 @@ if_ifinfo(struct dhcpcd_ctx *ctx, const struct if_msghdr *ifm)
 	if ((ifp = if_findindex(ctx->ifaces, ifm->ifm_index)) == NULL)
 		return 0;
 
-	switch (ifm->ifm_data.ifi_link_state) {
-	case LINK_STATE_UNKNOWN:
-		link_state = LINK_UNKNOWN;
-		break;
-#ifdef LINK_STATE_FULL_DUPLEX
-	case LINK_STATE_HALF_DUPLEX:	/* FALLTHROUGH */
-	case LINK_STATE_FULL_DUPLEX:	/* FALLTHROUGH */
-#endif
-	case LINK_STATE_UP:
-		link_state = LINK_UP;
-		break;
-	default:
-		link_state = LINK_DOWN;
-		break;
-	}
-
-	dhcpcd_handlecarrier(ctx, link_state,
-	    (unsigned int)ifm->ifm_flags, ifp->name);
+	link_state = if_carrier(ifp, &ifm->ifm_data);
+	dhcpcd_handlecarrier(ifp, link_state, (unsigned int)ifm->ifm_flags);
 	return 0;
 }
 

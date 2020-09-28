@@ -203,7 +203,7 @@ if_setmac(struct interface *ifp, void *mac, uint8_t maclen)
 }
 
 int
-if_carrier(struct interface *ifp)
+if_carrier(struct interface *ifp, __unused const void *ifadata)
 {
 	kstat_ctl_t		*kcp;
 	kstat_t			*ksp;
@@ -243,13 +243,6 @@ err:
 	if (kcp != NULL)
 		kstat_close(kcp);
 	return LINK_UNKNOWN;
-}
-
-int
-if_carrier_ifadata(struct interface *ifp, __unused void *ifadata)
-{
-
-	return if_carrier(ifp);
 }
 
 int
@@ -1065,7 +1058,7 @@ if_ifinfo(struct dhcpcd_ctx *ctx, const struct if_msghdr *ifm)
 		state = LINK_UP;
 		flags |= IFF_UP;
 	}
-	dhcpcd_handlecarrier(ctx, state, flags, ifp->name);
+	dhcpcd_handlecarrier(ifp, state, flags);
 	return 0;
 }
 
