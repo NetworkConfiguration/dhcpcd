@@ -3477,6 +3477,13 @@ dhcp_packet(struct interface *ifp, uint8_t *data, size_t len,
 #ifdef PRIVSEP
 	const struct dhcp_state *state = D_CSTATE(ifp);
 
+	/* It's possible that an interface departs and arrives in short
+	 * order to receive a BPF frame out of order.
+	 * There is a similar check in ARP, but much lower down the stack.
+	 * It's not needed for other inet protocols because we send the
+	 * message as a whole and select the interface off that and then
+	 * check state. BPF on the other hand is very interface
+	 * specific and we do need this check. */
 	if (state == NULL)
 		return;
 
