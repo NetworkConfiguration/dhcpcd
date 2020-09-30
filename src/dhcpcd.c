@@ -765,7 +765,7 @@ dhcpcd_handlecarrier(struct interface *ifp, int carrier, unsigned int flags)
 			/* BSD does not emit RTM_NEWADDR or RTM_CHGADDR when the
 			 * hardware address changes so we have to go
 			 * through the disovery process to work it out. */
-			dhcpcd_handleinterface(ctx, 0, ifp->name);
+			dhcpcd_handleinterface(ifp->ctx, 0, ifp->name);
 #endif
 			if (ifp->wireless) {
 				uint8_t ossid[IF_SSIDLEN];
@@ -1017,14 +1017,13 @@ dhcpcd_activateinterface(struct interface *ifp, unsigned long long options)
 int
 dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 {
-	struct dhcpcd_ctx *ctx;
+	struct dhcpcd_ctx *ctx = arg;
 	struct ifaddrs *ifaddrs;
 	struct if_head *ifs;
 	struct interface *ifp, *iff;
 	const char * const argv[] = { ifname };
 	int e;
 
-	ctx = arg;
 	if (action == -1) {
 		ifp = if_find(ctx->ifaces, ifname);
 		if (ifp == NULL) {
