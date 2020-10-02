@@ -197,6 +197,7 @@ int ps_setbuf_fdpair(int []);
 int ps_rights_limit_ioctl(int);
 int ps_rights_limit_fd_fctnl(int);
 int ps_rights_limit_fd_rdonly(int);
+int ps_rights_limit_fd_setsockopt(int);
 int ps_rights_limit_fd(int);
 int ps_rights_limit_fdpair(int []);
 #endif

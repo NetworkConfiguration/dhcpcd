@@ -215,6 +215,11 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 #warning kernel does not support route message filtering
 #endif
 
+#ifdef PRIVSEP_RIGHTS
+	if (IN_PRIVSEP(ctx))
+		ps_rights_limit_fd_setsockopt(ctx->link_fd);
+#endif
+
 	return 0;
 }
 

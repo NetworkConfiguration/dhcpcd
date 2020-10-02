@@ -260,6 +260,17 @@ ps_rights_limit_fd(int fd)
 }
 
 int
+ps_rights_limit_fd_setsockopt(int fd)
+{
+	cap_rights_t rights;
+
+	cap_rights_init(&rights, CAP_READ, CAP_WRITE, CAP_EVENT, CAP_SETSOCKOPT);
+	if (cap_rights_limit(fd, &rights) == -1 && errno != ENOSYS)
+		return -1;
+	return 0;
+}
+
+int
 ps_rights_limit_fd_rdonly(int fd)
 {
 	cap_rights_t rights;
@@ -537,7 +548,6 @@ ps_mastersandbox(struct dhcpcd_ctx *ctx, const char *_pledge)
 #ifdef PRIVSEP_RIGHTS
 	if ((ctx->pf_inet_fd != -1 &&
 	    ps_rights_limit_ioctl(ctx->pf_inet_fd) == -1) ||
-	    (ctx->link_fd != -1 && ps_rights_limit_fd(ctx->link_fd) == -1) ||
 	     ps_rights_limit_stdio(ctx) == -1)
 	{
 		logerr("%s: cap_rights_limit", __func__);
