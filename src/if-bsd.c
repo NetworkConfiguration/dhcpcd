@@ -216,8 +216,10 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 #endif
 
 #ifdef PRIVSEP_RIGHTS
+	/* We need to getsockopt for SO_RCVBUF and
+	 * setsockopt for RO_MISSFILTER. */
 	if (IN_PRIVSEP(ctx))
-		ps_rights_limit_fd_setsockopt(ctx->link_fd);
+		ps_rights_limit_fd_sockopt(ctx->link_fd);
 #endif
 
 	return 0;
