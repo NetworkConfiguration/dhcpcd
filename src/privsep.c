@@ -260,11 +260,12 @@ ps_rights_limit_fd(int fd)
 }
 
 int
-ps_rights_limit_fd_setsockopt(int fd)
+ps_rights_limit_fd_sockopt(int fd)
 {
 	cap_rights_t rights;
 
-	cap_rights_init(&rights, CAP_READ, CAP_WRITE, CAP_EVENT, CAP_SETSOCKOPT);
+	cap_rights_init(&rights, CAP_READ, CAP_WRITE, CAP_EVENT,
+	    CAP_GETSOCKOPT, CAP_SETSOCKOPT);
 	if (cap_rights_limit(fd, &rights) == -1 && errno != ENOSYS)
 		return -1;
 	return 0;
