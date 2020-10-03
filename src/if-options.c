@@ -460,13 +460,13 @@ parse_addr(struct in_addr *addr, struct in_addr *net, const char *arg)
 		if (e != 0 ||
 		    (net != NULL && inet_cidrtoaddr((int)i, net) != 0))
 		{
-			logerrx("`%s' is not a valid CIDR", p);
+			logerrx("invalid CIDR: %s", p);
 			return -1;
 		}
 	}
 
 	if (addr != NULL && inet_aton(arg, addr) == 0) {
-		logerrx("`%s' is not a valid IP address", arg);
+		logerrx("invalid IP address: %s", arg);
 		return -1;
 	}
 	if (p != NULL)
@@ -788,7 +788,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		    make_option_mask(d, dl, od, odl, no, arg, -1) != 0 ||
 		    make_option_mask(d, dl, od, odl, reject, arg, -1) != 0)
 		{
-			logerrx("unknown option `%s'", arg);
+			logerrx("unknown option: %s", arg);
 			return -1;
 		}
 		break;
@@ -800,7 +800,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		    make_option_mask(d, dl, od, odl, request, arg, -1) != 0 ||
 		    make_option_mask(d, dl, od, odl, require, arg, -1) != 0)
 		{
-			logerrx("unknown option `%s'", arg);
+			logerrx("unknown option: %s", arg);
 			return -1;
 		}
 		break;
@@ -1017,7 +1017,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		else if (strcmp(arg, "disable") == 0)
 			ifo->fqdn = FQDN_DISABLE;
 		else {
-			logerrx("invalid value `%s' for FQDN", arg);
+			logerrx("invalid FQDN value: %s", arg);
 			return -1;
 		}
 		break;
@@ -1063,7 +1063,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		    make_option_mask(d, dl, od, odl, require, arg, -1) != 0 ||
 		    make_option_mask(d, dl, od, odl, no, arg, 1) != 0)
 		{
-			logerrx("unknown option `%s'", arg);
+			logerrx("unknown option: %s", arg);
 			return -1;
 		}
 		break;
@@ -1076,7 +1076,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		    make_option_mask(d, dl, od, odl, no, arg, -1) != 0 ||
 		    make_option_mask(d, dl, od, odl, reject, arg, -1) != 0)
 		{
-			logerrx("unknown option `%s'", arg);
+			logerrx("unknown option: %s", arg);
 			return -1;
 		}
 		break;
@@ -1313,10 +1313,10 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		    ifo->dstmask, arg, 2) != 0)
 		{
 			if (errno == EINVAL)
-				logerrx("option `%s' does not take"
-				    " an IPv4 address", arg);
+				logerrx("option does not take"
+				    " an IPv4 address: %s", arg);
 			else
-				logerrx("unknown option `%s'", arg);
+				logerrx("unknown option: %s", arg);
 			return -1;
 		}
 		break;
@@ -1799,7 +1799,7 @@ err_sla:
 			return -1;
 		}
 		if (l && !(t & (OT_STRING | OT_BINHEX))) {
-			logwarnx("ignoring length for type `%s'", arg);
+			logwarnx("ignoring length for type: %s", arg);
 			l = 0;
 		}
 		if (t & OT_ARRAY && t & (OT_STRING | OT_BINHEX) &&
