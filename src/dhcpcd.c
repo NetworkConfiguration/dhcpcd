@@ -97,9 +97,6 @@ const int dhcpcd_signals_ignore[] = {
 const size_t dhcpcd_signals_ignore_len = __arraycount(dhcpcd_signals_ignore);
 #endif
 
-#define IF_UPANDRUNNING(a) \
-	(((a)->flags & (IFF_UP | IFF_RUNNING)) == (IFF_UP | IFF_RUNNING))
-
 const char *dhcpcd_default_script = SCRIPT;
 
 static void
@@ -708,106 +705,110 @@ dhcpcd_handlecarrier(struct interface *ifp, int carrier, unsigned int flags)
 	    !(ifp->options->options & DHCPCD_LINK);
 
 	ifp->flags = flags;
-	if (carrier == LINK_UNKNOWN) {
-		if (ifp->wireless)
-			carrier = LINK_DOWN;
-		else
-			carrier = IF_UPANDRUNNING(ifp) ? LINK_UP : LINK_DOWN;
-	}
+	/* Wireless *must* support link state changes. */
+	if (carrier == LINK_UNKNOWN && ifp->wireless)
+		carrier = LINK_DOWN;
 
 	if (carrier == LINK_DOWN || (ifp->flags & IFF_UP) == 0) {
-		if (ifp->carrier != LINK_DOWN) {
+		if (ifp->carrier == LINK_DOWN)
+			return;
+		ifp->carrier = LINK_DOWN;
+		if (!ifp->active || nolink)
+			return;
+		loginfox("%s: carrier lost", ifp->name);
+		script_runreason(ifp, "NOCARRIER");
 #ifdef NOCARRIER_PRESERVE_IP
-			if (ifp->flags & IFF_UP &&
-			    (ifp->options == NULL ||
-			    !(ifp->options->options & DHCPCD_ANONYMOUS)))
-				ifp->carrier = LINK_DOWN_IFFUP;
-			else
-#endif
-				ifp->carrier = LINK_DOWN;
-			if (!ifp->active || nolink)
-				return;
-			loginfox("%s: carrier lost", ifp->name);
-			script_runreason(ifp, "NOCARRIER");
-#ifdef NOCARRIER_PRESERVE_IP
-			if (ifp->flags & IFF_UP &&
-			    !(ifp->options->options & DHCPCD_ANONYMOUS))
-			{
+		if (ifp->flags & IFF_UP &&
+		    !(ifp->options->options & DHCPCD_ANONYMOUS))
+		{
 #ifdef ARP
-				arp_drop(ifp);
+			arp_drop(ifp);
 #endif
 #ifdef INET
-				dhcp_abort(ifp);
+			dhcp_abort(ifp);
 #endif
 #ifdef DHCP6
-				dhcp6_abort(ifp);
+			dhcp6_abort(ifp);
 #endif
-			} else
+		} else
 #endif
-				dhcpcd_drop(ifp, 0);
-			if (ifp->options->options & DHCPCD_ANONYMOUS) {
-				bool was_up = ifp->flags & IFF_UP;
+			dhcpcd_drop(ifp, 0);
+		if (ifp->options->options & DHCPCD_ANONYMOUS) {
+			bool was_up = ifp->flags & IFF_UP;
 
-				if (was_up)
-					if_down(ifp);
-				if (if_randomisemac(ifp) == -1 && errno != ENXIO)
-					logerr(__func__);
-				if (was_up)
-					if_up(ifp);
-			}
+			if (was_up)
+				if_down(ifp);
+			if (if_randomisemac(ifp) == -1 && errno != ENXIO)
+				logerr(__func__);
+			if (was_up)
+				if_up(ifp);
 		}
-	} else if (carrier == LINK_UP && ifp->flags & IFF_UP) {
-		if (ifp->carrier != LINK_UP) {
-			ifp->carrier = LINK_UP;
-			if (ifp->active)
-				loginfox("%s: carrier acquired", ifp->name);
+		return;
+	}
+
+	/*
+	 * At this point carrier is NOT DOWN and we have IFF_UP.
+	 * We should treat LINK_UNKNOWN as up as the driver may not support
+	 * link state changes.
+	 * The consideration of any other information about carrier should
+	 * be handled in the OS specific if_carrier() function.
+	 */
+	if (ifp->carrier == carrier)
+		return;
+	ifp->carrier = carrier;
+	if (ifp->active) {
+		if (carrier == LINK_UNKNOWN)
+			loginfox("%s: carrier unknown, assuming up", ifp->name);
+		else
+			loginfox("%s: carrier acquired", ifp->name);
+	}
+
 #if !defined(__linux__) && !defined(__NetBSD__)
-			/* BSD does not emit RTM_NEWADDR or RTM_CHGADDR when the
-			 * hardware address changes so we have to go
-			 * through the disovery process to work it out. */
-			dhcpcd_handleinterface(ifp->ctx, 0, ifp->name);
+	/* BSD does not emit RTM_NEWADDR or RTM_CHGADDR when the
+	 * hardware address changes so we have to go
+	 * through the disovery process to work it out. */
+	dhcpcd_handleinterface(ifp->ctx, 0, ifp->name);
 #endif
-			if (ifp->wireless) {
-				uint8_t ossid[IF_SSIDLEN];
-				size_t olen;
 
-				olen = ifp->ssid_len;
-				memcpy(ossid, ifp->ssid, ifp->ssid_len);
-				if_getssid(ifp);
+	if (ifp->wireless) {
+		uint8_t ossid[IF_SSIDLEN];
+		size_t olen;
 
-				/* If we changed SSID network, drop leases */
-				if ((ifp->ssid_len != olen ||
-				    memcmp(ifp->ssid, ossid, ifp->ssid_len)) &&
-				    ifp->active)
-				{
-					dhcpcd_reportssid(ifp);
+		olen = ifp->ssid_len;
+		memcpy(ossid, ifp->ssid, ifp->ssid_len);
+		if_getssid(ifp);
+
+		/* If we changed SSID network, drop leases */
+		if ((ifp->ssid_len != olen ||
+		    memcmp(ifp->ssid, ossid, ifp->ssid_len)) && ifp->active)
+		{
+			dhcpcd_reportssid(ifp);
 #ifdef NOCARRIER_PRESERVE_IP
-					dhcpcd_drop(ifp, 0);
+			dhcpcd_drop(ifp, 0);
 #endif
 #ifdef IPV4LL
-					ipv4ll_reset(ifp);
+			ipv4ll_reset(ifp);
 #endif
-				}
-			}
-			if (!ifp->active || nolink)
-				return;
-			dhcpcd_initstate(ifp, 0);
-			script_runreason(ifp, "CARRIER");
-#ifdef INET6
-#ifdef NOCARRIER_PRESERVE_IP
-			/* Set any IPv6 Routers we remembered to expire
-			 * faster than they would normally as we
-			 * maybe on a new network. */
-			ipv6nd_startexpire(ifp);
-#endif
-#ifdef IPV6_MANAGETEMPADDR
-			/* RFC4941 Section 3.5 */
-			ipv6_regentempaddrs(ifp);
-#endif
-#endif
-			dhcpcd_startinterface(ifp);
 		}
 	}
+
+	if (!ifp->active || nolink)
+		return;
+
+	dhcpcd_initstate(ifp, 0);
+	script_runreason(ifp, "CARRIER");
+#ifdef INET6
+#ifdef NOCARRIER_PRESERVE_IP
+	/* Set any IPv6 Routers we remembered to expire faster than they
+	 * would normally as we maybe on a new network. */
+	ipv6nd_startexpire(ifp);
+#endif
+#ifdef IPV6_MANAGETEMPADDR
+	/* RFC4941 Section 3.5 */
+	ipv6_regentempaddrs(ifp);
+#endif
+#endif
+	dhcpcd_startinterface(ifp);
 }
 
 static void
@@ -866,9 +867,7 @@ dhcpcd_startinterface(void *arg)
 	struct interface *ifp = arg;
 	struct if_options *ifo = ifp->options;
 
-	if (ifo->options & DHCPCD_LINK && (ifp->carrier == LINK_DOWN ||
-	    (ifp->carrier == LINK_UNKNOWN && !IF_UPANDRUNNING(ifp))))
-	{
+	if (ifo->options & DHCPCD_LINK && !IS_LINK_UP(ifp)) {
 		loginfox("%s: waiting for carrier", ifp->name);
 		return;
 	}
@@ -959,7 +958,7 @@ dhcpcd_prestartinterface(void *arg)
 	struct dhcpcd_ctx *ctx = ifp->ctx;
 	bool anondown;
 
-	if (ifp->carrier == LINK_DOWN &&
+	if (ifp->carrier <= LINK_DOWN &&
 	    ifp->options->options & DHCPCD_ANONYMOUS &&
 	    ifp->flags & IFF_UP)
 	{
@@ -1357,8 +1356,7 @@ dhcpcd_ifrenew(struct interface *ifp)
 	if (!ifp->active)
 		return;
 
-	if (ifp->options->options & DHCPCD_LINK &&
-	    ifp->carrier == LINK_DOWN)
+	if (ifp->options->options & DHCPCD_LINK && !IS_LINK_UP(ifp))
 		return;
 
 #ifdef INET
