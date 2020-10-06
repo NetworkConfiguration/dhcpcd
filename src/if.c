@@ -692,6 +692,12 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 
 		ifp->active = active;
 		ifp->carrier = if_carrier(ifp, ifa->ifa_data);
+
+		/* Wireless devices must support carrier change,
+		 * so treat UNKNOWN as down. */
+		if (ifp->wireless && ifp->carrier == LINK_UNKNOWN)
+			ifp->carrier = LINK_DOWN;
+
 		TAILQ_INSERT_TAIL(ifs, ifp, next);
 	}
 
