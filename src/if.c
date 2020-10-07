@@ -193,6 +193,17 @@ if_setflag(struct interface *ifp, short setflag, short unsetflag)
 	return 0;
 }
 
+bool
+if_is_link_up(const struct interface *ifp)
+{
+
+	return ifp->flags & IFF_UP &&
+	    (ifp->carrier == LINK_UP ||
+	     (ifp->carrier == LINK_UNKNOWN &&
+	      !(ifp->options == NULL ||
+	        ifp->options->options & DHCPCD_LINK)));
+}
+
 int
 if_randomisemac(struct interface *ifp)
 {
@@ -692,12 +703,6 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 
 		ifp->active = active;
 		ifp->carrier = if_carrier(ifp, ifa->ifa_data);
-
-		/* Wireless devices must support carrier change,
-		 * so treat UNKNOWN as down. */
-		if (ifp->wireless && ifp->carrier == LINK_UNKNOWN)
-			ifp->carrier = LINK_DOWN;
-
 		TAILQ_INSERT_TAIL(ifs, ifp, next);
 	}
 
