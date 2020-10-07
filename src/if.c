@@ -423,12 +423,14 @@ if_check_arphrd(struct interface *ifp, unsigned int active, bool if_noconf)
 		break;
 	default:
 		if (active) {
+			int i;
+
 			if (if_noconf)
 				active = IF_INACTIVE;
 			i = active ? LOG_WARNING : LOG_DEBUG;
 			logmessage(i, "%s: unsupported"
 			    " interface type 0x%.2x",
-			    ifp->name, ifp->hw_type);
+			    ifp->name, ifp->hwtype);
 		}
 		break;
 	}
