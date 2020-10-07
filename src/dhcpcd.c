@@ -409,7 +409,7 @@ dhcpcd_drop(struct interface *ifp, int stop)
 }
 
 static void
-stop_interface(struct interface *ifp)
+stop_interface(struct interface *ifp, const char *reason)
 {
 	struct dhcpcd_ctx *ctx;
 
@@ -418,10 +418,7 @@ stop_interface(struct interface *ifp)
 	ifp->options->options |= DHCPCD_STOPPING;
 
 	dhcpcd_drop(ifp, 1);
-	if (ifp->options->options & DHCPCD_DEPARTED)
-		script_runreason(ifp, "DEPARTED");
-	else
-		script_runreason(ifp, "STOPPED");
+	script_runreason(ifp, reason == NULL ? "STOPPED" : reason);
 
 	/* Delete all timeouts for the interfaces */
 	eloop_q_timeout_delete(ctx->eloop, ELOOP_QUEUE_ALL, NULL, ifp);
@@ -1025,8 +1022,7 @@ dhcpcd_handleinterface(void *arg, int action, const char *ifname)
 		}
 		if (ifp->active) {
 			logdebugx("%s: interface departed", ifp->name);
-			ifp->options->options |= DHCPCD_DEPARTED;
-			stop_interface(ifp);
+			stop_interface(ifp, "DEPARTED");
 		}
 		TAILQ_REMOVE(ctx->ifaces, ifp, next);
 		if_free(ifp);
@@ -1339,7 +1335,7 @@ stop_all_interfaces(struct dhcpcd_ctx *ctx, unsigned long long opts)
 		if (ifp->options->options & DHCPCD_RELEASE)
 			ifp->options->options &= ~DHCPCD_PERSISTENT;
 		ifp->options->options |= DHCPCD_EXITING;
-		stop_interface(ifp);
+		stop_interface(ifp, NULL);
 	}
 }
 
@@ -1591,7 +1587,7 @@ dumperr:
 			ifp->options->options |= opts;
 			if (opts & DHCPCD_RELEASE)
 				ifp->options->options &= ~DHCPCD_PERSISTENT;
-			stop_interface(ifp);
+			stop_interface(ifp, NULL);
 		}
 		return 0;
 	}
@@ -2293,7 +2289,7 @@ printpidfile:
 		break;
 	default:
 		setproctitle("[launcher]");
-		ctx.options |= DHCPCD_FORKED;
+		ctx.options |= DHCPCD_FORKED | DHCPCD_LAUNCHER;
 		ctx.fork_fd = fork_fd[0];
 		close(fork_fd[1]);
 #ifdef PRIVSEP_RIGHTS

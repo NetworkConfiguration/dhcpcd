@@ -116,7 +116,7 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 {
 	struct passwd *pw = ctx->ps_user;
 
-	if (!(ctx->options & DHCPCD_FORKED))
+	if (ctx->options & DHCPCD_LAUNCHER)
 		logdebugx("chrooting as %s to %s", pw->pw_name, pw->pw_dir);
 	if (chroot(pw->pw_dir) == -1 &&
 	    (errno != EPERM || ctx->options & DHCPCD_FORKED))
@@ -566,7 +566,7 @@ ps_mastersandbox(struct dhcpcd_ctx *ctx, const char *_pledge)
 		}
 		logerr("%s: %s", __func__, sandbox);
 		return -1;
-	} else if (!forked)
+	} else if (ctx->options & DHCPCD_LAUNCHER)
 		logdebugx("sandbox: %s", sandbox);
 	return 0;
 }
