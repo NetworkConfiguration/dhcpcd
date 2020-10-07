@@ -55,7 +55,6 @@
 #define	LINK_UP		1
 #define	LINK_UNKNOWN	0
 #define	LINK_DOWN	-1
-#define	IS_LINK_UP(ifp)	(((ifp)->flags & IFF_UP) && (ifp)->carrier != LINK_DOWN)
 
 #define IF_DATA_IPV4	0
 #define IF_DATA_ARP	1

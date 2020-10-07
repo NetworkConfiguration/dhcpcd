@@ -701,19 +701,13 @@ dhcpcd_reportssid(struct interface *ifp)
 void
 dhcpcd_handlecarrier(struct interface *ifp, int carrier, unsigned int flags)
 {
-	bool nolink = ifp->options == NULL ||
-	    !(ifp->options->options & DHCPCD_LINK);
+	bool was_link_up = if_is_link_up(ifp);
 
+	ifp->carrier = carrier;
 	ifp->flags = flags;
-	/* Wireless *must* support link state changes. */
-	if (carrier == LINK_UNKNOWN && ifp->wireless)
-		carrier = LINK_DOWN;
 
-	if (carrier == LINK_DOWN || (ifp->flags & IFF_UP) == 0) {
-		if (ifp->carrier == LINK_DOWN)
-			return;
-		ifp->carrier = LINK_DOWN;
-		if (!ifp->active || nolink)
+	if (!if_is_link_up(ifp)) {
+		if (!was_link_up || !ifp->active)
 			return;
 		loginfox("%s: carrier lost", ifp->name);
 		script_runreason(ifp, "NOCARRIER");
@@ -734,13 +728,13 @@ dhcpcd_handlecarrier(struct interface *ifp, int carrier, unsigned int flags)
 #endif
 			dhcpcd_drop(ifp, 0);
 		if (ifp->options->options & DHCPCD_ANONYMOUS) {
-			bool was_up = ifp->flags & IFF_UP;
+			bool is_up = ifp->flags & IFF_UP;
 
-			if (was_up)
+			if (is_up)
 				if_down(ifp);
 			if (if_randomisemac(ifp) == -1 && errno != ENXIO)
 				logerr(__func__);
-			if (was_up)
+			if (is_up)
 				if_up(ifp);
 		}
 		return;
@@ -753,9 +747,9 @@ dhcpcd_handlecarrier(struct interface *ifp, int carrier, unsigned int flags)
 	 * The consideration of any other information about carrier should
 	 * be handled in the OS specific if_carrier() function.
 	 */
-	if (ifp->carrier == carrier)
+	if (was_link_up)
 		return;
-	ifp->carrier = carrier;
+
 	if (ifp->active) {
 		if (carrier == LINK_UNKNOWN)
 			loginfox("%s: carrier unknown, assuming up", ifp->name);
@@ -792,7 +786,7 @@ dhcpcd_handlecarrier(struct interface *ifp, int carrier, unsigned int flags)
 		}
 	}
 
-	if (!ifp->active || nolink)
+	if (!ifp->active)
 		return;
 
 	dhcpcd_initstate(ifp, 0);
@@ -867,7 +861,7 @@ dhcpcd_startinterface(void *arg)
 	struct interface *ifp = arg;
 	struct if_options *ifo = ifp->options;
 
-	if (ifo->options & DHCPCD_LINK && !IS_LINK_UP(ifp)) {
+	if (ifo->options & DHCPCD_LINK && !if_is_link_up(ifp)) {
 		loginfox("%s: waiting for carrier", ifp->name);
 		return;
 	}
@@ -989,7 +983,7 @@ run_preinit(struct interface *ifp)
 		return;
 
 	script_runreason(ifp, "PREINIT");
-	if (ifp->wireless && ifp->carrier == LINK_UP)
+	if (ifp->wireless && if_is_link_up(ifp))
 		dhcpcd_reportssid(ifp);
 	if (ifp->options->options & DHCPCD_LINK && ifp->carrier != LINK_UNKNOWN)
 		script_runreason(ifp,
@@ -1356,7 +1350,7 @@ dhcpcd_ifrenew(struct interface *ifp)
 	if (!ifp->active)
 		return;
 
-	if (ifp->options->options & DHCPCD_LINK && !IS_LINK_UP(ifp))
+	if (ifp->options->options & DHCPCD_LINK && !if_is_link_up(ifp))
 		return;
 
 #ifdef INET
@@ -2461,8 +2455,7 @@ printpidfile:
 	TAILQ_FOREACH(ifp, ctx.ifaces, next) {
 		if (ifp->active) {
 			run_preinit(ifp);
-			if (!(ifp->options->options & DHCPCD_LINK) ||
-			    ifp->carrier != LINK_DOWN)
+			if (if_is_link_up(ifp))
 				opt = 1;
 		}
 	}
