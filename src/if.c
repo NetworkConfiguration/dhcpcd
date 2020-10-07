@@ -422,11 +422,14 @@ if_check_arphrd(struct interface *ifp, unsigned int active, bool if_noconf)
 		}
 		break;
 	default:
-		if (if_noconf)
-			active = IF_INACTIVE;
-		if (active)
-			logwarnx("%s: unsupported interface type 0x%.2x",
-			    ifp->name, ifp->hwtype);
+		if (active) {
+			if (if_noconf)
+				active = IF_INACTIVE;
+			i = active ? LOG_WARNING : LOG_DEBUG;
+			logmessage(i, "%s: unsupported"
+			    " interface type 0x%.2x",
+			    ifp->name, ifp->hw_type);
+		}
 		break;
 	}
 
@@ -632,12 +635,14 @@ if_discover(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs,
 #endif
 			default:
 				/* Don't allow unless explicit */
-				if (if_noconf)
-					active = IF_INACTIVE;
-				if (active)
-					logwarnx("%s: unsupported"
+				if (active) {
+					if (if_noconf)
+						active = IF_INACTIVE;
+					i = active ? LOG_WARNING : LOG_DEBUG;
+					logmessage(i, "%s: unsupported"
 					    " interface type 0x%.2x",
 					    ifp->name, sdl->sdl_type);
+				}
 				/* Pretend it's ethernet */
 				ifp->hwtype = ARPHRD_ETHER;
 				break;
