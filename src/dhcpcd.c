@@ -2246,7 +2246,7 @@ printpidfile:
 		ctx.fork_fd = fork_fd[1];
 		close(fork_fd[0]);
 #ifdef PRIVSEP_RIGHTS
-		if (ps_rights_limit_fd(fork_fd[1]) == -1) {
+		if (ps_rights_limit_fd(ctx.fork_fd) == -1) {
 			logerr("ps_rights_limit_fdpair");
 			goto exit_failure;
 		}
@@ -2293,10 +2293,8 @@ printpidfile:
 		ctx.fork_fd = fork_fd[0];
 		close(fork_fd[1]);
 #ifdef PRIVSEP_RIGHTS
-		if (ps_rights_limit_fd(fork_fd[0]) == -1 ||
-		    ps_rights_limit_fd(stderr_fd[0]) == 1)
-		{
-			logerr("ps_rights_limit_fdpair");
+		if (ps_rights_limit_fd(ctx.fork_fd) == -1) {
+			logerr("ps_rights_limit_fd");
 			goto exit_failure;
 		}
 #endif
@@ -2306,14 +2304,13 @@ printpidfile:
 			ctx.stderr_fd = stderr_fd[0];
 			close(stderr_fd[1]);
 #ifdef PRIVSEP_RIGHTS
-			if (ps_rights_limit_fd(stderr_fd[0]) == 1) {
-				logerr("ps_rights_limit_fdpair");
+			if (ps_rights_limit_fd(ctx.stderr_fd) == 1) {
+				logerr("ps_rights_limit_fd");
 				goto exit_failure;
 			}
 #endif
-			if (ctx.stderr_valid)
-				eloop_event_add(ctx.eloop, ctx.stderr_fd,
-				    dhcpcd_stderr_cb, &ctx);
+			eloop_event_add(ctx.eloop, ctx.stderr_fd,
+			    dhcpcd_stderr_cb, &ctx);
 		}
 #ifdef PRIVSEP
 		if (IN_PRIVSEP(&ctx) && ps_mastersandbox(&ctx, NULL) == -1)
