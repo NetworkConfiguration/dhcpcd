@@ -1,179 +1,331 @@
 /*
- * lxc: linux Container library
+ * Copyright © 2010 William Ahern
+ * Copyright © 2012-2013 Guillem Jover <guillem@hadrons.org>
  *
- * (C) Copyright IBM Corp. 2007, 2008
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to permit
+ * persons to whom the Software is furnished to do so, subject to the
+ * following conditions:
  *
- * Authors:
- * Daniel Lezcano <daniel.lezcano at free.fr>
+ * The above copyright notice and this permission notice shall be included
+ * in all copies or substantial portions of the Software.
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+ * NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+ * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+ * USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE 1
-#endif
-#ifdef __linux__
-#include <sys/prctl.h>
-#include <sys/syscall.h>
-#endif
-
 #include <errno.h>
-#include <fcntl.h>
+#include <stddef.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
+#include <err.h>
 #include <unistd.h>
+#include <string.h>
+//#include "local-link.h"
 
 #include "config.h"
 
-#define prctl_arg(x) ((unsigned long)x)
+static struct {
+	/* Original value. */
+	char *arg0;
 
-static char *setproctitle_argv;
+	/* Title space available. */
+	char *base, *end;
 
-int setproctitle(const char *fmt, ...)
+	 /* Pointer to original nul character within base. */
+	char *nul;
+
+	bool warned;
+	bool reset;
+	int error;
+
+	/* Our copy of args and environment to free. */
+	int argc;
+	char **argv;
+	char **tmp_environ;
+} SPT;
+
+
+static inline size_t
+spt_min(size_t a, size_t b)
 {
-	const char *progname;
-	char title[1024], *tp;
-	size_t tl, n;
-	va_list args;
-	int ret;
+	return a < b ? a : b;
+}
 
-#if 0
-	progname = getprogname();
+/*
+ * For discussion on the portability of the various methods, see
+ * https://lists.freebsd.org/pipermail/freebsd-stable/2008-June/043136.html
+ */
+static int
+spt_clearenv(void)
+{
+#ifdef HAVE_CLEARENV
+	return clearenv();
 #else
-	progname = "dhcpcd";
+	SPT.tmp_environ = malloc(sizeof(*SPT.tmp_environ));
+	if (SPT.tmp_environ == NULL)
+		return errno;
+
+	SPT.tmp_environ[0] = NULL;
+	environ = SPT.tmp_environ;
+
+	return 0;
 #endif
+}
 
-	tp = title;
-	tl = sizeof(title);
-	n = strlcpy(tp, progname, tl);
-	tp += n;
-	tl -= n;
-	n = strlcpy(tp, ": ", tl);
-	tp += n;
-	tl -= n;
-	va_start(args, fmt);
-	vsnprintf(tp, tl, fmt, args);
-	va_end(args);
+static int
+spt_copyenv(int envc, char *envp[])
+{
+	char **envcopy;
+	char *eq;
+	size_t envsize;
+	int i, error;
 
-#if defined(__linux__) && defined(PR_SET_MM_MAP)
-	int fd, i;
-	char *buf_ptr, *tmp_proctitle;
-	char buf[BUFSIZ];
-	ssize_t bytes_read;
-	size_t len;
+	if (environ != envp)
+		return 0;
 
-	/*
-	 * We don't really need to know all of this stuff, but unfortunately
-	 * PR_SET_MM_MAP requires us to set it all at once, so we have to
-	 * figure it out anyway.
-	 */
-	unsigned long start_data, end_data, start_brk, start_code, end_code,
-	    start_stack, arg_start, arg_end, env_start, env_end;
-	long brk_val;
-	struct prctl_mm_map prctl_map;
+	/* Make a copy of the old environ array of pointers, in case
+	 * clearenv() or setenv() is implemented to free the internal
+	 * environ array, because we will need to access the old environ
+	 * contents to make the new copy. */
+	envsize = (size_t)(envc + 1) * sizeof(char *);
+	envcopy = malloc(envsize);
+	if (envcopy == NULL)
+		return errno;
+	memcpy(envcopy, envp, envsize);
 
-	fd = open("/proc/self/stat", O_RDONLY);
-	if (fd == -1)
-		return -1;
-	bytes_read = read(fd, buf, sizeof(buf) - 1);
-	close(fd);
-	if (bytes_read == -1)
-		return -1;
-
-	buf[bytes_read] = '\0';
-
-	/* Skip the first 25 fields, column 26-28 are start_code, end_code,
-	 * and start_stack */
-	buf_ptr = strchr(buf, ' ');
-	for (i = 0; i < 24; i++) {
-		if (!buf_ptr)
-			return -1;
-		buf_ptr = strchr(buf_ptr + 1, ' ');
-	}
-	if (!buf_ptr)
-		return -1;
-
-	i = sscanf(buf_ptr, "%lu %lu %lu", &start_code, &end_code, &start_stack);
-	if (i != 3)
-		return -1;
-
-	/* Skip the next 19 fields, column 45-51 are start_data to arg_end */
-	for (i = 0; i < 19; i++) {
-		if (!buf_ptr)
-			return -1;
-		buf_ptr = strchr(buf_ptr + 1, ' ');
+	error = spt_clearenv();
+	if (error) {
+		environ = envp;
+		free(envcopy);
+		return error;
 	}
 
-	if (!buf_ptr)
-		return -1;
+	for (i = 0; envcopy[i]; i++) {
+		eq = strchr(envcopy[i], '=');
+		if (eq == NULL)
+			continue;
 
-	i = sscanf(buf_ptr, "%lu %lu %lu %*u %*u %lu %lu", &start_data,
-		   &end_data, &start_brk, &env_start, &env_end);
-	if (i != 5)
-		return -1;
+		*eq = '\0';
+		if (setenv(envcopy[i], eq + 1, 1) < 0)
+			error = errno;
+		*eq = '=';
 
-	/* Include the null byte here, because in the calculations below we
-	 * want to have room for it. */
-	len = strlen(title) + 1;
-
-	tmp_proctitle = realloc(setproctitle_argv, len);
-	if (!tmp_proctitle)
-		return -1;
-
-	setproctitle_argv = tmp_proctitle;
-
-	arg_start = (unsigned long)setproctitle_argv;
-	arg_end = arg_start + len;
-
-	brk_val = syscall(__NR_brk, 0);
-
-	prctl_map = (struct prctl_mm_map){
-	    .start_code = start_code,
-	    .end_code = end_code,
-	    .start_stack = start_stack,
-	    .start_data = start_data,
-	    .end_data = end_data,
-	    .start_brk = start_brk,
-	    .brk = (unsigned long long)brk_val,
-	    .arg_start = arg_start,
-	    .arg_end = arg_end,
-	    .env_start = env_start,
-	    .env_end = env_end,
-	    .auxv = NULL,
-	    .auxv_size = 0,
-	    .exe_fd = (unsigned int)-1,
-	};
-
-	ret = prctl(PR_SET_MM, prctl_arg(PR_SET_MM_MAP), prctl_arg(&prctl_map),
-		    prctl_arg(sizeof(prctl_map)), prctl_arg(0));
-	if (ret == 0)
-		(void)strlcpy((char *)arg_start, title, len);
+		if (error) {
+#ifdef HAVE_CLEARENV
+			/* Because the old environ might not be available
+			 * anymore we will make do with the shallow copy. */
+			environ = envcopy;
 #else
-	/* Solaris doesn't work with the ARGV stamping approach.
-	 * Is there any other way? */
-	ret = -1;
-	errno = ENOTSUP;
+			environ = envp;
+			free(envcopy);
 #endif
-	return ret;
+			return error;
+		}
+	}
+
+	/* Dispose of the shallow copy, now that we've finished transfering
+	 * the old environment. */
+	free(envcopy);
+
+	return 0;
+}
+
+static int
+spt_copyargs(int argc, char *argv[])
+{
+	char *tmp;
+	int i;
+
+	for (i = 1; i < argc || (i >= argc && argv[i]); i++) {
+		if (argv[i] == NULL)
+			continue;
+
+		tmp = strdup(argv[i]);
+		if (tmp == NULL)
+			return errno;
+
+		argv[i] = tmp;
+	}
+
+	return 0;
 }
 
 void
-setproctitle_free(void)
+setproctitle_init(int argc, char *argv[], char *envp[])
 {
+	char *base, *end, *nul, *tmp;
+	int i, envc, error;
 
-	free(setproctitle_argv);
+	/* Try to make sure we got called with main() arguments. */
+	if (argc < 0)
+		return;
+
+	base = argv[0];
+	if (base == NULL)
+		return;
+
+	nul = &base[strlen(base)];
+	end = nul + 1;
+
+	for (i = 0; i < argc || (i >= argc && argv[i]); i++) {
+		if (argv[i] == NULL || argv[i] != end)
+			continue;
+
+		end = argv[i] + strlen(argv[i]) + 1;
+	}
+
+	for (i = 0; envp[i]; i++) {
+		if (envp[i] != end)
+			continue;
+
+		end = envp[i] + strlen(envp[i]) + 1;
+	}
+	envc = i;
+
+	SPT.arg0 = strdup(argv[0]);
+	if (SPT.arg0 == NULL) {
+		SPT.error = errno;
+		return;
+	}
+
+	tmp = strdup(getprogname());
+	if (tmp == NULL) {
+		SPT.error = errno;
+		return;
+	}
+	setprogname(tmp);
+
+	error = spt_copyenv(envc, envp);
+	if (error) {
+		SPT.error = error;
+		return;
+	}
+
+	error = spt_copyargs(argc, argv);
+	if (error) {
+		SPT.error = error;
+		return;
+	}
+
+	SPT.argc = argc;
+	SPT.argv = argv;
+
+	SPT.nul  = nul;
+	SPT.base = base;
+	SPT.end  = end;
 }
+
+void
+setproctitle_fini(void)
+{
+	int i;
+
+	free(SPT.arg0);
+	SPT.arg0 = NULL;
+
+	for (i = 1; i < SPT.argc; i++) {
+		if (SPT.argv[i] != NULL)
+			free(SPT.argv[i]);
+	}
+	SPT.argc = 0;
+
+	free(SPT.tmp_environ);
+	SPT.tmp_environ = NULL;
+}
+
+#ifndef SPT_MAXTITLE
+#define SPT_MAXTITLE 255
+#endif
+
+__printflike(1, 2) static void
+setproctitle_impl(const char *fmt, ...)
+{
+	/* Use buffer in case argv[0] is passed. */
+	char buf[SPT_MAXTITLE + 1];
+	va_list ap;
+	char *nul;
+	int l;
+	size_t len, base_len;
+
+	if (SPT.base == NULL) {
+		if (!SPT.warned) {
+			warnx("setproctitle not initialized, please either call "
+			      "setproctitle_init() or link against libbsd-ctor.");
+			SPT.warned = true;
+		}
+		return;
+	}
+
+	if (fmt) {
+		if (fmt[0] == '-') {
+			/* Skip program name prefix. */
+			fmt++;
+			len = 0;
+		} else {
+			/* Print program name heading for grep. */
+			l = snprintf(buf, sizeof(buf), "%s: ", getprogname());
+			if (l <= 0)
+				return;
+			len = (size_t)l;
+		}
+
+		va_start(ap, fmt);
+		l = vsnprintf(buf + len, sizeof(buf) - len, fmt, ap);
+		va_end(ap);
+	} else {
+		len = 0;
+		l = snprintf(buf, sizeof(buf), "%s", SPT.arg0);
+	}
+
+	if (l <= 0) {
+		SPT.error = errno;
+		return;
+	}
+	len += (size_t)l;
+
+	base_len = (size_t)(SPT.end - SPT.base);
+	if (!SPT.reset) {
+		memset(SPT.base, 0, base_len);
+		SPT.reset = true;
+	} else {
+		memset(SPT.base, 0, spt_min(sizeof(buf), base_len));
+	}
+
+	len = spt_min(len, spt_min(sizeof(buf), base_len) - 1);
+	memcpy(SPT.base, buf, len);
+	nul = &SPT.base[len];
+
+	if (nul < SPT.nul) {
+		*SPT.nul = '.';
+	} else if (nul == SPT.nul && &nul[1] < SPT.end) {
+		*SPT.nul = ' ';
+		*++nul = '\0';
+	}
+}
+libbsd_symver_default(setproctitle, setproctitle_impl, LIBBSD_0.5);
+
+/* The original function introduced in 0.2 was a stub, it only got implemented
+ * in 0.5, make the implementation available in the old version as an alias
+ * for code linking against that version, and change the default to use the
+ * new version, so that new code depends on the implemented version. */
+#ifdef HAVE_TYPEOF
+extern __typeof__(setproctitle_impl)
+setproctitle_stub
+	__attribute__((__alias__("setproctitle_impl")));
+#else
+void
+setproctitle_stub(const char *fmt, ...)
+	__attribute__((__alias__("setproctitle_impl")));
+#endif
+libbsd_symver_variant(setproctitle, setproctitle_stub, LIBBSD_0.2);

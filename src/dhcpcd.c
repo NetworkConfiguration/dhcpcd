@@ -1787,6 +1787,10 @@ main(int argc, char **argv)
 	size_t si;
 #endif
 
+#ifdef SETPROCTITLE_H
+	setproctitle_init(argc, argv, environ);
+#endif
+
 	/* Test for --help and --version */
 	if (argc > 1) {
 		if (strcmp(argv[1], "--help") == 0) {
@@ -2566,7 +2570,7 @@ exit1:
 	free(ctx.logfile);
 	free(ctx.ctl_buf);
 #ifdef SETPROCTITLE_H
-	setproctitle_free();
+	setproctitle_fini();
 #endif
 #ifdef USE_SIGNALS
 	if (ctx.options & DHCPCD_STARTED) {
