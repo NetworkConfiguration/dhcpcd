@@ -1789,6 +1789,8 @@ main(int argc, char **argv, char **envp)
 
 #ifdef SETPROCTITLE_H
 	setproctitle_init(argc, argv, envp);
+#else
+	UNUSED(envp);
 #endif
 
 	/* Test for --help and --version */
