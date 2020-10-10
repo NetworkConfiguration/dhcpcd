@@ -1767,7 +1767,7 @@ dhcpcd_stderr_cb(void *arg)
 }
 
 int
-main(int argc, char **argv)
+main(int argc, char **argv, char **envp)
 {
 	struct dhcpcd_ctx ctx;
 	struct ifaddrs *ifaddrs = NULL;
@@ -1788,7 +1788,7 @@ main(int argc, char **argv)
 #endif
 
 #ifdef SETPROCTITLE_H
-	setproctitle_init(argc, argv, environ);
+	setproctitle_init(argc, argv, envp);
 #endif
 
 	/* Test for --help and --version */
