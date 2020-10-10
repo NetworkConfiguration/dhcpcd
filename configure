@@ -968,8 +968,17 @@ EOF
 	rm -f _setproctitle.c _setproctitle
 fi
 if [ "$SETPROCTITLE" = no ]; then
-	echo "COMPAT_SRCS+=	compat/setproctitle.c" >>$CONFIG_MK
-	echo "#include			\"compat/setproctitle.h\"" >>$CONFIG_H
+	case "$OS" in
+	solaris*|sunos*)
+		echo "$OS has no support for setting process title"
+		echo "#define	setproctitle(...)" >>$CONFIG_H
+		;;
+	*)
+		echo "COMPAT_SRCS+=	compat/setproctitle.c" >>$CONFIG_MK
+		echo "#include			\"compat/setproctitle.h\"" \
+			>>$CONFIG_H
+		;;
+	esac
 fi
 
 if [ -z "$STRLCPY" ]; then
