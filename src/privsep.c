@@ -168,7 +168,7 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 	 * or redirecting stderr to a file. */
 	if (ctx->logfile == NULL &&
 	    (ctx->options & DHCPCD_STARTED ||
-	     (ctx->stderr_valid && isatty(STDERR_FILENO) == 1)))
+	     !ctx->stderr_valid || isatty(STDERR_FILENO) == 1))
 	{
 		if (setrlimit(RLIMIT_FSIZE, &rzero) == -1)
 			logerr("setrlimit RLIMIT_FSIZE");
