@@ -37,6 +37,8 @@
 
 #warning Solaris privsep should compile but wont work,
 #warning no DLPI support, ioctl support need rework
+/* We should implement privileges(5) as well.
+ * https://illumos.org/man/5/privileges */
 
 static ssize_t
 ps_root_doioctl6(unsigned long req, void *data, size_t len)
