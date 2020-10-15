@@ -39,6 +39,7 @@
 #include <fcntl.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -46,6 +47,14 @@
 #include "if.h"
 #include "logerr.h"
 #include "privsep.h"
+
+/*
+ * Set this to debug SECCOMP.
+ * Then run dhcpcd with strace -f and strace will even translate
+ * the failing syscall into the __NR_name define we need to use below.
+ * DO NOT ENABLE THIS FOR PRODUCTION BUILDS!
+ */
+//#define SECCOMP_FILTER_DEBUG
 
 static ssize_t
 ps_root_dosendnetlink(int protocol, struct msghdr *msg)
@@ -125,7 +134,11 @@ ps_root_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct msghdr *msg)
 	BPF_STMT(BPF_LD + BPF_W + BPF_ABS,				\
 		offsetof(struct seccomp_data, nr))
 
+#ifdef SECCOMP_FILTER_DEBUG
+#define SECCOMP_FILTER_FAIL	SECCOMP_RET_TRAP
+#else
 #define SECCOMP_FILTER_FAIL	SECCOMP_RET_KILL
+#endif
 
 /* I personally find this quite nutty.
  * Why can a system header not define a default for this? */
@@ -247,6 +260,9 @@ static struct sock_filter ps_seccomp_filter[] = {
 #ifdef __NR_munmap
 	SECCOMP_ALLOW(__NR_munmap),
 #endif
+#ifdef __NR_nanosleep
+	SECCOMP_ALLOW(__NR_nanosleep),	/* XXX should use ppoll instead */
+#endif
 #ifdef __NR_ppoll
 	SECCOMP_ALLOW(__NR_ppoll),
 #endif
@@ -259,6 +275,9 @@ static struct sock_filter ps_seccomp_filter[] = {
 #ifdef __NR_readv
 	SECCOMP_ALLOW(__NR_readv),
 #endif
+#ifdef __NR_recv
+	SECCOMP_ALLOW(__NR_recv),
+#endif
 #ifdef __NR_recvfrom
 	SECCOMP_ALLOW(__NR_recvfrom),
 #endif
@@ -267,6 +286,9 @@ static struct sock_filter ps_seccomp_filter[] = {
 #endif
 #ifdef __NR_rt_sigreturn
 	SECCOMP_ALLOW(__NR_rt_sigreturn),
+#endif
+#ifdef __NR_send
+	SECCOMP_ALLOW(__NR_send),
 #endif
 #ifdef __NR_sendmsg
 	SECCOMP_ALLOW(__NR_sendmsg),
@@ -277,8 +299,14 @@ static struct sock_filter ps_seccomp_filter[] = {
 #ifdef __NR_shutdown
 	SECCOMP_ALLOW(__NR_shutdown),
 #endif
+#ifdef __NR_time
+	SECCOMP_ALLOW(__NR_time),
+#endif
 #ifdef __NR_wait4
 	SECCOMP_ALLOW(__NR_wait4),
+#endif
+#ifdef __NR_waitpid
+	SECCOMP_ALLOW(__NR_waitpid),
 #endif
 #ifdef __NR_write
 	SECCOMP_ALLOW(__NR_write),
@@ -299,9 +327,43 @@ static struct sock_fprog ps_seccomp_prog = {
 	.filter = ps_seccomp_filter,
 };
 
+#ifdef SECCOMP_FILTER_DEBUG
+static void
+ps_seccomp_violation(__unused int signum, siginfo_t *si, __unused void *context)
+{
+
+	logerrx("%s: unexpected syscall %d (arch=0x%x)",
+	    __func__, si->si_syscall, si->si_arch);
+	_exit(EXIT_FAILURE);
+}
+
+static int
+ps_seccomp_debug(void)
+{
+	struct sigaction sa = {
+		.sa_flags = SA_SIGINFO,
+		.sa_sigaction = &ps_seccomp_violation,
+	};
+	sigset_t mask;
+
+	/* Install a signal handler to catch any issues with our filter. */
+	sigemptyset(&mask);
+	sigaddset(&mask, SIGSYS);
+	if (sigaction(SIGSYS, &sa, NULL) == -1 ||
+	    sigprocmask(SIG_UNBLOCK, &mask, NULL) == -1)
+		return -1;
+
+	return 0;
+}
+#endif
+
 int
 ps_seccomp_enter(void)
 {
+
+#ifdef SECCOMP_FILTER_DEBUG
+	ps_seccomp_debug();
+#endif
 
 	if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) == -1 ||
 	    prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &ps_seccomp_prog) == -1)
