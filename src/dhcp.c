@@ -2926,6 +2926,8 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 	unsigned int i;
 	char *msg;
 	bool bootp_copied;
+	uint32_t v6only_time = 0;
+	bool use_v6only = false;
 #ifdef AUTH
 	const uint8_t *auth;
 	size_t auth_len;
@@ -3143,6 +3145,23 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 		}
 	}
 
+	if (has_option_mask(ifo->requestmask, DHO_IPV6_PREFERRED_ONLY)) {
+		if (get_option_uint32(ifp->ctx, &v6only_time, bootp, bootp_len,
+		    DHO_IPV6_PREFERRED_ONLY) == 0 &&
+		    (state->state == DHS_DISCOVER || state->state == DHS_REBOOT))
+		{
+			char v6msg[128];
+
+			use_v6only = true;
+			if (v6only_time < MIN_V6ONLY_WAIT)
+				v6only_time = MIN_V6ONLY_WAIT;
+			snprintf(v6msg, sizeof(v6msg),
+			    "IPv6-Only Preferred received (%u seconds)",
+			    v6only_time);
+			LOGDHCP(LOG_INFO, v6msg);
+		}
+	}
+
 	/* DHCP Auto-Configure, RFC 2563 */
 	if (type == DHCP_OFFER && bootp->yiaddr == 0) {
 		LOGDHCP(LOG_WARNING, "no address given");
@@ -3177,9 +3196,19 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 			}
 			eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 			eloop_timeout_add_sec(ifp->ctx->eloop,
-			    DHCP_MAX, dhcp_discover, ifp);
+			    use_v6only ? v6only_time : DHCP_MAX,
+			    dhcp_discover, ifp);
 		}
 #endif
+		return;
+	}
+
+	if (use_v6only) {
+		dhcp_drop(ifp, "EXPIRE");
+		dhcp_unlink(ifp->ctx, state->leasefile);
+		eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
+		eloop_timeout_add_sec(ifp->ctx->eloop, v6only_time,
+		    dhcp_discover, ifp);
 		return;
 	}
 
