@@ -1426,7 +1426,6 @@ dhcpcd_signal_cb(int sig, void *arg)
 			if (ps_root_logreopen(ctx) == -1)
 				logerr("ps_root_logreopen");
 		} else {
-			logclose();
 			if (logopen(ctx->logfile) == -1)
 				logerr("logopen");
 		}

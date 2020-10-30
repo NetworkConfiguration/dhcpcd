@@ -102,8 +102,10 @@ void logsetopts(unsigned int);
 void logsettag(const char *);
 #endif
 
+/* Can be called more than once. */
 int logopen(const char *);
+
+/* Should only be called at program exit. */
 void logclose(void);
-int logreopen(void);
 
 #endif
