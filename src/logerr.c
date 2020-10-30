@@ -452,6 +452,13 @@ logopen(const char *path)
 
 	(void)setvbuf(stderr, ctx->log_buf, _IOLBF, sizeof(ctx->log_buf));
 
+#ifndef SMALL
+	if (ctx->log_file != NULL) {
+		fclose(ctx->log_file);
+		ctx->log_file = NULL;
+	}
+#endif
+
 	if (ctx->log_opts & LOGERR_LOG_PID)
 		opts |= LOG_PID;
 	openlog(getprogname(), opts, LOGERR_SYSLOG_FACILITY);

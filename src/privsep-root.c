@@ -562,7 +562,6 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		}
 		break;
 	case PS_LOGREOPEN:
-		logclose();
 		err = logopen(ctx->logfile);
 		break;
 #ifdef AUTH
