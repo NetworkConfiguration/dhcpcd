@@ -1778,9 +1778,6 @@ send_message(struct interface *ifp, uint8_t type,
 	else
 		to.s_addr = INADDR_BROADCAST;
 
-	logdebugx("from %s", inet_ntoa(from));
-	logdebugx("to   %s", inet_ntoa(to));
-
 	/*
 	 * If not listening on the unspecified address we can
 	 * only receive broadcast messages via BPF.
