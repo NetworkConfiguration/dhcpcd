@@ -47,11 +47,15 @@
 #undef LOGERR_TAG
 #endif
 
+/* syslog protocol is 1k message max, RFC 3164 section 4.1 */
+#define LOGERR_SYSLOGBUF	1024 + sizeof(int)
+
 #define UNUSED(a)		(void)(a)
 
 struct logctx {
 	char		 log_buf[BUFSIZ];
 	unsigned int	 log_opts;
+	int		 log_syslogfd;
 #ifndef SMALL
 	FILE		*log_file;
 #ifdef LOGERR_TAG
@@ -63,9 +67,10 @@ struct logctx {
 static struct logctx _logctx = {
 	/* syslog style, but without the hostname or tag. */
 	.log_opts = LOGERR_LOG | LOGERR_LOG_DATE | LOGERR_LOG_PID,
+	.log_syslogfd = -1,
 };
 
-#if defined(LOGERR_TAG) && defined(__linux__)
+#if defined(__linux__)
 /* Poor man's getprogname(3). */
 static char *_logprog;
 static const char *
@@ -79,9 +84,12 @@ getprogname(void)
 		 * so zero the buffer. */
 		if ((_logprog = calloc(1, PATH_MAX + 1)) == NULL)
 			return NULL;
+		if (readlink("/proc/self/exe", _logprog, PATH_MAX + 1) == -1) {
+			free(_logprog);
+			_logprog = NULL;
+			return NULL;
+		}
 	}
-	if (readlink("/proc/self/exe", _logprog, PATH_MAX + 1) == -1)
-		return NULL;
 	if (_logprog[0] == '[')
 		return NULL;
 	p = strrchr(_logprog, '/');
@@ -198,14 +206,23 @@ vlogmessage(int pri, const char *fmt, va_list args)
 	struct logctx *ctx = &_logctx;
 	int len = 0;
 
+	if (ctx->log_syslogfd != -1) {
+		char buf[LOGERR_SYSLOGBUF];
+
+		memcpy(buf, &pri, sizeof(pri));
+		len = vsnprintf(buf + sizeof(pri), sizeof(buf) - sizeof(pri),
+		    fmt, args);
+		if (len != -1)
+			len = (int)write(ctx->log_syslogfd, buf,
+			    ((size_t)++len) + sizeof(pri));
+		return len;
+	}
+
 	if (ctx->log_opts & LOGERR_ERR &&
 	    (pri <= LOG_ERR ||
 	    (!(ctx->log_opts & LOGERR_QUIET) && pri <= LOG_INFO) ||
 	    (ctx->log_opts & LOGERR_DEBUG && pri <= LOG_DEBUG)))
 		len = vlogprintf_r(ctx, stderr, fmt, args);
-
-	if (!(ctx->log_opts & LOGERR_LOG))
-		return len;
 
 #ifndef SMALL
 	if (ctx->log_file != NULL &&
@@ -213,7 +230,9 @@ vlogmessage(int pri, const char *fmt, va_list args)
 		len = vlogprintf_r(ctx, ctx->log_file, fmt, args);
 #endif
 
-	vsyslog(pri, fmt, args);
+	if (ctx->log_opts & LOGERR_LOG)
+		vsyslog(pri, fmt, args);
+
 	return len;
 }
 #if defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ > 5))
@@ -331,6 +350,43 @@ log_errx(const char *fmt, ...)
 	va_end(args);
 }
 
+int
+loggetsyslogfd(void)
+{
+	struct logctx *ctx = &_logctx;
+
+	return ctx->log_syslogfd;
+}
+
+void
+logsetsyslogfd(int fd)
+{
+	struct logctx *ctx = &_logctx;
+
+	ctx->log_syslogfd = fd;
+}
+
+int
+loghandlesyslogfd(int fd)
+{
+	char buf[LOGERR_SYSLOGBUF];
+	int len, pri;
+
+	len = (int)read(fd, buf, sizeof(buf));
+	if (len == -1)
+		return -1;
+
+	/* Ensure we have pri and a terminator */
+	if (len < (int)sizeof(pri) + 1 || buf[len - 1] != '\0') {
+		errno = EINVAL;
+		return -1;
+	}
+
+	memcpy(&pri, buf, sizeof(pri));
+	logmessage(pri, "%s", buf + sizeof(pri));
+	return len;
+}
+
 unsigned int
 loggetopts(void)
 {
@@ -373,15 +429,9 @@ logopen(const char *path)
 
 	(void)setvbuf(stderr, ctx->log_buf, _IOLBF, sizeof(ctx->log_buf));
 
-	if (!(ctx->log_opts & LOGERR_LOG))
-		return 1;
-
-#ifdef LOG_NDELAY
-	opts |= LOG_NDELAY;
-#endif
 	if (ctx->log_opts & LOGERR_LOG_PID)
 		opts |= LOG_PID;
-	openlog(NULL, opts, LOGERR_SYSLOG_FACILITY);
+	openlog(getprogname(), opts, LOGERR_SYSLOG_FACILITY);
 	if (path == NULL)
 		return 1;
 
@@ -410,7 +460,7 @@ logclose(void)
 	fclose(ctx->log_file);
 	ctx->log_file = NULL;
 #endif
-#if defined(LOGERR_TAG) && defined(__linux__)
+#if defined(__linux__)
 	free(_logprog);
 #endif
 }
