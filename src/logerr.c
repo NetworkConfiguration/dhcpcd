@@ -48,14 +48,15 @@
 #endif
 
 /* syslog protocol is 1k message max, RFC 3164 section 4.1 */
-#define LOGERR_SYSLOGBUF	1024 + sizeof(int)
+#define LOGERR_SYSLOGBUF	1024 + sizeof(int) + sizeof(pid_t)
 
 #define UNUSED(a)		(void)(a)
 
 struct logctx {
 	char		 log_buf[BUFSIZ];
 	unsigned int	 log_opts;
-	int		 log_syslogfd;
+	int		 log_fd;
+	pid_t		 log_pid;
 #ifndef SMALL
 	FILE		*log_file;
 #ifdef LOGERR_TAG
@@ -67,7 +68,8 @@ struct logctx {
 static struct logctx _logctx = {
 	/* syslog style, but without the hostname or tag. */
 	.log_opts = LOGERR_LOG | LOGERR_LOG_DATE | LOGERR_LOG_PID,
-	.log_syslogfd = -1,
+	.log_fd = -1,
+	.log_pid = 0,
 };
 
 #if defined(__linux__)
@@ -155,7 +157,13 @@ vlogprintf_r(struct logctx *ctx, FILE *stream, const char *fmt, va_list args)
 	log_pid = ((stream == stderr && ctx->log_opts & LOGERR_ERR_PID) ||
 	    (stream != stderr && ctx->log_opts & LOGERR_LOG_PID));
 	if (log_pid) {
-		if ((e = fprintf(stream, "[%d]", getpid())) == -1)
+		pid_t pid;
+
+		if (ctx->log_pid == 0)
+			pid = getpid();
+		else
+			pid = ctx->log_pid;
+		if ((e = fprintf(stream, "[%d]", pid)) == -1)
 			return -1;
 		len += e;
 	}
@@ -206,15 +214,19 @@ vlogmessage(int pri, const char *fmt, va_list args)
 	struct logctx *ctx = &_logctx;
 	int len = 0;
 
-	if (ctx->log_syslogfd != -1) {
+	if (ctx->log_fd != -1) {
 		char buf[LOGERR_SYSLOGBUF];
+		pid_t pid;
 
 		memcpy(buf, &pri, sizeof(pri));
-		len = vsnprintf(buf + sizeof(pri), sizeof(buf) - sizeof(pri),
+		pid = getpid();
+		memcpy(buf + sizeof(pri), &pid, sizeof(pid));
+		len = vsnprintf(buf + sizeof(pri) + sizeof(pid),
+		    sizeof(buf) - sizeof(pri) - sizeof(pid),
 		    fmt, args);
 		if (len != -1)
-			len = (int)write(ctx->log_syslogfd, buf,
-			    ((size_t)++len) + sizeof(pri));
+			len = (int)write(ctx->log_fd, buf,
+			    ((size_t)++len) + sizeof(pri) + sizeof(pid));
 		return len;
 	}
 
@@ -351,24 +363,31 @@ log_errx(const char *fmt, ...)
 }
 
 int
-loggetsyslogfd(void)
+loggetfd(void)
 {
 	struct logctx *ctx = &_logctx;
 
-	return ctx->log_syslogfd;
+	return ctx->log_fd;
 }
 
 void
-logsetsyslogfd(int fd)
+logsetfd(int fd)
 {
 	struct logctx *ctx = &_logctx;
 
-	ctx->log_syslogfd = fd;
+	ctx->log_fd = fd;
+#ifndef SMALL
+	if (fd != -1 && ctx->log_file != NULL) {
+		fclose(ctx->log_file);
+		ctx->log_file = NULL;
+	}
+#endif
 }
 
 int
-loghandlesyslogfd(int fd)
+logreadfd(int fd)
 {
+	struct logctx *ctx = &_logctx;
 	char buf[LOGERR_SYSLOGBUF];
 	int len, pri;
 
@@ -376,14 +395,18 @@ loghandlesyslogfd(int fd)
 	if (len == -1)
 		return -1;
 
-	/* Ensure we have pri and a terminator */
-	if (len < (int)sizeof(pri) + 1 || buf[len - 1] != '\0') {
+	/* Ensure we have pri, pid and a terminator */
+	if (len < (int)(sizeof(pri) + sizeof(pid_t) + 1) ||
+	    buf[len - 1] != '\0')
+	{
 		errno = EINVAL;
 		return -1;
 	}
 
 	memcpy(&pri, buf, sizeof(pri));
-	logmessage(pri, "%s", buf + sizeof(pri));
+	memcpy(&ctx->log_pid, buf + sizeof(pri), sizeof(ctx->log_pid));
+	logmessage(pri, "%s", buf + sizeof(pri) + sizeof(ctx->log_pid));
+	ctx->log_pid = 0;
 	return len;
 }
 

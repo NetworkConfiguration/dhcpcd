@@ -561,6 +561,10 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 			rlen = sizeof(mtime);
 		}
 		break;
+	case PS_LOGREOPEN:
+		logclose();
+		err = logopen(ctx->logfile);
+		break;
 #ifdef AUTH
 	case PS_AUTH_MONORDM:
 		err = ps_root_monordm(data, len);
@@ -781,11 +785,11 @@ ps_root_dispatch(void *arg)
 }
 
 static void
-ps_root_syslog(void *arg)
+ps_root_log(void *arg)
 {
 	struct dhcpcd_ctx *ctx = arg;
 
-	if (loghandlesyslogfd(ctx->ps_syslog_fd) == -1)
+	if (logreadfd(ctx->ps_log_fd) == -1)
 		logerr(__func__);
 }
 
@@ -816,9 +820,9 @@ ps_root_start(struct dhcpcd_ctx *ctx)
 	    ps_root_startcb, ps_root_signalcb, 0);
 
 	if (pid == 0) {
-		ctx->ps_syslog_fd = logfd[1];
-		if (eloop_event_add(ctx->eloop, ctx->ps_syslog_fd,
-		    ps_root_syslog, ctx) == -1)
+		ctx->ps_log_fd = logfd[1];
+		if (eloop_event_add(ctx->eloop, ctx->ps_log_fd,
+		    ps_root_log, ctx) == -1)
 			return -1;
 		close(logfd[0]);
 		ctx->ps_data_fd = datafd[1];
@@ -827,7 +831,7 @@ ps_root_start(struct dhcpcd_ctx *ctx)
 	} else if (pid == -1)
 		return -1;
 
-	logsetsyslogfd(logfd[0]);
+	logsetfd(logfd[0]);
 	close(logfd[1]);
 
 	ctx->ps_data_fd = datafd[0];
@@ -928,6 +932,15 @@ ps_root_filemtime(struct dhcpcd_ctx *ctx, const char *file, time_t *time)
 	    file, strlen(file) + 1) == -1)
 		return -1;
 	return ps_root_readerror(ctx, time, sizeof(*time));
+}
+
+ssize_t
+ps_root_logreopen(struct dhcpcd_ctx *ctx)
+{
+
+	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_LOGREOPEN, 0, NULL, 0) == -1)
+		return -1;
+	return ps_root_readerror(ctx, NULL, 0);
 }
 
 #ifdef PRIVSEP_GETIFADDRS
