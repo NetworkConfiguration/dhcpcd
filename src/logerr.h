@@ -76,10 +76,10 @@ __printflike(2, 3) void logerrmessage(int pri, const char *fmt, ...);
 #define logerr(...)	log_err(__VA_ARGS__)
 #define logerrx(...)	log_errx(__VA_ARGS__)
 
-/* For syslog in a chroot */
-int loggetsyslogfd(void);
-void logsetsyslogfd(int);
-int loghandlesyslogfd(int);
+/* For logging in a chroot */
+int loggetfd(void);
+void logsetfd(int);
+int logreadfd(int);
 
 unsigned int loggetopts(void);
 void logsetopts(unsigned int);
