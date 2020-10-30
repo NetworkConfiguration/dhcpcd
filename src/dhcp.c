@@ -2082,12 +2082,14 @@ dhcp_addr_duplicated(struct interface *ifp, struct in_addr *ia)
 
 #ifdef ARP
 #ifdef KERNEL_RFC5227
+#ifdef ARPING
 static void
 dhcp_arp_announced(struct arp_state *state)
 {
 
 	arp_free(state);
 }
+#endif
 #else
 static void
 dhcp_arp_defend_failed(struct arp_state *astate)
