@@ -1860,7 +1860,7 @@ main(int argc, char **argv, char **envp)
 	ctx.dhcp6_wfd = -1;
 #endif
 #ifdef PRIVSEP
-	ctx.ps_root_fd = ctx.ps_data_fd = -1;
+	ctx.ps_root_fd = ctx.ps_syslog_fd = ctx.ps_data_fd = -1;
 	ctx.ps_inet_fd = ctx.ps_control_fd = -1;
 	TAILQ_INIT(&ctx.ps_processes);
 #endif

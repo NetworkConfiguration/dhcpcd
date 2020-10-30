@@ -780,18 +780,34 @@ ps_root_dispatch(void *arg)
 		logerr(__func__);
 }
 
+static void
+ps_root_syslog(void *arg)
+{
+	struct dhcpcd_ctx *ctx = arg;
+
+	if (loghandlesyslogfd(ctx->ps_syslog_fd) == -1)
+		logerr(__func__);
+}
+
 pid_t
 ps_root_start(struct dhcpcd_ctx *ctx)
 {
-	int fd[2];
+	int logfd[2], datafd[2];
 	pid_t pid;
 
-	if (socketpair(AF_UNIX, SOCK_DGRAM | SOCK_CXNB, 0, fd) == -1)
-		return -1;
-	if (ps_setbuf_fdpair(fd) == -1)
+	if (xsocketpair(AF_UNIX, SOCK_DGRAM | SOCK_CXNB, 0, logfd) == -1)
 		return -1;
 #ifdef PRIVSEP_RIGHTS
-	if (ps_rights_limit_fdpair(fd) == -1)
+	if (ps_rights_limit_fdpair(logfd) == -1)
+		return -1;
+#endif
+
+	if (socketpair(AF_UNIX, SOCK_DGRAM | SOCK_CXNB, 0, datafd) == -1)
+		return -1;
+	if (ps_setbuf_fdpair(datafd) == -1)
+		return -1;
+#ifdef PRIVSEP_RIGHTS
+	if (ps_rights_limit_fdpair(datafd) == -1)
 		return -1;
 #endif
 
@@ -800,14 +816,22 @@ ps_root_start(struct dhcpcd_ctx *ctx)
 	    ps_root_startcb, ps_root_signalcb, 0);
 
 	if (pid == 0) {
-		ctx->ps_data_fd = fd[1];
-		close(fd[0]);
+		ctx->ps_syslog_fd = logfd[1];
+		if (eloop_event_add(ctx->eloop, ctx->ps_syslog_fd,
+		    ps_root_syslog, ctx) == -1)
+			return -1;
+		close(logfd[0]);
+		ctx->ps_data_fd = datafd[1];
+		close(datafd[0]);
 		return 0;
 	} else if (pid == -1)
 		return -1;
 
-	ctx->ps_data_fd = fd[0];
-	close(fd[1]);
+	logsetsyslogfd(logfd[0]);
+	close(logfd[1]);
+
+	ctx->ps_data_fd = datafd[0];
+	close(datafd[1]);
 	if (eloop_event_add(ctx->eloop, ctx->ps_data_fd,
 	    ps_root_dispatch, ctx) == -1)
 		return -1;
