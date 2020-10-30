@@ -1520,21 +1520,15 @@ again:
 #endif
 }
 
-void
-dhcp_close(struct interface *ifp)
+static void
+dhcp_closebpf(struct interface *ifp)
 {
 	struct dhcpcd_ctx *ctx = ifp->ctx;
 	struct dhcp_state *state = D_STATE(ifp);
 
-	if (state == NULL)
-		return;
-
 #ifdef PRIVSEP
-	if (IN_PRIVSEP_SE(ctx)) {
+	if (IN_PRIVSEP_SE(ctx))
 		ps_bpf_closebootp(ifp);
-		if (state->addr != NULL)
-			ps_inet_closebootp(state->addr);
-	}
 #endif
 
 	if (state->bpf != NULL) {
@@ -1542,11 +1536,38 @@ dhcp_close(struct interface *ifp)
 		bpf_close(state->bpf);
 		state->bpf = NULL;
 	}
+}
+
+static void
+dhcp_closeinet(struct interface *ifp)
+{
+	struct dhcpcd_ctx *ctx = ifp->ctx;
+	struct dhcp_state *state = D_STATE(ifp);
+
+#ifdef PRIVSEP
+	if (IN_PRIVSEP_SE(ctx)) {
+		if (state->addr != NULL)
+			ps_inet_closebootp(state->addr);
+	}
+#endif
+
 	if (state->udp_rfd != -1) {
 		eloop_event_delete(ctx->eloop, state->udp_rfd);
 		close(state->udp_rfd);
 		state->udp_rfd = -1;
 	}
+}
+
+void
+dhcp_close(struct interface *ifp)
+{
+	struct dhcp_state *state = D_STATE(ifp);
+
+	if (state == NULL)
+		return;
+
+	dhcp_closebpf(ifp);
+	dhcp_closeinet(ifp);
 
 	state->interval = 0;
 }
@@ -1756,6 +1777,9 @@ send_message(struct interface *ifp, uint8_t type,
 		to.s_addr = state->lease.server.s_addr;
 	else
 		to.s_addr = INADDR_BROADCAST;
+
+	logdebugx("from %s", inet_ntoa(from));
+	logdebugx("to   %s", inet_ntoa(to));
 
 	/*
 	 * If not listening on the unspecified address we can
@@ -2321,22 +2345,23 @@ dhcp_bind(struct interface *ifp)
 			logerr("dhcp_writefile: %s", state->leasefile);
 	}
 
+	old_state = state->added;
+
 	/* Close the BPF filter as we can now receive DHCP messages
 	 * on a UDP socket. */
-	old_state = state->added;
-	if (ctx->options & DHCPCD_MASTER ||
-	    state->old == NULL ||
-	    state->old->yiaddr != state->new->yiaddr || old_state & STATE_FAKE)
-		dhcp_close(ifp);
+	dhcp_closebpf(ifp);
 
+	/* Add the address */
 	ipv4_applyaddr(ifp);
 
 	/* If not in master mode, open an address specific socket. */
 	if (ctx->options & DHCPCD_MASTER ||
 	    (state->old != NULL &&
-	    state->old->yiaddr == state->new->yiaddr &&
-	    old_state & STATE_ADDED && !(old_state & STATE_FAKE)))
+	     state->old->yiaddr == state->new->yiaddr &&
+	     old_state & STATE_ADDED && !(old_state & STATE_FAKE)))
 		return;
+
+	dhcp_closeinet(ifp);
 
 #ifdef PRIVSEP
 	if (IN_PRIVSEP_SE(ctx)) {
