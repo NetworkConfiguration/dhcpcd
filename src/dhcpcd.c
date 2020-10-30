@@ -1422,13 +1422,15 @@ dhcpcd_signal_cb(int sig, void *arg)
 		return;
 	case SIGUSR2:
 		loginfox(sigmsg, "SIGUSR2", "reopening log");
+#ifdef PRIVSEP
 		if (IN_PRIVSEP(ctx)) {
 			if (ps_root_logreopen(ctx) == -1)
 				logerr("ps_root_logreopen");
-		} else {
-			if (logopen(ctx->logfile) == -1)
-				logerr("logopen");
+			return;
 		}
+#endif
+		if (logopen(ctx->logfile) == -1)
+			logerr("logopen");
 		return;
 	case SIGCHLD:
 		while (waitpid(-1, NULL, WNOHANG) > 0)
