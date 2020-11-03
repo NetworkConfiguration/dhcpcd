@@ -743,6 +743,7 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 	struct priv *priv;
 #ifdef INET
 	struct in_addr addr, net, brd;
+	int ret;
 #endif
 #ifdef INET6
 	struct in6_addr addr6;
@@ -805,7 +806,11 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 
 		/* Validate RTM_DELADDR really means address deleted
 		 * and anything else really means address exists. */
-		if (if_addressexists(ifp, &addr) == 1) {
+		ret = if_addressexists(ifp, &addr);
+		if (ret == -1) {
+			logerr("if_addressexists: %s", inet_ntoa(addr));
+			break;
+		} else if (ret == 1) {
 			if (nlm->nlmsg_type == RTM_DELADDR)
 				break;
 		} else {
@@ -1080,11 +1085,8 @@ if_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct nlmsghdr *hdr,
 
 	switch (protocol) {
 	case NETLINK_ROUTE:
-		if (hdr->nlmsg_type != RTM_GETADDR) {
-			s = priv->route_fd;
-			break;
-		}
-		/* FALLTHROUGH */
+		s = priv->route_fd;
+		break;
 	case NETLINK_GENERIC:
 		s = priv->generic_fd;
 #if 0
@@ -1442,6 +1444,7 @@ struct ifiaddr
 {
 	unsigned int ifa_ifindex;
 	struct in_addr ifa_addr;
+	bool ifa_found;
 };
 
 static int
@@ -1457,13 +1460,18 @@ _if_addressexists(__unused struct dhcpcd_ctx *ctx,
 	ifa = NLMSG_DATA(nlm);
 	if (ifa->ifa_index != ia->ifa_ifindex || ifa->ifa_family != AF_INET)
 		return 0;
+
 	rta = IFA_RTA(ifa);
 	len = NLMSG_PAYLOAD(nlm, sizeof(*ifa));
 	for (; RTA_OK(rta, len); rta = RTA_NEXT(rta, len)) {
 		switch (rta->rta_type) {
 		case IFA_LOCAL:
 			memcpy(&this_addr, RTA_DATA(rta), sizeof(this_addr));
-			return this_addr == ia->ifa_addr.s_addr ? 1 : 0;
+			if (this_addr == ia->ifa_addr.s_addr) {
+				ia->ifa_found = true;
+				return 1;
+			}
+			break;
 		}
 	}
 	return 0;
@@ -1475,17 +1483,21 @@ if_addressexists(struct interface *ifp, struct in_addr *addr)
 	struct ifiaddr ia = {
 		.ifa_ifindex = ifp->index,
 		.ifa_addr = *addr,
+		.ifa_found = false,
 	};
 	struct nlma nlm = {
 	    .hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifaddrmsg)),
 	    .hdr.nlmsg_type = RTM_GETADDR,
-	    .hdr.nlmsg_flags = NLM_F_DUMP | NLM_F_REQUEST,
+	    .hdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_MATCH,
 	    .ifa.ifa_family = AF_INET,
 	    .ifa.ifa_index = ifp->index,
 	};
 
-	return if_sendnetlink(ifp->ctx, NETLINK_ROUTE, &nlm.hdr,
+	int error = if_sendnetlink(ifp->ctx, NETLINK_ROUTE, &nlm.hdr,
 	    &_if_addressexists, &ia);
+	if (error == -1)
+		return -1;
+	return ia.ifa_found ? 1 : 0;
 }
 #endif
 
