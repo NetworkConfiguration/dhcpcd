@@ -403,7 +403,7 @@ if_getnetworknamespace(char *buf, size_t len)
 		snprintf(file, sizeof(file), "/var/run/netns/%s", de->d_name);
 		if (stat(file, &sb_netns) == -1)
 			continue;
-		if (sb_self.st_dev != sb_netns.st_dev &&
+		if (sb_self.st_dev != sb_netns.st_dev ||
 		    sb_self.st_ino != sb_netns.st_ino)
 			continue;
 		strlcpy(buf, de->d_name, len);
