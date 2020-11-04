@@ -165,6 +165,8 @@ const struct option cf_options[] = {
 	{"inactive",        no_argument,       NULL, O_INACTIVE},
 	{"mudurl",          required_argument, NULL, O_MUDURL},
 	{"link_rcvbuf",     required_argument, NULL, O_LINK_RCVBUF},
+	{"configure",       no_argument,       NULL, O_CONFIGURE},
+	{"noconfigure",     no_argument,       NULL, O_NOCONFIGURE},
 	{NULL,              0,                 NULL, '\0'}
 };
 
@@ -2244,6 +2246,12 @@ invalid_token:
 		}
 #endif
 		break;
+	case O_CONFIGURE:
+		ifo->options |= DHCPCD_CONFIGURE;
+		break;
+	case O_NOCONFIGURE:
+		ifo->options &= ~DHCPCD_CONFIGURE;
+		break;
 	default:
 		return 0;
 	}
@@ -2363,7 +2371,8 @@ read_config(struct dhcpcd_ctx *ctx,
 	if ((ifo = default_config(ctx)) == NULL)
 		return NULL;
 	if (default_options == 0) {
-		default_options |= DHCPCD_DAEMONISE | DHCPCD_GATEWAY;
+		default_options |= DHCPCD_DAEMONISE |
+			DHCPCD_CONFIGURE | DHCPCD_GATEWAY;
 #ifdef INET
 		skip = socket(PF_INET, SOCK_DGRAM, 0);
 		if (skip != -1) {
