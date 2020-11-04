@@ -362,7 +362,7 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 		return pid;
 	}
 
-	ctx->options |= DHCPCD_UNPRIV | DHCPCD_FORKED;
+	ctx->options |= DHCPCD_FORKED;
 	if (ctx->fork_fd != -1) {
 		close(ctx->fork_fd);
 		ctx->fork_fd = -1;
