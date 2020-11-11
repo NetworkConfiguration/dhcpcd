@@ -2244,6 +2244,9 @@ printpidfile:
 	if (ctx.stdin_valid && freopen(_PATH_DEVNULL, "w", stdin) == NULL)
 		logwarn("freopen stdin");
 
+	if (!(ctx.options & DHCPCD_DAEMONISE))
+		goto start_master;
+
 #if defined(USE_SIGNALS) && !defined(THERE_IS_NO_FORK)
 	if (xsocketpair(AF_UNIX, SOCK_DGRAM | SOCK_CXNB, 0, fork_fd) == -1 ||
 	    (ctx.stderr_valid &&
@@ -2335,8 +2338,9 @@ printpidfile:
 
 	/* We have now forked, setsid, forked once more.
 	 * From this point on, we are the controlling daemon. */
-	ctx.options |= DHCPCD_STARTED;
 	logdebugx("spawned master process on PID %d", getpid());
+start_master:
+	ctx.options |= DHCPCD_STARTED;
 	if ((pid = pidfile_lock(ctx.pidfile)) != 0) {
 		logerr("%s: pidfile_lock %d", __func__, pid);
 #ifdef PRIVSEP
