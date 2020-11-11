@@ -2179,6 +2179,9 @@ printpidfile:
 		if (!(ctx.options & DHCPCD_MASTER))
 			ctx.control_fd = control_open(argv[optind], family,
 			    ctx.options & DHCPCD_DUMPLEASE);
+		if (!(ctx.options & DHCPCD_MASTER) && ctx.control_fd == -1)
+			ctx.control_fd = control_open(argv[optind], AF_UNSPEC,
+			    ctx.options & DHCPCD_DUMPLEASE);
 		if (ctx.control_fd == -1)
 			ctx.control_fd = control_open(NULL, AF_UNSPEC,
 			    ctx.options & DHCPCD_DUMPLEASE);

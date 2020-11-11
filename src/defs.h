@@ -60,10 +60,7 @@
 # define PIDFILE		RUNDIR "/%s%s%spid"
 #endif
 #ifndef CONTROLSOCKET
-# define CONTROLSOCKET		RUNDIR "/%s%s%ssock"
-#endif
-#ifndef UNPRIVSOCKET
-# define UNPRIVSOCKET		RUNDIR "/unpriv.sock"
+# define CONTROLSOCKET		RUNDIR "/%s%s%s%ssock"
 #endif
 #ifndef RDM_MONOFILE
 # define RDM_MONOFILE		DBDIR "/rdm_monotonic"
