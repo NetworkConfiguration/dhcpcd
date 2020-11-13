@@ -236,8 +236,14 @@ static struct sock_filter ps_seccomp_filter[] = {
 #ifdef __NR_fcntl
 	SECCOMP_ALLOW(__NR_fcntl),
 #endif
+#ifdef __NR_fcntl64
+	SECCOMP_ALLOW(__NR_fcntl64),
+#endif
 #ifdef __NR_fstat
 	SECCOMP_ALLOW(__NR_fstat),
+#endif
+#ifdef __NR_fstat64
+	SECCOMP_ALLOW(__NR_fstat64),
 #endif
 #ifdef __NR_gettimeofday
 	SECCOMP_ALLOW(__NR_gettimeofday),
