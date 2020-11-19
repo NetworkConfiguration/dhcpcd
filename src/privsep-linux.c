@@ -257,6 +257,8 @@ static struct sock_filter ps_seccomp_filter[] = {
 	SECCOMP_ALLOW_ARG(__NR_ioctl, 1, SIOCGIFINDEX),
 	SECCOMP_ALLOW_ARG(__NR_ioctl, 1, SIOCGIFMTU),
 	SECCOMP_ALLOW_ARG(__NR_ioctl, 1, SIOCGIFVLAN),
+	/* printf on some platforms seems to use this ioctl */
+	SECCOMP_ALLOW_ARG(__NR_ioctl, 1, TCGETS),
 	/* SECCOMP BPF is newer than nl80211 so we don't need SIOCGIWESSID
 	 * which lives in the impossible to include linux/wireless.h header */
 #endif
