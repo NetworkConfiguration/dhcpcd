@@ -2343,6 +2343,8 @@ default_config(struct dhcpcd_ctx *ctx)
 #endif
 
 	/* Inherit some global defaults */
+	if (ctx->options & DHCPCD_CONFIGURE)
+		ifo->options |= DHCPCD_CONFIGURE;
 	if (ctx->options & DHCPCD_PERSISTENT)
 		ifo->options |= DHCPCD_PERSISTENT;
 	if (ctx->options & DHCPCD_SLAACPRIVATE)
@@ -2371,8 +2373,8 @@ read_config(struct dhcpcd_ctx *ctx,
 	if ((ifo = default_config(ctx)) == NULL)
 		return NULL;
 	if (default_options == 0) {
-		default_options |= DHCPCD_DAEMONISE |
-			DHCPCD_CONFIGURE | DHCPCD_GATEWAY;
+		default_options |= DHCPCD_CONFIGURE | DHCPCD_DAEMONISE |
+		    DHCPCD_GATEWAY;
 #ifdef INET
 		skip = socket(PF_INET, SOCK_DGRAM, 0);
 		if (skip != -1) {
