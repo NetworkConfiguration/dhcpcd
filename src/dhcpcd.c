@@ -991,17 +991,20 @@ void
 dhcpcd_activateinterface(struct interface *ifp, unsigned long long options)
 {
 
-	if (!ifp->active) {
-		ifp->active = IF_ACTIVE;
-		dhcpcd_initstate2(ifp, options);
-		/* It's possible we might not have been able to load
-		 * a config. */
-		if (ifp->active) {
-			configure_interface1(ifp);
-			run_preinit(ifp);
-			dhcpcd_prestartinterface(ifp);
-		}
-	}
+	if (ifp->active)
+		return;
+
+	ifp->active = IF_ACTIVE;
+	dhcpcd_initstate2(ifp, options);
+
+	/* It's possible we might not have been able to load
+	 * a config. */
+	if (!ifp->active)
+		return;
+
+	configure_interface1(ifp);
+	run_preinit(ifp);
+	dhcpcd_prestartinterface(ifp);
 }
 
 int
