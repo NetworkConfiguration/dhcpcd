@@ -2540,7 +2540,7 @@ exit_failure:
 	i = EXIT_FAILURE;
 
 exit1:
-	if (control_stop(&ctx) == -1)
+	if (!(ctx.options & DHCPCD_TEST) && control_stop(&ctx) == -1)
 		logerr("%s: control_stop", __func__);
 	if (ifaddrs != NULL) {
 #ifdef PRIVSEP_GETIFADDRS
