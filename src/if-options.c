@@ -1002,8 +1002,16 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		else if (strcmp(arg, "uuid") == 0)
 			ctx->duid_type = DUID_UUID;
 		else {
-			logwarnx("%s: invalid duid type", arg);
-			ctx->duid_type = DUID_DEFAULT;
+			dl = hwaddr_aton(NULL, arg);
+			if (dl != 0) {
+				no = realloc(ctx->duid, dl);
+				if (no == NULL)
+					logerrx(__func__);
+				else {
+					ctx->duid = no;
+					ctx->duid_len = hwaddr_aton(no, arg);
+				}
+			}
 		}
 		break;
 	case 'E':

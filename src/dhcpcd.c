@@ -841,13 +841,17 @@ dhcpcd_initduid(struct dhcpcd_ctx *ctx, struct interface *ifp)
 {
 	char buf[DUID_LEN * 3];
 
-	if (ctx->duid != NULL)
+	if (ctx->duid != NULL) {
+		if (ifp == NULL)
+			goto log;
 		return;
+	}
 
 	duid_init(ctx, ifp);
 	if (ctx->duid == NULL)
 		return;
 
+log:
 	loginfox("DUID %s",
 	    hwaddr_ntoa(ctx->duid, ctx->duid_len, buf, sizeof(buf)));
 }
