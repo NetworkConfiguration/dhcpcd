@@ -1883,6 +1883,7 @@ main(int argc, char **argv, char **envp)
 		logopts |= LOGERR_ERR;
 
 	i = 0;
+
 	while ((opt = getopt_long(argc, argv,
 	    ctx.options & DHCPCD_PRINT_PIDFILE ? NOERR_IF_OPTS : IF_OPTS,
 	    cf_options, &oi)) != -1)
@@ -1957,6 +1958,9 @@ main(int argc, char **argv, char **envp)
 		}
 	}
 
+	if (optind != argc - 1)
+		ctx.options |= DHCPCD_MASTER;
+
 	logsetopts(logopts);
 	logopen(ctx.logfile);
 
@@ -1973,6 +1977,7 @@ main(int argc, char **argv, char **envp)
 			goto printpidfile;
 		goto exit_failure;
 	}
+
 	opt = add_options(&ctx, NULL, ifo, argc, argv);
 	if (opt != 1) {
 		if (ctx.options & DHCPCD_PRINT_PIDFILE)
@@ -2013,6 +2018,7 @@ main(int argc, char **argv, char **envp)
 		goto exit_success;
 	}
 	ctx.options |= ifo->options;
+
 	if (i == 1 || i == 3) {
 		if (i == 1)
 			ctx.options |= DHCPCD_TEST;

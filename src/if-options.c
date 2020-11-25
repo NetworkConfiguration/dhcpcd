@@ -134,9 +134,9 @@ const struct option cf_options[] = {
 	{"noipv6",          no_argument,       NULL, O_NOIPV6},
 	{"noalias",         no_argument,       NULL, O_NOALIAS},
 	{"iaid",            required_argument, NULL, O_IAID},
-	{"ia_na",           no_argument,       NULL, O_IA_NA},
-	{"ia_ta",           no_argument,       NULL, O_IA_TA},
-	{"ia_pd",           no_argument,       NULL, O_IA_PD},
+	{"ia_na",           optional_argument, NULL, O_IA_NA},
+	{"ia_ta",           optional_argument, NULL, O_IA_TA},
+	{"ia_pd",           optional_argument, NULL, O_IA_PD},
 	{"hostname_short",  no_argument,       NULL, O_HOSTNAME_SHORT},
 	{"dev",             required_argument, NULL, O_DEV},
 	{"nodev",           no_argument,       NULL, O_NODEV},
@@ -1344,7 +1344,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 #endif
 	case O_IAID:
 		ARG_REQUIRED;
-		if (!IN_CONFIG_BLOCK(ifo)) {
+		if (ctx->options & DHCPCD_MASTER && !IN_CONFIG_BLOCK(ifo)) {
 			logerrx("IAID must belong in an interface block");
 			return -1;
 		}
@@ -1386,7 +1386,9 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			logwarnx("%s: IA_PD not compiled in", ifname);
 			return -1;
 #else
-			if (!IN_CONFIG_BLOCK(ifo)) {
+			if (ctx->options & DHCPCD_MASTER &&
+			    !IN_CONFIG_BLOCK(ifo))
+			{
 				logerrx("IA PD must belong in an "
 				    "interface block");
 				return -1;
@@ -1394,7 +1396,9 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			i = D6_OPTION_IA_PD;
 #endif
 		}
-		if (!IN_CONFIG_BLOCK(ifo) && arg) {
+		if (ctx->options & DHCPCD_MASTER &&
+		    !IN_CONFIG_BLOCK(ifo) && arg)
+		{
 			logerrx("IA with IAID must belong in an "
 			    "interface block");
 			return -1;
