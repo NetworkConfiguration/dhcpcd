@@ -29,6 +29,7 @@
 #include <sys/ioctl.h>
 #include <sys/prctl.h>
 #include <sys/syscall.h>
+#include <sys/termios.h>	/* For TCGETS */
 
 #include <linux/audit.h>
 #include <linux/filter.h>
