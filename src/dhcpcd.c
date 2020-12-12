@@ -1285,8 +1285,9 @@ dhcpcd_handlehwaddr(struct interface *ifp,
 	}
 
 	if (ifp->hwtype != hwtype) {
-		loginfox("%s: hardware address type changed from %d to %d",
-		    ifp->name, ifp->hwtype, hwtype);
+		if (ifp->active)
+			loginfox("%s: hardware address type changed"
+			    " from %d to %d", ifp->name, ifp->hwtype, hwtype);
 		ifp->hwtype = hwtype;
 	}
 
@@ -1294,8 +1295,12 @@ dhcpcd_handlehwaddr(struct interface *ifp,
 	    (hwlen == 0 || memcmp(ifp->hwaddr, hwaddr, hwlen) == 0))
 		return;
 
-	loginfox("%s: new hardware address: %s", ifp->name,
-	    hwaddr_ntoa(hwaddr, hwlen, buf, sizeof(buf)));
+	if (ifp->active) {
+		loginfox("%s: old hardware address: %s", ifp->name,
+		    hwaddr_ntoa(ifp->hwaddr, ifp->hwlen, buf, sizeof(buf)));
+		loginfox("%s: new hardware address: %s", ifp->name,
+		    hwaddr_ntoa(hwaddr, hwlen, buf, sizeof(buf)));
+	}
 	ifp->hwlen = hwlen;
 	if (hwaddr != NULL)
 		memcpy(ifp->hwaddr, hwaddr, hwlen);
