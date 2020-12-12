@@ -1207,8 +1207,10 @@ dhcpcd_linkoverflow(struct dhcpcd_ctx *ctx)
 
 	socklen = sizeof(rcvbuflen);
 	if (getsockopt(ctx->link_fd, SOL_SOCKET,
-	    SO_RCVBUF, &rcvbuflen, &socklen) == -1)
+	    SO_RCVBUF, &rcvbuflen, &socklen) == -1) {
+		logerr("%s: getsockopt", __func__);
 		rcvbuflen = 0;
+	}
 #ifdef __linux__
 	else
 		rcvbuflen /= 2;
