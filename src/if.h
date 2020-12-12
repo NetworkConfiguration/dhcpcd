@@ -161,6 +161,7 @@ int if_domtu(const struct interface *, short int);
 #define if_getmtu(ifp) if_domtu((ifp), 0)
 #define if_setmtu(ifp, mtu) if_domtu((ifp), (mtu))
 int if_carrier(struct interface *, const void *);
+bool if_roaming(struct interface *);
 
 #ifdef ALIAS_ADDR
 int if_makealias(char *, size_t, const char *, int);

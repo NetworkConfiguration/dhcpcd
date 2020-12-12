@@ -410,6 +410,13 @@ if_carrier(struct interface *ifp, const void *ifadata)
 	return LINK_DOWN;
 }
 
+bool
+if_roaming(__unused struct interface *ifp)
+{
+
+	return false;
+}
+
 static void
 if_linkaddr(struct sockaddr_dl *sdl, const struct interface *ifp)
 {

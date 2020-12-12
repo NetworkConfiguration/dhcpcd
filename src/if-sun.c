@@ -245,6 +245,13 @@ err:
 	return LINK_UNKNOWN;
 }
 
+bool
+if_roaming(__unused struct interface *ifp)
+{
+
+	return false;
+}
+
 int
 if_mtu_os(const struct interface *ifp)
 {
