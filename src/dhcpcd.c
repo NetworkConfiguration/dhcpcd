@@ -695,35 +695,82 @@ dhcpcd_reportssid(struct interface *ifp)
 	loginfox("%s: connected to Access Point: %s", ifp->name, pssid);
 }
 
+static void
+dhcpcd_nocarrier_roaming(struct interface *ifp)
+{
+
+	loginfox("%s: carrier lost - roaming", ifp->name);
+
+	/*
+	 * XXX We should pass something like NOCARRIER_ROAMING
+	 * and set if_up=true; ifdown=false; so that the hook scripts
+	 * can make a decision to keep or discard the interface information.
+	 *
+	 * Currently they discard it (no carrier after all) which is
+	 * generally fine as new connections won't work and current
+	 * connections try to chug along as best as.
+	 * dhcpcd has been doing this since NetBSD-7 at least.
+	 *
+	 * However, for slow roaming this is poor for say web browsing
+	 * as new lookups will fail quickly giving a poor user experience.
+	 * We should improve this, but the hooks will require some work first
+	 * as we need to introduce a mechanism to sort interfaces by
+	 * carrier > roaming > nocarrier. Then the hooks know in which
+	 * order to apply their data, if at all.
+	 * This probably should be a user toggle.
+	 */
+	script_runreason(ifp, "NOCARRIER");
+
+#ifdef ARP
+	arp_drop(ifp);
+#endif
+#ifdef INET
+	dhcp_abort(ifp);
+#endif
+#ifdef DHCP6
+	dhcp6_abort(ifp);
+#endif
+}
+
 void
 dhcpcd_handlecarrier(struct interface *ifp, int carrier, unsigned int flags)
 {
 	bool was_link_up = if_is_link_up(ifp);
+	bool was_roaming = if_roaming(ifp);
 
 	ifp->carrier = carrier;
 	ifp->flags = flags;
 
 	if (!if_is_link_up(ifp)) {
-		if (!was_link_up || !ifp->active)
+		if (!ifp->active || (!was_link_up && !was_roaming))
 			return;
-		loginfox("%s: carrier lost", ifp->name);
-		script_runreason(ifp, "NOCARRIER");
+
+		/*
+		 * If the interface is roaming (generally on wireless)
+		 * then while we are not up, we are not down either.
+		 * Preserve the network state until we either disconnect
+		 * or re-connect.
+		 */
+		if (if_roaming(ifp)) {
+			dhcpcd_nocarrier_roaming(ifp);
+			return;
+		}
+
 #ifdef NOCARRIER_PRESERVE_IP
 		if (ifp->flags & IFF_UP &&
 		    !(ifp->options->options & DHCPCD_ANONYMOUS))
 		{
-#ifdef ARP
-			arp_drop(ifp);
+			/* This OS supports the roaming concept on any
+			 * interface. */
+			dhcpcd_nocarrier_roaming(ifp);
+			return;
+		}
 #endif
-#ifdef INET
-			dhcp_abort(ifp);
-#endif
-#ifdef DHCP6
-			dhcp6_abort(ifp);
-#endif
-		} else
-#endif
-			dhcpcd_drop(ifp, 0);
+
+		loginfox("%s: carrier lost", ifp->name);
+		script_runreason(ifp, "NOCARRIER");
+		dhcpcd_drop(ifp, 0);
+
 		if (ifp->options->options & DHCPCD_ANONYMOUS) {
 			bool is_up = ifp->flags & IFF_UP;
 
@@ -734,6 +781,7 @@ dhcpcd_handlecarrier(struct interface *ifp, int carrier, unsigned int flags)
 			if (is_up)
 				if_up(ifp);
 		}
+
 		return;
 	}
 
@@ -774,9 +822,7 @@ dhcpcd_handlecarrier(struct interface *ifp, int carrier, unsigned int flags)
 		    memcmp(ifp->ssid, ossid, ifp->ssid_len)) && ifp->active)
 		{
 			dhcpcd_reportssid(ifp);
-#ifdef NOCARRIER_PRESERVE_IP
 			dhcpcd_drop(ifp, 0);
-#endif
 #ifdef IPV4LL
 			ipv4ll_reset(ifp);
 #endif
@@ -788,17 +834,17 @@ dhcpcd_handlecarrier(struct interface *ifp, int carrier, unsigned int flags)
 
 	dhcpcd_initstate(ifp, 0);
 	script_runreason(ifp, "CARRIER");
+
 #ifdef INET6
-#ifdef NOCARRIER_PRESERVE_IP
 	/* Set any IPv6 Routers we remembered to expire faster than they
 	 * would normally as we maybe on a new network. */
 	ipv6nd_startexpire(ifp);
-#endif
 #ifdef IPV6_MANAGETEMPADDR
 	/* RFC4941 Section 3.5 */
 	ipv6_regentempaddrs(ifp);
 #endif
 #endif
+
 	dhcpcd_startinterface(ifp);
 }
 

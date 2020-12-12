@@ -515,6 +515,21 @@ if_carrier(struct interface *ifp, __unused const void *ifadata)
 	return ifp->flags & IFF_RUNNING ? LINK_UP : LINK_DOWN;
 }
 
+bool
+if_roaming(struct interface *ifp)
+{
+
+#ifdef IFF_LOWER_UP
+	if (!ifp->wireless ||
+	    ifp->flags & IFF_RUNNING ||
+	    (ifp->flags & (IFF_UP | IFF_LOWER_UP)) != (IFF_UP | IFF_LOWER_UP))
+		return false;
+	return true;
+#else
+	return false;
+#endif
+}
+
 int
 if_getnetlink(struct dhcpcd_ctx *ctx, struct iovec *iov, int fd, int flags,
     int (*cb)(struct dhcpcd_ctx *, void *, struct nlmsghdr *), void *cbarg)
