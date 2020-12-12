@@ -28,6 +28,7 @@
 
 #include <sys/ioctl.h>
 #include <sys/prctl.h>
+#include <sys/socket.h>
 #include <sys/syscall.h>
 #include <sys/termios.h>	/* For TCGETS */
 
@@ -251,6 +252,11 @@ static struct sock_filter ps_seccomp_filter[] = {
 #endif
 #ifdef __NR_getpid
 	SECCOMP_ALLOW(__NR_getpid),
+#endif
+#ifdef __NR_getsockopt
+	/* For route socket overflow */
+	SECCOMP_ALLOW_ARG(__NR_getsockopt, 1, SOL_SOCKET),
+	SECCOMP_ALLOW_ARG(__NR_getsockopt, 2, SO_RCVBUF),
 #endif
 #ifdef __NR_ioctl
 	SECCOMP_ALLOW_ARG(__NR_ioctl, 1, SIOCGIFFLAGS),
