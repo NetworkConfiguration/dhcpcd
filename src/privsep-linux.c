@@ -34,6 +34,7 @@
 
 #include <linux/audit.h>
 #include <linux/filter.h>
+#include <linux/net.h>
 #include <linux/seccomp.h>
 #include <linux/sockios.h>
 
@@ -310,6 +311,23 @@ static struct sock_filter ps_seccomp_filter[] = {
 #endif
 #ifdef __NR_sendto
 	SECCOMP_ALLOW(__NR_sendto),
+#endif
+#ifdef __NR_socketcall
+	/* i386 needs this and demonstrates why SECCOMP
+	 * is poor compared to OpenBSD pledge(2) and FreeBSD capsicum(4)
+	 * as this is soooo tied to the kernel API which changes per arch
+	 * and likely libc as well. */
+	SECCOMP_ALLOW_ARG(__NR_socketcall, 0, SYS_ACCEPT),
+	SECCOMP_ALLOW_ARG(__NR_socketcall, 0, SYS_ACCEPT4),
+	SECCOMP_ALLOW_ARG(__NR_socketcall, 0, SYS_LISTEN),
+	SECCOMP_ALLOW_ARG(__NR_socketcall, 0, SYS_GETSOCKOPT),	/* overflow */
+	SECCOMP_ALLOW_ARG(__NR_socketcall, 0, SYS_RECV),
+	SECCOMP_ALLOW_ARG(__NR_socketcall, 0, SYS_RECVFROM),
+	SECCOMP_ALLOW_ARG(__NR_socketcall, 0, SYS_RECVMSG),
+	SECCOMP_ALLOW_ARG(__NR_socketcall, 0, SYS_SEND),
+	SECCOMP_ALLOW_ARG(__NR_socketcall, 0, SYS_SENDMSG),
+	SECCOMP_ALLOW_ARG(__NR_socketcall, 0, SYS_SENDTO),
+	SECCOMP_ALLOW_ARG(__NR_socketcall, 0, SYS_SHUTDOWN),
 #endif
 #ifdef __NR_shutdown
 	SECCOMP_ALLOW(__NR_shutdown),
