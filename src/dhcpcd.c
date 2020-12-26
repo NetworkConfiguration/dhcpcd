@@ -2310,10 +2310,10 @@ printpidfile:
 	if (ctx.stdin_valid && freopen(_PATH_DEVNULL, "w", stdin) == NULL)
 		logwarn("freopen stdin");
 
+#if defined(USE_SIGNALS) && !defined(THERE_IS_NO_FORK)
 	if (!(ctx.options & DHCPCD_DAEMONISE))
 		goto start_master;
 
-#if defined(USE_SIGNALS) && !defined(THERE_IS_NO_FORK)
 	if (xsocketpair(AF_UNIX, SOCK_DGRAM | SOCK_CXNB, 0, fork_fd) == -1 ||
 	    (ctx.stderr_valid &&
 	    xsocketpair(AF_UNIX, SOCK_DGRAM | SOCK_CXNB, 0, stderr_fd) == -1))
