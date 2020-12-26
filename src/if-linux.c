@@ -167,10 +167,19 @@ static int if_addressexists(struct interface *, struct in_addr *);
 #define SYS_LAYER2	"/sys/class/net/%s/device/layer2"
 #define SYS_TUNTAP	"/sys/class/net/%s/tun_flags"
 
+#if defined(__aarch64__)
+static const char *mproc = "AArch64";
+int
+if_machinearch(char *str, size_t len)
+{
+
+	return snprintf(str, len, "%s", mproc);
+}
+#else
 static const char *mproc =
 #if defined(__alpha__)
 	"system type"
-#elif defined(__arm__) || defined(__aarch64__)
+#elif defined(__arm__)
 	"Hardware"
 #elif defined(__avr32__)
 	"cpu family"
@@ -232,6 +241,7 @@ if_machinearch(char *str, size_t len)
 	errno = ESRCH;
 	return -1;
 }
+#endif
 
 static int
 check_proc_int(struct dhcpcd_ctx *ctx, const char *path)
