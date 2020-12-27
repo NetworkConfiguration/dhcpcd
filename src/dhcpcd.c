@@ -734,21 +734,12 @@ dhcpcd_handlecarrier(struct interface *ifp, int carrier, unsigned int flags)
 		 * Preserve the network state until we either disconnect
 		 * or re-connect.
 		 */
-		if (if_roaming(ifp)) {
-			dhcpcd_nocarrier_roaming(ifp);
-			return;
-		}
-
-#ifdef NOCARRIER_PRESERVE_IP
-		if (ifp->flags & IFF_UP &&
-		    !(ifp->options->options & DHCPCD_ANONYMOUS))
+		if (!(ifp->options->options & DHCPCD_ANONYMOUS) &&
+		    if_roaming(ifp))
 		{
-			/* This OS supports the roaming concept on any
-			 * interface. */
 			dhcpcd_nocarrier_roaming(ifp);
 			return;
 		}
-#endif
 
 		loginfox("%s: carrier lost", ifp->name);
 		script_runreason(ifp, "NOCARRIER");

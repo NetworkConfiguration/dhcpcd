@@ -42,14 +42,6 @@
  * dhcpcd can poll it for the relevant flags periodically */
 #define IF_POLL_UP	100	/* milliseconds */
 
-/* Some systems have in-built IPv4 DAD.
- * However, we need them to do DAD at carrier up as well. */
-#ifdef IN_IFF_TENTATIVE
-#  ifdef __NetBSD__
-#    define NOCARRIER_PRESERVE_IP
-#  endif
-#endif
-
 /*
  * Systems which handle 1 address per alias.
  * Currenly this is just Solaris.
