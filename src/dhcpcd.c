@@ -700,7 +700,6 @@ dhcpcd_nocarrier_roaming(struct interface *ifp)
 {
 
 	loginfox("%s: carrier lost - roaming", ifp->name);
-	script_runreason(ifp, "NOCARRIER_ROAMING");
 
 #ifdef ARP
 	arp_drop(ifp);
@@ -711,6 +710,9 @@ dhcpcd_nocarrier_roaming(struct interface *ifp)
 #ifdef DHCP6
 	dhcp6_abort(ifp);
 #endif
+
+	rt_build(ifp->ctx, AF_UNSPEC);
+	script_runreason(ifp, "NOCARRIER_ROAMING");
 }
 
 void
