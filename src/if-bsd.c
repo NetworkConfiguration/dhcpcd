@@ -414,7 +414,10 @@ bool
 if_roaming(struct interface *ifp)
 {
 
-#ifdef IN_IFF_TENTATIVE
+/* Check for NetBSD as a safety measure.
+ * If other BSD's gain IN_IFF_TENTATIVE check they re-do DAD
+ * when the carrier comes up again. */
+#if defined(IN_IFF_TENTATIVE) && defined(__NetBSD__)
 	return ifp->flags & IFF_UP && ifp->carrier == LINK_DOWN;
 #else
 	UNUSED(ifp);
