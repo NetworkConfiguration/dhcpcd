@@ -411,10 +411,15 @@ if_carrier(struct interface *ifp, const void *ifadata)
 }
 
 bool
-if_roaming(__unused struct interface *ifp)
+if_roaming(struct interface *ifp)
 {
 
+#ifdef IN_IFF_TENTATIVE
+	return ifp->flags & IFF_UP && ifp->carrier == LINK_DOWN;
+#else
+	UNUSED(ifp);
 	return false;
+#endif
 }
 
 static void
