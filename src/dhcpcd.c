@@ -700,26 +700,7 @@ dhcpcd_nocarrier_roaming(struct interface *ifp)
 {
 
 	loginfox("%s: carrier lost - roaming", ifp->name);
-
-	/*
-	 * XXX We should pass something like NOCARRIER_ROAMING
-	 * and set if_up=true; ifdown=false; so that the hook scripts
-	 * can make a decision to keep or discard the interface information.
-	 *
-	 * Currently they discard it (no carrier after all) which is
-	 * generally fine as new connections won't work and current
-	 * connections try to chug along as best as.
-	 * dhcpcd has been doing this since NetBSD-7 at least.
-	 *
-	 * However, for slow roaming this is poor for say web browsing
-	 * as new lookups will fail quickly giving a poor user experience.
-	 * We should improve this, but the hooks will require some work first
-	 * as we need to introduce a mechanism to sort interfaces by
-	 * carrier > roaming > nocarrier. Then the hooks know in which
-	 * order to apply their data, if at all.
-	 * This probably should be a user toggle.
-	 */
-	script_runreason(ifp, "NOCARRIER");
+	script_runreason(ifp, "NOCARRIER_ROAMING");
 
 #ifdef ARP
 	arp_drop(ifp);

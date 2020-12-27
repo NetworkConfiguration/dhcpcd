@@ -148,3 +148,11 @@ copied to `$(libexecdir)/dhcpcd-hooks` for use.
 The configure program attempts to find hooks for systems you have installed.
 To add more simply
 `./configure -with-hook=ntp.conf`
+
+If using resolvconf, the `20-resolv.conf` hook now requires a version with the
+`-C` and `-c` options to deprecate and activate interfaces to support wireless
+roaming (Linux) or carrier just drops (NetBSD).
+If your resolvconf does not support this then you will see a warning
+about an illegal option when the carrier changes, but things should still work.
+In this instance the DNS information cannot be Deprecated and may not
+be optimal for multi-homed hosts.
