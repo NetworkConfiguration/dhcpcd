@@ -392,6 +392,8 @@ make_env(struct dhcpcd_ctx *ctx, const struct interface *ifp,
 
 	rb_tree_init(&ifaces, &rt_compare_proto_ops);
 	TAILQ_FOREACH(ifp2, ifp->ctx->ifaces, next) {
+		if (!ifp2->active)
+			continue;
 		rt = rt_new(UNCONST(ifp2));
 		if (rt == NULL)
 			goto eexit;
