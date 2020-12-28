@@ -734,9 +734,7 @@ dhcpcd_handlecarrier(struct interface *ifp, int carrier, unsigned int flags)
 		 * Preserve the network state until we either disconnect
 		 * or re-connect.
 		 */
-		if (!(ifp->options->options & DHCPCD_ANONYMOUS) &&
-		    if_roaming(ifp))
-		{
+		if (!ifp->options->randomise_hwaddr && if_roaming(ifp)) {
 			dhcpcd_nocarrier_roaming(ifp);
 			return;
 		}
@@ -745,7 +743,7 @@ dhcpcd_handlecarrier(struct interface *ifp, int carrier, unsigned int flags)
 		script_runreason(ifp, "NOCARRIER");
 		dhcpcd_drop(ifp, 0);
 
-		if (ifp->options->options & DHCPCD_ANONYMOUS) {
+		if (ifp->options->randomise_hwaddr) {
 			bool is_up = ifp->flags & IFF_UP;
 
 			if (is_up)
@@ -971,22 +969,22 @@ dhcpcd_prestartinterface(void *arg)
 {
 	struct interface *ifp = arg;
 	struct dhcpcd_ctx *ctx = ifp->ctx;
-	bool anondown;
+	bool randmac_down;
 
 	if (ifp->carrier <= LINK_DOWN &&
-	    ifp->options->options & DHCPCD_ANONYMOUS &&
+	    ifp->options->randomise_hwaddr &&
 	    ifp->flags & IFF_UP)
 	{
 		if_down(ifp);
-		anondown = true;
+		randmac_down = true;
 	} else
-		anondown = false;
+		randmac_down = false;
 
 	if ((!(ctx->options & DHCPCD_MASTER) ||
-	    ifp->options->options & DHCPCD_IF_UP || anondown) &&
+	    ifp->options->options & DHCPCD_IF_UP || randmac_down) &&
 	    !(ifp->flags & IFF_UP))
 	{
-		if (ifp->options->options & DHCPCD_ANONYMOUS &&
+		if (ifp->options->randomise_hwaddr &&
 		    if_randomisemac(ifp) == -1)
 			logerr(__func__);
 		if (if_up(ifp) == -1)
