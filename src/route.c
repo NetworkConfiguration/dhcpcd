@@ -409,6 +409,7 @@ rt_proto_add_ctx(rb_tree_t *tree, struct rt *rt, struct dhcpcd_ctx *ctx)
 		return rt;
 
 	rt_free(rt);
+	errno = EEXIST;
 	return NULL;
 }
 

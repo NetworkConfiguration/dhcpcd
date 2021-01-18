@@ -390,6 +390,7 @@ make_env(struct dhcpcd_ctx *ctx, const struct interface *ifp,
 	if (ifp->ctx->options & DHCPCD_DUMPLEASE)
 		goto dumplease;
 
+	ifp->ctx->rt_order = 0;
 	rb_tree_init(&ifaces, &rt_compare_proto_ops);
 	TAILQ_FOREACH(ifp2, ifp->ctx->ifaces, next) {
 		if (!ifp2->active)
@@ -397,7 +398,7 @@ make_env(struct dhcpcd_ctx *ctx, const struct interface *ifp,
 		rt = rt_new(UNCONST(ifp2));
 		if (rt == NULL)
 			goto eexit;
-		if (rb_tree_insert_node(&ifaces, rt) != rt)
+		if (rt_proto_add(&ifaces, rt) != rt)
 			goto eexit;
 	}
 	if (fprintf(fp, "interface_order=") == -1)
