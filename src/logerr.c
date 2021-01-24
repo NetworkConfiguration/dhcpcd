@@ -484,13 +484,14 @@ logclose(void)
 #endif
 
 	closelog();
+#if defined(__linux__)
+	free(_logprog);
+	_logprog = NULL;
+#endif
 #ifndef SMALL
 	if (ctx->log_file == NULL)
 		return;
 	fclose(ctx->log_file);
 	ctx->log_file = NULL;
-#endif
-#if defined(__linux__)
-	free(_logprog);
 #endif
 }
