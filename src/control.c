@@ -50,7 +50,7 @@
 
 #ifndef SUN_LEN
 #define SUN_LEN(su) \
-            (sizeof(*(su)) - sizeof((su)->sun_path) + strlen((su)->sun_path))
+	    (sizeof(*(su)) - sizeof((su)->sun_path) + strlen((su)->sun_path))
 #endif
 
 static void
@@ -350,12 +350,12 @@ control_start1(struct dhcpcd_ctx *ctx, const char *ifname, sa_family_t family,
 	}
 #endif
 
-	if ((fmode & S_PRIV) == S_PRIV)
-		strlcpy(ctx->control_sock, sa.sun_path,
-		    sizeof(ctx->control_sock));
-	else
+	if ((fmode & S_UNPRIV) == S_UNPRIV)
 		strlcpy(ctx->control_sock_unpriv, sa.sun_path,
 		    sizeof(ctx->control_sock_unpriv));
+	else
+		strlcpy(ctx->control_sock, sa.sun_path,
+		    sizeof(ctx->control_sock));
 	return fd;
 }
 
@@ -368,7 +368,8 @@ control_start(struct dhcpcd_ctx *ctx, const char *ifname, sa_family_t family)
 	if (IN_PRIVSEP_SE(ctx)) {
 		make_path(ctx->control_sock, sizeof(ctx->control_sock),
 		    ifname, family, false);
-		make_path(ctx->control_sock_unpriv, sizeof(ctx->control_sock),
+		make_path(ctx->control_sock_unpriv,
+		    sizeof(ctx->control_sock_unpriv),
 		    ifname, family, true);
 		return 0;
 	}
