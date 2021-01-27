@@ -84,7 +84,8 @@ control_free(struct fd_list *fd)
 		fd->ctx->ps_control_client = NULL;
 #endif
 
-	eloop_event_remove_writecb(fd->ctx->eloop, fd->fd);
+	if (eloop_event_remove_writecb(fd->ctx->eloop, fd->fd) == -1)
+		logerr(__func__);
 	TAILQ_REMOVE(&fd->ctx->control_fds, fd, next);
 	control_queue_free(fd);
 	free(fd);
@@ -529,7 +530,8 @@ control_writeone(void *arg)
 	if (TAILQ_FIRST(&fd->queue) != NULL)
 		return;
 
-	eloop_event_remove_writecb(fd->ctx->eloop, fd->fd);
+	if (eloop_event_remove_writecb(fd->ctx->eloop, fd->fd) == -1)
+		logerr(__func__);
 #ifdef PRIVSEP
 	if (IN_PRIVSEP_SE(fd->ctx) && !(fd->flags & FD_LISTEN)) {
 		if (ps_ctl_sendeof(fd) == -1)
