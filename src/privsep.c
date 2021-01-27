@@ -369,7 +369,15 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 		ctx->fork_fd = -1;
 	}
 	pidfile_clean();
+
 	eloop_clear(ctx->eloop);
+	eloop_signal_set_cb(ctx->eloop,
+	    dhcpcd_signals, dhcpcd_signals_len, signal_cb, ctx);
+	/* ctx->sigset aready has the initial sigmask set in main() */
+	if (eloop_signal_mask(ctx->eloop, NULL) == -1) {
+		logerr("%s: eloop_signal_mask", __func__);
+		goto errexit;
+	}
 
 	/* We are not root */
 	if (priv_fd != &ctx->ps_root_fd) {
@@ -391,15 +399,6 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 	if (priv_fd != &ctx->ps_inet_fd && ctx->ps_inet_fd != -1) {
 		close(ctx->ps_inet_fd);
 		ctx->ps_inet_fd = -1;
-	}
-
-	eloop_signal_set_cb(ctx->eloop,
-	    dhcpcd_signals, dhcpcd_signals_len, signal_cb, ctx);
-
-	/* ctx->sigset aready has the initial sigmask set in main() */
-	if (eloop_signal_mask(ctx->eloop, NULL) == -1) {
-		logerr("%s: eloop_signal_mask", __func__);
-		goto errexit;
 	}
 
 	if (eloop_event_add(ctx->eloop, *priv_fd, recv_msg, recv_ctx) == -1)
