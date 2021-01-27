@@ -85,7 +85,7 @@
 				 sizeof(struct ps_msghdr) +	\
 				 sizeof(struct msghdr) +	\
 				 CMSG_SPACE(sizeof(struct in6_pktinfo) + \
-				            sizeof(int)))
+					    sizeof(int)))
 
 /* Handy macro to work out if in the privsep engine or not. */
 #define	IN_PRIVSEP(ctx)	\

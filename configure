@@ -107,7 +107,7 @@ for x do
 	--with-udev) DEV=yes; UDEV=yes;;
 	--without-udev) UDEV=no;;
 	--with-poll) POLL="$var";;
-	--sanitize) SANITIZEADDRESS="yes";;
+	--sanitise|--sanitize) SANITIZEADDRESS="yes";;
 	--serviceexists) SERVICEEXISTS=$var;;
 	--servicecmd) SERVICECMD=$var;;
 	--servicestatus) SERVICESTATUS=$var;;
@@ -159,8 +159,8 @@ Fine tuning of the installation directories:
 
 System types:
   --build=BUILD           configure for building on BUILD [guessed]
-  --host=HOST       build programs to run on HOST [BUILD]
-  --target=TARGET   configure for building compilers for TARGET [HOST]
+  --host=HOST             build programs to run on HOST [BUILD]
+  --target=TARGET         configure for building compilers for TARGET [HOST]
 
 Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
@@ -170,9 +170,9 @@ Some influential environment variables:
   CC          C compiler command
   CFLAGS      C compiler flags
   LDFLAGS     linker flags, e.g. -L<lib dir> if you have libraries in a
-              nonstandard directory <lib dir>
+	      nonstandard directory <lib dir>
   CPPFLAGS    C/C++ preprocessor flags, e.g. -I<include dir> if you have
-              headers in a nonstandard directory <include dir>
+	      headers in a nonstandard directory <include dir>
   CPP         C preprocessor
   PKG_CONFIG  pkg-config executable
 
@@ -236,7 +236,7 @@ if [ -z "$OS" ]; then
 		fi
 	fi
 
-        # Work with cpu-kernel-os, ie Debian
+	# Work with cpu-kernel-os, ie Debian
 	case "$VENDOR" in
 	linux*|kfreebsd*) OS=$VENDOR; VENDOR= ;;
 	esac
@@ -376,10 +376,6 @@ if [ "$STATIC" = yes ]; then
 	echo "LDFLAGS+=	-static" >>$CONFIG_MK
 fi
 
-if [ -z "$DEBUG" -a -f .fslckout ]; then
-	printf "Found fossil checkout ... "
-	DEBUG=yes
-fi
 if [ -z "$DEBUG" -a -d .git ]; then
 	printf "Found git checkout ... "
 	DEBUG=yes
@@ -429,6 +425,7 @@ EOF
 		if $CC -fsanitize=address _test.c -o _test 2>&3; then
 			echo "yes"
 			echo "CFLAGS+=	-fsanitize=address" >>$CONFIG_MK
+			echo "CFLAGS+=	-fno-omit-frame-pointer" >>$CONFIG_MK
 			echo "LDFLAGS+=	-fsanitize=address" >>$CONFIG_MK
 		else
 			echo "no"
@@ -643,19 +640,19 @@ EOF
 	rm -f _capsicum.c _capsicum
 
 	printf "Testing for pledge ... "
-        cat <<EOF >_pledge.c
+	cat <<EOF >_pledge.c
 #include <unistd.h>
 int main(void) {
-        return pledge("stdio", NULL);
+	return pledge("stdio", NULL);
 }
 EOF
-        if $XCC _pledge.c -o _pledge 2>&3; then
-                echo "yes"
-                echo "#define	HAVE_PLEDGE" >>$CONFIG_H
-        else
-                echo "no"
-        fi
-        rm -f _pledge.c _pledge
+	if $XCC _pledge.c -o _pledge 2>&3; then
+		echo "yes"
+		echo "#define	HAVE_PLEDGE" >>$CONFIG_H
+	else
+		echo "no"
+	fi
+	rm -f _pledge.c _pledge
 fi
 
 # This block needs to be after the compiler test due to embedded quotes.
@@ -837,7 +834,7 @@ elif $XCC _inet_ntoa.c -lnsl -o _inet_ntoa 2>&3; then
 	echo "LDADD+=		-lnsl" >>$CONFIG_MK
 elif $XCC _inet_ntoa.c -lsocket -o _inet_ntoa 2>&3; then
 	echo "yes (-lsocket)"
-	echo "LDADD+=		-lsocket" >>$CONFIG_MK	
+	echo "LDADD+=		-lsocket" >>$CONFIG_MK
 else
 	echo "no"
 	echo "libc support for inet_ntoa is required - aborting" >&2
@@ -1772,12 +1769,12 @@ echo "   SBINDIR =		$SBINDIR"
 echo "   LIBDIR =		$LIBDIR"
 echo "   LIBEXECDIR =		$LIBEXECDIR"
 echo "   DBDIR =		$DBDIR"
-echo "   RUNDIR =		$RUNDIR"	
+echo "   RUNDIR =		$RUNDIR"
 echo "   MANDIR =		$MANDIR"
 echo "   DATADIR =		$DATADIR"
 echo "   HOOKSCRIPTS =	$HOOKS"
 echo "   EGHOOKSCRIPTS =	$EGHOOKS"
-echo "   STATUSARG = 		$STATUSARG"
+echo "   STATUSARG =		$STATUSARG"
 if [ "$PRIVSEP" = yes ]; then
 	echo "   PRIVSEPUSER =	$PRIVSEP_USER"
 fi
