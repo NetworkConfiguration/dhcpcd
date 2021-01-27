@@ -254,10 +254,8 @@ ps_bpf_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg)
 		ps_entersandbox("stdio", NULL);
 		break;
 	default:
-#ifdef PRIVSEP_DEBUG
 		logdebugx("%s: spawned BPF %s on PID %d",
 		    psp->psp_ifname, psp->psp_protostr, start);
-#endif
 		break;
 	}
 	return start;
