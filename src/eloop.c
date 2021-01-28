@@ -703,7 +703,6 @@ eloop_forked(struct eloop *eloop)
 #if defined(HAVE_KQUEUE)
 	struct kevent *pfds, *pfd;
 	size_t i;
-	int error;
 #elif defined(HAVE_EPOLL)
 	struct epoll_event epe = { .events = 0 };
 #endif
@@ -758,7 +757,7 @@ eloop_forked(struct eloop *eloop)
 #if defined(HAVE_KQUEUE)
 	if (i == 0)
 		return 0;
-	error = _kevent(eloop->fd, pfds, i, NULL, 0, NULL);
+	return _kevent(eloop->fd, pfds, i, NULL, 0, NULL);
 #else
 	return 0;
 #endif
