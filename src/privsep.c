@@ -137,7 +137,8 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 
 	if (ctx->ps_control_pid != getpid()) {
 		/* Prohibit new files, sockets, etc */
-#if defined(__linux__) || defined(__sun) || defined(__OpenBSD__)
+#if (defined(__linux__) || defined(__sun) || defined(__OpenBSD__)) && \
+    !defined(HAVE_KQUEUE)
 		/*
 		 * If poll(2) is called with nfds > RLIMIT_NOFILE
 		 * then it returns EINVAL.
@@ -148,6 +149,8 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 		 */
 		unsigned long maxfd;
 		maxfd = (unsigned long)eloop_event_count(ctx->eloop);
+		if (IN_PRIVSEP_SE(ctx))
+			maxfd++; /* why? */
 
 		struct rlimit rmaxfd = {
 		    .rlim_cur = maxfd,
