@@ -2335,6 +2335,7 @@ printpidfile:
 			logerr("fork");
 			goto exit_failure;
 		case 0:
+			eloop_forked(ctx.eloop);
 			break;
 		default:
 			ctx.options |= DHCPCD_FORKED; /* A lie */
@@ -2575,9 +2576,6 @@ exit1:
 #endif
 			freeifaddrs(ifaddrs);
 	}
-	/* ps_stop will clear DHCPCD_PRIVSEP but we need to
-	 * remember it to avoid attemping to remove the pidfile */
-	oi = ctx.options & DHCPCD_PRIVSEP ? 1 : 0;
 #ifdef PRIVSEP
 	ps_stop(&ctx);
 #endif
@@ -2611,14 +2609,15 @@ exit1:
 #ifdef PLUGIN_DEV
 	dev_stop(&ctx);
 #endif
-#ifdef PRIVSEP
-	eloop_free(ctx.ps_eloop);
-#endif
-	eloop_free(ctx.eloop);
 	if (ctx.script != dhcpcd_default_script)
 		free(ctx.script);
 	if (ctx.options & DHCPCD_STARTED && !(ctx.options & DHCPCD_FORKED))
 		loginfox(PACKAGE " exited");
+#ifdef PRIVSEP
+	ps_root_stop(&ctx);
+	eloop_free(ctx.ps_eloop);
+#endif
+	eloop_free(ctx.eloop);
 	logclose();
 	free(ctx.logfile);
 	free(ctx.ctl_buf);
@@ -2632,7 +2631,7 @@ exit1:
 		    write(ctx.fork_fd, &i, sizeof(i)) == -1)
 			logerr("%s: write", __func__);
 	}
-	if (ctx.options & DHCPCD_FORKED || oi != 0)
+	if (ctx.options & (DHCPCD_FORKED | DHCPCD_PRIVSEP))
 		_exit(i); /* so atexit won't remove our pidfile */
 #endif
 	return i;

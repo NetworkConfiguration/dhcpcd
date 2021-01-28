@@ -1222,6 +1222,43 @@ fi
 echo "#define	HAVE_REALLOCARRAY" >>$CONFIG_H
 
 if [ -z "$POLL" ]; then
+	printf "Testing for kqueue1 ... "
+	cat <<EOF >_kqueue1.c
+#include <sys/event.h>
+#include <sys/fcntl.h>
+#include <sys/wait.h>
+int main(void) {
+	return kqueue1(O_CLOEXEC);
+}
+EOF
+	if $XCC _kqueue1.c -o _kqueue1 2>&3; then
+		POLL=kqueue1
+		echo "yes"
+	else
+		echo "no"
+	fi
+	rm -f _kqueue1.c _kqueue1
+fi
+
+if [ -z "$POLL" ]; then
+	printf "Testing for kqueue ... "
+	cat <<EOF >_kqueue.c
+#include <sys/event.h>
+#include <sys/wait.h>
+int main(void) {
+	return kqueue();
+}
+EOF
+	if $XCC _kqueue.c -o _kqueue 2>&3; then
+		POLL=kqueue
+		echo "yes"
+	else
+		echo "no"
+	fi
+	rm -f _kqueue.c _kqueue
+fi
+
+if [ -z "$POLL" ]; then
 	printf "Testing for ppoll ... "
 	cat <<EOF >_ppoll.c
 #include <poll.h>
@@ -1276,6 +1313,14 @@ EOF
 	rm -f _pselect.c _pselect
 fi
 case "$POLL" in
+kqueue1)
+	echo "#define	HAVE_KQUEUE" >>$CONFIG_H
+	echo "#define	HAVE_KQUEUE1" >>$CONFIG_H
+	POLL=kqueue
+	;;
+kqueue)
+	echo "#define	HAVE_KQUEUE" >>$CONFIG_H
+	;;
 ppoll)
 	echo "#define	HAVE_PPOLL" >>$CONFIG_H
 	;;

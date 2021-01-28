@@ -370,7 +370,8 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 	}
 	pidfile_clean();
 
-	eloop_clear(ctx->eloop);
+	eloop_clear(ctx->eloop, loggetfd(), -1);
+	eloop_forked(ctx->eloop);
 	eloop_signal_set_cb(ctx->eloop,
 	    dhcpcd_signals, dhcpcd_signals_len, signal_cb, ctx);
 	/* ctx->sigset aready has the initial sigmask set in main() */
@@ -607,13 +608,9 @@ ps_stop(struct dhcpcd_ctx *ctx)
 
 	/* We've been chrooted, so we need to tell the
 	 * privileged actioneer to remove the pidfile. */
-	ps_root_unlink(ctx, ctx->pidfile);
+	if (ps_root_unlink(ctx, ctx->pidfile) == -1)
+		ret = -1;
 
-	r = ps_root_stop(ctx);
-	if (r != 0)
-		ret = r;
-
-	ctx->options &= ~DHCPCD_PRIVSEP;
 	return ret;
 }
 

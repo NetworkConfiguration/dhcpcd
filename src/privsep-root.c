@@ -853,6 +853,11 @@ int
 ps_root_stop(struct dhcpcd_ctx *ctx)
 {
 
+	if (!(ctx->options & DHCPCD_PRIVSEP) ||
+	    ctx->options & DHCPCD_FORKED ||
+	    ctx->eloop == NULL)
+		return 0;
+
 	return ps_dostop(ctx, &ctx->ps_root_pid, &ctx->ps_root_fd);
 }
 

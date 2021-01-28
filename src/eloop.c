@@ -25,15 +25,19 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
+#include <stdio.h>
+#if (defined(__unix__) || defined(unix)) && !defined(USG)
+#include <sys/param.h>
+#endif
 #include <sys/time.h>
 
 #include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
-#include <poll.h>
 #include <stdbool.h>
 #include <signal.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -44,13 +48,22 @@
 #include "config.h"
 #endif
 
-#if defined(HAVE_PPOLL)
+#if defined(HAVE_KQUEUE) || defined(HAVE_PPOLL)
 #elif defined(HAVE_POLLTS)
 #define ppoll pollts
 #elif !defined(HAVE_PSELECT)
 #pragma message("Compiling eloop with pselect(2) support.")
 #define HAVE_PSELECT
 #define ppoll eloop_ppoll
+#endif
+
+#if defined(HAVE_KQUEUE)
+#include <sys/event.h>
+#define NFD 2
+#else
+#include <poll.h>
+#define USE_POLL
+#define NFD 1
 #endif
 
 #include "eloop.h"
@@ -121,7 +134,9 @@ struct eloop_event {
 	void *read_cb_arg;
 	void (*write_cb)(void *);
 	void *write_cb_arg;
+#ifdef USE_POLL
 	struct pollfd *pollfd;
+#endif
 };
 
 struct eloop_timeout {
@@ -144,15 +159,21 @@ struct eloop {
 	struct timeout_head free_timeouts;
 
 	const int *signals;
-	size_t signals_len;
+	size_t nsignals;
 	void (*signal_cb)(int, void *);
 	void *signal_cb_ctx;
 
+#ifdef HAVE_KQUEUE
+	int fd;
+	struct kevent *fds;
+#else
 	struct pollfd *fds;
+#endif
 	size_t nfds;
 
 	int exitnow;
 	int exitcode;
+	bool cleared;
 };
 
 #ifdef HAVE_REALLOCARRAY
@@ -175,7 +196,7 @@ eloop_realloca(void *ptr, size_t n, size_t size)
 
 #ifdef HAVE_PSELECT
 /* Wrapper around pselect, to imitate the ppoll call. */
-static int
+int
 eloop_ppoll(struct pollfd * fds, nfds_t nfds,
     const struct timespec *ts, const sigset_t *sigmask)
 {
@@ -281,13 +302,30 @@ eloop_reduce_timers(struct eloop *eloop)
 	eloop->now = now;
 }
 
-static void
+static int
 eloop_event_setup_fds(struct eloop *eloop)
 {
 	struct eloop_event *e, *ne;
+#ifdef HAVE_KQUEUE
+	struct kevent *pfd;
+	size_t nfds = eloop->nsignals;
+#else
 	struct pollfd *pfd;
+	size_t nfds = 0;
+#endif
 
+	nfds += eloop->nevents * NFD;
+	if (eloop->nfds < nfds) {
+		pfd = eloop_realloca(eloop->fds, nfds, sizeof(*pfd));
+		if (pfd == NULL)
+			return -1;
+		eloop->fds = pfd;
+		eloop->nfds = nfds;
+	}
+
+#ifdef USE_POLL
 	pfd = eloop->fds;
+#endif
 	TAILQ_FOREACH_SAFE(e, &eloop->events, next, ne) {
 		if (e->fd == -1) {
 			TAILQ_REMOVE(&eloop->events, e, next);
@@ -298,6 +336,7 @@ eloop_event_setup_fds(struct eloop *eloop)
 		fprintf(stderr, "%s(%d) fd=%d, rcb=%p, wcb=%p\n",
 		    __func__, getpid(), e->fd, e->read_cb, e->write_cb);
 #endif
+#ifdef USE_POLL
 		e->pollfd = pfd;
 		pfd->fd = e->fd;
 		pfd->events = 0;
@@ -307,8 +346,11 @@ eloop_event_setup_fds(struct eloop *eloop)
 			pfd->events |= POLLOUT;
 		pfd->revents = 0;
 		pfd++;
+#endif
 	}
+
 	eloop->events_need_setup = false;
+	return 0;
 }
 
 size_t
@@ -324,7 +366,11 @@ eloop_event_add_rw(struct eloop *eloop, int fd,
     void (*write_cb)(void *), void *write_cb_arg)
 {
 	struct eloop_event *e;
-	struct pollfd *pfd;
+	bool added;
+#ifdef HAVE_KQUEUE
+	struct kevent ke[2], *pfd;
+	size_t n;
+#endif
 
 	assert(eloop != NULL);
 	assert(read_cb != NULL || write_cb != NULL);
@@ -339,22 +385,15 @@ eloop_event_add_rw(struct eloop *eloop, int fd,
 	}
 
 	if (e == NULL) {
-		if (eloop->nevents + 1 > eloop->nfds) {
-			pfd = eloop_realloca(eloop->fds, eloop->nevents + 1,
-			    sizeof(*pfd));
-			if (pfd == NULL)
-				return -1;
-			eloop->fds = pfd;
-			eloop->nfds++;
-		}
-
+		added = true;
 		e = TAILQ_FIRST(&eloop->free_events);
 		if (e != NULL)
 			TAILQ_REMOVE(&eloop->free_events, e, next);
 		else {
 			e = malloc(sizeof(*e));
-			if (e == NULL)
+			if (e == NULL) {
 				return -1;
+			}
 		}
 		TAILQ_INSERT_HEAD(&eloop->events, e, next);
 		eloop->nevents++;
@@ -364,19 +403,38 @@ eloop_event_add_rw(struct eloop *eloop, int fd,
 		e->write_cb = write_cb;
 		e->write_cb_arg = write_cb_arg;
 		goto setup;
-	}
+	} else
+		added = false;
 
-	if (read_cb) {
+	if (read_cb != NULL) {
 		e->read_cb = read_cb;
 		e->read_cb_arg = read_cb_arg;
 	}
-	if (write_cb) {
+	if (write_cb != NULL) {
 		e->write_cb = write_cb;
 		e->write_cb_arg = write_cb_arg;
 	}
 
 setup:
+#ifdef HAVE_KQUEUE
+	pfd = eloop->fds;
+	EV_SET(&ke[0], fd, EVFILT_READ, EV_ADD, 0, 0, e);
+	if (e->write_cb != NULL) {
+		EV_SET(&ke[1], fd, EVFILT_WRITE, EV_ADD, 0, 0, e);
+		n = 2;
+	} else
+		n = 1;
+	if (kevent(eloop->fd, ke, n, NULL, 0, NULL) == -1) {
+		if (added) {
+			TAILQ_REMOVE(&eloop->events, e, next);
+			TAILQ_INSERT_TAIL(&eloop->free_events, e, next);
+		}
+		return -1;
+	}
+#else
 	e->pollfd = NULL;
+	UNUSED(added);
+#endif
 	eloop->events_need_setup = true;
 	return 0;
 }
@@ -401,6 +459,9 @@ int
 eloop_event_delete_write(struct eloop *eloop, int fd, int write_only)
 {
 	struct eloop_event *e;
+#ifdef HAVE_KQUEUE
+	struct kevent ke;
+#endif
 
 	assert(eloop != NULL);
 	if (fd == -1) {
@@ -418,18 +479,23 @@ eloop_event_delete_write(struct eloop *eloop, int fd, int write_only)
 	}
 
 	if (write_only) {
-		if (e->read_cb == NULL)
-			goto remove;
-		e->write_cb = NULL;
-		e->write_cb_arg = NULL;
+#ifdef HAVE_KQUEUE
+		if (e->write_cb != NULL) {
+			EV_SET(&ke, e->fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
+			if (kevent(eloop->fd, &ke, 1, NULL, 0, NULL) == -1)
+				return -1;
+		}
+#else
 		if (e->pollfd != NULL) {
 			e->pollfd->events &= ~POLLOUT;
 			e->pollfd->revents &= ~POLLOUT;
 		}
-		return 1;
+#endif
+		e->write_cb = NULL;
+		e->write_cb_arg = NULL;
+		return 0;
 	}
 
-remove:
 	e->fd = -1;
 	eloop->nevents--;
 	eloop->events_need_setup = true;
@@ -574,23 +640,138 @@ void
 eloop_enter(struct eloop *eloop)
 {
 
+	assert(eloop != NULL);
+
 	eloop->exitnow = 0;
 }
 
-void
+/* Must be called after fork(2) */
+int
+eloop_forked(struct eloop *eloop)
+{
+#ifdef HAVE_KQUEUE
+	struct eloop_event *e;
+	size_t i;
+	struct kevent *pfds, *pfd;
+	int error;
+
+	assert(eloop != NULL);
+	if (eloop->fd != -1)
+		close(eloop->fd);
+	if (eloop_open(eloop) == -1)
+		return -1;
+
+	pfds = malloc((eloop->nsignals + (eloop->nevents * 2)) * sizeof(*pfds));
+	if (eloop->signal_cb != NULL) {
+		pfd = pfds;
+		for (i = 0; i < eloop->nsignals; i++) {
+			EV_SET(pfd++, eloop->signals[i], EVFILT_SIGNAL, EV_ADD,
+			    0, 0, NULL);
+		}
+	}
+	TAILQ_FOREACH(e, &eloop->events, next) {
+		if (e->fd == -1)
+			continue;
+		EV_SET(pfd++, e->fd, EVFILT_READ, EV_ADD, 0, 0, e);
+		i++;
+		if (e->write_cb != NULL) {
+			EV_SET(pfd++, e->fd, EVFILT_WRITE, EV_ADD, 0, 0, e);
+			i++;
+		}
+	}
+
+	if (i == 0)
+		return 0;
+	error = kevent(eloop->fd, pfds, i, NULL, 0, NULL);
+	free(pfds);
+	return error;
+#else
+	UNUSED(eloop);
+	return 0;
+#endif
+}
+
+int
+eloop_open(struct eloop *eloop)
+{
+	int fd;
+
+#if defined(HAVE_KQUEUE1)
+	fd = kqueue1(O_CLOEXEC);
+#elif defined(HAVE_KQUEUE)
+	int flags;
+
+	fd = kqueue();
+	flags = fcntl(fd, F_GETFD, 0);
+	if (!(flags != -1 && !(flags & FD_CLOEXEC) &&
+	    fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == 0))
+	{
+		close(fd);
+		return -1;
+	}
+#else
+	fd = 0;
+#endif
+
+#ifdef USE_POLL
+	UNUSED(eloop);
+#else
+	eloop->fd = fd;
+#endif
+
+	return fd;
+}
+
+int
 eloop_signal_set_cb(struct eloop *eloop,
-    const int *signals, size_t signals_len,
+    const int *signals, size_t nsignals,
     void (*signal_cb)(int, void *), void *signal_cb_ctx)
 {
+#ifdef HAVE_KQUEUE
+	size_t i;
+	struct kevent *ke, *kes;
+#endif
+	int error = 0;
 
 	assert(eloop != NULL);
 
+#ifdef HAVE_KQUEUE
+	ke = kes = malloc(MAX(eloop->nsignals, nsignals) * sizeof(*kes));
+	if (kes == NULL)
+		return -1;
+	for (i = 0; i < eloop->nsignals; i++) {
+		EV_SET(ke++, eloop->signals[i], EVFILT_SIGNAL, EV_DELETE,
+		    0, 0, NULL);
+	}
+	if (i != 0 && kevent(eloop->fd, kes, i, NULL, 0, NULL) == -1) {
+		error = -1;
+		goto out;
+	}
+#endif
+
 	eloop->signals = signals;
-	eloop->signals_len = signals_len;
+	eloop->nsignals = nsignals;
 	eloop->signal_cb = signal_cb;
 	eloop->signal_cb_ctx = signal_cb_ctx;
+
+#ifdef HAVE_KQUEUE
+	if (signal_cb == NULL)
+		goto out;
+	ke = kes;
+	for (i = 0; i < eloop->nsignals; i++) {
+		EV_SET(ke++, eloop->signals[i], EVFILT_SIGNAL, EV_ADD,
+		    0, 0, NULL);
+	}
+	if (i != 0 && kevent(eloop->fd, kes, i, NULL, 0, NULL) == -1)
+		error = -1;
+out:
+	free(kes);
+#endif
+
+	return error;
 }
 
+#ifndef HAVE_KQUEUE
 static volatile int _eloop_sig[ELOOP_NSIGNALS];
 static volatile size_t _eloop_nsig;
 
@@ -608,31 +789,37 @@ eloop_signal3(int sig, __unused siginfo_t *siginfo, __unused void *arg)
 
 	_eloop_sig[_eloop_nsig++] = sig;
 }
+#endif
 
 int
 eloop_signal_mask(struct eloop *eloop, sigset_t *oldset)
 {
 	sigset_t newset;
 	size_t i;
+#ifndef HAVE_KQUEUE
 	struct sigaction sa = {
 	    .sa_sigaction = eloop_signal3,
 	    .sa_flags = SA_SIGINFO,
 	};
+#endif
 
 	assert(eloop != NULL);
 
 	sigemptyset(&newset);
-	for (i = 0; i < eloop->signals_len; i++)
+	for (i = 0; i < eloop->nsignals; i++)
 		sigaddset(&newset, eloop->signals[i]);
 	if (sigprocmask(SIG_SETMASK, &newset, oldset) == -1)
 		return -1;
 
+#ifndef HAVE_KQUEUE
 	sigemptyset(&sa.sa_mask);
 
-	for (i = 0; i < eloop->signals_len; i++) {
+	for (i = 0; i < eloop->nsignals; i++) {
 		if (sigaction(eloop->signals[i], &sa, NULL) == -1)
 			return -1;
 	}
+#endif
+
 	return 0;
 }
 
@@ -657,26 +844,53 @@ eloop_new(void)
 	TAILQ_INIT(&eloop->free_timeouts);
 	eloop->exitcode = EXIT_FAILURE;
 
+#ifdef HAVE_KQUEUE
+	if (eloop_open(eloop) == -1) {
+		eloop_free(eloop);
+		return NULL;
+	}
+#endif
+
 	return eloop;
 }
 
 void
-eloop_clear(struct eloop *eloop)
+eloop_clear(struct eloop *eloop, ...)
 {
-	struct eloop_event *e;
+	va_list va1, va2;
+	int except_fd;
+	struct eloop_event *e, *ne;
 	struct eloop_timeout *t;
 
 	if (eloop == NULL)
 		return;
 
-	eloop->nevents = 0;
 	eloop->signals = NULL;
-	eloop->signals_len = 0;
+	eloop->nsignals = 0;
 
-	while ((e = TAILQ_FIRST(&eloop->events))) {
+	va_start(va1, eloop);
+	TAILQ_FOREACH_SAFE(e, &eloop->events, next, ne) {
+		va_copy(va2, va1);
+		do
+			except_fd = va_arg(va2, int);
+		while (except_fd != -1 && except_fd != e->fd);
+		va_end(va2);
+		if (e->fd == except_fd && e->fd != -1)
+			continue;
 		TAILQ_REMOVE(&eloop->events, e, next);
+		if (e->fd != -1)
+			close(e->fd);
 		free(e);
+		eloop->nevents--;
 	}
+	va_end(va1);
+	if (eloop->nevents == 0) {
+		free(eloop->fds);
+		eloop->fds = NULL;
+		eloop->nfds = 0;
+	} else
+		eloop->events_need_setup = true;
+
 	while ((e = TAILQ_FIRST(&eloop->free_events))) {
 		TAILQ_REMOVE(&eloop->free_events, e, next);
 		free(e);
@@ -689,17 +903,18 @@ eloop_clear(struct eloop *eloop)
 		TAILQ_REMOVE(&eloop->free_timeouts, t, next);
 		free(t);
 	}
-
-	free(eloop->fds);
-	eloop->fds = NULL;
-	eloop->nfds = 0;
+	eloop->cleared = true;
 }
 
 void
 eloop_free(struct eloop *eloop)
 {
 
-	eloop_clear(eloop);
+#ifdef HAVE_KQUEUE
+	if (eloop != NULL && eloop->fd != -1)
+		close(eloop->fd);
+#endif
+	eloop_clear(eloop, -1);
 	free(eloop);
 }
 
@@ -710,6 +925,10 @@ eloop_start(struct eloop *eloop, sigset_t *signals)
 	struct eloop_event *e;
 	struct eloop_timeout *t;
 	struct timespec ts, *tsp;
+#ifdef HAVE_KQUEUE
+	struct kevent *ke;
+	UNUSED(signals);
+#endif
 
 	assert(eloop != NULL);
 
@@ -717,12 +936,14 @@ eloop_start(struct eloop *eloop, sigset_t *signals)
 		if (eloop->exitnow)
 			break;
 
+#ifndef HAVE_KQUEUE
 		if (_eloop_nsig != 0) {
 			n = _eloop_sig[--_eloop_nsig];
 			if (eloop->signal_cb != NULL)
 				eloop->signal_cb(n, eloop->signal_cb_ctx);
 			continue;
 		}
+#endif
 
 		t = TAILQ_FIRST(&eloop->timeouts);
 		if (t == NULL && eloop->nevents == 0)
@@ -750,37 +971,68 @@ eloop_start(struct eloop *eloop, sigset_t *signals)
 		} else
 			tsp = NULL;
 
+		eloop->cleared = false;
 		if (eloop->events_need_setup)
 			eloop_event_setup_fds(eloop);
 
+#ifdef HAVE_KQUEUE
+		n = kevent(eloop->fd, NULL, 0, eloop->fds, eloop->nevents, tsp);
+#else
 		n = ppoll(eloop->fds, (nfds_t)eloop->nevents, tsp, signals);
+#endif
 		if (n == -1) {
 			if (errno == EINTR)
 				continue;
 			return -errno;
 		}
+
+#ifdef HAVE_KQUEUE
+		for (ke = eloop->fds; n != 0; n--, ke++) {
+			if (eloop->cleared)
+				break;
+			e = (struct eloop_event *)ke->udata;
+#if 0
+			/* What to do with this?
+			 * Currently we behave like ppoll and just try the
+			 * socket and get the error there. */
+			if (ke->flags & EV_ERROR)
+				errno = (int)ke->data;
+#endif
+			switch (ke->filter) {
+			case EVFILT_SIGNAL:
+				eloop->signal_cb((int)ke->ident,
+				    eloop->signal_cb_ctx);
+				break;
+			case EVFILT_WRITE:
+				e->write_cb(e->write_cb_arg);
+				break;
+			case EVFILT_READ:
+				e->read_cb(e->read_cb_arg);
+				break;
+			}
+		}
+#else
 		if (n == 0)
 			continue;
-
 		TAILQ_FOREACH(e, &eloop->events, next) {
+			if (eloop->cleared)
+				break;
 			/* Skip freshly added events */
 			if (e->pollfd == NULL)
 				continue;
 			if (e->pollfd->revents)
 				n--;
-			if (e->fd != -1 && e->pollfd->revents & POLLOUT) {
-				if (e->write_cb != NULL)
-					e->write_cb(e->write_cb_arg);
-			}
+			if (e->fd != -1 && e->pollfd->revents & POLLOUT &&
+			    e->write_cb != NULL)
+				e->write_cb(e->write_cb_arg);
 			if (e->fd != -1 &&
-			    e->pollfd != NULL && e->pollfd->revents)
-			{
-				if (e->read_cb != NULL)
-					e->read_cb(e->read_cb_arg);
-			}
+			    e->pollfd != NULL && e->pollfd->revents &&
+			    e->read_cb != NULL)
+				e->read_cb(e->read_cb_arg);
 			if (n == 0)
 				break;
 		}
+#endif
 	}
 
 	return eloop->exitcode;
