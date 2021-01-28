@@ -138,7 +138,7 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 	if (ctx->ps_control_pid != getpid()) {
 		/* Prohibit new files, sockets, etc */
 #if (defined(__linux__) || defined(__sun) || defined(__OpenBSD__)) && \
-    !defined(HAVE_KQUEUE)
+    !defined(HAVE_KQUEUE) && !defined(HAVE_EPOLL)
 		/*
 		 * If poll(2) is called with nfds > RLIMIT_NOFILE
 		 * then it returns EINVAL.

@@ -233,6 +233,15 @@ static struct sock_filter ps_seccomp_filter[] = {
 #ifdef __NR_close
 	SECCOMP_ALLOW(__NR_close),
 #endif
+#ifdef __NR_epoll_ctl
+	SECCOMP_ALLOW(__NR_epoll_ctl),
+#endif
+#ifdef __NR_epoll_wait
+	SECCOMP_ALLOW(__NR_epoll_wait),
+#endif
+#ifdef __NR_epoll_pwait
+	SECCOMP_ALLOW(__NR_epoll_pwait),
+#endif
 #ifdef __NR_exit_group
 	SECCOMP_ALLOW(__NR_exit_group),
 #endif

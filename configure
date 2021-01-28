@@ -1260,6 +1260,23 @@ EOF
 fi
 
 if [ -z "$POLL" ]; then
+	printf "Testing for epoll ... "
+	cat <<EOF >_epoll.c
+#include <sys/epoll.h>
+int main(void) {
+	return epoll_create1(EPOLL_CLOEXEC);
+}
+EOF
+	if $XCC _epoll.c -o _epoll 2>&3; then
+		POLL=epoll
+		echo "yes"
+	else
+		echo "no"
+	fi
+	rm -f _epoll.c _epoll
+fi
+
+if [ -z "$POLL" ]; then
 	printf "Testing for ppoll ... "
 	cat <<EOF >_ppoll.c
 #include <poll.h>
@@ -1321,6 +1338,9 @@ kqueue1)
 	;;
 kqueue)
 	echo "#define	HAVE_KQUEUE" >>$CONFIG_H
+	;;
+epoll)
+	echo "#define	HAVE_EPOLL" >>$CONFIG_H
 	;;
 ppoll)
 	echo "#define	HAVE_PPOLL" >>$CONFIG_H
