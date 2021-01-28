@@ -59,6 +59,12 @@
 
 #if defined(HAVE_KQUEUE)
 #include <sys/event.h>
+#if defined(__DragonFly__) || defined(__FreeBSD__)
+#define	_kevent(kq, cl, ncl, el, nel, t) \
+	kevent((kq), (cl), (int)(ncl), (el), (int)(nel), (t))
+#else
+#define	_kevent kevent
+#endif
 #define NFD 2
 #else
 #include <poll.h>
@@ -424,7 +430,7 @@ setup:
 		n = 2;
 	} else
 		n = 1;
-	if (kevent(eloop->fd, ke, n, NULL, 0, NULL) == -1) {
+	if (_kevent(eloop->fd, ke, n, NULL, 0, NULL) == -1) {
 		if (added) {
 			TAILQ_REMOVE(&eloop->events, e, next);
 			TAILQ_INSERT_TAIL(&eloop->free_events, e, next);
@@ -482,7 +488,7 @@ eloop_event_delete_write(struct eloop *eloop, int fd, int write_only)
 #ifdef HAVE_KQUEUE
 		if (e->write_cb != NULL) {
 			EV_SET(&ke, e->fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
-			if (kevent(eloop->fd, &ke, 1, NULL, 0, NULL) == -1)
+			if (_kevent(eloop->fd, &ke, 1, NULL, 0, NULL) == -1)
 				return -1;
 		}
 #else
@@ -682,7 +688,7 @@ eloop_forked(struct eloop *eloop)
 
 	if (i == 0)
 		return 0;
-	error = kevent(eloop->fd, pfds, i, NULL, 0, NULL);
+	error = _kevent(eloop->fd, pfds, i, NULL, 0, NULL);
 	free(pfds);
 	return error;
 #else
@@ -743,7 +749,7 @@ eloop_signal_set_cb(struct eloop *eloop,
 		EV_SET(ke++, eloop->signals[i], EVFILT_SIGNAL, EV_DELETE,
 		    0, 0, NULL);
 	}
-	if (i != 0 && kevent(eloop->fd, kes, i, NULL, 0, NULL) == -1) {
+	if (i != 0 && _kevent(eloop->fd, kes, i, NULL, 0, NULL) == -1) {
 		error = -1;
 		goto out;
 	}
@@ -762,7 +768,7 @@ eloop_signal_set_cb(struct eloop *eloop,
 		EV_SET(ke++, eloop->signals[i], EVFILT_SIGNAL, EV_ADD,
 		    0, 0, NULL);
 	}
-	if (i != 0 && kevent(eloop->fd, kes, i, NULL, 0, NULL) == -1)
+	if (i != 0 && _kevent(eloop->fd, kes, i, NULL, 0, NULL) == -1)
 		error = -1;
 out:
 	free(kes);
@@ -976,7 +982,7 @@ eloop_start(struct eloop *eloop, sigset_t *signals)
 			eloop_event_setup_fds(eloop);
 
 #ifdef HAVE_KQUEUE
-		n = kevent(eloop->fd, NULL, 0, eloop->fds, eloop->nevents, tsp);
+		n = _kevent(eloop->fd, NULL, 0, eloop->fds, eloop->nevents,tsp);
 #else
 		n = ppoll(eloop->fds, (nfds_t)eloop->nevents, tsp, signals);
 #endif
