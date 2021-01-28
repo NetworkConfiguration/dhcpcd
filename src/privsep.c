@@ -148,13 +148,12 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 		 */
 		unsigned long maxfd;
 		maxfd = (unsigned long)eloop_event_count(ctx->eloop);
-		if (IN_PRIVSEP_SE(ctx))
-			maxfd++; /* XXX why? */
 
 		struct rlimit rmaxfd = {
 		    .rlim_cur = maxfd,
 		    .rlim_max = maxfd
 		};
+
 		if (setrlimit(RLIMIT_NOFILE, &rmaxfd) == -1)
 			logerr("setrlimit RLIMIT_NOFILE");
 #else
