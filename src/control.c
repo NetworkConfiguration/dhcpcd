@@ -84,7 +84,8 @@ control_free(struct fd_list *fd)
 		fd->ctx->ps_control_client = NULL;
 #endif
 
-	if (eloop_event_remove_writecb(fd->ctx->eloop, fd->fd) == -1)
+	if (eloop_event_remove_writecb(fd->ctx->eloop, fd->fd) == -1 &&
+	    errno != ENOENT)
 		logerr(__func__);
 	TAILQ_REMOVE(&fd->ctx->control_fds, fd, next);
 	control_queue_free(fd);
