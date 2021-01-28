@@ -235,6 +235,7 @@ if_closesockets_os(struct dhcpcd_ctx *ctx)
 		close(priv->pf_inet6_fd);
 	free(priv);
 	ctx->priv = NULL;
+	free(ctx->rt_missfilter);
 }
 
 #if defined(SIOCALIFADDR) && defined(IFLR_ACTIVE) /*NetBSD */
