@@ -374,7 +374,7 @@ eloop_event_add_rw(struct eloop *eloop, int fd,
 	struct eloop_event *e;
 	bool added;
 #ifdef HAVE_KQUEUE
-	struct kevent ke[2], *pfd;
+	struct kevent ke[2];
 	size_t n;
 #endif
 
@@ -423,10 +423,9 @@ eloop_event_add_rw(struct eloop *eloop, int fd,
 
 setup:
 #ifdef HAVE_KQUEUE
-	pfd = eloop->fds;
-	EV_SET(&ke[0], fd, EVFILT_READ, EV_ADD, 0, 0, e);
+	EV_SET(&ke[0], (uintptr_t)fd, EVFILT_READ, EV_ADD, 0, 0, e);
 	if (e->write_cb != NULL) {
-		EV_SET(&ke[1], fd, EVFILT_WRITE, EV_ADD, 0, 0, e);
+		EV_SET(&ke[1], (uintptr_t)fd, EVFILT_WRITE, EV_ADD, 0, 0, e);
 		n = 2;
 	} else
 		n = 1;
@@ -487,7 +486,8 @@ eloop_event_delete_write(struct eloop *eloop, int fd, int write_only)
 	if (write_only) {
 #ifdef HAVE_KQUEUE
 		if (e->write_cb != NULL) {
-			EV_SET(&ke, e->fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
+			EV_SET(&ke, (uintptr_t)e->fd,
+			    EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
 			if (_kevent(eloop->fd, &ke, 1, NULL, 0, NULL) == -1)
 				return -1;
 		}
@@ -668,20 +668,24 @@ eloop_forked(struct eloop *eloop)
 		return -1;
 
 	pfds = malloc((eloop->nsignals + (eloop->nevents * 2)) * sizeof(*pfds));
+	pfd = pfds;
+
 	if (eloop->signal_cb != NULL) {
-		pfd = pfds;
 		for (i = 0; i < eloop->nsignals; i++) {
-			EV_SET(pfd++, eloop->signals[i], EVFILT_SIGNAL, EV_ADD,
-			    0, 0, NULL);
+			EV_SET(pfd++, (uintptr_t)eloop->signals[i],
+			    EVFILT_SIGNAL, EV_ADD, 0, 0, NULL);
 		}
-	}
+	} else
+		i = 0;
+
 	TAILQ_FOREACH(e, &eloop->events, next) {
 		if (e->fd == -1)
 			continue;
-		EV_SET(pfd++, e->fd, EVFILT_READ, EV_ADD, 0, 0, e);
+		EV_SET(pfd++, (uintptr_t)e->fd, EVFILT_READ, EV_ADD, 0, 0, e);
 		i++;
 		if (e->write_cb != NULL) {
-			EV_SET(pfd++, e->fd, EVFILT_WRITE, EV_ADD, 0, 0, e);
+			EV_SET(pfd++, (uintptr_t)e->fd,
+			    EVFILT_WRITE, EV_ADD, 0, 0, e);
 			i++;
 		}
 	}
@@ -746,8 +750,8 @@ eloop_signal_set_cb(struct eloop *eloop,
 	if (kes == NULL)
 		return -1;
 	for (i = 0; i < eloop->nsignals; i++) {
-		EV_SET(ke++, eloop->signals[i], EVFILT_SIGNAL, EV_DELETE,
-		    0, 0, NULL);
+		EV_SET(ke++, (uintptr_t)eloop->signals[i],
+		    EVFILT_SIGNAL, EV_DELETE, 0, 0, NULL);
 	}
 	if (i != 0 && _kevent(eloop->fd, kes, i, NULL, 0, NULL) == -1) {
 		error = -1;
@@ -765,8 +769,8 @@ eloop_signal_set_cb(struct eloop *eloop,
 		goto out;
 	ke = kes;
 	for (i = 0; i < eloop->nsignals; i++) {
-		EV_SET(ke++, eloop->signals[i], EVFILT_SIGNAL, EV_ADD,
-		    0, 0, NULL);
+		EV_SET(ke++, (uintptr_t)eloop->signals[i],
+		    EVFILT_SIGNAL, EV_ADD, 0, 0, NULL);
 	}
 	if (i != 0 && _kevent(eloop->fd, kes, i, NULL, 0, NULL) == -1)
 		error = -1;
