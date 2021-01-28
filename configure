@@ -1226,7 +1226,7 @@ if [ -z "$POLL" ]; then
 	cat <<EOF >_kqueue1.c
 #include <sys/event.h>
 #include <sys/fcntl.h>
-#include <sys/wait.h>
+#include <sys/time.h>
 int main(void) {
 	return kqueue1(O_CLOEXEC);
 }
@@ -1243,8 +1243,9 @@ fi
 if [ -z "$POLL" ]; then
 	printf "Testing for kqueue ... "
 	cat <<EOF >_kqueue.c
+#include <sys/types.h>
 #include <sys/event.h>
-#include <sys/wait.h>
+#include <sys/time.h>
 int main(void) {
 	return kqueue();
 }

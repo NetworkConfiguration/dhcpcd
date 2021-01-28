@@ -788,7 +788,8 @@ ps_root_log(void *arg)
 {
 	struct dhcpcd_ctx *ctx = arg;
 
-	if (logreadfd(ctx->ps_log_fd) == -1)
+	/* OpenBSD reports connection reset when dhcpcd exits ... */
+	if (logreadfd(ctx->ps_log_fd) == -1 && errno != ECONNRESET)
 		logerr(__func__);
 }
 
