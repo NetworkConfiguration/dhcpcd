@@ -953,13 +953,14 @@ eloop_clear(struct eloop *eloop, ...)
 		if (e->fd == except_fd && e->fd != -1)
 			continue;
 		TAILQ_REMOVE(&eloop->events, e, next);
-		if (e->fd != -1)
+		if (e->fd != -1) {
 			close(e->fd);
+			eloop->nevents--;
+		}
 		free(e);
-		eloop->nevents--;
 	}
 	va_end(va1);
-	if (eloop->nevents == 0) {
+	if (TAILQ_FIRST(&eloop->events) == NULL) {
 		free(eloop->fds);
 		eloop->fds = NULL;
 		eloop->nfds = 0;
