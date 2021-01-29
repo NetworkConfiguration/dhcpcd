@@ -233,7 +233,7 @@ if_machinearch(char *str, size_t len)
 		if (strncmp(buf, mproc, strlen(mproc)) == 0 &&
 		    fscanf(fp, "%255s", buf) == 1)
 		{
-		        fclose(fp);
+			fclose(fp);
 			return snprintf(str, len, "%s", buf);
 		}
 	}
@@ -915,7 +915,7 @@ link_neigh(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 	r = NLMSG_DATA(nlm);
 	rta = RTM_RTA(r);
 	len = RTM_PAYLOAD(nlm);
-        if (r->ndm_family == AF_INET6) {
+	if (r->ndm_family == AF_INET6) {
 		bool unreachable;
 		struct in6_addr addr6;
 
