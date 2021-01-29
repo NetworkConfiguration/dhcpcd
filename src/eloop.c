@@ -1068,7 +1068,7 @@ eloop_run_epoll(struct eloop *eloop, struct timespec *ts, sigset_t *signals)
 		if (epe->events & EPOLLOUT &&
 		    e->fd != -1 && e->write_cb != NULL)
 			e->write_cb(e->write_cb_arg);
-		if (epe->events && (EPOLLIN | EPOLLERR | EPOLLHUP) &&
+		if (epe->events & (EPOLLIN | EPOLLERR | EPOLLHUP) &&
 		    e->fd != -1 && e->read_cb != NULL)
 			e->read_cb(e->read_cb_arg);
 	}
