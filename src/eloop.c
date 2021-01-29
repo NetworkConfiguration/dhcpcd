@@ -940,9 +940,6 @@ eloop_clear(struct eloop *eloop, ...)
 	if (eloop == NULL)
 		return;
 
-	eloop->signals = NULL;
-	eloop->nsignals = 0;
-
 	va_start(va1, eloop);
 	TAILQ_FOREACH_SAFE(e, &eloop->events, next, ne) {
 		va_copy(va2, va1);
@@ -960,12 +957,14 @@ eloop_clear(struct eloop *eloop, ...)
 		free(e);
 	}
 	va_end(va1);
-	if (TAILQ_FIRST(&eloop->events) == NULL) {
-		free(eloop->fds);
-		eloop->fds = NULL;
-		eloop->nfds = 0;
-	} else
-		eloop->events_need_setup = true;
+
+	/* Free the pollfd buffer and ensure it's re-created before
+	 * the next run. This allows us to shrink it incase we use a lot less
+	 * signals and fds to respond to after forking. */
+	free(eloop->fds);
+	eloop->fds = NULL;
+	eloop->nfds = 0;
+	eloop->events_need_setup = true;
 
 	while ((e = TAILQ_FIRST(&eloop->free_events))) {
 		TAILQ_REMOVE(&eloop->free_events, e, next);
