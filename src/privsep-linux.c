@@ -204,6 +204,8 @@ ps_root_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct msghdr *msg)
 #  else
 #    define AUDIT_ARCH_SPARC
 #  endif
+#elif defined(__xtensa__)
+#  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_XTENSA
 #else
 #  error "Platform does not support seccomp filter yet"
 #endif
