@@ -66,14 +66,10 @@ import: ${SCRIPTS} ${FILES}
 	${INSTALL} -m ${NONBINMODE} ${SCRIPTS} /tmp/${DISTPREFIX}/dhcpcd-hooks
 	${INSTALL} -m ${NONBINMODE} ${FILES} /tmp/${DISTPREFIX}/dhcpcd-hooks
 
-_import-src:
+_import-src: all
 	${INSTALL} -d ${DESTDIR}/hooks
-	cp dhcpcd-run-hooks.in dhcpcd-run-hooks.8.in [0-9]* ${DESTDIR}/hooks
-	rm ${DESTDIR}/hooks/50-dhcpcd-compat
-	if [ `uname` = Linux ]; then \
-		rm ${DESTDIR}/hooks/50-ypbind.in; \
-	else \
-		rm ${DESTDIR}/hooks/50-yp.conf; \
-	fi
+	${INSTALL} -m ${NONBINMODE} ${PROG} ${MAN8} ${DESTDIR}/hooks
+	${INSTALL} -m ${NONBINMODE} ${SCRIPTS} ${DESTDIR}/hooks
+	${INSTALL} -m ${NONBINMODE} ${FILES} ${DESTDIR}/hooks
 
 include ${TOP}/Makefile.inc

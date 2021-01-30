@@ -1715,6 +1715,35 @@ if ! $HOOKSET; then
 		EGHOOKS="$EGHOOKS${EGHOOKS:+ }$YPHOOK"
 	else
 		echo "not found"
+		YPHOOK="50-ypbind"
+		case "$OS" in
+		linux*)
+			YPHOOK="50-yp.conf"
+			YPOS="Linux"
+			;;
+		freebsd*|dragonfly*)
+			YPOS="FreeBSD"
+			echo "YPDOMAIN_DIR=" >>$CONFIG_MK
+			echo "YPDOMAIN_SUFFIX=" >>$CONFIG_MK
+			;;
+		netbsd*)
+			YPOS="NetBSD"
+			echo "YPDOMAIN_DIR=	/var/yp" >>$CONFIG_MK
+			echo "YPDOMAIN_SUFFIX=.ypservers" >>$CONFIG_MK
+			;;
+		openbsd*)
+			YPOS="OpenBSD"
+			echo "YPDOMAIN_DIR=	/etc/yp" >>$CONFIG_MK
+			echo "YPDOMAIN_SUFFIX=" >>$CONFIG_MK
+			;;
+		*)
+			YPHOOK=
+			;;
+		esac
+		if [ -n "$YPHOOK" ]; then
+			echo "Assuming ypbind is $YPOS"
+			EGHOOKS="$EGHOOKS${EGHOOKS:+ }$YPHOOK"
+		fi
 	fi
 fi
 
