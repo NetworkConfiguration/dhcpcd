@@ -111,10 +111,10 @@ distclean: clean
 	rm -f .depend
 	rm -f *.diff *.patch *.orig *.rej
 
-_import-src: ${SRCS}
+_import-src: ${SRCS} ${MAN5} ${MAN8}
 	${INSTALL} -d ${DESTDIR}/src
 	touch if-bsd.h if-linux.h if-sun.h
-	for x in defs.h ${SRCS} ${SRCS:.c=.h} dev.h ${MAN5}.in ${MAN8}.in; do \
+	for x in defs.h ${SRCS} ${SRCS:.c=.h} dev.h ${MAN5} ${MAN8}; do \
 		cp $$x ${DESTDIR}/src; \
 	done
 	cp dhcpcd.conf ${DESTDIR}/src
