@@ -31,7 +31,9 @@
  * of say a few hundred, ppoll(2) performs just fine, if not faster than others.
  * It also has the smallest memory and binary size footprint.
  * ppoll(2) is available on all modern OS my software runs on.
- * If ppoll is not available, then pselect(2) can be used instead.
+ * If ppoll is not available, then pselect(2) can be used instead which has
+ * even smaller memory and binary size footprint.
+ * However, this difference is quite tiny and the ppoll API is superior.
  *
  * Both epoll(7) and kqueue(2) require an extra fd per process to manage
  * their respective list of interest AND syscalls to manage it.
@@ -41,6 +43,12 @@
  * epoll avoids the resource limit RLIMIT_NOFILE Linux poll stupidly applies.
  * kqueue avoids the same limit on OpenBSD.
  * ppoll can still be secured in both by using SEECOMP or pledge.
+ *
+ * kqueue can avoid the signal trick we use here so that we function calls
+ * other than those listed in sigaction(2) in our signal handlers which is
+ * probably more robust than ours at surviving a signal storm.
+ * signalfd(2) is available for Linux which probably works in a similar way
+ * but it's yet another fd to use.
  *
  * Taking this all into account, ppoll(2) is the default mechanism used here.
  */
@@ -67,12 +75,24 @@
 #include "config.h"
 #endif
 
-#if defined(HAVE_KQUEUE) || defined(HAVE_EPOLL) || defined(HAVE_PPOLL)
+/* Prioritise which mechanism we want to use.*/
+#if defined(HAVE_PPOLL)
+#undef HAVE_EPOLL
+#undef HAVE_KQUEUE
+#undef HAVE_PSELECT
 #elif defined(HAVE_POLLTS)
+#define HAVE_PPOLL
 #define ppoll pollts
-#elif defined(HAVE_PSELECT)
-#define ppoll eloop_ppoll
-#else
+#undef HAVE_EPOLL
+#undef HAVE_KQUEUE
+#undef HAVE_PSELECT
+#elif defined(HAVE_KQUEUE)
+#undef HAVE_EPOLL
+#undef HAVE_PSELECT
+#elif defined(HAVE_EPOLL)
+#undef HAVE_KQUEUE
+#undef HAVE_PSELECT
+#elif !defined(HAVE_PSELECT)
 #define HAVE_PPOLL
 #endif
 
@@ -88,10 +108,11 @@
 #elif defined(HAVE_EPOLL)
 #include <sys/epoll.h>
 #define	NFD 1
-#else
+#elif defined(HAVE_PPOLL)
 #include <poll.h>
-#define USE_POLL
 #define NFD 1
+#elif defined(HAVE_PSELECT)
+#include <sys/select.h>
 #endif
 
 #include "eloop.h"
@@ -105,10 +126,6 @@
 #else
 #define __unused
 #endif
-#endif
-
-#ifdef HAVE_PSELECT
-#include <sys/select.h>
 #endif
 
 /* Our structures require TAILQ macros, which really every libc should
@@ -162,7 +179,7 @@ struct eloop_event {
 	void *read_cb_arg;
 	void (*write_cb)(void *);
 	void *write_cb_arg;
-#ifdef USE_POLL
+#ifdef HAVE_PPOLL
 	struct pollfd *pollfd;
 #endif
 };
@@ -180,7 +197,6 @@ struct eloop {
 	TAILQ_HEAD (event_head, eloop_event) events;
 	size_t nevents;
 	struct event_head free_events;
-	bool events_need_setup;
 
 	struct timespec now;
 	TAILQ_HEAD (timeout_head, eloop_timeout) timeouts;
@@ -198,13 +214,16 @@ struct eloop {
 	struct kevent *fds;
 #elif defined(HAVE_EPOLL)
 	struct epoll_event *fds;
-#else
+#elif defined(HAVE_PPOLL)
 	struct pollfd *fds;
 #endif
+#if !defined(HAVE_PSELECT)
 	size_t nfds;
+#endif
 
-	int exitnow;
 	int exitcode;
+	bool exitnow;
+	bool events_need_setup;
 	bool cleared;
 };
 
@@ -223,46 +242,6 @@ eloop_realloca(void *ptr, size_t n, size_t size)
 		return NULL;
 	}
 	return realloc(ptr, n * size);
-}
-#endif
-
-#ifdef HAVE_PSELECT
-/* Wrapper around pselect, to imitate the ppoll call. */
-int
-eloop_ppoll(struct pollfd * fds, nfds_t nfds,
-    const struct timespec *ts, const sigset_t *sigmask)
-{
-	fd_set read_fds, write_fds;
-	nfds_t n;
-	int maxfd, r;
-
-	FD_ZERO(&read_fds);
-	FD_ZERO(&write_fds);
-	maxfd = 0;
-	for (n = 0; n < nfds; n++) {
-		if (fds[n].events & POLLIN) {
-			FD_SET(fds[n].fd, &read_fds);
-			if (fds[n].fd > maxfd)
-				maxfd = fds[n].fd;
-		}
-		if (fds[n].events & POLLOUT) {
-			FD_SET(fds[n].fd, &write_fds);
-			if (fds[n].fd > maxfd)
-				maxfd = fds[n].fd;
-		}
-	}
-
-	r = pselect(maxfd + 1, &read_fds, &write_fds, NULL, ts, sigmask);
-	if (r > 0) {
-		for (n = 0; n < nfds; n++) {
-			fds[n].revents =
-			    FD_ISSET(fds[n].fd, &read_fds) ? POLLIN : 0;
-			if (FD_ISSET(fds[n].fd, &write_fds))
-				fds[n].revents |= POLLOUT;
-		}
-	}
-
-	return r;
 }
 #endif
 
@@ -344,11 +323,12 @@ eloop_event_setup_fds(struct eloop *eloop)
 #elif defined(HAVE_EPOLL)
 	struct epoll_event *pfd;
 	size_t nfds = 0;
-#else
+#elif defined(HAVE_PPOLL)
 	struct pollfd *pfd;
 	size_t nfds = 0;
 #endif
 
+#ifndef HAVE_PSELECT
 	nfds += eloop->nevents * NFD;
 	if (eloop->nfds < nfds) {
 		pfd = eloop_realloca(eloop->fds, nfds, sizeof(*pfd));
@@ -357,8 +337,9 @@ eloop_event_setup_fds(struct eloop *eloop)
 		eloop->fds = pfd;
 		eloop->nfds = nfds;
 	}
+#endif
 
-#ifdef USE_POLL
+#ifdef HAVE_PPOLL
 	pfd = eloop->fds;
 #endif
 	TAILQ_FOREACH_SAFE(e, &eloop->events, next, ne) {
@@ -371,7 +352,7 @@ eloop_event_setup_fds(struct eloop *eloop)
 		fprintf(stderr, "%s(%d) fd=%d, rcb=%p, wcb=%p\n",
 		    __func__, getpid(), e->fd, e->read_cb, e->write_cb);
 #endif
-#ifdef USE_POLL
+#ifdef HAVE_PPOLL
 		e->pollfd = pfd;
 		pfd->fd = e->fd;
 		pfd->events = 0;
@@ -484,8 +465,10 @@ setup:
 		}
 		return -1;
 	}
-#else
+#elif defined(HAVE_PPOLL)
 	e->pollfd = NULL;
+	UNUSED(added);
+#else
 	UNUSED(added);
 #endif
 	eloop->events_need_setup = true;
@@ -553,7 +536,7 @@ eloop_event_delete_write(struct eloop *eloop, int fd, int write_only)
 			    e->fd, &epe) == -1)
 				return -1;
 		}
-#else
+#elif defined(HAVE_PPOLL)
 		if (e->pollfd != NULL) {
 			e->pollfd->events &= ~POLLOUT;
 			e->pollfd->revents &= ~POLLOUT;
@@ -701,7 +684,7 @@ eloop_exit(struct eloop *eloop, int code)
 	assert(eloop != NULL);
 
 	eloop->exitcode = code;
-	eloop->exitnow = 1;
+	eloop->exitnow = true;
 }
 
 void
@@ -710,7 +693,7 @@ eloop_enter(struct eloop *eloop)
 
 	assert(eloop != NULL);
 
-	eloop->exitnow = 0;
+	eloop->exitnow = false;
 }
 
 /* Must be called after fork(2) */
@@ -789,6 +772,7 @@ eloop_forked(struct eloop *eloop)
 int
 eloop_open(struct eloop *eloop)
 {
+#if defined(HAVE_KQUEUE) || defined(HAVE_EPOLL)
 	int fd;
 
 	assert(eloop != NULL);
@@ -807,15 +791,14 @@ eloop_open(struct eloop *eloop)
 	}
 #elif defined(HAVE_EPOLL)
 	fd = epoll_create1(EPOLL_CLOEXEC);
-#else
-	fd = 0;
 #endif
 
-#ifndef USE_POLL
 	eloop->fd = fd;
-#endif
-
 	return fd;
+#else
+	UNUSED(eloop);
+	return 0;
+#endif
 }
 
 int
@@ -940,10 +923,12 @@ eloop_new(void)
 	TAILQ_INIT(&eloop->free_timeouts);
 	eloop->exitcode = EXIT_FAILURE;
 
+#if defined(HAVE_KQUEUE) || defined(HAVE_EPOLL)
 	if (eloop_open(eloop) == -1) {
 		eloop_free(eloop);
 		return NULL;
 	}
+#endif
 
 	return eloop;
 }
@@ -977,6 +962,7 @@ eloop_clear(struct eloop *eloop, ...)
 	}
 	va_end(va1);
 
+#if !defined(HAVE_PSELECT)
 	/* Free the pollfd buffer and ensure it's re-created before
 	 * the next run. This allows us to shrink it incase we use a lot less
 	 * signals and fds to respond to after forking. */
@@ -984,6 +970,7 @@ eloop_clear(struct eloop *eloop, ...)
 	eloop->fds = NULL;
 	eloop->nfds = 0;
 	eloop->events_need_setup = true;
+#endif
 
 	while ((e = TAILQ_FIRST(&eloop->free_events))) {
 		TAILQ_REMOVE(&eloop->free_events, e, next);
@@ -1014,7 +1001,7 @@ eloop_free(struct eloop *eloop)
 
 #if defined(HAVE_KQUEUE)
 static int
-eloop_run_kqueue(struct eloop *eloop, struct timespec *ts)
+eloop_run_kqueue(struct eloop *eloop, const struct timespec *ts)
 {
 	int n, nn;
 	struct kevent *ke;
@@ -1054,7 +1041,8 @@ eloop_run_kqueue(struct eloop *eloop, struct timespec *ts)
 #elif defined(HAVE_EPOLL)
 
 static int
-eloop_run_epoll(struct eloop *eloop, struct timespec *ts, sigset_t *signals)
+eloop_run_epoll(struct eloop *eloop,
+    const struct timespec *ts, const sigset_t *signals)
 {
 	int timeout, n, nn;
 	struct epoll_event *epe;
@@ -1094,10 +1082,11 @@ eloop_run_epoll(struct eloop *eloop, struct timespec *ts, sigset_t *signals)
 	return n;
 }
 
-#else
+#elif defined(HAVE_PPOLL)
 
 static int
-eloop_run_ppoll(struct eloop *eloop, struct timespec *ts, sigset_t *signals)
+eloop_run_ppoll(struct eloop *eloop,
+    const struct timespec *ts, const sigset_t *signals)
 {
 	int n, nn;
 	struct eloop_event *e;
@@ -1125,6 +1114,52 @@ eloop_run_ppoll(struct eloop *eloop, struct timespec *ts, sigset_t *signals)
 		if (nn == 0)
 			break;
 	}
+	return n;
+}
+
+#elif defined(HAVE_PSELECT)
+
+static int
+eloop_run_pselect(struct eloop *eloop,
+    const struct timespec *ts, const sigset_t *sigmask)
+{
+	fd_set read_fds, write_fds;
+	int maxfd, n;
+	struct eloop_event *e;
+
+	FD_ZERO(&read_fds);
+	FD_ZERO(&write_fds);
+	maxfd = 0;
+	TAILQ_FOREACH(e, &eloop->events, next) {
+		if (e->fd == -1)
+			continue;
+		if (e->read_cb != NULL) {
+			FD_SET(e->fd, &read_fds);
+			if (e->fd > maxfd)
+				maxfd = e->fd;
+		}
+		if (e->write_cb != NULL) {
+			FD_SET(e->fd, &write_fds);
+			if (e->fd > maxfd)
+				maxfd = e->fd;
+		}
+	}
+
+	n = pselect(maxfd + 1, &read_fds, &write_fds, NULL, ts, sigmask);
+	if (n == -1 || n == 0)
+		return n;
+
+	TAILQ_FOREACH(e, &eloop->events, next) {
+		if (eloop->cleared)
+			break;
+		if (e->fd == -1)
+			continue;
+		if (e->write_cb != NULL && FD_ISSET(e->fd, &write_fds))
+			e->write_cb(e->write_cb_arg);
+		if (e->read_cb != NULL && FD_ISSET(e->fd, &read_fds))
+			e->read_cb(e->read_cb_arg);
+	}
+
 	return n;
 }
 #endif
@@ -1190,8 +1225,12 @@ eloop_start(struct eloop *eloop, sigset_t *signals)
 		error = eloop_run_kqueue(eloop, tsp);
 #elif defined(HAVE_EPOLL)
 		error = eloop_run_epoll(eloop, tsp, signals);
-#else
+#elif defined(HAVE_PPOLL)
 		error = eloop_run_ppoll(eloop, tsp, signals);
+#elif defined(HAVE_PSELECT)
+		error = eloop_run_pselect(eloop, tsp, signals);
+#else
+#error no polling mechanism to run!
 #endif
 		if (error == -1) {
 			if (errno == EINTR)
