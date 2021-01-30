@@ -26,6 +26,25 @@
  * SUCH DAMAGE.
  */
 
+/* NOTES:
+ * Basically for a small number of fd's (total, not max fd)
+ * of say a few hundred, ppoll(2) performs just fine, if not faster than others.
+ * It also has the smallest memory and binary size footprint.
+ * ppoll(2) is available on all modern OS my software runs on.
+ * If ppoll is not available, then pselect(2) can be used instead.
+ *
+ * Both epoll(7) and kqueue(2) require an extra fd per process to manage
+ * their respective list of interest AND syscalls to manage it.
+ * So for a small number of fd's, these are more resource intensive,
+ * especially when used with more than one process.
+ *
+ * epoll avoids the resource limit RLIMIT_NOFILE Linux poll stupidly applies.
+ * kqueue avoids the same limit on OpenBSD.
+ * ppoll can still be secured in both by using SEECOMP or pledge.
+ *
+ * Taking this all into account, ppoll(2) is the default mechanism used here.
+ */
+
 #if (defined(__unix__) || defined(unix)) && !defined(USG)
 #include <sys/param.h>
 #endif
@@ -51,10 +70,10 @@
 #if defined(HAVE_KQUEUE) || defined(HAVE_EPOLL) || defined(HAVE_PPOLL)
 #elif defined(HAVE_POLLTS)
 #define ppoll pollts
-#elif !defined(HAVE_PSELECT)
-#pragma message("Compiling eloop with pselect(2) support.")
-#define HAVE_PSELECT
+#elif defined(HAVE_PSELECT)
 #define ppoll eloop_ppoll
+#else
+#define HAVE_PPOLL
 #endif
 
 #if defined(HAVE_KQUEUE)
