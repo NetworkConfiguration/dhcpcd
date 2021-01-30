@@ -113,20 +113,15 @@ distclean: clean
 
 _import-src: ${SRCS} ${MAN5} ${MAN8}
 	${INSTALL} -d ${DESTDIR}/src
-	touch if-bsd.h if-linux.h if-sun.h
 	for x in defs.h ${SRCS} ${SRCS:.c=.h} dev.h ${MAN5} ${MAN8}; do \
-		cp $$x ${DESTDIR}/src; \
+		[ ! -e "$$x" ] || cp $$x ${DESTDIR}/src; \
 	done
 	cp dhcpcd.conf ${DESTDIR}/src
-	rm if-bsd.h if-linux.h if-sun.h
-	rm -f ${DESTDIR}/src/if-bsd.h ${DESTDIR}/src/if-linux.h ${DESTDIR}/src/if-sun.h
 	if [ -n "${COMPAT_SRCS}" ]; then \
 		${INSTALL} -d ${DESTDIR}/compat; \
-		cd ..; \
-		touch compat/rb.h compat/strtou.h; \
-		cp ${COMPAT_SRCS} ${COMPAT_SRCS:.c=.h} ${DESTDIR}/compat; \
-		rm compat/rb.h compat/strtou.h; \
-		rm -f ${DESTDIR}/compat/rb.h ${DESTDIR}/compat/strtou.h; \
+		for x in ${COMPAT_SRCS} ${COMPAT_SRCS:.c=.h}; do \
+			[ ! -e "../$$x" ] || cp "../$$x" ${DESTDIR}/compat; \
+		done; \
 	fi
 	if ! grep HAVE_SYS_BITOPS_H ../config.h; then \
 		cp ../compat/bitops.h ${DESTDIR}/compat; \
@@ -142,8 +137,9 @@ _import-src: ${SRCS} ${MAN5} ${MAN8}
 	fi
 	if [ -n "${CRYPT_SRCS}" ]; then \
 		${INSTALL} -d ${DESTDIR}/compat/crypt; \
-		cd ..; \
-		cp ${CRYPT_SRCS} ${CRYPT_SRCS:.c=.h} ${DESTDIR}/compat/crypt; \
+		for x in ${CRYPT_SRCS} ${CRYPT_SRCS:.c=.h}; do \
+			cp "../$$x" ${DESTDIR}/compat/crypt; \
+		done; \
 	fi
 	# DragonFlyBSD builds base version with private crypto
 	if [ `uname` = DragonFly ]; then rm ${DESTDIR}/compat/crypt/md5* ${DESTDIR}/compat/crypt/sha256*; fi
