@@ -7,7 +7,6 @@ ypbind_dir="$state_dir/ypbind"
 : ${ypdomain_dir:=@YPDOMAIN_DIR@}
 : ${ypdomain_suffix:=@YPDOMAIN_SUFFIX@}
 
-
 best_domain()
 {
 	for i in "$ypbind_dir/$interface_order".*; do
