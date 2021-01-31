@@ -185,7 +185,7 @@ ps_root_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct msghdr *msg)
 #elif defined(__nds32__)
 #  if (BYTE_ORDER == LITTLE_ENDIAN)
 #    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_NDS32
-#ele
+#else
 #    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_NDS32BE
 #endif
 #elif defined(__powerpc64__)
