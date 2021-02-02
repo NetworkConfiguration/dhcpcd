@@ -33,7 +33,7 @@
  * or address specific listener.
  * Spawn an unpriv process to send/receive common network data.
  * Then drop all privs and start running.
- * Every process aside from the privileged actioneer is chrooted.
+ * Every process aside from the privileged proxy is chrooted.
  * All privsep processes ignore signals - only the manager process accepts them.
  *
  * dhcpcd will maintain the config file in the chroot, no need to handle
@@ -470,7 +470,7 @@ ps_start(struct dhcpcd_ctx *ctx)
 	case 0:
 		return 0;
 	default:
-		logdebugx("spawned privileged actioneer on PID %d", pid);
+		logdebugx("spawned privileged proxy on PID %d", pid);
 	}
 
 	/* No point in spawning the generic network listener if we're
@@ -611,7 +611,7 @@ ps_stop(struct dhcpcd_ctx *ctx)
 		ret = r;
 
 	/* We've been chrooted, so we need to tell the
-	 * privileged actioneer to remove the pidfile. */
+	 * privileged proxy to remove the pidfile. */
 	if (ps_root_unlink(ctx, ctx->pidfile) == -1)
 		ret = -1;
 

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /*
- * Privilege Separation for dhcpcd, privileged actioneer
+ * Privilege Separation for dhcpcd, privileged proxy
  * Copyright (c) 2006-2021 Roy Marples <roy@marples.name>
  * All rights reserved
 
@@ -649,9 +649,9 @@ ps_root_startcb(void *arg)
 	struct dhcpcd_ctx *ctx = arg;
 
 	if (ctx->options & DHCPCD_MANAGER)
-		setproctitle("[privileged actioneer]");
+		setproctitle("[privileged proxy]");
 	else
-		setproctitle("[privileged actioneer] %s%s%s",
+		setproctitle("[privileged proxy] %s%s%s",
 		    ctx->ifv[0],
 		    ctx->options & DHCPCD_IPV4 ? " [ip4]" : "",
 		    ctx->options & DHCPCD_IPV6 ? " [ip6]" : "");
