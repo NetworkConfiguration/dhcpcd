@@ -54,7 +54,7 @@
 #include "privsep.h"
 
 static void
-ps_bpf_recvbpf(void *arg)
+ps_bpf_recvbpf(void *arg, unsigned short events)
 {
 	struct ps_process *psp = arg;
 	struct bpf *bpf = psp->psp_bpf;
@@ -64,6 +64,9 @@ ps_bpf_recvbpf(void *arg)
 		.ps_id = psp->psp_id,
 		.ps_cmd = psp->psp_id.psi_cmd,
 	};
+
+	if (events != ELE_READ)
+		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 	bpf->bpf_flags &= ~BPF_EOF;
 	/* A BPF read can read more than one filtered packet at time.
@@ -131,11 +134,11 @@ ps_bpf_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 }
 
 static void
-ps_bpf_recvmsg(void *arg)
+ps_bpf_recvmsg(void *arg, unsigned short events)
 {
 	struct ps_process *psp = arg;
 
-	if (ps_recvpsmsg(psp->psp_ctx, psp->psp_fd,
+	if (ps_recvpsmsg(psp->psp_ctx, psp->psp_fd, events,
 	    ps_bpf_recvmsgcb, arg) == -1)
 		logerr(__func__);
 }
@@ -164,8 +167,8 @@ ps_bpf_start_bpf(void *arg)
 	else if (ps_rights_limit_fd(psp->psp_bpf->bpf_fd) == -1)
 		logerr("%s: ps_rights_limit_fd", __func__);
 #endif
-	else if (eloop_event_add(ctx->eloop,
-	    psp->psp_bpf->bpf_fd, ps_bpf_recvbpf, psp) == -1)
+	else if (eloop_event_add(ctx->eloop, psp->psp_bpf->bpf_fd, ELE_READ,
+	    ps_bpf_recvbpf, psp) == -1)
 		logerr("%s: eloop_event_add", __func__);
 	else {
 		psp->psp_work_fd = psp->psp_bpf->bpf_fd;

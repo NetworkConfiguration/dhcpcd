@@ -49,30 +49,33 @@
 
 #ifdef INET
 static void
-ps_inet_recvbootp(void *arg)
+ps_inet_recvbootp(void *arg, unsigned short events)
 {
 	struct dhcpcd_ctx *ctx = arg;
 
-	if (ps_recvmsg(ctx, ctx->udp_rfd, PS_BOOTP, ctx->ps_inet_fd) == -1)
+	if (ps_recvmsg(ctx, ctx->udp_rfd, events,
+	    PS_BOOTP, ctx->ps_inet_fd) == -1)
 		logerr(__func__);
 }
 #endif
 
 #ifdef INET6
 static void
-ps_inet_recvra(void *arg)
+ps_inet_recvra(void *arg, unsigned short events)
 {
 #ifdef __sun
 	struct interface *ifp = arg;
 	struct rs_state *state = RS_STATE(ifp);
 	struct dhcpcd_ctx *ctx = ifp->ctx;
 
-	if (ps_recvmsg(ctx, state->nd_fd, PS_ND, ctx->ps_inet_fd) == -1)
+	if (ps_recvmsg(ctx, state->nd_fd, events,
+	    PS_ND, ctx->ps_inet_fd) == -1)
 		logerr(__func__);
 #else
 	struct dhcpcd_ctx *ctx = arg;
 
-	if (ps_recvmsg(ctx, ctx->nd_fd, PS_ND, ctx->ps_inet_fd) == -1)
+	if (ps_recvmsg(ctx, ctx->nd_fd, events,
+	    PS_ND, ctx->ps_inet_fd) == -1)
 		logerr(__func__);
 #endif
 }
@@ -80,11 +83,12 @@ ps_inet_recvra(void *arg)
 
 #ifdef DHCP6
 static void
-ps_inet_recvdhcp6(void *arg)
+ps_inet_recvdhcp6(void *arg, unsigned short events)
 {
 	struct dhcpcd_ctx *ctx = arg;
 
-	if (ps_recvmsg(ctx, ctx->dhcp6_rfd, PS_DHCP6, ctx->ps_inet_fd) == -1)
+	if (ps_recvmsg(ctx, ctx->dhcp6_rfd, events,
+	    PS_DHCP6, ctx->ps_inet_fd) == -1)
 		logerr(__func__);
 }
 #endif
@@ -145,7 +149,7 @@ ps_inet_startcb(void *arg)
 			ctx->udp_rfd = -1;
 		}
 #endif
-		else if (eloop_event_add(ctx->eloop, ctx->udp_rfd,
+		else if (eloop_event_add(ctx->eloop, ctx->udp_rfd, ELE_READ,
 		    ps_inet_recvbootp, ctx) == -1)
 		{
 			logerr("%s: eloop_event_add DHCP", __func__);
@@ -167,7 +171,7 @@ ps_inet_startcb(void *arg)
 			ctx->nd_fd = -1;
 		}
 #endif
-		else if (eloop_event_add(ctx->eloop, ctx->nd_fd,
+		else if (eloop_event_add(ctx->eloop, ctx->nd_fd, ELE_READ,
 		    ps_inet_recvra, ctx) == -1)
 		{
 			logerr("%s: eloop_event_add RA", __func__);
@@ -191,7 +195,7 @@ ps_inet_startcb(void *arg)
 			ctx->dhcp6_rfd = -1;
 		}
 #endif
-		else if (eloop_event_add(ctx->eloop, ctx->dhcp6_rfd,
+		else if (eloop_event_add(ctx->eloop, ctx->dhcp6_rfd, ELE_READ,
 		    ps_inet_recvdhcp6, ctx) == -1)
 		{
 			logerr("%s: eloop_event_add DHCP6", __func__);
@@ -299,12 +303,12 @@ dosend:
 }
 
 static void
-ps_inet_recvmsg(void *arg)
+ps_inet_recvmsg(void *arg, unsigned short events)
 {
 	struct dhcpcd_ctx *ctx = arg;
 
 	/* Receive shutdown */
-	if (ps_recvpsmsg(ctx, ctx->ps_inet_fd, NULL, NULL) == -1)
+	if (ps_recvpsmsg(ctx, ctx->ps_inet_fd, events, NULL, NULL) == -1)
 		logerr(__func__);
 }
 
@@ -337,11 +341,12 @@ ps_inet_dispatch(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 }
 
 static void
-ps_inet_dodispatch(void *arg)
+ps_inet_dodispatch(void *arg, unsigned short events)
 {
 	struct dhcpcd_ctx *ctx = arg;
 
-	if (ps_recvpsmsg(ctx, ctx->ps_inet_fd, ps_inet_dispatch, ctx) == -1)
+	if (ps_recvpsmsg(ctx, ctx->ps_inet_fd, events,
+	    ps_inet_dispatch, ctx) == -1)
 		logerr(__func__);
 }
 
@@ -370,11 +375,11 @@ ps_inet_stop(struct dhcpcd_ctx *ctx)
 
 #ifdef INET
 static void
-ps_inet_recvinbootp(void *arg)
+ps_inet_recvinbootp(void *arg, unsigned short events)
 {
 	struct ps_process *psp = arg;
 
-	if (ps_recvmsg(psp->psp_ctx, psp->psp_work_fd,
+	if (ps_recvmsg(psp->psp_ctx, psp->psp_work_fd, events,
 	    PS_BOOTP, psp->psp_ctx->ps_data_fd) == -1)
 		logerr(__func__);
 }
@@ -402,7 +407,7 @@ ps_inet_listenin(void *arg)
 	}
 #endif
 
-	if (eloop_event_add(psp->psp_ctx->eloop, psp->psp_work_fd,
+	if (eloop_event_add(psp->psp_ctx->eloop, psp->psp_work_fd, ELE_READ,
 	    ps_inet_recvinbootp, psp) == -1)
 	{
 		logerr("%s: eloop_event_add DHCP", __func__);
@@ -459,11 +464,11 @@ ps_inet_listennd(void *arg)
 
 #ifdef DHCP6
 static void
-ps_inet_recvin6dhcp6(void *arg)
+ps_inet_recvin6dhcp6(void *arg, unsigned short events)
 {
 	struct ps_process *psp = arg;
 
-	if (ps_recvmsg(psp->psp_ctx, psp->psp_work_fd,
+	if (ps_recvmsg(psp->psp_ctx, psp->psp_work_fd, events,
 	    PS_DHCP6, psp->psp_ctx->ps_data_fd) == -1)
 		logerr(__func__);
 }
@@ -491,7 +496,7 @@ ps_inet_listenin6(void *arg)
 	}
 #endif
 
-	if (eloop_event_add(psp->psp_ctx->eloop, psp->psp_work_fd,
+	if (eloop_event_add(psp->psp_ctx->eloop, psp->psp_work_fd, ELE_READ,
 	    ps_inet_recvin6dhcp6, psp) == -1)
 	{
 		logerr("%s: eloop_event_add DHCP", __func__);
@@ -504,12 +509,12 @@ ps_inet_listenin6(void *arg)
 #endif
 
 static void
-ps_inet_recvmsgpsp(void *arg)
+ps_inet_recvmsgpsp(void *arg, unsigned short events)
 {
 	struct ps_process *psp = arg;
 
 	/* Receive shutdown. */
-	if (ps_recvpsmsg(psp->psp_ctx, psp->psp_fd, NULL, NULL) == -1)
+	if (ps_recvpsmsg(psp->psp_ctx, psp->psp_fd, events, NULL, NULL) == -1)
 		logerr(__func__);
 }
 

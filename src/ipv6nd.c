@@ -78,7 +78,7 @@ struct nd_opt_rdnss {           /* RDNSS option RFC 6106 */
 	uint8_t		nd_opt_rdnss_len;
 	uint16_t	nd_opt_rdnss_reserved;
 	uint32_t	nd_opt_rdnss_lifetime;
-        /* followed by list of IP prefixes */
+	/* followed by list of IP prefixes */
 };
 __CTASSERT(sizeof(struct nd_opt_rdnss) == 8);
 #endif
@@ -131,7 +131,7 @@ __CTASSERT(sizeof(struct nd_opt_rdnss) == 8);
 //#define DEBUG_NS
 //
 
-static void ipv6nd_handledata(void *);
+static void ipv6nd_handledata(void *, unsigned short);
 
 /*
  * Android ships buggy ICMP6 filter headers.
@@ -281,8 +281,14 @@ ipv6nd_openif(struct interface *ifp)
 		return -1;
 	}
 
+	if (eloop_event_add(ifp->ctx->eloop, fd, ELE_READ,
+	    ipv6nd_handledata, ifp) == -1)
+	{
+		close(fd);
+		return -1;
+	}
+
 	state->nd_fd = fd;
-	eloop_event_add(ifp->ctx->eloop, fd, ipv6nd_handledata, ifp);
 	return fd;
 }
 #endif
@@ -388,7 +394,9 @@ ipv6nd_sendrsprobe(void *arg)
 			logerr(__func__);
 			return;
 		}
-		eloop_event_add(ctx->eloop, ctx->nd_fd, ipv6nd_handledata, ctx);
+		if (eloop_event_add(ctx->eloop, ctx->nd_fd, ELE_READ,
+		    ipv6nd_handledata, ctx) == -1)
+			logerr("%s: eloop_event_add", __func__);
 	}
 	s = ifp->ctx->nd_fd;
 #endif
@@ -1977,7 +1985,7 @@ ipv6nd_recvmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg)
 }
 
 static void
-ipv6nd_handledata(void *arg)
+ipv6nd_handledata(void *arg, unsigned short events)
 {
 	struct dhcpcd_ctx *ctx;
 	int fd;
@@ -2013,6 +2021,10 @@ ipv6nd_handledata(void *arg)
 	ctx = arg;
 	fd = ctx->nd_fd;
 #endif
+
+	if (events != ELE_READ)
+		logerrx("%s: unexpected event 0x%04x", __func__, events);
+
 	len = recvmsg(fd, &msg, 0);
 	if (len == -1) {
 		logerr(__func__);

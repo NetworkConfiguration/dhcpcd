@@ -320,7 +320,8 @@ ps_rights_limit_stdio(struct dhcpcd_ctx *ctx)
 pid_t
 ps_dostart(struct dhcpcd_ctx *ctx,
     pid_t *priv_pid, int *priv_fd,
-    void (*recv_msg)(void *), void (*recv_unpriv_msg),
+    void (*recv_msg)(void *, unsigned short),
+    void (*recv_unpriv_msg)(void *, unsigned short),
     void *recv_ctx, int (*callback)(void *), void (*signal_cb)(int, void *),
     unsigned int flags)
 {
@@ -356,7 +357,7 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 		close(fd[1]);
 		if (recv_unpriv_msg == NULL)
 			;
-		else if (eloop_event_add(ctx->eloop, *priv_fd,
+		else if (eloop_event_add(ctx->eloop, *priv_fd, ELE_READ,
 		    recv_unpriv_msg, recv_ctx) == -1)
 		{
 			logerr("%s: eloop_event_add", __func__);
@@ -404,7 +405,8 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 		ctx->ps_inet_fd = -1;
 	}
 
-	if (eloop_event_add(ctx->eloop, *priv_fd, recv_msg, recv_ctx) == -1)
+	if (eloop_event_add(ctx->eloop, *priv_fd, ELE_READ,
+	    recv_msg, recv_ctx) == -1)
 	{
 		logerr("%s: eloop_event_add", __func__);
 		goto errexit;
@@ -865,7 +867,8 @@ nobufs:
 }
 
 ssize_t
-ps_recvmsg(struct dhcpcd_ctx *ctx, int rfd, uint16_t cmd, int wfd)
+ps_recvmsg(struct dhcpcd_ctx *ctx, int rfd, unsigned short events,
+    uint16_t cmd, int wfd)
 {
 	struct sockaddr_storage ss = { .ss_family = AF_UNSPEC };
 	uint8_t controlbuf[sizeof(struct sockaddr_storage)] = { 0 };
@@ -878,8 +881,12 @@ ps_recvmsg(struct dhcpcd_ctx *ctx, int rfd, uint16_t cmd, int wfd)
 		.msg_control = controlbuf, .msg_controllen = sizeof(controlbuf),
 		.msg_iov = iov, .msg_iovlen = 1,
 	};
+	ssize_t len;
 
-	ssize_t len = recvmsg(rfd, &msg, 0);
+	if (events != ELE_READ)
+		logerrx("%s: unexpected event 0x%04x", __func__, events);
+
+	len = recvmsg(rfd, &msg, 0);
 
 	if (len == -1)
 		logerr("%s: recvmsg", __func__);
@@ -903,7 +910,7 @@ ps_recvmsg(struct dhcpcd_ctx *ctx, int rfd, uint16_t cmd, int wfd)
 }
 
 ssize_t
-ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd,
+ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd, unsigned short events,
     ssize_t (*callback)(void *, struct ps_msghdr *, struct msghdr *),
     void *cbctx)
 {
@@ -913,6 +920,9 @@ ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd,
 	struct iovec iov[1];
 	struct msghdr msg = { .msg_iov = iov, .msg_iovlen = 1 };
 	bool stop = false;
+
+	if (events != ELE_READ)
+		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 	len = read(fd, &psm, sizeof(psm));
 #ifdef PRIVSEP_DEBUG

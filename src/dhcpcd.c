@@ -1110,9 +1110,12 @@ out:
 }
 
 static void
-dhcpcd_handlelink(void *arg)
+dhcpcd_handlelink(void *arg, unsigned short events)
 {
 	struct dhcpcd_ctx *ctx = arg;
+
+	if (events != ELE_READ)
+		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 	if (if_handlelink(ctx) == -1) {
 		if (errno == ENOBUFS || errno == ENOMEM) {
@@ -1648,14 +1651,17 @@ dumperr:
 	return 0;
 }
 
-static void dhcpcd_readdump1(void *);
+static void dhcpcd_readdump1(void *, unsigned short);
 
 static void
-dhcpcd_readdump2(void *arg)
+dhcpcd_readdump2(void *arg, unsigned short events)
 {
 	struct dhcpcd_ctx *ctx = arg;
 	ssize_t len;
 	int exit_code = EXIT_FAILURE;
+
+	if (events != ELE_READ)
+		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 	len = read(ctx->control_fd, ctx->ctl_buf + ctx->ctl_bufpos,
 	    ctx->ctl_buflen - ctx->ctl_bufpos);
@@ -1675,8 +1681,9 @@ dhcpcd_readdump2(void *arg)
 	fflush(stdout);
 	if (--ctx->ctl_extra != 0) {
 		putchar('\n');
-		eloop_event_add(ctx->eloop, ctx->control_fd,
-		    dhcpcd_readdump1, ctx);
+		if (eloop_event_add(ctx->eloop, ctx->control_fd, ELE_READ,
+		    dhcpcd_readdump1, ctx) == -1)
+			logerr("%s: eloop_event_add", __func__);
 		return;
 	}
 	exit_code = EXIT_SUCCESS;
@@ -1687,10 +1694,13 @@ finished:
 }
 
 static void
-dhcpcd_readdump1(void *arg)
+dhcpcd_readdump1(void *arg, unsigned short events)
 {
 	struct dhcpcd_ctx *ctx = arg;
 	ssize_t len;
+
+	if (events != ELE_READ)
+		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 	len = read(ctx->control_fd, &ctx->ctl_buflen, sizeof(ctx->ctl_buflen));
 	if (len != sizeof(ctx->ctl_buflen)) {
@@ -1709,8 +1719,9 @@ dhcpcd_readdump1(void *arg)
 		goto err;
 
 	ctx->ctl_bufpos = 0;
-	eloop_event_add(ctx->eloop, ctx->control_fd,
-	    dhcpcd_readdump2, ctx);
+	if (eloop_event_add(ctx->eloop, ctx->control_fd, ELE_READ,
+	    dhcpcd_readdump2, ctx) == -1)
+		logerr("%s: eloop_event_add", __func__);
 	return;
 
 err:
@@ -1719,10 +1730,13 @@ err:
 }
 
 static void
-dhcpcd_readdump0(void *arg)
+dhcpcd_readdump0(void *arg, unsigned short events)
 {
 	struct dhcpcd_ctx *ctx = arg;
 	ssize_t len;
+
+	if (events != ELE_READ)
+		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 	len = read(ctx->control_fd, &ctx->ctl_extra, sizeof(ctx->ctl_extra));
 	if (len != sizeof(ctx->ctl_extra)) {
@@ -1738,8 +1752,9 @@ dhcpcd_readdump0(void *arg)
 		return;
 	}
 
-	eloop_event_add(ctx->eloop, ctx->control_fd,
-	    dhcpcd_readdump1, ctx);
+	if (eloop_event_add(ctx->eloop, ctx->control_fd, ELE_READ,
+	    dhcpcd_readdump1, ctx) == -1)
+		logerr("%s: eloop_event_add", __func__);
 }
 
 static void
@@ -1759,16 +1774,19 @@ dhcpcd_readdump(struct dhcpcd_ctx *ctx)
 	if (eloop_timeout_add_sec(ctx->eloop, 5,
 	    dhcpcd_readdumptimeout, ctx) == -1)
 		return -1;
-	return eloop_event_add(ctx->eloop, ctx->control_fd,
+	return eloop_event_add(ctx->eloop, ctx->control_fd, ELE_READ,
 	    dhcpcd_readdump0, ctx);
 }
 
 static void
-dhcpcd_fork_cb(void *arg)
+dhcpcd_fork_cb(void *arg, unsigned short events)
 {
 	struct dhcpcd_ctx *ctx = arg;
 	int exit_code;
 	ssize_t len;
+
+	if (events != ELE_READ)
+		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 	len = read(ctx->fork_fd, &exit_code, sizeof(exit_code));
 	if (len == -1) {
@@ -1786,11 +1804,14 @@ dhcpcd_fork_cb(void *arg)
 }
 
 static void
-dhcpcd_stderr_cb(void *arg)
+dhcpcd_stderr_cb(void *arg, unsigned short events)
 {
 	struct dhcpcd_ctx *ctx = arg;
 	char log[BUFSIZ];
 	ssize_t len;
+
+	if (events != ELE_READ)
+		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 	len = read(ctx->stderr_fd, log, sizeof(log));
 	if (len == -1) {
@@ -2306,7 +2327,9 @@ printpidfile:
 			goto exit_failure;
 		}
 #endif
-		eloop_event_add(ctx.eloop, ctx.fork_fd, dhcpcd_fork_cb, &ctx);
+		if (eloop_event_add(ctx.eloop, ctx.fork_fd, ELE_READ,
+		    dhcpcd_fork_cb, &ctx) == -1)
+			logerr("%s: eloop_event_add", __func__);
 
 		/*
 		 * Redirect stderr to the stderr socketpair.
@@ -2354,7 +2377,9 @@ printpidfile:
 			goto exit_failure;
 		}
 #endif
-		eloop_event_add(ctx.eloop, ctx.fork_fd, dhcpcd_fork_cb, &ctx);
+		if (eloop_event_add(ctx.eloop, ctx.fork_fd, ELE_READ,
+		    dhcpcd_fork_cb, &ctx) == -1)
+			logerr("%s: eloop_event_add", __func__);
 
 		if (ctx.stderr_valid) {
 			ctx.stderr_fd = stderr_fd[0];
@@ -2365,8 +2390,9 @@ printpidfile:
 				goto exit_failure;
 			}
 #endif
-			eloop_event_add(ctx.eloop, ctx.stderr_fd,
-			    dhcpcd_stderr_cb, &ctx);
+			if (eloop_event_add(ctx.eloop, ctx.stderr_fd, ELE_READ,
+			    dhcpcd_stderr_cb, &ctx) == -1)
+				logerr("%s: eloop_event_add", __func__);
 		}
 #ifdef PRIVSEP
 		if (IN_PRIVSEP(&ctx) && ps_mastersandbox(&ctx, NULL) == -1)
@@ -2448,7 +2474,9 @@ start_master:
 
 	/* Start handling kernel messages for interfaces, addresses and
 	 * routes. */
-	eloop_event_add(ctx.eloop, ctx.link_fd, dhcpcd_handlelink, &ctx);
+	if (eloop_event_add(ctx.eloop, ctx.link_fd, ELE_READ,
+	    dhcpcd_handlelink, &ctx) == -1)
+		logerr("%s: eloop_event_add", __func__);
 
 #ifdef PRIVSEP
 	if (IN_PRIVSEP(&ctx) && ps_mastersandbox(&ctx, "stdio route") == -1)

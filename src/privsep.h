@@ -187,8 +187,8 @@ ssize_t ps_sendmsg(struct dhcpcd_ctx *, int, uint16_t, unsigned long,
     const struct msghdr *);
 ssize_t ps_sendcmd(struct dhcpcd_ctx *, int, uint16_t, unsigned long,
     const void *data, size_t len);
-ssize_t ps_recvmsg(struct dhcpcd_ctx *, int, uint16_t, int);
-ssize_t ps_recvpsmsg(struct dhcpcd_ctx *, int,
+ssize_t ps_recvmsg(struct dhcpcd_ctx *, int, unsigned short, uint16_t, int);
+ssize_t ps_recvpsmsg(struct dhcpcd_ctx *, int, unsigned short,
     ssize_t (*callback)(void *, struct ps_msghdr *, struct msghdr *), void *);
 
 /* Internal privsep functions. */
@@ -209,7 +209,8 @@ int ps_seccomp_enter(void);
 
 pid_t ps_dostart(struct dhcpcd_ctx * ctx,
     pid_t *priv_pid, int *priv_fd,
-    void (*recv_msg)(void *), void (*recv_unpriv_msg),
+    void (*recv_msg)(void *, unsigned short),
+    void (*recv_unpriv_msg)(void *, unsigned short),
     void *recv_ctx, int (*callback)(void *), void (*)(int, void *),
     unsigned int);
 int ps_dostop(struct dhcpcd_ctx *ctx, pid_t *pid, int *fd);

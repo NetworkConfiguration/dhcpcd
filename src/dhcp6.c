@@ -173,7 +173,7 @@ static const char * const dhcp6_statuses[] = {
 
 static void dhcp6_bind(struct interface *, const char *, const char *);
 static void dhcp6_failinform(void *);
-static void dhcp6_recvaddr(void *);
+static void dhcp6_recvaddr(void *, unsigned short);
 static void dhcp6_startdecline(struct interface *);
 
 #ifdef SMALL
@@ -2243,8 +2243,8 @@ dhcp6_findpd(struct interface *ifp, const uint8_t *iaid,
 			if (!(a->flags & IPV6_AF_DELEGATEDPFX))
 				a->flags |= IPV6_AF_NEW | IPV6_AF_DELEGATEDPFX;
 			a->flags &= ~(IPV6_AF_STALE |
-			              IPV6_AF_EXTENDED |
-			              IPV6_AF_REQUEST);
+				      IPV6_AF_EXTENDED |
+				      IPV6_AF_REQUEST);
 			if (a->prefix_vltime != pdp.vltime)
 				a->flags |= IPV6_AF_NEW;
 		}
@@ -2396,7 +2396,7 @@ dhcp6_findia(struct interface *ifp, struct dhcp6_message *m, size_t l,
 				logwarnx("%s: IAID %s T1(%d) > T2(%d) from %s",
 				    ifp->name,
 				    hwaddr_ntoa(iaid, sizeof(iaid), buf,
-				                sizeof(buf)),
+						sizeof(buf)),
 				    ia.t1, ia.t2, sfrom);
 				continue;
 			}
@@ -2829,7 +2829,7 @@ dhcp6_script_try_run(struct interface *ifp, int delegated)
 		if (ap->flags & IPV6_AF_ONLINK) {
 			if (!(ap->flags & IPV6_AF_DADCOMPLETED) &&
 			    ipv6_iffindaddr(ap->iface, &ap->addr,
-			                    IN6_IFF_TENTATIVE))
+					    IN6_IFF_TENTATIVE))
 				ap->flags |= IPV6_AF_DADCOMPLETED;
 			if ((ap->flags & IPV6_AF_DADCOMPLETED) == 0
 #ifndef SMALL
@@ -3073,7 +3073,7 @@ dhcp6_bind(struct interface *ifp, const char *op, const char *sfrom)
 		if (state->reason == NULL)
 			state->reason = "INFORM6";
 		o = dhcp6_findmoption(state->new, state->new_len,
-		                      D6_OPTION_INFO_REFRESH_TIME, &ol);
+				      D6_OPTION_INFO_REFRESH_TIME, &ol);
 		if (o == NULL || ol != sizeof(uint32_t))
 			state->renew = IRT_DEFAULT;
 		else {
@@ -3693,7 +3693,7 @@ recvif:
 }
 
 static void
-dhcp6_recv(struct dhcpcd_ctx *ctx, struct ipv6_addr *ia)
+dhcp6_recv(struct dhcpcd_ctx *ctx, struct ipv6_addr *ia, unsigned short events)
 {
 	struct sockaddr_in6 from;
 	union {
@@ -3715,6 +3715,9 @@ dhcp6_recv(struct dhcpcd_ctx *ctx, struct ipv6_addr *ia)
 	int s;
 	ssize_t bytes;
 
+	if (events != ELE_READ)
+		logerrx("%s: unexpected event 0x%04x", __func__, events);
+
 	s = ia != NULL ? ia->dhcp6_fd : ctx->dhcp6_rfd;
 	bytes = recvmsg(s, &msg, 0);
 	if (bytes == -1) {
@@ -3727,19 +3730,20 @@ dhcp6_recv(struct dhcpcd_ctx *ctx, struct ipv6_addr *ia)
 }
 
 static void
-dhcp6_recvaddr(void *arg)
+
+dhcp6_recvaddr(void *arg, unsigned short events)
 {
 	struct ipv6_addr *ia = arg;
 
-	dhcp6_recv(ia->iface->ctx, ia);
+	dhcp6_recv(ia->iface->ctx, ia, events);
 }
 
 static void
-dhcp6_recvctx(void *arg)
+dhcp6_recvctx(void *arg, unsigned short events)
 {
 	struct dhcpcd_ctx *ctx = arg;
 
-	dhcp6_recv(ctx, NULL);
+	dhcp6_recv(ctx, NULL, events);
 }
 
 int
@@ -3860,7 +3864,9 @@ dhcp6_start1(void *arg)
 			logerr(__func__);
 			return;
 		}
-		eloop_event_add(ctx->eloop, ctx->dhcp6_rfd, dhcp6_recvctx, ctx);
+		if (eloop_event_add(ctx->eloop, ctx->dhcp6_rfd, ELE_READ,
+		    dhcp6_recvctx, ctx) == -1)
+			logerr("%s: eloop_event_add", __func__);
 	}
 
 	if (!IN_PRIVSEP(ctx) && ctx->dhcp6_wfd == -1) {
@@ -4172,12 +4178,12 @@ dhcp6_handleifa(int cmd, struct ipv6_addr *ia, pid_t pid)
 			if (ia->dhcp6_fd == -1)
 				ia->dhcp6_fd = dhcp6_openudp(ia->iface->index,
 				    &ia->addr);
-			if (ia->dhcp6_fd != -1)
-				eloop_event_add(ia->iface->ctx->eloop,
-				ia->dhcp6_fd, dhcp6_recvaddr, ia);
+			if (ia->dhcp6_fd != -1 &&
+			    eloop_event_add(ia->iface->ctx->eloop,
+			    ia->dhcp6_fd, ELE_READ, dhcp6_recvaddr, ia) == -1)
+				logerr("%s: eloop_event_add", __func__);
 		}
 	}
-
 
 	if ((state = D6_STATE(ifp)) != NULL)
 		ipv6_handleifa_addrs(cmd, &state->addrs, ia, pid);
@@ -4289,7 +4295,7 @@ dhcp6_env(FILE *fp, const char *prefix, const struct interface *ifp,
 
 delegated:
 #ifndef SMALL
-        /* Needed for Delegated Prefixes */
+	/* Needed for Delegated Prefixes */
 	state = D6_CSTATE(ifp);
 	TAILQ_FOREACH(ap, &state->addrs, next) {
 		if (ap->delegating_prefix)
@@ -4308,7 +4314,7 @@ delegated:
 		}
 		if (fprintf(fp, "%s", ap->saddr) == -1)
 			return -1;
-        }
+	}
 	if (fputc('\0', fp) == EOF)
 		return -1;
 #endif

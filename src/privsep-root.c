@@ -74,7 +74,7 @@ struct psr_ctx {
 };
 
 static void
-ps_root_readerrorcb(void *arg)
+ps_root_readerrorcb(void *arg, unsigned short events)
 {
 	struct psr_ctx *psr_ctx = arg;
 	struct dhcpcd_ctx *ctx = psr_ctx->psr_ctx;
@@ -86,6 +86,9 @@ ps_root_readerrorcb(void *arg)
 	};
 	ssize_t len;
 	int exit_code = EXIT_FAILURE;
+
+	if (events != ELE_READ)
+		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 #define PSR_ERROR(e)				\
 	do {					\
@@ -113,7 +116,7 @@ ps_root_readerror(struct dhcpcd_ctx *ctx, void *data, size_t len)
 	    .psr_data = data, .psr_datalen = len,
 	};
 
-	if (eloop_event_add(ctx->ps_eloop, ctx->ps_root_fd,
+	if (eloop_event_add(ctx->ps_eloop, ctx->ps_root_fd, ELE_READ,
 	    ps_root_readerrorcb, &psr_ctx) == -1)
 		return -1;
 
@@ -126,7 +129,7 @@ ps_root_readerror(struct dhcpcd_ctx *ctx, void *data, size_t len)
 
 #ifdef PRIVSEP_GETIFADDRS
 static void
-ps_root_mreaderrorcb(void *arg)
+ps_root_mreaderrorcb(void *arg, unsigned short events)
 {
 	struct psr_ctx *psr_ctx = arg;
 	struct dhcpcd_ctx *ctx = psr_ctx->psr_ctx;
@@ -137,6 +140,9 @@ ps_root_mreaderrorcb(void *arg)
 	};
 	ssize_t len;
 	int exit_code = EXIT_FAILURE;
+
+	if (events != ELE_READ)
+		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 	len = recv(ctx->ps_root_fd, psr_error, sizeof(*psr_error), MSG_PEEK);
 	if (len == -1)
@@ -605,11 +611,12 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 
 /* Receive from state engine, do an action. */
 static void
-ps_root_recvmsg(void *arg)
+ps_root_recvmsg(void *arg, unsigned short events)
 {
 	struct dhcpcd_ctx *ctx = arg;
 
-	if (ps_recvpsmsg(ctx, ctx->ps_root_fd, ps_root_recvmsgcb, ctx) == -1)
+	if (ps_recvpsmsg(ctx, ctx->ps_root_fd, events,
+	    ps_root_recvmsgcb, ctx) == -1)
 		logerr(__func__);
 }
 
@@ -775,18 +782,22 @@ ps_root_dispatchcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 }
 
 static void
-ps_root_dispatch(void *arg)
+ps_root_dispatch(void *arg, unsigned short events)
 {
 	struct dhcpcd_ctx *ctx = arg;
 
-	if (ps_recvpsmsg(ctx, ctx->ps_data_fd, ps_root_dispatchcb, ctx) == -1)
+	if (ps_recvpsmsg(ctx, ctx->ps_data_fd, events,
+	    ps_root_dispatchcb, ctx) == -1)
 		logerr(__func__);
 }
 
 static void
-ps_root_log(void *arg)
+ps_root_log(void *arg, unsigned short events)
 {
 	struct dhcpcd_ctx *ctx = arg;
+
+	if (events != ELE_READ)
+		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 	/* OpenBSD reports connection reset when dhcpcd exits ... */
 	if (logreadfd(ctx->ps_log_fd) == -1 && errno != ECONNRESET)
@@ -821,7 +832,7 @@ ps_root_start(struct dhcpcd_ctx *ctx)
 
 	if (pid == 0) {
 		ctx->ps_log_fd = logfd[1];
-		if (eloop_event_add(ctx->eloop, ctx->ps_log_fd,
+		if (eloop_event_add(ctx->eloop, ctx->ps_log_fd, ELE_READ,
 		    ps_root_log, ctx) == -1)
 			return -1;
 		close(logfd[0]);
@@ -836,7 +847,7 @@ ps_root_start(struct dhcpcd_ctx *ctx)
 
 	ctx->ps_data_fd = datafd[0];
 	close(datafd[1]);
-	if (eloop_event_add(ctx->eloop, ctx->ps_data_fd,
+	if (eloop_event_add(ctx->eloop, ctx->ps_data_fd, ELE_READ,
 	    ps_root_dispatch, ctx) == -1)
 		return -1;
 

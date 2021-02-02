@@ -137,7 +137,7 @@ static void dhcp_arp_found(struct arp_state *, const struct arp_msg *);
 #endif
 static void dhcp_handledhcp(struct interface *, struct bootp *, size_t,
     const struct in_addr *);
-static void dhcp_handleifudp(void *);
+static void dhcp_handleifudp(void *, unsigned short);
 static int dhcp_initstate(struct interface *);
 
 void
@@ -2406,7 +2406,9 @@ openudp:
 		dhcp_openbpf(ifp);
 		return;
 	}
-	eloop_event_add(ctx->eloop, state->udp_rfd, dhcp_handleifudp, ifp);
+	if (eloop_event_add(ctx->eloop, state->udp_rfd, ELE_READ,
+	    dhcp_handleifudp, ifp) == -1)
+		logerr("%s: eloop_event_add", __func__);
 }
 
 static size_t
@@ -3622,13 +3624,16 @@ dhcp_packet(struct interface *ifp, uint8_t *data, size_t len,
 }
 
 static void
-dhcp_readbpf(void *arg)
+dhcp_readbpf(void *arg, unsigned short events)
 {
 	struct interface *ifp = arg;
 	uint8_t buf[FRAMELEN_MAX];
 	ssize_t bytes;
 	struct dhcp_state *state = D_STATE(ifp);
 	struct bpf *bpf = state->bpf;
+
+	if (events != ELE_READ)
+		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 	bpf->bpf_flags &= ~BPF_EOF;
 	while (!(bpf->bpf_flags & BPF_EOF)) {
@@ -3693,7 +3698,8 @@ dhcp_recvmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg)
 }
 
 static void
-dhcp_readudp(struct dhcpcd_ctx *ctx, struct interface *ifp)
+dhcp_readudp(struct dhcpcd_ctx *ctx, struct interface *ifp,
+    unsigned short events)
 {
 	const struct dhcp_state *state;
 	struct sockaddr_in from;
@@ -3721,6 +3727,9 @@ dhcp_readudp(struct dhcpcd_ctx *ctx, struct interface *ifp)
 	int s;
 	ssize_t bytes;
 
+	if (events != ELE_READ)
+		logerrx("%s: unexpected event 0x%04x", __func__, events);
+
 	if (ifp != NULL) {
 		state = D_CSTATE(ifp);
 		s = state->udp_rfd;
@@ -3738,19 +3747,19 @@ dhcp_readudp(struct dhcpcd_ctx *ctx, struct interface *ifp)
 }
 
 static void
-dhcp_handleudp(void *arg)
+dhcp_handleudp(void *arg, unsigned short events)
 {
 	struct dhcpcd_ctx *ctx = arg;
 
-	dhcp_readudp(ctx, NULL);
+	dhcp_readudp(ctx, NULL, events);
 }
 
 static void
-dhcp_handleifudp(void *arg)
+dhcp_handleifudp(void *arg, unsigned short events)
 {
 	struct interface *ifp = arg;
 
-	dhcp_readudp(ifp->ctx, ifp);
+	dhcp_readudp(ifp->ctx, ifp, events);
 }
 
 static int
@@ -3785,8 +3794,9 @@ dhcp_openbpf(struct interface *ifp)
 		return -1;
 	}
 
-	eloop_event_add(ifp->ctx->eloop,
-	    state->bpf->bpf_fd, dhcp_readbpf, ifp);
+	if (eloop_event_add(ifp->ctx->eloop, state->bpf->bpf_fd, ELE_READ,
+	    dhcp_readbpf, ifp) == -1)
+		logerr("%s: eloop_event_add", __func__);
 	return 0;
 }
 
@@ -3962,7 +3972,9 @@ dhcp_start1(void *arg)
 			logerr(__func__);
 			return;
 		}
-		eloop_event_add(ctx->eloop, ctx->udp_rfd, dhcp_handleudp, ctx);
+		if (eloop_event_add(ctx->eloop, ctx->udp_rfd, ELE_READ,
+		    dhcp_handleudp, ctx) == -1)
+			logerr("%s: eloop_event_add", __func__);
 	}
 	if (!IN_PRIVSEP(ctx) && ctx->udp_wfd == -1) {
 		ctx->udp_wfd = xsocket(PF_INET, SOCK_RAW|SOCK_CXNB,IPPROTO_UDP);

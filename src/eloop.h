@@ -52,22 +52,19 @@
 /* Forward declare eloop - the content should be invisible to the outside */
 struct eloop;
 
+#define	ELE_READ	0x0001
+#define	ELE_WRITE	0x0002
+#define	ELE_ERROR	0x0100
+#define	ELE_HANGUP	0x0200
+#define	ELE_NVAL	0x0400
+
+size_t eloop_event_count(const struct eloop  *);
+int eloop_event_add(struct eloop *, int, unsigned short,
+    void (*)(void *, unsigned short), void *);
+int eloop_event_delete(struct eloop *, int);
+
 unsigned long long eloop_timespec_diff(const struct timespec *tsp,
     const struct timespec *usp, unsigned int *nsp);
-size_t eloop_event_count(const struct eloop  *);
-int eloop_event_add_rw(struct eloop *, int,
-    void (*)(void *), void *,
-    void (*)(void *), void *);
-int eloop_event_add(struct eloop *, int,
-    void (*)(void *), void *);
-int eloop_event_add_w(struct eloop *, int,
-    void (*)(void *), void *);
-#define eloop_event_delete(eloop, fd) \
-    eloop_event_delete_write((eloop), (fd), 0)
-#define eloop_event_remove_writecb(eloop, fd) \
-    eloop_event_delete_write((eloop), (fd), 1)
-int eloop_event_delete_write(struct eloop *, int, int);
-
 #define eloop_timeout_add_tv(eloop, tv, cb, ctx) \
     eloop_q_timeout_add_tv((eloop), ELOOP_QUEUE, (tv), (cb), (ctx))
 #define eloop_timeout_add_sec(eloop, tv, cb, ctx) \

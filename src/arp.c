@@ -299,7 +299,7 @@ arp_packet(struct interface *ifp, uint8_t *data, size_t len,
 }
 
 static void
-arp_read(void *arg)
+arp_read(void *arg, unsigned short events)
 {
 	struct arp_state *astate = arg;
 	struct bpf *bpf = astate->bpf;
@@ -307,6 +307,9 @@ arp_read(void *arg)
 	uint8_t buf[ARP_LEN];
 	ssize_t bytes;
 	struct in_addr addr = astate->addr;
+
+	if (events != ELE_READ)
+		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 	/* Some RAW mechanisms are generic file descriptors, not sockets.
 	 * This means we have no kernel call to just get one packet,
@@ -532,7 +535,7 @@ arp_new(struct interface *ifp, const struct in_addr *addr)
 	struct arp_state *astate;
 
 	if ((state = ARP_STATE(ifp)) == NULL) {
-	        ifp->if_data[IF_DATA_ARP] = malloc(sizeof(*state));
+		ifp->if_data[IF_DATA_ARP] = malloc(sizeof(*state));
 		state = ARP_STATE(ifp);
 		if (state == NULL) {
 			logerr(__func__);
@@ -567,8 +570,9 @@ arp_new(struct interface *ifp, const struct in_addr *addr)
 			free(astate);
 			return NULL;
 		}
-		eloop_event_add(ifp->ctx->eloop, astate->bpf->bpf_fd,
-		    arp_read, astate);
+		if (eloop_event_add(ifp->ctx->eloop, astate->bpf->bpf_fd, ELE_READ,
+		    arp_read, astate) == -1)
+			logerr("%s: eloop_event_add", __func__);
 	}
 
 

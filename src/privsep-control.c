@@ -82,11 +82,12 @@ ps_ctl_recvmsgcb(void *arg, struct ps_msghdr *psm, __unused struct msghdr *msg)
 }
 
 static void
-ps_ctl_recvmsg(void *arg)
+ps_ctl_recvmsg(void *arg, unsigned short events)
 {
 	struct dhcpcd_ctx *ctx = arg;
 
-	if (ps_recvpsmsg(ctx, ctx->ps_control_fd, ps_ctl_recvmsgcb, ctx) == -1)
+	if (ps_recvpsmsg(ctx, ctx->ps_control_fd, events,
+	    ps_ctl_recvmsgcb, ctx) == -1)
 		logerr(__func__);
 }
 
@@ -161,20 +162,24 @@ ps_ctl_dispatch(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 }
 
 static void
-ps_ctl_dodispatch(void *arg)
+ps_ctl_dodispatch(void *arg, unsigned short events)
 {
 	struct dhcpcd_ctx *ctx = arg;
 
-	if (ps_recvpsmsg(ctx, ctx->ps_control_fd, ps_ctl_dispatch, ctx) == -1)
+	if (ps_recvpsmsg(ctx, ctx->ps_control_fd, events,
+	    ps_ctl_dispatch, ctx) == -1)
 		logerr(__func__);
 }
 
 static void
-ps_ctl_recv(void *arg)
+ps_ctl_recv(void *arg, unsigned short events)
 {
 	struct dhcpcd_ctx *ctx = arg;
 	char buf[BUFSIZ];
 	ssize_t len;
+
+	if (events != ELE_READ)
+		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 	errno = 0;
 	len = read(ctx->ps_control_data_fd, buf, sizeof(buf));
@@ -191,12 +196,15 @@ ps_ctl_recv(void *arg)
 }
 
 static void
-ps_ctl_listen(void *arg)
+ps_ctl_listen(void *arg, unsigned short events)
 {
 	struct dhcpcd_ctx *ctx = arg;
 	char buf[BUFSIZ];
 	ssize_t len;
 	struct fd_list *fd;
+
+	if (events != ELE_READ)
+		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 	errno = 0;
 	len = read(ctx->ps_control->fd, buf, sizeof(buf));
@@ -250,7 +258,7 @@ ps_ctl_start(struct dhcpcd_ctx *ctx)
 
 	ctx->ps_control_data_fd = data_fd[0];
 	close(data_fd[1]);
-	if (eloop_event_add(ctx->eloop, ctx->ps_control_data_fd,
+	if (eloop_event_add(ctx->eloop, ctx->ps_control_data_fd, ELE_READ,
 	    ps_ctl_recv, ctx) == -1)
 		return -1;
 
@@ -259,7 +267,7 @@ ps_ctl_start(struct dhcpcd_ctx *ctx)
 	close(listen_fd[1]);
 	if (ctx->ps_control == NULL)
 		return -1;
-	if (eloop_event_add(ctx->eloop, ctx->ps_control->fd,
+	if (eloop_event_add(ctx->eloop, ctx->ps_control->fd, ELE_READ,
 	    ps_ctl_listen, ctx) == -1)
 		return -1;
 
