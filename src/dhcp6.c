@@ -868,11 +868,11 @@ dhcp6_makemessage(struct interface *ifp)
 		break;
 	}
 
-	/* In non master mode we listen and send from fixed addresses.
+	/* In non manager mode we listen and send from fixed addresses.
 	 * We should try and match an address we have to unicast to,
 	 * but for now this is the safest policy. */
-	if (unicast != NULL && !(ifp->ctx->options & DHCPCD_MASTER)) {
-		logdebugx("%s: ignoring unicast option as not master",
+	if (unicast != NULL && !(ifp->ctx->options & DHCPCD_MANAGER)) {
+		logdebugx("%s: ignoring unicast option as not manager",
 		    ifp->name);
 		unicast = NULL;
 	}
@@ -3245,7 +3245,7 @@ dhcp6_bind(struct interface *ifp, const char *op, const char *sfrom)
 
 	if (ifp->ctx->options & DHCPCD_TEST ||
 	    (ifp->options->options & DHCPCD_INFORM &&
-	    !(ifp->ctx->options & DHCPCD_MASTER)))
+	    !(ifp->ctx->options & DHCPCD_MANAGER)))
 	{
 		eloop_exit(ifp->ctx->eloop, EXIT_SUCCESS);
 	}
@@ -3852,7 +3852,7 @@ dhcp6_start1(void *arg)
 	size_t i;
 	const struct dhcp_compat *dhc;
 
-	if ((ctx->options & (DHCPCD_MASTER|DHCPCD_PRIVSEP)) == DHCPCD_MASTER &&
+	if ((ctx->options & (DHCPCD_MANAGER|DHCPCD_PRIVSEP)) == DHCPCD_MANAGER &&
 	    ctx->dhcp6_rfd == -1)
 	{
 		ctx->dhcp6_rfd = dhcp6_openudp(0, NULL);
@@ -4155,11 +4155,11 @@ dhcp6_handleifa(int cmd, struct ipv6_addr *ia, pid_t pid)
 	struct dhcp6_state *state;
 	struct interface *ifp = ia->iface;
 
-	/* If not running in master mode, listen to this address */
+	/* If not running in manager mode, listen to this address */
 	if (cmd == RTM_NEWADDR &&
 	    !(ia->addr_flags & IN6_IFF_NOTUSEABLE) &&
 	    ifp->active == IF_ACTIVE_USER &&
-	    !(ifp->ctx->options & DHCPCD_MASTER) &&
+	    !(ifp->ctx->options & DHCPCD_MANAGER) &&
 	    ifp->options->options & DHCPCD_DHCP6)
 	{
 #ifdef PRIVSEP

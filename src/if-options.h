@@ -74,7 +74,7 @@
 #define DHCPCD_DAEMONISE		(1ULL << 14)
 #define DHCPCD_DAEMONISED		(1ULL << 15)
 #define DHCPCD_TEST			(1ULL << 16)
-#define DHCPCD_MASTER			(1ULL << 17)
+#define DHCPCD_MANAGER			(1ULL << 17)
 #define DHCPCD_HOSTNAME			(1ULL << 18)
 #define DHCPCD_CLIENTID			(1ULL << 19)
 #define DHCPCD_LINK			(1ULL << 20)

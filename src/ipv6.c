@@ -596,7 +596,7 @@ ipv6_deletedaddr(struct ipv6_addr *ia)
 
 #ifdef DHCP6
 #ifdef PRIVSEP
-	if (!(ia->iface->ctx->options & DHCPCD_MASTER))
+	if (!(ia->iface->ctx->options & DHCPCD_MANAGER))
 		ps_inet_closedhcp6(ia);
 #elif defined(SMALL)
 	UNUSED(ia);

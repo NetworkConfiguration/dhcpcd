@@ -176,7 +176,7 @@ int ps_init(struct dhcpcd_ctx *);
 int ps_start(struct dhcpcd_ctx *);
 int ps_stop(struct dhcpcd_ctx *);
 int ps_entersandbox(const char *, const char **);
-int ps_mastersandbox(struct dhcpcd_ctx *, const char *);
+int ps_managersandbox(struct dhcpcd_ctx *, const char *);
 
 int ps_unrollmsg(struct msghdr *, struct ps_msghdr *, const void *, size_t);
 ssize_t ps_sendpsmmsg(struct dhcpcd_ctx *, int,
