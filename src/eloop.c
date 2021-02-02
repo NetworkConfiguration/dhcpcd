@@ -377,13 +377,12 @@ eloop_event_add(struct eloop *eloop, int fd, unsigned short events,
 #elif defined(HAVE_EPOLL)
 	memset(&epe, 0, sizeof(epe));
 	epe.data.ptr = e;
-	if (e->events & ELE_READ)
+	if (events & ELE_READ)
 		epe.events |= EPOLLIN;
-	if (e->events & ELE_WRITE)
+	if (events & ELE_WRITE)
 		epe.events |= EPOLLOUT;
-
 	op = added ? EPOLL_CTL_ADD : EPOLL_CTL_MOD;
-	if (epoll_ctl(eloop->fd, op, fd, &epe) == -1) {
+	if (epe.events != 0 && epoll_ctl(eloop->fd, op, fd, &epe) == -1) {
 		if (added) {
 			TAILQ_REMOVE(&eloop->events, e, next);
 			TAILQ_INSERT_TAIL(&eloop->free_events, e, next);
@@ -689,9 +688,9 @@ eloop_forked(struct eloop *eloop)
 #elif defined(HAVE_EPOLL)
 		memset(&epe, 0, sizeof(epe));
 		epe.data.ptr = e;
-		if (e->read_cb != NULL)
+		if (e->events & ELE_READ)
 			epe.events |= EPOLLIN;
-		if (e->write_cb != NULL)
+		if (e->events & ELE_WRITE)
 			epe.events |= EPOLLOUT;
 		if (epoll_ctl(eloop->fd, EPOLL_CTL_ADD, e->fd, &epe) == -1)
 			return -1;

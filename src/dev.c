@@ -167,9 +167,12 @@ dev_start1(struct dhcpcd_ctx *ctx, const struct dev_dhcpcd *dev_dhcpcd)
 }
 
 static void
-dev_handle_data(void *arg)
+dev_handle_data(void *arg, unsigned short events)
 {
 	struct dhcpcd_ctx *ctx;
+
+	if (events != ELE_READ)
+		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 	ctx = arg;
 	if (ctx->dev->handle_device(arg) == -1) {
@@ -191,7 +194,7 @@ dev_start(struct dhcpcd_ctx *ctx, int (*handler)(void *, int, const char *))
 
 	ctx->dev_fd = dev_start1(ctx, &dev_dhcpcd);
 	if (ctx->dev_fd != -1) {
-		if (eloop_event_add(ctx->eloop, ctx->dev_fd,
+		if (eloop_event_add(ctx->eloop, ctx->dev_fd, ELE_READ,
 		    dev_handle_data, ctx) == -1)
 		{
 			logerr(__func__);
