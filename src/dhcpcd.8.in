@@ -24,7 +24,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd November 25, 2020
+.Dd February 2, 2021
 .Dt DHCPCD 8
 .Os
 .Sh NAME
@@ -172,7 +172,7 @@ discovers available Ethernet interfaces that can be configured.
 When
 .Nm
 not limited to one interface on the command line,
-it is running in Master mode.
+it is running in Manager mode.
 The
 .Nm dhcpcd-ui
 project expects dhcpcd to be running this way.
@@ -192,9 +192,9 @@ Using a single interface also affects the
 and
 .Fl x
 options, where the same interface will need to be specified, as a lack of an
-interface will imply Master mode which this is not.
-To force starting in Master mode with only one interface, the
-.Fl M , Fl Fl master
+interface will imply Manager mode which this is not.
+To force starting in Manager mode with only one interface, the
+.Fl M , Fl Fl manager
 option can be used.
 .Pp
 Interfaces are preferred by carrier, DHCP lease/IPv4LL and then lowest metric.
@@ -393,7 +393,7 @@ regardless of the
 option.
 If no
 .Ar interface
-is specified then this applies to all interfaces in Master mode.
+is specified then this applies to all interfaces in Manager mode.
 If no interfaces are left running,
 .Nm
 will exit.
@@ -406,10 +406,10 @@ By default
 .Nm
 does not request any lease time and leaves it in the hands of the
 DHCP server.
-.It Fl M , Fl Fl master
+.It Fl M , Fl Fl manager
 Start
 .Nm
-in Master mode even if only one interface specified on the command line.
+in Manager mode even if only one interface specified on the command line.
 See the Multiple Interfaces section above.
 .It Fl m , Fl Fl metric Ar metric
 Metrics are used to prefer an interface over another one, lowest wins.
@@ -424,7 +424,7 @@ to reload its configuration and rebind the specified
 .Ar interface .
 If no
 .Ar interface
-is specified then this applies to all interfaces in Master mode.
+is specified then this applies to all interfaces in Manager mode.
 If
 .Nm
 is not running, then it starts up as normal.
@@ -435,7 +435,7 @@ to renew existing addresses on the specified
 .Ar interface .
 If no
 .Ar interface
-is specified then this applies to all interfaces in Master mode.
+is specified then this applies to all interfaces in Manager mode.
 If
 .Nm
 is not running, then it starts up as normal.
@@ -578,7 +578,7 @@ process running on the
 to exit.
 If no
 .Ar interface
-is specified, then the above is applied to all interfaces in Master mode.
+is specified, then the above is applied to all interfaces in Manager mode.
 See the
 .Fl p , Fl Fl persistent
 option to control configuration persistence on exit,
@@ -747,7 +747,7 @@ then it is still denied.
 Don't start any interfaces other than those specified on the command line.
 This allows
 .Nm
-to be started in Master mode and then wait for subsequent
+to be started in Manager mode and then wait for subsequent
 .Nm
 commands to start each interface as required.
 .It Fl Fl configure
@@ -855,11 +855,13 @@ Stores the PID of
 running on the
 .Ar interface .
 .It Pa @RUNDIR@/sock
-Control socket to the master daemon.
+Control socket to the manager daemon.
 .It Pa @RUNDIR@/unpriv.sock
-Unprivileged socket to the master daemon, only allows state retrieval.
+Unprivileged socket to the manager daemon, only allows state retrieval.
 .It Pa @RUNDIR@/ Ns Ar interface Ns .sock
 Control socket to per interface daemon.
+.It Pa @RUNDIR@/ Ns Ar interface Ns .unpriv.sock
+Unprivileged socket to per interface daemon, only allows state retrieval.
 .El
 .Sh SEE ALSO
 .Xr fnmatch 3 ,

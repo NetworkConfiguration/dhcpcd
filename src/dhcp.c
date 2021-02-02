@@ -2069,7 +2069,7 @@ dhcp_addr_duplicated(struct interface *ifp, struct in_addr *ia)
 	if (opts & (DHCPCD_STATIC | DHCPCD_INFORM)) {
 		state->reason = "EXPIRE";
 		script_runreason(ifp, state->reason);
-#define NOT_ONLY_SELF (DHCPCD_MASTER | DHCPCD_IPV6RS | DHCPCD_DHCP6)
+#define NOT_ONLY_SELF (DHCPCD_MANAGER | DHCPCD_IPV6RS | DHCPCD_DHCP6)
 		if (!(ctx->options & NOT_ONLY_SELF))
 			eloop_exit(ifp->ctx->eloop, EXIT_FAILURE);
 		return deleted;
@@ -2380,8 +2380,8 @@ dhcp_bind(struct interface *ifp)
 	dhcp_closebpf(ifp);
 
 openudp:
-	/* If not in master mode, open an address specific socket. */
-	if (ctx->options & DHCPCD_MASTER ||
+	/* If not in manager mode, open an address specific socket. */
+	if (ctx->options & DHCPCD_MANAGER ||
 	    (state->old != NULL &&
 	     state->old->yiaddr == state->new->yiaddr &&
 	     old_state & STATE_ADDED && !(old_state & STATE_FAKE)))
@@ -2399,7 +2399,7 @@ openudp:
 	state->udp_rfd = dhcp_openudp(&state->addr->addr);
 	if (state->udp_rfd == -1) {
 		logerr(__func__);
-		/* Address sharing without master mode is not supported.
+		/* Address sharing without manager mode is not supported.
 		 * It's also possible another DHCP client could be running,
 		 * which is even worse.
 		 * We still need to work, so re-open BPF. */
@@ -3962,9 +3962,9 @@ dhcp_start1(void *arg)
 
 	/* Listen on *.*.*.*:bootpc so that the kernel never sends an
 	 * ICMP port unreachable message back to the DHCP server.
-	 * Only do this in master mode so we don't swallow messages
+	 * Only do this in manager mode so we don't swallow messages
 	 * for dhcpcd running on another interface. */
-	if ((ctx->options & (DHCPCD_MASTER|DHCPCD_PRIVSEP)) == DHCPCD_MASTER
+	if ((ctx->options & (DHCPCD_MANAGER|DHCPCD_PRIVSEP)) == DHCPCD_MANAGER
 	    && ctx->udp_rfd == -1)
 	{
 		ctx->udp_rfd = dhcp_openudp(NULL);
@@ -4256,7 +4256,7 @@ dhcp_handleifa(int cmd, struct ipv4_addr *ia, pid_t pid)
 
 #ifdef PRIVSEP
 	if (IN_PRIVSEP_SE(ifp->ctx) &&
-	    !(ifp->ctx->options & (DHCPCD_MASTER | DHCPCD_CONFIGURE)) &&
+	    !(ifp->ctx->options & (DHCPCD_MANAGER | DHCPCD_CONFIGURE)) &&
 	    IN_ARE_ADDR_EQUAL(&state->lease.addr, &ia->addr))
 	{
 		state->addr = ia;

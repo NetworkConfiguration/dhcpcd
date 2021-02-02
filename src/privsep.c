@@ -34,7 +34,7 @@
  * Spawn an unpriv process to send/receive common network data.
  * Then drop all privs and start running.
  * Every process aside from the privileged actioneer is chrooted.
- * All privsep processes ignore signals - only the master process accepts them.
+ * All privsep processes ignore signals - only the manager process accepts them.
  *
  * dhcpcd will maintain the config file in the chroot, no need to handle
  * this in a script or something.
@@ -536,7 +536,7 @@ ps_entersandbox(const char *_pledge, const char **sandbox)
 }
 
 int
-ps_mastersandbox(struct dhcpcd_ctx *ctx, const char *_pledge)
+ps_managersandbox(struct dhcpcd_ctx *ctx, const char *_pledge)
 {
 	const char *sandbox = NULL;
 	bool forked;
@@ -587,7 +587,7 @@ ps_mastersandbox(struct dhcpcd_ctx *ctx, const char *_pledge)
 		return -1;
 	} else if (ctx->options & DHCPCD_LAUNCHER ||
 		  ((!(ctx->options & DHCPCD_DAEMONISE)) &&
-		   ctx->options & DHCPCD_MASTER))
+		   ctx->options & DHCPCD_MANAGER))
 		logdebugx("sandbox: %s", sandbox);
 	return 0;
 }

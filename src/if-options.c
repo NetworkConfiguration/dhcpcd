@@ -104,7 +104,7 @@ const struct option cf_options[] = {
 	{"broadcast",       no_argument,       NULL, 'J'},
 	{"nolink",          no_argument,       NULL, 'K'},
 	{"noipv4ll",        no_argument,       NULL, 'L'},
-	{"master",          no_argument,       NULL, 'M'},
+	{"manager",         no_argument,       NULL, 'M'},
 	{"renew",           no_argument,       NULL, 'N'},
 	{"nooption",        required_argument, NULL, 'O'},
 	{"printpidfile",    no_argument,       NULL, 'P'},
@@ -1068,7 +1068,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		ifo->options &= ~DHCPCD_IPV4LL;
 		break;
 	case 'M':
-		ifo->options |= DHCPCD_MASTER;
+		ifo->options |= DHCPCD_MANAGER;
 		break;
 	case 'O':
 		ARG_REQUIRED;
@@ -1356,7 +1356,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 #endif
 	case O_IAID:
 		ARG_REQUIRED;
-		if (ctx->options & DHCPCD_MASTER && !IN_CONFIG_BLOCK(ifo)) {
+		if (ctx->options & DHCPCD_MANAGER && !IN_CONFIG_BLOCK(ifo)) {
 			logerrx("IAID must belong in an interface block");
 			return -1;
 		}
@@ -1398,7 +1398,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			logwarnx("%s: IA_PD not compiled in", ifname);
 			return -1;
 #else
-			if (ctx->options & DHCPCD_MASTER &&
+			if (ctx->options & DHCPCD_MANAGER &&
 			    !IN_CONFIG_BLOCK(ifo))
 			{
 				logerrx("IA PD must belong in an "
@@ -1408,7 +1408,7 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			i = D6_OPTION_IA_PD;
 #endif
 		}
-		if (ctx->options & DHCPCD_MASTER &&
+		if (ctx->options & DHCPCD_MANAGER &&
 		    !IN_CONFIG_BLOCK(ifo) && arg)
 		{
 			logerrx("IA with IAID must belong in an "
