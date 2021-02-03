@@ -1,6 +1,6 @@
 /*
  * eloop benchmark
- * Copyright (c) 2006-2018 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2021 Roy Marples <roy@marples.name>
  * All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without
@@ -58,10 +58,13 @@ static struct pipe *pipes;
 static struct eloop *e;
 
 static void
-read_cb(void *arg)
+read_cb(void *arg, unsigned short events)
 {
 	struct pipe *p = arg;
 	unsigned char buf[1];
+
+	if (events != ELE_READ)
+		warn("%s: unexpected events 0x%04x", __func__, events);
 
 	if (read(p->fd[0], buf, 1) != 1) {
 		warn("%s: read", __func__);
@@ -156,7 +159,7 @@ main(int argc, char **argv)
 	for (i = 0, p = pipes; i < npipes; i++, p++) {
 		if (pipe2(p->fd, O_CLOEXEC | O_NONBLOCK) == -1)
 			err(EXIT_FAILURE, "pipe");
-		if (eloop_event_add(e, p->fd[0], read_cb, p) == -1)
+		if (eloop_event_add(e, p->fd[0], ELE_READ, read_cb, p) == -1)
 			err(EXIT_FAILURE, "eloop_event_add");
 	}
 
