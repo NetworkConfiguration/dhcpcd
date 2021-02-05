@@ -8,8 +8,8 @@ SRCS+=		dhcp-common.c script.c
 CFLAGS?=	-O2
 SUBDIRS+=	${MKDIRS}
 
-TOP?=		..
-include ${TOP}/iconfig.mk
+TOP=		..
+include		${TOP}/iconfig.mk
 
 CSTD?=		c99
 CFLAGS+=	-std=${CSTD}

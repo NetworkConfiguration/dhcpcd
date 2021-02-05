@@ -1,4 +1,4 @@
-TOP?=	../..
+TOP=	../..
 include ${TOP}/iconfig.mk
 
 PROG=		eloop-bench
