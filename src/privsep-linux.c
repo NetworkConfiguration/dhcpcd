@@ -220,9 +220,9 @@ ps_root_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct msghdr *msg)
 #  endif
 #elif defined(__sparc__)
 #  if defined(__arch64__)
-#    define AUDIT_ARCH_SPARC64
+#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_SPARC64
 #  else
-#    define AUDIT_ARCH_SPARC
+#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_SPARC
 #  endif
 #elif defined(__xtensa__)
 #  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_XTENSA
