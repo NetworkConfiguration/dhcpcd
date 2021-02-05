@@ -204,6 +204,20 @@ ps_root_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct msghdr *msg)
 #  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_S390X
 #elif defined(__s390__)
 #  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_S390
+#elif defined(__sh__)
+#  if defined(__LP64__)
+#    if (BYTE_ORDER == LITTLE_ENDIAN)
+#      define SECCOMP_AUDIT_ARCH AUDIT_ARCH_SHEL64
+#    else
+#      define SECCOMP_AUDIT_ARCH AUDIT_ARCH_SH64
+#    endif
+#  else
+#    if (BYTE_ORDER == LITTLE_ENDIAN)
+#      define SECCOMP_AUDIT_ARCH AUDIT_ARCH_SHEL
+#    else
+#      define SECCOMP_AUDIT_ARCH AUDIT_ARCH_SH
+#    endif
+#  endif
 #elif defined(__sparc__)
 #  if defined(__arch64__)
 #    define AUDIT_ARCH_SPARC64
