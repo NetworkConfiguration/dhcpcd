@@ -1,4 +1,4 @@
-TOP?=	../../
+TOP=	../../
 include ${TOP}/Makefile.inc
 include ${TOP}/config.mk
 
