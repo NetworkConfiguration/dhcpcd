@@ -192,6 +192,8 @@ ps_root_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct msghdr *msg)
 #endif
 #elif defined(__nios2__)
 #  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_NIOS2
+#elif defined(__or1k__)
+#  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_OPENRISC
 #elif defined(__powerpc64__)
 #  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_PPC64
 #elif defined(__powerpc__)
