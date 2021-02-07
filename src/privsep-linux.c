@@ -149,6 +149,22 @@ ps_root_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct msghdr *msg)
 #  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_I386
 #elif defined(__x86_64__)
 #  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_X86_64
+#elif defined(__arc__)
+#  if defined(__A7__)
+#    if (BYTE_ORDER == LITTLE_ENDIAN)
+#      define SECCOMP_AUDIT_ARCH AUDIT_ARCH_ARCOMPACT
+#    else
+#      define SECCOMP_AUDIT_ARCH AUDIT_ARCH_ARCOMPACTBE
+#    endif
+#  elif defined(__HS__)
+#    if (BYTE_ORDER == LITTLE_ENDIAN)
+#      define SECCOMP_AUDIT_ARCH AUDIT_ARCH_ARCV2
+#    else
+#      define SECCOMP_AUDIT_ARCH AUDIT_ARCH_ARCV2BE
+#    endif
+#  else
+#    error "Platform does not support seccomp filter yet"
+#  endif
 #elif defined(__arm__)
 #  ifndef EM_ARM
 #    define EM_ARM 40
