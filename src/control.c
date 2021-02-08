@@ -86,27 +86,12 @@ control_free(struct fd_list *fd)
 		fd->ctx->ps_control_client = NULL;
 #endif
 
-	/* Remove ELE_WRITE */
-	if (eloop_event_add(fd->ctx->eloop, fd->fd, ELE_READ,
-	    control_handle_data, fd) == -1)
-		logerr("%s: eloop_event_add", __func__);
+	if (eloop_event_delete(fd->ctx->eloop, fd->fd) == -1)
+		logerr("%s: eloop_event_delete", __func__);
+	close(fd->fd);
 	TAILQ_REMOVE(&fd->ctx->control_fds, fd, next);
 	control_queue_free(fd);
 	free(fd);
-}
-
-void
-control_delete(struct fd_list *fd)
-{
-
-#ifdef PRIVSEP
-	if (IN_PRIVSEP_SE(fd->ctx))
-		return;
-#endif
-
-	eloop_event_delete(fd->ctx->eloop, fd->fd);
-	close(fd->fd);
-	control_free(fd);
 }
 
 static void
@@ -120,7 +105,7 @@ control_handle_read(struct fd_list *fd)
 	if (bytes == -1 || bytes == 0) {
 		/* Control was closed or there was an error.
 		 * Remove it from our list. */
-		control_delete(fd);
+		control_free(fd);
 		return;
 	}
 
@@ -138,7 +123,7 @@ control_handle_read(struct fd_list *fd)
 		if (err == 1 &&
 		    ps_ctl_sendargs(fd, buffer, (size_t)bytes) == -1) {
 			logerr(__func__);
-			control_delete(fd);
+			control_free(fd);
 		}
 		return;
 	}
@@ -170,7 +155,7 @@ control_handle_write(struct fd_list *fd)
 
 	if (writev(fd->fd, iov, iov_len) == -1) {
 		logerr("%s: write", __func__);
-		control_delete(fd);
+		control_free(fd);
 		return;
 	}
 
@@ -193,7 +178,7 @@ control_handle_write(struct fd_list *fd)
 			logerr("%s: eloop_event_add", __func__);
 	} else {
 		if (eloop_event_delete(fd->ctx->eloop, fd->fd) == -1)
-			logerr("%s: eloop_event_add", __func__);
+			logerr("%s: eloop_event_delete", __func__);
 	}
 #ifdef PRIVSEP
 	if (IN_PRIVSEP_SE(fd->ctx) && !(fd->flags & FD_LISTEN)) {
@@ -268,7 +253,7 @@ control_recvdata(struct fd_list *fd, char *data, size_t len)
 		if (dhcpcd_handleargs(fd->ctx, fd, argc, argvp) == -1) {
 			logerr(__func__);
 			if (errno != EINTR && errno != EAGAIN) {
-				control_delete(fd);
+				control_free(fd);
 				return;
 			}
 		}
