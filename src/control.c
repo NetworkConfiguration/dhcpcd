@@ -86,8 +86,7 @@ control_free(struct fd_list *fd)
 		fd->ctx->ps_control_client = NULL;
 #endif
 
-	if (eloop_event_delete(fd->ctx->eloop, fd->fd) == -1)
-		logerr("%s: eloop_event_delete", __func__);
+	eloop_event_delete(fd->ctx->eloop, fd->fd);
 	close(fd->fd);
 	TAILQ_REMOVE(&fd->ctx->control_fds, fd, next);
 	control_queue_free(fd);
@@ -176,10 +175,8 @@ control_handle_write(struct fd_list *fd)
 		if (eloop_event_add(fd->ctx->eloop, fd->fd, ELE_READ,
 		    control_handle_data, fd) == -1)
 			logerr("%s: eloop_event_add", __func__);
-	} else {
-		if (eloop_event_delete(fd->ctx->eloop, fd->fd) == -1)
-			logerr("%s: eloop_event_delete", __func__);
-	}
+	} else
+		eloop_event_delete(fd->ctx->eloop, fd->fd);
 #ifdef PRIVSEP
 	if (IN_PRIVSEP_SE(fd->ctx) && !(fd->flags & FD_LISTEN)) {
 		if (ps_ctl_sendeof(fd) == -1)
