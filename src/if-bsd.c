@@ -627,6 +627,8 @@ if_findsa(struct dhcpcd_ctx *ctx, const struct sockaddr *sa)
 		sin = (const void *)sa;
 		if ((ia = ipv4_findmaskaddr(ctx, &sin->sin_addr)))
 			return ia->iface;
+		if ((ia = ipv4_findmaskbrd(ctx, &sin->sin_addr)))
+			return ia->iface;
 		break;
 	}
 #endif
