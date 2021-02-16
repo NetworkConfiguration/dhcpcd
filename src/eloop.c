@@ -404,6 +404,10 @@ int
 eloop_event_delete(struct eloop *eloop, int fd)
 {
 	struct eloop_event *e;
+#if defined(HAVE_KQUEUE)
+	struct kevent ke[2], *kep = &ke[0];
+	size_t n;
+#endif
 
 	assert(eloop != NULL);
 	if (fd == -1) {
@@ -420,6 +424,22 @@ eloop_event_delete(struct eloop *eloop, int fd)
 		return -1;
 	}
 
+#if defined(HAVE_KQUEUE)
+	n = 0;
+	if (e->events & ELE_READ) {
+		EV_SET(kep++, (uintptr_t)fd, EVFILT_READ, EV_DELETE, 0, 0, e);
+		n++;
+	}
+	if (e->events & ELE_WRITE) {
+		EV_SET(kep++, (uintptr_t)fd, EVFILT_WRITE, EV_DELETE, 0, 0, e);
+		n++;
+	}
+	if (n != 0 && _kevent(eloop->fd, ke, n, NULL, 0, NULL) == -1)
+		return -1;
+#elif defined(HAVE_EPOLL)
+	if (epoll_ctl(eloop->fd, EPOLL_CTL_DEL, fd, NULL) == -1)
+		return -1;
+#endif
 	e->fd = -1;
 	eloop->nevents--;
 	eloop->events_need_setup = true;
@@ -954,7 +974,7 @@ eloop_run_kqueue(struct eloop *eloop, const struct timespec *ts)
 		return -1;
 
 	for (nn = n, ke = eloop->fds; nn != 0; nn--, ke++) {
-		if (eloop->cleared)
+		if (eloop->cleared || eloop->exitnow)
 			break;
 		e = (struct eloop_event *)ke->udata;
 		if (ke->filter == EVFILT_SIGNAL) {
@@ -1009,7 +1029,7 @@ eloop_run_epoll(struct eloop *eloop,
 		return -1;
 
 	for (nn = n, epe = eloop->fds; nn != 0; nn--, epe++) {
-		if (eloop->cleared)
+		if (eloop->cleared || eloop->exitnow)
 			break;
 		e = (struct eloop_event *)epe->data.ptr;
 		if (e->fd == -1)
@@ -1045,7 +1065,7 @@ eloop_run_ppoll(struct eloop *eloop,
 
 	nn = n;
 	TAILQ_FOREACH(e, &eloop->events, next) {
-		if (eloop->cleared)
+		if (eloop->cleared || eloop->exitnow)
 			break;
 		/* Skip freshly added events */
 		if ((pfd = e->pollfd) == NULL)
@@ -1107,7 +1127,7 @@ eloop_run_pselect(struct eloop *eloop,
 		return n;
 
 	TAILQ_FOREACH(e, &eloop->events, next) {
-		if (eloop->cleared)
+		if (eloop->cleared || eloop->exitnow)
 			break;
 		if (e->fd == -1)
 			continue;
