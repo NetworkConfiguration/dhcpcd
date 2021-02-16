@@ -104,6 +104,7 @@ control_handle_read(struct fd_list *fd)
 	if (bytes == -1 || bytes == 0) {
 		/* Control was closed or there was an error.
 		 * Remove it from our list. */
+		logerr(__func__);
 		control_free(fd);
 		return;
 	}
