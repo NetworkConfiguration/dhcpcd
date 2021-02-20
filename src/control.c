@@ -193,11 +193,10 @@ control_handle_data(void *arg, unsigned short events)
 {
 	struct fd_list *fd = arg;
 
-	if (events != ELE_READ && events != ELE_WRITE &&
-	    events != (ELE_READ | ELE_WRITE))
+	if (!(events & (ELE_READ | ELE_WRITE)))
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
-	if (events & ELE_WRITE)
+	if (events & ELE_WRITE && !(events & ELE_HANGUP))
 		control_handle_write(fd);
 	if (events & ELE_READ)
 		control_handle_read(fd);
