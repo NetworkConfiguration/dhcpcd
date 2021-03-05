@@ -188,6 +188,8 @@ ps_root_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct msghdr *msg)
 #  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_IA64
 #elif defined(__microblaze__)
 #  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_MICROBLAZE
+#elif defined(__m68k__)
+#  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_M68K
 #elif defined(__mips__)
 #  if defined(__MIPSEL__)
 #    if defined(__LP64__)
