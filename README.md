@@ -22,10 +22,6 @@ to ensure they can co-exist.
 
 See [BUILDING.md](BUILDING.md) for how to build dhcpcd.
 
-If you wish to file a support ticket or help out with development, please
-[visit the Development Area](https://dev.marples.name/project/profile/101/)
-or join the mailing list below.
-
 ## Configuration
 
 You should read the
