@@ -100,11 +100,15 @@ control_handle_read(struct fd_list *fd)
 	ssize_t bytes;
 
 	bytes = read(fd->fd, buffer, sizeof(buffer) - 1);
-
-	if (bytes == -1 || bytes == 0) {
-		/* Control was closed or there was an error.
-		 * Remove it from our list. */
+#ifdef PRIVSEP
+	if (bytes == 0 && IN_PRIVSEP(fd->ctx)) {
+		if (ps_ctl_sendeof(fd) == -1)
+			logerr(__func__);
+	}
+#endif
+	if (bytes == -1)
 		logerr(__func__);
+	if (bytes == -1 || bytes == 0) {
 		control_free(fd);
 		return;
 	}
@@ -171,20 +175,17 @@ control_handle_write(struct fd_list *fd)
 	if (TAILQ_FIRST(&fd->queue) != NULL)
 		return;
 
-	/* Remove ELE_WRITE */
-	if (fd->flags & FD_LISTEN) {
-		if (eloop_event_add(fd->ctx->eloop, fd->fd, ELE_READ,
-		    control_handle_data, fd) == -1)
-			logerr("%s: eloop_event_add", __func__);
-	} else
-		eloop_event_delete(fd->ctx->eloop, fd->fd);
 #ifdef PRIVSEP
 	if (IN_PRIVSEP_SE(fd->ctx) && !(fd->flags & FD_LISTEN)) {
 		if (ps_ctl_sendeof(fd) == -1)
 			logerr(__func__);
-		control_free(fd);
 	}
 #endif
+
+	/* Done sending data, stop watching write to fd */
+	if (eloop_event_add(fd->ctx->eloop, fd->fd, ELE_READ,
+	    control_handle_data, fd) == -1)
+		logerr("%s: eloop_event_add", __func__);
 }
 
 
