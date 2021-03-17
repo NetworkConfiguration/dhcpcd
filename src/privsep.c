@@ -114,7 +114,6 @@ ps_init(struct dhcpcd_ctx *ctx)
 static int
 ps_dropprivs(struct dhcpcd_ctx *ctx)
 {
-	return 0;
 	struct passwd *pw = ctx->ps_user;
 
 	if (ctx->options & DHCPCD_LAUNCHER)
