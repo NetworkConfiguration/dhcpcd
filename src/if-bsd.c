@@ -1246,8 +1246,8 @@ if_rtm(struct dhcpcd_ctx *ctx, const struct rt_msghdr *rtm)
 
 	/* Ignore messages from ourself. */
 #ifdef PRIVSEP
-	if (ctx->ps_root_pid != 0) {
-		if (rtm->rtm_pid == ctx->ps_root_pid)
+	if (ctx->ps_root != NULL) {
+		if (rtm->rtm_pid == ctx->ps_root->psp_pid)
 			return 0;
 	}
 #endif
@@ -1298,8 +1298,8 @@ if_ifa(struct dhcpcd_ctx *ctx, const struct ifa_msghdr *ifam)
 	 * We need to process address flag changes though. */
 	if (ifam->ifam_type == RTM_DELADDR) {
 #ifdef PRIVSEP
-		if (ctx->ps_root_pid != 0) {
-			if (ifam->ifam_pid == ctx->ps_root_pid)
+		if (ctx->ps_root != NULL) {
+			if (ifam->ifam_pid == ctx->ps_root->psp_pid)
 				return 0;
 		} else
 #endif

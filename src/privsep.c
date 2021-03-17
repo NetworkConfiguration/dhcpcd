@@ -114,6 +114,7 @@ ps_init(struct dhcpcd_ctx *ctx)
 static int
 ps_dropprivs(struct dhcpcd_ctx *ctx)
 {
+	return 0;
 	struct passwd *pw = ctx->ps_user;
 
 	if (ctx->options & DHCPCD_LAUNCHER)
@@ -135,7 +136,7 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 
 	struct rlimit rzero = { .rlim_cur = 0, .rlim_max = 0 };
 
-	if (ctx->ps_control_pid != getpid()) {
+	if (ctx->ps_ctl == NULL || ctx->ps_ctl->psp_pid != getpid()) {
 		/* Prohibit new files, sockets, etc */
 #if (defined(__linux__) || defined(__sun) || defined(__OpenBSD__)) && \
     !defined(HAVE_KQUEUE) && !defined(HAVE_EPOLL)
@@ -318,17 +319,17 @@ ps_rights_limit_stdio(struct dhcpcd_ctx *ctx)
 #endif
 
 pid_t
-ps_dostart(struct dhcpcd_ctx *ctx,
-    pid_t *priv_pid, int *priv_fd,
+ps_startprocess(struct ps_process *psp,
     void (*recv_msg)(void *, unsigned short),
     void (*recv_unpriv_msg)(void *, unsigned short),
-    void *recv_ctx, int (*callback)(void *), void (*signal_cb)(int, void *),
+    int (*callback)(struct ps_process *), void (*signal_cb)(int, void *),
     unsigned int flags)
 {
+	struct dhcpcd_ctx *ctx = psp->psp_ctx;
 	int fd[2];
 	pid_t pid;
 
-	if (xsocketpair(AF_UNIX, SOCK_DGRAM | SOCK_CXNB, 0, fd) == -1) {
+	if (xsocketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CXNB, 0, fd) == -1) {
 		logerr("%s: socketpair", __func__);
 		return -1;
 	}
@@ -348,32 +349,30 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 		logerr("fork");
 		return -1;
 	case 0:
-		*priv_fd = fd[1];
+		psp->psp_pid = getpid();
+		psp->psp_fd = fd[1];
 		close(fd[0]);
 		break;
 	default:
-		*priv_pid = pid;
-		*priv_fd = fd[0];
+		psp->psp_pid = pid;
+		psp->psp_fd = fd[0];
 		close(fd[1]);
 		if (recv_unpriv_msg == NULL)
 			;
-		else if (eloop_event_add(ctx->eloop, *priv_fd, ELE_READ,
-		    recv_unpriv_msg, recv_ctx) == -1)
+		else if (eloop_event_add(ctx->eloop, psp->psp_fd, ELE_READ,
+		    recv_unpriv_msg, psp) == -1)
 		{
-			logerr("%s: eloop_event_add", __func__);
+			logerr("%s: eloop_event_add fd %d",
+			    __func__, psp->psp_fd);
 			return -1;
 		}
 		return pid;
 	}
 
 	ctx->options |= DHCPCD_FORKED;
-	if (ctx->fork_fd != -1) {
-		close(ctx->fork_fd);
-		ctx->fork_fd = -1;
-	}
-	pidfile_clean();
-
-	eloop_clear(ctx->eloop, loggetfd(), -1);
+	if (ctx->ps_log_fd != -1)
+		logsetfd(ctx->ps_log_fd);
+	eloop_clear(ctx->eloop, -1);
 	eloop_forked(ctx->eloop);
 	eloop_signal_set_cb(ctx->eloop,
 	    dhcpcd_signals, dhcpcd_signals_len, signal_cb, ctx);
@@ -383,16 +382,31 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 		goto errexit;
 	}
 
-	/* We are not root */
-	if (priv_fd != &ctx->ps_root_fd) {
-		ps_freeprocesses(ctx, recv_ctx);
-		if (ctx->ps_root_fd != -1) {
-			close(ctx->ps_root_fd);
-			ctx->ps_root_fd = -1;
-		}
+	if (ctx->fork_fd != -1) {
+		/* Already removed from eloop thanks to above clear. */
+		close(ctx->fork_fd);
+		ctx->fork_fd = -1;
+	}
 
+	/* This process has no need of the blocking inner eloop. */
+	if (!(flags & PSF_ELOOP)) {
+		eloop_free(ctx->ps_eloop);
+		ctx->ps_eloop = NULL;
+	} else
+		eloop_forked(ctx->ps_eloop);
+
+	pidfile_clean();
+	ps_freeprocesses(ctx, psp);
+
+	if (ctx->ps_root != psp) {
+		ctx->options &= ~DHCPCD_PRIVSEPROOT;
+		ctx->ps_root = NULL;
+		if (ctx->ps_log_root_fd != -1) {
+			/* Already removed from eloop thanks to above clear. */
+			close(ctx->ps_log_root_fd);
+			ctx->ps_log_root_fd = -1;
+		}
 #ifdef PRIVSEP_RIGHTS
-		/* We cannot limit the root process in any way. */
 		if (ps_rights_limit_stdio(ctx) == -1) {
 			logerr("ps_rights_limit_stdio");
 			goto errexit;
@@ -400,19 +414,26 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 #endif
 	}
 
-	if (priv_fd != &ctx->ps_inet_fd && ctx->ps_inet_fd != -1) {
-		close(ctx->ps_inet_fd);
-		ctx->ps_inet_fd = -1;
-	}
+	if (ctx->ps_inet != psp)
+		ctx->ps_inet = NULL;
+	if (ctx->ps_ctl != psp)
+		ctx->ps_ctl = NULL;
 
-	if (eloop_event_add(ctx->eloop, *priv_fd, ELE_READ,
-	    recv_msg, recv_ctx) == -1)
+#if 0
+	char buf[1024];
+	errno = 0;
+	ssize_t xx = recv(psp->psp_fd, buf, sizeof(buf), MSG_PEEK);
+	logerr("pid %d test fd %d recv peek %zd", getpid(), psp->psp_fd, xx);
+#endif
+
+	if (eloop_event_add(ctx->eloop, psp->psp_fd, ELE_READ,
+	    recv_msg, psp) == -1)
 	{
-		logerr("%s: eloop_event_add", __func__);
+		logerr("%d %s: eloop_event_add XX fd %d", getpid(), __func__, psp->psp_fd);
 		goto errexit;
 	}
 
-	if (callback(recv_ctx) == -1)
+	if (callback(psp) == -1)
 		goto errexit;
 
 	if (flags & PSF_DROPPRIVS)
@@ -421,38 +442,57 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 	return 0;
 
 errexit:
-	/* Failure to start root or inet processes is fatal. */
-	if (priv_fd == &ctx->ps_root_fd || priv_fd == &ctx->ps_inet_fd)
-		(void)ps_sendcmd(ctx, *priv_fd, PS_STOP, 0, NULL, 0);
-	shutdown(*priv_fd, SHUT_RDWR);
-	*priv_fd = -1;
+	if (psp->psp_fd != -1) {
+		close(psp->psp_fd);
+		psp->psp_fd = -1;
+	}
 	eloop_exit(ctx->eloop, EXIT_FAILURE);
 	return -1;
 }
 
+void
+ps_process_timeout(void *arg)
+{
+	struct dhcpcd_ctx *ctx = arg;
+
+	logerrx("%s: timed out", __func__);
+	eloop_exit(ctx->eloop, EXIT_FAILURE);
+}
+
 int
-ps_dostop(struct dhcpcd_ctx *ctx, pid_t *pid, int *fd)
+ps_stopprocess(struct ps_process *psp)
 {
 	int err = 0;
 
+	if (psp == NULL)
+		return 0;
+
 #ifdef PRIVSEP_DEBUG
-	logdebugx("%s: pid=%d fd=%d", __func__, *pid, *fd);
+	logdebugx("%s: me=%d pid=%d fd=%d %s", __func__,
+	    getpid(), psp->psp_pid, psp->psp_fd, psp->psp_name);
 #endif
 
-	if (*fd != -1) {
-		eloop_event_delete(ctx->eloop, *fd);
-		if (ps_sendcmd(ctx, *fd, PS_STOP, 0, NULL, 0) == -1) {
+	if (psp->psp_fd != -1) {
+		eloop_event_delete(psp->psp_ctx->eloop, psp->psp_fd);
+#if 0
+		if (ps_sendcmd(psp->psp_ctx, psp->psp_fd, PS_STOP, 0,
+		    NULL, 0) == -1)
+		{
+			logerr("%d %d %s %s", getpid(), psp->psp_pid, psp->psp_name, __func__);
+			err = -1;
+		}
+		shutdown(psp->psp_fd, SHUT_WR);
+#else
+		if (shutdown(psp->psp_fd, SHUT_WR) == -1) {
 			logerr(__func__);
 			err = -1;
 		}
-		(void)shutdown(*fd, SHUT_RDWR);
-		close(*fd);
-		*fd = -1;
+#endif
+		psp->psp_fd = -1;
 	}
 
 	/* Don't wait for the process as it may not respond to the shutdown
 	 * request. We'll reap the process on receipt of SIGCHLD. */
-	*pid = 0;
 	return err;
 }
 
@@ -462,6 +502,13 @@ ps_start(struct dhcpcd_ctx *ctx)
 	pid_t pid;
 
 	TAILQ_INIT(&ctx->ps_processes);
+
+	/* We need an inner eloop to block with. */
+	if ((ctx->ps_eloop = eloop_new()) == NULL)
+		return -1;
+	eloop_signal_set_cb(ctx->ps_eloop,
+	    dhcpcd_signals, dhcpcd_signals_len,
+	    dhcpcd_signal_cb, ctx);
 
 	switch (pid = ps_root_start(ctx)) {
 	case -1:
@@ -553,7 +600,7 @@ ps_managersandbox(struct dhcpcd_ctx *ctx, const char *_pledge)
 	 * If it cannot be opened before chrooting then syslog(3) will fail.
 	 * openlog(3) does not return an error which doubly sucks.
 	 */
-	if (ctx->ps_root_fd == -1) {
+	if (ctx->ps_root == NULL) {
 		unsigned int logopts = loggetopts();
 
 		logopts &= ~LOGERR_LOG;
@@ -602,35 +649,85 @@ ps_stop(struct dhcpcd_ctx *ctx)
 	    ctx->eloop == NULL)
 		return 0;
 
-	r = ps_ctl_stop(ctx);
-	if (r != 0)
-		ret = r;
+	if (ctx->ps_ctl != NULL) {
+		r = ps_ctl_stop(ctx);
+		if (r != 0)
+			ret = r;
+	}
 
-	r = ps_inet_stop(ctx);
-	if (r != 0)
-		ret = r;
+	if (ctx->ps_inet != NULL) {
+		r = ps_inet_stop(ctx);
+		if (r != 0)
+			ret = r;
+	}
 
-	/* We've been chrooted, so we need to tell the
-	 * privileged proxy to remove the pidfile. */
-	if (ps_root_unlink(ctx, ctx->pidfile) == -1)
-		ret = -1;
+	if (ctx->ps_root != NULL) {
+		if (ps_root_stopprocesses(ctx) == -1)
+			ret = -1;
+	}
 
 	return ret;
+}
+
+int
+ps_stopwait(struct dhcpcd_ctx *ctx)
+{
+	int error = EXIT_SUCCESS;
+
+	if (ctx->ps_eloop != NULL && PS_WAITING_FOR_PROCESSES(ctx)) {
+		int waited;
+
+		ctx->options |= DHCPCD_EXITING;
+		if (eloop_timeout_add_sec(ctx->ps_eloop, PS_PROCESS_TIMEOUT,
+		    ps_process_timeout, ctx) == -1)
+			logerr("%s: eloop_timeout_add_sec", __func__);
+		eloop_enter(ctx->ps_eloop);
+		waited = eloop_start(ctx->ps_eloop, &ctx->sigset);
+		if (waited != EXIT_SUCCESS) {
+			logerr("%s: eloop_start", __func__);
+			error = waited;
+		}
+		eloop_timeout_delete(ctx->ps_eloop, ps_process_timeout, ctx);
+	}
+
+	if (IN_PRIVSEP_SE(ctx) && ctx->ps_root != NULL) {
+		struct ps_process *psp = ctx->ps_root;
+
+		if (ps_root_unlink(ctx, ctx->pidfile) == -1)
+			logerr("%s: ps_root_unlink", __func__);
+
+		/* We cannot log the root process exited before we
+		 * log dhcpcd exits because the latter requires the former.
+		 * So we just log the intent to exit. */
+		logdebugx("%s%s%s will exit from PID %d",
+		    psp->psp_ifname,
+		    psp->psp_ifname[0] != '\0' ? ": " : "",
+		    psp->psp_name, psp->psp_pid);
+	}
+
+	return error;
 }
 
 void
 ps_freeprocess(struct ps_process *psp)
 {
+	struct dhcpcd_ctx *ctx = psp->psp_ctx;
 
-	TAILQ_REMOVE(&psp->psp_ctx->ps_processes, psp, next);
+	TAILQ_REMOVE(&ctx->ps_processes, psp, next);
 	if (psp->psp_fd != -1) {
-		eloop_event_delete(psp->psp_ctx->eloop, psp->psp_fd);
+		eloop_event_delete(ctx->eloop, psp->psp_fd);
 		close(psp->psp_fd);
 	}
 	if (psp->psp_work_fd != -1) {
-		eloop_event_delete(psp->psp_ctx->eloop, psp->psp_work_fd);
+		eloop_event_delete(ctx->eloop, psp->psp_work_fd);
 		close(psp->psp_work_fd);
 	}
+	if (ctx->ps_root == psp)
+		ctx->ps_root = NULL;
+	if (ctx->ps_inet == psp)
+		ctx->ps_inet = NULL;
+	if (ctx->ps_ctl == psp)
+		ctx->ps_ctl = NULL;
 #ifdef INET
 	if (psp->psp_bpf != NULL)
 		bpf_close(psp->psp_bpf);
@@ -641,12 +738,23 @@ ps_freeprocess(struct ps_process *psp)
 static void
 ps_free(struct dhcpcd_ctx *ctx)
 {
-	struct ps_process *psp;
-	bool stop = ctx->ps_root_pid == getpid();
+	struct ps_process *ppsp, *psp;
+	bool stop;
+
+	if (ctx->ps_root != NULL)
+		ppsp = ctx->ps_root;
+	else if (ctx->ps_ctl != NULL)
+		ppsp = ctx->ps_ctl;
+	else
+		ppsp = NULL;
+	if (ppsp != NULL)
+		stop = ppsp->psp_pid == getpid();
+	else
+		stop = false;
 
 	while ((psp = TAILQ_FIRST(&ctx->ps_processes)) != NULL) {
-		if (stop)
-			ps_dostop(ctx, &psp->psp_pid, &psp->psp_fd);
+		if (stop && psp != ppsp)
+			ps_stopprocess(psp);
 		ps_freeprocess(psp);
 	}
 }
@@ -739,7 +847,6 @@ ps_sendpsmmsg(struct dhcpcd_ctx *ctx, int fd,
 
 	len = writev(fd, iov, iovlen);
 	if (len == -1) {
-		logerr(__func__);
 		if (ctx->options & DHCPCD_FORKED &&
 		    !(ctx->options & DHCPCD_PRIVSEPROOT))
 			eloop_exit(ctx->eloop, EXIT_FAILURE);
@@ -883,27 +990,24 @@ ps_recvmsg(struct dhcpcd_ctx *ctx, int rfd, unsigned short events,
 	};
 	ssize_t len;
 
-	if (events != ELE_READ)
+	if (!(events & ELE_READ))
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 	len = recvmsg(rfd, &msg, 0);
-
 	if (len == -1)
 		logerr("%s: recvmsg", __func__);
 	if (len == -1 || len == 0) {
-		if (ctx->options & DHCPCD_FORKED &&
-		    !(ctx->options & DHCPCD_PRIVSEPROOT))
+		if (ctx->options & DHCPCD_FORKED)
 			eloop_exit(ctx->eloop,
-			    len == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
+			    len != -1 ? EXIT_SUCCESS : EXIT_FAILURE);
 		return len;
 	}
 
 	iov[0].iov_len = (size_t)len;
 	len = ps_sendcmdmsg(wfd, cmd, &msg);
 	if (len == -1) {
-		logerr("ps_sendcmdmsg");
-		if (ctx->options & DHCPCD_FORKED &&
-		    !(ctx->options & DHCPCD_PRIVSEPROOT))
+		logerr("%s: ps_sendcmdmsg", __func__);
+		if (ctx->options & DHCPCD_FORKED)
 			eloop_exit(ctx->eloop, EXIT_FAILURE);
 	}
 	return len;
@@ -921,7 +1025,7 @@ ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd, unsigned short events,
 	struct msghdr msg = { .msg_iov = iov, .msg_iovlen = 1 };
 	bool stop = false;
 
-	if (events != ELE_READ)
+	if (!(events & ELE_READ))
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 	len = read(fd, &psm, sizeof(psm));
@@ -945,6 +1049,7 @@ ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd, unsigned short events,
 	}
 
 	if (stop) {
+		ctx->options |= DHCPCD_EXITING;
 #ifdef PRIVSEP_DEBUG
 		logdebugx("process %d stopping", getpid());
 #endif
@@ -981,6 +1086,19 @@ ps_findprocess(struct dhcpcd_ctx *ctx, struct ps_id *psid)
 }
 
 struct ps_process *
+ps_findprocesspid(struct dhcpcd_ctx *ctx, pid_t pid)
+{
+	struct ps_process *psp;
+
+	TAILQ_FOREACH(psp, &ctx->ps_processes, next) {
+		if (psp->psp_pid == pid)
+			return psp;
+	}
+	errno = ESRCH;
+	return NULL;
+}
+
+struct ps_process *
 ps_newprocess(struct dhcpcd_ctx *ctx, struct ps_id *psid)
 {
 	struct ps_process *psp;
@@ -991,6 +1109,8 @@ ps_newprocess(struct dhcpcd_ctx *ctx, struct ps_id *psid)
 	psp->psp_ctx = ctx;
 	memcpy(&psp->psp_id, psid, sizeof(psp->psp_id));
 	psp->psp_work_fd = -1;
+	if (!(ctx->options & DHCPCD_MANAGER))
+		strlcpy(psp->psp_ifname, ctx->ifv[0], sizeof(psp->psp_name));
 	TAILQ_INSERT_TAIL(&ctx->ps_processes, psp, next);
 	return psp;
 }

@@ -33,6 +33,7 @@
 
 /* Start flags */
 #define	PSF_DROPPRIVS		0x01
+#define	PSF_ELOOP		0x02
 
 /* Protocols */
 #define	PS_BOOTP		0x0001
@@ -53,14 +54,20 @@
 #define	PS_CTL			0x0018
 #define	PS_CTL_EOF		0x0019
 #define	PS_LOGREOPEN		0x0020
+#define	PS_STOPPROCS		0x0021
+
+/* Domains */
+#define	PS_ROOT			0x0101
+#define	PS_INET			0x0102
+#define	PS_CONTROL		0x0103
 
 /* BSD Commands */
-#define	PS_IOCTLLINK		0x0101
-#define	PS_IOCTL6		0x0102
-#define	PS_IOCTLINDIRECT	0x0103
-#define	PS_IP6FORWARDING	0x0104
-#define	PS_GETIFADDRS		0x0105
-#define	PS_IFIGNOREGRP		0x0106
+#define	PS_IOCTLLINK		0x0201
+#define	PS_IOCTL6		0x0202
+#define	PS_IOCTLINDIRECT	0x0203
+#define	PS_IP6FORWARDING	0x0204
+#define	PS_GETIFADDRS		0x0205
+#define	PS_IFIGNOREGRP		0x0206
 
 /* Dev Commands */
 #define	PS_DEV_LISTENING	0x1001
@@ -87,11 +94,23 @@
 				 CMSG_SPACE(sizeof(struct in6_pktinfo) + \
 					    sizeof(int)))
 
+#define	PSP_NAMESIZE		16 + INET_MAX_ADDRSTRLEN
+
 /* Handy macro to work out if in the privsep engine or not. */
 #define	IN_PRIVSEP(ctx)	\
 	((ctx)->options & DHCPCD_PRIVSEP)
 #define	IN_PRIVSEP_SE(ctx)	\
 	(((ctx)->options & (DHCPCD_PRIVSEP | DHCPCD_FORKED)) == DHCPCD_PRIVSEP)
+
+#define	PS_PROCESS_TIMEOUT	5	/* seconds to stop all processes */
+
+/* We always have ourself as a process */
+#define	PS_WAITING_FOR_PROCESSES(_ctx)				\
+	((IN_PRIVSEP_SE((_ctx)) &&				\
+	  TAILQ_LAST(&(_ctx)->ps_processes, ps_process_head) != (_ctx)->ps_root) ||	\
+	  (!IN_PRIVSEP_SE((_ctx)) &&				\
+	  TAILQ_FIRST(&(_ctx)->ps_processes) !=			\
+	  TAILQ_LAST(&(_ctx)->ps_processes, ps_process_head)))
 
 #if defined(PRIVSEP) && defined(HAVE_CAPSICUM)
 #define PRIVSEP_RIGHTS
@@ -154,6 +173,7 @@ struct ps_process {
 	int psp_work_fd;
 	unsigned int psp_ifindex;
 	char psp_ifname[IF_NAMESIZE];
+	char psp_name[PSP_NAMESIZE];
 	uint16_t psp_proto;
 	const char *psp_protostr;
 
@@ -175,6 +195,7 @@ TAILQ_HEAD(ps_process_head, ps_process);
 int ps_init(struct dhcpcd_ctx *);
 int ps_start(struct dhcpcd_ctx *);
 int ps_stop(struct dhcpcd_ctx *);
+int ps_stopwait(struct dhcpcd_ctx *);
 int ps_entersandbox(const char *, const char **);
 int ps_managersandbox(struct dhcpcd_ctx *, const char *);
 
@@ -207,16 +228,16 @@ int ps_rights_limit_fdpair(int []);
 int ps_seccomp_enter(void);
 #endif
 
-pid_t ps_dostart(struct dhcpcd_ctx * ctx,
-    pid_t *priv_pid, int *priv_fd,
+pid_t ps_startprocess(struct ps_process *,
     void (*recv_msg)(void *, unsigned short),
     void (*recv_unpriv_msg)(void *, unsigned short),
-    void *recv_ctx, int (*callback)(void *), void (*)(int, void *),
+    int (*callback)(struct ps_process *), void (*)(int, void *),
     unsigned int);
-int ps_dostop(struct dhcpcd_ctx *ctx, pid_t *pid, int *fd);
-
+int ps_stopprocess(struct ps_process *);
 struct ps_process *ps_findprocess(struct dhcpcd_ctx *, struct ps_id *);
+struct ps_process *ps_findprocesspid(struct dhcpcd_ctx *, pid_t);
 struct ps_process *ps_newprocess(struct dhcpcd_ctx *, struct ps_id *);
+void ps_process_timeout(void *);
 void ps_freeprocess(struct ps_process *);
 void ps_freeprocesses(struct dhcpcd_ctx *, struct ps_process *);
 #endif

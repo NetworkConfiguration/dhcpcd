@@ -144,9 +144,8 @@ ps_bpf_recvmsg(void *arg, unsigned short events)
 }
 
 static int
-ps_bpf_start_bpf(void *arg)
+ps_bpf_start_bpf(struct ps_process *psp)
 {
-	struct ps_process *psp = arg;
 	struct dhcpcd_ctx *ctx = psp->psp_ctx;
 	char *addr;
 	struct in_addr *ia = &psp->psp_id.psi_addr.psa_in_addr;
@@ -187,6 +186,8 @@ ps_bpf_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg)
 	pid_t start;
 	struct iovec *iov = msg->msg_iov;
 	struct interface *ifp;
+	struct in_addr *ia = &psm->ps_id.psi_addr.psa_in_addr;
+	const char *addr;
 
 	cmd = (uint16_t)(psm->ps_cmd & ~(PS_START | PS_STOP));
 	psp = ps_findprocess(ctx, &psm->ps_id);
@@ -244,11 +245,16 @@ ps_bpf_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg)
 		break;
 	}
 
-	start = ps_dostart(ctx,
-	    &psp->psp_pid, &psp->psp_fd,
-	    ps_bpf_recvmsg, NULL, psp,
-	    ps_bpf_start_bpf, NULL,
-	    PSF_DROPPRIVS);
+	if (ia->s_addr == INADDR_ANY)
+		addr = NULL;
+	else
+		addr = inet_ntoa(*ia);
+	snprintf(psp->psp_name, sizeof(psp->psp_name), "BPF %s%s%s",
+	    psp->psp_protostr,
+	    addr != NULL ? " " : "", addr != NULL ? addr : "");
+
+	start = ps_startprocess(psp, ps_bpf_recvmsg, NULL,
+	    ps_bpf_start_bpf, NULL, PSF_DROPPRIVS);
 	switch (start) {
 	case -1:
 		ps_freeprocess(psp);
@@ -257,8 +263,8 @@ ps_bpf_cmd(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg)
 		ps_entersandbox("stdio", NULL);
 		break;
 	default:
-		logdebugx("%s: spawned BPF %s on PID %d",
-		    psp->psp_ifname, psp->psp_protostr, start);
+		logdebugx("%s: spawned %s on PID %d",
+		    psp->psp_ifname, psp->psp_name, psp->psp_pid);
 		break;
 	}
 	return start;
@@ -322,7 +328,7 @@ ps_bpf_send(const struct interface *ifp, const struct in_addr *ia,
 	if (ia != NULL)
 		psm.ps_id.psi_addr.psa_in_addr = *ia;
 
-	return ps_sendpsmdata(ctx, ctx->ps_root_fd, &psm, data, len);
+	return ps_sendpsmdata(ctx, ctx->ps_root->psp_fd, &psm, data, len);
 }
 
 #ifdef ARP

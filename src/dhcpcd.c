@@ -1409,7 +1409,7 @@ dhcpcd_renew(struct dhcpcd_ctx *ctx)
 
 #ifdef USE_SIGNALS
 #define sigmsg "received %s, %s"
-static void
+void
 dhcpcd_signal_cb(int sig, void *arg)
 {
 	struct dhcpcd_ctx *ctx = arg;
@@ -1468,8 +1468,12 @@ dhcpcd_signal_cb(int sig, void *arg)
 			logerr("logopen");
 		return;
 	case SIGCHLD:
+#ifdef PRIVSEP
+		ps_root_signalcb(sig, ctx);
+#else
 		while (waitpid(-1, NULL, WNOHANG) > 0)
 			;
+#endif
 		return;
 	default:
 		logerrx("received signal %d but don't know what to do with it",
@@ -1918,8 +1922,7 @@ main(int argc, char **argv, char **envp)
 	ctx.dhcp6_wfd = -1;
 #endif
 #ifdef PRIVSEP
-	ctx.ps_root_fd = ctx.ps_log_fd = ctx.ps_data_fd = -1;
-	ctx.ps_inet_fd = ctx.ps_control_fd = -1;
+	ctx.ps_log_fd = -1;
 	TAILQ_INIT(&ctx.ps_processes);
 #endif
 
@@ -2307,9 +2310,9 @@ printpidfile:
 	if (!(ctx.options & DHCPCD_DAEMONISE))
 		goto start_manager;
 
-	if (xsocketpair(AF_UNIX, SOCK_DGRAM | SOCK_CXNB, 0, fork_fd) == -1 ||
+	if (xsocketpair(AF_UNIX, SOCK_SEQPACKET|SOCK_CXNB, 0, fork_fd) == -1 ||
 	    (ctx.stderr_valid &&
-	    xsocketpair(AF_UNIX, SOCK_DGRAM | SOCK_CXNB, 0, stderr_fd) == -1))
+	    xsocketpair(AF_UNIX, SOCK_SEQPACKET|SOCK_CXNB, 0, stderr_fd) == -1))
 	{
 		logerr("socketpair");
 		goto exit_failure;
@@ -2639,10 +2642,22 @@ exit1:
 #endif
 	if (ctx.script != dhcpcd_default_script)
 		free(ctx.script);
-	if (ctx.options & DHCPCD_STARTED && !(ctx.options & DHCPCD_FORKED))
-		loginfox(PACKAGE " exited");
 #ifdef PRIVSEP
-	ps_root_stop(&ctx);
+	if (ps_stopwait(&ctx) != EXIT_SUCCESS)
+		i = EXIT_FAILURE;
+#endif
+	if (ctx.options & DHCPCD_STARTED && !(ctx.options & DHCPCD_FORKED)) {
+		loginfox(PACKAGE " exited");
+
+#ifdef PRIVSEP
+		/* Sleep some for the exited log entry to be written. */
+		struct timespec ts = { .tv_nsec = 10 };
+		nanosleep(&ts, NULL);
+#endif
+	}
+#ifdef PRIVSEP
+	if (ps_root_stop(&ctx) == -1)
+		i = EXIT_FAILURE;
 	eloop_free(ctx.ps_eloop);
 #endif
 	eloop_free(ctx.eloop);
