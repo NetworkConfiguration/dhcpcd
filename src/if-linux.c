@@ -745,8 +745,8 @@ link_route(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
 
 	/* Ignore messages we sent. */
 #ifdef PRIVSEP
-	if (ctx->ps_root_pid != 0 &&
-	    nlm->nlmsg_pid == (uint32_t)ctx->ps_root_pid)
+	if (ctx->ps_root != NULL &&
+	    nlm->nlmsg_pid == (uint32_t)ctx->ps_root->psp_pid)
 		return 0;
 #endif
 	priv = (struct priv *)ctx->priv;
@@ -788,8 +788,8 @@ link_addr(struct dhcpcd_ctx *ctx, struct interface *ifp, struct nlmsghdr *nlm)
 	 * We need to process address flag changes though. */
 	if (nlm->nlmsg_type == RTM_DELADDR) {
 #ifdef PRIVSEP
-		if (ctx->ps_root_pid != 0 &&
-		    nlm->nlmsg_pid == (uint32_t)ctx->ps_root_pid)
+		if (ctx->ps_root != NULL &&
+		    nlm->nlmsg_pid == (uint32_t)ctx->ps_root->psp_pid)
 			return 0;
 #endif
 		priv = (struct priv*)ctx->priv;

@@ -181,7 +181,7 @@ ps_root_mreaderror(struct dhcpcd_ctx *ctx, void **data, size_t *len)
 	    .psr_ctx = ctx,
 	};
 
-	if (eloop_event_add(ctx->ps_eloop, ctx->ps_root_fd, ELE_READ,
+	if (eloop_event_add(ctx->ps_eloop, ctx->ps_root->psp_fd, ELE_READ,
 	    ps_root_mreaderrorcb, &psr_ctx) == -1)
 		return -1;
 
