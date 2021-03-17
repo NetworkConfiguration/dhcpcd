@@ -322,7 +322,7 @@ eloop_event_add(struct eloop *eloop, int fd, unsigned short events,
 
 	assert(eloop != NULL);
 	assert(cb != NULL && cb_arg != NULL);
-	if (fd == -1 || !(events & (ELE_READ | ELE_WRITE))) {
+	if (fd == -1 || !(events & (ELE_READ | ELE_WRITE | ELE_HANGUP))) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -367,6 +367,13 @@ eloop_event_add(struct eloop *eloop, int fd, unsigned short events,
 		EV_SET(kep++, (uintptr_t)fd, EVFILT_WRITE, EV_DELETE, 0, 0, e);
 	else
 		n--;
+#ifdef EVFILT_PROCDESC
+	if (events & ELE_HANGUP)
+		EV_SET(kep++, (uintptr_t)fd, EVFILT_PROCDESC, EV_ADD,
+		    NOTE_EXIT, 0, e);
+	else
+		n--;
+#endif
 	if (n != 0 && _kevent(eloop->fd, ke, n, NULL, 0, NULL) == -1) {
 		if (added) {
 			TAILQ_REMOVE(&eloop->events, e, next);

@@ -182,6 +182,10 @@ struct ps_process {
 	struct interface psp_ifp; /* Move BPF gubbins elsewhere */
 	struct bpf *psp_bpf;
 #endif
+
+#ifdef HAVE_CAPSICUM
+	int psp_pfd;
+#endif
 };
 TAILQ_HEAD(ps_process_head, ps_process);
 

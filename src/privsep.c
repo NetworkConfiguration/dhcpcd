@@ -75,6 +75,7 @@
 
 #ifdef HAVE_CAPSICUM
 #include <sys/capsicum.h>
+#include <sys/procdesc.h>
 #include <capsicum_helpers.h>
 #endif
 #ifdef HAVE_UTIL_H
@@ -317,6 +318,29 @@ ps_rights_limit_stdio(struct dhcpcd_ctx *ctx)
 }
 #endif
 
+#ifdef HAVE_CAPSICUM
+static void
+ps_processhangup(void *arg, unsigned short events)
+{
+	struct ps_process *psp = arg;
+	struct dhcpcd_ctx *ctx = psp->psp_ctx;
+
+	if (!(events & ELE_HANGUP))
+		logerrx("%s: unexpected event 0x%04x", __func__, events);
+
+	logdebugx("%s%s%s exited from PID %d",
+	    psp->psp_ifname, psp->psp_ifname[0] != '\0' ? ": " : "",
+	    psp->psp_name, psp->psp_pid);
+
+	ps_freeprocess(psp);
+
+	if (!(ctx->options & DHCPCD_EXITING))
+		return;
+	if (!(PS_WAITING_FOR_PROCESSES(ctx)))
+		eloop_exit(ctx->ps_eloop, EXIT_SUCCESS);
+}
+#endif
+
 pid_t
 ps_startprocess(struct ps_process *psp,
     void (*recv_msg)(void *, unsigned short),
@@ -343,9 +367,18 @@ ps_startprocess(struct ps_process *psp,
 	}
 #endif
 
-	switch (pid = fork()) {
+#ifdef HAVE_CAPSICUM
+	pid = pdfork(&psp->psp_pfd, PD_CLOEXEC);
+#else
+	pid = fork();
+#endif
+	switch (pid) {
 	case -1:
+#ifdef HAVE_CAPSICUM
+		logerr("pdfork");
+#else
 		logerr("fork");
+#endif
 		return -1;
 	case 0:
 		psp->psp_pid = getpid();
@@ -365,6 +398,15 @@ ps_startprocess(struct ps_process *psp,
 			    __func__, psp->psp_fd);
 			return -1;
 		}
+#ifdef HAVE_CAPSICUM
+		if (eloop_event_add(ctx->eloop, psp->psp_pfd, ELE_HANGUP,
+		    ps_processhangup, psp) == -1)
+		{
+			logerr("%s: eloop_event_add pfd %d",
+			    __func__, psp->psp_pfd);
+			return -1;
+		}
+#endif
 		return pid;
 	}
 
@@ -681,6 +723,20 @@ ps_stopwait(struct dhcpcd_ctx *ctx)
 		    ps_process_timeout, ctx) == -1)
 			logerr("%s: eloop_timeout_add_sec", __func__);
 		eloop_enter(ctx->ps_eloop);
+
+#ifdef HAVE_CAPSICUM
+		struct ps_process *psp;
+
+		TAILQ_FOREACH(psp, &ctx->ps_processes, next) {
+			if (psp->psp_pfd == -1)
+				continue;
+			if (eloop_event_add(ctx->ps_eloop, psp->psp_pfd,
+			    ELE_HANGUP, ps_processhangup, psp) == -1)
+				logerr("%s: eloop_event_add pfd %d",
+				    __func__, psp->psp_pfd);
+		}
+#endif
+
 		waited = eloop_start(ctx->ps_eloop, &ctx->sigset);
 		if (waited != EXIT_SUCCESS) {
 			logerr("%s: eloop_start", __func__);
@@ -713,6 +769,7 @@ ps_freeprocess(struct ps_process *psp)
 	struct dhcpcd_ctx *ctx = psp->psp_ctx;
 
 	TAILQ_REMOVE(&ctx->ps_processes, psp, next);
+
 	if (psp->psp_fd != -1) {
 		eloop_event_delete(ctx->eloop, psp->psp_fd);
 		close(psp->psp_fd);
@@ -721,6 +778,14 @@ ps_freeprocess(struct ps_process *psp)
 		eloop_event_delete(ctx->eloop, psp->psp_work_fd);
 		close(psp->psp_work_fd);
 	}
+#ifdef HAVE_CAPSICUM
+	if (psp->psp_pfd != -1) {
+		eloop_event_delete(ctx->eloop, psp->psp_pfd);
+		if (ctx->ps_eloop != NULL)
+			eloop_event_delete(ctx->ps_eloop, psp->psp_pfd);
+		close(psp->psp_pfd);
+	}
+#endif
 	if (ctx->ps_root == psp)
 		ctx->ps_root = NULL;
 	if (ctx->ps_inet == psp)
@@ -1108,6 +1173,10 @@ ps_newprocess(struct dhcpcd_ctx *ctx, struct ps_id *psid)
 	psp->psp_ctx = ctx;
 	memcpy(&psp->psp_id, psid, sizeof(psp->psp_id));
 	psp->psp_work_fd = -1;
+#ifdef HAVE_CAPSICUM
+	psp->psp_pfd = -1;
+#endif
+
 	if (!(ctx->options & DHCPCD_MANAGER))
 		strlcpy(psp->psp_ifname, ctx->ifv[0], sizeof(psp->psp_name));
 	TAILQ_INSERT_TAIL(&ctx->ps_processes, psp, next);
