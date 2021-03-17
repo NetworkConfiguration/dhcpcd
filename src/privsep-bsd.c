@@ -250,7 +250,7 @@ ps_root_indirectioctl(struct dhcpcd_ctx *ctx, unsigned long request,
 
 	strlcpy(buf, ifname, IFNAMSIZ);
 	memcpy(buf + IFNAMSIZ, data, len);
-	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_IOCTLINDIRECT,
+	if (ps_sendcmd(ctx, ctx->ps_root->psp_fd, PS_IOCTLINDIRECT,
 	    request, buf, IFNAMSIZ + len) == -1)
 		return -1;
 	return ps_root_readerror(ctx, data, len);
@@ -260,7 +260,7 @@ ssize_t
 ps_root_ifignoregroup(struct dhcpcd_ctx *ctx, const char *ifname)
 {
 
-	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_IFIGNOREGRP, 0,
+	if (ps_sendcmd(ctx, ctx->ps_root->psp_fd, PS_IFIGNOREGRP, 0,
 	    ifname, strlen(ifname) + 1) == -1)
 		return -1;
 	return ps_root_readerror(ctx, NULL, 0);
