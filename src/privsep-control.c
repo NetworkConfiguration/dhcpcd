@@ -178,12 +178,12 @@ ps_ctl_recv(void *arg, unsigned short events)
 	char buf[BUFSIZ];
 	ssize_t len;
 
-	if (events != ELE_READ)
+	if (!(events & ELE_READ))
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 	errno = 0;
 	len = read(ctx->ps_control_data_fd, buf, sizeof(buf));
-	if (len == -1 || len == 0) {
+	if (len == -1) {
 		logerr("%s: read", __func__);
 		eloop_exit(ctx->eloop, EXIT_FAILURE);
 		return;
@@ -203,12 +203,13 @@ ps_ctl_listen(void *arg, unsigned short events)
 	ssize_t len;
 	struct fd_list *fd;
 
-	if (events != ELE_READ)
+	if (!(events & ELE_READ))
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
-	errno = 0;
 	len = read(ctx->ps_control->fd, buf, sizeof(buf));
-	if (len == -1 || len == 0) {
+	if (len == 0)
+		return;
+	if (len == -1) {
 		logerr("%s: read", __func__);
 		eloop_exit(ctx->eloop, EXIT_FAILURE);
 		return;
