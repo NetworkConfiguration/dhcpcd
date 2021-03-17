@@ -1789,7 +1789,7 @@ dhcpcd_fork_cb(void *arg, unsigned short events)
 	int exit_code;
 	ssize_t len;
 
-	if (events != ELE_READ)
+	if (!(events & ELE_READ))
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
 	len = read(ctx->fork_fd, &exit_code, sizeof(exit_code));
