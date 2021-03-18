@@ -993,6 +993,14 @@ eloop_run_kqueue(struct eloop *eloop, const struct timespec *ts)
 			events = ELE_READ;
 		else if (ke->filter == EVFILT_WRITE)
 			events = ELE_WRITE;
+#ifdef EVFILT_PROCDESC
+		else if (ke->filter == EVFILT_PROCDESC &&
+		    ke->fflags & NOTE_EXIT)
+			/* exit status is in ke->data.
+			 * As we default to using ppoll anyway
+			 * we don't have to do anything with it right now. */
+			events = ELE_HANGUP;
+#endif
 		else
 			continue; /* assert? */
 		if (ke->flags & EV_EOF)
