@@ -42,6 +42,7 @@
 #include <linux/if_vlan.h>
 #include <linux/filter.h>
 #include <linux/netlink.h>
+#include <linux/ethtool.h> /* for ipvlan detection */
 #include <linux/sockios.h>
 #include <linux/rtnetlink.h>
 
@@ -309,11 +310,54 @@ if_init(struct interface *ifp)
 	return if_writepathuint(ifp->ctx, path, 1) == -1 ? -1 : 0;
 }
 
+/* Returns number of bytes written to driver, else 0 (error or indeterminate). */
+static size_t
+if_get_driver(struct interface *ifp, char *driver, const size_t driverlen)
+{
+	struct ethtool_drvinfo drvinfo = { .cmd = ETHTOOL_GDRVINFO };
+	struct ifreq ifr = { .ifr_data = (void *)&drvinfo };
+
+	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
+	if (ioctl(ifp->ctx->pf_inet_fd, SIOCETHTOOL, &ifr) != 0) {
+		logerr("%s: SIOCETHTOOL ifname=%s", __func__, ifp->name);
+		return 0; /* 0 means error or indeterminate driver name */
+	}
+	return strlcpy(driver, drvinfo.driver, driverlen);
+}
+
+static bool
+if_cmp_driver(struct interface *ifp, const char *driver)
+{
+	char ifdriver[FIELD_SIZEOF(struct ethtool_drvinfo, driver)];
+	size_t n = if_get_driver(ifp, ifdriver, sizeof(ifdriver));
+
+	if (n == 0) {
+		logerr("%s: if_get_driver ifname=%s", __func__, ifp->name);
+		return false;
+	}
+	if (strncmp(ifdriver, driver, n) == 0)
+		return true;
+	return false;
+}
+
+static bool
+if_ipvlan(struct interface *ifp)
+{
+	if (if_cmp_driver(ifp, "ipvlan"))
+		return true;
+	return false;
+}
+
 int
 if_conf(struct interface *ifp)
 {
 	char path[sizeof(SYS_LAYER2) + IF_NAMESIZE];
 	int n;
+
+	/* Set broadcast flag for ipvlan interfaces.
+	 * XXX: move this out to dhcpcd if needed on other platforms. */
+	if (if_ipvlan(ifp))
+		ifp->options->options |= DHCPCD_BROADCAST;
 
 	/* Some qeth setups require the use of the broadcast flag. */
 	snprintf(path, sizeof(path), SYS_LAYER2, ifp->name);

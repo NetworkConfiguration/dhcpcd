@@ -63,6 +63,10 @@
 #define ROUNDUP4(a)		(1 + (((a) - 1) |  3))
 #define ROUNDUP8(a)		(1 + (((a) - 1) |  7))
 
+#ifndef FIELD_SIZEOF
+#define FIELD_SIZEOF(t, f) sizeof(((t *)0)->f)
+#endif
+
 /* Some systems don't define timespec macros */
 #ifndef timespecclear
 #define timespecclear(tsp)      (tsp)->tv_sec = (time_t)((tsp)->tv_nsec = 0L)
