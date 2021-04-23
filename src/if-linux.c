@@ -42,6 +42,7 @@
 #include <linux/if_vlan.h>
 #include <linux/filter.h>
 #include <linux/netlink.h>
+#include <linux/ethtool.h> /* for ipvlan detection */
 #include <linux/sockios.h>
 #include <linux/rtnetlink.h>
 
@@ -309,11 +310,59 @@ if_init(struct interface *ifp)
 	return if_writepathuint(ifp->ctx, path, 1) == -1 ? -1 : 0;
 }
 
+/* @maxlen should be greater than or equal to 32; see ethtool_drvinfo. */
+static int
+if_get_driver(const char *ifname, char *driver, const size_t maxlen)
+{
+	struct ifreq ifr;
+	struct ethtool_drvinfo drvinfo;
+	int fd;
+	if (!ifname || !*ifname)
+		return -1;
+
+	fd = socket(AF_INET, SOCK_STREAM, 0);
+	if (fd == -1) {
+		logerr("if_get_driver: failed socket creation: %s", strerror(errno));
+		return -1;
+	}
+
+	memset(&ifr, 0, sizeof(ifr));
+	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
+	drvinfo.cmd = ETHTOOL_GDRVINFO;
+	ifr.ifr_data = (void *)&drvinfo;
+	if (ioctl(fd, SIOCETHTOOL, &ifr) < 0) {
+		const int err = errno;
+		logerr("if_get_driver: failed ethtool ioctl on interface %s: %s",
+			ifname, strerror(errno));
+		close(fd);
+		return -1;
+	}
+	close(fd);
+	return strlcpy(driver, drvinfo.driver,
+		MIN(sizeof(drvinfo.driver), maxlen));
+}
+
+static bool
+if_ipvlan(const char *ifname)
+{
+	char driver[32]; /* sizeof(ethtool_drvinfo.driver) = 32 */
+	if (if_get_driver(ifname, driver, sizeof(driver)) < 0) {
+		logerr("if_ipvlan: failed to get driver name %s.", ifname);
+		return false;
+	}
+	return (strncmp(driver, "ipvlan", sizeof(driver)) == 0);
+}
+
 int
 if_conf(struct interface *ifp)
 {
 	char path[sizeof(SYS_LAYER2) + IF_NAMESIZE];
 	int n;
+
+	/* Set broadcast flag for ipvlan interfaces. */
+	if (if_ipvlan(ifp->name)) {
+		ifp->options->options |= DHCPCD_BROADCAST;
+	}
 
 	/* Some qeth setups require the use of the broadcast flag. */
 	snprintf(path, sizeof(path), SYS_LAYER2, ifp->name);
