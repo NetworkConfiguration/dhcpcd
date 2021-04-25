@@ -338,10 +338,9 @@ if_cmp_driver(struct interface *ifp, const char *driver)
 		logerr("%s: if_get_driver ifname=%s", __func__, ifp->name);
 	} else if (n == 0) {
 		logerr("%s: driver name empty ifname=%s", __func__, ifp->name);
-	} else if (n > 0) {
-		if (strncmp(ifdriver, driver, n) == 0)
-			return true;
 	}
+	if ((n >= 0) && (strncmp(ifdriver, driver, (size_t)n) == 0))
+		return true;
 	return false;
 }
 
