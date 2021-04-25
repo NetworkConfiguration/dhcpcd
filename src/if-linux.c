@@ -310,8 +310,11 @@ if_init(struct interface *ifp)
 	return if_writepathuint(ifp->ctx, path, 1) == -1 ? -1 : 0;
 }
 
-/* Returns number of bytes written to driver, else 0 (error or indeterminate). */
-static size_t
+/* Return values:
+ *   -1 = ioctl error
+ *    0 = no driver name or driver name indeterminate
+ *   >0 = length of driver name written to provided buffer. */
+static ssize_t
 if_get_driver(struct interface *ifp, char *driver, const size_t driverlen)
 {
 	struct ethtool_drvinfo drvinfo = { .cmd = ETHTOOL_GDRVINFO };
@@ -320,23 +323,25 @@ if_get_driver(struct interface *ifp, char *driver, const size_t driverlen)
 	strlcpy(ifr.ifr_name, ifp->name, sizeof(ifr.ifr_name));
 	if (ioctl(ifp->ctx->pf_inet_fd, SIOCETHTOOL, &ifr) != 0) {
 		logerr("%s: SIOCETHTOOL ifname=%s", __func__, ifp->name);
-		return 0; /* 0 means error or indeterminate driver name */
+		return -1; /* -1 means ioctl error */
 	}
-	return strlcpy(driver, drvinfo.driver, driverlen);
+	return (ssize_t)strlcpy(driver, drvinfo.driver, driverlen);
 }
 
 static bool
 if_cmp_driver(struct interface *ifp, const char *driver)
 {
 	char ifdriver[FIELD_SIZEOF(struct ethtool_drvinfo, driver)];
-	size_t n = if_get_driver(ifp, ifdriver, sizeof(ifdriver));
+	ssize_t n = if_get_driver(ifp, ifdriver, sizeof(ifdriver));
 
-	if (n == 0) {
+	if (n == -1) {
 		logerr("%s: if_get_driver ifname=%s", __func__, ifp->name);
-		return false;
+	} else if (n == 0) {
+		logerr("%s: driver name empty ifname=%s", __func__, ifp->name);
+	} else if (n > 0) {
+		if (strncmp(ifdriver, driver, n) == 0)
+			return true;
 	}
-	if (strncmp(ifdriver, driver, n) == 0)
-		return true;
 	return false;
 }
 
