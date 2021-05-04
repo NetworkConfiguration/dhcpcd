@@ -194,7 +194,7 @@ done
 _which()
 {
 	x="$(which "$1" 2>/dev/null)"
-	if [ $? = 0 -a -n "$x" ]; then
+	if [ $? = 0 ] && [ -n "$x" ]; then
 		echo "$x"
 		return 0
 	fi
@@ -304,7 +304,7 @@ else
 	_COMPILERS="cc clang gcc pcc icc"
 fi
 # Only look for a cross compiler if --host and --build are not the same
-if [ -n "$HOSTCC" -a "$BUILD" != "$HOST" ]; then
+if [ -n "$HOSTCC" ] && [ "$BUILD" != "$HOST" ]; then
 	for _CC in $_COMPILERS; do
 		_CC=$(_which "$HOSTCC$_CC")
 		if [ -x "$_CC" ]; then
@@ -351,7 +351,7 @@ if [ -e "$LDELF" ]; then
 	echo "LDFLAGS+=	-Wl,-rpath=${LIBDIR}" >>$CONFIG_MK
 fi
 
-if [ -z "$PREFIX" -o "$PREFIX" = / ]; then
+if [ -z "$PREFIX" ] || [ "$PREFIX" = / ]; then
 	ALLOW_USR_LIBS=false
 else
 	ALLOW_USR_LIBS=true
@@ -363,12 +363,12 @@ linux*|solaris*|sunos*|kfreebsd*) ;;
 	for LDELFN in /libexec/ld-elf.so.[0-9]*; do
 		[ -x "$LDELFN" ] && break
 	done
-	if ! [ -x "$LDELF" -o -x "$LDELFN" ] && \
-	    [ -z "$PREFIX" -o "$PREFIX" = "/" ]
-	then
-		echo "Forcing a static build for $OS and \$PREFIX of /"
-		STATIC=yes
-		ALLOW_USR_LIBS=true
+	if ! [ -x "$LDELF" ] || [ -x "$LDELFN" ]; then
+	    if [ -z "$PREFIX" ] || [ "$PREFIX" = "/" ]; then
+			echo "Forcing a static build for $OS and \$PREFIX of /"
+			STATIC=yes
+			ALLOW_USR_LIBS=true
+		fi
 	fi
 	;;
 esac
@@ -376,11 +376,11 @@ if [ "$STATIC" = yes ]; then
 	echo "LDFLAGS+=	-static" >>$CONFIG_MK
 fi
 
-if [ -z "$DEBUG" -a -d .git ]; then
+if [ -z "$DEBUG" ] && [ -d .git ]; then
 	printf "Found git checkout ... "
 	DEBUG=yes
 fi
-if [ -n "$DEBUG" -a "$DEBUG" != no -a "$DEBUG" != false ]; then
+if [ -n "$DEBUG" ] && [ "$DEBUG" != no ] && [ "$DEBUG" != false ]; then
 	echo "Adding debugging CFLAGS"
 
 	cat <<EOF >>$CONFIG_MK
@@ -436,7 +436,7 @@ else
 	echo "CPPFLAGS+=	-DNDEBUG" >>$CONFIG_MK
 fi
 
-if [ -n "$FORK" -a "$FORK" != yes -a "$FORK" != true ]; then
+if [ -n "$FORK" ] && [ "$FORK" != yes ] && [ "$FORK" != true ]; then
 	echo "There is no fork"
 	echo "CPPFLAGS+=	-DTHERE_IS_NO_FORK" >>$CONFIG_MK
 fi
@@ -509,20 +509,20 @@ else
 fi
 echo "DEFAULT_HOSTNAME=		$DEFAULT_HOSTNAME" >>$CONFIG_MK
 
-if [ -z "$INET" -o "$INET" = yes ]; then
+if [ -z "$INET" ] || [ "$INET" = yes ]; then
 	echo "Enabling INET support"
 	echo "CPPFLAGS+=	-DINET" >>$CONFIG_MK
 	echo "DHCPCD_SRCS+=	dhcp.c ipv4.c bpf.c" >>$CONFIG_MK
-	if [ -z "$ARP" -o "$ARP" = yes ]; then
+	if [ -z "$ARP" ] || [ "$ARP" = yes ]; then
 		echo "Enabling ARP support"
 		echo "CPPFLAGS+=	-DARP" >>$CONFIG_MK
 		echo "DHCPCD_SRCS+=	arp.c" >>$CONFIG_MK
 	fi
-	if [ -z "$ARPING" -o "$ARPING" = yes ]; then
+	if [ -z "$ARPING" ] || [ "$ARPING" = yes ]; then
 		echo "Enabling ARPing support"
 		echo "CPPFLAGS+=	-DARPING" >>$CONFIG_MK
 	fi
-	if [ -z "$IPV4LL" -o "$IPV4LL" = yes ]; then
+	if [ -z "$IPV4LL" ] || [ "$IPV4LL" = yes ]; then
 		echo "Enabling IPv4LL support"
 		echo "CPPFLAGS+=	-DIPV4LL" >>$CONFIG_MK
 		echo "DHCPCD_SRCS+=	ipv4ll.c" >>$CONFIG_MK
@@ -532,13 +532,13 @@ if [ -z "$INET6" ] || [ "$INET6" = yes ]; then
 	echo "Enabling INET6 support"
 	echo "CPPFLAGS+=	-DINET6" >>$CONFIG_MK
 	echo "DHCPCD_SRCS+=	ipv6.c ipv6nd.c" >>$CONFIG_MK
-	if [ -z "$DHCP6" -o "$DHCP6" = yes ]; then
+	if [ -z "$DHCP6" ] || [ "$DHCP6" = yes ]; then
 		echo "Enabling DHCPv6 support"
 		echo "CPPFLAGS+=	-DDHCP6" >>$CONFIG_MK
 		echo "DHCPCD_SRCS+=	dhcp6.c" >>$CONFIG_MK
 	fi
 fi
-if [ -z "$AUTH" -o "$AUTH" = yes ]; then
+if [ -z "$AUTH" ] || [ "$AUTH" = yes ]; then
 	echo "Enabling Authentication"
 	echo "CPPFLAGS+=	-DAUTH" >>$CONFIG_MK
 	echo "SRCS+=		auth.c" >>$CONFIG_MK
@@ -656,7 +656,7 @@ EOF
 fi
 
 # This block needs to be after the compiler test due to embedded quotes.
-if [ -z "$EMBEDDED" -o "$EMBEDDED" = yes ]; then
+if [ -z "$EMBEDDED" ] || [ "$EMBEDDED" = yes ]; then
 	echo "$DHCPCD_DEFS will be embedded in dhcpcd itself"
 	echo "DHCPCD_SRCS+=	dhcpcd-embedded.c" >>$CONFIG_MK
 else
@@ -1155,7 +1155,7 @@ EOF
 	rm -f _queue.c _queue
 fi
 
-if [ "$TAILQ_FOREACH_SAFE" = no -o "$TAILQ_CONCAT" = no ]; then
+if [ "$TAILQ_FOREACH_SAFE" = no ] || [ "$TAILQ_CONCAT" = no ]; then
 	# If we don't include sys/queue.h then clang analyser finds
 	# too many false positives.
 	# See http://llvm.org/bugs/show_bug.cgi?id=18222
@@ -1380,17 +1380,19 @@ else
 	[ -n "$MD5_LIB" ] && echo "LDADD+=		$MD5_LIB" >>$CONFIG_MK
 fi
 
-if [ -z "$SHA2_H" -a -z "$SHA2" -o "$SHA2" != no ]; then
-	printf "Testing for sha2.h ... "
-	if [ -e /usr/include/sha2.h ]; then
-		SHA2_H=sha2.h
-	elif [ -e /usr/include/sha256.h ]; then
-		SHA2_H=sha256.h
-	fi
-	if [ -n "$SHA2_H" ]; then
-		echo "$SHA2_H"
-	else
-		echo "no"
+if [ -z "$SHA2_H" ]; then
+	if [ -z "$SHA2" ] || [ "$SHA2" != no ]; then
+		printf "Testing for sha2.h ... "
+		if [ -e /usr/include/sha2.h ]; then
+			SHA2_H=sha2.h
+		elif [ -e /usr/include/sha256.h ]; then
+			SHA2_H=sha256.h
+		fi
+		if [ -n "$SHA2_H" ]; then
+			echo "$SHA2_H"
+		else
+			echo "no"
+		fi
 	fi
 fi
 
@@ -1683,11 +1685,11 @@ if ! $HOOKSET; then
 	else
 		echo "not found"
 	fi
-	if [ -n "$NTPD" -o -n "$CHRONYD" ]; then
+	if [ -n "$NTPD" ] || [ -n "$CHRONYD" ]; then
 		HOOKS="$HOOKS${HOOKS:+ }50-ntp.conf"
 	fi
 	# Warn if both are detected
-	if [ -n "$NTPD" -a -n "$CHRONYD" ]; then
+	if [ -n "$NTPD" ] && [ -n "$CHRONYD" ]; then
 		echo "NTP will default to $NTPD"
 	fi
 
