@@ -2031,7 +2031,8 @@ dhcp_finish_dad(struct interface *ifp, struct in_addr *ia)
 
 #ifdef IPV4LL
 	/* Stop IPv4LL now we have a working DHCP address */
-	ipv4ll_drop(ifp);
+	if (!IN_LINKLOCAL(ntohl(ia->s_addr)))
+		ipv4ll_drop(ifp);
 #endif
 
 	if (ifp->options->options & DHCPCD_INFORM)
@@ -2382,6 +2383,7 @@ dhcp_bind(struct interface *ifp)
 openudp:
 	/* If not in manager mode, open an address specific socket. */
 	if (ctx->options & DHCPCD_MANAGER ||
+	    ifo->options & DHCPCD_STATIC ||
 	    (state->old != NULL &&
 	     state->old->yiaddr == state->new->yiaddr &&
 	     old_state & STATE_ADDED && !(old_state & STATE_FAKE)))
