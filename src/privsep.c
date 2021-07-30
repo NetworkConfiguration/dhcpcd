@@ -82,6 +82,10 @@
 #include <util.h>
 #endif
 
+/* Calculate number of padding bytes to achieve 'struct cmsghdr' alignment */
+#define CALC_CMSG_PADLEN(has_cmsg, pos) ((has_cmsg) ? \
+	(socklen_t)(CMSG_ALIGN(pos) - (pos)) : 0)
+
 int
 ps_init(struct dhcpcd_ctx *ctx)
 {
@@ -828,9 +832,11 @@ ps_unrollmsg(struct msghdr *msg, struct ps_msghdr *psm,
     const void *data, size_t len)
 {
 	uint8_t *datap, *namep, *controlp;
+	socklen_t cmsg_padlen = CALC_CMSG_PADLEN(psm->ps_controllen,
+		psm->ps_namelen);
 
 	namep = UNCONST(data);
-	controlp = namep + psm->ps_namelen;
+	controlp = namep + psm->ps_namelen + cmsg_padlen;
 	datap = controlp + psm->ps_controllen;
 
 	if (psm->ps_namelen != 0) {
@@ -850,7 +856,7 @@ ps_unrollmsg(struct msghdr *msg, struct ps_msghdr *psm,
 			return -1;
 		}
 		msg->msg_control = controlp;
-		len -= psm->ps_controllen;
+		len -= psm->ps_controllen + cmsg_padlen;
 	} else
 		msg->msg_control = NULL;
 	msg->msg_controllen = psm->ps_controllen;
@@ -871,9 +877,11 @@ ssize_t
 ps_sendpsmmsg(struct dhcpcd_ctx *ctx, int fd,
     struct ps_msghdr *psm, const struct msghdr *msg)
 {
+	long padding[1] = {0};
 	struct iovec iov[] = {
 		{ .iov_base = UNCONST(psm), .iov_len = sizeof(*psm) },
 		{ .iov_base = NULL, },	/* name */
+		{ .iov_base = NULL, },	/* control padding */
 		{ .iov_base = NULL, },	/* control */
 		{ .iov_base = NULL, },	/* payload 1 */
 		{ .iov_base = NULL, },	/* payload 2 */
@@ -885,6 +893,7 @@ ps_sendpsmmsg(struct dhcpcd_ctx *ctx, int fd,
 	if (msg != NULL) {
 		struct iovec *iovp = &iov[1];
 		int i;
+		socklen_t cmsg_padlen;
 
 		psm->ps_namelen = msg->msg_namelen;
 		psm->ps_controllen = (socklen_t)msg->msg_controllen;
@@ -892,9 +901,16 @@ ps_sendpsmmsg(struct dhcpcd_ctx *ctx, int fd,
 		iovp->iov_base = msg->msg_name;
 		iovp->iov_len = msg->msg_namelen;
 		iovp++;
+
+		cmsg_padlen = CALC_CMSG_PADLEN(msg->msg_controllen, msg->msg_namelen);
+		assert(cmsg_padlen < sizeof(padding));
+		iovp->iov_len = cmsg_padlen;
+		iovp->iov_base = cmsg_padlen != 0 ? padding : NULL;
+		iovp++;
+
 		iovp->iov_base = msg->msg_control;
 		iovp->iov_len = msg->msg_controllen;
-		iovlen = 3;
+		iovlen = 4;
 
 		for (i = 0; i < (int)msg->msg_iovlen; i++) {
 			if ((size_t)(iovlen + i) > __arraycount(iov)) {
@@ -1004,6 +1020,8 @@ ps_sendcmdmsg(int fd, uint16_t cmd, const struct msghdr *msg)
 		{ .iov_base = data, .iov_len = 0 },
 	};
 	size_t dl = sizeof(data);
+	socklen_t cmsg_padlen = CALC_CMSG_PADLEN(msg->msg_controllen,
+		msg->msg_namelen);
 
 	if (msg->msg_namelen != 0) {
 		if (msg->msg_namelen > dl)
@@ -1015,8 +1033,13 @@ ps_sendcmdmsg(int fd, uint16_t cmd, const struct msghdr *msg)
 	}
 
 	if (msg->msg_controllen != 0) {
-		if (msg->msg_controllen > dl)
+		if (msg->msg_controllen + cmsg_padlen > dl)
 			goto nobufs;
+		if (cmsg_padlen != 0) {
+			memset(p, 0, cmsg_padlen);
+			p += cmsg_padlen;
+			dl -= cmsg_padlen;
+		}
 		psm.ps_controllen = (socklen_t)msg->msg_controllen;
 		memcpy(p, msg->msg_control, msg->msg_controllen);
 		p += msg->msg_controllen;
@@ -1027,7 +1050,8 @@ ps_sendcmdmsg(int fd, uint16_t cmd, const struct msghdr *msg)
 	if (psm.ps_datalen > dl)
 		goto nobufs;
 
-	iov[1].iov_len = psm.ps_namelen + psm.ps_controllen + psm.ps_datalen;
+	iov[1].iov_len = psm.ps_namelen + psm.ps_controllen + psm.ps_datalen
+		+ cmsg_padlen;
 	if (psm.ps_datalen != 0)
 		memcpy(p, msg->msg_iov[0].iov_base, psm.ps_datalen);
 	return writev(fd, iov, __arraycount(iov));
