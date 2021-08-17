@@ -2619,7 +2619,6 @@ dhcp_inform(struct interface *ifp)
 	    &ia->addr, &ia->mask);
 	if (state->offer_len) {
 		dhcp_new_xid(ifp);
-		get_lease(ifp, &state->lease, state->offer, state->offer_len);
 		send_inform(ifp);
 	}
 }
@@ -4270,7 +4269,7 @@ dhcp_handleifa(int cmd, struct ipv4_addr *ia, pid_t pid)
 #endif
 
 	if (ifo->options & DHCPCD_INFORM) {
-		if (state->state != DHS_INFORM)
+		if (state->state != DHS_INFORM && state->state != DHS_BOUND)
 			dhcp_inform(ifp);
 		return ia;
 	}
