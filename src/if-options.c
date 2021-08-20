@@ -321,9 +321,10 @@ parse_str(char *sbuf, size_t slen, const char *str, int flags)
 						break;
 					c[i] = *str++;
 				}
-				if (c[1] != '\0' && sbuf) {
+				if (c[1] != '\0') {
 					c[2] = '\0';
-					*sbuf++ = (char)strtol(c, NULL, 16);
+					if (sbuf)
+						*sbuf++ = (char)strtol(c, NULL, 16);
 				} else
 					l--;
 				break;
@@ -335,11 +336,12 @@ parse_str(char *sbuf, size_t slen, const char *str, int flags)
 						break;
 					c[i] = *str++;
 				}
-				if (c[2] != '\0' && sbuf) {
+				if (c[2] != '\0') {
 					i = (int)strtol(c, NULL, 8);
 					if (i > 255)
 						i = 255;
-					*sbuf ++= (char)i;
+					if (sbuf)
+						*sbuf++ = (char)i;
 				} else
 					l--;
 				break;
