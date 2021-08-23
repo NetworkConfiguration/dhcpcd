@@ -24,7 +24,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd February 2, 2021
+.Dd August 23, 2021
 .Dt DHCPCD 8
 .Os
 .Sh NAME
@@ -414,9 +414,10 @@ See the Multiple Interfaces section above.
 .It Fl m , Fl Fl metric Ar metric
 Metrics are used to prefer an interface over another one, lowest wins.
 .Nm
-will supply a default metic of 200 +
-.Xr if_nametoindex 3 .
-An extra 100 will be added for wireless interfaces.
+will supply a default metric starting at
+.Xr if_nametoindex 3 ,
+offset by 2000000 for roaming interfaces, 1000000 for IPv4LL, 2000 for wireless
+interfaces, and 1000 otherwise.
 .It Fl n , Fl Fl rebind Op Ar interface
 Notifies
 .Nm
