@@ -414,10 +414,10 @@ See the Multiple Interfaces section above.
 .It Fl m , Fl Fl metric Ar metric
 Metrics are used to prefer an interface over another one, lowest wins.
 .Nm
-will supply a default metric starting at
-.Xr if_nametoindex 3 ,
-offset by 2000000 for roaming interfaces, 1000000 for IPv4LL, 2000 for wireless
-interfaces, and 1000 otherwise.
+will supply a default metric of 1000 +
+.Xr if_nametoindex 3 .
+This will be offset by 2000 for wireless interfaces, with additional offsets
+of 1000000 for IPv4LL and 2000000 for roaming interfaces.
 .It Fl n , Fl Fl rebind Op Ar interface
 Notifies
 .Nm
