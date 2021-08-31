@@ -637,7 +637,7 @@ dhcp6_makemessage(struct interface *ifp)
 	uint8_t type;
 	uint16_t si_len, uni_len, n_options;
 	uint8_t *o_lenp;
-	struct if_options *ifo;
+	struct if_options *ifo = ifp->options;
 	const struct dhcp_opt *opt, *opt2;
 	const struct ipv6_addr *ap;
 	char hbuf[HOSTNAME_MAX_LEN + 1];
@@ -658,8 +658,50 @@ dhcp6_makemessage(struct interface *ifp)
 		state->send = NULL;
 	}
 
-	ifo = ifp->options;
-	fqdn = ifo->fqdn;
+	switch(state->state) {
+	case DH6S_INIT: /* FALLTHROUGH */
+	case DH6S_DISCOVER:
+		type = DHCP6_SOLICIT;
+		break;
+	case DH6S_REQUEST:
+		type = DHCP6_REQUEST;
+		break;
+	case DH6S_CONFIRM:
+		type = DHCP6_CONFIRM;
+		break;
+	case DH6S_REBIND:
+		type = DHCP6_REBIND;
+		break;
+	case DH6S_RENEW:
+		type = DHCP6_RENEW;
+		break;
+	case DH6S_INFORM:
+		type = DHCP6_INFORMATION_REQ;
+		break;
+	case DH6S_RELEASE:
+		type = DHCP6_RELEASE;
+		break;
+	case DH6S_DECLINE:
+		type = DHCP6_DECLINE;
+		break;
+	default:
+		errno = EINVAL;
+		return -1;
+	}
+
+	/* RFC 4704 Section 5 says we can only send FQDN for these
+	 * message types. */
+	switch(type) {
+	case DHCP6_SOLICIT:
+	case DHCP6_REQUEST:
+	case DHCP6_RENEW:
+	case DHCP6_REBIND:
+		fqdn = ifo->fqdn;
+		break;
+	default:
+		fqdn = FQDN_DISABLE;
+		break;
+	}
 
 	if (fqdn == FQDN_DISABLE && ifo->options & DHCPCD_HOSTNAME) {
 		/* We're sending the DHCPv4 hostname option, so send FQDN as
@@ -820,37 +862,6 @@ dhcp6_makemessage(struct interface *ifp)
 	if (m == NULL) {
 		m = state->new;
 		ml = state->new_len;
-	}
-
-	switch(state->state) {
-	case DH6S_INIT: /* FALLTHROUGH */
-	case DH6S_DISCOVER:
-		type = DHCP6_SOLICIT;
-		break;
-	case DH6S_REQUEST:
-		type = DHCP6_REQUEST;
-		break;
-	case DH6S_CONFIRM:
-		type = DHCP6_CONFIRM;
-		break;
-	case DH6S_REBIND:
-		type = DHCP6_REBIND;
-		break;
-	case DH6S_RENEW:
-		type = DHCP6_RENEW;
-		break;
-	case DH6S_INFORM:
-		type = DHCP6_INFORMATION_REQ;
-		break;
-	case DH6S_RELEASE:
-		type = DHCP6_RELEASE;
-		break;
-	case DH6S_DECLINE:
-		type = DHCP6_DECLINE;
-		break;
-	default:
-		errno = EINVAL;
-		return -1;
 	}
 
 	switch(state->state) {
