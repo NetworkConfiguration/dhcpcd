@@ -1649,7 +1649,7 @@ dhcp6_startinform(void *arg)
 
 	ifp = arg;
 	state = D6_STATE(ifp);
-	if (state->new == NULL && !state->failed)
+	if (state->new_start || (state->new == NULL && !state->failed))
 		llevel = LOG_INFO;
 	else
 		llevel = LOG_DEBUG;
@@ -3046,18 +3046,25 @@ static void
 dhcp6_bind(struct interface *ifp, const char *op, const char *sfrom)
 {
 	struct dhcp6_state *state = D6_STATE(ifp);
-	bool timedout = (op == NULL), has_new = false, confirmed;
+	bool timedout = (op == NULL), confirmed;
 	struct ipv6_addr *ia;
 	int loglevel;
 	struct timespec now;
 
-	TAILQ_FOREACH(ia, &state->addrs, next) {
-		if (ia->flags & IPV6_AF_NEW) {
-			has_new = true;
-			break;
+	if (state->state == DH6S_RENEW && !state->new_start) {
+		loglevel = LOG_DEBUG;
+		TAILQ_FOREACH(ia, &state->addrs, next) {
+			if (ia->flags & IPV6_AF_NEW) {
+				loglevel = LOG_INFO;
+				break;
+			}
 		}
-	}
-	loglevel = has_new || state->state != DH6S_RENEW ? LOG_INFO : LOG_DEBUG;
+	} else if (state->state == DH6S_INFORM)
+		loglevel = state->new_start ? LOG_INFO : LOG_DEBUG;
+	else
+		loglevel = LOG_INFO;
+	state->new_start = false;
+
 	if (!timedout) {
 		logmessage(loglevel, "%s: %s received from %s",
 		    ifp->name, op, sfrom);
@@ -3940,7 +3947,13 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 			    (state->state == DH6S_DISCOVER &&
 			    !(ifp->options->options & DHCPCD_IA_FORCED) &&
 			    !ipv6nd_hasradhcp(ifp, true)))
+			{
+				/* We don't want log spam when the RA
+				 * has just adjusted it's prefix times. */
+				if (state->state != DH6S_INFORMED)
+					state->new_start = true;
 				dhcp6_startinform(ifp);
+			}
 			break;
 		case DH6S_REQUEST:
 			if (ifp->options->options & DHCPCD_DHCP6 &&
@@ -3989,6 +4002,7 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 	TAILQ_INIT(&state->addrs);
 
 gogogo:
+	state->new_start = true;
 	state->state = init_state;
 	state->lerror = 0;
 	state->failed = false;
