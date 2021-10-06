@@ -33,6 +33,14 @@
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/nd6.h>
+#ifdef __NetBSD__
+#include <netinet/if_ether.h>
+#include <net/if_vlanvar.h> /* Needs netinet/if_ether.h */
+#elif defined(__DragonFly__)
+#include <net/vlan/if_vlan_var.h>
+#else
+#include <net/if_vlan_var.h>
+#endif
 #ifdef __DragonFly__
 #  include <netproto/802_11/ieee80211_ioctl.h>
 #else
