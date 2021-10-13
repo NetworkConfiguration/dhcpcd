@@ -2619,6 +2619,7 @@ dhcp_inform(struct interface *ifp)
 	    &ia->addr, &ia->mask);
 	if (state->offer_len) {
 		dhcp_new_xid(ifp);
+		get_lease(ifp, &state->lease, state->offer, state->offer_len);
 		send_inform(ifp);
 	}
 }
