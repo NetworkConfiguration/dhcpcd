@@ -2039,7 +2039,6 @@ dhcp_finish_dad(struct interface *ifp, struct in_addr *ia)
 		dhcp_inform(ifp);
 }
 
-
 static bool
 dhcp_addr_duplicated(struct interface *ifp, struct in_addr *ia)
 {
@@ -2571,7 +2570,6 @@ dhcp_inform(struct interface *ifp)
 	state = D_STATE(ifp);
 	ifo = ifp->options;
 
-	state->state = DHS_INFORM;
 	free(state->offer);
 	state->offer = NULL;
 	state->offer_len = 0;
@@ -2612,6 +2610,7 @@ dhcp_inform(struct interface *ifp)
 		}
 	}
 
+	state->state = DHS_INFORM;
 	state->addr = ia;
 	state->offer_len = dhcp_message_new(&state->offer,
 	    &ia->addr, &ia->mask);
@@ -4257,15 +4256,21 @@ dhcp_handleifa(int cmd, struct ipv4_addr *ia, pid_t pid)
 	}
 #endif
 
+	/* If we have requested a specific address, return now.
+	 * The below code is only for when inform or static has been
+	 * requested without a specific address. */
+	if (ifo->req_addr.s_addr != INADDR_ANY)
+		return ia;
+
+	/* Only inform if we are NOT in the inform state or bound. */
 	if (ifo->options & DHCPCD_INFORM) {
 		if (state->state != DHS_INFORM && state->state != DHS_BOUND)
 			dhcp_inform(ifp);
 		return ia;
 	}
 
+	/* Static and inform are mutually exclusive. If not static, return. */
 	if (!(ifo->options & DHCPCD_STATIC))
-		return ia;
-	if (ifo->req_addr.s_addr != INADDR_ANY)
 		return ia;
 
 	free(state->old);
@@ -4273,21 +4278,16 @@ dhcp_handleifa(int cmd, struct ipv4_addr *ia, pid_t pid)
 	state->new_len = dhcp_message_new(&state->new, &ia->addr, &ia->mask);
 	if (state->new == NULL)
 		return ia;
+
 	if (ifp->flags & IFF_POINTOPOINT) {
 		for (i = 1; i < 255; i++)
 			if (i != DHO_ROUTER && has_option_mask(ifo->dstmask,i))
 				dhcp_message_add_addr(state->new, i, ia->brd);
 	}
+
 	state->reason = "STATIC";
 	rt_build(ifp->ctx, AF_INET);
 	script_runreason(ifp, state->reason);
-	if (ifo->options & DHCPCD_INFORM) {
-		state->state = DHS_INFORM;
-		dhcp_new_xid(ifp);
-		state->lease.server.s_addr = INADDR_ANY;
-		state->addr = ia;
-		dhcp_inform(ifp);
-	}
 
 	return ia;
 }
