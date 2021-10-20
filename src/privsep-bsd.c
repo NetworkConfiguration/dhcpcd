@@ -30,6 +30,7 @@
 
 /* Need these for filtering the ioctls */
 #include <net/if.h>
+#include <netinet/if_ether.h>
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/nd6.h>
