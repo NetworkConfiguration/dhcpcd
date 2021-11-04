@@ -1768,7 +1768,7 @@ bpf_open(const struct interface *ifp,
 	bpf->bpf_ifp = ifp;
 
 	/* Allocate a suitably large buffer for a single packet. */
-	bpf->bpf_size = ETH_DATA_LEN;
+	bpf->bpf_size = ETH_FRAME_LEN;
 	bpf->bpf_buffer = malloc(bpf->bpf_size);
 	if (bpf->bpf_buffer == NULL)
 		goto eexit;
