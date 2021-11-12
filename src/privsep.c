@@ -145,35 +145,27 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 
 	struct rlimit rzero = { .rlim_cur = 0, .rlim_max = 0 };
 
+	/* Prohibit new files, sockets, etc */
+	/*
+	 * If poll(2) is called with nfds>RLIMIT_NOFILE then it returns EINVAL.
+	 * We don't know the final value of nfds at this point *easily*.
+	 * Sadly, this is a POSIX limitation and most platforms adhere to it.
+	 * However, some are not that strict and are whitelisted below.
+	 * Also, if we're not using poll then we can be restrictive.
+	 *
+	 * For the non whitelisted platforms there should be a sandbox to
+	 * fallback to where we don't allow new files, etc:
+	 *      Linux:seccomp, FreeBSD:capsicum, OpenBSD:pledge
+	 * Solaris users are sadly out of luck on both counts.
+	 */
+#if defined(__NetBSD__) || defined(__DragonFly__) || \
+    defined(HAVE_KQUEUE) || defined(HAVE_EPOLL)
+	/* The control proxy *does* need to create new fd's via accept(2). */
 	if (ctx->ps_ctl == NULL || ctx->ps_ctl->psp_pid != getpid()) {
-		/* Prohibit new files, sockets, etc */
-#if (defined(__linux__) || defined(__sun) || defined(__OpenBSD__)) && \
-    !defined(HAVE_KQUEUE) && !defined(HAVE_EPOLL)
-		/*
-		 * If poll(2) is called with nfds > RLIMIT_NOFILE
-		 * then it returns EINVAL.
-		 * This blows.
-		 * Do the best we can and limit to what we need.
-		 * An attacker could potentially close a file and
-		 * open a new one still, but that cannot be helped.
-		 */
-		unsigned long maxfd;
-		maxfd = (unsigned long)eloop_event_count(ctx->eloop);
-		if (IN_PRIVSEP_SE(ctx))
-			maxfd++; /* why? */
-
-		struct rlimit rmaxfd = {
-		    .rlim_cur = maxfd,
-		    .rlim_max = maxfd
-		};
-
-		if (setrlimit(RLIMIT_NOFILE, &rmaxfd) == -1)
-			logerr("setrlimit RLIMIT_NOFILE");
-#else
 		if (setrlimit(RLIMIT_NOFILE, &rzero) == -1)
 			logerr("setrlimit RLIMIT_NOFILE");
-#endif
 	}
+#endif
 
 #define DHC_NOCHKIO	(DHCPCD_STARTED | DHCPCD_DAEMONISE)
 	/* Prohibit writing to files.
