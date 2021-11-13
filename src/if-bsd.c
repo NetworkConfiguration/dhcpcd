@@ -104,6 +104,7 @@
  * just won't work without explicit configuration. */
 static const char * const ifnames_ignore[] = {
 	"bridge",
+	"epair",	/* Virtual patch cable */
 	"fwe",		/* Firewire */
 	"fwip",		/* Firewire */
 	"tap",
