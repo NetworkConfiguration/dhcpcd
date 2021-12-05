@@ -160,7 +160,7 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 #if defined(__NetBSD__) || defined(__DragonFly__) || \
     defined(HAVE_KQUEUE) || defined(HAVE_EPOLL)
 	/* The control proxy *does* need to create new fd's via accept(2). */
-	if (ctx->ps_ctl == NULL || ctx->ps_ctl->psp_pid != getpid()) {
+	if (ctx->ps_control_pid != getpid()) {
 		if (setrlimit(RLIMIT_NOFILE, &rzero) == -1)
 			logerr("setrlimit RLIMIT_NOFILE");
 	}
