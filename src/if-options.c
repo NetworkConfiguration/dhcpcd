@@ -264,7 +264,7 @@ parse_str(char *sbuf, size_t slen, const char *str, int flags)
 			str++;
 			end = p;
 		}
-	} else {
+	} else if (flags != PARSE_STRING_NULL) {
 		l = (size_t)hwaddr_aton(NULL, str);
 		if ((ssize_t) l != -1 && l > 1) {
 			if (l > slen) {
