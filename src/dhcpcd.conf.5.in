@@ -216,7 +216,7 @@ of the hardware family and the hardware address.
 .It Ic duid Op ll | lt | uuid | value
 Use a DHCP Unique Identifier.
 If a system UUID is available, that will be used to create a DUID-UUID,
-otheriwse if persistent storage is available then a DUID-LLT
+otherwise if persistent storage is available then a DUID-LLT
 (link local address + time) is generated,
 otherwise DUID-LL is generated (link local address).
 The DUID type can be hinted as an optional parameter if the file

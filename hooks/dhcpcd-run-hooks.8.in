@@ -94,7 +94,7 @@ dhcpcd lost the carrier.
 The cable may have been unplugged or association to the wireless point lost.
 .It Dv NOCARRIER_ROAMING
 dhcpcd lost the carrier but the interface configuration is persisted.
-The OS has to support wireless roaming or IP Persistance for this to happen.
+The OS has to support wireless roaming or IP Persistence for this to happen.
 .It Dv INFORM | Dv INFORM6
 dhcpcd informed a DHCP server about its address and obtained other
 configuration details.
