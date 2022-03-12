@@ -54,6 +54,11 @@
 #include "duid.h"
 #include "logerr.h"
 
+/*
+ * Machine, system or product UUIDs are not guaranteed unique.
+ * Let's not use them by default.
+ */
+#ifdef USE_MACHINE_UUID
 static size_t
 duid_machineuuid(char *uuid, size_t uuid_len)
 {
@@ -114,6 +119,7 @@ duid_make_uuid(uint8_t *d)
 	l += hwaddr_aton(d, uuid);
 	return l;
 }
+#endif
 
 size_t
 duid_make(void *d, const struct interface *ifp, uint16_t type)
@@ -176,6 +182,7 @@ duid_get(struct dhcpcd_ctx *ctx, const struct interface *ifp)
 
 	/* No file? OK, lets make one based the machines UUID */
 	if (ifp == NULL) {
+#ifdef USE_MACHINE_UUID
 		if (ctx->duid_type != DUID_DEFAULT &&
 		    ctx->duid_type != DUID_UUID)
 			len = 0;
@@ -186,6 +193,10 @@ duid_get(struct dhcpcd_ctx *ctx, const struct interface *ifp)
 		else
 			ctx->duid = data;
 		return len;
+#else
+		free(data);
+		return 0;
+#endif
 	}
 
 	/* Regardless of what happens we will create a DUID to use. */
