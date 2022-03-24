@@ -196,6 +196,12 @@ ps_root_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct msghdr *msg)
 #  endif
 #elif defined(__ia64__)
 #  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_IA64
+#elif defined(__loongarch__)
+#  if defined(__LP64__)
+#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_LOONGARCH64
+#  else
+#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_LOONGARCH32
+#  endif
 #elif defined(__microblaze__)
 #  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_MICROBLAZE
 #elif defined(__m68k__)
