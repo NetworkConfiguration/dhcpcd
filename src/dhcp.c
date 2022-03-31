@@ -4058,7 +4058,7 @@ dhcp_handleifa(int cmd, struct ipv4_addr *ia, pid_t pid)
 
 	ifo = ifp->options;
 	if (ifo->options & DHCPCD_INFORM) {
-		if (state->state != DHS_INFORM)
+		if (state->state != DHS_INFORM && state->state != DHS_BOUND)
 			dhcp_inform(ifp);
 		return ia;
 	}
