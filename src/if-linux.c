@@ -161,7 +161,6 @@ static const uint8_t ipv4_bcast_addr[] = {
 
 static int if_addressexists(struct interface *, struct in_addr *);
 
-#define PROC_INET6	"/proc/net/if_inet6"
 #define PROC_PROMOTE	"/proc/sys/net/ipv4/conf/%s/promote_secondaries"
 #define SYS_BRIDGE	"/sys/class/net/%s/bridge/bridge_id"
 #define SYS_LAYER2	"/sys/class/net/%s/device/layer2"
@@ -1974,46 +1973,73 @@ if_address6(unsigned char cmd, const struct ipv6_addr *ia)
 	    NULL, NULL);
 }
 
+struct ifiaddr6
+{
+	unsigned int ifa_ifindex;
+	struct in6_addr ifa_addr;
+	uint32_t ifa_flags;
+	bool ifa_found;
+};
+
+static int
+_if_addrflags6(__unused struct dhcpcd_ctx *ctx,
+    void *arg, struct nlmsghdr *nlm)
+{
+	struct ifiaddr6 *ia = arg;
+	size_t len;
+	struct rtattr *rta;
+	struct ifaddrmsg *ifa;
+	bool matches_addr = false;
+
+	ifa = NLMSG_DATA(nlm);
+	if (ifa->ifa_index != ia->ifa_ifindex || ifa->ifa_family != AF_INET6)
+		return 0;
+
+	rta = IFA_RTA(ifa);
+	len = NLMSG_PAYLOAD(nlm, sizeof(*ifa));
+	for (; RTA_OK(rta, len); rta = RTA_NEXT(rta, len)) {
+		switch (rta->rta_type) {
+		case IFA_ADDRESS:
+			if (IN6_ARE_ADDR_EQUAL(&ia->ifa_addr, RTA_DATA(rta)))
+				ia->ifa_found = matches_addr = true;
+			else
+				matches_addr = false;
+			break;
+		case IFA_FLAGS:
+			if (matches_addr)
+				memcpy(&ia->ifa_flags, RTA_DATA(rta), sizeof(ia->ifa_flags));
+			break;
+		}
+	}
+	return 0;
+}
+
 int
 if_addrflags6(const struct interface *ifp, const struct in6_addr *addr,
     __unused const char *alias)
 {
-	char buf[PS_BUFLEN], *bp = buf, *line;
-	ssize_t buflen;
-	char *p, ifaddress[33], address[33], name[IF_NAMESIZE + 1];
-	unsigned int ifindex;
-	int prefix, scope, flags, i;
+	struct ifiaddr6 ia = {
+		.ifa_ifindex = ifp->index,
+		.ifa_addr = *addr,
+		.ifa_found = false,
+	};
+	struct nlma nlm = {
+	    .hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifaddrmsg)),
+	    .hdr.nlmsg_type = RTM_GETADDR,
+	    .hdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_MATCH,
+	    .ifa.ifa_family = AF_INET6,
+	    .ifa.ifa_index = ifp->index,
+	};
 
-	buflen = dhcp_readfile(ifp->ctx, PROC_INET6, buf, sizeof(buf));
-	if (buflen == -1)
+	int error = if_sendnetlink(ifp->ctx, NETLINK_ROUTE, &nlm.hdr,
+	    &_if_addrflags6, &ia);
+	if (error == -1)
 		return -1;
-	if ((size_t)buflen == sizeof(buf)) {
-		errno = ENOBUFS;
+	if (!ia.ifa_found) {
+		errno = ESRCH;
 		return -1;
 	}
-
-	p = ifaddress;
-	for (i = 0; i < (int)sizeof(addr->s6_addr); i++) {
-		p += snprintf(p, 3, "%.2x", addr->s6_addr[i]);
-	}
-	*p = '\0';
-
-	while ((line = get_line(&bp, &buflen)) != NULL) {
-		if (sscanf(line,
-		    "%32[a-f0-9] %x %x %x %x %"TOSTRING(IF_NAMESIZE)"s\n",
-		    address, &ifindex, &prefix, &scope, &flags, name) != 6 ||
-		    strlen(address) != 32)
-		{
-			errno = EINVAL;
-			return -1;
-		}
-		if (strcmp(name, ifp->name) == 0 &&
-		    strcmp(ifaddress, address) == 0)
-			return flags;
-	}
-
-	errno = ESRCH;
-	return -1;
+	return (int)ia.ifa_flags;
 }
 
 int
