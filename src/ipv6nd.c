@@ -132,6 +132,7 @@ __CTASSERT(sizeof(struct nd_opt_rdnss) == 8);
 //
 
 static void ipv6nd_handledata(void *, unsigned short);
+static void ipv6nd_startrs1(void *);
 
 /*
  * Android ships buggy ICMP6 filter headers.
@@ -1748,7 +1749,8 @@ ipv6nd_handleifa(int cmd, struct ipv6_addr *addr, pid_t pid)
 void
 ipv6nd_expirera(void *arg)
 {
-	struct interface *ifp;
+	struct interface *ifp = arg;
+	struct dhcpcd_ctx *ctx = ifp->ctx;
 	struct ra *rap, *ran;
 	struct timespec now;
 	uint32_t elapsed;
@@ -1762,14 +1764,13 @@ ipv6nd_expirera(void *arg)
 #endif
 	struct nd_opt_dnssl dnssl;
 	struct nd_opt_rdnss rdnss;
-	unsigned int next = 0, ltime;
+	unsigned int next = 0, nextrs = 0, ltime;
 	size_t nexpired = 0;
 
-	ifp = arg;
 	clock_gettime(CLOCK_MONOTONIC, &now);
 	expired = false;
 
-	TAILQ_FOREACH_SAFE(rap, ifp->ctx->ra_routers, next, ran) {
+	TAILQ_FOREACH_SAFE(rap, ctx->ra_routers, next, ran) {
 		if (rap->iface != ifp || rap->expired)
 			continue;
 		valid = false;
@@ -1788,6 +1789,8 @@ ipv6nd_expirera(void *arg)
 				ltime = rap->lifetime - elapsed;
 				if (next == 0 || ltime < next)
 					next = ltime;
+				if (nextrs == 0 || ltime < nextrs)
+					nextrs = ltime;
 			}
 		}
 
@@ -1906,15 +1909,27 @@ ipv6nd_expirera(void *arg)
 			ipv6nd_free_ra(rap);
 	}
 
+	/* It seems that some routers fail to send periodic advertisements.
+	 * As such, send a Router Solicition just before the advertisement
+	 * expires. */
+	if (nextrs != 0) {
+		unsigned int rstime = nextrs -
+		    (MAX_RTR_SOLICITATIONS * RTR_SOLICITATION_INTERVAL) +
+		    (MAX_RTR_SOLICITATION_DELAY * 3);
+
+		if (rstime > nextrs)
+			rstime = 0;
+		eloop_timeout_add_sec(ctx->eloop, rstime, ipv6nd_startrs1, ifp);
+	}
+
 	if (next != 0)
-		eloop_timeout_add_sec(ifp->ctx->eloop,
-		    next, ipv6nd_expirera, ifp);
+		eloop_timeout_add_sec(ctx->eloop, next, ipv6nd_expirera, ifp);
 	if (expired) {
 		logwarnx("%s: part of a Router Advertisement expired",
 		    ifp->name);
-		ipv6nd_sortrouters(ifp->ctx);
+		ipv6nd_sortrouters(ctx);
 		ipv6nd_applyra(ifp);
-		rt_build(ifp->ctx, AF_INET6);
+		rt_build(ctx, AF_INET6);
 		script_runreason(ifp, "ROUTERADVERT");
 	}
 }
