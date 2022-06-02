@@ -782,7 +782,7 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 
 	bootp->op = BOOTREQUEST;
 	bootp->htype = (uint8_t)ifp->hwtype;
-	if (ifp->hwlen != 0 && ifp->hwlen < sizeof(bootp->chaddr)) {
+	if (ifp->hwlen != 0 && ifp->hwlen <= sizeof(bootp->chaddr)) {
 		bootp->hlen = (uint8_t)ifp->hwlen;
 		memcpy(&bootp->chaddr, &ifp->hwaddr, ifp->hwlen);
 	}
