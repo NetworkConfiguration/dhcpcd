@@ -266,6 +266,8 @@ parse_str(char *sbuf, size_t slen, const char *str, int flags)
 		}
 	} else {
 		l = (size_t)hwaddr_aton(NULL, str);
+		if (sbuf == NULL)
+			return (ssize_t)l;
 		if ((ssize_t) l != -1 && l > 1) {
 			if (l > slen) {
 				errno = ENOBUFS;
