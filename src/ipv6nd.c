@@ -1314,6 +1314,9 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 
 		switch (ndo.nd_opt_type) {
 		case ND_OPT_PREFIX_INFORMATION:
+		{
+			uint32_t vltime, pltime;
+
 			loglevel = new_data ? LOG_ERR : LOG_DEBUG;
 			if (ndo.nd_opt_len != 4) {
 				logmessage(loglevel,
@@ -1337,9 +1340,10 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 				    ifp->name);
 				continue;
 			}
-			if (ntohl(pi.nd_opt_pi_preferred_time) >
-			    ntohl(pi.nd_opt_pi_valid_time))
-			{
+
+			vltime = ntohl(pi.nd_opt_pi_valid_time);
+			pltime = ntohl(pi.nd_opt_pi_preferred_time);
+			if (pltime > vltime) {
 				logmessage(loglevel, "%s: pltime > vltime",
 				    ifp->name);
 				continue;
@@ -1364,10 +1368,15 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 				    &pi_prefix, pi.nd_opt_pi_prefix_len, flags);
 				if (ia == NULL)
 					break;
+
 				ia->prefix = pi_prefix;
+				ia->created = ia->acquired = rap->acquired;
+				ia->prefix_vltime = vltime;
+				ia->prefix_pltime = pltime;
+
 				if (flags & IPV6_AF_AUTOCONF)
 					ia->dadcallback = ipv6nd_dadcallback;
-				ia->created = ia->acquired = rap->acquired;
+
 				TAILQ_INSERT_TAIL(&rap->addrs, ia, next);
 
 #ifdef IPV6_MANAGETEMPADDR
@@ -1384,18 +1393,58 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 				else
 					new_ia = true;
 #endif
+
 			} else {
-#ifdef IPV6_MANAGETEMPADDR
-				new_ia = false;
-#endif
+				uint32_t rmtime;
+
+				/*
+				 * RFC 4862 5.5.3.e
+				 * Don't terminate existing connections.
+				 * This means that to actually remove the
+				 * existing prefix, the RA needs to stop
+				 * broadcasting the prefix and just let it
+				 * expire in 2 hours.
+				 * It might want to broadcast it to reduce
+				 * the vltime if it was greater than 2 hours
+				 * to start with/
+				 */
+				ia->prefix_pltime = pltime;
+				if (ia->prefix_vltime) {
+					uint32_t elapsed;
+
+					elapsed = (uint32_t)eloop_timespec_diff(
+						&rap->acquired, &ia->acquired,
+						NULL);
+					rmtime = ia->prefix_vltime - elapsed;
+					if (rmtime > ia->prefix_vltime)
+						rmtime = 0;
+				} else
+					rmtime = 0;
+				if (vltime > MIN_EXTENDED_VLTIME ||
+				    vltime > rmtime)
+					ia->prefix_vltime = vltime;
+				else if (rmtime <= MIN_EXTENDED_VLTIME)
+					/* No SEND support from RFC 3971 so
+					 * leave vltime alone */
+					ia->prefix_vltime = rmtime;
+				else
+					ia->prefix_vltime = MIN_EXTENDED_VLTIME;
+
+				/* Ensure pltime still fits */
+				if (pltime < ia->prefix_vltime)
+					ia->prefix_pltime = pltime;
+				else
+					ia->prefix_pltime = ia->prefix_vltime;
+
 				ia->flags |= flags;
 				ia->flags &= ~IPV6_AF_STALE;
 				ia->acquired = rap->acquired;
+
+#ifdef IPV6_MANAGETEMPADDR
+				new_ia = false;
+#endif
 			}
-			ia->prefix_vltime =
-			    ntohl(pi.nd_opt_pi_valid_time);
-			ia->prefix_pltime =
-			    ntohl(pi.nd_opt_pi_preferred_time);
+
 			if (ia->prefix_vltime != 0 &&
 			    ia->flags & IPV6_AF_AUTOCONF)
 				has_address = true;
@@ -1418,6 +1467,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 			}
 #endif
 			break;
+		}
 
 		case ND_OPT_MTU:
 			if (len < sizeof(mtu)) {

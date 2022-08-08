@@ -98,6 +98,8 @@ struct rs_state {
 #define	RETRANS_TIMER			1000	/* milliseconds */
 #define	DELAY_FIRST_PROBE_TIME		5	/* seconds */
 
+#define	MIN_EXTENDED_VLTIME		7200	/* seconds */
+
 int ipv6nd_open(bool);
 #ifdef __sun
 int ipv6nd_openif(struct interface *);
