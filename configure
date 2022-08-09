@@ -1707,6 +1707,21 @@ if ! $HOOKSET; then
 		echo "NTP will default to $NTPD"
 	fi
 
+	printf "Checking for timesyncd ... "
+	TIMESYNCD=
+	for x in /usr/lib/systemd/systemd-timesyncd; do
+		if [ -x "$x" ]; then
+			TIMESYNCD=$x
+			break
+		fi
+	done
+	if [ -n "$TIMESYNCD" ]; then
+		echo "$TIMESYNCD"
+		HOOKS="$HOOKS${HOOKS:+ }50-timesyncd.conf"
+	else
+		echo "not found"
+	fi
+
 	printf "Checking for ypbind ... "
 	YPBIND=$(_which ypbind)
 	if [ -n "$YPBIND" ]; then
