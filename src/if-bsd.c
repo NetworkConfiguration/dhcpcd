@@ -1906,12 +1906,6 @@ if_setup_inet6(const struct interface *ifp)
 		    &ifr, sizeof(ifr)) == -1 &&
 		    errno != ENOTSUP && errno != ENOTTY)
 			logwarn("SIOCSRTRFLUSH_IN6 %d", errno);
-#ifdef SIOCSPFXFLUSH_IN6
-		if (if_ioctl6(ifp->ctx, SIOCSPFXFLUSH_IN6,
-		    &ifr, sizeof(ifr)) == -1 &&
-		    errno != ENOTSUP && errno != ENOTTY)
-			logwarn("SIOCSPFXFLUSH_IN6");
-#endif
 	}
 #endif
 }
