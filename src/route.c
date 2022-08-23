@@ -711,7 +711,8 @@ rt_build(struct dhcpcd_ctx *ctx, int af)
 	rb_tree_init(&routes, &rt_compare_proto_ops);
 	rb_tree_init(&added, &rt_compare_os_ops);
 	rb_tree_init(&kroutes, &rt_compare_os_ops);
-	if_initrt(ctx, &kroutes, af);
+	if (if_initrt(ctx, &kroutes, af) != 0)
+		logerr("%s: if_initrt", __func__);
 	ctx->rt_order = 0;
 	ctx->options |= DHCPCD_RTBUILD;
 

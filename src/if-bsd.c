@@ -919,25 +919,18 @@ int
 if_initrt(struct dhcpcd_ctx *ctx, rb_tree_t *kroutes, int af)
 {
 	struct rt_msghdr *rtm;
-	int mib[6];
+	int mib[6] = { CTL_NET, PF_ROUTE, 0, af, NET_RT_DUMP, 0 };
 	size_t needed;
 	char *buf, *p, *end;
 	struct rt rt, *rtn;
 
-	mib[0] = CTL_NET;
-	mib[1] = PF_ROUTE;
-	mib[2] = 0;
-	mib[3] = af;
-	mib[4] = NET_RT_DUMP;
-	mib[5] = 0;
-
-	if (sysctl(mib, 6, NULL, &needed, NULL, 0) == -1)
+	if (sysctl(mib, __arraycount(mib), NULL, &needed, NULL, 0) == -1)
 		return -1;
 	if (needed == 0)
 		return 0;
 	if ((buf = malloc(needed)) == NULL)
 		return -1;
-	if (sysctl(mib, 6, buf, &needed, NULL, 0) == -1) {
+	if (sysctl(mib, __arraycount(mib), buf, &needed, NULL, 0) == -1) {
 		free(buf);
 		return -1;
 	}
@@ -945,7 +938,7 @@ if_initrt(struct dhcpcd_ctx *ctx, rb_tree_t *kroutes, int af)
 	end = buf + needed;
 	for (p = buf; p < end; p += rtm->rtm_msglen) {
 		rtm = (void *)p;
-		if (p + rtm->rtm_msglen >= end) {
+		if (p + sizeof(*rtm) > end || p + rtm->rtm_msglen > end) {
 			errno = EINVAL;
 			break;
 		}
@@ -1650,12 +1643,11 @@ inet6_sysctl(int code, int val, int action)
 	mib[3] = code;
 	size = sizeof(val);
 	if (action) {
-		if (sysctl(mib, sizeof(mib)/sizeof(mib[0]),
-		    NULL, 0, &val, size) == -1)
+		if (sysctl(mib, __arraycount(mib), NULL, 0, &val, size) == -1)
 			return -1;
 		return 0;
 	}
-	if (sysctl(mib, sizeof(mib)/sizeof(mib[0]), &val, &size, NULL, 0) == -1)
+	if (sysctl(mib, __arraycount(mib), &val, &size, NULL, 0) == -1)
 		return -1;
 	return val;
 }
