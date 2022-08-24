@@ -274,6 +274,8 @@ ps_root_os(struct ps_msghdr *psm, struct msghdr *msg,
 	case PS_SYSCTL:
 		*free_rdata = true;
 		return ps_root_dosysctl(psm->ps_flags, data, len, rdata, rlen);
+#else
+	UNUSED(free_rdata);
 #endif
 	default:
 		errno = ENOTSUP;

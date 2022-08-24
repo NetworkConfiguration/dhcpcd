@@ -924,6 +924,8 @@ if_sysctl(struct dhcpcd_ctx *ctx,
 	if (IN_PRIVSEP(ctx))
 		return (int)ps_root_sysctl(ctx, name, namelen,
 		    oldp, oldlenp, newp, newlen);
+#else
+	UNUSED(ctx);
 #endif
 
 	return sysctl(name, namelen, oldp, oldlenp, newp, newlen);
