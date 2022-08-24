@@ -918,7 +918,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 static int
 if_sysctl(struct dhcpcd_ctx *ctx,
     const int *name, u_int namelen,
-    void *oldp, size_t *oldlenp, const void *newp, size_t newlen)
+    void *oldp, size_t *oldlenp, void *newp, size_t newlen)
 {
 #if defined(PRIVSEP) && defined(HAVE_CAPSICUM)
 	if (IN_PRIVSEP(ctx))
