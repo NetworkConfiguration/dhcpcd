@@ -27,6 +27,7 @@
  */
 
 #include <sys/ioctl.h>
+#include <sys/sysctl.h>
 
 /* Need these for filtering the ioctls */
 #include <arpa/inet.h>
@@ -51,6 +52,7 @@
 #endif
 
 #include <errno.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -171,9 +173,79 @@ ps_root_doifignoregroup(void *data, size_t len)
 }
 #endif
 
+#ifdef HAVE_CAPSICUM
+static ssize_t
+ps_root_dosysctl(unsigned long flags,
+    void *data, size_t len, void **rdata, size_t *rlen)
+{
+	char *p = data, *e = p + len;
+	int name[10];
+	unsigned int namelen;
+	void *oldp;
+	size_t *oldlenp, oldlen, nlen;
+	void *newp;
+	size_t newlen;
+	int err;
+
+	if (sizeof(namelen) >= len) {
+		errno = EINVAL;
+		return -1;
+	}
+	memcpy(&namelen, p, sizeof(namelen));
+	p += sizeof(namelen);
+	nlen = sizeof(*name) * namelen;
+	if (namelen > __arraycount(name)) {
+		errno = ENOBUFS;
+		return -1;
+	}
+	if (p + nlen > e) {
+		errno = EINVAL;
+		return -1;
+	}
+	memcpy(name, p, nlen);
+	p += nlen;
+	if (p + sizeof(oldlen) > e) {
+		errno = EINVAL;
+		return -1;
+	}
+	memcpy(&oldlen, p, sizeof(oldlen));
+	p += sizeof(oldlen);
+	if (p + sizeof(newlen) > e) {
+		errno = EINVAL;
+		return -1;
+	}
+	memcpy(&newlen, p, sizeof(newlen));
+	p += sizeof(newlen);
+	if (p + newlen > e) {
+		errno = EINVAL;
+		return -1;
+	}
+	newp = newlen ? p : NULL;
+
+	if (flags & PS_SYSCTL_OLEN) {
+		*rlen = sizeof(oldlen) + oldlen;
+		*rdata = malloc(*rlen);
+		if (*rdata == NULL)
+			return -1;
+		oldlenp = (size_t *)*rdata;
+		*oldlenp = oldlen;
+		if (flags & PS_SYSCTL_ODATA)
+			oldp = (char *)*rdata + sizeof(oldlen);
+		else
+			oldp = NULL;
+	} else {
+		oldlenp = NULL;
+		oldp = NULL;
+	}
+
+	err = sysctl(name, namelen, oldp, oldlenp, newp, newlen);
+	return err;
+}
+#endif
+
 ssize_t
 ps_root_os(struct ps_msghdr *psm, struct msghdr *msg,
-    void **rdata, size_t *rlen)
+    void **rdata, size_t *rlen, bool *free_rdata)
 {
 	struct iovec *iov = msg->msg_iov;
 	void *data = iov->iov_base;
@@ -197,6 +269,11 @@ ps_root_os(struct ps_msghdr *psm, struct msghdr *msg,
 #ifdef HAVE_PLEDGE
 	case PS_IFIGNOREGRP:
 		return ps_root_doifignoregroup(data, len);
+#endif
+#ifdef HAVE_CAPSICUM
+	case PS_SYSCTL:
+		*free_rdata = true;
+		return ps_root_dosysctl(psm->ps_flags, data, len, rdata, rlen);
 #endif
 	default:
 		errno = ENOTSUP;
@@ -265,7 +342,9 @@ ps_root_indirectioctl(struct dhcpcd_ctx *ctx, unsigned long request,
 		return -1;
 	return ps_root_readerror(ctx, data, len);
 }
+#endif
 
+#ifdef HAVE_PLEDGE
 ssize_t
 ps_root_ifignoregroup(struct dhcpcd_ctx *ctx, const char *ifname)
 {
@@ -274,5 +353,60 @@ ps_root_ifignoregroup(struct dhcpcd_ctx *ctx, const char *ifname)
 	    ifname, strlen(ifname) + 1) == -1)
 		return -1;
 	return ps_root_readerror(ctx, NULL, 0);
+}
+#endif
+
+#ifdef HAVE_CAPSICUM
+ssize_t
+ps_root_sysctl(struct dhcpcd_ctx *ctx,
+    const int *name, unsigned int namelen,
+    void *oldp, size_t *oldlenp, const void *newp, size_t newlen)
+{
+	char buf[PS_BUFLEN], *p = buf;
+	unsigned long flags = 0;
+	size_t olen = (oldp && oldlenp) ? *oldlenp : 0, nolen;
+
+	if (sizeof(namelen) + (sizeof(*name) * namelen) +
+	    sizeof(oldlenp) +
+	    sizeof(newlen) + newlen > sizeof(buf))
+	{
+		errno = ENOBUFS;
+		return -1;
+	}
+
+	if (oldlenp)
+		flags |= PS_SYSCTL_OLEN;
+	if (oldp)
+		flags |= PS_SYSCTL_ODATA;
+	memcpy(p, &namelen, sizeof(namelen));
+	p += sizeof(namelen);
+	memcpy(p, name, sizeof(*name) * namelen);
+	p += sizeof(*name) * namelen;
+	memcpy(p, &olen, sizeof(olen));
+	p += sizeof(olen);
+	memcpy(p, &newlen, sizeof(newlen));
+	p += sizeof(newlen);
+	if (newlen) {
+		memcpy(p, newp, newlen);
+		p += newlen;
+	}
+
+	if (ps_sendcmd(ctx, ctx->ps_root->psp_fd, PS_SYSCTL,
+	    flags, buf, (size_t)(p - buf)) == -1)
+		return -1;
+
+	if (ps_root_readerror(ctx, buf, sizeof(buf)) == -1)
+		return -1;
+
+	p = buf;
+	memcpy(&nolen, p, sizeof(nolen));
+	p += sizeof(nolen);
+	if (oldlenp) {
+		*oldlenp = nolen;
+		if (oldp && nolen <= olen)
+			memcpy(oldp, p, nolen);
+	}
+
+	return 0;
 }
 #endif

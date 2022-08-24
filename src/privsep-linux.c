@@ -87,7 +87,7 @@ out:
 
 ssize_t
 ps_root_os(struct ps_msghdr *psm, struct msghdr *msg,
-    __unused void **rdata, __unused size_t *rlen)
+    __unused void **rdata, __unused size_t *rlen, __unused bool *free_data)
 {
 
 	switch (psm->ps_cmd) {
