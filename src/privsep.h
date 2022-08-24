@@ -61,6 +61,7 @@
 #define	PS_IP6FORWARDING	0x0104
 #define	PS_GETIFADDRS		0x0105
 #define	PS_IFIGNOREGRP		0x0106
+#define	PS_SYSCTL		0x0107
 
 /* Dev Commands */
 #define	PS_DEV_LISTENING	0x1001
@@ -75,6 +76,10 @@
 /* Control Type (via flags) */
 #define	PS_CTL_PRIV		0x0004
 #define	PS_CTL_UNPRIV		0x0005
+
+/* Sysctl Needs (via flags) */
+#define	PS_SYSCTL_OLEN		0x0001
+#define	PS_SYSCTL_ODATA		0x0002
 
 /* Process commands */
 #define	PS_START		0x4000

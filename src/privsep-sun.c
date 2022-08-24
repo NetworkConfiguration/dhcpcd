@@ -77,7 +77,7 @@ ps_root_doroute(void *data, size_t len)
 
 ssize_t
 ps_root_os(struct ps_msghdr *psm, struct msghdr *msg,
-    void **rdata, size_t *rlen)
+    void **rdata, size_t *rlen, __unused bool *free_rdata)
 {
 	struct iovec *iov = msg->msg_iov;
 	void *data = iov->iov_base;

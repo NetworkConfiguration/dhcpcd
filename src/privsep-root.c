@@ -593,7 +593,7 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		break;
 #endif
 	default:
-		err = ps_root_os(psm, msg, &rdata, &rlen);
+		err = ps_root_os(psm, msg, &rdata, &rlen, &free_rdata);
 		break;
 	}
 

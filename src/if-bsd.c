@@ -915,27 +915,42 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, const struct rt_msghdr *rtm)
 	return 0;
 }
 
+static int
+if_sysctl(struct dhcpcd_ctx *ctx,
+    const int *name, u_int namelen,
+    void *oldp, size_t *oldlenp, const void *newp, size_t newlen)
+{
+#if defined(PRIVSEP) && defined(HAVE_CAPSICUM)
+	if (IN_PRIVSEP(ctx))
+		return (int)ps_root_sysctl(ctx, name, namelen,
+		    oldp, oldlenp, newp, newlen);
+#endif
+
+	return sysctl(name, namelen, oldp, oldlenp, newp, newlen);
+}
+
 int
 if_initrt(struct dhcpcd_ctx *ctx, rb_tree_t *kroutes, int af)
 {
 	struct rt_msghdr *rtm;
 	int mib[6] = { CTL_NET, PF_ROUTE, 0, af, NET_RT_DUMP, 0 };
-	size_t needed;
+	size_t bufl;
 	char *buf, *p, *end;
 	struct rt rt, *rtn;
 
-	if (sysctl(mib, __arraycount(mib), NULL, &needed, NULL, 0) == -1)
+	if (if_sysctl(ctx, mib, __arraycount(mib), NULL, &bufl, NULL, 0) == -1)
 		return -1;
-	if (needed == 0)
+	if (bufl == 0)
 		return 0;
-	if ((buf = malloc(needed)) == NULL)
+	if ((buf = malloc(bufl)) == NULL)
 		return -1;
-	if (sysctl(mib, __arraycount(mib), buf, &needed, NULL, 0) == -1) {
+	if (if_sysctl(ctx, mib, __arraycount(mib), buf, &bufl, NULL, 0) == -1)
+	{
 		free(buf);
 		return -1;
 	}
 
-	end = buf + needed;
+	end = buf + bufl;
 	for (p = buf; p < end; p += rtm->rtm_msglen) {
 		rtm = (void *)p;
 		if (p + sizeof(*rtm) > end || p + rtm->rtm_msglen > end) {
