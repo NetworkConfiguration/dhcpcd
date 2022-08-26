@@ -300,6 +300,9 @@ static struct sock_filter ps_seccomp_filter[] = {
 #ifdef __NR_getpid
 	SECCOMP_ALLOW(__NR_getpid),
 #endif
+#ifdef __NR_getrandom
+	SECCOMP_ALLOW(__NR_getrandom),
+#endif
 #ifdef __NR_getsockopt
 	/* For route socket overflow */
 	SECCOMP_ALLOW_ARG(__NR_getsockopt, 1, SOL_SOCKET),
