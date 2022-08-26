@@ -1219,7 +1219,7 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 	struct dhcp6_state *state = D6_STATE(ifp);
 	struct dhcpcd_ctx *ctx = ifp->ctx;
 	unsigned int RT;
-	bool broadcast = true;
+	bool multicast = true;
 	struct sockaddr_in6 dst = {
 	    .sin6_family = AF_INET6,
 	    /* Setting the port on Linux gives EINVAL when sending.
@@ -1259,24 +1259,24 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 			/* Unicasting is denied for these types. */
 			break;
 		default:
-			broadcast = false;
+			multicast = false;
 			inet_ntop(AF_INET6, &state->unicast, uaddr,
 			    sizeof(uaddr));
 			break;
 		}
 	}
-	dst.sin6_addr = broadcast ? alldhcp : state->unicast;
+	dst.sin6_addr = multicast ? alldhcp : state->unicast;
 
 	if (!callback) {
 		logdebugx("%s: %s %s with xid 0x%02x%02x%02x%s%s",
 		    ifp->name,
-		    broadcast ? "broadcasting" : "unicasting",
+		    multicast ? "multicasting" : "unicasting",
 		    dhcp6_get_op(state->send->type),
 		    state->send->xid[0],
 		    state->send->xid[1],
 		    state->send->xid[2],
-		    !broadcast ? " " : "",
-		    !broadcast ? uaddr : "");
+		    !multicast ? " " : "",
+		    !multicast ? uaddr : "");
 		RT = 0;
 	} else {
 		if (state->IMD &&
@@ -1314,13 +1314,13 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 			    " next in %0.1f seconds",
 			    ifp->name,
 			    state->IMD != 0 ? "delaying" :
-			    broadcast ? "broadcasting" : "unicasting",
+			    multicast ? "multicasting" : "unicasting",
 			    dhcp6_get_op(state->send->type),
 			    state->send->xid[0],
 			    state->send->xid[1],
 			    state->send->xid[2],
-			    state->IMD == 0 && !broadcast ? " " : "",
-			    state->IMD == 0 && !broadcast ? uaddr : "",
+			    state->IMD == 0 && !multicast ? " " : "",
+			    state->IMD == 0 && !multicast ? uaddr : "",
 			    (float)RT / MSEC_PER_SEC);
 
 		/* Wait the initial delay */
@@ -1347,7 +1347,7 @@ dhcp6_sendmessage(struct interface *ifp, void (*callback)(void *))
 #endif
 
 	/* Set the outbound interface */
-	if (broadcast) {
+	if (multicast) {
 		struct cmsghdr *cm;
 		struct in6_pktinfo pi = { .ipi6_ifindex = ifp->index };
 
