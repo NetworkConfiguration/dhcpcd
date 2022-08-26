@@ -394,7 +394,7 @@ ps_root_sysctl(struct dhcpcd_ctx *ctx,
 		p += newlen;
 	}
 
-	if (ps_sendcmd(ctx, ctx->ps_root->psp_fd, PS_SYSCTL,
+	if (ps_sendcmd(ctx, ctx->ps_root_fd, PS_SYSCTL,
 	    flags, buf, (size_t)(p - buf)) == -1)
 		return -1;
 
