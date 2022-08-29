@@ -24,7 +24,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd February 24, 2022
+.Dd August 29, 2022
 .Dt DHCPCD.CONF 5
 .Os
 .Sh NAME
@@ -461,7 +461,7 @@ Enables IPv6 Router Advertisement solicitation.
 This is on by default, but is documented here in the case where it is disabled
 globally but needs to be enabled for one interface.
 .It Ic leasetime Ar seconds
-Request a lease time of
+Request DHCP a lease time of
 .Ar seconds .
 .Ar -1
 represents an infinite lease time.
@@ -469,6 +469,8 @@ By default
 .Nm dhcpcd
 does not request any lease time and leaves it in the hands of the
 DHCP server.
+It is not possible to request a DHCPv6 lease time as this is not RFC compliant.
+See RFC 8415 21.4, 21.6, 21.21 and 21.22.
 .It Ic link_rcvbuf Ar size
 Override the size of the link receive buffer from the kernel default.
 While
