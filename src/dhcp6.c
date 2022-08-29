@@ -962,6 +962,8 @@ dhcp6_makemessage(struct interface *ifp)
 		else
 			ia_na_len = sizeof(ia_na);
 		memcpy(ia_na.iaid, ifia->iaid, sizeof(ia_na.iaid));
+		/* RFC 8415 21.4 and 21.21 state that T1 and T2 should be zero.
+		 * An RFC compliant server MUST ignore them anyway. */
 		ia_na.t1 = 0;
 		ia_na.t2 = 0;
 		COPYIN(ifia->ia_type, &ia_na, ia_na_len);
@@ -980,11 +982,16 @@ dhcp6_makemessage(struct interface *ifp)
 				continue;
 			if (ap->ia_type == D6_OPTION_IA_PD) {
 #ifndef SMALL
-				struct dhcp6_pd_addr pdp;
+				struct dhcp6_pd_addr pdp = {
+				    .prefix_len = ap->prefix_len,
+				    /*
+				     * RFC 8415 21.22 states that the
+				     * valid and preferred lifetimes sent by
+				     * the client SHOULD be zero and MUST
+				     * be ignored by the server.
+				     */
+				};
 
-				pdp.pltime = htonl(ap->prefix_pltime);
-				pdp.vltime = htonl(ap->prefix_vltime);
-				pdp.prefix_len = ap->prefix_len;
 				/* pdp.prefix is not aligned, so copy it in. */
 				memcpy(&pdp.prefix, &ap->prefix, sizeof(pdp.prefix));
 				COPYIN(D6_OPTION_IAPREFIX, &pdp, sizeof(pdp));
@@ -1019,11 +1026,16 @@ dhcp6_makemessage(struct interface *ifp)
 				}
 #endif
 			} else {
-				struct dhcp6_ia_addr ia;
+				struct dhcp6_ia_addr ia = {
+				    .addr = ap->addr,
+				    /*
+				     * RFC 8415 21.6 states that the
+				     * valid and preferred lifetimes sent by
+				     * the client SHOULD be zero and MUST
+				     * be ignored by the server.
+				     */
+				};
 
-				ia.addr = ap->addr;
-				ia.pltime = htonl(ap->prefix_pltime);
-				ia.vltime = htonl(ap->prefix_vltime);
 				COPYIN(D6_OPTION_IA_ADDR, &ia, sizeof(ia));
 				ia_na_len = (uint16_t)
 				    (ia_na_len + sizeof(o) + sizeof(ia));
