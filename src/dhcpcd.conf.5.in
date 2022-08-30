@@ -24,7 +24,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd August 29, 2022
+.Dd August 30, 2022
 .Dt DHCPCD.CONF 5
 .Os
 .Sh NAME
@@ -648,13 +648,16 @@ instead of the default
 .It Ic ssid Ar ssid
 Subsequent options are only parsed for this wireless
 .Ar ssid .
-.It Ic slaac Ar hwaddr | Ar private Op Ar temp | Ar temporary
+.It Ic slaac Ic hwaddr | Ic private | Ic token Ar token Op Ic temp | Ic temporary
 Selects the interface identifier used for SLAAC generated IPv6 addresses.
 If
-.Ar private
+.Ic private
 is used, a RFC 7217 address is generated.
+If
+.Ic token Ar token
+is used then the token is combied with the prefix to make the final address.
 The
-.Ar temporary
+.Ic temporary
 directive will create a temporary address for the prefix as well.
 .It Ic static Ar value
 Configures a static

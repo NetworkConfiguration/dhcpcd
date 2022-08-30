@@ -2231,6 +2231,22 @@ invalid_token:
 			ifo->options |= DHCPCD_SLAACPRIVATE;
 		else
 			ifo->options &= ~DHCPCD_SLAACPRIVATE;
+		if (strcmp(arg, "token") == 0) {
+			if (np == NULL) {
+				logerrx("slaac token: no token specified");
+				return -1;
+			}
+			arg = np;
+			np = strwhite(np);
+			if (np != NULL) {
+				*np++ = '\0';
+				np = strskipwhite(np);
+			}
+			if (inet_pton(AF_INET6, arg, &ifo->token) != 1) {
+				logerrx("slaac token: invalid token");
+				return -1;
+			}
+		}
 		if (np != NULL &&
 		    (strcmp(np, "temp") == 0 || strcmp(np, "temporary") == 0))
 			ifo->options |= DHCPCD_SLAACTEMP;

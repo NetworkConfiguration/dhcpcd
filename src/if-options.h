@@ -266,6 +266,9 @@ struct if_options {
 
 	struct if_ia *ia;
 	size_t ia_len;
+#ifdef INET6
+	struct in6_addr token;
+#endif
 
 	struct dhcp_opt *dhcp_override;
 	size_t dhcp_override_len;
