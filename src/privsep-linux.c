@@ -60,39 +60,42 @@
 //#define SECCOMP_FILTER_DEBUG
 
 static ssize_t
-ps_root_dosendnetlink(int protocol, struct msghdr *msg)
+ps_root_dosendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct msghdr *msg)
 {
-	struct sockaddr_nl snl = { .nl_family = AF_NETLINK };
+	struct priv *priv = (struct priv *)ctx->priv;
 	int s;
 	unsigned char buf[16 * 1024];
 	struct iovec riov = {
 		.iov_base = buf,
 		.iov_len = sizeof(buf),
 	};
-	ssize_t retval;
 
-	if ((s = if_linksocket(&snl, protocol, 0)) == -1)
+	switch(protocol) {
+	case NETLINK_GENERIC:
+		s = priv->netlink_fd;
+		break;
+	case NETLINK_ROUTE:
+		s = priv->route_fd;
+		break;
+	default:
+		errno = EPFNOSUPPORT;
 		return -1;
-
-	if (sendmsg(s, msg, 0) == -1) {
-		retval = -1;
-		goto out;
 	}
 
-	retval = if_getnetlink(NULL, &riov, s, 0, NULL, NULL);
-out:
-	close(s);
-	return retval;
+	if (sendmsg(s, msg, 0) == -1)
+		return =-1;
+
+	return if_getnetlink(NULL, &riov, s, 0, NULL, NULL);
 }
 
 ssize_t
-ps_root_os(struct ps_msghdr *psm, struct msghdr *msg,
+ps_root_os(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg,
     __unused void **rdata, __unused size_t *rlen, __unused bool *free_data)
 {
 
 	switch (psm->ps_cmd) {
 	case PS_ROUTE:
-		return ps_root_dosendnetlink((int)psm->ps_flags, msg);
+		return ps_root_dosendnetlink(ctx, (int)psm->ps_flags, msg);
 	default:
 		errno = ENOTSUP;
 		return -1;

@@ -94,12 +94,6 @@ extern int getallifaddrs(sa_family_t, struct ifaddrs **, int64_t);
 
 #define COPYSA(dst, src) memcpy((dst), (src), sa_len((src)))
 
-struct priv {
-#ifdef INET6
-	int pf_inet6_fd;
-#endif
-};
-
 struct rtm
 {
 	struct rt_msghdr hdr;

@@ -58,13 +58,38 @@
 #include <unistd.h>
 
 #include "dhcpcd.h"
+#include "if.h"
 #include "logerr.h"
 #include "privsep.h"
 
 static ssize_t
-ps_root_doioctldom(int domain, unsigned long req, void *data, size_t len)
+ps_root_doioctldom(struct dhcpcd_ctx *ctx, int domain, unsigned long req, void *data, size_t len)
 {
-	int s, err;
+#if defined(INET6) || (defined(SIOCALIFADDR) && defined(IFLR_ACTIVE))
+	struct priv *priv = (struct priv *)ctx->priv;
+#endif
+	int s;
+
+	switch(domain) {
+#ifdef INET
+	case PF_INET:
+		s = ctx->pf_inet_fd;
+		break;
+#endif
+#ifdef INET6
+	case PF_INET6:
+		s = priv->pf_inet6_fd;
+		break;
+#endif
+#if defined(SIOCALIFADDR) && defined(IFLR_ACTIVE) /*NetBSD */
+	case PF_LINK:
+		s = priv->pf_link_fd;
+		break;
+#endif
+	default:
+		errno = EPFNOSUPPORT;
+		return -1;
+	}
 
 	/* Only allow these ioctls */
 	switch(req) {
@@ -107,33 +132,20 @@ ps_root_doioctldom(int domain, unsigned long req, void *data, size_t len)
 		return -1;
 	}
 
-	s = socket(domain, SOCK_DGRAM, 0);
-	if (s == -1)
-		return -1;
-	err = ioctl(s, req, data, len);
-	close(s);
-	return err;
+	return ioctl(s, req, data, len);
 }
 
 static ssize_t
-ps_root_doroute(void *data, size_t len)
+ps_root_doroute(struct dhcpcd_ctx *ctx, void *data, size_t len)
 {
-	int s;
-	ssize_t err;
 
-	s = socket(PF_ROUTE, SOCK_RAW, 0);
-	if (s != -1)
-		err = write(s, data, len);
-	else
-		err = -1;
-	if (s != -1)
-		close(s);
-	return err;
+	return write(ctx->link_fd, data, len);
 }
 
 #if defined(HAVE_CAPSICUM) || defined(HAVE_PLEDGE)
 static ssize_t
-ps_root_doindirectioctl(unsigned long req, void *data, size_t len)
+ps_root_doindirectioctl(struct dhcpcd_ctx *ctx,
+    unsigned long req, void *data, size_t len)
 {
 	char *p = data;
 	struct ifreq ifr = { .ifr_flags = 0 };
@@ -150,27 +162,21 @@ ps_root_doindirectioctl(unsigned long req, void *data, size_t len)
 	memmove(data, p + IFNAMSIZ, len);
 	ifr.ifr_data = data;
 
-	return ps_root_doioctldom(PF_INET, req, &ifr, sizeof(ifr));
+	return ps_root_doioctldom(ctx, PF_INET, req, &ifr, sizeof(ifr));
 }
 #endif
 
 #ifdef HAVE_PLEDGE
 static ssize_t
-ps_root_doifignoregroup(void *data, size_t len)
+ps_root_doifignoregroup(struct dhcpcd_ctx *ctx, void *data, size_t len)
 {
-	int s, err;
 
 	if (len == 0 || ((const char *)data)[len - 1] != '\0') {
 		errno = EINVAL;
 		return -1;
 	}
 
-	s = socket(PF_INET, SOCK_DGRAM, 0);
-	if (s == -1)
-		return -1;
-	err = if_ignoregroup(s, data);
-	close(s);
-	return err;
+	return if_ignoregroup(ctx->pf_inet_fd, data);
 }
 #endif
 
@@ -245,7 +251,7 @@ ps_root_dosysctl(unsigned long flags,
 #endif
 
 ssize_t
-ps_root_os(struct ps_msghdr *psm, struct msghdr *msg,
+ps_root_os(struct dhcpcd_ctx *ctx, struct ps_msghdr *psm, struct msghdr *msg,
     void **rdata, size_t *rlen, bool *free_rdata)
 {
 	struct iovec *iov = msg->msg_iov;
@@ -255,21 +261,21 @@ ps_root_os(struct ps_msghdr *psm, struct msghdr *msg,
 
 	switch (psm->ps_cmd) {
 	case PS_IOCTLLINK:
-		err = ps_root_doioctldom(PF_LINK, psm->ps_flags, data, len);
+		err = ps_root_doioctldom(ctx, PF_LINK, psm->ps_flags, data, len);
 		break;
 	case PS_IOCTL6:
-		err = ps_root_doioctldom(PF_INET6, psm->ps_flags, data, len);
+		err = ps_root_doioctldom(ctx, PF_INET6, psm->ps_flags, data, len);
 		break;
 	case PS_ROUTE:
-		return ps_root_doroute(data, len);
+		return ps_root_doroute(ctx, data, len);
 #if defined(HAVE_CAPSICUM) || defined(HAVE_PLEDGE)
 	case PS_IOCTLINDIRECT:
-		err = ps_root_doindirectioctl(psm->ps_flags, data, len);
+		err = ps_root_doindirectioctl(ctx, psm->ps_flags, data, len);
 		break;
 #endif
 #ifdef HAVE_PLEDGE
 	case PS_IFIGNOREGRP:
-		return ps_root_doifignoregroup(data, len);
+		return ps_root_doifignoregroup(ctx, data, len);
 #endif
 #ifdef HAVE_CAPSICUM
 	case PS_SYSCTL:

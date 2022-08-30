@@ -119,7 +119,33 @@ typedef unsigned long		ioctl_request_t;
  * It used to work, but lukily Solaris can fall back to
  * IP_PKTINFO. */
 #undef IP_RECVIF
+#endif
 
+/* Private structures specific to an OS */
+#ifdef BSD
+struct priv {
+#ifdef INET6
+	int pf_inet6_fd;
+#endif
+	int pf_link_fd; /* NetBSD only, but hard to define for here */
+};
+#endif
+#ifdef __linux__
+struct priv {
+	int route_fd;
+	int generic_fd;
+	uint32_t route_pid;
+};
+#endif
+#ifdef __sun
+struct priv {
+#ifdef INET6
+	int pf_inet6_fd;
+#endif
+};
+#endif
+
+#ifdef __sun
 /* Solaris getifaddrs is very un-suitable for dhcpcd.
  * See if-sun.c for details why. */
 struct ifaddrs;

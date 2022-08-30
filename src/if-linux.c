@@ -141,12 +141,6 @@ int if_getssid_wext(const char *ifname, uint8_t *ssid);
 	(struct rtattr *)(void *)(((char *)(rta)) \
 	+ RTA_ALIGN((rta)->rta_len)))
 
-struct priv {
-	int route_fd;
-	int generic_fd;
-	uint32_t route_pid;
-};
-
 /* We need this to send a broadcast for InfiniBand.
  * Our old code used sendto, but our new code writes to a raw BPF socket.
  * What header structure does IPoIB use? */
@@ -495,8 +489,10 @@ if_closesockets_os(struct dhcpcd_ctx *ctx)
 
 	if (ctx->priv != NULL) {
 		priv = (struct priv *)ctx->priv;
-		close(priv->route_fd);
-		close(priv->generic_fd);
+		if (priv->route_fd != -1)
+			close(priv->route_fd);
+		if (priv->generic_fd != -1)
+			close(priv->generic_fd);
 	}
 }
 

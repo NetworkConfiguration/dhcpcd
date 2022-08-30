@@ -113,10 +113,6 @@ static const char * const ifnames_ignore[] = {
 	NULL
 };
 
-struct priv {
-	int pf_inet6_fd;
-};
-
 struct rtm
 {
 	struct rt_msghdr hdr;
@@ -223,6 +219,12 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 		ps_rights_limit_fd_sockopt(ctx->link_fd);
 #endif
 
+
+#if defined(SIOCALIFADDR) && defined(IFLR_ACTIVE) /*NetBSD */
+	priv->pf_link_fd = socket(PF_LINK, SOCK_DGRAM, 0);
+	if (priv->pf_link_fd == -1)
+		logerr("%s: socket(PF_LINK)", __func__);
+#endif
 	return 0;
 }
 
@@ -234,6 +236,10 @@ if_closesockets_os(struct dhcpcd_ctx *ctx)
 	priv = (struct priv *)ctx->priv;
 	if (priv->pf_inet6_fd != -1)
 		close(priv->pf_inet6_fd);
+#if defined(SIOCALIFADDR) && defined(IFLR_ACTIVE) /*NetBSD */
+	if (priv->pf_link_fd != -1)
+		close(priv->pf_link_fd);
+#endif
 	free(priv);
 	ctx->priv = NULL;
 	free(ctx->rt_missfilter);
@@ -243,22 +249,14 @@ if_closesockets_os(struct dhcpcd_ctx *ctx)
 static int
 if_ioctllink(struct dhcpcd_ctx *ctx, unsigned long req, void *data, size_t len)
 {
-	int s;
-	int retval;
+	struct priv *priv = (struct priv *)ctx->priv;
 
 #ifdef PRIVSEP
 	if (ctx->options & DHCPCD_PRIVSEP)
 		return (int)ps_root_ioctllink(ctx, req, data, len);
-#else
-	UNUSED(ctx);
 #endif
 
-	s = socket(PF_LINK, SOCK_DGRAM, 0);
-	if (s == -1)
-		return -1;
-	retval = ioctl(s, req, data, len);
-	close(s);
-	return retval;
+	return ioctl(priv->pf_link_fd, req, data, len);
 }
 #endif
 

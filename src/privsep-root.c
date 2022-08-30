@@ -609,7 +609,7 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		break;
 #endif
 	default:
-		err = ps_root_os(psm, msg, &rdata, &rlen, &free_rdata);
+		err = ps_root_os(ctx, psm, msg, &rdata, &rlen, &free_rdata);
 		break;
 	}
 
@@ -666,6 +666,26 @@ ps_root_startcb(struct ps_process *psp)
 		    ctx->options & DHCPCD_IPV4 ? " [ip4]" : "",
 		    ctx->options & DHCPCD_IPV6 ? " [ip6]" : "");
 	ctx->options |= DHCPCD_PRIVSEPROOT;
+
+	if (if_opensockets(ctx) == -1)
+		logerr("%s: if_opensockets", __func__);
+	else {
+#ifdef BSD
+		/* We only want to write to this socket, so set
+		 * a small as possible buffer size. */
+		socklen_t smallbuf = 1;
+
+		if (setsockopt(ctx->link_fd, SOL_SOCKET, SO_RCVBUF,
+		    &smallbuf, (socklen_t)sizeof(smallbuf)) == -1)
+			logerr("%s: setsockopt(SO_RCVBUF)", __func__);
+#endif
+#ifdef __linux__
+		/* See if_opensockets_os as to why we close link_fd
+		 * rather than not open it. */
+		close(ctx->link_fd);
+		ctx->link_fd = -1;
+#endif
+	}
 
 	/* Open network sockets for sending.
 	 * This is a small bit wasteful for non sandboxed OS's
