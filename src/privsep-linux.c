@@ -72,7 +72,7 @@ ps_root_dosendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct msghdr *msg)
 
 	switch(protocol) {
 	case NETLINK_GENERIC:
-		s = priv->netlink_fd;
+		s = priv->generic_fd;
 		break;
 	case NETLINK_ROUTE:
 		s = priv->route_fd;
@@ -83,7 +83,7 @@ ps_root_dosendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct msghdr *msg)
 	}
 
 	if (sendmsg(s, msg, 0) == -1)
-		return =-1;
+		return -1;
 
 	return if_getnetlink(NULL, &riov, s, 0, NULL, NULL);
 }

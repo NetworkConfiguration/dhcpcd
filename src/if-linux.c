@@ -439,6 +439,13 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 	int on = 1;
 #endif
 
+#ifdef PRIVSEP
+	if (ctx->options & DHCPCD_PRIVSEPROOT) {
+		ctx->link_fd = -1;
+		goto setup_priv;
+	}
+#endif
+
 	/* Open the link socket first so it gets pid() for the socket.
 	 * Then open our persistent route socket so we get a unique
 	 * pid that doesn't clash with a process id for after we fork. */
@@ -461,6 +468,9 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 		logerr("%s: NETLINK_BROADCAST_ERROR", __func__);
 #endif
 
+#ifdef PRIVSEP
+setup_priv:
+#endif
 	if ((priv = calloc(1, sizeof(*priv))) == NULL)
 		return -1;
 
