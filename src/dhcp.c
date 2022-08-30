@@ -2005,7 +2005,7 @@ dhcp_finish_dad(struct interface *ifp, struct in_addr *ia)
 {
 	struct dhcp_state *state = D_STATE(ifp);
 
-	if (state->state != DHS_PROBE)
+	if (state->state == DHS_BOUND)
 		return;
 	if (state->offer == NULL || state->offer->yiaddr != ia->s_addr)
 		return;
