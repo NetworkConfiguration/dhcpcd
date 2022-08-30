@@ -1110,8 +1110,13 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			logerrx("static assignment required");
 			return -1;
 		}
-		p++;
+		p = strskipwhite(++p);
 		if (strncmp(arg, "ip_address=", strlen("ip_address=")) == 0) {
+			if (p == NULL) {
+				ifo->options &= ~DHCPCD_STATIC;
+				ifo->req_addr.s_addr = INADDR_ANY;
+				break;
+			}
 			if (parse_addr(&ifo->req_addr,
 			    ifo->req_mask.s_addr == 0 ? &ifo->req_mask : NULL,
 			    p) != 0)
@@ -1122,11 +1127,19 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		} else if (strncmp(arg, "subnet_mask=",
 		    strlen("subnet_mask=")) == 0)
 		{
+			if (p == NULL) {
+				ifo->req_mask.s_addr = INADDR_ANY;
+				break;
+			}
 			if (parse_addr(&ifo->req_mask, NULL, p) != 0)
 				return -1;
 		} else if (strncmp(arg, "broadcast_address=",
 		    strlen("broadcast_address=")) == 0)
 		{
+			if (p == NULL) {
+				ifo->req_brd.s_addr = INADDR_ANY;
+				break;
+			}
 			if (parse_addr(&ifo->req_brd, NULL, p) != 0)
 				return -1;
 		} else if (strncmp(arg, "routes=", strlen("routes=")) == 0 ||
@@ -1138,6 +1151,12 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		        strlen("ms_classless_static_routes=")) == 0)
 		{
 			struct in_addr addr3;
+
+			if (p == NULL) {
+				rt_headclear(&ifo->routes, AF_INET);
+				add_environ(&ifo->config, arg, 1);
+				break;
+			}
 
 			fp = np = strwhite(p);
 			if (np == NULL) {
@@ -1161,6 +1180,11 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 			if (rt_proto_add_ctx(&ifo->routes, rt, ctx))
 				add_environ(&ifo->config, arg, 0);
 		} else if (strncmp(arg, "routers=", strlen("routers=")) == 0) {
+			if (p == NULL) {
+				rt_headclear(&ifo->routes, AF_INET);
+				add_environ(&ifo->config, arg, 1);
+				break;
+			}
 			if (parse_addr(&addr, NULL, p) == -1)
 				return -1;
 			if ((rt = rt_new0(ctx)) == NULL)
@@ -1175,6 +1199,8 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 		    strlen("interface_mtu=")) == 0 ||
 		    strncmp(arg, "mtu=", strlen("mtu=")) == 0)
 		{
+			if (p == NULL)
+				break;
 			ifo->mtu = (unsigned int)strtou(p, NULL, 0,
 			    MTU_MIN, MTU_MAX, &e);
 			if (e) {
@@ -1182,6 +1208,12 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 				return -1;
 			}
 		} else if (strncmp(arg, "ip6_address=", strlen("ip6_address=")) == 0) {
+			if (p == NULL) {
+				memset(&ifo->req_addr6, 0,
+				    sizeof(ifo->req_addr6));
+				break;
+			}
+
 			np = strchr(p, '/');
 			if (np)
 				*np++ = '\0';
@@ -1207,8 +1239,9 @@ parse_option(struct dhcpcd_ctx *ctx, const char *ifname, struct if_options *ifo,
 				return -1;
 			}
 		} else
-			add_environ(&ifo->config, arg, 1);
+			add_environ(&ifo->config, arg, p == NULL ? 1 : 0);
 		break;
+
 	case 'W':
 		if (parse_addr(&addr, &addr2, arg) != 0)
 			return -1;

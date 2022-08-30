@@ -668,6 +668,13 @@ then
 .Nm dhcpcd
 will not attempt to obtain a lease and will just use the value for the address
 with an infinite lease time.
+If you set an empty value this removes all prior static allocations to
+the same value.
+This is useful when using profiles and in the case of
+.Ic ip_address
+it will remove the static allocation.
+Note that setting 0.0.0.0 keeps the static allocation but waits for a 3rdparty
+to configure the address.
 If you set
 .Ic ip6_address ,
 .Nm dhcpcd
@@ -695,7 +702,7 @@ It uses the special
 keyword to insert the destination address
 into the value.
 .D1 interface ppp0
-.D1 static ip_address=
+.D1 static ip_address=0.0.0.0
 .D1 destination routers
 .It Ic timeout Ar seconds
 Time out after
