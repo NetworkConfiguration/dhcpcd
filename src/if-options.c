@@ -2231,6 +2231,7 @@ invalid_token:
 			ifo->options |= DHCPCD_SLAACPRIVATE;
 		else
 			ifo->options &= ~DHCPCD_SLAACPRIVATE;
+#ifdef INET6
 		if (strcmp(arg, "token") == 0) {
 			if (np == NULL) {
 				logerrx("slaac token: no token specified");
@@ -2247,6 +2248,7 @@ invalid_token:
 				return -1;
 			}
 		}
+#endif
 		if (np != NULL &&
 		    (strcmp(np, "temp") == 0 || strcmp(np, "temporary") == 0))
 			ifo->options |= DHCPCD_SLAACTEMP;
