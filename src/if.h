@@ -127,7 +127,9 @@ struct priv {
 #ifdef INET6
 	int pf_inet6_fd;
 #endif
-	int pf_link_fd; /* NetBSD only, but hard to define for here */
+#if defined(SIOCALIFADDR) && defined(IFLR_ACTIVE) /*NetBSD */
+	int pf_link_fd;
+#endif
 };
 #endif
 #ifdef __linux__
