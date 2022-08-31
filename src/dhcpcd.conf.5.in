@@ -655,7 +655,7 @@ If
 is used, a RFC 7217 address is generated.
 If
 .Ic token Ar token
-is used then the token is combied with the prefix to make the final address.
+is used then the token is combined with the prefix to make the final address.
 The
 .Ic temporary
 directive will create a temporary address for the prefix as well.
