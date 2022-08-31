@@ -460,8 +460,21 @@ ipv6_makeaddr(struct in6_addr *addr, struct interface *ifp,
 			return -1;
 		return dad;
 	} else if (!IN6_IS_ADDR_UNSPECIFIED(&ifo->token)) {
+		int bytes = prefix_len / NBBY;
+		int bits = prefix_len % NBBY;
+
+		// Copy the token into the address.
 		*addr = ifo->token;
-		return ipv6_makeprefix(addr, prefix, prefix_len);
+
+		// If we have any dangling bits, just copy that in also.
+		// XXX Can we preserve part of the token still?
+		if (bits != 0)
+			bytes++;
+
+		// Copy the prefix in.
+		if (bytes > 0)
+			memcpy(addr->s6_addr, prefix->s6_addr, (size_t)bytes);
+		return 0;
 	}
 
 	if (prefix_len > 64) {
