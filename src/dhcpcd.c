@@ -2131,7 +2131,7 @@ printpidfile:
 			loginfox("sending signal %s to pid %d", siga, pid);
 		if (pid == 0 || pid == -1 || kill(pid, sig) != 0) {
 			if (sig != SIGHUP && sig != SIGUSR1 && errno != EPERM)
-				logerrx(PACKAGE" not running");
+				logerrx(PACKAGE" is not running");
 			if (pid != 0 && pid != -1 && errno != ESRCH) {
 				logerr("kill");
 				goto exit_failure;
@@ -2251,7 +2251,7 @@ printpidfile:
 				logerr("%s: control_open", __func__);
 			if (ctx.options & DHCPCD_DUMPLEASE) {
 				if (errno == ENOENT)
-					logerrx("dhcpcd is not running");
+					logerrx(PACKAGE" is not running");
 				goto exit_failure;
 			}
 			if (errno == EPERM || errno == EACCES)
