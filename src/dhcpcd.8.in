@@ -171,7 +171,7 @@ only works with those interfaces, otherwise
 discovers available Ethernet interfaces that can be configured.
 When
 .Nm
-not limited to one interface on the command line,
+is not limited to one interface on the command line,
 it is running in Manager mode.
 The
 .Nm dhcpcd-ui
@@ -182,6 +182,7 @@ If a single interface is given then
 only works for that interface and runs as a separate instance to other
 .Nm
 processes.
+The
 .Fl w , Fl Fl waitip
 option is enabled in this instance to maintain compatibility with older
 versions.
@@ -320,7 +321,7 @@ to put things back afterwards.
 does not read a new configuration when this happens - you should rebind if you
 need that functionality.
 .It Fl F , Fl Fl fqdn Ar fqdn
-Requests that the DHCP server updates DNS using FQDN instead of just a
+Requests that the DHCP server update DNS using FQDN instead of just a
 hostname.
 Valid values for
 .Ar fqdn
@@ -453,7 +454,7 @@ variable for use in
 .Nm
 normally de-configures the
 .Ar interface
-and configuration when it exits.
+when it exits.
 Sometimes, this isn't desirable if, for example, you have root mounted over
 NFS or SSH clients connect to this host and they need to be notified of
 the host shutting down.
@@ -789,7 +790,7 @@ If the point to point interface is configured for INFORM, then
 unicasts INFORM to the destination, otherwise it defaults to STATIC.
 .Sh NOTES
 .Nm
-requires a Berkley Packet Filter, or BPF device on BSD based systems and a
+requires a Berkeley Packet Filter, or BPF device on BSD based systems and a
 Linux Socket Filter, or LPF device on Linux based systems for all IPv4
 configuration.
 .Pp
@@ -825,7 +826,7 @@ Linux
 .Pa /dev
 management modules.
 .It Pa @HOOKDIR@
-A directory containing bourne shell scripts that are run by the above script.
+A directory containing Bourne shell scripts that are run by the above script.
 Each script can be disabled by using the
 .Fl C , Fl Fl nohook
 option described above.
@@ -881,4 +882,4 @@ RFC\ 6603, RFC\ 6704, RFC\ 7217, RFC\ 7550, RFC\ 7844.
 .An Roy Marples Aq Mt roy@marples.name
 .Sh BUGS
 Please report them to
-.Lk http://roy.marples.name/projects/dhcpcd
+.Lk https://roy.marples.name/projects/dhcpcd
