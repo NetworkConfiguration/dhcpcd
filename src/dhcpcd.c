@@ -2095,6 +2095,14 @@ printpidfile:
 			snprintf(ctx.pidfile, sizeof(ctx.pidfile),
 			    PIDFILE, "", "", "");
 			ctx.options |= DHCPCD_MANAGER;
+
+			/*
+			 * If we are given any interfaces, we
+			 * cannot send a signal as that would impact
+			 * other interfaces.
+			 */
+			if (optind != argc)
+				sig = 0;
 		}
 		if (ctx.options & DHCPCD_PRINT_PIDFILE) {
 			printf("%s\n", ctx.pidfile);
@@ -2130,15 +2138,13 @@ printpidfile:
 		if (pid != 0 && pid != -1)
 			loginfox("sending signal %s to pid %d", siga, pid);
 		if (pid == 0 || pid == -1 || kill(pid, sig) != 0) {
-			if (sig != SIGHUP && sig != SIGUSR1 && errno != EPERM)
-				logerrx(PACKAGE" is not running");
 			if (pid != 0 && pid != -1 && errno != ESRCH) {
 				logerr("kill");
 				goto exit_failure;
 			}
 			unlink(ctx.pidfile);
-			if (sig != SIGHUP && sig != SIGUSR1)
-				goto exit_failure;
+			/* We can still continue and send the command
+			 * via the control socket. */
 		} else {
 			struct timespec ts;
 
