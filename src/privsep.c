@@ -408,6 +408,7 @@ ps_startprocess(struct ps_process *psp,
 			return -1;
 		}
 #endif
+		psp->psp_started = true;
 		return pid;
 	}
 
@@ -481,6 +482,7 @@ ps_startprocess(struct ps_process *psp,
 	if (flags & PSF_DROPPRIVS)
 		ps_dropprivs(ctx);
 
+	psp->psp_started = true;
 	return 0;
 
 errexit:
@@ -508,6 +510,8 @@ ps_stopprocess(struct ps_process *psp)
 
 	if (psp == NULL)
 		return 0;
+
+	psp->psp_started = false;
 
 #ifdef PRIVSEP_DEBUG
 	logdebugx("%s: me=%d pid=%d fd=%d %s", __func__,
@@ -1164,6 +1168,8 @@ ps_findprocess(struct dhcpcd_ctx *ctx, struct ps_id *psid)
 	struct ps_process *psp;
 
 	TAILQ_FOREACH(psp, &ctx->ps_processes, next) {
+		if (!(psp->psp_started))
+			continue;
 		if (memcmp(&psp->psp_id, psid, sizeof(psp->psp_id)) == 0)
 			return psp;
 	}

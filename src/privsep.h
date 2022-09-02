@@ -169,6 +169,7 @@ struct ps_msg {
 };
 
 struct bpf;
+
 struct ps_process {
 	TAILQ_ENTRY(ps_process) next;
 	struct dhcpcd_ctx *psp_ctx;
@@ -181,6 +182,7 @@ struct ps_process {
 	char psp_name[PSP_NAMESIZE];
 	uint16_t psp_proto;
 	const char *psp_protostr;
+	bool psp_started;
 
 #ifdef INET
 	int (*psp_filter)(const struct bpf *, const struct in_addr *);
