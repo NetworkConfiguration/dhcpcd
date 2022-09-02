@@ -1940,12 +1940,6 @@ main(int argc, char **argv, char **envp)
 			sig = SIGHUP;
 			siga = "HUP";
 			break;
-		case 'g':
-		case 'p':
-			/* Force going via command socket as we're
-			 * out of user definable signals. */
-			i = 4;
-			break;
 		case 'q':
 			/* -qq disables console output entirely.
 			 * This is important for systemd because it logs
@@ -2213,12 +2207,8 @@ printpidfile:
 	}
 #endif
 
-	/* Test against siga instead of sig to avoid gcc
-	 * warning about a bogus potential signed overflow.
-	 * The end result will be the same. */
-	if ((siga == NULL || i == 4 || ctx.ifc != 0) &&
-	    !(ctx.options & DHCPCD_TEST))
-	{
+	/* Try and contact the manager process to send the instruction. */
+	if (!(ctx.options & DHCPCD_TEST)) {
 		ctx.options |= DHCPCD_FORKED; /* avoid socket unlink */
 		if (!(ctx.options & DHCPCD_MANAGER))
 			ctx.control_fd = control_open(argv[optind], family,
@@ -2255,7 +2245,12 @@ printpidfile:
 		} else {
 			if (errno != ENOENT)
 				logerr("%s: control_open", __func__);
-			if (ctx.options & DHCPCD_DUMPLEASE) {
+			/* If asking dhcpcd to exit and we failed to
+			 * send a signal or a message then we
+			 * don't proceed past here. */
+			if (ctx.options & DHCPCD_DUMPLEASE ||
+			    sig == SIGTERM || sig == SIGALRM)
+			{
 				if (errno == ENOENT)
 					logerrx(PACKAGE" is not running");
 				goto exit_failure;
