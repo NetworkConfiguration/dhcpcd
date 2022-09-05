@@ -2656,15 +2656,8 @@ exit1:
 	if (ps_stopwait(&ctx) != EXIT_SUCCESS)
 		i = EXIT_FAILURE;
 #endif
-	if (ctx.options & DHCPCD_STARTED && !(ctx.options & DHCPCD_FORKED)) {
+	if (ctx.options & DHCPCD_STARTED && !(ctx.options & DHCPCD_FORKED))
 		loginfox(PACKAGE " exited");
-
-#ifdef PRIVSEP
-		/* Sleep some for the exited log entry to be written. */
-		struct timespec ts = { .tv_nsec = 10 };
-		nanosleep(&ts, NULL);
-#endif
-	}
 #ifdef PRIVSEP
 	if (ps_root_stop(&ctx) == -1)
 		i = EXIT_FAILURE;
