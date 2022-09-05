@@ -353,9 +353,6 @@ static struct sock_filter ps_seccomp_filter[] = {
 #ifdef __NR_munmap
 	SECCOMP_ALLOW(__NR_munmap),
 #endif
-#ifdef __NR_nanosleep
-	SECCOMP_ALLOW(__NR_nanosleep),	/* XXX should use ppoll instead */
-#endif
 #ifdef __NR_newfstatat
 	SECCOMP_ALLOW(__NR_newfstatat),
 #endif

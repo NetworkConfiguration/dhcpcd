@@ -1828,6 +1828,24 @@ dhcpcd_stderr_cb(void *arg, unsigned short events)
 	fprintf(stderr, "%s", log);
 }
 
+static void
+dhcpcd_pidfile_timeout(void *arg)
+{
+	struct dhcpcd_ctx *ctx = arg;
+	pid_t pid;
+
+	pid = pidfile_read(ctx->pidfile);
+
+	if(pid == -1)
+		eloop_exit(ctx->eloop, EXIT_SUCCESS);
+	else if (++ctx->duid_len >= 100) { /* overload duid_len */
+		logerrx("pid %d failed to exit", pid);
+		eloop_exit(ctx->eloop, EXIT_FAILURE);
+	} else
+		eloop_timeout_add_msec(ctx->eloop, 100,
+		    dhcpcd_pidfile_timeout, ctx);
+}
+
 int
 main(int argc, char **argv, char **envp)
 {
@@ -2164,21 +2182,12 @@ printpidfile:
 			/* We can still continue and send the command
 			 * via the control socket. */
 		} else {
-			struct timespec ts;
-
 			if (sig == SIGHUP || sig == SIGUSR1)
 				goto exit_success;
 			/* Spin until it exits */
 			loginfox("waiting for pid %d to exit", pid);
-			ts.tv_sec = 0;
-			ts.tv_nsec = 100000000; /* 10th of a second */
-			for(i = 0; i < 100; i++) {
-				nanosleep(&ts, NULL);
-				if (pidfile_read(ctx.pidfile) == -1)
-					goto exit_success;
-			}
-			logerrx("pid %d failed to exit", pid);
-			goto exit_failure;
+			dhcpcd_pidfile_timeout(&ctx);
+			goto run_loop;
 		}
 	}
 #endif

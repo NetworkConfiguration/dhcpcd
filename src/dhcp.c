@@ -84,11 +84,6 @@
 /* We should define a maximum for the NAK exponential backoff */
 #define NAKOFF_MAX              60
 
-/* Wait N nanoseconds between sending a RELEASE and dropping the address.
- * This gives the kernel enough time to actually send it. */
-#define RELEASE_DELAY_S		0
-#define RELEASE_DELAY_NS	10000000
-
 #ifndef IPDEFTTL
 #define IPDEFTTL 64 /* RFC1340 */
 #endif
@@ -2755,12 +2750,8 @@ dhcp_reboot(struct interface *ifp)
 void
 dhcp_drop(struct interface *ifp, const char *reason)
 {
-	struct dhcp_state *state;
-#ifdef RELEASE_SLOW
-	struct timespec ts;
-#endif
+	struct dhcp_state *state = D_STATE(ifp);
 
-	state = D_STATE(ifp);
 	/* dhcp_start may just have been called and we don't yet have a state
 	 * but we do have a timeout, so punt it. */
 	if (state == NULL || state->state == DHS_NONE) {
@@ -2794,12 +2785,6 @@ dhcp_drop(struct interface *ifp, const char *reason)
 			    ifp->name, inet_ntoa(state->lease.addr));
 			dhcp_new_xid(ifp);
 			send_message(ifp, DHCP_RELEASE, NULL);
-#ifdef RELEASE_SLOW
-			/* Give the packet a chance to go */
-			ts.tv_sec = RELEASE_DELAY_S;
-			ts.tv_nsec = RELEASE_DELAY_NS;
-			nanosleep(&ts, NULL);
-#endif
 		}
 	}
 #ifdef AUTH
@@ -2819,10 +2804,6 @@ dhcp_drop(struct interface *ifp, const char *reason)
 #ifdef AUTH
 	dhcp_auth_reset(&state->auth);
 #endif
-
-	/* Close DHCP ports so a changed interface family is picked
-	 * up by a new BPF state. */
-	dhcp_close(ifp);
 
 	state->state = DHS_NONE;
 	free(state->offer);
@@ -2847,6 +2828,10 @@ dhcp_drop(struct interface *ifp, const char *reason)
 	state->lease.addr.s_addr = 0;
 	ifp->options->options &= ~(DHCPCD_CSR_WARNED |
 	    DHCPCD_ROUTER_HOST_ROUTE_WARNED);
+
+	/* Close DHCP ports so a changed interface family is picked
+	 * up by a new BPF state. */
+	dhcp_close(ifp);
 }
 
 static int
