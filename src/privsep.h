@@ -109,14 +109,6 @@
 
 #define	PS_PROCESS_TIMEOUT	5	/* seconds to stop all processes */
 
-/* We always have ourself as a process */
-#define	PS_WAITING_FOR_PROCESSES(_ctx)				\
-	((IN_PRIVSEP_SE((_ctx)) &&				\
-	  TAILQ_LAST(&(_ctx)->ps_processes, ps_process_head) != (_ctx)->ps_root) ||	\
-	  (!IN_PRIVSEP_SE((_ctx)) &&				\
-	  TAILQ_FIRST(&(_ctx)->ps_processes) !=			\
-	  TAILQ_LAST(&(_ctx)->ps_processes, ps_process_head)))
-
 #if defined(PRIVSEP) && defined(HAVE_CAPSICUM)
 #define PRIVSEP_RIGHTS
 #endif
@@ -248,6 +240,7 @@ int ps_stopprocess(struct ps_process *);
 struct ps_process *ps_findprocess(struct dhcpcd_ctx *, struct ps_id *);
 struct ps_process *ps_findprocesspid(struct dhcpcd_ctx *, pid_t);
 struct ps_process *ps_newprocess(struct dhcpcd_ctx *, struct ps_id *);
+bool ps_waitforprocs(struct dhcpcd_ctx *ctx);
 void ps_process_timeout(void *);
 void ps_freeprocess(struct ps_process *);
 void ps_freeprocesses(struct dhcpcd_ctx *, struct ps_process *);

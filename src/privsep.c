@@ -337,7 +337,7 @@ ps_processhangup(void *arg, unsigned short events)
 
 	if (!(ctx->options & DHCPCD_EXITING))
 		return;
-	if (!(PS_WAITING_FOR_PROCESSES(ctx)))
+	if (!(ps_waitforprocs(ctx)))
 		eloop_exit(ctx->ps_eloop, EXIT_SUCCESS);
 }
 #endif
@@ -715,55 +715,53 @@ ps_stop(struct dhcpcd_ctx *ctx)
 	return ret;
 }
 
+bool
+ps_waitforprocs(struct dhcpcd_ctx *ctx)
+{
+	struct ps_process *psp = TAILQ_FIRST(&ctx->ps_processes);
+
+	if (psp == NULL)
+		return false;
+
+	/* Different processes */
+	if (psp != TAILQ_LAST(&ctx->ps_processes, ps_process_head))
+		return true;
+
+	return !psp->psp_started;
+}
+
 int
 ps_stopwait(struct dhcpcd_ctx *ctx)
 {
 	int error = EXIT_SUCCESS;
 
-	if (ctx->ps_eloop != NULL && PS_WAITING_FOR_PROCESSES(ctx)) {
-		int waited;
+	if (ctx->ps_eloop == NULL || !ps_waitforprocs(ctx))
+		return 0;
 
-		ctx->options |= DHCPCD_EXITING;
-		if (eloop_timeout_add_sec(ctx->ps_eloop, PS_PROCESS_TIMEOUT,
-		    ps_process_timeout, ctx) == -1)
-			logerr("%s: eloop_timeout_add_sec", __func__);
-		eloop_enter(ctx->ps_eloop);
+	ctx->options |= DHCPCD_EXITING;
+	if (eloop_timeout_add_sec(ctx->ps_eloop, PS_PROCESS_TIMEOUT,
+	    ps_process_timeout, ctx) == -1)
+		logerr("%s: eloop_timeout_add_sec", __func__);
+	eloop_enter(ctx->ps_eloop);
 
 #ifdef HAVE_CAPSICUM
-		struct ps_process *psp;
+	struct ps_process *psp;
 
-		TAILQ_FOREACH(psp, &ctx->ps_processes, next) {
-			if (psp->psp_pfd == -1)
-				continue;
-			if (eloop_event_add(ctx->ps_eloop, psp->psp_pfd,
-			    ELE_HANGUP, ps_processhangup, psp) == -1)
-				logerr("%s: eloop_event_add pfd %d",
-				    __func__, psp->psp_pfd);
-		}
+	TAILQ_FOREACH(psp, &ctx->ps_processes, next) {
+		if (psp->psp_pfd == -1)
+			continue;
+		if (eloop_event_add(ctx->ps_eloop, psp->psp_pfd,
+		    ELE_HANGUP, ps_processhangup, psp) == -1)
+			logerr("%s: eloop_event_add pfd %d",
+			    __func__, psp->psp_pfd);
+	}
 #endif
 
-		waited = eloop_start(ctx->ps_eloop, &ctx->sigset);
-		if (waited != EXIT_SUCCESS) {
-			logerr("%s: eloop_start", __func__);
-			error = waited;
-		}
-		eloop_timeout_delete(ctx->ps_eloop, ps_process_timeout, ctx);
-	}
+	error = eloop_start(ctx->ps_eloop, &ctx->sigset);
+	if (error != EXIT_SUCCESS)
+		logerr("%s: eloop_start", __func__);
 
-	if (IN_PRIVSEP_SE(ctx) && ctx->ps_root != NULL) {
-		struct ps_process *psp = ctx->ps_root;
-
-		if (ps_root_unlink(ctx, ctx->pidfile) == -1)
-			logerr("%s: ps_root_unlink", __func__);
-
-		/* We cannot log the root process exited before we
-		 * log dhcpcd exits because the latter requires the former.
-		 * So we just log the intent to exit. */
-		logdebugx("%s%s%s will exit from PID %d",
-		    psp->psp_ifname,
-		    psp->psp_ifname[0] != '\0' ? ": " : "",
-		    psp->psp_name, psp->psp_pid);
-	}
+	eloop_timeout_delete(ctx->ps_eloop, ps_process_timeout, ctx);
 
 	return error;
 }
