@@ -2006,7 +2006,7 @@ _if_addrflags6(__unused struct dhcpcd_ctx *ctx,
 	for (; RTA_OK(rta, len); rta = RTA_NEXT(rta, len)) {
 		switch (rta->rta_type) {
 		case IFA_ADDRESS:
-			if (IN6_ARE_ADDR_EQUAL(&ia->ifa_addr, RTA_DATA(rta)))
+			if (IN6_ARE_ADDR_EQUAL(&ia->ifa_addr, (struct in6_addr *)RTA_DATA(rta)))
 				ia->ifa_found = matches_addr = true;
 			else
 				matches_addr = false;
