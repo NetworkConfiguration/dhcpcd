@@ -71,7 +71,7 @@ for x do
 	--disable-privsep) PRIVSEP=no;;
 	--enable-privsep) PRIVSEP=yes;;
 	--privsepuser) PRIVSEP_USER=$var;;
-	--prefix) PREFIX=$var;;
+	--prefix) PREFIX=$var;prefix=$var;; # prefix is set for autotools compat
 	--sysconfdir) SYSCONFDIR=$var;;
 	--bindir|--sbindir) SBINDIR=$var;;
 	--libexecdir) LIBEXECDIR=$var;;
