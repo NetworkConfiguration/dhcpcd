@@ -234,11 +234,11 @@ detect_init()
 	if [ -x /bin/systemctl ] && [ -S /run/systemd/private ]; then
 		_service_exists="/bin/systemctl --quiet is-enabled \$1.service"
 		_service_status="/bin/systemctl --quiet is-active \$1.service"
-		_service_cmd="/bin/systemctl \$2 \$1.service"
+		_service_cmd="/bin/systemctl \$2 --no-block \$1.service"
 	elif [ -x /usr/bin/systemctl ] && [ -S /run/systemd/private ]; then
 		_service_exists="/usr/bin/systemctl --quiet is-enabled \$1.service"
 		_service_status="/usr/bin/systemctl --quiet is-active \$1.service"
-		_service_cmd="/usr/bin/systemctl \$2 \$1.service"
+		_service_cmd="/usr/bin/systemctl \$2 --no-block \$1.service"
 	elif [ -x /sbin/rc-service ] &&
 	     { [ -s /libexec/rc/init.d/softlevel ] ||
 	     [ -s /run/openrc/softlevel ]; }
