@@ -1105,7 +1105,7 @@ out:
 		if_free(ifp);
 	}
 	free(ifs);
-	if_freeifaddrs(&ifaddrs);
+	if_freeifaddrs(ctx, &ifaddrs);
 
 	return e;
 }
@@ -1242,7 +1242,7 @@ dhcpcd_linkoverflow(struct dhcpcd_ctx *ctx)
 	if_markaddrsstale(ctx->ifaces);
 	if_learnaddrs(ctx, ctx->ifaces, &ifaddrs);
 	if_deletestaleaddrs(ctx->ifaces);
-	if_freeifaddrs(&ifaddrs);
+	if_freeifaddrs(ctx, &ifaddrs);
 }
 
 void
@@ -2500,7 +2500,7 @@ start_manager:
 			dhcpcd_initstate1(ifp, argc, argv, 0);
 	}
 	if_learnaddrs(&ctx, ctx.ifaces, &ifaddrs);
-	if_freeifaddrs(&ifaddrs);
+	if_freeifaddrs(&ctx, &ifaddrs);
 	ifaddrs = NULL;
 
 	if (ctx.options & DHCPCD_BACKGROUND)
@@ -2572,14 +2572,9 @@ exit_failure:
 exit1:
 	if (!(ctx.options & DHCPCD_TEST) && control_stop(&ctx) == -1)
 		logerr("%s: control_stop", __func__);
-	if (ifaddrs != NULL) {
-#ifdef PRIVSEP_GETIFADDRS
-		if (IN_PRIVSEP(&ctx))
-			free(ifaddrs);
-		else
-#endif
-			freeifaddrs(ifaddrs);
-	}
+
+	if_freeifaddrs(&ctx, &ifaddrs);
+
 	/* ps_stop will clear DHCPCD_PRIVSEP but we need to
 	 * remember it to avoid attemping to remove the pidfile */
 	oi = ctx.options & DHCPCD_PRIVSEP ? 1 : 0;
