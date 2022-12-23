@@ -170,6 +170,7 @@ bool if_is_link_up(const struct interface *);
 bool if_valid_hwaddr(const uint8_t *, size_t);
 struct if_head *if_discover(struct dhcpcd_ctx *, struct ifaddrs **,
     int, char * const *);
+void if_freeifaddrs(struct ifaddrs **);
 void if_markaddrsstale(struct if_head *);
 void if_learnaddrs(struct dhcpcd_ctx *, struct if_head *, struct ifaddrs **);
 void if_deletestaleaddrs(struct if_head *);

@@ -356,6 +356,13 @@ if_learnaddrs(struct dhcpcd_ctx *ctx, struct if_head *ifs,
 #endif
 		}
 	}
+}
+
+void if_freeifaddrs(struct ifaddrs **ifaddrs)
+{
+
+	if (ifaddrs == NULL)
+		return;
 
 #ifdef PRIVSEP_GETIFADDRS
 	if (IN_PRIVSEP(ctx))
@@ -363,7 +370,6 @@ if_learnaddrs(struct dhcpcd_ctx *ctx, struct if_head *ifs,
 	else
 #endif
 		freeifaddrs(*ifaddrs);
-	*ifaddrs = NULL;
 }
 
 void
