@@ -3828,6 +3828,7 @@ dhcp_free(struct interface *ifp)
 
 		free(ctx->opt_buffer);
 		ctx->opt_buffer = NULL;
+		ctx->opt_buffer_len = 0;
 	}
 }
 
