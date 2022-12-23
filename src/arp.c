@@ -232,6 +232,9 @@ arp_packet(struct interface *ifp, uint8_t *data, size_t len,
 	const struct iarp_state *state;
 	struct arp_state *astate, *astaten;
 	uint8_t *hw_s, *hw_t;
+#ifndef KERNEL_RFC5227
+	bool is_probe;
+#endif /* KERNEL_RFC5227 */
 
 	/* Copy the frame header source and destination out */
 	memset(&arm, 0, sizeof(arm));
@@ -283,6 +286,23 @@ arp_packet(struct interface *ifp, uint8_t *data, size_t len,
 	memcpy(&arm.sip.s_addr, hw_s + ar.ar_hln, ar.ar_pln);
 	memcpy(&arm.tha, hw_t, ar.ar_hln);
 	memcpy(&arm.tip.s_addr, hw_t + ar.ar_hln, ar.ar_pln);
+
+#ifndef KERNEL_RFC5227
+	/* During ARP probe the 'sender hardware address' MUST contain the hardware
+	 * address of the interface sending the packet. RFC5227, 1.1 */
+	is_probe = ar.ar_op == htons(ARPOP_REQUEST) && IN_IS_ADDR_UNSPECIFIED(&arm.sip) &&
+	    bpf_flags & BPF_BCAST;
+	if (is_probe && falen > 0 && (falen != ar.ar_hln ||
+	    memcmp(&arm.sha, &arm.fsha, ar.ar_hln))) {
+		char abuf[HWADDR_LEN * 3];
+		char fbuf[HWADDR_LEN * 3];
+		hwaddr_ntoa(&arm.sha, ar.ar_hln, abuf, sizeof(abuf));
+		hwaddr_ntoa(&arm.fsha, falen, fbuf, sizeof(fbuf));
+		logwarnx("%s: invalid ARP probe, sender hw address mismatch (%s, %s)",
+		    ifp->name, abuf, fbuf);
+		return;
+	}
+#endif /* KERNEL_RFC5227 */
 
 	/* Match the ARP probe to our states.
 	 * Ignore Unicast Poll, RFC1122. */
