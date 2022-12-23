@@ -358,8 +358,11 @@ if_learnaddrs(struct dhcpcd_ctx *ctx, struct if_head *ifs,
 	}
 }
 
-void if_freeifaddrs(struct ifaddrs **ifaddrs)
+void if_freeifaddrs(struct dhcpcd_ctx *ctx, struct ifaddrs **ifaddrs)
 {
+#ifndef PRIVSEP_GETIFADDRS
+	_UNUSED(ctx);
+#endif
 
 	if (ifaddrs == NULL)
 		return;
