@@ -266,9 +266,13 @@ parse_str(char *sbuf, size_t slen, const char *str, int flags)
 		}
 	} else {
 		l = (size_t)hwaddr_aton(NULL, str);
-		if (sbuf == NULL)
-			return (ssize_t)l;
-		if ((ssize_t) l != -1 && l > 1) {
+		if (l > 0) {
+			if ((ssize_t)l == -1) {
+				errno = ENOBUFS;
+				return -1;
+			}
+			if (sbuf == NULL)
+				return (ssize_t)l;
 			if (l > slen) {
 				errno = ENOBUFS;
 				return -1;
@@ -2096,7 +2100,7 @@ err_sla:
 		arg = fp;
 		fp = strend(arg);
 		if (fp == NULL) {
-			logerrx("authtoken requies an a key");
+			logerrx("authtoken requires a realm");
 			goto invalid_token;
 		}
 		*fp++ = '\0';
@@ -2149,7 +2153,7 @@ err_sla:
 			if (s == -1)
 				logerr("token_len");
 			else
-				logerrx("authtoken needs a key");
+				logerrx("authtoken requires a key");
 			goto invalid_token;
 		}
 		token->key_len = (size_t)s;
