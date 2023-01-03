@@ -442,15 +442,6 @@ decode_rfc3442_rt(rb_tree_t *routes, struct interface *ifp,
 		memcpy(&gateway.s_addr, p, 4);
 		p += 4;
 
-		/* An on-link host route is normally set by having the
-		 * gateway match the destination or assigned address */
-		if (gateway.s_addr == dest.s_addr ||
-		    (gateway.s_addr == bootp->yiaddr ||
-		    gateway.s_addr == bootp->ciaddr))
-		{
-			gateway.s_addr = INADDR_ANY;
-			netmask.s_addr = INADDR_BROADCAST;
-		}
 		if (netmask.s_addr == INADDR_BROADCAST)
 			rt->rt_flags = RTF_HOST;
 
