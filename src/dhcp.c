@@ -395,7 +395,7 @@ print_rfc3442(FILE *fp, const uint8_t *data, size_t data_len)
 
 static int
 decode_rfc3442_rt(rb_tree_t *routes, struct interface *ifp,
-    const uint8_t *data, size_t dl, const struct bootp *bootp)
+    const uint8_t *data, size_t dl)
 {
 	const uint8_t *p = data;
 	const uint8_t *e;
@@ -580,7 +580,7 @@ get_option_routes(rb_tree_t *routes, struct interface *ifp,
 		if (p)
 			csr = "MS ";
 	}
-	if (p && (n = decode_rfc3442_rt(routes, ifp, p, len, bootp)) != -1) {
+	if (p && (n = decode_rfc3442_rt(routes, ifp, p, len)) != -1) {
 		const struct dhcp_state *state;
 
 		state = D_CSTATE(ifp);
