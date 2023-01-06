@@ -200,12 +200,26 @@ ps_root_writeerror(struct dhcpcd_ctx *ctx, ssize_t result,
 		{ .iov_base = &psr, .iov_len = sizeof(psr) },
 		{ .iov_base = data, .iov_len = len },
 	};
+	ssize_t err;
 
 #ifdef PRIVSEP_DEBUG
 	logdebugx("%s: result %zd errno %d", __func__, result, errno);
 #endif
 
-	return writev(ctx->ps_root_fd, iov, __arraycount(iov));
+	err = writev(ctx->ps_root_fd, iov, __arraycount(iov));
+
+	/* Error sending the message? Try sending the error of sending. */
+	if (err == -1) {
+		logerr("%s: result=%zd, data=%p, len=%zu",
+		    __func__, result, data, len);
+		psr.psr_result = err;
+		psr.psr_errno = errno;
+		iov[1].iov_base = NULL;
+		iov[1].iov_len = 0;
+		err = writev(ctx->ps_root_fd, iov, __arraycount(iov));
+	}
+
+	return err;
 }
 
 static ssize_t
