@@ -848,8 +848,7 @@ if [ -z "$ARC4RANDOM" ]; then
 	cat <<EOF >_arc4random.c
 #include <stdlib.h>
 int main(void) {
-	arc4random();
-	return 0;
+	return (int)arc4random();
 }
 EOF
 	if $XCC _arc4random.c -o _arc4random 2>&3; then
@@ -870,8 +869,7 @@ if [ -z "$ARC4RANDOM_UNIFORM" ]; then
 	cat <<EOF >_arc4random_uniform.c
 #include <stdlib.h>
 int main(void) {
-	arc4random_uniform(100);
-	return 0;
+	return (int)arc4random_uniform(100);
 }
 EOF
 	if $XCC _arc4random_uniform.c -o _arc4random_uniform 2>&3; then
@@ -915,8 +913,7 @@ if [ -z "$PIDFILE_LOCK" ]; then
 #include <stdlib.h>
 #include <util.h>
 int main(void) {
-	pidfile_lock(NULL);
-	return 0;
+	return (int)pidfile_lock(NULL);
 }
 EOF
 	# We only want to link to libutil if it exists in /lib
@@ -985,8 +982,7 @@ if [ -z "$STRLCPY" ]; then
 int main(void) {
 	const char s1[] = "foo";
 	char s2[10];
-	strlcpy(s2, s1, sizeof(s2));
-	return 0;
+	return (int)strlcpy(s2, s1, sizeof(s2));
 }
 EOF
 	if $XCC _strlcpy.c -o _strlcpy 2>&3; then
@@ -1010,8 +1006,7 @@ if [ -z "$STRTOI" ]; then
 #include <inttypes.h>
 int main(void) {
 	int e;
-	strtoi("1234", NULL, 0, 0, INT32_MAX, &e);
-	return 0;
+	return (int)strtoi("1234", NULL, 0, 0, INT32_MAX, &e);
 }
 EOF
 	if $XCC _strtoi.c -o _strtoi 2>&3; then
@@ -1263,8 +1258,7 @@ if [ -z "$POLL" ]; then
 #include <sys/select.h>
 #include <stdlib.h>
 int main(void) {
-	pselect(0, NULL, NULL, NULL, NULL, NULL);
-	return 0;
+	return pselect(0, NULL, NULL, NULL, NULL, NULL);
 }
 EOF
 	if $XCC _pselect.c -o _pselect 2>&3; then
@@ -1489,8 +1483,7 @@ if [ -z "$HMAC" ]; then
 #include <stdlib.h>
 #include <hmac.h>
 int main(void) {
-	hmac(NULL, NULL, 0, NULL, 0, NULL, 0);
-	return 0;
+	return (int)hmac(NULL, NULL, 0, NULL, 0, NULL, 0);
 }
 EOF
 	if $XCC _hmac.c $MD5_LIB -o _hmac 2>&3; then
@@ -1502,8 +1495,7 @@ EOF
 		cat <<EOF >_hmac.c
 #include <stdlib.h>
 int main(void) {
-	hmac(NULL, NULL, 0, NULL, 0, NULL, 0);
-	return 0;
+	return (int)hmac(NULL, NULL, 0, NULL, 0, NULL, 0);
 }
 EOF
 		if $XCC _hmac.c $MD5_LIB -o _hmac 2>&3; then
@@ -1575,8 +1567,7 @@ if [ "$DEV" != no ] && [ "$UDEV" != no ] && [ -n "$LIBUDEV_LIBS" ]; then
 #include <libudev.h>
 #include <stdlib.h>
 int main(void) {
-	udev_monitor_filter_add_match_subsystem_devtype(NULL, NULL, NULL);
-	return 0;
+	return udev_monitor_filter_add_match_subsystem_devtype(NULL, NULL, NULL);
 }
 EOF
 	if $XCC $LIBUDEV_CFLAGS _udev.c -o _udev $LIBUDEV_LIBS 2>&3
@@ -1593,8 +1584,7 @@ EOF
 #include <libudev.h>
 #include <stdlib.h>
 int main(void) {
-	udev_device_get_is_initialized(NULL);
-	return 0;
+	return udev_device_get_is_initialized(NULL);
 }
 EOF
 	if $XCC $LIBUDEV_CFLAGS _udev.c -o _udev $LIBUDEV_LIBS 2>&3
