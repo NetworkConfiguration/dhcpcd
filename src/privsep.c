@@ -412,6 +412,13 @@ ps_startprocess(struct ps_process *psp,
 		return pid;
 	}
 
+
+#ifdef PLUGIN_DEV
+	/* If we are not the root process, stop listening to devices. */
+	if (ctx->ps_root != psp)
+		dev_stop(ctx);
+#endif
+
 	ctx->options |= DHCPCD_FORKED;
 	if (ctx->ps_log_fd != -1)
 		logsetfd(ctx->ps_log_fd);
@@ -1142,9 +1149,6 @@ ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd, unsigned short events,
 		logdebugx("process %d stopping", getpid());
 #endif
 		ps_free(ctx);
-#ifdef PLUGIN_DEV
-		dev_stop(ctx);
-#endif
 		eloop_exit(ctx->eloop, len != -1 ? EXIT_SUCCESS : EXIT_FAILURE);
 		return len;
 	}
