@@ -369,7 +369,7 @@ ps_dostart(struct dhcpcd_ctx *ctx,
 
 #ifdef PLUGIN_DEV
 	/* If we are not the root process, stop listening to devices. */
-	if (ctx->ps_root != psp)
+	if (priv_fd != &ctx->ps_root_fd)
 		dev_stop(ctx);
 #endif
 
