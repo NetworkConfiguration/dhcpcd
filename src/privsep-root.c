@@ -1110,17 +1110,17 @@ ps_root_getifaddrs(struct dhcpcd_ctx *ctx, struct ifaddrs **ifahead)
 		len -= ALIGN(sizeof(*ifa)) +
 		    ALIGN(IFNAMSIZ) + ALIGN(sizeof(salen) * IFA_NADDRS);
 
-#define	COPYOUTSA(addr)						\
-	do {							\
-		memcpy(&salen, sap, sizeof(salen));		\
-		if (len < salen)				\
-			goto err;				\
-		if (salen != 0) {				\
-			(addr) = (struct sockaddr *)bp;		\
-			bp += ALIGN(salen);			\
-			len -= ALIGN(salen);			\
-		}						\
-		sap += sizeof(salen);				\
+#define	COPYOUTSA(addr)							\
+	do {								\
+		memcpy(&salen, sap, sizeof(salen));			\
+		if (len < salen)					\
+			goto err;					\
+		if (salen != 0) {					\
+			(addr) = (struct sockaddr *)(void *)bp;		\
+			bp += ALIGN(salen);				\
+			len -= ALIGN(salen);				\
+		}							\
+		sap += sizeof(salen);					\
 	} while (0 /* CONSTCOND */)
 
 		COPYOUTSA(ifa->ifa_addr);
