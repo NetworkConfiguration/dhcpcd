@@ -19,7 +19,7 @@
 #define MD5_H_
 
 #define MD5_DIGEST_LENGTH	16
-#define MD5_BLOCK_LENGTH	64ULL
+#define MD5_BLOCK_LENGTH	64
 
 typedef struct MD5Context {
 	uint32_t state[4];	/* state (ABCD) */
