@@ -554,15 +554,15 @@ if_getnetlink(struct dhcpcd_ctx *ctx, struct iovec *iov, int fd, int flags,
 	    .msg_name = &nladdr, .msg_namelen = sizeof(nladdr),
 	    .msg_iov = iov, .msg_iovlen = 1,
 	};
-	ssize_t len;
+	size_t len;
 	struct nlmsghdr *nlm;
 	int r = 0;
 	unsigned int again;
 	bool terminated;
 
 recv_again:
-	len = recvmsg(fd, &msg, flags);
-	if (len == -1 || len == 0)
+	len = (size_t)recvmsg(fd, &msg, flags);
+	if (len == 0 || (ssize_t)len == -1)
 		return (int)len;
 
 	/* Check sender */
@@ -578,7 +578,7 @@ recv_again:
 	again = 0;
 	terminated = false;
 	for (nlm = iov->iov_base;
-	     nlm && NLMSG_OK(nlm, (size_t)len);
+	     nlm && NLMSG_OK(nlm, len);
 	     nlm = NLMSG_NEXT(nlm, len))
 	{
 		again = (nlm->nlmsg_flags & NLM_F_MULTI);
@@ -1143,7 +1143,8 @@ if_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct nlmsghdr *hdr,
 }
 
 #define NLMSG_TAIL(nmsg)						\
-	((struct rtattr *)(((ptrdiff_t)(nmsg))+NLMSG_ALIGN((nmsg)->nlmsg_len)))
+	((struct rtattr *)(void *)(((char *)(nmsg)) + \
+	    NLMSG_ALIGN((nmsg)->nlmsg_len)))
 
 static int
 add_attr_l(struct nlmsghdr *n, unsigned short maxlen, unsigned short type,
