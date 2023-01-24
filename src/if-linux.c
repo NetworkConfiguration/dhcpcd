@@ -237,7 +237,7 @@ if_machinearch(char *str, size_t len)
 #endif
 
 static int
-check_proc_int(struct dhcpcd_ctx *ctx, const char *path)
+check_proc_int(const char *ifname, struct dhcpcd_ctx *ctx, const char *path)
 {
 	char buf[64];
 	int error, i;
@@ -245,15 +245,18 @@ check_proc_int(struct dhcpcd_ctx *ctx, const char *path)
 	if (dhcp_readfile(ctx, path, buf, sizeof(buf)) == -1)
 		return -1;
 	i = (int)strtoi(buf, NULL, 0, INT_MIN, INT_MAX, &error);
+	logdebugx("%s: reading %d from %s", ifname, i, path);
 	if (error != 0 && error != ENOTSUP) {
 		errno = error;
+		logdebug("%s: reading %s", ifname, path);
 		return -1;
 	}
 	return i;
 }
 
 static int
-check_proc_uint(struct dhcpcd_ctx *ctx, const char *path, unsigned int *u)
+check_proc_uint(const char *ifname, struct dhcpcd_ctx *ctx, const char *path,
+        unsigned int *u)
 {
 	char buf[64];
 	int error;
@@ -261,15 +264,18 @@ check_proc_uint(struct dhcpcd_ctx *ctx, const char *path, unsigned int *u)
 	if (dhcp_readfile(ctx, path, buf, sizeof(buf)) == -1)
 		return -1;
 	*u = (unsigned int)strtou(buf, NULL, 0, 0, UINT_MAX, &error);
+	logdebugx("%s: reading %n from %s", ifname, u, path);
 	if (error != 0 && error != ENOTSUP) {
 		errno = error;
+		logdebug("%s: reading %s", ifname, path);
 		return error;
 	}
 	return 0;
 }
 
 static ssize_t
-if_writepathuint(struct dhcpcd_ctx *ctx, const char *path, unsigned int val)
+if_writepathuint(const char *ifname, struct dhcpcd_ctx *ctx, const char *path,
+        unsigned int val)
 {
 	char buf[64];
 	int len;
@@ -277,6 +283,7 @@ if_writepathuint(struct dhcpcd_ctx *ctx, const char *path, unsigned int val)
 	len = snprintf(buf, sizeof(buf), "%u\n", val);
 	if (len == -1)
 		return -1;
+	logdebugx("%s: writing %u to %s", ifname, val, path);
 	return dhcp_writefile(ctx, path, 0664, buf, (size_t)len);
 }
 
@@ -294,12 +301,12 @@ if_init(struct interface *ifp)
 	 * This matches the behaviour of BSD which makes coding dhcpcd
 	 * a little easier as there's just one behaviour. */
 	snprintf(path, sizeof(path), PROC_PROMOTE, ifp->name);
-	n = check_proc_int(ifp->ctx, path);
+	n = check_proc_int(ifp->name, ifp->ctx, path);
 	if (n == -1)
 		return errno == ENOENT ? 0 : -1;
 	if (n == 1)
 		return 0;
-	return if_writepathuint(ifp->ctx, path, 1) == -1 ? -1 : 0;
+	return if_writepathuint(ifp->name, ifp->ctx, path, 1) == -1 ? -1 : 0;
 }
 
 int
@@ -310,7 +317,7 @@ if_conf(struct interface *ifp)
 
 	/* Some qeth setups require the use of the broadcast flag. */
 	snprintf(path, sizeof(path), SYS_LAYER2, ifp->name);
-	n = check_proc_int(ifp->ctx, path);
+	n = check_proc_int(ifp->name, ifp->ctx, path);
 	if (n == -1)
 		return errno == ENOENT ? 0 : -1;
 	if (n == 0)
@@ -336,7 +343,7 @@ if_tap(struct dhcpcd_ctx *ctx, const char *ifname)
 	unsigned int u;
 
 	snprintf(path, sizeof(path), SYS_TUNTAP, ifname);
-	if (check_proc_uint(ctx, path, &u) == -1)
+	if (check_proc_uint(ifname, ctx, path, &u) == -1)
 		return false;
 	return u & IFF_TAP;
 }
@@ -2134,25 +2141,28 @@ if_setup_inet6(const struct interface *ifp)
 	 * If not doing autoconf, don't disable the kernel from doing it.
 	 * If we need to, we should have another option actively disable it.
 	 */
-	if (!(ifp->options->options & DHCPCD_IPV6RS))
+	if (!(ifp->options->options & DHCPCD_IPV6RS)) {
+		logdebugx("%s: leaving autoconf up to the kernel, noop here",
+			 ifp->name);
 		return;
+	}
 
 	snprintf(path, sizeof(path), "%s/%s/autoconf", p_conf, ifp->name);
-	ra = check_proc_int(ctx, path);
+	ra = check_proc_int(ifp->name, ctx, path);
 	if (ra != 1 && ra != -1) {
-		if (if_writepathuint(ctx, path, 0) == -1)
+		if (if_writepathuint(ifp->name, ctx, path, 0) == -1)
 			logerr("%s: %s", __func__, path);
 	}
 
 	snprintf(path, sizeof(path), "%s/%s/accept_ra", p_conf, ifp->name);
-	ra = check_proc_int(ctx, path);
+	ra = check_proc_int(ifp->name, ctx, path);
 	if (ra == -1) {
 		/* The sysctl probably doesn't exist, but this isn't an
 		 * error as such so just log it and continue */
 		if (errno != ENOENT)
 			logerr("%s: %s", __func__, path);
 	} else if (ra != 0) {
-		if (if_writepathuint(ctx, path, 0) == -1)
+		if (if_writepathuint(ifp->name, ctx, path, 0) == -1)
 			logerr("%s: %s", __func__, path);
 	}
 }
@@ -2167,21 +2177,21 @@ if_applyra(const struct ra *rap)
 
 	if (rap->hoplimit != 0) {
 		snprintf(path, sizeof(path), "%s/%s/hop_limit", p_conf, ifname);
-		if (if_writepathuint(ctx, path, rap->hoplimit) == -1)
+		if (if_writepathuint(ifname, ctx, path, rap->hoplimit) == -1)
 			error = -1;
 	}
 
 	if (rap->retrans != 0) {
 		snprintf(path, sizeof(path), "%s/%s/retrans_time_ms",
 		    p_neigh, ifname);
-		if (if_writepathuint(ctx, path, rap->retrans) == -1)
+		if (if_writepathuint(ifname, ctx, path, rap->retrans) == -1)
 			error = -1;
 	}
 
 	if (rap->reachable != 0) {
 		snprintf(path, sizeof(path), "%s/%s/base_reachable_time_ms",
 		    p_neigh, ifname);
-		if (if_writepathuint(ctx, path, rap->reachable) == -1)
+		if (if_writepathuint(ifname, ctx, path, rap->reachable) == -1)
 			error = -1;
 	}
 
