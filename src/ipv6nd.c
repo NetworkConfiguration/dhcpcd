@@ -92,7 +92,7 @@ struct nd_opt_dnssl {		/* DNSSL option RFC 6106 */
 	uint32_t	nd_opt_dnssl_lifetime;
 	/* followed by list of DNS servers */
 };
-__CTASSERT(sizeof(struct nd_opt_rdnss) == 8);
+__CTASSERT(sizeof(struct nd_opt_dnssl) == 8);
 #endif
 
 /* Impossible options, so we can easily add extras */
