@@ -78,7 +78,7 @@ struct nd_opt_rdnss {           /* RDNSS option RFC 6106 */
 	uint8_t		nd_opt_rdnss_len;
 	uint16_t	nd_opt_rdnss_reserved;
 	uint32_t	nd_opt_rdnss_lifetime;
-	/* followed by list of IP prefixes */
+	/* followed by list of DNS Server IPs */
 };
 __CTASSERT(sizeof(struct nd_opt_rdnss) == 8);
 #endif
@@ -90,7 +90,7 @@ struct nd_opt_dnssl {		/* DNSSL option RFC 6106 */
 	uint8_t		nd_opt_dnssl_len;
 	uint16_t	nd_opt_dnssl_reserved;
 	uint32_t	nd_opt_dnssl_lifetime;
-	/* followed by list of DNS servers */
+	/* followed by list of Domain Names */
 };
 __CTASSERT(sizeof(struct nd_opt_rdnss) == 8);
 #endif
@@ -1312,6 +1312,8 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 		if (has_option_mask(ifp->options->nomasknd, ndo.nd_opt_type))
 			continue;
 
+		// For possible option see:
+		// https://www.iana.org/assignments/icmpv6-parameters/icmpv6-parameters.xhtml#icmpv6-parameters-5
 		switch (ndo.nd_opt_type) {
 		case ND_OPT_PREFIX_INFORMATION:
 		{
