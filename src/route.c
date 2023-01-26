@@ -523,8 +523,10 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 	    !(nrt->rt_ifp->options->options & DHCPCD_GATEWAY)) ||
 	    (!nrt->rt_ifp->active && !(ctx->options & DHCPCD_GATEWAY))) &&
 	    sa_is_unspecified(&nrt->rt_dest) &&
-	    sa_is_unspecified(&nrt->rt_netmask))
+	    sa_is_unspecified(&nrt->rt_netmask)) {
+		rt_desc(ort == NULL ? "(VPN workaround) not adding" : "(VPN workaround) not changing", nrt);
 		return false;
+	}
 
 	rt_desc(ort == NULL ? "adding" : "changing", nrt);
 
@@ -668,6 +670,7 @@ rt_doroute(rb_tree_t *kroutes, struct rt *rt)
 	struct dhcpcd_ctx *ctx;
 	struct rt *or;
 
+	rt_desc("rt_doroute validate: ", rt);
 	ctx = rt->rt_ifp->ctx;
 	/* Do we already manage it? */
 	or = rb_tree_find_node(&ctx->routes, rt);
@@ -715,6 +718,7 @@ rt_build(struct dhcpcd_ctx *ctx, int af)
 		logerr("%s: if_initrt", __func__);
 	ctx->rt_order = 0;
 	ctx->options |= DHCPCD_RTBUILD;
+	logdebugx("rt_build was called");
 
 #ifdef INET
 	if (!inet_getroutes(ctx, &routes))
