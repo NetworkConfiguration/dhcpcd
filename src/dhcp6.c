@@ -1834,12 +1834,16 @@ dhcp6_startrebind(void *arg)
 	struct interface *ifp;
 	struct dhcp6_state *state;
 #ifndef SMALL
-	int pd;
+	int oldstate;
+	int pd_verification_needed;
 #endif
 
 	ifp = arg;
 	eloop_timeout_delete(ifp->ctx->eloop, dhcp6_sendrenew, ifp);
 	state = D6_STATE(ifp);
+#ifndef SMALL
+	oldstate = state->state;
+#endif
 	if (state->state == DH6S_RENEW)
 		logwarnx("%s: failed to renew DHCPv6, rebinding", ifp->name);
 	else
@@ -1849,9 +1853,21 @@ dhcp6_startrebind(void *arg)
 	state->MRC = 0;
 
 #ifndef SMALL
-	/* RFC 3633 section 12.1 */
-	pd = dhcp6_hasprefixdelegation(ifp);
-	if (pd) {
+	pd_verification_needed=false;
+	if (dhcp6_hasprefixdelegation(ifp)) {
+		switch(oldstate) {
+		case DH6S_BOUND:
+		case DH6S_RENEW:
+			/* This is an active lease, and neither reboot nor a
+                           link status flap happened since last renew. */
+		break;
+		default:
+			/* RFC 3633 section 12.1 applies given there may have
+			   been a reboot or link flap. */
+			pd_verification_needed=true;
+		}
+	}
+	if (pd_verification_needed) {
 		state->IMD = CNF_MAX_DELAY;
 		state->IRT = CNF_TIMEOUT;
 		state->MRT = CNF_MAX_RT;
@@ -1870,7 +1886,7 @@ dhcp6_startrebind(void *arg)
 
 #ifndef SMALL
 	/* RFC 3633 section 12.1 */
-	if (pd)
+	if (pd_verification_needed)
 		eloop_timeout_add_sec(ifp->ctx->eloop,
 		    CNF_MAX_RD, dhcp6_failrebind, ifp);
 #endif
