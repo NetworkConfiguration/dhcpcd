@@ -232,7 +232,11 @@ ps_root_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct msghdr *msg)
 #elif defined(__or1k__)
 #  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_OPENRISC
 #elif defined(__powerpc64__)
-#  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_PPC64
+#  if (BYTE_ORDER == LITTLE_ENDIAN)
+#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_PPC64LE
+#  else
+#    define SECCOMP_AUDIT_ARCH AUDIT_ARCH_PPC64
+#  endif
 #elif defined(__powerpc__)
 #  define SECCOMP_AUDIT_ARCH AUDIT_ARCH_PPC
 #elif defined(__riscv)
