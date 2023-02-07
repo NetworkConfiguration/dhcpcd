@@ -190,10 +190,9 @@ add_environ(char ***array, const char *value, int uniq)
 		return NULL;
 	}
 	*p++ = '\0';
-	l = strlen(match);
 
 	while (list && list[i]) {
-		if (match && strncmp(list[i], match, l) == 0) {
+		if (match && strcmp(list[i], match) == 0) {
 			if (uniq) {
 				n = strdup(value);
 				if (n == NULL) {
