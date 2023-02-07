@@ -190,9 +190,13 @@ add_environ(char ***array, const char *value, int uniq)
 		return NULL;
 	}
 	*p++ = '\0';
+	l = strlen(match);
 
 	while (list && list[i]) {
-		if (match && strcmp(list[i], match) == 0) {
+		/* We know that it must contain '=' due to the above test */
+		size_t listl = (size_t)(strchr(list[i], '=') - list[i]);
+
+		if (l == listl && strncmp(list[i], match, l) == 0) {
 			if (uniq) {
 				n = strdup(value);
 				if (n == NULL) {
