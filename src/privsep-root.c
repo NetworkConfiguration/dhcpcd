@@ -945,7 +945,9 @@ ps_root_stop(struct dhcpcd_ctx *ctx)
 		return 0;
 
 	/* If we are the root process then remove the pidfile */
-	if (ctx->options & DHCPCD_PRIVSEPROOT) {
+	if (ctx->options & DHCPCD_PRIVSEPROOT &&
+	    !(ctx->options & DHCPCD_TEST))
+	{
 		if (unlink(ctx->pidfile) == -1)
 			logerr("%s: unlink: %s", __func__, ctx->pidfile);
 	}
