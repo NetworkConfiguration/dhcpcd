@@ -30,7 +30,6 @@
 #include <sys/prctl.h>
 #include <sys/socket.h>
 #include <sys/syscall.h>
-#include <sys/termios.h>	/* For TCGETS */
 
 #include <linux/audit.h>
 #include <linux/filter.h>
@@ -40,10 +39,12 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <termios.h>	/* For TCGETS */
 #include <unistd.h>
 
 #include "common.h"
@@ -348,6 +349,8 @@ static struct sock_filter ps_seccomp_filter[] = {
 	SECCOMP_ALLOW_ARG(__NR_ioctl, 1, SIOCGIFVLAN),
 	/* printf over serial terminal requires this */
 	SECCOMP_ALLOW_ARG(__NR_ioctl, 1, TCGETS),
+	/* dumping leases on musl requires this */
+	SECCOMP_ALLOW_ARG(__NR_ioctl, 1, TIOCGWINSZ),
 	/* SECCOMP BPF is newer than nl80211 so we don't need SIOCGIWESSID
 	 * which lives in the impossible to include linux/wireless.h header */
 #endif
