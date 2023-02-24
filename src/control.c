@@ -100,15 +100,15 @@ control_handle_read(struct fd_list *fd)
 	ssize_t bytes;
 
 	bytes = read(fd->fd, buffer, sizeof(buffer) - 1);
-#ifdef PRIVSEP
-	if (bytes == 0 && IN_PRIVSEP(fd->ctx)) {
-		if (ps_ctl_sendeof(fd) == -1)
-			logerr(__func__);
-	}
-#endif
 	if (bytes == -1)
 		logerr(__func__);
 	if (bytes == -1 || bytes == 0) {
+#ifdef PRIVSEP
+		if (IN_PRIVSEP(fd->ctx)) {
+			if (ps_ctl_sendeof(fd) == -1)
+				logerr(__func__);
+		}
+#endif
 		control_free(fd);
 		return;
 	}
