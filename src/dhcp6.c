@@ -147,12 +147,18 @@ struct dhcp_compat {
 	uint16_t dhcp6_opt;
 };
 
+/*
+ * RFC 5908 deprecates OPTION_SNTP_SERVERS.
+ * But we can support both as the hook scripts will uniqify the
+ * results if the server returns both options.
+ */
 static const struct dhcp_compat dhcp_compats[] = {
 	{ DHO_DNSSERVER,	D6_OPTION_DNS_SERVERS },
 	{ DHO_HOSTNAME,		D6_OPTION_FQDN },
 	{ DHO_DNSDOMAIN,	D6_OPTION_FQDN },
 	{ DHO_NISSERVER,	D6_OPTION_NIS_SERVERS },
 	{ DHO_NTPSERVER,	D6_OPTION_SNTP_SERVERS },
+	{ DHO_NTPSERVER,	D6_OPTION_NTP_SERVER },
 	{ DHO_RAPIDCOMMIT,	D6_OPTION_RAPID_COMMIT },
 	{ DHO_FQDN,		D6_OPTION_FQDN },
 	{ DHO_VIVCO,		D6_OPTION_VENDOR_CLASS },
