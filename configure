@@ -357,7 +357,7 @@ else
 	ALLOW_USR_LIBS=true
 fi
 case "$OS" in
-linux*|solaris*|sunos*|kfreebsd*|dragonfly*) ;;
+linux*|solaris*|sunos*|kfreebsd*|dragonfly*|freebsd*) ;;
 *)
 	# There might be more than one ...
 	for LDELFN in /libexec/ld-elf.so.[0-9]*; do
