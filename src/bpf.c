@@ -174,6 +174,7 @@ bpf_open(const struct interface *ifp,
 	/* /dev/bpf is a cloner on modern kernels */
 	bpf->bpf_fd = open("/dev/bpf", BPF_OPEN_FLAGS);
 
+#ifndef SMALL
 	/* Support older kernels where /dev/bpf is not a cloner */
 	if (bpf->bpf_fd == -1) {
 		char device[32];
@@ -184,6 +185,7 @@ bpf_open(const struct interface *ifp,
 			bpf->bpf_fd = open(device, BPF_OPEN_FLAGS);
 		} while (bpf->bpf_fd == -1 && errno == EBUSY);
 	}
+#endif
 
 	if (bpf->bpf_fd == -1)
 		goto eexit;
