@@ -72,12 +72,12 @@ distinfo: dist
 	chmod 644 ${DISTSIGN}
 	ls -l ${DISTFILE} ${DISTINFO} ${DISTSIGN}
 
-{$DISTINFOMD}: ${DISTINFO}
+${DISTINFOMD}: ${DISTINFO}
 	echo '```' >${DISTINFOMD}
 	cat ${DISTINFO} >>${DISTINFOMD}
 	echo '```' >>${DISTINFOMD}
 
-release: distinfo
+release: distinfo ${DISTINFOMD}
 	gh release create v${VERSION} \
 		--title "dhcpcd ${VERSION}" --draft --generate-notes \
 		--notes-file ${DISTINFOMD} \
