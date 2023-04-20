@@ -15,9 +15,12 @@ LINT?=		lint
 SED?=		sed
 HOST_SH?=	/bin/sh
 
-# This isn't very portable, but I generaly make releases from NetBSD
-CKSUM?=		cksum -a SHA256
-PGP?=		netpgp
+# This isn't very portable, but I generaly make releases from DragonFlyBSD
+SHA256?=	sha256
+PGP?=		gpg
+# old NetBSD defs
+#SHA256?=		cksum -a SHA256
+#PGP?=		netpgp
 
 SCRIPT=		${LIBEXECDIR}/dhcpcd-run-hooks
 HOOKDIR=	${LIBEXECDIR}/dhcpcd-hooks

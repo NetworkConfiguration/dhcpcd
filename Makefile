@@ -9,10 +9,10 @@ GITREF?=	HEAD
 
 DISTSUFFIX=
 DISTPREFIX?=	dhcpcd-${VERSION}${DISTSUFFIX}
-DISTFILEGZ?=	${DISTPREFIX}.tar.gz
 DISTFILE?=	${DISTPREFIX}.tar.xz
 DISTINFO=	${DISTFILE}.distinfo
-DISTINFOSIGN=	${DISTINFO}.asc
+DISTINFOMD=	${DISTINFO}.md
+DISTSIGN=	${DISTFILE}.asc
 
 CLEANFILES+=	*.tar.xz
 
@@ -49,29 +49,39 @@ clean:
 
 distclean: clean
 	rm -f config.h config.mk config.log \
-		${DISTFILE} ${DISTFILEGZ} ${DISTINFO} ${DISTINFOSIGN}
+		${DISTFILE} ${DISTINFO} ${DISTINFOMD} ${DISTSIGN}
 	rm -f *.diff *.patch *.orig *.rej
 	for x in ${SUBDIRS} tests; do cd $$x; ${MAKE} $@ || exit $$?; cd ..; done
 
 dist-git:
-	git archive --prefix=${DISTPREFIX}/ ${GITREF} | xz >${DISTFILE}
+	git archive --prefix=${DISTPREFIX}/ v${VERSION} | xz >${DISTFILE}
 
 dist-inst:
 	mkdir /tmp/${DISTPREFIX}
 	cp -RPp * /tmp/${DISTPREFIX}
 	(cd /tmp/${DISTPREFIX}; make clean)
-	tar -cvjpf ${DISTFILE} -C /tmp ${DISTPREFIX}
+	tar -cvJpf ${DISTFILE} -C /tmp ${DISTPREFIX}
 	rm -rf /tmp/${DISTPREFIX}
 
 dist: ${DIST}
 
 distinfo: dist
-	rm -f ${DISTINFO} ${DISTINFOSIGN}
-	${CKSUM} ${DISTFILE} >${DISTINFO}
-	#printf "SIZE (${DISTFILE}) = %s\n" $$(wc -c <${DISTFILE}) >>${DISTINFO}
-	${PGP} --clearsign --output=${DISTINFOSIGN} ${DISTINFO}
-	chmod 644 ${DISTINFOSIGN}
-	ls -l ${DISTFILE} ${DISTINFO} ${DISTINFOSIGN}
+	rm -f ${DISTINFO} ${DISTSIGN}
+	${SHA256} ${DISTFILE} >${DISTINFO}
+	${PGP} --armour --detach-sign ${DISTFILE}
+	chmod 644 ${DISTSIGN}
+	ls -l ${DISTFILE} ${DISTINFO} ${DISTSIGN}
+
+{$DISTINFOMD}: ${DISTINFO}
+	echo '```' >${DISTINFOMD}
+	cat ${DISTINFO} >>${DISTINFOMD}
+	echo '```' >>${DISTINFOMD}
+
+release: distinfo
+	gh release create v${VERSION} \
+		--title "dhcpcd ${VERSION}" --draft --generate-notes \
+		--notes-file ${DISTINFOMD} \
+		${DISTFILE} ${DISTSIGN}
 
 snapshot:
 	rm -rf /tmp/${DISTPREFIX}
