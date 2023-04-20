@@ -1,5 +1,6 @@
 SUBDIRS=	src hooks
 
+PACKAGE=	dhcpcd
 VERSION!=	sed -n 's/\#define VERSION[[:space:]]*"\(.*\)".*/\1/p' src/defs.h
 
 DIST!=		if test -d .git; then echo "dist-git"; \
@@ -8,7 +9,7 @@ FOSSILID?=	current
 GITREF?=	HEAD
 
 DISTSUFFIX=
-DISTPREFIX?=	dhcpcd-${VERSION}${DISTSUFFIX}
+DISTPREFIX?=	${PACKAGE}-${VERSION}${DISTSUFFIX}
 DISTFILE?=	${DISTPREFIX}.tar.xz
 DISTINFO=	${DISTFILE}.distinfo
 DISTINFOMD=	${DISTINFO}.md
@@ -79,7 +80,7 @@ ${DISTINFOMD}: ${DISTINFO}
 
 release: distinfo ${DISTINFOMD}
 	gh release create v${VERSION} \
-		--title "dhcpcd ${VERSION}" --draft --generate-notes \
+		--title "${PACKAGE} ${VERSION}" --draft --generate-notes \
 		--notes-file ${DISTINFOMD} \
 		${DISTFILE} ${DISTSIGN}
 
@@ -97,7 +98,7 @@ _import: dist
 	tar xvpf ${DISTFILE} -C ${DESTDIR} --strip 1
 	@${ECHO}
 	@${ECHO} "============================================================="
-	@${ECHO} "dhcpcd-${VERSION} imported to ${DESTDIR}"
+	@${ECHO} "${PACKAGE}-${VERSION} imported to ${DESTDIR}"
 
 import:
 	${MAKE} _import DESTDIR=`if [ -n "${DESTDIR}" ]; then echo "${DESTDIR}"; else  echo /tmp/${DISTPREFIX}; fi`
@@ -110,7 +111,7 @@ _import-src: clean
 	for x in ${SUBDIRS}; do cd $$x; ${MAKE} DESTDIR=${DESTDIR} $@ || exit $$?; cd ..; done
 	@${ECHO}
 	@${ECHO} "============================================================="
-	@${ECHO} "dhcpcd-${VERSION} imported to ${DESTDIR}"
+	@${ECHO} "${PACKAGE}-${VERSION} imported to ${DESTDIR}"
 
 import-src:
 	${MAKE} _import-src DESTDIR=`if [ -n "${DESTDIR}" ]; then echo "${DESTDIR}"; else  echo /tmp/${DISTPREFIX}; fi`
