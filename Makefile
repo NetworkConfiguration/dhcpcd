@@ -68,6 +68,7 @@ dist: ${DIST}
 distinfo: dist
 	rm -f ${DISTINFO} ${DISTSIGN}
 	${SHA256} ${DISTFILE} >${DISTINFO}
+	stat -f "Size   (${DISTFILE}) = %z" ${DISTFILE} >>${DISTINFO}
 	${PGP} --armour --detach-sign ${DISTFILE}
 	chmod 644 ${DISTSIGN}
 	ls -l ${DISTFILE} ${DISTINFO} ${DISTSIGN}
