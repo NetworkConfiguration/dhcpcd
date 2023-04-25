@@ -154,6 +154,9 @@ if_opensockets_os(struct dhcpcd_ctx *ctx)
 #ifdef RTM_CHGADDR
 	    RTM_CHGADDR,
 #endif
+#ifdef RTM_DESYNC
+	    RTM_DESYNC,
+#endif
 	    RTM_NEWADDR, RTM_DELADDR
 	};
 #ifdef ROUTE_MSGFILTER
