@@ -1832,23 +1832,20 @@ if_disable_rtadv(void)
 void
 if_setup_inet6(const struct interface *ifp)
 {
+#ifdef ND6_NDI_FLAGS
 	struct priv *priv;
 	int s;
-#ifdef ND6_NDI_FLAGS
 	struct in6_ndireq nd;
 	int flags;
-#endif
 
 	priv = (struct priv *)ifp->ctx->priv;
 	s = priv->pf_inet6_fd;
 
-#ifdef ND6_NDI_FLAGS
 	memset(&nd, 0, sizeof(nd));
 	strlcpy(nd.ifname, ifp->name, sizeof(nd.ifname));
 	if (ioctl(s, SIOCGIFINFO_IN6, &nd) == -1)
 		logerr("%s: SIOCGIFINFO_FLAGS", ifp->name);
 	flags = (int)nd.ndi.flags;
-#endif
 
 #ifdef ND6_IFF_AUTO_LINKLOCAL
 	/* Unlike the kernel, dhcpcd make make a stable private address. */
@@ -1878,14 +1875,13 @@ if_setup_inet6(const struct interface *ifp)
 #endif
 #endif
 
-#ifdef ND6_NDI_FLAGS
 	if (nd.ndi.flags != (uint32_t)flags) {
 		nd.ndi.flags = (uint32_t)flags;
 		if (if_ioctl6(ifp->ctx, SIOCSIFINFO_FLAGS,
 		    &nd, sizeof(nd)) == -1)
 			logerr("%s: SIOCSIFINFO_FLAGS", ifp->name);
 	}
-#endif
+#endif /* ND6_NDI_FLAGS */
 
 	/* Enabling IPv6 by whatever means must be the
 	 * last action undertaken to ensure kernel RS and
