@@ -2117,7 +2117,7 @@ static const char *p_conf = "/proc/sys/net/ipv6/conf";
 static const char *p_neigh = "/proc/sys/net/ipv6/neigh";
 
 void
-if_setup_inet6(const struct interface *ifp)
+if_setup_inet6(struct interface *ifp)
 {
 	struct dhcpcd_ctx *ctx = ifp->ctx;
 	int ra;
