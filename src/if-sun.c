@@ -1741,7 +1741,7 @@ if_applyra(const struct ra *rap)
 }
 
 void
-if_setup_inet6(__unused struct interface *ifp)
+if_setup_inet6(__unused const struct interface *ifp)
 {
 
 }

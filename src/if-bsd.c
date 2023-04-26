@@ -1758,9 +1758,10 @@ ip6_forwarding(__unused const char *ifname)
 static int
 if_af_attach(const struct interface *ifp, int af)
 {
-	struct if_afreq ifar = { .ifar_af = af };
+	struct if_afreq ifar;
 
 	strlcpy(ifar.ifar_name, ifp->name, sizeof(ifar.ifar_name));
+	ifar.ifar_af = af;
 	return if_ioctl6(ifp->ctx, SIOCIFAFATTACH, &ifar, sizeof(ifar));
 }
 #endif
@@ -1832,7 +1833,7 @@ if_disable_rtadv(void)
 }
 
 void
-if_setup_inet6(struct interface *ifp)
+if_setup_inet6(const struct interface *ifp)
 {
 #ifdef ND6_NDI_FLAGS
 	struct priv *priv;
@@ -1891,14 +1892,6 @@ if_setup_inet6(struct interface *ifp)
 #ifdef SIOCIFAFATTACH
 	if (if_af_attach(ifp, AF_INET6) == -1)
 		logerr("%s: if_af_attach", ifp->name);
-#ifdef __OpenBSD__
-	/* Adding any address to any interface *will* force the interface
-	 * UP without sending a notification via route(4).
-	 * Attaching INET6 will add a LL address.
-	 * This truely sucks balls, but is what it is. */
-	else
-		ifp->flags |= IFF_UP;
-#endif
 #endif
 
 #ifdef SIOCGIFXFLAGS
