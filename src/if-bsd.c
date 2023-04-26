@@ -1763,10 +1763,9 @@ ip6_forwarding(__unused const char *ifname)
 static int
 if_af_attach(const struct interface *ifp, int af)
 {
-	struct if_afreq ifar;
+	struct if_afreq ifar = { .ifar_af = af };
 
 	strlcpy(ifar.ifar_name, ifp->name, sizeof(ifar.ifar_name));
-	ifar.ifar_af = af;
 	return if_ioctl6(ifp->ctx, SIOCIFAFATTACH, &ifar, sizeof(ifar));
 }
 #endif
