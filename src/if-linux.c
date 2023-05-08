@@ -237,7 +237,7 @@ if_machinearch(char *str, size_t len)
 #endif
 
 static int
-check_proc_int(struct dhcpcd_ctx *ctx, const char *path)
+check_proc_int(const char *ifname, struct dhcpcd_ctx *ctx, const char *path)
 {
 	char buf[64];
 	int error, i;
@@ -245,15 +245,18 @@ check_proc_int(struct dhcpcd_ctx *ctx, const char *path)
 	if (dhcp_readfile(ctx, path, buf, sizeof(buf)) == -1)
 		return -1;
 	i = (int)strtoi(buf, NULL, 0, INT_MIN, INT_MAX, &error);
+	logdebugx("%s: reading %d from %s", ifname, i, path);
 	if (error != 0 && error != ENOTSUP) {
 		errno = error;
+		logdebug("%s: reading %s", ifname, path);
 		return -1;
 	}
 	return i;
 }
 
 static int
-check_proc_uint(struct dhcpcd_ctx *ctx, const char *path, unsigned int *u)
+check_proc_uint(const char *ifname, struct dhcpcd_ctx *ctx, const char *path,
+        unsigned int *u)
 {
 	char buf[64];
 	int error;
@@ -261,15 +264,18 @@ check_proc_uint(struct dhcpcd_ctx *ctx, const char *path, unsigned int *u)
 	if (dhcp_readfile(ctx, path, buf, sizeof(buf)) == -1)
 		return -1;
 	*u = (unsigned int)strtou(buf, NULL, 0, 0, UINT_MAX, &error);
+	logdebugx("%s: reading %n from %s", ifname, u, path);
 	if (error != 0 && error != ENOTSUP) {
 		errno = error;
+		logdebug("%s: reading %s", ifname, path);
 		return error;
 	}
 	return 0;
 }
 
 static ssize_t
-if_writepathuint(struct dhcpcd_ctx *ctx, const char *path, unsigned int val)
+if_writepathuint(const char *ifname, struct dhcpcd_ctx *ctx, const char *path,
+        unsigned int val)
 {
 	char buf[64];
 	int len;
@@ -277,6 +283,7 @@ if_writepathuint(struct dhcpcd_ctx *ctx, const char *path, unsigned int val)
 	len = snprintf(buf, sizeof(buf), "%u\n", val);
 	if (len == -1)
 		return -1;
+	logdebugx("%s: writing %u to %s", ifname, val, path);
 	return dhcp_writefile(ctx, path, 0664, buf, (size_t)len);
 }
 
@@ -294,12 +301,12 @@ if_init(struct interface *ifp)
 	 * This matches the behaviour of BSD which makes coding dhcpcd
 	 * a little easier as there's just one behaviour. */
 	snprintf(path, sizeof(path), PROC_PROMOTE, ifp->name);
-	n = check_proc_int(ifp->ctx, path);
+	n = check_proc_int(ifp->name, ifp->ctx, path);
 	if (n == -1)
 		return errno == ENOENT ? 0 : -1;
 	if (n == 1)
 		return 0;
-	return if_writepathuint(ifp->ctx, path, 1) == -1 ? -1 : 0;
+	return if_writepathuint(ifp->name, ifp->ctx, path, 1) == -1 ? -1 : 0;
 }
 
 int
@@ -310,7 +317,7 @@ if_conf(struct interface *ifp)
 
 	/* Some qeth setups require the use of the broadcast flag. */
 	snprintf(path, sizeof(path), SYS_LAYER2, ifp->name);
-	n = check_proc_int(ifp->ctx, path);
+	n = check_proc_int(ifp->name, ifp->ctx, path);
 	if (n == -1)
 		return errno == ENOENT ? 0 : -1;
 	if (n == 0)
@@ -336,7 +343,7 @@ if_tap(struct dhcpcd_ctx *ctx, const char *ifname)
 	unsigned int u;
 
 	snprintf(path, sizeof(path), SYS_TUNTAP, ifname);
-	if (check_proc_uint(ctx, path, &u) == -1)
+	if (check_proc_uint(ifname, ctx, path, &u) == -1)
 		return false;
 	return u & IFF_TAP;
 }
@@ -1542,6 +1549,12 @@ struct nlmr
 int
 if_route(unsigned char cmd, const struct rt *rt)
 {
+    logdebugx(
+		"%s: Begin configuring route, %d gw %s",
+        rt->rt_ifp->name,
+        rt->rt_dest.sa_family,
+        rt->rt_gateway.sa_data
+	);
 	struct nlmr nlm;
 	bool gateway_unspec;
 
@@ -1549,14 +1562,17 @@ if_route(unsigned char cmd, const struct rt *rt)
 	nlm.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
 	switch (cmd) {
 	case RTM_CHANGE:
+        logdebugx("%s: RTM_CHANGE", rt->rt_ifp->name);
 		nlm.hdr.nlmsg_type = RTM_NEWROUTE;
 		nlm.hdr.nlmsg_flags = NLM_F_CREATE | NLM_F_REPLACE;
 		break;
 	case RTM_ADD:
+        logdebugx("%s: RTM_ADD", rt->rt_ifp->name);
 		nlm.hdr.nlmsg_type = RTM_NEWROUTE;
 		nlm.hdr.nlmsg_flags = NLM_F_CREATE | NLM_F_EXCL;
 		break;
 	case RTM_DELETE:
+        logdebugx("%s: RTM_DELETE", rt->rt_ifp->name);
 		nlm.hdr.nlmsg_type = RTM_DELROUTE;
 		break;
 	}
@@ -1572,29 +1588,41 @@ if_route(unsigned char cmd, const struct rt *rt)
 		/* Address generated routes are RTPROT_KERNEL,
 		 * otherwise RTPROT_BOOT */
 #ifdef RTPROT_RA
-		if (rt->rt_dflags & RTDF_RA)
+		if (rt->rt_dflags & RTDF_RA) {
+            logdebugx("%s: setting RTPROT_RA", rt->rt_ifp->name);
 			nlm.rt.rtm_protocol = RTPROT_RA;
-		else
+        } else
 #endif
 #ifdef RTPROT_DHCP
-		if (rt->rt_dflags & RTDF_DHCP)
+		if (rt->rt_dflags & RTDF_DHCP) {
+            logdebugx("%s: setting RTPROT_DHCP", rt->rt_ifp->name);
 			nlm.rt.rtm_protocol = RTPROT_DHCP;
-		else
+        } else
 #endif
-		if (rt->rt_dflags & RTDF_IFA_ROUTE)
+		if (rt->rt_dflags & RTDF_IFA_ROUTE) {
+            logdebugx("%s: setting RTPROT_KERNEL", rt->rt_ifp->name);
 			nlm.rt.rtm_protocol = RTPROT_KERNEL;
-		else
+        } else {
+            logdebugx("%s: setting RTPROT_BOOT", rt->rt_ifp->name);
 			nlm.rt.rtm_protocol = RTPROT_BOOT;
-		if (rt->rt_ifp->flags & IFF_LOOPBACK)
+        }
+		if (rt->rt_ifp->flags & IFF_LOOPBACK) {
+            logdebugx("%s: setting RT_SCOPE_HOST", rt->rt_ifp->name);
 			nlm.rt.rtm_scope = RT_SCOPE_HOST;
-		else if (gateway_unspec)
+        } else if (gateway_unspec) {
+            logdebugx("%s: setting RT_SCOPE_LINK", rt->rt_ifp->name);
 			nlm.rt.rtm_scope = RT_SCOPE_LINK;
-		else
+        } else {
+            logdebugx("%s: setting RT_SCOPE_UNIVERSE", rt->rt_ifp->name);
 			nlm.rt.rtm_scope = RT_SCOPE_UNIVERSE;
-		if (rt->rt_flags & RTF_REJECT)
+        }
+		if (rt->rt_flags & RTF_REJECT) {
+            logdebugx("%s: setting RTN_UNREACHABLE", rt->rt_ifp->name);
 			nlm.rt.rtm_type = RTN_UNREACHABLE;
-		else
+        } else {
+            logdebugx("%s: setting RTN_UNICAST", rt->rt_ifp->name);
 			nlm.rt.rtm_type = RTN_UNICAST;
+        }
 	}
 
 #define ADDSA(type, sa)							\
@@ -1602,21 +1630,28 @@ if_route(unsigned char cmd, const struct rt *rt)
 	    (const char *)(sa) + sa_addroffset((sa)),			\
 	    (unsigned short)sa_addrlen((sa)));
 	nlm.rt.rtm_dst_len = (unsigned char)sa_toprefix(&rt->rt_netmask);
+    logdebugx("%s: setting netmask %d", rt->rt_ifp->name, nlm.rt.rtm_dst_len);
 	/* rt->rt_dest and rt->gateway are unions where sockaddr_in6
 	 * is the biggest member. However, we access them as the
 	 * generic sockaddr and coverity thinks this will overrun. */
 	/* coverity[overrun-buffer-arg] */
 	ADDSA(RTA_DST, &rt->rt_dest);
+    logdebugx("%s: setting rt_dest %s", rt->rt_ifp->name, rt->rt_dest.sa_data);
 	if (cmd == RTM_ADD || cmd == RTM_CHANGE) {
 		if (!gateway_unspec) {
+            logdebugx("%s: with gateway %s", rt->rt_ifp->name, rt->rt_gateway.sa_data);
 			/* coverity[overrun-buffer-arg] */
 			ADDSA(RTA_GATEWAY, &rt->rt_gateway);
-		}
+		} else {
+            logdebugx("%s: without gateway", rt->rt_ifp->name);
+        }
 		/* Cannot add tentative source addresses.
 		 * We don't know this here, so just skip INET6 ifa's.*/
 		if (!sa_is_unspecified(&rt->rt_ifa) &&
-		    rt->rt_ifa.sa_family != AF_INET6)
+		    rt->rt_ifa.sa_family != AF_INET6) {
+            logdebugx("%s: not AF_INET6, setting RTA_PREFSRC", rt->rt_ifp->name);
 			ADDSA(RTA_PREFSRC, &rt->rt_ifa);
+            }
 		if (rt->rt_mtu) {
 			char metricsbuf[32];
 			struct rtattr *metrics = (void *)metricsbuf;
@@ -1625,9 +1660,11 @@ if_route(unsigned char cmd, const struct rt *rt)
 			metrics->rta_len = RTA_LENGTH(0);
 			rta_add_attr_32(metrics, sizeof(metricsbuf),
 			    RTAX_MTU, rt->rt_mtu);
+            logdebugx("%s: MTU %d", rt->rt_ifp->name, rt->rt_mtu);
 			add_attr_l(&nlm.hdr, sizeof(nlm), RTA_METRICS,
 			    RTA_DATA(metrics),
 			    (unsigned short)RTA_PAYLOAD(metrics));
+            logdebugx("%s: metrics %s", rt->rt_ifp->name, metricsbuf);
 		}
 
 #ifdef HAVE_ROUTE_PREF
@@ -1636,15 +1673,19 @@ if_route(unsigned char cmd, const struct rt *rt)
 
 			switch(rt->rt_pref) {
 			case RTPREF_LOW:
+                logdebugx("%s: ROUTE_PREF_LOW", rt->rt_ifp->name);
 				pref = ICMPV6_ROUTER_PREF_LOW;
 				break;
 			case RTPREF_MEDIUM:
+                logdebugx("%s: ROUTE_PREF_MEDIUM", rt->rt_ifp->name);
 				pref = ICMPV6_ROUTER_PREF_MEDIUM;
 				break;
 			case RTPREF_HIGH:
+                logdebugx("%s: ROUTE_PREF_HIGH", rt->rt_ifp->name);
 				pref = ICMPV6_ROUTER_PREF_HIGH;
 				break;
 			default:
+                logdebugx("%s: ROUTE_PREF_INVALID", rt->rt_ifp->name);
 				pref = ICMPV6_ROUTER_PREF_INVALID;
 				break;
 			}
@@ -1653,15 +1694,19 @@ if_route(unsigned char cmd, const struct rt *rt)
 #endif
 	}
 
-	if (!sa_is_loopback(&rt->rt_gateway))
+	if (!sa_is_loopback(&rt->rt_gateway)) {
 		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_OIF, rt->rt_ifp->index);
+    } else {
+        logdebugx("%s: sa_is_loopback %s", rt->rt_ifp->name, rt->rt_gateway.sa_data);
+	}
 
-	if (rt->rt_metric != 0)
-		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_PRIORITY,
-		    rt->rt_metric);
+	if (rt->rt_metric != 0) {
+		add_attr_32(&nlm.hdr, sizeof(nlm), RTA_PRIORITY, rt->rt_metric);
+	}
+    logdebugx("%s: metric %d", rt->rt_ifp->name, rt->rt_metric);
 
-	return if_sendnetlink(rt->rt_ifp->ctx, NETLINK_ROUTE, &nlm.hdr,
-	    NULL, NULL);
+    logdebug("%s: End configuring route, calling sendnetlink", rt->rt_ifp->name);
+	return if_sendnetlink(rt->rt_ifp->ctx, NETLINK_ROUTE, &nlm.hdr, NULL, NULL);
 }
 
 static int
@@ -2134,25 +2179,28 @@ if_setup_inet6(const struct interface *ifp)
 	 * If not doing autoconf, don't disable the kernel from doing it.
 	 * If we need to, we should have another option actively disable it.
 	 */
-	if (!(ifp->options->options & DHCPCD_IPV6RS))
+	if (!(ifp->options->options & DHCPCD_IPV6RS)) {
+		logdebugx("%s: leaving autoconf up to the kernel, noop here",
+			 ifp->name);
 		return;
+	}
 
 	snprintf(path, sizeof(path), "%s/%s/autoconf", p_conf, ifp->name);
-	ra = check_proc_int(ctx, path);
+	ra = check_proc_int(ifp->name, ctx, path);
 	if (ra != 1 && ra != -1) {
-		if (if_writepathuint(ctx, path, 0) == -1)
+		if (if_writepathuint(ifp->name, ctx, path, 0) == -1)
 			logerr("%s: %s", __func__, path);
 	}
 
 	snprintf(path, sizeof(path), "%s/%s/accept_ra", p_conf, ifp->name);
-	ra = check_proc_int(ctx, path);
+	ra = check_proc_int(ifp->name, ctx, path);
 	if (ra == -1) {
 		/* The sysctl probably doesn't exist, but this isn't an
 		 * error as such so just log it and continue */
 		if (errno != ENOENT)
 			logerr("%s: %s", __func__, path);
 	} else if (ra != 0) {
-		if (if_writepathuint(ctx, path, 0) == -1)
+		if (if_writepathuint(ifp->name, ctx, path, 0) == -1)
 			logerr("%s: %s", __func__, path);
 	}
 }
@@ -2167,21 +2215,21 @@ if_applyra(const struct ra *rap)
 
 	if (rap->hoplimit != 0) {
 		snprintf(path, sizeof(path), "%s/%s/hop_limit", p_conf, ifname);
-		if (if_writepathuint(ctx, path, rap->hoplimit) == -1)
+		if (if_writepathuint(ifname, ctx, path, rap->hoplimit) == -1)
 			error = -1;
 	}
 
 	if (rap->retrans != 0) {
 		snprintf(path, sizeof(path), "%s/%s/retrans_time_ms",
 		    p_neigh, ifname);
-		if (if_writepathuint(ctx, path, rap->retrans) == -1)
+		if (if_writepathuint(ifname, ctx, path, rap->retrans) == -1)
 			error = -1;
 	}
 
 	if (rap->reachable != 0) {
 		snprintf(path, sizeof(path), "%s/%s/base_reachable_time_ms",
 		    p_neigh, ifname);
-		if (if_writepathuint(ctx, path, rap->reachable) == -1)
+		if (if_writepathuint(ifname, ctx, path, rap->reachable) == -1)
 			error = -1;
 	}
 

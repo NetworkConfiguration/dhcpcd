@@ -2273,7 +2273,7 @@ inet6_makeprefix(struct interface *ifp, const struct ra *rap,
 }
 
 static struct rt *
-inet6_makerouter(struct ra *rap)
+inet6_makedefrouter(struct ra *rap)
 {
 	struct rt *rt;
 
@@ -2298,9 +2298,12 @@ inet6_staticroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 	struct rt *rt;
 
 	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-		if ((state = IPV6_STATE(ifp)) == NULL)
+		if ((state = IPV6_STATE(ifp)) == NULL) {
+			logdebugx("%s: not querying static routes because IPV6_STATE is NULL", ifp->name);
 			continue;
+		}
 		TAILQ_FOREACH(ia, &state->addrs, next) {
+			logdebugx("%s: checking static route %s", ifp->name, ia->saddr);
 			if ((ia->flags & (IPV6_AF_ADDED | IPV6_AF_STATIC)) ==
 			    (IPV6_AF_ADDED | IPV6_AF_STATIC))
 			{
@@ -2320,13 +2323,25 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 	struct ra *rap;
 	const struct ipv6_addr *addr;
 
-	if (ctx->ra_routers == NULL)
+	if (ctx->ra_routers == NULL) {
+		logdebugx("No ra_routers found");
 		return 0;
+	}
 
 	TAILQ_FOREACH(rap, ctx->ra_routers, next) {
+		logdebugx(
+			"%s: inet6_raroutes for %s, is %s, rap lifetime %d, has%s global address",
+			rap->iface->name,
+			rap->sfrom,
+			rap->expired ? "expired" : "valid",
+			rap->lifetime,
+			ipv6_anyglobal(rap->iface) == NULL ? " no" : ""
+			);
 		if (rap->expired)
 			continue;
+
 		TAILQ_FOREACH(addr, &rap->addrs, next) {
+			logdebugx("%s: addr %s, prefix_vltime %d, rap lifetime %d, from %s", rap->iface->name, addr->saddr, addr->prefix_vltime, rap->lifetime, rap->sfrom);
 			if (addr->prefix_vltime == 0)
 				continue;
 			rt = inet6_makeprefix(rap->iface, rap, addr);
@@ -2338,13 +2353,23 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 				rt_proto_add(routes, rt);
 			}
 		}
+
+		// Configure default gateway
+		// Router is not a default gateway if lifetime == 0 but may have other information or routes.
 		if (rap->lifetime == 0)
 			continue;
-		if (ipv6_anyglobal(rap->iface) == NULL)
+		logdebugx("%s: Is advertising itself as default gateway. Non zero lifetime.", rap->iface->name);
+		if (ipv6_anyglobal(rap->iface) == NULL) {
+			// This will also remove NAT66 VPNs from being used as default gateway.
+			// They usually handle their routes themselfes anyway.
+			logdebugx("%s: Interface does not have any global address, so skipping as default gateway.", rap->iface->name);
 			continue;
-		rt = inet6_makerouter(rap);
-		if (rt == NULL)
+		}
+		rt = inet6_makedefrouter(rap);
+		if (rt == NULL) {
+			logdebugx("%s: Cannot create default route, skipping...", rap->iface->name);
 			continue;
+		}
 		rt->rt_dflags |= RTDF_RA;
 #ifdef HAVE_ROUTE_PREF
 		rt->rt_pref = ipv6nd_rtpref(rap);
