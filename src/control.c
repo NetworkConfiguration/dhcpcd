@@ -164,8 +164,10 @@ control_handle_write(struct fd_list *fd)
 	}
 
 	if (writev(fd->fd, iov, iov_len) == -1) {
-		if (errno != EPIPE) // We don't get ELE_HANGUP for some reason
+		if (errno != EPIPE && errno != ENOTCONN) {
+			// We don't get ELE_HANGUP for some reason
 			logerr("%s: write", __func__);
+		}
 		control_hangup(fd);
 		return;
 	}
