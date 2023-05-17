@@ -1816,8 +1816,11 @@ dhcpcd_stderr_cb(void *arg, unsigned short events)
 	char log[BUFSIZ];
 	ssize_t len;
 
-	if (events != ELE_READ)
-		logerrx("%s: unexpected event 0x%04x", __func__, events);
+	if (events & ELE_HANGUP)
+		eloop_exit(ctx->eloop, EXIT_SUCCESS);
+
+	if (!(events & ELE_READ))
+		return;
 
 	len = read(ctx->stderr_fd, log, sizeof(log));
 	if (len == -1) {
