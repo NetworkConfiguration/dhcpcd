@@ -256,7 +256,7 @@ dhcpcd_ifafwaiting(const struct interface *ifp)
 		bool foundaddr = ipv6_hasaddr(ifp);
 
 		if (opts & DHCPCD_WAITIP6 && !foundaddr)
-			return AF_INET;
+			return AF_INET6;
 		if (foundaddr)
 			foundany = true;
 	}
