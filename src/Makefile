@@ -38,7 +38,7 @@ CLEANFILES+=	*.tar.xz
 
 .SUFFIXES:	.in
 
-.in: Makefile ${TOP}/config.mk
+.in:
 	${SED} ${SED_RUNDIR} ${SED_DBDIR} ${SED_LIBDIR} ${SED_HOOKDIR} \
 		${SED_SYS} ${SED_SCRIPT} ${SED_DATADIR} \
 		${SED_SERVICEEXISTS} ${SED_SERVICECMD} ${SED_SERVICESTATUS} \
@@ -51,7 +51,7 @@ all: ${TOP}/config.h ${PROG} ${SCRIPTS} ${MAN5} ${MAN8}
 dev:
 	cd dev && ${MAKE}
 
-.c.o: Makefile ${TOP}/config.mk
+.c.o:
 	${CC} ${CFLAGS} ${CPPFLAGS} -c $< -o $@
 
 CLEANFILES+=	dhcpcd-embedded.h dhcpcd-embedded.c

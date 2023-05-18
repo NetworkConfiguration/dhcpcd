@@ -20,7 +20,7 @@ CLEANFILES+=	${DSOBJ} ${DPLUGS}
 .c.So:
 	${CC} ${PICFLAG} -DPIC ${CPPFLAGS} ${CFLAGS} -c $< -o $@
 
-.So.so: ${DSOBJ}
+.So.so:
 	${CC} ${LDFLAGS} -shared -Wl,-x -o $@ -Wl,-soname,$@ \
 	    $< ${LIBS}
 
