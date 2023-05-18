@@ -115,7 +115,7 @@ for x do
 	--statusarg) STATUSARG=$var;;
 	--infodir) ;; # ignore autotools
 	--disable-maintainer-mode|--disable-dependency-tracking) ;;
-	--disable-silent-rules) ;;
+	--disable-option-checking|--disable-silent-rules) ;;
 	-V|--version)
 		v=$(sed -ne 's/.*VERSION[[:space:]]*"\([^"]*\).*/\1/p' defs.h);
 		c=$(sed -ne 's/^.*copyright\[\] = "\([^"]*\).*/\1/p' dhcpcd.c);

@@ -2,6 +2,17 @@
 
 This attempts to document various ways of building dhcpcd for your
 platform.
+`./configure` is a POSIX shell script that works in a similar way
+to GNU configure.
+This works fine provided you don't force any exotic options down
+which may or may not be silently discarded.
+
+Some build time warnings are expected - the only platforms with zero
+warnings are DragonFlyBSD and NetBSD.
+It is expected that the platforms be improvded to support dhcpcd
+better.
+There maybe some loss of functionality, but for the most part,
+dhcpcd can work around these deficiencies.
 
 ## Size is an issue
 To compile small dhcpcd, maybe to be used for installation media where
