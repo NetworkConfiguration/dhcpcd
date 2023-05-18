@@ -2107,7 +2107,12 @@ if_setup_inet6(const struct interface *ifp)
 
 	snprintf(path, sizeof(path), "%s/%s/autoconf", p_conf, ifp->name);
 	ra = check_proc_int(ctx, path);
-	if (ra != 1 && ra != -1) {
+	if (ra == -1) {
+		/* The sysctl probably doesn't exist, but this isn't an
+		 * error as such so just log it and continue */
+		if (errno != ENOENT)
+			logerr("%s: %s", __func__, path);
+	} else if (ra != 0) {
 		if (if_writepathuint(ctx, path, 0) == -1)
 			logerr("%s: %s", __func__, path);
 	}
