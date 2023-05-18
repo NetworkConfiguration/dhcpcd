@@ -64,8 +64,8 @@ dhcpcd-embedded.c: genembedc ${DHCPCD_DEFS} dhcpcd-embedded.c.in
 
 if-options.c: dhcpcd-embedded.h
 
-.depend: ${SRCS} ${COMPAT_SRCS} ${CRYPT_SRCS}
-	${CC} ${CPPFLAGS} -MM ${SRCS} ${COMPAT_SRCS} ${CRYPT_SRCS} > .depend
+.depend: ${SRCS} ${PCRYPT_SRCS} ${PCOMPAT_SRC}
+	${CC} ${CPPFLAGS} -MM ${SRCS} ${PCRYPT_SRCS} ${PCOMPAT_SRCS} > .depend
 
 depend: .depend
 
