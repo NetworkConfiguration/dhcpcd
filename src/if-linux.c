@@ -1996,7 +1996,8 @@ _if_addrflags6(__unused struct dhcpcd_ctx *ctx,
 	size_t len;
 	struct rtattr *rta;
 	struct ifaddrmsg *ifa;
-	bool matches_addr = false;
+	struct in6_addr *local = NULL, *address = NULL;
+	uint32_t *flags = NULL;
 
 	ifa = NLMSG_DATA(nlm);
 	if (ifa->ifa_index != ia->ifa_ifindex || ifa->ifa_family != AF_INET6)
@@ -2007,17 +2008,26 @@ _if_addrflags6(__unused struct dhcpcd_ctx *ctx,
 	for (; RTA_OK(rta, len); rta = RTA_NEXT(rta, len)) {
 		switch (rta->rta_type) {
 		case IFA_ADDRESS:
-			if (IN6_ARE_ADDR_EQUAL(&ia->ifa_addr, (struct in6_addr *)RTA_DATA(rta)))
-				ia->ifa_found = matches_addr = true;
-			else
-				matches_addr = false;
+			address = (struct in6_addr *)RTA_DATA(rta);
+			break;
+		case IFA_LOCAL:
+			local = (struct in6_addr *)RTA_DATA(rta);
 			break;
 		case IFA_FLAGS:
-			if (matches_addr)
-				memcpy(&ia->ifa_flags, RTA_DATA(rta), sizeof(ia->ifa_flags));
+			flags = (uint32_t *)RTA_DATA(rta);
 			break;
 		}
 	}
+
+	if (local) {
+	       if (IN6_ARE_ADDR_EQUAL(&ia->ifa_addr, local))
+			ia->ifa_found = true;
+	} else if (address) {
+	       if (IN6_ARE_ADDR_EQUAL(&ia->ifa_addr, address))
+			ia->ifa_found = true;
+	}
+	if (flags && ia->ifa_found)
+		memcpy(&ia->ifa_flags, flags, sizeof(ia->ifa_flags));
 	return 0;
 }
 
