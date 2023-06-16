@@ -202,6 +202,8 @@ static const char *mproc =
 	"cpu"
 #elif defined(__vax__)
 	"cpu"
+#elif defined(__riscv)
+	"uarch"
 #else
 	NULL
 #endif
