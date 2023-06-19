@@ -182,18 +182,20 @@ static const char *mproc =
 	"cpu model"
 #elif defined(__frv__)
 	"System"
+#elif defined(__hppa__)
+	"model"
 #elif defined(__i386__) || defined(__x86_64__)
 	"vendor_id"
 #elif defined(__ia64__)
 	"vendor"
-#elif defined(__hppa__)
-	"model"
 #elif defined(__m68k__)
 	"MMU"
 #elif defined(__mips__)
 	"system type"
 #elif defined(__powerpc__) || defined(__powerpc64__)
 	"machine"
+#elif defined(__riscv)
+	"uarch"
 #elif defined(__s390__) || defined(__s390x__)
 	"Manufacturer"
 #elif defined(__sh__)
