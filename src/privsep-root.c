@@ -962,15 +962,19 @@ ps_root_stop(struct dhcpcd_ctx *ctx)
 	 * log dhcpcd exits because the latter requires the former.
 	 * So we just log the intent to exit.
 	 * Even sending this will be a race to exit. */
-	if (psp) {
-		logdebugx("%s%s%s will exit from PID %d",
-		    psp->psp_ifname,
-		    psp->psp_ifname[0] != '\0' ? ": " : "",
-		    psp->psp_name, psp->psp_pid);
+
+	if (getuid() == 0 ) {
+		if (psp) {
+			logdebugx("%s%s%s will exit from PID %d",
+				psp->psp_ifname,
+				psp->psp_ifname[0] != '\0' ? ": " : "",
+				psp->psp_name, psp->psp_pid);
+		}
+	}
 
 		if (ps_stopprocess(psp) == -1)
 			return -1;
-	} /* else the root process has already exited :( */
+	 /* else the root process has already exited :( */
 
 	return ps_stopwait(ctx);
 }
@@ -1019,6 +1023,9 @@ ps_root_ioctl(struct dhcpcd_ctx *ctx, ioctl_request_t req, void *data,
 ssize_t
 ps_root_unlink(struct dhcpcd_ctx *ctx, const char *file)
 {
+	if (getuid() != 0) {
+		return -1;
+	}
 
 	if (ps_sendcmd(ctx, PS_ROOT_FD(ctx), PS_UNLINK, 0,
 	    file, strlen(file) + 1) == -1)
