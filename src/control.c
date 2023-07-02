@@ -498,9 +498,11 @@ control_stop(struct dhcpcd_ctx *ctx)
 
 #ifdef PRIVSEP
 	if (IN_PRIVSEP_SE(ctx)) {
-		if (ps_root_unlink(ctx, ctx->control_sock) == -1)
+		if (ctx->control_sock[0] != '\0' &&
+		    ps_root_unlink(ctx, ctx->control_sock) == -1)
 			retval = -1;
-		if (ps_root_unlink(ctx, ctx->control_sock_unpriv) == -1)
+		if (ctx->control_sock_unpriv[0] != '\0' &&
+		    ps_root_unlink(ctx, ctx->control_sock_unpriv) == -1)
 			retval = -1;
 		return retval;
 	} else if (ctx->options & DHCPCD_FORKED)
