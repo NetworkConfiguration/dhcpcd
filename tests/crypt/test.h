@@ -28,5 +28,6 @@
 #ifndef TEST_H
 
 int test_hmac_md5(void);
+int test_sha256(void);
 
 #endif

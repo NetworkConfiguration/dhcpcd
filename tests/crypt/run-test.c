@@ -33,6 +33,8 @@ int main(void)
 
 	if (test_hmac_md5())
 		r = -1;
+	if (test_sha256())
+		r = -1;
 
 	return r;
 }

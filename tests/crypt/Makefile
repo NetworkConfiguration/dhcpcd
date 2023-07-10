@@ -3,7 +3,7 @@ include ${TOP}/iconfig.mk
 
 PROG=		run-test
 SRCS=		run-test.c
-SRCS+=		test_hmac_md5.c
+SRCS+=		test_hmac_md5.c test_sha256.c
 
 CFLAGS?=	-O2
 CSTD?=		c99
