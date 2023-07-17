@@ -60,6 +60,9 @@
 #include <linux/if_arp.h>
 #endif
 
+/* Inlcude this *after* net/if.h so we get IFF_DORMANT */
+#include <linux/if.h>
+
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -525,11 +528,25 @@ if_setmac(struct interface *ifp, void *mac, uint8_t maclen)
 	return if_ioctl(ifp->ctx, SIOCSIFHWADDR, &ifr, sizeof(ifr));
 }
 
+static int if_carrier_from_flags(unsigned int flags)
+{
+
+#ifdef IFF_LOWER_UP
+	return ((flags & (IFF_LOWER_UP | IFF_RUNNING)) ==
+		(IFF_LOWER_UP | IFF_RUNNING))
+#ifdef IFF_DORMANT
+		&& !(flags & IFF_DORMANT)
+#endif
+		? LINK_UP : LINK_DOWN;
+#else
+	return flags & IFF_RUNNING ? LINK_UP : LINK_DOWN;
+#endif
+}
+
 int
 if_carrier(struct interface *ifp, __unused const void *ifadata)
 {
-
-	return ifp->flags & IFF_RUNNING ? LINK_UP : LINK_DOWN;
+	return if_carrier_from_flags(ifp->flags);
 }
 
 bool
@@ -1047,7 +1064,7 @@ link_netlink(struct dhcpcd_ctx *ctx, void *arg, struct nlmsghdr *nlm)
 	}
 
 	dhcpcd_handlecarrier(ifp,
-	    ifi->ifi_flags & IFF_RUNNING ? LINK_UP : LINK_DOWN,
+	    if_carrier_from_flags(ifi->ifi_flags),
 	    ifi->ifi_flags);
 	return 0;
 }
