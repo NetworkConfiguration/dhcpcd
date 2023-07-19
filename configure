@@ -1184,6 +1184,7 @@ EOF
 	rm -f _rbtree.c _rbtree
 fi
 if [ "$RBTREE" = no ]; then
+	echo "#define	HAVE_NBTOOL_CONFIG_H	0" >>$CONFIG_H
 	echo "#define	RBTEST" >>$CONFIG_H
 	echo "COMPAT_SRCS+=	compat/rb.c" >>$CONFIG_MK
 	echo "#include			\"compat/rbtree.h\"" >>$CONFIG_H
