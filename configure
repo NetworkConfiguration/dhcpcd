@@ -13,6 +13,7 @@ IPV4LL=
 INET6=
 PRIVSEP=
 PRIVSEP_USER=
+SECCOMP=
 ARC4RANDOM=
 CLOSEFROM=
 RBTREE=
@@ -70,6 +71,8 @@ for x do
 	--enable-auth) AUTH=yes;;
 	--disable-privsep) PRIVSEP=no;;
 	--enable-privsep) PRIVSEP=yes;;
+	--disable-seccomp) SECCOMP=no;;
+	--enable-seccomp) SECCOMP=yes;;
 	--privsepuser) PRIVSEP_USER=$var;;
 	--prefix) PREFIX=$var;prefix=$var;; # prefix is set for autotools compat
 	--sysconfdir) SYSCONFDIR=$var;;
@@ -585,7 +588,12 @@ if [ "$PRIVSEP" = yes ]; then
 		echo "PRIVSEP_SRCS+=	privsep-bpf.c" >>$CONFIG_MK
 	fi
 	case "$OS" in
-	linux*)		 echo "PRIVSEP_SRCS+=	privsep-linux.c" >>$CONFIG_MK;;
+	linux*)
+			 echo "PRIVSEP_SRCS+=	privsep-linux.c" >>$CONFIG_MK
+			 if [ -n "$SECCOMP" ] && [ "$SECCOMP" != no ]; then
+				 echo "#define	DISABLE_SECCOMP" >>$CONFIG_H
+			 fi
+			 ;;
 	solaris*|sunos*) echo "PRIVSEP_SRCS+=	privsep-sun.c" >>$CONFIG_MK;;
 	*)		 echo "PRIVSEP_SRCS+=	privsep-bsd.c" >>$CONFIG_MK;;
 	esac

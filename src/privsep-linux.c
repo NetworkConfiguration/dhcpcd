@@ -113,6 +113,10 @@ ps_root_sendnetlink(struct dhcpcd_ctx *ctx, int protocol, struct msghdr *msg)
 	return ps_root_readerror(ctx, NULL, 0);
 }
 
+#ifdef DISABLE_SECCOMP
+#warning SECCOMP has been disabled
+#else
+
 #if (BYTE_ORDER == LITTLE_ENDIAN)
 # define SECCOMP_ARG_LO	0
 # define SECCOMP_ARG_HI	sizeof(uint32_t)
@@ -500,3 +504,4 @@ ps_seccomp_enter(void)
 	}
 	return 0;
 }
+#endif /* !DISABLE_SECCOMP */

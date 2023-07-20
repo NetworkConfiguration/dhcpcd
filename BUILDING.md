@@ -120,6 +120,16 @@ so don't set either `ipv6ra_own` or `slaac private` in `dhcpcd.conf` if you
 want to have working IPv6 temporary addresses.
 SLAAC private addresses are just as private, just stable.
 
+Linux SECCOMP is very dependant on libc vs kernel.
+When libc is changed and uses a syscall that dhcpcd is unaware of,
+SECCOMP may break dhcpcd.
+When this happens you can configure dhcpcd with --disable-seccomp
+so dhcpcd can use a POSIX resource limited sandbox with privilege separation
+still. If you do this, please report the issue so that we can adjust the
+SECCOMP filter so that dhcpcd can use SECCOMP once more.
+Or convince the libc/kernel people to adpot something more maintainable
+like FreeBSD's capsicum or OpenBSD's pledge.
+
 ## Init systems
 We try and detect how dhcpcd should interact with system services at runtime.
 If we cannot auto-detect how do to this, or it is wrong then
