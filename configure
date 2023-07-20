@@ -590,7 +590,7 @@ if [ "$PRIVSEP" = yes ]; then
 	case "$OS" in
 	linux*)
 			 echo "PRIVSEP_SRCS+=	privsep-linux.c" >>$CONFIG_MK
-			 if [ -n "$SECCOMP" ] && [ "$SECCOMP" != no ]; then
+			 if [ -n "$SECCOMP" ] && [ "$SECCOMP" = no ]; then
 				 echo "#define	DISABLE_SECCOMP" >>$CONFIG_H
 			 fi
 			 ;;
