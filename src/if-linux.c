@@ -553,12 +553,14 @@ bool
 if_roaming(struct interface *ifp)
 {
 
-#ifdef IFF_LOWER_UP
 	if (!ifp->wireless ||
-	    ifp->flags & IFF_RUNNING ||
-	    (ifp->flags & (IFF_UP | IFF_LOWER_UP)) != (IFF_UP | IFF_LOWER_UP))
+	    ifp->flags & IFF_RUNNING)
 		return false;
-	return true;
+
+#if defined(IFF_DORMANT)
+	return ifp->flags & IFF_DORMANT;
+#elif defined(IFF_LOWER_UP)
+	return (ifp->flags & (IFF_UP|IFF_LOWER_UP)) == (IFF_UP|IFF_LOWER_UP);
 #else
 	return false;
 #endif
