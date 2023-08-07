@@ -70,6 +70,8 @@ static struct _rsx {
 	u_char		rs_buf[RSBUFSZ];	/* keystream blocks */
 } *rsx;
 
+static int _dhcpcd_rand_fd = -1;	/* /dev/urandom fd */
+
 static int _dhcpcd_getentropy(void *, size_t);
 static inline int _rs_allocate(struct _rs **, struct _rsx **);
 static inline void _rs_forkdetect(void);
@@ -89,7 +91,6 @@ static int
 _dhcpcd_getentropy(void *buf, size_t length)
 {
 	struct timeval	 tv;
-	int		 fd;
 	uint8_t		*rand = (uint8_t *)buf;
 
 	if (length < sizeof(tv)) {
@@ -98,11 +99,11 @@ _dhcpcd_getentropy(void *buf, size_t length)
 		length -= sizeof(tv);
 		rand += sizeof(tv);
 	}
-	fd = open("/dev/urandom", O_RDONLY | O_NONBLOCK);
-	if (fd != -1) {
+	if (_dhcpcd_rand_fd == -1)
+		_dhcpcd_rand_fd = open("/dev/urandom", O_RDONLY | O_NONBLOCK);
+	if (_dhcpcd_rand_fd != -1) {
 		/* coverity[check_return] */
-		(void)read(fd, rand, length);
-		close(fd);
+		(void)read(_dhcpcd_rand_fd, rand, length);
 	}
 
 	/* Never fail. If there is an error reading from /dev/urandom,
