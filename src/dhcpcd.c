@@ -1822,7 +1822,7 @@ dhcpcd_stderr_cb(void *arg, unsigned short events)
 	if (!(events & ELE_READ))
 		return;
 
-	len = read(ctx->stderr_fd, log, sizeof(log));
+	len = read(ctx->stderr_fd, log, sizeof(log) - 1);
 	if (len == -1) {
 		if (errno != ECONNRESET)
 			logerr(__func__);
