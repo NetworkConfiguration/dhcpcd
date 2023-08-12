@@ -1794,7 +1794,7 @@ dhcpcd_stderr_cb(void *arg)
 	char log[BUFSIZ];
 	ssize_t len;
 
-	len = read(ctx->stderr_fd, log, sizeof(log));
+	len = read(ctx->stderr_fd, log, sizeof(log) - 1);
 	if (len == -1) {
 		if (errno != ECONNRESET)
 			logerr(__func__);
