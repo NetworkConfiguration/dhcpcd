@@ -1200,7 +1200,7 @@ ps_newprocess(struct dhcpcd_ctx *ctx, struct ps_id *psid)
 #endif
 
 	if (!(ctx->options & DHCPCD_MANAGER))
-		strlcpy(psp->psp_ifname, ctx->ifv[0], sizeof(psp->psp_name));
+		strlcpy(psp->psp_ifname, ctx->ifv[0], sizeof(psp->psp_ifname));
 	TAILQ_INSERT_TAIL(&ctx->ps_processes, psp, next);
 	return psp;
 }
