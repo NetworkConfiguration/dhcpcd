@@ -273,6 +273,22 @@ check_proc_uint(struct dhcpcd_ctx *ctx, const char *path, unsigned int *u)
 	return 0;
 }
 
+static int
+parse_rtattr(struct rtattr *tb[], size_t max, struct rtattr *rta, size_t len)
+{
+	unsigned short type;
+
+	memset(tb, 0, sizeof(struct rtattr *) * (max + 1));
+	for (; RTA_OK(rta, len); rta = RTA_NEXT(rta, len)) {
+		type = (unsigned short)(rta->rta_type & NLA_TYPE_MASK);
+		if (type <= max && !tb[type])
+			tb[type] = rta;
+	}
+	return 0;
+}
+#define parse_rtattr_nested(tb, max, rta) \
+	(parse_rtattr((tb), (max), RTA_DATA(rta), RTA_PAYLOAD(rta)))
+
 static ssize_t
 if_writepathuint(struct dhcpcd_ctx *ctx, const char *path, unsigned int val)
 {
@@ -645,6 +661,7 @@ recv_again:
 static int
 if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 {
+	struct priv *priv = ctx->priv;
 	size_t len;
 	struct rtmsg *rtm;
 	struct rtattr *rta;
@@ -657,7 +674,7 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 		return -1;
 	}
 	rtm = (struct rtmsg *)NLMSG_DATA(nlm);
-	if (rtm->rtm_table != RT_TABLE_MAIN)
+	if (rtm->rtm_table != priv->rt_table)
 		return -1;
 
 	memset(rt, 0, sizeof(*rt));
@@ -1491,6 +1508,13 @@ struct nlma
 	char buffer[64];
 };
 
+struct nlmi
+{
+	struct nlmsghdr hdr;
+	struct ifinfomsg ifi;
+	char buffer[1024];
+};
+
 #ifdef INET
 struct ifiaddr
 {
@@ -1560,9 +1584,74 @@ struct nlmr
 	char buffer[256];
 };
 
+#ifdef IFLA_VRF_MAX
+static int
+_if_vrf_table(__unused struct dhcpcd_ctx *ctx,
+    void *arg, struct nlmsghdr *nlm)
+{
+	uint32_t *table = arg;
+	struct ifinfomsg *ifi;
+	size_t len;
+
+	struct rtattr *tb[IFLA_MAX + 1];
+	struct rtattr *li[IFLA_INFO_MAX + 1];
+	struct rtattr *vrf[IFLA_VRF_MAX + 1];
+
+	// Default to unspecified table
+	*table = 0;
+
+	ifi = NLMSG_DATA(nlm);
+	len = NLMSG_PAYLOAD(nlm, sizeof(*ifi));
+
+	parse_rtattr(tb, IFLA_MAX, IFLA_RTA(ifi), len);
+	if (!tb[IFLA_LINKINFO])
+		return 0;
+
+	parse_rtattr_nested(li, IFLA_INFO_MAX, tb[IFLA_LINKINFO]);
+
+	if (!li[IFLA_INFO_KIND] || strcmp(RTA_DATA(li[IFLA_INFO_KIND]), "vrf"))
+		return 0;
+
+	if (!li[IFLA_INFO_DATA])
+		return 0;
+
+	parse_rtattr_nested(vrf, IFLA_VRF_MAX, li[IFLA_INFO_DATA]);
+	if (vrf[IFLA_VRF_TABLE])
+		*table = *(uint32_t *)RTA_DATA(vrf[IFLA_VRF_TABLE]);
+
+	return 0;
+}
+
+static unsigned char
+if_vrf_table(const struct interface *ifp)
+{
+	uint32_t table;
+	struct nlmi nlm = {
+	    .hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifinfomsg)),
+	    .hdr.nlmsg_type = RTM_GETLINK,
+	    .hdr.nlmsg_flags = NLM_F_REQUEST,
+	    .ifi.ifi_family = AF_UNSPEC,
+	};
+
+	add_attr_l(&nlm.hdr, sizeof(nlm), IFLA_IFNAME,
+	    ifp->name, (unsigned short)(strlen(ifp->name) + 1));
+
+	int error = if_sendnetlink(ifp->ctx, NETLINK_ROUTE, &nlm.hdr,
+	    &_if_vrf_table, &table);
+	if (error == -1) {
+		logerr(__func__);
+		return 0;
+	}
+	return (unsigned char)table;
+}
+#else
+#define	if_vrf_table(ifp)	0
+#endif
+
 int
 if_route(unsigned char cmd, const struct rt *rt)
 {
+	struct priv *priv = rt->rt_ifp->ctx->priv;
 	struct nlmr nlm;
 	bool gateway_unspec;
 
@@ -1583,7 +1672,7 @@ if_route(unsigned char cmd, const struct rt *rt)
 	}
 	nlm.hdr.nlmsg_flags |= NLM_F_REQUEST;
 	nlm.rt.rtm_family = (unsigned char)rt->rt_dest.sa_family;
-	nlm.rt.rtm_table = RT_TABLE_MAIN;
+	nlm.rt.rtm_table = priv->rt_table;
 
 	gateway_unspec = sa_is_unspecified(&rt->rt_gateway);
 
@@ -1707,11 +1796,34 @@ _if_initrt(struct dhcpcd_ctx *ctx, void *arg,
 int
 if_initrt(struct dhcpcd_ctx *ctx, rb_tree_t *kroutes, int af)
 {
+	struct priv *priv = ctx->priv;
+
+#ifdef IFLA_VRF_MAX
+	if (!priv->rt_table) {
+		/* dhcpcd routing only works on one table.
+		 * For VRF we can work it out. */
+		struct interface *ifp;
+
+		if (!(ctx->options & DHCPCD_MANAGER)) {
+			if (!priv->rt_table) {
+				TAILQ_FOREACH(ifp, ctx->ifaces, next) {
+					if (ifp->active == IF_ACTIVE_USER)
+						break;
+				}
+				if (ifp)
+					priv->rt_table = if_vrf_table(ifp);
+			}
+		}
+	}
+#endif
+	if (!priv->rt_table)
+		priv->rt_table = RT_TABLE_MAIN;
+
 	struct nlmr nlm = {
 	    .hdr.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg)),
 	    .hdr.nlmsg_type = RTM_GETROUTE,
 	    .hdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_MATCH,
-	    .rt.rtm_table = RT_TABLE_MAIN,
+	    .rt.rtm_table = priv->rt_table,
 	    .rt.rtm_family = (unsigned char)af,
 	};
 

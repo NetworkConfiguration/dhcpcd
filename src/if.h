@@ -137,6 +137,7 @@ struct priv {
 	int route_fd;
 	int generic_fd;
 	uint32_t route_pid;
+	unsigned char rt_table;
 };
 #endif
 #ifdef __sun
