@@ -25,6 +25,9 @@ jobs:
     - name: Build
       run: make
 
+    - name: Tests
+      run: make tests
+
   openbsd:
     runs-on: macos-12
     steps:
@@ -45,6 +48,12 @@ jobs:
         ./configure --prefix=/usr
         echo "building"
         make
+
+    - name: Tests
+      run: |
+        ulimit -n 1024
+        cd build
+        make tests
 
   freebsd:
     runs-on: macos-12
@@ -67,6 +76,11 @@ jobs:
         echo "building"
         make
 
+    - name: Tests
+      run: |
+         cd build
+         make tests
+
   netbsd:
     runs-on: macos-12
     steps:
@@ -84,3 +98,8 @@ jobs:
         ./configure --prefix=/usr
         echo "building"
         make
+
+    - name: Tests
+      run: |
+        cd build
+        make tests
