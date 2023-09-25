@@ -40,6 +40,10 @@
 #include <sys/types.h>
 #include <sys/time.h>
 
+#if defined(HAVE_OPENSSL)
+#include <openssl/rand.h>
+#endif
+
 #define KEYSTREAM_ONLY
 #include "chacha_private.h"
 
@@ -92,6 +96,11 @@ _dhcpcd_getentropy(void *buf, size_t length)
 {
 	struct timeval	 tv;
 	uint8_t		*rand = (uint8_t *)buf;
+
+#if defined (HAVE_OPENSSL)
+	if (RAND_priv_bytes(buf, (int)length) == 1)
+		return (0);
+#endif
 
 	if (length < sizeof(tv)) {
 		gettimeofday(&tv, NULL);
