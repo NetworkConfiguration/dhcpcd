@@ -75,6 +75,9 @@ static const char dhcpcd_copyright[] = "Copyright (c) 2006-2023 Roy Marples";
 #ifdef HAVE_CAPSICUM
 #include <sys/capsicum.h>
 #endif
+#ifdef HAVE_OPENSSL
+#include <openssl/crypto.h>
+#endif
 #ifdef HAVE_UTIL_H
 #include <util.h>
 #endif
@@ -2195,6 +2198,11 @@ printpidfile:
 			goto run_loop;
 		}
 	}
+#endif
+
+#ifdef HAVE_OPENSSL
+	OPENSSL_init_crypto(OPENSSL_INIT_ADD_ALL_CIPHERS |
+	    OPENSSL_INIT_ADD_ALL_DIGESTS | OPENSSL_INIT_LOAD_CONFIG, NULL);
 #endif
 
 #ifdef PRIVSEP

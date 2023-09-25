@@ -37,6 +37,7 @@ POLL=
 SMALL=
 SANITIZE=no
 STATUSARG=
+OPENSSL=
 
 DHCPCD_DEFS=dhcpcd-definitions.conf
 
@@ -110,6 +111,8 @@ for x do
 	--with-udev) DEV=yes; UDEV=yes;;
 	--without-udev) UDEV=no;;
 	--with-poll) POLL="$var";;
+	--with-openssl) OPENSSL=yes;;
+	--without-openssl) OPENSSL=no;;
 	--sanitise|--sanitize) SANITIZEADDRESS="yes";;
 	--serviceexists) SERVICEEXISTS=$var;;
 	--servicecmd) SERVICECMD=$var;;
@@ -1350,14 +1353,6 @@ if [ "$FLS64" = yes ]; then
 	echo "#define	HAVE_SYS_BITOPS_H" >>$CONFIG_H
 fi
 
-# Workaround for DragonFlyBSD import
-if [ "$OS" = dragonfly ]; then
-	echo "#ifdef	USE_PRIVATECRYPTO" >>$CONFIG_H
-	echo "#define	HAVE_MD5_H" >>$CONFIG_H
-	echo "#define	SHA2_H			<openssl/sha.h>" >>$CONFIG_H
-	echo "#else" >>$CONFIG_H
-fi
-
 if [ -z "$MD5" ]; then
 	MD5_LIB=
 	printf "Testing for MD5Init ... "
@@ -1387,14 +1382,6 @@ EOF
 	fi
 	echo "$MD5"
 	rm -f _md5.c _md5
-fi
-if [ "$MD5" = no ]; then
-	echo "#include			\"compat/crypt/md5.h\"" >>$CONFIG_H
-	echo "MD5_SRC=	compat/crypt/md5.c" >>$CONFIG_MK
-else
-	echo "MD5_SRC=" >>$CONFIG_MK
-	echo "#define	HAVE_MD5_H" >>$CONFIG_H
-	[ -n "$MD5_LIB" ] && echo "LDADD+=		$MD5_LIB" >>$CONFIG_MK
 fi
 
 if [ -z "$SHA2_H" ]; then
@@ -1481,23 +1468,6 @@ EOF
 		rm -f _sha256.c _sha256
 	fi
 fi
-if [ "$SHA2" = no ]; then
-	echo "#include			\"compat/crypt/sha256.h\"" >>$CONFIG_H
-	echo "SHA256_SRC=	compat/crypt/sha256.c" >>$CONFIG_MK
-else
-	echo "SHA256_SRC=" >>$CONFIG_MK
-	echo "#define	SHA2_H			<$SHA2_H>" >>$CONFIG_H
-	if [ "$SHA2_RENAMED" = yes ]; then
-		echo "#define	SHA256_CTX	SHA2_CTX" >>$CONFIG_H
-		echo "#define	SHA256_Init	SHA256Init" >>$CONFIG_H
-		echo "#define	SHA256_Update	SHA256Update" >>$CONFIG_H
-		echo "#define	SHA256_Final	SHA256Final" >>$CONFIG_H
-	fi
-	[ -n "$SHA2_LIB" ] && echo "LDADD+=		$SHA2_LIB" >>$CONFIG_MK
-fi
-
-# Workarond for DragonFlyBSD import
-[ "$OS" = dragonfly ] && echo "#endif" >>$CONFIG_H
 
 if [ -z "$HMAC" ]; then
 	HMAC_LIB=
@@ -1530,7 +1500,108 @@ EOF
 	echo "$HMAC"
 	rm -f _hmac.c _hmac
 fi
-if [ "$HMAC" = no ]; then
+
+if [ "$OPENSSL" = yes ] ||
+   { [ -z "$OPENSSL" ] && [ "$ALLOW_USR_LIBS" = true ] &&
+     [ "$SHA2" = no ] &&  [ "$HMAC" = no ];
+   }; then
+	printf "Testing for openssl ... "
+	if type "$PKG_CONFIG" >/dev/null 2>&1; then
+		LIBCRYPTO_CFLAGS=$("$PKG_CONFIG" --cflags libcrypto 2>&3)
+		LIBCRYPTO_LIBS=$("$PKG_CONFIG" --libs libcrypto 2>&3)
+	fi
+
+	cat <<EOF >_openssl.c
+#include <stdio.h>
+#include <openssl/crypto.h>
+int main(void) {
+	return OPENSSL_init_crypto(0, NULL) == 1;
+}
+EOF
+	if $XCC $LIBCRYPTO_CFLAGS _openssl.c -o _openssl $LIBCRYPTO_LIBS 2>&3;
+	then
+		OPENSSL=yes
+		MD5=yes
+		MD5_LIB=
+		if [ -n "$LIBCRYPTO_CFLAGS" ]; then
+			echo "CFLAGS+=		$LIBCRYPTO_CFLAGS" >>$CONFIG_MK
+		fi
+		echo "LDADD+=		$LIBCRYPTO_LIBS" >>$CONFIG_MK
+		echo "#define	HAVE_OPENSSL" >>$CONFIG_H
+	else
+		OPENSSL=no
+	fi
+	echo "$OPENSSL"
+	rm -f _openssl.c _openssl
+fi
+
+if [ "$OPENSSL" = yes ]; then
+	printf "Testing for openssl/sha.h ... "
+	cat <<EOF >_openssl_sha.c
+#include <stdio.h>
+#include <openssl/sha.h>
+
+int main(void) {
+	SHA256_CTX ctx;
+	SHA256_Init(&ctx);
+	return 0;
+}
+EOF
+	if $XCC $LIBCRYPTO_CFLAGS _openssl_sha.c -o _openssl_sha \
+	   $LIBCRYPTO_LIBS 2>&3; then
+		SHA2_H=openssl/sha.h
+		SHA2="yes (-lcrypto)"
+	else
+		SHA2=no
+	fi
+	SHA2_LIB=
+	SHA2_RENAMED=
+	echo "$SHA2"
+	rm -f _openssl_sha.c _openssl_sha
+fi
+
+# Workaround for DragonFlyBSD import
+if [ "$OS" = dragonfly ]; then
+	echo "#ifdef	USE_PRIVATECRYPTO" >>$CONFIG_H
+	echo "#define	HAVE_MD5_H" >>$CONFIG_H
+	echo "#define	SHA2_H			<openssl/sha.h>" >>$CONFIG_H
+	echo "#else" >>$CONFIG_H
+fi
+
+if [ "$MD5" = no ]; then
+	echo "#include			\"compat/crypt/md5.h\"" >>$CONFIG_H
+	echo "MD5_SRC=	compat/crypt/md5.c" >>$CONFIG_MK
+else
+	echo "MD5_SRC=" >>$CONFIG_MK
+	[ "$OPENSSL" != yes ] && echo "#define	HAVE_MD5_H" >>$CONFIG_H
+	[ -n "$MD5_LIB" ] && echo "LDADD+=		$MD5_LIB" >>$CONFIG_MK
+fi
+
+if [ "$OPENSSL" = yes ] && [ "$SHA2" = no ]; then
+	echo "#include			\"compat/crypt_openssl/sha256.h\"" >>$CONFIG_H
+	echo "SHA256_SRC=	compat/crypt_openssl/sha256.c" >>$CONFIG_MK
+elif [ "$SHA2" = no ]; then
+	echo "#include			\"compat/crypt/sha256.h\"" >>$CONFIG_H
+	echo "SHA256_SRC=	compat/crypt/sha256.c" >>$CONFIG_MK
+else
+	echo "SHA256_SRC=" >>$CONFIG_MK
+	echo "#define	SHA2_H			<$SHA2_H>" >>$CONFIG_H
+	if [ "$SHA2_RENAMED" = yes ]; then
+		echo "#define	SHA256_CTX	SHA2_CTX" >>$CONFIG_H
+		echo "#define	SHA256_Init	SHA256Init" >>$CONFIG_H
+		echo "#define	SHA256_Update	SHA256Update" >>$CONFIG_H
+		echo "#define	SHA256_Final	SHA256Final" >>$CONFIG_H
+	fi
+	[ -n "$SHA2_LIB" ] && echo "LDADD+=		$SHA2_LIB" >>$CONFIG_MK
+fi
+
+# Workarond for DragonFlyBSD import
+[ "$OS" = dragonfly ] && echo "#endif" >>$CONFIG_H
+
+if [ "$OPENSSL" = yes ]; then
+	echo "#include			\"compat/crypt_openssl/hmac.h\"" >>$CONFIG_H
+	echo "HMAC_SRC=	compat/crypt_openssl/hmac.c" >>$CONFIG_MK
+elif [ "$HMAC" = no ]; then
 	echo "#include			\"compat/crypt/hmac.h\"" >>$CONFIG_H
 	echo "HMAC_SRC=	compat/crypt/hmac.c" >>$CONFIG_MK
 else

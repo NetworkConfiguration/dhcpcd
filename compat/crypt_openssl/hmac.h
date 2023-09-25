@@ -1,8 +1,7 @@
+/* SPDX-License-Identifier: BSD-2-Clause */
 /*
- * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2018 Roy Marples <roy@marples.name>
- * All rights reserved
-
+ * Copyright (c) 2023 Canonical Ltd.
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -25,9 +24,12 @@
  * SUCH DAMAGE.
  */
 
-#ifndef TEST_H
+#ifndef HMAC_H
+#define HMAC_H
 
-int test_hmac_md5(void);
-int test_sha256(void);
+#include <sys/types.h>
+
+ssize_t	 hmac(const char *, const void *, size_t, const void *, size_t, void *,
+   size_t);
 
 #endif
