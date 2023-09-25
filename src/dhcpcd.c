@@ -1414,6 +1414,7 @@ dhcpcd_renew(struct dhcpcd_ctx *ctx)
 
 #ifdef USE_SIGNALS
 #define sigmsg "received %s, %s"
+static volatile bool dhcpcd_exiting = false;
 void
 dhcpcd_signal_cb(int sig, void *arg)
 {
@@ -1486,9 +1487,20 @@ dhcpcd_signal_cb(int sig, void *arg)
 		return;
 	}
 
+	/*
+	 * Privsep has a mini-eloop for reading data from other processes.
+	 * This mini-eloop processes signals as well so we can reap children.
+	 * During teardown we don't want to process SIGTERM or SIGINT again,
+	 * as that could trigger memory issues.
+	 */
+	if (dhcpcd_exiting)
+		return;
+
+	dhcpcd_exiting = true;
 	if (!(ctx->options & DHCPCD_TEST))
 		stop_all_interfaces(ctx, opts);
 	eloop_exit(ctx->eloop, exit_code);
+	dhcpcd_exiting = false;
 }
 #endif
 
