@@ -1022,9 +1022,11 @@ dhcp6_makemessage(struct interface *ifp)
 						n--;
 					while (n-- > 0)
 						*ep++ = *pp--;
-					if (u8)
+					n = ep - exb;
+					if (u8) {
 						*ep = (uint8_t)(*pp << u8);
-					n++;
+						n++;
+					}
 					COPYIN(D6_OPTION_PD_EXCLUDE, exb,
 					    (uint16_t)n);
 					ia_na_len = (uint16_t)
