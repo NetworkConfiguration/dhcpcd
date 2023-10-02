@@ -1022,7 +1022,7 @@ dhcp6_makemessage(struct interface *ifp)
 						n--;
 					while (n-- > 0)
 						*ep++ = *pp--;
-					n = ep - exb;
+					n = (size_t)(ep - exb);
 					if (u8) {
 						*ep = (uint8_t)(*pp << u8);
 						n++;
