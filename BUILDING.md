@@ -150,6 +150,14 @@ You can disable this with `--without-dev`, or `without-udev`.
 NOTE: in Gentoo at least, `sys-fs/udev` as provided by systemd leaks memory
 `sys-fs/eudev`, the fork of udev does not and as such is recommended.
 
+## crypto
+dhcpcd ships with some cryptographic routines taken from various upstreams.
+These are routinely monitored and try to be as up to date as possible.
+You can optionally configure dhcpcd with `--with-openssl` to use libcrypto
+to use these instead.
+This is not enabled by default, even if libcrypto is found because libcrypto
+generally lives in /usr and dhcpcd in /sbin which could be a separate
+filesystem.
 
 ## Importing into another source control system
 To import the full sources, use the import target.
