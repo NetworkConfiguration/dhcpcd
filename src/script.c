@@ -682,6 +682,21 @@ send_interface(struct fd_list *fd, const struct interface *ifp, int af)
 }
 
 static int
+script_status(const char *script, int status)
+{
+
+	if (WIFEXITED(status)) {
+		if (WEXITSTATUS(status))
+			logerrx("%s: %s: WEXITSTATUS %d",
+			    __func__, script, WEXITSTATUS(status));
+	} else if (WIFSIGNALED(status))
+		logerrx("%s: %s: %s",
+		    __func__, script, strsignal(WTERMSIG(status)));
+
+	return WEXITSTATUS(status);
+}
+
+static int
 script_run(struct dhcpcd_ctx *ctx, char **argv)
 {
 	pid_t pid;
@@ -699,13 +714,7 @@ script_run(struct dhcpcd_ctx *ctx, char **argv)
 				break;
 			}
 		}
-		if (WIFEXITED(status)) {
-			if (WEXITSTATUS(status))
-				logerrx("%s: %s: WEXITSTATUS %d",
-				    __func__, argv[0], WEXITSTATUS(status));
-		} else if (WIFSIGNALED(status))
-			logerrx("%s: %s: %s",
-			    __func__, argv[0], strsignal(WTERMSIG(status)));
+		status = script_status(argv[0], status);
 	}
 
 	return WEXITSTATUS(status);
@@ -763,9 +772,13 @@ script_runreason(const struct interface *ifp, const char *reason)
 
 #ifdef PRIVSEP
 	if (ctx->options & DHCPCD_PRIVSEP) {
-		if (ps_root_script(ctx,
-		    ctx->script_buf, (size_t)buflen) == -1)
+		ssize_t err;
+
+		err = ps_root_script(ctx, ctx->script_buf, (size_t)buflen);
+		if (err == -1)
 			logerr(__func__);
+		else
+			script_status(ctx->script, (int)err);
 		goto send_listeners;
 	}
 #endif
