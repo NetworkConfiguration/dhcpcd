@@ -1869,6 +1869,22 @@ dhcpcd_pidfile_timeout(void *arg)
 		    dhcpcd_pidfile_timeout, ctx);
 }
 
+static int dup_null(int fd)
+{
+	int err;
+	int fd_null = open(_PATH_DEVNULL, O_RDONLY);
+
+	if (fd_null == -1) {
+		logwarn("open %s", _PATH_DEVNULL);
+		return -1;
+	}
+
+	if ((err = dup2(fd, fd_null)) == -1)
+		logwarn("dup2 %d", fd);
+	close(fd);
+	return err;
+}
+
 int
 main(int argc, char **argv, char **envp)
 {
@@ -2341,8 +2357,10 @@ printpidfile:
 	}
 
 	loginfox(PACKAGE "-" VERSION " starting");
-	if (ctx.stdin_valid && freopen(_PATH_DEVNULL, "w", stdin) == NULL)
-		logwarn("freopen stdin");
+
+	// We don't need stdin past this point
+	if (ctx.stdin_valid)
+		dup_null(STDIN_FILENO);
 
 #if defined(USE_SIGNALS) && !defined(THERE_IS_NO_FORK)
 	if (!(ctx.options & DHCPCD_DAEMONISE))
@@ -2385,10 +2403,9 @@ printpidfile:
 				logerr("dup2");
 			close(stderr_fd[0]);
 			close(stderr_fd[1]);
-		} else if (ctx.stdout_valid) {
-			if (freopen(_PATH_DEVNULL, "w", stdout) == NULL)
-				logerr("freopen stdout");
-		}
+		} else if (ctx.stdout_valid)
+			dup_null(STDOUT_FILENO);
+
 		if (setsid() == -1) {
 			logerr("%s: setsid", __func__);
 			goto exit_failure;
