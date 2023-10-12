@@ -364,6 +364,9 @@ static struct sock_filter ps_seccomp_filter[] = {
 #ifdef __NR_mmap
 	SECCOMP_ALLOW(__NR_mmap),
 #endif
+#ifdef __NR_mmap2
+	SECCOMP_ALLOW(__NR_mmap2),
+#endif
 #ifdef __NR_munmap
 	SECCOMP_ALLOW(__NR_munmap),
 #endif
