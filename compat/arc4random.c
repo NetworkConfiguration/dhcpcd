@@ -195,7 +195,7 @@ _rs_stir(void)
 		_rs_init(rnd, sizeof(rnd));
 	else
 		_rs_rekey(rnd, sizeof(rnd));
-	explicit_bzero(rnd, sizeof(rnd));	/* discard source seed */
+	memset(rnd, 0, sizeof(rnd));	/* discard source seed */
 
 	/* invalidate rs_buf */
 	rs->rs_have = 0;
