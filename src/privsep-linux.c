@@ -301,6 +301,9 @@ static struct sock_filter ps_seccomp_filter[] = {
 #if defined(__x86_64__) && defined(__ILP32__) && defined(__X32_SYSCALL_BIT)
 	SECCOMP_ALLOW(__NR_clock_gettime & ~__X32_SYSCALL_BIT),
 #endif
+#ifdef __NR_clock_gettime32
+	SECCOMP_ALLOW(__NR_clock_gettime32),
+#endif
 #ifdef __NR_clock_gettime64
 	SECCOMP_ALLOW(__NR_clock_gettime64),
 #endif
