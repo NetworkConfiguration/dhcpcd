@@ -310,6 +310,9 @@ static struct sock_filter ps_seccomp_filter[] = {
 #ifdef __NR_close
 	SECCOMP_ALLOW(__NR_close),
 #endif
+#ifdef __NR_dup2
+	SECCOMP_ALLOW(__NR_dup2), // daemonising dups stderr to stdin(/dev/null)
+#endif
 #ifdef __NR_epoll_ctl
 	SECCOMP_ALLOW(__NR_epoll_ctl),
 #endif
