@@ -700,24 +700,24 @@ static int
 script_run(struct dhcpcd_ctx *ctx, char **argv)
 {
 	pid_t pid;
-	int status = 0;
+	int status;
 
 	pid = script_exec(argv, ctx->script_env);
-	if (pid == -1)
+	if (pid == -1) {
 		logerr("%s: %s", __func__, argv[0]);
-	else if (pid != 0) {
-		/* Wait for the script to finish */
-		while (waitpid(pid, &status, 0) == -1) {
-			if (errno != EINTR) {
-				logerr("%s: waitpid", __func__);
-				status = 0;
-				break;
-			}
-		}
-		status = script_status(argv[0], status);
-	}
+		return -1;
+	} else if (pid == 0)
+		return 0;
 
-	return WEXITSTATUS(status);
+	/* Wait for the script to finish */
+	while (waitpid(pid, &status, 0) == -1) {
+		if (errno != EINTR) {
+			logerr("%s: waitpid", __func__);
+			status = 0;
+			break;
+		}
+	}
+	return script_status(argv[0], status);
 }
 
 int
@@ -771,7 +771,7 @@ script_runreason(const struct interface *ifp, const char *reason)
 	logdebugx("%s: executing: %s %s", ifp->name, argv[0], reason);
 
 #ifdef PRIVSEP
-	if (ctx->options & DHCPCD_PRIVSEP) {
+	if (IN_PRIVSEP(ctx)) {
 		ssize_t err;
 
 		err = ps_root_script(ctx, ctx->script_buf, (size_t)buflen);
