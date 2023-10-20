@@ -339,18 +339,14 @@ dhcpcd_daemonised(struct dhcpcd_ctx *ctx)
 	 * Stop writing to stderr.
 	 * On the happy path, only the manager process writes to stderr,
 	 * so this just stops wasting fprintf calls to nowhere.
-	 * All other calls - ie errors in privsep processes or script output,
-	 * will error when printing.
-	 * If we *really* want to fix that, then we need to suck
-	 * stderr/stdout in the manager process and either discard it or pass
-	 * it to the launcher process and then to stderr.
 	 */
 	logopts &= ~LOGERR_ERR;
 	logsetopts(logopts);
 
 	/*
-	 * We need to do something with stdout/stderr to avoid SIGPIPE
-	 * We know that stdin is already mapped to /dev/null
+	 * We need to do something with stdout/stderr to avoid SIGPIPE.
+	 * We know that stdin is already mapped to /dev/null.
+	 * TODO: Capture script output and log it to the logfile and/or syslog.
 	 */
 	dup2(STDIN_FILENO, STDOUT_FILENO);
 	dup2(STDIN_FILENO, STDERR_FILENO);
