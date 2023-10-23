@@ -945,6 +945,7 @@ fi
 if [ -z "$MEMSET_S" ]; then
 	printf "Testing for memset_s ... "
 	cat <<EOF >_memset_s.c
+#define	__STDC_WANT_LIB_EXT1__ 1
 #include <string.h>
 int main(void) {
 	int a;
@@ -961,6 +962,7 @@ EOF
 	rm -f _memset_s.c _memset_s
 fi
 if [ "$MEMSET_S" = yes ]; then
+	echo "#define	__STDC_WANT_LIB_EXT1__	1" >>$CONFIG_H
 	echo "#define	HAVE_MEMSET_S" >>$CONFIG_H
 fi
 
