@@ -907,7 +907,7 @@ int main(void) {
 	return 0;
 }
 EOF
-	if $XCC __memset_explicit.c -o _memset_explicit 2>&3; then
+	if $XCC _memset_explicit.c -o _memset_explicit 2>&3; then
 		MEMSET_EXPLICIT=yes
 	else
 		MEMSET_EXPLICIT=no
@@ -952,7 +952,7 @@ int main(void) {
 	return 0;
 }
 EOF
-	if $XCC __memset_s.c -o _memset_s 2>&3; then
+	if $XCC _memset_s.c -o _memset_s 2>&3; then
 		MEMSET_S=yes
 	else
 		MEMSET_S=no
