@@ -195,7 +195,16 @@ _rs_stir(void)
 		_rs_init(rnd, sizeof(rnd));
 	else
 		_rs_rekey(rnd, sizeof(rnd));
-	memset(rnd, 0, sizeof(rnd));	/* discard source seed */
+#if defined(HAVE_EXPLICIT_BZERO)
+	explicit_bzero(rnd, sizeof(rnd));	/* discard source seed */
+#elif defined(HAVE_MEMSET_EXPLICIT)
+	(void)memset_explicit(rnd, 0, sizeof(rnd));
+#elif defined(HAVE_MEMSET_S)
+	(void)memset_s(rnd, sizeof(rnd), 0, sizeof(rnd));
+#else
+#warning potentially insecure use of memset discarding the source seed
+	(void)memset(rnd, 0, sizeof(rnd));	/* discard source seed */
+#endif
 
 	/* invalidate rs_buf */
 	rs->rs_have = 0;
