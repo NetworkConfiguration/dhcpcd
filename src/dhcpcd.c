@@ -365,7 +365,6 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 	return;
 #else
 	int i;
-	unsigned int logopts = loggetopts();
 
 	if (ctx->options & DHCPCD_DAEMONISE &&
 	    !(ctx->options & (DHCPCD_DAEMONISED | DHCPCD_NOWAITIP)))
@@ -385,11 +384,6 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 	    !(ctx->options & DHCPCD_DAEMONISE))
 		return;
 
-	/* Don't use loginfo because this makes no sense in a log. */
-	if (!(logopts & LOGERR_QUIET) && ctx->stderr_valid)
-		(void)fprintf(stderr,
-		    "forked to background, child pid %d\n", getpid());
-
 #ifdef PRIVSEP
 	ps_daemonised(ctx);
 #else
@@ -400,9 +394,8 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 	if (write(ctx->fork_fd, &i, sizeof(i)) == -1)
 		logerr("write");
 	ctx->options |= DHCPCD_DAEMONISED;
-	eloop_event_delete(ctx->eloop, ctx->fork_fd);
-	close(ctx->fork_fd);
-	ctx->fork_fd = -1;
+	// dhcpcd_fork_cb will close the socket
+	shutdown(ctx->fork_fd, SHUT_RDWR);
 #endif
 }
 
@@ -1823,31 +1816,6 @@ dhcpcd_readdump(struct dhcpcd_ctx *ctx)
 }
 
 static void
-dhcpcd_fork_cb(void *arg, unsigned short events)
-{
-	struct dhcpcd_ctx *ctx = arg;
-	int exit_code;
-	ssize_t len;
-
-	if (!(events & ELE_READ))
-		logerrx("%s: unexpected event 0x%04x", __func__, events);
-
-	len = read(ctx->fork_fd, &exit_code, sizeof(exit_code));
-	if (len == -1) {
-		logerr(__func__);
-		exit_code = EXIT_FAILURE;
-	} else if ((size_t)len < sizeof(exit_code)) {
-		logerrx("%s: truncated read %zd (expected %zu)",
-		    __func__, len, sizeof(exit_code));
-		exit_code = EXIT_FAILURE;
-	}
-	if (ctx->options & DHCPCD_FORKED)
-		eloop_exit(ctx->eloop, exit_code);
-	else
-		dhcpcd_signal_cb(exit_code, ctx);
-}
-
-static void
 dhcpcd_stderr_cb(void *arg, unsigned short events)
 {
 	struct dhcpcd_ctx *ctx = arg;
@@ -1869,6 +1837,51 @@ dhcpcd_stderr_cb(void *arg, unsigned short events)
 
 	log[len] = '\0';
 	fprintf(stderr, "%s", log);
+}
+
+static void
+dhcpcd_fork_cb(void *arg, unsigned short events)
+{
+	struct dhcpcd_ctx *ctx = arg;
+	int exit_code;
+	ssize_t len;
+
+	if (!(events & ELE_READ))
+		logerrx("%s: unexpected event 0x%04x", __func__, events);
+
+	len = read(ctx->fork_fd, &exit_code, sizeof(exit_code));
+	if (len == -1) {
+		logerr(__func__);
+		eloop_exit(ctx->eloop, EXIT_FAILURE);
+		return;
+	}
+	if (len == 0) {
+		if (ctx->options & DHCPCD_FORKED) {
+			logerrx("%s: dhcpcd manager hungup", __func__);
+			eloop_exit(ctx->eloop, EXIT_FAILURE);
+		} else {
+			// Launcher exited
+			eloop_event_delete(ctx->eloop, ctx->fork_fd);
+			close(ctx->fork_fd);
+			ctx->fork_fd = -1;
+		}
+		return;
+	}
+	if ((size_t)len < sizeof(exit_code)) {
+		logerrx("%s: truncated read %zd (expected %zu)",
+		    __func__, len, sizeof(exit_code));
+		eloop_exit(ctx->eloop, EXIT_FAILURE);
+		return;
+	}
+
+	if (ctx->options & DHCPCD_FORKED) {
+		if (exit_code == EXIT_SUCCESS)
+			logdebugx("forked to background");
+		else
+			logerrx("exited with code %d", exit_code);
+		eloop_exit(ctx->eloop, exit_code);
+	} else
+		dhcpcd_signal_cb(exit_code, ctx);
 }
 
 static void
