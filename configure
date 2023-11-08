@@ -263,6 +263,10 @@ echo "Configuring dhcpcd for ... $OS"
 rm -f $CONFIG_H $CONFIG_MK
 echo "# $OS" >$CONFIG_MK
 echo "/* $OS */" >$CONFIG_H
+echo >>$CONFIG_H
+echo "#ifndef CONFIG_H">>$CONFIG_H
+echo "#define CONFIG_H">>$CONFIG_H
+echo >>$CONFIG_H
 
 : ${SYSCONFDIR:=$PREFIX/etc}
 : ${SBINDIR:=$PREFIX/sbin}
@@ -1917,6 +1921,9 @@ if ! $HOOKSET; then
 		fi
 	fi
 fi
+
+echo >>$CONFIG_H
+echo "#endif /*CONFIG_H*/">>$CONFIG_H
 
 find_hook()
 {
