@@ -622,6 +622,9 @@ ps_entersandbox(const char *_pledge, const char **sandbox)
 #elif defined(HAVE_PLEDGE)
 	if (sandbox != NULL)
 		*sandbox = "pledge";
+	// There is no need to use unveil(2) because we are in an empty chroot
+	// This is encouraged by Theo de Raadt himself:
+	// https://www.mail-archive.com/misc@openbsd.org/msg171655.html
 	return pledge(_pledge, NULL);
 #elif defined(HAVE_SECCOMP)
 	if (sandbox != NULL)
