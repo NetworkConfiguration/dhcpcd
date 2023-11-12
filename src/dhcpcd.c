@@ -395,7 +395,6 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 		logerr("write");
 	ctx->options |= DHCPCD_DAEMONISED;
 	// dhcpcd_fork_cb will close the socket
-	shutdown(ctx->fork_fd, SHUT_RDWR);
 #endif
 }
 
@@ -1877,8 +1876,6 @@ dhcpcd_fork_cb(void *arg, unsigned short events)
 	if (ctx->options & DHCPCD_FORKED) {
 		if (exit_code == EXIT_SUCCESS)
 			logdebugx("forked to background");
-		else
-			logerrx("exited with code %d", exit_code);
 		eloop_exit(ctx->eloop, exit_code);
 	} else
 		dhcpcd_signal_cb(exit_code, ctx);
@@ -2738,8 +2735,19 @@ exit1:
 	if (ps_stopwait(&ctx) != EXIT_SUCCESS)
 		i = EXIT_FAILURE;
 #endif
-	if (ctx.options & DHCPCD_STARTED && !(ctx.options & DHCPCD_FORKED))
+	if (ctx.options & DHCPCD_STARTED && !(ctx.options & DHCPCD_FORKED)) {
 		loginfox(PACKAGE " exited");
+#ifdef USE_SIGNALS
+		/* Detach from the launch process.
+		 * This *should* happen after we stop the root process,
+		 * but for some reason non privsep builds get a zero length
+		 * read in dhcpcd_fork_cb(). */
+		if (ctx.fork_fd != -1) {
+			if (write(ctx.fork_fd, &i, sizeof(i)) == -1)
+				logerr("%s: write", __func__);
+		}
+#endif
+	}
 #ifdef PRIVSEP
 	if (ps_root_stop(&ctx) == -1)
 		i = EXIT_FAILURE;
@@ -2753,12 +2761,6 @@ exit1:
 	setproctitle_fini();
 #endif
 #ifdef USE_SIGNALS
-	if (ctx.options & DHCPCD_STARTED) {
-		/* Try to detach from the launch process. */
-		if (ctx.fork_fd != -1 &&
-		    write(ctx.fork_fd, &i, sizeof(i)) == -1)
-			logerr("%s: write", __func__);
-	}
 	if (ctx.options & (DHCPCD_FORKED | DHCPCD_PRIVSEP))
 		_exit(i); /* so atexit won't remove our pidfile */
 #endif
