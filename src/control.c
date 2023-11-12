@@ -113,8 +113,9 @@ control_handle_read(struct fd_list *fd)
 	ssize_t bytes;
 
 	bytes = read(fd->fd, buffer, sizeof(buffer) - 1);
-	if (bytes == -1) {
+	if (bytes == -1)
 		logerr(__func__);
+	if (bytes == -1 || bytes == 0) {
 		control_hangup(fd);
 		return;
 	}
