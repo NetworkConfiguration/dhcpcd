@@ -388,9 +388,8 @@ dhcpcd_daemonise(struct dhcpcd_ctx *ctx)
 	if (IN_PRIVSEP(ctx))
 		ps_daemonised(ctx);
 	else
-#else
-		dhcpcd_daemonised(ctx);
 #endif
+		dhcpcd_daemonised(ctx);
 
 	eloop_event_delete(ctx->eloop, ctx->fork_fd);
 	exit_code = EXIT_SUCCESS;
