@@ -172,8 +172,7 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 	 * Obviously this won't work if we are using a logfile
 	 * or redirecting stderr to a file. */
 	if ((ctx->options & DHC_NOCHKIO) == DHC_NOCHKIO ||
-	    (ctx->logfile == NULL &&
-	    (!ctx->stderr_valid || isatty(STDERR_FILENO) == 1)))
+	    (ctx->logfile == NULL && isatty(STDERR_FILENO) == 1))
 	{
 		if (setrlimit(RLIMIT_FSIZE, &rzero) == -1)
 			logerr("setrlimit RLIMIT_FSIZE");
@@ -305,14 +304,11 @@ ps_rights_limit_stdio(struct dhcpcd_ctx *ctx)
 	const int iebadf = CAPH_IGNORE_EBADF;
 	int error = 0;
 
-	if (ctx->stdin_valid &&
-	    caph_limit_stream(STDIN_FILENO, CAPH_READ | iebadf) == -1)
+	if (caph_limit_stream(STDIN_FILENO, CAPH_READ | iebadf) == -1)
 		error = -1;
-	if (ctx->stdout_valid &&
-	    caph_limit_stream(STDOUT_FILENO, CAPH_WRITE | iebadf) == -1)
+	if (caph_limit_stream(STDOUT_FILENO, CAPH_WRITE | iebadf) == -1)
 		error = -1;
-	if (ctx->stderr_valid &&
-	    caph_limit_stream(STDERR_FILENO, CAPH_WRITE | iebadf) == -1)
+	if (caph_limit_stream(STDERR_FILENO, CAPH_WRITE | iebadf) == -1)
 		error = -1;
 
 	return error;
