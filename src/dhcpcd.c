@@ -657,20 +657,17 @@ configure_interface(struct interface *ifp, int argc, char **argv,
 }
 
 static void
-dhcpcd_initstate2(struct interface *ifp, unsigned long long options)
+dhcpcd_initstate1(struct interface *ifp, int argc, char **argv,
+    unsigned long long options)
 {
 	struct if_options *ifo;
 
-	if (options) {
-		if ((ifo = default_config(ifp->ctx)) == NULL) {
-			logerr(__func__);
-			return;
-		}
-		ifo->options |= options;
-		free(ifp->options);
-		ifp->options = ifo;
-	} else
-		ifo = ifp->options;
+	configure_interface(ifp, argc, argv, options);
+	if (!ifp->active)
+		return;
+
+	ifo = ifp->options;
+	ifo->options |= options;
 
 #ifdef INET6
 	if (ifo->options & DHCPCD_IPV6 && ipv6_init(ifp->ctx) == -1) {
@@ -678,16 +675,6 @@ dhcpcd_initstate2(struct interface *ifp, unsigned long long options)
 		ifo->options &= ~DHCPCD_IPV6;
 	}
 #endif
-}
-
-static void
-dhcpcd_initstate1(struct interface *ifp, int argc, char **argv,
-    unsigned long long options)
-{
-
-	configure_interface(ifp, argc, argv, options);
-	if (ifp->active)
-		dhcpcd_initstate2(ifp, 0);
 }
 
 static void
@@ -1033,15 +1020,17 @@ dhcpcd_activateinterface(struct interface *ifp, unsigned long long options)
 	if (ifp->active)
 		return;
 
+	/* IF_ACTIVE_USER will start protocols when the interface is started.
+	 * IF_ACTIVE will ask the protocols for setup,
+	 * such as any delegated prefixes. */
 	ifp->active = IF_ACTIVE;
-	dhcpcd_initstate2(ifp, options);
+	dhcpcd_initstate(ifp, options);
 
 	/* It's possible we might not have been able to load
 	 * a config. */
 	if (!ifp->active)
 		return;
 
-	configure_interface1(ifp);
 	run_preinit(ifp);
 	dhcpcd_prestartinterface(ifp);
 }
