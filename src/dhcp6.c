@@ -3871,8 +3871,9 @@ dhcp6_activateinterfaces(struct interface *ifp)
 			sla = &ia->sla[j];
 			ifd = if_find(ifp->ctx->ifaces, sla->ifname);
 			if (ifd == NULL) {
-				logwarn("%s: cannot delegate to %s",
-				    ifp->name, sla->ifname);
+				if (*sla->ifname != '-')
+					logwarn("%s: cannot delegate to %s",
+					    ifp->name, sla->ifname);
 				continue;
 			}
 			if (!ifd->active) {
