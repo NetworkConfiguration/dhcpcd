@@ -65,6 +65,7 @@
 #define DHCPCD_GATEWAY			(1ULL << 3)
 #define DHCPCD_STATIC			(1ULL << 4)
 #define DHCPCD_DEBUG			(1ULL << 5)
+#define DHCPCD_ARP_PERSISTDEFENCE	(1ULL << 6)
 #define DHCPCD_LASTLEASE		(1ULL << 7)
 #define DHCPCD_INFORM			(1ULL << 8)
 #define DHCPCD_REQUEST			(1ULL << 9)
@@ -183,6 +184,7 @@
 #define O_CONFIGURE		O_BASE + 50
 #define O_NOCONFIGURE		O_BASE + 51
 #define O_RANDOMISE_HWADDR	O_BASE + 52
+#define O_ARP_PERSISTDEFENCE	O_BASE + 53
 
 extern const struct option cf_options[];
 

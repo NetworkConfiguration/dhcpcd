@@ -168,6 +168,7 @@ const struct option cf_options[] = {
 	{"link_rcvbuf",     required_argument, NULL, O_LINK_RCVBUF},
 	{"configure",       no_argument,       NULL, O_CONFIGURE},
 	{"noconfigure",     no_argument,       NULL, O_NOCONFIGURE},
+	{"arp_persistdefence", no_argument,    NULL, O_ARP_PERSISTDEFENCE},
 	{NULL,              0,                 NULL, '\0'}
 };
 
@@ -2336,6 +2337,9 @@ invalid_token:
 		break;
 	case O_NOCONFIGURE:
 		ifo->options &= ~DHCPCD_CONFIGURE;
+		break;
+	case O_ARP_PERSISTDEFENCE:
+		ifo->options |= DHCPCD_ARP_PERSISTDEFENCE;
 		break;
 	default:
 		return 0;
