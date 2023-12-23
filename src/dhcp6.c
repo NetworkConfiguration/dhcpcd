@@ -179,7 +179,6 @@ static const char * const dhcp6_statuses[] = {
 
 static void dhcp6_bind(struct interface *, const char *, const char *);
 static void dhcp6_failinform(void *);
-static void dhcp6_recvaddr(void *, unsigned short);
 static void dhcp6_startdecline(struct interface *);
 
 #ifdef SMALL
@@ -861,7 +860,6 @@ dhcp6_makemessage(struct interface *ifp)
 	}
 
 	if (state->state == DH6S_DISCOVER &&
-	    !(ifp->ctx->options & DHCPCD_TEST) &&
 	    DHC_REQ(ifo->requestmask6, ifo->nomask6, D6_OPTION_RAPID_COMMIT))
 		len += sizeof(o);
 
@@ -883,15 +881,6 @@ dhcp6_makemessage(struct interface *ifp)
 	default:
 		unicast = NULL;
 		break;
-	}
-
-	/* In non manager mode we listen and send from fixed addresses.
-	 * We should try and match an address we have to unicast to,
-	 * but for now this is the safest policy. */
-	if (unicast != NULL && !(ifp->ctx->options & DHCPCD_MANAGER)) {
-		logdebugx("%s: ignoring unicast option as not manager",
-		    ifp->name);
-		unicast = NULL;
 	}
 
 #ifdef AUTH
@@ -1111,7 +1100,6 @@ dhcp6_makemessage(struct interface *ifp)
 	COPYIN(D6_OPTION_ELAPSED, &si_len, sizeof(si_len));
 
 	if (state->state == DH6S_DISCOVER &&
-	    !(ifp->ctx->options & DHCPCD_TEST) &&
 	    DHC_REQ(ifo->requestmask6, ifo->nomask6, D6_OPTION_RAPID_COMMIT))
 		COPYIN1(D6_OPTION_RAPID_COMMIT, 0);
 
@@ -2102,10 +2090,6 @@ dhcp6_checkstatusok(const struct interface *ifp,
 	state->lerror = code;
 	errno = 0;
 
-	/* code cannot be D6_STATUS_OK, so there is a failure */
-	if (ifp->ctx->options & DHCPCD_TEST)
-		eloop_exit(ifp->ctx->eloop, EXIT_FAILURE);
-
 	return (int)code;
 }
 
@@ -2739,10 +2723,7 @@ dhcp6_startinit(struct interface *ifp)
 		}
 	}
 
-	if (!(ifp->ctx->options & DHCPCD_TEST) &&
-	    !(has_ta && !has_non_ta) &&
-	    ifp->options->reboot != 0)
-	{
+	if (!(has_ta && !has_non_ta) && ifp->options->reboot != 0) {
 		r = dhcp6_readlease(ifp, 1);
 		if (r == -1) {
 			if (errno != ENOENT && errno != ESRCH)
@@ -3225,70 +3206,59 @@ dhcp6_bind(struct interface *ifp, const char *op, const char *sfrom)
 		confirmed = true;
 	}
 
-	if (ifp->ctx->options & DHCPCD_TEST)
-		script_runreason(ifp, "TEST");
-	else {
-		if (state->state == DH6S_INFORM)
-			state->state = DH6S_INFORMED;
-		else
-			state->state = DH6S_BOUND;
-		state->failed = false;
+	if (state->state == DH6S_INFORM)
+		state->state = DH6S_INFORMED;
+	else
+		state->state = DH6S_BOUND;
+	state->failed = false;
 
-		if (state->renew && state->renew != ND6_INFINITE_LIFETIME)
-			eloop_timeout_add_sec(ifp->ctx->eloop,
-			    state->renew,
-			    state->state == DH6S_INFORMED ?
-			    dhcp6_startinform : dhcp6_startrenew, ifp);
-		if (state->rebind && state->rebind != ND6_INFINITE_LIFETIME)
-			eloop_timeout_add_sec(ifp->ctx->eloop,
-			    state->rebind, dhcp6_startrebind, ifp);
-		if (state->expire != ND6_INFINITE_LIFETIME)
-			eloop_timeout_add_sec(ifp->ctx->eloop,
-			    state->expire, dhcp6_startexpire, ifp);
+	if (state->renew && state->renew != ND6_INFINITE_LIFETIME)
+		eloop_timeout_add_sec(ifp->ctx->eloop,
+		    state->renew,
+		    state->state == DH6S_INFORMED ?
+		    dhcp6_startinform : dhcp6_startrenew, ifp);
+	if (state->rebind && state->rebind != ND6_INFINITE_LIFETIME)
+		eloop_timeout_add_sec(ifp->ctx->eloop,
+		    state->rebind, dhcp6_startrebind, ifp);
+	if (state->expire != ND6_INFINITE_LIFETIME)
+		eloop_timeout_add_sec(ifp->ctx->eloop,
+		    state->expire, dhcp6_startexpire, ifp);
 
-		if (ifp->options->options & DHCPCD_CONFIGURE) {
-			ipv6_addaddrs(&state->addrs);
-			if (!timedout)
-				dhcp6_deprecateaddrs(&state->addrs);
-		}
+	if (ifp->options->options & DHCPCD_CONFIGURE) {
+		ipv6_addaddrs(&state->addrs);
+		if (!timedout)
+			dhcp6_deprecateaddrs(&state->addrs);
+	}
 
-		if (state->state == DH6S_INFORMED)
-			logmessage(loglevel, "%s: refresh in %"PRIu32" seconds",
-			    ifp->name, state->renew);
-		else if (state->renew == ND6_INFINITE_LIFETIME)
-			logmessage(loglevel, "%s: leased for infinity",
-			    ifp->name);
-		else if (state->renew || state->rebind)
-			logmessage(loglevel, "%s: renew in %"PRIu32", "
-			    "rebind in %"PRIu32", "
-			    "expire in %"PRIu32" seconds",
-			    ifp->name,
-			    state->renew, state->rebind, state->expire);
-		else if (state->expire == 0)
-			logmessage(loglevel, "%s: will expire", ifp->name);
-		else
-			logmessage(loglevel, "%s: expire in %"PRIu32" seconds",
-			    ifp->name, state->expire);
-		rt_build(ifp->ctx, AF_INET6);
-		if (!confirmed && !timedout) {
-			logdebugx("%s: writing lease: %s",
-			    ifp->name, state->leasefile);
-			if (dhcp_writefile(ifp->ctx, state->leasefile, 0640,
-			    state->new, state->new_len) == -1)
-				logerr("dhcp_writefile: %s",state->leasefile);
-		}
+	if (state->state == DH6S_INFORMED)
+		logmessage(loglevel, "%s: refresh in %"PRIu32" seconds",
+		    ifp->name, state->renew);
+	else if (state->renew == ND6_INFINITE_LIFETIME)
+		logmessage(loglevel, "%s: leased for infinity",
+		    ifp->name);
+	else if (state->renew || state->rebind)
+		logmessage(loglevel, "%s: renew in %"PRIu32", "
+		    "rebind in %"PRIu32", "
+		    "expire in %"PRIu32" seconds",
+		    ifp->name,
+		    state->renew, state->rebind, state->expire);
+	else if (state->expire == 0)
+		logmessage(loglevel, "%s: will expire", ifp->name);
+	else
+		logmessage(loglevel, "%s: expire in %"PRIu32" seconds",
+		    ifp->name, state->expire);
+	rt_build(ifp->ctx, AF_INET6);
+	if (!confirmed && !timedout) {
+		logdebugx("%s: writing lease: %s",
+		    ifp->name, state->leasefile);
+		if (dhcp_writefile(ifp->ctx, state->leasefile, 0640,
+		    state->new, state->new_len) == -1)
+			logerr("dhcp_writefile: %s",state->leasefile);
+	}
 #ifndef SMALL
-		dhcp6_delegate_prefix(ifp);
+	dhcp6_delegate_prefix(ifp);
 #endif
-		dhcp6_script_try_run(ifp, 0);
-	}
-
-	if (ifp->ctx->options & DHCPCD_TEST ||
-	    (ifp->options->options & DHCPCD_INFORM &&
-	    !(ifp->ctx->options & DHCPCD_MANAGER)))
-	{
-		eloop_exit(ifp->ctx->eloop, EXIT_SUCCESS);
-	}
+	dhcp6_script_try_run(ifp, 0);
 }
 
 static void
@@ -3595,7 +3565,7 @@ bind:
 }
 
 void
-dhcp6_recvmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg, struct ipv6_addr *ia)
+dhcp6_recvmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg)
 {
 	struct sockaddr_in6 *from = msg->msg_name;
 	size_t len = msg->msg_iov[0].iov_len;
@@ -3612,14 +3582,10 @@ dhcp6_recvmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg, struct ipv6_addr *ia)
 		return;
 	}
 
-	if (ia != NULL)
-		ifp = ia->iface;
-	else {
-		ifp = if_findifpfromcmsg(ctx, msg, NULL);
-		if (ifp == NULL) {
-			logerr(__func__);
-			return;
-		}
+	ifp = if_findifpfromcmsg(ctx, msg, NULL);
+	if (ifp == NULL) {
+		logerr(__func__);
+		return;
 	}
 
 	r = (struct dhcp6_message *)msg->msg_iov[0].iov_base;
@@ -3733,8 +3699,9 @@ recvif:
 }
 
 static void
-dhcp6_recv(struct dhcpcd_ctx *ctx, struct ipv6_addr *ia, unsigned short events)
+dhcp6_recv(void *arg, unsigned short events)
 {
+	struct dhcpcd_ctx *ctx = arg;
 	struct sockaddr_in6 from;
 	union {
 		struct dhcp6_message dhcp6;
@@ -3752,38 +3719,19 @@ dhcp6_recv(struct dhcpcd_ctx *ctx, struct ipv6_addr *ia, unsigned short events)
 	    .msg_iov = &iov, .msg_iovlen = 1,
 	    .msg_control = cmsgbuf.buf, .msg_controllen = sizeof(cmsgbuf.buf),
 	};
-	int s;
 	ssize_t bytes;
 
 	if (events != ELE_READ)
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
-	s = ia != NULL ? ia->dhcp6_fd : ctx->dhcp6_rfd;
-	bytes = recvmsg(s, &msg, 0);
+	bytes = recvmsg(ctx->dhcp6_rfd, &msg, 0);
 	if (bytes == -1) {
 		logerr(__func__);
 		return;
 	}
 
 	iov.iov_len = (size_t)bytes;
-	dhcp6_recvmsg(ctx, &msg, ia);
-}
-
-static void
-
-dhcp6_recvaddr(void *arg, unsigned short events)
-{
-	struct ipv6_addr *ia = arg;
-
-	dhcp6_recv(ia->iface->ctx, ia, events);
-}
-
-static void
-dhcp6_recvctx(void *arg, unsigned short events)
-{
-	struct dhcpcd_ctx *ctx = arg;
-
-	dhcp6_recv(ctx, NULL, events);
+	dhcp6_recvmsg(ctx, &msg);
 }
 
 int
@@ -3897,24 +3845,24 @@ dhcp6_start1(void *arg)
 	size_t i;
 	const struct dhcp_compat *dhc;
 
-	if ((ctx->options & (DHCPCD_MANAGER|DHCPCD_PRIVSEP)) == DHCPCD_MANAGER &&
-	    ctx->dhcp6_rfd == -1)
-	{
-		ctx->dhcp6_rfd = dhcp6_openudp(0, NULL);
+	if (!IN_PRIVSEP(ctx)) {
 		if (ctx->dhcp6_rfd == -1) {
-			logerr(__func__);
-			return;
+			ctx->dhcp6_rfd = dhcp6_openudp(0, NULL);
+			if (ctx->dhcp6_rfd == -1) {
+				logerr(__func__);
+				return;
+			}
+			if (eloop_event_add(ctx->eloop, ctx->dhcp6_rfd,
+			    ELE_READ, dhcp6_recv, ctx) == -1)
+				logerr("%s: eloop_event_add", __func__);
 		}
-		if (eloop_event_add(ctx->eloop, ctx->dhcp6_rfd, ELE_READ,
-		    dhcp6_recvctx, ctx) == -1)
-			logerr("%s: eloop_event_add", __func__);
-	}
 
-	if (!IN_PRIVSEP(ctx) && ctx->dhcp6_wfd == -1) {
-		ctx->dhcp6_wfd = dhcp6_openraw();
 		if (ctx->dhcp6_wfd == -1) {
-			logerr(__func__);
-			return;
+			ctx->dhcp6_wfd = dhcp6_openraw();
+			if (ctx->dhcp6_wfd == -1) {
+				logerr(__func__);
+				return;
+			}
 		}
 	}
 
@@ -4210,30 +4158,6 @@ dhcp6_handleifa(int cmd, struct ipv6_addr *ia, pid_t pid)
 {
 	struct dhcp6_state *state;
 	struct interface *ifp = ia->iface;
-
-	/* If not running in manager mode, listen to this address */
-	if (cmd == RTM_NEWADDR &&
-	    !(ia->addr_flags & IN6_IFF_NOTUSEABLE) &&
-	    ifp->active == IF_ACTIVE_USER &&
-	    !(ifp->ctx->options & DHCPCD_MANAGER) &&
-	    ifp->options->options & DHCPCD_DHCP6)
-	{
-#ifdef PRIVSEP
-		if (IN_PRIVSEP_SE(ifp->ctx)) {
-			if (ps_inet_opendhcp6(ia) == -1)
-				logerr(__func__);
-		} else
-#endif
-		{
-			if (ia->dhcp6_fd == -1)
-				ia->dhcp6_fd = dhcp6_openudp(ia->iface->index,
-				    &ia->addr);
-			if (ia->dhcp6_fd != -1 &&
-			    eloop_event_add(ia->iface->ctx->eloop,
-			    ia->dhcp6_fd, ELE_READ, dhcp6_recvaddr, ia) == -1)
-				logerr("%s: eloop_event_add", __func__);
-		}
-	}
 
 	if ((state = D6_STATE(ifp)) != NULL)
 		ipv6_handleifa_addrs(cmd, &state->addrs, ia, pid);

@@ -231,8 +231,6 @@ ipv4ll_not_found(struct interface *ifp)
 	if (!(ifp->options->options & DHCPCD_CONFIGURE))
 		goto run;
 	if (ia == NULL) {
-		if (ifp->ctx->options & DHCPCD_TEST)
-			goto test;
 		ia = ipv4_addaddr(ifp, &state->pickedaddr,
 		    &inaddr_llmask, &inaddr_llbcast,
 		    DHCP_INFINITE_LIFETIME, DHCP_INFINITE_LIFETIME);
@@ -245,14 +243,8 @@ ipv4ll_not_found(struct interface *ifp)
 	logdebugx("%s: DAD completed for %s", ifp->name, ia->saddr);
 #endif
 
-test:
 	state->addr = ia;
 	state->down = false;
-	if (ifp->ctx->options & DHCPCD_TEST) {
-		script_runreason(ifp, "TEST");
-		eloop_exit(ifp->ctx->eloop, EXIT_SUCCESS);
-		return;
-	}
 	rt_build(ifp->ctx, AF_INET);
 run:
 	astate = arp_announceaddr(ifp->ctx, &ia->addr);

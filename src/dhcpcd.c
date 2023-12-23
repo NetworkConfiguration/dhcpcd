@@ -195,20 +195,9 @@ free_globals(struct dhcpcd_ctx *ctx)
 static void
 handle_exit_timeout(void *arg)
 {
-	struct dhcpcd_ctx *ctx;
+	struct dhcpcd_ctx *ctx = arg;
 
-	ctx = arg;
 	logerrx("timed out");
-	if (!(ctx->options & DHCPCD_MANAGER)) {
-		struct interface *ifp;
-
-		TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-			if (ifp->active == IF_ACTIVE_USER)
-				script_runreason(ifp, "STOPPED");
-		}
-		eloop_exit(ctx->eloop, EXIT_FAILURE);
-		return;
-	}
 	ctx->options |= DHCPCD_NOWAITIP;
 	dhcpcd_daemonise(ctx);
 }
@@ -443,9 +432,6 @@ stop_interface(struct interface *ifp, const char *reason)
 	/* De-activate the interface */
 	ifp->active = IF_INACTIVE;
 	ifp->options->options &= ~DHCPCD_STOPPING;
-
-	if (!(ctx->options & (DHCPCD_MANAGER | DHCPCD_TEST)))
-		eloop_exit(ctx->eloop, EXIT_FAILURE);
 }
 
 static void
@@ -476,7 +462,7 @@ configure_interface1(struct interface *ifp)
 	/* We want to setup INET6 on the interface as soon as possible. */
 	if (ifp->active == IF_ACTIVE_USER &&
 	    ifo->options & DHCPCD_IPV6 &&
-	    !(ifp->ctx->options & (DHCPCD_DUMPLEASE | DHCPCD_TEST)))
+	    !(ifp->ctx->options & DHCPCD_DUMPLEASE))
 	{
 		/* If not doing any DHCP, disable the RDNSS requirement. */
 		if (!(ifo->options & (DHCPCD_DHCP | DHCPCD_DHCP6)))
@@ -972,7 +958,6 @@ static void
 dhcpcd_prestartinterface(void *arg)
 {
 	struct interface *ifp = arg;
-	struct dhcpcd_ctx *ctx = ifp->ctx;
 	bool randmac_down;
 
 	if (ifp->carrier <= LINK_DOWN &&
@@ -984,8 +969,7 @@ dhcpcd_prestartinterface(void *arg)
 	} else
 		randmac_down = false;
 
-	if ((!(ctx->options & DHCPCD_MANAGER) ||
-	    ifp->options->options & DHCPCD_IF_UP || randmac_down) &&
+	if ((ifp->options->options & DHCPCD_IF_UP || randmac_down) &&
 	    !(ifp->flags & IFF_UP))
 	{
 		if (ifp->options->randomise_hwaddr &&
@@ -1001,9 +985,6 @@ dhcpcd_prestartinterface(void *arg)
 static void
 run_preinit(struct interface *ifp)
 {
-
-	if (ifp->ctx->options & DHCPCD_TEST)
-		return;
 
 	script_runreason(ifp, "PREINIT");
 	if (ifp->wireless && if_is_link_up(ifp))
@@ -1322,8 +1303,6 @@ reload_config(struct dhcpcd_ctx *ctx)
 	/* We need to preserve these options. */
 	if (ctx->options & DHCPCD_STARTED)
 		ifo->options |= DHCPCD_STARTED;
-	if (ctx->options & DHCPCD_MANAGER)
-		ifo->options |= DHCPCD_MANAGER;
 	if (ctx->options & DHCPCD_DAEMONISED)
 		ifo->options |= DHCPCD_DAEMONISED;
 	if (ctx->options & DHCPCD_PRIVSEP)
@@ -1500,8 +1479,7 @@ dhcpcd_signal_cb(int sig, void *arg)
 		return;
 
 	dhcpcd_exiting = true;
-	if (!(ctx->options & DHCPCD_TEST))
-		stop_all_interfaces(ctx, opts);
+	stop_all_interfaces(ctx, opts);
 	eloop_exit(ctx->eloop, exit_code);
 	dhcpcd_exiting = false;
 }
@@ -1854,7 +1832,7 @@ dhcpcd_pidfile_timeout(void *arg)
 	struct dhcpcd_ctx *ctx = arg;
 	pid_t pid;
 
-	pid = pidfile_read(ctx->pidfile);
+	pid = pidfile_read(PIDFILE);
 
 	if(pid == -1)
 		eloop_exit(ctx->eloop, EXIT_SUCCESS);
@@ -1891,7 +1869,7 @@ main(int argc, char **argv, char **envp)
 	struct interface *ifp;
 	sa_family_t family = AF_UNSPEC;
 	int opt, oi = 0, i;
-	unsigned int logopts, t;
+	unsigned int logopts;
 	ssize_t len;
 #if defined(USE_SIGNALS) || !defined(THERE_IS_NO_FORK)
 	pid_t pid;
@@ -2046,8 +2024,8 @@ main(int argc, char **argv, char **envp)
 			logopts &= ~(LOGERR_LOG | LOGERR_ERR);
 			break;
 		case 'T':
-			i = 1;
-			logopts &= ~LOGERR_LOG;
+			// Test is no longer supported
+			//i = 1;
 			break;
 		case 'U':
 			i = 3;
@@ -2062,9 +2040,6 @@ main(int argc, char **argv, char **envp)
 			goto exit_failure;
 		}
 	}
-
-	if (optind != argc - 1)
-		ctx.options |= DHCPCD_MANAGER;
 
 	logsetopts(logopts);
 	logopen(ctx.logfile);
@@ -2124,11 +2099,8 @@ main(int argc, char **argv, char **envp)
 	}
 	ctx.options |= ifo->options;
 
-	if (i == 1 || i == 3) {
-		if (i == 1)
-			ctx.options |= DHCPCD_TEST;
-		else
-			ctx.options |= DHCPCD_DUMPLEASE;
+	if (i == 3) {
+		ctx.options |= DHCPCD_DUMPLEASE;
 		ctx.options |= DHCPCD_PERSISTENT;
 		ctx.options &= ~DHCPCD_DAEMONISE;
 	}
@@ -2140,48 +2112,17 @@ main(int argc, char **argv, char **envp)
 	if (ctx.options & DHCPCD_DEBUG)
 		logsetopts(logopts | LOGERR_DEBUG);
 
-	if (!(ctx.options & (DHCPCD_TEST | DHCPCD_DUMPLEASE))) {
+	if (!(ctx.options & (DHCPCD_DUMPLEASE))) {
 printpidfile:
-		/* If we have any other args, we should run as a single dhcpcd
-		 *  instance for that interface. */
-		if (optind == argc - 1 && !(ctx.options & DHCPCD_MANAGER)) {
-			const char *per;
-			const char *ifname;
-
-			ifname = *ctx.ifv;
-			if (ifname == NULL || strlen(ifname) > IF_NAMESIZE) {
-				errno = ifname == NULL ? EINVAL : E2BIG;
-				logerr("%s: ", ifname);
-				goto exit_failure;
-			}
-			/* Allow a dhcpcd interface per address family */
-			switch(family) {
-			case AF_INET:
-				per = "-4";
-				break;
-			case AF_INET6:
-				per = "-6";
-				break;
-			default:
-				per = "";
-			}
-			snprintf(ctx.pidfile, sizeof(ctx.pidfile),
-			    PIDFILE, ifname, per, ".");
-		} else {
-			snprintf(ctx.pidfile, sizeof(ctx.pidfile),
-			    PIDFILE, "", "", "");
-			ctx.options |= DHCPCD_MANAGER;
-
-			/*
-			 * If we are given any interfaces, we
-			 * cannot send a signal as that would impact
-			 * other interfaces.
-			 */
-			if (optind != argc)
-				sig = 0;
-		}
+		/*
+		 * If we are given any interfaces, we
+		 * cannot send a signal as that would impact
+		 * other interfaces.
+		 */
+		if (optind != argc)
+			sig = 0;
 		if (ctx.options & DHCPCD_PRINT_PIDFILE) {
-			printf("%s\n", ctx.pidfile);
+			printf("%s\n", PIDFILE);
 			goto exit_success;
 		}
 	}
@@ -2210,7 +2151,7 @@ printpidfile:
 	}
 
 	if (sig != 0) {
-		pid = pidfile_read(ctx.pidfile);
+		pid = pidfile_read(PIDFILE);
 		if (pid != 0 && pid != -1)
 			loginfox("sending signal %s to pid %d", siga, pid);
 		if (pid == 0 || pid == -1 || kill(pid, sig) != 0) {
@@ -2218,7 +2159,7 @@ printpidfile:
 				logerr("kill");
 				goto exit_failure;
 			}
-			unlink(ctx.pidfile);
+			unlink(PIDFILE);
 			/* We can still continue and send the command
 			 * via the control socket. */
 		} else {
@@ -2286,75 +2227,63 @@ printpidfile:
 #endif
 
 	/* Try and contact the manager process to send the instruction. */
-	if (!(ctx.options & DHCPCD_TEST)) {
-		ctx.options |= DHCPCD_FORKED; /* avoid socket unlink */
-		if (!(ctx.options & DHCPCD_MANAGER))
-			ctx.control_fd = control_open(argv[optind], family,
-			    ctx.options & DHCPCD_DUMPLEASE);
-		if (!(ctx.options & DHCPCD_MANAGER) && ctx.control_fd == -1)
-			ctx.control_fd = control_open(argv[optind], AF_UNSPEC,
-			    ctx.options & DHCPCD_DUMPLEASE);
-		if (ctx.control_fd == -1)
-			ctx.control_fd = control_open(NULL, AF_UNSPEC,
-			    ctx.options & DHCPCD_DUMPLEASE);
-		if (ctx.control_fd != -1) {
+	ctx.options |= DHCPCD_FORKED; /* avoid socket unlink */
+	ctx.control_fd = control_open(ctx.options & DHCPCD_DUMPLEASE);
+	if (ctx.control_fd != -1) {
 #ifdef PRIVSEP
-			if (IN_PRIVSEP(&ctx) &&
-			    ps_managersandbox(&ctx, NULL) == -1)
-				goto exit_failure;
+		if (IN_PRIVSEP(&ctx) &&
+		    ps_managersandbox(&ctx, NULL) == -1)
+			goto exit_failure;
 #endif
-			if (!(ctx.options & DHCPCD_DUMPLEASE))
-				loginfox("sending commands to dhcpcd process");
-			len = control_send(&ctx, argc, argv);
-			if (len > 0)
-				logdebugx("send OK");
-			else {
-				logerr("%s: control_send", __func__);
-				goto exit_failure;
-			}
-			if (ctx.options & DHCPCD_DUMPLEASE) {
-				if (dhcpcd_readdump(&ctx) == -1) {
-					logerr("%s: dhcpcd_readdump", __func__);
-					goto exit_failure;
-				}
-				goto run_loop;
-			}
-			goto exit_success;
-		} else {
-			if (errno != ENOENT)
-				logerr("%s: control_open", __func__);
-			/* If asking dhcpcd to exit and we failed to
-			 * send a signal or a message then we
-			 * don't proceed past here. */
-			if (ctx.options & DHCPCD_DUMPLEASE ||
-			    sig == SIGTERM || sig == SIGALRM)
-			{
-				if (errno == ENOENT)
-					logerrx(PACKAGE" is not running");
-				goto exit_failure;
-			}
-			if (errno == EPERM || errno == EACCES)
-				goto exit_failure;
-		}
-		ctx.options &= ~DHCPCD_FORKED;
-	}
-
-	if (!(ctx.options & DHCPCD_TEST)) {
-		/* Ensure we have the needed directories */
-		if (mkdir(DBDIR, 0750) == -1 && errno != EEXIST)
-			logerr("%s: mkdir: %s", __func__, DBDIR);
-		if (mkdir(RUNDIR, 0755) == -1 && errno != EEXIST)
-			logerr("%s: mkdir: %s", __func__, RUNDIR);
-		if ((pid = pidfile_lock(ctx.pidfile)) != 0) {
-			if (pid == -1)
-				logerr("%s: pidfile_lock: %s",
-				    __func__, ctx.pidfile);
-			else
-				logerrx(PACKAGE
-				    " already running on pid %d (%s)",
-				    pid, ctx.pidfile);
+		if (!(ctx.options & DHCPCD_DUMPLEASE))
+			loginfox("sending commands to dhcpcd process");
+		len = control_send(&ctx, argc, argv);
+		if (len > 0)
+			logdebugx("send OK");
+		else {
+			logerr("%s: control_send", __func__);
 			goto exit_failure;
 		}
+		if (ctx.options & DHCPCD_DUMPLEASE) {
+			if (dhcpcd_readdump(&ctx) == -1) {
+				logerr("%s: dhcpcd_readdump", __func__);
+				goto exit_failure;
+			}
+			goto run_loop;
+		}
+		goto exit_success;
+	} else {
+		if (errno != ENOENT)
+			logerr("%s: control_open", __func__);
+		/* If asking dhcpcd to exit and we failed to
+		 * send a signal or a message then we
+		 * don't proceed past here. */
+		if (ctx.options & DHCPCD_DUMPLEASE ||
+		    sig == SIGTERM || sig == SIGALRM)
+		{
+			if (errno == ENOENT)
+				logerrx(PACKAGE" is not running");
+			goto exit_failure;
+		}
+		if (errno == EPERM || errno == EACCES)
+			goto exit_failure;
+	}
+	ctx.options &= ~DHCPCD_FORKED;
+
+	/* Ensure we have the needed directories */
+	if (mkdir(DBDIR, 0750) == -1 && errno != EEXIST)
+		logerr("%s: mkdir: %s", __func__, DBDIR);
+	if (mkdir(RUNDIR, 0755) == -1 && errno != EEXIST)
+		logerr("%s: mkdir: %s", __func__, RUNDIR);
+	if ((pid = pidfile_lock(PIDFILE)) != 0) {
+		if (pid == -1)
+			logerr("%s: pidfile_lock: %s",
+			    __func__, PIDFILE);
+		else
+			logerrx(PACKAGE
+			    " already running on pid %d (%s)",
+			    pid, PIDFILE);
+		goto exit_failure;
 	}
 
 	loginfox(PACKAGE "-" VERSION " starting");
@@ -2432,7 +2361,7 @@ printpidfile:
 	logdebugx("spawned manager process on PID %d", getpid());
 start_manager:
 	ctx.options |= DHCPCD_STARTED;
-	if ((pid = pidfile_lock(ctx.pidfile)) != 0) {
+	if ((pid = pidfile_lock(PIDFILE)) != 0) {
 		logerr("%s: pidfile_lock %d", __func__, pid);
 #ifdef PRIVSEP
 		/* privsep has not started ... */
@@ -2459,29 +2388,20 @@ start_manager:
 		goto run_loop;
 #endif
 
-	if (!(ctx.options & DHCPCD_TEST)) {
-		if (control_start(&ctx,
-		    ctx.options & DHCPCD_MANAGER ?
-		    NULL : argv[optind], family) == -1)
-		{
-			logerr("%s: control_start", __func__);
-			goto exit_failure;
-		}
+	if (control_start(&ctx)  == -1) {
+		logerr("%s: control_start", __func__);
+		goto exit_failure;
 	}
 
 #ifdef PLUGIN_DEV
 	/* Start any dev listening plugin which may want to
 	 * change the interface name provided by the kernel */
 	if (!IN_PRIVSEP(&ctx) &&
-	    (ctx.options & (DHCPCD_MANAGER | DHCPCD_DEV)) ==
-	    (DHCPCD_MANAGER | DHCPCD_DEV))
+	    ctx.options & DHCPCD_DEV)
 		dev_start(&ctx, dhcpcd_handleinterface);
 #endif
 
-	setproctitle("%s%s%s",
-	    ctx.options & DHCPCD_MANAGER ? "[manager]" : argv[optind],
-	    ctx.options & DHCPCD_IPV4 ? " [ip4]" : "",
-	    ctx.options & DHCPCD_IPV6 ? " [ip6]" : "");
+	setproctitle("[manager]");
 
 	if (if_opensockets(&ctx) == -1) {
 		logerr("%s: if_opensockets", __func__);
@@ -2569,17 +2489,6 @@ start_manager:
 	}
 
 	if (!(ctx.options & DHCPCD_BACKGROUND)) {
-		if (ctx.options & DHCPCD_MANAGER)
-			t = ifo->timeout;
-		else {
-			t = 0;
-			TAILQ_FOREACH(ifp, ctx.ifaces, next) {
-				if (ifp->active) {
-					t = ifp->options->timeout;
-					break;
-				}
-			}
-		}
 		if (opt == 0 &&
 		    ctx.options & DHCPCD_LINK &&
 		    !(ctx.options & DHCPCD_WAITIP))
@@ -2590,11 +2499,10 @@ start_manager:
 			    LOG_DEBUG : LOG_WARNING;
 			logmessage(loglevel, "no interfaces have a carrier");
 			dhcpcd_daemonise(&ctx);
-		} else if (t > 0 &&
-		    /* Test mode removes the daemonise bit, so check for both */
-		    ctx.options & (DHCPCD_DAEMONISE | DHCPCD_TEST))
+		}
+		else if (ifo->timeout > 0 && ctx.options & DHCPCD_DAEMONISE)
 		{
-			eloop_timeout_add_sec(ctx.eloop, t,
+			eloop_timeout_add_sec(ctx.eloop, ifo->timeout,
 			    handle_exit_timeout, &ctx);
 		}
 	}
@@ -2623,7 +2531,7 @@ exit_failure:
 	i = EXIT_FAILURE;
 
 exit1:
-	if (!(ctx.options & DHCPCD_TEST) && control_stop(&ctx) == -1)
+	if (control_stop(&ctx) == -1)
 		logerr("%s: control_stop", __func__);
 	if_freeifaddrs(&ctx, &ifaddrs);
 #ifdef PRIVSEP

@@ -1546,11 +1546,6 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 	if (new_data)
 		ipv6nd_sortrouters(ifp->ctx);
 
-	if (ifp->ctx->options & DHCPCD_TEST) {
-		script_runreason(ifp, "TEST");
-		goto handle_flag;
-	}
-
 	if (!(ifp->options->options & DHCPCD_CONFIGURE))
 		goto run;
 
@@ -1567,7 +1562,6 @@ run:
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, rap); /* reachable timer */
 
-handle_flag:
 	if (!(ifp->options->options & DHCPCD_DHCP6))
 		goto nodhcp6;
 /* Only log a DHCPv6 start error if compiled in or debugging is enabled. */
@@ -1587,13 +1581,9 @@ handle_flag:
 		if (new_data)
 			logdebugx("%s: No DHCPv6 instruction in RA", ifp->name);
 #endif
-nodhcp6:
-		if (ifp->ctx->options & DHCPCD_TEST) {
-			eloop_exit(ifp->ctx->eloop, EXIT_SUCCESS);
-			return;
-		}
 	}
 
+nodhcp6:
 	/* Expire should be called last as the rap object could be destroyed */
 	ipv6nd_expirera(ifp);
 }

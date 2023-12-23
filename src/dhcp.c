@@ -132,7 +132,6 @@ static void dhcp_arp_found(struct arp_state *, const struct arp_msg *);
 #endif
 static void dhcp_handledhcp(struct interface *, struct bootp *, size_t,
     const struct in_addr *);
-static void dhcp_handleifudp(void *, unsigned short);
 static int dhcp_initstate(struct interface *);
 
 void
@@ -958,7 +957,6 @@ make_message(struct bootp **bootpm, const struct interface *ifp, uint8_t type)
 	}
 
 	if (type == DHCP_DISCOVER &&
-	    !(ifp->ctx->options & DHCPCD_TEST) &&
 	    DHC_REQ(ifo->requestmask, ifo->nomask, DHO_RAPIDCOMMIT))
 	{
 		/* RFC 4039 Section 3 */
@@ -1530,13 +1528,6 @@ dhcp_closeinet(struct interface *ifp)
 	struct dhcpcd_ctx *ctx = ifp->ctx;
 	struct dhcp_state *state = D_STATE(ifp);
 
-#ifdef PRIVSEP
-	if (IN_PRIVSEP_SE(ctx)) {
-		if (state->addr != NULL)
-			ps_inet_closebootp(state->addr);
-	}
-#endif
-
 	if (state->udp_rfd != -1) {
 		eloop_event_delete(ctx->eloop, state->udp_rfd);
 		close(state->udp_rfd);
@@ -1813,8 +1804,7 @@ send_message(struct interface *ifp, uint8_t type,
 		case ENOBUFS:
 			break;
 		default:
-			if (!(ifp->ctx->options & DHCPCD_TEST))
-				dhcp_drop(ifp, "FAIL");
+			dhcp_drop(ifp, "FAIL");
 			eloop_timeout_delete(ifp->ctx->eloop,
 			    NULL, ifp);
 			callback = NULL;
@@ -2072,9 +2062,6 @@ dhcp_addr_duplicated(struct interface *ifp, struct in_addr *ia)
 	if (opts & (DHCPCD_STATIC | DHCPCD_INFORM)) {
 		state->reason = "EXPIRE";
 		script_runreason(ifp, state->reason);
-#define NOT_ONLY_SELF (DHCPCD_MANAGER | DHCPCD_IPV6RS | DHCPCD_DHCP6)
-		if (!(ctx->options & NOT_ONLY_SELF))
-			eloop_exit(ifp->ctx->eloop, EXIT_FAILURE);
 		return deleted;
 	}
 	eloop_timeout_add_sec(ifp->ctx->eloop,
@@ -2230,7 +2217,6 @@ dhcp_bind(struct interface *ifp)
 	struct dhcp_state *state = D_STATE(ifp);
 	struct if_options *ifo = ifp->options;
 	struct dhcp_lease *lease = &state->lease;
-	uint8_t old_state;
 
 	state->reason = NULL;
 	/* If we don't have an offer, we are re-binding a lease on preference,
@@ -2303,12 +2289,6 @@ dhcp_bind(struct interface *ifp)
 				    lease->leasetime);
 		}
 	}
-	if (ctx->options & DHCPCD_TEST) {
-		state->reason = "TEST";
-		script_runreason(ifp, state->reason);
-		eloop_exit(ctx->eloop, EXIT_SUCCESS);
-		return;
-	}
 	if (state->reason == NULL) {
 		if (state->old &&
 		    !(state->added & (STATE_FAKE | STATE_EXPIRED)))
@@ -2347,8 +2327,6 @@ dhcp_bind(struct interface *ifp)
 			logerr("dhcp_writefile: %s", state->leasefile);
 	}
 
-	old_state = state->added;
-
 	if (!(ifo->options & DHCPCD_CONFIGURE)) {
 		struct ipv4_addr *ia;
 
@@ -2362,7 +2340,6 @@ dhcp_bind(struct interface *ifp)
 			state->addr = ia;
 			state->added = STATE_ADDED;
 			dhcp_closebpf(ifp);
-			goto openudp;
 		}
 		return;
 	}
@@ -2382,37 +2359,6 @@ dhcp_bind(struct interface *ifp)
 	 * on a UDP socket. */
 	dhcp_closebpf(ifp);
 
-openudp:
-	/* If not in manager mode, open an address specific socket. */
-	if (ctx->options & DHCPCD_MANAGER ||
-	    ifo->options & DHCPCD_STATIC ||
-	    (state->old != NULL &&
-	     state->old->yiaddr == state->new->yiaddr &&
-	     old_state & STATE_ADDED && !(old_state & STATE_FAKE)))
-		return;
-
-	dhcp_closeinet(ifp);
-#ifdef PRIVSEP
-	if (IN_PRIVSEP_SE(ctx)) {
-		if (ps_inet_openbootp(state->addr) == -1)
-		    logerr(__func__);
-		return;
-	}
-#endif
-
-	state->udp_rfd = dhcp_openudp(&state->addr->addr);
-	if (state->udp_rfd == -1) {
-		logerr(__func__);
-		/* Address sharing without manager mode is not supported.
-		 * It's also possible another DHCP client could be running,
-		 * which is even worse.
-		 * We still need to work, so re-open BPF. */
-		dhcp_openbpf(ifp);
-		return;
-	}
-	if (eloop_event_add(ctx->eloop, state->udp_rfd, ELE_READ,
-	    dhcp_handleifudp, ifp) == -1)
-		logerr("%s: eloop_event_add", __func__);
 }
 
 static size_t
@@ -2507,8 +2453,7 @@ static void
 dhcp_arp_bind(struct interface *ifp)
 {
 
-	if (ifp->ctx->options & DHCPCD_TEST ||
-	    dhcp_arp_address(ifp) == 1)
+	if (dhcp_arp_address(ifp) == 1)
 		dhcp_bind(ifp);
 }
 #endif
@@ -2585,20 +2530,13 @@ dhcp_inform(struct interface *ifp)
 			loginfox("%s: waiting for 3rd party to "
 			    "configure IP address",
 			    ifp->name);
-			if (!(ifp->ctx->options & DHCPCD_TEST)) {
-				state->reason = "3RDPARTY";
-				script_runreason(ifp, state->reason);
-			}
+			state->reason = "3RDPARTY";
+			script_runreason(ifp, state->reason);
 			return;
 		}
 	} else {
 		ia = ipv4_iffindaddr(ifp, &ifo->req_addr, &ifo->req_mask);
 		if (ia == NULL) {
-			if (ifp->ctx->options & DHCPCD_TEST) {
-				logerrx("%s: cannot add IP address in test mode",
-				    ifp->name);
-				return;
-			}
 			ia = ipv4_iffindaddr(ifp, &ifo->req_addr, NULL);
 			if (ia != NULL)
 				/* Netmask must be different, delete it. */
@@ -2724,7 +2662,6 @@ dhcp_reboot(struct interface *ifp)
 	 * interface gets the reply. */
 	ia = ipv4_iffindaddr(ifp, &state->lease.addr, NULL);
 	if (ia != NULL &&
-	    !(ifp->ctx->options & DHCPCD_TEST) &&
 #ifdef IN_IFF_NOTUSEABLE
 	    !(ia->addr_flags & IN_IFF_NOTUSEABLE) &&
 #endif
@@ -3161,10 +3098,8 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 		}
 		if (state->state == DHS_INFORM) /* INFORM should not be NAKed */
 			return;
-		if (!(ifp->ctx->options & DHCPCD_TEST)) {
-			dhcp_drop(ifp, "NAK");
-			dhcp_unlink(ifp->ctx, state->leasefile);
-		}
+		dhcp_drop(ifp, "NAK");
+		dhcp_unlink(ifp->ctx, state->leasefile);
 
 		/* If we constantly get NAKS then we should slowly back off */
 		eloop_timeout_add_sec(ifp->ctx->eloop,
@@ -3299,8 +3234,7 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 			lease->server.s_addr = INADDR_ANY;
 
 		/* Test for rapid commit in the OFFER */
-		if (!(ifp->ctx->options & DHCPCD_TEST) &&
-		    has_option_mask(ifo->requestmask, DHO_RAPIDCOMMIT) &&
+		if (has_option_mask(ifo->requestmask, DHO_RAPIDCOMMIT) &&
 		    get_option(ifp->ctx, bootp, bootp_len,
 		    DHO_RAPIDCOMMIT, NULL))
 		{
@@ -3320,21 +3254,6 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 		state->offer_len = bootp_len;
 		memcpy(state->offer, bootp, bootp_len);
 		bootp_copied = true;
-		if (ifp->ctx->options & DHCPCD_TEST) {
-			free(state->old);
-			state->old = state->new;
-			state->old_len = state->new_len;
-			state->new = state->offer;
-			state->new_len = state->offer_len;
-			state->offer = NULL;
-			state->offer_len = 0;
-			state->reason = "TEST";
-			script_runreason(ifp, state->reason);
-			eloop_exit(ifp->ctx->eloop, EXIT_SUCCESS);
-			if (state->bpf)
-				state->bpf->bpf_flags |= BPF_EOF;
-			return;
-		}
 		eloop_timeout_delete(ifp->ctx->eloop, send_discover, ifp);
 		/* We don't request BOOTP addresses */
 		if (type) {
@@ -3693,10 +3612,8 @@ dhcp_recvmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg)
 }
 
 static void
-dhcp_readudp(struct dhcpcd_ctx *ctx, struct interface *ifp,
-    unsigned short events)
+dhcp_readudp(struct dhcpcd_ctx *ctx, unsigned short events)
 {
-	const struct dhcp_state *state;
 	struct sockaddr_in from;
 	union {
 		struct bootp bootp;
@@ -3725,12 +3642,7 @@ dhcp_readudp(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	if (events != ELE_READ)
 		logerrx("%s: unexpected event 0x%04x", __func__, events);
 
-	if (ifp != NULL) {
-		state = D_CSTATE(ifp);
-		s = state->udp_rfd;
-	} else
-		s = ctx->udp_rfd;
-
+	s = ctx->udp_rfd;
 	bytes = recvmsg(s, &msg, 0);
 	if (bytes == -1) {
 		logerr(__func__);
@@ -3746,15 +3658,7 @@ dhcp_handleudp(void *arg, unsigned short events)
 {
 	struct dhcpcd_ctx *ctx = arg;
 
-	dhcp_readudp(ctx, NULL, events);
-}
-
-static void
-dhcp_handleifudp(void *arg, unsigned short events)
-{
-	struct interface *ifp = arg;
-
-	dhcp_readudp(ifp->ctx, ifp, events);
+	dhcp_readudp(ctx, events);
 }
 
 static int
@@ -3951,32 +3855,28 @@ dhcp_start1(void *arg)
 	struct if_options *ifo = ifp->options;
 	struct dhcp_state *state;
 	uint32_t l;
-	int nolease;
 
 	if (!(ifo->options & DHCPCD_IPV4))
 		return;
 
-	/* Listen on *.*.*.*:bootpc so that the kernel never sends an
-	 * ICMP port unreachable message back to the DHCP server.
-	 * Only do this in manager mode so we don't swallow messages
-	 * for dhcpcd running on another interface. */
-	if ((ctx->options & (DHCPCD_MANAGER|DHCPCD_PRIVSEP)) == DHCPCD_MANAGER
-	    && ctx->udp_rfd == -1)
-	{
-		ctx->udp_rfd = dhcp_openudp(NULL);
+	if (!IN_PRIVSEP(ctx)) {
 		if (ctx->udp_rfd == -1) {
-			logerr(__func__);
-			return;
+			ctx->udp_rfd = dhcp_openudp(NULL);
+			if (ctx->udp_rfd == -1) {
+				logerr(__func__);
+				return;
+			}
+			if (eloop_event_add(ctx->eloop, ctx->udp_rfd, ELE_READ,
+			    dhcp_handleudp, ctx) == -1)
+				logerr("%s: eloop_event_add", __func__);
 		}
-		if (eloop_event_add(ctx->eloop, ctx->udp_rfd, ELE_READ,
-		    dhcp_handleudp, ctx) == -1)
-			logerr("%s: eloop_event_add", __func__);
-	}
-	if (!IN_PRIVSEP(ctx) && ctx->udp_wfd == -1) {
-		ctx->udp_wfd = xsocket(PF_INET, SOCK_RAW|SOCK_CXNB,IPPROTO_UDP);
 		if (ctx->udp_wfd == -1) {
-			logerr(__func__);
-			return;
+			ctx->udp_wfd = xsocket(PF_INET, SOCK_RAW | SOCK_CXNB,
+			    IPPROTO_UDP);
+			if (ctx->udp_wfd == -1) {
+				logerr(__func__);
+				return;
+			}
 		}
 	}
 
@@ -4010,8 +3910,7 @@ dhcp_start1(void *arg)
 	}
 
 	/* We don't want to read the old lease if we NAK an old test */
-	nolease = state->offer && ifp->ctx->options & DHCPCD_TEST;
-	if (!nolease && ifo->options & DHCPCD_DHCP) {
+	if (ifo->options & DHCPCD_DHCP) {
 		state->offer_len = read_lease(ifp, &state->offer);
 		/* Check the saved lease matches the type we want */
 		if (state->offer) {
@@ -4252,14 +4151,12 @@ dhcp_handleifa(int cmd, struct ipv4_addr *ia, pid_t pid)
 
 #ifdef PRIVSEP
 	if (IN_PRIVSEP_SE(ifp->ctx) &&
-	    !(ifp->ctx->options & (DHCPCD_MANAGER | DHCPCD_CONFIGURE)) &&
+	    !(ifp->ctx->options & DHCPCD_CONFIGURE) &&
 	    IN_ARE_ADDR_EQUAL(&state->lease.addr, &ia->addr))
 	{
 		state->addr = ia;
 		state->added = STATE_ADDED;
 		dhcp_closebpf(ifp);
-		if (ps_inet_openbootp(ia) == -1)
-		    logerr(__func__);
 	}
 #endif
 

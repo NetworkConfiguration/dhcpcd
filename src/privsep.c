@@ -568,11 +568,6 @@ ps_start(struct dhcpcd_ctx *ctx)
 		logdebugx("spawned privileged proxy on PID %d", pid);
 	}
 
-	/* No point in spawning the generic network listener if we're
-	 * not going to use it. */
-	if (!ps_inet_canstart(ctx))
-		goto started_net;
-
 	switch (pid = ps_inet_start(ctx)) {
 	case -1:
 		return -1;
@@ -582,16 +577,13 @@ ps_start(struct dhcpcd_ctx *ctx)
 		logdebugx("spawned network proxy on PID %d", pid);
 	}
 
-started_net:
-	if (!(ctx->options & DHCPCD_TEST)) {
-		switch (pid = ps_ctl_start(ctx)) {
-		case -1:
-			return -1;
-		case 0:
-			return 0;
-		default:
-			logdebugx("spawned controller proxy on PID %d", pid);
-		}
+	switch (pid = ps_ctl_start(ctx)) {
+	case -1:
+		return -1;
+	case 0:
+		return 0;
+	default:
+		logdebugx("spawned controller proxy on PID %d", pid);
 	}
 
 #ifdef ARC4RANDOM_H
@@ -684,8 +676,7 @@ ps_managersandbox(struct dhcpcd_ctx *ctx, const char *_pledge)
 		logerr("%s: %s", __func__, sandbox);
 		return -1;
 	} else if (ctx->options & DHCPCD_LAUNCHER ||
-		  ((!(ctx->options & DHCPCD_DAEMONISE)) &&
-		   ctx->options & DHCPCD_MANAGER))
+		  !(ctx->options & DHCPCD_DAEMONISE))
 		logdebugx("sandbox: %s", sandbox);
 	return 0;
 }
@@ -1220,8 +1211,6 @@ ps_newprocess(struct dhcpcd_ctx *ctx, struct ps_id *psid)
 	psp->psp_pfd = -1;
 #endif
 
-	if (!(ctx->options & DHCPCD_MANAGER))
-		strlcpy(psp->psp_ifname, ctx->ifv[0], sizeof(psp->psp_ifname));
 	TAILQ_INSERT_TAIL(&ctx->ps_processes, psp, next);
 	return psp;
 }

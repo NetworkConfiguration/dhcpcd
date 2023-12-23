@@ -29,29 +29,22 @@
 #ifndef PRIVSEP_INET_H
 #define PRIVSEP_INET_H
 
-bool ps_inet_canstart(const struct dhcpcd_ctx *);
 pid_t ps_inet_start(struct dhcpcd_ctx *);
 int ps_inet_stop(struct dhcpcd_ctx *);
 ssize_t ps_inet_cmd(struct dhcpcd_ctx *, struct ps_msghdr *, struct msghdr *);
 ssize_t ps_inet_dispatch(void *, struct ps_msghdr *, struct msghdr *);
 
 #ifdef INET
-struct ipv4_addr;
-ssize_t ps_inet_openbootp(struct ipv4_addr *);
-ssize_t ps_inet_closebootp(struct ipv4_addr *);
 ssize_t ps_inet_sendbootp(struct interface *, const struct msghdr *);
 #endif
 
 #ifdef INET6
-struct ipv6_addr;
 #ifdef __sun
 ssize_t ps_inet_opennd(struct interface *);
 ssize_t ps_inet_closend(struct interface *);
 #endif
 ssize_t ps_inet_sendnd(struct interface *, const struct msghdr *);
 #ifdef DHCP6
-ssize_t ps_inet_opendhcp6(struct ipv6_addr *);
-ssize_t ps_inet_closedhcp6(struct ipv6_addr *);
 ssize_t ps_inet_senddhcp6(struct interface *, const struct msghdr *);
 #endif /* DHCP6 */
 #endif /* INET6 */

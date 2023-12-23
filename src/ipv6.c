@@ -611,20 +611,13 @@ static void
 ipv6_deletedaddr(struct ipv6_addr *ia)
 {
 
-#ifdef DHCP6
-#ifdef PRIVSEP
-	if (!(ia->iface->ctx->options & DHCPCD_MANAGER))
-		ps_inet_closedhcp6(ia);
-#elif defined(SMALL)
-	UNUSED(ia);
-#else
+#if defined(DHCP6) || !defined(SMALL)
 	/* NOREJECT is set if we delegated exactly the prefix to another
 	 * address.
 	 * This can only be one address, so just clear the flag.
 	 * This should ensure the reject route will be restored. */
 	if (ia->delegating_prefix != NULL)
 		ia->delegating_prefix->flags &= ~IPV6_AF_NOREJECT;
-#endif
 #else
 	UNUSED(ia);
 #endif

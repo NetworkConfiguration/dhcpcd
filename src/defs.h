@@ -57,10 +57,13 @@
 # define LEASEFILE6		LEASEFILE "6"
 #endif
 #ifndef PIDFILE
-# define PIDFILE		RUNDIR "/%s%s%spid"
+# define PIDFILE		RUNDIR "/pid"
 #endif
 #ifndef CONTROLSOCKET
-# define CONTROLSOCKET		RUNDIR "/%s%s%s%ssock"
+# define CONTROLSOCKET		RUNDIR "/sock"
+#endif
+#ifndef CONTROLSOCKET_UNPRIV
+# define CONTROLSOCKET_UNPRIV	RUNDIR "/unpriv.sock"
 #endif
 #ifndef RDM_MONOFILE
 # define RDM_MONOFILE		DBDIR "/rdm_monotonic"

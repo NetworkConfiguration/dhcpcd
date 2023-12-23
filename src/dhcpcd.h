@@ -114,7 +114,6 @@ TAILQ_HEAD(if_head, interface);
 struct passwd;
 
 struct dhcpcd_ctx {
-	char pidfile[sizeof(PIDFILE) + IF_NAMESIZE + 1];
 	char vendor[256];
 	int fork_fd;	/* FD for the fork init signal pipe */
 	const char *cffile;
@@ -175,8 +174,6 @@ struct dhcpcd_ctx {
 	int control_fd;
 	int control_unpriv_fd;
 	struct fd_list_head control_fds;
-	char control_sock[sizeof(CONTROLSOCKET) + IF_NAMESIZE];
-	char control_sock_unpriv[sizeof(CONTROLSOCKET) + IF_NAMESIZE + 7];
 	gid_t control_group;
 
 	/* DHCP Enterprise options, RFC3925 */

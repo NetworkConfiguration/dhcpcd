@@ -40,28 +40,9 @@ static int
 ps_ctl_startcb(struct ps_process *psp)
 {
 	struct dhcpcd_ctx *ctx = psp->psp_ctx;
-	sa_family_t af;
 
-	if (ctx->options & DHCPCD_MANAGER) {
-		setproctitle("[control proxy]");
-		af = AF_UNSPEC;
-	} else {
-		setproctitle("[control proxy] %s%s%s",
-		    ctx->ifv[0],
-		    ctx->options & DHCPCD_IPV4 ? " [ip4]" : "",
-		    ctx->options & DHCPCD_IPV6 ? " [ip6]" : "");
-		if ((ctx->options &
-		    (DHCPCD_IPV4 | DHCPCD_IPV6)) == DHCPCD_IPV4)
-			af = AF_INET;
-		else if ((ctx->options &
-		    (DHCPCD_IPV4 | DHCPCD_IPV6)) == DHCPCD_IPV6)
-			af = AF_INET6;
-		else
-			af = AF_UNSPEC;
-	}
-
-	return control_start(ctx,
-	    ctx->options & DHCPCD_MANAGER ? NULL : *ctx->ifv, af);
+	setproctitle("[control proxy]");
+	return control_start(ctx);
 }
 
 static void

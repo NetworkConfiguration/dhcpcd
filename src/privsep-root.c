@@ -674,13 +674,7 @@ ps_root_startcb(struct ps_process *psp)
 {
 	struct dhcpcd_ctx *ctx = psp->psp_ctx;
 
-	if (ctx->options & DHCPCD_MANAGER)
-		setproctitle("[privileged proxy]");
-	else
-		setproctitle("[privileged proxy] %s%s%s",
-		    ctx->ifv[0],
-		    ctx->options & DHCPCD_IPV4 ? " [ip4]" : "",
-		    ctx->options & DHCPCD_IPV6 ? " [ip6]" : "");
+	setproctitle("[privileged proxy]");
 	ctx->options |= DHCPCD_PRIVSEPROOT;
 
 	if (if_opensockets(ctx) == -1)
@@ -746,8 +740,7 @@ ps_root_startcb(struct ps_process *psp)
 #ifdef PLUGIN_DEV
 	/* Start any dev listening plugin which may want to
 	 * change the interface name provided by the kernel */
-	if ((ctx->options & (DHCPCD_MANAGER | DHCPCD_DEV)) ==
-	    (DHCPCD_MANAGER | DHCPCD_DEV))
+	if (ctx->options & DHCPCD_DEV)
 		dev_start(ctx, ps_root_handleinterface);
 #endif
 
@@ -947,11 +940,9 @@ ps_root_stop(struct dhcpcd_ctx *ctx)
 		return 0;
 
 	/* If we are the root process then remove the pidfile */
-	if (ctx->options & DHCPCD_PRIVSEPROOT &&
-	    !(ctx->options & DHCPCD_TEST))
-	{
-		if (unlink(ctx->pidfile) == -1)
-			logerr("%s: unlink: %s", __func__, ctx->pidfile);
+	if (ctx->options & DHCPCD_PRIVSEPROOT) {
+		if (unlink(PIDFILE) == -1)
+			logerr("%s: unlink: %s", __func__, PIDFILE);
 	}
 
 	/* Only the manager process gets past this point. */
