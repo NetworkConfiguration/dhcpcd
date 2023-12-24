@@ -1944,7 +1944,11 @@ dhcp_expire(void *arg)
 static void
 dhcp_decline(struct interface *ifp)
 {
+	struct dhcp_state *state = D_STATE(ifp);
 
+	// Set the expired state so we send over BPF as this could be
+	// an address defence failure.
+	state->added |= STATE_EXPIRED;
 	send_message(ifp, DHCP_DECLINE, NULL);
 }
 #endif
@@ -2098,8 +2102,12 @@ static void
 dhcp_arp_defend_failed(struct arp_state *astate)
 {
 	struct interface *ifp = astate->iface;
+	struct dhcp_state *state = D_STATE(ifp);
 
+	if (!(ifp->options->options & (DHCPCD_INFORM | DHCPCD_STATIC)))
+		dhcp_decline(ifp);
 	dhcp_drop(ifp, "EXPIRED");
+	dhcp_unlink(ifp->ctx, state->leasefile);
 	dhcp_start1(ifp);
 }
 #endif
