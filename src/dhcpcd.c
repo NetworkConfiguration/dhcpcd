@@ -29,7 +29,6 @@
 static const char dhcpcd_copyright[] = "Copyright (c) 2006-2023 Roy Marples";
 
 #include <sys/file.h>
-#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -2242,9 +2241,7 @@ printpidfile:
 #endif
 
 #ifndef SMALL
-	if (ctx.options & DHCPCD_DUMPLEASE &&
-	    ioctl(fileno(stdin), FIONREAD, &i, sizeof(i)) == 0 &&
-	    i > 0)
+	if (ctx.options & DHCPCD_DUMPLEASE && i > 0 && ctx.ifc == 0)
 	{
 		ctx.options |= DHCPCD_FORKED; /* pretend child process */
 #ifdef PRIVSEP
