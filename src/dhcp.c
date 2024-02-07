@@ -3532,12 +3532,6 @@ dhcp_handlebootp(struct interface *ifp, struct bootp *bootp, size_t len,
 {
 	size_t v;
 
-	if (len < offsetof(struct bootp, vend)) {
-		logerrx("%s: truncated packet (%zu) from %s",
-		    ifp->name, len, inet_ntoa(*from));
-		return;
-	}
-
 	/* Unlikely, but appeases sanitizers. */
 	if (len > FRAMELEN_MAX) {
 		logerrx("%s: packet exceeded frame length (%zu) from %s",
@@ -3670,6 +3664,13 @@ dhcp_recvmsg(struct dhcpcd_ctx *ctx, struct msghdr *msg)
 		logerr(__func__);
 		return;
 	}
+
+	if (iov->iov_len < offsetof(struct bootp, vend)) {
+		logerrx("%s: truncated packet (%zu) from %s",
+		    ifp->name, iov->iov_len, inet_ntoa(from->sin_addr));
+		return;
+	}
+
 	state = D_CSTATE(ifp);
 	if (state == NULL) {
 		/* Try re-directing it to another interface. */
