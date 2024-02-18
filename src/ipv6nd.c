@@ -71,6 +71,20 @@
 #define	ND_OPT_PI_FLAG_ROUTER	0x20	/* Router flag in PI */
 #endif
 
+#ifndef ND_OPT_RI
+#define ND_OPT_RI	24
+struct nd_opt_ri {		/* Route Information option RFC4191 */
+	uint8_t	 nd_opt_ri_type;
+	uint8_t	 nd_opt_ri_len;
+	uint8_t	 nd_opt_ri_prefixlen;
+	uint8_t	 nd_opt_ri_flags_reserved;
+	uint32_t nd_opt_ri_lifetime;
+	struct in6_addr nd_opt_ri_prefix;
+};
+__CTASSERT(sizeof(struct nd_opt_ri) == 24);
+#define OPT_RI_FLAG_PREFERENCE(flags) ((flags & 0x18) >> 3)
+#endif
+
 #ifndef ND_OPT_RDNSS
 #define ND_OPT_RDNSS			25
 struct nd_opt_rdnss {           /* RDNSS option RFC 6106 */
@@ -612,10 +626,10 @@ ipv6nd_startexpire(struct interface *ifp)
 }
 
 int
-ipv6nd_rtpref(struct ra *rap)
+ipv6nd_rtpref(uint8_t flags)
 {
 
-	switch (rap->flags & ND_RA_FLAG_RTPREF_MASK) {
+	switch (flags & ND_RA_FLAG_RTPREF_MASK) {
 	case ND_RA_FLAG_RTPREF_HIGH:
 		return RTPREF_HIGH;
 	case ND_RA_FLAG_RTPREF_MEDIUM:
@@ -624,7 +638,7 @@ ipv6nd_rtpref(struct ra *rap)
 	case ND_RA_FLAG_RTPREF_LOW:
 		return RTPREF_LOW;
 	default:
-		logerrx("%s: impossible RA flag %x", __func__, rap->flags);
+		logerrx("%s: impossible RA flag %x", __func__, flags);
 		return RTPREF_INVALID;
 	}
 	/* NOTREACHED */
@@ -649,7 +663,7 @@ ipv6nd_sortrouters(struct dhcpcd_ctx *ctx)
 				continue;
 			if (!ra1->isreachable && ra2->reachable)
 				continue;
-			if (ipv6nd_rtpref(ra1) <= ipv6nd_rtpref(ra2))
+			if (ipv6nd_rtpref(ra1->flags) <= ipv6nd_rtpref(ra2->flags))
 				continue;
 			/* All things being equal, prefer older routers. */
 			/* We don't need to check time, becase newer
@@ -827,6 +841,7 @@ ipv6nd_removefreedrop_ra(struct ra *rap, int remove_ra, int drop_ra)
 	if (remove_ra)
 		TAILQ_REMOVE(rap->iface->ctx->ra_routers, rap, next);
 	ipv6_freedrop_addrs(&rap->addrs, drop_ra, NULL);
+	routeinfohead_free(&rap->routeinfos);
 	free(rap->data);
 	free(rap);
 }
@@ -1105,6 +1120,8 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 	struct nd_opt_prefix_info pi;
 	struct nd_opt_mtu mtu;
 	struct nd_opt_rdnss rdnss;
+	struct nd_opt_ri ri;
+	struct routeinfo *routeinfo;
 	uint8_t *p;
 	struct ra *rap;
 	struct in6_addr pi_prefix;
@@ -1206,6 +1223,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 		rap->from = from->sin6_addr;
 		strlcpy(rap->sfrom, sfrom, sizeof(rap->sfrom));
 		TAILQ_INIT(&rap->addrs);
+		TAILQ_INIT(&rap->routeinfos);
 		new_rap = true;
 		rap->isreachable = true;
 	} else
@@ -1502,6 +1520,51 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 			    rdnss.nd_opt_rdnss_len > 1)
 				rap->hasdns = 1;
 			break;
+		case ND_OPT_RI:
+			if (ndo.nd_opt_len > 3) {
+				logmessage(loglevel, "%s: invalid route info option",
+				    ifp->name);
+				break;
+			}
+			memset(&ri, 0, sizeof(ri));
+			memcpy(&ri, p, olen); /* may be smaller than sizeof(ri), pad with zero */
+			if(ri.nd_opt_ri_prefixlen > 128) {
+				logmessage(loglevel, "%s: invalid route info prefix length",
+				    ifp->name);
+				break;
+			}
+
+			/* rfc4191 3.1 - RI for ::/0 applies to default route */
+			if(ri.nd_opt_ri_prefixlen == 0) {
+				rap->lifetime = ntohl(ri.nd_opt_ri_lifetime);
+
+				/* Update preference leaving other flags intact */
+				rap->flags = ((rap->flags & (~ (unsigned int)ND_RA_FLAG_RTPREF_MASK))
+					| ri.nd_opt_ri_flags_reserved) & 0xff;
+
+				break;
+			}
+
+			/* Update existing route info instead of rebuilding upon RA so that
+			previously announced but now absent routes can stay alive.  To kill a
+			route early, an RI with lifetime=0 needs to be received (rfc4191 3.1)*/
+			routeinfo = routeinfo_find(rap, &ri.nd_opt_ri_prefix, ri.nd_opt_ri_prefixlen);
+			if(routeinfo == NULL) {
+				/* add new route */
+				routeinfo = routeinfo_new(&ri.nd_opt_ri_prefix, ri.nd_opt_ri_prefixlen,
+				  ri.nd_opt_ri_flags_reserved,
+				  ntohl(ri.nd_opt_ri_lifetime));
+				if(routeinfo == NULL) {
+					break;
+				}
+				TAILQ_INSERT_TAIL(&rap->routeinfos, routeinfo, next);
+			} else {
+				/* Update the route info */
+				routeinfo->flags = ri.nd_opt_ri_flags_reserved;
+				routeinfo->lifetime = ntohl(ri.nd_opt_ri_lifetime);
+				routeinfo->acquired = rap->acquired;
+			}
+			break;
 		default:
 			continue;
 		}
@@ -1699,7 +1762,7 @@ ipv6nd_env(FILE *fp, const struct interface *ifp)
 			return -1;
 		if (efprintf(fp, "%s_hoplimit=%u", ndprefix, rap->hoplimit) == -1)
 			return -1;
-		pref = ipv6nd_rtpref(rap);
+		pref = ipv6nd_rtpref(rap->flags);
 		if (efprintf(fp, "%s_flags=%s%s%s%s%s", ndprefix,
 		    rap->flags & ND_RA_FLAG_MANAGED    ? "M" : "",
 		    rap->flags & ND_RA_FLAG_OTHER      ? "O" : "",
@@ -1804,6 +1867,7 @@ ipv6nd_expirera(void *arg)
 	uint32_t elapsed;
 	bool expired, valid;
 	struct ipv6_addr *ia;
+	struct routeinfo *routeinfo, *routeinfob;
 	size_t len, olen;
 	uint8_t *p;
 	struct nd_opt_hdr ndo;
@@ -1823,7 +1887,8 @@ ipv6nd_expirera(void *arg)
 		if (rap->iface != ifp || rap->expired)
 			continue;
 		valid = false;
-		if (rap->lifetime) {
+		/* lifetime may be set to infinite by rfc4191 route information */
+		if (rap->lifetime && rap->lifetime != ND6_INFINITE_LIFETIME) {
 			elapsed = (uint32_t)eloop_timespec_diff(&now,
 			    &rap->acquired, NULL);
 			if (elapsed >= rap->lifetime || rap->doexpire) {
@@ -1876,6 +1941,20 @@ ipv6nd_expirera(void *arg)
 				ltime = ia->prefix_vltime - elapsed;
 				if (next == 0 || ltime < next)
 					next = ltime;
+			}
+		}
+
+		/* Expire route information */
+		TAILQ_FOREACH_SAFE(routeinfo, &rap->routeinfos, next, routeinfob) {
+			if (routeinfo->lifetime == ND6_INFINITE_LIFETIME &&
+			    !rap->doexpire)
+				continue;
+			elapsed = (uint32_t)eloop_timespec_diff(&now,
+			    &routeinfo->acquired, NULL);
+			if (elapsed >= routeinfo->lifetime || rap->doexpire) {
+				logwarnx("%s: expired route %s",
+				    rap->iface->name, routeinfo->sprefix);
+				TAILQ_REMOVE(&rap->routeinfos, routeinfo, next);
 			}
 		}
 
@@ -2134,4 +2213,54 @@ ipv6nd_startrs(struct interface *ifp)
 	    ifp->name, (float)delay / MSEC_PER_SEC);
 	eloop_timeout_add_msec(ifp->ctx->eloop, delay, ipv6nd_startrs1, ifp);
 	return;
+}
+
+struct routeinfo *routeinfo_new(const struct in6_addr *prefix, uint8_t prefixlength, uint8_t flags, uint32_t lifetime)
+{
+	struct routeinfo *ri;
+	char buf[INET6_ADDRSTRLEN];
+	const char *p;
+
+	ri = calloc(1, sizeof(struct routeinfo));
+	if (ri == NULL)
+		return NULL;
+
+	memcpy(&ri->prefix, prefix, sizeof(ri->prefix));
+	ri->prefixlength = prefixlength;
+	ri->flags = flags;
+	ri->lifetime = lifetime;
+	clock_gettime(CLOCK_MONOTONIC, &ri->acquired);
+
+	p = inet_ntop(AF_INET6, prefix, buf, sizeof(buf));
+	if (p)
+		snprintf(ri->sprefix,
+			sizeof(ri->sprefix),
+			"%s/%d",
+			p, prefixlength);
+	else
+		ri->sprefix[0] = '\0';
+
+	return ri;
+}
+
+struct routeinfo *routeinfo_find(struct ra *rap, const struct in6_addr *prefix, uint8_t prefixlength)
+{
+	struct routeinfo *ri;
+
+	TAILQ_FOREACH(ri, &rap->routeinfos, next) {
+		if (ri->prefixlength == prefixlength &&
+		    IN6_ARE_ADDR_EQUAL(&ri->prefix, prefix))
+			return ri;
+	}
+	return NULL;
+}
+
+void routeinfohead_free(struct routeinfohead *head)
+{
+	struct routeinfo *ri;
+
+	while ((ri = TAILQ_FIRST(head))) {
+		TAILQ_REMOVE(head, ri, next);
+		free(ri);
+	}
 }
