@@ -300,7 +300,7 @@ sa_toprefix(const struct sockaddr *sa)
 	return prefix;
 }
 
-void
+static void
 ipbytes_fromprefix(uint8_t *ap, int prefix, int max_prefix)
 {
 	int bytes, bits, i;

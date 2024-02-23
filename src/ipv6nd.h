@@ -41,10 +41,10 @@
 struct routeinfo {
 	TAILQ_ENTRY(routeinfo) next;
 	struct in6_addr prefix;
+	uint8_t prefix_len;
 	uint32_t lifetime;
-	struct timespec acquired;
 	uint8_t flags;
-	uint8_t prefixlength;
+	struct timespec acquired;
 	char sprefix[INET6_ADDRSTRLEN];
 };
 
@@ -66,7 +66,7 @@ struct ra {
 	uint32_t mtu;
 	uint8_t hoplimit;
 	struct ipv6_addrhead addrs;
-	struct routeinfohead routeinfos;
+	struct routeinfohead rinfos;
 	bool hasdns;
 	bool expired;
 	bool willexpire;
@@ -142,9 +142,6 @@ void ipv6nd_advertise(struct ipv6_addr *);
 void ipv6nd_startexpire(struct interface *);
 void ipv6nd_drop(struct interface *);
 void ipv6nd_neighbour(struct dhcpcd_ctx *, struct in6_addr *, bool);
-struct routeinfo *routeinfo_new(const struct in6_addr *, uint8_t, uint8_t, uint32_t);
-struct routeinfo *routeinfo_find(struct ra *, const struct in6_addr *, uint8_t);
-void routeinfohead_free(struct routeinfohead *);
 #endif /* INET6 */
 
 #endif /* IPV6ND_H */

@@ -2318,7 +2318,7 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 {
 	struct rt *rt;
 	struct ra *rap;
-	const struct routeinfo *ri;
+	const struct routeinfo *rinfo;
 	const struct ipv6_addr *addr;
 	struct in6_addr netmask;
 
@@ -2330,19 +2330,19 @@ inet6_raroutes(rb_tree_t *routes, struct dhcpcd_ctx *ctx)
 			continue;
 
 		/* add rfc4191 route information routes */
-		TAILQ_FOREACH (ri, &rap->routeinfos, next) {
-			if(ri->lifetime == 0)
+		TAILQ_FOREACH (rinfo, &rap->rinfos, next) {
+			if(rinfo->lifetime == 0)
 				continue;
 			if ((rt = inet6_makeroute(rap->iface, rap)) == NULL)
 				continue;
 
-			in6_addr_fromprefix(&netmask, ri->prefixlength);
+			in6_addr_fromprefix(&netmask, rinfo->prefix_len);
 
-			sa_in6_init(&rt->rt_dest, &ri->prefix);
+			sa_in6_init(&rt->rt_dest, &rinfo->prefix);
 			sa_in6_init(&rt->rt_netmask, &netmask);
 			sa_in6_init(&rt->rt_gateway, &rap->from);
 #ifdef HAVE_ROUTE_PREF
-			rt->rt_pref = ipv6nd_rtpref(ri->flags);
+			rt->rt_pref = ipv6nd_rtpref(rinfo->flags);
 #endif
 
 			rt_proto_add(routes, rt);

@@ -67,7 +67,6 @@ bool sa_is_loopback(const struct sockaddr *);
 void *sa_toaddr(struct sockaddr *);
 int sa_toprefix(const struct sockaddr *);
 int sa_fromprefix(struct sockaddr *, int);
-void ipbytes_fromprefix(uint8_t *, int, int);
 void in6_addr_fromprefix(struct in6_addr *, int);
 const char *sa_addrtop(const struct sockaddr *, char *, socklen_t);
 int sa_cmp(const struct sockaddr *, const struct sockaddr *);

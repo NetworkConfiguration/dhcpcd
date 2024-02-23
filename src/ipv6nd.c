@@ -146,6 +146,9 @@ __CTASSERT(sizeof(struct nd_opt_dnssl) == 8);
 //
 
 static void ipv6nd_handledata(void *, unsigned short);
+static struct routeinfo *routeinfo_new(const struct in6_addr *, uint8_t, uint8_t, uint32_t, const struct timespec *);
+static struct routeinfo *routeinfo_find(struct ra *, const struct in6_addr *, uint8_t);
+static void routeinfohead_free(struct routeinfohead *);
 
 /*
  * Android ships buggy ICMP6 filter headers.
@@ -841,7 +844,7 @@ ipv6nd_removefreedrop_ra(struct ra *rap, int remove_ra, int drop_ra)
 	if (remove_ra)
 		TAILQ_REMOVE(rap->iface->ctx->ra_routers, rap, next);
 	ipv6_freedrop_addrs(&rap->addrs, drop_ra, NULL);
-	routeinfohead_free(&rap->routeinfos);
+	routeinfohead_free(&rap->rinfos);
 	free(rap->data);
 	free(rap);
 }
@@ -1121,7 +1124,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 	struct nd_opt_mtu mtu;
 	struct nd_opt_rdnss rdnss;
 	struct nd_opt_ri ri;
-	struct routeinfo *routeinfo;
+	struct routeinfo *rinfo;
 	uint8_t *p;
 	struct ra *rap;
 	struct in6_addr pi_prefix;
@@ -1223,7 +1226,7 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 		rap->from = from->sin6_addr;
 		strlcpy(rap->sfrom, sfrom, sizeof(rap->sfrom));
 		TAILQ_INIT(&rap->addrs);
-		TAILQ_INIT(&rap->routeinfos);
+		TAILQ_INIT(&rap->rinfos);
 		new_rap = true;
 		rap->isreachable = true;
 	} else
@@ -1255,9 +1258,6 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 	rap->flags = nd_ra->nd_ra_flags_reserved;
 	old_lifetime = rap->lifetime;
 	rap->lifetime = ntohs(nd_ra->nd_ra_router_lifetime);
-	if (!new_rap && rap->lifetime == 0 && old_lifetime != 0)
-		logwarnx("%s: %s: no longer a default router (lifetime = 0)",
-		    ifp->name, rap->sfrom);
 	if (nd_ra->nd_ra_curhoplimit != 0)
 		rap->hoplimit = nd_ra->nd_ra_curhoplimit;
 	else
@@ -1548,21 +1548,22 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 			/* Update existing route info instead of rebuilding upon RA so that
 			previously announced but now absent routes can stay alive.  To kill a
 			route early, an RI with lifetime=0 needs to be received (rfc4191 3.1)*/
-			routeinfo = routeinfo_find(rap, &ri.nd_opt_ri_prefix, ri.nd_opt_ri_prefixlen);
-			if(routeinfo == NULL) {
+			rinfo = routeinfo_find(rap, &ri.nd_opt_ri_prefix, ri.nd_opt_ri_prefixlen);
+			if(rinfo == NULL) {
 				/* add new route */
-				routeinfo = routeinfo_new(&ri.nd_opt_ri_prefix, ri.nd_opt_ri_prefixlen,
+				rinfo = routeinfo_new(&ri.nd_opt_ri_prefix, ri.nd_opt_ri_prefixlen,
 				  ri.nd_opt_ri_flags_reserved,
-				  ntohl(ri.nd_opt_ri_lifetime));
-				if(routeinfo == NULL) {
+				  ntohl(ri.nd_opt_ri_lifetime),
+					&rap->acquired
+				);
+				if(rinfo == NULL)
 					break;
-				}
-				TAILQ_INSERT_TAIL(&rap->routeinfos, routeinfo, next);
+				TAILQ_INSERT_TAIL(&rap->rinfos, rinfo, next);
 			} else {
 				/* Update the route info */
-				routeinfo->flags = ri.nd_opt_ri_flags_reserved;
-				routeinfo->lifetime = ntohl(ri.nd_opt_ri_lifetime);
-				routeinfo->acquired = rap->acquired;
+				rinfo->flags = ri.nd_opt_ri_flags_reserved;
+				rinfo->lifetime = ntohl(ri.nd_opt_ri_lifetime);
+				rinfo->acquired = rap->acquired;
 			}
 			break;
 		default:
@@ -1599,6 +1600,10 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 		 * try and prefer other addresses. */
 		ia->prefix_pltime = 0;
 	}
+
+	if (!new_rap && rap->lifetime == 0 && old_lifetime != 0)
+		logwarnx("%s: %s: no longer a default router (lifetime = 0)",
+		    ifp->name, rap->sfrom);
 
 	if (new_data && !has_address && rap->lifetime && !ipv6_anyglobal(ifp))
 		logwarnx("%s: no global addresses for default route",
@@ -1867,7 +1872,7 @@ ipv6nd_expirera(void *arg)
 	uint32_t elapsed;
 	bool expired, valid;
 	struct ipv6_addr *ia;
-	struct routeinfo *routeinfo, *routeinfob;
+	struct routeinfo *rinfo, *rinfob;
 	size_t len, olen;
 	uint8_t *p;
 	struct nd_opt_hdr ndo;
@@ -1945,16 +1950,16 @@ ipv6nd_expirera(void *arg)
 		}
 
 		/* Expire route information */
-		TAILQ_FOREACH_SAFE(routeinfo, &rap->routeinfos, next, routeinfob) {
-			if (routeinfo->lifetime == ND6_INFINITE_LIFETIME &&
+		TAILQ_FOREACH_SAFE(rinfo, &rap->rinfos, next, rinfob) {
+			if (rinfo->lifetime == ND6_INFINITE_LIFETIME &&
 			    !rap->doexpire)
 				continue;
 			elapsed = (uint32_t)eloop_timespec_diff(&now,
-			    &routeinfo->acquired, NULL);
-			if (elapsed >= routeinfo->lifetime || rap->doexpire) {
+			    &rinfo->acquired, NULL);
+			if (elapsed >= rinfo->lifetime || rap->doexpire) {
 				logwarnx("%s: expired route %s",
-				    rap->iface->name, routeinfo->sprefix);
-				TAILQ_REMOVE(&rap->routeinfos, routeinfo, next);
+				    rap->iface->name, rinfo->sprefix);
+				TAILQ_REMOVE(&rap->rinfos, rinfo, next);
 			}
 		}
 
@@ -2215,47 +2220,48 @@ ipv6nd_startrs(struct interface *ifp)
 	return;
 }
 
-struct routeinfo *routeinfo_new(const struct in6_addr *prefix, uint8_t prefixlength, uint8_t flags, uint32_t lifetime)
+static struct routeinfo *routeinfo_new(const struct in6_addr *prefix,
+  uint8_t prefix_len, uint8_t flags, uint32_t lifetime, const struct timespec *acquired)
 {
 	struct routeinfo *ri;
 	char buf[INET6_ADDRSTRLEN];
 	const char *p;
 
-	ri = calloc(1, sizeof(struct routeinfo));
+	ri = malloc(sizeof(struct routeinfo));
 	if (ri == NULL)
 		return NULL;
 
 	memcpy(&ri->prefix, prefix, sizeof(ri->prefix));
-	ri->prefixlength = prefixlength;
+	ri->prefix_len = prefix_len;
 	ri->flags = flags;
 	ri->lifetime = lifetime;
-	clock_gettime(CLOCK_MONOTONIC, &ri->acquired);
+	ri->acquired = *acquired;
 
 	p = inet_ntop(AF_INET6, prefix, buf, sizeof(buf));
 	if (p)
 		snprintf(ri->sprefix,
 			sizeof(ri->sprefix),
 			"%s/%d",
-			p, prefixlength);
+			p, prefix_len);
 	else
 		ri->sprefix[0] = '\0';
 
 	return ri;
 }
 
-struct routeinfo *routeinfo_find(struct ra *rap, const struct in6_addr *prefix, uint8_t prefixlength)
+static struct routeinfo *routeinfo_find(struct ra *rap, const struct in6_addr *prefix, uint8_t prefix_len)
 {
 	struct routeinfo *ri;
 
-	TAILQ_FOREACH(ri, &rap->routeinfos, next) {
-		if (ri->prefixlength == prefixlength &&
+	TAILQ_FOREACH(ri, &rap->rinfos, next) {
+		if (ri->prefix_len == prefix_len &&
 		    IN6_ARE_ADDR_EQUAL(&ri->prefix, prefix))
 			return ri;
 	}
 	return NULL;
 }
 
-void routeinfohead_free(struct routeinfohead *head)
+static void routeinfohead_free(struct routeinfohead *head)
 {
 	struct routeinfo *ri;
 
