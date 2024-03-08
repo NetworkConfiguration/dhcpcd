@@ -146,8 +146,7 @@ __CTASSERT(sizeof(struct nd_opt_dnssl) == 8);
 //
 
 static void ipv6nd_handledata(void *, unsigned short);
-static struct routeinfo *routeinfo_new(const struct in6_addr *, uint8_t, uint8_t, uint32_t, const struct timespec *);
-static struct routeinfo *routeinfo_find(struct ra *, const struct in6_addr *, uint8_t);
+static struct routeinfo *routeinfo_findalloc(struct ra *, const struct in6_addr *, uint8_t);
 static void routeinfohead_free(struct routeinfohead *);
 
 /*
@@ -1545,26 +1544,20 @@ ipv6nd_handlera(struct dhcpcd_ctx *ctx,
 				break;
 			}
 
-			/* Update existing route info instead of rebuilding upon RA so that
+			/* Update existing route info instead of rebuilding all routes so that
 			previously announced but now absent routes can stay alive.  To kill a
 			route early, an RI with lifetime=0 needs to be received (rfc4191 3.1)*/
-			rinfo = routeinfo_find(rap, &ri.nd_opt_ri_prefix, ri.nd_opt_ri_prefixlen);
+			rinfo = routeinfo_findalloc(rap, &ri.nd_opt_ri_prefix, ri.nd_opt_ri_prefixlen);
 			if(rinfo == NULL) {
-				/* add new route */
-				rinfo = routeinfo_new(&ri.nd_opt_ri_prefix, ri.nd_opt_ri_prefixlen,
-				  ri.nd_opt_ri_flags_reserved,
-				  ntohl(ri.nd_opt_ri_lifetime),
-					&rap->acquired
-				);
-				if(rinfo == NULL)
-					break;
-				TAILQ_INSERT_TAIL(&rap->rinfos, rinfo, next);
-			} else {
-				/* Update the route info */
-				rinfo->flags = ri.nd_opt_ri_flags_reserved;
-				rinfo->lifetime = ntohl(ri.nd_opt_ri_lifetime);
-				rinfo->acquired = rap->acquired;
+				logerr(__func__);
+				break;
 			}
+
+			/* Update/initialize other route info params */
+			rinfo->flags = ri.nd_opt_ri_flags_reserved;
+			rinfo->lifetime = ntohl(ri.nd_opt_ri_lifetime);
+			rinfo->acquired = rap->acquired;
+
 			break;
 		default:
 			continue;
@@ -2220,12 +2213,17 @@ ipv6nd_startrs(struct interface *ifp)
 	return;
 }
 
-static struct routeinfo *routeinfo_new(const struct in6_addr *prefix,
-  uint8_t prefix_len, uint8_t flags, uint32_t lifetime, const struct timespec *acquired)
+static struct routeinfo *routeinfo_findalloc(struct ra *rap, const struct in6_addr *prefix, uint8_t prefix_len)
 {
 	struct routeinfo *ri;
 	char buf[INET6_ADDRSTRLEN];
 	const char *p;
+
+	TAILQ_FOREACH(ri, &rap->rinfos, next) {
+		if (ri->prefix_len == prefix_len &&
+		    IN6_ARE_ADDR_EQUAL(&ri->prefix, prefix))
+			return ri;
+	}
 
 	ri = malloc(sizeof(struct routeinfo));
 	if (ri == NULL)
@@ -2233,10 +2231,6 @@ static struct routeinfo *routeinfo_new(const struct in6_addr *prefix,
 
 	memcpy(&ri->prefix, prefix, sizeof(ri->prefix));
 	ri->prefix_len = prefix_len;
-	ri->flags = flags;
-	ri->lifetime = lifetime;
-	ri->acquired = *acquired;
-
 	p = inet_ntop(AF_INET6, prefix, buf, sizeof(buf));
 	if (p)
 		snprintf(ri->sprefix,
@@ -2245,20 +2239,8 @@ static struct routeinfo *routeinfo_new(const struct in6_addr *prefix,
 			p, prefix_len);
 	else
 		ri->sprefix[0] = '\0';
-
+	TAILQ_INSERT_TAIL(&rap->rinfos, ri, next);
 	return ri;
-}
-
-static struct routeinfo *routeinfo_find(struct ra *rap, const struct in6_addr *prefix, uint8_t prefix_len)
-{
-	struct routeinfo *ri;
-
-	TAILQ_FOREACH(ri, &rap->rinfos, next) {
-		if (ri->prefix_len == prefix_len &&
-		    IN6_ARE_ADDR_EQUAL(&ri->prefix, prefix))
-			return ri;
-	}
-	return NULL;
 }
 
 static void routeinfohead_free(struct routeinfohead *head)
