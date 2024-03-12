@@ -3207,8 +3207,8 @@ dhcp_handledhcp(struct interface *ifp, struct bootp *bootp, size_t bootp_len,
 
 	if (has_option_mask(ifo->requestmask, DHO_IPV6_PREFERRED_ONLY)) {
 		if (get_option_uint32(ifp->ctx, &v6only_time, bootp, bootp_len,
-		    DHO_IPV6_PREFERRED_ONLY) == 0 &&
-		    (state->state == DHS_DISCOVER || state->state == DHS_REBOOT))
+		    DHO_IPV6_PREFERRED_ONLY) == 0 && (state->state == DHS_DISCOVER ||
+		    state->state == DHS_REBOOT || state->state == DHS_NONE))
 		{
 			char v6msg[128];
 
