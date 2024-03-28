@@ -4254,6 +4254,7 @@ dhcp6_env(FILE *fp, const char *prefix, const struct interface *ifp,
 #ifndef SMALL
 	const struct dhcp6_state *state;
 	const struct ipv6_addr *ap;
+	bool first;
 #endif
 
 	if (m == NULL)
@@ -4355,10 +4356,13 @@ delegated:
 		return 1;
 	if (fprintf(fp, "%s_delegated_dhcp6_prefix=", prefix) == -1)
 		return -1;
+	first = true;
 	TAILQ_FOREACH(ap, &state->addrs, next) {
 		if (ap->delegating_prefix == NULL)
 			continue;
-		if (ap != TAILQ_FIRST(&state->addrs)) {
+		if (first)
+			first = false;
+		else {
 			if (fputc(' ', fp) == EOF)
 				return -1;
 		}
