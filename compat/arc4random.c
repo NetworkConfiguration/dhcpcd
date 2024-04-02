@@ -78,7 +78,14 @@ static int _dhcpcd_rand_fd = -1;	/* /dev/urandom fd */
 
 static int _dhcpcd_getentropy(void *, size_t);
 static inline int _rs_allocate(struct _rs **, struct _rsx **);
+
+/* dhcpcd needs to hold onto the fd at fork due to privsep */
+#if 0
 static inline void _rs_forkdetect(void);
+#else
+#define _rs_forkdetect()
+#define _rs_forkhandler()
+#endif
 
 /* Inline "arc4random.h" */
 #include <sys/types.h>
@@ -89,7 +96,6 @@ static inline void _rs_rekey(u_char *dat, size_t datlen);
 /* dhcpcd isn't multithreaded */
 #define _ARC4_LOCK()
 #define _ARC4_UNLOCK()
-#define _ARC4_ATFORK(f)
 
 static int
 _dhcpcd_getentropy(void *buf, size_t length)
@@ -126,6 +132,7 @@ _getentropy_fail(void)
 	raise(SIGKILL);
 }
 
+#if 0
 static volatile sig_atomic_t _rs_forked;
 
 static inline void
@@ -148,6 +155,7 @@ _rs_forkdetect(void)
 			memset(rs, 0, sizeof(*rs));
 	}
 }
+#endif
 
 static inline int
 _rs_allocate(struct _rs **rsp, struct _rsx **rsxp)
@@ -163,7 +171,7 @@ _rs_allocate(struct _rs **rsp, struct _rsx **rsxp)
 		return (-1);
 	}
 
-	_ARC4_ATFORK(_rs_forkhandler);
+	_rs_forkhandler();
 	return (0);
 }
 
