@@ -2154,17 +2154,16 @@ if_setup_inet6(const struct interface *ifp)
 	int ra;
 	char path[256];
 
-	/* The kernel cannot make stable private addresses.
+	/* Modern linux kernels can make a stable private address.
 	 * However, a lot of distros ship newer kernel headers than
-	 * the kernel itself so sweep that error under the table. */
+	 * the kernel itself so we sweep that error under the table
+	 * from old kernels and just make them ourself regardless. */
 	if (if_disable_autolinklocal(ctx, ifp->index) == -1 &&
 	    errno != ENODEV && errno != ENOTSUP && errno != EINVAL)
 		logdebug("%s: if_disable_autolinklocal", ifp->name);
 
-	/*
-	 * If not doing autoconf, don't disable the kernel from doing it.
-	 * If we need to, we should have another option actively disable it.
-	 */
+	/* If not doing autoconf, don't disable the kernel from doing it.
+	 * If we need to, we should have another option actively disable it. */
 	if (!(ifp->options->options & DHCPCD_IPV6RS))
 		return;
 
