@@ -3965,20 +3965,16 @@ dhcp6_start(struct interface *ifp, enum DH6S init_state)
 		case DH6S_INIT:
 			goto gogogo;
 		case DH6S_INFORM:
+			/* RFC 8415 21.23
+			 * If D6_OPTION_INFO_REFRESH_TIME does not exist
+			 * then we MUST refresh by IRT_DEFAULT seconds
+			 * and should not be influenced by only the
+			 * pl/vl time of the RA changing. */
 			if (state->state == DH6S_INIT ||
-			    state->state == DH6S_INFORMED ||
 			    (state->state == DH6S_DISCOVER &&
 			    !(ifp->options->options & DHCPCD_IA_FORCED) &&
 			    !ipv6nd_hasradhcp(ifp, true)))
-			{
-				/* We don't want log spam when the RA
-				 * has just adjusted it's prefix times. */
-				if (state->state != DH6S_INFORMED) {
-					state->new_start = true;
-					state->failed = false;
-				}
 				dhcp6_startinform(ifp);
-			}
 			break;
 		case DH6S_REQUEST:
 			if (ifp->options->options & DHCPCD_DHCP6 &&
