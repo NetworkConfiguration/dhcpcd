@@ -3791,7 +3791,7 @@ dhcp6_openraw(void)
 {
 	int fd, v;
 
-	fd = socket(PF_INET6, SOCK_RAW | SOCK_CXNB, IPPROTO_UDP);
+	fd = xsocket(PF_INET6, SOCK_RAW | SOCK_CXNB, IPPROTO_UDP);
 	if (fd == -1)
 		return -1;
 

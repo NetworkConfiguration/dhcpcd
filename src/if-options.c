@@ -2465,7 +2465,7 @@ read_config(struct dhcpcd_ctx *ctx,
 		default_options |= DHCPCD_CONFIGURE | DHCPCD_DAEMONISE |
 		    DHCPCD_GATEWAY;
 #ifdef INET
-		skip = socket(PF_INET, SOCK_DGRAM, 0);
+		skip = xsocket(PF_INET, SOCK_DGRAM, 0);
 		if (skip != -1) {
 			close(skip);
 			default_options |= DHCPCD_IPV4 | DHCPCD_ARP |
@@ -2473,7 +2473,7 @@ read_config(struct dhcpcd_ctx *ctx,
 		}
 #endif
 #ifdef INET6
-		skip = socket(PF_INET6, SOCK_DGRAM, 0);
+		skip = xsocket(PF_INET6, SOCK_DGRAM, 0);
 		if (skip != -1) {
 			close(skip);
 			default_options |= DHCPCD_IPV6 | DHCPCD_IPV6RS |

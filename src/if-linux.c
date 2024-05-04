@@ -500,15 +500,22 @@ setup_priv:
 void
 if_closesockets_os(struct dhcpcd_ctx *ctx)
 {
-	struct priv *priv;
+	struct priv *priv = ctx->priv;
 
-	if (ctx->priv != NULL) {
-		priv = (struct priv *)ctx->priv;
-		if (priv->route_fd != -1)
-			close(priv->route_fd);
-		if (priv->generic_fd != -1)
-			close(priv->generic_fd);
+	if (priv == NULL)
+		return;
+
+	if (priv->route_fd != -1) {
+		close(priv->route_fd);
+		priv->route_fd = -1;
 	}
+	if (priv->generic_fd != -1) {
+		close(priv->generic_fd);
+		priv->generic_fd = -1;
+	}
+
+	free(priv);
+	ctx->priv = NULL;
 }
 
 int

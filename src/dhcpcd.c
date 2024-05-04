@@ -1981,6 +1981,7 @@ main(int argc, char **argv, char **envp)
 	}
 
 	memset(&ctx, 0, sizeof(ctx));
+	closefrom(STDERR_FILENO + 1);
 
 	ifo = NULL;
 	ctx.cffile = CONFIG;
@@ -2010,7 +2011,7 @@ main(int argc, char **argv, char **envp)
 	ctx.dhcp6_wfd = -1;
 #endif
 #ifdef PRIVSEP
-	ctx.ps_log_fd = -1;
+	ctx.ps_log_fd = ctx.ps_log_root_fd = -1;
 	TAILQ_INIT(&ctx.ps_processes);
 #endif
 
@@ -2461,9 +2462,14 @@ printpidfile:
 		goto run_loop;
 	}
 
+#ifdef DEBUG_FD
+	loginfox("forkfd %d", ctx.fork_fd);
+#endif
+
 	/* We have now forked, setsid, forked once more.
 	 * From this point on, we are the controlling daemon. */
 	logdebugx("spawned manager process on PID %d", getpid());
+
 start_manager:
 	ctx.options |= DHCPCD_STARTED;
 	if ((pid = pidfile_lock(ctx.pidfile)) != 0) {
@@ -2681,10 +2687,6 @@ exit1:
 	free(ctx.script_env);
 	rt_dispose(&ctx);
 	free(ctx.duid);
-	if (ctx.link_fd != -1) {
-		eloop_event_delete(ctx.eloop, ctx.link_fd);
-		close(ctx.link_fd);
-	}
 	if_closesockets(&ctx);
 	free_globals(&ctx);
 #ifdef INET6
