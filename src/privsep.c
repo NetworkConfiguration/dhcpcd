@@ -1131,7 +1131,7 @@ ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd, unsigned short events,
 
 	len = read(fd, &psm, sizeof(psm));
 #ifdef PRIVSEP_DEBUG
-	logdebugx("%s: %zd", __func__, len);
+	logdebugx("%s: fd=%d %zd", __func__, fd, len);
 #endif
 
 	if (len == -1 || len == 0)
