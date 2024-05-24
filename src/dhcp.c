@@ -1877,13 +1877,13 @@ dhcp_discover(void *arg)
 	dhcp_new_xid(ifp);
 	eloop_timeout_delete(ifp->ctx->eloop, NULL, ifp);
 	if (!(state->added & STATE_EXPIRED)) {
-		if (ifo->fallback)
+		if (ifo->fallback && ifo->fallback_time)
 			eloop_timeout_add_sec(ifp->ctx->eloop,
-			    ifo->reboot, dhcp_fallback, ifp);
+			    ifo->fallback_time, dhcp_fallback, ifp);
 #ifdef IPV4LL
 		else if (ifo->options & DHCPCD_IPV4LL)
 			eloop_timeout_add_sec(ifp->ctx->eloop,
-			    ifo->reboot, ipv4ll_start, ifp);
+			    ifo->ipv4ll_time, ipv4ll_start, ifp);
 #endif
 	}
 	if (ifo->options & DHCPCD_REQUEST)
@@ -1914,11 +1914,13 @@ dhcp_request(void *arg)
 {
 	struct interface *ifp = arg;
 	struct dhcp_state *state = D_STATE(ifp);
+	struct if_options *ifo = ifp->options;
 
 	state->state = DHS_REQUEST;
 	// Handle the server being silent to our request.
-	eloop_timeout_add_sec(ifp->ctx->eloop, ifp->options->reboot,
-	    dhcp_requestfailed, ifp);
+	if (ifo->request_time != 0)
+		eloop_timeout_add_sec(ifp->ctx->eloop, ifo->request_time,
+		    dhcp_requestfailed, ifp);
 	send_request(ifp);
 }
 
@@ -2748,7 +2750,7 @@ dhcp_reboot(struct interface *ifp)
 	/* Need to add this before dhcp_expire and friends. */
 	if (!ifo->fallback && ifo->options & DHCPCD_IPV4LL)
 		eloop_timeout_add_sec(ifp->ctx->eloop,
-		    ifo->reboot, ipv4ll_start, ifp);
+		    ifo->ipv4ll_time, ipv4ll_start, ifp);
 #endif
 
 	if (ifo->options & DHCPCD_LASTLEASE && state->lease.frominfo)
