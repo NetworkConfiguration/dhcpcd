@@ -816,7 +816,8 @@ if [ -z "$CLOSEFROM" ]; then
 	cat <<EOF >_closefrom.c
 #include <unistd.h>
 int main(void) {
-	return closefrom(3);
+	closefrom(3);
+	return 0;
 }
 EOF
 	if $XCC _closefrom.c -o _closefrom 2>&3; then
